@@ -1,0 +1,14 @@
+promote at 2026-10-31T08:05:43Z
+release: PROMOTED ad245d602f6f-m0M8pf121326vNSo2B759; previous 61a95f7397da-JYIBkYn8ynPgYMn1e5nK-. The running service is unchanged until it restarts.
+release: next: sudo systemctl restart afldb
+release: then: node deploy/release.mjs status --expect ad245d602f6f-m0M8pf121326vNSo2B759
+release: the database is not rolled back: migrations are forward-only (docs/deployment.md §11, including the ISSUE-257 guard); check a release older than an applied migration against it before the restart
+promote exit 0
+  total 12
+  drwxrwxr-x 5 arm arm 4096 Oct 31 19:00 builds
+  lrwxrwxrwx 1 arm arm   43 Oct 31 19:05 current -> releases/ad245d602f6f-m0M8pf121326vNSo2B759
+  -rw-rw-r-- 1 arm arm 2006 Oct 31 19:05 events.log
+  lrwxrwxrwx 1 arm arm   43 Oct 31 19:05 previous -> releases/61a95f7397da-JYIBkYn8ynPgYMn1e5nK-
+  drwxrwxr-x 5 arm arm 4096 Oct 31 19:05 releases
+  MainPID=3187278
+  ActiveEnterTimestamp=Sat 2026-10-31 18:02:55 AEDT

@@ -1,0 +1,27 @@
+waited until 2026-10-31T08:05:26Z
+no server running on /tmp/tmux-1000/default
+D2 start 2026-10-31T08:00:59Z HEAD 65c02ecc29f93cec8410e01c91f4fc293002b774 node v22.23.2
+release: admission: MemAvailable 2858 MB of 3915 MB, swap 0 MB, free disk 54.4 GB
+release: workspace /home/arm/afldb-releases/builds/20261031T080059Z-ad245d602f6f-d2fffb
+release: npm ci: 17 s, min MemAvailable 1913 MB, peak RSS 955 MB
+release: build: 227 s, min MemAvailable 1274 MB, peak RSS 1721 MB
+release: candidate ad245d602f6f-m0M8pf121326vNSo2B759 passed V1-V5; boot smoke on 127.0.0.1:3199
+release: smoke: health ok, _buildManifest.js 200, /_next/static/css/cb39c2e05a6b8ca6.css 200, pages {"/":"200 HIT","/players":"200","/clubs":"200","/seasons":"200"} (beta claim)
+release: RELEASE READY ad245d602f6f-m0M8pf121326vNSo2B759 (12995 files, manifest 9a0bdd6d9185…) at /home/arm/afldb-releases/releases/ad245d602f6f-m0M8pf121326vNSo2B759
+release: next: node deploy/release.mjs promote ad245d602f6f-m0M8pf121326vNSo2B759
+D2 EXIT 0 at 2026-10-31T08:05:24Z
+MemAvailable 2854 MB
+live health 200
+/home/arm/afldb-releases:
+total 12
+drwxrwxr-x 5 arm arm 4096 Oct 31 19:00 builds
+lrwxrwxrwx 1 arm arm   43 Oct 31 17:52 current -> releases/61a95f7397da-JYIBkYn8ynPgYMn1e5nK-
+-rw-rw-r-- 1 arm arm 1867 Oct 31 19:05 events.log
+lrwxrwxrwx 1 arm arm   43 Oct 31 17:52 previous -> releases/9ed9c9dd3e84-QNEHXAtU53TzUjj0Mb7mv
+drwxrwxr-x 5 arm arm 4096 Oct 31 19:05 releases
+
+/home/arm/afldb-releases/releases:
+total 12
+drwxrwxr-x 4 arm arm 4096 Oct 31 17:52 61a95f7397da-JYIBkYn8ynPgYMn1e5nK-
+drwxrwxr-x 4 arm arm 4096 Oct 31 15:57 9ed9c9dd3e84-QNEHXAtU53TzUjj0Mb7mv
+drwxrwxr-x 4 arm arm 4096 Oct 31 19:05 ad245d602f6f-m0M8pf121326vNSo2B759

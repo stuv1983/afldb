@@ -1,0 +1,16 @@
+﻿[2026-10-31T08:07:15.481Z] READY: the browser shows the sign-in page. Sign in (any role). Waiting up to 15 minutes.
+[2026-10-31T08:11:28.137Z] visible role: Super Admin
+[2026-10-31T08:11:32.549Z] PASS desktop players-page-authenticated {"url":"https://beta.afldb.com/players?sort=games","h1":"Players"}
+[2026-10-31T08:11:32.553Z] PASS desktop first-row-leader {"first":{"name":"Scott Pendlebury","games":442},"expected":{"name":"Scott Pendlebury","games":442},"rowCount":50,"gamesColumn":3}
+[2026-10-31T08:11:32.553Z] PASS desktop page-1-descending {"first5":[{"name":"Scott Pendlebury","games":442},{"name":"Brent Harvey","games":432},{"name":"Michael Tuck","games":426},{"name":"Shaun Burgoyne","games":407},{"name":"Kevin Bartlett","games":403}],"last":{"name":"Jason Akermanis","games":325}}
+[2026-10-31T08:11:32.553Z] PASS desktop no-careerless-players {"found":[]}
+[2026-10-31T08:11:32.553Z] PASS desktop no-zero-game-rows {"zeroRows":[]}
+[2026-10-31T08:11:32.555Z] PASS desktop no-overflow {"viewport":"1440x900","scrollWidth":1425,"innerWidth":1440}
+[2026-10-31T08:11:32.555Z] PASS desktop static-and-console {"staticSeen":12,"badStatic":[],"consoleErrors":[]}
+[2026-10-31T08:11:37.012Z] PASS mobile first-row-leader {"first":{"name":"Scott Pendlebury","games":442},"expected":{"name":"Scott Pendlebury","games":442},"rowCount":50,"gamesColumn":3}
+[2026-10-31T08:11:37.012Z] PASS mobile page-1-descending {"first5":[{"name":"Scott Pendlebury","games":442},{"name":"Brent Harvey","games":432},{"name":"Michael Tuck","games":426},{"name":"Shaun Burgoyne","games":407},{"name":"Kevin Bartlett","games":403}],"last":{"name":"Jason Akermanis","games":325}}
+[2026-10-31T08:11:37.012Z] PASS mobile no-careerless-players {"found":[]}
+[2026-10-31T08:11:37.012Z] PASS mobile no-zero-game-rows {"zeroRows":[]}
+[2026-10-31T08:11:37.014Z] PASS mobile no-overflow {"viewport":"390x844","scrollWidth":375,"innerWidth":390}
+[2026-10-31T08:11:37.014Z] PASS mobile static-and-console {"staticSeen":11,"badStatic":[],"consoleErrors":[]}
+[2026-10-31T08:11:37.118Z] VERDICT PASS (13/13)

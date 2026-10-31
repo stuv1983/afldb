@@ -1,9 +1,10 @@
 # AFLDB-ISSUE-330 — release candidate and deployment package
 
-Status: **candidate ready locally; NOT pushed, NOT deployed.** Push, `main` advancement and the
-production deployment each need the owner's explicit approval. Production is unchanged: it serves
-`61a95f7397da-JYIBkYn8ynPgYMn1e5nK-` (revision `61a95f7397dacc49fe919ca99cffa00379d612bf`) through the
-ISSUE-329 release route, with `9ed9c9dd3e84-QNEHXAtU53TzUjj0Mb7mv` retained as previous.
+Status: **RESOLVED 2026-10-31: deployed and live-accepted** under the owner's approval of §4 (§5).
+Production serves `ad245d602f6f-m0M8pf121326vNSo2B759` (revision `ad245d602f6f0776c1fd86b66fef4f177fe63276`,
+`BUILD_ID` `m0M8pf121326vNSo2B759`) through the ISSUE-329 release route. `61a95f7397da-JYIBkYn8ynPgYMn1e5nK-`
+is retained as `previous`, the rollback target, and `9ed9c9dd3e84-QNEHXAtU53TzUjj0Mb7mv` stays retained.
+§1–§4 are kept as approved; links in them that name `issues/open/` now resolve under `issues/closed/`.
 
 ## 1. Candidate
 
@@ -127,3 +128,32 @@ checkout; any migration in the diff; insufficient memory or disk; any `REFUSED`;
 **Retention.** Nothing is deleted: both earlier releases (`9ed9c9dd…` and `61a95f73…`), the checkout's
 in-place bundle, manifests, backups and build logs stay. Backup retention review: no earlier than
 2026-11-30.
+
+## 5. Production deployment and live acceptance (2026-10-31)
+
+Window: T0 **18:59:49 AEDT (07:59:49Z)**, promotion cut-off T0+20, hard end T0+45 (19:44:49 AEDT). Promotion
+began at T0+6; acceptance passed at T0+12. Evidence: [`AFLDB-ISSUE-330-evidence/live/`](AFLDB-ISSUE-330-evidence/live/)
+(host scripts under `scripts/`; console captures had their UTF-8 `…`/`§` mis-decoding by the Windows console
+repaired, nothing else changed).
+
+| Step | Result |
+|---|---|
+| Identities | `ad245d60` and package tip `65c02ecc` (child of `ad245d60`) verified; their difference is `issues/` and Markdown only; no migrations from `61a95f73` |
+| D0 | `origin/main` read `61a95f73`; atomic fast-forward push, no force: `main` and `codex/issue329-release` `61a95f73..65c02ecc`; both read back `65c02ecc` |
+| D1 | checkout `61a95f73` → `65c02ecc` by `git merge --ff-only`, porcelain 0; `STATUS PASS 61a95f7397da-JYIBkYn8ynPgYMn1e5nK-`; drop-in active, serving `current`; no lock; port 3199 free; rollback target has its `status-pass`; MemAvailable **2,866 MB** (floor 2,100), free disk **55 GB** (floor 6) |
+| D2 | in `tmux`, `build --revision ad245d60… --afldb-env production --typecheck off-host` with the recorded evidence: `npm ci` 17 s; `next build` 227 s, min MemAvailable 1,274 MB, peak RSS 1,721 MB; V1–V5 passed; boot smoke health ok, `_buildManifest.js` 200, CSS 200, `/` `/players` `/clubs` `/seasons` 200 (beta claim); **`RELEASE READY ad245d602f6f-m0M8pf121326vNSo2B759`** (12,995 files, manifest `9a0bdd6d…`). Live health 200 throughout |
+| D3 | promote 08:05:43Z (`previous` → `61a95f7397da-JYIBkYn8ynPgYMn1e5nK-`); owner `sudo systemctl restart afldb`, active 19:06:29 AEDT, `NRestarts=0`; **`STATUS PASS`**; **`POST-INSTALL CHECK PASS`** with the previous `JYIBkYn8ynPgYMn1e5nK-` 404 at the origin on loopback and cache-busted (`BYPASS`), its plain public URL reported as one `CACHE` line (old Cloudflare HIT), 8/8 assets byte-identical, email-intake 410, 0 journal error lines; journal `serving build m0M8pf121326vNSo2B759 release ad245d602f6f-m0M8pf121326vNSo2B759 revision ad245d60…` |
+| D4 | [`live-accept-330.mjs`](AFLDB-ISSUE-330-evidence/live-accept-330.mjs), headed Chromium, owner sign-in (visible role Super Admin): **PASS 13/13**. Desktop 1440×900 and mobile 390×844: row 1 Scott Pendlebury 442; page 1 descends 442 → 325 (50 rows); Riley Onley and Fred Rodriguez absent; no 0-game row; no document overflow; 12 and 11 static assets, 0 bad, 0 console errors. Screenshots inspected: the consent banner sits mid-capture because it is fixed-position in a full-page screenshot |
+| D5 | not used |
+
+**Checkout vs running build.** The serving checkout is at `65c02ecc29f93cec8410e01c91f4fc293002b774` (the package
+tip, documentation-only over the build revision). The running release is `ad245d602f6f-m0M8pf121326vNSo2B759`, built
+from revision `ad245d602f6f0776c1fd86b66fef4f177fe63276`, `BUILD_ID` `m0M8pf121326vNSo2B759`.
+
+**Retention.** Nothing was deleted: releases `ad245d60…` (current), `61a95f73…` (previous, rollback target) and
+`9ed9c9dd…`; the checkout's in-place bundle; manifests; backups; the build workspace `builds/20261031T080059Z-ad245d602f6f-d2fffb`
+with its logs; the host console log `/home/arm/afldb-issue330-D2-build.log` and its launcher. Backup retention review:
+no earlier than 2026-11-30.
+
+**Not claimed.** Other list surfaces were not audited. The pending `?_rsc=` prefetch observation is unchanged and is
+not registered as a defect.

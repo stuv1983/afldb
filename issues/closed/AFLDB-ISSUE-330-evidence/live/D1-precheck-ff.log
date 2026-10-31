@@ -1,0 +1,51 @@
+D1 host afldb-prod user arm at 2026-10-31T08:00:35Z
+HEAD before 61a95f7397dacc49fe919ca99cffa00379d612bf; porcelain 0
+  fetch: From github.com-afldb-deploy:stuv1983/afldb
+  fetch:    61a95f73..65c02ecc  main                   -> origin/main
+  fetch:  * [new branch]        codex/issue329-release -> origin/codex/issue329-release
+origin/main 65c02ecc29f93cec8410e01c91f4fc293002b774
+  merge:  rename issues/{open => closed}/AFLDB-ISSUE-329.md (92%)
+  merge:  create mode 100644 issues/open/AFLDB-ISSUE-330-evidence/typecheck.log
+  merge:  create mode 100644 issues/open/AFLDB-ISSUE-330.md
+HEAD after 65c02ecc29f93cec8410e01c91f4fc293002b774; porcelain 0
+candidate ad245d602f6f0776c1fd86b66fef4f177fe63276 present
+migrations PROD..CAND: none
+--- release.mjs status
+  release: current  61a95f7397da-JYIBkYn8ynPgYMn1e5nK- revision 61a95f7397dacc49fe919ca99cffa00379d612bf BUILD_ID JYIBkYn8ynPgYMn1e5nK- production
+  release: previous 9ed9c9dd3e84-QNEHXAtU53TzUjj0Mb7mv revision 9ed9c9dd3e84682c43e96c46e98974b245eb54ed BUILD_ID QNEHXAtU53TzUjj0Mb7mv
+  release: memory   afldb MemoryCurrent 315 MB
+  release: process  3187278 runs in /home/arm/afldb-releases/releases/61a95f7397da-JYIBkYn8ynPgYMn1e5nK-
+  release: health   200 status=ok database=ok
+  release: build    /_next/static/JYIBkYn8ynPgYMn1e5nK-/_buildManifest.js 200
+  release: build    /_next/static/QNEHXAtU53TzUjj0Mb7mv/_buildManifest.js 404 (previous; expect 404)
+  release: STATUS PASS 61a95f7397da-JYIBkYn8ynPgYMn1e5nK-
+status exit 0
+--- links, locks, port
+  total 12
+  drwxrwxr-x 4 arm arm 4096 Oct 31 17:47 builds
+  lrwxrwxrwx 1 arm arm   43 Oct 31 17:52 current -> releases/61a95f7397da-JYIBkYn8ynPgYMn1e5nK-
+  -rw-rw-r-- 1 arm arm 1288 Oct 31 18:03 events.log
+  lrwxrwxrwx 1 arm arm   43 Oct 31 17:52 previous -> releases/9ed9c9dd3e84-QNEHXAtU53TzUjj0Mb7mv
+  drwxrwxr-x 4 arm arm 4096 Oct 31 17:52 releases
+  no lock
+  smoke port 3199 free
+  status-pass records for rollback target: 1
+--- drop-in and service
+  MainPID=3187278
+  NRestarts=0
+  MemoryCurrent=330162176
+  ActiveState=active
+  DropInPaths=/etc/systemd/system/afldb.service.d/release-route.conf
+  ActiveEnterTimestamp=Sat 2026-10-31 18:02:55 AEDT
+  cwd /home/arm/afldb-releases/releases/61a95f7397da-JYIBkYn8ynPgYMn1e5nK-
+--- capacity
+                 total        used        free      shared  buff/cache   available
+  Mem:            3915        1049        1234         146        2069        2866
+  Swap:              0           0           0
+  Filesystem      Size  Used Avail Use% Mounted on
+  /dev/vda1        77G   23G   55G  29% /
+  MemAvailable 2866 MB (floor 2100); free disk 55 GB (floor 6)
+D1 CAPACITY OK
+  multiplexer: /usr/bin/tmux
+  multiplexer: /usr/bin/screen
+D1 END 2026-10-31T08:00:40Z

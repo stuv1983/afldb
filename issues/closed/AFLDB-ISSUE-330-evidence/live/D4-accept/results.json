@@ -1,0 +1,234 @@
+{
+  "started": "2026-10-31T08:07:14.665Z",
+  "base": "https://beta.afldb.com",
+  "target": "/players?sort=games",
+  "checks": [
+    {
+      "id": "desktop players-page-authenticated",
+      "ok": true,
+      "detail": {
+        "url": "https://beta.afldb.com/players?sort=games",
+        "h1": "Players"
+      }
+    },
+    {
+      "id": "desktop first-row-leader",
+      "ok": true,
+      "detail": {
+        "first": {
+          "name": "Scott Pendlebury",
+          "games": 442
+        },
+        "expected": {
+          "name": "Scott Pendlebury",
+          "games": 442
+        },
+        "rowCount": 50,
+        "gamesColumn": 3
+      }
+    },
+    {
+      "id": "desktop page-1-descending",
+      "ok": true,
+      "detail": {
+        "first5": [
+          {
+            "name": "Scott Pendlebury",
+            "games": 442
+          },
+          {
+            "name": "Brent Harvey",
+            "games": 432
+          },
+          {
+            "name": "Michael Tuck",
+            "games": 426
+          },
+          {
+            "name": "Shaun Burgoyne",
+            "games": 407
+          },
+          {
+            "name": "Kevin Bartlett",
+            "games": 403
+          }
+        ],
+        "last": {
+          "name": "Jason Akermanis",
+          "games": 325
+        }
+      }
+    },
+    {
+      "id": "desktop no-careerless-players",
+      "ok": true,
+      "detail": {
+        "found": []
+      }
+    },
+    {
+      "id": "desktop no-zero-game-rows",
+      "ok": true,
+      "detail": {
+        "zeroRows": []
+      }
+    },
+    {
+      "id": "desktop no-overflow",
+      "ok": true,
+      "detail": {
+        "viewport": "1440x900",
+        "scrollWidth": 1425,
+        "innerWidth": 1440
+      }
+    },
+    {
+      "id": "desktop static-and-console",
+      "ok": true,
+      "detail": {
+        "staticSeen": 12,
+        "badStatic": [],
+        "consoleErrors": []
+      }
+    },
+    {
+      "id": "mobile first-row-leader",
+      "ok": true,
+      "detail": {
+        "first": {
+          "name": "Scott Pendlebury",
+          "games": 442
+        },
+        "expected": {
+          "name": "Scott Pendlebury",
+          "games": 442
+        },
+        "rowCount": 50,
+        "gamesColumn": 3
+      }
+    },
+    {
+      "id": "mobile page-1-descending",
+      "ok": true,
+      "detail": {
+        "first5": [
+          {
+            "name": "Scott Pendlebury",
+            "games": 442
+          },
+          {
+            "name": "Brent Harvey",
+            "games": 432
+          },
+          {
+            "name": "Michael Tuck",
+            "games": 426
+          },
+          {
+            "name": "Shaun Burgoyne",
+            "games": 407
+          },
+          {
+            "name": "Kevin Bartlett",
+            "games": 403
+          }
+        ],
+        "last": {
+          "name": "Jason Akermanis",
+          "games": 325
+        }
+      }
+    },
+    {
+      "id": "mobile no-careerless-players",
+      "ok": true,
+      "detail": {
+        "found": []
+      }
+    },
+    {
+      "id": "mobile no-zero-game-rows",
+      "ok": true,
+      "detail": {
+        "zeroRows": []
+      }
+    },
+    {
+      "id": "mobile no-overflow",
+      "ok": true,
+      "detail": {
+        "viewport": "390x844",
+        "scrollWidth": 375,
+        "innerWidth": 390
+      }
+    },
+    {
+      "id": "mobile static-and-console",
+      "ok": true,
+      "detail": {
+        "staticSeen": 11,
+        "badStatic": [],
+        "consoleErrors": []
+      }
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "01-players-sort-games-desktop.png",
+      "url": "https://beta.afldb.com/players?sort=games",
+      "viewport": "1440x900",
+      "at": "2026-10-31T08:11:32.709Z"
+    },
+    {
+      "file": "02-players-sort-games-mobile.png",
+      "url": "https://beta.afldb.com/players?sort=games",
+      "viewport": "390x844",
+      "at": "2026-10-31T08:11:37.117Z"
+    }
+  ],
+  "role": "Super Admin",
+  "pendingAfterLoad": [
+    {
+      "url": "https://beta.afldb.com/players?sort=games",
+      "pending": [
+        "GET https://beta.afldb.com/admin/awards?_rsc=k7cmniC4OOfWcCnT",
+        "GET https://beta.afldb.com/admin/records?_rsc=k7cmniC4OOfWcCnT",
+        "GET https://beta.afldb.com/admin/current-season?_rsc=k7cmniC4OOfWcCnT",
+        "GET https://beta.afldb.com/admin/access?_rsc=k7cmniC4OOfWcCnT"
+      ]
+    },
+    {
+      "url": "https://beta.afldb.com/players?sort=games",
+      "pending": [
+        "GET https://beta.afldb.com/admin/awards?_rsc=k7cmniC4OOfWcCnT",
+        "GET https://beta.afldb.com/admin/records?_rsc=k7cmniC4OOfWcCnT",
+        "GET https://beta.afldb.com/admin/current-season?_rsc=k7cmniC4OOfWcCnT",
+        "GET https://beta.afldb.com/admin/access?_rsc=k7cmniC4OOfWcCnT",
+        "GET https://beta.afldb.com/?_rsc=U4vAK17UmTQTqThv",
+        "GET https://beta.afldb.com/players/scott-pendlebury-11724?_rsc=U4vAK17UmTQTqThv",
+        "GET https://beta.afldb.com/players/brent-harvey-2164?_rsc=U4vAK17UmTQTqThv",
+        "GET https://beta.afldb.com/?_rsc=SJiZ6DSeMDlsoTSt",
+        "GET https://beta.afldb.com/?_rsc=53iw3JQItK-zkyti",
+        "GET https://beta.afldb.com/players/scott-pendlebury-11724?_rsc=ZtShQ_l3jjZ6GEWj",
+        "GET https://beta.afldb.com/players/brent-harvey-2164?_rsc=ZtShQ_l3jjZ6GEWj",
+        "GET https://beta.afldb.com/players/michael-tuck-9593?_rsc=ZtShQ_l3jjZ6GEWj",
+        "GET https://beta.afldb.com/players/shaun-burgoyne-11836?_rsc=ZtShQ_l3jjZ6GEWj",
+        "GET https://beta.afldb.com/players/kevin-bartlett-8193?_rsc=ZtShQ_l3jjZ6GEWj",
+        "GET https://beta.afldb.com/players/dustin-fletcher-3993?_rsc=ZtShQ_l3jjZ6GEWj",
+        "GET https://beta.afldb.com/players/travis-boak-12808?_rsc=ZtShQ_l3jjZ6GEWj",
+        "GET https://beta.afldb.com/players/robert-harvey-11096?_rsc=ZtShQ_l3jjZ6GEWj",
+        "GET https://beta.afldb.com/players/patrick-dangerfield-10244?_rsc=ZtShQ_l3jjZ6GEWj",
+        "GET https://beta.afldb.com/players/simon-madden-11885?_rsc=ZtShQ_l3jjZ6GEWj",
+        "GET https://beta.afldb.com/players/david-mundy-3544?_rsc=ZtShQ_l3jjZ6GEWj",
+        "GET https://beta.afldb.com/players/craig-bradley-3080?_rsc=ZtShQ_l3jjZ6GEWj",
+        "GET https://beta.afldb.com/players/steele-sidebottom-11982?_rsc=ZtShQ_l3jjZ6GEWj",
+        "GET https://beta.afldb.com/players/adam-goodes-35?_rsc=ZtShQ_l3jjZ6GEWj",
+        "GET https://beta.afldb.com/players/bernie-quinlan-1177?_rsc=ZtShQ_l3jjZ6GEWj",
+        "GET https://beta.afldb.com/players/brad-johnson-2068?_rsc=ZtShQ_l3jjZ6GEWj",
+        "GET https://beta.afldb.com/players/john-blakey-7454?_rsc=ZtShQ_l3jjZ6GEWj"
+      ]
+    }
+  ],
+  "finished": "2026-10-31T08:11:37.117Z",
+  "verdict": "PASS"
+}

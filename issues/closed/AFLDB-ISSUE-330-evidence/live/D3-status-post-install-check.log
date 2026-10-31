@@ -1,0 +1,113 @@
+host afldb-prod user arm at 2026-10-31T08:07:01Z checkout HEAD 65c02ecc29f93cec8410e01c91f4fc293002b774 porcelain 0
+  MainPID=3190377
+  Result=success
+  NRestarts=0
+  WorkingDirectory=/home/arm/afldb-releases/current
+  ActiveState=active
+  ActiveEnterTimestamp=Sat 2026-10-31 19:06:29 AEDT
+  cwd /home/arm/afldb-releases/releases/ad245d602f6f-m0M8pf121326vNSo2B759
+=== status --expect ad245d602f6f-m0M8pf121326vNSo2B759
+  release: current  ad245d602f6f-m0M8pf121326vNSo2B759 revision ad245d602f6f0776c1fd86b66fef4f177fe63276 BUILD_ID m0M8pf121326vNSo2B759 production
+  release: previous 61a95f7397da-JYIBkYn8ynPgYMn1e5nK- revision 61a95f7397dacc49fe919ca99cffa00379d612bf BUILD_ID JYIBkYn8ynPgYMn1e5nK-
+  release: memory   afldb MemoryCurrent 177 MB
+  release: process  3190377 runs in /home/arm/afldb-releases/releases/ad245d602f6f-m0M8pf121326vNSo2B759
+  release: health   200 status=ok database=ok
+  release: build    /_next/static/m0M8pf121326vNSo2B759/_buildManifest.js 200
+  release: build    /_next/static/JYIBkYn8ynPgYMn1e5nK-/_buildManifest.js 404 (previous; expect 404)
+  release: STATUS PASS ad245d602f6f-m0M8pf121326vNSo2B759
+status exit 0
+=== post-install check (maintained, deploy/post-install-check.sh)
+AFLDB post-install check 2026-10-31T08:07:01Z: expect ad245d602f6f-m0M8pf121326vNSo2B759 (BUILD_ID m0M8pf121326vNSo2B759, previous JYIBkYn8ynPgYMn1e5nK-)
+release route status
+        release: current  ad245d602f6f-m0M8pf121326vNSo2B759 revision ad245d602f6f0776c1fd86b66fef4f177fe63276 BUILD_ID m0M8pf121326vNSo2B759 production
+        release: previous 61a95f7397da-JYIBkYn8ynPgYMn1e5nK- revision 61a95f7397dacc49fe919ca99cffa00379d612bf BUILD_ID JYIBkYn8ynPgYMn1e5nK-
+        release: memory   afldb MemoryCurrent 178 MB
+        release: process  3190377 runs in /home/arm/afldb-releases/releases/ad245d602f6f-m0M8pf121326vNSo2B759
+        release: health   200 status=ok database=ok
+        release: build    /_next/static/m0M8pf121326vNSo2B759/_buildManifest.js 200
+        release: build    /_next/static/JYIBkYn8ynPgYMn1e5nK-/_buildManifest.js 404 (previous; expect 404)
+        release: STATUS PASS ad245d602f6f-m0M8pf121326vNSo2B759
+  ok    status --expect ad245d602f6f-m0M8pf121326vNSo2B759 PASS
+current build and health through loopback and the public endpoint
+  ok    http://127.0.0.1:3100/api/health {"status":"ok","database":"ok","latencyMs":1}
+  ok    http://127.0.0.1:3100 _buildManifest.js for m0M8pf121326vNSo2B759 200
+  ok    https://beta.afldb.com/api/health {"status":"ok","database":"ok","latencyMs":2}
+  ok    https://beta.afldb.com _buildManifest.js for m0M8pf121326vNSo2B759 200
+previous build JYIBkYn8ynPgYMn1e5nK- must be absent at the origin
+  ok    origin (loopback) previous JYIBkYn8ynPgYMn1e5nK- 404
+  ok    origin (public, cache-busted) previous JYIBkYn8ynPgYMn1e5nK- 404, cf-cache-status BYPASS
+  CACHE public previous JYIBkYn8ynPgYMn1e5nK- 200 from an old Cloudflare cache HIT of an immutable asset; the origin checks above decide
+pages and every referenced asset (public endpoint, redirects followed)
+  ok    page / -> 200 https://beta.afldb.com/beta
+  ok    page /beta -> 200 https://beta.afldb.com/beta
+  ok    page /players -> 200 https://beta.afldb.com/beta?from=%2Fplayers
+  ok    page /matches -> 200 https://beta.afldb.com/beta?from=%2Fmatches
+  ok    page /seasons -> 200 https://beta.afldb.com/beta?from=%2Fseasons
+  ok    page /clubs -> 200 https://beta.afldb.com/beta?from=%2Fclubs
+  ok    page /records -> 200 https://beta.afldb.com/beta?from=%2Frecords
+  ok    page /search -> 200 https://beta.afldb.com/beta?from=%2Fsearch
+  ok    page /admin/operations -> 200 https://beta.afldb.com/admin/login
+  ok    8 assets 200 with the right type
+  ok    all 8 served assets are byte-identical to ad245d602f6f-m0M8pf121326vNSo2B759's files
+  ok    POST /api/admin/email-intake 410 (retired)
+journal since the service started
+  ok    primary start line present since Sat 2026-10-31 19:06:29 AEDT
+        [afldb] serving build m0M8pf121326vNSo2B759 release ad245d602f6f-m0M8pf121326vNSo2B759 revision ad245d602f6f0776c1fd86b66fef4f177fe63276
+  ok    0 error/fatal/unhandled lines
+  info  NRestarts 0, MemoryCurrent 196 MB
+POST-INSTALL CHECK PASS ad245d602f6f-m0M8pf121326vNSo2B759 (1 old Cloudflare cache HIT(s) reported above, origin 404)
+post-install exit 0
+=== release.json
+{
+  "schema": "afldb-release/1",
+  "id": "ad245d602f6f-m0M8pf121326vNSo2B759",
+  "revision": "ad245d602f6f0776c1fd86b66fef4f177fe63276",
+  "buildId": "m0M8pf121326vNSo2B759",
+  "afldbEnv": "production",
+  "createdBy": "build",
+  "createdAt": "2026-10-31T08:05:24.864Z",
+  "host": "afldb-prod",
+  "node": "v22.23.2",
+  "build": {
+    "heapMb": 3072,
+    "workers": 1,
+    "typecheck": "off-host",
+    "typecheckEvidence": "npm run typecheck exit 0 (next typegen && tsc --noEmit) on Linux (WSL Ubuntu 24.04.5, node v22.21.0) for git archive of ad245d60 (tree 89bd5b80); 2026-10-31; issues/open/AFLDB-ISSUE-330-evidence/typecheck.log",
+    "minAvailableMb": 1274,
+    "peakBuildRssMb": 1721,
+    "phases": {
+      "npm ci": {
+        "seconds": 17,
+        "minAvailableMb": 1913,
+        "peakRssMb": 955
+      },
+      "build": {
+        "seconds": 227,
+        "minAvailableMb": 1274,
+        "peakRssMb": 1721
+      }
+    },
+    "memTotalMb": 3915,
+    "memAvailableAtStartMb": 2858,
+    "swapTotalMb": 0,
+    "buildLogSha256": "e29f2a835c2cf962d8ccae12562fb2ee14facaf6ddcc49df0cddeb8e6dadd654"
+  },
+  "smoke": {
+    "authenticated": true,
+    "health": "ok",
+    "buildManifest": 200,
+    "css": "/_next/static/css/cb39c2e05a6b8ca6.css",
+    "pages": {
+=== events.log tail
+{"ts":"2026-10-31T07:03:40.823Z","op":"status-pass","id":"61a95f7397da-JYIBkYn8ynPgYMn1e5nK-"}
+{"ts":"2026-10-31T08:00:59.449Z","op":"build-start","revision":"ad245d602f6f0776c1fd86b66fef4f177fe63276","workspace":"/home/arm/afldb-releases/builds/20261031T080059Z-ad245d602f6f-d2fffb","afldbEnv":"production","memAvailableMb":2858}
+{"ts":"2026-10-31T08:05:24.887Z","op":"build-pass","id":"ad245d602f6f-m0M8pf121326vNSo2B759","revision":"ad245d602f6f0776c1fd86b66fef4f177fe63276","buildId":"m0M8pf121326vNSo2B759","manifest":"9a0bdd6d91855d7b5b53bf227a0d8ed22038d5f91dd72958241cc71492c5d68c","workspace":"/home/arm/afldb-releases/builds/20261031T080059Z-ad245d602f6f-d2fffb"}
+{"ts":"2026-10-31T08:05:47.853Z","op":"promote","id":"ad245d602f6f-m0M8pf121326vNSo2B759","previous":"61a95f7397da-JYIBkYn8ynPgYMn1e5nK-"}
+{"ts":"2026-10-31T08:07:01.554Z","op":"status-pass","id":"ad245d602f6f-m0M8pf121326vNSo2B759"}
+{"ts":"2026-10-31T08:07:01.873Z","op":"status-pass","id":"ad245d602f6f-m0M8pf121326vNSo2B759"}
+  total 12
+  drwxrwxr-x 5 arm arm 4096 Oct 31 19:00 builds
+  lrwxrwxrwx 1 arm arm   43 Oct 31 19:05 current -> releases/ad245d602f6f-m0M8pf121326vNSo2B759
+  -rw-rw-r-- 1 arm arm 2196 Oct 31 19:07 events.log
+  lrwxrwxrwx 1 arm arm   43 Oct 31 19:05 previous -> releases/61a95f7397da-JYIBkYn8ynPgYMn1e5nK-
+  drwxrwxr-x 5 arm arm 4096 Oct 31 19:05 releases
