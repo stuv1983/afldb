@@ -287,10 +287,29 @@ award results must be shown reconcilable before production; **no** — not a pro
     trigger): any writer that bypasses these editors (direct library calls, legacy loaders, the AFL Tables settle,
     ISSUE-316 tooling, ad hoc SQL) is not stopped by this. (2) The editors are protected **locally only**; nothing is
     deployed. Production needs the usual release path, and `afldb_import` must hold `SELECT` on `data_edits` (migration
-    108 and `privileges.sql` already grant it; verify on the target). (3) Known limitation: the action layer's
-    `optionalText(..., 2000)` silently truncates a crafted over-length note before the guard sees it (the textarea
-    enforces `maxLength`, and direct callers are refused at the boundary). (4) The pre-existing legacy `awards-admin.ts`
+    108 and `privileges.sql` already grant it; verify on the target). (3) ~~Known limitation~~ **FIXED 2026-11-01 (local, not deployed):** the action layer's
+    `optionalText(..., 2000)` used to cut a crafted over-length note to 2000 characters before the guard saw it, turning
+    an invalid note into an accepted correction. The audit-note field now goes through `parseCorrectionNote`
+    (`src/lib/seasons/correction-note.ts`: trims, never truncates) in the awards, coaches, draft, records, season-lists
+    and leadership actions; the data-editor and player-link actions already refused an over-length note outright. An
+    OPEN-season write stores exactly what it stored before (`recordDataEdit` and the player-link insert still store at
+    most 2000 characters, and `storedNoteText` caps the copies kept as an appointment or list note). Proved through the
+    real action boundary with a 2001-character note (refused; canonical rows, overrides and audit unchanged), with a
+    negative control against the pre-fix actions. (4) The pre-existing legacy `awards-admin.ts`
     helpers are not wired to a route and are only guarded where they call `recordDataEdit`.
+  - *2026-11-01 hardening and independent review.* One focused independent review of the actual mutation coverage found
+    no CRIT/HIGH and no sealed-season bypass. Supported findings fixed: **F-001 (MED)** the Brownlow eligibility
+    publication audit was sealed against a server-generated default note and relied on a later call to refuse (it now
+    passes the human note as `sealNote`); **F-002 (LOW)** seven draft-editor catch blocks reported a seal refusal as
+    `failed` with a prefix (now `validation`, like every other editor); **F-003 (LOW, part)** the open-season stored
+    copy of an appointment or list note is capped at 2000 as before; **F-005 (INFO)** an empty season declaration now
+    fails closed as an unknown season. Accepted, not changed: the F-003 design point (an appointment or list note is both
+    the correction note and the record's own note, so a sealed-season appointment needs a 20+ character note that is then
+    its public note); F-004 (`<form onSubmit>` without `action`: no pre-hydration submit; admin-only, JS-required app);
+    F-006 (the receipt records `brownlow_authority`, the table-derived workflow); F-007 (`awards-admin.ts` is dead code
+    kept for its test). A visual check also found that four forms using `<form action>` (player-link resolve, bulk
+    approve, Brownlow publish, delete match) lost the typed values after a refusal (React 19 resets uncontrolled
+    fields); they now submit through `keepFormOnSubmit`, pinned by a source test.
 
 ## V2-GAP-007 — No manifest of the real baseline exists yet
 

@@ -1,0 +1,16 @@
+editor shows the correction-note field: true
+REFUSAL shown; matches.notes unchanged=true; data_edits unchanged=true; typed edit kept in the form=true
+VALID NOTE saved; audit row bound: true; matches.notes now="gap006 visual probe 1793450830977"
+restored matches.notes via the database: true
+05-award-winner-new: /admin/awards/winners/new status=200 correctionNoteFields=1 horizontalOverflowPx=0 pageErrors=0
+06-award-winner-detail: /admin/awards/winners/3712 status=200 correctionNoteFields=1 horizontalOverflowPx=0 pageErrors=0
+07-draft-new-pick: /admin/draft/new status=200 correctionNoteFields=1 horizontalOverflowPx=0 pageErrors=0
+08-draft-pick-detail: /admin/draft/1 status=200 correctionNoteFields=1 horizontalOverflowPx=0 pageErrors=0
+11-first-kick-goal-new: /admin/records/first-kick-goal/new status=200 correctionNoteFields=1 horizontalOverflowPx=0 pageErrors=0
+12-first-kick-goal-detail: /admin/records/first-kick-goal/1 status=200 correctionNoteFields=1 horizontalOverflowPx=0 pageErrors=0
+04-create-match: correctionNoteFields=1
+09-coach-assignments: REFUSAL shown for Set without a note; match_coaches and data_edits unchanged=true; correctionNoteFields=1
+season-lists and player-links notes: not captured (the disposable database has no 2027 club identity and no open review target); source and typecheck only: VISUAL: UNVERIFIED
+14-data-editor mobile: horizontalOverflowPx=0
+blockedExternalRequests desktop=0 mobile=0
+database=afldb_v2_gap006_test baseURL=http://127.0.0.1:3912

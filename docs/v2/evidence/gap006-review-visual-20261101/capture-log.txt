@@ -1,0 +1,22 @@
+fixtures: players link=15673 open=15674 sealed=15675 mobile=15676; award_winners target=4911; list club=adelaide
+OK   player link, NO note: refused, award row unlinked, no resolution row, no data_edits row
+OK   player link, SHORT note: refused, nothing written
+OK   the typed note is still in the form after the refusal
+OK   the picked player is still shown after the refusal
+OK   valid note: the award row is linked to the picked player
+OK   valid note: the resolution row binds the actor, the action, the player and the trimmed note
+pageErrors during player-link journey: 0
+open add alerts: ["Added to the list.",""]
+OK   REAL registry (2027 open): an add with no note succeeds, as before
+SYNTHETIC REGISTRY in effect for the next steps: 2027 sealed (the build copy of seasons.json only)
+OK   SYNTHETIC REGISTRY, NO note: the add is refused, no membership, no data_edits row
+OK   SYNTHETIC REGISTRY, SHORT note: refused, nothing written
+OK   the typed note and the picked player are kept after the refusal
+OK   SYNTHETIC REGISTRY, valid note: added; the audit row (players/season_list_added) binds the actor and the trimmed note
+OK   mobile, SYNTHETIC REGISTRY: refusal shown, nothing written
+OK   mobile player link, no note: refused, row unlinked
+horizontalOverflowPx mobile: season-list=0 player-link=0; desktop player-links=0
+OK   no horizontal page scroll at 390px
+blockedExternalRequests desktop=0 mobile=0
+database=afldb_v2_gap006b_test baseURL=http://127.0.0.1:3912
+build copy of seasons.json restored from its backup

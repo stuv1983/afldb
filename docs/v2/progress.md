@@ -456,6 +456,11 @@ The season seal now covers every audited admin editor mutation (55 audit call si
 only: nothing pushed or deployed; database-level enforcement not implemented; gap 006 remains open (register count
 unchanged: 38 / 31 / 7).
 
+**2026-11-01 hardening (local only).** Note-length bypass fixed and proved at the action boundary; independent review
+done (no CRIT/HIGH; F-001, F-002, F-005 and the open-season stored-note cap fixed); player-link and season-list visual
+journeys captured; Coleman publication integration 28/28; Brownlow production-correction 4/8 with its provider-snapshot
+prerequisites missing. See `gap006-release-readiness-2026-11-01.md`. Gap 006 stays open.
+
 ## Next action for the owner
 
 1. Review `v2/rebuild` (`git log ff100dc2..v2/rebuild`) starting with `docs/v2/final-report.md`.

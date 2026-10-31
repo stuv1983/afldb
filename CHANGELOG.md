@@ -42,8 +42,45 @@ commit.
   horizontal overflow). Season-lists and player-links notes: VISUAL: UNVERIFIED (no 2027 club identity or open review
   target in that database).
 - **Not done / still open (gap 006 stays open).** Database-level enforcement (no constraint or trigger); direct-library,
-  legacy and ISSUE-316 writers; deployment and production verification. Known limitation: the action layer's
-  `optionalText(..., 2000)` silently truncates a crafted over-length note.
+  legacy and ISSUE-316 writers; deployment and production verification. (The over-length-note truncation noted here
+  at first is fixed: see the 2026-11-01 entry below.)
+
+### V2-GAP-006 hardening: note-length bypass, review findings, visual and integration evidence (2026-11-01, local only, not deployed)
+
+- **Fix: a crafted over-length note is now refused, never truncated into a valid correction.** The audit-note field of
+  the awards, coaches, draft, records, season-lists and leadership actions used `optionalText(..., 2000)`, which cut a
+  2001-character note to 2000 before the seal saw it. It now uses `parseCorrectionNote` (trim, no truncation); a sealed
+  season refuses it (`longer than 2000 characters`), an open season stores at most 2000 characters exactly as before
+  (`storedNoteText` caps the copies kept as an appointment or list note). Unrelated `optionalText` callers are unchanged.
+- **Fix: refused submits keep the typed values.** Player-link resolve, bulk approve, Brownlow publish and delete match
+  used `<form action>`, whose React 19 reset wiped the typed note and edit after a refusal; they now use
+  `keepFormOnSubmit`.
+- **Independent review fixes.** F-001 (MED): the Brownlow eligibility publication audit now seals the human note, not
+  its generated default. F-002: draft-editor seal refusals map to `validation` like the other editors. F-005: an empty
+  season declaration fails closed. No CRIT/HIGH; no sealed-season bypass found. Details: `docs/v2/known-gaps.md`.
+- **Tests.** Unit (integration excluded) 11,520 passed, 39 skipped, after the last code change (two source-contract
+  tests re-pointed at the new form marker). Integration on dedicated disposable clones of the retained baseline:
+  17 editor files 560 passed / 2 skipped; `sealed-editor-guard` 21/21 including action-boundary regressions (three
+  families refused with a crafted 2001-character note; an open season stores 2000) with a negative control that failed on
+  the pre-fix actions; `v2-coleman-publication` 28/28 on `afldb_v2_coleman_final_test`. After the review fixes,
+  `admin-draft`, `admin-club-leadership`, `admin-brownlow` and `sealed-editor-guard` passed; `admin-season-lists`,
+  `draft-linkage` and `v2-brownlow-eligibility` could not complete because the isolated cluster's distribution was
+  deleted by a process this session did not run (see the release-readiness record). They passed before the review fixes
+  (`v2-brownlow-eligibility` was not part of the earlier run).
+- **Not run to completion: `v2-brownlow-production-correction`.** 4 of 8 passed (the cases that need no provider snapshot).
+  The other four need the `afldb_v2_rb_brownlow2025_test` template (authentic 2025 provider snapshot, held only in the
+  stopped WSL rehearsal stores) and `AFLDB_BROWNLOW_REHEARSAL_SOURCE_ROOT` (the retained
+  `afl-api-brownlow-2025-2026-10-20-014218` snapshot); neither exists on this workstation. Not substituted.
+- **Visual evidence (headed Chromium, production build on the disposable database).** Player-link review: missing-note
+  and short-note refusals, typed note and picked player kept, a valid note links and the resolution row binds the actor
+  and the trimmed note. Season-list editor: open 2027 needs no note (real registry); the refusal path is shown on a
+  SYNTHETIC registry that seals 2027 (the build copy of `seasons.json` only, restored; the repository file is never
+  touched). Desktop 1280x800 and mobile 390x844, no horizontal overflow. Evidence:
+  `docs/v2/evidence/gap006-review-visual-20261101/` and the earlier data-editor set
+  `docs/v2/evidence/gap006-editor-visual-20261031/` (`tools/v2/gap006-review-visual.mts`). No credentials, cookies or
+  session storage are recorded.
+- **Still open (V2-GAP-006 stays open).** Database-level enforcement (not implemented); direct-library, legacy and
+  ISSUE-316 writers; deployment and production verification. Record: `docs/v2/gap006-release-readiness-2026-11-01.md`.
 
 ### V2-GAP-005 and V2-GAP-010 closed as accepted decisions; V2-GAP-006 traced and held (2026-10-31)
 
