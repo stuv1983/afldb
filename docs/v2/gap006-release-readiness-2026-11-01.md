@@ -37,7 +37,7 @@ directory), loopback binding, cluster name `afldb_v2_isolated` and the isolation
 | F-001 against real PostgreSQL | Brownlow season publication (`admin-brownlow`) and the eligibility publication (`v2-brownlow-eligibility`) refuse an absent, null or short human note on a sealed season, with revision, status, votes and audit count unchanged; the synthetic fixture seasons are sealed through the registry test seam, which is why an earlier run that did not seal them wrongly published |
 | Negative controls | the new F-003 tests failed against the pre-fix query files (9 tests); the F-001 test failed with `sealNote` stopped (2 failed, 45 passed); both restored, file diffs verified |
 | `v2-brownlow-production-correction` | **8/8, 0 failed, 0 skipped** on the final candidate (HEAD `23eb5fa9`), run 2026-11-01 on the retained authentic inputs (section "Authentic Brownlow inputs"). This is a separate, later run from the earlier **4/8** (cases 1, 6, 7, 8 only; cases 2 to 5 could not execute then, and two earlier attempts could not run). Per-case time 46 s to 207 s, 995 s in total. Machine-readable: `docs/v2/evidence/gap006-brownlow-cases-20261101/results-8of8.json` |
-| `v2-coleman-publication` | 28/28 from the earlier accepted run; its code and tests are unchanged, so it was not re-run |
+| `v2-coleman-publication` | 28/28 from the earlier accepted run. **Correction (2026-11-01):** the earlier claim "code and tests unchanged, so not re-run" was wrong: `src/db/queries/coleman-award-winners.ts` changed (it now names its workflow to the seal). It was run on Linux against the candidate: 28/28 (`docs/v2/evidence/gap006-linux-qualification-20261101/`) |
 | Full unit suite | not re-run: the only source changes since the accepted 11,520-pass run are in the season-list and leadership query and action layers, their panels and tests, all covered by the focused runs above |
 | Visual journey, headed Chromium, desktop 1280x800 and mobile 390x844 | 15/15 checks, 0 page errors, 0 external requests, no horizontal overflow |
 
@@ -185,6 +185,10 @@ not establish that this candidate caused exposure**; here it is consistent with 
 labelled synthetic journey, and the corrected design's journey (`gap006g`) shows no matches. These rows are test data in
 a disposable database that is never published. Disposition: **no action required, no deployment gate, no remediation
 SQL.** The clones may be dropped through the guard when no longer needed as evidence.
+
+## Linux qualification and release package (2026-11-01)
+
+Candidate bound as `fd48ace0` (tree `01b3e685`): after the tested `23eb5fa9` the only changes are documentation, evidence and one test-only fixture fix. Qualified on streamanator in a new disposable workspace with a guarded isolated cluster (loopback 55481): core editor/publication integration 653 passed / 0 failed / 5 skipped; import/settle-coupled 315/315; Coleman 28/28; unit suites 11,528 passed / 0 failed; release-route suite 33/33; `tsc --noEmit` exit 0; production-mode build exit 0 (3 min 16 s, peak RSS 1.59 GB) and boot smoke clean. The Linux pass found one real fixture defect (an admin-created 2026 draft selection in `draftguru-import` now needs a correction note because 2026 is sealed), fixed in the test only. Evidence: `docs/v2/evidence/gap006-linux-qualification-20261101/`. The release package is `docs/v2/gap006-editor-protections-release-package.md`. Nothing has been pushed or deployed.
 
 ## Remaining limitations and gates
 

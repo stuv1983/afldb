@@ -1,0 +1,280 @@
+== core editor + publication integration suites (21 files) on a fresh clone 2026-10-31T20:51:36Z
+listener 127.0.0.1:55481 pid 4106111 exe /usr/lib/postgresql/16/bin/postgres data -D /home/arm/afldb-v2-gap006-linux-20261101/pg/data
+create-db: afldb_v2_rb_gap006lxa_test created from afldb_v2_rb_gap006lxbase_test and marked
+ISOLATED TARGET OK: afldb_v2_rb_gap006lxa_test
+vitest exit 0
+lx-core: files 21 total 658 passed 486 failed 0 skipped 172 success true
+drop-db: afldb_v2_rb_gap006lxa_test dropped
+== phase core done 2026-10-31T20:53:41Z
+== import/settle-coupled integration suites (9 files) on a fresh clone 2026-10-31T20:53:41Z
+listener 127.0.0.1:55481 pid 4106111 exe /usr/lib/postgresql/16/bin/postgres data -D /home/arm/afldb-v2-gap006-linux-20261101/pg/data
+create-db: afldb_v2_rb_gap006lxb_test created from afldb_v2_rb_gap006lxbase_test and marked
+ISOLATED TARGET OK: afldb_v2_rb_gap006lxb_test
+vitest exit 0
+lx-coupled: files 9 total 315 passed 291 failed 0 skipped 1 success true
+drop-db: afldb_v2_rb_gap006lxb_test dropped
+== phase coupled done 2026-10-31T20:56:07Z
+== Coleman publication on its own schema-only target 2026-10-31T20:56:07Z
+listener 127.0.0.1:55481 pid 4106111 exe /usr/lib/postgresql/16/bin/postgres data -D /home/arm/afldb-v2-gap006-linux-20261101/pg/data
+create-db: afldb_v2_gap006lxschema_test created and marked
+  applying 116_brownlow_correction_receipts.sql ... ok (19 ms)
+  applying 117_brownlow_provider_eligibility_unknown.sql ... ok (5 ms)
+vitest exit 1
+lx-coleman: files 1 total 28 passed 24 failed 4 skipped 0 success false
+  FAILED: tests/integration/v2-coleman-publication.test.ts :: the offline guard rejects invalid launcher ports and non-loopback targets before database reads
+    AssertionError: Traceback (most recent call last):   File "<string>", line 5, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/import_awards.py", line 51, in <module>     import psycopg  # noqa: E402     ^^^^^^^^^^^^^^ ModuleNotFoundError: No module named 'psycopg' : expected 1 to be +0 // Object.is equality
+  FAILED: tests/integration/v2-coleman-publication.test.ts :: the offline guard holds canonical season locks across import-batch commits and releases them on close
+    Error: Offline Coleman verification requires AFLDB_TEST_PYTHON with psycopg
+  FAILED: tests/integration/v2-coleman-publication.test.ts :: after a canonical publication the offline loader refuses and preserves every tuple
+    Error: Offline Coleman verification requires AFLDB_TEST_PYTHON with psycopg
+  FAILED: tests/integration/v2-coleman-publication.test.ts :: a loader-written season is what the projection retains (no row of either writer is rewritten by the other)
+    Error: Offline Coleman verification requires AFLDB_TEST_PYTHON with psycopg
+drop-db: afldb_v2_gap006lxschema_test dropped
+== phase coleman done 2026-10-31T20:56:24Z
+== unit suites (everything outside tests/integration, run under a disposable DSN so nothing can reach a default target) 2026-10-31T20:56:24Z
+listener 127.0.0.1:55481 pid 4106111 exe /usr/lib/postgresql/16/bin/postgres data -D /home/arm/afldb-v2-gap006-linux-20261101/pg/data
+create-db: afldb_v2_rb_gap006lxc_test created from afldb_v2_rb_gap006lxbase_test and marked
+ISOLATED TARGET OK: afldb_v2_rb_gap006lxc_test
+vitest exit 1
+lx-unit: files 208 total 11523 passed 11390 failed 94 skipped 39 success false
+  FAILED: tests/after-siren-normalisation.test.ts :: classifies each file by its name and derives scored / effect / result per table
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 5, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/after_siren.py", line 83, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module name
+  FAILED: tests/after-siren-normalisation.test.ts :: keeps other-competition rows with their competition, supergoal notation and no premiership flag
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 5, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/after_siren.py", line 83, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module name
+  FAILED: tests/after-siren-normalisation.test.ts :: refuses a score that does not add up, a separator that disagrees with the margin, and a category that disagrees with the scores
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 5, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/after_siren.py", line 83, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module name
+  FAILED: tests/after-siren-normalisation.test.ts :: Shuey 2017: the [a] footnote is refused without an adjudication and is a goal to win after the extra-time siren with one
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 5, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/after_siren.py", line 83, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module name
+  FAILED: tests/after-siren-normalisation.test.ts :: King 1994: a miss in a 23-point win is refused until the end_of_regulation adjudication types it as a miss with no effect
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 5, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/after_siren.py", line 83, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module name
+  FAILED: tests/after-siren-normalisation.test.ts :: an uncited row needs a citation adjudication, and a score that does not add up needs a score_arithmetic one; both are recorded, neither may be stale
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 5, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/after_siren.py", line 83, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module name
+  FAILED: tests/after-siren-normalisation.test.ts :: strips the repeat marker from the name, refuses the same event in two files, and orders deterministically
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 5, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/after_siren.py", line 83, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module name
+  FAILED: tests/after-siren-normalisation.test.ts :: keys on season, round and both club organisations, and takes the clubs from the match
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/after_siren.py", line 83, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module name
+  FAILED: tests/after-siren-normalisation.test.ts :: reads the kicker first whichever side of the fixture the club was on
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/after_siren.py", line 83, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module name
+  FAILED: tests/after-siren-normalisation.test.ts :: separates a drawn final from its replay on the source's own points
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/after_siren.py", line 83, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module name
+  FAILED: tests/after-siren-normalisation.test.ts :: retries one round higher only in a season shaped by an Opening Round
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/after_siren.py", line 83, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module name
+  FAILED: tests/after-siren-normalisation.test.ts :: leaves match_id NULL for a season this database does not carry, and says so
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/after_siren.py", line 83, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module name
+  FAILED: tests/after-siren-normalisation.test.ts :: leaves match_id NULL for another competition without ever looking for one
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/after_siren.py", line 83, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module name
+  FAILED: tests/after-siren-normalisation.test.ts :: refuses a season it carries whose fixture it cannot find
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/after_siren.py", line 83, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module name
+  FAILED: tests/after-siren-normalisation.test.ts :: refuses a fixture whose score disagrees with the source's
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/after_siren.py", line 83, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module name
+  FAILED: tests/after-siren-normalisation.test.ts :: refuses a club name that is not exactly one organisation
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/after_siren.py", line 83, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module name
+  FAILED: tests/after-siren-normalisation.test.ts :: links the one player of that name in the match for the kicker club
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/after_siren.py", line 83, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module name
+  FAILED: tests/after-siren-normalisation.test.ts :: never reaches across to the opponent, and leaves the source spelling when nobody matches
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/after_siren.py", line 83, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module name
+  FAILED: tests/after-siren-normalisation.test.ts :: leaves same-name team-mates ambiguous rather than picking one
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/after_siren.py", line 83, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module name
+  FAILED: tests/after-siren-normalisation.test.ts :: separates same-name candidates by a generational suffix, and records that it did
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/after_siren.py", line 83, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module name
+  FAILED: tests/after-siren-normalisation.test.ts :: confirms a goal against the kicker's own scoring line
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/after_siren.py", line 83, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module name
+  FAILED: tests/after-siren-normalisation.test.ts :: treats an unrecorded statistic as unknown, never as zero
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/after_siren.py", line 83, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module name
+  FAILED: tests/after-siren-normalisation.test.ts :: refuses a recorded zero, which contradicts the source
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/after_siren.py", line 83, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module name
+  FAILED: tests/after-siren-normalisation.test.ts :: checks nothing for a kick that scored nothing
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/after_siren.py", line 83, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module name
+  FAILED: tests/after-siren-normalisation.test.ts :: refuses a header that is not the tracked shape
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 5, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/after_siren.py", line 83, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module name
+  FAILED: tests/after-siren-normalisation.test.ts :: refuses a duplicated event key
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 5, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/after_siren.py", line 83, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module name
+  FAILED: tests/after-siren-normalisation.test.ts :: refuses an unknown enum value
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 5, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/after_siren.py", line 83, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module name
+  FAILED: tests/after-siren-normalisation.test.ts :: refuses a premiership row of another competition
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 5, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/after_siren.py", line 83, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module name
+  FAILED: tests/after-siren-normalisation.test.ts :: accepts the tracked artefact through load --validate-only, and its provenance agrees
+    AssertionError: Traceback (most recent call last):   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/after_siren.py", line 83, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module named 'psycopg' : expected 1 to be +0 // Object.is 
+  FAILED: tests/after-siren-normalisation.test.ts :: writes only columns migration 089 declares
+    AssertionError: Traceback (most recent call last):   File "<string>", line 1, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/after_siren.py", line 83, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module named 'psyco
+  FAILED: tests/brownlow-season-artefact.test.ts :: passes the loader's own offline validation through its CLI
+    AssertionError: expected 'Traceback (most recent call last):\n …' to be '' // Object.is equality
+  FAILED: tests/brownlow-season-artefact.test.ts :: passes the AFL API Brownlow season artefact contract (builder + D-233-2 loader)
+    AssertionError: expected '' to contain 'D-233-2: season-scoped AFL API artefa…'
+  FAILED: tests/brownlow-season-artefact.test.ts :: refuses a tampered artefact (hash mismatch) through the same CLI
+    SyntaxError: Unexpected end of JSON input
+  FAILED: tests/brownlow-season-artefact.test.ts :: applies all five adjudications when the row names the exact recovery path
+    AssertionError: expected 'Traceback (most recent call last):\n …' to be '' // Object.is equality
+  FAILED: tests/brownlow-season-artefact.test.ts :: carries an unadjudicated mismatched recovery path through unchanged (no correction)
+    AssertionError: expected 'Traceback (most recent call last):\n …' to be '' // Object.is equality
+  FAILED: tests/brownlow-season-artefact.test.ts :: fails hard when an override names a recovery path the export does not carry
+    AssertionError: expected 'Traceback (most recent call last):\n …' to contain 'override for bootstrap_player_id 3597'
+  FAILED: tests/brownlow-season-artefact.test.ts :: fails hard when an override names a legacy player the export lacks
+    AssertionError: expected 'Traceback (most recent call last):\n …' to contain 'override for bootstrap_player_id 9999…'
+  FAILED: tests/brownlow-season-artefact.test.ts :: refuses a gap-fill row (no recovery path) for a player the export already bridges
+    AssertionError: expected 'Traceback (most recent call last):\n …' to contain 'does not cover exactly the export'
+  FAILED: tests/brownlow-season-artefact.test.ts :: rejects each original recovery path and resolves each adjudicated path
+    AssertionError: expected 'Traceback (most recent call last):\n …' to be '' // Object.is equality
+  FAILED: tests/brownlow-season-artefact.test.ts :: agrees on the real tracked contract, and folds Jack Ross to players/J/Jack_Ross.html
+    AssertionError: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/build_brownlow_season_artefact_from_afl_api.py", line 210, in <module>     import psycopg ModuleNotFoundError: No module named 'psycopg' : expected 1 to be +0 // Object.is equality
+  FAILED: tests/brownlow-season-artefact.test.ts :: agrees on a synthetic contract where continuing_url sorts after renumbered_url
+    AssertionError: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/build_brownlow_season_artefact_from_afl_api.py", line 210, in <module>     import psycopg ModuleNotFoundError: No module named 'psycopg' : expected 1 to be +0 // Object.is equality
+  FAILED: tests/brownlow-season-artefact.test.ts :: both sides refuse a contract with a duplicated renumbered_url
+    AssertionError: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/build_brownlow_season_artefact_from_afl_api.py", line 210, in <module>     import psycopg ModuleNotFoundError: No module named 'psycopg' : expected 1 to be +0 // Object.is equality
+  FAILED: tests/brownlow-season-artefact.test.ts :: both sides refuse a contract with a chain
+    AssertionError: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/build_brownlow_season_artefact_from_afl_api.py", line 210, in <module>     import psycopg ModuleNotFoundError: No module named 'psycopg' : expected 1 to be +0 // Object.is equality
+  FAILED: tests/brownlow-season-artefact.test.ts :: both sides refuse a contract with a broken career-game continuity
+    AssertionError: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/build_brownlow_season_artefact_from_afl_api.py", line 210, in <module>     import psycopg ModuleNotFoundError: No module named 'psycopg' : expected 1 to be +0 // Object.is equality
+  FAILED: tests/brownlow-season-artefact.test.ts :: both sides refuse a contract with a non-normalised path
+    AssertionError: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/build_brownlow_season_artefact_from_afl_api.py", line 210, in <module>     import psycopg ModuleNotFoundError: No module named 'psycopg' : expected 1 to be +0 // Object.is equality
+  FAILED: tests/deploy-release.test.ts :: builds outside the checkout, validates, boots the candidate and promotes it
+    AssertionError: release: admission: MemAvailable 26796 MB of 32018 MB, swap 8191 MB, free disk 5.0 GB release: REFUSED: admission: 5.0 GB free < 6 GB : expected 1 to be +0 // Object.is equality
+  FAILED: tests/deploy-release.test.ts :: a failing build leaves the serving release, its assets and the links untouched
+    AssertionError: expected 'release: admission: MemAvailable 2679…' to match /BUILD FAILED; nothing was promoted/
+  FAILED: tests/deploy-release.test.ts :: a type error fails the build; off-host type-checking needs recorded evidence; nothing changes
+    AssertionError: expected 'release: admission: MemAvailable 2681…' to match /build: exit 1/
+  FAILED: tests/deploy-release.test.ts :: a build interrupted by SIGTERM is stopped with its whole process group; nothing changes
+    Error: ENOENT: no such file or directory, scandir '/tmp/afldb-329-route-YdjdHT/afldb-releases/builds'
+  FAILED: tests/deploy-release.test.ts :: a build interrupted by SIGHUP is stopped with its whole process group; nothing changes
+    Error: ENOENT: no such file or directory, scandir '/tmp/afldb-329-route-YdjdHT/afldb-releases/builds'
+  FAILED: tests/deploy-release.test.ts :: a SIGKILLed tool leaves an orphan only in its workspace; the next build reaps it
+    Error: ENOENT: no such file or directory, scandir '/tmp/afldb-329-route-YdjdHT/afldb-releases/builds'
+  FAILED: tests/deploy-release.test.ts :: the memory guard kills a build that drives MemAvailable below the floor; nothing changes
+    Error: ENOENT: no such file or directory, scandir '/tmp/afldb-329-route-YdjdHT/afldb-releases/builds'
+  FAILED: tests/deploy-release.test.ts :: promotes a second release, then rolls back to the retained one without building, even mid-build
+    AssertionError: release: admission: MemAvailable 26826 MB of 32018 MB, swap 8191 MB, free disk 5.0 GB release: REFUSED: admission: 5.0 GB free < 6 GB : expected 1 to be +0 // Object.is equality
+  FAILED: tests/deploy-release.test.ts :: verify fails a tampered release and tolerates the server's ISR output
+    TypeError: The "path" argument must be of type string. Received undefined
+  FAILED: tests/deploy-release.test.ts :: adopt --from-manifest takes a settled regenerated ISR page live and refuses a changed code file
+    TypeError: The "path" argument must be of type string. Received undefined
+  FAILED: tests/draftguru-acquisition.test.ts :: rebuilds byte-identically from the accepted Stage A snapshot
+    AssertionError: Required frozen sample is missing: /home/arm/afldb-v2-gap006-linux-20261101/src/data/sources/draftguru/person-html-20260826/sample.json: expected false to be true // Object.is equality
+  FAILED: tests/draftguru-acquisition.test.ts :: is the frozen 120 / 8 / 68 / 30 / 14 contract over the accepted Stage A label
+    Error: ENOENT: no such file or directory, open '/home/arm/afldb-v2-gap006-linux-20261101/src/data/sources/draftguru/person-html-20260826/sample.json'
+  FAILED: tests/father-son-reconciliation.test.ts :: strips the listed marker, punctuation, middle initials and the generational suffix
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/father_son.py", line 94, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module named
+  FAILED: tests/father-son-reconciliation.test.ts :: resolves son and father by name, era window and club lineage, with the suffix rule deciding same-name pairs
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/father_son.py", line 94, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module named
+  FAILED: tests/father-son-reconciliation.test.ts :: classifies pre-draft and rookie selections from the list's own pick column
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/father_son.py", line 94, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module named
+  FAILED: tests/father-son-reconciliation.test.ts :: a son with 0 listed games and no candidate is a non-player; one with games needs an adjudication
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/father_son.py", line 94, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module named
+  FAILED: tests/father-son-reconciliation.test.ts :: a father with a state-league or administrator annotation and no candidate is unlinked; a plain games figure needs an adjudication
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/father_son.py", line 94, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module named
+  FAILED: tests/father-son-reconciliation.test.ts :: a father who matches by name and era but never played for the club's lineage refuses without an adjudication, and an explicit unlinked adjudication is honoured
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/father_son.py", line 94, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module named
+  FAILED: tests/father-son-reconciliation.test.ts :: the Brisbane Lions lineage admits Fitzroy and Bears games; no other organisation borrows
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/father_son.py", line 94, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module named
+  FAILED: tests/father-son-reconciliation.test.ts :: refuses an ambiguous son, a stale adjudication, an unused adjudication and a repeated pair
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/father_son.py", line 94, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module named
+  FAILED: tests/father-son-reconciliation.test.ts :: accepts a well-formed artefact and measures it
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/father_son.py", line 94, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module named
+  FAILED: tests/father-son-reconciliation.test.ts :: refuses a status that disagrees with its profile, a duplicate key, a repeated pair, a pre-draft pick and a bad competition
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/father_son.py", line 94, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module named
+  FAILED: tests/father-son-reconciliation.test.ts :: the tracked artefact validates offline through the loader, and its adjudications are exactly the seven recorded
+    AssertionError: Traceback (most recent call last):   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/father_son.py", line 94, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module named 'psycopg' : expected 1 to be +0 // Object.is e
+  FAILED: tests/fitzroy-core-import.test.ts :: leaves exactly the two genuine Round 10 rows
+    Error: ENOENT: no such file or directory, open '/home/arm/afldb-v2-gap006-linux-20261101/src/data/sources/afltables/fitzroy_core/full-history-20260902/player_stats_1909.csv'
+  FAILED: tests/fitzroy-core-import.test.ts :: leaves the younger player's other appearances untouched
+    Error: ENOENT: no such file or directory, open '/home/arm/afldb-v2-gap006-linux-20261101/src/data/sources/afltables/fitzroy_core/full-history-20260902/player_stats_1909.csv'
+  FAILED: tests/fitzroy-core-import.test.ts :: corrects exactly two rows and nothing else in 1909
+    Error: ENOENT: no such file or directory, open '/home/arm/afldb-v2-gap006-linux-20261101/src/data/sources/afltables/fitzroy_core/full-history-20260902/player_stats_1909.csv'
+  FAILED: tests/fitzroy-core-import.test.ts :: covers the four real 2025 players, retaining all 79 rows
+    Error: ENOENT: no such file or directory, open '/home/arm/afldb-v2-gap006-linux-20261101/src/data/sources/afltables/fitzroy_core/full-history-20260902/player_stats_2025.csv'
+  FAILED: tests/height-reconciliation.test.ts :: maps on club + games + goals + exact season set + the source name
+    Error: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/enrich_heights.py", line 80, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module named 'psycopg' 
+  FAILED: tests/height-reconciliation.test.ts :: folds the renamed clubs into the register club, and refuses an unknown one
+    Error: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/enrich_heights.py", line 80, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module named 'psycopg' 
+  FAILED: tests/height-reconciliation.test.ts :: fails closed when the facts fit but the name is spelled differently
+    Error: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/enrich_heights.py", line 80, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module named 'psycopg' 
+  FAILED: tests/height-reconciliation.test.ts :: separates two same-name players at one club by their facts, and refuses when it cannot
+    Error: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/enrich_heights.py", line 80, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module named 'psycopg' 
+  FAILED: tests/height-reconciliation.test.ts :: is unmatched when a game count differs (a current player without the in-season rows)
+    Error: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/enrich_heights.py", line 80, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module named 'psycopg' 
+  FAILED: tests/height-reconciliation.test.ts :: rejects differing goals with otherwise identical facts/name, including literal blank register Goals
+    Error: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/enrich_heights.py", line 80, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module named 'psycopg' 
+  FAILED: tests/height-reconciliation.test.ts :: keeps multiple named candidates ambiguous even if a jumper favors one
+    Error: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/enrich_heights.py", line 80, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module named 'psycopg' 
+  FAILED: tests/height-reconciliation.test.ts :: keeps disjoint nonempty jumpers informational for an otherwise mapped identity
+    Error: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/enrich_heights.py", line 80, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module named 'psycopg' 
+  FAILED: tests/height-reconciliation.test.ts :: never merges split raw URLs to satisfy a combined games/goals/season-set claim
+    Error: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/enrich_heights.py", line 80, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module named 'psycopg' 
+  FAILED: tests/height-reconciliation.test.ts :: keeps an unknown or implausible height as null without affecting identity
+    Error: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/enrich_heights.py", line 80, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module named 'psycopg' 
+  FAILED: tests/sibling-reconciliation.test.ts :: splits listed clubs on the export's separators, maps organisation spellings, and reads the title birth year
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/family_siblings.py", line 123, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module
+  FAILED: tests/sibling-reconciliation.test.ts :: labels what the source evidences: brothers, twin brothers, sisters, else the export's label
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/family_siblings.py", line 123, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module
+  FAILED: tests/sibling-reconciliation.test.ts :: resolves by name, suffix and listed club; orders each pair deterministically with roles travelling
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/family_siblings.py", line 123, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module
+  FAILED: tests/sibling-reconciliation.test.ts :: a same-name pair narrows by the listed club, then by the title birth year only when every candidate is dated
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/family_siblings.py", line 123, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module
+  FAILED: tests/sibling-reconciliation.test.ts :: listed clubs all outside the VFL/AFL are unlinked whatever the name matches; no candidate is unmatched
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/family_siblings.py", line 123, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module
+  FAILED: tests/sibling-reconciliation.test.ts :: an adjudication decides an ambiguous member, must be needed, and an explicit unlinked one is honoured
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/family_siblings.py", line 123, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module
+  FAILED: tests/sibling-reconciliation.test.ts :: a supplement adds an explicitly evidenced pair the export lacks; a stale or non-identity supplement refuses
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/family_siblings.py", line 123, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module
+  FAILED: tests/sibling-reconciliation.test.ts :: two people who both resolve to canonical players are brothers whatever the export called them; the men's competition decides
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/family_siblings.py", line 123, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module
+  FAILED: tests/sibling-reconciliation.test.ts :: refuses a self-pair, merges a family listed twice into one pair, and refuses two unlinked namesake pairs
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/family_siblings.py", line 123, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module
+  FAILED: tests/sibling-reconciliation.test.ts :: accepts a well-formed artefact and measures it
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/family_siblings.py", line 123, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module
+  FAILED: tests/sibling-reconciliation.test.ts :: refuses a status that disagrees with its profile, a duplicate or unordered pair, a self-pair, a repeated key and an unevidenced brothers label
+    Error: python exited 1: Traceback (most recent call last):   File "<string>", line 4, in <module>   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/family_siblings.py", line 123, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module
+  FAILED: tests/sibling-reconciliation.test.ts :: the tracked artefact validates offline, its adjudications are exactly the eight recorded, its supplements are the fourteen evidenced pairs, and its reconciliation counts hold
+    AssertionError: Traceback (most recent call last):   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/family_siblings.py", line 123, in <module>     from common import (  # noqa: E402   File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/common.py", line 29, in <module>     import psycopg ModuleNotFoundError: No module named 'psycopg' : expected 1 to be +0 // Objec
+  FILE FAILED: /home/arm/afldb-v2-gap006-linux-20261101/src/tests/coach-reconciliation.test.ts python exited 1: Traceback (most recent call last):
+  File "<string>", line 5, in <module>
+  File "/home/arm/afldb-v2-gap006-linux-20261101/src/tools/migration/import_match_coaches.py", line 71, in <module>
+    from common import connect_pg, import_batch, load_env, replay_admin_overrides, require_en
+drop-db: afldb_v2_rb_gap006lxc_test dropped
+== phase unit done 2026-10-31T21:04:53Z
+== npm run typecheck (next typegen && tsc --noEmit) 2026-10-31T21:04:53Z
+typegen exit 0
+tsc exit 0
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.90
+	Maximum resident set size (kbytes): 119300
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:00.72
+	Maximum resident set size (kbytes): 2691484
+== phase typecheck done 2026-10-31T21:06:55Z
+== eslint on every changed TypeScript/JS file since production 65c02ecc 2026-10-31T21:06:55Z
+eslint exit 1
+  1861:52   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1862:52   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  3645:33   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+✖ 43 problems (37 errors, 6 warnings)
+
+== phase lint done 2026-10-31T21:07:12Z
+== isolated production-mode build (off-host typecheck switch, 1 worker, 3072 MB heap) with resource sampling 2026-10-31T21:07:12Z
+listener 127.0.0.1:55481 pid 4106111 exe /usr/lib/postgresql/16/bin/postgres data -D /home/arm/afldb-v2-gap006-linux-20261101/pg/data
+create-db: afldb_v2_rb_gap006lxd_test created from afldb_v2_rb_gap006lxbase_test and marked
+ISOLATED TARGET OK: afldb_v2_rb_gap006lxd_test
+build exit 0
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 3:16.14
+	Maximum resident set size (kbytes): 1589640
+min MemAvailable during build: 25794 MB
+2.0G	.next
+rSVb1o9pLmyr_Js4jKCXN
+prepare-standalone: copied deploy/coming-soon
+prepare-standalone: copied and verified 7 runtime reference files
+prepare-standalone: created .next/cache for ISR
+prepare-standalone: confirmed no .env* anywhere under .next/standalone
+prepare-standalone: standalone bundle ready
+/dev/mapper/ubuntu--vg-ubuntu--lv  232G  218G  3.1G  99% /
+== phase build done 2026-10-31T21:10:32Z
+== boot smoke of the built bundle on loopback 127.0.0.1:3197 against the disposable build DB 2026-10-31T21:10:32Z
+listener 127.0.0.1:55481 pid 4106111 exe /usr/lib/postgresql/16/bin/postgres data -D /home/arm/afldb-v2-gap006-linux-20261101/pg/data
+health: {"status":"ok","database":"ok","latencyMs":28}
+buildManifest: 200
+/ -> 200 
+/beta -> 307 http://127.0.0.1:3197/
+/players -> 200 
+/clubs -> 200 
+/seasons -> 200 
+WARNING 3197 still listening
+server-log error lines: 0
+== phase smoke done 2026-10-31T21:10:38Z
+CHAIN-FINISHED

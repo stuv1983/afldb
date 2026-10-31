@@ -1,0 +1,53 @@
+== identity 2026-10-31T20:49:48Z
+host streamanator kernel 6.8.0-147-generic "Ubuntu 24.04.5 LTS" cores 24
+node v22.23.2 sha256 3517c2df0b2f8cd7…; postgres postgres (PostgreSQL) 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1); load 0.24 0.38 0.31 1/1641 4105965
+               total        used        free      shared  buff/cache   available
+Mem:           32018        4067        1150         228       27488       27950
+/dev/mapper/ubuntu--vg-ubuntu--lv  232G  215G  6.0G  98% /
+listeners (host's own, observed only): 127.0.0.1:3000 127.0.0.1:3100 127.0.0.1:5432 
+port 55481 free
+== phase identity done 2026-10-31T20:49:48Z
+== init/start cluster 127.0.0.1:55481 2026-10-31T20:49:48Z
+The files belonging to this database system will be owned by user "arm".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C".
+The default text search configuration will be set to "english".
+
+Data page checksums are disabled.
+
+creating directory /home/arm/afldb-v2-gap006-linux-20261101/pg/data ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default max_connections ... 100
+selecting default shared_buffers ... 128MB
+selecting default time zone ... Australia/Melbourne
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+init: cluster initialised
+waiting for server to start.... done
+server started
+roles: afldb_owner, afldb_app, afldb_import, afldb_backup, afldb_auth present
+listener 127.0.0.1:55481 pid 4106111 exe /usr/lib/postgresql/16/bin/postgres data -D /home/arm/afldb-v2-gap006-linux-20261101/pg/data
+== phase cluster done 2026-10-31T20:49:52Z
+== base: restore the approved baseline dump, migrate 116/117, privileges 2026-10-31T20:49:52Z
+listener 127.0.0.1:55481 pid 4106111 exe /usr/lib/postgresql/16/bin/postgres data -D /home/arm/afldb-v2-gap006-linux-20261101/pg/data
+/home/arm/afldb-v2-gap006-linux-20261101/xfer/baseline-rb_final.dump: OK
+create-db: afldb_v2_rb_gap006lxbase_test created and marked
+toc entries 1642; excluded 4
+pg_restore exit 0
+analyze exit 0
+  PENDING  117_brownlow_provider_eligibility_unknown.sql
+
+2 pending.
+  117 migration file(s), 115 already applied
+  applying 116_brownlow_correction_receipts.sql ... ok (27 ms)
+  applying 117_brownlow_provider_eligibility_unknown.sql ... ok (5 ms)
+DO
+ledger_count=117 ledger_max=117_brownlow_provider_eligibility_unknown.sql
+matches=16838 seasons=1897..2025
+players=13273
+ISOLATED TARGET OK: afldb_v2_rb_gap006lxbase_test
+== phase base done 2026-10-31T20:50:19Z

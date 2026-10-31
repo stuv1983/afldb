@@ -1,0 +1,16 @@
+isolated-pg: afldb_v2_gap006lxschema_test verified (cluster afldb_v2_isolated, 127.0.0.1:55481); running /home/arm/.nvm/versions/node/v22.23.2/bin/node
+DO
+DO
+psql:tools/maintenance/privileges.sql:200: NOTICE:  afldb_app: 55 public relations readable, 28 revoked
+DO
+psql:tools/maintenance/privileges.sql:510: NOTICE:  afldb_import: 47 registered tables writable, 36 relations revoked
+DO
+psql:tools/maintenance/privileges.sql:692: NOTICE:  afldb_auth: grants applied on 41 of 41 tables, 42 other relations revoked
+DO
+psql:tools/maintenance/privileges.sql:776: NOTICE:  nl_search_telemetry_clear(): PUBLIC revoked, afldb_auth EXECUTE granted
+DO
+psql:tools/maintenance/privileges.sql:845: NOTICE:  assert_viable_super_admin_actor(): PUBLIC revoked, afldb_import EXECUTE granted
+DO
+DO
+psql:tools/maintenance/privileges.sql:899: NOTICE:  afldb_backup: pg_read_all_data needs a superuser; unchanged
+DO

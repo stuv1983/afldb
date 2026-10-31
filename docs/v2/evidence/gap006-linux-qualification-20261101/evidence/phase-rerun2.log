@@ -1,0 +1,17 @@
+== core editor + publication suites AGAIN, with the host venv and inputs (importer replay/reload paths no longer skipped) 2026-10-31T21:25:24Z
+listener 127.0.0.1:55481 pid 4161821 data /home/arm/afldb-v2-gap006-linux-20261101/pg/data
+create-db: afldb_v2_rb_gap006lxa_test created from afldb_v2_rb_gap006lxbase_test and marked
+ISOLATED TARGET OK: afldb_v2_rb_gap006lxa_test
+lx2-core: files 21 total 658 passed 653 failed 0 skipped 5 success true
+drop-db: afldb_v2_rb_gap006lxa_test dropped
+== phase core2 done 2026-10-31T21:32:18Z
+== import/settle-coupled suites AGAIN, with the host venv and inputs 2026-10-31T21:32:18Z
+listener 127.0.0.1:55481 pid 4161821 data /home/arm/afldb-v2-gap006-linux-20261101/pg/data
+create-db: afldb_v2_rb_gap006lxb_test created from afldb_v2_rb_gap006lxbase_test and marked
+ISOLATED TARGET OK: afldb_v2_rb_gap006lxb_test
+lx2-coupled: files 9 total 315 passed 314 failed 1 skipped 0 success false
+  FAILED: tests/integration/draftguru-import.test.ts :: leaves an administrator-created player and selection standing through a reload
+    AssertionError: {"ok":false,"error":"Refused: season 2026 is sealed historical data, so a correction note of 20-2000 characters is required. No note was entered. Explain what is being corrected and why, then save again. Nothing was changed.","reason":"validation"}: expected false to be true // Object.is equality
+drop-db: afldb_v2_rb_gap006lxb_test dropped
+== phase coupled2 done 2026-10-31T21:43:45Z
+CHAIN3-FINISHED

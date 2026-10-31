@@ -1,0 +1,56 @@
+
+/home/arm/afldb-v2-gap006-linux-20261101/src/src/app/admin/player-links/ResolveControls.tsx
+  139:3  warning  'linkStatus' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/arm/afldb-v2-gap006-linux-20261101/src/src/db/queries/data-edits.ts
+  265:71  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  270:41  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/home/arm/afldb-v2-gap006-linux-20261101/src/src/db/queries/players.ts
+  158:32  warning  '_total' is defined but never used  @typescript-eslint/no-unused-vars
+  702:32  warning  '_total' is defined but never used  @typescript-eslint/no-unused-vars
+
+/home/arm/afldb-v2-gap006-linux-20261101/src/tests/integration/player-link-concurrency.test.ts
+  161:24  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  162:24  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  163:28  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  177:47  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  183:56  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  197:18  warning  'e' is defined but never used             @typescript-eslint/no-unused-vars
+  220:24  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  221:24  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  222:28  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  236:43  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  248:60  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  256:18  warning  'e' is defined but never used             @typescript-eslint/no-unused-vars
+  277:25  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  278:25  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  279:28  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  293:47  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  299:61  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  307:18  warning  'e' is defined but never used             @typescript-eslint/no-unused-vars
+
+/home/arm/afldb-v2-gap006-linux-20261101/src/tests/player-link-mutations.test.ts
+    99:7    error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   117:9    error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   123:34   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   125:49   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1805:77   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1808:62   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1813:11   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1816:11   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1819:77   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1822:96   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1826:88   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1830:102  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1837:81   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1838:66   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1839:68   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1840:75   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1859:38   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1861:52   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  1862:52   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  3645:33   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+✖ 43 problems (37 errors, 6 warnings)
+

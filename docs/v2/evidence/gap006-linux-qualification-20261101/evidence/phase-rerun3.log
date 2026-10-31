@@ -1,0 +1,8 @@
+== import/settle-coupled suites AGAIN, with the host venv and inputs 2026-10-31T21:44:56Z
+listener 127.0.0.1:55481 pid 4161821 data /home/arm/afldb-v2-gap006-linux-20261101/pg/data
+create-db: afldb_v2_rb_gap006lxb_test created from afldb_v2_rb_gap006lxbase_test and marked
+ISOLATED TARGET OK: afldb_v2_rb_gap006lxb_test
+lx2-coupled: files 9 total 315 passed 315 failed 0 skipped 0 success true
+drop-db: afldb_v2_rb_gap006lxb_test dropped
+== phase coupled2 done 2026-10-31T21:56:43Z
+CHAIN4-FINISHED

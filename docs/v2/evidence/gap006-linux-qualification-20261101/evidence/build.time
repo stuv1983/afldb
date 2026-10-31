@@ -1,0 +1,23 @@
+	Command being timed: "/home/arm/.nvm/versions/node/v22.23.2/bin/node node_modules/tsx/dist/cli.mjs tools/v2/isolated-pg.ts run afldb_v2_rb_gap006lxd_test -- /usr/bin/env AFLDB_ENV=production AFLDB_BUILD_TYPECHECK=off-host AFLDB_BUILD_WORKERS=1 NEXT_TELEMETRY_DISABLED=1 NODE_OPTIONS=--max-old-space-size=3072 npm run build"
+	User time (seconds): 300.60
+	System time (seconds): 20.63
+	Percent of CPU this job got: 163%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 3:16.14
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 1589640
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 78
+	Minor (reclaiming a frame) page faults: 1861068
+	Voluntary context switches: 561220
+	Involuntary context switches: 1990
+	Swaps: 0
+	File system inputs: 204576
+	File system outputs: 3991800
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

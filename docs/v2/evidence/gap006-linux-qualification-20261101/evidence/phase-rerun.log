@@ -1,0 +1,21 @@
+== Coleman publication on its own schema-only target, with the host venv 2026-10-31T21:12:26Z
+listener 127.0.0.1:55481 pid 4106111 data /home/arm/afldb-v2-gap006-linux-20261101/pg/data
+create-db: afldb_v2_gap006lxschema_test created and marked
+lx2-coleman: files 1 total 28 passed 28 failed 0 skipped 0 success true
+drop-db: afldb_v2_gap006lxschema_test dropped
+== phase coleman done 2026-10-31T21:12:43Z
+== full unit pass (everything outside tests/integration and tests/nl-ui), venv + inputs present, deploy-release excluded here 2026-10-31T21:12:43Z
+listener 127.0.0.1:55481 pid 4106111 data /home/arm/afldb-v2-gap006-linux-20261101/pg/data
+create-db: afldb_v2_rb_gap006lxc_test created from afldb_v2_rb_gap006lxbase_test and marked
+ISOLATED TARGET OK: afldb_v2_rb_gap006lxc_test
+lx2-unit: files 207 total 11529 passed 11528 failed 0 skipped 1 success true
+drop-db: afldb_v2_rb_gap006lxc_test dropped
+== phase unit done 2026-10-31T21:23:12Z
+== deploy-release route suite with TMPDIR on tmpfs (admission measures the temp root's filesystem) 2026-10-31T21:23:12Z
+listener 127.0.0.1:55481 pid 4106111 data /home/arm/afldb-v2-gap006-linux-20261101/pg/data
+create-db: afldb_v2_rb_gap006lxc_test created from afldb_v2_rb_gap006lxbase_test and marked
+ISOLATED TARGET OK: afldb_v2_rb_gap006lxc_test
+lx2-deploy-release: files 1 total 33 passed 33 failed 0 skipped 0 success true
+drop-db: afldb_v2_rb_gap006lxc_test dropped
+== phase deploy done 2026-10-31T21:23:41Z
+CHAIN2-FINISHED

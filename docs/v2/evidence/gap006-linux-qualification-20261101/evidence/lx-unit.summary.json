@@ -1,0 +1,1062 @@
+{
+ "report": "lx-unit",
+ "files": 208,
+ "total": 11523,
+ "passed": 11390,
+ "failed": 94,
+ "skipped": 39,
+ "success": false,
+ "failedFiles": [
+  "tests/after-siren-normalisation.test.ts",
+  "tests/brownlow-season-artefact.test.ts",
+  "tests/coach-reconciliation.test.ts",
+  "tests/deploy-release.test.ts",
+  "tests/draftguru-acquisition.test.ts",
+  "tests/father-son-reconciliation.test.ts",
+  "tests/fitzroy-core-import.test.ts",
+  "tests/height-reconciliation.test.ts",
+  "tests/sibling-reconciliation.test.ts"
+ ],
+ "perFile": [
+  {
+   "f": "tests/admin-access-actions.test.ts",
+   "s": "passed",
+   "n": 13
+  },
+  {
+   "f": "tests/admin-audit-viewer.test.ts",
+   "s": "passed",
+   "n": 33
+  },
+  {
+   "f": "tests/admin-awards-hall-of-fame-years.test.ts",
+   "s": "passed",
+   "n": 42
+  },
+  {
+   "f": "tests/admin-brownlow-actions.test.ts",
+   "s": "passed",
+   "n": 32
+  },
+  {
+   "f": "tests/admin-club-leadership-actions.test.ts",
+   "s": "passed",
+   "n": 15
+  },
+  {
+   "f": "tests/admin-coach-actions.test.ts",
+   "s": "passed",
+   "n": 25
+  },
+  {
+   "f": "tests/admin-current-season-settle.test.ts",
+   "s": "passed",
+   "n": 58
+  },
+  {
+   "f": "tests/admin-draft-actions.test.ts",
+   "s": "passed",
+   "n": 60
+  },
+  {
+   "f": "tests/admin-fixture-actions.test.ts",
+   "s": "passed",
+   "n": 81
+  },
+  {
+   "f": "tests/admin-lifecycle-actions.test.ts",
+   "s": "passed",
+   "n": 35
+  },
+  {
+   "f": "tests/admin-match-input.test.ts",
+   "s": "passed",
+   "n": 9
+  },
+  {
+   "f": "tests/admin-match-mutations.test.ts",
+   "s": "passed",
+   "n": 17
+  },
+  {
+   "f": "tests/admin-nl-search-actions.test.ts",
+   "s": "passed",
+   "n": 11
+  },
+  {
+   "f": "tests/admin-season-list-actions.test.ts",
+   "s": "passed",
+   "n": 28
+  },
+  {
+   "f": "tests/admin-settings-actions.test.ts",
+   "s": "passed",
+   "n": 4
+  },
+  {
+   "f": "tests/admin-upload-route.test.ts",
+   "s": "passed",
+   "n": 24
+  },
+  {
+   "f": "tests/advanced-spec.test.ts",
+   "s": "passed",
+   "n": 13
+  },
+  {
+   "f": "tests/afl-api-adjudication-actions-contract.test.ts",
+   "s": "passed",
+   "n": 4
+  },
+  {
+   "f": "tests/afl-api-adjudication-recovery.test.ts",
+   "s": "passed",
+   "n": 26
+  },
+  {
+   "f": "tests/afl-api-brownlow-acquire.test.ts",
+   "s": "passed",
+   "n": 11
+  },
+  {
+   "f": "tests/afl-api-brownlow.test.ts",
+   "s": "passed",
+   "n": 58
+  },
+  {
+   "f": "tests/afl-api-cutover.test.ts",
+   "s": "passed",
+   "n": 423
+  },
+  {
+   "f": "tests/afl-api-identity-correction.test.ts",
+   "s": "passed",
+   "n": 141
+  },
+  {
+   "f": "tests/afl-api-ingestion-control.test.ts",
+   "s": "passed",
+   "n": 10
+  },
+  {
+   "f": "tests/afl-api-ingestion-safety.test.ts",
+   "s": "passed",
+   "n": 170
+  },
+  {
+   "f": "tests/afl-api-lineup-migration.test.ts",
+   "s": "passed",
+   "n": 22
+  },
+  {
+   "f": "tests/afl-api-lineup-store.test.ts",
+   "s": "passed",
+   "n": 16
+  },
+  {
+   "f": "tests/afl-api-lineup.test.ts",
+   "s": "passed",
+   "n": 46
+  },
+  {
+   "f": "tests/afl-api-match-migration.test.ts",
+   "s": "passed",
+   "n": 25
+  },
+  {
+   "f": "tests/afl-api-match.test.ts",
+   "s": "passed",
+   "n": 245
+  },
+  {
+   "f": "tests/afl-api-page-table-wrap-contract.test.ts",
+   "s": "passed",
+   "n": 4
+  },
+  {
+   "f": "tests/afl-api-player-bridge-cli.test.ts",
+   "s": "passed",
+   "n": 28
+  },
+  {
+   "f": "tests/afl-api-player-bridge-import.test.ts",
+   "s": "passed",
+   "n": 36
+  },
+  {
+   "f": "tests/afl-api-player-evidence.test.ts",
+   "s": "passed",
+   "n": 58
+  },
+  {
+   "f": "tests/afl-api-rounds.test.ts",
+   "s": "passed",
+   "n": 8
+  },
+  {
+   "f": "tests/afl-api-settle-cli-gate.test.ts",
+   "s": "passed",
+   "n": 76
+  },
+  {
+   "f": "tests/afl-api-settle-plan.test.ts",
+   "s": "passed",
+   "n": 55
+  },
+  {
+   "f": "tests/aflw-match-outcome-guard.test.ts",
+   "s": "passed",
+   "n": 2
+  },
+  {
+   "f": "tests/after-siren-format.test.ts",
+   "s": "passed",
+   "n": 9
+  },
+  {
+   "f": "tests/after-siren-normalisation.test.ts",
+   "s": "failed",
+   "n": 31
+  },
+  {
+   "f": "tests/all-australian-source.test.ts",
+   "s": "passed",
+   "n": 40
+  },
+  {
+   "f": "tests/audit-afl-api-brownlow-canonical-equality.test.ts",
+   "s": "passed",
+   "n": 2
+  },
+  {
+   "f": "tests/audit-link-fk-indexes.test.ts",
+   "s": "passed",
+   "n": 5
+  },
+  {
+   "f": "tests/auth.test.ts",
+   "s": "passed",
+   "n": 203
+  },
+  {
+   "f": "tests/award-definitions-source.test.ts",
+   "s": "passed",
+   "n": 24
+  },
+  {
+   "f": "tests/award-stat-line.test.ts",
+   "s": "passed",
+   "n": 7
+  },
+  {
+   "f": "tests/awards-admin.test.ts",
+   "s": "passed",
+   "n": 41
+  },
+  {
+   "f": "tests/awards-replace-panel.test.ts",
+   "s": "passed",
+   "n": 25
+  },
+  {
+   "f": "tests/behind-holder.test.ts",
+   "s": "passed",
+   "n": 34
+  },
+  {
+   "f": "tests/beta-verify.test.ts",
+   "s": "passed",
+   "n": 12
+  },
+  {
+   "f": "tests/brownlow-entry.test.ts",
+   "s": "passed",
+   "n": 95
+  },
+  {
+   "f": "tests/brownlow-focus-restore.test.ts",
+   "s": "passed",
+   "n": 29
+  },
+  {
+   "f": "tests/brownlow-provider-team-club-map.test.ts",
+   "s": "passed",
+   "n": 18
+  },
+  {
+   "f": "tests/brownlow-season-artefact.test.ts",
+   "s": "failed",
+   "n": 44
+  },
+  {
+   "f": "tests/brownlow-vote-form-data.test.ts",
+   "s": "passed",
+   "n": 15
+  },
+  {
+   "f": "tests/captaincies-source.test.ts",
+   "s": "passed",
+   "n": 23
+  },
+  {
+   "f": "tests/catalogue-lookups.test.ts",
+   "s": "passed",
+   "n": 14
+  },
+  {
+   "f": "tests/census-afl-api-brownlow-identities.test.ts",
+   "s": "passed",
+   "n": 4
+  },
+  {
+   "f": "tests/club-best-and-fairest-source.test.ts",
+   "s": "passed",
+   "n": 37
+  },
+  {
+   "f": "tests/club-coach-records.test.ts",
+   "s": "passed",
+   "n": 8
+  },
+  {
+   "f": "tests/club-comparison-view.test.ts",
+   "s": "passed",
+   "n": 32
+  },
+  {
+   "f": "tests/club-comparison.test.ts",
+   "s": "passed",
+   "n": 15
+  },
+  {
+   "f": "tests/club-list-sources.test.ts",
+   "s": "passed",
+   "n": 8
+  },
+  {
+   "f": "tests/club-premierships.test.ts",
+   "s": "passed",
+   "n": 9
+  },
+  {
+   "f": "tests/club-records-sections.test.ts",
+   "s": "passed",
+   "n": 14
+  },
+  {
+   "f": "tests/coach-career-record.test.ts",
+   "s": "passed",
+   "n": 20
+  },
+  {
+   "f": "tests/coach-comparison-career.test.ts",
+   "s": "passed",
+   "n": 17
+  },
+  {
+   "f": "tests/coach-comparison-url.test.ts",
+   "s": "passed",
+   "n": 6
+  },
+  {
+   "f": "tests/coach-head-to-head-view.test.ts",
+   "s": "passed",
+   "n": 16
+  },
+  {
+   "f": "tests/coach-profile-route.test.ts",
+   "s": "passed",
+   "n": 18
+  },
+  {
+   "f": "tests/coach-reconciliation.test.ts",
+   "s": "failed",
+   "n": 0
+  },
+  {
+   "f": "tests/coach-slug.test.ts",
+   "s": "passed",
+   "n": 6
+  },
+  {
+   "f": "tests/coaches.test.ts",
+   "s": "passed",
+   "n": 12
+  },
+  {
+   "f": "tests/coleman-derivation.test.ts",
+   "s": "passed",
+   "n": 42
+  },
+  {
+   "f": "tests/correct-afl-api-identity-cli.test.ts",
+   "s": "passed",
+   "n": 276
+  },
+  {
+   "f": "tests/csv.test.ts",
+   "s": "passed",
+   "n": 18
+  },
+  {
+   "f": "tests/current-season-import.test.ts",
+   "s": "passed",
+   "n": 360
+  },
+  {
+   "f": "tests/data-overrides-source-contract.test.ts",
+   "s": "passed",
+   "n": 74
+  },
+  {
+   "f": "tests/db-promotion-check.test.ts",
+   "s": "passed",
+   "n": 480
+  },
+  {
+   "f": "tests/db-test-rebuild.test.ts",
+   "s": "passed",
+   "n": 1155
+  },
+  {
+   "f": "tests/deploy-release.test.ts",
+   "s": "failed",
+   "n": 33
+  },
+  {
+   "f": "tests/deploy-web-unit.test.ts",
+   "s": "passed",
+   "n": 31
+  },
+  {
+   "f": "tests/draft-linkage-invariants.test.ts",
+   "s": "passed",
+   "n": 8
+  },
+  {
+   "f": "tests/draftguru-acquisition.test.ts",
+   "s": "failed",
+   "n": 167
+  },
+  {
+   "f": "tests/draftguru-import.test.ts",
+   "s": "passed",
+   "n": 46
+  },
+  {
+   "f": "tests/dsn-policy.test.ts",
+   "s": "passed",
+   "n": 20
+  },
+  {
+   "f": "tests/early-access-questions.test.ts",
+   "s": "passed",
+   "n": 19
+  },
+  {
+   "f": "tests/edit-spec.test.ts",
+   "s": "passed",
+   "n": 12
+  },
+  {
+   "f": "tests/email-intake-route.test.ts",
+   "s": "passed",
+   "n": 7
+  },
+  {
+   "f": "tests/executable-statements.test.ts",
+   "s": "passed",
+   "n": 14
+  },
+  {
+   "f": "tests/expandable-table-frame.test.ts",
+   "s": "passed",
+   "n": 3
+  },
+  {
+   "f": "tests/external-grids-import.test.ts",
+   "s": "passed",
+   "n": 47
+  },
+  {
+   "f": "tests/family-records-surfaces.test.ts",
+   "s": "passed",
+   "n": 7
+  },
+  {
+   "f": "tests/father-son-reconciliation.test.ts",
+   "s": "failed",
+   "n": 11
+  },
+  {
+   "f": "tests/finals-semantics-contract.test.ts",
+   "s": "passed",
+   "n": 10
+  },
+  {
+   "f": "tests/first-kick-goal-source.test.ts",
+   "s": "passed",
+   "n": 20
+  },
+  {
+   "f": "tests/fitzroy-acquisition.test.ts",
+   "s": "passed",
+   "n": 23
+  },
+  {
+   "f": "tests/fitzroy-core-import.test.ts",
+   "s": "failed",
+   "n": 117
+  },
+  {
+   "f": "tests/format.test.ts",
+   "s": "passed",
+   "n": 43
+  },
+  {
+   "f": "tests/grid-solver-spec.test.ts",
+   "s": "passed",
+   "n": 19
+  },
+  {
+   "f": "tests/grid-solver-timeout.test.ts",
+   "s": "passed",
+   "n": 11
+  },
+  {
+   "f": "tests/grid-solver-under22.test.ts",
+   "s": "passed",
+   "n": 2
+  },
+  {
+   "f": "tests/gridley-acquisition.test.ts",
+   "s": "passed",
+   "n": 45
+  },
+  {
+   "f": "tests/gridley-compat.test.ts",
+   "s": "passed",
+   "n": 59
+  },
+  {
+   "f": "tests/hall-of-fame-source.test.ts",
+   "s": "passed",
+   "n": 24
+  },
+  {
+   "f": "tests/health-event-route.test.ts",
+   "s": "passed",
+   "n": 3
+  },
+  {
+   "f": "tests/height-reconciliation.test.ts",
+   "s": "failed",
+   "n": 14
+  },
+  {
+   "f": "tests/home-records.test.ts",
+   "s": "passed",
+   "n": 11
+  },
+  {
+   "f": "tests/honour-teams-source.test.ts",
+   "s": "passed",
+   "n": 22
+  },
+  {
+   "f": "tests/honours-lifecycle-public-contract.test.ts",
+   "s": "passed",
+   "n": 11
+  },
+  {
+   "f": "tests/import-role-lock-fixture.test.ts",
+   "s": "passed",
+   "n": 13
+  },
+  {
+   "f": "tests/import-role-parity.test.ts",
+   "s": "passed",
+   "n": 4
+  },
+  {
+   "f": "tests/indexing.test.ts",
+   "s": "passed",
+   "n": 4
+  },
+  {
+   "f": "tests/ingest-datasets.test.ts",
+   "s": "passed",
+   "n": 305
+  },
+  {
+   "f": "tests/issue246-retire-issue109-fixture.test.ts",
+   "s": "passed",
+   "n": 88
+  },
+  {
+   "f": "tests/issue248-cleanup-dev-auth-fixtures.test.ts",
+   "s": "passed",
+   "n": 138
+  },
+  {
+   "f": "tests/like.test.ts",
+   "s": "passed",
+   "n": 7
+  },
+  {
+   "f": "tests/match-backtest-compare.test.ts",
+   "s": "passed",
+   "n": 32
+  },
+  {
+   "f": "tests/match-lineup-editor.test.ts",
+   "s": "passed",
+   "n": 5
+  },
+  {
+   "f": "tests/match-sheet.test.ts",
+   "s": "passed",
+   "n": 91
+  },
+  {
+   "f": "tests/match-spec.test.ts",
+   "s": "passed",
+   "n": 20
+  },
+  {
+   "f": "tests/migration-checksum.test.ts",
+   "s": "passed",
+   "n": 12
+  },
+  {
+   "f": "tests/named-medals-source.test.ts",
+   "s": "passed",
+   "n": 44
+  },
+  {
+   "f": "tests/nl-answer-feedback-boundary.test.ts",
+   "s": "passed",
+   "n": 2
+  },
+  {
+   "f": "tests/nl-audit-acceptance.test.ts",
+   "s": "passed",
+   "n": 10
+  },
+  {
+   "f": "tests/nl-describe.test.ts",
+   "s": "passed",
+   "n": 89
+  },
+  {
+   "f": "tests/nl-expanded-ui-corpus-generator.test.ts",
+   "s": "passed",
+   "n": 2
+  },
+  {
+   "f": "tests/nl-feedback.test.ts",
+   "s": "passed",
+   "n": 31
+  },
+  {
+   "f": "tests/nl-finals-without-premiership-corpus-fix.test.ts",
+   "s": "passed",
+   "n": 10
+  },
+  {
+   "f": "tests/nl-head-to-head-describe.test.ts",
+   "s": "passed",
+   "n": 2
+  },
+  {
+   "f": "tests/nl-issue-199-corpus-fix.test.ts",
+   "s": "passed",
+   "n": 28
+  },
+  {
+   "f": "tests/nl-issue-200-audit-cluster.test.ts",
+   "s": "passed",
+   "n": 16
+  },
+  {
+   "f": "tests/nl-issue-200-audit-extract.test.ts",
+   "s": "passed",
+   "n": 21
+  },
+  {
+   "f": "tests/nl-issue-201-corpus-fix.test.ts",
+   "s": "passed",
+   "n": 17
+  },
+  {
+   "f": "tests/nl-issue-204-corpus-fix.test.ts",
+   "s": "passed",
+   "n": 34
+  },
+  {
+   "f": "tests/nl-issue-205-corpus-fix.test.ts",
+   "s": "passed",
+   "n": 15
+  },
+  {
+   "f": "tests/nl-parser.test.ts",
+   "s": "passed",
+   "n": 632
+  },
+  {
+   "f": "tests/nl-plan.test.ts",
+   "s": "passed",
+   "n": 220
+  },
+  {
+   "f": "tests/nl-player-career-metric-guard.test.ts",
+   "s": "passed",
+   "n": 31
+  },
+  {
+   "f": "tests/nl-regression-corpus.test.ts",
+   "s": "passed",
+   "n": 163
+  },
+  {
+   "f": "tests/nl-search-log.test.ts",
+   "s": "passed",
+   "n": 16
+  },
+  {
+   "f": "tests/nl-semantic-mapping.test.ts",
+   "s": "passed",
+   "n": 178
+  },
+  {
+   "f": "tests/nl-stress-corpus.test.ts",
+   "s": "passed",
+   "n": 65
+  },
+  {
+   "f": "tests/nl-stress-v2.test.ts",
+   "s": "passed",
+   "n": 58
+  },
+  {
+   "f": "tests/nl-ui-corpus.test.ts",
+   "s": "passed",
+   "n": 51
+  },
+  {
+   "f": "tests/player-after-siren-events.test.ts",
+   "s": "passed",
+   "n": 9
+  },
+  {
+   "f": "tests/player-coaching-career.test.ts",
+   "s": "passed",
+   "n": 12
+  },
+  {
+   "f": "tests/player-compare.test.ts",
+   "s": "passed",
+   "n": 8
+  },
+  {
+   "f": "tests/player-family-card.test.ts",
+   "s": "passed",
+   "n": 18
+  },
+  {
+   "f": "tests/player-identity-source.test.ts",
+   "s": "passed",
+   "n": 20
+  },
+  {
+   "f": "tests/player-link-mutations.test.ts",
+   "s": "passed",
+   "n": 160
+  },
+  {
+   "f": "tests/player-links-page.test.ts",
+   "s": "passed",
+   "n": 8
+  },
+  {
+   "f": "tests/player-matching-describe.test.ts",
+   "s": "passed",
+   "n": 38
+  },
+  {
+   "f": "tests/player-matching.test.ts",
+   "s": "passed",
+   "n": 100
+  },
+  {
+   "f": "tests/playwright-timeout-policy.test.ts",
+   "s": "passed",
+   "n": 6
+  },
+  {
+   "f": "tests/query-builder-spec.test.ts",
+   "s": "passed",
+   "n": 24
+  },
+  {
+   "f": "tests/query-intent.test.ts",
+   "s": "passed",
+   "n": 46
+  },
+  {
+   "f": "tests/rate-limit.test.ts",
+   "s": "passed",
+   "n": 6
+  },
+  {
+   "f": "tests/reference-data.test.ts",
+   "s": "passed",
+   "n": 58
+  },
+  {
+   "f": "tests/register-issue224-s9-dev-write-gate.test.ts",
+   "s": "passed",
+   "n": 154
+  },
+  {
+   "f": "tests/rising-star-source.test.ts",
+   "s": "passed",
+   "n": 33
+  },
+  {
+   "f": "tests/rising-star-winners-source.test.ts",
+   "s": "passed",
+   "n": 27
+  },
+  {
+   "f": "tests/search-rate-limit.test.ts",
+   "s": "passed",
+   "n": 6
+  },
+  {
+   "f": "tests/season-rollover.test.ts",
+   "s": "passed",
+   "n": 396
+  },
+  {
+   "f": "tests/seo.test.ts",
+   "s": "passed",
+   "n": 25
+  },
+  {
+   "f": "tests/settle-season-revalidation.test.ts",
+   "s": "passed",
+   "n": 69
+  },
+  {
+   "f": "tests/sibling-reconciliation.test.ts",
+   "s": "failed",
+   "n": 12
+  },
+  {
+   "f": "tests/site-content.test.ts",
+   "s": "passed",
+   "n": 48
+  },
+  {
+   "f": "tests/site-settings.test.ts",
+   "s": "passed",
+   "n": 37
+  },
+  {
+   "f": "tests/special-records-admin.test.ts",
+   "s": "passed",
+   "n": 43
+  },
+  {
+   "f": "tests/special-records-identity.test.ts",
+   "s": "passed",
+   "n": 15
+  },
+  {
+   "f": "tests/special-records-public-filter-contract.test.ts",
+   "s": "passed",
+   "n": 10
+  },
+  {
+   "f": "tests/special-records-replay-parity.test.ts",
+   "s": "passed",
+   "n": 19
+  },
+  {
+   "f": "tests/submission-review-actions.test.ts",
+   "s": "passed",
+   "n": 42
+  },
+  {
+   "f": "tests/table-filters.test.ts",
+   "s": "passed",
+   "n": 23
+  },
+  {
+   "f": "tests/under-22-importer.test.ts",
+   "s": "passed",
+   "n": 8
+  },
+  {
+   "f": "tests/under-22-source.test.ts",
+   "s": "passed",
+   "n": 12
+  },
+  {
+   "f": "tests/v2-acquisition-pipeline.test.ts",
+   "s": "passed",
+   "n": 24
+  },
+  {
+   "f": "tests/v2-acquisition-replay.test.ts",
+   "s": "passed",
+   "n": 13
+  },
+  {
+   "f": "tests/v2-admin-operations-ui.test.ts",
+   "s": "passed",
+   "n": 101
+  },
+  {
+   "f": "tests/v2-admin-operations.test.ts",
+   "s": "passed",
+   "n": 95
+  },
+  {
+   "f": "tests/v2-brownlow-eligibility.test.ts",
+   "s": "passed",
+   "n": 65
+  },
+  {
+   "f": "tests/v2-brownlow-legacy-ownership-adoption.test.ts",
+   "s": "passed",
+   "n": 21
+  },
+  {
+   "f": "tests/v2-brownlow-production-correction.test.ts",
+   "s": "passed",
+   "n": 16
+  },
+  {
+   "f": "tests/v2-brownlow-reconciliation.test.ts",
+   "s": "passed",
+   "n": 59
+  },
+  {
+   "f": "tests/v2-brownlow-round-vote-match-backfill.test.ts",
+   "s": "passed",
+   "n": 16
+  },
+  {
+   "f": "tests/v2-coleman-projection.test.ts",
+   "s": "passed",
+   "n": 36
+  },
+  {
+   "f": "tests/v2-coleman-publication-pglite.test.ts",
+   "s": "passed",
+   "n": 23
+  },
+  {
+   "f": "tests/v2-coleman-publication.test.ts",
+   "s": "passed",
+   "n": 32
+  },
+  {
+   "f": "tests/v2-coleman.test.ts",
+   "s": "passed",
+   "n": 45
+  },
+  {
+   "f": "tests/v2-coverage-registry.test.ts",
+   "s": "passed",
+   "n": 25
+  },
+  {
+   "f": "tests/v2-curated-awards-pglite.test.ts",
+   "s": "passed",
+   "n": 35
+  },
+  {
+   "f": "tests/v2-curated-awards.test.ts",
+   "s": "passed",
+   "n": 124
+  },
+  {
+   "f": "tests/v2-fixture-contract.test.ts",
+   "s": "passed",
+   "n": 67
+  },
+  {
+   "f": "tests/v2-historical-manifest.test.ts",
+   "s": "passed",
+   "n": 38
+  },
+  {
+   "f": "tests/v2-isolated-test-target.test.ts",
+   "s": "passed",
+   "n": 27
+  },
+  {
+   "f": "tests/v2-module-boundaries.test.ts",
+   "s": "passed",
+   "n": 53
+  },
+  {
+   "f": "tests/v2-reconciliation-report.test.ts",
+   "s": "passed",
+   "n": 17
+  },
+  {
+   "f": "tests/v2-season-seal.test.ts",
+   "s": "passed",
+   "n": 51
+  },
+  {
+   "f": "tests/v2-shadow-award-reports.test.ts",
+   "s": "passed",
+   "n": 59
+  },
+  {
+   "f": "tests/v2-shadow-capture.test.ts",
+   "s": "passed",
+   "n": 82
+  },
+  {
+   "f": "tests/v2-shadow-parity.test.ts",
+   "s": "passed",
+   "n": 201
+  },
+  {
+   "f": "tests/v2-shadow-target.test.ts",
+   "s": "passed",
+   "n": 72
+  },
+  {
+   "f": "tests/venue-records-sections.test.ts",
+   "s": "passed",
+   "n": 12
+  },
+  {
+   "f": "tests/workflow-preflight.test.ts",
+   "s": "passed",
+   "n": 37
+  },
+  {
+   "f": "tests/unit/NlAnswerSection.test.ts",
+   "s": "passed",
+   "n": 3
+  },
+  {
+   "f": "tests/unit/qualifying-matches-gate.test.ts",
+   "s": "passed",
+   "n": 3
+  },
+  {
+   "f": "tests/unit/sorting.test.ts",
+   "s": "passed",
+   "n": 4
+  }
+ ]
+}

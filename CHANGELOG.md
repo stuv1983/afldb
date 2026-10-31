@@ -15,6 +15,10 @@ commit.
 
 ## [Unreleased]
 
+### V2-GAP-006: Linux qualification and release package for the editor protections (2026-11-01, local only, not deployed)
+
+- Candidate `fd48ace0` qualified on Linux (integration 653 + 315, Coleman 28/28, unit 11,528, release route 33/33, typecheck, build and smoke). One test-only fixture fix (`draftguru-import` supplies a correction note for the sealed 2026 selection). Owner-attended release package with relative sequence, `afldb_import` SELECT on `data_edits` preflight, rollback and stop conditions: `docs/v2/gap006-editor-protections-release-package.md`. Editor protections only; database-level enforcement and other writers remain open; ISSUE-331 open.
+
 ### V2-GAP-006: season seal on the audited admin editors, Option E1 (2026-10-31, local only, not deployed)
 
 - **Behaviour.** Every audited editor mutation now goes through one guard (`src/lib/seasons/sealed-editor-guard.ts`,

@@ -1,0 +1,15 @@
+isolated-pg: afldb_v2_rb_gap006lxd_test verified (cluster afldb_v2_isolated, 127.0.0.1:55481); running /usr/bin/env
+[afldb] primary 4135950 starting 1 worker(s)
+[afldb] serving build rSVb1o9pLmyr_Js4jKCXN release in-place revision unknown
+▲ Next.js 16.3.1
+- Local:         http://127.0.0.1:3197
+- Network:       http://127.0.0.1:3197
+✓ Ready in 0ms
+✓ Running next.config took 6ms
+[afldb] SIGTERM received, stopping workers
+[afldb] worker 4135957 (id 1) exited (143); restarting in 1000ms
+▲ Next.js 16.3.1
+- Local:         http://127.0.0.1:3197
+- Network:       http://127.0.0.1:3197
+✓ Ready in 0ms
+✓ Running next.config took 7ms
