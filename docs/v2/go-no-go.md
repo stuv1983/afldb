@@ -198,7 +198,7 @@ production data, and criterion 10 needs host action. Shadow-ready would still no
 |---|---|---|
 | Fixture identity can duplicate or misassign matches | **yes, blocks until B2**: the writer is built and refuses ambiguity, but it has never seen a 2027 pre-match feed | V2-GAP-008 |
 | Player resolution creates placeholders or silently guesses | no | Stage 3 refusal tests |
-| API coverage is assumed rather than verified | no: 2012-2025 API coverage is not claimed | V2-GAP-010, `docs/v2/coverage-matrix.md` |
+| API coverage is assumed rather than verified | no: 2012-2025 API coverage is not claimed (V2-GAP-010 closed 2026-10-31 as an accepted constraint) | V2-GAP-010, `docs/v2/coverage-matrix.md` |
 | Historical data would be deleted or rewritten destructively | no | additive migrations; seal checks (V2-GAP-006 for other writers) |
 | Brownlow or Coleman results cannot be reconciled | **Brownlow: reconciles on authentic 2025 data except 12 unresolved eligibility disagreements: blocks until the owner rules**; Coleman 46/46 on local data and, 2026-10-31, on the production archive (V2-GAP-015 closed) | V2-GAP-015, 016; [record](brownlow-authentic-reconciliation-2026-10-20.md) |
 | The frontend requires unplanned breaking schema changes | no | no existing table changed |
@@ -227,8 +227,8 @@ production data, and criterion 10 needs host action. Shadow-ready would still no
 |---|---|
 | V2 merge | **merged locally 2026-10-29 (D-V2-LOCK-1) and pushed 2026-10-30 (D-V2-PUSH-ROUTE-1)**: `git merge --no-ff` into local `main`, locked execution commit `9ed9c9dd`. `origin` (the source repository's existing URL) was added. `origin/main` was exactly `ff100dc2` and was fast-forwarded to `9ed9c9dd` without force; `v2/rebuild` was pushed at `d3286d92`. The lock holds. Production execution: [package](production-execution-package-2026-10-30.md), preparation P-1–P-7 complete (§4.1); approved and **executed 2026-10-31** ([record](production-execution-record-2026-10-31.md)). Earlier text: reconcile the 19 ISSUE-316 follow-up-8 files it carries (commit `c9cca86d`) with the source worktree (RISK-15) |
 | V2-GAP-004 | **closed 2026-10-31**: hook fixed (no-shell runner), stray `supplies` deleted; see the gap entry |
-| V2-GAP-005 | whether AFLW joins the historical manifest |
-| V2-GAP-006 | database-level seal enforcement |
+| V2-GAP-005 | **closed 2026-10-31**: AFLW stays outside the manifest (accepted scope boundary) |
+| V2-GAP-006 | database-level seal enforcement (deferred, not implemented); admin editors: D-V2-GAP006-EDITORS (E1/E2/E3) pending, see [the sheet](owner-decisions-remaining-2026-10-31.md) |
 | V2-GAP-016 | decided (ADR 0014); remaining: confirm the projection path and run the blast-radius count |
 | V2-GAP-019 | decided and built (ADR 0008, four-eyes with attestation); nothing remaining |
 | V2-GAP-021 | decided and built (ADR 0015); remaining: retire the offline loader's coleman group for covered seasons |

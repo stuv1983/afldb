@@ -64,7 +64,7 @@ audited workflows in the table above.
 | `staging.*`, the observation spine, typed projections | source observations, not canonical history (074, 076, 077, 103) |
 | audit and decision ledgers (`data_edits`, `canonical_applications`, `promotion_*`, `import_batches`, ...) | append-only by design; they are what reconciliation reads |
 | auth, beta, site settings, media, NL search logs | operational, production-owned (`docs/production-promotion.md`) |
-| AFLW (`staging_aflw.*`, `aflw.*` views) | separate competition and loader (`tools/aflw/`, `docs/aflw.md`); not covered by this manifest (V2-GAP-005) |
+| AFLW (`staging_aflw.*`, `aflw.*` views) | separate competition and loader (`tools/aflw/`, `docs/aflw.md`); not covered by this manifest: an accepted scope boundary (V2-GAP-005, closed 2026-10-31, D-V2-GAP005 Option A) |
 | `fixtures` | the schedule, not results; a sealed season's results are in `matches` |
 
 ## 4. Verification

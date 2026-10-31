@@ -15,6 +15,21 @@ commit.
 
 ## [Unreleased]
 
+### V2-GAP-005 and V2-GAP-010 closed as accepted decisions; V2-GAP-006 traced and held (2026-10-31)
+
+- Records only; no code, test, database, host, provider or Brownlow operation. Owner decisions D-V2-GAP005 and
+  D-V2-GAP010 (Option A each): AFLW stays outside the AFL/VFL historical manifest (spec version unchanged, AFLW data
+  and backups untouched), and no verified AFL API match, statistics or Brownlow coverage is claimed for 2012-2025
+  (matrix unchanged; roster evidence and 2026 claims preserved).
+- V2-GAP-006 (Option B approved): the trace found the seal contract (closed list of eight workflows, a 20-2000
+  character note, an evidence reference) is collected by none of the audited admin editors, and seven have no workflow
+  id, so enforcing it would refuse every sealed-season edit. **No code was changed**; the exact decision
+  (D-V2-GAP006-EDITORS, E1/E2/E3) is prepared. The gap stays open; database-level enforcement is deferred and not
+  implemented.
+- Corrected stale statements: migrations 116 and 117 are already installed on production (ledger 117); installation is
+  not the Brownlow gate. The AFL Tables timer retirement is done and is not the full ISSUE-316 cutover.
+- Register now **38 total / 31 closed / 7 open** (open: 006, 008, 011, 016, 029, 030, 031).
+
 ### V2-GAP-004 closed: workstation Read/Grep/Glob hook verified safe (2026-10-31)
 
 - Records and evidence only; no repository code changed. The user-level hook (outside the repository) was fixed on
