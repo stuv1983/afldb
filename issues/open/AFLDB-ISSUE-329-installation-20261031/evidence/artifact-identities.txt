@@ -1,0 +1,111 @@
+# Artifact identities for the ISSUE-329 final verification (generated 2026-10-31T01:24:24Z in the private root)
+
+## A: in-place bundle of S1 (adopted in F1, F8, R2)
+in-place BUILD_ID gC9Y3ew1t8MqKAeq01-8D; manifest 41e14531bed1457cc3a646b3b58070b64a6a7a8ac2f12eb42561e5b2f7f8bb58, 2935 entries
+sha256sum -c against the manifest: OK
+S1 log (systemd-proof/proof.log):
+=== 1. today's layout: an in-place production build in the checkout stand-in (00:12:01)
+in-place BUILD_ID gC9Y3ew1t8MqKAeq01-8D, 2935 files
+
+## B: release m7 (promoted in F5, R7)
+events.log build-start/build-pass (release-root):
+{"ts":"2026-10-31T00:26:39.920Z","op":"build-start","revision":"1a95a5c3b730f01982119ba67490a0c60d697090","workspace":"/home/rehearsal/afldb-329-proof-20261030T233836Z/release-root/builds/20261031T002639Z-1a95a5c3b730-ce9cba","afldbEnv":"production","memAvailableMb":30941}
+{"ts":"2026-10-31T00:27:33.824Z","op":"build-pass","id":"1a95a5c3b730-o-bFsiDenQy8syPTbRMwz","revision":"1a95a5c3b730f01982119ba67490a0c60d697090","buildId":"o-bFsiDenQy8syPTbRMwz","manifest":"2d2b2f377d0e0c16c90e012369347c67f553ece7223269adce1825077af55ac8","workspace":"/home/rehearsal/afldb-329-proof-20261030T233836Z/release-root/builds/20261031T002639Z-1a95a5c3b730-ce9cba"}
+release.json (release-root/releases/1a95a5c3b730-o-bFsiDenQy8syPTbRMwz):
+{
+ "schema": "afldb-release/1",
+ "id": "1a95a5c3b730-o-bFsiDenQy8syPTbRMwz",
+ "revision": "1a95a5c3b730f01982119ba67490a0c60d697090",
+ "buildId": "o-bFsiDenQy8syPTbRMwz",
+ "afldbEnv": "production",
+ "createdBy": "build",
+ "createdAt": "2026-10-31T00:27:33.821Z",
+ "host": "Office",
+ "node": "v22.21.0",
+ "build": {
+  "heapMb": 3072,
+  "workers": 1,
+  "typecheck": "off-host",
+  "typecheckEvidence": "npm run typecheck exit 0 on the workstation, this session",
+  "minAvailableMb": 29107,
+  "peakBuildRssMb": 1743,
+  "phases": {
+   "npm ci": {
+    "seconds": 8,
+    "minAvailableMb": 29668,
+    "peakRssMb": 1014
+   },
+   "build": {
+    "seconds": 37,
+    "minAvailableMb": 29107,
+    "peakRssMb": 1743
+   }
+  },
+  "memTotalMb": 31956,
+  "memAvailableAtStartMb": 30941,
+  "swapTotalMb": 8192,
+  "buildLogSha256": "882e2e98f42d9559b0dbd0a70a816ce4002906b4f577f3f13d8312f9ee2c16f2"
+ },
+ "smoke": {
+  "authenticated": true,
+  "health": "ok",
+  "buildManifest": 200,
+  "css": "/_next/static/css/cb39c2e05a6b8ca6.css",
+  "pages": {
+   "/": "200 HIT",
+   "/players": "200",
+   "/clubs": "200",
+   "/seasons": "200"
+  },
+  "serverOutputWritten": []
+ },
+ "manifest": {
+  "sha256": "2d2b2f377d0e0c16c90e012369347c67f553ece7223269adce1825077af55ac8",
+  "files": 2936
+ }
+}
+MANIFEST.sha256 2d2b2f377d0e0c16c90e012369347c67f553ece7223269adce1825077af55ac8
+
+## Source of B: proof-tree commit 1a95a5c3 vs committed 44251c1f (git ls-tree -r, blob for blob)
+proof-tree log:
+1a95a5c3b730f01982119ba67490a0c60d697090 ISSUE-329 proof tree (m7)
+5bf6942f475d0ef1f0d867fe9076727b32102514 ISSUE-329 proof tree (m6-offhost)
+068a849a1cf2c81c8bc5fe18732f82686d7ff06a ISSUE-329 proof tree (m4-separate)
+fc201ca6ecb3ea5380f6b580558bea476b575c31 ISSUE-329 proof tree (m2-separate)
+913c725d0b39a04c9e89aa7f82141247e135211d ISSUE-329 proof tree (m1-intree-typecheck)
+a5fcf81637bbf48bae71ca3d7937c6979b93e025 docs(v2): record the V2 production release and its build incident (D-V2-PROD-EXEC-1)
+diff (< 44251c1f, > 1a95a5c3):
+84c84
+< 100644 blob cc44e8198184f85000ca970ccbd376ac1b9b20ee	CHANGELOG.md
+---
+> 100644 blob 106fa832a93a0716327b2a5d5b4ac0b1a3106fe8	CHANGELOG.md
+86c86
+< 100644 blob 00a1ae6b9892e6e47f81cf1415446e80dafdac30	IssuesIndex.md
+---
+> 100644 blob a4c8e59bb05459ed48443292c33b3a75fe8e879c	IssuesIndex.md
+177c177
+< 100644 blob 8b15384e75b09b2cb567baac7c266599803de69a	deploy/afldb.service.d/release-route.conf
+---
+> 100755 blob 8b15384e75b09b2cb567baac7c266599803de69a	deploy/afldb.service.d/release-route.conf
+191c191
+< 100644 blob 06c152116b685c27ee7b1ddc797dc9cb6679f2d7	deploy/release.mjs
+---
+> 100755 blob 06c152116b685c27ee7b1ddc797dc9cb6679f2d7	deploy/release.mjs
+204c204
+< 100644 blob c86286ecb7730d261c0a0a4b0d242cc3cc2259b7	docs/deployment.md
+---
+> 100644 blob de1a6d1b26b06467476b7f7478c1321168d534f8	docs/deployment.md
+1292c1292
+< 100644 blob bb9fe0815f1bf865f1588d9853daab789843fc85	issues.md
+---
+> 100644 blob bff0bafe41341604d78a664e9b3d3395b2cfc157	issues.md
+2129d2128
+< 100644 blob d6440098ce6722918a083f0f188a4fc7621f5a48	issues/open/AFLDB-ISSUE-329.md
+3021c3020
+< 100644 blob 85d50b2603597534b75d4be1a5f03df950216c0b	tests/deploy-release.test.ts
+---
+> 100755 blob 85d50b2603597534b75d4be1a5f03df950216c0b	tests/deploy-release.test.ts
+
+## Tool hashes: pre-review (5bf6942f, used by S1-S7) vs final (1a95a5c3 = 44251c1f = candidate)
+5bf6942f deploy/release.mjs c61fbfeefeeea26ef61a5ae0af67004c2b64e83e1cdbb464cee66b946b3ec703  -
+1a95a5c3 deploy/release.mjs f5a24a71e5cdef24f9b7aeba428c7c89e02353fa5f123da12ea37b94514e6b4b  -

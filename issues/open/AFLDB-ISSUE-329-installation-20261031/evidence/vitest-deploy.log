@@ -1,0 +1,19 @@
+
+ RUN  v4.1.10 /home/rehearsal/afldb-329-proof-20261030T233836Z/candidate-6790983a
+
+ ✓ tests/deploy-release.test.ts (25 tests) 9588ms
+     ✓ builds outside the checkout, validates, boots the candidate and promotes it  1891ms
+     ✓ a failing build leaves the serving release, its assets and the links untouched  387ms
+     ✓ a type error fails the build; off-host type-checking needs recorded evidence; nothing changes  489ms
+     ✓ a build interrupted by SIGTERM is stopped with its whole process group; nothing changes  485ms
+     ✓ a build interrupted by SIGHUP is stopped with its whole process group; nothing changes  487ms
+     ✓ a SIGKILLed tool leaves an orphan only in its workspace; the next build reaps it  773ms
+     ✓ the memory guard kills a build that drives MemAvailable below the floor; nothing changes  1311ms
+     ✓ promotes a second release, then rolls back to the retained one without building, even mid-build  3522ms
+ ✓ tests/deploy-web-unit.test.ts (31 tests) 79ms
+
+ Test Files  2 passed (2)
+      Tests  56 passed (56)
+   Start at  11:50:46
+   Duration  10.15s (transform 243ms, setup 77ms, import 249ms, tests 9.67s, environment 0ms)
+

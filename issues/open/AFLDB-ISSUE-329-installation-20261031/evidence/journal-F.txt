@@ -1,0 +1,82 @@
+Oct 31 00:52:35.162623 Office systemd[1]: Started afldb-r329f.service - AFLDB — Australian Football statistics database.
+Oct 31 00:52:35.205235 Office afldb[16251]: [afldb] primary 16251 starting 2 worker(s)
+Oct 31 00:52:35.206351 Office afldb[16251]: [afldb] serving build gC9Y3ew1t8MqKAeq01-8D release 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D revision 5bf6942f475d0ef1f0d867fe9076727b32102514
+Oct 31 00:52:35.353885 Office afldb[16262]: ▲ Next.js 16.3.1
+Oct 31 00:52:35.354186 Office afldb[16261]: ▲ Next.js 16.3.1
+Oct 31 00:52:35.354386 Office afldb[16262]: - Local:         http://127.0.0.1:3100
+Oct 31 00:52:35.354386 Office afldb[16262]: - Network:       http://127.0.0.1:3100
+Oct 31 00:52:35.354425 Office afldb[16261]: - Local:         http://127.0.0.1:3100
+Oct 31 00:52:35.354425 Office afldb[16261]: - Network:       http://127.0.0.1:3100
+Oct 31 00:52:35.354453 Office afldb[16262]: ✓ Ready in 0ms
+Oct 31 00:52:35.354518 Office afldb[16261]: ✓ Ready in 0ms
+Oct 31 00:52:35.355786 Office afldb[16262]: ✓ Running next.config took 0.8ms
+Oct 31 00:52:35.355968 Office afldb[16261]: ✓ Running next.config took 0.8ms
+Oct 31 00:52:38.556699 Office systemd[1]: Stopping afldb-r329f.service - AFLDB — Australian Football statistics database...
+Oct 31 00:52:38.556938 Office afldb[16251]: [afldb] SIGTERM received, stopping workers
+Oct 31 00:52:38.561762 Office afldb[16251]: [afldb] worker 16262 (id 2) exited (143); restarting in 1000ms
+Oct 31 00:52:38.562220 Office afldb[16251]: [afldb] worker 16261 (id 1) exited (143); restarting in 2000ms
+Oct 31 00:52:39.701862 Office afldb[16539]: ▲ Next.js 16.3.1
+Oct 31 00:52:39.702140 Office afldb[16539]: - Local:         http://127.0.0.1:3100
+Oct 31 00:52:39.702140 Office afldb[16539]: - Network:       http://127.0.0.1:3100
+Oct 31 00:52:39.702298 Office afldb[16539]: ✓ Ready in 0ms
+Oct 31 00:52:39.703978 Office afldb[16539]: ✓ Running next.config took 0.9ms
+Oct 31 00:52:40.709695 Office afldb[16586]: ▲ Next.js 16.3.1
+Oct 31 00:52:40.710017 Office afldb[16586]: - Local:         http://127.0.0.1:3100
+Oct 31 00:52:40.710017 Office afldb[16586]: - Network:       http://127.0.0.1:3100
+Oct 31 00:52:40.710230 Office afldb[16586]: ✓ Ready in 0ms
+Oct 31 00:52:40.711889 Office afldb[16586]: ✓ Running next.config took 0.9ms
+Oct 31 00:52:43.560150 Office systemd[1]: afldb-r329f.service: Killing process 16539 (next-server (v1) with signal SIGKILL.
+Oct 31 00:52:43.560328 Office systemd[1]: afldb-r329f.service: Killing process 16586 (next-server (v1) with signal SIGKILL.
+Oct 31 00:52:43.560508 Office systemd[1]: afldb-r329f.service: Deactivated successfully.
+Oct 31 00:52:43.560545 Office systemd[1]: afldb-r329f.service: Unit process 16586 (next-server (v1) remains running after unit stopped.
+Oct 31 00:52:43.560617 Office systemd[1]: Stopped afldb-r329f.service - AFLDB — Australian Football statistics database.
+Oct 31 00:52:43.560658 Office systemd[1]: afldb-r329f.service: Consumed 2.580s CPU time, 194.4M memory peak, 0B memory swap peak.
+Oct 31 00:52:43.594440 Office systemd[1]: Started afldb-r329f.service - AFLDB — Australian Football statistics database.
+Oct 31 00:52:43.638264 Office afldb[16729]: [afldb] primary 16729 starting 2 worker(s)
+Oct 31 00:52:43.639294 Office afldb[16729]: [afldb] serving build o-bFsiDenQy8syPTbRMwz release 1a95a5c3b730-o-bFsiDenQy8syPTbRMwz revision 1a95a5c3b730f01982119ba67490a0c60d697090
+Oct 31 00:52:43.791245 Office afldb[16742]: ▲ Next.js 16.3.1
+Oct 31 00:52:43.791493 Office afldb[16742]: - Local:         http://127.0.0.1:3100
+Oct 31 00:52:43.791493 Office afldb[16742]: - Network:       http://127.0.0.1:3100
+Oct 31 00:52:43.791614 Office afldb[16742]: ✓ Ready in 0ms
+Oct 31 00:52:43.791724 Office afldb[16741]: ▲ Next.js 16.3.1
+Oct 31 00:52:43.791905 Office afldb[16741]: - Local:         http://127.0.0.1:3100
+Oct 31 00:52:43.791928 Office afldb[16741]: - Network:       http://127.0.0.1:3100
+Oct 31 00:52:43.792115 Office afldb[16741]: ✓ Ready in 0ms
+Oct 31 00:52:43.793476 Office afldb[16742]: ✓ Running next.config took 1.0ms
+Oct 31 00:52:43.793746 Office afldb[16741]: ✓ Running next.config took 0.9ms
+Oct 31 00:52:45.523540 Office systemd[1]: Stopping afldb-r329f.service - AFLDB — Australian Football statistics database...
+Oct 31 00:52:45.523732 Office afldb[16729]: [afldb] SIGTERM received, stopping workers
+Oct 31 00:52:45.529420 Office afldb[16729]: [afldb] worker 16741 (id 1) exited (143); restarting in 1000ms
+Oct 31 00:52:45.529504 Office afldb[16729]: [afldb] worker 16742 (id 2) exited (143); restarting in 2000ms
+Oct 31 00:52:46.665997 Office afldb[16898]: ▲ Next.js 16.3.1
+Oct 31 00:52:46.666244 Office afldb[16898]: - Local:         http://127.0.0.1:3100
+Oct 31 00:52:46.666244 Office afldb[16898]: - Network:       http://127.0.0.1:3100
+Oct 31 00:52:46.666425 Office afldb[16898]: ✓ Ready in 0ms
+Oct 31 00:52:46.667932 Office afldb[16898]: ✓ Running next.config took 0.8ms
+Oct 31 00:52:47.669843 Office afldb[16909]: ▲ Next.js 16.3.1
+Oct 31 00:52:47.670105 Office afldb[16909]: - Local:         http://127.0.0.1:3100
+Oct 31 00:52:47.670105 Office afldb[16909]: - Network:       http://127.0.0.1:3100
+Oct 31 00:52:47.670212 Office afldb[16909]: ✓ Ready in 0ms
+Oct 31 00:52:47.671881 Office afldb[16909]: ✓ Running next.config took 0.9ms
+Oct 31 00:52:50.529228 Office systemd[1]: afldb-r329f.service: Killing process 16898 (next-server (v1) with signal SIGKILL.
+Oct 31 00:52:50.529419 Office systemd[1]: afldb-r329f.service: Killing process 16909 (next-server (v1) with signal SIGKILL.
+Oct 31 00:52:50.529575 Office systemd[1]: afldb-r329f.service: Deactivated successfully.
+Oct 31 00:52:50.529654 Office systemd[1]: Stopped afldb-r329f.service - AFLDB — Australian Football statistics database.
+Oct 31 00:52:50.529716 Office systemd[1]: afldb-r329f.service: Consumed 2.091s CPU time, 194.4M memory peak, 0B memory swap peak.
+Oct 31 00:52:50.562212 Office systemd[1]: Started afldb-r329f.service - AFLDB — Australian Football statistics database.
+Oct 31 00:52:50.603396 Office afldb[16922]: [afldb] primary 16922 starting 2 worker(s)
+Oct 31 00:52:50.604598 Office afldb[16922]: [afldb] serving build gC9Y3ew1t8MqKAeq01-8D release 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D revision 5bf6942f475d0ef1f0d867fe9076727b32102514
+Oct 31 00:52:50.756887 Office afldb[16934]: ▲ Next.js 16.3.1
+Oct 31 00:52:50.757129 Office afldb[16933]: ▲ Next.js 16.3.1
+Oct 31 00:52:50.757226 Office afldb[16934]: - Local:         http://127.0.0.1:3100
+Oct 31 00:52:50.757226 Office afldb[16934]: - Network:       http://127.0.0.1:3100
+Oct 31 00:52:50.757251 Office afldb[16933]: - Local:         http://127.0.0.1:3100
+Oct 31 00:52:50.757251 Office afldb[16933]: - Network:       http://127.0.0.1:3100
+Oct 31 00:52:50.757279 Office afldb[16934]: ✓ Ready in 0ms
+Oct 31 00:52:50.757288 Office afldb[16933]: ✓ Ready in 0ms
+Oct 31 00:52:50.758877 Office afldb[16934]: ✓ Running next.config took 0.9ms
+Oct 31 00:52:50.758947 Office afldb[16933]: ✓ Running next.config took 0.9ms
+Oct 31 00:52:51.712165 Office systemd[1]: Stopping afldb-r329f.service - AFLDB — Australian Football statistics database...
+Oct 31 00:52:51.712369 Office afldb[16922]: [afldb] SIGTERM received, stopping workers
+Oct 31 00:52:51.717751 Office afldb[16922]: [afldb] worker 16933 (id 1) exited (143); restarting in 1000ms
+Oct 31 00:52:51.718047 Office afldb[16922]: [afldb] worker 16934 (id 2) exited (143); restarting in 2000ms

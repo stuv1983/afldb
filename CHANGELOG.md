@@ -39,6 +39,13 @@ commit.
 - `tsconfig.json` excludes `docs/v2/evidence`. A retained session script imports an absolute
   Windows path, which failed a clean Linux type-check of the current branch. That failure was found
   by the route's first real build.
+- Final verification and installation package (not installed):
+  - `codex/issue329-release` integrates the route onto production's `9ed9c9dd` as a fast-forward.
+  - Linux off-host type-check exit 0.
+  - Real-systemd adopt, promote, rollback and filesystem-restriction proof with the reviewed code.
+  - Read-only `preflight.sh` and `post-install-check.sh`, proven by a dress rehearsal of the package.
+  - Restarts are paced 30 s apart: the unit's start limit counts manual restarts.
+  - Package: `issues/open/AFLDB-ISSUE-329-installation-20261031/`.
 - Release tracking reconciled to the 2026-10-31 window: V2-GAP-007 and V2-GAP-013 closed; checklist
   rows 5 and 9 closed; blocker R60 ended; V2-GAP-011 updated and still open (the ISSUE-316
   sequence). R6, R8 and R58 stay open: their production checks are not in the window's evidence.

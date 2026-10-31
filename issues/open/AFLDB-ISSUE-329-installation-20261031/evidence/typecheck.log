@@ -1,0 +1,8 @@
+candidate merge 6790983ab3d3ae5292ad8a311c203e2584bd04a5 tree b1d95b24c6e53317458229e04f1b3b35b39c2ccf (git archive, no untracked files)
+host Office Linux 6.18.33.2-microsoft-standard-WSL2 node v22.21.0 npm 10.9.4 at 2026-10-31T00:50:00Z
+package-lock.json 984b44221f8f72560c7b58f1f8642427cc6ece03d30623a7e2e45d1df23d8e86
+npm ci exit 0 in 7 s
+npm run typecheck (next typegen && tsc --noEmit) exit 0 in 39 s
+vitest deploy-release + deploy-web-unit exit 0 in 10 s
+ Test Files  2 passed (2)
+      Tests  56 passed (56)

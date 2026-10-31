@@ -1,8 +1,13 @@
 # AFLDB-ISSUE-329 — Non-destructive production build, promotion and rollback
 
-Status: **implemented and proven locally and on isolated Linux (2026-10-31). Not installed on
-production.** Production installation (§9) needs its own owner approval. Production stays at
-`9ed9c9dd3e84682c43e96c46e98974b245eb54ed` (`BUILD_ID` `QNEHXAtU53TzUjj0Mb7mv`).
+Status: **implemented and validated locally and on isolated Linux (2026-10-31); production
+installation pending.**
+- The final verification (§8a) closed the real-systemd proof gap with the reviewed code.
+- The installation package is
+  [`AFLDB-ISSUE-329-installation-20261031/INSTALLATION.md`](AFLDB-ISSUE-329-installation-20261031/INSTALLATION.md),
+  on branch `codex/issue329-release`. Each of its two parts needs its own owner approval.
+- Production stays at `9ed9c9dd3e84682c43e96c46e98974b245eb54ed` (`BUILD_ID`
+  `QNEHXAtU53TzUjj0Mb7mv`).
 
 Sources: incident [`docs/v2/production-execution-record-2026-10-31.md`](../../docs/v2/production-execution-record-2026-10-31.md)
 §4; `deploy/afldb.service`; `deploy/server-cluster.mjs`; `tools/build/prepare-standalone.mjs`;
@@ -287,10 +292,53 @@ Recorded, not fixed:
 
 None of these can change the serving release, `current` or `previous`.
 
-## 9. Production installation (proposal; separate owner approval)
+## 8a. Final verification (2026-10-31, after the implementation review)
 
-Not performed. Proposed sequence, all as `arm` except the marked owner-sudo steps. Each step is
-read back before the next.
+Full record: the package's §2 and its `evidence/`. No application build was run for it; both
+releases are existing validated artifacts, identified there.
+
+- **Integration.** Production `9ed9c9dd` is a `--no-ff` merge that `v2/rebuild` does not contain.
+  `codex/issue329-release` was branched at `9ed9c9dd` and merges `v2/rebuild` as `6790983a`. Its tree
+  equals `f44f62a5`'s, and production fast-forwards to it. `main` is unchanged.
+- **E1, off-host type-check.** On a `git archive` of `6790983a` on Linux, `npm run typecheck` exited
+  0. `deploy-release` passed 25/25 and `deploy-web-unit` 31/31.
+- **E2, real systemd 255 with the final `release.mjs` (`f5a24a71…`).** The drop-in was installed as a
+  drop-in file. Steps:
+  - adopt by manifest, start, and `status --expect`, with the journal identity line and served
+    assets byte-identical to the release;
+  - filesystem restrictions inside the service's namespace: only the own release is writable;
+    everything else is `EROFS`, even for root;
+  - promote m7 (built by the final tool), restart, PASS;
+  - roll back with no workspace created, restart, PASS.
+- **E3, production-format manifest.** A manifest written by the pinned `artifact-manifest.mjs`
+  adopts, and a wrong BUILD_ID refuses.
+- **E4, dress rehearsal of the package itself.** It started from production's present layout and
+  ran the preflight, adopt, drop-in, check, back-out, re-install, promote, rollback and checks. All
+  PASS.
+
+Two operational observations, neither an ISSUE-329 defect and neither investigated further:
+- **O1.** A restart takes about 5 s. `server-cluster.mjs` respawns workers that Next exits with code
+  143 on SIGTERM, until its 5 s exit timer fires. This is unchanged since `9ed9c9dd`.
+- **O2.** The unit's start limit (5 per 120 s) counts manual restarts; a rapid sixth restart left the
+  service stopped. The package therefore paces restarts 30 s apart and gives the
+  `reset-failed` + `start` recovery.
+
+Still not proven off-production:
+- production's memory headroom beside the service;
+- copying the 12,994-file bundle;
+- a real Caddy front.
+
+## 9. Production installation
+
+Superseded by the package
+[`AFLDB-ISSUE-329-installation-20261031/INSTALLATION.md`](AFLDB-ISSUE-329-installation-20261031/INSTALLATION.md).
+Part A covers Git, adopt, the drop-in and one restart, with no build. Part B, approved separately,
+is the first route build. The package adds the push steps, the preflight and post-install scripts,
+the start-limit pacing, the Playwright smoke and the live-acceptance criteria. The original outline
+is kept below as the record of the proposal.
+
+Proposed sequence, all as `arm` except the marked owner-sudo steps. Each step is read back before
+the next.
 
 1. **Checkout.** Fast-forward the serving checkout to the reviewed commit containing this route,
    with Git only. The running bundle (the checkout's `.next/standalone`) is unaffected, because

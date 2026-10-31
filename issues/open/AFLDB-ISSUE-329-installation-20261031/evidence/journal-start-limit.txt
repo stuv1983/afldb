@@ -1,0 +1,25 @@
+Oct 31 01:00:40.454775 Office systemd[1]: Stopping afldb-r329r.service - AFLDB — Australian Football statistics database...
+Oct 31 01:00:45.461101 Office systemd[1]: afldb-r329r.service: Killing process 18258 (next-server (v1) with signal SIGKILL.
+Oct 31 01:00:45.461274 Office systemd[1]: afldb-r329r.service: Killing process 18269 (next-server (v1) with signal SIGKILL.
+Oct 31 01:00:45.461434 Office systemd[1]: afldb-r329r.service: Deactivated successfully.
+Oct 31 01:00:45.461452 Office systemd[1]: afldb-r329r.service: Unit process 18258 (next-server (v1) remains running after unit stopped.
+Oct 31 01:00:45.461462 Office systemd[1]: afldb-r329r.service: Unit process 18269 (next-server (v1) remains running after unit stopped.
+Oct 31 01:00:45.461534 Office systemd[1]: Stopped afldb-r329r.service - AFLDB — Australian Football statistics database.
+Oct 31 01:00:45.461580 Office systemd[1]: afldb-r329r.service: Consumed 2.327s CPU time, 202.4M memory peak, 0B memory swap peak.
+Oct 31 01:00:45.462782 Office systemd[1]: afldb-r329r.service: Start request repeated too quickly.
+Oct 31 01:00:45.462810 Office systemd[1]: afldb-r329r.service: Failed with result 'start-limit-hit'.
+Oct 31 01:00:45.463082 Office systemd[1]: Failed to start afldb-r329r.service - AFLDB — Australian Football statistics database.
+---
+Oct 31 01:00:10.002202 Office systemd[1]: Started afldb-r329r.service - AFLDB — Australian Football statistics database.
+Oct 31 01:00:18.192696 Office systemd[1]: Stopped afldb-r329r.service - AFLDB — Australian Football statistics database.
+Oct 31 01:00:18.234395 Office systemd[1]: Started afldb-r329r.service - AFLDB — Australian Football statistics database.
+Oct 31 01:00:24.739816 Office systemd[1]: Stopped afldb-r329r.service - AFLDB — Australian Football statistics database.
+Oct 31 01:00:24.766687 Office systemd[1]: Started afldb-r329r.service - AFLDB — Australian Football statistics database.
+Oct 31 01:00:32.033032 Office systemd[1]: Stopped afldb-r329r.service - AFLDB — Australian Football statistics database.
+Oct 31 01:00:32.070301 Office systemd[1]: Started afldb-r329r.service - AFLDB — Australian Football statistics database.
+Oct 31 01:00:38.999521 Office systemd[1]: Stopped afldb-r329r.service - AFLDB — Australian Football statistics database.
+Oct 31 01:00:39.046355 Office systemd[1]: Started afldb-r329r.service - AFLDB — Australian Football statistics database.
+Oct 31 01:00:45.461534 Office systemd[1]: Stopped afldb-r329r.service - AFLDB — Australian Football statistics database.
+Oct 31 01:00:45.462782 Office systemd[1]: afldb-r329r.service: Start request repeated too quickly.
+Oct 31 01:00:45.462810 Office systemd[1]: afldb-r329r.service: Failed with result 'start-limit-hit'.
+Oct 31 01:00:45.463082 Office systemd[1]: Failed to start afldb-r329r.service - AFLDB — Australian Football statistics database.

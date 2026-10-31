@@ -1,0 +1,314 @@
+
+=== R0 production's present layout: the unit without the drop-in, serving the in-place bundle (01:03:17Z)
+MainPID 18717 cwd /home/rehearsal/afldb-329-proof-20261030T233836Z/tools-checkout; in-place _buildManifest 200
+(porcelain above; .env is ignored)
+
+=== R1 preflight install (01:03:19Z)
+AFLDB-ISSUE-329 preflight (install) 2026-10-31T01:03:19Z on Office
+identity
+  ok    user rehearsal
+  ok    checkout HEAD 1a95a5c3b730f01982119ba67490a0c60d697090 (already the candidate)
+  ok    candidate descends from 5bf6942f475d0ef1f0d867fe9076727b32102514 (fast-forward)
+  ok    checkout porcelain clean
+  ok    candidate differs from the typechecked tree 1a95a5c3b730f01982119ba67490a0c60d697090 only in issues/, docs/ or Markdown
+  ok    no migration between 5bf6942f475d0ef1f0d867fe9076727b32102514 and the candidate (forward-only rule not engaged)
+  ok    deploy/release.mjs f5a24a71e5cd… at the candidate
+  ok    deploy/afldb.service.d/release-route.conf 14942fc53421… at the candidate
+  ok    deploy/server-cluster.mjs d82f24c48e2b… at the candidate
+  ok    tools/build/env-in-standalone.mjs 99ed47c6d673… at the candidate
+  ok    node /opt/node-v22.21.0-linux-x64/bin/node v22.21.0
+service
+  ok    afldb-r329r active, MainPID 18717, NRestarts 0
+  ok    ExecStart runs the relative deploy/server-cluster.mjs
+  ok    no drop-in installed
+  ok    serving in place from /home/rehearsal/afldb-329-proof-20261030T233836Z/tools-checkout
+artifacts
+  ok    in-place BUILD_ID gC9Y3ew1t8MqKAeq01-8D
+  ok    manifest 41e14531bed1… intact
+  ok    manifest lists 2935 files, 0 symlinks
+  ok    release root /home/rehearsal/afldb-329-proof-20261030T233836Z/rehearsal-root absent or empty
+capacity
+  ok    free disk under /home/rehearsal/afldb-329-proof-20261030T233836Z: 916 GB (floor 6)
+  info  MemTotal 31956 MB, MemAvailable 30801 MB, swap 8192 MB, afldb-r329r MemoryCurrent 153 MB
+  ok    MemAvailable 30801 MB ≥ 800 MB
+PREFLIGHT PASS (install)
+
+=== R2 adopt (package §3.2 command, retargeted) (01:03:20Z)
+release: ADOPTED 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D (2936 files; 2935 files from /home/rehearsal/afldb-329-proof-20261030T233836Z/systemd-proof/inplace-manifest.sha256); current set
+release: VERIFY PASS 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D (revision 5bf6942f475d0ef1f0d867fe9076727b32102514, BUILD_ID gC9Y3ew1t8MqKAeq01-8D, 2936 files)
+release: current  5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D revision 5bf6942f475d0ef1f0d867fe9076727b32102514 BUILD_ID gC9Y3ew1t8MqKAeq01-8D production
+release: previous (none)
+release: STATUS PASS 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D
+
+=== R3 install the drop-in; daemon-reload; restart; post-install check (01:03:21Z)
+WorkingDirectory=/home/rehearsal/afldb-329-proof-20261030T233836Z/rehearsal-root/current
+ReadWritePaths=/home/rehearsal/afldb-329-proof-20261030T233836Z/rehearsal-root/releases -/var/www/afldb-soon
+DropInPaths=/etc/systemd/system/afldb-r329r.service.d/release-route.conf
+pacing: waiting 26 s
+restart exit 0 after 5.0 s
+AFLDB-ISSUE-329 post-install check 2026-10-31T01:03:52Z: expect 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D (BUILD_ID gC9Y3ew1t8MqKAeq01-8D)
+release route status
+        release: current  5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D revision 5bf6942f475d0ef1f0d867fe9076727b32102514 BUILD_ID gC9Y3ew1t8MqKAeq01-8D production
+        release: previous (none)
+        release: memory   afldb-r329r MemoryCurrent 168 MB
+        release: process  19362 runs in /home/rehearsal/afldb-329-proof-20261030T233836Z/rehearsal-root/releases/5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D
+        release: health   200 status=ok database=ok
+        release: build    /_next/static/gC9Y3ew1t8MqKAeq01-8D/_buildManifest.js 200
+        release: STATUS PASS 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D
+  ok    status --expect 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D PASS
+identity through both origins
+  ok    http://127.0.0.1:3100/api/health {"status":"ok","database":"ok","latencyMs":1}
+  ok    http://127.0.0.1:3100 _buildManifest.js for gC9Y3ew1t8MqKAeq01-8D 200
+  ok    http://127.0.0.1:3100/api/health {"status":"ok","database":"ok","latencyMs":0}
+  ok    http://127.0.0.1:3100 _buildManifest.js for gC9Y3ew1t8MqKAeq01-8D 200
+pages and every referenced asset (public origin, redirects followed)
+  ok    page / -> 200 http://127.0.0.1:3100/beta
+  ok    page /beta -> 200 http://127.0.0.1:3100/beta
+  ok    page /players -> 200 http://127.0.0.1:3100/beta?from=%2Fplayers
+  ok    page /matches -> 200 http://127.0.0.1:3100/beta?from=%2Fmatches
+  ok    page /seasons -> 200 http://127.0.0.1:3100/beta?from=%2Fseasons
+  ok    page /clubs -> 200 http://127.0.0.1:3100/beta?from=%2Fclubs
+  ok    page /records -> 200 http://127.0.0.1:3100/beta?from=%2Frecords
+  ok    page /search -> 200 http://127.0.0.1:3100/beta?from=%2Fsearch
+  ok    page /admin/operations -> 200 http://127.0.0.1:3100/admin/login
+  ok    8 assets 200 with the right type
+  ok    all 8 served assets are byte-identical to 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D's files
+  ok    POST /api/admin/email-intake 410 (retired)
+journal since the service started
+  ok    primary start line present since Sat 2026-10-31 12:03:52 AEDT
+        [afldb] serving build gC9Y3ew1t8MqKAeq01-8D release 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D revision 5bf6942f475d0ef1f0d867fe9076727b32102514
+  ok    0 error/fatal/unhandled lines
+  info  NRestarts 0, MemoryCurrent 218 MB
+POST-INSTALL CHECK PASS 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D
+
+=== R4 back-out before any promotion: remove the drop-in; daemon-reload; restart; serving in place again (01:03:53Z)
+pacing: waiting 28 s
+restart exit 0 after 5.0 s
+DropInPaths=[] MainPID 19578 cwd /home/rehearsal/afldb-329-proof-20261030T233836Z/tools-checkout
+health {"status":"ok","database":"ok","latencyMs":11}; in-place _buildManifest 200
+[afldb] primary 19578 starting 2 worker(s)
+[afldb] serving build gC9Y3ew1t8MqKAeq01-8D release in-place revision unknown
+
+=== R5 re-install the drop-in; restart; post-install check (01:04:29Z)
+pacing: waiting 28 s
+restart exit 0 after 5.0 s
+AFLDB-ISSUE-329 post-install check 2026-10-31T01:05:02Z: expect 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D (BUILD_ID gC9Y3ew1t8MqKAeq01-8D)
+release route status
+        release: current  5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D revision 5bf6942f475d0ef1f0d867fe9076727b32102514 BUILD_ID gC9Y3ew1t8MqKAeq01-8D production
+        release: previous (none)
+        release: memory   afldb-r329r MemoryCurrent 183 MB
+        release: process  19692 runs in /home/rehearsal/afldb-329-proof-20261030T233836Z/rehearsal-root/releases/5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D
+        release: health   200 status=ok database=ok
+        release: build    /_next/static/gC9Y3ew1t8MqKAeq01-8D/_buildManifest.js 200
+        release: STATUS PASS 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D
+  ok    status --expect 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D PASS
+identity through both origins
+  ok    http://127.0.0.1:3100/api/health {"status":"ok","database":"ok","latencyMs":1}
+  ok    http://127.0.0.1:3100 _buildManifest.js for gC9Y3ew1t8MqKAeq01-8D 200
+  ok    http://127.0.0.1:3100/api/health {"status":"ok","database":"ok","latencyMs":0}
+  ok    http://127.0.0.1:3100 _buildManifest.js for gC9Y3ew1t8MqKAeq01-8D 200
+pages and every referenced asset (public origin, redirects followed)
+  ok    page / -> 200 http://127.0.0.1:3100/beta
+  ok    page /beta -> 200 http://127.0.0.1:3100/beta
+  ok    page /players -> 200 http://127.0.0.1:3100/beta?from=%2Fplayers
+  ok    page /matches -> 200 http://127.0.0.1:3100/beta?from=%2Fmatches
+  ok    page /seasons -> 200 http://127.0.0.1:3100/beta?from=%2Fseasons
+  ok    page /clubs -> 200 http://127.0.0.1:3100/beta?from=%2Fclubs
+  ok    page /records -> 200 http://127.0.0.1:3100/beta?from=%2Frecords
+  ok    page /search -> 200 http://127.0.0.1:3100/beta?from=%2Fsearch
+  ok    page /admin/operations -> 200 http://127.0.0.1:3100/admin/login
+  ok    8 assets 200 with the right type
+  ok    all 8 served assets are byte-identical to 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D's files
+  ok    POST /api/admin/email-intake 410 (retired)
+journal since the service started
+  ok    primary start line present since Sat 2026-10-31 12:05:02 AEDT
+        [afldb] serving build gC9Y3ew1t8MqKAeq01-8D release 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D revision 5bf6942f475d0ef1f0d867fe9076727b32102514
+  ok    0 error/fatal/unhandled lines
+  info  NRestarts 0, MemoryCurrent 234 MB
+POST-INSTALL CHECK PASS 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D
+
+=== R6 preflight build (01:05:03Z)
+AFLDB-ISSUE-329 preflight (build) 2026-10-31T01:05:03Z on Office
+identity
+  ok    user rehearsal
+  ok    checkout HEAD is the candidate
+  ok    checkout porcelain clean
+  ok    candidate differs from the typechecked tree 1a95a5c3b730f01982119ba67490a0c60d697090 only in issues/, docs/ or Markdown
+  ok    no migration between 5bf6942f475d0ef1f0d867fe9076727b32102514 and the candidate (forward-only rule not engaged)
+  ok    deploy/release.mjs f5a24a71e5cd… at the candidate
+  ok    deploy/afldb.service.d/release-route.conf 14942fc53421… at the candidate
+  ok    deploy/server-cluster.mjs d82f24c48e2b… at the candidate
+  ok    tools/build/env-in-standalone.mjs 99ed47c6d673… at the candidate
+  ok    node /opt/node-v22.21.0-linux-x64/bin/node v22.21.0
+service
+  ok    afldb-r329r active, MainPID 19692, NRestarts 0
+  ok    ExecStart runs the relative deploy/server-cluster.mjs
+  ok    release-route drop-in active
+  ok    serving from current 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D
+artifacts
+  ok    adopted release 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D retained (the rollback target)
+  ok    adopted release has a recorded status PASS
+  ok    no build.lock
+  ok    no links.lock
+  ok    smoke port 3199 free
+capacity
+  ok    free disk under /home/rehearsal/afldb-329-proof-20261030T233836Z/rehearsal-root: 916 GB (floor 6)
+  info  MemTotal 31956 MB, MemAvailable 30699 MB, swap 8192 MB, afldb-r329r MemoryCurrent 234 MB
+  ok    MemAvailable 30699 MB ≥ 2100 MB
+PREFLIGHT PASS (build)
+
+=== R7 promote a validated release (m7 stands in for the first route build; no build here); restart; check (01:05:04Z)
+release: VERIFY PASS 1a95a5c3b730-o-bFsiDenQy8syPTbRMwz (revision 1a95a5c3b730f01982119ba67490a0c60d697090, BUILD_ID o-bFsiDenQy8syPTbRMwz, 2936 files)
+release: PROMOTED 1a95a5c3b730-o-bFsiDenQy8syPTbRMwz; previous 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D. The running service is unchanged until it restarts.
+release: next: sudo systemctl restart afldb
+release: then: node deploy/release.mjs status --expect 1a95a5c3b730-o-bFsiDenQy8syPTbRMwz --root /home/rehearsal/afldb-329-proof-20261030T233836Z/rehearsal-root
+release: the database is not rolled back: migrations are forward-only (docs/deployment.md §11, including the ISSUE-257 guard); check a release older than an applied migration against it before the restart
+pacing: waiting 27 s
+restart exit 0 after 5.0 s
+AFLDB-ISSUE-329 post-install check 2026-10-31T01:05:37Z: expect 1a95a5c3b730-o-bFsiDenQy8syPTbRMwz (BUILD_ID o-bFsiDenQy8syPTbRMwz)
+release route status
+        release: current  1a95a5c3b730-o-bFsiDenQy8syPTbRMwz revision 1a95a5c3b730f01982119ba67490a0c60d697090 BUILD_ID o-bFsiDenQy8syPTbRMwz production
+        release: previous 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D revision 5bf6942f475d0ef1f0d867fe9076727b32102514 BUILD_ID gC9Y3ew1t8MqKAeq01-8D
+        release: memory   afldb-r329r MemoryCurrent 184 MB
+        release: process  19962 runs in /home/rehearsal/afldb-329-proof-20261030T233836Z/rehearsal-root/releases/1a95a5c3b730-o-bFsiDenQy8syPTbRMwz
+        release: health   200 status=ok database=ok
+        release: build    /_next/static/o-bFsiDenQy8syPTbRMwz/_buildManifest.js 200
+        release: build    /_next/static/gC9Y3ew1t8MqKAeq01-8D/_buildManifest.js 404 (previous; expect 404)
+        release: STATUS PASS 1a95a5c3b730-o-bFsiDenQy8syPTbRMwz
+  ok    status --expect 1a95a5c3b730-o-bFsiDenQy8syPTbRMwz PASS
+identity through both origins
+  ok    http://127.0.0.1:3100/api/health {"status":"ok","database":"ok","latencyMs":0}
+  ok    http://127.0.0.1:3100 _buildManifest.js for o-bFsiDenQy8syPTbRMwz 200
+  ok    http://127.0.0.1:3100 previous gC9Y3ew1t8MqKAeq01-8D 404
+  ok    http://127.0.0.1:3100/api/health {"status":"ok","database":"ok","latencyMs":0}
+  ok    http://127.0.0.1:3100 _buildManifest.js for o-bFsiDenQy8syPTbRMwz 200
+  ok    http://127.0.0.1:3100 previous gC9Y3ew1t8MqKAeq01-8D 404
+pages and every referenced asset (public origin, redirects followed)
+  ok    page / -> 200 http://127.0.0.1:3100/beta
+  ok    page /beta -> 200 http://127.0.0.1:3100/beta
+  ok    page /players -> 200 http://127.0.0.1:3100/beta?from=%2Fplayers
+  ok    page /matches -> 200 http://127.0.0.1:3100/beta?from=%2Fmatches
+  ok    page /seasons -> 200 http://127.0.0.1:3100/beta?from=%2Fseasons
+  ok    page /clubs -> 200 http://127.0.0.1:3100/beta?from=%2Fclubs
+  ok    page /records -> 200 http://127.0.0.1:3100/beta?from=%2Frecords
+  ok    page /search -> 200 http://127.0.0.1:3100/beta?from=%2Fsearch
+  ok    page /admin/operations -> 200 http://127.0.0.1:3100/admin/login
+  ok    8 assets 200 with the right type
+  ok    all 8 served assets are byte-identical to 1a95a5c3b730-o-bFsiDenQy8syPTbRMwz's files
+  ok    POST /api/admin/email-intake 410 (retired)
+journal since the service started
+  ok    primary start line present since Sat 2026-10-31 12:05:37 AEDT
+        [afldb] serving build o-bFsiDenQy8syPTbRMwz release 1a95a5c3b730-o-bFsiDenQy8syPTbRMwz revision 1a95a5c3b730f01982119ba67490a0c60d697090
+  ok    0 error/fatal/unhandled lines
+  info  NRestarts 0, MemoryCurrent 234 MB
+POST-INSTALL CHECK PASS 1a95a5c3b730-o-bFsiDenQy8syPTbRMwz
+
+=== R8 rollback to the retained adopted release; restart; check (01:05:38Z)
+release: ROLLED BACK to 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D (no rebuild); previous is now 1a95a5c3b730-o-bFsiDenQy8syPTbRMwz.
+release: next: sudo systemctl restart afldb
+release: then: node deploy/release.mjs status --expect 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D --root /home/rehearsal/afldb-329-proof-20261030T233836Z/rehearsal-root
+release: the database is not rolled back: migrations are forward-only (docs/deployment.md §11, including the ISSUE-257 guard); check a release older than an applied migration against it before the restart
+pacing: waiting 28 s
+restart exit 0 after 5.0 s
+AFLDB-ISSUE-329 post-install check 2026-10-31T01:06:12Z: expect 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D (BUILD_ID gC9Y3ew1t8MqKAeq01-8D)
+release route status
+        release: current  5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D revision 5bf6942f475d0ef1f0d867fe9076727b32102514 BUILD_ID gC9Y3ew1t8MqKAeq01-8D production
+        release: previous 1a95a5c3b730-o-bFsiDenQy8syPTbRMwz revision 1a95a5c3b730f01982119ba67490a0c60d697090 BUILD_ID o-bFsiDenQy8syPTbRMwz
+        release: memory   afldb-r329r MemoryCurrent 185 MB
+        release: process  20154 runs in /home/rehearsal/afldb-329-proof-20261030T233836Z/rehearsal-root/releases/5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D
+        release: health   200 status=ok database=ok
+        release: build    /_next/static/gC9Y3ew1t8MqKAeq01-8D/_buildManifest.js 200
+        release: build    /_next/static/o-bFsiDenQy8syPTbRMwz/_buildManifest.js 404 (previous; expect 404)
+        release: STATUS PASS 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D
+  ok    status --expect 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D PASS
+identity through both origins
+  ok    http://127.0.0.1:3100/api/health {"status":"ok","database":"ok","latencyMs":1}
+  ok    http://127.0.0.1:3100 _buildManifest.js for gC9Y3ew1t8MqKAeq01-8D 200
+  ok    http://127.0.0.1:3100 previous o-bFsiDenQy8syPTbRMwz 404
+  ok    http://127.0.0.1:3100/api/health {"status":"ok","database":"ok","latencyMs":0}
+  ok    http://127.0.0.1:3100 _buildManifest.js for gC9Y3ew1t8MqKAeq01-8D 200
+  ok    http://127.0.0.1:3100 previous o-bFsiDenQy8syPTbRMwz 404
+pages and every referenced asset (public origin, redirects followed)
+  ok    page / -> 200 http://127.0.0.1:3100/beta
+  ok    page /beta -> 200 http://127.0.0.1:3100/beta
+  ok    page /players -> 200 http://127.0.0.1:3100/beta?from=%2Fplayers
+  ok    page /matches -> 200 http://127.0.0.1:3100/beta?from=%2Fmatches
+  ok    page /seasons -> 200 http://127.0.0.1:3100/beta?from=%2Fseasons
+  ok    page /clubs -> 200 http://127.0.0.1:3100/beta?from=%2Fclubs
+  ok    page /records -> 200 http://127.0.0.1:3100/beta?from=%2Frecords
+  ok    page /search -> 200 http://127.0.0.1:3100/beta?from=%2Fsearch
+  ok    page /admin/operations -> 200 http://127.0.0.1:3100/admin/login
+  ok    8 assets 200 with the right type
+  ok    all 8 served assets are byte-identical to 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D's files
+  ok    POST /api/admin/email-intake 410 (retired)
+journal since the service started
+  ok    primary start line present since Sat 2026-10-31 12:06:12 AEDT
+        [afldb] serving build gC9Y3ew1t8MqKAeq01-8D release 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D revision 5bf6942f475d0ef1f0d867fe9076727b32102514
+  ok    0 error/fatal/unhandled lines
+  info  NRestarts 0, MemoryCurrent 235 MB
+POST-INSTALL CHECK PASS 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D
+
+=== R8b the start-limit hazard and its recovery (deliberate unpaced restarts) (01:06:13Z)
+unpaced restart 1 ok
+unpaced restart 2 ok
+unpaced restart 3 ok
+unpaced restart 4 FAILED: start-limit-hit
+AFLDB-ISSUE-329 post-install check 2026-10-31T01:06:18Z: expect 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D (BUILD_ID gC9Y3ew1t8MqKAeq01-8D)
+  FAIL  afldb-r329r is failed (Result=start-limit-hit)
+        start limit hit (5 starts in 120 s): sudo systemctl reset-failed afldb-r329r && sudo systemctl start afldb-r329r, then re-run this check
+POST-INSTALL CHECK FAIL
+check FAILED as expected on the stopped service
+recovered: reset-failed + start
+AFLDB-ISSUE-329 post-install check 2026-10-31T01:07:19Z: expect 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D (BUILD_ID gC9Y3ew1t8MqKAeq01-8D)
+release route status
+        release: current  5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D revision 5bf6942f475d0ef1f0d867fe9076727b32102514 BUILD_ID gC9Y3ew1t8MqKAeq01-8D production
+        release: previous 1a95a5c3b730-o-bFsiDenQy8syPTbRMwz revision 1a95a5c3b730f01982119ba67490a0c60d697090 BUILD_ID o-bFsiDenQy8syPTbRMwz
+        release: memory   afldb-r329r MemoryCurrent 260 MB
+        release: process  20600 runs in /home/rehearsal/afldb-329-proof-20261030T233836Z/rehearsal-root/releases/5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D
+        release: health   200 status=ok database=ok
+        release: build    /_next/static/gC9Y3ew1t8MqKAeq01-8D/_buildManifest.js 200
+        release: build    /_next/static/o-bFsiDenQy8syPTbRMwz/_buildManifest.js 404 (previous; expect 404)
+        release: STATUS PASS 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D
+  ok    status --expect 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D PASS
+identity through both origins
+  ok    http://127.0.0.1:3100/api/health {"status":"ok","database":"ok","latencyMs":0}
+  ok    http://127.0.0.1:3100 _buildManifest.js for gC9Y3ew1t8MqKAeq01-8D 200
+  ok    http://127.0.0.1:3100 previous o-bFsiDenQy8syPTbRMwz 404
+  ok    http://127.0.0.1:3100/api/health {"status":"ok","database":"ok","latencyMs":0}
+  ok    http://127.0.0.1:3100 _buildManifest.js for gC9Y3ew1t8MqKAeq01-8D 200
+  ok    http://127.0.0.1:3100 previous o-bFsiDenQy8syPTbRMwz 404
+pages and every referenced asset (public origin, redirects followed)
+  ok    page / -> 200 http://127.0.0.1:3100/beta
+  ok    page /beta -> 200 http://127.0.0.1:3100/beta
+  ok    page /players -> 200 http://127.0.0.1:3100/beta?from=%2Fplayers
+  ok    page /matches -> 200 http://127.0.0.1:3100/beta?from=%2Fmatches
+  ok    page /seasons -> 200 http://127.0.0.1:3100/beta?from=%2Fseasons
+  ok    page /clubs -> 200 http://127.0.0.1:3100/beta?from=%2Fclubs
+  ok    page /records -> 200 http://127.0.0.1:3100/beta?from=%2Frecords
+  ok    page /search -> 200 http://127.0.0.1:3100/beta?from=%2Fsearch
+  ok    page /admin/operations -> 200 http://127.0.0.1:3100/admin/login
+  ok    8 assets 200 with the right type
+  ok    all 8 served assets are byte-identical to 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D's files
+  ok    POST /api/admin/email-intake 410 (retired)
+journal since the service started
+  ok    primary start line present since Sat 2026-10-31 12:07:19 AEDT
+        [afldb] serving build gC9Y3ew1t8MqKAeq01-8D release 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D revision 5bf6942f475d0ef1f0d867fe9076727b32102514
+  ok    0 error/fatal/unhandled lines
+  info  NRestarts 0, MemoryCurrent 312 MB
+POST-INSTALL CHECK PASS 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D
+--- events.log
+{"ts":"2026-10-31T01:03:21.282Z","op":"adopt","id":"5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D","revision":"5bf6942f475d0ef1f0d867fe9076727b32102514","buildId":"gC9Y3ew1t8MqKAeq01-8D","manifest":"ea1dec292f26f9af0a274e9ee621f21371f7fe1f5210e8f26ca46f89252a44cf","setCurrent":true,"copied":"2935 files from /home/rehearsal/afldb-329-proof-20261030T233836Z/systemd-proof/inplace-manifest.sha256"}
+{"ts":"2026-10-31T01:03:53.492Z","op":"status-pass","id":"5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D"}
+{"ts":"2026-10-31T01:05:03.480Z","op":"status-pass","id":"5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D"}
+{"ts":"2026-10-31T01:05:05.465Z","op":"promote","id":"1a95a5c3b730-o-bFsiDenQy8syPTbRMwz","previous":"5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D"}
+{"ts":"2026-10-31T01:05:38.278Z","op":"status-pass","id":"1a95a5c3b730-o-bFsiDenQy8syPTbRMwz"}
+{"ts":"2026-10-31T01:05:39.328Z","op":"rollback-start","id":"5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D","from":"1a95a5c3b730-o-bFsiDenQy8syPTbRMwz"}
+{"ts":"2026-10-31T01:05:39.328Z","op":"rollback","id":"5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D","from":"1a95a5c3b730-o-bFsiDenQy8syPTbRMwz"}
+{"ts":"2026-10-31T01:06:13.174Z","op":"status-pass","id":"5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D"}
+{"ts":"2026-10-31T01:07:20.647Z","op":"status-pass","id":"5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D"}
+
+REHEARSAL PASS
+
+=== R9 cleanup (01:07:21Z)
+unit removed
+temporary .env removed

@@ -1,0 +1,16 @@
+=== F8 adopt from a production-format manifest (2026-10-31T00:55:53Z)
+pinned script ea37a7e70087185c88815be39cb952e94bde2be624d6b848c6a2ca2324055b10 (expect ea37a7e70087185c88815be39cb952e94bde2be624d6b848c6a2ca2324055b10)
+{"files":2935,"symlinks":0,"bytes":83023498,"manifest_sha256":"5ece16d0c3264c7b8d9f1aa84a0cfb235a9f50c42cf4d4a39b5ba85eaa6acbcc"}
+same entries as the sha256sum manifest A (normalised, byte-order sorted)
+release: ADOPTED 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D (2936 files; 2935 files from /home/rehearsal/afldb-329-proof-20261030T233836Z/final-proof-20261031/inplace-manifest.artifact-format.sha256); current set
+adopt exit 0
+release: VERIFY PASS 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D (revision 5bf6942f475d0ef1f0d867fe9076727b32102514, BUILD_ID gC9Y3ew1t8MqKAeq01-8D, 2936 files)
+verify exit 0
+release: current  5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D revision 5bf6942f475d0ef1f0d867fe9076727b32102514 BUILD_ID gC9Y3ew1t8MqKAeq01-8D production
+release: previous (none)
+release: STATUS PASS 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D
+status --no-live exit 0
+--- refusal: wrong expected BUILD_ID sets no link
+release: REFUSED: in-place BUILD_ID is gC9Y3ew1t8MqKAeq01-8D, expected QNEHXAtU53TzUjj0Mb7mv
+adopt exit 1
+no current link

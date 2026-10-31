@@ -1,0 +1,160 @@
+
+=== F0 identities (00:52:34Z)
+host Office 6.18.33.2-microsoft-standard-WSL2; systemd 255 (255.4-1ubuntu8.18); node v22.21.0
+f5a24a71e5cdef24f9b7aeba428c7c89e02353fa5f123da12ea37b94514e6b4b  deploy/release.mjs
+d82f24c48e2bc310857826e8fecc2e5ad90381ec3267c0d1ddba5ae19a822865  deploy/server-cluster.mjs
+a3444840e0bd5f94ea05ea4b01508e0e8209d65ae452be665c1049c6b34e149a  deploy/afldb.service
+14942fc53421ff60eddb738b338e7a3db38a22429839fb4eabd8978edea1f5ff  deploy/afldb.service.d/release-route.conf
+99ed47c6d673e6dd1f9c789097be202e704162edcc98623e7182bac9d58635c2  tools/build/env-in-standalone.mjs
+manifest A 41e14531bed1457cc3a646b3b58070b64a6a7a8ac2f12eb42561e5b2f7f8bb58 (2935 files); in-place BUILD_ID gC9Y3ew1t8MqKAeq01-8D
+in-place bundle matches manifest A
+release B (source) manifest 2d2b2f377d0e0c16c90e012369347c67f553ece7223269adce1825077af55ac8
+temporary .env installed in the checkout stand-in (names: DATABASE_URL AFLDB_AUTH_DATABASE_URL AFLDB_IMPORT_DATABASE_URL AFLDB_OWNER_DATABASE_URL PORT AFLDB_WORKERS AFLDB_POOL_MAX AFLDB_INDEXING AFLDB_BETA_GATE AFLDB_SESSION_SECRET )
+
+=== F1 adopt the validated in-place bundle by its recorded manifest (00:52:34Z)
+release: ADOPTED 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D (2936 files; 2935 files from /home/rehearsal/afldb-329-proof-20261030T233836Z/systemd-proof/inplace-manifest.sha256); current set
+release: VERIFY PASS 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D (revision 5bf6942f475d0ef1f0d867fe9076727b32102514, BUILD_ID gC9Y3ew1t8MqKAeq01-8D, 2936 files)
+
+=== F2 install the unit and the drop-in as separate files (candidate tree, retargeted only at the private root) (00:52:34Z)
+--- unit vs deploy/afldb.service
+4c4
+< After=network-online.target postgresql.service
+---
+> After=network-online.target
+6d5
+< Requires=postgresql.service
+20,22c19,21
+< User=arm
+< Group=arm
+< WorkingDirectory=/home/arm/projects/afldb
+---
+> User=rehearsal
+> Group=rehearsal
+> WorkingDirectory=/home/rehearsal/afldb-329-proof-20261030T233836Z/tools-checkout
+29c28
+< ExecStart=/home/arm/.nvm/versions/node/v22.23.2/bin/node deploy/server-cluster.mjs
+---
+> ExecStart=/opt/node-v22.21.0-linux-x64/bin/node deploy/server-cluster.mjs
+33c32
+< EnvironmentFile=/home/arm/projects/afldb/.env
+---
+> EnvironmentFile=/home/rehearsal/afldb-329-proof-20261030T233836Z/tools-checkout/.env
+110c109
+< ReadWritePaths=/home/arm/projects/afldb/.next
+---
+> ReadWritePaths=/home/rehearsal/afldb-329-proof-20261030T233836Z/tools-checkout/.next
+--- drop-in vs deploy/afldb.service.d/release-route.conf
+16c16
+< WorkingDirectory=/home/arm/afldb-releases/current
+---
+> WorkingDirectory=/home/rehearsal/afldb-329-proof-20261030T233836Z/sysd-final-root/current
+22c22
+< ReadWritePaths=/home/arm/afldb-releases/releases
+---
+> ReadWritePaths=/home/rehearsal/afldb-329-proof-20261030T233836Z/sysd-final-root/releases
+UnsetEnvironment=AFLDB_OWNER_DATABASE_URL AFLDB_TEST_DATABASE_URL AFLDB_TEST_IMPORT_DATABASE_URL AFLDB_TEST_AUTH_DATABASE_URL AFLDB_CODE_TEST_DATABASE_URL AFLDB_CODE_TEST_IMPORT_DATABASE_URL AFLDB_DEV_DATABASE_URL AFLDB_DEV_IMPORT_DATABASE_URL AFLDB_BACKUP_DATABASE_URL AFLDB_PROD_DATABASE_URL AFLDB_PROD_IMPORT_DATABASE_URL AFLDB_PROD_AUTH_DATABASE_URL
+WorkingDirectory=/home/rehearsal/afldb-329-proof-20261030T233836Z/sysd-final-root/current
+User=rehearsal
+ReadWritePaths=/home/rehearsal/afldb-329-proof-20261030T233836Z/sysd-final-root/releases -/var/www/afldb-soon
+PrivateTmp=yes
+ProtectHome=read-only
+ProtectSystem=strict
+NoNewPrivileges=yes
+DropInPaths=/etc/systemd/system/afldb-r329f.service.d/release-route.conf
+{ path=/opt/node-v22.21.0-linux-x64/bin/node ; argv[]=/opt/node-v22.21.0-linux-x64/bin/node deploy/server-cluster.mjs ; 
+
+=== F3 start through the release route; identity and assets (00:52:35Z)
+healthy after 500 ms
+release: current  5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D revision 5bf6942f475d0ef1f0d867fe9076727b32102514 BUILD_ID gC9Y3ew1t8MqKAeq01-8D production
+release: previous (none)
+release: memory   afldb-r329f MemoryCurrent 149 MB
+release: process  16251 runs in /home/rehearsal/afldb-329-proof-20261030T233836Z/sysd-final-root/releases/5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D
+release: health   200 status=ok database=ok
+release: build    /_next/static/gC9Y3ew1t8MqKAeq01-8D/_buildManifest.js 200
+release: STATUS PASS 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D
+journal: [afldb] serving build gC9Y3ew1t8MqKAeq01-8D release 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D revision 5bf6942f475d0ef1f0d867fe9076727b32102514
+asset /_next/static/css/cb39c2e05a6b8ca6.css 200 text/css; charset=UTF-8 bytes = release file e9d9b5b11b54
+asset /_next/static/gC9Y3ew1t8MqKAeq01-8D/_buildManifest.js 200 application/javascript; charset=UTF-8 bytes = release file 455c2b57458c
+/ 307 -> http://127.0.0.1:3100/beta; /beta 200 (beta gate on, no claim)
+
+=== F4 filesystem restrictions of the running service (inside its mount namespace) (00:52:36Z)
+MainPID 16251 user rehearsal cwd /home/rehearsal/afldb-329-proof-20261030T233836Z/sysd-final-root/releases/5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D
+service user, own release ISR cache: /home/rehearsal/afldb-329-proof-20261030T233836Z/sysd-final-root/releases/5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D/.next/standalone/.next/cache/r329f-probe -> ok (expected ok)
+root in namespace, checkout: /home/rehearsal/afldb-329-proof-20261030T233836Z/tools-checkout/r329f-probe -> Read-only file system (expected EROFS)
+root in namespace, checkout .env dir: /home/rehearsal/afldb-329-proof-20261030T233836Z/tools-checkout/.env.r329f-probe -> Read-only file system (expected EROFS)
+root in namespace, release root (links): /home/rehearsal/afldb-329-proof-20261030T233836Z/sysd-final-root/r329f-probe -> Read-only file system (expected EROFS)
+root in namespace, /etc (ProtectSystem=strict): /etc/r329f-probe -> Read-only file system (expected EROFS)
+root in namespace, /usr: /usr/r329f-probe -> Read-only file system (expected EROFS)
+root in namespace, another home path: /home/rehearsal/r329f-probe -> Read-only file system (expected EROFS)
+replace current symlink -> Read-only file system
+PrivateTmp: host /tmp entries visible inside: 0 (host has 11)
+note: the whole releases/ directory is writable by design (drop-in grants it), so a retained release is writable by the service; verify/promote/rollback refuse a drifted release (L9)
+
+=== F5 promote another validated release (m7, no rebuild); restart; identity and assets (00:52:36Z)
+m7 copied byte-for-byte (cp -a) from release-root and renamed into releases/
+release: VERIFY PASS 1a95a5c3b730-o-bFsiDenQy8syPTbRMwz (revision 1a95a5c3b730f01982119ba67490a0c60d697090, BUILD_ID o-bFsiDenQy8syPTbRMwz, 2936 files)
+release: PROMOTED 1a95a5c3b730-o-bFsiDenQy8syPTbRMwz; previous 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D. The running service is unchanged until it restarts.
+release: next: sudo systemctl restart afldb
+release: then: node deploy/release.mjs status --expect 1a95a5c3b730-o-bFsiDenQy8syPTbRMwz --root /home/rehearsal/afldb-329-proof-20261030T233836Z/sysd-final-root
+release: the database is not rolled back: migrations are forward-only (docs/deployment.md §11, including the ISSUE-257 guard); check a release older than an applied migration against it before the restart
+release: current  1a95a5c3b730-o-bFsiDenQy8syPTbRMwz revision 1a95a5c3b730f01982119ba67490a0c60d697090 BUILD_ID o-bFsiDenQy8syPTbRMwz production
+release: previous 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D revision 5bf6942f475d0ef1f0d867fe9076727b32102514 BUILD_ID gC9Y3ew1t8MqKAeq01-8D
+release: memory   afldb-r329f MemoryCurrent 169 MB
+release: process  16251 runs in /home/rehearsal/afldb-329-proof-20261030T233836Z/sysd-final-root/releases/5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D
+release: health   200 status=ok database=ok
+release: build    /_next/static/o-bFsiDenQy8syPTbRMwz/_buildManifest.js 404
+release: build    /_next/static/gC9Y3ew1t8MqKAeq01-8D/_buildManifest.js 200 (previous; expect 404)
+release: FAIL process 16251 runs in /home/rehearsal/afldb-329-proof-20261030T233836Z/sysd-final-root/releases/5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D, not /home/rehearsal/afldb-329-proof-20261030T233836Z/sysd-final-root/releases/1a95a5c3b730-o-bFsiDenQy8syPTbRMwz (restart pending?)
+release: FAIL current BUILD_ID manifest answered 404
+release: FAIL previous BUILD_ID manifest answered 200
+release: STATUS FAIL
+status before restart: FAIL (expected: restart pending)
+healthy after 500 ms
+restart probe (health every 100 ms): 62 probes, 14 non-200 (window 5.3 s)
+release: current  1a95a5c3b730-o-bFsiDenQy8syPTbRMwz revision 1a95a5c3b730f01982119ba67490a0c60d697090 BUILD_ID o-bFsiDenQy8syPTbRMwz production
+release: previous 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D revision 5bf6942f475d0ef1f0d867fe9076727b32102514 BUILD_ID gC9Y3ew1t8MqKAeq01-8D
+release: memory   afldb-r329f MemoryCurrent 170 MB
+release: process  16729 runs in /home/rehearsal/afldb-329-proof-20261030T233836Z/sysd-final-root/releases/1a95a5c3b730-o-bFsiDenQy8syPTbRMwz
+release: health   200 status=ok database=ok
+release: build    /_next/static/o-bFsiDenQy8syPTbRMwz/_buildManifest.js 200
+release: build    /_next/static/gC9Y3ew1t8MqKAeq01-8D/_buildManifest.js 404 (previous; expect 404)
+release: STATUS PASS 1a95a5c3b730-o-bFsiDenQy8syPTbRMwz
+journal: [afldb] serving build o-bFsiDenQy8syPTbRMwz release 1a95a5c3b730-o-bFsiDenQy8syPTbRMwz revision 1a95a5c3b730f01982119ba67490a0c60d697090
+asset /_next/static/css/cb39c2e05a6b8ca6.css 200 text/css; charset=UTF-8 bytes = release file e9d9b5b11b54
+asset /_next/static/o-bFsiDenQy8syPTbRMwz/_buildManifest.js 200 application/javascript; charset=UTF-8 bytes = release file 455c2b57458c
+
+=== F6 roll back to the retained adopted release without rebuilding; restart; identity and assets (00:52:45Z)
+release: ROLLED BACK to 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D (no rebuild); previous is now 1a95a5c3b730-o-bFsiDenQy8syPTbRMwz.
+release: next: sudo systemctl restart afldb
+release: then: node deploy/release.mjs status --expect 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D --root /home/rehearsal/afldb-329-proof-20261030T233836Z/sysd-final-root
+release: the database is not rolled back: migrations are forward-only (docs/deployment.md §11, including the ISSUE-257 guard); check a release older than an applied migration against it before the restart
+rollback took 0.2 s; builds/ before: [20261031T005234Z-adopt-5bf6942f475d-c3154f import-m7 ] after: [20261031T005234Z-adopt-5bf6942f475d-c3154f import-m7 ]
+healthy after 500 ms
+release: current  5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D revision 5bf6942f475d0ef1f0d867fe9076727b32102514 BUILD_ID gC9Y3ew1t8MqKAeq01-8D production
+release: previous 1a95a5c3b730-o-bFsiDenQy8syPTbRMwz revision 1a95a5c3b730f01982119ba67490a0c60d697090 BUILD_ID o-bFsiDenQy8syPTbRMwz
+release: memory   afldb-r329f MemoryCurrent 150 MB
+release: process  16922 runs in /home/rehearsal/afldb-329-proof-20261030T233836Z/sysd-final-root/releases/5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D
+release: health   200 status=ok database=ok
+release: build    /_next/static/gC9Y3ew1t8MqKAeq01-8D/_buildManifest.js 200
+release: build    /_next/static/o-bFsiDenQy8syPTbRMwz/_buildManifest.js 404 (previous; expect 404)
+release: STATUS PASS 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D
+journal: [afldb] serving build gC9Y3ew1t8MqKAeq01-8D release 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D revision 5bf6942f475d0ef1f0d867fe9076727b32102514
+asset /_next/static/css/cb39c2e05a6b8ca6.css 200 text/css; charset=UTF-8 bytes = release file e9d9b5b11b54
+asset /_next/static/gC9Y3ew1t8MqKAeq01-8D/_buildManifest.js 200 application/javascript; charset=UTF-8 bytes = release file 455c2b57458c
+B's BUILD_ID now: 404 (expect 404)
+release: VERIFY PASS 5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D (revision 5bf6942f475d0ef1f0d867fe9076727b32102514, BUILD_ID gC9Y3ew1t8MqKAeq01-8D, 2936 files)
+release: VERIFY PASS 1a95a5c3b730-o-bFsiDenQy8syPTbRMwz (revision 1a95a5c3b730f01982119ba67490a0c60d697090, BUILD_ID o-bFsiDenQy8syPTbRMwz, 2936 files)
+--- events.log
+{"ts":"2026-10-31T00:52:34.726Z","op":"adopt","id":"5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D","revision":"5bf6942f475d0ef1f0d867fe9076727b32102514","buildId":"gC9Y3ew1t8MqKAeq01-8D","manifest":"ea1dec292f26f9af0a274e9ee621f21371f7fe1f5210e8f26ca46f89252a44cf","setCurrent":true,"copied":"2935 files from /home/rehearsal/afldb-329-proof-20261030T233836Z/systemd-proof/inplace-manifest.sha256"}
+{"ts":"2026-10-31T00:52:35.844Z","op":"status-pass","id":"5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D"}
+{"ts":"2026-10-31T00:52:37.445Z","op":"promote","id":"1a95a5c3b730-o-bFsiDenQy8syPTbRMwz","previous":"5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D"}
+{"ts":"2026-10-31T00:52:45.226Z","op":"status-pass","id":"1a95a5c3b730-o-bFsiDenQy8syPTbRMwz"}
+{"ts":"2026-10-31T00:52:45.497Z","op":"rollback-start","id":"5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D","from":"1a95a5c3b730-o-bFsiDenQy8syPTbRMwz"}
+{"ts":"2026-10-31T00:52:45.497Z","op":"rollback","id":"5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D","from":"1a95a5c3b730-o-bFsiDenQy8syPTbRMwz"}
+{"ts":"2026-10-31T00:52:51.247Z","op":"status-pass","id":"5bf6942f475d-gC9Y3ew1t8MqKAeq01-8D"}
+
+PROOF PASS
+
+=== F7 cleanup: stop and remove the test unit; remove the temporary .env (root, releases and logs kept) (00:52:51Z)
+unit removed
+temporary .env removed
