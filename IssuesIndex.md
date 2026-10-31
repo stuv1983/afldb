@@ -48,8 +48,8 @@
 
 ### AFLDB-ISSUE-330 — Players index ranks career-less players above the leader in descending sorts
 - **Severity:** Low. **Area:** public `/players` index — `listPlayers()` `ORDER BY` in `src/db/queries/players.ts`.
-- **State:** Open (2026-10-31). Listed players with no career row (ISSUE-108 DraftGuru shells, e.g. Riley Onley, Fred Rodriguez) have NULL sort values; PostgreSQL sorts NULL first under `DESC`, so they headed games/goals/finals/Brownlow/premierships descending. Fixed locally with `NULLS LAST`; `tests/integration/database.test.ts` red 5 failed → green 5 passed on isolated `afldb_v2_i330_test`. Not deployed.
-- **Next action:** include in the next approved route build; confirm `/players?sort=games` page 1 on production.
+- **State:** Open (2026-10-31). Listed players with no career row (ISSUE-108 DraftGuru shells, e.g. Riley Onley, Fred Rodriguez) have NULL sort values; PostgreSQL sorts NULL first under `DESC`, so they headed games/goals/finals/Brownlow/premierships descending. Fixed locally with `NULLS LAST`; `tests/integration/database.test.ts` red 5 failed → green 5 passed on isolated `afldb_v2_i330_test`. Independent review: approve (no MED+). Release candidate `ad245d602f6f0776c1fd86b66fef4f177fe63276` assembled with the maintained `deploy/post-install-check.sh` and rollback-runbook R4 corrections; exact-candidate off-host typecheck exit 0. Not pushed, not deployed.
+- **Next action:** owner approval of the [deployment package](issues/open/AFLDB-ISSUE-330.md) §4 (push, route build of `ad245d60`, promote, check, `/players?sort=games` live acceptance; rollback target `61a95f7397da-JYIBkYn8ynPgYMn1e5nK-`).
 
 **AFLDB-ISSUE-266, 267, 268, 269, 270, 271, 272, 273, 274, 275, 276, 279 and 328 resolved 2026-10-27 (V2 only; owner decision D-V2-SCOPE-20261027, approved with amendments).** The owner explicitly superseded the earlier closure conditions for V2 only.
 - **V2 engineering complete:** ISSUE-267, 269, 270, 274, 275, 276, 279 and 328. Each fix is in `v2/rebuild` and validated as recorded, including V2's 20 Oct local run (`docs/v2/evidence/local-supported-tests-delivered.json`; ISSUE-328 58/58 at `e91fae88`).

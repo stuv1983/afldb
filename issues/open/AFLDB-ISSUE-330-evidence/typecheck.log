@@ -1,0 +1,18 @@
+AFLDB-ISSUE-330 off-host type-check of the exact candidate (WSL distro AFLDB-V2-Rehearsal-20261020, Ubuntu 24.04.5; git archive piped from the workstation)
+candidate ad245d602f6f0776c1fd86b66fef4f177fe63276 tree 89bd5b80ca163be6083d018a6af82d8b8f587c35 (git archive, no untracked files)
+host Office 6.18.33.2-microsoft-standard-WSL2 node v22.21.0 npm 10.9.4 at 2026-10-31T07:47:41Z
+package-lock.json 984b44221f8f72560c7b58f1f8642427cc6ece03d30623a7e2e45d1df23d8e86
+npm ci exit 0 in 9 s
+npm run typecheck (next typegen && tsc --noEmit) exit 0 in 41 s
+> afldb@0.1.0 typecheck
+> next typegen && tsc --noEmit
+
+Generating route types...
+    ok Types generated successfully
+vitest deploy-release exit 0 in 11 s
+    ok a build interrupted by SIGHUP is stopped with its whole process group; nothing changes  592ms
+    ok a SIGKILLed tool leaves an orphan only in its workspace; the next build reaps it  882ms
+    ok the memory guard kills a build that drives MemAvailable below the floor; nothing changes  1309ms
+    ok promotes a second release, then rolls back to the retained one without building, even mid-build  3487ms
+ Test Files  1 passed (1)
+      Tests  33 passed (33)

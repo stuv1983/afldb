@@ -32,6 +32,16 @@ commit.
   debut) were ranked above the leader in games, goals, finals, Brownlow and premierships descending.
   New case in `tests/integration/database.test.ts`.
 
+### Maintained post-install check and rollback gate for the release route (AFLDB-ISSUE-330 candidate, 2026-10-31; local, not deployed)
+
+- New `deploy/post-install-check.sh`, the maintained successor of the frozen ISSUE-329 package
+  checker. The previous BUILD_ID must answer 404 at the origin (loopback and a cache-busted public
+  request). A public 200 for it that Cloudflare served from cache (`cf-cache-status: HIT`) is reported
+  as `CACHE`, not as a failure. Any other origin, identity, health or asset error still fails. Eight
+  controls in `tests/deploy-release.test.ts`.
+- Rollback runbook gate R4 now uses `release.mjs rollback` + `status --expect` instead of the
+  `x-afldb-build` header, which production does not emit.
+
 ### Non-destructive production build, promotion and rollback (AFLDB-ISSUE-329, 2026-10-31; installed 2026-10-31, see above)
 
 - New `deploy/release.mjs`. It builds a revision in a workspace outside the serving checkout
