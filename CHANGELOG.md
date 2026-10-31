@@ -82,6 +82,35 @@ commit.
 - **Still open (V2-GAP-006 stays open).** Database-level enforcement (not implemented); direct-library, legacy and
   ISSUE-316 writers; deployment and production verification. Record: `docs/v2/gap006-release-readiness-2026-11-01.md`.
 
+### V2-GAP-006: the correction justification is no longer copied into a record note; environment recovery and final verification (2026-11-01, local only, not deployed)
+
+- **Behaviour change (review F-003 corrected).** The human correction justification stays in the private audit row
+  (`data_edits.note`) and is what the season seal judges. A list entry's own optional text is `memberNote`; a leadership
+  appointment's is `appointmentNote` (the replace form has its own field too). Add, multi-add, transfer, copy-forward,
+  appoint and replace no longer store the correction text on `season_list_members.note` / `club_leadership.note` or in
+  an override payload; a removal tombstone carries no note; a transfer keeps the moved entry's own note. Open-season
+  behaviour, permissions, the 2000-character caps and transaction atomicity are unchanged. No schema change. The UI
+  forms gained the separate optional fields, and the correction fields are labelled private. The earlier "accepted
+  design point" was a producer acceptance, not an owner decision; see `docs/v2/known-gaps.md` V2-GAP-006.
+- **F-001 proved against real PostgreSQL.** On a sealed season, Brownlow season publication and the eligibility
+  publication refuse a missing, null or short human note and roll back completely (revision, status, votes and the
+  audit count unchanged); a negative control that stops passing `sealNote` fails the new test.
+- **Verification (fresh disposable databases, recovered cluster).** Integration `admin-season-lists`,
+  `admin-club-leadership`, `sealed-editor-guard`, `draft-linkage`, `v2-brownlow-eligibility`, `admin-brownlow`: 6 files,
+  210 passed (includes sealed-season tests that a long record note alone is refused and that both notes are stored
+  apart). Unit `v2-season-seal`, `admin-club-leadership-actions`, `admin-season-list-actions`: 94 passed. `tsc --noEmit`
+  clean. `v2-brownlow-production-correction`: 4/8 (cases 2 to 5 need authentic inputs that are not recoverable locally,
+  ISSUE-331). One independent read-only review of the final diff found no HIGH/MED production defect.
+- **Visual.** `tools/v2/gap006-note-separation-visual.mts`: private correction text appears nowhere on the admin list,
+  leadership panel, the club's public page or mobile; 0 page errors, 0 external requests, no overflow at 390px. Sealed
+  screenshots are labelled `SYNTHETIC-REGISTRY`. Evidence: `docs/v2/evidence/gap006-note-separation-visual-20261101/`
+  (the first, aborted attempt is retained as `...-attempt1-aborted/`).
+- **Environment incident, ISSUE-331 (cause UNKNOWN).** The isolated PostgreSQL distribution disappeared from
+  `D:\tmp\afldb-v2-pg16` while in use; recovered by cold backup and a verified vendor 16.14 distribution on a separate
+  recovery copy. Details and identities: `docs/v2/gap006-release-readiness-2026-11-01.md`.
+- **Still open (V2-GAP-006 stays open).** Database-level enforcement; direct-library, legacy and ISSUE-316 writers;
+  deployment; the Brownlow production-correction cases 2 to 5.
+
 ### V2-GAP-005 and V2-GAP-010 closed as accepted decisions; V2-GAP-006 traced and held (2026-10-31)
 
 - Records only; no code, test, database, host, provider or Brownlow operation. Owner decisions D-V2-GAP005 and

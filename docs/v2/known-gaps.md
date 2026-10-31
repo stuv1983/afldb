@@ -303,9 +303,18 @@ award results must be shown reconcilable before production; **no** — not a pro
     passes the human note as `sealNote`); **F-002 (LOW)** seven draft-editor catch blocks reported a seal refusal as
     `failed` with a prefix (now `validation`, like every other editor); **F-003 (LOW, part)** the open-season stored
     copy of an appointment or list note is capped at 2000 as before; **F-005 (INFO)** an empty season declaration now
-    fails closed as an unknown season. Accepted, not changed: the F-003 design point (an appointment or list note is both
-    the correction note and the record's own note, so a sealed-season appointment needs a 20+ character note that is then
-    its public note); F-004 (`<form onSubmit>` without `action`: no pre-hydration submit; admin-only, JS-required app);
+    fails closed as an unknown season. **F-003 design point: CORRECTED 2026-11-01 (local, not deployed).** The first
+    pass *accepted* coupling the correction justification to the record's own note (a sealed-season appointment or list
+    entry needed a 20+ character note that was then stored as its note). That was the producer's acceptance, never an
+    owner decision, and the owner has since stated it is not approved policy. Now `note` is always the private audit
+    (`data_edits.note`) justification, judged by the seal; a record's own optional text has its own field
+    (`memberNote` for a list entry, `appointmentNote` for a leadership appointment) under its existing purpose, validation
+    and cap, and a sealed-season write still needs a valid correction note whatever the record note says. The correction
+    text is no longer copied to `season_list_members.note`, `club_leadership.note`, an override payload or a tombstone,
+    and a transfer keeps the moved entry's own note. No schema change. No public query selects `club_leadership.note`
+    today, so it is a record field, not demonstrably a public one. Rows written by the first pass (commits `f2563e01`,
+    `fc9e07c4`, never deployed) would hold the justification in those fields: before any deployment, count rows whose
+    note equals a `data_edits.note` for the same entity. Still accepted, not changed: F-004 (`<form onSubmit>` without `action`: no pre-hydration submit; admin-only, JS-required app);
     F-006 (the receipt records `brownlow_authority`, the table-derived workflow); F-007 (`awards-admin.ts` is dead code
     kept for its test). A visual check also found that four forms using `<form action>` (player-link resolve, bulk
     approve, Brownlow publish, delete match) lost the typed values after a refusal (React 19 resets uncontrolled
