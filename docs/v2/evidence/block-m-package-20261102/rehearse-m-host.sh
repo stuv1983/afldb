@@ -76,7 +76,7 @@ EOS
   RUNDB "$DB" node "$W/in/mkenv.cjs" "$CAND/.env" || return 1
   echo .env >> "$CAND/.git/info/exclude"
   [ "$(git status --porcelain | wc -l)" = 0 ] || { echo ".env dirtied the tree"; return 1; }
-  echo "rehearsal identity oid=$OID sysid=$SYSID db=$DB"
+  echo "rehearsal identity oid=$OID sysid=$SYSID db=$DB"; echo "OID=$OID SYSID=$SYSID" > "$EV/ident.env"
   X="$EV/m-prod.rehearsal.sh"
   sed -e 's#^\[ "$(hostname)" = afldb-prod \] && \[ "$(id -un)" = arm \]#[ "$(hostname)" = streamanator ] \&\& [ "$(id -un)" = arm ]#' \
       -e "s#^R_CHK=.*#R_CHK=$CAND#" -e "s#^ROOT=.*#ROOT=/mnt/ssd#" -e "s#^EXPECT_DB=afldb_prod; EXPECT_DSN_HOST=localhost; EXPECT_DSN_PORT=5432#EXPECT_DB=$DB; EXPECT_DSN_HOST=127.0.0.1; EXPECT_DSN_PORT=$PORT#" \
@@ -91,17 +91,44 @@ EOS
   [ "$(git status --porcelain | wc -l)" = 0 ] || { echo "snapshot staging dirtied the tree (data/sources must be ignored)"; return 1; }
 }
 HERE_SRC="$CAND/docs/v2/evidence/block-m-package-20261102"
-M() { ( cd "$EV" && M_LOG_DIR="$EV/m1-log" bash "$EV/m-prod.rehearsal.sh" "$@" ); }
+M() { ( cd "$EV" && M_BACKUP_DIR="${MB:-$EV/synth-ok}" M_LOG_DIR="$EV/m1-log" bash "$EV/m-prod.rehearsal.sh" "$@" ); }
 PRE_OK=fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy
 okc() { "$@"; local rc=$?; [ $rc -eq 0 ] || { echo "ASSERT FAILED: expected success: $*  (rc=$rc)"; return 1; }; }
 nok() { "$@"; local rc=$?; [ $rc -ne 0 ] && { echo "CONTROL refused as required (rc=$rc): ${*:1:3}"; return 0; }; echo "ASSERT FAILED: expected a refusal: $*"; return 1; }
 p7_pre117() { okc M pre "$R" "$PRE_OK" 117; }
+# A SYNTHETIC backup directory (a stand-in file, real SHA256SUMS, a sidecar with the fields backup_fresh reads). It proves the binding logic and
+# its refusals only; the real capture script ran for Block L and its Block M copies differ by constants (diff in the package).
+mk_backup() { # dir digest minutes-ago sysid oid
+  node -e '
+const fs = require("fs"), cp = require("child_process"), path = require("path"), cr = require("crypto");
+const [dir, dig, ago, sysid, oid] = process.argv.slice(1);
+fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+const name = "afldb_prod-SYNTH.dump"; fs.writeFileSync(path.join(dir, name), "synthetic stand-in " + dig);
+const sha = cr.createHash("sha256").update(fs.readFileSync(path.join(dir, name))).digest("hex");
+const side = { observed_ledger_digest: dig, ledger_unchanged_across_capture: true, source_identity: { system_identifier: sysid, database_oid: oid },
+  captured_end_utc: new Date(Date.now() - Number(ago) * 60000).toISOString(), archive: name, archive_sha256: sha };
+fs.writeFileSync(path.join(dir, "afldb_prod-SYNTH.provenance.json"), JSON.stringify(side));
+const lines = [name, "afldb_prod-SYNTH.provenance.json"].map((n) => cr.createHash("sha256").update(fs.readFileSync(path.join(dir, n))).digest("hex") + "  " + n);
+fs.writeFileSync(path.join(dir, "SHA256SUMS"), lines.join(String.fromCharCode(10)) + String.fromCharCode(10));
+' "$@"
+}
+p7b_backup_controls() { # each variant must be refused by migrate BEFORE anything is written; the valid one is accepted by p9
+  . "$EV/ident.env"; local D117=647c3fb39ca66a572664e1dae9028e4fad4d6b121226d6bdf208e6738af45f72 D118=573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57
+  mk_backup "$EV/synth-ok" $D117 5 "$SYSID" "$OID" || return 1
+  mk_backup "$EV/synth-stale" $D117 300 "$SYSID" "$OID" || return 1
+  mk_backup "$EV/synth-wrongdigest" $D118 5 "$SYSID" "$OID" || return 1
+  mk_backup "$EV/synth-wrongtarget" $D117 5 "1" "2" || return 1
+  mk_backup "$EV/synth-tampered" $D117 5 "$SYSID" "$OID" || return 1; echo "tamper" >> "$EV/synth-tampered/afldb_prod-SYNTH.dump"
+  for v in stale wrongdigest wrongtarget tampered; do MB="$EV/synth-$v" nok M migrate "$R" || return 1; done
+  MB="$EV/no-such-dir" nok M migrate "$R" || return 1
+  okc M pre "$R" "$PRE_OK" 117
+}
 p8_neg_wrong_state() { # nothing may change
   nok M pre "$R" x-x 118 && nok M migrate 0000000000000000000000000000000000000000 && okc M pre "$R" "$PRE_OK" 117
 }
 p9_migrate() { okc M migrate "$R"; }
 p10_readback() { okc M readback; }
-M2() { ( cd "$EV" && M_LOG_DIR="$EV/m1-log2" bash "$EV/m-prod.rehearsal.sh" "$@" ); }
+M2() { ( cd "$EV" && M_BACKUP_DIR="$EV/synth-ok" M_LOG_DIR="$EV/m1-log2" bash "$EV/m-prod.rehearsal.sh" "$@" ); }
 p11_replay() {
   nok M migrate "$R" && nok M2 migrate "$R" && okc M pre "$R" "$PRE_OK" 118 && nok M pre "$R" "$PRE_OK" 117 || return 1
   echo "-- dirty checkout control"; echo "x" >> "$CAND/README.md"
@@ -128,7 +155,7 @@ p13_final() {
   ss -ltn | awk '{print $4}' | grep -E ":($PORT)$" && return 1
   du -sh "$W" | tail -1
 }
-ALL="p0_resources p1_inputs p4_cluster p5_restore p6_prepare p7_pre117 p8_neg_wrong_state p9_migrate p10_readback p11_replay p12_window_stage p12b_apply_readback_b p13_final"
+ALL="p0_resources p1_inputs p4_cluster p5_restore p6_prepare p7_pre117 p7b_backup_controls p8_neg_wrong_state p9_migrate p10_readback p11_replay p12_window_stage p12b_apply_readback_b p13_final"
 PH="${*:-$ALL}"
 for ph in $PH; do phase "$ph" "$ph" || { case "$ph" in p0_resources|p1_inputs|p4_cluster|p5_restore|p6_prepare) say "prerequisite $ph failed: stopping"; break;; esac; }; done
 say "DONE"; cat "$SUM"

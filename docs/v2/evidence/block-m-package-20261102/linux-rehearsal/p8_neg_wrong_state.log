@@ -1,0 +1,27 @@
+== pre: host, checkout, writers, serving, ledger (118) 2026-11-01T23:05:57Z
+checkout bbb52ed489119f6e95662cae94811322bf14e715 clean
+unit afldb-rehearsal-none.service enabled=not-found active=inactive
+no settle/migrate/dump/restore/window/label process
+crontab check skipped (rehearsal host)
+state-probe skipped (rehearsal host serves nothing)
+MemAvailable_MB=26861 free_GB=840
+dsn_identity key=AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=127.0.0.1 port=55494 database=afldb_v2_blockm_rh_test
+identity ok (database, OID, system identifier, read-only session)
+ledger rows=117 last=117_brownlow_provider_eligibility_unknown.sql digest=647c3fb39ca66a572664e1dae9028e4fad4d6b121226d6bdf208e6738af45f72
+STOP: ledger is not the expected 118-row state
+CONTROL refused as required (rc=5): M pre bbb52ed489119f6e95662cae94811322bf14e715
+== M1 migrate: migration 118 only 2026-11-01T23:05:57Z
+STOP: checkout HEAD is bbb52ed489119f6e95662cae94811322bf14e715, expected 0000000000000000000000000000000000000000
+CONTROL refused as required (rc=3): M migrate 0000000000000000000000000000000000000000
+== pre: host, checkout, writers, serving, ledger (117) 2026-11-01T23:05:57Z
+checkout bbb52ed489119f6e95662cae94811322bf14e715 clean
+unit afldb-rehearsal-none.service enabled=not-found active=inactive
+no settle/migrate/dump/restore/window/label process
+crontab check skipped (rehearsal host)
+state-probe skipped (rehearsal host serves nothing)
+MemAvailable_MB=26864 free_GB=840
+dsn_identity key=AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=127.0.0.1 port=55494 database=afldb_v2_blockm_rh_test
+identity ok (database, OID, system identifier, read-only session)
+ledger rows=117 last=117_brownlow_provider_eligibility_unknown.sql digest=647c3fb39ca66a572664e1dae9028e4fad4d6b121226d6bdf208e6738af45f72
+fixtures_rows=0 matches_rows=17056 switch_raw=(absent)
+PRE PASS

@@ -1,0 +1,14 @@
+== M1 migrate: migration 118 only 2026-11-01T23:05:57Z
+checkout bbb52ed489119f6e95662cae94811322bf14e715 clean
+unit afldb-rehearsal-none.service enabled=not-found active=inactive
+no settle/migrate/dump/restore/window/label process
+crontab check skipped (rehearsal host)
+dsn_identity key=AFLDB_OWNER_DATABASE_URL user=afldb_owner host=127.0.0.1 port=55494 database=afldb_v2_blockm_rh_test
+pending: 118_fixtures_unconfirmed_participants.sql
+AFLDB migrations -> prod (afldb_owner@127.0.0.1:55494/afldb_v2_blockm_rh_test)
+  118 migration file(s), 117 already applied
+
+  applying 118_fixtures_unconfirmed_participants.sql ... ok (11 ms)
+
+Applied 1 migration(s).
+MIGRATE PASS (run readback)

@@ -5,10 +5,10 @@
 # (never argv, never printed). Phases that WRITE the database are `migrate` (M1) and `window` run (M3); every other phase is read-only.
 #
 #   bash m-prod.sh pre       <expect-checkout-sha> <OLD_ID> <117|118>    read-only preflight (checkout, ledger, writers, serving)
-#   bash m-prod.sh migrate   <R>                                          M1: migration 118 only, owner role, atomic
+#   M_BACKUP_DIR=<M-a capture dir> M_LOG_DIR=<new dir> bash m-prod.sh migrate <R>   M1: migration 118 only, owner role, atomic; refuses without its own fresh backup
 #   bash m-prod.sh readback                                               read-only; proves 118 and prints the ledger digest
 #   bash m-prod.sh window-stage <snapshot-dir-name> <feed-sha256>         read-only; proves the staged snapshot bytes
-#   bash m-prod.sh window    check|run <R> <snapshot> <feed-sha256> <evidence-dir> <decision-text>   M3 (run writes; check does not)
+#   [M_BACKUP_DIR=<M-b capture dir>] bash m-prod.sh window check|run <R> <snapshot> <feed-sha256> <evidence-dir> <decision-text>   M3 (run writes and needs the M-b backup; check does not)
 #   bash m-prod.sh window    restore <evidence-dir>                       recovery: force the switch off and verify
 #   bash m-prod.sh readback-b <matches-rows-before> <decision-text>      read-only; proves the M-b result (218 / 135 / 83 / 11 / 10 / 83 / 0, one batch, switch false)
 set -u -o pipefail
@@ -83,6 +83,24 @@ no_writers() {
   echo "no settle/migrate/dump/restore/window/label process"
   if crontab -l >/dev/null 2>&1; then stop "arm has a crontab" 4; else echo "no crontab for arm"; fi
 }
+backup_fresh() { # dir expected-ledger-digest max-minutes : the stage is bound to ITS backup (checksums, target identity, ledger state, age)
+  local d=$1 dig=$2 max=$3 side
+  [ -d "$d" ] && [ -f "$d/SHA256SUMS" ] || stop "backup directory missing or has no SHA256SUMS: $d" 6
+  ( cd "$d" && sha256sum -c --quiet SHA256SUMS ) || stop "backup checksums do not verify" 6
+  side=$(ls "$d"/afldb_prod-*.provenance.json 2>/dev/null | head -1); [ -f "$side" ] || stop "no provenance sidecar in $d" 6
+  "$NODE" -e '
+const fs = require("fs"); const [side, dig, max, sysid, oid] = process.argv.slice(1);
+const p = JSON.parse(fs.readFileSync(side, "utf8")); const bad = [];
+if (p.observed_ledger_digest !== dig) bad.push("ledger digest " + p.observed_ledger_digest);
+if (p.ledger_unchanged_across_capture !== true) bad.push("ledger changed during capture");
+if (!p.source_identity || p.source_identity.system_identifier !== sysid || p.source_identity.database_oid !== oid) bad.push("target identity");
+const age = (Date.now() - Date.parse(p.captured_end_utc)) / 60000;
+if (!(age >= 0 && age <= Number(max))) bad.push("age " + age.toFixed(1) + " min (limit " + max + ")");
+if (!p.archive || !fs.existsSync(require("path").join(require("path").dirname(side), p.archive))) bad.push("archive file missing");
+if (bad.length) { console.error("backup refused: " + bad.join("; ")); process.exit(1); }
+console.log("backup ok: " + p.archive + " sha256 " + p.archive_sha256 + " captured_end " + p.captured_end_utc + " age_min " + age.toFixed(1) + " ledger_digest " + dig);
+' "$side" "$dig" "$max" "$EXPECT_SYSID" "$EXPECT_OID" || stop "the backup does not bind this stage" 6
+}
 clean_at() { # sha
   [[ $1 =~ ^[0-9a-f]{40}$ ]] || stop "not a 40-hex revision: $1" 2
   [ "$(git -C "$R_CHK" rev-parse HEAD)" = "$1" ] || stop "checkout HEAD is $(git -C "$R_CHK" rev-parse HEAD), expected $1" 3
@@ -112,6 +130,7 @@ migrate)
   R=${1:?R}
   step "M1 migrate: migration 118 only"
   clean_at "$R"; no_writers
+  backup_fresh "${M_BACKUP_DIR:?M_BACKUP_DIR (the M-a capture directory) is required}" "$L117_DIGEST" 120
   [ "$(git -C "$R_CHK" show "$R:src/db/migrations/$MIG118" | sha256sum | cut -c1-64)" = "$MIG118_SHA" ] || stop "migration 118 bytes differ from the approved sha256" 3
   [ "$(sha256sum < "$R_CHK/src/db/migrations/$MIG118" | cut -c1-64)" = "$MIG118_SHA" ] || stop "checked-out migration 118 differs from the approved sha256" 3
   # The owner DSN is used by the migrate child alone (AFLDB_PROD_DATABASE_URL is not kept in .env).
@@ -189,6 +208,7 @@ window)
   [ "${#DECISION}" -ge 20 ] || stop "decision reference must be 20+ characters (the owner's words)" 2
   case "$EV" in "$R_CHK"/*) stop "evidence dir must be outside the checkout" 2;; esac
   clean_at "$R"; no_writers
+  [ "$MODE" = check ] || backup_fresh "${M_BACKUP_DIR:?M_BACKUP_DIR (the M-b capture directory) is required}" "$L118_DIGEST" 120
   bash "$0" window-stage "$LABEL" "$FEED" || exit $?
   ARGS=(--label "$LABEL" --expect-initial absent --expect-created 218 --expect-feed-sha256 "$FEED" --decision "$DECISION" --evidence-dir "$EV" --max-minutes 15)
   if [ "$MODE" = check ]; then

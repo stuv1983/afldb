@@ -1,0 +1,13 @@
+
+> afldb@0.1.0 typecheck
+> next typegen && tsc --noEmit
+
+Generating route types...
+✓ Types generated successfully
+	Command being timed: "npm run typecheck"
+	User time (seconds): 155.92
+	System time (seconds): 3.05
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:04.28
+	Maximum resident set size (kbytes): 2711208
+	Exit status: 0
+NPM_TYPECHECK_EXIT=0

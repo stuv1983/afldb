@@ -1,0 +1,31 @@
+2026-11-01T23:05:17Z PHASE p0_resources: start
+2026-11-01T23:05:17Z PHASE p0_resources: FAIL rc=1 (see /mnt/ssd/afldb-v2-blockm-20261101T230500Z/evidence/p0_resources.log)
+2026-11-01T23:05:17Z prerequisite p0_resources failed: stopping
+2026-11-01T23:05:17Z DONE
+2026-11-01T23:05:29Z PHASE p0_resources: start
+2026-11-01T23:05:29Z PHASE p0_resources: PASS
+2026-11-01T23:05:29Z PHASE p1_inputs: start
+2026-11-01T23:05:37Z PHASE p1_inputs: PASS
+2026-11-01T23:05:37Z PHASE p4_cluster: start
+2026-11-01T23:05:43Z PHASE p4_cluster: PASS
+2026-11-01T23:05:43Z PHASE p5_restore: start
+2026-11-01T23:05:55Z PHASE p5_restore: PASS
+2026-11-01T23:05:55Z PHASE p6_prepare: start
+2026-11-01T23:05:56Z PHASE p6_prepare: PASS
+2026-11-01T23:05:56Z PHASE p7_pre117: start
+2026-11-01T23:05:57Z PHASE p7_pre117: PASS
+2026-11-01T23:05:57Z PHASE p8_neg_wrong_state: start
+2026-11-01T23:05:57Z PHASE p8_neg_wrong_state: PASS
+2026-11-01T23:05:57Z PHASE p9_migrate: start
+2026-11-01T23:05:59Z PHASE p9_migrate: PASS
+2026-11-01T23:05:59Z PHASE p10_readback: start
+2026-11-01T23:05:59Z PHASE p10_readback: PASS
+2026-11-01T23:05:59Z PHASE p11_replay: start
+2026-11-01T23:06:00Z PHASE p11_replay: PASS
+2026-11-01T23:06:00Z PHASE p12_window_stage: start
+2026-11-01T23:06:02Z PHASE p12_window_stage: PASS
+2026-11-01T23:06:02Z PHASE p12b_apply_readback_b: start
+2026-11-01T23:06:05Z PHASE p12b_apply_readback_b: PASS
+2026-11-01T23:06:05Z PHASE p13_final: start
+2026-11-01T23:06:09Z PHASE p13_final: PASS
+2026-11-01T23:06:09Z DONE

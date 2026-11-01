@@ -1,0 +1,7 @@
+== readback: ledger 118 and the schema it must have produced (afldb_backup, read-only) 2026-11-01T23:05:59Z
+dsn_identity key=AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=127.0.0.1 port=55494 database=afldb_v2_blockm_rh_test
+identity ok (database, OID, system identifier, read-only session)
+ledger rows=118 last=118_fixtures_unconfirmed_participants.sql digest=573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57
+columns: away_club_id:YES: | away_placeholder:YES: | confirmation:NO:'confirmed'::text | home_club_id:YES: | home_placeholder:YES:
+ledger118_digest=573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57 fixtures_rows=0 matches_rows=17056
+READBACK PASS

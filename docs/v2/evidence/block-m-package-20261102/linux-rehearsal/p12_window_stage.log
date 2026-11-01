@@ -1,0 +1,23 @@
+== window-stage: staged snapshot bytes 2026-11-01T23:06:00Z
+WINDOW-STAGE PASS manifest_sha256=63fc997403d5fb4edee2698e98e53e61d04c01ef35ebac1a965a8e8420d179e4
+== window-stage: staged snapshot bytes 2026-11-01T23:06:00Z
+STOP: feed sha256 differs from the approved value
+CONTROL refused as required (rc=3): M window-stage afl-api-2027-2026-11-01-012026
+checkout bbb52ed489119f6e95662cae94811322bf14e715 clean
+unit afldb-rehearsal-none.service enabled=not-found active=inactive
+no settle/migrate/dump/restore/window/label process
+crontab check skipped (rehearsal host)
+== window-stage: staged snapshot bytes 2026-11-01T23:06:00Z
+WINDOW-STAGE PASS manifest_sha256=63fc997403d5fb4edee2698e98e53e61d04c01ef35ebac1a965a8e8420d179e4
+== window --check-only (writes nothing) 2026-11-01T23:06:00Z
+AFLDB-ISSUE-229 fixture window fxw-2026-11-01T230601244Z-1284966: snapshot afl-api-2027-2026-11-01-012026, expect initial absent, expect created 218, deadline 15 minute(s), mode check-only, evidence /mnt/ssd/afldb-v2-blockm-20261101T230500Z/evidence/window-check-1
+FIXTURE WINDOW REFUSED
+  - afldb-settle-afl-api.timer is enabled / active
+  - afldb-settle-afl-api-brownlow.timer is enabled / active
+  - systemd-timer names a switch consumer: Mon 2026-11-02 10:10:00 AEDT       3min 58s Mon 2026-11-02 10:05:00 AEDT   1min 1s ago afldb-settle-afl-api-brownlow.timer afldb-settle-afl-
+  - systemd-timer names a switch consumer: Tue 2026-11-03 05:06:57 AEDT            19h Mon 2026-11-02 05:06:17 AEDT  4h 59min ago afldb-settle-afl-api.timer          afldb-settle-afl-
+  - a switch-consumer timer is installed and would start: afldb-settle-afl-api-brownlow.timer                                           enabled         enabled
+  - a switch-consumer timer is installed and would start: afldb-settle-afl-api.timer                                                    enabled         enabled
+  - a unit that runs a switch consumer can start: afldb-settle-afl-api-brownlow.timer enabled active
+  - a unit that runs a switch consumer can start: afldb-settle-afl-api.timer enabled active
+window check exit=2 (the DEV host has enabled AFL API timers: a refusal, exit 2, is the correct answer here; 0 would mean it saw none)

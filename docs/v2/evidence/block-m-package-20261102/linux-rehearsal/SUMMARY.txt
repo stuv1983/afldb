@@ -2,8 +2,6 @@ PASS p0_resources
 PASS p1_inputs
 PASS p4_cluster
 PASS p5_restore
-FAIL p6_prepare rc=1
-FAIL p6_prepare rc=1
 PASS p6_prepare
 PASS p7_pre117
 PASS p8_neg_wrong_state
@@ -11,6 +9,5 @@ PASS p9_migrate
 PASS p10_readback
 PASS p11_replay
 PASS p12_window_stage
-PASS p13_final
-PASS p11_replay
+PASS p12b_apply_readback_b
 PASS p13_final

@@ -1,0 +1,38 @@
+isolated-pg: afldb_v2_blockm_rh_test verified (cluster afldb_v2_isolated, 127.0.0.1:55494); running bash
+INSERT 0 1
+  CREATED CD_M20270142801
+  CREATED CD_M20270142802
+  CREATED CD_M20270142901
+UPDATE 1
+INSERT 0 1
+INSERT 0 1
+apply-inner done
+== readback-b: the first 2027 fixture apply (afldb_backup, read-only) 2026-11-01T23:06:04Z
+dsn_identity key=AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=127.0.0.1 port=55494 database=afldb_v2_blockm_rh_test
+identity ok (database, OID, system identifier, read-only session)
+ledger rows=118 last=118_fixtures_unconfirmed_participants.sql digest=573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57
+fixtures total|confirmed|unconfirmed|label|nullvenue|nulldatetime|unconf_with_datetime|batches|not_scheduled = 218|135|83|11|10|83|0|1|0
+fixture-schedule batches count|status|read|inserted|updated|rejected = 1|completed|218|218|0|0
+switch=boolean:false
+audit rows (decision rows : via window : distinct runs) = 2:2:1
+READBACK-B PASS
+== readback-b: the first 2027 fixture apply (afldb_backup, read-only) 2026-11-01T23:06:05Z
+dsn_identity key=AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=127.0.0.1 port=55494 database=afldb_v2_blockm_rh_test
+identity ok (database, OID, system identifier, read-only session)
+ledger rows=118 last=118_fixtures_unconfirmed_participants.sql digest=573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57
+fixtures total|confirmed|unconfirmed|label|nullvenue|nulldatetime|unconf_with_datetime|batches|not_scheduled = 218|135|83|11|10|83|0|1|0
+fixture-schedule batches count|status|read|inserted|updated|rejected = 1|completed|218|218|0|0
+switch=boolean:false
+audit rows (decision rows : via window : distinct runs) = 2:2:1
+STOP: matches row count changed
+CONTROL refused as required (rc=5): M readback-b 17055
+== readback-b: the first 2027 fixture apply (afldb_backup, read-only) 2026-11-01T23:06:05Z
+dsn_identity key=AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=127.0.0.1 port=55494 database=afldb_v2_blockm_rh_test
+identity ok (database, OID, system identifier, read-only session)
+ledger rows=118 last=118_fixtures_unconfirmed_participants.sql digest=573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57
+fixtures total|confirmed|unconfirmed|label|nullvenue|nulldatetime|unconf_with_datetime|batches|not_scheduled = 218|135|83|11|10|83|0|1|0
+fixture-schedule batches count|status|read|inserted|updated|rejected = 1|completed|218|218|0|0
+switch=boolean:false
+audit rows (decision rows : via window : distinct runs) = 0:0:0
+STOP: expected exactly one ON and one OFF audit row of one run carrying the decision
+CONTROL refused as required (rc=5): M readback-b 17056
