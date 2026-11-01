@@ -109,7 +109,7 @@ EOS
 
 # One full stage cycle: pre, snapshots, target, live baseline, fresh dump, restore + restored baseline, assemble, plan, synthetic approval, apply, accept.
 cycle() { # stage
-  local s=$1 d="$EV/stage-$s"; mkdir -p "$d"; . "$EV/ident.env"
+  local s=$1; local d="$EV/stage-$s"; mkdir -p "$d"; . "$EV/ident.env"
   okc B pre "$R" "$s" || return 1
   case "$s" in b0|b1) okc B snapshots "$s" || return 1;; esac
   okc B target "$R" "$s" || return 1
@@ -177,7 +177,20 @@ p7_b0() { nok B pre "$R" b1 && cycle b0; }                    # b1 first would s
 p7_b1() { nok B pre "$R" b0 && cycle b1; }                    # b0 is already applied
 p7_b2() { cycle b2; }
 p7_b3() { cycle b3; }
-p7_e()  { cycle e; }
+p7_e()  { # control: a disabled actor must be refused by the wrapper before any plan; then the real stage
+  cat > "$W/in/actor-off.sh" <<'EOS'
+#!/bin/bash
+/usr/lib/postgresql/16/bin/psql "$AFLDB_OWNER_DATABASE_URL" -X -At -v ON_ERROR_STOP=1 -c "UPDATE auth_users SET disabled_at = now() WHERE id = 1 AND disabled_at IS NULL" -c "SELECT 'actor disabled'"
+EOS
+  cat > "$W/in/actor-on.sh" <<'EOS'
+#!/bin/bash
+/usr/lib/postgresql/16/bin/psql "$AFLDB_OWNER_DATABASE_URL" -X -At -v ON_ERROR_STOP=1 -c "UPDATE auth_users SET disabled_at = NULL WHERE id = 1" -c "SELECT 'actor restored'"
+EOS
+  RUNDB "$DB" bash "$W/in/actor-off.sh" || return 1
+  nok B pre "$R" e; local rc=$?
+  RUNDB "$DB" bash "$W/in/actor-on.sh" || return 1
+  [ $rc -eq 0 ] && cycle e
+}
 p8_2026_control() { # Brownlow 2026 must stay byte-identical: change one 2026 row, the wrapper must refuse; restore the row
   cat > "$W/in/tamper-inner.sh" <<'EOS'
 #!/bin/bash

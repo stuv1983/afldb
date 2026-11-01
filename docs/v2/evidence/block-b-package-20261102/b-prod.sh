@@ -110,6 +110,17 @@ pre)
   common_pre "$R" "$S"
   got=$(receipts); echo "receipts=[$got] expected before=[$BEFORE]"
   [ "$got" = "$BEFORE" ] || stop "receipts are not exactly what stage $S expects before it runs (an earlier stage is missing, repeated or foreign)" 5
+  if [ "$S" = e ]; then
+    RF="$HERE/$REQ"; [ -f "$RF" ] && [ "$(sha256sum < "$RF" | cut -c1-16)" = "$REQ_SHA" ] || stop "eligibility request missing or not the pinned bytes" 3
+    ACTOR=$("$NODE" -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).actorId))' "$RF"); [[ $ACTOR =~ ^[0-9]+$ ]] || stop "actorId is not a number" 3
+    [ "$(q -c "SELECT count(*) FROM auth_users WHERE id = $ACTOR AND role::text = 'super_admin' AND disabled_at IS NULL")" = 1 ] || stop "the request actorId $ACTOR is not an active Super Admin on this target: regenerate and re-pin the request (its hash changes)" 5
+    [ "$(q -c "SELECT count(*) FROM brownlow_eligibility_decisions")" = 0 ] || stop "eligibility decisions already exist; every ruling carries expectedCurrentDecisionId null" 5
+    echo "actor $ACTOR is an active Super Admin; 0 existing decisions"
+  fi
+  if [ "$S" = e ]; then
+    [ "$(q -c "SELECT count(*) FROM data_issues WHERE issue_type = 'afl_api_brownlow_settle' AND entity_type = 'brownlow_round_votes' AND resolved_at IS NULL")" = 0 ] || stop "resolve checkpoint is non-zero: owner decision before eligibility" 5
+    echo "resolve checkpoint: 0 unresolved afl_api_brownlow_settle issues (resolve skipped)"
+  fi
   D26=$(digest2026); echo "votes2026=$D26"
   BD=$(BDIR_OF "$R"); mkdir -p -m 700 "$BD"
   if [ ! -e "$BD/votes2026.digest" ]; then [ "$S" = b0 ] || stop "no recorded 2026 digest: stage b0 must run first" 5; echo "$D26" > "$BD/votes2026.digest"; fi
