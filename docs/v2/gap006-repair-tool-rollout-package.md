@@ -1,7 +1,8 @@
 # V2-GAP-006 follow-up: repair-tool checkout update (7b4c609b), owner-attended package
 
-**Status: PREPARED, NOT EXECUTED.** Nothing in this file has run on production. No push, no production access, no repair
-tool execution of any kind (not even a dry run, which would connect to the database) was made in preparing it.
+**Status: EXECUTED 2026-11-01 (D0, P-A, D1, D2 all PASS; section 9).** The text below is the package as approved, kept
+unchanged. At preparation nothing had run on production: no push, no production access, no repair
+tool execution of any kind (not even a dry run, which would connect to the database).
 V2-GAP-006 stays **closed** under its accepted scope (D-V2-GAP006-SCOPE-1); this package is its recorded operational
 follow-up (known-gaps.md, V2-GAP-006, "Operational follow-ups" item 1).
 
@@ -320,4 +321,28 @@ database or grant change, writer activation, provider access, a Brownlow operati
 
 ## 9. Execution record
 
-_Not executed. To be appended after the owner's approval and the run._
+Approved by the owner at `R=affe9a2c30842e35557710bc582cb9d6114ee39c`, 2026-11-01. Excluded from the approval: R-1 and
+any reset (neither was needed or used). Transport: Windows OpenSSH (`C:\Windows\System32\OpenSSH\ssh.exe`) to host alias
+`afldb` as `arm`, no sudo; the production blocks were extracted verbatim from this file, with only the `R=` placeholder
+filled.
+
+| Step | Result |
+|---|---|
+| W0 (workstation) | **PASS**: tree is `R`, clean apart from `.codex/`, static check 33/33 ok, `git ls-remote` main = `2d1d0a83` |
+| P-A attempt 1 | **STOPPED, nothing written, nothing changed.** Cause: my transport (`bash -c "$(cat)"`) put the script text, which contains the tool's file name, into the process arguments, so the "tool is not running" check matched the transport itself. A follow-up read-only `ps` found no such process. Not a production state problem and not a check defect; no expected value was adjusted |
+| P-A attempt 2 | **PASS** by running the same script by path as the package specifies (scripts copied to `/tmp`, sha256 identical on both ends). Checkout `9b9c6b2a` clean, tool blob `a2de99e0`; `current` = `fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy`, `previous` = `ad245d602f6f-m0M8pf121326vNSo2B759`; unit active, `WorkingDirectory=/home/arm/afldb-releases/current`, drop-in `release-route.conf` listed, main PID 3218527 cwd = the serving release, **no process of the unit's cgroup in the checkout**; `release.mjs` `STATUS PASS` and `VERIFY PASS` (12,995 files; 21 ISR output files differ, allowed); health 200 `ok`/`ok`; about 55 GB free |
+| D0 (owner push) | **PASS**: `2d1d0a83..affe9a2c  affe9a2c… -> main`; remote main re-read as `R` |
+| D1 | **PASS**: fetched `origin/main` = `R`; static check re-run on production from `R`'s pinned bytes, 33/33; `git merge --ff-only` `9b9c6b2a` to `affe9a2c` (28 files, +1,209 / -22) |
+| D2 | **PASS**: HEAD = `R`, tracked tree = `R`, clean; tool blob `dca00bd8…`, `git hash-object` same, sha256 `3eaf23c5…`; `PROD_HEAD..HEAD` empty on `src`, `packages`, `deploy`, `data`, `package.json`, `package-lock.json`, `next.config.ts`, `tsconfig.json`; `git diff --stat` on `tools` = the one file, 6 insertions; `current`/`previous` unchanged; **PID 3218527, NRestarts 0, ActiveEnterTimestampMonotonic `6644146514621` identical to the P-A snapshot**; `.env` stat `600:arm:4067:1786877149` unchanged; no release lock; `STATUS PASS`, `VERIFY PASS`; health 200; no repair-tool process |
+
+**Final identities.** Production checkout `affe9a2c30842e35557710bc582cb9d6114ee39c` (was `9b9c6b2acda28e4d222c04a951275bdf654da74f`);
+`origin/main` = `affe9a2c…`; repair tool blob `dca00bd85d2eed909d0a042ebdba35e9602f6605` (was `a2de99e0fb6c73cce00e409915871a66503f3c2b`),
+sha256 `3eaf23c58fe38fab9375da86f669c564ca7544be3b50d079c9862046e93417db`; serving release `fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy`
+unchanged; rollback target `ad245d602f6f-m0M8pf121326vNSo2B759` unchanged.
+
+**Limits, stated plainly.** The guard was **not exercised on production**: the tool was not run in any mode (that would
+connect to the database, or, for `--apply`, risk a write). Its behaviour rests on the accepted isolated test evidence of
+`7b4c609b` plus the enforced proof that the installed bytes equal those tested. The checkout's `.next` and other ignored
+files were not inspected. **Leftovers on production (not deleted, none contains a secret):** `/home/arm/gap006-repair-rollout-pre.txt`
+and `/tmp/gap006-rollout-{pa,d1,d2}.sh`. **Not authorised by this installation:** any use of the repair tool on production
+(dry run or `--apply`), which needs its own explicit approval of target, scope and safeguards.

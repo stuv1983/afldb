@@ -477,6 +477,13 @@ authorised to run. The repair-tool fix `7b4c609b` is accepted but **committed lo
 the production `repair-match-rekeys --apply` has no seal check and must not be used until it is installed or a pinned
 fixed checkout is approved. GAP-011, ISSUE-316 and ISSUE-331 stay open. See `known-gaps.md` V2-GAP-006.
 
+**2026-11-01 (later) repair-tool checkout update EXECUTED** (`gap006-repair-tool-rollout-package.md`, section 9). Owner
+pushed `affe9a2c` (D0); the production operator checkout `/home/arm/projects/afldb` was fast-forwarded `9b9c6b2a` to
+`affe9a2c` (D1/D2 PASS). Checkout-only: no build, promotion or restart; serving release
+`fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy` and PID 3218527 unchanged. The repair tool was never run; installation grants no
+permission to use it on production. The earlier paragraph's "must not be used until installed" is thereby satisfied
+only as to the guard.
+
 ## Next action for the owner
 
 1. Review `v2/rebuild` (`git log ff100dc2..v2/rebuild`) starting with `docs/v2/final-report.md`.
