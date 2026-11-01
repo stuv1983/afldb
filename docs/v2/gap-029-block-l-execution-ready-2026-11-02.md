@@ -114,7 +114,7 @@ Use the installed, non-destructive release tool only (ISSUE-329): `node deploy/r
 
 ## 10. Type-check evidence for the current head
 
-(Appended by the recording commit; see `linux-rehearsal/typecheck-head.log`.)
+`node node_modules/typescript/bin/tsc --noEmit -p .` was run on streamanator (Node v22.23.2) on a clean shallow clone of **`933eb87effcd63c909a27454738656e7516c2e15`** (the commit that recorded sections 1-9; tar sha256 `6784656aa5c39d6c6762b39e78be8b714c8345e6f54699b8b992583cb172f99f`; `package.json` and `package-lock.json` byte-identical to the installed tree, `node_modules` linked, which is the one untracked line in the final status): **exit 0, 2 min 2 s** ([log](evidence/gap029-block-l-20261102/linux-rehearsal/typecheck-head.log)). The commit that adds this section differs from `933eb87e` only under `docs/` (checked with `git diff --name-only`), so every type-checked input is identical; if the owner pushes a later commit, the type-check is re-run on that exact revision before M2 and its log is cited in `--typecheck-evidence`.
 
 ## 11. Leftovers (retained, private; nothing deleted)
 
