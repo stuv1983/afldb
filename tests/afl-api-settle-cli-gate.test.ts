@@ -41,6 +41,7 @@ afterEach(() => vi.unstubAllEnvs());
 const isolatedFacts = async () => [{ cluster_name: 'afldb_v2_isolated', database_comment: 'afldb-v2-isolated-test' }];
 
 import { SealedSeasonRefusal } from '@afldb/domain';
+import { runRepairMatchRekeys } from '../tools/current-season/repair-match-rekeys';
 import { AflApiBrownlowFixtureIdentityRequiredError, BROWNLOW_ENABLE_ENV } from '@/lib/acquisition/afl-api-brownlow';
 import {
   AFL_API_FIXTURE_ACQUISITION_KIND,
@@ -1248,6 +1249,63 @@ describe('AFLDB-ISSUE-316 — the tracked registry seals 2026 at all three AFL A
     const { projectRoot, label } = trackedSnapshot('matches', 2027);
     const { sql, touched } = makeSqlStub();
     await expect(runAflApiSettleCli(['--label', label, '--dry-run'], { projectRoot, sql, ingestionControls: ENABLED_CONTROLS }))
+      .rejects.toThrow(SqlStubTouched);
+    expect(touched.value).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// V2-GAP-006 — the ISSUE-131 operator repair tool (tools/current-season/repair-match-rekeys.ts)
+// rewrites `matches` rows. Its own `--acknowledge-completed-season` admits a COMPLETED season to
+// that tool, but it is not an audited correction, so --apply must not open a sealed season. Same
+// seal, same offline timing as the settle CLIs: refused before any connection. The dry run writes
+// nothing and stays allowed. The tracked registry seals 2026 and leaves 2027 open.
+// ---------------------------------------------------------------------------
+
+describe('V2-GAP-006 — the seal at repair-match-rekeys --apply', () => {
+  const APPLY_FLAGS = ['--apply', '--plan-hash', 'reviewed-plan-hash', '--acknowledge-completed-season'];
+
+  it('refuses --apply for sealed 2026 even with --acknowledge-completed-season, before any connection', async () => {
+    const projectRoot = makeProjectRoot('afldb-v2-gap-006-repair-', 'tracked');
+    const { sql, touched } = makeSqlStub();
+    const error = await runRepairMatchRekeys(['--season', '2026', ...APPLY_FLAGS], { projectRoot, sql, log: () => {} })
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(SealedSeasonRefusal);
+    expect(error).toMatchObject({ code: 'season_sealed', season: 2026 });
+    expect((error as Error).message).toMatch(/season 2026 is sealed historical data/);
+    expect(touched.value).toBe(false);
+  });
+
+  it('refuses --apply for a season the predecessor registry sealed (2025) under the same acknowledgement', async () => {
+    const projectRoot = makeProjectRoot('afldb-v2-gap-006-repair-pre-');
+    const { sql, touched } = makeSqlStub();
+    await expect(runRepairMatchRekeys(['--season', '2025', ...APPLY_FLAGS], { projectRoot, sql, log: () => {} }))
+      .rejects.toThrow(/season 2025 is sealed historical data/);
+    expect(touched.value).toBe(false);
+  });
+
+  it('still allows the dry run on a sealed season: it writes nothing and reaches the database path', async () => {
+    const projectRoot = makeProjectRoot('afldb-v2-gap-006-repair-dry-', 'tracked');
+    const { sql, touched } = makeSqlStub();
+    await expect(runRepairMatchRekeys(
+      ['--season', '2026', '--acknowledge-completed-season'], { projectRoot, sql, log: () => {} },
+    )).rejects.toThrow(SqlStubTouched);
+    expect(touched.value).toBe(true);
+  });
+
+  it('does not seal the season in progress (2027): --apply continues to its database path', async () => {
+    const projectRoot = makeProjectRoot('afldb-v2-gap-006-repair-open-', 'tracked');
+    const { sql, touched } = makeSqlStub();
+    await expect(runRepairMatchRekeys(
+      ['--season', '2027', '--apply', '--plan-hash', 'reviewed-plan-hash'], { projectRoot, sql, log: () => {} },
+    )).rejects.toThrow(SqlStubTouched);
+    expect(touched.value).toBe(true);
+  });
+
+  it('does not seal a synthetic season outside first..last (2093), so the integration suite is unaffected', async () => {
+    const projectRoot = makeProjectRoot('afldb-v2-gap-006-repair-synth-', 'tracked');
+    const { sql, touched } = makeSqlStub();
+    await expect(runRepairMatchRekeys(['--season', '2093', ...APPLY_FLAGS], { projectRoot, sql, log: () => {} }))
       .rejects.toThrow(SqlStubTouched);
     expect(touched.value).toBe(true);
   });

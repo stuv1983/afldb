@@ -83,6 +83,7 @@ import {
   findRetiredMatchIdentities,
 } from '../../src/lib/acquisition/match-rekey';
 import { canonicalJson, type JsonValue } from '../../src/lib/acquisition/observations';
+import { refuseSealedSeasonForSettle } from './settle-season-seal';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PROJECT_ROOT = join(__dirname, '..', '..');
@@ -673,6 +674,11 @@ export async function runRepairMatchRekeys(
       + 'pass --acknowledge-completed-season only if you mean a completed season.',
     );
   }
+  // V2-GAP-006: a rekey rewrites `matches` rows, so --apply is a writing mode and the seal applies to it
+  // exactly as it does to the AFL API settle CLIs (settle-season-seal.ts). `--acknowledge-completed-season`
+  // admits a completed season to THIS tool; it is not an audited correction and never opens a sealed one.
+  // Refused offline, before any connection. The dry run writes nothing and stays allowed.
+  if (args.apply) refuseSealedSeasonForSettle(projectRoot, args.season);
 
   const ownsClient = deps.sql === undefined;
   const dsn = process.env.AFLDB_IMPORT_DATABASE_URL;

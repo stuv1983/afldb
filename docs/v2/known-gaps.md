@@ -67,7 +67,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 | V2-GAP-003 | Medium | environment | rehearsal | **CLOSED locally (2026-10-28, Linux)**: full default workflow on streamanator at `c3dea709` 14,860 passed / 3 failed / 63 skipped plus Coleman 28/28; the only failures are listed `gridley-corpus` (V2-GAP-029); three Linux regressions were fixed first. Not run: 11 Brownlow dedicated-clone tests, 45 opt-in tests ([Linux verification](linux-verification-2026-10-28.md)). A second pass (§9 there) ran the eligible opt-in suites: receipts 7/7, import lock 1/1, populated lifecycle 17/17, oracle reports pass. The Brownlow clones, Phase B, populated-pending and external-grids remain blocked, with their reasons recorded | none |
 | V2-GAP-004 | Low | source worktree hygiene | no | **CLOSED (2026-10-31, re-verified; fix made 2026-10-19)**: the user-level hook runs through a no-shell Node runner, not `cmd.exe`; harness 147/147 and a live Read probe created no file; the stray `supplies` was deleted 2026-10-19 under its four proved conditions. User-level, outside the repository; re-run the harness after any `codebase-memory-mcp` update | none |
 | V2-GAP-005 | Low | historical baseline scope | no | **CLOSED (2026-10-31, owner decision D-V2-GAP005 Option A): accepted scope boundary.** AFLW stays outside the V2 AFL/VFL historical manifest; the manifest specification is unchanged (spec version 1); AFLW data, loader and backups are untouched | none |
-| V2-GAP-006 | Medium | historical baseline | no | narrowed (Stages 3-4 and **the editors, 2026-10-31**): enforced at the AFL API settle CLIs, the Coleman publisher, curated award approval, Brownlow eligibility decisions and, **deployed to production and owner-accepted 2026-11-01** (running release `fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy`), every audited admin editor mutation (owner decision D-V2-GAP006-EDITORS, E1). Still unmet: database-level enforcement (**not implemented**) and direct-library and legacy writers (011, ISSUE-316) | decide database-level enforcement; legacy writers via 011 / ISSUE-316 |
+| V2-GAP-006 | Medium | historical baseline | no | narrowed (Stages 3-4 and **the editors, 2026-10-31**): enforced at the AFL API settle CLIs, the Coleman publisher, curated award approval, Brownlow eligibility decisions and, **deployed to production and owner-accepted 2026-11-01** (running release `fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy`), every audited admin editor mutation (owner decision D-V2-GAP006-EDITORS, E1). Still unmet: database-level enforcement (**not implemented**) and direct-library and legacy writers (011, ISSUE-316). **2026-11-01 inventory (local):** the operator repair tool `repair-match-rekeys --apply` now refuses a sealed season; the remaining writers are itemised in the section below (offline loaders and governed Brownlow operations carry no seal) | decide database-level enforcement; owner scope decision on the offline loaders and governed Brownlow operations |
 | V2-GAP-007 | Medium | historical baseline | rehearsal | **CLOSED (2026-10-31, D-V2-PROD-EXEC-1)**: the owner-authorised read-only production runs produced the real-baseline manifest before (`4060c929…`, ledger 110) and after (`ba1d5c64…`, ledger 117) the release; both are 32 tables and 1,380 buckets, kept outside the repository in the host release directory; gate M sealed scope identical. Isolated repeat runs were already identical (Launch F) | none |
 | V2-GAP-008 | High | AFL API fixtures | **cutover** | **open, production-only**: writer built and tested (Launch F, `d760280e`); AFLDB-ISSUE-229 B2 uncaptured (no 2027 season exists) | capture B2, review its dry run, approve the first apply |
 | V2-GAP-009 | Medium | AFL API promotion | rehearsal | **CLOSED on retained evidence (2026-10-31)**: all seven AFL API integration files executed on guarded isolated PostgreSQL, **124/124 passed, 0 skipped** locally (`local-supported-tests-delivered.json`, 73 + 21 + 16 + 6 + 4 + 3 + 1), including the transaction-rollback and preservation cases; the Linux run (PG 16.15, 2026-10-28) records them passing with no failure or refusal. Stated limit: **not replayed on a production-dump clone** | none (production-dump replay is a recorded limit, RISK-03) |
@@ -334,6 +334,49 @@ award results must be shown reconcilable before production; **no** — not a pro
     *Still open:* (1) database-level enforcement (not implemented, owner decision pending); (2) the other writers: direct
     library calls, legacy loaders (011, 013), the AFL Tables settle, ISSUE-316 tooling and ad hoc SQL. ISSUE-331 stays
     open, cause UNKNOWN.
+  - *2026-11-01, later: remaining-writer inventory (local source analysis; no production access, no push, no deployment,
+    no provider fetch, no writer activation, no Brownlow operation).* The "Still open" list above is now itemised. This is
+    an inventory of **application source**, pinned by `tests/v2-season-seal.test.ts` ("the season-bearing writer inventory"),
+    and it is **not** database-level enforcement: ad hoc SQL, a direct client or a script outside the tree is not seen by it
+    and is stopped by nothing (triggers stay DEFERRED under the Option B decision). Stale statements reconciled: the
+    "Still open after Stage 4" bullet (editors do not consult the seal) was superseded by E1 and is deployed; "sealed today:
+    1897-2025" is now 1897-2026 (2027 open); GAP-013 (email intake) and the AFL Tables timer are closed or disabled, below.
+    - *Seal reaches (verified in source):* the audited editors (55 `recordDataEdit` sites plus the player-link resolution),
+      Brownlow eligibility, Coleman publication and curated award approval; the AFL API settle CLIs
+      (`settle-afl-api`, `-fixtures`, `-fixture-schedule`, `-brownlow`: refused before any client, `--validate-only` and
+      `--report` allowed, the afldb_test completed-season Brownlow backtest the one logged exception).
+    - *FIXED (local, committed, not pushed or deployed):* `tools/current-season/repair-match-rekeys.ts --apply` rewrote
+      `matches` rows with no seal check, and its `--acknowledge-completed-season` flag admitted any completed season,
+      sealed ones included. `--apply` now refuses a sealed season offline before any connection, through the same
+      `refuseSealedSeasonForSettle` the settle CLIs use; the dry run stays allowed. No new policy, workflow id or bypass.
+      Tests: "V2-GAP-006 — the seal at repair-match-rekeys --apply" in `tests/afl-api-settle-cli-gate.test.ts` (five cases;
+      the two refusal cases fail with the guard removed, recorded as a negative control).
+    - *Library entry points:* `runSettleAflApi`, `runSettleAflApiBrownlow` and `canonical-apply.ts` do not themselves consult
+      the seal; they rely on the CLI above them plus the per-target `season_not_in_progress` gate (canonical targets only).
+      Non-CLI callers are all isolated or governed: the `tools/v2/*` visual and rehearsal tools and `tools/db/*rehearsal*`
+      (guarded `_test` targets), and `tools/v2/brownlow-production-correction.ts` (observe-only, approval-bound). No
+      `src/app` caller exists. `applyAttendanceEnrichment` has no season gate of its own, is reachable only from
+      `runSettleAflApi` for matches that run settled, and is therefore unreachable for a sealed season through any CLI.
+      **Not changed**: gating the library itself would also touch the legitimate afldb_test backtest and rehearsals.
+    - *Legacy loaders (retained source, not enabled):* CSV upload, CSV review and promotion, email intake and the
+      Squiggle/Kali refresh are retired at every entry (HTTP 410 or typed `legacy_retired`); `src/lib/ingest/{pipeline,datasets}.ts`,
+      `src/lib/external-afl/current-season-import.ts` and `src/db/queries/awards-admin.ts` have no runtime importer (asserted).
+      `tools/records/import-first-kick-goal.ts` (`npm run records:first-kick-goal`) and the `tools/migration/*` /
+      `tools/rebuild/*` families remain offline loaders that rewrite sealed history by design (L9, L10); they are not sealed.
+    - *AFL Tables settle:* `settle-afltables.ts` run directly, the deploy script and `npm run settle:afltables` refuse on a V2
+      checkout. Recorded production state at the 2026-10-31 closing writer check (not re-verified; no production access):
+      `afldb-settle-afltables.timer` disabled and inactive, its `.service` static and inactive; the three AFL API units and
+      both email-intake units `not-found`. `runSettleCli` / `runSettleAfltables` stay importable for the offline promotion
+      and rehearsal tools and the integration suite.
+    - *Governed Brownlow operations (not run, not changed):* `brownlow-legacy-ownership-adoption.ts`,
+      `brownlow-round-vote-match-backfill.ts` and `brownlow-production-correction.ts` write `brownlow_round_votes`
+      ownership and `match_id` for sealed seasons under a digest-bound reviewed export plus a fresh owner approval, and
+      refuse the wrong database. That is their own contract, not the editor note or an audited-correction record.
+    - *ISSUE-316 tooling:* `afl-api-c4b-rehearsal.ts` writes `site_settings` and `auth_audit_log` only;
+      `rollover-season.ts` and `successor-activation.ts` write registry files, not database rows. No season-bearing row.
+    - *Unmet, so the gap stays open:* (1) database-level enforcement; (2) ad hoc SQL and any client outside the tree;
+      (3) the offline loaders above and the governed Brownlow operations carry no seal or correction record. (3) needs an
+      owner scope and risk decision (recommendations in the session report), not a code change.
 
 ## V2-GAP-007 — No manifest of the real baseline exists yet
 

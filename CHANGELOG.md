@@ -15,6 +15,12 @@ commit.
 
 ## [Unreleased]
 
+### V2-GAP-006: remaining-writer inventory and the repair-tool seal (2026-11-01, local only, not deployed)
+
+- `tools/current-season/repair-match-rekeys.ts --apply` now refuses a sealed season (offline, before any connection, through the same `refuseSealedSeasonForSettle` as the settle CLIs). Before, `--apply --acknowledge-completed-season` could rewrite `matches` rows in a sealed season with no seal check. The dry run is unchanged; open and synthetic seasons are unchanged. No new policy, workflow id or bypass.
+- Tests: five cases in `tests/afl-api-settle-cli-gate.test.ts` (sealed 2026 and predecessor-sealed 2025 refused with the sql stub untouched; dry run, in-progress 2027 and synthetic 2093 still reach the database path) and a source-level writer inventory in `tests/v2-season-seal.test.ts` that classifies every application file writing a season-bearing table and asserts the retired legacy writers have no runtime importer. Negative control: the two refusal cases fail with the guard removed. Typecheck clean.
+- Application-level only. Database-level enforcement (triggers) stays deferred; ad hoc SQL, offline loaders and the governed Brownlow operations are not covered. V2-GAP-006 stays open; see `docs/v2/known-gaps.md`.
+
 ### V2-GAP-006: editor protections deployed to production, owner-accepted (2026-11-01)
 
 - **Production now enforces the season seal on the audited admin editors** (a sealed or undeterminable season needs a human correction note of 20-2000 characters; open seasons unchanged). Release package revision 3, executed 2026-11-01 (owner-attended): `docs/v2/gap006-editor-protections-release-package.md` section 11.3.

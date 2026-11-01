@@ -645,3 +645,125 @@ describe('the action layer never truncates the correction note (V2-GAP-006 E1, n
     expect(parser).not.toMatch(/slice|substring|substr|maxLength/);
   });
 });
+
+describe('the season-bearing writer inventory (V2-GAP-006, application level only)', () => {
+  /**
+   * Every non-test source file under src/, packages/ and tools/ that issues INSERT/UPDATE/DELETE against a
+   * season-bearing canonical table, with how the season seal reaches it TODAY. A new writer fails this test
+   * until someone classifies it. This is an inventory of application code, NOT enforcement: ad hoc SQL, a
+   * direct client and anything outside this tree are not seen here, and there is no database constraint or
+   * trigger (deferred under the Option B decision).
+   *
+   * Classes:
+   *   editor      audited admin editor: recordDataEdit / enforceSealedEditorWrite inside the editor transaction
+   *   derived     derived-table recompute, only called from a guarded editor/settle transaction or a tool
+   *   settle      AFL API settle library; the settle CLIs refuse a sealed season before any client (settle-season-seal.ts)
+   *   repair      operator repair CLI; --apply refuses a sealed season before any client
+   *   governed    Brownlow production-correction family: digest-bound reviewed export and owner approval, own contract
+   *   retained    retained source with no runtime caller (verified by the reachability assertions below)
+   *   offline     offline loader / rehearsal / visual tool: isolated-database guards, not the seal
+   */
+  const EXPECTED: Record<string, string> = {
+    'src/db/queries/admin-awards.ts': 'editor',
+    'src/db/queries/admin-brownlow.ts': 'editor',
+    'src/db/queries/admin-club-leadership.ts': 'editor',
+    'src/db/queries/admin-draft.ts': 'editor',
+    'src/db/queries/admin-fixtures.ts': 'editor',
+    'src/db/queries/admin-season-lists.ts': 'editor',
+    'src/db/queries/admin-special-records.ts': 'editor',
+    'src/db/queries/brownlow-eligibility.ts': 'editor',
+    'src/db/queries/coleman-award-winners.ts': 'editor',
+    'src/db/queries/data-edits.ts': 'editor',
+    'src/db/queries/match-admin.ts': 'editor',
+    'src/db/queries/match-sheet.ts': 'editor',
+    'src/db/queries/player-links.ts': 'editor',
+    'src/db/queries/players.ts': 'editor',
+    'src/db/queries/player-derived.ts': 'derived',
+    'src/lib/acquisition/afl-api-fixture-writer.ts': 'settle',
+    'src/lib/acquisition/canonical-apply.ts': 'settle',
+    'tools/current-season/repair-match-rekeys.ts': 'repair',
+    'src/db/queries/brownlow-legacy-ownership-adoption.ts': 'governed',
+    'src/db/queries/brownlow-round-vote-match-backfill.ts': 'governed',
+    'src/db/queries/awards-admin.ts': 'retained',
+    'src/lib/ingest/datasets.ts': 'retained',
+    'tools/db/afl-api-identity-correction-rehearsal.ts': 'offline',
+    'tools/db/afl-api-identity-promotion-rehearsal.ts': 'offline',
+    'tools/db/promotion-source-dependency-rehearsal.ts': 'offline',
+    'tools/records/first-kick-goal-rehearsal.ts': 'offline',
+    'tools/records/import-first-kick-goal.ts': 'offline',
+    'tools/v2/brownlow-operations-check.mts': 'offline',
+    'tools/v2/candidate-visual-brownlow-recapture.mts': 'offline',
+    'tools/v2/candidate-visual-corrected.mts': 'offline',
+    'tools/v2/candidate-visual-leaderboard.mts': 'offline',
+    'tools/v2/candidate-visual-states.mts': 'offline',
+    'tools/v2/gap006-editor-visual.mts': 'offline',
+    'tools/v2/gap006-review-visual.mts': 'offline',
+    'tools/v2/rollback-populate.ts': 'offline',
+  };
+  const TABLES = [
+    'matches', 'player_match_stats', 'player_match_period_stats', 'match_period_scores', 'draft_picks',
+    'award_winners', 'award_nominations', 'player_achievements', 'after_siren_kicks', 'club_leadership',
+    'brownlow_round_votes', 'brownlow_season_votes', 'season_list_members', 'captaincies', 'fixtures',
+  ];
+  const WRITE = new RegExp(`\\b(?:INSERT\\s+INTO|UPDATE|DELETE\\s+FROM)\\s+(?:public\\.)?(?:${TABLES.join('|')})\\b(?!_)`, 'i');
+  // A SQL statement spelled in prose ("the compare-and-set UPDATE matches no row") is not a write.
+  const PROSE_FALSE_POSITIVES = new Set(['src/db/queries/admin-users.ts']);
+  const ROOT = join(__dirname, '..');
+
+  function sourceFiles(dir: string, out: string[] = []): string[] {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name === 'node_modules' || entry.name === '.next') continue;
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) sourceFiles(full, out);
+      else if (/\.(ts|tsx|mts)$/.test(entry.name)) out.push(full);
+    }
+    return out;
+  }
+
+  const relative = (f: string): string => f.slice(ROOT.length + 1).split('\\').join('/');
+
+  const writers = ['src', 'packages', 'tools']
+    .flatMap((d) => sourceFiles(join(ROOT, d)))
+    .map(relative)
+    .filter((f) => WRITE.test(readFileSync(join(ROOT, f), 'utf8')) && !PROSE_FALSE_POSITIVES.has(f))
+    .sort();
+
+  it('classifies every source file that writes a season-bearing table, and nothing stale', () => {
+    expect(writers).toEqual(Object.keys(EXPECTED).sort());
+  });
+
+  it('keeps the repair CLI on the seal: --apply refuses a sealed season before any connection', () => {
+    const source = readFileSync(join(ROOT, 'tools/current-season/repair-match-rekeys.ts'), 'utf8');
+    expect(source).toContain("from './settle-season-seal'");
+    const guard = source.indexOf('if (args.apply) refuseSealedSeasonForSettle(projectRoot, args.season);');
+    expect(guard).toBeGreaterThan(0);
+    expect(guard).toBeLessThan(source.indexOf('postgres(dsn as string'));
+  });
+
+  it('keeps the AFL API settle CLIs and the fixture-schedule CLI on the seal', () => {
+    for (const file of ['settle-afl-api', 'settle-afl-api-fixtures', 'settle-afl-api-fixture-schedule', 'settle-afl-api-brownlow']) {
+      const source = readFileSync(join(ROOT, 'tools/current-season', `${file}.ts`), 'utf8');
+      expect(source, file).toContain("from './settle-season-seal'");
+      expect(source, file).toContain('refuseSealedSeasonForSettle(');
+    }
+  });
+
+  it('keeps the retired legacy writers unreachable from the application runtime', () => {
+    const runtimeFiles = ['src', 'packages']
+      .flatMap((d) => sourceFiles(join(ROOT, d)))
+      .map(relative);
+    const importsOf = (needle: RegExp): string[] => runtimeFiles
+      .filter((f) => needle.test(readFileSync(join(ROOT, f), 'utf8')))
+      .filter((f) => !/^src\/lib\/(ingest|external-afl)\//.test(f));
+    // CSV / email promotion library, the Squiggle-Kali refresh, and the unrouted awards helpers.
+    expect(importsOf(/lib\/ingest\/(pipeline|datasets)['"]/)).toEqual([]);
+    expect(importsOf(/external-afl\/current-season-import['"]/)).toEqual([]);
+    expect(importsOf(/queries\/awards-admin['"]/)).toEqual([]);
+    // The AFL Tables settle entry refuses when run directly (the scheduled unit and the package script).
+    const afltables = readFileSync(join(ROOT, 'tools/current-season/settle-afltables.ts'), 'utf8');
+    expect(afltables).toContain('AFLDB_LEGACY_RETIRED_V2');
+    expect(afltables).toMatch(/if \(invokedDirectly\) \{\s*console\.error\(AFLTABLES_SETTLE_RETIRED_V2\);\s*process\.exit\(1\);/);
+    // The email-intake route answers 410 and does nothing else.
+    expect(readFileSync(join(ROOT, 'src/app/api/admin/email-intake/route.ts'), 'utf8')).toMatch(/410/);
+  });
+});
