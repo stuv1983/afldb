@@ -3,13 +3,18 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { ClubsPanel } from '@/app/admin/fixtures/ClubsPanel';
-import { roundHeading, FIXTURE_STATUS_LABELS, PLAYED_STATE_LABELS } from '@/app/admin/fixtures/labels';
+import {
+  CONFIRMATION_LABELS, FIXTURE_STATUS_LABELS, PLAYED_STATE_LABELS, participantText, roundHeading,
+} from '@/app/admin/fixtures/labels';
 import { LifecyclePanel } from '@/app/admin/fixtures/LifecyclePanel';
 import { NotesPanel } from '@/app/admin/fixtures/NotesPanel';
 import { ReschedulePanel } from '@/app/admin/fixtures/ReschedulePanel';
 import { RoundPanel } from '@/app/admin/fixtures/RoundPanel';
 import { VenuePanel } from '@/app/admin/fixtures/VenuePanel';
-import { eligibleFixtureClubs, isPlayedState, readFixture } from '@/db/queries/admin-fixtures';
+import {
+  eligibleFixtureClubs, hasUnresolvedParticipant, isPlayedState, isProviderManaged, readFixture,
+  type SeasonFixtureRow,
+} from '@/db/queries/admin-fixtures';
 import { listVenues } from '@/db/queries/venues';
 import { hasCapability } from '@/lib/auth/capabilities';
 import { requireCapability } from '@/lib/auth/session';
@@ -17,14 +22,22 @@ import { formatDate, matchPath } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
 
+function fixtureSides(fixture: SeasonFixtureRow) {
+  return {
+    home: participantText({ clubName: fixture.homeClubName, placeholder: fixture.homePlaceholder }),
+    away: participantText({ clubName: fixture.awayClubName, placeholder: fixture.awayPlaceholder }),
+  };
+}
+
 export async function generateMetadata(
   { params }: { params: Promise<{ season: string; fixtureKey: string }> },
 ): Promise<Metadata> {
   await requireCapability('data.fixtures.read');
   const { fixtureKey } = await params;
   const fixture = await readFixture(fixtureKey);
+  const sides = fixture ? fixtureSides(fixture) : null;
   return {
-    title: fixture ? `${fixture.homeClubName} v ${fixture.awayClubName}` : 'Fixture',
+    title: sides ? `${sides.home.text} v ${sides.away.text}` : 'Fixture',
     robots: { index: false, follow: false },
   };
 }
@@ -60,7 +73,12 @@ export default async function FixtureDetailPage(
   // round and club panels there would offer four controls that can only ever
   // fail. Hiding them is a convenience, never the boundary: the backend gate
   // is unchanged and still refuses a forged request against any of them.
-  const schedulable = !played && fixture.status !== 'void';
+  const providerManaged = isProviderManaged(fixture);
+  // A provider-managed row (D-229-6) is read-only here: every edit on it is refused by the backend, so no panel is
+  // offered for it. Hiding is a convenience; the backend refusal (`provider_owned`) is the boundary.
+  const schedulable = !played && fixture.status !== 'void' && !providerManaged;
+  const { home, away } = fixtureSides(fixture);
+  const unresolved = hasUnresolvedParticipant(fixture);
 
   // Fetched unconditionally: both reads are cheap, and keeping one code path
   // avoids a ternary that would otherwise need to unify two differently-typed
@@ -71,9 +89,12 @@ export default async function FixtureDetailPage(
     <>
       <div className="page-header">
         <p className="eyebrow"><Link href={`/admin/fixtures/${season}`}>← {season} fixtures</Link></p>
-        <h1>{fixture.homeClubName} v {fixture.awayClubName}</h1>
+        <h1>{home.text} v {away.text}</h1>
         <p className="subtitle">
           {season} · {roundHeading(fixture)} · {FIXTURE_STATUS_LABELS[fixture.status]}
+          {' · '}<span className={fixture.confirmation === 'unconfirmed' ? 'badge badge-warn' : 'badge'} data-confirmation={fixture.confirmation}>
+            {CONFIRMATION_LABELS[fixture.confirmation]}
+          </span>
           {' · '}<Link href={`/admin/audit/entity/fixtures/${fixture.id}`}>Audit trail</Link>
         </p>
       </div>
@@ -83,6 +104,12 @@ export default async function FixtureDetailPage(
         <div className="table-wrap">
           <table>
             <tbody>
+              <tr>
+                <th scope="row">Home</th>
+                <td data-participant={home.tbc ? 'tbc' : 'club'}>{home.text}</td>
+                <th scope="row">Away</th>
+                <td data-participant={away.tbc ? 'tbc' : 'club'}>{away.text}</td>
+              </tr>
               <tr>
                 <th scope="row">Date</th>
                 <td>{fixture.matchDate ? formatDate(fixture.matchDate) : 'TBC'}</td>
@@ -152,6 +179,26 @@ export default async function FixtureDetailPage(
         </div>
       </section>
 
+      {fixture.confirmation === 'unconfirmed' && (
+        <section className="section">
+          <p className="notice" role="note" data-testid="unconfirmed-note">
+            The provider has not confirmed this fixture. It is a scheduled fixture, not a result: its date and
+            kick-off time{unresolved ? ', and at least one participant,' : ''} stay TBC until the provider confirms them.
+          </p>
+        </section>
+      )}
+      {providerManaged && (
+        <section className="section">
+          <p className="muted" data-testid="provider-managed-note">
+            This fixture is managed by the fixture importer ({fixture.sourceKey ?? 'unknown source'}) and is read-only
+            here. It is updated by the next fixture settle once the provider confirms it.
+            {unresolved && (
+              <> A manual fixture cannot be added in this round while a participant is still to be confirmed.</>
+            )}
+          </p>
+        </section>
+      )}
+
       {canEdit && schedulable && (
         <ReschedulePanel fixtureKey={fixture.fixtureKey} matchDate={fixture.matchDate} matchTime={fixture.matchTime} expectedUpdatedAt={fixture.updatedAt} />
       )}
@@ -161,7 +208,8 @@ export default async function FixtureDetailPage(
       {canEdit && schedulable && (
         <RoundPanel fixtureKey={fixture.fixtureKey} roundType={fixture.roundType} roundNumber={fixture.roundNumber} expectedUpdatedAt={fixture.updatedAt} />
       )}
-      {canEdit && schedulable && (
+      {canEdit && schedulable && fixture.homeClubId !== null && fixture.awayClubId !== null
+        && fixture.homeClubName !== null && fixture.awayClubName !== null && (
         <ClubsPanel
           fixtureKey={fixture.fixtureKey}
           homeClubId={fixture.homeClubId}
@@ -173,10 +221,10 @@ export default async function FixtureDetailPage(
         />
       )}
 
-      {canEdit && (
+      {canEdit && !providerManaged && (
         <NotesPanel fixtureKey={fixture.fixtureKey} notes={fixture.notes} expectedUpdatedAt={fixture.updatedAt} />
       )}
-      {!canEdit && fixture.notes && (
+      {(!canEdit || providerManaged) && fixture.notes && (
         <section className="section">
           <h2>Notes</h2>
           <p>{fixture.notes}</p>
@@ -186,7 +234,7 @@ export default async function FixtureDetailPage(
       {/* A played fixture still offers Reinstate when it is cancelled (AFLDB-ISSUE-289,
           D-289-1): its game was played after it was cancelled. Cancel and Void stay hidden
           for it, and the backend still refuses every other group as `played_locked`. */}
-      {canEdit && (!played || fixture.status === 'cancelled') && (
+      {canEdit && !providerManaged && (!played || fixture.status === 'cancelled') && (
         <LifecyclePanel fixtureKey={fixture.fixtureKey} status={fixture.status} expectedUpdatedAt={fixture.updatedAt} played={played} />
       )}
       {/* An editor is told this by LifecyclePanel's own terminal branch; this

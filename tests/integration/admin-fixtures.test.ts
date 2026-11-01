@@ -834,6 +834,114 @@ describe('finals (§17)', () => {
   });
 });
 
+describe('a manual fixture beside an open provider slot (ISSUE-229 L1)', () => {
+  /** A provider-owned, unconfirmed label slot, written the way the fixture writer writes one. */
+  async function providerSlot(roundType: 'qualifying_final' | 'semi_final', code: string, home: string, away: string, recordId: string) {
+    const [source] = await admin<{ id: number }[]>`SELECT id FROM sources WHERE key = 'afl_api'`;
+    expect(source, 'the afl_api source must exist').toBeTruthy();
+    const key = `l1-test-${recordId}`;
+    await admin`
+      INSERT INTO fixtures (fixture_key, season, round_code, round_number, round_type, match_date, match_time,
+                            venue_id, venue_raw, home_club_id, away_club_id, status, source_id, source_record_id,
+                            confirmation, home_placeholder, away_placeholder)
+      VALUES (${key}, ${seasonNext}::smallint, ${code}, NULL, ${roundType}::round_type, NULL, NULL,
+              NULL, NULL, NULL, NULL, 'scheduled', ${source.id}, ${recordId}, 'unconfirmed', ${home}, ${away})`;
+    return key;
+  }
+
+  const manualFinalInput = (over: Partial<FixtureInput> = {}) => baseInput({
+    roundType: 'qualifying_final', roundNumber: null, matchDate: null, matchTime: null, venueId: null, ...over,
+  });
+
+  it('refuses a manual final in a round whose provider slot is still a label, and writes nothing', async () => {
+    const slot = await providerSlot('qualifying_final', 'QF', '1st', '4th', 'L1-QF-1');
+    const before = await admin<{ n: number }[]>`SELECT count(*)::int AS n FROM fixtures WHERE season = ${seasonNext}`;
+    const result = await createFixture(manualFinalInput());
+    expect(result).toMatchObject({ ok: false, reason: 'provider_slot_exists', subjects: [slot] });
+    expect((result as { error: string }).error).toContain('1st v 4th');
+    const after = await admin<{ n: number }[]>`SELECT count(*)::int AS n FROM fixtures WHERE season = ${seasonNext}`;
+    expect(after[0].n).toBe(before[0].n);
+    expect(await admin`SELECT 1 FROM data_edits WHERE table_name = 'fixtures' AND field_group = 'fixture_creation'`).toHaveLength(0);
+    await clearFixtureState();
+  });
+
+  it('refuses a whole batch for that round (nothing partially written)', async () => {
+    await providerSlot('qualifying_final', 'QF', '1st', '4th', 'L1-QF-2');
+    const result = await createFixtures({
+      season: seasonNext, roundType: 'qualifying_final', roundNumber: null, adminUserId: actorId,
+      rows: [{ homeClubId: clubA.id, awayClubId: clubB.id }, { homeClubId: clubC.id, awayClubId: clubD.id }],
+      mode: 'commit',
+    } as unknown as Parameters<typeof createFixtures>[0]);
+    expect(result.ok).toBe(false);
+    const [n] = await admin<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM fixtures
+       WHERE season = ${seasonNext} AND source_id = (SELECT id FROM sources WHERE key = 'manual_admin_edit')`;
+    expect(n.n).toBe(0);
+    await clearFixtureState();
+  });
+
+  it('does not ban several finals in one round, and does not touch other rounds', async () => {
+    await providerSlot('qualifying_final', 'QF', '1st', '4th', 'L1-QF-3');
+    // A different round is unaffected by the QF slot.
+    const sf1 = await mustCreate(manualFinalInput({ roundType: 'semi_final' }));
+    // Two manual finals in one round are legitimate when no provider slot is open there.
+    const sf2 = await mustCreate(manualFinalInput({ roundType: 'semi_final', homeClubId: clubC.id, awayClubId: clubD.id }));
+    expect(sf1).not.toBe(sf2);
+    await clearFixtureState();
+  });
+
+  it('refuses MOVING a manual fixture into that round, but not editing one already beside a slot', async () => {
+    const manual = await mustCreate(manualFinalInput({ roundType: 'semi_final' }));
+    await providerSlot('qualifying_final', 'QF', '2nd', '3rd', 'L1-QF-4');
+    const move = await changeFixtureRound({
+      fixtureKey: manual, expectedUpdatedAt: await updatedAt(manual), adminUserId: actorId,
+      roundType: 'qualifying_final', roundNumber: null,
+    });
+    expect(move).toMatchObject({ ok: false, reason: 'provider_slot_exists' });
+    expect((await fixtureRow(manual))!.round_code).toBe('SF');
+
+    // An overlap that already exists (a manual fixture entered before the slot) stays repairable in place.
+    const beside = await mustCreate(manualFinalInput({ roundType: 'semi_final', homeClubId: clubC.id, awayClubId: clubD.id }));
+    await providerSlot('semi_final', 'SF', '1st', '2nd', 'L1-SF-5');
+    const repair = await changeFixtureClubs({
+      fixtureKey: beside, expectedUpdatedAt: await updatedAt(beside), adminUserId: actorId,
+      homeClubId: clubD.id, awayClubId: clubC.id,
+    });
+    expect(repair, JSON.stringify(repair)).toMatchObject({ ok: true });
+    await clearFixtureState();
+  });
+
+  it('resolves once the provider slot has real clubs: the club rules govern again', async () => {
+    const slot = await providerSlot('qualifying_final', 'QF', '1st', '4th', 'L1-QF-6');
+    await admin`UPDATE fixtures SET home_club_id = ${clubA.id}, away_club_id = ${clubB.id},
+                       home_placeholder = NULL, away_placeholder = NULL WHERE fixture_key = ${slot}`;
+    const other = await createFixture(manualFinalInput({ homeClubId: clubC.id, awayClubId: clubD.id }));
+    expect(other, JSON.stringify(other)).toMatchObject({ ok: true });
+    const dup = await createFixture(manualFinalInput({ homeClubId: clubA.id, awayClubId: clubB.id }));
+    expect(dup).toMatchObject({ ok: false, reason: 'duplicate_fixture' });
+    await clearFixtureState();
+  });
+
+  it('lists a label fixture and reads it: counted, labelled, unconfirmed, no date, never dropped', async () => {
+    const slot = await providerSlot('qualifying_final', 'QF', '7th', '10th', 'L1-QF-7');
+    const listed = (await readSeasonFixtures(seasonNext)).find((f) => f.fixtureKey === slot)!;
+    expect(listed).toMatchObject({
+      homeClubId: null, awayClubId: null, homeClubName: null, awayClubName: null,
+      homePlaceholder: '7th', awayPlaceholder: '10th', confirmation: 'unconfirmed',
+      sourceKey: 'afl_api', matchDate: null, matchTime: null, status: 'scheduled', playedState: 'unplayed',
+    });
+    expect(await readFixture(slot)).toMatchObject({ homePlaceholder: '7th', confirmation: 'unconfirmed' });
+    expect(await readFixtureSeasonSummary(seasonNext)).toMatchObject({ fixtures: 1, unresolvedParticipants: 1, unconfirmed: 1 });
+    expect((await readFixtureDiagnostics(seasonNext)).map((d) => d.code)).toContain('unconfirmed_fixtures');
+    // Every edit of a provider-owned row is still refused (D-229-6), including notes.
+    const note = await updateFixtureNotes({
+      fixtureKey: slot, expectedUpdatedAt: listed.updatedAt, adminUserId: actorId, notes: 'x',
+    });
+    expect(note).toMatchObject({ ok: false, reason: 'provider_owned' });
+    await clearFixtureState();
+  });
+});
+
 describe('the read-time played resolution (§18, D-6)', () => {
   it('resolves to the played match on the exact season, round and club pair', async () => {
     // The chronology this contract is about: the fixture is entered while the

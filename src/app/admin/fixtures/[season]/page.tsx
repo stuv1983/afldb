@@ -2,13 +2,17 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
-import { roundHeading, FIXTURE_STATUS_LABELS, PLAYED_STATE_LABELS } from '@/app/admin/fixtures/labels';
+import {
+  CONFIRMATION_LABELS, FIXTURE_STATUS_LABELS, PLAYED_STATE_LABELS, participantText, roundHeading,
+} from '@/app/admin/fixtures/labels';
 import {
   administrableFixtureSeasons,
   classifyFixtureDiagnostics,
   eligibleFixtureClubs,
+  hasUnresolvedParticipant,
   isAdministrableFixtureSeason,
   isPlayedState,
+  isProviderManaged,
   readFixtureSeasonSummary,
   readPlayedMatchesWithoutFixture,
   readSeasonFixtures,
@@ -42,6 +46,29 @@ function venueText(row: SeasonFixtureRow): { text: string; unmapped: boolean } {
   if (row.venueId !== null) return { text: row.venueRaw ?? '—', unmapped: false };
   if (row.venueRaw !== null) return { text: `${row.venueRaw} (unmapped)`, unmapped: true };
   return { text: 'Venue: TBC', unmapped: false };
+}
+
+const CONFIRMATION_FILTERS = ['all', 'confirmed', 'unconfirmed'] as const;
+type ConfirmationFilter = (typeof CONFIRMATION_FILTERS)[number];
+
+/** Home and away as displayed: a club name, or TBC with the provider's label. Never a label as a team. */
+function sides(row: SeasonFixtureRow) {
+  return {
+    home: participantText({ clubName: row.homeClubName, placeholder: row.homePlaceholder }),
+    away: participantText({ clubName: row.awayClubName, placeholder: row.awayPlaceholder }),
+  };
+}
+
+/** The confirmation state, always visible: an unconfirmed fixture is never presented as settled. */
+function ConfirmationBadge({ row }: { row: SeasonFixtureRow }) {
+  if (row.confirmation === 'confirmed') {
+    return <span className="badge" data-confirmation="confirmed">{CONFIRMATION_LABELS.confirmed}</span>;
+  }
+  return <span className="badge badge-warn" data-confirmation="unconfirmed">{CONFIRMATION_LABELS.unconfirmed}</span>;
+}
+
+function ParticipantCell({ side }: { side: { text: string; tbc: boolean } }) {
+  return side.tbc ? <span className="muted" data-participant="tbc">{side.text}</span> : <>{side.text}</>;
 }
 
 /**
@@ -81,6 +108,9 @@ export default async function FixtureSeasonPage(
   const clubFilter = firstValue(search.club) ?? '';
   const statusFilter = firstValue(search.status) ?? '';
   const tbcOnly = firstValue(search.tbc) === '1';
+  const rawConfirmation = firstValue(search.confirmation) ?? 'all';
+  const confirmationFilter: ConfirmationFilter = (CONFIRMATION_FILTERS as readonly string[]).includes(rawConfirmation)
+    ? (rawConfirmation as ConfirmationFilter) : 'all';
   const rawPlayed = firstValue(search.played) ?? 'all';
   const playedFilter: PlayedFilter = (PLAYED_FILTERS as readonly string[]).includes(rawPlayed) ? (rawPlayed as PlayedFilter) : 'all';
 
@@ -91,7 +121,9 @@ export default async function FixtureSeasonPage(
     if (roundFilter && f.roundCode !== roundFilter) return false;
     if (clubFilter && f.homeClubSlug !== clubFilter && f.awayClubSlug !== clubFilter) return false;
     if (statusFilter && f.status !== statusFilter) return false;
-    if (tbcOnly && f.matchDate !== null && f.matchTime !== null && (f.venueId !== null || f.venueRaw !== null)) return false;
+    if (confirmationFilter !== 'all' && f.confirmation !== confirmationFilter) return false;
+    if (tbcOnly && f.matchDate !== null && f.matchTime !== null && (f.venueId !== null || f.venueRaw !== null)
+      && !hasUnresolvedParticipant(f)) return false;
     if (playedFilter === 'played' && !isPlayedState(f.playedState)) return false;
     if (playedFilter === 'unplayed' && isPlayedState(f.playedState)) return false;
     return true;
@@ -109,8 +141,11 @@ export default async function FixtureSeasonPage(
         <h1>{season} fixtures</h1>
         <p className="subtitle">
           {summary.fixtures} fixture{summary.fixtures === 1 ? '' : 's'} across {summary.rounds} round{summary.rounds === 1 ? '' : 's'}
-          {summary.voided > 0 && ` (${summary.voided} voided, hidden by default)`}. Played state is
-          derived from the match record and never stored on the fixture.
+          {summary.voided > 0 && ` (${summary.voided} voided, hidden by default)`}
+          {summary.unconfirmed > 0 && `; ${summary.unconfirmed} unconfirmed by the provider`
+            + (summary.unresolvedParticipants > 0 ? `, ${summary.unresolvedParticipants} with a participant still TBC` : '')}. Played state is
+          derived from the match record and never stored on the fixture. An unconfirmed fixture is a scheduled
+          fixture whose date, time or participants the provider has not confirmed; it is not a result.
         </p>
       </div>
 
@@ -165,6 +200,14 @@ export default async function FixtureSeasonPage(
             </select>
           </label>
           <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.8rem' }}>
+            Confirmation
+            <select name="confirmation" defaultValue={confirmationFilter}>
+              <option value="all">All</option>
+              <option value="confirmed">Confirmed</option>
+              <option value="unconfirmed">Unconfirmed</option>
+            </select>
+          </label>
+          <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.8rem' }}>
             Played
             <select name="played" defaultValue={playedFilter}>
               <option value="all">All</option>
@@ -181,7 +224,7 @@ export default async function FixtureSeasonPage(
             Show voided
           </label>
           <button type="submit" className="btn btn-secondary">Filter</button>
-          {(roundFilter || clubFilter || statusFilter || tbcOnly || showVoided || playedFilter !== 'all') && (
+          {(roundFilter || clubFilter || statusFilter || tbcOnly || showVoided || playedFilter !== 'all' || confirmationFilter !== 'all') && (
             <Link href={`/admin/fixtures/${season}`} className="btn btn-secondary">Clear</Link>
           )}
         </form>
@@ -200,6 +243,7 @@ export default async function FixtureSeasonPage(
                     <th scope="col">Away</th>
                     <th scope="col">Venue</th>
                     <th scope="col">Status</th>
+                    <th scope="col">Confirmation</th>
                     <th scope="col">Played</th>
                     <th scope="col"></th>
                   </tr>
@@ -207,11 +251,12 @@ export default async function FixtureSeasonPage(
                 <tbody>
                   {rows.map((row) => {
                     const venue = venueText(row);
+                    const { home, away } = sides(row);
                     return (
                       <tr key={row.fixtureKey}>
                         <td>{scheduleText(row)}</td>
-                        <td>{row.homeClubName}</td>
-                        <td>{row.awayClubName}</td>
+                        <td><ParticipantCell side={home} /></td>
+                        <td><ParticipantCell side={away} /></td>
                         <td>{venue.text}</td>
                         <td>
                           {FIXTURE_STATUS_LABELS[row.status]}
@@ -219,6 +264,7 @@ export default async function FixtureSeasonPage(
                             <span className="muted"> — {row.statusReason}</span>
                           )}
                         </td>
+                        <td><ConfirmationBadge row={row} /></td>
                         <td>
                           <span className={
                             row.playedState === 'ambiguous' ? 'badge badge-danger'
@@ -231,7 +277,7 @@ export default async function FixtureSeasonPage(
                         </td>
                         <td>
                           <Link href={`/admin/fixtures/${season}/${row.fixtureKey}`} className="btn btn-secondary">
-                            {canEdit ? 'Manage' : 'View'}
+                            {canEdit && !isProviderManaged(row) ? 'Manage' : 'View'}
                           </Link>
                         </td>
                       </tr>
@@ -244,10 +290,11 @@ export default async function FixtureSeasonPage(
             <ul className="admin-cards">
               {rows.map((row) => {
                 const venue = venueText(row);
+                const { home, away } = sides(row);
                 return (
                   <li className="admin-card" key={row.fixtureKey}>
                     <div className="admin-card-title">
-                      {row.homeClubName} <span className="muted">vs</span> {row.awayClubName}
+                      <ParticipantCell side={home} /> <span className="muted">vs</span> <ParticipantCell side={away} />
                     </div>
                     <dl className="admin-card-fields">
                       <div>
@@ -268,6 +315,10 @@ export default async function FixtureSeasonPage(
                         </dd>
                       </div>
                       <div>
+                        <dt>Confirmation</dt>
+                        <dd><ConfirmationBadge row={row} />{isProviderManaged(row) && <span className="muted"> · provider-managed</span>}</dd>
+                      </div>
+                      <div>
                         <dt>Played</dt>
                         <dd>
                           <span className={
@@ -283,7 +334,7 @@ export default async function FixtureSeasonPage(
                     </dl>
                     <div className="admin-card-action">
                       <Link href={`/admin/fixtures/${season}/${row.fixtureKey}`} className="btn btn-secondary">
-                        {canEdit ? 'Manage' : 'View'}
+                        {canEdit && !isProviderManaged(row) ? 'Manage' : 'View'}
                       </Link>
                     </div>
                   </li>

@@ -38,6 +38,7 @@ vi.mock('@/app/admin/fixtures/submit-helper', () => ({
 }));
 
 import { LifecyclePanel } from '@/app/admin/fixtures/LifecyclePanel';
+import { participantText } from '@/app/admin/fixtures/labels';
 import {
   FINALS_ROUND_CODES,
   FIXTURE_ENTITY_TYPE,
@@ -696,10 +697,10 @@ describe('the lifecycle panel for a played fixture (AFLDB-ISSUE-289, D-289-1)', 
 
   it('is wired so the page renders the panel for a played fixture only when it is cancelled', () => {
     const page = readSource('src/app/admin/fixtures/[season]/[fixtureKey]/page.tsx');
-    expect(page).toMatch(/canEdit && \(!played \|\| fixture\.status === 'cancelled'\) && \(/);
+    expect(page).toMatch(/canEdit && !providerManaged && \(!played \|\| fixture\.status === 'cancelled'\) && \(/);
     expect(page).toMatch(/<LifecyclePanel [^>]*played=\{played\}/);
     // The schedule, venue, round and club panels stay hidden for any played fixture.
-    expect(page).toMatch(/const schedulable = !played && fixture\.status !== 'void';/);
+    expect(page).toMatch(/const schedulable = !played && fixture\.status !== 'void' && !providerManaged;/);
   });
 });
 
@@ -1055,6 +1056,9 @@ describe('the diagnostics report and never refuse (§27)', () => {
     awayClubName: 'Carlton',
     status: 'scheduled' as const,
     confirmation: 'confirmed' as const,
+    homePlaceholder: null,
+    awayPlaceholder: null,
+    sourceKey: 'manual_admin_edit',
     statusReason: null,
     notes: null,
     createdAt: 't',
@@ -1236,5 +1240,96 @@ describe('the client/server module boundary', () => {
     // vocabulary assertions above — which import from `admin-fixtures` — are
     // reading exactly these values.
     expect(moduleCode).toMatch(/export\s*\{[\s\S]*?\}\s*from\s*'@\/lib\/fixtures\/spec';/);
+  });
+});
+
+// -------------------------------------------------------------------------
+// AFLDB-ISSUE-229 L1 and the admin list of unconfirmed / label fixtures.
+
+describe('a manual fixture beside an open provider slot is refused (ISSUE-229 L1)', () => {
+  const SLOT = {
+    fixtureKey: 'prov-slot-1', home: '7th', away: '10th',
+  };
+  const OPEN_SLOTS = { 'COALESCE(hc.name, f.home_placeholder)': [SLOT] };
+
+  it('refuses a single create, writes nothing, and names the slot it would overlap', async () => {
+    const seen = fakeImportConnection(defaultDb(OPEN_SLOTS));
+    const result = await createFixture({ ...VALID, roundType: 'qualifying_final', roundNumber: null });
+    expect(result).toMatchObject({ ok: false, reason: 'provider_slot_exists', subjects: ['prov-slot-1'] });
+    expect((result as { error: string }).error).toContain('7th v 10th');
+    expect(wrote(seen)).toEqual([]);
+  });
+
+  it('refuses every row of a batch when the round has an open slot, and writes nothing', async () => {
+    const seen = fakeImportConnection(defaultDb(OPEN_SLOTS));
+    const result = await createFixtures({
+      season: 2027, roundType: 'qualifying_final', roundNumber: null, adminUserId: 1, mode: 'commit',
+      rows: [{ homeClubId: 7, awayClubId: 8 }, { homeClubId: 10, awayClubId: 9 }],
+    } as unknown as Parameters<typeof createFixtures>[0]);
+    expect(result.ok).toBe(false);
+    expect(wrote(seen)).toEqual([]);
+  });
+
+  it('does NOT ban finals: a round with no open slot still admits manual fixtures', async () => {
+    fakeImportConnection(defaultDb());
+    expect(await createFixture({ ...VALID, roundType: 'qualifying_final', roundNumber: null }))
+      .toMatchObject({ ok: true });
+  });
+
+  it('is checked by round, never by clubs, because a label cannot identify its club', () => {
+    expect(moduleCode).toMatch(/openProviderSlots\(tx, \{ season: input\.season, roundCode: input\.round\.roundCode \}\)/);
+    // A move INTO a round is guarded; an edit within the round it is already in is not, so an overlap that
+    // pre-dates the guard stays repairable.
+    expect(moduleCode).toMatch(/guardOpenSlots: true/);
+    expect(moduleCode.match(/guardOpenSlots: true/g)).toHaveLength(1);
+  });
+});
+
+describe('the admin list shows unconfirmed and label fixtures (ISSUE-229)', () => {
+  const base = {
+    id: 1, fixtureKey: 'k1', season: 2027, roundCode: 'QF', roundNumber: null,
+    roundType: 'qualifying_final' as const, isFinal: true, matchDate: null, matchTime: null,
+    venueId: null, venueSlug: null, venueRaw: null,
+    homeClubId: null, homeClubSlug: null, homeClubName: null,
+    awayClubId: null, awayClubSlug: null, awayClubName: null,
+    status: 'scheduled' as const, confirmation: 'unconfirmed' as const,
+    homePlaceholder: '7th', awayPlaceholder: '10th', sourceKey: 'afl_api',
+    statusReason: null, notes: null, createdAt: 't', updatedAt: 't',
+    playedState: 'unplayed' as const, playedMatchId: null, scheduleDiffersFromResult: false,
+  };
+  const clubs = [{ id: 7, slug: 'richmond', name: 'Richmond', organizationId: 7 }];
+  const run = (fixtures: (typeof base)[]) =>
+    classifyFixtureDiagnostics({ fixtures, playedWithoutFixture: [], eligibleClubs: clubs });
+
+  it('renders a label as TBC with the slot description, never as a club name', () => {
+    expect(participantText({ clubName: null, placeholder: '7th' })).toEqual({ text: 'TBC (7th)', tbc: true });
+    expect(participantText({ clubName: null, placeholder: null })).toEqual({ text: 'TBC', tbc: true });
+    expect(participantText({ clubName: 'Richmond', placeholder: null })).toEqual({ text: 'Richmond', tbc: false });
+  });
+
+  it('counts label participants in no club or pair collision and reports them as information', () => {
+    const report = run([base, { ...base, id: 2, fixtureKey: 'k2' }]);
+    expect(report.map((d) => d.code)).not.toContain('club_twice_in_round');
+    expect(report.map((d) => d.code)).not.toContain('pair_twice_in_round');
+    const note = report.find((d) => d.code === 'unconfirmed_fixtures')!;
+    expect(note.severity).toBe('info');
+    expect(note.message).toContain('2 fixture(s) are unconfirmed');
+    expect(note.message).toContain('2 with a participant still to be confirmed');
+  });
+
+  it('keeps TBC date and time on an unconfirmed fixture: nothing is rendered as a confirmed kick-off', () => {
+    const listPage = readSource('src/app/admin/fixtures/[season]/page.tsx');
+    expect(listPage).toContain("return 'Date: TBC'");
+    expect(listPage).toContain('ConfirmationBadge');
+    expect(listPage).not.toMatch(/label.*as.*club/i);
+    // Both layouts (table and mobile cards) carry the confirmation state.
+    expect(listPage.match(/ConfirmationBadge row=\{row\}/g)!.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('offers no edit control for a provider-managed row: the detail page is read-only for it', () => {
+    const detail = readSource('src/app/admin/fixtures/[season]/[fixtureKey]/page.tsx');
+    expect(detail).toContain('providerManaged');
+    expect(detail).toMatch(/const schedulable = !played && fixture\.status !== 'void' && !providerManaged/);
+    expect(detail).toMatch(/canEdit && !providerManaged && \(\s*<NotesPanel/);
   });
 });

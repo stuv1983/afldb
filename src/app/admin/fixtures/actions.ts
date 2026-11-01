@@ -39,7 +39,7 @@ function shouldAuditRefusal(reason: FixtureRefusalReason): boolean {
   return reason === 'duplicate_fixture' || reason === 'club_already_scheduled'
     || reason === 'already_played' || reason === 'played_locked'
     || reason === 'stale' || reason === 'stale_preview' || reason === 'forbidden'
-    || reason === 'provider_owned';
+    || reason === 'provider_owned' || reason === 'provider_slot_exists';
 }
 
 async function auditRefusal(

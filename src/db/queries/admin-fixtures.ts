@@ -359,6 +359,11 @@ export type FixtureRefusalReason =
   | 'identity_collision'
   /** AFLDB-ISSUE-229 D-229-6: the row is owned by a provider importer, not by this contract. */
   | 'provider_owned'
+  /**
+   * AFLDB-ISSUE-229 L1: a provider-managed slot with a participant still to be confirmed already occupies this round, so a
+   * manual fixture entered beside it would overlap it. The slot is read-only here (D-229-6); it resolves at the provider.
+   */
+  | 'provider_slot_exists'
   | 'stale'
   | 'stale_preview'
   | 'batch_invalid'
@@ -649,7 +654,8 @@ async function resolveVenue(
 
 // --- the canonical row ---------------------------------------------------
 
-export type FixtureRow = {
+/** The facts of a fixture that do not depend on its participants being clubs. */
+type FixtureRowCore = {
   id: number;
   fixtureKey: string;
   season: number;
@@ -662,23 +668,48 @@ export type FixtureRow = {
   venueId: number | null;
   venueSlug: string | null;
   venueRaw: string | null;
+  status: FixtureStatus;
+  /**
+   * AFLDB-ISSUE-229 B2 (migration 118): `unconfirmed` for a provider fixture the provider has not yet confirmed (AFL API
+   * PLACEHOLDER), still `status = 'scheduled'`. Never a result, never a cancellation.
+   */
+  confirmation: 'confirmed' | 'unconfirmed';
+  /** The provider's label for an unresolved home / away participant (club NULL), otherwise NULL. Never a club. */
+  homePlaceholder: string | null;
+  awayPlaceholder: string | null;
+  /** `sources.key` of the owner of the row: `manual_admin_edit` for this contract, otherwise a provider importer. */
+  sourceKey: string | null;
+  statusReason: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/**
+ * A fixture whose two participants are clubs: every manual row, and every provider row once resolved. This is the shape
+ * the edit paths work on; a provider-owned row is refused before any field of it is used (`editFixture`).
+ */
+export type FixtureRow = FixtureRowCore & {
   homeClubId: number;
   homeClubSlug: string;
   homeClubName: string;
   awayClubId: number;
   awayClubSlug: string;
   awayClubName: string;
-  status: FixtureStatus;
-  /**
-   * AFLDB-ISSUE-229 B2 (migration 118): `unconfirmed` for a provider fixture the provider has not yet confirmed (AFL API
-   * PLACEHOLDER), still `status = 'scheduled'`. These readers INNER JOIN `clubs`, so a fixture with a provider-label
-   * participant (club NULL) is deliberately not listed here; it is counted in `FixtureSeasonSummary.unresolvedParticipants`.
-   */
-  confirmation: 'confirmed' | 'unconfirmed';
-  statusReason: string | null;
-  notes: string | null;
-  createdAt: string;
-  updatedAt: string;
+};
+
+/**
+ * A fixture as the admin readers list it (ISSUE-229 L1 / admin UI): a participant may be an unresolved provider LABEL
+ * (club NULL, `homePlaceholder` / `awayPlaceholder` set). The readers LEFT JOIN `clubs` so such a row is listed and
+ * counted, never silently dropped.
+ */
+export type ListedFixtureRow = FixtureRowCore & {
+  homeClubId: number | null;
+  homeClubSlug: string | null;
+  homeClubName: string | null;
+  awayClubId: number | null;
+  awayClubSlug: string | null;
+  awayClubName: string | null;
 };
 
 const FIXTURE_COLUMNS = `
@@ -688,14 +719,30 @@ const FIXTURE_COLUMNS = `
   f.venue_id AS "venueId", v.slug AS "venueSlug", f.venue_raw AS "venueRaw",
   f.home_club_id AS "homeClubId", hc.slug AS "homeClubSlug", hc.name AS "homeClubName",
   f.away_club_id AS "awayClubId", ac.slug AS "awayClubSlug", ac.name AS "awayClubName",
-  f.status AS status, f.confirmation AS confirmation, f.status_reason AS "statusReason", f.notes AS notes,
+  f.status AS status, f.confirmation AS confirmation,
+  f.home_placeholder AS "homePlaceholder", f.away_placeholder AS "awayPlaceholder",
+  src.key AS "sourceKey",
+  f.status_reason AS "statusReason", f.notes AS notes,
   f.created_at::text AS "createdAt", f.updated_at::text AS "updatedAt"`;
 
 const FIXTURE_JOINS = `
   FROM fixtures f
-  JOIN clubs hc ON hc.id = f.home_club_id
-  JOIN clubs ac ON ac.id = f.away_club_id
-  LEFT JOIN venues v ON v.id = f.venue_id`;
+  LEFT JOIN clubs hc ON hc.id = f.home_club_id
+  LEFT JOIN clubs ac ON ac.id = f.away_club_id
+  LEFT JOIN venues v ON v.id = f.venue_id
+  LEFT JOIN sources src ON src.id = f.source_id`;
+
+/** True when a provider importer, not this admin contract, owns the row (D-229-6): it is read-only here. */
+export function isProviderManaged(row: { sourceKey: string | null }): boolean {
+  return row.sourceKey !== FIXTURE_SOURCE_KEY;
+}
+
+/** True when either participant is still a provider label rather than a club. */
+export function hasUnresolvedParticipant(row: {
+  homeClubId: number | null; awayClubId: number | null;
+}): boolean {
+  return row.homeClubId === null || row.awayClubId === null;
+}
 
 /**
  * Lock one fixture for update and read it back whole.
@@ -863,6 +910,48 @@ type PreparedRow = {
 };
 
 /**
+ * AFLDB-ISSUE-229 L1. The open provider slots of one round: scheduled fixtures where a participant is still a provider
+ * label (club NULL). The club-based collision rules (I-1, I-2) cannot see such a row, so a manual fixture entered beside
+ * one would silently overlap the slot the provider will fill. Only the round is matched, never the clubs: a label such as
+ * "Winner of QF1" says nothing about which club it will become, so a manual game cannot be proven to be a DIFFERENT game
+ * from the slot, and an ambiguous match is refused rather than guessed.
+ *
+ * This does NOT forbid several finals in one round: a round with no open slot admits as many manual finals as the club
+ * rules allow (qualifying finals, semi finals), and once the provider resolves a slot to real clubs I-1 / I-2 govern again.
+ */
+async function openProviderSlots(tx: Tx, input: {
+  season: number; roundCode: string; excludeFixtureId?: number;
+}): Promise<{ fixtureKey: string; home: string; away: string }[]> {
+  return tx<{ fixtureKey: string; home: string; away: string }[]>`
+    SELECT f.fixture_key AS "fixtureKey",
+           COALESCE(hc.name, f.home_placeholder) AS home,
+           COALESCE(ac.name, f.away_placeholder) AS away
+      FROM fixtures f
+      LEFT JOIN clubs hc ON hc.id = f.home_club_id
+      LEFT JOIN clubs ac ON ac.id = f.away_club_id
+     WHERE f.season = ${input.season}::smallint AND f.round_code = ${input.roundCode}
+       AND f.status = 'scheduled'
+       AND (f.home_club_id IS NULL OR f.away_club_id IS NULL)
+       AND f.id <> ${input.excludeFixtureId ?? 0}
+     ORDER BY f.id
+  `;
+}
+
+function openSlotRefusal(
+  slots: readonly { fixtureKey: string; home: string; away: string }[], roundCode: string,
+): FixtureRefusal {
+  const listed = slots.map((slot) => `${slot.home} v ${slot.away}`).join('; ');
+  return refuse('provider_slot_exists',
+    `Round ${roundCode} already has ${slots.length} provider-managed fixture${slots.length === 1 ? '' : 's'} whose `
+    + `participants are still to be confirmed (${listed}). A manual fixture in this round could overlap `
+    + `${slots.length === 1 ? 'that slot' : 'one of those slots'} and AFLDB cannot tell which. `
+    + `${slots.length === 1 ? 'It is' : 'They are'} read-only here: `
+    + 'open the slot to view it, and let the provider confirm it at the next fixture settle. '
+    + 'Nothing was written.',
+    slots.map((slot) => slot.fixtureKey));
+}
+
+/**
  * Every precondition of one fixture row, checked BEFORE the first write (§13).
  * Shared by the single create and by every row of a batch, so the two cannot
  * validate differently.
@@ -955,6 +1044,10 @@ async function preflightFixtureRow(tx: Tx, input: {
     return refuse('club_already_scheduled',
       `${club.name} already has a fixture in that round.`, [club.slug]);
   }
+
+  // I-4 (ISSUE-229 L1): an open provider slot in this round is invisible to I-1 / I-2, so it is checked by round.
+  const openSlots = await openProviderSlots(tx, { season: input.season, roundCode: input.round.roundCode });
+  if (openSlots.length) return openSlotRefusal(openSlots, input.round.roundCode);
 
   // I-3: the game already exists as a RESULT. There is nothing to schedule, and
   // a fixture entered now would resolve straight to played with no schedule
@@ -1424,6 +1517,13 @@ async function editFixture(input: FixtureEditBase & {
             `This fixture is owned by the '${owner?.sourceKey ?? 'unknown'}' importer and is read-only here. `
             + 'Correct it at its source; the next fixture settle applies the change.');
         }
+        // A row with a provider-label participant has no club to edit. Only a provider importer writes such a row, so the
+        // owner guard above already refused it; this is the same wall for a row that somehow is not provider-owned.
+        if (row.homeClubId === null || row.awayClubId === null) {
+          return refuse('provider_owned',
+            'This fixture has a participant that is not yet a club (a provider label). It cannot be edited here; '
+            + 'it resolves when the provider confirms it.');
+        }
         await lockSeason(tx, row.season);
 
         if (row.updatedAt !== input.expectedUpdatedAt) {
@@ -1615,6 +1715,7 @@ export async function changeFixtureRound(input: ChangeFixtureRoundInput) {
         awayClubId: row.awayClubId,
         homeClubName: row.homeClubName,
         awayClubName: row.awayClubName,
+        guardOpenSlots: true,
       });
     },
     apply: async ({ row }) => ({
@@ -1711,6 +1812,11 @@ async function checkMoveTarget(tx: Tx, input: {
    * rule does not apply to it. The duplicate and club-clash rules still do.
    */
   ownPlayedMatch?: boolean;
+  /**
+   * True only when the fixture is MOVING INTO this round (ISSUE-229 L1): it must not land beside an open provider slot.
+   * False for an edit within the round it is already in, so a pre-existing overlap stays repairable.
+   */
+  guardOpenSlots?: boolean;
 }): Promise<FixtureRefusal | null> {
   const [duplicate] = await tx<{ fixtureKey: string }[]>`
     SELECT fixture_key AS "fixtureKey" FROM fixtures
@@ -1739,6 +1845,13 @@ async function checkMoveTarget(tx: Tx, input: {
     const name = clash[0].clubId === input.homeClubId ? input.homeClubName : input.awayClubName;
     return refuse('club_already_scheduled', `${name} already has a fixture in that round.`,
       [String(clash[0].clubId)]);
+  }
+
+  if (input.guardOpenSlots) {
+    const openSlots = await openProviderSlots(tx, {
+      season: input.season, roundCode: input.roundCode, excludeFixtureId: input.excludeFixtureId,
+    });
+    if (openSlots.length) return openSlotRefusal(openSlots, input.roundCode);
   }
 
   if (input.ownPlayedMatch) return null;
@@ -1868,7 +1981,7 @@ export async function voidFixture(input: FixtureLifecycleInput) {
 
 // --- reads (§18, §27, §30) -----------------------------------------------
 
-export type SeasonFixtureRow = FixtureRow & {
+export type SeasonFixtureRow = ListedFixtureRow & {
   playedState: PlayedState;
   /** The played `matches.id`, resolved at READ TIME. Never stored (D-6). */
   playedMatchId: number | null;
@@ -1876,7 +1989,7 @@ export type SeasonFixtureRow = FixtureRow & {
   scheduleDiffersFromResult: boolean;
 };
 
-type RawSeasonFixtureRow = FixtureRow & {
+type RawSeasonFixtureRow = ListedFixtureRow & {
   exactCount: number;
   exactMatchId: number | null;
   swappedCount: number;
@@ -1929,6 +2042,9 @@ function withPlayedResolution(raw: RawSeasonFixtureRow): SeasonFixtureRow {
     awayClubName: raw.awayClubName,
     status: raw.status,
     confirmation: raw.confirmation,
+    homePlaceholder: raw.homePlaceholder,
+    awayPlaceholder: raw.awayPlaceholder,
+    sourceKey: raw.sourceKey,
     statusReason: raw.statusReason,
     notes: raw.notes,
     createdAt: raw.createdAt,
@@ -2136,10 +2252,13 @@ export function classifyFixtureDiagnostics(input: {
   const byRoundClub = new Map<string, string[]>();
   const byRoundPair = new Map<string, string[]>();
   for (const f of live) {
+    // A provider-label participant is not a club: it takes no part in the club and pair collision checks.
     for (const clubId of [f.homeClubId, f.awayClubId]) {
+      if (clubId === null) continue;
       const key = `${f.roundCode}|${clubId}`;
       byRoundClub.set(key, [...(byRoundClub.get(key) ?? []), f.fixtureKey]);
     }
+    if (f.homeClubId === null || f.awayClubId === null) continue;
     const pair = [f.homeClubId, f.awayClubId].slice().sort((a, b) => a - b).join('-');
     const key = `${f.roundCode}|${pair}`;
     byRoundPair.set(key, [...(byRoundPair.get(key) ?? []), f.fixtureKey]);
@@ -2222,7 +2341,7 @@ export function classifyFixtureDiagnostics(input: {
     });
   }
   if (live.length) {
-    const scheduledClubs = new Set(live.flatMap((f) => [f.homeClubId, f.awayClubId]));
+    const scheduledClubs = new Set(live.flatMap((f) => [f.homeClubId, f.awayClubId]).filter((id) => id !== null));
     const missing = input.eligibleClubs.filter((c) => !scheduledClubs.has(c.id));
     if (missing.length) {
       out.push({
@@ -2235,6 +2354,18 @@ export function classifyFixtureDiagnostics(input: {
   }
 
   // --- information --------------------------------------------------------
+  const unconfirmed = live.filter((f) => f.confirmation === 'unconfirmed');
+  if (unconfirmed.length) {
+    out.push({
+      severity: 'info',
+      code: 'unconfirmed_fixtures',
+      message: `${unconfirmed.length} fixture(s) are unconfirmed by the provider (${
+        unconfirmed.filter((f) => f.homeClubId === null || f.awayClubId === null).length
+      } with a participant still to be confirmed). Their date and time are TBC until the provider confirms them; `
+        + 'they are scheduled fixtures, never results.',
+      fixtureKeys: unconfirmed.map((f) => f.fixtureKey),
+    });
+  }
   out.push({
     severity: 'info',
     code: 'counts',
@@ -2248,7 +2379,7 @@ export function classifyFixtureDiagnostics(input: {
   });
   for (const roundCode of [...new Set(live.map((f) => f.roundCode))]) {
     const inRound = live.filter((f) => f.roundCode === roundCode);
-    const playing = new Set(inRound.flatMap((f) => [f.homeClubId, f.awayClubId]));
+    const playing = new Set(inRound.flatMap((f) => [f.homeClubId, f.awayClubId]).filter((id) => id !== null));
     const idle = input.eligibleClubs.filter((c) => !playing.has(c.id));
     if (idle.length) {
       out.push({

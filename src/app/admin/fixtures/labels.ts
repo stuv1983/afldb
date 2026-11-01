@@ -34,3 +34,20 @@ export const FIXTURE_STATUS_LABELS = {
   cancelled: 'Cancelled',
   void: 'Void',
 } as const;
+
+export const CONFIRMATION_LABELS = {
+  confirmed: 'Confirmed',
+  unconfirmed: 'Unconfirmed',
+} as const;
+
+/**
+ * One participant of a fixture for display (ISSUE-229). A club is its name. A participant that is not yet a club is
+ * shown as "TBC" with the provider's label beside it when there is one ("TBC (7th)"): the label is a description of
+ * the slot, never a club, so it is never rendered as a team name.
+ */
+export function participantText(side: {
+  clubName: string | null; placeholder: string | null;
+}): { text: string; tbc: boolean } {
+  if (side.clubName !== null) return { text: side.clubName, tbc: false };
+  return { text: side.placeholder ? `TBC (${side.placeholder})` : 'TBC', tbc: true };
+}
