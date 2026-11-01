@@ -1,7 +1,7 @@
 # ISSUE-331 bounded incident assessment (2026-11-01)
 
-Status: **assessment complete; cause of the deletions UNKNOWN; initiators NOT attributed.** Nothing here closes ISSUE-331.
-It separates what the records demonstrate from what they only suggest, and ends with a concrete owner disposition.
+Status: **assessment complete; cause of the deletions UNKNOWN; initiators NOT attributed. Closed 2026-11-01 on owner disposition (section 5): recovered, cause unestablished, uncertainty explicitly accepted.**
+It separates what the records demonstrate from what they only suggest, and ends with the recorded owner disposition.
 
 Scope and method. Read-only, metadata and log inspection of the three named roots only: `D:\tmp\afldb-v2-pg16` (isolated PostgreSQL
 root), `D:\afldb-v2-rehearsal-20261020` (frozen WSL rehearsal store) and the WSL export copy
@@ -48,16 +48,16 @@ executable image and libraries mapped by the running postmaster, which Windows w
 directory change in `dist\pgsql\bin` is **00:50:54** and the first logged failure is 00:51:04, ten seconds later. The pattern is
 what a recursive delete of `secrets`, `download` and `dist` would leave when it is blocked only on in-use files.
 
-**F5. Ruled out as causes, on the records examined.**
-- Microsoft Defender: **zero** detection, remediation or quarantine events (ids 1006-1009, 1116-1119) from 2026-10-26 to
+**F5. No evidence found in the examined records for these explanations (each is excluded only to the extent stated).**
+- Microsoft Defender: no evidence found in the examined records: **zero** detection, remediation or quarantine events (ids 1006-1009, 1116-1119) from 2026-10-26 to
   2026-11-01 03:00; only routine configuration-hash change notices.
-- Storage faults: no disk, volmgr or NTFS error events in the window; the one NTFS latency warning names an unrelated
+- Storage faults: no evidence found in the examined records: no disk, volmgr or NTFS error events in the window; the one NTFS latency warning names an unrelated
   `chrome.exe` file.
-- Disk exhaustion at the time of loss: `D:` held at 2.45-3.9 GB available through 31 Oct, but the interval summary to 01:38 shows
+- Disk exhaustion at the time of loss: this one the interval summary does rule out for 00:50: `D:` held at 2.45-3.9 GB available through 31 Oct, but the interval summary to 01:38 shows
   at least 62.8 GB available throughout, so `D:` was not full at 00:50.
-- WSL unregistration of the copy (F3) and a Windows update/reboot at the time (no boot events between 20:37:54 on 31 Oct and the
+- WSL unregistration of the copy (F3: the registration key still exists, so this one is excluded by the key's presence) and a Windows update/reboot at the time (no evidence found in the examined records: no boot events between 20:37:54 on 31 Oct and the
   assessment).
-- This project's own Claude Code sessions: seven transcripts covering 2026-10-31 21:59 to 2026-11-01 06:33 contain **no** delete,
+- This project's own Claude Code sessions: no evidence found in the examined records: seven transcripts covering 2026-10-31 21:59 to 2026-11-01 06:33 contain **no** delete,
   `--unregister` or `wsl --shutdown`/start command naming the three stores. Their deletes are `rm -rf /d/tmp/afldb-gap006-visual-20261031`
   (a scratch directory, 23:44) and repository evidence directories. One session started an integration run through
   `tools/v2/isolated-pg.ts` at 00:50:15, 39 seconds before the F4 directory change; the seven test files in that run contain no
@@ -112,3 +112,18 @@ rest.**
 Preventive measures worth considering (not implemented, not required for closure): keep the retained stores on a volume that is
 never the scratch volume; make retained evidence read-only at the file level; alert on `D:` below 10 GB; treat an operation that
 needs space as a prompt to ask rather than reclaim.
+
+## 5. Owner disposition recorded 2026-11-01 (supersedes the recommendations in section 4)
+
+| ID | Disposition |
+|---|---|
+| D-331-1 | **Accepted** as the incident record: cause UNKNOWN, no actor attributed. Negative findings are worded "no evidence found in the examined records" except where the evidence actually excludes a cause (section 1, F5 states which). |
+| D-331-2 | The changed original stores (`D:\afldb-v2-rehearsal-20261020`, the original isolated root `D:\tmp\afldb-v2-pg16`) are **logically quarantined**: retained untouched, never booted, never used as a baseline, their changed bytes never hashed and re-pinned as evidence. |
+| D-331-3 | **Deferred.** Nothing is unregistered or deleted. In particular `wsl --unregister AFLDB-V2-BrownlowExport-20261028` is not run. Physical cleanup is not a condition of closure. |
+| D-331-4 | Future tests use the verified recovery environment (manifest `b32809e8...b033`) or fresh, uniquely credentialled environments. |
+| D-331-5 | **ISSUE-331 closed** as recovered, cause unestablished, uncertainty explicitly accepted. |
+
+Retained after closure (not resolved by it): the artefact-binding limitation (Brownlow inputs are consistent with the record, not a
+proven historical full-hash match) and the separate exposed-credential follow-up (the shared role passwords remain in the original
+store and earlier transcripts; the disappearance of the export copy does not resolve exposure, and retiring or rotating them is a
+separate, owner-run step that this closure does not perform).
