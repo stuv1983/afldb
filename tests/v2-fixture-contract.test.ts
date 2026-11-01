@@ -46,6 +46,13 @@ type Json = Record<string, any>; // eslint-disable-line @typescript-eslint/no-ex
 const scheduled = readJson('tests', 'fixtures', 'afl_api', 'match', '04-season-feed-scheduled.raw-slice.json') as Json;
 const unconfirmed = readJson('tests', 'fixtures', 'afl_api', 'match', '05-season-feed-unconfirmed-teams.raw-slice.json') as Json;
 const seasonFeed = (readJson('tests', 'fixtures', 'afl_api', 'seasons', '00-season-matches-2026.raw.json') as { matches: Json[] }).matches;
+// AFLDB-ISSUE-229 B2: byte-exact records of the first authentic 2027 season feed (retained snapshot
+// afl-api-2027-2026-11-01-012026, feed sha256 21fd12e7...c84d). Every 2027 PLACEHOLDER test below
+// uses these real records; each case labelled SYNTHETIC mutates a deep copy.
+const placeholderRealClubs = readJson('tests', 'fixtures', 'afl_api', 'match', '06-season-feed-placeholder-real-clubs.raw-slice.json') as Json;
+const placeholderLabels = readJson('tests', 'fixtures', 'afl_api', 'match', '07-season-feed-placeholder-labels.raw-slice.json') as Json;
+const placeholderGrandFinal = readJson('tests', 'fixtures', 'afl_api', 'match', '08-season-feed-placeholder-grand-final.raw-slice.json') as Json;
+const seasonFeed2027 = (readJson('tests', 'fixtures', 'afl_api', 'seasons', '01-season-matches-2027.raw.json') as { matches: Json[] }).matches;
 
 /** SYNTHETIC mutation helper: a deep copy of a real record with `mutate` applied. */
 function mutated(base: Json, mutate: (copy: Json) => void): Json {
@@ -63,8 +70,12 @@ function refusalCodes(record: unknown): AflApiFixtureRefusalCode[] {
 describe('classifyAflApiFixtureStatus (D-229-1 revised, D-229-3)', () => {
   it('routes the observed statuses: CONCLUDED, and SCHEDULED / UNCONFIRMED_TEAMS both to fixture status scheduled', () => {
     expect(classifyAflApiFixtureStatus('CONCLUDED')).toEqual({ kind: 'concluded' });
-    expect(classifyAflApiFixtureStatus('SCHEDULED')).toEqual({ kind: 'scheduled', fixtureStatus: 'scheduled', observedStatus: 'SCHEDULED' });
-    expect(classifyAflApiFixtureStatus('UNCONFIRMED_TEAMS')).toEqual({ kind: 'scheduled', fixtureStatus: 'scheduled', observedStatus: 'UNCONFIRMED_TEAMS' });
+    expect(classifyAflApiFixtureStatus('SCHEDULED')).toEqual({ kind: 'scheduled', fixtureStatus: 'scheduled', confirmation: 'confirmed', observedStatus: 'SCHEDULED' });
+    expect(classifyAflApiFixtureStatus('UNCONFIRMED_TEAMS')).toEqual({ kind: 'scheduled', fixtureStatus: 'scheduled', confirmation: 'confirmed', observedStatus: 'UNCONFIRMED_TEAMS' });
+  });
+
+  it('routes PLACEHOLDER (observed in the 2027 feed) to an UNCONFIRMED scheduled fixture: never a result, cancellation or void (ISSUE-229 B2)', () => {
+    expect(classifyAflApiFixtureStatus('PLACEHOLDER')).toEqual({ kind: 'scheduled', fixtureStatus: 'scheduled', confirmation: 'unconfirmed', observedStatus: 'PLACEHOLDER' });
   });
 
   it('defers the in-play statuses the existing code already recognises (never projected)', () => {
@@ -90,6 +101,7 @@ describe('evaluateAflApiFixtureProjection (D-229-5, D-229-7, D-229-8a)', () => {
       target: 'fixtures',
       observationSpine: false,
       fixtureStatus: 'scheduled',
+      confirmation: 'confirmed',
       providerStatus: 'SCHEDULED',
       season: 2026,
       round: { roundCode: 'GF', roundNumber: null, roundType: 'grand_final', isFinal: true },
@@ -98,11 +110,14 @@ describe('evaluateAflApiFixtureProjection (D-229-5, D-229-7, D-229-8a)', () => {
       matchTime: '14:30',
       venueProviderId: 'CD_V40',
       venueLegacyName: 'M.C.G.',
+      venueIsPlaceholder: false,
       venueTimezone: 'Australia/Melbourne',
       homeTeamProviderId: 'CD_T60',
       homeClubHist: 'Fremantle',
+      homePlaceholderLabel: null,
       awayTeamProviderId: 'CD_T20',
       awayClubHist: 'Brisbane Lions',
+      awayPlaceholderLabel: null,
     });
   });
 
@@ -165,6 +180,14 @@ describe('evaluateAflApiFixtureProjection (D-229-5, D-229-7, D-229-8a)', () => {
     { code: 'team_unmapped', label: 'unknown home team', build: () => mutated(scheduled, (r) => { r.home.team.providerId = 'CD_T9999'; }) },
     { code: 'team_unmapped', label: 'away team missing', build: () => mutated(scheduled, (r) => { delete r.away.team; }) },
     { code: 'clubs_identical', label: 'both sides the same club', build: () => mutated(scheduled, (r) => { r.away.team.providerId = r.home.team.providerId; }) },
+    {
+      code: 'placeholder_in_confirmed_fixture', label: 'a declared placeholder TEAM on a SCHEDULED (confirmed) record',
+      build: () => mutated(scheduled, (r) => { r.home.team.providerId = 'CD_T3000'; }),
+    },
+    {
+      code: 'placeholder_in_confirmed_fixture', label: 'a declared placeholder VENUE on a SCHEDULED (confirmed) record',
+      build: () => mutated(scheduled, (r) => { r.venue.providerId = 'CD_V2385'; }),
+    },
     { code: 'venue_unresolved', label: 'venue not in the identities map', build: () => mutated(scheduled, (r) => { r.venue.providerId = 'CD_V9999'; }) },
     { code: 'venue_unresolved', label: 'venue block missing', build: () => mutated(scheduled, (r) => { delete r.venue; }) },
     { code: 'timezone_invalid', label: 'not an IANA zone', build: () => mutated(scheduled, (r) => { r.venue.timezone = 'Not/AZone'; }) },
@@ -186,7 +209,7 @@ describe('evaluateAflApiFixtureProjection (D-229-5, D-229-7, D-229-8a)', () => {
       record_invalid: true, provider_id_missing: true, status_unsupported: true, status_deferred: true,
       status_not_pre_match: true, prematch_score_present: true, season_unresolved: true,
       round_untranslatable: true, team_unmapped: true, clubs_identical: true, venue_unresolved: true,
-      timezone_invalid: true, start_time_unproven: true,
+      timezone_invalid: true, start_time_unproven: true, placeholder_in_confirmed_fixture: true,
     };
     expect(new Set(cases.map((c) => c.code))).toEqual(new Set(Object.keys(everyCode)));
   });
@@ -210,6 +233,119 @@ describe('evaluateAflApiFixtureProjection (D-229-5, D-229-7, D-229-8a)', () => {
     for (const r of refused) {
       expect(r).toEqual({ ok: false, refusals: [{ code: 'status_not_pre_match', detail: expect.any(String) }] });
     }
+  });
+});
+
+describe('PLACEHOLDER fixtures: unconfirmed scheduled, never a result (AFLDB-ISSUE-229 B2, owner policy 2026-11-01)', () => {
+  it('projects a real PLACEHOLDER record with real clubs and venue as an unconfirmed scheduled fixture whose provisional instant is NOT stored as a kick-off', () => {
+    const result = evaluateAflApiFixtureProjection(placeholderRealClubs, ctx);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.projection).toMatchObject({
+      identity: { sourceKey: 'afl_api', sourceRecordId: 'CD_M20270141702' },
+      fixtureStatus: 'scheduled', confirmation: 'unconfirmed', providerStatus: 'PLACEHOLDER', season: 2027,
+      round: { roundCode: '17', roundNumber: 17, roundType: 'home_and_away', isFinal: false },
+      // The record's utcStartTime (2027-07-05T02:00Z) is the round's shared provisional instant, not a proven kick-off
+      // (round 17 has 3 distinct starts across its 9 matches; the confirmed round 16 has 9): unresolved, never a sentinel.
+      matchDate: null, matchTime: null,
+      venueProviderId: 'CD_V40', venueIsPlaceholder: false, venueLegacyName: 'M.C.G.',
+      homeClubHist: 'Collingwood', homePlaceholderLabel: null, awayClubHist: 'Brisbane Lions', awayPlaceholderLabel: null,
+    });
+    expect(JSON.stringify(result)).not.toMatch(/"fixtureStatus":"(cancelled|void)"/);
+  });
+
+  it('projects a real Wildcard Final: labels stay labels (no club), the venue stays unresolved, date and time stay unproven', () => {
+    const result = evaluateAflApiFixtureProjection(placeholderLabels, ctx);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // Wildcard Finals are their own stage: never merged with an elimination or qualifying final.
+    expect(result.projection.round).toEqual({ roundCode: 'WF', roundNumber: null, roundType: 'wildcard_final', isFinal: true });
+    expect(result.projection).toMatchObject({
+      confirmation: 'unconfirmed', season: 2027,
+      matchDate: null, matchTime: null, venueProviderId: 'CD_V2385', venueIsPlaceholder: true, venueLegacyName: null, venueTimezone: null,
+      homeTeamProviderId: 'CD_T3006', homeClubHist: null, homePlaceholderLabel: '7th',
+      awayTeamProviderId: 'CD_T3009', awayClubHist: null, awayPlaceholderLabel: '10th',
+    });
+  });
+
+  it('projects the real placeholder Grand Final: bracket labels and a REAL venue (the MCG), but still no date or time while unconfirmed', () => {
+    const result = evaluateAflApiFixtureProjection(placeholderGrandFinal, ctx);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.projection).toMatchObject({
+      confirmation: 'unconfirmed', round: { roundCode: 'GF', roundType: 'grand_final' },
+      matchDate: null, matchTime: null, venueIsPlaceholder: false,
+      homeClubHist: null, homePlaceholderLabel: 'Winner of PF1', awayClubHist: null, awayPlaceholderLabel: 'Winner of PF2',
+    });
+  });
+
+  it('SYNTHETIC: a placeholder TEAM or VENUE is admitted only because the record is unconfirmed; on a confirmed record it refuses', () => {
+    expect(refusalCodes(mutated(scheduled, (r) => { r.away.team.providerId = 'CD_T3009'; }))).toEqual(['placeholder_in_confirmed_fixture']);
+    expect(refusalCodes(mutated(unconfirmed, (r) => { r.venue.providerId = 'CD_V2385'; }))).toEqual(['placeholder_in_confirmed_fixture']);
+  });
+
+  it('SYNTHETIC: an UNDECLARED team or venue on a PLACEHOLDER record is still unmapped; a label is never matched by name', () => {
+    expect(refusalCodes(mutated(placeholderLabels, (r) => { r.home.team.providerId = 'CD_T9999'; }))).toEqual(['team_unmapped']);
+    expect(refusalCodes(mutated(placeholderLabels, (r) => { r.home.team.providerId = 'CD_T9999'; r.home.team.name = 'Collingwood'; }))).toEqual(['team_unmapped']);
+    expect(refusalCodes(mutated(placeholderLabels, (r) => { r.venue.providerId = 'CD_V9999'; r.venue.name = 'To Be Confirmed'; }))).toEqual(['venue_unresolved']);
+  });
+
+  it('SYNTHETIC: PLACEHOLDER does not relax the pre-match score rule or the start-time proof', () => {
+    expect(refusalCodes(mutated(placeholderRealClubs, (r) => { r.home.score = { goals: 1, behinds: 0, totalScore: 6 }; }))).toContain('prematch_score_present');
+    expect(refusalCodes(mutated(placeholderRealClubs, (r) => { r.utcStartTime = null; }))).toContain('start_time_unproven');
+    expect(refusalCodes(mutated(placeholderLabels, (r) => { r.utcStartTime = 'TBC'; }))).toContain('start_time_unproven');
+  });
+
+  it('SYNTHETIC: the same club on both sides is refused on a PLACEHOLDER record, and so is the same label on both sides', () => {
+    expect(refusalCodes(mutated(placeholderRealClubs, (r) => { r.away.team = r.home.team; }))).toEqual(['clubs_identical']);
+    expect(refusalCodes(mutated(placeholderLabels, (r) => { r.away.team = r.home.team; }))).toEqual(['clubs_identical']);
+  });
+
+  it('SYNTHETIC: a label renamed under the same provider id is refused, never stored under its old name', () => {
+    expect(refusalCodes(mutated(placeholderLabels, (r) => { r.home.team.name = 'Winner of QF9'; }))).toEqual(['team_unmapped']);
+    expect(refusalCodes(mutated(placeholderLabels, (r) => { delete r.home.team.name; }))).toEqual(['team_unmapped']);
+  });
+
+  it('real 2027 feed: all 218 records project; 135 confirmed (SCHEDULED), 83 unconfirmed (PLACEHOLDER); nothing refused or collided', () => {
+    expect(seasonFeed2027).toHaveLength(218);
+    const stage = stageAflApiFixtureFeed(seasonFeed2027, ctx, { season: 2027 });
+    expect(stage.statusCounts).toEqual({ PLACEHOLDER: 83, SCHEDULED: 135 });
+    expect(stage.refused).toEqual([]);
+    expect(stage.collisions).toEqual([]);
+    expect(stage.completed).toHaveLength(0);
+    expect(stage.scheduled).toHaveLength(218);
+    expect(stage.scheduled.filter((p) => p.confirmation === 'unconfirmed')).toHaveLength(83);
+    expect(stage.scheduled.filter((p) => p.confirmation === 'confirmed')).toHaveLength(135);
+    // Ten finals matches have the 'To Be Confirmed' venue; eleven have a label participant on at least one side.
+    expect(stage.scheduled.filter((p) => p.venueIsPlaceholder)).toHaveLength(10);
+    expect(stage.scheduled.filter((p) => p.homeClubHist === null || p.awayClubHist === null)).toHaveLength(11);
+    // A label never becomes a club; a placeholder venue never gets a date or time.
+    for (const p of stage.scheduled) {
+      if (p.homeClubHist === null) expect(p.homePlaceholderLabel).toMatch(/\S/);
+      if (p.awayClubHist === null) expect(p.awayPlaceholderLabel).toMatch(/\S/);
+      // A provisional instant is never stored as a kick-off: unconfirmed means no date and no time; confirmed means both.
+      if (p.venueIsPlaceholder || p.confirmation === 'unconfirmed') expect([p.matchDate, p.matchTime]).toEqual([null, null]);
+      if (p.confirmation === 'confirmed') {
+        expect(p.homeClubHist !== null && p.awayClubHist !== null && !p.venueIsPlaceholder).toBe(true);
+        expect(p.matchDate).toMatch(/^2027-/);
+        expect(p.matchTime).toMatch(/^\d{2}:\d{2}$/);
+      }
+    }
+    // Rounds: 1-24 home-and-away with no offset, then WF / QF+EF / SF / PF / GF as distinct stages.
+    const roundCodes = new Map<string, number>();
+    for (const p of stage.scheduled) roundCodes.set(p.round.roundCode, (roundCodes.get(p.round.roundCode) ?? 0) + 1);
+    expect(roundCodes.get('WF')).toBe(2);
+    expect(roundCodes.get('QF')).toBe(2);
+    expect(roundCodes.get('EF')).toBe(2);
+    expect(roundCodes.get('SF')).toBe(2);
+    expect(roundCodes.get('PF')).toBe(2);
+    expect(roundCodes.get('GF')).toBe(1);
+    expect([...roundCodes.keys()].filter((c) => /^\d+$/.test(c))).toHaveLength(24);
+  });
+
+  it('the 2026 feed is unaffected: it has no unconfirmed fixture and no label participant', () => {
+    const stage = stageAflApiFixtureFeed(seasonFeed, ctx, { season: 2026 });
+    expect(stage.scheduled.every((p) => p.confirmation === 'confirmed' && p.homeClubHist !== null && p.awayClubHist !== null)).toBe(true);
   });
 });
 

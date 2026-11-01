@@ -36,6 +36,7 @@ import { settleAflApiFixtureStage } from '@/lib/acquisition/afl-api-fixture-writ
 process.env.AFLDB_IMPORT_DATABASE_URL = process.env.AFLDB_TEST_IMPORT_DATABASE_URL ?? process.env.AFLDB_TEST_DATABASE_URL;
 
 const MARKER = 'v2-fx-it';
+const PREFIX = 'CD_MV2FX';
 const SEASON = 2026;
 const root = join(__dirname, '..', '..');
 const readJson = (...parts: string[]): unknown => JSON.parse(readFileSync(join(root, ...parts), 'utf8'));
@@ -83,6 +84,9 @@ const identities: AflApiIdentities = {
   seasons: realIdentities.seasons,
   teams: new Map(teamIds.map((id) => [id, { ...realIdentities.teams.get(id)!, hist: histOf(id) }])),
   venues: new Map(venueIds.map((id) => [id, { ...realIdentities.venues.get(id)!, legacyName: VENUE_LEGACY }])),
+  // AFLDB-ISSUE-229 B2: the real declared 2027 label teams and the 'To Be Confirmed' venue.
+  placeholderTeams: realIdentities.placeholderTeams,
+  placeholderVenues: realIdentities.placeholderVenues,
 };
 const ctx: AflApiFixtureContractContext = { registry, identities };
 const provenance = { tool: 'v2-fixture-writer.test.ts', snapshotLabel: `${MARKER}-snapshot`, manifestSha256: '0'.repeat(64) };
@@ -94,14 +98,20 @@ const settle = (stage: AflApiFixtureStage, mode: 'apply' | 'dry-run' = 'apply') 
 type Row = {
   fixtureKey: string; sourceRecordId: string; sourceKey: string; roundCode: string; matchDate: string | null;
   matchTime: string | null; venueRaw: string | null; status: string; statusReason: string | null; batchId: string | null;
+  confirmation: string; homeClubId: number | null; awayClubId: number | null; homePlaceholder: string | null; awayPlaceholder: string | null;
+  venueId: number | null;
 };
 async function rows(): Promise<Row[]> {
   return owner<Row[]>`
     SELECT f.fixture_key AS "fixtureKey", f.source_record_id AS "sourceRecordId", s.key AS "sourceKey",
            f.round_code AS "roundCode", f.match_date::text AS "matchDate", f.match_time AS "matchTime",
-           f.venue_raw AS "venueRaw", f.status, f.status_reason AS "statusReason", f.import_batch_id::text AS "batchId"
+           f.venue_raw AS "venueRaw", f.status, f.status_reason AS "statusReason", f.import_batch_id::text AS "batchId",
+           f.confirmation, f.home_club_id::int AS "homeClubId", f.away_club_id::int AS "awayClubId",
+           f.home_placeholder AS "homePlaceholder", f.away_placeholder AS "awayPlaceholder", f.venue_id::int AS "venueId"
       FROM fixtures f JOIN sources s ON s.id = f.source_id
      WHERE f.home_club_id IN (SELECT id FROM clubs WHERE slug LIKE ${`${MARKER}-club-%`})
+        OR f.away_club_id IN (SELECT id FROM clubs WHERE slug LIKE ${`${MARKER}-club-%`})
+        OR f.source_record_id LIKE ${`${PREFIX}%`}
      ORDER BY f.source_record_id`;
 }
 const byId = async (id: string) => (await rows()).find((r) => r.sourceRecordId === id);
@@ -111,7 +121,9 @@ const batchCount = async () => (await owner<{ n: number }[]>`
 const clubIds: number[] = [];
 
 async function purgeFixtures(): Promise<void> {
-  await owner`DELETE FROM fixtures WHERE home_club_id IN (SELECT id FROM clubs WHERE slug LIKE ${`${MARKER}-club-%`})`;
+  await owner`DELETE FROM fixtures WHERE home_club_id IN (SELECT id FROM clubs WHERE slug LIKE ${`${MARKER}-club-%`})
+                  OR away_club_id IN (SELECT id FROM clubs WHERE slug LIKE ${`${MARKER}-club-%`})
+                  OR source_record_id LIKE ${`${PREFIX}%`}`;
   await owner`DELETE FROM import_batches WHERE tool = ${provenance.tool}`;
 }
 
@@ -328,6 +340,160 @@ describe('fail closed: identity, ownership, atomicity', () => {
     expect(outcome.status).toBe('refused');
     expect(await rows()).toHaveLength(0);
     expect(await batchCount()).toBe(0);
+  });
+});
+
+describe('PLACEHOLDER: unconfirmed fixtures with unresolved participants (AFLDB-ISSUE-229 B2, migration 118)', () => {
+  const P1 = 'CD_MV2FX0201';
+  const P2 = 'CD_MV2FX0202';
+  const P3 = 'CD_MV2FX0203';
+  /** SYNTHETIC: an authentic pre-match record turned PLACEHOLDER; real (mapped) clubs, venue and time. */
+  const asPlaceholder = (id: string, mutate: (c: Json) => void = () => {}): Json => preMatch(round1, id, (c) => { c.status = 'PLACEHOLDER'; mutate(c); });
+  /** SYNTHETIC: a finals-shaped record: both sides ladder-position labels, the 'To Be Confirmed' venue. */
+  const labelled = (id: string): Json => asPlaceholder(id, (c) => {
+    c.round = { ...c.round, abbreviation: 'GF', name: 'Grand Final', roundNumber: 29 };
+    c.home.team = { providerId: 'CD_T3000', name: '1st' };
+    c.away.team = { providerId: 'CD_T3001', name: '2nd' };
+    c.venue = { providerId: 'CD_V2385', name: 'To Be Confirmed', timezone: 'Australia/Melbourne' };
+  });
+
+  it('writes a PLACEHOLDER record with real clubs as a scheduled, UNCONFIRMED fixture with its venue but no date or time (the instant is provisional)', async () => {
+    const outcome = await settle(stageOf([asPlaceholder(P1)]));
+    expect(outcome.status).toBe('applied');
+    const row = (await byId(P1))!;
+    expect(row).toMatchObject({ status: 'scheduled', statusReason: null, confirmation: 'unconfirmed', homePlaceholder: null, awayPlaceholder: null, venueRaw: `${MARKER} Venue` });
+    expect(row.homeClubId).not.toBeNull();
+    expect([row.matchDate, row.matchTime]).toEqual([null, null]);
+  });
+
+  it('writes label participants with NULL clubs and a placeholder venue with NULL venue, date and time: nothing becomes a club or a venue', async () => {
+    const outcome = await settle(stageOf([labelled(P2)]));
+    expect(outcome.status).toBe('applied');
+    expect(await byId(P2)).toMatchObject({
+      status: 'scheduled', confirmation: 'unconfirmed', homeClubId: null, awayClubId: null,
+      homePlaceholder: '1st', awayPlaceholder: '2nd', venueId: null, venueRaw: null, matchDate: null, matchTime: null, roundCode: 'GF',
+    });
+    // 'To Be Confirmed' and '1st' were never inserted as a venue or a club.
+    const [leak] = await owner<{ n: number }[]>`
+      SELECT ((SELECT count(*) FROM venues WHERE canonical_name = 'To Be Confirmed' OR legacy_name = 'To Be Confirmed')
+            + (SELECT count(*) FROM clubs WHERE name IN ('1st', '2nd') OR short_name IN ('1st', '2nd')))::int AS n`;
+    expect(leak.n).toBe(0);
+  });
+
+  it('is idempotent for unconfirmed rows, including label rows', async () => {
+    await settle(stageOf([asPlaceholder(P1), labelled(P2)]));
+    const before = await rows();
+    const batches = await batchCount();
+    const replay = await settle(stageOf([asPlaceholder(P1), labelled(P2)]));
+    expect(replay.status).toBe('no_changes');
+    expect(replay.actions.every((a) => a.kind === 'unchanged')).toBe(true);
+    expect(await rows()).toEqual(before);
+    expect(await batchCount()).toBe(batches);
+  });
+
+  it('confirms in place: the same provider id later SCHEDULED keeps its fixture_key and becomes a confirmed fixture', async () => {
+    await settle(stageOf([asPlaceholder(P1)]));
+    const before = (await byId(P1))!;
+    const outcome = await settle(stageOf([preMatch(round1, P1)]));
+    expect(outcome.actions.find((a) => a.providerId === P1)!.kind).toBe('confirmed');
+    // Confirming also fills the date and time the provider only now proves.
+    expect(Object.keys(outcome.actions.find((a) => a.providerId === P1)!.changes).sort()).toEqual(['confirmation', 'match_date', 'match_time']);
+    const after = (await byId(P1))!;
+    expect(after.fixtureKey).toBe(before.fixtureKey);
+    expect(after.confirmation).toBe('confirmed');
+  });
+
+  it('resolves label participants to clubs and a venue in place when the provider confirms them', async () => {
+    await settle(stageOf([labelled(P2)]));
+    const before = (await byId(P2))!;
+    // The same provider id later carries two real clubs, a real venue and a real time, on a confirmed status.
+    const outcome = await settle(stageOf([preMatch(round1, P2, (c) => { c.round = { ...c.round, abbreviation: 'GF', name: 'Grand Final', roundNumber: 29 }; })]));
+    expect(outcome.status).toBe('applied');
+    expect(outcome.actions.find((a) => a.providerId === P2)!.kind).toBe('confirmed');
+    const after = (await byId(P2))!;
+    expect(after.fixtureKey).toBe(before.fixtureKey);
+    expect(after).toMatchObject({ confirmation: 'confirmed', homePlaceholder: null, awayPlaceholder: null, venueRaw: `${MARKER} Venue` });
+    expect(after.homeClubId).not.toBeNull();
+    expect(after.awayClubId).not.toBeNull();
+    expect(after.matchDate).not.toBeNull();
+  });
+
+  it('never regresses: a confirmed fixture observed again as PLACEHOLDER is refused and nothing changes', async () => {
+    await settle(stageOf([preMatch(round1, P1)]));
+    const before = await rows();
+    const outcome = await settle(stageOf([asPlaceholder(P1)]));
+    expect(outcome.status).toBe('refused');
+    expect(outcome.refusals.map((r) => [r.providerId, r.code])).toEqual([[P1, 'confirmation_regressed']]);
+    expect(await rows()).toEqual(before);
+  });
+
+  it('an unconfirmed fixture whose clubs change is still refused; only a label may resolve, never a real club be swapped', async () => {
+    await settle(stageOf([asPlaceholder(P1)]));
+    const swapped = asPlaceholder(P1, (c) => { const h = c.home; c.home = c.away; c.away = h; });
+    const outcome = await settle(stageOf([swapped]));
+    // A real club on a side is not a label: swapping home and away is a different fixture identity.
+    expect(outcome.status).toBe('refused');
+    expect(outcome.refusals.map((r) => r.code)).toEqual(['club_identity_changed']);
+  });
+
+  it('a CONCLUDED observation of a fixture still unconfirmed is refused, not retained (the played game would be stranded)', async () => {
+    await settle(stageOf([labelled(P2), asPlaceholder(P1)]));
+    const before = await rows();
+    for (const id of [P2, P1]) {
+      const concluded = { ...clone(round1), providerId: id };
+      const outcome = await settle(stageOf([concluded]));
+      expect(outcome.status).toBe('refused');
+      expect(outcome.refusals.map((r) => [r.providerId, r.code])).toEqual([[id, 'completed_unconfirmed_fixture']]);
+    }
+    expect(await rows()).toEqual(before);
+  });
+
+  it('resolving labels to a game already played is refused (already_played runs on a label-to-club update)', async () => {
+    await settle(stageOf([labelled(P2)]));
+    const home = clubIds[teamIds.indexOf(round1.home.team.providerId)];
+    const away = clubIds[teamIds.indexOf(round1.away.team.providerId)];
+    const [match] = await owner<{ id: number }[]>`
+      INSERT INTO matches (match_key, season, round_code, round_number, round_type, is_final, match_date, venue_raw, home_club_id, away_club_id, home_score, away_score, result, winner_club_id, margin, attendance_status)
+      VALUES (${`${MARKER}-played`}, ${SEASON}, 'GF', NULL, 'grand_final', true, '2026-09-26', ${`${MARKER} Venue`}, ${home}, ${away}, 80, 70, 'home_win'::match_result, ${home}, 10, 'not_collected'::coverage_status)
+      RETURNING id::int AS id`;
+    try {
+      const resolved = preMatch(round1, P2, (c) => { c.round = { ...c.round, abbreviation: 'GF', name: 'Grand Final', roundNumber: 29 }; });
+      const outcome = await settle(stageOf([resolved]));
+      expect(outcome.status).toBe('refused');
+      expect(outcome.refusals.map((r) => [r.providerId, r.code])).toEqual([[P2, 'already_played']]);
+      expect(await byId(P2)).toMatchObject({ confirmation: 'unconfirmed', homeClubId: null });
+    } finally {
+      await owner`DELETE FROM matches WHERE id = ${match.id}`;
+    }
+  });
+
+  it('dry-run of a label row writes nothing', async () => {
+    const outcome = await settle(stageOf([labelled(P3)]), 'dry-run');
+    expect(outcome.status).toBe('dry_run');
+    expect(await rows()).toHaveLength(0);
+  });
+
+  it('two unconfirmed label fixtures of the same round do not collide: a label has no club identity to compare', async () => {
+    const a = labelled(P2);
+    const b = labelled(P3);
+    b.home.team = { providerId: 'CD_T3002', name: '3rd' };
+    b.away.team = { providerId: 'CD_T3003', name: '4th' };
+    const outcome = await settle(stageOf([a, b]));
+    expect(outcome.status).toBe('applied');
+    expect((await rows()).map((r) => [r.sourceRecordId, r.homePlaceholder, r.awayPlaceholder])).toEqual([[P2, '1st', '2nd'], [P3, '3rd', '4th']]);
+  });
+
+  it('the database itself refuses a label on a confirmed row and a club-less side with no label (migration 118 checks)', async () => {
+    const [src] = await owner<{ id: number }[]>`SELECT id::int AS id FROM sources WHERE key = 'afl_api'`;
+    const insert = (key: string, home: number | null, label: string | null, confirmation: string) => owner`
+      INSERT INTO fixtures (fixture_key, season, round_code, round_number, round_type, home_club_id, away_club_id, home_placeholder, confirmation, source_id, source_record_id)
+      VALUES (${key}, ${SEASON}, 'GF', NULL, 'grand_final', ${home}, ${clubIds[0]}, ${label}, ${confirmation}, ${src.id}, ${key})`;
+    await expect(insert(`${PREFIX}CK1`, null, '1st', 'confirmed')).rejects.toThrow(/fixtures_home_participant_ck/);
+    await expect(insert(`${PREFIX}CK2`, null, null, 'unconfirmed')).rejects.toThrow(/fixtures_home_participant_ck/);
+    await expect(insert(`${PREFIX}CK3`, clubIds[1], '1st', 'unconfirmed')).rejects.toThrow(/fixtures_home_participant_ck/);
+    await expect(insert(`${PREFIX}CK4`, null, '  ', 'unconfirmed')).rejects.toThrow(/fixtures_home_participant_ck/);
+    await expect(insert(`${PREFIX}CK5`, clubIds[1], null, 'maybe')).rejects.toThrow(/fixtures_confirmation_ck/);
+    expect(await rows()).toHaveLength(0);
   });
 });
 

@@ -38,6 +38,13 @@
  *   D-229-8a (:602-614)  "First-slice fixture ingestion does **not** persist pre-match rows into the
  *     existing AFL API `match` observation spine". A projection therefore targets `fixtures` only
  *     (`observationSpine: false`).
+ *   PLACEHOLDER (owner decision 2026-11-01, observed in the first authentic 2027 feed): an UNCONFIRMED scheduled
+ *     fixture. It projects to AFLDB status `scheduled` with `confirmation: 'unconfirmed'`; it is never a result,
+ *     a cancellation or a void. A provider team that is a LABEL rather than a club (ladder position, bracket
+ *     reference) must be declared in `identities.placeholderTeams` and is admitted ONLY on an unconfirmed fixture;
+ *     it never becomes a club. A provider venue that is a LABEL ('To Be Confirmed') must be declared in
+ *     `identities.placeholderVenues`, is admitted ONLY on an unconfirmed fixture, never becomes a venue, and,
+ *     because no venue-local zone can be proven for it, leaves the local date and time unresolved (NULL).
  *   D-229-4 (:543-545) is about conflicts against EXISTING rows in the database (I-1, I-2, I-3,
  *     foreign_owned_collision) and so cannot be expressed here. See "Not covered" below.
  *
@@ -95,11 +102,20 @@ export const AFL_API_FIXTURE_SCHEDULED_STATUSES = ['SCHEDULED', 'UNCONFIRMED_TEA
  */
 export const AFL_API_FIXTURE_DEFERRED_STATUSES = ['LIVE', 'POSTGAME'] as const;
 
+/**
+ * Observed 2026-11-01 (first authentic 2027 season feed; Rounds 17-24 and every finals match). Owner policy: an
+ * UNCONFIRMED scheduled fixture, never a result, cancellation or void.
+ */
+export const AFL_API_FIXTURE_UNCONFIRMED_STATUSES = ['PLACEHOLDER'] as const;
+
+/** Whether the provider has confirmed the fixture's details. Orthogonal to `fixtures.status`. */
+export type AflApiFixtureConfirmation = 'confirmed' | 'unconfirmed';
+
 export type AflApiFixtureStatusClass =
   /** `CONCLUDED`: the match path owns it; the fixture writer takes no action. */
   | { kind: 'concluded' }
   /** `SCHEDULED` / `UNCONFIRMED_TEAMS`: both project to AFLDB fixture status `scheduled`. */
-  | { kind: 'scheduled'; fixtureStatus: Extract<FixtureStatus, 'scheduled'>; observedStatus: string }
+  | { kind: 'scheduled'; fixtureStatus: Extract<FixtureStatus, 'scheduled'>; confirmation: AflApiFixtureConfirmation; observedStatus: string }
   /** In-play status already recognised and deferred: never projected, never mutating. */
   | { kind: 'defer'; observedStatus: string }
   /** Anything else: `status_unsupported`, kept verbatim. Never auto-mapped to cancelled/void. */
@@ -112,7 +128,10 @@ export type AflApiFixtureStatusClass =
 export function classifyAflApiFixtureStatus(status: string): AflApiFixtureStatusClass {
   if (status === 'CONCLUDED') return { kind: 'concluded' };
   if ((AFL_API_FIXTURE_SCHEDULED_STATUSES as readonly string[]).includes(status)) {
-    return { kind: 'scheduled', fixtureStatus: 'scheduled', observedStatus: status };
+    return { kind: 'scheduled', fixtureStatus: 'scheduled', confirmation: 'confirmed', observedStatus: status };
+  }
+  if ((AFL_API_FIXTURE_UNCONFIRMED_STATUSES as readonly string[]).includes(status)) {
+    return { kind: 'scheduled', fixtureStatus: 'scheduled', confirmation: 'unconfirmed', observedStatus: status };
   }
   if ((AFL_API_FIXTURE_DEFERRED_STATUSES as readonly string[]).includes(status)) {
     return { kind: 'defer', observedStatus: status };
@@ -137,7 +156,8 @@ export type AflApiFixtureRefusalCode =
   | 'clubs_identical'
   | 'venue_unresolved'
   | 'timezone_invalid'
-  | 'start_time_unproven';
+  | 'start_time_unproven'
+  | 'placeholder_in_confirmed_fixture';
 
 export type AflApiFixtureRefusal = { code: AflApiFixtureRefusalCode; detail: string };
 
@@ -154,22 +174,29 @@ export type AflApiFixtureProjection = {
   /** D-229-8a: never written to the AFL API `match` observation spine. */
   observationSpine: false;
   fixtureStatus: Extract<FixtureStatus, 'scheduled'>;
+  /** `unconfirmed` exactly when the provider status is in `AFL_API_FIXTURE_UNCONFIRMED_STATUSES`. */
+  confirmation: AflApiFixtureConfirmation;
   providerStatus: string;
   season: number;
   round: CanonicalRound;
-  /** Venue-local calendar date, from `utcStartTime` + the provider's `venue.timezone`. */
-  matchDate: string;
-  /** Venue-local `HH:MM`; D-229-5 condition 4 refuses anything not exact to the minute. */
-  matchTime: string;
+  /** Venue-local calendar date, from `utcStartTime` + the provider's `venue.timezone`; NULL for a placeholder venue and for every UNCONFIRMED record (its instant is provisional, not a proven kick-off). */
+  matchDate: string | null;
+  /** Venue-local `HH:MM`; D-229-5 condition 4 refuses anything not exact to the minute; NULL for a placeholder venue and for every UNCONFIRMED record. */
+  matchTime: string | null;
   venueProviderId: string;
-  /** `identities.venues[...].legacyName`; whether a `venues` row has it is a database fact. */
-  venueLegacyName: string;
-  /** The provider's observed zone; not stored or owned by AFLDB (D-229-5). */
-  venueTimezone: string;
+  /** `identities.venues[...].legacyName`; whether a `venues` row has it is a database fact. NULL for a placeholder venue. */
+  venueLegacyName: string | null;
+  /** True when the venue is a declared placeholder ('To Be Confirmed'): the fixture's venue is unresolved (NULL), never a venue row. */
+  venueIsPlaceholder: boolean;
+  /** The provider's observed zone; not stored or owned by AFLDB (D-229-5). NULL for a placeholder venue. */
+  venueTimezone: string | null;
   homeTeamProviderId: string;
-  homeClubHist: string;
+  /** NULL when the side is a declared placeholder team; then `homePlaceholderLabel` carries the provider's label. */
+  homeClubHist: string | null;
+  homePlaceholderLabel: string | null;
   awayTeamProviderId: string;
-  awayClubHist: string;
+  awayClubHist: string | null;
+  awayPlaceholderLabel: string | null;
 };
 
 export type AflApiFixtureEvaluation =
@@ -311,43 +338,83 @@ export function evaluateAflApiFixtureProjection(
   }
 
   // --- clubs ---
+  const unconfirmed = statusClass.confirmation === 'unconfirmed';
   const homeTeamId = nonEmptyString(asObject(home?.team)?.providerId);
   const awayTeamId = nonEmptyString(asObject(away?.team)?.providerId);
-  const homeIdentity = homeTeamId === null ? undefined : ctx.identities.teams.get(homeTeamId);
-  const awayIdentity = awayTeamId === null ? undefined : ctx.identities.teams.get(awayTeamId);
-  if (homeIdentity === undefined) {
-    refusals.push({ code: 'team_unmapped', detail: `Home team provider id '${homeTeamId ?? ''}' is not in afl-api-identities.json teams.` });
+  type Side = { hist: string; label: null } | { hist: null; label: string } | undefined;
+  const sideOf = (teamId: string | null, name: string): Side => {
+    const club = teamId === null ? undefined : ctx.identities.teams.get(teamId);
+    if (club !== undefined) return { hist: club.hist, label: null };
+    const placeholder = teamId === null ? undefined : ctx.identities.placeholderTeams?.get(teamId);
+    if (placeholder !== undefined) {
+      const observedName = nonEmptyString(asObject(asObject(name === 'Home' ? home : away)?.team)?.name);
+      if (unconfirmed && observedName !== placeholder.rawName) {
+        refusals.push({
+          code: 'team_unmapped',
+          detail: `${name} placeholder team '${teamId}' is declared as '${placeholder.rawName}' but the record names it '${observedName ?? ''}'; a renamed label is never stored under its old name.`,
+        });
+        return undefined;
+      }
+      if (!unconfirmed) {
+        refusals.push({
+          code: 'placeholder_in_confirmed_fixture',
+          detail: `${name} team '${teamId}' ('${placeholder.rawName}') is a declared placeholder but the record's status '${observedStatus}' is a confirmed fixture status.`,
+        });
+        return undefined;
+      }
+      return { hist: null, label: placeholder.rawName };
+    }
+    refusals.push({ code: 'team_unmapped', detail: `${name} team provider id '${teamId ?? ''}' is not in afl-api-identities.json teams or placeholder_teams.` });
+    return undefined;
+  };
+  const homeSide = sideOf(homeTeamId, 'Home');
+  const awaySide = sideOf(awayTeamId, 'Away');
+  if (homeTeamId !== null && homeTeamId === awayTeamId && homeSide?.hist === null && awaySide?.hist === null) {
+    refusals.push({ code: 'clubs_identical', detail: `Home and away are the same provider team '${homeTeamId}'.` });
   }
-  if (awayIdentity === undefined) {
-    refusals.push({ code: 'team_unmapped', detail: `Away team provider id '${awayTeamId ?? ''}' is not in afl-api-identities.json teams.` });
-  }
-  if (homeIdentity !== undefined && awayIdentity !== undefined && homeIdentity.hist === awayIdentity.hist) {
-    refusals.push({ code: 'clubs_identical', detail: `Home and away both resolve to club '${homeIdentity.hist}'.` });
+  if (homeSide?.hist != null && awaySide?.hist != null && homeSide.hist === awaySide.hist) {
+    refusals.push({ code: 'clubs_identical', detail: `Home and away both resolve to club '${homeSide.hist}'.` });
   }
 
   // --- venue (D-229-5 condition 2) ---
   const venue = asObject(row.venue);
   const venueProviderId = nonEmptyString(venue?.providerId);
   const venueIdentity = venueProviderId === null ? undefined : ctx.identities.venues.get(venueProviderId);
+  const placeholderVenue = venueProviderId === null ? undefined : ctx.identities.placeholderVenues?.get(venueProviderId);
+  let venueIsPlaceholder = false;
   if (venueIdentity === undefined) {
-    refusals.push({
-      code: 'venue_unresolved',
-      detail: `Venue provider id '${venueProviderId ?? ''}' is not in afl-api-identities.json venues.`,
-    });
+    if (placeholderVenue !== undefined && unconfirmed) {
+      venueIsPlaceholder = true;
+    } else if (placeholderVenue !== undefined) {
+      refusals.push({
+        code: 'placeholder_in_confirmed_fixture',
+        detail: `Venue '${venueProviderId}' ('${placeholderVenue.rawName}') is a declared placeholder but the record's status '${observedStatus}' is a confirmed fixture status.`,
+      });
+    } else {
+      refusals.push({
+        code: 'venue_unresolved',
+        detail: `Venue provider id '${venueProviderId ?? ''}' is not in afl-api-identities.json venues or placeholder_venues.`,
+      });
+    }
   }
 
-  // --- timezone (D-229-5 condition 3) ---
+  // --- timezone (D-229-5 condition 3); a placeholder venue has no provable zone and none is required ---
   const timeZone = nonEmptyString(venue?.timezone);
   const timeZoneValid = timeZone !== null && timezoneIsValid(timeZone);
-  if (!timeZoneValid) {
+  if (!venueIsPlaceholder && !timeZoneValid) {
     refusals.push({ code: 'timezone_invalid', detail: `venue.timezone '${timeZone ?? ''}' is missing or not a valid IANA zone.` });
   }
 
   // --- start time (D-229-5 conditions 1 and 4); a genuine TBC representation is unobserved (B2) ---
-  let local: { matchDate: string; matchTime: string } | null = null;
+  let local: { matchDate: string | null; matchTime: string | null } | null = null;
   const start = parseObservedUtcStart(row.utcStartTime);
   if ('reason' in start) {
     refusals.push({ code: 'start_time_unproven', detail: start.reason });
+  } else if (venueIsPlaceholder || unconfirmed) {
+    // The instant is well formed but is not a proven kick-off: with no venue there is no zone to read it in, and on an
+    // UNCONFIRMED record the provider pins the matches of a round to a shared provisional instant (2027 feed: round 17 has
+    // 3 distinct starts across 9 matches against 9 across 9 for the confirmed round 16). Unresolved (NULL), retained in the snapshot.
+    local = { matchDate: null, matchTime: null };
   } else if (timeZoneValid) {
     const converted = convertUtcInstantToVenueLocal(start.instant, timeZone as string);
     if (converted === null) {
@@ -364,8 +431,9 @@ export function evaluateAflApiFixtureProjection(
 
   if (
     refusals.length > 0 || providerId === null || season === null || round === null
-    || homeTeamId === null || awayTeamId === null || homeIdentity === undefined || awayIdentity === undefined
-    || venueProviderId === null || venueIdentity === undefined || timeZone === null || local === null
+    || homeTeamId === null || awayTeamId === null || homeSide === undefined || awaySide === undefined
+    || venueProviderId === null || (venueIdentity === undefined && !venueIsPlaceholder) || local === null
+    || (!venueIsPlaceholder && timeZone === null)
   ) {
     return { ok: false, refusals };
   }
@@ -376,18 +444,22 @@ export function evaluateAflApiFixtureProjection(
       target: 'fixtures',
       observationSpine: false,
       fixtureStatus: statusClass.fixtureStatus,
+      confirmation: statusClass.confirmation,
       providerStatus: statusClass.observedStatus,
       season,
       round,
       matchDate: local.matchDate,
       matchTime: local.matchTime,
       venueProviderId,
-      venueLegacyName: venueIdentity.legacyName,
-      venueTimezone: timeZone,
+      venueLegacyName: venueIsPlaceholder ? null : venueIdentity!.legacyName,
+      venueIsPlaceholder,
+      venueTimezone: venueIsPlaceholder ? null : timeZone,
       homeTeamProviderId: homeTeamId,
-      homeClubHist: homeIdentity.hist,
+      homeClubHist: homeSide.hist,
+      homePlaceholderLabel: homeSide.label,
       awayTeamProviderId: awayTeamId,
-      awayClubHist: awayIdentity.hist,
+      awayClubHist: awaySide.hist,
+      awayPlaceholderLabel: awaySide.label,
     },
   };
 }

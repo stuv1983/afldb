@@ -1054,6 +1054,7 @@ describe('the diagnostics report and never refuse (§27)', () => {
     awayClubSlug: 'carlton',
     awayClubName: 'Carlton',
     status: 'scheduled' as const,
+    confirmation: 'confirmed' as const,
     statusReason: null,
     notes: null,
     createdAt: 't',

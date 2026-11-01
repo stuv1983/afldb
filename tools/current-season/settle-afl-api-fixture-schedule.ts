@@ -123,6 +123,10 @@ export function describeStage(stage: AflApiFixtureStage): string[] {
       + `${stage.transitions.length} transition(s), ${stage.completed.length} completed, ${stage.deferred.length} deferred, `
       + `${stage.refused.length} refused.`,
     `Observed statuses: ${Object.entries(stage.statusCounts).sort().map(([s, n]) => `${s}=${n}`).join(', ') || '(none)'}`,
+    `Scheduled by confirmation: ${stage.scheduled.filter((p) => p.confirmation === 'confirmed').length} confirmed, `
+      + `${stage.scheduled.filter((p) => p.confirmation === 'unconfirmed').length} unconfirmed `
+      + `(${stage.scheduled.filter((p) => p.homeClubHist === null || p.awayClubHist === null).length} with a provider-label participant, `
+      + `${stage.scheduled.filter((p) => p.venueIsPlaceholder).length} with a placeholder venue).`,
   ];
   for (const r of stage.refused) {
     for (const x of r.refusals) lines.push(`  REFUSED ${r.providerId ?? '(no id)'} [${r.providerStatus ?? '?'}] ${x.code}: ${x.detail}`);

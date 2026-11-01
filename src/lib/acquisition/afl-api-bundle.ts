@@ -190,11 +190,27 @@ export type AflApiSeasonIdentity = {
   providerId: string;
 };
 
+/**
+ * A provider "team" that is a LABEL, not a club (a ladder position such as '7th' or a bracket reference such as
+ * 'Winner of QF1'). Declared explicitly in `afl-api-identities.json` `placeholder_teams`; it never maps to a club and is
+ * only admitted on an unconfirmed fixture (AFLDB-ISSUE-229 B2 2027 policy).
+ */
+export type AflApiPlaceholderTeamIdentity = { rawName: string };
+
+/**
+ * A provider "venue" that is a LABEL, not a ground ('To Be Confirmed'). Declared explicitly in `placeholder_venues`; it
+ * never maps to a canonical venue and is only admitted on an unconfirmed fixture.
+ */
+export type AflApiPlaceholderVenueIdentity = { rawName: string };
+
 export type AflApiIdentities = {
   teams: ReadonlyMap<string, AflApiTeamIdentity>;
   venues: ReadonlyMap<string, AflApiVenueIdentity>;
   /** Keyed by season YEAR, not by providerId. */
   seasons: ReadonlyMap<number, AflApiSeasonIdentity>;
+  /** Optional so existing literal constructions stay valid; `parseAflApiIdentities` always supplies both (empty when absent). */
+  placeholderTeams?: ReadonlyMap<string, AflApiPlaceholderTeamIdentity>;
+  placeholderVenues?: ReadonlyMap<string, AflApiPlaceholderVenueIdentity>;
 };
 
 function record(value: unknown, path: string): Record<string, unknown> {
@@ -250,7 +266,24 @@ export function parseAflApiIdentities(raw: unknown): AflApiIdentities {
     seasons.set(year, { compSeasonId, providerId: str(row.providerId, `identities.seasons.${key}.providerId`) });
   }
 
-  return { teams, venues, seasons };
+  const placeholderTeams = new Map<string, AflApiPlaceholderTeamIdentity>();
+  if (root.placeholder_teams !== undefined) {
+    for (const [key, value] of Object.entries(record(root.placeholder_teams, 'identities.placeholder_teams'))) {
+      if (key === '$comment') continue;
+      if (teams.has(key)) fail('invalid_identities', `identities.placeholder_teams.${key} is also a real team; a provider id is one or the other.`);
+      placeholderTeams.set(key, { rawName: str(record(value, `identities.placeholder_teams.${key}`).raw_name, `identities.placeholder_teams.${key}.raw_name`) });
+    }
+  }
+  const placeholderVenues = new Map<string, AflApiPlaceholderVenueIdentity>();
+  if (root.placeholder_venues !== undefined) {
+    for (const [key, value] of Object.entries(record(root.placeholder_venues, 'identities.placeholder_venues'))) {
+      if (key === '$comment') continue;
+      if (venues.has(key)) fail('invalid_identities', `identities.placeholder_venues.${key} is also a real venue; a provider id is one or the other.`);
+      placeholderVenues.set(key, { rawName: str(record(value, `identities.placeholder_venues.${key}`).raw_name, `identities.placeholder_venues.${key}.raw_name`) });
+    }
+  }
+
+  return { teams, venues, seasons, placeholderTeams, placeholderVenues };
 }
 
 function resolveTeam(identities: AflApiIdentities, providerId: unknown): AflApiTeamIdentity {

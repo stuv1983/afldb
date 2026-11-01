@@ -1,0 +1,55 @@
+{
+  "id": 9291,
+  "providerId": "CD_M20270142501",
+  "compSeason": {
+    "id": 102,
+    "providerId": "CD_S2027014",
+    "name": "2027 Toyota AFL Premiership",
+    "shortName": "Premiership",
+    "currentRoundNumber": 1
+  },
+  "round": {
+    "id": 1572,
+    "providerId": "CD_R202701425",
+    "abbreviation": "WF",
+    "name": "Wildcard Finals",
+    "roundNumber": 25,
+    "byes": [],
+    "utcStartTime": "2027-08-30T02:00:00.000+0000",
+    "utcEndTime": "2027-08-30T02:00:00.000+0000"
+  },
+  "home": {
+    "team": {
+      "id": 156,
+      "providerId": "CD_T3006",
+      "name": "7th",
+      "abbreviation": "TBD",
+      "nickname": "TBD",
+      "teamType": "MEN"
+    }
+  },
+  "away": {
+    "team": {
+      "id": 160,
+      "providerId": "CD_T3009",
+      "name": "10th",
+      "abbreviation": "TBD",
+      "nickname": "TBD",
+      "teamType": "MEN"
+    }
+  },
+  "venue": {
+    "id": 103,
+    "providerId": "CD_V2385",
+    "name": "To Be Confirmed",
+    "abbreviation": "TBC",
+    "location": "Victoria",
+    "state": "VIC",
+    "timezone": "Australia/Melbourne"
+  },
+  "utcStartTime": "2027-08-30T02:00:00.000+0000",
+  "status": "PLACEHOLDER",
+  "metadata": {
+    "finals_match_label": "First Wildcard Final"
+  }
+}

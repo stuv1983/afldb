@@ -15,6 +15,13 @@
  *   3. writes only if nothing refused. Any refusal anywhere writes nothing at all (not even the
  *      import batch). A run with no change writes nothing either, so a replay is idempotent.
  *
+ * Unconfirmed fixtures (owner decision 2026-11-01, migration 118). A PLACEHOLDER record is written as status
+ * `scheduled` with `confirmation = 'unconfirmed'`. A side that is a provider label (ladder position, bracket
+ * reference) has a NULL club id and carries the label in `home_placeholder` / `away_placeholder`; it is never a club.
+ * A placeholder venue is NULL (venue TBC) and leaves the date and time NULL. When the provider later confirms the
+ * fixture (a confirmed status for the same provider id) the SAME row is updated in place (action `confirmed`);
+ * a confirmed row never regresses to unconfirmed (`confirmation_regressed`) and never changes clubs.
+ *
  * Ownership (D-229-4, D-229-6, D-229-7, D-229-8a). The writer touches only rows it owns:
  * `source_id = afl_api` with `source_record_id = <provider match id>`. A manual or other-source
  * row is never merged, updated or overwritten; colliding with one refuses. No `data_overrides`,
@@ -47,13 +54,15 @@ export type AflApiFixtureWriterRefusalCode =
   | 'foreign_owned_collision'
   | 'fixture_identity_collision'
   | 'club_already_scheduled'
-  | 'already_played';
+  | 'already_played'
+  | 'confirmation_regressed'
+  | 'completed_unconfirmed_fixture';
 
 export type AflApiFixtureWriterRefusal = { providerId: string | null; code: AflApiFixtureWriterRefusalCode; detail: string };
 
 export type AflApiFixtureActionKind =
   | 'created' | 'rescheduled' | 'reinstated' | 'postponed' | 'cancelled' | 'abandoned'
-  | 'unchanged' | 'completed_retained';
+  | 'confirmed' | 'unchanged' | 'completed_retained';
 
 export type AflApiFixtureAction = {
   providerId: string;
@@ -84,18 +93,25 @@ type FixtureState = {
   matchTime: string | null;
   venueId: number | null;
   venueRaw: string | null;
-  homeClubId: number;
-  awayClubId: number;
+  /** NULL only for an unconfirmed fixture whose side is a provider label (migration 118). */
+  homeClubId: number | null;
+  awayClubId: number | null;
+  homePlaceholder: string | null;
+  awayPlaceholder: string | null;
+  confirmation: string;
   status: string;
   statusReason: string | null;
 };
 
 const WRITABLE: readonly (keyof FixtureState)[] = [
   'roundCode', 'roundNumber', 'roundType', 'matchDate', 'matchTime', 'venueId', 'venueRaw', 'status', 'statusReason',
+  'homeClubId', 'awayClubId', 'homePlaceholder', 'awayPlaceholder', 'confirmation',
 ];
 const COLUMN: Record<string, string> = {
   roundCode: 'round_code', roundNumber: 'round_number', roundType: 'round_type', matchDate: 'match_date',
   matchTime: 'match_time', venueId: 'venue_id', venueRaw: 'venue_raw', status: 'status', statusReason: 'status_reason',
+  homeClubId: 'home_club_id', awayClubId: 'away_club_id', homePlaceholder: 'home_placeholder',
+  awayPlaceholder: 'away_placeholder', confirmation: 'confirmation',
 };
 
 class DryRunRollback extends Error {
@@ -108,7 +124,8 @@ async function loadSeasonFixtures(tx: SqlExecutor, season: number): Promise<Fixt
             f.round_code AS "roundCode", f.round_number::int AS "roundNumber", f.round_type::text AS "roundType",
             f.match_date::text AS "matchDate", f.match_time AS "matchTime", f.venue_id::int AS "venueId",
             f.venue_raw AS "venueRaw", f.home_club_id::int AS "homeClubId", f.away_club_id::int AS "awayClubId",
-            f.status AS "status", f.status_reason AS "statusReason"
+            f.home_placeholder AS "homePlaceholder", f.away_placeholder AS "awayPlaceholder",
+            f.confirmation AS "confirmation", f.status AS "status", f.status_reason AS "statusReason"
        FROM fixtures f JOIN sources s ON s.id = f.source_id
       WHERE f.season = $1::smallint
       ORDER BY f.id`,
@@ -171,21 +188,22 @@ export async function settleAflApiFixtureStage(
       const hists = [...new Set([
         ...stage.scheduled.flatMap((p) => [p.homeClubHist, p.awayClubHist]),
         ...stage.transitions.flatMap((t) => [t.homeClubHist, t.awayClubHist]),
-      ])];
+      ].filter((h): h is string => h !== null))];
       const clubRows = hists.length === 0 ? [] : await tx.query<{ hist: string; id: number }>(
         'SELECT legacy_club_hist AS hist, id::int AS id FROM clubs WHERE legacy_club_hist = ANY($1::text[])', [hists],
       );
       const clubByHist = new Map(clubRows.map((row) => [row.hist, row.id]));
-      const legacyNames = [...new Set(stage.scheduled.map((p) => p.venueLegacyName))];
+      const legacyNames = [...new Set(stage.scheduled.map((p) => p.venueLegacyName).filter((n): n is string => n !== null))];
       const venueRows = legacyNames.length === 0 ? [] : await tx.query<{ legacyName: string; id: number; canonicalName: string }>(
         `SELECT legacy_name AS "legacyName", id::int AS id, canonical_name AS "canonicalName"
            FROM venues WHERE legacy_name = ANY($1::text[])`, [legacyNames],
       );
       const venueByLegacy = new Map(venueRows.map((row) => [row.legacyName, row]));
 
-      const clubsOf = (providerId: string, homeHist: string, awayHist: string): [number, number] | null => {
-        const home = clubByHist.get(homeHist);
-        const away = clubByHist.get(awayHist);
+      // A side that is a provider label (hist null) resolves to a NULL club id by contract; a real side that misses refuses.
+      const clubsOf = (providerId: string, homeHist: string | null, awayHist: string | null): [number | null, number | null] | null => {
+        const home = homeHist === null ? null : clubByHist.get(homeHist);
+        const away = awayHist === null ? null : clubByHist.get(awayHist);
         if (home === undefined) refuse(providerId, 'club_unresolved', `clubs.legacy_club_hist has no row for '${homeHist}' (home).`);
         if (away === undefined) refuse(providerId, 'club_unresolved', `clubs.legacy_club_hist has no row for '${awayHist}' (away).`);
         return home === undefined || away === undefined ? null : [home, away];
@@ -215,15 +233,28 @@ export async function settleAflApiFixtureStage(
       function planScheduled(p: AflApiFixtureProjection): void {
         const id = p.identity.sourceRecordId;
         const clubs = clubsOf(id, p.homeClubHist, p.awayClubHist);
-        const venue = venueByLegacy.get(p.venueLegacyName);
+        // A declared placeholder venue is an unresolved venue (NULL id and NULL name), never a venue row.
+        const venue = p.venueIsPlaceholder
+          ? null
+          : venueByLegacy.get(p.venueLegacyName ?? '');
         if (venue === undefined) {
           refuse(id, 'venue_unresolved', `venues.legacy_name has no row for '${p.venueLegacyName}' (provider venue ${p.venueProviderId}).`);
         }
         if (clubs === null || venue === undefined) return;
         const own = owned.get(id) ?? null;
-        if (own !== null && (own.homeClubId !== clubs[0] || own.awayClubId !== clubs[1])) {
+        // Participants are immutable once confirmed. An UNCONFIRMED provider row may resolve its labels to clubs (or have
+        // them re-labelled) when the provider confirms the fixture; a confirmed row never changes clubs and never regresses.
+        if (own !== null && own.confirmation === 'confirmed' && p.confirmation === 'unconfirmed') {
+          refuse(id, 'confirmation_regressed',
+            `Provider match ${id} is held as confirmed but is now observed with status ${p.providerStatus} (unconfirmed). Never regressed automatically.`);
+          return;
+        }
+        // A side that already holds a club never changes to another club or back to a label, confirmed or not; only a side
+        // still holding a label (club NULL) may be resolved to a club.
+        const sideChanged = (held: number | null, observed: number | null): boolean => held !== null && held !== observed;
+        if (own !== null && (sideChanged(own.homeClubId, clubs[0]) || sideChanged(own.awayClubId, clubs[1]))) {
           refuse(id, 'club_identity_changed',
-            `Provider match ${id} now names clubs ${clubs[0]} v ${clubs[1]}; the fixture holds ${own.homeClubId} v ${own.awayClubId}. Never rewritten.`);
+            `Provider match ${id} now names clubs ${clubs[0] ?? 'label'} v ${clubs[1] ?? 'label'}; the fixture holds ${own.homeClubId ?? 'label'} v ${own.awayClubId ?? 'label'}. A held club is never rewritten.`);
           return;
         }
         if (own !== null && own.status === 'void') {
@@ -233,10 +264,14 @@ export async function settleAflApiFixtureStage(
         const after: FixtureState = {
           id: own?.id ?? null, sourceKey: AFL_API_FIXTURE_SOURCE_KEY, sourceRecordId: id,
           roundCode: p.round.roundCode, roundNumber: p.round.roundNumber, roundType: p.round.roundType,
-          matchDate: p.matchDate, matchTime: p.matchTime, venueId: venue.id, venueRaw: venue.canonicalName,
-          homeClubId: clubs[0], awayClubId: clubs[1], status: 'scheduled', statusReason: null,
+          matchDate: p.matchDate, matchTime: p.matchTime, venueId: venue === null ? null : venue.id,
+          venueRaw: venue === null ? null : venue.canonicalName,
+          homeClubId: clubs[0], awayClubId: clubs[1], homePlaceholder: p.homePlaceholderLabel, awayPlaceholder: p.awayPlaceholderLabel,
+          confirmation: p.confirmation, status: 'scheduled', statusReason: null,
         };
-        const kind: AflApiFixtureActionKind = own === null ? 'created' : own.status === 'cancelled' ? 'reinstated' : 'rescheduled';
+        const kind: AflApiFixtureActionKind = own === null ? 'created'
+          : own.status === 'cancelled' ? 'reinstated'
+            : own.confirmation === 'unconfirmed' && p.confirmation === 'confirmed' ? 'confirmed' : 'rescheduled';
         plan(id, kind, own, after);
       }
 
@@ -266,7 +301,16 @@ export async function settleAflApiFixtureStage(
       for (const p of stage.scheduled) planScheduled(p);
       for (const t of stage.transitions) planTransition(t);
       for (const id of stage.completed) {
-        if (owned.has(id)) actions.push({ providerId: id, kind: 'completed_retained', changes: {} });
+        const own = owned.get(id);
+        if (own === undefined) continue;
+        // A fixture still unconfirmed (possibly holding label participants) must not be left behind by a result: the game
+        // was played with clubs this writer never resolved. Fail closed so it is reviewed, never silently retained.
+        if (own.confirmation === 'unconfirmed') {
+          refuse(id, 'completed_unconfirmed_fixture',
+            `Provider match ${id} is CONCLUDED but its fixture is still unconfirmed (${own.homeClubId === null || own.awayClubId === null ? 'label participant' : 'real clubs'}); resolve the fixture before the result is retained.`);
+          continue;
+        }
+        actions.push({ providerId: id, kind: 'completed_retained', changes: {} });
       }
 
       // I-1 / I-2 (source-agnostic, D-229-4) over the final state; I-3 for a new row.
@@ -275,17 +319,22 @@ export async function settleAflApiFixtureStage(
         if (row.after.status !== 'scheduled') continue;
         for (const other of finalRows) {
           if (other === row.after || other.status !== 'scheduled' || other.roundCode !== row.after.roundCode) continue;
-          const clubs = [row.after.homeClubId, row.after.awayClubId];
-          const samePair = clubs.includes(other.homeClubId) && clubs.includes(other.awayClubId);
+          // A side that is a provider label has no club to collide on: only real clubs take part in I-1 / I-2.
+          const clubs = [row.after.homeClubId, row.after.awayClubId].filter((c): c is number => c !== null);
+          const otherClubs = [other.homeClubId, other.awayClubId].filter((c): c is number => c !== null);
+          if (clubs.length === 0 || otherClubs.length === 0) continue;
+          const samePair = clubs.length === 2 && otherClubs.length === 2
+            && clubs.includes(other.homeClubId as number) && clubs.includes(other.awayClubId as number);
           if (samePair) {
             refuse(row.providerId, other.sourceKey === AFL_API_FIXTURE_SOURCE_KEY ? 'fixture_identity_collision' : 'foreign_owned_collision',
               `Round ${row.after.roundCode} already holds this pair as ${other.sourceKey}:${other.sourceRecordId}; never merged.`);
-          } else if (clubs.includes(other.homeClubId) || clubs.includes(other.awayClubId)) {
+          } else if (otherClubs.some((c) => clubs.includes(c))) {
             refuse(row.providerId, 'club_already_scheduled',
               `A club of provider match ${row.providerId} already has ${other.sourceKey}:${other.sourceRecordId} in round ${row.after.roundCode}.`);
           }
         }
-        if (row.before === null) {
+        if ((row.before === null || row.before.homeClubId === null || row.before.awayClubId === null)
+            && row.after.homeClubId !== null && row.after.awayClubId !== null) {
           const [played] = await tx.query<{ n: number }>(
             `SELECT count(*)::int AS n FROM matches
               WHERE season = $1::smallint AND round_code = $2
@@ -327,21 +376,25 @@ export async function settleAflApiFixtureStage(
           await tx.query(
             `INSERT INTO fixtures (fixture_key, season, round_code, round_number, round_type, match_date, match_time,
                                    venue_id, venue_raw, home_club_id, away_club_id, status, status_reason,
-                                   source_id, source_record_id, import_batch_id)
-             VALUES ($1, $2::smallint, $3, $4::smallint, $5::round_type, $6::date, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16::bigint)`,
+                                   source_id, source_record_id, import_batch_id, confirmation, home_placeholder, away_placeholder)
+             VALUES ($1, $2::smallint, $3, $4::smallint, $5::round_type, $6::date, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16::bigint,
+                     $17, $18, $19)`,
             [mint(), stage.season, a.roundCode, a.roundNumber, a.roundType, a.matchDate, a.matchTime, a.venueId, a.venueRaw,
-              a.homeClubId, a.awayClubId, a.status, a.statusReason, source.id, a.sourceRecordId, batch.id],
+              a.homeClubId, a.awayClubId, a.status, a.statusReason, source.id, a.sourceRecordId, batch.id,
+              a.confirmation, a.homePlaceholder, a.awayPlaceholder],
           );
         } else {
           const updated = await tx.query<{ id: number }>(
             `UPDATE fixtures
                 SET round_code = $2, round_number = $3::smallint, round_type = $4::round_type, match_date = $5::date,
                     match_time = $6, venue_id = $7, venue_raw = $8, status = $9, status_reason = $10,
-                    import_batch_id = $11::bigint, updated_at = now()
+                    import_batch_id = $11::bigint, home_club_id = $14, away_club_id = $15, home_placeholder = $16,
+                    away_placeholder = $17, confirmation = $18, updated_at = now()
               WHERE id = $1 AND source_id = $12 AND source_record_id = $13
               RETURNING id::int AS id`,
             [row.before.id, a.roundCode, a.roundNumber, a.roundType, a.matchDate, a.matchTime, a.venueId, a.venueRaw,
-              a.status, a.statusReason, batch.id, source.id, a.sourceRecordId],
+              a.status, a.statusReason, batch.id, source.id, a.sourceRecordId,
+              a.homeClubId, a.awayClubId, a.homePlaceholder, a.awayPlaceholder, a.confirmation],
           );
           if (updated.length !== 1) throw new Error(`Fixture for ${row.providerId} changed owner during the settle; rolled back.`);
         }

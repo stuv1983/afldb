@@ -669,6 +669,12 @@ export type FixtureRow = {
   awayClubSlug: string;
   awayClubName: string;
   status: FixtureStatus;
+  /**
+   * AFLDB-ISSUE-229 B2 (migration 118): `unconfirmed` for a provider fixture the provider has not yet confirmed (AFL API
+   * PLACEHOLDER), still `status = 'scheduled'`. These readers INNER JOIN `clubs`, so a fixture with a provider-label
+   * participant (club NULL) is deliberately not listed here; it is counted in `FixtureSeasonSummary.unresolvedParticipants`.
+   */
+  confirmation: 'confirmed' | 'unconfirmed';
   statusReason: string | null;
   notes: string | null;
   createdAt: string;
@@ -682,7 +688,7 @@ const FIXTURE_COLUMNS = `
   f.venue_id AS "venueId", v.slug AS "venueSlug", f.venue_raw AS "venueRaw",
   f.home_club_id AS "homeClubId", hc.slug AS "homeClubSlug", hc.name AS "homeClubName",
   f.away_club_id AS "awayClubId", ac.slug AS "awayClubSlug", ac.name AS "awayClubName",
-  f.status AS status, f.status_reason AS "statusReason", f.notes AS notes,
+  f.status AS status, f.confirmation AS confirmation, f.status_reason AS "statusReason", f.notes AS notes,
   f.created_at::text AS "createdAt", f.updated_at::text AS "updatedAt"`;
 
 const FIXTURE_JOINS = `
@@ -1922,6 +1928,7 @@ function withPlayedResolution(raw: RawSeasonFixtureRow): SeasonFixtureRow {
     awayClubSlug: raw.awayClubSlug,
     awayClubName: raw.awayClubName,
     status: raw.status,
+    confirmation: raw.confirmation,
     statusReason: raw.statusReason,
     notes: raw.notes,
     createdAt: raw.createdAt,
@@ -2016,6 +2023,10 @@ export type FixtureSeasonSummary = {
   dateTbc: number;
   timeTbc: number;
   venueTbc: number;
+  /** Fixtures with a provider-label participant (club NULL): counted above, but not listed by the club-joined readers. */
+  unresolvedParticipants: number;
+  /** Fixtures the provider has not confirmed (migration 118); their date and time are NULL until it does. */
+  unconfirmed: number;
 };
 
 /** The season selector's counts — one grouped query per administrable season. */
@@ -2030,13 +2041,16 @@ export async function readFixtureSeasonSummary(season: number): Promise<FixtureS
            (count(*) FILTER (WHERE status <> 'void' AND match_date IS NULL))::int AS "dateTbc",
            (count(*) FILTER (WHERE status <> 'void' AND match_time IS NULL))::int AS "timeTbc",
            (count(*) FILTER (WHERE status <> 'void' AND venue_id IS NULL
-                               AND venue_raw IS NULL))::int AS "venueTbc"
+                               AND venue_raw IS NULL))::int AS "venueTbc",
+           (count(*) FILTER (WHERE status <> 'void'
+                               AND (home_club_id IS NULL OR away_club_id IS NULL)))::int AS "unresolvedParticipants",
+           (count(*) FILTER (WHERE status <> 'void' AND confirmation = 'unconfirmed'))::int AS "unconfirmed"
       FROM fixtures
      WHERE season = ${season}::smallint
   `;
   return row ?? {
     season, fixtures: 0, rounds: 0, scheduled: 0, cancelled: 0, voided: 0,
-    dateTbc: 0, timeTbc: 0, venueTbc: 0,
+    dateTbc: 0, timeTbc: 0, venueTbc: 0, unresolvedParticipants: 0, unconfirmed: 0,
   };
 }
 
@@ -2068,7 +2082,11 @@ export async function readPlayedMatchesWithoutFixture(
               WHERE f.season = m.season AND f.round_code = m.round_code
                 AND f.status <> 'void'
                 AND ((f.home_club_id = m.home_club_id AND f.away_club_id = m.away_club_id)
-                  OR (f.home_club_id = m.away_club_id AND f.away_club_id = m.home_club_id)))
+                  OR (f.home_club_id = m.away_club_id AND f.away_club_id = m.home_club_id)
+                  -- an unconfirmed fixture with a provider-label side (migration 118) covers the game its real side(s) allow
+                  OR (f.confirmation = 'unconfirmed' AND (f.home_club_id IS NULL OR f.away_club_id IS NULL)
+                      AND (f.home_club_id IS NULL OR f.home_club_id IN (m.home_club_id, m.away_club_id))
+                      AND (f.away_club_id IS NULL OR f.away_club_id IN (m.home_club_id, m.away_club_id)))))
      ORDER BY m.match_date, m.id
   `;
 }

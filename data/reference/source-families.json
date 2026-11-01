@@ -294,6 +294,49 @@
         { "api_round_number": 28, "api_abbreviation": "PF", "api_name": "Preliminary Finals",  "round_type": "preliminary_final" },
         { "api_round_number": 29, "api_abbreviation": "GF", "api_name": "Grand Final",         "round_type": "grand_final" }
       ]
+    },
+    "afl_api_2027": {
+      "description": "AFL API explicit round table for 2027 (AFLDB-ISSUE-229 B2 / ISSUE-316 C4). Declared from the first authentic 2027 season feed (one retained capture, 2026-11-01). Unlike 2026 there is NO Opening Round: Round 1 is the first round, so canonical_round_number equals the API round number (no offset). Wildcard Finals stay a DISTINCT round (WF, round_type wildcard_final) and the combined Qualifying & Elimination Finals round (QE) splits on metadata.finals_match_label exactly as in 2026; neither is merged with another stage.",
+      "mapping_status": "declared",
+      "season": 2027,
+      "evidence": [
+        "AFL API GET /afl/v2/matches?competitionId=1&compSeasonId=102&pageSize=1000, 2026-11-01T01:20:26Z, compSeason providerId CD_S2027014, 218 matches, feed sha256 21fd12e7704b7c7146cfbab414352352f3cfaa53e7ef5038f4411fa789e4c84d (retained snapshot afl-api-2027-2026-11-01-012026): rounds 1-24 'Rd <n>'/'Round <n>' (no round 0); round 25 'WF'/'Wildcard Finals' (2 matches); round 26 'QE'/'Qualifying & Elimination Finals' (4); round 27 'SF'/'Semi Finals' (2); round 28 'PF'/'Preliminary Finals' (2); round 29 'GF'/'Grand Final' (1). metadata.finals_match_label present on every finals match: 'First/Second Wildcard Final', 'First/Second Qualifying Final', 'First/Second Elimination Final', 'First/Second Semi Final', 'First/Second Preliminary Final', '2027 Toyota AFL Grand Final'."
+      ],
+      "rounds": [
+        { "api_round_number": 1, "api_abbreviation": "Rd 1", "api_name": "Round 1", "round_type": "home_and_away", "canonical_round_number": 1 },
+        { "api_round_number": 2, "api_abbreviation": "Rd 2", "api_name": "Round 2", "round_type": "home_and_away", "canonical_round_number": 2 },
+        { "api_round_number": 3, "api_abbreviation": "Rd 3", "api_name": "Round 3", "round_type": "home_and_away", "canonical_round_number": 3 },
+        { "api_round_number": 4, "api_abbreviation": "Rd 4", "api_name": "Round 4", "round_type": "home_and_away", "canonical_round_number": 4 },
+        { "api_round_number": 5, "api_abbreviation": "Rd 5", "api_name": "Round 5", "round_type": "home_and_away", "canonical_round_number": 5 },
+        { "api_round_number": 6, "api_abbreviation": "Rd 6", "api_name": "Round 6", "round_type": "home_and_away", "canonical_round_number": 6 },
+        { "api_round_number": 7, "api_abbreviation": "Rd 7", "api_name": "Round 7", "round_type": "home_and_away", "canonical_round_number": 7 },
+        { "api_round_number": 8, "api_abbreviation": "Rd 8", "api_name": "Round 8", "round_type": "home_and_away", "canonical_round_number": 8 },
+        { "api_round_number": 9, "api_abbreviation": "Rd 9", "api_name": "Round 9", "round_type": "home_and_away", "canonical_round_number": 9 },
+        { "api_round_number": 10, "api_abbreviation": "Rd 10", "api_name": "Round 10", "round_type": "home_and_away", "canonical_round_number": 10 },
+        { "api_round_number": 11, "api_abbreviation": "Rd 11", "api_name": "Round 11", "round_type": "home_and_away", "canonical_round_number": 11 },
+        { "api_round_number": 12, "api_abbreviation": "Rd 12", "api_name": "Round 12", "round_type": "home_and_away", "canonical_round_number": 12 },
+        { "api_round_number": 13, "api_abbreviation": "Rd 13", "api_name": "Round 13", "round_type": "home_and_away", "canonical_round_number": 13 },
+        { "api_round_number": 14, "api_abbreviation": "Rd 14", "api_name": "Round 14", "round_type": "home_and_away", "canonical_round_number": 14 },
+        { "api_round_number": 15, "api_abbreviation": "Rd 15", "api_name": "Round 15", "round_type": "home_and_away", "canonical_round_number": 15 },
+        { "api_round_number": 16, "api_abbreviation": "Rd 16", "api_name": "Round 16", "round_type": "home_and_away", "canonical_round_number": 16 },
+        { "api_round_number": 17, "api_abbreviation": "Rd 17", "api_name": "Round 17", "round_type": "home_and_away", "canonical_round_number": 17 },
+        { "api_round_number": 18, "api_abbreviation": "Rd 18", "api_name": "Round 18", "round_type": "home_and_away", "canonical_round_number": 18 },
+        { "api_round_number": 19, "api_abbreviation": "Rd 19", "api_name": "Round 19", "round_type": "home_and_away", "canonical_round_number": 19 },
+        { "api_round_number": 20, "api_abbreviation": "Rd 20", "api_name": "Round 20", "round_type": "home_and_away", "canonical_round_number": 20 },
+        { "api_round_number": 21, "api_abbreviation": "Rd 21", "api_name": "Round 21", "round_type": "home_and_away", "canonical_round_number": 21 },
+        { "api_round_number": 22, "api_abbreviation": "Rd 22", "api_name": "Round 22", "round_type": "home_and_away", "canonical_round_number": 22 },
+        { "api_round_number": 23, "api_abbreviation": "Rd 23", "api_name": "Round 23", "round_type": "home_and_away", "canonical_round_number": 23 },
+        { "api_round_number": 24, "api_abbreviation": "Rd 24", "api_name": "Round 24", "round_type": "home_and_away", "canonical_round_number": 24 },
+        { "api_round_number": 25, "api_abbreviation": "WF", "api_name": "Wildcard Finals", "round_type": "wildcard_final" },
+        { "api_round_number": 26, "api_abbreviation": "QE", "api_name": "Qualifying & Elimination Finals", "round_type": "mixed_finals",
+          "finals_label_rules": [
+            { "contains": "Qualifying",  "round_type": "qualifying_final" },
+            { "contains": "Elimination", "round_type": "elimination_final" }
+          ] },
+        { "api_round_number": 27, "api_abbreviation": "SF", "api_name": "Semi Finals",        "round_type": "semi_final" },
+        { "api_round_number": 28, "api_abbreviation": "PF", "api_name": "Preliminary Finals",  "round_type": "preliminary_final" },
+        { "api_round_number": 29, "api_abbreviation": "GF", "api_name": "Grand Final",         "round_type": "grand_final" }
+      ]
     }
   },
   "co_source_groups": [

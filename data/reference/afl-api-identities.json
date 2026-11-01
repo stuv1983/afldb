@@ -21,6 +21,31 @@
     "CD_T1000": { "hist": "Gold Coast",              "raw_name": "Gold Coast SUNS",     "raw_abbreviation": "GCFC", "raw_nickname": "SUNS" },
     "CD_T1010": { "hist": "Greater Western Sydney",  "raw_name": "GWS GIANTS",          "raw_abbreviation": "GWS",  "raw_nickname": "GIANTS" }
   },
+  "placeholder_teams": {
+    "$comment": "AFLDB-ISSUE-229 B2 (owner decision 2026-11-01). A provider 'team' that is a LABEL, not a club: a ladder position or a bracket reference used by the 2027 finals fixtures (CD_T3000-CD_T3021, all with club null in the retained feed). It never maps to a club; the fixture contract admits it only on an UNCONFIRMED (PLACEHOLDER) fixture, where it is stored as the fixture's home/away label. Declared by provider id; never matched by name.",
+    "CD_T3000": { "raw_name": "1st" },
+    "CD_T3001": { "raw_name": "2nd" },
+    "CD_T3002": { "raw_name": "3rd" },
+    "CD_T3003": { "raw_name": "4th" },
+    "CD_T3004": { "raw_name": "5th" },
+    "CD_T3005": { "raw_name": "6th" },
+    "CD_T3006": { "raw_name": "7th" },
+    "CD_T3007": { "raw_name": "8th" },
+    "CD_T3008": { "raw_name": "9th" },
+    "CD_T3009": { "raw_name": "10th" },
+    "CD_T3010": { "raw_name": "Lowest-ranked WF Winner" },
+    "CD_T3011": { "raw_name": "Highest-ranked WF Winner" },
+    "CD_T3012": { "raw_name": "Winner of QF1" },
+    "CD_T3013": { "raw_name": "Winner of QF2" },
+    "CD_T3014": { "raw_name": "Loser of QF1" },
+    "CD_T3015": { "raw_name": "Loser of QF2" },
+    "CD_T3016": { "raw_name": "Winner of EF1" },
+    "CD_T3017": { "raw_name": "Winner of EF2" },
+    "CD_T3018": { "raw_name": "Winner of SF1" },
+    "CD_T3019": { "raw_name": "Winner of SF2" },
+    "CD_T3020": { "raw_name": "Winner of PF1" },
+    "CD_T3021": { "raw_name": "Winner of PF2" }
+  },
   "venues": {
     "$comment": "AFLDB-ISSUE-244 I244-F003 (2026-09-21, two continuations): a READ-ONLY `SELECT id, slug, canonical_name, legacy_name, city, state, first_season, last_season FROM venues` against afldb_test (transaction_read_only=on, no row altered) proved TWO things this file previously could only guess at: (1) every one of the 52 canonical venues has a non-NULL legacy_name -- the §7 worry that legacy_name might be NULL for some real venues does not hold; (2) legacy_name equals canonical_name VERBATIM for every venue except three historically-abbreviated ones (M.C.G., S.C.G., W.A.C.A.). Continuation 1 turned nine of the 2026 season's 17 distinct CD_V provider venues into deterministic matches: five where src/search/nl/vocab.ts's VENUE_NICKNAMES (tracked repository evidence, not fuzzy similarity) already ties a commercial/colloquial provider name to a canonical_name the DB query confirms shares its legacy_name (Gabba, Docklands/Marvel Stadium, Kardinia Park/GMHBA Stadium, Perth Stadium/Optus Stadium, York Park/UTAS Stadium), and four where the provider's own raw venue name is IDENTICAL, character-for-character, to a legacy_name (Barossa Park, Adelaide Oval, Norwood Oval, Hands Oval). Continuation 2 (this pass) resolved the remaining six via authoritative public naming-rights-history evidence (AFL.com.au venue pages, Wikipedia, official venue/club sites -- not textual pattern matching, and never inferred from locality alone; see afldb-issue244.md §37.12): TIO Stadium = Marrara Stadium under naming rights, confirmed the same facility as canonical 'Marrara Oval' (~12,500 capacity, 'largest stadium in the Northern Territory', distinct from the separate 'Marrara Oval 2'); TIO Traeger Park = Traeger Park under naming rights, confirmed the same Alice Springs facility; Corroboree Group Oval Manuka = a GWS-announced three-year naming-rights rebrand of Manuka Oval itself (GIANTS official site); Ninja Stadium = Bellerive Oval under naming rights (AFL.com.au, official Ninja Stadium address at 15 Derwent Street, Bellerive); People First Stadium = the same Carrara ground continuously renamed (Carrara Stadium 1987 -> Metricon Stadium 2011 -> Heritage Bank Stadium 2023 -> People First Stadium 2024, AFL.com.au/Austadiums); ENGIE Stadium = Sydney Showground Stadium, the GWS Giants' continuous home venue since 2012 under successive sponsor names (Skoda -> Spotless -> Giants Stadium -> ENGIE), confirmed textually and by capacity/purpose (~23,500, AFL/cricket) as distinct from both Stadium Australia/Accor Stadium (~80,500, a separate venue in the same Sydney Olympic Park precinct) and the Sydney Cricket Ground (different suburb) -- the only one of the three same-city canonical candidates the evidence uniquely selects. All 17 of the 2026 season's distinct CD_V provider venues are now mapped; none was guessed.",
     "CD_V6":    { "raw_name": "Adelaide Oval", "legacy_name": "Adelaide Oval" },
@@ -39,7 +64,12 @@
     "CD_V150":  { "raw_name": "Corroboree Group Oval Manuka", "legacy_name": "Manuka Oval" },
     "CD_V2":    { "raw_name": "Ninja Stadium", "legacy_name": "Bellerive Oval" },
     "CD_V81":   { "raw_name": "People First Stadium", "legacy_name": "Carrara" },
-    "CD_V43":   { "raw_name": "ENGIE Stadium", "legacy_name": "Sydney Showground" }
+    "CD_V43":   { "raw_name": "ENGIE Stadium", "legacy_name": "Sydney Showground" },
+    "CD_V313":  { "raw_name": "Mars Stadium", "legacy_name": "Eureka Stadium" }
+  },
+  "placeholder_venues": {
+    "$comment": "AFLDB-ISSUE-229 B2 (owner decision 2026-11-01). A provider 'venue' that is a LABEL, not a ground. It never maps to a canonical venue; the fixture contract admits it only on an UNCONFIRMED (PLACEHOLDER) fixture, where the fixture's venue and its venue-local date and time stay NULL. Declared by provider id from the retained 2027 feed (10 finals matches); never matched by name.",
+    "CD_V2385": { "raw_name": "To Be Confirmed" }
   },
   "seasons": {
     "$comment": "year -> AFL API compSeason numeric id and CD_S providerId, verified from the top-level compSeason object of each season's 00-season-matches.raw.json.",
@@ -47,6 +77,7 @@
     "2023": { "compSeasonId": 52, "providerId": "CD_S2023014" },
     "2024": { "compSeasonId": 62, "providerId": "CD_S2024014" },
     "2025": { "compSeasonId": 73, "providerId": "CD_S2025014" },
-    "2026": { "compSeasonId": 85, "providerId": "CD_S2026014" }
+    "2026": { "compSeasonId": 85, "providerId": "CD_S2026014" },
+    "2027": { "compSeasonId": 102, "providerId": "CD_S2027014" }
   }
 }

@@ -15,6 +15,13 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-229 B2: local 2027 fixture support, unconfirmed (PLACEHOLDER) fixtures (2026-11-01; nothing installed or applied on DEV or PROD)
+
+- **Schema (not installed):** migration `118_fixtures_unconfirmed_participants.sql` adds `fixtures.confirmation` (`confirmed` default / `unconfirmed`), `home_placeholder` / `away_placeholder`, nullable club ids and per-side CHECKs (exactly one of club or label; a label requires `unconfirmed`).
+- **Behaviour:** the AFL API fixture contract and writer treat `PLACEHOLDER` as an unconfirmed scheduled fixture (never a result, cancellation or void); provider ladder/bracket labels are stored only as labels (never clubs), "To Be Confirmed" never becomes a venue, and an unconfirmed record stores no date or time. Confirmed fixtures never regress or change clubs; a label side may resolve to a club in place; a CONCLUDED observation of a still-unconfirmed fixture is refused. Admin fixture readers expose `confirmation` and the season summary counts unresolved participants and unconfirmed fixtures (no UI change).
+- **Reference data:** season 2027 (compSeason 102) registered, `afl_api_2027` round vocabulary declared (Wildcard Finals a distinct stage), `CD_V313` mapped to Eureka Stadium, 22 declared placeholder teams and one placeholder venue.
+- **Validation:** retained 2027 capture (218 records) validates, dry-runs and applies on a disposable production-derived clone, replays with no change; focused suites and typecheck pass. Record: `docs/v2/issue229-b2-2027-feed-check-2026-11-01.md` section 5.
+
 ### V2 remaining-items batch: GAP-029 event labels, ISSUE-229 B2 check, Brownlow census, ISSUE-316 reconciliation (2026-11-01; no deployment, nothing applied to DEV or PROD)
 
 - **New retained tooling and evidence (GAP-029):** `tools/v2/apply-gap029-match-events.ts` (isolated-only, plan by default, audited `saveEdit` path) and the 61-entry evidence file; demonstrated on a disposable clone only, where the 42 match-event Gridley findings close (unapproved 50 to 14). No behaviour change in the application.

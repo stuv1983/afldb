@@ -272,11 +272,11 @@ describe('AFL API identity maps (AFLDB-ISSUE-228 S1)', () => {
     );
   });
 
-  it('declares one compSeason id/providerId per captured season, 2022-2026', () => {
+  it('declares one compSeason id/providerId per captured season, 2022-2027', () => {
     const seasonKeys = Object.keys(aflApiIdentities.seasons).filter((k) => k !== '$comment');
-    expect(seasonKeys.sort()).toEqual(['2022', '2023', '2024', '2025', '2026']);
+    expect(seasonKeys.sort()).toEqual(['2022', '2023', '2024', '2025', '2026', '2027']);
     const ids = seasonKeys.map((y) => aflApiIdentities.seasons[y].compSeasonId);
-    expect(new Set(ids).size).toBe(5);
+    expect(new Set(ids).size).toBe(6);
     // compSeasonId increases monotonically with year across every captured season.
     const sorted = [...seasonKeys].sort((a, b) => Number(a) - Number(b));
     for (let i = 1; i < sorted.length; i++) {
@@ -313,9 +313,26 @@ describe('AFL API identity maps (AFLDB-ISSUE-228 S1)', () => {
     // evidence — see this file's own module comment above.
     expect(venueKeys.sort()).toEqual([
       'CD_V150', 'CD_V160', 'CD_V190', 'CD_V2', 'CD_V20', 'CD_V200',
-      'CD_V2125', 'CD_V2925', 'CD_V30', 'CD_V374', 'CD_V386', 'CD_V40',
+      'CD_V2125', 'CD_V2925', 'CD_V30', 'CD_V313', 'CD_V374', 'CD_V386', 'CD_V40',
       'CD_V4105', 'CD_V43', 'CD_V6', 'CD_V60', 'CD_V81',
     ].sort());
+    // AFLDB-ISSUE-229 B2 (2026-11-01): CD_V313 'Mars Stadium' (Ballarat) is the canonical 'Eureka Stadium'
+    // (venues.id 16). Unique support: all five 2023-2025 matches the provider places at CD_V313 map one to
+    // one, by date and clubs, onto the five canonical Eureka Stadium matches (docs/v2/issue229-b2-2027-feed-check-2026-11-01.md).
+    expect(aflApiIdentities.venues.CD_V313).toEqual({ raw_name: 'Mars Stadium', legacy_name: 'Eureka Stadium' });
+  });
+
+  it('declares provider LABELS apart from clubs and venues: placeholder teams and the To Be Confirmed venue (ISSUE-229 B2)', () => {
+    const labelTeams = Object.keys(aflApiIdentities.placeholder_teams).filter((k) => k !== '$comment');
+    expect(labelTeams).toHaveLength(22);
+    expect(labelTeams.sort()).toEqual(Array.from({ length: 22 }, (_, i) => `CD_T${3000 + i}`).sort());
+    // A label is never a club and never also a real team; the venue label is never a venue.
+    for (const key of labelTeams) {
+      expect(aflApiIdentities.teams[key]).toBeUndefined();
+      expect(aflApiIdentities.placeholder_teams[key].raw_name).toBeTruthy();
+    }
+    expect(aflApiIdentities.placeholder_venues.CD_V2385).toEqual({ raw_name: 'To Be Confirmed' });
+    expect(aflApiIdentities.venues.CD_V2385).toBeUndefined();
   });
 });
 

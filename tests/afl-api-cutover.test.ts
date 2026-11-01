@@ -973,18 +973,31 @@ describe('AFL API cutover readiness', () => {
     expect(r.ready).toBe(false);
   });
 
-  it('2027 (tracked files): NOT READY, each check naming what is missing', () => {
+  it('2027 (tracked files, 2026 fixtures): NOT READY on the fixture register and the missing feed; 2027 is registered and has a round table (ISSUE-229 B2)', () => {
     const r = assessAflApiCutoverReadiness(2027, real);
     expect(r.ready).toBe(false);
     const c = byId(r);
+    // The in-progress register here is the 2026 fixture, and no 2027 feed is supplied: both stay failing.
     expect(c.in_progress_season.ok).toBe(false);
     expect(c.in_progress_season.detail).toContain('[2026]');
-    expect(c.season_identity.ok).toBe(false);
-    expect(c.season_identity.detail).toContain('seasons.2027');
-    expect(c.round_vocabulary.ok).toBe(false);
-    expect(c.round_vocabulary.detail).toContain('afl_api_2027');
+    // Since 2026-11-01 the tracked files register 2027 (compSeasonId 102, CD_S2027014) and declare afl_api_2027.
+    expect(c.season_identity.ok).toBe(true);
+    expect(c.round_vocabulary.ok).toBe(true);
     expect(c.season_feed.ok).toBe(false);
-    expect(c.season_feed.detail).toContain('seasons.2027');
+    expect(c.season_feed.detail).toContain('2027');
+  });
+
+  it('2027 (tracked identities and round table + the authentic 2027 feed): every precondition holds; placeholder teams and venue count as covered', () => {
+    const FEED_2027 = 'tests/fixtures/afl_api/seasons/01-season-matches-2027.raw.json';
+    const r = assessAflApiCutoverReadiness(2027, {
+      ...real, seasons: { in_progress_seasons: [2027] }, afltablesNetwork: { status: 'retired', last_season: 2026, decision: 'D-316-1' },
+      seasonFeed: { path: FEED_2027, text: readFileSync(path.join(root, FEED_2027), 'utf8') },
+    });
+    expect(r.checks.filter((c) => !c.ok)).toEqual([]);
+    expect(r.ready).toBe(true);
+    expect(byId(r).season_feed.detail).toContain('218 match(es), complete for CD_S2027014');
+    // Real venues only: the 'To Be Confirmed' placeholder is not a provider venue to be matched to a legacy name.
+    expect(r.feedVenueLegacyNames).not.toContain('To Be Confirmed');
   });
 
   it('a registered 2027 with its own complete, fully mapped feed is REPOSITORY READY', () => {

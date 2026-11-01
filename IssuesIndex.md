@@ -42,9 +42,17 @@
   capture (218 matches: SCHEDULED 135, new `PLACEHOLDER` 83) validates (`--validate-only` PASS) but the
   isolated dry-run refuses all 218 (no `afl_api_2027` round vocabulary; `PLACEHOLDER` unsupported until
   observed; venue `CD_V313` unmapped). Nothing applied. Record: `docs/v2/issue229-b2-2027-feed-check-2026-11-01.md`.
-- **Next action:** owner decisions in that record (register 2027, declare the round vocabulary, map
-  `CD_V313`, decide the `PLACEHOLDER` policy), then re-run validate-only/dry-run; the owner then approves
-  the first apply.
+- **2026-11-01 (later), local implementation done on owner decisions:** 2027 registered, `afl_api_2027`
+  rounds declared (Wildcard Finals distinct), `CD_V313` -> Eureka Stadium (5/5 one-to-one evidence),
+  `PLACEHOLDER` = unconfirmed scheduled fixture (migration 118: `confirmation`, label columns, nullable clubs;
+  unconfirmed rows store no date/time; labels and "To Be Confirmed" never become clubs/venues). Retained
+  capture: validate-only 218/0 refused, dry-run and apply on a disposable production-derived clone created
+  218 (135 confirmed / 83 unconfirmed), replay no-change, lifecycle and refusal cases proven; independent
+  review H1/M1/M2/L2/L3 fixed, L1 open. **Nothing installed or applied on DEV/PROD.** Record:
+  `docs/v2/issue229-b2-2027-feed-check-2026-11-01.md` section 5.
+- **Next action:** owner approves migration 118 for a reviewed release, decides the L1 follow-up and whether
+  the admin list should show unconfirmed/label fixtures (UI, visual evidence), then separately approves the
+  first production apply (validate-only, dry-run, apply of the pinned snapshot).
   B2 is seasonal first-season operational acceptance, not missing fixture-writer implementation;
   authentic 2026 evidence already proves the technical status/projection contract. Whole-season
   2027/TBC/status/key/mapping evidence and owner approval are not waived.

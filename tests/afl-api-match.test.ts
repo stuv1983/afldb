@@ -3184,10 +3184,18 @@ describe('AFL API season discovery (AFLDB-ISSUE-233, D-233-1 proposal-only)', ()
   const RAW_PATH = join(projectRoot, 'tests', 'fixtures', 'afl_api', 'seasons', '00-compseasons.raw.json');
   const RAW_SHA256 = 'fe3f164160e37e0ce5b70ff3f379dc41ce234f2efad6e7f481c1b7443111d965';
   const rawText = () => readFileSync(RAW_PATH, 'utf8');
-  const registered = parseAflApiIdentities(
+  const trackedRegistry = parseAflApiIdentities(
     JSON.parse(readFileSync(join(projectRoot, 'data', 'reference', 'afl-api-identities.json'), 'utf8')),
   ).seasons;
+  // 00-compseasons.raw.json is the 2026-era capture (15 seasons, newest 2026); it is retained unchanged. Since the
+  // 2026-11-01 registration of 2027 (AFLDB-ISSUE-229 B2) the tracked registry also holds 2027, which that capture
+  // cannot list, so the cases below compare the capture with the registry AS IT STOOD for the seasons it covers.
+  // The 2027-era capture (RAW_2027_*) is compared with the whole tracked registry.
+  const registered = new Map<number, RegisteredAflApiSeason>([...trackedRegistry].filter(([year]) => year <= 2026));
   const source = { file: 'tests/fixtures/afl_api/seasons/00-compseasons.raw.json', sha256: RAW_SHA256 };
+  const RAW_2027_PATH = join(projectRoot, 'tests', 'fixtures', 'afl_api', 'seasons', '01-compseasons-2027.raw.json');
+  const RAW_2027_SHA256 = '0adc56ec4c6502c47d7680d3e490e7a245a448763c55b1584c30f65c3502d6b3';
+  const source2027 = { file: 'tests/fixtures/afl_api/seasons/01-compseasons-2027.raw.json', sha256: RAW_2027_SHA256 };
   const REGISTERED = [2022, 2023, 2024, 2025, 2026];
   const HISTORICAL = [2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021];
 
@@ -3228,6 +3236,25 @@ describe('AFL API season discovery (AFLDB-ISSUE-233, D-233-1 proposal-only)', ()
     expect(proposal.identitiesSeasonsAdditions).toEqual({});
     expect(proposal.confirmedRegistered).toEqual(REGISTERED);
     expect(proposal.historicalUnregistered).toEqual(HISTORICAL);
+    expect(proposal.findings).toEqual([]);
+  });
+
+  it('the 2027-era fixture is the recorded authentic bytes (hash-bound), 16 seasons, newest 2027 (compSeasonId 102)', () => {
+    const bytes = readFileSync(RAW_2027_PATH);
+    expect(createHash('sha256').update(bytes).digest('hex')).toBe(RAW_2027_SHA256);
+    const listing = parseAflApiCompSeasons(bytes.toString('utf8'));
+    expect(listing.complete).toBe(true);
+    expect(listing.numEntries).toBe(16);
+    expect(listing.entries[0]).toEqual({ id: 102, providerId: 'CD_S2027014', name: '2027 Toyota AFL Premiership', currentRoundNumber: 1 });
+  });
+
+  it('against the whole tracked registry the 2027-era response proposes nothing and confirms 2022-2027', () => {
+    const proposal = proposeAflApiSeasons({
+      listing: parseAflApiCompSeasons(readFileSync(RAW_2027_PATH, 'utf8')), registered: trackedRegistry, source: source2027,
+    });
+    expect(proposal.verdict).toBe('no_change');
+    expect(proposal.proposals).toEqual([]);
+    expect(proposal.confirmedRegistered).toEqual([...REGISTERED, 2027]);
     expect(proposal.findings).toEqual([]);
   });
 
@@ -3341,16 +3368,16 @@ describe('AFL API season discovery (AFLDB-ISSUE-233, D-233-1 proposal-only)', ()
       const identitiesBefore = readFileSync(join(projectRoot, 'data', 'reference', 'afl-api-identities.json'));
       const lines: string[] = [];
       const proposal = await runDiscoverAflApiSeasons(
-        ['--input', RAW_PATH, '--output', output],
+        ['--input', RAW_2027_PATH, '--output', output],
         { log: (line) => lines.push(line), fetchImpl: noFetch },
       );
       expect(proposal.verdict).toBe('no_change');
-      expect(proposal.input).toEqual(source);
+      expect(proposal.input).toEqual(source2027);
       expect(readFileSync(output, 'utf8')).toBe(serialiseAflApiSeasonDiscoveryProposal(proposal));
       expect(lines.join('\n')).toContain('verdict: NO_CHANGE. Nothing was written to data/reference/.');
       expect(readFileSync(join(projectRoot, 'data', 'reference', 'afl-api-identities.json'))).toEqual(identitiesBefore);
       // Never overwrites a reviewed proposal.
-      await expect(runDiscoverAflApiSeasons(['--input', RAW_PATH, '--output', output], { log: () => {} }))
+      await expect(runDiscoverAflApiSeasons(['--input', RAW_2027_PATH, '--output', output], { log: () => {} }))
         .rejects.toThrow(/already exists/);
     });
 
@@ -3380,7 +3407,7 @@ describe('AFL API season discovery (AFLDB-ISSUE-233, D-233-1 proposal-only)', ()
 
     it('--fetch retains the raw bytes verbatim and binds the proposal to their sha256', async () => {
       dir = mkdtempSync(join(tmpdir(), 'afldb-issue233-'));
-      const body = rawText();
+      const body = readFileSync(RAW_2027_PATH, 'utf8');
       const fetchImpl: FetchLike = async (url) => {
         expect(String(url)).toBe('https://aflapi.afl.com.au/afl/v2/competitions/1/compseasons?pageSize=100');
         return new Response(body, { status: 200, headers: { 'content-type': 'application/json' } });
@@ -3392,8 +3419,8 @@ describe('AFL API season discovery (AFLDB-ISSUE-233, D-233-1 proposal-only)', ()
       );
       expect(readFileSync(rawPath, 'utf8')).toBe(body);
       // the ASCII fixture's bytes, exactly: same bytes, same sha256 as the retained fixture
-      expect(readFileSync(rawPath)).toEqual(readFileSync(RAW_PATH));
-      expect(proposal.input.sha256).toBe(RAW_SHA256);
+      expect(readFileSync(rawPath)).toEqual(readFileSync(RAW_2027_PATH));
+      expect(proposal.input.sha256).toBe(RAW_2027_SHA256);
       expect(proposal.verdict).toBe('no_change');
     });
 
@@ -3408,14 +3435,14 @@ describe('AFL API season discovery (AFLDB-ISSUE-233, D-233-1 proposal-only)', ()
           { log: () => {}, fetchImpl, ingestionControls: ENABLED_INGESTION_CONTROLS });
         return { run, rawPath, output };
       };
-      const fixture = readFileSync(RAW_PATH);
+      const fixture = readFileSync(RAW_2027_PATH);
       // A UTF-8 BOM and a trailing CRLF: text() drops the BOM, so a decode/re-encode differs.
       const withBom = Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), fixture, Buffer.from('\r\n')]);
       const bom = await fetchBytes(withBom);
       const proposal = await bom.run;
       expect(readFileSync(bom.rawPath).equals(withBom)).toBe(true);
       expect(proposal.input.sha256).toBe(createHash('sha256').update(withBom).digest('hex'));
-      expect(proposal.input.sha256).not.toBe(RAW_SHA256);
+      expect(proposal.input.sha256).not.toBe(RAW_2027_SHA256);
       expect(proposal.verdict).toBe('no_change'); // parsed only after retention, from the same bytes
       rmSync(dir!, { recursive: true, force: true });
 

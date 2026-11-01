@@ -173,6 +173,11 @@ export function assessAflApiCutoverReadiness(season: number, inputs: ReadinessIn
           legacyNames.add(identity.legacyName);
           return;
         }
+        // A DECLARED placeholder venue ('To Be Confirmed') is an unresolved venue, not a venue: covered, but it names no canonical venue.
+        if (ids.placeholderVenues?.has(providerId)) {
+          mapped.add(providerId);
+          return;
+        }
         const seen = unmapped.get(providerId);
         const name = typeof field(venue, 'name') === 'string' ? field(venue, 'name') as string : '?';
         unmapped.set(providerId, { name, matches: (seen?.matches ?? 0) + 1 });
@@ -197,7 +202,9 @@ export function assessAflApiCutoverReadiness(season: number, inputs: ReadinessIn
           const providerId = nonEmptyString(
             field(field(field(entry, side), 'team'), 'providerId'), `feed entry ${index} ${side}.team.providerId`);
           seen.add(providerId);
-          if (!ids.teams.has(providerId)) unmapped.add(providerId);
+          // A DECLARED placeholder team (ladder position, bracket reference) is a label, not a club: covered; the fixture
+          // contract admits it only on an unconfirmed fixture.
+          if (!ids.teams.has(providerId) && !ids.placeholderTeams?.has(providerId)) unmapped.add(providerId);
         }
       });
       if (unmapped.size > 0) {
