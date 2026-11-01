@@ -117,7 +117,12 @@ async function main(): Promise<void> {
           if (!native) throw new Error('Native observation transaction required');
           const result = await runSettleAflApiBrownlow({ begin: (work: (t: postgres.TransactionSql) => Promise<unknown>) => work(native) } as unknown as postgres.Sql, {
             ...snapshot, registry: sourceRegistry, inProgressSeasons: registry.in_progress_seasons,
-            apply: true, autoApply: false, observeOnly: true,
+            // observeOnly is FALSE on purpose (isolated end-to-end finding, 2026-11-01): observe-only persists the
+            // spine and skips the typed projection, so staging.afl_api_brownlow_vote stayed empty and the next
+            // stage (adopt, which plans from that projection) refused "expected exactly 207 sets". With autoApply
+            // false this still writes NO canonical row (brownlow_round_votes is untouched); it adds the typed
+            // projection (621 positives) and the batch row. The gate below rolls everything back on any refusal.
+            apply: true, autoApply: false, observeOnly: false,
             fixtureIdentityFallback: { registry: sourceRegistry,
               identities: parseAflApiIdentities(JSON.parse(readFileSync('data/reference/afl-api-identities.json', 'utf8'))) },
           });

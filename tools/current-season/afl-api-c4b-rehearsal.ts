@@ -1166,7 +1166,8 @@ async function withSql<T>(dsnEnv: string, fn: (sql: postgres.Sql) => Promise<T>)
   }
 }
 
-function productionDeps(projectRoot: string, evidenceDir: string, runId: string): C4bDeps & WatchdogDeps {
+/** Exported so the isolated end-to-end harness (tools/v2/c4b-isolated-e2e.mts) runs the REAL database, evidence and watchdog code. */
+export function productionDeps(projectRoot: string, evidenceDir: string, runId: string): C4bDeps & WatchdogDeps {
   const log = (line: string): void => {
     try { appendFileSync(join(evidenceDir, 'run.log'), `${new Date().toISOString()} ${line}\n`); } catch { /* evidence is best effort */ }
     try { console.log(line); } catch { /* a lost terminal must not stop restoration */ }
