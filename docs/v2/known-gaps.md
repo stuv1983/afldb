@@ -424,7 +424,9 @@ award results must be shown reconcilable before production; **no** — not a pro
       test and classified before it ships.
     - *Operational follow-ups (open, none authorised here):* (1) **roll out `7b4c609b`** (push, then deploy through the
       release route, each needing its own owner approval) or approve a pinned fixed checkout; until then no production
-      `repair-match-rekeys --apply`; (2) V2-GAP-011 / ISSUE-316 writer retirement and activation steps; (3) ISSUE-331 (open,
+      `repair-match-rekeys --apply`. **Update (2026-11-01, later): a checkout-only procedure is PREPARED, not approved or
+      executed** (`docs/v2/gap006-repair-tool-rollout-package.md`): the delta from production checkout `9b9c6b2a` changes one
+      executable file, so no application build, promotion or restart is proposed; installation would not authorise `--apply`; (2) V2-GAP-011 / ISSUE-316 writer retirement and activation steps; (3) ISSUE-331 (open,
       cause UNKNOWN); (4) revisit database triggers only on a new owner decision, for example if privileged ad hoc SQL
       becomes a live concern.
 

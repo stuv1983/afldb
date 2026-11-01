@@ -15,6 +15,11 @@ commit.
 
 ## [Unreleased]
 
+### V2-GAP-006 follow-up: repair-tool checkout-update package prepared (2026-11-01, documentation only, NOT executed)
+
+- `docs/v2/gap006-repair-tool-rollout-package.md` and `docs/v2/evidence/gap006-repair-rollout-20261101/static-delta-check.sh`: an owner-attended, pinned fast-forward of the production operator checkout from `9b9c6b2a` to the package commit, to install the `7b4c609b` seal guard in `tools/current-season/repair-match-rekeys.ts` (blob `a2de99e0…` to `dca00bd8…`, sha256 `3eaf23c5…`). The enforced static check proves the outgoing delta is that one executable file (+6 / -0) plus documentation and two test files; `src`, `packages`, dependencies, lockfile, config, `deploy/`, `data/`, migrations and all other tools are identical. **No application build, promotion or restart is proposed**; the serving release is independent of the checkout by the release-route drop-in, which the package proves live (read-only) before any change.
+- **Nothing was pushed or run on production**: no SSH, no fetch, no tool execution (not even a dry run), no test re-run (the accepted `7b4c609b` evidence applies to byte-identical files, enforced). Installing the tool would not authorise `--apply`. V2-GAP-006 stays closed; this is its recorded operational follow-up.
+
 ### V2-GAP-006: closed as application-level scope complete, residual controls explicitly accepted (2026-11-01, documentation only)
 
 - **Owner decision D-V2-GAP006-SCOPE-1 (approved).** V2-GAP-006 is **closed** as "application-level scope complete / residual controls explicitly accepted". This is **risk acceptance, not new protection**: no code, test, push, deployment, host, database, provider or writer-activation action was taken.
