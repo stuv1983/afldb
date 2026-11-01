@@ -118,11 +118,11 @@ async function freshBackup(stage: string) {
   const dump = join(evidence, `${stage}-backup.dump`);
   const env = { ...process.env, PGHOST: url.hostname, PGPORT: url.port, PGUSER: decodeURIComponent(url.username), PGPASSWORD: decodeURIComponent(url.password) };
   const capturedAt = new Date().toISOString();
-  const d = spawnSync(join(pgBin, 'pg_dump.exe'), ['-Fc', '-Z', '3', '--no-password', '-f', dump, database], { env, encoding: 'utf8' });
+  const d = spawnSync(join(pgBin, process.platform === 'win32' ? 'pg_dump.exe' : 'pg_dump'), ['-Fc', '-Z', '3', '--no-password', '-f', dump, database], { env, encoding: 'utf8' });
   if (d.status !== 0) throw new Error(`pg_dump failed: ${(d.stderr ?? '').slice(-200)}`);
   const restoreDb = `${database.replace(/_test$/, '')}_${stage.replace(/[^a-z0-9]+/gi, '_')}_rst_test`;
   execFileSync(process.execPath, ['--import', 'tsx', 'tools/v2/isolated-pg.ts', 'create-db', restoreDb], { cwd: root, encoding: 'utf8', env: { ...process.env, AFLDB_V2_ISOLATED_PG: '' } });
-  const r = spawnSync(join(pgBin, 'pg_restore.exe'), ['--no-password', '--no-comments', '--no-owner', '-j', '4', '-d', restoreDb, dump], { env, encoding: 'utf8' });
+  const r = spawnSync(join(pgBin, process.platform === 'win32' ? 'pg_restore.exe' : 'pg_restore'), ['--no-password', '--no-comments', '--no-owner', '-j', '4', '-d', restoreDb, dump], { env, encoding: 'utf8' });
   if (r.status !== 0) throw new Error(`pg_restore failed: ${(r.stderr ?? '').slice(-300)}`);
   const restoredAt = new Date().toISOString();
   const targetBase = await identity(database);
