@@ -30,6 +30,9 @@ import { isAbsolute, relative, resolve } from 'node:path';
 import postgres from 'postgres';
 import { saveEdit } from '../../src/db/queries/data-edits';
 import { sql as appSql } from '../../src/db/client';
+import { entryProblem, type Entry, type Row } from './gap029-label-checks';
+
+export { entryProblem };
 
 /** sha256 of the committed LF bytes of the r2 evidence file (CRLF working copies are normalised before hashing). */
 export const EVIDENCE_SHA256 = 'e3848807931cf255175c1642d9ded63590b2c7e2633b33a5e9f0fa5b96a4430f';
@@ -39,7 +42,6 @@ const OPERATION = 'gap029-match-events';
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 interface Target { host: string; port: number; database: string; user: string; systemIdentifier: string; databaseOid: string; clusterName: string; databaseComment: string | null }
-interface Entry { family: string; label: string; year: number; matchId: number; expect: { season: number; matchDate: string; roundCode: string; venueRaw: string | null; homeClub: string; awayClub: string; homeScore: number; awayScore: number } }
 interface Backup { target: Target; sha256: string; restoreEvidenceSha256: string; capturedAt: string; restoredAt: string; baselineDigest: string }
 interface Plan { operation: string; revision: string; target: Target; evidenceSha256: string; actorId: number; baselineDigest: string; backup: Backup; createdAt: string; expiresAt: string; entries: { matchId: number; label: string; before: string | null; action: 'to label' | 'already labelled' }[]; digest: string }
 interface Approval { planDigest: string; target: Target; revision: string; operation: string; evidenceSha256: string; approvedAt: string; expiresAt: string; reference: string }
@@ -61,18 +63,6 @@ function readEvidence(): { entries: Entry[]; sha: string } {
   if (doc.entries.some((e) => !(LABELS as readonly string[]).includes(e.label))) fail('unrecognised label in the evidence');
   return { entries: doc.entries, sha: EVIDENCE_SHA256 };
 }
-
-/** Pure: a live row against the evidence entry. Returns null when the label may be (or already is) applied. */
-export function entryProblem(e: Entry, r: Row | undefined): string | null {
-  if (!r) return `match ${e.matchId} not found`;
-  const x = e.expect;
-  if (!(r.season === x.season && r.match_date === x.matchDate && r.round_code === x.roundCode && r.hn === x.homeClub && r.an === x.awayClub && r.hs === x.homeScore && r.aws === x.awayScore)) {
-    return `match ${e.matchId} no longer has the expected identity`;
-  }
-  if (r.match_event !== null && r.match_event !== e.label) return `match ${e.matchId} already carries a different event`;
-  return null;
-}
-export interface Row { id: number; season: number; match_date: string; round_code: string; hn: string; an: string; hs: number; aws: number; match_event: string | null }
 
 function main() {
   return run().catch((error: unknown) => {
@@ -109,7 +99,7 @@ async function run() {
   const sql = postgres(dsn, { max: 1, connect_timeout: 5, onnotice: () => {}, ...(mode === 'apply' ? {} : { connection: { default_transaction_read_only: true } }) });
   const ids = evidence.entries.map((e) => e.matchId);
   const readRows = async (s: postgres.Sql | postgres.TransactionSql): Promise<Map<number, Row>> => new Map((await s<Row[]>`
-    SELECT m.id::int AS id, m.season::int AS season, m.match_date::text AS match_date, m.round_code, hc.name AS hn, ac.name AS an,
+    SELECT m.id::int AS id, m.season::int AS season, m.match_date::text AS match_date, m.round_code, m.venue_raw, hc.name AS hn, ac.name AS an,
            m.home_score::int AS hs, m.away_score::int AS aws, m.match_event
       FROM matches m JOIN clubs hc ON hc.id = m.home_club_id JOIN clubs ac ON ac.id = m.away_club_id WHERE m.id = ANY(${ids})`).map((r) => [r.id, r]));
   const prove = async (s: postgres.TransactionSql): Promise<void> => {
@@ -126,6 +116,11 @@ async function run() {
       (SELECT count(*) FROM data_overrides WHERE entity_type = 'matches' AND field_group = 'match_event')::text AS overrides,
       (SELECT count(*) FROM matches WHERE match_event IS NOT NULL)::text AS labelled`;
     return sha(canon({ rows, c }));
+  };
+  /** The audited writer (`saveEdit`) records but does not check the actor, so every write path re-proves it here. */
+  const requireActiveSuperAdmin = async (s: postgres.Sql | postgres.TransactionSql, id: number): Promise<void> => {
+    const [actor] = await s<{ id: number }[]>`SELECT id::int AS id FROM auth_users WHERE id = ${id} AND role::text = 'super_admin' AND disabled_at IS NULL`;
+    if (!actor) fail('the actor is not an active Super Admin');
   };
   const now = Date.now();
   try {
@@ -146,8 +141,7 @@ async function run() {
         await prove(tx);
         const live = await baseline(tx);
         if (live !== backup.baselineDigest) fail('baseline drift: the restored backup no longer matches the live target');
-        const [actor] = await tx<{ id: number }[]>`SELECT id::int AS id FROM auth_users WHERE id = ${actorId} AND role::text = 'super_admin' AND disabled_at IS NULL`;
-        if (!actor) fail('the actor is not an active Super Admin');
+        await requireActiveSuperAdmin(tx, actorId);
         const rows = await readRows(tx);
         const entries = evidence.entries.map((e) => { const p = entryProblem(e, rows.get(e.matchId)); if (p) fail(p); const before = rows.get(e.matchId)!.match_event; return { matchId: e.matchId, label: e.label, before, action: (before === e.label ? 'already labelled' : 'to label') as 'to label' | 'already labelled' }; });
         const body: Omit<Plan, 'digest'> = { operation: OPERATION, revision, target, evidenceSha256: evidence.sha, actorId, baselineDigest: live, backup, createdAt: new Date(now).toISOString(), expiresAt: new Date(now + MAX_AGE_MS).toISOString(), entries };
@@ -170,6 +164,7 @@ async function run() {
     // re-validate live state and prove the target on the validation connection; the writer connections then name the same database
     const pre = await sql.begin('isolation level repeatable read', async (tx) => {
       await prove(tx);
+      await requireActiveSuperAdmin(tx, plan.actorId);
       const rows = await readRows(tx);
       const todo = evidence.entries.filter((e) => { const p = entryProblem(e, rows.get(e.matchId)); if (p) fail(p); return rows.get(e.matchId)!.match_event !== e.label; });
       const [c0] = await tx<{ edits: number; overrides: number }[]>`SELECT
@@ -185,6 +180,8 @@ async function run() {
     if (pre.live !== plan.baselineDigest) fail('baseline drift; re-plan and obtain new execution approval');
     const written: number[] = [];
     for (const e of pre.todo) {
+      // re-proved before EVERY label: an actor disabled or demoted mid-run stops the run at the next label boundary
+      await requireActiveSuperAdmin(sql, plan.actorId);
       const r = await saveEdit({ entityKey: 'matches', rowId: e.matchId, groupKey: 'match_event', raw: { match_event: e.label }, adminUserId: plan.actorId,
         note: `V2-GAP-029: ${e.label} ${e.year} named by first-party club/league sources; plan ${plan.digest.slice(0, 12)}; see ${EVIDENCE_PATH}` });
       if (!r.ok) throw new Error(`GAP-029 labels refused: the audited writer refused match ${e.matchId} after ${written.length} written; re-plan to resume`);

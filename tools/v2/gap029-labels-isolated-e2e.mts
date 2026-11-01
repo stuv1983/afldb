@@ -1,6 +1,6 @@
 /**
  * ISOLATED end-to-end exercise of the GAP-029 production entry point (apply-gap029-match-events-production.ts):
- * baseline -> plan -> approval -> apply -> replay, with refusals and a mid-run failure that is then resumed.
+ * baseline -> plan -> approval -> apply -> replay, with refusals (including a changed venue identity and a disabled or demoted actor), an injected audit failure and a mid-run actor revocation, each then resumed.
  *
  *   node tools/v2/isolated-pg.ts run afldb_v2_gap029lab_<label>_test -- \
  *     node --import tsx --conditions=react-server tools/v2/gap029-labels-isolated-e2e.mts <new-evidence-dir-outside-checkout>
@@ -127,6 +127,28 @@ r = cli(planArgs('plan-conflicting-event.json'));
 await sql`UPDATE matches SET match_event = NULL WHERE id = ${first.matchId}`;
 check('plan refuses when a covered match is changed after the backup (here: it carries a different event; the backup-baseline check fires first)', r.status !== 0 && /different event|baseline drift/.test(r.msg), r.msg.slice(0, 90));
 
+// negative controls: a changed venue identity, and a disabled or demoted actor, each refused with nothing written
+const venueId = (plan.entries[0] as { matchId: number }).matchId;
+const [venueRow] = await sql`SELECT venue_raw FROM matches WHERE id = ${venueId}`;
+for (const [name, value] of [['a different venue', 'GAP029 e2e changed venue'], ['a NULL venue', null]] as const) {
+  await sql`UPDATE matches SET venue_raw = ${value} WHERE id = ${venueId}`;
+  r = cli(applyArgs(join(evidence, 'plan.json'), goodApproval, `refused-venue-${name.replace(/\W+/g, '-')}.json`));
+  await sql`UPDATE matches SET venue_raw = ${venueRow.venue_raw} WHERE id = ${venueId}`;
+  check(`apply refuses a covered match whose venue identity changed to ${name}`, r.status !== 0 && /expected identity/.test(r.msg) && JSON.stringify(await counts()) === JSON.stringify(initial), r.msg.slice(0, 90));
+}
+const [actorRow] = await sql`SELECT role::text AS role, disabled_at FROM auth_users WHERE id = 1`;
+for (const [name, change] of [['disabled', () => sql`UPDATE auth_users SET disabled_at = now() WHERE id = 1`], ['demoted', () => sql`UPDATE auth_users SET role = 'admin' WHERE id = 1`]] as const) {
+  try {
+    await change();
+    const pr = cli(planArgs(`plan-actor-${name}.json`));
+    check(`plan refuses an actor who has been ${name}`, pr.status !== 0 && /not an active Super Admin/.test(pr.msg), pr.msg.slice(0, 90));
+    r = cli(applyArgs(join(evidence, 'plan.json'), goodApproval, `refused-actor-${name}.json`));
+    check(`apply refuses, before any write, when the planned actor has been ${name}`, r.status !== 0 && /not an active Super Admin/.test(r.msg) && JSON.stringify(await counts()) === JSON.stringify(initial), r.msg.slice(0, 90));
+  } finally { await sql`UPDATE auth_users SET role = ${actorRow.role}, disabled_at = ${actorRow.disabled_at} WHERE id = 1`; }
+}
+cli(['baseline', '--target', tPath, '--out', join(evidence, 'baseline-after-controls.json')]);
+check('the negative controls left nothing behind (live baseline equals the backup baseline again)', readJson<{ baselineDigest: string }>(join(evidence, 'baseline-after-controls.json')).baselineDigest === bt, '');
+
 // injected failure after 10 labels: partial state, resumable
 await sql.unsafe(`CREATE OR REPLACE FUNCTION public.gap029_e2e_fail() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
   IF (SELECT count(*) FROM data_edits WHERE table_name = 'matches' AND field_group = 'match_event') >= ${Number(initial.edits) + 10} THEN RAISE EXCEPTION 'gap029 e2e injected failure'; END IF; RETURN NEW; END $$`);
@@ -137,35 +159,61 @@ const partial = await counts();
 check('an injected audit failure stops the run part-way (10 labels written, audited, consistent)', r.status !== 0 && partial.labelled === String(Number(initial.labelled) + 10) && partial.edits === String(Number(initial.edits) + 10) && partial.overrides === String(Number(initial.overrides) + 10), JSON.stringify(partial));
 r = cli(applyArgs(join(evidence, 'plan.json'), goodApproval, 'refused-after-partial.json'));
 check('the old plan is refused after the partial write (baseline moved); resume needs a re-plan', r.status !== 0 && (await counts()).edits === partial.edits, r.msg.slice(0, 90));
-// resume: new backup is NOT required to be re-taken? it is: the baseline moved. Re-baseline the restore from a fresh dump.
-console.log('RESUME: fresh backup and restore, new plan, new approval');
-const dump2 = join(evidence, 'labels-backup-2.dump');
-const cap2 = new Date().toISOString();
-spawnSync(join(pgBin, process.platform === 'win32' ? 'pg_dump.exe' : 'pg_dump'), ['-Fc', '-Z', '3', '--no-password', '-f', dump2, database], { env, encoding: 'utf8' });
-const restoreDb2 = `${database.replace(/_test$/, '')}_rst2_test`;
-execFileSync(process.execPath, ['--import', 'tsx', 'tools/v2/isolated-pg.ts', 'create-db', restoreDb2], { cwd: root, encoding: 'utf8', env: { ...process.env, AFLDB_V2_ISOLATED_PG: '' } });
-spawnSync(join(pgBin, process.platform === 'win32' ? 'pg_restore.exe' : 'pg_restore'), ['--no-password', '--no-comments', '--no-owner', '-j', '4', '-d', restoreDb2, dump2], { env, encoding: 'utf8' });
-const res2 = new Date().toISOString();
-const rt2 = writeJson('restore-target-2.json', await identity(restoreDb2));
-cli(['baseline', '--target', tPath, '--out', join(evidence, 'baseline-target-2.json')]);
-cli(['baseline', '--target', rt2, '--out', join(evidence, 'baseline-restore-2.json')], {}, restoreDb2);
-const bt2 = readJson<{ baselineDigest: string }>(join(evidence, 'baseline-target-2.json')).baselineDigest;
-const br2 = readJson<{ baselineDigest: string }>(join(evidence, 'baseline-restore-2.json')).baselineDigest;
-check('second restore baseline equals the live baseline', bt2 === br2 && bt2 !== bt, bt2.slice(0, 16));
-const restoreEv2 = writeJson('restore-report-2.json', { restoreDatabase: restoreDb2, targetBaselineDigest: bt2, restoreBaselineDigest: br2, capturedAt: cap2, restoredAt: res2 });
-const backup2 = writeJson('backup-2.json', { target, baselineDigest: br2, sha256: sha(dump2), restoreEvidenceSha256: sha(restoreEv2), capturedAt: cap2, restoredAt: res2 });
-r = cli(['plan', '--target', tPath, '--actor-id', '1', '--backup', backup2, '--backup-file', dump2, '--restore-evidence', restoreEv2, '--out', join(evidence, 'plan-2.json')]);
-check('re-plan shows 54 to label and 10 already labelled', r.status === 0 && /54 to label, 10 already labelled/.test(r.msg), r.msg.slice(0, 90));
-const plan2 = readJson<Record<string, any>>(join(evidence, 'plan-2.json')); // eslint-disable-line @typescript-eslint/no-explicit-any
-const approval2 = writeJson('approval-2.json', { planDigest: plan2.digest, target: plan2.target, revision, operation: plan2.operation, evidenceSha256: plan2.evidenceSha256, approvedAt: new Date().toISOString(), expiresAt: plan2.expiresAt, reference: 'SYNTHETIC isolated rehearsal approval - never production authority' });
-r = spawnSync(process.execPath, [...CLI, 'apply', '--plan', join(evidence, 'plan-2.json'), '--approval', approval2, '--backup-file', dump2, '--restore-evidence', restoreEv2, '--out', join(evidence, 'result.json')], { cwd: root, encoding: 'utf8', env: { ...process.env, AFLDB_GAP029_DSN: dsnFor(database) } }) as never;
+// A resume always needs a fresh backup, a verified restore, baseline equality, a NEW plan and a NEW approval.
+async function cycle(tag: string) {
+  const dumpN = join(evidence, `labels-backup-${tag}.dump`);
+  const capN = new Date().toISOString();
+  if (spawnSync(join(pgBin, process.platform === 'win32' ? 'pg_dump.exe' : 'pg_dump'), ['-Fc', '-Z', '3', '--no-password', '-f', dumpN, database], { env, encoding: 'utf8' }).status !== 0) throw new Error('pg_dump failed');
+  const restoreDbN = `${database.replace(/_test$/, '')}_rst${tag}_test`;
+  execFileSync(process.execPath, ['--import', 'tsx', 'tools/v2/isolated-pg.ts', 'create-db', restoreDbN], { cwd: root, encoding: 'utf8', env: { ...process.env, AFLDB_V2_ISOLATED_PG: '' } });
+  if (spawnSync(join(pgBin, process.platform === 'win32' ? 'pg_restore.exe' : 'pg_restore'), ['--no-password', '--no-comments', '--no-owner', '-j', '4', '-d', restoreDbN, dumpN], { env, encoding: 'utf8' }).status !== 0) throw new Error('pg_restore failed');
+  const resN = new Date().toISOString();
+  const rtN = writeJson(`restore-target-${tag}.json`, await identity(restoreDbN));
+  cli(['baseline', '--target', tPath, '--out', join(evidence, `baseline-target-${tag}.json`)]);
+  cli(['baseline', '--target', rtN, '--out', join(evidence, `baseline-restore-${tag}.json`)], {}, restoreDbN);
+  const btN = readJson<{ baselineDigest: string }>(join(evidence, `baseline-target-${tag}.json`)).baselineDigest;
+  const brN = readJson<{ baselineDigest: string }>(join(evidence, `baseline-restore-${tag}.json`)).baselineDigest;
+  const restoreEvN = writeJson(`restore-report-${tag}.json`, { restoreDatabase: restoreDbN, targetBaselineDigest: btN, restoreBaselineDigest: brN, capturedAt: capN, restoredAt: resN });
+  const backupN = writeJson(`backup-${tag}.json`, { target, baselineDigest: brN, sha256: sha(dumpN), restoreEvidenceSha256: sha(restoreEvN), capturedAt: capN, restoredAt: resN });
+  const planRun = cli(['plan', '--target', tPath, '--actor-id', '1', '--backup', backupN, '--backup-file', dumpN, '--restore-evidence', restoreEvN, '--out', join(evidence, `plan-${tag}.json`)]);
+  const planPath = join(evidence, `plan-${tag}.json`);
+  const planN = readJson<Record<string, any>>(planPath); // eslint-disable-line @typescript-eslint/no-explicit-any
+  const approvalN = writeJson(`approval-${tag}.json`, { planDigest: planN.digest, target: planN.target, revision, operation: planN.operation, evidenceSha256: planN.evidenceSha256, approvedAt: new Date().toISOString(), expiresAt: planN.expiresAt, reference: 'SYNTHETIC isolated rehearsal approval - never production authority' });
+  return { dump: dumpN, restoreEv: restoreEvN, planPath, approval: approvalN, equal: btN === brN, digest: btN, planMsg: planRun.msg, planStatus: planRun.status };
+}
+const applyEnv = { ...process.env, AFLDB_GAP029_DSN: dsnFor(database) };
+const applyWith = (c: Awaited<ReturnType<typeof cycle>>, out: string) => spawnSync(process.execPath, [...CLI, 'apply', '--plan', c.planPath, '--approval', c.approval, '--backup-file', c.dump, '--restore-evidence', c.restoreEv, '--out', join(evidence, out)], { cwd: root, encoding: 'utf8', env: applyEnv });
+const lastLine = (x: { stdout?: string | null; stderr?: string | null }) => `${x.stdout ?? ''}${x.stderr ?? ''}`.trim().split('\n').filter(Boolean).pop() ?? '';
+
+console.log('RESUME 1: fresh backup and restore, new plan, new approval');
+const c2 = await cycle('2');
+check('second restore baseline equals the live baseline (and differs from the first)', c2.equal && c2.digest !== bt, c2.digest.slice(0, 16));
+check('re-plan shows 54 to label and 10 already labelled', c2.planStatus === 0 && /54 to label, 10 already labelled/.test(c2.planMsg), c2.planMsg.slice(0, 90));
+
+// the actor is disabled WHILE the run is writing: it must stop at the next label boundary, consistent and resumable
+await sql.unsafe(`CREATE OR REPLACE FUNCTION public.gap029_e2e_revoke() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$ BEGIN
+  IF (SELECT count(*) FROM data_edits WHERE table_name = 'matches' AND field_group = 'match_event') >= ${Number(initial.edits) + 20} THEN UPDATE auth_users SET disabled_at = now() WHERE id = 1; END IF; RETURN NEW; END $$`);
+await sql.unsafe('CREATE TRIGGER gap029_e2e_revoke_trg AFTER INSERT ON public.data_edits FOR EACH ROW EXECUTE FUNCTION public.gap029_e2e_revoke()');
+const midRun = applyWith(c2, 'failed-actor-revoked.json');
+await sql.unsafe('DROP TRIGGER gap029_e2e_revoke_trg ON public.data_edits'); await sql.unsafe('DROP FUNCTION public.gap029_e2e_revoke()');
+const partial2 = await counts();
+const [revoked] = await sql`SELECT disabled_at IS NOT NULL AS disabled FROM auth_users WHERE id = 1`;
+check('an actor disabled mid-run stops the run at the next label boundary (20 labels written, audited, consistent)', midRun.status !== 0 && revoked.disabled === true && /not an active Super Admin/.test(lastLine(midRun))
+  && partial2.labelled === String(Number(initial.labelled) + 20) && partial2.edits === String(Number(initial.edits) + 20) && partial2.overrides === String(Number(initial.overrides) + 20), `${lastLine(midRun).slice(0, 70)} ${JSON.stringify(partial2)}`);
+await sql`UPDATE auth_users SET role = ${actorRow.role}, disabled_at = ${actorRow.disabled_at} WHERE id = 1`;
+
+console.log('RESUME 2: fresh backup and restore, new plan, new approval');
+const c3 = await cycle('3');
+check('third restore baseline equals the live baseline', c3.equal && c3.digest !== c2.digest, c3.digest.slice(0, 16));
+check('re-plan shows 44 to label and 20 already labelled', c3.planStatus === 0 && /44 to label, 20 already labelled/.test(c3.planMsg), c3.planMsg.slice(0, 90));
+const finish = applyWith(c3, 'result.json');
 const done = await counts();
 const dist = await sql<{ match_event: string; n: number }[]>`SELECT match_event, count(*)::int AS n FROM matches WHERE match_event IS NOT NULL GROUP BY 1 ORDER BY 1`;
-check('resumed apply finishes: 64 labelled, 64 audit rows, 64 active overrides added in total', done.labelled === String(Number(initial.labelled) + 64) && done.edits === String(Number(initial.edits) + 64) && done.overrides === String(Number(initial.overrides) + 64), JSON.stringify(done));
+check('resumed apply finishes: 64 labelled, 64 audit rows, 64 active overrides added in total', finish.status === 0 && done.labelled === String(Number(initial.labelled) + 64) && done.edits === String(Number(initial.edits) + 64) && done.overrides === String(Number(initial.overrides) + 64), JSON.stringify(done));
 check('distribution is Anzac 31 / Dreamtime 22 / King\'s Birthday 11', JSON.stringify(dist.map((d) => [d.match_event, d.n])) === JSON.stringify([['Anzac Day', 31], ["Dreamtime at the 'G", 22], ["King's Birthday", 11]]), JSON.stringify(dist));
 const result = readJson<{ written: number; verify: { allLabelled: boolean; auditRowsAdded: number; overridesAdded: number } }>(join(evidence, 'result.json'));
-check('result records 54 written and a verified outcome', result.written === 54 && result.verify.allLabelled && result.verify.auditRowsAdded === 54 && result.verify.overridesAdded === 54, JSON.stringify(result.verify));
-const replay = spawnSync(process.execPath, [...CLI, 'apply', '--plan', join(evidence, 'plan-2.json'), '--approval', approval2, '--backup-file', dump2, '--restore-evidence', restoreEv2, '--out', join(evidence, 'replay.json')], { cwd: root, encoding: 'utf8', env: { ...process.env, AFLDB_GAP029_DSN: dsnFor(database) } });
+check('result records 44 written and a verified outcome', result.written === 44 && result.verify.allLabelled && result.verify.auditRowsAdded === 44 && result.verify.overridesAdded === 44, JSON.stringify(result.verify));
+const replay = applyWith(c3, 'replay.json');
 check('replay of the same plan and approval writes nothing', replay.status === 0 && JSON.stringify(await counts()) === JSON.stringify(done) && readJson<{ replay: boolean }>(join(evidence, 'replay.json')).replay === true, '');
 
 const failed = checks.filter((c) => !c.pass);
