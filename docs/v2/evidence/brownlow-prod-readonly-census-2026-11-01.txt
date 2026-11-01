@@ -1,0 +1,82 @@
+##### prod-census-20261101.txt
+HOST=afldb-prod UTC=2026-11-01T01:25:13Z
+== system identifier (may be denied) ==
+7674454702926115004
+== identity
+afldb_prod|afldb_import|66668|16/main|on
+ERROR:  permission denied for schema afldb_meta
+LINE 1: select 'ledger_rows', count(*) from afldb_meta.schema_migrat...
+                                            ^
+ERROR:  permission denied for schema afldb_meta
+LINE 1: ...dger_last', to_jsonb(t)::text from (select * from afldb_meta...
+                                                             ^
+== brownlow-ish tables with exact counts
+ERROR:  permission denied for table brownlow_correction_receipts
+CONTEXT:  SQL statement "select count(*) as c from public.brownlow_correction_receipts"
+== round votes by scope
+1984-2025|320861|0|320861|42|1984|2025|22239|298622|0|0|320861
+2026|9522|0|9522|1|2026|2026|621|8901|0|9522|0
+== 2025 and 2026 by source
+2025|<none>|9522|621|8901
+2026|afltables|9522|621|8901
+== backfill classification, scope 1984-2025 (theunterminated quoted string
+
+2025 positive matches/rows|207|621||
+classified|320861|320861|0|320861
+exclusion:<repairable>|320861|||
+proposal_digest(id:match)|ba6048e741d7ac352e863f730d43d7bb1869961137e2981fa3cd16f723afd500|||
+repairable positive/zero/seasons/range|22239|298622|42|1984-2025
+== fingerprints (theunterminated quoted string
+
+1984-2025|320861|0|bc52f294822559af08ce9de5997862ccca322a8b423c0751485ab69d3b4a418d|e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+2026|9522|0|91160419b77e52d618d52fd044b6a49660b2172b1e0984af045818da987f1337|e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+== season votes / awards (rows only)
+brownlow_season_votes|16120|1924|2025
+ERROR:  column a.key does not exist
+LINE 1: ...inners aw join awards a on a.id=aw.award_id where a.key ilik...
+                                                             ^
+== done
+##### prod-census2-20261101.txt
+HOST=afldb-prod UTC=2026-11-01T01:27:16Z
+== identity
+afldb_prod|afldb_import|on
+== brownlow/ownership tables: exact count where readable
+NOTICE:  public.brownlow_correction_receipts = NO_PRIVILEGE
+NOTICE:  public.brownlow_eligibility_decisions = 0
+NOTICE:  public.brownlow_round_votes = 330383
+NOTICE:  public.brownlow_season_authority = 0
+NOTICE:  public.brownlow_season_votes = 16120
+NOTICE:  public.brownlow_vote_entry_state = 1
+NOTICE:  staging.afl_api_brownlow_vote = 0
+DO
+== import batches / canonical applications touching Brownlow
+ERROR:  column "kind" does not exist
+LINE 1: select 'import_batches', kind, count(*) from import_batches ...
+                                 ^
+HINT:  Perhaps you meant to reference the column "import_batches.id".
+== sources
+source|1|wikipedia_first_kick_goal
+source|2|manual_admin_edit
+source|3|wikipedia_22under22
+source|4|squiggle_api
+source|5|kali_afl_stats
+source|6|afl_api
+source|7|gridley
+source|8|wikipedia_after_siren_kicks
+source|9|fitzroy_afldata
+source|10|afltables
+source|11|wikipedia
+source|13|draftguru
+source|14|footywire
+source|15|sports_data_lab
+== awards (Brownlow)
+award|30|{"id": 30, "name": "Brownlow Medal", "slug": "brownlow-medal", "club_id": null, "category": "award", "competition": "AFL", "description": "Awarded to the fairest and best player of the season. AFLDB holds the full vote history separately, from 1924.", "last_season": 2025, "first_season": 1980}
+== done
+##### prod-census3-20261101.txt
+HOST=afldb-prod UTC=2026-11-01T01:27:48Z
+== data_issues touching Brownlow
+== unresolved afl_api_brownlow_settle summary
+0|0|0||||||
+== vote entry state / season 2025 award row
+vote_entry_state|{"season": 2026, "status": "draft", "match_id": 17137, "revision": 1, "created_at": "2026-09-13T14:53:58.65654+10:00", "created_by": 1, "updated_at": "2026-09-13T14:53:58.65654+10:00", "updated_by": 1, "last_reason": null, "finalised_at": null, "finalised_by": null, "one_player_id": 10243, "two_player_id": 4251, "three_player_id": 2561, "finalised_revision": null}
+== done
