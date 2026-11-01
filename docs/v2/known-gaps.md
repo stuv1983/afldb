@@ -28,9 +28,12 @@ is recorded as a stated limit, not waived (entry below).
 The remaining owner decisions (005, 006, 010) and the production or external gates are consolidated in
 [owner-decisions-remaining-2026-10-31.md](owner-decisions-remaining-2026-10-31.md).
 **Gaps 005 and 010 were CLOSED on 2026-10-31** as accepted scope boundary and accepted constraint (owner decisions
-D-V2-GAP005 and D-V2-GAP010, Option A; entries below). **Gap 006 stays open** (D-V2-GAP006-EDITORS, entry below).
-Current register: **38 total / 31 closed / 7 open**, recounted from the table rows on 2026-10-31 after closing 005 and
-010 (open: 006, 008, 011, 016, 029, 030, 031). The figures that follow are earlier same-day counts (29 / 9 after 004;
+D-V2-GAP005 and D-V2-GAP010, Option A; entries below). **Gap 006 stayed open** (D-V2-GAP006-EDITORS, entry below) **until 2026-11-01**, when it was closed as
+"application-level scope complete / residual controls explicitly accepted" under owner decision D-V2-GAP006-SCOPE-1
+(entry below; that is risk acceptance, not database-level enforcement).
+Current register: **38 total / 32 closed / 6 open**, recounted from the table rows on 2026-11-01 after closing 006
+(open: 008, 011, 016, 029, 030, 031). Superseded count of 2026-10-31: **38 total / 31 closed / 7 open**, recounted
+from the table rows after closing 005 and 010 (open then: 006, 008, 011, 016, 029, 030, 031). The figures that follow are earlier same-day counts (29 / 9 after 004;
 28 / 10 before it). The 2026-10-31
 production execution (D-V2-PROD-EXEC-1) had already closed 007 and 013 (table 25 / 13); the sentence below still read
 23 / 15 and was not updated then. Closing 026 made 26 / 12, closing 015 made 27 / 11, and closing 009 makes 28 / 10.
@@ -67,7 +70,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 | V2-GAP-003 | Medium | environment | rehearsal | **CLOSED locally (2026-10-28, Linux)**: full default workflow on streamanator at `c3dea709` 14,860 passed / 3 failed / 63 skipped plus Coleman 28/28; the only failures are listed `gridley-corpus` (V2-GAP-029); three Linux regressions were fixed first. Not run: 11 Brownlow dedicated-clone tests, 45 opt-in tests ([Linux verification](linux-verification-2026-10-28.md)). A second pass (§9 there) ran the eligible opt-in suites: receipts 7/7, import lock 1/1, populated lifecycle 17/17, oracle reports pass. The Brownlow clones, Phase B, populated-pending and external-grids remain blocked, with their reasons recorded | none |
 | V2-GAP-004 | Low | source worktree hygiene | no | **CLOSED (2026-10-31, re-verified; fix made 2026-10-19)**: the user-level hook runs through a no-shell Node runner, not `cmd.exe`; harness 147/147 and a live Read probe created no file; the stray `supplies` was deleted 2026-10-19 under its four proved conditions. User-level, outside the repository; re-run the harness after any `codebase-memory-mcp` update | none |
 | V2-GAP-005 | Low | historical baseline scope | no | **CLOSED (2026-10-31, owner decision D-V2-GAP005 Option A): accepted scope boundary.** AFLW stays outside the V2 AFL/VFL historical manifest; the manifest specification is unchanged (spec version 1); AFLW data, loader and backups are untouched | none |
-| V2-GAP-006 | Medium | historical baseline | no | narrowed (Stages 3-4 and **the editors, 2026-10-31**): enforced at the AFL API settle CLIs, the Coleman publisher, curated award approval, Brownlow eligibility decisions and, **deployed to production and owner-accepted 2026-11-01** (running release `fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy`), every audited admin editor mutation (owner decision D-V2-GAP006-EDITORS, E1). Still unmet: database-level enforcement (**not implemented**) and direct-library and legacy writers (011, ISSUE-316). **2026-11-01 inventory (local):** the operator repair tool `repair-match-rekeys --apply` now refuses a sealed season; the remaining writers are itemised in the section below (offline loaders and governed Brownlow operations carry no seal) | decide database-level enforcement; owner scope decision on the offline loaders and governed Brownlow operations |
+| V2-GAP-006 | Medium | historical baseline | no | **CLOSED (2026-11-01, owner decision D-V2-GAP006-SCOPE-1): application-level scope complete / residual controls explicitly accepted.** This is **not** database-level enforcement. Enforced in application code at the AFL API settle CLIs, the Coleman publisher, curated award approval, Brownlow eligibility decisions and every audited admin editor mutation (**deployed to production and owner-accepted 2026-11-01**, running release `fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy`, D-V2-GAP006-EDITORS E1). **Accepted, not implemented:** no database triggers (privileged ad hoc SQL is the residual risk, RISK-17); offline loaders and governed Brownlow operations stay outside the generic seal under their own approvals. **Local only:** the `repair-match-rekeys --apply` sealed-season refusal (`7b4c609b`) is committed locally, **not pushed, not deployed**. Writer inventory, limits and follow-ups: the entry below. GAP-011, ISSUE-316 and ISSUE-331 are **not** closed by this decision | none for this gap; operational follow-ups are listed in the entry below (repair-tool rollout first) |
 | V2-GAP-007 | Medium | historical baseline | rehearsal | **CLOSED (2026-10-31, D-V2-PROD-EXEC-1)**: the owner-authorised read-only production runs produced the real-baseline manifest before (`4060c929…`, ledger 110) and after (`ba1d5c64…`, ledger 117) the release; both are 32 tables and 1,380 buckets, kept outside the repository in the host release directory; gate M sealed scope identical. Isolated repeat runs were already identical (Launch F) | none |
 | V2-GAP-008 | High | AFL API fixtures | **cutover** | **open, production-only**: writer built and tested (Launch F, `d760280e`); AFLDB-ISSUE-229 B2 uncaptured (no 2027 season exists) | capture B2, review its dry run, approve the first apply |
 | V2-GAP-009 | Medium | AFL API promotion | rehearsal | **CLOSED on retained evidence (2026-10-31)**: all seven AFL API integration files executed on guarded isolated PostgreSQL, **124/124 passed, 0 skipped** locally (`local-supported-tests-delivered.json`, 73 + 21 + 16 + 6 + 4 + 3 + 1), including the transaction-rollback and preservation cases; the Linux run (PG 16.15, 2026-10-28) records them passing with no failure or refusal. Stated limit: **not replayed on a production-dump clone** | none (production-dump replay is a recorded limit, RISK-03) |
@@ -205,6 +208,11 @@ award results must be shown reconcilable before production; **no** — not a pro
   reopened as a new gap by a later owner decision.
 
 ## V2-GAP-006 — The seal on historical seasons is enforced only at the AFL API settle entry points
+
+> **STATUS 2026-11-01: CLOSED as application-level scope complete / residual controls explicitly accepted
+> (D-V2-GAP006-SCOPE-1; see the last bullet of this section).** The bullets below are the dated history and keep their
+> original wording; "Still open" and "stays open" statements in them are superseded by that decision, which accepts the
+> residual risk and does **not** implement database-level enforcement.
 
 - **Stage 3 (2026-10-19) closed part of it.** `packages/domain/src/season-seal.ts`
   (`evaluateSeasonWrite`) decides a write against the seal from `data/reference/seasons.json`
@@ -374,9 +382,51 @@ award results must be shown reconcilable before production; **no** — not a pro
       refuse the wrong database. That is their own contract, not the editor note or an audited-correction record.
     - *ISSUE-316 tooling:* `afl-api-c4b-rehearsal.ts` writes `site_settings` and `auth_audit_log` only;
       `rollover-season.ts` and `successor-activation.ts` write registry files, not database rows. No season-bearing row.
-    - *Unmet, so the gap stays open:* (1) database-level enforcement; (2) ad hoc SQL and any client outside the tree;
-      (3) the offline loaders above and the governed Brownlow operations carry no seal or correction record. (3) needs an
-      owner scope and risk decision (recommendations in the session report), not a code change.
+    - *Unmet at that point:* (1) database-level enforcement; (2) ad hoc SQL and any client outside the tree;
+      (3) the offline loaders above and the governed Brownlow operations carry no seal or correction record. (3) needed an
+      owner scope and risk decision, not a code change. **That decision was made on 2026-11-01; see the next bullet.**
+  - *2026-11-01: CLOSED as "application-level scope complete / residual controls explicitly accepted" (owner decision
+    D-V2-GAP006-SCOPE-1, APPROVED). Documentation decision only: no code, test, push, deployment, host, database or provider
+    action.* The owner accepted this control boundary for the current release:
+    1. **Ordinary application writes.** The deployed audited-editor protections and the guarded settle entry points are the
+       application-level control. Direct library functions must not be exposed through a new runtime caller without
+       preserving that control.
+    2. **Offline loaders** may remain outside the generic season-seal mechanism for governed rebuild/import work. This grants
+       **no permission to run them against DEV or PROD**: any such operation needs its own explicit target, scope, safeguards
+       and execution approval. "Offline" is **not** enforced isolation unless the actual target guard of that operation
+       proves it, and must not be described as such.
+    3. **Governed Brownlow operations**: their existing digest-bound plans, audit/receipt mechanisms and exact owner
+       approvals are the accepted control. This decision authorises **no** recording, adoption, backfill, correction or
+       publication.
+    4. **Database enforcement: triggers remain deferred. Recorded as RISK ACCEPTANCE, not as implemented protection.** The
+       owner accepts the absence of database-level seal enforcement, including the residual risk from privileged ad hoc SQL,
+       for the current application-level release (RISK-17).
+    5. **Repair-tool fix.** The locally validated fix in `7b4c609b` is accepted. It is **committed locally only: not pushed
+       and not deployed**; production still runs checkout `9b9c6b2a`, whose `repair-match-rekeys.ts --apply` has **no seal
+       check**. **Do not use the production repair tool's `--apply` path** until the fix is installed or a pinned fixed
+       checkout is separately approved. Its rollout is an explicit operational follow-up.
+    - *What is preserved.* The writer inventory above and its source-level pin (`tests/v2-season-seal.test.ts`, "the
+      season-bearing writer inventory"); the limits (ad hoc SQL and any client outside the tree are stopped by nothing;
+      triggers deferred); and the local-versus-deployed split: **deployed** = editor protections and the settle CLIs
+      (release `fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy`, checkout `9b9c6b2a`); **local only** = `7b4c609b`.
+    - *Not closed by this decision:* **V2-GAP-011** (AFL Tables runtime retirement, production-only cutover blocker),
+      **ISSUE-316** and **ISSUE-331** (cause UNKNOWN; the frozen stores stay untouched). Production verification limits
+      recorded earlier (refusal behaviour not exercised in production; season-list and player-link panels not live-checked;
+      the Brownlow 8/8 is isolated-test evidence with the artefact-binding limitation) are unchanged.
+    - *Prerequisites that stay visible for any future writer activation or new caller* (none is satisfied or authorised by
+      this closure): (a) any new runtime caller of `runSettleAflApi`, `runSettleAflApiBrownlow`, `canonical-apply.ts` or
+      `applyAttendanceEnrichment` must keep the CLI seal and the `season_not_in_progress` gate in front of it (or add the
+      seal to the library) and be pinned by the writer inventory test; (b) any offline loader run (`tools/migration/*`,
+      `tools/rebuild/*`, `records:first-kick-goal`) against DEV or PROD needs its own explicit target, scope, safeguards,
+      target-guard proof and execution approval; (c) any Brownlow adoption, backfill, correction or publication needs its
+      own digest-bound plan, receipts and a fresh exact owner approval; (d) any writer activation or AFL Tables retirement
+      step stays under V2-GAP-011 and ISSUE-316; (e) a new writer of a season-bearing table must be added to the inventory
+      test and classified before it ships.
+    - *Operational follow-ups (open, none authorised here):* (1) **roll out `7b4c609b`** (push, then deploy through the
+      release route, each needing its own owner approval) or approve a pinned fixed checkout; until then no production
+      `repair-match-rekeys --apply`; (2) V2-GAP-011 / ISSUE-316 writer retirement and activation steps; (3) ISSUE-331 (open,
+      cause UNKNOWN); (4) revisit database triggers only on a new owner decision, for example if privileged ad hoc SQL
+      becomes a live concern.
 
 ## V2-GAP-007 — No manifest of the real baseline exists yet
 

@@ -15,6 +15,15 @@ commit.
 
 ## [Unreleased]
 
+### V2-GAP-006: closed as application-level scope complete, residual controls explicitly accepted (2026-11-01, documentation only)
+
+- **Owner decision D-V2-GAP006-SCOPE-1 (approved).** V2-GAP-006 is **closed** as "application-level scope complete / residual controls explicitly accepted". This is **risk acceptance, not new protection**: no code, test, push, deployment, host, database, provider or writer-activation action was taken.
+  - **Control boundary accepted:** ordinary application writes are controlled by the deployed audited-editor protections and the guarded settle entry points (a new runtime caller of a direct library function must preserve that control); offline loaders may stay outside the generic seal but **gain no permission to run against DEV or PROD** (each run needs its own target, scope, safeguards and approval; "offline" is not enforced isolation unless the target guard proves it); governed Brownlow operations keep their digest-bound plans, receipts and exact owner approvals (**no** recording, adoption, backfill, correction or publication is authorised).
+  - **Database triggers remain deferred** and the absence of database-level seal enforcement, including the residual risk from privileged ad hoc SQL, is accepted for the current application-level release (RISK-17).
+  - **Local versus deployed:** deployed to production = the audited-editor protections and settle CLIs (release `fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy`, checkout `9b9c6b2a`). **Local only, not pushed, not deployed = `7b4c609b`** (`repair-match-rekeys --apply` refuses a sealed season). Production's `--apply` path has no seal check and **must not be used** until the fix is installed or a pinned fixed checkout is separately approved.
+  - **Register recounted from the table rows: 38 total / 32 closed / 6 open** (open: 008, 011, 016, 029, 030, 031; was 31 / 7). V2-GAP-011, ISSUE-316 and ISSUE-331 are **not** closed by this decision.
+  - **Operational follow-ups (open, none authorised):** roll out `7b4c609b` (push and deploy, each separately approved); V2-GAP-011 / ISSUE-316 writer retirement and activation steps; ISSUE-331. Writer-activation prerequisites and the writer inventory: `docs/v2/known-gaps.md` V2-GAP-006.
+
 ### V2-GAP-006: remaining-writer inventory and the repair-tool seal (2026-11-01, local only, not deployed)
 
 - `tools/current-season/repair-match-rekeys.ts --apply` now refuses a sealed season (offline, before any connection, through the same `refuseSealedSeasonForSettle` as the settle CLIs). Before, `--apply --acknowledge-completed-season` could rewrite `matches` rows in a sealed season with no seal check. The dry run is unchanged; open and synthetic seasons are unchanged. No new policy, workflow id or bypass.

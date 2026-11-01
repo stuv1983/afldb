@@ -468,6 +468,15 @@ Admin, eight reviewed screenshots. Limits accepted: production refusal behaviour
 player-link panels not live-checked. Gap 006 stays open for database-level enforcement and the other writers; ISSUE-331
 stays open (cause UNKNOWN). See `known-gaps.md` V2-GAP-006 and `gap006-editor-protections-release-package.md` 11.3.
 
+**2026-11-01 (later) V2-GAP-006 closed: application-level scope complete / residual controls explicitly accepted
+(D-V2-GAP006-SCOPE-1).** Documentation decision only (no push, deployment, host, database or provider action). Register
+recounted from the table rows: **38 total / 32 closed / 6 open** (open: 008, 011, 016, 029, 030, 031; previously 31 / 7).
+Database triggers stay deferred and are recorded as **risk acceptance** (RISK-17), not implemented protection. Offline
+loaders and governed Brownlow operations remain outside the generic seal under their own explicit approvals; nothing is
+authorised to run. The repair-tool fix `7b4c609b` is accepted but **committed locally only (not pushed, not deployed)**;
+the production `repair-match-rekeys --apply` has no seal check and must not be used until it is installed or a pinned
+fixed checkout is approved. GAP-011, ISSUE-316 and ISSUE-331 stay open. See `known-gaps.md` V2-GAP-006.
+
 ## Next action for the owner
 
 1. Review `v2/rebuild` (`git log ff100dc2..v2/rebuild`) starting with `docs/v2/final-report.md`.

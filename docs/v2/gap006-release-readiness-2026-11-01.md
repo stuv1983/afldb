@@ -7,7 +7,9 @@
 provenance: `gap006-editor-protections-release-package.md` section 11.3 and `known-gaps.md` V2-GAP-006. Verification
 limits: production refusal behaviour not exercised; season-list and player-link panels not live-checked. The paragraph
 below and the "Linux qualification" section describe the state **before** that deployment and are kept as history.
-V2-GAP-006 **stays open** (database-level enforcement; other writers).
+V2-GAP-006 **stayed open** (database-level enforcement; other writers) at that point. **Later on 2026-11-01 it was closed
+as "application-level scope complete / residual controls explicitly accepted" (D-V2-GAP006-SCOPE-1, risk acceptance; triggers
+not implemented; see `known-gaps.md`).**
 
 Local milestone only (as written before the deployment above). Nothing was pushed, deployed or run against a host, a
 production database or a provider. No Brownlow was recorded, backfilled, adopted or published.
