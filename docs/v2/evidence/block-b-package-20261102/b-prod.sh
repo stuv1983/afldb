@@ -100,7 +100,7 @@ common_pre() { # R stage
 reqfile() { # stage -> path of the pinned request, verified
   stage_table "$1"; local f="$HERE/$REQ"
   [ -f "$f" ] && [ "$(sha256sum < "$f" | cut -c1-16)" = "$REQ_SHA" ] || stop "request file missing or not the pinned bytes" 3
-  echo "$f"
+  REQPATH="$f"
 }
 
 case "$PHASE" in
@@ -177,7 +177,10 @@ baseline|plan|apply)
     PRE=$(bash "$SELF" pre "$R" "$S") || { printf '%s\n' "$PRE"; stop "pre failed" 6; }
     OUT="$BD/plan.json"; [ ! -e "$OUT" ] || stop "a plan already exists for $S" 3
     step "plan $S (read-only session, no writes)"
-    AFLDB_BROWNLOW_CORRECTION_DSN=$DSN "${RUNNER[@]}" plan --target "$BD/target.json" --request "$(reqfile "$S")" --backup "$BACKUP" --backup-file "$BFILE" --restore-evidence "$RESTORE" --out "$OUT" "${SNAP[@]}" || stop "plan refused" 6
+    # The runner refuses any evidence file inside the checkout: the pinned request is hash-verified, then copied (exclusively) next to the stage evidence.
+    reqfile "$S"; REQCOPY="$BD/request.json"; [ ! -e "$REQCOPY" ] || stop "a request copy already exists for $S" 3
+    cp "$REQPATH" "$REQCOPY" && chmod 600 "$REQCOPY" && [ "$(sha256sum < "$REQCOPY" | cut -c1-16)" = "$REQ_SHA" ] || stop "request copy failed" 3
+    AFLDB_BROWNLOW_CORRECTION_DSN=$DSN "${RUNNER[@]}" plan --target "$BD/target.json" --request "$REQCOPY" --backup "$BACKUP" --backup-file "$BFILE" --restore-evidence "$RESTORE" --out "$OUT" "${SNAP[@]}" || stop "plan refused" 6
     sha256sum "$OUT"
   else
     PLAN=${1:?plan.json}; APPROVAL=${2:?approval.json}; BFILE=${3:?backup file}; RESTORE=${4:?restore evidence}

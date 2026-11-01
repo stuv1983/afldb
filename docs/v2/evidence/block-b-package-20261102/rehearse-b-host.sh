@@ -44,10 +44,19 @@ p1_inputs() {
   cd "$W" && rm -rf cand && tar xzf in/cand-m.tar.gz || return 1
   cd "$CAND" && [ "$(git rev-parse HEAD)" = "$R" ] && [ "$(git status --porcelain | wc -l)" = 0 ] || { echo "candidate not clean at $R"; return 1; }
   [ "$(sha256sum package-lock.json | cut -c1-16)" = "$LOCK_SHA" ] && [ "$(sha256sum "$OLDW/cand/package-lock.json" | cut -c1-16)" = "$LOCK_SHA" ] || { echo "lock mismatch"; return 1; }
+  cp "$OLDW/in/restore.mjs" "$OLDW/in/probe-dbs.mjs" "$W/in/"
   ln -s "$OLDW/cand/node_modules" "$CAND/node_modules"; echo node_modules >> "$CAND/.git/info/exclude"
   [ "$(git status --porcelain | wc -l)" = 0 ] && echo "candidate clean at $(git rev-parse HEAD)"
   ( cd "$PKGD" && node "$PKGD/assemble-backup-evidence.mjs" --help > /dev/null 2>&1; true )
   bash "$PKGD/assemble-selftest.sh"
+}
+p2_capture_controls() { # capture-b.sh is production-host only: prove it refuses before touching anything when its inputs or host are wrong (it cannot be run for real off-host)
+  local C="$PKGD/capture-b.sh"; bash -n "$C" || return 1
+  nok env -u B_STAGE -u B_APPROVAL_REFERENCE bash "$C" || return 1
+  nok env B_STAGE=zz B_APPROVAL_REFERENCE="SYNTHETIC rehearsal words, never an approval" bash "$C" || return 1
+  nok env B_STAGE=b1 B_APPROVAL_REFERENCE="short" bash "$C" || return 1
+  nok env B_STAGE=b1 B_APPROVAL_REFERENCE="SYNTHETIC rehearsal words, never an approval" bash "$C" || return 1   # wrong host: refused at P0
+  [ ! -e /home/arm/backups/afldb/blockb-b1-* ] 2>/dev/null && echo "no capture directory was created"
 }
 p4_cluster() {
   IR init && IR start > "$EV/pg-start.out" 2>&1 < /dev/null &
@@ -129,43 +138,22 @@ echo "dump $SHA"
 EOS
   RUNDB "$DB" bash "$W/in/dump-inner.sh" "$d" "$D118" "$SYSID" "$OID" || return 1
   local SHA; SHA=$(sha256sum "$d/d.dump" | cut -c1-64); sleep 2
-  local RDB="afldb_v2_blockb_${s}_rst_test"
-  IR create-db "$RDB" || return 1
-  RUNDB "$RDB" node "$OLDW/in/restore.mjs" "$d/d.dump" "$SHA" || return 1
-  # restored copy: facts + the REAL runner `baseline` against it (target built from the restored database's own facts)
-  cat > "$W/in/restored-inner.sh" <<'EOS'
-#!/bin/bash
-CHK=$1; D=$2; R=$3; PORT=$4
-P=/usr/lib/postgresql/16/bin/psql
-F=$("$P" "$AFLDB_OWNER_DATABASE_URL" -X -At -F '|' -c "SELECT current_database(), (SELECT oid FROM pg_database WHERE datname=current_database()), (SELECT system_identifier::text FROM pg_control_system()), current_setting('cluster_name'), coalesce(shobj_description((SELECT oid FROM pg_database WHERE datname=current_database()),'pg_database'),'')") || exit 1
-LED=$("$P" "$AFLDB_OWNER_DATABASE_URL" -X -At -F "$(printf '\t')" -c "SELECT name, checksum FROM afldb_meta.schema_migrations ORDER BY name COLLATE \"C\"") || exit 1
-ROWS=$(printf '%s\n' "$LED" | wc -l); DIG=$(printf '%s\n' "$LED" | sha256sum | cut -c1-64)
-M=$("$P" "$AFLDB_OWNER_DATABASE_URL" -X -At -c "SELECT count(*) FROM matches"); FX=$("$P" "$AFLDB_OWNER_DATABASE_URL" -X -At -c "SELECT count(*) FROM fixtures")
-node -e '
-const [f, rows, dig, m, fx, d, port] = process.argv.slice(1); const [db, oid, sys, cl, cm] = f.split("|");
-const fs = require("fs");
-fs.writeFileSync(d + "/restore-facts.json", JSON.stringify({ ledgerRows: Number(rows), ledgerDigest: dig, matches: Number(m), fixtures: Number(fx), restoredAt: new Date().toISOString() }));
-fs.writeFileSync(d + "/restored-target.json", JSON.stringify({ host: "127.0.0.1", port: Number(port), database: db, user: "afldb_owner", systemIdentifier: sys, databaseOid: oid, clusterName: cl, databaseComment: cm === "" ? null : cm }));
-' "$F" "$ROWS" "$DIG" "$M" "$FX" "$D" "$PORT"
-cd "$CHK" && AFLDB_BROWNLOW_CORRECTION_DSN="$AFLDB_OWNER_DATABASE_URL" node --import tsx --conditions=react-server tools/v2/brownlow-production-correction.ts baseline --target "$D/restored-target.json" --out "$D/baseline-restored.json"
-EOS
-  RUNDB "$RDB" bash "$W/in/restored-inner.sh" "$CAND" "$d" "$R" "$PORT" || return 1
+  # restore of the dump + restored-copy facts + the REAL runner baseline of the restored copy: the production script restore-verify-b.sh (same cluster here)
+  W="$W" R="$R" DUMP="$d/d.dump" DUMP_SHA="$SHA" TAG="$s" EXPECT_ROWS=118 EXPECT_LAST=118_fixtures_unconfirmed_participants.sql EXPECT_DIGEST="$D118" SAME_CLUSTER=1 \
+    bash "$PKGD/restore-verify-b.sh" > "$d/restore-verify.log" 2>&1 || { tail -15 "$d/restore-verify.log"; return 1; }
+  local RV="$W/evidence-private/$s"; tail -2 "$d/restore-verify.log"
   okc node "$PKGD/assemble-backup-evidence.mjs" --stage "$s" --revision "$R" --target "$BD/target.json" --live-baseline "$BD/baseline-live.json" \
-    --restored-baseline "$d/baseline-restored.json" --sidecar "$d/side.json" --dump "$d/d.dump" --restore-facts "$d/restore-facts.json" --expect-ledger-digest "$D118" --out-dir "$d/evidence" || return 1
+    --restored-baseline "$RV/baseline-restored.json" --sidecar "$d/side.json" --dump "$d/d.dump" --restore-facts "$RV/restore-facts.json" --expect-ledger-digest "$D118" --out-dir "$d/evidence" || return 1
   okc B plan "$R" "$s" "$d/evidence/backup-$s.json" "$d/d.dump" "$d/evidence/restore-evidence-$s.json" || return 1
-  # synthetic approvals: a WRONG one must be refused by the wrapper before the runner, then the right one
-  node -e '
-const fs = require("fs"); const [plan, out, bad] = process.argv.slice(1); const p = JSON.parse(fs.readFileSync(plan, "utf8"));
-const a = { planDigest: bad === "bad" ? "0".repeat(64) : p.digest, target: p.target, revision: process.env.REV, operation: p.request.operation, seasons: p.request.seasons,
-  source: String(p.request.operation).endsWith("backfill") ? "legacy" : "afl_api", approvedAt: new Date().toISOString(), expiresAt: p.expiresAt,
-  reference: "SYNTHETIC isolated rehearsal approval - never production authority", rulings: p.request.rulings, stage: p.request.stage };
-fs.writeFileSync(out, JSON.stringify(a), { flag: "wx" });' "$BD/plan.json" "$d/approval-bad.json" bad || return 1
-  REV="$R" node -e '
-const fs = require("fs"); const [plan, out] = process.argv.slice(1); const p = JSON.parse(fs.readFileSync(plan, "utf8"));
-const a = { planDigest: p.digest, target: p.target, revision: process.env.REV, operation: p.request.operation, seasons: p.request.seasons,
-  source: String(p.request.operation).endsWith("backfill") ? "legacy" : "afl_api", approvedAt: new Date().toISOString(), expiresAt: p.expiresAt,
-  reference: "SYNTHETIC isolated rehearsal approval - never production authority", rulings: p.request.rulings, stage: p.request.stage };
-fs.writeFileSync(out, JSON.stringify(a), { flag: "wx" });' "$BD/plan.json" "$d/approval.json" || return 1
+  # approvals through the production tool make-approval.mjs (SYNTHETIC owner words); its refusals first, then a tampered approval the wrapper must refuse, then the real one
+  local EXP; EXP=$(date -u -d "+1 hour" +%Y-%m-%dT%H:%M:%SZ); local REF="SYNTHETIC isolated rehearsal approval - never production authority"
+  nok node "$PKGD/make-approval.mjs" --plan "$BD/plan.json" --revision "$R" --reference "too short" --expires "$EXP" --out "$d/approval-short.json" || return 1
+  nok node "$PKGD/make-approval.mjs" --plan "$BD/plan.json" --revision "$R" --reference "$REF" --expires "$(date -u -d "+13 hours" +%Y-%m-%dT%H:%M:%SZ)" --out "$d/approval-long.json" || return 1
+  nok node "$PKGD/make-approval.mjs" --plan "$BD/plan.json" --revision "$R" --reference "$REF" --expires "$(date -u -d "-1 hour" +%Y-%m-%dT%H:%M:%SZ)" --out "$d/approval-past.json" || return 1
+  okc node "$PKGD/make-approval.mjs" --plan "$BD/plan.json" --revision "$R" --reference "$REF" --expires "$EXP" --out "$d/approval.json" || return 1
+  nok node "$PKGD/make-approval.mjs" --plan "$BD/plan.json" --revision "$R" --reference "$REF" --expires "$EXP" --out "$d/approval.json" || return 1   # never overwritten
+  node -e 'const fs=require("fs");const a=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));a.planDigest="0".repeat(64);fs.writeFileSync(process.argv[2],JSON.stringify(a),{flag:"wx"})' "$d/approval.json" "$d/approval-bad.json" || return 1
+  node "$PKGD/plan-summary.mjs" "$BD/plan.json" > "$d/plan-summary.txt" && head -c 1800 "$d/plan-summary.txt"
   nok B apply "$R" "$s" "$BD/plan.json" "$d/approval-bad.json" "$d/d.dump" "$d/evidence/restore-evidence-$s.json" || return 1
   nok B apply "$R" "$s" "$BD/plan.json" "$d/no-such-approval.json" "$d/d.dump" "$d/evidence/restore-evidence-$s.json" || return 1
   nok B accept "$R" "$s" || return 1   # accept must refuse before the stage has run
@@ -213,7 +201,7 @@ p13_final() {
   ss -ltn | awk '{print $4}' | grep -E ":($PORT)$" && return 1
   du -sh "$W" | tail -1
 }
-ALL="p0_resources p1_inputs p4_cluster p5_restore_migrate p6_prepare p7_b0 p7_b1 p7_b2 p7_b3 p7_e p8_2026_control p13_final"
+ALL="p0_resources p1_inputs p2_capture_controls p4_cluster p5_restore_migrate p6_prepare p7_b0 p7_b1 p7_b2 p7_b3 p7_e p8_2026_control p13_final"
 PH="${*:-$ALL}"
-for ph in $PH; do phase "$ph" "$ph" || { case "$ph" in p0_resources|p1_inputs|p4_cluster|p5_restore_migrate|p6_prepare|p7_b0|p7_b1|p7_b2|p7_b3) say "stage or prerequisite $ph failed: stopping"; break;; esac; }; done
+for ph in $PH; do phase "$ph" "$ph" || { case "$ph" in p0_resources|p1_inputs|p2_capture_controls|p4_cluster|p5_restore_migrate|p6_prepare|p7_b0|p7_b1|p7_b2|p7_b3) say "stage or prerequisite $ph failed: stopping"; break;; esac; }; done
 say "DONE"; cat "$SUM"
