@@ -42,10 +42,22 @@ The 34 include the earlier 24 (baseline equality, four plan refusals, four appro
 | Validation role | `afldb_backup` (existing read-only channel; not a superuser; no grants or role changes) |
 | Writer URLs (names only; values never printed) | `AFLDB_IMPORT_DATABASE_URL` is `afldb_import@localhost:5432/afldb_prod`; `DATABASE_URL` is `afldb_app@localhost:5432/afldb_prod`; no query strings |
 | Ledger | 117 rows, last `117_brownlow_provider_eligibility_unknown.sql`, digest `647c3fb39ca66a572664e1dae9028e4fad4d6b121226d6bdf208e6738af45f72`; extensions `pg_trgm=1.6 plpgsql=1.0 unaccent=1.1` (all unchanged across the backup) |
-| Serving | `afldb.service` MainPID 3218527 (since 2026-11-01 10:50:30 AEDT), build `QNEHXAtU53TzUjj0Mb7mv`; every settle, AFL API, Brownlow and e-mail unit is inactive and not enabled or not found; no crontab for `arm`; no AccessExclusive locks; no non-idle sessions |
+| Serving | `afldb.service` MainPID 3218527 (since 2026-11-01 10:50:30 AEDT), serving release `fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy` (build id `pqAQwRIJWLjSYzR8LiTuy`; corrected 2026-11-02, see the note below the table); every settle, AFL API, Brownlow and e-mail unit is inactive and not enabled or not found; no crontab for `arm`; no AccessExclusive locks; no non-idle sessions |
 | **Actor** | **id 1**: `super_admin`, not disabled, the **only** Super Admin, matches the owner's e-mail (boolean only), `can_manage_admins` false. |
 | Audited-writer privileges (`afldb_import`) | `matches.match_event` UPDATE; `data_edits` INSERT; `data_overrides` column-level INSERT on all seven columns the writer names and UPDATE on the four it updates (`has_table_privilege` reads false for INSERT because the grants are column-level, migration 078; the column checks are true); `data_overrides_id_seq` USAGE; no triggers on `matches`, `data_edits` or `data_overrides`. The editor path has been used on production before (`matches` `match_sheet` and `audit_note_repair` edits, 24-25 Oct). |
 | Label state now | 0 matches labelled, 0 `match_event` audit rows, 0 override rows. All 64 evidenced rows exist and equal the evidence in season, date, round, venue, both clubs and both scores, with `match_event` NULL. Production has 17,056 matches, latest `2026-09-26`, so it is the same data state as the earlier restore. |
+
+**Correction (2026-11-02, read-only re-probe 2026-11-01 22:44Z).** The first draft of the Serving row named build `QNEHXAtU53TzUjj0Mb7mv`; that is the retained deep release `9ed9c9dd3e84-QNEHXAtU53TzUjj0Mb7mv`, not what serves. Three different things must not be conflated:
+
+| Role | Identity (probe) |
+|---|---|
+| **Serving release** (`current`, MainPID 3218527 working directory) | `fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy`; `previous` = `ad245d602f6f-m0M8pf121326vNSo2B759` (the pinned rollback target) |
+| **Primary production checkout** (`/home/arm/projects/afldb`) | `affe9a2c30842e35557710bc582cb9d6114ee39c`, 0 changed lines in `git status --porcelain`. It is **not** the serving tree: the release route serves the immutable release directory |
+| **Private operations checkout** (`/home/arm/ops/gap029-labels-86da1a82/cand`) | `86da1a82329371fd23db6e2935a0e9334ba08f9a` = R |
+
+Block L reads the database only through the private checkout and the application's writer path, so none of this affects the plan. The probe used `readlink`, `systemctl show -p MainPID` and `git rev-parse`/`status` only.
+
+**Cause of the stale value.** The backup sidecar field `deployed_build_id` (`QNEHXAtU53TzUjj0Mb7mv`) is read by the capture script from the *primary checkout's* `.next/BUILD_ID`, which is a leftover of the old in-place build `9ed9c9dd`; the release route serves `afldb-releases/current`, not that tree. The sidecar in `records/` is therefore correct about the checkout file and wrong as a serving fact; it is retained unedited (its hash is bound by `SHA256SUMS`). The Block M capture scripts record `serving_release` from the `current` link instead.
 
 ## 3. Backup, restore verification and baseline equality
 
