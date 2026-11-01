@@ -1,0 +1,10 @@
+total 271996
+-rw-rw-r-- 1 arm arm     15185 Nov  2 07:47 backup-prod.sh
+-rw-rw-r-- 1 arm arm 278496119 Nov  2 07:47 cand.tar.gz
+-rw-rw-r-- 1 arm arm      6783 Nov  2 07:47 prod-ops.sh
+a6553f80c50a2b201fd27271293b3d4249e7d92aaeee2ccc0d563bad236a04df  /home/arm/ops/gap029-labels-86da1a82/in/cand.tar.gz
+== prep: verify upload, extract, pin 2026-11-01T20:47:03Z
+ops_checkout=/home/arm/ops/gap029-labels-86da1a82/cand HEAD=86da1a82329371fd23db6e2935a0e9334ba08f9a tracked=3856 dirty=0 node=v22.23.2
+prod_checkout_unchanged: head=affe9a2c30842e35557710bc582cb9d6114ee39c status_lines=0
+tool modules load: entryProblem function
+== DONE 2026-11-01T20:47:13Z

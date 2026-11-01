@@ -1,0 +1,423 @@
+{
+  "operation": "gap029-match-events",
+  "revision": "86da1a82329371fd23db6e2935a0e9334ba08f9a",
+  "target": {
+    "host": "localhost",
+    "port": 5432,
+    "database": "afldb_prod",
+    "user": "afldb_backup",
+    "systemIdentifier": "7674454702926115004",
+    "databaseOid": "66668",
+    "clusterName": "16/main",
+    "databaseComment": null
+  },
+  "evidenceSha256": "e3848807931cf255175c1642d9ded63590b2c7e2633b33a5e9f0fa5b96a4430f",
+  "actorId": 1,
+  "baselineDigest": "9b17f3ad2b94c0b7f20ade336e0bf546949f84c3e1f27cbb98e9087ebb4761cf",
+  "backup": {
+    "target": {
+      "host": "localhost",
+      "port": 5432,
+      "database": "afldb_prod",
+      "user": "afldb_backup",
+      "systemIdentifier": "7674454702926115004",
+      "databaseOid": "66668",
+      "clusterName": "16/main",
+      "databaseComment": null
+    },
+    "baselineDigest": "9b17f3ad2b94c0b7f20ade336e0bf546949f84c3e1f27cbb98e9087ebb4761cf",
+    "sha256": "9119895bcb5d6c34d88abd35169412c16c8dee2a49e32076d2ee23ffdc6e395d",
+    "restoreEvidenceSha256": "b9a4c1260af1a26b26a612e2b3e2304a10e79fa6674b72f07862e77c9f8254c1",
+    "capturedAt": "2026-11-01T20:47:24.990Z",
+    "restoredAt": "2026-11-01T20:48:21.983Z"
+  },
+  "createdAt": "2026-11-01T20:48:55.493Z",
+  "expiresAt": "2026-11-02T20:48:55.493Z",
+  "entries": [
+    {
+      "matchId": 10834,
+      "label": "Anzac Day",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 11020,
+      "label": "Anzac Day",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 11205,
+      "label": "Anzac Day",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 11391,
+      "label": "Anzac Day",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 11581,
+      "label": "Anzac Day",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 11782,
+      "label": "Anzac Day",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 11945,
+      "label": "Anzac Day",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 12130,
+      "label": "Anzac Day",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 12315,
+      "label": "Anzac Day",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 12505,
+      "label": "Anzac Day",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 12692,
+      "label": "Anzac Day",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 12869,
+      "label": "Anzac Day",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 13055,
+      "label": "Anzac Day",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 13248,
+      "label": "Anzac Day",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 13426,
+      "label": "Anzac Day",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 13614,
+      "label": "Anzac Day",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 13799,
+      "label": "Anzac Day",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 13996,
+      "label": "Anzac Day",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 14203,
+      "label": "Anzac Day",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 14419,
+      "label": "Anzac Day",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 14609,
+      "label": "Anzac Day",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 14831,
+      "label": "Anzac Day",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 15038,
+      "label": "Anzac Day",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 15245,
+      "label": "Anzac Day",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 15454,
+      "label": "Anzac Day",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 15828,
+      "label": "Anzac Day",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 16036,
+      "label": "Anzac Day",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 16244,
+      "label": "Anzac Day",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 16462,
+      "label": "Anzac Day",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 16677,
+      "label": "Anzac Day",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 12768,
+      "label": "Dreamtime at the 'G",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 12880,
+      "label": "Dreamtime at the 'G",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 13091,
+      "label": "Dreamtime at the 'G",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 13274,
+      "label": "Dreamtime at the 'G",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 13460,
+      "label": "Dreamtime at the 'G",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 13643,
+      "label": "Dreamtime at the 'G",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 13828,
+      "label": "Dreamtime at the 'G",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 14024,
+      "label": "Dreamtime at the 'G",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 14243,
+      "label": "Dreamtime at the 'G",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 14458,
+      "label": "Dreamtime at the 'G",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 14657,
+      "label": "Dreamtime at the 'G",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 14871,
+      "label": "Dreamtime at the 'G",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 15078,
+      "label": "Dreamtime at the 'G",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 15291,
+      "label": "Dreamtime at the 'G",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 15493,
+      "label": "Dreamtime at the 'G",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 15720,
+      "label": "Dreamtime at the 'G",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 15878,
+      "label": "Dreamtime at the 'G",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 16069,
+      "label": "Dreamtime at the 'G",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 16274,
+      "label": "Dreamtime at the 'G",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 16502,
+      "label": "Dreamtime at the 'G",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 16713,
+      "label": "Dreamtime at the 'G",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 14670,
+      "label": "King's Birthday",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 14894,
+      "label": "King's Birthday",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 15095,
+      "label": "King's Birthday",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 15305,
+      "label": "King's Birthday",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 15512,
+      "label": "King's Birthday",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 15888,
+      "label": "King's Birthday",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 16094,
+      "label": "King's Birthday",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 16304,
+      "label": "King's Birthday",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 16520,
+      "label": "King's Birthday",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 16735,
+      "label": "King's Birthday",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 17247,
+      "label": "Anzac Day",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 17076,
+      "label": "Dreamtime at the 'G",
+      "before": null,
+      "action": "to label"
+    },
+    {
+      "matchId": 17097,
+      "label": "King's Birthday",
+      "before": null,
+      "action": "to label"
+    }
+  ],
+  "digest": "1b538e1a50cacdb24d37d771d79261a5926e35c69f53d03481ec47a26e79528a"
+}

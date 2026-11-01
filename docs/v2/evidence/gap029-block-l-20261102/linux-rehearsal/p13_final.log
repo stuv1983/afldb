@@ -1,0 +1,7 @@
+--- DEV services AFTER (read-only)
+afldb.service active MainPID=1162113
+postgresql@16-main.service active MainPID=1504
+waiting for server to shut down..... done
+server stopped
+1155387 bash -c cd /mnt/ssd/afldb-v2-gap029l-20261101T204205Z && W=/mnt/ssd/afldb-v2-gap029l-20261101T204205Z R=86da1a82329371fd23db6e2935a0e9334ba08f9a CAND_SHA=a6553f80c50a2b201fd27271293b3d4249e7d92aaeee2ccc0d563bad236a04df setsid nohup bash in/rehearse-host.sh > /mnt/ssd/afldb-v2-gap029l-20261101T204205Z/run.out 2>&1 < /dev/null &
+4.8G	/mnt/ssd/afldb-v2-gap029l-20261101T204205Z

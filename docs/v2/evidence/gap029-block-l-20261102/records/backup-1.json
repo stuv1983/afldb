@@ -1,0 +1,17 @@
+{
+  "target": {
+    "host": "localhost",
+    "port": 5432,
+    "database": "afldb_prod",
+    "user": "afldb_backup",
+    "systemIdentifier": "7674454702926115004",
+    "databaseOid": "66668",
+    "clusterName": "16/main",
+    "databaseComment": null
+  },
+  "baselineDigest": "9b17f3ad2b94c0b7f20ade336e0bf546949f84c3e1f27cbb98e9087ebb4761cf",
+  "sha256": "9119895bcb5d6c34d88abd35169412c16c8dee2a49e32076d2ee23ffdc6e395d",
+  "restoreEvidenceSha256": "b9a4c1260af1a26b26a612e2b3e2304a10e79fa6674b72f07862e77c9f8254c1",
+  "capturedAt": "2026-11-01T20:47:24.990Z",
+  "restoredAt": "2026-11-01T20:48:21.983Z"
+}

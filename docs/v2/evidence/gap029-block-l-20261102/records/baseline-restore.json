@@ -1,0 +1,15 @@
+{
+  "target": {
+    "host": "127.0.0.1",
+    "port": 55493,
+    "database": "afldb_v2_gap029blockl_l1_rst_test",
+    "user": "afldb_owner",
+    "systemIdentifier": "7703306842500590472",
+    "databaseOid": "32242",
+    "clusterName": "afldb_v2_isolated",
+    "databaseComment": "afldb-v2-isolated-test"
+  },
+  "revision": "86da1a82329371fd23db6e2935a0e9334ba08f9a",
+  "baselineDigest": "9b17f3ad2b94c0b7f20ade336e0bf546949f84c3e1f27cbb98e9087ebb4761cf",
+  "capturedAt": "2026-11-01T20:48:23.903Z"
+}

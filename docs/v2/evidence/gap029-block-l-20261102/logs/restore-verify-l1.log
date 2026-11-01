@@ -1,0 +1,39 @@
+2026-11-01T20:48:10Z RV0 inputs
+dump sha256 verified; candidate clean at 86da1a82329371fd23db6e2935a0e9334ba08f9a
+DEV services BEFORE:
+afldb.service active MainPID=1162113
+postgresql@16-main.service active MainPID=1504
+2026-11-01T20:48:11Z RV1 start the guarded cluster
+pg_ctl: server is running (PID: 1164104)
+/usr/lib/postgresql/16/bin/postgres "-D" "/mnt/ssd/afldb-v2-gap029l-20261101T204205Z/pg-root/data"
+LISTEN 0      600        127.0.0.1:55493      0.0.0.0:*    users:(("postgres",pid=1164104,fd=7))      
+2026-11-01T20:48:15Z RV2 restore into a guarded disposable database
+create-db: afldb_v2_gap029blockl_l1_rst_test created and marked
+isolated-pg: afldb_v2_gap029blockl_l1_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running node
+pg_restore exit=0 seconds=5 stderrLines=0
+restore_started=2026-11-01T20:48:15.985Z restored_at=2026-11-01T20:48:21.983Z
+isolated-pg: afldb_v2_gap029blockl_l1_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running node
+afldb_v2_gap029blockl_l1_rst_test {"ledger":"117_brownlow_provider_eligibility_unknown.sql","matches":17056,"fixtures":0,"receipts":0}
+archive toc entries: 1648
+2026-11-01T20:48:22Z RV3 restored target identity and the tool's own baseline
+isolated-pg: afldb_v2_gap029blockl_l1_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running node
+{
+  "host": "127.0.0.1",
+  "port": 55493,
+  "database": "afldb_v2_gap029blockl_l1_rst_test",
+  "user": "afldb_owner",
+  "systemIdentifier": "7703306842500590472",
+  "databaseOid": "32242",
+  "clusterName": "afldb_v2_isolated",
+  "databaseComment": "afldb-v2-isolated-test"
+}
+isolated-pg: afldb_v2_gap029blockl_l1_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running bash
+Read-only GAP-029 baseline 9b17f3ad2b94c0b7f20ade336e0bf546949f84c3e1f27cbb98e9087ebb4761cf
+restore baselineDigest=9b17f3ad2b94c0b7f20ade336e0bf546949f84c3e1f27cbb98e9087ebb4761cf revision=86da1a82329371fd23db6e2935a0e9334ba08f9a
+2026-11-01T20:48:23Z RV4 stop the cluster and prove isolation
+waiting for server to shut down..... done
+server stopped
+DEV services AFTER:
+afldb.service active MainPID=1162113
+postgresql@16-main.service active MainPID=1504
+2026-11-01T20:48:27Z RV DONE restored_at=2026-11-01T20:48:21.983Z

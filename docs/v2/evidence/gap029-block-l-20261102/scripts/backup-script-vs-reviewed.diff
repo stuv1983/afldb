@@ -1,0 +1,47 @@
+0a1
+> :
+2c3,4
+< # AFLDB V2 current-production shadow capture (decision D-V2-CURRENT-SHADOW-CAPTURE-1).
+---
+> # AFLDB V2 Block L (GAP-029 labels) pre-change backup: the reviewed current-production capture procedure, constants only changed
+> # (ledger 117, its digest, the decision label, the output directory, the sidecar wording). Authority: the owner message of 2026-11-02 (one fresh backup).
+17c19
+< DECISION=D-V2-CURRENT-SHADOW-CAPTURE-1
+---
+> DECISION=GAP029-BLOCK-L-BACKUP-20261102
+23,24c25,26
+< EXPECT_LEDGER_ROWS=110
+< EXPECT_LAST=110_match_sheet_player_match_stats_authority.sql
+---
+> EXPECT_LEDGER_ROWS=117
+> EXPECT_LAST=117_brownlow_provider_eligibility_unknown.sql
+27c29
+< EXPECT_LEDGER_DIGEST=789946fe734b23c32ec87e59e3b860877d31a4b32b561624bf1d88fb8f055153
+---
+> EXPECT_LEDGER_DIGEST=647c3fb39ca66a572664e1dae9028e4fad4d6b121226d6bdf208e6738af45f72
+30c32
+< D=/home/arm/backups/afldb/current-shadow-$STAMP
+---
+> D=/home/arm/backups/afldb/gap029-labels-$STAMP
+90c92
+< q() { PGOPTIONS="$RO" PGAPPNAME=afldb-v2-current-shadow-inspect "$PGBIN/psql" -X -q -At -F "$(printf '\t')" -P pager=off -v ON_ERROR_STOP=1 "$@"; }
+---
+> q() { PGOPTIONS="$RO" PGAPPNAME=afldb-gap029-labels-backup-inspect "$PGBIN/psql" -X -q -At -F "$(printf '\t')" -P pager=off -v ON_ERROR_STOP=1 "$@"; }
+112c114
+<   || stop "ledger differs from the reviewed 110 baseline: review before any capture" 5
+---
+>   || stop "ledger differs from the reviewed 117 baseline (probe 2026-11-01T20:40Z): review before any capture" 5
+134c136
+< PGOPTIONS='-c default_transaction_read_only=on' PGAPPNAME=afldb-v2-current-shadow-dump \
+---
+> PGOPTIONS='-c default_transaction_read_only=on' PGAPPNAME=afldb-gap029-labels-backup-dump \
+165,166c167,168
+<   operator: "arm on afldb-prod, run by the owner-approved Claude Code session (D-V2-CURRENT-SHADOW-CAPTURE-1)",
+<   approval_reference: "D-V2-CURRENT-SHADOW-CAPTURE-1: one read-only capture; secure local export; isolated restore on streamanator only. Auth/audit data stays in mode-700/600 restricted locations outside Git.",
+---
+>   operator: "arm on afldb-prod, run by the owner-authorised Claude Code session (Block L preparation)",
+>   approval_reference: "Owner message 2026-11-02: one fresh production backup for the Block L plan; private transfer; restore verification on a guarded disposable target outside production only. Auth/audit data stays in mode-700/600 restricted locations outside Git.",
+181c183
+<   not_a_rollback_baseline: "Writers-active point-in-time shadow input. Not the frozen release rollback backup (release plan step 5).",
+---
+>   purpose: "Block L pre-change backup and plan input (GAP-029 labels). Writers-active point-in-time snapshot; the label tool binds it by sha256 and re-checks baseline equality.",

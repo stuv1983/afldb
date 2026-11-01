@@ -1,0 +1,9 @@
+== target identity from independent facts (read-only session) 2026-11-01T20:47:47Z
+{"host" : "localhost", "port" : 5432, "database" : "afldb_prod", "user" : "afldb_backup", "systemIdentifier" : "7674454702926115004", "databaseOid" : "66668", "clusterName" : "16/main", "databaseComment" : null}
+target equals the probe facts (sysid, oid, cluster, user)
+== tool baseline (read-only) 2026-11-01T20:47:47Z
+Read-only GAP-029 baseline 9b17f3ad2b94c0b7f20ade336e0bf546949f84c3e1f27cbb98e9087ebb4761cf
+baselineDigest=9b17f3ad2b94c0b7f20ade336e0bf546949f84c3e1f27cbb98e9087ebb4761cf revision=86da1a82329371fd23db6e2935a0e9334ba08f9a capturedAt=2026-11-01T20:47:48.387Z
+== post-run: ops checkout still clean 2026-11-01T20:47:48Z
+head=86da1a82329371fd23db6e2935a0e9334ba08f9a status_lines=0
+== DONE 2026-11-01T20:47:48Z

@@ -1,0 +1,177 @@
+{
+  "database": "afldb_v2_gap029lab_q_test",
+  "revision": "86da1a82329371fd23db6e2935a0e9334ba08f9a",
+  "checks": [
+    {
+      "name": "baseline succeeds on the live target and on the restored backup",
+      "pass": true,
+      "detail": "Read-only GAP-029 baseline 9b17f3ad2b94c | Read-only GAP-029 baseline 9b17f3ad2b94c"
+    },
+    {
+      "name": "restored backup baseline equals the live baseline",
+      "pass": true,
+      "detail": "9b17f3ad2b94c0b7"
+    },
+    {
+      "name": "plan refuses an actor that is not an active Super Admin",
+      "pass": true,
+      "detail": "GAP-029 labels refused: the actor is not an active Super Admin"
+    },
+    {
+      "name": "plan refuses a target whose identity is wrong",
+      "pass": true,
+      "detail": "GAP-029 labels refused: fresh target-bound backup and verified restore evidence required"
+    },
+    {
+      "name": "plan refuses when the writer connection names another database",
+      "pass": true,
+      "detail": "GAP-029 labels refused: wrong target; no connection authorised"
+    },
+    {
+      "name": "plan refuses backup evidence whose bytes differ",
+      "pass": true,
+      "detail": "GAP-029 labels refused: backup or restore evidence content differs"
+    },
+    {
+      "name": "no refusal wrote anything",
+      "pass": true,
+      "detail": "{\"edits\":\"0\",\"overrides\":\"0\",\"labelled\":\"0\"}"
+    },
+    {
+      "name": "plan succeeds read-only (64 to label)",
+      "pass": true,
+      "detail": "Review plan b13d7a19889592b952317fb402632e3ae46f7d82924f0edc99c4b5db7c73d374; no writes (6"
+    },
+    {
+      "name": "apply refuses an approval that is wrong-revision",
+      "pass": true,
+      "detail": "GAP-029 labels refused: stale plan or missing execution approval"
+    },
+    {
+      "name": "apply refuses an approval that is expired",
+      "pass": true,
+      "detail": "GAP-029 labels refused: stale plan or missing execution approval"
+    },
+    {
+      "name": "apply refuses an approval that is no-reference",
+      "pass": true,
+      "detail": "GAP-029 labels refused: stale plan or missing execution approval"
+    },
+    {
+      "name": "apply refuses an approval that is other-plan",
+      "pass": true,
+      "detail": "GAP-029 labels refused: stale plan or missing execution approval"
+    },
+    {
+      "name": "apply refuses a plan edited after review",
+      "pass": true,
+      "detail": "GAP-029 labels refused: plan digest or evidence differs"
+    },
+    {
+      "name": "apply refuses when the audited writer would write to another database",
+      "pass": true,
+      "detail": "GAP-029 labels refused: wrong target; no connection authorised"
+    },
+    {
+      "name": "apply refuses baseline drift since the plan",
+      "pass": true,
+      "detail": "GAP-029 labels refused: baseline drift; re-plan and obtain new execution approval"
+    },
+    {
+      "name": "plan refuses when a covered match is changed after the backup (here: it carries a different event; the backup-baseline check fires first)",
+      "pass": true,
+      "detail": "GAP-029 labels refused: baseline drift: the restored backup no longer matches the live tar"
+    },
+    {
+      "name": "apply refuses a covered match whose venue identity changed to a different venue",
+      "pass": true,
+      "detail": "GAP-029 labels refused: match 10834 no longer has the expected identity"
+    },
+    {
+      "name": "apply refuses a covered match whose venue identity changed to a case-changed venue",
+      "pass": true,
+      "detail": "GAP-029 labels refused: match 10834 no longer has the expected identity"
+    },
+    {
+      "name": "plan refuses an actor who has been disabled",
+      "pass": true,
+      "detail": "GAP-029 labels refused: the actor is not an active Super Admin"
+    },
+    {
+      "name": "apply refuses, before any write, when the planned actor has been disabled",
+      "pass": true,
+      "detail": "GAP-029 labels refused: the actor is not an active Super Admin"
+    },
+    {
+      "name": "plan refuses an actor who has been demoted",
+      "pass": true,
+      "detail": "GAP-029 labels refused: the actor is not an active Super Admin"
+    },
+    {
+      "name": "apply refuses, before any write, when the planned actor has been demoted",
+      "pass": true,
+      "detail": "GAP-029 labels refused: the actor is not an active Super Admin"
+    },
+    {
+      "name": "the negative controls left nothing behind (live baseline equals the backup baseline again)",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "an injected audit failure stops the run part-way (10 labels written, audited, consistent)",
+      "pass": true,
+      "detail": "{\"edits\":\"10\",\"overrides\":\"10\",\"labelled\":\"10\"}"
+    },
+    {
+      "name": "the old plan is refused after the partial write (baseline moved); resume needs a re-plan",
+      "pass": true,
+      "detail": "GAP-029 labels refused: baseline drift; re-plan and obtain new execution approval"
+    },
+    {
+      "name": "second restore baseline equals the live baseline (and differs from the first)",
+      "pass": true,
+      "detail": "2c89578c8eb70d01"
+    },
+    {
+      "name": "re-plan shows 54 to label and 10 already labelled",
+      "pass": true,
+      "detail": "Review plan f0294c5679326b47e2b8c7075f5ffec448d410bda11fe62ade3dcf175913af51; no writes (5"
+    },
+    {
+      "name": "an actor disabled mid-run stops the run at the next label boundary (20 labels written, audited, consistent)",
+      "pass": true,
+      "detail": "GAP-029 labels refused: the actor is not an active Super Admin {\"edits\":\"20\",\"overrides\":\"20\",\"labelled\":\"20\"}"
+    },
+    {
+      "name": "third restore baseline equals the live baseline",
+      "pass": true,
+      "detail": "c3b0a80152782588"
+    },
+    {
+      "name": "re-plan shows 44 to label and 20 already labelled",
+      "pass": true,
+      "detail": "Review plan cb99a4771ed5ea453994365e29931ba38fffa0b01147cf377e2f7b4c072d744d; no writes (4"
+    },
+    {
+      "name": "resumed apply finishes: 64 labelled, 64 audit rows, 64 active overrides added in total",
+      "pass": true,
+      "detail": "{\"edits\":\"64\",\"overrides\":\"64\",\"labelled\":\"64\"}"
+    },
+    {
+      "name": "distribution is Anzac 31 / Dreamtime 22 / King's Birthday 11",
+      "pass": true,
+      "detail": "[{\"match_event\":\"Anzac Day\",\"n\":31},{\"match_event\":\"Dreamtime at the 'G\",\"n\":22},{\"match_event\":\"King's Birthday\",\"n\":11}]"
+    },
+    {
+      "name": "result records 44 written and a verified outcome",
+      "pass": true,
+      "detail": "{\"allLabelled\":true,\"auditRowsAdded\":44,\"overridesAdded\":44,\"dist\":[{\"match_event\":\"Anzac Day\",\"n\":31},{\"match_event\":\"Dreamtime at the 'G\",\"n\":22},{\"match_event\":\"King's Birthday\",\"n\":11}]}"
+    },
+    {
+      "name": "replay of the same plan and approval writes nothing",
+      "pass": true,
+      "detail": ""
+    }
+  ],
+  "failed": 0
+}

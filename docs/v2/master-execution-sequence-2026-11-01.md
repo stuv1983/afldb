@@ -4,6 +4,8 @@
 
 **Update 2026-11-01 (evening):** F-BRO-1 and F-229-SWITCH are resolved locally (sections 5 and 6); the Linux qualification is redone correctly in section 8.2 (the nonconforming 8.1 is not to be cited); candidate revisions and the genuine-versus-simulated classification are in 8.3; the owner-action list is section 9.
 
+**Update 2026-11-02 (Block L):** Block L is execution-ready at revision `86da1a82329371fd23db6e2935a0e9334ba08f9a` with a fresh restore-verified backup and a digest-bound plan (`1b538e1a…528a`, deadline 2026-11-03 07:47 AEDT); the apply approval prompt, partial-failure handling and exclusivity are in the [execution-ready record](gap-029-block-l-execution-ready-2026-11-02.md), which **supersedes the revision and rehearsal figures in section 4** (the label rehearsal is now 34/34 and the tool also checks the venue identity and re-proves the actor at apply). Nothing was applied.
+
 This document orders the remaining owner-attended work, gives each block its **own exact approval**, and records what is proven, what is only simulated, and what cannot be proven off the production host. It supersedes the ordering text of the earlier per-subsystem packages where they differ; their command detail still stands except where section 7 corrects it.
 
 ## 1. Rules that bind every block
@@ -204,7 +206,7 @@ In order (nothing here is authorised by being listed). Separate approval blocks:
 
 1. Adopt or amend the C2 acceptance record (C2–C5 package section 2).
 2. Review and push the reviewed local commits (fast-forward only; not done here). Name the pushed revision R in every approval; its source tree must equal `e0f6c7bc` (docs aside).
-3. Approve block L (section 4), naming R; take the fresh backup it requires.
+3. Approve block L: use the prompt in the [execution-ready record](gap-029-block-l-execution-ready-2026-11-02.md) section 8 (revision `86da1a82…`, plan digest `1b538e1a…528a`, expiry no later than 2026-11-03 07:30 AEDT); the fresh backup, restore verification and plan already exist. If the window passes, the cycle is repeated.
 4. Approve block M-a (section 5): R, migration 118's blob sha256 `49e59fcd…8401`, backup. **Build with the release default heap 3072 or `--typecheck off-host`**; verify the host shows no AFL API timer enabled (finding 1 of 8.2).
 5. Approve block M-b: the window statement of section 5 (snapshot, feed hash, `--expect-created 218`); the operator runs `--check-only` first; the owner confirms no other operator is working.
 6. Approve block B (section 6): B0 first, a separate approval per stage; retake backup, restore evidence and baseline after L, M and B0.

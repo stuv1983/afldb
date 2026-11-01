@@ -1,0 +1,10 @@
+PASS p0_resources
+PASS p1_verify_inputs
+PASS p2_deps
+PASS p3_typecheck
+PASS p4_cluster
+PASS p5_template
+PASS mkdbs
+PASS p6_unit
+PASS p8_labels
+PASS p13_final

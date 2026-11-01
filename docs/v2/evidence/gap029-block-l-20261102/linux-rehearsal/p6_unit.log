@@ -1,0 +1,23 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-v2-gap029l-20261101T204205Z/cand
+
+ ✓ tests/v2-module-boundaries.test.ts (53 tests) 10050ms
+     ✓ src, tools, packages and deploy contain no boundary violation  1074ms
+     ✓ each package loads and exports what its index declares  909ms
+     ✓ fires on forbidden imports  2485ms
+     ✓ the quarantined tool exists and the whole tree has no violation  629ms
+     ✓ every real edge is known and every known edge is real (tests/** excluded)  1158ms
+     ✓ the transitive closure of every public src/app and src/components file is clean  335ms
+     ✓ no file under src/ or packages/*/src/ imports tools/{migration,rebuild,records,aflw,email_intake}/ or legacy/  362ms
+     ✓ the CLI exits 1 with the refusal for a retired entry and for an unknown name  1371ms
+     ✓ no file under src/app/admin or src/app/api/admin imports the pipeline, datasets, the Squiggle/Kali libraries or startSettleRun  480ms
+     ✓ the AFL Tables settle CLI, run directly, refuses before .env or a connection (exit 1)  751ms
+ ✓ tests/v2-season-seal.test.ts (55 tests) 339ms
+ ✓ tests/v2-isolated-test-target.test.ts (27 tests) 51ms
+ ✓ tests/v2-gap029-label-checks.test.ts (4 tests) 10ms
+
+ Test Files  4 passed (4)
+      Tests  139 passed (139)
+   Start at  07:45:11
+   Duration  13.04s (transform 1.49s, setup 308ms, import 1.32s, tests 10.45s, environment 1ms)
+

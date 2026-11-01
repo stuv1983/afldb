@@ -1,0 +1,134 @@
+== H host, user, disk, memory 2026-11-01T20:40:29Z
+host=afldb-prod user=arm kernel=6.8.0-137-generic uptime=up 11 weeks, 18 hours, 25 minutes
+56716808192  31%
+Mem:            3915         963         808         146        2580        2952
+node=v22.23.2 tsx=/home/arm/projects/afldb/node_modules/.bin/tsx
+ls: cannot access '/home/arm/ops': No such file or directory
+== S services, timers, serving release (read-only systemctl) 2026-11-01T20:40:29Z
+afldb.service active=active enabled=enabled
+afldb-settle-afltables.service active=inactive enabled=static
+afldb-settle-afltables.timer active=inactive enabled=disabled
+afldb-settle-afl-api.service active=inactive enabled=not-found
+afldb-settle-afl-api.timer active=inactive enabled=not-found
+afldb-settle-afl-api-brownlow.service active=inactive enabled=not-found
+afldb-settle-afl-api-brownlow.timer active=inactive enabled=not-found
+afldb-email-intake.service active=inactive enabled=not-found
+afldb-email-intake.timer active=inactive enabled=not-found
+afldb.service MainPID=3218527 ActiveEnterTimestamp=Sun 2026-11-01 10:50:30 AEDT
+afldb-settle-afltables.timer next=
+3254384 bash -c bash /home/arm/gap029-probe.sh 10834,11020,11205,11391,11581,11782,11945,12130,12315,12505,12692,12768,12869,12880,13055,13091,13248,13274,13426,13460,13614,13643,13799,13828,13996,14024,14203,14243,14419,14458,14609,14657,14670,14831,14871,14894,15038,15078,15095,15245,15291,15305,15454,15493,15512,15720,15828,15878,15888,16036,16069,16094,16244,16274,16304,16462,16502,16520,16677,16713,16735,17076,17097,17247; echo EXIT=$?; rm -f /home/arm/gap029-probe.sh
+3254385 bash /home/arm/gap029-probe.sh 10834,11020,11205,11391,11581,11782,11945,12130,12315,12505,12692,12768,12869,12880,13055,13091,13248,13274,13426,13460,13614,13643,13799,13828,13996,14024,14203,14243,14419,14458,14609,14657,14670,14831,14871,14894,15038,15078,15095,15245,15291,15305,15454,15493,15512,15720,15828,15878,15888,16036,16069,16094,16244,16274,16304,16462,16502,16520,16677,16713,16735,17076,17097,17247
+no crontab for arm
+checkout_head=affe9a2c30842e35557710bc582cb9d6114ee39c status_lines=0 branch=main
+serving_release_dir: 
+build_id=QNEHXAtU53TzUjj0Mb7mv
+== E env var NAMES (values never printed) and parsed identities 2026-11-01T20:40:29Z
+env_file_mode=600 arm:arm
+      1 AFLDB_AUTH_DATABASE_URL
+      1 AFLDB_BACKUP_DATABASE_URL
+      1 AFLDB_IMPORT_DATABASE_URL
+      1 AFLDB_OWNER_DATABASE_URL
+      1 AFLDB_PROD_DATABASE_URL
+      1 DATABASE_URL
+AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=localhost port=5432 database=afldb_prod has_query=no
+AFLDB_IMPORT_DATABASE_URL user=afldb_import host=localhost port=5432 database=afldb_prod has_query=no
+DATABASE_URL user=afldb_app host=localhost port=5432 database=afldb_prod has_query=no
+== C credential (afldb_backup) and read-only session 2026-11-01T20:40:29Z
+== I identity (for target.json), ledger, extensions 2026-11-01T20:40:29Z
+identity	afldb_prod	afldb_backup	5432	66668	7674454702926115004	16/main	<null>	on	false	16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+ledger	117	117_brownlow_provider_eligibility_unknown.sql
+ledger_digest=647c3fb39ca66a572664e1dae9028e4fad4d6b121226d6bdf208e6738af45f72 rows=117
+ledger_row 115_adjudication_supersession_fk_index.sql	2f16efb9694f76f946543bbaca01785127b632417ad21ba1fc7b8745bb7c1852
+ledger_row 116_brownlow_correction_receipts.sql	c61953b71e1210b5389579342e155d367dfada5737bf3cd37f1a536b9ac61075
+ledger_row 117_brownlow_provider_eligibility_unknown.sql	a7dff2bddb1dd9c01ea0e69478193c5e5c50d8a531b2db448e7052b9f25e286f
+extensions	pg_trgm=1.6 plpgsql=1.0 unaccent=1.1
+locks_access_exclusive	0
+nonidle_sessions	0
+pg_stat_activity_by_app	afldb-gap029-labels-probe	1
+pg_stat_activity_by_app	postgres.js	2
+== A actors: Super Admins (ids only) and who holds can_manage_admins; owner e-mail match is a boolean 2026-11-01T20:40:29Z
+actor	1	super_admin	false	false	false	true
+actor_counts	admin	false	2
+actor_counts	contributor	false	1
+actor_counts	super_admin	false	1
+== P privileges of the audited writer role (afldb_import) on the tables saveEdit touches 2026-11-01T20:40:29Z
+priv	auth_users	false	false	false	
+priv	data_edits	true	true	false	
+priv	data_overrides	true	false	false	
+priv	matches	true	true	true	true
+role	afldb_app	false	true	true
+role	afldb_backup	false	true	true
+role	afldb_import	false	true	true
+role	afldb_owner	false	true	true
+== L label state 2026-11-01T20:40:30Z
+labelled_total	0
+edits_match_event	0
+overrides_match_event	0	0
+matches_total	17056	17274	2026-09-26
+== M the 64 evidenced matches (identity columns; for local comparison with the evidence file) 2026-11-01T20:40:30Z
+m	10834	1995	1995-04-25	4	M.C.G.	Collingwood	Essendon	111	111	<null>
+m	11020	1996	1996-04-25	5	M.C.G.	Essendon	Collingwood	105	117	<null>
+m	11205	1997	1997-04-25	5	M.C.G.	Essendon	Collingwood	70	99	<null>
+m	11391	1998	1998-04-25	5	M.C.G.	Collingwood	Essendon	108	88	<null>
+m	11581	1999	1999-04-25	5	M.C.G.	Essendon	Collingwood	108	100	<null>
+m	11782	2000	2000-04-25	7	M.C.G.	Collingwood	Essendon	100	140	<null>
+m	11945	2001	2001-04-25	5	M.C.G.	Essendon	Collingwood	103	95	<null>
+m	12130	2002	2002-04-25	5	M.C.G.	Collingwood	Essendon	66	33	<null>
+m	12315	2003	2003-04-25	5	M.C.G.	Essendon	Collingwood	147	81	<null>
+m	12505	2004	2004-04-25	5	M.C.G.	Collingwood	Essendon	79	112	<null>
+m	12692	2005	2005-04-25	5	M.C.G.	Essendon	Collingwood	83	69	<null>
+m	12768	2005	2005-07-09	15	M.C.G.	Richmond	Essendon	92	66	<null>
+m	12869	2006	2006-04-25	4	M.C.G.	Collingwood	Essendon	106	89	<null>
+m	12880	2006	2006-05-06	6	M.C.G.	Essendon	Richmond	95	97	<null>
+m	13055	2007	2007-04-25	5	M.C.G.	Essendon	Collingwood	79	95	<null>
+m	13091	2007	2007-05-26	9	M.C.G.	Richmond	Essendon	84	92	<null>
+m	13248	2008	2008-04-25	6	M.C.G.	Collingwood	Essendon	154	81	<null>
+m	13274	2008	2008-05-24	9	M.C.G.	Essendon	Richmond	72	110	<null>
+m	13426	2009	2009-04-25	5	M.C.G.	Essendon	Collingwood	93	88	<null>
+m	13460	2009	2009-05-23	9	M.C.G.	Richmond	Essendon	85	125	<null>
+m	13614	2010	2010-04-25	5	M.C.G.	Collingwood	Essendon	120	55	<null>
+m	13643	2010	2010-05-22	9	M.C.G.	Essendon	Richmond	130	95	<null>
+m	13799	2011	2011-04-25	5	M.C.G.	Essendon	Collingwood	77	107	<null>
+m	13828	2011	2011-05-21	9	M.C.G.	Richmond	Essendon	105	89	<null>
+m	13996	2012	2012-04-25	5	M.C.G.	Collingwood	Essendon	80	79	<null>
+m	14024	2012	2012-05-19	8	M.C.G.	Essendon	Richmond	128	109	<null>
+m	14203	2013	2013-04-25	5	M.C.G.	Essendon	Collingwood	121	75	<null>
+m	14243	2013	2013-05-25	9	M.C.G.	Richmond	Essendon	62	91	<null>
+m	14419	2014	2014-04-25	6	M.C.G.	Collingwood	Essendon	83	60	<null>
+m	14458	2014	2014-05-31	11	M.C.G.	Essendon	Richmond	104	54	<null>
+m	14609	2015	2015-04-25	4	M.C.G.	Essendon	Collingwood	49	69	<null>
+m	14657	2015	2015-05-30	9	M.C.G.	Richmond	Essendon	72	59	<null>
+m	14670	2015	2015-06-08	10	M.C.G.	Melbourne	Collingwood	85	110	<null>
+m	14831	2016	2016-04-25	5	M.C.G.	Collingwood	Essendon	142	73	<null>
+m	14871	2016	2016-05-28	10	M.C.G.	Essendon	Richmond	67	105	<null>
+m	14894	2016	2016-06-13	12	M.C.G.	Melbourne	Collingwood	104	58	<null>
+m	15038	2017	2017-04-25	5	M.C.G.	Essendon	Collingwood	100	82	<null>
+m	15078	2017	2017-05-27	10	M.C.G.	Richmond	Essendon	81	66	<null>
+m	15095	2017	2017-06-12	12	M.C.G.	Melbourne	Collingwood	104	100	<null>
+m	15245	2018	2018-04-25	5	M.C.G.	Collingwood	Essendon	101	52	<null>
+m	15291	2018	2018-06-02	11	M.C.G.	Essendon	Richmond	43	114	<null>
+m	15305	2018	2018-06-11	12	M.C.G.	Melbourne	Collingwood	91	133	<null>
+m	15454	2019	2019-04-25	6	M.C.G.	Essendon	Collingwood	69	73	<null>
+m	15493	2019	2019-05-25	10	M.C.G.	Richmond	Essendon	73	50	<null>
+m	15512	2019	2019-06-10	12	M.C.G.	Collingwood	Melbourne	98	57	<null>
+m	15720	2020	2020-08-22	13	Marrara Oval	Essendon	Richmond	61	73	<null>
+m	15828	2021	2021-04-25	6	M.C.G.	Collingwood	Essendon	85	109	<null>
+m	15878	2021	2021-06-05	12	Perth Stadium	Essendon	Richmond	84	123	<null>
+m	15888	2021	2021-06-14	13	S.C.G.	Melbourne	Collingwood	63	80	<null>
+m	16036	2022	2022-04-25	6	M.C.G.	Essendon	Collingwood	82	93	<null>
+m	16069	2022	2022-05-21	10	M.C.G.	Richmond	Essendon	80	48	<null>
+m	16094	2022	2022-06-13	13	M.C.G.	Collingwood	Melbourne	82	56	<null>
+m	16244	2023	2023-04-25	6	M.C.G.	Collingwood	Essendon	90	77	<null>
+m	16274	2023	2023-05-20	10	M.C.G.	Essendon	Richmond	71	70	<null>
+m	16304	2023	2023-06-12	13	M.C.G.	Melbourne	Collingwood	66	62	<null>
+m	16462	2024	2024-04-25	8	M.C.G.	Essendon	Collingwood	85	85	<null>
+m	16502	2024	2024-05-25	12	M.C.G.	Richmond	Essendon	74	86	<null>
+m	16520	2024	2024-06-10	14	M.C.G.	Collingwood	Melbourne	89	51	<null>
+m	16677	2025	2025-04-25	8	M.C.G.	Collingwood	Essendon	107	66	<null>
+m	16713	2025	2025-05-23	12	M.C.G.	Essendon	Richmond	81	58	<null>
+m	16735	2025	2025-06-09	14	M.C.G.	Melbourne	Collingwood	71	72	<null>
+m	17076	2026	2026-05-22	12	M.C.G.	Richmond	Essendon	74	56	<null>
+m	17097	2026	2026-06-08	14	M.C.G.	Collingwood	Melbourne	75	83	<null>
+m	17247	2026	2026-04-25	8	M.C.G.	Essendon	Collingwood	60	137	<null>
+== DONE 2026-11-01T20:40:30Z
+EXIT=0

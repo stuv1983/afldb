@@ -1,0 +1,38 @@
+== column grants for afldb_import (the audited writer's connection)
+col	data_overrides.admin_user_id	true	true
+col	data_overrides.entity_key	true	false
+col	data_overrides.entity_type	true	false
+col	data_overrides.field_group	true	false
+col	data_overrides.is_active	true	true
+col	data_overrides.override_values	true	true
+col	data_overrides.updated_at	true	true
+seq	data_overrides_id_seq	true
+col	matches.match_event	true
+sel	clubs	true
+sel	data_edits	true
+sel	data_overrides	true
+sel	matches	true
+== non-internal triggers on the touched tables
+== prior use of the audited editor path in production
+data_edits_by_table	brownlow_vote_entry_state	draft	1	2026-09-13	2026-09-13
+data_edits_by_table	matches	audit_note_repair	1	2026-10-25	2026-10-25
+data_edits_by_table	matches	match_sheet	1	2026-10-24	2026-10-24
+data_edits_by_table	players	source_identity	92	2026-09-27	2026-09-27
+overrides_by_entity	player_match_stats	1	1
+overrides_by_entity	players	92	92
+== concurrency facts (editing / maintenance exclusivity)
+sessions_by_user_app	afldb_app	postgres.js		2
+sessions_by_user_app	afldb_backup	afldb-gap029-labels-probe2	active	1
+ssh.exe : ERROR:  column "source" does not exist
+At line:1 char:564
++ ... probe2.sh'; & 'C:\Windows\System32\OpenSSH\ssh.exe' -o BatchMode=yes  ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (ERROR:  column "source" does not exist:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+LINE 1: SELECT 'recent_import_batches', id::text, source, status, st...
+                                                  ^
+HINT:  Perhaps you meant to reference the column "import_batches.source_id".
+max_data_edit	95	2026-10-25 08:28:17.435528+11
+== DONE
+ls: cannot access '/home/arm/gap029-probe*': No such file or directory

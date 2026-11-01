@@ -1,0 +1,39 @@
+isolated-pg: afldb_v2_gap029lab_q_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running node
+PASS  baseline succeeds on the live target and on the restored backup  [Read-only GAP-029 baseline 9b17f3ad2b94c | Read-only GAP-029 baseline 9b17f3ad2b94c]
+PASS  restored backup baseline equals the live baseline  [9b17f3ad2b94c0b7]
+initial {"edits":"0","overrides":"0","labelled":"0"}
+PASS  plan refuses an actor that is not an active Super Admin  [GAP-029 labels refused: the actor is not an active Super Admin]
+PASS  plan refuses a target whose identity is wrong  [GAP-029 labels refused: fresh target-bound backup and verified restore evidence required]
+PASS  plan refuses when the writer connection names another database  [GAP-029 labels refused: wrong target; no connection authorised]
+PASS  plan refuses backup evidence whose bytes differ  [GAP-029 labels refused: backup or restore evidence content differs]
+PASS  no refusal wrote anything  [{"edits":"0","overrides":"0","labelled":"0"}]
+PASS  plan succeeds read-only (64 to label)  [Review plan b13d7a19889592b952317fb402632e3ae46f7d82924f0edc99c4b5db7c73d374; no writes (6]
+PASS  apply refuses an approval that is wrong-revision  [GAP-029 labels refused: stale plan or missing execution approval]
+PASS  apply refuses an approval that is expired  [GAP-029 labels refused: stale plan or missing execution approval]
+PASS  apply refuses an approval that is no-reference  [GAP-029 labels refused: stale plan or missing execution approval]
+PASS  apply refuses an approval that is other-plan  [GAP-029 labels refused: stale plan or missing execution approval]
+PASS  apply refuses a plan edited after review  [GAP-029 labels refused: plan digest or evidence differs]
+PASS  apply refuses when the audited writer would write to another database  [GAP-029 labels refused: wrong target; no connection authorised]
+PASS  apply refuses baseline drift since the plan  [GAP-029 labels refused: baseline drift; re-plan and obtain new execution approval]
+PASS  plan refuses when a covered match is changed after the backup (here: it carries a different event; the backup-baseline check fires first)  [GAP-029 labels refused: baseline drift: the restored backup no longer matches the live tar]
+PASS  apply refuses a covered match whose venue identity changed to a different venue  [GAP-029 labels refused: match 10834 no longer has the expected identity]
+PASS  apply refuses a covered match whose venue identity changed to a case-changed venue  [GAP-029 labels refused: match 10834 no longer has the expected identity]
+PASS  plan refuses an actor who has been disabled  [GAP-029 labels refused: the actor is not an active Super Admin]
+PASS  apply refuses, before any write, when the planned actor has been disabled  [GAP-029 labels refused: the actor is not an active Super Admin]
+PASS  plan refuses an actor who has been demoted  [GAP-029 labels refused: the actor is not an active Super Admin]
+PASS  apply refuses, before any write, when the planned actor has been demoted  [GAP-029 labels refused: the actor is not an active Super Admin]
+PASS  the negative controls left nothing behind (live baseline equals the backup baseline again)
+PASS  an injected audit failure stops the run part-way (10 labels written, audited, consistent)  [{"edits":"10","overrides":"10","labelled":"10"}]
+PASS  the old plan is refused after the partial write (baseline moved); resume needs a re-plan  [GAP-029 labels refused: baseline drift; re-plan and obtain new execution approval]
+RESUME 1: fresh backup and restore, new plan, new approval
+PASS  second restore baseline equals the live baseline (and differs from the first)  [2c89578c8eb70d01]
+PASS  re-plan shows 54 to label and 10 already labelled  [Review plan f0294c5679326b47e2b8c7075f5ffec448d410bda11fe62ade3dcf175913af51; no writes (5]
+PASS  an actor disabled mid-run stops the run at the next label boundary (20 labels written, audited, consistent)  [GAP-029 labels refused: the actor is not an active Super Admin {"edits":"20","overrides":"20","labelled":"20"}]
+RESUME 2: fresh backup and restore, new plan, new approval
+PASS  third restore baseline equals the live baseline  [c3b0a80152782588]
+PASS  re-plan shows 44 to label and 20 already labelled  [Review plan cb99a4771ed5ea453994365e29931ba38fffa0b01147cf377e2f7b4c072d744d; no writes (4]
+PASS  resumed apply finishes: 64 labelled, 64 audit rows, 64 active overrides added in total  [{"edits":"64","overrides":"64","labelled":"64"}]
+PASS  distribution is Anzac 31 / Dreamtime 22 / King's Birthday 11  [[{"match_event":"Anzac Day","n":31},{"match_event":"Dreamtime at the 'G","n":22},{"match_event":"King's Birthday","n":11}]]
+PASS  result records 44 written and a verified outcome  [{"allLabelled":true,"auditRowsAdded":44,"overridesAdded":44,"dist":[{"match_event":"Anzac Day","n":31},{"match_event":"Dreamtime at the 'G","n":22},{"match_event":"King's Birthday","n":11}]}]
+PASS  replay of the same plan and approval writes nothing
+SUMMARY 34/34 checks passed

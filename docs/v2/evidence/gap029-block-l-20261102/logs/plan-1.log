@@ -1,0 +1,10 @@
+b9a4c1260af1a26b26a612e2b3e2304a10e79fa6674b72f07862e77c9f8254c1  /home/arm/ops/gap029-labels-86da1a82/in/restore-evidence-1.json
+== target identity from independent facts (read-only session) 2026-11-01T20:48:55Z
+{"host" : "localhost", "port" : 5432, "database" : "afldb_prod", "user" : "afldb_backup", "systemIdentifier" : "7674454702926115004", "databaseOid" : "66668", "clusterName" : "16/main", "databaseComment" : null}
+target equals the probe facts (sysid, oid, cluster, user)
+== tool plan (read-only; writes only the plan file) 2026-11-01T20:48:55Z
+Review plan 1b538e1a50cacdb24d37d771d79261a5926e35c69f53d03481ec47a26e79528a; no writes (64 to label, 0 already labelled)
+ef2e25888f850b37b5a1c43595791eb517d15ccb73bd43fe7bd19047de4ccc24  /home/arm/ops/gap029-labels-86da1a82/evidence/plan-1.json
+== post-run: ops checkout still clean 2026-11-01T20:48:55Z
+head=86da1a82329371fd23db6e2935a0e9334ba08f9a status_lines=0
+== DONE 2026-11-01T20:48:55Z

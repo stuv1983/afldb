@@ -1,0 +1,10 @@
+{
+  "host": "127.0.0.1",
+  "port": 55493,
+  "database": "afldb_v2_gap029blockl_l1_rst_test",
+  "user": "afldb_owner",
+  "systemIdentifier": "7703306842500590472",
+  "databaseOid": "32242",
+  "clusterName": "afldb_v2_isolated",
+  "databaseComment": "afldb-v2-isolated-test"
+}
