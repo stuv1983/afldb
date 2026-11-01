@@ -126,6 +126,20 @@ C5 additionally requires: the C4b PASS record, no 2027 match started (the first 
 | C4b | 36/36 e2e | systemd answers, `[2027]` register, scripted acquire and settle, readiness verdict | real systemd, polkit, provider, `UnsetEnvironment=` |
 | Trigger | unit tests over eleven values; no spawn | none | the live `.env` and process environment |
 
+### 8.1 Isolated Linux qualification (2026-11-01)
+
+Workstation Windows runs do not prove Linux behaviour, so the changed tools were re-run on Linux. **Environment:** the WSL2 distro `AFLDB-V2-Rehearsal-20261020` (Linux, systemd present but not used by the drivers), non-root user `rehearsal`, Node v22.21.0, PostgreSQL 16 client and server binaries, 31 GB RAM and 915 GB free before the run (checked first; nothing deleted or unregistered). Workspace `/home/rehearsal/qual-20261101` = `git archive` of the committed tree (3,849 files equal to `git ls-files`), the distro's existing Linux `node_modules` copied privately (lock file sha256 `984b4422…` equal to the checkout's; nothing installed or upgraded), a **new** guarded cluster on 127.0.0.1:55490 under `/home/rehearsal/qual-pg-20261101` (the distro's older cluster untouched). The same verified production backup (sha256 `3f5b5339…4730`, re-hashed on Linux) was restored with `pg_restore --no-owner` (only the two expected extension-comment errors; 17,056 matches).
+
+| Check | Linux result |
+|---|---|
+| Typecheck | clean |
+| Focused suites (`afl-api-cutover`, `admin-fixture-actions`, `v2-fixture-contract`) | **557 passed, 0 failed, 58 skipped** (POSIX-only cases such as SIGTERM-ignoring processes ran) |
+| C4b end-to-end | **36/36**, including the parent-SIGKILL scenario: the real detached watchdog turned the setting off by itself in about 4.8 s with the `on (run)` then `off (watchdog)` audit trail |
+| GAP-029 labels end-to-end | **24/24** |
+| Brownlow end-to-end | **not re-run on Linux**: its simulated prerequisite is seeded from a Windows-side rehearsal database that is not on the Linux cluster, and the runner has no platform-specific code beyond the driver's dump/restore binary names (fixed below) |
+
+**Defects the Linux run found, all in test drivers (none in production code), fixed and committed (`ac6732c0`, `f2e5540c`):** the C4b driver killed the victim with the Windows-only `taskkill`, so on Linux the parent was never killed, S12 failed and S13 cascaded (31/36 on the first Linux run); the labels and Brownlow drivers named `pg_dump.exe` / `pg_restore.exe`. The first Linux attempt also showed a provisioning-order slip of mine (roles created before the cluster started), which is a procedure note, not a defect. **Residual:** the first Linux C4b run left an orphan victim process (killed by me afterwards), which is exactly the case the portable kill now avoids. Evidence on the distro: `/home/rehearsal/qual-evidence-20261101/` (retained).
+
 ## 9. Consolidated owner-action list
 
 See the final report and the table in [IssuesIndex.md](../../IssuesIndex.md); in order:
