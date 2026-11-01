@@ -1,5 +1,8 @@
 {
   "operation": "eligibility",
+  "seasons": [
+    2025
+  ],
   "actorId": 1,
   "rulings": [
     {
