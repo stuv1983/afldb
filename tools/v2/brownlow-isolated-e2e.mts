@@ -232,12 +232,14 @@ const obsFingerprint = async (): Promise<string> => scalar(OBS_FP_SQL);
   check(`${stage}: exactly 212 afl_api 2025 match-family observations now exist`, fp.startsWith('212:'), fp);
   check(`${stage}: canonical football data is UNCHANGED (${CANON.length} tables hashed before and after)`, JSON.stringify(canonBefore) === JSON.stringify(canonAfter), CANON.filter((t) => canonBefore[t] !== canonAfter[t]).join(',') || 'identical');
   check(`${stage}: all vote rows (incl. 2026) are unchanged and no staging vote row was created`, after.votes === before.votes && (await scalar('SELECT count(*) FROM staging.afl_api_brownlow_vote')) === '0', '');
-  const batch = await sql<{ tool: string; status: string; notes: string; n: number }[]>`SELECT tool, status, notes, records_inserted AS n FROM import_batches WHERE tool = 'brownlow-production-correction.ts' ORDER BY id DESC LIMIT 1`;
+  const batch = await sql<{ tool: string; status: string; notes: string; n: number }[]>`SELECT tool, status, notes, records_inserted::int AS n FROM import_batches WHERE tool = 'brownlow-production-correction.ts' ORDER BY id DESC LIMIT 1`;
   check(`${stage}: one completed import batch owns the observations and names the pinned snapshot`, batch.length === 1 && batch[0].status === 'completed' && batch[0].n === 212 && batch[0].notes.includes(fixManifestSha) && !/SIMULATED/i.test(batch[0].notes), `inserted=${batch[0]?.n}`);
   const replay = applyStage(stage, plan.out, goodApproval, b, request, 'replay');
   const afterReplay = await state();
   check(`${stage}: replay is accepted and writes no second batch, version or receipt`, replay.status === 0 && afterReplay.receipts === after.receipts && afterReplay.batches === after.batches && (await obsFingerprint()) === fp, `receipts=${afterReplay.receipts} batches=${afterReplay.batches}`);
-  const again = await planStage(stage, request, b, 'plan-after');
+  // A re-plan needs a backup of the CURRENT state (the one taken before the apply no longer equals the target).
+  const bAfter = await freshBackup(`${stage}-after`);
+  const again = await planStage(stage, request, bAfter, 'plan-after');
   check(`${stage}: planning the stage again is refused (first load only)`, again.status !== 0 && /first load only/.test(again.msg), again.msg.slice(0, 110));
   // Optional corroboration against the earlier authentic rehearsal output (the template restored on this cluster).
   const cmpDb = process.env.AFLDB_B0_COMPARE_DB;
