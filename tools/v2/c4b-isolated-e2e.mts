@@ -277,7 +277,9 @@ const watchdogGone = async (evidenceDir: string): Promise<boolean> => {
   check('S12 victim run turned the setting ON (real watchdog armed first)', on && files(evidenceDir).includes('watchdog-ready.json'), `on=${on}`);
   const wd = JSON.parse(readFileSync(join(evidenceDir, 'watchdog-ready.json'), 'utf8'));
   check('S12 watchdog is a different live process from the run', wd.watchdogPid !== child.pid && alive(wd.watchdogPid), `run=${child.pid} watchdog=${wd.watchdogPid}`);
-  spawnSync('taskkill', ['/PID', String(child.pid), '/F'], { stdio: 'ignore' });
+  // Hard-kill the run with no chance to clean up: SIGKILL on POSIX, a forced taskkill on Windows.
+  if (process.platform === 'win32') spawnSync('taskkill', ['/PID', String(child.pid), '/F'], { stdio: 'ignore' });
+  else if (child.pid !== undefined) process.kill(child.pid, 'SIGKILL');
   const killedAt = Date.now();
   const off = await wait(async () => (await setting()) === 'false', 60_000, 250);
   check('S12 after the run was killed, the watchdog wrote the setting OFF by itself', off, `${Math.round((Date.now() - killedAt) / 100) / 10}s`);
