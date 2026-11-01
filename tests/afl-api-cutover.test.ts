@@ -234,6 +234,22 @@ import {
   type WatchdogDeps,
   type WatchdogReadyMarker,
 } from '../tools/current-season/afl-api-c4b-rehearsal';
+import {
+  CONSUMER_PATTERN,
+  SWITCH_REFERENCES,
+  WindowError,
+  auditProblems,
+  parseActions,
+  parseWindowArgs,
+  runFixtureWindow,
+  stepOutcomeProblem,
+  writerFindings,
+  type AuditRow,
+  type Inventory,
+  type InventoryLine,
+  type WindowArgs,
+  type WindowDeps,
+} from '../tools/current-season/afl-api-fixture-window';
 
 /* ------------------------------------------------------------------ *
  * The tracked control
@@ -3486,5 +3502,338 @@ describe('C4b rehearsal (AFLDB-ISSUE-316 §7): the setting is restored however t
       });
     });
 
+  });
+});
+
+/* ------------------------------------------------------------------ *
+ * F-229-SWITCH: the bounded fixture window (tools/current-season/afl-api-fixture-window.ts)
+ * ------------------------------------------------------------------ */
+
+describe('fixture window (F-229-SWITCH): arguments', () => {
+  const good = ['--label', 'afl-api-2027-2026-11-01-012026', '--expect-initial', 'absent', '--expect-created', '218',
+    '--expect-feed-sha256', 'a'.repeat(64), '--decision', 'OWNER-APPROVAL-2026-11-ABC', '--evidence-dir', 'D:/x/ev'];
+  const without = (flag: string): string[] => { const i = good.indexOf(flag); return [...good.slice(0, i), ...good.slice(i + 2)]; };
+  it('parses a complete run and defaults to a 15 minute deadline', () => {
+    expect(parseWindowArgs(good)).toMatchObject({ mode: 'run', expectInitial: 'absent', expectCreated: 218, maxMinutes: 15 });
+    expect(parseWindowArgs([...good, '--check-only']).mode).toBe('check-only');
+    expect(parseWindowArgs(['--restore-only', '--evidence-dir', 'D:/x/ev'])).toEqual({ mode: 'restore-only', evidenceDir: 'D:/x/ev' });
+  });
+  it('refuses every missing or malformed approval input', () => {
+    for (const flag of ['--label', '--expect-initial', '--expect-created', '--expect-feed-sha256', '--decision', '--evidence-dir']) {
+      expect(() => parseWindowArgs(without(flag)), flag).toThrow(WindowError);
+    }
+    const bad = (flag: string, value: string): string[] => { const a = [...good]; a[a.indexOf(flag) + 1] = value; return a; };
+    expect(() => parseWindowArgs(bad('--expect-initial', 'true'))).toThrow(/absent or false/);
+    expect(() => parseWindowArgs(bad('--expect-created', '0'))).toThrow(/expect-created/);
+    expect(() => parseWindowArgs(bad('--expect-created', '2.5'))).toThrow(/expect-created/);
+    expect(() => parseWindowArgs(bad('--expect-feed-sha256', 'abc'))).toThrow(/64-hex/);
+    expect(() => parseWindowArgs(bad('--decision', 'too short'))).toThrow(/20 or more/);
+    expect(() => parseWindowArgs(bad('--label', '../escape'))).toThrow(/snapshot directory name/);
+    expect(() => parseWindowArgs([...good, '--max-minutes', '4'])).toThrow(/5 to 60/);
+    expect(() => parseWindowArgs([...good, '--max-minutes', '61'])).toThrow(/5 to 60/);
+    expect(() => parseWindowArgs([...good, '--force'])).toThrow(/Unknown argument/);
+    expect(() => parseWindowArgs([...good, '--label', 'other'])).toThrow(/more than once/);
+  });
+});
+
+describe('fixture window (F-229-SWITCH): pure checks', () => {
+  const none = new Set<number>();
+  const inv = (lines: InventoryLine[], extra: Partial<Inventory> = {}): Inventory => ({ lines, unreadable: [], notInstalled: [], ...extra });
+  it('an empty inventory shows no other writer; an unreadable source proves nothing', () => {
+    expect(writerFindings(inv([]), none)).toEqual([]);
+    expect(writerFindings(inv([], { unreadable: ['crontab'] }), none)).toEqual([expect.stringMatching(/'crontab' could not be read, so it proves nothing/)]);
+    expect(writerFindings(inv([], { notInstalled: ['at'] }), none)).toEqual([]);
+  });
+  it('finds a consumer in cron, at, the process table and a startable unit, whatever the unit is called', () => {
+    const f = writerFindings(inv([
+      { source: 'cron', text: '0 5 * * * node tools/current-season/settle-afl-api-fixtures.ts --label x' },
+      { source: 'at', text: '3 a arm node acquire-afl-api.ts' },
+      { source: 'process', pid: 77, text: 'node tools/current-season/settle-afl-api-brownlow.ts' },
+      { source: 'systemd-unit', text: 'nightly-sync.timer enabled inactive ExecStart=/usr/bin/node tools/current-season/acquire-afl-api.ts' },
+      { source: 'systemd-unit', text: 'adhoc.service disabled active ExecStart=/usr/bin/node tools/current-season/settle-afl-api.ts' },
+    ]), none);
+    expect(f).toHaveLength(5);
+  });
+  it('does not flag what cannot start, this process, or unrelated text', () => {
+    expect(writerFindings(inv([
+      { source: 'systemd-unit', text: 'afldb-settle-afl-api.service static inactive ExecStart=/srv/afldb/deploy/afldb-settle-afl-api.sh' },
+      { source: 'systemd-unit', text: 'afldb-settle-afl-api.timer disabled inactive ExecStart=' },
+      { source: 'systemd-unit-file', text: 'afldb-settle-afl-api.timer disabled enabled' },
+      { source: 'process', pid: 5, text: 'node tools/current-season/settle-afl-api-fixture-schedule.ts --apply' },
+      { source: 'process', pid: 9, text: 'node server.js' },
+      { source: 'cron', text: '0 3 * * * pg_dump afldb' },
+    ]), new Set([5]))).toEqual([]);
+  });
+  it('database sessions: a writer role is a finding, the application roles are not (backend pids are never compared with OS pids)', () => {
+    const f = writerFindings(inv([
+      { source: 'session', pid: 5, role: 'afldb_import', state: 'idle' },
+      { source: 'session', pid: 6, role: 'afldb_owner', state: 'active' },
+      { source: 'session', pid: 7, role: 'afldb_app', state: 'idle' },
+      { source: 'session', pid: 8, role: 'afldb_auth', state: 'idle' },
+    ]), new Set([5, 6]));
+    expect(f).toHaveLength(2);
+    expect(f[0]).toMatch(/afldb_import/);
+  });
+  it('step outcomes: exactly the expected status and created count, no other action, no refusal', () => {
+    const ok = 'Season 2027: x\nOutcome: dry_run\nActions: created=218\n  CREATED CD_M1\n';
+    expect(parseActions(ok)).toEqual({ created: 218 });
+    expect(parseActions('Actions: created=3, updated=1')).toEqual({ created: 3, updated: 1 });
+    expect(parseActions('no actions line')).toBeNull();
+    expect(stepOutcomeProblem('dry-run', ok, 'dry_run', 218)).toBeNull();
+    expect(stepOutcomeProblem('dry-run', ok, 'dry_run', 217)).toMatch(/not exactly created=217/);
+    expect(stepOutcomeProblem('dry-run', ok.replace('dry_run', 'no_changes'), 'dry_run', 218)).toMatch(/no_changes, not dry_run/);
+    expect(stepOutcomeProblem('apply', ok, 'applied', 218)).toMatch(/dry_run, not applied/);
+    expect(stepOutcomeProblem('apply', 'Outcome: applied\nActions: created=218, updated=2\n', 'applied', 218)).toMatch(/not exactly/);
+    expect(stepOutcomeProblem('apply', 'Outcome: applied\n  REFUSED CD_M9 venue\nActions: created=218\n', 'applied', 218)).toMatch(/refusal/);
+    expect(stepOutcomeProblem('apply', 'Outcome: applied\n', 'applied', 218)).toMatch(/no parsable Actions/);
+  });
+  it('audit reconciliation: our on then off only; any foreign row is a concurrent toggle', () => {
+    const row = (id: number, run: string, enabled: boolean): AuditRow => ({ id, actorLabel: null, detail: { run_id: run, enabled } });
+    expect(auditProblems([row(1, 'r', true), row(2, 'r', false)], 'r')).toEqual([]);
+    expect(auditProblems([row(1, 'r', true), row(2, 'someone', true), row(3, 'r', false)], 'r')[0]).toMatch(/concurrent toggle/);
+    expect(auditProblems([row(1, 'r', true)], 'r')[0]).toMatch(/expected an ON and an OFF/);
+    expect(auditProblems([row(1, 'r', true), row(2, 'r', false), row(3, 'r', true)], 'r').join(' ')).toMatch(/not the switch-off|turned on again/);
+  });
+});
+
+describe('fixture window (F-229-SWITCH): the registry of switch consumers cannot drift', () => {
+  const TOKENS = /afl_api_current_season_enabled|aflApiCurrentSeasonEnabled|readAflApiIngestionControls|afl-api-ingestion-control|afl-api-ingestion-safety|AflApiIngestion/;
+  const repoRoot = path.resolve(__dirname, '..');
+  const walk = (dir: string, out: string[] = []): string[] => {
+    for (const e of readdirSync(path.join(repoRoot, dir), { withFileTypes: true })) {
+      if (e.name === 'node_modules' || e.name === '.next' || e.name.startsWith('.')) continue;
+      const rel = `${dir}/${e.name}`;
+      if (e.isDirectory()) walk(rel, out);
+      else if (/\.(ts|tsx|mts|sh|service|timer)$/.test(e.name)) out.push(rel);
+    }
+    return out;
+  };
+  const referencing = [...walk('src'), ...walk('tools'), ...walk('deploy'), ...walk('packages')]
+    .filter((rel) => TOKENS.test(readFileSync(path.join(repoRoot, rel), 'utf8'))).sort();
+  it('every non-test file that reads the switch is in the reviewed registry, and the registry names nothing that no longer does', () => {
+    expect(referencing).toEqual(Object.keys(SWITCH_REFERENCES).sort());
+  });
+  it('every writer CLI the registry names is matched by the process/scheduler pattern', () => {
+    const cli = Object.entries(SWITCH_REFERENCES).filter(([, kind]) => kind === 'writer-cli').map(([rel]) => rel);
+    expect(cli.length).toBeGreaterThanOrEqual(7);
+    for (const rel of cli) expect(CONSUMER_PATTERN.test(rel), rel).toBe(true);
+    expect(CONSUMER_PATTERN.test('node server.js')).toBe(false);
+    expect(CONSUMER_PATTERN.test('tools/v2/brownlow-production-correction.ts')).toBe(false);
+  });
+});
+
+describe('fixture window (F-229-SWITCH): the window runs and always restores', () => {
+  const dryOk = (n: number) => `Outcome: dry_run\nActions: created=${n}\n`;
+  const applyOk = (n: number) => `Outcome: applied\nActions: created=${n}\n`;
+  type Opts = {
+    initial?: string | null; // raw stored text, null = absent
+    steps?: Partial<Record<'validate' | 'dry' | 'apply', (abort: AbortSignal) => StepResult | Promise<StepResult>>>;
+    inventory?: () => Inventory;
+    lock?: boolean;
+    files?: Record<string, string | undefined>;
+    failRestore?: boolean;
+    applyCreates?: number;
+  };
+  function harness(o: Opts = {}) {
+    const events: string[] = [];
+    const st = { raw: o.initial === undefined ? null : o.initial, fixtures: 0, matches: 100, audit: [] as AuditRow[], evidence: {} as Record<string, string>, lockReleased: false };
+    const files: Record<string, string | undefined> = {
+      'data/reference/seasons.json': JSON.stringify({ in_progress_seasons: [2027] }),
+      'data/reference/afltables-network.json': JSON.stringify({ status: 'retired', last_season: 2026 }),
+      ...o.files,
+    };
+    const stored = (): SettingValue => (st.raw === null ? { present: false } : { present: true, value: st.raw });
+    const deps: WindowDeps = {
+      log: () => {},
+      projectFile: (rel) => files[rel],
+      fileSha256: () => 'f'.repeat(64),
+      systemctl: (verb) => { events.push(`systemctl ${verb}`); return verb === 'is-enabled' ? 'disabled' : 'inactive'; },
+      sameDatabase: async () => {},
+      readSetting: async () => stored(),
+      rawSetting: async () => st.raw,
+      controlSeesEnabled: async () => { const s = stored(); return s.present && normaliseStoredSetting(s.value) === 'true'; },
+      writeSetting: async (enabled, detail) => {
+        if (!enabled && o.failRestore) throw new Error('simulated database error');
+        events.push(`write ${enabled}`);
+        st.raw = String(enabled);
+        st.audit.push({ id: st.audit.length + 1, actorLabel: null, detail: { ...detail, enabled } });
+      },
+      inventory: async () => { events.push('inventory'); return (o.inventory ?? (() => ({ lines: [], unreadable: [], notInstalled: [] })))(); },
+      ownPids: () => new Set<number>(),
+      holdWindowLock: async () => { events.push('lock'); return o.lock === false ? null : { release: async () => { st.lockReleased = true; } }; },
+      counts: async () => ({ fixtures: st.fixtures, matches: st.matches }),
+      maxAuditId: async () => st.audit.length,
+      auditSince: async (id) => st.audit.filter((r) => r.id > id),
+      runStep: async (_script, argv, abort) => {
+        const key = argv.includes('--validate-only') ? 'validate' : argv.includes('--dry-run') ? 'dry' : 'apply';
+        events.push(`step ${key}`);
+        const custom = o.steps?.[key];
+        if (custom) return custom(abort);
+        if (key === 'validate') return { exitCode: 0, signal: null, output: 'validated\n' };
+        if (key === 'dry') return { exitCode: 0, signal: null, output: dryOk(218) };
+        st.fixtures += o.applyCreates ?? 218;
+        return { exitCode: 0, signal: null, output: applyOk(o.applyCreates ?? 218) };
+      },
+      armWatchdog: async () => { events.push('arm'); },
+      markRestoreVerified: () => { events.push('restore-verified'); },
+      writeEvidence: (name, content) => { st.evidence[name] = content; },
+      onInterrupt: () => () => {},
+      scheduleDeadline: () => () => {},
+      now: () => new Date('2026-11-01T00:00:00Z'),
+      sleep: async () => {},
+    };
+    return { deps, st, events };
+  }
+  const args = (over: Partial<Extract<WindowArgs, { label: string }>> = {}): Extract<WindowArgs, { label: string }> => ({
+    mode: 'run', label: 'snap', expectInitial: 'absent', expectCreated: 218, expectFeedSha256: 'f'.repeat(64),
+    decision: 'OWNER-APPROVAL-2026-11-ABC', evidenceDir: 'ev', maxMinutes: 15, ...over,
+  });
+
+  it('succeeds in the proven order: validate, lock, watchdog, ON, dry-run, apply, OFF verified', async () => {
+    const h = harness();
+    const out = await runFixtureWindow(args(), 'run-1', h.deps);
+    expect(out).toMatchObject({ exitCode: 0, verdict: 'CLEAR' });
+    const seq = h.events.filter((e) => /^(lock|arm|write|step|restore-verified)/.test(e));
+    expect(seq).toEqual(['step validate', 'lock', 'arm', 'write true', 'step dry', 'step apply', 'write false', 'restore-verified']);
+    expect(h.st.fixtures).toBe(218);
+    expect(h.st.raw).toBe('false');
+    expect(h.st.lockReleased).toBe(true);
+    const tr = JSON.parse(h.st.evidence['transition.json']);
+    expect(tr.events.map((e: { what: string }) => e.what)).toEqual(['switch-on', 'dry-run', 'apply', 'switch-off']);
+    expect(tr.before.switchRaw).toBeNull();
+    expect(tr.after.switchRaw).toBe('false');
+  });
+  it('a refusal before any write leaves the switch, the audit trail and the lock alone', async () => {
+    const cases: [string, Opts, Partial<Extract<WindowArgs, { label: string }>>, RegExp][] = [
+      ['initial state true', { initial: 'true' }, {}, /true.*not the expected absent/],
+      ['initial state false when absent expected', { initial: 'false' }, {}, /false.*not the expected absent/],
+      ['initial state absent when false expected', { initial: null }, { expectInitial: 'false' }, /absent, not the expected false/],
+      ['odd stored value', { initial: '"maybe"' }, {}, /not the expected absent/],
+      ['AFL Tables switch not retired', { files: { 'data/reference/afltables-network.json': JSON.stringify({ status: 'active', last_season: 2026 }) } }, {}, /AFL Tables switch/],
+      ['a foreign writer process', { inventory: () => ({ lines: [{ source: 'process', pid: 9, text: 'node settle-afl-api-fixtures.ts' }], unreadable: [], notInstalled: [] }) }, {}, /running a switch consumer/],
+      ['an unreadable inventory source', { inventory: () => ({ lines: [], unreadable: ['at'], notInstalled: [] }) }, {}, /proves nothing/],
+    ];
+    for (const [name, o, over, needle] of cases) {
+      const h = harness(o);
+      const out = await runFixtureWindow(args(over), 'run-x', h.deps);
+      expect(out.exitCode, name).toBe(2);
+      expect(out.reasons.join(' | '), name).toMatch(needle);
+      expect(h.st.audit, name).toEqual([]);
+      expect(h.events.filter((e) => e.startsWith('write') || e === 'arm' || e === 'lock'), name).toEqual([]);
+    }
+  });
+  it('a failed offline validation or a held lock refuses before the switch is touched', async () => {
+    let h = harness({ steps: { validate: () => ({ exitCode: 1, signal: null, output: 'bad manifest' }) } });
+    expect((await runFixtureWindow(args(), 'r', h.deps)).exitCode).toBe(2);
+    expect(h.st.audit).toEqual([]);
+    h = harness({ lock: false });
+    const out = await runFixtureWindow(args(), 'r', h.deps);
+    expect(out.exitCode).toBe(2);
+    expect(out.reasons[0]).toMatch(/one window at a time/);
+    expect(h.events).not.toContain('arm');
+  });
+  it('--check-only proves the preconditions and writes nothing, arms nothing, locks nothing', async () => {
+    const h = harness();
+    const out = await runFixtureWindow(args({ mode: 'check-only' }), 'r', h.deps);
+    expect(out.exitCode).toBe(0);
+    expect(h.events.filter((e) => /^(lock|arm|write|step)/.test(e))).toEqual([]);
+  });
+  it('the watchdog failing to arm refuses with the switch never turned on', async () => {
+    const h = harness();
+    h.deps.armWatchdog = async () => { throw new Error('no handshake'); };
+    const out = await runFixtureWindow(args(), 'r', h.deps);
+    expect(out.exitCode).toBe(2);
+    expect(h.events).not.toContain('write true');
+    expect(h.st.lockReleased).toBe(true);
+  });
+  it('a dry-run that does not report exactly created=N halts, never applies, and restores', async () => {
+    for (const output of ['Outcome: dry_run\nActions: created=217\n', 'Outcome: no_changes\nActions: unchanged=218\n', 'Outcome: refused\n  REFUSED CD_M1 x\n']) {
+      const h = harness({ steps: { dry: () => ({ exitCode: 0, signal: null, output }) } });
+      const res = await runFixtureWindow(args(), 'r', h.deps);
+      expect(res.exitCode, output).toBe(1);
+      expect(h.events, output).not.toContain('step apply');
+      expect(h.st.raw, output).toBe('false');
+      expect(h.st.fixtures, output).toBe(0);
+    }
+  });
+  it('an apply that fails, or reports another count, halts and restores', async () => {
+    let h = harness({ steps: { apply: () => ({ exitCode: 1, signal: null, output: 'Outcome: refused\n' }) } });
+    expect((await runFixtureWindow(args(), 'r', h.deps)).exitCode).toBe(1);
+    expect(h.st.raw).toBe('false');
+    h = harness({ applyCreates: 200 });
+    const res = await runFixtureWindow(args(), 'r', h.deps);
+    expect(res.exitCode).toBe(1);
+    expect(res.reasons.join(' ')).toMatch(/created=200|created=218|fixtures went/);
+    expect(h.st.raw).toBe('false');
+  });
+  it('a writer appearing during the dry-run, a changed switch, or a foreign toggle stops the apply', async () => {
+    let calls = 0;
+    let h = harness({ inventory: () => (++calls === 1 ? { lines: [], unreadable: [], notInstalled: [] } : { lines: [{ source: 'cron', text: '* * * * * node settle-afl-api-fixtures.ts' }], unreadable: [], notInstalled: [] }) });
+    let res = await runFixtureWindow(args(), 'r', h.deps);
+    expect(res.exitCode).toBe(1);
+    expect(res.reasons.join(' ')).toMatch(/before the apply: cron names a switch consumer/);
+    expect(h.events).not.toContain('step apply');
+    expect(h.st.raw).toBe('false');
+
+    const h2 = harness();
+    h2.deps.runStep = async (_s, argv) => {
+      if (argv.includes('--validate-only')) return { exitCode: 0, signal: null, output: 'ok' };
+      h2.st.raw = 'false';
+      return { exitCode: 0, signal: null, output: dryOk(218) };
+    };
+    res = await runFixtureWindow(args(), 'r', h2.deps);
+    expect(res.exitCode).toBe(1);
+    expect(res.reasons.join(' ')).toMatch(/not true: someone else changed it/);
+    expect(h2.events).not.toContain('step apply');
+
+    h = harness();
+    const original = h.deps.runStep;
+    h.deps.runStep = async (s, argv, abort) => {
+      const r = await original(s, argv, abort);
+      if (argv.includes('--dry-run')) h.st.audit.push({ id: 99, actorLabel: 'admin', detail: { run_id: 'other', enabled: true } });
+      return r;
+    };
+    res = await runFixtureWindow(args(), 'r', h.deps);
+    expect(res.exitCode).toBe(1);
+    expect(res.reasons.join(' ')).toMatch(/concurrent toggle, so the apply is not started/);
+    expect(h.events).not.toContain('step apply');
+    expect(h.st.fixtures).toBe(0);
+  });
+  it('an interrupt stops the step and still restores', async () => {
+    const h = harness();
+    let interrupt: ((s: string) => void) | undefined;
+    h.deps.onInterrupt = (fn) => { interrupt = fn; return () => {}; };
+    h.deps.runStep = async (_s, argv, abort) => {
+      if (argv.includes('--validate-only')) return { exitCode: 0, signal: null, output: 'ok' };
+      return new Promise((resolve) => { setTimeout(() => interrupt?.('SIGTERM'), 5); abort.addEventListener('abort', () => resolve({ exitCode: null, signal: 'SIGTERM', output: '' }), { once: true }); });
+    };
+    const res = await runFixtureWindow(args(), 'r', h.deps);
+    expect(res.exitCode).toBe(1);
+    expect(res.reasons.join(' ')).toMatch(/interrupted by SIGTERM/);
+    expect(h.st.raw).toBe('false');
+    expect(h.st.lockReleased).toBe(true);
+  });
+  it('a restore that cannot be verified is exit 3 and says so; no restore marker is written', async () => {
+    const h = harness({ failRestore: true });
+    const res = await runFixtureWindow(args(), 'r', h.deps);
+    expect(res).toMatchObject({ exitCode: 3, verdict: 'RESTORATION NOT VERIFIED' });
+    expect(res.reasons[0]).toMatch(/--restore-only/);
+    expect(h.events).not.toContain('restore-verified');
+    expect(h.st.raw).toBe('true');
+  });
+  it('a missing result record turns a CLEAR into a HALT', async () => {
+    const h = harness();
+    const write = h.deps.writeEvidence;
+    h.deps.writeEvidence = (name, content) => { if (name === 'result.json') throw new Error('disk full'); write(name, content); };
+    const res = await runFixtureWindow(args(), 'r', h.deps);
+    expect(res.exitCode).toBe(1);
+    expect(res.evidenceError).toMatch(/result evidence could not be written/);
+  });
+  it('the admin-written JSON string "false" is accepted as `false`, and the run leaves the canonical boolean', async () => {
+    const h = harness({ initial: '"false"' });
+    const res = await runFixtureWindow(args({ expectInitial: 'false' }), 'r', h.deps);
+    expect(res.exitCode).toBe(0);
+    expect(h.st.raw).toBe('false');
+    expect(JSON.parse(h.st.evidence['transition.json']).before.switchRaw).toBe('"false"');
   });
 });
