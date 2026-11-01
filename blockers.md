@@ -1,5 +1,7 @@
 # AFLDB Waiting and Blocker Register
 
+> **2026-11-01 end-of-batch update (local; nothing pushed or executed on production):** one [master sequence](docs/v2/master-execution-sequence-2026-11-01.md) now orders the owner-attended blocks with separate approvals (L labels; M migration 118 + code + first fixture apply; C3/C4b/C5; B Brownlow). **New blockers:** F-BRO-1 (production lacks the 2025 `afl_api` fixture observations the Brownlow adopt stage needs; owner decision before block B can be approved) and F-229-SWITCH (the first fixture apply needs a temporary, verified-restored enable of `acquisition.afl_api_current_season_enabled`). **C2 acceptance recorded** on the corrected criterion. C4b and the Brownlow stages are proven end to end on disposable copies (36/36, 53/53); the 64 labels' production entry point exists (24/24 isolated).
+>
 > **V2 released to production (2026-10-31, D-V2-PROD-EXEC-1; latest):** `9ed9c9dd`, `BUILD_ID`
 > `QNEHXAtU53TzUjj0Mb7mv`, ledger 117, behind `beta.afldb.com`. The AFL Tables timer is retired, no new writer or
 > provider is enabled, and the freeze was lifted at 10:20:45 AEDT.

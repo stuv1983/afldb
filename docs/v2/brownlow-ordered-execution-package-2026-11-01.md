@@ -1,6 +1,6 @@
 # Brownlow ordered execution package: observe, backfill, adoption, eligibility, acceptance (2026-11-01)
 
-**Status: PREPARED, NOT EXECUTED. Nothing was run against production or any shared database, including `observe`.** This package orders and pins the stages already approved at policy level (D-V2-BROWNLOW-ELIGIBILITY-1, OD-BROWNLOW-OWNERSHIP-1, D-V2-BROWNLOW-MATCH-BACKFILL-1 at reviewed HEAD `92aa541d91a9b2cfcb43ddda861f573801540ec8`; [decisions](brownlow-policy-decisions-2026-10-20.md)). Policy approval is not execution approval: every stage below needs its own fresh plan, its own written execution approval and its own baseline ([approval package](brownlow-production-approval-package-2026-10-20.md) contract, unchanged). Covers V2-GAP-016, 030 and 031. 2026 is excluded from every stage.
+**Status: PREPARED, NOT EXECUTED. Nothing was run against production or any shared database, including `observe`. 2026-11-01 addendum: the stages were exercised end to end on guarded disposable copies (see [the master sequence](master-execution-sequence-2026-11-01.md) section 6); block B is BLOCKED by finding F-BRO-1 (production lacks the 2025 `afl_api` fixture observations that adopt needs), and ledger expectations below are rebound to 118.** This package orders and pins the stages already approved at policy level (D-V2-BROWNLOW-ELIGIBILITY-1, OD-BROWNLOW-OWNERSHIP-1, D-V2-BROWNLOW-MATCH-BACKFILL-1 at reviewed HEAD `92aa541d91a9b2cfcb43ddda861f573801540ec8`; [decisions](brownlow-policy-decisions-2026-10-20.md)). Policy approval is not execution approval: every stage below needs its own fresh plan, its own written execution approval and its own baseline ([approval package](brownlow-production-approval-package-2026-10-20.md) contract, unchanged). Covers V2-GAP-016, 030 and 031. 2026 is excluded from every stage.
 
 The facts here come from the fresh read-only production census ([record](brownlow-gaps-016-030-031-fresh-census-2026-11-01.md)) and from re-reads on the guarded disposable restore of the checksum-verified production backup (`afldb_prod-20261031-084435.dump`, sha256 `3f5b5339…4730`, restored as `afldb_v2_gap029_prod_test`). The disposable restore is a copy of PRODUCTION AS OF 2026-10-31, not production now; the tool's own `baseline` and `plan` are authoritative at execution time.
 
@@ -37,7 +37,7 @@ Plan / apply commands are those in the [approval package](brownlow-production-ap
 ```sql
 \set ON_ERROR_STOP on
 BEGIN READ ONLY;
--- 1. migration ledger (expect 117 as latest; 116 and 117 present)
+-- 1. migration ledger (expect 118 as latest once block M has run, otherwise 117; 116, 117 present). A plan or baseline bound to ledger 117 is NOT reused after 118: re-take it
 SELECT count(*) AS ledger_rows, max(name) AS latest FROM afldb_meta.schema_migrations;
 SELECT name, checksum FROM afldb_meta.schema_migrations WHERE name LIKE '116%' OR name LIKE '117%' ORDER BY name;
 -- 2. receipts (expect 0 rows before stage B1)
@@ -61,7 +61,7 @@ SELECT (SELECT count(*) FROM public.brownlow_eligibility_decisions) AS eligibili
 ROLLBACK;
 ```
 
-On the 2026-10-31 restore the same reads return: latest ledger name `117_brownlow_provider_eligibility_unknown.sql`, active Super Admin id **1** (one row, not disabled), 0 eligibility decisions. The restore is not production; production's values are what the owner block must report. `actorId` in the eligibility request (section 7) is **1 only if production returns the same**.
+On the 2026-10-31 restore (ledger 117) the same reads return: latest ledger name `117_brownlow_provider_eligibility_unknown.sql`, active Super Admin id **1** (one row, not disabled), 0 eligibility decisions. The restore is not production; production's values are what the owner block must report. `actorId` in the eligibility request (section 7) is **1 only if production returns the same**.
 
 ## 4. Stage A: baselines (read-only)
 
@@ -72,7 +72,7 @@ On the 2026-10-31 restore the same reads return: latest ledger name `117_brownlo
 | Item | Value |
 |---|---|
 | Request | `{"operation":"observe","seasons":[2025]}`, source `afl_api`, `--snapshot-label afl-api-brownlow-2025-2026-10-20-014218` on both `plan` and `apply` |
-| Prerequisite | the pinned snapshot (2 raw files + manifest, manifest sha256 `43dec3ee84e2bd622a9d33899eb16896487d5344f5225eaa819b5a1262bb47f3`) held at `D:\tmp\afldb-gap006-brownlow-artifacts-20261101\acq-x\` is placed under the reviewed checkout's acquisition directory (the loader resolves it from the process working directory, i.e. the checkout root) before planning; re-hash all three files first. No provider is contacted |
+| Prerequisite (corrected) | **The adopt stage (B3) also needs the 2025 `afl_api` match-family fixture observations (212 under `scope_key = 'season=2025'`), which production does not hold, and which the only producing tool refuses for a sealed season (finding F-BRO-1, master sequence section 6): an owner decision precedes any approval of this block.** Separately, the pinned snapshot (2 raw files + manifest, manifest sha256 `43dec3ee84e2bd622a9d33899eb16896487d5344f5225eaa819b5a1262bb47f3`) held at `D:\tmp\afldb-gap006-brownlow-artifacts-20261101\acq-x\` is placed under the reviewed checkout's acquisition directory (the loader resolves it from the process working directory, i.e. the checkout root) before planning; re-hash all three files first. No provider is contacted |
 | Entry guards | the runner requires 207 sets, 188 leaderboard entries, literal boolean provider eligibility and a 2025 manifest, and refuses an unknown flag |
 | Expected write | spine, typed staging (207 sets, 621 positive vote rows, 188 leaderboard players), import batch, receipt. **No canonical vote write** |
 | Acceptance (read-only) | `SELECT count(*) FROM staging.afl_api_brownlow_vote WHERE season = 2025` = 621 (and 207 distinct match sets in the receipt `result`); `brownlow_round_votes` total 330,383 and the scope and 2026 fingerprints unchanged from stage A; one `observe` receipt |

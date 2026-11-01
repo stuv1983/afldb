@@ -1,6 +1,6 @@
 # ISSUE-316 / V2-GAP-011: C2 acceptance record, and the C3, C4, C4b and C5 packages (2026-11-01)
 
-**Status: PREPARED, NOTHING EXECUTED.** No sudo, no unit installed, enabled or started, no setting changed, no production rehearsal, no writer activation, no cutover, no production migration. Frozen P/H/EXEC, authorities and recovery bindings are untouched and no expired window is revived. This document completes [the earlier reconciliation](issue316-gap011-remaining-reconciliation-2026-11-01.md) with the evidence that record lacked (the snapshot-label check and the `AFLDB_SETTLE_TRIGGER` supply), the C2 acceptance record drafted from actual evidence, and exact reviewable packages for the remaining steps. Procedure stays that of the [runbook](../../issues/open/AFLDB-ISSUE-316.md) §7 (rows C2 to C5, "C4b. D1 rehearsal"); where this document and the runbook differ, the difference is stated in section 1 or 6 and the owner decides.
+**Status: PREPARED, NOTHING EXECUTED. Section 2 (C2) is now RECORDED ACCEPTED on the corrected criterion (2026-11-01 addendum); C3 to C5 are not accepted and the withdrawn counted-night work is not revived.** No sudo, no unit installed, enabled or started, no setting changed, no production rehearsal, no writer activation, no cutover, no production migration. Frozen P/H/EXEC, authorities and recovery bindings are untouched and no expired window is revived. This document completes [the earlier reconciliation](issue316-gap011-remaining-reconciliation-2026-11-01.md) with the evidence that record lacked (the snapshot-label check and the `AFLDB_SETTLE_TRIGGER` supply), the C2 acceptance record drafted from actual evidence, and exact reviewable packages for the remaining steps. Procedure stays that of the [runbook](../../issues/open/AFLDB-ISSUE-316.md) §7 (rows C2 to C5, "C4b. D1 rehearsal"); where this document and the runbook differ, the difference is stated in section 1 or 6 and the owner decides.
 
 ## 1. New evidence taken today (read-only)
 
@@ -26,10 +26,22 @@ Runbook C2 acceptance column, item by item:
 | The deploy carries a rebuild | **MET** | V2 released at `9ed9c9dd`, build `QNEHXAtU53TzUjj0Mb7mv` (2026-10-31, D-V2-PROD-EXEC-1), and later routes ISSUE-329/330 rebuilt from descendants |
 | Next nightly logs `AFLDB_AFLTABLES_RETIRED` and exits 0, **or the timer is disabled** | **MET by the second branch** | `afldb-settle-afltables.timer` disabled and inactive (A-AFLT, release window 2026-10-31; re-read 2026-11-01); no nightly has run since |
 | Readiness INFO `afltables_network: retired` | **MET** (offline) | the readiness report prints `INFO afltables_network: retired` (re-run today against the retained 2027 feed: REPOSITORY READY, 7/7 PASS) |
-| **No AFL Tables snapshot label newer than the rollover's** | **NOT MET as worded; explained, owner decides** | The rollover's own final acquisition is `c2-2026-final-core-v1`, extracted **2026-10-21 04:34:37Z** (15:34 AEDT); production holds **ten nightly labels created after it**, `settle-2026-2026-10-22-0438` through `settle-2026-2026-10-31-0442`, and three of them (10-29, 10-30, 10-31) are also later than the rollover **commit** (10-28 09:14). They were produced by the legacy nightly because the **retirement reached production only with the 2026-10-31 release**; the repository switch and the deployed runtime were different things between 2026-10-28 and 2026-10-31. The last label is 04:42:58 AEDT on 2026-10-31, **before** the window opened (08:00) and the timer was disabled, and **no label exists after it**. What the criterion protects, no AFL Tables fetch after retirement took effect, **holds**. What those ten nightlies did to production data was not examined here |
+| **No AFL Tables snapshot label newer than the rollover's** (as originally worded) | **Superseded by the corrected criterion below** | The wording measured the undeployed plan's rollover label (`c2-2026-final-core-v1`, extracted 2026-10-21 04:34:37Z). The retirement that matters reached production with the 2026-10-31 release, so the criterion is restated on the **actual production writer-retirement boundary** (next row). The ten intervening nightly labels are preserved and accounted for there |
+| **Corrected: no AFL Tables acquisition after the actual production retirement boundary, and the ten intervening nightlies accounted for** | **MET (2026-11-01 addendum, section 2.1)** | Boundary: owner-run `sudo systemctl disable --now afldb-settle-afltables.timer`, pasted 2026-10-31 08:17 AEDT, stage `retired` PASS 2026-10-30T21:17:19Z (08:17:19 AEDT) ([execution record](production-execution-record-2026-10-31.md), session `hs-retired.log`, `stage1-owner.txt`). Ten `settle-afltables.ts` batches (ids 61 to 70) all `completed`, the last at 2026-10-31 04:43:25 AEDT, i.e. **before** the boundary; none after (section 2.1) |
 | Items not re-proved today | | the final fitzRoy acquisition and ladder witness, the D-233-3 census evidence and the rollover dry-run are historical (State B/C records, `c7e17da2` manifests); not repeated |
 
-**Suggested record for the owner to adopt or amend:** "C2 is accepted as applied (rollover `c7e17da2`, retirement D-316-1) and effective in production from the 2026-10-31 release. The runbook's snapshot-label criterion is restated as: no AFL Tables snapshot label was created after the production retirement took effect. Verified 2026-11-01: newest label 2026-10-31 04:42:58 AEDT, none after the window opened. Ten nightly labels (2026-10-22 to 2026-10-31) postdate the final acquisition because the legacy runtime stayed deployed until that release; their data effect is a separate question." Nothing here pre-empts that choice; the alternative is to treat the ten labels as a C2 finding and examine them first.
+### 2.1 Addendum 2026-11-01: C2 accepted on the corrected criterion
+
+Owner direction (2026-11-01): use the actual production writer-retirement boundary on 31 October, not the earlier undeployed plan's rollover label; preserve and account for the ten intervening nightly labels; verify their recorded completion precedes the actual retirement and that no later acquisition exists; any post-retirement acquisition is a STOP.
+
+| Check | Result | Source |
+|---|---|---|
+| Boundary | 2026-10-31 **08:17 AEDT** (21:17Z 10-30): timer disabled and inactive, stage `retired` PASS | session evidence `stage1-owner.txt`, `hs-retired.log` |
+| The ten nightlies (import batches 61 to 70, snapshots `settle-2026-2026-10-22-0438` through `settle-2026-2026-10-31-0442`) | all `completed`; completion times from 2026-10-22 04:39:24 to **2026-10-31 04:43:25 AEDT**; every one precedes the boundary (the last by about 3 h 34 min) | read-only census of the production-derived restore of the verified backup `afldb_prod-20261031-084435` (taken after the boundary, 08:44 AEDT), re-run for this addendum; batch 60 (2026-10-21 04:30) is the nightly before the final acquisition |
+| Acquisition after the boundary | **none**: 0 AFL Tables import batches and 0 import batches of any source started at or after 2026-10-31 08:00 AEDT (stricter than 08:17); newest batch of all started 04:42:59 AEDT | same census |
+| On the host | newest label directory `settle-2026-2026-10-31-0442` (mtime 04:42:58 AEDT); `find data/sources -newermt '2026-10-31 08:00:00 +1100'` returned nothing; the 2026-11-01 04:30 nightly did not run (timer disabled) | read-only SSH of 2026-11-01 (section 1) |
+
+**Recorded:** "C2 is accepted as applied (rollover `c7e17da2`, retirement D-316-1) and effective in production from the 2026-10-31 release. On the corrected criterion, no AFL Tables acquisition occurred after the actual production retirement boundary (2026-10-31 08:17 AEDT): the ten intervening nightly runs (batches 61 to 70, 2026-10-22 to 2026-10-31) completed before it, the last at 04:43:25 AEDT, and no later import batch or snapshot label exists. Their data effect remains a separate, unexamined question and is not part of this acceptance." This is recorded on the owner's approval-with-clarification of 2026-11-01. **It does not revive the withdrawn counted-night work and does not accept C3, C4, C4b or C5.** A post-retirement acquisition found at any later re-read is a STOP for adjudication, not a finding to absorb.
 
 ## 3. C3 package: install the four AFL API units INERT (owner sudo; D-316-2)
 
@@ -109,7 +121,18 @@ Only with the C4b PASS record, and before the first 2027 match (2027-03-17 UTC).
 | 5 | `sudo systemctl enable --now afldb-settle-afl-api.timer` (match timer only) | `is-enabled` = `enabled`, `is-active` = `active`; `afldb-settle-afl-api-brownlow.timer` `disabled`/`inactive` |
 | 6 | admin panel wording and button (D-316-12) | per that decision |
 
-**The trigger-variable finding changes the runbook's C5 acceptance line.** C5 says to "keep `AFLDB_SETTLE_TRIGGER=systemd`" (it also gates the AFL API status panel's reads). Today it is **not set** (section 1), so there is nothing to keep, and the panel's service column reads "On-demand refresh is not enabled on this host" until it is. Setting it is a `.env` line plus a service restart: `echo 'AFLDB_SETTLE_TRIGGER=systemd' >> /home/arm/projects/afldb/.env` then `sudo systemctl restart afldb`. Consequences, from the code: the Super Admin "start now" for the AFL Tables unit still refuses (`afltablesNetworkRefusal`: switch retired, no systemctl call), and a start needs the polkit rule that is absent; the AFL API units are read-status only (`startSettleRun()` starts the AFL Tables unit only). The owner decides whether to set it at C5 (panel status visible) or leave the panel inert; the choice carries no data risk in either direction. Rollback: delete that line and restart `afldb`.
+**Trigger variable `AFLDB_SETTLE_TRIGGER=systemd` (owner-approved for the C5 plan, 2026-11-01).** It is **not set today** (section 1), so the runbook's "keep" becomes "set". It is set explicitly **at C5**, through the reviewed configuration mechanism (a single `.env` line read by `EnvironmentFile=/home/arm/projects/afldb/.env`); **nothing was edited or restarted here.** What it governs, from the code: `settleTriggerConfigured()` is strict equality to `systemd`, and it gates **only read-only `systemctl show` status reads** for the three settle units (the Settle panel's service column). `startSettleRunAction` is retired and never imports `startSettleRun`; there is no direct-execution path anywhere, and the Super Admin "start now" for AFL Tables refuses on the retired switch before any `systemctl` call.
+
+Plan (owner-attended, relative to the C5 start):
+
+| Offset | Step | Check |
+|---|---|---|
+| +0 | append exactly one line `AFLDB_SETTLE_TRIGGER=systemd` to the host `.env` (no other edit) | **configuration read-back:** `grep -c '^AFLDB_SETTLE_TRIGGER=systemd$' .env` = `1`, and `grep -c '^AFLDB_SETTLE_TRIGGER' .env` = `1` (no duplicate or commented variant) |
+| +2 min | owner `sudo systemctl restart afldb` (at least 30 s after the last start) | journal shows the new MainPID serving |
+| +3 min | **effective-environment read-back** for the new MainPID: `tr '\0' '\n' < /proc/<MainPID>/environ \| grep -c '^AFLDB_SETTLE_TRIGGER=systemd$'` = `1` (needs the owner or `sudo`; the process environment, not the file, is what the code reads) | `1` |
+| +4 min | open the admin Settle panel as a Super Admin | service column shows unit state instead of "On-demand refresh is not enabled on this host." |
+
+**Absent or invalid configuration cannot introduce a direct-execution fallback, proven by unit test** (`tests/afl-api-cutover.test.ts`, commit `4518f321`): the values undefined, empty, `off`, `Systemd`, `SYSTEMD`, ` systemd`, `systemd ` , `true`, `1`, `direct` and `systemd` followed by a newline are all "not configured": the status read is unavailable, `startSettleRun` returns `unavailable`, and **no child process is spawned** (`execFile` not called). Only the exact value `systemd` allows the read-only `show` call, and no `start` is ever issued. Rollback: delete that line and `sudo systemctl restart afldb`; the panel returns to inert. Neither state carries data risk.
 
 C5 must not be done while C4b is HALT/REFUSED/unrecorded, while any 2027 match has started, or with the Brownlow timer enabled. **Rollback of C5:** disable `afldb-settle-afl-api.timer`, set `acquisition.afl_api_current_season_enabled` to `false`, verify both; the runbook's recovery section governs anything written by a run in between.
 
@@ -118,20 +141,20 @@ C5 must not be done while C4b is HALT/REFUSED/unrecorded, while any 2027 match h
 | Step | Status |
 |---|---|
 | C0, C1 | Done (historical) |
-| C2 | Applied and in production since 2026-10-31; acceptance record drafted (section 2) **awaiting the owner's decision on the snapshot-label wording** |
+| C2 | Applied and in production since 2026-10-31; **acceptance RECORDED 2026-11-01 on the corrected criterion (section 2.1)** |
 | C3 | Package ready (section 3); not done |
 | C4 | Repository work done locally and proven (fb54a3ed, not pushed); install package ready (section 4); not done |
-| C4b | Package ready (section 5); blocked on C3 and C4; tool unrun on PostgreSQL |
+| C4b | Package ready (section 5); blocked on C3 and C4; **tool exercised end to end on guarded disposable PostgreSQL, 36/36** ([master sequence](master-execution-sequence-2026-11-01.md) section 7); defect F-C4B-1 (setting form) fixed in `4518f321`; not run on production |
 | C5 | Package ready (section 6); blocked on the C4b PASS record; before 2027-03-17 UTC |
 | C6 to C9 | Not started; follow C5 |
 
 ## 8. Owner decisions and actions, consolidated
 
-1. Adopt or amend the C2 record, including whether the ten post-final nightly labels (2026-10-22 to 2026-10-31) need a data-effect examination first.
-2. Approve migration 118 (schema step M0 to M3) and the 2027 registration release (C4-1 to C4-4); choose the window; push the reviewed commit.
+1. ~~Adopt or amend the C2 record.~~ **Recorded 2026-11-01 (section 2.1).** Whether the ten nightlies need a data-effect examination remains an open, separate question.
+2. Approve migration 118 (schema step M0 to M3) and the 2027 registration release (C4-1 to C4-4); choose the window; push the reviewed commit. **Ordering and the new switch finding (F-229-SWITCH) are in the [master sequence](master-execution-sequence-2026-11-01.md).**
 3. C3: window and sudo for the four unit files.
 4. C4b: grant D-316-13 only after C3 and C4 are deployed; designate who reviews the evidence directory.
-5. C5: D-316-4 go; decide whether to set `AFLDB_SETTLE_TRIGGER=systemd` (section 6).
+5. C5: D-316-4 go. The `AFLDB_SETTLE_TRIGGER=systemd` plan is approved (section 6); the set, restart and read-backs are part of the C5 session.
 6. Independently: the ISSUE-229 first apply of the 2027 schedule (own approval), and the admin-list display and L1 decisions recorded in the ISSUE-229 record.
 
 ## 9. What was not done

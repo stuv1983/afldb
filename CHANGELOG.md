@@ -15,6 +15,13 @@ commit.
 
 ## [Unreleased]
 
+### Execution-readiness batch: admin fixture list + L1, GAP-029 production entry point, Brownlow/C4b end-to-end qualification (2026-11-01; local commits only, nothing pushed, installed or applied on DEV or PROD)
+
+- **Admin (ISSUE-229):** the fixtures list shows confirmed, unconfirmed and label fixtures with their confirmation state; L1 fixed (a manual create beside a provider-managed final slot is refused with a reason).
+- **Tooling:** `tools/v2/apply-gap029-match-events-production.ts` (reviewed production entry point for the 64 labels; baseline/plan/apply, approval-pinned, resumable) with an isolated end-to-end driver (24/24); Brownlow runner `observe` now writes the typed projection (adopt needs it); pinned eligibility request names `seasons: [2025]`; C4b tool reads/writes the ingestion setting in the form the application uses (fixes an unverifiable restore) and exports `productionDeps`; isolated end-to-end drivers for Brownlow (53/53) and C4b (36/36).
+- **Tests:** normaliser and strict `AFLDB_SETTLE_TRIGGER` cases in `tests/afl-api-cutover.test.ts`.
+- **Records:** master execution sequence with separate approval blocks, rollback-compatibility record, C2 acceptance on the corrected criterion, C5 trigger plan. Findings: F-BRO-1 (production lacks 2025 fixture observations; blocks Brownlow approval), F-229-SWITCH.
+
 ### ISSUE-229 B2: local 2027 fixture support, unconfirmed (PLACEHOLDER) fixtures (2026-11-01; nothing installed or applied on DEV or PROD)
 
 - **Schema (not installed):** migration `118_fixtures_unconfirmed_participants.sql` adds `fixtures.confirmation` (`confirmed` default / `unconfirmed`), `home_placeholder` / `away_placeholder`, nullable club ids and per-side CHECKs (exactly one of club or label; a label requires `unconfirmed`).
