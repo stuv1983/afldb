@@ -186,7 +186,7 @@ import {
   afltablesNetworkStatus,
   parseAfltablesNetworkStatus,
 } from '@/lib/acquisition/afltables-network';
-import { startSettleRun } from '@/lib/acquisition/settle-trigger';
+import { readUnitStateOf, settleTriggerConfigured, startSettleRun } from '@/lib/acquisition/settle-trigger';
 import { assessAflApiCutoverReadiness } from '@/lib/acquisition/afl-api-cutover-readiness';
 import {
   AFLTABLES_RETIREMENT_DECISIONS,
@@ -211,6 +211,7 @@ import {
   awaitWatchdogReady,
   childEnvironment,
   main as c4bMain,
+  normaliseStoredSetting,
   parseC4bArgs,
   publishWatchdogReady,
   readStandDown,
@@ -382,6 +383,61 @@ describe('startSettleRun() and the switch', () => {
     const argvs = mocks.execFile.mock.calls.map((c) => c[1]);
     expect(argvs[0][0]).toBe('show');
     expect(argvs[1]).toEqual(['start', '--no-block', 'afldb-settle-afltables.service']);
+  });
+});
+
+describe('normaliseStoredSetting() (C4b reads the setting the way the application does)', () => {
+  it.each([
+    ['false', 'false'],
+    ['true', 'true'],
+    ['"false"', 'false'], // the admin toggle's postgres.js double-encoded form
+    ['"true"', 'true'],
+    ['"yes"', '"yes"'], // a non-boolean string is never mistaken for off
+    ['0', '0'],
+    ['', ''],
+    ['not json', 'not json'],
+    ['{"a":1}', '{"a":1}'],
+    ['null', 'null'],
+  ])('%s -> %s', (stored, expected) => {
+    expect(normaliseStoredSetting(stored)).toBe(expected);
+  });
+});
+
+describe('AFLDB_SETTLE_TRIGGER is strict and has no direct-execution fallback', () => {
+  const saved = process.env.AFLDB_SETTLE_TRIGGER;
+  beforeEach(() => { mocks.execFile.mockReset(); });
+  afterAll(() => {
+    if (saved === undefined) delete process.env.AFLDB_SETTLE_TRIGGER;
+    else process.env.AFLDB_SETTLE_TRIGGER = saved;
+  });
+
+  it.each([undefined, '', 'off', 'Systemd', 'SYSTEMD', ' systemd', 'systemd ', 'true', '1', 'direct', 'systemd\n'])(
+    '%j is NOT configured: status reads are unavailable, nothing is spawned, and start refuses',
+    async (value) => {
+      if (value === undefined) delete process.env.AFLDB_SETTLE_TRIGGER;
+      else process.env.AFLDB_SETTLE_TRIGGER = value;
+      expect(settleTriggerConfigured()).toBe(false);
+      const state = await readUnitStateOf('afltables');
+      expect('available' in state && state.available === false).toBe(true);
+      const started = await startSettleRun();
+      expect(started.outcome).toBe('unavailable');
+      expect(mocks.execFile).not.toHaveBeenCalled();
+    },
+  );
+
+  it('only the exact value systemd enables the read-only status read (show, never start)', async () => {
+    process.env.AFLDB_SETTLE_TRIGGER = 'systemd';
+    expect(settleTriggerConfigured()).toBe(true);
+    mocks.execFile.mockImplementation(
+      (_bin: string, argv: string[], _opts: unknown, cb: (e: null, out: string, err: string) => void) => {
+        cb(null, 'LoadState=loaded\nActiveState=inactive\n', '');
+      },
+    );
+    await readUnitStateOf('afltables');
+    const argvs = mocks.execFile.mock.calls.map((c) => c[1] as string[]);
+    expect(argvs.length).toBe(1);
+    expect(argvs[0][0]).toBe('show');
+    expect(argvs.some((a) => a.includes('start'))).toBe(false);
   });
 });
 

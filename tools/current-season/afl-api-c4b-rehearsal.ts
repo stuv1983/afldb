@@ -196,6 +196,23 @@ export function parseC4bArgs(argv: readonly string[]): C4bArgs {
 export type SettingValue = { present: false } | { present: true; value: string };
 
 export const describeSetting = (s: SettingValue): string => (s.present ? s.value : 'absent');
+
+/**
+ * The stored `site_settings.value::text`, reduced to one canonical JSON text. The admin toggle persists a boolean as a
+ * JSON STRING (`JSON.stringify(enabled)::jsonb` through postgres.js is double-encoded, so `false` is stored as
+ * `"false"`), while a real jsonb boolean reads `false`; the application reads both through `fromStore`. This tool
+ * must agree with that reader: both are the setting being off. Anything else (a number, `"yes"`, an object) keeps
+ * its own text, so it is never mistaken for an exact `false`.
+ */
+export function normaliseStoredSetting(text: string): string {
+  try {
+    const once: unknown = JSON.parse(text);
+    if (typeof once !== 'string') return JSON.stringify(once);
+    try { return JSON.stringify(JSON.parse(once)); } catch { return text; }
+  } catch {
+    return text;
+  }
+}
 const isExactlyFalse = (s: SettingValue): boolean => s.present && s.value === 'false';
 
 /** The two steps get the AFL API unit's narrowed environment, never the auth DSN. */
@@ -1197,7 +1214,7 @@ export function productionDeps(projectRoot: string, evidenceDir: string, runId: 
     },
     readSetting: () => withSql('AFLDB_AUTH_DATABASE_URL', async (sql) => {
       const rows = await sql<{ value: string }[]>`SELECT value::text AS value FROM site_settings WHERE key = ${C4B_SETTING_KEY}`;
-      return rows[0] ? { present: true, value: rows[0].value } : { present: false };
+      return rows[0] ? { present: true, value: normaliseStoredSetting(rows[0].value) } : { present: false };
     }),
     controlSeesEnabled: async () => {
       const controls = await readAflApiIngestionControls(process.env);
@@ -1208,7 +1225,7 @@ export function productionDeps(projectRoot: string, evidenceDir: string, runId: 
       await sql.begin(async (tx) => {
         await tx`
           INSERT INTO site_settings (key, value, updated_by)
-          VALUES (${C4B_SETTING_KEY}, ${JSON.stringify(enabled)}::jsonb, NULL)
+          VALUES (${C4B_SETTING_KEY}, ${tx.json(enabled)}, NULL)
           ON CONFLICT (key) DO UPDATE
             SET value = EXCLUDED.value, updated_by = EXCLUDED.updated_by, updated_at = now()
         `;
@@ -1228,7 +1245,7 @@ export function productionDeps(projectRoot: string, evidenceDir: string, runId: 
       return {
         matchesInSeason: matches?.n ?? -1,
         aflApiOwnedMatches: owned?.n ?? -1,
-        acquisitionSettings: Object.fromEntries(settings.map((r) => [r.key, r.value])),
+        acquisitionSettings: Object.fromEntries(settings.map((r) => [r.key, r.key === C4B_SETTING_KEY ? normaliseStoredSetting(r.value) : r.value])),
       };
     })),
     runStep: (script, argv, abort) => {

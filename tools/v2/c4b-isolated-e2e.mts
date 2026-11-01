@@ -125,6 +125,13 @@ const watchdogGone = async (evidenceDir: string): Promise<boolean> => {
   check('S0 setting starts absent (never set on this database)', before === 'absent', before);
 }
 
+// S0b: the ADMIN toggle stores the value as a JSON string (`"false"`), a pre-existing production shape the tool must accept as off
+{
+  await sql`INSERT INTO site_settings (key, value) VALUES (${KEY}, ${JSON.stringify(false)}::jsonb) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`;
+  const stored = await setting();
+  check('S0b the admin-written shape is a JSON string "false" (documents the pre-existing production encoding)', stored === '"false"' || stored === 'false', stored);
+}
+
 // S1: CLEAR; the setting is visibly ON for the steps and OFF after
 {
   const seen: { acquireSees?: boolean; settleSees?: boolean; settingDuring?: string } = {};
@@ -136,8 +143,8 @@ const watchdogGone = async (evidenceDir: string): Promise<boolean> => {
     },
   });
   check('S1 exit 0 CLEAR', r.out.exitCode === 0 && r.out.verdict === 'CLEAR', `${r.out.verdict} ${r.out.reasons[0]?.slice(0, 60)}`);
-  check('S1 the toggle is really ON for the steps (stored true; the control path the CLIs read sees it)', seen.settingDuring === 'true' && seen.acquireSees === true && seen.settleSees === true, JSON.stringify(seen));
-  check('S1 setting is exactly false afterwards (was absent), control path off', r.stored === 'false' && (await readAflApiIngestionControls(process.env)).currentSeasonEnabled === false, r.stored);
+  check('S1 the toggle is really ON for the steps (stored as a real JSON boolean true; the control path the CLIs read sees it)', seen.settingDuring === 'true' && seen.acquireSees === true && seen.settleSees === true, JSON.stringify(seen));
+  check('S1 setting is a real JSON boolean false afterwards, control path off', r.stored === 'false' && (await readAflApiIngestionControls(process.env)).currentSeasonEnabled === false, r.stored);
   const rows = await auditRows(r.runId);
   check('S1 two auth_audit_log rows: on then restore, tagged with the run and decision', rows.length === 2 && rows[0].enabled === true && rows[0].step === 'on' && rows[1].enabled === false && rows[1].step === 'restore' && rows.every((d) => d.decision === 'D-316-13' && d.via === 'afl-api-c4b-rehearsal'), JSON.stringify(rows.map((d) => [d.enabled, d.step])));
   check('S1 the seven evidence files exist', EVIDENCE_FULL.every((f) => files(r.evidenceDir).includes(f)), files(r.evidenceDir).join(','));
