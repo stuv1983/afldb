@@ -53,7 +53,7 @@ manufactured (no stable identity was invented; no September roster was substitut
 They need 2026 canonical match/participation ingestion; `evidence/gap-029-targeted-recovery.json` already lists
 the first-party partial affiliation sources. The eight findings remain as the retained "dataset gap" set.
 
-**Caveat found later the same day:** the read-only production census for the Brownlow packages shows production holds 2026 data (vote-entry state for 2026 match 17137), so production is ahead of these clones. Whether the eight cells can be closed from production-held 2026 matches and registrations is **not yet checked** (that read was outside this item's authority). A read against a restore of the verified production backup, or an explicit read-only production check, would settle it.
+**Caveat found later the same day:** the read-only production census for the Brownlow packages shows production holds 2026 data (read-only probe 2026-11-01: 218 matches 2026-03-05 to 2026-09-26, all afltables-owned; player_club_season_stats up to 2026), so production is ahead of these clones. Whether the eight cells can be closed from production-held 2026 matches and registrations is **not yet checked** (that read was outside this item's authority). A read against a restore of the verified production backup, or an explicit read-only production check, would settle it.
 
 ## 5. Owner decisions / actions (none taken)
 

@@ -15,6 +15,11 @@ commit.
 
 ## [Unreleased]
 
+### V2 remaining-items batch: GAP-029 event labels, ISSUE-229 B2 check, Brownlow census, ISSUE-316 reconciliation (2026-11-01; no deployment, nothing applied to DEV or PROD)
+
+- **New retained tooling and evidence (GAP-029):** `tools/v2/apply-gap029-match-events.ts` (isolated-only, plan by default, audited `saveEdit` path) and the 61-entry evidence file; demonstrated on a disposable clone only, where the 42 match-event Gridley findings close (unapproved 50 to 14). No behaviour change in the application.
+- **Records only:** ISSUE-229 B2 (2027 feed now exists; captured once; validate-only passes; dry-run refuses all 218 records pending owner inputs), Brownlow gaps 016/030/031 fresh production read-only census (counts equal the archive), ISSUE-316/GAP-011 remaining-step reconciliation, and the ISSUE-331 incident assessment.
+
 ### V2-GAP-006 follow-up: repair-tool guard installed in the production operator checkout (2026-11-01)
 
 - **Executed, owner-approved at `R=affe9a2c30842e35557710bc582cb9d6114ee39c`** (`docs/v2/gap006-repair-tool-rollout-package.md`, section 9). The owner pushed `affe9a2c` to `origin/main` (from `2d1d0a83`); the production operator checkout `/home/arm/projects/afldb` was fast-forwarded `9b9c6b2a` to `affe9a2c` (D1/D2 PASS). `tools/current-season/repair-match-rekeys.ts` is now blob `dca00bd8…` (was `a2de99e0…`): `--apply` refuses a sealed season offline, before any database connection.
