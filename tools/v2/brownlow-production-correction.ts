@@ -20,6 +20,7 @@ import { parseSourceFamilyRegistry } from '@/lib/acquisition/source-families';
 import { loadSeasonRegistry } from '@/lib/seasons/sealed-seasons';
 
 import { loadSnapshot } from '../current-season/settle-afl-api-brownlow';
+import { applyFixturePrerequisite, loadFixturePrerequisite, type LoadedFixturePrerequisite } from './brownlow-fixture-prerequisite';
 
 function outside(path: string): string {
   const absolute = resolve(path);
@@ -74,7 +75,15 @@ async function main(): Promise<void> {
   }
   const registry = loadSeasonRegistry();
   const sourceRegistry = parseSourceFamilyRegistry(JSON.parse(readFileSync('data/reference/source-families.json', 'utf8')));
-  if (request.operation === 'observe') {
+  let fixtureStage: LoadedFixturePrerequisite | null = null;
+  if (request.operation === 'observe' && request.stage) {
+    // Stage B0 (F-BRO-1): the governed 2025 fixture-identity prerequisite. The snapshot is the single pinned, retained
+    // authentic one; every byte is checked offline BEFORE any connection. The general settle CLI's sealed-season refusal
+    // is untouched: this path is reachable only through an approved plan whose digest binds this exact observation.
+    fixtureStage = loadFixturePrerequisite(process.cwd(), opt('--snapshot-label'));
+    if (mode === 'apply' && correctionHash(fixtureStage.observation) !== correctionHash(request.observation)) throw new Error('Snapshot drift');
+    request.observation = fixtureStage.observation;
+  } else if (request.operation === 'observe') {
     const label = opt('--snapshot-label');
     if (!/^[a-zA-Z0-9_-]+$/.test(label)) throw new Error('Invalid snapshot label');
     const root = `data/sources/afl_api/brownlow/${label}`;
@@ -112,6 +121,11 @@ async function main(): Promise<void> {
         backup, now: new Date().toISOString() })
       : await applyBrownlowCorrection(executor, plan!, approval!, { revision, now: new Date().toISOString(), registry,
         observe: async (tx, payload) => {
+          if (fixtureStage) {
+            const nativeFixtures = nativeTransactionOf(tx);
+            if (!nativeFixtures) throw new Error('Native observation transaction required');
+            return applyFixturePrerequisite(nativeFixtures as unknown as postgres.TransactionSql, fixtureStage, revision);
+          }
           const { snapshot } = payload as { snapshot: ReturnType<typeof loadSnapshot> };
           const native = nativeTransactionOf(tx);
           if (!native) throw new Error('Native observation transaction required');

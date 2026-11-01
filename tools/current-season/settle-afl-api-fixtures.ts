@@ -146,7 +146,7 @@ export function verifyManifest(snapshotDir: string): { manifest: Record<string, 
 
 /** Discovers every acquired `fixture.json` from the manifest's own file
  * list — the manifest is the one proof of what acquisition actually wrote. */
-function fixturesRawFrom(snapshotDir: string, files: readonly ManifestFile[]): unknown[] {
+export function fixturesRawFrom(snapshotDir: string, files: readonly ManifestFile[]): unknown[] {
   const matchDirs = new Set<string>();
   for (const entry of files) {
     const parts = entry.file.split('/');

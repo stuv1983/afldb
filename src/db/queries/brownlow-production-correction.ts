@@ -17,6 +17,9 @@ import { resolvePlayerIdentity } from './player-identity';
 export const correctionHash = (value: unknown): string => createHash('sha256').update(JSON.stringify(value,
   (_key, v) => v !== null && typeof v === 'object' && !Array.isArray(v)
     ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => a.localeCompare(b))) : v) ?? 'undefined').digest('hex');
+/** Stage B0: the governed 2025 fixture-identity observation prerequisite (F-BRO-1). It is `observe` with this stage; the
+ * receipts table's operation CHECK is therefore unchanged and no migration is involved. */
+export const FIXTURE_IDENTITIES_STAGE = 'fixture-identities-2025' as const;
 export type CorrectionOperation = 'backfill' | 'adopt' | 'eligibility' | 'observe' | 'resolve' | 'reverse-backfill' | 'reverse-adopt';
 export interface CorrectionTarget {
   host: string; port: number; database: string; user: string;
@@ -42,6 +45,8 @@ export interface CorrectionRequest {
   resolution?: string;
   /** Parsed by the existing checksum-verifying snapshot loader before planning. */
   observation?: unknown;
+  /** Only with operation `observe`: names the governed fixture-identity prerequisite instead of the Brownlow snapshot. */
+  stage?: typeof FIXTURE_IDENTITIES_STAGE;
   reversal?: { originalPlanDigest: string; export: unknown };
 }
 export interface CorrectionPlan {
@@ -56,6 +61,8 @@ export interface CorrectionApproval {
   approvedAt: string; expiresAt: string; reference: string;
   /** Eligibility approvals list the exact complete records, including citations and supersedes ids. */
   rulings?: EligibilityRuling[];
+  /** Must equal the plan's stage (absent for every ordinary operation). */
+  stage?: typeof FIXTURE_IDENTITIES_STAGE;
 }
 const fail = (reason: string): never => { throw new Error(`Brownlow correction refused: ${reason}`); };
 const equal = (a: unknown, b: unknown): boolean => correctionHash(a) === correctionHash(b);
@@ -89,15 +96,23 @@ const TABLES = ['brownlow_round_votes', 'brownlow_season_votes', 'award_winners'
   'staging.afl_api_match', 'brownlow_eligibility_decisions',
   'brownlow_season_authority', 'data_edits', 'data_issues', 'auth_users', 'site_settings', 'afldb_meta.schema_migrations'] as const;
 
-export async function correctionBaseline(tx: SqlExecutor): Promise<string> {
-  const hashes: unknown[] = [];
+/** Per-table count and content hash, in TABLES order. `correctionBaseline` is the hash of exactly this list. */
+export async function correctionTableHashes(tx: SqlExecutor): Promise<[string, unknown][]> {
+  const hashes: [string, unknown][] = [];
   for (const table of TABLES) {
     const [row] = await tx.query(`SELECT count(*)::text AS n, md5(coalesce(string_agg(v, E'\\n' ORDER BY v), '')) AS hash
       FROM (SELECT md5(to_jsonb(t)::text) AS v FROM ${table} t) x`);
     hashes.push([table, row]);
   }
-  return correctionHash(hashes);
+  return hashes;
 }
+
+export async function correctionBaseline(tx: SqlExecutor): Promise<string> {
+  return correctionHash(await correctionTableHashes(tx));
+}
+
+/** The only tables the fixture-identity prerequisite may change (the observation spine and the batch row that owns it). */
+export const FIXTURE_IDENTITIES_WRITABLE = ['import_batches', 'staging.source_records', 'staging.source_record_versions'] as const;
 
 function fresh(timestamp: string, now: number): boolean {
   const t = Date.parse(timestamp);
@@ -113,6 +128,7 @@ function checkRequest(r: CorrectionRequest): void {
     || !Array.isArray(r.seasons) || !r.seasons.length || new Set(r.seasons).size !== r.seasons.length
     || r.seasons.some((s) => !Number.isInteger(s) || s < 1984 || s > 2025)) fail('scope must name explicit seasons 1984–2025; 2026 excluded');
   if (!['backfill', 'reverse-backfill'].includes(r.operation) && !equal(r.seasons, [2025])) fail('this operation is season-2025 only');
+  if (r.stage !== undefined && (r.stage !== FIXTURE_IDENTITIES_STAGE || r.operation !== 'observe')) fail('unknown stage, or a stage on an operation that has none');
 }
 
 async function payloadFor(tx: SqlExecutor, request: CorrectionRequest): Promise<unknown> {
@@ -151,6 +167,13 @@ async function payloadFor(tx: SqlExecutor, request: CorrectionRequest): Promise<
   }
   if (request.operation === 'observe') {
     if (!request.observation) fail('checksum-verified observation required');
+    if (request.stage) {
+      const o = request.observation as { stage?: string; season?: number; builtRecords?: number; manifestSha256?: string };
+      if (o.stage !== request.stage || o.season !== 2025 || !Number.isInteger(o.builtRecords) || !HASH.test(String(o.manifestSha256))) fail('checksum-verified fixture-identity observation required');
+      const [held] = await tx.query<{ n: number }>(`SELECT count(*)::int AS n FROM staging.source_records r JOIN sources s ON s.id = r.source_id
+        WHERE s.key = 'afl_api' AND r.family = 'match' AND r.scope_key = 'season=2025'`);
+      if (held.n !== 0) fail('the target already holds 2025 afl_api fixture observations; this prerequisite is a first load only');
+    } else if ((request.observation as { stage?: unknown }).stage !== undefined) fail('a stage observation needs its stage');
     return request.observation;
   }
   if (!request.issueIds?.length || new Set(request.issueIds).size !== request.issueIds.length || !request.resolution || request.resolution.trim().length < 20) fail('exact issue ids and evidence-based resolution required');
@@ -238,7 +261,8 @@ export function checkCorrectionApproval(plan: CorrectionPlan, approval: Correcti
     || approval.planDigest !== digest) fail('invalid or unapproved plan digest');
   if (revision !== plan.revision || approval.revision !== revision || !/^[0-9a-f]{40}$/.test(revision)) fail('code revision changed');
   if (!equal(approval.target, plan.target) || !equal(approval.seasons, plan.request.seasons)
-    || approval.operation !== plan.request.operation || approval.source !== (plan.request.operation.endsWith('backfill') ? 'legacy' : 'afl_api')) fail('approval target, season, source or operation differs');
+    || approval.operation !== plan.request.operation || approval.source !== (plan.request.operation.endsWith('backfill') ? 'legacy' : 'afl_api')
+    || (approval.stage ?? null) !== (plan.request.stage ?? null)) fail('approval target, season, source, operation or stage differs');
   if (!fresh(plan.createdAt, t) || !fresh(approval.approvedAt, t) || Date.parse(approval.approvedAt) < Date.parse(plan.createdAt)
     || !(Date.parse(plan.expiresAt) > t) || !(Date.parse(approval.expiresAt) > t)
     || Date.parse(approval.expiresAt) > Date.parse(plan.expiresAt)
@@ -293,7 +317,17 @@ export async function applyBrownlowCorrection(executor: TransactionalSqlExecutor
       result = decisions;
     } else if (r.operation === 'observe') {
       if (!context.observe) fail('reviewed observation adapter required');
+      const tablesBefore = r.stage ? await correctionTableHashes(tx) : null;
       result = await context.observe!(tx, payload);
+      if (tablesBefore) {
+        // The prerequisite writes observation records only. Prove it: every other hashed table, canonical football data
+        // included, must be byte-identical inside this same transaction, or the whole stage rolls back.
+        const tablesAfter = await correctionTableHashes(tx);
+        const writable = new Set<string>(FIXTURE_IDENTITIES_WRITABLE);
+        const moved = tablesAfter.filter(([table, h], i) => correctionHash(h) !== correctionHash(tablesBefore[i][1])).map(([table]) => table);
+        const unexpected = moved.filter((table) => !writable.has(table));
+        if (unexpected.length || !moved.includes('staging.source_records') || !moved.includes('import_batches')) fail(`fixture prerequisite changed ${unexpected.length ? `tables outside its surface (${unexpected.join(', ')})` : 'nothing it should have'}; rollback`);
+      }
     } else {
       const changed = await tx.query(`UPDATE data_issues SET resolved_at = clock_timestamp(), resolution = $2
         WHERE id = ANY($1::text::bigint[]) AND resolved_at IS NULL RETURNING id`, [`{${r.issueIds!.join(',')}}`, r.resolution]);

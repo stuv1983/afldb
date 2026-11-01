@@ -71,3 +71,63 @@ describe('Brownlow production correction approval boundary', () => {
     expect(() => check(plan, approval)).toThrow();
   });
 });
+
+// F-BRO-1 / stage B0: the governed 2025 fixture-identity prerequisite (observe + stage).
+describe('Brownlow fixture-identity prerequisite (stage B0)', () => {
+  const STAGE = 'fixture-identities-2025' as const;
+  const stageFixture = () => {
+    const f = fixture('observe');
+    const body = { ...f.plan } as Partial<CorrectionPlan>; delete body.digest;
+    body.request = { operation: 'observe', seasons: [2025], stage: STAGE, observation: { stage: STAGE } };
+    f.plan.request = body.request!; f.plan.digest = correctionHash(body); f.approval.planDigest = f.plan.digest; f.approval.stage = STAGE;
+    return f;
+  };
+  it('accepts an approval that names the stage', () => { const { plan, approval } = stageFixture(); expect(() => check(plan, approval)).not.toThrow(); });
+  it('refuses an approval without the stage, and a stage approval for an ordinary observe plan', () => {
+    const s = stageFixture();
+    expect(() => check(s.plan, { ...s.approval, stage: undefined })).toThrow(/stage/);
+    const o = fixture('observe');
+    expect(() => check(o.plan, { ...o.approval, stage: STAGE })).toThrow(/stage/);
+  });
+  it('refuses a stage on any other operation and an unknown stage', () => {
+    for (const bad of [{ operation: 'adopt', stage: STAGE }, { operation: 'observe', stage: 'anything-else' }] as const) {
+      const f = fixture('observe'); const body = { ...f.plan } as Partial<CorrectionPlan>; delete body.digest;
+      body.request = { operation: bad.operation, seasons: [2025], stage: bad.stage as typeof STAGE };
+      f.plan.request = body.request!; f.plan.digest = correctionHash(body); f.approval.planDigest = f.plan.digest; f.approval.operation = bad.operation;
+      expect(() => check(f.plan, { ...f.approval, stage: bad.stage as typeof STAGE })).toThrow(/stage/);
+    }
+  });
+  it('refuses every snapshot other than the pinned one before reading anything', async () => {
+    const { loadFixturePrerequisite } = await import('../tools/v2/brownlow-fixture-prerequisite');
+    expect(() => loadFixturePrerequisite('/nonexistent-root', 'afl-api-2025-2026-10-21-000000')).toThrow(/only the pinned snapshot/);
+    expect(() => loadFixturePrerequisite('/nonexistent-root', '../fixtures/afl-api-2025-2026-10-20-014218')).toThrow(/only the pinned snapshot/);
+  });
+  it('refuses a manifest whose bytes differ from the pin', async () => {
+    const { loadFixturePrerequisite, FIXTURE_PREREQUISITE_PIN } = await import('../tools/v2/brownlow-fixture-prerequisite');
+    const { mkdtempSync, mkdirSync, writeFileSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os'); const { join } = await import('node:path');
+    const root = mkdtempSync(join(tmpdir(), 'b0-pin-'));
+    const dir = join(root, 'data', 'sources', 'afl_api', 'fixtures', FIXTURE_PREREQUISITE_PIN.label);
+    mkdirSync(dir, { recursive: true }); writeFileSync(join(dir, 'manifest.json'), '{"season":2025}');
+    expect(() => loadFixturePrerequisite(root, FIXTURE_PREREQUISITE_PIN.label)).toThrow(/differs from the pinned bytes/);
+  });
+  const retainedRoot = process.env.AFLDB_B0_RETAINED_ROOT;
+  it.skipIf(!retainedRoot)('loads the retained authentic snapshot: 212 records, four finals refusals, stable digest', async () => {
+    const { loadFixturePrerequisite, FIXTURE_PREREQUISITE_PIN } = await import('../tools/v2/brownlow-fixture-prerequisite');
+    const a = loadFixturePrerequisite(retainedRoot!, FIXTURE_PREREQUISITE_PIN.label);
+    const b = loadFixturePrerequisite(retainedRoot!, FIXTURE_PREREQUISITE_PIN.label);
+    expect(a.records).toHaveLength(212);
+    expect(a.observation.refusedProviderMatchIds).toEqual([...FIXTURE_PREREQUISITE_PIN.refusedProviderMatchIds]);
+    expect(a.observation.recordsDigest).toBe(b.observation.recordsDigest);
+    expect(a.observation.manifestSha256).toBe(FIXTURE_PREREQUISITE_PIN.manifestSha256);
+  });
+  it.skipIf(!retainedRoot)('refuses a single changed byte in a retained fixture file', async () => {
+    const { loadFixturePrerequisite, FIXTURE_PREREQUISITE_PIN } = await import('../tools/v2/brownlow-fixture-prerequisite');
+    const { cpSync, mkdtempSync, readFileSync, writeFileSync, chmodSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os'); const { join } = await import('node:path');
+    const root = mkdtempSync(join(tmpdir(), 'b0-drift-')); cpSync(join(retainedRoot!, 'data'), join(root, 'data'), { recursive: true });
+    const file = join(root, 'data', 'sources', 'afl_api', 'fixtures', FIXTURE_PREREQUISITE_PIN.label, '00-season-matches.json');
+    chmodSync(file, 0o644); writeFileSync(file, `${readFileSync(file, 'utf8')} `);
+    expect(() => loadFixturePrerequisite(root, FIXTURE_PREREQUISITE_PIN.label)).toThrow(/sha256 mismatch/);
+  });
+});
