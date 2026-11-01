@@ -14,7 +14,7 @@ evidence. Nothing in section 3 is executed.
 
 ## 2. D-V2-GAP006-EDITORS — the exact decision the trace produced
 
-> **DECIDED 2026-10-31: E1 approved for local implementation, and implemented locally the same day (not deployed).**
+> **DECIDED 2026-10-31: E1 approved for local implementation, and implemented locally the same day (not deployed then; DEPLOYED to production and owner-accepted 2026-11-01, see `known-gaps.md` V2-GAP-006).**
 > See `known-gaps.md` V2-GAP-006 for what is covered and what remains. The workflow mapping the owner chose is `data_editor`
 > for the audited manual editors, with `brownlow_authority` and `identity_adjudication` retained where they already apply,
 > and no new workflow id. One detail of the package below changed with the owner's decision: the evidence reference is the

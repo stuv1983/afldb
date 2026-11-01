@@ -228,7 +228,7 @@ production data, and criterion 10 needs host action. Shadow-ready would still no
 | V2 merge | **merged locally 2026-10-29 (D-V2-LOCK-1) and pushed 2026-10-30 (D-V2-PUSH-ROUTE-1)**: `git merge --no-ff` into local `main`, locked execution commit `9ed9c9dd`. `origin` (the source repository's existing URL) was added. `origin/main` was exactly `ff100dc2` and was fast-forwarded to `9ed9c9dd` without force; `v2/rebuild` was pushed at `d3286d92`. The lock holds. Production execution: [package](production-execution-package-2026-10-30.md), preparation P-1–P-7 complete (§4.1); approved and **executed 2026-10-31** ([record](production-execution-record-2026-10-31.md)). Earlier text: reconcile the 19 ISSUE-316 follow-up-8 files it carries (commit `c9cca86d`) with the source worktree (RISK-15) |
 | V2-GAP-004 | **closed 2026-10-31**: hook fixed (no-shell runner), stray `supplies` deleted; see the gap entry |
 | V2-GAP-005 | **closed 2026-10-31**: AFLW stays outside the manifest (accepted scope boundary) |
-| V2-GAP-006 | database-level seal enforcement (deferred, not implemented); admin editors: D-V2-GAP006-EDITORS (E1/E2/E3) pending, see [the sheet](owner-decisions-remaining-2026-10-31.md) |
+| V2-GAP-006 | database-level seal enforcement (deferred, not implemented) and the other writers; admin editors: D-V2-GAP006-EDITORS decided (E1), **deployed to production and owner-accepted 2026-11-01** (see `known-gaps.md`) |
 | V2-GAP-016 | decided (ADR 0014); remaining: confirm the projection path and run the blast-radius count |
 | V2-GAP-019 | decided and built (ADR 0008, four-eyes with attestation); nothing remaining |
 | V2-GAP-021 | decided and built (ADR 0015); remaining: retire the offline loader's coleman group for covered seasons |

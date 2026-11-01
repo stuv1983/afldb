@@ -67,7 +67,7 @@ award results must be shown reconcilable before production; **no** — not a pro
 | V2-GAP-003 | Medium | environment | rehearsal | **CLOSED locally (2026-10-28, Linux)**: full default workflow on streamanator at `c3dea709` 14,860 passed / 3 failed / 63 skipped plus Coleman 28/28; the only failures are listed `gridley-corpus` (V2-GAP-029); three Linux regressions were fixed first. Not run: 11 Brownlow dedicated-clone tests, 45 opt-in tests ([Linux verification](linux-verification-2026-10-28.md)). A second pass (§9 there) ran the eligible opt-in suites: receipts 7/7, import lock 1/1, populated lifecycle 17/17, oracle reports pass. The Brownlow clones, Phase B, populated-pending and external-grids remain blocked, with their reasons recorded | none |
 | V2-GAP-004 | Low | source worktree hygiene | no | **CLOSED (2026-10-31, re-verified; fix made 2026-10-19)**: the user-level hook runs through a no-shell Node runner, not `cmd.exe`; harness 147/147 and a live Read probe created no file; the stray `supplies` was deleted 2026-10-19 under its four proved conditions. User-level, outside the repository; re-run the harness after any `codebase-memory-mcp` update | none |
 | V2-GAP-005 | Low | historical baseline scope | no | **CLOSED (2026-10-31, owner decision D-V2-GAP005 Option A): accepted scope boundary.** AFLW stays outside the V2 AFL/VFL historical manifest; the manifest specification is unchanged (spec version 1); AFLW data, loader and backups are untouched | none |
-| V2-GAP-006 | Medium | historical baseline | no | narrowed (Stages 3-4 and **the editors, 2026-10-31**): enforced at the AFL API settle CLIs, the Coleman publisher, curated award approval, Brownlow eligibility decisions and, **new and local only (not deployed)**, every audited admin editor mutation (owner decision D-V2-GAP006-EDITORS, E1). Still unmet: database-level enforcement (**not implemented**), direct-library and legacy writers (011, ISSUE-316) and deployment | deploy the editor guard (PROD gates, not run); decide database-level enforcement; legacy writers via 011 / ISSUE-316 |
+| V2-GAP-006 | Medium | historical baseline | no | narrowed (Stages 3-4 and **the editors, 2026-10-31**): enforced at the AFL API settle CLIs, the Coleman publisher, curated award approval, Brownlow eligibility decisions and, **deployed to production and owner-accepted 2026-11-01** (running release `fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy`), every audited admin editor mutation (owner decision D-V2-GAP006-EDITORS, E1). Still unmet: database-level enforcement (**not implemented**) and direct-library and legacy writers (011, ISSUE-316) | decide database-level enforcement; legacy writers via 011 / ISSUE-316 |
 | V2-GAP-007 | Medium | historical baseline | rehearsal | **CLOSED (2026-10-31, D-V2-PROD-EXEC-1)**: the owner-authorised read-only production runs produced the real-baseline manifest before (`4060c929…`, ledger 110) and after (`ba1d5c64…`, ledger 117) the release; both are 32 tables and 1,380 buckets, kept outside the repository in the host release directory; gate M sealed scope identical. Isolated repeat runs were already identical (Launch F) | none |
 | V2-GAP-008 | High | AFL API fixtures | **cutover** | **open, production-only**: writer built and tested (Launch F, `d760280e`); AFLDB-ISSUE-229 B2 uncaptured (no 2027 season exists) | capture B2, review its dry run, approve the first apply |
 | V2-GAP-009 | Medium | AFL API promotion | rehearsal | **CLOSED on retained evidence (2026-10-31)**: all seven AFL API integration files executed on guarded isolated PostgreSQL, **124/124 passed, 0 skipped** locally (`local-supported-tests-delivered.json`, 73 + 21 + 16 + 6 + 4 + 3 + 1), including the transaction-rollback and preservation cases; the Linux run (PG 16.15, 2026-10-28) records them passing with no failure or refusal. Stated limit: **not replayed on a production-dump clone** | none (production-dump replay is a recorded limit, RISK-03) |
@@ -285,9 +285,10 @@ award results must be shown reconcilable before production; **no** — not a pro
     `afldb_v2_rb_final_test`).* See `CHANGELOG.md` (Unreleased) for the run counts. Visual evidence is listed there.
   - *Still unmet, so the gap stays open.* (1) **Database-level enforcement is not implemented** (no constraint or
     trigger): any writer that bypasses these editors (direct library calls, legacy loaders, the AFL Tables settle,
-    ISSUE-316 tooling, ad hoc SQL) is not stopped by this. (2) The editors are protected **locally only**; nothing is
-    deployed. Production needs the usual release path, and `afldb_import` must hold `SELECT` on `data_edits` (migration
-    108 and `privileges.sql` already grant it; verify on the target). (3) ~~Known limitation~~ **FIXED 2026-11-01 (local, not deployed):** the action layer's
+    ISSUE-316 tooling, ad hoc SQL) is not stopped by this. (2) ~~The editors are protected locally only; nothing is
+    deployed.~~ **DEPLOYED to production 2026-11-01** (see the deployment bullet at the end of this section).
+    `afldb_import` needed `SELECT` on `data_edits` (migration 108 and `privileges.sql` grant it); the revision 3 P6 check
+    asserted it on the target. (3) ~~Known limitation~~ **FIXED 2026-11-01 (local, not deployed):** the action layer's
     `optionalText(..., 2000)` used to cut a crafted over-length note to 2000 characters before the guard saw it, turning
     an invalid note into an accepted correction. The audit-note field now goes through `parseCorrectionNote`
     (`src/lib/seasons/correction-note.ts`: trims, never truncates) in the awards, coaches, draft, records, season-lists
@@ -319,6 +320,20 @@ award results must be shown reconcilable before production; **no** — not a pro
     kept for its test). A visual check also found that four forms using `<form action>` (player-link resolve, bulk
     approve, Brownlow publish, delete match) lost the typed values after a refusal (React 19 resets uncontrolled
     fields); they now submit through `keepFormOnSubmit`, pinned by a source test.
+  - *2026-11-01: DEPLOYED to production and owner-accepted (the deployment gate is closed; the gap stays open).* Release
+    package revision 3 (`gap006-editor-protections-release-package.md` section 11.3). Production checkout
+    `9b9c6b2acda28e4d222c04a951275bdf654da74f`; running revision `fd48ace0c2cb70296d723603aa397b5bd7a21a0d`; running
+    release `fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy`; retained rollback target
+    `ad245d602f6f-m0M8pf121326vNSo2B759`. D3c PASS, `NEW_SERVING`, zero reported errors or restarts. D4 25/25 as Super
+    Admin with eight reviewed screenshots (`docs/v2/evidence/gap006-live-acceptance-20261101/`). No grant, schema or
+    database change. *Provenance:* W0, P-A and J1 reported PASS at about 10:21 AEDT (J1's wider cron inspection
+    best-effort, some paths unreadable); P6/P7 PASS exit 0 and D0 PASS (remote `main` at R) are shown by owner-supplied
+    production and workstation output; none was re-run afterwards. *Limits accepted by the owner:* production refusal
+    behaviour was not exercised (it rests on isolated integration and visual evidence); the season-list and player-link
+    panels were not live-checked; the Brownlow 8/8 is isolated-test evidence with the artefact-binding limitation intact.
+    *Still open:* (1) database-level enforcement (not implemented, owner decision pending); (2) the other writers: direct
+    library calls, legacy loaders (011, 013), the AFL Tables settle, ISSUE-316 tooling and ad hoc SQL. ISSUE-331 stays
+    open, cause UNKNOWN.
 
 ## V2-GAP-007 — No manifest of the real baseline exists yet
 

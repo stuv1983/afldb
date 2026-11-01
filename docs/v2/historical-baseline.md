@@ -57,7 +57,7 @@ comparison remains the control. Settle is never a correction workflow: the refus
 audited workflows in the table above.
 
 **The audited admin editors (V2-GAP-006, owner decision D-V2-GAP006-EDITORS, Option E1; implemented locally
-2026-10-31, not deployed).** Every mutation the editors make goes through `recordDataEdit`
+2026-10-31, deployed to production and owner-accepted 2026-11-01).** Every mutation the editors make goes through `recordDataEdit`
 (`src/db/queries/audit-log.ts`), which inserts the `data_edits` row and then asks
 `enforceSealedEditorWrite` (`src/lib/seasons/sealed-editor-guard.ts`) to decide the write against the season registry
 inside the same transaction. A write that touches a sealed season, or a season that cannot be determined (fail

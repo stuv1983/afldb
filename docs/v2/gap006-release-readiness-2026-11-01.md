@@ -1,7 +1,16 @@
 # V2-GAP-006 (editors, Option E1): release-readiness record, 2026-11-01
 
-Local milestone only. Nothing was pushed, deployed or run against a host, a production database or a provider. No
-Brownlow was recorded, backfilled, adopted or published. V2-GAP-006 **stays open**.
+**Update 2026-11-01 (later): deployed to production and owner-accepted.** Release `fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy`
+(revision `fd48ace0c2cb70296d723603aa397b5bd7a21a0d`) is serving from production checkout
+`9b9c6b2acda28e4d222c04a951275bdf654da74f`; retained rollback target `ad245d602f6f-m0M8pf121326vNSo2B759`; D3c PASS,
+`NEW_SERVING`, zero reported errors or restarts; D4 25/25 as Super Admin, eight reviewed screenshots. Record and
+provenance: `gap006-editor-protections-release-package.md` section 11.3 and `known-gaps.md` V2-GAP-006. Verification
+limits: production refusal behaviour not exercised; season-list and player-link panels not live-checked. The paragraph
+below and the "Linux qualification" section describe the state **before** that deployment and are kept as history.
+V2-GAP-006 **stays open** (database-level enforcement; other writers).
+
+Local milestone only (as written before the deployment above). Nothing was pushed, deployed or run against a host, a
+production database or a provider. No Brownlow was recorded, backfilled, adopted or published.
 
 ## What the candidate does
 
@@ -195,9 +204,11 @@ Candidate bound as `fd48ace0` (tree `01b3e685`): after the tested `23eb5fa9` the
 1. **Database-level enforcement:** not implemented (owner decision pending; deferred under Option B).
 2. **Other writers:** direct library calls, legacy loaders (V2-GAP-011, V2-GAP-013), the AFL Tables settle, ISSUE-316
    tooling and ad hoc SQL bypass the editors.
-3. **Deployment:** nothing is deployed. The usual release path applies; `afldb_import` must hold `SELECT` on
-   `data_edits` (migration 108 and `privileges.sql` grant it; verify on the target). The earlier proposed one-off count
-   of production note rows is **withdrawn**: the first design never reached DEV or PRODUCTION.
+3. ~~**Deployment:** nothing is deployed.~~ **CLOSED 2026-11-01: deployed to production and owner-accepted** (revision 3,
+   `gap006-editor-protections-release-package.md` section 11.3). `afldb_import` `SELECT` on `data_edits` was asserted on
+   the target by P6 (owner-supplied output). The earlier proposed one-off count of production note rows stays
+   **withdrawn**: the first design never reached DEV or PRODUCTION. Accepted limits: production refusal behaviour not
+   exercised; season-list and player-link panels not live-checked.
 4. **Brownlow production-correction cases:** all eight pass locally (this record). This is isolated-test evidence only;
    it grants no authority for any real Brownlow recording, backfill, adoption or publication.
 5. **ISSUE-331 stays open:** the unexplained disappearance of the isolated root's files, the frozen `ext4.vhdx` drift

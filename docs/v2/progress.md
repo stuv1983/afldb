@@ -461,6 +461,13 @@ done (no CRIT/HIGH; F-001, F-002, F-005 and the open-season stored-note cap fixe
 journeys captured; Coleman publication integration 28/28; Brownlow production-correction 4/8 with its provider-snapshot
 prerequisites missing. See `gap006-release-readiness-2026-11-01.md`. Gap 006 stays open.
 
+**2026-11-01 deployed to production and owner-accepted.** Release package revision 3 executed: running release
+`fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy` (revision `fd48ace0`), production checkout `9b9c6b2a`, retained rollback target
+`ad245d602f6f-m0M8pf121326vNSo2B759`; D3c PASS (`NEW_SERVING`, zero reported errors or restarts); D4 25/25 as Super
+Admin, eight reviewed screenshots. Limits accepted: production refusal behaviour not exercised; season-list and
+player-link panels not live-checked. Gap 006 stays open for database-level enforcement and the other writers; ISSUE-331
+stays open (cause UNKNOWN). See `known-gaps.md` V2-GAP-006 and `gap006-editor-protections-release-package.md` 11.3.
+
 ## Next action for the owner
 
 1. Review `v2/rebuild` (`git log ff100dc2..v2/rebuild`) starting with `docs/v2/final-report.md`.
