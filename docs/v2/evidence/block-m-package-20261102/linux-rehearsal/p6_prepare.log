@@ -1,6 +1,6 @@
 isolated-pg: afldb_v2_blockm_rh_test verified (cluster afldb_v2_isolated, 127.0.0.1:55494); running bash
 isolated-pg: afldb_v2_blockm_rh_test verified (cluster afldb_v2_isolated, 127.0.0.1:55494); running bash
 isolated-pg: afldb_v2_blockm_rh_test verified (cluster afldb_v2_isolated, 127.0.0.1:55494); running node
-rehearsal identity oid=20331 sysid=7703343126414206586 db=afldb_v2_blockm_rh_test
+rehearsal identity oid=20331 sysid=7703345348590660326 db=afldb_v2_blockm_rh_test
 transform diff lines: 17
 rehearsal copy syntax ok

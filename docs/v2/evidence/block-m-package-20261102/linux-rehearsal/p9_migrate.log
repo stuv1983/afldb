@@ -1,14 +1,15 @@
-== M1 migrate: migration 118 only 2026-11-01T23:05:57Z
-checkout bbb52ed489119f6e95662cae94811322bf14e715 clean
+== M1 migrate: migration 118 only 2026-11-01T23:14:35Z
+checkout 0bf95bee446be372b5b4bfb05f83a261ba534edc clean
 unit afldb-rehearsal-none.service enabled=not-found active=inactive
 no settle/migrate/dump/restore/window/label process
 crontab check skipped (rehearsal host)
+backup ok: afldb_prod-SYNTH.dump sha256 1b2059317f683095ddd14eb4f539b0ada5e643f4ea2a20c866eb8eb3f28b07c9 captured_end 2026-11-01T23:09:34.166Z age_min 5.0 ledger_digest 647c3fb39ca66a572664e1dae9028e4fad4d6b121226d6bdf208e6738af45f72
 dsn_identity key=AFLDB_OWNER_DATABASE_URL user=afldb_owner host=127.0.0.1 port=55494 database=afldb_v2_blockm_rh_test
 pending: 118_fixtures_unconfirmed_participants.sql
 AFLDB migrations -> prod (afldb_owner@127.0.0.1:55494/afldb_v2_blockm_rh_test)
   118 migration file(s), 117 already applied
 
-  applying 118_fixtures_unconfirmed_participants.sql ... ok (11 ms)
+  applying 118_fixtures_unconfirmed_participants.sql ... ok (12 ms)
 
 Applied 1 migration(s).
 MIGRATE PASS (run readback)

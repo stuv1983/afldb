@@ -6,7 +6,7 @@ The default text search configuration will be set to "english".
 
 Data page checksums are disabled.
 
-creating directory /mnt/ssd/afldb-v2-blockm-20261101T230500Z/pg-root/data ... ok
+creating directory /mnt/ssd/afldb-v2-blockm-20261101T231338Z/pg-root/data ... ok
 creating subdirectories ... ok
 selecting dynamic shared memory implementation ... posix
 selecting default max_connections ... 100
@@ -18,6 +18,6 @@ performing post-bootstrap initialization ... ok
 syncing data to disk ... ok
 init: cluster initialised
 roles: afldb_owner, afldb_app, afldb_import, afldb_backup, afldb_auth present
-pg_ctl: server is running (PID: 1283769)
-/usr/lib/postgresql/16/bin/postgres "-D" "/mnt/ssd/afldb-v2-blockm-20261101T230500Z/pg-root/data"
-LISTEN 0      600        127.0.0.1:55494      0.0.0.0:*    users:(("postgres",pid=1283769,fd=7))      
+pg_ctl: server is running (PID: 1293047)
+/usr/lib/postgresql/16/bin/postgres "-D" "/mnt/ssd/afldb-v2-blockm-20261101T231338Z/pg-root/data"
+LISTEN 0      600        127.0.0.1:55494      0.0.0.0:*    users:(("postgres",pid=1293047,fd=7))      

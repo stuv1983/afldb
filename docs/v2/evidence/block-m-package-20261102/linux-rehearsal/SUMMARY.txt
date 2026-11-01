@@ -4,6 +4,7 @@ PASS p4_cluster
 PASS p5_restore
 PASS p6_prepare
 PASS p7_pre117
+PASS p7b_backup_controls
 PASS p8_neg_wrong_state
 PASS p9_migrate
 PASS p10_readback

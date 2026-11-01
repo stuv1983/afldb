@@ -1,6 +1,6 @@
 AFLDB migrations -> prod (afldb_owner@127.0.0.1:55494/afldb_v2_blockm_rh_test)
   118 migration file(s), 117 already applied
 
-  applying 118_fixtures_unconfirmed_participants.sql ... ok (11 ms)
+  applying 118_fixtures_unconfirmed_participants.sql ... ok (12 ms)
 
 Applied 1 migration(s).

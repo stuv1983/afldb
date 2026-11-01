@@ -1,0 +1,52 @@
+== M1 migrate: migration 118 only 2026-11-01T23:14:34Z
+checkout 0bf95bee446be372b5b4bfb05f83a261ba534edc clean
+unit afldb-rehearsal-none.service enabled=not-found active=inactive
+no settle/migrate/dump/restore/window/label process
+crontab check skipped (rehearsal host)
+backup refused: age 300.0 min (limit 120)
+STOP: the backup does not bind this stage
+CONTROL refused as required (rc=6): M migrate 0bf95bee446be372b5b4bfb05f83a261ba534edc
+== M1 migrate: migration 118 only 2026-11-01T23:14:34Z
+checkout 0bf95bee446be372b5b4bfb05f83a261ba534edc clean
+unit afldb-rehearsal-none.service enabled=not-found active=inactive
+no settle/migrate/dump/restore/window/label process
+crontab check skipped (rehearsal host)
+backup refused: ledger digest 573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57
+STOP: the backup does not bind this stage
+CONTROL refused as required (rc=6): M migrate 0bf95bee446be372b5b4bfb05f83a261ba534edc
+== M1 migrate: migration 118 only 2026-11-01T23:14:34Z
+checkout 0bf95bee446be372b5b4bfb05f83a261ba534edc clean
+unit afldb-rehearsal-none.service enabled=not-found active=inactive
+no settle/migrate/dump/restore/window/label process
+crontab check skipped (rehearsal host)
+backup refused: target identity
+STOP: the backup does not bind this stage
+CONTROL refused as required (rc=6): M migrate 0bf95bee446be372b5b4bfb05f83a261ba534edc
+== M1 migrate: migration 118 only 2026-11-01T23:14:34Z
+checkout 0bf95bee446be372b5b4bfb05f83a261ba534edc clean
+unit afldb-rehearsal-none.service enabled=not-found active=inactive
+no settle/migrate/dump/restore/window/label process
+crontab check skipped (rehearsal host)
+afldb_prod-SYNTH.dump: FAILED
+sha256sum: WARNING: 1 computed checksum did NOT match
+STOP: backup checksums do not verify
+CONTROL refused as required (rc=6): M migrate 0bf95bee446be372b5b4bfb05f83a261ba534edc
+== M1 migrate: migration 118 only 2026-11-01T23:14:34Z
+checkout 0bf95bee446be372b5b4bfb05f83a261ba534edc clean
+unit afldb-rehearsal-none.service enabled=not-found active=inactive
+no settle/migrate/dump/restore/window/label process
+crontab check skipped (rehearsal host)
+STOP: backup directory missing or has no SHA256SUMS: /mnt/ssd/afldb-v2-blockm-20261101T231338Z/evidence/no-such-dir
+CONTROL refused as required (rc=6): M migrate 0bf95bee446be372b5b4bfb05f83a261ba534edc
+== pre: host, checkout, writers, serving, ledger (117) 2026-11-01T23:14:35Z
+checkout 0bf95bee446be372b5b4bfb05f83a261ba534edc clean
+unit afldb-rehearsal-none.service enabled=not-found active=inactive
+no settle/migrate/dump/restore/window/label process
+crontab check skipped (rehearsal host)
+state-probe skipped (rehearsal host serves nothing)
+MemAvailable_MB=26890 free_GB=838
+dsn_identity key=AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=127.0.0.1 port=55494 database=afldb_v2_blockm_rh_test
+identity ok (database, OID, system identifier, read-only session)
+ledger rows=117 last=117_brownlow_provider_eligibility_unknown.sql digest=647c3fb39ca66a572664e1dae9028e4fad4d6b121226d6bdf208e6738af45f72
+fixtures_rows=0 matches_rows=17056 switch_raw=(absent)
+PRE PASS

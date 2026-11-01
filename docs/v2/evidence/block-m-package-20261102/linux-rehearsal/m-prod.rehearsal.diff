@@ -2,14 +2,14 @@
 < R_CHK=/home/arm/projects/afldb
 < ROOT=/home/arm/afldb-releases
 ---
-> R_CHK=/mnt/ssd/afldb-v2-blockm-20261101T230500Z/cand
+> R_CHK=/mnt/ssd/afldb-v2-blockm-20261101T231338Z/cand
 > ROOT=/mnt/ssd
 25,26c25,26
 < EXPECT_DB=afldb_prod; EXPECT_DSN_HOST=localhost; EXPECT_DSN_PORT=5432
 < EXPECT_SYSID=7674454702926115004; EXPECT_OID=66668
 ---
 > EXPECT_DB=afldb_v2_blockm_rh_test; EXPECT_DSN_HOST=127.0.0.1; EXPECT_DSN_PORT=55494
-> EXPECT_SYSID=7703343126414206586; EXPECT_OID=20331
+> EXPECT_SYSID=7703345348590660326; EXPECT_OID=20331
 32,33c32
 < UNITS="afldb-settle-afltables.service afldb-settle-afltables.timer afldb-settle-afl-api.service afldb-settle-afl-api.timer
 < afldb-settle-afl-api-brownlow.service afldb-settle-afl-api-brownlow.timer afldb-email-intake.service afldb-email-intake.timer"
@@ -23,7 +23,7 @@
 <   if crontab -l >/dev/null 2>&1; then stop "arm has a crontab" 4; else echo "no crontab for arm"; fi
 ---
 >   echo "crontab check skipped (rehearsal host)"
-99c98
+117c116
 <   bash "$HERE/state-probe.sh" "$OLD_ID" - --expect OLD_SERVING || stop "serving state is not OLD_SERVING" 6
 ---
 >   echo "state-probe skipped (rehearsal host serves nothing)"

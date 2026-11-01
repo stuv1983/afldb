@@ -3,4 +3,4 @@ afldb.service active MainPID=1162113
 postgresql@16-main.service active MainPID=1504
 waiting for server to shut down..... done
 server stopped
-2.2G	/mnt/ssd/afldb-v2-blockm-20261101T230500Z
+2.2G	/mnt/ssd/afldb-v2-blockm-20261101T231338Z

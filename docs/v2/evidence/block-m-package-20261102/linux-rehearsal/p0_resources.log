@@ -1,5 +1,5 @@
 Filesystem                         Size  Used Avail Use% Mounted on
-/dev/sdf1                          938G   49G  842G   6% /mnt/ssd
+/dev/sdf1                          938G   52G  839G   6% /mnt/ssd
 /dev/mapper/ubuntu--vg-ubuntu--lv  232G  216G  5.3G  98% /
 Mem:              31           4           2           0          25          26
 24
