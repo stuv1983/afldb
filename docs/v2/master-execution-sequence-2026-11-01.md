@@ -126,7 +126,9 @@ C5 additionally requires: the C4b PASS record, no 2027 match started (the first 
 | C4b | 36/36 e2e | systemd answers, `[2027]` register, scripted acquire and settle, readiness verdict | real systemd, polkit, provider, `UnsetEnvironment=` |
 | Trigger | unit tests over eleven values; no spawn | none | the live `.env` and process environment |
 
-### 8.1 Isolated Linux qualification (2026-11-01)
+### 8.1 Isolated Linux qualification (2026-11-01) - NONCONFORMING ENVIRONMENT, superseded by 8.2
+
+> **These results were obtained inside the quarantined WSL distro `AFLDB-V2-Rehearsal-20261020`, which ISSUE-331 / D-331-2 forbids booting.** They are retained unedited for the record and are **not authorised release qualification**; no approval block may cite them. The toolchain came from a changed, unverifiable store. ISSUE-331 is reopened for this use (`docs/v2/issue331-incident-assessment-2026-11-01.md` section 6). The correct qualification is section 8.2.
 
 Workstation Windows runs do not prove Linux behaviour, so the changed tools were re-run on Linux. **Environment:** the WSL2 distro `AFLDB-V2-Rehearsal-20261020` (Linux, systemd present but not used by the drivers), non-root user `rehearsal`, Node v22.21.0, PostgreSQL 16 client and server binaries, 31 GB RAM and 915 GB free before the run (checked first; nothing deleted or unregistered). Workspace `/home/rehearsal/qual-20261101` = `git archive` of the committed tree (3,849 files equal to `git ls-files`), the distro's existing Linux `node_modules` copied privately (lock file sha256 `984b4422…` equal to the checkout's; nothing installed or upgraded), a **new** guarded cluster on 127.0.0.1:55490 under `/home/rehearsal/qual-pg-20261101` (the distro's older cluster untouched). The same verified production backup (sha256 `3f5b5339…4730`, re-hashed on Linux) was restored with `pg_restore --no-owner` (only the two expected extension-comment errors; 17,056 matches).
 

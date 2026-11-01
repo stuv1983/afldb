@@ -127,3 +127,57 @@ Retained after closure (not resolved by it): the artefact-binding limitation (Br
 proven historical full-hash match) and the separate exposed-credential follow-up (the shared role passwords remain in the original
 store and earlier transcripts; the disappearance of the export copy does not resolve exposure, and retiring or rotating them is a
 separate, owner-run step that this closure does not perform).
+
+## 6. Reopening 2026-11-01 (evening): quarantined store used as a Linux runtime host
+
+**This is a separate, later event. It does not explain, and must not be used to explain, the earlier disappearance, which stays
+cause UNKNOWN (section 1, section 5 D-331-1).**
+
+### 6.1 What happened (from the batch's own committed records)
+
+The 2026-11-01 readiness batch ran its "isolated Linux qualification" **inside the quarantined distro**
+`AFLDB-V2-Rehearsal-20261020`, in breach of D-331-2 ("never booted"). Source records: commit `151f7f00` (20:02:16 local) and
+`docs/v2/master-execution-sequence-2026-11-01.md` section 8.1; driver fixes `ac6732c0` (19:30) and `f2e5540c` (20:00). They name
+the workspace `/home/rehearsal/qual-20261101`, a new cluster on 127.0.0.1:55490 under `/home/rehearsal/qual-pg-20261101`, the
+distro's own Linux `node_modules`, Node v22.21.0 and PostgreSQL 16 binaries taken from the distro, and evidence in
+`/home/rehearsal/qual-evidence-20261101/`. The records also state that a first C4b run left an orphan victim process that was
+killed by hand. The number and times of boots are **not independently recorded**: no Hyper-V compute or worker events exist for the
+period, so only the file times below bound them.
+
+### 6.2 Containment facts (read-only, Windows side, 2026-11-01 about 20:11 local)
+
+| Item | Fact |
+|---|---|
+| Registration | `HKCU\...\Lxss\{0cb6e2c4-5caa-4c0b-ba1e-25953010be02}`, name `AFLDB-V2-Rehearsal-20261020`, BasePath `D:/afldb-v2-rehearsal-20261020` (forward-slash form as registered), State 1, Version 2, default uid 0 |
+| Run state | **Stopped.** `wsl --list --running` reports no running distribution; no `wsl`, `wslhost`, `vmmem` or `vmwp` process exists (only `wslservice`, started 2026-10-31 20:38:06). Nothing needed stopping; nothing was started |
+| Store files | `ext4.vhdx` 51,419,021,312 bytes, created 2026-10-20 10:54:15, **last write 2026-11-01 20:03:09 local** (09:03:09Z), NTFS file ID `0x000000000000000000040000005f50a6`; `previous-reviewed.tar` (117,606,400) and `v2-reviewed.tar` (207,329,280) and `shortcut.ico` are unchanged since 2026-10-20 |
+| Change since the last record | ISSUE-331 recorded 47,045,410,816 bytes, last write 2026-10-31 20:33:45. The store grew by **4,373,610,496 bytes** and was last written about one minute after commit `151f7f00`, which is the expected flush at distro shutdown |
+| Identity | Identified by registry GUID, BasePath, file ID, size and times. The VHDX was deliberately **not hashed** (D-331-2: changed bytes are never hashed and re-pinned as evidence); a background hash started during this check was stopped and its partial output deleted. Its bytes are a CHANGED store and not a baseline, as before |
+| Export base | `C:\afldb-v2-brownlow-export-20261028` still absent; `AFLDB-V2-BrownlowExport-20261028` still registered (D-331-3 deferred); `D:\tmp\afldb-v2-pg16` still present |
+| Not done | no boot, unregister, deletion, re-pin, repair or retention change |
+
+Windows-side `node ... isolated-pg` processes (PIDs 19600, 37280, 34440) and their launching bash scripts belong to the earlier
+rollback serving probes on the Windows recovery environment. They are not part of this breach and were left alone.
+
+### 6.3 Integrity implications
+
+- Everything run in the distro (typecheck, focused suites 557 passed, C4b 36/36, labels 24/24) used a **toolchain from a quarantined,
+  changed store**: Node, the PostgreSQL binaries and `node_modules` were not re-verified from source. The lock-file hash and the
+  production backup hash (`3f5b5339…4730`, re-hashed on Linux) were checked, so the **data input** is sound; the **executables** are
+  unproven. The results are retained and not erased, but they are **nonconforming-environment results, not authorised release
+  qualification**, and no approval block may cite them as such. They are replaced by the correct Linux qualification (this
+  record's successor, master sequence section 8.2).
+- The store gained about 4.37 GB of new content (a workspace, a cluster, restored production-backup data, evidence). The quarantine
+  already treated it as CHANGED; it is now also **contaminated with a restored copy of production-derived data** and with whatever
+  credentials the new cluster used. It must be handled as sensitive when the owner eventually retires it.
+- The shared role passwords from the earlier exposure remain in that store; this event neither fixes nor worsens that finding, but it
+  reinforces that the owner-run rotation/retirement step is still owed.
+- Evidence left inside the distro (`/home/rehearsal/qual-evidence-20261101/`) is **not readable without booting**, so it was not
+  retrieved and is not claimed. The conversation transcript of the breaching session is retained by the client and was not edited.
+
+### 6.4 Disposition for this reopening
+
+ISSUE-331 is **reopened** for this confirmed use. D-331-2 stands and is restated: the store is not to be booted again by any
+session, including to retrieve logs. Retiring it (`wsl --unregister`, deleting the base) remains the owner's irreversible act, after
+deciding whether `/home/rehearsal/qual-evidence-20261101/` should first be exported by an owner-run boot. All new qualification
+uses fresh disposable workspaces on the DEV host `streamanator` (owner-authorised 2026-11-01).
