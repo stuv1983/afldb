@@ -10,6 +10,7 @@
 #   bash m-prod.sh window-stage <snapshot-dir-name> <feed-sha256>         read-only; proves the staged snapshot bytes
 #   bash m-prod.sh window    check|run <R> <snapshot> <feed-sha256> <evidence-dir> <decision-text>   M3 (run writes; check does not)
 #   bash m-prod.sh window    restore <evidence-dir>                       recovery: force the switch off and verify
+#   bash m-prod.sh readback-b <matches-rows-before> <decision-text>      read-only; proves the M-b result (218 / 135 / 83 / 11 / 10 / 83 / 0, one batch, switch false)
 set -u -o pipefail
 export LC_ALL=C
 umask 077
@@ -145,6 +146,27 @@ readback)
   [ "$P" = "true,true,true" ] || stop "writer/reader column privileges on the new columns: $P (privileges.sql was NOT part of this approval)" 5
   echo "ledger118_digest=$L118_DIGEST fixtures_rows=$(q -c 'SELECT count(*) FROM fixtures') matches_rows=$(q -c 'SELECT count(*) FROM matches')"
   echo "READBACK PASS"
+  ;;
+readback-b)
+  EXPECT_MATCHES=${1:?matches row count before the window}; DECISION=${2:?decision text used for the window}
+  [[ $EXPECT_MATCHES =~ ^[0-9]+$ ]] || stop "matches count must be a number" 2
+  step "readback-b: the first 2027 fixture apply (afldb_backup, read-only)"
+  backup_identity
+  ledger_is 118 "$MIG118" "$L118_DIGEST"
+  G=$(q -c "SELECT count(*), count(*) FILTER (WHERE confirmation='confirmed'), count(*) FILTER (WHERE confirmation='unconfirmed'), count(*) FILTER (WHERE home_placeholder IS NOT NULL OR away_placeholder IS NOT NULL), count(*) FILTER (WHERE venue_id IS NULL AND venue_raw IS NULL), count(*) FILTER (WHERE match_date IS NULL AND match_time IS NULL), count(*) FILTER (WHERE confirmation='unconfirmed' AND (match_date IS NOT NULL OR match_time IS NOT NULL)), count(DISTINCT import_batch_id), count(*) FILTER (WHERE status<>'scheduled') FROM fixtures" | tr '	' '|')
+  echo "fixtures total|confirmed|unconfirmed|label|nullvenue|nulldatetime|unconf_with_datetime|batches|not_scheduled = $G"
+  [ "$G" = "218|135|83|11|10|83|0|1|0" ] || stop "fixture breakdown differs from the approved 218|135|83|11|10|83|0|1|0" 5
+  B=$(q -c "SELECT count(*), min(status::text), min(records_read), min(records_inserted), min(records_updated), min(records_rejected) FROM import_batches WHERE tool='settle-afl-api-fixture-schedule.ts'" | tr '	' '|')
+  echo "fixture-schedule batches count|status|read|inserted|updated|rejected = $B"
+  [ "$B" = "1|completed|218|218|0|0" ] || stop "import batch differs from one completed 218/218/0/0" 5
+  [ "$(q -c "SELECT count(*) FROM fixtures f JOIN import_batches b ON b.id=f.import_batch_id WHERE b.tool='settle-afl-api-fixture-schedule.ts'")" = 218 ] || stop "fixtures are not all attributed to that batch" 5
+  S=$(q -c "SELECT jsonb_typeof(value)||':'||value::text FROM site_settings WHERE key='acquisition.afl_api_current_season_enabled'")
+  echo "switch=$S"; [ "$S" = "boolean:false" ] || stop "the switch is not an explicit boolean false: $S (run: m-prod.sh window restore <evidence-dir>)" 5
+  DLIT=${DECISION//\'/\'\'}   # SQL string literal: psql -c does no variable interpolation
+  A=$(q -c "SELECT count(*)||':'||count(*) FILTER (WHERE detail->>'via'='afl-api-fixture-window')||':'||count(DISTINCT detail->>'run_id') FROM auth_audit_log WHERE action='current_season.afl_api_ingestion_set' AND detail->>'decision' = '$DLIT'")
+  echo "audit rows (decision rows : via window : distinct runs) = $A"; [ "$A" = "2:2:1" ] || stop "expected exactly one ON and one OFF audit row of one run carrying the decision" 5
+  [ "$(q -c "SELECT count(*) FROM matches")" = "$EXPECT_MATCHES" ] || stop "matches row count changed" 5
+  echo "READBACK-B PASS"
   ;;
 window-stage)
   LABEL=${1:?snapshot dir name}; FEED=${2:?feed sha256}
