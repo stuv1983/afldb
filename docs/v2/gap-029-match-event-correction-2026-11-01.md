@@ -86,7 +86,7 @@ No new production dump was taken. The existing workstation copy of the verified 
 
 ## 7. Labels, revision 2
 
-`docs/v2/evidence/gap-029-match-event-correction-2026-11-01-r2.json` (sha256 `b197f99f3b0ca4ef4f524e6d57f5b5de60b140ff8e3cca02f6c67c4f3b498ea4`); the first file (sha `dcdc8b20…3859e`, 61 entries) is retained unchanged. 64 entries: Anzac Day 31, Dreamtime at the 'G 22, King's Birthday 11.
+`docs/v2/evidence/gap-029-match-event-correction-2026-11-01-r2.json` (sha256 `e3848807931cf255175c1642d9ded63590b2c7e2633b33a5e9f0fa5b96a4430f`, the committed LF bytes; the first apply run read a CRLF working copy of the same content, sha `b197f99f…8ea4`, recorded in the first report); the first file (sha `dcdc8b20…3859e`, 61 entries) is retained unchanged. 64 entries: Anzac Day 31, Dreamtime at the 'G 22, King's Birthday 11.
 
 - **2026 editions, re-evaluated against production data and the corpus cutoff (board dates to 2026-09-01).** The corpus now contains 2026 boards, so the 61 labels ending in 2025 could not be assumed complete. Each 2026 edition was identified in the production-derived `matches` and confirmed by first-party reports: Anzac Day 2026-04-25 Essendon 9.6 (60) v Collingwood 20.17 (137), match id 17247 (afl.com.au 1504213 and essendonfc 2004645, crowd 92,231); Dreamtime 2026-05-22 Richmond 10.14 (74) v Essendon 7.14 (56), id 17076 (afl.com.au 1523923, richmondfc 2029375, crowd 78,815); King's Birthday 2026-06-08 Melbourne 12.11 (83) v Collingwood 11.9 (75), id 17097 (afl.com.au 1536297, collingwoodfc 2042779, melbournefc 2042914, "Big Freeze 12", crowd 88,019). Raw pages are outside Git under `D:\tmp\afldb-gap029-source-evidence-20261101\raw2\` (pages 28-40, `fetch-log-2.txt`).
 - **Anzac Day 2023 is now raw-evidenced** (the owner did not approve count closure alone): AFL.com.au match page 4837 gives Collingwood 13.12 (90) d Essendon 11.11 (77), id 16244.
@@ -99,7 +99,7 @@ No new production dump was taken. The existing workstation copy of the verified 
 | Plan | 64/64 validated before the first write (identity unchanged; event NULL or already intended) |
 | Apply on `afldb_v2_gap029_prodev_test` | verified true; 64 `data_edits` rows; 64 active `data_overrides`; labelled Anzac 31 / Dreamtime 22 / King's Birthday 11 |
 | Idempotence | re-run changes nothing (still 64 and 64) |
-| Report | `docs/v2/evidence/gap-029-match-event-apply-report-2026-11-01-r2.json` |
+| Reports | first apply `docs/v2/evidence/gap-029-match-event-apply-report-2026-11-01-r2.json` (CRLF working-copy hash); idempotent replay against the committed LF file `…-r2-replay.json` (64 "already labelled", 64 audit, 64 overrides, hash `e3848807…430f`) |
 
 Gridley strict-parity corpus (`AFLDB_GRIDLEY_DIAGNOSTIC=1`), production-derived data, same corpus run on both clones:
 
