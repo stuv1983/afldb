@@ -28,7 +28,7 @@ MIG118=118_fixtures_unconfirmed_participants.sql
 L118_DIGEST=573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57
 UNITS="afldb-settle-afltables.service afldb-settle-afltables.timer afldb-settle-afl-api.service afldb-settle-afl-api.timer
 afldb-settle-afl-api-brownlow.service afldb-settle-afl-api-brownlow.timer afldb-email-intake.service afldb-email-intake.timer"
-HERE=$(cd "$(dirname "$0")" && pwd)
+HERE=$(cd "$(dirname "$0")" && pwd); SELF="$HERE/$(basename "$0")"
 [ "$(hostname)" = afldb-prod ] && [ "$(id -un)" = arm ] || stop "unexpected host/user" 3
 [ -x "$NODE" ] && [ -x "$PGBIN/psql" ] || stop "missing node or psql" 3
 
@@ -158,12 +158,12 @@ baseline|plan|apply)
   SNAP=(); [ -n "$LABEL" ] && SNAP=(--snapshot-label "$LABEL")
   if [ "$PHASE" = baseline ]; then
     OUT="$BD/baseline-live.json"; [ ! -e "$OUT" ] || stop "baseline already exists for $S; take a new stage directory or a new revision, evidence is never overwritten" 3
-    bash "$HERE/b-prod.sh" pre "$R" "$S" > /dev/null || stop "pre failed: no baseline is taken on a state this stage does not expect" 6
+    bash "$SELF" pre "$R" "$S" > /dev/null || stop "pre failed: no baseline is taken on a state this stage does not expect" 6
     step "baseline $S (read-only session)"; AFLDB_BROWNLOW_CORRECTION_DSN=$DSN "${RUNNER[@]}" baseline --target "$BD/target.json" --out "$OUT" || stop "baseline refused" 6
   elif [ "$PHASE" = plan ]; then
     BACKUP=${1:?backup.json}; BFILE=${2:?backup file}; RESTORE=${3:?restore evidence}
-    [ -z "$LABEL" ] || bash "$HERE/b-prod.sh" snapshots "$S" || exit $?
-    PRE=$(bash "$HERE/b-prod.sh" pre "$R" "$S") || { printf '%s\n' "$PRE"; stop "pre failed" 6; }
+    [ -z "$LABEL" ] || bash "$SELF" snapshots "$S" || exit $?
+    PRE=$(bash "$SELF" pre "$R" "$S") || { printf '%s\n' "$PRE"; stop "pre failed" 6; }
     OUT="$BD/plan.json"; [ ! -e "$OUT" ] || stop "a plan already exists for $S" 3
     step "plan $S (read-only session, no writes)"
     AFLDB_BROWNLOW_CORRECTION_DSN=$DSN "${RUNNER[@]}" plan --target "$BD/target.json" --request "$(reqfile "$S")" --backup "$BACKUP" --backup-file "$BFILE" --restore-evidence "$RESTORE" --out "$OUT" "${SNAP[@]}" || stop "plan refused" 6
@@ -171,8 +171,8 @@ baseline|plan|apply)
   else
     PLAN=${1:?plan.json}; APPROVAL=${2:?approval.json}; BFILE=${3:?backup file}; RESTORE=${4:?restore evidence}
     [ -f "$APPROVAL" ] || stop "no execution approval file: the owner has not approved" 3
-    [ -z "$LABEL" ] || bash "$HERE/b-prod.sh" snapshots "$S" || exit $?
-    bash "$HERE/b-prod.sh" pre "$R" "$S" > /dev/null || stop "pre failed at apply time; nothing was written" 6
+    [ -z "$LABEL" ] || bash "$SELF" snapshots "$S" || exit $?
+    bash "$SELF" pre "$R" "$S" > /dev/null || stop "pre failed at apply time; nothing was written" 6
     OUT="$BD/receipt.json"; [ ! -e "$OUT" ] || stop "a receipt file already exists for $S; a stage is never re-applied" 3
     "$NODE" -e '
 const fs = require("fs"); const [plan, appr, R, S, reqSha] = process.argv.slice(1);
