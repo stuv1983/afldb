@@ -3,7 +3,8 @@
  * No database, no `server-only`, no I/O: a live `matches` row is compared with its evidence entry and the first
  * mismatch is named. Every identity field the evidence records is compared, `venueRaw` included, and NULL keeps its
  * meaning: an evidence NULL matches only a live NULL, and a live NULL never matches an evidenced venue. An evidence
- * entry that omits `venueRaw` (undefined) is malformed and refuses rather than being read as NULL.
+ * entry that omits `venueRaw` (undefined) is malformed and refuses rather than being read as NULL. (The live column is
+ * NOT NULL, so a live NULL cannot occur today; the check stays defensive so a schema change cannot loosen it.)
  */
 export interface Entry {
   family: string; label: string; year: number; matchId: number;

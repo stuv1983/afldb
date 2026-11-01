@@ -127,10 +127,11 @@ r = cli(planArgs('plan-conflicting-event.json'));
 await sql`UPDATE matches SET match_event = NULL WHERE id = ${first.matchId}`;
 check('plan refuses when a covered match is changed after the backup (here: it carries a different event; the backup-baseline check fires first)', r.status !== 0 && /different event|baseline drift/.test(r.msg), r.msg.slice(0, 90));
 
-// negative controls: a changed venue identity, and a disabled or demoted actor, each refused with nothing written
+// negative controls: a changed venue identity (different text, case change), and a disabled or demoted actor, each refused with nothing written
 const venueId = (plan.entries[0] as { matchId: number }).matchId;
 const [venueRow] = await sql`SELECT venue_raw FROM matches WHERE id = ${venueId}`;
-for (const [name, value] of [['a different venue', 'GAP029 e2e changed venue'], ['a NULL venue', null]] as const) {
+// (matches.venue_raw is NOT NULL, so a NULL venue cannot be staged here; the pure check covers NULL in tests/v2-gap029-label-checks.test.ts)
+for (const [name, value] of [['a different venue', 'GAP029 e2e changed venue'], ['a case-changed venue', String(venueRow.venue_raw).toLowerCase()]] as const) {
   await sql`UPDATE matches SET venue_raw = ${value} WHERE id = ${venueId}`;
   r = cli(applyArgs(join(evidence, 'plan.json'), goodApproval, `refused-venue-${name.replace(/\W+/g, '-')}.json`));
   await sql`UPDATE matches SET venue_raw = ${venueRow.venue_raw} WHERE id = ${venueId}`;
