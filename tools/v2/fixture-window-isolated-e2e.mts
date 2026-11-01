@@ -54,8 +54,11 @@ const ARGS = (over: Record<string, unknown> = {}) => ({ mode: 'run' as const, la
 
 function winDeps(evidenceDir: string, runId: string, host: Host = {}) {
   const real = fxw.productionWindowDeps(root, evidenceDir, runId);
-  // The harness's own owner connection is excluded from the session inventory; every other session is real.
-  const inventory = fxw.hostInventory(async () => (await fxw.databaseSessions()).filter((s) => s.pid !== harnessBackend && !(process.env.FXW_HARNESS_BACKENDS ?? '').split(',').includes(String(s.pid))));
+  // HOST facts are simulated on every OS (a developer host may legitimately run its own timers; see the informational S0c).
+  // The database-session inventory is REAL; the harness's own owner connections are excluded.
+  const inventory = async (): Promise<fxw.Inventory> => ({ lines: (await fxw.databaseSessions())
+    .filter((s) => s.pid !== harnessBackend && !(process.env.FXW_HARNESS_BACKENDS ?? '').split(',').includes(String(s.pid)))
+    .map((s) => ({ source: 'session' as const, pid: s.pid, role: s.role, state: s.state })), unreadable: [], notInstalled: ['simulated host'] });
   return {
     ...real,
     systemctl: (verb: 'is-enabled' | 'is-active', unit: string): string => {
@@ -127,6 +130,14 @@ const realStep = (evidenceDir: string, runId: string) => winDeps(evidenceDir, ru
   check('S0 the pinned feed file sha256 matches the approved value', createHashOf(join(SNAP_DST, '00-season-matches.json')) === FEED_SHA, FEED_SHA.slice(0, 12));
 }
 function createHashOf(p: string): string { return spawnSync(process.execPath, ['-e', `process.stdout.write(require('crypto').createHash('sha256').update(require('fs').readFileSync(process.argv[1])).digest('hex'))`, p], { encoding: 'utf8' }).stdout; }
+
+// S0c INFORMATIONAL: what the REAL host inventory reads on this machine (no assertion on its content; a dev host may run its own timers)
+{
+  const real = await fxw.hostInventory(async () => [])();
+  const findings = fxw.writerFindings(real, new Set([process.pid, process.ppid]));
+  report.realHostInventory = { platform: process.platform, lines: real.lines.length, unreadable: real.unreadable, notInstalled: real.notInstalled, findings: findings.map((f) => f.slice(0, 160)) };
+  check('S0c the REAL host inventory is readable by this unprivileged user (every source that is installed answered); its findings are recorded, not asserted', real.unreadable.length === 0, `platform=${process.platform} lines=${real.lines.length} findings=${findings.length} notInstalled=${real.notInstalled.join('|')}`);
+}
 
 // S1 --check-only: every precondition, nothing written
 {
