@@ -1,0 +1,606 @@
+{
+  "database": "afldb_v2_gap029_prodev_test",
+  "apply": true,
+  "planned": 64,
+  "counts": {
+    "Anzac Day": 31,
+    "Dreamtime at the 'G": 22,
+    "King's Birthday": 11
+  },
+  "verified": true,
+  "auditRows": 64,
+  "activeOverrides": 64,
+  "labelledAfter": [
+    {
+      "match_event": "Anzac Day",
+      "n": 31
+    },
+    {
+      "match_event": "Dreamtime at the 'G",
+      "n": 22
+    },
+    {
+      "match_event": "King's Birthday",
+      "n": 11
+    }
+  ],
+  "evidenceSha256": "b197f99f3b0ca4ef4f524e6d57f5b5de60b140ff8e3cca02f6c67c4f3b498ea4",
+  "results": [
+    {
+      "matchId": 10834,
+      "family": "Anzac Day",
+      "year": 1995,
+      "date": "1995-04-25",
+      "before": null,
+      "label": "Anzac Day",
+      "outcome": "written"
+    },
+    {
+      "matchId": 11020,
+      "family": "Anzac Day",
+      "year": 1996,
+      "date": "1996-04-25",
+      "before": null,
+      "label": "Anzac Day",
+      "outcome": "written"
+    },
+    {
+      "matchId": 11205,
+      "family": "Anzac Day",
+      "year": 1997,
+      "date": "1997-04-25",
+      "before": null,
+      "label": "Anzac Day",
+      "outcome": "written"
+    },
+    {
+      "matchId": 11391,
+      "family": "Anzac Day",
+      "year": 1998,
+      "date": "1998-04-25",
+      "before": null,
+      "label": "Anzac Day",
+      "outcome": "written"
+    },
+    {
+      "matchId": 11581,
+      "family": "Anzac Day",
+      "year": 1999,
+      "date": "1999-04-25",
+      "before": null,
+      "label": "Anzac Day",
+      "outcome": "written"
+    },
+    {
+      "matchId": 11782,
+      "family": "Anzac Day",
+      "year": 2000,
+      "date": "2000-04-25",
+      "before": null,
+      "label": "Anzac Day",
+      "outcome": "written"
+    },
+    {
+      "matchId": 11945,
+      "family": "Anzac Day",
+      "year": 2001,
+      "date": "2001-04-25",
+      "before": null,
+      "label": "Anzac Day",
+      "outcome": "written"
+    },
+    {
+      "matchId": 12130,
+      "family": "Anzac Day",
+      "year": 2002,
+      "date": "2002-04-25",
+      "before": null,
+      "label": "Anzac Day",
+      "outcome": "written"
+    },
+    {
+      "matchId": 12315,
+      "family": "Anzac Day",
+      "year": 2003,
+      "date": "2003-04-25",
+      "before": null,
+      "label": "Anzac Day",
+      "outcome": "written"
+    },
+    {
+      "matchId": 12505,
+      "family": "Anzac Day",
+      "year": 2004,
+      "date": "2004-04-25",
+      "before": null,
+      "label": "Anzac Day",
+      "outcome": "written"
+    },
+    {
+      "matchId": 12692,
+      "family": "Anzac Day",
+      "year": 2005,
+      "date": "2005-04-25",
+      "before": null,
+      "label": "Anzac Day",
+      "outcome": "written"
+    },
+    {
+      "matchId": 12869,
+      "family": "Anzac Day",
+      "year": 2006,
+      "date": "2006-04-25",
+      "before": null,
+      "label": "Anzac Day",
+      "outcome": "written"
+    },
+    {
+      "matchId": 13055,
+      "family": "Anzac Day",
+      "year": 2007,
+      "date": "2007-04-25",
+      "before": null,
+      "label": "Anzac Day",
+      "outcome": "written"
+    },
+    {
+      "matchId": 13248,
+      "family": "Anzac Day",
+      "year": 2008,
+      "date": "2008-04-25",
+      "before": null,
+      "label": "Anzac Day",
+      "outcome": "written"
+    },
+    {
+      "matchId": 13426,
+      "family": "Anzac Day",
+      "year": 2009,
+      "date": "2009-04-25",
+      "before": null,
+      "label": "Anzac Day",
+      "outcome": "written"
+    },
+    {
+      "matchId": 13614,
+      "family": "Anzac Day",
+      "year": 2010,
+      "date": "2010-04-25",
+      "before": null,
+      "label": "Anzac Day",
+      "outcome": "written"
+    },
+    {
+      "matchId": 13799,
+      "family": "Anzac Day",
+      "year": 2011,
+      "date": "2011-04-25",
+      "before": null,
+      "label": "Anzac Day",
+      "outcome": "written"
+    },
+    {
+      "matchId": 13996,
+      "family": "Anzac Day",
+      "year": 2012,
+      "date": "2012-04-25",
+      "before": null,
+      "label": "Anzac Day",
+      "outcome": "written"
+    },
+    {
+      "matchId": 14203,
+      "family": "Anzac Day",
+      "year": 2013,
+      "date": "2013-04-25",
+      "before": null,
+      "label": "Anzac Day",
+      "outcome": "written"
+    },
+    {
+      "matchId": 14419,
+      "family": "Anzac Day",
+      "year": 2014,
+      "date": "2014-04-25",
+      "before": null,
+      "label": "Anzac Day",
+      "outcome": "written"
+    },
+    {
+      "matchId": 14609,
+      "family": "Anzac Day",
+      "year": 2015,
+      "date": "2015-04-25",
+      "before": null,
+      "label": "Anzac Day",
+      "outcome": "written"
+    },
+    {
+      "matchId": 14831,
+      "family": "Anzac Day",
+      "year": 2016,
+      "date": "2016-04-25",
+      "before": null,
+      "label": "Anzac Day",
+      "outcome": "written"
+    },
+    {
+      "matchId": 15038,
+      "family": "Anzac Day",
+      "year": 2017,
+      "date": "2017-04-25",
+      "before": null,
+      "label": "Anzac Day",
+      "outcome": "written"
+    },
+    {
+      "matchId": 15245,
+      "family": "Anzac Day",
+      "year": 2018,
+      "date": "2018-04-25",
+      "before": null,
+      "label": "Anzac Day",
+      "outcome": "written"
+    },
+    {
+      "matchId": 15454,
+      "family": "Anzac Day",
+      "year": 2019,
+      "date": "2019-04-25",
+      "before": null,
+      "label": "Anzac Day",
+      "outcome": "written"
+    },
+    {
+      "matchId": 15828,
+      "family": "Anzac Day",
+      "year": 2021,
+      "date": "2021-04-25",
+      "before": null,
+      "label": "Anzac Day",
+      "outcome": "written"
+    },
+    {
+      "matchId": 16036,
+      "family": "Anzac Day",
+      "year": 2022,
+      "date": "2022-04-25",
+      "before": null,
+      "label": "Anzac Day",
+      "outcome": "written"
+    },
+    {
+      "matchId": 16244,
+      "family": "Anzac Day",
+      "year": 2023,
+      "date": "2023-04-25",
+      "before": null,
+      "label": "Anzac Day",
+      "outcome": "written"
+    },
+    {
+      "matchId": 16462,
+      "family": "Anzac Day",
+      "year": 2024,
+      "date": "2024-04-25",
+      "before": null,
+      "label": "Anzac Day",
+      "outcome": "written"
+    },
+    {
+      "matchId": 16677,
+      "family": "Anzac Day",
+      "year": 2025,
+      "date": "2025-04-25",
+      "before": null,
+      "label": "Anzac Day",
+      "outcome": "written"
+    },
+    {
+      "matchId": 12768,
+      "family": "Dreamtime at the 'G",
+      "year": 2005,
+      "date": "2005-07-09",
+      "before": null,
+      "label": "Dreamtime at the 'G",
+      "outcome": "written"
+    },
+    {
+      "matchId": 12880,
+      "family": "Dreamtime at the 'G",
+      "year": 2006,
+      "date": "2006-05-06",
+      "before": null,
+      "label": "Dreamtime at the 'G",
+      "outcome": "written"
+    },
+    {
+      "matchId": 13091,
+      "family": "Dreamtime at the 'G",
+      "year": 2007,
+      "date": "2007-05-26",
+      "before": null,
+      "label": "Dreamtime at the 'G",
+      "outcome": "written"
+    },
+    {
+      "matchId": 13274,
+      "family": "Dreamtime at the 'G",
+      "year": 2008,
+      "date": "2008-05-24",
+      "before": null,
+      "label": "Dreamtime at the 'G",
+      "outcome": "written"
+    },
+    {
+      "matchId": 13460,
+      "family": "Dreamtime at the 'G",
+      "year": 2009,
+      "date": "2009-05-23",
+      "before": null,
+      "label": "Dreamtime at the 'G",
+      "outcome": "written"
+    },
+    {
+      "matchId": 13643,
+      "family": "Dreamtime at the 'G",
+      "year": 2010,
+      "date": "2010-05-22",
+      "before": null,
+      "label": "Dreamtime at the 'G",
+      "outcome": "written"
+    },
+    {
+      "matchId": 13828,
+      "family": "Dreamtime at the 'G",
+      "year": 2011,
+      "date": "2011-05-21",
+      "before": null,
+      "label": "Dreamtime at the 'G",
+      "outcome": "written"
+    },
+    {
+      "matchId": 14024,
+      "family": "Dreamtime at the 'G",
+      "year": 2012,
+      "date": "2012-05-19",
+      "before": null,
+      "label": "Dreamtime at the 'G",
+      "outcome": "written"
+    },
+    {
+      "matchId": 14243,
+      "family": "Dreamtime at the 'G",
+      "year": 2013,
+      "date": "2013-05-25",
+      "before": null,
+      "label": "Dreamtime at the 'G",
+      "outcome": "written"
+    },
+    {
+      "matchId": 14458,
+      "family": "Dreamtime at the 'G",
+      "year": 2014,
+      "date": "2014-05-31",
+      "before": null,
+      "label": "Dreamtime at the 'G",
+      "outcome": "written"
+    },
+    {
+      "matchId": 14657,
+      "family": "Dreamtime at the 'G",
+      "year": 2015,
+      "date": "2015-05-30",
+      "before": null,
+      "label": "Dreamtime at the 'G",
+      "outcome": "written"
+    },
+    {
+      "matchId": 14871,
+      "family": "Dreamtime at the 'G",
+      "year": 2016,
+      "date": "2016-05-28",
+      "before": null,
+      "label": "Dreamtime at the 'G",
+      "outcome": "written"
+    },
+    {
+      "matchId": 15078,
+      "family": "Dreamtime at the 'G",
+      "year": 2017,
+      "date": "2017-05-27",
+      "before": null,
+      "label": "Dreamtime at the 'G",
+      "outcome": "written"
+    },
+    {
+      "matchId": 15291,
+      "family": "Dreamtime at the 'G",
+      "year": 2018,
+      "date": "2018-06-02",
+      "before": null,
+      "label": "Dreamtime at the 'G",
+      "outcome": "written"
+    },
+    {
+      "matchId": 15493,
+      "family": "Dreamtime at the 'G",
+      "year": 2019,
+      "date": "2019-05-25",
+      "before": null,
+      "label": "Dreamtime at the 'G",
+      "outcome": "written"
+    },
+    {
+      "matchId": 15720,
+      "family": "Dreamtime at the 'G",
+      "year": 2020,
+      "date": "2020-08-22",
+      "before": null,
+      "label": "Dreamtime at the 'G",
+      "outcome": "written"
+    },
+    {
+      "matchId": 15878,
+      "family": "Dreamtime at the 'G",
+      "year": 2021,
+      "date": "2021-06-05",
+      "before": null,
+      "label": "Dreamtime at the 'G",
+      "outcome": "written"
+    },
+    {
+      "matchId": 16069,
+      "family": "Dreamtime at the 'G",
+      "year": 2022,
+      "date": "2022-05-21",
+      "before": null,
+      "label": "Dreamtime at the 'G",
+      "outcome": "written"
+    },
+    {
+      "matchId": 16274,
+      "family": "Dreamtime at the 'G",
+      "year": 2023,
+      "date": "2023-05-20",
+      "before": null,
+      "label": "Dreamtime at the 'G",
+      "outcome": "written"
+    },
+    {
+      "matchId": 16502,
+      "family": "Dreamtime at the 'G",
+      "year": 2024,
+      "date": "2024-05-25",
+      "before": null,
+      "label": "Dreamtime at the 'G",
+      "outcome": "written"
+    },
+    {
+      "matchId": 16713,
+      "family": "Dreamtime at the 'G",
+      "year": 2025,
+      "date": "2025-05-23",
+      "before": null,
+      "label": "Dreamtime at the 'G",
+      "outcome": "written"
+    },
+    {
+      "matchId": 14670,
+      "family": "King's Birthday",
+      "year": 2015,
+      "date": "2015-06-08",
+      "before": null,
+      "label": "King's Birthday",
+      "outcome": "written"
+    },
+    {
+      "matchId": 14894,
+      "family": "King's Birthday",
+      "year": 2016,
+      "date": "2016-06-13",
+      "before": null,
+      "label": "King's Birthday",
+      "outcome": "written"
+    },
+    {
+      "matchId": 15095,
+      "family": "King's Birthday",
+      "year": 2017,
+      "date": "2017-06-12",
+      "before": null,
+      "label": "King's Birthday",
+      "outcome": "written"
+    },
+    {
+      "matchId": 15305,
+      "family": "King's Birthday",
+      "year": 2018,
+      "date": "2018-06-11",
+      "before": null,
+      "label": "King's Birthday",
+      "outcome": "written"
+    },
+    {
+      "matchId": 15512,
+      "family": "King's Birthday",
+      "year": 2019,
+      "date": "2019-06-10",
+      "before": null,
+      "label": "King's Birthday",
+      "outcome": "written"
+    },
+    {
+      "matchId": 15888,
+      "family": "King's Birthday",
+      "year": 2021,
+      "date": "2021-06-14",
+      "before": null,
+      "label": "King's Birthday",
+      "outcome": "written"
+    },
+    {
+      "matchId": 16094,
+      "family": "King's Birthday",
+      "year": 2022,
+      "date": "2022-06-13",
+      "before": null,
+      "label": "King's Birthday",
+      "outcome": "written"
+    },
+    {
+      "matchId": 16304,
+      "family": "King's Birthday",
+      "year": 2023,
+      "date": "2023-06-12",
+      "before": null,
+      "label": "King's Birthday",
+      "outcome": "written"
+    },
+    {
+      "matchId": 16520,
+      "family": "King's Birthday",
+      "year": 2024,
+      "date": "2024-06-10",
+      "before": null,
+      "label": "King's Birthday",
+      "outcome": "written"
+    },
+    {
+      "matchId": 16735,
+      "family": "King's Birthday",
+      "year": 2025,
+      "date": "2025-06-09",
+      "before": null,
+      "label": "King's Birthday",
+      "outcome": "written"
+    },
+    {
+      "matchId": 17247,
+      "family": "Anzac Day",
+      "year": 2026,
+      "date": "2026-04-25",
+      "before": null,
+      "label": "Anzac Day",
+      "outcome": "written"
+    },
+    {
+      "matchId": 17076,
+      "family": "Dreamtime at the 'G",
+      "year": 2026,
+      "date": "2026-05-22",
+      "before": null,
+      "label": "Dreamtime at the 'G",
+      "outcome": "written"
+    },
+    {
+      "matchId": 17097,
+      "family": "King's Birthday",
+      "year": 2026,
+      "date": "2026-06-08",
+      "before": null,
+      "label": "King's Birthday",
+      "outcome": "written"
+    }
+  ]
+}

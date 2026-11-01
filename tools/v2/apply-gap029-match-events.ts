@@ -23,7 +23,7 @@ const port = Number(process.env.AFLDB_V2_ISOLATED_PORT);
 if (process.env.AFLDB_V2_ISOLATED_PG !== '1' || checkIsolatedTestDsn(dsn, port).length) throw new Error('Guarded isolated target required');
 const apply = process.argv.includes('--apply');
 const argOf = (name: string) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
-const evidencePath = argOf('evidence') ?? 'docs/v2/evidence/gap-029-match-event-correction-2026-11-01.json';
+const evidencePath = argOf('evidence') ?? 'docs/v2/evidence/gap-029-match-event-correction-2026-11-01-r2.json';
 const reportPath = argOf('report');
 
 interface Entry {

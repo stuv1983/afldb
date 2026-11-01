@@ -1,0 +1,1571 @@
+{
+ "version": 2,
+ "generated": "2026-11-01",
+ "task": "V2-GAP-029 event-label correction, revision 2 (production-derived data, 2026 editions); prepared, NOT applied outside a disposable clone",
+ "database": "afldb_v2_gap029_prod_test (marked isolated restore of the checksum-verified production dump afldb_prod-20261031-084435.dump, sha256 3f5b5339cee312950c308b494ca98ff29a2f1620d9f60a4d062fbaf37b624730); matches.id values are identical to afldb_v2_gap029_test for the 61 version 1 ids",
+ "acquisition": {
+  "date": "2026-11-01",
+  "method": "HTTP GET (curl) of public first-party pages; text extraction also checked by pattern match against the captured HTML. Raw captures are retained OUTSIDE Git at D:/tmp/afldb-gap029-source-evidence-20261101/raw (sha256 below).",
+  "pages": [
+   {
+    "id": "01",
+    "url": "https://www.afl.com.au/sir-doug-nicholls-round/indigenous-greats/dreamtime/",
+    "httpStatus": 200,
+    "bytes": 304606,
+    "sha256": "554440758444a020a3a60e802f1ca8a44c2cd6105e171f27ea7e5a457b2a3544",
+    "capturedFile": "raw/01.html"
+   },
+   {
+    "id": "02",
+    "url": "https://www.richmondfc.com.au/news/1130121/dreamtime-data",
+    "httpStatus": 200,
+    "bytes": 328526,
+    "sha256": "7b5a8fed55927bb8f01fed2c90f375dc83b3b3a64c16cdae450ce24e544f5d24",
+    "capturedFile": "raw/02.html"
+   },
+   {
+    "id": "03",
+    "url": "https://www.essendonfc.com.au/news/48589/the-dreamtime-timeline",
+    "httpStatus": 200,
+    "bytes": 240794,
+    "sha256": "f39302e99340917f026e3d3dc54701af057d7cdc192a38baccab09e46008df65",
+    "capturedFile": "raw/03.html"
+   },
+   {
+    "id": "04",
+    "url": "https://www.collingwoodfc.com.au/news/256176/anzac-day-1995-2017",
+    "httpStatus": 200,
+    "bytes": 285756,
+    "sha256": "21104ab87b9f154ee59668ca09ed2348e52b925d87699cfb8a8fee77b0538538",
+    "capturedFile": "raw/04.html"
+   },
+   {
+    "id": "05",
+    "url": "https://www.collingwoodfc.com.au/news/916260/anzac-day-entrenched-in-history",
+    "httpStatus": 200,
+    "bytes": 263370,
+    "sha256": "9a75a76add78b34f0b6ebc9ab52ee87460e38ce3b1e63b5ad4cf7bb9a63ec6c6",
+    "capturedFile": "raw/05.html"
+   },
+   {
+    "id": "06",
+    "url": "https://www.collingwoodfc.com.au/news/1765342/pies-win-18th-anzac-day-game",
+    "httpStatus": 200,
+    "bytes": 279644,
+    "sha256": "c023878c170e4f054fa50f68ef543576f3bad70546e9d66e4ecccc84c50e8e67",
+    "capturedFile": "raw/06.html"
+   },
+   {
+    "id": "07",
+    "url": "https://www.essendonfc.com.au/news/1764469/record-crowds-late-drama-iconic-performances-anzac-days-defining-moments",
+    "httpStatus": 200,
+    "bytes": 271424,
+    "sha256": "a82edb299cf259c4f2199060cb946c65358c5918eb811d244fc5fc707264a3d1",
+    "capturedFile": "raw/07.html"
+   },
+   {
+    "id": "08",
+    "url": "https://www.collingwoodfc.com.au/news/1106838/",
+    "httpStatus": 200,
+    "bytes": 268230,
+    "sha256": "543679a053d6002b644a0f39edf5a4b1c75d5a746910706a64e8a6a9582c473d",
+    "capturedFile": "raw/08.html"
+   },
+   {
+    "id": "09",
+    "url": "https://www.collingwoodfc.com.au/news/278684/anzac-day-facts-and-figures",
+    "httpStatus": 200,
+    "bytes": 260767,
+    "sha256": "7f7c13178474792d03259e883eb35791e78115859aeae882c151a883351b75bf",
+    "capturedFile": "raw/09.html"
+   },
+   {
+    "id": "10",
+    "url": "https://www.collingwoodfc.com.au/news/307603/new-twilight-slot-for-2020-anzac-day-game",
+    "httpStatus": 200,
+    "bytes": 260270,
+    "sha256": "3180f0fecf027a9fd820b30056bfd8cc80832622b6283c87e8dd90657e58fd63",
+    "capturedFile": "raw/10.html"
+   },
+   {
+    "id": "11",
+    "url": "https://www.afl.com.au/news/625677/big-freeze-match-moves-to-the-scg",
+    "httpStatus": 200,
+    "bytes": 356785,
+    "sha256": "13ad9745ca7c424e24fe669a170b54a39cc058b8ff266c16a242c5281728c078",
+    "capturedFile": "raw/11.html"
+   },
+   {
+    "id": "12",
+    "url": "https://www.afl.com.au/news/123725/match-report-collingwood-v-melbourne",
+    "httpStatus": 200,
+    "bytes": 340677,
+    "sha256": "f5bb170e09d54866a78fd0d5516fc2124b67726d55c908e973d73fd94f562da5",
+    "capturedFile": "raw/12.html"
+   },
+   {
+    "id": "13",
+    "url": "https://www.collingwoodfc.com.au/news/134962/match-report-hot-pies-triumph-in-big-freeze",
+    "httpStatus": 200,
+    "bytes": 264341,
+    "sha256": "12dc759456bf4018fb985fc7d1037a6bdaeb84bbe74af40cb29ac5fc6a94bca9",
+    "capturedFile": "raw/13.html"
+   },
+   {
+    "id": "14",
+    "url": "https://www.afl.com.au/news/103417/match-report-dees-freeze-out-gutsy-pies",
+    "httpStatus": 200,
+    "bytes": 337364,
+    "sha256": "ccdffd72bc9fc92cc8cc45a613dfe9a0af8c67dab89a8ad653fa4f33534a9891",
+    "capturedFile": "raw/14.html"
+   },
+   {
+    "id": "15",
+    "url": "https://www.afl.com.au/news/779351/match-report-collingwood-magpies-v-melbourne-demons",
+    "httpStatus": 200,
+    "bytes": 434129,
+    "sha256": "69c675955e867504d70e32e107a0fb8e5339705be362f7f91dd27a78dc03a3a1",
+    "capturedFile": "raw/15.html"
+   },
+   {
+    "id": "16",
+    "url": "https://www.melbournefc.com.au/news/1357191/melbourne-hold-off-collingwood-to-secure-four-points",
+    "httpStatus": 200,
+    "bytes": 293663,
+    "sha256": "e5b2f7dd322a644613ac50c70c43747ff49ab1b7f4edda786c30e50b52fa15df",
+    "capturedFile": "raw/16.html"
+   },
+   {
+    "id": "17",
+    "url": "https://www.melbournefc.com.au/news/345793/melbourne-wins-first-qb-clash-since-2007",
+    "httpStatus": 200,
+    "bytes": 287706,
+    "sha256": "e9aee389d4af9916ccc745a3a5531c859fc0dff79095ad73ad9c4e11fc158938",
+    "capturedFile": "raw/17.html"
+   },
+   {
+    "id": "18",
+    "url": "https://www.afl.com.au/news/87994/cloke-fires-as-pies-claim-fifth-straight-queens-birthday-win",
+    "httpStatus": 200,
+    "bytes": 337281,
+    "sha256": "452398f99f208b981e9b52af395a60c476c9e6dc8b335338b3149532cbc9f0af",
+    "capturedFile": "raw/18.html"
+   },
+   {
+    "id": "19",
+    "url": "https://www.afl.com.au/news/138544/match-report-melbourne-v-collingwood",
+    "httpStatus": 200,
+    "bytes": 339541,
+    "sha256": "51163308509ba1fb310610e1b7717c152bf31ffdc70c81c6e7801792671d0fa3",
+    "capturedFile": "raw/19.html"
+   },
+   {
+    "id": "20",
+    "url": "https://www.collingwoodfc.com.au/news/274739/2018-recap-five-great-wins",
+    "httpStatus": 200,
+    "bytes": 261962,
+    "sha256": "4c59bd4153256b1cd5787b7d36d7b861f13374478410fdb7834f77afcf40be58",
+    "capturedFile": "raw/20.html"
+   },
+   {
+    "id": "21",
+    "url": "https://www.melbournefc.com.au/themed_rounds_overview",
+    "httpStatus": 200,
+    "bytes": 242286,
+    "sha256": "7deb61e73a14fddad484ad4a8b12b763541921f75247ef1696e166240d7e905b",
+    "capturedFile": "raw/21.html"
+   },
+   {
+    "id": "22",
+    "url": "https://www.melbournefc.com.au/news/449474/big-freeze-at-the-g-stars-take-the-plunge",
+    "httpStatus": 200,
+    "bytes": 285371,
+    "sha256": "9e31e914b76c49c53cccf28749c34c4b4cff24d238d8e4d6323ab3652cc06ebf",
+    "capturedFile": "raw/22.html"
+   },
+   {
+    "id": "23",
+    "url": "https://www.collingwoodfc.com.au/news/2042779/match-report-v-melbourne",
+    "httpStatus": 200,
+    "bytes": 267252,
+    "sha256": "2055cc13395deb6ab2aaaaf95a8816edd141af2060408465d77eceb0800eb3f8",
+    "capturedFile": "raw/23.html"
+   },
+   {
+    "id": "24",
+    "url": "https://www.melbournefc.com.au/news/1575907/pies-defeat-dees-on-kings-birthday-stage",
+    "httpStatus": 200,
+    "bytes": 286147,
+    "sha256": "a38017f51f06aa6cc693b25646ccaecea0533e56619a84e5ca3db8f43e245f57",
+    "capturedFile": "raw/24.html"
+   },
+   {
+    "id": "25",
+    "url": "https://www.afl.com.au/news/1339566/pies-by-a-point-over-demons-in-kings-birthday-royal-rumble",
+    "httpStatus": 200,
+    "bytes": 468399,
+    "sha256": "f77b7f2d856aed025e007eafdc8710ed99eea8a381d4bef95e62bec5dc3ff67f",
+    "capturedFile": "raw/25.html"
+   },
+   {
+    "id": "26",
+    "url": "https://www.collingwoodfc.com.au/news/1574318/pies-and-dees-to-battle-it-out-for-tenth-big-freeze",
+    "httpStatus": 200,
+    "bytes": 274573,
+    "sha256": "329257b029b10fc945406a121514c8bf4ca833dba31a399194feb6cdb56ccc0f",
+    "capturedFile": "raw/26.html"
+   },
+   {
+    "id": "27",
+    "url": "https://www.melbournefc.com.au/news/1339279/kings-birthday-blockbuster-sold-out",
+    "httpStatus": 200,
+    "bytes": 286024,
+    "sha256": "a8b69d0e22ed177bf50a4e7eaf98b7924a40f3276d67f749b27cfdee36ed4a90",
+    "capturedFile": "raw/27.html"
+   },
+   {
+    "id": "28",
+    "url": "https://www.afl.com.au/afl/matches/4837",
+    "httpStatus": 200,
+    "bytes": 648032,
+    "sha256": "19d003a5e829d9c8b33ec359c8ef858177895898802b81f0386f2219b8c0e6c7",
+    "capturedFile": "raw2/28.html"
+   },
+   {
+    "id": "29",
+    "url": "https://www.collingwoodfc.com.au/matches/4837",
+    "httpStatus": 200,
+    "bytes": 321718,
+    "sha256": "f8e8c7fa0c0387585e97a00795367c8e79cbf36c865bc0deca0d1dc3408264f5",
+    "capturedFile": "raw2/29.html"
+   },
+   {
+    "id": "30",
+    "url": "https://www.essendonfc.com.au/news/2004645/pies-defeat-dons-on-anzac-day",
+    "httpStatus": 200,
+    "bytes": 229524,
+    "sha256": "3f0b0fdf72efb334e615f24cc14d248b666eb307d6703b94d4e2a4c9e9b9d32e",
+    "capturedFile": "raw2/30.html"
+   },
+   {
+    "id": "31",
+    "url": "https://www.afl.com.au/news/1504213/match-report-essendon-bombers-v-collingwood-magpies",
+    "httpStatus": 200,
+    "bytes": 464841,
+    "sha256": "817ee5944d96f85fa55e2c874b6b92ab93312e21124577f256b080ed3ad9816b",
+    "capturedFile": "raw2/31.html"
+   },
+   {
+    "id": "32",
+    "url": "https://www.afl.com.au/news/1522886/follow-it-live-richmond-tigers-v-essendon-bombers-walyalup-dockers-v-euro-yroke-saints-afl-round-11-2026",
+    "httpStatus": 200,
+    "bytes": 347474,
+    "sha256": "6c2d03549d179993820d881512bdbbab3fe0290d680cde6d83f35b598bcee679",
+    "capturedFile": "raw2/32.html"
+   },
+   {
+    "id": "33",
+    "url": "https://www.afl.com.au/news/1535570/big-freeze-big-day-for-all-as-collingwood-pies-melbourne-demons-look-to-right-seasons",
+    "httpStatus": 200,
+    "bytes": 353514,
+    "sha256": "a8872a3c06c0dfeb63a52cfbe59e5f480f67d6a03c425ca5ca3c917990af9df1",
+    "capturedFile": "raw2/33.html"
+   },
+   {
+    "id": "34",
+    "url": "https://www.mcg.org.au/globalassets/global-media/files/mcc/club-heritage/library/2026-fact-sheets/06-june/2026-06-08-rd-13-coll-v-melb---daniher-vale.pdf",
+    "httpStatus": 200,
+    "bytes": 2226832,
+    "sha256": "1e2d8fbf7999bdf0d33cc720c64165d766f54b6e7a5d82d90a260be29a68bd92",
+    "capturedFile": "raw2/34.html"
+   },
+   {
+    "id": "35",
+    "url": "https://www.afl.com.au/news/1532700/follow-it-live-collingwood-magpies-v-melbourne-demons-afl-round-13-2026",
+    "httpStatus": 200,
+    "bytes": 340685,
+    "sha256": "bec157df3bdaaf05994df9eb3345f6c39690f697a2c2dd0d6769334533e7cf01",
+    "capturedFile": "raw2/35.html"
+   },
+   {
+    "id": "36",
+    "url": "https://www.afl.com.au/news/1523923/richmond-tigers-ramp-up-pressure-on-battered-essendon-bombers",
+    "httpStatus": 200,
+    "bytes": 462644,
+    "sha256": "85cf570e8b9108fe77e2d5d92559fe2e18abf4e8696a2d7a9aa07b37d0268c1d",
+    "capturedFile": "raw2/36.html"
+   },
+   {
+    "id": "37",
+    "url": "https://www.richmondfc.com.au/news/2029375/tigers-ramp-up-pressure-in-dreamtime-victory",
+    "httpStatus": 200,
+    "bytes": 293403,
+    "sha256": "7e3acaf71307d34c3a92f30b0fb731916869451a6cf97983fbe4dd6ddd90caeb",
+    "capturedFile": "raw2/37.html"
+   },
+   {
+    "id": "38",
+    "url": "https://www.afl.com.au/news/1536297/melbourne-demons-down-collingwood-magpies-pies-in-kings-birthday-battle-royale-marred-by-serious-injury-concern",
+    "httpStatus": 200,
+    "bytes": 457577,
+    "sha256": "f54b188e1f91b9b407e34796670d6117cad065c1990cb38618b47e9ece001562",
+    "capturedFile": "raw2/38.html"
+   },
+   {
+    "id": "39",
+    "url": "https://www.collingwoodfc.com.au/news/2042779/match-report-v-melbourne",
+    "httpStatus": 200,
+    "bytes": 267021,
+    "sha256": "6cc0d638feb78075da4ed37cefa4b71ce9af2a5491acb46f274bedad17695363",
+    "capturedFile": "raw2/39.html"
+   },
+   {
+    "id": "40",
+    "url": "https://www.melbournefc.com.au/news/2042914/demons-down-pies-in-kings-birthday-battle",
+    "httpStatus": 200,
+    "bytes": 412953,
+    "sha256": "b52bad7684c1d4f9fa32cf8874ae2a5223ccba5b7dec215bb5238156fecbce60",
+    "capturedFile": "raw2/40.html"
+   }
+  ],
+  "rev2": "2026-11-01 later: pages 28-40 captured under raw2/ (same method). Page 28 (AFL.com.au match page 4837) states 13.12 (90) to 11.11 (77) for Anzac Day 2023; pages 30, 31 state 20.17 (137) v 9.6 (60) for 2026; 36, 37 state 10.14 (74) v 7.14 (56); 38, 39, 40 state 12.11 (83) v 11.9 (75)."
+ },
+ "labels": [
+  "Dreamtime at the 'G",
+  "Anzac Day",
+  "King's Birthday"
+ ],
+ "counts": {
+  "Anzac Day": 31,
+  "Dreamtime at the 'G": 22,
+  "King's Birthday": 11
+ },
+ "total": 64,
+ "evidenceTier": {
+  "Dreamtime at the 'G": "A: complete official year-by-year table (AFL.com.au, Richmond FC, Essendon FC) agreeing on every score",
+  "Anzac Day": "A: Collingwood FC edition list 1995-2017 with scores; B: per-edition first-party reports or statements 2018-2025; closure by the clubs' own counts (30th game in 2025; 29 before it) and the 2020 non-occurrence statements",
+  "King's Birthday": "B: per-edition first-party report naming the Big Freeze or the Queen's/King's Birthday match with the final score; 2015-2017 edition names rest on the Melbourne FC statement that the annual match has been the Big Freeze match since 2015"
+ },
+ "sourcesByFamily": {
+  "Dreamtime at the 'G": [
+   "https://www.afl.com.au/sir-doug-nicholls-round/indigenous-greats/dreamtime/",
+   "https://www.richmondfc.com.au/news/1130121/dreamtime-data",
+   "https://www.essendonfc.com.au/news/48589/the-dreamtime-timeline"
+  ],
+  "Anzac Day": [
+   "https://www.collingwoodfc.com.au/news/256176/anzac-day-1995-2017",
+   "https://www.collingwoodfc.com.au/news/916260/anzac-day-entrenched-in-history",
+   "https://www.collingwoodfc.com.au/news/1765342/pies-win-18th-anzac-day-game",
+   "https://www.essendonfc.com.au/news/1764469/record-crowds-late-drama-iconic-performances-anzac-days-defining-moments",
+   "https://www.collingwoodfc.com.au/news/1106838/",
+   "https://www.collingwoodfc.com.au/news/278684/anzac-day-facts-and-figures",
+   "https://www.collingwoodfc.com.au/news/307603/new-twilight-slot-for-2020-anzac-day-game"
+  ],
+  "King's Birthday": [
+   "https://www.afl.com.au/news/625677/big-freeze-match-moves-to-the-scg",
+   "https://www.afl.com.au/news/123725/match-report-collingwood-v-melbourne",
+   "https://www.collingwoodfc.com.au/news/134962/match-report-hot-pies-triumph-in-big-freeze",
+   "https://www.afl.com.au/news/103417/match-report-dees-freeze-out-gutsy-pies",
+   "https://www.afl.com.au/news/779351/match-report-collingwood-magpies-v-melbourne-demons",
+   "https://www.melbournefc.com.au/news/1357191/melbourne-hold-off-collingwood-to-secure-four-points",
+   "https://www.melbournefc.com.au/news/345793/melbourne-wins-first-qb-clash-since-2007",
+   "https://www.afl.com.au/news/87994/cloke-fires-as-pies-claim-fifth-straight-queens-birthday-win",
+   "https://www.afl.com.au/news/138544/match-report-melbourne-v-collingwood",
+   "https://www.collingwoodfc.com.au/news/274739/2018-recap-five-great-wins",
+   "https://www.melbournefc.com.au/themed_rounds_overview",
+   "https://www.melbournefc.com.au/news/449474/big-freeze-at-the-g-stars-take-the-plunge",
+   "https://www.collingwoodfc.com.au/news/2042779/match-report-v-melbourne",
+   "https://www.melbournefc.com.au/news/1575907/pies-defeat-dees-on-kings-birthday-stage",
+   "https://www.afl.com.au/news/1339566/pies-by-a-point-over-demons-in-kings-birthday-royal-rumble",
+   "https://www.collingwoodfc.com.au/news/1574318/pies-and-dees-to-battle-it-out-for-tenth-big-freeze",
+   "https://www.melbournefc.com.au/news/1339279/kings-birthday-blockbuster-sold-out"
+  ]
+ },
+ "completeness": {
+  "Dreamtime at the 'G": "COMPLETE for 2005-2026 in the database (first edition 2005; every year listed; 2020 Darwin, 2021 Perth). The 2026 edition (22 May 2026, Richmond 74 d Essendon 56, MCG, crowd 78,815) is matchId 17076.",
+  "Anzac Day": "COMPLETE for 1995-2026 in the database: 25 editions 1995-2019, none in 2020, 6 editions 2021-2026 = 31. The 2023 score is now raw-captured (AFL.com.au 13.12 (90) d 11.11 (77)).",
+  "King's Birthday": "COMPLETE for 2015-2026 excluding 2020 within the Big Freeze criterion (11 labels). AFL.com.au labels the 2026 game \"Big Freeze 12\": the Big Freeze series began in 2014, and 2014-2019 (6) + 2021-2026 (6) = 12, which closes the count; 2014 is outside the criterion (2015-2099). King's/Queen's Birthday matches before 2015 (including 2001-2014) are NOT labelled and the wider family is NOT claimed complete."
+ },
+ "exclusions": [
+  "2020 Anzac Day: not played (Collingwood FC news/307603 context and Essendon FC news/1764469 \"missed out on an Anzac Day clash entirely in 2020\").",
+  "2020 King's Birthday/Big Freeze match: none (Melbourne FC news/1339279 \"every year since 2001 (barring 2020)\").",
+  "2023-09-07 Collingwood v Melbourne qualifying final: not a Big Freeze match; not labelled.",
+  "2026 editions of all three series are now included (ids 17247, 17076, 17097).",
+  "Queen's/King's Birthday matches 2001-2014 are not labelled: outside the Big Freeze 2015-2099 criterion only; no claim about the wider family."
+ ],
+ "entries": [
+  {
+   "family": "Anzac Day",
+   "label": "Anzac Day",
+   "year": 1995,
+   "matchId": 10834,
+   "expect": {
+    "season": 1995,
+    "matchDate": "1995-04-25",
+    "roundCode": "4",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Collingwood",
+    "awayClub": "Essendon",
+    "homeScore": 111,
+    "awayScore": 111
+   },
+   "sourceScoreAsStated": "111-111",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Anzac Day",
+   "label": "Anzac Day",
+   "year": 1996,
+   "matchId": 11020,
+   "expect": {
+    "season": 1996,
+    "matchDate": "1996-04-25",
+    "roundCode": "5",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Essendon",
+    "awayClub": "Collingwood",
+    "homeScore": 105,
+    "awayScore": 117
+   },
+   "sourceScoreAsStated": "117-105",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Anzac Day",
+   "label": "Anzac Day",
+   "year": 1997,
+   "matchId": 11205,
+   "expect": {
+    "season": 1997,
+    "matchDate": "1997-04-25",
+    "roundCode": "5",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Essendon",
+    "awayClub": "Collingwood",
+    "homeScore": 70,
+    "awayScore": 99
+   },
+   "sourceScoreAsStated": "99-70",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Anzac Day",
+   "label": "Anzac Day",
+   "year": 1998,
+   "matchId": 11391,
+   "expect": {
+    "season": 1998,
+    "matchDate": "1998-04-25",
+    "roundCode": "5",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Collingwood",
+    "awayClub": "Essendon",
+    "homeScore": 108,
+    "awayScore": 88
+   },
+   "sourceScoreAsStated": "108-88",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Anzac Day",
+   "label": "Anzac Day",
+   "year": 1999,
+   "matchId": 11581,
+   "expect": {
+    "season": 1999,
+    "matchDate": "1999-04-25",
+    "roundCode": "5",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Essendon",
+    "awayClub": "Collingwood",
+    "homeScore": 108,
+    "awayScore": 100
+   },
+   "sourceScoreAsStated": "100-108",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Anzac Day",
+   "label": "Anzac Day",
+   "year": 2000,
+   "matchId": 11782,
+   "expect": {
+    "season": 2000,
+    "matchDate": "2000-04-25",
+    "roundCode": "7",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Collingwood",
+    "awayClub": "Essendon",
+    "homeScore": 100,
+    "awayScore": 140
+   },
+   "sourceScoreAsStated": "100-140",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Anzac Day",
+   "label": "Anzac Day",
+   "year": 2001,
+   "matchId": 11945,
+   "expect": {
+    "season": 2001,
+    "matchDate": "2001-04-25",
+    "roundCode": "5",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Essendon",
+    "awayClub": "Collingwood",
+    "homeScore": 103,
+    "awayScore": 95
+   },
+   "sourceScoreAsStated": "95-103",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Anzac Day",
+   "label": "Anzac Day",
+   "year": 2002,
+   "matchId": 12130,
+   "expect": {
+    "season": 2002,
+    "matchDate": "2002-04-25",
+    "roundCode": "5",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Collingwood",
+    "awayClub": "Essendon",
+    "homeScore": 66,
+    "awayScore": 33
+   },
+   "sourceScoreAsStated": "66-33",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Anzac Day",
+   "label": "Anzac Day",
+   "year": 2003,
+   "matchId": 12315,
+   "expect": {
+    "season": 2003,
+    "matchDate": "2003-04-25",
+    "roundCode": "5",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Essendon",
+    "awayClub": "Collingwood",
+    "homeScore": 147,
+    "awayScore": 81
+   },
+   "sourceScoreAsStated": "81-147",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Anzac Day",
+   "label": "Anzac Day",
+   "year": 2004,
+   "matchId": 12505,
+   "expect": {
+    "season": 2004,
+    "matchDate": "2004-04-25",
+    "roundCode": "5",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Collingwood",
+    "awayClub": "Essendon",
+    "homeScore": 79,
+    "awayScore": 112
+   },
+   "sourceScoreAsStated": "79-112",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Anzac Day",
+   "label": "Anzac Day",
+   "year": 2005,
+   "matchId": 12692,
+   "expect": {
+    "season": 2005,
+    "matchDate": "2005-04-25",
+    "roundCode": "5",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Essendon",
+    "awayClub": "Collingwood",
+    "homeScore": 83,
+    "awayScore": 69
+   },
+   "sourceScoreAsStated": "69-83",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Anzac Day",
+   "label": "Anzac Day",
+   "year": 2006,
+   "matchId": 12869,
+   "expect": {
+    "season": 2006,
+    "matchDate": "2006-04-25",
+    "roundCode": "4",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Collingwood",
+    "awayClub": "Essendon",
+    "homeScore": 106,
+    "awayScore": 89
+   },
+   "sourceScoreAsStated": "106-89",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Anzac Day",
+   "label": "Anzac Day",
+   "year": 2007,
+   "matchId": 13055,
+   "expect": {
+    "season": 2007,
+    "matchDate": "2007-04-25",
+    "roundCode": "5",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Essendon",
+    "awayClub": "Collingwood",
+    "homeScore": 79,
+    "awayScore": 95
+   },
+   "sourceScoreAsStated": "95-79",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Anzac Day",
+   "label": "Anzac Day",
+   "year": 2008,
+   "matchId": 13248,
+   "expect": {
+    "season": 2008,
+    "matchDate": "2008-04-25",
+    "roundCode": "6",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Collingwood",
+    "awayClub": "Essendon",
+    "homeScore": 154,
+    "awayScore": 81
+   },
+   "sourceScoreAsStated": "154-81",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Anzac Day",
+   "label": "Anzac Day",
+   "year": 2009,
+   "matchId": 13426,
+   "expect": {
+    "season": 2009,
+    "matchDate": "2009-04-25",
+    "roundCode": "5",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Essendon",
+    "awayClub": "Collingwood",
+    "homeScore": 93,
+    "awayScore": 88
+   },
+   "sourceScoreAsStated": "88-93",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Anzac Day",
+   "label": "Anzac Day",
+   "year": 2010,
+   "matchId": 13614,
+   "expect": {
+    "season": 2010,
+    "matchDate": "2010-04-25",
+    "roundCode": "5",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Collingwood",
+    "awayClub": "Essendon",
+    "homeScore": 120,
+    "awayScore": 55
+   },
+   "sourceScoreAsStated": "120-55",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Anzac Day",
+   "label": "Anzac Day",
+   "year": 2011,
+   "matchId": 13799,
+   "expect": {
+    "season": 2011,
+    "matchDate": "2011-04-25",
+    "roundCode": "5",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Essendon",
+    "awayClub": "Collingwood",
+    "homeScore": 77,
+    "awayScore": 107
+   },
+   "sourceScoreAsStated": "107-77",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Anzac Day",
+   "label": "Anzac Day",
+   "year": 2012,
+   "matchId": 13996,
+   "expect": {
+    "season": 2012,
+    "matchDate": "2012-04-25",
+    "roundCode": "5",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Collingwood",
+    "awayClub": "Essendon",
+    "homeScore": 80,
+    "awayScore": 79
+   },
+   "sourceScoreAsStated": "80-79",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Anzac Day",
+   "label": "Anzac Day",
+   "year": 2013,
+   "matchId": 14203,
+   "expect": {
+    "season": 2013,
+    "matchDate": "2013-04-25",
+    "roundCode": "5",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Essendon",
+    "awayClub": "Collingwood",
+    "homeScore": 121,
+    "awayScore": 75
+   },
+   "sourceScoreAsStated": "75-121",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Anzac Day",
+   "label": "Anzac Day",
+   "year": 2014,
+   "matchId": 14419,
+   "expect": {
+    "season": 2014,
+    "matchDate": "2014-04-25",
+    "roundCode": "6",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Collingwood",
+    "awayClub": "Essendon",
+    "homeScore": 83,
+    "awayScore": 60
+   },
+   "sourceScoreAsStated": "83-60",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Anzac Day",
+   "label": "Anzac Day",
+   "year": 2015,
+   "matchId": 14609,
+   "expect": {
+    "season": 2015,
+    "matchDate": "2015-04-25",
+    "roundCode": "4",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Essendon",
+    "awayClub": "Collingwood",
+    "homeScore": 49,
+    "awayScore": 69
+   },
+   "sourceScoreAsStated": "69-49",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Anzac Day",
+   "label": "Anzac Day",
+   "year": 2016,
+   "matchId": 14831,
+   "expect": {
+    "season": 2016,
+    "matchDate": "2016-04-25",
+    "roundCode": "5",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Collingwood",
+    "awayClub": "Essendon",
+    "homeScore": 142,
+    "awayScore": 73
+   },
+   "sourceScoreAsStated": "142-73",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Anzac Day",
+   "label": "Anzac Day",
+   "year": 2017,
+   "matchId": 15038,
+   "expect": {
+    "season": 2017,
+    "matchDate": "2017-04-25",
+    "roundCode": "5",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Essendon",
+    "awayClub": "Collingwood",
+    "homeScore": 100,
+    "awayScore": 82
+   },
+   "sourceScoreAsStated": "82-100",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Anzac Day",
+   "label": "Anzac Day",
+   "year": 2018,
+   "matchId": 15245,
+   "expect": {
+    "season": 2018,
+    "matchDate": "2018-04-25",
+    "roundCode": "5",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Collingwood",
+    "awayClub": "Essendon",
+    "homeScore": 101,
+    "awayScore": 52
+   },
+   "sourceScoreAsStated": "101-52",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Anzac Day",
+   "label": "Anzac Day",
+   "year": 2019,
+   "matchId": 15454,
+   "expect": {
+    "season": 2019,
+    "matchDate": "2019-04-25",
+    "roundCode": "6",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Essendon",
+    "awayClub": "Collingwood",
+    "homeScore": 69,
+    "awayScore": 73
+   },
+   "sourceScoreAsStated": "73-69",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Anzac Day",
+   "label": "Anzac Day",
+   "year": 2021,
+   "matchId": 15828,
+   "expect": {
+    "season": 2021,
+    "matchDate": "2021-04-25",
+    "roundCode": "6",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Collingwood",
+    "awayClub": "Essendon",
+    "homeScore": 85,
+    "awayScore": 109
+   },
+   "sourceScoreAsStated": "85-109",
+   "resolvedBy": "season + club pair + 25 April meeting (the only Collingwood v Essendon match that date); first-party source states the Anzac Day fixture and edition but not the full score; score read from the database; agrees with Essendon FC \"by four goals\" (24 points)"
+  },
+  {
+   "family": "Anzac Day",
+   "label": "Anzac Day",
+   "year": 2022,
+   "matchId": 16036,
+   "expect": {
+    "season": 2022,
+    "matchDate": "2022-04-25",
+    "roundCode": "6",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Essendon",
+    "awayClub": "Collingwood",
+    "homeScore": 82,
+    "awayScore": 93
+   },
+   "sourceScoreAsStated": "93-82",
+   "resolvedBy": "season + club pair + 25 April meeting (the only Collingwood v Essendon match that date); first-party source states the Anzac Day fixture and edition but not the full score; score read from the database; Collingwood FC news/1106838 confirms a 2022 Anzac Day match with Collingwood away"
+  },
+  {
+   "family": "Anzac Day",
+   "label": "Anzac Day",
+   "year": 2023,
+   "matchId": 16244,
+   "expect": {
+    "season": 2023,
+    "matchDate": "2023-04-25",
+    "roundCode": "6",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Collingwood",
+    "awayClub": "Essendon",
+    "homeScore": 90,
+    "awayScore": 77
+   },
+   "sourceScoreAsStated": "90-77",
+   "resolvedBy": "season + club pair + exact final score (unique); score now raw-captured from AFL.com.au match page (raw2 page 28: 13.12 (90) d 11.11 (77))",
+   "rawPages": [
+    "28"
+   ]
+  },
+  {
+   "family": "Anzac Day",
+   "label": "Anzac Day",
+   "year": 2024,
+   "matchId": 16462,
+   "expect": {
+    "season": 2024,
+    "matchDate": "2024-04-25",
+    "roundCode": "8",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Essendon",
+    "awayClub": "Collingwood",
+    "homeScore": 85,
+    "awayScore": 85
+   },
+   "sourceScoreAsStated": "85-85",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Anzac Day",
+   "label": "Anzac Day",
+   "year": 2025,
+   "matchId": 16677,
+   "expect": {
+    "season": 2025,
+    "matchDate": "2025-04-25",
+    "roundCode": "8",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Collingwood",
+    "awayClub": "Essendon",
+    "homeScore": 107,
+    "awayScore": 66
+   },
+   "sourceScoreAsStated": "107-66",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Dreamtime at the 'G",
+   "label": "Dreamtime at the 'G",
+   "year": 2005,
+   "matchId": 12768,
+   "expect": {
+    "season": 2005,
+    "matchDate": "2005-07-09",
+    "roundCode": "15",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Richmond",
+    "awayClub": "Essendon",
+    "homeScore": 92,
+    "awayScore": 66
+   },
+   "sourceScoreAsStated": "92-66",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Dreamtime at the 'G",
+   "label": "Dreamtime at the 'G",
+   "year": 2006,
+   "matchId": 12880,
+   "expect": {
+    "season": 2006,
+    "matchDate": "2006-05-06",
+    "roundCode": "6",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Essendon",
+    "awayClub": "Richmond",
+    "homeScore": 95,
+    "awayScore": 97
+   },
+   "sourceScoreAsStated": "97-95",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Dreamtime at the 'G",
+   "label": "Dreamtime at the 'G",
+   "year": 2007,
+   "matchId": 13091,
+   "expect": {
+    "season": 2007,
+    "matchDate": "2007-05-26",
+    "roundCode": "9",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Richmond",
+    "awayClub": "Essendon",
+    "homeScore": 84,
+    "awayScore": 92
+   },
+   "sourceScoreAsStated": "84-92",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Dreamtime at the 'G",
+   "label": "Dreamtime at the 'G",
+   "year": 2008,
+   "matchId": 13274,
+   "expect": {
+    "season": 2008,
+    "matchDate": "2008-05-24",
+    "roundCode": "9",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Essendon",
+    "awayClub": "Richmond",
+    "homeScore": 72,
+    "awayScore": 110
+   },
+   "sourceScoreAsStated": "110-72",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Dreamtime at the 'G",
+   "label": "Dreamtime at the 'G",
+   "year": 2009,
+   "matchId": 13460,
+   "expect": {
+    "season": 2009,
+    "matchDate": "2009-05-23",
+    "roundCode": "9",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Richmond",
+    "awayClub": "Essendon",
+    "homeScore": 85,
+    "awayScore": 125
+   },
+   "sourceScoreAsStated": "85-125",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Dreamtime at the 'G",
+   "label": "Dreamtime at the 'G",
+   "year": 2010,
+   "matchId": 13643,
+   "expect": {
+    "season": 2010,
+    "matchDate": "2010-05-22",
+    "roundCode": "9",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Essendon",
+    "awayClub": "Richmond",
+    "homeScore": 130,
+    "awayScore": 95
+   },
+   "sourceScoreAsStated": "95-130",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Dreamtime at the 'G",
+   "label": "Dreamtime at the 'G",
+   "year": 2011,
+   "matchId": 13828,
+   "expect": {
+    "season": 2011,
+    "matchDate": "2011-05-21",
+    "roundCode": "9",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Richmond",
+    "awayClub": "Essendon",
+    "homeScore": 105,
+    "awayScore": 89
+   },
+   "sourceScoreAsStated": "105-89",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Dreamtime at the 'G",
+   "label": "Dreamtime at the 'G",
+   "year": 2012,
+   "matchId": 14024,
+   "expect": {
+    "season": 2012,
+    "matchDate": "2012-05-19",
+    "roundCode": "8",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Essendon",
+    "awayClub": "Richmond",
+    "homeScore": 128,
+    "awayScore": 109
+   },
+   "sourceScoreAsStated": "109-128",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Dreamtime at the 'G",
+   "label": "Dreamtime at the 'G",
+   "year": 2013,
+   "matchId": 14243,
+   "expect": {
+    "season": 2013,
+    "matchDate": "2013-05-25",
+    "roundCode": "9",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Richmond",
+    "awayClub": "Essendon",
+    "homeScore": 62,
+    "awayScore": 91
+   },
+   "sourceScoreAsStated": "62-91",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Dreamtime at the 'G",
+   "label": "Dreamtime at the 'G",
+   "year": 2014,
+   "matchId": 14458,
+   "expect": {
+    "season": 2014,
+    "matchDate": "2014-05-31",
+    "roundCode": "11",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Essendon",
+    "awayClub": "Richmond",
+    "homeScore": 104,
+    "awayScore": 54
+   },
+   "sourceScoreAsStated": "54-104",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Dreamtime at the 'G",
+   "label": "Dreamtime at the 'G",
+   "year": 2015,
+   "matchId": 14657,
+   "expect": {
+    "season": 2015,
+    "matchDate": "2015-05-30",
+    "roundCode": "9",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Richmond",
+    "awayClub": "Essendon",
+    "homeScore": 72,
+    "awayScore": 59
+   },
+   "sourceScoreAsStated": "72-59",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Dreamtime at the 'G",
+   "label": "Dreamtime at the 'G",
+   "year": 2016,
+   "matchId": 14871,
+   "expect": {
+    "season": 2016,
+    "matchDate": "2016-05-28",
+    "roundCode": "10",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Essendon",
+    "awayClub": "Richmond",
+    "homeScore": 67,
+    "awayScore": 105
+   },
+   "sourceScoreAsStated": "105-67",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Dreamtime at the 'G",
+   "label": "Dreamtime at the 'G",
+   "year": 2017,
+   "matchId": 15078,
+   "expect": {
+    "season": 2017,
+    "matchDate": "2017-05-27",
+    "roundCode": "10",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Richmond",
+    "awayClub": "Essendon",
+    "homeScore": 81,
+    "awayScore": 66
+   },
+   "sourceScoreAsStated": "81-66",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Dreamtime at the 'G",
+   "label": "Dreamtime at the 'G",
+   "year": 2018,
+   "matchId": 15291,
+   "expect": {
+    "season": 2018,
+    "matchDate": "2018-06-02",
+    "roundCode": "11",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Essendon",
+    "awayClub": "Richmond",
+    "homeScore": 43,
+    "awayScore": 114
+   },
+   "sourceScoreAsStated": "114-43",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Dreamtime at the 'G",
+   "label": "Dreamtime at the 'G",
+   "year": 2019,
+   "matchId": 15493,
+   "expect": {
+    "season": 2019,
+    "matchDate": "2019-05-25",
+    "roundCode": "10",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Richmond",
+    "awayClub": "Essendon",
+    "homeScore": 73,
+    "awayScore": 50
+   },
+   "sourceScoreAsStated": "73-50",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Dreamtime at the 'G",
+   "label": "Dreamtime at the 'G",
+   "year": 2020,
+   "matchId": 15720,
+   "expect": {
+    "season": 2020,
+    "matchDate": "2020-08-22",
+    "roundCode": "13",
+    "venueRaw": "Marrara Oval",
+    "homeClub": "Essendon",
+    "awayClub": "Richmond",
+    "homeScore": 61,
+    "awayScore": 73
+   },
+   "sourceScoreAsStated": "73-61",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Dreamtime at the 'G",
+   "label": "Dreamtime at the 'G",
+   "year": 2021,
+   "matchId": 15878,
+   "expect": {
+    "season": 2021,
+    "matchDate": "2021-06-05",
+    "roundCode": "12",
+    "venueRaw": "Perth Stadium",
+    "homeClub": "Essendon",
+    "awayClub": "Richmond",
+    "homeScore": 84,
+    "awayScore": 123
+   },
+   "sourceScoreAsStated": "123-84",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Dreamtime at the 'G",
+   "label": "Dreamtime at the 'G",
+   "year": 2022,
+   "matchId": 16069,
+   "expect": {
+    "season": 2022,
+    "matchDate": "2022-05-21",
+    "roundCode": "10",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Richmond",
+    "awayClub": "Essendon",
+    "homeScore": 80,
+    "awayScore": 48
+   },
+   "sourceScoreAsStated": "80-48",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Dreamtime at the 'G",
+   "label": "Dreamtime at the 'G",
+   "year": 2023,
+   "matchId": 16274,
+   "expect": {
+    "season": 2023,
+    "matchDate": "2023-05-20",
+    "roundCode": "10",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Essendon",
+    "awayClub": "Richmond",
+    "homeScore": 71,
+    "awayScore": 70
+   },
+   "sourceScoreAsStated": "70-71",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Dreamtime at the 'G",
+   "label": "Dreamtime at the 'G",
+   "year": 2024,
+   "matchId": 16502,
+   "expect": {
+    "season": 2024,
+    "matchDate": "2024-05-25",
+    "roundCode": "12",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Richmond",
+    "awayClub": "Essendon",
+    "homeScore": 74,
+    "awayScore": 86
+   },
+   "sourceScoreAsStated": "74-86",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Dreamtime at the 'G",
+   "label": "Dreamtime at the 'G",
+   "year": 2025,
+   "matchId": 16713,
+   "expect": {
+    "season": 2025,
+    "matchDate": "2025-05-23",
+    "roundCode": "12",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Essendon",
+    "awayClub": "Richmond",
+    "homeScore": 81,
+    "awayScore": 58
+   },
+   "sourceScoreAsStated": "58-81",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "King's Birthday",
+   "label": "King's Birthday",
+   "year": 2015,
+   "matchId": 14670,
+   "expect": {
+    "season": 2015,
+    "matchDate": "2015-06-08",
+    "roundCode": "10",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Melbourne",
+    "awayClub": "Collingwood",
+    "homeScore": 85,
+    "awayScore": 110
+   },
+   "sourceScoreAsStated": "85-110",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "King's Birthday",
+   "label": "King's Birthday",
+   "year": 2016,
+   "matchId": 14894,
+   "expect": {
+    "season": 2016,
+    "matchDate": "2016-06-13",
+    "roundCode": "12",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Melbourne",
+    "awayClub": "Collingwood",
+    "homeScore": 104,
+    "awayScore": 58
+   },
+   "sourceScoreAsStated": "104-58",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "King's Birthday",
+   "label": "King's Birthday",
+   "year": 2017,
+   "matchId": 15095,
+   "expect": {
+    "season": 2017,
+    "matchDate": "2017-06-12",
+    "roundCode": "12",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Melbourne",
+    "awayClub": "Collingwood",
+    "homeScore": 104,
+    "awayScore": 100
+   },
+   "sourceScoreAsStated": "104-100",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "King's Birthday",
+   "label": "King's Birthday",
+   "year": 2018,
+   "matchId": 15305,
+   "expect": {
+    "season": 2018,
+    "matchDate": "2018-06-11",
+    "roundCode": "12",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Melbourne",
+    "awayClub": "Collingwood",
+    "homeScore": 91,
+    "awayScore": 133
+   },
+   "sourceScoreAsStated": "91-133",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "King's Birthday",
+   "label": "King's Birthday",
+   "year": 2019,
+   "matchId": 15512,
+   "expect": {
+    "season": 2019,
+    "matchDate": "2019-06-10",
+    "roundCode": "12",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Collingwood",
+    "awayClub": "Melbourne",
+    "homeScore": 98,
+    "awayScore": 57
+   },
+   "sourceScoreAsStated": "57-98",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "King's Birthday",
+   "label": "King's Birthday",
+   "year": 2021,
+   "matchId": 15888,
+   "expect": {
+    "season": 2021,
+    "matchDate": "2021-06-14",
+    "roundCode": "13",
+    "venueRaw": "S.C.G.",
+    "homeClub": "Melbourne",
+    "awayClub": "Collingwood",
+    "homeScore": 63,
+    "awayScore": 80
+   },
+   "sourceScoreAsStated": "63-80",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "King's Birthday",
+   "label": "King's Birthday",
+   "year": 2022,
+   "matchId": 16094,
+   "expect": {
+    "season": 2022,
+    "matchDate": "2022-06-13",
+    "roundCode": "13",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Collingwood",
+    "awayClub": "Melbourne",
+    "homeScore": 82,
+    "awayScore": 56
+   },
+   "sourceScoreAsStated": "56-82",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "King's Birthday",
+   "label": "King's Birthday",
+   "year": 2023,
+   "matchId": 16304,
+   "expect": {
+    "season": 2023,
+    "matchDate": "2023-06-12",
+    "roundCode": "13",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Melbourne",
+    "awayClub": "Collingwood",
+    "homeScore": 66,
+    "awayScore": 62
+   },
+   "sourceScoreAsStated": "66-62",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "King's Birthday",
+   "label": "King's Birthday",
+   "year": 2024,
+   "matchId": 16520,
+   "expect": {
+    "season": 2024,
+    "matchDate": "2024-06-10",
+    "roundCode": "14",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Collingwood",
+    "awayClub": "Melbourne",
+    "homeScore": 89,
+    "awayScore": 51
+   },
+   "sourceScoreAsStated": "51-89",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "King's Birthday",
+   "label": "King's Birthday",
+   "year": 2025,
+   "matchId": 16735,
+   "expect": {
+    "season": 2025,
+    "matchDate": "2025-06-09",
+    "roundCode": "14",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Melbourne",
+    "awayClub": "Collingwood",
+    "homeScore": 71,
+    "awayScore": 72
+   },
+   "sourceScoreAsStated": "71-72",
+   "resolvedBy": "season + club pair + exact final score (unique)"
+  },
+  {
+   "family": "Anzac Day",
+   "label": "Anzac Day",
+   "year": 2026,
+   "matchId": 17247,
+   "expect": {
+    "season": 2026,
+    "matchDate": "2026-04-25",
+    "roundCode": "8",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Essendon",
+    "awayClub": "Collingwood",
+    "homeScore": 60,
+    "awayScore": 137
+   },
+   "sourceScoreAsStated": "Collingwood 20.17 (137) d Essendon 9.6 (60)",
+   "resolvedBy": "season + club pair + exact final score (unique); raw pages 30, 31",
+   "rawPages": [
+    "30",
+    "31"
+   ]
+  },
+  {
+   "family": "Dreamtime at the 'G",
+   "label": "Dreamtime at the 'G",
+   "year": 2026,
+   "matchId": 17076,
+   "expect": {
+    "season": 2026,
+    "matchDate": "2026-05-22",
+    "roundCode": "12",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Richmond",
+    "awayClub": "Essendon",
+    "homeScore": 74,
+    "awayScore": 56
+   },
+   "sourceScoreAsStated": "Richmond 10.14 (74) d Essendon 7.14 (56)",
+   "resolvedBy": "season + club pair + exact final score (unique); raw pages 36, 37 (AFL.com.au reports it as round 11; the database round_code is 12)",
+   "rawPages": [
+    "36",
+    "37"
+   ]
+  },
+  {
+   "family": "King's Birthday",
+   "label": "King's Birthday",
+   "year": 2026,
+   "matchId": 17097,
+   "expect": {
+    "season": 2026,
+    "matchDate": "2026-06-08",
+    "roundCode": "14",
+    "venueRaw": "M.C.G.",
+    "homeClub": "Collingwood",
+    "awayClub": "Melbourne",
+    "homeScore": 75,
+    "awayScore": 83
+   },
+   "sourceScoreAsStated": "Melbourne 12.11 (83) d Collingwood 11.9 (75)",
+   "resolvedBy": "season + club pair + exact final score (unique); raw pages 38, 39, 40 (AFL.com.au reports it as round 13; the database round_code is 14)",
+   "rawPages": [
+    "38",
+    "39",
+    "40"
+   ]
+  }
+ ],
+ "supersedes": {
+  "file": "gap-029-match-event-correction-2026-11-01.json",
+  "sha256": "dcdc8b206168a977815614bffa643fef23e6821ceb1dd1398ea522d3b643859e",
+  "note": "version 1 is retained unchanged; version 2 adds the 2026 editions and the raw Anzac Day 2023 capture"
+ }
+}
