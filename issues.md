@@ -41896,6 +41896,14 @@ Full record: `issues/closed/AFLDB-ISSUE-228.md` §22.22.
 
 ## AFLDB-ISSUE-229 — AFL API fixture ingestion
 
+- **B2 availability check (2026-11-01):** the 2027 compSeason now exists (`CD_S2027014`, id 102, listing
+  sha256 `0adc56ec…d6b3`). One fixtures-only capture (218 matches; feed sha256 `21fd12e7…4d`; SCHEDULED
+  135, new `PLACEHOLDER` 83; six finals carry ladder-position placeholders) passes `--validate-only`; the
+  isolated `--dry-run` refuses all 218 (round vocabulary `afl_api_2027` undeclared; `PLACEHOLDER`
+  unsupported until observed; venue `CD_V313` Mars Stadium unmapped). No apply, no repository registration.
+  Supersedes the 2026-10-19 "no 2027 feed" note. Owner decisions listed in
+  `docs/v2/issue229-b2-2027-feed-check-2026-11-01.md`. ISSUE-229 remains OPEN.
+
 - **Owner migration-policy separation (2026-10-20):** B2 remains OPEN before wiring/first
   application of the new-season fixture schedule writer; authentic whole-season/TBC/status/key
   and venue/round-mapping evidence and first-apply approval remain required. It is not a blanket

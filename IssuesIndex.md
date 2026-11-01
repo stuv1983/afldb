@@ -38,8 +38,13 @@
     on isolated PostgreSQL 16 (17/17); the 2026 feed dry-runs clean. Never applied outside
     isolation.
 - **Runbook:** `issues/open/AFLDB-ISSUE-229.md`.
-- **Next action:** B2: capture the first authentic 2027 pre-match feed (no 2027 compSeason exists
-  as of 2026-10-19). Validate-only and dry-run it, then the owner approves the first apply.
+- **2026-11-01:** the 2027 compSeason now exists (`CD_S2027014`, id 102). One authentic fixtures-only
+  capture (218 matches: SCHEDULED 135, new `PLACEHOLDER` 83) validates (`--validate-only` PASS) but the
+  isolated dry-run refuses all 218 (no `afl_api_2027` round vocabulary; `PLACEHOLDER` unsupported until
+  observed; venue `CD_V313` unmapped). Nothing applied. Record: `docs/v2/issue229-b2-2027-feed-check-2026-11-01.md`.
+- **Next action:** owner decisions in that record (register 2027, declare the round vocabulary, map
+  `CD_V313`, decide the `PLACEHOLDER` policy), then re-run validate-only/dry-run; the owner then approves
+  the first apply.
   B2 is seasonal first-season operational acceptance, not missing fixture-writer implementation;
   authentic 2026 evidence already proves the technical status/projection contract. Whole-season
   2027/TBC/status/key/mapping evidence and owner approval are not waived.
