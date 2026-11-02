@@ -1,0 +1,423 @@
+mock world /c/Users/stuar/AppData/Local/Temp/claude/D--dev-afldb/b8163eba-d955-4bb1-9736-e391e3493f91/scratchpad/mock-final
+phase script  ab0f929b7228afd3b4ee17597e4c46222ffea098fdd7665548dc1958ddeac47e  /d/dev/afldb/docs/v2/evidence/d31612-release-package-20261102/d31612-phase.sh
+state-probe   9ed4673eb26f4a2118c4ee9fff7065de20b43db17ca9dff3d2d6025a4cb38432
+mock R=37ffe4cda86ef42c48d77f20ac9b4c15e2f80939 H=7a6c9235848845b9c596d3511ed37224af2b45c0 PROD_HEAD=1992bfaa91a301d629bafd34c7bfd36336664704   OLD_ID=ea98a35f2061--vY0EFS0DdR-TiPkxTZz6   NEW_ID=a0b1080f5b98-TESTBUILD
+
+[harness self-test: the stubs log and refuse every mutator no phase may call]
+    ok    'systemctl restart afldb' is refused (nonzero) and logged DISALLOWED
+    ok    'systemctl start afldb' is refused (nonzero) and logged DISALLOWED
+    ok    'systemctl stop afldb' is refused (nonzero) and logged DISALLOWED
+    ok    'systemctl reset-failed afldb' is refused (nonzero) and logged DISALLOWED
+    ok    'systemctl enable x.timer' is refused (nonzero) and logged DISALLOWED
+    ok    'systemctl disable x.timer' is refused (nonzero) and logged DISALLOWED
+    ok    'sudo true' is refused (nonzero) and logged DISALLOWED
+    ok    'node deploy/release.mjs rollback' is refused (nonzero) and logged DISALLOWED
+
+[pa: preflight PASS, read-only]
+    ok    pa exits 0 and prints 'D31612 pa PASS'
+    ok    state OLD_SERVING proved
+    ok    no mutator
+    ok    nothing moved
+
+[pa: STOP when the serving process lacks the effective trigger]
+    ok    pa exits 1 with 'D31612 pa FAIL'
+    ok    ...STOP names: effective AFLDB_SETTLE_TRIGGER=systemd count in the process is not 1
+
+[pa: STOP when the first scheduled run has not fired]
+    ok    pa exits 1 with 'D31612 pa FAIL'
+    ok    ...STOP names: G1: the first scheduled run has not fired and finished
+
+[pa: STOP when a pinned helper's bytes differ]
+    ok    pa exits 1 with 'D31612 pa FAIL'
+    ok    ...STOP names: is missing or not the pinned bytes
+
+[pa: STOP when OLD_ID fails its manifest check (failed old-release verification)]
+    ok    pa exits 1 with 'D31612 pa FAIL'
+    ok    ...STOP names: OLD_ID no longer matches its manifest
+    ok    no mutator
+
+[pa: STOP when the checkout is not at the production head]
+    ok    pa exits 1 with 'D31612 pa FAIL'
+    ok    ...STOP names: checkout HEAD is not PROD_HEAD
+
+[d1: baseline, fast-forward, OLD_SERVING]
+    ok    d1 exits 0 and prints 'D31612 d1 PASS'
+    ok    HEAD is H
+    ok    baseline written
+    ok    baseline records the exact effective trigger count 1
+    ok    no mutator
+
+[d1: a second run STOPs (HEAD is no longer PROD_HEAD) and leaves the baseline alone]
+    ok    d1 exits 1 with 'D31612 d1 FAIL'
+    ok    ...STOP names: checkout HEAD is not PROD_HEAD
+    ok    baseline unchanged
+
+[d2: PASS inside tmux; new-id.txt written; links unmoved]
+    ok    d2 exits 0 and prints 'D31612 d2 PASS'
+    ok    new-id.txt holds the release id
+    ok    only the build mutated
+    ok    verify NEW_ID ran
+    ok    links unmoved
+
+[d2: STOP outside tmux]
+    ok    d2 exits 1 with 'D31612 d2 FAIL'
+    ok    ...STOP names: not inside tmux
+    ok    no build
+    ok    no new-id.txt
+
+[d2: STOP when new-id.txt already exists (once only)]
+    ok    d2 exits 1 with 'D31612 d2 FAIL'
+    ok    ...STOP names: NEWFILE exists
+    ok    no build
+
+[d2: STOP without a baseline]
+    ok    d2 exits 1 with 'D31612 d2 FAIL'
+    ok    ...STOP names: no baseline
+    ok    no build
+
+[d2 NEGATIVE CONTROL A: the build prints a valid RELEASE READY line, THEN exits nonzero]
+    ok    d2 exits 1 with 'D31612 d2 FAIL'
+    ok    ...STOP names: the build pipeline failed (build exit 3
+    ok    the ready line really was in the log
+    ok    new-id.txt NOT written
+    ok    no verify, no promote, no rollback (promotion never reached)
+    ok    only the build was invoked
+    ok    links unmoved
+
+[d2 NEGATIVE CONTROL B: the build fails and prints no ready line]
+    ok    d2 exits 1 with 'D31612 d2 FAIL'
+    ok    ...STOP names: the build pipeline failed (build exit 4
+    ok    new-id.txt NOT written
+    ok    no verify, no promote, no rollback
+    ok    links unmoved
+
+[d2: the build exits 0 but prints no ready line]
+    ok    d2 exits 1 with 'D31612 d2 FAIL'
+    ok    ...STOP names: no RELEASE READY a0b1080f5b98-<BUILD_ID> line
+    ok    new-id.txt NOT written
+    ok    no verify
+
+[d2: the ready line names a different revision]
+    ok    d2 exits 1 with 'D31612 d2 FAIL'
+    ok    ...STOP names: no RELEASE READY
+    ok    new-id.txt NOT written
+
+[d2: the new release fails its manifest check]
+    ok    d2 exits 1 with 'D31612 d2 FAIL'
+    ok    ...STOP names: new release failed its manifest check
+    ok    new-id.txt NOT written
+
+[d2: a build that moved current is a STOP]
+    ok    d2 exits 1 with 'D31612 d2 FAIL'
+    ok    ...STOP names: a build moved current
+    ok    new-id.txt NOT written
+
+[d2 MUTATION CONTROL 1: without the status check the same ready-then-fail build is wrongly accepted (the test can detect the defect)]
+    ok    unfixed variant exits 0 and WRITES new-id.txt
+
+[d3a: successful promotion]
+    ok    d3a exits 0 and prints 'D31612 d3a PASS'
+    ok    only promote NEW_ID mutated
+    ok    state NEW_SELECTED_OLD_RUNNING proved
+    ok    current=NEW previous=OLD
+    ok    tells the OWNER to restart (printed, not run)
+    ok    no restart executed
+
+[d3a: promotion REFUSED by release.mjs]
+    ok    d3a exits 1 with 'D31612 d3a FAIL'
+    ok    ...STOP names: promote refused (no link moved; run probe)
+    ok    links unmoved
+    ok    only the refused promote was attempted; no rollback
+    ok    no restart instruction
+
+[d3a: promote reports success but the state is not NEW_SELECTED_OLD_RUNNING]
+    ok    d3a exits 1 with 'D31612 d3a FAIL'
+    ok    ...STOP names: state is not NEW_SELECTED_OLD_RUNNING
+    ok    no rollback
+
+[d3a: state is not OLD_SERVING before the promotion (links already odd)]
+    ok    d3a exits 1 with 'D31612 d3a FAIL'
+    ok    ...STOP names: state is not OLD_SERVING
+    ok    no promote
+
+[d3a: missing new-id.txt]
+    ok    d3a exits 1 with 'D31612 d3a FAIL'
+    ok    ...STOP names: NEWFILE does not hold a new release id
+    ok    no promote
+
+[d3a: invalid new-id.txt]
+    ok    d3a exits 1 with 'D31612 d3a FAIL'
+    ok    ...STOP names: NEWFILE does not hold a new release id
+    ok    no promote
+    ok    d3a exits 1 with 'D31612 d3a FAIL'
+    ok    ...STOP names: NEWFILE does not hold a new release id
+    ok    no promote (injected text)
+
+[d3c: PASS with the baseline preserved (journal names NEW_ID)]
+    ok    d3c exits 0 and prints 'D31612 d3c PASS'
+    ok    state NEW_SERVING proved
+    ok    journal checked
+    ok    no mutator
+    ok    nothing moved
+
+[d3c: journal line names another release]
+    ok    d3c exits 1 with 'D31612 d3c FAIL'
+    ok    ...STOP names: does not name a0b1080f5b98-TESTBUILD
+
+[d3c: STOP when the new process lacks the trigger]
+    ok    d3c exits 1 with 'D31612 d3c FAIL'
+    ok    ...STOP names: EFFECTIVE AFLDB_SETTLE_TRIGGER=systemd count in the restarted process is not exactly 1
+
+[d3c: STOP when the new process has the trigger twice]
+    ok    d3c exits 1 with 'D31612 d3c FAIL'
+    ok    ...STOP names: not exactly 1
+
+[d3c: STOP when the match timer's next elapse changed]
+    ok    d3c exits 1 with 'D31612 d3c FAIL'
+    ok    ...STOP names: match timer next elapse changed
+
+[d3c: STOP when the service did not restart]
+    ok    d3c exits 1 with 'D31612 d3c FAIL'
+    ok    ...STOP names: MainPID unchanged since the baseline
+
+[d3c: STOP when the .env trigger count changed]
+    ok    d3c exits 1 with 'D31612 d3c FAIL'
+    ok    ...STOP names: .env trigger line count changed
+
+[d3c: STOP when a timer's enablement changed]
+    ok    d3c exits 1 with 'D31612 d3c FAIL'
+    ok    ...STOP names: timer enablement changed
+
+[d3c: STOP when the post-install check fails]
+    ok    d3c exits 1 with 'D31612 d3c FAIL'
+    ok    ...STOP names: post-install check did not PASS
+
+[d3c: missing new-id.txt]
+    ok    d3c exits 1 with 'D31612 d3c FAIL'
+    ok    ...STOP names: NEWFILE does not hold a new release id
+
+[probe: OLD_SERVING, read-only, exit 0]
+    ok    exits 0
+    ok    prints the state
+    ok    no mutator
+    ok    nothing moved
+
+[probe: new-id.txt missing -> '-' (informational), exit 0]
+    ok    exits 0
+    ok    NEW_ID not set
+
+[probe: UNCERTAIN is informational (exit 0), state printed]
+    ok    exits 0
+    ok    prints UNCERTAIN
+
+[probe: FAILED underlying probe (exit 2, invalid NEW_ID text) is propagated and its diagnostic kept]
+    ok    phase exit status is the probe's 2
+    ok    the probe's diagnostic is preserved
+    ok    phase says FAIL with the status
+
+[probe: FAILED underlying probe (exit 7 from the probe script) is propagated and its diagnostic kept]
+    ok    phase exit status is 7
+    ok    diagnostic preserved
+    ok    no mutator
+
+[probe: the probe script is missing (shell exit 127) is propagated]
+    ok    phase exit status is 127
+    ok    says FAIL
+
+[probe MUTATION CONTROL 3: the unfixed variant exits 0 on a failed probe]
+    ok    unfixed variant exits 0 (defect reproduced)
+
+[r2: NEW_SELECTED_OLD_RUNNING -> link-only recovery PASS]
+    ok    r2 exits 0 and prints 'D31612 r2 PASS'
+    ok    only rollback --to OLD_ID mutated
+    ok    links current=OLD
+    ok    post-install check ran on OLD_ID
+    ok    state OLD_SERVING
+    ok    no restart/sudo/systemctl mutation
+    ok    no restart instruction
+
+[r2: OLD_SERVING -> no rollback, no restart instruction]
+    ok    r2 exits 1 with 'D31612 r2 FAIL'
+    ok    ...STOP names: r2 applies only to NEW_SELECTED_OLD_RUNNING
+    ok    no rollback
+    ok    no mutator
+    ok    no restart instruction
+    ok    nothing moved
+
+[r2: NEW_SERVING (already restarted) -> no rollback; r3 is the path]
+    ok    r2 exits 1 with 'D31612 r2 FAIL'
+    ok    ...STOP names: r2 applies only to NEW_SELECTED_OLD_RUNNING
+    ok    no rollback
+    ok    nothing moved
+
+[r2: UNCERTAIN -> act on nothing]
+    ok    r2 exits 1 with 'D31612 r2 FAIL'
+    ok    ...STOP names: r2 applies only
+    ok    no rollback
+    ok    nothing moved
+
+[r2: rollback --to OLD_ID refused (OLD_ID fails its manifest check)]
+    ok    r2 exits 1 with 'D31612 r2 FAIL'
+    ok    ...STOP names: rollback --to OLD_ID refused (state R5: change nothing)
+    ok    only the refused rollback attempted
+    ok    links unmoved
+    ok    no post-install check, no restart
+
+[r2: post-install check on OLD_ID fails after the links moved (failed old-release verification)]
+    ok    r2 exits 1 with 'D31612 r2 FAIL'
+    ok    ...STOP names: post-install check on OLD_ID did not PASS
+    ok    no restart executed
+
+[r2: missing new-id.txt]
+    ok    r2 exits 1 with 'D31612 r2 FAIL'
+    ok    ...STOP names: NEWFILE does not hold a new release id
+    ok    no rollback
+    ok    nothing moved
+
+[r2: invalid new-id.txt]
+    ok    r2 exits 1 with 'D31612 r2 FAIL'
+    ok    ...STOP names: NEWFILE does not hold a new release id
+    ok    no rollback
+
+[r3-links: after the new release started -> links back to OLD_ID]
+    ok    r3-links exits 0 and prints 'D31612 r3-links PASS'
+    ok    only rollback --to OLD_ID mutated
+    ok    current=OLD previous=NEW
+    ok    owner restart instruction printed
+    ok    start-limit-hit recovery text printed
+    ok    none of it executed
+
+[r3-links: OLD_SERVING (current already OLD_ID) -> no rollback, no restart instruction]
+    ok    r3-links exits 1 with 'D31612 r3-links FAIL'
+    ok    ...STOP names: roll back only when NEW_ID is the selected release
+    ok    no rollback
+    ok    no restart instruction
+    ok    nothing moved
+
+[r3-links: rollback --to OLD_ID refused]
+    ok    r3-links exits 1 with 'D31612 r3-links FAIL'
+    ok    ...STOP names: rollback --to OLD_ID refused (state R5: change nothing)
+    ok    links unmoved
+    ok    no restart instruction
+
+[r3-links: rollback reports success but current did not move]
+    ok    r3-links exits 1 with 'D31612 r3-links FAIL'
+    ok    ...STOP names: current is not OLD_ID
+    ok    no restart instruction
+
+[r3-links: missing new-id.txt]
+    ok    r3-links exits 1 with 'D31612 r3-links FAIL'
+    ok    ...STOP names: NEWFILE does not hold a new release id
+    ok    no rollback
+
+[r3-links: invalid new-id.txt]
+    ok    r3-links exits 1 with 'D31612 r3-links FAIL'
+    ok    ...STOP names: NEWFILE does not hold a new release id
+    ok    no rollback
+
+[r3-verify: OLD_ID serving, trigger/.env/timer state preserved -> PASS]
+    ok    r3-verify exits 0 and prints 'D31612 r3-verify PASS'
+    ok    state OLD_SERVING proved
+    ok    post-install check ran on OLD_ID
+    ok    helper ran
+    ok    read-only: no mutator
+    ok    nothing moved
+    ok    no secrets: no env VALUES printed
+
+[r3-verify: the restored process has NO effective AFLDB_SETTLE_TRIGGER]
+    ok    r3-verify exits 1 with 'D31612 r3-verify FAIL'
+    ok    ...STOP names: EFFECTIVE AFLDB_SETTLE_TRIGGER=systemd count in the restarted process is not exactly 1
+    ok    no mutator
+
+[r3-verify: the restored process has the trigger TWICE]
+    ok    r3-verify exits 1 with 'D31612 r3-verify FAIL'
+    ok    ...STOP names: not exactly 1
+
+[r3-verify: the restored process environment is unreadable]
+    ok    r3-verify exits 1 with 'D31612 r3-verify FAIL'
+    ok    ...STOP names: environment is not readable
+
+[r3-verify: .env trigger count differs from the baseline (0)]
+    ok    r3-verify exits 1 with 'D31612 r3-verify FAIL'
+    ok    ...STOP names: .env trigger line count changed
+
+[r3-verify: .env trigger count differs from the baseline (2)]
+    ok    r3-verify exits 1 with 'D31612 r3-verify FAIL'
+    ok    ...STOP names: .env trigger line count changed
+
+[r3-verify: match timer next elapse changed]
+    ok    r3-verify exits 1 with 'D31612 r3-verify FAIL'
+    ok    ...STOP names: match timer next elapse changed
+
+[r3-verify: match timer last trigger changed]
+    ok    r3-verify exits 1 with 'D31612 r3-verify FAIL'
+    ok    ...STOP names: match timer last trigger changed
+
+[r3-verify: timer enablement changed]
+    ok    r3-verify exits 1 with 'D31612 r3-verify FAIL'
+    ok    ...STOP names: timer enablement changed
+
+[r3-verify: no baseline -> preservation cannot be proven]
+    ok    r3-verify exits 1 with 'D31612 r3-verify FAIL'
+    ok    ...STOP names: no baseline
+
+[r3-verify: the owner has not restarted yet (OLD_SELECTED_NEW_RUNNING)]
+    ok    r3-verify exits 1 with 'D31612 r3-verify FAIL'
+    ok    ...STOP names: state is not OLD_SERVING
+
+[r3-verify: the service was never restarted (MainPID unchanged since the baseline)]
+    ok    r3-verify exits 1 with 'D31612 r3-verify FAIL'
+    ok    ...STOP names: MainPID unchanged since the baseline
+
+[r3-verify: uncertain state]
+    ok    r3-verify exits 1 with 'D31612 r3-verify FAIL'
+    ok    ...STOP names: state is not OLD_SERVING
+
+[r3-verify: post-install check on OLD_ID fails (failed old-release verification)]
+    ok    r3-verify exits 1 with 'D31612 r3-verify FAIL'
+    ok    ...STOP names: post-install check on OLD_ID did not PASS
+    ok    stopped before the probe
+
+[r3-verify: the read-only timer/setting helper fails]
+    ok    r3-verify exits 1 with 'D31612 r3-verify FAIL'
+    ok    ...STOP names: timer/setting helper did not PASS
+
+[r3-verify: previous is not NEW_ID]
+    ok    r3-verify exits 1 with 'D31612 r3-verify FAIL'
+    ok    ...STOP names: previous is not NEW_ID after the recovery
+
+[r3-verify: missing new-id.txt]
+    ok    r3-verify exits 1 with 'D31612 r3-verify FAIL'
+    ok    ...STOP names: NEWFILE does not hold a new release id
+
+[r3-verify MUTATION CONTROL 2: without the preservation comparison a missing effective trigger is wrongly accepted]
+    ok    unfixed variant PASSES with no trigger in the process (defect reproduced)
+
+[chain A: pa -> d1 -> d2 -> d3a -> owner restart -> d3c (acceptance path)]
+    ok    pa exits 0 and prints 'D31612 pa PASS'
+    ok    d1 exits 0 and prints 'D31612 d1 PASS'
+    ok    d2 exits 0 and prints 'D31612 d2 PASS'
+    ok    d3a exits 0 and prints 'D31612 d3a PASS'
+    ok    d3c exits 0 and prints 'D31612 d3c PASS'
+    ok    only build + promote mutated, in order
+
+[chain A cont.: r3-links -> owner recovery restart -> r3-verify (recovery after the new release started, real baseline)]
+    ok    r3-links exits 0 and prints 'D31612 r3-links PASS'
+    ok    r3-verify exits 0 and prints 'D31612 r3-verify PASS'
+    ok    mutators over the whole chain: build, promote, rollback --to OLD_ID only
+
+[chain B: pa -> d1 -> d2 -> d3a -> r2 (abandon before any restart)]
+    ok    pa exits 0 and prints 'D31612 pa PASS'
+    ok    d1 exits 0 and prints 'D31612 d1 PASS'
+    ok    d2 exits 0 and prints 'D31612 d2 PASS'
+    ok    d3a exits 0 and prints 'D31612 d3a PASS'
+    ok    r2 exits 0 and prints 'D31612 r2 PASS'
+    ok    links back: current=OLD_ID
+    ok    mutators: build, promote, rollback --to OLD_ID only
+
+[global: no disallowed or unknown call in ANY test of this run]
+(stub calls over the whole run: 86 lines; node release.mjs calls by subcommand:      10 build       5 promote       8 rollback      10 status      13 verify )
+    ok    no systemctl restart/start/stop/reset-failed/enable/disable, no sudo, no unqualified rollback, no unknown stub call
+
+RESULT: 257 passed, 0 failed (257 assertions)
+MOCK TEST PASS
