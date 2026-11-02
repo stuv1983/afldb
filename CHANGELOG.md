@@ -15,6 +15,12 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-316 close-out preparation: D-316-12 admin wording (local), helper self-match fix, C6-C9 classification (2026-11-02, local; production unchanged)
+
+- **Application text changed (local, NOT deployed):** `/admin/current-season` now says AFL Tables is retired (timer disabled), AFL API match ingestion runs from its timer while the switch is Enabled, Brownlow is governed separately and off until a count window, and there is no Start control; the unconfigured-host status text no longer points at the retired polkit rule. No control, permission or behaviour changed. `docs/deployment.md` 7b, on-demand and 7d updated. Release package prepared, not granted.
+- Helper: the `timer` process-count check self-matched the operator's own shell (reproduced read-only); `c5-observe-r3.sh` and `c5-proc-guard.sh` exclude only wrapper ancestors and the helper's own forks and still detect genuine writers (17/17). The first failed observation is retained. Adds a read-only `first-night` classification phase.
+- ISSUE-316 stays open: C6 to C9 and D-316-5..11 classified with gates; owner close-out decision prepared. Gap register recounted: 38 / 37 closed / 1 open (029).
+
 ### ISSUE-316 C5 (D-316-4): AFL API ingestion activated on production; V2-GAP-011 closed (2026-11-02, local record)
 
 - **Production behaviour changed (owner-executed, attended):** `AFLDB_SETTLE_TRIGGER=systemd` added to the production `.env` and `afldb` restarted (MainPID 3303369); the AFL API Current-Season Ingestion switch enabled through the audited admin panel; `afldb-settle-afl-api.timer` enabled (next elapse 2026-11-03 05:01:47 AEDT, a real `--apply`). Brownlow and AFL Tables timers stay disabled. Activation accepted by two `C5-ACCEPT PASS` observations; **the first scheduled run is not yet observed.**
