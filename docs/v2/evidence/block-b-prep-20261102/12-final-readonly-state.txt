@@ -1,0 +1,9 @@
+﻿now 2026-11-02T02:53:41Z
+actor1 (id|role|disabled): 1|super_admin|active
+unresolved afl_api_brownlow_settle issues: 0
+receipts: []
+fixtures=218 matches=17056 batches=67 switch=false
+2026 votes: 9522 ; match_id not null: 0
+2025 winner check (award_winners 2025 brownlow): 188
+afldb.service active MainPID=3268373 NRestarts=0
+checkout HEAD=ea98a35f20610e75c18e698bc0d9fe084c3c783d porcelain=0

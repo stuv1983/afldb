@@ -296,7 +296,7 @@ State probe: `bash "$PKGD/state-probe.sh" "$OLD_ID" "$NEW_ID" [--expect STATE]` 
 
 | Observation | Meaning | Action |
 |---|---|---|
-| exit 0 and `READBACK-B PASS` | done | record; Brownlow baselines void |
+| exit 0 and `READBACK-B PASS` | done | record; earlier Brownlow baselines are unsuitable as current evidence (the earlier backups stay valid recovery archives) |
 | exit 2 | refused before any write | read the reasons; fix; the same approval may be re-run only if the owner says so |
 | exit 1, fixtures 0, switch `false` | HALT before the apply, restored | read `result.json`; no data written; new run needs the owner's decision |
 | exit 1 or a failed `readback-b` with fixtures 218 | the apply committed but the run did not end CLEAR (for example a `result.json` write failure) | do **not** re-run; read `transition.json`; the owner decides whether to accept (a replay is refused by the tool itself) |

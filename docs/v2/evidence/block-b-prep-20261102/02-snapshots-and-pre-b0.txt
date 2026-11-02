@@ -1,0 +1,16 @@
+﻿== snapshots b0: staged bytes equal the pinned list 2026-11-02T02:41:14Z
+SNAPSHOTS PASS b0 (218 files)
+EXIT snapshots b0 = 0
+== snapshots b1: staged bytes equal the pinned list 2026-11-02T02:41:14Z
+SNAPSHOTS PASS b1 (3 files)
+EXIT snapshots b1 = 0
+== pre b0: checkout, writers, identity, ledger 118, receipts 2026-11-02T02:41:14Z
+no writer unit enabled or active; no writer process; no crontab
+dsn_identity key=AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=localhost port=5432 database=afldb_prod
+identity ok
+ledger rows=118 last=118_fixtures_unconfirmed_participants.sql digest=573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57
+receipts=[] expected before=[]
+votes2026=9522:8096c0494f77a8f4cd1ed270654fae95
+facts total|2026|inscope_match_id|2025_nosource|2025_source|staged2025|decisions = 330383|9522|0|9522|0|0|0
+PRE PASS b0
+EXIT pre b0 = 0

@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-229 — AFL API fixture ingestion
 
-**Status:** Open. **Severity:** Medium. **Opened:** 2026-09-23 (ISSUE-228 §13.1, §16 S10).
+**Status: RESOLVED 2026-11-02** (moved here from `issues/open/`; the text below is the historical runbook, unedited). Closure reconciliation: `docs/v2/issue229-gap008-closure-2026-11-02.md`; ledger entry: `issues.md`. Superseded as to "stays open" by that record. **Severity:** Medium. **Opened:** 2026-09-23 (ISSUE-228 §13.1, §16 S10).
 **This runbook:** created 2026-09-26 in the bulk successor pass on
 `opus/afl-api-successors-229-234` (base `main` `2e587415`). Uncommitted.
 

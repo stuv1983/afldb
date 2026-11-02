@@ -1,0 +1,25 @@
+﻿##### bash /home/arm/blockb-pkg-ea98a35f2061/docs/v2/evidence/block-b-package-20261102/b-prod.sh target ea98a35f20610e75c18e698bc0d9fe084c3c783d b0
+no writer unit enabled or active; no writer process; no crontab
+dsn_identity key=AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=localhost port=5432 database=afldb_prod
+identity ok
+{"host" : "localhost", "port" : 5432, "database" : "afldb_prod", "user" : "afldb_owner", "systemIdentifier" : "7674454702926115004", "databaseOid" : "66668", "clusterName" : "16/main", "databaseComment" : null}
+target equals the reviewed facts (sysid, oid, cluster, owner role)
+##### EXIT 0
+##### bash /home/arm/blockb-pkg-ea98a35f2061/docs/v2/evidence/block-b-package-20261102/b-prod.sh baseline ea98a35f20610e75c18e698bc0d9fe084c3c783d b0
+no writer unit enabled or active; no writer process; no crontab
+dsn_identity key=AFLDB_OWNER_DATABASE_URL user=afldb_owner host=localhost port=5432 database=afldb_prod
+== baseline b0 (read-only session) 2026-11-02T02:44:33Z
+Read-only Brownlow baseline d998c1200d7b5de7dc0d93f35005cd2eacad65b95924412a5bc39720ce9b3de5
+##### EXIT 0
+##### node /home/arm/blockb-pkg-ea98a35f2061/docs/v2/evidence/block-b-package-20261102/assemble-backup-evidence.mjs --stage b0 --revision ea98a35f20610e75c18e698bc0d9fe084c3c783d --target /home/arm/ops/blockb-ea98a35f2061/b0/target.json --live-baseline /home/arm/ops/blockb-ea98a35f2061/b0/baseline-live.json --restored-baseline /home/arm/ops/blockb-ea98a35f2061/b0-in/baseline-restored.json --sidecar /home/arm/backups/afldb/blockb-b0-20261102T024137Z/afldb_prod-20261102T024137Z.provenance.json --dump /home/arm/backups/afldb/blockb-b0-20261102T024137Z/afldb_prod-20261102T024137Z.dump --restore-facts /home/arm/ops/blockb-ea98a35f2061/b0-in/restore-facts.json --expect-ledger-digest 573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57 --out-dir /home/arm/ops/blockb-ea98a35f2061/b0/evidence
+ssh : REFUSED:
+At line:4 char:1
++ ssh -o ConnectTimeout=15 afldb "bash /home/arm/bb-plan-b0.sh" 2>&1 |  ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (REFUSED::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  - live baseline d998c1200d7b5de7dc0d93f35005cd2eacad65b95924412a5bc39720ce9b3de5 differs from the restored copy's 
+399583baeb9800f6dfd83f92f9ebb2e79c2835bde581ec9ae86886a34283edce
+##### EXIT 1
+SEQUENCE STOPPED

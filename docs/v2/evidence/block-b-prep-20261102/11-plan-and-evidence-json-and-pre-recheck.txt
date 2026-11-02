@@ -1,0 +1,142 @@
+﻿{
+  "format": "afldb.brownlow.production-correction.v1",
+  "request": {
+    "operation": "observe",
+    "seasons": [
+      2025
+    ],
+    "stage": "fixture-identities-2025",
+    "observation": {
+      "stage": "fixture-identities-2025",
+      "label": "afl-api-2025-2026-10-20-014218",
+      "season": 2025,
+      "manifestSha256": "46a793d8874ff7e1063e4323cb14154f7852dfd184679588dfae58f59b769b36",
+      "builtRecords": 212,
+      "refusedProviderMatchIds": [
+        "CD_M20250142501",
+        "CD_M20250142502",
+        "CD_M20250142503",
+        "CD_M20250142504"
+      ],
+      "recordsDigest": "d6bbe18465b02915627defde6db6a42849de80fbfedb5822d9fd2c980c9e671f"
+    }
+  },
+  "target": {
+    "host": "localhost",
+    "port": 5432,
+    "database": "afldb_prod",
+    "user": "afldb_owner",
+    "systemIdentifier": "7674454702926115004",
+    "databaseOid": "66668",
+    "clusterName": "16/main",
+    "databaseComment": null
+  },
+  "revision": "ea98a35f20610e75c18e698bc0d9fe084c3c783d",
+  "backup": {
+    "sha256": "25d89ec745fb2aeed6b16d964da5e7ee3b0a9032eecda53dae609036a5e73536",
+    "capturedAt": "2026-11-02T02:41:46.489439Z",
+    "restoredAt": "2026-11-02T02:43:25.839Z",
+    "restoreEvidenceSha256": "07418a0e687ce6c7ca058a994356ca8a182224e371beefca63ce4bbe9ca1eecb",
+    "baselineDigest": "d998c1200d7b5de7dc0d93f35005cd2eacad65b95924412a5bc39720ce9b3de5",
+    "target": {
+      "host": "localhost",
+      "port": 5432,
+      "database": "afldb_prod",
+      "user": "afldb_owner",
+      "systemIdentifier": "7674454702926115004",
+      "databaseOid": "66668",
+      "clusterName": "16/main",
+      "databaseComment": null
+    }
+  },
+  "createdAt": "2026-11-02T02:49:58.336Z",
+  "expiresAt": "2026-11-03T02:49:58.336Z",
+  "baseline": "d998c1200d7b5de7dc0d93f35005cd2eacad65b95924412a5bc39720ce9b3de5",
+  "payload": {
+    "stage": "fixture-identities-2025",
+    "label": "afl-api-2025-2026-10-20-014218",
+    "season": 2025,
+    "manifestSha256": "46a793d8874ff7e1063e4323cb14154f7852dfd184679588dfae58f59b769b36",
+    "builtRecords": 212,
+    "refusedProviderMatchIds": [
+      "CD_M20250142501",
+      "CD_M20250142502",
+      "CD_M20250142503",
+      "CD_M20250142504"
+    ],
+    "recordsDigest": "d6bbe18465b02915627defde6db6a42849de80fbfedb5822d9fd2c980c9e671f"
+  },
+  "digest": "7c84362f84c09d49dabd4616f4e70eca91d15d65e17bfd5d24895cb93c2bf267"
+}
+
+{
+  "sha256": "25d89ec745fb2aeed6b16d964da5e7ee3b0a9032eecda53dae609036a5e73536",
+  "capturedAt": "2026-11-02T02:41:46.489439Z",
+  "restoredAt": "2026-11-02T02:43:25.839Z",
+  "restoreEvidenceSha256": "07418a0e687ce6c7ca058a994356ca8a182224e371beefca63ce4bbe9ca1eecb",
+  "baselineDigest": "d998c1200d7b5de7dc0d93f35005cd2eacad65b95924412a5bc39720ce9b3de5",
+  "target": {
+    "host": "localhost",
+    "port": 5432,
+    "database": "afldb_prod",
+    "user": "afldb_owner",
+    "systemIdentifier": "7674454702926115004",
+    "databaseOid": "66668",
+    "clusterName": "16/main",
+    "databaseComment": null
+  }
+}
+
+{
+  "format": "afldb.block-b.restore-evidence.1",
+  "stage": "b0",
+  "revision": "ea98a35f20610e75c18e698bc0d9fe084c3c783d",
+  "backup": {
+    "archive": "afldb_prod-20261102T024137Z.dump",
+    "sha256": "25d89ec745fb2aeed6b16d964da5e7ee3b0a9032eecda53dae609036a5e73536",
+    "capturedAt": "2026-11-02T02:41:46.489439Z"
+  },
+  "source": {
+    "ledgerDigest": "573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57",
+    "target": {
+      "host": "localhost",
+      "port": 5432,
+      "database": "afldb_prod",
+      "user": "afldb_owner",
+      "systemIdentifier": "7674454702926115004",
+      "databaseOid": "66668",
+      "clusterName": "16/main",
+      "databaseComment": null
+    }
+  },
+  "restore": {
+    "restoredAt": "2026-11-02T02:43:25.839Z",
+    "ledgerRows": 118,
+    "ledgerDigest": "573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57",
+    "matches": 17056,
+    "fixtures": 218,
+    "baselineDigest": "d998c1200d7b5de7dc0d93f35005cd2eacad65b95924412a5bc39720ce9b3de5",
+    "restoredTarget": {
+      "host": "127.0.0.1",
+      "port": 55496,
+      "user": "afldb_owner",
+      "database": "afldb_v2_blockb_b0_rst_test",
+      "databaseOid": "16390",
+      "systemIdentifier": "7703399194485209629",
+      "clusterName": "afldb_v2_isolated",
+      "databaseComment": "afldb-v2-isolated-test"
+    }
+  },
+  "liveBaselineDigest": "d998c1200d7b5de7dc0d93f35005cd2eacad65b95924412a5bc39720ce9b3de5"
+}
+
+== pre b0: checkout, writers, identity, ledger 118, receipts 2026-11-02T02:50:43Z
+no writer unit enabled or active; no writer process; no crontab
+dsn_identity key=AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=localhost port=5432 database=afldb_prod
+identity ok
+ledger rows=118 last=118_fixtures_unconfirmed_participants.sql digest=573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57
+receipts=[] expected before=[]
+votes2026=9522:8096c0494f77a8f4cd1ed270654fae95
+facts total|2026|inscope_match_id|2025_nosource|2025_source|staged2025|decisions = 330383|9522|0|9522|0|0|0
+PRE PASS b0
+9522:8096c0494f77a8f4cd1ed270654fae95

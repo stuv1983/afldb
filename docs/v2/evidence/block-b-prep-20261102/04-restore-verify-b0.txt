@@ -1,0 +1,52 @@
+﻿RV EXIT 0
+2026-11-02T02:43:11Z RV0 inputs
+dump sha256 verified; candidate clean at ea98a35f20610e75c18e698bc0d9fe084c3c783d
+DEV services BEFORE:
+afldb.service active MainPID=1162113
+postgresql@16-main.service active MainPID=1504
+2026-11-02T02:43:12Z RV1 start the guarded cluster
+The files belonging to this database system will be owned by user "arm".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C".
+The default text search configuration will be set to "english".
+
+Data page checksums are disabled.
+
+creating directory /mnt/ssd/afldb-v2-blockb-prod-20261102T024241Z/pg-root/data ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default max_connections ... 100
+selecting default shared_buffers ... 128MB
+selecting default time zone ... Australia/Melbourne
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+init: cluster initialised
+roles: afldb_owner, afldb_app, afldb_import, afldb_backup, afldb_auth present
+pg_ctl: server is running (PID: 1505846)
+/usr/lib/postgresql/16/bin/postgres "-D" "/mnt/ssd/afldb-v2-blockb-prod-20261102T024241Z/pg-root/data"
+LISTEN 0      600        127.0.0.1:55496      0.0.0.0:*    users:(("postgres",pid=1505846,fd=7))      
+2026-11-02T02:43:18Z RV2 restore into a guarded disposable database
+create-db: afldb_v2_blockb_b0_rst_test created and marked
+isolated-pg: afldb_v2_blockb_b0_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55496); running node
+pg_restore exit=0 seconds=6 stderrLines=0
+restore_started=2026-11-02T02:43:19.231Z restored_at=2026-11-02T02:43:25.839Z
+isolated-pg: afldb_v2_blockb_b0_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55496); running node
+afldb_v2_blockb_b0_rst_test {"ledger":"118_fixtures_unconfirmed_participants.sql","matches":17056,"fixtures":218,"receipts":0}
+archive toc entries: 1651
+2026-11-02T02:43:26Z RV3 restored copy facts and target (read-only) -> clean JSON files
+isolated-pg: afldb_v2_blockb_b0_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55496); running node
+{"ledgerRows":118,"ledgerLast":"118_fixtures_unconfirmed_participants.sql","ledgerDigest":"573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57","matches":17056,"fixtures":218,"restoredAt":"2026-11-02T02:43:25.839Z"}
+2026-11-02T02:43:26Z RV3b baseline of the restored copy (the real runner, read-only)
+isolated-pg: afldb_v2_blockb_b0_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55496); running bash
+Read-only Brownlow baseline 399583baeb9800f6dfd83f92f9ebb2e79c2835bde581ec9ae86886a34283edce
+2026-11-02T02:43:56Z RV4 stop the cluster and prove isolation
+waiting for server to shut down.... done
+server stopped
+DEV services AFTER:
+afldb.service active MainPID=1162113
+postgresql@16-main.service active MainPID=1504
+2026-11-02T02:43:59Z RV DONE restored_at=2026-11-02T02:43:25.839Z evidence=/mnt/ssd/afldb-v2-blockb-prod-20261102T024241Z/evidence-private/b0
+RV EXIT 0

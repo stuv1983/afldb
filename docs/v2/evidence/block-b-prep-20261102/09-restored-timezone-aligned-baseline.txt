@@ -1,0 +1,36 @@
+﻿pg_ctl: server is running (PID: 1511501)
+/usr/lib/postgresql/16/bin/postgres "-D" "/mnt/ssd/afldb-v2-blockb-prod-20261102T024241Z/pg-root/data"
+ssh : isolated-pg: afldb_v2_blockb_b0_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55496); running bash
+At line:4 char:1
++ ssh -o ConnectTimeout=15 streamanator "bash /tmp/bb-rst-tz.sh" 2>&1 | ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (isolated-pg: af...); running bash:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+isolated-pg: afldb_v2_blockb_b0_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55496); running bash
+Australia/Melbourne
+isolated-pg: afldb_v2_blockb_b0_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55496); running bash
+Read-only Brownlow baseline d998c1200d7b5de7dc0d93f35005cd2eacad65b95924412a5bc39720ce9b3de5
+BASELINE EXIT 0
+222e11a3a1f67d1856d85fad297268d201e2d1569eaa3cd203eca4c2f28605e1  /mnt/ssd/afldb-v2-blockb-prod-20261102T024241Z/evidence-private/b0/baseline-restored.json
+760b7d8b611e4882de3c8ba7e689f8ffa8594e3a0698405b5168abd7940fc291  /mnt/ssd/afldb-v2-blockb-prod-20261102T024241Z/evidence-private/b0/baseline-restored-utc-session.json
+{
+  "target": {
+    "host": "127.0.0.1",
+    "port": 55496,
+    "user": "afldb_owner",
+    "database": "afldb_v2_blockb_b0_rst_test",
+    "databaseOid": "16390",
+    "systemIdentifier": "7703399194485209629",
+    "clusterName": "afldb_v2_isolated",
+    "databaseComment": "afldb-v2-isolated-test"
+  },
+  "revision": "ea98a35f20610e75c18e698bc0d9fe084c3c783d",
+  "baselineDigest": "d998c1200d7b5de7dc0d93f35005cd2eacad65b95924412a5bc39720ce9b3de5",
+  "capturedAt": "2026-11-02T02:49:32.616Z"
+}
+waiting for server to shut down.... done
+server stopped
+cluster stopped; no listener
+afldb.service active MainPID=1162113
+postgresql@16-main.service active MainPID=1504

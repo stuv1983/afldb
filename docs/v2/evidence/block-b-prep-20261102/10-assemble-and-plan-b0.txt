@@ -1,0 +1,76 @@
+﻿222e11a3a1f67d1856d85fad297268d201e2d1569eaa3cd203eca4c2f28605e1  /home/arm/ops/blockb-ea98a35f2061/b0-in/baseline-restored-melbourne.json
+b0 dir now:
+total 16
+drwx------ 2 arm arm 4096 Nov  2 13:45 .
+drwx------ 4 arm arm 4096 Nov  2 13:44 ..
+-rw------- 1 arm arm  445 Nov  2 13:45 baseline-live.json
+-rw------- 1 arm arm  211 Nov  2 13:44 target.json
+##### node /home/arm/blockb-pkg-ea98a35f2061/docs/v2/evidence/block-b-package-20261102/assemble-backup-evidence.mjs --stage b0 --revision ea98a35f20610e75c18e698bc0d9fe084c3c783d --target /home/arm/ops/blockb-ea98a35f2061/b0/target.json --live-baseline /home/arm/ops/blockb-ea98a35f2061/b0/baseline-live.json --restored-baseline /home/arm/ops/blockb-ea98a35f2061/b0-in/baseline-restored-melbourne.json --sidecar /home/arm/backups/afldb/blockb-b0-20261102T024137Z/afldb_prod-20261102T024137Z.provenance.json --dump /home/arm/backups/afldb/blockb-b0-20261102T024137Z/afldb_prod-20261102T024137Z.dump --restore-facts /home/arm/ops/blockb-ea98a35f2061/b0-in/restore-facts.json --expect-ledger-digest 573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57 --out-dir /home/arm/ops/blockb-ea98a35f2061/b0/evidence
+ASSEMBLED b0: baseline d998c1200d7b5de7dc0d93f35005cd2eacad65b95924412a5bc39720ce9b3de5 == restored; backup 25d89ec745fb2aeed6b16d964da5e7ee3b0a9032eecda53dae609036a5e73536; restoredAt 2026-11-02T02:43:25.839Z
+##### EXIT 0
+##### bash /home/arm/blockb-pkg-ea98a35f2061/docs/v2/evidence/block-b-package-20261102/b-prod.sh plan ea98a35f20610e75c18e698bc0d9fe084c3c783d b0 /home/arm/ops/blockb-ea98a35f2061/b0/evidence/backup-b0.json /home/arm/backups/afldb/blockb-b0-20261102T024137Z/afldb_prod-20261102T024137Z.dump /home/arm/ops/blockb-ea98a35f2061/b0/evidence/restore-evidence-b0.json
+no writer unit enabled or active; no writer process; no crontab
+dsn_identity key=AFLDB_OWNER_DATABASE_URL user=afldb_owner host=localhost port=5432 database=afldb_prod
+== snapshots b0: staged bytes equal the pinned list 2026-11-02T02:49:56Z
+SNAPSHOTS PASS b0 (218 files)
+== plan b0 (read-only session, no writes) 2026-11-02T02:49:57Z
+Review plan 7c84362f84c09d49dabd4616f4e70eca91d15d65e17bfd5d24895cb93c2bf267; no writes
+6e8f26973cb991374910f9eea4ed1265c0e47fb5101e79812a57ff5ee3c05ea0  /home/arm/ops/blockb-ea98a35f2061/b0/plan.json
+##### EXIT 0
+##### node /home/arm/blockb-pkg-ea98a35f2061/docs/v2/evidence/block-b-package-20261102/plan-summary.mjs /home/arm/ops/blockb-ea98a35f2061/b0/plan.json
+{
+  "digest": "7c84362f84c09d49dabd4616f4e70eca91d15d65e17bfd5d24895cb93c2bf267",
+  "operation": "observe",
+  "stage": "fixture-identities-2025",
+  "seasons": "1 (2025..2025; includes 2026: false)",
+  "rulings": null,
+  "actorId": null,
+  "revision": "ea98a35f20610e75c18e698bc0d9fe084c3c783d",
+  "baseline": "d998c1200d7b5de7dc0d93f35005cd2eacad65b95924412a5bc39720ce9b3de5",
+  "createdAt": "2026-11-02T02:49:58.336Z",
+  "expiresAt": "2026-11-03T02:49:58.336Z",
+  "backup": {
+    "sha256": "25d89ec745fb2aeed6b16d964da5e7ee3b0a9032eecda53dae609036a5e73536",
+    "capturedAt": "2026-11-02T02:41:46.489439Z",
+    "restoredAt": "2026-11-02T02:43:25.839Z",
+    "baselineDigest": "d998c1200d7b5de7dc0d93f35005cd2eacad65b95924412a5bc39720ce9b3de5"
+  },
+  "target": {
+    "database": "afldb_prod",
+    "user": "afldb_owner",
+    "systemIdentifier": "7674454702926115004",
+    "databaseOid": "66668"
+  },
+  "payload": {
+    "stage": "fixture-identities-2025",
+    "label": "afl-api-2025-2026-10-20-014218",
+    "season": 2025,
+    "manifestSha256": "46a793d8874ff7e1063e4323cb14154f7852dfd184679588dfae58f59b769b36",
+    "builtRecords": 212,
+    "refusedProviderMatchIds": "[4 items]",
+    "recordsDigest": "d6bbe18465b02915627defde6db6a42849de80fbfedb5822d9fd2c980c9e671f"
+  }
+}
+##### EXIT 0
+/home/arm/ops/blockb-ea98a35f2061/b0:
+total 28
+drwx------ 3 arm arm 4096 Nov  2 13:50 .
+drwx------ 4 arm arm 4096 Nov  2 13:44 ..
+-rw------- 1 arm arm  445 Nov  2 13:45 baseline-live.json
+drwx------ 2 arm arm 4096 Nov  2 13:49 evidence
+-rw------- 1 arm arm 2362 Nov  2 13:50 plan.json
+-rw------- 1 arm arm   75 Nov  2 13:49 request.json
+-rw------- 1 arm arm  211 Nov  2 13:44 target.json
+
+/home/arm/ops/blockb-ea98a35f2061/b0/evidence:
+total 16
+drwx------ 2 arm arm 4096 Nov  2 13:49 .
+drwx------ 3 arm arm 4096 Nov  2 13:50 ..
+-rw------- 1 arm arm  609 Nov  2 13:49 backup-b0.json
+-rw------- 1 arm arm 1433 Nov  2 13:49 restore-evidence-b0.json
+e46c2494ffcbc365d25a7dbd3e9aedb8412508db4b9cdef9d5134b7bf5acfe0e  /home/arm/ops/blockb-ea98a35f2061/b0/baseline-live.json
+6e8f26973cb991374910f9eea4ed1265c0e47fb5101e79812a57ff5ee3c05ea0  /home/arm/ops/blockb-ea98a35f2061/b0/plan.json
+71941fbeb2a52890bf1790514ddf474e8110cd7f557a3513d4dc4cc85ff0a058  /home/arm/ops/blockb-ea98a35f2061/b0/request.json
+98946a229263a1ec9473ffd420de40b1a6f9ba11bf0fbcdbb2c88c975b99b25f  /home/arm/ops/blockb-ea98a35f2061/b0/target.json
+22195af6234529cdab00c3d1e6abbeac571fbc5c87e5dc835ee5002f05087845  /home/arm/ops/blockb-ea98a35f2061/b0/evidence/backup-b0.json
+07418a0e687ce6c7ca058a994356ca8a182224e371beefca63ce4bbe9ca1eecb  /home/arm/ops/blockb-ea98a35f2061/b0/evidence/restore-evidence-b0.json

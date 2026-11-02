@@ -84,7 +84,7 @@ Reply with E1 (and the mapping choice), E2 or E3.
 
 | Item | What it waits for | Notes |
 |---|---|---|
-| V2-GAP-008 / ISSUE-229 | An authentic 2027-season B2 capture | No 2027 season exists yet; blocks nothing unrelated |
+| V2-GAP-008 / ISSUE-229 | ~~An authentic 2027-season B2 capture~~ **done and applied; closed 2026-11-02** ([record](issue229-gap008-closure-2026-11-02.md)) | ~~No 2027 season exists yet~~ the 2027 season exists, was captured 2026-11-01 and its first fixture window ran under approval on 2026-11-02 |
 | V2-GAP-011 / ISSUE-316 | The remaining ISSUE-316 cutover sequence: the owner's C2, the C4b PASS and C5 | **One step is already done:** the production AFL Tables timer is disabled and inactive (A-AFLT executed 2026-10-31, D-V2-PROD-EXEC-1; the polkit rule was recorded absent; `legacy-writers` passed at Stages 3 and 13). That retirement is **not** the full cutover. Frozen P/H/EXEC, authorities and recovery bindings are untouched |
 | V2-GAP-016, 030, 031 | Separate exact approval of each production **Brownlow operation**: the `match_id` backfill, legacy-ownership adoption, exact recording and reconciliation acceptance | **Migrations 116 and 117 are already installed on production** (A-REL applied 111-117 on 2026-10-31, ledger 117, read-back 12/12; [record](production-execution-record-2026-10-31.md)). Installation is not the gate. Installed schema does not authorise recording, backfill, adoption or acceptance. [Approval package](brownlow-production-approval-package-2026-10-20.md) |
 | V2-GAP-029 | Source evidence for the Gridley findings | Findings unchanged and not waived; [source requests](gap-029-source-requests.md) |

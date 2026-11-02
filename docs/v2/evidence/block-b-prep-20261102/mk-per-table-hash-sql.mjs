@@ -1,0 +1,5 @@
+import { writeFileSync } from 'node:fs';
+const T = ['brownlow_round_votes', 'brownlow_season_votes', 'award_winners', 'players', 'player_career_stats', 'matches', 'player_match_stats', 'external_identities', 'sources', 'import_batches', 'canonical_applications', 'staging.source_records', 'staging.source_record_versions', 'staging.afl_api_brownlow_vote', 'staging.afl_api_match', 'brownlow_eligibility_decisions', 'brownlow_season_authority', 'data_edits', 'data_issues', 'auth_users', 'site_settings', 'afldb_meta.schema_migrations'];
+let s = "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;\nSELECT 'SETTINGS', current_setting('TimeZone'), current_setting('DateStyle'), current_setting('IntervalStyle'), current_setting('extra_float_digits'), current_setting('server_encoding');\n";
+s += T.map((t) => `SELECT '${t}', count(*)::text, md5(coalesce(string_agg(v, E'\\n' ORDER BY v), '')) FROM (SELECT md5(to_jsonb(t)::text) AS v FROM ${t} t) x;`).join('\n') + '\nCOMMIT;\n';
+writeFileSync(process.argv[2], s);

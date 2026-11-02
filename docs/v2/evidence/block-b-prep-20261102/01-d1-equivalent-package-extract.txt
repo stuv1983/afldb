@@ -1,0 +1,26 @@
+﻿host=afldb-prod user=arm
+HEAD=ea98a35f20610e75c18e698bc0d9fe084c3c783d
+R object type: commit
+porcelain lines: 0
+branch: main  origin/main: ea98a35f20610e75c18e698bc0d9fe084c3c783d
+package extracted to /home/arm/blockb-pkg-ea98a35f2061/docs/v2/evidence/block-b-package-20261102
+14
+4d1d1aa8a12ef0e8cad5d0bd420b0a0b4702ea1297478e78160d9b45315e87eb  ./assemble-backup-evidence.mjs
+6e2e780ee7d696d2d28737846e1e41a920ad17459dbc0c3e7670a47bdfdca0a3  ./assemble-selftest.sh
+73f9c9e969d3971203b3fffd8f50427c8cdfbdeaebef37fe5c5878173b0328c8  ./b-prod.sh
+20c0783027cc366fb5875822c644979a161ce360156a31494ab695408a2eca77  ./capture-b.sh
+4d7843d30966dc21799340b4a225fe3b0e2da921140d45b9a152e24948b6e1c9  ./make-approval.mjs
+fd4bb35040605b2a2d13f014e1c9273bdd971a91afee33cd9b03d42c260962e8  ./plan-summary.mjs
+3ce2fb3ee36063583107d32f9453e4f7f0c80baa9f5c20348af0dd71d6265743  ./rehearse-b-host.sh
+71941fbeb2a52890bf1790514ddf474e8110cd7f557a3513d4dc4cc85ff0a058  ./requests/b0-fixture-identities.json
+91a54c4050e9ac4125da327ab0c82aee54e34a7cd8cc2e983366a04e9903728f  ./requests/b1-observe.json
+606e0ad4086c5ff5643cce8aa4bd03903d3c08046c60321e4ff7c23a17dbe72d  ./requests/b2-backfill.json
+50e00e7ffab82de5f8dbaf25385dac5a66a89d6c30814ecdbf37cf2665b5a07b  ./requests/b3-adopt.json
+563f336ea92a549d79c0dfd0a4bd2fd61fbdfa0b484f6cac1d47bc10228e858b  ./requests/e-eligibility.json
+40ab71ace47db96990a8d7b2053028dd62b17f9a910fc902fd474002ab76300b  ./restore-verify-b.sh
+c97c03c509061694e5fbc51e18f84bd401ef74022205b0090ebc1de37a157e4b  ./snapshots.sha256
+snapshot dirs present in checkout:
+ls: cannot access '/home/arm/projects/afldb/data/sources/afl_api/fixtures/afl-api-2025-2026-10-20-014218': No such file or directory
+ls: cannot access '/home/arm/projects/afldb/data/sources/afl_api/brownlow/afl-api-brownlow-2025-2026-10-20-014218': No such file or directory
+porcelain after: 0
+D1-EQUIV PASS
