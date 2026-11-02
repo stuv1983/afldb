@@ -1,0 +1,430 @@
+{
+  "replay": false,
+  "result": [
+    {
+      "ok": true,
+      "decision": {
+        "id": 1,
+        "season": 2025,
+        "playerIdentity": "afltables:players/T/Toby_Greene.html",
+        "playerIdAtDecision": 12446,
+        "verdict": "ineligible",
+        "citation": "2025 Brownlow Medal eligibility, Toby Greene: AFL Regulations effective 28 February 2025, reg. 21.2(c), 21.3-21.5. https://www.afl.com.au/news/1373677 ; https://www.afl.com.au/news/1427225",
+        "note": "Toby Greene (14 votes): R20 striking Isaac Heeney, one match: MRO 1373677. The later 2025 count report 1427225 expressly calls Greene ineligible through suspension, establishing the final Brownlow status. Ruling: Ineligible; directly confirmed at the count.",
+        "decidedBy": 1,
+        "decidedAt": "2026-11-02T03:32:44Z",
+        "basis": "audited_correction",
+        "correction": {
+          "note": "Toby Greene (14 votes): R20 striking Isaac Heeney, one match: MRO 1373677. The later 2025 count report 1427225 expressly calls Greene ineligible through suspension, establishing the final Brownlow status. Ruling: Ineligible; directly confirmed at the count.",
+          "season": 2025,
+          "workflow": "brownlow_eligibility_decision",
+          "actorUserId": 1,
+          "evidenceRef": "brownlow_eligibility:2025:afltables:players/T/Toby_Greene.html"
+        },
+        "supersedesId": null,
+        "current": true
+      },
+      "supersededId": null,
+      "publication": {
+        "state": "withheld",
+        "unresolvedPlayerIds": [
+          12869,
+          13246,
+          11386,
+          11625,
+          3191,
+          4006,
+          10252,
+          8798,
+          10130,
+          11831,
+          6737
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "decision": {
+        "id": 2,
+        "season": 2025,
+        "playerIdentity": "afltables:players/T/Tristan_Xerri.html",
+        "playerIdAtDecision": 12869,
+        "verdict": "ineligible",
+        "citation": "2025 Brownlow Medal eligibility, Tristan Xerri: AFL Regulations effective 28 February 2025, reg. 21.2(c), 21.3-21.5. https://www.afl.com.au/news/1365693 ; https://www.afl.com.au/news/1365899",
+        "note": "Tristan Xerri (7 votes): R18 striking Tom Sparrow, three matches: initial challenge 1365693; Tribunal outcome 1365899 upholds three matches and rejects the downgrade. Ruling: Ineligible; qualifying reportable offence, suspension upheld.",
+        "decidedBy": 1,
+        "decidedAt": "2026-11-02T03:32:44Z",
+        "basis": "audited_correction",
+        "correction": {
+          "note": "Tristan Xerri (7 votes): R18 striking Tom Sparrow, three matches: initial challenge 1365693; Tribunal outcome 1365899 upholds three matches and rejects the downgrade. Ruling: Ineligible; qualifying reportable offence, suspension upheld.",
+          "season": 2025,
+          "workflow": "brownlow_eligibility_decision",
+          "actorUserId": 1,
+          "evidenceRef": "brownlow_eligibility:2025:afltables:players/T/Tristan_Xerri.html"
+        },
+        "supersedesId": null,
+        "current": true
+      },
+      "supersededId": null,
+      "publication": {
+        "state": "withheld",
+        "unresolvedPlayerIds": [
+          13246,
+          11386,
+          11625,
+          3191,
+          4006,
+          10252,
+          8798,
+          10130,
+          11831,
+          6737
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "decision": {
+        "id": 3,
+        "season": 2025,
+        "playerIdentity": "afltables:players/Z/Zac_Bailey.html",
+        "playerIdAtDecision": 13246,
+        "verdict": "ineligible",
+        "citation": "2025 Brownlow Medal eligibility, Zac Bailey: AFL Regulations effective 28 February 2025, reg. 21.2(c), 21.3-21.5. https://www.afl.com.au/news/1361425 ; https://www.afl.com.au/news/1365899",
+        "note": "Zac Bailey (6 votes): R18 rough conduct against Nick Haynes, one match: MRO 1361425; Tribunal outcome 1365899 rejects the attempted reduction to low impact/a fine. Ruling: Ineligible; financial-only exception does not apply.",
+        "decidedBy": 1,
+        "decidedAt": "2026-11-02T03:32:44Z",
+        "basis": "audited_correction",
+        "correction": {
+          "note": "Zac Bailey (6 votes): R18 rough conduct against Nick Haynes, one match: MRO 1361425; Tribunal outcome 1365899 rejects the attempted reduction to low impact/a fine. Ruling: Ineligible; financial-only exception does not apply.",
+          "season": 2025,
+          "workflow": "brownlow_eligibility_decision",
+          "actorUserId": 1,
+          "evidenceRef": "brownlow_eligibility:2025:afltables:players/Z/Zac_Bailey.html"
+        },
+        "supersedesId": null,
+        "current": true
+      },
+      "supersededId": null,
+      "publication": {
+        "state": "withheld",
+        "unresolvedPlayerIds": [
+          11386,
+          11625,
+          3191,
+          4006,
+          10252,
+          8798,
+          10130,
+          11831,
+          6737
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "decision": {
+        "id": 4,
+        "season": 2025,
+        "playerIdentity": "afltables:players/R/Rory_Laird.html",
+        "playerIdAtDecision": 11386,
+        "verdict": "ineligible",
+        "citation": "2025 Brownlow Medal eligibility, Rory Laird: AFL Regulations effective 28 February 2025, reg. 21.2(c), 21.3-21.5. https://www.afl.com.au/news/1388030 ; https://www.afl.com.au/news/1388249/the-verdict-is-in-essendon-bombers-veteran-dylan-shiel-learns-his-fate-at-tribunal ; https://www.afl.com.au/news/1396186/medical-room-the-full-afl-injury-list-r24/amp",
+        "note": "Rory Laird (5 votes): R22 rough conduct against Jamie Cripps, one match: initial challenge 1388030; Tribunal 1388249 rejects it. R24 follow-up confirms return from that suspension. Ruling: Ineligible; the later R24 fine does not undo the R22 suspension.",
+        "decidedBy": 1,
+        "decidedAt": "2026-11-02T03:32:44Z",
+        "basis": "audited_correction",
+        "correction": {
+          "note": "Rory Laird (5 votes): R22 rough conduct against Jamie Cripps, one match: initial challenge 1388030; Tribunal 1388249 rejects it. R24 follow-up confirms return from that suspension. Ruling: Ineligible; the later R24 fine does not undo the R22 suspension.",
+          "season": 2025,
+          "workflow": "brownlow_eligibility_decision",
+          "actorUserId": 1,
+          "evidenceRef": "brownlow_eligibility:2025:afltables:players/R/Rory_Laird.html"
+        },
+        "supersedesId": null,
+        "current": true
+      },
+      "supersededId": null,
+      "publication": {
+        "state": "withheld",
+        "unresolvedPlayerIds": [
+          11625,
+          3191,
+          4006,
+          10252,
+          8798,
+          10130,
+          11831,
+          6737
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "decision": {
+        "id": 5,
+        "season": 2025,
+        "playerIdentity": "afltables:players/S/Sam_Durham.html",
+        "playerIdAtDecision": 11625,
+        "verdict": "ineligible",
+        "citation": "2025 Brownlow Medal eligibility, Sam Durham: AFL Regulations effective 28 February 2025, reg. 21.2(c), 21.3-21.5. https://www.afl.com.au/news/1339570 ; https://www.afl.com.au/news/1339726/medical-room-the-full-afl-injury-list-r14/amp ; https://www.afl.com.au/news/1354977/medical-room-the-full-afl-injury-list-r17",
+        "note": "Sam Durham (4 votes): R13 forceful front-on contact against Adam Cerra, two matches offered: 1339570. R14 follow-up 1339726 lists suspension/return R17; R17 follow-up 1354977 confirms return from suspension. No overturn is evidenced; the actual absence corroborates the sanction. Ruling: Ineligible; subsequent reports establish a served suspension, not merely an offered charge.",
+        "decidedBy": 1,
+        "decidedAt": "2026-11-02T03:32:44Z",
+        "basis": "audited_correction",
+        "correction": {
+          "note": "Sam Durham (4 votes): R13 forceful front-on contact against Adam Cerra, two matches offered: 1339570. R14 follow-up 1339726 lists suspension/return R17; R17 follow-up 1354977 confirms return from suspension. No overturn is evidenced; the actual absence corroborates the sanction. Ruling: Ineligible; subsequent reports establish a served suspension, not merely an offered charge.",
+          "season": 2025,
+          "workflow": "brownlow_eligibility_decision",
+          "actorUserId": 1,
+          "evidenceRef": "brownlow_eligibility:2025:afltables:players/S/Sam_Durham.html"
+        },
+        "supersedesId": null,
+        "current": true
+      },
+      "supersededId": null,
+      "publication": {
+        "state": "withheld",
+        "unresolvedPlayerIds": [
+          3191,
+          4006,
+          10252,
+          8798,
+          10130,
+          11831,
+          6737
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "decision": {
+        "id": 6,
+        "season": 2025,
+        "playerIdentity": "afltables:players/D/Dan_Houston.html",
+        "playerIdAtDecision": 3191,
+        "verdict": "ineligible",
+        "citation": "2025 Brownlow Medal eligibility, Dan Houston: AFL Regulations effective 28 February 2025, reg. 21.2(c), 21.3-21.5. https://www.afl.com.au/news/1292232 ; https://www.afl.com.au/news/1305410/medical-room-the-full-afl-injury-list-r7/amp",
+        "note": "Dan Houston (3 votes): R4 rough conduct against Lachie Fogarty, two matches: 1292232. R7 follow-up 1305410 confirms he served the two-game suspension. Ruling: Ineligible for the 2025 offence; no reliance on the separate 2024 ban carried over.",
+        "decidedBy": 1,
+        "decidedAt": "2026-11-02T03:32:44Z",
+        "basis": "audited_correction",
+        "correction": {
+          "note": "Dan Houston (3 votes): R4 rough conduct against Lachie Fogarty, two matches: 1292232. R7 follow-up 1305410 confirms he served the two-game suspension. Ruling: Ineligible for the 2025 offence; no reliance on the separate 2024 ban carried over.",
+          "season": 2025,
+          "workflow": "brownlow_eligibility_decision",
+          "actorUserId": 1,
+          "evidenceRef": "brownlow_eligibility:2025:afltables:players/D/Dan_Houston.html"
+        },
+        "supersedesId": null,
+        "current": true
+      },
+      "supersededId": null,
+      "publication": {
+        "state": "withheld",
+        "unresolvedPlayerIds": [
+          4006,
+          10252,
+          8798,
+          10130,
+          11831,
+          6737
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "decision": {
+        "id": 7,
+        "season": 2025,
+        "playerIdentity": "afltables:players/D/Dylan_Shiel.html",
+        "playerIdAtDecision": 4006,
+        "verdict": "ineligible",
+        "citation": "2025 Brownlow Medal eligibility, Dylan Shiel: AFL Regulations effective 28 February 2025, reg. 21.2(c), 21.3-21.5. https://www.afl.com.au/news/1383983 ; https://www.afl.com.au/news/1388249/the-verdict-is-in-essendon-bombers-veteran-dylan-shiel-learns-his-fate-at-tribunal ; https://www.afl.com.au/news/1396186/medical-room-the-full-afl-injury-list-r24/amp",
+        "note": "Dylan Shiel (3 votes): R22 shove of Mark O'Connor causing Luamon Lual's fall: referral 1383983 proposed one match; Tribunal 1388249 imposes one match for rough conduct. R24 follow-up confirms availability after suspension. Ruling: Ineligible; the Tribunal rejected the defence that injury to a teammate fell outside the rule.",
+        "decidedBy": 1,
+        "decidedAt": "2026-11-02T03:32:44Z",
+        "basis": "audited_correction",
+        "correction": {
+          "note": "Dylan Shiel (3 votes): R22 shove of Mark O'Connor causing Luamon Lual's fall: referral 1383983 proposed one match; Tribunal 1388249 imposes one match for rough conduct. R24 follow-up confirms availability after suspension. Ruling: Ineligible; the Tribunal rejected the defence that injury to a teammate fell outside the rule.",
+          "season": 2025,
+          "workflow": "brownlow_eligibility_decision",
+          "actorUserId": 1,
+          "evidenceRef": "brownlow_eligibility:2025:afltables:players/D/Dylan_Shiel.html"
+        },
+        "supersedesId": null,
+        "current": true
+      },
+      "supersededId": null,
+      "publication": {
+        "state": "withheld",
+        "unresolvedPlayerIds": [
+          10252,
+          8798,
+          10130,
+          11831,
+          6737
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "decision": {
+        "id": 8,
+        "season": 2025,
+        "playerIdentity": "afltables:players/P/Patrick_Voss.html",
+        "playerIdAtDecision": 10252,
+        "verdict": "ineligible",
+        "citation": "2025 Brownlow Medal eligibility, Patrick Voss: AFL Regulations effective 28 February 2025, reg. 21.2(c), 21.3-21.5. https://www.afl.com.au/news/1300207 ; https://www.afl.com.au/news/1300516",
+        "note": "Patrick Voss (3 votes): R5 striking Nick Vlastuin, three matches: initial challenge 1300207; Tribunal 1300516 rejects reducing severe impact to high and leaves all three matches in place. Ruling: Ineligible; qualifying suspension upheld.",
+        "decidedBy": 1,
+        "decidedAt": "2026-11-02T03:32:44Z",
+        "basis": "audited_correction",
+        "correction": {
+          "note": "Patrick Voss (3 votes): R5 striking Nick Vlastuin, three matches: initial challenge 1300207; Tribunal 1300516 rejects reducing severe impact to high and leaves all three matches in place. Ruling: Ineligible; qualifying suspension upheld.",
+          "season": 2025,
+          "workflow": "brownlow_eligibility_decision",
+          "actorUserId": 1,
+          "evidenceRef": "brownlow_eligibility:2025:afltables:players/P/Patrick_Voss.html"
+        },
+        "supersedesId": null,
+        "current": true
+      },
+      "supersededId": null,
+      "publication": {
+        "state": "withheld",
+        "unresolvedPlayerIds": [
+          8798,
+          10130,
+          11831,
+          6737
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "decision": {
+        "id": 9,
+        "season": 2025,
+        "playerIdentity": "afltables:players/L/Liam_Baker.html",
+        "playerIdAtDecision": 8798,
+        "verdict": "ineligible",
+        "citation": "2025 Brownlow Medal eligibility, Liam Baker: AFL Regulations effective 28 February 2025, reg. 21.2(c), 21.3-21.5. https://www.afl.com.au/news/1401221 ; https://www.afl.com.au/news/1403587",
+        "note": "Liam Baker (2 votes): R24 rough conduct against Chad Warner, one match: challenge 1401221; Tribunal 1403587 rejects the impact downgrade. Ban to be served in 2026. Ruling: Ineligible in 2025 under 21.2(c), because the offence occurred in the 2025 H&A match. This does not transfer any 2026 ownership.",
+        "decidedBy": 1,
+        "decidedAt": "2026-11-02T03:32:44Z",
+        "basis": "audited_correction",
+        "correction": {
+          "note": "Liam Baker (2 votes): R24 rough conduct against Chad Warner, one match: challenge 1401221; Tribunal 1403587 rejects the impact downgrade. Ban to be served in 2026. Ruling: Ineligible in 2025 under 21.2(c), because the offence occurred in the 2025 H&A match. This does not transfer any 2026 ownership.",
+          "season": 2025,
+          "workflow": "brownlow_eligibility_decision",
+          "actorUserId": 1,
+          "evidenceRef": "brownlow_eligibility:2025:afltables:players/L/Liam_Baker.html"
+        },
+        "supersedesId": null,
+        "current": true
+      },
+      "supersededId": null,
+      "publication": {
+        "state": "withheld",
+        "unresolvedPlayerIds": [
+          10130,
+          11831,
+          6737
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "decision": {
+        "id": 10,
+        "season": 2025,
+        "playerIdentity": "afltables:players/O/Ollie_Wines.html",
+        "playerIdAtDecision": 10130,
+        "verdict": "ineligible",
+        "citation": "2025 Brownlow Medal eligibility, Ollie Wines: AFL Regulations effective 28 February 2025, reg. 21.2(c), 21.3-21.5. https://www.afl.com.au/news/1393572 ; https://www.afl.com.au/news/1396382/the-verdict-is-in-suns-young-gun-learns-his-fate-at-tribunal",
+        "note": "Ollie Wines (2 votes): R23 rough conduct against Cooper Lord, three matches: 1393572; Tribunal 1396382 rejects reducing severe impact to high and upholds three matches. Ruling: Ineligible for the 2025 offence, regardless of carry-over service.",
+        "decidedBy": 1,
+        "decidedAt": "2026-11-02T03:32:44Z",
+        "basis": "audited_correction",
+        "correction": {
+          "note": "Ollie Wines (2 votes): R23 rough conduct against Cooper Lord, three matches: 1393572; Tribunal 1396382 rejects reducing severe impact to high and upholds three matches. Ruling: Ineligible for the 2025 offence, regardless of carry-over service.",
+          "season": 2025,
+          "workflow": "brownlow_eligibility_decision",
+          "actorUserId": 1,
+          "evidenceRef": "brownlow_eligibility:2025:afltables:players/O/Ollie_Wines.html"
+        },
+        "supersedesId": null,
+        "current": true
+      },
+      "supersededId": null,
+      "publication": {
+        "state": "withheld",
+        "unresolvedPlayerIds": [
+          11831,
+          6737
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "decision": {
+        "id": 11,
+        "season": 2025,
+        "playerIdentity": "afltables:players/S/Shannon_Neale.html",
+        "playerIdAtDecision": 11831,
+        "verdict": "ineligible",
+        "citation": "2025 Brownlow Medal eligibility, Shannon Neale: AFL Regulations effective 28 February 2025, reg. 21.2(c), 21.3-21.5. https://www.afl.com.au/news/1396161/match-review-big-geelong-cat-shannon-neale-banned-for-high-bump ; https://www.afl.com.au/news/1398164/geelong-cats-coach-chris-scott-left-doubly-surprised-by-tribunals-bump-call",
+        "note": "Shannon Neale (2 votes): R23 rough conduct/high bump against Jake Lloyd, one match offered: 1396161. The later Scott follow-up 1398164, read directly, confirms the Cats did not appeal and Neale would miss Richmond. Davies' separate successful downgrade did not change Neale's sanction. Ruling: Ineligible; qualifying one-match suspension stood without an appeal.",
+        "decidedBy": 1,
+        "decidedAt": "2026-11-02T03:32:44Z",
+        "basis": "audited_correction",
+        "correction": {
+          "note": "Shannon Neale (2 votes): R23 rough conduct/high bump against Jake Lloyd, one match offered: 1396161. The later Scott follow-up 1398164, read directly, confirms the Cats did not appeal and Neale would miss Richmond. Davies' separate successful downgrade did not change Neale's sanction. Ruling: Ineligible; qualifying one-match suspension stood without an appeal.",
+          "season": 2025,
+          "workflow": "brownlow_eligibility_decision",
+          "actorUserId": 1,
+          "evidenceRef": "brownlow_eligibility:2025:afltables:players/S/Shannon_Neale.html"
+        },
+        "supersedesId": null,
+        "current": true
+      },
+      "supersededId": null,
+      "publication": {
+        "state": "withheld",
+        "unresolvedPlayerIds": [
+          6737
+        ]
+      }
+    },
+    {
+      "ok": true,
+      "decision": {
+        "id": 12,
+        "season": 2025,
+        "playerIdentity": "afltables:players/J/James_Peatling.html",
+        "playerIdAtDecision": 6737,
+        "verdict": "ineligible",
+        "citation": "2025 Brownlow Medal eligibility, James Peatling: AFL Regulations effective 28 February 2025, reg. 21.2(c), 21.3-21.5. https://www.afl.com.au/news/1297048 ; https://www.afl.com.au/news/1305410/medical-room-the-full-afl-injury-list-r7/amp",
+        "note": "James Peatling (1 votes): R5 rough conduct/dangerous tackle against Oisin Mullin, one match: 1297048. R7 follow-up 1305410 confirms he served one match. Ruling: Ineligible; subsequent service confirms the sanction.",
+        "decidedBy": 1,
+        "decidedAt": "2026-11-02T03:32:44Z",
+        "basis": "audited_correction",
+        "correction": {
+          "note": "James Peatling (1 votes): R5 rough conduct/dangerous tackle against Oisin Mullin, one match: 1297048. R7 follow-up 1305410 confirms he served one match. Ruling: Ineligible; subsequent service confirms the sanction.",
+          "season": 2025,
+          "workflow": "brownlow_eligibility_decision",
+          "actorUserId": 1,
+          "evidenceRef": "brownlow_eligibility:2025:afltables:players/J/James_Peatling.html"
+        },
+        "supersedesId": null,
+        "current": true
+      },
+      "supersededId": null,
+      "publication": {
+        "state": "published",
+        "unresolvedPlayerIds": []
+      }
+    }
+  ]
+}

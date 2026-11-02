@@ -1,0 +1,24 @@
+const fs = require('fs'); const { createRequire } = require('module');
+const req = createRequire('/home/arm/projects/afldb/package.json'); const postgres = req('postgres');
+(async () => {
+  const env = fs.readFileSync('/home/arm/projects/afldb/.env', 'utf8').split('\n');
+  const l = env.filter((x) => x.startsWith('AFLDB_BACKUP_DATABASE_URL='));
+  const sql = postgres(l[0].slice(26).replace(/^"(.*)"$/, '$1'), { max: 1, connection: { default_transaction_read_only: 'on' } });
+  const q = async (label, text) => { try { const rows = await sql.unsafe(text); console.log('## ' + label); console.log(JSON.stringify(rows)); } catch (e) { console.log('## ' + label + ' ERROR ' + e.message); } };
+  await q('receipts', `SELECT operation, plan_digest, code_revision, before_digest, after_digest, applied_at, length(result::text) AS result_bytes FROM brownlow_correction_receipts ORDER BY applied_at`);
+  await q('e receipt last publication', `SELECT (result->-1->'publication') AS last_publication, jsonb_array_length(result) AS n, (SELECT count(*) FROM jsonb_array_elements(result) e WHERE (e->>'ok')='true') AS ok FROM brownlow_correction_receipts WHERE operation='eligibility'`);
+  await q('decisions', `SELECT id, season, player_id_at_decision AS pid, verdict, basis, decided_by, supersedes_id FROM brownlow_eligibility_decisions ORDER BY id`);
+  await q('2025 top by season votes', `SELECT player_id, votes, vote_rank, eligible_rank, is_ineligible, is_winner FROM brownlow_season_votes WHERE season=2025 ORDER BY votes DESC, player_id LIMIT 6`);
+  await q('2025 ineligible flagged', `SELECT count(*) AS flagged, count(*) FILTER (WHERE eligible_rank IS NULL) AS no_eligible_rank, count(*) FILTER (WHERE is_winner) AS winners FROM brownlow_season_votes WHERE season=2025 AND is_ineligible`);
+  await q('2025 winner', `SELECT player_id, votes FROM brownlow_season_votes WHERE season=2025 AND is_winner`);
+  await q('raw 2025 votes', `SELECT count(*) AS rows, sum(votes) AS total_votes, count(*) FILTER (WHERE votes>0) AS positive FROM brownlow_round_votes WHERE season=2025`);
+  await q('raw top 2025 by round sum', `SELECT player_id, sum(votes) AS v FROM brownlow_round_votes WHERE season=2025 GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 3`);
+  await q('match_id facts', `SELECT count(*) FILTER (WHERE season BETWEEN 1984 AND 2025 AND match_id IS NOT NULL) AS in_scope, count(*) FILTER (WHERE season BETWEEN 1984 AND 2025 AND match_id IS NOT NULL AND votes>0) AS pos, count(*) FILTER (WHERE season BETWEEN 1984 AND 2025 AND match_id IS NOT NULL AND votes=0) AS zero, count(*) FILTER (WHERE season=2026) AS r2026, count(*) FILTER (WHERE season=2026 AND match_id IS NOT NULL) AS r2026_mid, count(*) FILTER (WHERE season<1984 AND match_id IS NOT NULL) AS pre1984_mid FROM brownlow_round_votes`);
+  await q('2025 ownership', `SELECT count(*) FILTER (WHERE source_id IS NOT NULL) AS sourced, count(*) FILTER (WHERE source_id IS NULL) AS sourceless, count(*) FILTER (WHERE source_id IS NOT NULL AND votes>0) AS sourced_pos, count(*) FILTER (WHERE source_id IS NULL AND votes=0) AS sourceless_zero, count(*) FILTER (WHERE source_id IS NULL AND votes>0) AS sourceless_pos FROM brownlow_round_votes WHERE season=2025`);
+  await q('2026 digest', `SELECT count(*)||':'||md5(coalesce(string_agg(md5(to_jsonb(x)::text), '|' ORDER BY md5(to_jsonb(x)::text)), '')) AS d FROM brownlow_round_votes x WHERE season = 2026`);
+  await q('import_batches latest', `SELECT id, source_id, status, started_at FROM import_batches ORDER BY id DESC LIMIT 5`);
+  await q('canonical_applications', `SELECT count(*) AS n FROM canonical_applications WHERE import_batch_id IN (SELECT id FROM import_batches ORDER BY id DESC LIMIT 5)`);
+  await q('ledger', `SELECT count(*) AS rows, max(name) AS last FROM afldb_meta.schema_migrations`);
+  await q('unresolved settle issues', `SELECT count(*) AS n FROM data_issues WHERE issue_type='afl_api_brownlow_settle' AND resolved_at IS NULL`);
+  await sql.end({ timeout: 2 });
+})().catch((e) => { console.error('ro failed:', e.message); process.exit(1); });

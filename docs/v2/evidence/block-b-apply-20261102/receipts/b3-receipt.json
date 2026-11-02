@@ -1,0 +1,23 @@
+{
+  "replay": false,
+  "result": {
+    "database": "afldb_prod",
+    "digest": "6971ec9197100d59054697e59de21ef0fd08dfae3211c3e5580b24affa3da385",
+    "batchId": 75,
+    "setsExported": 207,
+    "setsChanged": 207,
+    "setsAlreadyInState": 0,
+    "rowsChanged": 621,
+    "ledgerRows": 621,
+    "before": {
+      "rows": 9522,
+      "stable": "85e6b022c7c9aa9566793dd67565984c213e521bf5ccb24feafd76858eeb2bb0",
+      "outsideOwnership": "8b86e92e26f9784d0d0665f747af3e5be02947dec96d1b5ae572924114c92301"
+    },
+    "after": {
+      "rows": 9522,
+      "stable": "85e6b022c7c9aa9566793dd67565984c213e521bf5ccb24feafd76858eeb2bb0",
+      "outsideOwnership": "8b86e92e26f9784d0d0665f747af3e5be02947dec96d1b5ae572924114c92301"
+    }
+  }
+}

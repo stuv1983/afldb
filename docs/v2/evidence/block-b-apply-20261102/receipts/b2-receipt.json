@@ -1,0 +1,22 @@
+{
+  "replay": false,
+  "result": {
+    "database": "afldb_prod",
+    "digest": "2a5b5405d69a134db4d01f5bb9de8948ac3780d0c3b4771f618e858842e595b1",
+    "exported": 320861,
+    "applied": 320861,
+    "alreadyApplied": 0,
+    "before": {
+      "rows": 320861,
+      "mapped": 0,
+      "columns": "bc52f294822559af08ce9de5997862ccca322a8b423c0751485ab69d3b4a418d",
+      "mapping": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "after": {
+      "rows": 320861,
+      "mapped": 320861,
+      "columns": "bc52f294822559af08ce9de5997862ccca322a8b423c0751485ab69d3b4a418d",
+      "mapping": "ba6048e741d7ac352e863f730d43d7bb1869961137e2981fa3cd16f723afd500"
+    }
+  }
+}
