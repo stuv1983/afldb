@@ -1,0 +1,16 @@
+﻿2026-11-02T10:16:04Z
+== c5-observe env-effective 2026-11-02T10:16:04Z N=924ff273261834e4112e3f41b61ceeab55427534 (host local 2026-11-02 21:16:04 AEDT)
+identity ok (afldb_prod, OID 66668, read-only session)
+afldb MainPID=3303369 (before C5: 3268373) ActiveEnterMonotonic=6768053182911 (before: 6739446504275) ActiveEnterTimestamp=Mon 2026-11-02 21:15:37 AEDT
+restarted: new MainPID and new ActiveEnter
+.env mtime epoch=1793614403; service active-enter epoch=1793614537
+.env lines exactly AFLDB_SETTLE_TRIGGER=systemd = [1] (expected [1])
+.env any mention = [1] (expected [1])
+.env stat (perm owner size): 4067 before + 29 bytes (one AFLDB_SETTLE_TRIGGER=systemd line) = 4096, nothing else added = [600 arm 4096] (expected [600 arm 4096])
+MainPID cwd is the serving release = [/home/arm/afldb-releases/releases/ea98a35f2061--vY0EFS0DdR-TiPkxTZz6] (expected [/home/arm/afldb-releases/releases/ea98a35f2061--vY0EFS0DdR-TiPkxTZz6])
+process env: exact AFLDB_SETTLE_TRIGGER=systemd = [1] (expected [1])
+process env: any AFLDB_SETTLE_TRIGGER = [1] (expected [1])
+health = [200] (expected [200])
+switch still false before the toggle = [false] (expected [false])
+C5-OBSERVE env-effective PASS
+EXIT=0

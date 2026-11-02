@@ -15,6 +15,12 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-316 C5 (D-316-4): AFL API ingestion activated on production; V2-GAP-011 closed (2026-11-02, local record)
+
+- **Production behaviour changed (owner-executed, attended):** `AFLDB_SETTLE_TRIGGER=systemd` added to the production `.env` and `afldb` restarted (MainPID 3303369); the AFL API Current-Season Ingestion switch enabled through the audited admin panel; `afldb-settle-afl-api.timer` enabled (next elapse 2026-11-03 05:01:47 AEDT, a real `--apply`). Brownlow and AFL Tables timers stay disabled. Activation accepted by two `C5-ACCEPT PASS` observations; **the first scheduled run is not yet observed.**
+- V2-GAP-011 closed on its written Close condition; ISSUE-316 stays open (first-night observation, D-316-12 wording, C6-C9).
+- Finding recorded, not fixed: the admin toggle stores the switch as a JSON string (`"true"`) through postgres.js double-encoding; every reader tolerates it via `fromStore`. Record: `docs/v2/block-c-c5-activation-record-2026-11-02.md`.
+
 ### ISSUE-316 C4b r2 read-back, step-c wrapper fix and C5 procedure (2026-11-02, local; production unchanged)
 
 - **Operations tooling (`docs/v2/evidence/`):** `run.sh step-c` now fails when a required read fails (it printed `STEP-C DONE` after a SQL error), reads the setting with an exit check, and replaces the invalid `import_batches.created_at` query with `started_at` anchored on the run id; a sandbox negative control (including the original script reproducing the defect) passes. New read-only helpers: `c4b-r2-readback-20261102/readback.sh` (independent non-retention read-back of the C4b r2 run, ran on production: consistent), `c5-prep-20261102/c5-prep.sh` and `c5-observe.sh` (C5 survey and window observation phases).

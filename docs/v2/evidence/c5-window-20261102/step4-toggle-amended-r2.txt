@@ -1,0 +1,14 @@
+﻿2026-11-02T10:21:29Z
+== c5-observe toggle 2026-11-02T10:21:29Z N=924ff273261834e4112e3f41b61ceeab55427534 (host local 2026-11-02 21:21:29 AEDT)
+identity ok (afldb_prod, OID 66668, read-only session)
+setting stored value = [true] (expected [true])
+setting rows = [1] (expected [1])
+setting updated_by is an admin user (not NULL) = [true] (expected [true])
+new ingestion-switch audit rows after id 304 = [1] (expected [1])
+that row: enabled true, attributed to an admin user (actor_user_id NOT NULL) = [true,true] (expected [true,true])
+that row is newer than the C4b restore (id 304) and its setting write = [true] (expected [true])
+Brownlow admin switch rows (must stay absent: not part of C5) = [0] (expected [0])
+Brownlow switch audit rows (must stay 0) = [0] (expected [0])
+match timer still disabled (enabled only in the next step) = [disabled] (expected [disabled])
+C5-OBSERVE toggle PASS
+EXIT=0

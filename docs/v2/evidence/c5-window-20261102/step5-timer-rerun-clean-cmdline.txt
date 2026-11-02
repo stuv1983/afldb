@@ -1,0 +1,14 @@
+﻿== c5-observe timer 2026-11-02T10:24:44Z N=924ff273261834e4112e3f41b61ceeab55427534 (host local 2026-11-02 21:24:44 AEDT)
+identity ok (afldb_prod, OID 66668, read-only session)
+match timer is-enabled = [enabled] (expected [enabled])
+match timer ActiveState = [active] (expected [active])
+next elapse: [Tue 2026-11-03 05:01:47 AEDT]
+Brownlow timer enabled/active = [disabled/inactive] (expected [disabled/inactive])
+AFL Tables timer enabled/active = [disabled/inactive] (expected [disabled/inactive])
+match service ActiveState (nothing running yet) = [inactive] (expected [inactive])
+settle/acquire processes = [0] (expected [0])
+setting still true = [true] (expected [true])
+afldb timers known to systemd:
+    Tue 2026-11-03 05:01:47 AEDT       7h -                                        - afldb-settle-afl-api.timer     afldb-settle-afl-api.service
+C5-OBSERVE timer PASS
+EXIT=0

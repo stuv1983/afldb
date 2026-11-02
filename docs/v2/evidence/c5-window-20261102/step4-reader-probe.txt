@@ -1,0 +1,6 @@
+﻿2026-11-02T10:20:17Z
+REAL READER readAflApiIngestionControls() = {"currentSeasonEnabled":true,"brownlowAdminEnabled":false}
+stored jsonb_typeof / text = [["string","\"true\""]]
+driver hands the reader: typeof = string  value = "true"
+EXIT=0
+0

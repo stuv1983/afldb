@@ -1,0 +1,9 @@
+﻿matches:
+ssh.exe : bash: line 1: [acquire]-afl-api: command not found
+At line:5 char:1
++ & $ssh arm@209.38.87.252 'a=settle; b=acquire; echo matches:; ps -eo  ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (bash: line 1: [...mmand not found:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+end

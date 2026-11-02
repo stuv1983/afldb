@@ -1,0 +1,14 @@
+﻿== c5-accept 2026-11-02T10:28:16Z
+checkout is exactly 924ff273261834e4112e3f41b61ceeab55427534 and clean
+identity ok (afldb_prod, OID 66668, read-only session)
+setting acquisition.afl_api_current_season_enabled = ["true"]
+afldb-settle-afl-api.timer enabled=[enabled] active=[active]
+afldb-settle-afl-api-brownlow.timer enabled=[disabled] active=[inactive]
+afldb-settle-afltables.timer enabled=[disabled] active=[inactive]
+C5-ACCEPT PASS
+EXIT=0
+MainPID=3303369
+NRestarts=0
+health=200nafldb timers known to systemd:
+    Tue 2026-11-03 05:01:47 AEDT       7h -                                        - afldb-settle-afl-api.timer     afldb-settle-afl-api.service
+C5-OBSERVE timer PASS
