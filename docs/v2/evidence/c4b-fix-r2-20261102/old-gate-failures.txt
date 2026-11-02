@@ -1,0 +1,15 @@
+# The new/updated C4b tests run against the OLD gate (dryRunHalts comparing seasonFeedComplete to the text 'true'), 2026-11-02 16:40 AEDT.
+# Command: npx vitest run tests/afl-api-cutover.test.ts -t "C4b rehearsal"   (tests at F, tools/current-season/afl-api-c4b-rehearsal.ts at R=ea98a35f)
+# 10 failed | 198 passed | 269 skipped. After the gate fix (F): the same file passes.
+⎯⎯⎯⎯⎯⎯ Failed Tests 10 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/afl-api-cutover.test.ts  >  C4b rehearsal (AFLDB-ISSUE-316 §7): the setting is restored however the run ends  >  success: preconditions, BEFORE, watchdog, on, acquire, dry-run settle, off and verified, then the check
+ FAIL  tests/afl-api-cutover.test.ts  >  C4b rehearsal (AFLDB-ISSUE-316 §7): the setting is restored however the run ends  >  evidence that cannot be written: refusals and restoration keep their exit codes, a CLEAR needs its evid
+ FAIL  tests/afl-api-cutover.test.ts  >  C4b rehearsal (AFLDB-ISSUE-316 §7): the setting is restored however the run ends  >  evidence that cannot be written: refusals and restoration keep their exit codes, a CLEAR needs its evid
+ FAIL  tests/afl-api-cutover.test.ts  >  C4b rehearsal (AFLDB-ISSUE-316 §7): the setting is restored however the run ends  >  an absent setting is an acceptable BEFORE; it is restored to exactly false
+ FAIL  tests/afl-api-cutover.test.ts  >  C4b rehearsal (AFLDB-ISSUE-316 §7): the setting is restored however the run ends  >  HALT on an incomplete season feed (real counter 0), with the setting already off
+ FAIL  tests/afl-api-cutover.test.ts  >  C4b rehearsal (AFLDB-ISSUE-316 §7): the setting is restored however the run ends  >  HALT on a malformed completeness counter (the old hand-written "true"), with the setting already off
+ FAIL  tests/afl-api-cutover.test.ts  >  C4b rehearsal (AFLDB-ISSUE-316 §7): the setting is restored however the run ends  >  HALT on an out-of-contract nonzero completeness counter (2), with the setting already off
+ FAIL  tests/afl-api-cutover.test.ts  >  C4b rehearsal (AFLDB-ISSUE-316 §7): the setting is restored however the run ends  >  the real report of a complete feed with zero canonical writes passes the gate (the first production run
+ FAIL  tests/afl-api-cutover.test.ts  >  C4b rehearsal (AFLDB-ISSUE-316 §7): the setting is restored however the run ends  >  dryRunHalts consumes the numeric contract strictly: 1 complete, 0 incomplete, anything else malformed
+ FAIL  tests/afl-api-cutover.test.ts  >  C4b rehearsal (AFLDB-ISSUE-316 §7): the setting is restored however the run ends  >  watchdog startup handshake: the parent waits for proof, never for a PID alone  >  through the rehearsal
+      Tests  10 failed | 198 passed | 269 skipped (477)

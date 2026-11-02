@@ -1,0 +1,654 @@
+{
+  "database": "afldb_v2_c4b_r2_test",
+  "startedAt": "2026-11-02T05:58:42.243Z",
+  "simulated": [
+    "systemctl answers (no systemd in this environment)",
+    "post-C2 register [2027] supplied in memory",
+    "acquire-afl-api.ts and settle-afl-api.ts --dry-run steps (provider-facing)",
+    "readiness verdict"
+  ],
+  "scenarios": {
+    "s1-clear": {
+      "exitCode": 0,
+      "verdict": "CLEAR",
+      "reasons": [
+        "every automated HALT criterion is clear; the setting is off and verified; both timers disabled. This is the evidence for the C4b record, not the record: C5 still needs the reviewed, recorded C4b PASS."
+      ],
+      "settingAfter": "false",
+      "evidence": [
+        "acquire.log",
+        "after.json",
+        "before.json",
+        "readiness.txt",
+        "restore-verified.json",
+        "result.json",
+        "run.log",
+        "settle-dry-run.log",
+        "watchdog-ready.json",
+        "watchdog.pid"
+      ],
+      "auditRows": [
+        {
+          "enabled": true,
+          "step": "on"
+        },
+        {
+          "enabled": false,
+          "step": "restore"
+        }
+      ]
+    },
+    "s2-settle-fails": {
+      "exitCode": 1,
+      "verdict": "HALT",
+      "reasons": [
+        "settle-afl-api.ts --dry-run ended with exit 1",
+        "the dry-run report has no canonicalRowsInserted line",
+        "the dry-run report has no canonicalRowsUpdated line",
+        "the dry-run Season feed (AFLDB-ISSUE-231) evidence is absent: the report has no seasonFeedComplete line"
+      ],
+      "settingAfter": "false",
+      "evidence": [
+        "acquire.log",
+        "after.json",
+        "before.json",
+        "readiness.txt",
+        "restore-verified.json",
+        "result.json",
+        "run.log",
+        "settle-dry-run.log",
+        "watchdog-ready.json",
+        "watchdog.pid"
+      ],
+      "auditRows": [
+        {
+          "enabled": true,
+          "step": "on"
+        },
+        {
+          "enabled": false,
+          "step": "restore"
+        }
+      ]
+    },
+    "s3-acquire-throws": {
+      "exitCode": 1,
+      "verdict": "HALT",
+      "reasons": [
+        "the rehearsal stopped on a database or process error"
+      ],
+      "settingAfter": "false",
+      "evidence": [
+        "after.json",
+        "before.json",
+        "restore-verified.json",
+        "result.json",
+        "run.log",
+        "watchdog-ready.json",
+        "watchdog.pid"
+      ],
+      "auditRows": [
+        {
+          "enabled": true,
+          "step": "on"
+        },
+        {
+          "enabled": false,
+          "step": "restore"
+        }
+      ]
+    },
+    "s4-dryrun-writes": {
+      "exitCode": 1,
+      "verdict": "HALT",
+      "reasons": [
+        "dry-run canonicalRowsInserted is 3, not 0"
+      ],
+      "settingAfter": "false",
+      "evidence": [
+        "acquire.log",
+        "after.json",
+        "before.json",
+        "readiness.txt",
+        "restore-verified.json",
+        "result.json",
+        "run.log",
+        "settle-dry-run.log",
+        "watchdog-ready.json",
+        "watchdog.pid"
+      ],
+      "auditRows": [
+        {
+          "enabled": true,
+          "step": "on"
+        },
+        {
+          "enabled": false,
+          "step": "restore"
+        }
+      ]
+    },
+    "s5-incomplete-feed": {
+      "exitCode": 1,
+      "verdict": "HALT",
+      "reasons": [
+        "the dry-run Season feed (AFLDB-ISSUE-231) is incomplete (seasonFeedComplete 0)"
+      ],
+      "settingAfter": "false",
+      "evidence": [
+        "acquire.log",
+        "after.json",
+        "before.json",
+        "readiness.txt",
+        "restore-verified.json",
+        "result.json",
+        "run.log",
+        "settle-dry-run.log",
+        "watchdog-ready.json",
+        "watchdog.pid"
+      ],
+      "auditRows": [
+        {
+          "enabled": true,
+          "step": "on"
+        },
+        {
+          "enabled": false,
+          "step": "restore"
+        }
+      ]
+    },
+    "s5b-missing-evidence": {
+      "exitCode": 1,
+      "verdict": "HALT",
+      "reasons": [
+        "the dry-run Season feed (AFLDB-ISSUE-231) evidence is absent: the report has no seasonFeedComplete line"
+      ],
+      "settingAfter": "false",
+      "evidence": [
+        "acquire.log",
+        "after.json",
+        "before.json",
+        "readiness.txt",
+        "restore-verified.json",
+        "result.json",
+        "run.log",
+        "settle-dry-run.log",
+        "watchdog-ready.json",
+        "watchdog.pid"
+      ],
+      "auditRows": [
+        {
+          "enabled": true,
+          "step": "on"
+        },
+        {
+          "enabled": false,
+          "step": "restore"
+        }
+      ]
+    },
+    "s5c-malformed-evidence": {
+      "exitCode": 1,
+      "verdict": "HALT",
+      "reasons": [
+        "the dry-run Season feed (AFLDB-ISSUE-231) evidence is malformed (seasonFeedComplete true; the settle prints exactly 1 or 0)"
+      ],
+      "settingAfter": "false",
+      "evidence": [
+        "acquire.log",
+        "after.json",
+        "before.json",
+        "readiness.txt",
+        "restore-verified.json",
+        "result.json",
+        "run.log",
+        "settle-dry-run.log",
+        "watchdog-ready.json",
+        "watchdog.pid"
+      ],
+      "auditRows": [
+        {
+          "enabled": true,
+          "step": "on"
+        },
+        {
+          "enabled": false,
+          "step": "restore"
+        }
+      ]
+    },
+    "s5d-missing-counter": {
+      "exitCode": 1,
+      "verdict": "HALT",
+      "reasons": [
+        "the dry-run report has no canonicalRowsUpdated line"
+      ],
+      "settingAfter": "false",
+      "evidence": [
+        "acquire.log",
+        "after.json",
+        "before.json",
+        "readiness.txt",
+        "restore-verified.json",
+        "result.json",
+        "run.log",
+        "settle-dry-run.log",
+        "watchdog-ready.json",
+        "watchdog.pid"
+      ],
+      "auditRows": [
+        {
+          "enabled": true,
+          "step": "on"
+        },
+        {
+          "enabled": false,
+          "step": "restore"
+        }
+      ]
+    },
+    "s6-record-drift": {
+      "exitCode": 1,
+      "verdict": "HALT",
+      "reasons": [
+        "BEFORE/AFTER differ: acquisition.c4b_e2e_marker: BEFORE absent, AFTER \"changed\""
+      ],
+      "settingAfter": "false",
+      "evidence": [
+        "acquire.log",
+        "after.json",
+        "before.json",
+        "readiness.txt",
+        "restore-verified.json",
+        "result.json",
+        "run.log",
+        "settle-dry-run.log",
+        "watchdog-ready.json",
+        "watchdog.pid"
+      ],
+      "auditRows": [
+        {
+          "enabled": true,
+          "step": "on"
+        },
+        {
+          "enabled": false,
+          "step": "restore"
+        }
+      ]
+    },
+    "s7-interrupt": {
+      "exitCode": 1,
+      "verdict": "HALT",
+      "reasons": [
+        "interrupted by SIGINT",
+        "acquire-afl-api.ts ended SIGTERM"
+      ],
+      "settingAfter": "false",
+      "evidence": [
+        "acquire.log",
+        "after.json",
+        "before.json",
+        "restore-verified.json",
+        "result.json",
+        "run.log",
+        "watchdog-ready.json",
+        "watchdog.pid"
+      ],
+      "auditRows": [
+        {
+          "enabled": true,
+          "step": "on"
+        },
+        {
+          "enabled": false,
+          "step": "restore"
+        }
+      ]
+    },
+    "s8-deadline": {
+      "exitCode": 1,
+      "verdict": "HALT",
+      "reasons": [
+        "the 5-minute deadline was reached",
+        "acquire-afl-api.ts ended SIGTERM"
+      ],
+      "settingAfter": "false",
+      "evidence": [
+        "acquire.log",
+        "after.json",
+        "before.json",
+        "restore-verified.json",
+        "result.json",
+        "run.log",
+        "watchdog-ready.json",
+        "watchdog.pid"
+      ],
+      "auditRows": [
+        {
+          "enabled": true,
+          "step": "on"
+        },
+        {
+          "enabled": false,
+          "step": "restore"
+        }
+      ]
+    },
+    "s9b-restore-transient": {
+      "exitCode": 0,
+      "attempts": 3,
+      "settingAfter": "false"
+    },
+    "s10-restore-permanent": {
+      "exitCode": 3,
+      "verdict": "RESTORATION NOT VERIFIED",
+      "settingWhileUnverified": "true",
+      "restoreOnlyExit": 0,
+      "evidence": [
+        "acquire.log",
+        "before.json",
+        "result.json",
+        "run.log",
+        "settle-dry-run.log",
+        "watchdog-ready.json",
+        "watchdog.pid"
+      ]
+    },
+    "s11a-timer-enabled": {
+      "exitCode": 2,
+      "verdict": "REFUSED",
+      "reasons": [
+        "afldb-settle-afl-api.timer is enabled / active, not disabled / inactive"
+      ],
+      "settingAfter": "false",
+      "evidence": [
+        "result.json",
+        "run.log"
+      ],
+      "auditRows": []
+    },
+    "s11b-service-running": {
+      "exitCode": 2,
+      "verdict": "REFUSED",
+      "reasons": [
+        "afldb-settle-afl-api-brownlow.service is active, not inactive (C3 not installed, or a run in progress)"
+      ],
+      "settingAfter": "false",
+      "evidence": [
+        "result.json",
+        "run.log"
+      ],
+      "auditRows": []
+    },
+    "s11c-register-not-2027": {
+      "exitCode": 2,
+      "verdict": "REFUSED",
+      "reasons": [
+        "data/reference/seasons.json in_progress_seasons is [2026], not [2027] (the C2 rollover writes this register: C2 not deployed?)"
+      ],
+      "settingAfter": "false",
+      "evidence": [
+        "result.json",
+        "run.log"
+      ],
+      "auditRows": []
+    },
+    "s11d-leftover-on": {
+      "exitCode": 2,
+      "verdict": "REFUSED",
+      "reasons": [
+        "acquisition.afl_api_current_season_enabled is true; it must be absent or false before C4b (a leftover is recovered with --restore-only, then investigated)",
+        "the control path already sees acquisition.afl_api_current_season_enabled enabled"
+      ],
+      "settingAfter": "true",
+      "evidence": [
+        "result.json",
+        "run.log"
+      ],
+      "auditRows": []
+    },
+    "s11e-different-database": {
+      "exitCode": 2,
+      "verdict": "REFUSED",
+      "reasons": [
+        "the database preconditions could not be proved: a database or process error (3D000)"
+      ],
+      "settingAfter": "false",
+      "evidence": [
+        "result.json",
+        "run.log"
+      ],
+      "auditRows": []
+    },
+    "s12-parent-killed": {
+      "watchdogRestored": true,
+      "evidence": [
+        "before.json",
+        "run.log",
+        "watchdog-ready.json",
+        "watchdog-result.json",
+        "watchdog.pid"
+      ],
+      "auditRows": [
+        {
+          "enabled": true,
+          "via": "afl-api-c4b-rehearsal"
+        },
+        {
+          "enabled": false,
+          "via": "afl-api-c4b-watchdog"
+        }
+      ]
+    },
+    "s13-real-cli-no-systemd": {
+      "exitCode": 2,
+      "excerpt": [
+        "AFLDB-ISSUE-316 C4b rehearsal c4b-2026-11-02T055909597Z-1682871: season 2027, decision D-316-13, deadline 5 minute(s), evidence /mnt/ssd/afldb-c4b-fix-qual-2026",
+        "C4B REFUSED",
+        "  - afldb-settle-afl-api.timer is enabled / active, not disabled / inactive",
+        "  - afldb-settle-afl-api-brownlow.timer is enabled / active, not disabled / inactive"
+      ]
+    }
+  },
+  "checks": [
+    {
+      "name": "S0 setting starts absent (never set on this database)",
+      "pass": true,
+      "detail": "absent"
+    },
+    {
+      "name": "S0b the admin-written shape is a JSON string \"false\" (documents the pre-existing production encoding)",
+      "pass": true,
+      "detail": "\"false\""
+    },
+    {
+      "name": "S1 exit 0 CLEAR",
+      "pass": true,
+      "detail": "CLEAR every automated HALT criterion is clear; the setting is off "
+    },
+    {
+      "name": "S1 the toggle is really ON for the steps (stored as a real JSON boolean true; the control path the CLIs read sees it)",
+      "pass": true,
+      "detail": "{\"acquireSees\":true,\"settingDuring\":\"true\",\"settleSees\":true}"
+    },
+    {
+      "name": "S1 setting is a real JSON boolean false afterwards, control path off",
+      "pass": true,
+      "detail": "false"
+    },
+    {
+      "name": "S1 two auth_audit_log rows: on then restore, tagged with the run and decision",
+      "pass": true,
+      "detail": "[[true,\"on\"],[false,\"restore\"]]"
+    },
+    {
+      "name": "S1 the seven evidence files exist",
+      "pass": true,
+      "detail": "acquire.log,after.json,before.json,readiness.txt,restore-verified.json,result.json,run.log,settle-dry-run.log,watchdog-ready.json,watchdog.pid"
+    },
+    {
+      "name": "S1 the detached watchdog (real second process) handshook and exited after the verified restore",
+      "pass": true,
+      "detail": "no watchdog-result.json: it never had to act"
+    },
+    {
+      "name": "S2 settle exit 1 -> HALT (exit 1) and setting restored false",
+      "pass": true,
+      "detail": "HALT false"
+    },
+    {
+      "name": "S3 a step that throws -> HALT and setting restored false",
+      "pass": true,
+      "detail": "HALT false"
+    },
+    {
+      "name": "S4 a dry-run that reports canonical inserts -> HALT, setting restored false",
+      "pass": true,
+      "detail": "dry-run canonicalRowsInserted is 3, not 0"
+    },
+    {
+      "name": "S5 an incomplete season feed (real counter 0) -> HALT, setting restored false",
+      "pass": true,
+      "detail": "the dry-run Season feed (AFLDB-ISSUE-231) is incomplete (seasonFeedCom"
+    },
+    {
+      "name": "S5b a report with no completeness line -> HALT (absent), setting restored false",
+      "pass": true,
+      "detail": "the dry-run Season feed (AFLDB-ISSUE-231) evidence is absent: the repo"
+    },
+    {
+      "name": "S5c the old hand-written \"true\" is malformed evidence -> HALT, setting restored false",
+      "pass": true,
+      "detail": "the dry-run Season feed (AFLDB-ISSUE-231) evidence is malformed (seaso"
+    },
+    {
+      "name": "S5d a report with no canonicalRowsUpdated line -> HALT, setting restored false",
+      "pass": true,
+      "detail": "the dry-run report has no canonicalRowsUpdated line"
+    },
+    {
+      "name": "S6 an unrelated acquisition.* setting changing during the run -> HALT with a BEFORE/AFTER difference; setting restored",
+      "pass": true,
+      "detail": "BEFORE/AFTER differ: acquisition.c4b_e2e_marker: BEFORE absent, AFTER \"changed\""
+    },
+    {
+      "name": "S7 SIGINT during a step -> step stopped, setting restored false, HALT",
+      "pass": true,
+      "detail": "false"
+    },
+    {
+      "name": "S8 deadline reached during a step -> setting restored false, HALT",
+      "pass": true,
+      "detail": "false"
+    },
+    {
+      "name": "S9 two transient restore failures -> the third attempt restores and verifies (attempts=3), exit 0",
+      "pass": true,
+      "detail": "attempts=3"
+    },
+    {
+      "name": "S10 restore that cannot be written -> exit 3 RESTORATION NOT VERIFIED and the setting is honestly still true",
+      "pass": true,
+      "detail": "RESTORATION NOT VERIFIED true"
+    },
+    {
+      "name": "S10 no restore-verified marker is written when the restore is not verified",
+      "pass": true,
+      "detail": "acquire.log,before.json,result.json,run.log,settle-dry-run.log,watchdog-ready.json,watchdog.pid"
+    },
+    {
+      "name": "S10 --restore-only recovers: exit 0, setting exactly false, control path off",
+      "pass": true,
+      "detail": "code=0"
+    },
+    {
+      "name": "S10 --restore-only on an already-false setting writes nothing",
+      "pass": true,
+      "detail": "code=0"
+    },
+    {
+      "name": "S11 s11a-timer-enabled: REFUSED (exit 2) naming the cause; setting untouched; no watchdog armed",
+      "pass": true,
+      "detail": "afldb-settle-afl-api.timer is enabled / active, not disabled / inactive"
+    },
+    {
+      "name": "S11 s11a-timer-enabled: no audit row, no watchdog marker",
+      "pass": true,
+      "detail": "result.json,run.log"
+    },
+    {
+      "name": "S11 s11b-service-running: REFUSED (exit 2) naming the cause; setting untouched; no watchdog armed",
+      "pass": true,
+      "detail": "afldb-settle-afl-api-brownlow.service is active, not inactive (C3 not installed,"
+    },
+    {
+      "name": "S11 s11b-service-running: no audit row, no watchdog marker",
+      "pass": true,
+      "detail": "result.json,run.log"
+    },
+    {
+      "name": "S11 s11c-register-not-2027: REFUSED (exit 2) naming the cause; setting untouched; no watchdog armed",
+      "pass": true,
+      "detail": "data/reference/seasons.json in_progress_seasons is [2026], not [2027] (the C2 ro"
+    },
+    {
+      "name": "S11 s11c-register-not-2027: no audit row, no watchdog marker",
+      "pass": true,
+      "detail": "result.json,run.log"
+    },
+    {
+      "name": "S11 a leftover `true` setting is REFUSED (exit 2) and left alone for --restore-only",
+      "pass": true,
+      "detail": "acquisition.afl_api_current_season_enabled is true; it must be absent or false b"
+    },
+    {
+      "name": "S11 the refusals added no audit rows at all",
+      "pass": true,
+      "detail": "26"
+    },
+    {
+      "name": "S11 writer/control databases differ -> REFUSED (exit 2), nothing written",
+      "pass": true,
+      "detail": "the database preconditions could not be proved: a database or process error (3D000)"
+    },
+    {
+      "name": "S12 victim run turned the setting ON (real watchdog armed first)",
+      "pass": true,
+      "detail": "on=true"
+    },
+    {
+      "name": "S12 watchdog is a different live process from the run",
+      "pass": true,
+      "detail": "run=1682764 watchdog=1682781"
+    },
+    {
+      "name": "S12 after the run was killed, the watchdog wrote the setting OFF by itself",
+      "pass": true,
+      "detail": "5s"
+    },
+    {
+      "name": "S12 audit trail shows on (run) then off (watchdog)",
+      "pass": true,
+      "detail": "[[true,\"afl-api-c4b-rehearsal\"],[false,\"afl-api-c4b-watchdog\"]]"
+    },
+    {
+      "name": "S12 watchdog recorded watchdog-result.json (reason: parent ended) and exited",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "S12 control path reads off again",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "S13 the unmodified CLI, with no systemd and a pre-C2 register, REFUSES (exit 2) and writes nothing",
+      "pass": true,
+      "detail": "exit=2"
+    }
+  ],
+  "failed": 0,
+  "finishedAt": "2026-11-02T05:59:09.662Z"
+}

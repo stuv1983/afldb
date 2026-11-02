@@ -1,0 +1,10 @@
+{
+  "exitCode": 1,
+  "verdict": "HALT",
+  "reasons": [
+    "the dry-run Season feed (AFLDB-ISSUE-231) evidence is seasonFeedComplete 1"
+  ],
+  "label": "afl-api-2027-2026-11-02-052722",
+  "run_id": "c4b-2026-11-02T052721596Z-3289853",
+  "at": "2026-11-02T05:27:24.109Z"
+}
