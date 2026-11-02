@@ -20,6 +20,24 @@ afterAll(async () => { await db.end({ timeout: 5 }); });
 
 class Rollback extends Error {}
 
+/** Three synthetic clubs, created inside the caller's rolled-back transaction (a schema-only database has none). */
+async function makeClubs(tx: postgres.TransactionSql, count: number): Promise<{ id: number }[]> {
+  await tx`SET CONSTRAINTS clubs_current_identity_id_fkey DEFERRED`;
+  const [org] = await tx<{ id: number }[]>`
+    INSERT INTO club_organizations (name, slug) VALUES ('C7 observer org', 'c7-observer-org') RETURNING id`;
+  const out: { id: number }[] = [];
+  for (let i = 0; i < count; i += 1) {
+    const slug = `c7-observer-club-${i}`;
+    const [club] = await tx<{ id: number }[]>`
+      INSERT INTO clubs (slug, name, short_name, abbreviation, current_identity_id, legacy_club_hist, organization_id)
+      VALUES (${slug}, ${`C7 Observer Club ${i}`}, ${`C7 ${i}`}, ${`C7${i}`}, -1, ${slug}, ${org.id})
+      RETURNING id`;
+    await tx`UPDATE clubs SET current_identity_id = ${club.id} WHERE id = ${club.id}`;
+    out.push(club);
+  }
+  return out;
+}
+
 describe('readC7Facts against PostgreSQL (rolled back)', () => {
   it('counts only afl_api matches, period rows and both-club statistics, and reads batches', async () => {
     let seen: Awaited<ReturnType<typeof readC7Facts>> | null = null;
@@ -29,7 +47,7 @@ describe('readC7Facts against PostgreSQL (rolled back)', () => {
       const [aflApi] = await tx<{ id: number }[]>`SELECT id FROM sources WHERE key = 'afl_api'`;
       const [other] = await tx<{ id: number }[]>`SELECT id FROM sources WHERE key <> 'afl_api' ORDER BY id LIMIT 1`;
       expect(aflApi, 'sources.afl_api must exist (migration)').toBeTruthy();
-      const clubs = await tx<{ id: number }[]>`SELECT id FROM clubs ORDER BY id LIMIT 3`;
+      const clubs = await makeClubs(tx, 3);
       expect(clubs.length).toBe(3);
       await tx`INSERT INTO seasons (year, league) VALUES (${SEASON}, 'AFL') ON CONFLICT (year) DO NOTHING`;
 
@@ -125,7 +143,7 @@ describe('readC7Facts against PostgreSQL (rolled back)', () => {
     let seen: Awaited<ReturnType<typeof readC7Facts>> | null = null;
     await db.begin(async (tx) => {
       const [aflApi] = await tx<{ id: number }[]>`SELECT id FROM sources WHERE key = 'afl_api'`;
-      const clubs = await tx<{ id: number }[]>`SELECT id FROM clubs ORDER BY id LIMIT 2`;
+      const clubs = await makeClubs(tx, 2);
       await tx`INSERT INTO seasons (year, league) VALUES (${SEASON}, 'AFL') ON CONFLICT (year) DO NOTHING`;
       for (const round of ['1', '2']) {
         await tx`
