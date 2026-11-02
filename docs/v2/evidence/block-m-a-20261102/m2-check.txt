@@ -1,0 +1,64 @@
+AFLDB post-install check 2026-11-02T02:19:10Z: expect ea98a35f2061--vY0EFS0DdR-TiPkxTZz6 (BUILD_ID -vY0EFS0DdR-TiPkxTZz6, previous pqAQwRIJWLjSYzR8LiTuy)
+release route status
+        release: current  ea98a35f2061--vY0EFS0DdR-TiPkxTZz6 revision ea98a35f20610e75c18e698bc0d9fe084c3c783d BUILD_ID -vY0EFS0DdR-TiPkxTZz6 production
+        release: previous fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy revision fd48ace0c2cb70296d723603aa397b5bd7a21a0d BUILD_ID pqAQwRIJWLjSYzR8LiTuy
+        release: memory   afldb MemoryCurrent 186 MB
+        release: process  3268373 runs in /home/arm/afldb-releases/releases/ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+        release: health   200 status=ok database=ok
+        release: build    /_next/static/-vY0EFS0DdR-TiPkxTZz6/_buildManifest.js 200
+        release: build    /_next/static/pqAQwRIJWLjSYzR8LiTuy/_buildManifest.js 404 (previous; expect 404)
+        release: STATUS PASS ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+  ok    status --expect ea98a35f2061--vY0EFS0DdR-TiPkxTZz6 PASS
+current build and health through loopback and the public endpoint
+  ok    http://127.0.0.1:3100/api/health {"status":"ok","database":"ok","latencyMs":2}
+  ok    http://127.0.0.1:3100 _buildManifest.js for -vY0EFS0DdR-TiPkxTZz6 200
+  ok    https://beta.afldb.com/api/health {"status":"ok","database":"ok","latencyMs":1}
+  ok    https://beta.afldb.com _buildManifest.js for -vY0EFS0DdR-TiPkxTZz6 200
+previous build pqAQwRIJWLjSYzR8LiTuy must be absent at the origin
+  ok    origin (loopback) previous pqAQwRIJWLjSYzR8LiTuy 404
+  ok    origin (public, cache-busted) previous pqAQwRIJWLjSYzR8LiTuy 404, cf-cache-status BYPASS
+  CACHE public previous pqAQwRIJWLjSYzR8LiTuy 200 from an old Cloudflare cache HIT of an immutable asset; the origin checks above decide
+pages and every referenced asset (public endpoint, redirects followed)
+  ok    page / -> 200 https://beta.afldb.com/beta
+  ok    page /beta -> 200 https://beta.afldb.com/beta
+  ok    page /players -> 200 https://beta.afldb.com/beta?from=%2Fplayers
+  ok    page /matches -> 200 https://beta.afldb.com/beta?from=%2Fmatches
+  ok    page /seasons -> 200 https://beta.afldb.com/beta?from=%2Fseasons
+  ok    page /clubs -> 200 https://beta.afldb.com/beta?from=%2Fclubs
+  ok    page /records -> 200 https://beta.afldb.com/beta?from=%2Frecords
+  ok    page /search -> 200 https://beta.afldb.com/beta?from=%2Fsearch
+  ok    page /admin/operations -> 200 https://beta.afldb.com/admin/login
+  ok    8 assets 200 with the right type
+  ok    all 8 served assets are byte-identical to ea98a35f2061--vY0EFS0DdR-TiPkxTZz6's files
+  ok    POST /api/admin/email-intake 410 (retired)
+journal since the service started
+  ok    primary start line present since Mon 2026-11-02 13:18:50 AEDT
+        [afldb] serving build -vY0EFS0DdR-TiPkxTZz6 release ea98a35f2061--vY0EFS0DdR-TiPkxTZz6 revision ea98a35f20610e75c18e698bc0d9fe084c3c783d
+  ok    0 error/fatal/unhandled lines
+  info  NRestarts 0, MemoryCurrent 214 MB
+POST-INSTALL CHECK PASS ea98a35f2061--vY0EFS0DdR-TiPkxTZz6 (1 old Cloudflare cache HIT(s) reported above, origin 404)
+state probe 2026-11-02T02:19:14Z
+  OLD_ID   fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy
+  NEW_ID   ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+  current  ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+  previous fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy
+  unit     afldb ActiveState=active Result=success MainPID=3268373
+  process  runs ea98a35f2061--vY0EFS0DdR-TiPkxTZz6 (/home/arm/afldb-releases/releases/ea98a35f2061--vY0EFS0DdR-TiPkxTZz6)
+  health   {"status":"ok","database":"ok","latencyMs":5}
+  locks    none
+STATE NEW_SERVING
+== readback: ledger 118 and the schema it must have produced (afldb_backup, read-only) 2026-11-02T02:19:14Z
+dsn_identity key=AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=localhost port=5432 database=afldb_prod
+identity ok (database, OID, system identifier, read-only session)
+ledger rows=118 last=118_fixtures_unconfirmed_participants.sql digest=573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57
+columns: away_club_id:YES: | away_placeholder:YES: | confirmation:NO:'confirmed'::text | home_club_id:YES: | home_placeholder:YES:
+ledger118_digest=573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57 fixtures_rows=0 matches_rows=17056
+READBACK PASS
+Hint: You are currently not seeing messages from other users and the system.
+      Users in groups 'adm', 'systemd-journal' can see all messages.
+      Pass -q to turn off this notice.
+Nov 02 13:18:50 afldb-prod afldb[3268373]: [afldb] serving build -vY0EFS0DdR-TiPkxTZz6 release ea98a35f2061--vY0EFS0DdR-TiPkxTZz6 revision ea98a35f20610e75c18e698bc0d9fe084c3c783d
+Hint: You are currently not seeing messages from other users and the system.
+      Users in groups 'adm', 'systemd-journal' can see all messages.
+      Pass -q to turn off this notice.
+M2-check PASS

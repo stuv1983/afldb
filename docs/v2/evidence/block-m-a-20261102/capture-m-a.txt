@@ -1,0 +1,58 @@
+== P0 host, tools, target directory 2026-11-02T01:47:42Z
+host=afldb-prod user=arm kernel=6.8.0-137-generic boot_id=b77c04f1-23e4-4d58-aad2-c0734ccd6dac
+pg_dump (PostgreSQL) 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+pg_restore (PostgreSQL) 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+== P1 writer and service state (read-only systemctl queries) 2026-11-02T01:47:42Z
+afldb.service active=active enabled=enabled
+afldb-settle-afltables.service active=inactive enabled=static
+afldb-settle-afltables.timer active=inactive enabled=disabled
+afldb-settle-afl-api.service active=inactive enabled=not-found
+afldb-settle-afl-api.timer active=inactive enabled=not-found
+afldb-settle-afl-api-brownlow.service active=inactive enabled=not-found
+afldb-settle-afl-api-brownlow.timer active=inactive enabled=not-found
+afldb-email-intake.service active=inactive enabled=not-found
+afldb-email-intake.timer active=inactive enabled=not-found
+afldb-settle-afltables.timer next=
+no settle/migrate/dump process
+primary_checkout=ea98a35f20610e75c18e698bc0d9fe084c3c783d serving_release=fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy
+== P2 disk 2026-11-02T01:47:43Z
+home_avail_bytes=55902806016
+== P3 credential channel (values never printed) 2026-11-02T01:47:43Z
+env_file_mode=600 arm:arm
+dsn_identity user=afldb_backup host=localhost port=5432 database=afldb_prod
+== P4 identity, ledger and inspection (each a single statement, so one snapshot, in a read-only session) 2026-11-02T01:47:43Z
+identity afldb_prod	afldb_backup	66668	7674454702926115004	160015	::1	5432	on	f	t	afldb_owner	16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+extensions pg_trgm=1.6 plpgsql=1.0 unaccent=1.1
+ledger rows=117 last=117_brownlow_provider_eligibility_unknown.sql digest=647c3fb39ca66a572664e1dae9028e4fad4d6b121226d6bdf208e6738af45f72
+inspect access_exclusive_relation_locks	0
+inspect visible_nonidle_sessions	0
+inspect staging_default_acl_entries	1
+inspect staged_brownlow_seasons	none
+inspect public_base_tables	83
+== P5 capture: one full custom-format pg_dump (single MVCC snapshot; writers stay enabled) 2026-11-02T01:47:43Z
+CAPTURE_DIR=/home/arm/backups/afldb/blockm-a-20261102T014742Z
+pg_dump exit=0 start=2026-11-02T01:47:43.549439Z end=2026-11-02T01:47:52.155244Z stderr_bytes=0
+archive afldb_prod-20261102T014742Z.dump bytes=29837494 sha256=914f1d9aae2b7f4d09703735ca2fdef7f9783e5c7929efc7120af0a9dadfbd3e toc_entries=1648
+== P6 post-capture drift checks 2026-11-02T01:47:52Z
+writers_before: afltables_service=inactive timer=disabled/inactive app=active
+writers_after:  afltables_service=inactive timer=disabled/inactive app=active
+== P7 sidecar (exclusive create; no credential) 2026-11-02T01:47:52Z
+== P8 manifest and result 2026-11-02T01:47:52Z
+914f1d9aae2b7f4d09703735ca2fdef7f9783e5c7929efc7120af0a9dadfbd3e  afldb_prod-20261102T014742Z.dump
+24f00981285eefcab650fe4397f60cf837370ddb4c58d2fdff93aa22eb4891c3  afldb_prod-20261102T014742Z.provenance.json
+79970009129703844d71f127d6dadf151f0cbe345727d0e6088f1e247c760459  archive.toc
+647c3fb39ca66a572664e1dae9028e4fad4d6b121226d6bdf208e6738af45f72  ledger-before.tsv
+647c3fb39ca66a572664e1dae9028e4fad4d6b121226d6bdf208e6738af45f72  ledger-after.tsv
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  pg-dump.stderr
+total 29316
+drwx------  2 arm arm     4096 Nov  2 12:47 .
+drwx------ 17 arm arm     4096 Nov  2 12:47 ..
+-rw-------  1 arm arm      535 Nov  2 12:47 SHA256SUMS
+-rw-------  1 arm arm 29837494 Nov  2 12:47 afldb_prod-20261102T014742Z.dump
+-rw-------  1 arm arm    19688 Nov  2 12:47 afldb_prod-20261102T014742Z.provenance.json
+-rw-------  1 arm arm   122856 Nov  2 12:47 archive.toc
+-rw-------  1 arm arm    11248 Nov  2 12:47 ledger-after.tsv
+-rw-------  1 arm arm    11248 Nov  2 12:47 ledger-before.tsv
+-rw-------  1 arm arm        0 Nov  2 12:47 pg-dump.stderr
+elapsed_seconds=10
+RESULT PASS stamp=20261102T014742Z archive_sha256=914f1d9aae2b7f4d09703735ca2fdef7f9783e5c7929efc7120af0a9dadfbd3e bytes=29837494 toc=1648 staged_brownlow=none

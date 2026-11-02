@@ -15,6 +15,10 @@ commit.
 
 ## [Unreleased]
 
+### Block M-a applied to production: migration 118 and release ea98a35f (2026-11-02)
+
+- **Operations (PRODUCTION):** under the owner's M-a approval at revision `ea98a35f20610e75c18e698bc0d9fe084c3c783d` (pushed by the owner), a fresh backup (`blockm-a-20261102T014742Z`, sha256 `914f1d9a…dfbd3e`) was restore-verified off-host, the production checkout was fast-forwarded, migration `118_fixtures_unconfirmed_participants.sql` was applied (ledger 117 to 118, digest `573594e9…af57`, `fixtures` 0, `matches` 17,056) and release `ea98a35f2061--vY0EFS0DdR-TiPkxTZz6` was built (`--typecheck off-host`, default guards), verified, promoted and, after the owner's restart at 02:18:50Z, confirmed serving (post-install check PASS, journal line, schema readback). Rollback target `fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy` retained as `previous`, not used. Production `/admin/fixtures` visual is `VISUAL: UNVERIFIED`. **Block M-b (the fixture window) was not run and is not approved.** Record: `docs/v2/block-m-a-outcome-2026-11-02.md`.
+
 ### Block L applied to production; local negative-control incident recorded (2026-11-02; local commits only, nothing pushed)
 
 - **Operations (GAP-029 labels, PRODUCTION):** under the owner's approval of the execution-ready plan (revision `86da1a82`, plan digest `1b538e1a…528a`, target `afldb_prod` on `afldb-prod`, actor 1) the 64 evidenced match-event labels were written through the audited editor writer at 2026-11-02T00:47Z: Anzac Day 31, Dreamtime at the 'G 22, King's Birthday 11. Verified row by row (not by wrapper status): 64 `matches.match_event` values, 64 `data_edits` rows (ids 96 to 159, actor 1, old NULL) and 64 active `data_overrides` rows equal to the plan and the evidence file; the replay of the same plan and approval wrote nothing; `matches` 17,056 and ledger 117 unchanged; no restart. [Outcome](docs/v2/gap-029-block-l-outcome-2026-11-02.md). V2-GAP-029 stays open (Gridley findings unchanged; page/ISR effect unverified).

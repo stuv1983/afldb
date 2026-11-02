@@ -1,0 +1,58 @@
+== pre: host, checkout, writers, serving, ledger (117) 2026-11-02T01:50:20Z
+checkout ea98a35f20610e75c18e698bc0d9fe084c3c783d clean
+unit afldb-settle-afltables.service enabled=static active=inactive
+unit afldb-settle-afltables.timer enabled=disabled active=inactive
+unit afldb-settle-afl-api.service enabled=not-found active=inactive
+unit afldb-settle-afl-api.timer enabled=not-found active=inactive
+unit afldb-settle-afl-api-brownlow.service enabled=not-found active=inactive
+unit afldb-settle-afl-api-brownlow.timer enabled=not-found active=inactive
+unit afldb-email-intake.service enabled=not-found active=inactive
+unit afldb-email-intake.timer enabled=not-found active=inactive
+no settle/migrate/dump/restore/window/label process
+no crontab for arm
+state probe 2026-11-02T01:50:21Z
+  OLD_ID   fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy
+  NEW_ID   (not set)
+  current  fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy
+  previous ad245d602f6f-m0M8pf121326vNSo2B759
+  unit     afldb ActiveState=active Result=success MainPID=3218527
+  process  runs fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy (/home/arm/afldb-releases/releases/fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy)
+  health   {"status":"ok","database":"ok","latencyMs":3}
+  locks    none
+STATE OLD_SERVING
+MemAvailable_MB=2903 free_GB=53
+dsn_identity key=AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=localhost port=5432 database=afldb_prod
+identity ok (database, OID, system identifier, read-only session)
+ledger rows=117 last=117_brownlow_provider_eligibility_unknown.sql digest=647c3fb39ca66a572664e1dae9028e4fad4d6b121226d6bdf208e6738af45f72
+fixtures_rows=0 matches_rows=17056 switch_raw=(absent)
+PRE PASS
+== M1 migrate: migration 118 only 2026-11-02T01:50:21Z
+checkout ea98a35f20610e75c18e698bc0d9fe084c3c783d clean
+unit afldb-settle-afltables.service enabled=static active=inactive
+unit afldb-settle-afltables.timer enabled=disabled active=inactive
+unit afldb-settle-afl-api.service enabled=not-found active=inactive
+unit afldb-settle-afl-api.timer enabled=not-found active=inactive
+unit afldb-settle-afl-api-brownlow.service enabled=not-found active=inactive
+unit afldb-settle-afl-api-brownlow.timer enabled=not-found active=inactive
+unit afldb-email-intake.service enabled=not-found active=inactive
+unit afldb-email-intake.timer enabled=not-found active=inactive
+no settle/migrate/dump/restore/window/label process
+no crontab for arm
+backup ok: afldb_prod-20261102T014742Z.dump sha256 914f1d9aae2b7f4d09703735ca2fdef7f9783e5c7929efc7120af0a9dadfbd3e captured_end 2026-11-02T01:47:52.155244Z age_min 2.5 ledger_digest 647c3fb39ca66a572664e1dae9028e4fad4d6b121226d6bdf208e6738af45f72
+dsn_identity key=AFLDB_OWNER_DATABASE_URL user=afldb_owner host=localhost port=5432 database=afldb_prod
+pending: 118_fixtures_unconfirmed_participants.sql
+AFLDB migrations -> prod (afldb_owner@localhost:5432/afldb_prod)
+  118 migration file(s), 117 already applied
+
+  applying 118_fixtures_unconfirmed_participants.sql ... ok (21 ms)
+
+Applied 1 migration(s).
+MIGRATE PASS (run readback)
+== readback: ledger 118 and the schema it must have produced (afldb_backup, read-only) 2026-11-02T01:50:25Z
+dsn_identity key=AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=localhost port=5432 database=afldb_prod
+identity ok (database, OID, system identifier, read-only session)
+ledger rows=118 last=118_fixtures_unconfirmed_participants.sql digest=573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57
+columns: away_club_id:YES: | away_placeholder:YES: | confirmation:NO:'confirmed'::text | home_club_id:YES: | home_placeholder:YES:
+ledger118_digest=573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57 fixtures_rows=0 matches_rows=17056
+READBACK PASS
+M1 PASS

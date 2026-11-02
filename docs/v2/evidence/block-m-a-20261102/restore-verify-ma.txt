@@ -1,0 +1,28 @@
+2026-11-02T01:49:20Z RV0 inputs
+dump sha256 verified; candidate clean at 86da1a82329371fd23db6e2935a0e9334ba08f9a
+DEV services BEFORE:
+afldb.service active MainPID=1162113
+postgresql@16-main.service active MainPID=1504
+2026-11-02T01:49:21Z RV1 start the guarded cluster
+pg_ctl: server is running (PID: 1458331)
+/usr/lib/postgresql/16/bin/postgres "-D" "/mnt/ssd/afldb-v2-gap029l-20261101T204205Z/pg-root/data"
+LISTEN 0      600        127.0.0.1:55493      0.0.0.0:*    users:(("postgres",pid=1458331,fd=7))      
+2026-11-02T01:49:25Z RV2 restore into a guarded disposable database
+create-db: afldb_v2_blockm_ma_rst_test created and marked
+isolated-pg: afldb_v2_blockm_ma_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running node
+pg_restore exit=0 seconds=5 stderrLines=0
+restore_started=2026-11-02T01:49:26.110Z restored_at=2026-11-02T01:49:32.162Z
+isolated-pg: afldb_v2_blockm_ma_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running node
+afldb_v2_blockm_ma_rst_test {"ledger":"117_brownlow_provider_eligibility_unknown.sql","matches":17056,"fixtures":0,"receipts":0}
+archive toc entries: 1648
+2026-11-02T01:49:32Z RV3 restored copy facts (read-only; the live facts come from m-prod.sh pre/readback and must be equal)
+isolated-pg: afldb_v2_blockm_ma_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running node
+{"ledgerRows":117,"ledgerLast":"117_brownlow_provider_eligibility_unknown.sql","ledgerDigest":"647c3fb39ca66a572664e1dae9028e4fad4d6b121226d6bdf208e6738af45f72","matches":17056,"fixtures":0}
+2026-11-02T01:49:33Z RV4 stop the cluster and prove isolation
+waiting for server to shut down.... done
+server stopped
+DEV services AFTER:
+afldb.service active MainPID=1162113
+postgresql@16-main.service active MainPID=1504
+2026-11-02T01:49:36Z RV DONE restored_at=2026-11-02T01:49:32.162Z
+RV EXIT 0
