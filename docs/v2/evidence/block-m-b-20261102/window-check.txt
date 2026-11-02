@@ -1,0 +1,18 @@
+checkout ea98a35f20610e75c18e698bc0d9fe084c3c783d clean
+unit afldb-settle-afltables.service enabled=static active=inactive
+unit afldb-settle-afltables.timer enabled=disabled active=inactive
+unit afldb-settle-afl-api.service enabled=not-found active=inactive
+unit afldb-settle-afl-api.timer enabled=not-found active=inactive
+unit afldb-settle-afl-api-brownlow.service enabled=not-found active=inactive
+unit afldb-settle-afl-api-brownlow.timer enabled=not-found active=inactive
+unit afldb-email-intake.service enabled=not-found active=inactive
+unit afldb-email-intake.timer enabled=not-found active=inactive
+no settle/migrate/dump/restore/window/label process
+no crontab for arm
+== window-stage: staged snapshot bytes 2026-11-02T02:24:53Z
+WINDOW-STAGE PASS manifest_sha256=63fc997403d5fb4edee2698e98e53e61d04c01ef35ebac1a965a8e8420d179e4
+== window --check-only (writes nothing) 2026-11-02T02:24:53Z
+AFLDB-ISSUE-229 fixture window fxw-2026-11-02T022454326Z-3270157: snapshot afl-api-2027-2026-11-01-012026, expect initial absent, expect created 218, deadline 15 minute(s), mode check-only, evidence /home/arm/blockm-b-20261102T022239Z-check
+FIXTURE WINDOW CLEAR
+  - --check-only: every precondition holds; nothing was written and no watchdog was armed.
+CHECK EXIT 0

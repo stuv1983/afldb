@@ -1,0 +1,4 @@
+Season 2027 (CD_S2027014): 218 scheduled, 0 transition(s), 0 completed, 0 deferred, 0 refused.
+Observed statuses: PLACEHOLDER=83, SCHEDULED=135
+Scheduled by confirmation: 135 confirmed, 83 unconfirmed (11 with a provider-label participant, 10 with a placeholder venue).
+--validate-only: manifest, season feed and fixture contract verified. No connection opened.

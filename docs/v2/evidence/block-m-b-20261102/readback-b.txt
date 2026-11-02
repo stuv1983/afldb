@@ -1,0 +1,178 @@
+== readback-b: the first 2027 fixture apply (afldb_backup, read-only) 2026-11-02T02:25:40Z
+dsn_identity key=AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=localhost port=5432 database=afldb_prod
+identity ok (database, OID, system identifier, read-only session)
+ledger rows=118 last=118_fixtures_unconfirmed_participants.sql digest=573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57
+fixtures total|confirmed|unconfirmed|label|nullvenue|nulldatetime|unconf_with_datetime|batches|not_scheduled = 218|135|83|11|10|83|0|1|0
+fixture-schedule batches count|status|read|inserted|updated|rejected = 1|completed|218|218|0|0
+switch=boolean:false
+audit rows (decision rows : via window : distinct runs) = 2:2:1
+READBACK-B PASS
+RB EXIT 0
+total 288
+-rw------- 1 arm arm     88 Nov  2 13:25 after.json
+-rw------- 1 arm arm   5994 Nov  2 13:25 apply.log
+-rw------- 1 arm arm    102 Nov  2 13:25 before.json
+-rw------- 1 arm arm   6050 Nov  2 13:25 dry-run.log
+-rw------- 1 arm arm 105010 Nov  2 13:25 preconditions.json
+-rw------- 1 arm arm     92 Nov  2 13:25 restore-verified.json
+-rw------- 1 arm arm    371 Nov  2 13:25 result.json
+-rw------- 1 arm arm  27069 Nov  2 13:25 run.log
+-rw------- 1 arm arm 113312 Nov  2 13:25 transition.json
+-rw------- 1 arm arm    362 Nov  2 13:25 validate-only.log
+-rw------- 1 arm arm    156 Nov  2 13:25 watchdog-ready.json
+-rw------- 1 arm arm      8 Nov  2 13:25 watchdog.pid
+--- result.json
+{
+  "exitCode": 0,
+  "verdict": "CLEAR",
+  "reasons": [
+    "the dry-run and the apply each reported exactly created=218; fixtures 0 -> 218; the switch is off and verified; every audit row is this run's. This is the evidence for the M3 record, not the record."
+  ],
+  "applied": true,
+  "run_id": "fxw-2026-11-02T022520565Z-3270427",
+  "at": "2026-11-02T02:25:27.140Z"
+}
+
+--- transition.json
+{
+  "run_id": "fxw-2026-11-02T022520565Z-3270427",
+  "decision": "D-MB-20261102 approved first production 2027 fixture ingestion",
+  "label": "afl-api-2027-2026-11-01-012026",
+  "expectInitial": "absent",
+  "expectCreated": 218,
+  "events": [
+    {
+      "at": "2026-11-02T02:25:23.455Z",
+      "what": "switch-on"
+    },
+    {
+      "at": "2026-11-02T02:25:24.638Z",
+      "what": "dry-run",
+      "exit": 0
+    },
+    {
+      "at": "2026-11-02T02:25:26.882Z",
+      "what": "apply",
+      "exit": 0
+    },
+    {
+      "at": "2026-11-02T02:25:26.968Z",
+      "what": "switch-off",
+      "verified": true,
+      "attempts": 1
+    }
+  ],
+  "preconditions": {
+    "feedSha256": "21fd12e7704b7c7146cfbab414352352f3cfaa53e7ef5038f4411fa789e4c84d",
+    "units": {
+      "afldb-settle-afl-api.timer is-enabled": "not-found",
+      "afldb-settle-afl-api.timer is-active": "inactive",
+      "afldb-settle-afl-api-brownlow.timer is-enabled": "not-found",
+      "afldb-settle-afl-api-brownlow.timer is-active": "inactive",
+      "afldb-settle-afl-api.service is-active": "inactive",
+      "afldb-settle-afl-api-brownlow.service is-active": "inactive"
+    },
+    "absentUnitsAreNotProof": true,
+    "inventory": {
+      "lines": [
+        {
+          "source": "process",
+          "pid": 1,
+          "text": "/usr/lib/systemd/systemd --system --deserialize=109"
+        },
+        {
+          "source": "process",
+          "pid": 2,
+          "text": "[kthreadd]"
+        },
+        {
+          "source": "process",
+          "pid": 3,
+          "text": "[pool_workqueue_release]"
+        },
+        {
+          "source": "process",
+          "pid": 4,
+          "text": "[kworker/R-rcu_g]"
+        },
+        {
+          "source": "process",
+          "pid": 5,
+          "text": "[kworker/R-rcu_p]"
+        },
+        {
+          "source": "process",
+          "pid": 6,
+          "text": "[kworker/R-slub_]"
+        },
+        {
+          "source": "process",
+          "pid": 7,
+          "text": "[kworker/R-netns]"
+        },
+        {
+          "source": "process",
+          "pid": 12,
+          "text": "[kworker/R-mm_pe]"
+        },
+        {
+          "source": "process",
+          "pid": 13,
+          "text": "[rcu_tasks_kthread]"
+        },
+        {
+          "source": "process",
+          "pid": 14,
+          "text": "[rcu_tasks_rude_kthread]"
+        },
+        {
+          "source": "process",
+          "pid": 15,
+          "text": "[rcu_tasks_trace_kthread]"
+        },
+        {
+          "source": "process",
+          "pid": 16,
+          "text": "[ksoftirqd/0]"
+        },
+        {
+          "source": "process",
+          "pid": 17,
+          "text": "[rcu_preempt]"
+        },
+        {
+          "source": "process",
+          "pid": 18,
+          "text": "[migration/0]"
+        },
+        {
+          "source": "process",
+          "pid": 19,
+          "text": "[idle_inject/0]"
+        },
+        {
+          "source": "process",
+          "pid": 20,
+          "text": "[cpu
+--- run.log head/tail
+2026-11-02T02:25:20.566Z AFLDB-ISSUE-229 fixture window fxw-2026-11-02T022520565Z-3270427: snapshot afl-api-2027-2026-11-01-012026, expect initial absent, expect created 218, deadline 15 minute(s), mode run, evidence /home/arm/blockm-b-20261102T02223
+2026-11-02T02:25:22.914Z watchdog started: pid 3270480; waiting for it to prove readiness
+2026-11-02T02:25:23.344Z watchdog 3270480: ready, monitoring parent 3270427
+2026-11-02T02:25:23.422Z watchdog ready: pid 3270480 proved run fxw-2026-11-02T022520565Z-3270427, parent 3270427
+2026-11-02T02:25:23.422Z watchdog armed and proven ready; it acts after 2026-11-02T02:42:22.910Z or when this process ends
+2026-11-02T02:25:23.455Z acquisition.afl_api_current_season_enabled ON at 2026-11-02T02:25:23.455Z
+2026-11-02T02:25:24.611Z   | Actions: created=218
+2026-11-02T02:25:26.856Z   | Actions: created=218
+2026-11-02T02:25:26.968Z acquisition.afl_api_current_season_enabled OFF at 2026-11-02T02:25:26.968Z, verified on the writer and the control path
+2026-11-02T02:25:27.141Z FIXTURE WINDOW CLEAR
+2026-11-02T02:25:27.142Z   - the dry-run and the apply each reported exactly created=218; fixtures 0 -> 218; the switch is off and verified; every audit row is this run's. This is the evidence for the M3 record, not the record.
+state probe 2026-11-02T02:25:41Z
+  OLD_ID   fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy
+  NEW_ID   ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+  current  ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+  previous fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy
+  unit     afldb ActiveState=active Result=success MainPID=3268373
+  process  runs ea98a35f2061--vY0EFS0DdR-TiPkxTZz6 (/home/arm/afldb-releases/releases/ea98a35f2061--vY0EFS0DdR-TiPkxTZz6)
+  health   {"status":"ok","database":"ok","latencyMs":1}
+  locks    none
+STATE NEW_SERVING

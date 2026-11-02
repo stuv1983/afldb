@@ -1,0 +1,10 @@
+{
+  "exitCode": 0,
+  "verdict": "CLEAR",
+  "reasons": [
+    "the dry-run and the apply each reported exactly created=218; fixtures 0 -> 218; the switch is off and verified; every audit row is this run's. This is the evidence for the M3 record, not the record."
+  ],
+  "applied": true,
+  "run_id": "fxw-2026-11-02T022520565Z-3270427",
+  "at": "2026-11-02T02:25:27.140Z"
+}

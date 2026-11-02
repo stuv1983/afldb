@@ -1,0 +1,91 @@
+﻿{
+ "run_id": "fxw-2026-11-02T022520565Z-3270427",
+ "decision": "D-MB-20261102 approved first production 2027 fixture ingestion",
+ "label": "afl-api-2027-2026-11-01-012026",
+ "expectInitial": "absent",
+ "expectCreated": 218,
+ "events": [
+  {
+   "at": "2026-11-02T02:25:23.455Z",
+   "what": "switch-on"
+  },
+  {
+   "at": "2026-11-02T02:25:24.638Z",
+   "what": "dry-run",
+   "exit": 0
+  },
+  {
+   "at": "2026-11-02T02:25:26.882Z",
+   "what": "apply",
+   "exit": 0
+  },
+  {
+   "at": "2026-11-02T02:25:26.968Z",
+   "what": "switch-off",
+   "verified": true,
+   "attempts": 1
+  }
+ ],
+ "before": {
+  "counts": {
+   "fixtures": 0,
+   "matches": 17056
+  },
+  "switchRaw": null,
+  "auditMaxId": 0
+ },
+ "after": {
+  "counts": {
+   "fixtures": 218,
+   "matches": 17056
+  },
+  "switchRaw": "false"
+ },
+ "audit": [
+  {
+   "id": 297,
+   "actorLabel": "afl-api-c4b-rehearsal",
+   "detail": {
+    "via": "afl-api-fixture-window",
+    "step": "on",
+    "run_id": "fxw-2026-11-02T022520565Z-3270427",
+    "enabled": true,
+    "decision": "D-MB-20261102 approved first production 2027 fixture ingestion"
+   }
+  },
+  {
+   "id": 298,
+   "actorLabel": "afl-api-c4b-rehearsal",
+   "detail": {
+    "via": "afl-api-fixture-window",
+    "step": "restore",
+    "run_id": "fxw-2026-11-02T022520565Z-3270427",
+    "attempt": 1,
+    "enabled": false,
+    "decision": "D-MB-20261102 approved first production 2027 fixture ingestion"
+   }
+  }
+ ],
+ "verdict": "CLEAR",
+ "preconditions": {
+  "feedSha256": "21fd12e7704b7c7146cfbab414352352f3cfaa53e7ef5038f4411fa789e4c84d",
+  "units": {
+   "afldb-settle-afl-api.timer is-enabled": "not-found",
+   "afldb-settle-afl-api.timer is-active": "inactive",
+   "afldb-settle-afl-api-brownlow.timer is-enabled": "not-found",
+   "afldb-settle-afl-api-brownlow.timer is-active": "inactive",
+   "afldb-settle-afl-api.service is-active": "inactive",
+   "afldb-settle-afl-api-brownlow.service is-active": "inactive"
+  },
+  "absentUnitsAreNotProof": true,
+  "initial": {
+   "state": "absent",
+   "raw": null
+  },
+  "inventory_summary": {
+   "lines": 776,
+   "unreadable": 0,
+   "notInstalled": 1
+  }
+ }
+}
