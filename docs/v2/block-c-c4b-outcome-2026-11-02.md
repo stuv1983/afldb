@@ -74,3 +74,7 @@ The sections above are the record of the first run and stand unchanged: **HALT, 
 * **Launch error, precisely:** launch 1 exited 127 (`node: command not found`) because the non-login tmux shell had no node on PATH; the tool never started and nothing was written. The new launcher uses the absolute node path, an explicit PATH, and a tmux node probe that must pass before the tool is started.
 * **Retained versus live feed (limitation 2 above):** the established facts (same count, status distribution, completeness, venue/team/round coverage, readiness REPOSITORY READY on the live feed) are in section 4 of the package; the field-level diff needs one read-only copy of the host snapshot and is open.
 * **Still true:** the first run selected zero matches and exercised no `playerStats` or `matchRoster` path; those paths are not claimed verified, and the rerun will not exercise them either (no `CONCLUDED` 2027 match exists before 2027-03-17).
+
+## Addendum (2026-11-02, after the HALT; the HALT record above is unchanged)
+
+Limitation 2 is now measured, not guessed: the live feed differs from the retained pin only in `venue.name` on four matches (`UTAS Stadium` becomes `University of Tasmania Stadium`, same `providerId` `CD_V200`); no match added or removed and no status, date, team or round change, so the "likely status/timestamps" guess above was wrong. Detail: section 4 of [c4b-gate-fix-rollout-and-rerun-2026-11-02.md](c4b-gate-fix-rollout-and-rerun-2026-11-02.md) and `evidence/c4b-fix-r2-20261102/live-feed-comparison.json`.

@@ -50,9 +50,22 @@ Isolation facts: DEV `afldb.service` (MainPID 1162113) and `postgresql@16-main` 
 | Completeness | complete for `CD_S2027014` | complete for `CD_S2027014` |
 | Readiness | REPOSITORY READY | REPOSITORY READY (`readiness.txt`): season identity `CD_S2027014`, 29 round-vocabulary rows, every venue mapped (19 distinct), every team mapped (40 distinct), every entry translates through `afl_api_2027` |
 
-**What is established without the captured bytes:** same match count, same status distribution, same completeness verdict, same venue, team and round coverage, readiness identical. The 72-byte difference therefore does not change anything the C4b rehearsal or its readiness gate assumes: the rehearsal does not compare the live feed with the pin (the pin is used only by `c4b-pre`, on the retained copy, and by M-b's already-applied window); it reads the live feed and gates on completeness, coverage and zero canonical writes. The match settle selects `CONCLUDED` only (`selected: 0`), so a changed `PLACEHOLDER`/`SCHEDULED` record cannot reach canonical rows.
+**MEASURED (recorded after `N`, 2026-11-02; supersedes the earlier text of this section, which inferred "no relevant change" from matching aggregates and was an overstatement).** The captured file was copied read-only from the host (one `scp`, no provider request; sha256 verified `1a51317b…7ced`, 266,461 bytes) to `D:\tmp\afldb-c4b-live-feed-20261102\` and compared offline with `compare-season-feeds.mjs` against the retained copy (`21fd12e7…c84d`; three byte-identical copies exist). Report: [live-feed-comparison.json](evidence/c4b-fix-r2-20261102/live-feed-comparison.json).
 
-**What is NOT established:** which fields differ, which match IDs, and whether any status, date or venue changed in place. That needs the captured file, which exists only on the host (the first run's evidence copy deliberately omitted the raw snapshot). The comparison tool is ready and self-tested (identical feeds; a mutated copy with a status change, a time change, a venue rename, an extra field, a removed match and a changed meta count, all reported): `evidence/c4b-fix-r2-20261102/compare-season-feeds.mjs`. **It needs one read-only copy of that one file** (command in section 7, "Feed comparison"); until it is run, the field-level answer is open and is recorded as open. Neither feed is rewritten, no fixture is repinned, no production fixture is updated.
+| Dimension | Result |
+|---|---|
+| Top-level keys, `meta` (code 200, `numPages` 1, `pageSize` 1000, `numEntries` 218) | identical |
+| Match-id set (218 each, no duplicate keys) | identical: **0 added, 0 removed** |
+| Status (per match and distribution) | **0 changes** (SCHEDULED 135, PLACEHOLDER 83 on both) |
+| Dates / times (`utcStartTime` and every other date-like leaf) | **0 changes** |
+| Teams (identity of home and away, 40 distinct) | **0 changes** |
+| Rounds | **0 changes** |
+| Structural (fields on one side only, array length changes) | **0** |
+| Venues | **4 matches changed, one leaf each, `venue.name` only**: `CD_M20270140807` (R8 Hawthorn v GWS GIANTS, SCHEDULED), `CD_M20270141103` (R11 Hawthorn v St Kilda, SCHEDULED), `CD_M20270141805` (R18 Hawthorn v Gold Coast SUNS, PLACEHOLDER), `CD_M20270142107` (R21 Hawthorn v Sydney Swans, PLACEHOLDER): `"UTAS Stadium"` becomes `"University of Tasmania Stadium"` |
+
+The whole 72-byte difference is those four renames (4 x 18 bytes). `venue.id` (4), `venue.providerId` (`CD_V200`), `abbreviation` (`UTAS`), `location`, `state`, `timezone` and `landOwner` are unchanged, so it is one venue relabelled by the provider, not a different venue. Distinct venues 19 and teams 40 on both sides.
+
+**Why the rename cannot reach the C4b result or a canonical row (read from the code, not assumed):** every venue is resolved by `venue.providerId` through `afl-api-identities.json` (`afl-api-cutover-readiness.ts` `ids.venues.get(providerId)`, `afl-api-bundle.ts` `resolveVenue`); the feed `name` is used only as a label in an unmapped-venue message and as `venueRaw` in the bundle projection, which nothing downstream consumes. The fixture writer writes `venue_raw` from the resolved venue's canonical name, not from the feed. The rehearsal does not compare the live feed with the pin; it gates on completeness, coverage and zero canonical writes, and the match settle selects `CONCLUDED` only (`selected: 0`). **Residual:** a later fixture refresh would see no venue change on these four matches for the same reason. Neither feed is rewritten, no fixture is repinned, no production fixture is updated.
 
 ## 5. The qualified source delta (`static-delta-check.sh`, run on the workstation and again on production from `N`'s own bytes in D1)
 
@@ -137,7 +150,7 @@ The previous `exit 127 / node: command not found` cannot recur: the node path is
 
 **R-1** `bash rollout.sh r1 $N`: only if D2 fails after the fast-forward, the checkout is exactly `N` and clean: `git reset --hard ea98a35f`. The service is not involved. Anything else is the owner's decision.
 
-**Feed comparison (owner or Claude with the owner's go; read-only; no provider contact).** One file copied from the host to the workstation, then compared offline:
+**Feed comparison (DONE 2026-11-02, result in section 4; kept for reproduction).** One file copied from the host to the workstation, then compared offline:
 
 ```bash
 mkdir -p /d/tmp/afldb-c4b-live-feed-20261102 && /c/Windows/System32/OpenSSH/scp.exe \

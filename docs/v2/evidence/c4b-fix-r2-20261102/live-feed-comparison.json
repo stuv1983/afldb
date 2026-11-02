@@ -1,0 +1,125 @@
+{
+  "files": {
+    "retained": {
+      "path": "data/sources/afl_api/fixtures/afl-api-2027-2026-11-01-012026/00-season-matches.json",
+      "bytes": 266389,
+      "sha256": "21fd12e7704b7c7146cfbab414352352f3cfaa53e7ef5038f4411fa789e4c84d"
+    },
+    "captured": {
+      "path": "D:/tmp/afldb-c4b-live-feed-20261102/00-season-matches.json",
+      "bytes": 266461,
+      "sha256": "1a51317b514b53c2d7261d23f506c92af6e0dbaff29c4a969e1281b19e2b7ced"
+    },
+    "byteDelta": 72
+  },
+  "sameJsonModuloFormatting": false,
+  "identicalBytes": false,
+  "topLevelKeys": {
+    "onlyRetained": [],
+    "onlyCaptured": []
+  },
+  "meta": {
+    "differences": []
+  },
+  "matches": {
+    "retained": 218,
+    "captured": 218,
+    "duplicateKeys": {
+      "retained": 0,
+      "captured": 0
+    },
+    "onlyInRetained": [],
+    "onlyInCaptured": [],
+    "matchesWithAnyDifference": 4
+  },
+  "statusCounts": {
+    "retained": {
+      "SCHEDULED": 135,
+      "PLACEHOLDER": 83
+    },
+    "captured": {
+      "SCHEDULED": 135,
+      "PLACEHOLDER": 83
+    }
+  },
+  "statusChanges": [],
+  "dateChanges": [],
+  "venueChanges": [
+    {
+      "match": "CD_M20270140807",
+      "path": ".venue.name",
+      "kind": "changed",
+      "retained": "UTAS Stadium",
+      "captured": "University of Tasmania Stadium"
+    },
+    {
+      "match": "CD_M20270141103",
+      "path": ".venue.name",
+      "kind": "changed",
+      "retained": "UTAS Stadium",
+      "captured": "University of Tasmania Stadium"
+    },
+    {
+      "match": "CD_M20270141805",
+      "path": ".venue.name",
+      "kind": "changed",
+      "retained": "UTAS Stadium",
+      "captured": "University of Tasmania Stadium"
+    },
+    {
+      "match": "CD_M20270142107",
+      "path": ".venue.name",
+      "kind": "changed",
+      "retained": "UTAS Stadium",
+      "captured": "University of Tasmania Stadium"
+    }
+  ],
+  "teamChanges": [],
+  "roundChanges": [],
+  "distinct": {
+    "venues": {
+      "retained": 19,
+      "captured": 19
+    },
+    "teams": {
+      "retained": 40,
+      "captured": 40
+    }
+  },
+  "changedPathGroups": [
+    {
+      "path": ".venue.name [changed]",
+      "leafDifferences": 4,
+      "matchesAffected": 4,
+      "examples": [
+        {
+          "match": "CD_M20270140807",
+          "retained": "UTAS Stadium",
+          "captured": "University of Tasmania Stadium"
+        },
+        {
+          "match": "CD_M20270141103",
+          "retained": "UTAS Stadium",
+          "captured": "University of Tasmania Stadium"
+        },
+        {
+          "match": "CD_M20270141805",
+          "retained": "UTAS Stadium",
+          "captured": "University of Tasmania Stadium"
+        }
+      ]
+    }
+  ],
+  "assumptionFlags": {
+    "sameMatchCount": true,
+    "sameMatchIdSet": true,
+    "sameStatusDistribution": true,
+    "noStatusChange": true,
+    "noDateOrTimeChange": true,
+    "noVenueChange": false,
+    "noTeamChange": true,
+    "noRoundChange": true,
+    "sameDistinctVenues": true,
+    "sameDistinctTeams": true
+  }
+}
