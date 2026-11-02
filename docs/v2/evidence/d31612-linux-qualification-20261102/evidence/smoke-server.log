@@ -1,0 +1,15 @@
+isolated-pg: afldb_v2_c316ui_schema_test verified (cluster afldb_v2_isolated, 127.0.0.1:55482); running /usr/bin/env
+[afldb] primary 1967463 starting 1 worker(s)
+[afldb] serving build 8cOw9f9cWlZ7VOWRAVxGz release in-place revision unknown
+▲ Next.js 16.3.1
+- Local:         http://127.0.0.1:3198
+- Network:       http://127.0.0.1:3198
+✓ Ready in 0ms
+✓ Running next.config took 7ms
+[afldb] SIGTERM received, stopping workers
+[afldb] worker 1967484 (id 1) exited (143); restarting in 1000ms
+▲ Next.js 16.3.1
+- Local:         http://127.0.0.1:3198
+- Network:       http://127.0.0.1:3198
+✓ Ready in 0ms
+✓ Running next.config took 7ms

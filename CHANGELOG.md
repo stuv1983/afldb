@@ -15,6 +15,13 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-316 close-out preparation, part 2: C7 observer, Linux qualification, UI release package rev 2, successor ISSUE-332 (2026-11-02, local; production unchanged)
+
+- **Code added (local, NOT deployed, no route imports it):** read-only C7 observer (`src/lib/acquisition/afl-api-c7-observation.ts`, `tools/v2/c7-observe.ts`) distinguishing no batch, no concluded matches, incomplete acquisition, failed processing and measured-criteria-met; never records an acceptance, never measures the ISR window. Unit tests and an integration test (rolled-back transaction on a real PostgreSQL 16) added.
+- **Qualified on Linux (isolated, disposable, `/dev/shm` workspace):** focused suites 420/420, C7 reader 3/3, release-route suite 33/33, typecheck exit 0, production-mode build exit 0 and boot smoke on revision `a0b1080f5b98aee7191894c138be27bb524c7b1b`; C5 process guard table 17/17 and the real-process test PASS. Record: `docs/v2/d31612-linux-qualification-2026-11-02.md`.
+- **Prepared, not granted:** UI release package revision 2 (full revision, release route, off-host typecheck, pinned rollback target `ea98a35f2061--vY0EFS0DdR-TiPkxTZz6`, state-aware recovery): `docs/v2/d31612-ui-release-approval-2026-11-02.md`.
+- **Tracking:** AFLDB-ISSUE-332 opened as the named successor of the ISSUE-316 seasonal obligations (C6 to C9, D-316-5 to D-316-11 with gates); nothing decided or accepted. ISSUE-316 stays open (first night unobserved, D-316-12 not deployed).
+
 ### ISSUE-316 close-out preparation: D-316-12 admin wording (local), helper self-match fix, C6-C9 classification (2026-11-02, local; production unchanged)
 
 - **Application text changed (local, NOT deployed):** `/admin/current-season` now says AFL Tables is retired (timer disabled), AFL API match ingestion runs from its timer while the switch is Enabled, Brownlow is governed separately and off until a count window, and there is no Start control; the unconfigured-host status text no longer points at the retired polkit rule. No control, permission or behaviour changed. `docs/deployment.md` 7b, on-demand and 7d updated. Release package prepared, not granted.

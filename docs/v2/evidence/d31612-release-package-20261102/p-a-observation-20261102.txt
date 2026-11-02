@@ -1,0 +1,30 @@
+﻿host afldb-prod 2026-11-02T11:41:16Z / 2026-11-02 22:41:16 AEDT
+current  -> releases/ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+previous -> releases/fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy
+releases:
+61a95f7397da-JYIBkYn8ynPgYMn1e5nK-
+9ed9c9dd3e84-QNEHXAtU53TzUjj0Mb7mv
+ad245d602f6f-m0M8pf121326vNSo2B759
+ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy
+locks: 
+checkout HEAD 924ff273261834e4112e3f41b61ceeab55427534; status lines: 0; branch main
+outgoing revision present in checkout
+release: current  ea98a35f2061--vY0EFS0DdR-TiPkxTZz6 revision ea98a35f20610e75c18e698bc0d9fe084c3c783d BUILD_ID -vY0EFS0DdR-TiPkxTZz6 production
+release: previous fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy revision fd48ace0c2cb70296d723603aa397b5bd7a21a0d BUILD_ID pqAQwRIJWLjSYzR8LiTuy
+release: memory   afldb MemoryCurrent 213 MB
+release: process  3303369 runs in /home/arm/afldb-releases/releases/ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+release: health   200 status=ok database=ok
+release: build    /_next/static/-vY0EFS0DdR-TiPkxTZz6/_buildManifest.js 200
+release: build    /_next/static/pqAQwRIJWLjSYzR8LiTuy/_buildManifest.js 404 (previous; expect 404)
+release: STATUS PASS ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+MemAvailable 2946 MB; swap 0 kB
+free /home/arm 53427316 KB
+timers:
+Tue 2026-11-03 05:01:47 afldb-settle-afl-api.service
+enabled: enabled / brownlow disabled / afltables disabled
+trigger line count: 1
+service: MainPID=3303369 ActiveState=active 
+cron:
+no afldb cron entries
+tmux: /usr/bin/tmux

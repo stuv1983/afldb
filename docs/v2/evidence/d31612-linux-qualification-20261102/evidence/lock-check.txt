@@ -1,0 +1,2 @@
+ABSENT node_modules/@electric-sql/pglite@0.2.17
+lock check: ok 426, optional-absent 125, bad 1
