@@ -1,0 +1,7 @@
+{
+  "matchesInSeason": 0,
+  "aflApiOwnedMatches": 0,
+  "acquisitionSettings": {
+    "acquisition.afl_api_current_season_enabled": "false"
+  }
+}

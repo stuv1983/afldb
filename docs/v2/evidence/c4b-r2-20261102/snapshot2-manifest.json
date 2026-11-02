@@ -1,0 +1,40 @@
+{
+  "contract_version": 1,
+  "source_key": "afl_api",
+  "acquisition_kind": "afl_api_match_snapshot",
+  "fixtures_only": false,
+  "label": "afl-api-2027-2026-11-02-083723",
+  "season": 2027,
+  "comp_season_id": 102,
+  "selection": {
+    "status": "CONCLUDED",
+    "since": null,
+    "match": null
+  },
+  "acquisition_tool": "acquire-afl-api.ts",
+  "acquisition_started_at": "2026-11-02T08:37:23.124Z",
+  "request_parameters": {
+    "competition_id": 1,
+    "comp_season_id": 102,
+    "page_size": 1000
+  },
+  "acquired_at": "2026-11-02T08:37:23.434Z",
+  "counts": {
+    "matches_in_feed": 218,
+    "matches_selected": 0
+  },
+  "files": [
+    {
+      "file": "00-season-matches.json",
+      "sha256": "21fd12e7704b7c7146cfbab414352352f3cfaa53e7ef5038f4411fa789e4c84d",
+      "http_status": 200,
+      "etag": "W/\"0026267be4c0bd64563890e41d1a01425\"",
+      "cache_control": "public, max-age=120",
+      "retrieved_at": "2026-11-02T08:37:23.425Z",
+      "request": {
+        "method": "GET",
+        "url": "https://aflapi.afl.com.au/afl/v2/matches?competitionId=1&compSeasonId=102&pageSize=1000"
+      }
+    }
+  ]
+}

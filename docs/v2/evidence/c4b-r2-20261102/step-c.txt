@@ -1,0 +1,67 @@
+== step-c 2026-11-02T08:37:49Z exit=0
+HEAD=924ff273261834e4112e3f41b61ceeab55427534 porcelain=0
+afldb MainPID=3268373 (was 3268373) NRestarts=0 (was 0) ActiveEnter=6739446504275 (was 6739446504275)
+afldb-settle-afl-api.service active=inactive enabled=static
+afldb-settle-afl-api-brownlow.service active=inactive enabled=static
+afldb-settle-afl-api.timer active=inactive enabled=disabled
+afldb-settle-afl-api-brownlow.timer active=inactive enabled=disabled
+afldb-settle-afltables.timer active=inactive enabled=disabled
+--- evidence dir
+total 52
+drwx------  2 arm arm 4096 Nov  2 19:37 .
+drwx------ 26 arm arm 4096 Nov  2 19:37 ..
+-rw-------  1 arm arm  250 Nov  2 19:37 acquire.log
+-rw-------  1 arm arm  144 Nov  2 19:37 after.json
+-rw-------  1 arm arm  144 Nov  2 19:37 before.json
+-rw-------  1 arm arm 1968 Nov  2 19:37 readiness.txt
+-rw-------  1 arm arm   92 Nov  2 19:37 restore-verified.json
+-rw-------  1 arm arm  399 Nov  2 19:37 result.json
+-rw-------  1 arm arm 5011 Nov  2 19:37 run.log
+-rw-------  1 arm arm 1891 Nov  2 19:37 settle-dry-run.log
+-rw-------  1 arm arm  156 Nov  2 19:37 watchdog-ready.json
+-rw-------  1 arm arm    8 Nov  2 19:37 watchdog.pid
+432a826da72b1321abbff9ca4c33fc95e49ad7e975d9428a3488fca15df64a96  ./acquire.log
+15cc09f9fbb43473e4e646118f3a95aba59a0be02b4432c1f3b8b923bd8a3849  ./after.json
+15cc09f9fbb43473e4e646118f3a95aba59a0be02b4432c1f3b8b923bd8a3849  ./before.json
+f3e3504958d0b9a3fa47d92058ef2bb35225f39fea9427fe452d98d5c331e9dd  ./readiness.txt
+5e4746ab782e51199d0bae4b01321a68bc6ab9c5646c8d78ad53f0ad2f0e80f5  ./restore-verified.json
+1571892cc538ac3d51fba3cd595436658ee4bd35fd78f9b950dc1e96cdf9d04b  ./result.json
+0f6c4e62f4fa96f90b66d94fe39fc47f11958df73c3eb99fccf9a5d754dd944a  ./run.log
+29118f8db0503311910c73d654b03bcc24e61ad149a96652b44c0a0ad6f3914e  ./settle-dry-run.log
+cc66b30b09c8967cdda50c5df03e7898231651a0d21054afa011dbb2ff592f1f  ./watchdog-ready.json
+b61202bd99a8093d1c14021091a464fab14221a16995c90404788fa2522eb899  ./watchdog.pid
+--- result.json
+{
+  "exitCode": 0,
+  "verdict": "CLEAR",
+  "reasons": [
+    "every automated HALT criterion is clear; the setting is off and verified; both timers disabled. This is the evidence for the C4b record, not the record: C5 still needs the reviewed, recorded C4b PASS."
+  ],
+  "label": "afl-api-2027-2026-11-02-083723",
+  "run_id": "c4b-2026-11-02T083721874Z-3296445",
+  "at": "2026-11-02T08:37:24.584Z"
+}
+--- snapshots
+total 16
+drwx------ 4 arm arm 4096 Nov  2 19:37 .
+drwxrwxr-x 5 arm arm 4096 Nov  2 16:27 ..
+drwx------ 2 arm arm 4096 Nov  2 16:27 afl-api-2027-2026-11-02-052722
+drwx------ 2 arm arm 4096 Nov  2 19:37 afl-api-2027-2026-11-02-083723
+--- tmux
+no server running on /tmp/tmux-1000/default
+--- database (read-only; the packaged reader definitions, no phase is run)
+identity ok (afldb_prod, OID 66668, read-only session)
+setting=[false]
+--- audit rows by the rehearsal tool
+297	2026-11-02 13:25:23.440047+11	afl-api-c4b-rehearsal	current_season.afl_api_ingestion_set	{"via": "afl-api-fixture-window", "step": "on", "run_id": "fxw-2026-11-02T022520565Z-3270427", "enabled": true, "decision": "D-MB-20261102 approved first production 2027 fixture ingestion"}
+298	2026-11-02 13:25:26.902165+11	afl-api-c4b-rehearsal	current_season.afl_api_ingestion_set	{"via": "afl-api-fixture-window", "step": "restore", "run_id": "fxw-2026-11-02T022520565Z-3270427", "attempt": 1, "enabled": false, "decision": "D-MB-20261102 approved first production 2027 fixture ingestion"}
+301	2026-11-02 16:27:22.289922+11	afl-api-c4b-rehearsal	current_season.afl_api_ingestion_set	{"via": "afl-api-c4b-rehearsal", "step": "on", "run_id": "c4b-2026-11-02T052721596Z-3289853", "enabled": true, "decision": "D-316-13"}
+302	2026-11-02 16:27:23.928961+11	afl-api-c4b-rehearsal	current_season.afl_api_ingestion_set	{"via": "afl-api-c4b-rehearsal", "step": "restore", "run_id": "c4b-2026-11-02T052721596Z-3289853", "attempt": 1, "enabled": false, "decision": "D-316-13"}
+303	2026-11-02 19:37:22.727908+11	afl-api-c4b-rehearsal	current_season.afl_api_ingestion_set	{"via": "afl-api-c4b-rehearsal", "step": "on", "run_id": "c4b-2026-11-02T083721874Z-3296445", "enabled": true, "decision": "D-316-13"}
+304	2026-11-02 19:37:24.377982+11	afl-api-c4b-rehearsal	current_season.afl_api_ingestion_set	{"via": "afl-api-c4b-rehearsal", "step": "restore", "run_id": "c4b-2026-11-02T083721874Z-3296445", "attempt": 1, "enabled": false, "decision": "D-316-13"}
+--- canonical counts (season 2027 matches; afl_api-owned matches; import batches in the last hour)
+0	0
+ERROR:  column "created_at" does not exist
+LINE 1: SELECT count(*), max(created_at) FROM import_batches WHERE c...
+                             ^
+STEP-C DONE (read-only; the verdict is in result.json above; the reviewer records it)

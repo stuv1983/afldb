@@ -1,0 +1,17 @@
+AFL API cutover readiness — season 2027 (repository and season feed only, DB-free)
+  PASS in_progress_season: data/reference/seasons.json in_progress_seasons = [2027]
+  PASS season_identity: afl-api-identities.json seasons.2027 = CD_S2027014
+  PASS round_vocabulary: source-families.json round_vocabularies.afl_api_2027 declared (29 round row(s))
+  PASS season_feed: data/sources/afl_api/matches/afl-api-2027-2026-11-02-083723/00-season-matches.json: 218 match(es), complete for CD_S2027014, sha256 21fd12e7704b7c7146cfbab414352352f3cfaa53e7ef5038f4411fa789e4c84d
+  PASS venue_coverage: every feed venue is mapped (19 distinct provider venue(s), 218 match(es))
+  PASS team_coverage: every feed team is mapped (40 distinct provider team(s))
+  PASS round_coverage: every feed entry translates through round_vocabularies.afl_api_2027
+  INFO afltables_network: retired (AFL Tables network acquisition refused by every gated path)
+VERDICT: REPOSITORY READY — the tracked files and this feed meet the settle's preconditions. This is NOT the cutover go (D-316-4): the host and database checks below are the operator's.
+
+Host checks (operator-run on the target host; not run by this tool):
+  systemctl show afldb-settle-afl-api.service afldb-settle-afl-api-brownlow.service --property=Id,LoadState
+  systemctl is-enabled afldb-settle-afl-api.timer afldb-settle-afl-api-brownlow.timer afldb-settle-afltables.timer
+  psql "$DATABASE_URL" -XAtc "SELECT key, value FROM site_settings WHERE key LIKE 'acquisition.%' ORDER BY key"
+  ls /etc/polkit-1/rules.d/ | grep afldb ; grep -c "^AFLDB_SETTLE_TRIGGER=" .env
+  in psql on the target database: SELECT count(*) FROM venues WHERE legacy_name IN ('Adelaide Oval', 'Barossa Park', 'Bellerive Oval', 'Carrara', 'Docklands', 'Eureka Stadium', 'Gabba', 'Hands Oval', 'Kardinia Park', 'M.C.G.', 'Manuka Oval', 'Marrara Oval', 'Norwood Oval', 'Perth Stadium', 'S.C.G.', 'Sydney Showground', 'Traeger Park', 'York Park');  -- expect 18

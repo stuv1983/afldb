@@ -1,0 +1,10 @@
+{
+  "exitCode": 0,
+  "verdict": "CLEAR",
+  "reasons": [
+    "every automated HALT criterion is clear; the setting is off and verified; both timers disabled. This is the evidence for the C4b record, not the record: C5 still needs the reviewed, recorded C4b PASS."
+  ],
+  "label": "afl-api-2027-2026-11-02-083723",
+  "run_id": "c4b-2026-11-02T083721874Z-3296445",
+  "at": "2026-11-02T08:37:24.584Z"
+}
