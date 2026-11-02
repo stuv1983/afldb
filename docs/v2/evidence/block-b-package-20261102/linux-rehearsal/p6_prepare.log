@@ -1,0 +1,4 @@
+clone identity oid=20331 sysid=7703356136479211818 cluster=afldb_v2_isolated comment=[afldb-v2-isolated-test]
+isolated-pg: afldb_v2_blockb_rh_test verified (cluster afldb_v2_isolated, 127.0.0.1:55495); running node
+transform diff lines: 19
+rehearsal copy syntax ok

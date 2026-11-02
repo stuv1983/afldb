@@ -1,0 +1,27 @@
+{
+  "digest": "11443bcea09bff09f600d42620fd94e935f32b8d88b94fe05db27fc12bde2c85",
+  "operation": "eligibility",
+  "stage": null,
+  "seasons": "1 (2025..2025; includes 2026: false)",
+  "rulings": 12,
+  "actorId": 1,
+  "revision": "ae8b625b8e09c353add74b1296d422d090a80321",
+  "baseline": "d8636567fae9920bc4ecf7b9a858a6cb37de10dc75001f22a0e44e70246d3333",
+  "createdAt": "2026-11-02T00:16:19.636Z",
+  "expiresAt": "2026-11-03T00:16:19.636Z",
+  "backup": {
+    "sha256": "3a07ed21b4d50a3b3856a96e0fbee126bc389309690774e586c0035476740935",
+    "capturedAt": "2026-11-02T00:15:37.765Z",
+    "restoredAt": "2026-11-02T00:15:46.899Z",
+    "baselineDigest": "d8636567fae9920bc4ecf7b9a858a6cb37de10dc75001f22a0e44e70246d3333"
+  },
+  "target": {
+    "database": "afldb_v2_blockb_rh_test",
+    "user": "afldb_owner",
+    "systemIdentifier": "7703356136479211818",
+    "databaseOid": "20331"
+  },
+  "payload": {
+    "rulings": "[12 items]"
+  }
+}

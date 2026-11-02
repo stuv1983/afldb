@@ -1,0 +1,14 @@
+PASS p0_resources
+PASS p1_inputs
+PASS p2_capture_controls
+PASS p4_cluster
+PASS p5_restore_migrate
+PASS p6_prepare
+FAIL p7_b0 rc=1
+PASS p7_b0
+PASS p7_b1
+PASS p7_b2
+PASS p7_b3
+PASS p7_e
+PASS p8_2026_control
+PASS p13_final

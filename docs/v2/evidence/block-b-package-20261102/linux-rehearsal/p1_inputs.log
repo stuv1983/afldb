@@ -1,0 +1,8 @@
+candidate clean at ae8b625b8e09c353add74b1296d422d090a80321
+  ok refused: restored baseline differs
+  ok refused: dump bytes differ from sidecar
+  ok refused: sidecar ledger digest wrong
+  ok refused: restored ledger digest wrong
+  ok refused: restore before capture
+  ok refused: backup from another target
+SELFTEST PASS

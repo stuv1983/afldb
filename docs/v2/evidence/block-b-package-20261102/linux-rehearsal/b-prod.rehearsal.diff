@@ -1,0 +1,35 @@
+22c22
+< CHK=/home/arm/projects/afldb
+---
+> CHK=/mnt/ssd/afldb-v2-blockb-20261101T235531Z/cand
+25,26c25,26
+< EXPECT_DB=afldb_prod; EXPECT_DSN_HOST=localhost; EXPECT_DSN_PORT=5432
+< EXPECT_SYSID=7674454702926115004; EXPECT_OID=66668
+---
+> EXPECT_DB=afldb_v2_blockb_rh_test; EXPECT_DSN_HOST=127.0.0.1; EXPECT_DSN_PORT=55495
+> EXPECT_SYSID=7703356136479211818; EXPECT_OID=20331
+29,30c29
+< UNITS="afldb-settle-afltables.service afldb-settle-afltables.timer afldb-settle-afl-api.service afldb-settle-afl-api.timer
+< afldb-settle-afl-api-brownlow.service afldb-settle-afl-api-brownlow.timer afldb-email-intake.service afldb-email-intake.timer"
+---
+> UNITS="afldb-rehearsal-none.service"
+32c31
+< [ "$(hostname)" = afldb-prod ] && [ "$(id -un)" = arm ] || stop "unexpected host/user" 3
+---
+> [ "$(hostname)" = streamanator ] && [ "$(id -un)" = arm ] || stop "unexpected host/user" 3
+80c79
+<   if crontab -l >/dev/null 2>&1; then stop "arm has a crontab" 4; fi
+---
+>   echo "crontab check skipped (rehearsal host)"
+92c91
+< BDIR_OF() { echo "/home/arm/ops/blockb-${1:0:12}"; }
+---
+> BDIR_OF() { echo "/mnt/ssd/afldb-v2-blockb-20261101T235531Z/evidence/ops/blockb-${1:0:12}"; }
+150c149
+<   T=$(q -c "SELECT json_build_object('host','localhost','port',inet_server_port(),'database',current_database(),'user','afldb_owner','systemIdentifier',(SELECT system_identifier::text FROM pg_control_system()),'databaseOid',(SELECT oid::text FROM pg_database WHERE datname=current_database()),'clusterName',current_setting('cluster_name'),'databaseComment',shobj_description((SELECT oid FROM pg_database WHERE datname=current_database()),'pg_database'))")
+---
+>   T=$(q -c "SELECT json_build_object('host','127.0.0.1','port',inet_server_port(),'database',current_database(),'user','afldb_owner','systemIdentifier',(SELECT system_identifier::text FROM pg_control_system()),'databaseOid',(SELECT oid::text FROM pg_database WHERE datname=current_database()),'clusterName',current_setting('cluster_name'),'databaseComment',shobj_description((SELECT oid FROM pg_database WHERE datname=current_database()),'pg_database'))")
+155c154
+< const want = { host: "localhost", port: 5432, database: "afldb_prod", user: "afldb_owner", systemIdentifier: "7674454702926115004", databaseOid: "66668", clusterName: "16/main", databaseComment: null };
+---
+> const want = { host: "127.0.0.1", port: 55495, database: "afldb_v2_blockb_rh_test", user: "afldb_owner", systemIdentifier: "7703356136479211818", databaseOid: "20331", clusterName: "afldb_v2_isolated", databaseComment: "afldb-v2-isolated-test" };

@@ -1,0 +1,123 @@
+== pre b2: checkout, writers, identity, ledger 118, receipts 2026-11-02T00:07:37Z
+crontab check skipped (rehearsal host)
+no writer unit enabled or active; no writer process; no crontab
+dsn_identity key=AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=127.0.0.1 port=55495 database=afldb_v2_blockb_rh_test
+identity ok
+ledger rows=118 last=118_fixtures_unconfirmed_participants.sql digest=573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57
+receipts=[observe=2] expected before=[observe=2]
+votes2026=9522:c3db1567b6932a7653ca68017cd0d630
+facts total|2026|inscope_match_id|2025_nosource|2025_source|staged2025|decisions = 330383|9522|0|9522|0|621|0
+PRE PASS b2
+crontab check skipped (rehearsal host)
+no writer unit enabled or active; no writer process; no crontab
+dsn_identity key=AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=127.0.0.1 port=55495 database=afldb_v2_blockb_rh_test
+identity ok
+{"host" : "127.0.0.1", "port" : 55495, "database" : "afldb_v2_blockb_rh_test", "user" : "afldb_owner", "systemIdentifier" : "7703356136479211818", "databaseOid" : "20331", "clusterName" : "afldb_v2_isolated", "databaseComment" : "afldb-v2-isolated-test"}
+target equals the reviewed facts (sysid, oid, cluster, owner role)
+crontab check skipped (rehearsal host)
+no writer unit enabled or active; no writer process; no crontab
+dsn_identity key=AFLDB_OWNER_DATABASE_URL user=afldb_owner host=127.0.0.1 port=55495 database=afldb_v2_blockb_rh_test
+== baseline b2 (read-only session) 2026-11-02T00:07:38Z
+Read-only Brownlow baseline 13e3e799a1c409f6107f7a79cec36ec53f1f3bd2f248d61c7098d0120415d942
+isolated-pg: afldb_v2_blockb_rh_test verified (cluster afldb_v2_isolated, 127.0.0.1:55495); running bash
+dump 2609e60ea8c2e14da2b6b88cc2aa1402c6e6b9c33e190d66a340274ef8a122af
+postgresql@16-main.service active MainPID=1504
+2026-11-02T00:08:56Z RV DONE restored_at=2026-11-02T00:08:26.121Z evidence=/mnt/ssd/afldb-v2-blockb-20261101T235531Z/evidence-private/b2
+ASSEMBLED b2: baseline 13e3e799a1c409f6107f7a79cec36ec53f1f3bd2f248d61c7098d0120415d942 == restored; backup 2609e60ea8c2e14da2b6b88cc2aa1402c6e6b9c33e190d66a340274ef8a122af; restoredAt 2026-11-02T00:08:26.121Z
+crontab check skipped (rehearsal host)
+no writer unit enabled or active; no writer process; no crontab
+dsn_identity key=AFLDB_OWNER_DATABASE_URL user=afldb_owner host=127.0.0.1 port=55495 database=afldb_v2_blockb_rh_test
+== plan b2 (read-only session, no writes) 2026-11-02T00:08:57Z
+Review plan aa16b5ac407134716142c759e3a0d7f0ba5447e5b3e7b963babbb792d823bdf8; no writes
+a439453c0a333f2fc395654f1f159e5cb3e6a6d2767680ef72fdd827dd096694  /mnt/ssd/afldb-v2-blockb-20261101T235531Z/evidence/ops/blockb-ae8b625b8e09/b2/plan.json
+REFUSED:
+  - the reference must be the owner's own approval words (20+ characters)
+CONTROL refused as required (rc=1): node /mnt/ssd/afldb-v2-blockb-20261101T235531Z/cand/docs/v2/evidence/block-b-package-20261102/make-approval.mjs --plan /mnt/ssd/afldb-v2-blockb-20261101T235531Z/evidence/ops/blockb-ae8b625b8e09/b2/plan.json
+REFUSED:
+  - expiry is more than 12 hours away: approve a window, not a standing permission
+CONTROL refused as required (rc=1): node /mnt/ssd/afldb-v2-blockb-20261101T235531Z/cand/docs/v2/evidence/block-b-package-20261102/make-approval.mjs --plan /mnt/ssd/afldb-v2-blockb-20261101T235531Z/evidence/ops/blockb-ae8b625b8e09/b2/plan.json
+REFUSED:
+  - expiry is not in the future
+CONTROL refused as required (rc=1): node /mnt/ssd/afldb-v2-blockb-20261101T235531Z/cand/docs/v2/evidence/block-b-package-20261102/make-approval.mjs --plan /mnt/ssd/afldb-v2-blockb-20261101T235531Z/evidence/ops/blockb-ae8b625b8e09/b2/plan.json
+APPROVAL FILE /mnt/ssd/afldb-v2-blockb-20261101T235531Z/evidence/stage-b2/approval.json: plan aa16b5ac407134716142c759e3a0d7f0ba5447e5b3e7b963babbb792d823bdf8, operation backfill, seasons 42, expires 2026-11-02T01:09:36.000Z
+REFUSED:
+  - output exists; approvals are never overwritten
+CONTROL refused as required (rc=1): node /mnt/ssd/afldb-v2-blockb-20261101T235531Z/cand/docs/v2/evidence/block-b-package-20261102/make-approval.mjs --plan /mnt/ssd/afldb-v2-blockb-20261101T235531Z/evidence/ops/blockb-ae8b625b8e09/b2/plan.json
+{
+  "digest": "aa16b5ac407134716142c759e3a0d7f0ba5447e5b3e7b963babbb792d823bdf8",
+  "operation": "backfill",
+  "stage": null,
+  "seasons": "42 (1984..2025; includes 2026: false)",
+  "rulings": null,
+  "actorId": null,
+  "revision": "ae8b625b8e09c353add74b1296d422d090a80321",
+  "baseline": "13e3e799a1c409f6107f7a79cec36ec53f1f3bd2f248d61c7098d0120415d942",
+  "createdAt": "2026-11-02T00:08:57.976Z",
+  "expiresAt": "2026-11-03T00:08:57.976Z",
+  "backup": {
+    "sha256": "2609e60ea8c2e14da2b6b88cc2aa1402c6e6b9c33e190d66a340274ef8a122af",
+    "capturedAt": "2026-11-02T00:08:16.990Z",
+    "restoredAt": "2026-11-02T00:08:26.121Z",
+    "baselineDigest": "13e3e799a1c409f6107f7a79cec36ec53f1f3bd2f248d61c7098d0120415d942"
+  },
+  "target": {
+    "database": "afldb_v2_blockb_rh_test",
+    "user": "afldb_owner",
+    "systemIdentifier": "7703356136479211818",
+    "databaseOid": "20331"
+  },
+  "payload": {
+    "export": {
+      "format": "afldb.v2.brownlow-round-vote-match-backfill",
+      "formatVersion": 1,
+      "rule": "migration-094-s27.5: unique home_and_away match in the row season and round holding a p...",
+      "seasons": "[42 items]",
+      "digest": "2a5b5405d69a134db4d01f5bb9de8948ac3780d0c3b4771f618e858842e595b1",
+      "repairs": "[320861 items]"
+    },
+    "fingerprints": {
+      "rows": 320861,
+      "mapped": 0,
+      "columns": "bc52f294822559af08ce9de5997862ccca322a8b423c0751485ab69d3b4a418d",
+      "mapping": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "perSeason": "[42 items]"
+  }
+}
+crontab check skipped (rehearsal host)
+no writer unit enabled or active; no writer process; no crontab
+dsn_identity key=AFLDB_OWNER_DATABASE_URL user=afldb_owner host=127.0.0.1 port=55495 database=afldb_v2_blockb_rh_test
+approval refused: planDigest
+STOP: approval does not bind this plan and stage
+CONTROL refused as required (rc=6): B apply ae8b625b8e09c353add74b1296d422d090a80321 b2
+crontab check skipped (rehearsal host)
+no writer unit enabled or active; no writer process; no crontab
+dsn_identity key=AFLDB_OWNER_DATABASE_URL user=afldb_owner host=127.0.0.1 port=55495 database=afldb_v2_blockb_rh_test
+STOP: no execution approval file: the owner has not approved
+CONTROL refused as required (rc=3): B apply ae8b625b8e09c353add74b1296d422d090a80321 b2
+== accept b2 (read-only) 2026-11-02T00:09:39Z
+dsn_identity key=AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=127.0.0.1 port=55495 database=afldb_v2_blockb_rh_test
+identity ok
+receipts=[observe=2] expected after=[backfill=1,observe=2]
+STOP: receipts after b2 are not exactly [backfill=1,observe=2]
+CONTROL refused as required (rc=5): B accept ae8b625b8e09c353add74b1296d422d090a80321 b2
+crontab check skipped (rehearsal host)
+no writer unit enabled or active; no writer process; no crontab
+dsn_identity key=AFLDB_OWNER_DATABASE_URL user=afldb_owner host=127.0.0.1 port=55495 database=afldb_v2_blockb_rh_test
+approval matches plan aa16b5ac407134716142c759e3a0d7f0ba5447e5b3e7b963babbb792d823bdf8 at ae8b625b8e09c353add74b1296d422d090a80321
+== apply b2 (WRITES; one stage, one receipt; no retry) 2026-11-02T00:09:40Z
+Correction receipt committed; review restricted output
+RUNNER EXIT 0
+APPLY RAN b2: now run: bash b-prod.sh accept ae8b625b8e09c353add74b1296d422d090a80321 b2
+== accept b2 (read-only) 2026-11-02T00:11:36Z
+dsn_identity key=AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=127.0.0.1 port=55495 database=afldb_v2_blockb_rh_test
+identity ok
+receipts=[backfill=1,observe=2] expected after=[backfill=1,observe=2]
+votes2026=9522:c3db1567b6932a7653ca68017cd0d630
+facts total|2026|inscope_match_id|2025_nosource|2025_source|staged2025|decisions = 330383|9522|320861|9522|0|621|0
+ACCEPT PASS b2
+crontab check skipped (rehearsal host)
+no writer unit enabled or active; no writer process; no crontab
+dsn_identity key=AFLDB_OWNER_DATABASE_URL user=afldb_owner host=127.0.0.1 port=55495 database=afldb_v2_blockb_rh_test
+STOP: pre failed at apply time; nothing was written
+CONTROL refused as required (rc=6): B apply ae8b625b8e09c353add74b1296d422d090a80321 b2

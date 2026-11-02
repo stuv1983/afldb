@@ -1,0 +1,33 @@
+{
+  "digest": "308d93f216455c789e25759aaf35d0c08a46097cf2998e885203f89d6dc61d59",
+  "operation": "observe",
+  "stage": null,
+  "seasons": "1 (2025..2025; includes 2026: false)",
+  "rulings": null,
+  "actorId": null,
+  "revision": "ae8b625b8e09c353add74b1296d422d090a80321",
+  "baseline": "a7630f3233868f02dfdc37b50a1d25d807f8daa3de10d2232958b28437f5ef66",
+  "createdAt": "2026-11-02T00:05:59.426Z",
+  "expiresAt": "2026-11-03T00:05:59.426Z",
+  "backup": {
+    "sha256": "24629fce259f11778bd5114a91e2d26e424e09f30f9c0262ef29299193e74948",
+    "capturedAt": "2026-11-02T00:05:18.444Z",
+    "restoredAt": "2026-11-02T00:05:27.519Z",
+    "baselineDigest": "a7630f3233868f02dfdc37b50a1d25d807f8daa3de10d2232958b28437f5ef66"
+  },
+  "target": {
+    "database": "afldb_v2_blockb_rh_test",
+    "user": "afldb_owner",
+    "systemIdentifier": "7703356136479211818",
+    "databaseOid": "20331"
+  },
+  "payload": {
+    "snapshot": {
+      "season": 2025,
+      "matchVotes": "[207 items]",
+      "leaderboard": "[188 items]",
+      "leaderboardStatus": "CONCLUDED"
+    },
+    "filesDigest": "68297dbaa60246f76e317e1b75de3293eb75924ca33626a8ce27b77aefafc88e"
+  }
+}

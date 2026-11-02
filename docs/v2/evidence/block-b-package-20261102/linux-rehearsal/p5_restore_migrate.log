@@ -1,0 +1,11 @@
+create-db: afldb_v2_btmpl_test created and marked
+isolated-pg: afldb_v2_btmpl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55495); running node
+pg_restore exit=0 seconds=6 stderrLines=0
+create-db: afldb_v2_blockb_rh_test created from afldb_v2_btmpl_test and marked
+isolated-pg: afldb_v2_blockb_rh_test verified (cluster afldb_v2_isolated, 127.0.0.1:55495); running bash
+
+  applying 118_fixtures_unconfirmed_participants.sql ... ok (11 ms)
+
+Applied 1 migration(s).
+isolated-pg: afldb_v2_blockb_rh_test verified (cluster afldb_v2_isolated, 127.0.0.1:55495); running bash
+afldb_v2_blockb_rh_test|20331|7703356136479211818|afldb_v2_isolated|afldb-v2-isolated-test|118|330383|0

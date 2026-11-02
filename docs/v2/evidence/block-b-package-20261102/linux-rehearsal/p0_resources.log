@@ -1,0 +1,5 @@
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sdf1       938G   60G  831G   7% /mnt/ssd
+Mem:              31           4           1           0          26          26
+afldb.service active MainPID=1162113
+postgresql@16-main.service active MainPID=1504

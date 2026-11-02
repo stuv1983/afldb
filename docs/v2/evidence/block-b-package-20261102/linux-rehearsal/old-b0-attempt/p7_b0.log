@@ -1,0 +1,109 @@
+== pre b1: checkout, writers, identity, ledger 118, receipts 2026-11-01T23:56:26Z
+crontab check skipped (rehearsal host)
+no writer unit enabled or active; no writer process; no crontab
+dsn_identity key=AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=127.0.0.1 port=55495 database=afldb_v2_blockb_rh_test
+identity ok
+ledger rows=118 last=118_fixtures_unconfirmed_participants.sql digest=573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57
+receipts=[] expected before=[observe=1]
+STOP: receipts are not exactly what stage b1 expects before it runs (an earlier stage is missing, repeated or foreign)
+CONTROL refused as required (rc=5): B pre ae8b625b8e09c353add74b1296d422d090a80321 b1
+== pre b0: checkout, writers, identity, ledger 118, receipts 2026-11-01T23:56:26Z
+crontab check skipped (rehearsal host)
+no writer unit enabled or active; no writer process; no crontab
+dsn_identity key=AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=127.0.0.1 port=55495 database=afldb_v2_blockb_rh_test
+identity ok
+ledger rows=118 last=118_fixtures_unconfirmed_participants.sql digest=573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57
+receipts=[] expected before=[]
+votes2026=9522:c3db1567b6932a7653ca68017cd0d630
+facts total|2026|inscope_match_id|2025_nosource|2025_source|staged2025|decisions = 330383|9522|0|9522|0|0|0
+PRE PASS b0
+== snapshots b0: staged bytes equal the pinned list 2026-11-01T23:56:27Z
+SNAPSHOTS PASS b0 (218 files)
+crontab check skipped (rehearsal host)
+no writer unit enabled or active; no writer process; no crontab
+dsn_identity key=AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=127.0.0.1 port=55495 database=afldb_v2_blockb_rh_test
+identity ok
+{"host" : "127.0.0.1", "port" : 55495, "database" : "afldb_v2_blockb_rh_test", "user" : "afldb_owner", "systemIdentifier" : "7703356136479211818", "databaseOid" : "20331", "clusterName" : "afldb_v2_isolated", "databaseComment" : "afldb-v2-isolated-test"}
+target equals the reviewed facts (sysid, oid, cluster, owner role)
+crontab check skipped (rehearsal host)
+no writer unit enabled or active; no writer process; no crontab
+dsn_identity key=AFLDB_OWNER_DATABASE_URL user=afldb_owner host=127.0.0.1 port=55495 database=afldb_v2_blockb_rh_test
+== baseline b0 (read-only session) 2026-11-01T23:56:28Z
+Read-only Brownlow baseline bf0ae840e35cbaff3b562e8d19a4f6f0b8a8b52226b6c3d6193993197f6b1deb
+isolated-pg: afldb_v2_blockb_rh_test verified (cluster afldb_v2_isolated, 127.0.0.1:55495); running bash
+dump 21d763786ae880fe0b592879b4d1eb6544aeecb5804def9d0512445ceea9ab23
+postgresql@16-main.service active MainPID=1504
+2026-11-01T23:57:46Z RV DONE restored_at=2026-11-01T23:57:16.637Z evidence=/mnt/ssd/afldb-v2-blockb-20261101T235531Z/evidence-private/b0
+ASSEMBLED b0: baseline bf0ae840e35cbaff3b562e8d19a4f6f0b8a8b52226b6c3d6193993197f6b1deb == restored; backup 21d763786ae880fe0b592879b4d1eb6544aeecb5804def9d0512445ceea9ab23; restoredAt 2026-11-01T23:57:16.637Z
+crontab check skipped (rehearsal host)
+no writer unit enabled or active; no writer process; no crontab
+dsn_identity key=AFLDB_OWNER_DATABASE_URL user=afldb_owner host=127.0.0.1 port=55495 database=afldb_v2_blockb_rh_test
+== snapshots b0: staged bytes equal the pinned list 2026-11-01T23:57:47Z
+SNAPSHOTS PASS b0 (218 files)
+== plan b0 (read-only session, no writes) 2026-11-01T23:57:47Z
+Review plan de51d0e858dda81818fa7f7b7689465a5e97d98ca9dac496a11dfbe71153cfe1; no writes
+d9a570aaac5d6b22485e260f79c5705e172a9fe3b66fc810dd2c5e2180914c77  /mnt/ssd/afldb-v2-blockb-20261101T235531Z/evidence/ops/blockb-ae8b625b8e09/b0/plan.json
+REFUSED:
+  - the reference must be the owner's own approval words (20+ characters)
+CONTROL refused as required (rc=1): node /mnt/ssd/afldb-v2-blockb-20261101T235531Z/cand/docs/v2/evidence/block-b-package-20261102/make-approval.mjs --plan /mnt/ssd/afldb-v2-blockb-20261101T235531Z/evidence/ops/blockb-ae8b625b8e09/b0/plan.json
+REFUSED:
+  - expiry is more than 12 hours away: approve a window, not a standing permission
+CONTROL refused as required (rc=1): node /mnt/ssd/afldb-v2-blockb-20261101T235531Z/cand/docs/v2/evidence/block-b-package-20261102/make-approval.mjs --plan /mnt/ssd/afldb-v2-blockb-20261101T235531Z/evidence/ops/blockb-ae8b625b8e09/b0/plan.json
+REFUSED:
+  - expiry is not in the future
+CONTROL refused as required (rc=1): node /mnt/ssd/afldb-v2-blockb-20261101T235531Z/cand/docs/v2/evidence/block-b-package-20261102/make-approval.mjs --plan /mnt/ssd/afldb-v2-blockb-20261101T235531Z/evidence/ops/blockb-ae8b625b8e09/b0/plan.json
+APPROVAL FILE /mnt/ssd/afldb-v2-blockb-20261101T235531Z/evidence/stage-b0/approval.json: plan de51d0e858dda81818fa7f7b7689465a5e97d98ca9dac496a11dfbe71153cfe1, operation observe (fixture-identities-2025), seasons 1, expires 2026-11-02T00:58:16.000Z
+REFUSED:
+  - output exists; approvals are never overwritten
+CONTROL refused as required (rc=1): node /mnt/ssd/afldb-v2-blockb-20261101T235531Z/cand/docs/v2/evidence/block-b-package-20261102/make-approval.mjs --plan /mnt/ssd/afldb-v2-blockb-20261101T235531Z/evidence/ops/blockb-ae8b625b8e09/b0/plan.json
+{
+  "digest": "de51d0e858dda81818fa7f7b7689465a5e97d98ca9dac496a11dfbe71153cfe1",
+  "operation": "observe",
+  "stage": "fixture-identities-2025",
+  "seasons": "1 (2025..2025; includes 2026: false)",
+  "rulings": null,
+  "actorId": null,
+  "revision": "ae8b625b8e09c353add74b1296d422d090a80321",
+  "baseline": "bf0ae840e35cbaff3b562e8d19a4f6f0b8a8b52226b6c3d6193993197f6b1deb",
+  "createdAt": "2026-11-01T23:57:48.555Z",
+  "expiresAt": "2026-11-02T23:57:48.555Z",
+  "backup": {
+    "sha256": "21d763786ae880fe0b592879b4d1eb6544aeecb5804def9d0512445ceea9ab23",
+    "capturedAt": "2026-11-01T23:57:06.790Z",
+    "restoredAt": "2026-11-01T23:57:16.637Z",
+    "baselineDigest": "bf0ae840e35cbaff3b562e8d19a4f6f0b8a8b52226b6c3d6193993197f6b1deb"
+  },
+  "target": {
+    "database": "afldb_v2_blockb_rh_test",
+    "user": "afldb_owner",
+    "systemIdentifier": "7703356136479211818",
+    "databaseOid": "20331"
+  },
+  "payload": {
+    "stage": "fixture-identities-2025",
+    "label": "afl-api-2025-2026-10-20-014218",
+    "season": 2025,
+    "manifestSha256": "46a793d8874ff7e1063e4323cb14154f7852dfd184679588dfae58f59b769b36",
+    "builtRecords": 212,
+    "refusedProviderMatchIds": "[4 items]",
+    "recordsDigest": "d6bbe18465b02915627defde6db6a42849de80fbfedb5822d9fd2c980c9e671f"
+  }
+}
+1351034 node --import tsx tools/v2/isolated-pg.ts run afldb_v2_blockb_lcheck_rst_test -- bash -c cd "$1" && AFLDB_BROWNLOW_CORRECTION_DSN="$AFLDB_OWNER_DATABASE_URL" node --import tsx --conditions=react-server tools/v2/brownlow-production-correction.ts baseline --target "$2/restored-target.json" --out "$2/baseline-restored.json" _ /mnt/ssd/afldb-v2-blockb-rv-20261101T235635Z/cand /mnt/ssd/afldb-v2-blockb-rv-20261101T235635Z/evidence-private/lcheck
+1351068 node --import tsx --conditions=react-server tools/v2/brownlow-production-correction.ts baseline --target /mnt/ssd/afldb-v2-blockb-rv-20261101T235635Z/evidence-private/lcheck/restored-target.json --out /mnt/ssd/afldb-v2-blockb-rv-20261101T235635Z/evidence-private/lcheck/baseline-restored.json
+STOP: a settle, migration, dump, restore, window, label or Brownlow process is running
+CONTROL refused as required (rc=4): B apply ae8b625b8e09c353add74b1296d422d090a80321 b0
+1351034 node --import tsx tools/v2/isolated-pg.ts run afldb_v2_blockb_lcheck_rst_test -- bash -c cd "$1" && AFLDB_BROWNLOW_CORRECTION_DSN="$AFLDB_OWNER_DATABASE_URL" node --import tsx --conditions=react-server tools/v2/brownlow-production-correction.ts baseline --target "$2/restored-target.json" --out "$2/baseline-restored.json" _ /mnt/ssd/afldb-v2-blockb-rv-20261101T235635Z/cand /mnt/ssd/afldb-v2-blockb-rv-20261101T235635Z/evidence-private/lcheck
+1351068 node --import tsx --conditions=react-server tools/v2/brownlow-production-correction.ts baseline --target /mnt/ssd/afldb-v2-blockb-rv-20261101T235635Z/evidence-private/lcheck/restored-target.json --out /mnt/ssd/afldb-v2-blockb-rv-20261101T235635Z/evidence-private/lcheck/baseline-restored.json
+STOP: a settle, migration, dump, restore, window, label or Brownlow process is running
+CONTROL refused as required (rc=4): B apply ae8b625b8e09c353add74b1296d422d090a80321 b0
+== accept b0 (read-only) 2026-11-01T23:58:17Z
+dsn_identity key=AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=127.0.0.1 port=55495 database=afldb_v2_blockb_rh_test
+identity ok
+receipts=[] expected after=[observe=1]
+STOP: receipts after b0 are not exactly [observe=1]
+CONTROL refused as required (rc=5): B accept ae8b625b8e09c353add74b1296d422d090a80321 b0
+1351034 node --import tsx tools/v2/isolated-pg.ts run afldb_v2_blockb_lcheck_rst_test -- bash -c cd "$1" && AFLDB_BROWNLOW_CORRECTION_DSN="$AFLDB_OWNER_DATABASE_URL" node --import tsx --conditions=react-server tools/v2/brownlow-production-correction.ts baseline --target "$2/restored-target.json" --out "$2/baseline-restored.json" _ /mnt/ssd/afldb-v2-blockb-rv-20261101T235635Z/cand /mnt/ssd/afldb-v2-blockb-rv-20261101T235635Z/evidence-private/lcheck
+1351068 node --import tsx --conditions=react-server tools/v2/brownlow-production-correction.ts baseline --target /mnt/ssd/afldb-v2-blockb-rv-20261101T235635Z/evidence-private/lcheck/restored-target.json --out /mnt/ssd/afldb-v2-blockb-rv-20261101T235635Z/evidence-private/lcheck/baseline-restored.json
+STOP: a settle, migration, dump, restore, window, label or Brownlow process is running
+ASSERT FAILED: expected success: B apply ae8b625b8e09c353add74b1296d422d090a80321 b0 (rc=4)

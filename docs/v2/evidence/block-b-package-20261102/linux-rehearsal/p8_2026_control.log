@@ -1,0 +1,20 @@
+isolated-pg: afldb_v2_blockb_rh_test verified (cluster afldb_v2_isolated, 127.0.0.1:55495); running bash
+UPDATE 1
+tampered
+== accept e (read-only) 2026-11-02T00:18:04Z
+dsn_identity key=AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=127.0.0.1 port=55495 database=afldb_v2_blockb_rh_test
+identity ok
+receipts=[adopt=1,backfill=1,eligibility=1,observe=2] expected after=[adopt=1,backfill=1,eligibility=1,observe=2]
+votes2026=9522:8b88fe41f99098f899da4ed5580930f1
+STOP: the 2026 vote rows changed
+CONTROL refused as required (rc=5): B accept ae8b625b8e09c353add74b1296d422d090a80321 e
+isolated-pg: afldb_v2_blockb_rh_test verified (cluster afldb_v2_isolated, 127.0.0.1:55495); running bash
+UPDATE 1
+restored
+== accept e (read-only) 2026-11-02T00:18:05Z
+dsn_identity key=AFLDB_BACKUP_DATABASE_URL user=afldb_backup host=127.0.0.1 port=55495 database=afldb_v2_blockb_rh_test
+identity ok
+receipts=[adopt=1,backfill=1,eligibility=1,observe=2] expected after=[adopt=1,backfill=1,eligibility=1,observe=2]
+votes2026=9522:c3db1567b6932a7653ca68017cd0d630
+facts total|2026|inscope_match_id|2025_nosource|2025_source|staged2025|decisions = 330383|9522|320861|8901|621|621|12
+ACCEPT PASS e

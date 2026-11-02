@@ -29,7 +29,9 @@ echo "DEV services BEFORE:"; for u in afldb.service postgresql@16-main.service; 
 
 if [ "${SAME_CLUSTER:-0}" != 1 ]; then
   say "RV1 start the guarded cluster"
+  NEW_CLUSTER=0; [ -d "$AFLDB_V2_PG_ROOT/data" ] || { IR init || exit 4; NEW_CLUSTER=1; }
   ( IR start > "$EVP/pg-start.out" 2>&1 < /dev/null & ) ; sleep 4
+  [ "$NEW_CLUSTER" = 1 ] && { IR roles || exit 4; }
   IR status || exit 4
   pmpid=$(head -1 "$AFLDB_V2_PG_ROOT/data/postmaster.pid"); ss -ltnp 2>/dev/null | grep ":$PORT " | tee "$EVP/listener.txt"
   grep -q "127.0.0.1:$PORT" "$EVP/listener.txt" && grep -q "pid=$pmpid," "$EVP/listener.txt" && [ "$(grep -c . "$EVP/listener.txt")" = 1 ] || { echo "STOP listener is not exclusively the cluster we started"; exit 4; }

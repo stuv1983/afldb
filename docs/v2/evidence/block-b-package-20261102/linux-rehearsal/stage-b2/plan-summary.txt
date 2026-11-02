@@ -1,0 +1,41 @@
+{
+  "digest": "aa16b5ac407134716142c759e3a0d7f0ba5447e5b3e7b963babbb792d823bdf8",
+  "operation": "backfill",
+  "stage": null,
+  "seasons": "42 (1984..2025; includes 2026: false)",
+  "rulings": null,
+  "actorId": null,
+  "revision": "ae8b625b8e09c353add74b1296d422d090a80321",
+  "baseline": "13e3e799a1c409f6107f7a79cec36ec53f1f3bd2f248d61c7098d0120415d942",
+  "createdAt": "2026-11-02T00:08:57.976Z",
+  "expiresAt": "2026-11-03T00:08:57.976Z",
+  "backup": {
+    "sha256": "2609e60ea8c2e14da2b6b88cc2aa1402c6e6b9c33e190d66a340274ef8a122af",
+    "capturedAt": "2026-11-02T00:08:16.990Z",
+    "restoredAt": "2026-11-02T00:08:26.121Z",
+    "baselineDigest": "13e3e799a1c409f6107f7a79cec36ec53f1f3bd2f248d61c7098d0120415d942"
+  },
+  "target": {
+    "database": "afldb_v2_blockb_rh_test",
+    "user": "afldb_owner",
+    "systemIdentifier": "7703356136479211818",
+    "databaseOid": "20331"
+  },
+  "payload": {
+    "export": {
+      "format": "afldb.v2.brownlow-round-vote-match-backfill",
+      "formatVersion": 1,
+      "rule": "migration-094-s27.5: unique home_and_away match in the row season and round holding a p...",
+      "seasons": "[42 items]",
+      "digest": "2a5b5405d69a134db4d01f5bb9de8948ac3780d0c3b4771f618e858842e595b1",
+      "repairs": "[320861 items]"
+    },
+    "fingerprints": {
+      "rows": 320861,
+      "mapped": 0,
+      "columns": "bc52f294822559af08ce9de5997862ccca322a8b423c0751485ab69d3b4a418d",
+      "mapping": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "perSeason": "[42 items]"
+  }
+}

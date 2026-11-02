@@ -1,0 +1,23 @@
+2026-11-01T23:55:57Z PHASE p0_resources: start
+2026-11-01T23:55:57Z PHASE p0_resources: PASS
+2026-11-01T23:55:57Z PHASE p1_inputs: start
+2026-11-01T23:56:06Z PHASE p1_inputs: PASS
+2026-11-01T23:56:06Z PHASE p2_capture_controls: start
+2026-11-01T23:56:06Z PHASE p2_capture_controls: PASS
+2026-11-01T23:56:06Z PHASE p4_cluster: start
+2026-11-01T23:56:13Z PHASE p4_cluster: PASS
+2026-11-01T23:56:13Z PHASE p5_restore_migrate: start
+2026-11-01T23:56:25Z PHASE p5_restore_migrate: PASS
+2026-11-01T23:56:25Z PHASE p6_prepare: start
+2026-11-01T23:56:26Z PHASE p6_prepare: PASS
+2026-11-01T23:56:26Z PHASE p7_b0: start
+2026-11-01T23:58:17Z PHASE p7_b0: FAIL rc=1 (see /mnt/ssd/afldb-v2-blockb-20261101T235531Z/evidence/p7_b0.log)
+2026-11-01T23:58:17Z stage or prerequisite p7_b0 failed: stopping
+2026-11-01T23:58:17Z DONE
+PASS p0_resources
+PASS p1_inputs
+PASS p2_capture_controls
+PASS p4_cluster
+PASS p5_restore_migrate
+PASS p6_prepare
+FAIL p7_b0 rc=1

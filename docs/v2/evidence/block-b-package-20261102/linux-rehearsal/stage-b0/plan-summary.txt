@@ -1,0 +1,33 @@
+{
+  "digest": "79232f5658ba4f37d759545e5eac9b25566f7e0159ab6f508250ff81d10c8603",
+  "operation": "observe",
+  "stage": "fixture-identities-2025",
+  "seasons": "1 (2025..2025; includes 2026: false)",
+  "rulings": null,
+  "actorId": null,
+  "revision": "ae8b625b8e09c353add74b1296d422d090a80321",
+  "baseline": "bf0ae840e35cbaff3b562e8d19a4f6f0b8a8b52226b6c3d6193993197f6b1deb",
+  "createdAt": "2026-11-02T00:02:06.367Z",
+  "expiresAt": "2026-11-03T00:02:06.367Z",
+  "backup": {
+    "sha256": "e3b423ed906e56ba0e56c712026bb7a86db7fb625ef45de155628978c02e161a",
+    "capturedAt": "2026-11-02T00:01:25.596Z",
+    "restoredAt": "2026-11-02T00:01:34.612Z",
+    "baselineDigest": "bf0ae840e35cbaff3b562e8d19a4f6f0b8a8b52226b6c3d6193993197f6b1deb"
+  },
+  "target": {
+    "database": "afldb_v2_blockb_rh_test",
+    "user": "afldb_owner",
+    "systemIdentifier": "7703356136479211818",
+    "databaseOid": "20331"
+  },
+  "payload": {
+    "stage": "fixture-identities-2025",
+    "label": "afl-api-2025-2026-10-20-014218",
+    "season": 2025,
+    "manifestSha256": "46a793d8874ff7e1063e4323cb14154f7852dfd184679588dfae58f59b769b36",
+    "builtRecords": 212,
+    "refusedProviderMatchIds": "[4 items]",
+    "recordsDigest": "d6bbe18465b02915627defde6db6a42849de80fbfedb5822d9fd2c980c9e671f"
+  }
+}

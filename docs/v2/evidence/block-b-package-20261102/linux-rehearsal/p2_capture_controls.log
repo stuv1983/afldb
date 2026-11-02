@@ -1,0 +1,10 @@
+STOP: B_STAGE must be b0, b1, b2, b3 or e
+CONTROL refused as required (rc=2): env -u B_STAGE -u
+STOP: B_STAGE must be b0, b1, b2, b3 or e
+CONTROL refused as required (rc=2): env B_STAGE=zz B_APPROVAL_REFERENCE=SYNTHETIC rehearsal words, never an approval bash
+STOP: B_APPROVAL_REFERENCE (the owner's approval words, 20+ characters) is not set
+CONTROL refused as required (rc=2): env B_STAGE=b1 B_APPROVAL_REFERENCE=short bash
+== P0 host, tools, target directory 2026-11-01T23:56:06Z
+STOP: unexpected host streamanator
+CONTROL refused as required (rc=3): env B_STAGE=b1 B_APPROVAL_REFERENCE=SYNTHETIC rehearsal words, never an approval bash
+no capture directory was created
