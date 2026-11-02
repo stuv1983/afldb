@@ -1,0 +1,3 @@
+AFLDB-ISSUE-228 acquire — season 2027 (compSeasonId 102), label afl-api-2027-2026-11-02-083723
+  season feed: 218 match(es); selected: 0
+  manifest: /home/arm/projects/afldb/data/sources/afl_api/matches/afl-api-2027-2026-11-02-083723/manifest.json

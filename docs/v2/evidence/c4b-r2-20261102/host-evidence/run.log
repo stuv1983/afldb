@@ -1,0 +1,64 @@
+2026-11-02T08:37:21.876Z AFLDB-ISSUE-316 C4b rehearsal c4b-2026-11-02T083721874Z-3296445: season 2027, decision D-316-13, deadline 30 minute(s), evidence /home/arm/backups/afldb/c4b-924ff273-r2
+2026-11-02T08:37:22.201Z watchdog started: pid 3296476; waiting for it to prove readiness
+2026-11-02T08:37:22.666Z watchdog 3296476: ready, monitoring parent 3296445
+2026-11-02T08:37:22.705Z watchdog ready: pid 3296476 proved run c4b-2026-11-02T083721874Z-3296445, parent 3296445
+2026-11-02T08:37:22.705Z watchdog armed and proven ready; it acts after 2026-11-02T09:09:22.191Z or when this process ends
+2026-11-02T08:37:22.744Z acquisition.afl_api_current_season_enabled ON at 2026-11-02T08:37:22.743Z
+2026-11-02T08:37:22.746Z RUN tools/current-season/acquire-afl-api.ts --season 2027
+2026-11-02T08:37:23.123Z   | AFLDB-ISSUE-228 acquire — season 2027 (compSeasonId 102), label afl-api-2027-2026-11-02-083723
+2026-11-02T08:37:23.432Z   |   season feed: 218 match(es); selected: 0
+2026-11-02T08:37:23.435Z   |   manifest: /home/arm/projects/afldb/data/sources/afl_api/matches/afl-api-2027-2026-11-02-083723/manifest.json
+2026-11-02T08:37:23.447Z RUN tools/current-season/settle-afl-api.ts --label afl-api-2027-2026-11-02-083723 --dry-run --auto-apply --require-complete-source
+2026-11-02T08:37:24.189Z   | Bundle v2 'afl-api-2027-2026-11-02-083723' (season 2027): 0 match unit(s) built, 0 build failure(s).
+2026-11-02T08:37:24.208Z   | Season feed CD_S2027014: 218 match(es), complete; statuses observed: PLACEHOLDER 83, SCHEDULED 135.
+2026-11-02T08:37:24.303Z   | AFL API ingestion preflight: control database = afldb_prod, writer database = afldb_prod.
+2026-11-02T08:37:24.332Z   | Snapshot
+2026-11-02T08:37:24.333Z   |   snapshotMatches: 0
+2026-11-02T08:37:24.333Z   |   snapshotPlayerMatchRows: 0
+2026-11-02T08:37:24.333Z   |   buildFailures: 0
+2026-11-02T08:37:24.333Z   | Season feed (AFLDB-ISSUE-231 — informational, never a failure)
+2026-11-02T08:37:24.333Z   |   seasonFeedMatches: 218
+2026-11-02T08:37:24.333Z   |   seasonFeedComplete: 1
+2026-11-02T08:37:24.333Z   |   seasonFeedStatusCounts: {"SCHEDULED":135,"PLACEHOLDER":83}
+2026-11-02T08:37:24.333Z   | Observation
+2026-11-02T08:37:24.333Z   |   observationsSeen: 0
+2026-11-02T08:37:24.333Z   |   payloadsCreated: 0
+2026-11-02T08:37:24.333Z   |   versionsAppended: 0
+2026-11-02T08:37:24.333Z   |   observationsUnchanged: 0
+2026-11-02T08:37:24.333Z   | Deferral (§7.3, T3 — informational, never a failure)
+2026-11-02T08:37:24.333Z   |   recordsDeferred: {}
+2026-11-02T08:37:24.333Z   | Participation (AFLDB-ISSUE-255 — informational, never a failure)
+2026-11-02T08:37:24.333Z   |   nonParticipantPlayerRows: 0
+2026-11-02T08:37:24.334Z   | Resolution / ownership
+2026-11-02T08:37:24.334Z   |   unresolvedIdentityMatch: 0
+2026-11-02T08:37:24.334Z   |   unresolvedIdentityPlayer: 0
+2026-11-02T08:37:24.334Z   |   foreignOwnedCollision: 0
+2026-11-02T08:37:24.334Z   |   corroboratedForeignOwned: 0
+2026-11-02T08:37:24.334Z   |   sourceDisagreement: 0
+2026-11-02T08:37:24.334Z   |   manualAuthorityRefusals: 0
+2026-11-02T08:37:24.334Z   |   venueProviderUnmapped: 0
+2026-11-02T08:37:24.334Z   |   venueUnmapped: 0
+2026-11-02T08:37:24.334Z   | Review
+2026-11-02T08:37:24.334Z   |   candidatesCreated: 0
+2026-11-02T08:37:24.334Z   |   candidatesRefreshed: 0
+2026-11-02T08:37:24.334Z   |   candidatesMootLeftPending: 0
+2026-11-02T08:37:24.334Z   | Data issues
+2026-11-02T08:37:24.334Z   |   dataIssuesOpened: 0
+2026-11-02T08:37:24.334Z   |   dataIssuesRefreshed: 0
+2026-11-02T08:37:24.334Z   |   dataIssuesResolved: 0
+2026-11-02T08:37:24.334Z   | Canonical
+2026-11-02T08:37:24.334Z   |   canonicalRowsInserted: 0
+2026-11-02T08:37:24.334Z   |   canonicalRowsUpdated: 0
+2026-11-02T08:37:24.334Z   |   canonicalApplicationsLogged: 0
+2026-11-02T08:37:24.334Z   |   canonicalApplyRefusals: 0
+2026-11-02T08:37:24.334Z   |   canonicalApplyFailures: 0
+2026-11-02T08:37:24.334Z   |   attendanceEnrichmentsApplied: 0
+2026-11-02T08:37:24.334Z   | Derived recompute
+2026-11-02T08:37:24.334Z   |   derivedRecomputeRuns: 0
+2026-11-02T08:37:24.334Z   |   derivedRecomputePlayers: 0
+2026-11-02T08:37:24.334Z   | Source completeness: COMPLETE
+2026-11-02T08:37:24.334Z   |   Source complete: the source supplied no rows for this scope, and none were dropped.
+2026-11-02T08:37:24.334Z   | Dry-run rollback. The full write path executed against real constraints and privileges, the automatic canonical path included, then the whole transaction was rolled back. Nothing was retained — not even the import_batches row. Re-run with --apply --auto-apply to keep it.
+2026-11-02T08:37:24.445Z acquisition.afl_api_current_season_enabled OFF at 2026-11-02T08:37:24.445Z, verified on the writer and the control path
+2026-11-02T08:37:24.585Z C4B CLEAR
+2026-11-02T08:37:24.585Z   - every automated HALT criterion is clear; the setting is off and verified; both timers disabled. This is the evidence for the C4b record, not the record: C5 still needs the reviewed, recorded C4b PASS.

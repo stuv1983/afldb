@@ -1,0 +1,62 @@
+Bundle v2 'afl-api-2027-2026-11-02-083723' (season 2027): 0 match unit(s) built, 0 build failure(s).
+Season feed CD_S2027014: 218 match(es), complete; statuses observed: PLACEHOLDER 83, SCHEDULED 135.
+AFL API ingestion preflight: control database = afldb_prod, writer database = afldb_prod.
+
+Snapshot
+  snapshotMatches: 0
+  snapshotPlayerMatchRows: 0
+  buildFailures: 0
+
+Season feed (AFLDB-ISSUE-231 — informational, never a failure)
+  seasonFeedMatches: 218
+  seasonFeedComplete: 1
+  seasonFeedStatusCounts: {"SCHEDULED":135,"PLACEHOLDER":83}
+
+Observation
+  observationsSeen: 0
+  payloadsCreated: 0
+  versionsAppended: 0
+  observationsUnchanged: 0
+
+Deferral (§7.3, T3 — informational, never a failure)
+  recordsDeferred: {}
+
+Participation (AFLDB-ISSUE-255 — informational, never a failure)
+  nonParticipantPlayerRows: 0
+
+Resolution / ownership
+  unresolvedIdentityMatch: 0
+  unresolvedIdentityPlayer: 0
+  foreignOwnedCollision: 0
+  corroboratedForeignOwned: 0
+  sourceDisagreement: 0
+  manualAuthorityRefusals: 0
+  venueProviderUnmapped: 0
+  venueUnmapped: 0
+
+Review
+  candidatesCreated: 0
+  candidatesRefreshed: 0
+  candidatesMootLeftPending: 0
+
+Data issues
+  dataIssuesOpened: 0
+  dataIssuesRefreshed: 0
+  dataIssuesResolved: 0
+
+Canonical
+  canonicalRowsInserted: 0
+  canonicalRowsUpdated: 0
+  canonicalApplicationsLogged: 0
+  canonicalApplyRefusals: 0
+  canonicalApplyFailures: 0
+  attendanceEnrichmentsApplied: 0
+
+Derived recompute
+  derivedRecomputeRuns: 0
+  derivedRecomputePlayers: 0
+
+Source completeness: COMPLETE
+  Source complete: the source supplied no rows for this scope, and none were dropped.
+
+Dry-run rollback. The full write path executed against real constraints and privileges, the automatic canonical path included, then the whole transaction was rolled back. Nothing was retained — not even the import_batches row. Re-run with --apply --auto-apply to keep it.
