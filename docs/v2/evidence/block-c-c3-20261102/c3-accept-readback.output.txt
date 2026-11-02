@@ -1,0 +1,47 @@
+== c3-accept-readback.sh run over SSH as arm on afldb-prod (read-only, no sudo), exit 0 ==
+host=afldb-prod user=arm now=2026-11-02T05:19:55Z
+staged c-prod.sh sha256 vs R: ec839a47b645a61561ef885c1a5d1926be2e864fe3e557ec254553c6a031d496 / ec839a47b645a61561ef885c1a5d1926be2e864fe3e557ec254553c6a031d496
+== c3-accept
+== c3-accept (twice, a minute apart) 2026-11-02T05:19:55Z
+checkout is exactly ea98a35f20610e75c18e698bc0d9fe084c3c783d and clean
+the six pinned deploy files equal their hashes
+identity ok (afldb_prod, OID 66668, read-only session)
+-- pass 1
+afldb-settle-afl-api.service load=[loaded] active=[inactive]
+afldb-settle-afl-api-brownlow.service load=[loaded] active=[inactive]
+afldb-settle-afl-api.timer enabled=[disabled] active=[inactive]
+afldb-settle-afl-api-brownlow.timer enabled=[disabled] active=[inactive]
+setting acquisition.afl_api_current_season_enabled = [false]
+installed copies equal the repository files
+afldb-settle-afltables.timer enabled=[disabled] active=[inactive]
+-- pass 2
+afldb-settle-afl-api.service load=[loaded] active=[inactive]
+afldb-settle-afl-api-brownlow.service load=[loaded] active=[inactive]
+afldb-settle-afl-api.timer enabled=[disabled] active=[inactive]
+afldb-settle-afl-api-brownlow.timer enabled=[disabled] active=[inactive]
+setting acquisition.afl_api_current_season_enabled = [false]
+installed copies equal the repository files
+afldb-settle-afltables.timer enabled=[disabled] active=[inactive]
+C3-ACCEPT PASS
+c3-accept exit=0
+== independent read-backs
+afldb-settle-afl-api.service load=loaded active=inactive sub=dead
+afldb-settle-afl-api-brownlow.service load=loaded active=inactive sub=dead
+afldb-settle-afl-api.timer load=loaded enabled=disabled active=inactive next=[] nextmono=[infinity]
+afldb-settle-afl-api-brownlow.timer load=loaded enabled=disabled active=inactive next=[] nextmono=[infinity]
+list-timers afl-api matches: 0
+timers.target.wants afl-api matches: 0
+any wants/requires symlinks to the units anywhere under /etc/systemd/system: 0
+cmp OK afldb-settle-afl-api.service installed == checkout
+   git-object==installed: yes
+cmp OK afldb-settle-afl-api.timer installed == checkout
+   git-object==installed: yes
+cmp OK afldb-settle-afl-api-brownlow.service installed == checkout
+   git-object==installed: yes
+cmp OK afldb-settle-afl-api-brownlow.timer installed == checkout
+   git-object==installed: yes
+afldb.service MainPID after: 3268373  NRestarts=0  ActiveEnterTimestamp=Mon 2026-11-02 13:18:50 AEDT  ActiveState=active
+trigger variable lines in .env (count only): 0
+HEAD=ea98a35f20610e75c18e698bc0d9fe084c3c783d porcelain lines=0
+afltables timer: enabled=disabled active=inactive
+failed afl-api units: 0

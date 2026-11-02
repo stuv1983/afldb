@@ -1,0 +1,22 @@
+== Owner's sudo install block on afldb-prod (the owner ran it; Claude used no sudo). Result lines as returned by the owner. ==
+(The owner's terminal paste also echoed the typed commands in a garbled order; the result lines below are the command output only. Every gate was re-derived independently afterwards: see c3-accept-readback.output.txt.)
+
+deploy/afldb-settle-afl-api.service: OK
+deploy/afldb-settle-afl-api.timer: OK
+deploy/afldb-settle-afl-api-brownlow.service: OK
+deploy/afldb-settle-afl-api-brownlow.timer: OK
+[sudo] password for arm:
+afldb-settle-afl-api.service: OK
+afldb-settle-afl-api.timer: OK
+afldb-settle-afl-api-brownlow.service: OK
+afldb-settle-afl-api-brownlow.timer: OK
+644 root:root /etc/systemd/system/afldb-settle-afl-api.service
+644 root:root /etc/systemd/system/afldb-settle-afl-api.timer
+644 root:root /etc/systemd/system/afldb-settle-afl-api-brownlow.service
+644 root:root /etc/systemd/system/afldb-settle-afl-api-brownlow.timer
+(systemd-analyze verify: no output)
+afldb-settle-afl-api.service load=loaded active=inactive
+afldb-settle-afl-api-brownlow.service load=loaded active=inactive
+afldb-settle-afl-api.timer load=loaded enabled=disabled active=inactive
+afldb-settle-afl-api-brownlow.timer load=loaded enabled=disabled active=inactive
+C3 INSTALL BLOCK DONE: nothing enabled, started or restarted

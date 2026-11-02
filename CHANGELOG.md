@@ -15,6 +15,11 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-316 C3: four AFL API units installed inert on production; C4b approval prepared (2026-11-02)
+
+- **Operations (PRODUCTION):** under the owner's C3 approval at `ea98a35f`, `afldb-settle-afl-api.{service,timer}` and `afldb-settle-afl-api-brownlow.{service,timer}` were installed into `/etc/systemd/system` by the owner's sudo block and `daemon-reload` run. They are inert: services loaded/inactive, timers disabled/inactive with no scheduled elapse and no enable symlink; installed bytes equal the pinned files; acquisition switch `false`; `AFLDB_SETTLE_TRIGGER` absent; `afldb.service` MainPID 3268373 and NRestarts 0 unchanged; checkout clean. Nothing was enabled, started, restarted, contacted or written to the database. Record `docs/v2/block-c-c3-outcome-2026-11-02.md`; evidence `docs/v2/evidence/block-c-c3-20261102/`.
+- **Prepared, not granted:** the exact D-316-13 (C4b) grant and ordered steps, `docs/v2/block-c-c4b-approval-2026-11-02.md`. C4b and C5 remain unapproved; C4b would end the validity of the `43300297…821d` Brownlow baseline. Brownlow public rendering remains an unverified owner-led follow-up.
+
 ### Brownlow final acceptance; V2-GAP-030, 031 and 016 closed; C3 commands prepared (2026-11-02)
 
 - **Records:** the owner's final acceptance of Block B (stages b0, b1, b2, b3, e at `ea98a35f`) is recorded; V2-GAP-030 and V2-GAP-031 close on their written criteria and the production receipts; V2-GAP-016 closes on the owner's acceptance plus a production-dump comparison. Register recounted from its rows: 38 total / 36 closed / 2 open (011, 029). Record: `docs/v2/brownlow-final-acceptance-gap016-closure-2026-11-02.md`.

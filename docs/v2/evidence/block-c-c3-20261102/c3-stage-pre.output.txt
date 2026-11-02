@@ -1,0 +1,43 @@
+== c3-stage-pre.sh run over SSH as arm on afldb-prod (read-only apart from creating the mode-700 staging directory), exit 0 ==
+host=afldb-prod user=arm now=2026-11-02T05:06:29Z
+HEAD=ea98a35f20610e75c18e698bc0d9fe084c3c783d
+porcelain lines=0
+R is ancestor of origin/main: yes
+staging absent: creating
+-- package vs R git objects
+OK  c-prod.sh ec839a47b645a61561ef885c1a5d1926be2e864fe3e557ec254553c6a031d496
+OK  c-selftest.sh cf5d044b876c9b32a08f504b005a43e5968c52da47fa7db90b1e0c0b462195a0
+staging file list:
+./docs/v2/evidence/block-c-package-20261102/c-prod.sh
+./docs/v2/evidence/block-c-package-20261102/c-selftest.sh
+-- six deploy files at R (git object) vs checkout
+OK  afldb-settle-afl-api.service git=checkout 8698b6860ddf530b4954f0cbd585acddf38d12ec2a0436d1553d85ae7471b7f4
+OK  afldb-settle-afl-api.timer git=checkout a37114b44eab72d4bc85e15f059a6d7f837f0d503b07f4e0c9934e39bac2a2c2
+OK  afldb-settle-afl-api-brownlow.service git=checkout 55b0a70b8aba516e48231f4fb8ad1576b7c1c1579218b03e9f9bcd6915e7b402
+OK  afldb-settle-afl-api-brownlow.timer git=checkout 7fa27377516ce9ea86400542166788727179effbd1b2692397506b3a42903bb1
+OK  afldb-settle-afl-api.sh git=checkout b35e3a321a2c276ee4ff0b3f1cfed4dce4afcdfef78d1d7f41e6eb3ef142aeeb
+OK  afldb-settle-afl-api-brownlow.sh git=checkout 05a559be858633ddbbf099ec4fcd809a5b8fbf0116c2ce83ae6477f73efff9b1
+-- c3-pre
+== c3-pre 2026-11-02T05:06:29Z
+checkout is exactly ea98a35f20610e75c18e698bc0d9fe084c3c783d and clean
+the six pinned deploy files equal their hashes
+identity ok (afldb_prod, OID 66668, read-only session)
+setting acquisition.afl_api_current_season_enabled = [false]
+afldb-settle-afl-api.service load=[not-found] active=[inactive]
+afldb-settle-afl-api-brownlow.service load=[not-found] active=[inactive]
+afldb-settle-afl-api.timer enabled=[not-found] active=[inactive]
+afldb-settle-afl-api-brownlow.timer enabled=[not-found] active=[inactive]
+afldb-settle-afltables.timer enabled=[disabled] active=[inactive]
+sh -n ok for both scripts
+C3-PRE PASS
+c3-pre exit=0
+-- before-state
+afldb.service MainPID before: 3268373  NRestarts=0  ActiveEnterTimestamp=Mon 2026-11-02 13:18:50 AEDT
+list-unit-files afldb-settle-afl-api*:
+UNIT FILE STATE PRESET
+
+0 unit files listed.
+etc/systemd/system matches: 0
+timers.target.wants afl-api matches: 0
+list-timers afl-api matches: 0
+trigger variable lines in .env (count only): 0
