@@ -15,6 +15,13 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-316 resolved as "cutover delivered" (2026-11-03, tracking only; local, not pushed)
+
+- **Closed under the owner's Option A:** first scheduled night accepted (gate file recorded), D-316-12 released and visually checked, successor AFLDB-ISSUE-332 open. No application, schema, production or configuration change in this entry; it records project state.
+- **Accepted limitation, stated plainly:** at 390x844 the D-316-12 gates G3 to G5 rest on the runner's page-text checks, not screenshots (cookie banner and a horizontally scrolling table hide them); they are not recorded as visually verified at mobile width. The 1280x800 image evidences G1 to G6.
+- **Carried unchanged by ISSUE-332:** C6 to C9 and D-316-5 to D-316-11 with their gates. Older ownership warnings (20 `foreign_source_owner` rows, season 2026) stay recorded and unwaived. Open issues now 3 (ISSUE-321, ISSUE-331, ISSUE-332); the ISSUE-331 row was added to the Open Issues table, which had omitted it.
+- **Archive:** runbook moved unchanged to `issues/closed/AFLDB-ISSUE-316.md`; the pre-closure index section is kept verbatim in `issues/closed/AFLDB-ISSUE-316-INDEX-SECTION-20261103.md`; the `issues/open/AFLDB-ISSUE-316-*` companion directories (frozen P/H/EXEC and hash-pinned evidence) were not moved or changed.
+
 ### ISSUE-316 D-316-12: admin current-season wording RELEASED to production (2026-11-03)
 
 - **Deployed:** release `a0b1080f5b98-B8kdpO6PO1tUCHus0j1za` (code revision `a0b1080f5b98aee7191894c138be27bb524c7b1b`, pushed as `d00e07e37566e92b35a34e62a1ff03e173715e87`) is serving on `beta.afldb.com` since the owner's restart at 08:48:00 AEDT. Behaviour change: `/admin/current-season` subtitle and settle-units wording now describe the post-cutover state (AFL Tables retired, AFL API match timer, no Start control), and the unconfigured-host status strings were reworded; the inert read-only C7 observer was added (no route or unit uses it). No control, server action behaviour, schema, grant, `.env`, timer or setting changed.
