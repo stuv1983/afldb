@@ -1,0 +1,38 @@
+9dd0633f3c156d56bcd1360c234a3af3046d315d158d02c2109d0190d669d481  /home/arm/c5-observe-20261102.sh
+== c5-observe rollback-verify 2026-11-02T09:23:47Z N=924ff273261834e4112e3f41b61ceeab55427534 (host local 2026-11-02 20:23:47 AEDT)
+identity ok (afldb_prod, OID 66668, read-only session)
+match timer enabled/active = [disabled/inactive] (expected [disabled/inactive])
+Brownlow timer enabled/active = [disabled/inactive] (expected [disabled/inactive])
+AFL Tables timer enabled/active = [disabled/inactive] (expected [disabled/inactive])
+match service ActiveState = [inactive] (expected [inactive])
+settle/acquire processes = [0] (expected [0])
+setting stored value = [false] (expected [false])
+.env any AFLDB_SETTLE_TRIGGER mention = [0] (expected [0])
+.env stat (perm owner size): back to the pre-C5 600 arm 4067 (the file ended with a newline before) = [600 arm 4067] (expected [600 arm 4067])
+afldb MainPID=3268373 ActiveEnterTimestamp=Mon 2026-11-02 13:18:50 AEDT
+process env: any AFLDB_SETTLE_TRIGGER (0 only after the restart that follows the .env removal) = [0] (expected [0])
+health = [200] (expected [200])
+C5-OBSERVE rollback-verify PASS
+phase rollback-verify exit=0
+
+== c5-observe env-effective 2026-11-02T09:23:47Z N=924ff273261834e4112e3f41b61ceeab55427534 (host local 2026-11-02 20:23:47 AEDT)
+identity ok (afldb_prod, OID 66668, read-only session)
+afldb MainPID=3268373 (before C5: 3268373) ActiveEnterMonotonic=6739446504275 (before: 6739446504275) ActiveEnterTimestamp=Mon 2026-11-02 13:18:50 AEDT
+FAIL: afldb has not been restarted since the baseline
+.env mtime epoch=1786877149; service active-enter epoch=1793585930
+.env lines exactly AFLDB_SETTLE_TRIGGER=systemd = [0] (expected [1])
+FAIL: .env lines exactly AFLDB_SETTLE_TRIGGER=systemd
+.env any mention = [0] (expected [1])
+FAIL: .env any mention
+.env stat (perm owner size): 4067 before + 29 bytes (one AFLDB_SETTLE_TRIGGER=systemd line) = 4096, nothing else added = [600 arm 4067] (expected [600 arm 4096])
+FAIL: .env stat (perm owner size): 4067 before + 29 bytes (one AFLDB_SETTLE_TRIGGER=systemd line) = 4096, nothing else added
+MainPID cwd is the serving release = [/home/arm/afldb-releases/releases/ea98a35f2061--vY0EFS0DdR-TiPkxTZz6] (expected [/home/arm/afldb-releases/releases/ea98a35f2061--vY0EFS0DdR-TiPkxTZz6])
+process env: exact AFLDB_SETTLE_TRIGGER=systemd = [0] (expected [1])
+FAIL: process env: exact AFLDB_SETTLE_TRIGGER=systemd
+process env: any AFLDB_SETTLE_TRIGGER = [0] (expected [1])
+FAIL: process env: any AFLDB_SETTLE_TRIGGER
+health = [200] (expected [200])
+switch still false before the toggle = [false] (expected [false])
+C5-OBSERVE env-effective FAIL (6 check(s) failed; a finding for review, nothing was changed)
+phase env-effective exit=1
+

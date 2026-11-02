@@ -1,0 +1,90 @@
+e14c2ed1edf7bfe02b6b04c3c82ba5595a8eb3e33ed52e2ab039fc5354250997  /home/arm/c4b-r2-readback-20261102.sh
+== readback 2026-11-02T09:04:03Z host=afldb-prod user=arm N=924ff273261834e4112e3f41b61ceeab55427534
+run_id=c4b-2026-11-02T083721874Z-3296445 label=afl-api-2027-2026-11-02-083723 window T0=2026-11-02T08:37:21.874Z T1=2026-11-02T08:37:24.585Z
+identity ok (afldb_prod, OID 66668, read-only session)
+
+### A. the import_batches schema (why the pinned query failed)
+import_batches columns (ordinal, name, type, nullable):
+    1	id	bigint	NO
+    2	source_id	smallint	NO
+    3	tool	text	NO
+    4	target_table	text	YES
+    5	started_at	timestamp with time zone	NO
+    6	completed_at	timestamp with time zone	YES
+    7	status	USER-DEFINED	NO
+    8	records_read	bigint	NO
+    9	records_inserted	bigint	NO
+    10	records_updated	bigint	NO
+    11	records_rejected	bigint	NO
+    12	validation_result	jsonb	YES
+    13	error	text	YES
+    14	notes	text	YES
+columns named created_at = [0] (expected [0])
+columns named started_at = [1] (expected [1])
+
+### B. import_batches (batch BOOKKEEPING): rows that exist for this run
+batches started inside [T0,T1] = [0] (expected [0])
+batches started at or after T0 (to date, fixed instant) = [0] (expected [0])
+batches naming the snapshot label (notes/validation_result/error/tool) = [0] (expected [0])
+batches naming the run id = [0] (expected [0])
+unfinished batches (status <> completed) started at or after T0 = [0] (expected [0])
+latest 5 batches (id, source, tool, started_at, completed_at, status); all expected to PREDATE T0:
+    75	afl_api	brownlow-ownership-adoption.ts	2026-11-02 14:27:56.692247+11	2026-11-02 14:28:39.342743+11	completed
+    74	afl_api	settle-afl-api-brownlow.ts	2026-11-02 14:17:42.302188+11	2026-11-02 14:18:18.224896+11	completed
+    73	afl_api	brownlow-production-correction.ts	2026-11-02 14:10:35.516754+11	2026-11-02 14:11:40.428404+11	completed
+    72	afl_api	settle-afl-api-fixture-schedule.ts	2026-11-02 13:25:26.345648+11	2026-11-02 13:25:26.851789+11	completed
+    70	afltables	settle-afltables.ts	2026-10-31 04:42:59.520326+11	2026-10-31 04:43:25.693706+11	completed
+identity sequence vs max(id) (a gap = some insert was rolled back or deleted at some time; NOT attributable to one run):
+    import_batches_id_seq	77	75
+
+### C. rows that would hang off a batch started at or after T0 (staging observations, candidates, canonical applications)
+versions/records/candidates/canonical_applications/rejections referencing such batches = [0,0,0,0,0] (expected [0,0,0,0,0])
+
+### D. durable acquisition / staging rows by their OWN timestamps (independent of batch linkage), at or after T0
+payloads(first_stored_at) versions(observed_from|observed_to) records(first_seen|last_seen|absent_since) candidates(created|resolved) decisions issues(detected|resolved) canonical_applications(applied_at) = [0,0,0,0,0,0,0] (expected [0,0,0,0,0,0,0])
+(observed_to, absent_since, resolved_at and closed_by_batch_id may be NULL: a NULL never satisfies >= or IN, so it is never counted as inside the window)
+afl_api match projection rows for the 2027 season feed (CD_S2027014) = [0] (expected [0])
+afl_api player-match projection rows, season 2027 = [0] (expected [0])
+
+### E. CANONICAL rows (a different check from section B)
+canonical matches in season 2027 = [0] (expected [0])
+canonical matches owned by source afl_api = [0] (expected [0])
+
+### F. the switch and its audit trail
+site_settings row (key, value as stored, updated_at, updated_by or <NULL>):
+    acquisition.afl_api_current_season_enabled	false	2026-11-02 19:37:24.377982+11	<NULL>
+site_settings rows for the key = [1] (expected [1])
+stored value = [false] (expected [false])
+audit rows for this run id (id, at, step, attempt-or-<NULL>, enabled):
+    303	2026-11-02 19:37:22.727908+11	on	<NULL>	true
+    304	2026-11-02 19:37:24.377982+11	restore	1	false
+audit rows for this run id = [2] (expected [2])
+ingestion-switch audit rows with id > 304 (anything after this run's restore) = [0] (expected [0])
+
+### G. files on disk (acquisition artefacts live on the filesystem, not in the database; the dry-run rollback does not cover them)
+total 280
+drwx------ 2 arm arm   4096 Nov  2 19:37 .
+drwx------ 4 arm arm   4096 Nov  2 19:37 ..
+-rw------- 1 arm arm 266389 Nov  2 19:37 00-season-matches.json
+-rw------- 1 arm arm   1115 Nov  2 19:37 manifest.json
+-rw------- 1 arm arm     66 Nov  2 19:37 token.meta.json
+21fd12e7704b7c7146cfbab414352352f3cfaa53e7ef5038f4411fa789e4c84d  00-season-matches.json
+1be355c67f2f026e4665537ad34df126c4b67889d8614d2e7dcbeca1ed44816e  manifest.json
+(token.meta.json: name, size and mode only) 66 bytes mode 600
+snapshot directory present: acquisition artefact RETAINED on disk by design (git-ignored)
+-- evidence directory /home/arm/backups/afldb/c4b-924ff273-r2 against the hashes recorded by step-c at 2026-11-02T08:37:49Z
+evidence directory unchanged (10 files, every hash equal to the recorded value)
+
+failed queries: 0; unexpected values: 0
+READBACK CONSISTENT (read-only; this proves what the listed checks prove and no more)
+readback exit=0
+
+== negctl 2026-11-02T09:04:04Z: the invalid query of the pinned step-c, through the same wrapper
+identity ok (afldb_prod, OID 66668, read-only session)
+QUERY FAILED [NEGATIVE CONTROL: max(created_at) on import_batches] exit=1: ERROR:  column "created_at" does not exist
+LINE 1: SELECT count(*), max(created_at) FROM import_batches WHERE s...
+                             ^
+failed queries: 1; unexpected values: 0
+READBACK NOT CONSISTENT (a failed query or an unexpected value is a finding for review, never auto-corrected)
+NEGATIVE CONTROL PASS (the invalid query was counted as a failure and the verdict was non-zero)
+negctl exit=0

@@ -114,13 +114,23 @@ step-c)
   # shellcheck disable=SC1090
   source <(sed -n '14,18p;20,75p' "$P")
   backup_identity
-  echo "setting=[$(setting_raw)]"
+  # A required query that fails must FAIL step-c (2 Nov r2: an invalid query printed ERROR and step-c still ended DONE). rq runs one query and counts a non-zero exit or an ERROR: line.
+  RC=0
+  rq() { local out s; out=$("$@" 2>&1); s=$?; printf '%s\n' "$out"; if [ "$s" -ne 0 ] || [[ $out == *"ERROR:"* ]]; then echo "STEP-C QUERY FAILED (exit $s)"; RC=1; fi; return 0; }
+  SETV=$(setting_raw) || { echo "STEP-C QUERY FAILED (setting_raw)"; RC=1; }
+  echo "setting=[$SETV]"
   echo "--- audit rows by the rehearsal tool"
-  q -c "SELECT id, at, actor_label, action, detail::text FROM auth_audit_log WHERE actor_label='afl-api-c4b-rehearsal' ORDER BY id" 2>&1
-  echo "--- canonical counts (season 2027 matches; afl_api-owned matches; import batches in the last hour)"
-  q -c "SELECT (SELECT count(*) FROM matches WHERE season=2027), (SELECT count(*) FROM matches m JOIN sources s ON s.id=m.source_id WHERE s.key='afl_api')" 2>&1
-  q -c "SELECT count(*), max(created_at) FROM import_batches WHERE created_at > now() - interval '1 hour'" 2>&1
+  rq q -c "SELECT id, at, actor_label, action, detail::text FROM auth_audit_log WHERE actor_label='afl-api-c4b-rehearsal' ORDER BY id"
+  echo "--- canonical counts (season 2027 matches; afl_api-owned matches)"
+  rq q -c "SELECT (SELECT count(*) FROM matches WHERE season=2027), (SELECT count(*) FROM matches m JOIN sources s ON s.id=m.source_id WHERE s.key='afl_api')"
+  echo "--- import batches started at or after the run start recorded in the run id (import_batches has started_at, not created_at)"
+  RID=$(sed -n 's/.*"run_id": *"\([^"]*\)".*/\1/p' "$EVD/result.json" | head -1); RTS=${RID#c4b-}; RTS=${RTS%%Z-*}
+  if [[ $RTS =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{9}$ ]]; then
+    RT0="${RTS%T*}T${RTS:11:2}:${RTS:13:2}:${RTS:15:2}.${RTS:17:3}Z"; echo "run_id=$RID run start=$RT0"
+    rq q -c "SELECT count(*), COALESCE(max(started_at)::text,'<NULL>') FROM import_batches WHERE started_at >= '$RT0'::timestamptz"
+  else echo "STEP-C QUERY FAILED (no usable run_id in $EVD/result.json)"; RC=1; fi
   unset PGPASSWORD
+  [ "$RC" -eq 0 ] || { echo "STEP-C FAILED (at least one required read failed; do not treat the output above as complete)"; exit 1; }
   echo "STEP-C DONE (read-only; the verdict is in result.json above; the reviewer records it)"
   ;;
 *) stop "unknown phase" 2 ;;

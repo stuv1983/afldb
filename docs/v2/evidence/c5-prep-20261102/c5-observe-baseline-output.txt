@@ -1,0 +1,89 @@
+30c664626cfd04f8c9ba5434bd40df79b830052185dc96422644f6f49bcb059f  /home/arm/c5-observe-20261102.sh
+== c5-observe rollback-verify 2026-11-02T09:16:02Z N=924ff273261834e4112e3f41b61ceeab55427534 (host local 2026-11-02 20:16:02 AEDT)
+identity ok (afldb_prod, OID 66668, read-only session)
+match timer enabled/active = [disabled/inactive] (expected [disabled/inactive])
+Brownlow timer enabled/active = [disabled/inactive] (expected [disabled/inactive])
+AFL Tables timer enabled/active = [disabled/inactive] (expected [disabled/inactive])
+match service ActiveState = [inactive] (expected [inactive])
+settle/acquire processes = [0] (expected [0])
+setting stored value = [false] (expected [false])
+.env any AFLDB_SETTLE_TRIGGER mention = [0] (expected [0])
+afldb MainPID=3268373 ActiveEnterTimestamp=Mon 2026-11-02 13:18:50 AEDT
+process env: any AFLDB_SETTLE_TRIGGER (0 only after the restart that follows the .env removal) = [0] (expected [0])
+health = [200] (expected [200])
+C5-OBSERVE rollback-verify PASS
+phase rollback-verify exit=0
+
+== c5-observe env-effective 2026-11-02T09:16:02Z N=924ff273261834e4112e3f41b61ceeab55427534 (host local 2026-11-02 20:16:02 AEDT)
+identity ok (afldb_prod, OID 66668, read-only session)
+afldb MainPID=3268373 (before C5: 3268373) ActiveEnterMonotonic=6739446504275 (before: 6739446504275) ActiveEnterTimestamp=Mon 2026-11-02 13:18:50 AEDT
+FAIL: afldb has not been restarted since the baseline
+.env mtime epoch=1786877149; service active-enter epoch=1793585930
+.env lines exactly AFLDB_SETTLE_TRIGGER=systemd = [0] (expected [1])
+FAIL: .env lines exactly AFLDB_SETTLE_TRIGGER=systemd
+.env any mention = [0] (expected [1])
+FAIL: .env any mention
+.env stat (perm owner) = [600 arm] (expected [600 arm])
+MainPID cwd is the serving release = [/home/arm/afldb-releases/releases/ea98a35f2061--vY0EFS0DdR-TiPkxTZz6] (expected [/home/arm/afldb-releases/releases/ea98a35f2061--vY0EFS0DdR-TiPkxTZz6])
+process env: exact AFLDB_SETTLE_TRIGGER=systemd = [0] (expected [1])
+FAIL: process env: exact AFLDB_SETTLE_TRIGGER=systemd
+process env: any AFLDB_SETTLE_TRIGGER = [0] (expected [1])
+FAIL: process env: any AFLDB_SETTLE_TRIGGER
+health = [200] (expected [200])
+switch still false before the toggle = [false] (expected [false])
+C5-OBSERVE env-effective FAIL (5 check(s) failed; a finding for review, nothing was changed)
+phase env-effective exit=1
+
+== c5-observe toggle 2026-11-02T09:16:02Z N=924ff273261834e4112e3f41b61ceeab55427534 (host local 2026-11-02 20:16:02 AEDT)
+identity ok (afldb_prod, OID 66668, read-only session)
+setting stored value = [false] (expected [true])
+FAIL: setting stored value
+setting rows = [1] (expected [1])
+setting updated_by is an admin user (not NULL) = [false] (expected [true])
+FAIL: setting updated_by is an admin user (not NULL)
+new ingestion-switch audit rows after id 304 = [0] (expected [1])
+FAIL: new ingestion-switch audit rows after id 304
+that row: enabled true, attributed to an admin user (actor_user_id NOT NULL) = [] (expected [true,true])
+FAIL: that row: enabled true, attributed to an admin user (actor_user_id NOT NULL)
+that row is newer than the C4b restore (id 304) and its setting write = [] (expected [true])
+FAIL: that row is newer than the C4b restore (id 304) and its setting write
+Brownlow admin switch rows (must stay absent: not part of C5) = [0] (expected [0])
+Brownlow switch audit rows (must stay 0) = [0] (expected [0])
+match timer still disabled (enabled only in the next step) = [disabled] (expected [disabled])
+C5-OBSERVE toggle FAIL (5 check(s) failed; a finding for review, nothing was changed)
+phase toggle exit=1
+
+== c5-observe timer 2026-11-02T09:16:03Z N=924ff273261834e4112e3f41b61ceeab55427534 (host local 2026-11-02 20:16:03 AEDT)
+identity ok (afldb_prod, OID 66668, read-only session)
+match timer is-enabled = [disabled] (expected [enabled])
+FAIL: match timer is-enabled
+match timer ActiveState = [inactive] (expected [active])
+FAIL: match timer ActiveState
+next elapse: []
+FAIL: no future next-elapse time
+Brownlow timer enabled/active = [disabled/inactive] (expected [disabled/inactive])
+AFL Tables timer enabled/active = [disabled/inactive] (expected [disabled/inactive])
+match service ActiveState (nothing running yet) = [inactive] (expected [inactive])
+settle/acquire processes = [0] (expected [0])
+setting still true = [false] (expected [true])
+FAIL: setting still true
+afldb timers known to systemd:
+C5-OBSERVE timer FAIL (4 check(s) failed; a finding for review, nothing was changed)
+phase timer exit=1
+
+== c5-observe first-run 2026-11-02T09:16:03Z N=924ff273261834e4112e3f41b61ceeab55427534 (host local 2026-11-02 20:16:03 AEDT)
+identity ok (afldb_prod, OID 66668, read-only session)
+service: Result=success ExecMainStatus=0 ActiveState=inactive InactiveEnter=
+service Result of the last run = [success] (expected [success])
+ExecMainStatus = [0] (expected [0])
+batches after id 75 (id, tool, started_at, completed_at or <NULL>, status, read/ins/upd/rej):
+    
+at least one completed settle-afl-api.ts batch after id 75 (the scheduled run retained one) = [false] (expected [true])
+FAIL: at least one completed settle-afl-api.ts batch after id 75 (the scheduled run retained one)
+batches after 75 by settle-afl-api.ts that did not complete = [0] (expected [0])
+canonical 2027 matches (no CONCLUDED match exists before 2027-03-17) = [0] (expected [0])
+match timer still enabled = [disabled] (expected [enabled])
+FAIL: match timer still enabled
+C5-OBSERVE first-run FAIL (2 check(s) failed; a finding for review, nothing was changed)
+phase first-run exit=1
+

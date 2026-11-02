@@ -15,6 +15,11 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-316 C4b r2 read-back, step-c wrapper fix and C5 procedure (2026-11-02, local; production unchanged)
+
+- **Operations tooling (`docs/v2/evidence/`):** `run.sh step-c` now fails when a required read fails (it printed `STEP-C DONE` after a SQL error), reads the setting with an exit check, and replaces the invalid `import_batches.created_at` query with `started_at` anchored on the run id; a sandbox negative control (including the original script reproducing the defect) passes. New read-only helpers: `c4b-r2-readback-20261102/readback.sh` (independent non-retention read-back of the C4b r2 run, ran on production: consistent), `c5-prep-20261102/c5-prep.sh` and `c5-observe.sh` (C5 survey and window observation phases).
+- **Records:** the C4b r2 outcome wording is corrected (zero canonical-write counters and before/after files are not retention checks; the independent read-back is); one ordered owner-attended C5 procedure with exact acceptance and approval wording is prepared, not granted.
+
 ### ISSUE-316 C4b: first production run HALTed on a gate defect; fixed locally, rollout and fresh grant prepared (2026-11-02)
 
 - **Operations (PRODUCTION):** under D-316-13 at `ea98a35f` the C4b rehearsal ran once and ended `HALT` (exit 1): `seasonFeedComplete: 1` was rejected by the tool's own gate. The setting was restored to `false` and verified, zero canonical writes, application MainPID 3268373 unchanged, units and timers inert. Not a CLEAR; C5 cannot proceed. Record: [docs/v2/block-c-c4b-outcome-2026-11-02.md](docs/v2/block-c-c4b-outcome-2026-11-02.md) (the first launch also failed with exit 127 because the tmux shell had no node on PATH; the tool never started).
