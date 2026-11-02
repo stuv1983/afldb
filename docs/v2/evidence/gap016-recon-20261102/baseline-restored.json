@@ -1,0 +1,15 @@
+{
+  "target": {
+    "host": "127.0.0.1",
+    "port": 55496,
+    "user": "afldb_owner",
+    "database": "afldb_v2_blockb_recon_rst_test",
+    "databaseOid": "36442",
+    "systemIdentifier": "7703399194485209629",
+    "clusterName": "afldb_v2_isolated",
+    "databaseComment": "afldb-v2-isolated-test"
+  },
+  "revision": "ea98a35f20610e75c18e698bc0d9fe084c3c783d",
+  "baselineDigest": "433002971a4f9db9bfce8b6ab6858254b7f759af7151e00068153889d4ed821d",
+  "capturedAt": "2026-11-02T03:56:15.258Z"
+}

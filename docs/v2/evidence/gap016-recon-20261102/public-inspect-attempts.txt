@@ -1,0 +1,6 @@
+Public rendering inspection, headed Playwright on https://beta.afldb.com (read-only; owner enters the access code)
+Attempt 1: 2026-11-02T03:58:50Z opened; 04:08:50Z GATE NOT PASSED within 10 minutes; closed. No page read.
+Attempt 2: 2026-11-02T04:09:15Z opened; 04:39:15Z GATE NOT PASSED within 30 minutes; closed. No page read.
+Anonymous HTTP checks (no credential): afldb.com apex = static coming-soon page (200), /awards and /brownlow = 404 with empty body;
+beta.afldb.com/awards = 307 to /beta?from=%2Fawards (closed-beta access-code gate).
+Script: public-inspect.cjs (loads pages and saves text/screenshots only).

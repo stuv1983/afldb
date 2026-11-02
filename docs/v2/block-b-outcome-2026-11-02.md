@@ -81,9 +81,9 @@ Only the disposable restore database was changed; production's setting and the b
 ## 5. Remaining limitations (not closed by this record)
 
 * **Not pushed.** This record and its commit are local only; origin/main is unchanged by this work.
-* **Block C acceptance is not recorded.** The owner has not yet written the final acceptance, so GAP-030 and GAP-031 stay open until their criteria are met on these receipts. Nothing here claims otherwise.
-* **Public rendering is unverified.** No page, ISR cache or admin view was fetched; whether `/awards` and player career pages already show the E publication, or wait for revalidation, has not been checked.
-* **The 98/98 local-season reconciliation was not re-run** in this session; the acceptance reads it names belong to the owner's Block C step.
+* **Final owner acceptance: RECORDED later on 2026-11-02** (verbatim in [brownlow-final-acceptance-gap016-closure-2026-11-02.md](brownlow-final-acceptance-gap016-closure-2026-11-02.md) section 1). GAP-030 and GAP-031 are closed on it. *(This bullet originally read: the owner had not yet written the acceptance, so both gaps stayed open.)*
+* **Public rendering:** unverified when this record was written; checked read-only later the same day, see section 5 of the closure record. *(Originally: no page, ISR cache or admin view had been fetched.)*
+* **The 98/98 local-season reconciliation was not re-run** in this session. A separate fresh post-E production-derived reconciliation (98 of 98 seasons determined and agreeing) was run later the same day: closure record section 4. It does not alter the retained local record.
 * **Baselines moved.** Production's Brownlow baseline is now `43300297…821d`. Any pending baseline-bound work (C4b, C5) must re-baseline.
 * **Procedure deviation (disclosed):** the time zone alignment above is outside the packaged S3 text; it follows the preparation record and the owner's instruction.
 * **B0 reused** the plan and backup prepared before the approval (backup 29 minutes old and plan 20 minutes old at apply), revalidated by `pre`, the plan summary and apply's own gates.
@@ -93,4 +93,4 @@ Only the disposable restore database was changed; production's setting and the b
 
 > I accept the Brownlow correction stages b0, b1, b2, b3 and e as applied to `afldb_prod` on 2026-11-02 at revision `ea98a35f20610e75c18e698bc0d9fe084c3c783d`, evidenced by the five receipts (plan digests `7c84362f…f267`, `c3e2320a…ab2ba`, `c55a894b…ead6`, `5251b00a…7996`, `2333b308…a2fe`) and the acceptance reads recorded in docs/v2/block-b-outcome-2026-11-02.md, against the 98/98 local-season reconciliation. GAP-030 and GAP-031 may close on these receipts.
 
-Not recorded as accepted until the owner writes it.
+**Recorded:** the owner wrote the acceptance (with its own wording, covering the five receipts, the 212 observations, the 320,861 backfills, the 621 adoptions with 8,901 preserved, the twelve rulings and the 9,522 preserved 2026 rows) on 2026-11-02. See the closure record. The wording above was a proposal, not what was recorded.
