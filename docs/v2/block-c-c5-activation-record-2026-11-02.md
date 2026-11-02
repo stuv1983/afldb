@@ -48,7 +48,22 @@
 
 `c5-observe.sh timer` at 10:24:17Z reported 1 matching process (expected 0) and failed. The service was `inactive`. The check uses `pgrep -fc '[s]ettle-afl-api|[a]cquire-afl-api'`, which excludes `pgrep` itself but not the remote shell whose command line carried my own `systemctl show afldb-settle-afl-api.timer` text. Re-run 27 seconds later with a command line containing no such text, the same check read **0** and `timer` ended **PASS**. A direct process listing was attempted but the command was mangled by quoting and is void (`step5-process-listing.txt`); **the self-match explanation is therefore inferred from the clean re-run, not from inspecting the matched process.** No settle or acquire process was running at any other observation, and the unit's `LastTriggerUSec` is empty.
 
-## 6. First-night execution: NOT YET OBSERVED (pending read-only observation)
+## 6. First-night execution: OBSERVED 2026-11-03 05:23 AEDT (scheduled success at the systemd level; owner review pending)
+
+**Result (read-only, as `arm`, both helpers exit 0; evidence `evidence/c5-window-20261102/first-night-first-run.txt` and `first-night-first-night.txt`).** Classification: **scheduled success**. The systemd view and the data view agree with the prediction below.
+
+- Invocation: timer `LastTriggerUSec` Tue 2026-11-03 05:02:00 AEDT; `ExecStart=/bin/sh /home/arm/projects/afldb/deploy/afldb-settle-afl-api.sh`; `ExecMainStart` 05:02:00, `ExecMainExit` 05:02:02; `Result=success`, `ExecMainStatus=0`, `ActiveState=inactive`; InvocationID `34dad02cd1e542809946c30a14a8293c`.
+- `first-run`: `C5-OBSERVE first-run PASS` (Result success, exit 0, one completed `settle-afl-api.ts` batch after id 75, none uncompleted, 0 canonical 2027 matches, timer enabled).
+- Batch: id 78, `settle-afl-api.ts`, 2026-11-03 05:02:02.387 to .408, completed, read/inserted/updated/rejected 0/0/0/0; sequence 77 to 78. `validation_result`: `seasonFeedComplete` 1, `seasonFeedMatches` 218 (`SCHEDULED` 135, `PLACEHOLDER` 83), every write counter 0.
+- Canonical effects: 2027 matches 0; fixtures in season 2027 218 (unchanged).
+- Journal visible to `arm`: the tool's own lines only, ending `Applied as import batch 78: 0 canonical row(s) inserted, 0 updated ...` and `AFLDB_SETTLE_SUCCESS label=afl-api-2027-2026-11-02-180200`. `arm` is not in `adm`/`systemd-journal`, so systemd's Started/Finished lines and the provider request count were not seen; if the owner wants them: `sudo journalctl -u afldb-settle-afl-api.service --since '2026-11-03 04:30' --until '2026-11-03 08:00' --no-pager`.
+- Preserved: switch true; one trigger line in `.env`; Brownlow and AFL Tables timers disabled/inactive; match timer enabled, next elapse Wed 2026-11-04 05:02:46 AEDT; 0 settle/acquire processes.
+- **Difference from the prediction:** none in outcome. **Unrecorded before, noted only:** the post-run exceptions report lists 20 open canonical apply warnings (`player_match_stats`, `foreign_source_owner`, season 2026 match ids, "first detected 2026-09-28", "more than 20 open"). This batch refused 0 and applied 0, so they are carried rows, not produced by this run. Not investigated and not classified here.
+- Not done: no gate file written (the owner writes it after review), nothing restarted, retried, deployed or pushed.
+
+The pre-run text follows unchanged for history.
+
+### 6.0 Pre-run text (written before the run; not observed at the time)
 
 The timer fires between 05:00 and 05:15 AEDT on 2026-11-03 (observed next elapse 05:01:47). That run is `acquire-afl-api.ts` (two provider requests) then `settle-afl-api.ts --apply --auto-apply --require-complete-source`. With no CONCLUDED 2027 match it is **expected** (from the dry-run text; not observed) to retain one `import_batches` row (id 78 or later; the sequence is at 77) and no canonical rows. This is a real apply, not a rehearsal.
 

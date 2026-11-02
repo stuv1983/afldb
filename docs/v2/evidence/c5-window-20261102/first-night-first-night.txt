@@ -1,0 +1,84 @@
+﻿== c5-observe first-night 2026-11-02T18:23:27Z N=924ff273261834e4112e3f41b61ceeab55427534 (host local 2026-11-03 05:23:27 AEDT)
+identity ok (afldb_prod, OID 66668, read-only session)
+== service invocation (systemctl show, no sudo)
+    ExecStart: ExecStart=/bin/sh /home/arm/projects/afldb/deploy/afldb-settle-afl-api.sh
+    timer LastTriggerUSec=[Tue 2026-11-03 05:02:00 AEDT] NextElapse=[Wed 2026-11-04 05:02:46 AEDT] timer enabled=[enabled] active=[active]
+    service Result=[success] ExecMainStatus=[0] ExecMainStart=[Tue 2026-11-03 05:02:00 AEDT] ExecMainExit=[Tue 2026-11-03 05:02:02 AEDT] InvocationID=[34dad02cd1e542809946c30a14a8293c] ActiveState=[inactive]
+== journal visible to arm (arm is not in adm/systemd-journal: only the tool's own output lines are visible; systemd's Started/Finished lines need: sudo journalctl -u afldb-settle-afl-api.service --since '2026-11-03 04:30' --until '2026-11-03 08:00' --no-pager)
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:   derivedRecomputeRuns: 0
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:   derivedRecomputePlayers: 0
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]: Source completeness: COMPLETE
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:   Source complete: the source supplied no rows for this scope, and none were dropped.
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]: Applied as import batch 78: 0 canonical row(s) inserted, 0 updated, 0 ledger row(s), 0 attendance enrichment(s), 0 refused at the write, 0 unit(s) rolled back.
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]: afl_api settle exceptions — season 2027
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:   Latest completed batch 78 (2026-11-03 05:02:02.40824+11): 0 records read, 0 rejection rows.
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]: ACTIVE — requires attention (20)
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:   Unresolved identities (0)
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:     (none)
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:   Other pending candidates still open (0)
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:     (none)
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:   Open canonical apply failures (20)
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:     [warning] afl_api|apply|player_match_stats|CD_M20260140003|CD_T80|CD_I998134|player_match_stats — first detected 2026-09-28
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:         The automatic canonical application of player_match_stats 'CD_M20260140003|CD_T80|CD_I998134' was refused (foreign_source_owner): the canonical row is owned by anot
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:     [warning] afl_api|apply|player_match_stats|CD_M20260140004|CD_T20|CD_I993834|player_match_stats — first detected 2026-09-28
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:         The automatic canonical application of player_match_stats 'CD_M20260140004|CD_T20|CD_I993834' was refused (foreign_source_owner): the canonical row is owned by anot
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:     [warning] afl_api|apply|player_match_stats|CD_M20260140102|CD_T80|CD_I1012857|player_match_stats — first detected 2026-09-28
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:         The automatic canonical application of player_match_stats 'CD_M20260140102|CD_T80|CD_I1012857' was refused (foreign_source_owner): the canonical row is owned by ano
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:     [warning] afl_api|apply|player_match_stats|CD_M20260140105|CD_T160|CD_I1020339|player_match_stats — first detected 2026-09-28
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:         The automatic canonical application of player_match_stats 'CD_M20260140105|CD_T160|CD_I1020339' was refused (foreign_source_owner): the canonical row is owned by an
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:     [warning] afl_api|apply|player_match_stats|CD_M20260140202|CD_T10|CD_I1021200|player_match_stats — first detected 2026-09-28
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:         The automatic canonical application of player_match_stats 'CD_M20260140202|CD_T10|CD_I1021200' was refused (foreign_source_owner): the canonical row is owned by ano
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:     [warning] afl_api|apply|player_match_stats|CD_M20260140207|CD_T100|CD_I1023518|player_match_stats — first detected 2026-09-28
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:         The automatic canonical application of player_match_stats 'CD_M20260140207|CD_T100|CD_I1023518' was refused (foreign_source_owner): the canonical row is owned by an
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:     [warning] afl_api|apply|player_match_stats|CD_M20260140207|CD_T150|CD_I993902|player_match_stats — first detected 2026-09-28
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:         The automatic canonical application of player_match_stats 'CD_M20260140207|CD_T150|CD_I993902' was refused (foreign_source_owner): the canonical row is owned by ano
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:     [warning] afl_api|apply|player_match_stats|CD_M20260140303|CD_T130|CD_I1009260|player_match_stats — first detected 2026-09-28
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:         The automatic canonical application of player_match_stats 'CD_M20260140303|CD_T130|CD_I1009260' was refused (foreign_source_owner): the canonical row is owned by an
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:     [warning] afl_api|apply|player_match_stats|CD_M20260140303|CD_T130|CD_I1018018|player_match_stats — first detected 2026-09-28
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:         The automatic canonical application of player_match_stats 'CD_M20260140303|CD_T130|CD_I1018018' was refused (foreign_source_owner): the canonical row is owned by an
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:     [warning] afl_api|apply|player_match_stats|CD_M20260140303|CD_T130|CD_I1027790|player_match_stats — first detected 2026-09-28
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:         The automatic canonical application of player_match_stats 'CD_M20260140303|CD_T130|CD_I1027790' was refused (foreign_source_owner): the canonical row is owned by an
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:     [warning] afl_api|apply|player_match_stats|CD_M20260140403|CD_T60|CD_I1020250|player_match_stats — first detected 2026-09-28
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:         The automatic canonical application of player_match_stats 'CD_M20260140403|CD_T60|CD_I1020250' was refused (foreign_source_owner): the canonical row is owned by ano
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:     [warning] afl_api|apply|player_match_stats|CD_M20260140507|CD_T70|CD_I1016433|player_match_stats — first detected 2026-09-28
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:         The automatic canonical application of player_match_stats 'CD_M20260140507|CD_T70|CD_I1016433' was refused (foreign_source_owner): the canonical row is owned by ano
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:     [warning] afl_api|apply|player_match_stats|CD_M20260140602|CD_T140|CD_I1002404|player_match_stats — first detected 2026-09-28
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:         The automatic canonical application of player_match_stats 'CD_M20260140602|CD_T140|CD_I1002404' was refused (foreign_source_owner): the canonical row is owned by an
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:     [warning] afl_api|apply|player_match_stats|CD_M20260140607|CD_T120|CD_I290627|player_match_stats — first detected 2026-09-28
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:         The automatic canonical application of player_match_stats 'CD_M20260140607|CD_T120|CD_I290627' was refused (foreign_source_owner): the canonical row is owned by ano
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:     [warning] afl_api|apply|player_match_stats|CD_M20260140608|CD_T90|CD_I999391|player_match_stats — first detected 2026-09-28
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:         The automatic canonical application of player_match_stats 'CD_M20260140608|CD_T90|CD_I999391' was refused (foreign_source_owner): the canonical row is owned by anot
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:     [warning] afl_api|apply|player_match_stats|CD_M20260140902|CD_T20|CD_I291548|player_match_stats — first detected 2026-09-28
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:         The automatic canonical application of player_match_stats 'CD_M20260140902|CD_T20|CD_I291548' was refused (foreign_source_owner): the canonical row is owned by anot
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:     [warning] afl_api|apply|player_match_stats|CD_M20260140909|CD_T120|CD_I1002245|player_match_stats — first detected 2026-09-28
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:         The automatic canonical application of player_match_stats 'CD_M20260140909|CD_T120|CD_I1002245' was refused (foreign_source_owner): the canonical row is owned by an
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:     [warning] afl_api|apply|player_match_stats|CD_M20260140909|CD_T120|CD_I1032081|player_match_stats — first detected 2026-09-28
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:         The automatic canonical application of player_match_stats 'CD_M20260140909|CD_T120|CD_I1032081' was refused (foreign_source_owner): the canonical row is owned by an
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:     [warning] afl_api|apply|player_match_stats|CD_M20260141001|CD_T70|CD_I1027877|player_match_stats — first detected 2026-09-28
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:         The automatic canonical application of player_match_stats 'CD_M20260141001|CD_T70|CD_I1027877' was refused (foreign_source_owner): the canonical row is owned by ano
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:     [warning] afl_api|apply|player_match_stats|CD_M20260141101|CD_T10|CD_I1011981|player_match_stats — first detected 2026-09-28
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:         The automatic canonical application of player_match_stats 'CD_M20260141101|CD_T10|CD_I1011981' was refused (foreign_source_owner): the canonical row is owned by ano
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:   Open source disagreements (0)
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:     (none)
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:     … more than 20 open; query data_issues directly for the full list.
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]: MOOT — pending candidates whose record has since applied (0); retained as history under AFLDB-ISSUE-099 F7, nothing to do
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318377]:     (none)
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318328]: AFLDB_SETTLE_SUCCESS label=afl-api-2027-2026-11-02-180200
+    2026-11-03T05:02:02+11:00 afldb-prod afldb-settle-afl-api[3318328]: afl_api settle chain complete — label afl-api-2027-2026-11-02-180200
+== database evidence
+    import_batches_id_seq = 78 is_called=true (was 77 before the first scheduled run; max(id) was 75)
+    max(import_batches.id) = 78
+    batches after id 75 (id, tool, started_at, completed_at, status, read/ins/upd/rej):
+      78	settle-afl-api.ts	2026-11-03 05:02:02.387313+11	2026-11-03 05:02:02.40824+11	completed	0/0/0/0
+    newest batch validation_result (first 1800 chars):
+      {"buildFailures": 0, "venueUnmapped": 0, "payloadsReused": 0, "payloadsCreated": 0, "recordsDeferred": {}, "snapshotMatches": 0, "dataIssuesOpened": 0, "observationsSeen": 0, "versionsAppended": 0, "candidatesCreated": 0, "seasonFeedMatches": 218, "dataIssuesResolved": 0, "seasonFeedComplete": 1, "sourceDisagreement": 0, "absenceSweepSkipped": 0, "candidatesRefreshed": 0, "dataIssuesRefreshed": 0, "canonicalRowsUpdated": 0, "derivedRecomputeRuns": 0, "canonicalRowsInserted": 0, "foreignOwnedCollision": 0, "observationsCorrected": 0, "observationsUnchanged": 0, "projectionRowsWritten": 0, "venueProviderUnmapped": 0, "canonicalApplyFailures": 0, "canonicalApplyRefusals": 0, "observationsReappeared": 0, "seasonFeedStatusCounts": {"SCHEDULED": 135, "PLACEHOLDER": 83}, "unresolvedIdentityClub": 0, "derivedRecomputePlayers": 0, "manualAuthorityRefusals": 0, "observationsHistoryOnly": 0, "snapshotPlayerMatchRows": 0, "unresolvedIdentityMatch": 0, "corroboratedForeignOwned": 0, "nonParticipantPlayerRows": 0, "observationsMarkedAbsent": 0, "unresolvedIdentityPlayer": 0, "candidatesMootLeftPending": 0, "canonicalApplicationsLogged": 0, "attendanceEnrichmentsApplied": 0}
+    canonical matches in season 2027 = 0 (0 expected: no CONCLUDED 2027 match exists before 2027-03-17)
+    fixtures in season 2027 = 218 (218 before; the match chain does not write fixtures)
+== configuration preserved
+    switch (normalised) = [true]
+    trigger lines in .env = [1]; Brownlow timer = [disabled/inactive]; AFL Tables timer = [disabled/inactive]
+    settle/acquire processes right now = 0 (a run still in progress shows here)
+== CLASSIFICATION (the systemd view and the data view are reported separately)
+    systemd view: RAN, exit 0 (scheduled success at the systemd level). Whether it did what was expected is the data view below.
+    data view: 1 batch row(s) retained after id 75; canonical 2027 matches = 0.
+C5-OBSERVE first-night COMPLETE (information and classification; no PASS/FAIL is claimed)

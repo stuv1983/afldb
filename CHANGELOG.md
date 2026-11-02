@@ -15,6 +15,12 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-316 C5: first scheduled night observed on production, scheduled success at the systemd level (2026-11-03, read-only observation; local record)
+
+- **Observed, not changed:** the `afldb-settle-afl-api` timer fired Tue 2026-11-03 05:02:00 AEDT and the service ran about 2 s, `Result=success`, exit 0. One `import_batches` row was retained (batch 78, `settle-afl-api.ts`, completed, 0 read/inserted/updated/rejected; season feed complete, 218 matches); canonical 2027 matches 0; Brownlow and AFL Tables timers still disabled. This matched the prediction in the activation record. Helpers: `first-run` PASS, `first-night` COMPLETE.
+- Observation recorded without a conclusion: 20 open `foreign_source_owner` apply warnings on season 2026 `player_match_stats` (first detected 2026-09-28) appear in the post-run exceptions report; this run refused none. Evidence: `docs/v2/evidence/c5-window-20261102/first-night-*.txt`.
+- ISSUE-316 stays open: owner review and gate file pending, D-316-12 not deployed.
+
 ### ISSUE-316 close-out preparation, part 2: C7 observer, Linux qualification, UI release package rev 2, successor ISSUE-332 (2026-11-02, local; production unchanged)
 
 - **Code added (local, NOT deployed, no route imports it):** read-only C7 observer (`src/lib/acquisition/afl-api-c7-observation.ts`, `tools/v2/c7-observe.ts`) distinguishing no batch, no concluded matches, incomplete acquisition, failed processing and measured-criteria-met; never records an acceptance, never measures the ISR window. Unit tests and an integration test (rolled-back transaction on a real PostgreSQL 16) added.

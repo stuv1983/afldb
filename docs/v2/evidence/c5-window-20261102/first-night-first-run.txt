@@ -1,0 +1,12 @@
+﻿== c5-observe first-run 2026-11-02T18:23:26Z N=924ff273261834e4112e3f41b61ceeab55427534 (host local 2026-11-03 05:23:26 AEDT)
+identity ok (afldb_prod, OID 66668, read-only session)
+service: Result=success ExecMainStatus=0 ActiveState=inactive InactiveEnter=Tue 2026-11-03 05:02:02 AEDT
+service Result of the last run = [success] (expected [success])
+ExecMainStatus = [0] (expected [0])
+batches after id 75 (id, tool, started_at, completed_at or <NULL>, status, read/ins/upd/rej):
+    78	settle-afl-api.ts	2026-11-03 05:02:02.387313+11	2026-11-03 05:02:02.40824+11	completed	0/0/0/0
+at least one completed settle-afl-api.ts batch after id 75 (the scheduled run retained one) = [true] (expected [true])
+batches after 75 by settle-afl-api.ts that did not complete = [0] (expected [0])
+canonical 2027 matches (no CONCLUDED match exists before 2027-03-17) = [0] (expected [0])
+match timer still enabled = [enabled] (expected [enabled])
+C5-OBSERVE first-run PASS
