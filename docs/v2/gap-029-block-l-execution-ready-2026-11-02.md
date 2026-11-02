@@ -1,6 +1,8 @@
 # Block L (GAP-029 match-event labels): execution-ready record (2026-11-02)
 
-**Status: PREPARED. NOTHING WAS WRITTEN TO PRODUCTION.** One fresh backup was taken and read-only plan artefacts were produced. No label was applied, no approval exists, nothing was pushed, deployed, restarted, migrated or cleaned up. The apply script exists (`scripts/prod-apply.sh`) but has not been run and refuses to start without an owner approval file that this session did not create.
+**SUPERSEDED STATUS (2026-11-02, later): the 64 labels were APPLIED to production and verified; see the [outcome record](gap-029-block-l-outcome-2026-11-02.md). The text below is the preparation record as it stood and is kept unedited.**
+
+**Status at preparation: PREPARED. NOTHING WAS WRITTEN TO PRODUCTION.** One fresh backup was taken and read-only plan artefacts were produced. No label was applied, no approval exists, nothing was pushed, deployed, restarted, migrated or cleaned up. The apply script exists (`scripts/prod-apply.sh`) but has not been run and refuses to start without an owner approval file that this session did not create.
 
 Evidence directory: [`evidence/gap029-block-l-20261102/`](evidence/gap029-block-l-20261102/) (scripts, public records, logs, Linux rehearsal). Dumps, the restored database and credentials are **not** in Git.
 

@@ -1,0 +1,19 @@
+{
+  "planDigest": "1b538e1a50cacdb24d37d771d79261a5926e35c69f53d03481ec47a26e79528a",
+  "target": {
+    "host": "localhost",
+    "port": 5432,
+    "database": "afldb_prod",
+    "user": "afldb_backup",
+    "systemIdentifier": "7674454702926115004",
+    "databaseOid": "66668",
+    "clusterName": "16/main",
+    "databaseComment": null
+  },
+  "revision": "86da1a82329371fd23db6e2935a0e9334ba08f9a",
+  "operation": "gap029-match-events",
+  "evidenceSha256": "e3848807931cf255175c1642d9ded63590b2c7e2633b33a5e9f0fa5b96a4430f",
+  "approvedAt": "2026-11-02T00:45:00.000Z",
+  "expiresAt": "2026-11-02T20:25:00.000Z",
+  "reference": "Owner message of 2026-11-02 (Block L APPROVAL): apply exactly the 64 match-event labels in docs/v2/gap-029-block-l-execution-ready-2026-11-02.md, revision 86da1a82, plan digest 1b538e1a, plan file sha256 ef2e2588, target afldb_prod system id 7674454702926115004 OID 66668, actor 1, distribution Anzac Day 31 / Dreamtime at the G 22 / Kings Birthday 11; expires 2026-11-02T20:25:00Z; exclusivity confirmed; per-label commits accepted; no retry or reversal approved."
+}

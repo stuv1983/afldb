@@ -1,0 +1,87 @@
+# Recovery evidence, read-only Git, captured 2026-11-02T00:56:12Z at HEAD f123311d34d04e073286a38ce711515612a15e06
+
+## 1. HEAD reflog for the incident window (07:56 to 09:53 +1100, 2026-11-02)
+88889724 HEAD@{2026-11-02 09:52:42 +1100}: commit: docs(v2): Block M package scripts (static check, phased production script, M-a/M-b capture) and Block L serving-release correction
+7cf05fc1 HEAD@{2026-11-02 09:52:04 +1100}: reset: moving to 7cf05fc1
+75dc444a HEAD@{2026-11-02 09:51:24 +1100}: commit: neg: migration edit
+7cf05fc1 HEAD@{2026-11-02 09:51:24 +1100}: reset: moving to HEAD~1
+6dc4fb5e HEAD@{2026-11-02 09:51:23 +1100}: commit: neg: doc only
+7cf05fc1 HEAD@{2026-11-02 09:50:57 +1100}: reset: moving to HEAD~1
+8dd017f9 HEAD@{2026-11-02 09:50:56 +1100}: commit: neg: other tool
+7cf05fc1 HEAD@{2026-11-02 09:50:56 +1100}: reset: moving to HEAD~1
+5a73a4f2 HEAD@{2026-11-02 09:50:55 +1100}: commit: neg: src change
+7cf05fc1 HEAD@{2026-11-02 07:56:59 +1100}: commit: docs(v2): record the exact-head Linux typecheck for the later M2 off-host build
+
+## 2. The four accidental commits (parent, files, stat)
+commit 5a73a4f2824bd8e3a6f5dcb93ab3c0178438b137
+parent 7cf05fc11a6436b39d966222e16fea873e2ce5ab
+date 2026-11-02 09:50:55 +1100
+subject neg: src change
+
+ docs/v2/gap-029-block-l-execution-ready-2026-11-02.md | 12 +++++++++++-
+ src/lib/acquisition/afl-api-acquisition-constants.ts  |  1 +
+ 2 files changed, 12 insertions(+), 1 deletion(-)
+
+commit 8dd017f9e7ee22df34cc31522d16f20a16f7c276
+parent 7cf05fc11a6436b39d966222e16fea873e2ce5ab
+date 2026-11-02 09:50:56 +1100
+subject neg: other tool
+
+ tools/v2/isolated-pg.ts | 1 +
+ 1 file changed, 1 insertion(+)
+
+commit 6dc4fb5e7a8e401511260e4fa3256b49b4c9dd0c
+parent 7cf05fc11a6436b39d966222e16fea873e2ce5ab
+date 2026-11-02 09:51:23 +1100
+subject neg: doc only
+
+ docs/v2/progress.md | 1 +
+ 1 file changed, 1 insertion(+)
+
+commit 75dc444a1791de0dcb7f1d8b8f3f009f366746cd
+parent 7cf05fc11a6436b39d966222e16fea873e2ce5ab
+date 2026-11-02 09:51:24 +1100
+subject neg: migration edit
+
+ src/db/migrations/118_fixtures_unconfirmed_participants.sql | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+## 3. The only pre-incident uncommitted content: diff 7cf05fc1..5a73a4f2 for the Block L record (the other file is the control line)
+ docs/v2/gap-029-block-l-execution-ready-2026-11-02.md | 12 +++++++++++-
+ src/lib/acquisition/afl-api-acquisition-constants.ts  |  1 +
+ 2 files changed, 12 insertions(+), 1 deletion(-)
+
+## 4. Recovered lines retained: removed lines in 5a73a4f2..HEAD for the Block L record (none expected)
+(none: every recovered line is still present; later changes only add)
+
+## 5. Blob identity of the four touched paths: 7cf05fc1 == HEAD == working tree
+913566878734901d65311f73722f40c3dbef0502 913566878734901d65311f73722f40c3dbef0502 913566878734901d65311f73722f40c3dbef0502 src/lib/acquisition/afl-api-acquisition-constants.ts
+0fdb9bb4e5079ba0c442b9bd5d5a5fe7415b31d1 0fdb9bb4e5079ba0c442b9bd5d5a5fe7415b31d1 0fdb9bb4e5079ba0c442b9bd5d5a5fe7415b31d1 tools/v2/isolated-pg.ts
+140b834f65acc61cf4034a617ea1dddc39c4febf 140b834f65acc61cf4034a617ea1dddc39c4febf 140b834f65acc61cf4034a617ea1dddc39c4febf docs/v2/progress.md
+02068b2a3e63f31ec234bbe17539bdd8614cb562 02068b2a3e63f31ec234bbe17539bdd8614cb562 02068b2a3e63f31ec234bbe17539bdd8614cb562 src/db/migrations/118_fixtures_unconfirmed_participants.sql
+
+## 6. Non-docs, non-root-md paths changed since the Block L revision 86da1a82 (none expected)
+(none)
+
+## 7. Static check at HEAD (rules A, B, C; reads Git objects only)
+STATIC CHECK PASS R=f123311d34d04e073286a38ce711515612a15e06 (A,B,C)
+
+## 8. Migration 118 sha256 at HEAD and in the working tree (approved: 49e59fcd...8401)
+49e59fcd96aa62142fb2da8141f926997582ef86502b37e22c4796f004498401 *-
+49e59fcd96aa62142fb2da8141f926997582ef86502b37e22c4796f004498401 *src/db/migrations/118_fixtures_unconfirmed_participants.sql
+
+## 9. Block M rehearsal-bound script: m-prod.sh sha256 (rehearsed 14/14 at 29ebbdc2...)
+29ebbdc2da64e0406af4222ae2d1d281242959a32af0b780b60f75e93fdcdf21 *docs/v2/evidence/block-m-package-20261102/m-prod.sh
+
+## 10. Preservation refs created by this session
+refs/recovery/negative-control-incident-20261102/doc-only 6dc4fb5e7a8e401511260e4fa3256b49b4c9dd0c
+refs/recovery/negative-control-incident-20261102/migration-edit 75dc444a1791de0dcb7f1d8b8f3f009f366746cd
+refs/recovery/negative-control-incident-20261102/other-tool 8dd017f9e7ee22df34cc31522d16f20a16f7c276
+refs/recovery/negative-control-incident-20261102/src-change 5a73a4f2824bd8e3a6f5dcb93ab3c0178438b137
+
+## 11. Working tree and refs now
+?? .codex/
+?? docs/v2/evidence/block-m-package-20261102/m-neg-controls.sh
+?? docs/v2/evidence/gap029-block-l-20261102/applied/
+?? docs/v2/evidence/incident-20261102-negctl-wrong-repo/
+refs/heads/main f123311d

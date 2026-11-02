@@ -1,0 +1,25 @@
+{
+  "replay": false,
+  "written": 64,
+  "planDigest": "1b538e1a50cacdb24d37d771d79261a5926e35c69f53d03481ec47a26e79528a",
+  "verify": {
+    "allLabelled": true,
+    "auditRowsAdded": 64,
+    "overridesAdded": 64,
+    "dist": [
+      {
+        "match_event": "Anzac Day",
+        "n": 31
+      },
+      {
+        "match_event": "Dreamtime at the 'G",
+        "n": 22
+      },
+      {
+        "match_event": "King's Birthday",
+        "n": 11
+      }
+    ]
+  },
+  "at": "2026-11-02T00:47:04.675Z"
+}

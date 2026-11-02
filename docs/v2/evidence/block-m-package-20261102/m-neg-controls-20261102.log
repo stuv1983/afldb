@@ -1,0 +1,10 @@
+real repository: root=D:/dev/afldb HEAD=f123311d34d04e073286a38ce711515612a15e06 refs=e4ebb0c78f41 status=16ed205918b5
+disposable clone: root=D:/tmp/nc1102 gitdir=D:/tmp/nc1102/.git base=f123311d34d04e073286a38ce711515612a15e06
+ok   src-change (exit 1; required: A B; forbidden: C)
+ok   other-tool (exit 1; required: A B; forbidden: C)
+ok   doc-only (exit 0; required: none; forbidden: A B C)
+ok   migration-118-edit (exit 1; required: A B C; forbidden: none)
+ok   label-tool-edit (exit 1; required: B; forbidden: A C)
+ok   evidence-file-edit (exit 1; required: C; forbidden: A B)
+NEGATIVE CONTROLS 6/6; real repository HEAD, branch refs and status unchanged; disposable clone retained at D:/tmp/nc1102
+exit=0

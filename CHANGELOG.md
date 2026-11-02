@@ -15,6 +15,12 @@ commit.
 
 ## [Unreleased]
 
+### Block L applied to production; local negative-control incident recorded (2026-11-02; local commits only, nothing pushed)
+
+- **Operations (GAP-029 labels, PRODUCTION):** under the owner's approval of the execution-ready plan (revision `86da1a82`, plan digest `1b538e1a…528a`, target `afldb_prod` on `afldb-prod`, actor 1) the 64 evidenced match-event labels were written through the audited editor writer at 2026-11-02T00:47Z: Anzac Day 31, Dreamtime at the 'G 22, King's Birthday 11. Verified row by row (not by wrapper status): 64 `matches.match_event` values, 64 `data_edits` rows (ids 96 to 159, actor 1, old NULL) and 64 active `data_overrides` rows equal to the plan and the evidence file; the replay of the same plan and approval wrote nothing; `matches` 17,056 and ledger 117 unchanged; no restart. [Outcome](docs/v2/gap-029-block-l-outcome-2026-11-02.md). V2-GAP-029 stays open (Gridley findings unchanged; page/ISR effect unverified).
+- **Incident record:** a failed scratch `git clone --local` left the negative controls of the Block M static check running in the real repository (four accidental commits, three hard resets, a transient edit of migration 118; one uncommitted Block L record edit swept into a commit and recovered). No content lost: migration 118 sha256 equals its approved value, no non-doc file differs from the Block L revision, `m-static-check.sh` passes at HEAD; the accidental commits are pinned under `refs/recovery/negative-control-incident-20261102/`. [Incident record](docs/v2/incident-2026-11-02-negative-control-wrong-repo.md).
+- **Tooling/evidence:** `m-neg-controls.sh` re-runs the static-check negative controls in a new disposable clone that asserts its absolute root and Git directory before any mutation and fails if the real repository's HEAD, refs or status change (6 of 6, including a label-tool edit that fails rule B only and an evidence-file edit that fails rule C only).
+
 ### Execution-readiness batch: admin fixture list + L1, GAP-029 production entry point, Brownlow/C4b end-to-end qualification (2026-11-01; local commits only, nothing pushed, installed or applied on DEV or PROD)
 
 - **Admin (ISSUE-229):** the fixtures list shows confirmed, unconfirmed and label fixtures with their confirmation state; L1 fixed (a manual create beside a provider-managed final slot is refused with a reason).

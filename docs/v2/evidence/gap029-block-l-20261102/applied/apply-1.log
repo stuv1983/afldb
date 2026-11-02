@@ -1,0 +1,17 @@
+== A0 approval, plan and checkout 2026-11-02T00:47:01Z
+approval matches plan 1b538e1a50ca; backup freshness left 1200 min
+== A1 exclusivity gate (read-only) 2026-11-02T00:47:01Z
+no conflicting process; app: active MainPID=3218527
+== A2 tool apply (per-label audited commits) 2026-11-02T00:47:01Z
+Labels committed (64 written); review restricted output
+apply exit=0
+== A3 read-only verification (afldb_backup) 2026-11-02T00:47:04Z
+labelled	Anzac Day	31
+labelled	Dreamtime at the 'G	22
+labelled	King's Birthday	11
+edits_match_event	64
+overrides_match_event_active	64
+== A4 replay of the same plan and approval (expects: already applied, writes nothing) 2026-11-02T00:47:04Z
+Every label is already applied; nothing written
+head=86da1a82329371fd23db6e2935a0e9334ba08f9a status_lines=0
+== DONE 2026-11-02T00:47:05Z
