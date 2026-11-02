@@ -1,0 +1,41 @@
+== d31612 pa 2026-11-02T21:25:07Z  (host local 2026-11-03 08:25:07 AEDT; AEDT 2026-11-03 08:25:07)
+   R=a0b1080f5b98aee7191894c138be27bb524c7b1b
+   H=d00e07e37566e92b35a34e62a1ff03e173715e87
+   OLD_ID=ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+release: current  ea98a35f2061--vY0EFS0DdR-TiPkxTZz6 revision ea98a35f20610e75c18e698bc0d9fe084c3c783d BUILD_ID -vY0EFS0DdR-TiPkxTZz6 production
+release: previous fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy revision fd48ace0c2cb70296d723603aa397b5bd7a21a0d BUILD_ID pqAQwRIJWLjSYzR8LiTuy
+release: memory   afldb MemoryCurrent 225 MB
+release: process  3303369 runs in /home/arm/afldb-releases/releases/ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+release: health   200 status=ok database=ok
+release: build    /_next/static/-vY0EFS0DdR-TiPkxTZz6/_buildManifest.js 200
+release: build    /_next/static/pqAQwRIJWLjSYzR8LiTuy/_buildManifest.js 404 (previous; expect 404)
+release: STATUS PASS ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+release: VERIFY PASS ea98a35f2061--vY0EFS0DdR-TiPkxTZz6 (revision ea98a35f20610e75c18e698bc0d9fe084c3c783d, BUILD_ID -vY0EFS0DdR-TiPkxTZz6, 12995 files)
+MemAvailable 2900 MB
+free 53424332 KB
+timer afldb-settle-afl-api.timer next: Wed 2026-11-04 05:02:46 AEDT
+match timer LastTriggerUSec=[Tue 2026-11-03 05:02:00 AEDT] service ExecMainExit=[Tue 2026-11-03 05:02:02 AEDT] ActiveState=[inactive]
+== c5-observe timer 2026-11-02T21:25:13Z N=924ff273261834e4112e3f41b61ceeab55427534 (host local 2026-11-03 08:25:13 AEDT)
+identity ok (afldb_prod, OID 66668, read-only session)
+match timer is-enabled = [enabled] (expected [enabled])
+match timer ActiveState = [active] (expected [active])
+next elapse: [Wed 2026-11-04 05:02:46 AEDT]
+Brownlow timer enabled/active = [disabled/inactive] (expected [disabled/inactive])
+AFL Tables timer enabled/active = [disabled/inactive] (expected [disabled/inactive])
+match service ActiveState (nothing running yet) = [inactive] (expected [inactive])
+settle/acquire processes = [0] (expected [0])
+setting still true = [true] (expected [true])
+afldb timers known to systemd:
+    Wed 2026-11-04 05:02:46 AEDT      20h Tue 2026-11-03 05:02:00 AEDT 3h 23min ago afldb-settle-afl-api.timer     afldb-settle-afl-api.service
+C5-OBSERVE timer PASS
+state probe 2026-11-02T21:25:13Z
+  OLD_ID   ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+  NEW_ID   (not set)
+  current  ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+  previous fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy
+  unit     afldb ActiveState=active Result=success MainPID=3303369
+  process  runs ea98a35f2061--vY0EFS0DdR-TiPkxTZz6 (/home/arm/afldb-releases/releases/ea98a35f2061--vY0EFS0DdR-TiPkxTZz6)
+  health   {"status":"ok","database":"ok","latencyMs":1}
+  locks    none
+STATE OLD_SERVING
+D31612 pa PASS

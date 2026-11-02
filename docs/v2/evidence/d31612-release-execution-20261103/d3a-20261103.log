@@ -1,0 +1,29 @@
+== d31612 d3a 2026-11-02T21:41:16Z  (host local 2026-11-03 08:41:16 AEDT; AEDT 2026-11-03 08:41:16)
+   R=a0b1080f5b98aee7191894c138be27bb524c7b1b
+   H=d00e07e37566e92b35a34e62a1ff03e173715e87
+   OLD_ID=ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+state probe 2026-11-02T21:41:16Z
+  OLD_ID   ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+  NEW_ID   a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+  current  ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+  previous fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy
+  unit     afldb ActiveState=active Result=success MainPID=3303369
+  process  runs ea98a35f2061--vY0EFS0DdR-TiPkxTZz6 (/home/arm/afldb-releases/releases/ea98a35f2061--vY0EFS0DdR-TiPkxTZz6)
+  health   {"status":"ok","database":"ok","latencyMs":0}
+  locks    none
+STATE OLD_SERVING
+release: PROMOTED a0b1080f5b98-B8kdpO6PO1tUCHus0j1za; previous ea98a35f2061--vY0EFS0DdR-TiPkxTZz6. The running service is unchanged until it restarts.
+release: next: sudo systemctl restart afldb
+release: then: node deploy/release.mjs status --expect a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+release: the database is not rolled back: migrations are forward-only (docs/deployment.md §11, including the ISSUE-257 guard); check a release older than an applied migration against it before the restart
+state probe 2026-11-02T21:41:21Z
+  OLD_ID   ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+  NEW_ID   a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+  current  a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+  previous ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+  unit     afldb ActiveState=active Result=success MainPID=3303369
+  process  runs ea98a35f2061--vY0EFS0DdR-TiPkxTZz6 (/home/arm/afldb-releases/releases/ea98a35f2061--vY0EFS0DdR-TiPkxTZz6)
+  health   {"status":"ok","database":"ok","latencyMs":2}
+  locks    none
+STATE NEW_SELECTED_OLD_RUNNING
+D31612 d3a PASS  -> the OWNER now runs: sudo systemctl restart afldb

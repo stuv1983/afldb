@@ -1,0 +1,68 @@
+== d31612 d3c 2026-11-02T21:48:15Z  (host local 2026-11-03 08:48:15 AEDT; AEDT 2026-11-03 08:48:15)
+   R=a0b1080f5b98aee7191894c138be27bb524c7b1b
+   H=d00e07e37566e92b35a34e62a1ff03e173715e87
+   OLD_ID=ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+AFLDB post-install check 2026-11-02T21:48:15Z: expect a0b1080f5b98-B8kdpO6PO1tUCHus0j1za (BUILD_ID B8kdpO6PO1tUCHus0j1za, previous -vY0EFS0DdR-TiPkxTZz6)
+release route status
+        release: current  a0b1080f5b98-B8kdpO6PO1tUCHus0j1za revision a0b1080f5b98aee7191894c138be27bb524c7b1b BUILD_ID B8kdpO6PO1tUCHus0j1za production
+        release: previous ea98a35f2061--vY0EFS0DdR-TiPkxTZz6 revision ea98a35f20610e75c18e698bc0d9fe084c3c783d BUILD_ID -vY0EFS0DdR-TiPkxTZz6
+        release: memory   afldb MemoryCurrent 177 MB
+        release: process  3326560 runs in /home/arm/afldb-releases/releases/a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+        release: health   200 status=ok database=ok
+        release: build    /_next/static/B8kdpO6PO1tUCHus0j1za/_buildManifest.js 200
+        release: build    /_next/static/-vY0EFS0DdR-TiPkxTZz6/_buildManifest.js 404 (previous; expect 404)
+        release: STATUS PASS a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+  ok    status --expect a0b1080f5b98-B8kdpO6PO1tUCHus0j1za PASS
+current build and health through loopback and the public endpoint
+  ok    http://127.0.0.1:3100/api/health {"status":"ok","database":"ok","latencyMs":1}
+  ok    http://127.0.0.1:3100 _buildManifest.js for B8kdpO6PO1tUCHus0j1za 200
+  ok    https://beta.afldb.com/api/health {"status":"ok","database":"ok","latencyMs":1}
+  ok    https://beta.afldb.com _buildManifest.js for B8kdpO6PO1tUCHus0j1za 200
+previous build -vY0EFS0DdR-TiPkxTZz6 must be absent at the origin
+  ok    origin (loopback) previous -vY0EFS0DdR-TiPkxTZz6 404
+  ok    origin (public, cache-busted) previous -vY0EFS0DdR-TiPkxTZz6 404, cf-cache-status BYPASS
+  CACHE public previous -vY0EFS0DdR-TiPkxTZz6 200 from an old Cloudflare cache HIT of an immutable asset; the origin checks above decide
+pages and every referenced asset (public endpoint, redirects followed)
+  ok    page / -> 200 https://beta.afldb.com/beta
+  ok    page /beta -> 200 https://beta.afldb.com/beta
+  ok    page /players -> 200 https://beta.afldb.com/beta?from=%2Fplayers
+  ok    page /matches -> 200 https://beta.afldb.com/beta?from=%2Fmatches
+  ok    page /seasons -> 200 https://beta.afldb.com/beta?from=%2Fseasons
+  ok    page /clubs -> 200 https://beta.afldb.com/beta?from=%2Fclubs
+  ok    page /records -> 200 https://beta.afldb.com/beta?from=%2Frecords
+  ok    page /search -> 200 https://beta.afldb.com/beta?from=%2Fsearch
+  ok    page /admin/operations -> 200 https://beta.afldb.com/admin/login
+  ok    8 assets 200 with the right type
+  ok    all 8 served assets are byte-identical to a0b1080f5b98-B8kdpO6PO1tUCHus0j1za's files
+  ok    POST /api/admin/email-intake 410 (retired)
+journal since the service started
+  ok    primary start line present since Tue 2026-11-03 08:48:00 AEDT
+        [afldb] serving build B8kdpO6PO1tUCHus0j1za release a0b1080f5b98-B8kdpO6PO1tUCHus0j1za revision a0b1080f5b98aee7191894c138be27bb524c7b1b
+  ok    0 error/fatal/unhandled lines
+  info  NRestarts 0, MemoryCurrent 201 MB
+POST-INSTALL CHECK PASS a0b1080f5b98-B8kdpO6PO1tUCHus0j1za (1 old Cloudflare cache HIT(s) reported above, origin 404)
+state probe 2026-11-02T21:48:18Z
+  OLD_ID   ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+  NEW_ID   a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+  current  a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+  previous ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+  unit     afldb ActiveState=active Result=success MainPID=3326560
+  process  runs a0b1080f5b98-B8kdpO6PO1tUCHus0j1za (/home/arm/afldb-releases/releases/a0b1080f5b98-B8kdpO6PO1tUCHus0j1za)
+  health   {"status":"ok","database":"ok","latencyMs":1}
+  locks    none
+STATE NEW_SERVING
+journal: serving build names a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+== c5-observe timer 2026-11-02T21:48:18Z N=d00e07e37566e92b35a34e62a1ff03e173715e87 (host local 2026-11-03 08:48:18 AEDT)
+identity ok (afldb_prod, OID 66668, read-only session)
+match timer is-enabled = [enabled] (expected [enabled])
+match timer ActiveState = [active] (expected [active])
+next elapse: [Wed 2026-11-04 05:02:46 AEDT]
+Brownlow timer enabled/active = [disabled/inactive] (expected [disabled/inactive])
+AFL Tables timer enabled/active = [disabled/inactive] (expected [disabled/inactive])
+match service ActiveState (nothing running yet) = [inactive] (expected [inactive])
+settle/acquire processes = [0] (expected [0])
+setting still true = [true] (expected [true])
+afldb timers known to systemd:
+    Wed 2026-11-04 05:02:46 AEDT      20h Tue 2026-11-03 05:02:00 AEDT 3h 46min ago afldb-settle-afl-api.timer     afldb-settle-afl-api.service
+C5-OBSERVE timer PASS
+D31612 d3c PASS

@@ -1,0 +1,34 @@
+== d31612 d2 2026-11-02T21:36:09Z  (host local 2026-11-03 08:36:09 AEDT; AEDT 2026-11-03 08:36:09)
+   R=a0b1080f5b98aee7191894c138be27bb524c7b1b
+   H=d00e07e37566e92b35a34e62a1ff03e173715e87
+   OLD_ID=ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+state probe 2026-11-02T21:36:09Z
+  OLD_ID   ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+  NEW_ID   (not set)
+  current  ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+  previous fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy
+  unit     afldb ActiveState=active Result=success MainPID=3303369
+  process  runs ea98a35f2061--vY0EFS0DdR-TiPkxTZz6 (/home/arm/afldb-releases/releases/ea98a35f2061--vY0EFS0DdR-TiPkxTZz6)
+  health   {"status":"ok","database":"ok","latencyMs":1}
+  locks    none
+STATE OLD_SERVING
+release: admission: MemAvailable 2986 MB of 3915 MB, swap 0 MB, free disk 50.9 GB
+release: workspace /home/arm/afldb-releases/builds/20261102T213609Z-a0b1080f5b98-c269b2
+release: npm ci: 16 s, min MemAvailable 2091 MB, peak RSS 900 MB
+release: build: 235 s, min MemAvailable 1364 MB, peak RSS 1755 MB
+release: candidate a0b1080f5b98-B8kdpO6PO1tUCHus0j1za passed V1-V5; boot smoke on 127.0.0.1:3199
+release: smoke: health ok, _buildManifest.js 200, /_next/static/css/cb39c2e05a6b8ca6.css 200, pages {"/":"200 HIT","/players":"200","/clubs":"200","/seasons":"200"} (beta claim)
+release: RELEASE READY a0b1080f5b98-B8kdpO6PO1tUCHus0j1za (12995 files, manifest 554d83f38c5c…) at /home/arm/afldb-releases/releases/a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+release: next: node deploy/release.mjs promote a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+release: VERIFY PASS a0b1080f5b98-B8kdpO6PO1tUCHus0j1za (revision a0b1080f5b98aee7191894c138be27bb524c7b1b, BUILD_ID B8kdpO6PO1tUCHus0j1za, 12995 files)
+state probe 2026-11-02T21:40:48Z
+  OLD_ID   ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+  NEW_ID   a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+  current  ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+  previous fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy
+  unit     afldb ActiveState=active Result=success MainPID=3303369
+  process  runs ea98a35f2061--vY0EFS0DdR-TiPkxTZz6 (/home/arm/afldb-releases/releases/ea98a35f2061--vY0EFS0DdR-TiPkxTZz6)
+  health   {"status":"ok","database":"ok","latencyMs":0}
+  locks    none
+STATE OLD_SERVING
+D31612 d2 PASS NEW_ID=a0b1080f5b98-B8kdpO6PO1tUCHus0j1za

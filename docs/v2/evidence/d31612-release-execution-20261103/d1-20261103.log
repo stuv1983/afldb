@@ -1,0 +1,227 @@
+== d31612 d1 2026-11-02T21:35:54Z  (host local 2026-11-03 08:35:54 AEDT; AEDT 2026-11-03 08:35:54)
+   R=a0b1080f5b98aee7191894c138be27bb524c7b1b
+   H=d00e07e37566e92b35a34e62a1ff03e173715e87
+   OLD_ID=ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+captured_utc=2026-11-02T21:35:54Z
+main_pid=3303369
+current=releases/ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+previous=releases/fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy
+match_timer_next=Wed 2026-11-04 05:02:46 AEDT
+match_timer_last=Tue 2026-11-03 05:02:00 AEDT
+timers_enabled=enabled/disabled/disabled
+dotenv_trigger_exact=1
+process_trigger_exact=1
+process_trigger_any=1
+STATIC DELTA CHECK PASS (H=d00e07e37566e92b35a34e62a1ff03e173715e87)
+Updating 924ff273..d00e07e3
+Fast-forward
+ CHANGELOG.md                                       |  24 ++
+ IssuesIndex.md                                     |  15 +-
+ docs/deployment.md                                 |  30 ++-
+ ...-2027-season-operations-successor-2026-11-02.md |  45 ++++
+ docs/v2/block-c-c4b-outcome-2026-11-02.md          |   4 +
+ docs/v2/block-c-c4b-r2-outcome-2026-11-02.md       |  76 ++++++
+ docs/v2/block-c-c5-activation-record-2026-11-02.md |  82 ++++++
+ ...ock-c-c5-owner-attended-procedure-2026-11-02.md | 110 ++++++++
+ .../c4b-gate-fix-rollout-and-rerun-2026-11-02.md   |  19 +-
+ docs/v2/c4b-r2-approval-924ff273.md                |  95 +++++++
+ docs/v2/d31612-linux-qualification-2026-11-02.md   |  38 +++
+ docs/v2/d31612-ui-release-approval-2026-11-02.md   | 285 ++++++++++++++++++++
+ .../c4b-fix-r2-20261102/live-feed-comparison.json  | 125 +++++++++
+ docs/v2/evidence/c4b-fix-r2-20261102/run.sh        |  20 +-
+ docs/v2/evidence/c4b-r2-20261102/c4b-pre.txt       |  30 +++
+ docs/v2/evidence/c4b-r2-20261102/c4b-run.exit      |   1 +
+ .../c4b-r2-20261102/host-evidence/acquire.log      |   3 +
+ .../c4b-r2-20261102/host-evidence/after.json       |   7 +
+ .../c4b-r2-20261102/host-evidence/before.json      |   7 +
+ .../c4b-r2-20261102/host-evidence/readiness.txt    |  17 ++
+ .../host-evidence/restore-verified.json            |   1 +
+ .../c4b-r2-20261102/host-evidence/result.json      |  10 +
+ .../evidence/c4b-r2-20261102/host-evidence/run.log |  64 +++++
+ .../host-evidence/settle-dry-run.log               |  62 +++++
+ .../host-evidence/watchdog-ready.json              |   1 +
+ .../c4b-r2-20261102/host-evidence/watchdog.pid     |   1 +
+ docs/v2/evidence/c4b-r2-20261102/rollout-pre.txt   |   7 +
+ .../c4b-r2-20261102/snapshot2-manifest.json        |  40 +++
+ docs/v2/evidence/c4b-r2-20261102/step-c.txt        |  67 +++++
+ .../c4b-r2-readback-20261102/readback-output.txt   |  90 +++++++
+ .../evidence/c4b-r2-readback-20261102/readback.sh  | 126 +++++++++
+ .../stepc-negative-control.sh                      |  61 +++++
+ .../evidence/c5-prep-20261102/c5-journal-probe.sh  |   9 +
+ .../c5-observe-baseline-output.txt                 |  89 ++++++
+ .../c5-observe-baseline2-output.txt                |  38 +++
+ docs/v2/evidence/c5-prep-20261102/c5-observe-r2.sh | 107 ++++++++
+ docs/v2/evidence/c5-prep-20261102/c5-observe-r3.sh | 146 ++++++++++
+ docs/v2/evidence/c5-prep-20261102/c5-observe.sh    | 107 ++++++++
+ .../c5-prep-output-run1-matcher-defect.txt         | 136 ++++++++++
+ .../evidence/c5-prep-20261102/c5-prep-output.txt   | 139 ++++++++++
+ docs/v2/evidence/c5-prep-20261102/c5-prep.sh       | 117 ++++++++
+ .../c5-prep-20261102/c5-proc-guard-live-test.sh    |  22 ++
+ .../c5-prep-20261102/c5-proc-guard-test.sh         |  67 +++++
+ docs/v2/evidence/c5-prep-20261102/c5-proc-guard.sh |  34 +++
+ .../c5-prep-20261102/c5-selfmatch-repro.sh         |  18 ++
+ .../c5-window-20261102/c5-reader-probe.mts         |  21 ++
+ ...up-first-night-phase-dry-test-prod-readonly.txt |  29 ++
+ .../followup-journal-probe-readonly.txt            |  33 +++
+ ...followup-selfmatch-repro-prod-readonly-run2.txt |  15 ++
+ .../followup-selfmatch-repro-prod-readonly.txt     |  18 ++
+ .../step0-c5-prep-fresh-094400Z.txt                | 140 ++++++++++
+ .../evidence/c5-window-20261102/step0-c5-prep.txt  | 138 ++++++++++
+ .../c5-window-20261102/step3-env-effective.txt     |  16 ++
+ .../step4-before-current-season.png                | Bin 0 -> 209296 bytes
+ .../c5-window-20261102/step4-reader-probe.txt      |   6 +
+ .../c5-window-20261102/step4-toggle-amended-r2.txt |  14 +
+ .../evidence/c5-window-20261102/step4-toggle.txt   |  15 ++
+ .../c5-window-20261102/step5-process-listing.txt   |   9 +
+ .../step5-timer-rerun-clean-cmdline.txt            |  14 +
+ .../v2/evidence/c5-window-20261102/step5-timer.txt |  26 ++
+ .../c5-window-20261102/step6-accept-obs1.txt       |   9 +
+ .../c5-window-20261102/step6-accept-obs2.txt       |  14 +
+ .../step7-after-current-season.png                 | Bin 0 -> 209995 bytes
+ .../evidence/build-memavail.txt                    |  48 ++++
+ .../evidence/build.log                             | 208 ++++++++++++++
+ .../evidence/build.time                            |  23 ++
+ .../evidence/lock-check-after-pglite.txt           |   1 +
+ .../evidence/lock-check.txt                        |   2 +
+ .../evidence/lx-deploy-release.json                |   1 +
+ .../evidence/lx-deploy-release.stderr.log          |   1 +
+ .../evidence/lx-deploy-release.stdout.log          |   1 +
+ .../evidence/lx-focused.json                       |   1 +
+ .../evidence/lx-focused.stderr.log                 |   1 +
+ .../evidence/lx-focused.stdout.log                 |   1 +
+ .../evidence/lx-integration.json                   |   1 +
+ .../evidence/lx-integration.stderr.log             |   1 +
+ .../evidence/lx-integration.stdout.log             |   1 +
+ .../evidence/schema-migrate.log                    | 124 +++++++++
+ .../evidence/schema-privileges.log                 |  16 ++
+ .../evidence/smoke-health.json                     |   1 +
+ .../evidence/smoke-server.log                      |  15 ++
+ .../evidence/typecheck.log                         |   2 +
+ .../evidence/typecheck.time                        |  46 ++++
+ .../scripts/run-qual.sh                            | 163 +++++++++++
+ .../p-a-observation-20261102.txt                   |  30 +++
+ .../static-delta-check.sh                          |  33 +++
+ .../current-season-copy__desktop-1280x800.png      | Bin 0 -> 67894 bytes
+ .../current-season-copy__mobile-390x844.png        | Bin 0 -> 50867 bytes
+ .../d31612-wording-20261102/static-render.mts      |  51 ++++
+ ...closeout-and-seasonal-obligations-2026-11-02.md | 125 +++++++++
+ docs/v2/known-gaps.md                              |   6 +-
+ issues.md                                          |  33 ++-
+ .../current-season/AflApiSettleUnitsPanel.tsx      |  11 +-
+ src/app/admin/current-season/actions.ts            |   5 +-
+ src/app/admin/current-season/page.tsx              |  14 +-
+ src/lib/acquisition/afl-api-c7-observation.ts      | 300 +++++++++++++++++++++
+ src/lib/acquisition/settle-status.ts               |   2 +-
+ src/lib/acquisition/settle-trigger.ts              |   6 +-
+ tests/admin-current-season-settle.test.ts          |  18 +-
+ tests/afl-api-c7-observation.test.ts               | 166 ++++++++++++
+ tests/integration/afl-api-c7-observation.test.ts   | 161 +++++++++++
+ tools/v2/c7-observe.ts                             |  89 ++++++
+ 102 files changed, 4778 insertions(+), 39 deletions(-)
+ create mode 100644 docs/v2/afl-api-2027-season-operations-successor-2026-11-02.md
+ create mode 100644 docs/v2/block-c-c4b-r2-outcome-2026-11-02.md
+ create mode 100644 docs/v2/block-c-c5-activation-record-2026-11-02.md
+ create mode 100644 docs/v2/block-c-c5-owner-attended-procedure-2026-11-02.md
+ create mode 100644 docs/v2/c4b-r2-approval-924ff273.md
+ create mode 100644 docs/v2/d31612-linux-qualification-2026-11-02.md
+ create mode 100644 docs/v2/d31612-ui-release-approval-2026-11-02.md
+ create mode 100644 docs/v2/evidence/c4b-fix-r2-20261102/live-feed-comparison.json
+ create mode 100644 docs/v2/evidence/c4b-r2-20261102/c4b-pre.txt
+ create mode 100644 docs/v2/evidence/c4b-r2-20261102/c4b-run.exit
+ create mode 100644 docs/v2/evidence/c4b-r2-20261102/host-evidence/acquire.log
+ create mode 100644 docs/v2/evidence/c4b-r2-20261102/host-evidence/after.json
+ create mode 100644 docs/v2/evidence/c4b-r2-20261102/host-evidence/before.json
+ create mode 100644 docs/v2/evidence/c4b-r2-20261102/host-evidence/readiness.txt
+ create mode 100644 docs/v2/evidence/c4b-r2-20261102/host-evidence/restore-verified.json
+ create mode 100644 docs/v2/evidence/c4b-r2-20261102/host-evidence/result.json
+ create mode 100644 docs/v2/evidence/c4b-r2-20261102/host-evidence/run.log
+ create mode 100644 docs/v2/evidence/c4b-r2-20261102/host-evidence/settle-dry-run.log
+ create mode 100644 docs/v2/evidence/c4b-r2-20261102/host-evidence/watchdog-ready.json
+ create mode 100644 docs/v2/evidence/c4b-r2-20261102/host-evidence/watchdog.pid
+ create mode 100644 docs/v2/evidence/c4b-r2-20261102/rollout-pre.txt
+ create mode 100644 docs/v2/evidence/c4b-r2-20261102/snapshot2-manifest.json
+ create mode 100644 docs/v2/evidence/c4b-r2-20261102/step-c.txt
+ create mode 100644 docs/v2/evidence/c4b-r2-readback-20261102/readback-output.txt
+ create mode 100644 docs/v2/evidence/c4b-r2-readback-20261102/readback.sh
+ create mode 100644 docs/v2/evidence/c4b-r2-readback-20261102/stepc-negative-control.sh
+ create mode 100644 docs/v2/evidence/c5-prep-20261102/c5-journal-probe.sh
+ create mode 100644 docs/v2/evidence/c5-prep-20261102/c5-observe-baseline-output.txt
+ create mode 100644 docs/v2/evidence/c5-prep-20261102/c5-observe-baseline2-output.txt
+ create mode 100644 docs/v2/evidence/c5-prep-20261102/c5-observe-r2.sh
+ create mode 100644 docs/v2/evidence/c5-prep-20261102/c5-observe-r3.sh
+ create mode 100644 docs/v2/evidence/c5-prep-20261102/c5-observe.sh
+ create mode 100644 docs/v2/evidence/c5-prep-20261102/c5-prep-output-run1-matcher-defect.txt
+ create mode 100644 docs/v2/evidence/c5-prep-20261102/c5-prep-output.txt
+ create mode 100644 docs/v2/evidence/c5-prep-20261102/c5-prep.sh
+ create mode 100644 docs/v2/evidence/c5-prep-20261102/c5-proc-guard-live-test.sh
+ create mode 100644 docs/v2/evidence/c5-prep-20261102/c5-proc-guard-test.sh
+ create mode 100644 docs/v2/evidence/c5-prep-20261102/c5-proc-guard.sh
+ create mode 100644 docs/v2/evidence/c5-prep-20261102/c5-selfmatch-repro.sh
+ create mode 100644 docs/v2/evidence/c5-window-20261102/c5-reader-probe.mts
+ create mode 100644 docs/v2/evidence/c5-window-20261102/followup-first-night-phase-dry-test-prod-readonly.txt
+ create mode 100644 docs/v2/evidence/c5-window-20261102/followup-journal-probe-readonly.txt
+ create mode 100644 docs/v2/evidence/c5-window-20261102/followup-selfmatch-repro-prod-readonly-run2.txt
+ create mode 100644 docs/v2/evidence/c5-window-20261102/followup-selfmatch-repro-prod-readonly.txt
+ create mode 100644 docs/v2/evidence/c5-window-20261102/step0-c5-prep-fresh-094400Z.txt
+ create mode 100644 docs/v2/evidence/c5-window-20261102/step0-c5-prep.txt
+ create mode 100644 docs/v2/evidence/c5-window-20261102/step3-env-effective.txt
+ create mode 100644 docs/v2/evidence/c5-window-20261102/step4-before-current-season.png
+ create mode 100644 docs/v2/evidence/c5-window-20261102/step4-reader-probe.txt
+ create mode 100644 docs/v2/evidence/c5-window-20261102/step4-toggle-amended-r2.txt
+ create mode 100644 docs/v2/evidence/c5-window-20261102/step4-toggle.txt
+ create mode 100644 docs/v2/evidence/c5-window-20261102/step5-process-listing.txt
+ create mode 100644 docs/v2/evidence/c5-window-20261102/step5-timer-rerun-clean-cmdline.txt
+ create mode 100644 docs/v2/evidence/c5-window-20261102/step5-timer.txt
+ create mode 100644 docs/v2/evidence/c5-window-20261102/step6-accept-obs1.txt
+ create mode 100644 docs/v2/evidence/c5-window-20261102/step6-accept-obs2.txt
+ create mode 100644 docs/v2/evidence/c5-window-20261102/step7-after-current-season.png
+ create mode 100644 docs/v2/evidence/d31612-linux-qualification-20261102/evidence/build-memavail.txt
+ create mode 100644 docs/v2/evidence/d31612-linux-qualification-20261102/evidence/build.log
+ create mode 100644 docs/v2/evidence/d31612-linux-qualification-20261102/evidence/build.time
+ create mode 100644 docs/v2/evidence/d31612-linux-qualification-20261102/evidence/lock-check-after-pglite.txt
+ create mode 100644 docs/v2/evidence/d31612-linux-qualification-20261102/evidence/lock-check.txt
+ create mode 100644 docs/v2/evidence/d31612-linux-qualification-20261102/evidence/lx-deploy-release.json
+ create mode 100644 docs/v2/evidence/d31612-linux-qualification-20261102/evidence/lx-deploy-release.stderr.log
+ create mode 100644 docs/v2/evidence/d31612-linux-qualification-20261102/evidence/lx-deploy-release.stdout.log
+ create mode 100644 docs/v2/evidence/d31612-linux-qualification-20261102/evidence/lx-focused.json
+ create mode 100644 docs/v2/evidence/d31612-linux-qualification-20261102/evidence/lx-focused.stderr.log
+ create mode 100644 docs/v2/evidence/d31612-linux-qualification-20261102/evidence/lx-focused.stdout.log
+ create mode 100644 docs/v2/evidence/d31612-linux-qualification-20261102/evidence/lx-integration.json
+ create mode 100644 docs/v2/evidence/d31612-linux-qualification-20261102/evidence/lx-integration.stderr.log
+ create mode 100644 docs/v2/evidence/d31612-linux-qualification-20261102/evidence/lx-integration.stdout.log
+ create mode 100644 docs/v2/evidence/d31612-linux-qualification-20261102/evidence/schema-migrate.log
+ create mode 100644 docs/v2/evidence/d31612-linux-qualification-20261102/evidence/schema-privileges.log
+ create mode 100644 docs/v2/evidence/d31612-linux-qualification-20261102/evidence/smoke-health.json
+ create mode 100644 docs/v2/evidence/d31612-linux-qualification-20261102/evidence/smoke-server.log
+ create mode 100644 docs/v2/evidence/d31612-linux-qualification-20261102/evidence/typecheck.log
+ create mode 100644 docs/v2/evidence/d31612-linux-qualification-20261102/evidence/typecheck.time
+ create mode 100644 docs/v2/evidence/d31612-linux-qualification-20261102/scripts/run-qual.sh
+ create mode 100644 docs/v2/evidence/d31612-release-package-20261102/p-a-observation-20261102.txt
+ create mode 100644 docs/v2/evidence/d31612-release-package-20261102/static-delta-check.sh
+ create mode 100644 docs/v2/evidence/d31612-wording-20261102/capture/current-season-copy__desktop-1280x800.png
+ create mode 100644 docs/v2/evidence/d31612-wording-20261102/capture/current-season-copy__mobile-390x844.png
+ create mode 100644 docs/v2/evidence/d31612-wording-20261102/static-render.mts
+ create mode 100644 docs/v2/issue316-closeout-and-seasonal-obligations-2026-11-02.md
+ create mode 100644 src/lib/acquisition/afl-api-c7-observation.ts
+ create mode 100644 tests/afl-api-c7-observation.test.ts
+ create mode 100644 tests/integration/afl-api-c7-observation.test.ts
+ create mode 100644 tools/v2/c7-observe.ts
+release: current  ea98a35f2061--vY0EFS0DdR-TiPkxTZz6 revision ea98a35f20610e75c18e698bc0d9fe084c3c783d BUILD_ID -vY0EFS0DdR-TiPkxTZz6 production
+release: previous fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy revision fd48ace0c2cb70296d723603aa397b5bd7a21a0d BUILD_ID pqAQwRIJWLjSYzR8LiTuy
+release: memory   afldb MemoryCurrent 226 MB
+release: process  3303369 runs in /home/arm/afldb-releases/releases/ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+release: health   200 status=ok database=ok
+release: build    /_next/static/-vY0EFS0DdR-TiPkxTZz6/_buildManifest.js 200
+release: build    /_next/static/pqAQwRIJWLjSYzR8LiTuy/_buildManifest.js 404 (previous; expect 404)
+release: STATUS PASS ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+state probe 2026-11-02T21:35:59Z
+  OLD_ID   ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+  NEW_ID   (not set)
+  current  ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+  previous fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy
+  unit     afldb ActiveState=active Result=success MainPID=3303369
+  process  runs ea98a35f2061--vY0EFS0DdR-TiPkxTZz6 (/home/arm/afldb-releases/releases/ea98a35f2061--vY0EFS0DdR-TiPkxTZz6)
+  health   {"status":"ok","database":"ok","latencyMs":0}
+  locks    none
+STATE OLD_SERVING
+D31612 d1 PASS

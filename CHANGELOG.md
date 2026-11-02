@@ -15,6 +15,12 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-316 D-316-12: admin current-season wording RELEASED to production (2026-11-03)
+
+- **Deployed:** release `a0b1080f5b98-B8kdpO6PO1tUCHus0j1za` (code revision `a0b1080f5b98aee7191894c138be27bb524c7b1b`, pushed as `d00e07e37566e92b35a34e62a1ff03e173715e87`) is serving on `beta.afldb.com` since the owner's restart at 08:48:00 AEDT. Behaviour change: `/admin/current-season` subtitle and settle-units wording now describe the post-cutover state (AFL Tables retired, AFL API match timer, no Start control), and the unconfigured-host status strings were reworded; the inert read-only C7 observer was added (no route or unit uses it). No control, server action behaviour, schema, grant, `.env`, timer or setting changed.
+- **Verified:** D3c PASS with the preservation comparison (match timer, acquisition setting, effective `AFLDB_SETTLE_TRIGGER`, disabled Brownlow/AFL Tables timers) and the authenticated visual runner PASS 45/45; both screenshots read (1280x800 evidences G1 to G6; at 390x844 the cookie banner and a clipped table hide G3 to G5 from the image, which rest on the runner's DOM text). Previous release `ea98a35f2061--vY0EFS0DdR-TiPkxTZz6` retained as the rollback target.
+- ISSUE-316 stays open pending the owner's recorded visual acceptance. Record: `docs/v2/evidence/d31612-release-execution-20261103/execution-record.md`.
+
 ### ISSUE-316 C5: first scheduled night observed on production, scheduled success at the systemd level (2026-11-03, read-only observation; local record)
 
 - **Observed, not changed:** the `afldb-settle-afl-api` timer fired Tue 2026-11-03 05:02:00 AEDT and the service ran about 2 s, `Result=success`, exit 0. One `import_batches` row was retained (batch 78, `settle-afl-api.ts`, completed, 0 read/inserted/updated/rejected; season feed complete, 218 matches); canonical 2027 matches 0; Brownlow and AFL Tables timers still disabled. This matched the prediction in the activation record. Helpers: `first-run` PASS, `first-night` COMPLETE.

@@ -1,0 +1,405 @@
+{
+  "started": "2026-11-02T22:00:15.772Z",
+  "base": "https://beta.afldb.com",
+  "path": "/admin/current-season",
+  "checks": [
+    {
+      "id": "role-super-admin",
+      "ok": true,
+      "detail": {
+        "role": "Super Admin"
+      }
+    },
+    {
+      "id": "1280x800 http-200-on-path",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "url": "https://beta.afldb.com/admin/current-season"
+      }
+    },
+    {
+      "id": "1280x800 G1 has \"AFL Tables network acquisition is retired…\"",
+      "ok": true,
+      "detail": {
+        "found": true
+      }
+    },
+    {
+      "id": "1280x800 G1 has \"its nightly timer is disabled…\"",
+      "ok": true,
+      "detail": {
+        "found": true
+      }
+    },
+    {
+      "id": "1280x800 G1 has \"Match and player ingestion runs from the AFL API…\"",
+      "ok": true,
+      "detail": {
+        "found": true
+      }
+    },
+    {
+      "id": "1280x800 G1 has \"Brownlow ingestion is governed separately…\"",
+      "ok": true,
+      "detail": {
+        "found": true
+      }
+    },
+    {
+      "id": "1280x800 G1 has \"stays off until the owner opens a count window…\"",
+      "ok": true,
+      "detail": {
+        "found": true
+      }
+    },
+    {
+      "id": "1280x800 G1 has \"there is no Start control, because runs follow t…\"",
+      "ok": true,
+      "detail": {
+        "found": true
+      }
+    },
+    {
+      "id": "1280x800 G1 has \"there is no Start control (AFLDB-ISSUE-316, D-31…\"",
+      "ok": true,
+      "detail": {
+        "found": true
+      }
+    },
+    {
+      "id": "1280x800 G2/G5 lacks \"still runs on the host\"",
+      "ok": true,
+      "detail": {
+        "found": false
+      }
+    },
+    {
+      "id": "1280x800 G2/G5 lacks \"neither starts nor stops it\"",
+      "ok": true,
+      "detail": {
+        "found": false
+      }
+    },
+    {
+      "id": "1280x800 G2/G5 lacks \"On-demand refresh is not enabled on this host\"",
+      "ok": true,
+      "detail": {
+        "found": false
+      }
+    },
+    {
+      "id": "1280x800 G2/G5 lacks \"polkit\"",
+      "ok": true,
+      "detail": {
+        "found": false
+      }
+    },
+    {
+      "id": "1280x800 G2/G5 lacks \"Unit status is not read on this host\"",
+      "ok": true,
+      "detail": {
+        "found": false
+      }
+    },
+    {
+      "id": "1280x800 G2/G5 lacks \"Service state is not available on this host\"",
+      "ok": true,
+      "detail": {
+        "found": false
+      }
+    },
+    {
+      "id": "1280x800 G3 current-season ingestion Enabled",
+      "ok": true,
+      "detail": {
+        "row": "AFL API Current-Season IngestionEnabledDisable"
+      }
+    },
+    {
+      "id": "1280x800 G4 Brownlow admin control Disabled",
+      "ok": true,
+      "detail": {
+        "row": "Brownlow Live IngestionAdmin control: DisabledDeployment gate: DisabledEffective state: DisabledEnable admin control"
+      }
+    },
+    {
+      "id": "1280x800 G4 Brownlow deployment gate Disabled",
+      "ok": true,
+      "detail": {
+        "row": "Brownlow Live IngestionAdmin control: DisabledDeployment gate: DisabledEffective state: DisabledEnable admin control"
+      }
+    },
+    {
+      "id": "1280x800 G5 match settle row shows a service state",
+      "ok": true,
+      "detail": {
+        "row": "Match and player statisticsafldb-settle-afl-api.serviceIdle (inactive), last finished Tue 2026-11-03 05:02:02 AEDTBatch 78, status completed, snapshot afl-api-2027-2026-11-02-180200, season 2027, completed 2026-11-03 05:02:02.40824+11. 0 records read, 0 rejected."
+      }
+    },
+    {
+      "id": "1280x800 G5 Brownlow settle row shows a service state",
+      "ok": true,
+      "detail": {
+        "row": "Brownlow votesafldb-settle-afl-api-brownlow.serviceIdle (inactive)Batch 74, status completed, season 2025, completed 2026-11-02 14:18:18.224896+11. 207 records read, 0 rejected."
+      }
+    },
+    {
+      "id": "1280x800 G6 no control labelled Start",
+      "ok": true,
+      "detail": {
+        "controls": [
+          "«Collapse the admin menu",
+          "Dashboard",
+          "Operations centre",
+          "Data editor",
+          "Brownlow",
+          "Player links",
+          "Coaches",
+          "Draft administration",
+          "Season lists",
+          "Fixtures",
+          "Awards & honours",
+          "Special records",
+          "Current season",
+          "Beta access",
+          "Administrators",
+          "Page content",
+          "Settings",
+          "Data QA search",
+          "Database health",
+          "Application health",
+          "Search telemetry",
+          "Reader feedback",
+          "Audit trail",
+          "Change password",
+          "View site",
+          "Sign out",
+          "Disable",
+          "Enable admin control"
+        ]
+      }
+    },
+    {
+      "id": "1280x800 G7 no-overflow",
+      "ok": true,
+      "detail": {
+        "scrollWidth": 1265,
+        "innerWidth": 1280
+      }
+    },
+    {
+      "id": "1280x800 G7 static-and-console",
+      "ok": true,
+      "detail": {
+        "staticSeen": 12,
+        "badStatic": [],
+        "consoleErrors": []
+      }
+    },
+    {
+      "id": "390x844 http-200-on-path",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "url": "https://beta.afldb.com/admin/current-season"
+      }
+    },
+    {
+      "id": "390x844 G1 has \"AFL Tables network acquisition is retired…\"",
+      "ok": true,
+      "detail": {
+        "found": true
+      }
+    },
+    {
+      "id": "390x844 G1 has \"its nightly timer is disabled…\"",
+      "ok": true,
+      "detail": {
+        "found": true
+      }
+    },
+    {
+      "id": "390x844 G1 has \"Match and player ingestion runs from the AFL API…\"",
+      "ok": true,
+      "detail": {
+        "found": true
+      }
+    },
+    {
+      "id": "390x844 G1 has \"Brownlow ingestion is governed separately…\"",
+      "ok": true,
+      "detail": {
+        "found": true
+      }
+    },
+    {
+      "id": "390x844 G1 has \"stays off until the owner opens a count window…\"",
+      "ok": true,
+      "detail": {
+        "found": true
+      }
+    },
+    {
+      "id": "390x844 G1 has \"there is no Start control, because runs follow t…\"",
+      "ok": true,
+      "detail": {
+        "found": true
+      }
+    },
+    {
+      "id": "390x844 G1 has \"there is no Start control (AFLDB-ISSUE-316, D-31…\"",
+      "ok": true,
+      "detail": {
+        "found": true
+      }
+    },
+    {
+      "id": "390x844 G2/G5 lacks \"still runs on the host\"",
+      "ok": true,
+      "detail": {
+        "found": false
+      }
+    },
+    {
+      "id": "390x844 G2/G5 lacks \"neither starts nor stops it\"",
+      "ok": true,
+      "detail": {
+        "found": false
+      }
+    },
+    {
+      "id": "390x844 G2/G5 lacks \"On-demand refresh is not enabled on this host\"",
+      "ok": true,
+      "detail": {
+        "found": false
+      }
+    },
+    {
+      "id": "390x844 G2/G5 lacks \"polkit\"",
+      "ok": true,
+      "detail": {
+        "found": false
+      }
+    },
+    {
+      "id": "390x844 G2/G5 lacks \"Unit status is not read on this host\"",
+      "ok": true,
+      "detail": {
+        "found": false
+      }
+    },
+    {
+      "id": "390x844 G2/G5 lacks \"Service state is not available on this host\"",
+      "ok": true,
+      "detail": {
+        "found": false
+      }
+    },
+    {
+      "id": "390x844 G3 current-season ingestion Enabled",
+      "ok": true,
+      "detail": {
+        "row": "AFL API Current-Season IngestionEnabledDisable"
+      }
+    },
+    {
+      "id": "390x844 G4 Brownlow admin control Disabled",
+      "ok": true,
+      "detail": {
+        "row": "Brownlow Live IngestionAdmin control: DisabledDeployment gate: DisabledEffective state: DisabledEnable admin control"
+      }
+    },
+    {
+      "id": "390x844 G4 Brownlow deployment gate Disabled",
+      "ok": true,
+      "detail": {
+        "row": "Brownlow Live IngestionAdmin control: DisabledDeployment gate: DisabledEffective state: DisabledEnable admin control"
+      }
+    },
+    {
+      "id": "390x844 G5 match settle row shows a service state",
+      "ok": true,
+      "detail": {
+        "row": "Match and player statisticsafldb-settle-afl-api.serviceIdle (inactive), last finished Tue 2026-11-03 05:02:02 AEDTBatch 78, status completed, snapshot afl-api-2027-2026-11-02-180200, season 2027, completed 2026-11-03 05:02:02.40824+11. 0 records read, 0 rejected."
+      }
+    },
+    {
+      "id": "390x844 G5 Brownlow settle row shows a service state",
+      "ok": true,
+      "detail": {
+        "row": "Brownlow votesafldb-settle-afl-api-brownlow.serviceIdle (inactive)Batch 74, status completed, season 2025, completed 2026-11-02 14:18:18.224896+11. 207 records read, 0 rejected."
+      }
+    },
+    {
+      "id": "390x844 G6 no control labelled Start",
+      "ok": true,
+      "detail": {
+        "controls": [
+          "»Expand the admin menu",
+          "Dashboard",
+          "Operations centre",
+          "Data editor",
+          "Brownlow",
+          "Player links",
+          "Coaches",
+          "Draft administration",
+          "Season lists",
+          "Fixtures",
+          "Awards & honours",
+          "Special records",
+          "Current season",
+          "Beta access",
+          "Administrators",
+          "Page content",
+          "Settings",
+          "Data QA search",
+          "Database health",
+          "Application health",
+          "Search telemetry",
+          "Reader feedback",
+          "Audit trail",
+          "Change password",
+          "View site",
+          "Sign out",
+          "Disable",
+          "Enable admin control"
+        ]
+      }
+    },
+    {
+      "id": "390x844 G7 no-overflow",
+      "ok": true,
+      "detail": {
+        "scrollWidth": 375,
+        "innerWidth": 390
+      }
+    },
+    {
+      "id": "390x844 G7 static-and-console",
+      "ok": true,
+      "detail": {
+        "staticSeen": 12,
+        "badStatic": [],
+        "consoleErrors": []
+      }
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "01-current-season-1280x800.png",
+      "url": "https://beta.afldb.com/admin/current-season",
+      "viewport": "1280x800",
+      "at": "2026-11-02T22:02:24.352Z"
+    },
+    {
+      "file": "02-current-season-390x844.png",
+      "url": "https://beta.afldb.com/admin/current-season",
+      "viewport": "390x844",
+      "at": "2026-11-02T22:02:28.599Z"
+    }
+  ],
+  "role": "Super Admin",
+  "finished": "2026-11-02T22:02:28.599Z",
+  "verdict": "PASS"
+}

@@ -1,0 +1,5 @@
+FIRST-NIGHT-RECORD: reviewed
+CLASSIFICATION: RAN, exit 0; batch 78 completed 0/0/0/0; canonical 2027 matches 0; fixtures unchanged at 218.
+RECORDED-AEDT: 2026-11-02 20:44:38 GMT
+REVIEWER: Stuart
+RELEASE-DECISION: proceed
