@@ -195,6 +195,9 @@ import {
 } from '@/lib/rollover/afltables-network-retirement';
 import { RolloverRefused } from '@/lib/rollover/season-rollover';
 import { runAflApiCutoverReadiness, venueRowsCheck } from '../tools/current-season/afl-api-cutover-readiness';
+import type { AflApiSettleCounters } from '@/lib/acquisition/settle-afl-api';
+import { emptySettleCounters } from '@/lib/acquisition/settle-core';
+import { counterLines } from '../tools/current-season/settle-afl-api';
 import {
   ACQUIRE_SCRIPT,
   AFL_API_SERVICE_FILE,
@@ -210,6 +213,7 @@ import {
   assessWatchdogReady,
   awaitWatchdogReady,
   childEnvironment,
+  dryRunHalts,
   main as c4bMain,
   normaliseStoredSetting,
   parseC4bArgs,
@@ -1141,8 +1145,19 @@ describe('AFL API cutover readiness', () => {
 
 describe('C4b rehearsal (AFLDB-ISSUE-316 §7): the setting is restored however the run ends', () => {
   const ACQ_OK = 'AFLDB-ISSUE-228 acquire — season 2027 (compSeasonId 99), label 20270301T000000Z\n';
-  const DRY_OK = ['', 'Season feed', '  seasonFeedComplete: true', 'Canonical',
-    '  canonicalRowsInserted: 0', '  canonicalRowsUpdated: 0'].join('\n');
+  /**
+   * The dry-run report as the REAL formatter prints it (`counterLines` in settle-afl-api.ts), from typed counters.
+   * Never hand-write this text: the first production C4b run HALTed because a hand-written `seasonFeedComplete: true`
+   * fixture disagreed with the real numeric `seasonFeedComplete: 1`.
+   */
+  const realDryRun = (over: Partial<AflApiSettleCounters> = {}): string => counterLines({
+    ...emptySettleCounters(),
+    snapshotMatches: 0, snapshotPlayerMatchRows: 0, buildFailures: 0, venueProviderUnmapped: 0,
+    seasonFeedMatches: 218, seasonFeedComplete: 1, seasonFeedStatusCounts: { SCHEDULED: 135, PLACEHOLDER: 83 },
+    nonParticipantPlayerRows: 0,
+    ...over,
+  }).join('\n');
+  const DRY_OK = realDryRun();
   const OFF: SettingValue = { present: true, value: 'false' };
   const baseFiles = (): Record<string, string> => ({
     'data/reference/seasons.json': JSON.stringify({ in_progress_seasons: [2027] }),
@@ -1655,7 +1670,13 @@ describe('C4b rehearsal (AFLDB-ISSUE-316 §7): the setting is restored however t
     ['canonical rows inserted', { [SETTLE_SCRIPT]: () => ({ exitCode: 0, signal: null, output: DRY_OK.replace('canonicalRowsInserted: 0', 'canonicalRowsInserted: 1') }) }, {}, /canonicalRowsInserted is 1, not 0/],
     ['canonical rows updated', { [SETTLE_SCRIPT]: () => ({ exitCode: 0, signal: null, output: DRY_OK.replace('canonicalRowsUpdated: 0', 'canonicalRowsUpdated: 2') }) }, {}, /canonicalRowsUpdated is 2, not 0/],
     ['no dry-run report', { [SETTLE_SCRIPT]: () => ({ exitCode: 0, signal: null, output: 'ok' }) }, {}, /no canonicalRowsInserted line/],
-    ['an incomplete season feed', { [SETTLE_SCRIPT]: () => ({ exitCode: 0, signal: null, output: DRY_OK.replace('seasonFeedComplete: true', 'seasonFeedComplete: false') }) }, {}, /seasonFeedComplete false/],
+    ['an incomplete season feed (real counter 0)', { [SETTLE_SCRIPT]: () => ({ exitCode: 0, signal: null, output: realDryRun({ seasonFeedComplete: 0 }) }) }, {}, /Season feed .* incomplete \(seasonFeedComplete 0\)/],
+    ['completeness evidence missing from the report', { [SETTLE_SCRIPT]: () => ({ exitCode: 0, signal: null, output: DRY_OK.replace(/^ *seasonFeedComplete:.*\n/m, '') }) }, {}, /Season feed .* absent/],
+    ['a malformed completeness counter (the old hand-written "true")', { [SETTLE_SCRIPT]: () => ({ exitCode: 0, signal: null, output: DRY_OK.replace('seasonFeedComplete: 1', 'seasonFeedComplete: true') }) }, {}, /malformed \(seasonFeedComplete true;/],
+    ['an out-of-contract nonzero completeness counter (2)', { [SETTLE_SCRIPT]: () => ({ exitCode: 0, signal: null, output: realDryRun({ seasonFeedComplete: 2 }) }) }, {}, /malformed \(seasonFeedComplete 2;/],
+    ['a missing canonicalRowsInserted counter', { [SETTLE_SCRIPT]: () => ({ exitCode: 0, signal: null, output: DRY_OK.replace(/^ *canonicalRowsInserted:.*\n/m, '') }) }, {}, /no canonicalRowsInserted line/],
+    ['a missing canonicalRowsUpdated counter', { [SETTLE_SCRIPT]: () => ({ exitCode: 0, signal: null, output: DRY_OK.replace(/^ *canonicalRowsUpdated:.*\n/m, '') }) }, {}, /no canonicalRowsUpdated line/],
+    ['a malformed canonicalRowsInserted counter', { [SETTLE_SCRIPT]: () => ({ exitCode: 0, signal: null, output: DRY_OK.replace('canonicalRowsInserted: 0', 'canonicalRowsInserted: 00') }) }, {}, /canonicalRowsInserted is 00, not 0/],
     ['a canonical change between BEFORE and AFTER', {}, { afterRecord: { aflApiOwnedMatches: 1 } }, /afl_api-owned matches: BEFORE 0, AFTER 1/],
     ['another acquisition setting changed', {}, { afterRecord: { acquisitionSettings: { 'acquisition.afl_api_brownlow_enabled': 'true', [C4B_SETTING_KEY]: 'false' } } }, /afl_api_brownlow_enabled: BEFORE false, AFTER true/],
   ])('HALT on %s, with the setting already off', async (_label, steps, extra, reason) => {
@@ -1664,6 +1685,37 @@ describe('C4b rehearsal (AFLDB-ISSUE-316 §7): the setting is restored however t
     expect(outcome.exitCode).toBe(1);
     expect(outcome.reasons.join('\n')).toMatch(reason);
     expect(h.state.setting).toEqual(OFF);
+  });
+
+  it('the real report of a complete feed with zero canonical writes passes the gate (the first production run HALTed here)', () => {
+    expect(DRY_OK).toContain('seasonFeedComplete: 1');
+    expect(DRY_OK).not.toMatch(/seasonFeedComplete: (true|false)/);
+    expect(dryRunHalts(DRY_OK)).toEqual([]);
+  });
+
+  it('dryRunHalts consumes the numeric contract strictly: 1 complete, 0 incomplete, anything else malformed', () => {
+    for (const bad of ['true', 'false', '2', '-1', '01', '1.0', 'yes', 'null', '']) {
+      const text = DRY_OK.replace('seasonFeedComplete: 1', `seasonFeedComplete: ${bad}`);
+      const halts = dryRunHalts(text);
+      expect(halts, `seasonFeedComplete: ${bad}`).toHaveLength(1);
+      expect(halts[0]).toMatch(bad === '' ? /absent/ : /malformed/);
+    }
+    expect(dryRunHalts(realDryRun({ seasonFeedComplete: 0 }))[0]).toMatch(/incomplete \(seasonFeedComplete 0\)/);
+    // Canonical counters are exact strings too; the three problems are reported together.
+    const all = dryRunHalts(realDryRun({ seasonFeedComplete: 0, canonicalRowsInserted: 1, canonicalRowsUpdated: 2 }));
+    expect(all).toHaveLength(3);
+    expect(dryRunHalts('')).toHaveLength(3);
+  });
+
+  it('an incomplete real season feed HALTs, with the setting turned on for the steps and restored before result.json', async () => {
+    const h = harness({ steps: { [SETTLE_SCRIPT]: () => ({ exitCode: 0, signal: null, output: realDryRun({ seasonFeedComplete: 0 }) }) } });
+    recordEvidenceOrder(h);
+    const outcome = await run(h);
+    expect(outcome.exitCode).toBe(1);
+    expect(outcome.verdict).toBe('HALT');
+    expect(h.state.writes).toEqual([true, false]);
+    expect(h.state.setting).toEqual(OFF);
+    expect(restoredBeforeResult(h)).toBe(true);
   });
 
   it('HALT when a timer is enabled AFTER, or readiness on the acquired feed is NOT READY', async () => {

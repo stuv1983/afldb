@@ -26,6 +26,8 @@ import { join, relative, resolve } from 'node:path';
 import postgres from 'postgres';
 import { readAflApiIngestionControls } from '../../src/lib/acquisition/afl-api-ingestion-control';
 import * as c4b from '../current-season/afl-api-c4b-rehearsal';
+import { counterLines } from '../current-season/settle-afl-api';
+import { emptySettleCounters } from '../../src/lib/acquisition/settle-core';
 
 const root = process.cwd();
 const SEASON = 2027;
@@ -65,7 +67,19 @@ function baseDeps(evidenceDir: string, runId: string, host: Host = {}) {
   };
 }
 const ACQUIRE_OK = (label: string) => ({ exitCode: 0, signal: null, output: `acquire-afl-api: season ${SEASON}, label ${label}\n` });
-const SETTLE_OK = { exitCode: 0, signal: null, output: '  canonicalRowsInserted: 0\n  canonicalRowsUpdated: 0\n  seasonFeedComplete: true\n' };
+/**
+ * The settle's dry-run report from the REAL formatter (`counterLines`, tools/current-season/settle-afl-api.ts) over typed
+ * counters, never a hand-written string: the first production C4b run HALTed because the old fixture printed
+ * `seasonFeedComplete: true` while the real settle prints the number `1`.
+ */
+const realReport = (over: Partial<Parameters<typeof counterLines>[0]> = {}): string => counterLines({
+  ...emptySettleCounters(),
+  snapshotMatches: 0, snapshotPlayerMatchRows: 0, buildFailures: 0, venueProviderUnmapped: 0,
+  seasonFeedMatches: 218, seasonFeedComplete: 1, seasonFeedStatusCounts: { SCHEDULED: 135, PLACEHOLDER: 83 },
+  nonParticipantPlayerRows: 0, ...over,
+}).join('\n') + '\n';
+const settleOut = (output: string) => ({ exitCode: 0, signal: null, output });
+const SETTLE_OK = settleOut(realReport());
 
 const setting = async (): Promise<string> => (await sql<{ v: string }[]>`SELECT value::text AS v FROM site_settings WHERE key = ${KEY}`)[0]?.v ?? 'absent';
 const auditRows = async (runId: string) => (await sql<{ detail: Record<string, unknown> }[]>`
@@ -161,12 +175,27 @@ const watchdogGone = async (evidenceDir: string): Promise<boolean> => {
   check('S3 a step that throws -> HALT and setting restored false', r.out.exitCode === 1 && r.stored === 'false' && (await auditRows(r.runId)).length === 2, `${r.out.verdict} ${r.stored}`);
 }
 {
-  const r = await run('s4-dryrun-writes', { runStep: async (s: string) => (s === c4b.ACQUIRE_SCRIPT ? ACQUIRE_OK('s4label') : { exitCode: 0, signal: null, output: '  canonicalRowsInserted: 3\n  canonicalRowsUpdated: 0\n  seasonFeedComplete: true\n' }) });
+  const r = await run('s4-dryrun-writes', { runStep: async (s: string) => (s === c4b.ACQUIRE_SCRIPT ? ACQUIRE_OK('s4label') : settleOut(realReport({ canonicalRowsInserted: 3 }))) });
   check('S4 a dry-run that reports canonical inserts -> HALT, setting restored false', r.out.exitCode === 1 && r.out.reasons.some((x) => /canonicalRowsInserted is 3/.test(x)) && r.stored === 'false', r.out.reasons[0]?.slice(0, 70));
 }
 {
-  const r = await run('s5-incomplete-feed', { runStep: async (s: string) => (s === c4b.ACQUIRE_SCRIPT ? ACQUIRE_OK('s5label') : { exitCode: 0, signal: null, output: '  canonicalRowsInserted: 0\n  canonicalRowsUpdated: 0\n  seasonFeedComplete: false\n' }) });
-  check('S5 an incomplete season feed -> HALT, setting restored false', r.out.exitCode === 1 && r.stored === 'false', r.out.reasons[0]?.slice(0, 70));
+  const r = await run('s5-incomplete-feed', { runStep: async (s: string) => (s === c4b.ACQUIRE_SCRIPT ? ACQUIRE_OK('s5label') : settleOut(realReport({ seasonFeedComplete: 0 })) ) });
+  check('S5 an incomplete season feed (real counter 0) -> HALT, setting restored false', r.out.exitCode === 1 && r.out.reasons.some((x) => /incomplete \(seasonFeedComplete 0\)/.test(x)) && r.stored === 'false', r.out.reasons[0]?.slice(0, 70));
+}
+{
+  const missing = realReport().replace(/^ *seasonFeedComplete:.*\n/m, '');
+  const r = await run('s5b-missing-evidence', { runStep: async (s: string) => (s === c4b.ACQUIRE_SCRIPT ? ACQUIRE_OK('s5blabel') : settleOut(missing)) });
+  check('S5b a report with no completeness line -> HALT (absent), setting restored false', r.out.exitCode === 1 && r.out.reasons.some((x) => /evidence is absent/.test(x)) && r.stored === 'false', r.out.reasons[0]?.slice(0, 70));
+}
+{
+  const malformed = realReport().replace('seasonFeedComplete: 1', 'seasonFeedComplete: true');
+  const r = await run('s5c-malformed-evidence', { runStep: async (s: string) => (s === c4b.ACQUIRE_SCRIPT ? ACQUIRE_OK('s5clabel') : settleOut(malformed)) });
+  check('S5c the old hand-written "true" is malformed evidence -> HALT, setting restored false', r.out.exitCode === 1 && r.out.reasons.some((x) => /malformed \(seasonFeedComplete true/.test(x)) && r.stored === 'false', r.out.reasons[0]?.slice(0, 70));
+}
+{
+  const noCounter = realReport().replace(/^ *canonicalRowsUpdated:.*\n/m, '');
+  const r = await run('s5d-missing-counter', { runStep: async (s: string) => (s === c4b.ACQUIRE_SCRIPT ? ACQUIRE_OK('s5dlabel') : settleOut(noCounter)) });
+  check('S5d a report with no canonicalRowsUpdated line -> HALT, setting restored false', r.out.exitCode === 1 && r.out.reasons.some((x) => /no canonicalRowsUpdated line/.test(x)) && r.stored === 'false', r.out.reasons[0]?.slice(0, 70));
 }
 {
   const r = await run('s6-record-drift', { runStep: async (s: string) => {

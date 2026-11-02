@@ -237,10 +237,17 @@ export function parseAcquiredLabel(output: string): string | null {
   return output.match(/, label ([A-Za-z0-9_-]+)/)?.[1] ?? null;
 }
 
-/** The dry-run report's own counter lines (`settle-afl-api.ts` counterLines). Missing is not zero. */
+/**
+ * The dry-run report's own counter lines (`settle-afl-api.ts` `counterLines`). Missing is not zero.
+ *
+ * Producer contract (not a guess): every counter is a number. `seasonFeedComplete` is `bundle.seasonFeed.complete ? 1 : 0`
+ * (src/lib/acquisition/settle-afl-api.ts), so the line reads exactly `1` (complete) or `0` (incomplete). The first
+ * production C4b run HALTed because this gate compared the text to `true`. Only `1` passes; `0` is incomplete; any other
+ * text (`true`, `false`, `2`, `01`) is malformed evidence and also halts. No loose truthiness.
+ */
 export function dryRunHalts(output: string): string[] {
   const counter = (key: string): string | null =>
-    output.match(new RegExp(`^\\s*${key}:\\s*(\\S+)\\s*$`, 'm'))?.[1] ?? null;
+    output.match(new RegExp(`^[ \\t]*${key}:[ \\t]*(\\S+)[ \\t]*$`, 'm'))?.[1] ?? null;
   const halts: string[] = [];
   for (const key of ['canonicalRowsInserted', 'canonicalRowsUpdated']) {
     const value = counter(key);
@@ -248,7 +255,9 @@ export function dryRunHalts(output: string): string[] {
     else if (value !== '0') halts.push(`dry-run ${key} is ${value}, not 0`);
   }
   const feed = counter('seasonFeedComplete');
-  if (feed !== 'true') halts.push(`the dry-run Season feed (AFLDB-ISSUE-231) evidence is ${feed === null ? 'absent' : `seasonFeedComplete ${feed}`}`);
+  if (feed === null) halts.push('the dry-run Season feed (AFLDB-ISSUE-231) evidence is absent: the report has no seasonFeedComplete line');
+  else if (feed === '0') halts.push('the dry-run Season feed (AFLDB-ISSUE-231) is incomplete (seasonFeedComplete 0)');
+  else if (feed !== '1') halts.push(`the dry-run Season feed (AFLDB-ISSUE-231) evidence is malformed (seasonFeedComplete ${feed}; the settle prints exactly 1 or 0)`);
   return halts;
 }
 

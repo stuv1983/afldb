@@ -193,7 +193,8 @@ function createImportClient(): postgres.Sql {
   return postgres(dsn, { max: 1, onnotice: () => {}, transform: { undefined: null } });
 }
 
-function counterLines(counters: AflApiSettleCounters): string[] {
+/** Exported so the C4b gate (`dryRunHalts` in afl-api-c4b-rehearsal.ts) is tested against this real formatter, never a hand-written report. */
+export function counterLines(counters: AflApiSettleCounters): string[] {
   const lines: string[] = [];
   const group = (title: string, keys: readonly (keyof AflApiSettleCounters)[]): void => {
     lines.push('', title);
