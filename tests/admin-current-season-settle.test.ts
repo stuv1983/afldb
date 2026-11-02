@@ -102,6 +102,7 @@ import {
 } from '@/db/queries/settle-runs';
 import {
   parseUnitShow,
+  SETTLE_TRIGGER_UNCONFIGURED,
   SETTLE_UNIT,
   SETTLE_UNITS,
   summariseFailure,
@@ -864,13 +865,26 @@ describe('AFLDB V2 Stage 5 — the current-season admin surface after the retire
     }
   });
 
-  it('states the AFL Tables position truthfully: still on the host behind ISSUE-316, not started or stopped by V2', () => {
+  it('states the post-cutover position truthfully (D-316-12): AFL Tables retired, AFL API match ingestion on its timer, Brownlow separately governed, no Start control', () => {
     expect(page).toContain('AFLDB-ISSUE-316');
     expect(page).toContain('D-316-1');
     expect(page).toContain('D-316-4');
     expect(page).not.toContain('D-316-2'); // plan section 7 R-042
-    expect(page).toContain('neither starts nor');
+    expect(page).toContain('AFL Tables network acquisition is retired');
+    expect(page).toContain('nightly timer is disabled');
+    expect(page).toContain('Match and player ingestion runs from the AFL API match');
+    expect(page).toContain('Brownlow ingestion is');
+    expect(page).toContain('governed separately');
+    expect(page).toContain('no Start control');
     expect(page).toContain('retired');
+    // The pre-cutover claims must not return.
+    expect(page).not.toContain('still runs on the host');
+    expect(page).not.toContain('neither starts nor');
+    expect(page).not.toContain('until the owner');
+    // The status messages no longer send an operator to the retired polkit trigger.
+    expect(SETTLE_TRIGGER_UNCONFIGURED).not.toMatch(/polkit|afltables-trigger|On-demand refresh is not enabled/);
+    expect(SETTLE_TRIGGER_UNCONFIGURED).toContain('AFLDB_SETTLE_TRIGGER=systemd');
+    expect(SETTLE_TRIGGER_UNCONFIGURED).toContain('no on-demand Start');
     // The wording the observed ISSUE-128 defect displayed must not return.
     expect(page).not.toContain('Auto update uses Kali');
     expect(page).not.toContain('is the primary and only automatic');

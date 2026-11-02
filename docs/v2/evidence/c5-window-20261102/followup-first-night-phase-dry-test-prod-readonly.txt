@@ -1,0 +1,29 @@
+﻿== c5-observe first-night 2026-11-02T10:47:25Z N=924ff273261834e4112e3f41b61ceeab55427534 (host local 2026-11-02 21:47:25 AEDT)
+identity ok (afldb_prod, OID 66668, read-only session)
+== service invocation (systemctl show, no sudo)
+    ExecStart: ExecStart=/bin/sh /home/arm/projects/afldb/deploy/afldb-settle-afl-api.sh
+    timer LastTriggerUSec=[] NextElapse=[Tue 2026-11-03 05:01:47 AEDT] timer enabled=[enabled] active=[active]
+    service Result=[success] ExecMainStatus=[0] ExecMainStart=[] ExecMainExit=[] InvocationID=[] ActiveState=[inactive]
+== journal visible to arm (arm is not in adm/systemd-journal: only the tool's own output lines are visible; systemd's Started/Finished lines need: sudo journalctl -u afldb-settle-afl-api.service --since '2026-11-03 04:30' --until '2026-11-03 08:00' --no-pager)
+    Hint: You are currently not seeing messages from other users and the system.
+          Users in groups 'adm', 'systemd-journal' can see all messages.
+          Pass -q to turn off this notice.
+    -- No entries --
+== database evidence
+    import_batches_id_seq = 77 is_called=true (was 77 before the first scheduled run; max(id) was 75)
+    max(import_batches.id) = 75
+    batches after id 75 (id, tool, started_at, completed_at, status, read/ins/upd/rej):
+      
+    newest batch validation_result (first 1800 chars):
+      
+    canonical matches in season 2027 = 0 (0 expected: no CONCLUDED 2027 match exists before 2027-03-17)
+    fixtures in season 2027 = 218 (218 before; the match chain does not write fixtures)
+== configuration preserved
+    switch (normalised) = [true]
+    trigger lines in .env = [1]; Brownlow timer = [disabled/inactive]; AFL Tables timer = [disabled/inactive]
+    settle/acquire processes right now = 0 (a run still in progress shows here)
+== CLASSIFICATION (the systemd view and the data view are reported separately)
+    systemd view: NO-RUN: the timer has not fired (LastTriggerUSec empty, no ExecMain start). Check the host clock against the 05:00-05:15 window. Not a failed run; nothing to recover.
+    data view: no batch row retained and the sequence is unmoved at 77 (the run, if any, consumed no id).
+C5-OBSERVE first-night COMPLETE (information and classification; no PASS/FAIL is claimed)
+EXIT=0

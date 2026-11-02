@@ -1,0 +1,33 @@
+﻿groups: arm sudo users
+-- journal (last 3 lines of the match unit):
+Hint: You are currently not seeing messages from other users and the system.
+      Users in groups 'adm', 'systemd-journal' can see all messages.
+      Pass -q to turn off this notice.
+-- No entries --
+-- unit invocation lines:
+Type=oneshot
+User=arm
+WorkingDirectory=/home/arm/projects/afldb
+ExecStart=/bin/sh /home/arm/projects/afldb/deploy/afldb-settle-afl-api.sh
+TimeoutStartSec=3600
+-- timer lines:
+OnCalendar=*-*-* 05:00
+RandomizedDelaySec=15min
+AccuracySec=1min
+Persistent=true
+-- state:
+Result=success
+ExecMainStartTimestamp=
+ExecMainExitTimestamp=
+ExecMainStatus=0
+InvocationID=
+NextElapseUSecRealtime=Tue 2026-11-03 05:01:47 AEDT
+LastTriggerUSec=
+LastTriggerUSecMonotonic=0
+-- wrapper script the unit runs:
+7:#   acquire-afl-api.ts --season <S>               (network; writes files, manifest LAST)
+8:#     -> settle-afl-api.ts --label <L> --apply
+13:# are Node (`tools/current-season/acquire-afl-api.ts`,
+14:# `tools/current-season/settle-afl-api.ts`), and `settle-afl-api.ts` builds its
+23:# `acquire-afl-api.ts` self-cleans its own partial snapshot directory on
+33:# in-progress register (`data/reference/seasons.json`), same file

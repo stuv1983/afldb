@@ -108,7 +108,7 @@ export async function readSettleUnitTableStatus(): Promise<Record<SettleUnitKey,
       if ('available' in state) unitError = state.reason;
       else unit = state;
     } else {
-      unitError = 'On-demand refresh is not enabled on this host.';
+      unitError = 'Unit status is not read on this host: AFLDB_SETTLE_TRIGGER=systemd is not set in .env.';
     }
 
     let latestRun: SettleRunRecord | null = null;

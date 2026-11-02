@@ -4,8 +4,8 @@
  * ISSUE-228 S8 built `readSettleUnitTableStatus()` (`settle-status.ts`) and
  * left it unrendered. This shows its two AFL API rows: what systemd says each
  * unit is doing, and the newest `import_batches` row each settle CLI wrote.
- * The AFL Tables row is not shown: its on-demand panel was retired in AFLDB V2 Stage 5 (the
- * nightly AFL Tables settle stays behind AFLDB-ISSUE-316).
+ * The AFL Tables row is not shown: its on-demand panel was retired in AFLDB V2 Stage 5 and its
+ * nightly settle is retired by AFLDB-ISSUE-316 (D-316-1; the timer is disabled).
  *
  * It starts nothing and takes no input. The two facts stay separate for the
  * same reason the retired AFL Tables panel kept them apart: a run in flight has
@@ -80,9 +80,10 @@ export function AflApiSettleUnitsPanel({
     <section className="section">
       <h2>AFL API scheduled settles</h2>
       <p>
-        The AFL.com.au match and Brownlow settles run from their own systemd timers once an
-        operator installs them on this host (AFLDB-ISSUE-232). This table only reports: it
-        starts nothing. While a run is in progress, the batch shown is the previous run&apos;s.
+        The AFL.com.au match and Brownlow settles each run from their own systemd timer
+        (AFLDB-ISSUE-232), subject to the switches above. This table only reports: it starts
+        nothing, and there is no Start control (AFLDB-ISSUE-316, D-316-12). While a run is in
+        progress, the batch shown is the previous run&apos;s.
       </p>
       {error !== null ? (
         <p className="notice" role="alert">{error}</p>

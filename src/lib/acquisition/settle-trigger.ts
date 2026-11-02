@@ -175,10 +175,8 @@ export function settleTriggerConfigured(): boolean {
 
 /** The operator sentence shown when it is not configured. */
 export const SETTLE_TRIGGER_UNCONFIGURED =
-  `On-demand refresh is not enabled on this host. It needs the polkit rule from `
-  + `deploy/afldb-settle-afltables-trigger.rules installed and `
-  + `${SETTLE_TRIGGER_ENV}=${SETTLE_TRIGGER_MODE} set in .env (docs/deployment.md §7b). `
-  + `The nightly timer is unaffected.`;
+  `Unit status is not read on this host: ${SETTLE_TRIGGER_ENV}=${SETTLE_TRIGGER_MODE} is not set in .env. `
+  + `There is no on-demand Start (AFLDB-ISSUE-316, D-316-12); the timers are unaffected.`;
 
 type ExecResult = { code: number; stdout: string; stderr: string };
 

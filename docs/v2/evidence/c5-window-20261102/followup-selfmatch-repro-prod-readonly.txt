@@ -1,0 +1,18 @@
+﻿== repro 2026-11-02T10:44:11Z host=afldb-prod self=3305432 argv: /home/arm/c5-selfmatch-repro-20261102.sh afldb-settle-afl-api.timer
+-- who matches the OLD pgrep pattern right now (pid args):
+    3305432 bash /home/arm/c5-selfmatch-repro-20261102.sh afldb-settle-afl-api.timer
+-- OLD helper (r2) timer phase, process lines only:
+settle/acquire processes = [1] (expected [0])
+FAIL: settle/acquire processes
+C5-OBSERVE timer FAIL (1 check(s) failed; a finding for review, nothing was changed)
+-- FIXED helper (r3) timer phase:
+settle/acquire processes = [0] (expected [0])
+C5-OBSERVE timer PASS
+-- REAL ps table through the guard (own transport excluded):
+    3305538 3305432 bash            bash /home/arm/c5-selfmatch-repro-20261102.sh afldb-settle-afl-api.timer
+    (count: 2)
+-- REAL ps table + ONE INJECTED line (a text line, not a process) naming a writer:
+    3305547 3305432 bash            bash /home/arm/c5-selfmatch-repro-20261102.sh afldb-settle-afl-api.timer
+    3305548 3305432 bash            bash /home/arm/c5-selfmatch-repro-20261102.sh afldb-settle-afl-api.timer
+    999999 1 node node tools/current-season/settle-afl-api.ts --apply   <INJECTED TEST LINE>
+== end

@@ -822,6 +822,13 @@ turns `WHERE conference = ''` into a syntax error.
 
 ## 7b. In-season AFL Tables settle (scheduled)
 
+> **RETIRED for the current season (AFLDB-ISSUE-316, D-316-1 at C2; D-316-12).** AFL Tables network
+> acquisition is retired in `data/reference/afltables-network.json` (`status: retired`), the timer
+> `afldb-settle-afltables.timer` is **disabled** on production (approval A-AFLT, 2026-10-31), and a V2
+> checkout refuses the settle. The current-season source is the AFL API (section 7d). What follows is the
+> historical design of the retired chain, kept for the 2026 and earlier record; do not enable the timer
+> from it.
+
 `AFLDB-ISSUE-122`. Once a night, in season, AFL Tables is acquired through
 fitzRoy, adjudicated offline, and applied canonically without a human. The
 chain is:
@@ -1160,6 +1167,15 @@ build up unnoticed.
 
 ### On-demand refresh from the admin surface (`AFLDB-ISSUE-127`)
 
+> **RETIRED (AFLDB V2 Stage 5; AFLDB-ISSUE-316, D-316-12).** `/admin/current-season` has **no Start
+> control** and no on-demand trigger of any kind: `startSettleRunAction` refuses with a typed
+> `legacy_retired` result and one audit row, and the polkit rule
+> `deploy/afldb-settle-afltables-trigger.rules` must **not** be installed (the cutover preflight
+> refuses a release while it is). The AFL API units are reported read-only; runs follow their host
+> timers. `AFLDB_SETTLE_TRIGGER=systemd` stays in the production `.env` only because it lets the
+> status panel read unit state with `systemctl show`; it grants no start capability. The text below
+> is the historical pre-V2 design.
+
 A Super Admin can start **this same unit** immediately from
 `/admin/current-season` — "Fetch current AFL data now" — instead of waiting for
 04:30. It is the same script, the same gates, the same transaction and the same
@@ -1305,10 +1321,14 @@ its own hour. Nothing is retried and nothing is rolled back.
 
 ## 7d. In-season AFL.com.au (`afl_api`) settle — S8 (`AFLDB-ISSUE-228`)
 
-**Not installed or enabled on any host yet.** Installation is
-`AFLDB-ISSUE-232`'s operator-run DEV acceptance (`issues/closed/AFLDB-ISSUE-232.md`
-§7), which includes a mandatory `--dry-run` rehearsal before the match unit's
-first applying run, then production after sign-off. See
+**Production status (AFLDB-ISSUE-316, 2026-11-02):** the four unit files were installed inert at C3,
+the C4b rehearsal passed, and at C5 (D-316-4) the **match/stats timer was enabled** with
+`acquisition.afl_api_current_season_enabled` on; the first scheduled run is read-only observed
+afterwards (`docs/v2/block-c-c5-activation-record-2026-11-02.md`). The **Brownlow timer stays
+disabled** and its two gates unset until the owner opens a count window (C8). The admin panel has
+no Start control. Installation follows `AFLDB-ISSUE-232`'s operator-run DEV acceptance
+(`issues/closed/AFLDB-ISSUE-232.md` §7), which includes a mandatory `--dry-run` rehearsal before
+the match unit's first applying run, then production after sign-off. See
 `issues/closed/AFLDB-ISSUE-228.md` §16/§17 for the frozen design these files
 implement.
 
@@ -1316,7 +1336,7 @@ implement.
 
 | Chain | Script | Unit | Timer | Enable gate |
 |---|---|---|---|---|
-| Match/stats | `deploy/afldb-settle-afl-api.sh` | `afldb-settle-afl-api.service` | `afldb-settle-afl-api.timer` (nightly, 05:00, after the AFL Tables timer) | `site_settings.afl_api_current_season_enabled` must be enabled in the control database |
+| Match/stats | `deploy/afldb-settle-afl-api.sh` | `afldb-settle-afl-api.service` | `afldb-settle-afl-api.timer` (nightly, 05:00 plus a randomised delay of up to 15 minutes, host time; the AFL Tables timer is retired and disabled) | `site_settings.afl_api_current_season_enabled` must be enabled in the control database |
 | Brownlow live count | `deploy/afldb-settle-afl-api-brownlow.sh` | `afldb-settle-afl-api-brownlow.service` | `afldb-settle-afl-api-brownlow.timer` (every 5 min, permanently enabled once installed) | `AFLDB_AFL_API_BROWNLOW_ENABLED=true` **and** `site_settings.afl_api_brownlow_enabled`, plus `site_settings.afl_api_current_season_enabled` for its fixture-identity steps |
 
 The match/stats chain is two Node steps (`acquire-afl-api.ts` →
