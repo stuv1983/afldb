@@ -1,5 +1,5 @@
 --- docs/v2/evidence/gap029-hardening-20261103/scripts/capture-prod-stage.sh	2026-11-03 15:59:17.103262700 +1100
-+++ tools/v2/gap029-ops/capture-prod-stage.sh	2026-11-03 17:20:48.426427500 +1100
++++ tools/v2/gap029-ops/capture-prod-stage.sh	2026-11-03 18:18:43.146106500 +1100
 @@ -1,17 +1,19 @@
 -:
 +#!/usr/bin/env bash
@@ -33,7 +33,7 @@
  set -u -o pipefail
  export LC_ALL=C
  umask 077
-@@ -20,24 +22,24 @@
+@@ -20,24 +22,27 @@
  
  STAGE=${1:?stage S1, S2, S3 or S4 required as the first argument}
  case "$STAGE" in S1|S2|S3|S4) ;; *) echo "STOP: stage must be S1, S2, S3 or S4"; exit 2;; esac
@@ -41,8 +41,11 @@
 +PROFILE=${GAP029_PROFILE:-$HERE/profile.production.env}
 +[ -r "$PROFILE" ] || stop "profile unreadable" 2
 +if grep -qvE '^(#.*|[A-Z_]+="[^"$`\\]*"|)$' "$PROFILE"; then stop "profile contains a line that is not KEY=\"plain value\"" 2; fi
++if grep -E '^[A-Z_]+=' "$PROFILE" | cut -d= -f1 | grep -qvxE 'PROFILE_NAME|EVIDENCE_CLASS|EXPECT_HOST|EXPECT_USER|PROD_CHECKOUT|OPS_ROOT|BACKUP_ROOT|PGBIN|NODE|PYTHON|EXPECT_SYSID|EXPECT_OID|EXPECT_CLUSTER|EXPECT_DB|EXPECT_DB_HOST|EXPECT_DB_PORT|EXPECT_LEDGER_ROWS|EXPECT_LEDGER_LAST|EXPECT_EXT|EXPECT_DB_OWNER|WRITER_UNITS|ALL_UNITS|TIMER_UNIT|SSH_HOST'; then
++  stop "profile sets a key that is not in the profile grammar" 2; fi
 +# shellcheck disable=SC1090
 +. "$PROFILE"
++if [ "$(hostname)" = afldb-prod ]; then [ "$PROFILE_NAME" = production ] && [ "$EVIDENCE_CLASS" = GENUINE_PRODUCTION ] || stop "only the production profile may run on the production host" 2; fi
  DECISION=GAP029-$STAGE-BACKUP-20261103
 -R=/home/arm/projects/afldb
 -PGBIN=/usr/lib/postgresql/16/bin
@@ -70,7 +73,7 @@
  [ ! -e "$D" ] || stop "capture directory already exists" 3
  for x in pg_dump pg_restore psql; do [ -x "$PGBIN/$x" ] || stop "missing $PGBIN/$x" 3; done
  command -v sha256sum >/dev/null && command -v timeout >/dev/null && [ -x "$NODE" ] || stop "missing sha256sum/timeout/node" 3
-@@ -45,16 +47,14 @@
+@@ -45,16 +50,14 @@
  DUMP_VERSION=$("$PGBIN/pg_dump" --version); echo "$DUMP_VERSION"; "$PGBIN/pg_restore" --version
  
  step "P1 writer and service state (read-only systemctl queries)"
@@ -91,7 +94,7 @@
  if [[ "$NEXT" =~ ^@([0-9]+)$ ]]; then
    [ $(( BASH_REMATCH[1] - $(date +%s) )) -ge 1800 ] || stop "AFL Tables settle timer fires within 30 minutes" 4
  else
-@@ -66,12 +66,13 @@
+@@ -66,12 +69,13 @@
  DEPLOYED_REV=$(GIT_OPTIONAL_LOCKS=0 git -C "$R" rev-parse HEAD 2>/dev/null || echo unknown)
  DEPLOYED_BUILD=$(cat "$R/.next/BUILD_ID" 2>/dev/null || echo unknown)
  echo "deployed_checkout=$DEPLOYED_REV build_id=$DEPLOYED_BUILD"
@@ -109,7 +112,7 @@
  
  step "P3 credential channel (values never printed)"
  ENVF="$R/.env"
-@@ -87,8 +88,8 @@
+@@ -87,8 +91,8 @@
  # "\%": an unescaped leading % would anchor the pattern at the end and leave escapes undecoded.
  PGPASSWORD=$(printf '%b' "${PWENC//\%/\\x}"); unset PWENC DSN BASH_REMATCH
  echo "dsn_identity user=$PGUSER host=$PGHOST port=$PGPORT database=$PGDATABASE"
@@ -120,7 +123,7 @@
  export PGUSER PGHOST PGPORT PGDATABASE PGPASSWORD PGCONNECT_TIMEOUT=10
  RO='-c default_transaction_read_only=on -c statement_timeout=60000 -c lock_timeout=2000 -c idle_in_transaction_session_timeout=120000'
  q() { PGOPTIONS="$RO" PGAPPNAME=afldb-gap029-stage-backup-inspect "$PGBIN/psql" -X -q -At -F "$(printf '\t')" -P pager=off -v ON_ERROR_STOP=1 "$@"; }
-@@ -102,8 +103,8 @@
+@@ -102,8 +106,8 @@
    || stop "identity query failed" 5
  echo "identity $IDENT"
  IFS=$'\t' read -r I_DB I_USER I_OID I_SYSID I_VNUM I_ADDR I_PORT I_RO I_SUPER I_READALL I_OWNER I_VER <<< "$IDENT"
@@ -131,7 +134,7 @@
    && [ "$I_VNUM" -ge 160000 ] && [ "$I_VNUM" -lt 170000 ] || stop "identity differs from the reviewed target" 5
  EXT=$(q -c "SELECT string_agg(extname||'='||extversion, ' ' ORDER BY extname) FROM pg_extension") || stop "extension query failed" 5
  echo "extensions $EXT"; [ "$EXT" = "$EXPECT_EXT" ] || stop "extension set/versions differ" 5
-@@ -112,8 +113,8 @@
+@@ -112,8 +116,8 @@
  L_ROWS=$(printf '%s\n' "$LEDGER_BEFORE" | wc -l); L_LAST=$(printf '%s\n' "$LEDGER_BEFORE" | tail -1 | cut -f1)
  L_DIG=$(printf '%s\n' "$LEDGER_BEFORE" | sha256sum | cut -c1-64)
  echo "ledger rows=$L_ROWS last=$L_LAST digest=$L_DIG"
@@ -142,7 +145,7 @@
  INSPECT=$(q -c "SELECT 'access_exclusive_relation_locks', count(*)::text FROM pg_locks l JOIN pg_database d ON d.oid=l.database
   WHERE d.datname=current_database() AND l.locktype='relation' AND l.mode='AccessExclusiveLock'
  UNION ALL SELECT 'visible_nonidle_sessions', count(*)::text FROM pg_stat_activity
-@@ -127,10 +128,10 @@
+@@ -127,10 +131,10 @@
  LOCKS=$(printf '%s\n' "$INSPECT" | awk -F'\t' '$1=="access_exclusive_relation_locks"{print $2}')
  STAGED=$(printf '%s\n' "$INSPECT" | awk -F'\t' '$1=="staged_brownlow_seasons"{print $2}')
  STAGING_DACL=$(printf '%s\n' "$INSPECT" | awk -F'\t' '$1=="staging_default_acl_entries"{print $2}')
@@ -155,7 +158,7 @@
  mkdir -m 700 "$D" || stop "cannot create $D" 6
  echo "CAPTURE_DIR=$D"
  printf '%s\n' "$LEDGER_BEFORE" > "$D/ledger-before.tsv"
-@@ -154,23 +155,24 @@
+@@ -154,23 +158,24 @@
  LEDGER_AFTER_AT=$(date -u +%FT%T.%3NZ); LEDGER_AFTER=$(ledger) || stop "post ledger query failed" 8
  printf '%s\n' "$LEDGER_AFTER" > "$D/ledger-after.tsv"
  [ "$(printf '%s\n' "$LEDGER_AFTER" | sha256sum | cut -c1-64)" = "$L_DIG" ] || stop "ledger changed during capture; archive retained, not usable" 8
@@ -186,7 +189,7 @@
    captured_start_utc: e.START_UTC, captured_end_utc: e.END_UTC, dump_version: e.DUMP_VERSION,
    ledger_measured_before_utc: e.LEDGER_BEFORE_AT, ledger_measured_after_utc: e.LEDGER_AFTER_AT,
    observed_ledger: ledger, observed_ledger_digest: e.L_DIG, ledger_unchanged_across_capture: true,
-@@ -195,5 +197,5 @@
+@@ -195,5 +200,5 @@
  ELAPSED=$(( $(date +%s) - T0 ))
  echo "elapsed_seconds=$ELAPSED"
  [ "$ELAPSED" -le 1200 ] || echo "REVIEW: production phase exceeded 20 minutes"

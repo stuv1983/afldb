@@ -1,6 +1,6 @@
 --- docs/v2/evidence/gap029-hardening-20261103/scripts/restore-assemble-host.sh	2026-11-03 15:44:07.734200900 +1100
-+++ tools/v2/gap029-ops/restore-assemble-host.sh	2026-11-03 17:25:33.489372200 +1100
-@@ -1,23 +1,30 @@
++++ tools/v2/gap029-ops/restore-assemble-host.sh	2026-11-03 18:18:43.249132300 +1100
+@@ -1,23 +1,31 @@
  #!/usr/bin/env bash
 -# GAP-029: for ONE data stage, restore that stage's OWN fresh production backup into a guarded disposable database on the isolated cluster,
 -# then assemble the stage's machine-generated, sealed restore evidence from the restored copy. Run once per stage (S1, S2, S3, S4), each with a
@@ -38,13 +38,14 @@
 +PROFILE=${PROFILE:-$HERE/profile.production.env}
 +[ -r "$PROFILE" ] || { echo "STOP profile unreadable"; exit 2; }
 +if grep -qvE '^(#.*|[A-Z_]+="[^"$`\\]*"|)$' "$PROFILE"; then echo "STOP profile contains a line that is not KEY=\"plain value\""; exit 2; fi
++if grep -E '^[A-Z_]+=' "$PROFILE" | cut -d= -f1 | grep -qvxE 'PROFILE_NAME|EVIDENCE_CLASS|EXPECT_HOST|EXPECT_USER|PROD_CHECKOUT|OPS_ROOT|BACKUP_ROOT|PGBIN|NODE|PYTHON|EXPECT_SYSID|EXPECT_OID|EXPECT_CLUSTER|EXPECT_DB|EXPECT_DB_HOST|EXPECT_DB_PORT|EXPECT_LEDGER_ROWS|EXPECT_LEDGER_LAST|EXPECT_EXT|EXPECT_DB_OWNER|WRITER_UNITS|ALL_UNITS|TIMER_UNIT|SSH_HOST'; then echo "STOP profile sets a key that is not in the profile grammar"; exit 2; fi
 +# shellcheck disable=SC1090
 +. "$PROFILE"
 +PORT=${PORT:-55493}
  CAND="$W/cand"; EVP="$W/evidence-private/$TAG"
  export AFLDB_PYTHON="${PY:-$W/venv/bin/python}"   # a python with psycopg (the S2/S4 tools and the importer need it)
  mkdir -p -m 700 "$W/evidence-private"; [ -e "$EVP" ] && { echo "STOP $EVP exists; choose a new TAG (evidence is never overwritten)"; exit 2; }; mkdir -m 700 "$EVP"
-@@ -28,13 +35,16 @@
+@@ -28,13 +36,16 @@
  RDB=afldb_v2_gap029_${TAG}_rst_test
  dev_services() { for u in afldb.service postgresql@16-main.service; do echo "$u $(systemctl is-active $u 2>&1) MainPID=$(systemctl show -p MainPID --value $u 2>&1)"; done; }
  
@@ -65,7 +66,7 @@
  echo "DEV services BEFORE:"; dev_services | tee "$EVP/dev-before.txt"
  
  # cleanup trap FIRST: a slow start must not leave the isolated cluster running (the trap also covers the start itself)
-@@ -50,21 +60,23 @@
+@@ -50,21 +61,23 @@
  grep -q "127.0.0.1:$PORT" "$EVP/listener.txt" && grep -q "pid=$pmpid," "$EVP/listener.txt" && [ "$(grep -c . "$EVP/listener.txt")" = 1 ] \
    || { echo "STOP listener is not exclusively the cluster we started"; IR stop || true; exit 4; }
  

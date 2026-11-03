@@ -1,0 +1,42 @@
+{
+  "format": "afldb.gap029.stage-run.1",
+  "stage": "S1",
+  "operation": "gap029-captaincy-additions",
+  "revision": "f05a2e78fdd0d90824789ab81ee2d2e4ffe3ab8f",
+  "evidenceClass": "GENUINE_PRODUCTION",
+  "profileName": "production",
+  "profileSha256": "9bee98b5b071694100a867d14008b9316652f93894568a5db01fd0833baa8170",
+  "target": {
+    "host": "localhost",
+    "port": 5432,
+    "database": "afldb_prod",
+    "user": "afldb_backup",
+    "systemIdentifier": "7674454702926115004",
+    "databaseOid": "66668",
+    "clusterName": "16/main",
+    "databaseComment": null
+  },
+  "planDigest": "e5a7a0396c5f8d37a6748779c41bffda9564943e24a93409e60cf4eabc4eefb2",
+  "planExpiresAt": "2026-11-04T07:45:34.891Z",
+  "backupCapturedAt": "2026-11-03T07:44:35.055Z",
+  "createdAt": "2026-11-03T07:45:35.918Z",
+  "captureDir": "/home/arm/backups/afldb/gap029-S1-20261103T074434Z",
+  "dumpName": "afldb_prod-20261103T074434Z.dump",
+  "provenanceName": "afldb_prod-20261103T074434Z.provenance.json",
+  "files": {
+    "dump": "409b21a2da198d58d442dcdc6b4726fa893877023839e58e8c57b621ee661ded",
+    "provenance": "deab0eeebd99b193df54fd6800f0d1f42cb76a6a46193255cc50bca190380e57",
+    "target.json": "5b0a54ee050f4d2d277efa0a8f557838f06e20c26e4eff8cf9d38c1d79f8a3b9",
+    "backup.json": "58976ebf447f38fc3fc760a4e707a0ab727bf195ed71ef7331805807685b7dc0",
+    "restore-evidence.json": "4c784f7e51b6a39e5008e58b637564212baa032646f23dc570cdee849c66a25f",
+    "plan.json": "5fce9a1c0e151be1d4f962569b758f22bf536e3566316b3c065708a21a9abc2a"
+  },
+  "opsToolSha256": {
+    "tools/v2/gap029-ops.ts": "127aac5baa57246138339604947415bd94aca59d2a7f58f4bd240f589fc5c2ed",
+    "tools/v2/gap029-ops-lib.ts": "0caec51a39a3ee842b53839d1a3b2d3993a28eaaea03363666c6ba916cd5ba84",
+    "tools/v2/gap029-common.ts": "9a42b41bbeffa9b73dec9d8b1d34cc164194cc29ed2319e2512dab971522fe55",
+    "tools/v2/gap029-ops/prod-stage.sh": "1794c4d9f31fa4d2cf668d0cfbacc07abad247a2056ef47b7162135ab7385698",
+    "tools/v2/gap029-ops/capture-prod-stage.sh": "8279f351965e22ae696d4a96ad3d9188f57e4f2b274019ddb1b069b64a1cef63",
+    "tools/v2/gap029-ops/restore-assemble-host.sh": "6006b26d9fd362caf780bba61f3fefec2f3d22657bc06ed60fc80df7aabe8a66"
+  }
+}
