@@ -281,6 +281,9 @@ def main(argv=None) -> int:
     except (Refused, gate.GateError, imp.ImportFailure) as exc:
         print(f"GAP-029 draft-link refused: {exc if isinstance(exc, Refused) else type(exc).__name__ + ' ' + str(exc)[:200]}")
         return 1
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        print(f"GAP-029 draft-link refused: unreadable or malformed input ({type(exc).__name__})")
+        return 1
 
 
 if __name__ == "__main__":
