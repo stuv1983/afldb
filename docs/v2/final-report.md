@@ -1,5 +1,7 @@
 # AFLDB V2 — final report (close of Launch F, 2026-10-19; first written at Stage 6)
 
+> **Update 2026-11-03:** V2-GAP-029 is CLOSED (all four production stages applied and accepted; fresh post-S4 production restore: 0 unapproved, 0 incorrect known answers, strict parity retained at 118 approved findings). The "GAP-029 stays open" and "50 unapproved" statements below are historical. See [the closure record](gap-029-s4-outcome-and-closure-2026-11-03.md). This report's other findings are unchanged.
+
 **Migration acceptance (2026-10-20, D-V2-BROWNLOW-ALT-1):** backend migration compatibility and
 acceptance are **PASS, scoped** to production archive `a583fc7d…ed11b04` and the migration-only
 transition 110 → 115, using the owner-approved alternative Brownlow evidence (raw-vote/audit

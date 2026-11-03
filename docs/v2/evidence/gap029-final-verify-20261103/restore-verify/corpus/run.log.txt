@@ -1,0 +1,1323 @@
+isolated-pg: afldb_v2_gap029_final_20261103_091009_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running bash
+
+ RUN  v4.1.10 /mnt/ssd/afldb-v2-gap029-prod-20261103/cand
+
+stdout | tests/integration/gridley-corpus.test.ts
+[gridley-corpus] known-answer adjudications (AFLDB-ISSUE-225):
+players/C/Cameron_Bruce.html captain/gridley_omits -> afldb 2489: current
+players/D/David_Swallow.html games250sameclub/gridley_lists -> afldb 3581: current
+players/D/Dylan_Shiel.html games100clubs2/gridley_lists -> afldb 4006: current
+
+stdout | tests/integration/gridley-corpus.test.ts > Gridley corpus -- criteria > names every dataset this database lacks, and nothing else is empty or unresolved
+[gridley-corpus] dataset gaps on this database: {"maxSeason":2026,"registerSeason":2026,"draftLinks":true,"matchEvents":true,"heights":true,"dobs":true,"coaches":true,"fatherSon":true,"siblings":true,"afterSiren":true}; gapped criteria: none
+
+stdout | tests/integration/gridley-corpus.test.ts > Gridley corpus -- criteria > leaves unsupported exactly the §23.36 accepted deferrals -- no more, no fewer
+[gridley-corpus] unsupported valid criteria: 7
+season2024player [14]: AFLDB models games played, not season lists: a listed player with no game is not represented
+intrulesplayer [5]: other-code (NFL) careers and International Rules representation are not modelled
+irish [2]: AFLDB has no birthplace, nationality or state-of-origin column
+recruitedByDodoro [2]: recruiters and list managers are not modelled
+nfl [1]: other-code (NFL) careers and International Rules representation are not modelled
+spoils5season [1]: spoils are not a recorded AFLDB statistic (one_percenters is a different measure)
+tasmanian [1]: AFLDB has no birthplace, nationality or state-of-origin column
+
+stdout | tests/integration/gridley-corpus.test.ts > Gridley corpus -- criteria > has no probed dataset gap, unless run in diagnostic mode
+[gridley-corpus] AFLDB_GRIDLEY_DIAGNOSTIC=1: unsupported criteria and dataset gaps are counted, not failed. This is NOT an acceptance run.
+
+stdout | tests/integration/gridley-corpus.test.ts > Gridley corpus -- criteria > flags every criterion whose full eligible set takes over one second and fails any over four
+[gridley-corpus] criteria over 1 s: 3
+moreFFthanFAcareer -> career_stat_exceeds({"statA":"frees_for","statB":"frees_against"}): 1800 ms (2554 players)
+teammates-150 -> career_teammates_min({"x":"150"}): 1716 ms (1005 players)
+teammates-100 -> career_teammates_min({"x":"100"}): 1715 ms (3622 players)
+
+stdout | tests/integration/gridley-corpus.test.ts > Gridley corpus -- every cell through solveCellSummary > writes the run report and has no failing cells
+[gridley-corpus] cells solved 10209/10287; findings {"time of board":23530,"adjudicated key disagreement":54,"unsupported":78,"list membership":1232,"external source disagreement":425,"adjudicated source conflict":63,"criterion disagreement":40}; cells over 1 s: 21
+[gridley-corpus]   time of board (23530): Gridley's answer key is frozen at the board's date and the player was still playing then; AFLDB answers for today
+[gridley-corpus]   list membership (1232): Gridley's club, decade, teammate, club-count, wooden-spoon, minor-premiership and coached-by criteria include players merely listed by a club that season (a trade-period move, the suspended 2016 Essendon players, a listed player who did not play a caretaker coach's one match); AFLDB models games played
+[gridley-corpus]   external source disagreement (425): a height cell where every independent source AFLDB holds (AFL API roster, Wikipedia infobox) sits on AFLDB's side of the bound and none on Gridley's (ISSUE-118 §23.19); or a premiership-captain cell where AFLDB's canonical captaincies record the player as one of several captains of the premier club that season who all played and won the Grand Final, and Gridley's key names one premiership captain per flag (ISSUE-118 §23.23); or a National Draft pick-range cell where Gridley lists a linked player whose only trusted-linked pick inside the range is a non-national selection, named in the finding (AFLDB-ISSUE-222 §11.19.12 D1). AFLDB's answer is source-backed; the definitions differ
+[gridley-corpus]   adjudicated source conflict (63): a height source conflict the operator has reviewed against every source AFLDB holds and decided in a tracked record (data/players/height-adjudications.csv, ISSUE-118 §23.26): AFL Tables is retained under the §23.19 precedence policy and the competing values are named; the record applies only while the canonical height and the competing evidence are exactly those it was decided on
+[gridley-corpus]   adjudicated key disagreement (54): an operator-adjudicated difference from Gridley's answer key (AFLDB-ISSUE-225 §19, D4-D6), one of two mechanisms named in each finding: (a) the teammates semantic contract -- Gridley lists, AFLDB omits, career_teammates_min is the only lacking axis and the career reaches 2001: Gridley counts list co-members after 2000, AFLDB counts players who played for the same club in the same season, and AFLDB's played-teammate count is in the detail; or (b) a tracked known-answer adjudication (data/players/gridley-known-answer-adjudications.csv) keyed by AFL Tables profile, applying only on its criterion and direction, only while the AFLDB fact it was decided on is exactly what the database holds (otherwise the cell stays `incorrect known answer`, marked STALE), and for a self-inconsistent key only where AFLDB satisfies the other criterion and Gridley's own frozen key lists the player under that criterion elsewhere in the corpus (D10)
+[gridley-corpus]   unsupported (78): the criterion needs data AFLDB does not hold (src/search/gridley-compat.ts names it) -- acquisition required [diagnostic: not failed]
+
+ ❯ tests/integration/gridley-corpus.test.ts (1212 tests | 1 failed) 262527ms
+     ✓ accepts only the 21 owner-approved sibling disagreements while retaining every strict finding 34ms
+     ✓ D-GAP029-D3 approves exactly the 11 enumerated 2026-board Lyons cells and nothing adjacent 15ms
+     ✓ D-GAP029-D4W approves exactly the 8 enumerated Webster cells, keeps the evidence tiers distinct, and nothing adjacent 24ms
+     ✓ bounds the seven retained deferrals to their original 78 cells and keeps strict results 39ms
+     ✓ fails strict parity and policy for unexpected categories, cells and criterion pairs 9ms
+     ✓ is the complete stored history: 1,143 boards, 6,858 criterion occurrences, 839 distinct criteria 41ms
+     ✓ carries a non-empty answer key for every one of the 10,287 cells  33586ms
+     ✓ recognises every criterion occurrence (zero unrecognised, zero unresolved with stub lookups) 1ms
+     ✓ accounts for the whole denominator explicitly 4ms
+     ✓ names every data-absent criterion with its reason 16ms
+     ✓ maps every mapped occurrence to a complete axis on a real builder  329ms
+     ✓ maps each criterion id to exactly one axis regardless of the board it appears on 169ms
+     ✓ refuses a criterion whose title no longer matches the rule it was written for 1ms
+     ✓ has no rule that the corpus never uses 2ms
+     ✓ "less than 10 goals" is career_goals_max(9) 0ms
+     ✓ Brisbane Lions includes Fitzroy and the Bears via the merger link; every other club stays at its organization 1ms
+     ✓ keeps the All-Australian final team distinct from the 40-man squad, and repeats on distinct seasons 1ms
+     ✓ maps height bounds exactly onto players.height_cm builders 1ms
+     ✓ teammate criteria resolve through the id-embedded Gridley player id or the title 1ms
+     ✓ normalises names the way the resolver compares them 0ms
+     ✓ keys a no-break-space name exactly like its ASCII spelling (AFLDB-ISSUE-222 corpus triage) 0ms
+     ✓ draft criteria name a draft_kind, and both father-son criteria read the tracked list (AFLDB-ISSUE-221) 2ms
+     ✓ resolver: a 2026 override with no namesake is a REGISTER gap when no player debuted after 2025, even though the database holds 2026 matches 1ms
+     ✓ resolver: the match-horizon gap is unchanged when the database itself ends before the debut 0ms
+     ✓ resolver: once the register holds a 2026 debut, a missing 2026 override is UNRESOLVED (a fault, not a gap) 0ms
+     ✓ resolver: a namesake with another debut season is never a gap 0ms
+     ✓ resolver: an override that hits exactly one debut resolves; a plain name resolves only when unique 1ms
+     ✓ triage: Brad Crouch (afldb 2054) -- a 2011 Mini-Draft pick 2 is inside TOP 5 / TOP 10 but is not a national pick 1ms
+     ✓ triage: Lachie Henderson (afldb 8350) -- the linked DraftGuru page carries no Rookie event, so pickrookie has nothing to read 1ms
+     ✓ triage: a late-career rookie re-listing the source DOES carry satisfies pickrookie (GWS Sam Reid, 2015 Rookie pick 8) 1ms
+     ✓ V2-GAP-029: the sourced board-541 adjudication cannot hide another trade discrepancy 1ms
+     ✓ D1 (§11.19.12): the national-pick key disagreement fires only for a non-national pick inside a national range 1ms
+     ✓ triage: no linked row at all is a linkage gap, never a source or key finding; an unread builder is unassessed 0ms
+     ✓ D2 (§11.19.12/§11.19.13): a reviewed gridley_supported outcome classifies its pickrookie cell as a source coverage gap 0ms
+     ✓ D2: a player with no reviewed outcome is never reclassified, even with the identical no_linked_row_matches cause -- there is no general rule 0ms
+     ✓ D2: a draftguru_supported or undetermined verdict records review history but never reclassifies a cell 0ms
+     ✓ D2: the outcome is read only for the pickrookie (draft_type_is rookie) axis; another builder is unaffected 0ms
+     ✓ D2: an unlinked player is unaffected even under a matching outcome -- a linkage matter, never a source gap 0ms
+     ✓ D2 and D1 do not interfere: D1 stays national-only, D2 stays rookie-only, and a satisfied cause blocks either rule 0ms
+     ✓ D2: every row of the real tracked artefact is recognised by the classifier (data/players/rookie-relisting-outcomes.csv) 3ms
+     ✓ the tracked CSV holds exactly the three decided records, keyed by AFL Tables profile 1ms
+     ✓ the reader accepts a well-formed row and rejects every malformed shape 4ms
+     ✓ teammates: fires on Gridley lists / AFLDB omits / career_teammates_min the only lacking axis / career reaching 2001, naming the count 0ms
+     ✓ teammates: null for the reverse direction, a pre-2001 career, a mixed lacking set, another builder or an unknown final season 0ms
+     ✓ staleness: each record is current against exactly the AFLDB facts it was decided on 0ms
+     ✓ staleness: a changed game count, an extra or missing organization, or an added or missing captaincy row is STALE 1ms
+     ✓ adjudication: a current gridley_key_error record fires on its own lacking criterion (Swallow board 938, Shiel board 967) 1ms
+     ✓ adjudication: null for no record, another criterion, the other direction, a criterion that is not lacking, or a mixed lacking set 1ms
+     ✓ adjudication: a STALE record that would otherwise apply is reported stale, never adjudicated 1ms
+     ✓ D10: Bruce's record fires only when AFLDB lists him on both axes and Gridley's key independently accepts him for the other criterion 1ms
+     ✓ D10: stale Bruce captaincy evidence fails closed 1ms
+     ✓ D10: an unrelated player cannot use the rule -- no record, no adjudication, whatever the key says 0ms
+     ✓ census: the 20 captain cells are Gridley-listed captain cells for Bruce and May, both of whom S1 gives a trusted captaincy row 5ms
+     ✓ census: the 15 teammate cells are Gridley-listed teammate cells the D5 rule classifies, each with its played-teammate count 3ms
+     ✓ census: Swallow (938 0-1) and Shiel (967 0-2) are Gridley-listed cells on exactly their records' criteria 0ms
+     ✓ frozen key: Gridley lists Bruce on 11 captain cells, all in 2026, and omits him on 166 (144 before 2026) 1ms
+     ✓ D10 pins: the old pair guard covered 26; the D10 rule adds 11 adjudications (plus 1 club-count cell); 37 intended Bruce adjudications, all before 2026 8ms
+     ✓ D10 controls: a criterion the key never accepts for Bruce stays unadjudicated, grandfinals1 included 1ms
+     ✓ D11 population: 20 + 15 + 2 census cells and the 164 evaluable Bruce omissions, each with its one passing classification 1ms
+     ✓ D11 population: a census cell that is no longer Gridley-listed is an expected cell missing, and refuses 78ms
+     ✓ D11 classifier: mirrors the corpus chain -- agreement, time of board, D10 adjudication, club-count, and fail-closed otherwise 1ms
+     ✓ names every dataset this database lacks, and nothing else is empty or unresolved 1ms
+     ✓ leaves unsupported exactly the §23.36 accepted deferrals -- no more, no fewer 1ms
+     ✓ has no probed dataset gap, unless run in diagnostic mode 1ms
+     ✓ bridges the Gridley player ids the corpus embeds 0ms
+     ✓ compiles and answers every mapped criterion without error or timeout 0ms
+     ✓ flags every criterion whose full eligible set takes over one second and fails any over four 1ms
+     ✓ board #1 83ms
+     ✓ board #2 40ms
+     ✓ board #3 74ms
+     ✓ board #4 47ms
+     ✓ board #5 48ms
+     ✓ board #6 20ms
+     ✓ board #7 27ms
+     ✓ board #8 19ms
+     ✓ board #9 32ms
+     ✓ board #10 21ms
+     ✓ board #11 27ms
+     ✓ board #12 40ms
+     ✓ board #13 34ms
+     ✓ board #14 22ms
+     ✓ board #15 26ms
+     ✓ board #16 43ms
+     ✓ board #17 19ms
+     ✓ board #18 29ms
+     ✓ board #19 28ms
+     ✓ board #20 17ms
+     ✓ board #21 19ms
+     ✓ board #22 18ms
+     ✓ board #23 25ms
+     ✓ board #24 18ms
+     ✓ board #25 24ms
+     ✓ board #26 22ms
+     ✓ board #27 23ms
+     ✓ board #28 21ms
+     ✓ board #29 14ms
+     ✓ board #30 25ms
+     ✓ board #31 174ms
+     ✓ board #32 33ms
+     ✓ board #33 20ms
+     ✓ board #34 30ms
+     ✓ board #35 22ms
+     ✓ board #36 23ms
+     ✓ board #37 27ms
+     ✓ board #38 27ms
+     ✓ board #39 29ms
+     ✓ board #40 26ms
+     ✓ board #41 29ms
+     ✓ board #42 29ms
+     ✓ board #43 31ms
+     ✓ board #44 30ms
+     ✓ board #45  442ms
+     ✓ board #46 19ms
+     ✓ board #47 25ms
+     ✓ board #48 21ms
+     ✓ board #49 30ms
+     ✓ board #50 41ms
+     ✓ board #51  322ms
+     ✓ board #52 37ms
+     ✓ board #53 48ms
+     ✓ board #54 30ms
+     ✓ board #55 19ms
+     ✓ board #56 24ms
+     ✓ board #57 41ms
+     ✓ board #58 29ms
+     ✓ board #59 34ms
+     ✓ board #60 279ms
+     ✓ board #61 41ms
+     ✓ board #62 34ms
+     ✓ board #63 25ms
+     ✓ board #64  359ms
+     ✓ board #65 70ms
+     ✓ board #66  491ms
+     ✓ board #67 29ms
+     ✓ board #68 31ms
+     ✓ board #69 98ms
+     ✓ board #70 26ms
+     ✓ board #71  310ms
+     ✓ board #72 23ms
+     ✓ board #73 39ms
+     ✓ board #74 110ms
+     ✓ board #75 297ms
+     ✓ board #76 41ms
+     ✓ board #77 282ms
+     ✓ board #78 24ms
+     ✓ board #79 22ms
+     ✓ board #80 22ms
+     ✓ board #81 23ms
+     ✓ board #82 20ms
+     ✓ board #83 26ms
+     ✓ board #84 99ms
+     ✓ board #85 99ms
+     ✓ board #86 53ms
+     ✓ board #87 21ms
+     ✓ board #88 29ms
+     ✓ board #89 105ms
+     ✓ board #90 28ms
+     ✓ board #91 33ms
+     ✓ board #92 154ms
+     ✓ board #93 26ms
+     ✓ board #94  1801ms
+     ✓ board #95 71ms
+     ✓ board #96 99ms
+     ✓ board #97 26ms
+     ✓ board #98 19ms
+     ✓ board #99 33ms
+     ✓ board #100 30ms
+     ✓ board #101 20ms
+     ✓ board #102 113ms
+     ✓ board #103 282ms
+     ✓ board #104 17ms
+     ✓ board #105  332ms
+     ✓ board #106 22ms
+     ✓ board #107 21ms
+     ✓ board #108 22ms
+     ✓ board #109 29ms
+     ✓ board #110 114ms
+     ✓ board #111  327ms
+     ✓ board #112 105ms
+     ✓ board #113 22ms
+     ✓ board #114 147ms
+     ✓ board #115 20ms
+     ✓ board #116 27ms
+     ✓ board #117 30ms
+     ✓ board #118 101ms
+     ✓ board #119 281ms
+     ✓ board #120 53ms
+     ✓ board #121 24ms
+     ✓ board #122 140ms
+     ✓ board #123 34ms
+     ✓ board #124 28ms
+     ✓ board #125 151ms
+     ✓ board #126 23ms
+     ✓ board #127 49ms
+     ✓ board #128 37ms
+     ✓ board #129 280ms
+     ✓ board #130 272ms
+     ✓ board #131 88ms
+     ✓ board #132 29ms
+     ✓ board #133 38ms
+     ✓ board #134 100ms
+     ✓ board #135  308ms
+     ✓ board #136 83ms
+     ✓ board #137 34ms
+     ✓ board #138 279ms
+     ✓ board #139 45ms
+     ✓ board #140 95ms
+     ✓ board #141 26ms
+     ✓ board #142 25ms
+     ✓ board #143 30ms
+     ✓ board #144 23ms
+     ✓ board #145 165ms
+     ✓ board #146 152ms
+     ✓ board #147 30ms
+     ✓ board #148 35ms
+     ✓ board #149 27ms
+     ✓ board #150 31ms
+     ✓ board #151 37ms
+     ✓ board #152 96ms
+     ✓ board #153 160ms
+     ✓ board #154 269ms
+     ✓ board #155  357ms
+     ✓ board #156 147ms
+     ✓ board #157 98ms
+     ✓ board #158 28ms
+     ✓ board #159 52ms
+     ✓ board #160 258ms
+     ✓ board #161  429ms
+     ✓ board #162  302ms
+     ✓ board #163 61ms
+     ✓ board #164 34ms
+     ✓ board #165 23ms
+     ✓ board #166  458ms
+     ✓ board #167 49ms
+     ✓ board #168 36ms
+     ✓ board #169 18ms
+     ✓ board #170 24ms
+     ✓ board #171 155ms
+     ✓ board #172  358ms
+     ✓ board #173 86ms
+     ✓ board #174 53ms
+     ✓ board #175 22ms
+     ✓ board #176 51ms
+     ✓ board #177 277ms
+     ✓ board #178 33ms
+     ✓ board #179 299ms
+     ✓ board #180 292ms
+     ✓ board #181  443ms
+     ✓ board #182 53ms
+     ✓ board #183  423ms
+     ✓ board #184  306ms
+     ✓ board #185 25ms
+     ✓ board #186  473ms
+     ✓ board #187 139ms
+     ✓ board #188 82ms
+     ✓ board #189 276ms
+     ✓ board #190 37ms
+     ✓ board #191 20ms
+     ✓ board #192  615ms
+     ✓ board #193 99ms
+     ✓ board #194 18ms
+     ✓ board #195 29ms
+     ✓ board #196 78ms
+     ✓ board #197 100ms
+     ✓ board #198 95ms
+     ✓ board #199 86ms
+     ✓ board #200 30ms
+     ✓ board #201  482ms
+     ✓ board #202 277ms
+     ✓ board #203 57ms
+     ✓ board #204 45ms
+     ✓ board #205 221ms
+     ✓ board #206 292ms
+     ✓ board #207 24ms
+     ✓ board #208 272ms
+     ✓ board #209 35ms
+     ✓ board #210 26ms
+     ✓ board #211 73ms
+     ✓ board #212 52ms
+     ✓ board #213  479ms
+     ✓ board #214 40ms
+     ✓ board #215  367ms
+     ✓ board #216  458ms
+     ✓ board #217 102ms
+     ✓ board #218  347ms
+     ✓ board #219 53ms
+     ✓ board #220 62ms
+     ✓ board #221  664ms
+     ✓ board #222 23ms
+     ✓ board #223 27ms
+     ✓ board #224  422ms
+     ✓ board #225 14ms
+     ✓ board #226 30ms
+     ✓ board #227  344ms
+     ✓ board #228 26ms
+     ✓ board #229 284ms
+     ✓ board #230 32ms
+     ✓ board #231 81ms
+     ✓ board #232 272ms
+     ✓ board #233 77ms
+     ✓ board #234 47ms
+     ✓ board #235 30ms
+     ✓ board #236  322ms
+     ✓ board #237 49ms
+     ✓ board #238  707ms
+     ✓ board #239 292ms
+     ✓ board #240  421ms
+     ✓ board #241 53ms
+     ✓ board #242 27ms
+     ✓ board #243 75ms
+     ✓ board #244  615ms
+     ✓ board #245 30ms
+     ✓ board #246  437ms
+     ✓ board #247  312ms
+     ✓ board #248 81ms
+     ✓ board #249 51ms
+     ✓ board #250 36ms
+     ✓ board #251 25ms
+     ✓ board #252  305ms
+     ✓ board #253 24ms
+     ✓ board #254 83ms
+     ✓ board #255 257ms
+     ✓ board #256 33ms
+     ✓ board #257  463ms
+     ✓ board #258 80ms
+     ✓ board #259  304ms
+     ✓ board #260 289ms
+     ✓ board #261 92ms
+     ✓ board #262  423ms
+     ✓ board #263 145ms
+     ✓ board #264 291ms
+     ✓ board #265 20ms
+     ✓ board #266 44ms
+     ✓ board #267 28ms
+     ✓ board #268  310ms
+     ✓ board #269 275ms
+     ✓ board #270 101ms
+     ✓ board #271 44ms
+     ✓ board #272  337ms
+     ✓ board #273 20ms
+     ✓ board #274  313ms
+     ✓ board #275 23ms
+     ✓ board #276  476ms
+     ✓ board #277 289ms
+     ✓ board #278 296ms
+     ✓ board #279 96ms
+     ✓ board #280 281ms
+     ✓ board #281 95ms
+     ✓ board #282 18ms
+     ✓ board #283  426ms
+     ✓ board #284 46ms
+     ✓ board #285 278ms
+     ✓ board #286 88ms
+     ✓ board #287 18ms
+     ✓ board #288 260ms
+     ✓ board #289 274ms
+     ✓ board #290 74ms
+     ✓ board #291 23ms
+     ✓ board #292 85ms
+     ✓ board #293 25ms
+     ✓ board #294 28ms
+     ✓ board #295 262ms
+     ✓ board #296  701ms
+     ✓ board #297  312ms
+     ✓ board #298  409ms
+     ✓ board #299 48ms
+     ✓ board #300 87ms
+     ✓ board #301 36ms
+     ✓ board #302 37ms
+     ✓ board #303  310ms
+     ✓ board #304 34ms
+     ✓ board #305 83ms
+     ✓ board #306 90ms
+     ✓ board #307 27ms
+     ✓ board #308  418ms
+     ✓ board #309  306ms
+     ✓ board #310  309ms
+     ✓ board #311 51ms
+     ✓ board #312 32ms
+     ✓ board #313  347ms
+     ✓ board #314 36ms
+     ✓ board #315 300ms
+     ✓ board #316 62ms
+     ✓ board #317 65ms
+     ✓ board #318 31ms
+     ✓ board #319 41ms
+     ✓ board #320 80ms
+     ✓ board #321 26ms
+     ✓ board #322 291ms
+     ✓ board #323  368ms
+     ✓ board #324 29ms
+     ✓ board #325 73ms
+     ✓ board #326  375ms
+     ✓ board #327 296ms
+     ✓ board #328 36ms
+     ✓ board #329 39ms
+     ✓ board #330 30ms
+     ✓ board #331 61ms
+     ✓ board #332  486ms
+     ✓ board #333 280ms
+     ✓ board #334 300ms
+     ✓ board #335  306ms
+     ✓ board #336 280ms
+     ✓ board #337 276ms
+     ✓ board #338 288ms
+     ✓ board #339 20ms
+     ✓ board #340 49ms
+     ✓ board #341 289ms
+     ✓ board #342 274ms
+     ✓ board #343 41ms
+     ✓ board #344 82ms
+     ✓ board #345  300ms
+     ✓ board #346 266ms
+     ✓ board #347  602ms
+     ✓ board #348 64ms
+     ✓ board #349 35ms
+     ✓ board #350 27ms
+     ✓ board #351 20ms
+     ✓ board #352 86ms
+     ✓ board #353 284ms
+     ✓ board #354 14ms
+     ✓ board #355 100ms
+     ✓ board #356 257ms
+     ✓ board #357 72ms
+     ✓ board #358 93ms
+     ✓ board #359 48ms
+     ✓ board #360 15ms
+     ✓ board #361 100ms
+     ✓ board #362 274ms
+     ✓ board #363 99ms
+     ✓ board #364 293ms
+     ✓ board #365 100ms
+     ✓ board #366  310ms
+     ✓ board #367 25ms
+     ✓ board #368 23ms
+     ✓ board #369 74ms
+     ✓ board #370 18ms
+     ✓ board #371 161ms
+     ✓ board #372 42ms
+     ✓ board #373 48ms
+     ✓ board #374  315ms
+     ✓ board #375 56ms
+     ✓ board #376 48ms
+     ✓ board #377 27ms
+     ✓ board #378 124ms
+     ✓ board #379 158ms
+     ✓ board #380  845ms
+     ✓ board #381 292ms
+     ✓ board #382 34ms
+     ✓ board #383 279ms
+     ✓ board #384 52ms
+     ✓ board #385  344ms
+     ✓ board #386 67ms
+     ✓ board #387 25ms
+     ✓ board #388  306ms
+     ✓ board #389 271ms
+     ✓ board #390 26ms
+     ✓ board #391 114ms
+     ✓ board #392 39ms
+     ✓ board #393 299ms
+     ✓ board #394  321ms
+     ✓ board #395 33ms
+     ✓ board #396 89ms
+     ✓ board #397 31ms
+     ✓ board #398 47ms
+     ✓ board #399 24ms
+     ✓ board #400 141ms
+     ✓ board #401 28ms
+     ✓ board #402 44ms
+     ✓ board #403  478ms
+     ✓ board #404 56ms
+     ✓ board #405 37ms
+     ✓ board #406  601ms
+     ✓ board #407 35ms
+     ✓ board #408 75ms
+     ✓ board #409 69ms
+     ✓ board #410 91ms
+     ✓ board #411 24ms
+     ✓ board #412 69ms
+     ✓ board #413 37ms
+     ✓ board #414  318ms
+     ✓ board #415 201ms
+     ✓ board #416  308ms
+     ✓ board #417 63ms
+     ✓ board #418 33ms
+     ✓ board #419 33ms
+     ✓ board #420 34ms
+     ✓ board #421 277ms
+     ✓ board #422 110ms
+     ✓ board #423  321ms
+     ✓ board #424  493ms
+     ✓ board #425 110ms
+     ✓ board #426 45ms
+     ✓ board #427 88ms
+     ✓ board #428 102ms
+     ✓ board #429  309ms
+     ✓ board #430 85ms
+     ✓ board #431 94ms
+     ✓ board #432 268ms
+     ✓ board #433 101ms
+     ✓ board #434 56ms
+     ✓ board #435 74ms
+     ✓ board #436 104ms
+     ✓ board #437  321ms
+     ✓ board #438 31ms
+     ✓ board #439 62ms
+     ✓ board #440 26ms
+     ✓ board #441 43ms
+     ✓ board #442 105ms
+     ✓ board #443 95ms
+     ✓ board #444 51ms
+     ✓ board #445 26ms
+     ✓ board #446 101ms
+     ✓ board #447 130ms
+     ✓ board #448 263ms
+     ✓ board #449 30ms
+     ✓ board #450 147ms
+     ✓ board #451 293ms
+     ✓ board #452  667ms
+     ✓ board #453 134ms
+     ✓ board #454 254ms
+     ✓ board #455 134ms
+     ✓ board #456 32ms
+     ✓ board #457 95ms
+     ✓ board #458 81ms
+     ✓ board #459  877ms
+     ✓ board #460 38ms
+     ✓ board #461 49ms
+     ✓ board #462 54ms
+     ✓ board #463 83ms
+     ✓ board #464 98ms
+     ✓ board #465 44ms
+     ✓ board #466 21ms
+     ✓ board #467 39ms
+     ✓ board #468 272ms
+     ✓ board #469 21ms
+     ✓ board #470 135ms
+     ✓ board #471 97ms
+     ✓ board #472 141ms
+     ✓ board #473 80ms
+     ✓ board #474 159ms
+     ✓ board #475 32ms
+     ✓ board #476 94ms
+     ✓ board #477 55ms
+     ✓ board #478 298ms
+     ✓ board #479 61ms
+     ✓ board #480 291ms
+     ✓ board #481  429ms
+     ✓ board #482 85ms
+     ✓ board #483 88ms
+     ✓ board #484 24ms
+     ✓ board #485  356ms
+     ✓ board #486  700ms
+     ✓ board #487 55ms
+     ✓ board #488 261ms
+     ✓ board #489 297ms
+     ✓ board #490 104ms
+     ✓ board #491 40ms
+     ✓ board #492  531ms
+     ✓ board #493 47ms
+     ✓ board #494 294ms
+     ✓ board #495 58ms
+     ✓ board #496 23ms
+     ✓ board #497 142ms
+     ✓ board #498  438ms
+     ✓ board #499 18ms
+     ✓ board #500 31ms
+     ✓ board #501 270ms
+     ✓ board #502 27ms
+     ✓ board #503 21ms
+     ✓ board #504 37ms
+     ✓ board #505 16ms
+     ✓ board #506 23ms
+     ✓ board #507  318ms
+     ✓ board #508 78ms
+     ✓ board #509 34ms
+     ✓ board #510 30ms
+     ✓ board #511 87ms
+     ✓ board #512  444ms
+     ✓ board #513 84ms
+     ✓ board #514 275ms
+     ✓ board #515 210ms
+     ✓ board #516 33ms
+     ✓ board #517  410ms
+     ✓ board #518 131ms
+     ✓ board #519 269ms
+     ✓ board #520 279ms
+     ✓ board #521 290ms
+     ✓ board #522 32ms
+     ✓ board #523 24ms
+     ✓ board #524  311ms
+     ✓ board #525 24ms
+     ✓ board #526 30ms
+     ✓ board #527 74ms
+     ✓ board #528 99ms
+     ✓ board #529 54ms
+     ✓ board #530 56ms
+     ✓ board #531 106ms
+     ✓ board #532 289ms
+     ✓ board #533 262ms
+     ✓ board #534 109ms
+     ✓ board #535 274ms
+     ✓ board #536 275ms
+     ✓ board #537 59ms
+     ✓ board #538 83ms
+     ✓ board #539 277ms
+     ✓ board #540 267ms
+     ✓ board #541 147ms
+     ✓ board #542 28ms
+     ✓ board #543  488ms
+     ✓ board #544 35ms
+     ✓ board #545 35ms
+     ✓ board #546 32ms
+     ✓ board #547 19ms
+     ✓ board #548 274ms
+     ✓ board #549  431ms
+     ✓ board #550 284ms
+     ✓ board #551  420ms
+     ✓ board #552 107ms
+     ✓ board #553 25ms
+     ✓ board #554 272ms
+     ✓ board #555 31ms
+     ✓ board #556 24ms
+     ✓ board #557 19ms
+     ✓ board #558 23ms
+     ✓ board #559 35ms
+     ✓ board #560 15ms
+     ✓ board #561  354ms
+     ✓ board #562 27ms
+     ✓ board #563  1027ms
+     ✓ board #564 167ms
+     ✓ board #565 31ms
+     ✓ board #566 34ms
+     ✓ board #567 279ms
+     ✓ board #568  738ms
+     ✓ board #569 38ms
+     ✓ board #570  359ms
+     ✓ board #571  407ms
+     ✓ board #572  307ms
+     ✓ board #573 23ms
+     ✓ board #574 294ms
+     ✓ board #575 292ms
+     ✓ board #576 41ms
+     ✓ board #577 275ms
+     ✓ board #578 280ms
+     ✓ board #579 84ms
+     ✓ board #580 16ms
+     ✓ board #581  390ms
+     ✓ board #582 28ms
+     ✓ board #583 286ms
+     ✓ board #584 48ms
+     ✓ board #585 88ms
+     ✓ board #586  344ms
+     ✓ board #587 73ms
+     ✓ board #588  505ms
+     ✓ board #589 20ms
+     ✓ board #590  341ms
+     ✓ board #591 297ms
+     ✓ board #592  435ms
+     ✓ board #593 105ms
+     ✓ board #594 274ms
+     ✓ board #595 104ms
+     ✓ board #596 89ms
+     ✓ board #597 292ms
+     ✓ board #598  437ms
+     ✓ board #599 27ms
+     ✓ board #600 74ms
+     ✓ board #601 178ms
+     ✓ board #602 23ms
+     ✓ board #603 290ms
+     ✓ board #604 94ms
+     ✓ board #605 88ms
+     ✓ board #606 299ms
+     ✓ board #607 86ms
+     ✓ board #608 87ms
+     ✓ board #609 294ms
+     ✓ board #610  312ms
+     ✓ board #611 62ms
+     ✓ board #612 84ms
+     ✓ board #613 91ms
+     ✓ board #614  375ms
+     ✓ board #615 82ms
+     ✓ board #616 23ms
+     ✓ board #617 179ms
+     ✓ board #618 111ms
+     ✓ board #619 56ms
+     ✓ board #620 28ms
+     ✓ board #621  732ms
+     ✓ board #622 265ms
+     ✓ board #623 27ms
+     ✓ board #624 50ms
+     ✓ board #625 18ms
+     ✓ board #626 150ms
+     ✓ board #627 81ms
+     ✓ board #628  620ms
+     ✓ board #629 271ms
+     ✓ board #630 36ms
+     ✓ board #631 118ms
+     ✓ board #632  318ms
+     ✓ board #633 75ms
+     ✓ board #634 16ms
+     ✓ board #635 273ms
+     ✓ board #636 20ms
+     ✓ board #637 22ms
+     ✓ board #638 95ms
+     ✓ board #639 70ms
+     ✓ board #640  328ms
+     ✓ board #641  348ms
+     ✓ board #642 292ms
+     ✓ board #643  481ms
+     ✓ board #644 51ms
+     ✓ board #645 94ms
+     ✓ board #646  375ms
+     ✓ board #647 64ms
+     ✓ board #648 32ms
+     ✓ board #649 37ms
+     ✓ board #650  307ms
+     ✓ board #651 93ms
+     ✓ board #652 26ms
+     ✓ board #653  397ms
+     ✓ board #654  1049ms
+     ✓ board #655 37ms
+     ✓ board #656 51ms
+     ✓ board #657 274ms
+     ✓ board #658 25ms
+     ✓ board #659 24ms
+     ✓ board #660 29ms
+     ✓ board #661 279ms
+     ✓ board #662  359ms
+     ✓ board #663  747ms
+     ✓ board #664 21ms
+     ✓ board #665  336ms
+     ✓ board #666 29ms
+     ✓ board #667 82ms
+     ✓ board #668 71ms
+     ✓ board #669 285ms
+     ✓ board #670 123ms
+     ✓ board #671  595ms
+     ✓ board #672 44ms
+     ✓ board #673 40ms
+     ✓ board #674  480ms
+     ✓ board #675 41ms
+     ✓ board #676 125ms
+     ✓ board #677 59ms
+     ✓ board #678 273ms
+     ✓ board #679 100ms
+     ✓ board #680  451ms
+     ✓ board #681 23ms
+     ✓ board #682  390ms
+     ✓ board #683 132ms
+     ✓ board #684 98ms
+     ✓ board #685 88ms
+     ✓ board #686 73ms
+     ✓ board #687  448ms
+     ✓ board #688  345ms
+     ✓ board #689 22ms
+     ✓ board #690 89ms
+     ✓ board #691  359ms
+     ✓ board #692 76ms
+     ✓ board #693 299ms
+     ✓ board #694  418ms
+     ✓ board #695 100ms
+     ✓ board #696 279ms
+     ✓ board #697 68ms
+     ✓ board #698 28ms
+     ✓ board #699 278ms
+     ✓ board #700 48ms
+     ✓ board #701  435ms
+     ✓ board #702  305ms
+     ✓ board #703  368ms
+     ✓ board #704  479ms
+     ✓ board #705 105ms
+     ✓ board #706  370ms
+     ✓ board #707  500ms
+     ✓ board #708 46ms
+     ✓ board #709  641ms
+     ✓ board #710  318ms
+     ✓ board #711 131ms
+     ✓ board #712 19ms
+     ✓ board #713  361ms
+     ✓ board #714 28ms
+     ✓ board #715  788ms
+     ✓ board #716 36ms
+     ✓ board #717 282ms
+     ✓ board #718  304ms
+     ✓ board #719 108ms
+     ✓ board #720  784ms
+     ✓ board #721  503ms
+     ✓ board #722 34ms
+     ✓ board #723 94ms
+     ✓ board #724 29ms
+     ✓ board #725 292ms
+     ✓ board #726  326ms
+     ✓ board #727 281ms
+     ✓ board #728 30ms
+     ✓ board #729  511ms
+     ✓ board #730 108ms
+     ✓ board #731  562ms
+     ✓ board #732 27ms
+     ✓ board #733  611ms
+     ✓ board #734 92ms
+     ✓ board #735 32ms
+     ✓ board #736 50ms
+     ✓ board #737 62ms
+     ✓ board #738 35ms
+     ✓ board #739 111ms
+     ✓ board #740 24ms
+     ✓ board #741 22ms
+     ✓ board #742 281ms
+     ✓ board #743 84ms
+     ✓ board #744  331ms
+     ✓ board #745 70ms
+     ✓ board #746 29ms
+     ✓ board #747  459ms
+     ✓ board #748  312ms
+     ✓ board #749  572ms
+     ✓ board #750 47ms
+     ✓ board #751  512ms
+     ✓ board #752 22ms
+     ✓ board #753 117ms
+     ✓ board #754 55ms
+     ✓ board #755 99ms
+     ✓ board #756  307ms
+     ✓ board #757  331ms
+     ✓ board #758 284ms
+     ✓ board #759 107ms
+     ✓ board #760  331ms
+     ✓ board #761 34ms
+     ✓ board #762 17ms
+     ✓ board #763 107ms
+     ✓ board #764 20ms
+     ✓ board #765 99ms
+     ✓ board #766 47ms
+     ✓ board #767  323ms
+     ✓ board #768 29ms
+     ✓ board #769 101ms
+     ✓ board #770  1079ms
+     ✓ board #771 71ms
+     ✓ board #772  491ms
+     ✓ board #773 53ms
+     ✓ board #774 39ms
+     ✓ board #775  303ms
+     ✓ board #776 282ms
+     ✓ board #777 71ms
+     ✓ board #778  344ms
+     ✓ board #779 80ms
+     ✓ board #780  501ms
+     ✓ board #781 118ms
+     ✓ board #782 58ms
+     ✓ board #783 96ms
+     ✓ board #784 39ms
+     ✓ board #785 30ms
+     ✓ board #786 274ms
+     ✓ board #787 167ms
+     ✓ board #788  391ms
+     ✓ board #789 115ms
+     ✓ board #790 27ms
+     ✓ board #791 18ms
+     ✓ board #792 284ms
+     ✓ board #793 53ms
+     ✓ board #794 40ms
+     ✓ board #795 100ms
+     ✓ board #796 87ms
+     ✓ board #797 27ms
+     ✓ board #798 32ms
+     ✓ board #799  304ms
+     ✓ board #800  832ms
+     ✓ board #801 48ms
+     ✓ board #802 44ms
+     ✓ board #803 278ms
+     ✓ board #804 276ms
+     ✓ board #805 27ms
+     ✓ board #806 137ms
+     ✓ board #807 37ms
+     ✓ board #808  409ms
+     ✓ board #809  302ms
+     ✓ board #810 279ms
+     ✓ board #811 96ms
+     ✓ board #812 21ms
+     ✓ board #813 46ms
+     ✓ board #814  418ms
+     ✓ board #815 72ms
+     ✓ board #816 53ms
+     ✓ board #817  626ms
+     ✓ board #818 93ms
+     ✓ board #819  347ms
+     ✓ board #820  529ms
+     ✓ board #821 112ms
+     ✓ board #822  315ms
+     ✓ board #823  321ms
+     ✓ board #824 44ms
+     ✓ board #825  347ms
+     ✓ board #826  428ms
+     ✓ board #827  310ms
+     ✓ board #828 23ms
+     ✓ board #829 18ms
+     ✓ board #830 32ms
+     ✓ board #831 18ms
+     ✓ board #832 80ms
+     ✓ board #833 20ms
+     ✓ board #834  441ms
+     ✓ board #835 24ms
+     ✓ board #836  605ms
+     ✓ board #837 20ms
+     ✓ board #838 291ms
+     ✓ board #839  512ms
+     ✓ board #840 53ms
+     ✓ board #841 272ms
+     ✓ board #842 75ms
+     ✓ board #843  758ms
+     ✓ board #844 121ms
+     ✓ board #845 20ms
+     ✓ board #846  453ms
+     ✓ board #847 34ms
+     ✓ board #848 299ms
+     ✓ board #849 52ms
+     ✓ board #850 25ms
+     ✓ board #851 91ms
+     ✓ board #852 274ms
+     ✓ board #853 50ms
+     ✓ board #854  454ms
+     ✓ board #855  420ms
+     ✓ board #856  397ms
+     ✓ board #857 18ms
+     ✓ board #858  522ms
+     ✓ board #859 286ms
+     ✓ board #860 93ms
+     ✓ board #861 36ms
+     ✓ board #862  344ms
+     ✓ board #863 30ms
+     ✓ board #864 72ms
+     ✓ board #865 83ms
+     ✓ board #866  432ms
+     ✓ board #867 292ms
+     ✓ board #868  300ms
+     ✓ board #869 39ms
+     ✓ board #870 50ms
+     ✓ board #871 28ms
+     ✓ board #872 19ms
+     ✓ board #873 53ms
+     ✓ board #874 82ms
+     ✓ board #875 106ms
+     ✓ board #876 65ms
+     ✓ board #877 32ms
+     ✓ board #878 59ms
+     ✓ board #879  305ms
+     ✓ board #880 37ms
+     ✓ board #881 28ms
+     ✓ board #882 277ms
+     ✓ board #883 18ms
+     ✓ board #884  414ms
+     ✓ board #885 23ms
+     ✓ board #886 32ms
+     ✓ board #887  361ms
+     ✓ board #888 57ms
+     ✓ board #889 97ms
+     ✓ board #890 293ms
+     ✓ board #891 30ms
+     ✓ board #892  463ms
+     ✓ board #893 23ms
+     ✓ board #894 18ms
+     ✓ board #895 264ms
+     ✓ board #896 40ms
+     ✓ board #897 29ms
+     ✓ board #898 261ms
+     ✓ board #899 143ms
+     ✓ board #900 300ms
+     ✓ board #901  407ms
+     ✓ board #902  335ms
+     ✓ board #903 20ms
+     ✓ board #904 292ms
+     ✓ board #905  344ms
+     ✓ board #906 54ms
+     ✓ board #907 35ms
+     ✓ board #908  490ms
+     ✓ board #909  451ms
+     ✓ board #910  442ms
+     ✓ board #911 88ms
+     ✓ board #912 51ms
+     ✓ board #913 106ms
+     ✓ board #914  339ms
+     ✓ board #915 36ms
+     ✓ board #916 47ms
+     ✓ board #917 91ms
+     ✓ board #918 22ms
+     ✓ board #919 30ms
+     ✓ board #920  365ms
+     ✓ board #921 21ms
+     ✓ board #922  485ms
+     ✓ board #923 28ms
+     ✓ board #924 129ms
+     ✓ board #925 291ms
+     ✓ board #926 24ms
+     ✓ board #927  326ms
+     ✓ board #928 17ms
+     ✓ board #929 44ms
+     ✓ board #930  498ms
+     ✓ board #931  528ms
+     ✓ board #932 28ms
+     ✓ board #933  400ms
+     ✓ board #934  301ms
+     ✓ board #935 285ms
+     ✓ board #936 54ms
+     ✓ board #937 112ms
+     ✓ board #938 285ms
+     ✓ board #939 74ms
+     ✓ board #940 107ms
+     ✓ board #941 31ms
+     ✓ board #942  363ms
+     ✓ board #943 275ms
+     ✓ board #944 45ms
+     ✓ board #945 93ms
+     ✓ board #946 257ms
+     ✓ board #947  538ms
+     ✓ board #948 299ms
+     ✓ board #949 63ms
+     ✓ board #950 80ms
+     ✓ board #951 24ms
+     ✓ board #952  651ms
+     ✓ board #953  301ms
+     ✓ board #954  328ms
+     ✓ board #955  369ms
+     ✓ board #956 94ms
+     ✓ board #957  473ms
+     ✓ board #958 262ms
+     ✓ board #959 20ms
+     ✓ board #960 32ms
+     ✓ board #961  661ms
+     ✓ board #962 104ms
+     ✓ board #963 298ms
+     ✓ board #964  372ms
+     ✓ board #965  440ms
+     ✓ board #966 29ms
+     ✓ board #967 88ms
+     ✓ board #968  526ms
+     ✓ board #969 131ms
+     ✓ board #970 134ms
+     ✓ board #971 95ms
+     ✓ board #972 299ms
+     ✓ board #973 289ms
+     ✓ board #974 292ms
+     ✓ board #975 91ms
+     ✓ board #976 26ms
+     ✓ board #977 26ms
+     ✓ board #978 60ms
+     ✓ board #979 108ms
+     ✓ board #980  338ms
+     ✓ board #981  526ms
+     ✓ board #982  320ms
+     ✓ board #983 115ms
+     ✓ board #984 32ms
+     ✓ board #985 66ms
+     ✓ board #986 113ms
+     ✓ board #987 108ms
+     ✓ board #988 43ms
+     ✓ board #989 50ms
+     ✓ board #990 39ms
+     ✓ board #991  608ms
+     ✓ board #992 45ms
+     ✓ board #993  1689ms
+     ✓ board #994 67ms
+     ✓ board #995 109ms
+     ✓ board #996  301ms
+     ✓ board #997  414ms
+     ✓ board #998 34ms
+     ✓ board #999 30ms
+     ✓ board #1000 106ms
+     ✓ board #1001 266ms
+     ✓ board #1002 27ms
+     ✓ board #1003 45ms
+     ✓ board #1004  549ms
+     ✓ board #1005  368ms
+     ✓ board #1006 156ms
+     ✓ board #1007 99ms
+     ✓ board #1008 27ms
+     ✓ board #1009 31ms
+     ✓ board #1010  907ms
+     ✓ board #1011 173ms
+     ✓ board #1012  346ms
+     ✓ board #1013  311ms
+     ✓ board #1014 111ms
+     ✓ board #1015 265ms
+     ✓ board #1016  435ms
+     ✓ board #1017 49ms
+     ✓ board #1018  304ms
+     ✓ board #1019 94ms
+     ✓ board #1020 147ms
+     ✓ board #1021 23ms
+     ✓ board #1022 34ms
+     ✓ board #1023 52ms
+     ✓ board #1024  1989ms
+     ✓ board #1025  307ms
+     ✓ board #1026  1746ms
+     ✓ board #1027 51ms
+     ✓ board #1028 273ms
+     ✓ board #1029  529ms
+     ✓ board #1030 283ms
+     ✓ board #1031 37ms
+     ✓ board #1032 114ms
+     ✓ board #1033 32ms
+     ✓ board #1034 75ms
+     ✓ board #1035 62ms
+     ✓ board #1036  528ms
+     ✓ board #1037  457ms
+     ✓ board #1038  300ms
+     ✓ board #1039 44ms
+     ✓ board #1040  438ms
+     ✓ board #1041  584ms
+     ✓ board #1042  310ms
+     ✓ board #1043 44ms
+     ✓ board #1044 18ms
+     ✓ board #1045 41ms
+     ✓ board #1046  346ms
+     ✓ board #1047  303ms
+     ✓ board #1048 110ms
+     ✓ board #1049 90ms
+     ✓ board #1050 21ms
+     ✓ board #1051  486ms
+     ✓ board #1052 40ms
+     ✓ board #1053 68ms
+     ✓ board #1054 32ms
+     ✓ board #1055 115ms
+     ✓ board #1056 281ms
+     ✓ board #1057  363ms
+     ✓ board #1058 39ms
+     ✓ board #1059 45ms
+     ✓ board #1060  492ms
+     ✓ board #1061  307ms
+     ✓ board #1062  890ms
+     ✓ board #1063  461ms
+     ✓ board #1064  505ms
+     ✓ board #1065 112ms
+     ✓ board #1066  563ms
+     ✓ board #1067  301ms
+     ✓ board #1068 267ms
+     ✓ board #1069 28ms
+     ✓ board #1070 30ms
+     ✓ board #1071 54ms
+     ✓ board #1072 27ms
+     ✓ board #1073  478ms
+     ✓ board #1074  321ms
+     ✓ board #1075 49ms
+     ✓ board #1076 51ms
+     ✓ board #1077 25ms
+     ✓ board #1078  372ms
+     ✓ board #1079  318ms
+     ✓ board #1080 125ms
+     ✓ board #1081 35ms
+     ✓ board #1082 38ms
+     ✓ board #1083 101ms
+     ✓ board #1084  656ms
+     ✓ board #1085  474ms
+     ✓ board #1086 54ms
+     ✓ board #1087 113ms
+     ✓ board #1088 76ms
+     ✓ board #1089 47ms
+     ✓ board #1090 273ms
+     ✓ board #1091  414ms
+     ✓ board #1092  413ms
+     ✓ board #1093  481ms
+     ✓ board #1094  602ms
+     ✓ board #1095 86ms
+     ✓ board #1096 27ms
+     ✓ board #1097 68ms
+     ✓ board #1098  493ms
+     ✓ board #1099 79ms
+     ✓ board #1100 280ms
+     ✓ board #1101  1052ms
+     ✓ board #1102  396ms
+     ✓ board #1103  334ms
+     ✓ board #1104 32ms
+     ✓ board #1105 278ms
+     ✓ board #1106  548ms
+     ✓ board #1107 32ms
+     ✓ board #1108 47ms
+     ✓ board #1109 101ms
+     ✓ board #1110 295ms
+     ✓ board #1111 25ms
+     ✓ board #1112 84ms
+     ✓ board #1113  316ms
+     ✓ board #1114  413ms
+     ✓ board #1115 20ms
+     ✓ board #1116  335ms
+     ✓ board #1117  609ms
+     ✓ board #1118 59ms
+     ✓ board #1119 85ms
+     ✓ board #1120 107ms
+     ✓ board #1121 36ms
+     ✓ board #1122  357ms
+     ✓ board #1123 103ms
+     ✓ board #1124 99ms
+     ✓ board #1125 296ms
+     ✓ board #1126 38ms
+     ✓ board #1127  429ms
+     ✓ board #1128 47ms
+     ✓ board #1129 112ms
+     ✓ board #1130  566ms
+     ✓ board #1131 21ms
+     ✓ board #1132 297ms
+     ✓ board #1133  475ms
+     ✓ board #1134 30ms
+     ✓ board #1135 23ms
+     ✓ board #1136 85ms
+     ✓ board #1137  316ms
+     ✓ board #1138 19ms
+     ✓ board #1139 291ms
+     ✓ board #1140  451ms
+     ✓ board #1141  481ms
+     ✓ board #1142  315ms
+     ✓ board #1143 103ms
+     × writes the run report and has no failing cells 143ms
+     ✓ conforms to the bounded approved-deferral policy, independently of diagnostic mode 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/gridley-corpus.test.ts > Gridley corpus -- every cell through solveCellSummary > writes the run report and has no failing cells
+AssertionError: expected [ …(40) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "#562 2-1 [criterion disagreement] brother x BL :: has_brother({}) x played_for_club_incl_merged({\"club\":\"3\"}) :: gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires games > 0; https://www.lions.com.au/news/830119/six-depart-the-den; https://www.afl.com.au/news/624377/going-to-the-big-dance-standalone-clubs-best-msd-chances",
++   "#564 2-2 [criterion disagreement] brother x games150 :: has_brother({}) x career_games_min({\"games\":\"150\"}) :: gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires games > 0; https://www.lions.com.au/news/830119/six-depart-the-den; https://www.afl.com.au/news/624377/going-to-the-big-dance-standalone-clubs-best-msd-chances",
++   "#606 2-2 [criterion disagreement] brother x 2020s :: has_brother({}) x played_in_decade({\"decade\":\"2020\"}) :: gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires games > 0; https://www.lions.com.au/news/830119/six-depart-the-den; https://www.afl.com.au/news/624377/going-to-the-big-dance-standalone-clubs-best-msd-chances",
++   "#624 2-0 [criterion disagreement] brother x GC :: has_brother({}) x played_for_club({\"club\":\"11\"}) :: gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires games > 0; https://www.lions.com.au/news/830119/six-depart-the-den; https://www.afl.com.au/news/624377/going-to-the-big-dance-standalone-clubs-best-msd-chances",
++   "#624 2-2 [criterion disagreement] brother x 2020s :: has_brother({}) x played_in_decade({\"decade\":\"2020\"}) :: gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires games > 0; https://www.lions.com.au/news/830119/six-depart-the-den; https://www.afl.com.au/news/624377/going-to-the-big-dance-standalone-clubs-best-msd-chances",
++   "#682 2-2 [criterion disagreement] brother x prelimfinals1 :: has_brother({}) x prelim_finals_played_min({\"times\":\"1\"}) :: gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires games > 0; https://www.lions.com.au/news/830119/six-depart-the-den; https://www.afl.com.au/news/624377/going-to-the-big-dance-standalone-clubs-best-msd-chances",
++   "#682 2-1 [criterion disagreement] brother x marks10match :: has_brother({}) x single_game_stat_min({\"stat\":\"marks\",\"x\":\"10\"}) :: gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires games > 0; https://www.lions.com.au/news/830119/six-depart-the-den; https://www.afl.com.au/news/624377/going-to-the-big-dance-standalone-clubs-best-msd-chances",
++   "#693 1-0 [criterion disagreement] brother x games100 :: has_brother({}) x career_games_min({\"games\":\"100\"}) :: gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires games > 0; https://www.lions.com.au/news/830119/six-depart-the-den; https://www.afl.com.au/news/624377/going-to-the-big-dance-standalone-clubs-best-msd-chances",
++   "#728 2-2 [criterion disagreement] brother x 2010s :: has_brother({}) x played_in_decade({\"decade\":\"2010\"}) :: gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires games > 0; https://www.lions.com.au/news/830119/six-depart-the-den; https://www.afl.com.au/news/624377/going-to-the-big-dance-standalone-clubs-best-msd-chances",
++   "#774 2-1 [criterion disagreement] brother x prelimfinals1 :: has_brother({}) x prelim_finals_played_min({\"times\":\"1\"}) :: gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires games > 0; https://www.lions.com.au/news/830119/six-depart-the-den; https://www.afl.com.au/news/624377/going-to-the-big-dance-standalone-clubs-best-msd-chances",
++   "#774 2-2 [criterion disagreement] brother x games100 :: has_brother({}) x career_games_min({\"games\":\"100\"}) :: gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires games > 0; https://www.lions.com.au/news/830119/six-depart-the-den; https://www.afl.com.au/news/624377/going-to-the-big-dance-standalone-clubs-best-msd-chances",
++   "#779 2-2 [criterion disagreement] brother x games150 :: has_brother({}) x career_games_min({\"games\":\"150\"}) :: gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires games > 0; https://www.lions.com.au/news/830119/six-depart-the-den; https://www.afl.com.au/news/624377/going-to-the-big-dance-standalone-clubs-best-msd-chances",
++   "#779 2-0 [criterion disagreement] brother x AD :: has_brother({}) x played_for_club({\"club\":\"1\"}) :: gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires games > 0; https://www.lions.com.au/news/830119/six-depart-the-den; https://www.afl.com.au/news/624377/going-to-the-big-dance-standalone-clubs-best-msd-chances",
++   "#779 2-1 [criterion disagreement] brother x handballs20 :: has_brother({}) x single_game_stat_min({\"stat\":\"handballs\",\"x\":\"20\"}) :: gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires games > 0; https://www.lions.com.au/news/830119/six-depart-the-den; https://www.afl.com.au/news/624377/going-to-the-big-dance-standalone-clubs-best-msd-chances",
++   "#784 2-2 [criterion disagreement] brother x 2010s :: has_brother({}) x played_in_decade({\"decade\":\"2010\"}) :: gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires games > 0; https://www.lions.com.au/news/830119/six-depart-the-den; https://www.afl.com.au/news/624377/going-to-the-big-dance-standalone-clubs-best-msd-chances",
++   "#784 2-0 [criterion disagreement] brother x GC :: has_brother({}) x played_for_club({\"club\":\"11\"}) :: gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires games > 0; https://www.lions.com.au/news/830119/six-depart-the-den; https://www.afl.com.au/news/624377/going-to-the-big-dance-standalone-clubs-best-msd-chances",
++   "#792 2-1 [criterion disagreement] brother x disposals25 :: has_brother({}) x single_game_stat_min({\"stat\":\"disposals\",\"x\":\"25\"}) :: gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires games > 0; https://www.lions.com.au/news/830119/six-depart-the-den; https://www.afl.com.au/news/624377/going-to-the-big-dance-standalone-clubs-best-msd-chances",
++   "#797 2-1 [criterion disagreement] brother x BL :: has_brother({}) x played_for_club_incl_merged({\"club\":\"3\"}) :: gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires games > 0; https://www.lions.com.au/news/830119/six-depart-the-den; https://www.afl.com.au/news/624377/going-to-the-big-dance-standalone-clubs-best-msd-chances",
++   "#805 2-0 [criterion disagreement] brother x BL :: has_brother({}) x played_for_club_incl_merged({\"club\":\"3\"}) :: gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires games > 0; https://www.lions.com.au/news/830119/six-depart-the-den; https://www.afl.com.au/news/624377/going-to-the-big-dance-standalone-clubs-best-msd-chances",
++   "#819 2-2 [criterion disagreement] brother x prelimfinals1 :: has_brother({}) x prelim_finals_played_min({\"times\":\"1\"}) :: gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires games > 0; https://www.lions.com.au/news/830119/six-depart-the-den; https://www.afl.com.au/news/624377/going-to-the-big-dance-standalone-clubs-best-msd-chances",
++   "#819 2-1 [criterion disagreement] brother x marks10match :: has_brother({}) x single_game_stat_min({\"stat\":\"marks\",\"x\":\"10\"}) :: gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires games > 0; https://www.lions.com.au/news/830119/six-depart-the-den; https://www.afl.com.au/news/624377/going-to-the-big-dance-standalone-clubs-best-msd-chances",
++   "#920 2-2 [criterion disagreement] brother x 2020s :: has_brother({}) x played_in_decade({\"decade\":\"2020\"}) :: gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires games > 0; https://www.lions.com.au/news/830119/six-depart-the-den; https://www.afl.com.au/news/624377/going-to-the-big-dance-standalone-clubs-best-msd-chances",
++   "#920 2-2 [criterion disagreement] brother x 2020s :: has_brother({}) x played_in_decade({\"decade\":\"2020\"}) :: gridley player 3989 = afldb 7271: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Zac Webster was AFL-listed; afl.com.au (https://www.afl.com.au/news/91683/axe-falls-at-hawthorn-with-cult-hero-among-seven-cut) states he was unable to play a senior game in his three Hawthorn seasons (statement dated by inference to Oct 2016); the relationship is https://www.afl.com.au/news/76126/tough-tasmanians-growing-stature; has_brother requires games > 0",
++   "#920 2-0 [criterion disagreement] brother x GC :: has_brother({}) x played_for_club({\"club\":\"11\"}) :: gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires games > 0; https://www.lions.com.au/news/830119/six-depart-the-den; https://www.afl.com.au/news/624377/going-to-the-big-dance-standalone-clubs-best-msd-chances",
++   "#929 2-2 [criterion disagreement] brother x goalscareerlessthan20 :: has_brother({}) x career_goals_max({\"goals\":\"19\"}) :: gridley player 3989 = afldb 7271: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Zac Webster was AFL-listed; afl.com.au (https://www.afl.com.au/news/91683/axe-falls-at-hawthorn-with-cult-hero-among-seven-cut) states he was unable to play a senior game in his three Hawthorn seasons (statement dated by inference to Oct 2016); the relationship is https://www.afl.com.au/news/76126/tough-tasmanians-growing-stature; has_brother requires games > 0",
++   "#964 2-2 [criterion disagreement] brother x prelimfinals1 :: has_brother({}) x prelim_finals_played_min({\"times\":\"1\"}) :: gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires games > 0; https://www.lions.com.au/news/830119/six-depart-the-den; https://www.afl.com.au/news/624377/going-to-the-big-dance-standalone-clubs-best-msd-chances",
++   "#964 2-1 [criterion disagreement] brother x marks10match :: has_brother({}) x single_game_stat_min({\"stat\":\"marks\",\"x\":\"10\"}) :: gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires games > 0; https://www.lions.com.au/news/830119/six-depart-the-den; https://www.afl.com.au/news/624377/going-to-the-big-dance-standalone-clubs-best-msd-chances",
++   "#964 2-1 [criterion disagreement] brother x marks10match :: has_brother({}) x single_game_stat_min({\"stat\":\"marks\",\"x\":\"10\"}) :: gridley player 3989 = afldb 7271: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Zac Webster was AFL-listed; afl.com.au (https://www.afl.com.au/news/91683/axe-falls-at-hawthorn-with-cult-hero-among-seven-cut) states he was unable to play a senior game in his three Hawthorn seasons (statement dated by inference to Oct 2016); the relationship is https://www.afl.com.au/news/76126/tough-tasmanians-growing-stature; has_brother requires games > 0",
++   "#990 2-1 [criterion disagreement] brother x goalscareerlessthan20 :: has_brother({}) x career_goals_max({\"goals\":\"19\"}) :: gridley player 3989 = afldb 7271: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Zac Webster was AFL-listed; afl.com.au (https://www.afl.com.au/news/91683/axe-falls-at-hawthorn-with-cult-hero-among-seven-cut) states he was unable to play a senior game in his three Hawthorn seasons (statement dated by inference to Oct 2016); the relationship is https://www.afl.com.au/news/76126/tough-tasmanians-growing-stature; has_brother requires games > 0",
++   "#990 2-2 [criterion disagreement] brother x 2020s :: has_brother({}) x played_in_decade({\"decade\":\"2020\"}) :: gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires games > 0; https://www.lions.com.au/news/830119/six-depart-the-den; https://www.afl.com.au/news/624377/going-to-the-big-dance-standalone-clubs-best-msd-chances",
++   "#990 2-2 [criterion disagreement] brother x 2020s :: has_brother({}) x played_in_decade({\"decade\":\"2020\"}) :: gridley player 3989 = afldb 7271: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Zac Webster was AFL-listed; afl.com.au (https://www.afl.com.au/news/91683/axe-falls-at-hawthorn-with-cult-hero-among-seven-cut) states he was unable to play a senior game in his three Hawthorn seasons (statement dated by inference to Oct 2016); the relationship is https://www.afl.com.au/news/76126/tough-tasmanians-growing-stature; has_brother requires games > 0",
++   "#1015 2-0 [criterion disagreement] brother x AD :: has_brother({}) x played_for_club({\"club\":\"1\"}) :: gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires games > 0; https://www.lions.com.au/news/830119/six-depart-the-den; https://www.afl.com.au/news/624377/going-to-the-big-dance-standalone-clubs-best-msd-chances",
++   "#1015 2-1 [criterion disagreement] brother x BL :: has_brother({}) x played_for_club_incl_merged({\"club\":\"3\"}) :: gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires games > 0; https://www.lions.com.au/news/830119/six-depart-the-den; https://www.afl.com.au/news/624377/going-to-the-big-dance-standalone-clubs-best-msd-chances",
++   "#1073 2-2 [criterion disagreement] brother x 2020s :: has_brother({}) x played_in_decade({\"decade\":\"2020\"}) :: gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires games > 0; https://www.lions.com.au/news/830119/six-depart-the-den; https://www.afl.com.au/news/624377/going-to-the-big-dance-standalone-clubs-best-msd-chances",
++   "#1073 2-2 [criterion disagreement] brother x 2020s :: has_brother({}) x played_in_decade({\"decade\":\"2020\"}) :: gridley player 3989 = afldb 7271: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Zac Webster was AFL-listed; afl.com.au (https://www.afl.com.au/news/91683/axe-falls-at-hawthorn-with-cult-hero-among-seven-cut) states he was unable to play a senior game in his three Hawthorn seasons (statement dated by inference to Oct 2016); the relationship is https://www.afl.com.au/news/76126/tough-tasmanians-growing-stature; has_brother requires games > 0",
++   "#1109 2-2 [criterion disagreement] brother x finals1 :: has_brother({}) x played_in_a_final({}) :: gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires games > 0; https://www.lions.com.au/news/830119/six-depart-the-den; https://www.afl.com.au/news/624377/going-to-the-big-dance-standalone-clubs-best-msd-chances",
++   "#1109 2-2 [criterion disagreement] brother x finals1 :: has_brother({}) x played_in_a_final({}) :: gridley player 3989 = afldb 7271: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Zac Webster was AFL-listed; afl.com.au (https://www.afl.com.au/news/91683/axe-falls-at-hawthorn-with-cult-hero-among-seven-cut) states he was unable to play a senior game in his three Hawthorn seasons (statement dated by inference to Oct 2016); the relationship is https://www.afl.com.au/news/76126/tough-tasmanians-growing-stature; has_brother requires games > 0",
++   "#1109 2-1 [criterion disagreement] brother x woodenspoon :: has_brother({}) x wooden_spoon_season({}) :: gridley player 3989 = afldb 7271: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Zac Webster was AFL-listed; afl.com.au (https://www.afl.com.au/news/91683/axe-falls-at-hawthorn-with-cult-hero-among-seven-cut) states he was unable to play a senior game in his three Hawthorn seasons (statement dated by inference to Oct 2016); the relationship is https://www.afl.com.au/news/76126/tough-tasmanians-growing-stature; has_brother requires games > 0",
++   "#1114 2-2 [criterion disagreement] brother x grandfinals1 :: has_brother({}) x played_a_grand_final({}) :: gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires games > 0; https://www.lions.com.au/news/830119/six-depart-the-den; https://www.afl.com.au/news/624377/going-to-the-big-dance-standalone-clubs-best-msd-chances",
++   "#1114 2-1 [criterion disagreement] brother x finals10 :: has_brother({}) x finals_games_min({\"games\":\"10\"}) :: gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires games > 0; https://www.lions.com.au/news/830119/six-depart-the-den; https://www.afl.com.au/news/624377/going-to-the-big-dance-standalone-clubs-best-msd-chances",
++ ]
+
+ ❯ tests/integration/gridley-corpus.test.ts:833:152
+    831|
+    832|     const failing = findings.filter((f) => !Object.hasOwn(INFORMATIONA…
+    833|     expect(failing.slice(0, 40).map((f) => `#${f.board} ${f.cell} [${f…
+       |                                                                                                                                                        ^
+    834|     expect(failing).toHaveLength(0);
+    835|     // Over 1 s is flagged in the report; over 4 s (the ISSUE-076 marg…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1211 passed (1212)
+   Start at  20:17:17
+   Duration  347.45s (transform 580ms, setup 165ms, import 84.43s, tests 262.53s, environment 0ms)
+

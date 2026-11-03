@@ -1,0 +1,50 @@
+{
+  "scope": {
+    "database": "afldb_v2_gap029_final_20261103_091009_rst_test",
+    "maxSeason": 2026,
+    "registerSeason": 2026,
+    "draftPicks": 6818,
+    "draftPicksLinked": 5221,
+    "captaincies": 1781,
+    "matchesWithEvent": 64,
+    "players": 13365,
+    "playersWithDob": 13255,
+    "playersWithHeight": 12487,
+    "fatherSon": 123,
+    "siblings": 390,
+    "afterSiren": 120,
+    "diagnostic": true,
+    "scoreDraft": false,
+    "gaps": {
+      "maxSeason": 2026,
+      "registerSeason": 2026,
+      "draftLinks": true,
+      "matchEvents": true,
+      "heights": true,
+      "dobs": true,
+      "coaches": true,
+      "fatherSon": true,
+      "siblings": true,
+      "afterSiren": true
+    }
+  },
+  "cells": 10287,
+  "solvedCells": 10209,
+  "knownAnswerAdjudications": [
+    "players/C/Cameron_Bruce.html captain/gridley_omits -> afldb 2489: current",
+    "players/D/David_Swallow.html games250sameclub/gridley_lists -> afldb 3581: current",
+    "players/D/Dylan_Shiel.html games100clubs2/gridley_lists -> afldb 4006: current"
+  ],
+  "checks": {
+    "strictParityFindings118": true,
+    "approvedDeferrals78": true,
+    "approvedDisagreements40": true,
+    "approvedTotal118": true,
+    "findingsByCategoryAgree": true,
+    "everyAdjudicationCurrent": true,
+    "noStaleAdjudication": true,
+    "everyGapFlagOpen": true,
+    "draftLinksGateOpen": true,
+    "productionScopeCounts": true
+  }
+}

@@ -1,0 +1,204 @@
+2026-11-03T09:16:55Z A0 inputs (profile production, evidence class GENUINE_PRODUCTION)
+PASS candidate clean at f05a2e78fdd0d90824789ab81ee2d2e4ffe3ab8f
+TARGET CHECK PASS
+dump sha256 3a4f17c169ea23019465602df1f3c47e84798214424ea1f081fb2df6d94be4d0 verified by check-capture; stage-4-accepted production backup taken after S4 (final verification)
+afldb.service active MainPID=1677
+postgresql@16-main.service active MainPID=1536
+2026-11-03T09:16:56Z A1 start the guarded cluster
+PASS listener is exclusively the cluster we started (127.0.0.1:55493)
+2026-11-03T09:17:01Z A2 restore into a guarded disposable database
+restore_started=2026-11-03T09:17:01.589Z restored_at=2026-11-03T09:17:07.815Z
+PASS restored ledger starts 118_
+archive toc entries: 1651
+2026-11-03T09:17:08Z A3 restore evidence (identity proven by query inside the guarded database; source identity from the capture provenance, checked against the production target)
+PASS restore evidence generated from the guarded restored database
+restore-evidence.json sha256 adc155af12dfd715a598527fd63d9e8a0561dbd4e549635bd593035f89a77cff
+production target sha256 5b0a54ee050f4d2d277efa0a8f557838f06e20c26e4eff8cf9d38c1d79f8a3b9
+2026-11-03T09:17:09Z V0 bind the evidence: revision, tool and policy file hashes
+revision f05a2e78fdd0d90824789ab81ee2d2e4ffe3ab8f
+head f05a2e78fdd0d90824789ab81ee2d2e4ffe3ab8f
+0163a5e525fb8abc6e4f1f16ae813ca4da7b72dcd161eae6a2957c9cb8e01b22  tools/v2/gap029-captaincy-additions-production.ts  (git blob 5e9d6fe339c8e08566357514234ec1c07d91d1fe)
+228a64b922b199c9b9476aa74396074555fe8fef48999f0e6ca58bfd841cf116  tools/v2/gap029-rookie-selections-production.ts  (git blob c46eb806b1f5cf429be00510c077b813bd2e1aca)
+97aff072b6a9dbe9b9e16f91b30afc573a264c14faf034be4d98fe658825bded  tools/v2/gap029-draft-link-production.py  (git blob 733cc6f80020c1d2b59669da33c4dc297cd8072f)
+047ea314573ea346b845b81d833da8c96cb72a589b97d1d7cd16c52032209cd6  tools/v2/gap029-sibling-pair-production.py  (git blob f4d1d0a73d4eceea34f30d6d86f56734d5420a1f)
+9a42b41bbeffa9b73dec9d8b1d34cc164194cc29ed2319e2512dab971522fe55  tools/v2/gap029-common.ts  (git blob a92c69a1a8f89f29ce3860efd0495c1a5b2d06f7)
+ddefab1e69ca5ed8e02b32d9eead4f3a790a84b7012e345f94092eaff31231e7  tools/v2/gap029_common.py  (git blob 3547c21a41d1229b82641f704922081aa986ccb7)
+bcf23b9ec27e9d6cb701b207fe28bfa6f6dd3510166f2255060f565726c7c75c  tools/v2/gap029-assemble-restore-evidence.ts  (git blob 228b18ae77926de5cd7c79dc99af200d827c36a5)
+6f1ce0597cc833f289b69fa3e065d72a2d03dcba0ec52c7c0c5703ed5a27fd42  tools/migration/family_siblings.py  (git blob f6e6ba42c91458ecc832f29965e2dd83097b2406)
+f23e76464818e9109f46004812dc65354c280ae1361a9ebe9fef59493d5540e1  tools/rebuild/draftguru/import_draftguru.py  (git blob ca68f2b86a4b285b595dd28c98846d826fa97fb2)
+fbce43f7f1e374b3dfac05968e627b8ad9f337279f233a49bc19ff57d02d558d  tools/rebuild/draftguru/bridge_import_gate.py  (git blob 75ab7b9d28d49c407bfb19ae997a6ebaa3e25d2c)
+b1f0ff4ed0bfcf23b53fc8e0007c08ffee636cfd7077b39c3d07aa3b842bd318  data/players/sibling-relationships.csv  (git blob 28c5afa9d8a346b32dedafd86f8a8ebb20b5f506)
+8257e8a216a0565c694a5970c56f3cc7469d194135094fa55389c700b70dea32  tests/integration/gridley-corpus.test.ts  (git blob 58dbeeebdc344652343bf511b5a0ae79568916e9)
+cb897dc0f6fe467ff640420f5b454820b6410e8f7ec780aa4b9dbe1293caf447  tests/gridley-release-policy.ts  (git blob 703caa7deb3382eb1a582124a5a05b75f63be29a)
+739b499c1dee97378348c30dd64fa87adcd4eed6fef8ec6949c88d45bfd761fa  tests/gridley-known-answer-adjudications.ts  (git blob 8f88b0cf3b8885a6f2485cd9fdf7c4bc7212780d)
+6acd7fb28c08144d6fbe81ea524e87e1fecece13d255876d24d7fdf6d5faf9e6  tests/rookie-relisting-outcomes.ts  (git blob da9f8aaab144138cfe2f285cbc99a8d0cfd9314f)
+bb5ae25ccdbb84e2a7579f41e3984f006da201cf86b8ee4bb8499406119b504f  tests/fixtures/gridley/corpus.json  (git blob c79adaeef02d6e166a34a4b6162bde27c595b6f5)
+86d8d05c151d82b2b705f6b201164fdbf86b8ddc4a8fa10137f7649d9a9ac24a  data/reference/gridley-approved-deferrals.json  (git blob 74cf984f0a1c5d8251e1843c769cd4299cde09ed)
+d6bba75ba612398bead94785ecae27e1d24634439c955b0d4db12a043e10f738  data/reference/gridley-approved-sibling-disagreements.json  (git blob fe5bf2444487c0f77abb612f51e343e04112ca5b)
+dd1b47050f39bd265b40a4ea972742649b8371d0c909fb46f17fc66b43a9e27f  data/reference/gridley-sibling-eligibility-webster.json  (git blob 6d572dc26d66a6dd15eac088ee862a7a3d3fbedd)
+d4137f2d27cf7d31f135150ecb6fb7c54a66e49f25b7b6131ab18eaba3b8c30d  data/players/gridley-known-answer-adjudications.csv  (git blob 2eb6d9957bdd1b32df56e1e24256ab8395fa4035)
+c24ea37cce6eb4852ec7d04ab30f82c3be354a942ba3957e4994c2137a5a4b65  data/players/rookie-relisting-outcomes.csv  (git blob 0dc301099b2076f06a4b8b6084445f607be0a6b0)
+PASS tool and policy files bound to revision f05a2e78fdd0d90824789ab81ee2d2e4ffe3ab8f (LF-normalised sha256 + git blob ids)
+PASS retained post-S2 and post-S3 comparison restores present
+2026-11-03T09:17:10Z V1 targeted read-only checks of the four stages' data
+isolated-pg: afldb_v2_gap029_final_20261103_091009_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running bash
+INFO restored database -- {"db":"afldb_v2_gap029_final_20261103_091009_rst_test","ledger":"118_fixtures_unconfirmed_participants.sql","n":118,"ro":"on"}
+PASS identity: guarded restored database, read-only session, ledger 118
+PASS S1 plan names exactly 7 entries -- 7
+PASS S1 2008 Melbourne Cameron Bruce -- id 1775 source wikipedia batch 79 name_raw "Cameron Bruce"
+PASS S1 2008 Melbourne James McDonald -- id 1776 source wikipedia batch 79 name_raw "James McDonald"
+PASS S1 2017 Gold Coast Steven May -- id 1777 source wikipedia batch 79 name_raw "Steven May"
+PASS S1 2018 Gold Coast Steven May -- id 1778 source wikipedia batch 79 name_raw "Steven May"
+PASS S1 2019 Gold Coast Jarrod Witts -- id 1779 source wikipedia batch 79 name_raw "Jarrod Witts"
+PASS S1 2020 Gold Coast Jarrod Witts -- id 1780 source wikipedia batch 79 name_raw "Jarrod Witts"
+PASS S1 2021 Gold Coast Jarrod Witts -- id 1781 source wikipedia batch 79 name_raw "Jarrod Witts"
+PASS S1 all seven rows carry one import batch -- 79
+PASS S1 captaincies total 1781 (1774 + 7), natural keys unique -- {"n":1781,"nat":1781}
+PASS S3 plan names exactly 8 selections as actor 1 -- 8
+PASS S3 pick 2014 #54 Adam Schneider (St Kilda) -- draft_picks id 6811
+PASS S3 override Adam Schneider -- data_overrides id 158 actor 1 key manual_admin_edit:162f11fa-5eaa-4845-b81f-18826a625135
+PASS S3 correction note Adam Schneider -- data_edits id 161 actor 1
+PASS S3 pick 2019 #35 Lachie Henderson (Geelong) -- draft_picks id 6812
+PASS S3 override Lachie Henderson -- data_overrides id 159 actor 1 key manual_admin_edit:d8b81703-ea94-4cfb-ade0-82baae416e70
+PASS S3 correction note Lachie Henderson -- data_edits id 162 actor 1
+PASS S3 pick 2022 #3 Phil Davis (Greater Western Sydney) -- draft_picks id 6813
+PASS S3 override Phil Davis -- data_overrides id 160 actor 1 key manual_admin_edit:05999a14-572a-49c5-a553-00b78646cac3
+PASS S3 correction note Phil Davis -- data_edits id 163 actor 1
+PASS S3 pick 2023 #11 Sam Reid (Sydney) -- draft_picks id 6814
+PASS S3 override Sam Reid -- data_overrides id 161 actor 1 key manual_admin_edit:2ece5101-9254-43c3-92f3-11d78c21d16f
+PASS S3 correction note Sam Reid -- data_edits id 164 actor 1
+PASS S3 pick 2021 #10 Lewis Taylor (Sydney) -- draft_picks id 6815
+PASS S3 override Lewis Taylor -- data_overrides id 162 actor 1 key manual_admin_edit:0f3e731d-ab4a-4656-b931-39c1ad257144
+PASS S3 correction note Lewis Taylor -- data_edits id 165 actor 1
+PASS S3 pick 2022 #21 Paul Seedsman (Adelaide) -- draft_picks id 6816
+PASS S3 override Paul Seedsman -- data_overrides id 163 actor 1 key manual_admin_edit:0945483a-dab2-4324-90fa-357d0ed62eda
+PASS S3 correction note Paul Seedsman -- data_edits id 166 actor 1
+PASS S3 pick 2018 #2 Michael Rischitelli (Gold Coast) -- draft_picks id 6817
+PASS S3 override Michael Rischitelli -- data_overrides id 164 actor 1 key manual_admin_edit:6c89964c-005c-4e98-87c3-62c6e633093d
+PASS S3 correction note Michael Rischitelli -- data_edits id 167 actor 1
+PASS S3 pick 2020 #1 Bryce Gibbs (Adelaide) -- draft_picks id 6818
+PASS S3 override Bryce Gibbs -- data_overrides id 165 actor 1 key manual_admin_edit:4add0701-f818-4f62-9d0a-8503e08eeaab
+PASS S3 correction note Bryce Gibbs -- data_edits id 168 actor 1
+PASS S3 exactly 8 reviewed correction notes, 8 players, actor 1 only -- {"n":8,"players":8,"amin":1,"amax":1}
+PASS S3 exactly 8 active selection overrides name actor 1 -- 8
+PASS S3 draft_picks total 6818 (6810 + 8) -- {"n":6818,"linked":5221}
+INFO import_batches -- {"n":74,"max_id":"81"}
+PASS persisted through S4: captaincies identical to the post-S3 restore -- 1781 rows vs 1781
+PASS persisted through S4: draft_persons identical to the post-S3 restore -- 5057 rows vs 5057
+PASS persisted through S4: external_identities identical to the post-S3 restore -- 19319 rows vs 19319
+PASS persisted through S4: draft_picks identical to the post-S3 restore -- 6818 rows vs 6818
+PASS persisted through S4: draft_overrides identical to the post-S3 restore -- 8 rows vs 8
+PASS persisted through S4: data_edits identical to the post-S3 restore -- 168 rows vs 168
+PASS persisted through S4: sibling_rows_ex_new identical to the post-S3 restore -- 498 rows vs 498
+PASS S3 left captaincies untouched (post-S3 restore equals post-S2 restore) -- 1781 rows vs 1781
+PASS S3 left draft_persons untouched (post-S3 restore equals post-S2 restore) -- 5057 rows vs 5057
+PASS S3 left external_identities untouched (post-S3 restore equals post-S2 restore) -- 19319 rows vs 19319
+INFO S3 surface growth (post-S2 restore -> final) -- {"draft_picks":[6810,6818],"draft_overrides":[0,8]}
+SQL VERIFICATION PASS
+PASS V1 SQL verification
+2026-11-03T09:17:12Z V2 S4 digests and the S2 gate VERIFY via the stage tools' own read helpers
+isolated-pg: afldb_v2_gap029_final_20261103_091009_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running env
+PASS S4 sibling rows: 499 in total, 498 pre-existing -- 499 / 498
+PASS S4 exactly one new relationship siblings:afldb-sibling-supplement:015 = Jeremy McGovern 6937 / Mitch McGovern 9714 -- names Jeremy McGovern / Mitch McGovern
+PASS S4 content digest equals the rehearsed digest d6fceb33... -- d6fceb338d5f37e8fdef18443da696c52225db9caa80cedb9261e401aea212ec
+PASS S4 the 498 pre-existing rows are byte-identical to the pre-S4 backup (every column, incl. import_batch_id) -- c3e629cedc45bf3889ec19ece76cd420d8201e948d90da680fd3259cebee2470
+PASS S4 the new row carries its own new import batch -- 81
+INFO import_batches rows now 74 (S4 plan before: 73)
+PASS S2 the child.json on this host is the one the production plan pinned -- d6251609b12f48ad1c48a8bd33482820e606e123f9b12fa16a3769e6b7f15d6e
+FAIL S2 the gate's own VERIFY of the DraftGuru link-only after-state -- the gate's verify refused: 2 check(s) failed: ["8.14 baseline_sha256 equals the plan's value", "8.15 link-only: all four non-link preservation digests were read, and the baseline they belong to reproduces the plan's baseline_sha256 -- 6.4, 6.6 and 6.7 proven after the fact, server-side, over every non-link column"]
+INFO S2 plan-mode after_state_sha256: now a186c592cffeffa1 vs production plan a186c592cffeffa1 (equal)
+INFO S2 plan-mode picks_after_sha256: now a56ca83d7bcbac0b vs production plan a56ca83d7bcbac0b (equal)
+INFO S2 plan-mode newly_linked_sha256: now d4a65f47e71b072f vs production plan d4a65f47e71b072f (equal)
+INFO S2 plan-mode baseline_sha256: now fdc6e6f2bc2f8e3f vs production plan be716e651e942b61 (differs)
+PY VERIFICATION FAIL (1)
+FAIL V2 Python verification (exit 1)
+2026-11-03T09:17:16Z V3 production-scope Gridley corpus on this restore (diagnostic mode)
+corpus test file exit 1 (diagnostic mode exits 1 by design while strict parity retains its 118 accepted findings; the failing assertions are listed below)
+     ✓ accepts only the 21 owner-approved sibling disagreements while retaining every strict finding 34ms
+     ✓ D-GAP029-D3 approves exactly the 11 enumerated 2026-board Lyons cells and nothing adjacent 15ms
+     ✓ D-GAP029-D4W approves exactly the 8 enumerated Webster cells, keeps the evidence tiers distinct, and nothing adjacent 24ms
+     ✓ bounds the seven retained deferrals to their original 78 cells and keeps strict results 39ms
+     ✓ fails strict parity and policy for unexpected categories, cells and criterion pairs 9ms
+     ✓ is the complete stored history: 1,143 boards, 6,858 criterion occurrences, 839 distinct criteria 41ms
+     ✓ carries a non-empty answer key for every one of the 10,287 cells  33586ms
+     ✓ recognises every criterion occurrence (zero unrecognised, zero unresolved with stub lookups) 1ms
+     ✓ accounts for the whole denominator explicitly 4ms
+     ✓ names every data-absent criterion with its reason 16ms
+     ✓ maps every mapped occurrence to a complete axis on a real builder  329ms
+     ✓ maps each criterion id to exactly one axis regardless of the board it appears on 169ms
+     ✓ refuses a criterion whose title no longer matches the rule it was written for 1ms
+     ✓ has no rule that the corpus never uses 2ms
+     ✓ "less than 10 goals" is career_goals_max(9) 0ms
+     ✓ Brisbane Lions includes Fitzroy and the Bears via the merger link; every other club stays at its organization 1ms
+     ✓ keeps the All-Australian final team distinct from the 40-man squad, and repeats on distinct seasons 1ms
+     ✓ maps height bounds exactly onto players.height_cm builders 1ms
+     ✓ teammate criteria resolve through the id-embedded Gridley player id or the title 1ms
+     ✓ normalises names the way the resolver compares them 0ms
+     ✓ keys a no-break-space name exactly like its ASCII spelling (AFLDB-ISSUE-222 corpus triage) 0ms
+     ✓ draft criteria name a draft_kind, and both father-son criteria read the tracked list (AFLDB-ISSUE-221) 2ms
+     ✓ resolver: a 2026 override with no namesake is a REGISTER gap when no player debuted after 2025, even though the database holds 2026 matches 1ms
+     ✓ resolver: the match-horizon gap is unchanged when the database itself ends before the debut 0ms
+     ✓ resolver: once the register holds a 2026 debut, a missing 2026 override is UNRESOLVED (a fault, not a gap) 0ms
+     ✓ resolver: a namesake with another debut season is never a gap 0ms
+     ✓ resolver: an override that hits exactly one debut resolves; a plain name resolves only when unique 1ms
+     ✓ triage: Brad Crouch (afldb 2054) -- a 2011 Mini-Draft pick 2 is inside TOP 5 / TOP 10 but is not a national pick 1ms
+     ✓ triage: Lachie Henderson (afldb 8350) -- the linked DraftGuru page carries no Rookie event, so pickrookie has nothing to read 1ms
+     ✓ triage: a late-career rookie re-listing the source DOES carry satisfies pickrookie (GWS Sam Reid, 2015 Rookie pick 8) 1ms
+     ✓ V2-GAP-029: the sourced board-541 adjudication cannot hide another trade discrepancy 1ms
+     ✓ D1 (§11.19.12): the national-pick key disagreement fires only for a non-national pick inside a national range 1ms
+     ✓ triage: no linked row at all is a linkage gap, never a source or key finding; an unread builder is unassessed 0ms
+     ✓ D2 (§11.19.12/§11.19.13): a reviewed gridley_supported outcome classifies its pickrookie cell as a source coverage gap 0ms
+     ✓ D2: a player with no reviewed outcome is never reclassified, even with the identical no_linked_row_matches cause -- there is no general rule 0ms
+     ✓ D2: a draftguru_supported or undetermined verdict records review history but never reclassifies a cell 0ms
+     ✓ D2: the outcome is read only for the pickrookie (draft_type_is rookie) axis; another builder is unaffected 0ms
+     ✓ D2: an unlinked player is unaffected even under a matching outcome -- a linkage matter, never a source gap 0ms
+     ✓ D2 and D1 do not interfere: D1 stays national-only, D2 stays rookie-only, and a satisfied cause blocks either rule 0ms
+     ✓ D2: every row of the real tracked artefact is recognised by the classifier (data/players/rookie-relisting-outcomes.csv) 3ms
+corpus report sha256 640df638f535cd69eac7c9a914d4e3f53d4e72bbcc030e152882bc0cfbcf7e6a
+2026-11-03T09:23:04Z V4 corpus acceptance
+PASS reviewed corpus summary: conformance PASS, 0 unapproved, 0 incorrect known answers, strict parity retained at 118
+PASS extra corpus checks: 78 deferrals + 40 disagreements, adjudications current, production-scope counts
+    "playersWithDob": 13255,
+    "playersWithHeight": 12487,
+    "fatherSon": 123,
+    "siblings": 390,
+    "afterSiren": 120,
+    "diagnostic": true,
+    "scoreDraft": false,
+    "gaps": {
+      "maxSeason": 2026,
+      "registerSeason": 2026,
+      "draftLinks": true,
+      "matchEvents": true,
+      "heights": true,
+      "dobs": true,
+      "coaches": true,
+      "fatherSon": true,
+      "siblings": true,
+      "afterSiren": true
+    }
+  },
+  "cells": 10287,
+  "solvedCells": 10209,
+  "knownAnswerAdjudications": [
+    "players/C/Cameron_Bruce.html captain/gridley_omits -> afldb 2489: current",
+    "players/D/David_Swallow.html games250sameclub/gridley_lists -> afldb 3581: current",
+    "players/D/Dylan_Shiel.html games100clubs2/gridley_lists -> afldb 4006: current"
+  ],
+  "checks": {
+    "strictParityFindings118": true,
+    "approvedDeferrals78": true,
+    "approvedDisagreements40": true,
+    "approvedTotal118": true,
+    "findingsByCategoryAgree": true,
+    "everyAdjudicationCurrent": true,
+    "noStaleAdjudication": true,
+    "everyGapFlagOpen": true,
+    "draftLinksGateOpen": true,
+    "productionScopeCounts": true
+  }
+}
+2026-11-03T09:23:05Z V9 stop the cluster and prove isolation
+PASS DEV services unchanged (afldb.service, postgresql@16-main.service: state and MainPID)
+PASS pinned checkout still clean at f05a2e78fdd0d90824789ab81ee2d2e4ffe3ab8f
+FINAL VERIFICATION RESULT: FAIL (1)  revision f05a2e78fdd0d90824789ab81ee2d2e4ffe3ab8f  restored database afldb_v2_gap029_final_20261103_091009_rst_test  host streamanator user arm

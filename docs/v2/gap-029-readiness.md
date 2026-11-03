@@ -1,5 +1,7 @@
 # GAP-029 bounded acceptance and backend handoff
 
+> **Superseded 2026-11-03: GAP-029 is CLOSED.** The 149 / 99 / 50 figures below are the 2025-only baseline of 2026-10-20 and are historical. The production-scope acceptance run (fresh post-S4 production restore) gives 0 unapproved differences, 0 incorrect known answers and strict parity retained at exactly 118 approved findings: [closure record](gap-029-s4-outcome-and-closure-2026-11-03.md).
+
 **Current owner decision (2026-10-20):** [D-V2-MIGRATION-SEPARATION](migration-acceptance-2026-10-20.md)
 approves separate backend-migration and strict Gridley criteria. GAP-029 stays OPEN as data
 quality debt: **149 strict / 99 approved / 50 unapproved**. Its 50 findings remain unapproved.

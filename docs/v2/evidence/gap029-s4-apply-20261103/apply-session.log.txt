@@ -1,0 +1,19 @@
+== apply S4 (S4-20261103T090149Z): wrapper gates (nothing is written by them) 2026-11-03T09:08:34Z
+MANIFEST VERIFY PASS stage S4 revision f05a2e78fdd0d90824789ab81ee2d2e4ffe3ab8f plan ef98fa113e0f139074ec0488000b39ba79c5ee0ea5db466628b29b6f5b2fe69d class GENUINE_PRODUCTION
+CAPTURE CHECK PASS stage S4 class GENUINE_PRODUCTION profile production dump afldb_prod-20261103T090149Z.dump bytes 30140902 sha256 e589566bc5caa2759d87f17d685e90452e5fb20f1611f78f4eaa62ea4f34da04 captured 2026-11-03T09:01:50.381689Z ledger 118
+APPROVAL CHECK PASS for S4 plan ef98fa113e0f139074ec0488000b39ba79c5ee0ea5db466628b29b6f5b2fe69d
+no conflicting writer, migration or dump process
+app: active MainPID=3326560
+apply launched detached (a dropped session does not stop it); waiting up to 1800 s for the recorded outcome
+== apply S4 (S4-20261103T090149Z): tool apply (single attempt) 2026-11-03T09:08:35Z
+OUTCOME COMMITTED_VERIFIED (exit 0)
+COMMITTED AND VERIFIED: the writer committed and an independent read-only check of the committed state passed.
+[tool log /home/arm/ops/gap029-stages/f05a2e78/runs/S4-20261103T090149Z/logs/apply-1.log exit 0]
+== apply S4 (S4-20261103T090149Z): read-only post-run state probe 2026-11-03T09:08:37Z
+tool exit 0; state probe exit 0
+== apply S4 (S4-20261103T090149Z): outcome 2026-11-03T09:08:38Z
+WRAPPER OUTCOME COMMITTED_VERIFIED (exit 0) stage S4
+COMMITTED AND VERIFIED: the transaction committed and an independent read-only check of the committed state passed.
+post-run state probe: PLANNED RESULT PRESENT
+Next: run `accept` (read-only state + verification); only then prepare the next stage with its OWN fresh backup.
+The wrapper never retries an apply, never claims rollback after a commit and never restores a backup.

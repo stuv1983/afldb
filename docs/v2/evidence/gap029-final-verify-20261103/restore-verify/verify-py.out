@@ -1,0 +1,14 @@
+isolated-pg: afldb_v2_gap029_final_20261103_091009_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running env
+PASS S4 sibling rows: 499 in total, 498 pre-existing -- 499 / 498
+PASS S4 exactly one new relationship siblings:afldb-sibling-supplement:015 = Jeremy McGovern 6937 / Mitch McGovern 9714 -- names Jeremy McGovern / Mitch McGovern
+PASS S4 content digest equals the rehearsed digest d6fceb33... -- d6fceb338d5f37e8fdef18443da696c52225db9caa80cedb9261e401aea212ec
+PASS S4 the 498 pre-existing rows are byte-identical to the pre-S4 backup (every column, incl. import_batch_id) -- c3e629cedc45bf3889ec19ece76cd420d8201e948d90da680fd3259cebee2470
+PASS S4 the new row carries its own new import batch -- 81
+INFO import_batches rows now 74 (S4 plan before: 73)
+PASS S2 the child.json on this host is the one the production plan pinned -- d6251609b12f48ad1c48a8bd33482820e606e123f9b12fa16a3769e6b7f15d6e
+FAIL S2 the gate's own VERIFY of the DraftGuru link-only after-state -- the gate's verify refused: 2 check(s) failed: ["8.14 baseline_sha256 equals the plan's value", "8.15 link-only: all four non-link preservation digests were read, and the baseline they belong to reproduces the plan's baseline_sha256 -- 6.4, 6.6 and 6.7 proven after the fact, server-side, over every non-link column"]
+INFO S2 plan-mode after_state_sha256: now a186c592cffeffa1 vs production plan a186c592cffeffa1 (equal)
+INFO S2 plan-mode picks_after_sha256: now a56ca83d7bcbac0b vs production plan a56ca83d7bcbac0b (equal)
+INFO S2 plan-mode newly_linked_sha256: now d4a65f47e71b072f vs production plan d4a65f47e71b072f (equal)
+INFO S2 plan-mode baseline_sha256: now fdc6e6f2bc2f8e3f vs production plan be716e651e942b61 (differs)
+PY VERIFICATION FAIL (1)

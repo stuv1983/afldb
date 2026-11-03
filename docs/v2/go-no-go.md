@@ -84,7 +84,7 @@ reports, passing integration and unit/report checks) **solely for archive `a583f
 acceptance **PASS, scoped**. The original staged Brownlow comparator remains **INCOMPLETE**.
 Authentic API vote/identity/leaderboard reconciliation is **not established** and stays required for
 Brownlow operational readiness (criterion 7 below is unchanged). Strict Gridley **FAIL (149)** and
-adjudication conformance **FAIL (50 unapproved)** are unchanged; GAP-029 stays open. Production
+adjudication conformance **FAIL (50 unapproved)** are unchanged; GAP-029 stays open *(historical, 2026-10-20; superseded 2026-11-03: GAP-029 is CLOSED, production-scope conformance PASS with 0 unapproved and strict parity retained at 118 approved findings, [closure record](gap-029-s4-outcome-and-closure-2026-11-03.md); the production GO/NO-GO status here is not changed by that closure)*. Production
 operational acceptance stays **INCOMPLETE / NO-GO**: no ingestion, publication, deployment or GO is
 approved, and the archive says nothing about the current live database. Rollback reversal and archive recovery were rehearsed
 with populated synthetic V2 ledgers on an isolated copy (2026-10-20), not on a production dump. [Decision](owner-decision-brownlow-alternative-2026-10-20.md);

@@ -1,5 +1,7 @@
 # V2-GAP-029 — S3 applied and accepted; S4 prepared (3 Nov 2026)
 
+> **Update 2026-11-03 (later):** S4 was approved, applied once (`COMMITTED_VERIFIED`) and accepted, and GAP-029 is now closed: [closure record](gap-029-s4-outcome-and-closure-2026-11-03.md). The statements below are as written before S4.
+
 **GAP-029 remains open.** S1, S2 and S3 are applied to production and technically accepted. S4 is prepared (read-only plan, own fresh backup) and **not approved or applied**.
 
 Execution revision for everything below: **R = `f05a2e78fdd0d90824789ab81ee2d2e4ffe3ab8f`** (local `main`, unpushed; production checkout still `d00e07e3`, untouched). Predecessor: `docs/v2/gap-029-s2-outcome-and-s3-preparation-2026-11-03.md`.

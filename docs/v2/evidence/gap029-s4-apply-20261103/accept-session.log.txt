@@ -1,0 +1,7 @@
+MANIFEST VERIFY PASS stage S4 revision f05a2e78fdd0d90824789ab81ee2d2e4ffe3ab8f plan ef98fa113e0f139074ec0488000b39ba79c5ee0ea5db466628b29b6f5b2fe69d class GENUINE_PRODUCTION
+STATE PLANNED RESULT PRESENT (exactly the reviewed pair was added)
+[tool log /home/arm/ops/gap029-stages/f05a2e78/runs/S4-20261103T090149Z/logs/state-3.log exit 0]
+ACCEPTANCE RECORDED for S4 plan ef98fa113e0f139074ec0488000b39ba79c5ee0ea5db466628b29b6f5b2fe69d
+ACCEPTED stage=S4 run=S4-20261103T090149Z
+ANALYZE is not run by this wrapper (no privilege grant is authorised); the stage tools and autovacuum own statistics.
+== DONE accept 2026-11-03T09:08:47Z

@@ -1,0 +1,54 @@
+isolated-pg: afldb_v2_gap029_final_20261103_091009_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running bash
+INFO restored database -- {"db":"afldb_v2_gap029_final_20261103_091009_rst_test","ledger":"118_fixtures_unconfirmed_participants.sql","n":118,"ro":"on"}
+PASS identity: guarded restored database, read-only session, ledger 118
+PASS S1 plan names exactly 7 entries -- 7
+PASS S1 2008 Melbourne Cameron Bruce -- id 1775 source wikipedia batch 79 name_raw "Cameron Bruce"
+PASS S1 2008 Melbourne James McDonald -- id 1776 source wikipedia batch 79 name_raw "James McDonald"
+PASS S1 2017 Gold Coast Steven May -- id 1777 source wikipedia batch 79 name_raw "Steven May"
+PASS S1 2018 Gold Coast Steven May -- id 1778 source wikipedia batch 79 name_raw "Steven May"
+PASS S1 2019 Gold Coast Jarrod Witts -- id 1779 source wikipedia batch 79 name_raw "Jarrod Witts"
+PASS S1 2020 Gold Coast Jarrod Witts -- id 1780 source wikipedia batch 79 name_raw "Jarrod Witts"
+PASS S1 2021 Gold Coast Jarrod Witts -- id 1781 source wikipedia batch 79 name_raw "Jarrod Witts"
+PASS S1 all seven rows carry one import batch -- 79
+PASS S1 captaincies total 1781 (1774 + 7), natural keys unique -- {"n":1781,"nat":1781}
+PASS S3 plan names exactly 8 selections as actor 1 -- 8
+PASS S3 pick 2014 #54 Adam Schneider (St Kilda) -- draft_picks id 6811
+PASS S3 override Adam Schneider -- data_overrides id 158 actor 1 key manual_admin_edit:162f11fa-5eaa-4845-b81f-18826a625135
+PASS S3 correction note Adam Schneider -- data_edits id 161 actor 1
+PASS S3 pick 2019 #35 Lachie Henderson (Geelong) -- draft_picks id 6812
+PASS S3 override Lachie Henderson -- data_overrides id 159 actor 1 key manual_admin_edit:d8b81703-ea94-4cfb-ade0-82baae416e70
+PASS S3 correction note Lachie Henderson -- data_edits id 162 actor 1
+PASS S3 pick 2022 #3 Phil Davis (Greater Western Sydney) -- draft_picks id 6813
+PASS S3 override Phil Davis -- data_overrides id 160 actor 1 key manual_admin_edit:05999a14-572a-49c5-a553-00b78646cac3
+PASS S3 correction note Phil Davis -- data_edits id 163 actor 1
+PASS S3 pick 2023 #11 Sam Reid (Sydney) -- draft_picks id 6814
+PASS S3 override Sam Reid -- data_overrides id 161 actor 1 key manual_admin_edit:2ece5101-9254-43c3-92f3-11d78c21d16f
+PASS S3 correction note Sam Reid -- data_edits id 164 actor 1
+PASS S3 pick 2021 #10 Lewis Taylor (Sydney) -- draft_picks id 6815
+PASS S3 override Lewis Taylor -- data_overrides id 162 actor 1 key manual_admin_edit:0f3e731d-ab4a-4656-b931-39c1ad257144
+PASS S3 correction note Lewis Taylor -- data_edits id 165 actor 1
+PASS S3 pick 2022 #21 Paul Seedsman (Adelaide) -- draft_picks id 6816
+PASS S3 override Paul Seedsman -- data_overrides id 163 actor 1 key manual_admin_edit:0945483a-dab2-4324-90fa-357d0ed62eda
+PASS S3 correction note Paul Seedsman -- data_edits id 166 actor 1
+PASS S3 pick 2018 #2 Michael Rischitelli (Gold Coast) -- draft_picks id 6817
+PASS S3 override Michael Rischitelli -- data_overrides id 164 actor 1 key manual_admin_edit:6c89964c-005c-4e98-87c3-62c6e633093d
+PASS S3 correction note Michael Rischitelli -- data_edits id 167 actor 1
+PASS S3 pick 2020 #1 Bryce Gibbs (Adelaide) -- draft_picks id 6818
+PASS S3 override Bryce Gibbs -- data_overrides id 165 actor 1 key manual_admin_edit:4add0701-f818-4f62-9d0a-8503e08eeaab
+PASS S3 correction note Bryce Gibbs -- data_edits id 168 actor 1
+PASS S3 exactly 8 reviewed correction notes, 8 players, actor 1 only -- {"n":8,"players":8,"amin":1,"amax":1}
+PASS S3 exactly 8 active selection overrides name actor 1 -- 8
+PASS S3 draft_picks total 6818 (6810 + 8) -- {"n":6818,"linked":5221}
+INFO import_batches -- {"n":74,"max_id":"81"}
+PASS persisted through S4: captaincies identical to the post-S3 restore -- 1781 rows vs 1781
+PASS persisted through S4: draft_persons identical to the post-S3 restore -- 5057 rows vs 5057
+PASS persisted through S4: external_identities identical to the post-S3 restore -- 19319 rows vs 19319
+PASS persisted through S4: draft_picks identical to the post-S3 restore -- 6818 rows vs 6818
+PASS persisted through S4: draft_overrides identical to the post-S3 restore -- 8 rows vs 8
+PASS persisted through S4: data_edits identical to the post-S3 restore -- 168 rows vs 168
+PASS persisted through S4: sibling_rows_ex_new identical to the post-S3 restore -- 498 rows vs 498
+PASS S3 left captaincies untouched (post-S3 restore equals post-S2 restore) -- 1781 rows vs 1781
+PASS S3 left draft_persons untouched (post-S3 restore equals post-S2 restore) -- 5057 rows vs 5057
+PASS S3 left external_identities untouched (post-S3 restore equals post-S2 restore) -- 19319 rows vs 19319
+INFO S3 surface growth (post-S2 restore -> final) -- {"draft_picks":[6810,6818],"draft_overrides":[0,8]}
+SQL VERIFICATION PASS

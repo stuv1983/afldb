@@ -1,0 +1,4 @@
+isolated-pg: afldb_v2_gap029_final_20261103_091009_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running env
+PASS S2 gate VERIFY passes IN FULL against the production plan on the post-S2 restore (afldb_v2_gap029_s3_20261103_081918_rst_test)
+PASS post-S3 restore (afldb_v2_gap029_s4_20261103_090149_rst_test): three S2 hashes equal, baseline_sha256 differs (S3's eight rows exist) -- {"after_state_sha256": true, "picks_after_sha256": true, "newly_linked_sha256": true, "baseline_sha256": false}
+S2 FOLLOW-UP PASS

@@ -1,0 +1,18 @@
+PASS candidate clean at f05a2e78fdd0d90824789ab81ee2d2e4ffe3ab8f
+afldb.service active MainPID=1677
+postgresql@16-main.service active MainPID=1536
+PASS listener is exclusively the cluster we started
+2026-11-03T09:25:46Z F1 S2 gate on the retained post-S2 and post-S3 restores
+isolated-pg: afldb_v2_gap029_final_20261103_091009_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running env
+PASS S2 gate VERIFY passes IN FULL against the production plan on the post-S2 restore (afldb_v2_gap029_s3_20261103_081918_rst_test)
+PASS post-S3 restore (afldb_v2_gap029_s4_20261103_090149_rst_test): three S2 hashes equal, baseline_sha256 differs (S3's eight rows exist) -- {"after_state_sha256": true, "picks_after_sha256": true, "newly_linked_sha256": true, "baseline_sha256": false}
+S2 FOLLOW-UP PASS
+PASS F1 S2 follow-up
+2026-11-03T09:25:49Z F2 draft_picks: the post-S2 rows are an unchanged prefix of the final table; the additions are exactly S3's eight
+isolated-pg: afldb_v2_gap029_final_20261103_091009_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running bash
+PASS post-S2 draft_picks (6810 rows, id <= 6810) identical in the final restore
+PASS rows added after S2: 8, all V2-GAP-029 selections: ["2014#54 p57","2019#35 p8350","2022#3 p10673","2023#11 p11672","2021#10 p8793","2022#21 p10348","2018#2 p9575","2020#1 p2443"]
+PASS F2 draft_picks prefix and additions
+PASS DEV services unchanged
+PASS pinned checkout still clean
+FOLLOW-UP RESULT: PASS
