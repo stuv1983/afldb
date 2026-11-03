@@ -1,0 +1,23 @@
+RECORDED OUTCOME:
+{
+  "stage": "S3",
+  "classification": "COMMITTED_VERIFIED",
+  "exitCode": 0,
+  "committed": true,
+  "notes": [],
+  "toolLogSha256": "3ce7c9edfe8876ff49afe46567239f1ea24e57b75dff5bf1c174547394daac7b",
+  "at": "2026-11-03T09:00:07.958Z"
+}
+
+== apply S3 (S3-20261103T081918Z): tool apply (single attempt) 2026-11-03T09:00:02Z
+OUTCOME COMMITTED_VERIFIED (exit 0)
+COMMITTED AND VERIFIED: the transaction committed and an independent read-only check of the committed state passed.
+[tool log /home/arm/ops/gap029-stages/f05a2e78/runs/S3-20261103T081918Z/logs/apply-1.log exit 0]
+== apply S3 (S3-20261103T081918Z): read-only post-run state probe 2026-11-03T09:00:06Z
+tool exit 0; state probe exit 0
+== apply S3 (S3-20261103T081918Z): outcome 2026-11-03T09:00:07Z
+WRAPPER OUTCOME COMMITTED_VERIFIED (exit 0) stage S3
+COMMITTED AND VERIFIED: the transaction committed and an independent read-only check of the committed state passed.
+post-run state probe: PLANNED RESULT PRESENT
+Next: run `accept` (read-only state + verification); only then prepare the next stage with its OWN fresh backup.
+The wrapper never retries an apply, never claims rollback after a commit and never restores a backup.

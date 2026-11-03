@@ -1,0 +1,19 @@
+== apply S3 (S3-20261103T081918Z): wrapper gates (nothing is written by them) 2026-11-03T09:00:00Z
+MANIFEST VERIFY PASS stage S3 revision f05a2e78fdd0d90824789ab81ee2d2e4ffe3ab8f plan cca95f3ad992a1c4807afbc107d79ab6ef277aa71a5e44190d23dfcef65435f0 class GENUINE_PRODUCTION
+CAPTURE CHECK PASS stage S3 class GENUINE_PRODUCTION profile production dump afldb_prod-20261103T081918Z.dump bytes 30134346 sha256 628749cea9b74b67677e227ddc2e2026c83ec5b596935e6cf1fd3780dc624a54 captured 2026-11-03T08:19:19.026203Z ledger 118
+APPROVAL CHECK PASS for S3 plan cca95f3ad992a1c4807afbc107d79ab6ef277aa71a5e44190d23dfcef65435f0
+no conflicting writer, migration or dump process
+app: active MainPID=3326560
+apply launched detached (a dropped session does not stop it); waiting up to 1800 s for the recorded outcome
+== apply S3 (S3-20261103T081918Z): tool apply (single attempt) 2026-11-03T09:00:02Z
+OUTCOME COMMITTED_VERIFIED (exit 0)
+COMMITTED AND VERIFIED: the transaction committed and an independent read-only check of the committed state passed.
+[tool log /home/arm/ops/gap029-stages/f05a2e78/runs/S3-20261103T081918Z/logs/apply-1.log exit 0]
+== apply S3 (S3-20261103T081918Z): read-only post-run state probe 2026-11-03T09:00:06Z
+tool exit 0; state probe exit 0
+== apply S3 (S3-20261103T081918Z): outcome 2026-11-03T09:00:07Z
+WRAPPER OUTCOME COMMITTED_VERIFIED (exit 0) stage S3
+COMMITTED AND VERIFIED: the transaction committed and an independent read-only check of the committed state passed.
+post-run state probe: PLANNED RESULT PRESENT
+Next: run `accept` (read-only state + verification); only then prepare the next stage with its OWN fresh backup.
+The wrapper never retries an apply, never claims rollback after a commit and never restores a backup.

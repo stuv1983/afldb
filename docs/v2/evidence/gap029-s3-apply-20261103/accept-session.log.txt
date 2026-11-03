@@ -1,0 +1,9 @@
+MANIFEST VERIFY PASS stage S3 revision f05a2e78fdd0d90824789ab81ee2d2e4ffe3ab8f plan cca95f3ad992a1c4807afbc107d79ab6ef277aa71a5e44190d23dfcef65435f0 class GENUINE_PRODUCTION
+STATE PLANNED RESULT PRESENT (every reviewed selection is present)
+[tool log /home/arm/ops/gap029-stages/f05a2e78/runs/S3-20261103T081918Z/logs/state-3.log exit 0]
+Read-only verification: 8/8 selections present
+[tool log /home/arm/ops/gap029-stages/f05a2e78/runs/S3-20261103T081918Z/logs/verify-1.log exit 0]
+ACCEPTANCE RECORDED for S3 plan cca95f3ad992a1c4807afbc107d79ab6ef277aa71a5e44190d23dfcef65435f0
+ACCEPTED stage=S3 run=S3-20261103T081918Z
+ANALYZE is not run by this wrapper (no privilege grant is authorised); the stage tools and autovacuum own statistics.
+== DONE accept 2026-11-03T09:00:17Z
