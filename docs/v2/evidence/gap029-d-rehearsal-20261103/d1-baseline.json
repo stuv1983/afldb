@@ -1,0 +1,18 @@
+{
+  "target": {
+    "host": "127.0.0.1",
+    "port": 55432,
+    "database": "afldb_v2_gap029_d1_test",
+    "user": "afldb_owner",
+    "systemIdentifier": "7698245742874524392",
+    "databaseOid": "200062",
+    "clusterName": "afldb_v2_isolated",
+    "databaseComment": "afldb-v2-isolated-test"
+  },
+  "revision": "bf6ae1038f1c7e6a0000494098ef439e2de6da98",
+  "baselineDigest": "ef4a40010bf7828d5ded804618ba3013117be7a866e70f7fe3f692a228b220bb",
+  "captaincies": 1774,
+  "maxCaptaincyId": 1774,
+  "importBatches": "66",
+  "capturedAt": "2026-11-03T00:48:19.936Z"
+}

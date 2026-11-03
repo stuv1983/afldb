@@ -289,7 +289,7 @@ describe('family_siblings.py accepted artefact', () => {
   it('the tracked artefact validates offline, its adjudications are exactly the eight recorded, its supplements are the fourteen evidenced pairs, and its reconciliation counts hold', () => {
     const proc = spawnSync(python, ['tools/migration/family_siblings.py', 'load', '--validate-only'], { cwd: repositoryRoot, encoding: 'utf8' });
     expect(proc.status, proc.stderr).toBe(0);
-    expect(proc.stdout).toMatch(/498 sibling pairs, shape verified; provenance revision 1365040810/);
+    expect(proc.stdout).toMatch(/499 sibling pairs, shape verified; provenance revision 1365040810/);
     // Every supplement is a pair the export lacks (its prose rule saw only "X is the father of
     // A and B", or missed the family note), admitted on the people's own articles' words.
     // Absence of an export row is unknown coverage, never a negative.
@@ -309,6 +309,8 @@ describe('family_siblings.py accepted artefact', () => {
       '012 players/T/Travis_Cloke.html ~ players/J/Jason_Cloke.html (brothers)',
       '013 players/T/Travis_Cloke.html ~ players/C/Cameron_Cloke.html (brothers)',
       '014 players/J/Jake_Kelly.html ~ players/W/Will_Kelly.html (brothers)',
+      // V2-GAP-029 D4 (2026-11-03): first-party evidence in the row (afl.com.au 46682, Carlton FC 1385370)
+      '015 players/J/Jeremy_McGovern.html ~ players/M/Mitch_McGovern.html (brothers)',
     ]);
     for (const r of supplements) expect(r[8], r[0]).toMatch(/\bbrothers?\b/); // each quotes a sentence that says brother
     expect(supplements[0][8]).toMatch(/younger brother of Gary Ablett Jr/);

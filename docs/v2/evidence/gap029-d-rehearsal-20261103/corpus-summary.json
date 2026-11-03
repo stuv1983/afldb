@@ -1,0 +1,644 @@
+{
+ "recordedOn": "2026-11-03",
+ "note": "Gridley corpus, AFLDB_GRIDLEY_DIAGNOSTIC=1, on guarded isolated clones of the production-derived restore (production fingerprints equal the baseline clone: see the read-only census). Full reports are outside Git at D:/tmp/gap029-corpus/<run>/report.json (sha256 recorded).",
+ "runs": {
+  "d1_D1_D3": {
+   "database": "afldb_v2_gap029_d1_test",
+   "reportSha256": "97a44d8dfa1d2a09a4fb5b76d5b1805d92413d5d9aca8f7b77d2c38814112d3c",
+   "draftPicks": 6810,
+   "draftPicksLinked": 5,
+   "captaincies": 1781,
+   "siblingsPairs": 389,
+   "gapDraftLinks": false,
+   "strictFindings": 413,
+   "approvedDeferrals": 78,
+   "approvedDisagreements": 32,
+   "unapproved": 303,
+   "unapprovedByCategory": {
+    "dataset gap": 281,
+    "source coverage gap": 22
+   },
+   "findingsByCategory": {
+    "time of board": 22860,
+    "adjudicated key disagreement": 54,
+    "dataset gap": 281,
+    "unsupported": 78,
+    "list membership": 1223,
+    "external source disagreement": 386,
+    "adjudicated source conflict": 63,
+    "criterion disagreement": 32,
+    "source coverage gap": 22
+   },
+   "unapprovedCells": "(see report; omitted over 60)"
+  },
+  "s1_bridge_D1_D3": {
+   "database": "afldb_v2_gap029_d2_test",
+   "reportSha256": "fda04839f0bb85f373b8d894e2902ede466c26bf5942da4fea7cf69388bff5e7",
+   "draftPicks": 6810,
+   "draftPicksLinked": 5213,
+   "captaincies": 1781,
+   "siblingsPairs": 389,
+   "gapDraftLinks": true,
+   "strictFindings": 155,
+   "approvedDeferrals": 78,
+   "approvedDisagreements": 32,
+   "unapproved": 45,
+   "unapprovedByCategory": {
+    "source coverage gap": 45
+   },
+   "findingsByCategory": {
+    "time of board": 23575,
+    "adjudicated key disagreement": 54,
+    "unsupported": 78,
+    "list membership": 1232,
+    "external source disagreement": 425,
+    "source coverage gap": 45,
+    "adjudicated source conflict": 63,
+    "criterion disagreement": 32
+   },
+   "unapprovedCells": [
+    [
+     81,
+     "2-0",
+     "pickrookie",
+     "SK",
+     "source coverage gap"
+    ],
+    [
+     81,
+     "2-2",
+     "pickrookie",
+     "clubbestfairest",
+     "source coverage gap"
+    ],
+    [
+     81,
+     "2-2",
+     "pickrookie",
+     "clubbestfairest",
+     "source coverage gap"
+    ],
+    [
+     81,
+     "2-1",
+     "pickrookie",
+     "games150",
+     "source coverage gap"
+    ],
+    [
+     81,
+     "2-1",
+     "pickrookie",
+     "games150",
+     "source coverage gap"
+    ],
+    [
+     81,
+     "2-1",
+     "pickrookie",
+     "games150",
+     "source coverage gap"
+    ],
+    [
+     81,
+     "2-1",
+     "pickrookie",
+     "games150",
+     "source coverage gap"
+    ],
+    [
+     81,
+     "2-1",
+     "pickrookie",
+     "games150",
+     "source coverage gap"
+    ],
+    [
+     81,
+     "2-1",
+     "pickrookie",
+     "games150",
+     "source coverage gap"
+    ],
+    [
+     151,
+     "2-2",
+     "pickrookie",
+     "2010s",
+     "source coverage gap"
+    ],
+    [
+     151,
+     "2-2",
+     "pickrookie",
+     "2010s",
+     "source coverage gap"
+    ],
+    [
+     151,
+     "2-2",
+     "pickrookie",
+     "2010s",
+     "source coverage gap"
+    ],
+    [
+     151,
+     "2-2",
+     "pickrookie",
+     "2010s",
+     "source coverage gap"
+    ],
+    [
+     151,
+     "2-2",
+     "pickrookie",
+     "2010s",
+     "source coverage gap"
+    ],
+    [
+     151,
+     "2-2",
+     "pickrookie",
+     "2010s",
+     "source coverage gap"
+    ],
+    [
+     151,
+     "2-2",
+     "pickrookie",
+     "2010s",
+     "source coverage gap"
+    ],
+    [
+     151,
+     "2-2",
+     "pickrookie",
+     "2010s",
+     "source coverage gap"
+    ],
+    [
+     169,
+     "2-1",
+     "pickrookie",
+     "CA",
+     "source coverage gap"
+    ],
+    [
+     169,
+     "2-1",
+     "pickrookie",
+     "CA",
+     "source coverage gap"
+    ],
+    [
+     169,
+     "2-2",
+     "pickrookie",
+     "GW",
+     "source coverage gap"
+    ],
+    [
+     169,
+     "2-0",
+     "pickrookie",
+     "AD",
+     "source coverage gap"
+    ],
+    [
+     169,
+     "2-0",
+     "pickrookie",
+     "AD",
+     "source coverage gap"
+    ],
+    [
+     169,
+     "2-0",
+     "pickrookie",
+     "AD",
+     "source coverage gap"
+    ],
+    [
+     920,
+     "2-2",
+     "brother",
+     "2020s",
+     "source coverage gap"
+    ],
+    [
+     920,
+     "2-2",
+     "brother",
+     "2020s",
+     "source coverage gap"
+    ],
+    [
+     929,
+     "2-2",
+     "brother",
+     "goalscareerlessthan20",
+     "source coverage gap"
+    ],
+    [
+     929,
+     "2-1",
+     "brother",
+     "finalsMoreWinsThanLosses",
+     "source coverage gap"
+    ],
+    [
+     964,
+     "2-2",
+     "brother",
+     "prelimfinals1",
+     "source coverage gap"
+    ],
+    [
+     964,
+     "2-1",
+     "brother",
+     "marks10match",
+     "source coverage gap"
+    ],
+    [
+     964,
+     "2-1",
+     "brother",
+     "marks10match",
+     "source coverage gap"
+    ],
+    [
+     990,
+     "2-1",
+     "brother",
+     "goalscareerlessthan20",
+     "source coverage gap"
+    ],
+    [
+     990,
+     "2-0",
+     "brother",
+     "WC",
+     "source coverage gap"
+    ],
+    [
+     990,
+     "2-2",
+     "brother",
+     "2020s",
+     "source coverage gap"
+    ],
+    [
+     990,
+     "2-2",
+     "brother",
+     "2020s",
+     "source coverage gap"
+    ],
+    [
+     1009,
+     "2-1",
+     "brother",
+     "premier1x",
+     "source coverage gap"
+    ],
+    [
+     1015,
+     "2-2",
+     "brother",
+     "premier1x",
+     "source coverage gap"
+    ],
+    [
+     1073,
+     "2-2",
+     "brother",
+     "2020s",
+     "source coverage gap"
+    ],
+    [
+     1073,
+     "2-2",
+     "brother",
+     "2020s",
+     "source coverage gap"
+    ],
+    [
+     1109,
+     "2-2",
+     "brother",
+     "finals1",
+     "source coverage gap"
+    ],
+    [
+     1109,
+     "2-2",
+     "brother",
+     "finals1",
+     "source coverage gap"
+    ],
+    [
+     1109,
+     "2-0",
+     "brother",
+     "WC",
+     "source coverage gap"
+    ],
+    [
+     1109,
+     "2-1",
+     "brother",
+     "woodenspoon",
+     "source coverage gap"
+    ],
+    [
+     1109,
+     "2-1",
+     "brother",
+     "woodenspoon",
+     "source coverage gap"
+    ],
+    [
+     1114,
+     "2-2",
+     "brother",
+     "grandfinals1",
+     "source coverage gap"
+    ],
+    [
+     1114,
+     "2-1",
+     "brother",
+     "finals10",
+     "source coverage gap"
+    ]
+   ]
+  },
+  "s2_plus_rookies": {
+   "database": "afldb_v2_gap029_d2_test",
+   "reportSha256": "55ec36bdd51591e8189c7cc5ddb709e973a22937df24630a176ce03c3896b842",
+   "draftPicks": 6818,
+   "draftPicksLinked": 5221,
+   "captaincies": 1781,
+   "siblingsPairs": 389,
+   "gapDraftLinks": true,
+   "strictFindings": 132,
+   "approvedDeferrals": 78,
+   "approvedDisagreements": 32,
+   "unapproved": 22,
+   "unapprovedByCategory": {
+    "source coverage gap": 22
+   },
+   "findingsByCategory": {
+    "time of board": 23575,
+    "adjudicated key disagreement": 54,
+    "unsupported": 78,
+    "list membership": 1232,
+    "external source disagreement": 425,
+    "adjudicated source conflict": 63,
+    "criterion disagreement": 32,
+    "source coverage gap": 22
+   },
+   "unapprovedCells": [
+    [
+     920,
+     "2-2",
+     "brother",
+     "2020s",
+     "source coverage gap"
+    ],
+    [
+     920,
+     "2-2",
+     "brother",
+     "2020s",
+     "source coverage gap"
+    ],
+    [
+     929,
+     "2-2",
+     "brother",
+     "goalscareerlessthan20",
+     "source coverage gap"
+    ],
+    [
+     929,
+     "2-1",
+     "brother",
+     "finalsMoreWinsThanLosses",
+     "source coverage gap"
+    ],
+    [
+     964,
+     "2-2",
+     "brother",
+     "prelimfinals1",
+     "source coverage gap"
+    ],
+    [
+     964,
+     "2-1",
+     "brother",
+     "marks10match",
+     "source coverage gap"
+    ],
+    [
+     964,
+     "2-1",
+     "brother",
+     "marks10match",
+     "source coverage gap"
+    ],
+    [
+     990,
+     "2-1",
+     "brother",
+     "goalscareerlessthan20",
+     "source coverage gap"
+    ],
+    [
+     990,
+     "2-2",
+     "brother",
+     "2020s",
+     "source coverage gap"
+    ],
+    [
+     990,
+     "2-2",
+     "brother",
+     "2020s",
+     "source coverage gap"
+    ],
+    [
+     990,
+     "2-0",
+     "brother",
+     "WC",
+     "source coverage gap"
+    ],
+    [
+     1009,
+     "2-1",
+     "brother",
+     "premier1x",
+     "source coverage gap"
+    ],
+    [
+     1015,
+     "2-2",
+     "brother",
+     "premier1x",
+     "source coverage gap"
+    ],
+    [
+     1073,
+     "2-2",
+     "brother",
+     "2020s",
+     "source coverage gap"
+    ],
+    [
+     1073,
+     "2-2",
+     "brother",
+     "2020s",
+     "source coverage gap"
+    ],
+    [
+     1109,
+     "2-2",
+     "brother",
+     "finals1",
+     "source coverage gap"
+    ],
+    [
+     1109,
+     "2-2",
+     "brother",
+     "finals1",
+     "source coverage gap"
+    ],
+    [
+     1109,
+     "2-0",
+     "brother",
+     "WC",
+     "source coverage gap"
+    ],
+    [
+     1109,
+     "2-1",
+     "brother",
+     "woodenspoon",
+     "source coverage gap"
+    ],
+    [
+     1109,
+     "2-1",
+     "brother",
+     "woodenspoon",
+     "source coverage gap"
+    ],
+    [
+     1114,
+     "2-2",
+     "brother",
+     "grandfinals1",
+     "source coverage gap"
+    ],
+    [
+     1114,
+     "2-1",
+     "brother",
+     "finals10",
+     "source coverage gap"
+    ]
+   ]
+  },
+  "s3_plus_mcgovern_final_candidate": {
+   "database": "afldb_v2_gap029_d2_test",
+   "reportSha256": "f6e53c315478ebc7db161d69cd3ef4dc85311f29dcedb30d51d1db55b02ce42f",
+   "draftPicks": 6818,
+   "draftPicksLinked": 5221,
+   "captaincies": 1781,
+   "siblingsPairs": 390,
+   "gapDraftLinks": true,
+   "strictFindings": 118,
+   "approvedDeferrals": 78,
+   "approvedDisagreements": 32,
+   "unapproved": 8,
+   "unapprovedByCategory": {
+    "source coverage gap": 8
+   },
+   "findingsByCategory": {
+    "time of board": 23530,
+    "adjudicated key disagreement": 54,
+    "unsupported": 78,
+    "list membership": 1232,
+    "external source disagreement": 425,
+    "adjudicated source conflict": 63,
+    "criterion disagreement": 32,
+    "source coverage gap": 8
+   },
+   "unapprovedCells": [
+    [
+     920,
+     "2-2",
+     "brother",
+     "2020s",
+     "source coverage gap"
+    ],
+    [
+     929,
+     "2-2",
+     "brother",
+     "goalscareerlessthan20",
+     "source coverage gap"
+    ],
+    [
+     964,
+     "2-1",
+     "brother",
+     "marks10match",
+     "source coverage gap"
+    ],
+    [
+     990,
+     "2-2",
+     "brother",
+     "2020s",
+     "source coverage gap"
+    ],
+    [
+     990,
+     "2-1",
+     "brother",
+     "goalscareerlessthan20",
+     "source coverage gap"
+    ],
+    [
+     1073,
+     "2-2",
+     "brother",
+     "2020s",
+     "source coverage gap"
+    ],
+    [
+     1109,
+     "2-2",
+     "brother",
+     "finals1",
+     "source coverage gap"
+    ],
+    [
+     1109,
+     "2-1",
+     "brother",
+     "woodenspoon",
+     "source coverage gap"
+    ]
+   ]
+  }
+ }
+}

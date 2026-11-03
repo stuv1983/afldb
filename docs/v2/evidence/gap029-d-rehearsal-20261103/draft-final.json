@@ -1,0 +1,396 @@
+{
+ "database": "afldb_v2_gap029_d2_test",
+ "persons": {
+  "n": 5057,
+  "linked": 3564,
+  "backlog": 0,
+  "nonlink": "c5462114ac310209baae5885fabfd590",
+  "link": "7ecaa094b4df31ba24bdaff186485eed"
+ },
+ "picks": {
+  "n": 6818,
+  "linked": 5221,
+  "linked_players": 3564,
+  "nonlink": "c1bf9794eb2a871e4463d4df88625389",
+  "link": "7bf30f5379839fdfe319527ef3a58b52"
+ },
+ "identities": {
+  "n": 5057,
+  "linked": 3564,
+  "nonlink": "dcb31f5fbe57a3273b74c2fc9920377b",
+  "link": "daec604c6f74b155e22576a522662fba"
+ },
+ "afltablesRegistration": {
+  "n": 13367
+ },
+ "pickStatus": [
+  {
+   "s": "unique",
+   "m": "draftguru_person_page_afltables_bridge",
+   "n": 5208
+  },
+  {
+   "s": "unmatched",
+   "m": null,
+   "n": 1596
+  },
+  {
+   "s": "resolved",
+   "m": "manual_admin_edit",
+   "n": 8
+  },
+  {
+   "s": "resolved",
+   "m": "draftguru_explicit_admin_decision",
+   "n": 5
+  },
+  {
+   "s": "unmatched",
+   "m": "draftguru_explicit_admin_decision",
+   "n": 1
+  }
+ ],
+ "byKind": [
+  {
+   "k": "free_agency",
+   "n": 138,
+   "linked": 138
+  },
+  {
+   "k": "midseason",
+   "n": 280,
+   "linked": 166
+  },
+  {
+   "k": "mini_draft",
+   "n": 4,
+   "linked": 4
+  },
+  {
+   "k": "national",
+   "n": 3089,
+   "linked": 2385
+  },
+  {
+   "k": "post_draft",
+   "n": 188,
+   "linked": 142
+  },
+  {
+   "k": "pre_draft",
+   "n": 370,
+   "linked": 298
+  },
+  {
+   "k": "preseason",
+   "n": 541,
+   "linked": 428
+  },
+  {
+   "k": "rookie",
+   "n": 1217,
+   "linked": 690
+  },
+  {
+   "k": "trade",
+   "n": 990,
+   "linked": 969
+  },
+  {
+   "k": "training_squad_selection",
+   "n": 1,
+   "linked": 1
+  }
+ ],
+ "byYear": [
+  {
+   "y": 1981,
+   "n": 24,
+   "linked": 16
+  },
+  {
+   "y": 1982,
+   "n": 24,
+   "linked": 17
+  },
+  {
+   "y": 1986,
+   "n": 71,
+   "linked": 32
+  },
+  {
+   "y": 1987,
+   "n": 65,
+   "linked": 28
+  },
+  {
+   "y": 1988,
+   "n": 182,
+   "linked": 107
+  },
+  {
+   "y": 1989,
+   "n": 238,
+   "linked": 130
+  },
+  {
+   "y": 1990,
+   "n": 275,
+   "linked": 165
+  },
+  {
+   "y": 1991,
+   "n": 228,
+   "linked": 143
+  },
+  {
+   "y": 1992,
+   "n": 262,
+   "linked": 175
+  },
+  {
+   "y": 1993,
+   "n": 132,
+   "linked": 111
+  },
+  {
+   "y": 1994,
+   "n": 222,
+   "linked": 186
+  },
+  {
+   "y": 1995,
+   "n": 166,
+   "linked": 140
+  },
+  {
+   "y": 1996,
+   "n": 235,
+   "linked": 187
+  },
+  {
+   "y": 1997,
+   "n": 180,
+   "linked": 137
+  },
+  {
+   "y": 1998,
+   "n": 165,
+   "linked": 129
+  },
+  {
+   "y": 1999,
+   "n": 184,
+   "linked": 140
+  },
+  {
+   "y": 2000,
+   "n": 170,
+   "linked": 139
+  },
+  {
+   "y": 2001,
+   "n": 156,
+   "linked": 119
+  },
+  {
+   "y": 2002,
+   "n": 146,
+   "linked": 116
+  },
+  {
+   "y": 2003,
+   "n": 150,
+   "linked": 112
+  },
+  {
+   "y": 2004,
+   "n": 141,
+   "linked": 109
+  },
+  {
+   "y": 2005,
+   "n": 138,
+   "linked": 110
+  },
+  {
+   "y": 2006,
+   "n": 146,
+   "linked": 119
+  },
+  {
+   "y": 2007,
+   "n": 149,
+   "linked": 116
+  },
+  {
+   "y": 2008,
+   "n": 153,
+   "linked": 113
+  },
+  {
+   "y": 2009,
+   "n": 193,
+   "linked": 156
+  },
+  {
+   "y": 2010,
+   "n": 200,
+   "linked": 159
+  },
+  {
+   "y": 2011,
+   "n": 187,
+   "linked": 152
+  },
+  {
+   "y": 2012,
+   "n": 160,
+   "linked": 142
+  },
+  {
+   "y": 2013,
+   "n": 153,
+   "linked": 127
+  },
+  {
+   "y": 2014,
+   "n": 166,
+   "linked": 134
+  },
+  {
+   "y": 2015,
+   "n": 176,
+   "linked": 152
+  },
+  {
+   "y": 2016,
+   "n": 173,
+   "linked": 149
+  },
+  {
+   "y": 2017,
+   "n": 150,
+   "linked": 130
+  },
+  {
+   "y": 2018,
+   "n": 203,
+   "linked": 165
+  },
+  {
+   "y": 2019,
+   "n": 143,
+   "linked": 117
+  },
+  {
+   "y": 2020,
+   "n": 155,
+   "linked": 132
+  },
+  {
+   "y": 2021,
+   "n": 141,
+   "linked": 123
+  },
+  {
+   "y": 2022,
+   "n": 161,
+   "linked": 125
+  },
+  {
+   "y": 2023,
+   "n": 153,
+   "linked": 131
+  },
+  {
+   "y": 2024,
+   "n": 160,
+   "linked": 124
+  },
+  {
+   "y": 2025,
+   "n": 142,
+   "linked": 107
+  }
+ ],
+ "adminDecisions": [
+  {
+   "id": 1000,
+   "draft_year": 1991,
+   "draft_kind": "national",
+   "pick_number": 76,
+   "player_id": 9310,
+   "link_status_value": "resolved",
+   "match_method": "draftguru_explicit_admin_decision"
+  },
+  {
+   "id": 2552,
+   "draft_year": 1999,
+   "draft_kind": "national",
+   "pick_number": 56,
+   "player_id": 11590,
+   "link_status_value": "resolved",
+   "match_method": "draftguru_explicit_admin_decision"
+  },
+  {
+   "id": 3846,
+   "draft_year": 2007,
+   "draft_kind": "rookie",
+   "pick_number": 58,
+   "player_id": null,
+   "link_status_value": "unmatched",
+   "match_method": "draftguru_explicit_admin_decision"
+  },
+  {
+   "id": 4070,
+   "draft_year": 2009,
+   "draft_kind": "national",
+   "pick_number": 20,
+   "player_id": 9762,
+   "link_status_value": "resolved",
+   "match_method": "draftguru_explicit_admin_decision"
+  },
+  {
+   "id": 6763,
+   "draft_year": 2025,
+   "draft_kind": "rookie",
+   "pick_number": 1,
+   "player_id": 13364,
+   "link_status_value": "resolved",
+   "match_method": "draftguru_explicit_admin_decision"
+  },
+  {
+   "id": 6764,
+   "draft_year": 2025,
+   "draft_kind": "rookie",
+   "pick_number": 3,
+   "player_id": 13365,
+   "link_status_value": "resolved",
+   "match_method": "draftguru_explicit_admin_decision"
+  }
+ ],
+ "batches": [
+  {
+   "id": "15",
+   "tool": "import_draftguru.py",
+   "status": "completed",
+   "notes": "",
+   "error": ""
+  },
+  {
+   "id": "71",
+   "tool": "import_draftguru.py",
+   "status": "failed",
+   "notes": "mode=link_only stage_a_snapshot=annual-html-20260826 bridge_sha256=e55fb5c17ff71c95c1a0d97f10ba05b49",
+   "error": "DryRunComplete: "
+  },
+  {
+   "id": "72",
+   "tool": "import_draftguru.py",
+   "status": "completed",
+   "notes": "mode=link_only stage_a_snapshot=annual-html-20260826 bridge_sha256=e55fb5c17ff71c95c1a0d97f10ba05b49",
+   "error": ""
+  }
+ ]
+}

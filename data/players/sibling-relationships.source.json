@@ -18,23 +18,23 @@
     "spouse": 2
   },
   "raw_sibling_rows": 485,
-  "supplement_pairs": 14,
+  "supplement_pairs": 15,
   "normalised_on": "2026-09-05",
   "measures": {
-    "pairs": 498,
-    "pairs_both_linked": 389,
+    "pairs": 499,
+    "pairs_both_linked": 390,
     "pairs_one_linked": 64,
     "pairs_unlinked": 45,
-    "brother_pairs_linked": 389,
-    "players_with_brother": 658,
+    "brother_pairs_linked": 390,
+    "players_with_brother": 660,
     "unlinked_sides": 154,
     "ambiguous_sides": 0,
     "adjudicated_sides": 9,
     "merged_duplicate_rows": 1,
-    "supplement_pairs": 14
+    "supplement_pairs": 15
   },
   "labels": {
-    "brothers": 467,
+    "brothers": 468,
     "siblings": 13,
     "sisters": 8,
     "twin brothers": 7,

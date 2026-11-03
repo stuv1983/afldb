@@ -1,0 +1,88 @@
+{
+  "version": 1,
+  "reference": "V2-GAP-029",
+  "status": "PROPOSAL ONLY — not owner-approved, not wired into any policy or test",
+  "decision": "D4 (Webster)",
+  "player": {
+    "aflPlayerIdOnProduction": 7271,
+    "name": "Jimmy Webster",
+    "afltablesProfile": "players/J/Jimmy_Webster.html"
+  },
+  "relationship": {
+    "established": true,
+    "brother": "Zac Webster",
+    "source": "https://www.afl.com.au/news/76126/tough-tasmanians-growing-stature",
+    "quote": "Zac is \"the brother of second-year St Kilda half-back Jimmy Webster\""
+  },
+  "participation": {
+    "seniorAflGamesFound": 0,
+    "basis": [
+      "AFL Tables Hawthorn all-time list (https://afltables.com/afl/stats/alltime/hawthorn.html) carries no Zac or Zachary Webster (re-checked by the lead)",
+      "hawthornfc.com.au/news/410320: eight VFL/VFL-development appearances in 2015 and 'yet to make his AFL debut' (agent-reported, undated, ~Dec 2015)",
+      "Hawthorn rookie 2013 (round 3, pick 48), senior list 2014, delisted October 2016 (Footywire, secondary)"
+    ],
+    "confidence": "medium-high; no source states '0 AFL games' outright; no profile page for Zac exists on AFL Tables (404)"
+  },
+  "rule": "has_brother requires the brother's player_career_stats.games > 0 (identical to D-GAP029-21 / D-GAP029-D3)",
+  "interpretation": "Same shape as Lyons: the brother was AFL-listed but has no senior appearance; modern state-league VFL appearances do not satisfy the rule. Gridley's key lists Webster, so this is a criterion disagreement, not a missing sibling pair. No data correction is supportable: inserting Zac as a sibling would not change has_brother (games = 0) and AFL Tables has no Zac profile to link.",
+  "openQuestion": "Whether Jimmy has any OTHER brother who played senior VFL/AFL football was not established; none was found. Absence stays UNKNOWN.",
+  "proposedApproval": "If approved: extend the existing adjudication mechanism with an enumerated, hash-pinned cell list for Webster (the 8 cells below), same predicate, no blanket approval. Until then the 8 cells stay unapproved.",
+  "cells": [
+    {
+      "board": 920,
+      "cell": "2-2",
+      "date": "2026-01-21",
+      "row": "brother",
+      "col": "2020s"
+    },
+    {
+      "board": 929,
+      "cell": "2-2",
+      "date": "2026-01-30",
+      "row": "brother",
+      "col": "goalscareerlessthan20"
+    },
+    {
+      "board": 964,
+      "cell": "2-1",
+      "date": "2026-03-06",
+      "row": "brother",
+      "col": "marks10match"
+    },
+    {
+      "board": 990,
+      "cell": "2-2",
+      "date": "2026-04-01",
+      "row": "brother",
+      "col": "2020s"
+    },
+    {
+      "board": 990,
+      "cell": "2-1",
+      "date": "2026-04-01",
+      "row": "brother",
+      "col": "goalscareerlessthan20"
+    },
+    {
+      "board": 1073,
+      "cell": "2-2",
+      "date": "2026-06-23",
+      "row": "brother",
+      "col": "2020s"
+    },
+    {
+      "board": 1109,
+      "cell": "2-2",
+      "date": "2026-07-29",
+      "row": "brother",
+      "col": "finals1"
+    },
+    {
+      "board": 1109,
+      "cell": "2-1",
+      "date": "2026-07-29",
+      "row": "brother",
+      "col": "woodenspoon"
+    }
+  ]
+}

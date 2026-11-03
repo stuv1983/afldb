@@ -1,0 +1,54 @@
+# GAP-029 D1/D2/D4 read-only production census, 2026-11-03 (output of D:	mp\gap029-d\prod-census.sh; script sha256 recorded in the handoff).
+# One SSH session to `afldb` (host afldb-prod) as `arm`; psql as role afldb_import with default_transaction_read_only=on, statement_timeout 60s,
+# lock_timeout 3s; DSN parsed in-process from the checkout .env and never printed; no remote file written.
+# Not errors: the PowerShell host reported the first-line BOM and a CR in the piped script (harmless); the final `player_relationships`
+# query used a column name that does not exist and was not retried here (sibling presence is measured on the clones, not production).
+UTC=2026-11-03T00:54:11Z
+== identity
+afldb_prod|afldb_import|66668|16/main|on
+== system identifier
+7674454702926115004
+== captaincies
+1774|1774|23|23|13656140bbfb0cfc0fa915afb0472f21
+== captaincies seven keys present (expect 0)
+0
+== captaincies natural-key clashes for the seven (expect 0)
+0
+== identity resolution (profile|player ids|display names)
+players/C/Cameron_Bruce.html|2489|Cameron Bruce
+players/J/James_McDonald.html|6730|James McDonald
+players/J/Jarrod_Witts.html|6815|Jarrod Witts
+players/J/Jeremy_McGovern.html|6937|Jeremy McGovern
+players/J/Jimmy_Webster.html|7271|Jimmy Webster
+players/M/Mitch_McGovern.html|9714|Mitch McGovern
+players/S/Steven_May.html|12093|Steven May
+== clubs / source / seasons
+11|Gold Coast
+15|Melbourne
+11|wikipedia
+== draft state
+5057|5|3516|6810|5
+unmatched|-|6804
+resolved|draftguru_explicit_admin_decision|5
+unmatched|draftguru_explicit_admin_decision|1
+afltables|resolved|afltables_profile_url|92|92
+afltables|unique|afltables_profile_url|13275|13275
+draftguru|resolved|draftguru_explicit_admin_decision|5|5
+draftguru|unmatched|-|5051|0
+draftguru|unmatched|draftguru_explicit_admin_decision|1|0
+stage_a_snapshot=annual-html-20260826|5057
+15|import_draftguru.py|completed|2026-09-28 06:58:19.451743+10
+== draft non-link and link digests (persons / picks / draftguru identities)
+c5462114ac310209baae5885fabfd590|ae34d7b20fdce217ff1cf354bfa4ef08
+77f578dea95541a8e708de4cb34d8eea|9e8fe5a246bf1b609783e61b2da29990
+dcb31f5fbe57a3273b74c2fc9920377b|8516dc5274039d33aa3983984666a983
+== afltables registration (rows, distinct external ids)
+13367|13367
+== max season / 2026
+2026|218
+== siblings
+ERROR:  column "relationship_type" does not exist
+LINE 1: select count(*) from player_relationships where relationship...
+                                                        ^
+== done
+bash: line 29: $'\r': command not found
