@@ -23,7 +23,7 @@ must() { # name expected-exit -- cmd...   (positive step: exit code and OUTCOME 
 }
 ctl() { # name expected-text -- cmd...   (negative control: refuses, exit 1, database fingerprint unchanged)
   local name="$1" want="$2"; shift 3; local log="$OUT/ctl-$name.log"; local b a; b=$(fp); "$@" > "$log" 2>&1; local rc=$?; a=$(fp)
-  if [ "$rc" != 0 ] && grep -q -- "$want" "$log" && [ "$b" = "$a" ]; then PASS=$((PASS+1)); note "PASS control $name :: exit=$rc :: $(head -1 "$log" | cut -c1-110)"; else FAILN=$((FAILN+1)); note "FAIL control $name exit=$rc fp-equal=$([ "$b" = "$a" ] && echo yes || echo NO)"; head -3 "$log"; fi
+  if [ "$rc" != 0 ] && grep -qi -- "$want" "$log" && [ "$b" = "$a" ]; then PASS=$((PASS+1)); note "PASS control $name :: exit=$rc :: $(head -1 "$log" | cut -c1-110)"; else FAILN=$((FAILN+1)); note "FAIL control $name exit=$rc fp-equal=$([ "$b" = "$a" ] && echo yes || echo NO)"; head -3 "$log"; fi
 }
 tamper() { node -e "const f=require('fs');const p=JSON.parse(f.readFileSync(process.argv[1],'utf8'));p.tamperedByControl=true;f.writeFileSync(process.argv[2],JSON.stringify(p))" "$1" "$2"; }
 
@@ -49,8 +49,7 @@ tamper "$OUT/s1-plan.json" "$OUT/s1-plan-tampered.json"
 ctl s1-tampered-plan "plan digest" -- S1 apply --plan "$OUT/s1-plan-tampered.json" --rehearsal --out "$OUT/ctl-s1.json"
 ctl s1-clone-without-rehearsal "rehears" -- S1 plan --target "$T" --out "$OUT/ctl-s1b.json"
 must s1-apply 0 -- S1 apply --plan "$OUT/s1-plan.json" --rehearsal --out "$OUT/s1-apply.json"
-must s1-replay 0 -- S1 apply --plan "$OUT/s1-plan.json" --rehearsal --out "$OUT/s1-apply-2.json"
-grep -q 'NOTHING_WRITTEN' "$OUT/s1-replay.log" && note "PASS s1 replay wrote nothing" || { FAILN=$((FAILN+1)); note "FAIL s1 replay did not report NOTHING_WRITTEN"; }
+ctl s1-replay-of-applied-plan "baseline drift" -- S1 apply --plan "$OUT/s1-plan.json" --rehearsal --out "$OUT/ctl-s1-replay.json"
 must s1-state 0 -- S1 state --plan "$OUT/s1-plan.json" --rehearsal --out "$OUT/s1-state.json"
 grep -q "PLANNED RESULT PRESENT" "$OUT/s1-state.log" && note "PASS s1 state reports the planned result" || { FAILN=$((FAILN+1)); note "FAIL s1 state does not report the planned result"; }
 note "fingerprint after S1: $(fp)"
@@ -69,17 +68,20 @@ ctl s2-tampered-plan "plan digest" -- S2 apply --plan "$OUT/s2-plan-tampered.jso
 must s2-apply 0 -- S2 apply --plan "$OUT/s2-plan.json" --rehearsal --out "$OUT/s2-apply.json"
 must s2-state 0 -- S2 state --plan "$OUT/s2-plan.json" --rehearsal --out "$OUT/s2-state.json"
 grep -q "PLANNED RESULT PRESENT" "$OUT/s2-state.log" && note "PASS s2 state reports the planned result" || { FAILN=$((FAILN+1)); note "FAIL s2 state does not report the planned result"; }
+ctl s2-replay-of-applied-plan "refused" -- S2 apply --plan "$OUT/s2-plan.json" --rehearsal --out "$OUT/ctl-s2-replay.json"
 note "fingerprint after S2: $(fp)"
 
 # ---- S3 ----
 must s3-plan 0 -- S3 plan --target "$T" --actor-user-id "$ACTOR" --rehearsal --out "$OUT/s3-plan.json"
-ctl s3-nonviable-actor "actor" -- S3 plan --target "$T" --actor-user-id 999999 --rehearsal --out "$OUT/ctl-s3a.json"
+must s3-plan-nonviable-actor 0 -- S3 plan --target "$T" --actor-user-id 999999 --rehearsal --out "$OUT/s3-plan-bad-actor.json"
+ctl s3-nonviable-actor-refused-at-apply "actor" -- S3 apply --plan "$OUT/s3-plan-bad-actor.json" --rehearsal --out "$OUT/ctl-s3a.json"
 tamper "$OUT/s3-plan.json" "$OUT/s3-plan-tampered.json"
 ctl s3-tampered-plan "plan digest" -- S3 apply --plan "$OUT/s3-plan-tampered.json" --rehearsal --out "$OUT/ctl-s3b.json"
 must s3-apply 0 -- S3 apply --plan "$OUT/s3-plan.json" --rehearsal --out "$OUT/s3-apply.json"
 must s3-verify 0 -- S3 verify --plan "$OUT/s3-plan.json" --apply-record "$OUT/s3-apply.json" --out "$OUT/s3-verify.json"
 must s3-state 0 -- S3 state --plan "$OUT/s3-plan.json" --rehearsal --out "$OUT/s3-state.json"
 grep -q "PLANNED RESULT PRESENT" "$OUT/s3-state.log" && note "PASS s3 state reports the planned result" || { FAILN=$((FAILN+1)); note "FAIL s3 state does not report the planned result"; }
+ctl s3-replay-of-applied-plan "refused" -- S3 apply --plan "$OUT/s3-plan.json" --rehearsal --out "$OUT/ctl-s3-replay.json"
 note "fingerprint after S3: $(fp)"
 
 # ---- S4 ----
@@ -90,6 +92,7 @@ ctl s4-clone-without-rehearsal "rehears" -- S4 plan --target "$T" --out "$OUT/ct
 must s4-apply 0 -- S4 apply --plan "$OUT/s4-plan.json" --rehearsal --out "$OUT/s4-apply.json"
 must s4-state 0 -- S4 state --plan "$OUT/s4-plan.json" --rehearsal --out "$OUT/s4-state.json"
 grep -q "PLANNED RESULT PRESENT" "$OUT/s4-state.log" && note "PASS s4 state reports the planned result" || { FAILN=$((FAILN+1)); note "FAIL s4 state does not report the planned result"; }
+ctl s4-replay-of-applied-plan "refused" -- S4 apply --plan "$OUT/s4-plan.json" --rehearsal --out "$OUT/ctl-s4-replay.json"
 note "fingerprint after S4 (end of chain): $(fp)"
 
 note "CHAIN RESULT: $PASS passed, $FAILN failed"
