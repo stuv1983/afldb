@@ -1,0 +1,41 @@
+2026-11-03T05:11:35Z Q0 inputs
+host=streamanator user=arm kernel=Linux 6.8.0-147-generic node=v22.23.2 python=Python 3.12.3 pg_restore=pg_restore (PostgreSQL) 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+PASS candidate clean at 96fc69bb47a74d99ee166826cf8df6dc27fec3ba
+PASS dump sha256 verified
+PASS chain dump sha256 verified
+afldb.service active MainPID=1677
+postgresql@16-main.service active MainPID=1536
+2026-11-03T05:11:35Z Q1 static: typecheck, focused DB-free tests, Python contract, original gate
+PASS tsc --noEmit clean
+PASS focused GAP-029 + season-seal suites (      Tests  127 passed (127))
+PASS Python contract (41 checks)
+PASS bridge_import_gate.py byte-identical (fbce43f7...558d)
+2026-11-03T05:11:52Z Q2 start the guarded cluster, restore the retained baseline into a disposable chain database
+PASS listener is exclusively the cluster we started (127.0.0.1:55493)
+PASS restored ledger starts 117_
+2026-11-03T05:12:04Z Q3 the four-stage chain and its negative controls (S1 -> S2 -> S3 -> S4 on one disposable clone)
+PASS chain: CHAIN RESULT: 30 passed, 0 failed
+2026-11-03T05:12:43Z Q4 evidence assembly from a fresh restore, with its negative controls (one data stage shown; run restore-assemble-host.sh per stage for the real packages)
+PASS restore evidence generated from the guarded restored database
+PASS assembled sealed S1 evidence: Assembled S1 restore evidence at revision 96fc69bb47a7; backup sha256 9119895bcb5d; seal e8e31ea0baa5; sha256 cc3584fb819cffa7c53847d960ef8c7a0dfc95fa
+PASS assembled sealed S2 evidence: Assembled S2 restore evidence at revision 96fc69bb47a7; backup sha256 9119895bcb5d; seal e368caf1df75; sha256 0d21625b76fc52786e2f22ac5dd48d84ce3c9e81
+PASS assembled sealed S3 evidence: Assembled S3 restore evidence at revision 96fc69bb47a7; backup sha256 9119895bcb5d; seal e176e654fd4d; sha256 3b68843b1504c0f253def95c538f12072e91ff8c
+PASS assembled sealed S4 evidence: Assembled S4 restore evidence at revision 96fc69bb47a7; backup sha256 9119895bcb5d; seal fe031a999fc7; sha256 4f2816075d79bd78307e6ff6bad47c81c365ca17
+PASS assembler refuses wrong-dump-sha
+PASS assembler refuses stale-evidence
+PASS assembler refuses evidence-for-another-dump
+PASS assembler refuses evidence-for-another-source
+PASS assembler refuses output-exists
+PASS assembler refuses work-dir-exists
+cc3584fb819cffa7c53847d960ef8c7a0dfc95fa88330729feeac038dd83d5eb  /mnt/ssd/afldb-v2-gap029h-20261103T044914Z/evidence-private/q4/asm-backup-S1.json
+0d21625b76fc52786e2f22ac5dd48d84ce3c9e81b4ba570251b5bd8f6b30c7a4  /mnt/ssd/afldb-v2-gap029h-20261103T044914Z/evidence-private/q4/asm-backup-S2.json
+3b68843b1504c0f253def95c538f12072e91ff8c51fd5527b178855a5bffaaa0  /mnt/ssd/afldb-v2-gap029h-20261103T044914Z/evidence-private/q4/asm-backup-S3.json
+4f2816075d79bd78307e6ff6bad47c81c365ca178a991e9dc117b2ef1ee48145  /mnt/ssd/afldb-v2-gap029h-20261103T044914Z/evidence-private/q4/asm-backup-S4.json
+S2 draftLinkRestorePlanExpect equals the chain plan expectation
+PASS assembled S2 expectation == plan expectation on the same baseline
+2026-11-03T05:13:04Z Q5 affected editor integration and focused regressions (against a disposable database; AFLDB_TEST_DATABASE_URL is set by the guarded runner)
+PASS editor integration + focused regressions (      Tests  241 passed | 6 skipped (247))
+Q6 corpus re-measurement SKIPPED by SKIP_CORPUS=1 (measured in another run)
+2026-11-03T05:13:22Z Q7 stop the cluster, prove isolation
+PASS DEV services unchanged (afldb.service, postgresql@16-main.service: state and MainPID)
+QUALIFICATION RESULT: PASS  revision 96fc69bb47a74d99ee166826cf8df6dc27fec3ba  host streamanator user arm

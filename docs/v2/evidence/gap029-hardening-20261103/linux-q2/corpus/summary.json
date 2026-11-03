@@ -1,0 +1,38 @@
+{
+  "reportSha256": "6ae3f36b82e2817a3a613f176d47107e0699b5eed6ed72376d889507da995ca6",
+  "cells": 10287,
+  "solvedCells": 10209,
+  "strictCorpusParity": {
+    "passed": false,
+    "findings": 118
+  },
+  "approvedTotal": {
+    "findings": 118,
+    "dataMatches": 0
+  },
+  "approvedPolicyConformance": {
+    "passed": true,
+    "unapprovedDifferences": []
+  },
+  "incorrectKnownAnswer": 0,
+  "knownAnswerAdjudications": [
+    "players/C/Cameron_Bruce.html captain/gridley_omits -> afldb 2489: current",
+    "players/D/David_Swallow.html games250sameclub/gridley_lists -> afldb 3581: current",
+    "players/D/Dylan_Shiel.html games100clubs2/gridley_lists -> afldb 4006: current"
+  ],
+  "findingsByCategory": {
+    "time of board": 23530,
+    "adjudicated key disagreement": 54,
+    "unsupported": 78,
+    "list membership": 1232,
+    "external source disagreement": 425,
+    "adjudicated source conflict": 63,
+    "criterion disagreement": 40
+  },
+  "checks": {
+    "conformancePassed": true,
+    "zeroUnapprovedDifferences": true,
+    "zeroIncorrectKnownAnswers": true,
+    "strictParityRetainedAt118": true
+  }
+}

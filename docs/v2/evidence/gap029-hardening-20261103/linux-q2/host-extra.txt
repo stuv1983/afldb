@@ -1,0 +1,66 @@
+--- sha256 of the corpus report (not copied):
+6ae3f36b82e2817a3a613f176d47107e0699b5eed6ed72376d889507da995ca6  corpus/report.json
+9805353 bytes
+--- chain file listing
+child-export.log
+child.json
+ctl-s1-clone-without-rehearsal.log
+ctl-s1-replay-of-applied-plan.log
+ctl-s1-tampered-plan.log
+ctl-s2-clone-without-rehearsal.log
+ctl-s2-missing-label.log
+ctl-s2-no-production-dry-run.log
+ctl-s2-replay-of-applied-plan.log
+ctl-s2-tampered-plan.log
+ctl-s2-wrong-child-sha.log
+ctl-s3-nonviable-actor-refused-at-apply.log
+ctl-s3-replay-of-applied-plan.log
+ctl-s3-tampered-plan.log
+ctl-s4-clone-without-rehearsal.log
+ctl-s4-replay-of-applied-plan.log
+ctl-s4-tampered-plan.log
+fake-prod-target.json
+s1-apply.json
+s1-apply.log
+s1-baseline.json
+s1-baseline.log
+s1-plan.json
+s1-plan.log
+s1-plan-tampered.json
+s1-state.json
+s1-state.log
+s2-apply.json
+s2-apply.log
+s2-apply.writer.log
+s2-plan.json
+s2-plan.log
+s2-plan-tampered.json
+s2-state.json
+s2-state.log
+s3-apply.json
+s3-apply.log
+s3-plan-bad-actor.json
+s3-plan.json
+s3-plan.log
+s3-plan-nonviable-actor.log
+s3-plan-tampered.json
+s3-state.json
+s3-state.log
+s3-verify.json
+s3-verify.log
+s4-apply.json
+s4-apply.log
+s4-apply.writer.log
+s4-plan.json
+s4-plan.log
+s4-plan-tampered.json
+s4-state.json
+s4-state.log
+summary.txt
+target.json
+--- fingerprints
+fingerprint at start: 66:159:59e0794592301e8a5427d3bd2e49ab5b:28d5e0d3bca943c48470ba8f2082aceb:0e5444f8e3bfc05612ebe49cf260a125:6c6a93696c6ecc92de4de56fc0df5e2e
+fingerprint after S1: 67:159:59e0794592301e8a5427d3bd2e49ab5b:826feb4129963ec14495d3985ec1c1af:0e5444f8e3bfc05612ebe49cf260a125:6c6a93696c6ecc92de4de56fc0df5e2e
+fingerprint after S2: 68:159:54aa7be43e25ca8a35706cd47d1ada0d:826feb4129963ec14495d3985ec1c1af:0e5444f8e3bfc05612ebe49cf260a125:6c6a93696c6ecc92de4de56fc0df5e2e
+fingerprint after S3: 68:167:a77601b99fd90c755a14d2aff3f7de87:826feb4129963ec14495d3985ec1c1af:0e5444f8e3bfc05612ebe49cf260a125:014a50e83d80d7ac13ab5578b1a3ebd6
+fingerprint after S4 (end of chain): 69:167:a77601b99fd90c755a14d2aff3f7de87:826feb4129963ec14495d3985ec1c1af:71872af1bf26a34fe9f1037b33844715:014a50e83d80d7ac13ab5578b1a3ebd6

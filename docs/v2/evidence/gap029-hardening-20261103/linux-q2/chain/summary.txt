@@ -1,0 +1,42 @@
+chain clone: afldb_v2_gap029_q2_chain_test system=7703802821689628919 oid=24450  revision 7d3fd6834b06a995561011e5b8489d41dbab620c
+fingerprint at start: 66:159:59e0794592301e8a5427d3bd2e49ab5b:28d5e0d3bca943c48470ba8f2082aceb:0e5444f8e3bfc05612ebe49cf260a125:6c6a93696c6ecc92de4de56fc0df5e2e
+PASS s1-baseline exit=0 :: 
+PASS s1-plan exit=0 :: 
+PASS control s1-tampered-plan :: exit=1 :: GAP-029 captaincies refused: plan digest, evidence or revision differs
+PASS control s1-clone-without-rehearsal :: exit=1 :: GAP-029 captaincies refused: an isolated clone is rehearsed with --rehearsal
+PASS s1-apply exit=0 :: OUTCOME COMMITTED_VERIFIED (exit 0)
+PASS control s1-replay-of-applied-plan :: exit=1 :: OUTCOME REFUSED_BEFORE_MUTATION (exit 1)
+PASS s1-state exit=0 :: 
+PASS s1 state reports the planned result
+fingerprint after S1: 67:159:59e0794592301e8a5427d3bd2e49ab5b:826feb4129963ec14495d3985ec1c1af:0e5444f8e3bfc05612ebe49cf260a125:6c6a93696c6ecc92de4de56fc0df5e2e
+S2 child sha256 b41453c80c4afc2d9508d2087b8411002ee27891e7c1b0c05bda30a87f875876
+PASS s2-plan exit=0 :: 
+PASS control s2-wrong-child-sha :: exit=1 :: OUTCOME REFUSED_BEFORE_MUTATION (exit 1)
+PASS control s2-missing-label :: exit=1 :: OUTCOME REFUSED_BEFORE_MUTATION (exit 1)
+PASS control s2-no-production-dry-run :: exit=1 :: OUTCOME REFUSED_BEFORE_MUTATION (exit 1)
+PASS control s2-clone-without-rehearsal :: exit=1 :: OUTCOME REFUSED_BEFORE_MUTATION (exit 1)
+PASS control s2-tampered-plan :: exit=1 :: OUTCOME REFUSED_BEFORE_MUTATION (exit 1)
+PASS s2-apply exit=0 :: OUTCOME COMMITTED_VERIFIED (exit 0)
+PASS s2-state exit=0 :: 
+PASS s2 state reports the planned result
+PASS control s2-replay-of-applied-plan :: exit=1 :: OUTCOME REFUSED_BEFORE_MUTATION (exit 1)
+fingerprint after S2: 68:159:54aa7be43e25ca8a35706cd47d1ada0d:826feb4129963ec14495d3985ec1c1af:0e5444f8e3bfc05612ebe49cf260a125:6c6a93696c6ecc92de4de56fc0df5e2e
+PASS s3-plan exit=0 :: 
+PASS s3-plan-nonviable-actor exit=0 :: 
+PASS control s3-nonviable-actor-refused-at-apply :: exit=1 :: OUTCOME REFUSED_BEFORE_MUTATION (exit 1)
+PASS control s3-tampered-plan :: exit=1 :: GAP-029 rookies refused: plan digest differs from its content
+PASS s3-apply exit=0 :: OUTCOME COMMITTED_VERIFIED (exit 0)
+PASS s3-verify exit=0 :: 
+PASS s3-state exit=0 :: 
+PASS s3 state reports the planned result
+PASS control s3-replay-of-applied-plan :: exit=1 :: OUTCOME REFUSED_BEFORE_MUTATION (exit 1)
+fingerprint after S3: 68:167:a77601b99fd90c755a14d2aff3f7de87:826feb4129963ec14495d3985ec1c1af:0e5444f8e3bfc05612ebe49cf260a125:014a50e83d80d7ac13ab5578b1a3ebd6
+PASS s4-plan exit=0 :: 
+PASS control s4-tampered-plan :: exit=1 :: OUTCOME REFUSED_BEFORE_MUTATION (exit 1)
+PASS control s4-clone-without-rehearsal :: exit=1 :: OUTCOME REFUSED_BEFORE_MUTATION (exit 1)
+PASS s4-apply exit=0 :: OUTCOME COMMITTED_VERIFIED (exit 0)
+PASS s4-state exit=0 :: 
+PASS s4 state reports the planned result
+PASS control s4-replay-of-applied-plan :: exit=1 :: OUTCOME REFUSED_BEFORE_MUTATION (exit 1)
+fingerprint after S4 (end of chain): 69:167:a77601b99fd90c755a14d2aff3f7de87:826feb4129963ec14495d3985ec1c1af:71872af1bf26a34fe9f1037b33844715:014a50e83d80d7ac13ab5578b1a3ebd6
+CHAIN RESULT: 30 passed, 0 failed
