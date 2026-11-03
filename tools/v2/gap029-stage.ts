@@ -114,6 +114,8 @@ async function prepare(c: Ctx, tar: string, tarSha: string): Promise<void> {
   const field = (name: string): string => new RegExp(`^${name}=(.+)$`, 'm').exec(cap.out)?.[1]?.trim() ?? fail(`capture output has no ${name}`);
   const run = field('RUN'); const capDir = field('CAPTURE_DIR'); const runDir = field('RUN_DIR'); const targetSha = field('TARGET_SHA256');
   if (!/CAPTURE_COMPLETE/.test(cap.out) || !new RegExp(`^${c.stage}-\\d{8}T\\d{6}Z$`).test(run)) fail('capture did not complete');
+  // the host's reported paths are never trusted: both are derivable from the profile and the run name
+  if (runDir !== `${prodOps(c)}/runs/${run}` || capDir !== `${c.profile.BACKUP_ROOT}/gap029-${c.stage}-${run.slice(c.stage.length + 1)}`) fail('the production host reported a run or capture directory that is not the one derived from the profile');
   const local = join(runLocalBase, run); mkdirSync(join(local, 'capture'), { recursive: true });
   record.run = run; record.remoteRunDir = runDir; record.remoteCaptureDir = capDir; record.localDir = local;
   left = `the production host keeps capture ${capDir} and run ${runDir} (private, mode 700, never deleted by this tool); the workstation keeps ${local}`;
@@ -187,6 +189,7 @@ function printCommands(c: Ctx, local: string, rec: Record<string, any>): void {
 async function viaRun(runDir: string, phase: string, extra: string[] = []): Promise<number> {
   const rec = JSON.parse(readFileSync(join(resolve(runDir), 'run.json'), 'utf8')) as Record<string, any>;
   const c = ctxFrom(rec.stage, rec.revision, '', '', '', '');
+  if (rec.profileSha256 !== c.profileSha || rec.evidenceClass !== c.profile.EVIDENCE_CLASS) fail(`this run was prepared with profile ${String(rec.profileSha256).slice(0, 12)}... (${String(rec.evidenceClass)}); the profile now loaded is ${c.profileSha.slice(0, 12)}... (${c.profile.EVIDENCE_CLASS}). Unset GAP029_PROFILE / GAP029_REMOTE_ENV or load the profile the run was prepared with`);
   const r = await ssh(c.prodHost, withEnv(c, `bash ${q(prodScript(c))} ${phase} ${q(c.rev)} ${q(c.stage)} ${q(String(rec.run))}${extra.map((x) => ` ${q(x)}`).join('')}`));
   return r.code;
 }
@@ -215,7 +218,8 @@ async function main(): Promise<number> {
     const local = resolve(opt('--run-dir')); const rec = JSON.parse(readFileSync(join(local, 'run.json'), 'utf8')) as Record<string, any>;
     const c = ctxFrom(rec.stage, rec.revision, '', '', '', '');
     const plan = JSON.parse(readFileSync(join(local, 'plan.json'), 'utf8')); const manifest = JSON.parse(readFileSync(join(local, 'manifest.json'), 'utf8')) as Manifest;
-    const expires = opt('--expires'); const nb = opt('--not-before', true) || new Date().toISOString();
+    // the window start is always sent explicitly (one minute behind this clock to absorb skew), so the statement text and the recorded approval agree
+    const expires = opt('--expires'); const nb = opt('--not-before', true) || new Date(Date.now() - 60000).toISOString();
     const statement = approvalStatement(c.stage, plan, { dumpSha256: manifest.files.dump, restoreEvidenceSha256: manifest.files[RUN_FILES.restoreEvidence], evidenceClass: manifest.evidenceClass, window: `from ${nb} until ${expires}` });
     const stmtName = `approval-statement-${new Date().toISOString().replace(/[-:.]/g, '')}.txt`;
     writeFileSync(join(local, stmtName), `${statement}\n`, { flag: 'wx', mode: 0o600 });
@@ -223,7 +227,7 @@ async function main(): Promise<number> {
     const remoteStmt = `${rec.remoteRunDir}/${stmtName}`;
     const up = await scp(local, [stmtName], `${c.prodHost}:${remoteStmt}`);
     if (up.code !== 0) fail('could not upload the statement');
-    return viaRun(local, 'approve', [opt('--digest'), remoteStmt, expires, ...(opt('--not-before', true) ? [nb] : [])]);
+    return viaRun(local, 'approve', [opt('--digest'), remoteStmt, expires, nb]);
   }
   if (['apply', 'report', 'state', 'accept'].includes(cmd)) return viaRun(opt('--run-dir'), cmd);
   return fail('unknown command');

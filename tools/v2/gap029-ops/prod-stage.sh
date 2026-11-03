@@ -27,8 +27,12 @@ HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 PROFILE=${GAP029_PROFILE:-$HERE/profile.production.env}
 [ -r "$PROFILE" ] || stop "profile unreadable"
 if grep -qvE '^(#.*|[A-Z_]+="[^"$`\\]*"|)$' "$PROFILE"; then stop "profile contains a line that is not KEY=\"plain value\""; fi
+if grep -E '^[A-Z_]+=' "$PROFILE" | cut -d= -f1 | grep -qvxE 'PROFILE_NAME|EVIDENCE_CLASS|EXPECT_HOST|EXPECT_USER|PROD_CHECKOUT|OPS_ROOT|BACKUP_ROOT|PGBIN|NODE|PYTHON|EXPECT_SYSID|EXPECT_OID|EXPECT_CLUSTER|EXPECT_DB|EXPECT_DB_HOST|EXPECT_DB_PORT|EXPECT_LEDGER_ROWS|EXPECT_LEDGER_LAST|EXPECT_EXT|EXPECT_DB_OWNER|WRITER_UNITS|ALL_UNITS|TIMER_UNIT|SSH_HOST'; then
+  stop "profile sets a key that is not in the profile grammar"; fi
 # shellcheck disable=SC1090
 . "$PROFILE"
+# On the production host only the production profile is acceptable, whatever GAP029_PROFILE says (a simulation profile can never drive a production host).
+if [ "$(hostname)" = afldb-prod ]; then [ "$PROFILE_NAME" = production ] && [ "$EVIDENCE_CLASS" = GENUINE_PRODUCTION ] || stop "only the production profile may run on the production host"; fi
 
 PHASE=${1:?phase}; R=${2:?execution revision (40 hex)}
 [[ "$R" =~ ^[0-9a-f]{40}$ ]] || stop "revision must be 40 hex" 2
@@ -76,7 +80,24 @@ load_dsns() {
 }
 drop_dsns() { unset AFLDB_GAP029_DSN AFLDB_GAP029_WRITE_DSN PGPASSWORD PGUSER PGHOST PGPORT PGDATABASE; }
 prev_stage() { case "$1" in S2) echo S1;; S3) echo S2;; S4) echo S3;; *) echo "";; esac; }
-exit_of() { node -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).exitCode))' "$1"; }
+# The recorded outcome's exit code, or 25 when outcome.json is unreadable: a bare `exit ""` would be status 2, which is ROLLED_BACK's code.
+exit_of() {
+  local c; c=$(node -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).exitCode))' "$1" 2>/dev/null)
+  if [[ "$c" =~ ^[0-5]$ ]]; then echo "$c"; else echo "WARN: outcome.json is unreadable; run report/state before deciding anything" >&2; echo 25; fi
+}
+class_of() { node -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).classification))' "$1" 2>/dev/null; }
+# A stage is applied once. Refuse any plan/approval/apply for a stage that is already accepted.
+not_accepted() { [ ! -e "$OPS/accepted/$S.json" ] || stop "$S is already accepted; no further plan, approval or apply for it" 21; }
+# One apply per stage across ALL runs of that stage: another run that started an apply blocks this one unless its recorded outcome proves nothing was written
+# (REFUSED_BEFORE_MUTATION or ROLLED_BACK). Argument: this run's directory ("" when none yet).
+stage_run_gate() {
+  local own="$1" L d c
+  for L in "$OPS"/runs/"$S"-*/apply.lock; do
+    [ -e "$L" ] || continue; d=$(dirname "$L"); [ "$d" = "$own" ] && continue
+    c=$(class_of "$d/outcome.json")
+    case "$c" in REFUSED_BEFORE_MUTATION|ROLLED_BACK) ;; *) stop "another $S run ($(basename "$d")) has started an apply (outcome: ${c:-unrecorded}); one apply per stage: report on it and get an owner decision" 22;; esac
+  done
+}
 
 # Everything that must hold before a backup is worth taking. Read-only. Uses $S.
 preflight_checks() {
@@ -86,7 +107,8 @@ preflight_checks() {
     [ -f "$OPS/accepted/$P.json" ] || stop "$P has not been accepted ($OPS/accepted/$P.json missing): $S needs a fresh backup AFTER $P is applied and accepted" 21
     echo "$P accepted: $(sha256sum "$OPS/accepted/$P.json" | cut -c1-16)"
   fi
-  [ ! -f "$OPS/accepted/$S.json" ] || stop "$S is already accepted; a new run would re-prepare an applied stage" 21
+  not_accepted
+  stage_run_gate ""
   step "preflight $S: exclusivity (read-only)"
   no_conflicts
   step "preflight $S: live identity, ledger and extensions (read-only session)"
@@ -178,6 +200,7 @@ capture)
 
 plan)
   stage_arg "${3:-}"; run_arg "${4:-}"; need_checkout
+  not_accepted
   step "plan $S ($RUN): inputs"
   for f in target.json backup.json restore-evidence.json; do [ -f "$RUNDIR/$f" ] || stop "$RUNDIR/$f is missing (upload the assembled evidence first)" 3; done
   [ "$S" != S2 ] || [ -f "$RUNDIR/child.json" ] || stop "S2 needs child.json from the restore" 3
@@ -204,7 +227,7 @@ plan)
 
 approve)
   stage_arg "${3:-}"; run_arg "${4:-}"; DIGEST=${5:?plan digest}; STMT=${6:?statement file}; EXPIRES=${7:?expiry ISO}; NB=${8:-}
-  need_checkout
+  need_checkout; not_accepted
   [ ! -e "$RUNDIR/approval.json" ] || stop "an approval already exists for this run" 3
   OPSCLI manifest-verify --stage "$S" --run-dir "$RUNDIR" --profile "$PROFILE" || stop "the prepared run no longer verifies; no approval written" 6
   if [ -n "$NB" ]; then OPSCLI approval-make --stage "$S" --run-dir "$RUNDIR" --digest "$DIGEST" --statement-file "$STMT" --expires "$EXPIRES" --not-before "$NB" || stop "approval refused" 6
@@ -214,6 +237,7 @@ approve)
 apply)
   stage_arg "${3:-}"; run_arg "${4:-}"; need_checkout
   step "apply $S ($RUN): wrapper gates (nothing is written by them)"
+  not_accepted
   [ -f "$RUNDIR/approval.json" ] || stop "no owner approval: the owner has not approved this plan" 3
   [ ! -e "$RUNDIR/apply.lock" ] || stop "an apply was already started for this run ($(cat "$RUNDIR/apply.lock" 2>/dev/null)); the wrapper never retries. Use report/state" 22
   P=$(prev_stage "$S"); if [ -n "$P" ]; then [ -f "$OPS/accepted/$P.json" ] || stop "$P has not been accepted" 21; fi
@@ -221,9 +245,11 @@ apply)
   OPSCLI check-capture --stage "$S" --dir "$CAPDIR" --profile "$PROFILE" || stop "capture check failed" 6
   OPSCLI approval-check --stage "$S" --run-dir "$RUNDIR" || stop "approval check failed" 6
   no_conflicts
+  stage_run_gate "$RUNDIR"
   echo "app: $(systemctl is-active afldb.service 2>/dev/null) MainPID=$(systemctl show afldb.service -p MainPID --value 2>/dev/null)" | tee "$RUNDIR/logs/app-before.txt"
   # one apply, ever: the lock is created exclusively BEFORE the detached run starts
   ( set -o noclobber; echo "started $(date -u +%FT%TZ) pid $$ by $(id -un)@$(hostname)" > "$RUNDIR/apply.lock" ) 2>/dev/null || stop "could not take the apply lock" 22
+  export GAP029_APPLY_TOKEN="$RUN:$$"
   setsid nohup bash "$HERE/prod-stage.sh" __apply "$R" "$S" "$RUN" > "$RUNDIR/logs/apply-wrapper.log" 2>&1 < /dev/null &
   echo "apply launched detached (a dropped session does not stop it); waiting up to ${APPLY_WAIT_SECONDS:-1800} s for the recorded outcome"
   W=0; while [ ! -f "$RUNDIR/outcome.json" ] && [ "$W" -lt "${APPLY_WAIT_SECONDS:-1800}" ]; do sleep 2; W=$((W + 2)); done
@@ -234,10 +260,15 @@ apply)
 
 __apply)   # internal: the detached run
   stage_arg "${3:-}"; run_arg "${4:-}"; need_checkout
+  # Internal phase: only the `apply` phase of THIS run may start it, once. It runs none of the apply gates, so it refuses to start on its own.
+  LOCKPID=$(sed -n 's/^.* pid \([0-9][0-9]*\) by .*$/\1/p' "$RUNDIR/apply.lock" 2>/dev/null)
+  [ -n "$LOCKPID" ] && [ "${GAP029_APPLY_TOKEN:-}" = "$RUN:$LOCKPID" ] || stop "__apply is internal to the apply phase and cannot be started directly" 2
+  [ ! -e "$RUNDIR/outcome.json" ] && ! ls "$RUNDIR"/logs/apply-[0-9]*.log >/dev/null 2>&1 || stop "this run already has an apply record; the wrapper never retries" 22
   step "apply $S ($RUN): tool apply (single attempt)"
   load_dsns
   OPSCLI run-tool --stage "$S" --phase apply --run-dir "$RUNDIR" --capture-dir "$CAPDIR" --profile "$PROFILE"; TOOLRC=$?
-  APPLYLOG=$(ls -t "$RUNDIR"/logs/apply-[0-9]*.log | head -1)
+  APPLYLOG=$(ls -t "$RUNDIR"/logs/apply-[0-9]*.log 2>/dev/null | head -1)
+  if [ -z "$APPLYLOG" ] || [ ! -f "$APPLYLOG" ]; then APPLYLOG="$RUNDIR/logs/apply-missing.log"; echo "the tool left no apply log (it refused before starting)" > "$APPLYLOG"; fi
   step "apply $S ($RUN): read-only post-run state probe"
   OPSCLI run-tool --stage "$S" --phase state --run-dir "$RUNDIR" --capture-dir "$CAPDIR" --profile "$PROFILE" > "$RUNDIR/logs/post-apply-state.txt" 2>&1; STRC=$?
   drop_dsns
@@ -271,7 +302,8 @@ state)
 accept)
   stage_arg "${3:-}"; run_arg "${4:-}"; need_checkout
   [ -f "$RUNDIR/outcome.json" ] || stop "no recorded outcome for $RUN" 3
-  CLASS=$(node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).classification)' "$RUNDIR/outcome.json")
+  OPSCLI manifest-verify --stage "$S" --run-dir "$RUNDIR" --profile "$PROFILE" || stop "the prepared run no longer verifies; nothing is accepted" 24
+  CLASS=$(class_of "$RUNDIR/outcome.json"); [ -n "$CLASS" ] || stop "outcome.json is unreadable" 24
   case "$CLASS" in COMMITTED_VERIFIED|NOTHING_WRITTEN) ;; *) stop "outcome is $CLASS: acceptance requires COMMITTED_VERIFIED or NOTHING_WRITTEN" 24;; esac
   [ ! -e "$OPS/accepted/$S.json" ] || stop "$S is already accepted" 21
   load_dsns

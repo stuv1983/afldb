@@ -26,8 +26,11 @@ HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 PROFILE=${GAP029_PROFILE:-$HERE/profile.production.env}
 [ -r "$PROFILE" ] || stop "profile unreadable" 2
 if grep -qvE '^(#.*|[A-Z_]+="[^"$`\\]*"|)$' "$PROFILE"; then stop "profile contains a line that is not KEY=\"plain value\"" 2; fi
+if grep -E '^[A-Z_]+=' "$PROFILE" | cut -d= -f1 | grep -qvxE 'PROFILE_NAME|EVIDENCE_CLASS|EXPECT_HOST|EXPECT_USER|PROD_CHECKOUT|OPS_ROOT|BACKUP_ROOT|PGBIN|NODE|PYTHON|EXPECT_SYSID|EXPECT_OID|EXPECT_CLUSTER|EXPECT_DB|EXPECT_DB_HOST|EXPECT_DB_PORT|EXPECT_LEDGER_ROWS|EXPECT_LEDGER_LAST|EXPECT_EXT|EXPECT_DB_OWNER|WRITER_UNITS|ALL_UNITS|TIMER_UNIT|SSH_HOST'; then
+  stop "profile sets a key that is not in the profile grammar" 2; fi
 # shellcheck disable=SC1090
 . "$PROFILE"
+if [ "$(hostname)" = afldb-prod ]; then [ "$PROFILE_NAME" = production ] && [ "$EVIDENCE_CLASS" = GENUINE_PRODUCTION ] || stop "only the production profile may run on the production host" 2; fi
 DECISION=GAP029-$STAGE-BACKUP-20261103
 R=$PROD_CHECKOUT
 EXPECT_LEDGER_ROWS=${EXPECT_LEDGER_ROWS:?}

@@ -19,4 +19,5 @@ const r = spawnSync(join(bin, exe), ['--no-password', '--no-comments', '--no-own
 const err = (r.stderr ?? '').split('\n').filter(Boolean);
 console.log(`pg_restore exit=${r.status} seconds=${Math.round((Date.now() - t0) / 1000)} stderrLines=${err.length}`);
 for (const l of err.slice(0, 6)) console.log(`  ${l.replace(/postgres(ql)?:\/\/\S+/g, '<dsn>').slice(0, 160)}`);
-process.exit(r.status === 0 || err.length <= 6 ? 0 : 1);
+// Strict (the reviewed copy tolerated a non-zero status with up to six stderr lines): any non-zero pg_restore status is a failed restore.
+process.exit(r.status === 0 ? 0 : 1);

@@ -107,7 +107,7 @@ async function runTool(stage: StageId, phase: string, runDir: string, captureDir
   const log = createWriteStream(logPath, { flags: 'wx', mode: 0o600 });
   log.write(`# ${stamp()} ${stage} ${phase} #${n}: ${spec.runner} ${spec.tool} ${args[0]} (arguments are file paths only; no connection string is logged)\n`);
   const code: number | null = await new Promise((done) => {
-    const child = spawn(exe, argv, { env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' }, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(exe, argv, { env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1', PYTHONUNBUFFERED: '1' }, stdio: ['ignore', 'pipe', 'pipe'] });
     const pipe = (s: NodeJS.ReadableStream, to: NodeJS.WritableStream) => s.on('data', (c: Buffer) => { log.write(c); to.write(c); });
     pipe(child.stdout!, process.stdout); pipe(child.stderr!, process.stderr);
     child.on('error', () => done(null)); child.on('close', (c) => done(c));
@@ -129,6 +129,7 @@ async function main(): Promise<number> {
   if (cmd === 'check-capture') {
     const { profile } = loadProfile(opt('--profile'));
     const hours = opt('--max-age-hours', true);
+    if (hours && !(Number(hours) > 0 && Number(hours) <= 24)) return fail('--max-age-hours may only tighten the 24 h limit');
     const dir = outsideCheckout(opt('--dir')); const files = captureDirFiles(dir);
     const problems = captureProblems(stage!, { files }, profile, Date.now(), hours ? Number(hours) * 3600000 : MAX_AGE_MS);
     if (problems.length) { for (const p of problems) console.log(`CAPTURE CHECK FAIL: ${p}`); return 1; }

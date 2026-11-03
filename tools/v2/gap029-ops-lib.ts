@@ -113,6 +113,8 @@ export const PROFILE_KEYS = ['PROFILE_NAME', 'EVIDENCE_CLASS', 'EXPECT_HOST', 'E
   'WRITER_UNITS', 'ALL_UNITS', 'TIMER_UNIT', 'SSH_HOST'] as const;
 export type Profile = Record<(typeof PROFILE_KEYS)[number], string>;
 export const GENUINE = 'GENUINE_PRODUCTION';
+/** The pinned production identity (read-only probes of 2026-11-03; the Block L record). Only the GENUINE_PRODUCTION profile may carry it. */
+export const PRODUCTION_IDENTITY = { host: 'afldb-prod', sysid: '7674454702926115004', oid: '66668', db: 'afldb_prod' } as const;
 
 /** `KEY="value"` lines (the same file is sourced by bash). Anything else that is not blank or a comment is refused, so a profile cannot carry code. */
 export function parseProfile(text: string): { profile: Profile; problems: string[] } {
@@ -126,6 +128,13 @@ export function parseProfile(text: string): { profile: Profile; problems: string
   }
   for (const k of PROFILE_KEYS) if (!(k in raw)) problems.push(`profile key ${k} is missing`);
   for (const k of Object.keys(raw)) if (!(PROFILE_KEYS as readonly string[]).includes(k)) problems.push(`profile key ${k} is not recognised`);
+  // The evidence class is not a free label: it is bound to the pinned production identity in BOTH directions, so a hand-made profile cannot mint
+  // GENUINE_PRODUCTION evidence for another database, nor label the real production database as a simulation.
+  const claimsProd = raw.EVIDENCE_CLASS === GENUINE;
+  const isProd = raw.EXPECT_SYSID === PRODUCTION_IDENTITY.sysid || raw.EXPECT_HOST === PRODUCTION_IDENTITY.host || raw.EXPECT_OID === PRODUCTION_IDENTITY.oid && raw.EXPECT_DB === PRODUCTION_IDENTITY.db;
+  if (claimsProd && !(raw.PROFILE_NAME === 'production' && raw.EXPECT_HOST === PRODUCTION_IDENTITY.host && raw.EXPECT_SYSID === PRODUCTION_IDENTITY.sysid
+    && raw.EXPECT_OID === PRODUCTION_IDENTITY.oid && raw.EXPECT_DB === PRODUCTION_IDENTITY.db)) problems.push('a GENUINE_PRODUCTION profile must carry exactly the pinned production host, system identifier, database and OID');
+  if (!claimsProd && isProd) problems.push('a profile naming the production host or system identifier must be the GENUINE_PRODUCTION profile');
   return { profile: raw as Profile, problems };
 }
 
@@ -277,6 +286,8 @@ export function buildApproval(stage: StageId, plan: Record<string, any>, input: 
   if (!statement.includes(String(plan.digest))) p.push('the approval statement does not contain the full plan digest');
   if (!statement.includes(STAGES[stage].decision)) p.push(`the approval statement does not name ${STAGES[stage].decision}`);
   if (!statement.includes(String(plan.revision))) p.push('the approval statement does not name the full execution revision');
+  const zoned = (s: string | undefined) => s === undefined || /(Z|[+-]\d{2}:\d{2})$/.test(s);
+  if (!zoned(input.expiresAt) || !zoned(input.notBefore)) return { approval: null, problems: ['approval times must carry an explicit UTC "Z" or numeric offset (a bare time would be read in the host clock zone)'] };
   const exp = Date.parse(input.expiresAt); const nb = Date.parse(input.notBefore ?? new Date(input.now).toISOString());
   if (!Number.isFinite(exp) || !(exp > input.now)) p.push('the approval expiry is missing or already past');
   if (!Number.isFinite(nb) || nb > exp) p.push('the approval window start is missing or after its expiry');

@@ -277,7 +277,7 @@ describe('wrapper script structure (static guarantees)', () => {
     expect(prodStage).toMatch(/\[ ! -e "\$RUNDIR\/apply.lock" \] \|\| stop "an apply was already started/);
   });
   it('the apply gates run before the lock: approval present, manifest, capture, approval check, conflicts', () => {
-    const order = ['no owner approval', 'manifest verification failed', 'capture check failed', 'approval check failed', 'no_conflicts\n  echo "app:', 'set -o noclobber'].map((s) => prodStage.indexOf(s, prodStage.indexOf('\napply)')));
+    const order = ['no owner approval', 'manifest verification failed', 'capture check failed', 'approval check failed', 'no_conflicts\n  stage_run_gate "$RUNDIR"\n  echo "app:', 'set -o noclobber'].map((s) => prodStage.indexOf(s, prodStage.indexOf('\napply)')));
     expect(order.every((i) => i > 0)).toBe(true); expect([...order].sort((a, b) => a - b)).toEqual(order);
   });
   it('capture and every later stage are ordered behind acceptance of the previous stage', () => {
@@ -299,5 +299,38 @@ describe('wrapper script structure (static guarantees)', () => {
   it('the host CLI never prints a connection string and launches tools with file-path arguments only', () => {
     const cli = read('tools/v2/gap029-ops.ts');
     expect(cli).not.toMatch(/console\.log\([^)]*(DSN|PASSWORD)/); expect(cli).toMatch(/arguments are file paths only/);
+  });
+});
+describe('review fixes', () => {
+  const prodStage2 = read('tools/v2/gap029-ops/prod-stage.sh');
+  const base = read('tools/v2/gap029-ops/profile.production.env');
+  it('the evidence class is bound to the pinned production identity in both directions', () => {
+    const sim = base.replace('PROFILE_NAME="production"', 'PROFILE_NAME="sim"').replace('EVIDENCE_CLASS="GENUINE_PRODUCTION"', 'EVIDENCE_CLASS="SIMULATION"');
+    expect(parseProfile(sim).problems.join()).toMatch(/must be the GENUINE_PRODUCTION profile/);
+    const forged = base.replace('EXPECT_SYSID="7674454702926115004"', 'EXPECT_SYSID="1"');
+    expect(parseProfile(forged).problems.join()).toMatch(/must carry exactly the pinned production host/);
+    const notProd = sim.replace('EXPECT_HOST="afldb-prod"', 'EXPECT_HOST="streamanator"').replace('EXPECT_SYSID="7674454702926115004"', 'EXPECT_SYSID="9"').replace('EXPECT_OID="66668"', 'EXPECT_OID="9"');
+    expect(parseProfile(notProd).problems).toEqual([]);
+  });
+  it('approval times need an explicit zone', () => {
+    const r = buildApproval('S1', plan('S1'), { digest: DIGEST, statement: STATEMENT('S1'), expiresAt: '2026-11-04T05:00:00', now: NOW2 });
+    expect(r.problems.join()).toMatch(/explicit UTC/);
+  });
+  it('__apply refuses to run unless started by this run\'s apply phase, once', () => {
+    expect(prodStage2).toContain('GAP029_APPLY_TOKEN="$RUN:$$"');
+    expect(prodStage2).toContain('"${GAP029_APPLY_TOKEN:-}" = "$RUN:$LOCKPID"');
+    expect(prodStage2).toMatch(/__apply is internal to the apply phase/);
+    expect(prodStage2).toMatch(/this run already has an apply record/);
+  });
+  it('an unreadable outcome.json can never become exit 2 (ROLLED_BACK); a stage is applied once across runs and never after acceptance', () => {
+    expect(prodStage2).toContain('echo 25');
+    expect(prodStage2).toContain('not_accepted() {');
+    for (const phase of ['plan)', 'approve)', 'apply)']) expect(prodStage2.slice(prodStage2.indexOf(`\n${phase}`), prodStage2.indexOf(`\n${phase}`) + 600)).toContain('not_accepted');
+    expect(prodStage2).toContain('stage_run_gate "$RUNDIR"');
+    expect(prodStage2).toMatch(/accept\)[\s\S]*manifest-verify/);
+  });
+  it('a simulation profile can never drive the production host', () => {
+    expect(prodStage2).toContain('only the production profile may run on the production host');
+    expect(read('tools/v2/gap029-ops/capture-prod-stage.sh')).toContain('only the production profile may run on the production host');
   });
 });

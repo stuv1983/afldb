@@ -22,6 +22,7 @@ HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 PROFILE=${PROFILE:-$HERE/profile.production.env}
 [ -r "$PROFILE" ] || { echo "STOP profile unreadable"; exit 2; }
 if grep -qvE '^(#.*|[A-Z_]+="[^"$`\\]*"|)$' "$PROFILE"; then echo "STOP profile contains a line that is not KEY=\"plain value\""; exit 2; fi
+if grep -E '^[A-Z_]+=' "$PROFILE" | cut -d= -f1 | grep -qvxE 'PROFILE_NAME|EVIDENCE_CLASS|EXPECT_HOST|EXPECT_USER|PROD_CHECKOUT|OPS_ROOT|BACKUP_ROOT|PGBIN|NODE|PYTHON|EXPECT_SYSID|EXPECT_OID|EXPECT_CLUSTER|EXPECT_DB|EXPECT_DB_HOST|EXPECT_DB_PORT|EXPECT_LEDGER_ROWS|EXPECT_LEDGER_LAST|EXPECT_EXT|EXPECT_DB_OWNER|WRITER_UNITS|ALL_UNITS|TIMER_UNIT|SSH_HOST'; then echo "STOP profile sets a key that is not in the profile grammar"; exit 2; fi
 # shellcheck disable=SC1090
 . "$PROFILE"
 PORT=${PORT:-55493}
