@@ -89,7 +89,8 @@ async function pack(rev: string, outDir: string): Promise<{ tar: string; sha: st
   if (git('rev-parse', 'HEAD') !== rev) fail('the packed checkout is not at the requested revision');
   if (git('status', '--porcelain') !== '') fail('the packed checkout is not clean');
   const tar = join(work, 'cand.tar.gz');
-  execFileSync('tar', ['-czf', tar, '-C', work, 'cand']);
+  // relative names with a cwd: a drive-letter path ("D:\...") is read as a remote host by GNU tar
+  execFileSync('tar', ['-czf', 'cand.tar.gz', 'cand'], { cwd: work });
   const h = sha(tar);
   console.log(`PACKED revision ${rev} tar ${tar} sha256 ${h} tracked ${git('ls-files').split('\n').length}`);
   return { tar, sha: h };
@@ -101,7 +102,8 @@ async function prepare(c: Ctx, tar: string, tarSha: string): Promise<void> {
   const runLocalBase = resolve(c.privateRoot); mkdirSync(runLocalBase, { recursive: true });
   const ops = prodOps(c); const prod = c.prodHost;
   const record: Record<string, unknown> = { stage: c.stage, revision: c.rev, tarSha256: tarSha, profile: c.profile.PROFILE_NAME, evidenceClass: c.profile.EVIDENCE_CLASS, profileSha256: c.profileSha, startedAt: new Date().toISOString() };
-  const must = (r: Ran, what: string): Ran => { if (r.code !== 0) fail(`${what} failed (exit ${r.code}); nothing further was run. Left behind: see the output above`); return r; };
+  let left = 'on the production host only the private pinned-checkout upload (nothing else; no backup yet)';
+  const must = (r: Ran, what: string): Ran => { if (r.code !== 0) fail(`${what} failed (exit ${r.code}); nothing further was run. Left behind: ${left}. Nothing is retried; prepare a NEW run (a fresh backup) or ask for a decision`); return r; };
 
   step(`1 upload the pinned checkout to ${prod} (private staging directory ${ops}/in) and bootstrap`);
   must(await ssh(prod, `umask 077; mkdir -p -m 700 ${q(ops)}/in && cat > ${q(ops)}/in/cand.tar.gz`, { stdinFile: tar }), 'upload');
@@ -114,6 +116,7 @@ async function prepare(c: Ctx, tar: string, tarSha: string): Promise<void> {
   if (!/CAPTURE_COMPLETE/.test(cap.out) || !new RegExp(`^${c.stage}-\\d{8}T\\d{6}Z$`).test(run)) fail('capture did not complete');
   const local = join(runLocalBase, run); mkdirSync(join(local, 'capture'), { recursive: true });
   record.run = run; record.remoteRunDir = runDir; record.remoteCaptureDir = capDir; record.localDir = local;
+  left = `the production host keeps capture ${capDir} and run ${runDir} (private, mode 700, never deleted by this tool); the workstation keeps ${local}`;
 
   step('3 fetch the capture directory and target.json, verify every hash locally');
   must(await scp(join(local, 'capture'), [`${prod}:${capDir}/*`], '.'), 'download of the capture directory');

@@ -38,7 +38,7 @@ ss -ltnp 2>/dev/null | grep ":$SIM_PORT " | sed 's/users:.*//'
 
 say "create $SIM_DB (owner afldb_owner) as the cluster superuser and restore the retained dump with the production role names"
 SUPERPW=$(cat "$AFLDB_V2_PG_ROOT/secrets/superuser.pw")
-SU() { PGPASSWORD="$SUPERPW" "$PGBIN/psql" -X -q -At -h 127.0.0.1 -p "$SIM_PORT" -U postgres -v ON_ERROR_STOP=1 "$@"; }
+SU() { PGPASSWORD="$SUPERPW" "$PGBIN/psql" -X -q -At -h 127.0.0.1 -p "$SIM_PORT" -U afldb_v2_super -v ON_ERROR_STOP=1 "$@"; }
 SU -d postgres -c "CREATE DATABASE $SIM_DB OWNER afldb_owner" || exit 5
 SU -d "$SIM_DB" -c "CREATE EXTENSION IF NOT EXISTS pg_trgm; CREATE EXTENSION IF NOT EXISTS unaccent; ALTER SCHEMA public OWNER TO afldb_owner;" || exit 5
 OWNPW=$(node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).afldb_owner)' "$AFLDB_V2_PG_ROOT/secrets/roles.json")
@@ -46,6 +46,10 @@ PGPASSWORD="$OWNPW" "$PGBIN/pg_restore" --no-password --no-comments --no-owner -
 echo "pg_restore exit=$? stderr_lines=$(grep -c . "$SIM/private/restore.out")"; unset OWNPW SUPERPW
 head -5 "$SIM/private/restore.out" | sed 's/postgres\(ql\)\?:\/\/[^ ]*/<dsn>/g' | cut -c1-160
 SU() { :; }
+
+say "initialise the restore-host cluster root ($SIM/rw/pg-root, port 55493) with the five roles; the restore script starts and stops it"
+( export AFLDB_V2_PG_ROOT="$SIM/rw/pg-root" AFLDB_V2_PG_PORT=55493; cd "$SIM/rw/cand" && node --import tsx tools/v2/isolated-pg.ts init > /dev/null \
+  && { ( node --import tsx tools/v2/isolated-pg.ts start > "$SIM/private/pg-restore-start.out" 2>&1 < /dev/null & ); sleep 5; node --import tsx tools/v2/isolated-pg.ts roles; node --import tsx tools/v2/isolated-pg.ts stop; } ) || exit 4
 
 say "generate the credential file and the SIMULATION profile from the live simulated cluster"
 ( cd "$SIM/rw/cand" && SIM_ROLES="$AFLDB_V2_PG_ROOT/secrets/roles.json" SIM_PORT=$SIM_PORT SIM_DB=$SIM_DB SIM_ENV_OUT="$SIM/prodco/.env" SIM_PROFILE_OUT="$SIM/profile.sim.env" \

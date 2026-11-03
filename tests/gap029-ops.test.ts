@@ -267,6 +267,10 @@ describe('wrapper script structure (static guarantees)', () => {
     expect(prodStage).not.toMatch(/\bretry\b.*while|until .*apply/);
     expect(prodStage).toMatch(/never retries/);
   });
+  it('preflight pins actor 1 (enabled, enrolled, non-fixture Super Admin) and exactly one enabled Super Admin', () => {
+    expect(prodStage).toContain('[ "$A_ID" = 1 ] && [ "$A_ROLE" = super_admin ] && [ "$A_EN" = true ] && [ "$A_ENR" = true ] && [ "$A_NF" = true ]');
+    expect(prodStage).toContain('[ "$SUPERS" = 1 ] || stop');
+  });
   it('the apply lock is taken exclusively BEFORE the detached run starts, and a second apply is refused', () => {
     const lock = prodStage.indexOf('set -o noclobber; echo "started'); const launch = prodStage.indexOf('setsid nohup bash "$HERE/prod-stage.sh" __apply');
     expect(lock).toBeGreaterThan(0); expect(launch).toBeGreaterThan(lock);

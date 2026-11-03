@@ -115,6 +115,7 @@ preflight_checks() {
   IFS=$'\t' read -r A_ID A_ROLE A_EN A_ENR A_NF A_OWN <<< "$ACTOR"
   [ "$A_ID" = 1 ] && [ "$A_ROLE" = super_admin ] && [ "$A_EN" = true ] && [ "$A_ENR" = true ] && [ "$A_NF" = true ] || stop "actor id 1 is not an enabled, fully enrolled, non-fixture Super Admin" 5
   [ "$A_OWN" != false ] || stop "actor id 1 does not match the owner e-mail" 5
+  [ "$SUPERS" = 1 ] || stop "the enabled Super Admin count is $SUPERS, not the 1 recorded by the reviewed role probe: the actor set changed, review before any backup" 5
   drop_dsns
 }
 
