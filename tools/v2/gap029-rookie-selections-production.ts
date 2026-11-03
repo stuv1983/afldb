@@ -345,7 +345,10 @@ async function run() {
           FROM draft_picks WHERE id = ANY(${created.map((c) => c.pickId)})`;
         const clubsOk = todo.every((e) => { const n = newRows.find((r) => r.player_id === e.playerId); return n && n.club_id === e.clubId && n.pick_number === e.pick; });
         // commits only if: every pre-existing row byte-identical, exactly N new rows/overrides, exactly N audit ids consumed, content as reviewed
-        if (total.picks !== before.picks + todo.length || total.overrides !== before.overrides + todo.length || seqAfter !== (seqBefore as number) + todo.length || !allThere || !clubsOk || newRows.length !== todo.length) fail('post-write verification failed; rolled back');
+        if (total.picks !== before.picks + todo.length || newRows.length !== todo.length) fail('post-write verification failed: the number of new draft_picks rows is not exactly the planned number; rolled back');
+        if (total.overrides !== before.overrides + todo.length) fail('post-write verification failed: the number of new draft_overrides rows is not exactly the planned number; rolled back');
+        if (seqAfter !== (seqBefore as number) + todo.length) fail(`post-write verification failed: the audit sequence moved by ${(seqAfter ?? NaN) - (seqBefore as number)}, not ${todo.length}; rolled back`);
+        if (!allThere || !clubsOk) fail('post-write verification failed: a created row differs from the reviewed content; rolled back');
         if (await priorRowsDigest(tx, before.maxId, before.maxOverrideId) !== priorBefore) fail('a pre-existing draft_picks or override row changed; rolled back');
         return { replay: false, written: todo.length, created, maxIdBefore: before.maxId, auditSequenceBefore: seqBefore, auditSequenceAfter: seqAfter, draftPicksAfter: total.picks };
       });
