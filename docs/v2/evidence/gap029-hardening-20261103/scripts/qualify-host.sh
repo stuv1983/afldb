@@ -16,6 +16,7 @@ set -u -o pipefail
 export PATH="$HOME/.nvm/versions/node/v22.23.2/bin:$PATH"
 PORT=55493; CAND="$W/cand"; EVP="$W/evidence-private/$TAG"; HELP="$CAND/docs/v2/evidence/gap029-hardening-20261103/scripts"
 PY="${PY:-$W/venv/bin/python}"
+LEDGER_PREFIX="${LEDGER_PREFIX:-118_}"   # production is at 118; the retained Block L baselines are at 117 (pass LEDGER_PREFIX=117_ for those)
 mkdir -p -m 700 "$W/evidence-private"; [ -e "$EVP" ] && { echo "STOP $EVP exists; choose a new TAG"; exit 2; }; mkdir -m 700 "$EVP"
 SUM="$EVP/qualification-summary.txt"; : > "$SUM"
 export AFLDB_V2_PG_ROOT="$W/pg-root" AFLDB_V2_PG_BIN=/usr/lib/postgresql/16/bin AFLDB_V2_PG_PORT=$PORT AFLDB_PYTHON="$PY"
@@ -55,7 +56,7 @@ CHAIN=afldb_v2_gap029_${TAG}_chain_test
 IR create-db "$CHAIN" || exit 5
 RUNDB "$CHAIN" node "$W/in/restore.mjs" "$DUMP" "$DUMP_SHA" | tee "$EVP/restore.out" || exit 5
 cp "$W/in/probe-dbs.mjs" "$CAND/.probe-dbs.mjs"; RUNDB "$CHAIN" node .probe-dbs.mjs "$CHAIN" | tee "$EVP/restore-probe.txt"; rm -f "$CAND/.probe-dbs.mjs"
-grep -q '"ledger":"118_' "$EVP/restore-probe.txt" && ok "restored ledger is 118" || { bad "restored ledger is not 118"; exit 5; }
+grep -qF '"ledger":"'"$LEDGER_PREFIX" "$EVP/restore-probe.txt" && ok "restored ledger starts $LEDGER_PREFIX" || { bad "restored ledger does not start $LEDGER_PREFIX"; exit 5; }
 
 say "Q3 the four-stage chain and its negative controls (S1 -> S2 -> S3 -> S4 on one disposable clone)"
 RUNDB "$CHAIN" env CAND="$CAND" EVP="$EVP" HELPERS="$HELP" PY="$PY" bash "$HELP/chain-inner.sh" && ok "chain: $(tail -1 "$EVP/chain/summary.txt")" || { bad "chain: $(tail -1 "$EVP/chain/summary.txt" 2>/dev/null)"; grep '^FAIL' "$EVP/chain/summary.txt" | head -10; }

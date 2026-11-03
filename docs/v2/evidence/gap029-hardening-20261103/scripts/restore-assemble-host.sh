@@ -58,7 +58,7 @@ RUNDB "$RDB" node "$W/in/restore.mjs" "$DUMP" "$DUMP_SHA" | tee "$EVP/restore.ou
 RESTORED_AT=$(date -u +%FT%T.%3NZ)
 echo "restore_started=$RESTORED_AT_START restored_at=$RESTORED_AT"
 cp "$W/in/probe-dbs.mjs" "$CAND/.probe-dbs.mjs"; RUNDB "$RDB" node .probe-dbs.mjs "$RDB" | tee "$EVP/restore-probe.txt"; rm -f "$CAND/.probe-dbs.mjs"
-grep -q '"ledger":"118_fixtures_unconfirmed_participants.sql"' "$EVP/restore-probe.txt" || { echo "STOP restored ledger is not 118_fixtures_unconfirmed_participants.sql"; exit 5; }
+grep -qF '"ledger":"'"${LEDGER_PREFIX:-118_}" "$EVP/restore-probe.txt" || { echo "STOP restored ledger does not start ${LEDGER_PREFIX:-118_} (production's current ledger is 118_fixtures_unconfirmed_participants.sql)"; exit 5; }
 
 TOC=$(/usr/lib/postgresql/16/bin/pg_restore --list "$DUMP" | grep -cv '^;'); echo "archive toc entries: $TOC"
 say "A3 restore evidence (identity proven by query inside the guarded database; source identity from the capture provenance, checked against the production target)"
