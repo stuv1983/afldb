@@ -1,0 +1,16 @@
+# GAP-029 D4 read-only production census 2 (sibling table), 2026-11-03; same method as the first census (afldb_import, default_transaction_read_only=on, DSN never printed). The PowerShell host's BOM/CR notices are omitted.
+UTC=2026-11-03T01:06:49Z
+afldb_prod|afldb_import|on
+== sibling rows
+sibling|498|389
+parent_child|127|96
+14
+f28e3f74fea87646f5b46b24ad05ae80
+== pair already present (expect 0)
+0
+== mitch / jeremy career games
+6937|Jeremy McGovern|197
+7271|Jimmy Webster|180
+9714|Mitch McGovern|170
+== done
+bash: line 14: $'\r': command not found

@@ -15,6 +15,13 @@ commit.
 
 ## [Unreleased]
 
+### V2-GAP-029: owner decisions D1-D5 prepared and rehearsed (2026-11-03, local; nothing applied to production, DEV or pushed)
+
+- **D3 Lyons (retained behaviour change in the corpus policy).** `data/reference/gridley-sibling-eligibility-extension-2026-boards.json` enumerates exactly 11 2026-board Lyons cells under decision `D-GAP029-D3` (same player identity, source evidence and `games > 0` predicate as `D-GAP029-21`); the approval file carries an `extensions` block and the policy loader pins the file's hash. The original 21-cell evidence file is untouched. `tests/gridley-compat.test.ts` pins the 32 covered cells and the refusals.
+- **D4 McGovern.** Sibling supplement `afldb-sibling-supplement:015` (Jeremy and Mitch McGovern, first-party afl.com.au and Carlton FC evidence in the row) and its relationship row; the sibling artefact is now 499 pairs. The loader inserts exactly one row on a production-equal clone. Webster is a documented, unapproved adjudication proposal only.
+- **D1 and D2 tooling.** `tools/v2/gap029-captaincy-additions-production.ts` (additive, key-guarded, plan/apply with backup and approval pinned to a plan digest; unit-tested) and `tools/v2/gap029-draft-link-measure.mjs` (read-only draft-link fingerprints). Rehearsed on production-equal disposable clones only.
+- **Measured.** On the rehearsal target the unapproved production-derived findings fall 334 to 8 (all Webster). Production's live fingerprints were read-only and equal the clones' starting state. Handoff, exact approval packages and open questions: `docs/v2/gap-029-d1-d5-handoff-2026-11-03.md`. V2-GAP-029 stays open.
+
 ### V2-GAP-029: production-scope reconciliation of the strict Gridley findings (2026-11-03, local; nothing applied or pushed)
 
 - **Classification.** The 334 production-derived unapproved findings, recorded on 2026-11-01 as not investigated, are classified (`docs/v2/gap-029-production-scope-reconciliation-2026-11-03.md`, `docs/v2/evidence/gap-029-production-scope-2026-11-03.json`): 281 draft/trade dataset gaps (production `draft_picks` links 5 of 6,810; the baseline 5,123 of 6,818), 20 captain known-answer cells (production lacks the seven tracked AFLDB-ISSUE-225 co-captain rows) and 33 `has_brother` cells on 2026 boards that the 2025-only baseline masked. No query or application defect found. The 149/99/50 baseline and the production-derived counts are different evidence sets.
