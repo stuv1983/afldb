@@ -1,0 +1,30 @@
+UTC=2026-11-03T22:40:42Z workspace=/mnt/ssd/afldb-v2-coach2026-20261104
+== BEFORE: facts
+isolated-pg: afldb_v2_coach2026_20261104_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running bash
+coaches|386
+nm1940 sides w/o coach|11
+match_coaches|32034
+2026 sides w/o coach|436
+84
+match_coaches digest before: isolated-pg: afldb_v2_coach2026_20261104_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running bash
+9b83fe8e90e38fb4a131c1257e227cca
+== importer: validate-only (offline artefact check)
+AFLDB coaches import (AFL Tables coach pages + fitzRoy per-match Coach column)
+  coaches-20260905: 386 index rows, 386 pages verified; raw/ not present (the tracked parsed artefacts are the rebuild input)
+  fitzRoy player_stats files verified: c2-2026-final-core-v1 + [] = 130 files
+  done (validate only) in 1.2s
+== importer: dry-run on the disposable database
+isolated-pg: afldb_v2_coach2026_20261104_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running /mnt/ssd/afldb-v2-gap029-prod-20261103/venv/bin/python
+AFLDB coaches import (AFL Tables coach pages + fitzRoy per-match Coach column)
+  coaches-20260905: 386 index rows, 386 pages verified; raw/ not present (the tracked parsed artefacts are the rebuild input)
+  fitzRoy player_stats files verified: c2-2026-final-core-v1 + [] = 130 files
+  rows 695,499: team-match groups 34,112, with a coach 32,470, without 1,642; distinct strings 385
+  target: afldb_import@127.0.0.1:55493/afldb_v2_coach2026_20261104_test
+  DRY RUN - nothing will be written
+  canonical: matches 17,056 (seasons 1897–2026), afltables identities 13,367
+  coaches 386: linked to a player 368, coach-only 18
+  match_coaches 32,470: matches with both coaches 16,035, one 400, none 621
+  cross-check: coach pages whose Games Coached equals the canonical assignment count 376 / 386 (differences are the source's own pre-1923/1940 gaps and seasons beyond the baseline)
+  measured: {"coaches": 386, "coaches_linked_to_players": 368, "coaches_unlinked": 18, "match_coaches": 32470, "matches_with_both_coaches": 16035, "matches_with_one_coach": 400, "matches_without_coach": 621}
+  done (dry run) in 24.3s
+== done (dry-run phase)

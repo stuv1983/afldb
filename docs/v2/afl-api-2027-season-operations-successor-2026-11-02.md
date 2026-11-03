@@ -2,6 +2,8 @@
 
 **Status: OPEN. Prepared obligations, not decisions.** Nothing here is accepted, decided or executed. The owner chose Option A of [issue316-closeout-and-seasonal-obligations-2026-11-02.md](issue316-closeout-and-seasonal-obligations-2026-11-02.md) section 4 on three conditions; this document is condition (c). It **preserves** obligations and gates; it does not manufacture a completed acceptance, choose a C9 design, or authorise Brownlow activation. Ledger entry: `AFLDB-ISSUE-332` in `issues.md`.
 
+**Update 2026-11-04:** the first two nights were observed (both succeeded, empty batches 78 and 82), ISSUE-316 was resolved, and recommendations with a dated gate calendar (every future item marked SCHEDULED) are in [post-release-closeout-2026-11-04.md](post-release-closeout-2026-11-04.md) section 4. The "First night not yet observed" and "closure eligibility UNMET" cells below are historical. Nothing is decided.
+
 ## 1. Timeline of gates (AEDT unless stated; the dates are the runbook's, not new commitments)
 
 | When | Obligation | Owner decision needed | State today |

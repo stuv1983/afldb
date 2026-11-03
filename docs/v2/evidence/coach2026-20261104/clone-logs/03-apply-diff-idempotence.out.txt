@@ -1,0 +1,54 @@
+UTC=2026-11-03T22:41:30Z
+== existing-rows digest of the 32,034 pre-existing assignments BEFORE
+9b83fe8e90e38fb4a131c1257e227cca|32034
+== APPLY (disposable database)
+AFLDB coaches import (AFL Tables coach pages + fitzRoy per-match Coach column)
+  coaches-20260905: 386 index rows, 386 pages verified; raw/ not present (the tracked parsed artefacts are the rebuild input)
+  fitzRoy player_stats files verified: c2-2026-final-core-v1 + [] = 130 files
+  rows 695,499: team-match groups 34,112, with a coach 32,470, without 1,642; distinct strings 385
+  target: afldb_import@127.0.0.1:55493/afldb_v2_coach2026_20261104_test
+  canonical: matches 17,056 (seasons 1897–2026), afltables identities 13,367
+  coaches 386: linked to a player 368, coach-only 18
+  match_coaches 32,470: matches with both coaches 16,035, one 400, none 621
+  cross-check: coach pages whose Games Coached equals the canonical assignment count 376 / 386 (differences are the source's own pre-1923/1940 gaps and seasons beyond the baseline)
+  measured: {"coaches": 386, "coaches_linked_to_players": 368, "coaches_unlinked": 18, "match_coaches": 32470, "matches_with_both_coaches": 16035, "matches_with_one_coach": 400, "matches_without_coach": 621}
+  batch 82: coaches 386, match_coaches 32470 (stale removed 0); write 3.1s; done in 27.4s
+== table-count differences (before -> after)
+< isolated-pg: afldb_v2_coach2026_20261104_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running bash
+< import_batches|74
+> import_batches|75
+< match_coaches|32034
+> match_coaches|32470
+(none)
+== facts after
+match_coaches|32470
+coaches|386
+matches|17056
+== pre-existing 32,034 assignments unchanged? (rows for seasons <=2025: digest + count)
+9b83fe8e90e38fb4a131c1257e227cca|32034
+== 2026 sides still without a coach
+0
+== 2026 games per coach (derived from match_coaches join matches)
+ERROR:  column co.name_raw does not exist
+LINE 1: select co.name_raw, cl.name, count(*) from match_coaches mc ...
+               ^
+HINT:  Perhaps you meant to reference the column "co.name_key".
+== Josh Carr / Josh Fraser totals
+ERROR:  column co.name_raw does not exist
+LINE 1: select co.name_raw, count(*), min(m.season), max(m.season) f...
+               ^
+HINT:  Perhaps you meant to reference the column "co.name_key".
+== new import batch
+82|import_match_coaches.py|completed|695499|32856|0
+81|family_siblings.py|completed|499|1|0
+== other tables touched? data_overrides / data_edits / players / external_identities counts
+data_overrides|165
+players|13365
+external_identities|19319
+== IDEMPOTENCE rerun
+  match_coaches 32,470: matches with both coaches 16,035, one 400, none 621
+  cross-check: coach pages whose Games Coached equals the canonical assignment count 376 / 386 (differences are the source's own pre-1923/1940 gaps and seasons beyond the baseline)
+  measured: {"coaches": 386, "coaches_linked_to_players": 368, "coaches_unlinked": 18, "match_coaches": 32470, "matches_with_both_coaches": 16035, "matches_with_one_coach": 400, "matches_without_coach": 621}
+  batch 83: coaches 386, match_coaches 32470 (stale removed 0); write 2.3s; done in 26.2s
+d9af336baafd021b62dada359ac40282|32470
+== done (apply phase)

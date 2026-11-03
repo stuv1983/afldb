@@ -15,6 +15,12 @@ commit.
 
 ## [Unreleased]
 
+### Post-release reconciliation: verification, ISSUE-333 registered with a prepared (not applied) fix, ISSUE-321 and ISSUE-332 recommendations (2026-11-04; documentation, evidence and tooling only; no application behaviour changed; local commit not pushed)
+
+- **Verified read-only (production and DEV, no writes).** Public Brownlow pages match the post-E production state (2025 winner 39 votes, 12 recorded-ineligible rows, joint-winner seasons); R8 (override census 0 rows, installed `common.py`) and R58 (invite-redemption code installed and served) met; nights 1 and 2 of the AFL API nightly timer succeeded with empty batches; the "20" historical ownership warnings are 36 open rows, all converged (50/50 flagged fields equal the AFL API value) and not self-closing; DEV timers classified. Record: `docs/v2/post-release-closeout-2026-11-04.md`.
+- **New ISSUE-333.** Production has no 2026 `match_coaches` (436 sides). A guarded owner-run script `docs/v2/evidence/coach2026-20261104/prod-coach2026.sh` (preflight, dry-run, apply, verify) and clone-proof logs were added; proven on a disposable clone of production (32,034 to 32,470, pre-existing rows digest identical, idempotent). **Nothing was applied to production.**
+- **Tracking.** ISSUE-321 reconciled (candidate figures corrected to production's; recommendation to close as accepted limitations awaits the owner); ISSUE-332 recommendations and dated gate calendar recorded; `blockers.md` dated banner.
+
 ### ISSUE-331 CLOSED: quarantined WSL distributions retired by the owner; quarantine rule added (2026-11-04; local environment only, local commit not pushed)
 
 - **Retired (owner-run, local workstation).** `AFLDB-V2-Rehearsal-20261020` and the dangling `AFLDB-V2-BrownlowExport-20261028` were unregistered with `wsl --unregister` by a hash-verified guarded script (gates repeated before each step; the owner's pasted output shows both commands succeeded, both registry keys absent, registrations 3 to 1, `ext4.vhdx` and its base directory absent). **Not secure erasure, not a credential rotation and not proof of global invalidation.** Three undocumented files from the base directory (two tarballs and an icon) were preserved unopened in the owner-restricted `D:\afldb-retained\issue331-20261104`, so no claim is made that every verifier copy was destroyed.

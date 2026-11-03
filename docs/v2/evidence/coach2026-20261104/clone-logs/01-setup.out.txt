@@ -1,0 +1,16 @@
+UTC=2026-11-03T22:40:19Z
+/dev/sdf1       938G   96G  795G  11% /mnt/ssd
+132
+pg_ctl: no server running
+waiting for server to start.... done
+server started
+afldb_v2_gap029_final_20261103_091009_rst_test	marked	406987279
+afldb_v2_gap029_s1_20261103_074434_rst_test	marked	405561871
+afldb_v2_gap029_s2_20261103_080332_rst_test	marked	405594639
+afldb_v2_gap029_s3_20261103_081918_rst_test	marked	406921743
+afldb_v2_gap029_s4_20261103_090149_rst_test	marked	406987279
+postgres	unmarked	7683095
+create-db: afldb_v2_coach2026_20261104_test created from afldb_v2_gap029_final_20261103_091009_rst_test and marked
+ISOLATED TARGET OK: afldb_v2_coach2026_20261104_test
+psycopg 3.3.4
+== setup done
