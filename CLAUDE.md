@@ -523,6 +523,22 @@ Windows editing/inspection does not prove Linux integration/release behaviour.
 
 Never expose secrets, passwords, tokens, private DSNs, or production credentials.
 
+## Quarantined local stores (ISSUE-331)
+
+The WSL distribution `AFLDB-V2-Rehearsal-20261020` (registry GUID `{0cb6e2c4-5caa-4c0b-ba1e-25953010be02}`, base
+`D:/afldb-v2-rehearsal-20261020`), the stale registration `AFLDB-V2-BrownlowExport-20261028` and the original isolated
+root `D:\tmp\afldb-v2-pg16` are quarantined (D-331-2). Claude must never start, enter, mount, hash, copy, export,
+unregister or delete them, never open them through `\\wsl$\…` or `\\wsl.localhost\…`, and never run a `wsl` command to
+"look for a Linux environment". Only the owner unregisters the two distributions (decided D-331-7 and D-331-8, 2026-11-04;
+the owner runs it), and only the owner changes this section. After that retirement the original Windows isolated root
+stays quarantined, and nothing may re-import or re-register a distribution with either name.
+`D:\afldb-retained\issue331-20261104` holds three owner-retained, potentially sensitive files moved out of the retired
+distribution's base directory: do not extract, open, move, copy or delete them unless the owner asks.
+
+Linux for tests is the DEV host `streamanator` (fresh disposable workspaces, no sudo, per
+`docs/v2/master-execution-sequence-2026-11-01.md` section 8.2). If that is unavailable, stop and ask. Record:
+`issues/open/AFLDB-ISSUE-331.md`.
+
 ---
 
 # 12. Git Policy
