@@ -1,0 +1,159 @@
+{
+  "operation": "gap029-draft-link-production",
+  "revision": "f05a2e78fdd0d90824789ab81ee2d2e4ffe3ab8f",
+  "target": {
+    "host": "localhost",
+    "port": 5432,
+    "database": "afldb_prod",
+    "user": "afldb_backup",
+    "systemIdentifier": "7674454702926115004",
+    "databaseOid": "66668",
+    "clusterName": "16/main",
+    "databaseComment": null
+  },
+  "rehearsal": false,
+  "childPath": "/home/arm/ops/gap029-stages/f05a2e78/runs/S2-20261103T080332Z/child.json",
+  "childSha256": "d6251609b12f48ad1c48a8bd33482820e606e123f9b12fa16a3769e6b7f15d6e",
+  "label": "annual-html-20260826",
+  "parentSha256": "1f7413a2ad96e7d026cc521acfdeba3de9cab7066794de99002c9b5928e6e21b",
+  "gate": {
+    "targets": [
+      "dev",
+      "test"
+    ],
+    "productionRefused": true,
+    "gateSha256": "fbce43f7f1e374b3dfac05968e627b8ad9f337279f233a49bc19ff57d02d558d"
+  },
+  "importerSha256": "f23e76464818e9109f46004812dc65354c280ae1361a9ebe9fef59493d5540e1",
+  "writeSet": {
+    "draft_persons": [
+      "player_id",
+      "link_status",
+      "match_method",
+      "confidence_notes",
+      "is_matching_backlog"
+    ],
+    "draft_picks": [
+      "player_id",
+      "link_status_value",
+      "match_method",
+      "confidence_notes"
+    ],
+    "external_identities": [
+      "player_id",
+      "status",
+      "match_method"
+    ]
+  },
+  "expect": {
+    "after_state_sha256": "a186c592cffeffa17692610e81aec9a6ebda01a1df5e0bc357afa12ea41a620e",
+    "picks_after_sha256": "a56ca83d7bcbac0be5a6e14446955f87b4fc7985b811fb9b08a80bac6a5178b3",
+    "newly_linked_sha256": "d4a65f47e71b072f0cfae78a2e014945f5f02af93d27698033ce95de3464afca",
+    "baseline_sha256": "be716e651e942b611578b7a8c437284f96a20c3d88d3463713625e7701c166f6"
+  },
+  "batchesBefore": 4,
+  "gateSummarySha256": "62a805aba853f5faac24c6d010c24eb9314fb79888665f7b7ec3be8e0b8253aa",
+  "counts": {
+    "bridges": 3562,
+    "withheld": 1495,
+    "withheld_by_reason": {
+      "U-no-href": 1493,
+      "different_person_wrong_href": 2
+    },
+    "persons_in_snapshot": null,
+    "picks_in_snapshot": null,
+    "decided_persons_in_bridge": [
+      "https://www.draftguru.com.au/players/matt_rendell/1",
+      "https://www.draftguru.com.au/players/nathan_fyfe/1",
+      "https://www.draftguru.com.au/players/ryan_o'keefe/1"
+    ],
+    "expected_bridged": 3559
+  },
+  "safeguards": {
+    "G1": "target identity proof + exact DSN",
+    "G2": "read-only session via gate.open_read_only/with_read_only",
+    "G3": "rollback and close; exclusive output outside checkout",
+    "G4": "no DSN printed",
+    "G5": "child sha pinned + label",
+    "G6": "test child refused",
+    "G7": "parent chain verified",
+    "G8": "explicit label proven; no Stage A",
+    "G9": "write set equals link columns",
+    "G10": "zero gate failures",
+    "G11": "gate verify against plan hashes",
+    "G12": "plan re-run at apply must equal the plan"
+  },
+  "backup": {
+    "target": {
+      "host": "localhost",
+      "port": 5432,
+      "database": "afldb_prod",
+      "user": "afldb_backup",
+      "systemIdentifier": "7674454702926115004",
+      "databaseOid": "66668",
+      "clusterName": "16/main",
+      "databaseComment": null
+    },
+    "sha256": "de596efd59994d7d9e3592bfac77a74e685bfcd7b7f2fdcf6fb52da49cc8f524",
+    "restoreEvidenceSha256": "80c0f74b5a8ab77a5a3469c3cdf0aed87f38340b84e1e8660821bb3bb267c826",
+    "capturedAt": "2026-11-03T08:03:33.484Z",
+    "restoredAt": "2026-11-03T08:04:11.341Z",
+    "baselineDigest": "be716e651e942b611578b7a8c437284f96a20c3d88d3463713625e7701c166f6",
+    "draftLinkRestorePlanExpect": {
+      "after_state_sha256": "a186c592cffeffa17692610e81aec9a6ebda01a1df5e0bc357afa12ea41a620e",
+      "baseline_sha256": "be716e651e942b611578b7a8c437284f96a20c3d88d3463713625e7701c166f6",
+      "newly_linked_sha256": "d4a65f47e71b072f0cfae78a2e014945f5f02af93d27698033ce95de3464afca",
+      "picks_after_sha256": "a56ca83d7bcbac0be5a6e14446955f87b4fc7985b811fb9b08a80bac6a5178b3"
+    },
+    "batchesBefore": 4,
+    "assembly": {
+      "format": "afldb.gap029.restore-evidence-assembly.1",
+      "stage": "S2",
+      "operation": "gap029-draft-link-production",
+      "revision": "f05a2e78fdd0d90824789ab81ee2d2e4ffe3ab8f",
+      "assembledAt": "2026-11-03T08:04:15.942Z",
+      "restoreTarget": {
+        "host": "127.0.0.1",
+        "port": 55493,
+        "database": "afldb_v2_gap029_s2_20261103_080332_rst_test",
+        "user": "afldb_owner",
+        "systemIdentifier": "7703847560657506565",
+        "databaseOid": "20337",
+        "clusterName": "afldb_v2_isolated",
+        "databaseComment": "afldb-v2-isolated-test"
+      },
+      "inputs": {
+        "dumpSha256": "de596efd59994d7d9e3592bfac77a74e685bfcd7b7f2fdcf6fb52da49cc8f524",
+        "restoreEvidenceSha256": "80c0f74b5a8ab77a5a3469c3cdf0aed87f38340b84e1e8660821bb3bb267c826",
+        "toolSha256": {
+          "tools/rebuild/draftguru/bridge_import_gate.py": "fbce43f7f1e374b3dfac05968e627b8ad9f337279f233a49bc19ff57d02d558d",
+          "tools/rebuild/draftguru/import_draftguru.py": "f23e76464818e9109f46004812dc65354c280ae1361a9ebe9fef59493d5540e1",
+          "tools/v2/gap029-draft-link-production.py": "97aff072b6a9dbe9b9e16f91b30afc573a264c14faf034be4d98fe658825bded",
+          "tools/v2/gap029_common.py": "ddefab1e69ca5ed8e02b32d9eead4f3a790a84b7012e345f94092eaff31231e7"
+        },
+        "childSha256": "d6251609b12f48ad1c48a8bd33482820e606e123f9b12fa16a3769e6b7f15d6e",
+        "label": "annual-html-20260826",
+        "parentSha256": "1f7413a2ad96e7d026cc521acfdeba3de9cab7066794de99002c9b5928e6e21b"
+      },
+      "derived": {
+        "mode": "plan --rehearsal",
+        "outputSha256": "602980366daf5e00a474a1d474541e988cbbee9354ea9b3335b9f13dfe368a62",
+        "values": {
+          "baselineDigest": "be716e651e942b611578b7a8c437284f96a20c3d88d3463713625e7701c166f6",
+          "draftLinkRestorePlanExpect": {
+            "after_state_sha256": "a186c592cffeffa17692610e81aec9a6ebda01a1df5e0bc357afa12ea41a620e",
+            "baseline_sha256": "be716e651e942b611578b7a8c437284f96a20c3d88d3463713625e7701c166f6",
+            "newly_linked_sha256": "d4a65f47e71b072f0cfae78a2e014945f5f02af93d27698033ce95de3464afca",
+            "picks_after_sha256": "a56ca83d7bcbac0be5a6e14446955f87b4fc7985b811fb9b08a80bac6a5178b3"
+          },
+          "batchesBefore": 4
+        }
+      },
+      "sealedBody": "{\"assembly\":{\"assembledAt\":\"2026-11-03T08:04:15.942Z\",\"derived\":{\"mode\":\"plan --rehearsal\",\"outputSha256\":\"602980366daf5e00a474a1d474541e988cbbee9354ea9b3335b9f13dfe368a62\",\"values\":{\"baselineDigest\":\"be716e651e942b611578b7a8c437284f96a20c3d88d3463713625e7701c166f6\",\"batchesBefore\":4,\"draftLinkRestorePlanExpect\":{\"after_state_sha256\":\"a186c592cffeffa17692610e81aec9a6ebda01a1df5e0bc357afa12ea41a620e\",\"baseline_sha256\":\"be716e651e942b611578b7a8c437284f96a20c3d88d3463713625e7701c166f6\",\"newly_linked_sha256\":\"d4a65f47e71b072f0cfae78a2e014945f5f02af93d27698033ce95de3464afca\",\"picks_after_sha256\":\"a56ca83d7bcbac0be5a6e14446955f87b4fc7985b811fb9b08a80bac6a5178b3\"}}},\"format\":\"afldb.gap029.restore-evidence-assembly.1\",\"inputs\":{\"childSha256\":\"d6251609b12f48ad1c48a8bd33482820e606e123f9b12fa16a3769e6b7f15d6e\",\"dumpSha256\":\"de596efd59994d7d9e3592bfac77a74e685bfcd7b7f2fdcf6fb52da49cc8f524\",\"label\":\"annual-html-20260826\",\"parentSha256\":\"1f7413a2ad96e7d026cc521acfdeba3de9cab7066794de99002c9b5928e6e21b\",\"restoreEvidenceSha256\":\"80c0f74b5a8ab77a5a3469c3cdf0aed87f38340b84e1e8660821bb3bb267c826\",\"toolSha256\":{\"tools/rebuild/draftguru/bridge_import_gate.py\":\"fbce43f7f1e374b3dfac05968e627b8ad9f337279f233a49bc19ff57d02d558d\",\"tools/rebuild/draftguru/import_draftguru.py\":\"f23e76464818e9109f46004812dc65354c280ae1361a9ebe9fef59493d5540e1\",\"tools/v2/gap029-draft-link-production.py\":\"97aff072b6a9dbe9b9e16f91b30afc573a264c14faf034be4d98fe658825bded\",\"tools/v2/gap029_common.py\":\"ddefab1e69ca5ed8e02b32d9eead4f3a790a84b7012e345f94092eaff31231e7\"}},\"operation\":\"gap029-draft-link-production\",\"restoreTarget\":{\"clusterName\":\"afldb_v2_isolated\",\"database\":\"afldb_v2_gap029_s2_20261103_080332_rst_test\",\"databaseComment\":\"afldb-v2-isolated-test\",\"databaseOid\":\"20337\",\"host\":\"127.0.0.1\",\"port\":55493,\"systemIdentifier\":\"7703847560657506565\",\"user\":\"afldb_owner\"},\"revision\":\"f05a2e78fdd0d90824789ab81ee2d2e4ffe3ab8f\",\"stage\":\"S2\"},\"baselineDigest\":\"be716e651e942b611578b7a8c437284f96a20c3d88d3463713625e7701c166f6\",\"batchesBefore\":4,\"capturedAt\":\"2026-11-03T08:03:33.484Z\",\"draftLinkRestorePlanExpect\":{\"after_state_sha256\":\"a186c592cffeffa17692610e81aec9a6ebda01a1df5e0bc357afa12ea41a620e\",\"baseline_sha256\":\"be716e651e942b611578b7a8c437284f96a20c3d88d3463713625e7701c166f6\",\"newly_linked_sha256\":\"d4a65f47e71b072f0cfae78a2e014945f5f02af93d27698033ce95de3464afca\",\"picks_after_sha256\":\"a56ca83d7bcbac0be5a6e14446955f87b4fc7985b811fb9b08a80bac6a5178b3\"},\"restoreEvidenceSha256\":\"80c0f74b5a8ab77a5a3469c3cdf0aed87f38340b84e1e8660821bb3bb267c826\",\"restoredAt\":\"2026-11-03T08:04:11.341Z\",\"sha256\":\"de596efd59994d7d9e3592bfac77a74e685bfcd7b7f2fdcf6fb52da49cc8f524\",\"target\":{\"clusterName\":\"16/main\",\"database\":\"afldb_prod\",\"databaseComment\":null,\"databaseOid\":\"66668\",\"host\":\"localhost\",\"port\":5432,\"systemIdentifier\":\"7674454702926115004\",\"user\":\"afldb_backup\"}}",
+      "sealedBodySha256": "7f9c9e518d558413a53e6a6b5a686efe7f89e6cfa750692c0f09ad976eb4f7e6"
+    }
+  },
+  "createdAt": "2026-11-03T08:04:33.696Z",
+  "expiresAt": "2026-11-04T08:04:33.696Z",
+  "digest": "fc39483a2fa8217265a472681c71a9bf3eb80bdd865f51ccb56c4d714ec8d9c3"
+}

@@ -1,0 +1,193 @@
+
+##### 2026-11-03T08:18:08.871Z 1 upload the pinned checkout to afldb (private staging directory /home/arm/ops/gap029-stages/f05a2e78/in) and bootstrap
+== prep: verify upload, extract, pin (idempotent) 2026-11-03T08:19:15Z
+pinned_checkout=/home/arm/ops/gap029-stages/f05a2e78/cand HEAD=f05a2e78fdd0d90824789ab81ee2d2e4ffe3ab8f tracked=4292 dirty=0 node=v22.23.2
+prod_checkout_unchanged: head=d00e07e37566e92b35a34e62a1ff03e173715e87 status_lines=0
+wrapper library loads; stages S1,S2,S3,S4
+python 3.12.3 psycopg 3.3.4
+profile=production class=GENUINE_PRODUCTION profile_sha256=9bee98b5b071694100a867d14008b9316652f93894568a5db01fd0833baa8170
+== DONE prep 2026-11-03T08:19:17Z
+
+##### 2026-11-03T08:19:17.658Z 2 S3: capture on afldb (preflight, actor check, ONE fresh backup, target identity)
+== preflight S3: order gate 2026-11-03T08:19:18Z
+S2 accepted: b0be3dedbc19fba1
+== preflight S3: exclusivity (read-only) 2026-11-03T08:19:18Z
+no conflicting writer, migration or dump process
+== preflight S3: live identity, ledger and extensions (read-only session) 2026-11-03T08:19:18Z
+live identity: db=afldb_prod user=afldb_backup oid=66668 system=7674454702926115004 ledger=118/118_fixtures_unconfirmed_participants.sql
+== preflight S3: actor auth_users.id 1 (migration-105 predicate by plain SELECTs; no function call) 2026-11-03T08:19:18Z
+actor1 (id, role, enabled, enrolled, non_fixture_email, owner_email_match): 1	super_admin	true	true	true	unchecked; enabled super_admin count: 1
+== capture S3: ONE fresh backup (capture-prod-stage.sh) 2026-11-03T08:19:18Z
+== P0 host, tools, target directory (profile production, evidence class GENUINE_PRODUCTION) 2026-11-03T08:19:18Z
+host=afldb-prod user=arm kernel=6.8.0-137-generic boot_id=b77c04f1-23e4-4d58-aad2-c0734ccd6dac
+pg_dump (PostgreSQL) 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+pg_restore (PostgreSQL) 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+== P1 writer and service state (read-only systemctl queries) 2026-11-03T08:19:18Z
+afldb.service active=active enabled=enabled
+afldb-settle-afltables.service active=inactive enabled=static
+afldb-settle-afltables.timer active=inactive enabled=disabled
+afldb-settle-afl-api.service active=inactive enabled=static
+afldb-settle-afl-api.timer active=active enabled=enabled
+afldb-settle-afl-api-brownlow.service active=inactive enabled=static
+afldb-settle-afl-api-brownlow.timer active=inactive enabled=disabled
+afldb-email-intake.service active=inactive enabled=not-found
+afldb-email-intake.timer active=inactive enabled=not-found
+afldb-settle-afltables.timer next=
+no settle/migrate/dump process
+deployed_checkout=d00e07e37566e92b35a34e62a1ff03e173715e87 build_id=QNEHXAtU53TzUjj0Mb7mv
+== P2 disk 2026-11-03T08:19:18Z
+backup_root_avail_bytes=52965404672
+== P3 credential channel (values never printed) 2026-11-03T08:19:18Z
+env_file_mode=600 arm:arm
+dsn_identity user=afldb_backup host=localhost port=5432 database=afldb_prod
+== P4 identity, ledger and inspection (each a single statement, so one snapshot, in a read-only session) 2026-11-03T08:19:18Z
+identity afldb_prod	afldb_backup	66668	7674454702926115004	160015	::1	5432	on	f	t	afldb_owner	16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+extensions pg_trgm=1.6 plpgsql=1.0 unaccent=1.1
+ledger rows=118 last=118_fixtures_unconfirmed_participants.sql digest=573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57
+inspect access_exclusive_relation_locks	0
+inspect visible_nonidle_sessions	0
+inspect staging_default_acl_entries	1
+inspect staged_brownlow_seasons	2025:621
+inspect public_base_tables	83
+== P5 capture: one full custom-format pg_dump (single MVCC snapshot; writers stay enabled) 2026-11-03T08:19:19Z
+CAPTURE_DIR=/home/arm/backups/afldb/gap029-S3-20261103T081918Z
+pg_dump exit=0 start=2026-11-03T08:19:19.026203Z end=2026-11-03T08:19:28.076320Z stderr_bytes=0
+archive afldb_prod-20261103T081918Z.dump bytes=30134346 sha256=628749cea9b74b67677e227ddc2e2026c83ec5b596935e6cf1fd3780dc624a54 toc_entries=1651
+== P6 post-capture drift checks 2026-11-03T08:19:28Z
+writers_before: afltables_service=inactive timer=disabled/inactive app=active
+writers_after:  afltables_service=inactive timer=disabled/inactive app=active
+== P7 sidecar (exclusive create; no credential) 2026-11-03T08:19:28Z
+== P8 manifest and result 2026-11-03T08:19:28Z
+628749cea9b74b67677e227ddc2e2026c83ec5b596935e6cf1fd3780dc624a54  afldb_prod-20261103T081918Z.dump
+7eadc0364c27a96d5abe3dcea9cdb4a527866fba0ba5e2da9a0359297590411a  afldb_prod-20261103T081918Z.provenance.json
+86f474e2d73790c867cd7b0c575f83bc80705d0631bab7cb0cd997888a27aa79  archive.toc
+573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57  ledger-before.tsv
+573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57  ledger-after.tsv
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  pg-dump.stderr
+total 29620
+drwx------  2 arm arm     4096 Nov  3 19:19 .
+drwx------ 29 arm arm    12288 Nov  3 19:19 ..
+-rw-------  1 arm arm      535 Nov  3 19:19 SHA256SUMS
+-rw-------  1 arm arm 30134346 Nov  3 19:19 afldb_prod-20261103T081918Z.dump
+-rw-------  1 arm arm    20144 Nov  3 19:19 afldb_prod-20261103T081918Z.provenance.json
+-rw-------  1 arm arm   123062 Nov  3 19:19 archive.toc
+-rw-------  1 arm arm    11355 Nov  3 19:19 ledger-after.tsv
+-rw-------  1 arm arm    11355 Nov  3 19:19 ledger-before.tsv
+-rw-------  1 arm arm        0 Nov  3 19:19 pg-dump.stderr
+elapsed_seconds=10
+RESULT PASS stamp=20261103T081918Z archive_sha256=628749cea9b74b67677e227ddc2e2026c83ec5b596935e6cf1fd3780dc624a54 bytes=30134346 toc=1651 staged_brownlow=2025:621 class=GENUINE_PRODUCTION
+== capture S3: independent check of the capture directory and target identity 2026-11-03T08:19:28Z
+CAPTURE CHECK PASS stage S3 class GENUINE_PRODUCTION profile production dump afldb_prod-20261103T081918Z.dump bytes 30134346 sha256 628749cea9b74b67677e227ddc2e2026c83ec5b596935e6cf1fd3780dc624a54 captured 2026-11-03T08:19:19.026203Z ledger 118
+TARGET CHECK PASS
+RUN=S3-20261103T081918Z
+RUN_DIR=/home/arm/ops/gap029-stages/f05a2e78/runs/S3-20261103T081918Z
+CAPTURE_DIR=/home/arm/backups/afldb/gap029-S3-20261103T081918Z
+TARGET_SHA256=5b0a54ee050f4d2d277efa0a8f557838f06e20c26e4eff8cf9d38c1d79f8a3b9
+CAPTURE_COMPLETE stage=S3 run=S3-20261103T081918Z class=GENUINE_PRODUCTION
+== DONE capture 2026-11-03T08:19:29Z
+
+##### 2026-11-03T08:19:29.567Z 3 fetch the capture directory and target.json, verify every hash locally
+CAPTURE CHECK PASS stage S3 class GENUINE_PRODUCTION profile production dump afldb_prod-20261103T081918Z.dump bytes 30134346 sha256 628749cea9b74b67677e227ddc2e2026c83ec5b596935e6cf1fd3780dc624a54 captured 2026-11-03T08:19:19.026203Z ledger 118
+
+##### 2026-11-03T08:19:37.539Z 4 copy to dev (private workspace), restore into a guarded disposable database and assemble the sealed evidence
+restore host holds identical bytes (dump 628749cea9b74b67..., target 5b0a54ee050f4d2d...)
+2026-11-03T08:19:50Z A0 inputs (profile production, evidence class GENUINE_PRODUCTION)
+CAPTURE CHECK PASS stage S3 class GENUINE_PRODUCTION profile production dump afldb_prod-20261103T081918Z.dump bytes 30134346 sha256 628749cea9b74b67677e227ddc2e2026c83ec5b596935e6cf1fd3780dc624a54 captured 2026-11-03T08:19:19.026203Z ledger 118
+TARGET CHECK PASS
+dump sha256 628749cea9b74b67677e227ddc2e2026c83ec5b596935e6cf1fd3780dc624a54 verified by check-capture; candidate clean at f05a2e78fdd0d90824789ab81ee2d2e4ffe3ab8f; stage S3
+DEV services BEFORE:
+afldb.service active MainPID=1677
+postgresql@16-main.service active MainPID=1536
+2026-11-03T08:19:51Z A1 start the guarded cluster
+pg_ctl: server is running (PID: 250089)
+/usr/lib/postgresql/16/bin/postgres "-D" "/mnt/ssd/afldb-v2-gap029-prod-20261103/pg-root/data"
+LISTEN 0      600        127.0.0.1:55493      0.0.0.0:*    users:(("postgres",pid=250089,fd=7))      
+2026-11-03T08:19:55Z A2 restore into a guarded disposable database
+create-db: afldb_v2_gap029_s3_20261103_081918_rst_test created and marked
+isolated-pg: afldb_v2_gap029_s3_20261103_081918_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running node
+pg_restore exit=0 seconds=5 stderrLines=0
+restore_started=2026-11-03T08:19:56.469Z restored_at=2026-11-03T08:20:02.615Z
+isolated-pg: afldb_v2_gap029_s3_20261103_081918_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running node
+afldb_v2_gap029_s3_20261103_081918_rst_test {"ledger":"118_fixtures_unconfirmed_participants.sql","matches":17056,"fixtures":218,"receipts":5}
+archive toc entries: 1651
+2026-11-03T08:20:03Z A3 restore evidence (identity proven by query inside the guarded database; source identity from the capture provenance, checked against the production target)
+isolated-pg: afldb_v2_gap029_s3_20261103_081918_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running bash
+Restore evidence written (118 ledger rows, 1651 archive entries); sha256 cb511373512cce28212ff98fa57a1a1576abc35365126902b253e454c323e14c
+2026-11-03T08:20:04Z A4 assemble the sealed backup evidence for S3 from the restored copy
+isolated-pg: afldb_v2_gap029_s3_20261103_081918_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running bash
+Assembled S3 restore evidence at revision f05a2e78fdd0; backup sha256 628749cea9b7; seal 67d5e89ec6a2; sha256 ed7fd456d9e6e6af7482bb33ff2744da9d166952989c563d21595019415452fd
+OUTPUT backup.json ed7fd456d9e6e6af7482bb33ff2744da9d166952989c563d21595019415452fd
+OUTPUT restore-evidence.json cb511373512cce28212ff98fa57a1a1576abc35365126902b253e454c323e14c
+ASSEMBLY_COMPLETE stage=S3 class=GENUINE_PRODUCTION evidence_dir=/mnt/ssd/afldb-v2-gap029-prod-20261103/evidence-private/s3_20261103_081918
+2026-11-03T08:20:05Z A9 stop the cluster and prove isolation
+waiting for server to shut down.... done
+server stopped
+DEV services AFTER:
+afldb.service active MainPID=1677
+postgresql@16-main.service active MainPID=1536
+DEV services unchanged
+2026-11-03T08:20:08Z DONE rc=0
+
+##### 2026-11-03T08:20:08.756Z 5 fetch the assembled evidence and verify it
+assembled evidence verified: stage S3 revision f05a2e78fdd0 dump 628749cea9b74b67... restoreTarget afldb_v2_gap029_s3_20261103_081918_rst_test
+
+##### 2026-11-03T08:20:11.610Z 6 upload the evidence to afldb and generate the read-only plan
+== plan S3 (S3-20261103T081918Z): inputs 2026-11-03T08:20:19Z
+CAPTURE CHECK PASS stage S3 class GENUINE_PRODUCTION profile production dump afldb_prod-20261103T081918Z.dump bytes 30134346 sha256 628749cea9b74b67677e227ddc2e2026c83ec5b596935e6cf1fd3780dc624a54 captured 2026-11-03T08:19:19.026203Z ledger 118
+TARGET CHECK PASS
+no conflicting writer, migration or dump process
+== plan S3 (S3-20261103T081918Z): tool plan (read-only; writes only the plan file) 2026-11-03T08:20:20Z
+Review plan cca95f3ad992a1c4807afbc107d79ab6ef277aa71a5e44190d23dfcef65435f0; no writes (8 to insert, 0 already present); actor 1 is asserted only at apply
+[tool log /home/arm/ops/gap029-stages/f05a2e78/runs/S3-20261103T081918Z/logs/plan-1.log exit 0]
+cp: warning: behavior of -n is non-portable and may change in future; use --update=none instead
+== plan S3 (S3-20261103T081918Z): manifest 2026-11-03T08:20:22Z
+MANIFEST WRITTEN stage S3 revision f05a2e78fdd0d90824789ab81ee2d2e4ffe3ab8f plan cca95f3ad992a1c4807afbc107d79ab6ef277aa71a5e44190d23dfcef65435f0 class GENUINE_PRODUCTION sha256 4cd97d6ce1b67e8e976ed2e4bc1ad61ea8054f67865113605c3a8629825a6985
+== plan S3 (S3-20261103T081918Z): read-only state against the new plan (also re-verifies the plan digest) 2026-11-03T08:20:22Z
+STATE BASELINE (the plan has not been applied)
+[tool log /home/arm/ops/gap029-stages/f05a2e78/runs/S3-20261103T081918Z/logs/state-1.log exit 0]
+PLAN S3 eight manual rookie selections (draft_picks via the audited editor)
+  digest cca95f3ad992a1c4807afbc107d79ab6ef277aa71a5e44190d23dfcef65435f0
+  plan file sha256 3b2eb4d18640931fce1ff3537d9bd93ec3202e1d51e0df94de1908c2f3314738
+  revision f05a2e78fdd0d90824789ab81ee2d2e4ffe3ab8f
+  evidence class GENUINE_PRODUCTION
+  target afldb_prod OID 66668 system 7674454702926115004 as afldb_backup
+  backup sha256 628749cea9b74b67677e227ddc2e2026c83ec5b596935e6cf1fd3780dc624a54 captured 2026-11-03T08:19:19.026Z restored 2026-11-03T08:20:02.615Z
+  restore evidence sha256 cb511373512cce28212ff98fa57a1a1576abc35365126902b253e454c323e14c
+  plan expires 2026-11-04T08:20:21.472Z; approvals must expire before 2026-11-04T07:59:19.026Z (backup 24 h limit minus 20 min)
+  expected changes:
+    8 manual rookie selections as actor auth_users.id 1, each with its data_overrides and data_edits audit row
+      {"pick":54,"player":"Adam Schneider","action":"to insert"}
+      {"pick":35,"player":"Lachie Henderson","action":"to insert"}
+      {"pick":3,"player":"Phil Davis","action":"to insert"}
+      {"pick":11,"player":"Sam Reid","action":"to insert"}
+      {"pick":10,"player":"Lewis Taylor","action":"to insert"}
+      {"pick":21,"player":"Paul Seedsman","action":"to insert"}
+      {"pick":2,"player":"Michael Rischitelli","action":"to insert"}
+      {"pick":1,"player":"Bryce Gibbs","action":"to insert"}
+PLAN_COMPLETE stage=S3 run=S3-20261103T081918Z
+== DONE plan 2026-11-03T08:20:23Z
+
+##### 2026-11-03T08:20:23.924Z 7 fetch the plan and manifest; record the run
+
+PREPARATION COMPLETE stage S3 run S3-20261103T081918Z plan cca95f3ad992a1c4807afbc107d79ab6ef277aa71a5e44190d23dfcef65435f0 class GENUINE_PRODUCTION
+
+===== COPY-READY OWNER COMMANDS (each line is labelled with the machine it runs on) =====
+
+[WORKSTATION  D:\dev\afldb]
+  node --import tsx tools/v2/gap029-stage.ts approve --run-dir D:\tmp\gap029-prod\runs\S3-20261103T081918Z --digest cca95f3ad992a1c4807afbc107d79ab6ef277aa71a5e44190d23dfcef65435f0 --expires <ISO-8601 UTC, before the plan/backup limits>
+  expect: APPROVAL WRITTEN for S3 plan cca95f3ad992a1c4807afbc107d79ab6ef277aa71a5e44190d23dfcef65435f0 ... (refused if the digest is not this plan's)
+
+[WORKSTATION  D:\dev\afldb]
+  node --import tsx tools/v2/gap029-stage.ts apply --run-dir D:\tmp\gap029-prod\runs\S3-20261103T081918Z
+  expect: WRAPPER OUTCOME COMMITTED_VERIFIED (exit 0) ... or the named non-zero outcome; the apply runs ONCE, detached on the production host
+
+[WORKSTATION  D:\dev\afldb]
+  node --import tsx tools/v2/gap029-stage.ts report --run-dir D:\tmp\gap029-prod\runs\S3-20261103T081918Z
+  expect: RECORDED OUTCOME (use this if the apply session drops; it never starts another apply)
+
+[WORKSTATION  D:\dev\afldb]
+  node --import tsx tools/v2/gap029-stage.ts accept --run-dir D:\tmp\gap029-prod\runs\S3-20261103T081918Z
+  expect: ACCEPTED stage=S3 (read-only; only after a COMMITTED_VERIFIED or NOTHING_WRITTEN outcome)
+
+(production-host equivalent for the apply step: ssh afldb "bash /home/arm/ops/gap029-stages/f05a2e78/cand/tools/v2/gap029-ops/prod-stage.sh apply f05a2e78fdd0d90824789ab81ee2d2e4ffe3ab8f S3 S3-20261103T081918Z")
+PREPARE_EXIT=0

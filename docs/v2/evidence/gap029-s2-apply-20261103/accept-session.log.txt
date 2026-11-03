@@ -1,0 +1,7 @@
+MANIFEST VERIFY PASS stage S2 revision f05a2e78fdd0d90824789ab81ee2d2e4ffe3ab8f plan fc39483a2fa8217265a472681c71a9bf3eb80bdd865f51ccb56c4d714ec8d9c3 class GENUINE_PRODUCTION
+STATE PLANNED RESULT PRESENT (the gate's VERIFY passes)
+[tool log /home/arm/ops/gap029-stages/f05a2e78/runs/S2-20261103T080332Z/logs/state-3.log exit 0]
+ACCEPTANCE RECORDED for S2 plan fc39483a2fa8217265a472681c71a9bf3eb80bdd865f51ccb56c4d714ec8d9c3
+ACCEPTED stage=S2 run=S2-20261103T080332Z
+ANALYZE is not run by this wrapper (no privilege grant is authorised); the stage tools and autovacuum own statistics.
+== DONE accept 2026-11-03T08:17:57Z
