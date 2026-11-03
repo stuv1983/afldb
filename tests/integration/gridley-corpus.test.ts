@@ -130,6 +130,13 @@ const memberships = new Map<string, { expectedGridleyIds: number[]; actualAfldbI
 const unresolvedLog: string[] = [];
 const gapLog: string[] = [];
 let gaps: DatasetGaps = { maxSeason: 0, registerSeason: 0, draftLinks: true, matchEvents: true, heights: true, dobs: true, coaches: true, fatherSon: true, siblings: true, afterSiren: true };
+/**
+ * V2-GAP-029 evidence-scope record. The 149/99/50 baseline was measured on `afldb_test` (no 2026 season,
+ * ~5.1k linked draft picks, 1,781 captaincies); a production restore differs on exactly these probes. The
+ * report carries them so two runs can be compared by scope instead of by count alone. Diagnostic only: no
+ * assertion reads it.
+ */
+let scope: Record<string, unknown> = {};
 /** Diagnostic mode: dataset-shaped findings are counted and named instead of failing. Never the default. */
 const DIAGNOSTIC = process.env.AFLDB_GRIDLEY_DIAGNOSTIC === '1';
 /**
@@ -286,8 +293,10 @@ beforeAll(async () => {
         FROM caps a JOIN caps b ON b.season = a.season AND b.club_id = a.club_id AND b.player_id <> a.player_id
         JOIN clubs c ON c.id = a.club_id
        GROUP BY a.player_id, a.season, c.name`,
-    sql<{ maxSeason: number; draftTotal: string; draftLinked: string; matchEvents: string; heights: string; players: string; dobs: string; fatherSon: string; siblings: string; afterSiren: string }[]>`
-      SELECT (SELECT max(season) FROM matches)::int AS "maxSeason",
+    sql<{ database: string; captaincies: string; maxSeason: number; draftTotal: string; draftLinked: string; matchEvents: string; heights: string; players: string; dobs: string; fatherSon: string; siblings: string; afterSiren: string }[]>`
+      SELECT current_database() AS "database",
+             (SELECT count(*) FROM captaincies) AS "captaincies",
+             (SELECT max(season) FROM matches)::int AS "maxSeason",
              (SELECT count(*) FROM draft_picks) AS "draftTotal",
              (SELECT count(*) FROM draft_picks WHERE link_status_value IN ('unique', 'resolved')) AS "draftLinked",
              (SELECT count(*) FROM matches WHERE match_event IS NOT NULL) AS "matchEvents",
@@ -331,6 +340,13 @@ beforeAll(async () => {
     siblings: Number(probe.siblings) > 0,
     // ISSUE-118 §23.35: the after-siren load carries the tracked Wikipedia after-the-siren artefact.
     afterSiren: Number(probe.afterSiren) > 0,
+  };
+  scope = {
+    database: probe.database, maxSeason: probe.maxSeason, registerSeason: gaps.registerSeason,
+    draftPicks: Number(probe.draftTotal), draftPicksLinked: Number(probe.draftLinked), captaincies: Number(probe.captaincies),
+    matchesWithEvent: Number(probe.matchEvents), players: Number(probe.players), playersWithDob: Number(probe.dobs),
+    playersWithHeight: Number(probe.heights), fatherSon: Number(probe.fatherSon), siblings: Number(probe.siblings),
+    afterSiren: Number(probe.afterSiren), diagnostic: DIAGNOSTIC, scoreDraft: SCORE_DRAFT, gaps,
   };
   if (SCORE_DRAFT) {
     console.log(`[gridley-corpus] AFLDB_GRIDLEY_SCORE_DRAFT=1: draft criteria are scored `
@@ -786,6 +802,7 @@ describe('Gridley corpus -- every cell through solveCellSummary', () => {
     for (const f of findings) byCategory.set(f.category, (byCategory.get(f.category) ?? 0) + 1);
     const slowCells = cellStats.filter((s) => s.ms > 1000).sort((a, b) => b.ms - a.ms);
     const report = {
+      scope,
       releaseOutcomes: gridleyPolicyResults(findings.filter((f) => !Object.hasOwn(INFORMATIONAL, f.category)), deferralPolicy),
       residualMemberships: [...new Set(findings.filter((f) => !Object.hasOwn(INFORMATIONAL, f.category)).map((f) => `${f.board}:${f.cell}`))]
         .sort().map((key) => ({ key, ...memberships.get(key) })),

@@ -1,0 +1,466 @@
+{
+ "version": 1,
+ "reference": "V2-GAP-029",
+ "recordedOn": "2026-11-03",
+ "purpose": "Reconcile the accepted 149/99/50 baseline (afldb_test, no 2026) with the production-derived run (restore of the verified production backup + 64 labels), classify every unapproved finding. Observations, not defects, until classified.",
+ "inputs": {
+  "productionDerivedReport": {
+   "file": "D:/tmp/gap029-corpus/afldb_v2_gap029_prodev_test.json",
+   "sha256": "90aa85189b7a0188d369784918164f5e76151b382b7adc8a0115c805facdeb90",
+   "note": "outside Git; produced 2026-11-01 on afldb_v2_gap029_prodev_test"
+  },
+  "captaincyCorrectedReport": {
+   "file": "(scratch) cap.json",
+   "sha256": "f0b684e277d839864e74e9222df3dc266cbbf93799ed6c0bd1ab594937dd3182",
+   "database": "afldb_v2_gap029_cap_test",
+   "note": "prodev + tracked captaincies loaded; produced 2026-11-03"
+  },
+  "baselineLikeReport": {
+   "file": "(scratch) ev.json",
+   "sha256": "1d022814d4b149e6deb25a6c34118c51f5d2f090a68c0b6b386db42323f9433b",
+   "database": "afldb_v2_gap029_events_test",
+   "note": "baseline data + 61 labels; re-run 2026-11-03 with the scope field; findings identical to the 2026-11-01 record"
+  },
+  "trackedCaptaincies": {
+   "path": "data/awards/captaincies.csv",
+   "sha256": "d81844c6622282b61bf8e733478259e96c1afd27baf4b5b3e48966e7d9e657f6",
+   "rows": 1781
+  }
+ },
+ "scopes": {
+  "baseline_afldb_test_like": {
+   "database": "afldb_v2_gap029_events_test",
+   "maxSeason": 2025,
+   "registerSeason": 2025,
+   "draftPicks": 6818,
+   "draftPicksLinked": 5123,
+   "captaincies": 1781,
+   "matchesWithEvent": 61,
+   "players": 13273,
+   "playersWithDob": 13255,
+   "playersWithHeight": 12487,
+   "fatherSon": 123,
+   "siblings": 389,
+   "afterSiren": 120,
+   "diagnostic": true,
+   "scoreDraft": false,
+   "gaps": {
+    "maxSeason": 2025,
+    "registerSeason": 2025,
+    "draftLinks": true,
+    "matchEvents": true,
+    "heights": true,
+    "dobs": true,
+    "coaches": true,
+    "fatherSon": true,
+    "siblings": true,
+    "afterSiren": true
+   }
+  },
+  "production_restore_labelled": "(report predates the scope field; probes re-measured 2026-11-03 on afldb_v2_gap029_prod_test: draft_picks 6810, linked 5, captaincies 1774, max season 2026)",
+  "production_restore_with_tracked_captaincies": {
+   "database": "afldb_v2_gap029_cap_test",
+   "maxSeason": 2026,
+   "registerSeason": 2026,
+   "draftPicks": 6810,
+   "draftPicksLinked": 5,
+   "captaincies": 1781,
+   "matchesWithEvent": 64,
+   "players": 13365,
+   "playersWithDob": 13255,
+   "playersWithHeight": 12487,
+   "fatherSon": 123,
+   "siblings": 389,
+   "afterSiren": 120,
+   "diagnostic": true,
+   "scoreDraft": false,
+   "gaps": {
+    "maxSeason": 2026,
+    "registerSeason": 2026,
+    "draftLinks": false,
+    "matchEvents": true,
+    "heights": true,
+    "dobs": true,
+    "coaches": true,
+    "fatherSon": true,
+    "siblings": true,
+    "afterSiren": true
+   }
+  }
+ },
+ "productionDerivedUnapproved": {
+  "total": 334,
+  "byCategory": {
+   "dataset gap": 281,
+   "incorrect known answer": 20,
+   "source coverage gap": 33
+  }
+ },
+ "classification": {
+  "draftTradeDatasetGap": {
+   "cells": 281,
+   "byCriterion": {
+    "pick1": 11,
+    "picktop10": 228,
+    "pickrookie": 9,
+    "traded1": 15,
+    "freeagent1": 3,
+    "picktop5": 15
+   },
+   "boardYears": {
+    "2023": 80,
+    "2024": 87,
+    "2025": 78,
+    "2026": 36
+   },
+   "cause": "gaps.draftLinks=false: production draft_picks carries 5 linked of 6,810 (baseline 5,123 of 6,818, the ISSUE-222 DraftGuru bridge plus 8 audited manual rookie selections); every other gap flag is true. The corpus routes every draft-criterion cell to dataset gap before comparing.",
+   "class": "missing source data on production; evidence-scope mismatch with the afldb_test baseline",
+   "ownerPolicy": true
+  },
+  "captainKnownAnswer": {
+   "cells": 20,
+   "cause": "production captaincies holds 1,774 rows; the tracked source holds 1,781. The seven AFLDB-ISSUE-225 co-captain rows are absent, so the Cameron Bruce known-answer adjudication is STALE. Loading the tracked group on a clone gives 1,781 rows, equal to the baseline set key for key with no production row lost.",
+   "result": {
+    "before": {
+     "unapproved": 334,
+     "incorrectKnownAnswer": 20
+    },
+    "after": {
+     "unapproved": 314,
+     "incorrectKnownAnswer": 0
+    }
+   },
+   "class": "missing source data on production (tracked data not yet loaded)",
+   "missingRows": [
+    {
+     "source_key": "0a590b03a95e13bcfac2c41c",
+     "season": 2008,
+     "club": "Melbourne",
+     "player": "Cameron Bruce",
+     "playerIdInDb": 2489,
+     "role": "Captain",
+     "period": "2008 (co-captain, rounds 6–22)",
+     "csvLine": "0a590b03a95e13bcfac2c41c,2008,Melbourne,Cameron Bruce,747,unique,Captain,\"2008 (co-captain, rounds 6–22)\",co-captain with James McDonald for the remainder of 2008 after David Neitz retired (Wikipedia: 2008 Melbourne Football Club season; corroborated: Melbourne FC),wikipedia"
+    },
+    {
+     "source_key": "8dbd379972bbe7f8ecf68a10",
+     "season": 2008,
+     "club": "Melbourne",
+     "player": "James McDonald",
+     "playerIdInDb": 6730,
+     "role": "Captain",
+     "period": "2008 (co-captain, rounds 6–22)",
+     "csvLine": "8dbd379972bbe7f8ecf68a10,2008,Melbourne,James McDonald,730,unique,Captain,\"2008 (co-captain, rounds 6–22)\",co-captain with Cameron Bruce for the remainder of 2008 after David Neitz retired (Wikipedia: 2008 Melbourne Football Club season; corroborated: Melbourne FC),wikipedia"
+    },
+    {
+     "source_key": "25f8dac05c6995eb838d7bef",
+     "season": 2017,
+     "club": "Gold Coast",
+     "player": "Steven May",
+     "playerIdInDb": 12093,
+     "role": "Captain",
+     "period": "2017–2018 (co-captain)",
+     "csvLine": "25f8dac05c6995eb838d7bef,2017,Gold Coast,Steven May,11940,unique,Captain,2017–2018 (co-captain),co-captain with Tom Lynch (Wikipedia: List of Gold Coast Suns captains; corroborated: Gold Coast SUNS 2018 leadership announcement and captaincy history),wikipedia"
+    },
+    {
+     "source_key": "3469269fae62fa9aa25d705d",
+     "season": 2018,
+     "club": "Gold Coast",
+     "player": "Steven May",
+     "playerIdInDb": 12093,
+     "role": "Captain",
+     "period": "2017–2018 (co-captain)",
+     "csvLine": "3469269fae62fa9aa25d705d,2018,Gold Coast,Steven May,11940,unique,Captain,2017–2018 (co-captain),co-captain with Tom Lynch (Wikipedia: List of Gold Coast Suns captains; corroborated: Gold Coast SUNS 2018 leadership announcement and captaincy history),wikipedia"
+    },
+    {
+     "source_key": "91b499dcbe61d3386183fc8e",
+     "season": 2019,
+     "club": "Gold Coast",
+     "player": "Jarrod Witts",
+     "playerIdInDb": 6815,
+     "role": "Captain",
+     "period": "2019–2021 (co-captain)",
+     "csvLine": "91b499dcbe61d3386183fc8e,2019,Gold Coast,Jarrod Witts,12177,unique,Captain,2019–2021 (co-captain),co-captain with David Swallow (Wikipedia: List of Gold Coast Suns captains; corroborated: Gold Coast SUNS captaincy history),wikipedia"
+    },
+    {
+     "source_key": "2c4db502ad00390a4f74db74",
+     "season": 2020,
+     "club": "Gold Coast",
+     "player": "Jarrod Witts",
+     "playerIdInDb": 6815,
+     "role": "Captain",
+     "period": "2019–2021 (co-captain)",
+     "csvLine": "2c4db502ad00390a4f74db74,2020,Gold Coast,Jarrod Witts,12177,unique,Captain,2019–2021 (co-captain),co-captain with David Swallow (Wikipedia: List of Gold Coast Suns captains; corroborated: Gold Coast SUNS captaincy history),wikipedia"
+    },
+    {
+     "source_key": "c9d6a0dffa2a7035f52c66e7",
+     "season": 2021,
+     "club": "Gold Coast",
+     "player": "Jarrod Witts",
+     "playerIdInDb": 6815,
+     "role": "Captain",
+     "period": "2019–2021 (co-captain)",
+     "csvLine": "c9d6a0dffa2a7035f52c66e7,2021,Gold Coast,Jarrod Witts,12177,unique,Captain,2019–2021 (co-captain),co-captain with David Swallow (Wikipedia: List of Gold Coast Suns captains; corroborated: Gold Coast SUNS captaincy history),wikipedia"
+    }
+   ]
+  },
+  "siblingSourceCoverageGap": {
+   "cells": 33,
+   "byPlayer": {
+    "6818": {
+     "cells": 11,
+     "list": [
+      {
+       "board": 920,
+       "boardDate": "2026-01-21",
+       "cell": "2-2",
+       "row": "brother",
+       "col": "2020s"
+      },
+      {
+       "board": 920,
+       "boardDate": "2026-01-21",
+       "cell": "2-0",
+       "row": "brother",
+       "col": "GC"
+      },
+      {
+       "board": 964,
+       "boardDate": "2026-03-06",
+       "cell": "2-2",
+       "row": "brother",
+       "col": "prelimfinals1"
+      },
+      {
+       "board": 964,
+       "boardDate": "2026-03-06",
+       "cell": "2-1",
+       "row": "brother",
+       "col": "marks10match"
+      },
+      {
+       "board": 990,
+       "boardDate": "2026-04-01",
+       "cell": "2-2",
+       "row": "brother",
+       "col": "2020s"
+      },
+      {
+       "board": 1015,
+       "boardDate": "2026-04-26",
+       "cell": "2-0",
+       "row": "brother",
+       "col": "AD"
+      },
+      {
+       "board": 1015,
+       "boardDate": "2026-04-26",
+       "cell": "2-1",
+       "row": "brother",
+       "col": "BL"
+      },
+      {
+       "board": 1073,
+       "boardDate": "2026-06-23",
+       "cell": "2-2",
+       "row": "brother",
+       "col": "2020s"
+      },
+      {
+       "board": 1109,
+       "boardDate": "2026-07-29",
+       "cell": "2-2",
+       "row": "brother",
+       "col": "finals1"
+      },
+      {
+       "board": 1114,
+       "boardDate": "2026-08-03",
+       "cell": "2-2",
+       "row": "brother",
+       "col": "grandfinals1"
+      },
+      {
+       "board": 1114,
+       "boardDate": "2026-08-03",
+       "cell": "2-1",
+       "row": "brother",
+       "col": "finals10"
+      }
+     ]
+    },
+    "6937": {
+     "cells": 14,
+     "list": [
+      {
+       "board": 920,
+       "boardDate": "2026-01-21",
+       "cell": "2-2",
+       "row": "brother",
+       "col": "2020s"
+      },
+      {
+       "board": 929,
+       "boardDate": "2026-01-30",
+       "cell": "2-1",
+       "row": "brother",
+       "col": "finalsMoreWinsThanLosses"
+      },
+      {
+       "board": 964,
+       "boardDate": "2026-03-06",
+       "cell": "2-2",
+       "row": "brother",
+       "col": "prelimfinals1"
+      },
+      {
+       "board": 964,
+       "boardDate": "2026-03-06",
+       "cell": "2-1",
+       "row": "brother",
+       "col": "marks10match"
+      },
+      {
+       "board": 990,
+       "boardDate": "2026-04-01",
+       "cell": "2-0",
+       "row": "brother",
+       "col": "WC"
+      },
+      {
+       "board": 990,
+       "boardDate": "2026-04-01",
+       "cell": "2-2",
+       "row": "brother",
+       "col": "2020s"
+      },
+      {
+       "board": 1009,
+       "boardDate": "2026-04-20",
+       "cell": "2-1",
+       "row": "brother",
+       "col": "premier1x"
+      },
+      {
+       "board": 1015,
+       "boardDate": "2026-04-26",
+       "cell": "2-2",
+       "row": "brother",
+       "col": "premier1x"
+      },
+      {
+       "board": 1073,
+       "boardDate": "2026-06-23",
+       "cell": "2-2",
+       "row": "brother",
+       "col": "2020s"
+      },
+      {
+       "board": 1109,
+       "boardDate": "2026-07-29",
+       "cell": "2-2",
+       "row": "brother",
+       "col": "finals1"
+      },
+      {
+       "board": 1109,
+       "boardDate": "2026-07-29",
+       "cell": "2-0",
+       "row": "brother",
+       "col": "WC"
+      },
+      {
+       "board": 1109,
+       "boardDate": "2026-07-29",
+       "cell": "2-1",
+       "row": "brother",
+       "col": "woodenspoon"
+      },
+      {
+       "board": 1114,
+       "boardDate": "2026-08-03",
+       "cell": "2-2",
+       "row": "brother",
+       "col": "grandfinals1"
+      },
+      {
+       "board": 1114,
+       "boardDate": "2026-08-03",
+       "cell": "2-1",
+       "row": "brother",
+       "col": "finals10"
+      }
+     ]
+    },
+    "7271": {
+     "cells": 8,
+     "list": [
+      {
+       "board": 920,
+       "boardDate": "2026-01-21",
+       "cell": "2-2",
+       "row": "brother",
+       "col": "2020s"
+      },
+      {
+       "board": 929,
+       "boardDate": "2026-01-30",
+       "cell": "2-2",
+       "row": "brother",
+       "col": "goalscareerlessthan20"
+      },
+      {
+       "board": 964,
+       "boardDate": "2026-03-06",
+       "cell": "2-1",
+       "row": "brother",
+       "col": "marks10match"
+      },
+      {
+       "board": 990,
+       "boardDate": "2026-04-01",
+       "cell": "2-2",
+       "row": "brother",
+       "col": "2020s"
+      },
+      {
+       "board": 990,
+       "boardDate": "2026-04-01",
+       "cell": "2-1",
+       "row": "brother",
+       "col": "goalscareerlessthan20"
+      },
+      {
+       "board": 1073,
+       "boardDate": "2026-06-23",
+       "cell": "2-2",
+       "row": "brother",
+       "col": "2020s"
+      },
+      {
+       "board": 1109,
+       "boardDate": "2026-07-29",
+       "cell": "2-2",
+       "row": "brother",
+       "col": "finals1"
+      },
+      {
+       "board": 1109,
+       "boardDate": "2026-07-29",
+       "cell": "2-1",
+       "row": "brother",
+       "col": "woodenspoon"
+      }
+     ]
+    }
+   },
+   "cause": "All 33 are has_brother cells on 2026 boards (2026-01-21 to 2026-08-03). On the baseline every 2026 board was routed to time of board because the board year exceeded the maximum season (2025); production holds 2026, so the cells are judged on the player final season (6818: 2024, 6937: 2025, 7271: 2025) and surface. No brothers row exists for any of the three in either database.",
+   "class": "stale expectation (2026 masked in the baseline) plus missing relationship evidence",
+   "notes": {
+    "6818": "Jarryd Lyons: the same Corey Lyons evidence as the 21 approved cells (gridley-sibling-eligibility-evidence.json). The 11 cells are on 2026 boards the approval does not enumerate. Extension needs an owner decision.",
+    "6937": "Jeremy McGovern: no sibling evidence held locally.",
+    "7271": "Jimmy Webster: no sibling evidence held locally."
+   }
+  }
+ }
+}

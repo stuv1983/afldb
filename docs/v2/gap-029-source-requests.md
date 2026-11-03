@@ -74,3 +74,21 @@ canonical rows. Stage through the existing registration/player-identity and part
 ingestion paths, review unresolved links, then dry-run and transactionally promote with audit
 on an isolated clone. Verify idempotence and all eight intersections. No import is authorized
 or performed by this source request; no registration or participation evidence is invented.
+
+## 3. Production-scope additions (2026-11-03)
+
+Added by the [production-scope reconciliation](gap-029-production-scope-reconciliation-2026-11-03.md). The two sections above describe the
+`afldb_test` baseline (149/99/50) and are unchanged; section 1's 42 event cells are closed on production data by the applied labels, and
+section 2's eight cells are not unapproved on production-derived data. The production-derived run adds three groups, none of which the
+sections above cover.
+
+1. **Sibling evidence, 22 cells (Jeremy McGovern 14, Jimmy Webster 8).** For AFLDB players 6937 and 7271, an evidenced statement of whether
+   each has a brother who played senior VFL/AFL football, with the brother's AFL Tables profile and a source naming the relationship. The
+   cells are `has_brother` on 2026 boards 920, 929, 964, 990, 1009, 1015, 1073, 1109, 1114 (exact list in
+   `evidence/gap-029-production-scope-2026-11-03.json`). Admit through `data/players/sibling-supplements.csv` only on an explicitly
+   evidenced pair. Absence of a row is UNKNOWN, never "no brother". No pair is inferred or manufactured.
+2. **Draft linkage on production (281 cells).** Not a source request: the dataset exists (the tracked DraftGuru bridges) and is applied on
+   `afldb_test` and `afldb_dev`. It needs an owner decision on a production promotion (D2 in the reconciliation record). Production holds
+   5 trusted-linked picks of 6,810; the baseline holds 5,123 of 6,818.
+3. **Captaincy delta (20 cells).** Not a source request: the seven co-captain rows are in the tracked `data/awards/captaincies.csv`
+   (AFLDB-ISSUE-225). Needs an owner decision on an additive production load (D1).

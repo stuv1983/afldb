@@ -15,6 +15,13 @@ commit.
 
 ## [Unreleased]
 
+### V2-GAP-029: production-scope reconciliation of the strict Gridley findings (2026-11-03, local; nothing applied or pushed)
+
+- **Classification.** The 334 production-derived unapproved findings, recorded on 2026-11-01 as not investigated, are classified (`docs/v2/gap-029-production-scope-reconciliation-2026-11-03.md`, `docs/v2/evidence/gap-029-production-scope-2026-11-03.json`): 281 draft/trade dataset gaps (production `draft_picks` links 5 of 6,810; the baseline 5,123 of 6,818), 20 captain known-answer cells (production lacks the seven tracked AFLDB-ISSUE-225 co-captain rows) and 33 `has_brother` cells on 2026 boards that the 2025-only baseline masked. No query or application defect found. The 149/99/50 baseline and the production-derived counts are different evidence sets.
+- **Demonstrated, not applied.** Loading the tracked captaincies on a disposable clone of the production restore equals the baseline set (1,781 rows, 0 lost) and takes the unapproved count 334 → 314 (`incorrect known answer` 20 → 0).
+- **Tests.** `tests/integration/gridley-corpus.test.ts` writes an additive `scope` block into its report (database, maximum season, draft and captaincy probe counts, gap flags). No assertion, expectation or threshold changed; a baseline-like clone still reports 107 strict / 8 unapproved.
+- **Open.** V2-GAP-029 stays open. Owner decisions D1-D5 (captaincy load, production draft linkage, Lyons 2026 cells, McGovern and Webster evidence, closure definition) are in the record. `docs/v2/gap-029-source-requests.md` §3 adds the production-scope requests.
+
 ### ISSUE-316 resolved as "cutover delivered" (2026-11-03, tracking only; local, not pushed)
 
 - **Closed under the owner's Option A:** first scheduled night accepted (gate file recorded), D-316-12 released and visually checked, successor AFLDB-ISSUE-332 open. No application, schema, production or configuration change in this entry; it records project state.
