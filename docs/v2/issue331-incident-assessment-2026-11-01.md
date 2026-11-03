@@ -1,5 +1,8 @@
 # ISSUE-331 bounded incident assessment (2026-11-01)
 
+Status (2026-11-04): **ISSUE-331 is CLOSED** (Path A; retirement executed by the owner, section 9). The status below is the
+2026-11-03 reconciliation, kept as history.
+
 Status (reconciled 2026-11-03): **ISSUE-331 is OPEN.** Assessment complete; cause of the deletions UNKNOWN; initiators NOT
 attributed; that uncertainty was accepted by the owner on 2026-11-01 (section 5). The issue was closed on that disposition,
 **reopened 2026-11-01 (evening)** for a separate quarantine breach (section 6) and again recorded **2026-11-03** for a
@@ -225,6 +228,10 @@ unregistered or deleted.
 | Created | 2026-10-20 10:54:15 | 2026-10-20 10:54:15 |
 | WSL VM processes | none (`wslservice` only) | none: no `wsl`, `wslhost`, `vmmem`, `vmwp`; `wslservice` PID 5356 only |
 
+*Reading note (2026-11-04, owner correction 3):* a later write to `ext4.vhdx` is changed file **metadata**. It is not a boot
+record and names no initiator; the heading's "started again" rests on that session's own report of four commands, not on the
+metadata. The metadata supports only "the file changed".
+
 The quarantined store **did change** after the first breach record. That is consistent with this boot. It is not proof that this
 boot was the only start since 2026-11-01 (no Hyper-V or WSL event log was read). The process check says the distro is not running
 now; it says nothing about the interval.
@@ -267,3 +274,29 @@ position.
 **Boundaries restated.** A missing or deleted copy does not retire a credential. Invalidation of the quarantined store's
 credentials without a boot is possible only by destroying the store, so the evidence-value decision (D-331-6) comes first.
 ISSUE-331 remains open until the owner decides D-331-6 to D-331-11 (proposed in the runbook; none recorded here).
+
+## 9. Retirement executed and issue closed (2026-11-04)
+
+Decisions D-331-6 to D-331-11 were recorded by the owner on 2026-11-04 (runbook `issues/closed/AFLDB-ISSUE-331.md`
+section 13.1). The owner ran the hash-verified guarded script `issues/closed/AFLDB-ISSUE-331-retire-wsl.ps1` (SHA-256
+`00E30792384F6F115F6BDBFC91ED7CFD87CA0B9A23B385E3895C26935FFA3020`) and pasted its output; Claude ran no WSL command.
+
+**Evidenced by that output (runbook section 13.6):** all gates passed at the start, after the typed `RETIRE`, and
+immediately before each unregister; `wsl --unregister AFLDB-V2-BrownlowExport-20261028` and
+`wsl --unregister AFLDB-V2-Rehearsal-20261020` each returned "The operation completed successfully."; both registry keys are
+absent and the registration count went from 3 to 1 with no other registration removed; `ext4.vhdx` and its base directory
+`D:\afldb-v2-rehearsal-20261020` are absent; the three files preserved in `D:\afldb-retained\issue331-20261104` were re-hashed and
+match their recorded lengths and SHA-256 values. Final line: `RESULT: RETIRED, all checks passed`. Free space on `D:` rose by
+51,433,717,760 bytes; that is informational only and is not an erasure test.
+
+**Not evidenced (accepted by the owner, D-331-10; listed as residuals, not as resolved):** unregistering is not secure erasure,
+a password rotation or proof that the 2026-10-28 credentials are invalid everywhere. Unknown: reuse of those passwords (K-U1),
+autostart (K-U2, now moot), whether other plaintext was ever transcribed (K-U3), recoverable deleted bytes (K-U4), whether
+production-derived auth data was populated in the store (K-U5), the identity of the unrelated third WSL registration (K-U6,
+by design), the contents of the three retained files (K-U7: because they are preserved, no assertion is made that every verifier
+copy was destroyed) and the existence of other copies (K-U8). Plaintext from 2026-10-28 remains in transcripts and provider
+processing. The original disappearance (section 1) remains **cause UNKNOWN, no actor attributed, uncertainty accepted (D-331-1)**.
+
+**Retained and untouched:** `D:\tmp\afldb-v2-pg16` (still quarantined), the cold backup, the recovery environment, the
+transcripts, the three retained files and the frozen P/H/EXEC material. The quarantine rule is in `CLAUDE.md` and `AGENTS.md`
+(D-331-9). **ISSUE-331 is closed 2026-11-04 under Path A.** Sections 1-8 are history.
