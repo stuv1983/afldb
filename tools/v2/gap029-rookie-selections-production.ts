@@ -47,7 +47,7 @@ export const OPERATION = 'gap029-rookie-selections';
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 export const DRAFT_TYPE = 'Rookie';
 export const DRAFT_KIND = 'rookie';
-export const MANUAL_SOURCE = 'manual';
+export const MANUAL_SOURCE = 'manual_admin_edit';
 const PICK_LINK = "ARRAY['player_id','link_status_value','match_method','confidence_notes']";
 
 /** What the reviewed owner decision adds to each CSV row: the production player id (read live 3 Nov), the club slug, the
