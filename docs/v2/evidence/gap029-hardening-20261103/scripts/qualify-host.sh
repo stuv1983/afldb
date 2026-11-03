@@ -94,7 +94,7 @@ for st in S1 S2 S3 S4; do sha256sum "$EVP/asm-backup-$st.json" | tee -a "$SUM"; 
 if [ "$CHAIN_DUMP_SHA" = "$DUMP_SHA" ]; then
 node -e "
 const f=require('fs');const a=JSON.parse(f.readFileSync('$EVP/asm-backup-S2.json'));const p=JSON.parse(f.readFileSync('$EVP/chain/s2-plan.json'));
-const ok=JSON.stringify(a.draftLinkRestorePlanExpect)===JSON.stringify(p.expect);console.log(ok?'S2 draftLinkRestorePlanExpect equals the chain plan expectation':'S2 draftLinkRestorePlanExpect DIFFERS from the chain plan expectation');process.exit(ok?0:1)" | tee -a "$SUM" && ok "assembled S2 expectation == plan expectation on the same baseline" || bad "S2 expectation differs"
+const A=a.draftLinkRestorePlanExpect,P=p.expect;const ks=['after_state_sha256','baseline_sha256','newly_linked_sha256','picks_after_sha256'];const ok=Object.keys(A).length===4&&Object.keys(P).length===4&&ks.every(k=>typeof A[k]==='string'&&A[k]===P[k]);console.log(ok?'S2 draftLinkRestorePlanExpect equals the chain plan expectation':'S2 draftLinkRestorePlanExpect DIFFERS from the chain plan expectation');process.exit(ok?0:1)" | tee -a "$SUM" && ok "assembled S2 expectation == plan expectation on the same baseline" || bad "S2 expectation differs"
 else rec "S2 expectation equality NOT compared: the assembly dump and the chain dump differ, so their restore-derived hashes are not comparable (run once with CHAIN_DUMP unset)"; fi
 
 fi
