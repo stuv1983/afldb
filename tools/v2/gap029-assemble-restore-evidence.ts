@@ -167,7 +167,7 @@ async function run(): Promise<void> {
     mkdirSync(work, { mode: 0o700, recursive: true });
     const restoreTargetFile = join(work, 'restore-target.json'); write(restoreTargetFile, restoreTarget);
     const env = { ...process.env, AFLDB_GAP029_DSN: dsn };
-    const py = process.env.AFLDB_PYTHON || 'python3';
+    const py = process.env.AFLDB_PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
     const runTs = (tool: string, extra: string[], conditions = false): void => { execFileSync('node', ['--import', 'tsx', ...(conditions ? ['--conditions=react-server'] : []), tool, ...extra], { env, cwd: root, stdio: ['ignore', 'pipe', 'inherit'] }); };
     const runPy = (tool: string, extra: string[]): void => { execFileSync(py, [tool, ...extra], { env, cwd: root, stdio: ['ignore', 'pipe', 'inherit'] }); };
     const pyHashes = (tool: string): Record<string, string> => JSON.parse(execFileSync(py, [tool, 'tool-hashes'], { env, cwd: root, encoding: 'utf8' }));

@@ -18,6 +18,7 @@ case "$STAGE" in S1|S2|S3|S4) ;; *) echo "STOP STAGE must be S1, S2, S3 or S4"; 
 export PATH="$HOME/.nvm/versions/node/v22.23.2/bin:$PATH"
 PORT=55493
 CAND="$W/cand"; EVP="$W/evidence-private/$TAG"
+export AFLDB_PYTHON="${PY:-$W/venv/bin/python}"   # a python with psycopg (the S2/S4 tools and the importer need it)
 mkdir -p -m 700 "$W/evidence-private"; [ -e "$EVP" ] && { echo "STOP $EVP exists; choose a new TAG (evidence is never overwritten)"; exit 2; }; mkdir -m 700 "$EVP"
 export AFLDB_V2_PG_ROOT="$W/pg-root" AFLDB_V2_PG_BIN=/usr/lib/postgresql/16/bin AFLDB_V2_PG_PORT=$PORT
 say() { echo "$(date -u +%FT%TZ) $*"; }
