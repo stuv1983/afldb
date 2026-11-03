@@ -1,0 +1,27 @@
+2026-11-03T04:50:00Z Q0 inputs
+host=streamanator user=arm kernel=Linux 6.8.0-147-generic node=v22.23.2 python=Python 3.12.3 pg_restore=pg_restore (PostgreSQL) 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+PASS candidate clean at 421de2ba1b0880b12944bb23f7ade497f1f41b39
+PASS dump sha256 verified
+PASS chain dump sha256 verified
+afldb.service active MainPID=1677
+postgresql@16-main.service active MainPID=1536
+2026-11-03T04:50:00Z Q1 static: typecheck, focused DB-free tests, Python contract, original gate
+PASS tsc --noEmit clean
+PASS focused GAP-029 + season-seal suites (      Tests  127 passed (127))
+PASS Python contract (41 checks)
+PASS bridge_import_gate.py byte-identical (fbce43f7...558d)
+2026-11-03T04:50:34Z Q2 start the guarded cluster, restore the retained baseline into a disposable chain database
+PASS listener is exclusively the cluster we started (127.0.0.1:55493)
+restored chain database: afldb_v2_gap029_q1_chain_test {"ledger":"118_fixtures_unconfirmed_participants.sql","matches":17056,"fixtures":0,"receipts":0}
+2026-11-03T04:50:46Z Q3 the four-stage chain and its negative controls (S1 -> S2 -> S3 -> S4 on one disposable clone)
+PASS chain: CHAIN RESULT: 30 passed, 0 failed
+2026-11-03T04:51:26Z Q4 evidence assembly from a fresh restore, with its negative controls (one data stage shown; run restore-assemble-host.sh per stage for the real packages)
+PASS REAL retained evidence refused as stale (older than 24 hours): the assembler happy path needs a FRESH production backup, which is a production-preparation step awaiting owner approval
+2026-11-03T04:51:34Z Q5 affected editor integration and focused regressions (against a disposable database; AFLDB_TEST_DATABASE_URL is set by the guarded runner)
+PASS editor integration + focused regressions (      Tests  241 passed | 6 skipped (247))
+2026-11-03T04:51:52Z Q6 final corpus re-measurement on the post-chain clone
+corpus test file exit 1 (diagnostic mode exits 1 by design while strict parity retains its 118 accepted findings)
+PASS corpus: conformance PASS, 0 unapproved, 0 incorrect known answers, strict parity retained at 118 (report sha256 76638b52cc2a1a665c3ff762a8e39943356e036bbdc722285bc08e4859be3602)
+2026-11-03T04:57:55Z Q7 stop the cluster, prove isolation
+PASS DEV services unchanged (afldb.service, postgresql@16-main.service: state and MainPID)
+QUALIFICATION RESULT: PASS  revision 421de2ba1b0880b12944bb23f7ade497f1f41b39  host streamanator user arm

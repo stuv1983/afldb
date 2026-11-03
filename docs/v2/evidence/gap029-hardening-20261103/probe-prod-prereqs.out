@@ -1,0 +1,21 @@
+== H 2026-11-03T04:59:45Z host=afldb-prod user=arm
+== checkout (read-only git)
+HEAD=d00e07e37566e92b35a34e62a1ff03e173715e87 dirty_tracked=0
+== node
+v22.23.2
+== node_modules: 333 entries; tsx: 1; postgres: 1
+== python
+/home/arm/projects/afldb/.venv/bin/python: 3.12.3 psycopg 3.3.4
+/usr/bin/python3: 3.12.3 ModuleNotFoundError: No module named 'psycopg'
+== env var NAMES present in the checkout .env (counts only)
+AFLDB_BACKUP_DATABASE_URL lines=1
+AFLDB_IMPORT_DATABASE_URL lines=1
+AFLDB_DATABASE_URL lines=0
+== disk
+/dev/vda1        77G   27G   51G  35% /
+== backups dir
+/home/arm/backups/afldb
+release117-20261020T194821676044Z
+release117-20261020T194848633969Z
+v2-rehearsal-20261019T233531867935Z
+== done
