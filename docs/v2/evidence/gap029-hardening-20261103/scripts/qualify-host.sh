@@ -91,16 +91,20 @@ ASMCTL output-exists "already exists" AS assemble --stage S1 --production-target
 ASMCTL work-dir-exists "work directory already exists" AS assemble --stage S1 --production-target "$PROD_TARGET" --dump "$DUMP" --dump-sha256 "$DUMP_SHA" --restore-evidence "$EVP/asm-restore-evidence.json" --work-dir "$EVP/asm-work-S1" --out "$EVP/asm-ctl-work-dir-exists.json"
 for st in S1 S2 S3 S4; do sha256sum "$EVP/asm-backup-$st.json" | tee -a "$SUM"; done
 # determinism: the stage values must equal what the chain's own plans computed on the same baseline, independent of the assembler
+if [ "$CHAIN_DUMP_SHA" = "$DUMP_SHA" ]; then
 node -e "
 const f=require('fs');const a=JSON.parse(f.readFileSync('$EVP/asm-backup-S2.json'));const p=JSON.parse(f.readFileSync('$EVP/chain/s2-plan.json'));
 const ok=JSON.stringify(a.draftLinkRestorePlanExpect)===JSON.stringify(p.expect);console.log(ok?'S2 draftLinkRestorePlanExpect equals the chain plan expectation':'S2 draftLinkRestorePlanExpect DIFFERS from the chain plan expectation');process.exit(ok?0:1)" | tee -a "$SUM" && ok "assembled S2 expectation == plan expectation on the same baseline" || bad "S2 expectation differs"
+else rec "S2 expectation equality NOT compared: the assembly dump and the chain dump differ, so their restore-derived hashes are not comparable (run once with CHAIN_DUMP unset)"; fi
 
 fi
 say "Q5 affected editor integration and focused regressions (against a disposable database; AFLDB_TEST_DATABASE_URL is set by the guarded runner)"
 RUNDB "$CHAIN" bash -c "cd '$CAND' && node node_modules/vitest/vitest.mjs run tests/integration/admin-draft.test.ts tests/integration/sealed-editor-guard.test.ts tests/admin-draft-actions.test.ts tests/data-overrides-source-contract.test.ts tests/draftguru-import.test.ts" > "$EVP/vitest-editor.log" 2>&1 \
   && ok "editor integration + focused regressions ($(sed 's/\x1b\[[0-9;]*m//g' "$EVP/vitest-editor.log" | grep -E 'Tests ' | tail -1))" || { bad "editor integration / regressions"; sed 's/\x1b\[[0-9;]*m//g' "$EVP/vitest-editor.log" | grep -E "FAIL|Error" | head -10; }
 
+if [ "${SKIP_CORPUS:-0}" = 1 ]; then rec "Q6 corpus re-measurement SKIPPED by SKIP_CORPUS=1 (measured in another run)"; else
 say "Q6 final corpus re-measurement on the post-chain clone"
 mkdir -p "$EVP/corpus"
 RUNDB "$CHAIN" bash -c "cd '$CAND' && AFLDB_GRIDLEY_DIAGNOSTIC=1 AFLDB_GRIDLEY_REPORT='$EVP/corpus/report.json' node node_modules/vitest/vitest.mjs run tests/integration/gridley-corpus.test.ts" > "$EVP/corpus/run.log" 2>&1; echo "corpus test file exit $? (diagnostic mode exits 1 by design while strict parity retains its 118 accepted findings)" | tee -a "$SUM"
 node "$HELP/corpus-summary.mjs" "$EVP/corpus/report.json" > "$EVP/corpus/summary.json" && ok "corpus: conformance PASS, 0 unapproved, 0 incorrect known answers, strict parity retained at 118 (report sha256 $(sha256sum "$EVP/corpus/report.json" | cut -d' ' -f1))" || { bad "corpus acceptance"; cat "$EVP/corpus/summary.json" | head -40; }
+fi
