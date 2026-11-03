@@ -142,11 +142,12 @@ async function run() {
   if (mode === 'apply') sameDb(process.env.AFLDB_GAP029_WRITE_DSN ?? '', false);
   const evidence = readEvidence();
   const sql = postgres(dsn, { max: 1, connect_timeout: 5, onnotice: () => {}, ...(mode === 'apply' ? {} : { connection: { default_transaction_read_only: true } }) });
-  const prove = async (s: postgres.TransactionSql): Promise<void> => {
+  const prove = async (s: postgres.TransactionSql, writerRole = false): Promise<void> => {
     const [row] = await s<Record<string, string | null>[]>`SELECT current_database() AS database, current_user AS "user", c.system_identifier::text AS "systemIdentifier",
       d.oid::text AS "databaseOid", current_setting('cluster_name') AS "clusterName", shobj_description(d.oid,'pg_database') AS "databaseComment"
       FROM pg_control_system() c CROSS JOIN pg_database d WHERE d.datname = current_database()`;
-    if (!row || !same(row, { database: target.database, user: target.user, systemIdentifier: target.systemIdentifier, databaseOid: target.databaseOid, clusterName: target.clusterName, databaseComment: target.databaseComment })) fail('live database identity differs from the reviewed target');
+    if (writerRole && row?.user !== 'afldb_import') fail('the write connection must be the afldb_import role');
+    if (!row || !same({ ...row, ...(writerRole ? { user: target.user } : {}) }, { database: target.database, user: target.user, systemIdentifier: target.systemIdentifier, databaseOid: target.databaseOid, clusterName: target.clusterName, databaseComment: target.databaseComment })) fail('live database identity differs from the reviewed target');
   };
   const resolveAll = (live: Live): (Entry & Resolved)[] => evidence.entries.map((e) => { const r = captaincyEntryProblem(e, live); if (typeof r === 'string') return fail(r); return { ...e, ...r }; });
   const baselineOf = async (s: postgres.TransactionSql) => {
@@ -199,7 +200,7 @@ async function run() {
     const writer = postgres(process.env.AFLDB_GAP029_WRITE_DSN ?? '', { max: 1, connect_timeout: 5, onnotice: () => {} });
     try {
       const result = await writer.begin('isolation level repeatable read', async (tx) => {
-        await prove(tx);
+        await prove(tx, true);
         const before = await baselineOf(tx);
         if (before.digest !== plan.baselineDigest) fail('baseline drift; re-plan and obtain new execution approval');
         const live = await readLive(tx, evidence.entries);
