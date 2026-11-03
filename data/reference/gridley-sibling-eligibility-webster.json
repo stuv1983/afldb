@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "reference": "V2-GAP-029",
+  "decision": "D-GAP029-D4W",
+  "decidedOn": "2026-11-03",
+  "ownerApproved": true,
+  "provenance": "owner instruction of 2026-11-03 (GAP-029 remaining decisions, item Webster)",
+  "extends": {
+    "decision": "D-GAP029-21",
+    "evidence": "data/reference/gridley-sibling-eligibility-evidence.json",
+    "evidenceSha256": "a23fadce6c014404197bf94c698d6a95a60ed10fddce7e74c1d7a8b21b46c6f0"
+  },
+  "scope": "Exactly the 8 enumerated cells below: Jimmy Webster (AFL Tables players/J/Jimmy_Webster.html, Gridley player 3989, AFLDB player 7271 on production) / Zac Webster, criterion disagreement under the existing has_brother rule (the brother's player_career_stats.games > 0), Gridley-only direction, sole lacking builder has_brother. NOT a blanket approval of sibling findings, other players, other boards or future cells; any cell not listed stays unapproved. No fictional participation record and no weakening of the sibling criterion: no sibling pair is inserted for Zac Webster and he has no player row.",
+  "profile": "players/J/Jimmy_Webster.html",
+  "gridleyPlayerId": 3989,
+  "afldbPlayerIdOnProduction": 7271,
+  "preservedRule": "player_career_stats.games > 0",
+  "sibling": {
+    "name": "Zac Webster",
+    "listedClub": "Hawthorn",
+    "listing": "rookie 2013 (round 3, pick 48), senior list 2014, delisted October 2016",
+    "aflAppearancesFound": 0
+  },
+  "evidenceTiers": {
+    "datedPrimaryStatement": {
+      "url": "https://www.afl.com.au/news/91683/axe-falls-at-hawthorn-with-cult-hero-among-seven-cut",
+      "publisher": "afl.com.au (Ashley Browne with Peter Ryan)",
+      "publicationDate": "not printed on the page; its embedded links place it in late October 2016 (a linked post is dated 28 October 2016), so the date is inferred, not stated",
+      "quote": "The pacy Webster was unable to play a senior game and was troubled by soft tissue injuries in his three seasons at the club.",
+      "scopeOfClaim": "Zac Webster's three Hawthorn seasons up to his October 2016 delisting only. It says nothing about any later club or competition."
+    },
+    "relationship": {
+      "url": "https://www.afl.com.au/news/76126/tough-tasmanians-growing-stature",
+      "quote": "the brother of second-year St Kilda half-back Jimmy Webster",
+      "scopeOfClaim": "Establishes the brother relationship only; says nothing about participation."
+    },
+    "registrationEvidence": {
+      "url": "https://afltables.com/afl/stats/alltime/hawthorn.html",
+      "fact": "The AFL Tables Hawthorn all-time player list carries no Zac or Zachary Webster, and AFL Tables has no profile page for him. Absence from a register is registration evidence, not a dated statement of zero games.",
+      "scopeOfClaim": "Hawthorn only."
+    },
+    "broaderCareerInference": {
+      "basis": "No source found places Zac Webster in any senior AFL match for any club; the dated statement covers Hawthorn to 2016 and the register absence covers the AFL Tables record. The remainder is an inference of absence, not a recorded fact, and is held at medium-high confidence."
+    },
+    "supportingContext": {
+      "url": "https://www.hawthornfc.com.au/news/410320",
+      "fact": "Hawthorn FC (undated, about December 2015) records eight VFL appearances in 2015 and that he was yet to make his AFL debut. Secondary context; the dated statement above supersedes it as the evidence of record."
+    }
+  },
+  "reasoning": "The cell population is a criterion disagreement exactly as for Lyons: Gridley's key lists Jimmy Webster through a brother who was AFL-listed but has no senior appearance, so the brother fails games > 0. The relationship is established; the participation criterion is not satisfied. State-league (VFL) appearances are not top-tier senior appearances under the rule.",
+  "openLimitation": "Whether Jimmy has another brother who played senior VFL/AFL football was not established and none was found; absence of such a brother stays unknown, not asserted.",
+  "cells": [
+    { "board": 920, "cell": "2-2", "date": "2026-01-21", "row": "brother", "col": "2020s" },
+    { "board": 929, "cell": "2-2", "date": "2026-01-30", "row": "brother", "col": "goalscareerlessthan20" },
+    { "board": 964, "cell": "2-1", "date": "2026-03-06", "row": "brother", "col": "marks10match" },
+    { "board": 990, "cell": "2-2", "date": "2026-04-01", "row": "brother", "col": "2020s" },
+    { "board": 990, "cell": "2-1", "date": "2026-04-01", "row": "brother", "col": "goalscareerlessthan20" },
+    { "board": 1073, "cell": "2-2", "date": "2026-06-23", "row": "brother", "col": "2020s" },
+    { "board": 1109, "cell": "2-2", "date": "2026-07-29", "row": "brother", "col": "finals1" },
+    { "board": 1109, "cell": "2-1", "date": "2026-07-29", "row": "brother", "col": "woodenspoon" }
+  ]
+}

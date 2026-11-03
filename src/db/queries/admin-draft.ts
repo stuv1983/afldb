@@ -979,66 +979,76 @@ export type CreateManualPickInput = ManualPickFields & {
   confirmed?: boolean;
 };
 
+type CreateManualPickResult = DraftMutationResult<{ pickId: number; pickToken: string; playerSlug: string; playerId: number }>;
+
+/**
+ * The whole audited mutation, inside a transaction the CALLER owns (afldb_import). `createManualPick` is a thin wrapper that opens
+ * the import-role transaction and delegates here, so the admin editor and a reviewed multi-selection tool (V2-GAP-029) run the
+ * SAME validation, identity, override and sealed-season audit code. A caller composing several selections in one transaction MUST
+ * roll back on any non-ok result: this function returns its refusals (it has written nothing when it does) rather than throwing.
+ */
+export async function createManualPickInTransaction(tx: Tx, input: CreateManualPickInput): Promise<CreateManualPickResult> {
+  const [player] = await tx<{ id: number; displayName: string; slug: string }[]>`
+    SELECT id, display_name AS "displayName", slug FROM players WHERE id = ${input.playerId} FOR UPDATE
+  `;
+  if (!player) return refuse('not_found', 'No player with that id.');
+
+  const conflict = await checkSelectionConflicts(tx, {
+    playerId: player.id,
+    draftYear: input.draftYear,
+    draftKind: input.draftKind,
+    draftType: input.draftType,
+    pickNumber: input.pickNumber,
+    pickNote: input.pickNote ?? null,
+  }, { confirmed: input.confirmed });
+  if (!conflict.ok) return conflict;
+
+  const club = await resolveClubForYear(tx, input.clubSlug, input.draftYear);
+  if (!club.ok) return refuse('validation', club.error);
+
+  const identity = await resolvePlayerIdentity(tx, player.id);
+  if (!identity.ok) return refuse(identity.reason, identity.error);
+  if (identity.identity === null) {
+    return refuse('conflict',
+      `${player.displayName} (#${player.id}) carries no durable identity, so a selection `
+      + 'recorded against them could not survive a rebuild. Repair the player first.');
+  }
+
+  const token = randomUUID();
+  const playerNameRaw = (input.playerNameRaw ?? '').trim() || player.displayName;
+  const pickId = await insertManualPick(tx, {
+    token, playerId: player.id, playerNameRaw,
+    clubId: club.club.id, clubName: club.club.name, fields: input,
+  });
+
+  const payload = manualSelectionPayload(input, identity.identity, playerNameRaw);
+  await tx`
+    INSERT INTO data_overrides
+          (entity_type, entity_key, field_group, override_values, admin_user_id, is_active, updated_at)
+    VALUES ('draft_picks', ${manualEntityKey(token)}, 'selection',
+            ${tx.json(payload as postgres.JSONValue)}, ${input.adminUserId}, true, now())
+  `;
+  await recordDataEdit(tx, {
+    tableName: 'players',
+    rowId: player.id,
+    fieldGroup: 'draft_selection',
+    oldValues: {},
+    newValues: { ...payload, pick_token: token },
+    adminUserId: input.adminUserId,
+    note: input.note,
+    seal: { kind: 'seasons', seasons: [input.draftYear] },
+  });
+  return { ok: true as const, pickId, pickToken: token, playerSlug: player.slug, playerId: player.id };
+}
+
 export async function createManualPick(
   input: CreateManualPickInput,
-): Promise<DraftMutationResult<{ pickId: number; pickToken: string; playerSlug: string; playerId: number }>> {
+): Promise<CreateManualPickResult> {
   const measures = validateManualPickMeasures(input);
   if (!measures.ok) return refuse('validation', measures.error);
   return withImportConnection(async (importSql) => {
     try {
-      return await importSql.begin(async (tx) => {
-        const [player] = await tx<{ id: number; displayName: string; slug: string }[]>`
-          SELECT id, display_name AS "displayName", slug FROM players WHERE id = ${input.playerId} FOR UPDATE
-        `;
-        if (!player) return refuse('not_found', 'No player with that id.');
-
-        const conflict = await checkSelectionConflicts(tx, {
-          playerId: player.id,
-          draftYear: input.draftYear,
-          draftKind: input.draftKind,
-          draftType: input.draftType,
-          pickNumber: input.pickNumber,
-          pickNote: input.pickNote ?? null,
-        }, { confirmed: input.confirmed });
-        if (!conflict.ok) return conflict;
-
-        const club = await resolveClubForYear(tx, input.clubSlug, input.draftYear);
-        if (!club.ok) return refuse('validation', club.error);
-
-        const identity = await resolvePlayerIdentity(tx, player.id);
-        if (!identity.ok) return refuse(identity.reason, identity.error);
-        if (identity.identity === null) {
-          return refuse('conflict',
-            `${player.displayName} (#${player.id}) carries no durable identity, so a selection `
-            + 'recorded against them could not survive a rebuild. Repair the player first.');
-        }
-
-        const token = randomUUID();
-        const playerNameRaw = (input.playerNameRaw ?? '').trim() || player.displayName;
-        const pickId = await insertManualPick(tx, {
-          token, playerId: player.id, playerNameRaw,
-          clubId: club.club.id, clubName: club.club.name, fields: input,
-        });
-
-        const payload = manualSelectionPayload(input, identity.identity, playerNameRaw);
-        await tx`
-          INSERT INTO data_overrides
-                (entity_type, entity_key, field_group, override_values, admin_user_id, is_active, updated_at)
-          VALUES ('draft_picks', ${manualEntityKey(token)}, 'selection',
-                  ${tx.json(payload as postgres.JSONValue)}, ${input.adminUserId}, true, now())
-        `;
-        await recordDataEdit(tx, {
-          tableName: 'players',
-          rowId: player.id,
-          fieldGroup: 'draft_selection',
-          oldValues: {},
-          newValues: { ...payload, pick_token: token },
-          adminUserId: input.adminUserId,
-          note: input.note,
-          seal: { kind: 'seasons', seasons: [input.draftYear] },
-        });
-        return { ok: true as const, pickId, pickToken: token, playerSlug: player.slug, playerId: player.id };
-      });
+      return await importSql.begin(async (tx) => createManualPickInTransaction(tx, input));
     } catch (error) {
       // V2-GAP-006: the season seal rolled the transaction back whole; say so in its own words, as every editor does.
       if (isSealedEditorRefusal(error)) return refuse('validation', error.message);

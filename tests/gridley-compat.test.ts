@@ -9,6 +9,7 @@
  * Lookups are stubbed here with fixed ids: the point of this suite is the
  * mapping and the denominator, not the ids.
  */
+import { createHash } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -109,6 +110,83 @@ describe('GAP-029 release policy', () => {
       const finding = { ...first, ...('board' in changed ? { board: changed.board } : {}), siblingEvidence: { ...first.siblingEvidence, ...changed } };
       expect(gridleyPolicyResults([finding], policy).approvedPolicyConformance.passed).toBe(false);
     }
+  });
+  it('D-GAP029-D4W approves exactly the 8 enumerated Webster cells, keeps the evidence tiers distinct, and nothing adjacent', () => {
+    const root = join(__dirname, '..');
+    const baseline = JSON.parse(readFileSync(join(root, 'data/reference/gridley-sibling-eligibility-evidence.json'), 'utf8'));
+    const lyons = JSON.parse(readFileSync(join(root, 'data/reference/gridley-sibling-eligibility-extension-2026-boards.json'), 'utf8'));
+    const webster = JSON.parse(readFileSync(join(root, 'data/reference/gridley-sibling-eligibility-webster.json'), 'utf8'));
+    const approval = JSON.parse(readFileSync(join(root, 'data/reference/gridley-approved-sibling-disagreements.json'), 'utf8'));
+    expect(webster.decision).toBe('D-GAP029-D4W');
+    expect(webster.ownerApproved).toBe(true);
+    expect(webster.cells).toHaveLength(8);
+    expect(webster.profile).toBe('players/J/Jimmy_Webster.html');
+    expect(webster.gridleyPlayerId).toBe(3989);
+    expect(webster.preservedRule).toBe('player_career_stats.games > 0');
+    // the proposal's 8 cells are exactly the approved cells, none overlaps the Lyons cells, and both Lyons files are untouched
+    const proposal = JSON.parse(readFileSync(join(root, 'docs/v2/evidence/gap029-webster-adjudication-proposal-2026-11-03.json'), 'utf8'));
+    expect(webster.cells).toEqual(proposal.cells);
+    const key = (c: { board: number; cell: string; row: string; col: string }) => JSON.stringify([c.board, c.cell, c.row, c.col]);
+    // five cells hold both a Lyons and a Webster finding (different players); within one player no cell is listed twice
+    expect(new Set([...baseline.cells, ...lyons.cells].map(key)).size).toBe(32);
+    expect(new Set([...baseline.cells, ...lyons.cells, ...webster.cells].map(key)).size).toBe(32 + 8 - 5);
+    expect(webster.cells.every((c: { date: string; row: string }) => c.date.startsWith('2026-') && c.row === 'brother')).toBe(true);
+    // the three evidence tiers are kept apart: a dated statement, registration evidence, and a labelled inference
+    expect(webster.evidenceTiers.datedPrimaryStatement.url).toBe('https://www.afl.com.au/news/91683/axe-falls-at-hawthorn-with-cult-hero-among-seven-cut');
+    expect(webster.evidenceTiers.datedPrimaryStatement.scopeOfClaim).toMatch(/Hawthorn seasons/);
+    expect(webster.evidenceTiers.datedPrimaryStatement.publicationDate).toMatch(/inferred, not stated/);
+    expect(webster.evidenceTiers.registrationEvidence.fact).toMatch(/not a dated statement of zero games/);
+    expect(webster.evidenceTiers.broaderCareerInference.basis).toMatch(/inference of absence, not a recorded fact/);
+    expect(webster.sibling.aflAppearancesFound).toBe(0);
+    // approval pin
+    const entry = approval.extensions.find((e: { decision: string }) => e.decision === 'D-GAP029-D4W');
+    expect(entry.cells).toBe(8);
+    expect(entry.evidenceSha256).toBe(createHash('sha256').update(readFileSync(join(root, entry.evidence))).digest('hex'));
+    expect(() => loadGridleyDeferrals()).not.toThrow();
+    const policy = loadGridleyDeferrals();
+    const base = { profile: webster.profile, gridleyPlayerId: webster.gridleyPlayerId,
+      inGridley: true, inAfldb: false, lackingBuilders: ['has_brother'] };
+    const findings = webster.cells.map((cell: { board: number; cell: string; row: string; col: string }) => ({
+      board: cell.board, cell: cell.cell, row: cell.row, col: cell.col, category: 'criterion disagreement',
+      siblingEvidence: { ...base, board: cell.board, cell: cell.cell, row: cell.row, col: cell.col } }));
+    for (const finding of findings) expect(siblingCriterionDisagreement(finding.siblingEvidence)).toContain('Zac Webster');
+    const result = gridleyPolicyResults(findings, policy);
+    expect(result.strictCorpusParity).toEqual({ passed: false, findings: 8 });
+    expect(result.approvedDisagreements).toEqual({ findings: 8, dataMatches: 0 });
+    expect(result.approvedPolicyConformance.passed).toBe(true);
+    // neighbouring cells, different identities, a different predicate builder, a changed direction and Lyons' identity are refused
+    const first = findings[0];
+    for (const changed of [{ board: first.board + 1 }, { cell: '0-0' }, { col: 'other' }, { row: 'other' },
+      { profile: 'players/J/Jarryd_Lyons.html' }, { profile: 'players/J/Jimmy_Webster2.html' }, { gridleyPlayerId: 3746 },
+      { gridleyPlayerId: 1 }, { inGridley: false }, { inAfldb: true }, { lackingBuilders: ['has_brother', 'played_for_club'] },
+      { lackingBuilders: ['played_for_club'] }]) {
+      const patch = changed as Record<string, unknown>;
+      const finding = { ...first, ...('board' in patch ? { board: patch.board } : {}), ...('cell' in patch ? { cell: patch.cell } : {}),
+        ...('col' in patch ? { col: patch.col } : {}), ...('row' in patch ? { row: patch.row } : {}),
+        siblingEvidence: { ...first.siblingEvidence, ...changed } };
+      expect(gridleyPolicyResults([finding], policy).approvedPolicyConformance.passed).toBe(false);
+    }
+    // a shared cell is approved once per player, but an exact duplicate (same cell and player) is still unapproved
+    const lyonsShared = lyons.cells.find((c: { board: number; cell: string; col: string }) => c.board === first.board && c.cell === first.cell && c.col === first.col);
+    expect(lyonsShared).toBeTruthy();
+    const lyonsFinding = { board: lyonsShared.board, cell: lyonsShared.cell, row: lyonsShared.row, col: lyonsShared.col, category: 'criterion disagreement',
+      siblingEvidence: { profile: lyons.profile, gridleyPlayerId: lyons.gridleyPlayerId, inGridley: true, inAfldb: false, lackingBuilders: ['has_brother'],
+        board: lyonsShared.board, cell: lyonsShared.cell, row: lyonsShared.row, col: lyonsShared.col } };
+    expect(gridleyPolicyResults([first, lyonsFinding], policy).approvedPolicyConformance.passed).toBe(true);
+    expect(gridleyPolicyResults([first, lyonsFinding], policy).approvedDisagreements.findings).toBe(2);
+    expect(gridleyPolicyResults([first, first], policy).approvedPolicyConformance.unapprovedDifferences).toEqual([first]);
+    // Lyons' cell list cannot approve Webster's identity and vice versa
+    const webSet = new Set(webster.cells.map(key));
+    const lyonsCell = lyons.cells.find((c: { board: number; cell: string; row: string; col: string }) => !webSet.has(key(c)));
+    expect(lyonsCell).toBeTruthy();
+    expect(siblingCriterionDisagreement({ ...base, board: lyonsCell.board, cell: lyonsCell.cell, row: lyonsCell.row, col: lyonsCell.col })).toBeNull();
+    const lyonsSet = new Set([...baseline.cells, ...lyons.cells].map(key));
+    const webOnly = webster.cells.find((c: { board: number; cell: string; row: string; col: string }) => !lyonsSet.has(key(c)));
+    expect(webOnly).toBeTruthy();
+    expect(siblingCriterionDisagreement({ board: webOnly.board, cell: webOnly.cell, row: webOnly.row, col: webOnly.col,
+      profile: lyons.profile, gridleyPlayerId: lyons.gridleyPlayerId, inGridley: true, inAfldb: false, lackingBuilders: ['has_brother'] })).toBeNull();
+    // changed evidence: a one-byte change to the Webster file makes the whole policy stale
+    expect(createHash('sha256').update(readFileSync(join(root, entry.evidence)) + ' ').digest('hex')).not.toBe(entry.evidenceSha256);
   });
   it('bounds the seven retained deferrals to their original 78 cells and keeps strict results', () => {
     const policy = loadGridleyDeferrals();

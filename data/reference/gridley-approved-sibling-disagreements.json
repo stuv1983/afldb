@@ -20,6 +20,16 @@
       "scope": "Only the 11 enumerated 2026-board cells, Jarryd Lyons / Corey Lyons, identical player identity, source evidence and games > 0 predicate to D-GAP029-21. Not a blanket approval of sibling findings or future cells.",
       "cells": 11,
       "dataMatches": 0
+    },
+    {
+      "decision": "D-GAP029-D4W",
+      "decidedOn": "2026-11-03",
+      "provenance": "owner instruction of 2026-11-03 (GAP-029 remaining decisions, item Webster)",
+      "evidence": "data/reference/gridley-sibling-eligibility-webster.json",
+      "evidenceSha256": "dd1b47050f39bd265b40a4ea972742649b8371d0c909fb46f17fc66b43a9e27f",
+      "scope": "Only the 8 enumerated cells, Jimmy Webster (Gridley 3989) / Zac Webster, under the existing games > 0 rule; the dated afl.com.au statement, registration evidence and broader inference are kept distinct in the evidence file. No participation record or sibling pair is added. Not a blanket approval of siblings or future cells.",
+      "cells": 8,
+      "dataMatches": 0
     }
   ]
 }

@@ -46,8 +46,11 @@ export function gridleyPolicyResults<T extends PolicyFinding>(strictFailures: re
   const approvedDisagreements: T[] = [];
   const unapprovedDifferences: T[] = [];
   for (const finding of strictFailures) {
-    const key = JSON.stringify([finding.board, finding.cell, finding.row, finding.col]);
     const evidence = finding.siblingEvidence;
+    // A cell can legitimately carry findings for different players (Lyons and Webster share five cells), so a sibling
+    // finding's duplicate key includes the player identity; an exact duplicate (same cell and player) stays unapproved.
+    const key = JSON.stringify([finding.board, finding.cell, finding.row, finding.col,
+      finding.category === 'criterion disagreement' && evidence ? [evidence.profile, evidence.gridleyPlayerId] : null]);
     const sibling = finding.category === 'criterion disagreement' && evidence
       && evidence.board === finding.board && evidence.cell === finding.cell
       && evidence.row === finding.row && evidence.col === finding.col

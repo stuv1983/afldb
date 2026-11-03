@@ -21,14 +21,32 @@ import { KNOWN_ANSWER_EVIDENCE_KIND, type GridleyKnownAnswerAdjudication } from 
 import board541Trade from '../data/reference/gridley-board-541-trade.json';
 import siblingEligibility from '../data/reference/gridley-sibling-eligibility-evidence.json';
 import siblingExtension2026 from '../data/reference/gridley-sibling-eligibility-extension-2026-boards.json';
+import siblingWebster from '../data/reference/gridley-sibling-eligibility-webster.json';
+
+type SiblingCell = { board: number; cell: string; row: string; col: string };
 
 /**
- * Every enumerated has_brother cell the Lyons evidence covers: the 21 baseline cells (D-GAP029-21) and the 11
- * enumerated 2026-board cells (D-GAP029-D3). Nothing else is covered; the policy loader pins both files' hashes.
+ * Every enumerated has_brother cell the sibling evidence covers, grouped per player so one player's cells can never
+ * approve another's: Lyons has the 21 baseline cells (D-GAP029-21) and the 11 enumerated 2026-board cells
+ * (D-GAP029-D3); Webster has the 8 enumerated cells (D-GAP029-D4W). Nothing else is covered; the policy loader pins
+ * every file's hash.
  */
-export const SIBLING_EVIDENCE_CELLS: readonly { board: number; cell: string; row: string; col: string }[] = [
-  ...siblingEligibility.cells,
-  ...siblingExtension2026.cells,
+export const SIBLING_EVIDENCE_GROUPS: readonly {
+  profile: string; gridleyPlayerId: number; cells: readonly SiblingCell[]; explanation: string;
+}[] = [
+  {
+    profile: siblingEligibility.profile, gridleyPlayerId: siblingEligibility.gridleyPlayerId,
+    cells: [...siblingEligibility.cells, ...siblingExtension2026.cells],
+    explanation: `criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; `
+      + `has_brother requires games > 0; ${siblingEligibility.sources[0].url}; ${siblingEligibility.sources[1].url}`,
+  },
+  {
+    profile: siblingWebster.profile, gridleyPlayerId: siblingWebster.gridleyPlayerId,
+    cells: siblingWebster.cells,
+    explanation: `criterion disagreement: Zac Webster was AFL-listed; afl.com.au (${siblingWebster.evidenceTiers.datedPrimaryStatement.url}) `
+      + `states he was unable to play a senior game in his three Hawthorn seasons (statement dated by inference to Oct 2016); `
+      + `the relationship is ${siblingWebster.evidenceTiers.relationship.url}; has_brother requires games > 0`,
+  },
 ];
 
 /** Evidence classification only: strict finding retained; the separate policy checks owner approval. */
@@ -36,13 +54,11 @@ export function siblingCriterionDisagreement(input: {
   board: number; cell: string; row: string; col: string; profile: string; gridleyPlayerId: number;
   inGridley: boolean; inAfldb: boolean; lackingBuilders: readonly string[];
 }): string | null {
-  if (!input.inGridley || input.inAfldb || input.profile !== siblingEligibility.profile
-    || input.gridleyPlayerId !== siblingEligibility.gridleyPlayerId
-    || input.lackingBuilders.length !== 1 || input.lackingBuilders[0] !== 'has_brother'
-    || !SIBLING_EVIDENCE_CELLS.some((cell) => cell.board === input.board && cell.cell === input.cell
-      && cell.row === input.row && cell.col === input.col)) return null;
-  return `criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; `
-    + `has_brother requires games > 0; ${siblingEligibility.sources[0].url}; ${siblingEligibility.sources[1].url}`;
+  if (!input.inGridley || input.inAfldb || input.lackingBuilders.length !== 1 || input.lackingBuilders[0] !== 'has_brother') return null;
+  const group = SIBLING_EVIDENCE_GROUPS.find((g) => g.profile === input.profile && g.gridleyPlayerId === input.gridleyPlayerId);
+  if (!group || !group.cells.some((cell) => cell.board === input.board && cell.cell === input.cell
+    && cell.row === input.row && cell.col === input.col)) return null;
+  return group.explanation;
 }
 
 export type PlayerRow = {
