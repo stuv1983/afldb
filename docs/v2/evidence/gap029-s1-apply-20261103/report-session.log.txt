@@ -1,0 +1,23 @@
+RECORDED OUTCOME:
+{
+  "stage": "S1",
+  "classification": "COMMITTED_VERIFIED",
+  "exitCode": 0,
+  "committed": true,
+  "notes": [],
+  "toolLogSha256": "65bf8ba6dab195c9262bc33f9a246d30d8a12b69a82f8fd6fedba07d570e69e0",
+  "at": "2026-11-03T08:01:33.307Z"
+}
+
+== apply S1 (S1-20261103T074434Z): tool apply (single attempt) 2026-11-03T08:01:31Z
+OUTCOME COMMITTED_VERIFIED (exit 0)
+COMMITTED AND VERIFIED: the transaction committed and an independent read-only check of the committed state passed.
+[tool log /home/arm/ops/gap029-stages/f05a2e78/runs/S1-20261103T074434Z/logs/apply-1.log exit 0]
+== apply S1 (S1-20261103T074434Z): read-only post-run state probe 2026-11-03T08:01:32Z
+tool exit 0; state probe exit 0
+== apply S1 (S1-20261103T074434Z): outcome 2026-11-03T08:01:33Z
+WRAPPER OUTCOME COMMITTED_VERIFIED (exit 0) stage S1
+COMMITTED AND VERIFIED: the transaction committed and an independent read-only check of the committed state passed.
+post-run state probe: PLANNED RESULT PRESENT
+Next: run `accept` (read-only state + verification); only then prepare the next stage with its OWN fresh backup.
+The wrapper never retries an apply, never claims rollback after a commit and never restores a backup.

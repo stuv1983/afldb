@@ -1,0 +1,186 @@
+{
+  "operation": "gap029-captaincy-additions",
+  "revision": "f05a2e78fdd0d90824789ab81ee2d2e4ffe3ab8f",
+  "target": {
+    "host": "localhost",
+    "port": 5432,
+    "database": "afldb_prod",
+    "user": "afldb_backup",
+    "systemIdentifier": "7674454702926115004",
+    "databaseOid": "66668",
+    "clusterName": "16/main",
+    "databaseComment": null
+  },
+  "rehearsal": false,
+  "evidenceSha256": "f88f55246fa8815ee17cf4b6ba44d939f265077cd58ac8ca1857357d0c0d5153",
+  "manifestSha256": "d81844c6622282b61bf8e733478259e96c1afd27baf4b5b3e48966e7d9e657f6",
+  "baselineDigest": "5173a76b4bde483ce138af254d41e21dd1f15bab2fe8c29fc83625f7397af9d4",
+  "backup": {
+    "target": {
+      "host": "localhost",
+      "port": 5432,
+      "database": "afldb_prod",
+      "user": "afldb_backup",
+      "systemIdentifier": "7674454702926115004",
+      "databaseOid": "66668",
+      "clusterName": "16/main",
+      "databaseComment": null
+    },
+    "sha256": "409b21a2da198d58d442dcdc6b4726fa893877023839e58e8c57b621ee661ded",
+    "restoreEvidenceSha256": "4c784f7e51b6a39e5008e58b637564212baa032646f23dc570cdee849c66a25f",
+    "capturedAt": "2026-11-03T07:44:35.055Z",
+    "restoredAt": "2026-11-03T07:45:16.376Z",
+    "baselineDigest": "5173a76b4bde483ce138af254d41e21dd1f15bab2fe8c29fc83625f7397af9d4",
+    "assembly": {
+      "format": "afldb.gap029.restore-evidence-assembly.1",
+      "stage": "S1",
+      "operation": "gap029-captaincy-additions",
+      "revision": "f05a2e78fdd0d90824789ab81ee2d2e4ffe3ab8f",
+      "assembledAt": "2026-11-03T07:45:19.473Z",
+      "restoreTarget": {
+        "host": "127.0.0.1",
+        "port": 55493,
+        "database": "afldb_v2_gap029_s1_20261103_074434_rst_test",
+        "user": "afldb_owner",
+        "systemIdentifier": "7703847560657506565",
+        "databaseOid": "16390",
+        "clusterName": "afldb_v2_isolated",
+        "databaseComment": "afldb-v2-isolated-test"
+      },
+      "inputs": {
+        "dumpSha256": "409b21a2da198d58d442dcdc6b4726fa893877023839e58e8c57b621ee661ded",
+        "restoreEvidenceSha256": "4c784f7e51b6a39e5008e58b637564212baa032646f23dc570cdee849c66a25f",
+        "toolSha256": {
+          "tools/v2/gap029-captaincy-additions-production.ts": "0163a5e525fb8abc6e4f1f16ae813ca4da7b72dcd161eae6a2957c9cb8e01b22",
+          "tools/v2/gap029-common.ts": "9a42b41bbeffa9b73dec9d8b1d34cc164194cc29ed2319e2512dab971522fe55"
+        }
+      },
+      "derived": {
+        "mode": "baseline --rehearsal",
+        "outputSha256": "7dc183d50392fb2f94871a670899070e2f021fc3a6072cbf5eb2430ec3a1395b",
+        "values": {
+          "baselineDigest": "5173a76b4bde483ce138af254d41e21dd1f15bab2fe8c29fc83625f7397af9d4"
+        }
+      },
+      "sealedBody": "{\"assembly\":{\"assembledAt\":\"2026-11-03T07:45:19.473Z\",\"derived\":{\"mode\":\"baseline --rehearsal\",\"outputSha256\":\"7dc183d50392fb2f94871a670899070e2f021fc3a6072cbf5eb2430ec3a1395b\",\"values\":{\"baselineDigest\":\"5173a76b4bde483ce138af254d41e21dd1f15bab2fe8c29fc83625f7397af9d4\"}},\"format\":\"afldb.gap029.restore-evidence-assembly.1\",\"inputs\":{\"dumpSha256\":\"409b21a2da198d58d442dcdc6b4726fa893877023839e58e8c57b621ee661ded\",\"restoreEvidenceSha256\":\"4c784f7e51b6a39e5008e58b637564212baa032646f23dc570cdee849c66a25f\",\"toolSha256\":{\"tools/v2/gap029-captaincy-additions-production.ts\":\"0163a5e525fb8abc6e4f1f16ae813ca4da7b72dcd161eae6a2957c9cb8e01b22\",\"tools/v2/gap029-common.ts\":\"9a42b41bbeffa9b73dec9d8b1d34cc164194cc29ed2319e2512dab971522fe55\"}},\"operation\":\"gap029-captaincy-additions\",\"restoreTarget\":{\"clusterName\":\"afldb_v2_isolated\",\"database\":\"afldb_v2_gap029_s1_20261103_074434_rst_test\",\"databaseComment\":\"afldb-v2-isolated-test\",\"databaseOid\":\"16390\",\"host\":\"127.0.0.1\",\"port\":55493,\"systemIdentifier\":\"7703847560657506565\",\"user\":\"afldb_owner\"},\"revision\":\"f05a2e78fdd0d90824789ab81ee2d2e4ffe3ab8f\",\"stage\":\"S1\"},\"baselineDigest\":\"5173a76b4bde483ce138af254d41e21dd1f15bab2fe8c29fc83625f7397af9d4\",\"capturedAt\":\"2026-11-03T07:44:35.055Z\",\"restoreEvidenceSha256\":\"4c784f7e51b6a39e5008e58b637564212baa032646f23dc570cdee849c66a25f\",\"restoredAt\":\"2026-11-03T07:45:16.376Z\",\"sha256\":\"409b21a2da198d58d442dcdc6b4726fa893877023839e58e8c57b621ee661ded\",\"target\":{\"clusterName\":\"16/main\",\"database\":\"afldb_prod\",\"databaseComment\":null,\"databaseOid\":\"66668\",\"host\":\"localhost\",\"port\":5432,\"systemIdentifier\":\"7674454702926115004\",\"user\":\"afldb_backup\"}}",
+      "sealedBodySha256": "c735132ac9f2aeb800b2aba87553023cc60b724a11c3e212a4478894dc4f3b9c"
+    }
+  },
+  "createdAt": "2026-11-03T07:45:34.891Z",
+  "expiresAt": "2026-11-04T07:45:34.891Z",
+  "entries": [
+    {
+      "sourceKey": "0a590b03a95e13bcfac2c41c",
+      "season": 2008,
+      "club": "Melbourne",
+      "player": "Cameron Bruce",
+      "bootstrapPlayerId": 747,
+      "afltablesProfile": "players/C/Cameron_Bruce.html",
+      "linkStatus": "unique",
+      "role": "Captain",
+      "period": "2008 (co-captain, rounds 6–22)",
+      "note": "co-captain with James McDonald for the remainder of 2008 after David Neitz retired (Wikipedia: 2008 Melbourne Football Club season; corroborated: Melbourne FC)",
+      "rowSha256": "0c1756647e61b0a3b9d302041f4e3c418ead79822228da768fd821b8aa8479eb",
+      "clubId": 15,
+      "playerId": 2489,
+      "action": "to insert"
+    },
+    {
+      "sourceKey": "8dbd379972bbe7f8ecf68a10",
+      "season": 2008,
+      "club": "Melbourne",
+      "player": "James McDonald",
+      "bootstrapPlayerId": 730,
+      "afltablesProfile": "players/J/James_McDonald.html",
+      "linkStatus": "unique",
+      "role": "Captain",
+      "period": "2008 (co-captain, rounds 6–22)",
+      "note": "co-captain with Cameron Bruce for the remainder of 2008 after David Neitz retired (Wikipedia: 2008 Melbourne Football Club season; corroborated: Melbourne FC)",
+      "rowSha256": "ee798c4a6b2c4630c06198e8cc0638b59dfaa884263807fe7eb789bf78a3552d",
+      "clubId": 15,
+      "playerId": 6730,
+      "action": "to insert"
+    },
+    {
+      "sourceKey": "25f8dac05c6995eb838d7bef",
+      "season": 2017,
+      "club": "Gold Coast",
+      "player": "Steven May",
+      "bootstrapPlayerId": 11940,
+      "afltablesProfile": "players/S/Steven_May.html",
+      "linkStatus": "unique",
+      "role": "Captain",
+      "period": "2017–2018 (co-captain)",
+      "note": "co-captain with Tom Lynch (Wikipedia: List of Gold Coast Suns captains; corroborated: Gold Coast SUNS 2018 leadership announcement and captaincy history)",
+      "rowSha256": "917bcf9eee2921d26f3336b70766ea270cb975ee97900de15c1bff8902e453d0",
+      "clubId": 11,
+      "playerId": 12093,
+      "action": "to insert"
+    },
+    {
+      "sourceKey": "3469269fae62fa9aa25d705d",
+      "season": 2018,
+      "club": "Gold Coast",
+      "player": "Steven May",
+      "bootstrapPlayerId": 11940,
+      "afltablesProfile": "players/S/Steven_May.html",
+      "linkStatus": "unique",
+      "role": "Captain",
+      "period": "2017–2018 (co-captain)",
+      "note": "co-captain with Tom Lynch (Wikipedia: List of Gold Coast Suns captains; corroborated: Gold Coast SUNS 2018 leadership announcement and captaincy history)",
+      "rowSha256": "c30d2dfb8d0f70ef26afa570424dc5ae3acba005395caa945a9a09a1a40a3eae",
+      "clubId": 11,
+      "playerId": 12093,
+      "action": "to insert"
+    },
+    {
+      "sourceKey": "91b499dcbe61d3386183fc8e",
+      "season": 2019,
+      "club": "Gold Coast",
+      "player": "Jarrod Witts",
+      "bootstrapPlayerId": 12177,
+      "afltablesProfile": "players/J/Jarrod_Witts.html",
+      "linkStatus": "unique",
+      "role": "Captain",
+      "period": "2019–2021 (co-captain)",
+      "note": "co-captain with David Swallow (Wikipedia: List of Gold Coast Suns captains; corroborated: Gold Coast SUNS captaincy history)",
+      "rowSha256": "46283b3ca38de082963273424a809d0162e63190aef5c190b697c72a2c9d2497",
+      "clubId": 11,
+      "playerId": 6815,
+      "action": "to insert"
+    },
+    {
+      "sourceKey": "2c4db502ad00390a4f74db74",
+      "season": 2020,
+      "club": "Gold Coast",
+      "player": "Jarrod Witts",
+      "bootstrapPlayerId": 12177,
+      "afltablesProfile": "players/J/Jarrod_Witts.html",
+      "linkStatus": "unique",
+      "role": "Captain",
+      "period": "2019–2021 (co-captain)",
+      "note": "co-captain with David Swallow (Wikipedia: List of Gold Coast Suns captains; corroborated: Gold Coast SUNS captaincy history)",
+      "rowSha256": "2c60373943c99fb53a143c9c619c2bead9de71c5aa0253a14e042ee853a39087",
+      "clubId": 11,
+      "playerId": 6815,
+      "action": "to insert"
+    },
+    {
+      "sourceKey": "c9d6a0dffa2a7035f52c66e7",
+      "season": 2021,
+      "club": "Gold Coast",
+      "player": "Jarrod Witts",
+      "bootstrapPlayerId": 12177,
+      "afltablesProfile": "players/J/Jarrod_Witts.html",
+      "linkStatus": "unique",
+      "role": "Captain",
+      "period": "2019–2021 (co-captain)",
+      "note": "co-captain with David Swallow (Wikipedia: List of Gold Coast Suns captains; corroborated: Gold Coast SUNS captaincy history)",
+      "rowSha256": "f56ffec0cb1bae88b8418761b15bbbbf9fc97097bcee69915e615cf677b32347",
+      "clubId": 11,
+      "playerId": 6815,
+      "action": "to insert"
+    }
+  ],
+  "digest": "e5a7a0396c5f8d37a6748779c41bffda9564943e24a93409e60cf4eabc4eefb2"
+}
