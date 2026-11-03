@@ -3,14 +3,15 @@
  *   baseline  read-only digest of the draft_picks surface the plan depends on
  *   plan      read-only; target-bound; resolves every selection's player, club and conflicts; digest-sealed; names the actor
  *   apply     needs the plan, an approval pinned to the plan digest, a clean HEAD, fresh backup + verified restore evidence
- *   verify    read-only after the fact: the eight rows, their overrides, unchanged pre-existing rows, optional audit-table count
+ *   verify    read-only after the fact: the eight rows, their overrides, unchanged pre-existing rows, the audit-table count where readable
+ *   state     read-only: classifies the live surface as the plan's BASELINE, the plan's RESULT, or OTHER (use it after any non-zero apply)
  *
  *   node --import tsx --conditions=react-server tools/v2/gap029-rookie-selections-production.ts baseline --target T --out O
  *   ... plan   --target T --actor-user-id N --backup B --backup-file F --restore-evidence R --out O          (production)
  *   ... plan   --target T --actor-user-id N --rehearsal --out O                                             (isolated clone only)
  *   ... apply  --plan P --approval A --backup-file F --restore-evidence R --out O                           (production)
  *   ... apply  --plan P --rehearsal --out O                                                                 (isolated clone only)
- *   ... verify --plan P --apply-record A --out O                                                            (read-only; AFLDB_GAP029_AUDIT_DSN optional)
+ *   ... verify --plan P --apply-record A --out O                                                            (read-only; the read DSN reads data_edits itself, migration 108; AFLDB_GAP029_AUDIT_DSN is an optional override only)
  *
  * The write IS the existing audited admin mutation: `createManualPickInTransaction` (src/db/queries/admin-draft.ts), the very code
  * `createManualPick` runs for the admin editor, so validation, selection-conflict refusal, durable-identity resolution, the
@@ -29,6 +30,11 @@
  *   - BINDING: the plan digest covers the target identity, the reviewed revision, the evidence and outcomes-file hashes, the baseline
  *     digest, the actor and every resolved id/action; the approval pins the digest, target, revision, evidence, actor, operation.
  *
+ * OUTCOMES (see gap029-common.ts): an apply ends in exactly one of REFUSED_BEFORE_MUTATION (exit 1), ROLLED_BACK (2), COMMITTED_VERIFIED / NOTHING_WRITTEN (0),
+ * COMMITTED_VERIFICATION_FAILED (3), COMMITTED_VERIFICATION_UNAVAILABLE (4) or OUTCOME_UNDETERMINED (5). The post-write checks run INSIDE the transaction and
+ * roll it back; after COMMIT a fresh read-only session re-checks. A committed outcome is never reported as rolled back, never retried and never restored by
+ * this tool: restoring the verified backup would discard every later write and is a separate owner decision.
+ *
  * Transport: reads and the target proof use AFLDB_GAP029_DSN (read-only session for baseline/plan/verify); the write uses
  * AFLDB_GAP029_WRITE_DSN (the afldb_import role). Both must name exactly the reviewed target. Output files lie outside the checkout and
  * are created exclusively. No retry, no Git write. The tool never creates, edits or disables a user.
@@ -40,10 +46,15 @@ import { isAbsolute, relative, resolve } from 'node:path';
 import postgres from 'postgres';
 
 import { loadRookieRelistingOutcomes, type RookieRelistingOutcome } from '../../tests/rookie-relisting-outcomes';
+import { assemblyProblem, lfSha256, reportLines, runApply } from './gap029-common';
 
 export const EVIDENCE_PATH = 'docs/v2/evidence/gap-029-rookie-selections-2026-11-03.json';
 export const OUTCOMES_PATH = 'data/players/rookie-relisting-outcomes.csv';
 export const OPERATION = 'gap029-rookie-selections';
+export const STAGE = 'S3';
+export const TOOL_PATH = 'tools/v2/gap029-rookie-selections-production.ts';
+/** Every file whose bytes decide what the restore-derived baseline means (the editor module defines the write, the digest functions live in the tool). */
+export const toolHashes = (): Record<string, string> => ({ [TOOL_PATH]: lfSha256(TOOL_PATH), 'tools/v2/gap029-common.ts': lfSha256('tools/v2/gap029-common.ts'), 'src/db/queries/admin-draft.ts': lfSha256('src/db/queries/admin-draft.ts') });
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 export const DRAFT_TYPE = 'Rookie';
 export const DRAFT_KIND = 'rookie';
@@ -156,6 +167,12 @@ export function approvalProblem(plan: Plan, approval: Approval | null, ctx: { no
   return null;
 }
 
+/** Pure: every reason a production plan must not trust this backup evidence (target-bound, fresh, ordered, MACHINE-ASSEMBLED and sealed), or null. The file hashes are checked by the caller. */
+export function backupProblem(backup: Backup, target: Target, ctx: { now: number; revision: string }, tools: Record<string, string> = toolHashes()): string | null {
+  if (!same(backup.target, target) || !fresh(backup.capturedAt, ctx.now) || !fresh(backup.restoredAt, ctx.now) || Date.parse(backup.restoredAt) < Date.parse(backup.capturedAt)) return 'fresh target-bound backup and verified restore evidence required';
+  return assemblyProblem(backup as unknown as Record<string, unknown>, { operation: OPERATION, stage: STAGE, revision: ctx.revision, now: ctx.now, target, toolSha256: tools, stageFields: { baselineDigest: backup.baselineDigest } });
+}
+
 function readEvidence(): { entries: Entry[]; sha: string; outcomesSha: string } {
   const normalised = Buffer.from(readFileSync(EVIDENCE_PATH).toString('utf8').replace(/\r\n/g, '\n'), 'utf8');
   const doc = JSON.parse(normalised.toString('utf8')) as { entries: Entry[]; outcomes: { sha256: string } };
@@ -205,12 +222,22 @@ async function auditSequence(s: postgres.Sql | postgres.TransactionSql): Promise
   return r?.v == null ? null : Number(r.v);
 }
 
+/** The facts an independent session needs to judge the committed state, captured inside the transaction. */
+interface Info { maxPickId: number; maxOverrideId: number; picksBefore: number; overridesBefore: number; priorDigest: string; planned: number; auditBefore: number | null; createdPickIds: number[] }
+
+/** Reviewed-note audit rows, or null when the role cannot read the audit table (never an assumption either way). Runs in a savepoint so a denied read cannot abort the transaction. */
+async function auditNoteCount(s: postgres.TransactionSql): Promise<number | null> {
+  try {
+    return await s.savepoint(async (sp) => (await sp<{ n: number }[]>`SELECT count(*)::int AS n FROM data_edits WHERE table_name = 'players' AND field_group = 'draft_selection' AND note LIKE 'V2-GAP-029 owner-approved correction%'`)[0].n);
+  } catch { return null; }
+}
+
 async function run() {
   const mode = process.argv[2];
   const args = process.argv.slice(3);
   const flag = (f: string) => args.includes(f);
   const opt = (f: string): string => { const i = args.indexOf(f); if (i < 0 || !args[i + 1]) throw new Error(`${f} required`); return args[i + 1]; };
-  if (!['baseline', 'plan', 'apply', 'verify'].includes(mode ?? '')) fail('mode must be baseline, plan, apply or verify');
+  if (!['baseline', 'plan', 'apply', 'verify', 'state'].includes(mode ?? '')) fail('mode must be baseline, plan, apply, verify or state');
   const root = process.cwd();
   const outside = (p: string): string => { const abs = resolve(p); const rel = relative(root, abs); if (!rel.startsWith('..') || isAbsolute(rel)) fail('evidence files must be outside the checkout'); return abs; };
   const json = <T,>(p: string): T => JSON.parse(readFileSync(outside(p), 'utf8')) as T;
@@ -218,7 +245,7 @@ async function run() {
   if (existsSync(out)) fail('output already exists; preserve evidence and choose another path');
   const revision = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
   if (mode === 'apply' || mode === 'plan') { execFileSync('git', ['diff', '--quiet']); execFileSync('git', ['diff', '--cached', '--quiet']); }
-  const plan0 = mode === 'apply' || mode === 'verify' ? json<Plan>(opt('--plan')) : null;
+  const plan0 = mode === 'apply' || mode === 'verify' || mode === 'state' ? json<Plan>(opt('--plan')) : null;
   const rehearsal = plan0 ? plan0.rehearsal : flag('--rehearsal');
   if (flag('--rehearsal') && plan0 && !plan0.rehearsal) fail('the plan is not a rehearsal plan');
   const target = plan0?.target ?? json<Target>(opt('--target'));
@@ -233,13 +260,19 @@ async function run() {
   if (!rehearsal && /^afldb_v2_.*_test$/.test(target.database)) fail('an isolated clone is rehearsed with --rehearsal');
   if (mode === 'apply') sameDb(process.env.AFLDB_GAP029_WRITE_DSN ?? '', false);
   const evidence = readEvidence();
-  const sql = postgres(dsn, { max: 1, connect_timeout: 5, onnotice: () => {}, connection: { default_transaction_read_only: true } });
+  const readOnly = () => postgres(dsn, { max: 1, connect_timeout: 5, onnotice: () => {}, connection: { default_transaction_read_only: true } });
+  const sql = readOnly();
   const prove = async (s: postgres.TransactionSql, writerRole = false): Promise<void> => {
     const [row] = await s<Record<string, string | null>[]>`SELECT current_database() AS database, current_user AS "user", c.system_identifier::text AS "systemIdentifier",
       d.oid::text AS "databaseOid", current_setting('cluster_name') AS "clusterName", shobj_description(d.oid,'pg_database') AS "databaseComment"
       FROM pg_control_system() c CROSS JOIN pg_database d WHERE d.datname = current_database()`;
     if (writerRole && row?.user !== 'afldb_import') fail('the write connection must be the afldb_import role');
     if (!row || !same({ ...row, ...(writerRole ? { user: target.user } : {}) }, { database: target.database, user: target.user, systemIdentifier: target.systemIdentifier, databaseOid: target.databaseOid, clusterName: target.clusterName, databaseComment: target.databaseComment })) fail('live database identity differs from the reviewed target');
+  };
+  /** A fresh READ-ONLY session, separate from the writer's connection. */
+  const independent = async <T,>(work: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> => {
+    const ro = readOnly();
+    try { return (await ro.begin('read only isolation level repeatable read', async (tx) => { await prove(tx); return work(tx); })) as T; } finally { await ro.end({ timeout: 5 }); }
   };
   const resolveAll = (live: Live): (Entry & Resolved)[] => evidence.entries.map((e) => { const r = entryProblem(e, live); if (typeof r === 'string') return fail(r); return { ...e, ...r }; });
   const now = Date.now();
@@ -257,7 +290,8 @@ async function run() {
       if (!Number.isInteger(actorUserId) || actorUserId < 1) fail('--actor-user-id must be a real auth_users id');
       const backup = rehearsal ? null : json<Backup>(opt('--backup'));
       if (backup) {
-        if (!same(backup.target, target) || !fresh(backup.capturedAt, now) || !fresh(backup.restoredAt, now) || Date.parse(backup.restoredAt) < Date.parse(backup.capturedAt)) fail('fresh target-bound backup and verified restore evidence required');
+        const refused = backupProblem(backup, target, { now, revision });
+        if (refused) fail(refused);
         if (fileHash(opt('--backup-file')) !== backup.sha256 || fileHash(opt('--restore-evidence')) !== backup.restoreEvidenceSha256) fail('backup or restore evidence content differs');
       }
       const result = await sql.begin('read only isolation level repeatable read', async (tx) => {
@@ -288,7 +322,10 @@ async function run() {
         const totals = await surfaceDigest(tx, null);
         const ov = await tx<{ n: number }[]>`SELECT count(*)::int AS n FROM data_overrides WHERE entity_type = 'draft_picks' AND field_group = 'selection' AND is_active
           AND admin_user_id = ${plan.actorUserId} AND (override_values ->> 'detail') LIKE 'V2-GAP-029;%' AND (override_values ->> 'draft_kind') = ${DRAFT_KIND}`;
-        let audit: unknown = 'not checked: set AFLDB_GAP029_AUDIT_DSN to a role that can read data_edits';
+        // afldb_import holds SELECT on data_edits on production (migration 108) and on the isolated clones, so the same read-only session reads it; where a target's role
+        // cannot, the result says so (never an assumption). AFLDB_GAP029_AUDIT_DSN stays an optional override for a target whose reader role differs.
+        const count = await auditNoteCount(tx);
+        let audit: unknown = count === null ? 'not checked: the role cannot read data_edits on this target' : { reviewedNoteRows: count };
         const auditDsn = process.env.AFLDB_GAP029_AUDIT_DSN;
         if (auditDsn) {
           sameDb(auditDsn, false);
@@ -303,57 +340,105 @@ async function run() {
       console.log(`Read-only verification: ${report.entriesPresent}/${report.entriesTotal} selections present`);
       return;
     }
+    if (mode === 'state') {
+      { const { digest, ...body } = plan; if (digest !== planDigest(body) || plan.operation !== OPERATION) fail('plan digest or operation differs'); }
+      const seen = await independent(async (tx) => {
+        const b = await surfaceDigest(tx, null);
+        const live = await readLive(tx, evidence.entries);
+        const all = evidence.entries.every((e) => { const r = entryProblem(e, live); return typeof r !== 'string' && r.action === 'already present'; });
+        return { baseline: b.digest === plan.baselineDigest, allPresent: all, draftPicks: b.picks, draftOverrides: b.overrides };
+      });
+      const state = seen.baseline ? 'BASELINE (the plan has not been applied)' : seen.allPresent ? 'PLANNED RESULT PRESENT (every reviewed selection is present)' : 'OTHER (neither the plan baseline nor the planned result)';
+      write({ planDigest: plan.digest, state, ...seen, checkedAt: new Date().toISOString() });
+      console.log(`STATE ${state}`);
+      return;
+    }
     const problem = approvalProblem(plan, rehearsal ? null : json<Approval>(opt('--approval')), { now, revision, evidenceSha256: evidence.sha });
     if (problem) fail(problem);
-    if (!rehearsal) {
-      const pb = plan.backup!;
-      if (fileHash(opt('--backup-file')) !== pb.sha256 || fileHash(opt('--restore-evidence')) !== pb.restoreEvidenceSha256) fail('backup or restore evidence content differs');
-    }
     // The editor module builds (but does not connect) the app's own pools when imported. Point them at the reviewed read-only target BEFORE the import
     // so nothing can fall back to an ambient configuration; they are never queried on this path (the mutation runs on the caller's transaction).
     process.env.DATABASE_URL = dsn; process.env.AFLDB_AUTH_DATABASE_URL = dsn;
     const { createManualPickInTransaction } = await import('../../src/db/queries/admin-draft');
     const writer = postgres(process.env.AFLDB_GAP029_WRITE_DSN ?? '', { max: 1, connect_timeout: 5, onnotice: () => {} });
     try {
-      const result = await writer.begin('isolation level repeatable read', async (tx) => {
-        await prove(tx, true);
-        // The actor FIRST: an enabled, fully-enrolled, non-fixture Super Admin, row-locked FOR SHARE until this transaction ends.
-        try { await tx`SELECT public.assert_viable_super_admin_actor(${plan.actorUserId}::int)`; } catch { fail(`actor ${plan.actorUserId} is not a viable Super Admin; nothing written`); }
-        const before = await surfaceDigest(tx, null);
-        if (before.digest !== plan.baselineDigest) fail('baseline drift; re-plan and obtain new execution approval');
-        const live = await readLive(tx, evidence.entries);
-        const entries = resolveAll(live);
-        if (!same(entries.map((e) => ({ k: e.afltablesProfile, p: e.playerId, c: e.clubId, a: e.action })), plan.entries.map((e) => ({ k: e.afltablesProfile, p: e.playerId, c: e.clubId, a: e.action })))) fail('the live resolution differs from the reviewed plan');
-        const todo = entries.filter((e) => e.action === 'to insert');
-        if (todo.length === 0) return { replay: true, written: 0 };
-        const priorBefore = await priorRowsDigest(tx, before.maxId, before.maxOverrideId);
-        const seqBefore = await auditSequence(tx);
-        if (seqBefore === null) fail('the audit sequence is not readable, so exactly-N audit rows cannot be proved; nothing written');
-        const created: { profile: string; pickId: number; playerId: number; token: string }[] = [];
-        for (const e of todo) {
-          const r = await createManualPickInTransaction(tx, { playerId: e.playerId, adminUserId: plan.actorUserId, draftYear: e.draftEventYear, draftType: e.draftType, draftKind: e.draftKind,
-            pickNumber: e.pick, clubSlug: e.clubSlug, detail: e.detail, note: e.correctionNote });
-          // any non-ok result throws, so the whole transaction rolls back; nothing is confirmed on the operator's behalf
-          if (!r.ok) return fail(`the audited editor path refused ${e.afltablesProfile}: ${'error' in r ? r.error : 'confirmation required'}`);
-          created.push({ profile: e.afltablesProfile, pickId: r.pickId, playerId: r.playerId, token: r.pickToken });
-        }
-        const seqAfter = await auditSequence(tx);
-        const total = await surfaceDigest(tx, null);
-        const cur = await readLive(tx, evidence.entries);
-        const allThere = evidence.entries.every((e) => { const x = entryProblem(e, cur); return typeof x !== 'string' && x.action === 'already present'; });
-        const newRows = await tx<{ id: number; club_id: number; pick_number: number; player_id: number }[]>`SELECT id::int AS id, club_id::int AS club_id, pick_number::int AS pick_number, player_id::int AS player_id
-          FROM draft_picks WHERE id = ANY(${created.map((c) => c.pickId)})`;
-        const clubsOk = todo.every((e) => { const n = newRows.find((r) => r.player_id === e.playerId); return n && n.club_id === e.clubId && n.pick_number === e.pick; });
-        // commits only if: every pre-existing row byte-identical, exactly N new rows/overrides, exactly N audit ids consumed, content as reviewed
-        if (total.picks !== before.picks + todo.length || newRows.length !== todo.length) fail('post-write verification failed: the number of new draft_picks rows is not exactly the planned number; rolled back');
-        if (total.overrides !== before.overrides + todo.length) fail('post-write verification failed: the number of new draft_overrides rows is not exactly the planned number; rolled back');
-        if (seqAfter !== (seqBefore as number) + todo.length) fail(`post-write verification failed: the audit sequence moved by ${(seqAfter ?? NaN) - (seqBefore as number)}, not ${todo.length}; rolled back`);
-        if (!allThere || !clubsOk) fail('post-write verification failed: a created row differs from the reviewed content; rolled back');
-        if (await priorRowsDigest(tx, before.maxId, before.maxOverrideId) !== priorBefore) fail('a pre-existing draft_picks or override row changed; rolled back');
-        return { replay: false, written: todo.length, created, maxIdBefore: before.maxId, auditSequenceBefore: seqBefore, auditSequenceAfter: seqAfter, draftPicksAfter: total.picks };
+      const report = await runApply<Info>({
+        preflight: async () => {
+          if (rehearsal) return;
+          const pb = plan.backup!;
+          if (fileHash(opt('--backup-file')) !== pb.sha256 || fileHash(opt('--restore-evidence')) !== pb.restoreEvidenceSha256) fail('backup or restore evidence content differs');
+          const refused = backupProblem(pb, plan.target, { now, revision });
+          if (refused) fail(refused);
+        },
+        transact: (marks) => writer.begin('isolation level repeatable read', async (tx) => {
+          await prove(tx, true);
+          // The actor FIRST: an enabled, fully-enrolled, non-fixture Super Admin, row-locked FOR SHARE until this transaction ends.
+          try { await tx`SELECT public.assert_viable_super_admin_actor(${plan.actorUserId}::int)`; } catch { fail(`actor ${plan.actorUserId} is not a viable Super Admin; nothing written`); }
+          const before = await surfaceDigest(tx, null);
+          if (before.digest !== plan.baselineDigest) fail('baseline drift; re-plan and obtain new execution approval');
+          const live = await readLive(tx, evidence.entries);
+          const entries = resolveAll(live);
+          if (!same(entries.map((e) => ({ k: e.afltablesProfile, p: e.playerId, c: e.clubId, a: e.action })), plan.entries.map((e) => ({ k: e.afltablesProfile, p: e.playerId, c: e.clubId, a: e.action })))) fail('the live resolution differs from the reviewed plan');
+          const todo = entries.filter((e) => e.action === 'to insert');
+          if (todo.length === 0) return { replay: true };
+          const priorBefore = await priorRowsDigest(tx, before.maxId, before.maxOverrideId);
+          const seqBefore = await auditSequence(tx);
+          if (seqBefore === null) fail('the audit sequence is not readable, so exactly-N audit rows cannot be proved; nothing written');
+          const auditBefore = await auditNoteCount(tx);
+          marks.writing();
+          const created: { profile: string; pickId: number; playerId: number; token: string }[] = [];
+          for (const e of todo) {
+            const r = await createManualPickInTransaction(tx, { playerId: e.playerId, adminUserId: plan.actorUserId, draftYear: e.draftEventYear, draftType: e.draftType, draftKind: e.draftKind,
+              pickNumber: e.pick, clubSlug: e.clubSlug, detail: e.detail, note: e.correctionNote });
+            // any non-ok result throws, so the whole transaction rolls back; nothing is confirmed on the operator's behalf
+            if (!r.ok) return fail(`the audited editor path refused ${e.afltablesProfile}: ${'error' in r ? r.error : 'confirmation required'}`);
+            created.push({ profile: e.afltablesProfile, pickId: r.pickId, playerId: r.playerId, token: r.pickToken });
+          }
+          const seqAfter = await auditSequence(tx);
+          const total = await surfaceDigest(tx, null);
+          const cur = await readLive(tx, evidence.entries);
+          const allThere = evidence.entries.every((e) => { const x = entryProblem(e, cur); return typeof x !== 'string' && x.action === 'already present'; });
+          const newRows = await tx<{ id: number; club_id: number; pick_number: number; player_id: number }[]>`SELECT id::int AS id, club_id::int AS club_id, pick_number::int AS pick_number, player_id::int AS player_id
+            FROM draft_picks WHERE id = ANY(${created.map((c) => c.pickId)})`;
+          const clubsOk = todo.every((e) => { const n = newRows.find((r) => r.player_id === e.playerId); return n && n.club_id === e.clubId && n.pick_number === e.pick; });
+          // INSIDE the transaction: it commits only if every pre-existing row is byte-identical, exactly N new rows/overrides were added, exactly N audit ids
+          // were consumed (and, where the audit table is readable, exactly N audit rows), and the content is as reviewed. Otherwise it rolls back.
+          if (total.picks !== before.picks + todo.length || newRows.length !== todo.length) fail('post-write verification failed: the number of new draft_picks rows is not exactly the planned number; rolled back');
+          if (total.overrides !== before.overrides + todo.length) fail('post-write verification failed: the number of new draft_overrides rows is not exactly the planned number; rolled back');
+          if (seqAfter !== (seqBefore as number) + todo.length) fail(`post-write verification failed: the audit sequence moved by ${(seqAfter ?? NaN) - (seqBefore as number)}, not ${todo.length}; rolled back`);
+          const auditAfter = await auditNoteCount(tx);
+          if (auditBefore !== null && auditAfter !== null && auditAfter !== auditBefore + todo.length) fail(`post-write verification failed: the audit table gained ${auditAfter - auditBefore} reviewed-note rows, not ${todo.length}; rolled back`);
+          if (!allThere || !clubsOk) fail('post-write verification failed: a created row differs from the reviewed content; rolled back');
+          if (await priorRowsDigest(tx, before.maxId, before.maxOverrideId) !== priorBefore) fail('a pre-existing draft_picks or override row changed; rolled back');
+          const info: Info = { maxPickId: before.maxId, maxOverrideId: before.maxOverrideId, picksBefore: before.picks, overridesBefore: before.overrides, priorDigest: priorBefore, planned: todo.length, auditBefore, createdPickIds: created.map((c) => c.pickId) };
+          marks.commitNext(info);
+          return { replay: false, info, result: { replay: false, written: todo.length, created, maxIdBefore: before.maxId, auditSequenceBefore: seqBefore, auditSequenceAfter: seqAfter, draftPicksAfter: total.picks, planDigest: plan.digest } };
+        }),
+        verify: (info) => independent(async (tx) => {
+          const problems: string[] = [];
+          const live = await readLive(tx, evidence.entries);
+          if (!evidence.entries.every((e) => { const x = entryProblem(e, live); return typeof x !== 'string' && x.action === 'already present'; })) problems.push('a reviewed selection is missing or differs');
+          if (await priorRowsDigest(tx, info.maxPickId, info.maxOverrideId) !== info.priorDigest) problems.push('a pre-existing draft_picks or override row differs from its pre-write state');
+          const total = await surfaceDigest(tx, null);
+          if (total.picks !== info.picksBefore + info.planned) problems.push(`draft_picks holds ${total.picks} rows, expected ${info.picksBefore + info.planned}`);
+          if (total.overrides !== info.overridesBefore + info.planned) problems.push(`draft_picks overrides hold ${total.overrides} rows, expected ${info.overridesBefore + info.planned}`);
+          const [ov] = await tx<{ n: number }[]>`SELECT count(*)::int AS n FROM data_overrides WHERE entity_type = 'draft_picks' AND field_group = 'selection' AND is_active
+            AND admin_user_id = ${plan.actorUserId} AND (override_values ->> 'detail') LIKE 'V2-GAP-029;%' AND (override_values ->> 'draft_kind') = ${DRAFT_KIND}`;
+          if (ov.n < info.planned) problems.push(`only ${ov.n} active selection overrides name the approved actor, expected at least ${info.planned}`);
+          const auditNow = await auditNoteCount(tx);
+          if (info.auditBefore !== null && auditNow !== null && auditNow !== info.auditBefore + info.planned) problems.push(`the audit table holds ${auditNow - info.auditBefore} new reviewed-note rows, expected ${info.planned}`);
+          return problems;
+        }),
+        probe: (info) => independent(async (tx) => {
+          const b = await surfaceDigest(tx, null);
+          if (b.digest === plan.baselineDigest) return 'unchanged' as const;
+          const live = await readLive(tx, evidence.entries);
+          const all = evidence.entries.every((e) => { const x = entryProblem(e, live); return typeof x !== 'string' && x.action === 'already present'; });
+          return all && b.picks === info.picksBefore + info.planned ? ('applied' as const) : ('other' as const);
+        }),
+        persist: (record) => write({ ...record, planDigest: plan.digest }),
       });
-      write({ ...result, planDigest: plan.digest, at: new Date().toISOString() });
-      console.log(result.replay ? 'Every selection is already present; nothing written' : `Committed ${result.written} selections in one transaction; review restricted output`);
+      for (const line of reportLines(report)) console.log(line);
+      process.exitCode = report.exitCode;
     } finally { await writer.end({ timeout: 5 }); }
   } finally { await sql.end({ timeout: 5 }); }
 }

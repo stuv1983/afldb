@@ -6,6 +6,7 @@
  * No database, no network.
  */
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -770,5 +771,52 @@ describe('the season-bearing writer inventory (V2-GAP-006, application level onl
     expect(afltables).toMatch(/if \(invokedDirectly\) \{\s*console\.error\(AFLTABLES_SETTLE_RETIRED_V2\);\s*process\.exit\(1\);/);
     // The email-intake route answers 410 and does nothing else.
     expect(readFileSync(join(ROOT, 'src/app/api/admin/email-intake/route.ts'), 'utf8')).toMatch(/410/);
+  });
+});
+
+/**
+ * V2-GAP-029 production writers, classified EXPLICITLY. The SQL-pattern inventory above cannot see (a) the rookie-selections tool, which writes through the
+ * audited editor (`createManualPickInTransaction`) and so contains no `INSERT INTO draft_picks`, or (b) the two Python entry points, which drive the
+ * unchanged importer / loader. All four are `governed`: digest-bound reviewed plan, owner approval pinned to the plan digest, target-identity proof, clean
+ * revision, a fresh restore-verified backup with MACHINE-ASSEMBLED evidence, and the shared outcome taxonomy (no automatic retry or restore). The two shared
+ * modules hold no write SQL and are not writers. The seal policy is unchanged: none of these is a settle path, and none can reach a sealed season's rows
+ * except through the same reviewed, approved plan.
+ */
+describe('V2-GAP-029 production writers are all classified as governed and carry the whole ceremony', () => {
+  const ROOT = join(__dirname, '..');
+  const text = (rel: string): string => readFileSync(join(ROOT, rel), 'utf8').replace(/\r\n/g, '\n');
+  const WRITERS: Record<string, 'governed'> = {
+    'tools/v2/gap029-captaincy-additions-production.ts': 'governed',
+    'tools/v2/gap029-rookie-selections-production.ts': 'governed',
+    'tools/v2/gap029-draft-link-production.py': 'governed',
+    'tools/v2/gap029-sibling-pair-production.py': 'governed',
+  };
+  const NOT_WRITERS = ['tools/v2/gap029-common.ts', 'tools/v2/gap029_common.py', 'tools/v2/gap029-assemble-restore-evidence.ts'];
+
+  it('every gap029 *-production tool under tools/v2 is classified, and nothing classified is missing', () => {
+    const found = readdirSync(join(ROOT, 'tools/v2')).filter((f) => /^gap029-.*-production\.(ts|py)$/.test(f) && !/^apply-/.test(f)).map((f) => `tools/v2/${f}`).sort();
+    expect(found).toEqual(Object.keys(WRITERS).sort());
+  });
+
+  it.each(Object.keys(WRITERS))('%s carries the production ceremony', (rel) => {
+    const src = text(rel);
+    const py = rel.endsWith('.py');
+    expect(src).toMatch(py ? /run_apply\(/ : /runApply</);                       // shared outcome taxonomy; no automatic retry or restore
+    expect(src).toMatch(/assembly|assembled/i);                                   // machine-assembled, sealed backup evidence is required
+    expect(src).toMatch(/digest/i);                                               // digest-sealed reviewed plan
+    expect(src).toMatch(/approval/i);                                             // owner approval pinned to that digest
+    expect(src).toMatch(/systemIdentifier|system_identifier|prove_identity/);       // target identity is proven (the sibling tool reuses the draft-link tool's proof), not typed
+    expect(src).not.toMatch(/refuseSealedSeasonForSettle|settle-season-seal/);    // these are not settle paths; the policy is not bypassed by borrowing it
+  });
+
+  it('the shared modules write nothing', () => {
+    for (const rel of NOT_WRITERS) expect(text(rel), rel).not.toMatch(/\b(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+(?:public\.)?\w+/i);
+  });
+
+  it('the original bridge gate is byte-identical and the Python entry point reaches it only as a library', () => {
+    const gate = readFileSync(join(ROOT, 'tools/rebuild/draftguru/bridge_import_gate.py'));
+    expect(createHash('sha256').update(gate).digest('hex')).toBe('fbce43f7f1e374b3dfac05968e627b8ad9f337279f233a49bc19ff57d02d558d');
+    const tool = text('tools/v2/gap029-draft-link-production.py');
+    expect(tool).not.toMatch(/gate\.TARGETS\s*(\[|\.update|=)/);
   });
 });

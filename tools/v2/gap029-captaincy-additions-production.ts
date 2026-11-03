@@ -5,6 +5,12 @@
  *   plan      read-only; target-bound; resolves every row's club and player identity, refuses any conflict;
  *             produces a digest-sealed plan (7 "to insert", or "already present" when a row equals the evidence exactly)
  *   apply     needs the plan, an approval pinned to the plan digest, a clean HEAD, fresh backup + verified restore evidence
+ *   state     read-only: classifies the live table as the plan's BASELINE, the plan's RESULT, or OTHER (use it after any non-zero apply)
+ *
+ * OUTCOMES (see gap029-common.ts): an apply ends in exactly one of REFUSED_BEFORE_MUTATION (exit 1), ROLLED_BACK (2), COMMITTED_VERIFIED /
+ * NOTHING_WRITTEN (0), COMMITTED_VERIFICATION_FAILED (3), COMMITTED_VERIFICATION_UNAVAILABLE (4) or OUTCOME_UNDETERMINED (5). The post-write
+ * checks run INSIDE the transaction and roll it back; after COMMIT an independent read-only session re-checks. A committed outcome is never
+ * reported as rolled back, never retried and never restored by this tool; restoring the backup is a separate owner decision.
  *
  *   node --import tsx tools/v2/gap029-captaincy-additions-production.ts baseline --target T --out O
  *   ... plan  --target T --backup B --backup-file F --restore-evidence R --out O          (production)
@@ -29,9 +35,15 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
 import postgres from 'postgres';
 
+import { assemblyProblem, lfSha256, reportLines, runApply } from './gap029-common';
+
 export const EVIDENCE_PATH = 'docs/v2/evidence/gap-029-captaincy-additions-2026-11-03.json';
 export const MANIFEST_PATH = 'data/awards/captaincies.csv';
 export const OPERATION = 'gap029-captaincy-additions';
+export const STAGE = 'S1';
+export const TOOL_PATH = 'tools/v2/gap029-captaincy-additions-production.ts';
+/** Every file whose bytes decide what the restore-derived baseline means; a change to any of them invalidates assembled evidence. */
+export const toolHashes = (): Record<string, string> => ({ [TOOL_PATH]: lfSha256(TOOL_PATH), 'tools/v2/gap029-common.ts': lfSha256('tools/v2/gap029-common.ts') });
 const SOURCE_KEY = 'wikipedia';
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
@@ -69,12 +81,18 @@ export function captaincyEntryProblem(e: Entry, live: Live): string | Resolved {
   return { clubId, playerId, action: 'to insert' };
 }
 
-interface Target { host: string; port: number; database: string; user: string; systemIdentifier: string; databaseOid: string; clusterName: string; databaseComment: string | null }
-interface Backup { target: Target; sha256: string; restoreEvidenceSha256: string; capturedAt: string; restoredAt: string; baselineDigest: string }
+export interface Target { host: string; port: number; database: string; user: string; systemIdentifier: string; databaseOid: string; clusterName: string; databaseComment: string | null }
+export interface Backup { target: Target; sha256: string; restoreEvidenceSha256: string; capturedAt: string; restoredAt: string; baselineDigest: string }
 interface Plan { operation: string; revision: string; target: Target; rehearsal: boolean; evidenceSha256: string; manifestSha256: string; baselineDigest: string; backup: Backup | null; createdAt: string; expiresAt: string; entries: (Entry & Resolved)[]; digest: string }
 interface Approval { planDigest: string; target: Target; revision: string; operation: string; evidenceSha256: string; approvedAt: string; expiresAt: string; reference: string }
 const planDigest = (p: Omit<Plan, 'digest'>) => sha(canon(p));
 const fresh = (iso: string, now: number) => { const t = Date.parse(iso); return Number.isFinite(t) && t <= now && now - t <= MAX_AGE_MS; };
+
+/** Pure: every reason a production plan must not trust this backup evidence (target-bound, fresh, ordered, MACHINE-ASSEMBLED and sealed), or null. The file hashes are checked by the caller. */
+export function backupProblem(backup: Backup, target: Target, ctx: { now: number; revision: string }, tools: Record<string, string> = toolHashes()): string | null {
+  if (!same(backup.target, target) || !fresh(backup.capturedAt, ctx.now) || !fresh(backup.restoredAt, ctx.now) || Date.parse(backup.restoredAt) < Date.parse(backup.capturedAt)) return 'fresh target-bound backup and verified restore evidence required';
+  return assemblyProblem(backup as unknown as Record<string, unknown>, { operation: OPERATION, stage: STAGE, revision: ctx.revision, now: ctx.now, target, toolSha256: tools, stageFields: { baselineDigest: backup.baselineDigest } });
+}
 
 function readEvidence(): { entries: Entry[]; sha: string; manifestSha: string } {
   const normalised = Buffer.from(readFileSync(EVIDENCE_PATH).toString('utf8').replace(/\r\n/g, '\n'), 'utf8');
@@ -118,7 +136,7 @@ async function run() {
   const args = process.argv.slice(3);
   const flag = (f: string) => args.includes(f);
   const opt = (f: string): string => { const i = args.indexOf(f); if (i < 0 || !args[i + 1]) throw new Error(`${f} required`); return args[i + 1]; };
-  if (!['baseline', 'plan', 'apply'].includes(mode ?? '')) fail('mode must be baseline, plan or apply');
+  if (!['baseline', 'plan', 'apply', 'state'].includes(mode ?? '')) fail('mode must be baseline, plan, apply or state');
   const root = process.cwd();
   const outside = (p: string): string => { const abs = resolve(p); const rel = relative(root, abs); if (!rel.startsWith('..') || isAbsolute(rel)) fail('evidence files must be outside the checkout'); return abs; };
   const json = <T,>(p: string): T => JSON.parse(readFileSync(outside(p), 'utf8')) as T;
@@ -126,7 +144,7 @@ async function run() {
   if (existsSync(out)) fail('output already exists; preserve evidence and choose another path');
   const revision = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
   execFileSync('git', ['diff', '--quiet']); execFileSync('git', ['diff', '--cached', '--quiet']);
-  const plan0 = mode === 'apply' ? json<Plan>(opt('--plan')) : null;
+  const plan0 = mode === 'apply' || mode === 'state' ? json<Plan>(opt('--plan')) : null;
   const rehearsal = plan0 ? plan0.rehearsal : flag('--rehearsal');
   if (flag('--rehearsal') && plan0 && !plan0.rehearsal) fail('the plan is not a rehearsal plan');
   const target = plan0?.target ?? json<Target>(opt('--target'));
@@ -141,7 +159,8 @@ async function run() {
   if (!rehearsal && /^afldb_v2_.*_test$/.test(target.database)) fail('an isolated clone is rehearsed with --rehearsal');
   if (mode === 'apply') sameDb(process.env.AFLDB_GAP029_WRITE_DSN ?? '', false);
   const evidence = readEvidence();
-  const sql = postgres(dsn, { max: 1, connect_timeout: 5, onnotice: () => {}, ...(mode === 'apply' ? {} : { connection: { default_transaction_read_only: true } }) });
+  const readOnly = () => postgres(dsn, { max: 1, connect_timeout: 5, onnotice: () => {}, connection: { default_transaction_read_only: true } });
+  const sql = readOnly();
   const prove = async (s: postgres.TransactionSql, writerRole = false): Promise<void> => {
     const [row] = await s<Record<string, string | null>[]>`SELECT current_database() AS database, current_user AS "user", c.system_identifier::text AS "systemIdentifier",
       d.oid::text AS "databaseOid", current_setting('cluster_name') AS "clusterName", shobj_description(d.oid,'pg_database') AS "databaseComment"
@@ -168,7 +187,8 @@ async function run() {
     if (mode === 'plan') {
       const backup = rehearsal ? null : json<Backup>(opt('--backup'));
       if (backup) {
-        if (!same(backup.target, target) || !fresh(backup.capturedAt, now) || !fresh(backup.restoredAt, now) || Date.parse(backup.restoredAt) < Date.parse(backup.capturedAt)) fail('fresh target-bound backup and verified restore evidence required');
+        const refused = backupProblem(backup, target, { now, revision });
+        if (refused) fail(refused);
         if (fileHash(opt('--backup-file')) !== backup.sha256 || fileHash(opt('--restore-evidence')) !== backup.restoreEvidenceSha256) fail('backup or restore evidence content differs');
       }
       const result = await sql.begin('read only isolation level repeatable read', async (tx) => {
@@ -187,8 +207,27 @@ async function run() {
     const plan = plan0!;
     const { digest, ...body } = plan;
     if (digest !== planDigest(body) || plan.operation !== OPERATION || plan.evidenceSha256 !== evidence.sha || plan.manifestSha256 !== evidence.manifestSha || plan.revision !== revision) fail('plan digest, evidence or revision differs');
-    if (!(Date.parse(plan.expiresAt) > now)) fail('stale plan');
-    if (!rehearsal) {
+    /** The facts an independent session needs to judge the committed state, captured inside the transaction. */
+    interface Info { maxIdBefore: number; countBefore: number; priorDigest: string; planned: number; batchId: string }
+    /** A fresh READ-ONLY session, separate from the writer's connection. */
+    const independent = async <T,>(work: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> => {
+      const ro = readOnly();
+      try { return (await ro.begin('read only isolation level repeatable read', async (tx) => { await prove(tx); return work(tx); })) as T; } finally { await ro.end({ timeout: 5 }); }
+    };
+    const allPresent = (live: Live): boolean => evidence.entries.every((e) => { const r = captaincyEntryProblem(e, live); return typeof r !== 'string' && r.action === 'already present'; });
+    if (mode === 'state') {
+      const seen = await independent(async (tx) => {
+        const b = await baselineOf(tx);
+        return { baseline: b.digest === plan.baselineDigest, allPresent: allPresent(await readLive(tx, evidence.entries)), tableRows: b.count };
+      });
+      const state = seen.baseline ? 'BASELINE (the plan has not been applied)' : seen.allPresent ? 'PLANNED RESULT PRESENT (every reviewed row is present)' : 'OTHER (neither the plan baseline nor the planned result)';
+      write({ planDigest: plan.digest, state, ...seen, checkedAt: new Date().toISOString() });
+      console.log(`STATE ${state}`);
+      return;
+    }
+    const checkApproval = (): void => {
+      if (!(Date.parse(plan.expiresAt) > now)) fail('stale plan');
+      if (rehearsal) return;
       const approval = json<Approval>(opt('--approval'));
       if (!plan.backup || approval.planDigest !== plan.digest || approval.operation !== OPERATION || !same(approval.target, plan.target) || approval.revision !== revision
         || approval.evidenceSha256 !== evidence.sha || !(Date.parse(approval.expiresAt) > now) || Date.parse(approval.expiresAt) > Date.parse(plan.expiresAt)
@@ -196,35 +235,58 @@ async function run() {
       const pb = plan.backup!;
       if (!fresh(pb.capturedAt, now) || !fresh(pb.restoredAt, now)) fail('backup no longer fresh');
       if (fileHash(opt('--backup-file')) !== pb.sha256 || fileHash(opt('--restore-evidence')) !== pb.restoreEvidenceSha256) fail('backup or restore evidence content differs');
-    }
+      const refused = backupProblem(pb, plan.target, { now, revision });
+      if (refused) fail(refused);
+    };
     const writer = postgres(process.env.AFLDB_GAP029_WRITE_DSN ?? '', { max: 1, connect_timeout: 5, onnotice: () => {} });
     try {
-      const result = await writer.begin('isolation level repeatable read', async (tx) => {
-        await prove(tx, true);
-        const before = await baselineOf(tx);
-        if (before.digest !== plan.baselineDigest) fail('baseline drift; re-plan and obtain new execution approval');
-        const live = await readLive(tx, evidence.entries);
-        const entries = resolveAll(live);
-        if (!same(entries.map((e) => ({ k: e.sourceKey, c: e.clubId, p: e.playerId, a: e.action })), plan.entries.map((e) => ({ k: e.sourceKey, c: e.clubId, p: e.playerId, a: e.action })))) fail('the live resolution differs from the reviewed plan');
-        const todo = entries.filter((e) => e.action === 'to insert');
-        if (todo.length === 0) return { replay: true, written: 0 };
-        const [batch] = await tx<{ id: string }[]>`INSERT INTO import_batches (source_id, tool, target_table, status, records_read, records_inserted, records_updated, records_rejected, notes, completed_at)
-          VALUES (${live.sourceId!}, 'gap029-captaincy-additions-production.ts', 'captaincies', 'completed', ${evidence.entries.length}, ${todo.length}, 0, 0,
-                  ${`V2-GAP-029 D1 additive co-captain rows; plan ${plan.digest.slice(0, 12)}; evidence ${EVIDENCE_PATH}`}, now()) RETURNING id::text AS id`;
-        for (const e of todo) {
-          await tx`INSERT INTO captaincies (season, club_id, player_id, player_name_raw, link_status_value, role, period, notes, source_id, source_record_id, import_batch_id)
-            VALUES (${e.season}, ${e.clubId}, ${e.playerId}, ${e.player}, ${e.linkStatus}::link_status, ${e.role}, ${e.period}, ${e.note}, ${live.sourceId!}, ${e.sourceKey}, ${batch.id}::bigint)`;
-        }
-        const after = await tableDigest(tx, before.maxId);
-        const total = await tableDigest(tx, null);
-        const cur = await readLive(tx, evidence.entries);
-        const allThere = evidence.entries.every((e) => { const r = captaincyEntryProblem(e, cur); return typeof r !== 'string' && r.action === 'already present'; });
-        // the transaction commits only if every pre-existing row is byte-identical and exactly the planned rows were added
-        if (after.digest !== before.tableDigest || total.count !== before.count + todo.length || !allThere) fail('post-write verification failed; rolled back');
-        return { replay: false, written: todo.length, batchId: batch.id, captaincies: total.count };
+      const report = await runApply<Info>({
+        preflight: async () => { checkApproval(); },
+        transact: (marks) => writer.begin('isolation level repeatable read', async (tx) => {
+          await prove(tx, true);
+          const before = await baselineOf(tx);
+          if (before.digest !== plan.baselineDigest) fail('baseline drift; re-plan and obtain new execution approval');
+          const live = await readLive(tx, evidence.entries);
+          const entries = resolveAll(live);
+          if (!same(entries.map((e) => ({ k: e.sourceKey, c: e.clubId, p: e.playerId, a: e.action })), plan.entries.map((e) => ({ k: e.sourceKey, c: e.clubId, p: e.playerId, a: e.action })))) fail('the live resolution differs from the reviewed plan');
+          const todo = entries.filter((e) => e.action === 'to insert');
+          if (todo.length === 0) return { replay: true };
+          marks.writing();
+          const [batch] = await tx<{ id: string }[]>`INSERT INTO import_batches (source_id, tool, target_table, status, records_read, records_inserted, records_updated, records_rejected, notes, completed_at)
+            VALUES (${live.sourceId!}, 'gap029-captaincy-additions-production.ts', 'captaincies', 'completed', ${evidence.entries.length}, ${todo.length}, 0, 0,
+                    ${`V2-GAP-029 D1 additive co-captain rows; plan ${plan.digest.slice(0, 12)}; evidence ${EVIDENCE_PATH}`}, now()) RETURNING id::text AS id`;
+          for (const e of todo) {
+            await tx`INSERT INTO captaincies (season, club_id, player_id, player_name_raw, link_status_value, role, period, notes, source_id, source_record_id, import_batch_id)
+              VALUES (${e.season}, ${e.clubId}, ${e.playerId}, ${e.player}, ${e.linkStatus}::link_status, ${e.role}, ${e.period}, ${e.note}, ${live.sourceId!}, ${e.sourceKey}, ${batch.id}::bigint)`;
+          }
+          const after = await tableDigest(tx, before.maxId);
+          const total = await tableDigest(tx, null);
+          // INSIDE the transaction: it commits only if every pre-existing row is byte-identical and exactly the planned rows were added
+          if (after.digest !== before.tableDigest || total.count !== before.count + todo.length || !allPresent(await readLive(tx, evidence.entries))) fail('post-write verification failed; rolled back');
+          const info: Info = { maxIdBefore: before.maxId, countBefore: before.count, priorDigest: before.tableDigest, planned: todo.length, batchId: batch.id };
+          marks.commitNext(info);
+          return { replay: false, info, result: { written: todo.length, batchId: batch.id, captaincies: total.count, planDigest: plan.digest } };
+        }),
+        verify: (info) => independent(async (tx) => {
+          const problems: string[] = [];
+          const prior = await tableDigest(tx, info.maxIdBefore);
+          if (prior.digest !== info.priorDigest) problems.push('a pre-existing captaincies row differs from its pre-write state');
+          const total = await tableDigest(tx, null);
+          if (total.count !== info.countBefore + info.planned) problems.push(`captaincies holds ${total.count} rows, expected ${info.countBefore + info.planned}`);
+          if (!allPresent(await readLive(tx, evidence.entries))) problems.push('a reviewed row is missing or differs');
+          const [b] = await tx<{ n: number }[]>`SELECT count(*)::int AS n FROM import_batches WHERE id = ${info.batchId}::bigint AND status::text = 'completed' AND records_inserted = ${info.planned}`;
+          if (b.n !== 1) problems.push('the completed audit batch row is missing or differs');
+          return problems;
+        }),
+        probe: (info) => independent(async (tx) => {
+          const b = await baselineOf(tx);
+          if (b.digest === plan.baselineDigest) return 'unchanged' as const;
+          return allPresent(await readLive(tx, evidence.entries)) && b.count === info.countBefore + info.planned ? ('applied' as const) : ('other' as const);
+        }),
+        persist: (record) => write({ ...record, planDigest: plan.digest }),
       });
-      write({ ...result, planDigest: plan.digest, at: new Date().toISOString() });
-      console.log(result.replay ? 'Every row is already present; nothing written' : `Committed ${result.written} rows; review restricted output`);
+      for (const line of reportLines(report)) console.log(line);
+      process.exitCode = report.exitCode;
     } finally { await writer.end({ timeout: 5 }); }
   } finally { await sql.end({ timeout: 5 }); }
 }

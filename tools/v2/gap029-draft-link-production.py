@@ -5,11 +5,13 @@ tools/rebuild/draftguru/bridge_import_gate.py, which stays unmodified and keeps 
     plan      read-only; runs the gate's own link-only plan over the target; seals a target-bound, digest-pinned plan
     apply     needs the plan, an approval pinned to its digest, a clean HEAD at the reviewed revision, fresh backup + restore evidence;
               re-runs the plan, runs the importer's --link-only write, then the gate's own VERIFY against the plan's hashes
+    state     read-only: classifies the live target as the plan's BASELINE, the plan's RESULT, or OTHER (use it after any non-zero apply)
     (rehearsal only) apply --with-dry-run runs the importer's --dry-run first. A dry run RETAINS a failed audit batch, so it is a write
               to import_batches and is refused on any non-isolated target: no production dry run is authorised.
 
     python tools/v2/gap029-draft-link-production.py plan  --target T --child C --child-sha256 H --label L [--rehearsal | --backup B --backup-file F --restore-evidence R] --out O
     python tools/v2/gap029-draft-link-production.py apply --plan P [--rehearsal [--with-dry-run] | --approval A --backup-file F --restore-evidence R] --out O
+    python tools/v2/gap029-draft-link-production.py state --plan P --out O
 
 WHY A REPLACEMENT, AND WHAT IT KEEPS. The gate's closed TARGETS list (test, dev) is its production refusal: "no PROD target exists and none
 can be added by a command-line value". This tool does not edit, wrap, monkey-patch or call around that list; it never calls `resolve_dsn`,
@@ -31,8 +33,21 @@ checks -- with its own connection that carries the guards below. Every safeguard
   G12 deterministic                                                 -> the plan is re-run at apply time and every hash must equal the plan's
 
 Properties added for production: one importer transaction (the importer's own); the target's backup baseline digest must equal the live
-baseline; the approval pins plan digest, target, revision, child sha, label, expiry. A failed VERIFY after the importer commits cannot be undone by
-this tool: it reports RESTORE REQUIRED (restore of the verified backup is the only recovery; there is no inverse).
+baseline; the approval pins plan digest, target, revision, child sha, label, expiry; the backup evidence must be MACHINE-ASSEMBLED
+(gap029-assemble-restore-evidence.ts: sealed, bound to this revision, these tools, this child and a restore verified off production).
+
+OUTCOMES (gap029_common.py). An apply ends in exactly one of: REFUSED_BEFORE_MUTATION (exit 1: a check failed before the importer started),
+ROLLED_BACK (2: the importer failed and a fresh read-only session PROVES the pre-run state), COMMITTED_VERIFIED / NOTHING_WRITTEN (0),
+COMMITTED_VERIFICATION_FAILED (3) or COMMITTED_VERIFICATION_UNAVAILABLE (4) (the importer committed; the independent gate VERIFY failed or could
+not run) and OUTCOME_UNDETERMINED (5: the importer failed and the live state could not be classified). An importer exit code is NOT evidence about
+the transaction: the importer commits its linkage and its `completed` audit row in one transaction and then runs ANALYZE, so a non-zero exit can
+follow a COMMIT. Only the read-only probe decides.
+
+COMMITTED-STATE RECOVERY LIMIT. The importer owns its transaction and exposes no pre-commit hook, so the gate VERIFY cannot run INSIDE it. The
+checks that can run inside (stored-population preconditions, authority order, the link-only write set) are the importer's own and do run there;
+everything this tool adds runs before it (identity, plan re-run, validate-only) or after it (VERIFY). After a committed outcome this tool does not
+retry, reverse or restore: no inverse exists, and restoring the verified backup would discard every write made after it was taken, which is a
+separate OWNER decision.
 """
 from __future__ import annotations
 
@@ -51,8 +66,10 @@ from urllib.parse import unquote, urlparse
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "tools" / "rebuild" / "draftguru"))
 sys.path.insert(0, str(REPO / "tools" / "migration"))
+sys.path.insert(0, str(REPO / "tools" / "v2"))
 import bridge_import_gate as gate  # noqa: E402
 import import_draftguru as imp  # noqa: E402
+import gap029_common as common  # noqa: E402
 
 OPERATION = "gap029-draft-link-production"
 CHILD_LABEL = "isolated"          # the exporter's label for a child resolved against a verified restore of the target
@@ -171,14 +188,70 @@ def run_gate_mode(mode: str, dsn: str, target: dict, child: str, child_sha: str,
     return summary
 
 
+STAGE = "S2"
+TOOL_REL = "tools/v2/gap029-draft-link-production.py"
+WRITER_TIMEOUT_SECONDS = 1800
+
+
+def lf_sha256(rel: str) -> str:
+    """sha256 of a repository file with CRLF folded to LF, so a Windows checkout and a Linux checkout of the same blob hash alike."""
+    return sha((REPO / rel).read_bytes().replace(b"\r\n", b"\n"))
+
+
+def tool_hashes() -> dict:
+    """Every file whose bytes decide what the restore-derived plan means; a change to any of them invalidates assembled evidence."""
+    return {rel: lf_sha256(rel) for rel in (TOOL_REL, "tools/v2/gap029_common.py", "tools/rebuild/draftguru/bridge_import_gate.py", "tools/rebuild/draftguru/import_draftguru.py")}
+
+
+def read_backup(a, target: dict, t: datetime) -> dict:
+    """The fresh, target-bound, hash-bound and MACHINE-ASSEMBLED backup evidence of a production plan. Any failure refuses."""
+    backup = json.loads(outside(a.backup).read_text())
+    if backup["target"] != target or not fresh(backup["capturedAt"]) or not fresh(backup["restoredAt"]) or parse_iso(backup["restoredAt"]) < parse_iso(backup["capturedAt"]):
+        raise Refused("fresh target-bound backup and verified restore evidence required")
+    if sha(outside(a.backup_file).read_bytes()) != backup["sha256"] or sha(outside(a.restore_evidence).read_bytes()) != backup["restoreEvidenceSha256"]:
+        raise Refused("backup or restore evidence content differs")
+    return backup
+
+
+def assembled_problem(backup: dict, target: dict, revision: str, child_sha: str, label: str, t: datetime) -> str | None:
+    return common.assembly_problem(backup, operation=OPERATION, stage=STAGE, revision=revision, now=t, target=target, tool_sha256=tool_hashes(),
+                                   stage_fields={k: backup.get(k) for k in ("baselineDigest", "draftLinkRestorePlanExpect")},
+                                   inputs={"childSha256": child_sha, "label": label, "parentSha256": V3_PARENT_SHA})
+
+
+def write_exclusive(path: Path, doc: dict) -> None:
+    with open(path, "x", encoding="utf-8") as fh:
+        fh.write(json.dumps(doc, indent=2) + "\n")
+
+
+def classify_state(dsn: str, target: dict, plan: dict, dry_runs: int) -> str:
+    """A fresh read-only session: 'applied' (the gate's VERIFY against the plan's after-state passes), 'unchanged' (the gate's plan equals the plan's baseline
+    and no batch was added beyond the declared dry runs), or 'other'. Raises when the database cannot be read."""
+    expect = {**plan["expect"], "batches_before": plan["batchesBefore"] + dry_runs}
+    try:
+        run_gate_mode("verify", dsn, target, plan["childPath"], plan["childSha256"], plan["label"], expect)
+        return "applied"
+    except Refused:
+        pass
+    try:
+        again = run_gate_mode("plan", dsn, target, plan["childPath"], plan["childSha256"], plan["label"])
+    except Refused:
+        return "other"
+    same = {k: again[k] for k in EXPECT_KEYS} == plan["expect"] and again["import_batches_before"] == plan["batchesBefore"] + dry_runs
+    return "unchanged" if same else "other"
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("mode", choices=("plan", "apply"))
+    ap.add_argument("mode", choices=("plan", "apply", "state", "tool-hashes"))
     for flag in ("--target", "--child", "--child-sha256", "--label", "--backup", "--backup-file", "--restore-evidence", "--plan", "--approval", "--out"):
         ap.add_argument(flag)
     ap.add_argument("--rehearsal", action="store_true")
     ap.add_argument("--with-dry-run", action="store_true")
     a = ap.parse_args(argv)
+    if a.mode == "tool-hashes":       # read-only: the single source of truth for what the assembler binds restore evidence to
+        print(json.dumps(tool_hashes(), sort_keys=True))
+        return 0
     try:
         out = outside(a.out)
         if out.exists():
@@ -187,7 +260,7 @@ def main(argv=None) -> int:
         if subprocess.run(["git", "diff", "--quiet"], cwd=REPO).returncode or subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=REPO).returncode:
             raise Refused("tracked working tree is not clean")
         refusal = gate_still_refuses_production()
-        plan0 = json.loads(outside(a.plan).read_text()) if a.mode == "apply" else None
+        plan0 = json.loads(outside(a.plan).read_text()) if a.mode in ("apply", "state") else None
         rehearsal = plan0["rehearsal"] if plan0 else a.rehearsal
         if a.rehearsal and plan0 and not plan0["rehearsal"]:
             raise Refused("the plan is not a rehearsal plan")
@@ -210,11 +283,10 @@ def main(argv=None) -> int:
         if a.mode == "plan":
             backup = None
             if not rehearsal:
-                backup = json.loads(outside(a.backup).read_text())
-                if backup["target"] != target or not fresh(backup["capturedAt"]) or not fresh(backup["restoredAt"]) or parse_iso(backup["restoredAt"]) < parse_iso(backup["capturedAt"]):
-                    raise Refused("fresh target-bound backup and verified restore evidence required")
-                if sha(outside(a.backup_file).read_bytes()) != backup["sha256"] or sha(outside(a.restore_evidence).read_bytes()) != backup["restoreEvidenceSha256"]:
-                    raise Refused("backup or restore evidence content differs")
+                backup = read_backup(a, target, t)
+                problem = assembled_problem(backup, target, revision, child_sha, label, t)
+                if problem:
+                    raise Refused(problem)
             summary = run_gate_mode("plan", dsn, target, child, child_sha, label)
             if backup and {k: summary[k] for k in EXPECT_KEYS} != backup.get("draftLinkRestorePlanExpect"):
                 raise Refused("the plan run against the verified restore (draftLinkRestorePlanExpect) does not equal the live target's plan: baseline drift or an unverified restore")
@@ -224,65 +296,88 @@ def main(argv=None) -> int:
                     "gateSummarySha256": summary["summary_sha256"], "counts": summary.get("counts"), "safeguards": SAFEGUARDS, "backup": backup,
                     "createdAt": iso(t), "expiresAt": iso(t + MAX_AGE)}
             plan = {**body, "digest": sha(canon(body))}
-            out.write_text(json.dumps(plan, indent=2) + "\n", encoding="utf-8")
+            write_exclusive(out, plan)
             print(f"Review plan {plan['digest']}; gate plan clean; no writes; expecting after-state {summary['after_state_sha256'][:16]}")
             return 0
         plan = plan0
         body = {k: v for k, v in plan.items() if k != "digest"}
-        if plan["digest"] != sha(canon(body)) or plan["operation"] != OPERATION or plan["revision"] != revision or not parse_iso(plan["expiresAt"]) > t:
-            raise Refused("plan digest, operation, revision or expiry differs")
-        if sha((REPO / "tools/rebuild/draftguru/import_draftguru.py").read_bytes()) != plan["importerSha256"] or refusal["gateSha256"] != plan["gate"]["gateSha256"]:
-            raise Refused("the importer or the gate differs from the reviewed bytes")
-        if not rehearsal:
-            ap_ = json.loads(outside(a.approval).read_text())
-            pb = plan["backup"]
-            if not pb or ap_["planDigest"] != plan["digest"] or ap_["operation"] != OPERATION or ap_["target"] != plan["target"] or ap_["revision"] != revision \
-                    or ap_["childSha256"] != plan["childSha256"] or ap_["label"] != plan["label"] or not parse_iso(ap_["expiresAt"]) > t \
-                    or parse_iso(ap_["expiresAt"]) > parse_iso(plan["expiresAt"]) or not parse_iso(ap_["approvedAt"]) <= t or not str(ap_.get("reference", "")).strip():
-                raise Refused("stale plan or missing execution approval")
-            if not fresh(pb["capturedAt"]) or not fresh(pb["restoredAt"]) or sha(outside(a.backup_file).read_bytes()) != pb["sha256"] \
-                    or sha(outside(a.restore_evidence).read_bytes()) != pb["restoreEvidenceSha256"]:
-                raise Refused("backup no longer fresh or its evidence differs")
+        if plan["digest"] != sha(canon(body)) or plan["operation"] != OPERATION or plan["revision"] != revision:
+            raise Refused("plan digest, operation or revision differs")
+        if a.mode == "state":
+            seen = classify_state(dsn, target, plan, 0 if not a.with_dry_run else 1)
+            label_ = {"unchanged": "BASELINE (the plan has not been applied)", "applied": "PLANNED RESULT PRESENT (the gate's VERIFY passes)", "other": "OTHER (neither the plan baseline nor the planned result)"}[seen]
+            write_exclusive(out, {"planDigest": plan["digest"], "state": label_, "checkedAt": iso(now())})
+            print(f"STATE {label_}")
+            return 0
         wdsn = os.environ.get("AFLDB_GAP029_WRITE_DSN", "")
-        dsn_matches(wdsn, target, False)
-        prove_identity(wdsn, target, writer=True)
-        # G12: the live state must still produce exactly the reviewed plan
-        again = run_gate_mode("plan", dsn, target, plan["childPath"], plan["childSha256"], plan["label"])
-        if {k: again[k] for k in EXPECT_KEYS} != plan["expect"] or again["import_batches_before"] != plan["batchesBefore"]:
-            raise Refused("baseline drift; re-plan and obtain new execution approval")
         base = [sys.executable, str(REPO / "tools/rebuild/draftguru/import_draftguru.py"), "--link-only", "--no-seed", "--label", plan["label"], "--bridge", plan["childPath"]]
         env = {**os.environ, "AFLDB_IMPORT_DATABASE_URL": wdsn}
-        run = lambda extra: subprocess.run([*base, *extra], cwd=REPO, env=env, capture_output=True, text=True)
-        v = run(["--validate-only"])
-        if v.returncode:
-            raise Refused("the importer's validate-only refused; nothing written")
-        record: dict = {"planDigest": plan["digest"], "at": iso(now())}
-        if a.with_dry_run:
-            d = run(["--dry-run"])
-            record["dryRun"] = {"exit": d.returncode, "note": "retains one failed audit batch by design; rehearsal only"}
-            if d.returncode:
-                raise Refused("the importer's dry run refused")
-        applied = run([])
-        record["importerExit"] = applied.returncode
-        if applied.returncode:
-            raise Refused("the importer refused or failed; inspect the target (its own transaction rolled back); restore is the recovery if rows differ")
-        expect = {**plan["expect"], "batches_before": plan["batchesBefore"] + (1 if a.with_dry_run else 0)}
-        try:
-            run_gate_mode("verify", dsn, target, plan["childPath"], plan["childSha256"], plan["label"], expect)           # G11
-            record["verify"] = "PASS"
-        except Refused as exc:
-            record["verify"] = f"FAIL: {exc}"
-            out.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
-            print("RESTORE REQUIRED: the importer committed but the gate's verify refused. Stop; restore the verified backup; do not retry.")
-            return 1
-        out.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
-        print("Committed link-only promotion; gate verify PASS; review restricted output")
-        return 0
+
+        def run(extra):
+            return subprocess.run([*base, *extra], cwd=REPO, env=env, capture_output=True, text=True, timeout=WRITER_TIMEOUT_SECONDS)
+
+        def preflight():
+            tt = now()
+            if not parse_iso(plan["expiresAt"]) > tt:
+                raise Refused("plan expired")
+            if sha((REPO / "tools/rebuild/draftguru/import_draftguru.py").read_bytes()) != plan["importerSha256"] or refusal["gateSha256"] != plan["gate"]["gateSha256"]:
+                raise Refused("the importer or the gate differs from the reviewed bytes")
+            if not rehearsal:
+                ap_ = json.loads(outside(a.approval).read_text())
+                pb = plan["backup"]
+                if not pb or ap_["planDigest"] != plan["digest"] or ap_["operation"] != OPERATION or ap_["target"] != plan["target"] or ap_["revision"] != revision \
+                        or ap_["childSha256"] != plan["childSha256"] or ap_["label"] != plan["label"] or not parse_iso(ap_["expiresAt"]) > tt \
+                        or parse_iso(ap_["expiresAt"]) > parse_iso(plan["expiresAt"]) or not parse_iso(ap_["approvedAt"]) <= tt or not str(ap_.get("reference", "")).strip():
+                    raise Refused("stale plan or missing execution approval")
+                if not fresh(pb["capturedAt"]) or not fresh(pb["restoredAt"]) or sha(outside(a.backup_file).read_bytes()) != pb["sha256"] \
+                        or sha(outside(a.restore_evidence).read_bytes()) != pb["restoreEvidenceSha256"]:
+                    raise Refused("backup no longer fresh or its evidence differs")
+                problem = assembled_problem(pb, plan["target"], revision, plan["childSha256"], plan["label"], tt)
+                if problem:
+                    raise Refused(problem)
+            dsn_matches(wdsn, target, False)
+            prove_identity(wdsn, target, writer=True)
+            # G12: the live state must still produce exactly the reviewed plan
+            again = run_gate_mode("plan", dsn, target, plan["childPath"], plan["childSha256"], plan["label"])
+            if {k: again[k] for k in EXPECT_KEYS} != plan["expect"] or again["import_batches_before"] != plan["batchesBefore"]:
+                raise Refused("baseline drift; re-plan and obtain new execution approval")
+            if run(["--validate-only"]).returncode:
+                raise Refused("the importer's validate-only refused; nothing written")
+
+        dry_runs = 0
+
+        def launch():
+            nonlocal dry_runs
+            info: dict = {}
+            if a.with_dry_run:
+                dry_runs = 1          # a dry run retains one failed audit batch by design (rehearsal only)
+                d = run(["--dry-run"])
+                info["dryRun"] = {"exit": d.returncode, "note": "retains one failed audit batch by design; rehearsal only"}
+                if d.returncode:
+                    return {"exit": d.returncode, "stage": "dry-run", **info}
+            applied = run([])
+            return {"exit": applied.returncode, "stage": "apply", **info}
+
+        def probe():
+            return classify_state(dsn, target, plan, dry_runs)
+
+        def verify():
+            expect = {**plan["expect"], "batches_before": plan["batchesBefore"] + dry_runs}
+            try:
+                run_gate_mode("verify", dsn, target, plan["childPath"], plan["childSha256"], plan["label"], expect)       # G11
+            except Refused as exc:
+                return [str(exc)]
+            return []
+
+        report = common.run_apply(preflight, launch, probe, verify, lambda rec: write_exclusive(out, {"planDigest": plan["digest"], **rec}), lambda: iso(now()))
+        for line in report.lines():
+            print(line)
+        return report.exit_code
     except (Refused, gate.GateError, imp.ImportFailure) as exc:
-        print(f"GAP-029 draft-link refused: {exc if isinstance(exc, Refused) else type(exc).__name__ + ' ' + str(exc)[:200]}")
+        print(f"OUTCOME REFUSED_BEFORE_MUTATION (exit 1)\nGAP-029 draft-link refused: {exc if isinstance(exc, Refused) else type(exc).__name__ + ' ' + str(exc)[:200]}")
         return 1
     except (OSError, ValueError, KeyError, TypeError) as exc:
-        print(f"GAP-029 draft-link refused: unreadable or malformed input ({type(exc).__name__})")
+        print(f"OUTCOME REFUSED_BEFORE_MUTATION (exit 1)\nGAP-029 draft-link refused: unreadable or malformed input ({type(exc).__name__})")
         return 1
 
 

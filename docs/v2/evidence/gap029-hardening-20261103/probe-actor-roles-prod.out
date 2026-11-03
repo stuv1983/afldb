@@ -1,0 +1,53 @@
+== H host and user 2026-11-03T03:56:55Z
+host=afldb-prod user=arm
+== C1 credential (afldb_backup) and identity 2026-11-03T03:56:55Z
+identity	afldb_prod	afldb_backup	5432	66668	7674454702926115004	16/main	<null>	on	16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+ledger	118	118_fixtures_unconfirmed_participants.sql
+ledger_108	066_atomic_audit_import_grants.sql	58ee0417e79748a7dcb15a40c396fcbd5d2fc87936a608d6a4c87d2fa9478c16
+ledger_108	105_prod_actor_lifecycle_assertion.sql	89f61d66bfb45e1975304e1b5cb67e2c296bc0d1085083734837e581535004d9
+ledger_108	108_import_reads_data_edits.sql	4cb44be26631bc61cb5e82dc0babfd06bf64435a51b3a014367d1619a338500e
+== A actor: auth_users id 1 against the migration-105 predicate, then every Super Admin (ids only) 2026-11-03T03:56:55Z
+actor1	1	super_admin	true	true	true	true	true	false	false	2026-08-16 13:00:47.926753+10
+actor1_viable_by_predicate	true
+super_admins	1	true	true	true
+actor_counts	admin	false	2
+actor_counts	contributor	false	1
+actor_counts	super_admin	false	1
+actor_fn	assert_viable_super_admin_actor	afldb_owner	true	search_path=pg_catalog, pg_temp	true	false	false
+== P1 afldb_import on public.data_edits: catalog view (table, column, sequence, ACL, RLS, role settings, memberships) 2026-11-03T03:56:56Z
+role	afldb_app	false	true	true	false	<none>
+role	afldb_auth	false	true	true	false	<none>
+role	afldb_backup	false	true	true	false	<none>
+role	afldb_import	false	true	true	false	<none>
+role	afldb_owner	false	true	true	false	<none>
+memberships	afldb_backup	pg_read_all_data
+table_priv	afldb_app	false	false	false	false	false	false
+table_priv	afldb_auth	true	true	false	false	false	true
+table_priv	afldb_backup	true	false	false	false	false	false
+table_priv	afldb_import	true	true	false	false	false	true
+column_select_import	9	9
+acl	afldb_auth	INSERT	false	afldb_owner
+acl	afldb_auth	SELECT	false	afldb_owner
+acl	afldb_import	INSERT	false	afldb_owner
+acl	afldb_import	SELECT	false	afldb_owner
+acl	afldb_owner	DELETE	false	afldb_owner
+acl	afldb_owner	INSERT	false	afldb_owner
+acl	afldb_owner	REFERENCES	false	afldb_owner
+acl	afldb_owner	SELECT	false	afldb_owner
+acl	afldb_owner	TRIGGER	false	afldb_owner
+acl	afldb_owner	TRUNCATE	false	afldb_owner
+acl	afldb_owner	UPDATE	false	afldb_owner
+rls	false	false	afldb_owner	r
+policies	0
+triggers_on_data_edits	0
+meta_import_writable_has_data_edits n/a
+rows_visible_to_backup	160	160
+== C2 credential (afldb_import): parsed identity only, then ONE empirical READ ONLY count on data_edits 2026-11-03T03:56:56Z
+import_dsn user=afldb_import host=localhost port=5432 database=afldb_prod has_query=no
+import_identity	afldb_import	afldb_import	afldb_prod	on	false
+import_data_edits_count	160	160
+import_data_edits_select=OK
+ERROR:  permission denied for sequence data_edits_id_seq
+import_seq_read=DENIED_OR_FAILED
+import_effective	true	true	false
+== DONE 2026-11-03T03:56:56Z

@@ -181,3 +181,50 @@ ISSUE-331 is **reopened** for this confirmed use. D-331-2 stands and is restated
 session, including to retrieve logs. Retiring it (`wsl --unregister`, deleting the base) remains the owner's irreversible act, after
 deciding whether `/home/rehearsal/qual-evidence-20261101/` should first be exported by an owner-run boot. All new qualification
 uses fresh disposable workspaces on the DEV host `streamanator` (owner-authorised 2026-11-01).
+
+## 7. Second breach 2026-11-03: the quarantined distro was started again (separate from sections 1-6)
+
+**This is a separate, later event. It does not explain, and must not be used to explain, the earlier disappearance (cause UNKNOWN,
+section 1 and D-331-1), and it is separate from the 2026-11-01 evening event in section 6.**
+
+### 7.1 What happened
+
+During the GAP-029 ordered-execution session of 2026-11-03, `AFLDB-V2-Rehearsal-20261020` was started **despite the explicit
+prohibition** (D-331-2: never booted, by any session, for any purpose, including to retrieve logs). Four commands ran inside it
+(`uname`, `node -v`, `python3 -V`, `ls /home`; that session recorded them in
+`docs/v2/gap-029-ordered-execution-handoff-2026-11-03.md` section 9.2) and the session then reported the distro **stopped**. That
+stop was the session's own report and was not independently verified at the time; it is not upgraded here. The number of starts is
+not independently recorded.
+
+### 7.2 Correction of a claim
+
+The earlier session wrote that it "wrote nothing", implying the store was unchanged. **That claim is withdrawn.** Starting a
+distro mounts the ext4 filesystem inside `ext4.vhdx`, replays its journal and runs init; mount counters, last-mount metadata,
+orphan cleanup, logs and caches can change even when every command run inside is read-only. "The commands were read-only" does not
+establish that the store did not change, and the store was never opened to check.
+
+### 7.3 Containment facts (Windows-side metadata only, 2026-11-03 about 14:53 local)
+
+Read-only `Get-Item` and `Get-Process`. No WSL command was executed; nothing was mounted, opened, hashed, exported, copied,
+unregistered or deleted.
+
+| Item | 2026-11-01 evening record (section 6.2) | 2026-11-03 check |
+|---|---|---|
+| `ext4.vhdx` size | 51,419,021,312 bytes | **51,433,701,376 bytes** (+14,680,064 = 14 MiB) |
+| `ext4.vhdx` last write | 2026-11-01 20:03:09 | **2026-11-03 12:59:20** |
+| Created | 2026-10-20 10:54:15 | 2026-10-20 10:54:15 |
+| WSL VM processes | none (`wslservice` only) | none: no `wsl`, `wslhost`, `vmmem`, `vmwp`; `wslservice` PID 5356 only |
+
+The quarantined store **did change** after the first breach record. That is consistent with this boot. It is not proof that this
+boot was the only start since 2026-11-01 (no Hyper-V or WSL event log was read). The process check says the distro is not running
+now; it says nothing about the interval.
+
+### 7.4 Integrity implications and disposition
+
+- The store remains a CHANGED, quarantined, never-a-baseline artefact, now with two recorded boots.
+- What the four commands printed is not evidence of anything: the toolchain inside is unverified.
+- No GAP-029 result depends on the store. Each Windows result keeps its labelled environment (handoff section 10).
+- D-331-2 stands and is restated. The owner-run decisions already owed are unchanged and not taken: whether to export
+  `/home/rehearsal/qual-evidence-20261101/` by an owner-run boot, retirement (`wsl --unregister`, deleting the base) and
+  credential rotation.
+- ISSUE-331 stays Open; the original disappearance stays cause UNKNOWN.

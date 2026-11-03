@@ -126,6 +126,8 @@ describe('GAP-029 draft-link production procedure: the gate stays closed and eve
     expect(tool).toContain('no production dry run is authorised');
     expect(tool).toContain('gate.run_gate(');
     expect(tool).toContain('link_only=True');
-    expect(tool).toContain('RESTORE REQUIRED');
+    // A committed-but-unverified stage is reported by the shared runner, which never restores automatically (a restore is a separate owner decision).
+    expect(tool).toContain('run_apply(');
+    expect(tool).not.toContain('RESTORE REQUIRED');
   });
 });
