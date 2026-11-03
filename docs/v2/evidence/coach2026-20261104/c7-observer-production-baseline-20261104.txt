@@ -1,0 +1,35 @@
+# C7 observer, first read-only run against production (afldb_prod), 2026-11-03T22:49Z (2026-11-04 09:49 AEDT). Read-only transaction, SELECTs only, no provider request, no unit start. Not an acceptance.
+# Command run by the preparer through the read-only probe wrapper: node --import tsx tools/v2/c7-observe.ts --season 2027 --since 2026-11-02T18:00:00Z --dsn-env <named variable> --json
+﻿UTC=2026-11-03T22:49:00Z node=v22.23.2
+tsx: present
+{
+  "verdict": "NO_CONCLUDED_MATCHES",
+  "reasons": [
+    "batch 82 completed and the retained season feed shows 0 CONCLUDED match(es); no canonical afl_api match exists. Expected before the first round concludes; nothing to accept yet"
+  ],
+  "figures": {
+    "database": "afldb_prod",
+    "season": 2027,
+    "since": "2026-11-02T18:00:00.000Z",
+    "round": null,
+    "settleBatchesSinceCutover": 2,
+    "completedBatches": 2,
+    "notCompletedBatches": 0,
+    "newestCompletedBatch": "82",
+    "canonicalAflApiMatches": 0,
+    "canonicalOtherSourceMatches": 0,
+    "afltablesBatchesSince": 0,
+    "seasonFeedMatches": 218,
+    "seasonFeedComplete": 1,
+    "concludedInFeed": 0,
+    "expectedConcluded": 0
+  },
+  "notMeasured": [
+    "criterion 1: the scheduled unit ended Result=success, ExecMainStatus=0 on each night of the round week (pass --systemd on the host, and read each night)",
+    "criterion 8: public season pages show the round within the ISR window the owner chose (D-316-10); a database read cannot measure it",
+    "criterion 7, host-side part: no new AFL Tables snapshot label, timer disabled, register retired (c5-accept covers the timers and register; the snapshot-label listing is host-side)"
+  ],
+  "exitCode": 10
+}
+observer exit: 10
+== done
