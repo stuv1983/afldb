@@ -22,6 +22,14 @@ export function loadGridleyDeferrals(): DeferralPolicy {
   if (evidenceDigest !== siblingApproval.evidenceSha256 || !siblingApproval.ownerApproved) {
     throw new Error('Gridley sibling approval is stale or absent; review the exact owner-authorized scope');
   }
+  // D-GAP029-D3: each extension is an enumerated, hash-pinned cell list; a changed list is stale until re-approved.
+  const extensions = (siblingApproval as { extensions?: { evidence: string; evidenceSha256: string }[] }).extensions ?? [];
+  for (const extension of extensions) {
+    const digest = createHash('sha256').update(readFileSync(join(root, extension.evidence))).digest('hex');
+    if (digest !== extension.evidenceSha256) {
+      throw new Error('Gridley sibling extension approval is stale; review the exact owner-authorized cells');
+    }
+  }
   return policy;
 }
 

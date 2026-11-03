@@ -9,5 +9,17 @@
   "evidenceSha256": "a23fadce6c014404197bf94c698d6a95a60ed10fddce7e74c1d7a8b21b46c6f0",
   "scope": "Only the 21 enumerated sibling differences, Jarryd Lyons / Corey Lyons, exact board/cell/criterion pair, identity, Gridley-only direction and sole lacking has_brother builder. Duplicate or additional findings remain unapproved.",
   "dataMatches": 0,
-  "preservedRule": "player_career_stats.games > 0"
+  "preservedRule": "player_career_stats.games > 0",
+  "extensions": [
+    {
+      "decision": "D-GAP029-D3",
+      "decidedOn": "2026-11-03",
+      "provenance": "owner instruction of 2026-11-03 (GAP-029 decisions D1-D5, item D3)",
+      "evidence": "data/reference/gridley-sibling-eligibility-extension-2026-boards.json",
+      "evidenceSha256": "e56239fc6cc5209f3b46eb7072d4620829b06e551add6b9a0595055f773ed16c",
+      "scope": "Only the 11 enumerated 2026-board cells, Jarryd Lyons / Corey Lyons, identical player identity, source evidence and games > 0 predicate to D-GAP029-21. Not a blanket approval of sibling findings or future cells.",
+      "cells": 11,
+      "dataMatches": 0
+    }
+  ]
 }

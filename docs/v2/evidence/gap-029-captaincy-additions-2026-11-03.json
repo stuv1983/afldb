@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "reference": "V2-GAP-029",
+  "decision": "D1 (owner 2026-11-03): correction, not acceptance",
+  "operation": "gap029-captaincy-additions",
+  "purpose": "Seven AFLDB-ISSUE-225 co-captain rows present in the tracked captaincies manifest and absent from the production captaincies table (1,774 rows vs 1,781).",
+  "trackedManifest": {
+    "path": "data/awards/captaincies.csv",
+    "sha256": "d81844c6622282b61bf8e733478259e96c1afd27baf4b5b3e48966e7d9e657f6",
+    "rows": 1781
+  },
+  "sourceKeyColumn": "captaincies.source_record_id (source: wikipedia)",
+  "provenance": "AFLDB-ISSUE-225 co-captaincy review (issues/closed/AFLDB-ISSUE-225.md section 5.1/17): each row's note cites the Wikipedia season / captains-list page and a corroborating club source; the identities resolve through the tracked player-identity census to AFL Tables profile URLs.",
+  "entries": [
+    {
+      "sourceKey": "0a590b03a95e13bcfac2c41c",
+      "season": 2008,
+      "club": "Melbourne",
+      "player": "Cameron Bruce",
+      "bootstrapPlayerId": 747,
+      "afltablesProfile": "players/C/Cameron_Bruce.html",
+      "linkStatus": "unique",
+      "role": "Captain",
+      "period": "2008 (co-captain, rounds 6–22)",
+      "note": "co-captain with James McDonald for the remainder of 2008 after David Neitz retired (Wikipedia: 2008 Melbourne Football Club season; corroborated: Melbourne FC)",
+      "rowSha256": "0c1756647e61b0a3b9d302041f4e3c418ead79822228da768fd821b8aa8479eb"
+    },
+    {
+      "sourceKey": "8dbd379972bbe7f8ecf68a10",
+      "season": 2008,
+      "club": "Melbourne",
+      "player": "James McDonald",
+      "bootstrapPlayerId": 730,
+      "afltablesProfile": "players/J/James_McDonald.html",
+      "linkStatus": "unique",
+      "role": "Captain",
+      "period": "2008 (co-captain, rounds 6–22)",
+      "note": "co-captain with Cameron Bruce for the remainder of 2008 after David Neitz retired (Wikipedia: 2008 Melbourne Football Club season; corroborated: Melbourne FC)",
+      "rowSha256": "ee798c4a6b2c4630c06198e8cc0638b59dfaa884263807fe7eb789bf78a3552d"
+    },
+    {
+      "sourceKey": "25f8dac05c6995eb838d7bef",
+      "season": 2017,
+      "club": "Gold Coast",
+      "player": "Steven May",
+      "bootstrapPlayerId": 11940,
+      "afltablesProfile": "players/S/Steven_May.html",
+      "linkStatus": "unique",
+      "role": "Captain",
+      "period": "2017–2018 (co-captain)",
+      "note": "co-captain with Tom Lynch (Wikipedia: List of Gold Coast Suns captains; corroborated: Gold Coast SUNS 2018 leadership announcement and captaincy history)",
+      "rowSha256": "917bcf9eee2921d26f3336b70766ea270cb975ee97900de15c1bff8902e453d0"
+    },
+    {
+      "sourceKey": "3469269fae62fa9aa25d705d",
+      "season": 2018,
+      "club": "Gold Coast",
+      "player": "Steven May",
+      "bootstrapPlayerId": 11940,
+      "afltablesProfile": "players/S/Steven_May.html",
+      "linkStatus": "unique",
+      "role": "Captain",
+      "period": "2017–2018 (co-captain)",
+      "note": "co-captain with Tom Lynch (Wikipedia: List of Gold Coast Suns captains; corroborated: Gold Coast SUNS 2018 leadership announcement and captaincy history)",
+      "rowSha256": "c30d2dfb8d0f70ef26afa570424dc5ae3acba005395caa945a9a09a1a40a3eae"
+    },
+    {
+      "sourceKey": "91b499dcbe61d3386183fc8e",
+      "season": 2019,
+      "club": "Gold Coast",
+      "player": "Jarrod Witts",
+      "bootstrapPlayerId": 12177,
+      "afltablesProfile": "players/J/Jarrod_Witts.html",
+      "linkStatus": "unique",
+      "role": "Captain",
+      "period": "2019–2021 (co-captain)",
+      "note": "co-captain with David Swallow (Wikipedia: List of Gold Coast Suns captains; corroborated: Gold Coast SUNS captaincy history)",
+      "rowSha256": "46283b3ca38de082963273424a809d0162e63190aef5c190b697c72a2c9d2497"
+    },
+    {
+      "sourceKey": "2c4db502ad00390a4f74db74",
+      "season": 2020,
+      "club": "Gold Coast",
+      "player": "Jarrod Witts",
+      "bootstrapPlayerId": 12177,
+      "afltablesProfile": "players/J/Jarrod_Witts.html",
+      "linkStatus": "unique",
+      "role": "Captain",
+      "period": "2019–2021 (co-captain)",
+      "note": "co-captain with David Swallow (Wikipedia: List of Gold Coast Suns captains; corroborated: Gold Coast SUNS captaincy history)",
+      "rowSha256": "2c60373943c99fb53a143c9c619c2bead9de71c5aa0253a14e042ee853a39087"
+    },
+    {
+      "sourceKey": "c9d6a0dffa2a7035f52c66e7",
+      "season": 2021,
+      "club": "Gold Coast",
+      "player": "Jarrod Witts",
+      "bootstrapPlayerId": 12177,
+      "afltablesProfile": "players/J/Jarrod_Witts.html",
+      "linkStatus": "unique",
+      "role": "Captain",
+      "period": "2019–2021 (co-captain)",
+      "note": "co-captain with David Swallow (Wikipedia: List of Gold Coast Suns captains; corroborated: Gold Coast SUNS captaincy history)",
+      "rowSha256": "f56ffec0cb1bae88b8418761b15bbbbf9fc97097bcee69915e615cf677b32347"
+    }
+  ]
+}

@@ -20,6 +20,16 @@ import { normalisePlayerName, type GridleyPlayerRef } from '@/search/gridley-com
 import { KNOWN_ANSWER_EVIDENCE_KIND, type GridleyKnownAnswerAdjudication } from './gridley-known-answer-adjudications';
 import board541Trade from '../data/reference/gridley-board-541-trade.json';
 import siblingEligibility from '../data/reference/gridley-sibling-eligibility-evidence.json';
+import siblingExtension2026 from '../data/reference/gridley-sibling-eligibility-extension-2026-boards.json';
+
+/**
+ * Every enumerated has_brother cell the Lyons evidence covers: the 21 baseline cells (D-GAP029-21) and the 11
+ * enumerated 2026-board cells (D-GAP029-D3). Nothing else is covered; the policy loader pins both files' hashes.
+ */
+export const SIBLING_EVIDENCE_CELLS: readonly { board: number; cell: string; row: string; col: string }[] = [
+  ...siblingEligibility.cells,
+  ...siblingExtension2026.cells,
+];
 
 /** Evidence classification only: strict finding retained; the separate policy checks owner approval. */
 export function siblingCriterionDisagreement(input: {
@@ -29,7 +39,7 @@ export function siblingCriterionDisagreement(input: {
   if (!input.inGridley || input.inAfldb || input.profile !== siblingEligibility.profile
     || input.gridleyPlayerId !== siblingEligibility.gridleyPlayerId
     || input.lackingBuilders.length !== 1 || input.lackingBuilders[0] !== 'has_brother'
-    || !siblingEligibility.cells.some((cell) => cell.board === input.board && cell.cell === input.cell
+    || !SIBLING_EVIDENCE_CELLS.some((cell) => cell.board === input.board && cell.cell === input.cell
       && cell.row === input.row && cell.col === input.col)) return null;
   return `criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; `
     + `has_brother requires games > 0; ${siblingEligibility.sources[0].url}; ${siblingEligibility.sources[1].url}`;

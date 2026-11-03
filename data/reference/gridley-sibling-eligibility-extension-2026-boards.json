@@ -1,0 +1,99 @@
+{
+  "version": 1,
+  "reference": "V2-GAP-029",
+  "decision": "D-GAP029-D3",
+  "decidedOn": "2026-11-03",
+  "ownerApproved": true,
+  "provenance": "owner instruction of 2026-11-03 (GAP-029 decisions D1-D5, item D3)",
+  "extends": {
+    "decision": "D-GAP029-21",
+    "evidence": "data/reference/gridley-sibling-eligibility-evidence.json",
+    "evidenceSha256": "a23fadce6c014404197bf94c698d6a95a60ed10fddce7e74c1d7a8b21b46c6f0"
+  },
+  "scope": "Exactly the 11 enumerated cells below: Jarryd Lyons (AFL Tables players/J/Jarryd_Lyons.html, Gridley player 3746) / Corey Lyons on 2026 boards, same player identity, same source evidence (the two sources recorded in the extended evidence file), same predicate (has_brother requires the brother's player_career_stats.games > 0), Gridley-only direction, sole lacking builder has_brother. NOT a blanket approval of sibling findings, other players, other boards or future cells; any cell not listed stays unapproved.",
+  "profile": "players/J/Jarryd_Lyons.html",
+  "gridleyPlayerId": 3746,
+  "afldbPlayerIdOnProduction": 6818,
+  "reasoning": "On the production-derived data the corpus judges these 2026-board cells on the player's final season (2024) and they surface as has_brother disagreements. The cause is the one already adjudicated for the 21 baseline cells: Gridley's key lists Jarryd Lyons via his brother Corey, who was AFL-listed (Brisbane Lions 2017-2020) but whose club records no senior appearance, so Corey fails the games > 0 rule. The 2026 boards were masked in the baseline (maximum season 2025) and are not new evidence about the relationship.",
+  "cells": [
+    {
+      "board": 920,
+      "cell": "2-2",
+      "date": "2026-01-21",
+      "row": "brother",
+      "col": "2020s"
+    },
+    {
+      "board": 920,
+      "cell": "2-0",
+      "date": "2026-01-21",
+      "row": "brother",
+      "col": "GC"
+    },
+    {
+      "board": 964,
+      "cell": "2-2",
+      "date": "2026-03-06",
+      "row": "brother",
+      "col": "prelimfinals1"
+    },
+    {
+      "board": 964,
+      "cell": "2-1",
+      "date": "2026-03-06",
+      "row": "brother",
+      "col": "marks10match"
+    },
+    {
+      "board": 990,
+      "cell": "2-2",
+      "date": "2026-04-01",
+      "row": "brother",
+      "col": "2020s"
+    },
+    {
+      "board": 1015,
+      "cell": "2-0",
+      "date": "2026-04-26",
+      "row": "brother",
+      "col": "AD"
+    },
+    {
+      "board": 1015,
+      "cell": "2-1",
+      "date": "2026-04-26",
+      "row": "brother",
+      "col": "BL"
+    },
+    {
+      "board": 1073,
+      "cell": "2-2",
+      "date": "2026-06-23",
+      "row": "brother",
+      "col": "2020s"
+    },
+    {
+      "board": 1109,
+      "cell": "2-2",
+      "date": "2026-07-29",
+      "row": "brother",
+      "col": "finals1"
+    },
+    {
+      "board": 1114,
+      "cell": "2-2",
+      "date": "2026-08-03",
+      "row": "brother",
+      "col": "grandfinals1"
+    },
+    {
+      "board": 1114,
+      "cell": "2-1",
+      "date": "2026-08-03",
+      "row": "brother",
+      "col": "finals10"
+    }
+  ],
+  "dataMatches": 0,
+  "preservedRule": "player_career_stats.games > 0"
+}

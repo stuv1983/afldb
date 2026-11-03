@@ -79,6 +79,37 @@ describe('GAP-029 release policy', () => {
     expect(all.approvedTotal).toEqual({ findings: 99, dataMatches: 0 });
     expect(all.approvedPolicyConformance.unapprovedDifferences).toHaveLength(50);
   });
+  it('D-GAP029-D3 approves exactly the 11 enumerated 2026-board Lyons cells and nothing adjacent', () => {
+    const baseline = JSON.parse(readFileSync(join(__dirname, '../data/reference/gridley-sibling-eligibility-evidence.json'), 'utf8'));
+    const extension = JSON.parse(readFileSync(join(__dirname, '../data/reference/gridley-sibling-eligibility-extension-2026-boards.json'), 'utf8'));
+    expect(extension.decision).toBe('D-GAP029-D3');
+    expect(extension.cells).toHaveLength(11);
+    expect(extension.profile).toBe(baseline.profile);
+    expect(extension.gridleyPlayerId).toBe(baseline.gridleyPlayerId);
+    expect(extension.preservedRule).toBe(baseline.rule.match(/player_career_stats\.games > 0/)![0]);
+    // the baseline file and its 21 cells are untouched, and no cell is listed twice across the two files
+    expect(baseline.cells).toHaveLength(21);
+    const key = (c: { board: number; cell: string; row: string; col: string }) => JSON.stringify([c.board, c.cell, c.row, c.col]);
+    expect(new Set([...baseline.cells, ...extension.cells].map(key)).size).toBe(32);
+    expect(extension.cells.every((c: { date: string }) => c.date.startsWith('2026-'))).toBe(true);
+    const policy = loadGridleyDeferrals();
+    const base = { profile: extension.profile, gridleyPlayerId: extension.gridleyPlayerId,
+      inGridley: true, inAfldb: false, lackingBuilders: ['has_brother'] };
+    const findings = extension.cells.map((cell: { board: number; cell: string; row: string; col: string }) => ({
+      board: cell.board, cell: cell.cell, row: cell.row, col: cell.col, category: 'criterion disagreement',
+      siblingEvidence: { ...base, board: cell.board, cell: cell.cell, row: cell.row, col: cell.col } }));
+    const result = gridleyPolicyResults(findings, policy);
+    expect(result.strictCorpusParity).toEqual({ passed: false, findings: 11 });
+    expect(result.approvedDisagreements).toEqual({ findings: 11, dataMatches: 0 });
+    expect(result.approvedPolicyConformance.passed).toBe(true);
+    // a neighbouring cell, another player, another builder, or a changed identity is NOT approved
+    const first = findings[0];
+    for (const changed of [{ board: first.board + 1 }, { cell: '0-0' }, { col: 'other' }, { profile: 'players/J/Jeremy_McGovern.html' },
+      { gridleyPlayerId: 1 }, { inGridley: false }, { inAfldb: true }, { lackingBuilders: ['has_brother', 'played_for_club'] }]) {
+      const finding = { ...first, ...('board' in changed ? { board: changed.board } : {}), siblingEvidence: { ...first.siblingEvidence, ...changed } };
+      expect(gridleyPolicyResults([finding], policy).approvedPolicyConformance.passed).toBe(false);
+    }
+  });
   it('bounds the seven retained deferrals to their original 78 cells and keeps strict results', () => {
     const policy = loadGridleyDeferrals();
     expect(policy.criteria).toEqual(['intrulesplayer', 'irish', 'nfl', 'recruitedByDodoro', 'season2024player', 'spoils5season', 'tasmanian']);
