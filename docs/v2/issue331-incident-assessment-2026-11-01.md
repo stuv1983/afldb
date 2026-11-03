@@ -1,7 +1,11 @@
 # ISSUE-331 bounded incident assessment (2026-11-01)
 
-Status: **assessment complete; cause of the deletions UNKNOWN; initiators NOT attributed. Closed 2026-11-01 on owner disposition (section 5): recovered, cause unestablished, uncertainty explicitly accepted.**
-It separates what the records demonstrate from what they only suggest, and ends with the recorded owner disposition.
+Status (reconciled 2026-11-03): **ISSUE-331 is OPEN.** Assessment complete; cause of the deletions UNKNOWN; initiators NOT
+attributed; that uncertainty was accepted by the owner on 2026-11-01 (section 5). The issue was closed on that disposition,
+**reopened 2026-11-01 (evening)** for a separate quarantine breach (section 6) and again recorded **2026-11-03** for a
+second one (section 7). Current position, what remains and the owner decisions: section 8 and `issues/open/AFLDB-ISSUE-331.md`.
+Sections 1-7 are history and are not rewritten except where marked "superseded".
+It separates what the records demonstrate from what they only suggest, and records the owner disposition.
 
 Scope and method. Read-only, metadata and log inspection of the three named roots only: `D:\tmp\afldb-v2-pg16` (isolated PostgreSQL
 root), `D:\afldb-v2-rehearsal-20261020` (frozen WSL rehearsal store) and the WSL export copy
@@ -99,7 +103,10 @@ rest.**
 - The preservation snapshot loss weakens, but does not remove, the provenance in `docs/v2/baseline.md`: the imported files are in
   Git; only the snapshot's capture-time status/patch records are unrecoverable.
 
-## 4. Owner disposition (recommended; none is executed)
+## 4. Owner disposition (recommended; none is executed) - HISTORICAL, superseded by section 5 (decided 2026-11-01)
+
+*These were the recommendations at the time. The decisions are in section 5 and differ (notably D-331-3 was deferred, not run).
+The "next actions" implied here no longer apply; see section 8.*
 
 | ID | Decision | Recommendation |
 |---|---|---|
@@ -182,6 +189,9 @@ session, including to retrieve logs. Retiring it (`wsl --unregister`, deleting t
 deciding whether `/home/rehearsal/qual-evidence-20261101/` should first be exported by an owner-run boot. All new qualification
 uses fresh disposable workspaces on the DEV host `streamanator` (owner-authorised 2026-11-01).
 
+*Reconciliation 2026-11-03: the corrected qualification is complete (`docs/v2/master-execution-sequence-2026-11-01.md` section 8.2;
+nothing further is owed). The export question is addressed in section 8 and the runbook, which recommends against an export.*
+
 ## 7. Second breach 2026-11-03: the quarantined distro was started again (separate from sections 1-6)
 
 **This is a separate, later event. It does not explain, and must not be used to explain, the earlier disappearance (cause UNKNOWN,
@@ -228,3 +238,32 @@ now; it says nothing about the interval.
   `/home/rehearsal/qual-evidence-20261101/` by an owner-run boot, retirement (`wsl --unregister`, deleting the base) and
   credential rotation.
 - ISSUE-331 stays Open; the original disappearance stays cause UNKNOWN.
+
+## 8. Reconciliation and current position (2026-11-03)
+
+Documentation only. No WSL command was run; no quarantined store was started, mounted, inspected, hashed, copied, exported,
+unregistered or deleted; no host, database, credential, service or production operation occurred. The runbook is
+`issues/open/AFLDB-ISSUE-331.md`; it carries the decisions, procedures and approval text. This section only records the
+position.
+
+**Corrections to stale wording elsewhere (history preserved, not deleted):**
+
+- The header said "Closed 2026-11-01". Corrected: the issue is open (closed 2026-11-01, reopened twice).
+- Section 4 read as live next actions. Marked historical; section 5 is the decision.
+- The `issues.md` entry said the owner "decides D-331-1 to D-331-5" and, after the first breach, that the corrected
+  qualification was an "authorised next action". Both are done (2026-11-01); marked superseded in the entry.
+- "Replacement qualification remains owed" no longer holds: it is complete and is the only Linux record any approval may
+  cite (master sequence section 8.2). The 8.1 results stay labelled nonconforming-environment results.
+
+**Four things remain, kept apart:**
+
+| Class | State |
+|---|---|
+| Accepted uncertainty (original disappearance) | Accepted 2026-11-01 (D-331-1). No new lead; no action |
+| Evidence and sensitive-data retention | The quarantined distro (51,433,701,376 bytes at the 2026-11-03 14:53 read, changed, two recorded boots) holds a production-derived store; its evidence has no remaining use (runbook section 5). Undocumented residue tarballs share its base directory |
+| Prevention of another breach | Both breaches lacked the rule and the sanctioned Linux alternative in loaded context (`CLAUDE.md` does not mention either); no technical guard exists. Retirement is the only measure covering every actor |
+| Exposed credentials that may still authenticate | The 2026-10-28 exposed WSL-cluster passwords were never retired; the only known live verifier copies are in the quarantined distro (the export copy's disk is gone). Uniqueness against production/DEV was never tested; no production exposure is claimed. Inventory K1-K11: runbook section 4 |
+
+**Boundaries restated.** A missing or deleted copy does not retire a credential. Invalidation of the quarantined store's
+credentials without a boot is possible only by destroying the store, so the evidence-value decision (D-331-6) comes first.
+ISSUE-331 remains open until the owner decides D-331-6 to D-331-11 (proposed in the runbook; none recorded here).
