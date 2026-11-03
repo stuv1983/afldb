@@ -162,7 +162,7 @@ prep)
   echo "pinned_checkout=$CAND HEAD=$(git rev-parse HEAD) tracked=$(git ls-files | wc -l) dirty=0 node=$(node -v)"
   echo "prod_checkout_unchanged: head=$(GIT_OPTIONAL_LOCKS=0 git -C "$PROD_CHECKOUT" rev-parse HEAD) status_lines=$(GIT_OPTIONAL_LOCKS=0 git -C "$PROD_CHECKOUT" status --porcelain | wc -l)"
   node --import tsx --conditions=react-server -e "import('./tools/v2/gap029-ops-lib.ts').then(m=>console.log('wrapper library loads; stages', Object.keys(m.STAGES).join(',')))" || stop "tsx cannot load the wrapper library" 3
-  "$PYTHON" -c 'import psycopg,sys;print("python", sys.version.split()[0], "psycopg", psycopg.__version__)' || stop "the stage python has no psycopg" 3
+  PYTHONDONTWRITEBYTECODE=1 "$PYTHON" -c 'import psycopg,sys;print("python", sys.version.split()[0], "psycopg", psycopg.__version__)' || stop "the stage python has no psycopg" 3
   echo "profile=$PROFILE_NAME class=$EVIDENCE_CLASS profile_sha256=$(sha256sum "$PROFILE" | cut -d' ' -f1)"
   ;;
 
