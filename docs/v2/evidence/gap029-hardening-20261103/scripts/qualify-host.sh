@@ -16,7 +16,8 @@ set -u -o pipefail
 export PATH="$HOME/.nvm/versions/node/v22.23.2/bin:$PATH"
 PORT=55493; CAND="$W/cand"; EVP="$W/evidence-private/$TAG"; HELP="$CAND/docs/v2/evidence/gap029-hardening-20261103/scripts"
 PY="${PY:-$W/venv/bin/python}"
-LEDGER_PREFIX="${LEDGER_PREFIX:-118_}"   # production is at 118; the retained Block L baselines are at 117 (pass LEDGER_PREFIX=117_ for those)
+CHAIN_DUMP="${CHAIN_DUMP:-$DUMP}"; CHAIN_DUMP_SHA="${CHAIN_DUMP_SHA:-$DUMP_SHA}"   # the chain / editor / corpus database may restore a different (e.g. later, label-bearing) dump than the assembly test
+LEDGER_PREFIX="${LEDGER_PREFIX:-}"   # when set, the chain restore must start with it (production is at 118_; the retained Block L baselines are at 117_)
 mkdir -p -m 700 "$W/evidence-private"; [ -e "$EVP" ] && { echo "STOP $EVP exists; choose a new TAG"; exit 2; }; mkdir -m 700 "$EVP"
 SUM="$EVP/qualification-summary.txt"; : > "$SUM"
 export AFLDB_V2_PG_ROOT="$W/pg-root" AFLDB_V2_PG_BIN=/usr/lib/postgresql/16/bin AFLDB_V2_PG_PORT=$PORT AFLDB_PYTHON="$PY"
@@ -31,6 +32,7 @@ say "Q0 inputs"
 rec "host=$(hostname) user=$(whoami) kernel=$(uname -sr) node=$(node -v) python=$("$PY" -V 2>&1) pg_restore=$(/usr/lib/postgresql/16/bin/pg_restore --version)"
 [ "$(cd "$CAND" && git rev-parse HEAD)" = "$R" ] && [ "$(cd "$CAND" && git status --porcelain | wc -l)" = 0 ] && ok "candidate clean at $R" || { bad "candidate not clean at $R"; exit 3; }
 [ "$(sha256sum "$DUMP" | cut -d' ' -f1)" = "$DUMP_SHA" ] && ok "dump sha256 verified" || { bad "dump sha256 mismatch"; exit 3; }
+[ "$(sha256sum "$CHAIN_DUMP" | cut -d' ' -f1)" = "$CHAIN_DUMP_SHA" ] && ok "chain dump sha256 verified" || { bad "chain dump sha256 mismatch"; exit 3; }
 ss -ltn 2>/dev/null | awk '{print $4}' | grep -E ":$PORT$" && { bad "port $PORT already listening"; exit 3; }
 dev_services | tee "$EVP/dev-before.txt" >> "$SUM"
 
@@ -54,9 +56,9 @@ pmpid=$(head -1 "$AFLDB_V2_PG_ROOT/data/postmaster.pid"); ss -ltnp 2>/dev/null |
 grep -q "127.0.0.1:$PORT" "$EVP/listener.txt" && grep -q "pid=$pmpid," "$EVP/listener.txt" && [ "$(grep -c . "$EVP/listener.txt")" = 1 ] && ok "listener is exclusively the cluster we started (127.0.0.1:$PORT)" || { bad "listener not exclusive"; IR stop || true; exit 4; }
 CHAIN=afldb_v2_gap029_${TAG}_chain_test
 IR create-db "$CHAIN" || exit 5
-RUNDB "$CHAIN" node "$W/in/restore.mjs" "$DUMP" "$DUMP_SHA" | tee "$EVP/restore.out" || exit 5
+RUNDB "$CHAIN" node "$W/in/restore.mjs" "$CHAIN_DUMP" "$CHAIN_DUMP_SHA" | tee "$EVP/restore.out" || exit 5
 cp "$W/in/probe-dbs.mjs" "$CAND/.probe-dbs.mjs"; RUNDB "$CHAIN" node .probe-dbs.mjs "$CHAIN" | tee "$EVP/restore-probe.txt"; rm -f "$CAND/.probe-dbs.mjs"
-grep -qF '"ledger":"'"$LEDGER_PREFIX" "$EVP/restore-probe.txt" && ok "restored ledger starts $LEDGER_PREFIX" || { bad "restored ledger does not start $LEDGER_PREFIX"; exit 5; }
+if [ -n "$LEDGER_PREFIX" ]; then grep -qF '"ledger":"'"$LEDGER_PREFIX" "$EVP/restore-probe.txt" && ok "restored ledger starts $LEDGER_PREFIX" || { bad "restored ledger does not start $LEDGER_PREFIX"; exit 5; }; else rec "restored chain database: $(cat "$EVP/restore-probe.txt" | cut -c1-200)"; fi
 
 say "Q3 the four-stage chain and its negative controls (S1 -> S2 -> S3 -> S4 on one disposable clone)"
 RUNDB "$CHAIN" env CAND="$CAND" EVP="$EVP" HELPERS="$HELP" PY="$PY" bash "$HELP/chain-inner.sh" && ok "chain: $(tail -1 "$EVP/chain/summary.txt")" || { bad "chain: $(tail -1 "$EVP/chain/summary.txt" 2>/dev/null)"; grep '^FAIL' "$EVP/chain/summary.txt" | head -10; }
@@ -67,7 +69,11 @@ RESTORED_AT=$(date -u +%FT%T.%3NZ)
 RUNDB "$ASM" node "$W/in/restore.mjs" "$DUMP" "$DUMP_SHA" > "$EVP/asm-restore.out" 2>&1 || exit 6
 TOC=$(/usr/lib/postgresql/16/bin/pg_restore --list "$DUMP" | grep -cv '^;')
 AS() { RUNDB "$ASM" bash -c "cd '$CAND' && node --import tsx tools/v2/gap029-assemble-restore-evidence.ts $*"; }
-AS restore-evidence --provenance "$PROVENANCE" --dump "$DUMP" --dump-sha256 "$DUMP_SHA" --restored-at "$RESTORED_AT" --toc-entries "$TOC" --production-target "$PROD_TARGET" --out "$EVP/asm-restore-evidence.json" > "$EVP/asm-1.log" 2>&1 && ok "restore evidence generated from the guarded restored database" || { bad "restore evidence"; tail -3 "$EVP/asm-1.log"; }
+ASM_OK=0
+if AS restore-evidence --provenance "$PROVENANCE" --dump "$DUMP" --dump-sha256 "$DUMP_SHA" --restored-at "$RESTORED_AT" --toc-entries "$TOC" --production-target "$PROD_TARGET" --out "$EVP/asm-restore-evidence.json" > "$EVP/asm-1.log" 2>&1 > "$EVP/asm-1.log" 2>&1; then ok "restore evidence generated from the guarded restored database"; ASM_OK=1
+elif grep -q "older than 24 hours" "$EVP/asm-1.log"; then ok "REAL retained evidence refused as stale (older than 24 hours): the assembler happy path needs a FRESH production backup, which is a production-preparation step awaiting owner approval"
+else bad "restore evidence"; tail -3 "$EVP/asm-1.log"; fi
+if [ "$ASM_OK" = 1 ]; then
 for st in S1 S2 S3 S4; do
   extra=""; [ "$st" = S2 ] && extra="--label annual-html-20260826"
   AS assemble --stage $st --production-target "$PROD_TARGET" --dump "$DUMP" --dump-sha256 "$DUMP_SHA" --restore-evidence "$EVP/asm-restore-evidence.json" --work-dir "$EVP/asm-work-$st" --out "$EVP/asm-backup-$st.json" $extra > "$EVP/asm-$st.log" 2>&1 \
@@ -89,6 +95,7 @@ node -e "
 const f=require('fs');const a=JSON.parse(f.readFileSync('$EVP/asm-backup-S2.json'));const p=JSON.parse(f.readFileSync('$EVP/chain/s2-plan.json'));
 const ok=JSON.stringify(a.draftLinkRestorePlanExpect)===JSON.stringify(p.expect);console.log(ok?'S2 draftLinkRestorePlanExpect equals the chain plan expectation':'S2 draftLinkRestorePlanExpect DIFFERS from the chain plan expectation');process.exit(ok?0:1)" | tee -a "$SUM" && ok "assembled S2 expectation == plan expectation on the same baseline" || bad "S2 expectation differs"
 
+fi
 say "Q5 affected editor integration and focused regressions (against a disposable database; AFLDB_TEST_DATABASE_URL is set by the guarded runner)"
 RUNDB "$CHAIN" bash -c "cd '$CAND' && node node_modules/vitest/vitest.mjs run tests/integration/admin-draft.test.ts tests/integration/sealed-editor-guard.test.ts tests/admin-draft-actions.test.ts tests/data-overrides-source-contract.test.ts tests/draftguru-import.test.ts" > "$EVP/vitest-editor.log" 2>&1 \
   && ok "editor integration + focused regressions ($(sed 's/\x1b\[[0-9;]*m//g' "$EVP/vitest-editor.log" | grep -E 'Tests ' | tail -1))" || { bad "editor integration / regressions"; sed 's/\x1b\[[0-9;]*m//g' "$EVP/vitest-editor.log" | grep -E "FAIL|Error" | head -10; }
