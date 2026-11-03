@@ -14,6 +14,7 @@
 # work/ (the stage tool's own rehearsal output), restore-target.json, and the logs. Exit 0 only when the sealed backup.json exists.
 set -u -o pipefail
 : "${W:?}" "${R:?}" "${STAGE:?}" "${DUMP:?}" "${DUMP_SHA:?}" "${PROVENANCE:?}" "${PROD_TARGET:?}" "${TAG:?}"
+[[ "$TAG" =~ ^[a-z0-9_]+$ ]] || { echo "STOP TAG must match [a-z0-9_]+ (it becomes part of an isolated database name)"; exit 2; }
 case "$STAGE" in S1|S2|S3|S4) ;; *) echo "STOP STAGE must be S1, S2, S3 or S4"; exit 2 ;; esac
 export PATH="$HOME/.nvm/versions/node/v22.23.2/bin:$PATH"
 PORT=55493
@@ -36,6 +37,12 @@ ss -ltn 2>/dev/null | awk '{print $4}' | grep -E ":$PORT$" && { echo "STOP port 
 echo "dump sha256 verified; candidate clean at $R; stage $STAGE"
 echo "DEV services BEFORE:"; dev_services | tee "$EVP/dev-before.txt"
 
+# cleanup trap FIRST: a slow start must not leave the isolated cluster running (the trap also covers the start itself)
+fin() { local rc=$?; say "A9 stop the cluster and prove isolation"; IR stop || true; sleep 2
+  ss -ltn | awk '{print $4}' | grep -E ":$PORT$" && echo "WARN port still listening"
+  echo "DEV services AFTER:"; dev_services | tee "$EVP/dev-after.txt"; cmp -s "$EVP/dev-before.txt" "$EVP/dev-after.txt" && echo "DEV services unchanged" || echo "WARN DEV services differ (compare dev-before.txt / dev-after.txt)"
+  say "DONE rc=$rc"; exit $rc; }
+trap fin EXIT
 say "A1 start the guarded cluster"
 ( IR start > "$EVP/pg-start.out" 2>&1 < /dev/null & ); sleep 4
 IR status || exit 4
@@ -43,11 +50,6 @@ pmpid=$(head -1 "$AFLDB_V2_PG_ROOT/data/postmaster.pid"); ss -ltnp 2>/dev/null |
 grep -q "127.0.0.1:$PORT" "$EVP/listener.txt" && grep -q "pid=$pmpid," "$EVP/listener.txt" && [ "$(grep -c . "$EVP/listener.txt")" = 1 ] \
   || { echo "STOP listener is not exclusively the cluster we started"; IR stop || true; exit 4; }
 
-fin() { local rc=$?; say "A9 stop the cluster and prove isolation"; IR stop || true; sleep 2
-  ss -ltn | awk '{print $4}' | grep -E ":$PORT$" && echo "WARN port still listening"
-  echo "DEV services AFTER:"; dev_services | tee "$EVP/dev-after.txt"; cmp -s "$EVP/dev-before.txt" "$EVP/dev-after.txt" && echo "DEV services unchanged" || echo "WARN DEV services differ (compare dev-before.txt / dev-after.txt)"
-  say "DONE rc=$rc"; exit $rc; }
-trap fin EXIT
 
 say "A2 restore into a guarded disposable database"
 IR create-db "$RDB" || exit 5

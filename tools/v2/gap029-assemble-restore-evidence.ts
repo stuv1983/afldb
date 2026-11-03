@@ -4,7 +4,7 @@
  *   restore-evidence  builds `afldb.gap029.restore-evidence.1` from the capture provenance sidecar, the dump, and the GUARDED restored database
  *                     (identity proven by query, never typed in). Run once per data stage, after that stage's own fresh backup was restored.
  *   assemble          runs the stage's own tool in --rehearsal mode against the guarded restored database, reads what it produced and writes the
- *                     sealed `backup.json` that the stage's production `plan` requires. Nothing is typed in; nothing is chosen.
+ *                     sealed `backup.json` that the stage's production `plan` requires. The stage digests are read from the guarded restored database, never typed in; the dump hash, restore time, archive entry count, provenance sidecar and production-target file are supplied inputs that are checked against each other and against the restored database, not chosen to satisfy a gate.
  *
  *   AFLDB_V2_ISOLATED_PG=1 AFLDB_TEST_DATABASE_URL=<restored db>   (both set by `tools/v2/isolated-pg.ts run <db> -- ...`)
  *   node --import tsx tools/v2/gap029-assemble-restore-evidence.ts restore-evidence --provenance P --dump D --dump-sha256 H --restored-at ISO \
@@ -68,16 +68,18 @@ export function restoreEvidenceProblem(ev: unknown, ctx: { dumpSha256: string; r
 /** Pure: the stage-specific fields (and nothing else) a stage's production plan relies on, validated. */
 export function stageFieldsFrom(stage: Stage, out: any): Record<string, unknown> {
   const hex = (v: unknown, what: string): string => (typeof v === 'string' && HEX64.test(v) ? v : fail(`${what} is not a sha256`));
-  if (stage === 'S1' || stage === 'S3') return { baselineDigest: hex(out?.baselineDigest, 'baselineDigest') };
+  const count = (v: unknown, what: string): number => (Number.isInteger(v) && (v as number) >= 0 ? (v as number) : fail(`${what} is not a count`));
+  if (stage === 'S1') return { baselineDigest: hex(out?.baselineDigest, 'baselineDigest') };
+  if (stage === 'S3') return { baselineDigest: hex(out?.baselineDigest, 'baselineDigest'), importBatchesBefore: count(out?.importBatchesBefore, 'importBatchesBefore') };
   if (stage === 'S2') {
     const x = out?.expect ?? {};
     const expect = { after_state_sha256: hex(x.after_state_sha256, 'after_state_sha256'), baseline_sha256: hex(x.baseline_sha256, 'baseline_sha256'),
       newly_linked_sha256: hex(x.newly_linked_sha256, 'newly_linked_sha256'), picks_after_sha256: hex(x.picks_after_sha256, 'picks_after_sha256') };
     if (Object.keys(x).length !== 4) fail('the draft-link plan expectation does not have exactly four values');
-    return { baselineDigest: expect.baseline_sha256, draftLinkRestorePlanExpect: expect };
+    return { baselineDigest: expect.baseline_sha256, draftLinkRestorePlanExpect: expect, batchesBefore: count(out?.batchesBefore, 'batchesBefore') };
   }
   const b = out?.before ?? {};
-  if (!Number.isInteger(out?.importBatchesBefore) || out.importBatchesBefore < 0) fail('importBatchesBefore is not a count');
+  count(out?.importBatchesBefore, 'importBatchesBefore');
   return { baselineDigest: hex(b.fullRowDigest, 'fullRowDigest'), siblingContentDigest: hex(b.contentDigest, 'contentDigest'), siblingFullRowDigest: hex(b.fullRowDigest, 'fullRowDigest'), siblingImportBatchesBefore: out.importBatchesBefore };
 }
 

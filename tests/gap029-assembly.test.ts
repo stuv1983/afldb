@@ -28,7 +28,7 @@ function backupFor(stage: 'S1' | 'S2' | 'S3' | 'S4', fields: Record<string, unkn
 }
 const ctx = (stage: string, operation: string, fields: Record<string, unknown>, over: Partial<AssemblyContext> = {}): AssemblyContext =>
   ({ operation, stage, revision: REV, now: NOW, target: PROD, toolSha256: TOOLS, stageFields: fields, ...over });
-const S2_FIELDS = { baselineDigest: h('4'), draftLinkRestorePlanExpect: { after_state_sha256: h('1'), baseline_sha256: h('4'), newly_linked_sha256: h('3'), picks_after_sha256: h('2') } };
+const S2_FIELDS = { baselineDigest: h('4'), draftLinkRestorePlanExpect: { after_state_sha256: h('1'), baseline_sha256: h('4'), newly_linked_sha256: h('3'), picks_after_sha256: h('2') }, batchesBefore: 66 };
 const S2_INPUTS = { childSha256: h('9'), label: 'annual-html-20260826', parentSha256: h('7') };
 const good = () => backupFor('S2', S2_FIELDS, S2_INPUTS);
 const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
@@ -51,14 +51,19 @@ describe('restore evidence: what it must prove before it can back a plan', () =>
 });
 
 describe('stage values are read from the tool output, validated, and nothing else is accepted', () => {
-  it('S1 and S3 need a sha256 baseline digest', () => {
+  it('S1 needs a sha256 baseline digest (its digest already carries the batch count)', () => {
     expect(stageFieldsFrom('S1', { baselineDigest: h('5') })).toEqual({ baselineDigest: h('5') });
-    expect(() => stageFieldsFrom('S3', { baselineDigest: 'abc' })).toThrow(/not a sha256/);
     expect(() => stageFieldsFrom('S1', {})).toThrow(/not a sha256/);
   });
+  it('S3 binds the production import_batches count too, so a backup taken before another stage committed is refused at plan time', () => {
+    expect(stageFieldsFrom('S3', { baselineDigest: h('5'), importBatchesBefore: 69 })).toEqual({ baselineDigest: h('5'), importBatchesBefore: 69 });
+    expect(() => stageFieldsFrom('S3', { baselineDigest: 'abc', importBatchesBefore: 69 })).toThrow(/not a sha256/);
+    expect(() => stageFieldsFrom('S3', { baselineDigest: h('5') })).toThrow(/not a count/);
+  });
   it('S2 needs exactly the four expectation hashes and records the baseline from them', () => {
-    const out = { expect: S2_FIELDS.draftLinkRestorePlanExpect };
+    const out = { expect: S2_FIELDS.draftLinkRestorePlanExpect, batchesBefore: 66 };
     expect(stageFieldsFrom('S2', out)).toEqual(S2_FIELDS);
+    expect(() => stageFieldsFrom('S2', { expect: out.expect })).toThrow(/batchesBefore is not a count/);
     expect(() => stageFieldsFrom('S2', { expect: { ...out.expect, extra: h('0') } })).toThrow(/exactly four/);
     expect(() => stageFieldsFrom('S2', { expect: { ...out.expect, after_state_sha256: 'x' } })).toThrow(/not a sha256/);
   });

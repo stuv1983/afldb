@@ -144,7 +144,7 @@ export function entryProblem(e: Entry, live: Live): string | Resolved {
 }
 
 export interface Target { host: string; port: number; database: string; user: string; systemIdentifier: string; databaseOid: string; clusterName: string; databaseComment: string | null }
-export interface Backup { target: Target; sha256: string; restoreEvidenceSha256: string; capturedAt: string; restoredAt: string; baselineDigest: string }
+export interface Backup { target: Target; sha256: string; restoreEvidenceSha256: string; capturedAt: string; restoredAt: string; baselineDigest: string; importBatchesBefore: number }
 export interface Plan { operation: string; revision: string; target: Target; rehearsal: boolean; actorUserId: number; evidenceSha256: string; outcomesSha256: string; baselineDigest: string;
   backup: Backup | null; createdAt: string; expiresAt: string; entries: (Entry & Resolved)[]; digest: string }
 export interface Approval { planDigest: string; target: Target; revision: string; operation: string; evidenceSha256: string; actorUserId: number; approvedAt: string; expiresAt: string; reference: string }
@@ -170,7 +170,7 @@ export function approvalProblem(plan: Plan, approval: Approval | null, ctx: { no
 /** Pure: every reason a production plan must not trust this backup evidence (target-bound, fresh, ordered, MACHINE-ASSEMBLED and sealed), or null. The file hashes are checked by the caller. */
 export function backupProblem(backup: Backup, target: Target, ctx: { now: number; revision: string }, tools: Record<string, string> = toolHashes()): string | null {
   if (!same(backup.target, target) || !fresh(backup.capturedAt, ctx.now) || !fresh(backup.restoredAt, ctx.now) || Date.parse(backup.restoredAt) < Date.parse(backup.capturedAt)) return 'fresh target-bound backup and verified restore evidence required';
-  return assemblyProblem(backup as unknown as Record<string, unknown>, { operation: OPERATION, stage: STAGE, revision: ctx.revision, now: ctx.now, target, toolSha256: tools, stageFields: { baselineDigest: backup.baselineDigest } });
+  return assemblyProblem(backup as unknown as Record<string, unknown>, { operation: OPERATION, stage: STAGE, revision: ctx.revision, now: ctx.now, target, toolSha256: tools, stageFields: { baselineDigest: backup.baselineDigest, importBatchesBefore: backup.importBatchesBefore } });
 }
 
 function readEvidence(): { entries: Entry[]; sha: string; outcomesSha: string } {
@@ -202,6 +202,12 @@ async function readLive(s: postgres.Sql | postgres.TransactionSql, entries: read
 }
 
 /** Whole-surface digest: every draft_picks row EXCEPT the link columns (a link-only DraftGuru import leaves it equal), plus the draft overrides. */
+/** import_batches rows. The draft surface digest cannot see another stage's commit (S1 adds a batch, S2 changes only excluded link columns and adds one), so this count is what makes
+ * 'one fresh backup per stage' enforced instead of procedural: a backup taken before another stage committed fails the plan. */
+async function batchCount(s: postgres.Sql | postgres.TransactionSql): Promise<number> {
+  return (await s<{ n: number }[]>`SELECT count(*)::int AS n FROM import_batches`)[0].n;
+}
+
 async function surfaceDigest(s: postgres.Sql | postgres.TransactionSql, maxId: number | null): Promise<{ digest: string; picks: number; maxId: number; overrides: number; maxOverrideId: number; overridesDigest: string }> {
   const [p] = await s.unsafe(`SELECT count(*)::int AS n, coalesce(max(id),0)::int AS mx, coalesce(md5(string_agg((to_jsonb(t) - ${PICK_LINK})::text, '|' ORDER BY id)),'') AS d
       FROM draft_picks t WHERE ($1::int IS NULL OR id <= $1::int)`, [maxId]) as unknown as { n: number; mx: number; d: string }[];
@@ -279,8 +285,8 @@ async function run() {
   const write = (v: unknown) => writeFileSync(out, `${JSON.stringify(v, null, 2)}\n`, { flag: 'wx', mode: 0o600 });
   try {
     if (mode === 'baseline') {
-      const b = await sql.begin('read only isolation level repeatable read', async (tx) => { await prove(tx); return surfaceDigest(tx, null); });
-      write({ target, revision, baselineDigest: b.digest, draftPicks: b.picks, maxDraftPickId: b.maxId, draftOverrides: b.overrides, capturedAt: new Date().toISOString() });
+      const b = await sql.begin('read only isolation level repeatable read', async (tx) => { await prove(tx); return { ...(await surfaceDigest(tx, null)), batches: await batchCount(tx) }; });
+      write({ target, revision, baselineDigest: b.digest, importBatchesBefore: b.batches, draftPicks: b.picks, maxDraftPickId: b.maxId, draftOverrides: b.overrides, capturedAt: new Date().toISOString() });
       console.log(`Read-only draft_picks baseline ${b.digest} (${b.picks} picks, ${b.overrides} overrides)`);
       return;
     }
@@ -300,6 +306,7 @@ async function run() {
         if (fn.n !== 1) fail('the actor-viability assertion (migration 105) is not installed on the target');
         const b = await surfaceDigest(tx, null);
         if (backup && b.digest !== backup.baselineDigest) fail('baseline drift: the restored backup no longer matches the live target');
+        if (backup && (await batchCount(tx)) !== backup.importBatchesBefore) fail('the backup was taken before another stage committed (import_batches count differs): take a fresh restore-verified backup for this stage');
         const entries = resolveAll(await readLive(tx, evidence.entries));
         const body: Omit<Plan, 'digest'> = { operation: OPERATION, revision, target, rehearsal, actorUserId, evidenceSha256: evidence.sha, outcomesSha256: evidence.outcomesSha, baselineDigest: b.digest, backup,
           createdAt: new Date(now).toISOString(), expiresAt: new Date(now + MAX_AGE_MS).toISOString(), entries };

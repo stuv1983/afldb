@@ -215,8 +215,32 @@ def read_backup(a, target: dict, t: datetime) -> dict:
 
 def assembled_problem(backup: dict, target: dict, revision: str, child_sha: str, label: str, t: datetime) -> str | None:
     return common.assembly_problem(backup, operation=OPERATION, stage=STAGE, revision=revision, now=t, target=target, tool_sha256=tool_hashes(),
-                                   stage_fields={k: backup.get(k) for k in ("baselineDigest", "draftLinkRestorePlanExpect")},
+                                   stage_fields={k: backup.get(k) for k in ("baselineDigest", "draftLinkRestorePlanExpect", "batchesBefore")},
                                    inputs={"childSha256": child_sha, "label": label, "parentSha256": V3_PARENT_SHA})
+
+
+_REDACT = re.compile(r"(postgres(?:ql)?://\S+|(?:password|passwd|pwd)\s*[=:]\s*\S+)", re.IGNORECASE)
+
+
+def run_logged(cmd: list, *, out: Path, tag: str, **kw) -> "subprocess.CompletedProcess":
+    """subprocess.run for a WRITER, with its stdout/stderr (DSNs and passwords redacted) appended to `<out>.writer.log` (0600, outside the checkout, like every
+    output). A failed, timed-out or undetermined run therefore leaves a diagnostic; the log is never part of the outcome decision."""
+    def keep(stdout, stderr, note: str) -> None:
+        def txt(x):
+            return x.decode("utf-8", "replace") if isinstance(x, bytes) else (x or "")
+        try:
+            fd = os.open(str(out.with_suffix(".writer.log")), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+            with os.fdopen(fd, "a", encoding="utf-8") as fh:
+                fh.write(_REDACT.sub("<redacted>", f"=== {tag} {note}" + "\n--- stdout\n" + txt(stdout) + "\n--- stderr\n" + txt(stderr) + "\n"))
+        except OSError:
+            pass
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, **kw)
+    except subprocess.TimeoutExpired as exc:
+        keep(exc.stdout, exc.stderr, "TIMED OUT")
+        raise
+    keep(r.stdout, r.stderr, f"exit {r.returncode}")
+    return r
 
 
 def write_exclusive(path: Path, doc: dict) -> None:
@@ -290,6 +314,8 @@ def main(argv=None) -> int:
             summary = run_gate_mode("plan", dsn, target, child, child_sha, label)
             if backup and {k: summary[k] for k in EXPECT_KEYS} != backup.get("draftLinkRestorePlanExpect"):
                 raise Refused("the plan run against the verified restore (draftLinkRestorePlanExpect) does not equal the live target's plan: baseline drift or an unverified restore")
+            if backup and backup.get("batchesBefore") != summary["import_batches_before"]:
+                raise Refused("the backup was taken before another stage committed (import_batches count differs): take a fresh restore-verified backup for this stage")
             body = {"operation": OPERATION, "revision": revision, "target": target, "rehearsal": rehearsal, "childPath": str(Path(child).resolve()), "childSha256": child_sha,
                     "label": label, "parentSha256": V3_PARENT_SHA, "gate": refusal, "importerSha256": sha((REPO / "tools/rebuild/draftguru/import_draftguru.py").read_bytes()),
                     "writeSet": summary["link_only_write_set"], "expect": {k: summary[k] for k in EXPECT_KEYS}, "batchesBefore": summary["import_batches_before"],
@@ -314,7 +340,7 @@ def main(argv=None) -> int:
         env = {**os.environ, "AFLDB_IMPORT_DATABASE_URL": wdsn}
 
         def run(extra):
-            return subprocess.run([*base, *extra], cwd=REPO, env=env, capture_output=True, text=True, timeout=WRITER_TIMEOUT_SECONDS)
+            return run_logged([*base, *extra], out=out, tag="importer " + " ".join(extra), cwd=REPO, env=env, timeout=WRITER_TIMEOUT_SECONDS)
 
         def preflight():
             tt = now()

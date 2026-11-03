@@ -67,8 +67,8 @@ def run_apply(preflight: Callable[[], None], launch: Callable[[], dict], probe: 
     """Runs one apply of a tool whose writer commits in its OWN transaction (a subprocess), and classifies it.
 
     preflight()  everything that must hold before the writer starts; any exception => REFUSED_BEFORE_MUTATION.
-    launch()     starts the writer and returns {'exit': int, ...}. The writer is NOT known to be transactional from here: exit 0 means it reported
-                 success, a non-zero exit means nothing about whether it committed (a later step of the writer, or its own cleanup, can fail
+    launch()     starts the writer and returns {'exit': int, ...}. The writer is NOT known to be transactional from here: exit 0 means only that it reported
+                 success (the probe still decides), a non-zero exit means nothing about whether it committed (a later step of the writer, or its own cleanup, can fail
                  after COMMIT), and an exception (timeout, killed) means the same.
     probe()      a fresh read-only session classifies the live state: 'unchanged' (equals the plan's baseline), 'applied' (equals the planned
                  result in every pre-existing respect) or 'other'. May raise (=> unreadable).
@@ -98,18 +98,25 @@ def run_apply(preflight: Callable[[], None], launch: Callable[[], dict], probe: 
     except BaseException as exc:  # noqa: BLE001 - includes KeyboardInterrupt and timeouts: the writer's state is then unknown
         writer_ok = False
         launch_detail = f"the writer did not return normally ({_msg(exc)})"
-    extra = {"writer": {k: v for k, v in launched.items() if k != "stderr" and k != "stdout"}}
-    if not writer_ok:
-        try:
-            seen = probe()
-        except Exception:  # noqa: BLE001
-            seen = "unreadable"
-        if seen == "unchanged":
-            return finish("ROLLED_BACK", [], f"{launch_detail}; a fresh read-only session sees the pre-run state", extra)
-        if seen != "applied":
-            return finish("OUTCOME_UNDETERMINED", [], f"{launch_detail} and the live state was " + ("neither the baseline nor the planned result" if seen == "other" else "unreadable"), extra)
-        # the writer failed AFTER committing: the state is the planned one; verify it like any commit
-        extra["writerFailedAfterCommit"] = launch_detail
+    extra = {"writer": {k: v for k, v in launched.items() if k not in ("stderr", "stdout")}}
+    # The writer's exit code is NEVER evidence about its transaction: a fresh read-only probe classifies the live state after EVERY launch, including exit 0
+    # (a writer can exit 0 having persisted nothing, e.g. an "already satisfied" early return; asserting "committed" from the exit code would then be false).
+    try:
+        seen = probe()
+    except Exception:  # noqa: BLE001
+        seen = "unreadable"
+    if seen == "applied":
+        if not writer_ok:
+            extra["writerFailedAfterCommit"] = launch_detail      # the writer failed AFTER committing: the state is the planned one; verify it like any commit
+    elif writer_ok:
+        # the writer reported success, but the live state is not the planned result: nothing may be claimed either way
+        return finish("OUTCOME_UNDETERMINED", [], "the writer exited 0 but the live state " + (
+            "equals the pre-run baseline (it reported success without persisting the planned change)" if seen == "unchanged" else
+            "is neither the baseline nor the planned result" if seen == "other" else "could not be read"), extra)
+    elif seen == "unchanged":
+        return finish("ROLLED_BACK", [], f"{launch_detail}; a fresh read-only session sees the pre-run state", extra)
+    else:
+        return finish("OUTCOME_UNDETERMINED", [], f"{launch_detail} and the live state was " + ("neither the baseline nor the planned result" if seen == "other" else "unreadable"), extra)
     try:
         problems = verify()
     except Exception as exc:  # noqa: BLE001

@@ -90,7 +90,7 @@ describe('GAP-029 rookie selections: execution approval binding', () => {
   const t0 = Date.parse('2026-11-03T10:00:00Z');
   const body: Omit<Plan, 'digest'> = { operation: 'gap029-rookie-selections', revision: 'a'.repeat(40), target, rehearsal: false, actorUserId: 1, evidenceSha256: 'e'.repeat(64),
     outcomesSha256: 'o'.repeat(64), baselineDigest: 'b'.repeat(64), createdAt: '2026-11-03T10:00:00.000Z', expiresAt: '2026-11-04T10:00:00.000Z', entries: [],
-    backup: { target, sha256: 's', restoreEvidenceSha256: 'r', capturedAt: '2026-11-03T09:30:00.000Z', restoredAt: '2026-11-03T09:45:00.000Z', baselineDigest: 'b'.repeat(64) } };
+    backup: { target, sha256: 's', restoreEvidenceSha256: 'r', capturedAt: '2026-11-03T09:30:00.000Z', restoredAt: '2026-11-03T09:45:00.000Z', baselineDigest: 'b'.repeat(64), importBatchesBefore: 69 } };
   const plan: Plan = { ...body, digest: planDigest(body) };
   const approval = { planDigest: plan.digest, target, revision: plan.revision, operation: plan.operation, evidenceSha256: plan.evidenceSha256, actorUserId: 1,
     approvedAt: '2026-11-03T10:05:00.000Z', expiresAt: '2026-11-04T09:00:00.000Z', reference: 'owner approval 2026-11-03' };

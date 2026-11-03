@@ -12,6 +12,7 @@
 #        bash qualify-host.sh
 set -u -o pipefail
 : "${W:?}" "${R:?}" "${DUMP:?}" "${DUMP_SHA:?}" "${PROVENANCE:?}" "${PROD_TARGET:?}" "${TAG:?}"
+[[ "$TAG" =~ ^[a-z0-9_]+$ ]] || { echo "STOP TAG must match [a-z0-9_]+ (it becomes part of an isolated database name)"; exit 2; }
 export PATH="$HOME/.nvm/versions/node/v22.23.2/bin:$PATH"
 PORT=55493; CAND="$W/cand"; EVP="$W/evidence-private/$TAG"; HELP="$CAND/docs/v2/evidence/gap029-hardening-20261103/scripts"
 PY="${PY:-$W/venv/bin/python}"
@@ -40,15 +41,16 @@ say "Q1 static: typecheck, focused DB-free tests, Python contract, original gate
 grep -q '^skip' "$EVP/py-contract.log" && bad "a Python contract check was skipped (psycopg missing?)"
 [ "$(sha256sum "$CAND/tools/rebuild/draftguru/bridge_import_gate.py" | cut -d' ' -f1)" = fbce43f7f1e374b3dfac05968e627b8ad9f337279f233a49bc19ff57d02d558d ] && ok "bridge_import_gate.py byte-identical (fbce43f7...558d)" || bad "bridge_import_gate.py differs"
 
-say "Q2 start the guarded cluster, restore the retained baseline into a disposable chain database"
-( IR start > "$EVP/pg-start.out" 2>&1 < /dev/null & ); sleep 4; IR status || exit 4
-pmpid=$(head -1 "$AFLDB_V2_PG_ROOT/data/postmaster.pid"); ss -ltnp 2>/dev/null | grep ":$PORT " > "$EVP/listener.txt"
-grep -q "127.0.0.1:$PORT" "$EVP/listener.txt" && grep -q "pid=$pmpid," "$EVP/listener.txt" && [ "$(grep -c . "$EVP/listener.txt")" = 1 ] && ok "listener is exclusively the cluster we started (127.0.0.1:$PORT)" || { bad "listener not exclusive"; IR stop || true; exit 4; }
+# cleanup trap FIRST: a slow start must not leave the isolated cluster running (the trap also covers the start itself)
 fin() { local rc=$?; say "Q7 stop the cluster, prove isolation"; IR stop || true; sleep 2
   ss -ltn | awk '{print $4}' | grep -E ":$PORT$" && bad "port still listening"
   dev_services > "$EVP/dev-after.txt"; cmp -s "$EVP/dev-before.txt" "$EVP/dev-after.txt" && ok "DEV services unchanged (afldb.service, postgresql@16-main.service: state and MainPID)" || bad "DEV service state differs"
   rec "QUALIFICATION RESULT: $([ "$FAILS" = 0 ] && echo PASS || echo "FAIL ($FAILS)")  revision $R  host $(hostname) user $(whoami)"; exit $([ "$FAILS" = 0 ] && echo 0 || echo 1); }
 trap fin EXIT
+say "Q2 start the guarded cluster, restore the retained baseline into a disposable chain database"
+( IR start > "$EVP/pg-start.out" 2>&1 < /dev/null & ); sleep 4; IR status || exit 4
+pmpid=$(head -1 "$AFLDB_V2_PG_ROOT/data/postmaster.pid"); ss -ltnp 2>/dev/null | grep ":$PORT " > "$EVP/listener.txt"
+grep -q "127.0.0.1:$PORT" "$EVP/listener.txt" && grep -q "pid=$pmpid," "$EVP/listener.txt" && [ "$(grep -c . "$EVP/listener.txt")" = 1 ] && ok "listener is exclusively the cluster we started (127.0.0.1:$PORT)" || { bad "listener not exclusive"; IR stop || true; exit 4; }
 CHAIN=afldb_v2_gap029_${TAG}_chain_test
 IR create-db "$CHAIN" || exit 5
 RUNDB "$CHAIN" node "$W/in/restore.mjs" "$DUMP" "$DUMP_SHA" | tee "$EVP/restore.out" || exit 5

@@ -53,7 +53,7 @@ def at() -> str:
     return "2026-11-03T00:00:00.000Z"
 
 
-def drive(preflight=lambda: None, launch=lambda: {"exit": 0}, probe=None, verify=lambda: []):
+def drive(preflight=lambda: None, launch=lambda: {"exit": 0}, probe=lambda: "applied", verify=lambda: []):
     calls, records = [], []
 
     def p():
@@ -66,8 +66,6 @@ def drive(preflight=lambda: None, launch=lambda: {"exit": 0}, probe=None, verify
 
     def pr():
         calls.append("probe")
-        if probe is None:
-            raise AssertionError("probe must not run")
         return probe()
 
     def v():
@@ -103,7 +101,15 @@ def outcomes_and_writer_semantics() -> None:
     check("preflight failure => REFUSED_BEFORE_MUTATION, writer never launched, no record", r.outcome == "REFUSED_BEFORE_MUTATION" and calls == ["preflight"] and not rec and r.exit_code == 1)
 
     r, calls, _ = drive()
-    check("writer exit 0 + verify passes => COMMITTED_VERIFIED", r.outcome == "COMMITTED_VERIFIED" and calls == ["preflight", "launch", "verify", "persist"] and r.exit_code == 0)
+    check("writer exit 0 + probe sees the planned result + verify passes => COMMITTED_VERIFIED (the probe runs even on exit 0)",
+          r.outcome == "COMMITTED_VERIFIED" and calls == ["preflight", "launch", "probe", "verify", "persist"] and r.exit_code == 0)
+
+    for seen, why in (("unchanged", "equals the pre-run baseline"), ("other", "neither the baseline nor the planned result")):
+        r, calls, _ = drive(probe=lambda seen=seen: seen)
+        check(f"writer exit 0 but the live state is '{seen}' => OUTCOME_UNDETERMINED, never 'committed' (verify not run)",
+              r.outcome == "OUTCOME_UNDETERMINED" and why in (r.detail or "") and "verify" not in calls and "COMMITTED" not in (r.detail or ""))
+    r, _, _ = drive(probe=raising(ConnectionError("down")))
+    check("writer exit 0 + unreadable state => OUTCOME_UNDETERMINED", r.outcome == "OUTCOME_UNDETERMINED" and "could not be read" in (r.detail or ""))
 
     r, calls, _ = drive(verify=lambda: ["a pre-existing row changed"])
     check("writer exit 0 + verify finds differences => COMMITTED_VERIFICATION_FAILED (no retry)", r.outcome == "COMMITTED_VERIFICATION_FAILED" and r.exit_code == 3 and calls.count("launch") == 1
@@ -143,7 +149,7 @@ def outcomes_and_writer_semantics() -> None:
 
     def bad_persist(_rec):
         raise FileExistsError("x")
-    rr = c.run_apply(lambda: None, lambda: {"exit": 0}, lambda: "unchanged", lambda: [], bad_persist, at)
+    rr = c.run_apply(lambda: None, lambda: {"exit": 0}, lambda: "applied", lambda: [], bad_persist, at)
     check("a record that cannot be written never changes the outcome; its content is printed", rr.outcome == "COMMITTED_VERIFIED" and not rr.record_persisted
           and "the output record could not be written" in "\n".join(rr.lines()))
 

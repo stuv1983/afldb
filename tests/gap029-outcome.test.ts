@@ -163,13 +163,14 @@ describe('every production tool routes its apply through the runner and never re
     expect(src).toMatch(/assembly/i); // a production plan requires machine-assembled evidence
     expect(src).toMatch(/\bstate\b/); // the read-only classification mode
   });
-  it('the two TypeScript tools keep their enforceable checks INSIDE the transaction (marks.writing precedes the first write; commitNext is last)', () => {
+  it('the two TypeScript tools keep their enforceable checks INSIDE the transaction: a fail( sits between marks.writing() and marks.commitNext(), and commitNext is the last mark', () => {
     for (const t of tools.filter((x) => x.endsWith('.ts'))) {
       const src = read(t);
       const body = src.slice(src.indexOf('transact: (marks)'));
-      expect(body.indexOf('marks.writing()')).toBeGreaterThan(-1);
-      expect(body.indexOf('marks.writing()')).toBeLessThan(body.indexOf('marks.commitNext('));
-      expect(body.slice(0, body.indexOf('marks.commitNext(')).match(/fail\(/g)?.length).toBeGreaterThanOrEqual(3);
+      const w = body.indexOf('marks.writing()'); const c = body.indexOf('marks.commitNext(');
+      expect(w, t).toBeGreaterThan(-1); expect(c, t).toBeGreaterThan(w);
+      expect(body.slice(w, c).match(/fail\(/g)?.length ?? 0, `${t}: post-write verification inside the transaction`).toBeGreaterThanOrEqual(1);
+      expect(body.slice(c).match(/marks\.(writing|commitNext)\(/g)?.length ?? 0, `${t}: commitNext is the last mark`).toBe(1);
     }
   });
 });

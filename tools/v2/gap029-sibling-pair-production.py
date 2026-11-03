@@ -232,8 +232,8 @@ def main(argv=None) -> int:
                 raise Refused("baseline drift; re-plan and obtain new execution approval")
 
         def launch():
-            r = subprocess.run([sys.executable, str(REPO / "tools/migration/family_siblings.py"), "load", "--quiet"], cwd=REPO,
-                               env={**os.environ, "AFLDB_IMPORT_DATABASE_URL": wdsn}, capture_output=True, text=True, timeout=WRITER_TIMEOUT_SECONDS)
+            r = dl.run_logged([sys.executable, str(REPO / "tools/migration/family_siblings.py"), "load", "--quiet"], out=out, tag="loader",
+                              cwd=REPO, env={**os.environ, "AFLDB_IMPORT_DATABASE_URL": wdsn}, timeout=WRITER_TIMEOUT_SECONDS)
             return {"exit": r.returncode, "loaderExit": r.returncode}
 
         def probe():
