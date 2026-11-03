@@ -1,0 +1,10 @@
+{
+  "planDigest": "eefa37d8ca12439c82f42df3d3b48165524c684915644f6ce5b7b08729c84d5a",
+  "at": "2026-11-03T01:53:32.439Z",
+  "dryRun": {
+    "exit": 0,
+    "note": "retains one failed audit batch by design; rehearsal only"
+  },
+  "importerExit": 0,
+  "verify": "PASS"
+}

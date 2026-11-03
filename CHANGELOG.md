@@ -15,6 +15,12 @@ commit.
 
 ## [Unreleased]
 
+### V2-GAP-029: Webster adjudication and guarded production entry points; ordered package rehearsed (2026-11-03, local; nothing applied to production, DEV or pushed)
+
+- **Webster (retained behaviour change in the corpus policy).** `data/reference/gridley-sibling-eligibility-webster.json` pins exactly eight Jimmy Webster 2026-board cells under `D-GAP029-D4W` (hash-pinned extension; dated afl.com.au primary statement kept apart from registration evidence and career inference; predicate `games > 0` unchanged; per-identity matcher and duplicate key; 12 mutation controls). Corpus policy conformance on the production-derived chain: 0 unapproved, 0 incorrect known answers; 118 strict findings retained.
+- **Guarded production entry points (not run on production).** `tools/v2/gap029-rookie-selections-production.ts` (eight audited manual rookie selections through `createManualPickInTransaction`, real active Super Admin actor, sealed-season note, one transaction), `tools/v2/gap029-draft-link-production.py` (replaces, never bypasses, `bridge_import_gate.py`, which is unmodified and still refuses production; clone-only dry run) and `tools/v2/gap029-sibling-pair-production.py` (one McGovern pair, zero changed/stale proven). `src/db/queries/admin-draft.ts`: behaviour-neutral extraction of `createManualPickInTransaction`.
+- **Tests.** `tests/gap029-rookie-selections.test.ts`; the V2-GAP-006 writer inventory classifies the new tools. Handoff and copy-ready approvals: `docs/v2/gap-029-ordered-execution-handoff-2026-11-03.md`. V2-GAP-029 stays open; Linux qualification of the new files is not yet run.
+
 ### V2-GAP-029: owner decisions D1-D5 prepared and rehearsed (2026-11-03, local; nothing applied to production, DEV or pushed)
 
 - **D3 Lyons (retained behaviour change in the corpus policy).** `data/reference/gridley-sibling-eligibility-extension-2026-boards.json` enumerates exactly 11 2026-board Lyons cells under decision `D-GAP029-D3` (same player identity, source evidence and `games > 0` predicate as `D-GAP029-21`); the approval file carries an `extensions` block and the policy loader pins the file's hash. The original 21-cell evidence file is untouched. `tests/gridley-compat.test.ts` pins the 32 covered cells and the refusals.

@@ -1,0 +1,34 @@
+{
+  "operation": "gap029-sibling-pair",
+  "revision": "d3a13fc3aea68a0112ae0c2c66da9810b8881cdc",
+  "target": {
+    "host": "127.0.0.1",
+    "port": 55432,
+    "database": "afldb_v2_gap029_chain_test",
+    "user": "afldb_owner",
+    "systemIdentifier": "7698245742874524392",
+    "databaseOid": "200441",
+    "clusterName": "afldb_v2_isolated",
+    "databaseComment": "afldb-v2-isolated-test"
+  },
+  "rehearsal": true,
+  "before": {
+    "rows": 498,
+    "contentDigest": "e2239be82d7b37db5e213e18a9804f48a8b290d23b1f259a68d5943105c27e9e",
+    "fullRowDigest": "c3e629cedc45bf3889ec19ece76cd420d8201e948d90da680fd3259cebee2470"
+  },
+  "newPair": {
+    "key": "siblings:afldb-sibling-supplement:015",
+    "personAPlayerId": 6937,
+    "personBPlayerId": 9714
+  },
+  "importBatchesBefore": 69,
+  "artefactRows": 499,
+  "artefactSha256": "b1f0ff4ed0bfcf23b53fc8e0007c08ffee636cfd7077b39c3d07aa3b842bd318",
+  "loaderSha256": "6f1ce0597cc833f289b69fa3e065d72a2d03dcba0ec52c7c0c5703ed5a27fd42",
+  "expectAfterContentDigest": null,
+  "backup": null,
+  "createdAt": "2026-11-03T01:54:17.628Z",
+  "expiresAt": "2026-11-04T01:54:17.628Z",
+  "digest": "92e0acb707c1d8892dacf177278d6a8a54937826ac326dc95a4c47c9ec1c0ccb"
+}

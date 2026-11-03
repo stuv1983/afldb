@@ -1,0 +1,353 @@
+{
+ "scope": {
+  "database": "afldb_v2_gap029_chain_test",
+  "maxSeason": 2026,
+  "registerSeason": 2026,
+  "draftPicks": 6818,
+  "draftPicksLinked": 5221,
+  "captaincies": 1781,
+  "matchesWithEvent": 64,
+  "players": 13365,
+  "playersWithDob": 13255,
+  "playersWithHeight": 12487,
+  "fatherSon": 123,
+  "siblings": 390,
+  "afterSiren": 120,
+  "diagnostic": true,
+  "scoreDraft": false,
+  "gaps": {
+   "maxSeason": 2026,
+   "registerSeason": 2026,
+   "draftLinks": true,
+   "matchEvents": true,
+   "heights": true,
+   "dobs": true,
+   "coaches": true,
+   "fatherSon": true,
+   "siblings": true,
+   "afterSiren": true
+  }
+ },
+ "cells": 10287,
+ "solvedCells": 10209,
+ "findingsByCategory": {
+  "time of board": 23530,
+  "adjudicated key disagreement": 54,
+  "unsupported": 78,
+  "list membership": 1232,
+  "external source disagreement": 425,
+  "adjudicated source conflict": 63,
+  "criterion disagreement": 40
+ },
+ "releaseOutcomes": {
+  "strictCorpusParity": {
+   "passed": false,
+   "findings": 118
+  },
+  "approvedDeferrals": {
+   "findings": 78,
+   "dataMatches": 0
+  },
+  "approvedDisagreements": {
+   "findings": 40,
+   "dataMatches": 0
+  },
+  "approvedTotal": {
+   "findings": 118,
+   "dataMatches": 0
+  },
+  "approvedPolicyConformance": {
+   "passed": true,
+   "unapprovedDifferences": []
+  }
+ },
+ "knownAnswerAdjudications": [
+  "players/C/Cameron_Bruce.html captain/gridley_omits -> afldb 2489: current",
+  "players/D/David_Swallow.html games250sameclub/gridley_lists -> afldb 3581: current",
+  "players/D/Dylan_Shiel.html games100clubs2/gridley_lists -> afldb 4006: current"
+ ],
+ "incorrectKnownAnswer": 0,
+ "reportSha256": "bcb1ad11b3e774dc4f3255b4d08d17ffc2cbf57450d3fa2c622c3d30de76a388",
+ "criterionDisagreements": [
+  {
+   "board": 562,
+   "cell": "2-1",
+   "row": "brother",
+   "col": "BL",
+   "detail": "gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires "
+  },
+  {
+   "board": 564,
+   "cell": "2-2",
+   "row": "brother",
+   "col": "games150",
+   "detail": "gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires "
+  },
+  {
+   "board": 606,
+   "cell": "2-2",
+   "row": "brother",
+   "col": "2020s",
+   "detail": "gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires "
+  },
+  {
+   "board": 624,
+   "cell": "2-2",
+   "row": "brother",
+   "col": "2020s",
+   "detail": "gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires "
+  },
+  {
+   "board": 624,
+   "cell": "2-0",
+   "row": "brother",
+   "col": "GC",
+   "detail": "gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires "
+  },
+  {
+   "board": 682,
+   "cell": "2-2",
+   "row": "brother",
+   "col": "prelimfinals1",
+   "detail": "gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires "
+  },
+  {
+   "board": 682,
+   "cell": "2-1",
+   "row": "brother",
+   "col": "marks10match",
+   "detail": "gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires "
+  },
+  {
+   "board": 693,
+   "cell": "1-0",
+   "row": "brother",
+   "col": "games100",
+   "detail": "gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires "
+  },
+  {
+   "board": 728,
+   "cell": "2-2",
+   "row": "brother",
+   "col": "2010s",
+   "detail": "gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires "
+  },
+  {
+   "board": 774,
+   "cell": "2-2",
+   "row": "brother",
+   "col": "games100",
+   "detail": "gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires "
+  },
+  {
+   "board": 774,
+   "cell": "2-1",
+   "row": "brother",
+   "col": "prelimfinals1",
+   "detail": "gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires "
+  },
+  {
+   "board": 779,
+   "cell": "2-2",
+   "row": "brother",
+   "col": "games150",
+   "detail": "gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires "
+  },
+  {
+   "board": 779,
+   "cell": "2-0",
+   "row": "brother",
+   "col": "AD",
+   "detail": "gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires "
+  },
+  {
+   "board": 779,
+   "cell": "2-1",
+   "row": "brother",
+   "col": "handballs20",
+   "detail": "gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires "
+  },
+  {
+   "board": 784,
+   "cell": "2-2",
+   "row": "brother",
+   "col": "2010s",
+   "detail": "gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires "
+  },
+  {
+   "board": 784,
+   "cell": "2-0",
+   "row": "brother",
+   "col": "GC",
+   "detail": "gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires "
+  },
+  {
+   "board": 792,
+   "cell": "2-1",
+   "row": "brother",
+   "col": "disposals25",
+   "detail": "gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires "
+  },
+  {
+   "board": 797,
+   "cell": "2-1",
+   "row": "brother",
+   "col": "BL",
+   "detail": "gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires "
+  },
+  {
+   "board": 805,
+   "cell": "2-0",
+   "row": "brother",
+   "col": "BL",
+   "detail": "gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires "
+  },
+  {
+   "board": 819,
+   "cell": "2-2",
+   "row": "brother",
+   "col": "prelimfinals1",
+   "detail": "gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires "
+  },
+  {
+   "board": 819,
+   "cell": "2-1",
+   "row": "brother",
+   "col": "marks10match",
+   "detail": "gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires "
+  },
+  {
+   "board": 920,
+   "cell": "2-0",
+   "row": "brother",
+   "col": "GC",
+   "detail": "gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires "
+  },
+  {
+   "board": 920,
+   "cell": "2-2",
+   "row": "brother",
+   "col": "2020s",
+   "detail": "gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires "
+  },
+  {
+   "board": 920,
+   "cell": "2-2",
+   "row": "brother",
+   "col": "2020s",
+   "detail": "gridley player 3989 = afldb 7271: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Zac Webster was AFL-listed; afl.com.au (https://www.afl.com.au/news/91683/axe-falls-at-hawt"
+  },
+  {
+   "board": 929,
+   "cell": "2-2",
+   "row": "brother",
+   "col": "goalscareerlessthan20",
+   "detail": "gridley player 3989 = afldb 7271: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Zac Webster was AFL-listed; afl.com.au (https://www.afl.com.au/news/91683/axe-falls-at-hawt"
+  },
+  {
+   "board": 964,
+   "cell": "2-2",
+   "row": "brother",
+   "col": "prelimfinals1",
+   "detail": "gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires "
+  },
+  {
+   "board": 964,
+   "cell": "2-1",
+   "row": "brother",
+   "col": "marks10match",
+   "detail": "gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires "
+  },
+  {
+   "board": 964,
+   "cell": "2-1",
+   "row": "brother",
+   "col": "marks10match",
+   "detail": "gridley player 3989 = afldb 7271: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Zac Webster was AFL-listed; afl.com.au (https://www.afl.com.au/news/91683/axe-falls-at-hawt"
+  },
+  {
+   "board": 990,
+   "cell": "2-2",
+   "row": "brother",
+   "col": "2020s",
+   "detail": "gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires "
+  },
+  {
+   "board": 990,
+   "cell": "2-2",
+   "row": "brother",
+   "col": "2020s",
+   "detail": "gridley player 3989 = afldb 7271: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Zac Webster was AFL-listed; afl.com.au (https://www.afl.com.au/news/91683/axe-falls-at-hawt"
+  },
+  {
+   "board": 990,
+   "cell": "2-1",
+   "row": "brother",
+   "col": "goalscareerlessthan20",
+   "detail": "gridley player 3989 = afldb 7271: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Zac Webster was AFL-listed; afl.com.au (https://www.afl.com.au/news/91683/axe-falls-at-hawt"
+  },
+  {
+   "board": 1015,
+   "cell": "2-1",
+   "row": "brother",
+   "col": "BL",
+   "detail": "gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires "
+  },
+  {
+   "board": 1015,
+   "cell": "2-0",
+   "row": "brother",
+   "col": "AD",
+   "detail": "gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires "
+  },
+  {
+   "board": 1073,
+   "cell": "2-2",
+   "row": "brother",
+   "col": "2020s",
+   "detail": "gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires "
+  },
+  {
+   "board": 1073,
+   "cell": "2-2",
+   "row": "brother",
+   "col": "2020s",
+   "detail": "gridley player 3989 = afldb 7271: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Zac Webster was AFL-listed; afl.com.au (https://www.afl.com.au/news/91683/axe-falls-at-hawt"
+  },
+  {
+   "board": 1109,
+   "cell": "2-2",
+   "row": "brother",
+   "col": "finals1",
+   "detail": "gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires "
+  },
+  {
+   "board": 1109,
+   "cell": "2-2",
+   "row": "brother",
+   "col": "finals1",
+   "detail": "gridley player 3989 = afldb 7271: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Zac Webster was AFL-listed; afl.com.au (https://www.afl.com.au/news/91683/axe-falls-at-hawt"
+  },
+  {
+   "board": 1109,
+   "cell": "2-1",
+   "row": "brother",
+   "col": "woodenspoon",
+   "detail": "gridley player 3989 = afldb 7271: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Zac Webster was AFL-listed; afl.com.au (https://www.afl.com.au/news/91683/axe-falls-at-hawt"
+  },
+  {
+   "board": 1114,
+   "cell": "2-2",
+   "row": "brother",
+   "col": "grandfinals1",
+   "detail": "gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires "
+  },
+  {
+   "board": 1114,
+   "cell": "2-1",
+   "row": "brother",
+   "col": "finals10",
+   "detail": "gridley player 3746 = afldb 6818: Gridley lists, AFLDB omits (missing from brother); criterion disagreement: Corey Lyons was AFL-listed but the club records no senior appearance; has_brother requires "
+  }
+ ]
+}

@@ -1,0 +1,394 @@
+{
+  "target": {
+    "database": "afldb_v2_gap029_chain_test",
+    "systemIdentifier": "7698245742874524392"
+  },
+  "actor": 1,
+  "planDigest": "81ce305e92b6aba7d74dea78f4c7eb9ac260b2ee6dd219bd1ac6522922bdfc0d",
+  "surfaceBeforeApply": "[{\"n\":6810,\"d\":\"54aa7be43e25ca8a35706cd47d1ada0d\"},{\"n\":0,\"d\":null},{\"n\":0}]",
+  "rows": [
+    {
+      "id": 6820,
+      "player_id": 57,
+      "draft_year": 2014,
+      "draft_type": "Rookie",
+      "draft_kind": "rookie",
+      "pick_number": 54,
+      "club_id": 20,
+      "source": "manual_admin_edit",
+      "link": "resolved",
+      "match_method": "manual_admin_edit"
+    },
+    {
+      "id": 6821,
+      "player_id": 8350,
+      "draft_year": 2019,
+      "draft_type": "Rookie",
+      "draft_kind": "rookie",
+      "pick_number": 35,
+      "club_id": 10,
+      "source": "manual_admin_edit",
+      "link": "resolved",
+      "match_method": "manual_admin_edit"
+    },
+    {
+      "id": 6822,
+      "player_id": 10673,
+      "draft_year": 2022,
+      "draft_type": "Rookie",
+      "draft_kind": "rookie",
+      "pick_number": 3,
+      "club_id": 12,
+      "source": "manual_admin_edit",
+      "link": "resolved",
+      "match_method": "manual_admin_edit"
+    },
+    {
+      "id": 6823,
+      "player_id": 11672,
+      "draft_year": 2023,
+      "draft_type": "Rookie",
+      "draft_kind": "rookie",
+      "pick_number": 11,
+      "club_id": 21,
+      "source": "manual_admin_edit",
+      "link": "resolved",
+      "match_method": "manual_admin_edit"
+    },
+    {
+      "id": 6824,
+      "player_id": 8793,
+      "draft_year": 2021,
+      "draft_type": "Rookie",
+      "draft_kind": "rookie",
+      "pick_number": 10,
+      "club_id": 21,
+      "source": "manual_admin_edit",
+      "link": "resolved",
+      "match_method": "manual_admin_edit"
+    },
+    {
+      "id": 6825,
+      "player_id": 10348,
+      "draft_year": 2022,
+      "draft_type": "Rookie",
+      "draft_kind": "rookie",
+      "pick_number": 21,
+      "club_id": 1,
+      "source": "manual_admin_edit",
+      "link": "resolved",
+      "match_method": "manual_admin_edit"
+    },
+    {
+      "id": 6826,
+      "player_id": 9575,
+      "draft_year": 2018,
+      "draft_type": "Rookie",
+      "draft_kind": "rookie",
+      "pick_number": 2,
+      "club_id": 11,
+      "source": "manual_admin_edit",
+      "link": "resolved",
+      "match_method": "manual_admin_edit"
+    },
+    {
+      "id": 6827,
+      "player_id": 2443,
+      "draft_year": 2020,
+      "draft_type": "Rookie",
+      "draft_kind": "rookie",
+      "pick_number": 1,
+      "club_id": 1,
+      "source": "manual_admin_edit",
+      "link": "resolved",
+      "match_method": "manual_admin_edit"
+    }
+  ],
+  "overrides": 8,
+  "audit": [
+    {
+      "id": 168,
+      "player_id": 57,
+      "actor": 1,
+      "note_len": 204,
+      "pick": "54",
+      "year": "2014"
+    },
+    {
+      "id": 169,
+      "player_id": 8350,
+      "actor": 1,
+      "note_len": 205,
+      "pick": "35",
+      "year": "2019"
+    },
+    {
+      "id": 170,
+      "player_id": 10673,
+      "actor": 1,
+      "note_len": 213,
+      "pick": "3",
+      "year": "2022"
+    },
+    {
+      "id": 171,
+      "player_id": 11672,
+      "actor": 1,
+      "note_len": 196,
+      "pick": "11",
+      "year": "2023"
+    },
+    {
+      "id": 172,
+      "player_id": 8793,
+      "actor": 1,
+      "note_len": 200,
+      "pick": "10",
+      "year": "2021"
+    },
+    {
+      "id": 173,
+      "player_id": 10348,
+      "actor": 1,
+      "note_len": 203,
+      "pick": "21",
+      "year": "2022"
+    },
+    {
+      "id": 174,
+      "player_id": 9575,
+      "actor": 1,
+      "note_len": 212,
+      "pick": "2",
+      "year": "2018"
+    },
+    {
+      "id": 175,
+      "player_id": 2443,
+      "actor": 1,
+      "note_len": 202,
+      "pick": "1",
+      "year": "2020"
+    }
+  ],
+  "controls": [
+    {
+      "control": "plan: non-numeric actor refused",
+      "expected": "actor-user-id must be a real auth_users id",
+      "exit": 1,
+      "matched": true,
+      "surfaceUnchanged": true
+    },
+    {
+      "control": "plan: wrong target refused before any connection",
+      "expected": "wrong target",
+      "exit": 1,
+      "matched": true,
+      "surfaceUnchanged": true
+    },
+    {
+      "control": "plan: an isolated clone is not accepted as a production plan",
+      "expected": "an isolated clone is rehearsed with --rehearsal",
+      "exit": 1,
+      "matched": true,
+      "surfaceUnchanged": true
+    },
+    {
+      "control": "apply: actor refused: admin role (not Super Admin)",
+      "expected": "actor 2 is not a viable Super Admin",
+      "exit": 1,
+      "matched": true,
+      "surfaceUnchanged": true
+    },
+    {
+      "control": "apply: actor refused: second admin role, test.com.tst domain",
+      "expected": "actor 3 is not a viable Super Admin",
+      "exit": 1,
+      "matched": true,
+      "surfaceUnchanged": true
+    },
+    {
+      "control": "apply: actor refused: contributor",
+      "expected": "actor 4 is not a viable Super Admin",
+      "exit": 1,
+      "matched": true,
+      "surfaceUnchanged": true
+    },
+    {
+      "control": "apply: actor refused: Super Admin with example.invalid domain, no password/TOTP",
+      "expected": "actor 5 is not a viable Super Admin",
+      "exit": 1,
+      "matched": true,
+      "surfaceUnchanged": true
+    },
+    {
+      "control": "apply: actor refused: disabled Super Admin",
+      "expected": "actor 6 is not a viable Super Admin",
+      "exit": 1,
+      "matched": true,
+      "surfaceUnchanged": true
+    },
+    {
+      "control": "apply: actor refused: non-existent user",
+      "expected": "actor 999999 is not a viable Super Admin",
+      "exit": 1,
+      "matched": true,
+      "surfaceUnchanged": true
+    },
+    {
+      "control": "apply: tampered plan refused",
+      "expected": "plan digest differs from its content",
+      "exit": 1,
+      "matched": true,
+      "surfaceUnchanged": true
+    },
+    {
+      "control": "apply: stale plan refused",
+      "expected": "stale plan",
+      "exit": 1,
+      "matched": true,
+      "surfaceUnchanged": true
+    },
+    {
+      "control": "apply: wrong revision refused",
+      "expected": "plan operation, evidence or revision differs",
+      "exit": 1,
+      "matched": true,
+      "surfaceUnchanged": true
+    },
+    {
+      "control": "apply: changed evidence refused",
+      "expected": "plan operation, evidence or revision differs",
+      "exit": 1,
+      "matched": true,
+      "surfaceUnchanged": true
+    },
+    {
+      "control": "apply: wrong operation refused",
+      "expected": "plan operation, evidence or revision differs",
+      "exit": 1,
+      "matched": true,
+      "surfaceUnchanged": true
+    },
+    {
+      "control": "apply: writer must be afldb_import",
+      "expected": "the write connection must be the afldb_import role",
+      "exit": 1,
+      "matched": true,
+      "surfaceUnchanged": true
+    },
+    {
+      "control": "apply: write DSN naming another database refused",
+      "expected": "wrong target",
+      "exit": 1,
+      "matched": true,
+      "surfaceUnchanged": true
+    },
+    {
+      "control": "apply: baseline drift after planning refused",
+      "expected": "baseline drift",
+      "exit": 1,
+      "matched": true,
+      "surfaceUnchanged": true
+    },
+    {
+      "control": "plan: pick held by another player refused",
+      "expected": "is held by selection",
+      "exit": 1,
+      "matched": true,
+      "surfaceUnchanged": true
+    },
+    {
+      "control": "sealed season: a note under 20 characters is refused on the shared editor path and rolls back",
+      "expected": "sealed",
+      "exit": null,
+      "matched": true,
+      "surfaceUnchanged": true
+    },
+    {
+      "control": "apply: fault on the 8th insert rolls back all eight (atomic)",
+      "expected": "refused or failed",
+      "exit": 1,
+      "matched": true,
+      "surfaceUnchanged": true
+    },
+    {
+      "control": "apply: the first plan cannot be replayed after commit",
+      "expected": "baseline drift",
+      "exit": 1,
+      "matched": true,
+      "surfaceUnchanged": true
+    },
+    {
+      "control": "approval binds",
+      "expected": "pure",
+      "exit": null,
+      "matched": true,
+      "surfaceUnchanged": null
+    },
+    {
+      "control": "approval: other plan digest refused",
+      "expected": "pure",
+      "exit": null,
+      "matched": true,
+      "surfaceUnchanged": null
+    },
+    {
+      "control": "approval: other actor refused",
+      "expected": "pure",
+      "exit": null,
+      "matched": true,
+      "surfaceUnchanged": null
+    },
+    {
+      "control": "approval: other target refused",
+      "expected": "pure",
+      "exit": null,
+      "matched": true,
+      "surfaceUnchanged": null
+    },
+    {
+      "control": "approval: other revision refused",
+      "expected": "pure",
+      "exit": null,
+      "matched": true,
+      "surfaceUnchanged": null
+    },
+    {
+      "control": "approval: other evidence refused",
+      "expected": "pure",
+      "exit": null,
+      "matched": true,
+      "surfaceUnchanged": null
+    },
+    {
+      "control": "approval: expired refused",
+      "expected": "pure",
+      "exit": null,
+      "matched": true,
+      "surfaceUnchanged": null
+    },
+    {
+      "control": "approval: outlives plan refused",
+      "expected": "pure",
+      "exit": null,
+      "matched": true,
+      "surfaceUnchanged": null
+    },
+    {
+      "control": "approval: missing refused",
+      "expected": "pure",
+      "exit": null,
+      "matched": true,
+      "surfaceUnchanged": null
+    },
+    {
+      "control": "approval: blank reference refused",
+      "expected": "pure",
+      "exit": null,
+      "matched": true,
+      "surfaceUnchanged": null
+    }
+  ],
+  "allPassed": true
+}

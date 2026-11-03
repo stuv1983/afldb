@@ -1,0 +1,90 @@
+{
+  "operation": "gap029-draft-link-production",
+  "revision": "d3a13fc3aea68a0112ae0c2c66da9810b8881cdc",
+  "target": {
+    "host": "127.0.0.1",
+    "port": 55432,
+    "database": "afldb_v2_gap029_chain_test",
+    "user": "afldb_owner",
+    "systemIdentifier": "7698245742874524392",
+    "databaseOid": "200441",
+    "clusterName": "afldb_v2_isolated",
+    "databaseComment": "afldb-v2-isolated-test"
+  },
+  "rehearsal": true,
+  "childPath": "D:\\tmp\\gap029-r\\chain\\child-v3.json",
+  "childSha256": "3ac793c85406c1487e1bab2e075d50802f14579d0c26b31394f92cd9529e4926",
+  "label": "annual-html-20260826",
+  "parentSha256": "1f7413a2ad96e7d026cc521acfdeba3de9cab7066794de99002c9b5928e6e21b",
+  "gate": {
+    "targets": [
+      "dev",
+      "test"
+    ],
+    "productionRefused": true,
+    "gateSha256": "fbce43f7f1e374b3dfac05968e627b8ad9f337279f233a49bc19ff57d02d558d"
+  },
+  "importerSha256": "f23e76464818e9109f46004812dc65354c280ae1361a9ebe9fef59493d5540e1",
+  "writeSet": {
+    "draft_persons": [
+      "player_id",
+      "link_status",
+      "match_method",
+      "confidence_notes",
+      "is_matching_backlog"
+    ],
+    "draft_picks": [
+      "player_id",
+      "link_status_value",
+      "match_method",
+      "confidence_notes"
+    ],
+    "external_identities": [
+      "player_id",
+      "status",
+      "match_method"
+    ]
+  },
+  "expect": {
+    "after_state_sha256": "a186c592cffeffa17692610e81aec9a6ebda01a1df5e0bc357afa12ea41a620e",
+    "picks_after_sha256": "a56ca83d7bcbac0be5a6e14446955f87b4fc7985b811fb9b08a80bac6a5178b3",
+    "newly_linked_sha256": "d4a65f47e71b072f0cfae78a2e014945f5f02af93d27698033ce95de3464afca",
+    "baseline_sha256": "2618bcf954f26defecbed975eade9f5d96eee7867911fede6e394721de85c44d"
+  },
+  "batchesBefore": 4,
+  "gateSummarySha256": "400e4e427eb7ae1eb7a705edea340400ab5cb5374c4b65581f170829b3c52bed",
+  "counts": {
+    "bridges": 3562,
+    "withheld": 1495,
+    "withheld_by_reason": {
+      "U-no-href": 1493,
+      "different_person_wrong_href": 2
+    },
+    "persons_in_snapshot": null,
+    "picks_in_snapshot": null,
+    "decided_persons_in_bridge": [
+      "https://www.draftguru.com.au/players/matt_rendell/1",
+      "https://www.draftguru.com.au/players/nathan_fyfe/1",
+      "https://www.draftguru.com.au/players/ryan_o'keefe/1"
+    ],
+    "expected_bridged": 3559
+  },
+  "safeguards": {
+    "G1": "target identity proof + exact DSN",
+    "G2": "read-only session via gate.open_read_only/with_read_only",
+    "G3": "rollback and close; exclusive output outside checkout",
+    "G4": "no DSN printed",
+    "G5": "child sha pinned + label",
+    "G6": "test child refused",
+    "G7": "parent chain verified",
+    "G8": "explicit label proven; no Stage A",
+    "G9": "write set equals link columns",
+    "G10": "zero gate failures",
+    "G11": "gate verify against plan hashes",
+    "G12": "plan re-run at apply must equal the plan"
+  },
+  "backup": null,
+  "createdAt": "2026-11-03T01:53:27.150Z",
+  "expiresAt": "2026-11-04T01:53:27.150Z",
+  "digest": "eefa37d8ca12439c82f42df3d3b48165524c684915644f6ce5b7b08729c84d5a"
+}

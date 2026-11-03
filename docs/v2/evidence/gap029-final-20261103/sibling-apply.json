@@ -1,0 +1,12 @@
+{
+  "planDigest": "92e0acb707c1d8892dacf177278d6a8a54937826ac326dc95a4c47c9ec1c0ccb",
+  "loaderExit": 0,
+  "at": "2026-11-03T01:54:22.142Z",
+  "after": {
+    "rows": 499,
+    "contentDigest": "d6fceb338d5f37e8fdef18443da696c52225db9caa80cedb9261e401aea212ec",
+    "fullRowDigest": "f032f5f248595d63e9c88dc14e0bae78a2cfb22f41b3585a96d616b92c9fb2eb"
+  },
+  "importBatchesAfter": 70,
+  "problems": []
+}

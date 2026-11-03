@@ -659,7 +659,8 @@ describe('the season-bearing writer inventory (V2-GAP-006, application level onl
    *   derived     derived-table recompute, only called from a guarded editor/settle transaction or a tool
    *   settle      AFL API settle library; the settle CLIs refuse a sealed season before any client (settle-season-seal.ts)
    *   repair      operator repair CLI; --apply refuses a sealed season before any client
-   *   governed    Brownlow production-correction family: digest-bound reviewed export and owner approval, own contract
+   *   governed    Brownlow production-correction family and the V2-GAP-029 production tools: digest-bound reviewed plan and owner approval,
+   *               fresh backup, own contract
    *   retained    retained source with no runtime caller (verified by the reachability assertions below)
    *   offline     offline loader / rehearsal / visual tool: isolated-database guards, not the seal
    */
@@ -684,6 +685,7 @@ describe('the season-bearing writer inventory (V2-GAP-006, application level onl
     'tools/current-season/repair-match-rekeys.ts': 'repair',
     'src/db/queries/brownlow-legacy-ownership-adoption.ts': 'governed',
     'src/db/queries/brownlow-round-vote-match-backfill.ts': 'governed',
+    'tools/v2/gap029-captaincy-additions-production.ts': 'governed',
     'src/db/queries/awards-admin.ts': 'retained',
     'src/lib/ingest/datasets.ts': 'retained',
     'tools/db/afl-api-identity-correction-rehearsal.ts': 'offline',
@@ -699,6 +701,7 @@ describe('the season-bearing writer inventory (V2-GAP-006, application level onl
     'tools/v2/candidate-visual-states.mts': 'offline',
     'tools/v2/gap006-editor-visual.mts': 'offline',
     'tools/v2/gap029-labels-isolated-e2e.mts': 'offline',
+    'tools/v2/gap029-rookie-selections-rehearsal.mts': 'offline',
     'tools/v2/gap006-review-visual.mts': 'offline',
     'tools/v2/rollback-populate.ts': 'offline',
   };
