@@ -1,0 +1,8 @@
+coaches.html mtime=2026-11-04 15:23:57.697532364 +1100 size=247638
+clubs/port-adelaide.html mtime=2026-11-04 15:24:36.445732491 +1100 size=395150
+clubs/carlton.html mtime=2026-11-04 15:24:49.823801347 +1100 size=1531856
+-- port-adelaide.html coach-table rows mentioning Josh Carr (text only)
+clubs/port-adelaide.html ['Josh Carr', '2000–2010', '124', '65']
+clubs/port-adelaide.html ['2004', 'Josh Carr', '19', '3', '11']
+clubs/port-adelaide.html ['Josh Carr', '2026', '23', '7', '0', '16', '30.4']
+clubs/carlton.html ['Josh Fraser', '2026', '16', '12', '1', '3', '78.1']

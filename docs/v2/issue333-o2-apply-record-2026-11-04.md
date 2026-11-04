@@ -1,6 +1,6 @@
 # ISSUE-333 (O1) and O2: production apply record (2026-11-04)
 
-**Status: APPLIED AND VERIFIED (both), public visibility UNMEASURED.** O1 (436 `match_coaches` rows) and O2 (36 `data_issues` resolutions) were each applied once on
+**Status: APPLIED AND VERIFIED (both). Public visibility PARTLY MEASURED (section 8); two specific criteria remain unmet, so ISSUE-333 stays open.** O1 (436 `match_coaches` rows) and O2 (36 `data_issues` resolutions) were each applied once on
 production under the owner's consolidated approval and ended `COMMITTED_VERIFIED` with an independent `state` verdict `PLANNED RESULT PRESENT`. Nothing else was
 changed: no push, deployment, restart, schema/grant/credential/timer/setting change, provider request, manual settle, WSL access or cleanup.
 ISSUE-333 stays **open** on one specific limitation (section 6). Approval and plans: `docs/v2/issue333-o2-consolidated-approval-2026-11-04.md`.
@@ -99,3 +99,33 @@ Therefore ISSUE-333 is **not resolved**. The data defect is corrected and verifi
 
 The backup `issue333-o2-20261104T021037Z` was not used. No reversal exists for either operation by design; both were additive (O1) or a 36-row update to two columns (O2), and the
 restore-verified dump remains the retained recovery reference. The ops workspace, plans, approvals and apply evidence under `/home/arm/ops/issue333-o2-50ed6e4f/` were preserved.
+
+## 8. Public visibility probe (owner-authorised beta-admission cookie), 2026-11-04
+
+**Authority and scope.** The owner authorised ONE temporary beta-admission probe cookie (beta admission only; not admin, not impersonation of the owner), read-only GETs of five pages, normal ISR regeneration from those requests, and nothing else (no data write, forced revalidation, cache deletion, restart, deployment, setting change or second token). No existing beta session was available to Claude, so one `kind='beta'` claim was minted with the repository's `signClaim` (`src/lib/auth/tokens.ts`, byte-identical to the serving build's since `a0b1080f`) inside one process on the production host, from the serving process's own `AFLDB_SESSION_SECRET` and `AFLDB_BETA_EPOCH` (read from `/proc/<main pid>/environ`, those two keys only). Subject `issue333-readonly-probe-20261104`, kind `beta`, epoch 1, **created 2026-11-04T04:23:57.070Z, expires 05:18:57Z** (55 minutes). The secret and token stayed in that process's memory: not printed, not in argv, no cookie file, no screenshot or trace; the committed evidence JSON contains no cookie (searched). The cookie was sent only to `beta.afldb.com` over TLS, no redirect was followed, and no admin claim, database session, allowlist change, magic link, epoch change or gate change occurred. The process exited at 05:17:22Z; the ops checkout stayed clean.
+
+**What was requested.** 1,680 ordinary public-host GETs (336 per page, bursts of two, 1.5 s apart, one round every ~2.5 minutes from 04:23:57Z to 05:16:20Z, about 0.5 requests/s) plus an explicitly labelled loopback diagnostic of 80 GETs (16 per page, 05:16:20Z to 05:17:09Z). **This was more than the gentle pacing intended**: the stop condition required worker identifiers the server never sends, so it ran every round. All 1,760 responses were HTTP 200; 0 errors. Evidence: `prod-apply/visibility-beta-probe-20261104.json` (every request: time, status, selected headers, body size, extracted rows).
+
+**Observed on the public host (these are observations, not inferences):**
+
+| Page | Old content last seen | New figures first seen | Then |
+|---|---|---|---|
+| `/coaches` | 04:23:57.077Z and 04:23:57.094Z, both `x-nextjs-cache: STALE`, Carr and Fraser `0` | **04:23:58.810Z** (`HIT`): Josh Carr `2026 / 23`, Josh Fraser `2026 / 16` | 334 of 334 later responses show them |
+| `/clubs/carlton` | 04:24:48.468Z and 04:24:48.469Z, `STALE`, no 2026 coach row | **04:24:50.328Z** (`HIT`): Josh Fraser `2026, 16 games, 12 W, 1 D, 3 L, 78.1` | 334 of 334 later responses |
+| `/coaches/josh-carr-243` (force-dynamic) | none (no regeneration involved) | first request **04:24:09.884Z**: Port Adelaide `2026`, `23` games, `7 - 16 - 0`, `30.4` | identical in 336 of 336 responses |
+| `/coaches/josh-fraser-293` (force-dynamic) | none | first request **04:24:22.817Z**: Carlton `2026`, `16` games, `12 - 3 - 1`, `78.1` | identical in 336 of 336 responses |
+| `/clubs/port-adelaide` | 04:24:35.800Z and 04:24:35.801Z, `STALE`, body 393,154 bytes | body grew to 394,106/394,149 bytes from **04:24:37.414Z** (`HIT`), the same growth pattern as Carlton | **the coach row itself was not captured** (see below) |
+
+"First seen" is the first time the probe saw it, not the regeneration time, which is unknown (it lies between the last stale and the first fresh response of each page, about 1.7 s for `/coaches` and 1.9 s for Carlton). The probe's own checks wrongly reported the three non-ISR-matching pages as failures: the career tables render wins, losses and draws in one cell (`7 - 16 - 0`), which the check did not expect, and the Port Adelaide check read the first row containing "Josh Carr", which is the 2000-2010 *player* (`2000-2010, 124, 65`). The recorded `seen` rows above are what the pages actually showed. The ISR window from the apply (03:14:48Z) to first fresh content was at least 1 hour 9 minutes on `/coaches` and `/clubs/carlton` (until then no request had rendered them: anonymous requests are redirected by the gate).
+
+**Supporting diagnostics, labelled, NOT visibility evidence:** (a) the regenerated on-disk entry `clubs/port-adelaide.html` (written 04:24:36Z) contains the row `Josh Carr | 2026 | 23 | 7 | 0 | 16 | 30.4`, and `clubs/carlton.html` the Fraser row (`prod-apply/isr-disk-diagnostic.txt`); (b) the loopback diagnostic returned the new figures on `/coaches` and `/clubs/carlton` (its checks have the same defect elsewhere); (c) on both club pages the 334 fresh responses split into exactly two body-size variants of 167 each (394,106/394,149 and 1,528,135/1,528,178), alternating, consistent with two worker caches that both regenerated, but this is an inference from byte counts.
+
+**Unmet criteria (specific):**
+1. **Worker identity was not observable.** Production runs `deploy/server-cluster.mjs` with two workers (pids 3326572 and 3326573), but the `x-afldb-worker`/`x-afldb-pid`/`x-afldb-build` headers are emitted only when `AFLDB_TRACE_REQUESTS=on`, which production does not set; enabling it needs a setting change and restart, which are not authorised. No response could be attributed to a worker, so "the expected data on both production workers for each page" is **not demonstrated**, only suggested by (c).
+2. **`/clubs/port-adelaide`: the coach row was not read from a public response.** Only the body growth (+952 bytes) and the on-disk diagnostic support it.
+
+The token has expired. Completing (2) needs a new probe with a corrected row selector (and, for (1), either an owner-approved temporary `AFLDB_TRACE_REQUESTS=on` with a restart, or an owner-accepted statement that two-worker coverage is shown by the evidence above). Neither was authorised, so none was done.
+
+## 9. The two modified `prod-plans` text files
+
+`git status` showed `prod-plans/prod-plans.txt` and `prod-plans/prod-prep.txt` modified from before this work. Their working-tree bytes are LF with no CR and are **byte-identical to the committed blobs** (sha256 `cf118d805d7d54d5...` and `efc52b7d9efafcbe...`, equal to `SHA256SUMS`; `git diff` empty; blob `6f45063f` for prod-plans). The "modification" was a stale index stat entry (recorded size 3,367 bytes against 3,344 in the file), left by an earlier CRLF working copy. No retained change existed; `git add` refreshed the index entry and the status cleared with nothing staged. Nothing was discarded.

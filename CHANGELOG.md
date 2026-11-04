@@ -15,6 +15,13 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-333 public visibility probed with an owner-authorised beta cookie; two criteria unmet, issue stays open (2026-11-04; read-only observation; no data, setting or deployment change)
+
+- One temporary `kind='beta'` probe cookie (subject `issue333-readonly-probe-20261104`, created 04:23:57Z, expired 05:18:57Z, epoch 1) was minted in memory on the production host and used for 1,680 public-host GETs and 80 labelled loopback GETs of `/coaches`, `/coaches/josh-carr-243`, `/coaches/josh-fraser-293`, `/clubs/port-adelaide` and `/clubs/carlton` (all HTTP 200). Neither the token nor the signing key was printed, stored or committed.
+- Observed on the public host: Carr 23 and Fraser 16 first seen on `/coaches` at 04:23:58.810Z, `/clubs/carlton` at 04:24:50.328Z, and on the force-dynamic coach pages from their first requests; each ISR page served stale content first (`STALE`), then the new figures. Regeneration times are not known more precisely than that interval.
+- **Unmet:** worker identity is not observable in production (no `x-afldb-*` headers; `AFLDB_TRACE_REQUESTS` is off), and the `/clubs/port-adelaide` coach row was not read from a public response (probe selector defect). The request volume exceeded the gentle pacing intended. The two `prod-plans` text files shown as modified were a stale index entry with bytes identical to the committed ones.
+- Record: `docs/v2/issue333-o2-apply-record-2026-11-04.md` sections 8 and 9; evidence `docs/v2/evidence/issue333-o2-20261104/prod-apply/`.
+
 ### ISSUE-333 (O1) and O2 APPLIED to production, verified; ISSUE-332 observer wording corrected (2026-11-04; production data change; local commits not pushed; **public visibility unmeasured, ISSUE-333 stays open**)
 
 - **O1 applied once** (plan `4de5368c...515e`, revision `50ed6e4f`): 436 missing 2026 `match_coaches` rows and one `import_batches` row (batch 83, `add_match_coaches_2026.py`) in one transaction, commit 2026-11-04T03:14:48Z, `COMMITTED_VERIFIED` and an independent `state` of `PLANNED RESULT PRESENT`. `match_coaches` 32,034 to 32,470; 2026 sides without a coach 436 to 0; the 32,034 pre-existing rows unchanged. Through the application queries Josh Carr shows 23 games and Josh Fraser 16 (both were 0).

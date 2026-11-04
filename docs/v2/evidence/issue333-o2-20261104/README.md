@@ -25,9 +25,10 @@ These files support `docs/v2/issue333-o2-consolidated-approval-2026-11-04.md`.
 | `scripts/prod-apply-i333-o2.sh` | The apply wrapper. The original (sha256 `ae456bdc...51c2`, preparation) ignored a failed approval-file step. **Revision 2 (sha256 `f1d810ee...970f`) is what ran**; the `SHA256SUMS` entry below is the original and is left as written. |
 | `scripts/mock-wrapper-test-i333-o2.sh`, `prod-apply/wrapper-mock-test-result.txt` | The mocked exercise of every wrapper phase: 34 checks, 0 failures; reproduces the original defect. |
 | `scripts/postapply-verify-i333-o2.sh`, `scripts/visibility-probe-i333-o2.sh` | Read-only post-apply verification (psql as `afldb_backup`, application-query figures as `afldb_app`) and the visibility probe (process, file-system and anonymous HTTP status only; mints no cookie). |
+| `scripts/visibility-beta-probe.mts`, `scripts/visibility-beta-probe-run.sh`, `scripts/probe-env-check.sh`, `scripts/isr-disk-diagnostic.sh`, `prod-apply/visibility-beta-probe-20261104.json`, `prod-apply/isr-disk-diagnostic.txt` | The owner-authorised beta-cookie visibility probe (token and key never recorded; the JSON holds request times, status, selected headers, sizes and extracted rows), the presence-only environment check and the on-disk ISR diagnostic. Results: apply record sections 8 and 9. |
 | `prod-apply/` | Approvals, apply and state JSON, writer logs, post-apply verification and visibility-probe outputs, and the application-query figures. Sums: `SHA256SUMS-postapply`. |
 
 - **Measured rehearsal result:** 18 of 18 scenarios passed (see section 5 of the approval doc).
-- **Not measured:** production time-to-visibility (still unmeasured after the apply: beta gate) and either recovery.
+- **Not measured:** per-worker visibility and the Port Adelaide club coach row (see apply record section 8) and either recovery.
 
 `SHA256SUMS` covers the preparation files; `SHA256SUMS-postapply` covers the post-apply files and the revised wrapper.
