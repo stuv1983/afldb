@@ -1,0 +1,6 @@
+=== writer exit 0
+--- stdout
+ISSUE-333 writer: COMMITTED {"batchId": 83, "committed": true, "inserted": 436, "settings": {"TimeZone": "UTC", "lock_timeout": "5s", "statement_timeout": "5min", "track_counts": "on", "transaction_read_only": "off"}}
+
+--- stderr
+
