@@ -3,3 +3,4 @@
 
 - fixes/ : subfolder (see fixes/_index.md)
 - implementation/ : subfolder (see implementation/_index.md)
+- PLAN-issue333-o2-20261104.md : Execution plan for ISSUE-333 (O1) narrow coach-assignment insert and O2 guarded resolution of 36 converged findings.
