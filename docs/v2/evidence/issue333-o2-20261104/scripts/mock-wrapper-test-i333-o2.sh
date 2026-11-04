@@ -95,7 +95,7 @@ cp "$OPS/evidence.gone/plan-o2.json" "$ROOT/plan-o2.json"
 run "approve-o2 creation failure (evidence dir missing) must NOT succeed" 1 W approve-o2 $R "$ROOT/plan-o2.json" "ref" "$EXP"; has "approval creation FAILED"; hasnt "== DONE"
 mv "$OPS/evidence.gone" "$OPS/evidence"
 echo "--- the ORIGINAL committed wrapper on the same failure (proves the defect and the fix) ---"
-"$REALGIT" -C "$(dirname "$WRAP")" show HEAD:docs/v2/evidence/issue333-o2-20261104/scripts/prod-apply-i333-o2.sh | sed "s#/home/arm#$ROOT/home/arm#g" > "$ROOT/orig.sh" 2>/dev/null
+"$REALGIT" -C "$(dirname "$WRAP")" show 93c45479:docs/v2/evidence/issue333-o2-20261104/scripts/prod-apply-i333-o2.sh | sed "s#/home/arm#$ROOT/home/arm#g" > "$ROOT/orig.sh" 2>/dev/null
 if [ -s "$ROOT/orig.sh" ]; then
   mv "$OPS/evidence" "$OPS/evidence.gone"
   bash "$ROOT/orig.sh" approve-o2 $R "$ROOT/plan-o2.json" "ref" "$EXP" > "$ROOT/orig.out" 2>&1; echo "      ORIGINAL wrapper rc=$? ; says DONE: $(grep -c '== DONE' "$ROOT/orig.out")"

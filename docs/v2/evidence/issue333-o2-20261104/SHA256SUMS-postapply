@@ -16,5 +16,5 @@ c3118c35894d0faf28478bb8a88d1f7afec6a7e4a1bed10bda67b454dfa7d1fc *prod-apply/wra
 f1d810eef585b5170fbb8deea274a4db67c3decfb6418a8e702b3f88bae0970f *scripts/prod-apply-i333-o2.sh
 3f936b68febb210d4760a4066e0c8c4054b059e95b1d2de6315d1409fa7c1eb4 *scripts/postapply-verify-i333-o2.sh
 05766180a3f79057cbb5addbcbeefe3b39ca56f4a41814c60a9c442078c87ff1 *scripts/visibility-probe-i333-o2.sh
-65e91a839bd3cba18387849c93e9c8ee441d2436124bc4aac51811a87c397717 *scripts/mock-wrapper-test-i333-o2.sh
+033546ec2d1b5aa124d85c7381605040d27d3f41af10b68ba2a6adeba09dc707 *scripts/mock-wrapper-test-i333-o2.sh
 81e9817a893e041f117787404abbb1361f3e650b1efa743f9862b5fcdc566e02 *README.md
