@@ -11,7 +11,7 @@ import {
   fixtureClubPage,
   selectCoachRow,
   selfTest,
-} from '../docs/v2/evidence/issue333-o2-20261104/scripts/coach-row-selector.mts';
+} from '../docs/v2/evidence/issue333-o2-20261104/scripts/coach-row-selector.mjs';
 
 const record = (coachId: number, displayName: string, first: number, last: number, g: number, w: number, d: number, l: number, pct: string) => ({
   coachId, displayName, firstSeason: first, lastSeason: last, games: g, wins: w, draws: d, losses: l, winPct: pct,
