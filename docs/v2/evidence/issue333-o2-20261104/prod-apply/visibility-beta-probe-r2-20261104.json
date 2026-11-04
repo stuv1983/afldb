@@ -1,0 +1,116 @@
+{
+ "subject": "issue333-readonly-probe-20261104-r2",
+ "createdAt": "2026-11-04T05:34:08.102Z",
+ "expiresAt": "2026-11-04T05:40:08.000Z",
+ "kind": "beta",
+ "epoch": 1,
+ "host": "beta.afldb.com",
+ "path": "/clubs/port-adelaide",
+ "expected": {
+  "href": "/coaches/josh-carr-243",
+  "name": "Josh Carr",
+  "span": "2026",
+  "games": "23",
+  "wins": "7",
+  "draws": "0",
+  "losses": "16"
+ },
+ "limits": {
+  "MAX_REQUESTS": 10,
+  "MIN_GAP_MS": 5000,
+  "GAP_MS": 5500,
+  "REQUEST_TIMEOUT_MS": 15000,
+  "DEADLINE_MS": 120000,
+  "TTL_SECONDS": 360
+ },
+ "summary": {
+  "stopReason": "expected-row-observed",
+  "requests": 1,
+  "observed": true,
+  "elapsedMs": 97,
+  "finishedAt": "2026-11-04T05:34:08.204Z"
+ },
+ "log": [
+  {
+   "n": 1,
+   "startedAt": "2026-11-04T05:34:08.107Z",
+   "receivedAt": "2026-11-04T05:34:08.204Z",
+   "status": 200,
+   "serverDate": "Wed, 04 Nov 2026 05:34:08 GMT",
+   "headers": {
+    "date": "Wed, 04 Nov 2026 05:34:08 GMT",
+    "cache-control": "s-maxage=86400, stale-while-revalidate=31449600",
+    "x-nextjs-cache": "HIT",
+    "x-nextjs-prerender": "1",
+    "cf-cache-status": "DYNAMIC",
+    "content-type": "text/html; charset=utf-8",
+    "vary": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding"
+   },
+   "bodyBytes": 395385,
+   "bodySha256": "11e26492a30ee175e43ded68a5fbc00a2736c3c9726b0d256b15fb8846fa87b0",
+   "selection": {
+    "status": "row",
+    "headers": [
+     "Coach",
+     "Span",
+     "Games",
+     "W",
+     "D",
+     "L",
+     "Win %"
+    ],
+    "cells": [
+     "Josh Carr",
+     "2026",
+     "23",
+     "7",
+     "0",
+     "16",
+     "30.4"
+    ],
+    "byHeader": {
+     "Coach": "Josh Carr",
+     "Span": "2026",
+     "Games": "23",
+     "W": "7",
+     "D": "0",
+     "L": "16",
+     "Win %": "30.4"
+    },
+    "compared": {
+     "Coach": {
+      "expected": "Josh Carr",
+      "seen": "Josh Carr",
+      "ok": true
+     },
+     "Span": {
+      "expected": "2026",
+      "seen": "2026",
+      "ok": true
+     },
+     "Games": {
+      "expected": "23",
+      "seen": "23",
+      "ok": true
+     },
+     "W": {
+      "expected": "7",
+      "seen": "7",
+      "ok": true
+     },
+     "D": {
+      "expected": "0",
+      "seen": "0",
+      "ok": true
+     },
+     "L": {
+      "expected": "16",
+      "seen": "16",
+      "ok": true
+     }
+    },
+    "matches": true
+   }
+  }
+ ]
+}

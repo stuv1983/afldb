@@ -29,6 +29,7 @@ These files support `docs/v2/issue333-o2-consolidated-approval-2026-11-04.md`.
 | `prod-apply/` | Approvals, apply and state JSON, writer logs, post-apply verification and visibility-probe outputs, and the application-query figures. Sums: `SHA256SUMS-postapply`. |
 
 - **Measured rehearsal result:** 18 of 18 scenarios passed (see section 5 of the approval doc).
-- **Not measured:** per-worker visibility and the Port Adelaide club coach row (see apply record section 8) and either recovery.
+- **Second bounded probe (-r2) and closure, 2026-11-04 (apply record section 10):** `scripts/coach-row-selector.mts` (corrected, tested selector; unit test `tests/issue333-coach-row-selector.test.ts`), `scripts/visibility-beta-probe-r2.mts`, `scripts/visibility-beta-probe-r2-run.sh` and `prod-apply/visibility-beta-probe-r2-20261104.json` (one request: `/clubs/port-adelaide`, HTTP 200, row `Josh Carr | 2026 | 23 | 7 | 0 | 16 | 30.4` at 05:34:08.204Z; no cookie or key in the file). ISSUE-333 resolved under the owner's amended visibility criterion.
+- **Not measured (accepted by the owner as a disclosed limitation):** worker-by-worker attribution of any response (apply record sections 8 and 10), the exact ISR regeneration times, and either recovery.
 
 `SHA256SUMS` covers the preparation files; `SHA256SUMS-postapply` covers the post-apply files and the revised wrapper.

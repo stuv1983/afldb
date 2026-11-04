@@ -1,9 +1,9 @@
 # ISSUE-333 (O1) and O2: production apply record (2026-11-04)
 
-**Status: APPLIED AND VERIFIED (both). Public visibility PARTLY MEASURED (section 8); two specific criteria remain unmet, so ISSUE-333 stays open.** O1 (436 `match_coaches` rows) and O2 (36 `data_issues` resolutions) were each applied once on
+**Status: APPLIED AND VERIFIED (both). ISSUE-333 RESOLVED 2026-11-04 under the owner's amended visibility criterion (section 10): the corrected figures were observed through the public routes; worker-by-worker attribution stays unmeasured and is an accepted, disclosed limitation.** O1 (436 `match_coaches` rows) and O2 (36 `data_issues` resolutions) were each applied once on
 production under the owner's consolidated approval and ended `COMMITTED_VERIFIED` with an independent `state` verdict `PLANNED RESULT PRESENT`. Nothing else was
 changed: no push, deployment, restart, schema/grant/credential/timer/setting change, provider request, manual settle, WSL access or cleanup.
-ISSUE-333 stays **open** on one specific limitation (section 6). Approval and plans: `docs/v2/issue333-o2-consolidated-approval-2026-11-04.md`.
+(Superseded within the day: the sections below are written in time order; sections 6 and 8 describe the state before the second probe, and section 10 records the closure.) Approval and plans: `docs/v2/issue333-o2-consolidated-approval-2026-11-04.md`.
 Evidence: `docs/v2/evidence/issue333-o2-20261104/prod-apply/` and `scripts/` (sha256 in `SHA256SUMS-postapply`).
 
 ## 1. Authority and window
@@ -91,9 +91,9 @@ The 36 canonical rows of the O2 findings remain `afltables`-owned and untouched.
 | One apply ending COMMITTED_VERIFIED | Met |
 | `state` reports PLANNED RESULT PRESENT | Met |
 | Read-only 2026 count is 436 | Met |
-| Time-to-visibility of the public coach and club pages measured per page and worker | **NOT met: unmeasured behind the beta gate (section 5)** |
+| Time-to-visibility of the public coach and club pages measured per page and worker | **Not met as originally written** (unmeasured behind the beta gate, section 5; worker identity never observable). **Replaced by the owner's amended criterion (section 10): the corrected figures observed through the public routes, worker-by-worker attribution accepted as an unmeasured, disclosed limitation. Met on that criterion.** |
 
-Therefore ISSUE-333 is **not resolved**. The data defect is corrected and verified; the open remainder is the visibility measurement.
+At the time of the apply ISSUE-333 was not resolved: the data defect was corrected and verified and the open remainder was the visibility measurement. **It was resolved later on 2026-11-04 under the owner's amended visibility criterion; see section 10.**
 
 ## 7. Recovery limits (accepted by the owner, unchanged)
 
@@ -124,8 +124,38 @@ restore-verified dump remains the retained recovery reference. The ops workspace
 1. **Worker identity was not observable.** Production runs `deploy/server-cluster.mjs` with two workers (pids 3326572 and 3326573), but the `x-afldb-worker`/`x-afldb-pid`/`x-afldb-build` headers are emitted only when `AFLDB_TRACE_REQUESTS=on`, which production does not set; enabling it needs a setting change and restart, which are not authorised. No response could be attributed to a worker, so "the expected data on both production workers for each page" is **not demonstrated**, only suggested by (c).
 2. **`/clubs/port-adelaide`: the coach row was not read from a public response.** Only the body growth (+952 bytes) and the on-disk diagnostic support it.
 
-The token has expired. Completing (2) needs a new probe with a corrected row selector (and, for (1), either an owner-approved temporary `AFLDB_TRACE_REQUESTS=on` with a restart, or an owner-accepted statement that two-worker coverage is shown by the evidence above). Neither was authorised, so none was done.
+The token has expired. Completing (2) needs a new probe with a corrected row selector (and, for (1), either an owner-approved temporary `AFLDB_TRACE_REQUESTS=on` with a restart, or an owner-accepted statement that two-worker coverage is shown by the evidence above). Neither was authorised, so none was done. **Update (same day, later): point 2 was closed by the second bounded probe and point 1 was accepted by the owner as a disclosed limitation; see section 10.**
 
 ## 9. The two modified `prod-plans` text files
 
 `git status` showed `prod-plans/prod-plans.txt` and `prod-plans/prod-prep.txt` modified from before this work. Their working-tree bytes are LF with no CR and are **byte-identical to the committed blobs** (sha256 `cf118d805d7d54d5...` and `efc52b7d9efafcbe...`, equal to `SHA256SUMS`; `git diff` empty; blob `6f45063f` for prod-plans). The "modification" was a stale index stat entry (recorded size 3,367 bytes against 3,344 in the file), left by an earlier CRLF working copy. No retained change existed; `git add` refreshed the index entry and the status cleared with nothing staged. Nothing was discarded.
+
+## 10. Second bounded probe (-r2), the owner's amended visibility criterion and the closure of ISSUE-333, 2026-11-04
+
+**Owner amendment.** The visibility criterion is amended to require *the corrected figures observed through the public routes*. Worker-by-worker attribution remains unmeasured and is accepted as a disclosed limitation. The body-size variants do **not** prove worker coverage and are not claimed to. No tracing setting, restart or deployment was authorised. The four pages in section 8 (`/coaches`, `/clubs/carlton`, `/coaches/josh-carr-243`, `/coaches/josh-fraser-293`) already satisfied their route-level checks; their evidence is preserved unchanged and was not repeated. One second, narrowly bounded beta probe was authorised for `/clubs/port-adelaide` only.
+
+**Selector corrected and tested before any token existed.** `scripts/coach-row-selector.mts` finds the coaching table by its caption (`Every coach of <club>, with their record for the club`, as rendered by `src/components/ClubCoachRecords.tsx`) and its seven headers (`Coach, Span, Games, W, D, L, Win %`), then the one row inside that table whose anchor `href` is exactly `/coaches/josh-carr-243`, and reads each value by header name. It refuses (never guesses) when there is no such table, more than one, no such row, more than one, or the row has the wrong number of cells. It therefore cannot read the 2000-2010 *player* row or the 2004 row of another table. Test: `tests/issue333-coach-row-selector.test.ts`, 12 cases (good fixture; player-row decoy; reordered columns; mismatching values; W/D/L swapped; ambiguous row; ambiguous table; absent row; absent table or renamed caption; wrong cell count; look-alike href; and the markup the real `ClubCoachRecords` component server-renders), run before the probe: 12 passed. The probe also ran the selector's built-in self-test as its first act, before reading any key or creating any token.
+
+**Authority and handling (all kept).** One `kind='beta'` claim, beta admission only (no admin claim, no impersonation), minted with `signClaim` inside one process on the production host from the serving process's own `AFLDB_SESSION_SECRET` and `AFLDB_BETA_EPOCH` (those two keys only), held in memory, never printed, never in argv, no cookie file, sent only to `beta.afldb.com` over TLS, no redirect followed, no loopback request, no dependence on any `x-afldb-*` header, no renewal. Subject `issue333-readonly-probe-20261104-r2`, **created 2026-11-04T05:34:08.102Z, expires 05:40:08Z (6 minutes)**, created only after the selector and the request limits had been validated. Limits in force: at most 10 GETs, at least 5 s between starts (scheduled 5.5 s), 15 s request timeout, 2 minute overall deadline, stop immediately on the expected row. The three non-secret files were copied to the ops workspace `in/` and hash-compared with the local copies (selector `af4dc158...c440`, probe `0d83e65c...4812`, wrapper `12014cab...d4b5`); the ops checkout stayed clean (0 status lines).
+
+**Result: the expected row was observed on request 1 of a permitted 10, and the probe stopped immediately.** `GET https://beta.afldb.com/clubs/port-adelaide`, started 2026-11-04T05:34:08.107Z, received 05:34:08.204Z (97 ms), response `Date: Wed, 04 Nov 2026 05:34:08 GMT`:
+
+| Item | Value |
+|---|---|
+| HTTP status | 200 |
+| `x-nextjs-cache` / `x-nextjs-prerender` | `HIT` / `1` |
+| `cache-control` | `s-maxage=86400, stale-while-revalidate=31449600` |
+| `cf-cache-status` | `DYNAMIC` |
+| Body | 395,385 bytes, sha256 `11e26492...87b0` |
+| Coaching table headers | `Coach, Span, Games, W, D, L, Win %` |
+| **Extracted row** | **`Josh Carr / 2026 / 23 / 7 / 0 / 16 / 30.4`**: Josh Carr, 2026, 23 games, 7 wins, 0 draws, 16 losses (every compared column equal to the expectation) |
+
+Evidence: `prod-apply/visibility-beta-probe-r2-20261104.json` (one request record; no cookie or key; searched). Total public GETs of this probe: **1**. The probe process exited 0 at 05:34:08Z; the token expired at 05:40:08Z and nothing was minted afterwards. (Body sizes here are bytes; the first probe's sizes in section 8 were JavaScript string lengths, so the two series are not comparable.)
+
+**Preserved disclosures (unchanged by this probe).**
+1. The first probe's selectors failed (they read the 2000-2010 player row and expected W/D/L in separate cells), and it sent **1,680 public and 80 loopback GETs, more than the gentle pacing intended**, because its stop condition depended on headers the server never sends (section 8). The -r2 probe made 1 GET.
+2. **The exact ISR regeneration times are unknown.** The first probe bounds each only between the last `STALE` and the first fresh response of that page (about 1.7 s for `/coaches`, 1.9 s for `/clubs/carlton`; for `/clubs/port-adelaide` between 04:24:35.801Z and 04:24:37.414Z on body-growth evidence). Nothing here is a visibility deadline.
+3. **Worker coverage is not demonstrated.** No response in either probe could be attributed to a worker, and this probe's single response does not say which worker served it. The alternating body-size variants of the first probe are consistent with two worker caches but are an inference from byte counts and are **not** claimed as proof. The owner accepted this as a disclosed limitation.
+4. The O1 and O2 outcomes (sections 3 and 4), the original evidence and the recovery limits (section 7) are unchanged.
+
+**Resolution of ISSUE-333.** On the owner's amended criterion every item is met: owner approval of plan `4de5368c...515e`; one COMMITTED_VERIFIED apply with `state` PLANNED RESULT PRESENT; the read-only 2026 count of 436; and the corrected figures observed through the public routes (`/coaches` first seen 04:23:58.810Z, `/clubs/carlton` 04:24:50.328Z, `/coaches/josh-carr-243` 04:24:09.884Z and `/coaches/josh-fraser-293` 04:24:22.817Z, each as a first-seen time and not a regeneration time, and the `/clubs/port-adelaide` coaching row at 05:34:08.204Z). **ISSUE-333 is resolved 2026-11-04.** Not done and not authorised by this closure: any tracing setting, restart, deployment, production data write, provider request, timer or setting change, WSL access or cleanup. ISSUE-332's future obligations (C6 to C9 and D-316-5 to D-316-11 with their gates) are unchanged and it remains open.

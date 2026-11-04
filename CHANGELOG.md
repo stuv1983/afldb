@@ -15,6 +15,13 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-333 RESOLVED: second bounded probe reads the Port Adelaide coaching row; visibility criterion amended by the owner (2026-11-04; read-only observation; no data, setting or deployment change; local commits not pushed)
+
+- **Corrected selector, tested first.** `docs/v2/evidence/issue333-o2-20261104/scripts/coach-row-selector.mts` identifies the club page's coaching table by caption and the seven headers (`Coach, Span, Games, W, D, L, Win %`), then the one row whose link is exactly `/coaches/josh-carr-243`, reads values by header name and refuses ambiguity. `tests/issue333-coach-row-selector.test.ts` (12 cases, including the markup the real `ClubCoachRecords` renders) passed before the probe.
+- **One bounded probe (-r2).** One in-memory `kind='beta'` token (subject `issue333-readonly-probe-20261104-r2`, created 05:34:08.102Z, 6-minute life), created only after the selector and limits were validated; `/clubs/port-adelaide` only; limits 10 GETs, 5 s spacing, 15 s timeout, 2 minute deadline. **Request 1 returned HTTP 200 (`x-nextjs-cache: HIT`, `Date` 05:34:08 GMT) with the coaching row `Josh Carr, 2026, 23 games, 7 W, 0 D, 16 L, 30.4`; the probe stopped there (1 GET).** No token, key or cookie was printed or stored.
+- **ISSUE-333 closed** under the owner's amended criterion (the corrected figures observed through the public routes). Disclosed and accepted: worker-by-worker attribution is unmeasured (no `x-afldb-*` headers; no tracing setting, restart or deployment); the body-size variants are not proof of worker coverage; exact ISR regeneration times are unknown; the first probe's selectors failed and it sent 1,680 public and 80 loopback GETs, more than intended. O1/O2 outcomes, original evidence and recovery limits are unchanged. Open issues: 1 (ISSUE-332, obligations unchanged).
+- Record: `docs/v2/issue333-o2-apply-record-2026-11-04.md` section 10; evidence `docs/v2/evidence/issue333-o2-20261104/prod-apply/visibility-beta-probe-r2-20261104.json`.
+
 ### ISSUE-333 public visibility probed with an owner-authorised beta cookie; two criteria unmet, issue stays open (2026-11-04; read-only observation; no data, setting or deployment change)
 
 - One temporary `kind='beta'` probe cookie (subject `issue333-readonly-probe-20261104`, created 04:23:57Z, expired 05:18:57Z, epoch 1) was minted in memory on the production host and used for 1,680 public-host GETs and 80 labelled loopback GETs of `/coaches`, `/coaches/josh-carr-243`, `/coaches/josh-fraser-293`, `/clubs/port-adelaide` and `/clubs/carlton` (all HTTP 200). Neither the token nor the signing key was printed, stored or committed.
