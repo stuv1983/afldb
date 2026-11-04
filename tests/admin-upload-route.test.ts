@@ -22,6 +22,9 @@ const mocks = vi.hoisted(() => ({
   requireCapability: vi.fn(),
   audit: vi.fn(),
   stageSubmission: vi.fn(),
+  listMedia: vi.fn(),
+  countMedia: vi.fn(),
+  insertMedia: vi.fn(),
 }));
 
 vi.mock('@/lib/auth/session', () => ({
@@ -32,7 +35,14 @@ vi.mock('@/lib/ingest/pipeline', () => ({
   MAX_UPLOAD_BYTES: 5 * 1024 * 1024,
   stageSubmission: mocks.stageSubmission,
 }));
+// AFLDB-ISSUE-334: the /admin/content image upload route's storage, asserted on (no database).
+vi.mock('@/db/queries/site-content', () => ({
+  listMedia: mocks.listMedia,
+  countMedia: mocks.countMedia,
+  insertMedia: mocks.insertMedia,
+}));
 
+import { POST as POST_MEDIA } from '@/app/admin/content/media/route';
 import { POST } from '@/app/admin/upload/stage/route';
 import {
   declaredLengthCheck,
@@ -294,5 +304,163 @@ describe('what is pinned statically (the framework and the browser are not exerc
     expect(page).toContain("await requireCapability('acquisition.legacyIntake')");
     expect(page).toMatch(/retired/i);
     expect(page).not.toMatch(/<form|<input|UploadForm|ingest\/datasets|ingest\/pipeline/);
+  });
+});
+
+/*
+ * AFLDB-ISSUE-334: the /admin/content image upload Route Handler (`/admin/content/media`) is the
+ * other admin Route Handler that takes a POST body, so it needs the same CSRF layer as the
+ * upload route above: a Route Handler gets no Server Action origin check. These cases drive the
+ * REAL media route with the REAL `sameOriginRefusal`, the REAL image probe and a mocked session
+ * and media store; the session cookie (SameSite=Lax), permissions and limits are unchanged.
+ */
+describe('AFLDB-ISSUE-334: the content image upload route refuses a cross-site request first', () => {
+  const MEDIA_URL = 'https://dev.afldb.example/admin/content/media';
+  const SUPER = { id: 3, email: 'content@example.test' };
+
+  /** A minimal PNG the real probe accepts: signature, then an IHDR chunk carrying 640x360. */
+  const png = () => {
+    const bytes = Buffer.alloc(33);
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(bytes, 0);
+    bytes.writeUInt32BE(13, 8);
+    bytes.write('IHDR', 12, 'ascii');
+    bytes.writeUInt32BE(640, 16);
+    bytes.writeUInt32BE(360, 20);
+    return new Uint8Array(bytes);
+  };
+
+  async function imageForm(fileBytes: Uint8Array, name = 'Hero Shot.png', alt = 'A hero shot') {
+    const form = new FormData();
+    form.set('file', new File([fileBytes as BlobPart], name, { type: 'image/png' }));
+    form.set('alt', alt);
+    const response = new Response(form);
+    return {
+      bytes: new Uint8Array(await response.arrayBuffer()),
+      contentType: response.headers.get('content-type')!,
+    };
+  }
+
+  const mediaRequest = (
+    body: Uint8Array | ReadableStream<Uint8Array>, contentType: string, headers: Record<string, string> = SAME_ORIGIN,
+  ) => new Request(MEDIA_URL, {
+    method: 'POST',
+    headers: { ...headers, 'content-type': contentType },
+    body: body as BodyInit,
+    ...(body instanceof ReadableStream ? { duplex: 'half' } : {}),
+  } as RequestInit);
+
+  /** A FINITE body that counts its pulls (a read of an unrefused request ends, never hangs). */
+  const finiteCountingStream = () => {
+    const state = { pulled: 0 };
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        state.pulled += 1;
+        if (state.pulled > 4) { controller.close(); return; }
+        controller.enqueue(new Uint8Array(1024));
+      },
+    }, { highWaterMark: 0 });
+    return { state, stream };
+  };
+
+  const nothingWritten = () => {
+    expect(mocks.listMedia).not.toHaveBeenCalled();
+    expect(mocks.countMedia).not.toHaveBeenCalled();
+    expect(mocks.insertMedia).not.toHaveBeenCalled();
+    expect(mocks.audit).not.toHaveBeenCalled();
+  };
+
+  beforeEach(() => {
+    mocks.requireCapability.mockResolvedValue(SUPER);
+    mocks.listMedia.mockResolvedValue([]);
+    mocks.countMedia.mockResolvedValue(0);
+    mocks.insertMedia.mockResolvedValue(undefined);
+  });
+
+  const refused: Array<[string, Record<string, string>]> = [
+    ['a cross-site Sec-Fetch-Site', { ...SAME_ORIGIN, 'sec-fetch-site': 'cross-site' }],
+    ['a sibling-origin request (same-site Sec-Fetch-Site, sibling Origin)',
+      { ...SAME_ORIGIN, 'sec-fetch-site': 'same-site', origin: 'https://beta.dev.afldb.example' }],
+    ['a sibling Origin with no Sec-Fetch-Site', { host: SAME_ORIGIN.host, origin: 'https://beta.dev.afldb.example' }],
+    ['a foreign Origin with no Sec-Fetch-Site', { host: SAME_ORIGIN.host, origin: 'https://evil.example' }],
+    ['a missing Origin', { host: SAME_ORIGIN.host }],
+    ['an opaque Origin', { host: SAME_ORIGIN.host, origin: 'null' }],
+    ['an unparseable Origin', { host: SAME_ORIGIN.host, origin: 'not a url' }],
+  ];
+  for (const [label, headers] of refused) {
+    it(`refuses ${label} with 403 before authenticating, parsing, storing or auditing`, async () => {
+      const { bytes, contentType } = await imageForm(png());
+      const response = await POST_MEDIA(mediaRequest(bytes, contentType, headers));
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ error: 'This upload did not come from this site.' });
+      expect(mocks.requireCapability).not.toHaveBeenCalled();
+      nothingWritten();
+    });
+  }
+
+  it('reads none of a refused request body', async () => {
+    const { state, stream } = finiteCountingStream();
+    const response = await POST_MEDIA(mediaRequest(
+      stream, 'multipart/form-data; boundary=x', { host: SAME_ORIGIN.host, origin: 'https://evil.example' },
+    ));
+    expect(response.status).toBe(403);
+    expect(state.pulled).toBe(0);
+    expect(mocks.requireCapability).not.toHaveBeenCalled();
+    nothingWritten();
+  });
+
+  it('a same-origin upload still asks for site.content, and a refused session stores nothing and reads no body', async () => {
+    const { state, stream } = finiteCountingStream();
+    mocks.requireCapability.mockRejectedValueOnce(new Error('NEXT_REDIRECT /admin'));
+    await expect(POST_MEDIA(mediaRequest(stream, 'multipart/form-data; boundary=x'))).rejects.toThrow('NEXT_REDIRECT');
+    expect(mocks.requireCapability).toHaveBeenCalledExactlyOnceWith('site.content');
+    expect(state.pulled).toBe(0);
+    nothingWritten();
+  });
+
+  it('a same-origin upload is stored and audited exactly as before', async () => {
+    const image = png();
+    const { bytes, contentType } = await imageForm(image);
+    const response = await POST_MEDIA(mediaRequest(bytes, contentType));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      name: 'hero-shot.png', mime: 'image/png', width: 640, height: 360,
+      byteSize: image.length, alt: 'A hero shot', replaced: false,
+    });
+    expect(mocks.requireCapability).toHaveBeenCalledExactlyOnceWith('site.content');
+    expect(mocks.insertMedia).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+      name: 'hero-shot.png', mime: 'image/png', width: 640, height: 360, alt: 'A hero shot', uploadedBy: SUPER.id,
+    }));
+    expect(Buffer.from(mocks.insertMedia.mock.calls[0][0].bytes)).toEqual(Buffer.from(image));
+    expect(mocks.audit).toHaveBeenCalledExactlyOnceWith('content.media_uploaded', {
+      name: 'hero-shot.png', mime: 'image/png', bytes: image.length, width: 640, height: 360, replaced: false,
+    }, { userId: SUPER.id, label: SUPER.email });
+  });
+
+  it('the proxied same-origin form (public host as X-Forwarded-Host) is accepted', async () => {
+    const { bytes, contentType } = await imageForm(png());
+    const response = await POST_MEDIA(mediaRequest(bytes, contentType, {
+      origin: 'https://dev.afldb.example', 'x-forwarded-host': 'dev.afldb.example',
+      host: '127.0.0.1:3100', 'sec-fetch-site': 'same-origin',
+    }));
+    expect(response.status).toBe(200);
+    expect(mocks.insertMedia).toHaveBeenCalledOnce();
+  });
+
+  it('same-origin requests keep the existing refusals: not an image (415), over the limit (413), at the cap (409)', async () => {
+    const notImage = await imageForm(new Uint8Array(Buffer.from('<script>alert(1)</script>'.padEnd(64, ' '))), 'x.png');
+    expect((await POST_MEDIA(mediaRequest(notImage.bytes, notImage.contentType))).status).toBe(415);
+
+    const big = new Uint8Array(2 * 1024 * 1024 + 1);
+    big.set(png());
+    const tooBig = await imageForm(big);
+    expect((await POST_MEDIA(mediaRequest(tooBig.bytes, tooBig.contentType))).status).toBe(413);
+
+    mocks.countMedia.mockResolvedValue(40);
+    const atCap = await imageForm(png());
+    expect((await POST_MEDIA(mediaRequest(atCap.bytes, atCap.contentType))).status).toBe(409);
+
+    expect(mocks.insertMedia).not.toHaveBeenCalled();
+    expect(mocks.audit).not.toHaveBeenCalled();
   });
 });

@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { countMedia, insertMedia, listMedia } from '@/db/queries/site-content';
 import { audit, requireCapability } from '@/lib/auth/session';
 import { mediaFileName, probeImage } from '@/lib/image-probe';
+import { sameOriginRefusal } from '@/lib/ingest/upload-request';
 import { CONTENT_LIMITS } from '@/lib/site-content';
 
 export const dynamic = 'force-dynamic';
@@ -16,10 +17,16 @@ export const dynamic = 'force-dynamic';
  * in the application. A route handler takes a 2 MB screenshot without
  * loosening anything else.
  *
+ * CSRF (AFLDB-ISSUE-334): a Route Handler gets none of the Server Action
+ * origin check, so the request must be same-origin (`sameOriginRefusal`, 403)
+ * before anything else runs: no session lookup, no body read, no write, no
+ * audit. The `SameSite=Lax` session cookie alone does not stop a POST from a
+ * sibling origin on the same site (beta.afldb.com and afldb.com).
+ *
  * Under /admin, so middleware demands an admin cookie at the door before this
- * code runs at all; `requireSuperAdmin` then re-checks the session against the
- * database, which is where it can be revoked. Both, because the cookie only
- * gets a request through the door.
+ * code runs at all; `requireCapability('site.content')` then re-checks the
+ * session against the database, which is where it can be revoked. Both,
+ * because the cookie only gets a request through the door.
  *
  * NOTHING about the upload is trusted. The declared Content-Type and the file
  * name are client-supplied and are used for neither the stored MIME type nor
@@ -28,6 +35,9 @@ export const dynamic = 'force-dynamic';
  * script being written into a directory a web server publishes.
  */
 export async function POST(request: Request) {
+  const crossSite = sameOriginRefusal(request.headers);
+  if (crossSite) return NextResponse.json({ error: crossSite }, { status: 403 });
+
   const admin = await requireCapability('site.content');
 
   let form: FormData;

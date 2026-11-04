@@ -14,6 +14,7 @@ import {
   recomputeSeasonBrownlowStatus,
   recomputeSeasonMetadata,
 } from '@/db/queries/player-derived';
+import { matchDeletionCoachOverrideRefusal } from '@/db/queries/admin-coaches';
 import { matchDeletionAuthorityRefusal } from '@/db/queries/match-sheet';
 import { validateAdminMatchNumbers } from '@/lib/admin-match';
 
@@ -484,6 +485,18 @@ export async function deleteMatch(input: {
       );
       if (authorityRefusal !== null) {
         return { ok: false as const, error: authorityRefusal };
+      }
+
+      // AFLDB-ISSUE-335: the same rule for an ACTIVE manual coach assignment override. The
+      // match_coaches row would cascade away with the match (migration 087) and its override
+      // would stay active naming no match. Refused here, under the match lock taken above;
+      // the assignment and its override are left exactly as they are. Inactive overrides and
+      // source-owned assignments do not block (those rows still cascade with the match).
+      const coachRefusal = await matchDeletionCoachOverrideRefusal(
+        tx, input.matchId, match.matchKey,
+      );
+      if (coachRefusal !== null) {
+        return { ok: false as const, error: coachRefusal };
       }
 
       // AFLDB-ISSUE-167 §8.3, the THIRD destruction path. Until Stage 6 this

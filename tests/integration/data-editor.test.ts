@@ -6,6 +6,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import postgres from 'postgres';
 import { sql } from '@/db/client';
 import { saveEdit } from '@/db/queries/data-edits';
+import { clearCoachAssignment, setCoachAssignment } from '@/db/queries/admin-coaches';
 import { deleteMatch } from '@/db/queries/match-admin';
 import { loadMatchSheetStaleToken, returnMatchSheetToSource, saveMatchSheet } from '@/db/queries/match-sheet';
 import { playerMatchStatsAuthorityStorable } from '@/lib/acquisition/manual-authority';
@@ -78,6 +79,8 @@ const KEY_ROOT_257 = `${SEASON_257}|issue257-`;
 const ABSENT_ROOT_257 = '9999|issue257-';
 const SLUG_257 = 'issue257-';
 const PATH_ROOT_257 = 'issue257_players/';
+/** AFLDB-ISSUE-335 coaches (afltables_coach_path); their assignments ride on ISSUE-257 matches. */
+const COACH_ROOT_335 = 'issue335_coaches/';
 const FX_TIMEOUT = 120_000;
 
 type Row257 = Record<string, number | string | null>;
@@ -196,13 +199,19 @@ async function cleanup257(): Promise<void> {
   const matches = () => sql`(SELECT id FROM matches WHERE starts_with(match_key, ${KEY_ROOT_257}::text))`;
   await sql`
     DELETE FROM data_overrides
-     WHERE entity_type = 'player_match_stats'
+     WHERE entity_type IN ('player_match_stats', 'match_coaches')
        AND (starts_with(entity_key, ${KEY_ROOT_257}::text) OR starts_with(entity_key, ${ABSENT_ROOT_257}::text))
   `;
   await sql`
     DELETE FROM data_edits
      WHERE table_name = 'matches'
        AND (row_id = ANY(${idList257(seededMatchIds257)}) OR row_id IN ${matches()})
+  `;
+  // ISSUE-335: assignments on namespace matches, or naming a namespace coach.
+  await sql`
+    DELETE FROM match_coaches
+     WHERE match_id IN ${matches()}
+        OR coach_id IN (SELECT id FROM coaches WHERE starts_with(afltables_coach_path, ${COACH_ROOT_335}::text))
   `;
   if (adminUserId > 0) {
     await sql`
@@ -224,6 +233,7 @@ async function cleanup257(): Promise<void> {
   `;
   await sql`DELETE FROM players WHERE starts_with(slug, ${SLUG_257}::text)`;
   await sql`DELETE FROM matches WHERE starts_with(match_key, ${KEY_ROOT_257}::text)`;
+  await sql`DELETE FROM coaches WHERE starts_with(afltables_coach_path, ${COACH_ROOT_335}::text)`;
   await sql`
     DELETE FROM seasons
      WHERE year = ${SEASON_257}
@@ -234,7 +244,7 @@ async function cleanup257(): Promise<void> {
 const NO_RESIDUE_257 = {
   dataOverrides: 0, dataEdits: 0, playerMatchStats: 0, playerClubs: 0, playerClubSeasonStats: 0,
   playerSeasonStats: 0, playerCareerStats: 0, clubSeasons: 0, externalIdentities: 0,
-  players: 0, matches: 0, seasons: 0,
+  players: 0, matches: 0, seasons: 0, coaches: 0, matchCoaches: 0,
 };
 
 /** Counts of every namespace row, by namespace prefix AND by the ids this run seeded. */
@@ -244,7 +254,7 @@ async function residue257(): Promise<typeof NO_RESIDUE_257> {
   const [r] = await sql<(typeof NO_RESIDUE_257)[]>`
     SELECT
       (SELECT count(*) FROM data_overrides
-        WHERE entity_type = 'player_match_stats'
+        WHERE entity_type IN ('player_match_stats', 'match_coaches')
           AND (starts_with(entity_key, ${KEY_ROOT_257}::text)
                OR starts_with(entity_key, ${ABSENT_ROOT_257}::text)))::int AS "dataOverrides",
       (SELECT count(*) FROM data_edits
@@ -262,7 +272,13 @@ async function residue257(): Promise<typeof NO_RESIDUE_257> {
         WHERE id = ANY(${pids}) OR starts_with(slug, ${SLUG_257}::text))::int AS "players",
       (SELECT count(*) FROM matches
         WHERE id = ANY(${mids}) OR starts_with(match_key, ${KEY_ROOT_257}::text))::int AS "matches",
-      (SELECT count(*) FROM seasons WHERE year = ${SEASON_257})::int AS "seasons"
+      (SELECT count(*) FROM seasons WHERE year = ${SEASON_257})::int AS "seasons",
+      (SELECT count(*) FROM coaches
+        WHERE starts_with(afltables_coach_path, ${COACH_ROOT_335}::text))::int AS "coaches",
+      (SELECT count(*) FROM match_coaches
+        WHERE match_id = ANY(${mids})
+           OR coach_id IN (SELECT id FROM coaches
+                            WHERE starts_with(afltables_coach_path, ${COACH_ROOT_335}::text)))::int AS "matchCoaches"
   `;
   return r;
 }
@@ -1831,6 +1847,172 @@ describe('Durable Match Sheet authority: delete guard and Return to source (AFLD
     expect(result).toMatchObject({ ok: true, rowDeleted: false, rowKept: false });
     expect(await rowOf(p)).toBeUndefined();
     expect(await records(p)).toEqual([{ fieldGroup: 'lineup', isActive: false }]);
+  }, FX_TIMEOUT);
+});
+
+/* ---------------------------------------------------------------------------------------
+ * AFLDB-ISSUE-335: deleteMatch and ACTIVE manual coach assignment overrides.
+ *
+ * `match_coaches.match_id` is ON DELETE CASCADE (migration 087), so a deletion used to remove
+ * an admin's assignment silently and leave its `data_overrides` row active, naming no match.
+ * Every case uses ISSUE-257 synthetic matches (season 2079) plus namespace coaches
+ * (`issue335_coaches/`), writes assignments through the REAL coach mutations, and is cleaned by
+ * cleanup257 (afterEach/afterAll) with the residue and historical-row proofs.
+ * ------------------------------------------------------------------------------------ */
+describe('AFLDB-ISSUE-335: deleteMatch and active manual coach assignment overrides', () => {
+  const NOTE = 'issue-257 issue-335 coach assignment test';
+
+  const seedCoach = async (token: string) => {
+    const path = `${COACH_ROOT_335}${token}.html`;
+    const [row] = await sql<{ id: number }[]>`
+      INSERT INTO coaches (afltables_coach_path, name_key, display_name, source_id, source_record_id)
+      VALUES (${path}, ${`Issue335, ${token}`}, ${`Issue335 ${token}`},
+              (SELECT id FROM sources WHERE key = 'afltables'), ${path})
+      RETURNING id::int AS id
+    `;
+    return { id: row.id, path };
+  };
+
+  type State335 = {
+    match: Record<string, unknown> | null;
+    assignments: Array<Record<string, unknown>>;
+    overrides: Array<Record<string, unknown>>;
+    audit: Array<Record<string, unknown>>;
+    stats: number;
+  };
+
+  /** Everything a refused deletion must leave unchanged, read on a separate connection. */
+  const stateOf = async (fx: Fx257): Promise<State335> => {
+    const [r] = await sql<{ state: State335 }[]>`
+      SELECT jsonb_build_object(
+        'match', (SELECT to_jsonb(m) FROM matches m WHERE m.id = ${fx.matchId}),
+        'assignments', (SELECT coalesce(jsonb_agg(to_jsonb(mc) ORDER BY mc.club_id), '[]'::jsonb)
+                          FROM match_coaches mc WHERE mc.match_id = ${fx.matchId}),
+        'overrides', (SELECT coalesce(jsonb_agg(to_jsonb(o) ORDER BY o.entity_key, o.field_group), '[]'::jsonb)
+                        FROM data_overrides o
+                       WHERE o.entity_type = 'match_coaches' AND starts_with(o.entity_key, ${fx.matchKey}::text)),
+        'audit', (SELECT coalesce(jsonb_agg(to_jsonb(e) ORDER BY e.id), '[]'::jsonb)
+                    FROM data_edits e WHERE e.table_name = 'matches' AND e.row_id = ${fx.matchId}),
+        'stats', (SELECT count(*)::int FROM player_match_stats WHERE match_id = ${fx.matchId})
+      ) AS state
+    `;
+    return r.state;
+  };
+
+  const deletionAudits = async (fx: Fx257) => {
+    const [r] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM data_edits
+       WHERE table_name = 'matches' AND row_id = ${fx.matchId} AND field_group = 'match_deletion'
+    `;
+    return r.n;
+  };
+
+  const assign = async (fx: Fx257, coachId: number) => {
+    expect(await setCoachAssignment({
+      assignments: [{ matchId: fx.matchId, clubId: fx.clubId }], coachId, adminUserId, note: NOTE,
+    })).toEqual({ ok: true });
+  };
+
+  it('an assignment made through the real coach mutation blocks deletion; match, assignment, override and audit unchanged', async () => {
+    const fx = await seedFixture257('c335-blocked');
+    const coach = await seedCoach('blocked');
+    await assign(fx, coach.id);
+
+    const before = await stateOf(fx);
+    expect(before.match).not.toBeNull();
+    expect(before.assignments).toEqual([expect.objectContaining({
+      match_id: fx.matchId, club_id: fx.clubId, coach_id: coach.id,
+      source_record_id: `${fx.matchKey}|${fx.clubSlug}`,
+    })]);
+    expect(before.overrides).toEqual([expect.objectContaining({
+      entity_key: `${fx.matchKey}|${fx.clubSlug}`, field_group: 'assignment', is_active: true,
+      override_values: { coach_identity: coach.path },
+    })]);
+    expect(before.audit.map((e) => e.field_group)).toEqual(['coach_assignment']);
+
+    const result = await deleteMatch({ matchId: fx.matchId, adminUserId, reason: NOTE });
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('unreachable');
+    expect(result.error).toContain(`Match #${fx.matchId} carries 1 active manual coach assignment (${fx.clubSlug})`);
+    expect(result.error).toContain('Clear override');
+    expect(result.error).toContain(`/admin/coaches/${coach.id}`);
+
+    expect(await stateOf(fx)).toEqual(before);
+    expect(await deletionAudits(fx)).toBe(0);
+  }, FX_TIMEOUT);
+
+  it('an override retired through the real clear mutation does not block; the inactive record is kept', async () => {
+    const fx = await seedFixture257('c335-inactive');
+    const coach = await seedCoach('inactive');
+    await assign(fx, coach.id);
+    expect(await clearCoachAssignment({
+      matchId: fx.matchId, clubId: fx.clubId, adminUserId, note: NOTE,
+    })).toEqual({ ok: true });
+    const before = await stateOf(fx);
+    expect(before.overrides).toEqual([expect.objectContaining({ is_active: false })]);
+
+    const result = await deleteMatch({ matchId: fx.matchId, adminUserId, reason: NOTE });
+    expect(result).toMatchObject({ ok: true, deletedId: fx.matchId });
+
+    const after = await stateOf(fx);
+    expect(after.match).toBeNull();
+    expect(after.assignments).toEqual([]); // the canonical row cascades with the match, as before
+    expect(after.overrides).toEqual(before.overrides); // the retired decision is preserved, untouched
+    expect(await deletionAudits(fx)).toBe(1);
+  }, FX_TIMEOUT);
+
+  it('a source-only assignment (no override) keeps the existing behaviour: deleted, cascading the assignment', async () => {
+    const fx = await seedFixture257('c335-source');
+    const coach = await seedCoach('source');
+    await sql`
+      INSERT INTO match_coaches (match_id, club_id, coach_id, source_id, source_record_id)
+      VALUES (${fx.matchId}, ${fx.clubId}, ${coach.id},
+              (SELECT id FROM sources WHERE key = 'afltables'), 'issue-335 source row')
+    `;
+    expect((await stateOf(fx)).assignments).toHaveLength(1);
+
+    const result = await deleteMatch({ matchId: fx.matchId, adminUserId, reason: NOTE });
+    expect(result).toMatchObject({ ok: true, deletedId: fx.matchId });
+
+    const after = await stateOf(fx);
+    expect(after.match).toBeNull();
+    expect(after.assignments).toEqual([]);
+    expect(after.overrides).toEqual([]);
+    expect(await deletionAudits(fx)).toBe(1);
+  }, FX_TIMEOUT);
+
+  it('overrides naming another match do not block, including keys a prefix pattern would catch', async () => {
+    const target = await seedFixture257('c335-target');
+    const other = await seedFixture257('c335-other');
+    const coach = await seedCoach('other');
+    await assign(other, coach.id);
+    const otherBefore = await stateOf(other);
+    expect(otherBefore.overrides).toEqual([expect.objectContaining({ is_active: true })]);
+
+    // Active near-miss keys: a match key extending the target's, and one that starts with
+    // `<target key>|` but decodes (last '|') to the match key `<target key>|extra`.
+    const nearMiss = [`${target.matchKey}x|${target.clubSlug}`, `${target.matchKey}|extra|${target.clubSlug}`];
+    for (const key of nearMiss) {
+      await sql`
+        INSERT INTO data_overrides (entity_type, entity_key, field_group, override_values, admin_user_id, is_active)
+        VALUES ('match_coaches', ${key}, 'assignment', ${sql.json({ coach_identity: coach.path })}, ${adminUserId}, true)
+      `;
+    }
+    const nearMissState = () => sql<{ entityKey: string; isActive: boolean }[]>`
+      SELECT entity_key AS "entityKey", is_active AS "isActive" FROM data_overrides
+       WHERE entity_type = 'match_coaches' AND entity_key = ANY(${nearMiss}::text[])
+       ORDER BY entity_key
+    `;
+    const nearMissBefore = await nearMissState();
+    expect(nearMissBefore).toHaveLength(2);
+
+    const result = await deleteMatch({ matchId: target.matchId, adminUserId, reason: NOTE });
+    expect(result).toMatchObject({ ok: true, deletedId: target.matchId });
+    expect((await stateOf(target)).match).toBeNull();
+    expect(await deletionAudits(target)).toBe(1);
+
+    expect(await stateOf(other)).toEqual(otherBefore);
+    expect(await nearMissState()).toEqual(nearMissBefore);
   }, FX_TIMEOUT);
 });
 

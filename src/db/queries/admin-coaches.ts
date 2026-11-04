@@ -48,6 +48,44 @@ export function assignmentOverrideEntityKey(matchKey: string, clubSlug: string):
   return `${matchKey}|${clubSlug}`;
 }
 
+/**
+ * AFLDB-ISSUE-335: `deleteMatch` refuses while an ACTIVE manual coach assignment override names
+ * the match. `match_coaches.match_id` is `ON DELETE CASCADE` (migration 087), so without this the
+ * delete silently removed the assignment and left its `data_overrides` row active and naming no
+ * match -- which `replay_admin_overrides(match_coaches)` then refuses to commit ("no match carries
+ * that match_key") on the next destructive reload.
+ *
+ * The key is decoded exactly as that replay decodes it (tools/migration/common.py): `match_key`
+ * is everything before the LAST `|` (match keys are themselves pipe-delimited; club slugs carry
+ * none), compared by equality. No LIKE or prefix pattern, so a key that merely starts with this
+ * match's key never matches. Like the replay, every active `match_coaches` override counts,
+ * whatever its field group. Read-only; runs inside the caller's transaction after the caller has
+ * locked the match row (`setCoachAssignment` and `clearCoachAssignment` take the same lock), and
+ * never deactivates, deletes or discards anything. Returns the refusal text, or `null`.
+ */
+export async function matchDeletionCoachOverrideRefusal(
+  tx: postgres.Sql | postgres.TransactionSql, matchId: number, matchKey: string,
+): Promise<string | null> {
+  const active = await tx<{ clubSlug: string; coachId: number | null }[]>`
+    SELECT right(o.entity_key, strpos(reverse(o.entity_key), '|') - 1) AS "clubSlug",
+           c.id::int AS "coachId"
+      FROM data_overrides o
+      LEFT JOIN coaches c ON c.afltables_coach_path = o.override_values->>'coach_identity'
+     WHERE o.entity_type = 'match_coaches'
+       AND o.is_active
+       AND strpos(o.entity_key, '|') > 0
+       AND left(o.entity_key, length(o.entity_key) - strpos(reverse(o.entity_key), '|')) = ${matchKey}::text
+     ORDER BY o.entity_key, o.field_group
+  `;
+  if (active.length === 0) return null;
+  const n = active.length;
+  const where = [...new Set(active.map((r) => (r.coachId === null ? '/admin/coaches' : `/admin/coaches/${r.coachId}`)))];
+  return `Match #${matchId} carries ${n} active manual coach assignment${n === 1 ? '' : 's'} `
+    + `(${active.map((r) => r.clubSlug).join(', ')}) and cannot be deleted. Deleting the match would `
+    + `remove the assignment and leave its durable override naming no match. Clear ${n === 1 ? 'it' : 'them'} `
+    + `first with "Clear override" in Coach administration (${where.join(', ')}).`;
+}
+
 // --- the D-2 narrow SELECT-only import-role helper --------------------
 
 async function withImportConnection<T>(fn: (importSql: postgres.Sql) => Promise<T>): Promise<T> {
