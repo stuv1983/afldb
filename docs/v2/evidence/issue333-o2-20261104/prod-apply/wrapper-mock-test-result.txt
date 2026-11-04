@@ -1,0 +1,83 @@
+--- transformation diff (only /home/arm path tokens may differ) ---
+diff after reversing the prefix: IDENTICAL
+=== approve ===
+PASS [1] approve-i333 success (rc=0)
+      output has: approval read-back OK
+      output has: == DONE
+      independent file check: OK
+      no leftover temp file
+PASS [2] approve-i333 existing approval refused (rc=3)
+      output has: approval file exists
+      output lacks (as required): == DONE
+      existing approval unchanged
+PASS [3] approve-o2 success (rc=0)
+      output has: approval read-back OK
+      independent file check: OK
+PASS [4] approve-o2 bad expiry format (rc=1)
+      output has: expires-at must be
+      output lacks (as required): == DONE
+      no file created
+PASS [5] approve-o2 expiry in the past (rc=1)
+      output has: not in the future
+      output lacks (as required): == DONE
+PASS [6] approve-o2 expiry beyond plan (rc=1)
+      output has: outlives the plan
+      output lacks (as required): == DONE
+PASS [7] approve-o2 empty reference (rc=1)
+      output has: empty reference
+      output lacks (as required): == DONE
+PASS [8] approve-o2 creation failure (evidence dir missing) must NOT succeed (rc=1)
+      output has: approval creation FAILED
+      output lacks (as required): == DONE
+--- the ORIGINAL committed wrapper on the same failure (proves the defect and the fix) ---
+      ORIGINAL wrapper rc=0 ; says DONE: 1
+=== state ===
+PASS [9] state present/expect present (rc=0)
+      output has: VERDICT MATCH: PLANNED RESULT PRESENT
+PASS [10] state present/expect any (rc=0)
+PASS [11] state present/expect baseline (rc=7)
+      output has: verdict is not the expected
+PASS [12] state baseline/expect present (exit 0 alone is NOT enough) (rc=7)
+      output has: state exit 0
+      output has: verdict is not the expected 'present'
+      output lacks (as required): VERDICT MATCH
+PASS [13] state baseline/expect baseline (rc=0)
+      output has: VERDICT MATCH: BASELINE
+PASS [14] state OTHER propagates tool rc (rc=6)
+PASS [15] state UNDETERMINED propagates tool rc (rc=6)
+PASS [16] state tool refusal propagates rc (rc=1)
+PASS [17] state bad expectation (rc=2)
+=== apply ===
+PASS [18] apply without approval file (rc=3)
+      output has: no approval file
+PASS [19] apply inside no-apply window (rc=4)
+      output has: no-apply window
+PASS [20] apply with a settle writer active (rc=4)
+      output has: is running
+PASS [21] apply COMMITTED_VERIFIED (rc 0) (rc=0)
+      output has: apply exit 0
+      output has: NEXT: run state-i333
+      apply child got both DSNs via env, none in argv
+      output lacks (as required): SECRET
+PASS [22] apply tool rc 1 propagates (rc=1)
+      output has: apply exit 1
+PASS [23] apply tool rc 2 propagates (rc=2)
+      output has: apply exit 2
+PASS [24] apply tool rc 3 propagates (rc=3)
+      output has: apply exit 3
+PASS [25] apply tool rc 4 propagates (rc=4)
+      output has: apply exit 4
+PASS [26] apply tool rc 5 propagates (rc=5)
+      output has: apply exit 5
+PASS [27] apply-o2 rc 0 with approval (rc=0)
+      output has: backup-O2.json
+=== guards ===
+PASS [28] bad revision (rc=2)
+PASS [29] unknown phase (rc=2)
+PASS [30] wrong host (rc=3)
+PASS [31] wrong user (rc=3)
+PASS [32] dirty checkout (rc=3)
+PASS [33] wrong HEAD (rc=3)
+PASS [34] plan file missing (rc=3)
+
+TOTAL checks: 34 ; FAILURES: 0

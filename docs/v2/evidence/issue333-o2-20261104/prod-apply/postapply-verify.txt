@@ -1,0 +1,40 @@
+== I identity 2026-11-04T03:22:39Z
+afldb_prod|afldb_backup|on|7674454702926115004|66668
+== O1 counts (baseline: match_coaches 32034, coaches 386, import_batches 75 max 82, rejections 681, match_coaches_2026 0, sides_without_coach 436) 2026-11-04T03:22:39Z
+import_batches_max_id|83
+import_batches|76
+coaches|386
+import_rejections_max_id|681
+import_rejections|681
+match_coaches_2026|436
+match_coaches|32470
+sides_2026_without_coach|0
+batches_after_82|83|10|add_match_coaches_2026.py|match_coaches|completed|695499|436|0|0|2026-11-04 14:14:48.188619+11|2026-11-04 14:14:48.188619+11|
+new_rows_by_batch|83|10|436|17056|17274
+rows_with_batch_leq82_or_null|32034
+season_2026_by_season_batch|2025|432|19
+season_2026_by_season_batch|2026|436|20
+carr_fraser|243|coaches/Josh_Carr.html|Carr, Josh|23|23
+carr_fraser|293|coaches/Josh_Fraser.html|Fraser, Josh|16|16
+coach_2026_distinct|20
+== O2 findings (baseline: 40 rows, 40 open, ids 41-76 open canonical_apply_failed foreign_source_owner) 2026-11-04T03:22:39Z
+data_issues_total|40|4|76
+o2_resolved|36|41|76|2026-11-04 14:15:45.048261+11|2026-11-04 14:15:45.048261+11|canonical_apply_not_needed|36
+o2_rows_still_open|0
+o2_details_md5|9dd9b226a745171137c73cb5175dd128
+other_issues|1|career_kicks_contradicts_source|player_achievements|warning|||2026-09-28 07:00:25.05467+10
+other_issues|2|first_kick_match_unresolved|player_achievements|warning|||2026-09-28 07:00:25.05467+10
+other_issues|3|first_kick_match_unresolved|player_achievements|warning|||2026-09-28 07:00:25.05467+10
+other_issues|4|source_count_discrepancy|player_achievements|info|||2026-09-28 07:00:25.05467+10
+other_issues_md5|4bfe6101daa65b6c7ef820bed52fe3fd
+open_by_type|career_kicks_contradicts_source|1
+open_by_type|first_kick_match_unresolved|2
+open_by_type|source_count_discrepancy|1
+pms_afltables_owner_36|36
+== F application-query figures (src/db/queries/coaches.ts via the ops checkout; role afldb_app; SELECT-only) 2026-11-04T03:22:40Z
+coach 243: games 23 W 7 D 0 L 16
+coach 293: games 16 W 12 D 1 L 3
+listCoaches rows 386 games total 32470 digest 2da45fca2b597cb8 (db afldb_prod, user afldb_app)
+figures exit 0
+ops checkout status lines after figures: 0
+== DONE 2026-11-04T03:22:40Z

@@ -1,0 +1,16 @@
+{
+  "planDigest": "4de5368c7b4dfff00550b5ec60bb8596d1e84804534a94d0b7f6836a3dbc515e",
+  "outcome": "COMMITTED_VERIFIED",
+  "exitCode": 0,
+  "statement": "COMMITTED AND VERIFIED: the writer committed and an independent read-only check of the committed state passed.",
+  "problems": [],
+  "detail": null,
+  "at": "2026-11-04T03:14:50.036Z",
+  "writer": {
+    "exit": 0,
+    "writerExit": 0,
+    "writerSaid": [
+      "ISSUE-333 writer: COMMITTED {\"batchId\": 83, \"committed\": true, \"inserted\": 436, \"settings\": {\"TimeZone\": \"UTC\", \"lock_timeout\": \"5s\", \"statement_timeout\": \"5min\", \"track_counts\": \"on\", \"transaction_read_only\": \"off\"}}"
+    ]
+  }
+}

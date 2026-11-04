@@ -1,0 +1,29 @@
+== S service and workers 2026-11-04T03:22:41Z
+active
+MainPID=3326560
+ExecStart={ path=/home/arm/.nvm/versions/node/v22.23.2/bin/node ; argv[]=/home/arm/.nvm/versions/node/v22.23.2/bin/node deploy/server-cluster.mjs ; ignore_errors=no ; start_time=[Tue 2026-11-03 08:48:00 AEDT] ; stop_time=[n/a] ; pid=3326560
+WorkingDirectory=/home/arm/afldb-releases/current
+ActiveEnterTimestamp=Tue 2026-11-03 08:48:00 AEDT
+primary pid=3326560 children:
+    PID    PPID                  STARTED ELAPSED CMD
+3326572 3326560 Tue Nov  3 08:48:00 2026  106480 next-server (v16.3.1)
+3326573 3326560 Tue Nov  3 08:48:00 2026  106480 next-server (v16.3.1)
+worker_count=2
+== G anonymous HTTP status on the loopback app (the beta gate) 2026-11-04T03:22:41Z
+/coaches -> 307 https://beta.afldb.com/beta?from=%2Fcoaches
+/coaches/josh-carr-243 -> 307 https://beta.afldb.com/beta?from=%2Fcoaches%2Fjosh-carr-243
+/clubs/port-adelaide -> 307 https://beta.afldb.com/beta?from=%2Fclubs%2Fport-adelaide
+/clubs/carlton -> 307 https://beta.afldb.com/beta?from=%2Fclubs%2Fcarlton
+== I ISR on-disk entries (the served standalone tree) 2026-11-04T03:22:41Z
+-- /home/arm/afldb-releases/current/.next/standalone/.next/server/app
+.next/standalone/.next/server/app/coaches.html mtime=2026-11-04 09:36:01.198089251 +1100 size=247570
+.next/standalone/.next/server/app/coaches.meta mtime=2026-11-04 09:36:01.203089188 +1100 size=195
+.next/standalone/.next/server/app/clubs/port-adelaide.html mtime=2026-11-03 08:40:21.953548278 +1100 size=394155
+.next/standalone/.next/server/app/clubs/carlton.html mtime=2026-11-03 08:40:21.934548199 +1100 size=1530890
+.next/standalone/.next/server/app/clubs/port-adelaide.meta mtime=2026-11-03 08:40:21.954548282 +1100 size=663
+.next/standalone/.next/server/app/clubs/carlton.meta mtime=2026-11-03 08:40:21.941548228 +1100 size=657
+no dir /home/arm/afldb-releases/current/.next/server/app
+== C content in the on-disk coaches.html (Carr and Fraser rows as prerendered) 2026-11-04T03:22:41Z
+-- /home/arm/afldb-releases/current/.next/standalone/.next/server/app/coaches.html
+mentions of 2026 in file: 0
+== DONE 2026-11-04T03:22:41Z

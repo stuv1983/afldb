@@ -2,7 +2,7 @@
 
 These files support `docs/v2/issue333-o2-consolidated-approval-2026-11-04.md`.
 
-**Nothing in this folder applied anything to production.** The only production write was the backup directory that `scripts/capture-prod-issue333-o2.sh` created. All other production access was read-only.
+**Everything above the `prod-apply/` row records preparation only; nothing in it applied anything to production.** The preparation's only production write was the backup directory that `scripts/capture-prod-issue333-o2.sh` created. **O1 and O2 were then applied once each on 2026-11-04 (03:14:48Z and 03:15:45Z); see `prod-apply/` and `docs/v2/issue333-o2-apply-record-2026-11-04.md`.**
 
 - **Tool revision R:** `50ed6e4f4a697160ef263ade293792363e52e975` (local commit, not pushed).
 - **Production ops checkout:** `/home/arm/ops/issue333-o2-50ed6e4f/cand`, clean at R.
@@ -22,9 +22,12 @@ These files support `docs/v2/issue333-o2-consolidated-approval-2026-11-04.md`.
 | `rehearsal/rehearsal-<n>.txt` | Run logs on fresh clones of the restored backup. Run 1: all 18 scenarios. Runs 2 and 3: the two killed-writer scenarios after harness fixes. |
 | `rehearsal/rehearsal-<n>/<scenario>.txt` and `<scenario>/` | Per-scenario logs, mode outputs (`*.out`), outcome JSON, digests and Carr/Fraser figures. Plans and staging were omitted for size. Writer logs are redacted by the tools. |
 | `scripts/` | The derived capture, ops, workspace, restore and assembly, rehearsal harness, figures and probe scripts. See the next table for the owner wrapper. |
-| `scripts/prod-apply-i333-o2.sh` | The owner-run apply wrapper, placed in production ops `in/` with sha256 `ae456bdc...51c2`. It was **not run, not reviewed and not rehearsed**. It only calls the rehearsed ceremonies, which fail closed. |
+| `scripts/prod-apply-i333-o2.sh` | The apply wrapper. The original (sha256 `ae456bdc...51c2`, preparation) ignored a failed approval-file step. **Revision 2 (sha256 `f1d810ee...970f`) is what ran**; the `SHA256SUMS` entry below is the original and is left as written. |
+| `scripts/mock-wrapper-test-i333-o2.sh`, `prod-apply/wrapper-mock-test-result.txt` | The mocked exercise of every wrapper phase: 34 checks, 0 failures; reproduces the original defect. |
+| `scripts/postapply-verify-i333-o2.sh`, `scripts/visibility-probe-i333-o2.sh` | Read-only post-apply verification (psql as `afldb_backup`, application-query figures as `afldb_app`) and the visibility probe (process, file-system and anonymous HTTP status only; mints no cookie). |
+| `prod-apply/` | Approvals, apply and state JSON, writer logs, post-apply verification and visibility-probe outputs, and the application-query figures. Sums: `SHA256SUMS-postapply`. |
 
 - **Measured rehearsal result:** 18 of 18 scenarios passed (see section 5 of the approval doc).
-- **Not measured:** production time-to-visibility, either recovery, and the owner wrapper.
+- **Not measured:** production time-to-visibility (still unmeasured after the apply: beta gate) and either recovery.
 
-`SHA256SUMS` in this folder covers every other file here.
+`SHA256SUMS` covers the preparation files; `SHA256SUMS-postapply` covers the post-apply files and the revised wrapper.

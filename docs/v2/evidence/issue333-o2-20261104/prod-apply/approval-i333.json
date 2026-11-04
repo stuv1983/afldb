@@ -1,0 +1,19 @@
+{
+ "approvedAt": "2026-11-04T03:13:55.018Z",
+ "coreTarSha256": "9a989fdcf7177cff24bbedcd0ee4559b772ebc452c05dab331e128859e4db080",
+ "expiresAt": "2026-11-04T04:35:00Z",
+ "operation": "issue333-coach-assignments",
+ "planDigest": "4de5368c7b4dfff00550b5ec60bb8596d1e84804534a94d0b7f6836a3dbc515e",
+ "reference": "OWNER-APPROVAL-2026-11-04T0308Z-O1-backup-issue333-o2-20261104T021037Z-written-by-Claude-on-owner-behalf",
+ "revision": "50ed6e4f4a697160ef263ade293792363e52e975",
+ "target": {
+  "clusterName": "16/main",
+  "database": "afldb_prod",
+  "databaseComment": null,
+  "databaseOid": "66668",
+  "host": "localhost",
+  "port": 5432,
+  "systemIdentifier": "7674454702926115004",
+  "user": "afldb_backup"
+ }
+}
