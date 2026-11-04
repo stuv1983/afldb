@@ -1,0 +1,23 @@
+﻿43a8c339ee76aa38343a31348fe7ce2647cdf51962bce67606790ee971157e98  /home/arm/ops/issue333-o2-50ed6e4f/in/backup-I333.json
+6f74095d6b2bcda12ab7dac56e2f5ee88fbeb0416bc7e1f2b8d9d91e83c1fcf3  /home/arm/ops/issue333-o2-50ed6e4f/in/backup-O2.json
+07e1f6942df51dff90e045b942d5c35cf3585f35d6b36c53d09489c3e987c6f1  /home/arm/ops/issue333-o2-50ed6e4f/in/restore-evidence.json
+== target identity from independent facts (read-only session) 2026-11-04T02:16:51Z
+{"host" : "localhost", "port" : 5432, "database" : "afldb_prod", "user" : "afldb_backup", "systemIdentifier" : "7674454702926115004", "databaseOid" : "66668", "clusterName" : "16/main", "databaseComment" : null, "transactionReadOnly" : "on"}
+target equals the probe facts (sysid, oid, cluster, user)
+== I333 plan (read-only; writes only the plan file and a fresh staging directory) 2026-11-04T02:16:51Z
+Review plan 4de5368c7b4dfff00550b5ec60bb8596d1e84804534a94d0b7f6836a3dbc515e; no writes (read-only session, SELECT-only cursor); 436 new assignments over 218 matches; operation digest d5ddb146a0e72c79; new rows 33f5b466cab2adb2; batches appended since backup 0
+10d2f8254a9eeff30b1826d8f239cb763dfd174ca00e4305487713c502db83ad  /home/arm/ops/issue333-o2-50ed6e4f/evidence/plan-i333-20261104T021651Z.json
+PLAN issue333-coach-assignments digest 4de5368c7b4dfff00550b5ec60bb8596d1e84804534a94d0b7f6836a3dbc515e createdAt 2026-11-04T02:16:51.682Z expiresAt 2026-11-05T02:16:51.682Z revision 50ed6e4f4a697160ef263ade293792363e52e975 readSession {"current_database": "afldb_prod", "default_transaction_read_only": "on", "isolation": "repeatable read", "selectOnlyCursor": true, "serverVersionNum": "160015", "temporarySchema": "none", "timezone": "UTC", "trackCounts": "on", "transaction_read_only": "on"}
+== post-run: ops checkout still clean 2026-11-04T02:17:14Z
+head=50ed6e4f4a697160ef263ade293792363e52e975 status_lines=0
+== DONE 2026-11-04T02:17:14Z
+== target identity from independent facts (read-only session) 2026-11-04T02:17:14Z
+{"host" : "localhost", "port" : 5432, "database" : "afldb_prod", "user" : "afldb_backup", "systemIdentifier" : "7674454702926115004", "databaseOid" : "66668", "clusterName" : "16/main", "databaseComment" : null, "transactionReadOnly" : "on"}
+target equals the probe facts (sysid, oid, cluster, user)
+== O2 plan (read-only; writes only the plan file) 2026-11-04T02:17:14Z
+Review plan c29d148d17af1cdc94ecae547a8026365dee5ade66def278dba9b49a84f7ea03; no writes; 36 findings, 53 of 53 flagged fields equal; operation digest 1286f940098475a6; other findings appended since backup 0
+7e421ac3d6ff053c68f0d73846700b26ac44920b6e1e7b12085aa598dcb50c9e  /home/arm/ops/issue333-o2-50ed6e4f/evidence/plan-o2-20261104T021714Z.json
+PLAN o2-converged-findings digest c29d148d17af1cdc94ecae547a8026365dee5ade66def278dba9b49a84f7ea03 createdAt 2026-11-04T02:17:15.032Z expiresAt 2026-11-05T02:17:15.032Z revision 50ed6e4f4a697160ef263ade293792363e52e975 readSession {"current_database": "afldb_prod", "default_transaction_read_only": "on", "isolation": "repeatable read", "selectOnlyCursor": true, "serverVersionNum": "160015", "temporarySchema": "none", "timezone": "UTC", "trackCounts": "on", "transaction_read_only": "on"}
+== post-run: ops checkout still clean 2026-11-04T02:17:15Z
+head=50ed6e4f4a697160ef263ade293792363e52e975 status_lines=0
+== DONE 2026-11-04T02:17:15Z

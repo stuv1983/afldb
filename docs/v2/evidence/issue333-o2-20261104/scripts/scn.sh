@@ -41,13 +41,20 @@ apply2() { run "$1" "$PY" "$C2" apply --plan "$OUT/plan.json" --rehearsal --out 
 state1() { run "$1" "$PY" "$C1" state --plan "$OUT/plan.json" --out "$OUT/$1.json"; }
 state2() { run "$1" "$PY" "$C2" state --plan "$OUT/plan.json" --out "$OUT/$1.json"; }
 killed() {   # $1 ceremony, $2 lock to hold, $3 writer application_name: the ceremony + writer are SIGKILLed while the writer waits on a held lock
-  H hold-lock "$2" 120 > "$OUT/lock-holder.out" 2>&1 & local HOLDER=$!
+  # the python process itself is backgrounded (run 2: backgrounding the H function left the holder alive when its subshell was killed)
+  "$PY" "$W/in/rehearsal_helper.py" hold-lock "$2" 120 > "$OUT/lock-holder.out" 2>&1 & local HOLDER=$!
   for i in $(seq 1 50); do grep -q LOCKED "$OUT/lock-holder.out" && break; sleep 0.2; done; cat "$OUT/lock-holder.out"
   setsid "$PY" "$1" apply --plan "$OUT/plan.json" --rehearsal --out "$OUT/apply-killed.json" > "$OUT/apply-killed.out" 2>&1 & local CPID=$!
   H wait-writer "$3" Lock 180 | tee "$OUT/wait-writer.out"
   kill -9 -- -"$CPID"; wait "$CPID" 2>/dev/null; echo "ceremony process group $CPID SIGKILLed while its writer waited on the lock (exit $?)"; cat "$OUT/apply-killed.out"
-  sleep 2; kill "$HOLDER"; wait "$HOLDER" 2>/dev/null; echo "lock holder stopped"
+  sleep 2; kill "$HOLDER"; wait "$HOLDER" 2>/dev/null; echo "lock holder stopped $(date -u +%T.%N | cut -c1-12)"
   [ -e "$OUT/apply-killed.json" ] && echo "CHECK FAIL $SCN killed ceremony left an outcome record" || echo "CHECK PASS $SCN killed ceremony left no outcome record"
+  # Run 1 showed the dead client's server session can outlive it for seconds: state may then say UNDETERMINED (exit 6), never BASELINE/APPLIED.
+  run state-immediate "$PY" "$1" state --plan "$OUT/plan.json" --out "$OUT/state-immediate.json"; local rc=$?
+  if [ $rc = 6 ] && grep -q UNDETERMINED "$OUT/state-immediate.out"; then echo "CHECK PASS $SCN state while the dead writer's session is live says UNDETERMINED exit=6"
+  elif [ $rc = 0 ] && grep -q BASELINE "$OUT/state-immediate.out"; then echo "CHECK PASS $SCN state immediately after the kill says BASELINE exit=0 (session already gone)"
+  else echo "CHECK FAIL $SCN state immediately after the kill exit=$rc"; fi
+  H wait-gone "$3" 180; echo "writer session gone $(date -u +%T.%N | cut -c1-12)"
 }
 inflight() {  # $1 ceremony, $2 writer path, $3 writer application_name: SIGKILL ONLY the writer process while the server sleeps inside its COMMIT
   "$PY" "$1" apply --plan "$OUT/plan.json" --rehearsal --out "$OUT/apply-inflight.json" > "$OUT/apply-inflight.out" 2>&1 & local CPID=$!

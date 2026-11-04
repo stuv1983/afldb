@@ -1,0 +1,82 @@
+{
+  "target": {
+    "host": "localhost",
+    "port": 5432,
+    "database": "afldb_prod",
+    "user": "afldb_backup",
+    "systemIdentifier": "7674454702926115004",
+    "databaseOid": "66668",
+    "clusterName": "16/main",
+    "databaseComment": null
+  },
+  "sha256": "e77c307d3e0cddcb652e398a946e4c22c2063f13c70edadf96a975c92842826d",
+  "restoreEvidenceSha256": "07e1f6942df51dff90e045b942d5c35cf3585f35d6b36c53d09489c3e987c6f1",
+  "capturedAt": "2026-11-04T02:10:38.102Z",
+  "restoredAt": "2026-11-04T02:13:31.072Z",
+  "baselineDigest": "8255e09459f7e8292b91bf654a56103a4849d7a38a627d026860c4d46da44714",
+  "i333OperationDigest": "d5ddb146a0e72c799a4a131c2348bf86b15fa57e64231c6519f74ad364acc2de",
+  "i333NewRowsDigest": "33f5b466cab2adb27d5d45497f0e69bfe1917904e33940510f42de530646dd99",
+  "i333ImportBatches": {
+    "rows": 75,
+    "maxId": 82,
+    "fullRowDigest": "a45d3f50613db5385f9a7fc316f79953e8dc20fcdb2ee1c75f90e5c65b64cb5b"
+  },
+  "assembly": {
+    "format": "afldb.gap029.restore-evidence-assembly.1",
+    "stage": "I333",
+    "operation": "issue333-coach-assignments",
+    "revision": "50ed6e4f4a697160ef263ade293792363e52e975",
+    "assembledAt": "2026-11-04T02:14:06.139Z",
+    "restoreTarget": {
+      "host": "127.0.0.1",
+      "port": 55493,
+      "database": "afldb_v2_i333o2_b20261104t021037z_rst_test",
+      "user": "afldb_owner",
+      "systemIdentifier": "7704133593388370608",
+      "databaseOid": "16390",
+      "clusterName": "afldb_v2_isolated",
+      "databaseComment": "afldb-v2-isolated-test"
+    },
+    "inputs": {
+      "dumpSha256": "e77c307d3e0cddcb652e398a946e4c22c2063f13c70edadf96a975c92842826d",
+      "restoreEvidenceSha256": "07e1f6942df51dff90e045b942d5c35cf3585f35d6b36c53d09489c3e987c6f1",
+      "toolSha256": {
+        "data/reference/clubs.json": "9aaa8d4688206d03b0960bd03dcda199a642c5f7343570cc8bc2d439f5674f32",
+        "data/sources/afltables/coaches/coaches-20260905/parsed/coach_pages.csv": "ec4959a40fc56a6ff6e15b6a91a4bd81cc75326c507440cf98b4ed60f853113b",
+        "data/sources/afltables/coaches/coaches-20260905/parsed/coaches_index.csv": "525ae8876786a2bb006f8be91fc29f860e12e765eb12316c5f9da9ed6ef142ef",
+        "docs/rebuild-manifests/afltables_coaches/coaches-20260905.json": "3e78f47354ac9fe594547ad327efaa6a2f6da90c54b17072ade4443e74ba8094",
+        "docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json": "02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988",
+        "tools/migration/add_match_coaches_2026.py": "3ff3ac3d08ac325b327a7b2621183850fac2d76c3064711fd5192e229079e6dc",
+        "tools/migration/common.py": "d2c429d3d21b66a03d080f73a28d87becd314042a09e511739a9b5c23515dff8",
+        "tools/migration/enrich_heights.py": "647bb383eb661f0ab0b0d6cac2dafe495b27a3f7361c7ea3ffafd50a51a6bcf0",
+        "tools/migration/import_fitzroy_core.py": "4786d336349170bce6b210fceeb6f72de79d8eebc1471b79e25a8f9e18e75cc5",
+        "tools/migration/import_match_coaches.py": "4895874b9208aa08e8f3b1293836fe77351ea622b278a00197b783787a827ba6",
+        "tools/rebuild/afltables/afltables-contract.json": "ca4291cb19963d83734e94e1dda36e6d27d2abef32491e4cac27e79dfc3ca60f",
+        "tools/rebuild/afltables/coach_snapshot_parser.py": "146af72592d2ca19efa9c0f9a2e36926e616ac6043d1255d2c7fd7a3626736b3",
+        "tools/rebuild/draftguru/bridge_import_gate.py": "fbce43f7f1e374b3dfac05968e627b8ad9f337279f233a49bc19ff57d02d558d",
+        "tools/rebuild/fitzroy/fitzroy-contract.json": "4e98a4c96b57011937f78c5dbd2c7cfd50d4cd65b270d11279173b9dbda3edd5",
+        "tools/v2/gap029-draft-link-production.py": "97aff072b6a9dbe9b9e16f91b30afc573a264c14faf034be4d98fe658825bded",
+        "tools/v2/gap029_common.py": "ddefab1e69ca5ed8e02b32d9eead4f3a790a84b7012e345f94092eaff31231e7",
+        "tools/v2/issue333-coach-assignments-production.py": "84935a3768f11fec46d4c4497973fc240e30a171649f22bce54493c0300fb461",
+        "tools/v2/issue333_o2_common.py": "06af487a19c17eed41dbaa99b44b1d8012e93313680cefdfe31a0803e346a57c"
+      },
+      "coreTarSha256": "9a989fdcf7177cff24bbedcd0ee4559b772ebc452c05dab331e128859e4db080"
+    },
+    "derived": {
+      "mode": "plan --rehearsal",
+      "outputSha256": "2ea2e2454ec3b1f8fb3f79ec6b1b1b19ef5059d348da22e9f8285435435f2d04",
+      "values": {
+        "baselineDigest": "8255e09459f7e8292b91bf654a56103a4849d7a38a627d026860c4d46da44714",
+        "i333OperationDigest": "d5ddb146a0e72c799a4a131c2348bf86b15fa57e64231c6519f74ad364acc2de",
+        "i333NewRowsDigest": "33f5b466cab2adb27d5d45497f0e69bfe1917904e33940510f42de530646dd99",
+        "i333ImportBatches": {
+          "rows": 75,
+          "maxId": 82,
+          "fullRowDigest": "a45d3f50613db5385f9a7fc316f79953e8dc20fcdb2ee1c75f90e5c65b64cb5b"
+        }
+      }
+    },
+    "sealedBody": "{\"assembly\":{\"assembledAt\":\"2026-11-04T02:14:06.139Z\",\"derived\":{\"mode\":\"plan --rehearsal\",\"outputSha256\":\"2ea2e2454ec3b1f8fb3f79ec6b1b1b19ef5059d348da22e9f8285435435f2d04\",\"values\":{\"baselineDigest\":\"8255e09459f7e8292b91bf654a56103a4849d7a38a627d026860c4d46da44714\",\"i333ImportBatches\":{\"fullRowDigest\":\"a45d3f50613db5385f9a7fc316f79953e8dc20fcdb2ee1c75f90e5c65b64cb5b\",\"maxId\":82,\"rows\":75},\"i333NewRowsDigest\":\"33f5b466cab2adb27d5d45497f0e69bfe1917904e33940510f42de530646dd99\",\"i333OperationDigest\":\"d5ddb146a0e72c799a4a131c2348bf86b15fa57e64231c6519f74ad364acc2de\"}},\"format\":\"afldb.gap029.restore-evidence-assembly.1\",\"inputs\":{\"coreTarSha256\":\"9a989fdcf7177cff24bbedcd0ee4559b772ebc452c05dab331e128859e4db080\",\"dumpSha256\":\"e77c307d3e0cddcb652e398a946e4c22c2063f13c70edadf96a975c92842826d\",\"restoreEvidenceSha256\":\"07e1f6942df51dff90e045b942d5c35cf3585f35d6b36c53d09489c3e987c6f1\",\"toolSha256\":{\"data/reference/clubs.json\":\"9aaa8d4688206d03b0960bd03dcda199a642c5f7343570cc8bc2d439f5674f32\",\"data/sources/afltables/coaches/coaches-20260905/parsed/coach_pages.csv\":\"ec4959a40fc56a6ff6e15b6a91a4bd81cc75326c507440cf98b4ed60f853113b\",\"data/sources/afltables/coaches/coaches-20260905/parsed/coaches_index.csv\":\"525ae8876786a2bb006f8be91fc29f860e12e765eb12316c5f9da9ed6ef142ef\",\"docs/rebuild-manifests/afltables_coaches/coaches-20260905.json\":\"3e78f47354ac9fe594547ad327efaa6a2f6da90c54b17072ade4443e74ba8094\",\"docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json\":\"02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988\",\"tools/migration/add_match_coaches_2026.py\":\"3ff3ac3d08ac325b327a7b2621183850fac2d76c3064711fd5192e229079e6dc\",\"tools/migration/common.py\":\"d2c429d3d21b66a03d080f73a28d87becd314042a09e511739a9b5c23515dff8\",\"tools/migration/enrich_heights.py\":\"647bb383eb661f0ab0b0d6cac2dafe495b27a3f7361c7ea3ffafd50a51a6bcf0\",\"tools/migration/import_fitzroy_core.py\":\"4786d336349170bce6b210fceeb6f72de79d8eebc1471b79e25a8f9e18e75cc5\",\"tools/migration/import_match_coaches.py\":\"4895874b9208aa08e8f3b1293836fe77351ea622b278a00197b783787a827ba6\",\"tools/rebuild/afltables/afltables-contract.json\":\"ca4291cb19963d83734e94e1dda36e6d27d2abef32491e4cac27e79dfc3ca60f\",\"tools/rebuild/afltables/coach_snapshot_parser.py\":\"146af72592d2ca19efa9c0f9a2e36926e616ac6043d1255d2c7fd7a3626736b3\",\"tools/rebuild/draftguru/bridge_import_gate.py\":\"fbce43f7f1e374b3dfac05968e627b8ad9f337279f233a49bc19ff57d02d558d\",\"tools/rebuild/fitzroy/fitzroy-contract.json\":\"4e98a4c96b57011937f78c5dbd2c7cfd50d4cd65b270d11279173b9dbda3edd5\",\"tools/v2/gap029-draft-link-production.py\":\"97aff072b6a9dbe9b9e16f91b30afc573a264c14faf034be4d98fe658825bded\",\"tools/v2/gap029_common.py\":\"ddefab1e69ca5ed8e02b32d9eead4f3a790a84b7012e345f94092eaff31231e7\",\"tools/v2/issue333-coach-assignments-production.py\":\"84935a3768f11fec46d4c4497973fc240e30a171649f22bce54493c0300fb461\",\"tools/v2/issue333_o2_common.py\":\"06af487a19c17eed41dbaa99b44b1d8012e93313680cefdfe31a0803e346a57c\"}},\"operation\":\"issue333-coach-assignments\",\"restoreTarget\":{\"clusterName\":\"afldb_v2_isolated\",\"database\":\"afldb_v2_i333o2_b20261104t021037z_rst_test\",\"databaseComment\":\"afldb-v2-isolated-test\",\"databaseOid\":\"16390\",\"host\":\"127.0.0.1\",\"port\":55493,\"systemIdentifier\":\"7704133593388370608\",\"user\":\"afldb_owner\"},\"revision\":\"50ed6e4f4a697160ef263ade293792363e52e975\",\"stage\":\"I333\"},\"baselineDigest\":\"8255e09459f7e8292b91bf654a56103a4849d7a38a627d026860c4d46da44714\",\"capturedAt\":\"2026-11-04T02:10:38.102Z\",\"i333ImportBatches\":{\"fullRowDigest\":\"a45d3f50613db5385f9a7fc316f79953e8dc20fcdb2ee1c75f90e5c65b64cb5b\",\"maxId\":82,\"rows\":75},\"i333NewRowsDigest\":\"33f5b466cab2adb27d5d45497f0e69bfe1917904e33940510f42de530646dd99\",\"i333OperationDigest\":\"d5ddb146a0e72c799a4a131c2348bf86b15fa57e64231c6519f74ad364acc2de\",\"restoreEvidenceSha256\":\"07e1f6942df51dff90e045b942d5c35cf3585f35d6b36c53d09489c3e987c6f1\",\"restoredAt\":\"2026-11-04T02:13:31.072Z\",\"sha256\":\"e77c307d3e0cddcb652e398a946e4c22c2063f13c70edadf96a975c92842826d\",\"target\":{\"clusterName\":\"16/main\",\"database\":\"afldb_prod\",\"databaseComment\":null,\"databaseOid\":\"66668\",\"host\":\"localhost\",\"port\":5432,\"systemIdentifier\":\"7674454702926115004\",\"user\":\"afldb_backup\"}}",
+    "sealedBodySha256": "35cdcab582e6eeb30a0a89a9c8d441605182dde369d8102950c71763034f85a9"
+  }
+}

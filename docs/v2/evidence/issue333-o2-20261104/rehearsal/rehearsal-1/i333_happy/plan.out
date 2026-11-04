@@ -1,0 +1,1 @@
+Review plan 52aa2c1a8deea484c7b713ab4c278a1f253678eff4c1bc86ccefa47da0bb0e2c; no writes (read-only session, SELECT-only cursor); 436 new assignments over 218 matches; operation digest d5ddb146a0e72c79; new rows 33f5b466cab2adb2; batches appended since backup 0

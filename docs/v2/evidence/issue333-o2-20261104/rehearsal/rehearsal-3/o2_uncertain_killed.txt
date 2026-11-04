@@ -1,0 +1,33 @@
+create-db: afldb_v2_r3_o2_uncertain_killed_test created from afldb_v2_i333o2_b20261104t021037z_rst_test and marked
+ISOLATED TARGET OK: afldb_v2_r3_o2_uncertain_killed_test
+isolated-pg: afldb_v2_r3_o2_uncertain_killed_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running bash
+{"clusterName": "afldb_v2_isolated", "database": "afldb_v2_r3_o2_uncertain_killed_test", "databaseComment": "afldb-v2-isolated-test", "databaseOid": "20466", "host": "127.0.0.1", "port": 55493, "systemIdentifier": "7704133593388370608", "user": "afldb_owner"}
+{'match_coaches_2026': ['0', 'd41d8cd98f00b204e9800998ecf8427e'], 'sides_2026_without_coach': ['436', ''], 'import_batches_gt_82': ['0', ''], 'data_issues_41_76_unresolved': ['36', '502173a14897e11bb272498e5bf4ed6d'], 'user_triggers_touched_tables': ['1', 'match_coaches.match_coaches_club_in_match_trg']}
+--- plan: $W/venv/bin/python tools/v2/o2-converged-findings-production.py plan --target $W/evidence-private/rehearsal-3/o2_uncertain_killed/target.json --rehearsal --out $W/evidence-private/rehearsal-3/o2_uncertain_killed/plan.json
+Review plan 8e437759b42298af28f3ddaffb66e93ee30005663311dd5f69d0a15f88e92d2d; no writes; 36 findings, 53 of 53 flagged fields equal; operation digest 1286f940098475a6; other findings appended since backup 0
+    (exit 0)
+CHECK PASS o2_uncertain_killed plan exit=0
+LOCKED
+WAITING pid=1170444
+ceremony process group 1170421 SIGKILLed while its writer waited on the lock (exit 137)
+lock holder stopped 02:39:02.671
+CHECK PASS o2_uncertain_killed killed ceremony left no outcome record
+--- state-immediate: $W/venv/bin/python tools/v2/o2-converged-findings-production.py state --plan $W/evidence-private/rehearsal-3/o2_uncertain_killed/plan.json --out $W/evidence-private/rehearsal-3/o2_uncertain_killed/state-immediate.json
+STATE BASELINE (the plan has not been applied)
+    (exit 0)
+CHECK PASS o2_uncertain_killed state immediately after the kill says BASELINE exit=0 (session already gone)
+GONE
+writer session gone 02:39:03.389
+--- state: $W/venv/bin/python tools/v2/o2-converged-findings-production.py state --plan $W/evidence-private/rehearsal-3/o2_uncertain_killed/plan.json --out $W/evidence-private/rehearsal-3/o2_uncertain_killed/state.json
+STATE BASELINE (the plan has not been applied)
+    (exit 0)
+CHECK PASS o2_uncertain_killed state after the kill exit=0
+CHECK PASS o2_uncertain_killed state says 'BASELINE'
+--- apply-recovered: $W/venv/bin/python tools/v2/o2-converged-findings-production.py apply --plan $W/evidence-private/rehearsal-3/o2_uncertain_killed/plan.json --rehearsal --out $W/evidence-private/rehearsal-3/o2_uncertain_killed/apply-recovered.json
+OUTCOME COMMITTED_VERIFIED (exit 0)
+COMMITTED AND VERIFIED: the writer committed and an independent read-only check of the committed state passed.
+    (exit 0)
+CHECK PASS o2_uncertain_killed the same plan applied after the kill was classified BASELINE exit=0
+CHECK PASS o2_uncertain_killed apply-recovered says 'COMMITTED_VERIFIED'
+SCENARIO DONE o2_uncertain_killed
+scenario exit 0

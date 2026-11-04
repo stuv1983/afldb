@@ -1,0 +1,3 @@
+OUTCOME ROLLED_BACK (exit 2)
+ROLLED BACK: the writer failed and an independent read-only check proves the database holds its pre-run state (sequence values consumed by the attempt are not returned).
+detail: the writer exited 3; a fresh read-only session sees the pre-run state

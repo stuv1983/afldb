@@ -1,0 +1,6 @@
+=== writer exit 2
+--- stdout
+ISSUE-333 writer: ROLLED BACK / REFUSED: post-state check failed inside the transaction: ['a pre-existing match_coaches row changed (in any column) or was removed']; writes {'public.import_batches': [1, 1, 0], 'public.match_coaches': [436, 1, 0]}
+
+--- stderr
+

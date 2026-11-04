@@ -1,0 +1,16 @@
+{
+  "planDigest": "33e3bab10776bd1b87b6dce2a553c9a21696d09270a530b9921f561a56bf290d",
+  "outcome": "ROLLED_BACK",
+  "exitCode": 2,
+  "statement": "ROLLED BACK: the writer failed and an independent read-only check proves the database holds its pre-run state (sequence values consumed by the attempt are not returned).",
+  "problems": [],
+  "detail": "the writer exited 2; a fresh read-only session sees the pre-run state",
+  "at": "2026-11-04T02:30:30.472Z",
+  "writer": {
+    "exit": 2,
+    "writerExit": 2,
+    "writerSaid": [
+      "O2 writer: ROLLED BACK / REFUSED: post-state check failed inside the transaction: ['another data_issues row changed', 'note: other data_issues rows changed or were added since the plan (pre-existing rows unchanged: False)']; writes {'public.data_issues': [0, 37, 0]}"
+    ]
+  }
+}

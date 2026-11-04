@@ -1,0 +1,41 @@
+/dev/sdf1       938G  110G  781G  13% /mnt/ssd
+DEV services BEFORE:
+afldb.service active MainPID=1677
+postgresql@16-main.service active MainPID=1536
+pg_ctl: server is running (PID: 1164429)
+/usr/lib/postgresql/16/bin/postgres "-D" "/mnt/ssd/afldb-issue333-o2-20261104/pg-root/data"
+LISTEN 0      600        127.0.0.1:55493      0.0.0.0:*    users:(("postgres",pid=1164429,fd=7))     
+2026-11-04T02:33:14Z SCENARIO i333_uncertain_killed on afldb_v2_r2_i333_uncertain_killed_test (clone of afldb_v2_i333o2_b20261104t021037z_rst_test)
+CHECK PASS i333_uncertain_killed plan exit=0
+CHECK PASS i333_uncertain_killed killed ceremony left no outcome record
+CHECK PASS i333_uncertain_killed state while the dead writer's session is live says UNDETERMINED exit=6
+CHECK PASS i333_uncertain_killed state after the kill exit=0
+CHECK PASS i333_uncertain_killed state says 'BASELINE'
+CHECK FAIL i333_uncertain_killed the same plan applied after the kill was classified BASELINE exit=2 expected=0
+CHECK FAIL i333_uncertain_killed apply-recovered lacks 'COMMITTED_VERIFIED'
+CHECK PASS digests unchanged match_coaches_not_2026,coaches,import_batches_le_82,import_rejections,data_issues_41_76_unresolved,data_issues_other
+SCENARIO DONE i333_uncertain_killed
+2026-11-04T02:35:30Z SCENARIO o2_uncertain_killed on afldb_v2_r2_o2_uncertain_killed_test (clone of afldb_v2_i333o2_b20261104t021037z_rst_test)
+CHECK PASS o2_uncertain_killed plan exit=0
+CHECK PASS o2_uncertain_killed killed ceremony left no outcome record
+CHECK PASS o2_uncertain_killed state while the dead writer's session is live says UNDETERMINED exit=6
+CHECK PASS o2_uncertain_killed state after the kill exit=0
+CHECK PASS o2_uncertain_killed state says 'BASELINE'
+CHECK FAIL o2_uncertain_killed the same plan applied after the kill was classified BASELINE exit=2 expected=0
+CHECK FAIL o2_uncertain_killed apply-recovered lacks 'COMMITTED_VERIFIED'
+SCENARIO DONE o2_uncertain_killed
+2026-11-04T02:35:47Z stop the cluster
+waiting for server to shut down..... done
+server stopped
+DEV services AFTER:
+afldb.service active MainPID=1677
+postgresql@16-main.service active MainPID=1536
+DEV services unchanged
+== SUMMARY
+      4 CHECK FAIL
+     11 CHECK PASS
+CHECK FAIL i333_uncertain_killed the same plan applied after the kill was classified BASELINE exit=2 expected=0
+CHECK FAIL i333_uncertain_killed apply-recovered lacks 'COMMITTED_VERIFIED'
+CHECK FAIL o2_uncertain_killed the same plan applied after the kill was classified BASELINE exit=2 expected=0
+CHECK FAIL o2_uncertain_killed apply-recovered lacks 'COMMITTED_VERIFIED'
+2026-11-04T02:35:52Z DONE rc=0

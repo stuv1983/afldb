@@ -1,0 +1,26 @@
+create-db: afldb_v2_r1_o2_already_resolved_test created from afldb_v2_i333o2_b20261104t021037z_rst_test and marked
+ISOLATED TARGET OK: afldb_v2_r1_o2_already_resolved_test
+isolated-pg: afldb_v2_r1_o2_already_resolved_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running bash
+{"clusterName": "afldb_v2_isolated", "database": "afldb_v2_r1_o2_already_resolved_test", "databaseComment": "afldb-v2-isolated-test", "databaseOid": "20449", "host": "127.0.0.1", "port": 55493, "systemIdentifier": "7704133593388370608", "user": "afldb_owner"}
+{'match_coaches_2026': ['0', 'd41d8cd98f00b204e9800998ecf8427e'], 'sides_2026_without_coach': ['436', ''], 'import_batches_gt_82': ['0', ''], 'data_issues_41_76_unresolved': ['36', '502173a14897e11bb272498e5bf4ed6d'], 'user_triggers_touched_tables': ['1', 'match_coaches.match_coaches_club_in_match_trg']}
+--- plan: $W/venv/bin/python tools/v2/o2-converged-findings-production.py plan --target $W/evidence-private/rehearsal-1/o2_already_resolved/target.json --rehearsal --out $W/evidence-private/rehearsal-1/o2_already_resolved/plan.json
+Review plan 74c81407930cc88390892a41760dd48b8316bbfa223eb8b548720a00bd5785dc; no writes; 36 findings, 53 of 53 flagged fields equal; operation digest 1286f940098475a6; other findings appended since backup 0
+    (exit 0)
+CHECK PASS o2_already_resolved plan exit=0
+fixture o2-resolve-one: data_issues 41 resolved by another actor
+--- apply: $W/venv/bin/python tools/v2/o2-converged-findings-production.py apply --plan $W/evidence-private/rehearsal-1/o2_already_resolved/plan.json --rehearsal --out $W/evidence-private/rehearsal-1/o2_already_resolved/apply.json
+OUTCOME REFUSED_BEFORE_MUTATION (exit 1)
+REFUSED BEFORE MUTATION: a check failed before the writer was started; nothing was written.
+detail: Refused: data_issues 41 is not an unresolved canonical_apply_failed/foreign_source_owner finding of afl_api owned by AFLDB-ISSUE-122
+    (exit 1)
+CHECK PASS o2_already_resolved apply after one finding was resolved by another actor exit=1
+CHECK PASS o2_already_resolved apply says 'REFUSED_BEFORE_MUTATION'
+--- plan-again: $W/venv/bin/python tools/v2/o2-converged-findings-production.py plan --target $W/evidence-private/rehearsal-1/o2_already_resolved/target.json --rehearsal --out $W/evidence-private/rehearsal-1/o2_already_resolved/plan-again.json
+OUTCOME REFUSED_BEFORE_MUTATION (exit 1)
+O2 refused: data_issues 41 is not an unresolved canonical_apply_failed/foreign_source_owner finding of afl_api owned by AFLDB-ISSUE-122
+    (exit 1)
+CHECK PASS o2_already_resolved plan with one already-resolved finding exit=1
+CHECK PASS o2_already_resolved plan-again says 'not an unresolved'
+CHECK PASS digests unchanged data_issues_other,player_match_stats_flagged_rows
+SCENARIO DONE o2_already_resolved
+scenario exit 0

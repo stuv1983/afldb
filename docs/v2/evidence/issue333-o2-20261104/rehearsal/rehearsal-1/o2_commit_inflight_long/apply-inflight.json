@@ -1,0 +1,14 @@
+{
+  "planDigest": "e1a2f7d985c505075605e8ea7b33d344989da316f4c1823d4fbf16877eb7ac37",
+  "outcome": "OUTCOME_UNDETERMINED",
+  "exitCode": 5,
+  "statement": "OUTCOME UNDETERMINED: the tool could not establish whether the writer committed. Do NOT assume it rolled back and do NOT retry; read the state with the read-only `state` mode against the same plan.",
+  "problems": [],
+  "detail": "the writer exited -9 and the live state was unreadable",
+  "at": "2026-11-04T02:31:09.626Z",
+  "writer": {
+    "exit": -9,
+    "writerExit": -9,
+    "writerSaid": []
+  }
+}

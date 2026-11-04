@@ -1,0 +1,5 @@
+=== writer exit -9
+--- stdout
+
+--- stderr
+

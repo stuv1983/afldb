@@ -1,0 +1,3 @@
+OUTCOME REFUSED_BEFORE_MUTATION (exit 1)
+REFUSED BEFORE MUTATION: a check failed before the writer was started; nothing was written.
+detail: Refused: another writer session of this operation is live

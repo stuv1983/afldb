@@ -1,0 +1,6 @@
+﻿== prep: verify upload, extract, pin 2026-11-04T02:10:10Z
+ops_checkout=/home/arm/ops/issue333-o2-50ed6e4f/cand HEAD=50ed6e4f4a697160ef263ade293792363e52e975 tracked=4415 dirty=0 node=v22.23.2 python=3.12.3 3.3.4
+prod_checkout_unchanged: head=d00e07e37566e92b35a34e62a1ff03e173715e87 status_lines=0
+tools/v2/issue333-coach-assignments-production.py tool-hashes: 5919be7ec2b51664
+tools/v2/o2-converged-findings-production.py tool-hashes: 784ac23a4893adbb
+== DONE 2026-11-04T02:10:23Z

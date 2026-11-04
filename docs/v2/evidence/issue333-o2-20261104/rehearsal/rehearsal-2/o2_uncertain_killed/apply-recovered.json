@@ -1,0 +1,16 @@
+{
+  "planDigest": "e85da70201d4628e7b2ce5ac5909602de13d1b9c4190a039880ca04d11434e87",
+  "outcome": "ROLLED_BACK",
+  "exitCode": 2,
+  "statement": "ROLLED BACK: the writer failed and an independent read-only check proves the database holds its pre-run state (sequence values consumed by the attempt are not returned).",
+  "problems": [],
+  "detail": "the writer exited 3; a fresh read-only session sees the pre-run state",
+  "at": "2026-11-04T02:35:47.439Z",
+  "writer": {
+    "exit": 3,
+    "writerExit": 3,
+    "writerSaid": [
+      "O2 writer: FAILED (LockNotAvailable); the transaction was rolled back if it was open"
+    ]
+  }
+}

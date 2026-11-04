@@ -1,0 +1,38 @@
+create-db: afldb_v2_r1_i333_happy_test created from afldb_v2_i333o2_b20261104t021037z_rst_test and marked
+ISOLATED TARGET OK: afldb_v2_r1_i333_happy_test
+isolated-pg: afldb_v2_r1_i333_happy_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running bash
+{"clusterName": "afldb_v2_isolated", "database": "afldb_v2_r1_i333_happy_test", "databaseComment": "afldb-v2-isolated-test", "databaseOid": "20420", "host": "127.0.0.1", "port": 55493, "systemIdentifier": "7704133593388370608", "user": "afldb_owner"}
+{'match_coaches_2026': ['0', 'd41d8cd98f00b204e9800998ecf8427e'], 'sides_2026_without_coach': ['436', ''], 'import_batches_gt_82': ['0', ''], 'data_issues_41_76_unresolved': ['36', '502173a14897e11bb272498e5bf4ed6d'], 'user_triggers_touched_tables': ['1', 'match_coaches.match_coaches_club_in_match_trg']}
+coach 243: games 0 W 0 D 0 L 0
+coach 293: games 0 W 0 D 0 L 0
+listCoaches rows 386 games total 32034 digest a07c9bea7aa9682d (db afldb_v2_r1_i333_happy_test, user afldb_app)
+--- plan: $W/venv/bin/python tools/v2/issue333-coach-assignments-production.py plan --target $W/evidence-private/rehearsal-1/i333_happy/target.json --core-tar $W/in/core.tar --staging-dir $W/evidence-private/rehearsal-1/i333_happy/staging-plan --rehearsal --out $W/evidence-private/rehearsal-1/i333_happy/plan.json
+Review plan 52aa2c1a8deea484c7b713ab4c278a1f253678eff4c1bc86ccefa47da0bb0e2c; no writes (read-only session, SELECT-only cursor); 436 new assignments over 218 matches; operation digest d5ddb146a0e72c79; new rows 33f5b466cab2adb2; batches appended since backup 0
+    (exit 0)
+CHECK PASS i333_happy plan exit=0
+--- apply: $W/venv/bin/python tools/v2/issue333-coach-assignments-production.py apply --plan $W/evidence-private/rehearsal-1/i333_happy/plan.json --rehearsal --out $W/evidence-private/rehearsal-1/i333_happy/apply.json
+OUTCOME COMMITTED_VERIFIED (exit 0)
+COMMITTED AND VERIFIED: the writer committed and an independent read-only check of the committed state passed.
+    (exit 0)
+CHECK PASS i333_happy apply exit=0
+CHECK PASS i333_happy apply says 'COMMITTED_VERIFIED'
+--- state: $W/venv/bin/python tools/v2/issue333-coach-assignments-production.py state --plan $W/evidence-private/rehearsal-1/i333_happy/plan.json --out $W/evidence-private/rehearsal-1/i333_happy/state.json
+STATE PLANNED RESULT PRESENT (exactly the reviewed 436 assignments were added)
+    (exit 0)
+CHECK PASS i333_happy state exit=0
+CHECK PASS i333_happy state says 'PLANNED RESULT PRESENT'
+CHECK PASS digests unchanged match_coaches_not_2026,coaches,import_batches_le_82,import_rejections,data_issues_41_76_unresolved,data_issues_other
+{'match_coaches_2026': ['436', 'f57422f5de3a896aaa218b38de1938fb'], 'sides_2026_without_coach': ['0', ''], 'import_batches_gt_82': ['1', '83:add_match_coaches_2026.py:completed:436']}
+coach 243: games 23 W 7 D 0 L 16
+coach 293: games 16 W 12 D 1 L 3
+listCoaches rows 386 games total 32470 digest 2da45fca2b597cb8 (db afldb_v2_r1_i333_happy_test, user afldb_app)
+--- apply-second: $W/venv/bin/python tools/v2/issue333-coach-assignments-production.py apply --plan $W/evidence-private/rehearsal-1/i333_happy/plan.json --rehearsal --out $W/evidence-private/rehearsal-1/i333_happy/apply-second.json
+OUTCOME REFUSED_BEFORE_MUTATION (exit 1)
+REFUSED BEFORE MUTATION: a check failed before the writer was started; nothing was written.
+detail: Refused: the new set is not exactly the reviewed 436 season-2026 assignments (both sides of all 218 matches): 0 new, seasons [], matches 0 of 218
+    (exit 1)
+CHECK PASS i333_happy second apply of the same plan exit=1
+CHECK PASS i333_happy apply-second says 'REFUSED_BEFORE_MUTATION'
+CHECK PASS second apply wrote nothing
+SCENARIO DONE i333_happy
+scenario exit 0

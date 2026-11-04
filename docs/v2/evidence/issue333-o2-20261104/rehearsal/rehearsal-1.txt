@@ -1,0 +1,174 @@
+/dev/sdf1       938G  100G  791G  12% /mnt/ssd
+DEV services BEFORE:
+afldb.service active MainPID=1677
+postgresql@16-main.service active MainPID=1536
+pg_ctl: server is running (PID: 1143392)
+/usr/lib/postgresql/16/bin/postgres "-D" "/mnt/ssd/afldb-issue333-o2-20261104/pg-root/data"
+LISTEN 0      600        127.0.0.1:55493      0.0.0.0:*    users:(("postgres",pid=1143392,fd=7))     
+2026-11-04T02:14:36Z SCENARIO i333_happy on afldb_v2_r1_i333_happy_test (clone of afldb_v2_i333o2_b20261104t021037z_rst_test)
+CHECK PASS i333_happy plan exit=0
+CHECK PASS i333_happy apply exit=0
+CHECK PASS i333_happy apply says 'COMMITTED_VERIFIED'
+CHECK PASS i333_happy state exit=0
+CHECK PASS i333_happy state says 'PLANNED RESULT PRESENT'
+CHECK PASS digests unchanged match_coaches_not_2026,coaches,import_batches_le_82,import_rejections,data_issues_41_76_unresolved,data_issues_other
+CHECK PASS i333_happy second apply of the same plan exit=1
+CHECK PASS i333_happy apply-second says 'REFUSED_BEFORE_MUTATION'
+CHECK PASS second apply wrote nothing
+SCENARIO DONE i333_happy
+2026-11-04T02:16:32Z SCENARIO i333_conflict on afldb_v2_r1_i333_conflict_test (clone of afldb_v2_i333o2_b20261104t021037z_rst_test)
+CHECK PASS i333_conflict plan over a pre-existing 2026 assignment exit=1
+CHECK PASS i333_conflict plan says 'REFUSED_BEFORE_MUTATION'
+SCENARIO DONE i333_conflict
+2026-11-04T02:17:10Z SCENARIO i333_drift on afldb_v2_r1_i333_drift_test (clone of afldb_v2_i333o2_b20261104t021037z_rst_test)
+CHECK PASS i333_drift plan exit=0
+CHECK PASS i333_drift apply after a coaches row changed exit=1
+CHECK PASS i333_drift apply says 'baseline drift'
+CHECK PASS digests unchanged match_coaches_not_2026,match_coaches_2026,import_batches_le_82,import_batches_gt_82
+SCENARIO DONE i333_drift
+2026-11-04T02:18:04Z SCENARIO i333_rollback_commit on afldb_v2_r1_i333_rollback_commit_test (clone of afldb_v2_i333o2_b20261104t021037z_rst_test)
+CHECK PASS i333_rollback_commit plan (clone-only trigger is in the baseline) exit=0
+CHECK PASS i333_rollback_commit apply whose COMMIT fails exit=2
+CHECK PASS i333_rollback_commit apply says 'ROLLED_BACK'
+CHECK PASS i333_rollback_commit state exit=0
+CHECK PASS i333_rollback_commit state says 'BASELINE'
+CHECK PASS digests unchanged match_coaches_not_2026,match_coaches_2026,coaches,import_batches_le_82,import_batches_gt_82
+SCENARIO DONE i333_rollback_commit
+2026-11-04T02:19:38Z SCENARIO i333_rollback_surplus on afldb_v2_r1_i333_rollback_surplus_test (clone of afldb_v2_i333o2_b20261104t021037z_rst_test)
+CHECK PASS i333_rollback_surplus plan (clone-only trigger is in the baseline) exit=0
+CHECK PASS i333_rollback_surplus apply with a surplus trigger write exit=2
+CHECK PASS i333_rollback_surplus apply says 'ROLLED_BACK'
+CHECK PASS i333_rollback_surplus state exit=0
+CHECK PASS i333_rollback_surplus state says 'BASELINE'
+CHECK PASS digests unchanged match_coaches_not_2026,match_coaches_2026,coaches,import_batches_le_82,import_batches_gt_82
+SCENARIO DONE i333_rollback_surplus
+2026-11-04T02:21:10Z SCENARIO i333_rollback_preserve on afldb_v2_r1_i333_rollback_preserve_test (clone of afldb_v2_i333o2_b20261104t021037z_rst_test)
+CHECK PASS i333_rollback_preserve plan (clone-only trigger is in the baseline) exit=0
+CHECK PASS i333_rollback_preserve apply whose transaction also changed a pre-existing assignment exit=2
+CHECK PASS i333_rollback_preserve apply says 'ROLLED_BACK'
+CHECK PASS i333_rollback_preserve state exit=0
+CHECK PASS i333_rollback_preserve state says 'BASELINE'
+CHECK PASS digests unchanged match_coaches_not_2026,match_coaches_2026,coaches,import_batches_le_82,import_batches_gt_82
+SCENARIO DONE i333_rollback_preserve
+2026-11-04T02:22:41Z SCENARIO i333_commit_inflight on afldb_v2_r1_i333_commit_inflight_test (clone of afldb_v2_i333o2_b20261104t021037z_rst_test)
+CHECK PASS i333_commit_inflight plan exit=0
+CHECK PASS i333_commit_inflight ceremony after its writer was killed mid-COMMIT (commit completes within the wait) exit=0
+CHECK PASS i333_commit_inflight apply-inflight says 'COMMITTED_VERIFIED'
+CHECK PASS i333_commit_inflight outcome record carries writerFailedAfterCommit
+CHECK PASS i333_commit_inflight state exit=0
+CHECK PASS i333_commit_inflight state says 'PLANNED RESULT PRESENT'
+CHECK PASS digests unchanged match_coaches_not_2026,coaches,import_batches_le_82,import_rejections,data_issues_41_76_unresolved,data_issues_other
+SCENARIO DONE i333_commit_inflight
+2026-11-04T02:24:29Z SCENARIO i333_commit_inflight_long on afldb_v2_r1_i333_commit_inflight_long_test (clone of afldb_v2_i333o2_b20261104t021037z_rst_test)
+CHECK PASS i333_commit_inflight_long plan exit=0
+CHECK PASS i333_commit_inflight_long ceremony while the killed writer's COMMIT outlasts the 30 s wait exit=5
+CHECK PASS i333_commit_inflight_long apply-inflight says 'OUTCOME_UNDETERMINED'
+CHECK PASS i333_commit_inflight_long state while the writer session is live exit=6
+CHECK PASS i333_commit_inflight_long state-while-live says 'UNDETERMINED'
+CHECK PASS i333_commit_inflight_long state after the session ended exit=0
+CHECK PASS i333_commit_inflight_long state says 'PLANNED RESULT PRESENT'
+SCENARIO DONE i333_commit_inflight_long
+2026-11-04T02:26:50Z SCENARIO i333_uncertain_committed on afldb_v2_r1_i333_uncertain_committed_test (clone of afldb_v2_i333o2_b20261104t021037z_rst_test)
+CHECK PASS i333_uncertain_committed plan exit=0
+CHECK PASS i333_uncertain_committed writer alone (no ceremony probe) exit=0
+CHECK PASS i333_uncertain_committed state after an unclassified run exit=0
+CHECK PASS i333_uncertain_committed state says 'PLANNED RESULT PRESENT'
+CHECK PASS i333_uncertain_committed apply after the unclassified commit exit=1
+CHECK PASS i333_uncertain_committed apply-after says 'REFUSED_BEFORE_MUTATION'
+CHECK PASS digests unchanged match_coaches_not_2026,coaches,import_batches_le_82,import_rejections,data_issues_41_76_unresolved,data_issues_other
+SCENARIO DONE i333_uncertain_committed
+2026-11-04T02:28:21Z SCENARIO i333_uncertain_killed on afldb_v2_r1_i333_uncertain_killed_test (clone of afldb_v2_i333o2_b20261104t021037z_rst_test)
+CHECK PASS i333_uncertain_killed plan exit=0
+CHECK PASS i333_uncertain_killed killed ceremony left no outcome record
+CHECK FAIL i333_uncertain_killed state after the kill exit=6 expected=0
+CHECK FAIL i333_uncertain_killed state lacks 'BASELINE'
+CHECK FAIL i333_uncertain_killed the same plan applied after the kill was classified BASELINE exit=1 expected=0
+CHECK FAIL i333_uncertain_killed apply-recovered lacks 'COMMITTED_VERIFIED'
+CHECK PASS digests unchanged match_coaches_not_2026,coaches,import_batches_le_82,import_rejections,data_issues_41_76_unresolved,data_issues_other
+SCENARIO DONE i333_uncertain_killed
+2026-11-04T02:29:54Z SCENARIO o2_happy on afldb_v2_r1_o2_happy_test (clone of afldb_v2_i333o2_b20261104t021037z_rst_test)
+CHECK PASS o2_happy plan exit=0
+CHECK PASS o2_happy apply exit=0
+CHECK PASS o2_happy apply says 'COMMITTED_VERIFIED'
+CHECK PASS o2_happy state exit=0
+CHECK PASS o2_happy state says 'PLANNED RESULT PRESENT'
+CHECK PASS digests unchanged match_coaches_not_2026,match_coaches_2026,coaches,import_batches_le_82,import_batches_gt_82,data_issues_41_76_fixed_columns,data_issues_other,player_match_stats_flagged_rows
+CHECK PASS o2_happy second apply of the same plan exit=1
+CHECK PASS o2_happy apply-second says 'REFUSED_BEFORE_MUTATION'
+SCENARIO DONE o2_happy
+2026-11-04T02:30:01Z SCENARIO o2_drift on afldb_v2_r1_o2_drift_test (clone of afldb_v2_i333o2_b20261104t021037z_rst_test)
+CHECK PASS o2_drift plan exit=0
+CHECK PASS o2_drift apply after a canonical value changed exit=1
+CHECK PASS o2_drift apply says 'REFUSED_BEFORE_MUTATION'
+CHECK PASS o2_drift plan after the drift (field no longer converged) exit=1
+CHECK PASS o2_drift plan-again says 'NOT equal'
+CHECK PASS digests unchanged data_issues_41_76_unresolved,data_issues_other
+SCENARIO DONE o2_drift
+2026-11-04T02:30:09Z SCENARIO o2_already_resolved on afldb_v2_r1_o2_already_resolved_test (clone of afldb_v2_i333o2_b20261104t021037z_rst_test)
+CHECK PASS o2_already_resolved plan exit=0
+CHECK PASS o2_already_resolved apply after one finding was resolved by another actor exit=1
+CHECK PASS o2_already_resolved apply says 'REFUSED_BEFORE_MUTATION'
+CHECK PASS o2_already_resolved plan with one already-resolved finding exit=1
+CHECK PASS o2_already_resolved plan-again says 'not an unresolved'
+CHECK PASS digests unchanged data_issues_other,player_match_stats_flagged_rows
+SCENARIO DONE o2_already_resolved
+2026-11-04T02:30:16Z SCENARIO o2_rollback_commit on afldb_v2_r1_o2_rollback_commit_test (clone of afldb_v2_i333o2_b20261104t021037z_rst_test)
+CHECK PASS o2_rollback_commit plan (clone-only trigger is in the baseline) exit=0
+CHECK PASS o2_rollback_commit apply whose COMMIT fails exit=2
+CHECK PASS o2_rollback_commit apply says 'ROLLED_BACK'
+CHECK PASS o2_rollback_commit state exit=0
+CHECK PASS o2_rollback_commit state says 'BASELINE'
+CHECK PASS digests unchanged data_issues_41_76_unresolved,data_issues_other
+SCENARIO DONE o2_rollback_commit
+2026-11-04T02:30:24Z SCENARIO o2_rollback_surplus on afldb_v2_r1_o2_rollback_surplus_test (clone of afldb_v2_i333o2_b20261104t021037z_rst_test)
+CHECK PASS o2_rollback_surplus plan (clone-only trigger is in the baseline) exit=0
+CHECK PASS o2_rollback_surplus apply with a surplus trigger write exit=2
+CHECK PASS o2_rollback_surplus apply says 'ROLLED_BACK'
+CHECK PASS o2_rollback_surplus state exit=0
+CHECK PASS o2_rollback_surplus state says 'BASELINE'
+CHECK PASS digests unchanged data_issues_41_76_unresolved,data_issues_other
+SCENARIO DONE o2_rollback_surplus
+2026-11-04T02:30:31Z SCENARIO o2_commit_inflight_long on afldb_v2_r1_o2_commit_inflight_long_test (clone of afldb_v2_i333o2_b20261104t021037z_rst_test)
+CHECK PASS o2_commit_inflight_long plan exit=0
+CHECK PASS o2_commit_inflight_long ceremony while the killed writer's COMMIT outlasts the 30 s wait exit=5
+CHECK PASS o2_commit_inflight_long apply-inflight says 'OUTCOME_UNDETERMINED'
+CHECK PASS o2_commit_inflight_long state while the writer session is live exit=6
+CHECK PASS o2_commit_inflight_long state-while-live says 'UNDETERMINED'
+CHECK PASS o2_commit_inflight_long state after the session ended exit=0
+CHECK PASS o2_commit_inflight_long state says 'PLANNED RESULT PRESENT'
+SCENARIO DONE o2_commit_inflight_long
+2026-11-04T02:31:29Z SCENARIO o2_uncertain_committed on afldb_v2_r1_o2_uncertain_committed_test (clone of afldb_v2_i333o2_b20261104t021037z_rst_test)
+CHECK PASS o2_uncertain_committed plan exit=0
+CHECK PASS o2_uncertain_committed writer alone (no ceremony probe) exit=0
+CHECK PASS o2_uncertain_committed state after an unclassified run exit=0
+CHECK PASS o2_uncertain_committed state says 'PLANNED RESULT PRESENT'
+CHECK PASS o2_uncertain_committed apply after the unclassified commit exit=1
+CHECK PASS o2_uncertain_committed apply-after says 'REFUSED_BEFORE_MUTATION'
+SCENARIO DONE o2_uncertain_committed
+2026-11-04T02:31:36Z SCENARIO o2_uncertain_killed on afldb_v2_r1_o2_uncertain_killed_test (clone of afldb_v2_i333o2_b20261104t021037z_rst_test)
+CHECK PASS o2_uncertain_killed plan exit=0
+CHECK PASS o2_uncertain_killed killed ceremony left no outcome record
+CHECK FAIL o2_uncertain_killed state after the kill exit=6 expected=0
+CHECK FAIL o2_uncertain_killed state lacks 'BASELINE'
+CHECK FAIL o2_uncertain_killed the same plan applied after the kill was classified BASELINE exit=1 expected=0
+CHECK FAIL o2_uncertain_killed apply-recovered lacks 'COMMITTED_VERIFIED'
+SCENARIO DONE o2_uncertain_killed
+2026-11-04T02:31:46Z stop the cluster
+waiting for server to shut down..... done
+server stopped
+DEV services AFTER:
+afldb.service active MainPID=1677
+postgresql@16-main.service active MainPID=1536
+DEV services unchanged
+== SUMMARY
+      8 CHECK FAIL
+     97 CHECK PASS
+CHECK FAIL i333_uncertain_killed state after the kill exit=6 expected=0
+CHECK FAIL i333_uncertain_killed state lacks 'BASELINE'
+CHECK FAIL i333_uncertain_killed the same plan applied after the kill was classified BASELINE exit=1 expected=0
+CHECK FAIL i333_uncertain_killed apply-recovered lacks 'COMMITTED_VERIFIED'
+CHECK FAIL o2_uncertain_killed state after the kill exit=6 expected=0
+CHECK FAIL o2_uncertain_killed state lacks 'BASELINE'
+CHECK FAIL o2_uncertain_killed the same plan applied after the kill was classified BASELINE exit=1 expected=0
+CHECK FAIL o2_uncertain_killed apply-recovered lacks 'COMMITTED_VERIFIED'
+2026-11-04T02:31:50Z DONE rc=0

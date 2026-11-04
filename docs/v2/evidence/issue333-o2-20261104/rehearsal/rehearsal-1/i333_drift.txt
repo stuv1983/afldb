@@ -1,0 +1,21 @@
+create-db: afldb_v2_r1_i333_drift_test created from afldb_v2_i333o2_b20261104t021037z_rst_test and marked
+ISOLATED TARGET OK: afldb_v2_r1_i333_drift_test
+isolated-pg: afldb_v2_r1_i333_drift_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running bash
+{"clusterName": "afldb_v2_isolated", "database": "afldb_v2_r1_i333_drift_test", "databaseComment": "afldb-v2-isolated-test", "databaseOid": "20426", "host": "127.0.0.1", "port": 55493, "systemIdentifier": "7704133593388370608", "user": "afldb_owner"}
+{'match_coaches_2026': ['0', 'd41d8cd98f00b204e9800998ecf8427e'], 'sides_2026_without_coach': ['436', ''], 'import_batches_gt_82': ['0', ''], 'data_issues_41_76_unresolved': ['36', '502173a14897e11bb272498e5bf4ed6d'], 'user_triggers_touched_tables': ['1', 'match_coaches.match_coaches_club_in_match_trg']}
+--- plan: $W/venv/bin/python tools/v2/issue333-coach-assignments-production.py plan --target $W/evidence-private/rehearsal-1/i333_drift/target.json --core-tar $W/in/core.tar --staging-dir $W/evidence-private/rehearsal-1/i333_drift/staging-plan --rehearsal --out $W/evidence-private/rehearsal-1/i333_drift/plan.json
+Review plan 88a7e6fd709c3ba5ddafddc0b6e6727b801d9cc42c8533b7ca106ca1afd4daf2; no writes (read-only session, SELECT-only cursor); 436 new assignments over 218 matches; operation digest d5ddb146a0e72c79; new rows 33f5b466cab2adb2; batches appended since backup 0
+    (exit 0)
+CHECK PASS i333_drift plan exit=0
+fixture i333-drift-coach: one coaches.notes changed
+--- apply: $W/venv/bin/python tools/v2/issue333-coach-assignments-production.py apply --plan $W/evidence-private/rehearsal-1/i333_drift/plan.json --rehearsal --out $W/evidence-private/rehearsal-1/i333_drift/apply.json
+OUTCOME REFUSED_BEFORE_MUTATION (exit 1)
+REFUSED BEFORE MUTATION: a check failed before the writer was started; nothing was written.
+detail: Refused: baseline drift (or a changed staging directory); re-plan and obtain new execution approval
+    (exit 1)
+CHECK PASS i333_drift apply after a coaches row changed exit=1
+CHECK PASS i333_drift apply says 'baseline drift'
+{'match_coaches_2026': ['0', 'd41d8cd98f00b204e9800998ecf8427e'], 'sides_2026_without_coach': ['436', ''], 'import_batches_gt_82': ['0', '']}
+CHECK PASS digests unchanged match_coaches_not_2026,match_coaches_2026,import_batches_le_82,import_batches_gt_82
+SCENARIO DONE i333_drift
+scenario exit 0

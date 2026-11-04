@@ -1,0 +1,2 @@
+OUTCOME REFUSED_BEFORE_MUTATION (exit 1)
+ISSUE-333 refused: 1 stored assignments conflict with the source (pre-existing assignment conflict), e.g. ['2026|10|2026-05-07|Fremantle|Hawthorn@Fremantle']

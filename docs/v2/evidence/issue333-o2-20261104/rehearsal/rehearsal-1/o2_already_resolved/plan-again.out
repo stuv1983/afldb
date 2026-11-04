@@ -1,0 +1,2 @@
+OUTCOME REFUSED_BEFORE_MUTATION (exit 1)
+O2 refused: data_issues 41 is not an unresolved canonical_apply_failed/foreign_source_owner finding of afl_api owned by AFLDB-ISSUE-122

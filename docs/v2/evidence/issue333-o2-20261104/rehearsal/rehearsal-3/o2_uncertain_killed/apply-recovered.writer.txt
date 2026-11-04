@@ -1,0 +1,6 @@
+=== writer exit 0
+--- stdout
+O2 writer: COMMITTED {"committed": true, "resolvedAt": "2026-11-04T02:39:04.478108+00:00", "settings": {"TimeZone": "UTC", "lock_timeout": "5s", "statement_timeout": "5min", "track_counts": "on", "transaction_read_only": "off"}, "updated": 36}
+
+--- stderr
+

@@ -1,0 +1,69 @@
+{
+  "target": {
+    "host": "localhost",
+    "port": 5432,
+    "database": "afldb_prod",
+    "user": "afldb_backup",
+    "systemIdentifier": "7674454702926115004",
+    "databaseOid": "66668",
+    "clusterName": "16/main",
+    "databaseComment": null
+  },
+  "sha256": "e77c307d3e0cddcb652e398a946e4c22c2063f13c70edadf96a975c92842826d",
+  "restoreEvidenceSha256": "07e1f6942df51dff90e045b942d5c35cf3585f35d6b36c53d09489c3e987c6f1",
+  "capturedAt": "2026-11-04T02:10:38.102Z",
+  "restoredAt": "2026-11-04T02:13:31.072Z",
+  "baselineDigest": "d8c8cd943e9f732eae0cfdf93d8c84001b83fc287b5dce952ad780fdf0b76644",
+  "o2OperationDigest": "1286f940098475a648e992784b152dadaef0a6c13d389e3caf7808edaba77551",
+  "o2ComparisonDigest": "8cbcb7203bc072e076c64c415807bd011d2a6f8cf0c900db515bd0e650a3da4e",
+  "o2Others": {
+    "rows": 4,
+    "maxId": 4,
+    "fullRowDigest": "7eed5860df42f268de66accae4036a42b02e9c20d67f7a117a4bc39554fefbc4"
+  },
+  "assembly": {
+    "format": "afldb.gap029.restore-evidence-assembly.1",
+    "stage": "O2",
+    "operation": "o2-converged-findings",
+    "revision": "50ed6e4f4a697160ef263ade293792363e52e975",
+    "assembledAt": "2026-11-04T02:14:07.645Z",
+    "restoreTarget": {
+      "host": "127.0.0.1",
+      "port": 55493,
+      "database": "afldb_v2_i333o2_b20261104t021037z_rst_test",
+      "user": "afldb_owner",
+      "systemIdentifier": "7704133593388370608",
+      "databaseOid": "16390",
+      "clusterName": "afldb_v2_isolated",
+      "databaseComment": "afldb-v2-isolated-test"
+    },
+    "inputs": {
+      "dumpSha256": "e77c307d3e0cddcb652e398a946e4c22c2063f13c70edadf96a975c92842826d",
+      "restoreEvidenceSha256": "07e1f6942df51dff90e045b942d5c35cf3585f35d6b36c53d09489c3e987c6f1",
+      "toolSha256": {
+        "tools/rebuild/draftguru/bridge_import_gate.py": "fbce43f7f1e374b3dfac05968e627b8ad9f337279f233a49bc19ff57d02d558d",
+        "tools/v2/gap029-draft-link-production.py": "97aff072b6a9dbe9b9e16f91b30afc573a264c14faf034be4d98fe658825bded",
+        "tools/v2/gap029_common.py": "ddefab1e69ca5ed8e02b32d9eead4f3a790a84b7012e345f94092eaff31231e7",
+        "tools/v2/issue333_o2_common.py": "06af487a19c17eed41dbaa99b44b1d8012e93313680cefdfe31a0803e346a57c",
+        "tools/v2/o2-converged-findings-production.py": "39ef3878b8bd888177f606a4dde0f262ee46e2a77aee41f19fdeb9b1d06f7337",
+        "tools/v2/o2_converged_findings.py": "0dbd09c96391edc7c733f46047c6e08ac48fd80f40274549b26f9b117da8c078"
+      }
+    },
+    "derived": {
+      "mode": "plan --rehearsal",
+      "outputSha256": "a91ba3d9493bd3ec058f48eb9abe8db1258ce09e2eb2108687a5b8e09b69dadd",
+      "values": {
+        "baselineDigest": "d8c8cd943e9f732eae0cfdf93d8c84001b83fc287b5dce952ad780fdf0b76644",
+        "o2OperationDigest": "1286f940098475a648e992784b152dadaef0a6c13d389e3caf7808edaba77551",
+        "o2ComparisonDigest": "8cbcb7203bc072e076c64c415807bd011d2a6f8cf0c900db515bd0e650a3da4e",
+        "o2Others": {
+          "rows": 4,
+          "maxId": 4,
+          "fullRowDigest": "7eed5860df42f268de66accae4036a42b02e9c20d67f7a117a4bc39554fefbc4"
+        }
+      }
+    },
+    "sealedBody": "{\"assembly\":{\"assembledAt\":\"2026-11-04T02:14:07.645Z\",\"derived\":{\"mode\":\"plan --rehearsal\",\"outputSha256\":\"a91ba3d9493bd3ec058f48eb9abe8db1258ce09e2eb2108687a5b8e09b69dadd\",\"values\":{\"baselineDigest\":\"d8c8cd943e9f732eae0cfdf93d8c84001b83fc287b5dce952ad780fdf0b76644\",\"o2ComparisonDigest\":\"8cbcb7203bc072e076c64c415807bd011d2a6f8cf0c900db515bd0e650a3da4e\",\"o2OperationDigest\":\"1286f940098475a648e992784b152dadaef0a6c13d389e3caf7808edaba77551\",\"o2Others\":{\"fullRowDigest\":\"7eed5860df42f268de66accae4036a42b02e9c20d67f7a117a4bc39554fefbc4\",\"maxId\":4,\"rows\":4}}},\"format\":\"afldb.gap029.restore-evidence-assembly.1\",\"inputs\":{\"dumpSha256\":\"e77c307d3e0cddcb652e398a946e4c22c2063f13c70edadf96a975c92842826d\",\"restoreEvidenceSha256\":\"07e1f6942df51dff90e045b942d5c35cf3585f35d6b36c53d09489c3e987c6f1\",\"toolSha256\":{\"tools/rebuild/draftguru/bridge_import_gate.py\":\"fbce43f7f1e374b3dfac05968e627b8ad9f337279f233a49bc19ff57d02d558d\",\"tools/v2/gap029-draft-link-production.py\":\"97aff072b6a9dbe9b9e16f91b30afc573a264c14faf034be4d98fe658825bded\",\"tools/v2/gap029_common.py\":\"ddefab1e69ca5ed8e02b32d9eead4f3a790a84b7012e345f94092eaff31231e7\",\"tools/v2/issue333_o2_common.py\":\"06af487a19c17eed41dbaa99b44b1d8012e93313680cefdfe31a0803e346a57c\",\"tools/v2/o2-converged-findings-production.py\":\"39ef3878b8bd888177f606a4dde0f262ee46e2a77aee41f19fdeb9b1d06f7337\",\"tools/v2/o2_converged_findings.py\":\"0dbd09c96391edc7c733f46047c6e08ac48fd80f40274549b26f9b117da8c078\"}},\"operation\":\"o2-converged-findings\",\"restoreTarget\":{\"clusterName\":\"afldb_v2_isolated\",\"database\":\"afldb_v2_i333o2_b20261104t021037z_rst_test\",\"databaseComment\":\"afldb-v2-isolated-test\",\"databaseOid\":\"16390\",\"host\":\"127.0.0.1\",\"port\":55493,\"systemIdentifier\":\"7704133593388370608\",\"user\":\"afldb_owner\"},\"revision\":\"50ed6e4f4a697160ef263ade293792363e52e975\",\"stage\":\"O2\"},\"baselineDigest\":\"d8c8cd943e9f732eae0cfdf93d8c84001b83fc287b5dce952ad780fdf0b76644\",\"capturedAt\":\"2026-11-04T02:10:38.102Z\",\"o2ComparisonDigest\":\"8cbcb7203bc072e076c64c415807bd011d2a6f8cf0c900db515bd0e650a3da4e\",\"o2OperationDigest\":\"1286f940098475a648e992784b152dadaef0a6c13d389e3caf7808edaba77551\",\"o2Others\":{\"fullRowDigest\":\"7eed5860df42f268de66accae4036a42b02e9c20d67f7a117a4bc39554fefbc4\",\"maxId\":4,\"rows\":4},\"restoreEvidenceSha256\":\"07e1f6942df51dff90e045b942d5c35cf3585f35d6b36c53d09489c3e987c6f1\",\"restoredAt\":\"2026-11-04T02:13:31.072Z\",\"sha256\":\"e77c307d3e0cddcb652e398a946e4c22c2063f13c70edadf96a975c92842826d\",\"target\":{\"clusterName\":\"16/main\",\"database\":\"afldb_prod\",\"databaseComment\":null,\"databaseOid\":\"66668\",\"host\":\"localhost\",\"port\":5432,\"systemIdentifier\":\"7674454702926115004\",\"user\":\"afldb_backup\"}}",
+    "sealedBodySha256": "2ff179ddaf8503b103ada384525255adcf941ab07059631a90163ff7fc14aaff"
+  }
+}

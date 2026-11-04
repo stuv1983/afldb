@@ -1,0 +1,16 @@
+{
+  "planDigest": "56b36f60d801d697c04b49d797e134729e5b16f9a6363938bc3815726c0ce4e4",
+  "outcome": "ROLLED_BACK",
+  "exitCode": 2,
+  "statement": "ROLLED BACK: the writer failed and an independent read-only check proves the database holds its pre-run state (sequence values consumed by the attempt are not returned).",
+  "problems": [],
+  "detail": "the writer exited 3; a fresh read-only session sees the pre-run state",
+  "at": "2026-11-04T02:19:37.413Z",
+  "writer": {
+    "exit": 3,
+    "writerExit": 3,
+    "writerSaid": [
+      "ISSUE-333 writer: FAILED (RaiseException); the transaction was rolled back if it was open"
+    ]
+  }
+}

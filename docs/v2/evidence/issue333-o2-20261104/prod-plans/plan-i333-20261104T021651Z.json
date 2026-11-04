@@ -1,0 +1,3276 @@
+{
+  "operation": "issue333-coach-assignments",
+  "revision": "50ed6e4f4a697160ef263ade293792363e52e975",
+  "target": {
+    "host": "localhost",
+    "port": 5432,
+    "database": "afldb_prod",
+    "user": "afldb_backup",
+    "systemIdentifier": "7674454702926115004",
+    "databaseOid": "66668",
+    "clusterName": "16/main",
+    "databaseComment": null
+  },
+  "rehearsal": false,
+  "baseline": {
+    "operation": {
+      "matchCoaches": {
+        "rows": 32034,
+        "fullRowDigest": "552006ea2be355a7f27c0b71f3ea0aa51e4aae5ec2549d660b28e3ba4594aed1"
+      },
+      "coaches": {
+        "rows": 386,
+        "fullRowDigest": "ebf943a13aeb91115f2b4022bc8ff52453702dc329072e36e1bd57c447059901"
+      },
+      "matches2026": {
+        "rows": 218,
+        "identityDigest": "e19ea1d34efb532b1696501d8e6414ec7192161c15e7e9fb2b0edf17cd54deca"
+      },
+      "coachOverrides": {
+        "rows": 0,
+        "fullRowDigest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "triggers": [
+        [
+          "match_coaches",
+          "match_coaches_club_in_match_trg",
+          "O",
+          "CREATE TRIGGER match_coaches_club_in_match_trg BEFORE INSERT OR UPDATE ON public.match_coaches FOR EACH ROW EXECUTE FUNCTION match_coaches_club_in_match()"
+        ]
+      ]
+    },
+    "operationDigest": "d5ddb146a0e72c799a4a131c2348bf86b15fa57e64231c6519f74ad364acc2de",
+    "importBatches": {
+      "rows": 75,
+      "maxId": 82,
+      "fullRowDigest": "a45d3f50613db5385f9a7fc316f79953e8dc20fcdb2ee1c75f90e5c65b64cb5b"
+    },
+    "importRejections": {
+      "rows": 681,
+      "maxId": 681
+    },
+    "baselineDigest": "8255e09459f7e8292b91bf654a56103a4849d7a38a627d026860c4d46da44714"
+  },
+  "newRows": {
+    "rows": [
+      [
+        17056,
+        9,
+        55,
+        10,
+        "2026|10|2026-05-07|Fremantle|Hawthorn@Fremantle"
+      ],
+      [
+        17056,
+        13,
+        76,
+        10,
+        "2026|10|2026-05-07|Fremantle|Hawthorn@Hawthorn"
+      ],
+      [
+        17057,
+        3,
+        39,
+        10,
+        "2026|10|2026-05-08|Brisbane Lions|Carlton@Brisbane Lions"
+      ],
+      [
+        17057,
+        4,
+        47,
+        10,
+        "2026|10|2026-05-08|Brisbane Lions|Carlton@Carlton"
+      ],
+      [
+        17058,
+        17,
+        243,
+        10,
+        "2026|10|2026-05-08|Port Adelaide|Western Bulldogs@Port Adelaide"
+      ],
+      [
+        17058,
+        24,
+        31,
+        10,
+        "2026|10|2026-05-08|Port Adelaide|Western Bulldogs@Western Bulldogs"
+      ],
+      [
+        17059,
+        5,
+        73,
+        10,
+        "2026|10|2026-05-09|Geelong|Collingwood@Collingwood"
+      ],
+      [
+        17059,
+        10,
+        16,
+        10,
+        "2026|10|2026-05-09|Geelong|Collingwood@Geelong"
+      ],
+      [
+        17060,
+        11,
+        17,
+        10,
+        "2026|10|2026-05-09|Gold Coast|St Kilda@Gold Coast"
+      ],
+      [
+        17060,
+        20,
+        14,
+        10,
+        "2026|10|2026-05-09|Gold Coast|St Kilda@St Kilda"
+      ],
+      [
+        17061,
+        6,
+        27,
+        10,
+        "2026|10|2026-05-09|Greater Western Sydney|Essendon@Essendon"
+      ],
+      [
+        17061,
+        12,
+        93,
+        10,
+        "2026|10|2026-05-09|Greater Western Sydney|Essendon@Greater Western Sydney"
+      ],
+      [
+        17062,
+        16,
+        8,
+        10,
+        "2026|10|2026-05-09|North Melbourne|Sydney@North Melbourne"
+      ],
+      [
+        17062,
+        21,
+        179,
+        10,
+        "2026|10|2026-05-09|North Melbourne|Sydney@Sydney"
+      ],
+      [
+        17063,
+        15,
+        232,
+        10,
+        "2026|10|2026-05-10|Melbourne|West Coast@Melbourne"
+      ],
+      [
+        17063,
+        23,
+        150,
+        10,
+        "2026|10|2026-05-10|Melbourne|West Coast@West Coast"
+      ],
+      [
+        17064,
+        1,
+        56,
+        10,
+        "2026|10|2026-05-10|Richmond|Adelaide@Adelaide"
+      ],
+      [
+        17064,
+        18,
+        131,
+        10,
+        "2026|10|2026-05-10|Richmond|Adelaide@Richmond"
+      ],
+      [
+        17065,
+        3,
+        39,
+        10,
+        "2026|11|2026-05-14|Brisbane Lions|Geelong@Brisbane Lions"
+      ],
+      [
+        17065,
+        10,
+        16,
+        10,
+        "2026|11|2026-05-14|Brisbane Lions|Geelong@Geelong"
+      ],
+      [
+        17066,
+        11,
+        17,
+        10,
+        "2026|11|2026-05-15|Gold Coast|Port Adelaide@Gold Coast"
+      ],
+      [
+        17066,
+        17,
+        243,
+        10,
+        "2026|11|2026-05-15|Gold Coast|Port Adelaide@Port Adelaide"
+      ],
+      [
+        17067,
+        5,
+        73,
+        10,
+        "2026|11|2026-05-15|Sydney|Collingwood@Collingwood"
+      ],
+      [
+        17067,
+        21,
+        179,
+        10,
+        "2026|11|2026-05-15|Sydney|Collingwood@Sydney"
+      ],
+      [
+        17068,
+        1,
+        56,
+        10,
+        "2026|11|2026-05-16|Adelaide|North Melbourne@Adelaide"
+      ],
+      [
+        17068,
+        16,
+        8,
+        10,
+        "2026|11|2026-05-16|Adelaide|North Melbourne@North Melbourne"
+      ],
+      [
+        17069,
+        4,
+        293,
+        10,
+        "2026|11|2026-05-16|Carlton|Western Bulldogs@Carlton"
+      ],
+      [
+        17069,
+        24,
+        31,
+        10,
+        "2026|11|2026-05-16|Carlton|Western Bulldogs@Western Bulldogs"
+      ],
+      [
+        17070,
+        13,
+        76,
+        10,
+        "2026|11|2026-05-16|Melbourne|Hawthorn@Hawthorn"
+      ],
+      [
+        17070,
+        15,
+        232,
+        10,
+        "2026|11|2026-05-16|Melbourne|Hawthorn@Melbourne"
+      ],
+      [
+        17071,
+        6,
+        27,
+        10,
+        "2026|11|2026-05-17|Essendon|Fremantle@Essendon"
+      ],
+      [
+        17071,
+        9,
+        55,
+        10,
+        "2026|11|2026-05-17|Essendon|Fremantle@Fremantle"
+      ],
+      [
+        17072,
+        18,
+        131,
+        10,
+        "2026|11|2026-05-17|St Kilda|Richmond@Richmond"
+      ],
+      [
+        17072,
+        20,
+        14,
+        10,
+        "2026|11|2026-05-17|St Kilda|Richmond@St Kilda"
+      ],
+      [
+        17073,
+        12,
+        93,
+        10,
+        "2026|11|2026-05-17|West Coast|Greater Western Sydney@Greater Western Sydney"
+      ],
+      [
+        17073,
+        23,
+        150,
+        10,
+        "2026|11|2026-05-17|West Coast|Greater Western Sydney@West Coast"
+      ],
+      [
+        17074,
+        1,
+        56,
+        10,
+        "2026|12|2026-05-21|Hawthorn|Adelaide@Adelaide"
+      ],
+      [
+        17074,
+        13,
+        76,
+        10,
+        "2026|12|2026-05-21|Hawthorn|Adelaide@Hawthorn"
+      ],
+      [
+        17075,
+        9,
+        55,
+        10,
+        "2026|12|2026-05-22|Fremantle|St Kilda@Fremantle"
+      ],
+      [
+        17075,
+        20,
+        14,
+        10,
+        "2026|12|2026-05-22|Fremantle|St Kilda@St Kilda"
+      ],
+      [
+        17076,
+        6,
+        27,
+        10,
+        "2026|12|2026-05-22|Richmond|Essendon@Essendon"
+      ],
+      [
+        17076,
+        18,
+        131,
+        10,
+        "2026|12|2026-05-22|Richmond|Essendon@Richmond"
+      ],
+      [
+        17077,
+        5,
+        73,
+        10,
+        "2026|12|2026-05-23|Collingwood|West Coast@Collingwood"
+      ],
+      [
+        17077,
+        23,
+        150,
+        10,
+        "2026|12|2026-05-23|Collingwood|West Coast@West Coast"
+      ],
+      [
+        17078,
+        10,
+        16,
+        10,
+        "2026|12|2026-05-23|Geelong|Sydney@Geelong"
+      ],
+      [
+        17078,
+        21,
+        179,
+        10,
+        "2026|12|2026-05-23|Geelong|Sydney@Sydney"
+      ],
+      [
+        17079,
+        11,
+        17,
+        10,
+        "2026|12|2026-05-23|North Melbourne|Gold Coast@Gold Coast"
+      ],
+      [
+        17079,
+        16,
+        8,
+        10,
+        "2026|12|2026-05-23|North Melbourne|Gold Coast@North Melbourne"
+      ],
+      [
+        17080,
+        4,
+        293,
+        10,
+        "2026|12|2026-05-23|Port Adelaide|Carlton@Carlton"
+      ],
+      [
+        17080,
+        17,
+        243,
+        10,
+        "2026|12|2026-05-23|Port Adelaide|Carlton@Port Adelaide"
+      ],
+      [
+        17081,
+        3,
+        39,
+        10,
+        "2026|12|2026-05-24|Greater Western Sydney|Brisbane Lions@Brisbane Lions"
+      ],
+      [
+        17081,
+        12,
+        93,
+        10,
+        "2026|12|2026-05-24|Greater Western Sydney|Brisbane Lions@Greater Western Sydney"
+      ],
+      [
+        17082,
+        15,
+        232,
+        10,
+        "2026|12|2026-05-24|Western Bulldogs|Melbourne@Melbourne"
+      ],
+      [
+        17082,
+        24,
+        31,
+        10,
+        "2026|12|2026-05-24|Western Bulldogs|Melbourne@Western Bulldogs"
+      ],
+      [
+        17083,
+        13,
+        76,
+        10,
+        "2026|13|2026-05-28|St Kilda|Hawthorn@Hawthorn"
+      ],
+      [
+        17083,
+        20,
+        14,
+        10,
+        "2026|13|2026-05-28|St Kilda|Hawthorn@St Kilda"
+      ],
+      [
+        17084,
+        4,
+        293,
+        10,
+        "2026|13|2026-05-29|Carlton|Geelong@Carlton"
+      ],
+      [
+        17084,
+        10,
+        16,
+        10,
+        "2026|13|2026-05-29|Carlton|Geelong@Geelong"
+      ],
+      [
+        17085,
+        3,
+        39,
+        10,
+        "2026|13|2026-05-30|Brisbane Lions|Fremantle@Brisbane Lions"
+      ],
+      [
+        17085,
+        9,
+        55,
+        10,
+        "2026|13|2026-05-30|Brisbane Lions|Fremantle@Fremantle"
+      ],
+      [
+        17086,
+        18,
+        131,
+        10,
+        "2026|13|2026-05-30|Sydney|Richmond@Richmond"
+      ],
+      [
+        17086,
+        21,
+        179,
+        10,
+        "2026|13|2026-05-30|Sydney|Richmond@Sydney"
+      ],
+      [
+        17087,
+        5,
+        73,
+        10,
+        "2026|13|2026-05-30|Western Bulldogs|Collingwood@Collingwood"
+      ],
+      [
+        17087,
+        24,
+        31,
+        10,
+        "2026|13|2026-05-30|Western Bulldogs|Collingwood@Western Bulldogs"
+      ],
+      [
+        17088,
+        12,
+        93,
+        10,
+        "2026|13|2026-05-31|Melbourne|Greater Western Sydney@Greater Western Sydney"
+      ],
+      [
+        17088,
+        15,
+        232,
+        10,
+        "2026|13|2026-05-31|Melbourne|Greater Western Sydney@Melbourne"
+      ],
+      [
+        17089,
+        6,
+        294,
+        10,
+        "2026|13|2026-05-31|West Coast|Essendon@Essendon"
+      ],
+      [
+        17089,
+        23,
+        150,
+        10,
+        "2026|13|2026-05-31|West Coast|Essendon@West Coast"
+      ],
+      [
+        17090,
+        1,
+        56,
+        10,
+        "2026|14|2026-06-04|Adelaide|Geelong@Adelaide"
+      ],
+      [
+        17090,
+        10,
+        16,
+        10,
+        "2026|14|2026-06-04|Adelaide|Geelong@Geelong"
+      ],
+      [
+        17091,
+        13,
+        76,
+        10,
+        "2026|14|2026-06-05|Hawthorn|Western Bulldogs@Hawthorn"
+      ],
+      [
+        17091,
+        24,
+        31,
+        10,
+        "2026|14|2026-06-05|Hawthorn|Western Bulldogs@Western Bulldogs"
+      ],
+      [
+        17092,
+        3,
+        39,
+        10,
+        "2026|14|2026-06-06|Gold Coast|Brisbane Lions@Brisbane Lions"
+      ],
+      [
+        17092,
+        11,
+        17,
+        10,
+        "2026|14|2026-06-06|Gold Coast|Brisbane Lions@Gold Coast"
+      ],
+      [
+        17093,
+        9,
+        55,
+        10,
+        "2026|14|2026-06-06|North Melbourne|Fremantle@Fremantle"
+      ],
+      [
+        17093,
+        16,
+        8,
+        10,
+        "2026|14|2026-06-06|North Melbourne|Fremantle@North Melbourne"
+      ],
+      [
+        17094,
+        17,
+        243,
+        10,
+        "2026|14|2026-06-06|West Coast|Port Adelaide@Port Adelaide"
+      ],
+      [
+        17094,
+        23,
+        150,
+        10,
+        "2026|14|2026-06-06|West Coast|Port Adelaide@West Coast"
+      ],
+      [
+        17095,
+        4,
+        293,
+        10,
+        "2026|14|2026-06-07|Essendon|Carlton@Carlton"
+      ],
+      [
+        17095,
+        6,
+        294,
+        10,
+        "2026|14|2026-06-07|Essendon|Carlton@Essendon"
+      ],
+      [
+        17096,
+        20,
+        14,
+        10,
+        "2026|14|2026-06-07|Sydney|St Kilda@St Kilda"
+      ],
+      [
+        17096,
+        21,
+        179,
+        10,
+        "2026|14|2026-06-07|Sydney|St Kilda@Sydney"
+      ],
+      [
+        17097,
+        5,
+        73,
+        10,
+        "2026|14|2026-06-08|Collingwood|Melbourne@Collingwood"
+      ],
+      [
+        17097,
+        15,
+        232,
+        10,
+        "2026|14|2026-06-08|Collingwood|Melbourne@Melbourne"
+      ],
+      [
+        17098,
+        1,
+        56,
+        10,
+        "2026|15|2026-06-11|Western Bulldogs|Adelaide@Adelaide"
+      ],
+      [
+        17098,
+        24,
+        31,
+        10,
+        "2026|15|2026-06-11|Western Bulldogs|Adelaide@Western Bulldogs"
+      ],
+      [
+        17099,
+        10,
+        16,
+        10,
+        "2026|15|2026-06-12|Geelong|Gold Coast@Geelong"
+      ],
+      [
+        17099,
+        11,
+        17,
+        10,
+        "2026|15|2026-06-12|Geelong|Gold Coast@Gold Coast"
+      ],
+      [
+        17100,
+        6,
+        294,
+        10,
+        "2026|15|2026-06-13|Melbourne|Essendon@Essendon"
+      ],
+      [
+        17100,
+        15,
+        232,
+        10,
+        "2026|15|2026-06-13|Melbourne|Essendon@Melbourne"
+      ],
+      [
+        17101,
+        16,
+        8,
+        10,
+        "2026|15|2026-06-13|North Melbourne|West Coast@North Melbourne"
+      ],
+      [
+        17101,
+        23,
+        150,
+        10,
+        "2026|15|2026-06-13|North Melbourne|West Coast@West Coast"
+      ],
+      [
+        17102,
+        17,
+        243,
+        10,
+        "2026|15|2026-06-13|Port Adelaide|Sydney@Port Adelaide"
+      ],
+      [
+        17102,
+        21,
+        179,
+        10,
+        "2026|15|2026-06-13|Port Adelaide|Sydney@Sydney"
+      ],
+      [
+        17103,
+        3,
+        39,
+        10,
+        "2026|15|2026-06-14|Richmond|Brisbane Lions@Brisbane Lions"
+      ],
+      [
+        17103,
+        18,
+        131,
+        10,
+        "2026|15|2026-06-14|Richmond|Brisbane Lions@Richmond"
+      ],
+      [
+        17104,
+        12,
+        93,
+        10,
+        "2026|15|2026-06-14|St Kilda|Greater Western Sydney@Greater Western Sydney"
+      ],
+      [
+        17104,
+        20,
+        14,
+        10,
+        "2026|15|2026-06-14|St Kilda|Greater Western Sydney@St Kilda"
+      ],
+      [
+        17105,
+        9,
+        55,
+        10,
+        "2026|16|2026-06-18|Fremantle|Geelong@Fremantle"
+      ],
+      [
+        17105,
+        10,
+        16,
+        10,
+        "2026|16|2026-06-18|Fremantle|Geelong@Geelong"
+      ],
+      [
+        17106,
+        11,
+        17,
+        10,
+        "2026|16|2026-06-19|Gold Coast|Hawthorn@Gold Coast"
+      ],
+      [
+        17106,
+        13,
+        76,
+        10,
+        "2026|16|2026-06-19|Gold Coast|Hawthorn@Hawthorn"
+      ],
+      [
+        17107,
+        1,
+        56,
+        10,
+        "2026|16|2026-06-20|Adelaide|Melbourne@Adelaide"
+      ],
+      [
+        17107,
+        15,
+        232,
+        10,
+        "2026|16|2026-06-20|Adelaide|Melbourne@Melbourne"
+      ],
+      [
+        17108,
+        5,
+        73,
+        10,
+        "2026|16|2026-06-20|Collingwood|Port Adelaide@Collingwood"
+      ],
+      [
+        17108,
+        17,
+        243,
+        10,
+        "2026|16|2026-06-20|Collingwood|Port Adelaide@Port Adelaide"
+      ],
+      [
+        17109,
+        4,
+        293,
+        10,
+        "2026|16|2026-06-20|Greater Western Sydney|Carlton@Carlton"
+      ],
+      [
+        17109,
+        12,
+        93,
+        10,
+        "2026|16|2026-06-20|Greater Western Sydney|Carlton@Greater Western Sydney"
+      ],
+      [
+        17110,
+        16,
+        8,
+        10,
+        "2026|16|2026-06-21|Richmond|North Melbourne@North Melbourne"
+      ],
+      [
+        17110,
+        18,
+        131,
+        10,
+        "2026|16|2026-06-21|Richmond|North Melbourne@Richmond"
+      ],
+      [
+        17111,
+        20,
+        14,
+        10,
+        "2026|16|2026-06-21|St Kilda|Western Bulldogs@St Kilda"
+      ],
+      [
+        17111,
+        24,
+        31,
+        10,
+        "2026|16|2026-06-21|St Kilda|Western Bulldogs@Western Bulldogs"
+      ],
+      [
+        17112,
+        3,
+        39,
+        10,
+        "2026|17|2026-06-25|Brisbane Lions|Sydney@Brisbane Lions"
+      ],
+      [
+        17112,
+        21,
+        179,
+        10,
+        "2026|17|2026-06-25|Brisbane Lions|Sydney@Sydney"
+      ],
+      [
+        17113,
+        12,
+        93,
+        10,
+        "2026|17|2026-06-26|Hawthorn|Greater Western Sydney@Greater Western Sydney"
+      ],
+      [
+        17113,
+        13,
+        76,
+        10,
+        "2026|17|2026-06-26|Hawthorn|Greater Western Sydney@Hawthorn"
+      ],
+      [
+        17114,
+        4,
+        293,
+        10,
+        "2026|17|2026-06-27|Carlton|West Coast@Carlton"
+      ],
+      [
+        17114,
+        23,
+        150,
+        10,
+        "2026|17|2026-06-27|Carlton|West Coast@West Coast"
+      ],
+      [
+        17115,
+        5,
+        73,
+        10,
+        "2026|17|2026-06-27|Collingwood|Richmond@Collingwood"
+      ],
+      [
+        17115,
+        18,
+        131,
+        10,
+        "2026|17|2026-06-27|Collingwood|Richmond@Richmond"
+      ],
+      [
+        17116,
+        1,
+        56,
+        10,
+        "2026|17|2026-06-27|Port Adelaide|Adelaide@Adelaide"
+      ],
+      [
+        17116,
+        17,
+        243,
+        10,
+        "2026|17|2026-06-27|Port Adelaide|Adelaide@Port Adelaide"
+      ],
+      [
+        17117,
+        9,
+        55,
+        10,
+        "2026|17|2026-06-28|Fremantle|Gold Coast@Fremantle"
+      ],
+      [
+        17117,
+        11,
+        17,
+        10,
+        "2026|17|2026-06-28|Fremantle|Gold Coast@Gold Coast"
+      ],
+      [
+        17118,
+        6,
+        294,
+        10,
+        "2026|17|2026-06-28|North Melbourne|Essendon@Essendon"
+      ],
+      [
+        17118,
+        16,
+        8,
+        10,
+        "2026|17|2026-06-28|North Melbourne|Essendon@North Melbourne"
+      ],
+      [
+        17119,
+        3,
+        39,
+        10,
+        "2026|18|2026-07-02|Geelong|Brisbane Lions@Brisbane Lions"
+      ],
+      [
+        17119,
+        10,
+        16,
+        10,
+        "2026|18|2026-07-02|Geelong|Brisbane Lions@Geelong"
+      ],
+      [
+        17120,
+        21,
+        179,
+        10,
+        "2026|18|2026-07-03|Sydney|Western Bulldogs@Sydney"
+      ],
+      [
+        17120,
+        24,
+        31,
+        10,
+        "2026|18|2026-07-03|Sydney|Western Bulldogs@Western Bulldogs"
+      ],
+      [
+        17121,
+        1,
+        56,
+        10,
+        "2026|18|2026-07-03|West Coast|Adelaide@Adelaide"
+      ],
+      [
+        17121,
+        23,
+        150,
+        10,
+        "2026|18|2026-07-03|West Coast|Adelaide@West Coast"
+      ],
+      [
+        17122,
+        5,
+        73,
+        10,
+        "2026|18|2026-07-04|Gold Coast|Collingwood@Collingwood"
+      ],
+      [
+        17122,
+        11,
+        17,
+        10,
+        "2026|18|2026-07-04|Gold Coast|Collingwood@Gold Coast"
+      ],
+      [
+        17123,
+        9,
+        55,
+        10,
+        "2026|18|2026-07-04|Greater Western Sydney|Fremantle@Fremantle"
+      ],
+      [
+        17123,
+        12,
+        93,
+        10,
+        "2026|18|2026-07-04|Greater Western Sydney|Fremantle@Greater Western Sydney"
+      ],
+      [
+        17124,
+        13,
+        76,
+        10,
+        "2026|18|2026-07-04|Hawthorn|Melbourne@Hawthorn"
+      ],
+      [
+        17124,
+        15,
+        232,
+        10,
+        "2026|18|2026-07-04|Hawthorn|Melbourne@Melbourne"
+      ],
+      [
+        17125,
+        4,
+        293,
+        10,
+        "2026|18|2026-07-04|Richmond|Carlton@Carlton"
+      ],
+      [
+        17125,
+        18,
+        131,
+        10,
+        "2026|18|2026-07-04|Richmond|Carlton@Richmond"
+      ],
+      [
+        17126,
+        6,
+        294,
+        10,
+        "2026|18|2026-07-05|Essendon|St Kilda@Essendon"
+      ],
+      [
+        17126,
+        20,
+        14,
+        10,
+        "2026|18|2026-07-05|Essendon|St Kilda@St Kilda"
+      ],
+      [
+        17127,
+        16,
+        8,
+        10,
+        "2026|18|2026-07-05|Port Adelaide|North Melbourne@North Melbourne"
+      ],
+      [
+        17127,
+        17,
+        243,
+        10,
+        "2026|18|2026-07-05|Port Adelaide|North Melbourne@Port Adelaide"
+      ],
+      [
+        17128,
+        9,
+        55,
+        10,
+        "2026|19|2026-07-09|Fremantle|Sydney@Fremantle"
+      ],
+      [
+        17128,
+        21,
+        179,
+        10,
+        "2026|19|2026-07-09|Fremantle|Sydney@Sydney"
+      ],
+      [
+        17129,
+        5,
+        73,
+        10,
+        "2026|19|2026-07-10|Collingwood|North Melbourne@Collingwood"
+      ],
+      [
+        17129,
+        16,
+        8,
+        10,
+        "2026|19|2026-07-10|Collingwood|North Melbourne@North Melbourne"
+      ],
+      [
+        17130,
+        1,
+        56,
+        10,
+        "2026|19|2026-07-11|Adelaide|Gold Coast@Adelaide"
+      ],
+      [
+        17130,
+        11,
+        17,
+        10,
+        "2026|19|2026-07-11|Adelaide|Gold Coast@Gold Coast"
+      ],
+      [
+        17131,
+        4,
+        293,
+        10,
+        "2026|19|2026-07-11|Carlton|Hawthorn@Carlton"
+      ],
+      [
+        17131,
+        13,
+        76,
+        10,
+        "2026|19|2026-07-11|Carlton|Hawthorn@Hawthorn"
+      ],
+      [
+        17132,
+        10,
+        16,
+        10,
+        "2026|19|2026-07-11|Greater Western Sydney|Geelong@Geelong"
+      ],
+      [
+        17132,
+        12,
+        93,
+        10,
+        "2026|19|2026-07-11|Greater Western Sydney|Geelong@Greater Western Sydney"
+      ],
+      [
+        17133,
+        17,
+        243,
+        10,
+        "2026|19|2026-07-11|St Kilda|Port Adelaide@Port Adelaide"
+      ],
+      [
+        17133,
+        20,
+        14,
+        10,
+        "2026|19|2026-07-11|St Kilda|Port Adelaide@St Kilda"
+      ],
+      [
+        17134,
+        3,
+        39,
+        10,
+        "2026|19|2026-07-12|Brisbane Lions|Essendon@Brisbane Lions"
+      ],
+      [
+        17134,
+        6,
+        294,
+        10,
+        "2026|19|2026-07-12|Brisbane Lions|Essendon@Essendon"
+      ],
+      [
+        17135,
+        15,
+        232,
+        10,
+        "2026|19|2026-07-12|Melbourne|Richmond@Melbourne"
+      ],
+      [
+        17135,
+        18,
+        131,
+        10,
+        "2026|19|2026-07-12|Melbourne|Richmond@Richmond"
+      ],
+      [
+        17136,
+        23,
+        150,
+        10,
+        "2026|19|2026-07-12|Western Bulldogs|West Coast@West Coast"
+      ],
+      [
+        17136,
+        24,
+        31,
+        10,
+        "2026|19|2026-07-12|Western Bulldogs|West Coast@Western Bulldogs"
+      ],
+      [
+        17137,
+        4,
+        47,
+        10,
+        "2026|1|2026-03-05|Sydney|Carlton@Carlton"
+      ],
+      [
+        17137,
+        21,
+        179,
+        10,
+        "2026|1|2026-03-05|Sydney|Carlton@Sydney"
+      ],
+      [
+        17138,
+        10,
+        16,
+        10,
+        "2026|1|2026-03-06|Gold Coast|Geelong@Geelong"
+      ],
+      [
+        17138,
+        11,
+        17,
+        10,
+        "2026|1|2026-03-06|Gold Coast|Geelong@Gold Coast"
+      ],
+      [
+        17139,
+        3,
+        39,
+        10,
+        "2026|1|2026-03-07|Brisbane Lions|Western Bulldogs@Brisbane Lions"
+      ],
+      [
+        17139,
+        24,
+        31,
+        10,
+        "2026|1|2026-03-07|Brisbane Lions|Western Bulldogs@Western Bulldogs"
+      ],
+      [
+        17140,
+        12,
+        93,
+        10,
+        "2026|1|2026-03-07|Greater Western Sydney|Hawthorn@Greater Western Sydney"
+      ],
+      [
+        17140,
+        13,
+        76,
+        10,
+        "2026|1|2026-03-07|Greater Western Sydney|Hawthorn@Hawthorn"
+      ],
+      [
+        17141,
+        5,
+        73,
+        10,
+        "2026|1|2026-03-08|St Kilda|Collingwood@Collingwood"
+      ],
+      [
+        17141,
+        20,
+        14,
+        10,
+        "2026|1|2026-03-08|St Kilda|Collingwood@St Kilda"
+      ],
+      [
+        17142,
+        10,
+        16,
+        10,
+        "2026|20|2026-07-16|Geelong|St Kilda@Geelong"
+      ],
+      [
+        17142,
+        20,
+        14,
+        10,
+        "2026|20|2026-07-16|Geelong|St Kilda@St Kilda"
+      ],
+      [
+        17143,
+        1,
+        56,
+        10,
+        "2026|20|2026-07-17|Sydney|Adelaide@Adelaide"
+      ],
+      [
+        17143,
+        21,
+        179,
+        10,
+        "2026|20|2026-07-17|Sydney|Adelaide@Sydney"
+      ],
+      [
+        17144,
+        4,
+        293,
+        10,
+        "2026|20|2026-07-18|Collingwood|Carlton@Carlton"
+      ],
+      [
+        17144,
+        5,
+        73,
+        10,
+        "2026|20|2026-07-18|Collingwood|Carlton@Collingwood"
+      ],
+      [
+        17145,
+        15,
+        232,
+        10,
+        "2026|20|2026-07-18|North Melbourne|Melbourne@Melbourne"
+      ],
+      [
+        17145,
+        16,
+        8,
+        10,
+        "2026|20|2026-07-18|North Melbourne|Melbourne@North Melbourne"
+      ],
+      [
+        17146,
+        9,
+        55,
+        10,
+        "2026|20|2026-07-18|Port Adelaide|Fremantle@Fremantle"
+      ],
+      [
+        17146,
+        17,
+        243,
+        10,
+        "2026|20|2026-07-18|Port Adelaide|Fremantle@Port Adelaide"
+      ],
+      [
+        17147,
+        3,
+        39,
+        10,
+        "2026|20|2026-07-18|West Coast|Brisbane Lions@Brisbane Lions"
+      ],
+      [
+        17147,
+        23,
+        150,
+        10,
+        "2026|20|2026-07-18|West Coast|Brisbane Lions@West Coast"
+      ],
+      [
+        17148,
+        6,
+        294,
+        10,
+        "2026|20|2026-07-19|Essendon|Greater Western Sydney@Essendon"
+      ],
+      [
+        17148,
+        12,
+        93,
+        10,
+        "2026|20|2026-07-19|Essendon|Greater Western Sydney@Greater Western Sydney"
+      ],
+      [
+        17149,
+        11,
+        17,
+        10,
+        "2026|20|2026-07-19|Gold Coast|Western Bulldogs@Gold Coast"
+      ],
+      [
+        17149,
+        24,
+        31,
+        10,
+        "2026|20|2026-07-19|Gold Coast|Western Bulldogs@Western Bulldogs"
+      ],
+      [
+        17150,
+        13,
+        76,
+        10,
+        "2026|20|2026-07-19|Richmond|Hawthorn@Hawthorn"
+      ],
+      [
+        17150,
+        18,
+        131,
+        10,
+        "2026|20|2026-07-19|Richmond|Hawthorn@Richmond"
+      ],
+      [
+        17151,
+        1,
+        56,
+        10,
+        "2026|21|2026-07-23|Adelaide|Collingwood@Adelaide"
+      ],
+      [
+        17151,
+        5,
+        73,
+        10,
+        "2026|21|2026-07-23|Adelaide|Collingwood@Collingwood"
+      ],
+      [
+        17152,
+        9,
+        55,
+        10,
+        "2026|21|2026-07-24|Fremantle|West Coast@Fremantle"
+      ],
+      [
+        17152,
+        23,
+        150,
+        10,
+        "2026|21|2026-07-24|Fremantle|West Coast@West Coast"
+      ],
+      [
+        17153,
+        10,
+        16,
+        10,
+        "2026|21|2026-07-24|Melbourne|Geelong@Geelong"
+      ],
+      [
+        17153,
+        15,
+        232,
+        10,
+        "2026|21|2026-07-24|Melbourne|Geelong@Melbourne"
+      ],
+      [
+        17154,
+        4,
+        293,
+        10,
+        "2026|21|2026-07-25|Carlton|Gold Coast@Carlton"
+      ],
+      [
+        17154,
+        11,
+        17,
+        10,
+        "2026|21|2026-07-25|Carlton|Gold Coast@Gold Coast"
+      ],
+      [
+        17155,
+        12,
+        93,
+        10,
+        "2026|21|2026-07-25|Greater Western Sydney|Sydney@Greater Western Sydney"
+      ],
+      [
+        17155,
+        21,
+        179,
+        10,
+        "2026|21|2026-07-25|Greater Western Sydney|Sydney@Sydney"
+      ],
+      [
+        17156,
+        6,
+        294,
+        10,
+        "2026|21|2026-07-25|Hawthorn|Essendon@Essendon"
+      ],
+      [
+        17156,
+        13,
+        76,
+        10,
+        "2026|21|2026-07-25|Hawthorn|Essendon@Hawthorn"
+      ],
+      [
+        17157,
+        18,
+        131,
+        10,
+        "2026|21|2026-07-25|Western Bulldogs|Richmond@Richmond"
+      ],
+      [
+        17157,
+        24,
+        31,
+        10,
+        "2026|21|2026-07-25|Western Bulldogs|Richmond@Western Bulldogs"
+      ],
+      [
+        17158,
+        3,
+        39,
+        10,
+        "2026|21|2026-07-26|Brisbane Lions|Port Adelaide@Brisbane Lions"
+      ],
+      [
+        17158,
+        17,
+        243,
+        10,
+        "2026|21|2026-07-26|Brisbane Lions|Port Adelaide@Port Adelaide"
+      ],
+      [
+        17159,
+        16,
+        8,
+        10,
+        "2026|21|2026-07-26|North Melbourne|St Kilda@North Melbourne"
+      ],
+      [
+        17159,
+        20,
+        14,
+        10,
+        "2026|21|2026-07-26|North Melbourne|St Kilda@St Kilda"
+      ],
+      [
+        17160,
+        5,
+        73,
+        10,
+        "2026|22|2026-07-30|Collingwood|Geelong@Collingwood"
+      ],
+      [
+        17160,
+        10,
+        16,
+        10,
+        "2026|22|2026-07-30|Collingwood|Geelong@Geelong"
+      ],
+      [
+        17161,
+        9,
+        55,
+        10,
+        "2026|22|2026-07-31|Fremantle|Western Bulldogs@Fremantle"
+      ],
+      [
+        17161,
+        24,
+        31,
+        10,
+        "2026|22|2026-07-31|Fremantle|Western Bulldogs@Western Bulldogs"
+      ],
+      [
+        17162,
+        3,
+        39,
+        10,
+        "2026|22|2026-08-01|Carlton|Brisbane Lions@Brisbane Lions"
+      ],
+      [
+        17162,
+        4,
+        293,
+        10,
+        "2026|22|2026-08-01|Carlton|Brisbane Lions@Carlton"
+      ],
+      [
+        17163,
+        13,
+        76,
+        10,
+        "2026|22|2026-08-01|Hawthorn|North Melbourne@Hawthorn"
+      ],
+      [
+        17163,
+        16,
+        8,
+        10,
+        "2026|22|2026-08-01|Hawthorn|North Melbourne@North Melbourne"
+      ],
+      [
+        17164,
+        12,
+        93,
+        10,
+        "2026|22|2026-08-01|Port Adelaide|Greater Western Sydney@Greater Western Sydney"
+      ],
+      [
+        17164,
+        17,
+        243,
+        10,
+        "2026|22|2026-08-01|Port Adelaide|Greater Western Sydney@Port Adelaide"
+      ],
+      [
+        17165,
+        20,
+        14,
+        10,
+        "2026|22|2026-08-01|St Kilda|Sydney@St Kilda"
+      ],
+      [
+        17165,
+        21,
+        179,
+        10,
+        "2026|22|2026-08-01|St Kilda|Sydney@Sydney"
+      ],
+      [
+        17166,
+        1,
+        56,
+        10,
+        "2026|22|2026-08-02|Essendon|Adelaide@Adelaide"
+      ],
+      [
+        17166,
+        6,
+        294,
+        10,
+        "2026|22|2026-08-02|Essendon|Adelaide@Essendon"
+      ],
+      [
+        17167,
+        11,
+        17,
+        10,
+        "2026|22|2026-08-02|Gold Coast|Melbourne@Gold Coast"
+      ],
+      [
+        17167,
+        15,
+        232,
+        10,
+        "2026|22|2026-08-02|Gold Coast|Melbourne@Melbourne"
+      ],
+      [
+        17168,
+        18,
+        131,
+        10,
+        "2026|22|2026-08-02|Richmond|West Coast@Richmond"
+      ],
+      [
+        17168,
+        23,
+        150,
+        10,
+        "2026|22|2026-08-02|Richmond|West Coast@West Coast"
+      ],
+      [
+        17169,
+        16,
+        8,
+        10,
+        "2026|23|2026-08-06|Western Bulldogs|North Melbourne@North Melbourne"
+      ],
+      [
+        17169,
+        24,
+        31,
+        10,
+        "2026|23|2026-08-06|Western Bulldogs|North Melbourne@Western Bulldogs"
+      ],
+      [
+        17170,
+        3,
+        39,
+        10,
+        "2026|23|2026-08-07|Brisbane Lions|Hawthorn@Brisbane Lions"
+      ],
+      [
+        17170,
+        13,
+        76,
+        10,
+        "2026|23|2026-08-07|Brisbane Lions|Hawthorn@Hawthorn"
+      ],
+      [
+        17171,
+        1,
+        56,
+        10,
+        "2026|23|2026-08-08|Adelaide|Richmond@Adelaide"
+      ],
+      [
+        17171,
+        18,
+        131,
+        10,
+        "2026|23|2026-08-08|Adelaide|Richmond@Richmond"
+      ],
+      [
+        17172,
+        6,
+        294,
+        10,
+        "2026|23|2026-08-08|Geelong|Essendon@Essendon"
+      ],
+      [
+        17172,
+        10,
+        16,
+        10,
+        "2026|23|2026-08-08|Geelong|Essendon@Geelong"
+      ],
+      [
+        17173,
+        9,
+        55,
+        10,
+        "2026|23|2026-08-08|Melbourne|Fremantle@Fremantle"
+      ],
+      [
+        17173,
+        15,
+        232,
+        10,
+        "2026|23|2026-08-08|Melbourne|Fremantle@Melbourne"
+      ],
+      [
+        17174,
+        17,
+        243,
+        10,
+        "2026|23|2026-08-08|Sydney|Port Adelaide@Port Adelaide"
+      ],
+      [
+        17174,
+        21,
+        179,
+        10,
+        "2026|23|2026-08-08|Sydney|Port Adelaide@Sydney"
+      ],
+      [
+        17175,
+        11,
+        17,
+        10,
+        "2026|23|2026-08-09|Greater Western Sydney|Gold Coast@Gold Coast"
+      ],
+      [
+        17175,
+        12,
+        93,
+        10,
+        "2026|23|2026-08-09|Greater Western Sydney|Gold Coast@Greater Western Sydney"
+      ],
+      [
+        17176,
+        4,
+        293,
+        10,
+        "2026|23|2026-08-09|St Kilda|Carlton@Carlton"
+      ],
+      [
+        17176,
+        20,
+        14,
+        10,
+        "2026|23|2026-08-09|St Kilda|Carlton@St Kilda"
+      ],
+      [
+        17177,
+        5,
+        73,
+        10,
+        "2026|23|2026-08-09|West Coast|Collingwood@Collingwood"
+      ],
+      [
+        17177,
+        23,
+        150,
+        10,
+        "2026|23|2026-08-09|West Coast|Collingwood@West Coast"
+      ],
+      [
+        17178,
+        1,
+        56,
+        10,
+        "2026|24|2026-08-14|Fremantle|Adelaide@Adelaide"
+      ],
+      [
+        17178,
+        9,
+        55,
+        10,
+        "2026|24|2026-08-14|Fremantle|Adelaide@Fremantle"
+      ],
+      [
+        17179,
+        3,
+        39,
+        10,
+        "2026|24|2026-08-15|Brisbane Lions|Gold Coast@Brisbane Lions"
+      ],
+      [
+        17179,
+        11,
+        17,
+        10,
+        "2026|24|2026-08-15|Brisbane Lions|Gold Coast@Gold Coast"
+      ],
+      [
+        17180,
+        5,
+        73,
+        10,
+        "2026|24|2026-08-15|Hawthorn|Collingwood@Collingwood"
+      ],
+      [
+        17180,
+        13,
+        76,
+        10,
+        "2026|24|2026-08-15|Hawthorn|Collingwood@Hawthorn"
+      ],
+      [
+        17181,
+        10,
+        16,
+        10,
+        "2026|24|2026-08-15|North Melbourne|Geelong@Geelong"
+      ],
+      [
+        17181,
+        16,
+        8,
+        10,
+        "2026|24|2026-08-15|North Melbourne|Geelong@North Melbourne"
+      ],
+      [
+        17182,
+        15,
+        232,
+        10,
+        "2026|24|2026-08-15|Port Adelaide|Melbourne@Melbourne"
+      ],
+      [
+        17182,
+        17,
+        243,
+        10,
+        "2026|24|2026-08-15|Port Adelaide|Melbourne@Port Adelaide"
+      ],
+      [
+        17183,
+        18,
+        131,
+        10,
+        "2026|24|2026-08-15|Richmond|St Kilda@Richmond"
+      ],
+      [
+        17183,
+        20,
+        14,
+        10,
+        "2026|24|2026-08-15|Richmond|St Kilda@St Kilda"
+      ],
+      [
+        17184,
+        6,
+        294,
+        10,
+        "2026|24|2026-08-16|Essendon|Sydney@Essendon"
+      ],
+      [
+        17184,
+        21,
+        179,
+        10,
+        "2026|24|2026-08-16|Essendon|Sydney@Sydney"
+      ],
+      [
+        17185,
+        12,
+        93,
+        10,
+        "2026|24|2026-08-16|Greater Western Sydney|West Coast@Greater Western Sydney"
+      ],
+      [
+        17185,
+        23,
+        150,
+        10,
+        "2026|24|2026-08-16|Greater Western Sydney|West Coast@West Coast"
+      ],
+      [
+        17186,
+        4,
+        293,
+        10,
+        "2026|24|2026-08-16|Western Bulldogs|Carlton@Carlton"
+      ],
+      [
+        17186,
+        24,
+        31,
+        10,
+        "2026|24|2026-08-16|Western Bulldogs|Carlton@Western Bulldogs"
+      ],
+      [
+        17187,
+        11,
+        17,
+        10,
+        "2026|25|2026-08-20|St Kilda|Gold Coast@Gold Coast"
+      ],
+      [
+        17187,
+        20,
+        14,
+        10,
+        "2026|25|2026-08-20|St Kilda|Gold Coast@St Kilda"
+      ],
+      [
+        17188,
+        3,
+        39,
+        10,
+        "2026|25|2026-08-21|Collingwood|Brisbane Lions@Brisbane Lions"
+      ],
+      [
+        17188,
+        5,
+        73,
+        10,
+        "2026|25|2026-08-21|Collingwood|Brisbane Lions@Collingwood"
+      ],
+      [
+        17189,
+        1,
+        56,
+        10,
+        "2026|25|2026-08-22|Adelaide|Greater Western Sydney@Adelaide"
+      ],
+      [
+        17189,
+        12,
+        93,
+        10,
+        "2026|25|2026-08-22|Adelaide|Greater Western Sydney@Greater Western Sydney"
+      ],
+      [
+        17190,
+        4,
+        293,
+        10,
+        "2026|25|2026-08-22|Carlton|Fremantle@Carlton"
+      ],
+      [
+        17190,
+        9,
+        55,
+        10,
+        "2026|25|2026-08-22|Carlton|Fremantle@Fremantle"
+      ],
+      [
+        17191,
+        10,
+        16,
+        10,
+        "2026|25|2026-08-22|Geelong|Richmond@Geelong"
+      ],
+      [
+        17191,
+        18,
+        131,
+        10,
+        "2026|25|2026-08-22|Geelong|Richmond@Richmond"
+      ],
+      [
+        17192,
+        15,
+        232,
+        10,
+        "2026|25|2026-08-22|Melbourne|Western Bulldogs@Melbourne"
+      ],
+      [
+        17192,
+        24,
+        31,
+        10,
+        "2026|25|2026-08-22|Melbourne|Western Bulldogs@Western Bulldogs"
+      ],
+      [
+        17193,
+        6,
+        294,
+        10,
+        "2026|25|2026-08-23|Essendon|Port Adelaide@Essendon"
+      ],
+      [
+        17193,
+        17,
+        243,
+        10,
+        "2026|25|2026-08-23|Essendon|Port Adelaide@Port Adelaide"
+      ],
+      [
+        17194,
+        16,
+        8,
+        10,
+        "2026|25|2026-08-23|Sydney|North Melbourne@North Melbourne"
+      ],
+      [
+        17194,
+        21,
+        179,
+        10,
+        "2026|25|2026-08-23|Sydney|North Melbourne@Sydney"
+      ],
+      [
+        17195,
+        13,
+        76,
+        10,
+        "2026|25|2026-08-23|West Coast|Hawthorn@Hawthorn"
+      ],
+      [
+        17195,
+        23,
+        150,
+        10,
+        "2026|25|2026-08-23|West Coast|Hawthorn@West Coast"
+      ],
+      [
+        17196,
+        4,
+        47,
+        10,
+        "2026|2|2026-03-12|Carlton|Richmond@Carlton"
+      ],
+      [
+        17196,
+        18,
+        131,
+        10,
+        "2026|2|2026-03-12|Carlton|Richmond@Richmond"
+      ],
+      [
+        17197,
+        6,
+        27,
+        10,
+        "2026|2|2026-03-13|Essendon|Hawthorn@Essendon"
+      ],
+      [
+        17197,
+        13,
+        76,
+        10,
+        "2026|2|2026-03-13|Essendon|Hawthorn@Hawthorn"
+      ],
+      [
+        17198,
+        1,
+        56,
+        10,
+        "2026|2|2026-03-14|Collingwood|Adelaide@Adelaide"
+      ],
+      [
+        17198,
+        5,
+        73,
+        10,
+        "2026|2|2026-03-14|Collingwood|Adelaide@Collingwood"
+      ],
+      [
+        17199,
+        9,
+        55,
+        10,
+        "2026|2|2026-03-14|Geelong|Fremantle@Fremantle"
+      ],
+      [
+        17199,
+        10,
+        16,
+        10,
+        "2026|2|2026-03-14|Geelong|Fremantle@Geelong"
+      ],
+      [
+        17200,
+        3,
+        39,
+        10,
+        "2026|2|2026-03-14|Sydney|Brisbane Lions@Brisbane Lions"
+      ],
+      [
+        17200,
+        21,
+        179,
+        10,
+        "2026|2|2026-03-14|Sydney|Brisbane Lions@Sydney"
+      ],
+      [
+        17201,
+        12,
+        93,
+        10,
+        "2026|2|2026-03-14|Western Bulldogs|Greater Western Sydney@Greater Western Sydney"
+      ],
+      [
+        17201,
+        24,
+        31,
+        10,
+        "2026|2|2026-03-14|Western Bulldogs|Greater Western Sydney@Western Bulldogs"
+      ],
+      [
+        17202,
+        11,
+        17,
+        10,
+        "2026|2|2026-03-15|Gold Coast|West Coast@Gold Coast"
+      ],
+      [
+        17202,
+        23,
+        150,
+        10,
+        "2026|2|2026-03-15|Gold Coast|West Coast@West Coast"
+      ],
+      [
+        17203,
+        15,
+        232,
+        10,
+        "2026|2|2026-03-15|Melbourne|St Kilda@Melbourne"
+      ],
+      [
+        17203,
+        20,
+        14,
+        10,
+        "2026|2|2026-03-15|Melbourne|St Kilda@St Kilda"
+      ],
+      [
+        17204,
+        16,
+        8,
+        10,
+        "2026|2|2026-03-15|North Melbourne|Port Adelaide@North Melbourne"
+      ],
+      [
+        17204,
+        17,
+        243,
+        10,
+        "2026|2|2026-03-15|North Melbourne|Port Adelaide@Port Adelaide"
+      ],
+      [
+        17205,
+        13,
+        76,
+        10,
+        "2026|3|2026-03-19|Hawthorn|Sydney@Hawthorn"
+      ],
+      [
+        17205,
+        21,
+        179,
+        10,
+        "2026|3|2026-03-19|Hawthorn|Sydney@Sydney"
+      ],
+      [
+        17206,
+        1,
+        56,
+        10,
+        "2026|3|2026-03-20|Adelaide|Western Bulldogs@Adelaide"
+      ],
+      [
+        17206,
+        24,
+        31,
+        10,
+        "2026|3|2026-03-20|Adelaide|Western Bulldogs@Western Bulldogs"
+      ],
+      [
+        17207,
+        9,
+        55,
+        10,
+        "2026|3|2026-03-21|Fremantle|Melbourne@Fremantle"
+      ],
+      [
+        17207,
+        15,
+        232,
+        10,
+        "2026|3|2026-03-21|Fremantle|Melbourne@Melbourne"
+      ],
+      [
+        17208,
+        12,
+        93,
+        10,
+        "2026|3|2026-03-21|Greater Western Sydney|St Kilda@Greater Western Sydney"
+      ],
+      [
+        17208,
+        20,
+        14,
+        10,
+        "2026|3|2026-03-21|Greater Western Sydney|St Kilda@St Kilda"
+      ],
+      [
+        17209,
+        11,
+        17,
+        10,
+        "2026|3|2026-03-21|Richmond|Gold Coast@Gold Coast"
+      ],
+      [
+        17209,
+        18,
+        131,
+        10,
+        "2026|3|2026-03-21|Richmond|Gold Coast@Richmond"
+      ],
+      [
+        17210,
+        6,
+        27,
+        10,
+        "2026|3|2026-03-22|Port Adelaide|Essendon@Essendon"
+      ],
+      [
+        17210,
+        17,
+        243,
+        10,
+        "2026|3|2026-03-22|Port Adelaide|Essendon@Port Adelaide"
+      ],
+      [
+        17211,
+        16,
+        8,
+        10,
+        "2026|3|2026-03-22|West Coast|North Melbourne@North Melbourne"
+      ],
+      [
+        17211,
+        23,
+        150,
+        10,
+        "2026|3|2026-03-22|West Coast|North Melbourne@West Coast"
+      ],
+      [
+        17212,
+        1,
+        56,
+        10,
+        "2026|4|2026-03-26|Geelong|Adelaide@Adelaide"
+      ],
+      [
+        17212,
+        10,
+        16,
+        10,
+        "2026|4|2026-03-26|Geelong|Adelaide@Geelong"
+      ],
+      [
+        17213,
+        5,
+        73,
+        10,
+        "2026|4|2026-03-27|Collingwood|Greater Western Sydney@Collingwood"
+      ],
+      [
+        17213,
+        12,
+        93,
+        10,
+        "2026|4|2026-03-27|Collingwood|Greater Western Sydney@Greater Western Sydney"
+      ],
+      [
+        17214,
+        6,
+        27,
+        10,
+        "2026|4|2026-03-28|Essendon|North Melbourne@Essendon"
+      ],
+      [
+        17214,
+        16,
+        8,
+        10,
+        "2026|4|2026-03-28|Essendon|North Melbourne@North Melbourne"
+      ],
+      [
+        17215,
+        9,
+        55,
+        10,
+        "2026|4|2026-03-28|Fremantle|Richmond@Fremantle"
+      ],
+      [
+        17215,
+        18,
+        131,
+        10,
+        "2026|4|2026-03-28|Fremantle|Richmond@Richmond"
+      ],
+      [
+        17216,
+        3,
+        39,
+        10,
+        "2026|4|2026-03-28|St Kilda|Brisbane Lions@Brisbane Lions"
+      ],
+      [
+        17216,
+        20,
+        14,
+        10,
+        "2026|4|2026-03-28|St Kilda|Brisbane Lions@St Kilda"
+      ],
+      [
+        17217,
+        4,
+        47,
+        10,
+        "2026|4|2026-03-29|Carlton|Melbourne@Carlton"
+      ],
+      [
+        17217,
+        15,
+        232,
+        10,
+        "2026|4|2026-03-29|Carlton|Melbourne@Melbourne"
+      ],
+      [
+        17218,
+        17,
+        243,
+        10,
+        "2026|4|2026-03-29|Port Adelaide|West Coast@Port Adelaide"
+      ],
+      [
+        17218,
+        23,
+        150,
+        10,
+        "2026|4|2026-03-29|Port Adelaide|West Coast@West Coast"
+      ],
+      [
+        17219,
+        3,
+        39,
+        10,
+        "2026|5|2026-04-02|Brisbane Lions|Collingwood@Brisbane Lions"
+      ],
+      [
+        17219,
+        5,
+        73,
+        10,
+        "2026|5|2026-04-02|Brisbane Lions|Collingwood@Collingwood"
+      ],
+      [
+        17220,
+        1,
+        56,
+        10,
+        "2026|5|2026-04-03|Adelaide|Fremantle@Adelaide"
+      ],
+      [
+        17220,
+        9,
+        55,
+        10,
+        "2026|5|2026-04-03|Adelaide|Fremantle@Fremantle"
+      ],
+      [
+        17221,
+        4,
+        47,
+        10,
+        "2026|5|2026-04-03|North Melbourne|Carlton@Carlton"
+      ],
+      [
+        17221,
+        16,
+        8,
+        10,
+        "2026|5|2026-04-03|North Melbourne|Carlton@North Melbourne"
+      ],
+      [
+        17222,
+        17,
+        243,
+        10,
+        "2026|5|2026-04-04|Richmond|Port Adelaide@Port Adelaide"
+      ],
+      [
+        17222,
+        18,
+        131,
+        10,
+        "2026|5|2026-04-04|Richmond|Port Adelaide@Richmond"
+      ],
+      [
+        17223,
+        21,
+        179,
+        10,
+        "2026|5|2026-04-04|West Coast|Sydney@Sydney"
+      ],
+      [
+        17223,
+        23,
+        150,
+        10,
+        "2026|5|2026-04-04|West Coast|Sydney@West Coast"
+      ],
+      [
+        17224,
+        11,
+        17,
+        10,
+        "2026|5|2026-04-05|Melbourne|Gold Coast@Gold Coast"
+      ],
+      [
+        17224,
+        15,
+        232,
+        10,
+        "2026|5|2026-04-05|Melbourne|Gold Coast@Melbourne"
+      ],
+      [
+        17225,
+        6,
+        27,
+        10,
+        "2026|5|2026-04-05|Western Bulldogs|Essendon@Essendon"
+      ],
+      [
+        17225,
+        24,
+        31,
+        10,
+        "2026|5|2026-04-05|Western Bulldogs|Essendon@Western Bulldogs"
+      ],
+      [
+        17226,
+        10,
+        16,
+        10,
+        "2026|5|2026-04-06|Hawthorn|Geelong@Geelong"
+      ],
+      [
+        17226,
+        13,
+        76,
+        10,
+        "2026|5|2026-04-06|Hawthorn|Geelong@Hawthorn"
+      ],
+      [
+        17227,
+        1,
+        56,
+        10,
+        "2026|6|2026-04-09|Adelaide|Carlton@Adelaide"
+      ],
+      [
+        17227,
+        4,
+        47,
+        10,
+        "2026|6|2026-04-09|Adelaide|Carlton@Carlton"
+      ],
+      [
+        17228,
+        5,
+        73,
+        10,
+        "2026|6|2026-04-10|Collingwood|Fremantle@Collingwood"
+      ],
+      [
+        17228,
+        9,
+        55,
+        10,
+        "2026|6|2026-04-10|Collingwood|Fremantle@Fremantle"
+      ],
+      [
+        17229,
+        6,
+        27,
+        10,
+        "2026|6|2026-04-11|Essendon|Melbourne@Essendon"
+      ],
+      [
+        17229,
+        15,
+        232,
+        10,
+        "2026|6|2026-04-11|Essendon|Melbourne@Melbourne"
+      ],
+      [
+        17230,
+        13,
+        76,
+        10,
+        "2026|6|2026-04-11|Hawthorn|Western Bulldogs@Hawthorn"
+      ],
+      [
+        17230,
+        24,
+        31,
+        10,
+        "2026|6|2026-04-11|Hawthorn|Western Bulldogs@Western Bulldogs"
+      ],
+      [
+        17231,
+        3,
+        39,
+        10,
+        "2026|6|2026-04-11|North Melbourne|Brisbane Lions@Brisbane Lions"
+      ],
+      [
+        17231,
+        16,
+        8,
+        10,
+        "2026|6|2026-04-11|North Melbourne|Brisbane Lions@North Melbourne"
+      ],
+      [
+        17232,
+        11,
+        17,
+        10,
+        "2026|6|2026-04-11|Sydney|Gold Coast@Gold Coast"
+      ],
+      [
+        17232,
+        21,
+        179,
+        10,
+        "2026|6|2026-04-11|Sydney|Gold Coast@Sydney"
+      ],
+      [
+        17233,
+        10,
+        16,
+        10,
+        "2026|6|2026-04-12|Geelong|West Coast@Geelong"
+      ],
+      [
+        17233,
+        23,
+        150,
+        10,
+        "2026|6|2026-04-12|Geelong|West Coast@West Coast"
+      ],
+      [
+        17234,
+        12,
+        93,
+        10,
+        "2026|6|2026-04-12|Greater Western Sydney|Richmond@Greater Western Sydney"
+      ],
+      [
+        17234,
+        18,
+        131,
+        10,
+        "2026|6|2026-04-12|Greater Western Sydney|Richmond@Richmond"
+      ],
+      [
+        17235,
+        17,
+        243,
+        10,
+        "2026|6|2026-04-12|Port Adelaide|St Kilda@Port Adelaide"
+      ],
+      [
+        17235,
+        20,
+        14,
+        10,
+        "2026|6|2026-04-12|Port Adelaide|St Kilda@St Kilda"
+      ],
+      [
+        17236,
+        4,
+        47,
+        10,
+        "2026|7|2026-04-16|Carlton|Collingwood@Carlton"
+      ],
+      [
+        17236,
+        5,
+        73,
+        10,
+        "2026|7|2026-04-16|Carlton|Collingwood@Collingwood"
+      ],
+      [
+        17237,
+        10,
+        16,
+        10,
+        "2026|7|2026-04-17|Geelong|Western Bulldogs@Geelong"
+      ],
+      [
+        17237,
+        24,
+        31,
+        10,
+        "2026|7|2026-04-17|Geelong|Western Bulldogs@Western Bulldogs"
+      ],
+      [
+        17238,
+        12,
+        93,
+        10,
+        "2026|7|2026-04-17|Sydney|Greater Western Sydney@Greater Western Sydney"
+      ],
+      [
+        17238,
+        21,
+        179,
+        10,
+        "2026|7|2026-04-17|Sydney|Greater Western Sydney@Sydney"
+      ],
+      [
+        17239,
+        1,
+        56,
+        10,
+        "2026|7|2026-04-18|Adelaide|St Kilda@Adelaide"
+      ],
+      [
+        17239,
+        20,
+        14,
+        10,
+        "2026|7|2026-04-18|Adelaide|St Kilda@St Kilda"
+      ],
+      [
+        17240,
+        6,
+        27,
+        10,
+        "2026|7|2026-04-18|Gold Coast|Essendon@Essendon"
+      ],
+      [
+        17240,
+        11,
+        17,
+        10,
+        "2026|7|2026-04-18|Gold Coast|Essendon@Gold Coast"
+      ],
+      [
+        17241,
+        13,
+        76,
+        10,
+        "2026|7|2026-04-18|Hawthorn|Port Adelaide@Hawthorn"
+      ],
+      [
+        17241,
+        17,
+        243,
+        10,
+        "2026|7|2026-04-18|Hawthorn|Port Adelaide@Port Adelaide"
+      ],
+      [
+        17242,
+        3,
+        39,
+        10,
+        "2026|7|2026-04-19|Melbourne|Brisbane Lions@Brisbane Lions"
+      ],
+      [
+        17242,
+        15,
+        232,
+        10,
+        "2026|7|2026-04-19|Melbourne|Brisbane Lions@Melbourne"
+      ],
+      [
+        17243,
+        16,
+        8,
+        10,
+        "2026|7|2026-04-19|North Melbourne|Richmond@North Melbourne"
+      ],
+      [
+        17243,
+        18,
+        131,
+        10,
+        "2026|7|2026-04-19|North Melbourne|Richmond@Richmond"
+      ],
+      [
+        17244,
+        9,
+        55,
+        10,
+        "2026|7|2026-04-19|West Coast|Fremantle@Fremantle"
+      ],
+      [
+        17244,
+        23,
+        150,
+        10,
+        "2026|7|2026-04-19|West Coast|Fremantle@West Coast"
+      ],
+      [
+        17245,
+        21,
+        179,
+        10,
+        "2026|8|2026-04-23|Western Bulldogs|Sydney@Sydney"
+      ],
+      [
+        17245,
+        24,
+        31,
+        10,
+        "2026|8|2026-04-23|Western Bulldogs|Sydney@Western Bulldogs"
+      ],
+      [
+        17246,
+        15,
+        232,
+        10,
+        "2026|8|2026-04-24|Richmond|Melbourne@Melbourne"
+      ],
+      [
+        17246,
+        18,
+        131,
+        10,
+        "2026|8|2026-04-24|Richmond|Melbourne@Richmond"
+      ],
+      [
+        17247,
+        5,
+        73,
+        10,
+        "2026|8|2026-04-25|Essendon|Collingwood@Collingwood"
+      ],
+      [
+        17247,
+        6,
+        27,
+        10,
+        "2026|8|2026-04-25|Essendon|Collingwood@Essendon"
+      ],
+      [
+        17248,
+        4,
+        47,
+        10,
+        "2026|8|2026-04-25|Fremantle|Carlton@Carlton"
+      ],
+      [
+        17248,
+        9,
+        55,
+        10,
+        "2026|8|2026-04-25|Fremantle|Carlton@Fremantle"
+      ],
+      [
+        17249,
+        11,
+        17,
+        10,
+        "2026|8|2026-04-25|Hawthorn|Gold Coast@Gold Coast"
+      ],
+      [
+        17249,
+        13,
+        76,
+        10,
+        "2026|8|2026-04-25|Hawthorn|Gold Coast@Hawthorn"
+      ],
+      [
+        17250,
+        10,
+        16,
+        10,
+        "2026|8|2026-04-25|Port Adelaide|Geelong@Geelong"
+      ],
+      [
+        17250,
+        17,
+        243,
+        10,
+        "2026|8|2026-04-25|Port Adelaide|Geelong@Port Adelaide"
+      ],
+      [
+        17251,
+        1,
+        56,
+        10,
+        "2026|8|2026-04-26|Brisbane Lions|Adelaide@Adelaide"
+      ],
+      [
+        17251,
+        3,
+        39,
+        10,
+        "2026|8|2026-04-26|Brisbane Lions|Adelaide@Brisbane Lions"
+      ],
+      [
+        17252,
+        12,
+        93,
+        10,
+        "2026|8|2026-04-26|Greater Western Sydney|North Melbourne@Greater Western Sydney"
+      ],
+      [
+        17252,
+        16,
+        8,
+        10,
+        "2026|8|2026-04-26|Greater Western Sydney|North Melbourne@North Melbourne"
+      ],
+      [
+        17253,
+        20,
+        14,
+        10,
+        "2026|8|2026-04-26|St Kilda|West Coast@St Kilda"
+      ],
+      [
+        17253,
+        23,
+        150,
+        10,
+        "2026|8|2026-04-26|St Kilda|West Coast@West Coast"
+      ],
+      [
+        17254,
+        5,
+        73,
+        10,
+        "2026|9|2026-04-30|Collingwood|Hawthorn@Collingwood"
+      ],
+      [
+        17254,
+        13,
+        76,
+        10,
+        "2026|9|2026-04-30|Collingwood|Hawthorn@Hawthorn"
+      ],
+      [
+        17255,
+        1,
+        56,
+        10,
+        "2026|9|2026-05-01|Adelaide|Port Adelaide@Adelaide"
+      ],
+      [
+        17255,
+        17,
+        243,
+        10,
+        "2026|9|2026-05-01|Adelaide|Port Adelaide@Port Adelaide"
+      ],
+      [
+        17256,
+        9,
+        55,
+        10,
+        "2026|9|2026-05-01|Western Bulldogs|Fremantle@Fremantle"
+      ],
+      [
+        17256,
+        24,
+        31,
+        10,
+        "2026|9|2026-05-01|Western Bulldogs|Fremantle@Western Bulldogs"
+      ],
+      [
+        17257,
+        4,
+        47,
+        10,
+        "2026|9|2026-05-02|Carlton|St Kilda@Carlton"
+      ],
+      [
+        17257,
+        20,
+        14,
+        10,
+        "2026|9|2026-05-02|Carlton|St Kilda@St Kilda"
+      ],
+      [
+        17258,
+        3,
+        39,
+        10,
+        "2026|9|2026-05-02|Essendon|Brisbane Lions@Brisbane Lions"
+      ],
+      [
+        17258,
+        6,
+        27,
+        10,
+        "2026|9|2026-05-02|Essendon|Brisbane Lions@Essendon"
+      ],
+      [
+        17259,
+        10,
+        16,
+        10,
+        "2026|9|2026-05-02|Geelong|North Melbourne@Geelong"
+      ],
+      [
+        17259,
+        16,
+        8,
+        10,
+        "2026|9|2026-05-02|Geelong|North Melbourne@North Melbourne"
+      ],
+      [
+        17260,
+        18,
+        131,
+        10,
+        "2026|9|2026-05-02|West Coast|Richmond@Richmond"
+      ],
+      [
+        17260,
+        23,
+        150,
+        10,
+        "2026|9|2026-05-02|West Coast|Richmond@West Coast"
+      ],
+      [
+        17261,
+        11,
+        17,
+        10,
+        "2026|9|2026-05-03|Gold Coast|Greater Western Sydney@Gold Coast"
+      ],
+      [
+        17261,
+        12,
+        93,
+        10,
+        "2026|9|2026-05-03|Gold Coast|Greater Western Sydney@Greater Western Sydney"
+      ],
+      [
+        17262,
+        15,
+        232,
+        10,
+        "2026|9|2026-05-03|Sydney|Melbourne@Melbourne"
+      ],
+      [
+        17262,
+        21,
+        179,
+        10,
+        "2026|9|2026-05-03|Sydney|Melbourne@Sydney"
+      ],
+      [
+        17263,
+        4,
+        293,
+        10,
+        "2026|EF|2026-09-04|Geelong|Carlton@Carlton"
+      ],
+      [
+        17263,
+        10,
+        16,
+        10,
+        "2026|EF|2026-09-04|Geelong|Carlton@Geelong"
+      ],
+      [
+        17264,
+        1,
+        56,
+        10,
+        "2026|EF|2026-09-05|Adelaide|Western Bulldogs@Adelaide"
+      ],
+      [
+        17264,
+        24,
+        31,
+        10,
+        "2026|EF|2026-09-05|Adelaide|Western Bulldogs@Western Bulldogs"
+      ],
+      [
+        17265,
+        9,
+        55,
+        10,
+        "2026|PF|2026-09-18|Sydney|Fremantle@Fremantle"
+      ],
+      [
+        17265,
+        21,
+        179,
+        10,
+        "2026|PF|2026-09-18|Sydney|Fremantle@Sydney"
+      ],
+      [
+        17266,
+        3,
+        39,
+        10,
+        "2026|PF|2026-09-19|Hawthorn|Brisbane Lions@Brisbane Lions"
+      ],
+      [
+        17266,
+        13,
+        76,
+        10,
+        "2026|PF|2026-09-19|Hawthorn|Brisbane Lions@Hawthorn"
+      ],
+      [
+        17267,
+        9,
+        55,
+        10,
+        "2026|QF|2026-09-03|Fremantle|Hawthorn@Fremantle"
+      ],
+      [
+        17267,
+        13,
+        76,
+        10,
+        "2026|QF|2026-09-03|Fremantle|Hawthorn@Hawthorn"
+      ],
+      [
+        17268,
+        3,
+        39,
+        10,
+        "2026|QF|2026-09-05|Sydney|Brisbane Lions@Brisbane Lions"
+      ],
+      [
+        17268,
+        21,
+        179,
+        10,
+        "2026|QF|2026-09-05|Sydney|Brisbane Lions@Sydney"
+      ],
+      [
+        17269,
+        9,
+        55,
+        10,
+        "2026|SF|2026-09-11|Fremantle|Geelong@Fremantle"
+      ],
+      [
+        17269,
+        10,
+        16,
+        10,
+        "2026|SF|2026-09-11|Fremantle|Geelong@Geelong"
+      ],
+      [
+        17270,
+        1,
+        56,
+        10,
+        "2026|SF|2026-09-12|Brisbane Lions|Adelaide@Adelaide"
+      ],
+      [
+        17270,
+        3,
+        39,
+        10,
+        "2026|SF|2026-09-12|Brisbane Lions|Adelaide@Brisbane Lions"
+      ],
+      [
+        17271,
+        5,
+        73,
+        10,
+        "2026|WF|2026-08-28|Western Bulldogs|Collingwood@Collingwood"
+      ],
+      [
+        17271,
+        24,
+        31,
+        10,
+        "2026|WF|2026-08-28|Western Bulldogs|Collingwood@Western Bulldogs"
+      ],
+      [
+        17272,
+        4,
+        293,
+        10,
+        "2026|WF|2026-08-29|Melbourne|Carlton@Carlton"
+      ],
+      [
+        17272,
+        15,
+        232,
+        10,
+        "2026|WF|2026-08-29|Melbourne|Carlton@Melbourne"
+      ],
+      [
+        17274,
+        3,
+        39,
+        10,
+        "2026|GF|2026-09-26|Fremantle|Brisbane Lions@Brisbane Lions"
+      ],
+      [
+        17274,
+        9,
+        55,
+        10,
+        "2026|GF|2026-09-26|Fremantle|Brisbane Lions@Fremantle"
+      ]
+    ],
+    "count": 436,
+    "digest": "33f5b466cab2adb27d5d45497f0e69bfe1917904e33940510f42de530646dd99",
+    "matches": 218,
+    "otherSourceStoredRows": 0,
+    "perCoach": {
+      "Beveridge, Luke": 25,
+      "Carr, Josh": 23,
+      "Clarkson, Alastair": 23,
+      "Cox, Dean": 25,
+      "Fagan, Chris": 27,
+      "Fraser, Josh": 16,
+      "Hardwick, Damien": 23,
+      "King, Steven": 24,
+      "Kingsley, Adam": 23,
+      "Longmuir, Justin": 27,
+      "Lyon, Ross": 23,
+      "McQualter, Andrew": 23,
+      "McRae, Craig": 24,
+      "Mitchell, Sam": 25,
+      "Nicks, Matthew": 25,
+      "Scott, Brad": 11,
+      "Scott, Chris": 25,
+      "Solomon, Dean": 12,
+      "Voss, Michael": 9,
+      "Yze, Adem": 23
+    }
+  },
+  "staging": {
+    "path": "/home/arm/ops/issue333-o2-50ed6e4f/staging-20261104T021651Z",
+    "files": 132,
+    "setDigest": "62aff03930b1573cd02f70e673767f065b19d7521ffadf69ed1daf9ea27fa242",
+    "manifestSha256": "02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988"
+  },
+  "source": {
+    "rowsRead": 695499,
+    "groups": 34112,
+    "blankRows": 30095,
+    "season2026Groups": 436,
+    "season2026Rows": 10028,
+    "distinctStrings": 385,
+    "coachIndexRows": 386,
+    "coachPages": 386,
+    "rawState": "raw/ not present (the tracked parsed artefacts are the rebuild input)",
+    "files": 130
+  },
+  "readSession": {
+    "transaction_read_only": "on",
+    "default_transaction_read_only": "on",
+    "current_database": "afldb_prod",
+    "timezone": "UTC",
+    "temporarySchema": "none",
+    "isolation": "repeatable read",
+    "selectOnlyCursor": true,
+    "trackCounts": "on",
+    "serverVersionNum": "160015"
+  },
+  "importBatchesAppendedSinceBackup": [],
+  "toolSha256": {
+    "tools/v2/issue333-coach-assignments-production.py": "84935a3768f11fec46d4c4497973fc240e30a171649f22bce54493c0300fb461",
+    "tools/migration/add_match_coaches_2026.py": "3ff3ac3d08ac325b327a7b2621183850fac2d76c3064711fd5192e229079e6dc",
+    "tools/v2/issue333_o2_common.py": "06af487a19c17eed41dbaa99b44b1d8012e93313680cefdfe31a0803e346a57c",
+    "tools/v2/gap029_common.py": "ddefab1e69ca5ed8e02b32d9eead4f3a790a84b7012e345f94092eaff31231e7",
+    "tools/v2/gap029-draft-link-production.py": "97aff072b6a9dbe9b9e16f91b30afc573a264c14faf034be4d98fe658825bded",
+    "tools/rebuild/draftguru/bridge_import_gate.py": "fbce43f7f1e374b3dfac05968e627b8ad9f337279f233a49bc19ff57d02d558d",
+    "tools/migration/import_match_coaches.py": "4895874b9208aa08e8f3b1293836fe77351ea622b278a00197b783787a827ba6",
+    "tools/migration/import_fitzroy_core.py": "4786d336349170bce6b210fceeb6f72de79d8eebc1471b79e25a8f9e18e75cc5",
+    "tools/migration/enrich_heights.py": "647bb383eb661f0ab0b0d6cac2dafe495b27a3f7361c7ea3ffafd50a51a6bcf0",
+    "tools/migration/common.py": "d2c429d3d21b66a03d080f73a28d87becd314042a09e511739a9b5c23515dff8",
+    "tools/rebuild/afltables/coach_snapshot_parser.py": "146af72592d2ca19efa9c0f9a2e36926e616ac6043d1255d2c7fd7a3626736b3",
+    "tools/rebuild/afltables/afltables-contract.json": "ca4291cb19963d83734e94e1dda36e6d27d2abef32491e4cac27e79dfc3ca60f",
+    "tools/rebuild/fitzroy/fitzroy-contract.json": "4e98a4c96b57011937f78c5dbd2c7cfd50d4cd65b270d11279173b9dbda3edd5",
+    "data/reference/clubs.json": "9aaa8d4688206d03b0960bd03dcda199a642c5f7343570cc8bc2d439f5674f32",
+    "docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json": "02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988",
+    "docs/rebuild-manifests/afltables_coaches/coaches-20260905.json": "3e78f47354ac9fe594547ad327efaa6a2f6da90c54b17072ade4443e74ba8094",
+    "data/sources/afltables/coaches/coaches-20260905/parsed/coaches_index.csv": "525ae8876786a2bb006f8be91fc29f860e12e765eb12316c5f9da9ed6ef142ef",
+    "data/sources/afltables/coaches/coaches-20260905/parsed/coach_pages.csv": "ec4959a40fc56a6ff6e15b6a91a4bd81cc75326c507440cf98b4ed60f853113b"
+  },
+  "coreTar": {
+    "path": "/home/arm/ops/issue333-o2-50ed6e4f/in/core.tar",
+    "sha256": "9a989fdcf7177cff24bbedcd0ee4559b772ebc452c05dab331e128859e4db080"
+  },
+  "backup": {
+    "target": {
+      "host": "localhost",
+      "port": 5432,
+      "database": "afldb_prod",
+      "user": "afldb_backup",
+      "systemIdentifier": "7674454702926115004",
+      "databaseOid": "66668",
+      "clusterName": "16/main",
+      "databaseComment": null
+    },
+    "sha256": "e77c307d3e0cddcb652e398a946e4c22c2063f13c70edadf96a975c92842826d",
+    "restoreEvidenceSha256": "07e1f6942df51dff90e045b942d5c35cf3585f35d6b36c53d09489c3e987c6f1",
+    "capturedAt": "2026-11-04T02:10:38.102Z",
+    "restoredAt": "2026-11-04T02:13:31.072Z",
+    "baselineDigest": "8255e09459f7e8292b91bf654a56103a4849d7a38a627d026860c4d46da44714",
+    "i333OperationDigest": "d5ddb146a0e72c799a4a131c2348bf86b15fa57e64231c6519f74ad364acc2de",
+    "i333NewRowsDigest": "33f5b466cab2adb27d5d45497f0e69bfe1917904e33940510f42de530646dd99",
+    "i333ImportBatches": {
+      "rows": 75,
+      "maxId": 82,
+      "fullRowDigest": "a45d3f50613db5385f9a7fc316f79953e8dc20fcdb2ee1c75f90e5c65b64cb5b"
+    },
+    "assembly": {
+      "format": "afldb.gap029.restore-evidence-assembly.1",
+      "stage": "I333",
+      "operation": "issue333-coach-assignments",
+      "revision": "50ed6e4f4a697160ef263ade293792363e52e975",
+      "assembledAt": "2026-11-04T02:14:06.139Z",
+      "restoreTarget": {
+        "host": "127.0.0.1",
+        "port": 55493,
+        "database": "afldb_v2_i333o2_b20261104t021037z_rst_test",
+        "user": "afldb_owner",
+        "systemIdentifier": "7704133593388370608",
+        "databaseOid": "16390",
+        "clusterName": "afldb_v2_isolated",
+        "databaseComment": "afldb-v2-isolated-test"
+      },
+      "inputs": {
+        "dumpSha256": "e77c307d3e0cddcb652e398a946e4c22c2063f13c70edadf96a975c92842826d",
+        "restoreEvidenceSha256": "07e1f6942df51dff90e045b942d5c35cf3585f35d6b36c53d09489c3e987c6f1",
+        "toolSha256": {
+          "data/reference/clubs.json": "9aaa8d4688206d03b0960bd03dcda199a642c5f7343570cc8bc2d439f5674f32",
+          "data/sources/afltables/coaches/coaches-20260905/parsed/coach_pages.csv": "ec4959a40fc56a6ff6e15b6a91a4bd81cc75326c507440cf98b4ed60f853113b",
+          "data/sources/afltables/coaches/coaches-20260905/parsed/coaches_index.csv": "525ae8876786a2bb006f8be91fc29f860e12e765eb12316c5f9da9ed6ef142ef",
+          "docs/rebuild-manifests/afltables_coaches/coaches-20260905.json": "3e78f47354ac9fe594547ad327efaa6a2f6da90c54b17072ade4443e74ba8094",
+          "docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json": "02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988",
+          "tools/migration/add_match_coaches_2026.py": "3ff3ac3d08ac325b327a7b2621183850fac2d76c3064711fd5192e229079e6dc",
+          "tools/migration/common.py": "d2c429d3d21b66a03d080f73a28d87becd314042a09e511739a9b5c23515dff8",
+          "tools/migration/enrich_heights.py": "647bb383eb661f0ab0b0d6cac2dafe495b27a3f7361c7ea3ffafd50a51a6bcf0",
+          "tools/migration/import_fitzroy_core.py": "4786d336349170bce6b210fceeb6f72de79d8eebc1471b79e25a8f9e18e75cc5",
+          "tools/migration/import_match_coaches.py": "4895874b9208aa08e8f3b1293836fe77351ea622b278a00197b783787a827ba6",
+          "tools/rebuild/afltables/afltables-contract.json": "ca4291cb19963d83734e94e1dda36e6d27d2abef32491e4cac27e79dfc3ca60f",
+          "tools/rebuild/afltables/coach_snapshot_parser.py": "146af72592d2ca19efa9c0f9a2e36926e616ac6043d1255d2c7fd7a3626736b3",
+          "tools/rebuild/draftguru/bridge_import_gate.py": "fbce43f7f1e374b3dfac05968e627b8ad9f337279f233a49bc19ff57d02d558d",
+          "tools/rebuild/fitzroy/fitzroy-contract.json": "4e98a4c96b57011937f78c5dbd2c7cfd50d4cd65b270d11279173b9dbda3edd5",
+          "tools/v2/gap029-draft-link-production.py": "97aff072b6a9dbe9b9e16f91b30afc573a264c14faf034be4d98fe658825bded",
+          "tools/v2/gap029_common.py": "ddefab1e69ca5ed8e02b32d9eead4f3a790a84b7012e345f94092eaff31231e7",
+          "tools/v2/issue333-coach-assignments-production.py": "84935a3768f11fec46d4c4497973fc240e30a171649f22bce54493c0300fb461",
+          "tools/v2/issue333_o2_common.py": "06af487a19c17eed41dbaa99b44b1d8012e93313680cefdfe31a0803e346a57c"
+        },
+        "coreTarSha256": "9a989fdcf7177cff24bbedcd0ee4559b772ebc452c05dab331e128859e4db080"
+      },
+      "derived": {
+        "mode": "plan --rehearsal",
+        "outputSha256": "2ea2e2454ec3b1f8fb3f79ec6b1b1b19ef5059d348da22e9f8285435435f2d04",
+        "values": {
+          "baselineDigest": "8255e09459f7e8292b91bf654a56103a4849d7a38a627d026860c4d46da44714",
+          "i333OperationDigest": "d5ddb146a0e72c799a4a131c2348bf86b15fa57e64231c6519f74ad364acc2de",
+          "i333NewRowsDigest": "33f5b466cab2adb27d5d45497f0e69bfe1917904e33940510f42de530646dd99",
+          "i333ImportBatches": {
+            "rows": 75,
+            "maxId": 82,
+            "fullRowDigest": "a45d3f50613db5385f9a7fc316f79953e8dc20fcdb2ee1c75f90e5c65b64cb5b"
+          }
+        }
+      },
+      "sealedBody": "{\"assembly\":{\"assembledAt\":\"2026-11-04T02:14:06.139Z\",\"derived\":{\"mode\":\"plan --rehearsal\",\"outputSha256\":\"2ea2e2454ec3b1f8fb3f79ec6b1b1b19ef5059d348da22e9f8285435435f2d04\",\"values\":{\"baselineDigest\":\"8255e09459f7e8292b91bf654a56103a4849d7a38a627d026860c4d46da44714\",\"i333ImportBatches\":{\"fullRowDigest\":\"a45d3f50613db5385f9a7fc316f79953e8dc20fcdb2ee1c75f90e5c65b64cb5b\",\"maxId\":82,\"rows\":75},\"i333NewRowsDigest\":\"33f5b466cab2adb27d5d45497f0e69bfe1917904e33940510f42de530646dd99\",\"i333OperationDigest\":\"d5ddb146a0e72c799a4a131c2348bf86b15fa57e64231c6519f74ad364acc2de\"}},\"format\":\"afldb.gap029.restore-evidence-assembly.1\",\"inputs\":{\"coreTarSha256\":\"9a989fdcf7177cff24bbedcd0ee4559b772ebc452c05dab331e128859e4db080\",\"dumpSha256\":\"e77c307d3e0cddcb652e398a946e4c22c2063f13c70edadf96a975c92842826d\",\"restoreEvidenceSha256\":\"07e1f6942df51dff90e045b942d5c35cf3585f35d6b36c53d09489c3e987c6f1\",\"toolSha256\":{\"data/reference/clubs.json\":\"9aaa8d4688206d03b0960bd03dcda199a642c5f7343570cc8bc2d439f5674f32\",\"data/sources/afltables/coaches/coaches-20260905/parsed/coach_pages.csv\":\"ec4959a40fc56a6ff6e15b6a91a4bd81cc75326c507440cf98b4ed60f853113b\",\"data/sources/afltables/coaches/coaches-20260905/parsed/coaches_index.csv\":\"525ae8876786a2bb006f8be91fc29f860e12e765eb12316c5f9da9ed6ef142ef\",\"docs/rebuild-manifests/afltables_coaches/coaches-20260905.json\":\"3e78f47354ac9fe594547ad327efaa6a2f6da90c54b17072ade4443e74ba8094\",\"docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json\":\"02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988\",\"tools/migration/add_match_coaches_2026.py\":\"3ff3ac3d08ac325b327a7b2621183850fac2d76c3064711fd5192e229079e6dc\",\"tools/migration/common.py\":\"d2c429d3d21b66a03d080f73a28d87becd314042a09e511739a9b5c23515dff8\",\"tools/migration/enrich_heights.py\":\"647bb383eb661f0ab0b0d6cac2dafe495b27a3f7361c7ea3ffafd50a51a6bcf0\",\"tools/migration/import_fitzroy_core.py\":\"4786d336349170bce6b210fceeb6f72de79d8eebc1471b79e25a8f9e18e75cc5\",\"tools/migration/import_match_coaches.py\":\"4895874b9208aa08e8f3b1293836fe77351ea622b278a00197b783787a827ba6\",\"tools/rebuild/afltables/afltables-contract.json\":\"ca4291cb19963d83734e94e1dda36e6d27d2abef32491e4cac27e79dfc3ca60f\",\"tools/rebuild/afltables/coach_snapshot_parser.py\":\"146af72592d2ca19efa9c0f9a2e36926e616ac6043d1255d2c7fd7a3626736b3\",\"tools/rebuild/draftguru/bridge_import_gate.py\":\"fbce43f7f1e374b3dfac05968e627b8ad9f337279f233a49bc19ff57d02d558d\",\"tools/rebuild/fitzroy/fitzroy-contract.json\":\"4e98a4c96b57011937f78c5dbd2c7cfd50d4cd65b270d11279173b9dbda3edd5\",\"tools/v2/gap029-draft-link-production.py\":\"97aff072b6a9dbe9b9e16f91b30afc573a264c14faf034be4d98fe658825bded\",\"tools/v2/gap029_common.py\":\"ddefab1e69ca5ed8e02b32d9eead4f3a790a84b7012e345f94092eaff31231e7\",\"tools/v2/issue333-coach-assignments-production.py\":\"84935a3768f11fec46d4c4497973fc240e30a171649f22bce54493c0300fb461\",\"tools/v2/issue333_o2_common.py\":\"06af487a19c17eed41dbaa99b44b1d8012e93313680cefdfe31a0803e346a57c\"}},\"operation\":\"issue333-coach-assignments\",\"restoreTarget\":{\"clusterName\":\"afldb_v2_isolated\",\"database\":\"afldb_v2_i333o2_b20261104t021037z_rst_test\",\"databaseComment\":\"afldb-v2-isolated-test\",\"databaseOid\":\"16390\",\"host\":\"127.0.0.1\",\"port\":55493,\"systemIdentifier\":\"7704133593388370608\",\"user\":\"afldb_owner\"},\"revision\":\"50ed6e4f4a697160ef263ade293792363e52e975\",\"stage\":\"I333\"},\"baselineDigest\":\"8255e09459f7e8292b91bf654a56103a4849d7a38a627d026860c4d46da44714\",\"capturedAt\":\"2026-11-04T02:10:38.102Z\",\"i333ImportBatches\":{\"fullRowDigest\":\"a45d3f50613db5385f9a7fc316f79953e8dc20fcdb2ee1c75f90e5c65b64cb5b\",\"maxId\":82,\"rows\":75},\"i333NewRowsDigest\":\"33f5b466cab2adb27d5d45497f0e69bfe1917904e33940510f42de530646dd99\",\"i333OperationDigest\":\"d5ddb146a0e72c799a4a131c2348bf86b15fa57e64231c6519f74ad364acc2de\",\"restoreEvidenceSha256\":\"07e1f6942df51dff90e045b942d5c35cf3585f35d6b36c53d09489c3e987c6f1\",\"restoredAt\":\"2026-11-04T02:13:31.072Z\",\"sha256\":\"e77c307d3e0cddcb652e398a946e4c22c2063f13c70edadf96a975c92842826d\",\"target\":{\"clusterName\":\"16/main\",\"database\":\"afldb_prod\",\"databaseComment\":null,\"databaseOid\":\"66668\",\"host\":\"localhost\",\"port\":5432,\"systemIdentifier\":\"7674454702926115004\",\"user\":\"afldb_backup\"}}",
+      "sealedBodySha256": "35cdcab582e6eeb30a0a89a9c8d441605182dde369d8102950c71763034f85a9"
+    }
+  },
+  "noApplyWindowHostLocal": "04:15-05:30 Australia/Melbourne",
+  "createdAt": "2026-11-04T02:16:51.682Z",
+  "expiresAt": "2026-11-05T02:16:51.682Z",
+  "digest": "4de5368c7b4dfff00550b5ec60bb8596d1e84804534a94d0b7f6836a3dbc515e"
+}

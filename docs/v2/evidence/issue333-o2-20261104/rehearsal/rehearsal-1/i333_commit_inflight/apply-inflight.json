@@ -1,0 +1,15 @@
+{
+  "planDigest": "bef1f406b37e040abeac7ba547b0388ae338ee5fd5799bcf0c594254039e6681",
+  "outcome": "COMMITTED_VERIFIED",
+  "exitCode": 0,
+  "statement": "COMMITTED AND VERIFIED: the writer committed and an independent read-only check of the committed state passed.",
+  "problems": [],
+  "detail": null,
+  "at": "2026-11-04T02:24:28.044Z",
+  "writer": {
+    "exit": -9,
+    "writerExit": -9,
+    "writerSaid": []
+  },
+  "writerFailedAfterCommit": "the writer exited -9"
+}

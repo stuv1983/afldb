@@ -1,0 +1,6 @@
+=== writer exit 2
+--- stdout
+O2 writer: ROLLED BACK / REFUSED: post-state check failed inside the transaction: ['another data_issues row changed', 'note: other data_issues rows changed or were added since the plan (pre-existing rows unchanged: False)']; writes {'public.data_issues': [0, 37, 0]}
+
+--- stderr
+

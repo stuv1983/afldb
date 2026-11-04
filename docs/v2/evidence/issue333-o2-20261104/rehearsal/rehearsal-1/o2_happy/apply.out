@@ -1,0 +1,2 @@
+OUTCOME COMMITTED_VERIFIED (exit 0)
+COMMITTED AND VERIFIED: the writer committed and an independent read-only check of the committed state passed.

@@ -1,0 +1,6 @@
+=== writer exit 2
+--- stdout
+ISSUE-333 writer: ROLLED BACK / REFUSED: post-state check failed inside the transaction: ["1 import_batches rows other than this tool's were added inside the write transaction", 'import_batches did not grow by exactly one row']; writes {'public.import_batches': [2, 1, 0], 'public.match_coaches': [436, 0, 0]}
+
+--- stderr
+

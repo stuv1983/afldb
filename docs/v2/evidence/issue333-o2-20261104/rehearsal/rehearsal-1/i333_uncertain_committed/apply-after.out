@@ -1,0 +1,3 @@
+OUTCOME REFUSED_BEFORE_MUTATION (exit 1)
+REFUSED BEFORE MUTATION: a check failed before the writer was started; nothing was written.
+detail: Refused: the new set is not exactly the reviewed 436 season-2026 assignments (both sides of all 218 matches): 0 new, seasons [], matches 0 of 218

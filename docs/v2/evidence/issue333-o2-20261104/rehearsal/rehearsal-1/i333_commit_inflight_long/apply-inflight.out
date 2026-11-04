@@ -1,0 +1,3 @@
+OUTCOME OUTCOME_UNDETERMINED (exit 5)
+OUTCOME UNDETERMINED: the tool could not establish whether the writer committed. Do NOT assume it rolled back and do NOT retry; read the state with the read-only `state` mode against the same plan.
+detail: the writer exited -9 and the live state was unreadable

@@ -1,0 +1,16 @@
+{
+  "planDigest": "8e437759b42298af28f3ddaffb66e93ee30005663311dd5f69d0a15f88e92d2d",
+  "outcome": "COMMITTED_VERIFIED",
+  "exitCode": 0,
+  "statement": "COMMITTED AND VERIFIED: the writer committed and an independent read-only check of the committed state passed.",
+  "problems": [],
+  "detail": null,
+  "at": "2026-11-04T02:39:04.797Z",
+  "writer": {
+    "exit": 0,
+    "writerExit": 0,
+    "writerSaid": [
+      "O2 writer: COMMITTED {\"committed\": true, \"resolvedAt\": \"2026-11-04T02:39:04.478108+00:00\", \"settings\": {\"TimeZone\": \"UTC\", \"lock_timeout\": \"5s\", \"statement_timeout\": \"5min\", \"track_counts\": \"on\", \"transaction_read_only\": \"off\"}, \"updated\": 36}"
+    ]
+  }
+}

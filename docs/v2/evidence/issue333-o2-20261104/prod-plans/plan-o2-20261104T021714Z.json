@@ -1,0 +1,1663 @@
+{
+  "operation": "o2-converged-findings",
+  "revision": "50ed6e4f4a697160ef263ade293792363e52e975",
+  "target": {
+    "host": "localhost",
+    "port": 5432,
+    "database": "afldb_prod",
+    "user": "afldb_backup",
+    "systemIdentifier": "7674454702926115004",
+    "databaseOid": "66668",
+    "clusterName": "16/main",
+    "databaseComment": null
+  },
+  "rehearsal": false,
+  "baseline": {
+    "operation": {
+      "targets": {
+        "rows": 36,
+        "fullRowDigest": "c8194a189d9a6748adb8df8eb2d656b4c9a96cf2eb757a7dbf45dc448ba382ba"
+      },
+      "canonical": {
+        "rows": 36,
+        "fullRowDigest": "53e3c4a443c517afca662cc799fe363bdbb2fb7c36bd732f864503fea2d2eae5"
+      },
+      "staged": {
+        "rows": 36,
+        "fullRowDigest": "6657983da7df93f558696d348efed94463a2b177504afb33974e4129234d435a"
+      },
+      "comparison": {
+        "entries": 53,
+        "equal": 53,
+        "digest": "8cbcb7203bc072e076c64c415807bd011d2a6f8cf0c900db515bd0e650a3da4e"
+      },
+      "triggers": []
+    },
+    "operationDigest": "1286f940098475a648e992784b152dadaef0a6c13d389e3caf7808edaba77551",
+    "others": {
+      "rows": 4,
+      "maxId": 4,
+      "fullRowDigest": "7eed5860df42f268de66accae4036a42b02e9c20d67f7a117a4bc39554fefbc4"
+    },
+    "baselineDigest": "d8c8cd943e9f732eae0cfdf93d8c84001b83fc287b5dce952ad780fdf0b76644"
+  },
+  "comparison": [
+    [
+      41,
+      "afl_api|apply|player_match_stats|CD_M20260140003|CD_T80|CD_I998134|player_match_stats",
+      700402,
+      "CD_M20260140003|CD_T80|CD_I998134",
+      "one_percenters",
+      2,
+      2,
+      true
+    ],
+    [
+      42,
+      "afl_api|apply|player_match_stats|CD_M20260140004|CD_T20|CD_I993834|player_match_stats",
+      700464,
+      "CD_M20260140004|CD_T20|CD_I993834",
+      "one_percenters",
+      5,
+      5,
+      true
+    ],
+    [
+      43,
+      "afl_api|apply|player_match_stats|CD_M20260140102|CD_T80|CD_I1012857|player_match_stats",
+      698912,
+      "CD_M20260140102|CD_T80|CD_I1012857",
+      "one_percenters",
+      0,
+      0,
+      true
+    ],
+    [
+      44,
+      "afl_api|apply|player_match_stats|CD_M20260140105|CD_T160|CD_I1020339|player_match_stats",
+      695720,
+      "CD_M20260140105|CD_T160|CD_I1020339",
+      "rebounds",
+      0,
+      0,
+      true
+    ],
+    [
+      45,
+      "afl_api|apply|player_match_stats|CD_M20260140202|CD_T10|CD_I1021200|player_match_stats",
+      701208,
+      "CD_M20260140202|CD_T10|CD_I1021200",
+      "tackles",
+      1,
+      1,
+      true
+    ],
+    [
+      46,
+      "afl_api|apply|player_match_stats|CD_M20260140207|CD_T150|CD_I993902|player_match_stats",
+      702044,
+      "CD_M20260140207|CD_T150|CD_I993902",
+      "one_percenters",
+      4,
+      4,
+      true
+    ],
+    [
+      47,
+      "afl_api|apply|player_match_stats|CD_M20260140207|CD_T100|CD_I1023518|player_match_stats",
+      698451,
+      "CD_M20260140207|CD_T100|CD_I1023518",
+      "disposals",
+      39,
+      39,
+      true
+    ],
+    [
+      47,
+      "afl_api|apply|player_match_stats|CD_M20260140207|CD_T100|CD_I1023518|player_match_stats",
+      698451,
+      "CD_M20260140207|CD_T100|CD_I1023518",
+      "kicks",
+      21,
+      21,
+      true
+    ],
+    [
+      48,
+      "afl_api|apply|player_match_stats|CD_M20260140303|CD_T130|CD_I1009260|player_match_stats",
+      703920,
+      "CD_M20260140303|CD_T130|CD_I1009260",
+      "goal_assists",
+      1,
+      1,
+      true
+    ],
+    [
+      49,
+      "afl_api|apply|player_match_stats|CD_M20260140303|CD_T130|CD_I1027790|player_match_stats",
+      698636,
+      "CD_M20260140303|CD_T130|CD_I1027790",
+      "tackles",
+      9,
+      9,
+      true
+    ],
+    [
+      50,
+      "afl_api|apply|player_match_stats|CD_M20260140303|CD_T130|CD_I1018018|player_match_stats",
+      697331,
+      "CD_M20260140303|CD_T130|CD_I1018018",
+      "tackles",
+      2,
+      2,
+      true
+    ],
+    [
+      51,
+      "afl_api|apply|player_match_stats|CD_M20260140403|CD_T60|CD_I1020250|player_match_stats",
+      702738,
+      "CD_M20260140403|CD_T60|CD_I1020250",
+      "disposals",
+      20,
+      20,
+      true
+    ],
+    [
+      51,
+      "afl_api|apply|player_match_stats|CD_M20260140403|CD_T60|CD_I1020250|player_match_stats",
+      702738,
+      "CD_M20260140403|CD_T60|CD_I1020250",
+      "handballs",
+      11,
+      11,
+      true
+    ],
+    [
+      51,
+      "afl_api|apply|player_match_stats|CD_M20260140403|CD_T60|CD_I1020250|player_match_stats",
+      702738,
+      "CD_M20260140403|CD_T60|CD_I1020250",
+      "uncontested",
+      12,
+      12,
+      true
+    ],
+    [
+      52,
+      "afl_api|apply|player_match_stats|CD_M20260140507|CD_T70|CD_I1016433|player_match_stats",
+      704156,
+      "CD_M20260140507|CD_T70|CD_I1016433",
+      "goal_assists",
+      1,
+      1,
+      true
+    ],
+    [
+      53,
+      "afl_api|apply|player_match_stats|CD_M20260140602|CD_T140|CD_I1002404|player_match_stats",
+      695491,
+      "CD_M20260140602|CD_T140|CD_I1002404",
+      "goal_assists",
+      1,
+      1,
+      true
+    ],
+    [
+      54,
+      "afl_api|apply|player_match_stats|CD_M20260140607|CD_T120|CD_I290627|player_match_stats",
+      697757,
+      "CD_M20260140607|CD_T120|CD_I290627",
+      "goal_assists",
+      2,
+      2,
+      true
+    ],
+    [
+      55,
+      "afl_api|apply|player_match_stats|CD_M20260140608|CD_T90|CD_I999391|player_match_stats",
+      704793,
+      "CD_M20260140608|CD_T90|CD_I999391",
+      "one_percenters",
+      0,
+      0,
+      true
+    ],
+    [
+      56,
+      "afl_api|apply|player_match_stats|CD_M20260140902|CD_T20|CD_I291548|player_match_stats",
+      703663,
+      "CD_M20260140902|CD_T20|CD_I291548",
+      "rebounds",
+      3,
+      3,
+      true
+    ],
+    [
+      56,
+      "afl_api|apply|player_match_stats|CD_M20260140902|CD_T20|CD_I291548|player_match_stats",
+      703663,
+      "CD_M20260140902|CD_T20|CD_I291548",
+      "uncontested",
+      12,
+      12,
+      true
+    ],
+    [
+      57,
+      "afl_api|apply|player_match_stats|CD_M20260140909|CD_T120|CD_I1002245|player_match_stats",
+      702993,
+      "CD_M20260140909|CD_T120|CD_I1002245",
+      "behinds",
+      2,
+      2,
+      true
+    ],
+    [
+      58,
+      "afl_api|apply|player_match_stats|CD_M20260140909|CD_T120|CD_I1032081|player_match_stats",
+      703322,
+      "CD_M20260140909|CD_T120|CD_I1032081",
+      "one_percenters",
+      2,
+      2,
+      true
+    ],
+    [
+      59,
+      "afl_api|apply|player_match_stats|CD_M20260141001|CD_T70|CD_I1027877|player_match_stats",
+      697192,
+      "CD_M20260141001|CD_T70|CD_I1027877",
+      "one_percenters",
+      4,
+      4,
+      true
+    ],
+    [
+      60,
+      "afl_api|apply|player_match_stats|CD_M20260141101|CD_T80|CD_I297354|player_match_stats",
+      700826,
+      "CD_M20260141101|CD_T80|CD_I297354",
+      "one_percenters",
+      2,
+      2,
+      true
+    ],
+    [
+      61,
+      "afl_api|apply|player_match_stats|CD_M20260141101|CD_T80|CD_I1027935|player_match_stats",
+      700600,
+      "CD_M20260141101|CD_T80|CD_I1027935",
+      "one_percenters",
+      8,
+      8,
+      true
+    ],
+    [
+      62,
+      "afl_api|apply|player_match_stats|CD_M20260141101|CD_T10|CD_I1024023|player_match_stats",
+      697458,
+      "CD_M20260141101|CD_T10|CD_I1024023",
+      "one_percenters",
+      2,
+      2,
+      true
+    ],
+    [
+      63,
+      "afl_api|apply|player_match_stats|CD_M20260141101|CD_T10|CD_I1011981|player_match_stats",
+      700622,
+      "CD_M20260141101|CD_T10|CD_I1011981",
+      "one_percenters",
+      3,
+      3,
+      true
+    ],
+    [
+      64,
+      "afl_api|apply|player_match_stats|CD_M20260141102|CD_T120|CD_I295203|player_match_stats",
+      702631,
+      "CD_M20260141102|CD_T120|CD_I295203",
+      "one_percenters",
+      6,
+      6,
+      true
+    ],
+    [
+      65,
+      "afl_api|apply|player_match_stats|CD_M20260141102|CD_T120|CD_I992049|player_match_stats",
+      699947,
+      "CD_M20260141102|CD_T120|CD_I992049",
+      "one_percenters",
+      3,
+      3,
+      true
+    ],
+    [
+      66,
+      "afl_api|apply|player_match_stats|CD_M20260141102|CD_T120|CD_I294674|player_match_stats",
+      702904,
+      "CD_M20260141102|CD_T120|CD_I294674",
+      "clangers",
+      3,
+      3,
+      true
+    ],
+    [
+      66,
+      "afl_api|apply|player_match_stats|CD_M20260141102|CD_T120|CD_I294674|player_match_stats",
+      702904,
+      "CD_M20260141102|CD_T120|CD_I294674",
+      "frees_against",
+      2,
+      2,
+      true
+    ],
+    [
+      67,
+      "afl_api|apply|player_match_stats|CD_M20260141102|CD_T50|CD_I1015873|player_match_stats",
+      695787,
+      "CD_M20260141102|CD_T50|CD_I1015873",
+      "contested",
+      4,
+      4,
+      true
+    ],
+    [
+      67,
+      "afl_api|apply|player_match_stats|CD_M20260141102|CD_T50|CD_I1015873|player_match_stats",
+      695787,
+      "CD_M20260141102|CD_T50|CD_I1015873",
+      "frees_for",
+      1,
+      1,
+      true
+    ],
+    [
+      67,
+      "afl_api|apply|player_match_stats|CD_M20260141102|CD_T50|CD_I1015873|player_match_stats",
+      695787,
+      "CD_M20260141102|CD_T50|CD_I1015873",
+      "marks",
+      7,
+      7,
+      true
+    ],
+    [
+      67,
+      "afl_api|apply|player_match_stats|CD_M20260141102|CD_T50|CD_I1015873|player_match_stats",
+      695787,
+      "CD_M20260141102|CD_T50|CD_I1015873",
+      "one_percenters",
+      2,
+      2,
+      true
+    ],
+    [
+      67,
+      "afl_api|apply|player_match_stats|CD_M20260141102|CD_T50|CD_I1015873|player_match_stats",
+      695787,
+      "CD_M20260141102|CD_T50|CD_I1015873",
+      "uncontested",
+      15,
+      15,
+      true
+    ],
+    [
+      68,
+      "afl_api|apply|player_match_stats|CD_M20260141104|CD_T100|CD_I1015781|player_match_stats",
+      696938,
+      "CD_M20260141104|CD_T100|CD_I1015781",
+      "rebounds",
+      5,
+      5,
+      true
+    ],
+    [
+      69,
+      "afl_api|apply|player_match_stats|CD_M20260141104|CD_T100|CD_I1023477|player_match_stats",
+      698112,
+      "CD_M20260141104|CD_T100|CD_I1023477",
+      "rebounds",
+      1,
+      1,
+      true
+    ],
+    [
+      70,
+      "afl_api|apply|player_match_stats|CD_M20260141105|CD_T70|CD_I1009229|player_match_stats",
+      703851,
+      "CD_M20260141105|CD_T70|CD_I1009229",
+      "one_percenters",
+      3,
+      3,
+      true
+    ],
+    [
+      71,
+      "afl_api|apply|player_match_stats|CD_M20260141105|CD_T70|CD_I291800|player_match_stats",
+      704799,
+      "CD_M20260141105|CD_T70|CD_I291800",
+      "one_percenters",
+      3,
+      3,
+      true
+    ],
+    [
+      72,
+      "afl_api|apply|player_match_stats|CD_M20260141107|CD_T110|CD_I1004530|player_match_stats",
+      699238,
+      "CD_M20260141107|CD_T110|CD_I1004530",
+      "contested",
+      4,
+      4,
+      true
+    ],
+    [
+      72,
+      "afl_api|apply|player_match_stats|CD_M20260141107|CD_T110|CD_I1004530|player_match_stats",
+      699238,
+      "CD_M20260141107|CD_T110|CD_I1004530",
+      "frees_for",
+      2,
+      2,
+      true
+    ],
+    [
+      73,
+      "afl_api|apply|player_match_stats|CD_M20260141107|CD_T30|CD_I1036426|player_match_stats",
+      704274,
+      "CD_M20260141107|CD_T30|CD_I1036426",
+      "clangers",
+      3,
+      3,
+      true
+    ],
+    [
+      73,
+      "afl_api|apply|player_match_stats|CD_M20260141107|CD_T30|CD_I1036426|player_match_stats",
+      704274,
+      "CD_M20260141107|CD_T30|CD_I1036426",
+      "frees_against",
+      1,
+      1,
+      true
+    ],
+    [
+      74,
+      "afl_api|apply|player_match_stats|CD_M20260141705|CD_T80|CD_I1008550|player_match_stats",
+      705042,
+      "CD_M20260141705|CD_T80|CD_I1008550",
+      "one_percenters",
+      2,
+      2,
+      true
+    ],
+    [
+      75,
+      "afl_api|apply|player_match_stats|CD_M20260142702|CD_T10|CD_I1018335|player_match_stats",
+      696447,
+      "CD_M20260142702|CD_T10|CD_I1018335",
+      "clearances",
+      0,
+      0,
+      true
+    ],
+    [
+      75,
+      "afl_api|apply|player_match_stats|CD_M20260142702|CD_T10|CD_I1018335|player_match_stats",
+      696447,
+      "CD_M20260142702|CD_T10|CD_I1018335",
+      "contested",
+      5,
+      5,
+      true
+    ],
+    [
+      75,
+      "afl_api|apply|player_match_stats|CD_M20260142702|CD_T10|CD_I1018335|player_match_stats",
+      696447,
+      "CD_M20260142702|CD_T10|CD_I1018335",
+      "disposals",
+      14,
+      14,
+      true
+    ],
+    [
+      75,
+      "afl_api|apply|player_match_stats|CD_M20260142702|CD_T10|CD_I1018335|player_match_stats",
+      696447,
+      "CD_M20260142702|CD_T10|CD_I1018335",
+      "kicks",
+      9,
+      9,
+      true
+    ],
+    [
+      76,
+      "afl_api|apply|player_match_stats|CD_M20260142702|CD_T10|CD_I1023273|player_match_stats",
+      698653,
+      "CD_M20260142702|CD_T10|CD_I1023273",
+      "clearances",
+      1,
+      1,
+      true
+    ],
+    [
+      76,
+      "afl_api|apply|player_match_stats|CD_M20260142702|CD_T10|CD_I1023273|player_match_stats",
+      698653,
+      "CD_M20260142702|CD_T10|CD_I1023273",
+      "contested",
+      5,
+      5,
+      true
+    ],
+    [
+      76,
+      "afl_api|apply|player_match_stats|CD_M20260142702|CD_T10|CD_I1023273|player_match_stats",
+      698653,
+      "CD_M20260142702|CD_T10|CD_I1023273",
+      "disposals",
+      25,
+      25,
+      true
+    ],
+    [
+      76,
+      "afl_api|apply|player_match_stats|CD_M20260142702|CD_T10|CD_I1023273|player_match_stats",
+      698653,
+      "CD_M20260142702|CD_T10|CD_I1023273",
+      "kicks",
+      17,
+      17,
+      true
+    ]
+  ],
+  "preImage": [
+    [
+      41,
+      "player_match_stats",
+      700402,
+      "canonical_apply_failed",
+      "warning",
+      "The automatic canonical application of player_match_stats 'CD_M20260140003|CD_T80|CD_I998134' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.",
+      {
+        "external_record_id": "CD_M20260140003|CD_T80|CD_I998134",
+        "family": "player_match_stats",
+        "fields": [
+          "one_percenters"
+        ],
+        "issue": "AFLDB-ISSUE-244 I244-F009",
+        "match_key": "2026|1|2026-03-07|Greater Western Sydney|Hawthorn",
+        "owner": "AFLDB-ISSUE-122",
+        "refusal": "foreign_source_owner",
+        "source_key": "afl_api",
+        "source_version_seq": 1,
+        "target_table": "player_match_stats"
+      },
+      "2026-09-27T21:11:30.460661+00:00",
+      null,
+      null,
+      "afl_api|apply|player_match_stats|CD_M20260140003|CD_T80|CD_I998134|player_match_stats"
+    ],
+    [
+      42,
+      "player_match_stats",
+      700464,
+      "canonical_apply_failed",
+      "warning",
+      "The automatic canonical application of player_match_stats 'CD_M20260140004|CD_T20|CD_I993834' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.",
+      {
+        "external_record_id": "CD_M20260140004|CD_T20|CD_I993834",
+        "family": "player_match_stats",
+        "fields": [
+          "one_percenters"
+        ],
+        "issue": "AFLDB-ISSUE-244 I244-F009",
+        "match_key": "2026|1|2026-03-07|Brisbane Lions|Western Bulldogs",
+        "owner": "AFLDB-ISSUE-122",
+        "refusal": "foreign_source_owner",
+        "source_key": "afl_api",
+        "source_version_seq": 1,
+        "target_table": "player_match_stats"
+      },
+      "2026-09-27T21:11:30.460661+00:00",
+      null,
+      null,
+      "afl_api|apply|player_match_stats|CD_M20260140004|CD_T20|CD_I993834|player_match_stats"
+    ],
+    [
+      43,
+      "player_match_stats",
+      698912,
+      "canonical_apply_failed",
+      "warning",
+      "The automatic canonical application of player_match_stats 'CD_M20260140102|CD_T80|CD_I1012857' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.",
+      {
+        "external_record_id": "CD_M20260140102|CD_T80|CD_I1012857",
+        "family": "player_match_stats",
+        "fields": [
+          "one_percenters"
+        ],
+        "issue": "AFLDB-ISSUE-244 I244-F009",
+        "match_key": "2026|2|2026-03-13|Essendon|Hawthorn",
+        "owner": "AFLDB-ISSUE-122",
+        "refusal": "foreign_source_owner",
+        "source_key": "afl_api",
+        "source_version_seq": 1,
+        "target_table": "player_match_stats"
+      },
+      "2026-09-27T21:11:30.460661+00:00",
+      null,
+      null,
+      "afl_api|apply|player_match_stats|CD_M20260140102|CD_T80|CD_I1012857|player_match_stats"
+    ],
+    [
+      44,
+      "player_match_stats",
+      695720,
+      "canonical_apply_failed",
+      "warning",
+      "The automatic canonical application of player_match_stats 'CD_M20260140105|CD_T160|CD_I1020339' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.",
+      {
+        "external_record_id": "CD_M20260140105|CD_T160|CD_I1020339",
+        "family": "player_match_stats",
+        "fields": [
+          "rebounds"
+        ],
+        "issue": "AFLDB-ISSUE-244 I244-F009",
+        "match_key": "2026|2|2026-03-14|Sydney|Brisbane Lions",
+        "owner": "AFLDB-ISSUE-122",
+        "refusal": "foreign_source_owner",
+        "source_key": "afl_api",
+        "source_version_seq": 1,
+        "target_table": "player_match_stats"
+      },
+      "2026-09-27T21:11:30.460661+00:00",
+      null,
+      null,
+      "afl_api|apply|player_match_stats|CD_M20260140105|CD_T160|CD_I1020339|player_match_stats"
+    ],
+    [
+      45,
+      "player_match_stats",
+      701208,
+      "canonical_apply_failed",
+      "warning",
+      "The automatic canonical application of player_match_stats 'CD_M20260140202|CD_T10|CD_I1021200' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.",
+      {
+        "external_record_id": "CD_M20260140202|CD_T10|CD_I1021200",
+        "family": "player_match_stats",
+        "fields": [
+          "tackles"
+        ],
+        "issue": "AFLDB-ISSUE-244 I244-F009",
+        "match_key": "2026|3|2026-03-20|Adelaide|Western Bulldogs",
+        "owner": "AFLDB-ISSUE-122",
+        "refusal": "foreign_source_owner",
+        "source_key": "afl_api",
+        "source_version_seq": 1,
+        "target_table": "player_match_stats"
+      },
+      "2026-09-27T21:11:30.460661+00:00",
+      null,
+      null,
+      "afl_api|apply|player_match_stats|CD_M20260140202|CD_T10|CD_I1021200|player_match_stats"
+    ],
+    [
+      46,
+      "player_match_stats",
+      702044,
+      "canonical_apply_failed",
+      "warning",
+      "The automatic canonical application of player_match_stats 'CD_M20260140207|CD_T150|CD_I993902' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.",
+      {
+        "external_record_id": "CD_M20260140207|CD_T150|CD_I993902",
+        "family": "player_match_stats",
+        "fields": [
+          "one_percenters"
+        ],
+        "issue": "AFLDB-ISSUE-244 I244-F009",
+        "match_key": "2026|3|2026-03-22|West Coast|North Melbourne",
+        "owner": "AFLDB-ISSUE-122",
+        "refusal": "foreign_source_owner",
+        "source_key": "afl_api",
+        "source_version_seq": 1,
+        "target_table": "player_match_stats"
+      },
+      "2026-09-27T21:11:30.460661+00:00",
+      null,
+      null,
+      "afl_api|apply|player_match_stats|CD_M20260140207|CD_T150|CD_I993902|player_match_stats"
+    ],
+    [
+      47,
+      "player_match_stats",
+      698451,
+      "canonical_apply_failed",
+      "warning",
+      "The automatic canonical application of player_match_stats 'CD_M20260140207|CD_T100|CD_I1023518' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.",
+      {
+        "external_record_id": "CD_M20260140207|CD_T100|CD_I1023518",
+        "family": "player_match_stats",
+        "fields": [
+          "disposals",
+          "kicks"
+        ],
+        "issue": "AFLDB-ISSUE-244 I244-F009",
+        "match_key": "2026|3|2026-03-22|West Coast|North Melbourne",
+        "owner": "AFLDB-ISSUE-122",
+        "refusal": "foreign_source_owner",
+        "source_key": "afl_api",
+        "source_version_seq": 1,
+        "target_table": "player_match_stats"
+      },
+      "2026-09-27T21:11:30.460661+00:00",
+      null,
+      null,
+      "afl_api|apply|player_match_stats|CD_M20260140207|CD_T100|CD_I1023518|player_match_stats"
+    ],
+    [
+      48,
+      "player_match_stats",
+      703920,
+      "canonical_apply_failed",
+      "warning",
+      "The automatic canonical application of player_match_stats 'CD_M20260140303|CD_T130|CD_I1009260' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.",
+      {
+        "external_record_id": "CD_M20260140303|CD_T130|CD_I1009260",
+        "family": "player_match_stats",
+        "fields": [
+          "goal_assists"
+        ],
+        "issue": "AFLDB-ISSUE-244 I244-F009",
+        "match_key": "2026|4|2026-03-28|St Kilda|Brisbane Lions",
+        "owner": "AFLDB-ISSUE-122",
+        "refusal": "foreign_source_owner",
+        "source_key": "afl_api",
+        "source_version_seq": 1,
+        "target_table": "player_match_stats"
+      },
+      "2026-09-27T21:11:30.460661+00:00",
+      null,
+      null,
+      "afl_api|apply|player_match_stats|CD_M20260140303|CD_T130|CD_I1009260|player_match_stats"
+    ],
+    [
+      49,
+      "player_match_stats",
+      698636,
+      "canonical_apply_failed",
+      "warning",
+      "The automatic canonical application of player_match_stats 'CD_M20260140303|CD_T130|CD_I1027790' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.",
+      {
+        "external_record_id": "CD_M20260140303|CD_T130|CD_I1027790",
+        "family": "player_match_stats",
+        "fields": [
+          "tackles"
+        ],
+        "issue": "AFLDB-ISSUE-244 I244-F009",
+        "match_key": "2026|4|2026-03-28|St Kilda|Brisbane Lions",
+        "owner": "AFLDB-ISSUE-122",
+        "refusal": "foreign_source_owner",
+        "source_key": "afl_api",
+        "source_version_seq": 1,
+        "target_table": "player_match_stats"
+      },
+      "2026-09-27T21:11:30.460661+00:00",
+      null,
+      null,
+      "afl_api|apply|player_match_stats|CD_M20260140303|CD_T130|CD_I1027790|player_match_stats"
+    ],
+    [
+      50,
+      "player_match_stats",
+      697331,
+      "canonical_apply_failed",
+      "warning",
+      "The automatic canonical application of player_match_stats 'CD_M20260140303|CD_T130|CD_I1018018' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.",
+      {
+        "external_record_id": "CD_M20260140303|CD_T130|CD_I1018018",
+        "family": "player_match_stats",
+        "fields": [
+          "tackles"
+        ],
+        "issue": "AFLDB-ISSUE-244 I244-F009",
+        "match_key": "2026|4|2026-03-28|St Kilda|Brisbane Lions",
+        "owner": "AFLDB-ISSUE-122",
+        "refusal": "foreign_source_owner",
+        "source_key": "afl_api",
+        "source_version_seq": 1,
+        "target_table": "player_match_stats"
+      },
+      "2026-09-27T21:11:30.460661+00:00",
+      null,
+      null,
+      "afl_api|apply|player_match_stats|CD_M20260140303|CD_T130|CD_I1018018|player_match_stats"
+    ],
+    [
+      51,
+      "player_match_stats",
+      702738,
+      "canonical_apply_failed",
+      "warning",
+      "The automatic canonical application of player_match_stats 'CD_M20260140403|CD_T60|CD_I1020250' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.",
+      {
+        "external_record_id": "CD_M20260140403|CD_T60|CD_I1020250",
+        "family": "player_match_stats",
+        "fields": [
+          "disposals",
+          "handballs",
+          "uncontested"
+        ],
+        "issue": "AFLDB-ISSUE-244 I244-F009",
+        "match_key": "2026|5|2026-04-03|Adelaide|Fremantle",
+        "owner": "AFLDB-ISSUE-122",
+        "refusal": "foreign_source_owner",
+        "source_key": "afl_api",
+        "source_version_seq": 1,
+        "target_table": "player_match_stats"
+      },
+      "2026-09-27T21:11:30.460661+00:00",
+      null,
+      null,
+      "afl_api|apply|player_match_stats|CD_M20260140403|CD_T60|CD_I1020250|player_match_stats"
+    ],
+    [
+      52,
+      "player_match_stats",
+      704156,
+      "canonical_apply_failed",
+      "warning",
+      "The automatic canonical application of player_match_stats 'CD_M20260140507|CD_T70|CD_I1016433' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.",
+      {
+        "external_record_id": "CD_M20260140507|CD_T70|CD_I1016433",
+        "family": "player_match_stats",
+        "fields": [
+          "goal_assists"
+        ],
+        "issue": "AFLDB-ISSUE-244 I244-F009",
+        "match_key": "2026|6|2026-04-12|Geelong|West Coast",
+        "owner": "AFLDB-ISSUE-122",
+        "refusal": "foreign_source_owner",
+        "source_key": "afl_api",
+        "source_version_seq": 1,
+        "target_table": "player_match_stats"
+      },
+      "2026-09-27T21:11:30.460661+00:00",
+      null,
+      null,
+      "afl_api|apply|player_match_stats|CD_M20260140507|CD_T70|CD_I1016433|player_match_stats"
+    ],
+    [
+      53,
+      "player_match_stats",
+      695491,
+      "canonical_apply_failed",
+      "warning",
+      "The automatic canonical application of player_match_stats 'CD_M20260140602|CD_T140|CD_I1002404' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.",
+      {
+        "external_record_id": "CD_M20260140602|CD_T140|CD_I1002404",
+        "family": "player_match_stats",
+        "fields": [
+          "goal_assists"
+        ],
+        "issue": "AFLDB-ISSUE-244 I244-F009",
+        "match_key": "2026|7|2026-04-17|Geelong|Western Bulldogs",
+        "owner": "AFLDB-ISSUE-122",
+        "refusal": "foreign_source_owner",
+        "source_key": "afl_api",
+        "source_version_seq": 1,
+        "target_table": "player_match_stats"
+      },
+      "2026-09-27T21:11:30.460661+00:00",
+      null,
+      null,
+      "afl_api|apply|player_match_stats|CD_M20260140602|CD_T140|CD_I1002404|player_match_stats"
+    ],
+    [
+      54,
+      "player_match_stats",
+      697757,
+      "canonical_apply_failed",
+      "warning",
+      "The automatic canonical application of player_match_stats 'CD_M20260140607|CD_T120|CD_I290627' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.",
+      {
+        "external_record_id": "CD_M20260140607|CD_T120|CD_I290627",
+        "family": "player_match_stats",
+        "fields": [
+          "goal_assists"
+        ],
+        "issue": "AFLDB-ISSUE-244 I244-F009",
+        "match_key": "2026|7|2026-04-19|North Melbourne|Richmond",
+        "owner": "AFLDB-ISSUE-122",
+        "refusal": "foreign_source_owner",
+        "source_key": "afl_api",
+        "source_version_seq": 1,
+        "target_table": "player_match_stats"
+      },
+      "2026-09-27T21:11:30.460661+00:00",
+      null,
+      null,
+      "afl_api|apply|player_match_stats|CD_M20260140607|CD_T120|CD_I290627|player_match_stats"
+    ],
+    [
+      55,
+      "player_match_stats",
+      704793,
+      "canonical_apply_failed",
+      "warning",
+      "The automatic canonical application of player_match_stats 'CD_M20260140608|CD_T90|CD_I999391' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.",
+      {
+        "external_record_id": "CD_M20260140608|CD_T90|CD_I999391",
+        "family": "player_match_stats",
+        "fields": [
+          "one_percenters"
+        ],
+        "issue": "AFLDB-ISSUE-244 I244-F009",
+        "match_key": "2026|7|2026-04-19|Melbourne|Brisbane Lions",
+        "owner": "AFLDB-ISSUE-122",
+        "refusal": "foreign_source_owner",
+        "source_key": "afl_api",
+        "source_version_seq": 1,
+        "target_table": "player_match_stats"
+      },
+      "2026-09-27T21:11:30.460661+00:00",
+      null,
+      null,
+      "afl_api|apply|player_match_stats|CD_M20260140608|CD_T90|CD_I999391|player_match_stats"
+    ],
+    [
+      56,
+      "player_match_stats",
+      703663,
+      "canonical_apply_failed",
+      "warning",
+      "The automatic canonical application of player_match_stats 'CD_M20260140902|CD_T20|CD_I291548' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.",
+      {
+        "external_record_id": "CD_M20260140902|CD_T20|CD_I291548",
+        "family": "player_match_stats",
+        "fields": [
+          "rebounds",
+          "uncontested"
+        ],
+        "issue": "AFLDB-ISSUE-244 I244-F009",
+        "match_key": "2026|10|2026-05-08|Brisbane Lions|Carlton",
+        "owner": "AFLDB-ISSUE-122",
+        "refusal": "foreign_source_owner",
+        "source_key": "afl_api",
+        "source_version_seq": 1,
+        "target_table": "player_match_stats"
+      },
+      "2026-09-27T21:11:30.460661+00:00",
+      null,
+      null,
+      "afl_api|apply|player_match_stats|CD_M20260140902|CD_T20|CD_I291548|player_match_stats"
+    ],
+    [
+      57,
+      "player_match_stats",
+      702993,
+      "canonical_apply_failed",
+      "warning",
+      "The automatic canonical application of player_match_stats 'CD_M20260140909|CD_T120|CD_I1002245' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.",
+      {
+        "external_record_id": "CD_M20260140909|CD_T120|CD_I1002245",
+        "family": "player_match_stats",
+        "fields": [
+          "behinds"
+        ],
+        "issue": "AFLDB-ISSUE-244 I244-F009",
+        "match_key": "2026|10|2026-05-10|Richmond|Adelaide",
+        "owner": "AFLDB-ISSUE-122",
+        "refusal": "foreign_source_owner",
+        "source_key": "afl_api",
+        "source_version_seq": 1,
+        "target_table": "player_match_stats"
+      },
+      "2026-09-27T21:11:30.460661+00:00",
+      null,
+      null,
+      "afl_api|apply|player_match_stats|CD_M20260140909|CD_T120|CD_I1002245|player_match_stats"
+    ],
+    [
+      58,
+      "player_match_stats",
+      703322,
+      "canonical_apply_failed",
+      "warning",
+      "The automatic canonical application of player_match_stats 'CD_M20260140909|CD_T120|CD_I1032081' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.",
+      {
+        "external_record_id": "CD_M20260140909|CD_T120|CD_I1032081",
+        "family": "player_match_stats",
+        "fields": [
+          "one_percenters"
+        ],
+        "issue": "AFLDB-ISSUE-244 I244-F009",
+        "match_key": "2026|10|2026-05-10|Richmond|Adelaide",
+        "owner": "AFLDB-ISSUE-122",
+        "refusal": "foreign_source_owner",
+        "source_key": "afl_api",
+        "source_version_seq": 1,
+        "target_table": "player_match_stats"
+      },
+      "2026-09-27T21:11:30.460661+00:00",
+      null,
+      null,
+      "afl_api|apply|player_match_stats|CD_M20260140909|CD_T120|CD_I1032081|player_match_stats"
+    ],
+    [
+      59,
+      "player_match_stats",
+      697192,
+      "canonical_apply_failed",
+      "warning",
+      "The automatic canonical application of player_match_stats 'CD_M20260141001|CD_T70|CD_I1027877' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.",
+      {
+        "external_record_id": "CD_M20260141001|CD_T70|CD_I1027877",
+        "family": "player_match_stats",
+        "fields": [
+          "one_percenters"
+        ],
+        "issue": "AFLDB-ISSUE-244 I244-F009",
+        "match_key": "2026|11|2026-05-14|Brisbane Lions|Geelong",
+        "owner": "AFLDB-ISSUE-122",
+        "refusal": "foreign_source_owner",
+        "source_key": "afl_api",
+        "source_version_seq": 1,
+        "target_table": "player_match_stats"
+      },
+      "2026-09-27T21:11:30.460661+00:00",
+      null,
+      null,
+      "afl_api|apply|player_match_stats|CD_M20260141001|CD_T70|CD_I1027877|player_match_stats"
+    ],
+    [
+      60,
+      "player_match_stats",
+      700826,
+      "canonical_apply_failed",
+      "warning",
+      "The automatic canonical application of player_match_stats 'CD_M20260141101|CD_T80|CD_I297354' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.",
+      {
+        "external_record_id": "CD_M20260141101|CD_T80|CD_I297354",
+        "family": "player_match_stats",
+        "fields": [
+          "one_percenters"
+        ],
+        "issue": "AFLDB-ISSUE-244 I244-F009",
+        "match_key": "2026|12|2026-05-21|Hawthorn|Adelaide",
+        "owner": "AFLDB-ISSUE-122",
+        "refusal": "foreign_source_owner",
+        "source_key": "afl_api",
+        "source_version_seq": 1,
+        "target_table": "player_match_stats"
+      },
+      "2026-09-27T21:11:30.460661+00:00",
+      null,
+      null,
+      "afl_api|apply|player_match_stats|CD_M20260141101|CD_T80|CD_I297354|player_match_stats"
+    ],
+    [
+      61,
+      "player_match_stats",
+      700600,
+      "canonical_apply_failed",
+      "warning",
+      "The automatic canonical application of player_match_stats 'CD_M20260141101|CD_T80|CD_I1027935' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.",
+      {
+        "external_record_id": "CD_M20260141101|CD_T80|CD_I1027935",
+        "family": "player_match_stats",
+        "fields": [
+          "one_percenters"
+        ],
+        "issue": "AFLDB-ISSUE-244 I244-F009",
+        "match_key": "2026|12|2026-05-21|Hawthorn|Adelaide",
+        "owner": "AFLDB-ISSUE-122",
+        "refusal": "foreign_source_owner",
+        "source_key": "afl_api",
+        "source_version_seq": 1,
+        "target_table": "player_match_stats"
+      },
+      "2026-09-27T21:11:30.460661+00:00",
+      null,
+      null,
+      "afl_api|apply|player_match_stats|CD_M20260141101|CD_T80|CD_I1027935|player_match_stats"
+    ],
+    [
+      62,
+      "player_match_stats",
+      697458,
+      "canonical_apply_failed",
+      "warning",
+      "The automatic canonical application of player_match_stats 'CD_M20260141101|CD_T10|CD_I1024023' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.",
+      {
+        "external_record_id": "CD_M20260141101|CD_T10|CD_I1024023",
+        "family": "player_match_stats",
+        "fields": [
+          "one_percenters"
+        ],
+        "issue": "AFLDB-ISSUE-244 I244-F009",
+        "match_key": "2026|12|2026-05-21|Hawthorn|Adelaide",
+        "owner": "AFLDB-ISSUE-122",
+        "refusal": "foreign_source_owner",
+        "source_key": "afl_api",
+        "source_version_seq": 1,
+        "target_table": "player_match_stats"
+      },
+      "2026-09-27T21:11:30.460661+00:00",
+      null,
+      null,
+      "afl_api|apply|player_match_stats|CD_M20260141101|CD_T10|CD_I1024023|player_match_stats"
+    ],
+    [
+      63,
+      "player_match_stats",
+      700622,
+      "canonical_apply_failed",
+      "warning",
+      "The automatic canonical application of player_match_stats 'CD_M20260141101|CD_T10|CD_I1011981' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.",
+      {
+        "external_record_id": "CD_M20260141101|CD_T10|CD_I1011981",
+        "family": "player_match_stats",
+        "fields": [
+          "one_percenters"
+        ],
+        "issue": "AFLDB-ISSUE-244 I244-F009",
+        "match_key": "2026|12|2026-05-21|Hawthorn|Adelaide",
+        "owner": "AFLDB-ISSUE-122",
+        "refusal": "foreign_source_owner",
+        "source_key": "afl_api",
+        "source_version_seq": 1,
+        "target_table": "player_match_stats"
+      },
+      "2026-09-27T21:11:30.460661+00:00",
+      null,
+      null,
+      "afl_api|apply|player_match_stats|CD_M20260141101|CD_T10|CD_I1011981|player_match_stats"
+    ],
+    [
+      64,
+      "player_match_stats",
+      702631,
+      "canonical_apply_failed",
+      "warning",
+      "The automatic canonical application of player_match_stats 'CD_M20260141102|CD_T120|CD_I295203' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.",
+      {
+        "external_record_id": "CD_M20260141102|CD_T120|CD_I295203",
+        "family": "player_match_stats",
+        "fields": [
+          "one_percenters"
+        ],
+        "issue": "AFLDB-ISSUE-244 I244-F009",
+        "match_key": "2026|12|2026-05-22|Richmond|Essendon",
+        "owner": "AFLDB-ISSUE-122",
+        "refusal": "foreign_source_owner",
+        "source_key": "afl_api",
+        "source_version_seq": 1,
+        "target_table": "player_match_stats"
+      },
+      "2026-09-27T21:11:30.460661+00:00",
+      null,
+      null,
+      "afl_api|apply|player_match_stats|CD_M20260141102|CD_T120|CD_I295203|player_match_stats"
+    ],
+    [
+      65,
+      "player_match_stats",
+      699947,
+      "canonical_apply_failed",
+      "warning",
+      "The automatic canonical application of player_match_stats 'CD_M20260141102|CD_T120|CD_I992049' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.",
+      {
+        "external_record_id": "CD_M20260141102|CD_T120|CD_I992049",
+        "family": "player_match_stats",
+        "fields": [
+          "one_percenters"
+        ],
+        "issue": "AFLDB-ISSUE-244 I244-F009",
+        "match_key": "2026|12|2026-05-22|Richmond|Essendon",
+        "owner": "AFLDB-ISSUE-122",
+        "refusal": "foreign_source_owner",
+        "source_key": "afl_api",
+        "source_version_seq": 1,
+        "target_table": "player_match_stats"
+      },
+      "2026-09-27T21:11:30.460661+00:00",
+      null,
+      null,
+      "afl_api|apply|player_match_stats|CD_M20260141102|CD_T120|CD_I992049|player_match_stats"
+    ],
+    [
+      66,
+      "player_match_stats",
+      702904,
+      "canonical_apply_failed",
+      "warning",
+      "The automatic canonical application of player_match_stats 'CD_M20260141102|CD_T120|CD_I294674' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.",
+      {
+        "external_record_id": "CD_M20260141102|CD_T120|CD_I294674",
+        "family": "player_match_stats",
+        "fields": [
+          "clangers",
+          "frees_against"
+        ],
+        "issue": "AFLDB-ISSUE-244 I244-F009",
+        "match_key": "2026|12|2026-05-22|Richmond|Essendon",
+        "owner": "AFLDB-ISSUE-122",
+        "refusal": "foreign_source_owner",
+        "source_key": "afl_api",
+        "source_version_seq": 1,
+        "target_table": "player_match_stats"
+      },
+      "2026-09-27T21:11:30.460661+00:00",
+      null,
+      null,
+      "afl_api|apply|player_match_stats|CD_M20260141102|CD_T120|CD_I294674|player_match_stats"
+    ],
+    [
+      67,
+      "player_match_stats",
+      695787,
+      "canonical_apply_failed",
+      "warning",
+      "The automatic canonical application of player_match_stats 'CD_M20260141102|CD_T50|CD_I1015873' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.",
+      {
+        "external_record_id": "CD_M20260141102|CD_T50|CD_I1015873",
+        "family": "player_match_stats",
+        "fields": [
+          "contested",
+          "frees_for",
+          "marks",
+          "one_percenters",
+          "uncontested"
+        ],
+        "issue": "AFLDB-ISSUE-244 I244-F009",
+        "match_key": "2026|12|2026-05-22|Richmond|Essendon",
+        "owner": "AFLDB-ISSUE-122",
+        "refusal": "foreign_source_owner",
+        "source_key": "afl_api",
+        "source_version_seq": 1,
+        "target_table": "player_match_stats"
+      },
+      "2026-09-27T21:11:30.460661+00:00",
+      null,
+      null,
+      "afl_api|apply|player_match_stats|CD_M20260141102|CD_T50|CD_I1015873|player_match_stats"
+    ],
+    [
+      68,
+      "player_match_stats",
+      696938,
+      "canonical_apply_failed",
+      "warning",
+      "The automatic canonical application of player_match_stats 'CD_M20260141104|CD_T100|CD_I1015781' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.",
+      {
+        "external_record_id": "CD_M20260141104|CD_T100|CD_I1015781",
+        "family": "player_match_stats",
+        "fields": [
+          "rebounds"
+        ],
+        "issue": "AFLDB-ISSUE-244 I244-F009",
+        "match_key": "2026|12|2026-05-23|North Melbourne|Gold Coast",
+        "owner": "AFLDB-ISSUE-122",
+        "refusal": "foreign_source_owner",
+        "source_key": "afl_api",
+        "source_version_seq": 1,
+        "target_table": "player_match_stats"
+      },
+      "2026-09-27T21:11:30.460661+00:00",
+      null,
+      null,
+      "afl_api|apply|player_match_stats|CD_M20260141104|CD_T100|CD_I1015781|player_match_stats"
+    ],
+    [
+      69,
+      "player_match_stats",
+      698112,
+      "canonical_apply_failed",
+      "warning",
+      "The automatic canonical application of player_match_stats 'CD_M20260141104|CD_T100|CD_I1023477' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.",
+      {
+        "external_record_id": "CD_M20260141104|CD_T100|CD_I1023477",
+        "family": "player_match_stats",
+        "fields": [
+          "rebounds"
+        ],
+        "issue": "AFLDB-ISSUE-244 I244-F009",
+        "match_key": "2026|12|2026-05-23|North Melbourne|Gold Coast",
+        "owner": "AFLDB-ISSUE-122",
+        "refusal": "foreign_source_owner",
+        "source_key": "afl_api",
+        "source_version_seq": 1,
+        "target_table": "player_match_stats"
+      },
+      "2026-09-27T21:11:30.460661+00:00",
+      null,
+      null,
+      "afl_api|apply|player_match_stats|CD_M20260141104|CD_T100|CD_I1023477|player_match_stats"
+    ],
+    [
+      70,
+      "player_match_stats",
+      703851,
+      "canonical_apply_failed",
+      "warning",
+      "The automatic canonical application of player_match_stats 'CD_M20260141105|CD_T70|CD_I1009229' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.",
+      {
+        "external_record_id": "CD_M20260141105|CD_T70|CD_I1009229",
+        "family": "player_match_stats",
+        "fields": [
+          "one_percenters"
+        ],
+        "issue": "AFLDB-ISSUE-244 I244-F009",
+        "match_key": "2026|12|2026-05-23|Geelong|Sydney",
+        "owner": "AFLDB-ISSUE-122",
+        "refusal": "foreign_source_owner",
+        "source_key": "afl_api",
+        "source_version_seq": 1,
+        "target_table": "player_match_stats"
+      },
+      "2026-09-27T21:11:30.460661+00:00",
+      null,
+      null,
+      "afl_api|apply|player_match_stats|CD_M20260141105|CD_T70|CD_I1009229|player_match_stats"
+    ],
+    [
+      71,
+      "player_match_stats",
+      704799,
+      "canonical_apply_failed",
+      "warning",
+      "The automatic canonical application of player_match_stats 'CD_M20260141105|CD_T70|CD_I291800' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.",
+      {
+        "external_record_id": "CD_M20260141105|CD_T70|CD_I291800",
+        "family": "player_match_stats",
+        "fields": [
+          "one_percenters"
+        ],
+        "issue": "AFLDB-ISSUE-244 I244-F009",
+        "match_key": "2026|12|2026-05-23|Geelong|Sydney",
+        "owner": "AFLDB-ISSUE-122",
+        "refusal": "foreign_source_owner",
+        "source_key": "afl_api",
+        "source_version_seq": 1,
+        "target_table": "player_match_stats"
+      },
+      "2026-09-27T21:11:30.460661+00:00",
+      null,
+      null,
+      "afl_api|apply|player_match_stats|CD_M20260141105|CD_T70|CD_I291800|player_match_stats"
+    ],
+    [
+      72,
+      "player_match_stats",
+      699238,
+      "canonical_apply_failed",
+      "warning",
+      "The automatic canonical application of player_match_stats 'CD_M20260141107|CD_T110|CD_I1004530' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.",
+      {
+        "external_record_id": "CD_M20260141107|CD_T110|CD_I1004530",
+        "family": "player_match_stats",
+        "fields": [
+          "contested",
+          "frees_for"
+        ],
+        "issue": "AFLDB-ISSUE-244 I244-F009",
+        "match_key": "2026|12|2026-05-23|Port Adelaide|Carlton",
+        "owner": "AFLDB-ISSUE-122",
+        "refusal": "foreign_source_owner",
+        "source_key": "afl_api",
+        "source_version_seq": 1,
+        "target_table": "player_match_stats"
+      },
+      "2026-09-27T21:11:30.460661+00:00",
+      null,
+      null,
+      "afl_api|apply|player_match_stats|CD_M20260141107|CD_T110|CD_I1004530|player_match_stats"
+    ],
+    [
+      73,
+      "player_match_stats",
+      704274,
+      "canonical_apply_failed",
+      "warning",
+      "The automatic canonical application of player_match_stats 'CD_M20260141107|CD_T30|CD_I1036426' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.",
+      {
+        "external_record_id": "CD_M20260141107|CD_T30|CD_I1036426",
+        "family": "player_match_stats",
+        "fields": [
+          "clangers",
+          "frees_against"
+        ],
+        "issue": "AFLDB-ISSUE-244 I244-F009",
+        "match_key": "2026|12|2026-05-23|Port Adelaide|Carlton",
+        "owner": "AFLDB-ISSUE-122",
+        "refusal": "foreign_source_owner",
+        "source_key": "afl_api",
+        "source_version_seq": 1,
+        "target_table": "player_match_stats"
+      },
+      "2026-09-27T21:11:30.460661+00:00",
+      null,
+      null,
+      "afl_api|apply|player_match_stats|CD_M20260141107|CD_T30|CD_I1036426|player_match_stats"
+    ],
+    [
+      74,
+      "player_match_stats",
+      705042,
+      "canonical_apply_failed",
+      "warning",
+      "The automatic canonical application of player_match_stats 'CD_M20260141705|CD_T80|CD_I1008550' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.",
+      {
+        "external_record_id": "CD_M20260141705|CD_T80|CD_I1008550",
+        "family": "player_match_stats",
+        "fields": [
+          "one_percenters"
+        ],
+        "issue": "AFLDB-ISSUE-244 I244-F009",
+        "match_key": "2026|18|2026-07-04|Hawthorn|Melbourne",
+        "owner": "AFLDB-ISSUE-122",
+        "refusal": "foreign_source_owner",
+        "source_key": "afl_api",
+        "source_version_seq": 1,
+        "target_table": "player_match_stats"
+      },
+      "2026-09-27T21:11:30.460661+00:00",
+      null,
+      null,
+      "afl_api|apply|player_match_stats|CD_M20260141705|CD_T80|CD_I1008550|player_match_stats"
+    ],
+    [
+      75,
+      "player_match_stats",
+      696447,
+      "canonical_apply_failed",
+      "warning",
+      "The automatic canonical application of player_match_stats 'CD_M20260142702|CD_T10|CD_I1018335' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.",
+      {
+        "external_record_id": "CD_M20260142702|CD_T10|CD_I1018335",
+        "family": "player_match_stats",
+        "fields": [
+          "clearances",
+          "contested",
+          "disposals",
+          "kicks"
+        ],
+        "issue": "AFLDB-ISSUE-244 I244-F009",
+        "match_key": "2026|SF|2026-09-12|Brisbane Lions|Adelaide",
+        "owner": "AFLDB-ISSUE-122",
+        "refusal": "foreign_source_owner",
+        "source_key": "afl_api",
+        "source_version_seq": 1,
+        "target_table": "player_match_stats"
+      },
+      "2026-09-27T21:11:30.460661+00:00",
+      null,
+      null,
+      "afl_api|apply|player_match_stats|CD_M20260142702|CD_T10|CD_I1018335|player_match_stats"
+    ],
+    [
+      76,
+      "player_match_stats",
+      698653,
+      "canonical_apply_failed",
+      "warning",
+      "The automatic canonical application of player_match_stats 'CD_M20260142702|CD_T10|CD_I1023273' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.",
+      {
+        "external_record_id": "CD_M20260142702|CD_T10|CD_I1023273",
+        "family": "player_match_stats",
+        "fields": [
+          "clearances",
+          "contested",
+          "disposals",
+          "kicks"
+        ],
+        "issue": "AFLDB-ISSUE-244 I244-F009",
+        "match_key": "2026|SF|2026-09-12|Brisbane Lions|Adelaide",
+        "owner": "AFLDB-ISSUE-122",
+        "refusal": "foreign_source_owner",
+        "source_key": "afl_api",
+        "source_version_seq": 1,
+        "target_table": "player_match_stats"
+      },
+      "2026-09-27T21:11:30.460661+00:00",
+      null,
+      null,
+      "afl_api|apply|player_match_stats|CD_M20260142702|CD_T10|CD_I1023273|player_match_stats"
+    ]
+  ],
+  "readSession": {
+    "transaction_read_only": "on",
+    "default_transaction_read_only": "on",
+    "current_database": "afldb_prod",
+    "timezone": "UTC",
+    "temporarySchema": "none",
+    "isolation": "repeatable read",
+    "selectOnlyCursor": true,
+    "trackCounts": "on",
+    "serverVersionNum": "160015"
+  },
+  "otherFindingsAppendedSinceBackup": [],
+  "resolution": "canonical_apply_not_needed",
+  "ids": [
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    54,
+    55,
+    56,
+    57,
+    58,
+    59,
+    60,
+    61,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    69,
+    70,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76
+  ],
+  "toolSha256": {
+    "tools/v2/o2-converged-findings-production.py": "39ef3878b8bd888177f606a4dde0f262ee46e2a77aee41f19fdeb9b1d06f7337",
+    "tools/v2/o2_converged_findings.py": "0dbd09c96391edc7c733f46047c6e08ac48fd80f40274549b26f9b117da8c078",
+    "tools/v2/issue333_o2_common.py": "06af487a19c17eed41dbaa99b44b1d8012e93313680cefdfe31a0803e346a57c",
+    "tools/v2/gap029_common.py": "ddefab1e69ca5ed8e02b32d9eead4f3a790a84b7012e345f94092eaff31231e7",
+    "tools/v2/gap029-draft-link-production.py": "97aff072b6a9dbe9b9e16f91b30afc573a264c14faf034be4d98fe658825bded",
+    "tools/rebuild/draftguru/bridge_import_gate.py": "fbce43f7f1e374b3dfac05968e627b8ad9f337279f233a49bc19ff57d02d558d"
+  },
+  "backup": {
+    "target": {
+      "host": "localhost",
+      "port": 5432,
+      "database": "afldb_prod",
+      "user": "afldb_backup",
+      "systemIdentifier": "7674454702926115004",
+      "databaseOid": "66668",
+      "clusterName": "16/main",
+      "databaseComment": null
+    },
+    "sha256": "e77c307d3e0cddcb652e398a946e4c22c2063f13c70edadf96a975c92842826d",
+    "restoreEvidenceSha256": "07e1f6942df51dff90e045b942d5c35cf3585f35d6b36c53d09489c3e987c6f1",
+    "capturedAt": "2026-11-04T02:10:38.102Z",
+    "restoredAt": "2026-11-04T02:13:31.072Z",
+    "baselineDigest": "d8c8cd943e9f732eae0cfdf93d8c84001b83fc287b5dce952ad780fdf0b76644",
+    "o2OperationDigest": "1286f940098475a648e992784b152dadaef0a6c13d389e3caf7808edaba77551",
+    "o2ComparisonDigest": "8cbcb7203bc072e076c64c415807bd011d2a6f8cf0c900db515bd0e650a3da4e",
+    "o2Others": {
+      "rows": 4,
+      "maxId": 4,
+      "fullRowDigest": "7eed5860df42f268de66accae4036a42b02e9c20d67f7a117a4bc39554fefbc4"
+    },
+    "assembly": {
+      "format": "afldb.gap029.restore-evidence-assembly.1",
+      "stage": "O2",
+      "operation": "o2-converged-findings",
+      "revision": "50ed6e4f4a697160ef263ade293792363e52e975",
+      "assembledAt": "2026-11-04T02:14:07.645Z",
+      "restoreTarget": {
+        "host": "127.0.0.1",
+        "port": 55493,
+        "database": "afldb_v2_i333o2_b20261104t021037z_rst_test",
+        "user": "afldb_owner",
+        "systemIdentifier": "7704133593388370608",
+        "databaseOid": "16390",
+        "clusterName": "afldb_v2_isolated",
+        "databaseComment": "afldb-v2-isolated-test"
+      },
+      "inputs": {
+        "dumpSha256": "e77c307d3e0cddcb652e398a946e4c22c2063f13c70edadf96a975c92842826d",
+        "restoreEvidenceSha256": "07e1f6942df51dff90e045b942d5c35cf3585f35d6b36c53d09489c3e987c6f1",
+        "toolSha256": {
+          "tools/rebuild/draftguru/bridge_import_gate.py": "fbce43f7f1e374b3dfac05968e627b8ad9f337279f233a49bc19ff57d02d558d",
+          "tools/v2/gap029-draft-link-production.py": "97aff072b6a9dbe9b9e16f91b30afc573a264c14faf034be4d98fe658825bded",
+          "tools/v2/gap029_common.py": "ddefab1e69ca5ed8e02b32d9eead4f3a790a84b7012e345f94092eaff31231e7",
+          "tools/v2/issue333_o2_common.py": "06af487a19c17eed41dbaa99b44b1d8012e93313680cefdfe31a0803e346a57c",
+          "tools/v2/o2-converged-findings-production.py": "39ef3878b8bd888177f606a4dde0f262ee46e2a77aee41f19fdeb9b1d06f7337",
+          "tools/v2/o2_converged_findings.py": "0dbd09c96391edc7c733f46047c6e08ac48fd80f40274549b26f9b117da8c078"
+        }
+      },
+      "derived": {
+        "mode": "plan --rehearsal",
+        "outputSha256": "a91ba3d9493bd3ec058f48eb9abe8db1258ce09e2eb2108687a5b8e09b69dadd",
+        "values": {
+          "baselineDigest": "d8c8cd943e9f732eae0cfdf93d8c84001b83fc287b5dce952ad780fdf0b76644",
+          "o2OperationDigest": "1286f940098475a648e992784b152dadaef0a6c13d389e3caf7808edaba77551",
+          "o2ComparisonDigest": "8cbcb7203bc072e076c64c415807bd011d2a6f8cf0c900db515bd0e650a3da4e",
+          "o2Others": {
+            "rows": 4,
+            "maxId": 4,
+            "fullRowDigest": "7eed5860df42f268de66accae4036a42b02e9c20d67f7a117a4bc39554fefbc4"
+          }
+        }
+      },
+      "sealedBody": "{\"assembly\":{\"assembledAt\":\"2026-11-04T02:14:07.645Z\",\"derived\":{\"mode\":\"plan --rehearsal\",\"outputSha256\":\"a91ba3d9493bd3ec058f48eb9abe8db1258ce09e2eb2108687a5b8e09b69dadd\",\"values\":{\"baselineDigest\":\"d8c8cd943e9f732eae0cfdf93d8c84001b83fc287b5dce952ad780fdf0b76644\",\"o2ComparisonDigest\":\"8cbcb7203bc072e076c64c415807bd011d2a6f8cf0c900db515bd0e650a3da4e\",\"o2OperationDigest\":\"1286f940098475a648e992784b152dadaef0a6c13d389e3caf7808edaba77551\",\"o2Others\":{\"fullRowDigest\":\"7eed5860df42f268de66accae4036a42b02e9c20d67f7a117a4bc39554fefbc4\",\"maxId\":4,\"rows\":4}}},\"format\":\"afldb.gap029.restore-evidence-assembly.1\",\"inputs\":{\"dumpSha256\":\"e77c307d3e0cddcb652e398a946e4c22c2063f13c70edadf96a975c92842826d\",\"restoreEvidenceSha256\":\"07e1f6942df51dff90e045b942d5c35cf3585f35d6b36c53d09489c3e987c6f1\",\"toolSha256\":{\"tools/rebuild/draftguru/bridge_import_gate.py\":\"fbce43f7f1e374b3dfac05968e627b8ad9f337279f233a49bc19ff57d02d558d\",\"tools/v2/gap029-draft-link-production.py\":\"97aff072b6a9dbe9b9e16f91b30afc573a264c14faf034be4d98fe658825bded\",\"tools/v2/gap029_common.py\":\"ddefab1e69ca5ed8e02b32d9eead4f3a790a84b7012e345f94092eaff31231e7\",\"tools/v2/issue333_o2_common.py\":\"06af487a19c17eed41dbaa99b44b1d8012e93313680cefdfe31a0803e346a57c\",\"tools/v2/o2-converged-findings-production.py\":\"39ef3878b8bd888177f606a4dde0f262ee46e2a77aee41f19fdeb9b1d06f7337\",\"tools/v2/o2_converged_findings.py\":\"0dbd09c96391edc7c733f46047c6e08ac48fd80f40274549b26f9b117da8c078\"}},\"operation\":\"o2-converged-findings\",\"restoreTarget\":{\"clusterName\":\"afldb_v2_isolated\",\"database\":\"afldb_v2_i333o2_b20261104t021037z_rst_test\",\"databaseComment\":\"afldb-v2-isolated-test\",\"databaseOid\":\"16390\",\"host\":\"127.0.0.1\",\"port\":55493,\"systemIdentifier\":\"7704133593388370608\",\"user\":\"afldb_owner\"},\"revision\":\"50ed6e4f4a697160ef263ade293792363e52e975\",\"stage\":\"O2\"},\"baselineDigest\":\"d8c8cd943e9f732eae0cfdf93d8c84001b83fc287b5dce952ad780fdf0b76644\",\"capturedAt\":\"2026-11-04T02:10:38.102Z\",\"o2ComparisonDigest\":\"8cbcb7203bc072e076c64c415807bd011d2a6f8cf0c900db515bd0e650a3da4e\",\"o2OperationDigest\":\"1286f940098475a648e992784b152dadaef0a6c13d389e3caf7808edaba77551\",\"o2Others\":{\"fullRowDigest\":\"7eed5860df42f268de66accae4036a42b02e9c20d67f7a117a4bc39554fefbc4\",\"maxId\":4,\"rows\":4},\"restoreEvidenceSha256\":\"07e1f6942df51dff90e045b942d5c35cf3585f35d6b36c53d09489c3e987c6f1\",\"restoredAt\":\"2026-11-04T02:13:31.072Z\",\"sha256\":\"e77c307d3e0cddcb652e398a946e4c22c2063f13c70edadf96a975c92842826d\",\"target\":{\"clusterName\":\"16/main\",\"database\":\"afldb_prod\",\"databaseComment\":null,\"databaseOid\":\"66668\",\"host\":\"localhost\",\"port\":5432,\"systemIdentifier\":\"7674454702926115004\",\"user\":\"afldb_backup\"}}",
+      "sealedBodySha256": "2ff179ddaf8503b103ada384525255adcf941ab07059631a90163ff7fc14aaff"
+    }
+  },
+  "noApplyWindowHostLocal": "04:15-05:30 Australia/Melbourne",
+  "createdAt": "2026-11-04T02:17:15.032Z",
+  "expiresAt": "2026-11-05T02:17:15.032Z",
+  "digest": "c29d148d17af1cdc94ecae547a8026365dee5ade66def278dba9b49a84f7ea03"
+}

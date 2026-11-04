@@ -1,0 +1,14 @@
+create-db: afldb_v2_r1_i333_conflict_test created from afldb_v2_i333o2_b20261104t021037z_rst_test and marked
+ISOLATED TARGET OK: afldb_v2_r1_i333_conflict_test
+isolated-pg: afldb_v2_r1_i333_conflict_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running bash
+{"clusterName": "afldb_v2_isolated", "database": "afldb_v2_r1_i333_conflict_test", "databaseComment": "afldb-v2-isolated-test", "databaseOid": "20425", "host": "127.0.0.1", "port": 55493, "systemIdentifier": "7704133593388370608", "user": "afldb_owner"}
+{'match_coaches_2026': ['0', 'd41d8cd98f00b204e9800998ecf8427e'], 'sides_2026_without_coach': ['436', ''], 'import_batches_gt_82': ['0', ''], 'data_issues_41_76_unresolved': ['36', '502173a14897e11bb272498e5bf4ed6d'], 'user_triggers_touched_tables': ['1', 'match_coaches.match_coaches_club_in_match_trg']}
+fixture i333-conflict: match 17056 club 9 coach 243
+--- plan: $W/venv/bin/python tools/v2/issue333-coach-assignments-production.py plan --target $W/evidence-private/rehearsal-1/i333_conflict/target.json --core-tar $W/in/core.tar --staging-dir $W/evidence-private/rehearsal-1/i333_conflict/staging-plan --rehearsal --out $W/evidence-private/rehearsal-1/i333_conflict/plan.json
+OUTCOME REFUSED_BEFORE_MUTATION (exit 1)
+ISSUE-333 refused: 1 stored assignments conflict with the source (pre-existing assignment conflict), e.g. ['2026|10|2026-05-07|Fremantle|Hawthorn@Fremantle']
+    (exit 1)
+CHECK PASS i333_conflict plan over a pre-existing 2026 assignment exit=1
+CHECK PASS i333_conflict plan says 'REFUSED_BEFORE_MUTATION'
+SCENARIO DONE i333_conflict
+scenario exit 0

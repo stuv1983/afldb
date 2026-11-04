@@ -1,0 +1,6 @@
+=== writer exit 3
+--- stdout
+ISSUE-333 writer: FAILED (RaiseException); the transaction was rolled back if it was open
+
+--- stderr
+

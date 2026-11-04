@@ -1,0 +1,8 @@
+{
+  "planDigest": "e85da70201d4628e7b2ce5ac5909602de13d1b9c4190a039880ca04d11434e87",
+  "state": "UNDETERMINED (a writer session is still live)",
+  "liveWriterPids": [
+    1166857
+  ],
+  "checkedAt": "2026-11-04T02:35:38.332Z"
+}

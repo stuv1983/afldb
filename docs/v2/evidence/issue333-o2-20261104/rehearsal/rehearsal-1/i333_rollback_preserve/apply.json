@@ -1,0 +1,16 @@
+{
+  "planDigest": "e115a3c4be546c7dde025104c9a4acb6ae254ac714ac623e2dfa0361655b3a8d",
+  "outcome": "ROLLED_BACK",
+  "exitCode": 2,
+  "statement": "ROLLED BACK: the writer failed and an independent read-only check proves the database holds its pre-run state (sequence values consumed by the attempt are not returned).",
+  "problems": [],
+  "detail": "the writer exited 2; a fresh read-only session sees the pre-run state",
+  "at": "2026-11-04T02:22:40.385Z",
+  "writer": {
+    "exit": 2,
+    "writerExit": 2,
+    "writerSaid": [
+      "ISSUE-333 writer: ROLLED BACK / REFUSED: post-state check failed inside the transaction: ['a pre-existing match_coaches row changed (in any column) or was removed']; writes {'public.import_batches': [1, 1, 0], 'public.match_coaches': [436, 1, 0]}"
+    ]
+  }
+}

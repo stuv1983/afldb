@@ -1,0 +1,31 @@
+create-db: afldb_v2_r1_o2_commit_inflight_long_test created from afldb_v2_i333o2_b20261104t021037z_rst_test and marked
+ISOLATED TARGET OK: afldb_v2_r1_o2_commit_inflight_long_test
+isolated-pg: afldb_v2_r1_o2_commit_inflight_long_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running bash
+{"clusterName": "afldb_v2_isolated", "database": "afldb_v2_r1_o2_commit_inflight_long_test", "databaseComment": "afldb-v2-isolated-test", "databaseOid": "20457", "host": "127.0.0.1", "port": 55493, "systemIdentifier": "7704133593388370608", "user": "afldb_owner"}
+{'match_coaches_2026': ['0', 'd41d8cd98f00b204e9800998ecf8427e'], 'sides_2026_without_coach': ['436', ''], 'import_batches_gt_82': ['0', ''], 'data_issues_41_76_unresolved': ['36', '502173a14897e11bb272498e5bf4ed6d'], 'user_triggers_touched_tables': ['1', 'match_coaches.match_coaches_club_in_match_trg']}
+fixture o2-trigger-sleep-50: deferred constraint trigger on data_issues sleeps 50 s once at COMMIT
+--- plan: $W/venv/bin/python tools/v2/o2-converged-findings-production.py plan --target $W/evidence-private/rehearsal-1/o2_commit_inflight_long/target.json --rehearsal --out $W/evidence-private/rehearsal-1/o2_commit_inflight_long/plan.json
+Review plan e1a2f7d985c505075605e8ea7b33d344989da316f4c1823d4fbf16877eb7ac37; no writes; 36 findings, 53 of 53 flagged fields equal; operation digest afe042af3f466e85; other findings appended since backup 0
+    (exit 0)
+CHECK PASS o2_commit_inflight_long plan exit=0
+WAITING pid=1161600
+writer process 1161598 SIGKILLed while the server was inside its COMMIT (deferred trigger sleeping)
+OUTCOME OUTCOME_UNDETERMINED (exit 5)
+OUTCOME UNDETERMINED: the tool could not establish whether the writer committed. Do NOT assume it rolled back and do NOT retry; read the state with the read-only `state` mode against the same plan.
+detail: the writer exited -9 and the live state was unreadable
+    (ceremony exit 5)
+CHECK PASS o2_commit_inflight_long ceremony while the killed writer's COMMIT outlasts the 30 s wait exit=5
+CHECK PASS o2_commit_inflight_long apply-inflight says 'OUTCOME_UNDETERMINED'
+--- state-while-live: $W/venv/bin/python tools/v2/o2-converged-findings-production.py state --plan $W/evidence-private/rehearsal-1/o2_commit_inflight_long/plan.json --out $W/evidence-private/rehearsal-1/o2_commit_inflight_long/state-while-live.json
+STATE UNDETERMINED: a writer session is still live (pids [1161600]); its COMMIT may be in flight. Re-run state when it has gone.
+    (exit 6)
+CHECK PASS o2_commit_inflight_long state while the writer session is live exit=6
+CHECK PASS o2_commit_inflight_long state-while-live says 'UNDETERMINED'
+GONE
+--- state: $W/venv/bin/python tools/v2/o2-converged-findings-production.py state --plan $W/evidence-private/rehearsal-1/o2_commit_inflight_long/plan.json --out $W/evidence-private/rehearsal-1/o2_commit_inflight_long/state.json
+STATE PLANNED RESULT PRESENT (exactly the 36 findings are resolved)
+    (exit 0)
+CHECK PASS o2_commit_inflight_long state after the session ended exit=0
+CHECK PASS o2_commit_inflight_long state says 'PLANNED RESULT PRESENT'
+SCENARIO DONE o2_commit_inflight_long
+scenario exit 0

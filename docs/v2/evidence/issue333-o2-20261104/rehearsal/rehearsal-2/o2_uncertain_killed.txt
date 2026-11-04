@@ -1,0 +1,34 @@
+create-db: afldb_v2_r2_o2_uncertain_killed_test created from afldb_v2_i333o2_b20261104t021037z_rst_test and marked
+ISOLATED TARGET OK: afldb_v2_r2_o2_uncertain_killed_test
+isolated-pg: afldb_v2_r2_o2_uncertain_killed_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running bash
+{"clusterName": "afldb_v2_isolated", "database": "afldb_v2_r2_o2_uncertain_killed_test", "databaseComment": "afldb-v2-isolated-test", "databaseOid": "20464", "host": "127.0.0.1", "port": 55493, "systemIdentifier": "7704133593388370608", "user": "afldb_owner"}
+{'match_coaches_2026': ['0', 'd41d8cd98f00b204e9800998ecf8427e'], 'sides_2026_without_coach': ['436', ''], 'import_batches_gt_82': ['0', ''], 'data_issues_41_76_unresolved': ['36', '502173a14897e11bb272498e5bf4ed6d'], 'user_triggers_touched_tables': ['1', 'match_coaches.match_coaches_club_in_match_trg']}
+--- plan: $W/venv/bin/python tools/v2/o2-converged-findings-production.py plan --target $W/evidence-private/rehearsal-2/o2_uncertain_killed/target.json --rehearsal --out $W/evidence-private/rehearsal-2/o2_uncertain_killed/plan.json
+Review plan e85da70201d4628e7b2ce5ac5909602de13d1b9c4190a039880ca04d11434e87; no writes; 36 findings, 53 of 53 flagged fields equal; operation digest 1286f940098475a6; other findings appended since backup 0
+    (exit 0)
+CHECK PASS o2_uncertain_killed plan exit=0
+LOCKED
+WAITING pid=1166857
+ceremony process group 1166816 SIGKILLed while its writer waited on the lock (exit 137)
+lock holder stopped 02:35:38.002
+CHECK PASS o2_uncertain_killed killed ceremony left no outcome record
+--- state-immediate: $W/venv/bin/python tools/v2/o2-converged-findings-production.py state --plan $W/evidence-private/rehearsal-2/o2_uncertain_killed/plan.json --out $W/evidence-private/rehearsal-2/o2_uncertain_killed/state-immediate.json
+STATE UNDETERMINED: a writer session is still live (pids [1166857]); its COMMIT may be in flight. Re-run state when it has gone.
+    (exit 6)
+CHECK PASS o2_uncertain_killed state while the dead writer's session is live says UNDETERMINED exit=6
+GONE
+writer session gone 02:35:41.210
+--- state: $W/venv/bin/python tools/v2/o2-converged-findings-production.py state --plan $W/evidence-private/rehearsal-2/o2_uncertain_killed/plan.json --out $W/evidence-private/rehearsal-2/o2_uncertain_killed/state.json
+STATE BASELINE (the plan has not been applied)
+    (exit 0)
+CHECK PASS o2_uncertain_killed state after the kill exit=0
+CHECK PASS o2_uncertain_killed state says 'BASELINE'
+--- apply-recovered: $W/venv/bin/python tools/v2/o2-converged-findings-production.py apply --plan $W/evidence-private/rehearsal-2/o2_uncertain_killed/plan.json --rehearsal --out $W/evidence-private/rehearsal-2/o2_uncertain_killed/apply-recovered.json
+OUTCOME ROLLED_BACK (exit 2)
+ROLLED BACK: the writer failed and an independent read-only check proves the database holds its pre-run state (sequence values consumed by the attempt are not returned).
+detail: the writer exited 3; a fresh read-only session sees the pre-run state
+    (exit 2)
+CHECK FAIL o2_uncertain_killed the same plan applied after the kill was classified BASELINE exit=2 expected=0
+CHECK FAIL o2_uncertain_killed apply-recovered lacks 'COMMITTED_VERIFIED'
+SCENARIO DONE o2_uncertain_killed
+scenario exit 0
