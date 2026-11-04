@@ -15,6 +15,15 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-333 (O1) and O2 APPLIED to production, verified; ISSUE-332 observer wording corrected (2026-11-04; production data change; local commits not pushed; **public visibility unmeasured, ISSUE-333 stays open**)
+
+- **O1 applied once** (plan `4de5368c...515e`, revision `50ed6e4f`): 436 missing 2026 `match_coaches` rows and one `import_batches` row (batch 83, `add_match_coaches_2026.py`) in one transaction, commit 2026-11-04T03:14:48Z, `COMMITTED_VERIFIED` and an independent `state` of `PLANNED RESULT PRESENT`. `match_coaches` 32,034 to 32,470; 2026 sides without a coach 436 to 0; the 32,034 pre-existing rows unchanged. Through the application queries Josh Carr shows 23 games and Josh Fraser 16 (both were 0).
+- **O2 applied once** (plan `c29d148d...ea03`): `data_issues` 41 to 76 resolved as `canonical_apply_not_needed` (36 rows, one `resolved_at`, commit 03:15:45Z), `COMMITTED_VERIFIED` and `PLANNED RESULT PRESENT`; the other four findings are unchanged and open.
+- **Owner wrapper corrected** (`docs/v2/evidence/issue333-o2-20261104/scripts/prod-apply-i333-o2.sh`, revision 2, sha256 `f1d810ee...970f`): a failed approval-file step no longer exits 0 or prints completion; approvals are created atomically and read back; `state-*` accepts an expectation so BASELINE cannot pass as applied. Exercised by a 34-check mocked harness (0 failures) before use.
+- **Not done:** the public time-to-visibility of the coach and club pages was not measured (the site is behind the beta gate; no cookie was minted). No push, deployment, restart, schema/grant/credential/timer/setting change, provider request or manual settle.
+- **ISSUE-332:** the stale wording "C7 observer not run against production" was corrected using the already recorded 2026-11-04 read-only run (`NO_CONCLUDED_MATCHES`, exit 10, a baseline, not an acceptance; no future acceptance is implied).
+- Record: `docs/v2/issue333-o2-apply-record-2026-11-04.md`; evidence `docs/v2/evidence/issue333-o2-20261104/prod-apply/`.
+
 ### ISSUE-333 (O1) and O2: narrowly scoped guarded writers, one restore-verified backup, reviewed production plans and a consolidated approval (2026-11-04; tooling, evidence and documentation; **nothing applied to production**; local commits not pushed)
 
 - **New narrowly additive O1 writer** `tools/migration/add_match_coaches_2026.py` with ceremony `tools/v2/issue333-coach-assignments-production.py` (plan / apply / state / tool-hashes, the GAP-029 pattern). It inserts exactly the reviewed 2026 `match_coaches` rows and one `import_batches` row in one transaction. It refuses any conflict with a stored assignment, any missing coach identity, any update or deletion, stale staging, a tampered `core.tar` (sha256 bound) and any drift from a full-row baseline. The broad importer `tools/migration/import_match_coaches.py` is unchanged.

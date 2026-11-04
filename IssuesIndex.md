@@ -20,15 +20,15 @@
 ### AFLDB-ISSUE-333 — 2026 season coach assignments absent from production
 
 - **Severity / area:** Medium; data completeness, `match_coaches` (public coach and club coaching records).
-- **State:** Open, opened 2026-11-04. Production has no coach rows for the 2026 season (436 sides, 218 matches); Josh Carr and Josh Fraser show 0 games. The retained manifest-pinned core `c2-2026-final-core-v1` carries all 436; proven on a disposable clone of production (+436, pre-existing digest identical, idempotent). The earlier `prod-coach2026.sh` path is withdrawn.
-  - **Prepared 2026-11-04 (not applied):** a narrowly additive writer and ceremony; restore-verified backup `issue333-o2-20261104T021037Z` (deadline 2026-11-05T02:10:38Z); read-only production plan `4de5368c...515e`; 18 of 18 rehearsals passed.
-  - **Not applied to production.**
-- **Key files:** `docs/v2/issue333-o2-consolidated-approval-2026-11-04.md`, `tools/migration/add_match_coaches_2026.py`, `tools/v2/issue333-coach-assignments-production.py`, `docs/v2/evidence/issue333-o2-20261104/`.
+- **State:** Open, opened 2026-11-04; **narrowed the same day: data corrected and verified, public visibility UNMEASURED.**
+  - **Applied 2026-11-04 (owner-approved, once each):** O1 plan `4de5368c...515e`, batch 83, 436 rows, commit 03:14:48Z, COMMITTED_VERIFIED, state PLANNED RESULT PRESENT. O2 plan `c29d148d...ea03`, 36 findings (`data_issues` 41 to 76) resolved, commit 03:15:45Z, COMMITTED_VERIFIED, state PLANNED RESULT PRESENT.
+  - **Measured read-only:** `match_coaches` 32,034 to 32,470; 2026 sides without a coach 436 to 0; the 32,034 pre-existing rows unchanged; application queries give Josh Carr 23 and Josh Fraser 16 games; the other four findings unchanged and open.
+  - **Not measured:** time-to-visibility of `/coaches` (revalidate 3600), `/coaches/[slug]` (force-dynamic) and the club pages (revalidate 86400). The site is behind the beta gate (anonymous GET is a 307 to `/beta`), so no page or worker (2 in production) could be sampled; no cookie was minted. On disk, `coaches.html` is still the 09:36 AEDT prerender and the club entries are from the build.
+- **Key files:** `docs/v2/issue333-o2-apply-record-2026-11-04.md`, `docs/v2/issue333-o2-consolidated-approval-2026-11-04.md`, `docs/v2/evidence/issue333-o2-20261104/` (`prod-apply/`, `scripts/`).
 - **Next action:**
-  1. Owner approval of O1 (and O2) per the approval doc. Practical window until 2026-11-04T17:15Z; otherwise a read-only re-plan and a new approval.
-  2. The owner runs the command block.
-  3. Measure time-to-visibility per page and worker.
-  4. Close with the evidence.
+  1. Owner supplies a beta cookie for an allowlisted address, or authorises a probe cookie to be minted on the host.
+  2. Sample `/coaches`, `/coaches/josh-carr-243`, `/coaches/josh-fraser-293`, `/clubs/port-adelaide` and `/clubs/carlton` repeatedly, recording status, `x-afldb-worker`, `x-afldb-pid`, `x-afldb-build`, the Carr/Fraser figures and timestamps, until both worker pids are observed (or declare it incomplete).
+  3. Close with that evidence; nothing else remains.
 
 ### AFLDB-ISSUE-332 — AFL API 2027 season operations (successor of ISSUE-316)
 

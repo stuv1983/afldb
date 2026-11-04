@@ -1,6 +1,6 @@
 # ISSUE-333 (O1) and O2: consolidated approval package (2026-11-04)
 
-**Status: PREPARED, NOT APPLIED.** Nothing in this package has written to production except the one authorised backup directory
+**Status: APPLIED 2026-11-04 (O1 03:14:48Z, O2 03:15:45Z), see `docs/v2/issue333-o2-apply-record-2026-11-04.md`; the text below is the preparation record as written and still says "not applied" where it was true at the time.** (Original status: PREPARED, NOT APPLIED.) Nothing in this package has written to production except the one authorised backup directory
 (`/home/arm/backups/afldb/issue333-o2-20261104T021037Z`, mode 700) and the private ops workspace `/home/arm/ops/issue333-o2-50ed6e4f/`
 (checkout, plan files, one staging directory). No apply, grant, deploy, restart, timer or setting change was made. Open issues: 2 (ISSUE-332, ISSUE-333).
 Every figure below traces to a retained output in `docs/v2/evidence/issue333-o2-20261104/` (README lists each file and its sha256).

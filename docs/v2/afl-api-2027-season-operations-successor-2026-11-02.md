@@ -32,7 +32,7 @@
 | `FAILED_PROCESSING` | 12 | A non-completed batch, a refusal or failure counter, AFL Tables batches after the cutover, a failed unit, contradictory counts, or no derived recompute. |
 | `MEASURED_CRITERIA_MET` | 0 | The measurable criteria held. It always lists what it could not measure (criterion 8, ISR window; the host-side parts of 1 and 7). The owner accepts. |
 
-- Usage (future; **not run against production, no acceptance simulated**): `node --import tsx tools/v2/c7-observe.ts --season 2027 --since <ISO instant> [--round <code> --expected-concluded <n>] [--unit-result success --unit-exec-status 0] [--dsn-env DATABASE_URL] [--json]`. The DSN is read from the named environment variable and never printed.
+- Usage (**first run against production 2026-11-04, read-only: `NO_CONCLUDED_MATCHES`, exit 10, the expected pre-season baseline; not an acceptance, no PASS exists**; see `post-release-closeout-2026-11-04.md` V8; run it again for each real observation, no acceptance simulated): `node --import tsx tools/v2/c7-observe.ts --season 2027 --since <ISO instant> [--round <code> --expected-concluded <n>] [--unit-result success --unit-exec-status 0] [--dsn-env DATABASE_URL] [--json]`. The DSN is read from the named environment variable and never printed.
 - Qualification actually run: classifier and parser unit tests; the reader's SQL against a real PostgreSQL 16 isolated cluster on Linux in a rolled-back transaction (3/3); a `read only` transaction refuses a write. Records: [d31612-linux-qualification-2026-11-02.md](d31612-linux-qualification-2026-11-02.md).
 - **Process guard** (`docs/v2/evidence/c5-prep-20261102/c5-proc-guard.sh`): table test 17/17 and the real-process test PASS on Linux (record above).
 
