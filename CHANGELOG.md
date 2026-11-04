@@ -15,6 +15,10 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-332 operating record consolidated (2026-11-04; documentation only; nothing decided, accepted or executed)
+
+- `docs/v2/afl-api-2027-season-operations-successor-2026-11-02.md` is now the single current operating record: one decision and gate register (debutant handling and the round-two review, attendance, coaches, C7 criteria and first-concluded-round acceptance, ISR and revalidation, ownership-baseline selection and rollover, the Brownlow successor and count-window gates), the eight C7 criteria with what the observer can and cannot measure, the per-round routine, a bounded read-only plan for measuring the ISR window, and the stale "state today" cells replaced. All recommendations remain recommendations; every future acceptance stays at its own date.
+
 ### ISSUE-333 RESOLVED: second bounded probe reads the Port Adelaide coaching row; visibility criterion amended by the owner (2026-11-04; read-only observation; no data, setting or deployment change; local commits not pushed)
 
 - **Corrected selector, tested first.** `docs/v2/evidence/issue333-o2-20261104/scripts/coach-row-selector.mts` identifies the club page's coaching table by caption and the seven headers (`Coach, Span, Games, W, D, L, Win %`), then the one row whose link is exactly `/coaches/josh-carr-243`, reads values by header name and refuses ambiguity. `tests/issue333-coach-row-selector.test.ts` (12 cases, including the markup the real `ClubCoachRecords` renders) passed before the probe.
