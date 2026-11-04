@@ -79,8 +79,11 @@ const KEY_ROOT_257 = `${SEASON_257}|issue257-`;
 const ABSENT_ROOT_257 = '9999|issue257-';
 const SLUG_257 = 'issue257-';
 const PATH_ROOT_257 = 'issue257_players/';
-/** AFLDB-ISSUE-335 coaches (afltables_coach_path); their assignments ride on ISSUE-257 matches. */
-const COACH_ROOT_335 = 'issue335_coaches/';
+/**
+ * AFLDB-ISSUE-335 coaches (afltables_coach_path); their assignments ride on ISSUE-257 matches. Inside the
+ * `coaches/` namespace that `coaches_path_namespace_ck` (migration 095) requires of a source-owned coach.
+ */
+const COACH_ROOT_335 = 'coaches/issue335_';
 const FX_TIMEOUT = 120_000;
 
 type Row257 = Record<string, number | string | null>;
@@ -1856,7 +1859,7 @@ describe('Durable Match Sheet authority: delete guard and Return to source (AFLD
  * `match_coaches.match_id` is ON DELETE CASCADE (migration 087), so a deletion used to remove
  * an admin's assignment silently and leave its `data_overrides` row active, naming no match.
  * Every case uses ISSUE-257 synthetic matches (season 2079) plus namespace coaches
- * (`issue335_coaches/`), writes assignments through the REAL coach mutations, and is cleaned by
+ * (`coaches/issue335_`), writes assignments through the REAL coach mutations, and is cleaned by
  * cleanup257 (afterEach/afterAll) with the residue and historical-row proofs.
  * ------------------------------------------------------------------------------------ */
 describe('AFLDB-ISSUE-335: deleteMatch and active manual coach assignment overrides', () => {
@@ -1907,6 +1910,13 @@ describe('AFLDB-ISSUE-335: deleteMatch and active manual coach assignment overri
     return r.n;
   };
 
+  /**
+   * deleteMatch rebuilds the season's club_seasons and refuses a season left with no canonical
+   * home-and-away match (recomputeClubSeasons). A second synthetic match keeps season 2079
+   * non-empty, so each case reaches the behaviour under test rather than that refusal.
+   */
+  const seedAnchor = (name: string) => seedFixture257(`${name}-anchor`);
+
   const assign = async (fx: Fx257, coachId: number) => {
     expect(await setCoachAssignment({
       assignments: [{ matchId: fx.matchId, clubId: fx.clubId }], coachId, adminUserId, note: NOTE,
@@ -1914,6 +1924,7 @@ describe('AFLDB-ISSUE-335: deleteMatch and active manual coach assignment overri
   };
 
   it('an assignment made through the real coach mutation blocks deletion; match, assignment, override and audit unchanged', async () => {
+    await seedAnchor('c335-blocked');
     const fx = await seedFixture257('c335-blocked');
     const coach = await seedCoach('blocked');
     await assign(fx, coach.id);
@@ -1942,6 +1953,7 @@ describe('AFLDB-ISSUE-335: deleteMatch and active manual coach assignment overri
   }, FX_TIMEOUT);
 
   it('an override retired through the real clear mutation does not block; the inactive record is kept', async () => {
+    await seedAnchor('c335-inactive');
     const fx = await seedFixture257('c335-inactive');
     const coach = await seedCoach('inactive');
     await assign(fx, coach.id);
@@ -1962,6 +1974,7 @@ describe('AFLDB-ISSUE-335: deleteMatch and active manual coach assignment overri
   }, FX_TIMEOUT);
 
   it('a source-only assignment (no override) keeps the existing behaviour: deleted, cascading the assignment', async () => {
+    await seedAnchor('c335-source');
     const fx = await seedFixture257('c335-source');
     const coach = await seedCoach('source');
     await sql`
