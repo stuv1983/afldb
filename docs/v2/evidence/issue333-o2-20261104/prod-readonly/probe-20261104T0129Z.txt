@@ -1,0 +1,131 @@
+== H host, user, disk 2026-11-04T01:29:36Z
+host=afldb-prod user=arm date_local=2026-11-04 12:29:36 AEDT
+52880175104  36%
+afldb.service active=active enabled=enabled
+afldb-settle-afltables.service active=inactive enabled=static
+afldb-settle-afltables.timer active=inactive enabled=disabled
+afldb-settle-afl-api.service active=inactive enabled=static
+afldb-settle-afl-api.timer active=active enabled=enabled
+afldb-settle-afl-api-brownlow.service active=inactive enabled=static
+afldb-settle-afl-api-brownlow.timer active=inactive enabled=disabled
+afldb-email-intake.service active=inactive enabled=not-found
+afldb-email-intake.timer active=inactive enabled=not-found
+afl-api timer next=Thu 2026-11-05 05:03:08 AEDT now=1793755776
+afldb-settle-afl-api.service User=arm EnvironmentFiles=/home/arm/projects/afldb/.env (ignore_errors=no)
+checkout_head=d00e07e37566e92b35a34e62a1ff03e173715e87 status_lines=0
+python=3.12.3 3.3.4
+drwx------ 31 arm arm 12288 Nov  3 20:10 /home/arm/backups/afldb
+drwx------  5 arm arm  4096 Nov  3 18:43 /home/arm/ops
+blockb-ea98a35f2061 gap029-labels-86da1a82 gap029-stages 
+== C credential channel (values never printed) 2026-11-04T01:29:36Z
+== I identity 2026-11-04T01:29:36Z
+afldb_prod|afldb_backup|on|7674454702926115004|66668|16/main|16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)|2026-11-04 12:29:36.644716+11
+timezone|Australia/Melbourne|2s|2min
+Thu 2026-11-05 05:03:08 AEDT      16h Wed 2026-11-04 05:03:01 AEDT       7h ago afldb-settle-afl-api.timer     afldb-settle-afl-api.service
+afldb-settle-afltables.timer { OnCalendar=*-*-* 04:30:00 ; next_elapse=(null) } 15min yes 
+afldb-settle-afl-api.timer { OnCalendar=*-*-* 05:00:00 ; next_elapse=Thu 2026-11-05 05:00:00 AEDT } 15min yes 
+afldb-settle-afl-api-brownlow.timer { OnCalendar=*-*-* *:00/5:00 ; next_elapse=(null) } 0 no 
+host_tz=Australia/Melbourne
+== L ledger 2026-11-04T01:29:36Z
+ledger rows=118 last=118_fixtures_unconfirmed_participants.sql digest=573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57
+pg_trgm=1.6 plpgsql=1.0 unaccent=1.1
+== O1 counts 2026-11-04T01:29:36Z
+data_edits_coaches|0
+data_overrides_coach_active|0
+data_overrides_coach_all|0
+data_edits_coach_assignment|0
+import_batches_max_id|82
+import_batches|75
+coaches|386
+coaches_manual|0
+matches_2026|218
+import_rejections_max_id|681
+import_rejections|681
+match_coaches_2026|0
+match_coaches|32034
+match_coaches_non_afltables_source|0
+sides_2026_without_coach|436
+carr_fraser|243|coaches/Josh_Carr.html|Carr, Josh|0
+carr_fraser|293|coaches/Josh_Fraser.html|Fraser, Josh|0
+recent_batch|82|settle-afl-api.ts|staging.source_record_versions|completed|2026-11-04 05:03:03.529486+11|2026-11-04 05:03:03.556681+11
+recent_batch|81|family_siblings.py|player_relationships|completed|2026-11-03 20:08:37.292969+11|2026-11-03 20:08:37.327769+11
+recent_batch|80|import_draftguru.py|draft_persons|completed|2026-11-03 19:17:40.747361+11|2026-11-03 19:17:40.75416+11
+recent_batch|79|gap029-captaincy-additions-production.ts|captaincies|completed|2026-11-03 19:01:31.930518+11|2026-11-03 19:01:31.930518+11
+== S schema: columns, triggers, rules, dependants 2026-11-04T01:29:37Z
+coaches|id:integer:NO:-:YES, afltables_coach_path:text:NO:-:NO, name_key:text:NO:-:NO, display_name:text:NO:-:NO, given_name:text:YES:-:NO, surname:text:YES:-:NO, dob:date:YES:-:NO, player_id:integer:YES:-:NO, link_status_value:USER-DEFINED:NO:'unmatched'::link_status:NO, afltables_profile_path:text:YES:-:NO, source_games_coached:integer:YES:-:NO, source_id:smallint:NO:-:NO, source_record_id:text:NO:-:NO, import_batch_id:bigint:YES:-:NO, notes:text:YES:-:NO
+data_issues|id:bigint:NO:-:YES, entity_type:text:NO:-:NO, entity_id:bigint:YES:-:NO, issue_type:text:NO:-:NO, severity:USER-DEFINED:NO:'warning'::issue_severity:NO, description:text:NO:-:NO, details:jsonb:YES:-:NO, detected_at:timestamp with time zone:NO:now():NO, resolved_at:timestamp with time zone:YES:-:NO, resolution:text:YES:-:NO, issue_key:text:YES:-:NO
+import_batches|id:bigint:NO:-:YES, source_id:smallint:NO:-:NO, tool:text:NO:-:NO, target_table:text:YES:-:NO, started_at:timestamp with time zone:NO:now():NO, completed_at:timestamp with time zone:YES:-:NO, status:USER-DEFINED:NO:'running'::import_status:NO, records_read:bigint:NO:0:NO, records_inserted:bigint:NO:0:NO, records_updated:bigint:NO:0:NO, records_rejected:bigint:NO:0:NO, validation_result:jsonb:YES:-:NO, error:text:YES:-:NO, notes:text:YES:-:NO
+match_coaches|match_id:integer:NO:-:NO, club_id:integer:NO:-:NO, coach_id:integer:NO:-:NO, source_id:smallint:NO:-:NO, source_record_id:text:NO:-:NO, import_batch_id:bigint:YES:-:NO
+trigger|match_coaches|match_coaches_club_in_match_trg|O|CREATE TRIGGER match_coaches_club_in_match_trg BEFORE INSERT OR UPDATE ON public.match_coaches FOR EACH ROW EXECUTE FUNCTION match_coaches_club_in_match()
+rowsecurity|coaches|f
+rowsecurity|data_issues|f
+rowsecurity|import_batches|f
+rowsecurity|match_coaches|f
+matviews|0
+index|data_issues_pkey|CREATE UNIQUE INDEX data_issues_pkey ON public.data_issues USING btree (id)
+index|ix_data_issues_open|CREATE INDEX ix_data_issues_open ON public.data_issues USING btree (entity_type, issue_type) WHERE (resolved_at IS NULL)
+index|ix_match_coaches_coach|CREATE INDEX ix_match_coaches_coach ON public.match_coaches USING btree (coach_id, match_id)
+index|match_coaches_pkey|CREATE UNIQUE INDEX match_coaches_pkey ON public.match_coaches USING btree (match_id, club_id)
+index|uq_data_issues_open_by_key|CREATE UNIQUE INDEX uq_data_issues_open_by_key ON public.data_issues USING btree (issue_type, issue_key) WHERE ((issue_key IS NOT NULL) AND (resolved_at IS NULL))
+index|uq_data_issues_open_dob_per_player|CREATE UNIQUE INDEX uq_data_issues_open_dob_per_player ON public.data_issues USING btree (entity_type, entity_id, issue_type) WHERE ((issue_type = ANY (ARRAY['dob_conflict'::text, 'dob_internal_conflict'::text])) AND (resolved_at IS NULL))
+== P privileges (no grant is made; read only) 2026-11-04T01:29:37Z
+afldb_import|public.coaches|DELETE,INSERT,SELECT,TRUNCATE,UPDATE
+afldb_import|public.data_issues|DELETE,INSERT,SELECT,TRUNCATE,UPDATE
+afldb_import|public.data_overrides|SELECT
+afldb_import|public.import_batches|DELETE,INSERT,SELECT,TRUNCATE,UPDATE
+afldb_import|public.import_rejections|DELETE,INSERT,SELECT,TRUNCATE,UPDATE
+afldb_import|public.match_coaches|DELETE,INSERT,SELECT,TRUNCATE,UPDATE
+afldb_import|public.player_match_stats|DELETE,INSERT,SELECT,TRUNCATE,UPDATE
+afldb_import|staging.afl_api_player_match|DELETE,INSERT,SELECT,TRUNCATE,UPDATE
+afldb_app|public.coaches|SELECT
+afldb_app|public.data_issues|SELECT
+afldb_app|public.import_batches|SELECT
+afldb_app|public.import_rejections|SELECT
+afldb_app|public.match_coaches|SELECT
+afldb_app|public.player_match_stats|SELECT
+afldb_app|staging.afl_api_player_match|SELECT
+afldb_owner|public.coaches|DELETE,INSERT,SELECT,TRUNCATE,UPDATE
+afldb_owner|public.data_issues|DELETE,INSERT,SELECT,TRUNCATE,UPDATE
+afldb_owner|public.data_overrides|DELETE,INSERT,SELECT,TRUNCATE,UPDATE
+afldb_owner|public.import_batches|DELETE,INSERT,SELECT,TRUNCATE,UPDATE
+afldb_owner|public.import_rejections|DELETE,INSERT,SELECT,TRUNCATE,UPDATE
+afldb_owner|public.match_coaches|DELETE,INSERT,SELECT,TRUNCATE,UPDATE
+afldb_owner|public.player_match_stats|DELETE,INSERT,SELECT,TRUNCATE,UPDATE
+afldb_owner|staging.afl_api_player_match|DELETE,INSERT,SELECT,TRUNCATE,UPDATE
+column_update_data_issues|afldb_import|description,details,detected_at,entity_id,entity_type,id,issue_key,issue_type,resolution,resolved_at,severity
+role|afldb_app|f|t|f
+role|afldb_auth|f|t|f
+role|afldb_backup|f|t|f
+role|afldb_import|f|t|f
+role|afldb_owner|f|t|f
+member|pg_read_all_data|afldb_backup
+== O2 the open canonical_apply_failed findings 2026-11-04T01:29:37Z
+open_by_type|canonical_apply_failed|foreign_source_owner|afl_api|player_match_stats|36|41|76|2026-09-28 07:11:30.460661+10|2026-09-28 07:11:30.460661+10
+open_by_type|career_kicks_contradicts_source|||player_achievements|1|1|1|2026-09-28 07:00:25.05467+10|2026-09-28 07:00:25.05467+10
+open_by_type|first_kick_match_unresolved|||player_achievements|2|2|3|2026-09-28 07:00:25.05467+10|2026-09-28 07:00:25.05467+10
+open_by_type|source_count_discrepancy|||player_achievements|1|4|4|2026-09-28 07:00:25.05467+10|2026-09-28 07:00:25.05467+10
+o2_rows|36|41|76|502d0b93f37a43f9ec047271f9d0f43f|53|1|AFLDB-ISSUE-122
+o2_ids_match_predicate|36
+o2_predicate_total|36|41|76
+o2_detail_keys|external_record_id,family,fields,issue,match_key,owner,refusal,source_key,source_version_seq,target_table
+o2_sample|41|afl_api|apply|player_match_stats|CD_M20260140003|CD_T80|CD_I998134|player_match_stats|700402|{"issue": "AFLDB-ISSUE-244 I244-F009", "owner": "AFLDB-ISSUE-122", "family": "player_match_stats", "fields": ["one_percenters"], "refusal": "foreign_source_owner", "match_key": "2026|1|2026-03-07|Greater Western Sydney|Hawthorn", "source_key": "afl_api", "target_table": "player_match_stats", "external_record_id": "CD_M20260140003|CD_T80|CD_I998134", "source_version_seq": 1}
+o2_sample|76|afl_api|apply|player_match_stats|CD_M20260142702|CD_T10|CD_I1023273|player_match_stats|698653|{"issue": "AFLDB-ISSUE-244 I244-F009", "owner": "AFLDB-ISSUE-122", "family": "player_match_stats", "fields": ["clearances", "contested", "disposals", "kicks"], "refusal": "foreign_source_owner", "match_key": "2026|SF|2026-09-12|Brisbane Lions|Adelaide", "source_key": "afl_api", "target_table": "player_match_stats", "external_record_id": "CD_M20260142702|CD_T10|CD_I1023273", "source_version_seq": 1}
+o2_compare|one_percenters|17|17|0|17|0|0
+o2_compare|contested|4|4|0|4|0|0
+o2_compare|disposals|4|4|0|4|0|0
+o2_compare|goal_assists|4|4|0|4|0|0
+o2_compare|rebounds|4|4|0|4|0|0
+o2_compare|kicks|3|3|0|3|0|0
+o2_compare|tackles|3|3|0|3|0|0
+o2_compare|uncontested|3|3|0|3|0|0
+o2_compare|clangers|2|2|0|2|0|0
+o2_compare|clearances|2|2|0|2|0|0
+o2_compare|frees_against|2|2|0|2|0|0
+o2_compare|frees_for|2|2|0|2|0|0
+o2_compare|behinds|1|1|0|1|0|0
+o2_compare|handballs|1|1|0|1|0|0
+o2_compare|marks|1|1|0|1|0|0
+o2_canonical_owner|afltables|47|36
+o2_staged_versions|36|0|0
+data_issues_total|40|40|76
+== DONE 2026-11-04T01:29:38Z

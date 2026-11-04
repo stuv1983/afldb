@@ -1,4 +1,17 @@
 #!/bin/bash
+# =====================================================================================================================================
+# WITHDRAWN / SUPERSEDED 2026-11-04 (later the same day). THIS SCRIPT REFUSES TO RUN (exit 9). Kept unmodified below for the record.
+# Why: it drove the broad importer tools/migration/import_match_coaches.py, whose write is NOT 436 additions only (it upserts all coaches
+# rows, rewrites coach_id/source_record_id/import_batch_id of every existing assignment in its input, deletes source assignments missing
+# from its input, replays admin overrides, and commits its batch row in a separate transaction); its "verify" proved counts and a
+# three-column digest, not full rows; it offered a production importer dry run (not proven transaction-read-only); it reused an existing
+# staging directory without re-verifying it file by file; it accepted any same-day non-empty dump filename as a backup; and several of its
+# failed checks printed FAIL but exited 0.
+# Replacement: tools/v2/issue333-coach-assignments-production.py (plan / apply / state) with the narrowly additive writer
+# tools/migration/add_match_coaches_2026.py; procedure and approval: docs/v2/issue333-o2-consolidated-approval-2026-11-04.md.
+# =====================================================================================================================================
+echo "REFUSED: prod-coach2026.sh is WITHDRAWN (2026-11-04); use docs/v2/issue333-o2-consolidated-approval-2026-11-04.md" >&2
+exit 9
 # AFLDB-ISSUE-333 -- load the 2026 per-match coach assignments into PRODUCTION (OWNER-RUN ONLY; prepared 2026-11-04, NEVER RUN by the preparer).
 #
 #   bash prod-coach2026.sh preflight        read-only: state, inputs, guards (writes only the temp workspace)

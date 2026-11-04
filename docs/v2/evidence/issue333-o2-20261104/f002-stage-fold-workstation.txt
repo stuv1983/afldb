@@ -1,0 +1,13 @@
+ISSUE-333 review F-002: the REAL stage_core + read_source chain of tools/migration/add_match_coaches_2026.py, run DB-free on the workstation
+(2026-11-04, Windows, Python 3 + psycopg importable; no database connection is made by these two functions) against D:\tmp\coach2026\core.tar
+(sha256 9a989fdcf7177cff24bbedcd0ee4559b772ebc452c05dab331e128859e4db080, measured the same run), into a NEW scratch staging directory
+(removed afterwards). Probe script: scripts/local_stage_probe.py. Output verbatim:
+
+staged 132 62aff03930b1573c 2.0
+{'rowsRead': 695499, 'groups': 34112, 'blankRows': 30095, 'season2026Groups': 436, 'season2026Rows': 10028, 'distinctStrings': 385, 'coachIndexRows': 386, 'coachPages': 386, 'rawState': 'raw/ not present (the tracked parsed artefacts are the rebuild input)', 'files': 130}
+assignments 32470 2026 436
+[('Fagan, Chris', 27), ('Longmuir, Justin', 27), ('Cox, Dean', 25), ('Scott, Chris', 25), ('Mitchell, Sam', 25), ('Beveridge, Luke', 25), ('Nicks, Matthew', 25), ('McRae, Craig', 24), ('King, Steven', 24), ('Hardwick, Damien', 23), ('Kingsley, Adam', 23), ('Lyon, Ross', 23), ('Yze, Adem', 23), ('Clarkson, Alastair', 23), ('Carr, Josh', 23), ('McQualter, Andrew', 23), ('Fraser, Josh', 16), ('Solomon, Dean', 12), ('Scott, Brad', 11), ('Voss, Michael', 9)]
+elapsed 9.1
+
+Acceptance (reviewer): season2026Groups == 436 and no exception -- MET. The per-coach list is the SOURCE's 2026 side count (top 20 shown);
+the application-query figures for Carr and Fraser come from the clone rehearsal (i333_happy figures-before/after).

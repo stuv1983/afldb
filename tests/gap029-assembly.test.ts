@@ -73,6 +73,18 @@ describe('stage values are read from the tool output, validated, and nothing els
     expect(() => stageFieldsFrom('S4', { ...out, importBatchesBefore: -1 })).toThrow(/not a count/);
     expect(() => stageFieldsFrom('S4', { before: {}, importBatchesBefore: 1 })).toThrow(/not a sha256/);
   });
+  it('I333 (ISSUE-333 / O1) needs the baseline, operation and new-row digests and the import_batches prefix', () => {
+    const out = { baseline: { baselineDigest: h('1'), operationDigest: h('2'), importBatches: { rows: 75, maxId: 82, fullRowDigest: h('4') } }, newRows: { count: 436, digest: h('3') } };
+    expect(stageFieldsFrom('I333', out)).toEqual({ baselineDigest: h('1'), i333OperationDigest: h('2'), i333NewRowsDigest: h('3'), i333ImportBatches: { rows: 75, maxId: 82, fullRowDigest: h('4') } });
+    expect(() => stageFieldsFrom('I333', { ...out, newRows: { digest: h('3') } })).toThrow(/newRows.count is not a count/);
+    expect(() => stageFieldsFrom('I333', { ...out, baseline: { ...out.baseline, importBatches: { rows: 75, maxId: 82 } } })).toThrow(/not a sha256/);
+  });
+  it('O2 needs the baseline, operation and comparison digests and the other-findings prefix', () => {
+    const out = { baseline: { baselineDigest: h('1'), operationDigest: h('2'), operation: { comparison: { digest: h('3') } }, others: { rows: 4, maxId: 4, fullRowDigest: h('4') } } };
+    expect(stageFieldsFrom('O2', out)).toEqual({ baselineDigest: h('1'), o2OperationDigest: h('2'), o2ComparisonDigest: h('3'), o2Others: { rows: 4, maxId: 4, fullRowDigest: h('4') } });
+    expect(() => stageFieldsFrom('O2', { baseline: { ...out.baseline, operation: {} } })).toThrow(/comparison.digest is not a sha256/);
+    expect(() => stageFieldsFrom('O2', { baseline: { ...out.baseline, others: { rows: -1, maxId: 4, fullRowDigest: h('4') } } })).toThrow(/not a count/);
+  });
 });
 
 describe('the seal: a production plan refuses hand-written, edited, mismatched and stale evidence', () => {

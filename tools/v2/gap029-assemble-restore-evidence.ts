@@ -11,6 +11,7 @@
  *        --toc-entries N --production-target T --out E
  *   node --import tsx tools/v2/gap029-assemble-restore-evidence.ts assemble --stage S1|S2|S3|S4 --production-target T --dump D --dump-sha256 H \
  *        --restore-evidence E --work-dir W --out B  [--label L]            (S2 also exports its child from the restored database)
+ *   ... assemble --stage I333|O2 ... [--core-tar C]                         (ISSUE-333 / O2 narrow writers; I333 requires --core-tar)
  *
  * It REFUSES (and writes nothing) on: a dirty checkout; a restored database that is not a marked isolated `afldb_v2_*_test` database or that sits
  * in the production cluster; a missing or unreadable dump; a dump whose bytes do not hash to the stated sha256; restore evidence that is missing,
@@ -35,9 +36,12 @@ export const RESTORE_EVIDENCE_FORMAT = 'afldb.gap029.restore-evidence.1';
 export const V3_PARENT_REL = 'data/reference/draftguru-person-bridge-20260918-v3.json';
 export const V3_PARENT_SHA = '1f7413a2ad96e7d026cc521acfdeba3de9cab7066794de99002c9b5928e6e21b';
 export const DEFAULT_LABEL = 'annual-html-20260826';
-export const STAGES = ['S1', 'S2', 'S3', 'S4'] as const;
+// I333 (AFLDB-ISSUE-333, owner decision O1) and O2 (owner decision O2) reuse this machinery for their own narrowly scoped writers; S1-S4 are unchanged.
+export const STAGES = ['S1', 'S2', 'S3', 'S4', 'I333', 'O2'] as const;
 export type Stage = (typeof STAGES)[number];
-export const OPERATION_OF: Record<Stage, string> = { S1: S1_OP, S2: 'gap029-draft-link-production', S3: S3_OP, S4: 'gap029-sibling-pair' };
+export const OPERATION_OF: Record<Stage, string> = {
+  S1: S1_OP, S2: 'gap029-draft-link-production', S3: S3_OP, S4: 'gap029-sibling-pair', I333: 'issue333-coach-assignments', O2: 'o2-converged-findings',
+};
 const HEX64 = /^[0-9a-f]{64}$/;
 
 export interface RestoreEvidence {
@@ -77,6 +81,19 @@ export function stageFieldsFrom(stage: Stage, out: any): Record<string, unknown>
       newly_linked_sha256: hex(x.newly_linked_sha256, 'newly_linked_sha256'), picks_after_sha256: hex(x.picks_after_sha256, 'picks_after_sha256') };
     if (Object.keys(x).length !== 4) fail('the draft-link plan expectation does not have exactly four values');
     return { baselineDigest: expect.baseline_sha256, draftLinkRestorePlanExpect: expect, batchesBefore: count(out?.batchesBefore, 'batchesBefore') };
+  }
+  if (stage === 'I333') {
+    const b = out?.baseline ?? {}; const ib = b.importBatches ?? {};
+    count(out?.newRows?.count, 'newRows.count');
+    return { baselineDigest: hex(b.baselineDigest, 'baselineDigest'), i333OperationDigest: hex(b.operationDigest, 'operationDigest'),
+      i333NewRowsDigest: hex(out?.newRows?.digest, 'newRows.digest'),
+      i333ImportBatches: { rows: count(ib.rows, 'importBatches.rows'), maxId: count(ib.maxId, 'importBatches.maxId'), fullRowDigest: hex(ib.fullRowDigest, 'importBatches.fullRowDigest') } };
+  }
+  if (stage === 'O2') {
+    const b = out?.baseline ?? {}; const o = b.others ?? {};
+    return { baselineDigest: hex(b.baselineDigest, 'baselineDigest'), o2OperationDigest: hex(b.operationDigest, 'operationDigest'),
+      o2ComparisonDigest: hex(b.operation?.comparison?.digest, 'comparison.digest'),
+      o2Others: { rows: count(o.rows, 'others.rows'), maxId: count(o.maxId, 'others.maxId'), fullRowDigest: hex(o.fullRowDigest, 'others.fullRowDigest') } };
   }
   const b = out?.before ?? {};
   count(out?.importBatchesBefore, 'importBatchesBefore');
@@ -159,7 +176,7 @@ async function run(): Promise<void> {
 
     // ---- assemble ----
     const stage = opt('--stage') as Stage;
-    if (!STAGES.includes(stage)) fail('--stage must be S1, S2, S3 or S4');
+    if (!STAGES.includes(stage)) fail('--stage must be S1, S2, S3, S4, I333 or O2');
     const evBytes = readFileSync(outside(opt('--restore-evidence')));
     const ev = JSON.parse(evBytes.toString('utf8')) as RestoreEvidence;
     const problem = restoreEvidenceProblem(ev, { dumpSha256, restoreTarget, productionTarget, now });
@@ -191,6 +208,16 @@ async function run(): Promise<void> {
       outFile = join(work, 's2-plan.json'); derivedMode = 'plan --rehearsal'; toolSha256 = pyHashes('tools/v2/gap029-draft-link-production.py');
       runPy('tools/v2/gap029-draft-link-production.py', ['plan', '--target', restoreTargetFile, '--child', child, '--child-sha256', childSha, '--label', label, '--rehearsal', '--out', outFile]);
       extraInputs = { childSha256: childSha, label, parentSha256: V3_PARENT_SHA };
+    } else if (stage === 'I333') {
+      // The stage tool stages the hash-pinned core tar FRESHLY under the (new, exclusive) work dir; the tar's own hash is bound as an input.
+      const coreTar = outside(opt('--core-tar'));
+      if (!existsSync(coreTar) || !statSync(coreTar).isFile()) fail('the core tar is missing');
+      outFile = join(work, 'i333-plan.json'); derivedMode = 'plan --rehearsal'; toolSha256 = pyHashes('tools/v2/issue333-coach-assignments-production.py');
+      runPy('tools/v2/issue333-coach-assignments-production.py', ['plan', '--target', restoreTargetFile, '--core-tar', coreTar, '--staging-dir', join(work, 'core-staging'), '--rehearsal', '--out', outFile]);
+      extraInputs = { coreTarSha256: await fileSha256(coreTar) };
+    } else if (stage === 'O2') {
+      outFile = join(work, 'o2-plan.json'); derivedMode = 'plan --rehearsal'; toolSha256 = pyHashes('tools/v2/o2-converged-findings-production.py');
+      runPy('tools/v2/o2-converged-findings-production.py', ['plan', '--target', restoreTargetFile, '--rehearsal', '--out', outFile]);
     } else {
       outFile = join(work, 's4-plan.json'); derivedMode = 'plan --rehearsal'; toolSha256 = pyHashes('tools/v2/gap029-sibling-pair-production.py');
       runPy('tools/v2/gap029-sibling-pair-production.py', ['plan', '--target', restoreTargetFile, '--rehearsal', '--out', outFile]);
