@@ -1,0 +1,9 @@
+ ✓ tests/integration/data-editor.test.ts > AFLDB-ISSUE-335: deleteMatch and active manual coach assignment overrides > an assignment made through the real coach mutation blocks deletion; match, assignment, override and audit unchanged 405ms
+ ✓ tests/integration/data-editor.test.ts > AFLDB-ISSUE-335: deleteMatch and active manual coach assignment overrides > an override retired through the real clear mutation does not block; the inactive record is kept 497ms
+ ✓ tests/integration/data-editor.test.ts > AFLDB-ISSUE-335: deleteMatch and active manual coach assignment overrides > a source-only assignment (no override) keeps the existing behaviour: deleted, cascading the assignment 430ms
+ ✓ tests/integration/data-editor.test.ts > AFLDB-ISSUE-335: deleteMatch and active manual coach assignment overrides > overrides naming another match do not block, including keys a prefix pattern would catch 504ms
+AFLDB-ISSUE-277 replay cases SKIPPED: `python3 -c "import psycopg"` did not succeed
+AFLDB-ISSUE-267/269 replay cases SKIPPED: `python3 -c "import psycopg"` exited 1: ModuleNotFoundError: No module named 'psycopg'
+ ✓ tests/integration/data-editor.test.ts > Data Editor - Match Sheet Delta Tests > propagates kicks correctly 526ms
+ Test Files  3 passed (3)
+      Tests  65 passed | 13 skipped (78)

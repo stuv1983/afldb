@@ -1,0 +1,15 @@
+isolated-pg: afldb_v2_i335draft_test verified (cluster afldb_v2_isolated, 127.0.0.1:55497); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-i335-qual-20261104T235919Z/cand
+
+ ✓ tests/integration/admin-draft.test.ts (46 tests | 5 skipped) 3574ms
+     ✓ draft_pick_key names a source row and a manual row, and skips a NULL-source one  683ms
+ ✓ tests/integration/sealed-editor-guard.test.ts (21 tests) 3393ms
+     ✓ refuses a missing, blank, short and excessive note, and leaves no match and no audit row  402ms
+     ✓ refuses without a reason, leaving the match and the audit; deletes with a reason and audits it  399ms
+
+ Test Files  2 passed (2)
+      Tests  62 passed | 5 skipped (67)
+   Start at  11:03:31
+   Duration  10.94s (transform 2.71s, setup 259ms, import 3.24s, tests 6.97s, environment 1ms)
+

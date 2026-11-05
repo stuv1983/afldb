@@ -1,0 +1,8 @@
+--- DEV services AFTER (read-only)
+afldb.service active MainPID=1677
+postgresql@16-main.service active MainPID=1536
+waiting for server to shut down..... done
+server stopped
+no listener on 55497
+candidate dirty=0 HEAD=0f251c2daa8d7c6c38eacd559376dde41e010fd9
+4.1G	/mnt/ssd/afldb-i335-qual-20261104T235919Z

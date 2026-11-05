@@ -1,0 +1,105 @@
+isolated-pg: afldb_v2_i335_test verified (cluster afldb_v2_isolated, 127.0.0.1:55497); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-i335-qual-20261104T235919Z/cand
+
+stderr | tests/integration/data-editor.test.ts
+AFLDB-ISSUE-277 replay cases SKIPPED: `python3 -c "import psycopg"` did not succeed
+
+stderr | tests/integration/data-editor.test.ts
+AFLDB-ISSUE-267/269 replay cases SKIPPED: `python3 -c "import psycopg"` exited 1: ModuleNotFoundError: No module named 'psycopg'
+
+ ✓ tests/integration/data-editor.test.ts > Data Editor - Match Sheet Delta Tests > propagates kicks correctly 526ms
+ ✓ tests/integration/data-editor.test.ts > Atomic required audit (AFLDB-ISSUE-027) > persists the match-sheet mutation and its data_edits audit together 554ms
+ ✓ tests/integration/data-editor.test.ts > Atomic required audit (AFLDB-ISSUE-027) > rolls the statistical mutation back when the required audit cannot be written 374ms
+ ✓ tests/integration/data-editor.test.ts > Restricted Data Editor role parity (AFLDB-ISSUE-083/-109) > commits the production match-sheet and migration-066 audit path as afldb_import 445ms
+ ✓ tests/integration/data-editor.test.ts > Restricted Data Editor role parity (AFLDB-ISSUE-083/-109) > inserts and updates a durable override atomically as afldb_import 254ms
+ ✓ tests/integration/data-editor.test.ts > AFLDB-ISSUE-224 §21.3.2: a name edit repairs the durable creation record > rewrites the manual_admin_edit identity payload and audits it separately 236ms
+ ✓ tests/integration/data-editor.test.ts > AFLDB-ISSUE-277 (D-277-1): an edit to a player with no AFL Tables identity is written into the creation record > writes dob, birth year, height, weight and notes into the record, audits each, and the replay re-creates them 389ms
+ ✓ tests/integration/data-editor.test.ts > AFLDB-ISSUE-277 (D-277-1): an edit to a player with no AFL Tables identity is written into the creation record > a cleared value is an explicit null in the record, and the replay clears it 328ms
+ ✓ tests/integration/data-editor.test.ts > AFLDB-ISSUE-277 (D-277-1): an edit to a player with no AFL Tables identity is written into the creation record > an unchanged save writes nothing to the record and adds no record audit row 250ms
+ ✓ tests/integration/data-editor.test.ts > AFLDB-ISSUE-277 (D-277-1): an edit to a player with no AFL Tables identity is written into the creation record > the guard refuses a dob the replay could not re-create, and nothing is written 203ms
+ ✓ tests/integration/data-editor.test.ts > AFLDB-ISSUE-277 (D-277-1): an edit to a player with no AFL Tables identity is written into the creation record > the guard does not turn a record that was already unreplayable into a block on every edit 252ms
+ ↓ tests/integration/data-editor.test.ts > AFLDB-ISSUE-277 (D-277-1): an edit to a player with no AFL Tables identity is written into the creation record > the guard agrees with the real replay about which records it refuses
+ ✓ tests/integration/data-editor.test.ts > AFLDB-ISSUE-277 (D-277-1): an edit to a player with no AFL Tables identity is written into the creation record > a player who holds an AFL Tables identity is unchanged: the correction is keyed under the source and the record is not touched 181ms
+ ✓ tests/integration/data-editor.test.ts > AFLDB-ISSUE-277 (D-277-1): an edit to a player with no AFL Tables identity is written into the creation record > a player with no identity at all keeps the old behaviour: the save succeeds and nothing durable exists 204ms
+ ✓ tests/integration/data-editor.test.ts > AFLDB-ISSUE-292: a player with two accepted AFL Tables paths is always keyed under the same one > keys two edits of one group under one path, whatever the physical row order 256ms
+ ✓ tests/integration/data-editor.test.ts > Targeted club_seasons rebuild (AFLDB-ISSUE-015) > reproduces the canonical full-rebuild rows for a completed season 196ms
+ ✓ tests/integration/data-editor.test.ts > Targeted club_seasons rebuild (AFLDB-ISSUE-015) > follows match facts for the premiership flag 160ms
+ ✓ tests/integration/data-editor.test.ts > Targeted club_seasons rebuild (AFLDB-ISSUE-015) > refuses to build a ladder for a season it has no matches for 165ms
+ ✓ tests/integration/data-editor.test.ts > Targeted club_seasons rebuild (AFLDB-ISSUE-015) > derives the ladder from match facts, following a score correction 162ms
+ ✓ tests/integration/data-editor.test.ts > AFLDB-ISSUE-155 §27.15: the match sheet is not a Brownlow writer > T6: a complete Brownlow allocation is refused on a Wildcard Final and nothing is written 142ms
+ ✓ tests/integration/data-editor.test.ts > AFLDB-ISSUE-155 §27.15: the match sheet is not a Brownlow writer > T6b: a single Brownlow value is refused on a home-and-away match too, before any write 135ms
+ ✓ tests/integration/data-editor.test.ts > AFLDB-ISSUE-155 §27.15: the match sheet is not a Brownlow writer > T6c: an explicit zero is refused as firmly as a vote 132ms
+ ✓ tests/integration/data-editor.test.ts > Durable Match Sheet authority (AFLDB-ISSUE-257 Slice 3) > refuses a stale sheet whole, before any write (a settle must never become authority) 321ms
+ ✓ tests/integration/data-editor.test.ts > Durable Match Sheet authority (AFLDB-ISSUE-257 Slice 3) > refuses a save whose token is missing 276ms
+ ✓ tests/integration/data-editor.test.ts > Durable Match Sheet authority (AFLDB-ISSUE-257 Slice 3) > rolls the row change back when the player has no durable identity 333ms
+ ✓ tests/integration/data-editor.test.ts > Durable Match Sheet authority (AFLDB-ISSUE-257 Slice 3) > commits the row change and its authority together, reusing an existing identity key 417ms
+ ✓ tests/integration/data-editor.test.ts > Durable Match Sheet authority: delete guard and Return to source (AFLDB-ISSUE-257 Slice 7) > deleteMatch refuses while active Match Sheet authority exists, and deletes nothing 343ms
+ ✓ tests/integration/data-editor.test.ts > Durable Match Sheet authority: delete guard and Return to source (AFLDB-ISSUE-257 Slice 7) > returns ordinary field authority to source: record withdrawn, row untouched 343ms
+ ✓ tests/integration/data-editor.test.ts > Durable Match Sheet authority: delete guard and Return to source (AFLDB-ISSUE-257 Slice 7) > a manual addition still unowned is withdrawn and its row deleted 391ms
+ ✓ tests/integration/data-editor.test.ts > Durable Match Sheet authority: delete guard and Return to source (AFLDB-ISSUE-257 Slice 7) > a manual addition a settling source has since owned is withdrawn and the row kept 342ms
+ ✓ tests/integration/data-editor.test.ts > Durable Match Sheet authority: delete guard and Return to source (AFLDB-ISSUE-257 Slice 7) > F-S7-01: a manual addition now owned by fitzroy_afldata is withdrawn and the row kept 334ms
+ ✓ tests/integration/data-editor.test.ts > Durable Match Sheet authority: delete guard and Return to source (AFLDB-ISSUE-257 Slice 7) > F-S7-01: a manual addition owned by an unsupported source refuses, writing nothing 332ms
+ ✓ tests/integration/data-editor.test.ts > Durable Match Sheet authority: delete guard and Return to source (AFLDB-ISSUE-257 Slice 7) > a manual removal is withdrawn with no canonical write; the next settle restores the row 318ms
+ ✓ tests/integration/data-editor.test.ts > AFLDB-ISSUE-335: deleteMatch and active manual coach assignment overrides > an assignment made through the real coach mutation blocks deletion; match, assignment, override and audit unchanged 405ms
+ ✓ tests/integration/data-editor.test.ts > AFLDB-ISSUE-335: deleteMatch and active manual coach assignment overrides > an override retired through the real clear mutation does not block; the inactive record is kept 497ms
+ ✓ tests/integration/data-editor.test.ts > AFLDB-ISSUE-335: deleteMatch and active manual coach assignment overrides > a source-only assignment (no override) keeps the existing behaviour: deleted, cascading the assignment 430ms
+ ✓ tests/integration/data-editor.test.ts > AFLDB-ISSUE-335: deleteMatch and active manual coach assignment overrides > overrides naming another match do not block, including keys a prefix pattern would catch 504ms
+ ✓ tests/integration/data-editor.test.ts > Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) > (1) rolls the row change AND the authority back when the authority write fails (post-110) 456ms
+ ↓ tests/integration/data-editor.test.ts > Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) > (2a) replay re-applies a field correction over a reset source value
+ ↓ tests/integration/data-editor.test.ts > Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) > (2b) replay recreates a durable addition the reload did not supply
+ ↓ tests/integration/data-editor.test.ts > Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) > (2c) replay deletes a reinserted row under a durable removal
+ ↓ tests/integration/data-editor.test.ts > Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) > (3a) an active key whose match_key is absent from matches refuses before any write
+ ↓ tests/integration/data-editor.test.ts > Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) > (3b) an active key whose identity names no accepted external identity refuses before any write
+ ↓ tests/integration/data-editor.test.ts > Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) > (5) D-257-9: a save records the folded continuing_url identity and the replay resolves it back
+ ✓ tests/integration/data-editor.test.ts > AFLDB-ISSUE-261 Slice 1: bounded lock waits on the Data Editor score edit and deleteMatch > 'Data Editor score edit (saveEdit, mat…' > BASIC LOCK TIMEOUT (no deadlock): refused at its 5 s bound, rolled back whole, every lock released 5692ms
+ ✓ tests/integration/data-editor.test.ts > AFLDB-ISSUE-261 Slice 1: bounded lock waits on the Data Editor score edit and deleteMatch > 'Data Editor score edit (saveEdit, mat…' > SETTLE/ADMIN DEADLOCK (settle stood in for by a test transaction, settle is the victim): the writer is refused at its bound and the settle recovers on a retry 7209ms
+ ✓ tests/integration/data-editor.test.ts > AFLDB-ISSUE-261 Slice 1: bounded lock waits on the Data Editor score edit and deleteMatch > 'deleteMatch' > BASIC LOCK TIMEOUT (no deadlock): refused at its 5 s bound, rolled back whole, every lock released 5711ms
+ ✓ tests/integration/data-editor.test.ts > AFLDB-ISSUE-261 Slice 1: bounded lock waits on the Data Editor score edit and deleteMatch > 'deleteMatch' > SETTLE/ADMIN DEADLOCK (settle stood in for by a test transaction, settle is the victim): the writer is refused at its bound and the settle recovers on a retry 7192ms
+ ✓ tests/integration/data-editor.test.ts > AFLDB-ISSUE-261 Slice 1: bounded lock waits on the Data Editor score edit and deleteMatch > driver recovery (Slice 1b): a 40P01 recovered inside the retry does not roll the outer transaction back > first attempt raises 40P01, a later attempt succeeds: the outer transaction commits and the failed attempt's writes are gone 334ms
+ ✓ tests/integration/data-editor.test.ts > AFLDB-ISSUE-261 Slice 1: bounded lock waits on the Data Editor score edit and deleteMatch > driver recovery (Slice 1b): a 40P01 recovered inside the retry does not roll the outer transaction back > 40P01 on every attempt: four attempts, the error propagates, and the whole outer transaction rolls back 294ms
+ ↓ tests/integration/data-editor.test.ts > AFLDB-ISSUE-267/269: the matches override replay merges every active row and syncs the final period > ISSUE-267: a one-field score edit keeps every unchanged component, and both final-period rows equal the corrected totals
+ ↓ tests/integration/data-editor.test.ts > AFLDB-ISSUE-267/269: the matches override replay merges every active row and syncs the final period > ISSUE-269: an attendance edit and a partial score edit on one match both survive, with derived totals and final periods
+ ↓ tests/integration/data-editor.test.ts > AFLDB-ISSUE-267/269: the matches override replay merges every active row and syncs the final period > equal-authority overrides that disagree are refused before any write
+ ↓ tests/integration/data-editor.test.ts > AFLDB-ISSUE-267/269: the matches override replay merges every active row and syncs the final period > identical overlapping values merge; an inactive override contributes nothing
+ ↓ tests/integration/data-editor.test.ts > AFLDB-ISSUE-267/269: the matches override replay merges every active row and syncs the final period > a score component neither the source nor the override records is refused, never written as zero
+ ↓ tests/integration/data-editor.test.ts > AFLDB-ISSUE-267/269: the matches override replay merges every active row and syncs the final period > a component the source lacks but another active group supplies is derived from the merge: the replay succeeds and census section 4 agrees
+stdout | tests/integration/admin-coaches.test.ts
+{
+  severity_local: 'NOTICE',
+  severity: 'NOTICE',
+  code: '00000',
+  message: 'trigger "issue159_test_force_data_edits_failure_trg" for relation "data_edits" does not exist, skipping',
+  file: 'dropcmds.c',
+  line: '528',
+  routine: 'does_not_exist_skipping'
+}
+
+ ✓ tests/integration/admin-coaches.test.ts > createCoach > creates a manual coach row, its identity override, and its audit row in one transaction 93ms
+ ✓ tests/integration/admin-coaches.test.ts > createCoach > refuses a duplicate name with the same or unrecorded date of birth 67ms
+ ✓ tests/integration/admin-coaches.test.ts > createCoach > refuses an impossible date of birth with a sentence and writes nothing (AFLDB-ISSUE-288) 6ms
+ ✓ tests/integration/admin-coaches.test.ts > createCoach > asks for confirmation, then proceeds, when the name matches but the dob differs 143ms
+ ✓ tests/integration/admin-coaches.test.ts > createCoach > rolls the canonical row back when the audit/override companion write cannot commit 75ms
+ ✓ tests/integration/admin-coaches.test.ts > createCoach > §10.2 gate 8: rolls back the canonical row and its override when the data_edits insert itself fails 65ms
+ ✓ tests/integration/admin-coaches.test.ts > saveCoachMetadata > updates the canonical row and merges an override on the sourced coach without touching identity columns 52ms
+ ✓ tests/integration/admin-coaches.test.ts > saveCoachMetadata > refuses an impossible date of birth before the transaction, not with a PostgreSQL message (AFLDB-ISSUE-288) 4ms
+ ✓ tests/integration/admin-coaches.test.ts > saveCoachMetadata > §10.2 gate 9: the override above survives a reload that reimports different source values, running the importer's own replay SQL verbatim 11ms
+ ✓ tests/integration/admin-coaches.test.ts > saveCoachMetadata > §10.2 gate 8: rolls back the canonical UPDATE and the override merge when the data_edits insert itself fails 73ms
+ ✓ tests/integration/admin-coaches.test.ts > linkCoachToPlayer / unlinkCoach > links through external_identities, stores the profile path in the override, and unlinks cleanly 116ms
+ ✓ tests/integration/admin-coaches.test.ts > linkCoachToPlayer / unlinkCoach > §10.2 gate 8: rolls back the link when the data_edits insert itself fails 35ms
+ ✓ tests/integration/admin-coaches.test.ts > setCoachAssignment / clearCoachAssignment > writes match_coaches with the manual source and refuses a club that did not play in the match 194ms
+ ✓ tests/integration/admin-coaches.test.ts > setCoachAssignment / clearCoachAssignment > §10.2 gate 8: rolls back match_coaches when the data_edits insert itself fails 43ms
+ ✓ tests/integration/admin-coaches.test.ts > retireCoachOverride > retires a manual coach's identity override -- the documented reversibility mechanism (§1.4) 108ms
+ ✓ tests/integration/match-admin-delete.test.ts > AFLDB-ISSUE-177 -- a match still linked by current-season staging cannot be deleted > refuses deletion, names the staging dependency, and changes nothing 54ms
+ ✓ tests/integration/match-admin-delete.test.ts > AFLDB-ISSUE-177 -- a match still linked by current-season staging cannot be deleted > still deletes normally when nothing references the match 116ms
+ ✓ tests/integration/match-admin-delete.test.ts > AFLDB-ISSUE-177 -- a match still linked by current-season staging cannot be deleted > AFLDB-ISSUE-180: refuses deletion, names the period-stats dependency, and changes nothing 53ms
+ ✓ tests/integration/match-admin-delete.test.ts > AFLDB-ISSUE-177 -- a match still linked by current-season staging cannot be deleted > AFLDB-ISSUE-181: refuses deletion, names the AFL API lineup dependency, and changes nothing 424ms
+ ✓ tests/integration/match-admin-delete.test.ts > AFLDB-ISSUE-177 -- a match still linked by current-season staging cannot be deleted > AFLDB-ISSUE-253: deletes a match carrying an AFL API Brownlow vote set, keeping the observation and clearing only its link 144ms
+ ✓ tests/integration/match-admin-delete.test.ts > AFLDB-ISSUE-177 -- a match still linked by current-season staging cannot be deleted > AFLDB-ISSUE-253: a refused deletion leaves the AFL API Brownlow link intact 52ms
+ ✓ tests/integration/match-admin-delete.test.ts > AFLDB-ISSUE-177 -- a match still linked by current-season staging cannot be deleted > maps a genuine race-window FK violation (23503) to a refusal instead of throwing 119ms
+
+ Test Files  3 passed (3)
+      Tests  65 passed | 13 skipped (78)
+   Start at  11:02:40
+   Duration  46.33s (transform 1.13s, setup 304ms, import 2.12s, tests 43.19s, environment 1ms)
+

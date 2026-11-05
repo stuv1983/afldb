@@ -1,0 +1,9 @@
+
+ Test Files  2 passed (2)
+      Tests  122 passed (122)
+   Start at  11:03:27
+   Duration  2.36s (transform 901ms, setup 209ms, import 1.27s, tests 418ms, environment 1ms)
+
+ Test Files  2 passed (2)
+      Tests  62 passed | 5 skipped (67)
+unit rc=0 integration rc=0

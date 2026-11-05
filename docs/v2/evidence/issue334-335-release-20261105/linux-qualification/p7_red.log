@@ -1,0 +1,38 @@
+--- base source in place:
+ M src/app/admin/content/media/route.ts
+ M src/db/queries/admin-coaches.ts
+ M src/db/queries/match-admin.ts
+=== RED unit (ISSUE-334)
+ × tests/admin-upload-route.test.ts > AFLDB-ISSUE-334: the content image upload route refuses a cross-site request first > refuses a cross-site Sec-Fetch-Site with 403 before authenticating, parsing, storing or auditing 58ms
+   → expected 200 to be 403 // Object.is equality
+ × tests/admin-upload-route.test.ts > AFLDB-ISSUE-334: the content image upload route refuses a cross-site request first > refuses a sibling-origin request (same-site Sec-Fetch-Site, sibling Origin) with 403 before authenticating, parsing, storing or auditing 5ms
+   → expected 200 to be 403 // Object.is equality
+ × tests/admin-upload-route.test.ts > AFLDB-ISSUE-334: the content image upload route refuses a cross-site request first > refuses a sibling Origin with no Sec-Fetch-Site with 403 before authenticating, parsing, storing or auditing 4ms
+   → expected 200 to be 403 // Object.is equality
+ × tests/admin-upload-route.test.ts > AFLDB-ISSUE-334: the content image upload route refuses a cross-site request first > refuses a foreign Origin with no Sec-Fetch-Site with 403 before authenticating, parsing, storing or auditing 3ms
+   → expected 200 to be 403 // Object.is equality
+ × tests/admin-upload-route.test.ts > AFLDB-ISSUE-334: the content image upload route refuses a cross-site request first > refuses a missing Origin with 403 before authenticating, parsing, storing or auditing 4ms
+   → expected 200 to be 403 // Object.is equality
+ × tests/admin-upload-route.test.ts > AFLDB-ISSUE-334: the content image upload route refuses a cross-site request first > refuses an opaque Origin with 403 before authenticating, parsing, storing or auditing 3ms
+   → expected 200 to be 403 // Object.is equality
+ × tests/admin-upload-route.test.ts > AFLDB-ISSUE-334: the content image upload route refuses a cross-site request first > refuses an unparseable Origin with 403 before authenticating, parsing, storing or auditing 2ms
+   → expected 200 to be 403 // Object.is equality
+ × tests/admin-upload-route.test.ts > AFLDB-ISSUE-334: the content image upload route refuses a cross-site request first > reads none of a refused request body 3ms
+   → expected 400 to be 403 // Object.is equality
+ ✓ tests/admin-upload-route.test.ts > AFLDB-ISSUE-334: the content image upload route refuses a cross-site request first > a same-origin upload still asks for site.content, and a refused session stores nothing and reads no body 6ms
+ ✓ tests/admin-upload-route.test.ts > AFLDB-ISSUE-334: the content image upload route refuses a cross-site request first > a same-origin upload is stored and audited exactly as before 7ms
+ ✓ tests/admin-upload-route.test.ts > AFLDB-ISSUE-334: the content image upload route refuses a cross-site request first > the proxied same-origin form (public host as X-Forwarded-Host) is accepted 3ms
+ ✓ tests/admin-upload-route.test.ts > AFLDB-ISSUE-334: the content image upload route refuses a cross-site request first > same-origin requests keep the existing refusals: not an image (415), over the limit (413), at the cap (409) 17ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+      Tests  8 failed | 4 passed | 24 skipped (36)
+=== RED database (ISSUE-335)
+ ↓ tests/integration/data-editor.test.ts > Data Editor - Match Sheet Delta Tests > propagates kicks correctly
+ × tests/integration/data-editor.test.ts > AFLDB-ISSUE-335: deleteMatch and active manual coach assignment overrides > an assignment made through the real coach mutation blocks deletion; match, assignment, override and audit unchanged 614ms
+   → expected true to be false // Object.is equality
+ ✓ tests/integration/data-editor.test.ts > AFLDB-ISSUE-335: deleteMatch and active manual coach assignment overrides > an override retired through the real clear mutation does not block; the inactive record is kept 572ms
+ ✓ tests/integration/data-editor.test.ts > AFLDB-ISSUE-335: deleteMatch and active manual coach assignment overrides > a source-only assignment (no override) keeps the existing behaviour: deleted, cascading the assignment 524ms
+ ✓ tests/integration/data-editor.test.ts > AFLDB-ISSUE-335: deleteMatch and active manual coach assignment overrides > overrides naming another match do not block, including keys a prefix pattern would catch 544ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+      Tests  1 failed | 3 passed | 52 skipped (56)
+unit rc=1 database rc=1; tree restored and clean
+      Tests  8 failed | 4 passed | 24 skipped (36)

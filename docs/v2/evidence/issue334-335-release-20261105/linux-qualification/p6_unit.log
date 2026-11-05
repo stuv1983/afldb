@@ -1,0 +1,14 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-i335-qual-20261104T235919Z/cand
+
+ ✓ tests/auth.test.ts (203 tests) 826ms
+     ✓ round-trips and rejects a wrong password  424ms
+ ✓ tests/admin-upload-route.test.ts (36 tests) 154ms
+ ✓ tests/admin-coach-actions.test.ts (25 tests) 36ms
+ ✓ tests/issue333-coach-row-selector.test.ts (12 tests) 88ms
+
+ Test Files  4 passed (4)
+      Tests  276 passed (276)
+   Start at  11:02:27
+   Duration  4.10s (transform 1.18s, setup 360ms, import 1.69s, tests 1.10s, environment 1ms)
+

@@ -1,0 +1,100 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-i335-qual-20261104T235919Z/cand
+
+ ↓ tests/admin-upload-route.test.ts > an authorised caller gets the typed refusal (HTTP 410) and nothing is staged > answers a well-formed 1.5 MB upload with 410 and the retirement refusal
+ ↓ tests/admin-upload-route.test.ts > an authorised caller gets the typed refusal (HTTP 410) and nothing is staged > writes exactly one audit row for the refusal, naming the surface and the export
+ ↓ tests/admin-upload-route.test.ts > an authorised caller gets the typed refusal (HTTP 410) and nothing is staged > still refuses with 410 when the audit write fails
+ ↓ tests/admin-upload-route.test.ts > an authorised caller gets the typed refusal (HTTP 410) and nothing is staged > refuses the same way for a malformed body, an oversized declared length or no file at all
+ ↓ tests/admin-upload-route.test.ts > an authorised caller gets the typed refusal (HTTP 410) and nothing is staged > reads none of the request body, whatever it declares
+ ↓ tests/admin-upload-route.test.ts > authentication and authorisation are unchanged > asks for the legacy-intake capability and refuses nothing, audits nothing, when it throws
+ ↓ tests/admin-upload-route.test.ts > authentication and authorisation are unchanged > checks the session before reading any of the body
+ ↓ tests/admin-upload-route.test.ts > authentication and authorisation are unchanged > turns an under-privileged session away exactly as the page does (a redirect, not a 410)
+ ↓ tests/admin-upload-route.test.ts > CSRF: a cross-site request is refused before the session is consulted > refuses a cross-site Sec-Fetch-Site
+ ↓ tests/admin-upload-route.test.ts > CSRF: a cross-site request is refused before the session is consulted > refuses a same-site (sibling) Sec-Fetch-Site
+ ↓ tests/admin-upload-route.test.ts > CSRF: a cross-site request is refused before the session is consulted > refuses a foreign Origin with no Sec-Fetch-Site
+ ↓ tests/admin-upload-route.test.ts > CSRF: a cross-site request is refused before the session is consulted > refuses a missing Origin
+ ↓ tests/admin-upload-route.test.ts > CSRF: a cross-site request is refused before the session is consulted > refuses an opaque Origin
+ ↓ tests/admin-upload-route.test.ts > CSRF: a cross-site request is refused before the session is consulted > refuses an unparseable Origin
+ ↓ tests/admin-upload-route.test.ts > CSRF: a cross-site request is refused before the session is consulted > refuses an Origin on another port
+ ↓ tests/admin-upload-route.test.ts > CSRF: a cross-site request is refused before the session is consulted > refuses no host at all
+ ↓ tests/admin-upload-route.test.ts > CSRF: a cross-site request is refused before the session is consulted > accepts the proxied form: the public host arrives as X-Forwarded-Host, the Origin matches it
+ ↓ tests/admin-upload-route.test.ts > CSRF: a cross-site request is refused before the session is consulted > accepts a request with no Sec-Fetch-Site (an older browser) when the Origin matches
+ ↓ tests/admin-upload-route.test.ts > the request helpers on their own (retained library code) > declaredLengthCheck: absent is ok, non-numeric is invalid, over the bound is too large
+ ↓ tests/admin-upload-route.test.ts > the request helpers on their own (retained library code) > readBoundedBody: returns the bytes in order, an empty body as empty, and null past the bound
+ ↓ tests/admin-upload-route.test.ts > what is pinned statically (the framework and the browser are not exercised here) > the route checks the origin first, then the session, then refuses; it never reads the body
+ ↓ tests/admin-upload-route.test.ts > what is pinned statically (the framework and the browser are not exercised here) > imports neither the ingest pipeline nor the dataset registry
+ ↓ tests/admin-upload-route.test.ts > what is pinned statically (the framework and the browser are not exercised here) > the form and the 1 MB Server Action it replaced are gone, and the global action limit is untouched
+ ↓ tests/admin-upload-route.test.ts > what is pinned statically (the framework and the browser are not exercised here) > the page still gates on the capability the route enforces, and renders a notice, not a form
+ × tests/admin-upload-route.test.ts > AFLDB-ISSUE-334: the content image upload route refuses a cross-site request first > refuses a cross-site Sec-Fetch-Site with 403 before authenticating, parsing, storing or auditing 58ms
+   → expected 200 to be 403 // Object.is equality
+ × tests/admin-upload-route.test.ts > AFLDB-ISSUE-334: the content image upload route refuses a cross-site request first > refuses a sibling-origin request (same-site Sec-Fetch-Site, sibling Origin) with 403 before authenticating, parsing, storing or auditing 5ms
+   → expected 200 to be 403 // Object.is equality
+ × tests/admin-upload-route.test.ts > AFLDB-ISSUE-334: the content image upload route refuses a cross-site request first > refuses a sibling Origin with no Sec-Fetch-Site with 403 before authenticating, parsing, storing or auditing 4ms
+   → expected 200 to be 403 // Object.is equality
+ × tests/admin-upload-route.test.ts > AFLDB-ISSUE-334: the content image upload route refuses a cross-site request first > refuses a foreign Origin with no Sec-Fetch-Site with 403 before authenticating, parsing, storing or auditing 3ms
+   → expected 200 to be 403 // Object.is equality
+ × tests/admin-upload-route.test.ts > AFLDB-ISSUE-334: the content image upload route refuses a cross-site request first > refuses a missing Origin with 403 before authenticating, parsing, storing or auditing 4ms
+   → expected 200 to be 403 // Object.is equality
+ × tests/admin-upload-route.test.ts > AFLDB-ISSUE-334: the content image upload route refuses a cross-site request first > refuses an opaque Origin with 403 before authenticating, parsing, storing or auditing 3ms
+   → expected 200 to be 403 // Object.is equality
+ × tests/admin-upload-route.test.ts > AFLDB-ISSUE-334: the content image upload route refuses a cross-site request first > refuses an unparseable Origin with 403 before authenticating, parsing, storing or auditing 2ms
+   → expected 200 to be 403 // Object.is equality
+ × tests/admin-upload-route.test.ts > AFLDB-ISSUE-334: the content image upload route refuses a cross-site request first > reads none of a refused request body 3ms
+   → expected 400 to be 403 // Object.is equality
+ ✓ tests/admin-upload-route.test.ts > AFLDB-ISSUE-334: the content image upload route refuses a cross-site request first > a same-origin upload still asks for site.content, and a refused session stores nothing and reads no body 6ms
+ ✓ tests/admin-upload-route.test.ts > AFLDB-ISSUE-334: the content image upload route refuses a cross-site request first > a same-origin upload is stored and audited exactly as before 7ms
+ ✓ tests/admin-upload-route.test.ts > AFLDB-ISSUE-334: the content image upload route refuses a cross-site request first > the proxied same-origin form (public host as X-Forwarded-Host) is accepted 3ms
+ ✓ tests/admin-upload-route.test.ts > AFLDB-ISSUE-334: the content image upload route refuses a cross-site request first > same-origin requests keep the existing refusals: not an image (415), over the limit (413), at the cap (409) 17ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/admin-upload-route.test.ts > AFLDB-ISSUE-334: the content image upload route refuses a cross-site request first > refuses a cross-site Sec-Fetch-Site with 403 before authenticating, parsing, storing or auditing
+ FAIL  tests/admin-upload-route.test.ts > AFLDB-ISSUE-334: the content image upload route refuses a cross-site request first > refuses a sibling-origin request (same-site Sec-Fetch-Site, sibling Origin) with 403 before authenticating, parsing, storing or auditing
+ FAIL  tests/admin-upload-route.test.ts > AFLDB-ISSUE-334: the content image upload route refuses a cross-site request first > refuses a sibling Origin with no Sec-Fetch-Site with 403 before authenticating, parsing, storing or auditing
+ FAIL  tests/admin-upload-route.test.ts > AFLDB-ISSUE-334: the content image upload route refuses a cross-site request first > refuses a foreign Origin with no Sec-Fetch-Site with 403 before authenticating, parsing, storing or auditing
+ FAIL  tests/admin-upload-route.test.ts > AFLDB-ISSUE-334: the content image upload route refuses a cross-site request first > refuses a missing Origin with 403 before authenticating, parsing, storing or auditing
+ FAIL  tests/admin-upload-route.test.ts > AFLDB-ISSUE-334: the content image upload route refuses a cross-site request first > refuses an opaque Origin with 403 before authenticating, parsing, storing or auditing
+ FAIL  tests/admin-upload-route.test.ts > AFLDB-ISSUE-334: the content image upload route refuses a cross-site request first > refuses an unparseable Origin with 403 before authenticating, parsing, storing or auditing
+AssertionError: expected 200 to be 403 // Object.is equality
+
+- Expected
++ Received
+
+- 403
++ 200
+
+ ❯ tests/admin-upload-route.test.ts:393:31
+    391|       const { bytes, contentType } = await imageForm(png());
+    392|       const response = await POST_MEDIA(mediaRequest(bytes, contentTyp…
+    393|       expect(response.status).toBe(403);
+       |                               ^
+    394|       expect(await response.json()).toEqual({ error: 'This upload did …
+    395|       expect(mocks.requireCapability).not.toHaveBeenCalled();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  tests/admin-upload-route.test.ts > AFLDB-ISSUE-334: the content image upload route refuses a cross-site request first > reads none of a refused request body
+AssertionError: expected 400 to be 403 // Object.is equality
+
+- Expected
++ Received
+
+- 403
++ 400
+
+ ❯ tests/admin-upload-route.test.ts:405:29
+    403|       stream, 'multipart/form-data; boundary=x', { host: SAME_ORIGIN.h…
+    404|     ));
+    405|     expect(response.status).toBe(403);
+       |                             ^
+    406|     expect(state.pulled).toBe(0);
+    407|     expect(mocks.requireCapability).not.toHaveBeenCalled();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  8 failed | 4 passed | 24 skipped (36)
+   Start at  11:04:56
+   Duration  1.06s (transform 462ms, setup 225ms, import 473ms, tests 123ms, environment 0ms)
+

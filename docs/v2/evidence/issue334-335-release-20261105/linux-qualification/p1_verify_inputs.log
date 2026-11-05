@@ -1,0 +1,10 @@
+tar and dump hashes verified
+HEAD=0f251c2daa8d7c6c38eacd559376dde41e010fd9 base=87b6b2160a7c7e627f10646957aeeb754d04393e tracked=4731 dirty=0
+--- files R changes against base
+ src/app/admin/content/media/route.ts      |  16 ++-
+ src/db/queries/admin-coaches.ts           |  38 ++++++
+ src/db/queries/match-admin.ts             |  13 ++
+ tests/admin-upload-route.test.ts          | 168 +++++++++++++++++++++++++
+ tests/integration/data-editor.test.ts     | 203 +++++++++++++++++++++++++++++-
+ tests/issue333-coach-row-selector.test.ts |   2 +-
+ 6 files changed, 432 insertions(+), 8 deletions(-)
