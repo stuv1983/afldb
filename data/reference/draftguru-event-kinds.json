@@ -100,9 +100,16 @@
         "Academy", "Compensation", "Concession", "Concessional", "DFA", "FA",
         "Father-Son", "Foundation", "International", "SSP", "Scholarship",
         "Special Cat B", "Supplementary", "Top-Up", "Uncontracted", "Underage",
-        "Unregistered", "Zone"
+        "Unregistered", "Zone", "Intl Schol"
       ],
-      "vocabulary_note": "Exactly the 18 values of GRID_SIGNING_KINDS in src/search/grid-solver-spec.ts, set-equal in both directions. Stage A's 165 distinct signing_raw values reduce onto precisely this set with no residue either way.",
+      "post_stage_a_additions": [
+        {
+          "head": "Intl Schol",
+          "decision": "D-336-1, owner-accepted 2026-11-06 (AFLDB-ISSUE-336)",
+          "evidence": "Owner DraftGuru CSV exports 2008-2025: 32 Pre-Draft rows absent from Stage A and from storage; DraftGuru year pages fetched 2026-11-05 carry the same head. See docs/v2/evidence/issue336-draft-categories-20261105/."
+        }
+      ],
+      "vocabulary_note": "Exactly the 19 values of GRID_SIGNING_KINDS in src/search/grid-solver-spec.ts, set-equal in both directions. Stage A's 165 distinct signing_raw values reduce onto precisely the 18 values that are not post_stage_a_additions, with no residue either way.",
       "on_unknown_head": "HALT",
       "unknown_head_note": "A head outside the vocabulary requires a reviewed edit to this file and to GRID_SIGNING_KINDS."
     },

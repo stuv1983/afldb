@@ -155,6 +155,7 @@ export const GRID_SIGNING_KINDS = [
   'Academy', 'Foundation', 'Father-Son', 'Zone', 'International', 'SSP',
   'FA', 'DFA', 'Uncontracted', 'Unregistered', 'Scholarship', 'Underage',
   'Concessional', 'Concession', 'Top-Up', 'Supplementary', 'Compensation', 'Special Cat B',
+  'Intl Schol', // D-336-1 (AFLDB-ISSUE-336): DraftGuru Pre-Draft international scholarship head
 ] as const;
 
 // The complete set of tagged marquee fixtures in matches.match_event

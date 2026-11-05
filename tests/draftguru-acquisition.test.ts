@@ -2146,7 +2146,11 @@ describe("Stage B2-2 event-kind mapping contract", () => {
 
     const vocab = eventKinds.signing.signing_kind.vocabulary;
     expect([...vocab].sort()).toEqual([...gridKinds].sort());
-    expect(vocab).toHaveLength(18);
+    expect(vocab).toHaveLength(19);
+    // the only head added after Stage A is the owner-accepted D-336-1 'Intl Schol' (AFLDB-ISSUE-336)
+    const additions = eventKinds.signing.signing_kind.post_stage_a_additions.map((a: { head: string }) => a.head);
+    expect(additions).toEqual(["Intl Schol"]);
+    expect(vocab).toEqual(expect.arrayContaining(additions));
     expect(eventKinds.signing.signing_kind.on_unknown_head).toBe("HALT");
   });
 
@@ -2167,8 +2171,10 @@ describe("Stage B2-2 event-kind mapping contract", () => {
     expect(present).toBe(995);
     expect(withParenthetical).toBe(eventKinds.signing.signing_detail.stage_a_rows_with_parenthetical);
 
-    // the head rule lands exactly on the closed vocabulary, with no residue either way
-    const vocab: string[] = eventKinds.signing.signing_kind.vocabulary;
+    // the head rule lands exactly on the closed vocabulary less its reviewed post-Stage-A
+    // additions (D-336-1), with no residue either way
+    const added = new Set(eventKinds.signing.signing_kind.post_stage_a_additions.map((a: { head: string }) => a.head));
+    const vocab: string[] = eventKinds.signing.signing_kind.vocabulary.filter((h: string) => !added.has(h));
     expect([...heads].sort()).toEqual([...vocab].sort());
     // and no head carries the NBSP that father-son qualifiers embed
     for (const head of heads) expect(head).not.toContain(NBSP);
