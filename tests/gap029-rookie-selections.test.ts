@@ -10,6 +10,7 @@ import {
   approvalProblem, buildEntries, entryProblem, eventKey, pickKey, planDigest, REVIEWED, rowDigest,
   type Entry, type Live, type Plan,
 } from '../tools/v2/gap029-rookie-selections-production';
+import * as I336 from '../tools/v2/issue336-predraft-insert-production';
 
 const root = join(__dirname, '..');
 const read = (p: string) => readFileSync(join(root, p), 'utf8');
@@ -129,5 +130,85 @@ describe('GAP-029 draft-link production procedure: the gate stays closed and eve
     // A committed-but-unverified stage is reported by the shared runner, which never restores automatically (a restore is a separate owner decision).
     expect(tool).toContain('run_apply(');
     expect(tool).not.toContain('RESTORE REQUIRED');
+  });
+});
+
+/* AFLDB-ISSUE-336 (D-336-1, D-336-2): the guarded production insert of the 35 DraftGuru Pre-Draft rows follows the same contract. Its database-backed
+ * controls (actor, seal audit, drift, replay, rollback) are rehearsed on a production-derived isolated clone; see
+ * docs/v2/evidence/issue336-draft-categories-20261105/. */
+describe('ISSUE-336 Pre-Draft insert: reviewed content, resolution and approval binding', () => {
+  const kinds = JSON.parse(read('data/reference/draftguru-event-kinds.json'));
+  const clubs = JSON.parse(read('tools/rebuild/draftguru/draftguru-contract.json'));
+  const vocab = new Set<string>(kinds.signing.signing_kind.vocabulary);
+  const nulls = new Set<string>(clubs.club_resolution.deliberate_null.map((d: { club_slug: string }) => d.club_slug));
+  const text = read(I336.EVIDENCE_PATH);
+  const built = I336.buildEntries(text, vocab, nulls);
+
+  it('derives exactly 35 unnumbered Pre-Draft entries from the pinned evidence, with distinct reload keys and notes the seal accepts', () => {
+    expect(built).toHaveLength(35);
+    expect(new Set(built.map((e) => e.key)).size).toBe(35);
+    expect(built.filter((e) => e.signingKind === 'Intl Schol')).toHaveLength(32);
+    for (const e of built) {
+      expect(e.correctionNote.length).toBeGreaterThanOrEqual(20);
+      expect(e.correctionNote.length).toBeLessThanOrEqual(2000);
+      expect(e.correctionNote).toContain(e.sourceRecordId);
+      expect(e.correctionNote).not.toContain(e.playerNameRaw); // the note names the source record, never the player
+    }
+    expect(built.some((e) => e.clubSlug === null)).toBe(true); // 'brisbane' stays a reviewed deliberate NULL, as in the importer
+  });
+
+  it('refuses changed evidence, and a head the closed vocabulary does not carry (D-336-1 is a contract edit, not a flag)', () => {
+    expect(() => I336.buildEntries(text.replace('"Pre-Draft"', '"Pre-draft"'), vocab, nulls)).toThrow(/reviewed bytes/);
+    const without = new Set([...vocab].filter((h) => h !== 'Intl Schol'));
+    expect(() => I336.buildEntries(text, without, nulls)).toThrow(/closed vocabulary/);
+  });
+
+  const e = built.find((x) => x.clubSlug !== null)!;
+  const live = (over: Partial<import('../tools/v2/issue336-predraft-insert-production').Live> = {}) => ({
+    sourceIds: [3], clubIds: new Map([[e.clubSlug!, [7]]]), picks: new Map(), persons: new Map(), ...over,
+  });
+  const person = { id: 40, dg_person_id: 900, player_id: null, link_status: 'unmatched', match_method: null };
+
+  it('inserts a clean row, reuses a stored person URL with its link, and recognises an identical stored row as already present', () => {
+    expect(I336.entryProblem(e, live())).toEqual({ clubId: 7, personId: null, playerId: null, linkStatus: 'unmatched', action: 'to insert' });
+    const linked = { ...person, player_id: 8331, link_status: 'unique' };
+    expect(I336.entryProblem(e, live({ persons: new Map([[e.playerUrl, [linked]]]) }))).toMatchObject({ personId: 40, playerId: 8331, linkStatus: 'unique', action: 'to insert' });
+    const stored = { id: 9, source_record_id: e.sourceRecordId, draft_type: 'Pre-Draft', signing: e.signing, club_name_raw: null };
+    expect(I336.entryProblem(e, live({ persons: new Map([[e.playerUrl, [person]]]), picks: new Map([[e.key, [stored]]]) }))).toMatchObject({ action: 'already present' });
+  });
+
+  it('refuses an ambiguous source, club or person, and any different row already holding the reload key', () => {
+    expect(I336.entryProblem(e, live({ sourceIds: [3, 4] }))).toMatch(/exactly one/);
+    expect(I336.entryProblem(e, live({ clubIds: new Map([[e.clubSlug!, [7, 8]]]) }))).toMatch(/2 clubs/);
+    expect(I336.entryProblem(e, live({ clubIds: new Map() }))).toMatch(/0 clubs/);
+    expect(I336.entryProblem(e, live({ persons: new Map([[e.playerUrl, [person, { ...person, id: 41 }]]]) }))).toMatch(/stored 2 times/);
+    const other = { id: 9, source_record_id: 'elsewhere#1', draft_type: 'Pre-Draft', signing: e.signing, club_name_raw: null };
+    expect(I336.entryProblem(e, live({ persons: new Map([[e.playerUrl, [person]]]), picks: new Map([[e.key, [other]]]) }))).toMatch(/different content/);
+  });
+
+  it('accepts only an approval bound to the plan, target, revision, evidence and actor', () => {
+    const target = { host: 'h', port: 5432, database: 'afldb_prod', user: 'afldb_ro', systemIdentifier: '1', databaseOid: '2', clusterName: '16/main', databaseComment: null };
+    const body = { operation: I336.OPERATION, revision: 'a'.repeat(40), target, rehearsal: false, actorUserId: 1, evidenceSha256: I336.EVIDENCE_SHA256, baselineDigest: 'b'.repeat(64),
+      importBatchesBefore: 70, createdAt: '2026-11-06T10:00:00.000Z', expiresAt: '2026-11-07T10:00:00.000Z', entries: [],
+      backup: { target, sha256: 's', restoreEvidenceSha256: 'r', capturedAt: '2026-11-06T09:30:00.000Z', restoredAt: '2026-11-06T09:45:00.000Z', baselineDigest: 'b'.repeat(64), importBatchesBefore: 70 } };
+    const plan = { ...body, digest: I336.planDigest(body) };
+    const approval = { planDigest: plan.digest, target, revision: plan.revision, operation: plan.operation, evidenceSha256: plan.evidenceSha256, actorUserId: 1,
+      approvedAt: '2026-11-06T10:05:00.000Z', expiresAt: '2026-11-07T09:00:00.000Z', reference: 'owner approval D-336-2' };
+    const ctx = { now: Date.parse('2026-11-06T10:10:00Z'), revision: plan.revision };
+    expect(I336.approvalProblem(plan, approval, ctx)).toBeNull();
+    for (const bad of [{ planDigest: 'x' }, { actorUserId: 2 }, { revision: 'b'.repeat(40) }, { evidenceSha256: 'z' }, { operation: 'y' }, { target: { ...target, databaseOid: '3' } },
+      { expiresAt: '2026-11-07T11:00:00.000Z' }, { reference: ' ' }]) expect(I336.approvalProblem(plan, { ...approval, ...bad }, ctx)).not.toBeNull();
+    expect(I336.approvalProblem(plan, null, ctx)).not.toBeNull();
+    expect(I336.approvalProblem({ ...plan, actorUserId: 2 }, approval, ctx)).not.toBeNull();
+    expect(I336.approvalProblem({ ...plan, rehearsal: true, digest: I336.planDigest({ ...body, rehearsal: true }) }, null, ctx)).toBeNull(); // rehearsal: no approval
+  });
+
+  it('writes through the audited seal path, never an override, and refuses an isolated target outside --rehearsal', () => {
+    const tool = read('tools/v2/issue336-predraft-insert-production.ts');
+    expect(tool).toContain("recordDataEdit(tx, { tableName: 'draft_picks'");
+    expect(tool).toContain("seal: { kind: 'row' }");
+    expect(tool).toContain('assert_viable_super_admin_actor');
+    expect(tool).not.toMatch(/INSERT INTO data_overrides/);
+    expect(tool).toContain("an isolated clone is rehearsed with --rehearsal");
   });
 });

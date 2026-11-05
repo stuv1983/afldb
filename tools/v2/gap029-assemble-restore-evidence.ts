@@ -31,16 +31,18 @@ import postgres from 'postgres';
 import { ASSEMBLY_FORMAT, ISOLATED_CLUSTER, ISOLATED_COMMENT, ISOLATED_DB, freshAt, sealAssembly, sameJson, sha256, type TargetId } from './gap029-common';
 import { toolHashes as s1ToolHashes, OPERATION as S1_OP } from './gap029-captaincy-additions-production';
 import { toolHashes as s3ToolHashes, OPERATION as S3_OP } from './gap029-rookie-selections-production';
+import { toolHashes as i336ToolHashes, OPERATION as I336_OP } from './issue336-predraft-insert-production';
 
 export const RESTORE_EVIDENCE_FORMAT = 'afldb.gap029.restore-evidence.1';
 export const V3_PARENT_REL = 'data/reference/draftguru-person-bridge-20260918-v3.json';
 export const V3_PARENT_SHA = '1f7413a2ad96e7d026cc521acfdeba3de9cab7066794de99002c9b5928e6e21b';
 export const DEFAULT_LABEL = 'annual-html-20260826';
-// I333 (AFLDB-ISSUE-333, owner decision O1) and O2 (owner decision O2) reuse this machinery for their own narrowly scoped writers; S1-S4 are unchanged.
-export const STAGES = ['S1', 'S2', 'S3', 'S4', 'I333', 'O2'] as const;
+// I333 (AFLDB-ISSUE-333, owner decision O1), O2 (owner decision O2) and I336 (AFLDB-ISSUE-336, D-336-2) reuse this machinery for their own narrowly
+// scoped writers; S1-S4 are unchanged.
+export const STAGES = ['S1', 'S2', 'S3', 'S4', 'I333', 'O2', 'I336'] as const;
 export type Stage = (typeof STAGES)[number];
 export const OPERATION_OF: Record<Stage, string> = {
-  S1: S1_OP, S2: 'gap029-draft-link-production', S3: S3_OP, S4: 'gap029-sibling-pair', I333: 'issue333-coach-assignments', O2: 'o2-converged-findings',
+  S1: S1_OP, S2: 'gap029-draft-link-production', S3: S3_OP, S4: 'gap029-sibling-pair', I333: 'issue333-coach-assignments', O2: 'o2-converged-findings', I336: I336_OP,
 };
 const HEX64 = /^[0-9a-f]{64}$/;
 
@@ -74,7 +76,7 @@ export function stageFieldsFrom(stage: Stage, out: any): Record<string, unknown>
   const hex = (v: unknown, what: string): string => (typeof v === 'string' && HEX64.test(v) ? v : fail(`${what} is not a sha256`));
   const count = (v: unknown, what: string): number => (Number.isInteger(v) && (v as number) >= 0 ? (v as number) : fail(`${what} is not a count`));
   if (stage === 'S1') return { baselineDigest: hex(out?.baselineDigest, 'baselineDigest') };
-  if (stage === 'S3') return { baselineDigest: hex(out?.baselineDigest, 'baselineDigest'), importBatchesBefore: count(out?.importBatchesBefore, 'importBatchesBefore') };
+  if (stage === 'S3' || stage === 'I336') return { baselineDigest: hex(out?.baselineDigest, 'baselineDigest'), importBatchesBefore: count(out?.importBatchesBefore, 'importBatchesBefore') };
   if (stage === 'S2') {
     const x = out?.expect ?? {};
     const expect = { after_state_sha256: hex(x.after_state_sha256, 'after_state_sha256'), baseline_sha256: hex(x.baseline_sha256, 'baseline_sha256'),
@@ -176,7 +178,7 @@ async function run(): Promise<void> {
 
     // ---- assemble ----
     const stage = opt('--stage') as Stage;
-    if (!STAGES.includes(stage)) fail('--stage must be S1, S2, S3, S4, I333 or O2');
+    if (!STAGES.includes(stage)) fail('--stage must be S1, S2, S3, S4, I333, O2 or I336');
     const evBytes = readFileSync(outside(opt('--restore-evidence')));
     const ev = JSON.parse(evBytes.toString('utf8')) as RestoreEvidence;
     const problem = restoreEvidenceProblem(ev, { dumpSha256, restoreTarget, productionTarget, now });
@@ -198,6 +200,9 @@ async function run(): Promise<void> {
     } else if (stage === 'S3') {
       outFile = join(work, 's3-baseline.json'); derivedMode = 'baseline --rehearsal'; toolSha256 = s3ToolHashes();
       runTs('tools/v2/gap029-rookie-selections-production.ts', ['baseline', '--target', restoreTargetFile, '--rehearsal', '--out', outFile], true);
+    } else if (stage === 'I336') {
+      outFile = join(work, 'i336-baseline.json'); derivedMode = 'baseline --rehearsal'; toolSha256 = i336ToolHashes();
+      runTs('tools/v2/issue336-predraft-insert-production.ts', ['baseline', '--target', restoreTargetFile, '--rehearsal', '--out', outFile], true);
     } else if (stage === 'S2') {
       const label = opt('--label', true) || DEFAULT_LABEL;
       if ((await fileSha256(resolve(root, V3_PARENT_REL))) !== V3_PARENT_SHA) fail('the v3 parent bridge differs from its pinned sha256');

@@ -687,6 +687,8 @@ describe('the season-bearing writer inventory (V2-GAP-006, application level onl
     'src/db/queries/brownlow-legacy-ownership-adoption.ts': 'governed',
     'src/db/queries/brownlow-round-vote-match-backfill.ts': 'governed',
     'tools/v2/gap029-captaincy-additions-production.ts': 'governed',
+    // AFLDB-ISSUE-336 (D-336-1, D-336-2): digest-bound plan and approval, fresh assembled backup (stage I336), and every insert audited through recordDataEdit under the seal.
+    'tools/v2/issue336-predraft-insert-production.ts': 'governed',
     'src/db/queries/awards-admin.ts': 'retained',
     'src/lib/ingest/datasets.ts': 'retained',
     'tools/db/afl-api-identity-correction-rehearsal.ts': 'offline',
@@ -704,8 +706,6 @@ describe('the season-bearing writer inventory (V2-GAP-006, application level onl
     'tools/v2/gap029-labels-isolated-e2e.mts': 'offline',
     'tools/v2/gap029-rookie-selections-rehearsal.mts': 'offline',
     'tools/v2/gap006-review-visual.mts': 'offline',
-    // AFLDB-ISSUE-336 Pre-Draft insert rehearsal: refuses any target but an isolated afldb_v2_*_test database. A production variant must be reclassified 'governed'.
-    'tools/v2/issue336-predraft-insert.ts': 'offline',
     'tools/v2/rollback-populate.ts': 'offline',
   };
   const TABLES = [

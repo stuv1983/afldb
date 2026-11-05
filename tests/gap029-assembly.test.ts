@@ -60,6 +60,11 @@ describe('stage values are read from the tool output, validated, and nothing els
     expect(() => stageFieldsFrom('S3', { baselineDigest: 'abc', importBatchesBefore: 69 })).toThrow(/not a sha256/);
     expect(() => stageFieldsFrom('S3', { baselineDigest: h('5') })).toThrow(/not a count/);
   });
+  it('I336 (AFLDB-ISSUE-336) binds the baseline digest and the import_batches count, as S3 does', () => {
+    expect(stageFieldsFrom('I336', { baselineDigest: h('8'), importBatchesBefore: 70 })).toEqual({ baselineDigest: h('8'), importBatchesBefore: 70 });
+    expect(() => stageFieldsFrom('I336', { baselineDigest: h('8') })).toThrow(/not a count/);
+    expect(() => stageFieldsFrom('I336', { importBatchesBefore: 70 })).toThrow(/not a sha256/);
+  });
   it('S2 needs exactly the four expectation hashes and records the baseline from them', () => {
     const out = { expect: S2_FIELDS.draftLinkRestorePlanExpect, batchesBefore: 66 };
     expect(stageFieldsFrom('S2', out)).toEqual(S2_FIELDS);
