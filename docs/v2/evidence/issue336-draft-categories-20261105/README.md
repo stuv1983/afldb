@@ -37,7 +37,7 @@ Coast; Willem Duursma = 2025 National #1 West Coast; Nick Daicos = 2021 National
 
 `predraft-insert-plan.json` (sha256 `6a207cfe…11cb`): the 35 rows with DraftGuru person URLs taken from the live
 year pages (fetched 2026-11-05, page sha256s in the plan), parsed by the repository's own fail-closed parser; the 11
-pages' row totals equal the CSV totals. Writer `tools/v2/issue336-predraft-insert.ts` (isolated `_test` targets
+pages' row totals equal the CSV totals. Writer `tools/v2/issue336-predraft-insert.ts` at `e747d96b` (since replaced, see §6; isolated `_test` targets
 only). Rehearsal on `afldb_v2_i336app_test` (`q-q5_db.log`): refused without decision D-336-1; dry run rolled back;
 apply committed **35 picks, 31 new unmatched persons, 4 existing persons reused by URL** (2 already linked: player
 8331, 5867); every pre-existing `draft_picks`/`draft_persons` row and every draft override byte-identical; re-run
@@ -62,3 +62,14 @@ writer inventory, which must classify every file writing `draft_picks`; the rehe
 files: the one error (a variable reassigned during render, `react-hooks/immutability`) is fixed; two pre-existing
 unused-variable warnings remain in untouched lines. Rebuilt (`npm run build` PASS); the served page carries the new
 BUILD_ID; browser re-check **68/68**. `src/`, `tests/` and `tools/` trees on the Linux candidate equal the branch.
+
+## 6. Owner decisions of 2026-11-06 and the production tool
+
+D-336-1 accepted: `Intl Schol` is in `draftguru-event-kinds.json` (as `post_stage_a_additions`) and `GRID_SIGNING_KINDS`; the set-equality and Stage A
+head tests now account for it explicitly. D-336-2 "prepare": the isolated-only writer of §4 was replaced by
+`tools/v2/issue336-predraft-insert-production.ts`, run through the V2-GAP-029 operations framework as stage I336 (stage table, approval statement, the
+three host-script guards, restore-evidence assembly). `prod-tool-rehearsal/` holds its rehearsal at `09acd432` on a fresh clone of the 2026-11-04
+production dump: production mode on a clone refused; non-viable actor refused before mutation; `COMMITTED_VERIFIED` with 35 picks, 31 new persons, 35
+audit rows by actor 1 and seal basis `audited_correction` × 35; verify 35/35 with every pre-existing draft row unchanged; replay refused on baseline
+drift; `reconcile-after.txt` 5,966 = 5,966. The assembler's I336 derivation (`baseline-rehearsal.json`) was run; a production capture and a sealed
+assembly were not (no dump younger than 24 hours exists). Runbook: `issues/open/AFLDB-ISSUE-336.md`.

@@ -1,0 +1,273 @@
+{
+  "outcome": "COMMITTED_VERIFIED",
+  "exitCode": 0,
+  "statement": "COMMITTED AND VERIFIED: the transaction committed and an independent read-only check of the committed state passed.",
+  "problems": [],
+  "detail": null,
+  "at": "2026-11-05T13:50:07.095Z",
+  "written": 35,
+  "newPersons": 31,
+  "created": [
+    {
+      "key": "[\"https://www.draftguru.com.au/players/solomoni_loki/1\",2008,\"pre_draft\"]",
+      "pickId": 6819,
+      "personId": 5058,
+      "auditId": "169",
+      "seal": "audited_correction"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/amua_pirika/1\",2008,\"pre_draft\"]",
+      "pickId": 6820,
+      "personId": 5059,
+      "auditId": "170",
+      "seal": "audited_correction"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/inoke_ratu/1\",2008,\"pre_draft\"]",
+      "pickId": 6821,
+      "personId": 5060,
+      "auditId": "171",
+      "seal": "audited_correction"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/stanis_susuve/1\",2008,\"pre_draft\"]",
+      "pickId": 6822,
+      "personId": 5061,
+      "auditId": "172",
+      "seal": "audited_correction"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/donald_barry/1\",2009,\"pre_draft\"]",
+      "pickId": 6823,
+      "personId": 5062,
+      "auditId": "173",
+      "seal": "audited_correction"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/brendan_beno/1\",2009,\"pre_draft\"]",
+      "pickId": 6824,
+      "personId": 5063,
+      "auditId": "174",
+      "seal": "audited_correction"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/kurt_heatherley/1\",2009,\"pre_draft\"]",
+      "pickId": 6825,
+      "personId": 2753,
+      "auditId": "175",
+      "seal": "audited_correction"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/ezra_kautu/1\",2009,\"pre_draft\"]",
+      "pickId": 6826,
+      "personId": 5064,
+      "auditId": "176",
+      "seal": "audited_correction"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/peter_labi/1\",2009,\"pre_draft\"]",
+      "pickId": 6827,
+      "personId": 5065,
+      "auditId": "177",
+      "seal": "audited_correction"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/max_lavai/1\",2009,\"pre_draft\"]",
+      "pickId": 6828,
+      "personId": 5066,
+      "auditId": "178",
+      "seal": "audited_correction"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/nathan_malbak/1\",2009,\"pre_draft\"]",
+      "pickId": 6829,
+      "personId": 5067,
+      "auditId": "179",
+      "seal": "audited_correction"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/david_meli/1\",2009,\"pre_draft\"]",
+      "pickId": 6830,
+      "personId": 5068,
+      "auditId": "180",
+      "seal": "audited_correction"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/victor_rame/1\",2009,\"pre_draft\"]",
+      "pickId": 6831,
+      "personId": 5069,
+      "auditId": "181",
+      "seal": "audited_correction"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/gideon_simon/1\",2009,\"pre_draft\"]",
+      "pickId": 6832,
+      "personId": 1717,
+      "auditId": "182",
+      "seal": "audited_correction"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/bayanda_sobetwa/1\",2009,\"pre_draft\"]",
+      "pickId": 6833,
+      "personId": 5070,
+      "auditId": "183",
+      "seal": "audited_correction"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/rhys_panui-leth/1\",2010,\"pre_draft\"]",
+      "pickId": 6834,
+      "personId": 5071,
+      "auditId": "184",
+      "seal": "audited_correction"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/shem_tatupu/1\",2010,\"pre_draft\"]",
+      "pickId": 6835,
+      "personId": 4410,
+      "auditId": "185",
+      "seal": "audited_correction"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/charlton_brown/1\",2011,\"pre_draft\"]",
+      "pickId": 6836,
+      "personId": 5072,
+      "auditId": "186",
+      "seal": "audited_correction"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/theo_gavuri/1\",2011,\"pre_draft\"]",
+      "pickId": 6837,
+      "personId": 5073,
+      "auditId": "187",
+      "seal": "audited_correction"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/yoshi_harris/1\",2011,\"pre_draft\"]",
+      "pickId": 6838,
+      "personId": 5074,
+      "auditId": "188",
+      "seal": "audited_correction"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/peni_mahina/1\",2011,\"pre_draft\"]",
+      "pickId": 6839,
+      "personId": 5075,
+      "auditId": "189",
+      "seal": "audited_correction"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/ben_miller/4\",2011,\"pre_draft\"]",
+      "pickId": 6840,
+      "personId": 5076,
+      "auditId": "190",
+      "seal": "audited_correction"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/joe_baker-thomas/1\",2012,\"pre_draft\"]",
+      "pickId": 6841,
+      "personId": 5077,
+      "auditId": "191",
+      "seal": "audited_correction"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/aksel_bang/1\",2012,\"pre_draft\"]",
+      "pickId": 6842,
+      "personId": 5078,
+      "auditId": "192",
+      "seal": "audited_correction"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/siope_ngata/1\",2012,\"pre_draft\"]",
+      "pickId": 6843,
+      "personId": 5079,
+      "auditId": "193",
+      "seal": "audited_correction"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/maia_westrupp/1\",2012,\"pre_draft\"]",
+      "pickId": 6844,
+      "personId": 5080,
+      "auditId": "194",
+      "seal": "audited_correction"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/giovanni_mountain-silbery/1\",2013,\"pre_draft\"]",
+      "pickId": 6845,
+      "personId": 5081,
+      "auditId": "195",
+      "seal": "audited_correction"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/barclay_miller/1\",2014,\"pre_draft\"]",
+      "pickId": 6846,
+      "personId": 5082,
+      "auditId": "196",
+      "seal": "audited_correction"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/shaoliang_chen/1\",2015,\"pre_draft\"]",
+      "pickId": 6847,
+      "personId": 5083,
+      "auditId": "197",
+      "seal": "audited_correction"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/brandon_kaufman/1\",2015,\"pre_draft\"]",
+      "pickId": 6848,
+      "personId": 5084,
+      "auditId": "198",
+      "seal": "audited_correction"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/hewago%20paul_oea/1\",2017,\"pre_draft\"]",
+      "pickId": 6849,
+      "personId": 1875,
+      "auditId": "199",
+      "seal": "audited_correction"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/bassirou_faye/1\",2021,\"pre_draft\"]",
+      "pickId": 6850,
+      "personId": 5085,
+      "auditId": "200",
+      "seal": "audited_correction"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/cillian_bourke/1\",2025,\"pre_draft\"]",
+      "pickId": 6851,
+      "personId": 5086,
+      "auditId": "201",
+      "seal": "audited_correction"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/kobe_mcdonald/1\",2025,\"pre_draft\"]",
+      "pickId": 6852,
+      "personId": 5087,
+      "auditId": "202",
+      "seal": "audited_correction"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/jake_miles-wrency/1\",2025,\"pre_draft\"]",
+      "pickId": 6853,
+      "personId": 5088,
+      "auditId": "203",
+      "seal": "audited_correction"
+    }
+  ],
+  "auditSequenceBefore": 168,
+  "auditSequenceAfter": 203,
+  "draftPicksAfter": 6853,
+  "info": {
+    "maxPickId": 6818,
+    "maxPersonId": 5057,
+    "maxOverrideId": 165,
+    "picksBefore": 6818,
+    "personsBefore": 5057,
+    "overridesBefore": 8,
+    "priorDigest": "ee442cb57d52e8491f97c7ac3a9fd596472deddbd5735537605898cd635dbe2f",
+    "planned": 35,
+    "newPersons": 31,
+    "auditBefore": 0
+  },
+  "planDigest": "885aed6ff46d4b388f0e1db85a84ab131744469deb01a792f11890d6d3e320e1"
+}

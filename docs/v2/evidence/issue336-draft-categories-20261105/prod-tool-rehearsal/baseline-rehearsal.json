@@ -1,0 +1,19 @@
+{
+  "target": {
+    "host": "127.0.0.1",
+    "port": 55498,
+    "database": "afldb_v2_i336rehe_test",
+    "user": "afldb_owner",
+    "systemIdentifier": "7704631262453729945",
+    "databaseOid": "20429",
+    "clusterName": "afldb_v2_isolated",
+    "databaseComment": "afldb-v2-isolated-test"
+  },
+  "revision": "09acd432ae1a69597d293966032f54479a665a00",
+  "baselineDigest": "d5b00c181b9a3cf099a0275a33abc7d832240aaf957ef33ec7e2fd089c72814f",
+  "importBatchesBefore": 75,
+  "draftPicks": 6853,
+  "draftPersons": 5088,
+  "draftOverrides": 8,
+  "capturedAt": "2026-11-05T13:50:34.790Z"
+}

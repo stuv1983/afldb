@@ -10,7 +10,7 @@
 # restore-derived value: the assembler reads them from the guarded restored database (tools/v2/gap029-assemble-restore-evidence.ts).
 #
 # Usage (as the host user): W=<workspace: cand/ (pinned checkout + node_modules), pg-root/, venv/ (python with psycopg)> R=<40-hex execution revision>
-#   STAGE=S1|S2|S3|S4 CAPDIR=<copied capture directory> PROD_TARGET=<production target json> TAG=<label [a-z0-9_]+> [PROFILE=<profile>] [PORT=55493] bash restore-assemble-host.sh
+#   STAGE=S1|S2|S3|S4|I336 CAPDIR=<copied capture directory> PROD_TARGET=<production target json> TAG=<label [a-z0-9_]+> [PROFILE=<profile>] [PORT=55493] bash restore-assemble-host.sh
 # Outputs under $W/evidence-private/$TAG: restore-evidence.json, backup.json (the --backup input of that stage's production plan), work/ (the stage tool's own
 # rehearsal output; S2: work/child.json), restore-target.json and logs. Exit 0 only when the sealed backup.json exists.
 set -u -o pipefail

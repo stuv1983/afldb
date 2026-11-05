@@ -13,7 +13,7 @@
 #   bash prod-stage.sh apply     R S RUN                      gates, approval, ONE detached apply, post-run state probe, outcome report
 #   bash prod-stage.sh report    R S RUN                      print (or, for an unrecorded apply, derive) the outcome
 #   bash prod-stage.sh state     R S RUN                      read-only classification of the live database against the plan
-#   bash prod-stage.sh accept    R S RUN                      read-only acceptance: outcome + state (+ S3 verify) -> accepted/S.json
+#   bash prod-stage.sh accept    R S RUN                      read-only acceptance: outcome + state (+ S3/I336 verify) -> accepted/S.json
 #
 # There is NO retry, NO rollback claim after a commit and NO restore in this script. Connection strings are read from <checkout>/.env into environment
 # variables of the child process only; they are never in argv and never printed. GAP029_PROFILE overrides the production profile (a simulation passes its own).

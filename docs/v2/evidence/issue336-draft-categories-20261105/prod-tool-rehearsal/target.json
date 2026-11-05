@@ -1,0 +1,10 @@
+{
+  "host": "127.0.0.1",
+  "port": 55498,
+  "database": "afldb_v2_i336rehe_test",
+  "user": "afldb_owner",
+  "systemIdentifier": "7704631262453729945",
+  "databaseOid": "20429",
+  "clusterName": "afldb_v2_isolated",
+  "databaseComment": "afldb-v2-isolated-test"
+}

@@ -13,7 +13,7 @@
 # PG* variables only (never argv, never printed). The only host write is ONE new mode-700 directory holding the archive, its TOC, the sidecar, two ledger
 # listings, pg_dump stderr and SHA256SUMS, created only after every pre-check passes, so a stop before P5 leaves the host unchanged. No retention script,
 # no pruning, no migration, no privilege, service, timer, Brownlow or application action.
-#   Usage: bash capture-prod-stage.sh S1|S2|S3|S4        (GAP029_PROFILE=<file> overrides the production profile; a simulation passes its own)
+#   Usage: bash capture-prod-stage.sh S1|S2|S3|S4|I336      (GAP029_PROFILE=<file> overrides the production profile; a simulation passes its own)
 set -u -o pipefail
 export LC_ALL=C
 umask 077
