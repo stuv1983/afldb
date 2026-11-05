@@ -1,0 +1,12 @@
+[monitor] success marker: AFLDB_SETTLE_SUCCESS
+[monitor] failure marker: AFLDB_SETTLE_FAILURE (also inspect REFUSED|ERROR|FAILED|Traceback)
+Season feed CD_S2026014: 218 match(es), complete; statuses observed: CONCLUDED 218.
+Source completeness: COMPLETE
+Applied as import batch 145: 0 canonical row(s) inserted, 0 updated, 0 ledger row(s), 0 attendance enrichment(s), 64 refused at the write, 0 unit(s) rolled back.
+  Latest completed batch 145 (2026-11-06 05:10:03.819533+11): 10464 records read, 0 rejection rows.
+AFLDB_SETTLE_SUCCESS label=afl-api-2026-2026-11-05-180838
+afldb-settle-afl-api.service: Deactivated successfully.
+Finished afldb-settle-afl-api.service - AFLDB — in-season AFL.com.au (afl_api) canonical settle (one run).
+NEXT                         LEFT LAST                              PASSED UNIT                       ACTIVATES
+Sat 2026-11-07 05:12:56 AEDT  22h Fri 2026-11-06 05:08:37 AEDT 2h 3min ago afldb-settle-afl-api.timer afldb-settle-afl-api.service
+

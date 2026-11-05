@@ -1,0 +1,18 @@
+generated restart+gate+readiness rc=0 elapsed_ms=12942
+[deploy] >>> enter project directory
+[deploy] >>> capture standalone build identity
+[deploy] built BUILD_ID: AEysMesRQ2T68a0vtmt72
+[deploy] >>> restart systemd service
+[deploy] restart method: respawn (SIGTERM to MainPID; systemd Restart=always)
+[deploy] systemd respawned the service: 4040039 -> 4040918
+[deploy] >>> show systemd service status
+[deploy] >>> verify development worker and pool controls
+AFLDB_POOL_MAX=10
+AFLDB_WORKERS=4
+[deploy] >>> wait for healthy service readiness
+[deploy] readiness pending (0s/120s): curl exit 7: curl: (7) Failed to connect to 127.0.0.1 port 33364 after 0 ms: Couldn't connect to server 
+[deploy] health ready after 3s and 2 probe(s): {"status":"ok","database":"ok","latencyMs":30}
+[deploy] live BUILD_ID: AEysMesRQ2T68a0vtmt72
+poll samples=64 non200=32 outage_windows=2 longest_outage_ms=5554
+unit NRestarts=1
+probe unit stopped: inactive

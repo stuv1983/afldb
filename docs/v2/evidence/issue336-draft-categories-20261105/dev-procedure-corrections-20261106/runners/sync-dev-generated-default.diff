@@ -1,0 +1,4 @@
+346c346
+<   test "$AFLDB_RESTART_POLICY" = always || { echo "[deploy] cannot restart: no passwordless sudo and Restart=$AFLDB_RESTART_POLICY" >&2; exit 23; }
+---
+>   test "$AFLDB_RESTART_POLICY" = always || { echo "[deploy] cannot respawn: the unit has Restart=$AFLDB_RESTART_POLICY, not always" >&2; exit 23; }

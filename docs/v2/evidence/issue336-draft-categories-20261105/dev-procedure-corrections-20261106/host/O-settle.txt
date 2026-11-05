@@ -1,0 +1,19 @@
+-- 242fa276 settle --validate-only
+Season feed CD_S2026014: 218 match(es), complete; statuses observed: CONCLUDED 218.
+
+--validate-only: manifest, registry and bundle contract verified. No connection opened.
+-- 242fa276 settle --apply --auto-apply --require-complete-source
+old settle rc=0
+Season feed CD_S2026014: 218 match(es), complete; statuses observed: CONCLUDED 218.
+Season feed (AFLDB-ISSUE-231 — informational, never a failure)
+Source completeness: COMPLETE
+  Source complete: all 10246 acquired record(s) were represented, none were dropped, and every scope was proven sweepable.
+Applied as import batch 146: 0 canonical row(s) inserted, 0 updated, 0 ledger row(s), 0 attendance enrichment(s), 64 refused at the write, 0 unit(s) rolled back.
+  Latest completed batch 146 (2026-11-05 20:10:12.853789+00): 10464 records read, 0 rejection rows.
+importBatches {"n":78,"max_id":145} -> {"n":79,"max_id":146}
+matchesBySeason [{"season":2025,"n":216},{"season":2026,"n":218}] -> [{"season":2025,"n":216},{"season":2026,"n":218}]
+fixtures {"n":3,"season2027":3} -> {"n":3,"season2027":3}
+playerMatchStats {"n":"695499"} -> {"n":"695499"}
+dataIssuesOpen {"n":68} -> {"n":68}
+stagingAflApiMatch {"n":0} -> {"n":0}
+lastBatch {"id":146,"tool":"settle-afl-api.ts","error":null,"status":"completed","source_id":6,"started_at":"2026-11-05T20:09:19.826928+00:00","completed_at":"2026-11-05T20:10:12.853789+00:00","records_read":10464,"target_table":"staging.source_record_versions","records_updated":0,"records_inserted":0,"records_rejected":0}

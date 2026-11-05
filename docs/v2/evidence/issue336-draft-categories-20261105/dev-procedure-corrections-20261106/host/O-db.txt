@@ -1,0 +1,4 @@
+pg_restore exit=0 seconds=7 stderrLines=0
+Applied 8 migration(s).
+privileges (pin tool) rc=0
+copied DEV label afl-api-2026-2026-11-05-180838 (53M)

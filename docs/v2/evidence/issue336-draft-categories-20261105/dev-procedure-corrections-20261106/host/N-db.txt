@@ -1,0 +1,3 @@
+pg_restore exit=0 seconds=9 stderrLines=0
+Applied 8 migration(s).
+privileges rc=0

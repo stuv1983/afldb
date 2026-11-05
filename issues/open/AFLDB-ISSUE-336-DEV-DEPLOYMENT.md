@@ -1,63 +1,105 @@
-# AFLDB-ISSUE-336 — DEV deployment recommendation (consolidated, pinned)
+# AFLDB-ISSUE-336: DEV deployment recommendation (consolidated, pinned)
 
-Prepared 2026-11-06. **Nothing here has been run against DEV.** This is the single procedure for moving DEV (`streamanator`,
-`~/projects/afldb`, `afldb_dev`) from its DEV-only `242fa276` onto the published V2 line at an exact commit. It supersedes the earlier
-outline in `docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/README.md` §4. Evidence for every claim:
-`docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/README.md`. Ledger: `issues.md` → AFLDB-ISSUE-336, -337, -338.
+Prepared 2026-11-06; **revised 2026-11-06 (r2)**. **Nothing here has been run against DEV.**
+
+This is the single procedure for moving DEV (`streamanator`, `~/projects/afldb`, `afldb_dev`) from its DEV-only `242fa276` onto the
+published V2 line at an exact commit. It supersedes the earlier outline in
+`docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/README.md` §4.
+
+Evidence:
+* `docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/README.md` (preview, backup and rollback qualification);
+* `docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/README.md` (r2: restart, artifact, nightly).
+
+Ledger: `issues.md` → AFLDB-ISSUE-336, -337, -338.
+
+**r2 corrections.** The first version is in commit `e153d82f`. r2 changes four things:
+1. **Restart:** step 6 now uses the sudo-free `-RestartMethod respawn`, with measured downtime.
+2. **Nightly:** the claim that the 2027 fixture "has not appeared" is withdrawn. Fixture acquisition and concluded-match ingestion are
+   separated, and A3 states what the next firing will execute. The production Brownlow comparison is corrected: production's Brownlow
+   timer is disabled.
+3. **Recovery:** the current artifact is preserved before the build, and restored without rebuilding. The schema stays at 118, and
+   destructive database steps are separate owner decisions.
+4. **Acceptance:** immediate checks are split from overnight observation.
 
 Three things are kept distinct:
 
 | Track | State |
 |---|---|
 | ISSUE-336 implementation (draft categories) | On `origin/main` `ea9bddf8`. |
-| ISSUE-337 fix (NBSP name search) and pinned `sync-dev` | Local commit `8b024098`, **not pushed**. Verified in the isolated preview. |
+| ISSUE-337 fix (NBSP name search), pinned `sync-dev`, `-RestartMethod respawn` | Local commits `8b024098` (application pin) and `b82dfcea` (workstation deploy tooling), **not pushed**. Verified in isolation. |
 | DEV deployment | **Not done.** Needs the approvals in §0. Production release and the I336 production insert need their own, separate approvals (`AFLDB-ISSUE-336.md`). |
 
-## 0. Owner approvals required (each separate)
+## 0. Owner approvals required
 
 | # | Approval | Recommendation |
 |---|---|---|
-| A1 | **Publish:** fast-forward `origin/main` from `ea9bddf8` to the branch head `claude/issue-336-draft-categories`, which contains `8b024098` and later records-only commits. | Approve. The pinned deploy refuses a commit that is not on `origin/main` (exit 34). |
+| A1 | **Publish:** fast-forward `origin/main` from `ea9bddf8` to the head of `claude/issue-336-draft-categories`. The head contains `8b024098` (app pin), `b82dfcea` (tooling) and records-only commits. | Approve. The pinned deploy refuses a commit that is not on `origin/main` (exit 34). |
 | A2 | **Acknowledge the DEV-only behaviour that stops running** (§4): ISSUE-271 F4/F5 and ISSUE-272 lapsed with their retired paths under D-V2-SCOPE-20261027; ISSUE-326 is a test-only change with no recorded decision; ISSUE-327 is parked (amendment 5), and its 17-venue span widening **stays in DEV's data**. | Acknowledge as recorded. Nothing in this procedure restores DEV-only behaviour. |
-| A3 | **Timer disposition:** keep both settle timers enabled and unchanged (§5). | Keep. This mirrors production's accepted "do not pause the timer". |
-| A4 | **The DEV deployment itself**, steps 1–8 of §6, in a window outside 04:45–05:45 AEDT (17:45–18:45 UTC). | Approve after A1–A3. |
+| A3 | **Timers: enablement unchanged, executed code changes.** Both timers stay enabled, with no unit, `daemon-reload` or `.env` change. Their *next firings* nevertheless run the pin's scripts, because both execute from `~/projects/afldb`. See the box below. | Keep. This matches production's accepted 2027 nightly ("do not pause the timer"). |
+| A4 | **The DEV deployment**, steps 0–8 of §6, inside one bounded window (§6), including the code-only recovery R1 (§8) if a stop condition is hit. | Approve after A1–A3. |
 
-## 1. The pin
+> **A3: what changes at the next firing (from the moment step 4 switches the checkout).**
+>
+> * **`afldb-settle-afl-api.timer`** (daily 05:00 AEDT + up to 15 min). If the deployment completes on day D, the next firing is
+>   05:00–05:15 AEDT on D+1.
+>   * **Today** (`242fa276`), each night acquires the **2026** season and re-settles it: 10,464 records read, 0 inserted or updated,
+>     64 refused (`foreign_source_owner`). See DEV's journal for 2026-11-06 05:08.
+>   * **After the switch**, the same timer runs the pin's wrapper and `seasons.json` (in progress: [2027]):
+>     * it makes two requests to AFL.com.au: a token, then the 2027 season feed;
+>     * it writes one snapshot directory, `data/sources/afl_api/matches/afl-api-2027-<stamp>/` (3 files, about 270 KB);
+>     * it records one `import_batches` row with 0 records read and no canonical write;
+>     * until the first 2027 match concludes, every night repeats this;
+>     * **DEV's 2026 data is no longer re-settled**: the pin treats 2026 as sealed and refuses it before opening any client. A later
+>       provider correction to a 2026 match no longer reaches DEV automatically.
+> * **`afldb-settle-afl-api-brownlow.timer`** (every 5 minutes): keeps firing. At both revisions the wrapper exits before Node because
+>   `AFLDB_AFL_API_BROWNLOW_ENABLED` is absent. There is no provider or database contact.
+>   * Production's Brownlow timer is **disabled**. DEV's is enabled but inert: same effect, different state. Disabling DEV's needs
+>     sudo and is not proposed.
 
-* **Revision:** `8b024098a6771fc5e5be2f8bf006c9c3ca8ab55a` (tree `5242abe13560c1f7c12536aacfab8595278f0931`). This is the exact revision
-  built, served and tested in the preview. Records-only commits published after it in A1 do not change the pin.
-* **Mechanism:** `deploy/sync-dev.ps1 -ExpectedRevision <40-hex>` (new in `8b024098`). After `git checkout <RemoteRef>` it runs
-  `afldb_checkout_pinned_revision` instead of `git pull --ff-only`, and refuses **before** `npm ci`, migration or build when:
-  * the id is malformed (exit 30);
-  * HEAD is detached (31);
-  * the object is missing (32);
-  * the branch has no upstream (33);
-  * the pin is not on the upstream (34);
-  * the branch has diverged from the pin (35);
-  * the fast-forward fails (36);
-  * HEAD is not exactly the pin afterwards (37).
+## 1. The revisions
 
-  It never resets, cleans, forces or pulls. Coverage:
-  * 8 new cases in `tests/sync-dev-remote.test.sh`: 26/26 pass locally and on Linux.
-  * 20 static assertions in `tests/sync-dev-static.test.ps1`. The 20th was added after `8b024098` (test-only): the largest real
-    variant, step 6, has a payload of 20,760 base64 characters against the 24,000 limit.
-* **Why the pin is needed:** without it, `sync-dev` pulls to whatever `origin/main` is at deploy time.
+* **Application pin:** `8b024098a6771fc5e5be2f8bf006c9c3ca8ab55a` (tree `5242abe13560c1f7c12536aacfab8595278f0931`). This is the
+  exact revision built, served and tested in the preview, and the only revision DEV's checkout is moved to.
+* **Deploy tooling:** `b82dfcea015c40579f4efc60d68c57480d398487`. It adds `deploy/sync-dev.ps1 -RestartMethod respawn`.
+  * `sync-dev.ps1` runs **on the workstation** and generates the remote script, so steps 4 and 6 must run from a workstation checkout
+    at `b82dfcea` or later.
+  * An older `sync-dev.ps1` rejects the unknown `-RestartMethod` parameter before doing anything.
+  * `b82dfcea` changes no application file, so the pin is unchanged.
+* **Pinning mechanism:** `-ExpectedRevision <40-hex>` (from `8b024098`). After `git checkout <RemoteRef>` it runs
+  `afldb_checkout_pinned_revision` instead of `git pull --ff-only`. It refuses **before** `npm ci`, migration or build on:
+  * a malformed id (exit 30);
+  * a detached HEAD (31);
+  * a missing object (32);
+  * no upstream (33);
+  * a pin not on the upstream (34);
+  * a diverged branch (35);
+  * a failed fast-forward (36);
+  * HEAD not exactly the pin afterwards (37).
+
+  It never resets, cleans, forces or pulls.
+* **Coverage:**
+  * 8 cases in `tests/sync-dev-remote.test.sh` (26/26 locally and on Linux);
+  * 27 assertions in `tests/sync-dev-static.test.ps1`, including the respawn variant;
+  * the step-6 payload with respawn is 20,548 base64 characters against the 24,000 limit.
 
 ## 2. Verified in isolation (streamanator; DEV untouched, health identical before and after every part)
 
 | Check | Result |
 |---|---|
-| Typecheck, ESLint (pin) | rc 0; ESLint has one pre-existing warning (`draft.ts` `_total`). |
+| Typecheck, ESLint (pin) | rc 0; one pre-existing ESLint warning (`draft.ts` `_total`). |
 | ISSUE-337 unit tests | Fail against `ea9bddf8`'s `draft.ts`, pass with the fix. Parity with migration 099's 18 separators is asserted. |
 | ISSUE-337 integration (DEV-data copy) | 263 passed, against 262 before. The six data-dependent failures are unchanged. |
 | ISSUE-337 HTTP on the DEV-data preview | `q=Jake Long`: 0 rows at `ea9bddf8` → 2 at the pin. The NBSP form gives 2 on both. |
-| Browser, desktop 1280×900 and mobile 390×844 | **76/76 at the pin.** The same script against `ea9bddf8` scores 72/76: the four failures are exactly the ordinary-space and lower-case Jake Long checks. |
+| Browser, desktop 1280×900 and mobile 390×844 | **76/76 at the pin.** `ea9bddf8` scores 72/76; the four failures are exactly the ordinary-space and lower-case Jake Long checks. |
 | HTTP smoke, about 40 routes | First preview and pin are identical in status and error markers. |
 | Migrations 111–118 on a restore of DEV | Clean; ledger 110 → 118; `privileges.ts` rc 0; a re-run applies nothing. |
-| **Rollback:** `242fa276` (from the off-host-verified preservation bundle) on the 118 schema over DEV data | Old migrator: "110 file(s), 118 already applied … Nothing to apply" (rc 0). Old build rc 0; served on `:33363`. All 36 smoke routes give the same status as the pin, with 0 error markers. |
-| **Backup procedure, rehearsed as written** (`scripts/dev-backup-verify.sh`) | Read-only dump in 12 s. Restore exit 0 with 0 stderr lines. 18/18 table counts and the ledger equal the live read. 111–118 plus privileges clean on the copy. `BACKUP-VERIFIED`. |
-| Timers at the pin, offline against DEV's own labels | See §5. |
-| `draft-linkage` on production data with production's bridge child (v3) | 11/11 (§8). |
+| Rollback build: `242fa276` on the 118 schema over DEV data | Old migrator: "Nothing to apply". Old build served; all 36 smoke routes match the pin's statuses, with 0 error markers. |
+| Backup procedure rehearsed as written | `BACKUP-VERIFIED` (dump 12 s; restore exit 0; 18/18 counts and ledger equal; 111–118 plus privileges clean on the copy). |
+| **r2 R: generated `-RestartMethod respawn` restart, gate and readiness, executed** | rc 0. New MainPID; gate saw `AFLDB_WORKERS=4`, `AFLDB_POOL_MAX=10`; live BUILD_ID equals the built one; 4 workers before and after. **About 10.3 s from SIGTERM to steady service, about 7 s of it refusing.** |
+| **r2 P: DEV's current artifact preserved and served without npm ci or build** | Read-only `tar` in 9 s: 907 MB, 0 `.env` entries, BUILD_ID `8sFpWkolwF1yKuKbFkOir`. Served by `242fa276`'s `server-cluster.mjs` alone (no root `node_modules`): 4 workers, that BUILD_ID; 36 routes with 0 differences from the `242fa276` build. |
+| **r2 N: the pin's nightly on the authentic 2027 feed, two nights, over today's DEV backup** | rc 0 each night; one `completed` batch per night with 0 read, inserted, updated or rejected; `matches`, `player_match_stats`, `fixtures`, `data_issues`, staging unchanged. |
+| **r2 O: `242fa276`'s nightly on the 118 schema, with DEV's own 2026 label** | rc 0, 10,464 read, 0 written, 64 refused: identical to DEV's real 2026-11-06 run. |
+| `draft-linkage` on production data with production's bridge child (v3) | 11/11 (§9). |
 
 ## 3. Configuration compatibility (DEV `.env`, names only)
 
@@ -65,96 +107,121 @@ Three things are kept distinct:
   `AFLDB_EMAIL_INTAKE_SECRET`, `AFLDB_ENV`, `AFLDB_IMPORT_DATABASE_URL`, `AFLDB_LEGACY_SQLITE`, `AFLDB_MAX_FILTERS`,
   `AFLDB_MAX_PAGE_SIZE`, `AFLDB_OWNER_DATABASE_URL`, `AFLDB_POOL_MAX`=10, `AFLDB_SESSION_SECRET`, `AFLDB_STATEMENT_TIMEOUT_MS`,
   `AFLDB_TEST_DATABASE_URL`, `AFLDB_TRACE_REQUESTS`=on, `AFLDB_WORKERS`=4, `DATABASE_URL`, `PORT`=3100.
-* **The pin requires nothing new.**
-  * `AFLDB_BETA_EPOCH` absent → 1.
-  * `AFLDB_EXTERNAL_API_USER_AGENT` absent → the built-in default.
-  * `AFLDB_REVALIDATE_*` are optional.
-  * `AFLDB_AFL_API_BROWNLOW_ENABLED` stays absent (§5).
-* **`-Issue107Gate` preconditions are met as they stand:** `AFLDB_TRACE_REQUESTS=on`, `AFLDB_WORKERS=4`, `AFLDB_POOL_MAX=10`.
+* **The pin requires nothing new:**
+  * `AFLDB_BETA_EPOCH` absent → 1;
+  * `AFLDB_EXTERNAL_API_USER_AGENT` absent → the built-in default;
+  * `AFLDB_REVALIDATE_*` optional;
+  * `AFLDB_AFL_API_BROWNLOW_ENABLED` stays absent (A3);
+  * `AFLDB_SETTLE_TRIGGER` (on production) only enables the admin on-demand refresh, and the timers do not need it.
+* **`-Issue107Gate` preconditions already hold:** `AFLDB_TRACE_REQUESTS=on`, `AFLDB_WORKERS=4`, `AFLDB_POOL_MAX=10`.
 * **Units:** `afldb.service`, both settle services and timers, and `deploy/afldb-settle-afl-api*.sh` are byte-identical between DEV's
-  base `ff100dc2` and the pin. The installed units match `deploy/` and `afldb.service` has no drop-ins.
+  base `ff100dc2` and the pin. The installed units match `deploy/`, and `afldb.service` has no drop-ins.
   * So: **no unit copy, no `daemon-reload`, no sudo.**
+  * The unit has `Restart=always`, `RestartSec=5`, `KillMode=mixed`.
   * `deploy/release-route.conf` is production-only and must not be installed on DEV.
-* **Working tree:** DEV has 10 untracked files: one `.env.bak-issue272-u1b-20261010-191158` and nine settle manifests.
-  * All 10 are on `sync-dev`'s known-operational allowlist (`sync-dev-remote.sh`), so the classifier proceeds.
-  * None is tracked at the pin, so `git checkout` cannot collide.
-  * **Leave all 10 in place.** The earlier README's claim that the `.env.bak` file blocks the classifier was wrong and is corrected there.
+* **Working tree:** 10 untracked files: one `.env.bak-issue272-u1b-20261010-191158` and nine settle manifests.
+  * All 10 are on `sync-dev`'s known-operational allowlist, and none is tracked at the pin.
+  * **Leave all 10 in place.**
+  * Nightly snapshot directories live under the ignored `data/`.
 
 ## 4. DEV-only behaviour that stops (from the legacy archive, `ff100dc2..242fa276`)
 
 | Item | What DEV runs today | After the switch | Basis |
 |---|---|---|---|
-| ISSUE-271 F4 | `deleteMatch` refuses a match with an active `data_overrides` row of `entity_type='matches'` | Not present. V2 keeps the D-257-5 and ISSUE-335 guards. DEV has **0** active match overrides today (production 64), so nothing would be orphaned now. | D-V2-SCOPE-20261027: lapses with the retired path |
+| ISSUE-271 F4 | `deleteMatch` refuses a match with an active `data_overrides` row of `entity_type='matches'` | Not present. V2 keeps the D-257-5 and ISSUE-335 guards. DEV has **0** active match overrides (production 64). | D-V2-SCOPE-20261027: lapses with the retired path |
 | ISSUE-271 F5 | Reader timeouts in the retired `pipeline.ts` | Path retired | Same |
 | ISSUE-272 | Venue preservation in the retired settle path | Path retired | Same |
 | ISSUE-326 | Test-only fix | No runtime effect | No owner decision recorded |
 | ISSUE-327 | R1 resolver (retired path), R2 offline tool | Code not present | Parked (amendment 5) |
-| ISSUE-327 data | R2 apply widened 17 venues' `last_season` 2025 → 2026 | **Stays in `afldb_dev`.** The switch does not revert data, so DEV differs from production in those 17 spans. | Parked; no revert decided |
+| ISSUE-327 data | R2 apply widened 17 venues' `last_season` 2025 → 2026 | **Stays in `afldb_dev`**; DEV differs from production in those 17 spans | Parked; no revert decided |
+| 2026 nightly re-settle | Nightly acquires and re-settles 2026 | Stops; the nightly moves to 2027 (A3) | Pin's `seasons.json`, as on production |
 
-**DEV-only commits are not lost.** They stay on local `main` (left at `242fa276`), in the off-host-verified preservation bundle
+**DEV-only commits are not lost.** They stay on local `main` (left at `242fa276`), in the off-host-verified bundle
 `dev-main-and-stashes-20261106.bundle` (sha256 `7e286772…6349`), and in the legacy archive.
 
-## 5. Timers after the switch, and states to preserve
+## 5. The nightly at the pin: what it does and does not do
 
-Both timers run scripts and `.env` straight from `~/projects/afldb`, so they pick up the pin on their next firing. No restart of
-either timer is needed or recommended.
+**Withdrawn (r1 claim).** r1 said the nightly writes empty batches "until the 2027 fixture appears (production expects 2027-03-16)".
+That is wrong:
+* the authentic 2027 season feed `CD_S2027014` was captured on 2026-11-01 (label `afl-api-2027-2026-11-01-012026`, sha256
+  `21fd12e7…c84d`) and accepted;
+* it lists 218 matches: SCHEDULED 135, PLACEHOLDER 83;
+* production's first 2027 night (2026-11-03, batch 78) read exactly that feed.
 
-* **`afldb-settle-afl-api-brownlow.timer` (every 5 minutes):** the wrapper exits before Node because
-  `AFLDB_AFL_API_BROWNLOW_ENABLED` is absent.
-  * Verified at the pin: "Nothing to do", rc 0.
-  * DEV logged 576 such runs in two days. No database contact, same as production, where the gate is also absent.
-  * Note: `site_settings` `acquisition.afl_api_brownlow_enabled` is `"true"` on DEV, but the shell gate is what decides.
-* **`afldb-settle-afl-api.timer` (daily 05:00 AEDT + up to 15 min, `Persistent=true`):**
-  * At the pin, `seasons.json` gives `last_season` 2027, `in_progress` [2027], and sealed seasons 1897–2026.
-  * Verified against DEV's own 2026 label: `--validate-only` gives 218 units, rc 0, no connection. `--dry-run` refuses with
-    "season 2026 is sealed", rc 1, before any database client.
-  * So the next nightly acquires **2027** from AFL.com.au and, until the 2027 fixture appears (production expects 2027-03-16), writes
-    an empty batch. DEV's 2026 data is never rewritten again.
-  * This is production's accepted state.
-  * `Persistent=true` means a run missed during the window fires once at the next timer start. No timer is stopped in this
-    procedure, so this does not arise.
-* **States to preserve:**
-  * both timers enabled and active;
-  * unit files untouched, and no `daemon-reload`;
-  * `.env` byte-identical (sha256 recorded in step 1);
-  * `AFLDB_AFL_API_BROWNLOW_ENABLED` absent;
-  * local `main` at `242fa276`;
-  * 2 stashes;
-  * the 10 untracked files;
-  * the off-host bundle.
-* **Alternative to A3, if the owner prefers no nightly 2027 fetches on DEV:** `sudo systemctl disable --now afldb-settle-afl-api.timer`
-  (owner, sudo), recorded as a DEV deviation. Not recommended; it diverges DEV from production.
+Two different things must be kept apart:
+
+| | Status | Who writes it |
+|---|---|---|
+| **Fixture acquisition** (the season's schedule) | Done: the feed is published and was acquired. | Production's 218 `fixtures` rows came from the separate ISSUE-229 fixture writer (Block M-b). **The nightly never writes `fixtures`.** DEV holds 3 fixture rows (all 2027), and neither this deployment nor the nightly changes that. |
+| **Concluded-match ingestion** (results and player statistics) | Not yet possible: the nightly selects only CONCLUDED matches, and none exist. The first scheduled match is 2027-03-17 08:30 UTC (19:30 AEDT), so the first nightly that can ingest one is about 05:00 AEDT 2027-03-18, if the provider has concluded it by then. | The nightly settle (`matches`, `player_match_stats`, etc.). |
+
+**Expected behaviour of each night until then.** Established offline, with no provider contact, over a copy of today's DEV backup and
+the retained authentic feed (evidence r2 §3):
+* the wrapper's settle step exits rc 0, with one `completed` `import_batches` row;
+* that row has 0 records read, inserted, updated and rejected, and its validation records `seasonFeedMatches` 218 and
+  `snapshotMatches` 0;
+* the log reports "Source completeness: COMPLETE … supplied no rows" and "0 refused at the write", and ends with
+  `AFLDB_SETTLE_SUCCESS label=afl-api-2027-<stamp>`;
+* no canonical, fixture, issue or staging row changes, and the second night is identical;
+* the exceptions report lists DEV's existing open `data_issues` and adds none.
+
+The only parts not exercised in isolation (by instruction) are the two live provider requests. If the provider fails, the wrapper
+stops at acquisition with `AFLDB_SETTLE_FAILURE` and nothing is written to the database. If the feed has changed by then, the counts
+in the log change, but with no CONCLUDED match the batch stays empty.
+
+**States to preserve:**
+* both timers enabled and active;
+* unit files untouched, and no `daemon-reload`;
+* `.env` byte-identical (step 1 sha256);
+* `AFLDB_AFL_API_BROWNLOW_ENABLED` absent;
+* local `main` at `242fa276`;
+* 2 stashes;
+* the 10 untracked files;
+* the off-host bundle;
+* the step-2 dump and the step-2b artifact archive.
+
+**Alternative to A3, if the owner prefers no nightly 2027 fetches on DEV:** `sudo systemctl disable --now afldb-settle-afl-api.timer`
+(owner, sudo), recorded as a DEV deviation. Not recommended: it diverges DEV from production, where the 2027 nightly runs.
 
 ## 6. Procedure (after A1–A4)
 
-Run from the workstation in Windows PowerShell; DEV is reached as `streamanator`. Total DEV downtime is one service respawn.
+**Window.** One owner-chosen date, starting between 08:00 and 20:00 AEDT. Steps 0–7a must finish within **2 hours** of starting step
+2, and never inside 04:45–05:45 AEDT.
+* If the window expires before step 4 starts, stop; nothing has changed.
+* If it expires after step 4, finish to a stop condition or acceptance, or run R1 (§8).
 
-**Step 0. Window and quiescence.** Outside 04:45–05:45 AEDT. On DEV:
+The workstation runs Windows PowerShell from a checkout at `b82dfcea` or later; DEV is reached as `streamanator`.
+
+**Step 0. Quiescence.** On DEV:
 
 ```
 systemctl is-active afldb-settle-afl-api.service afldb-settle-afl-api-brownlow.service
 ```
 
-Both must be `inactive`; a Brownlow run lasts about a second, so re-check if one is `activating`.
+Both must be `inactive`. A Brownlow run lasts about a second; re-check if one is `activating`.
 
 **Step 1. Record the before state (read-only).** On DEV:
 
 ```
 cd ~/projects/afldb
-git rev-parse HEAD
-git branch --show-current
-git stash list | wc -l
-git status --porcelain | wc -l
-sha256sum .env
-cat .next/BUILD_ID
+git rev-parse HEAD; git branch --show-current; git stash list | wc -l; git status --porcelain | wc -l
+sha256sum .env; cat .next/BUILD_ID .next/standalone/.next/BUILD_ID
 systemctl show afldb -p MainPID --value
 systemctl is-enabled afldb-settle-afl-api.timer afldb-settle-afl-api-brownlow.timer
+systemctl list-timers afldb-settle-afl-api.timer --no-pager
 ```
 
-Expect `242fa276…`, `main`, `2`, `10`, `8sFpWkolwF1yKuKbFkOir`, and both timers `enabled`.
+Expect:
+* `242fa276…`, `main`, `2`, `10`;
+* `8sFpWkolwF1yKuKbFkOir` twice;
+* both timers `enabled`.
 
-**Step 2. Backup with restore verification.** Copy
-`docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/scripts/` to DEV, then:
+Record the MainPID and the next nightly time.
+
+**Stop** on any difference.
+
+**Step 2. Database backup with restore verification.** Copy
+`docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/scripts/` to DEV.
 
 * **Dump (read-only):**
 
@@ -162,8 +229,7 @@ Expect `242fa276…`, `main`, `2`, `10`, `8sFpWkolwF1yKuKbFkOir`, and both timer
   bash scripts/dev-backup-verify.sh dump /mnt/ssd/afldb/backups/dev-pre-v2-<UTC stamp>
   ```
 
-  This takes one `pg_dump -Fc` of `afldb_dev` as `afldb_backup`, plus live row counts and the ledger in a READ ONLY transaction, and a
-  `SHA256SUMS`. The directory is mode 700. Expect `BACKUP-DUMPED` and ledger `110 110_…`.
+  Expect `BACKUP-DUMPED` and ledger `110 110_…`.
 * **Verify (isolated cluster only):**
 
   ```
@@ -171,16 +237,32 @@ Expect `242fa276…`, `main`, `2`, `10`, `8sFpWkolwF1yKuKbFkOir`, and both timer
     bash scripts/dev-backup-verify.sh verify <dir> <a clean checkout at the pin>
   ```
 
-  This restores into a fresh marked `afldb_v2_*_test` database and requires all of: `pg_restore` exit 0 with no stderr, every count and
-  the ledger equal to the live read, and migrations 111–118 plus privileges clean on that copy. Expect `BACKUP-VERIFIED`.
-* **Copy off-host:** copy the directory to the workstation and compare `sha256sum -c SHA256SUMS`.
+  Expect `BACKUP-VERIFIED`.
+  * The isolated cluster can be `/mnt/ssd/afldb/workspaces/i336-preview-20261106/pg-root` (port 55499).
+  * The pin checkout can be `/mnt/ssd/afldb/workspaces/i336-preview2-20261106/checkout`.
+* **Off-host:** copy the directory to the workstation and check it with `sha256sum -c SHA256SUMS`.
 
-**Do not continue without `BACKUP-VERIFIED`.** The script was rehearsed end to end on 2026-11-06; see the evidence README §6.
+**Stop** without `BACKUP-VERIFIED`.
 
-* The isolated cluster can be the preview's own (`/mnt/ssd/afldb/workspaces/i336-preview-20261106/pg-root`, port 55499).
-* The pin checkout can be `/mnt/ssd/afldb/workspaces/i336-preview2-20261106/checkout`.
+**Step 2b. Preserve the current application artifact (read-only, before anything replaces build output).** On DEV, with `D` set to
+the step-2 directory:
 
-**Step 3. Create the deployment branch (ref-only, no working-tree change).** On DEV:
+```
+cd ~/projects/afldb
+tar -cf "$D/dev-app-8sFpWkolwF1yKuKbFkOir.tar" .next/BUILD_ID .next/standalone
+cd "$D" && sha256sum dev-app-8sFpWkolwF1yKuKbFkOir.tar > SHA256SUMS-app && sha256sum -c SHA256SUMS-app
+tar -xOf dev-app-8sFpWkolwF1yKuKbFkOir.tar .next/BUILD_ID; echo
+tar -xOf dev-app-8sFpWkolwF1yKuKbFkOir.tar .next/standalone/.next/BUILD_ID; echo
+tar -tf dev-app-8sFpWkolwF1yKuKbFkOir.tar | grep -c '/\.env'
+```
+
+Expect `OK`, `8sFpWkolwF1yKuKbFkOir` twice, and `0`. The rehearsal took about 9 s and gave about 907 MB and 20,638 entries.
+
+This archive is what R1 restores. It has been proven to serve without `npm ci` or a build (r2 P).
+
+**Stop** on any difference.
+
+**Step 3. Create the deployment branch (ref-only).** On DEV:
 
 ```
 cd ~/projects/afldb && git fetch --prune origin
@@ -189,7 +271,9 @@ git branch dev/v2-main 8b024098a6771fc5e5be2f8bf006c9c3ca8ab55a
 git branch --set-upstream-to=origin/main dev/v2-main
 ```
 
-**Step 4. Code and schema, old code still serving.** From a workstation checkout at the pin or later:
+**Stop** without `published`.
+
+**Step 4. Code and schema, while the old code still serves.** From the workstation:
 
 ```
 powershell -ExecutionPolicy Bypass -File .\deploy\sync-dev.ps1 -SshTarget streamanator `
@@ -198,11 +282,12 @@ powershell -ExecutionPolicy Bypass -File .\deploy\sync-dev.ps1 -SshTarget stream
 
 * It classifies the tree, fetches, checks out `dev/v2-main`, applies the pin (a no-op), runs `npm ci`, then `npm run db:migrate`
   (111–118, as `AFLDB_OWNER_DATABASE_URL`).
-* The running service keeps serving `242fa276`'s standalone build, verified on the 118 schema in §2.
-  * Workers import `.next/standalone/server.js`, which carries its own traced `node_modules`, so `npm ci` does not touch the running
-    code.
-  * A worker that respawns before step 6 loads the pin's `deploy/server-cluster.mjs`. The only difference is one startup log line.
-* `sync-dev`'s "capture standalone build identity" step still runs. It reads DEV's existing `.next/standalone/.next/BUILD_ID`.
+* The running service keeps serving `242fa276`'s standalone build, which is verified on the 118 schema.
+* From here on, the timers run the pin's scripts (A3).
+
+**Stop** on a non-zero exit:
+* if migrate did not run: `git switch main`, then `npm ci`;
+* if it did: R1 (§8). The schema stays at 118.
 
 **Step 5. Privileges.** On DEV:
 
@@ -210,99 +295,141 @@ powershell -ExecutionPolicy Bypass -File .\deploy\sync-dev.ps1 -SshTarget stream
 cd ~/projects/afldb && npm run db:privileges
 ```
 
-It runs as `AFLDB_OWNER_DATABASE_URL` (`--target dev`) and must give rc 0. This is the 111–114 follow-up, and `sync-dev` does not run it.
-Run it before new code serves, so the new tables are never read without grants.
+Require rc 0. This is the 111–114 follow-up, run before new code serves.
 
-**Step 6. Build, restart and gate.** From the workstation:
+**Stop** on non-zero, before step 6. The old code is still serving. Diagnose, then re-run (the command is idempotent) or take R1.
+
+**Step 6. Build, sudo-free respawn and gate.** From the workstation:
 
 ```
 powershell -ExecutionPolicy Bypass -File .\deploy\sync-dev.ps1 -SshTarget streamanator `
-  -RemoteRef dev/v2-main -ExpectedRevision 8b024098a6771fc5e5be2f8bf006c9c3ca8ab55a -Issue107Gate
+  -RemoteRef dev/v2-main -ExpectedRevision 8b024098a6771fc5e5be2f8bf006c9c3ca8ab55a -Issue107Gate -RestartMethod respawn
 ```
 
-* It repeats the pin check (no-op), then `npm ci`, then migrate ("Nothing to apply"), then build.
-* It restarts: `sudo -n` if passwordless, otherwise it kills the MainPID and systemd respawns the service (`Restart=always`).
-* The ISSUE-107 gate checks the live process's `AFLDB_WORKERS=4` and `AFLDB_POOL_MAX=10`.
-* It then waits for readiness and requires the served build to be the one just built.
+* **Sequence:** pin check (no-op), `npm ci`, migrate ("Nothing to apply"), then `npm run build`.
+  * **The build rewrites `.next` in place, under the still-running old processes.** A page that the old workers have not yet loaded
+    may fail until the respawn. This is how every earlier `sync-dev` deploy behaved, and is why step 2b preserves the artifact first.
+* **Restart** (`-RestartMethod respawn`):
+  * **No `sudo` is attempted.**
+  * The script sends `kill` (SIGTERM) to the unit's MainPID. The cluster master stops its workers and exits about 5 s later.
+    systemd (`Restart=always`, `RestartSec=5`) starts a new master, which forks 4 workers over the new standalone build.
+  * The script requires a new MainPID within 60 s; otherwise it fails (exit 23 if the unit is not `Restart=always`).
+  * **Downtime:** about 10 s from SIGTERM to steady service, with about 7 s of refused connections (measured in r2 R). DEV's earlier
+    respawns took about 10 s.
+* **Gate:** the ISSUE-107 gate reads the new process's `AFLDB_WORKERS=4` and `AFLDB_POOL_MAX=10`. Readiness then requires
+  `/api/health` 200 and `x-afldb-build` equal to the BUILD_ID just built.
 
-**Step 7. Acceptance (§7).**
+**Stop and run R1** on:
+* a build failure (the old processes are then running over a partly rewritten `.next`);
+* a respawn failure;
+* a gate or readiness failure.
 
-**Step 8. Records.** Update ISSUE-336/337 with the deploy evidence; ISSUE-337 can be resolved once DEV acceptance passes.
+**Step 7a. Immediate acceptance (§7.1).** Any failure → R1.
 
-## 7. Acceptance (all required)
+**Step 8. Records.** Update ISSUE-336 and ISSUE-337 with the deploy evidence. ISSUE-337 can be resolved on 7a. Record §7.2 as
+**pending**.
 
-1. **Git state:**
+## 7. Acceptance
+
+### 7.1 Immediate: inside the window, all required
+
+1. **Identity:**
    * `git rev-parse HEAD` = `8b024098…`;
-   * `git branch --show-current` = `dev/v2-main`;
+   * branch `dev/v2-main`;
    * `git rev-parse main` = `242fa276…`;
    * stashes 2, untracked 10;
-   * `sha256sum .env` unchanged.
-2. **Schema:** ledger 118, last `118_fixtures_unconfirmed_participants.sql`; `npm run db:migrate` reports "Nothing to apply";
-   `db:privileges` rc 0.
-3. **Service:** `afldb` active with a new MainPID; `/api/health` 200; the gate's `BUILD_ID` equals `.next/standalone/.next/BUILD_ID`.
-4. **Browser:** `scripts/shots-acceptance.cjs` through a tunnel to `127.0.0.1:3100` must give **76/76**:
-   * run with `BASE=http://127.0.0.1:3100`, `EXPECT_ALL_2021=140` and `BETA_COOKIE=<the owner's beta cookie value>` (DEV keeps its beta
-     gate on);
-   * Jake Long must be found for all of: an ordinary space, NBSP, and lower case.
-5. **HTTP smoke:** run `BETA_COOKIE=<value> bash scripts/smoke.sh 3100` on DEV. The cookie goes into a mode-600 jar and is never put in
-   argv. Compare statuses and Jake Long rows with `host/smoke-33362.txt`. Byte counts will differ because DEV keeps its beta gate on.
-6. **Timers:**
-   * the next Brownlow journal says "Nothing to do";
-   * the next nightly journal names **season 2027** and ends `AFLDB_SETTLE_SUCCESS` or an empty batch, with no write to 2026;
-   * `systemctl is-enabled` is unchanged for both timers.
+   * `sha256sum .env` unchanged;
+   * `.next/BUILD_ID` = `.next/standalone/.next/BUILD_ID` = the live `x-afldb-build` header, and ≠ `8sFpWkolwF1yKuKbFkOir`.
+2. **Schema:**
+   * ledger 118, last `118_fixtures_unconfirmed_participants.sql`;
+   * `npm run db:migrate` reports "Nothing to apply";
+   * `db:privileges` rc 0.
+3. **Health:** `afldb` active, with a MainPID different from step 1's. `/api/health` returns 200 with `"database":"ok"`.
+4. **Four-worker runtime:**
+   * `pgrep -P "$(systemctl show afldb -p MainPID --value)" | wc -l` = 4;
+   * the gate saw `AFLDB_WORKERS=4` and `AFLDB_POOL_MAX=10`;
+   * 40 requests to `/api/health` show `x-afldb-worker` values 1–4.
+5. **Authenticated browser:** `scripts/shots-acceptance.cjs` through a tunnel to `127.0.0.1:3100` gives **76/76**.
+   * Run it with `BASE=http://127.0.0.1:3100`, `EXPECT_ALL_2021=140` and `BETA_COOKIE=<the owner's beta cookie value>`; DEV keeps
+     its beta gate on.
+   * Jake Long is found with an ordinary space, NBSP, and lower case.
+6. **HTTP smoke:** `BETA_COOKIE=<value> bash scripts/smoke.sh 3100` on DEV. The cookie goes into a mode-600 jar, never into argv.
+   Statuses and Jake Long rows must match `host/smoke-33362.txt`.
+7. **Timers:**
+   * `systemctl is-enabled` and `is-active` are unchanged for both timers;
+   * `list-timers` shows the next nightly at 05:00–05:15 AEDT on the following day;
+   * the first Brownlow firing after step 6 (within 5 minutes) logs "Nothing to do" with rc 0.
+
+### 7.2 Overnight observation: PENDING until it occurs
+
+The next nightly firing (05:00–05:15 AEDT, D+1) is **recorded as pending observation**. It is **not triggered manually**, and its
+success is **not claimed in advance**.
+
+After it has run, read-only on DEV:
+
+```
+journalctl -u afldb-settle-afl-api.service --since "<D+1> 04:55" --no-pager -o cat \
+  | grep -E 'Season feed CD_|Applied as import batch|Source completeness|AFLDB_SETTLE_(SUCCESS|FAILURE)'
+ls -d ~/projects/afldb/data/sources/afl_api/matches/afl-api-2027-* | tail -1
+```
+
+| Observed | Meaning | Action |
+|---|---|---|
+| `Season feed CD_S2027014: <n> match(es)`; "Applied as import batch …: 0 canonical row(s) inserted, 0 updated … 0 refused"; `AFLDB_SETTLE_SUCCESS label=afl-api-2027-…` | As predicted by r2 N | Record as observed; close the observation |
+| `AFLDB_SETTLE_FAILURE` during acquisition (provider or network) | Nothing reached the database | Record. Not a recovery trigger; the next night retries. Report to the owner if it repeats. |
+| Any canonical insert or update, any 2026 label, or a settle refusal | Not predicted | Report to the owner. No automatic action. |
 
 ## 8. Recovery
 
-* **Before step 4 completes:**
+**R1: code-only recovery without rebuilding (part of A4; automatic on a stop condition at step 4 after migrate, step 6, or 7a).** On
+DEV, with `D` set to the step-2 directory:
 
-  ```
-  git switch main
-  ```
+```
+cd ~/projects/afldb
+git switch main                                           # 242fa276; dev/v2-main is kept
+mv .next ".next.v2-failed-$(date -u +%Y%m%dT%H%M%SZ)"     # keep the new build for diagnosis; delete only on owner instruction
+(cd "$D" && sha256sum -c SHA256SUMS-app) && tar -xf "$D/dev-app-8sFpWkolwF1yKuKbFkOir.tar"
+cat .next/BUILD_ID .next/standalone/.next/BUILD_ID        # 8sFpWkolwF1yKuKbFkOir twice
+kill "$(systemctl show afldb -p MainPID --value)"         # the same sudo-free respawn: about 10 s
+```
 
-  Code is back at `242fa276`. The database is unchanged unless migrate ran; if it did, see "Schema".
-* **Code only, after step 6:**
+Then verify:
+* `/api/health` 200;
+* `x-afldb-build: 8sFpWkolwF1yKuKbFkOir`;
+* 4 children of the new MainPID.
 
-  ```
-  git switch main && npm ci && npm run build
-  ```
+Then, **before the next 05:00 AEDT nightly**, run `npm ci` (at `242fa276`).
+* The restored server needs no root `node_modules`: r2 P served this exact archive without them.
+* The timers' `tsx` does need them. At `242fa276` the nightly re-settles 2026 again, and is proven on the 118 schema (r2 O).
+* `npm ci` does not touch the running server.
 
-  Then restart without sudo: `kill $(systemctl show afldb -p MainPID --value)`, and wait for `/api/health` 200.
-  * Or run `sync-dev.ps1 -RemoteRef main -SkipMigrate`, but **not** with `-ExpectedRevision`: local `main` has no published upstream
-    for `242fa276`.
-  * `242fa276` builds and serves on the 118 schema (§2); its migrator applies nothing.
-  * Do not delete ledger rows.
-* **Schema, only if required:** the per-migration ROLLBACK statements in reverse order 118 → 111, as the owner role, then remove those
-  eight ledger rows.
-  * This is safe only while the 111–114 tables are empty, no fixture is unconfirmed, and no `eligible` value is NULL; check each first.
-* **Whole database:** `pg_restore --clean` of the step-2 dump into `afldb_dev`.
-  * Stop the service and both timers first (owner, sudo).
-  * It discards every write after the dump.
-  * It is a separate owner decision.
-* **Branch:** `git branch -D dev/v2-main` only after switching back, and only on owner instruction.
+**The schema stays at 118.** That is the supported state for the old code:
+* the old migrator applies nothing;
+* the old app serves (r2 P);
+* the old nightly settles normally (r2 O).
+
+**Separate owner decisions: never part of R1 or any automatic recovery.** Each needs its own explicit approval.
+* **Migration reversal** 118 → 111: the per-migration ROLLBACK statements, as the owner role. This is safe only while the 111–114
+  tables are empty, no fixture is unconfirmed and no `eligible` value is NULL.
+* **Ledger row removal** for 111–118 (only together with a reversal).
+* **Whole-database restoration**: `pg_restore --clean` of the step-2 dump. It needs sudo to stop the service and both timers, and it
+  discards every write after the dump, including any nightly batch.
+* **Deleting** `dev/v2-main`, the `.next.v2-failed-*` directory, the dump or the artifact archive.
+* **Disabling or altering either timer.**
 
 ## 9. Remaining coverage limits (not deployment blockers)
 
-* **DEV-data integration:** six focused integration failures persist on a DEV copy, identically at base and at the pin. They are
-  in `draft-linkage` and `grid-solver`.
+* **DEV-data integration:** six focused integration failures persist on a DEV copy, identically at base and at the pin, in
+  `draft-linkage` and `grid-solver`.
   * DEV's draft data was never bridged: 0 bridged persons, 5 of 6,810 picks linked.
-  * On production data, 4 of the 6 pass with the default child.
-  * The other 2 (`draft-linkage` partition and withheld) pass 11/11 with `AFLDB_DRAFTGURU_BRIDGE=…-v3.json`, which is the child production
-    carries.
-  * With `v2.json`, one check fails (Dean Laidley); v3 supersedes v2.
-  * The default `afldb_test` child (3,468 bridges) is not production's (3,562).
-  * Limit: these suites prove production shape only with that override. DEV cannot exercise them until DEV is bridged, which is not
-    proposed.
-* **Frozen DraftGuru samples:** the two Stage A tests pass when the untracked `annual-html-20260826`/`person-html-20260826` snapshots are
-  supplied. A clean clone lacks them by design, so those two tests remain environment-dependent.
-* **AFLDB-ISSUE-338 (new, Low):** the operator-review contract's byte-identical rerun check (11a/11c) fails when two `finalize()` calls
-  straddle a second boundary.
-  * Cause: `build_final_document` stamps `utc_now()` (`tools/rebuild/draftguru/review_bridge_operator.py:1424`).
-  * Observed once; 0 of 5 reruns failed.
-  * Not a runtime defect. It is not fixed here.
-* **Not verified:**
-  * DEV's real `.env` under the pin. Every variable was checked by name, and none is new.
-  * A live 05:00 nightly at the pin. The offline `--validate-only`/`--dry-run` evidence stands in for it.
-  * The beta-gated browser run on DEV itself (acceptance item 4).
-  * The DEV runtime shape. The previews ran `next start` on a single process; DEV runs `deploy/server-cluster.mjs` with four workers
-    over `.next/standalone/server.js`. The pin's build produced and checked the standalone bundle. Step 6's ISSUE-107 gate and readiness
-    are what prove it on DEV.
+  * On production data, 4 of the 6 pass with the default child. The other 2 pass 11/11 with
+    `AFLDB_DRAFTGURU_BRIDGE=…-v3.json`, production's child.
+* **Frozen DraftGuru samples:** two Stage A tests need the untracked `annual-html-20260826`/`person-html-20260826` snapshots, so they
+  remain environment-dependent.
+* **AFLDB-ISSUE-338 (Low):** the operator-review rerun check (11a/11c) fails when two `finalize()` calls straddle a second boundary
+  (`tools/rebuild/draftguru/review_bridge_operator.py:1424`). It is not a runtime defect.
+* **Not verified before deployment, by design:**
+  * DEV's real `.env` under the pin (every variable checked by name; none is new);
+  * the live provider requests and the live 05:00 nightly at the pin (§7.2 pending observation; offline evidence in r2 N);
+  * the beta-gated browser run on DEV itself (§7.1 item 5);
+  * the old-process behaviour *during* step 6's build. Isolated runs did not rebuild under a serving process; R1 covers a failure.

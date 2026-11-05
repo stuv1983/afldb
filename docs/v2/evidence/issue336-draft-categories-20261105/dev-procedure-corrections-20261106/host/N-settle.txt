@@ -1,0 +1,29 @@
+-- afl-api-2027-2026-11-01-012026 --validate-only
+Bundle v2 'afl-api-2027-2026-11-01-012026' (season 2027): 0 match unit(s) built, 0 build failure(s).
+Season feed CD_S2027014: 218 match(es), complete; statuses observed: PLACEHOLDER 83, SCHEDULED 135.
+
+--validate-only: manifest, registry and bundle contract verified. No connection opened.
+-- afl-api-2027-2026-11-01-012026 --apply --auto-apply --require-complete-source (the wrapper's step 2, verbatim)
+settle rc=0
+Season feed CD_S2027014: 218 match(es), complete; statuses observed: PLACEHOLDER 83, SCHEDULED 135.
+Season feed (AFLDB-ISSUE-231 — informational, never a failure)
+Source completeness: COMPLETE
+  Source complete: the source supplied no rows for this scope, and none were dropped.
+Applied as import batch 146: 0 canonical row(s) inserted, 0 updated, 0 ledger row(s), 0 attendance enrichment(s), 0 refused at the write, 0 unit(s) rolled back.
+afl_api settle exceptions — season 2027
+  Latest completed batch 146 (2026-11-05 20:07:44.841058+00): 0 records read, 0 rejection rows.
+-- afl-api-2027-2026-11-02-012026 --validate-only
+Bundle v2 'afl-api-2027-2026-11-02-012026' (season 2027): 0 match unit(s) built, 0 build failure(s).
+Season feed CD_S2027014: 218 match(es), complete; statuses observed: PLACEHOLDER 83, SCHEDULED 135.
+
+--validate-only: manifest, registry and bundle contract verified. No connection opened.
+-- afl-api-2027-2026-11-02-012026 --apply --auto-apply --require-complete-source (the wrapper's step 2, verbatim)
+settle rc=0
+Season feed CD_S2027014: 218 match(es), complete; statuses observed: PLACEHOLDER 83, SCHEDULED 135.
+Season feed (AFLDB-ISSUE-231 — informational, never a failure)
+Source completeness: COMPLETE
+  Source complete: the source supplied no rows for this scope, and none were dropped.
+Applied as import batch 147: 0 canonical row(s) inserted, 0 updated, 0 ledger row(s), 0 attendance enrichment(s), 0 refused at the write, 0 unit(s) rolled back.
+afl_api settle exceptions — season 2027
+  Latest completed batch 147 (2026-11-05 20:07:47.560108+00): 0 records read, 0 rejection rows.
+snapshot files written per night: 00-season-matches.json manifest.json token.meta.json 

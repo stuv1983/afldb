@@ -1,0 +1,69 @@
+{
+ "label": "before",
+ "database": "afldb_v2_i336night_test",
+ "ledger": {
+  "n": 118,
+  "last": "118_fixtures_unconfirmed_participants.sql"
+ },
+ "importBatches": {
+  "n": 78,
+  "max_id": 145
+ },
+ "lastBatch": {
+  "row": {
+   "id": 145,
+   "tool": "settle-afl-api.ts",
+   "error": null,
+   "status": "completed",
+   "source_id": 6,
+   "started_at": "2026-11-05T18:09:35.302453+00:00",
+   "completed_at": "2026-11-05T18:10:03.819533+00:00",
+   "records_read": 10464,
+   "target_table": "staging.source_record_versions",
+   "records_updated": 0,
+   "records_inserted": 0,
+   "records_rejected": 0
+  },
+  "feed_status": {
+   "CONCLUDED": 218
+  },
+  "feed_matches": "218",
+  "snapshot_matches": "218"
+ },
+ "matchesBySeason": [
+  {
+   "season": 2025,
+   "n": 216
+  },
+  {
+   "season": 2026,
+   "n": 218
+  }
+ ],
+ "fixtures": {
+  "n": 3,
+  "season2027": 3
+ },
+ "playerMatchStats": {
+  "n": "695499"
+ },
+ "dataIssuesOpen": {
+  "n": 68
+ },
+ "dataIssuesTotal": {
+  "n": 69
+ },
+ "stagingAflApiMatch": {
+  "n": 0
+ },
+ "siteSwitch": [
+  {
+   "key": "acquisition.afl_api_brownlow_enabled",
+   "value": "\"true\""
+  },
+  {
+   "key": "acquisition.afl_api_current_season_enabled",
+   "value": "\"true\""
+  }
+ ]
+}

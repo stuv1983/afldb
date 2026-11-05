@@ -1,0 +1,34 @@
+[deploy] >>> enter project directory
+[deploy] >>> capture standalone build identity
+[deploy] built BUILD_ID: AEysMesRQ2T68a0vtmt72
+[deploy] >>> restart systemd service
+[deploy] restart method: respawn (SIGTERM to MainPID; systemd Restart=always)
+[deploy] systemd respawned the service: 4040039 -> 4040918
+[deploy] >>> show systemd service status
+● afldb-i336-respawn-probe.service - /home/arm/.nvm/versions/node/v22.23.2/bin/node deploy/server-cluster.mjs
+     Loaded: loaded (/run/user/1000/systemd/transient/afldb-i336-respawn-probe.service; transient)
+  Transient: yes
+     Active: active (running) since Fri 2026-11-06 06:55:48 AEDT; 402ms ago
+   Main PID: 4040918 (node)
+      Tasks: 35 (limit: 38220)
+     Memory: 117.9M (peak: 118.1M)
+        CPU: 1.583s
+     CGroup: /user.slice/user-1000.slice/user@1000.service/app.slice/afldb-i336-respawn-probe.service
+             ├─4040918 /home/arm/.nvm/versions/node/v22.23.2/bin/node deploy/server-cluster.mjs
+             ├─4040925 /home/arm/.nvm/versions/node/v22.23.2/bin/node /mnt/ssd/afldb/workspaces/i336-preview2-20261106/checkout/deploy/server-cluster.mjs
+             ├─4040926 /home/arm/.nvm/versions/node/v22.23.2/bin/node /mnt/ssd/afldb/workspaces/i336-preview2-20261106/checkout/deploy/server-cluster.mjs
+             ├─4040927 /home/arm/.nvm/versions/node/v22.23.2/bin/node /mnt/ssd/afldb/workspaces/i336-preview2-20261106/checkout/deploy/server-cluster.mjs
+             └─4040929 /home/arm/.nvm/versions/node/v22.23.2/bin/node /mnt/ssd/afldb/workspaces/i336-preview2-20261106/checkout/deploy/server-cluster.mjs
+
+Nov 06 06:55:43 streamanator systemd[3702619]: afldb-i336-respawn-probe.service: Consumed 12.119s CPU time, 382.2M memory peak, 0B memory swap peak.
+Nov 06 06:55:48 streamanator systemd[3702619]: afldb-i336-respawn-probe.service: Scheduled restart job, restart counter is at 1.
+Nov 06 06:55:48 streamanator systemd[3702619]: Started afldb-i336-respawn-probe.service - /home/arm/.nvm/versions/node/v22.23.2/bin/node deploy/server-cluster.mjs.
+Nov 06 06:55:48 streamanator node[4040918]: [afldb] primary 4040918 starting 4 worker(s)
+Nov 06 06:55:48 streamanator node[4040918]: [afldb] serving build AEysMesRQ2T68a0vtmt72 release in-place revision unknown
+[deploy] >>> verify development worker and pool controls
+AFLDB_POOL_MAX=10
+AFLDB_WORKERS=4
+[deploy] >>> wait for healthy service readiness
+[deploy] readiness pending (0s/120s): curl exit 7: curl: (7) Failed to connect to 127.0.0.1 port 33364 after 0 ms: Couldn't connect to server 
+[deploy] health ready after 3s and 2 probe(s): {"status":"ok","database":"ok","latencyMs":30}
+[deploy] live BUILD_ID: AEysMesRQ2T68a0vtmt72

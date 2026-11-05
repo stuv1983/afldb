@@ -1,0 +1,44 @@
+341,363c341,359
+< if sudo -n systemctl restart 'afldb' 2>/dev/null; then
+<   echo "[deploy] restarted through sudo systemctl"
+< else
+<   echo "[deploy] passwordless sudo unavailable; restarting through the unit Restart= policy"
+<   AFLDB_RESTART_POLICY="$(systemctl show --property Restart --value 'afldb')"
+<   test "$AFLDB_RESTART_POLICY" = always || { echo "[deploy] cannot restart: no passwordless sudo and Restart=$AFLDB_RESTART_POLICY" >&2; exit 23; }
+<   AFLDB_OLD_PID="$(systemctl show --property MainPID --value 'afldb')"
+<   test "$AFLDB_OLD_PID" -gt 0 || { echo "[deploy] service is stopped; a privileged start is required" >&2; exit 24; }
+<   kill "$AFLDB_OLD_PID"
+<   AFLDB_NEW_PID="$AFLDB_OLD_PID"
+<   for _ in $(seq 1 60); do
+<     sleep 1
+<     AFLDB_NEW_PID="$(systemctl show --property MainPID --value 'afldb')"
+<     if [ "$(systemctl is-active 'afldb')" = active ] && [ "$AFLDB_NEW_PID" -gt 0 ] && [ "$AFLDB_NEW_PID" != "$AFLDB_OLD_PID" ]; then break; fi
+<     afldb_service_state 'afldb'
+<     if [ "$AFLDB_SERVICE_ACTIVE" = failed ] || { [ "$AFLDB_SERVICE_ACTIVE" = inactive ] && [ "$AFLDB_SERVICE_SUB" = dead ]; }; then
+<       afldb_readiness_diagnostics 'afldb' 'http://127.0.0.1:3100/api/health' 0 "service failed before systemd respawn completed"
+<       exit 25
+<     fi
+<   done
+<   test "$AFLDB_NEW_PID" -gt 0 && test "$AFLDB_NEW_PID" != "$AFLDB_OLD_PID" || { echo "[deploy] systemd did not respawn the service" >&2; exit 25; }
+<   echo "[deploy] systemd respawned the service: $AFLDB_OLD_PID -> $AFLDB_NEW_PID"
+< fi
+---
+> echo "[deploy] restart method: respawn (SIGTERM to MainPID; systemd Restart=always)"
+> AFLDB_RESTART_POLICY="$(systemctl show --property Restart --value 'afldb')"
+> test "$AFLDB_RESTART_POLICY" = always || { echo "[deploy] cannot respawn: the unit has Restart=$AFLDB_RESTART_POLICY, not always" >&2; exit 23; }
+> AFLDB_OLD_PID="$(systemctl show --property MainPID --value 'afldb')"
+> test "$AFLDB_OLD_PID" -gt 0 || { echo "[deploy] service is stopped; a privileged start is required" >&2; exit 24; }
+> kill "$AFLDB_OLD_PID"
+> AFLDB_NEW_PID="$AFLDB_OLD_PID"
+> for _ in $(seq 1 60); do
+>   sleep 1
+>   AFLDB_NEW_PID="$(systemctl show --property MainPID --value 'afldb')"
+>   if [ "$(systemctl is-active 'afldb')" = active ] && [ "$AFLDB_NEW_PID" -gt 0 ] && [ "$AFLDB_NEW_PID" != "$AFLDB_OLD_PID" ]; then break; fi
+>   afldb_service_state 'afldb'
+>   if [ "$AFLDB_SERVICE_ACTIVE" = failed ] || { [ "$AFLDB_SERVICE_ACTIVE" = inactive ] && [ "$AFLDB_SERVICE_SUB" = dead ]; }; then
+>     afldb_readiness_diagnostics 'afldb' 'http://127.0.0.1:3100/api/health' 0 "service failed before systemd respawn completed"
+>     exit 25
+>   fi
+> done
+> test "$AFLDB_NEW_PID" -gt 0 && test "$AFLDB_NEW_PID" != "$AFLDB_OLD_PID" || { echo "[deploy] systemd did not respawn the service" >&2; exit 25; }
+> echo "[deploy] systemd respawned the service: $AFLDB_OLD_PID -> $AFLDB_NEW_PID"

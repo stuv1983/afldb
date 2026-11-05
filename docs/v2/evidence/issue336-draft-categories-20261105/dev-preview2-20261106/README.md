@@ -3,6 +3,12 @@
 Isolated verification on streamanator for the pinned DEV deployment recommendation
 (`issues/open/AFLDB-ISSUE-336-DEV-DEPLOYMENT.md`). **Nothing was changed on DEV.**
 
+> **Partly superseded (2026-11-06, r2).** The evidence below stands unchanged. Its **interpretation** in §4 is superseded by
+> `../dev-procedure-corrections-20261106/README.md` §5, in three places:
+> * the nightly "empty batches until the fixture appears" (the 2027 feed was already captured and accepted);
+> * the production Brownlow comparison (production's Brownlow timer is disabled);
+> * the restart and recovery description.
+
 DEV contact was limited to:
 * read-only inspection (`runners/devcfg.sh`);
 * health probes before and after each part;

@@ -31,11 +31,16 @@
   - **Implementation** is on `origin/main` `ea9bddf8` (pushed 2026-11-06).
   - **Preview verification:** PASS on an isolated restore of DEV's own data (2026-11-06).
   - **Pinned DEV procedure** prepared 2026-11-06: candidate `8b024098` (local, not pushed) verified in isolation (browser 76/76, backup rehearsed to `BACKUP-VERIFIED`, rollback to `242fa276` proven on the 118 schema, timers checked offline).
+  - **Procedure r2** (2026-11-06):
+    - sudo-free `-RestartMethod respawn` (tooling `b82dfcea`, about 10 s outage, executed in isolation);
+    - corrected 2027 nightly account, with production's Brownlow timer disabled;
+    - DEV artifact preserved and restorable without rebuild;
+    - next nightly recorded as pending observation.
   - **Deployment:** none. DEV is still on `242fa276` with ledger 110.
   - D-336-1 accepted. The 35-row production insert (stage I336) is prepared and rehearsed; **not run**.
 - **Key files:** `src/lib/draft-categories.ts`, `src/db/queries/draft.ts`, `src/app/draft/[year]/page.tsx`, `src/app/draft/page.tsx`, `src/components/DraftCategoryNav.tsx`, `src/app/players/[slug]/page.tsx`, `tools/v2/issue336-predraft-insert-production.ts`; runbook `issues/open/AFLDB-ISSUE-336.md`; evidence `docs/v2/evidence/issue336-draft-categories-20261105/` (DEV preview and DEV recommendation: `dev-preview-20261106/README.md`).
-- **Key files (DEV deployment):** `issues/open/AFLDB-ISSUE-336-DEV-DEPLOYMENT.md`; evidence `docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/`.
-- **Next action:** owner approvals A1–A4 in `issues/open/AFLDB-ISSUE-336-DEV-DEPLOYMENT.md` (publish; DEV-only behaviour; keep both timers; DEV deploy outside 04:45–05:45 AEDT); production application release; D-336-2 execution approval (runbook); D-336-3 (187 revised origin paths).
+- **Key files (DEV deployment):** `issues/open/AFLDB-ISSUE-336-DEV-DEPLOYMENT.md`; evidence `docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/` and `dev-procedure-corrections-20261106/`.
+- **Next action:** owner approvals A1–A4 in `issues/open/AFLDB-ISSUE-336-DEV-DEPLOYMENT.md` r2 (publish; DEV-only behaviour; A3 timer consequence; DEV deploy in a bounded 2-hour window); production application release; D-336-2 execution approval (runbook); D-336-3 (187 revised origin paths).
 
 ### AFLDB-ISSUE-337 — Draft-page name search misses unlinked picks whose stored raw name uses U+00A0
 

@@ -63,5 +63,12 @@ approval.** Production application release and the I336 data step are unaffected
 
 * It is pinned to `8b024098`, which adds the ISSUE-337 fix and `sync-dev.ps1 -ExpectedRevision`.
 * It needs no timer pause, no sudo and no unit change.
+* **r2 (2026-11-06):**
+  * the restart is the sudo-free `-RestartMethod respawn` (tooling `b82dfcea`);
+  * the 2027 nightly account is corrected, and A3 states that the timers' next firings run the pin's code;
+  * DEV's artifact is preserved and restorable without rebuild (R1);
+  * the next nightly is recorded as pending observation.
+
+  Evidence: `docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/`.
 * Its backup has been rehearsed to `BACKUP-VERIFIED`, and rollback to `242fa276` has been proven on the 118 schema.
 * Owner approvals A1–A4 are listed there. Nothing has been run on DEV.

@@ -1,0 +1,104 @@
+﻿== 2026-11-05T19:49:34Z service
+Restart=always
+RestartUSec=5s
+TimeoutStopUSec=1min 30s
+MainPID=1677
+NRestarts=0
+ExecMainStartTimestamp=Tue 2026-11-03 15:35:37 AEDT
+WorkingDirectory=/home/arm/projects/afldb
+User=arm
+KillMode=mixed
+ActiveEnterTimestamp=Tue 2026-11-03 15:35:37 AEDT
+worker children of MainPID: 4
+== journal visibility and past respawn timings (last 40 days)
+2026-10-15T16:30:13+11:00 streamanator afldb[1800193]: ✓ Ready in 0ms
+2026-10-15T16:30:13+11:00 streamanator afldb[1800196]: ✓ Ready in 0ms
+2026-10-15T22:07:03+11:00 streamanator afldb[2083993]: ✓ Ready in 0ms
+2026-10-15T22:07:04+11:00 streamanator afldb[2084034]: ✓ Ready in 0ms
+2026-10-15T22:07:06+11:00 streamanator afldb[2084065]: ✓ Ready in 0ms
+2026-10-15T22:07:07+11:00 streamanator systemd[1]: afldb.service: Deactivated successfully.
+2026-10-15T22:07:12+11:00 streamanator systemd[1]: afldb.service: Scheduled restart job, restart counter is at 3.
+2026-10-15T22:07:12+11:00 streamanator systemd[1]: Started afldb.service - AFLDB — Australian Football statistics database.
+2026-10-15T22:07:12+11:00 streamanator afldb[2084219]: [afldb] primary 2084219 starting 4 worker(s)
+2026-10-15T22:07:13+11:00 streamanator afldb[2084229]: ✓ Ready in 0ms
+2026-10-15T22:07:13+11:00 streamanator afldb[2084226]: ✓ Ready in 0ms
+2026-10-15T22:07:13+11:00 streamanator afldb[2084228]: ✓ Ready in 0ms
+2026-10-15T22:07:13+11:00 streamanator afldb[2084227]: ✓ Ready in 0ms
+2026-10-25T08:11:00+11:00 streamanator systemd[1]: Stopping afldb.service - AFLDB — Australian Football statistics database...
+2026-10-25T08:11:02+11:00 streamanator afldb[950775]: ✓ Ready in 0ms
+2026-10-25T08:11:03+11:00 streamanator afldb[950807]: ✓ Ready in 0ms
+2026-10-25T08:11:05+11:00 streamanator afldb[950820]: ✓ Ready in 0ms
+2026-10-25T08:11:05+11:00 streamanator systemd[1]: afldb.service: Deactivated successfully.
+2026-10-25T08:11:05+11:00 streamanator systemd[1]: Stopped afldb.service - AFLDB — Australian Football statistics database.
+2026-10-25T08:55:37+11:00 streamanator systemd[1]: Started afldb.service - AFLDB — Australian Football statistics database.
+2026-10-25T08:55:37+11:00 streamanator afldb[988354]: [afldb] primary 988354 starting 4 worker(s)
+2026-10-25T08:55:37+11:00 streamanator afldb[988364]: ✓ Ready in 0ms
+2026-10-25T08:55:37+11:00 streamanator afldb[988363]: ✓ Ready in 0ms
+2026-10-25T08:55:37+11:00 streamanator afldb[988362]: ✓ Ready in 0ms
+2026-10-25T08:55:37+11:00 streamanator afldb[988361]: ✓ Ready in 0ms
+2026-10-25T17:01:31+11:00 streamanator systemd[1]: Stopping afldb.service - AFLDB — Australian Football statistics database...
+2026-10-25T17:01:32+11:00 streamanator afldb[1394522]: ✓ Ready in 0ms
+2026-10-25T17:01:33+11:00 streamanator afldb[1394534]: ✓ Ready in 0ms
+2026-10-25T17:01:35+11:00 streamanator afldb[1394603]: ✓ Ready in 0ms
+2026-10-25T17:01:36+11:00 streamanator systemd[1]: afldb.service: Deactivated successfully.
+2026-10-25T17:01:36+11:00 streamanator systemd[1]: Stopped afldb.service - AFLDB — Australian Football statistics database.
+2026-10-25T17:43:26+11:00 streamanator systemd[1]: Started afldb.service - AFLDB — Australian Football statistics database.
+2026-10-25T17:43:27+11:00 streamanator afldb[1630]: [afldb] primary 1630 starting 4 worker(s)
+2026-10-25T17:43:28+11:00 streamanator afldb[1825]: ✓ Ready in 0ms
+2026-10-25T17:43:28+11:00 streamanator afldb[1824]: ✓ Ready in 0ms
+2026-10-25T17:43:28+11:00 streamanator afldb[1823]: ✓ Ready in 0ms
+2026-10-25T17:43:28+11:00 streamanator afldb[1817]: ✓ Ready in 0ms
+2026-10-26T16:36:42+11:00 streamanator afldb[1161909]: ✓ Ready in 0ms
+2026-10-26T16:36:43+11:00 streamanator afldb[1161926]: ✓ Ready in 0ms
+2026-10-26T16:36:45+11:00 streamanator afldb[1161957]: ✓ Ready in 0ms
+2026-10-26T16:36:46+11:00 streamanator systemd[1]: afldb.service: Deactivated successfully.
+2026-10-26T16:36:51+11:00 streamanator systemd[1]: afldb.service: Scheduled restart job, restart counter is at 1.
+2026-10-26T16:36:51+11:00 streamanator systemd[1]: Started afldb.service - AFLDB — Australian Football statistics database.
+2026-10-26T16:36:51+11:00 streamanator afldb[1162113]: [afldb] primary 1162113 starting 4 worker(s)
+2026-10-26T16:36:51+11:00 streamanator afldb[1162121]: ✓ Ready in 0ms
+2026-10-26T16:36:51+11:00 streamanator afldb[1162120]: ✓ Ready in 0ms
+2026-10-26T16:36:51+11:00 streamanator afldb[1162123]: ✓ Ready in 0ms
+2026-10-26T16:36:51+11:00 streamanator afldb[1162122]: ✓ Ready in 0ms
+2026-11-03T08:42:19+11:00 streamanator systemd[1]: Stopping afldb.service - AFLDB — Australian Football statistics database...
+2026-11-03T08:42:22+11:00 streamanator afldb[2470946]: ✓ Ready in 0ms
+2026-11-03T08:42:22+11:00 streamanator afldb[2471208]: ✓ Ready in 0ms
+2026-11-03T08:42:24+11:00 streamanator afldb[2471262]: ✓ Ready in 0ms
+2026-11-03T08:42:25+11:00 streamanator systemd[1]: afldb.service: Deactivated successfully.
+2026-11-03T08:42:25+11:00 streamanator systemd[1]: Stopped afldb.service - AFLDB — Australian Football statistics database.
+2026-11-03T15:35:37+11:00 streamanator systemd[1]: Started afldb.service - AFLDB — Australian Football statistics database.
+2026-11-03T15:35:38+11:00 streamanator afldb[1677]: [afldb] primary 1677 starting 4 worker(s)
+2026-11-03T15:35:38+11:00 streamanator afldb[1871]: ✓ Ready in 0ms
+2026-11-03T15:35:38+11:00 streamanator afldb[1877]: ✓ Ready in 0ms
+2026-11-03T15:35:38+11:00 streamanator afldb[1870]: ✓ Ready in 0ms
+2026-11-03T15:35:38+11:00 streamanator afldb[1879]: ✓ Ready in 0ms
+== build artifact
+BUILD_ID 8sFpWkolwF1yKuKbFkOir standalone BUILD_ID 8sFpWkolwF1yKuKbFkOir
+2.8G	/home/arm/projects/afldb/.next
+symlinks under .next/standalone: 0
+absolute links leaving the bundle (first 5):
+files with .env* under standalone: 0
+data
+deploy
+node_modules
+package.json
+public
+server.js
+tools
+== disk
+/dev/mapper/ubuntu--vg-ubuntu--lv  232G  141G   80G  64% /
+/dev/sdf1                          938G  186G  705G  21% /mnt/ssd
+== settle timers next elapse
+NEXT                         LEFT LAST                               PASSED UNIT                                ACTIVATES
+Fri 2026-11-06 06:50:00 AEDT   4s Fri 2026-11-06 06:45:15 AEDT 4min 40s ago afldb-settle-afl-api-brownlow.timer afldb-settle-afl-api-brownlow.service
+Sat 2026-11-07 05:12:56 AEDT  22h Fri 2026-11-06 05:08:37 AEDT 1h 41min ago afldb-settle-afl-api.timer          afldb-settle-afl-api.service
+
+2 timers listed.
+== AFL API snapshot dirs on DEV (names only)
+matches: 42
+seasons: 1
+rosters: 1
+fixtures: 0
+afl-api-2026-2026-11-05-180838
+afl-api-2026-2026-11-04-181118
+afl-api-2026-2026-11-03-180538
+DEVINSPECT2-DONE

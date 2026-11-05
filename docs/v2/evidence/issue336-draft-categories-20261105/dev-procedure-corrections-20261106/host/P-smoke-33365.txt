@@ -1,0 +1,36 @@
+200 bytes=47 error_markers=0 /api/health
+200 bytes=42952 error_markers=0 /
+200 bytes=113578 error_markers=0 /players
+200 bytes=43731 error_markers=0 /players/fred-rodriguez-13364
+200 bytes=29385 error_markers=0 /clubs
+200 bytes=27532 error_markers=0 /clubs/compare
+200 bytes=27532 error_markers=0 /clubs/compare
+200 bytes=156083 error_markers=0 /seasons
+200 bytes=1218209 error_markers=0 /seasons/2026
+404 bytes=16190 error_markers=0 /seasons/2027
+200 bytes=91971 error_markers=0 /matches/17137
+200 bytes=57041 error_markers=0 /venues
+200 bytes=86944 error_markers=0 /venues/melbourne-cricket-ground
+200 bytes=26985 error_markers=0 /records
+200 bytes=194110 error_markers=0 /records/most-games
+200 bytes=144888 error_markers=0 /records/father-son
+200 bytes=247781 error_markers=0 /coaches
+200 bytes=62400 error_markers=0 /coaches/adam-kingsley-93
+200 bytes=191988 error_markers=0 /brownlow
+200 bytes=52242 error_markers=0 /awards
+200 bytes=358591 error_markers=0 /hall-of-fame
+404 bytes=22278 error_markers=0 /honour-teams
+307 bytes=15450 error_markers=0 /grid-solver
+200 bytes=26660 error_markers=0 /search?q=ablett
+308 bytes=15622 error_markers=0 /advanced-search
+200 bytes=37200 error_markers=0 /match-search
+200 bytes=38886 error_markers=0 /aflw
+200 bytes=25330 error_markers=0 /about
+200 bytes=27660 error_markers=0 /privacy
+200 bytes=28616 error_markers=0 /draft
+200 bytes=34368 error_markers=0 jake_rows=0 empty_state=0 /draft/2014?q=Jake+Long
+200 bytes=34430 error_markers=0 jake_rows=0 empty_state=0 /draft/2014?view=rookie&q=Jake+Long
+200 bytes=40494 error_markers=0 jake_rows=0 empty_state=0 /draft/2014?view=rookie&q=Jake%C2%A0Long
+404 bytes=9 error_markers=0 /sitemap.xml
+200 bytes=27 error_markers=0 /robots.txt
+307 bytes=12 error_markers=0 /admin
