@@ -162,8 +162,6 @@ export default async function DraftYearPage({
     />
   );
 
-  let lastKind: string | null | undefined;
-
   return (
     <>
       <Breadcrumbs items={[
@@ -251,10 +249,9 @@ export default async function DraftYearPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.flatMap((pick) => {
+                  {rows.flatMap((pick, i) => {
                     const out = [];
-                    if (grouped && pick.draftKind !== lastKind) {
-                      lastKind = pick.draftKind;
+                    if (grouped && (i === 0 || rows[i - 1].draftKind !== pick.draftKind)) {
                       out.push(
                         <tr key={`group-${pick.draftKind ?? pick.draftType}-${pick.id}`} className="draft-group">
                           <th scope="colgroup" colSpan={7}>
