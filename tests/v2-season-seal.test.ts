@@ -704,6 +704,8 @@ describe('the season-bearing writer inventory (V2-GAP-006, application level onl
     'tools/v2/gap029-labels-isolated-e2e.mts': 'offline',
     'tools/v2/gap029-rookie-selections-rehearsal.mts': 'offline',
     'tools/v2/gap006-review-visual.mts': 'offline',
+    // AFLDB-ISSUE-336 Pre-Draft insert rehearsal: refuses any target but an isolated afldb_v2_*_test database. A production variant must be reclassified 'governed'.
+    'tools/v2/issue336-predraft-insert.ts': 'offline',
     'tools/v2/rollback-populate.ts': 'offline',
   };
   const TABLES = [
