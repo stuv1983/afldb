@@ -1,0 +1,86 @@
+== provenance 2026-11-05T04:17:39Z (AEDT 2026-11-05 15:17:39)
+-- events.log (last 15)
+{"ts":"2026-10-31T23:30:05.183Z","op":"build-start","revision":"fd48ace0c2cb70296d723603aa397b5bd7a21a0d","workspace":"/home/arm/afldb-releases/builds/20261031T233005Z-fd48ace0c2cb-85430f","afldbEnv":"production","memAvailableMb":2943}
+{"ts":"2026-10-31T23:34:31.305Z","op":"build-pass","id":"fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy","revision":"fd48ace0c2cb70296d723603aa397b5bd7a21a0d","buildId":"pqAQwRIJWLjSYzR8LiTuy","manifest":"2f011e790d79a31c7729c0625dc1848e3c73171aa38cfe16891fb260436914dd","workspace":"/home/arm/afldb-releases/builds/20261031T233005Z-fd48ace0c2cb-85430f"}
+{"ts":"2026-10-31T23:35:45.285Z","op":"promote","id":"fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy","previous":"ad245d602f6f-m0M8pf121326vNSo2B759"}
+{"ts":"2026-10-31T23:51:25.560Z","op":"status-pass","id":"fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy"}
+{"ts":"2026-11-02T01:50:46.883Z","op":"build-start","revision":"ea98a35f20610e75c18e698bc0d9fe084c3c783d","workspace":"/home/arm/afldb-releases/builds/20261102T015046Z-ea98a35f2061-8292a3","afldbEnv":"production","memAvailableMb":2915}
+{"ts":"2026-11-02T01:55:32.270Z","op":"build-pass","id":"ea98a35f2061--vY0EFS0DdR-TiPkxTZz6","revision":"ea98a35f20610e75c18e698bc0d9fe084c3c783d","buildId":"-vY0EFS0DdR-TiPkxTZz6","manifest":"bf4d3703ee269df500466fa5fd834cd067f30bd6aea8e29d83069846e1f42099","workspace":"/home/arm/afldb-releases/builds/20261102T015046Z-ea98a35f2061-8292a3"}
+{"ts":"2026-11-02T01:59:10.636Z","op":"promote","id":"ea98a35f2061--vY0EFS0DdR-TiPkxTZz6","previous":"fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy"}
+{"ts":"2026-11-02T02:19:10.878Z","op":"status-pass","id":"ea98a35f2061--vY0EFS0DdR-TiPkxTZz6"}
+{"ts":"2026-11-02T21:36:09.898Z","op":"build-start","revision":"a0b1080f5b98aee7191894c138be27bb524c7b1b","workspace":"/home/arm/afldb-releases/builds/20261102T213609Z-a0b1080f5b98-c269b2","afldbEnv":"production","memAvailableMb":2986}
+{"ts":"2026-11-02T21:40:44.120Z","op":"build-pass","id":"a0b1080f5b98-B8kdpO6PO1tUCHus0j1za","revision":"a0b1080f5b98aee7191894c138be27bb524c7b1b","buildId":"B8kdpO6PO1tUCHus0j1za","manifest":"554d83f38c5c98b9ea58a623d4b91d393bc84465b7937cd75d1bc37e9afbf869","workspace":"/home/arm/afldb-releases/builds/20261102T213609Z-a0b1080f5b98-c269b2"}
+{"ts":"2026-11-02T21:41:21.672Z","op":"promote","id":"a0b1080f5b98-B8kdpO6PO1tUCHus0j1za","previous":"ea98a35f2061--vY0EFS0DdR-TiPkxTZz6"}
+{"ts":"2026-11-02T21:48:16.046Z","op":"status-pass","id":"a0b1080f5b98-B8kdpO6PO1tUCHus0j1za"}
+{"ts":"2026-11-05T01:11:57.884Z","op":"build-start","revision":"0f251c2daa8d7c6c38eacd559376dde41e010fd9","workspace":"/home/arm/afldb-releases/builds/20261105T011157Z-0f251c2daa8d-79bbe9","afldbEnv":"production","memAvailableMb":2778}
+{"ts":"2026-11-05T01:16:48.479Z","op":"build-pass","id":"0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN","revision":"0f251c2daa8d7c6c38eacd559376dde41e010fd9","buildId":"3t0xWKI76Jgna2tB8a9oN","manifest":"ee6f3971a3ea86926be2b41e1cea4a9933aa430ac668792d5d93edcda68564af","workspace":"/home/arm/afldb-releases/builds/20261105T011157Z-0f251c2daa8d-79bbe9"}
+{"ts":"2026-11-05T04:11:49.252Z","op":"promote","id":"0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN","previous":"a0b1080f5b98-B8kdpO6PO1tUCHus0j1za"}
+-- links
+lrwxrwxrwx 1 arm arm 43 2026-11-05 15:11:49.251067362 +1100 /home/arm/afldb-releases/current -> releases/0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN
+lrwxrwxrwx 1 arm arm 43 2026-11-05 15:11:49.251067362 +1100 /home/arm/afldb-releases/previous -> releases/a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+-- work folder
+total 156
+drwx------  2 arm arm  4096 2026-11-05 15:12:23.693240047 +1100 .
+drwxr-x--- 41 arm arm 12288 2026-11-05 15:12:03.684139734 +1100 ..
+-rw-rw-r--  1 arm arm   566 2026-11-05 15:15:55.156815838 +1100 cutover.log
+-rw-------  1 arm arm 97555 2026-11-05 12:11:57.593276946 +1100 d1.log
+-rw-------  1 arm arm   105 2026-11-05 12:11:57.639277353 +1100 d2-launch.log
+-rw-rw-r--  1 arm arm  2131 2026-11-05 12:17:00.071840359 +1100 d2-wait.log
+-rw-------  1 arm arm  2063 2026-11-05 12:16:54.131791794 +1100 d2.log
+-rw-------  1 arm arm  2385 2026-11-05 12:09:09.853747097 +1100 pa.log
+-rw-------  1 arm arm  3606 2026-11-05 12:08:59.370648031 +1100 pa.sh
+-rw-------  1 arm arm 11966 2026-11-05 12:11:51.778225469 +1100 phase.sh
+-rw-rw-r--  1 arm arm   563 2026-11-05 15:12:23.803240598 +1100 restart-probe.log
+-rw-rw-r--  1 arm arm  1832 2026-11-05 12:17:12.110938629 +1100 v.log
+-- /home/arm/i334-335/cutover.log
+== i334-335 cutover 2026-11-05T04:15:44Z (AEDT 2026-11-05 15:15:44)
+checkout at H, clean
+NEW_ID 0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN
+release: VERIFY PASS 0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN (revision 0f251c2daa8d7c6c38eacd559376dde41e010fd9, BUILD_ID 3t0xWKI76Jgna2tB8a9oN, 12996 files)
+release: a0b1080f5b98-B8kdpO6PO1tUCHus0j1za: 190 server-output file(s) differ (ISR; allowed)
+release: VERIFY PASS a0b1080f5b98-B8kdpO6PO1tUCHus0j1za (revision a0b1080f5b98aee7191894c138be27bb524c7b1b, BUILD_ID B8kdpO6PO1tUCHus0j1za, 12995 files)
+CUTOVER FAILED rc=1: DO NOT RESTART
+-- /home/arm/i334-335/restart-probe.log
+== i334-335 probe 2026-11-05T04:12:23Z (AEDT 2026-11-05 15:12:23)
+state probe 2026-11-05T04:12:23Z
+  OLD_ID   a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+  NEW_ID   0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN
+  current  0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN
+  previous a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+  unit     afldb ActiveState=active Result=success MainPID=3427584
+  process  runs 0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN (/home/arm/afldb-releases/releases/0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN)
+  health   {"status":"ok","database":"ok","latencyMs":2}
+  locks    none
+STATE NEW_SERVING
+-- phase.sh hash
+3ca42f903f850cc9a5f5aa278ee238a39da0ed91904474b5e21ece19f119e6af  /home/arm/i334-335/phase.sh
+-- unit
+MainPID=3427584
+Result=success
+NRestarts=0
+ExecMainStartTimestamp=Thu 2026-11-05 15:12:03 AEDT
+ActiveState=active
+SubState=running
+ActiveEnterTimestamp=Thu 2026-11-05 15:12:03 AEDT
+-- journal: unit start/stop and identity lines since 12:17 AEDT
+Hint: You are currently not seeing messages from other users and the system.
+      Users in groups 'adm', 'systemd-journal' can see all messages.
+      Pass -q to turn off this notice.
+2026-11-05T15:11:58+11:00 afldb-prod afldb[3326560]: [afldb] SIGTERM received, stopping workers
+2026-11-05T15:11:58+11:00 afldb-prod afldb[3326560]: [afldb] worker 3326573 (id 2) exited (143); restarting in 1000ms
+2026-11-05T15:11:58+11:00 afldb-prod afldb[3326560]: [afldb] worker 3326572 (id 1) exited (143); restarting in 2000ms
+2026-11-05T15:12:03+11:00 afldb-prod afldb[3427584]: [afldb] primary 3427584 starting 2 worker(s)
+2026-11-05T15:12:03+11:00 afldb-prod afldb[3427584]: [afldb] serving build 3t0xWKI76Jgna2tB8a9oN release 0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN revision 0f251c2daa8d7c6c38eacd559376dde41e010fd9
+-- journal: error count since the current start
+0
+-- sudo entries for afldb since 12:17 (if readable)
+2026-11-05T15:11:58+11:00 afldb-prod sudo[3427549]:      arm : TTY=pts/0 ; PWD=/home/arm/i334-335 ; USER=root ; COMMAND=/usr/bin/systemctl restart afldb
+2026-11-05T15:11:58+11:00 afldb-prod sudo[3427549]: pam_unix(sudo:session): session opened for user root(uid=0) by arm(uid=1000)
+2026-11-05T15:12:03+11:00 afldb-prod sudo[3427549]: pam_unix(sudo:session): session closed for user root
+-- timers
+NextElapseUSecRealtime=Fri 2026-11-06 05:07:25 AEDT
+LastTriggerUSec=Thu 2026-11-05 05:03:41 AEDT
+-- tmux
+no tmux sessions
+-- checkout
+f32d44f07b3f81129aad4cce2feef1629a37fef1

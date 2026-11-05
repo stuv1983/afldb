@@ -1,0 +1,48 @@
+﻿ff352f9f117e52b31914dedce979710bf633443cf110dab7fb0ace6c261b2062  /home/arm/i334-335/pa.sh
+/home/arm/i334-335/pa.sh: line 1: ﻿#!/usr/bin/env: No such file or directory
+== i334-335 P-A 2026-11-05T01:08:59Z (AEDT 2026-11-05 12:08:59)
+release: current  a0b1080f5b98-B8kdpO6PO1tUCHus0j1za revision a0b1080f5b98aee7191894c138be27bb524c7b1b BUILD_ID B8kdpO6PO1tUCHus0j1za production
+release: previous ea98a35f2061--vY0EFS0DdR-TiPkxTZz6 revision ea98a35f20610e75c18e698bc0d9fe084c3c783d BUILD_ID -vY0EFS0DdR-TiPkxTZz6
+release: memory   afldb MemoryCurrent 446 MB
+release: process  3326560 runs in /home/arm/afldb-releases/releases/a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+release: health   200 status=ok database=ok
+release: build    /_next/static/B8kdpO6PO1tUCHus0j1za/_buildManifest.js 200
+release: build    /_next/static/-vY0EFS0DdR-TiPkxTZz6/_buildManifest.js 404 (previous; expect 404)
+release: STATUS PASS a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+release: a0b1080f5b98-B8kdpO6PO1tUCHus0j1za: 190 server-output file(s) differ (ISR; allowed)
+release: VERIFY PASS a0b1080f5b98-B8kdpO6PO1tUCHus0j1za (revision a0b1080f5b98aee7191894c138be27bb524c7b1b, BUILD_ID B8kdpO6PO1tUCHus0j1za, 12995 files)
+state probe 2026-11-05T01:09:09Z
+  OLD_ID   a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+  NEW_ID   (not set)
+  current  a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+  previous ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+  unit     afldb ActiveState=active Result=success MainPID=3326560
+  process  runs a0b1080f5b98-B8kdpO6PO1tUCHus0j1za (/home/arm/afldb-releases/releases/a0b1080f5b98-B8kdpO6PO1tUCHus0j1za)
+  health   {"status":"ok","database":"ok","latencyMs":1}
+  locks    none
+STATE OLD_SERVING
+MemAvailable 2745 MB
+free 50082752 KB
+timer afldb-settle-afl-api.timer next: Fri 2026-11-06 05:07:25 AEDT
+P-A PASS (record the match timer's next-elapse time for the D3c comparison)
+P-A exit 0
+== J1 crontab
+no afldb cron entries
+== extra read-only baseline
+NEWFILE absent
+c5-observe present sha256 f3362f881f0f1c8a
+MainPID=3326560
+NRestarts=0
+ActiveEnterTimestamp=Tue 2026-11-03 08:48:00 AEDT
+NextElapseUSecRealtime=Fri 2026-11-06 05:07:25 AEDT
+LastTriggerUSec=Thu 2026-11-05 05:03:41 AEDT
+tmux tmux 3.4
+no tmux sessions
+61a95f7397da-JYIBkYn8ynPgYMn1e5nK-
+9ed9c9dd3e84-QNEHXAtU53TzUjj0Mb7mv
+a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+ad245d602f6f-m0M8pf121326vNSo2B759
+ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy
+arm can read the afldb journal
+/home/arm/i334-335/pa.sh: line 50: $'\r': command not found

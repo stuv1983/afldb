@@ -1,0 +1,93 @@
+phase.sh: OK
+== i334-335 d3c 2026-11-05T04:17:54Z (AEDT 2026-11-05 15:17:54)
+AFLDB post-install check 2026-11-05T04:17:54Z: expect 0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN (BUILD_ID 3t0xWKI76Jgna2tB8a9oN, previous B8kdpO6PO1tUCHus0j1za)
+release route status
+        release: current  0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN revision 0f251c2daa8d7c6c38eacd559376dde41e010fd9 BUILD_ID 3t0xWKI76Jgna2tB8a9oN production
+        release: previous a0b1080f5b98-B8kdpO6PO1tUCHus0j1za revision a0b1080f5b98aee7191894c138be27bb524c7b1b BUILD_ID B8kdpO6PO1tUCHus0j1za
+        release: memory   afldb MemoryCurrent 150 MB
+        release: process  3427584 runs in /home/arm/afldb-releases/releases/0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN
+        release: health   200 status=ok database=ok
+        release: build    /_next/static/3t0xWKI76Jgna2tB8a9oN/_buildManifest.js 200
+        release: build    /_next/static/B8kdpO6PO1tUCHus0j1za/_buildManifest.js 404 (previous; expect 404)
+        release: STATUS PASS 0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN
+  ok    status --expect 0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN PASS
+current build and health through loopback and the public endpoint
+  ok    http://127.0.0.1:3100/api/health {"status":"ok","database":"ok","latencyMs":0}
+  ok    http://127.0.0.1:3100 _buildManifest.js for 3t0xWKI76Jgna2tB8a9oN 200
+  ok    https://beta.afldb.com/api/health {"status":"ok","database":"ok","latencyMs":0}
+  ok    https://beta.afldb.com _buildManifest.js for 3t0xWKI76Jgna2tB8a9oN 200
+previous build B8kdpO6PO1tUCHus0j1za must be absent at the origin
+  ok    origin (loopback) previous B8kdpO6PO1tUCHus0j1za 404
+  ok    origin (public, cache-busted) previous B8kdpO6PO1tUCHus0j1za 404, cf-cache-status BYPASS
+  CACHE public previous B8kdpO6PO1tUCHus0j1za 200 from an old Cloudflare cache HIT of an immutable asset; the origin checks above decide
+pages and every referenced asset (public endpoint, redirects followed)
+  ok    page / -> 200 https://beta.afldb.com/beta
+  ok    page /beta -> 200 https://beta.afldb.com/beta
+  ok    page /players -> 200 https://beta.afldb.com/beta?from=%2Fplayers
+  ok    page /matches -> 200 https://beta.afldb.com/beta?from=%2Fmatches
+  ok    page /seasons -> 200 https://beta.afldb.com/beta?from=%2Fseasons
+  ok    page /clubs -> 200 https://beta.afldb.com/beta?from=%2Fclubs
+  ok    page /records -> 200 https://beta.afldb.com/beta?from=%2Frecords
+  ok    page /search -> 200 https://beta.afldb.com/beta?from=%2Fsearch
+  ok    page /admin/operations -> 200 https://beta.afldb.com/admin/login
+  ok    8 assets 200 with the right type
+  ok    all 8 served assets are byte-identical to 0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN's files
+  ok    POST /api/admin/email-intake 410 (retired)
+journal since the service started
+  ok    primary start line present since Thu 2026-11-05 15:12:03 AEDT
+        [afldb] serving build 3t0xWKI76Jgna2tB8a9oN release 0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN revision 0f251c2daa8d7c6c38eacd559376dde41e010fd9
+  ok    0 error/fatal/unhandled lines
+  info  NRestarts 0, MemoryCurrent 160 MB
+POST-INSTALL CHECK PASS 0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN (1 old Cloudflare cache HIT(s) reported above, origin 404)
+state probe 2026-11-05T04:17:58Z
+  OLD_ID   a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+  NEW_ID   0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN
+  current  0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN
+  previous a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+  unit     afldb ActiveState=active Result=success MainPID=3427584
+  process  runs 0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN (/home/arm/afldb-releases/releases/0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN)
+  health   {"status":"ok","database":"ok","latencyMs":1}
+  locks    none
+STATE NEW_SERVING
+Hint: You are currently not seeing messages from other users and the system.
+      Users in groups 'adm', 'systemd-journal' can see all messages.
+      Pass -q to turn off this notice.
+== c5-observe timer 2026-11-05T04:17:58Z N=f32d44f07b3f81129aad4cce2feef1629a37fef1 (host local 2026-11-05 15:17:58 AEDT)
+identity ok (afldb_prod, OID 66668, read-only session)
+match timer is-enabled = [enabled] (expected [enabled])
+match timer ActiveState = [active] (expected [active])
+next elapse: [Fri 2026-11-06 05:07:25 AEDT]
+Brownlow timer enabled/active = [disabled/inactive] (expected [disabled/inactive])
+AFL Tables timer enabled/active = [disabled/inactive] (expected [disabled/inactive])
+match service ActiveState (nothing running yet) = [inactive] (expected [inactive])
+settle/acquire processes = [0] (expected [0])
+setting still true = [true] (expected [true])
+afldb timers known to systemd:
+    Fri 2026-11-06 05:07:25 AEDT          13h Thu 2026-11-05 05:03:41 AEDT      10h ago afldb-settle-afl-api.timer     afldb-settle-afl-api.service
+C5-OBSERVE timer PASS
+D3c PASS
+-- serving-build journal line
+Hint: You are currently not seeing messages from other users and the system.
+      Users in groups 'adm', 'systemd-journal' can see all messages.
+      Pass -q to turn off this notice.
+Nov 05 15:12:03 afldb-prod afldb[3427584]: [afldb] serving build 3t0xWKI76Jgna2tB8a9oN release 0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN revision 0f251c2daa8d7c6c38eacd559376dde41e010fd9
+-- preservation vs P-A baseline (timer 'Fri 2026-11-06 05:07:25 AEDT', last trigger 'Thu 2026-11-05 05:03:41 AEDT')
+NextElapseUSecRealtime=Fri 2026-11-06 05:07:25 AEDT
+LastTriggerUSec=Thu 2026-11-05 05:03:41 AEDT
+match timer schedule preserved (unchanged, or advanced only by a normal firing)
+MainPID=3427584
+NRestarts=0
+ActiveEnterTimestamp=Thu 2026-11-05 15:12:03 AEDT
+== i334-335 d4 2026-11-05T04:17:58Z (AEDT 2026-11-05 15:17:58)
+release: VERIFY PASS 0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN (revision 0f251c2daa8d7c6c38eacd559376dde41e010fd9, BUILD_ID 3t0xWKI76Jgna2tB8a9oN, 12996 files)
+state probe 2026-11-05T04:18:04Z
+  OLD_ID   a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+  NEW_ID   0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN
+  current  0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN
+  previous a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+  unit     afldb ActiveState=active Result=success MainPID=3427584
+  process  runs 0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN (/home/arm/afldb-releases/releases/0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN)
+  health   {"status":"ok","database":"ok","latencyMs":1}
+  locks    none
+STATE NEW_SERVING
+D4 PASS (serving revision R, manifest-verified; refusals proven on Linux, not on production)

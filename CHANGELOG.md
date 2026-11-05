@@ -15,6 +15,15 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-334 and ISSUE-335 RELEASED to production and resolved (2026-11-05; application release; no database, schema, grant, setting, `.env` or timer change; the outcome commit is local and not pushed)
+
+- **Release:** production now serves `0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN`, built from `R` `0f251c2daa8d7c6c38eacd559376dde41e010fd9` and manifest-verified, through the release route. This release puts the ISSUE-334 media-route same-origin refusal and the ISSUE-335 `deleteMatch` coach-override refusal (both described in the entry below) into service, along with the GAP-029 `admin-draft.ts` refactor that production had never built.
+- **Push:** `origin/main` moved `87b6b216..f32d44f0` as a fast-forward.
+- **Cutover:** promoted 15:11:49 AEDT; the owner restarted at 15:11:58. D3c PASS covered health, assets, the identity journal line, and preservation of the timers, the setting and `AFLDB_SETTLE_TRIGGER`. D4 PASS covered the manifest and the serving identity. For ISSUE-335, D4 also confirmed a bundle literal, checked with a single `grep -rqF`; this is the owner's recorded D4 amendment.
+- **Rollback target:** `a0b1080f5b98-B8kdpO6PO1tUCHus0j1za`, retained as `previous`.
+- **Not exercised on production:** neither refusal (both are proven on isolated Linux), the same-origin upload smoke, or any check for orphaned `match_coaches` overrides.
+- **Record:** `docs/v2/evidence/issue334-335-release-execution-20261105/execution-record.md`.
+
 ### ISSUE-334 and ISSUE-335 fixed and Linux-qualified; application release prepared, not approved (2026-11-05; local commits not pushed; **production not changed and not fixed**)
 
 - **ISSUE-334 (Low):** `POST /admin/content/media` (the `/admin/content` image upload Route Handler) now refuses a request that is not same-origin with HTTP 403 before any session lookup, body read, write or audit. It reuses the CSV upload route's `sameOriginRefusal`, because a Route Handler gets no Server Action origin check and the `SameSite=Lax` cookie does not stop a sibling-origin POST. The origin policy, cookie, permissions and limits are unchanged.

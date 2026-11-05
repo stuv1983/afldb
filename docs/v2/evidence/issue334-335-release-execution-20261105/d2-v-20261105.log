@@ -1,0 +1,64 @@
+phase.sh: OK
+== i334-335 d2-wait 2026-11-05T01:12:09Z (AEDT 2026-11-05 12:12:09)
+== i334-335 d2 2026-11-05T01:11:57Z (AEDT 2026-11-05 12:11:57)
+state probe 2026-11-05T01:11:57Z
+  OLD_ID   a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+  NEW_ID   (not set)
+  current  a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+  previous ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+  unit     afldb ActiveState=active Result=success MainPID=3326560
+  process  runs a0b1080f5b98-B8kdpO6PO1tUCHus0j1za (/home/arm/afldb-releases/releases/a0b1080f5b98-B8kdpO6PO1tUCHus0j1za)
+  health   {"status":"ok","database":"ok","latencyMs":1}
+  locks    none
+STATE OLD_SERVING
+release: admission: MemAvailable 2778 MB of 3915 MB, swap 0 MB, free disk 47.8 GB
+release: workspace /home/arm/afldb-releases/builds/20261105T011157Z-0f251c2daa8d-79bbe9
+release: npm ci: 16 s, min MemAvailable 1897 MB, peak RSS 903 MB
+release: build: 248 s, min MemAvailable 1209 MB, peak RSS 1695 MB
+release: candidate 0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN passed V1-V5; boot smoke on 127.0.0.1:3199
+release: smoke: health ok, _buildManifest.js 200, /_next/static/css/cb39c2e05a6b8ca6.css 200, pages {"/":"200 HIT","/players":"200","/clubs":"200","/seasons":"200"} (beta claim)
+release: RELEASE READY 0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN (12996 files, manifest ee6f3971a3ea…) at /home/arm/afldb-releases/releases/0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN
+release: next: node deploy/release.mjs promote 0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN
+release: VERIFY PASS 0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN (revision 0f251c2daa8d7c6c38eacd559376dde41e010fd9, BUILD_ID 3t0xWKI76Jgna2tB8a9oN, 12996 files)
+state probe 2026-11-05T01:16:54Z
+  OLD_ID   a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+  NEW_ID   0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN
+  current  a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+  previous ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+  unit     afldb ActiveState=active Result=success MainPID=3326560
+  process  runs a0b1080f5b98-B8kdpO6PO1tUCHus0j1za (/home/arm/afldb-releases/releases/a0b1080f5b98-B8kdpO6PO1tUCHus0j1za)
+  health   {"status":"ok","database":"ok","latencyMs":1}
+  locks    none
+STATE OLD_SERVING
+D2 PASS NEW_ID=0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN
+== i334-335 v 2026-11-05T01:17:00Z (AEDT 2026-11-05 12:17:00)
+NEW_ID 0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN
+release: VERIFY PASS 0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN (revision 0f251c2daa8d7c6c38eacd559376dde41e010fd9, BUILD_ID 3t0xWKI76Jgna2tB8a9oN, 12996 files)
+release: current  a0b1080f5b98-B8kdpO6PO1tUCHus0j1za revision a0b1080f5b98aee7191894c138be27bb524c7b1b BUILD_ID B8kdpO6PO1tUCHus0j1za production
+release: previous ea98a35f2061--vY0EFS0DdR-TiPkxTZz6 revision ea98a35f20610e75c18e698bc0d9fe084c3c783d BUILD_ID -vY0EFS0DdR-TiPkxTZz6
+release: memory   afldb MemoryCurrent 413 MB
+release: process  3326560 runs in /home/arm/afldb-releases/releases/a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+release: health   200 status=ok database=ok
+release: build    /_next/static/B8kdpO6PO1tUCHus0j1za/_buildManifest.js 200
+release: build    /_next/static/-vY0EFS0DdR-TiPkxTZz6/_buildManifest.js 404 (previous; expect 404)
+release: STATUS PASS a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+state probe 2026-11-05T01:17:06Z
+  OLD_ID   a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+  NEW_ID   0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN
+  current  a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+  previous ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+  unit     afldb ActiveState=active Result=success MainPID=3326560
+  process  runs a0b1080f5b98-B8kdpO6PO1tUCHus0j1za (/home/arm/afldb-releases/releases/a0b1080f5b98-B8kdpO6PO1tUCHus0j1za)
+  health   {"status":"ok","database":"ok","latencyMs":0}
+  locks    none
+STATE OLD_SERVING
+ISSUE-335 string present in NEW_ID bundle
+string absent from OLD_ID (as expected)
+0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN
+61a95f7397da-JYIBkYn8ynPgYMn1e5nK-
+9ed9c9dd3e84-QNEHXAtU53TzUjj0Mb7mv
+a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+ad245d602f6f-m0M8pf121326vNSo2B759
+ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy
+V PASS NEW_ID=0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN
