@@ -7,7 +7,7 @@
 | Item | Value |
 |---|---|
 | **R** (qualified revision, the one built) | `0f251c2daa8d7c6c38eacd559376dde41e010fd9` (local `main`, **not pushed**) |
-| **H** (head the owner pushes) | `R`, or a later descendant that `static-delta-check.sh` proves documentation-only. It is written into the approval, because a commit cannot print its own hash |
+| **H** (head the owner pushes) | The documentation commit that carries this package, or a later documentation-only descendant; `static-delta-check.sh` proves it. It is written into the approval, because a commit cannot print its own hash. **`R` itself is not a valid `H`:** the enumerated file list the check reads lives in the documentation after `R`, so `H = R` fails (verified) |
 | Serving release `OLD_ID` (pinned rollback target) | `a0b1080f5b98-B8kdpO6PO1tUCHus0j1za` (revision `a0b1080f5b98aee7191894c138be27bb524c7b1b`). **Last recorded 2026-11-04** (`post-release-closeout-2026-11-04.md` V5); P-A re-observes it |
 | `previous` `OLD_PREV` | `ea98a35f2061--vY0EFS0DdR-TiPkxTZz6` (recorded at the D-316-12 promotion, 2026-11-03). **Only `OLD_ID` is a rollback target** |
 | Production operator checkout `PROD_HEAD` | `d00e07e37566e92b35a34e62a1ff03e173715e87`, **last recorded 2026-11-04**; P-A re-observes it |
