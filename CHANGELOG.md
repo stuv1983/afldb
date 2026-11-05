@@ -15,6 +15,12 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-336 draft categories separated; picks numbered within their own draft (2026-11-05; local branch `claude/issue-336-draft-categories`, not pushed, **not deployed**; no schema or database change)
+
+- **Draft year pages:** `/draft/[year]` now has year navigation and category views (All, National, Rookie, Pre-Season, Mid-Season, Trade, a prominent Father–Son view, and Pre-Draft, Post-Draft, Free Agency, Mini-Draft and Training Squad Selection when present), each with its count. The All view groups rows by category and every row names its category ("National — Pick 4 — Father–Son"); trades and other unnumbered acquisitions show no number. Father–Son is a view over the real categories and is never counted twice. Ordering is stable (category, pick, name, id), a pick sort stays inside each category, changing category resets pagination, and pagination keeps the sort. Old `?type=` links open the matching category.
+- **Draft index and player pages:** the index states each year's categories; player draft history reads "2025 Rookie Draft — Pick 1", links to that category, and shows the signing mechanism.
+- **Data (prepared, not applied):** a reconciliation against the owner's DraftGuru CSVs (1991–2025, 5,966 rows) found 35 Pre-Draft rows missing from storage and 187 revised origin paths; an insert-only repair and its plan are rehearsed on an isolated clone only. Production data is unchanged. Record: `docs/v2/evidence/issue336-draft-categories-20261105/`.
+
 ### ISSUE-334 and ISSUE-335 RELEASED to production and resolved (2026-11-05; application release; no database, schema, grant, setting, `.env` or timer change; the outcome commit is local and not pushed)
 
 - **Release:** production now serves `0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN`, built from `R` `0f251c2daa8d7c6c38eacd559376dde41e010fd9` and manifest-verified, through the release route. This release puts the ISSUE-334 media-route same-origin refusal and the ISSUE-335 `deleteMatch` coach-override refusal (both described in the entry below) into service, along with the GAP-029 `admin-draft.ts` refactor that production had never built.
