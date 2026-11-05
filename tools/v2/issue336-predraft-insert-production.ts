@@ -385,7 +385,7 @@ async function run(): Promise<void> {
           let rank = (await tx<{ m: number }[]>`SELECT coalesce(max(dg_person_id),0)::int AS m FROM draft_persons WHERE source_id = ${sourceId}`)[0].m;
           marks.writing();
           let newPersons = 0;
-          const created: { key: string; pickId: number; personId: number; auditId: string }[] = [];
+          const created: { key: string; pickId: number; personId: number; auditId: string; seal: string }[] = [];
           for (const p of todo) {
             const e = byKey.get(p.key)!;
             let person = live.persons.get(e.playerUrl)?.[0] ?? null;
@@ -410,7 +410,7 @@ async function run(): Promise<void> {
               newValues: { draft_year: e.draftYear, draft_kind: DRAFT_KIND, source_record_id: e.sourceRecordId, player_url: e.playerUrl, club_id: p.clubId, signing_kind: e.signingKind,
                 draft_person_id: person.id, link_status_value: person.link_status },
               adminUserId: plan.actorUserId, note: e.correctionNote, seal: { kind: 'row' } });
-            created.push({ key: e.key, pickId: pick.id, personId: person.id, auditId: receipt.id });
+            created.push({ key: e.key, pickId: pick.id, personId: person.id, auditId: receipt.id, seal: receipt.seal.basis });
           }
           const plannedPersons = todo.filter((e) => e.personId === null).length;
           const total = await surfaceDigest(tx);
