@@ -31,6 +31,14 @@ branch's upstream; a detached HEAD, an unpublished pin or a diverged branch is
 refused before install, migration or build (sync-dev-remote.sh,
 afldb_checkout_pinned_revision). Combine with -RemoteRef <branch> to select the
 branch first.
+
+-RestartMethod selects how the service is restarted. 'auto' (default) tries
+`sudo -n systemctl restart` and falls back to the respawn below when passwordless
+sudo is unavailable. 'respawn' never invokes sudo: it requires the unit's
+Restart=always, sends SIGTERM to the unit's MainPID (server-cluster.mjs stops its
+workers and exits within 5 s; KillMode=mixed), and systemd starts the unit again
+after RestartSec; a new MainPID must appear within 60 s, then readiness is polled.
+The unit, its environment file and the timers are not touched.
 #>
 
 [CmdletBinding(SupportsShouldProcess = $true)]
@@ -53,7 +61,9 @@ param(
   [switch] $SkipHealth,
   [switch] $AllowDirtyServer,
   [switch] $NoPrune,
-  [switch] $Issue107Gate
+  [switch] $Issue107Gate,
+  [ValidateSet('auto', 'respawn')]
+  [string] $RestartMethod = 'auto'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -177,31 +187,40 @@ if (-not $SkipRestart) {
   # *systemd* respawn it from the unit — the environment file is re-read and
   # the restart is still systemd-managed. The respawn is then proven by a new
   # MainPID rather than assumed.
-  $restartCommand = @'
-if sudo -n systemctl restart __SERVICE__ 2>/dev/null; then
-  echo "[deploy] restarted through sudo systemctl"
-else
-  echo "[deploy] passwordless sudo unavailable; restarting through the unit Restart= policy"
-  AFLDB_RESTART_POLICY="$(systemctl show --property Restart --value __SERVICE__)"
-  test "$AFLDB_RESTART_POLICY" = always || { echo "[deploy] cannot restart: no passwordless sudo and Restart=$AFLDB_RESTART_POLICY" >&2; exit 23; }
-  AFLDB_OLD_PID="$(systemctl show --property MainPID --value __SERVICE__)"
-  test "$AFLDB_OLD_PID" -gt 0 || { echo "[deploy] service is stopped; a privileged start is required" >&2; exit 24; }
-  kill "$AFLDB_OLD_PID"
-  AFLDB_NEW_PID="$AFLDB_OLD_PID"
-  for _ in $(seq 1 60); do
-    sleep 1
-    AFLDB_NEW_PID="$(systemctl show --property MainPID --value __SERVICE__)"
-    if [ "$(systemctl is-active __SERVICE__)" = active ] && [ "$AFLDB_NEW_PID" -gt 0 ] && [ "$AFLDB_NEW_PID" != "$AFLDB_OLD_PID" ]; then break; fi
-    afldb_service_state __SERVICE__
-    if [ "$AFLDB_SERVICE_ACTIVE" = failed ] || { [ "$AFLDB_SERVICE_ACTIVE" = inactive ] && [ "$AFLDB_SERVICE_SUB" = dead ]; }; then
-      afldb_readiness_diagnostics __SERVICE__ __HEALTH_URL__ 0 "service failed before systemd respawn completed"
-      exit 25
-    fi
-  done
-  test "$AFLDB_NEW_PID" -gt 0 && test "$AFLDB_NEW_PID" != "$AFLDB_OLD_PID" || { echo "[deploy] systemd did not respawn the service" >&2; exit 25; }
-  echo "[deploy] systemd respawned the service: $AFLDB_OLD_PID -> $AFLDB_NEW_PID"
-fi
+  # The respawn path: SIGTERM to MainPID, systemd's Restart=always starts the unit
+  # again, proven by a new MainPID. Shared verbatim by both methods.
+  $respawnCommand = @'
+AFLDB_RESTART_POLICY="$(systemctl show --property Restart --value __SERVICE__)"
+test "$AFLDB_RESTART_POLICY" = always || { echo "[deploy] cannot respawn: the unit has Restart=$AFLDB_RESTART_POLICY, not always" >&2; exit 23; }
+AFLDB_OLD_PID="$(systemctl show --property MainPID --value __SERVICE__)"
+test "$AFLDB_OLD_PID" -gt 0 || { echo "[deploy] service is stopped; a privileged start is required" >&2; exit 24; }
+kill "$AFLDB_OLD_PID"
+AFLDB_NEW_PID="$AFLDB_OLD_PID"
+for _ in $(seq 1 60); do
+  sleep 1
+  AFLDB_NEW_PID="$(systemctl show --property MainPID --value __SERVICE__)"
+  if [ "$(systemctl is-active __SERVICE__)" = active ] && [ "$AFLDB_NEW_PID" -gt 0 ] && [ "$AFLDB_NEW_PID" != "$AFLDB_OLD_PID" ]; then break; fi
+  afldb_service_state __SERVICE__
+  if [ "$AFLDB_SERVICE_ACTIVE" = failed ] || { [ "$AFLDB_SERVICE_ACTIVE" = inactive ] && [ "$AFLDB_SERVICE_SUB" = dead ]; }; then
+    afldb_readiness_diagnostics __SERVICE__ __HEALTH_URL__ 0 "service failed before systemd respawn completed"
+    exit 25
+  fi
+done
+test "$AFLDB_NEW_PID" -gt 0 && test "$AFLDB_NEW_PID" != "$AFLDB_OLD_PID" || { echo "[deploy] systemd did not respawn the service" >&2; exit 25; }
+echo "[deploy] systemd respawned the service: $AFLDB_OLD_PID -> $AFLDB_NEW_PID"
 '@
+  $respawnCommand = $respawnCommand -replace "`r`n", "`n"
+  if ($RestartMethod -eq 'respawn') {
+    # Explicit, sudo-free method: no sudo invocation is generated at all.
+    $restartCommand = "echo `"[deploy] restart method: respawn (SIGTERM to MainPID; systemd Restart=always)`"`n" + $respawnCommand
+  } else {
+    $indented = (($respawnCommand.TrimEnd("`n") -split "`n") | ForEach-Object { '  ' + $_ }) -join "`n"
+    $restartCommand = "if sudo -n systemctl restart __SERVICE__ 2>/dev/null; then`n" +
+      "  echo `"[deploy] restarted through sudo systemctl`"`n" +
+      "else`n" +
+      "  echo `"[deploy] passwordless sudo unavailable; restarting through the unit Restart= policy`"`n" +
+      $indented + "`nfi"
+  }
   $restartCommand = $restartCommand -replace '__SERVICE__', $quotedServiceName
   $restartCommand = $restartCommand -replace '__HEALTH_URL__', $quotedHealthUrl
   Add-RemoteStep $remoteCommands 'restart systemd service' $restartCommand
@@ -237,6 +256,9 @@ Write-Host "Service:       $ServiceName"
 Write-Host "Health URL:    $HealthUrl"
 Write-Host "Readiness:     $ReadinessTimeoutSeconds s timeout / $ReadinessIntervalSeconds s interval"
 Write-Host "ISSUE-107 gate: $(if ($Issue107Gate) { 'on' } else { 'off' })"
+if (-not $SkipRestart) {
+  Write-Host "Restart:       $RestartMethod$(if ($RestartMethod -eq 'respawn') { ' (SIGTERM to MainPID, systemd Restart=always; no sudo)' } else { ' (sudo -n, else respawn)' })"
+}
 if ($RemoteRef.Trim()) {
   Write-Host "Remote ref:    $($RemoteRef.Trim())"
 }

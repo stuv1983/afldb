@@ -15,6 +15,18 @@ commit.
 
 ## [Unreleased]
 
+### `sync-dev -RestartMethod respawn`: a sudo-free DEV restart (2026-11-06; local, not pushed; workstation deploy tooling only)
+
+- **`deploy/sync-dev.ps1 -RestartMethod respawn`:** the restart step sends SIGTERM to the unit's MainPID and requires systemd
+  (`Restart=always`) to start a new MainPID within 60 s. It never attempts `sudo`. The ISSUE-107 gate and built-BUILD_ID readiness
+  follow unchanged.
+  - The default `auto` (try `sudo -n systemctl restart`, else respawn) is unchanged apart from one error-message wording.
+  - Unit files, the env file and timers are never touched.
+  - Executed against a transient user unit with DEV's restart settings and four workers: about 10 s from SIGTERM to steady service,
+    about 7 s of refused connections (`docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/`).
+- Tests: `tests/sync-dev-static.test.ps1` adds assertions for the respawn variant (no `sudo`; one kill, after the build and before
+  readiness; payload limit; `-RestartMethod sudo` refused).
+
 ### ISSUE-337 draft name search matches across Unicode spaces; pinned DEV deploys (2026-11-06; local commit `8b024098`, not pushed, **not deployed**; no schema or database change)
 
 - **Draft name search (AFLDB-ISSUE-337):** `/draft/[year]?q=` now finds a pick whichever Unicode space separator the stored name or the

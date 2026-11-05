@@ -69,6 +69,22 @@ $pinnedGateScript = & {
 $pinnedGatePayload = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($pinnedGateScript))
 Assert-True ($pinnedGatePayload.Length -le 24000) 'the pinned ISSUE-107-gated SSH payload exceeds the enforced safety limit'
 
+# -RestartMethod respawn: one explicit restart method with no sudo invocation anywhere in the generated script.
+$respawnScript = & {
+  . $syncScript -WhatIf -RemoteRef 'dev/v2-main' -ExpectedRevision $pin -Issue107Gate -RestartMethod respawn *> $null
+  $remoteScript
+}
+Assert-True ($respawnScript -notmatch 'sudo') 'a respawn deploy must not invoke or mention sudo'
+Assert-True (([regex]::Matches($respawnScript, '(?m)^kill "\$AFLDB_OLD_PID"$')).Count -eq 1) 'a respawn deploy must terminate MainPID exactly once'
+Assert-True ($respawnScript.IndexOf('kill "$AFLDB_OLD_PID"') -gt $respawnScript.IndexOf('npm run build')) 'the respawn must come after the build'
+Assert-True ($respawnScript.IndexOf('kill "$AFLDB_OLD_PID"') -lt $respawnScript.IndexOf('afldb_wait_for_readiness ')) 'readiness must be polled after the respawn'
+Assert-True ($respawnScript -match [regex]::Escape('"$AFLDB_BUILT_BUILD_ID"')) 'a respawn deploy must keep the ISSUE-107 build identity'
+$respawnPayload = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($respawnScript))
+Assert-True ($respawnPayload.Length -le 24000) 'the respawn SSH payload exceeds the enforced safety limit'
+$badMethodRefused = $false
+try { & { . $syncScript -WhatIf -RestartMethod 'sudo' *> $null } } catch { $badMethodRefused = $true }
+Assert-True $badMethodRefused 'an unknown restart method must be refused on the workstation'
+
 $gitBash = if ($env:ProgramFiles) { Join-Path $env:ProgramFiles 'Git\usr\bin\bash.exe' } else { '' }
 $bash = if ($gitBash -and (Test-Path -LiteralPath $gitBash)) {
   $gitBash
@@ -84,4 +100,4 @@ try {
   Remove-Item -LiteralPath $tempScript -Force -ErrorAction SilentlyContinue
 }
 
-Write-Output 'PASS: sync-dev PowerShell/static integration (20 assertions)'
+Write-Output 'PASS: sync-dev PowerShell/static integration (27 assertions)'
