@@ -53838,7 +53838,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   - **Bundle literal:** `active manual coach assignment` is present in the serving release's server bundle and absent from the outgoing `a0b1080f5b98-B8kdpO6PO1tUCHus0j1za`. The check is one invocation, `grep -rqF -- 'active manual coach assignment' "$ROOT/releases/$NEW_ID/.next/standalone/.next/server"`. This is the owner's recorded amendment of the package's D4 command, replacing `grep -rlF … | grep -q .`, which can fail falsely under `pipefail`. `R` and H were unchanged.
   - **Disclosed limitations:**
     - The refusal was proven on isolated Linux (RED 1 failed / 3 passed; GREEN 65 passed / 13 skipped / 0 failed) and was **not exercised on production**: no match was deleted.
-    - Production was **not checked** for orphaned `match_coaches` overrides left by past deletions. That stays a separate read-only check for the owner to authorise if wanted, and it is not a condition of this closure.
+    - Production was **not checked** for orphaned `match_coaches` overrides at acceptance. **Checked afterwards (2026-11-05T04:26Z, owner-authorised read-only census, replay-identical key decode):** production holds **no `match_coaches` overrides in any state**, so there are no orphaned, malformed, missing-match or invalid-club overrides and no remediation finding. Record: execution record, section "Post-acceptance".
     - The 13 Python-replay cases were not run.
     - The release also carried the GAP-029 `admin-draft.ts` behaviour-preserving refactor (package section 2), which the owner acknowledged.
   - **Record:** `docs/v2/evidence/issue334-335-release-execution-20261105/execution-record.md`. **Area:** admin data integrity, the Data Editor match deletion (`deleteMatch`) and coach assignment overrides (ISSUE-159).
@@ -53868,5 +53868,5 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   - The ISSUE-257 residue and historical-row guard held.
   - Evidence: `docs/v2/evidence/issue334-335-release-20261105/`.
 - **Process note:** the first Linux run, on `06459e99`, failed all four cases. The fixture was at fault (coach path outside `coaches_path_namespace_ck`; a lone synthetic match that `recomputeClubSeasons` refuses to delete); corrected in `0f251c2d`. No production code changed between the two runs.
-- **Not done:** the refusal is not exercised on production (that needs a match deletion); after a release its presence rests on provenance plus a bundle literal unique to `R`. Production was not checked for orphaned `match_coaches` overrides from past deletions; that is a separate read-only check for the owner to authorise if wanted.
-- **Next action:** none. Resolved 2026-11-05. The optional read-only check for orphaned overrides on production is the owner's to authorise.
+- **Not done:** the refusal is not exercised on production (that needs a match deletion); after a release its presence rests on provenance plus a bundle literal unique to `R`. Production was not checked for orphaned `match_coaches` overrides from past deletions at release time; the later owner-authorised read-only census found none (zero overrides of that type in any state).
+- **Next action:** none. Resolved 2026-11-05. The read-only orphaned-override census ran afterwards and found zero `match_coaches` overrides on production.

@@ -1,0 +1,8 @@
+== H host and user 2026-11-05T04:26:00Z
+host=afldb-prod user=arm
+== Q census (one REPEATABLE READ, READ ONLY transaction, rolled back) 2026-11-05T04:26:00Z
+identity	afldb_prod	afldb_backup	on	16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)	118	118_fixtures_unconfirmed_participants.sql
+active_total	-	0
+still_read_only	on
+psql_rc=0
+== DONE 2026-11-05T04:26:00Z

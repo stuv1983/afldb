@@ -106,3 +106,25 @@ Claude acted on nothing until a read-only provenance collection (`provenance.sh`
 **Retained:** `OLD_ID` (now `previous`, the only rollback target), `OLD_PREV` and the four older releases. Logs: `/home/arm/i334-335/` on production, and this folder.
 
 **Push:** none after D0. The outcome commit is local.
+
+## Post-acceptance: orphaned `match_coaches` override census (owner-authorised, read-only)
+
+Run 2026-11-05T04:26:00Z by Claude over the existing read-only SSH authority (`arm`, no sudo). Script:
+`scripts/census-match-coaches-overrides-prod.sh`; output: `census-match-coaches-overrides-prod.out` (both in this folder).
+
+- **Boundary:** `afldb_backup` credential from the checkout `.env` (never printed), `default_transaction_read_only=on`
+  plus an explicit `BEGIN … REPEATABLE READ READ ONLY … ROLLBACK`; `transaction_read_only` read `on` at start and end.
+  No DDL, no temp objects, no write, deactivation, repair, deletion or replay.
+- **Target:** `afldb_prod`, PostgreSQL 16.15, ledger 118 (`118_fixtures_unconfirmed_participants.sql`).
+- **Method:** the key decode is copied verbatim from `replay_admin_overrides(match_coaches)` in
+  `tools/migration/common.py` (match key = everything before the last `|`, club slug after it, equality only). Classes,
+  in the replay's precedence: malformed (no delimiter / empty slug), missing match, invalid club slug, then a
+  participation check (club is the match's home or away club, as `setCoachAssignment` enforces), missing or unresolvable
+  `coach_identity`.
+- **Result:** `data_overrides` holds **no `match_coaches` rows in any state** (no active, no inactive); `active_total 0`.
+  So there are **0** malformed keys, **0** missing matches, **0** invalid club references and **0** non-participant
+  clubs. No data-remediation finding is needed.
+- **Basis for reading 0 as real:** no row-level security policy exists in the migration history, and a privilege
+  failure would have aborted the run under `ON_ERROR_STOP` (`psql_rc=0`). No separate positive-control count was run.
+- The cutover provenance above is unchanged: the second run's documented refusal and the overwritten first-run
+  `cutover.log` stand as recorded; cutover was not rerun and no missing evidence was reconstructed.
