@@ -52,8 +52,9 @@ that staging table, so a live migration should not overlap a settle run. Code at
 reads changes meaning until V2 code writes NULL eligibility or unconfirmed fixtures), and its migrator treats the extra ledger rows as
 nothing to do. The 111–114 headers require `npm run db:privileges` after migrating; `deploy/sync-dev.ps1` does not run it.
 
-**`deploy/sync-dev.ps1` against today's DEV:** classifier blocks on the unknown untracked `.env.bak-…` file (the nine manifests are
-"known operational"); `git pull --ff-only` on local `main` fails (diverged); it then runs `npm ci`, `db:migrate`, an in-place `npm run
+**`deploy/sync-dev.ps1` against today's DEV:** ~~classifier blocks on the unknown untracked `.env.bak-…` file~~ **Corrected
+2026-11-06:** the classifier does *not* block. `.env.bak-*` and the nine manifests are all on its known-operational allowlist
+(`deploy/sync-dev-remote.sh`), so it warns and continues (`../dev-preview2-20261106/README.md` §3). `git pull --ff-only` on local `main` fails (diverged); it then runs `npm ci`, `db:migrate`, an in-place `npm run
 build` and a restart, with **no backup step, no privileges step and no timer pause**. The service and both timer units run straight
 from `~/projects/afldb` with its `.env` (unit files unchanged by V2; `deploy/afldb-settle-afl-api*.sh` are byte-identical at `ea9bddf8`).
 
@@ -87,6 +88,10 @@ data (including auth tables): keep it on loopback. To stop it later: `kill $(cat
 and `isolated-pg.ts stop` with `AFLDB_V2_PG_ROOT=…/pg-root AFLDB_V2_PG_PORT=55499` (not done; no cleanup was authorised).
 
 ## 4. Recommendation for primary DEV (requires separate owner approval)
+
+> **Superseded 2026-11-06** by the pinned, consolidated procedure `issues/open/AFLDB-ISSUE-336-DEV-DEPLOYMENT.md`. That procedure has
+> no timer pause or sudo, does not move the `.env.bak` file (step 3 below was based on the wrong classifier claim), and uses an exact
+> `-ExpectedRevision`. This section is kept as the record of the first proposal.
 
 **Move DEV onto a new local branch that tracks `origin/main`, leaving local `main` at `242fa276`; migrate in a timer-paused window
 after a restore-verified backup; then privileges, build, restart, smoke.** No reset, no merge, no force: the 18 commits stay on local

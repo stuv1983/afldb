@@ -1,0 +1,1 @@
+ ✓ tests/integration/admin-draft.test.ts > AFLDB-ISSUE-337: public draft name search across U+00A0 > finds the unlinked pick by a name typed with ordinary spaces, and keeps the raw name intact

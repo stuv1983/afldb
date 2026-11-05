@@ -58,3 +58,10 @@ base) or pre-existing (AFLDB-ISSUE-337); DEV health is identical before and afte
 backup, a new local branch tracking `origin/main` with local `main` kept, `sync-dev.ps1`, `db:privileges`, smoke, timers resumed) and its recovery are
 in `docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/README.md` §4. **Any live DEV migration or replacement is a separate owner
 approval.** Production application release and the I336 data step are unaffected by this and still need their own approvals.
+
+**Superseded for DEV (2026-11-06, follow-up):** the single DEV procedure is now `issues/open/AFLDB-ISSUE-336-DEV-DEPLOYMENT.md`.
+
+* It is pinned to `8b024098`, which adds the ISSUE-337 fix and `sync-dev.ps1 -ExpectedRevision`.
+* It needs no timer pause, no sudo and no unit change.
+* Its backup has been rehearsed to `BACKUP-VERIFIED`, and rollback to `242fa276` has been proven on the 118 schema.
+* Owner approvals A1–A4 are listed there. Nothing has been run on DEV.

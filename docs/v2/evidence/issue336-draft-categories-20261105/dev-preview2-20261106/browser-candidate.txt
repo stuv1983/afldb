@@ -1,0 +1,81 @@
+PASS desktop /draft status 200, no horizontal page overflow — status 200 overflow 0px
+PASS desktop index card states categories
+PASS desktop /draft/2025 status 200, no horizontal page overflow — status 200 overflow 0px
+PASS desktop 2025 All groups by category — NATIONAL DRAFT58
+PASS desktop 2025 All labels each row with its category — National — Pick 1 | National — Pick 2
+PASS desktop /draft/2025?view=rookie status 200, no horizontal page overflow — status 200 overflow 0px
+PASS desktop Fred Rodriguez 2025 Rookie Pick 1 West Coast — ["Pick 1","Fred Rodriguez","West Coast"]
+PASS desktop rookie tab is current
+PASS desktop /draft/2025?view=national status 200, no horizontal page overflow — status 200 overflow 0px
+PASS desktop Willem Duursma 2025 National Pick 1 West Coast — ["Pick 1","Willem Duursma","West Coast"]
+PASS desktop /draft/2021?view=father-son status 200, no horizontal page overflow — status 200 overflow 0px
+PASS desktop Nick Daicos under Father–Son as National — Pick 4 — Father–Son — ["National — Pick 4 — Father–Son","Nick Daicos","Collingwood"]
+PASS desktop Father–Son count is a subset, All not inflated — (database 2021 rows 140) Father–Son
+5 / All
+140
+PASS desktop /draft/1995?view=father-son status 200, no horizontal page overflow — status 200 overflow 0px
+PASS desktop 1995 Father–Son Pre-Draft keeps its category — Pre-Draft — Father–Son | Pre-Draft — Father–Son | Pre-Draft — Father–Son | Pre-Draft — Father–Son | Pre-Draft — Father–Son | Pre-Draft — Father–Son
+PASS desktop /draft/2014?view=rookie&q=Jake+Long status 200, no horizontal page overflow — status 200 overflow 0px
+PASS desktop 2014 Father–Son Rookie keeps its category — ["Pick 47 — Father–Son","Jake Long"]
+PASS desktop /draft/2014?view=rookie&q=Jake%C2%A0Long status 200, no horizontal page overflow — status 200 overflow 0px
+PASS desktop ISSUE-337 q=Jake%C2%A0Long finds Rookie Pick 47 — Father–Son — ["Pick 47 — Father–Son","Jake Long"]
+PASS desktop /draft/2014?view=rookie&q=jake+long status 200, no horizontal page overflow — status 200 overflow 0px
+PASS desktop ISSUE-337 q=jake+long finds Rookie Pick 47 — Father–Son — ["Pick 47 — Father–Son","Jake Long"]
+PASS desktop /draft/2021?view=trade status 200, no horizontal page overflow — status 200 overflow 0px
+PASS desktop trades stay unnumbered — 15 rows
+PASS desktop /draft/2025?view=national&sort=pick&dir=desc status 200, no horizontal page overflow — status 200 overflow 0px
+PASS desktop category-specific pick sort descending — 60,57,56
+PASS desktop /draft/2025?club=west-coast&view=rookie status 200, no horizontal page overflow — status 200 overflow 0px
+PASS desktop club filter within category — 1 rows
+PASS desktop /draft/2025?page=2 status 200, no horizontal page overflow — status 200 overflow 0px
+PASS desktop pagination page 2 renders and the category link resets page — 50 rows; /draft/2025?view=rookie
+PASS desktop /draft/2025?view=mini-draft status 200, no horizontal page overflow — status 200 overflow 0px
+PASS desktop empty category state
+PASS desktop /draft/2025?view=rookie&q=zzzzqq status 200, no horizontal page overflow — status 200 overflow 0px
+PASS desktop empty filtered state
+PASS desktop /draft/2021?type=Rookie status 200, no horizontal page overflow — status 200 overflow 0px
+PASS desktop legacy ?type=Rookie opens the Rookie category
+PASS desktop /draft/2025?view=rookie status 200, no horizontal page overflow — status 200 overflow 0px
+PASS desktop player page labels Fred Rodriguez as 2025 Rookie Draft — Pick 1 — 2025 Rookie Draft — Pick 1
+PASS desktop no page errors
+PASS mobile /draft status 200, no horizontal page overflow — status 200 overflow 0px
+PASS mobile index card states categories
+PASS mobile /draft/2025 status 200, no horizontal page overflow — status 200 overflow 0px
+PASS mobile 2025 All groups by category — NATIONAL DRAFT58
+PASS mobile 2025 All labels each row with its category — National — Pick 1 | National — Pick 2
+PASS mobile /draft/2025?view=rookie status 200, no horizontal page overflow — status 200 overflow 0px
+PASS mobile Fred Rodriguez 2025 Rookie Pick 1 West Coast — ["Pick 1","Fred Rodriguez","West Coast"]
+PASS mobile rookie tab is current
+PASS mobile /draft/2025?view=national status 200, no horizontal page overflow — status 200 overflow 0px
+PASS mobile Willem Duursma 2025 National Pick 1 West Coast — ["Pick 1","Willem Duursma","West Coast"]
+PASS mobile /draft/2021?view=father-son status 200, no horizontal page overflow — status 200 overflow 0px
+PASS mobile Nick Daicos under Father–Son as National — Pick 4 — Father–Son — ["National — Pick 4 — Father–Son","Nick Daicos","Collingwood"]
+PASS mobile Father–Son count is a subset, All not inflated — (database 2021 rows 140) Father–Son
+5 / All
+140
+PASS mobile /draft/1995?view=father-son status 200, no horizontal page overflow — status 200 overflow 0px
+PASS mobile 1995 Father–Son Pre-Draft keeps its category — Pre-Draft — Father–Son | Pre-Draft — Father–Son | Pre-Draft — Father–Son | Pre-Draft — Father–Son | Pre-Draft — Father–Son | Pre-Draft — Father–Son
+PASS mobile /draft/2014?view=rookie&q=Jake+Long status 200, no horizontal page overflow — status 200 overflow 0px
+PASS mobile 2014 Father–Son Rookie keeps its category — ["Pick 47 — Father–Son","Jake Long"]
+PASS mobile /draft/2014?view=rookie&q=Jake%C2%A0Long status 200, no horizontal page overflow — status 200 overflow 0px
+PASS mobile ISSUE-337 q=Jake%C2%A0Long finds Rookie Pick 47 — Father–Son — ["Pick 47 — Father–Son","Jake Long"]
+PASS mobile /draft/2014?view=rookie&q=jake+long status 200, no horizontal page overflow — status 200 overflow 0px
+PASS mobile ISSUE-337 q=jake+long finds Rookie Pick 47 — Father–Son — ["Pick 47 — Father–Son","Jake Long"]
+PASS mobile /draft/2021?view=trade status 200, no horizontal page overflow — status 200 overflow 0px
+PASS mobile trades stay unnumbered — 15 rows
+PASS mobile /draft/2025?view=national&sort=pick&dir=desc status 200, no horizontal page overflow — status 200 overflow 0px
+PASS mobile category-specific pick sort descending — 60,57,56
+PASS mobile /draft/2025?club=west-coast&view=rookie status 200, no horizontal page overflow — status 200 overflow 0px
+PASS mobile club filter within category — 1 rows
+PASS mobile /draft/2025?page=2 status 200, no horizontal page overflow — status 200 overflow 0px
+PASS mobile pagination page 2 renders and the category link resets page — 50 rows; /draft/2025?view=rookie
+PASS mobile /draft/2025?view=mini-draft status 200, no horizontal page overflow — status 200 overflow 0px
+PASS mobile empty category state
+PASS mobile /draft/2025?view=rookie&q=zzzzqq status 200, no horizontal page overflow — status 200 overflow 0px
+PASS mobile empty filtered state
+PASS mobile /draft/2021?type=Rookie status 200, no horizontal page overflow — status 200 overflow 0px
+PASS mobile legacy ?type=Rookie opens the Rookie category
+PASS mobile /draft/2025?view=rookie status 200, no horizontal page overflow — status 200 overflow 0px
+PASS mobile player page labels Fred Rodriguez as 2025 Rookie Draft — Pick 1 — 2025 Rookie Draft — Pick 1
+PASS mobile no page errors
+TOTAL 76 checks, 0 failed

@@ -1,0 +1,12 @@
+create-db: afldb_v2_i336c3rb_test created and marked
+pg_restore exit=0 seconds=7 stderrLines=0
+Applied 8 migration(s).
+privileges (V2 tool) rc=0
+-- the OLD migrator (242fa276) against the 118 ledger
+  110 migration file(s), 118 already applied
+
+Nothing to apply — schema is up to date.
+old migrate rc=0
+old build rc=0 BUILD_ID=XOH-3WD6BtN4ue-_cKIH5
+old app pid=4002014
+old app stopped

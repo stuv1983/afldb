@@ -1,0 +1,35 @@
+PASS: clean tree continues
+PASS: tracked modification blocks
+PASS: staged and renamed changes block
+PASS: known operational artifacts warn and continue
+PASS: unknown untracked file blocks
+PASS: known plus unknown mixture blocks
+PASS: AllowDirtyServer bypass is explicit
+PASS: operational allowlist is narrow
+PASS: immediate healthy readiness succeeds
+PASS: transient connection refusal then healthy succeeds
+PASS: failed service stops readiness early
+PASS: readiness timeout fails with diagnostics
+PASS: unhealthy HTTP 200 payload is refused
+PASS: expected build identity remains enforced
+PASS: curl connection reset is a retryable probe failure
+PASS: curl probe validates healthy JSON and build header
+PASS: failure diagnostics are bounded and actionable
+PASS: classification performs no repository cleanup
+warning: remote HEAD refers to nonexistent ref, unable to checkout
+PASS: pin fast-forwards to exactly the pin, not the upstream tip
+warning: remote HEAD refers to nonexistent ref, unable to checkout
+PASS: pin already current is a no-op
+warning: remote HEAD refers to nonexistent ref, unable to checkout
+PASS: pin refuses a short or malformed id
+warning: remote HEAD refers to nonexistent ref, unable to checkout
+PASS: pin refuses a detached HEAD
+warning: remote HEAD refers to nonexistent ref, unable to checkout
+PASS: pin refuses an unpublished commit
+warning: remote HEAD refers to nonexistent ref, unable to checkout
+PASS: pin refuses a diverged branch without rewriting it
+warning: remote HEAD refers to nonexistent ref, unable to checkout
+PASS: pin refuses a branch without an upstream
+PASS: pin helper never resets, cleans, checks out or pulls
+26 passed, 0 failed
+sync-dev-remote rc=0

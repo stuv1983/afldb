@@ -1,0 +1,69 @@
+== 2026-11-05T19:14:26Z DEV health before
+afldb=active mainpid=1677 health=200 head=242fa276b7b0fcb2613918984e82791faa1143d6 porcelain=10 build_id=8sFpWkolwF1yKuKbFkOir timers=active/active
+== 2026-11-05T19:14:26Z dump
+{"role":"afldb_backup","database":"afldb_dev","host":"loopback","exit":0,"seconds":12,"stderr":[]}
+; Archive created at 2026-11-06 06:14:26 AEDT
+ledger 110 110_match_sheet_player_match_stats_authority.sql
+ee2ffc6ec9c08a0eb0165aefb0ebb981f3f3b24827e6cc4d90990226464b26f5  afldb_dev-20261105T191426Z.dump
+ca61922d5bc80bea467511e5ad7a0cc0724ede90dac6611c594d9df9039a5efd  live-counts.json
+def537dca824b4067e4aec296e5a90c662268c083da441c22d1653c1572025a5  dump.json
+BACKUP-DUMPED
+dump rc=0
+== 2026-11-05T19:14:39Z verify
+create-db: afldb_v2_devbk20261105191426_test created and marked
+pg_restore exit=0 seconds=6 stderrLines=0
+same players live=13365 restored=13365
+same matches live=17056 restored=17056
+same player_match_stats live=695499 restored=695499
+same match_period_scores live=136448 restored=136448
+same draft_picks live=6810 restored=6810
+same draft_persons live=5057 restored=5057
+same data_overrides live=120 restored=120
+same data_edits live=4 restored=4
+same import_batches live=78 restored=78
+same site_settings live=17 restored=17
+same auth_users live=4 restored=4
+same venues live=52 restored=52
+same venue_name_spans live=null restored=null
+same fixtures live=3 restored=3
+same brownlow_round_votes live=330383 restored=330383
+same award_winners live=3712 restored=3712
+same staging.afl_api_match live=0 restored=0
+same staging.afl_api_brownlow_vote live=0 restored=0
+same ledger live=110/110_match_sheet_player_match_stats_authority.sql restored=110/110_match_sheet_player_match_stats_authority.sql
+-- schema step rehearsed on the backup copy
+  PENDING  111_curated_award_proposals.sql
+  PENDING  112_derived_award_results.sql
+  PENDING  113_brownlow_eligibility_decisions.sql
+  PENDING  114_award_projections_and_curated_revisions.sql
+  PENDING  115_adjudication_supersession_fk_index.sql
+  PENDING  116_brownlow_correction_receipts.sql
+  PENDING  117_brownlow_provider_eligibility_unknown.sql
+  PENDING  118_fixtures_unconfirmed_participants.sql
+
+8 pending.
+AFLDB migrations -> test (afldb_owner@127.0.0.1:55499/afldb_v2_devbk20261105191426_test)
+  118 migration file(s), 110 already applied
+
+  applying 111_curated_award_proposals.sql ... ok (50 ms)
+  applying 112_derived_award_results.sql ... ok (28 ms)
+  applying 113_brownlow_eligibility_decisions.sql ... ok (29 ms)
+  applying 114_award_projections_and_curated_revisions.sql ... ok (28 ms)
+  applying 115_adjudication_supersession_fk_index.sql ... ok (6 ms)
+  applying 116_brownlow_correction_receipts.sql ... ok (13 ms)
+  applying 117_brownlow_provider_eligibility_unknown.sql ... ok (4 ms)
+  applying 118_fixtures_unconfirmed_participants.sql ... ok (7 ms)
+
+Applied 8 migration(s).
+privileges rc=0
+Nothing to apply — schema is up to date.
+after migrate: ledger 118 118_fixtures_unconfirmed_participants.sql
+verify database: afldb_v2_devbk20261105191426_test (left for inspection)
+BACKUP-VERIFIED
+verify rc=0
+candidate checkout clean
+== 2026-11-05T19:14:52Z smoke.sh (cookie-capable copy) against the candidate on 33362, no cookie
+smoke identical to the original script's
+== 2026-11-05T19:14:54Z DEV health after
+afldb=active mainpid=1677 health=200 head=242fa276b7b0fcb2613918984e82791faa1143d6 porcelain=10 build_id=8sFpWkolwF1yKuKbFkOir timers=active/active
+REHEARSAL-DONE

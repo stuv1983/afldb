@@ -1,0 +1,2 @@
+ × tests/integration/draft-linkage.test.ts > DraftGuru bridge on afldb_test — §6.1 reconciliation (read-only) > persons partition exactly as the child + ledger predict
+ × tests/integration/draft-linkage.test.ts > DraftGuru bridge on afldb_test — §6.4 negative controls (read-only) > withheld persons stay unlinked by the bridge; the rejected identities are reached by nobody

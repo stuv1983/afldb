@@ -1,0 +1,44 @@
+{
+ "label": "dev-copy",
+ "database": "afldb_v2_i336c2dev_test",
+ "ledger": {
+  "n": 118,
+  "last": "118_fixtures_unconfirmed_participants.sql"
+ },
+ "siteSettings": [
+  {
+   "key": "acquisition.afl_api_brownlow_enabled",
+   "value": "\"true\""
+  },
+  {
+   "key": "acquisition.afl_api_current_season_enabled",
+   "value": "\"true\""
+  }
+ ],
+ "draft": {
+  "picks": 6810,
+  "unlinked": 6805,
+  "raw_with_nbsp": 6810,
+  "unlinked_raw_with_nbsp": 6805
+ },
+ "playersDisplayNbsp": 0,
+ "jakeLong2014": [
+  {
+   "kind": "rookie",
+   "pick": 47,
+   "linked": false,
+   "raw_hex": "4a616b65c2a04c6f6e67"
+  }
+ ],
+ "activeMatchOverrides": 0,
+ "matchesBySeason": [
+  {
+   "season": 2025,
+   "n": 216
+  },
+  {
+   "season": 2026,
+   "n": 218
+  }
+ ]
+}

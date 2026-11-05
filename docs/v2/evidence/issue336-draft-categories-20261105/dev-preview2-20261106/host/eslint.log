@@ -1,0 +1,7 @@
+
+/mnt/ssd/afldb/workspaces/i336-preview2-20261106/checkout/src/db/queries/draft.ts
+  183:30  warning  '_total' is defined but never used  @typescript-eslint/no-unused-vars
+
+✖ 1 problem (0 errors, 1 warning)
+
+eslint rc=0

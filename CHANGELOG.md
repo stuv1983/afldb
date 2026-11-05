@@ -15,6 +15,33 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-337 draft name search matches across Unicode spaces; pinned DEV deploys (2026-11-06; local commit `8b024098`, not pushed, **not deployed**; no schema or database change)
+
+- **Draft name search (AFLDB-ISSUE-337):** `/draft/[year]?q=` now finds a pick whichever Unicode space separator the stored name or the
+  typed term uses. DraftGuru stores raw names with U+00A0, so `q=Jake Long` previously missed every unlinked pick (1,597 on the
+  2026-11-04 production dump).
+  - Both columns are compared through `translate()` over migration 099's 18 separators, and the term through the new `canonicalSpaces()`
+    in `src/lib/like.ts`.
+  - Stored names are unchanged. Zero-width characters are untouched.
+  - The category counts use the same condition.
+- **`deploy/sync-dev.ps1 -ExpectedRevision <40-hex>`:** a DEV deployment can be pinned to one published commit. After the optional
+  `-RemoteRef` checkout, it fast-forwards to exactly that commit instead of `git pull --ff-only`. It refuses before `npm ci`, migration
+  or build on any of these (exit codes 30–37):
+  - a malformed id;
+  - a detached HEAD;
+  - a missing object;
+  - no upstream;
+  - an unpublished commit;
+  - a diverged branch;
+  - a failed fast-forward;
+  - a mismatch afterwards.
+
+  It never resets, cleans or forces. Without the parameter, behaviour is unchanged.
+- Tests:
+  - `tests/like.test.ts`, `tests/catalogue-lookups.test.ts`, `tests/integration/admin-draft.test.ts` (ISSUE-337);
+  - 8 cases in `tests/sync-dev-remote.test.sh`;
+  - static assertions in `tests/sync-dev-static.test.ps1`, including the payload-size guard for the pinned, ISSUE-107-gated variant.
+
 ### ISSUE-336 draft categories separated; picks numbered within their own draft (2026-11-05; local branch `claude/issue-336-draft-categories`, not pushed, **not deployed**; no schema or database change)
 
 - **Draft year pages:** `/draft/[year]` now has year navigation and category views (All, National, Rookie, Pre-Season, Mid-Season, Trade, a prominent Father–Son view, and Pre-Draft, Post-Draft, Free Agency, Mini-Draft and Training Squad Selection when present), each with its count. The All view groups rows by category and every row names its category ("National — Pick 4 — Father–Son"); trades and other unnumbered acquisitions show no number. Father–Son is a view over the real categories and is never counted twice. Ordering is stable (category, pick, name, id), a pick sort stays inside each category, changing category resets pagination, and pagination keeps the sort. Old `?type=` links open the matching category.

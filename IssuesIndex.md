@@ -27,16 +27,33 @@
 ### AFLDB-ISSUE-336 — Draft pages merge National, Rookie and other categories; 35 DraftGuru Pre-Draft rows missing
 
 - **Severity / area:** Medium; public draft pages, player draft history, DraftGuru draft data.
-- **State:** Open, opened 2026-11-05. **Implementation** on `origin/main` `ea9bddf8` (pushed 2026-11-06). **Preview verification** PASS on an isolated restore of DEV's own data (2026-11-06; app `127.0.0.1:33361` via SSH tunnel; integration failures identical at base; browser 66/68, the two failures being ISSUE-337). **Deployment:** none; primary DEV is blocked (18 DEV-only commits on its local `main`, preserved; migrations 111–118 pending) and awaits an owner decision. D-336-1 accepted. The 35-row production insert (stage I336) is prepared and rehearsed; **not run**.
+- **State:** Open, opened 2026-11-05.
+  - **Implementation** is on `origin/main` `ea9bddf8` (pushed 2026-11-06).
+  - **Preview verification:** PASS on an isolated restore of DEV's own data (2026-11-06).
+  - **Pinned DEV procedure** prepared 2026-11-06: candidate `8b024098` (local, not pushed) verified in isolation (browser 76/76, backup rehearsed to `BACKUP-VERIFIED`, rollback to `242fa276` proven on the 118 schema, timers checked offline).
+  - **Deployment:** none. DEV is still on `242fa276` with ledger 110.
+  - D-336-1 accepted. The 35-row production insert (stage I336) is prepared and rehearsed; **not run**.
 - **Key files:** `src/lib/draft-categories.ts`, `src/db/queries/draft.ts`, `src/app/draft/[year]/page.tsx`, `src/app/draft/page.tsx`, `src/components/DraftCategoryNav.tsx`, `src/app/players/[slug]/page.tsx`, `tools/v2/issue336-predraft-insert-production.ts`; runbook `issues/open/AFLDB-ISSUE-336.md`; evidence `docs/v2/evidence/issue336-draft-categories-20261105/` (DEV preview and DEV recommendation: `dev-preview-20261106/README.md`).
-- **Next action:** owner decision on the primary-DEV update (preview record §4); production application release; D-336-2 execution approval (runbook); D-336-3 (187 revised origin paths).
+- **Key files (DEV deployment):** `issues/open/AFLDB-ISSUE-336-DEV-DEPLOYMENT.md`; evidence `docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/`.
+- **Next action:** owner approvals A1–A4 in `issues/open/AFLDB-ISSUE-336-DEV-DEPLOYMENT.md` (publish; DEV-only behaviour; keep both timers; DEV deploy outside 04:45–05:45 AEDT); production application release; D-336-2 execution approval (runbook); D-336-3 (187 revised origin paths).
 
 ### AFLDB-ISSUE-337 — Draft-page name search misses unlinked picks whose stored raw name uses U+00A0
 
 - **Severity / area:** Low; public draft pages (`/draft/[year]?q=`).
-- **State:** Open, opened 2026-11-06; reproduced on the ISSUE-336 DEV-data preview (`q=Jake+Long` empty, `q=Jake` finds the pick); not fixed.
-- **Key files:** `src/db/queries/draft.ts` (`q` filter), `tests/catalogue-lookups.test.ts`.
-- **Next action:** read-only count of affected unlinked rows on production; normalise U+00A0 on both sides of the match with a regression case.
+- **State:** Open, opened 2026-11-06.
+  - **Fixed locally** in `8b024098` (not pushed).
+  - Verified on the isolated DEV-data preview: unit RED/GREEN, integration, browser 76/76.
+  - **Not deployed.**
+  - Production impact measured on the 2026-11-04 dump: 1,597 unlinked U+00A0 picks.
+- **Key files:** `src/lib/like.ts` (`canonicalSpaces`), `src/db/queries/draft.ts` (`scopeConditions`), `tests/like.test.ts`, `tests/catalogue-lookups.test.ts`, `tests/integration/admin-draft.test.ts`.
+- **Next action:** deploy with ISSUE-336's pinned DEV procedure; resolve after DEV acceptance (Jake Long found for ordinary-space, NBSP and lower-case queries).
+
+### AFLDB-ISSUE-338 — DraftGuru operator-review contract's byte-identical rerun check is time-dependent
+
+- **Severity / area:** Low; test tooling only.
+- **State:** Open, opened 2026-11-06. Observed once at `8b024098` (checks 11a and 11c); 0 of 5 reruns failed. Not fixed.
+- **Key files:** `tools/rebuild/draftguru/review_bridge_operator.py:1424` (`review_completed_utc: utc_now()`), `tests/python/draftguru_bridge_operator_review_contract.py:466-469`.
+- **Next action:** make the rerun check independent of the completion timestamp (freeze or inject the clock, or exclude that field) without weakening byte identity for the rest.
 
 **AFLDB-ISSUE-280 resolved 2026-10-15, DEV-scoped** (code `c68e1214`; installed on DEV by the gated deployment of `0cb3d20c` at 22:07 AEDT; accepted 22:26-22:55 AEDT). DEV stayed at `0cb3d20c` (BUILD_ID `jfwHG_Ru35eHV1Q9_O6oy`); no redeployment. **D-280-1 amended (owner, 2026-10-15):** one magic-link issuance for `stuart.villanti@gmail.com` through DEV's existing journal fallback; no SMTP configuration and no external email. The address was first verified allowlisted and not revoked (`/admin/access`, read-only). Under the D-280-2 criterion (reviewed simulated prefetch, one human confirmation, refused replay): one link issued at 11:50:30 UTC (audit `beta.magic_link_issued`, `delivered=false`; exactly one journal line, redacted in every record); the owner obtained it privately (their own terminal read the journal line, the clipboard excluded from history) and pasted it into the hidden box of an isolated test-browser window; it was never in chat and never saved. Before confirmation, `prefetch-sim.py --expect confirm`: 3 GET 200 "Confirm sign-in", no `afldb_beta` cookie, no `Location`, HEAD 200, EXPECTATION MET (token sha256[:8] `8c6493a5`, 43 characters); audit before confirmation: issued present, **no** verified event (1,072 events; baseline 1,071). The owner pressed "Sign in to the beta" once at 11:51:19 UTC (I issued no click): httpOnly `afldb_beta` cookie, landed on `/`, exactly one `beta.magic_link_verified`. Replay in a brand-new cookie-less browser context (the link was read inside the browser process from the test page's history, never printed): GET 200 confirmation page, no `Set-Cookie`, no `Location`, robots `noindex, nofollow`, referrer `no-referrer`; the button pressed once; redirected to `/beta` with no cookie; the audit then still showed exactly one verified event (1,073 events = baseline + issued + verified; no `beta.magic_link_revoked_email`). Journal check since 22:27:31: PASS (523 lines; the three `ERROR` matches are HTTP-200 requests for the static chunk `error-*.js`; no syntax error, unhandled, ECONNREFUSED or digest line). Visual: V-280-1 (desktop 1280x800) and V-280-2 (mobile 390x844, no horizontal overflow) were captured at replay time, i.e. of the same link's confirmation page after its token was spent (a GET reads no table, so the page is identical), because the owner clicked before the unused page could be captured; V-280-3 is the signed-in landing. Screenshots are viewport-only; URL metadata is path `/beta/verify` with `token=<redacted>`. Credential hygiene: a leak scan of the evidence found no token or link. Effects: `beta_login_tokens` +1 row (hash only, now used), `auth_audit_log` +2; no allowlist, settings, `.env`, hook, schema or SMTP change; no email; PROD untouched. **Limits:** actual link-scanning gateway behaviour remains untested (D-280-2); the pre-fix defect was not reproduced on the previous build (the optional control was not authorised); the replay and the captures were driven by the browser tool, the confirmation click was the owner's. PROD installation and acceptance pending. Evidence (workstation, not in the repository): `D:\tmp\dev-deploy-280-308-20261015-r2\run-20261015-2227-280\` (`SHA256SUMS.txt`, 18 files; decisions verbatim in `OWNER-DECISIONS.md`; results in `accept\ACCEPTANCE-RESULTS.md`). Full record: `issues.md` (ISSUE-280 entry) and `issues/closed/AFLDB-ISSUE-280.md` §22.
 

@@ -1,0 +1,2 @@
+     × AFLDB-ISSUE-337: a name search canonicalises Unicode spaces on both sides of the match 25ms
+      Tests  1 failed | 19 passed (20)

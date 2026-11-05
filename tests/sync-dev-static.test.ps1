@@ -61,6 +61,13 @@ $payload = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($defaultScri
 $decoded = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($payload))
 Assert-True ($decoded -ceq $defaultScript) 'base64 transport changed the remote script'
 Assert-True ($payload.Length -le 24000) 'generated SSH payload exceeds the enforced safety limit'
+# The largest variant actually used (AFLDB-ISSUE-336 DEV procedure step 6): pinned + ISSUE-107 gate.
+$pinnedGateScript = & {
+  . $syncScript -WhatIf -RemoteRef 'dev/v2-main' -ExpectedRevision $pin -Issue107Gate *> $null
+  $remoteScript
+}
+$pinnedGatePayload = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($pinnedGateScript))
+Assert-True ($pinnedGatePayload.Length -le 24000) 'the pinned ISSUE-107-gated SSH payload exceeds the enforced safety limit'
 
 $gitBash = if ($env:ProgramFiles) { Join-Path $env:ProgramFiles 'Git\usr\bin\bash.exe' } else { '' }
 $bash = if ($gitBash -and (Test-Path -LiteralPath $gitBash)) {
@@ -77,4 +84,4 @@ try {
   Remove-Item -LiteralPath $tempScript -Force -ErrorAction SilentlyContinue
 }
 
-Write-Output 'PASS: sync-dev PowerShell/static integration (19 assertions)'
+Write-Output 'PASS: sync-dev PowerShell/static integration (20 assertions)'

@@ -1,0 +1,8 @@
+-- AFLDB_DRAFTGURU_BRIDGE=data/reference/draftguru-person-bridge-20260918-v2.json
+ × tests/integration/draft-linkage.test.ts > DraftGuru bridge on afldb_test — §6.4 negative controls (read-only) > every admitted child bridge: the exact target is registered once, resolves to the stored player, and the person stores the bridge state (or the agreeing human state)
+ Test Files  1 failed (1)
+      Tests  1 failed | 10 passed (11)
+AssertionError: expected [ 'players/D/Dean_Laidley.html', …(1) ] to deeply equal []
+-- AFLDB_DRAFTGURU_BRIDGE=data/reference/draftguru-person-bridge-20260918-v3.json
+ Test Files  1 passed (1)
+      Tests  11 passed (11)

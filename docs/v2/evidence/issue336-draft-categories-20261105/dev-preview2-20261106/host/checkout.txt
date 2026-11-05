@@ -1,0 +1,15 @@
+HEAD 8b024098a6771fc5e5be2f8bf006c9c3ca8ab55a tree 5242abe13560c1f7c12536aacfab8595278f0931 porcelain 0
+commits since ea9bddf81284f68a8913fc258629fba3238b742a:
+  8b024098a6771fc5e5be2f8bf006c9c3ca8ab55a fix(ISSUE-337): draft name search across U+00A0; feat(ISSUE-336): pinned DEV deploy
+  ff1737e5efb531c62407d4fd92dc1ae8da90cb32 docs(ISSUE-336): DEV preserved and an isolated DEV-data preview verified at ea9bddf8; register ISSUE-337
+files changed since ea9bddf81284f68a8913fc258629fba3238b742a (code commit only):
+   deploy/sync-dev-remote.sh             |  44 +++++++++++++++
+   deploy/sync-dev.ps1                   |  21 ++++++-
+   src/db/queries/draft.ts               |  11 +++-
+   src/lib/like.ts                       |  24 ++++++++
+   tests/catalogue-lookups.test.ts       |  23 +++++++-
+   tests/integration/admin-draft.test.ts |  40 ++++++++++++++
+   tests/like.test.ts                    |  39 +++++++++++++
+   tests/sync-dev-remote.test.sh         | 100 ++++++++++++++++++++++++++++++++++
+   tests/sync-dev-static.test.ps1        |  15 ++++-
+   9 files changed, 312 insertions(+), 5 deletions(-)
