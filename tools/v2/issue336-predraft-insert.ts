@@ -60,6 +60,8 @@ const DIGEST = (tx: Tx, table: 'draft_picks' | 'draft_persons', maxId: number) =
   tx<{ n: number; d: string }[]>`SELECT count(*)::int AS n, md5(string_agg(t::text, '|' ORDER BY t.id)) AS d FROM ${tx(table)} t WHERE t.id <= ${maxId}`;
 
 class DryRun extends Error {}
+
+async function main(): Promise<void> {
 try {
   await sql.begin('ISOLATION LEVEL REPEATABLE READ', async (tx) => {
     const [{ id: sourceId }] = await tx<{ id: number }[]>`SELECT id FROM sources WHERE key = 'draftguru'`;
@@ -140,3 +142,6 @@ try {
 } finally {
   await sql.end();
 }
+}
+
+void main();
