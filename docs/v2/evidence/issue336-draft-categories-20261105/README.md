@@ -1,7 +1,7 @@
 # AFLDB-ISSUE-336 — draft categories: evidence (2026-11-05)
 
-Branch `claude/issue-336-draft-categories` (local, not pushed): `036c31c0` (implementation), `3a130595` and `e747d96b` (rehearsal writer fixes), then this
-records commit. Base `eec192f2`. Production, DEV and the live DEV database were not touched.
+Branch `claude/issue-336-draft-categories` (local, not pushed): `036c31c0` (implementation), `3a130595` and `e747d96b` (rehearsal writer fixes), `9f903367` (records),
+`d4070e7c` (lint fix), `dc55bdd1` (seal inventory), then this update. Base `eec192f2`. Production, DEV and the live DEV database were not touched.
 
 ## 1. Root cause
 
@@ -52,3 +52,13 @@ Linux (streamanator, `/mnt/ssd/afldb/workspaces/i336-draft-20261105`, loopback c
 `draft.ts`: 5 failed / 14 passed (exactly the draft ORDER BY and category-filter cases); `npm run build` PASS.
 Browser (Playwright from the workstation through an SSH tunnel to the isolated app, data = clone after rehearsal):
 **68/68 checks**, desktop 1280×900 and mobile 390×844, `screens/results.json` and the PNGs.
+
+Follow-up pass (commits `d4070e7c` lint fix, `dc55bdd1` seal inventory): full unit suite (integration, NL-UI and
+E2E excluded) on a clean base clone and on the candidate. Base 106 failed / 11,667 passed, candidate 107 / 11,671
+(`fullunit-*.fails`); the 106 are identical in both (10 files that need data absent from a clean clone:
+reconciliation inputs, rebuild fixtures, the DraftGuru snapshot). The one candidate-only failure was the V2-GAP-006
+writer inventory, which must classify every file writing `draft_picks`; the rehearsal writer is now classified
+`offline` (isolated targets only). After the fix the seal and draft suites pass 81/81 on Linux. ESLint on the changed
+files: the one error (a variable reassigned during render, `react-hooks/immutability`) is fixed; two pre-existing
+unused-variable warnings remain in untouched lines. Rebuilt (`npm run build` PASS); the served page carries the new
+BUILD_ID; browser re-check **68/68**. `src/`, `tests/` and `tools/` trees on the Linux candidate equal the branch.

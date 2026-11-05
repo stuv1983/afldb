@@ -1,0 +1,107 @@
+ × tests/after-siren-normalisation.test.ts > after_siren.py artefact contract for the loader > accepts the tracked artefact through load --validate-only, and its provenance agrees
+ × tests/after-siren-normalisation.test.ts > after_siren.py artefact contract for the loader > refuses a duplicated event key
+ × tests/after-siren-normalisation.test.ts > after_siren.py artefact contract for the loader > refuses a header that is not the tracked shape
+ × tests/after-siren-normalisation.test.ts > after_siren.py artefact contract for the loader > refuses an unknown enum value
+ × tests/after-siren-normalisation.test.ts > after_siren.py artefact contract for the loader > refuses a premiership row of another competition
+ × tests/after-siren-normalisation.test.ts > after_siren.py artefact contract for the loader > writes only columns migration 089 declares
+ × tests/after-siren-normalisation.test.ts > after_siren.py match resolution > keys on season, round and both club organisations, and takes the clubs from the match
+ × tests/after-siren-normalisation.test.ts > after_siren.py match resolution > leaves match_id NULL for another competition without ever looking for one
+ × tests/after-siren-normalisation.test.ts > after_siren.py match resolution > leaves match_id NULL for a season this database does not carry, and says so
+ × tests/after-siren-normalisation.test.ts > after_siren.py match resolution > reads the kicker first whichever side of the fixture the club was on
+ × tests/after-siren-normalisation.test.ts > after_siren.py match resolution > refuses a club name that is not exactly one organisation
+ × tests/after-siren-normalisation.test.ts > after_siren.py match resolution > refuses a fixture whose score disagrees with the source's
+ × tests/after-siren-normalisation.test.ts > after_siren.py match resolution > refuses a season it carries whose fixture it cannot find
+ × tests/after-siren-normalisation.test.ts > after_siren.py match resolution > retries one round higher only in a season shaped by an Opening Round
+ × tests/after-siren-normalisation.test.ts > after_siren.py match resolution > separates a drawn final from its replay on the source's own points
+ × tests/after-siren-normalisation.test.ts > after_siren.py normalisation > an uncited row needs a citation adjudication, and a score that does not add up needs a score_arithmetic one; both are recorded, neither may be stale
+ × tests/after-siren-normalisation.test.ts > after_siren.py normalisation > classifies each file by its name and derives scored / effect / result per table
+ × tests/after-siren-normalisation.test.ts > after_siren.py normalisation > keeps other-competition rows with their competition, supergoal notation and no premiership flag
+ × tests/after-siren-normalisation.test.ts > after_siren.py normalisation > King 1994: a miss in a 23-point win is refused until the end_of_regulation adjudication types it as a miss with no effect
+ × tests/after-siren-normalisation.test.ts > after_siren.py normalisation > refuses a score that does not add up, a separator that disagrees with the margin, and a category that disagrees with the scores
+ × tests/after-siren-normalisation.test.ts > after_siren.py normalisation > Shuey 2017: the [a] footnote is refused without an adjudication and is a goal to win after the extra-time siren with one
+ × tests/after-siren-normalisation.test.ts > after_siren.py normalisation > strips the repeat marker from the name, refuses the same event in two files, and orders deterministically
+ × tests/after-siren-normalisation.test.ts > after_siren.py player resolution > leaves same-name team-mates ambiguous rather than picking one
+ × tests/after-siren-normalisation.test.ts > after_siren.py player resolution > links the one player of that name in the match for the kicker club
+ × tests/after-siren-normalisation.test.ts > after_siren.py player resolution > never reaches across to the opponent, and leaves the source spelling when nobody matches
+ × tests/after-siren-normalisation.test.ts > after_siren.py player resolution > separates same-name candidates by a generational suffix, and records that it did
+ × tests/after-siren-normalisation.test.ts > after_siren.py score confirmation > checks nothing for a kick that scored nothing
+ × tests/after-siren-normalisation.test.ts > after_siren.py score confirmation > confirms a goal against the kicker's own scoring line
+ × tests/after-siren-normalisation.test.ts > after_siren.py score confirmation > refuses a recorded zero, which contradicts the source
+ × tests/after-siren-normalisation.test.ts > after_siren.py score confirmation > treats an unrecorded statistic as unknown, never as zero
+ × tests/brownlow-season-artefact.test.ts > AFL API Brownlow builder: stable identity parity with classifyAflApiForwardIdentity > agrees on a synthetic contract where continuing_url sorts after renumbered_url
+ × tests/brownlow-season-artefact.test.ts > AFL API Brownlow builder: stable identity parity with classifyAflApiForwardIdentity > agrees on the real tracked contract, and folds Jack Ross to players/J/Jack_Ross.html
+ × tests/brownlow-season-artefact.test.ts > AFL API Brownlow builder: stable identity parity with classifyAflApiForwardIdentity > both sides refuse a contract with a broken career-game continuity
+ × tests/brownlow-season-artefact.test.ts > AFL API Brownlow builder: stable identity parity with classifyAflApiForwardIdentity > both sides refuse a contract with a chain
+ × tests/brownlow-season-artefact.test.ts > AFL API Brownlow builder: stable identity parity with classifyAflApiForwardIdentity > both sides refuse a contract with a duplicated renumbered_url
+ × tests/brownlow-season-artefact.test.ts > AFL API Brownlow builder: stable identity parity with classifyAflApiForwardIdentity > both sides refuse a contract with a non-normalised path
+ × tests/brownlow-season-artefact.test.ts > brownlow season artefact: manifest and loader validation > passes the AFL API Brownlow season artefact contract (builder + D-233-2 loader)
+ × tests/brownlow-season-artefact.test.ts > brownlow season artefact: manifest and loader validation > passes the loader's own offline validation through its CLI
+ × tests/brownlow-season-artefact.test.ts > brownlow season artefact: manifest and loader validation > refuses a tampered artefact (hash mismatch) through the same CLI
+ × tests/brownlow-season-artefact.test.ts > brownlow season builder: override rule (§8.14.5) > applies all five adjudications when the row names the exact recovery path
+ × tests/brownlow-season-artefact.test.ts > brownlow season builder: override rule (§8.14.5) > carries an unadjudicated mismatched recovery path through unchanged (no correction)
+ × tests/brownlow-season-artefact.test.ts > brownlow season builder: override rule (§8.14.5) > fails hard when an override names a legacy player the export lacks
+ × tests/brownlow-season-artefact.test.ts > brownlow season builder: override rule (§8.14.5) > fails hard when an override names a recovery path the export does not carry
+ × tests/brownlow-season-artefact.test.ts > brownlow season builder: override rule (§8.14.5) > refuses a gap-fill row (no recovery path) for a player the export already bridges
+ × tests/brownlow-season-artefact.test.ts > brownlow season loader: unadjudicated recovery paths are rejected > rejects each original recovery path and resolves each adjudicated path
+ × tests/db-test-rebuild.test.ts > DraftGuru preflight validates the label the data stage will import > gives the data stage the same label the preflight proved
+ × tests/db-test-rebuild.test.ts > DraftGuru preflight validates the label the data stage will import > keeps the default label correct, and identical on both sides, with no override
+ × tests/db-test-rebuild.test.ts > DraftGuru preflight validates the label the data stage will import > makes preflight/data label equality contractual, for any label
+ × tests/db-test-rebuild.test.ts > DraftGuru preflight validates the label the data stage will import > propagates --draftguru-label through to the preflight validator
+ × tests/db-test-rebuild.test.ts > fitzRoy preflight > runs the independent validator BEFORE any destructive stage
+ × tests/db-test-rebuild.test.ts > stage graph > after-siren events (AFLDB-ISSUE-118 §23.33–§23.35) > preflights the tracked files and the loader's offline validation before the destructive stage
+ × tests/db-test-rebuild.test.ts > stage graph > birth dates (AFLDB-ISSUE-118 §23.24 Stage D1) > preflights the snapshot offline before the destructive stage and refuses on failure
+ × tests/db-test-rebuild.test.ts > stage graph > brownlow season (AFLDB-ISSUE-113 §8.6) > preflights the tracked artefact, manifest and adjudication file offline
+ × tests/db-test-rebuild.test.ts > stage graph > coaches (AFLDB-ISSUE-118 §23.27 Stage E2) > mandatory raw replay outside the predecessor (AFLDB-ISSUE-319) > c2-2026-rehearsal-only: preflight replays raw through the loader and refuses, with nothing destroyed, on any failure
+ × tests/db-test-rebuild.test.ts > stage graph > coaches (AFLDB-ISSUE-118 §23.27 Stage E2) > mandatory raw replay outside the predecessor (AFLDB-ISSUE-319) > c2-2026-successor: preflight replays raw through the loader and refuses, with nothing destroyed, on any failure
+ × tests/db-test-rebuild.test.ts > stage graph > coaches (AFLDB-ISSUE-118 §23.27 Stage E2) > preflights the snapshot offline before the destructive stage and refuses on failure
+ × tests/db-test-rebuild.test.ts > stage graph > father–son selections (AFLDB-ISSUE-118 §23.29 family F) > preflights the tracked files and the loader's offline validation before the destructive stage
+ × tests/db-test-rebuild.test.ts > stage graph > first-kick goal (AFLDB-ISSUE-249) > preflights the tracked pair and the pinned --validate-only before the destructive stage
+ × tests/db-test-rebuild.test.ts > stage graph > height enrichment (AFLDB-ISSUE-118 §23.19) > explicit shared height/coach stats inputs (ISSUE-316) > baseline_only stops on baseline/register/stats, configured supplement, API, Wikipedia or coach-page preflight failure before reset
+ × tests/db-test-rebuild.test.ts > stage graph > height enrichment (AFLDB-ISSUE-118 §23.19) > explicit shared height/coach stats inputs (ISSUE-316) > baseline_only uses the same ordered stats inputs in both loaders, stages, preflight and strict final gates
+ × tests/db-test-rebuild.test.ts > stage graph > height enrichment (AFLDB-ISSUE-118 §23.19) > explicit shared height/coach stats inputs (ISSUE-316) > supplemented_baseline stops on baseline/register/stats, configured supplement, API, Wikipedia or coach-page preflight failure before reset
+ × tests/db-test-rebuild.test.ts > stage graph > height enrichment (AFLDB-ISSUE-118 §23.19) > explicit shared height/coach stats inputs (ISSUE-316) > supplemented_baseline uses the same ordered stats inputs in both loaders, stages, preflight and strict final gates
+ × tests/db-test-rebuild.test.ts > stage graph > height enrichment (AFLDB-ISSUE-118 §23.19) > follows fitzroy (identities and match facts) and precedes everything that reads players
+ × tests/db-test-rebuild.test.ts > stage graph > height enrichment (AFLDB-ISSUE-118 §23.19) > preflights both snapshots offline before the destructive stage and refuses on failure
+ × tests/db-test-rebuild.test.ts > stage graph > ladder witness cross-check (AFLDB-ISSUE-095 D7) > proves the witness offline BEFORE anything is destroyed
+ × tests/db-test-rebuild.test.ts > stage graph > sibling pairs (AFLDB-ISSUE-118 §23.31 family F) > preflights the tracked files and the loader's offline validation before the destructive stage
+ × tests/draftguru-acquisition.test.ts > frozen Stage B1 sample (local snapshot) > is the frozen 120 / 8 / 68 / 30 / 14 contract over the accepted Stage A label
+ × tests/draftguru-acquisition.test.ts > frozen Stage B1 sample (local snapshot) > rebuilds byte-identically from the accepted Stage A snapshot
+ × tests/father-son-reconciliation.test.ts > father_son.py accepted artefact > accepts a well-formed artefact and measures it
+ × tests/father-son-reconciliation.test.ts > father_son.py accepted artefact > refuses a status that disagrees with its profile, a duplicate key, a repeated pair, a pre-draft pick and a bad competition
+ × tests/father-son-reconciliation.test.ts > father_son.py accepted artefact > the tracked artefact validates offline through the loader, and its adjudications are exactly the seven recorded
+ × tests/father-son-reconciliation.test.ts > father_son.py name normalisation > strips the listed marker, punctuation, middle initials and the generational suffix
+ × tests/father-son-reconciliation.test.ts > father_son.py resolution rules > a father who matches by name and era but never played for the club's lineage refuses without an adjudication, and an explicit unlinked adjudication is honoured
+ × tests/father-son-reconciliation.test.ts > father_son.py resolution rules > a father with a state-league or administrator annotation and no candidate is unlinked; a plain games figure needs an adjudication
+ × tests/father-son-reconciliation.test.ts > father_son.py resolution rules > a son with 0 listed games and no candidate is a non-player; one with games needs an adjudication
+ × tests/father-son-reconciliation.test.ts > father_son.py resolution rules > classifies pre-draft and rookie selections from the list's own pick column
+ × tests/father-son-reconciliation.test.ts > father_son.py resolution rules > refuses an ambiguous son, a stale adjudication, an unused adjudication and a repeated pair
+ × tests/father-son-reconciliation.test.ts > father_son.py resolution rules > resolves son and father by name, era window and club lineage, with the suffix rule deciding same-name pairs
+ × tests/father-son-reconciliation.test.ts > father_son.py resolution rules > the Brisbane Lions lineage admits Fitzroy and Bears games; no other organisation borrows
+ × tests/fitzroy-core-import.test.ts > blank Player fallback > covers the four real 2025 players, retaining all 79 rows
+ × tests/fitzroy-core-import.test.ts > fitzRoy source row corrections > corrects exactly two rows and nothing else in 1909
+ × tests/fitzroy-core-import.test.ts > fitzRoy source row corrections > leaves exactly the two genuine Round 10 rows
+ × tests/fitzroy-core-import.test.ts > fitzRoy source row corrections > leaves the younger player's other appearances untouched
+ × tests/height-reconciliation.test.ts > enrich_heights reconciliation > fails closed when the facts fit but the name is spelled differently
+ × tests/height-reconciliation.test.ts > enrich_heights reconciliation > folds the renamed clubs into the register club, and refuses an unknown one
+ × tests/height-reconciliation.test.ts > enrich_heights reconciliation > is unmatched when a game count differs (a current player without the in-season rows)
+ × tests/height-reconciliation.test.ts > enrich_heights reconciliation > keeps an unknown or implausible height as null without affecting identity
+ × tests/height-reconciliation.test.ts > enrich_heights reconciliation > keeps disjoint nonempty jumpers informational for an otherwise mapped identity
+ × tests/height-reconciliation.test.ts > enrich_heights reconciliation > keeps multiple named candidates ambiguous even if a jumper favors one
+ × tests/height-reconciliation.test.ts > enrich_heights reconciliation > maps on club + games + goals + exact season set + the source name
+ × tests/height-reconciliation.test.ts > enrich_heights reconciliation > never merges split raw URLs to satisfy a combined games/goals/season-set claim
+ × tests/height-reconciliation.test.ts > enrich_heights reconciliation > rejects differing goals with otherwise identical facts/name, including literal blank register Goals
+ × tests/height-reconciliation.test.ts > enrich_heights reconciliation > separates two same-name players at one club by their facts, and refuses when it cannot
+ × tests/sibling-reconciliation.test.ts > family_siblings.py accepted artefact > accepts a well-formed artefact and measures it
+ × tests/sibling-reconciliation.test.ts > family_siblings.py accepted artefact > refuses a status that disagrees with its profile, a duplicate or unordered pair, a self-pair, a repeated key and an unevidenced brothers label
+ × tests/sibling-reconciliation.test.ts > family_siblings.py accepted artefact > the tracked artefact validates offline, its adjudications are exactly the eight recorded, its supplements are the fourteen evidenced pairs, and its reconciliation counts hold
+ × tests/sibling-reconciliation.test.ts > family_siblings.py helpers > labels what the source evidences: brothers, twin brothers, sisters, else the export's label
+ × tests/sibling-reconciliation.test.ts > family_siblings.py helpers > splits listed clubs on the export's separators, maps organisation spellings, and reads the title birth year
+ × tests/sibling-reconciliation.test.ts > family_siblings.py resolution rules > an adjudication decides an ambiguous member, must be needed, and an explicit unlinked one is honoured
+ × tests/sibling-reconciliation.test.ts > family_siblings.py resolution rules > a same-name pair narrows by the listed club, then by the title birth year only when every candidate is dated
+ × tests/sibling-reconciliation.test.ts > family_siblings.py resolution rules > a supplement adds an explicitly evidenced pair the export lacks; a stale or non-identity supplement refuses
+ × tests/sibling-reconciliation.test.ts > family_siblings.py resolution rules > listed clubs all outside the VFL/AFL are unlinked whatever the name matches; no candidate is unmatched
+ × tests/sibling-reconciliation.test.ts > family_siblings.py resolution rules > refuses a self-pair, merges a family listed twice into one pair, and refuses two unlinked namesake pairs
+ × tests/sibling-reconciliation.test.ts > family_siblings.py resolution rules > resolves by name, suffix and listed club; orders each pair deterministically with roles travelling
+ × tests/sibling-reconciliation.test.ts > family_siblings.py resolution rules > two people who both resolve to canonical players are brothers whatever the export called them; the men's competition decides
+ × tests/v2-acquisition-pipeline.test.ts > (e) docs/v2/architecture.md §9 is the rendered stage map > equals renderAflApiStageMap output
+ × tests/v2-season-seal.test.ts > the season-bearing writer inventory (V2-GAP-006, application level only) > classifies every source file that writes a season-bearing table, and nothing stale
