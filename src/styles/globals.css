@@ -1248,6 +1248,62 @@ label {
   text-decoration: none;
 }
 
+/* Draft categories (AFLDB-ISSUE-336). Chips wrap rather than scroll, so every
+   category stays visible and tappable at phone width. */
+.draft-year-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+}
+.draft-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0 0 1.1rem;
+}
+.draft-tabs-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+.draft-tabs-label {
+  font-size: 0.75rem;
+  color: var(--text-faint);
+  letter-spacing: 0.04em;
+  margin-right: 0.2rem;
+}
+.draft-tab { display: inline-flex; align-items: center; gap: 0.4rem; min-height: 2.25rem; }
+.draft-tab .count { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-faint); }
+.draft-tab.is-empty { opacity: 0.6; }
+.draft-tab[aria-current='page'] {
+  color: var(--bg);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.draft-tab[aria-current='page'] .count { color: inherit; opacity: 0.85; }
+.draft-tab-feature { border-style: dashed; font-weight: 600; }
+.draft-tab-feature[aria-current='page'] { border-style: solid; }
+.draft-view-note { font-size: 0.8125rem; max-width: var(--measure); margin: 0 0 1rem; }
+.draft-table tr.draft-group th {
+  text-align: left;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text);
+  background: var(--bg-subtle);
+  padding-top: 0.55rem;
+  padding-bottom: 0.45rem;
+}
+.draft-table tr.draft-group .count {
+  margin-left: 0.5rem;
+  font-family: var(--font-mono);
+  color: var(--text-faint);
+  text-transform: none;
+}
+.draft-selection { font-variant-numeric: tabular-nums; }
+
 /* Two-column ledger split (head-to-head | record of the week). */
 .split {
   display: grid;

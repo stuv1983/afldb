@@ -174,7 +174,8 @@ export function seasonFilterFields(options: {
 export function draftFilterFields(options: {
   years?: SelectOption[];
   clubs: SelectOption[];
-  types: SelectOption[];
+  /** The legacy source-label select; omitted where category navigation replaces it. */
+  types?: SelectOption[];
 }): FilterField[] {
   const fields: FilterField[] = [
     { kind: 'text', key: 'q', label: 'Player', placeholder: 'Search by name' },
@@ -195,11 +196,18 @@ export function draftFilterFields(options: {
       placeholder: 'e.g. Claremont, Subiaco, Oakleigh',
       help: 'The feeder or state-league club a player came from, as recorded by the source.',
     },
-    {
+  );
+  if (options.types) {
+    fields.push({
       kind: 'select', key: 'type', label: 'Draft type',
       options: options.types, anyLabel: 'Any type',
+    });
+  }
+  fields.push(
+    {
+      kind: 'range', key: 'pick', label: 'Pick number', min: 1, max: 200,
+      help: 'Within each category: National pick 1 and Rookie pick 1 are different selections. Trades and other unnumbered acquisitions are excluded.',
     },
-    { kind: 'range', key: 'pick', label: 'Pick number', min: 1, max: 200 },
     {
       kind: 'range', key: 'age', label: 'Draft age', min: 14, max: 45,
       help: 'Age is not recorded for every selection; those rows are excluded by this filter.',

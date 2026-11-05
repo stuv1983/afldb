@@ -1,0 +1,777 @@
+{
+ "format": "afldb.issue336.predraft-insert-plan.1",
+ "issue": "AFLDB-ISSUE-336",
+ "purpose": "Insert-only repair: 35 DraftGuru Pre-Draft rows (2008-2025) present in the owner-supplied CSV exports and on the live DraftGuru year pages but absent from draft_picks. No existing row is updated or deleted.",
+ "source_csv_sha256": {
+  "1991_AFL_Draft_and_Trade_Period_Table_1.csv": "d019a8f2068cbf2802a5bbf593a0346c42f3849dc5a33d4e49ecaf5c8bc4a6dd",
+  "1992_AFL_Draft_and_Trade_Period_Table_1.csv": "d41ac17121271724e1e61f844c30bed07dfdf03afe4d316216a525d2162144d3",
+  "1993_AFL_Draft_and_Trade_Period_Table_1.csv": "69214400b04391dad83a1401b8857cae3d095558ec1f349c7ac67e97109efaf9",
+  "1994_AFL_Draft_and_Trade_Period_Table_1.csv": "b5749b86a23add20c0f2f5316b919faad5d4c2853736bf4f4eaca763636cc991",
+  "1995_AFL_Draft_and_Trade_Period_Table_1.csv": "3559973902ae2cbe4280ed624b794e049d4cc6038f7cc3f99d14e0438f2a4c82",
+  "1996_AFL_Draft_and_Trade_Period_Table_1.csv": "87a36d75b0363de3b9fe9094f6a861eaab69c85102acc93d3804f9a17501e65a",
+  "1997_AFL_Draft_and_Trade_Period_Table_1.csv": "7f88a0c2dc3a0a858f28bf43444804b0f6aea0d7c0e56b51246ece53c091c1ec",
+  "1998_AFL_Draft_and_Trade_Period_Table_1.csv": "248f71b3f0f358275ef45c90b54bae2ab7afdd7cb842a430f657ffd023bf7099",
+  "1999_AFL_Draft_and_Trade_Period_Table_1.csv": "fba733c898c265f7a621f430d90f129d1fb1b854272a31fabcb0c2469ba148ec",
+  "2000_AFL_Draft_and_Trade_Period_Table_1.csv": "cdedac9c7b6c5b49f9d47d831bcad8fa6fb130d5000c5790f2e987c35be3fadc",
+  "2001_AFL_Draft_and_Trade_Period_Table_1.csv": "5f9544ed8a9e734aadcc572cfa3086d5afd09a9079826faf6b9a074a558ba926",
+  "2002_AFL_Draft_and_Trade_Period_Table_1.csv": "0464ce64e2e397c1e0cfcffbc9eab51d6ecd42620c75a6220d01a17dd5bc151f",
+  "2003_AFL_Draft_and_Trade_Period_Table_1.csv": "5d8162528377f8d694e8557aa5dea03bfae86200840c2246bf5f3d0a814b505f",
+  "2004_AFL_Draft_and_Trade_Period_Table_1.csv": "594c5f4f8529c709a9d482cffce3ccec53dd52487e8acf22851dad9c078e55be",
+  "2005_AFL_Draft_and_Trade_Period_Table_1.csv": "6bbe98862024dfbb19da4e25b32a82cca1acf78350a4b4efb13d11bac33a5961",
+  "2006_AFL_Draft_and_Trade_Period_Table_1.csv": "3bb18ab6bac073f86be69bbc8213e221e3402cade96cb8dd15e927da9a2a9254",
+  "2007_AFL_Draft_and_Trade_Period_Table_1.csv": "4600aba6859cccd49c55b5bfdc97634df2f85be8b9d3527559919598815c5af9",
+  "2008_AFL_Draft_and_Trade_Period_Table_1.csv": "1ea1941ee222e0bb511294c40f1e9a7d82f1898676b794a944a4da4f71675719",
+  "2009_AFL_Draft_and_Trade_Period_Table_1.csv": "7ba4bad699c66c633e9e2f96d48c53e8f2ba65644e8c775e9080ca92e1c36df8",
+  "2010_AFL_Draft_and_Trade_Period_Table_1.csv": "879f6c09f410366952e900ce1babdaf98bfd0d4c8eb9a02e96f119cd18b81ba5",
+  "2011_AFL_Draft_and_Trade_Period_Table_1.csv": "bae512975cc3bca1c48c0ec984480779a4b16911cfb414665087cc20ba189980",
+  "2012_AFL_Draft_and_Trade_Period_Table_1.csv": "9dc3582ffa9a3d6b6bd23de5799b54d8c4666c52da0e4e88a65a4fd783935ff4",
+  "2013_AFL_Draft_and_Trade_Period_Table_1.csv": "7599fb574b06eff3c50ae4ac12f9e912f95a70070366dc75d8ebf9b9e64f0f77",
+  "2014_AFL_Draft_and_Trade_Period_Table_1.csv": "a76cc41b622715c36fc1e300b52f092a963794a2970f9db60601d4d6fd395bb7",
+  "2015_AFL_Draft_and_Trade_Period_Table_1.csv": "40c69a83ef0afc11970ba91d55406f19b877a9cecc2d51a4d3554bdda7e96d79",
+  "2016_AFL_Draft_and_Trade_Period_Table_1.csv": "bdf7f6adf3673ff39037ec09aed38d899b3aba4a76ac8d2fe2db03a37caced97",
+  "2017_AFL_Draft_and_Trade_Period_Table_1.csv": "de9e37bbea369fec801ef8e6ea7d8882385e0c6e8ca0f64f395acb174977b306",
+  "2018_AFL_Draft_and_Trade_Period_Table_1.csv": "cb6b590e0be746b882f56e6ba90bc7c4130499e0d84891db726e1f5725264ddc",
+  "2019_AFL_Draft_and_Trade_Period_Table_1.csv": "78dd8336383ead7569e36139cf4f581d793fede48336db565ca19ddc2b37ed26",
+  "2020_AFL_Draft_and_Trade_Period_Table_1.csv": "ed699aa2ae27d1744c8cf3f0e55d0f691dc3654a93bf202771dfd421dfaaa961",
+  "2021_AFL_Draft_and_Trade_Period_Table_1.csv": "16f29824b880c037881eec527f0bd68ce3c090ca6a67e42f3ca553f958033563",
+  "2022_AFL_Draft_and_Trade_Period_Table_1.csv": "0c61721e33977fc2e511213d8136f531c732816fe228863f53992cacb8c8ea32",
+  "2023_AFL_Draft_and_Trade_Period_Table_1.csv": "6616b9b714018380a81c63ee0dfa55ff40d48743ff938a7f1414ac05a2f95911",
+  "2024_AFL_Draft_and_Trade_Period_Table_1.csv": "da08c4466e2e0cc8768ff416fbcd855451923c1b8c65c6aef5300dd05d234a3d",
+  "2025_AFL_Draft_and_Trade_Period_Table_1.csv": "1b9767a18ad30d5094c561a73597b387c6248ba588dc8e7511a33b395a2bb50e"
+ },
+ "draftguru_pages": {
+  "2008": {
+   "url": "https://www.draftguru.com.au/years/2008",
+   "fetched_at_utc": "2026-11-05T10:33:58.439734+00:00",
+   "sha256": "943736379ce9588c03f3d1982b63aa0502811fa1577ddd9f481cd86586ec1ec2"
+  },
+  "2009": {
+   "url": "https://www.draftguru.com.au/years/2009",
+   "fetched_at_utc": "2026-11-05T10:34:01.608051+00:00",
+   "sha256": "c427e20617fe5c5536ef3ab06d56cf0f122083e73a5e8e6d473d71e809011ca8"
+  },
+  "2010": {
+   "url": "https://www.draftguru.com.au/years/2010",
+   "fetched_at_utc": "2026-11-05T10:34:04.778248+00:00",
+   "sha256": "3a2b1902c0f0db326c4e348000d66aea52cf9740db921511f166df9b122518ff"
+  },
+  "2011": {
+   "url": "https://www.draftguru.com.au/years/2011",
+   "fetched_at_utc": "2026-11-05T10:34:07.903201+00:00",
+   "sha256": "38d5cc00b6301e0dba9d10c2b6c5f55e1d56a903a31c9fc0474683e6ee8bc701"
+  },
+  "2012": {
+   "url": "https://www.draftguru.com.au/years/2012",
+   "fetched_at_utc": "2026-11-05T10:34:11.041933+00:00",
+   "sha256": "d1f3c21b1d9948963e9e787305d6a896b1d3c62d5b694156be7ba8d459f36f29"
+  },
+  "2013": {
+   "url": "https://www.draftguru.com.au/years/2013",
+   "fetched_at_utc": "2026-11-05T10:34:14.157160+00:00",
+   "sha256": "808a1a927263e461f022afe245a6984cf68802a5203c5a521c5c7f362c26eec5"
+  },
+  "2014": {
+   "url": "https://www.draftguru.com.au/years/2014",
+   "fetched_at_utc": "2026-11-05T10:34:17.282036+00:00",
+   "sha256": "2776168629d1059f940001b66be00084404d0698c00206612e5be25af9b90f8a"
+  },
+  "2015": {
+   "url": "https://www.draftguru.com.au/years/2015",
+   "fetched_at_utc": "2026-11-05T10:34:20.444901+00:00",
+   "sha256": "b42bb5e8d7256fa0f274cc5dba042e638c820c7105546ee0b2dba0bf95c06d4d"
+  },
+  "2017": {
+   "url": "https://www.draftguru.com.au/years/2017",
+   "fetched_at_utc": "2026-11-05T10:34:23.596164+00:00",
+   "sha256": "7cd7ac56ae4d06a38aea260618ef7f7ddc37e71b690f0a7136cb895faeef1f51"
+  },
+  "2021": {
+   "url": "https://www.draftguru.com.au/years/2021",
+   "fetched_at_utc": "2026-11-05T10:34:26.711426+00:00",
+   "sha256": "21e40b51d7af60b9f9bda721c3dfc41913d38026369630df0cc1e2da895fc5f1"
+  },
+  "2025": {
+   "url": "https://www.draftguru.com.au/years/2025",
+   "fetched_at_utc": "2026-11-05T10:34:29.846898+00:00",
+   "sha256": "c2ad680c616c146a3944ca064ae8d4ef2bf8966902505ef94c95d01793868e9c"
+  }
+ },
+ "baseline": {
+  "dump": "afldb_prod-20261104T021037Z.dump",
+  "dump_sha256": "e77c307d3e0cddcb652e398a946e4c22c2063f13c70edadf96a975c92842826d",
+  "draft_picks": 6818,
+  "draftguru_draft_picks": 6810,
+  "gap029_manual_rookie_picks": 8,
+  "active_draft_overrides": 8
+ },
+ "decisions_required": {
+  "D-336-1": "Accept the DraftGuru signing head 'Intl Schol' (32 rows) into the closed signing vocabulary (data/reference/draftguru-event-kinds.json and GRID_SIGNING_KINDS), or keep these rows out."
+ },
+ "rows": [
+  {
+   "draft_year": 2008,
+   "event_type_raw": "Pre-Draft",
+   "player_name_raw": "Solomoni Loki",
+   "player_url": "https://www.draftguru.com.au/players/solomoni_loki/1",
+   "club_name_raw": "Western Bulldogs",
+   "club_slug_source": "western-bulldogs",
+   "signing_raw": "Intl Schol",
+   "pick_number": null,
+   "pick_note_raw": null,
+   "age_raw": "16yr",
+   "height_raw": "186cm",
+   "original_club_raw": "Fiji",
+   "source_url": "https://www.draftguru.com.au/years/2008",
+   "row_index": 6,
+   "csv_agrees": {
+    "signing": true
+   }
+  },
+  {
+   "draft_year": 2008,
+   "event_type_raw": "Pre-Draft",
+   "player_name_raw": "Amua Pirika",
+   "player_url": "https://www.draftguru.com.au/players/amua_pirika/1",
+   "club_name_raw": "Gold Coast",
+   "club_slug_source": "gold-coast",
+   "signing_raw": "Intl Schol",
+   "pick_number": null,
+   "pick_note_raw": null,
+   "age_raw": "18yr",
+   "height_raw": "187cm",
+   "original_club_raw": "Papua New Guinea",
+   "source_url": "https://www.draftguru.com.au/years/2008",
+   "row_index": 7,
+   "csv_agrees": {
+    "signing": true
+   }
+  },
+  {
+   "draft_year": 2008,
+   "event_type_raw": "Pre-Draft",
+   "player_name_raw": "Inoke Ratu",
+   "player_url": "https://www.draftguru.com.au/players/inoke_ratu/1",
+   "club_name_raw": "Western Bulldogs",
+   "club_slug_source": "western-bulldogs",
+   "signing_raw": "Intl Schol",
+   "pick_number": null,
+   "pick_note_raw": null,
+   "age_raw": "20yr",
+   "height_raw": "199cm",
+   "original_club_raw": "Fiji",
+   "source_url": "https://www.draftguru.com.au/years/2008",
+   "row_index": 8,
+   "csv_agrees": {
+    "signing": true
+   }
+  },
+  {
+   "draft_year": 2008,
+   "event_type_raw": "Pre-Draft",
+   "player_name_raw": "Stanis Susuve",
+   "player_url": "https://www.draftguru.com.au/players/stanis_susuve/1",
+   "club_name_raw": "Gold Coast",
+   "club_slug_source": "gold-coast",
+   "signing_raw": "Intl Schol",
+   "pick_number": null,
+   "pick_note_raw": null,
+   "age_raw": "18yr",
+   "height_raw": "182cm",
+   "original_club_raw": "Papua New Guinea",
+   "source_url": "https://www.draftguru.com.au/years/2008",
+   "row_index": 9,
+   "csv_agrees": {
+    "signing": true
+   }
+  },
+  {
+   "draft_year": 2009,
+   "event_type_raw": "Pre-Draft",
+   "player_name_raw": "Donald Barry",
+   "player_url": "https://www.draftguru.com.au/players/donald_barry/1",
+   "club_name_raw": "Brisbane",
+   "club_slug_source": "brisbane",
+   "signing_raw": "Intl Schol",
+   "pick_number": null,
+   "pick_note_raw": null,
+   "age_raw": "20yr",
+   "height_raw": "180cm",
+   "original_club_raw": "Papua New Guinea",
+   "source_url": "https://www.draftguru.com.au/years/2009",
+   "row_index": 23,
+   "csv_agrees": {
+    "signing": true
+   }
+  },
+  {
+   "draft_year": 2009,
+   "event_type_raw": "Pre-Draft",
+   "player_name_raw": "Brendan Beno",
+   "player_url": "https://www.draftguru.com.au/players/brendan_beno/1",
+   "club_name_raw": "Brisbane",
+   "club_slug_source": "brisbane",
+   "signing_raw": "Intl Schol",
+   "pick_number": null,
+   "pick_note_raw": null,
+   "age_raw": "15yr",
+   "height_raw": "170cm",
+   "original_club_raw": "Papua New Guinea",
+   "source_url": "https://www.draftguru.com.au/years/2009",
+   "row_index": 24,
+   "csv_agrees": {
+    "signing": true
+   }
+  },
+  {
+   "draft_year": 2009,
+   "event_type_raw": "Pre-Draft",
+   "player_name_raw": "Kurt Heatherley",
+   "player_url": "https://www.draftguru.com.au/players/kurt_heatherley/1",
+   "club_name_raw": "Hawthorn",
+   "club_slug_source": "hawthorn",
+   "signing_raw": "Intl Schol",
+   "pick_number": null,
+   "pick_note_raw": null,
+   "age_raw": "14yr",
+   "height_raw": "193cm",
+   "original_club_raw": "New Zealand/​Sandringham U18",
+   "source_url": "https://www.draftguru.com.au/years/2009",
+   "row_index": 25,
+   "csv_agrees": {
+    "signing": true
+   }
+  },
+  {
+   "draft_year": 2009,
+   "event_type_raw": "Pre-Draft",
+   "player_name_raw": "Ezra Kautu",
+   "player_url": "https://www.draftguru.com.au/players/ezra_kautu/1",
+   "club_name_raw": "Brisbane",
+   "club_slug_source": "brisbane",
+   "signing_raw": "Intl Schol",
+   "pick_number": null,
+   "pick_note_raw": null,
+   "age_raw": "15yr",
+   "height_raw": "180cm",
+   "original_club_raw": "Papua New Guinea",
+   "source_url": "https://www.draftguru.com.au/years/2009",
+   "row_index": 26,
+   "csv_agrees": {
+    "signing": true
+   }
+  },
+  {
+   "draft_year": 2009,
+   "event_type_raw": "Pre-Draft",
+   "player_name_raw": "Peter Labi",
+   "player_url": "https://www.draftguru.com.au/players/peter_labi/1",
+   "club_name_raw": "Carlton",
+   "club_slug_source": "carlton",
+   "signing_raw": "Intl Schol",
+   "pick_number": null,
+   "pick_note_raw": null,
+   "age_raw": "17yr",
+   "height_raw": "187cm",
+   "original_club_raw": "Papua New Guinea",
+   "source_url": "https://www.draftguru.com.au/years/2009",
+   "row_index": 27,
+   "csv_agrees": {
+    "signing": true
+   }
+  },
+  {
+   "draft_year": 2009,
+   "event_type_raw": "Pre-Draft",
+   "player_name_raw": "Max Lavai",
+   "player_url": "https://www.draftguru.com.au/players/max_lavai/1",
+   "club_name_raw": "Essendon",
+   "club_slug_source": "essendon",
+   "signing_raw": "Intl Schol",
+   "pick_number": null,
+   "pick_note_raw": null,
+   "age_raw": "14yr",
+   "height_raw": "178cm",
+   "original_club_raw": "Papua New Guinea",
+   "source_url": "https://www.draftguru.com.au/years/2009",
+   "row_index": 28,
+   "csv_agrees": {
+    "signing": true
+   }
+  },
+  {
+   "draft_year": 2009,
+   "event_type_raw": "Pre-Draft",
+   "player_name_raw": "Nathan Malbak",
+   "player_url": "https://www.draftguru.com.au/players/nathan_malbak/1",
+   "club_name_raw": "Richmond",
+   "club_slug_source": "richmond",
+   "signing_raw": "Intl Schol",
+   "pick_number": null,
+   "pick_note_raw": null,
+   "age_raw": "15yr",
+   "height_raw": "167cm",
+   "original_club_raw": "Papua New Guinea",
+   "source_url": "https://www.draftguru.com.au/years/2009",
+   "row_index": 29,
+   "csv_agrees": {
+    "signing": true
+   }
+  },
+  {
+   "draft_year": 2009,
+   "event_type_raw": "Pre-Draft",
+   "player_name_raw": "David Meli",
+   "player_url": "https://www.draftguru.com.au/players/david_meli/1",
+   "club_name_raw": "Essendon",
+   "club_slug_source": "essendon",
+   "signing_raw": "Intl Schol",
+   "pick_number": null,
+   "pick_note_raw": null,
+   "age_raw": "16yr",
+   "height_raw": "174cm",
+   "original_club_raw": "Papua New Guinea",
+   "source_url": "https://www.draftguru.com.au/years/2009",
+   "row_index": 30,
+   "csv_agrees": {
+    "signing": true
+   }
+  },
+  {
+   "draft_year": 2009,
+   "event_type_raw": "Pre-Draft",
+   "player_name_raw": "Victor Rame",
+   "player_url": "https://www.draftguru.com.au/players/victor_rame/1",
+   "club_name_raw": "Essendon",
+   "club_slug_source": "essendon",
+   "signing_raw": "Intl Schol",
+   "pick_number": null,
+   "pick_note_raw": null,
+   "age_raw": "14yr",
+   "height_raw": null,
+   "original_club_raw": "Papua New Guinea",
+   "source_url": "https://www.draftguru.com.au/years/2009",
+   "row_index": 31,
+   "csv_agrees": {
+    "signing": true
+   }
+  },
+  {
+   "draft_year": 2009,
+   "event_type_raw": "Pre-Draft",
+   "player_name_raw": "Gideon Simon",
+   "player_url": "https://www.draftguru.com.au/players/gideon_simon/1",
+   "club_name_raw": "Richmond",
+   "club_slug_source": "richmond",
+   "signing_raw": "Intl Schol",
+   "pick_number": null,
+   "pick_note_raw": null,
+   "age_raw": "15yr",
+   "height_raw": "172cm",
+   "original_club_raw": "Papua New Guinea/​Coburg",
+   "source_url": "https://www.draftguru.com.au/years/2009",
+   "row_index": 32,
+   "csv_agrees": {
+    "signing": true
+   }
+  },
+  {
+   "draft_year": 2009,
+   "event_type_raw": "Pre-Draft",
+   "player_name_raw": "Bayanda Sobetwa",
+   "player_url": "https://www.draftguru.com.au/players/bayanda_sobetwa/1",
+   "club_name_raw": "GWS",
+   "club_slug_source": "greater-western-sydney",
+   "signing_raw": "Intl Schol",
+   "pick_number": null,
+   "pick_note_raw": null,
+   "age_raw": "19yr",
+   "height_raw": "183cm",
+   "original_club_raw": "South Africa",
+   "source_url": "https://www.draftguru.com.au/years/2009",
+   "row_index": 33,
+   "csv_agrees": {
+    "signing": true
+   }
+  },
+  {
+   "draft_year": 2010,
+   "event_type_raw": "Pre-Draft",
+   "player_name_raw": "Rhys Panui-Leth",
+   "player_url": "https://www.draftguru.com.au/players/rhys_panui-leth/1",
+   "club_name_raw": "Hawthorn",
+   "club_slug_source": "hawthorn",
+   "signing_raw": "Intl Schol",
+   "pick_number": null,
+   "pick_note_raw": null,
+   "age_raw": "16yr",
+   "height_raw": "190cm",
+   "original_club_raw": "New Zealand",
+   "source_url": "https://www.draftguru.com.au/years/2010",
+   "row_index": 21,
+   "csv_agrees": {
+    "signing": true
+   }
+  },
+  {
+   "draft_year": 2010,
+   "event_type_raw": "Pre-Draft",
+   "player_name_raw": "Shem Tatupu",
+   "player_url": "https://www.draftguru.com.au/players/shem_tatupu/1",
+   "club_name_raw": "Hawthorn",
+   "club_slug_source": "hawthorn",
+   "signing_raw": "Intl Schol",
+   "pick_number": null,
+   "pick_note_raw": null,
+   "age_raw": "15yr",
+   "height_raw": "192cm",
+   "original_club_raw": "New Zealand/​Oakleigh U18/​Box Hill",
+   "source_url": "https://www.draftguru.com.au/years/2010",
+   "row_index": 22,
+   "csv_agrees": {
+    "signing": true
+   }
+  },
+  {
+   "draft_year": 2011,
+   "event_type_raw": "Pre-Draft",
+   "player_name_raw": "Charlton Brown",
+   "player_url": "https://www.draftguru.com.au/players/charlton_brown/1",
+   "club_name_raw": "GWS",
+   "club_slug_source": "greater-western-sydney",
+   "signing_raw": "Intl Schol",
+   "pick_number": null,
+   "pick_note_raw": null,
+   "age_raw": "16yr",
+   "height_raw": "187cm",
+   "original_club_raw": "New Zealand",
+   "source_url": "https://www.draftguru.com.au/years/2011",
+   "row_index": 28,
+   "csv_agrees": {
+    "signing": true
+   }
+  },
+  {
+   "draft_year": 2011,
+   "event_type_raw": "Pre-Draft",
+   "player_name_raw": "Theo Gavuri",
+   "player_url": "https://www.draftguru.com.au/players/theo_gavuri/1",
+   "club_name_raw": "GWS",
+   "club_slug_source": "greater-western-sydney",
+   "signing_raw": "Intl Schol",
+   "pick_number": null,
+   "pick_note_raw": null,
+   "age_raw": "17yr",
+   "height_raw": "168cm",
+   "original_club_raw": "Papua New Guinea",
+   "source_url": "https://www.draftguru.com.au/years/2011",
+   "row_index": 29,
+   "csv_agrees": {
+    "signing": true
+   }
+  },
+  {
+   "draft_year": 2011,
+   "event_type_raw": "Pre-Draft",
+   "player_name_raw": "Yoshi Harris",
+   "player_url": "https://www.draftguru.com.au/players/yoshi_harris/1",
+   "club_name_raw": "GWS",
+   "club_slug_source": "greater-western-sydney",
+   "signing_raw": "Intl Schol",
+   "pick_number": null,
+   "pick_note_raw": null,
+   "age_raw": "17yr",
+   "height_raw": "183cm",
+   "original_club_raw": "Nauru",
+   "source_url": "https://www.draftguru.com.au/years/2011",
+   "row_index": 30,
+   "csv_agrees": {
+    "signing": true
+   }
+  },
+  {
+   "draft_year": 2011,
+   "event_type_raw": "Pre-Draft",
+   "player_name_raw": "Peni Mahina",
+   "player_url": "https://www.draftguru.com.au/players/peni_mahina/1",
+   "club_name_raw": "GWS",
+   "club_slug_source": "greater-western-sydney",
+   "signing_raw": "Intl Schol",
+   "pick_number": null,
+   "pick_note_raw": null,
+   "age_raw": "19yr",
+   "height_raw": "184cm",
+   "original_club_raw": "Tonga",
+   "source_url": "https://www.draftguru.com.au/years/2011",
+   "row_index": 31,
+   "csv_agrees": {
+    "signing": true
+   }
+  },
+  {
+   "draft_year": 2011,
+   "event_type_raw": "Pre-Draft",
+   "player_name_raw": "Ben Miller",
+   "player_url": "https://www.draftguru.com.au/players/ben_miller/4",
+   "club_name_raw": "Hawthorn",
+   "club_slug_source": "hawthorn",
+   "signing_raw": "Intl Schol",
+   "pick_number": null,
+   "pick_note_raw": null,
+   "age_raw": "17yr",
+   "height_raw": "186cm",
+   "original_club_raw": "New Zealand",
+   "source_url": "https://www.draftguru.com.au/years/2011",
+   "row_index": 32,
+   "csv_agrees": {
+    "signing": true
+   }
+  },
+  {
+   "draft_year": 2012,
+   "event_type_raw": "Pre-Draft",
+   "player_name_raw": "Joe Baker-Thomas",
+   "player_url": "https://www.draftguru.com.au/players/joe_baker-thomas/1",
+   "club_name_raw": "St Kilda",
+   "club_slug_source": "st-kilda",
+   "signing_raw": "Intl Schol",
+   "pick_number": null,
+   "pick_note_raw": null,
+   "age_raw": "17yr",
+   "height_raw": "194cm",
+   "original_club_raw": "New Zealand",
+   "source_url": "https://www.draftguru.com.au/years/2012",
+   "row_index": 45,
+   "csv_agrees": {
+    "signing": true
+   }
+  },
+  {
+   "draft_year": 2012,
+   "event_type_raw": "Pre-Draft",
+   "player_name_raw": "Aksel Bang",
+   "player_url": "https://www.draftguru.com.au/players/aksel_bang/1",
+   "club_name_raw": "GWS",
+   "club_slug_source": "greater-western-sydney",
+   "signing_raw": "Intl Schol",
+   "pick_number": null,
+   "pick_note_raw": null,
+   "age_raw": "21yr",
+   "height_raw": "170cm",
+   "original_club_raw": "Denmark",
+   "source_url": "https://www.draftguru.com.au/years/2012",
+   "row_index": 46,
+   "csv_agrees": {
+    "signing": true
+   }
+  },
+  {
+   "draft_year": 2012,
+   "event_type_raw": "Pre-Draft",
+   "player_name_raw": "Siope Ngata",
+   "player_url": "https://www.draftguru.com.au/players/siope_ngata/1",
+   "club_name_raw": "Hawthorn",
+   "club_slug_source": "hawthorn",
+   "signing_raw": "Intl Schol",
+   "pick_number": null,
+   "pick_note_raw": null,
+   "age_raw": "15yr",
+   "height_raw": "187cm",
+   "original_club_raw": "New Zealand",
+   "source_url": "https://www.draftguru.com.au/years/2012",
+   "row_index": 47,
+   "csv_agrees": {
+    "signing": true
+   }
+  },
+  {
+   "draft_year": 2012,
+   "event_type_raw": "Pre-Draft",
+   "player_name_raw": "Maia Westrupp",
+   "player_url": "https://www.draftguru.com.au/players/maia_westrupp/1",
+   "club_name_raw": "Melbourne",
+   "club_slug_source": "melbourne",
+   "signing_raw": "Intl Schol",
+   "pick_number": null,
+   "pick_note_raw": null,
+   "age_raw": "18yr",
+   "height_raw": "188cm",
+   "original_club_raw": "New Zealand",
+   "source_url": "https://www.draftguru.com.au/years/2012",
+   "row_index": 48,
+   "csv_agrees": {
+    "signing": true
+   }
+  },
+  {
+   "draft_year": 2013,
+   "event_type_raw": "Pre-Draft",
+   "player_name_raw": "Giovanni Mountain-Silbery",
+   "player_url": "https://www.draftguru.com.au/players/giovanni_mountain-silbery/1",
+   "club_name_raw": "St Kilda",
+   "club_slug_source": "st-kilda",
+   "signing_raw": "Intl Schol",
+   "pick_number": null,
+   "pick_note_raw": null,
+   "age_raw": "16yr",
+   "height_raw": "196cm",
+   "original_club_raw": "New Zealand",
+   "source_url": "https://www.draftguru.com.au/years/2013",
+   "row_index": 43,
+   "csv_agrees": {
+    "signing": true
+   }
+  },
+  {
+   "draft_year": 2014,
+   "event_type_raw": "Pre-Draft",
+   "player_name_raw": "Barclay Miller",
+   "player_url": "https://www.draftguru.com.au/players/barclay_miller/1",
+   "club_name_raw": "St Kilda",
+   "club_slug_source": "st-kilda",
+   "signing_raw": "Intl Schol",
+   "pick_number": null,
+   "pick_note_raw": null,
+   "age_raw": "16yr",
+   "height_raw": "194cm",
+   "original_club_raw": "New Zealand",
+   "source_url": "https://www.draftguru.com.au/years/2014",
+   "row_index": 36,
+   "csv_agrees": {
+    "signing": true
+   }
+  },
+  {
+   "draft_year": 2015,
+   "event_type_raw": "Pre-Draft",
+   "player_name_raw": "Shaoliang Chen",
+   "player_url": "https://www.draftguru.com.au/players/shaoliang_chen/1",
+   "club_name_raw": "Port Adelaide",
+   "club_slug_source": "port-adelaide",
+   "signing_raw": "Intl Schol",
+   "pick_number": null,
+   "pick_note_raw": null,
+   "age_raw": "23yr",
+   "height_raw": "185cm",
+   "original_club_raw": "China",
+   "source_url": "https://www.draftguru.com.au/years/2015",
+   "row_index": 48,
+   "csv_agrees": {
+    "signing": true
+   }
+  },
+  {
+   "draft_year": 2015,
+   "event_type_raw": "Pre-Draft",
+   "player_name_raw": "Brandon Kaufman",
+   "player_url": "https://www.draftguru.com.au/players/brandon_kaufman/1",
+   "club_name_raw": "Gold Coast",
+   "club_slug_source": "gold-coast",
+   "signing_raw": "Intl Schol",
+   "pick_number": null,
+   "pick_note_raw": null,
+   "age_raw": "25yr",
+   "height_raw": "196cm",
+   "original_club_raw": "USA",
+   "source_url": "https://www.draftguru.com.au/years/2015",
+   "row_index": 49,
+   "csv_agrees": {
+    "signing": true
+   }
+  },
+  {
+   "draft_year": 2017,
+   "event_type_raw": "Pre-Draft",
+   "player_name_raw": "Hewago Paul Oea",
+   "player_url": "https://www.draftguru.com.au/players/hewago%20paul_oea/1",
+   "club_name_raw": "Gold Coast",
+   "club_slug_source": "gold-coast",
+   "signing_raw": "Intl Schol",
+   "pick_number": null,
+   "pick_note_raw": null,
+   "age_raw": "16yr",
+   "height_raw": "176cm",
+   "original_club_raw": "Papua New Guinea",
+   "source_url": "https://www.draftguru.com.au/years/2017",
+   "row_index": 35,
+   "csv_agrees": {
+    "signing": true
+   }
+  },
+  {
+   "draft_year": 2021,
+   "event_type_raw": "Pre-Draft",
+   "player_name_raw": "Bassirou Faye",
+   "player_url": "https://www.draftguru.com.au/players/bassirou_faye/1",
+   "club_name_raw": "Collingwood",
+   "club_slug_source": "collingwood",
+   "signing_raw": "Intl Schol",
+   "pick_number": null,
+   "pick_note_raw": null,
+   "age_raw": "18yr",
+   "height_raw": "203cm",
+   "original_club_raw": "Senegal",
+   "source_url": "https://www.draftguru.com.au/years/2021",
+   "row_index": 27,
+   "csv_agrees": {
+    "signing": true
+   }
+  },
+  {
+   "draft_year": 2025,
+   "event_type_raw": "Pre-Draft",
+   "player_name_raw": "Cillian Bourke",
+   "player_url": "https://www.draftguru.com.au/players/cillian_bourke/1",
+   "club_name_raw": "Essendon",
+   "club_slug_source": "essendon",
+   "signing_raw": "International",
+   "pick_number": null,
+   "pick_note_raw": null,
+   "age_raw": "19yr",
+   "height_raw": "190cm",
+   "original_club_raw": "County Offaly",
+   "source_url": "https://www.draftguru.com.au/years/2025",
+   "row_index": 35,
+   "csv_agrees": {
+    "signing": true
+   }
+  },
+  {
+   "draft_year": 2025,
+   "event_type_raw": "Pre-Draft",
+   "player_name_raw": "Kobe McDonald",
+   "player_url": "https://www.draftguru.com.au/players/kobe_mcdonald/1",
+   "club_name_raw": "St Kilda",
+   "club_slug_source": "st-kilda",
+   "signing_raw": "International",
+   "pick_number": null,
+   "pick_note_raw": null,
+   "age_raw": "17yr",
+   "height_raw": "193cm",
+   "original_club_raw": "County Mayo",
+   "source_url": "https://www.draftguru.com.au/years/2025",
+   "row_index": 36,
+   "csv_agrees": {
+    "signing": true
+   }
+  },
+  {
+   "draft_year": 2025,
+   "event_type_raw": "Pre-Draft",
+   "player_name_raw": "Jake Miles-Wrency",
+   "player_url": "https://www.draftguru.com.au/players/jake_miles-wrency/1",
+   "club_name_raw": "West Coast",
+   "club_slug_source": "west-coast",
+   "signing_raw": "Unregistered",
+   "pick_number": null,
+   "pick_note_raw": null,
+   "age_raw": "20yr",
+   "height_raw": "199cm",
+   "original_club_raw": "Coorparoo JAFC/​Basketball",
+   "source_url": "https://www.draftguru.com.au/years/2025",
+   "row_index": 37,
+   "csv_agrees": {
+    "signing": true
+   }
+  }
+ ]
+}

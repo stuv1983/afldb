@@ -16,6 +16,9 @@
  * use Object.hasOwn, the same discipline the search specs already apply to
  * their own catalogues (isGridStatKey, isPlayerSort).
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it, vi } from 'vitest';
 
 import { DATASETS, getDataset } from '@/lib/ingest/datasets';
@@ -136,13 +139,31 @@ const fakeSql = Object.assign(
   { unsafe: (text: string) => ({ unsafeText: text }) },
 );
 
+/**
+ * Fragments built by modules that loaded the real client first (filters.ts, through
+ * records.ts above) are real postgres.js queries, which keep their parameters in `args`
+ * rather than `values`; both shapes are rendered.
+ */
+function parts(value: unknown): { strings: readonly string[]; values: unknown[] } | null {
+  if (!value || typeof value !== 'object' || !('strings' in value)) return null;
+  const v = value as { strings: readonly string[]; values?: unknown[]; args?: unknown[] };
+  const values = Array.isArray(v.values) ? v.values : Array.isArray(v.args) ? v.args : null;
+  return values ? { strings: v.strings, values } : null;
+}
+
 function render(value: unknown): string {
   if (value && typeof value === 'object' && 'unsafeText' in value) return String(value.unsafeText);
-  if (value && typeof value === 'object' && 'strings' in value && 'values' in value) {
-    const { strings, values } = value as Recorded;
-    return strings.reduce((text, part, i) => text + part + (i < values.length ? render(values[i]) : ''), '');
-  }
+  const p = parts(value);
+  if (p) return p.strings.reduce((text, part, i) => text + part + (i < p.values.length ? render(p.values[i]) : ''), '');
   return '$?';
+}
+
+/** Every bound (non-fragment) value of a recorded statement, depth first. */
+function leafValues(value: unknown): unknown[] {
+  const p = parts(value);
+  if (p) return p.values.flatMap(leafValues);
+  if (value && typeof value === 'object' && 'unsafeText' in value) return [];
+  return [value];
 }
 
 /** The ORDER BY clause of the last top-level statement, whitespace collapsed. */
@@ -158,6 +179,9 @@ const { PLAYER_MATCH_SORTS, getPlayerMatches, isPlayerMatchSort, isPlayerMatchSo
   '@/db/queries/players'
 );
 const { DRAFT_SORTS, isDraftSort, isDraftSortDir, listDraftPicks } = await import('@/db/queries/draft');
+const {
+  DRAFT_CATEGORIES, DRAFT_KIND_RANK_SQL, draftEventLabel, draftYearViewPath, parseDraftView, selectionLabel,
+} = await import('@/lib/draft-categories');
 
 describe('isPlayerMatchSort and isDraftSort', () => {
   it('accept every declared sort key', () => {
@@ -182,14 +206,38 @@ describe('isPlayerMatchSort and isDraftSort', () => {
 
 describe('match-log and draft ORDER BY', () => {
   const PLAYER_DEFAULT = 'm.match_date DESC, m.id DESC';
-  const DRAFT_DEFAULT = 'dp.draft_year DESC, dp.pick_number NULLS LAST';
+  // AFLDB-ISSUE-336: category order, pick WITHIN the category, name, then id, so pages are stable.
+  const DRAFT_DEFAULT =
+    `dp.draft_year DESC, ${DRAFT_KIND_RANK_SQL}, dp.pick_number NULLS LAST, COALESCE(p.sort_name, dp.player_name_raw), dp.id`;
   const draftFilters = { page: 1, pageSize: 50 };
 
   it('uses the declared column for a valid sort key and direction', async () => {
     await getPlayerMatches(1, { limit: 10, offset: 0, sort: 'g', dir: 'asc' });
     expect(lastOrderBy()).toBe(`s.goals ASC NULLS LAST, ${PLAYER_DEFAULT}`);
+    await listDraftPicks({ ...draftFilters, sort: 'player', dir: 'desc' });
+    expect(lastOrderBy()).toBe(`COALESCE(p.sort_name, dp.player_name_raw) DESC NULLS LAST, ${DRAFT_DEFAULT}`);
+  });
+
+  it('AFLDB-ISSUE-336: a pick sort stays inside each category and a type sort is category order', async () => {
     await listDraftPicks({ ...draftFilters, sort: 'pick', dir: 'desc' });
-    expect(lastOrderBy()).toBe(`dp.pick_number DESC NULLS LAST, ${DRAFT_DEFAULT}`);
+    expect(lastOrderBy()).toBe(`${DRAFT_KIND_RANK_SQL}, dp.pick_number DESC NULLS LAST, ${DRAFT_DEFAULT}`);
+    await listDraftPicks({ ...draftFilters, sort: 'type', dir: 'asc' });
+    expect(lastOrderBy()).toBe(`${DRAFT_KIND_RANK_SQL} ASC NULLS LAST, ${DRAFT_DEFAULT}`);
+    expect(DRAFT_SORTS.type).not.toContain('draft_type');
+  });
+
+  it('AFLDB-ISSUE-336: filters by canonical category and by the Father–Son signing kind', async () => {
+    await listDraftPicks({ ...draftFilters, year: 2025, kind: 'rookie' });
+    let text = render(recordedQueries.at(-1)).replace(/\s+/g, ' ');
+    expect(text).toContain('dp.draft_kind = $?');
+    expect(text).not.toContain('dp.signing_kind = $?');
+    expect(leafValues(recordedQueries.at(-1))).toEqual(expect.arrayContaining([2025, 'rookie']));
+
+    await listDraftPicks({ ...draftFilters, year: 2021, fatherSon: true });
+    text = render(recordedQueries.at(-1)).replace(/\s+/g, ' ');
+    expect(text).toContain('dp.signing_kind = $?');
+    expect(text).not.toContain('dp.draft_kind = $?');
+    expect(leafValues(recordedQueries.at(-1))).toEqual(expect.arrayContaining([2021, 'Father-Son']));
   });
 
   it('falls back to the default order for constructor and toString', async () => {
@@ -214,5 +262,53 @@ describe('match-log and draft ORDER BY', () => {
       await listDraftPicks({ ...draftFilters, sort, dir });
       expect(lastOrderBy()).toBe(DRAFT_DEFAULT);
     }
+  });
+});
+
+/*
+ * AFLDB-ISSUE-336: the draft category catalogue. `view` is request-supplied, and a pick
+ * number is only meaningful inside its category: National pick 1 and Rookie pick 1 are
+ * different selections, unnumbered acquisitions stay unnumbered, and Father–Son is a
+ * signing mechanism that keeps the real category rather than a category of its own.
+ */
+describe('AFLDB-ISSUE-336 draft categories', () => {
+  it('enumerates exactly the kinds of the tracked DraftGuru event contract', () => {
+    const contract = JSON.parse(readFileSync(join(process.cwd(), 'data', 'reference', 'draftguru-event-kinds.json'), 'utf8')) as {
+      events: { draft_kind: string }[]; absent_column: { draft_kind: string };
+    };
+    const kinds = new Set([...contract.events.map((e) => e.draft_kind), contract.absent_column.draft_kind]);
+    expect(new Set(DRAFT_CATEGORIES.map((c) => c.kind))).toEqual(kinds);
+    expect(new Set(DRAFT_CATEGORIES.map((c) => c.slug)).size).toBe(DRAFT_CATEGORIES.length);
+    for (const c of DRAFT_CATEGORIES) expect(DRAFT_KIND_RANK_SQL).toContain(`WHEN '${c.kind}' THEN`);
+  });
+
+  it('opens the named view and treats unknown, inherited or empty values as All', () => {
+    expect(parseDraftView('rookie')).toMatchObject({ type: 'category', category: { kind: 'rookie' } });
+    expect(parseDraftView('pre-season')).toMatchObject({ type: 'category', category: { kind: 'preseason' } });
+    expect(parseDraftView('father-son')).toEqual({ type: 'father-son' });
+    for (const value of [undefined, '', 'all', 'Rookie', 'preseason', ...INHERITED_KEYS]) {
+      expect(parseDraftView(value)).toEqual({ type: 'all' });
+    }
+  });
+
+  it('labels a pick within its own category and never numbers an unnumbered acquisition', () => {
+    const fred = { draftYear: 2025, draftKind: 'rookie', draftType: 'Rookie', pickNumber: 1, signingKind: null };
+    const willem = { draftYear: 2025, draftKind: 'national', draftType: 'National', pickNumber: 1, signingKind: null };
+    const nick = { draftYear: 2021, draftKind: 'national', draftType: 'National', pickNumber: 4, signingKind: 'Father-Son' };
+    expect(draftEventLabel(fred)).toBe('2025 Rookie Draft — Pick 1');
+    expect(draftEventLabel(willem)).toBe('2025 National Draft — Pick 1');
+    expect(selectionLabel(fred)).not.toBe(selectionLabel(willem));
+    expect(selectionLabel(nick)).toBe('National — Pick 4 — Father–Son');
+    expect(selectionLabel({ draftKind: 'pre_draft', draftType: 'Pre-Draft', pickNumber: null, signingKind: 'Father-Son' }))
+      .toBe('Pre-Draft — Father–Son');
+    expect(selectionLabel({ draftKind: 'rookie', draftType: 'Rookie', pickNumber: 12, signingKind: 'Father-Son' }))
+      .toBe('Rookie — Pick 12 — Father–Son');
+    expect(selectionLabel({ draftKind: 'trade', draftType: 'Trade', pickNumber: null })).toBe('Trade');
+    expect(draftEventLabel({ draftYear: 1987, draftKind: 'national', draftType: 'National Draft', pickNumber: 3 }))
+      .toBe('1987 National Draft — Pick 3');
+    // An unknown kind keeps the source's own label rather than being merged into another category.
+    expect(selectionLabel({ draftKind: 'mystery', draftType: 'Mystery Draft', pickNumber: 2 })).toBe('Mystery Draft — Pick 2');
+    expect(draftYearViewPath(2025, 'rookie')).toBe('/draft/2025?view=rookie');
+    expect(draftYearViewPath(2025, 'mystery')).toBe('/draft/2025');
   });
 });

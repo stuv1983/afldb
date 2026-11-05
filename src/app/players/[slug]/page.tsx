@@ -16,6 +16,7 @@ import { getPlayerHonours } from '@/db/queries/awards';
 import { getComparisonOrganizations } from '@/db/queries/club-comparison';
 import { getCoach, getPlayerCoachingCareer } from '@/db/queries/coaches';
 import { getPlayerDraftHistory } from '@/db/queries/draft';
+import { draftCategoryRank, draftEventLabel, draftYearViewPath } from '@/lib/draft-categories';
 import {
   getPlayer,
   getPlayerBrownlow,
@@ -101,6 +102,11 @@ export async function generateMetadata({
  * follows the career rather than the search volume, which is the same rule
  * the season pages already apply through `season.league`.
  */
+/** Signing mechanism (e.g. "Academy (Brisbane)") and the selection's own detail or pick note. */
+function draftNotes(d: { signing: string | null; detail: string | null; pickNote: string | null }): string {
+  return [d.signing, d.detail || d.pickNote].filter(Boolean).join(' · ');
+}
+
 function leagueOf(finalSeason: number | null): 'VFL' | 'AFL' {
   return finalSeason !== null && finalSeason < 1990 ? 'VFL' : 'AFL';
 }
@@ -320,8 +326,7 @@ export default async function PlayerPage({
                 defaultDir="desc"
                 columns={[
                   { key: 'year', label: 'Year', sortType: 'number', className: 'num' },
-                  { key: 'pick', label: 'Pick', sortType: 'number', className: 'num' },
-                  { key: 'type', label: 'Draft type', sortType: 'text', className: 'nowrap' },
+                  { key: 'selection', label: 'Selection', sortType: 'number', className: 'nowrap' },
                   { key: 'drafted_to', label: 'Drafted to', sortType: 'text' },
                   { key: 'from', label: 'Recruited from', sortType: 'text' },
                   { key: 'age', label: 'Draft age', sortType: 'number', className: 'num' },
@@ -331,18 +336,21 @@ export default async function PlayerPage({
                   id: String(d.id),
                   values: {
                     year: d.draftYear,
-                    pick: d.pickNumber ?? 9999,
-                    type: d.draftType,
+                    // Category first, then the pick within it (AFLDB-ISSUE-336).
+                    selection: draftCategoryRank(d.draftKind) * 10000 + (d.pickNumber ?? 9999),
                     drafted_to: d.clubName ?? '',
                     from: d.originClub ?? '',
                     age: d.draftAge ?? -1,
-                    notes: d.detail || d.pickNote || '',
+                    notes: draftNotes(d),
                   },
                   element: (
                     <tr key={d.id}>
                       <td className="num">{d.draftYear}</td>
-                      <td className="num">{d.pickNumber ?? '—'}</td>
-                      <td className="nowrap">{d.draftType}</td>
+                      <td className="nowrap">
+                        <Link href={draftYearViewPath(d.draftYear, d.draftKind)}>
+                          {draftEventLabel(d)}
+                        </Link>
+                      </td>
                       <td>
                         {d.clubSlug ? (
                           <Link href={clubPath(d.clubSlug)}>{d.clubName}</Link>
@@ -352,7 +360,7 @@ export default async function PlayerPage({
                       </td>
                       <td className="muted">{d.originClub ?? '—'}</td>
                       <td className="num">{d.draftAge ?? '—'}</td>
-                      <td className="wide muted">{d.detail || d.pickNote || '—'}</td>
+                      <td className="wide muted">{draftNotes(d) || '—'}</td>
                     </tr>
                   ),
                 }))}
