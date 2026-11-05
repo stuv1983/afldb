@@ -1,0 +1,6 @@
+ × tests/integration/draft-linkage.test.ts > DraftGuru bridge on afldb_test — §6.1 reconciliation (read-only) > every pick inherits its person and the pick population is the manifest's
+ × tests/integration/draft-linkage.test.ts > DraftGuru bridge on afldb_test — §6.1 reconciliation (read-only) > persons partition exactly as the child + ledger predict
+ × tests/integration/draft-linkage.test.ts > DraftGuru bridge on afldb_test — §6.4 negative controls (read-only) > every admitted child bridge: the exact target is registered once, resolves to the stored player, and the person stores the bridge state (or the agreeing human state)
+ × tests/integration/draft-linkage.test.ts > Grid Solver draft criteria on the real linked population (read-only, production compiler) > the ISSUE-221 "No data" square is gone: national top-10 × any career is a populated cell
+ × tests/integration/draft-linkage.test.ts > Grid Solver draft criteria on the real linked population (read-only, production compiler) > the six draft builders each answer a non-empty set with sane bounds
+ × tests/integration/grid-solver.test.ts > grid solver correctness > drafted_by_club_never_played matches a hand-written equivalent for a real club

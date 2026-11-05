@@ -1,0 +1,3 @@
+  118 migration file(s), 118 already applied
+
+Nothing to apply — schema is up to date.

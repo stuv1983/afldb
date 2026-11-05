@@ -1,0 +1,18 @@
+create-db: afldb_v2_i336cmpbase_test created and marked
+pg_restore exit=0 seconds=7 stderrLines=0
+Applied 8 migration(s).
+== base eec192f2
+ Test Files  2 failed | 1 passed | 1 skipped (4)
+      Tests  6 failed | 262 passed | 6 skipped (297)
+drop-db: afldb_v2_i336cmpbase_test dropped
+create-db: afldb_v2_i336cmpcand_test created and marked
+pg_restore exit=0 seconds=7 stderrLines=0
+Applied 8 migration(s).
+== cand ea9bddf8
+ Test Files  2 failed | 1 passed | 1 skipped (4)
+      Tests  6 failed | 262 passed | 6 skipped (297)
+drop-db: afldb_v2_i336cmpcand_test dropped
+== fails only in cand
+== fails only in base
+== shared: 6
+CMP-DONE

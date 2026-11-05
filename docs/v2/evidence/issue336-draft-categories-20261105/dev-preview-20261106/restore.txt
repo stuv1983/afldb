@@ -1,0 +1,1 @@
+pg_restore exit=0 seconds=7 stderrLines=0

@@ -1,0 +1,5 @@
+afldb=active mainpid=1677 health=200
+checkout head=242fa276b7b0fcb2613918984e82791faa1143d6 branch=main porcelain=10 stashes=2 build_id=8sFpWkolwF1yKuKbFkOir
+units: settle-afl-api=active settle-brownlow=active
+Fri 2026-11-06 01:25:00 AEDT 2min 21s Fri 2026-11-06 01:20:07 AEDT 2min 30s ago afldb-settle-afl-api-brownlow.timer afldb-settle-afl-api-brownlow.service
+Fri 2026-11-06 05:08:30 AEDT 3h 45min Thu 2026-11-05 05:11:17 AEDT 20h ago afldb-settle-afl-api.timer afldb-settle-afl-api.service

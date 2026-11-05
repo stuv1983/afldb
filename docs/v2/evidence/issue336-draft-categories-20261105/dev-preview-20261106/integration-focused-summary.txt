@@ -1,0 +1,16 @@
+# Summary of integration-focused.log (full log kept on the host: /mnt/ssd/afldb/workspaces/i336-preview-20261106/evidence/integration-focused.log)
+ FAIL  tests/integration/draft-linkage.test.ts > DraftGuru bridge on afldb_test — §6.1 reconciliation (read-only) > persons partition exactly as the child + ledger predict
+AssertionError: expected +0 to be 3465 // Object.is equality
+ FAIL  tests/integration/draft-linkage.test.ts > DraftGuru bridge on afldb_test — §6.1 reconciliation (read-only) > every pick inherits its person and the pick population is the manifest's
+AssertionError: expected 5 to be greater than 3405
+ FAIL  tests/integration/draft-linkage.test.ts > DraftGuru bridge on afldb_test — §6.4 negative controls (read-only) > every admitted child bridge: the exact target is registered once, resolves to the stored player, and the person stores
+AssertionError: expected [ { …(2) }, { …(2) }, …(3463) ] to deeply equal []
+ FAIL  tests/integration/draft-linkage.test.ts > Grid Solver draft criteria on the real linked population (read-only, production compiler) > the six draft builders each answer a non-empty set with sane bounds
+AssertionError: expected 0 to be greater than 0
+ FAIL  tests/integration/draft-linkage.test.ts > Grid Solver draft criteria on the real linked population (read-only, production compiler) > the ISSUE-221 "No data" square is gone: national top-10 × any career is a populated cell
+AssertionError: expected 'row' to be null
+ FAIL  tests/integration/grid-solver.test.ts > grid solver correctness > drafted_by_club_never_played matches a hand-written equivalent for a real club
+AssertionError: linked draft selections are required to exercise the criterion: expected 0 to be greater than 0
+ Test Files  2 failed | 1 passed | 1 skipped (4)
+      Tests  6 failed | 262 passed | 6 skipped (297)
+integration rc=1

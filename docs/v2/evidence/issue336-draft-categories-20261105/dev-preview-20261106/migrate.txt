@@ -1,0 +1,14 @@
+AFLDB migrations -> test (afldb_owner@127.0.0.1:55499/afldb_v2_i336prev_test)
+  118 migration file(s), 110 already applied
+
+  applying 111_curated_award_proposals.sql ... ok (66 ms)
+  applying 112_derived_award_results.sql ... ok (30 ms)
+  applying 113_brownlow_eligibility_decisions.sql ... ok (30 ms)
+  applying 114_award_projections_and_curated_revisions.sql ... ok (29 ms)
+  applying 115_adjudication_supersession_fk_index.sql ... ok (6 ms)
+  applying 116_brownlow_correction_receipts.sql ... ok (10 ms)
+  applying 117_brownlow_provider_eligibility_unknown.sql ... ok (2 ms)
+  applying 118_fixtures_unconfirmed_participants.sql ... ok (4 ms)
+
+Applied 8 migration(s).
+migrate rc=0

@@ -1,0 +1,2 @@
+pg_ctl: server is running (PID: 3749760)
+/usr/lib/postgresql/16/bin/postgres "-D" "/mnt/ssd/afldb/workspaces/i336-preview-20261106/pg-root/data"

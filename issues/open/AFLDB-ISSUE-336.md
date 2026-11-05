@@ -47,3 +47,14 @@ constant added.
 
 Outcomes and exit codes are `tools/v2/gap029-common.ts`'s. A refused or rolled-back run wrote nothing. A committed run is never retried, reversed or
 restored by the tools; restoring the stage backup would discard every later write and is a separate owner decision.
+
+## 5. DEV status (2026-11-06): not deployed; isolated preview verified
+
+The owner chose to push, merge and deploy to DEV. Before any DEV change I found DEV's checkout 18 commits ahead of origin (`242fa276`, all already in the
+archived source repository) and its database 8 migrations behind, so a plain `sync-dev.ps1` would fail its fast-forward and would migrate the live DEV
+database. On the owner's instruction DEV was left unchanged and ISSUE-336 was verified through an isolated preview on a restore of DEV's own data at
+`ea9bddf8`: migrations 111–118 apply cleanly; the focused draft tests and browser checks pass apart from failures shown to be data-dependent (identical at
+base) or pre-existing (AFLDB-ISSUE-337); DEV health is identical before and after. The recommended primary-DEV procedure (timer pause, restore-verified
+backup, a new local branch tracking `origin/main` with local `main` kept, `sync-dev.ps1`, `db:privileges`, smoke, timers resumed) and its recovery are
+in `docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/README.md` §4. **Any live DEV migration or replacement is a separate owner
+approval.** Production application release and the I336 data step are unaffected by this and still need their own approvals.

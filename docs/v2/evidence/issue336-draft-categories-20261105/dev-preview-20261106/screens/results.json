@@ -1,0 +1,342 @@
+[
+ {
+  "name": "desktop /draft status 200, no horizontal page overflow",
+  "ok": true,
+  "detail": "status 200 overflow 0px"
+ },
+ {
+  "name": "desktop index card states categories",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "desktop /draft/2025 status 200, no horizontal page overflow",
+  "ok": true,
+  "detail": "status 200 overflow 0px"
+ },
+ {
+  "name": "desktop 2025 All groups by category",
+  "ok": true,
+  "detail": "NATIONAL DRAFT58"
+ },
+ {
+  "name": "desktop 2025 All labels each row with its category",
+  "ok": true,
+  "detail": "National — Pick 1 | National — Pick 2"
+ },
+ {
+  "name": "desktop /draft/2025?view=rookie status 200, no horizontal page overflow",
+  "ok": true,
+  "detail": "status 200 overflow 0px"
+ },
+ {
+  "name": "desktop Fred Rodriguez 2025 Rookie Pick 1 West Coast",
+  "ok": true,
+  "detail": "[\"Pick 1\",\"Fred Rodriguez\",\"West Coast\"]"
+ },
+ {
+  "name": "desktop rookie tab is current",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "desktop /draft/2025?view=national status 200, no horizontal page overflow",
+  "ok": true,
+  "detail": "status 200 overflow 0px"
+ },
+ {
+  "name": "desktop Willem Duursma 2025 National Pick 1 West Coast",
+  "ok": true,
+  "detail": "[\"Pick 1\",\"Willem Duursma\",\"West Coast\"]"
+ },
+ {
+  "name": "desktop /draft/2021?view=father-son status 200, no horizontal page overflow",
+  "ok": true,
+  "detail": "status 200 overflow 0px"
+ },
+ {
+  "name": "desktop Nick Daicos under Father–Son as National — Pick 4 — Father–Son",
+  "ok": true,
+  "detail": "[\"National — Pick 4 — Father–Son\",\"Nick Daicos\",\"Collingwood\"]"
+ },
+ {
+  "name": "desktop Father–Son count is a subset, All not inflated",
+  "ok": true,
+  "detail": "(database 2021 rows 140) Father–Son\n5 / All\n140"
+ },
+ {
+  "name": "desktop /draft/1995?view=father-son status 200, no horizontal page overflow",
+  "ok": true,
+  "detail": "status 200 overflow 0px"
+ },
+ {
+  "name": "desktop 1995 Father–Son Pre-Draft keeps its category",
+  "ok": true,
+  "detail": "Pre-Draft — Father–Son | Pre-Draft — Father–Son | Pre-Draft — Father–Son | Pre-Draft — Father–Son | Pre-Draft — Father–Son | Pre-Draft — Father–Son"
+ },
+ {
+  "name": "desktop /draft/2014?view=rookie&q=Jake+Long status 200, no horizontal page overflow",
+  "ok": true,
+  "detail": "status 200 overflow 0px"
+ },
+ {
+  "name": "desktop 2014 Father–Son Rookie keeps its category",
+  "ok": false,
+  "detail": ""
+ },
+ {
+  "name": "desktop /draft/2021?view=trade status 200, no horizontal page overflow",
+  "ok": true,
+  "detail": "status 200 overflow 0px"
+ },
+ {
+  "name": "desktop trades stay unnumbered",
+  "ok": true,
+  "detail": "15 rows"
+ },
+ {
+  "name": "desktop /draft/2025?view=national&sort=pick&dir=desc status 200, no horizontal page overflow",
+  "ok": true,
+  "detail": "status 200 overflow 0px"
+ },
+ {
+  "name": "desktop category-specific pick sort descending",
+  "ok": true,
+  "detail": "60,57,56"
+ },
+ {
+  "name": "desktop /draft/2025?club=west-coast&view=rookie status 200, no horizontal page overflow",
+  "ok": true,
+  "detail": "status 200 overflow 0px"
+ },
+ {
+  "name": "desktop club filter within category",
+  "ok": true,
+  "detail": "1 rows"
+ },
+ {
+  "name": "desktop /draft/2025?page=2 status 200, no horizontal page overflow",
+  "ok": true,
+  "detail": "status 200 overflow 0px"
+ },
+ {
+  "name": "desktop pagination page 2 renders and the category link resets page",
+  "ok": true,
+  "detail": "50 rows; /draft/2025?view=rookie"
+ },
+ {
+  "name": "desktop /draft/2025?view=mini-draft status 200, no horizontal page overflow",
+  "ok": true,
+  "detail": "status 200 overflow 0px"
+ },
+ {
+  "name": "desktop empty category state",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "desktop /draft/2025?view=rookie&q=zzzzqq status 200, no horizontal page overflow",
+  "ok": true,
+  "detail": "status 200 overflow 0px"
+ },
+ {
+  "name": "desktop empty filtered state",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "desktop /draft/2021?type=Rookie status 200, no horizontal page overflow",
+  "ok": true,
+  "detail": "status 200 overflow 0px"
+ },
+ {
+  "name": "desktop legacy ?type=Rookie opens the Rookie category",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "desktop /draft/2025?view=rookie status 200, no horizontal page overflow",
+  "ok": true,
+  "detail": "status 200 overflow 0px"
+ },
+ {
+  "name": "desktop player page labels Fred Rodriguez as 2025 Rookie Draft — Pick 1",
+  "ok": true,
+  "detail": "2025 Rookie Draft — Pick 1"
+ },
+ {
+  "name": "desktop no page errors",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "mobile /draft status 200, no horizontal page overflow",
+  "ok": true,
+  "detail": "status 200 overflow 0px"
+ },
+ {
+  "name": "mobile index card states categories",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "mobile /draft/2025 status 200, no horizontal page overflow",
+  "ok": true,
+  "detail": "status 200 overflow 0px"
+ },
+ {
+  "name": "mobile 2025 All groups by category",
+  "ok": true,
+  "detail": "NATIONAL DRAFT58"
+ },
+ {
+  "name": "mobile 2025 All labels each row with its category",
+  "ok": true,
+  "detail": "National — Pick 1 | National — Pick 2"
+ },
+ {
+  "name": "mobile /draft/2025?view=rookie status 200, no horizontal page overflow",
+  "ok": true,
+  "detail": "status 200 overflow 0px"
+ },
+ {
+  "name": "mobile Fred Rodriguez 2025 Rookie Pick 1 West Coast",
+  "ok": true,
+  "detail": "[\"Pick 1\",\"Fred Rodriguez\",\"West Coast\"]"
+ },
+ {
+  "name": "mobile rookie tab is current",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "mobile /draft/2025?view=national status 200, no horizontal page overflow",
+  "ok": true,
+  "detail": "status 200 overflow 0px"
+ },
+ {
+  "name": "mobile Willem Duursma 2025 National Pick 1 West Coast",
+  "ok": true,
+  "detail": "[\"Pick 1\",\"Willem Duursma\",\"West Coast\"]"
+ },
+ {
+  "name": "mobile /draft/2021?view=father-son status 200, no horizontal page overflow",
+  "ok": true,
+  "detail": "status 200 overflow 0px"
+ },
+ {
+  "name": "mobile Nick Daicos under Father–Son as National — Pick 4 — Father–Son",
+  "ok": true,
+  "detail": "[\"National — Pick 4 — Father–Son\",\"Nick Daicos\",\"Collingwood\"]"
+ },
+ {
+  "name": "mobile Father–Son count is a subset, All not inflated",
+  "ok": true,
+  "detail": "(database 2021 rows 140) Father–Son\n5 / All\n140"
+ },
+ {
+  "name": "mobile /draft/1995?view=father-son status 200, no horizontal page overflow",
+  "ok": true,
+  "detail": "status 200 overflow 0px"
+ },
+ {
+  "name": "mobile 1995 Father–Son Pre-Draft keeps its category",
+  "ok": true,
+  "detail": "Pre-Draft — Father–Son | Pre-Draft — Father–Son | Pre-Draft — Father–Son | Pre-Draft — Father–Son | Pre-Draft — Father–Son | Pre-Draft — Father–Son"
+ },
+ {
+  "name": "mobile /draft/2014?view=rookie&q=Jake+Long status 200, no horizontal page overflow",
+  "ok": true,
+  "detail": "status 200 overflow 0px"
+ },
+ {
+  "name": "mobile 2014 Father–Son Rookie keeps its category",
+  "ok": false,
+  "detail": ""
+ },
+ {
+  "name": "mobile /draft/2021?view=trade status 200, no horizontal page overflow",
+  "ok": true,
+  "detail": "status 200 overflow 0px"
+ },
+ {
+  "name": "mobile trades stay unnumbered",
+  "ok": true,
+  "detail": "15 rows"
+ },
+ {
+  "name": "mobile /draft/2025?view=national&sort=pick&dir=desc status 200, no horizontal page overflow",
+  "ok": true,
+  "detail": "status 200 overflow 0px"
+ },
+ {
+  "name": "mobile category-specific pick sort descending",
+  "ok": true,
+  "detail": "60,57,56"
+ },
+ {
+  "name": "mobile /draft/2025?club=west-coast&view=rookie status 200, no horizontal page overflow",
+  "ok": true,
+  "detail": "status 200 overflow 0px"
+ },
+ {
+  "name": "mobile club filter within category",
+  "ok": true,
+  "detail": "1 rows"
+ },
+ {
+  "name": "mobile /draft/2025?page=2 status 200, no horizontal page overflow",
+  "ok": true,
+  "detail": "status 200 overflow 0px"
+ },
+ {
+  "name": "mobile pagination page 2 renders and the category link resets page",
+  "ok": true,
+  "detail": "50 rows; /draft/2025?view=rookie"
+ },
+ {
+  "name": "mobile /draft/2025?view=mini-draft status 200, no horizontal page overflow",
+  "ok": true,
+  "detail": "status 200 overflow 0px"
+ },
+ {
+  "name": "mobile empty category state",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "mobile /draft/2025?view=rookie&q=zzzzqq status 200, no horizontal page overflow",
+  "ok": true,
+  "detail": "status 200 overflow 0px"
+ },
+ {
+  "name": "mobile empty filtered state",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "mobile /draft/2021?type=Rookie status 200, no horizontal page overflow",
+  "ok": true,
+  "detail": "status 200 overflow 0px"
+ },
+ {
+  "name": "mobile legacy ?type=Rookie opens the Rookie category",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "mobile /draft/2025?view=rookie status 200, no horizontal page overflow",
+  "ok": true,
+  "detail": "status 200 overflow 0px"
+ },
+ {
+  "name": "mobile player page labels Fred Rodriguez as 2025 Rookie Draft — Pick 1",
+  "ok": true,
+  "detail": "2025 Rookie Draft — Pick 1"
+ },
+ {
+  "name": "mobile no page errors",
+  "ok": true,
+  "detail": ""
+ }
+]

@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-336 — draft categories: evidence (2026-11-05)
 
-Branch `claude/issue-336-draft-categories` (local, not pushed): `036c31c0` (implementation), `3a130595` and `e747d96b` (rehearsal writer fixes), `9f903367` (records),
+Branch `claude/issue-336-draft-categories` (fast-forwarded into `origin/main` `ea9bddf8` on 2026-11-06; §1–§5 describe it as it was on 5 Nov): `036c31c0` (implementation), `3a130595` and `e747d96b` (rehearsal writer fixes), `9f903367` (records),
 `d4070e7c` (lint fix), `dc55bdd1` (seal inventory), then this update. Base `eec192f2`. Production, DEV and the live DEV database were not touched.
 
 ## 1. Root cause
@@ -73,3 +73,8 @@ production dump: production mode on a clone refused; non-viable actor refused be
 audit rows by actor 1 and seal basis `audited_correction` × 35; verify 35/35 with every pre-existing draft row unchanged; replay refused on baseline
 drift; `reconcile-after.txt` 5,966 = 5,966. The assembler's I336 derivation (`baseline-rehearsal.json`) was run; a production capture and a sealed
 assembly were not (no dump younger than 24 hours exists). Runbook: `issues/open/AFLDB-ISSUE-336.md`.
+
+## 7. DEV preview (2026-11-06)
+
+Code pushed (`origin/main` `ea9bddf8`); DEV not deployed because its checkout had diverged and its database is 8 migrations behind. Isolated preview on
+a restore of DEV's data, DEV preservation, migration review and the recommended DEV procedure: `dev-preview-20261106/README.md`.
