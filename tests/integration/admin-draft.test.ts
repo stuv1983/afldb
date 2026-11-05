@@ -1771,3 +1771,43 @@ describe('the /admin/draft list review states (§18)', () => {
     }
   });
 });
+
+/*
+ * AFLDB-ISSUE-337 on a real database: the PUBLIC draft search (`/draft/[year]?q=`) must find an
+ * UNLINKED source pick whose raw name separates words with U+00A0, as every DraftGuru raw name does,
+ * when the reader types an ordinary space. Linked picks were always found through
+ * `players.display_name`; an unlinked one has only `player_name_raw`, which is never rewritten.
+ */
+describe('AFLDB-ISSUE-337: public draft name search across U+00A0', () => {
+  const RAW = `${MARKER} Nbsp Search`;
+  let nbspPickId = 0;
+
+  beforeAll(async () => {
+    const [row] = await admin<{ id: number }[]>`
+      INSERT INTO draft_picks
+        (draft_year, draft_type, draft_kind, pick_number, player_name_raw,
+         link_status_value, club_id, source_id, source_record_id, player_url)
+      VALUES (${fixtureYear}, 'Pre-Draft', 'pre_draft', NULL, ${RAW}, 'unmatched', ${clubId},
+              ${draftguruSourceId}, ${MARKER + '#337'}, ${SOURCE_URL.replace('/1', '/337')})
+      RETURNING id`;
+    nbspPickId = row.id;
+    createdPickIds.add(nbspPickId);
+  });
+
+  it('finds the unlinked pick by a name typed with ordinary spaces, and keeps the raw name intact', async () => {
+    const { listDraftPicks, getDraftCategoryCounts } = await import('@/db/queries/draft');
+    for (const q of [`${MARKER} Nbsp Search`, `${MARKER} Nbsp Search`, 'nbsp search']) {
+      const { rows, total } = await listDraftPicks({ year: fixtureYear, q, page: 1, pageSize: 50 });
+      expect(rows.map((r) => r.id), q).toContain(nbspPickId);
+      expect(total).toBeGreaterThanOrEqual(1);
+      const found = rows.find((r) => r.id === nbspPickId)!;
+      expect(found.playerId).toBeNull();
+      expect(found.playerNameRaw).toBe(RAW);
+      const counts = await getDraftCategoryCounts({ year: fixtureYear, q });
+      expect(counts.find((c) => c.draftKind === 'pre_draft')?.total ?? 0, q).toBeGreaterThanOrEqual(1);
+    }
+    // Negative control: canonicalising spaces does not turn the search into "match anything".
+    const miss = await listDraftPicks({ year: fixtureYear, q: `${MARKER} Nbsp Absent`, page: 1, pageSize: 50 });
+    expect(miss.rows.map((r) => r.id)).not.toContain(nbspPickId);
+  });
+});

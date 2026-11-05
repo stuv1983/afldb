@@ -1,6 +1,12 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import {
+  UNICODE_SPACE_REPLACEMENTS,
+  UNICODE_SPACE_SEPARATORS,
+  canonicalSpaces,
   containsPattern,
   escapeLike,
   normalisedSearchTerm,
@@ -38,6 +44,39 @@ describe('LIKE pattern building', () => {
     // ordinary characters to LIKE and common in player names.
     expect(containsPattern("O'Brien-Smith")).toBe("%O'Brien-Smith%");
     expect(containsPattern('Krakouer')).toBe('%Krakouer%');
+  });
+});
+
+/*
+ * AFLDB-ISSUE-337: DraftGuru raw names separate words with U+00A0, so `Jake Long` typed with an
+ * ordinary space missed an unlinked pick stored as `Jake<U+00A0>Long`. The separator list must
+ * stay exactly the one migration 099 gives afldb_normalise_name, or the two notions of "a space"
+ * drift apart again.
+ */
+describe('AFLDB-ISSUE-337 Unicode space separators', () => {
+  it('maps every separator to an ordinary space and leaves everything else alone', () => {
+    expect(canonicalSpaces('Jake Long')).toBe('Jake Long');
+    expect(canonicalSpaces('a b c　d')).toBe('a b c d');
+    expect(canonicalSpaces('Jake Long')).toBe('Jake Long');
+    // Zero-width characters are not separators (migration 099): untouched, as there.
+    expect(canonicalSpaces('Jake​Long﻿')).toBe('Jake​Long﻿');
+    expect(canonicalSpaces("O'Brien-Smith")).toBe("O'Brien-Smith");
+    expect(canonicalSpaces(`x${UNICODE_SPACE_SEPARATORS}y`)).toBe(`x${' '.repeat(UNICODE_SPACE_SEPARATORS.length)}y`);
+  });
+
+  it('gives translate() a replacement of equal length', () => {
+    expect(UNICODE_SPACE_REPLACEMENTS).toMatch(/^ +$/);
+    expect(UNICODE_SPACE_REPLACEMENTS.length).toBe(UNICODE_SPACE_SEPARATORS.length);
+  });
+
+  it('is exactly the code-point list of migration 099', () => {
+    const migration = readFileSync(
+      join(process.cwd(), 'src', 'db', 'migrations', '099_normalise_unicode_whitespace.sql'), 'utf8',
+    );
+    const literal = /U&'((?:\\[0-9A-Fa-f]{4})+)'/.exec(migration);
+    expect(literal, 'migration 099 translate() literal').not.toBeNull();
+    const fromMigration = literal![1].split('\\').filter(Boolean).map((hex) => String.fromCharCode(parseInt(hex, 16)));
+    expect([...UNICODE_SPACE_SEPARATORS]).toEqual(fromMigration);
   });
 });
 

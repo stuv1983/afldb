@@ -83,6 +83,50 @@ afldb_classify_worktree() {
   return 20
 }
 
+# AFLDB-ISSUE-336 (DEV deployment preparation): deploy EXACTLY one reviewed commit instead of
+# whatever the upstream tip is at deploy time. Fast-forwards the checked-out branch to the pin and
+# refuses -- changing nothing -- unless every precondition holds: a full 40-hex commit id; a branch
+# (not a detached HEAD); the commit present after the fetch; the commit already published on the
+# branch's upstream; and HEAD equal to the pin or an ancestor of it. No reset, no merge commit, no
+# checkout of another ref: a diverged branch is refused, never rewritten.
+afldb_checkout_pinned_revision() {
+  local expected="$1" branch upstream head
+
+  if [[ ! "$expected" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "[deploy] pinned revision must be a full 40-character lower-case commit id; got '$expected'" >&2
+    return 30
+  fi
+  if ! branch="$(git symbolic-ref --quiet --short HEAD)"; then
+    echo "[deploy] a pinned deploy needs a checked-out branch, not a detached HEAD" >&2
+    return 31
+  fi
+  if ! git cat-file -e "${expected}^{commit}" 2>/dev/null; then
+    echo "[deploy] pinned revision $expected is not present after the fetch" >&2
+    return 32
+  fi
+  if ! upstream="$(git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null)"; then
+    echo "[deploy] branch $branch has no upstream; the pinned revision must be published on it" >&2
+    return 33
+  fi
+  if ! git merge-base --is-ancestor "$expected" "$upstream"; then
+    echo "[deploy] pinned revision $expected is not on $upstream; publish it first" >&2
+    return 34
+  fi
+  head="$(git rev-parse HEAD)"
+  if [[ "$head" != "$expected" ]]; then
+    if ! git merge-base --is-ancestor "$head" "$expected"; then
+      echo "[deploy] $branch at $head is not an ancestor of the pinned revision $expected; refusing (no reset, no merge commit)" >&2
+      return 35
+    fi
+    git merge --ff-only --quiet "$expected" || return 36
+  fi
+  if [[ "$(git rev-parse HEAD)" != "$expected" ]]; then
+    echo "[deploy] HEAD is not the pinned revision after the fast-forward" >&2
+    return 37
+  fi
+  echo "[deploy] pinned revision: $branch at $expected (upstream $upstream at $(git rev-parse --short "$upstream"))"
+}
+
 afldb_compact_text() {
   tr '\r\n' '  ' | cut -c 1-300
 }

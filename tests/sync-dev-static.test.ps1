@@ -32,6 +32,19 @@ $customScript = & {
   $remoteScript
 }
 
+$pin = '0123456789abcdef0123456789abcdef01234567'
+$pinnedScript = & {
+  . $syncScript -WhatIf -RemoteRef 'dev/v2-main' -ExpectedRevision $pin *> $null
+  $remoteScript
+}
+Assert-True ($defaultScript -match "(?m)^git pull --ff-only$") 'an unpinned deploy must still pull fast-forward only'
+Assert-True ($pinnedScript -match "(?m)^afldb_checkout_pinned_revision '$pin'$") 'a pinned deploy must fast-forward to exactly the pin'
+Assert-True ($pinnedScript -notmatch "(?m)^git pull") 'a pinned deploy must not git pull'
+Assert-True ($pinnedScript.IndexOf("afldb_checkout_pinned_revision '$pin'") -lt $pinnedScript.IndexOf('npm ci')) 'the pin must be enforced before npm ci'
+$badPinRefused = $false
+try { & { . $syncScript -WhatIf -ExpectedRevision 'ABC123' *> $null } } catch { $badPinRefused = $true }
+Assert-True $badPinRefused 'a short pin must be refused on the workstation'
+
 Assert-True ($defaultScript -notmatch "`r") 'generated remote script must contain LF only'
 Assert-True ($defaultScript -match [regex]::Escape('$(hostname)')) 'remote hostname expansion was lost'
 Assert-True ($defaultScript -match [regex]::Escape('$(git rev-parse --short HEAD)')) 'remote Git expansion was lost'
@@ -64,4 +77,4 @@ try {
   Remove-Item -LiteralPath $tempScript -Force -ErrorAction SilentlyContinue
 }
 
-Write-Output 'PASS: sync-dev PowerShell/static integration (14 assertions)'
+Write-Output 'PASS: sync-dev PowerShell/static integration (19 assertions)'

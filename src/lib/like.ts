@@ -33,6 +33,30 @@ export function prefixPattern(term: string): string {
 }
 
 /**
+ * The Unicode space separators that migration 099 maps to an ordinary space inside
+ * `afldb_normalise_name`, in the same order: U+00A0, U+1680, U+2000..U+200A, U+2028, U+2029,
+ * U+202F, U+205F, U+3000. Zero-width characters (U+200B, U+FEFF) are deliberately absent, as
+ * there: they are not separators.
+ */
+export const UNICODE_SPACE_SEPARATORS =
+  '                 　';
+
+/** One ordinary space per separator: the `to` argument of SQL `translate(col, separators, spaces)`. */
+export const UNICODE_SPACE_REPLACEMENTS = ' '.repeat(UNICODE_SPACE_SEPARATORS.length);
+
+const SEPARATOR_CLASS = new RegExp(`[${UNICODE_SPACE_SEPARATORS}]`, 'g');
+
+/**
+ * Turns each Unicode space separator into an ordinary space (AFLDB-ISSUE-337). A raw source name
+ * such as DraftGuru's `Jake<U+00A0>Long` matches a term typed as `Jake Long` only when both
+ * sides are canonicalised the same way; the column side uses SQL `translate()` with the two
+ * constants above. Nothing else (case, accents, punctuation) changes.
+ */
+export function canonicalSpaces(term: string): string {
+  return term.replace(SEPARATOR_CLASS, ' ');
+}
+
+/**
  * Neutralise only the metacharacters that survive `afldb_normalise_name`.
  *
  * The global search normalises in SQL, after this runs, and that function

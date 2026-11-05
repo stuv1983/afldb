@@ -178,7 +178,9 @@ vi.doMock('@/db/client', () => ({ sql: fakeSql }));
 const { PLAYER_MATCH_SORTS, getPlayerMatches, isPlayerMatchSort, isPlayerMatchSortDir } = await import(
   '@/db/queries/players'
 );
-const { DRAFT_SORTS, isDraftSort, isDraftSortDir, listDraftPicks } = await import('@/db/queries/draft');
+const {
+  DRAFT_SORTS, getDraftCategoryCounts, isDraftSort, isDraftSortDir, listDraftPicks,
+} = await import('@/db/queries/draft');
 const {
   DRAFT_CATEGORIES, DRAFT_KIND_RANK_SQL, draftEventLabel, draftYearViewPath, parseDraftView, selectionLabel,
 } = await import('@/lib/draft-categories');
@@ -238,6 +240,25 @@ describe('match-log and draft ORDER BY', () => {
     expect(text).toContain('dp.signing_kind = $?');
     expect(text).not.toContain('dp.draft_kind = $?');
     expect(leafValues(recordedQueries.at(-1))).toEqual(expect.arrayContaining([2021, 'Father-Son']));
+  });
+
+  it('AFLDB-ISSUE-337: a name search canonicalises Unicode spaces on both sides of the match', async () => {
+    const { UNICODE_SPACE_SEPARATORS, UNICODE_SPACE_REPLACEMENTS } = await import('@/lib/like');
+    for (const q of ['Jake Long', 'Jake Long']) {
+      await listDraftPicks({ ...draftFilters, year: 2014, q });
+      const text = render(recordedQueries.at(-1)).replace(/\s+/g, ' ');
+      expect(text).toContain('translate(dp.player_name_raw, $?::text, $?::text) ILIKE $?');
+      expect(text).toContain('translate(p.display_name, $?::text, $?::text) ILIKE $?');
+      const values = leafValues(recordedQueries.at(-1));
+      // The typed term reaches the pattern with ordinary spaces, whichever space it was typed with.
+      expect(values).toContain('%Jake Long%');
+      expect(values).not.toContain('%Jake Long%');
+      expect(values).toEqual(expect.arrayContaining([UNICODE_SPACE_SEPARATORS, UNICODE_SPACE_REPLACEMENTS]));
+    }
+    // The per-category counts share the same condition, so a tab count agrees with its list.
+    await getDraftCategoryCounts({ year: 2014, q: 'Jake Long' });
+    expect(render(recordedQueries.at(-1)).replace(/\s+/g, ' '))
+      .toContain('translate(dp.player_name_raw, $?::text, $?::text) ILIKE $?');
   });
 
   it('falls back to the default order for constructor and toString', async () => {

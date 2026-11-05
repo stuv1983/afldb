@@ -2,6 +2,7 @@ import 'server-only';
 
 import { sql } from '@/db/client';
 import { allOf, containsPattern, rangeConditions } from '@/db/queries/filters';
+import { UNICODE_SPACE_REPLACEMENTS, UNICODE_SPACE_SEPARATORS, canonicalSpaces } from '@/lib/like';
 import { DRAFT_KIND_RANK_SQL, FATHER_SON_SIGNING_KIND } from '@/lib/draft-categories';
 import type { FilterValues } from '@/search/table-filters';
 
@@ -114,8 +115,14 @@ function scopeConditions(filters: DraftScopeFilters) {
     conditions.push(sql`dp.draft_type = ${filters.draftType}`);
   }
   if (filters.q) {
-    const like = containsPattern(filters.q);
-    conditions.push(sql`(dp.player_name_raw ILIKE ${like} OR p.display_name ILIKE ${like})`);
+    // AFLDB-ISSUE-337: DraftGuru raw names separate words with U+00A0, so an unlinked pick could
+    // not be found by a name typed with an ordinary space. Both sides are canonicalised with the
+    // separator list of migration 099; the raw column itself is never rewritten.
+    const like = containsPattern(canonicalSpaces(filters.q));
+    conditions.push(sql`(
+      translate(dp.player_name_raw, ${UNICODE_SPACE_SEPARATORS}::text, ${UNICODE_SPACE_REPLACEMENTS}::text) ILIKE ${like}
+      OR translate(p.display_name, ${UNICODE_SPACE_SEPARATORS}::text, ${UNICODE_SPACE_REPLACEMENTS}::text) ILIKE ${like}
+    )`);
   }
   return conditions;
 }

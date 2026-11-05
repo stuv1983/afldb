@@ -23,6 +23,14 @@ add -Issue107Gate. That mode refuses skipped install/build/restart/health
 steps and proves the built BUILD_ID equals the live x-afldb-build header.
 
 It does not push local changes. Commit and push first, then run this.
+
+-ExpectedRevision <40-hex commit> pins the deploy: instead of `git pull
+--ff-only` (whatever the upstream tip is at that moment), the checked-out branch
+is fast-forwarded to exactly that commit, which must already be published on the
+branch's upstream; a detached HEAD, an unpublished pin or a diverged branch is
+refused before install, migration or build (sync-dev-remote.sh,
+afldb_checkout_pinned_revision). Combine with -RemoteRef <branch> to select the
+branch first.
 #>
 
 [CmdletBinding(SupportsShouldProcess = $true)]
@@ -32,6 +40,8 @@ param(
   [string] $ServiceName = 'afldb',
   [string] $HealthUrl = 'http://127.0.0.1:3100/api/health',
   [string] $RemoteRef = '',
+  [ValidatePattern('^([0-9a-f]{40})?$')]
+  [string] $ExpectedRevision = '',
   [ValidateRange(1, 600)]
   [int] $ReadinessTimeoutSeconds = 120,
   [ValidateRange(1, 30)]
@@ -137,7 +147,13 @@ if (-not $NoPrune) {
 }
 
 Add-RemoteStep $remoteCommands 'checkout requested ref if supplied' "if [ -n $quotedRemoteRef ]; then git checkout $quotedRemoteRef; fi"
-Add-RemoteStep $remoteCommands 'pull latest commit' 'git pull --ff-only'
+if ($ExpectedRevision) {
+  # A pinned deploy fast-forwards to exactly this commit (it must already be on the branch's upstream)
+  # and refuses before install, migration or build when it cannot. `git pull` is not run.
+  Add-RemoteStep $remoteCommands 'fast-forward to the pinned revision' "afldb_checkout_pinned_revision $(Escape-BashSingleQuoted $ExpectedRevision)"
+} else {
+  Add-RemoteStep $remoteCommands 'pull latest commit' 'git pull --ff-only'
+}
 Add-RemoteStep $remoteCommands 'show deployed revision' 'echo "[deploy] after: $(git rev-parse --short HEAD) $(git branch --show-current)"'
 
 if (-not $SkipInstall) {
@@ -223,6 +239,9 @@ Write-Host "Readiness:     $ReadinessTimeoutSeconds s timeout / $ReadinessInterv
 Write-Host "ISSUE-107 gate: $(if ($Issue107Gate) { 'on' } else { 'off' })"
 if ($RemoteRef.Trim()) {
   Write-Host "Remote ref:    $($RemoteRef.Trim())"
+}
+if ($ExpectedRevision) {
+  Write-Host "Pinned to:     $ExpectedRevision (fast-forward only; no git pull)"
 }
 Write-Host ''
 

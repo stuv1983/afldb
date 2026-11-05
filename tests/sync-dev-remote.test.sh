@@ -246,6 +246,98 @@ test_no_repository_cleanup_commands() {
     && "$classifier" != *'.deploy-backups'* && "$classifier" != *'docs/rebuild-manifests'* ]]
 }
 
+# --- AFLDB-ISSUE-336: pinned deploy (afldb_checkout_pinned_revision) on real throwaway repositories ---
+# origin/main: A -> B -> C. The working clone's `dev` branch tracks origin/main and starts at A.
+PIN_ROOT=''
+pin_setup() {
+  PIN_ROOT="$(mktemp -d)"
+  (
+    unset -f git command 2>/dev/null
+    set -e
+    export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.invalid GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.invalid
+    git init -q --bare "$PIN_ROOT/origin.git"
+    git init -q -b main "$PIN_ROOT/seed"
+    for c in A B C; do echo "$c" > "$PIN_ROOT/seed/f"; git -C "$PIN_ROOT/seed" add f; git -C "$PIN_ROOT/seed" commit -qm "$c"; done
+    git -C "$PIN_ROOT/seed" push -q "$PIN_ROOT/origin.git" main
+    git clone -q "$PIN_ROOT/origin.git" "$PIN_ROOT/work"
+    git -C "$PIN_ROOT/work" switch -q --create dev "$(git -C "$PIN_ROOT/seed" rev-parse HEAD~2)"
+    git -C "$PIN_ROOT/work" branch -q --set-upstream-to=origin/main dev
+  )
+}
+pin_rev() { (unset -f git; git -C "$PIN_ROOT/seed" rev-parse "$1"); }
+pin_run() { (unset -f git command 2>/dev/null; cd "$PIN_ROOT/work" && afldb_checkout_pinned_revision "$1"); }
+pin_head() { (unset -f git; git -C "$PIN_ROOT/work" rev-parse HEAD); }
+pin_teardown() { rm -rf -- "$PIN_ROOT"; }
+
+test_pin_fast_forwards_to_exactly_the_pin_not_the_tip() {
+  local out rc b ok=1
+  pin_setup; b="$(pin_rev HEAD~1)"
+  out="$(pin_run "$b" 2>&1)"; rc=$?
+  (( rc == 0 )) && [[ "$(pin_head)" == "$b" ]] && contains "$out" "pinned revision: dev at $b" && ok=0
+  pin_teardown; return $ok
+}
+
+test_pin_already_current_is_a_no_op() {
+  local rc a ok=1
+  pin_setup; a="$(pin_rev HEAD~2)"
+  pin_run "$a" >/dev/null 2>&1; rc=$?
+  (( rc == 0 )) && [[ "$(pin_head)" == "$a" ]] && ok=0
+  pin_teardown; return $ok
+}
+
+test_pin_refuses_short_or_malformed_ids() {
+  local out rc a ok=1
+  pin_setup; a="$(pin_rev HEAD~2)"
+  out="$(pin_run "${a:0:12}" 2>&1)"; rc=$?
+  (( rc == 30 )) && contains "$out" 'full 40-character' && [[ "$(pin_head)" == "$a" ]] && ok=0
+  pin_teardown; return $ok
+}
+
+test_pin_refuses_detached_head() {
+  local rc a ok=1
+  pin_setup; a="$(pin_rev HEAD~2)"
+  (unset -f git; git -C "$PIN_ROOT/work" switch -q --detach "$a")
+  pin_run "$(pin_rev HEAD)" >/dev/null 2>&1; rc=$?
+  (( rc == 31 )) && [[ "$(pin_head)" == "$a" ]] && ok=0
+  pin_teardown; return $ok
+}
+
+test_pin_refuses_unpublished_commit() {
+  local rc a local_only ok=1
+  pin_setup; a="$(pin_rev HEAD~2)"
+  # A commit that exists in the clone but is not on origin/main.
+  local_only="$(unset -f git; cd "$PIN_ROOT/work" && git -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty -m local && git rev-parse HEAD)"
+  (unset -f git; git -C "$PIN_ROOT/work" switch -q --create other "$a" && git -C "$PIN_ROOT/work" branch -q --set-upstream-to=origin/main other)
+  pin_run "$local_only" >/dev/null 2>&1; rc=$?
+  (( rc == 34 )) && [[ "$(pin_head)" == "$a" ]] && ok=0
+  pin_teardown; return $ok
+}
+
+test_pin_refuses_diverged_branch_without_rewriting_it() {
+  local rc before ok=1
+  pin_setup
+  before="$(unset -f git; cd "$PIN_ROOT/work" && git -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty -m dev-only && git rev-parse HEAD)"
+  pin_run "$(pin_rev HEAD)" >/dev/null 2>&1; rc=$?
+  (( rc == 35 )) && [[ "$(pin_head)" == "$before" ]] && ok=0
+  pin_teardown; return $ok
+}
+
+test_pin_refuses_branch_without_upstream() {
+  local rc a ok=1
+  pin_setup; a="$(pin_rev HEAD~2)"
+  (unset -f git; git -C "$PIN_ROOT/work" branch -q --unset-upstream dev)
+  pin_run "$(pin_rev HEAD)" >/dev/null 2>&1; rc=$?
+  (( rc == 33 )) && [[ "$(pin_head)" == "$a" ]] && ok=0
+  pin_teardown; return $ok
+}
+
+test_pin_helper_never_resets_or_cleans() {
+  local body
+  body="$(declare -f afldb_checkout_pinned_revision)"
+  [[ "$body" != *'git reset'* && "$body" != *'git clean'* && "$body" != *'git checkout'* \
+    && "$body" != *'git pull'* && "$body" != *'--force'* ]]
+}
+
 run_test 'clean tree continues' test_clean_tree
 run_test 'tracked modification blocks' test_tracked_modification_blocks
 run_test 'staged and renamed changes block' test_staged_and_renamed_changes_block
@@ -264,6 +356,14 @@ run_test 'curl connection reset is a retryable probe failure' test_curl_probe_co
 run_test 'curl probe validates healthy JSON and build header' test_curl_probe_healthy_with_build
 run_test 'failure diagnostics are bounded and actionable' test_diagnostics_are_bounded
 run_test 'classification performs no repository cleanup' test_no_repository_cleanup_commands
+run_test 'pin fast-forwards to exactly the pin, not the upstream tip' test_pin_fast_forwards_to_exactly_the_pin_not_the_tip
+run_test 'pin already current is a no-op' test_pin_already_current_is_a_no_op
+run_test 'pin refuses a short or malformed id' test_pin_refuses_short_or_malformed_ids
+run_test 'pin refuses a detached HEAD' test_pin_refuses_detached_head
+run_test 'pin refuses an unpublished commit' test_pin_refuses_unpublished_commit
+run_test 'pin refuses a diverged branch without rewriting it' test_pin_refuses_diverged_branch_without_rewriting_it
+run_test 'pin refuses a branch without an upstream' test_pin_refuses_branch_without_upstream
+run_test 'pin helper never resets, cleans, checks out or pulls' test_pin_helper_never_resets_or_cleans
 
 echo "$passed passed, $failed failed"
 (( failed == 0 ))
