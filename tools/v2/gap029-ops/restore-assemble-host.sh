@@ -16,7 +16,7 @@
 set -u -o pipefail
 : "${W:?}" "${R:?}" "${STAGE:?}" "${CAPDIR:?}" "${PROD_TARGET:?}" "${TAG:?}"
 [[ "$TAG" =~ ^[a-z0-9_]+$ ]] || { echo "STOP TAG must match [a-z0-9_]+ (it becomes part of an isolated database name)"; exit 2; }
-case "$STAGE" in S1|S2|S3|S4) ;; *) echo "STOP STAGE must be S1, S2, S3 or S4"; exit 2 ;; esac
+case "$STAGE" in S1|S2|S3|S4|I336) ;; *) echo "STOP STAGE must be S1, S2, S3, S4 or I336"; exit 2 ;; esac
 export PATH="$HOME/.nvm/versions/node/v22.23.2/bin:$PATH"
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 PROFILE=${PROFILE:-$HERE/profile.production.env}

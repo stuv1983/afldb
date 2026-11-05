@@ -21,7 +21,7 @@ step() { echo "== $* $(date -u +%FT%TZ)"; }
 stop() { unset PGPASSWORD; echo "STOP: $1"; exit "${2:-1}"; }
 
 STAGE=${1:?stage S1, S2, S3 or S4 required as the first argument}
-case "$STAGE" in S1|S2|S3|S4) ;; *) echo "STOP: stage must be S1, S2, S3 or S4"; exit 2;; esac
+case "$STAGE" in S1|S2|S3|S4|I336) ;; *) echo "STOP: stage must be S1, S2, S3, S4 or I336"; exit 2;; esac
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 PROFILE=${GAP029_PROFILE:-$HERE/profile.production.env}
 [ -r "$PROFILE" ] || stop "profile unreadable" 2

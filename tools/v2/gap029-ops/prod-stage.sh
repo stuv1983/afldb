@@ -60,7 +60,7 @@ need_checkout() {
   [ "$(git rev-parse HEAD)" = "$R" ] || stop "pinned checkout is not at $R"
   [ "$(git status --porcelain | wc -l)" = 0 ] || stop "pinned checkout is not clean"
 }
-stage_arg() { S=${1:?stage S1..S4}; case "$S" in S1|S2|S3|S4) ;; *) stop "stage must be S1, S2, S3 or S4" 2;; esac; }
+stage_arg() { S=${1:?stage S1..S4 or I336}; case "$S" in S1|S2|S3|S4|I336) ;; *) stop "stage must be S1, S2, S3, S4 or I336" 2;; esac; }
 run_arg() {
   RUN=${1:?run name (e.g. S1-20261103T000000Z)}; [[ "$RUN" =~ ^S[1-4]-[0-9]{8}T[0-9]{6}Z$ ]] || stop "bad run name" 2; [ "${RUN%%-*}" = "$S" ] || stop "run $RUN is not a $S run" 2
   RUNDIR=$OPS/runs/$RUN; CAPDIR=$BACKUP_ROOT/gap029-$S-${RUN#*-}; [ -d "$RUNDIR" ] || stop "no run directory $RUNDIR"; [ -d "$CAPDIR" ] || stop "no capture directory $CAPDIR"
@@ -309,9 +309,9 @@ accept)
   load_dsns
   OPSCLI run-tool --stage "$S" --phase state --run-dir "$RUNDIR" --capture-dir "$CAPDIR" --profile "$PROFILE" > "$RUNDIR/logs/accept-state.txt" 2>&1; cat "$RUNDIR/logs/accept-state.txt"
   grep -q '^STATE PLANNED RESULT PRESENT' "$RUNDIR/logs/accept-state.txt" || { drop_dsns; stop "the live state is not the planned result" 24; }
-  if [ "$S" = S3 ]; then
-    OPSCLI run-tool --stage S3 --phase verify --run-dir "$RUNDIR" --capture-dir "$CAPDIR" --profile "$PROFILE" > "$RUNDIR/logs/accept-verify.txt" 2>&1 \
-      || { cat "$RUNDIR/logs/accept-verify.txt"; drop_dsns; stop "S3 read-only verify failed" 24; }
+  if [ "$S" = S3 ] || [ "$S" = I336 ]; then
+    OPSCLI run-tool --stage "$S" --phase verify --run-dir "$RUNDIR" --capture-dir "$CAPDIR" --profile "$PROFILE" > "$RUNDIR/logs/accept-verify.txt" 2>&1 \
+      || { cat "$RUNDIR/logs/accept-verify.txt"; drop_dsns; stop "$S read-only verify failed" 24; }
     cat "$RUNDIR/logs/accept-verify.txt"
   fi
   drop_dsns

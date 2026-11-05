@@ -30,7 +30,7 @@
  * added, and every row must read back as reviewed, or it rolls back. Outcomes and exit codes are gap029-common.ts's; a committed outcome is never
  * reported as rolled back, never retried and never restored by this tool.
  *
- * Transport: AFLDB_ISSUE336_DSN (read-only sessions) and AFLDB_ISSUE336_WRITE_DSN (the afldb_import role), both naming exactly the reviewed target.
+ * Transport: AFLDB_GAP029_DSN (read-only sessions) and AFLDB_GAP029_WRITE_DSN (the afldb_import role), both naming exactly the reviewed target.
  * Output files lie outside the checkout and are created exclusively. Prints no DSN and no player name.
  */
 import { execFileSync } from 'node:child_process';
@@ -242,7 +242,7 @@ async function run(): Promise<void> {
   const out = outside(opt('--out'));
   if (existsSync(out)) fail('output already exists; preserve evidence and choose another path');
   const write = (v: unknown) => writeFileSync(out, `${JSON.stringify(v, null, 2)}\n`, { flag: 'wx', mode: 0o600 });
-  const dsn = process.env.AFLDB_ISSUE336_DSN ?? '';
+  const dsn = process.env.AFLDB_GAP029_DSN ?? '';
   const readOnly = () => postgres(dsn, { max: 1, connect_timeout: 5, onnotice: () => {}, connection: { default_transaction_read_only: true } });
   const identity = async (s: Db): Promise<Omit<Target, 'host' | 'port'>> => {
     const [row] = await s<Record<string, string | null>[]>`SELECT current_database() AS database, current_user AS "user", c.system_identifier::text AS "systemIdentifier",
@@ -251,7 +251,7 @@ async function run(): Promise<void> {
     return row as unknown as Omit<Target, 'host' | 'port'>;
   };
   if (mode === 'describe') {
-    let u: URL; try { u = new URL(dsn); } catch { return fail('explicit AFLDB_ISSUE336_DSN required'); }
+    let u: URL; try { u = new URL(dsn); } catch { return fail('explicit AFLDB_GAP029_DSN required'); }
     const sql = readOnly();
     try { write({ host: u.hostname, port: Number(u.port || 5432), ...(await sql.begin('read only', (tx) => identity(tx))) }); } finally { await sql.end({ timeout: 5 }); }
     console.log('Target identity written (read-only)');
@@ -271,7 +271,7 @@ async function run(): Promise<void> {
   sameDb(dsn, true);
   if (rehearsal && !/^afldb_v2_[a-z0-9_]+_test$/.test(target.database)) fail('a rehearsal is only for an isolated afldb_v2_*_test database');
   if (!rehearsal && /^afldb_v2_.*_test$/.test(target.database)) fail('an isolated clone is rehearsed with --rehearsal');
-  if (mode === 'apply') sameDb(process.env.AFLDB_ISSUE336_WRITE_DSN ?? '', false);
+  if (mode === 'apply') sameDb(process.env.AFLDB_GAP029_WRITE_DSN ?? '', false);
   const entries = readEntries();
   const sql = readOnly();
   const prove = async (s: postgres.TransactionSql, writerRole = false): Promise<void> => {
@@ -357,7 +357,7 @@ async function run(): Promise<void> {
     process.env.DATABASE_URL = dsn; process.env.AFLDB_AUTH_DATABASE_URL = dsn;
     const { recordDataEdit } = await import('../../src/db/queries/audit-log');
     const byKey = new Map(entries.map((e) => [e.key, e]));
-    const writer = postgres(process.env.AFLDB_ISSUE336_WRITE_DSN ?? '', { max: 1, connect_timeout: 5, onnotice: () => {} });
+    const writer = postgres(process.env.AFLDB_GAP029_WRITE_DSN ?? '', { max: 1, connect_timeout: 5, onnotice: () => {} });
     try {
       const report = await runApply<Info>({
         preflight: async () => {

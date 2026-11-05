@@ -11,6 +11,7 @@ import {
   type Entry, type Live, type Plan,
 } from '../tools/v2/gap029-rookie-selections-production';
 import * as I336 from '../tools/v2/issue336-predraft-insert-production';
+import * as OPS from '../tools/v2/gap029-ops-lib';
 
 const root = join(__dirname, '..');
 const read = (p: string) => readFileSync(join(root, p), 'utf8');
@@ -201,6 +202,12 @@ describe('ISSUE-336 Pre-Draft insert: reviewed content, resolution and approval 
     expect(I336.approvalProblem(plan, null, ctx)).not.toBeNull();
     expect(I336.approvalProblem({ ...plan, actorUserId: 2 }, approval, ctx)).not.toBeNull();
     expect(I336.approvalProblem({ ...plan, rehearsal: true, digest: I336.planDigest({ ...body, rehearsal: true }) }, null, ctx)).toBeNull(); // rehearsal: no approval
+  });
+
+  it('the ops framework pins the same evidence and operation as the tool (stage I336)', () => {
+    expect(OPS.I336_EVIDENCE_SHA256).toBe(I336.EVIDENCE_SHA256);
+    expect(OPS.STAGES.I336.operation).toBe(I336.OPERATION);
+    expect(OPS.STAGES.I336.tool).toBe(I336.TOOL_PATH);
   });
 
   it('writes through the audited seal path, never an override, and refuses an isolated target outside --rehearsal', () => {

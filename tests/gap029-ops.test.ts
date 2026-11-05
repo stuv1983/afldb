@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import { EXIT_CODE } from '../tools/v2/gap029-common';
 import {
-  APPLY_MIN_BACKUP_LEFT_MS, GENUINE, STAGES, STAGE_IDS, approvalProblems, approvalStatement, backupEvidenceBasicProblems, buildApproval, captureProblems, classifyOutcome,
+  APPLY_MIN_BACKUP_LEFT_MS, GENUINE, I336_EVIDENCE_SHA256, STAGES, STAGE_IDS, approvalProblems, approvalStatement, backupEvidenceBasicProblems, buildApproval, captureProblems, classifyOutcome,
   manifestProblems, parseProfile, parseSha256Sums, planProblems, sha256Hex, targetProblems, type Manifest, type Profile, type StageId,
 } from '../tools/v2/gap029-ops-lib';
 
@@ -117,6 +117,8 @@ function plan(stage: StageId, over: Record<string, unknown> = {}): Record<string
   if (stage === 'S2') Object.assign(base, { childSha256: 'c'.repeat(64), label: 'annual-html-20260826', parentSha256: '1f7413a2ad96e7d026cc521acfdeba3de9cab7066794de99002c9b5928e6e21b', expect: { after_state_sha256: '1'.repeat(64) } });
   if (stage === 'S3') Object.assign(base, { evidenceSha256: 'f'.repeat(64), actorUserId: 1, entries: Array.from({ length: 8 }, (_v, i) => ({ season: 2025, pickNumber: i + 1, action: 'to insert' })) });
   if (stage === 'S4') Object.assign(base, { artefactSha256: 'b1b7fe41'.padEnd(64, '0'), expectAfterContentDigest: 'd6fceb338d5f37e8fdef18443da696c52225db9caa80cedb9261e401aea212ec' });
+  if (stage === 'I336') Object.assign(base, { evidenceSha256: I336_EVIDENCE_SHA256, actorUserId: 1,
+    entries: Array.from({ length: 35 }, (_v, i) => ({ sourceRecordId: `https://www.draftguru.com.au/years/2010#${i}`, action: 'to insert', personId: i < 31 ? null : 100 + i, linkStatus: 'unmatched' })) });
   return { ...base, ...over };
 }
 const STATEMENT = (stage: StageId, p = plan(stage)) => approvalStatement(stage, p, { dumpSha256: 'd'.repeat(64), restoreEvidenceSha256: 'e'.repeat(64), evidenceClass: GENUINE, window: 'from now until later' });
@@ -178,6 +180,14 @@ describe('stage-specific plan expectations', () => {
     expect(planProblems('S2', plan('S2', { label: 'other' }), ctx).join()).toMatch(/label is other/);
     expect(planProblems('S2', plan('S2', { parentSha256: '0'.repeat(64) }), ctx).join()).toMatch(/parent/);
     expect(planProblems('S4', plan('S4', { expectAfterContentDigest: '0'.repeat(64) }), ctx).join()).toMatch(/after-content digest/);
+  });
+  it('I336 (AFLDB-ISSUE-336) needs the pinned evidence, actor 1, and exactly 35 rows to insert', () => {
+    expect(planProblems('I336', plan('I336', { actorUserId: 2 }), ctx).join()).toMatch(/actor is 2/);
+    expect(planProblems('I336', plan('I336', { evidenceSha256: '0'.repeat(64) }), ctx).join()).toMatch(/pinned reviewed evidence/);
+    expect(planProblems('I336', plan('I336', { entries: plan('I336').entries.slice(1) }), ctx).join()).toMatch(/34 rows, not 35/);
+    expect(planProblems('I336', plan('I336', { entries: plan('I336').entries.map((e: Record<string, unknown>) => ({ ...e, action: 'already present' })) }), ctx).join()).toMatch(/0 rows to insert/);
+    expect(STAGES.I336.changes(plan('I336'))[0]).toMatch(/INSERT 35 draft_picks rows .* 31 new unmatched draft_persons rows/);
+    expect(STATEMENT('I336')).toMatch(/D-336-2.*35 DraftGuru Pre-Draft rows.*actor auth_users\.id 1.*D-336-1/);
   });
   it('statements name the stage decision, the digest, the revision and the recovery limit where it applies', () => {
     expect(STATEMENT('S1')).toMatch(/D1-PROD.*plan a1a1/); expect(STATEMENT('S2')).toMatch(/OUTCOME_UNDETERMINED.*owner-decided restore/); expect(STATEMENT('S3')).toMatch(/actor auth_users\.id 1/);

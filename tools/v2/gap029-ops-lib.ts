@@ -24,7 +24,8 @@ const HEX40 = /^[0-9a-f]{40}$/;
 /* Stage table                                                                                                                           */
 /* ------------------------------------------------------------------------------------------------------------------------------------- */
 
-export const STAGE_IDS = ['S1', 'S2', 'S3', 'S4'] as const;
+/** S1-S4 are V2-GAP-029; I336 is AFLDB-ISSUE-336 (D-336-2), which reuses this capture, plan, approval and outcome machinery unchanged. */
+export const STAGE_IDS = ['S1', 'S2', 'S3', 'S4', 'I336'] as const;
 export type StageId = (typeof STAGE_IDS)[number];
 export const isStage = (s: unknown): s is StageId => typeof s === 'string' && (STAGE_IDS as readonly string[]).includes(s);
 
@@ -44,6 +45,8 @@ export interface StageSpec {
 export const S2_LABEL = 'annual-html-20260826';
 export const S4_AFTER_CONTENT_DIGEST = 'd6fceb338d5f37e8fdef18443da696c52225db9caa80cedb9261e401aea212ec';
 export const S3_ACTOR_USER_ID = 1;
+/** The reviewed ISSUE-336 evidence (docs/v2/evidence/issue336-draft-categories-20261105/predraft-insert-plan.json), as pinned in the tool; I336 uses S3's pinned actor. */
+export const I336_EVIDENCE_SHA256 = '6a207cfe3b1408d6ff747040cecfac1cde9ebd9a43f584711c573eb20ff511cb';
 
 const arr = (v: unknown): any[] => (Array.isArray(v) ? v : []);
 
@@ -101,6 +104,25 @@ export const STAGES: Readonly<Record<StageId, StageSpec>> = {
     },
     changes: (p) => [`add exactly the sibling key afldb-sibling-supplement:015 (Jeremy McGovern 6937 / Mitch McGovern 9714) through family_siblings.py load; artefact ${String(p.artefactSha256).slice(0, 16)}...`,
       `expected content digest ${String(p.expectAfterContentDigest ?? '?').slice(0, 16)}...`],
+  },
+  I336: {
+    id: 'I336', title: '35 DraftGuru Pre-Draft rows (draft_picks, audited under the season seal)', decision: 'D-336-2', operation: 'issue336-predraft-insert',
+    tool: 'tools/v2/issue336-predraft-insert-production.ts', runner: 'tsx', conditions: true, needsChild: false, needsActor: true, hasVerify: true,
+    approvalExtras: (p) => ({ evidenceSha256: p.evidenceSha256, actorUserId: p.actorUserId }),
+    planProblems: (p) => {
+      const e = arr(p.entries); const ins = e.filter((x) => x.action === 'to insert').length; const out: string[] = [];
+      if (p.actorUserId !== S3_ACTOR_USER_ID) out.push(`I336 plan actor is ${String(p.actorUserId)}, not the pinned ${S3_ACTOR_USER_ID}`);
+      if (p.evidenceSha256 !== I336_EVIDENCE_SHA256) out.push('I336 plan evidence differs from the pinned reviewed evidence');
+      if (e.length !== 35) out.push(`I336 plan names ${e.length} rows, not 35`);
+      if (ins !== 35) out.push(`I336 plan has ${ins} rows to insert, not 35 (an already-applied or drifted state needs review)`);
+      return out;
+    },
+    changes: (p) => {
+      const e = arr(p.entries);
+      return [`INSERT ${e.filter((x) => x.action === 'to insert').length} draft_picks rows (source draftguru, Pre-Draft, unnumbered), ${e.filter((x) => x.action === 'to insert' && x.personId === null).length} new unmatched draft_persons rows, `
+        + `and one data_edits audit row per pick as actor auth_users.id ${String(p.actorUserId)}; nothing updated or deleted; no override written`,
+      ...e.map((x) => `  ${String(x.sourceRecordId)} -> ${x.action}${x.personId === null ? ' (new person)' : ` (person ${String(x.personId)}, ${String(x.linkStatus)})`}`)];
+    },
   },
 };
 
@@ -381,6 +403,7 @@ export function approvalStatement(stage: StageId, plan: Record<string, any>, ev:
     S2: `Through gap029-draft-link-production.py with child sha256 ${plan.childSha256} and label ${plan.label}. I accept that the importer commits in its own transaction, that a failure mid-write may be reported as OUTCOME_UNDETERMINED, and that recovery is an owner-decided restore.`,
     S3: `Exactly the eight manual rookie selections named in the plan, through the audited editor path as actor auth_users.id ${String(plan.actorUserId)}, my active, fully enrolled Super Admin.`,
     S4: `Exactly the sibling key afldb-sibling-supplement:015 through family_siblings.py load, artefact ${plan.artefactSha256}, expecting content digest ${plan.expectAfterContentDigest}. I accept the same recovery limit as S2.`,
+    I336: `Exactly the 35 DraftGuru Pre-Draft rows of reviewed evidence ${plan.evidenceSha256} named in the plan, each audited through recordDataEdit under the season seal as actor auth_users.id ${String(plan.actorUserId)}, my active, fully enrolled Super Admin; signing head 'Intl Schol' accepted under D-336-1.`,
   };
   return `${common}${own[stage]} Nothing else. No retry and no automatic restore. Window: ${ev.window}.`;
 }
