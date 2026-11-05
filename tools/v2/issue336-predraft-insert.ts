@@ -50,6 +50,11 @@ const dsn = process.env.AFLDB_TEST_IMPORT_DATABASE_URL ?? '';
 const url = new URL(dsn);
 if (!/^\/afldb_v2_.+_test$/.test(url.pathname) || url.hostname !== '127.0.0.1') throw new Error('isolated _test target required');
 
+const clubContract = JSON.parse(readFileSync('tools/rebuild/draftguru/draftguru-contract.json', 'utf8')) as {
+  club_resolution: { deliberate_null: { club_slug: string }[] };
+};
+const DELIBERATE_NULL_CLUBS = new Set(clubContract.club_resolution.deliberate_null.map((d) => d.club_slug));
+
 const leadingInt = (raw: string | null) => { const m = raw ? /^\s*(\d+)/.exec(raw) : null; return m ? Number(m[1]) : null; };
 const signingHead = (raw: string | null) => (raw === null ? null : raw.replace(/\s*\(.*$/s, '').trim());
 const nameKey = (s: string) => s.normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z]/g, '');
@@ -84,8 +89,12 @@ try {
       const clash = await tx`SELECT id FROM draft_picks WHERE source_id = ${sourceId} AND player_url = ${r.player_url}
                               AND draft_year = ${r.draft_year} AND draft_kind = 'pre_draft'`;
       if (clash.length > 0) throw new Error(`row ${r.player_url} ${r.draft_year}: reload key already stored (id ${clash[0].id})`);
+      // The importer's reviewed club rules: an exact clubs.slug, or a contract-declared deliberate
+      // NULL ('brisbane' spans the Bears and the Lions), else refuse. Never by name or alias.
       const clubId = r.club_slug_source ? clubs.get(r.club_slug_source) : undefined;
-      if (r.club_slug_source && clubId === undefined) throw new Error(`club slug ${r.club_slug_source} is not a clubs.slug`);
+      if (r.club_slug_source && clubId === undefined && !DELIBERATE_NULL_CLUBS.has(r.club_slug_source)) {
+        throw new Error(`club slug ${r.club_slug_source} is neither a clubs.slug nor a reviewed deliberate NULL`);
+      }
 
       let [person] = await tx<{ id: number; dg_person_id: number; player_id: number | null; link_status: string; match_method: string | null; confidence_notes: string | null }[]>`
         SELECT id, dg_person_id, player_id, link_status::text AS link_status, match_method, confidence_notes
