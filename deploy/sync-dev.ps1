@@ -39,6 +39,30 @@ Restart=always, sends SIGTERM to the unit's MainPID (server-cluster.mjs stops it
 workers and exits within 5 s; KillMode=mixed), and systemd starts the unit again
 after RestartSec; a new MainPID must appear within 60 s, then readiness is polled.
 The unit, its environment file and the timers are not touched.
+
+DEPLOY GATE (AFLDB-ISSUE-339). Every run executes afldb_deploy_gate on the host
+after `git fetch` and before any checkout change, install, migration, build or
+restart. It reports every safely discoverable blocker at once and writes a
+timestamped, secret-free record under -EvidenceDir. It checks: expected host,
+repository and origin; the exact operational-file allowlist; target branch,
+namespace collisions (dev versus dev/v2-main), upstream and a published pin
+(a reviewed pin behind the published tip is allowed; local main is preserved,
+never deployed); .env names (never values); disk, memory and the service's Node
+runtime; running afldb-* jobs and writer timers inside the deploy window; the
+owner approval window; acceptance-address reachability from this workstation;
+database identity, ledger names and checksums against the target revision and
+an explicitly approved migration transition (-ExpectedLedgerBefore/-After;
+none pending by default); a verified backup (-BackupDir) and a recoverable
+artifact of the serving build (-ArtifactArchive).
+
+  -Phase assess   gate only; nothing changes. Exit 0 READY, 40 BLOCKED,
+                  41 PREPARATION REQUIRED (backup, artifact, window, access).
+  -Phase execute  (default) the gate must be READY; then checkout (42),
+                  pre-migration (43), post-migration parity (44), pre-restart
+                  (45) and preserved-state (46) revalidations stop the run.
+
+The remote exit status is returned as this script's exit code. -WhatIf only
+generates the payload; it never contacts the host and is not an inspection mode.
 #>
 
 [CmdletBinding(SupportsShouldProcess = $true)]
@@ -63,7 +87,37 @@ param(
   [switch] $NoPrune,
   [switch] $Issue107Gate,
   [ValidateSet('auto', 'respawn')]
-  [string] $RestartMethod = 'auto'
+  [string] $RestartMethod = 'auto',
+  [ValidateSet('assess', 'execute')]
+  [string] $Phase = 'execute',
+  [string] $ExpectedHost = 'streamanator',
+  [string] $ExpectedOrigin = 'git@github.com-afldb-deploy:stuv1983/afldb.git',
+  [string] $ExpectedBranch = '',
+  [string] $ExpectedUpstream = 'origin/main',
+  [ValidateRange(-1, 9999)]
+  [int] $ExpectedLedgerBefore = -1,
+  [ValidateRange(-1, 9999)]
+  [int] $ExpectedLedgerAfter = -1,
+  [ValidatePattern('^[A-Z][A-Z0-9_]*$')]
+  [string] $DsnName = 'AFLDB_OWNER_DATABASE_URL',
+  [string] $ExpectedDatabase = 'afldb_dev',
+  [string[]] $RequiredConfig = @('DATABASE_URL', 'AFLDB_OWNER_DATABASE_URL', 'AFLDB_AUTH_DATABASE_URL',
+    'AFLDB_SESSION_SECRET', 'AFLDB_ENV', 'AFLDB_BASE_URL', 'PORT', 'AFLDB_WORKERS', 'AFLDB_POOL_MAX'),
+  [ValidateRange(1, 500)]
+  [int] $MinFreeGiB = 10,
+  [ValidateRange(256, 65536)]
+  [int] $MinMemAvailableMiB = 2100,
+  [string[]] $ConflictTimers = @('afldb-settle-afl-api', 'afldb-settle-afltables', 'afldb-email-intake'),
+  [ValidateRange(5, 720)]
+  [int] $ConflictWindowMinutes = 45,
+  [string] $ApprovalWindowStart = '',
+  [string] $ApprovalWindowEnd = '',
+  [string] $BackupDir = '',
+  [ValidateRange(1, 72)]
+  [int] $MaxBackupAgeHours = 12,
+  [string] $ArtifactArchive = '',
+  [string] $AcceptanceUrl = 'http://10.0.40.100:8090/beta',
+  [string] $EvidenceDir = '/mnt/ssd/afldb/records/deploy-preflight'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -113,6 +167,64 @@ if ($ReadinessIntervalSeconds -gt $ReadinessTimeoutSeconds) {
   throw '-ReadinessIntervalSeconds cannot exceed -ReadinessTimeoutSeconds.'
 }
 
+# --- AFLDB-ISSUE-339 gate arguments: refused on the workstation before anything is sent. ---
+$targetBranch = $RemoteRef.Trim()
+if ($ExpectedRevision -and -not $ExpectedBranch) {
+  throw 'A pinned deploy (-ExpectedRevision) must name -ExpectedBranch.'
+}
+if ($targetBranch -and $ExpectedBranch -and $targetBranch -ne $ExpectedBranch) {
+  throw "-RemoteRef '$targetBranch' and -ExpectedBranch '$ExpectedBranch' disagree."
+}
+if (-not $targetBranch -and $ExpectedBranch) { $targetBranch = $ExpectedBranch }
+foreach ($branchName in @($targetBranch, $ExpectedBranch, $ExpectedUpstream) | Where-Object { $_ }) {
+  if ($branchName -notmatch '^[A-Za-z0-9][A-Za-z0-9._/-]*$' -or $branchName -match '\.\.|//|/$|\.lock$') {
+    throw "Not a plausible branch name: '$branchName'."
+  }
+}
+if (($ExpectedLedgerBefore -lt 0) -ne ($ExpectedLedgerAfter -lt 0)) {
+  throw 'An approved migration transition needs both -ExpectedLedgerBefore and -ExpectedLedgerAfter.'
+}
+if ($ExpectedLedgerAfter -ge 0 -and $ExpectedLedgerAfter -lt $ExpectedLedgerBefore) {
+  throw '-ExpectedLedgerAfter cannot be lower than -ExpectedLedgerBefore.'
+}
+foreach ($name in $RequiredConfig + $ConflictTimers + @($ExpectedHost, $ExpectedDatabase, $ServiceName)) {
+  if ($name -notmatch '^[A-Za-z0-9_.@-]+$') { throw "Not a plausible name: '$name'." }
+}
+foreach ($path in @($BackupDir, $ArtifactArchive, $EvidenceDir) | Where-Object { $_ }) {
+  if (-not $path.StartsWith('/') -or $path -match '[\\\r\n]') { throw "Host paths must be absolute Linux paths: '$path'." }
+}
+function ConvertTo-WindowEpoch {
+  param([string] $Value, [string] $Name)
+  if (-not $Value) { return '' }
+  $parsed = [DateTimeOffset]::MinValue
+  if (-not [DateTimeOffset]::TryParse($Value, [Globalization.CultureInfo]::InvariantCulture,
+      [Globalization.DateTimeStyles]::None, [ref] $parsed) -or $Value -notmatch '(Z|[+-]\d{2}:?\d{2})$') {
+    throw "$Name must be an ISO 8601 time with an explicit offset, e.g. 2026-11-08T08:00:00+11:00."
+  }
+  return [string] $parsed.ToUnixTimeSeconds()
+}
+$windowStart = ConvertTo-WindowEpoch $ApprovalWindowStart '-ApprovalWindowStart'
+$windowEnd = ConvertTo-WindowEpoch $ApprovalWindowEnd '-ApprovalWindowEnd'
+if (([bool] $windowStart) -ne ([bool] $windowEnd)) { throw 'Supply both -ApprovalWindowStart and -ApprovalWindowEnd.' }
+
+# Workstation-side fact for the one combined report: can this workstation reach the acceptance
+# address (the VPN has captured 10.0.40.x before)? Any HTTP response counts; sign-in stays manual.
+function Test-AcceptanceAccess {
+  param([string] $Url)
+  try {
+    $request = [Net.HttpWebRequest]::Create($Url)
+    $request.Method = 'GET'; $request.Timeout = 8000; $request.AllowAutoRedirect = $false
+    $response = $request.GetResponse(); $code = [int] $response.StatusCode; $response.Close()
+    return "ok:$code"
+  } catch [Net.WebException] {
+    if ($_.Exception.Response) { return "ok:$([int] $_.Exception.Response.StatusCode)" }
+    return "fail:$($_.Exception.Status)"
+  } catch {
+    return 'fail:invalid-url'
+  }
+}
+$acceptance = if ($WhatIfPreference) { 'unchecked:whatif' } elseif ($AcceptanceUrl) { Test-AcceptanceAccess $AcceptanceUrl } else { 'unchecked:no-url' }
+
 $remoteHelperPath = Join-Path $PSScriptRoot 'sync-dev-remote.sh'
 if (-not (Test-Path -LiteralPath $remoteHelperPath -PathType Leaf)) {
   throw "Remote deployment helper was not found: $remoteHelperPath"
@@ -128,6 +240,43 @@ $remoteCommands = [System.Collections.Generic.List[string]]::new()
 Add-RemoteCommand $remoteCommands 'set -Eeuo pipefail'
 Add-RemoteCommand $remoteCommands 'trap ''code=$?; echo "[deploy] FAILED line ${LINENO}: ${BASH_COMMAND}" >&2; exit $code'' ERR'
 Add-RemoteCommand $remoteCommands $remoteHelper
+# Gate inputs: every value single-quoted, so nothing expands on either side.
+$gateInputs = [ordered] @{
+  AFLDB_PF_PHASE = $Phase
+  AFLDB_PF_EXPECTED_HOST = $ExpectedHost
+  AFLDB_PF_PROJECT_DIR = $ProjectDir
+  AFLDB_PF_EXPECTED_ORIGIN = $ExpectedOrigin
+  AFLDB_PF_TARGET_BRANCH = $targetBranch
+  AFLDB_PF_EXPECTED_BRANCH = $ExpectedBranch
+  AFLDB_PF_EXPECTED_UPSTREAM = $ExpectedUpstream
+  AFLDB_PF_EXPECTED_REVISION = $ExpectedRevision
+  AFLDB_PF_LEDGER_BEFORE = $(if ($ExpectedLedgerBefore -ge 0) { [string] $ExpectedLedgerBefore } else { '' })
+  AFLDB_PF_LEDGER_AFTER = $(if ($ExpectedLedgerAfter -ge 0) { [string] $ExpectedLedgerAfter } else { '' })
+  AFLDB_PF_SKIP_MIGRATE = $(if ($SkipMigrate) { '1' } else { '0' })
+  AFLDB_PF_ALLOW_DIRTY = $(if ($AllowDirtyServer) { '1' } else { '0' })
+  AFLDB_PF_DSN_NAME = $DsnName
+  AFLDB_PF_EXPECTED_DATABASE = $ExpectedDatabase
+  AFLDB_PF_REQUIRED_CONFIG = ($RequiredConfig -join ' ')
+  AFLDB_PF_MIN_FREE_GIB = [string] $MinFreeGiB
+  AFLDB_PF_MIN_MEM_MIB = [string] $MinMemAvailableMiB
+  AFLDB_PF_SERVICE = $ServiceName
+  AFLDB_PF_CONFLICT_TIMERS = ($ConflictTimers -join ' ')
+  AFLDB_PF_CONFLICT_MINUTES = [string] $ConflictWindowMinutes
+  AFLDB_PF_WINDOW_START = $windowStart
+  AFLDB_PF_WINDOW_END = $windowEnd
+  AFLDB_PF_BACKUP_DIR = $BackupDir
+  AFLDB_PF_MAX_BACKUP_AGE_HOURS = [string] $MaxBackupAgeHours
+  AFLDB_PF_ARTIFACT = $ArtifactArchive
+  AFLDB_PF_ACCEPTANCE = $acceptance
+  AFLDB_PF_EVIDENCE_DIR = $EvidenceDir
+}
+# The helper's clock/meminfo overrides exist for its unit tests only; a deploy never honours them.
+Add-RemoteCommand $remoteCommands 'unset AFLDB_PF_NOW AFLDB_PF_MEMINFO'
+foreach ($entry in $gateInputs.GetEnumerator()) {
+  $value = if ($entry.Value) { Escape-BashSingleQuoted ([string] $entry.Value) } else { "''" }
+  Add-RemoteCommand $remoteCommands "$($entry.Key)=$value"
+}
+Add-RemoteCommand $remoteCommands 'trap ''afldb_pf_finish $?'' EXIT'
 Add-RemoteStep $remoteCommands 'enter project directory' "cd $quotedProjectDir"
 # These must be single-quoted PowerShell strings. A double-quoted string would
 # expand $(...) on the *workstation*, so the deployment would report the local
@@ -147,23 +296,25 @@ Add-RemoteStep $remoteCommands 'enforce Next.js Node floor' "node -e `"const [ma
 Add-RemoteStep $remoteCommands 'show npm version' 'echo "[deploy] npm: $(npm --version)"'
 Add-RemoteStep $remoteCommands 'show current revision' 'echo "[deploy] before: $(git rev-parse --short HEAD) $(git branch --show-current)"'
 
-$allowDirtyArgument = if ($AllowDirtyServer) { '1' } else { '0' }
-Add-RemoteStep $remoteCommands 'classify server working tree' "afldb_classify_worktree $allowDirtyArgument"
-
+if ($Phase -eq 'assess') {
+  # Assessment: refs are fetched (no prune), the gate runs, nothing else. Exit 0/40/41.
+  Add-RemoteStep $remoteCommands 'fetch Git refs (assessment; no prune)' 'git fetch'
+  Add-RemoteStep $remoteCommands 'deploy gate (assessment)' 'afldb_deploy_gate'
+  Add-RemoteStep $remoteCommands 'assessment complete' 'echo "[deploy] assessment READY; nothing was changed"'
+} else {
 if (-not $NoPrune) {
   Add-RemoteStep $remoteCommands 'fetch Git refs with prune' 'git fetch --prune'
 } else {
   Add-RemoteStep $remoteCommands 'fetch Git refs' 'git fetch'
 }
 
-Add-RemoteStep $remoteCommands 'checkout requested ref if supplied' "if [ -n $quotedRemoteRef ]; then git checkout $quotedRemoteRef; fi"
-if ($ExpectedRevision) {
-  # A pinned deploy fast-forwards to exactly this commit (it must already be on the branch's upstream)
-  # and refuses before install, migration or build when it cannot. `git pull` is not run.
-  Add-RemoteStep $remoteCommands 'fast-forward to the pinned revision' "afldb_checkout_pinned_revision $(Escape-BashSingleQuoted $ExpectedRevision)"
-} else {
-  Add-RemoteStep $remoteCommands 'pull latest commit' 'git pull --ff-only'
-}
+# The gate precedes every mutation; under `set -e` a non-zero gate ends the run here.
+Add-RemoteStep $remoteCommands 'deploy gate (readiness to mutate)' 'afldb_deploy_gate'
+Add-RemoteStep $remoteCommands 'switch to the target branch if needed' 'if [ "$(git branch --show-current)" != "$AFLDB_PF_TARGET_BRANCH_RESOLVED" ]; then git switch --no-guess "$AFLDB_PF_TARGET_BRANCH_RESOLVED"; fi'
+# Pinned or not, the branch fast-forwards to exactly the revision the gate assessed (an unpinned
+# deploy's target is the upstream tip seen by the gate); `git pull` is never run.
+Add-RemoteStep $remoteCommands 'fast-forward to the assessed revision' 'afldb_checkout_pinned_revision "$AFLDB_PF_TARGET_REV"'
+Add-RemoteStep $remoteCommands 'revalidate the checkout' 'afldb_pf_revalidate_checkout'
 Add-RemoteStep $remoteCommands 'show deployed revision' 'echo "[deploy] after: $(git rev-parse --short HEAD) $(git branch --show-current)"'
 
 if (-not $SkipInstall) {
@@ -171,8 +322,10 @@ if (-not $SkipInstall) {
 }
 
 if (-not $SkipMigrate) {
+  Add-RemoteStep $remoteCommands 'revalidate before migration' 'afldb_pf_revalidate_before_migration'
   Add-RemoteStep $remoteCommands 'run database migrations' 'npm run db:migrate'
 }
+Add-RemoteStep $remoteCommands 'post-migration parity' 'afldb_pf_migration_parity'
 
 if (-not $SkipBuild) {
   Add-RemoteStep $remoteCommands 'build Next.js standalone output' 'npm run build'
@@ -181,6 +334,7 @@ if (-not $SkipBuild) {
 Add-RemoteStep $remoteCommands 'capture standalone build identity' 'test -s .next/standalone/.next/BUILD_ID; AFLDB_BUILT_BUILD_ID="$(tr -d ''\r\n'' < .next/standalone/.next/BUILD_ID)"; test -n "$AFLDB_BUILT_BUILD_ID"; echo "[deploy] built BUILD_ID: $AFLDB_BUILT_BUILD_ID"'
 
 if (-not $SkipRestart) {
+  Add-RemoteStep $remoteCommands 'revalidate before restart' 'afldb_pf_revalidate_before_restart'
   # `sudo` is password-protected on the development host, so `sudo -n` cannot
   # restart the unit over a non-interactive SSH session. The unit runs as the
   # deploying user with Restart=always, so terminating the main process makes
@@ -236,6 +390,8 @@ if (-not $SkipHealth) {
     $ReadinessTimeoutSeconds + ' ' + $ReadinessIntervalSeconds + ' ' + $expectedBuildArgument
   Add-RemoteStep $remoteCommands 'wait for healthy service readiness' $readinessCommand
 }
+Add-RemoteStep $remoteCommands 'verify preserved state' 'afldb_pf_verify_preserved'
+}
 
 # PowerShell writes a UTF-8 BOM into a native command's stdin pipe, so piping
 # the script straight into `bash -s` makes the remote shell fail on its first
@@ -244,7 +400,13 @@ if (-not $SkipHealth) {
 # payload survives the pipe, CRLF normalisation and PowerShell's argument
 # handling unchanged.
 $remoteScript = ($remoteCommands -join "`n") -replace "`r`n", "`n"
-$remotePayload = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($remoteScript))
+# gzip before base64 keeps the gated payload well inside the SSH argument limit.
+$scriptBytes = [System.Text.Encoding]::UTF8.GetBytes($remoteScript)
+$compressed = New-Object System.IO.MemoryStream
+$gzip = New-Object System.IO.Compression.GZipStream($compressed, [System.IO.Compression.CompressionMode]::Compress)
+$gzip.Write($scriptBytes, 0, $scriptBytes.Length)
+$gzip.Close()
+$remotePayload = [Convert]::ToBase64String($compressed.ToArray())
 
 if ($remotePayload.Length -gt 24000) {
   throw "The remote deployment script is too large to pass as an SSH argument ($($remotePayload.Length) base64 characters)."
@@ -267,9 +429,27 @@ if ($ExpectedRevision) {
 }
 Write-Host ''
 
-if ($PSCmdlet.ShouldProcess($SshTarget, 'sync AFLDB dev deployment from Git')) {
-  ssh $SshTarget "echo $remotePayload | base64 -d | bash -s"
-  if ($LASTEXITCODE -ne 0) {
-    throw "Remote deployment failed with exit code $LASTEXITCODE. Look above for the '[deploy] FAILED' line."
+Write-Host "Phase:         $Phase$(if ($Phase -eq 'assess') { ' (gate only; nothing changes)' } else { ' (gate, then mutation)' })"
+Write-Host "Acceptance:    $acceptance"
+Write-Host "Evidence:      $EvidenceDir"
+Write-Host ''
+
+if ($PSCmdlet.ShouldProcess($SshTarget, "AFLDB dev deployment ($Phase)")) {
+  ssh $SshTarget "echo $remotePayload | base64 -d | gunzip | bash -s"
+  $remoteExit = $LASTEXITCODE
+  if ($remoteExit -ne 0) {
+    $meaning = switch ($remoteExit) {
+      40 { 'deploy gate BLOCKED; nothing was changed' }
+      41 { 'deploy gate PREPARATION REQUIRED; nothing was changed' }
+      42 { 'checkout revalidation failed' }
+      43 { 'pre-migration revalidation failed' }
+      44 { 'post-migration parity failed' }
+      45 { 'pre-restart revalidation failed' }
+      46 { 'preserved-state check failed' }
+      default { "look above for the '[deploy] FAILED' line" }
+    }
+    Write-Error "Remote deployment exited $remoteExit ($meaning)." -ErrorAction Continue
+    # exit, not throw: the remote status survives pipelines, Tee-Object and powershell -File callers.
+    exit $remoteExit
   }
 }

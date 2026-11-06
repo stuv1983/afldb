@@ -86,6 +86,28 @@ powershell -ExecutionPolicy Bypass -File .\deploy\sync-dev.ps1
 Use `-WhatIf` to print the target without touching the server, and
 `-SkipMigrate`, `-SkipBuild` or `-SkipRestart` for narrower maintenance runs.
 
+**Deploy gate (AFLDB-ISSUE-339).** Every run first executes `afldb_deploy_gate` on the host, after
+`git fetch` and before any checkout change, install, migration, build or restart. The gate reports
+every blocker at once and writes a secret-free record under `/mnt/ssd/afldb/records/deploy-preflight/`.
+
+Assess first; this run changes nothing:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\deploy\sync-dev.ps1 -Phase assess `
+  -RemoteRef <branch> -ExpectedBranch <branch> -ExpectedRevision <40-hex> `
+  -ExpectedLedgerBefore <n> -ExpectedLedgerAfter <m> `
+  -BackupDir <verified backup dir> -ArtifactArchive <archive of the serving build> `
+  -ApprovalWindowStart <ISO+offset> -ApprovalWindowEnd <ISO+offset>
+```
+
+- Exit 0 means READY, 40 BLOCKED and 41 PREPARATION REQUIRED.
+- Run the same arguments without `-Phase assess` to deploy.
+- Execution stops at 42–46 if a revalidation fails: checkout, pre-migration, post-migration parity, pre-restart or preserved state.
+- The defaults allow no pending migration.
+- A backup must be in the `dev-backup-verify.sh` layout. It must match the live database and ledger, be at most 12 h old, and be newer than any writer job's last start.
+
+The sections below describe the classifier the gate reuses.
+
 Before fetching, `sync-dev.ps1` classifies the remote checkout instead of treating every
 untracked path as equivalent:
 

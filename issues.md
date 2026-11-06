@@ -21,6 +21,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-336 | Draft pages merge National, Rookie and other categories; 35 DraftGuru Pre-Draft rows missing | Medium | Public draft pages, player draft history, DraftGuru data | Open, opened 2026-11-05. Code on `origin/main` `ea9bddf8`; preview-verified on an isolated restore of DEV data (2026-11-06); **not deployed** (DEV diverged: 18 DEV-only commits, migrations 111–118 pending). D-336-1 accepted; 35-row production insert prepared and rehearsed, not run. Pinned DEV procedure prepared (2026-11-06): candidate `8b024098` verified in isolation (backup rehearsed, rollback proven); not run. Procedure corrected (r2): sudo-free respawn restart (tooling `b82dfcea`), corrected 2027 nightly account, artifact restore without rebuild, immediate vs pending-overnight acceptance. | Owner approvals A1–A4 in `issues/open/AFLDB-ISSUE-336-DEV-DEPLOYMENT.md` r2 (publish, DEV-only behaviour, timer consequence, DEV deploy); production application release; D-336-2 execution approval; D-336-3. |
 | AFLDB-ISSUE-337 | Draft-page name search misses unlinked picks whose stored raw name uses U+00A0 | Low | Public draft pages (`/draft/[year]?q=`) | Open, opened 2026-11-06. **Fixed locally** in `8b024098` (not pushed); verified on the isolated DEV-data preview (unit RED/GREEN, integration, browser 76/76); **not deployed**. | Deploy with ISSUE-336's pinned DEV procedure; resolve after DEV acceptance (Jake Long found for ordinary-space, NBSP and lower-case queries). |
 | AFLDB-ISSUE-338 | DraftGuru operator-review contract's byte-identical rerun check is time-dependent | Low | Test tooling (`tests/python/draftguru_bridge_operator_review_contract.py`, via `tests/draftguru-acquisition.test.ts`) | Open, opened 2026-11-06. Observed once at `8b024098`; 0 of 5 reruns failed. Not fixed. | Make the rerun check independent of `review_completed_utc` (inject or freeze the clock, or compare with that field excluded). |
+| AFLDB-ISSUE-339 | DEV deployment (`sync-dev.ps1`) ran checkout, install, migration, build and restart with no enforced preflight | Medium | Deployment tooling (`deploy/sync-dev.ps1`, `deploy/sync-dev-remote.sh`) | Open, opened 2026-11-07. Host-side deploy gate implemented on local branch `claude/issue-339-deploy-preflight` (unpushed); Linux 43/43; real DEV assessment correctly BLOCKED on stale backup/artifact; nothing deployed. | Owner review, push and merge; decide the standalone `db:migrate` and `preflight --mode deploy` gaps. |
 
 **AFLDB-ISSUE-323 and AFLDB-ISSUE-324 resolved 2026-10-24** (fixes `481511d2`; `82603dc7`, `14abea5e`, `876dadbf`; local, not pushed). The owner ruled on 2026-10-24 that the ISSUE-316 revision J2 disposable rebuild is the J2 proof, and that its 5 sampler anomalies (F-J06) are an evidence-monitor defect, registered as ISSUE-325. That rebuild was the ordinary successor path at pinned `876dadbf`, under the reviewed native closure (policy `a8e586e0…`) with no provenance, against `afldb_v2_rb_i316_revision_j2_test`. It passed the successor preflight and the real execution boundary, and executed the constrained tsx/npm path under enforcement: runner exit 0, 30 stages, 91 checks PASSED, all 1,640 club-seasons equal, `AFLDB-POST PASSED`, 0 native REFUSED lines and 0 provenance mentions. A focused read-only evidence review of the retained artefacts preceded the closure; it is recorded in the ISSUE-316 entry. No push, deployment, apply, activation or census. Removed from `IssuesIndex.md` and the Open Issues table. Full record: the entries in this file.
 
@@ -53956,3 +53957,47 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   - Five further runs of `tests/python/draftguru_bridge_operator_review_contract.py` passed (`host/operator-review-reruns.txt`).
 - **Root cause (code read):** `build_final_document` writes `"review_completed_utc": utc_now()` (`tools/rebuild/draftguru/review_bridge_operator.py:1424`). The check compares two `finalize()` outputs byte for byte (`tests/python/draftguru_bridge_operator_review_contract.py:466-469`), so the outputs differ whenever the two calls straddle a second boundary. The CSV has no timestamp.
 - **Next action:** make the check deterministic: freeze or inject the clock for the rerun, or compare with `review_completed_utc` excluded. Do not weaken the byte-identity check for the remaining content.
+
+## AFLDB-ISSUE-339 — DEV deployment (`sync-dev.ps1`) ran checkout, install, migration, build and restart with no enforced preflight
+
+- **Status:** Open (opened 2026-11-07). **Fix for `sync-dev`:** implemented on local branch `claude/issue-339-deploy-preflight` (not pushed), qualified in isolation on Linux and by one read-only assessment against DEV. **Not deployed:** nothing on DEV changed. The gate ships inside each `sync-dev.ps1` payload, so it takes effect for the next DEV deploy run from a checkout that has this commit.
+- **Severity / area:** Medium; deployment tooling (`deploy/sync-dev.ps1`, `deploy/sync-dev-remote.sh`).
+- **Defect (confirmed by code read, 2026-11-07):**
+  - `sync-dev.ps1` ran `git fetch`/`checkout`/`pull`, `npm ci`, `npm run db:migrate`, `npm run build` and the restart. No preflight ran first.
+  - The only gates were the worktree classifier and, for a pin, `afldb_checkout_pinned_revision`. Both stop at the first failure, one blocker at a time.
+  - `db:migrate` applied every pending migration, with no approved transition.
+  - `-RemoteRef` used `git checkout` DWIM. This is how the `dev` versus `dev/v2-main` collision surfaced only mid-procedure (ISSUE-336 step 3).
+  - Nothing checked the host identity, database identity, ledger checksums against the target, timers, the approval window, backup or artifact evidence. Nothing wrote a durable result.
+  - `npm run preflight -- --mode deploy` (`tools/dev/preflight.ts`) does not fit DEV. It requires `main`, refuses DEV's known operational untracked files, and fails on every pending migration (recorded under ISSUE-156). No wrapper calls it.
+- **Fix (sync-dev):** `afldb_deploy_gate` in `deploy/sync-dev-remote.sh`. It runs on the host from the reviewed workstation payload, after the fetch and before any mutation. It reports every blocker at once as PASS/FAIL/PREP/INFO. Exit codes: 0 READY, 40 BLOCKED, 41 PREPARATION REQUIRED.
+  - **Identity:** expected host, repository and origin.
+  - **Working tree:** the existing exact operational-file classifier.
+  - **Branch:** target branch existence and namespace collisions. `git switch --no-guess` replaces `git checkout`.
+  - **Revision:** expected upstream, and the pin published on it. A reviewed pin behind the tip is reported, not refused. Local `main` is preserved and recorded.
+  - **Host checks:** `.env` presence by name only; disk, memory and the service's Node; running `afldb-*` jobs and writer timers in the window.
+  - **Operator preparation:** the owner approval window, and acceptance-address reachability from the workstation.
+  - **Database:** read-only identity; ledger names and checksums (raw, LF or CRLF) equal to the target's first N migrations; an explicit transition (`-ExpectedLedgerBefore/-After`, none pending by default).
+  - **Recovery evidence:** a verified backup in the `dev-backup-verify.sh` layout. It must be checksummed, restored equal, of the same database and ledger as live, at most 12 h old, and newer than any writer start. Also a checksummed artifact of the serving `BUILD_ID` with no `.env` member.
+  - **Phases:** `-Phase assess` changes nothing. `-Phase execute` then revalidates the checkout (42), before migration (43), post-migration parity (44), before restart (45) and preserved state (46).
+  - **Evidence:** a timestamped, secret-free record under `/mnt/ssd/afldb/records/deploy-preflight/` ends with `RESULT exit=N`. The remote status is the script's exit code, so it survives `powershell -File`, pipelines and `Tee-Object`.
+  - **Transport:** the payload is gzip+base64 (18.4k of the 24k limit). Unpinned deploys fast-forward to the assessed tip; `git pull` is gone.
+- **Validation:**
+  - `tests/sync-dev-static.test.ps1` PASS (Windows). It covers gate ordering before every mutation, assessment with no mutation step, 6 workstation refusals, the gzip round trip, payload size, `bash -n` on 4 variants, and exit 40 through `powershell -File | Tee-Object`.
+  - `tests/sync-dev-remote.test.sh` on streamanator, in disposable workspace `/mnt/ssd/afldb/workspaces/i339-qual-20261107`: **43 passed, 0 failed.**
+    - 4 gate unit cases, plus 13 end-to-end cases that run the real generated payload against a throwaway repository with stubbed host commands.
+    - READY pin: 1 behind the tip; diverged `main` and stash preserved; migrated 2→3 exactly.
+    - Each of these blocks with no checkout change, install, migration, build or restart: wrong host; `dev` vs `dev/v2-main`; unapproved or mismatched transition; wrong database; stale backup; absent pin; running job.
+    - Missing preparation exits 41. A parity failure exits 44 before the build. Assessment reports all blockers. Exit status survives `tee`.
+  - **Real DEV assessment** (2026-11-07 08:57 AEDT, read-only) at pin `8b024098` with the 7 Nov backup and artifact: exit 40.
+    - It reported both stale-evidence blockers together: the backup ledger is 110 against live 118, and the archived build `8sFp…` is not the serving `AlYJ…`. The window was PREP.
+    - Everything else passed: ledger 118 equal to the pin, Node v22.23.2 on both, acceptance HTTP 200, and the expected diverged `main` `242fa276`.
+    - Record: `/mnt/ssd/afldb/records/deploy-preflight/20261106T215735Z-streamanator-8b024098a677-assess-1357270.txt`. DEV is unchanged.
+- **Entry points (2026-11-07):**
+  - **Enforced:** DEV deploy `sync-dev.ps1` (this fix). `db:test:rebuild` (`runPreflight` in `tools/db/rebuild-test.ts`). `db:migrate` has its own migration-collision and branch-local guard.
+  - **Advisory only (operator-run):** `npm run preflight` implementation/merge/read-only modes, `merge:ready`, and `worktree:bootstrap`.
+  - **Remaining gaps:**
+    - a standalone `npm run db:migrate` on DEV bypasses the transition approval;
+    - `preflight.ts --mode deploy` is unusable ahead of a migration-carrying or pinned non-`main` deploy;
+    - production `deploy/release.mjs` was not reviewed here;
+    - the authenticated sign-in for acceptance stays a manual owner step (the gate proves reachability only).
+- **Next action:** owner review of the branch; push and merge on request. Separately decide whether to route a standalone DEV `db:migrate` through the gate and whether `preflight.ts --mode deploy` should accept an approved transition. The next real DEV deploy needs a fresh verified backup and artifact (the gate refuses the 7 Nov ones).

@@ -15,6 +15,21 @@ commit.
 
 ## [Unreleased]
 
+### DEV deploys are gated by a host-side preflight (AFLDB-ISSUE-339; tooling only, nothing deployed)
+
+- `deploy/sync-dev.ps1` now runs `afldb_deploy_gate` on the host after `git fetch` and before any checkout change, install, migration, build or restart. It reports every blocker at once.
+  - **Identity:** host, repository and origin.
+  - **Working tree:** the exact operational-file allowlist.
+  - **Branch and revision:** the target branch with `dev` versus `dev/v2-main` collision detection, its upstream, and the published pin. A reviewed pin behind the tip is allowed, and local `main` is preserved.
+  - **Host checks:** `.env` names (never values); disk, memory and service Node; running jobs and writer timers.
+  - **Operator preparation:** the approval window and acceptance reachability.
+  - **Database:** identity, and ledger names and checksums against the target with an explicitly approved transition. No pending migration is accepted by default.
+  - **Recovery evidence:** a verified, fresh backup, and a recoverable artifact of the serving build.
+- `-Phase assess` changes nothing and exits 0, 40 (BLOCKED) or 41 (PREPARATION REQUIRED). `-Phase execute` adds revalidation at checkout, migration, post-migration parity, restart and preserved state (exits 42–46).
+- Results are saved, secret-free and timestamped, under `/mnt/ssd/afldb/records/deploy-preflight/`. The remote exit status is now the script's exit code.
+- `git checkout` DWIM and `git pull` are no longer used. The payload is gzip-compressed.
+- New gate parameters: `-ExpectedBranch`, `-ExpectedLedgerBefore/-After`, `-ApprovalWindowStart/-End`, `-BackupDir` and `-ArtifactArchive`. A pinned deploy must name `-ExpectedBranch`.
+
 ### `sync-dev -RestartMethod respawn`: a sudo-free DEV restart (2026-11-06; local, not pushed; workstation deploy tooling only)
 
 - **`deploy/sync-dev.ps1 -RestartMethod respawn`:** the restart step sends SIGTERM to the unit's MainPID and requires systemd

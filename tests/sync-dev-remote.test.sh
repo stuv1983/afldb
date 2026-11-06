@@ -365,5 +365,293 @@ run_test 'pin refuses a diverged branch without rewriting it' test_pin_refuses_d
 run_test 'pin refuses a branch without an upstream' test_pin_refuses_branch_without_upstream
 run_test 'pin helper never resets, cleans, checks out or pulls' test_pin_helper_never_resets_or_cleans
 
+# --- AFLDB-ISSUE-339: deploy gate helpers ---
+test_gate_branch_collision_dev_vs_dev_slash() {
+  local root out ok=1
+  root="$(mktemp -d)"
+  (unset -f git; cd "$root" && git init -q -b main && git -c user.name=t -c user.email=t@e.invalid commit -q --allow-empty -m a && git branch dev)
+  out="$(cd "$root" && afldb_pf_branch_collisions 'dev/v2-main')"
+  [[ "$out" == 'dev ' ]] && [[ -z "$(cd "$root" && afldb_pf_branch_collisions 'dev-v2-main')" ]] && ok=0
+  rm -rf -- "$root"; return $ok
+}
+
+test_gate_ledger_accepts_crlf_checksum_and_refuses_drift() {
+  local root rev ledger lf crlf ok=1
+  root="$(mktemp -d)"; ledger="$root/ledger"
+  rev="$(unset -f git; cd "$root" && git init -q -b main && mkdir -p src/db/migrations \
+    && printf 'select 1;\nselect 2;\n' > src/db/migrations/001_a.sql && printf 'select 3;\n' > src/db/migrations/002_b.sql \
+    && git add . && git -c user.name=t -c user.email=t@e.invalid commit -q -m a && git rev-parse HEAD)"
+  crlf="$(printf 'select 1;\r\nselect 2;\r\n' | sha256sum | cut -d' ' -f1)"
+  printf '001_a.sql %s\n' "$crlf" > "$ledger"
+  (cd "$root" && afldb_pf_compare_ledger "$rev" "$ledger"
+   (( ${#AFLDB_PF_LEDGER_PROBLEMS[@]} == 0 && AFLDB_PF_APPLIED_N == 1 && AFLDB_PF_TARGET_M == 2 )) && [[ "$AFLDB_PF_PENDING" == '002_b.sql ' ]]) || { rm -rf -- "$root"; return 1; }
+  printf '001_a.sql %s\n' "$(printf 'edited;\n' | sha256sum | cut -d' ' -f1)" > "$ledger"
+  (cd "$root" && afldb_pf_compare_ledger "$rev" "$ledger"; [[ "${AFLDB_PF_LEDGER_PROBLEMS[0]}" == *'checksum differs'* ]]) || { rm -rf -- "$root"; return 1; }
+  lf="$(printf 'select 3;\n' | sha256sum | cut -d' ' -f1)"
+  printf '002_b.sql %s\n' "$lf" > "$ledger"
+  (cd "$root" && afldb_pf_compare_ledger "$rev" "$ledger"; [[ "${AFLDB_PF_LEDGER_PROBLEMS[0]}" == *'not migration #1'* ]]) && ok=0
+  rm -rf -- "$root"; return $ok
+}
+
+test_gate_env_presence_never_prints_values() {
+  local root out ok=1
+  root="$(mktemp -d)"
+  printf 'AFLDB_SESSION_SECRET="s3cr3t-value"\nEMPTY=\n' > "$root/.env"
+  out="$(cd "$root" && { afldb_pf_env_has AFLDB_SESSION_SECRET && echo has; afldb_pf_env_has EMPTY || echo empty; afldb_pf_env_has MISSING || echo missing; })"
+  [[ "$out" == $'has\nempty\nmissing' && "$out" != *s3cr3t* ]] && [[ "$(cd "$root" && afldb_pf_env_value AFLDB_SESSION_SECRET)" == 's3cr3t-value' ]] && ok=0
+  rm -rf -- "$root"; return $ok
+}
+
+test_gate_window_states() {
+  local out
+  out="$(AFLDB_PF_FAILS=0 AFLDB_PF_PREPS=0 AFLDB_PF_NOW=1000 AFLDB_PF_WINDOW_START='' AFLDB_PF_WINDOW_END='' afldb_pf_window_check)"
+  [[ "$out" == *'PREP approval window'* ]] || return 1
+  out="$(AFLDB_PF_NOW=1000 AFLDB_PF_WINDOW_START=100 AFLDB_PF_WINDOW_END=900 afldb_pf_window_check)"
+  [[ "$out" == *'FAIL approval window -- ended'* ]] || return 1
+  out="$(AFLDB_PF_NOW=1000 AFLDB_PF_WINDOW_START=100 AFLDB_PF_WINDOW_END=200000 afldb_pf_window_check)"
+  [[ "$out" == *'FAIL approval window -- empty, inverted or longer'* ]] || return 1
+  out="$(AFLDB_PF_NOW=1000 AFLDB_PF_WINDOW_START=2000 AFLDB_PF_WINDOW_END=3000 afldb_pf_window_check)"
+  [[ "$out" == *'PREP approval window -- opens'* ]] || return 1
+  out="$(AFLDB_PF_NOW=1000 AFLDB_PF_WINDOW_START=500 AFLDB_PF_WINDOW_END=3000 afldb_pf_window_check)"
+  [[ "$out" == *'PASS approval window'* ]]
+}
+
+# --- AFLDB-ISSUE-339: the real generated payload, end to end, against a throwaway repository ---
+# SYNC_DEV_GENERATED_DIR holds gen-execute.sh and gen-assess.sh, written by
+#   tests/sync-dev-static.test.ps1 -ExportDir <dir>
+# Values are substituted line by line (AFLDB_PF_*=...), exactly as -Param values would be generated.
+E2E=''
+e2e_setup() {
+  E2E="$(mktemp -d)"
+  local stubs="$E2E/stubs"
+  mkdir -p "$stubs" "$E2E/evidence" "$E2E/backup"
+  (
+    unset -f git command 2>/dev/null
+    set -e
+    export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@e.invalid GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@e.invalid
+    export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.autocrlf GIT_CONFIG_VALUE_0=false
+    git init -q --bare -b main "$E2E/origin.git"
+    git init -q -b main "$E2E/seed"
+    cd "$E2E/seed"
+    mkdir -p src/db/migrations docs/rebuild-manifests/afltables_fitzroy_core
+    printf '.next/\n.env\n' > .gitignore
+    : > docs/rebuild-manifests/afltables_fitzroy_core/.gitkeep
+    printf 'create table a();\n' > src/db/migrations/001_a.sql
+    printf 'create table b();\n' > src/db/migrations/002_b.sql
+    git add . && git commit -qm A
+    printf 'create table c();\n' > src/db/migrations/003_c.sql
+    git add . && git commit -qm B
+    echo tip > tip.txt && git add . && git commit -qm C
+    git push -q "$E2E/origin.git" main
+    git clone -q "$E2E/origin.git" "$E2E/work"
+    cd "$E2E/work"
+    git switch -q --create dev-v2-main HEAD~2 && git branch -q --set-upstream-to=origin/main dev-v2-main
+    git switch -q main && git reset -q --hard HEAD~2 && git commit -q --allow-empty -m dev-only-main
+    git switch -q dev-v2-main
+    echo stash-me > stash.txt && git add stash.txt && git stash -q && test "$(git stash list | wc -l)" = 1
+    mkdir -p docs/rebuild-manifests/afltables_fitzroy_core .next/standalone/.next
+    echo '{}' > docs/rebuild-manifests/afltables_fitzroy_core/settle-2026-test.json
+    printf 'DATABASE_URL=x\nAFLDB_OWNER_DATABASE_URL=postgres://u:p@h/afldb_dev\n' > .env
+    echo OLDBUILD > .next/standalone/.next/BUILD_ID
+    tar -cf "$E2E/backup/app.tar" .next/standalone/.next/BUILD_ID
+    (cd "$E2E/backup" && sha256sum app.tar > SHA256SUMS-app)
+  )
+  local lf1 lf2 now
+  lf1="$(printf 'create table a();\n' | sha256sum | cut -d' ' -f1)"
+  lf2="$(printf 'create table b();\n' | sha256sum | cut -d' ' -f1)"
+  printf '001_a.sql %s\n002_b.sql %s\n' "$lf1" "$lf2" > "$E2E/ledger"
+  now="$(date +%s)"
+  echo dump > "$E2E/backup/db.dump"
+  (cd "$E2E/backup" && sha256sum db.dump > SHA256SUMS && echo 'pg_restore exit=0 seconds=1' > verify-restore.txt)
+  local stamp; stamp="$(date -u -d "@$((now - 3600))" +%Y-%m-%dT%H:%M:%SZ)"
+  printf '{"label":"live","database":"afldb_dev","readAt":"%s","ledger":{"n":2,"last":"002_b.sql"},"counts":{"t":1}}\n' "$stamp" > "$E2E/backup/live-counts.json"
+  printf '{"label":"restored","database":"afldb_v2_x_test","readAt":"%s","ledger":{"n":2,"last":"002_b.sql"},"counts":{"t":1}}\n' "$stamp" > "$E2E/backup/restored-counts.json"
+  sleep 600 & E2E_VICTIM=$!
+  echo "$E2E_VICTIM" > "$E2E/victim"
+  cat > "$stubs/hostname" <<'S'
+#!/usr/bin/env bash
+echo "${STUB_HOST:-streamanator}"
+S
+  cat > "$stubs/psql" <<'S'
+#!/usr/bin/env bash
+echo "psql $*" | sed 's#postgres://[^ ]*#<dsn>#' >> "$E2E/calls"
+for a in "$@"; do last="$a"; done
+case "$last" in
+  *current_database*) echo "${STUB_DB:-afldb_dev} arm" ;;
+  *schema_migrations*) cat "$E2E/ledger" ;;
+  *) exit 3 ;;
+esac
+S
+  cat > "$stubs/npm" <<'S'
+#!/usr/bin/env bash
+echo "npm $*" >> "$E2E/calls"
+case "$*" in
+  --version) echo 10.0.0 ;;
+  'run db:migrate')
+    have="$(wc -l < "$E2E/ledger")"
+    i=0
+    for f in $(ls src/db/migrations | LC_ALL=C sort); do
+      i=$((i + 1)); (( i <= have )) && continue
+      if [[ -n "${STUB_MIGRATE_BAD:-}" ]]; then sum=deadbeef; else sum="$(sha256sum < "src/db/migrations/$f" | cut -d' ' -f1)"; fi
+      echo "$f $sum" >> "$E2E/ledger"
+    done ;;
+  'run build') echo NEWBUILD > .next/standalone/.next/BUILD_ID ;;
+esac
+S
+  cat > "$stubs/systemctl" <<'S'
+#!/usr/bin/env bash
+echo "systemctl $*" >> "$E2E/calls"
+victim="$(cat "$E2E/victim")"
+case "$*" in
+  *'list-units'*) [[ -n "${STUB_RUNNING:-}" ]] && echo "$STUB_RUNNING loaded active running x" ;;
+  *ExecStart*) echo "{ path=$(command -v node) ; argv[]=node deploy/server-cluster.mjs ; }" ;;
+  *NextElapseUSecRealtime*) echo "${STUB_TIMER_NEXT:-}" ;;
+  *ExecMainStartTimestamp*) echo "${STUB_WRITER_START:-}" ;;
+  *'--property Restart '*) echo always ;;
+  *MainPID*) if kill -0 "$victim" 2>/dev/null; then echo "$victim"; else echo 4242; fi ;;
+  *ActiveState*) echo active ;;
+  *SubState*) echo running ;;
+  'is-active'*) echo active ;;
+esac
+exit 0
+S
+  cat > "$stubs/curl" <<'S'
+#!/usr/bin/env bash
+out=''; while (( $# )); do case "$1" in --output) out="$2"; shift ;; esac; shift; done
+printf '{"status":"ok","database":"ok"}' > "$out"; printf 200
+S
+  chmod +x "$stubs"/*
+}
+e2e_teardown() {
+  kill "$(cat "$E2E/victim")" 2>/dev/null || true
+  rm -rf -- "$E2E"; E2E=''
+}
+e2e_pin() { (unset -f git; git -C "$E2E/seed" rev-parse HEAD~1); }
+# e2e_run <gen file> [NAME=value ...]: run the generated payload with values substituted.
+e2e_run() {
+  local gen="$1" script="$E2E/run.sh" now kv name value
+  shift
+  now="$(date +%s)"
+  sed -e "s#/__PROJECT__#$E2E/work#g" "$gen" > "$script"
+  for kv in "AFLDB_PF_EXPECTED_REVISION=$(e2e_pin)" "AFLDB_PF_EXPECTED_ORIGIN=$E2E/origin.git" \
+            "AFLDB_PF_WINDOW_START=$((now - 600))" "AFLDB_PF_WINDOW_END=$((now + 3600))" \
+            'AFLDB_PF_ACCEPTANCE=ok:200' "AFLDB_PF_EVIDENCE_DIR=$E2E/evidence" "AFLDB_PF_BACKUP_DIR=$E2E/backup" \
+            "AFLDB_PF_ARTIFACT=$E2E/backup/app.tar" 'AFLDB_PF_MIN_FREE_GIB=0' 'AFLDB_PF_MIN_MEM_MIB=0' \
+            'AFLDB_PF_REQUIRED_CONFIG=DATABASE_URL AFLDB_OWNER_DATABASE_URL' 'AFLDB_PF_LEDGER_BEFORE=2' 'AFLDB_PF_LEDGER_AFTER=3' "$@"; do
+    name="${kv%%=*}"; value="${kv#*=}"
+    sed -i -e "s#^${name}=.*\$#${name}='${value}'#" "$script"
+  done
+  if ! grep -q '^MemAvailable:' /proc/meminfo 2>/dev/null; then
+    # Test-only: hosts without MemAvailable (MSYS) get a fixture; the deploy payload unsets this hook.
+    echo 'MemAvailable: 4194304 kB' > "$E2E/meminfo"
+    sed -i "s#^unset AFLDB_PF_NOW AFLDB_PF_MEMINFO\$#AFLDB_PF_MEMINFO='$E2E/meminfo'#" "$script"
+  fi
+  (unset -f git command 2>/dev/null; export E2E NVM_DIR="$E2E/no-nvm"; PATH="$E2E/stubs:$(e2e_node_dir):$PATH" bash "$script" > "$E2E/out" 2>&1)
+}
+# A Node >= 20 for the payload's floor check, with the payload's nvm step neutralised (NVM_DIR) so
+# the stubs stay first on PATH.
+e2e_node_dir() {
+  local d best=''
+  for d in "$(dirname "$(command -v node)")" "$HOME"/.nvm/versions/node/*/bin; do
+    if [[ -x "$d/node" ]] && "$d/node" -e 'process.exit(+process.versions.node.split(".")[0] >= 20 ? 0 : 1)' 2>/dev/null; then best="$d"; fi
+  done
+  printf '%s' "${best:-$(dirname "$(command -v node)")}"
+}
+e2e_head() { (unset -f git; git -C "$E2E/work" rev-parse HEAD); }
+e2e_untouched() {
+  # No checkout change, install, migration, build or restart.
+  local start; start="$(unset -f git; git -C "$E2E/work" rev-parse dev-v2-main@{upstream}~2)"
+  [[ "$(e2e_head)" == "$start" ]] && ! grep -q '^npm ci\|^npm run' "$E2E/calls" 2>/dev/null \
+    && kill -0 "$(cat "$E2E/victim")" 2>/dev/null && [[ "$(cat "$E2E/work/.next/standalone/.next/BUILD_ID")" == OLDBUILD ]] \
+    && [[ "$(wc -l < "$E2E/ledger")" == 2 ]]
+}
+e2e_case() { # name expected_rc expected_text [NAME=value ...]
+  local expected_rc="$1" text="$2" rc ok=1
+  shift 2
+  e2e_setup
+  e2e_run "$SYNC_DEV_GENERATED_DIR/gen-execute.sh" "$@"; rc=$?
+  if (( rc == expected_rc )) && grep -qF -- "$text" "$E2E/out" && e2e_untouched \
+      && grep -q "^RESULT exit=$expected_rc " "$E2E"/evidence/*.txt; then ok=0
+  else echo "    rc=$rc; blockers and tail:"; { grep -F "[preflight] FAIL" "$E2E/out"; tail -n 3 "$E2E/out"; } | sed 's/^/    /'; fi
+  e2e_teardown; return $ok
+}
+test_e2e_ready_pin_deploys_and_preserves() {
+  local rc ok=1 pin
+  e2e_setup; pin="$(e2e_pin)"
+  e2e_run "$SYNC_DEV_GENERATED_DIR/gen-execute.sh"; rc=$?
+  if (( rc == 0 )) && [[ "$(e2e_head)" == "$pin" ]] && grep -q '^npm ci' "$E2E/calls" \
+      && grep -q '^npm run build' "$E2E/calls" && [[ "$(wc -l < "$E2E/ledger")" == 3 ]] \
+      && ! kill -0 "$(cat "$E2E/victim")" 2>/dev/null \
+      && grep -q 'PASS post-migration parity' "$E2E/out" && grep -q 'PASS preserved state after deploy' "$E2E/out" \
+      && grep -q '1 commit(s) behind the published tip' "$E2E/out" && grep -q 'diverged from the target' "$E2E/out" \
+      && [[ "$(unset -f git; git -C "$E2E/work" stash list | wc -l)" == 1 ]] && grep -q '^RESULT exit=0 ' "$E2E"/evidence/*.txt \
+      && ! grep -q 'p@h' "$E2E"/evidence/*.txt "$E2E/out"; then ok=0
+  else echo "    rc=$rc; blockers and tail:"; { grep -F "[preflight] FAIL" "$E2E/out"; tail -n 3 "$E2E/out"; } | sed 's/^/    /'; fi
+  e2e_teardown; return $ok
+}
+test_e2e_wrong_host_blocks() { STUB_HOST=elsewhere e2e_case 40 "FAIL expected host -- on 'elsewhere'"; }
+test_e2e_branch_collision_blocks() {
+  local ok=1 rc
+  e2e_setup
+  (unset -f git; git -C "$E2E/work" branch -q dev)
+  e2e_run "$SYNC_DEV_GENERATED_DIR/gen-execute.sh" AFLDB_PF_TARGET_BRANCH=dev/v2-main AFLDB_PF_EXPECTED_BRANCH=dev/v2-main; rc=$?
+  (( rc == 40 )) && grep -q "FAIL branch namespace -- 'dev/v2-main' collides with existing branch(es) dev" "$E2E/out" && e2e_untouched && ok=0
+  e2e_teardown; return $ok
+}
+test_e2e_unapproved_migration_blocks() { e2e_case 40 'unapproved pending: 003_c.sql' AFLDB_PF_LEDGER_BEFORE= AFLDB_PF_LEDGER_AFTER=; }
+test_e2e_wrong_transition_blocks() { e2e_case 40 'approval expects 117 before' AFLDB_PF_LEDGER_BEFORE=117 AFLDB_PF_LEDGER_AFTER=118; }
+test_e2e_wrong_database_blocks() { STUB_DB=afldb_prod e2e_case 40 "connected to 'afldb_prod', expected 'afldb_dev'"; }
+test_e2e_stale_backup_blocks() { STUB_WRITER_START="@$(date +%s)" e2e_case 40 'started after the backup was read'; }
+test_e2e_unpublished_pin_blocks() { e2e_case 40 'is not a commit here after the fetch' AFLDB_PF_EXPECTED_REVISION=0123456789abcdef0123456789abcdef01234567; }
+test_e2e_running_job_blocks() { STUB_RUNNING=afldb-settle-afl-api.service e2e_case 40 'afldb-settle-afl-api.service is running'; }
+test_e2e_missing_preparation_stops_execute() { e2e_case 41 'PREP verified database backup' AFLDB_PF_BACKUP_DIR= AFLDB_PF_ACCEPTANCE=fail:ConnectFailure; }
+test_e2e_parity_failure_stops_before_build() {
+  local rc ok=1
+  e2e_setup
+  STUB_MIGRATE_BAD=1 e2e_run "$SYNC_DEV_GENERATED_DIR/gen-execute.sh"; rc=$?
+  (( rc == 44 )) && grep -q 'FAIL post-migration parity' "$E2E/out" && ! grep -q '^npm run build' "$E2E/calls" \
+    && kill -0 "$(cat "$E2E/victim")" 2>/dev/null && grep -q '^RESULT exit=44 ' "$E2E"/evidence/*.txt && ok=0
+  e2e_teardown; return $ok
+}
+test_e2e_assessment_reports_all_and_changes_nothing() {
+  local rc ok=1
+  e2e_setup
+  e2e_run "$SYNC_DEV_GENERATED_DIR/gen-assess.sh" AFLDB_PF_BACKUP_DIR= AFLDB_PF_ARTIFACT= AFLDB_PF_LEDGER_BEFORE= AFLDB_PF_LEDGER_AFTER=; rc=$?
+  (( rc == 40 )) && grep -q 'unapproved pending' "$E2E/out" && grep -q 'PREP verified database backup' "$E2E/out" \
+    && grep -q 'PREP recoverable application artifact' "$E2E/out" && e2e_untouched && ok=0
+  e2e_teardown; return $ok
+}
+test_e2e_exit_status_survives_a_logging_pipeline() {
+  local rc ok=1
+  e2e_setup
+  sed -e "s#/__PROJECT__#$E2E/work#g" -e "s#^AFLDB_PF_EVIDENCE_DIR=.*#AFLDB_PF_EVIDENCE_DIR='$E2E/evidence'#" \
+    "$SYNC_DEV_GENERATED_DIR/gen-execute.sh" > "$E2E/run.sh"
+  (unset -f git command 2>/dev/null; export E2E NVM_DIR="$E2E/no-nvm"; PATH="$E2E/stubs:$(e2e_node_dir):$PATH" bash "$E2E/run.sh" 2>&1 | tee "$E2E/log" >/dev/null; exit "${PIPESTATUS[0]}"); rc=$?
+  (( rc == 40 )) && grep -q 'gate result -- BLOCKED' "$E2E/log" && e2e_untouched && ok=0
+  e2e_teardown; return $ok
+}
+
+run_test 'gate: branch namespace collision dev vs dev/v2-main' test_gate_branch_collision_dev_vs_dev_slash
+run_test 'gate: ledger accepts CRLF checksum, refuses drift and reordering' test_gate_ledger_accepts_crlf_checksum_and_refuses_drift
+run_test 'gate: .env presence by name never prints values' test_gate_env_presence_never_prints_values
+run_test 'gate: approval window missing/expired/too long/future/open' test_gate_window_states
+if [[ -n "${SYNC_DEV_GENERATED_DIR:-}" && -f "$SYNC_DEV_GENERATED_DIR/gen-execute.sh" && -f "$SYNC_DEV_GENERATED_DIR/gen-assess.sh" ]]; then
+  run_test 'e2e: READY pin behind tip deploys, migrates exactly, preserves main/stash' test_e2e_ready_pin_deploys_and_preserves
+  run_test 'e2e: wrong host blocks before any change' test_e2e_wrong_host_blocks
+  run_test 'e2e: branch namespace collision blocks before any change' test_e2e_branch_collision_blocks
+  run_test 'e2e: unapproved pending migration blocks' test_e2e_unapproved_migration_blocks
+  run_test 'e2e: approved transition mismatch blocks' test_e2e_wrong_transition_blocks
+  run_test 'e2e: wrong database blocks' test_e2e_wrong_database_blocks
+  run_test 'e2e: stale backup (writer ran after it) blocks' test_e2e_stale_backup_blocks
+  run_test 'e2e: unpublished/absent pin blocks' test_e2e_unpublished_pin_blocks
+  run_test 'e2e: running afldb job blocks' test_e2e_running_job_blocks
+  run_test 'e2e: missing preparation (41) stops execute' test_e2e_missing_preparation_stops_execute
+  run_test 'e2e: post-migration parity failure stops before build/restart' test_e2e_parity_failure_stops_before_build
+  run_test 'e2e: assessment reports every blocker and changes nothing' test_e2e_assessment_reports_all_and_changes_nothing
+  run_test 'e2e: exit status survives a tee logging pipeline' test_e2e_exit_status_survives_a_logging_pipeline
+else
+  echo 'NOT RUN: e2e generated-payload cases (set SYNC_DEV_GENERATED_DIR; see tests/sync-dev-static.test.ps1 -ExportDir)'
+fi
+
 echo "$passed passed, $failed failed"
 (( failed == 0 ))
