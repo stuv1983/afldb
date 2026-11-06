@@ -1,0 +1,27 @@
+-- schema step rehearsed on the backup copy
+  PENDING  111_curated_award_proposals.sql
+  PENDING  112_derived_award_results.sql
+  PENDING  113_brownlow_eligibility_decisions.sql
+  PENDING  114_award_projections_and_curated_revisions.sql
+  PENDING  115_adjudication_supersession_fk_index.sql
+  PENDING  116_brownlow_correction_receipts.sql
+  PENDING  117_brownlow_provider_eligibility_unknown.sql
+  PENDING  118_fixtures_unconfirmed_participants.sql
+
+8 pending.
+AFLDB migrations -> test (afldb_owner@127.0.0.1:55499/afldb_v2_devbk20261106210008_test)
+  118 migration file(s), 110 already applied
+
+  applying 111_curated_award_proposals.sql ... ok (59 ms)
+  applying 112_derived_award_results.sql ... ok (31 ms)
+  applying 113_brownlow_eligibility_decisions.sql ... ok (32 ms)
+  applying 114_award_projections_and_curated_revisions.sql ... ok (31 ms)
+  applying 115_adjudication_supersession_fk_index.sql ... ok (7 ms)
+  applying 116_brownlow_correction_receipts.sql ... ok (16 ms)
+  applying 117_brownlow_provider_eligibility_unknown.sql ... ok (4 ms)
+  applying 118_fixtures_unconfirmed_participants.sql ... ok (9 ms)
+
+Applied 8 migration(s).
+privileges rc=0
+Nothing to apply — schema is up to date.
+after migrate: ledger 118 118_fixtures_unconfirmed_participants.sql

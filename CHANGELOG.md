@@ -30,6 +30,21 @@ commit.
 - `git checkout` DWIM and `git pull` are no longer used. The payload is gzip-compressed.
 - New gate parameters: `-ExpectedBranch`, `-ExpectedLedgerBefore/-After`, `-ApprovalWindowStart/-End`, `-BackupDir` and `-ArtifactArchive`. A pinned deploy must name `-ExpectedBranch`.
 
+### ISSUE-336 and ISSUE-337 deployed to DEV (2026-11-07; DEV only, production unchanged)
+
+- DEV moved from its DEV-only `242fa276` onto the published V2 line at exactly `8b024098` (`origin/main` `7fabc6e5`). It is on branch
+  `dev-v2-main`, and local `main` is kept.
+- **Schema:** migrations 111–118 were applied to `afldb_dev` after a fresh backup, which was verified by restoring it on an isolated cluster.
+- **Build:** `AlYJjIargpO5esTkTX_zq`, started by the sudo-free respawn.
+- **Behaviour now on DEV:**
+  - the draft pages separate National, Rookie and other categories (ISSUE-336);
+  - the draft name search matches across U+00A0 (ISSUE-337, resolved DEV-scoped);
+  - the timers now run the V2 scripts: the nightly acquires the 2027 feed and refuses sealed 2026;
+  - the DEV-only behaviours listed in the procedure's §4 stop.
+- **Acceptance:** the immediate checks passed, including an authenticated browser run at 76/76. The overnight nightly is pending observation.
+- Record: `docs/v2/evidence/issue336-draft-categories-20261105/dev-deploy-20261106/README.md`. The production release and the 35-row
+  insert are separate.
+
 ### `sync-dev -RestartMethod respawn`: a sudo-free DEV restart (2026-11-06; local, not pushed; workstation deploy tooling only)
 
 - **`deploy/sync-dev.ps1 -RestartMethod respawn`:** the restart step sends SIGTERM to the unit's MainPID and requires systemd

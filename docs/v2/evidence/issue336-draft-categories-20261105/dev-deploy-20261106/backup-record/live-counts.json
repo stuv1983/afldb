@@ -1,0 +1,29 @@
+{
+ "label": "live",
+ "database": "afldb_dev",
+ "readAt": "2026-11-07 08:00:20.510012+11",
+ "ledger": {
+  "n": 110,
+  "last": "110_match_sheet_player_match_stats_authority.sql"
+ },
+ "counts": {
+  "players": "13365",
+  "matches": "17056",
+  "player_match_stats": "695499",
+  "match_period_scores": "136448",
+  "draft_picks": "6810",
+  "draft_persons": "5057",
+  "data_overrides": "120",
+  "data_edits": "4",
+  "import_batches": "79",
+  "site_settings": "17",
+  "auth_users": "4",
+  "venues": "52",
+  "venue_name_spans": null,
+  "fixtures": "3",
+  "brownlow_round_votes": "330383",
+  "award_winners": "3712",
+  "staging.afl_api_match": "0",
+  "staging.afl_api_brownlow_vote": "0"
+ }
+}

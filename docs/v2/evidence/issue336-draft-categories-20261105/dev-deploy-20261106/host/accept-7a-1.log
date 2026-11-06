@@ -1,0 +1,44 @@
+now 2026-11-07 08:10:22 AEDT
+== 1 identity
+PASS HEAD = 8b024098a6771fc5e5be2f8bf006c9c3ca8ab55a
+FAIL branch: got [dev-v2-main] want [dev/v2-main]
+PASS main = 242fa276b7b0fcb2613918984e82791faa1143d6
+PASS stashes = 2
+PASS untracked = 10
+PASS .env sha256 = 81dc3f695a86597d90a21a7421206903a4d38336863602cfa3ccd110fc62a2e2
+PASS standalone BUILD_ID = AlYJjIargpO5esTkTX_zq
+PASS live x-afldb-build = AlYJjIargpO5esTkTX_zq
+PASS new build AlYJjIargpO5esTkTX_zq differs from 8sFp…
+== 2 schema
+PASS ledger = 118 118_fixtures_unconfirmed_participants.sql
+  migrate:   118 migration file(s), 118 already applied
+  migrate: 
+  migrate: Nothing to apply — schema is up to date.
+PASS db:migrate nothing to apply
+== 3 health
+PASS afldb active = active
+PASS MainPID 1246449 differs from 1677
+  health: {"status":"ok","database":"ok","latencyMs":35} 200
+PASS health 200 database ok
+== 4 workers
+PASS children of MainPID = 4
+  x-afldb-worker over 40 requests:  10 1; 10 2; 10 3; 10 4;
+PASS distinct workers = 1 2 3 4 
+== 7 timers
+PASS timers enabled = enabled enabled 
+PASS timers active = active active 
+NEXT                             LEFT LAST                               PASSED UNIT                                ACTIVATES
+Sat 2026-11-07 08:15:00 AEDT 4min 34s Sat 2026-11-07 08:10:00 AEDT      25s ago afldb-settle-afl-api-brownlow.timer afldb-settle-afl-api-brownlow.service
+Sun 2026-11-08 05:08:36 AEDT      20h Sat 2026-11-07 05:13:01 AEDT 2h 57min ago afldb-settle-afl-api.timer          afldb-settle-afl-api.service
+unit definitions sha256 (compare with step 1):
+  afldb.service e2006bfb44343b5c
+  afldb-settle-afl-api.service 718d7ce000552de0
+  afldb-settle-afl-api.timer de91f69c52e47a50
+  afldb-settle-afl-api-brownlow.service e1f5aaaa293fdb3a
+  afldb-settle-afl-api-brownlow.timer d8674b4fc85d49a4
+-- Brownlow firings since step 6 (2026-11-07 08:05:22):
+2026-11-07T08:10:00+11:00 streamanator systemd[1]: Starting afldb-settle-afl-api-brownlow.service - AFLDB — AFL.com.au (afl_api) Brownlow live-count settle (one run)...
+2026-11-07T08:10:00+11:00 streamanator afldb-settle-afl-api-brownlow[1246338]: AFLDB_AFL_API_BROWNLOW_ENABLED is not 'true' — Brownlow settle is disabled outside the live count window (§10). Nothin
+2026-11-07T08:10:00+11:00 streamanator systemd[1]: afldb-settle-afl-api-brownlow.service: Deactivated successfully.
+2026-11-07T08:10:00+11:00 streamanator systemd[1]: Finished afldb-settle-afl-api-brownlow.service - AFLDB — AFL.com.au (afl_api) Brownlow live-count settle (one run).
+DEV-SIDE FAILURES: 1

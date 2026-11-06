@@ -1,6 +1,17 @@
 # AFLDB-ISSUE-336: DEV deployment recommendation (consolidated, pinned)
 
-Prepared 2026-11-06; **revised 2026-11-06 (r2)**. **Nothing here has been run against DEV.**
+Prepared 2026-11-06; **revised 2026-11-06 (r2)**.
+
+**Executed 2026-11-07; immediate acceptance (§7.1) PASS; §7.2 overnight observation PENDING (Sun 2026-11-08 05:08:36 AEDT).**
+* A1 published on 2026-11-06. A2–A4 were re-approved for 2026-11-07 after the first window passed unused.
+* **One owner-approved deviation:** step 3 stopped because DEV's local branch `dev` makes `refs/heads/dev/v2-main` impossible. The
+  branch is **`dev-v2-main`**, and both sync-dev runs used `-RemoteRef dev-v2-main`. Read `dev/v2-main` below as `dev-v2-main` for this
+  DEV.
+* Authenticated acceptance used the owner's headed sign-in (DEV's normal address, beta gate on), not a `BETA_COOKIE` tunnel.
+* R1 was not needed.
+* Record: `docs/v2/evidence/issue336-draft-categories-20261105/dev-deploy-20261106/README.md`.
+
+The text below is the r2 procedure as approved. The track table's "not pushed" and "Not done" describe the state before execution.
 
 This is the single procedure for moving DEV (`streamanator`, `~/projects/afldb`, `afldb_dev`) from its DEV-only `242fa276` onto the
 published V2 line at an exact commit. It supersedes the earlier outline in

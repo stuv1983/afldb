@@ -1,0 +1,8 @@
+2026-11-07T08:15:02+11:00 streamanator systemd[1]: Starting afldb-settle-afl-api-brownlow.service - AFLDB — AFL.com.au (afl_api) Brownlow live-count settle (one run)...
+2026-11-07T08:15:02+11:00 streamanator afldb-settle-afl-api-brownlow[1251278]: AFLDB_AFL_API_BROWNLOW_ENABLED is not 'true' — Brownlow settle is disabled outside the live count window (§10). Nothing to do.
+2026-11-07T08:15:02+11:00 streamanator systemd[1]: afldb-settle-afl-api-brownlow.service: Deactivated successfully.
+2026-11-07T08:15:02+11:00 streamanator systemd[1]: Finished afldb-settle-afl-api-brownlow.service - AFLDB — AFL.com.au (afl_api) Brownlow live-count settle (one run).
+Result=success
+ExecMainStatus=0
+
+[exited with code 0]

@@ -18,8 +18,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
 | AFLDB-ISSUE-332 | AFL API 2027 season operations (successor of ISSUE-316) | Medium | Data acquisition operations, 2027 season | Open, opened 2026-11-02 (owner decisions recorded 2026-11-04). Carries C6 debutant routine, C7 first-concluded-round acceptance, C8 Brownlow 2027, C9 ownership baseline and the D-316 seasonal items, each with its own gate. **Decided 2026-11-04:** D-316-5, -8, -9 and -10 accepted; C7 criteria 1 to 7 approved and criterion 8 replaced; the future opening of the Brownlow successor in June 2027 (D-316-7, action only) approved. **Undecided or future:** C9 (until its June gate; Option C a recommendation only), the Brownlow substantive decision and count window, and the C7 acceptance (the owner's act after the first concluded round); no acceptance, probe or cookie is authorised now; D-316-11 not pursued. The C7 read-only observer is implemented and Linux-qualified, and was run once against production on 2026-11-04 (read-only baseline: `NO_CONCLUDED_MATCHES`, exit 10; not an acceptance, no PASS exists). | Dated obligations: D-316-5 and D-316-9 reviews after round 2; the owner's C7 acceptance after the first concluded round (March 2027); June 2027 open the Brownlow successor and choose the C9 option (by 2027-06-30); Brownlow substantive decision before 2027-09-01; C9 delivered before the rollover (about October 2027). See `docs/v2/afl-api-2027-season-operations-successor-2026-11-02.md` section 9. |
-| AFLDB-ISSUE-336 | Draft pages merge National, Rookie and other categories; 35 DraftGuru Pre-Draft rows missing | Medium | Public draft pages, player draft history, DraftGuru data | Open, opened 2026-11-05. Code on `origin/main` `ea9bddf8`; preview-verified on an isolated restore of DEV data (2026-11-06); **not deployed** (DEV diverged: 18 DEV-only commits, migrations 111–118 pending). D-336-1 accepted; 35-row production insert prepared and rehearsed, not run. Pinned DEV procedure prepared (2026-11-06): candidate `8b024098` verified in isolation (backup rehearsed, rollback proven); not run. Procedure corrected (r2): sudo-free respawn restart (tooling `b82dfcea`), corrected 2027 nightly account, artifact restore without rebuild, immediate vs pending-overnight acceptance. | Owner approvals A1–A4 in `issues/open/AFLDB-ISSUE-336-DEV-DEPLOYMENT.md` r2 (publish, DEV-only behaviour, timer consequence, DEV deploy); production application release; D-336-2 execution approval; D-336-3. |
-| AFLDB-ISSUE-337 | Draft-page name search misses unlinked picks whose stored raw name uses U+00A0 | Low | Public draft pages (`/draft/[year]?q=`) | Open, opened 2026-11-06. **Fixed locally** in `8b024098` (not pushed); verified on the isolated DEV-data preview (unit RED/GREEN, integration, browser 76/76); **not deployed**. | Deploy with ISSUE-336's pinned DEV procedure; resolve after DEV acceptance (Jake Long found for ordinary-space, NBSP and lower-case queries). |
+| AFLDB-ISSUE-336 | Draft pages merge National, Rookie and other categories; 35 DraftGuru Pre-Draft rows missing | Medium | Public draft pages, player draft history, DraftGuru data | Open, opened 2026-11-05. Code on `origin/main` `ea9bddf8`; preview-verified on an isolated restore of DEV data (2026-11-06); **not deployed** (DEV diverged: 18 DEV-only commits, migrations 111–118 pending). D-336-1 accepted; 35-row production insert prepared and rehearsed, not run. Pinned DEV procedure prepared (2026-11-06): candidate `8b024098` verified in isolation (backup rehearsed, rollback proven); not run. Procedure corrected (r2). Published `7fabc6e5` (2026-11-06). **Deployed to DEV 2026-11-07** (pin `8b024098`, branch `dev-v2-main`, ledger 118, build `AlYJjIargpO5esTkTX_zq`); **immediate acceptance PASS** (authenticated browser 76/76). Overnight nightly observation **pending** (2026-11-08 05:08 AEDT). | Observe the 2026-11-08 nightly read-only (§7.2); production application release; D-336-2 execution approval; D-336-3. |
 | AFLDB-ISSUE-338 | DraftGuru operator-review contract's byte-identical rerun check is time-dependent | Low | Test tooling (`tests/python/draftguru_bridge_operator_review_contract.py`, via `tests/draftguru-acquisition.test.ts`) | Open, opened 2026-11-06. Observed once at `8b024098`; 0 of 5 reruns failed. Not fixed. | Make the rerun check independent of `review_completed_utc` (inject or freeze the clock, or compare with that field excluded). |
 | AFLDB-ISSUE-339 | DEV deployment (`sync-dev.ps1`) ran checkout, install, migration, build and restart with no enforced preflight | Medium | Deployment tooling (`deploy/sync-dev.ps1`, `deploy/sync-dev-remote.sh`) | Open, opened 2026-11-07. Host-side deploy gate implemented on local branch `claude/issue-339-deploy-preflight` (unpushed); Linux 43/43; real DEV assessment correctly BLOCKED on stale backup/artifact; nothing deployed. | Owner review, push and merge; decide the standalone `db:migrate` and `preflight --mode deploy` gaps. |
 
@@ -53915,17 +53914,34 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
     - **Production's Brownlow timer is disabled**; DEV's is enabled but exits before Node.
   - **Recovery:** step 2b preserves DEV's artifact (`.next/BUILD_ID` and `.next/standalone`, 907 MB, 0 `.env` entries). It was served without `npm ci` or a build by `242fa276`'s `server-cluster.mjs`: 4 workers, BUILD_ID `8sFpWkolwF1yKuKbFkOir`, 36 routes identical. R1 = switch to main, restore the archive, respawn, then `npm ci` before the next nightly. The schema stays at 118. Migration reversal, ledger removal and whole-database restore are separate owner decisions.
   - **Acceptance:** split into immediate checks (identity, health, 4-worker runtime, authenticated browser 76/76, smoke, timer state) and the next nightly, which stays **pending observation**: not triggered manually, and its success not claimed in advance.
-- **Next action:** owner approvals A1–A4 in `issues/open/AFLDB-ISSUE-336-DEV-DEPLOYMENT.md` (r2):
-  - publish the branch head (app pin `8b024098`, tooling `b82dfcea`);
-  - acknowledge the DEV-only behaviour;
-  - accept the A3 timer consequence;
-  - the DEV deployment in a bounded 2-hour window.
+- **Published (A1, 2026-11-06):** `origin/main` `ea9bddf8` → `7fabc6e5`, fast-forward; the remote was checked before and after.
+- **DEPLOYED TO DEV, immediate acceptance PASS (2026-11-07):** approved A2–A4 for 2026-11-07, 08:00–18:00 AEDT. The 2026-11-06 window passed unused: no one signed in, then the workstation VPN blocked DEV. Record: `docs/v2/evidence/issue336-draft-categories-20261105/dev-deploy-20261106/README.md`.
+  - **Before (08:00):** quiescent; DEV exactly as the procedure expects.
+  - **Backup:** a fresh one after that morning's nightly (batch 146), restored to `BACKUP-VERIFIED` on the isolated cluster and copied off-host with checksums OK. The artifact archive is preserved (877 MB, 0 `.env` entries).
+  - **Deviation (owner-approved at the stop):** step 3 stopped because DEV's existing local branch `dev` blocks `dev/v2-main`. The branch is **`dev-v2-main`**; nothing else changed.
+  - **Step 4:** fast-forwarded to exactly `8b024098`; migrations 111–118 applied (ledger 110 → 118).
+  - **Step 5:** `db:privileges` rc 0.
+  - **Step 6:** built `AlYJjIargpO5esTkTX_zq`; sudo-free respawn 1677 → 1246449; ISSUE-107 gate 4 workers and pool 10; healthy after 2 s.
+  - **7a (by 08:15, inside the 2-hour limit):** all pass.
+    - Identity: `main` still `242fa276`, 2 stashes, 10 untracked, `.env` unchanged.
+    - Schema: ledger 118, migrate reports "Nothing to apply".
+    - Health 200; 4 workers, 40 requests spread 10 each over workers 1–4.
+    - Authenticated headed browser 76/76 through DEV's normal address, beta gate on: the owner signed in, and no cookie file or minted credential was used.
+    - Smoke statuses identical to the qualified preview.
+    - Timers enabled and active, unit definitions byte-identical, the 08:15 Brownlow firing "Nothing to do" rc 0.
+  - R1 not needed. No sudo, timer, unit or `.env` change, manual job trigger, provider request, production operation or cleanup.
+  - **§7.2 overnight observation PENDING:** next nightly Sun 2026-11-08 05:08:36 AEDT. Read-only observation is authorised after it runs.
+- **Next action:**
+  - observe the 2026-11-08 nightly read-only, per the procedure's §7.2;
+  - then the production application release;
+  - production data per the runbook (D-336-2 execution approval);
+  - D-336-3 stays open.
 
-  Then the production application release; production data per the runbook (D-336-2 execution approval); D-336-3 open.
+  DEV acceptance does not authorise the production release or the 35-row insert.
 
 ## AFLDB-ISSUE-337 — Draft-page name search misses unlinked picks whose stored raw name uses U+00A0
 
-- **Status:** Open (opened 2026-11-06). **Fixed locally 2026-11-06** in commit `8b024098` (not pushed); verified on the isolated DEV-data preview; **not deployed**. Stays open until DEV acceptance.
+- **Status:** **Resolved 2026-11-07 (DEV-scoped).** Fixed in `8b024098`, published in `origin/main` `7fabc6e5` on 2026-11-06, and deployed to DEV with ISSUE-336's pinned procedure and accepted there on 2026-11-07. **Production installation and acceptance are pending** with ISSUE-336's production application release, which stays a separate owner approval. Opened 2026-11-06.
 - **Severity / area:** Low; public draft pages (`/draft/[year]?q=…`).
 - **Source:** found by the ISSUE-336 isolated preview on a restore of DEV data (`docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/`). Duplicate check: `issues.md` U+00A0 entries concern `draft_persons` name matching (ISSUE-164, migration 099), not this search.
 - **Evidence:** `/draft/2014?view=rookie&q=Jake+Long` returns the empty state, while `q=Jake` and `q=Long` both return the row "Pick 47 — Father–Son" and the 2014 Father–Son view lists it. The rendered raw name is `Jake` U+00A0 `Long` (bytes `c2 a0`); the pick is not linked to a player on DEV. On production data the same search succeeds through the linked player's `display_name`.
@@ -53945,7 +53961,11 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   - HTTP: `q=Jake+Long` gives 0 → 2 rows.
   - Browser, desktop and mobile: 76/76 at the candidate; at `ea9bddf8` exactly the ordinary-space and lower-case checks fail (72/76).
   - Evidence: `docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/` §2.
-- **Next action:** deploy with ISSUE-336's pinned DEV procedure (`issues/open/AFLDB-ISSUE-336-DEV-DEPLOYMENT.md`). Resolve once DEV acceptance shows the three Jake Long queries found. Production then follows with the ISSUE-336 application release.
+- **DEV acceptance (2026-11-07):** live DEV build `AlYJjIargpO5esTkTX_zq` at `8b024098`, beta gate on, owner-authenticated headed browser.
+  - `accept-1` passed 76/76. That includes, on desktop and mobile, `/draft/2014?view=rookie` finding Rookie Pick 47 — Father–Son "Jake Long" for `q=Jake+Long`, `q=Jake%C2%A0Long` and the lower-case query.
+  - HTTP smoke: `jake_rows=2` and `empty_state=0` for all three Jake Long URLs.
+  - Record: `docs/v2/evidence/issue336-draft-categories-20261105/dev-deploy-20261106/README.md` §2.
+- **Follow-up:** production gets the fix only with ISSUE-336's production application release. Until then, production's 1,597 unlinked U+00A0 picks remain affected.
 
 ## AFLDB-ISSUE-338 — DraftGuru operator-review contract's byte-identical rerun check is time-dependent
 

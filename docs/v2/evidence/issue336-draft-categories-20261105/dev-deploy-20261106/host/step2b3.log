@@ -1,0 +1,16 @@
+D=/mnt/ssd/afldb/backups/dev-pre-v2-20261106T210008Z
+start 2026-11-07 08:00:49 AEDT
+dev-app-8sFpWkolwF1yKuKbFkOir.tar: OK
+archive BUILD_IDs 8sFpWkolwF1yKuKbFkOir / 8sFpWkolwF1yKuKbFkOir; .env entries 0; entries 21058; size 877M
+d3a36193cefc6c5bd869900ac43e96c40afa3ec76506e77f75e6e9cf797f0639  dev-app-8sFpWkolwF1yKuKbFkOir.tar
+STEP2B-OK
+-- step 3
+From github.com-afldb-deploy:stuv1983/afldb
+   ff100dc2..7fabc6e5  main                   -> origin/main
+ * [new branch]        claude/issue-336-draft-categories -> origin/claude/issue-336-draft-categories
+ * [new branch]        codex/issue329-release -> origin/codex/issue329-release
+ * [new branch]        v2/rebuild             -> origin/v2/rebuild
+published
+origin/main 7fabc6e51c5c53c4b6f6fe345f21191d9184660b
+fatal: cannot lock ref 'refs/heads/dev/v2-main': 'refs/heads/dev' exists; cannot create 'refs/heads/dev/v2-main'
+STOP-step3-branch

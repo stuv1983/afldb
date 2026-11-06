@@ -71,4 +71,12 @@ approval.** Production application release and the I336 data step are unaffected
 
   Evidence: `docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/`.
 * Its backup has been rehearsed to `BACKUP-VERIFIED`, and rollback to `242fa276` has been proven on the 118 schema.
-* Owner approvals A1–A4 are listed there. Nothing has been run on DEV.
+* Owner approvals A1–A4 are listed there.
+
+**Deployed to DEV on 2026-11-07, immediate acceptance PASS.**
+* DEV runs pin `8b024098` on branch `dev-v2-main`, with ledger 118 and build `AlYJjIargpO5esTkTX_zq`.
+* The authenticated browser check passed 76/76, and the timers are unchanged.
+* The 2026-11-08 nightly is pending observation.
+* Record: `docs/v2/evidence/issue336-draft-categories-20261105/dev-deploy-20261106/README.md`.
+
+This does not change sections 0–4. The production application release and stage I336 still need their own approvals.

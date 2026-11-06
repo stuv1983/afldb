@@ -1,0 +1,30 @@
+now 2026-11-07 08:00:02 AEDT
+step0 services: inactive inactive 
+HEAD 242fa276b7b0fcb2613918984e82791faa1143d6
+branch main
+stashes 2
+untracked/changed 10
+.env sha256 81dc3f695a86597d90a21a7421206903a4d38336863602cfa3ccd110fc62a2e2
+BUILD_ID 8sFpWkolwF1yKuKbFkOir / standalone 8sFpWkolwF1yKuKbFkOir
+MainPID 1677 children 4
+timers enabled: enabled enabled  active: active active 
+NEXT                             LEFT LAST                               PASSED UNIT                                ACTIVATES
+Sat 2026-11-07 08:05:00 AEDT 4min 57s Sat 2026-11-07 08:00:01 AEDT       1s ago afldb-settle-afl-api-brownlow.timer afldb-settle-afl-api-brownlow.service
+Sun 2026-11-08 05:08:36 AEDT      21h Sat 2026-11-07 05:13:01 AEDT 2h 47min ago afldb-settle-afl-api.timer          afldb-settle-afl-api.service
+unit definitions sha256 (systemctl cat):
+  afldb.service e2006bfb44343b5c
+  afldb-settle-afl-api.service 718d7ce000552de0
+  afldb-settle-afl-api.timer de91f69c52e47a50
+  afldb-settle-afl-api-brownlow.service e1f5aaaa293fdb3a
+  afldb-settle-afl-api-brownlow.timer d8674b4fc85d49a4
+?? .env.bak-issue272-u1b-20261010-191158
+?? docs/rebuild-manifests/afltables_fitzroy_core/settle-2026-2026-09-15-2201.json
+?? docs/rebuild-manifests/afltables_fitzroy_core/settle-2026-2026-09-15-2203.json
+?? docs/rebuild-manifests/afltables_fitzroy_core/settle-2026-2026-09-22-0444.json
+?? docs/rebuild-manifests/afltables_fitzroy_core/settle-2026-2026-09-26-0941.json
+?? docs/rebuild-manifests/afltables_fitzroy_core/settle-2026-2026-10-01-1936.json
+?? docs/rebuild-manifests/afltables_fitzroy_core/settle-2026-2026-10-03-2019.json
+?? docs/rebuild-manifests/afltables_fitzroy_core/settle-2026-2026-10-03-2044.json
+?? docs/rebuild-manifests/afltables_fitzroy_core/settle-2026-2026-10-03-2047.json
+?? docs/rebuild-manifests/afltables_fitzroy_core/settle-2026-2026-10-06-1334.json
+STEP01-OK

@@ -1,0 +1,7 @@
+{"role":"afldb_backup","database":"afldb_dev","host":"loopback","exit":0,"seconds":12,"stderr":[]}
+; Archive created at 2026-11-07 08:00:08 AEDT
+ledger 110 110_match_sheet_player_match_stats_authority.sql
+c783b58e28204bfee1fa7fafb20016d26a26d2a5b8f3802dc90f55ddd11c8030  afldb_dev-20261106T210008Z.dump
+eab9058997453b6782efd7ded299a89550a6f93b0c47c815c872d5f8a3ce832e  live-counts.json
+def537dca824b4067e4aec296e5a90c662268c083da441c22d1653c1572025a5  dump.json
+BACKUP-DUMPED

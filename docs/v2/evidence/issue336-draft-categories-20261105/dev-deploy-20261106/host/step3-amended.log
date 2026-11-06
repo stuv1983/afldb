@@ -1,0 +1,8 @@
+now 2026-11-07 08:03:13 AEDT
+published
+branch 'dev-v2-main' set up to track 'origin/main'.
+  dev         26775e8d [origin/dev] Close Fable NL code review with clean V6 corpus
+  dev-v2-main 8b024098 [origin/main: behind 3] fix(ISSUE-337): draft name search across U+00A0; feat(ISSUE-336): pinned 
+* main        242fa276 [origin/main: ahead 18, behind 367] docs(issue-327): record DEV apply of the 17-row venue-span pl
+HEAD still 242fa276 on main
+STEP3-OK
