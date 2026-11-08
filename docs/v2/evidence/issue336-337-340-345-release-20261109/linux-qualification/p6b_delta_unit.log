@@ -1,0 +1,9 @@
+ ❯ tests/draftguru-acquisition.test.ts (167 tests | 2 failed | 2 skipped) 19155ms
+     × rebuilds byte-identically from the accepted Stage A snapshot 27ms
+     × is the frozen 120 / 8 / 68 / 30 / 14 contract over the accepted Stage A label 2ms
+ ✓ tests/v2-season-seal.test.ts (62 tests) 345ms
+ ✓ tests/gap029-ops.test.ts (76 tests) 175ms
+ ✓ tests/gap029-assembly.test.ts (34 tests) 132ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  1 failed | 3 passed (4)
+      Tests  2 failed | 335 passed | 2 skipped (339)

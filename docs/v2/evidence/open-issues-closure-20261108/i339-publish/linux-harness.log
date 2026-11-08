@@ -1,0 +1,71 @@
+PASS: clean tree continues
+PASS: tracked modification blocks
+PASS: staged and renamed changes block
+PASS: known operational artifacts warn and continue
+PASS: unknown untracked file blocks
+PASS: known plus unknown mixture blocks
+PASS: AllowDirtyServer bypass is explicit
+PASS: operational allowlist is narrow
+PASS: immediate healthy readiness succeeds
+PASS: transient connection refusal then healthy succeeds
+PASS: failed service stops readiness early
+PASS: readiness timeout fails with diagnostics
+PASS: unhealthy HTTP 200 payload is refused
+PASS: expected build identity remains enforced
+PASS: curl connection reset is a retryable probe failure
+PASS: curl probe validates healthy JSON and build header
+PASS: failure diagnostics are bounded and actionable
+PASS: classification performs no repository cleanup
+warning: remote HEAD refers to nonexistent ref, unable to checkout
+PASS: pin fast-forwards to exactly the pin, not the upstream tip
+warning: remote HEAD refers to nonexistent ref, unable to checkout
+PASS: pin already current is a no-op
+warning: remote HEAD refers to nonexistent ref, unable to checkout
+PASS: pin refuses a short or malformed id
+warning: remote HEAD refers to nonexistent ref, unable to checkout
+PASS: pin refuses a detached HEAD
+warning: remote HEAD refers to nonexistent ref, unable to checkout
+PASS: pin refuses an unpublished commit
+warning: remote HEAD refers to nonexistent ref, unable to checkout
+PASS: pin refuses a diverged branch without rewriting it
+warning: remote HEAD refers to nonexistent ref, unable to checkout
+PASS: pin refuses a branch without an upstream
+PASS: pin helper never resets, cleans, checks out or pulls
+PASS: R339-D: userinfo password leaves argv for PGPASSWORD (percent-decoded); routing env removed
+PASS: R339-D: query password (encoded keyword) leaves argv
+PASS: R339-D: dual/ssl/key-value/malformed passwords are refused before psql
+PASS: R339-D: password-free DSN is passed unchanged
+PASS: R339-B: expected state permits only the target-main move
+PASS: R339-C: complete payload runs and its status propagates
+PASS: R339-C: invalid base64 refuses (47) with nothing run
+PASS: R339-C: corrupt gzip refuses (47) with nothing run
+PASS: R339-C: truncated payload refuses (47) without running partial input
+PASS: R339-C: missing decoder refuses (47) with nothing run
+PASS: R339-C: transport template has no double quote and no bash -s
+PASS: gate: branch namespace collision dev vs dev/v2-main
+PASS: gate: ledger accepts CRLF checksum, refuses drift and reordering
+PASS: gate: .env presence by name never prints values
+PASS: gate: approval window missing/expired/too long/future/open
+PASS: e2e: READY pin behind tip deploys, migrates exactly, preserves main/stash
+PASS: e2e: wrong host blocks before any change
+PASS: e2e: branch namespace collision blocks before any change
+PASS: e2e: unapproved pending migration blocks
+PASS: e2e: approved transition mismatch blocks
+PASS: e2e: wrong database blocks
+PASS: e2e: stale backup (writer ran after it) blocks
+PASS: e2e: unpublished/absent pin blocks
+PASS: e2e: running afldb job blocks
+PASS: e2e: missing preparation (41) stops execute
+PASS: e2e: post-migration parity failure stops before build/restart
+PASS: e2e: assessment reports every blocker and changes nothing
+PASS: e2e: exit status survives a tee logging pipeline
+PASS: e2e R339-B: pinned main fast-forward completes, stash preserved
+PASS: e2e R339-B: unpinned main fast-forward completes
+PASS: e2e R339-B: non-target main is still preserved exactly
+PASS: e2e R339-A: exported AFLDB_MIGRATE_TARGET blocks before checkout
+PASS: e2e R339-A: exported owner DSN blocks before checkout
+PASS: e2e R339-A: custom -DsnName without -SkipMigrate blocks
+PASS: e2e R339-A: .env migration target other than dev blocks
+PASS: e2e R339-A: duplicate .env DSN line blocks
+PASS: e2e R339-A: migration child is pinned to --target dev with no exported target/DSN
+63 passed, 0 failed

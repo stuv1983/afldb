@@ -1,0 +1,10 @@
+
+> afldb@0.1.0 db:migrate
+> tsx tools/db/migrate.ts
+
+AFLDB migrations -> test (afldb_owner@127.0.0.1:55481/afldb_v2_w339_n1b_test)
+  118 migration file(s), 117 already applied
+
+  applying 118_fixtures_unconfirmed_participants.sql ... ok (9 ms)
+
+Applied 1 migration(s).

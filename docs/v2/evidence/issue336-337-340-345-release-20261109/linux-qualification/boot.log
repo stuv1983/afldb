@@ -1,0 +1,6 @@
+isolated-pg: afldb_v2_i336build_test verified (cluster afldb_v2_isolated, 127.0.0.1:55498); running env
+▲ Next.js 16.3.1
+- Local:         http://127.0.0.1:56498
+- Network:       http://127.0.0.1:56498
+✓ Ready in 0ms
+✓ Running next.config took 6ms

@@ -1,0 +1,11 @@
+Filesystem                         Size  Used Avail Use% Mounted on
+/dev/sdf1                          938G  221G  671G  25% /mnt/ssd
+/dev/mapper/ubuntu--vg-ubuntu--lv  232G  140G   82G  64% /
+Mem:              31           4           0           0          27          27
+ 07:12:09 up 25 min, 10 users,  load average: 0.20, 0.63, 0.63
+24
+--- DEV services BEFORE (read-only)
+afldb.service active MainPID=1730
+postgresql@16-main.service active MainPID=1555
+--- snapshot present (read-only)
+-rw------- 1 arm arm 30141895 Nov  4 13:12 /mnt/ssd/afldb/workspaces/afldb-issue333-o2-20261104/private/afldb_prod-20261104T021037Z.dump

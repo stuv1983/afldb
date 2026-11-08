@@ -1,0 +1,4 @@
+==> Restoring i341-synthetic.dump into afldb_restore_test
+ERROR: cannot connect to afldb_restore_test as afldb_owner, or the connection
+       landed somewhere else. Nothing has been changed.
+       Create it first: sudo bash tools/maintenance/01_setup_service.sh

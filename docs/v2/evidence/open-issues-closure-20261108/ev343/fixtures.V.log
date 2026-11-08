@@ -1,0 +1,4 @@
+Fixtures-only snapshot 'afl-api-2027-2026-11-08-063639' (season 2027): 2 fixture(s) built, 0 build failure(s).
+Season feed CD_S2027014: 4 match(es), complete; statuses observed: CONCLUDED 2, SCHEDULED 2.
+
+--validate-only: manifest, registry and fixture contract verified. No connection opened.

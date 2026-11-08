@@ -1,0 +1,10 @@
+AFLDB afl_api Brownlow settle — season 2027
+[monitor] exact launcher: /bin/sh deploy/afldb-settle-afl-api-brownlow.sh
+[monitor] launcher PID: 716225
+[monitor] log: journalctl -u afldb-settle-afl-api-brownlow -f
+[monitor] success marker: AFLDB_SETTLE_SUCCESS
+[monitor] failure marker: AFLDB_SETTLE_FAILURE (also inspect REFUSED|ERROR|FAILED|Traceback)
+[monitor] expected during a live count: frequent no-op/head-touch runs between genuine vote changes.
+[1/4] acquire fixture identity (AFL.com.au season feed, --fixtures-only)
+AFL API current-season ingestion is disabled (site_settings 'acquisition.afl_api_current_season_enabled'). A super admin must enable it from /admin/current-season before this tool will make a network request.
+AFLDB_SETTLE_FAILURE season=2027 exit=1

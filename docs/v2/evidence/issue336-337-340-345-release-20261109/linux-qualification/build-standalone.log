@@ -1,0 +1,10 @@
+isolated-pg: afldb_v2_i336build_test verified (cluster afldb_v2_isolated, 127.0.0.1:55498); running node
+prepare-standalone: confirmed no .env* under .next/standalone
+prepare-standalone: info: AFLDB_ENV is not production; building with development headers
+prepare-standalone: copied .next/static
+prepare-standalone: copied public
+prepare-standalone: copied deploy/coming-soon
+prepare-standalone: copied and verified 7 runtime reference files
+prepare-standalone: created .next/cache for ISR
+prepare-standalone: confirmed no .env* anywhere under .next/standalone
+prepare-standalone: standalone bundle ready

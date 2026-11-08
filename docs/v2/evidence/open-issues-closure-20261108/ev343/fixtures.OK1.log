@@ -1,0 +1,11 @@
+Fixtures-only snapshot 'afl-api-2027-2026-11-08-063639' (season 2027): 2 fixture(s) built, 0 build failure(s).
+Season feed CD_S2027014: 4 match(es), complete; statuses observed: CONCLUDED 2, SCHEDULED 2.
+AFL API ingestion preflight: control database = afldb_v2_i343a_test, writer database = afldb_v2_i343a_test.
+
+Observation
+  observationsSeen: 2
+  versionsAppended: 2
+  observationsUnchanged: 0
+  buildFailures: 0
+
+Dry run. The write path executed against real constraints and privileges, then the whole transaction was rolled back. Nothing was retained — not even the import_batches row. Re-run with --apply to keep it.

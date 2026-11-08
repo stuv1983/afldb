@@ -1,0 +1,27 @@
+├ ○ /records/family                                         1d      1y
+├ ○ /records/father-son                                     1d      1y
+├ ƒ /records/first-kick-goal
+├ ○ /robots.txt
+├ ƒ /search
+├ ƒ /search/qualifying-matches
+├ ƒ /seasons
+├   /seasons/[year]
+│ ├ ● /seasons/2026                                         1h      1y
+│ ├ ● /seasons/2025                                         1h      1y
+│ ├ ● /seasons/2024                                         1h      1y
+│ └ ● [+127 more paths]
+├ ○ /sitemap.xml                                            1d      1y
+├ ● /sitemap/[__metadata_id__]
+├ ƒ /venues
+├   /venues/[slug]
+│ ├ ● /venues/adelaide-oval                                 1d      1y
+│ ├ ● /venues/albury                                        1d      1y
+│ ├ ● /venues/arden-st                                      1d      1y
+│ └ ● [+49 more paths]
+└ ƒ /venues/[slug]/matches
+ƒ Proxy (Middleware)
+○  (Static)   prerendered as static content
+●  (SSG)      prerendered as static HTML (uses generateStaticParams)
+ƒ  (Dynamic)  server-rendered on demand
+BUILD_ID=Agk-PqLoJQjc23I9yiieX
+build exit 0; tree clean

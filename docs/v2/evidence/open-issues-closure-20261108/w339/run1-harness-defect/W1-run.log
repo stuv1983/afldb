@@ -1,0 +1,17 @@
+[preflight] PASS database identity -- afldb_v2_w339_w1a_test afldb_owner via AFLDB_OWNER_DATABASE_URL (read-only session)
+[preflight] PASS applied migrations match the target revision -- 117 applied, names and checksums equal (ledger sha 0dbd4bab4fe160e5)
+[preflight] PASS approved migration transition -- 117 -> 118 (pending 118_fixtures_unconfirmed_participants.sql)
+[preflight] PASS migration target is the assessed database -- db:migrate --target dev reads AFLDB_OWNER_DATABASE_URL from the same single .env line
+[w339] running the exact line in write mode: env -u AFLDB_MIGRATE_TARGET -u AFLDB_OWNER_DATABASE_URL npm run db:migrate -- --target dev
+
+> afldb@0.1.0 db:migrate
+> tsx tools/db/migrate.ts --target dev
+
+AFLDB migrations -> dev (afldb_owner@127.0.0.1:55481/afldb_v2_w339_w1a_test)
+  118 migration file(s), 117 already applied
+
+  applying 118_fixtures_unconfirmed_participants.sql ... ok (11 ms)
+
+Applied 1 migration(s).
+[preflight] PASS post-migration parity -- 118/118, names and checksums equal
+[preflight] evidence: /mnt/ssd/afldb-close2-20261108T102607Z-ops/evW/W1-gate/20261108T103238Z-streamanator-549c5892d7e3-w339-959374.txt (exit 0)

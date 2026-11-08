@@ -1,0 +1,2 @@
+ERROR: AFLDB_OWNER_DATABASE_URL is outside the restore connection contract: query option 'target_session_attrs' can change the target or is not supported.
+       Expected postgresql://USER:PASSWORD@HOST:PORT/DBNAME with no target-changing options.

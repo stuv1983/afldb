@@ -1,0 +1,9 @@
+==> Restoring i341-synthetic.dump into afldb_restore_test
+    clearing afldb_restore_test
+NOTICE:  drop cascades to 2 other objects
+DETAIL:  drop cascades to constraint matches_away_club_id_fkey on table matches
+drop cascades to constraint matches_home_club_id_fkey on table matches
+NOTICE:  drop cascades to constraint brownlow_season_votes_player_id_fkey on table brownlow_season_votes
+tools/maintenance/restore-test.sh: line 225: 694802 Killed                  pg_restore --dbname="$RESTORE_DSN" --clean --if-exists --no-owner --no-privileges --no-comments --jobs=4 "$BACKUP" > "$RESTORE_LOG" 2>&1
+ERROR: pg_restore terminated abnormally (exit status 137).
+       The restore is incomplete and cannot be verified.

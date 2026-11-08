@@ -1,0 +1,214 @@
+== setup ==
+  target cluster: afldb_v2_isolated on 127.0.0.1:55481 (verified)
+ERROR:  column "filename" does not exist
+LINE 1: select count(*)||' (last '||max(filename)||')' from afldb_me...
+                                        ^
+  afldb_v2_i343a_test ledger rows: 
+ERROR:  column "filename" does not exist
+LINE 1: select count(*)||' (last '||max(filename)||')' from afldb_me...
+                                        ^
+  afldb_v2_i343b_test ledger rows: 
+  statement logging on for afldb_app/afldb_import in A and B only; server log postgresql-2026-11-08_062150.log
+  switches: A=true B=false
+== snapshots: real acquire-afl-api.ts --fixtures-only against the loopback stub (control = A, read only) ==
+-- ACQ27 (readonly): rc=0; A before [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0] after [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]; B [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]
+  PASS  ACQ27 exit 0
+  PASS  ACQ27 says: label afl-api-2027-2026-11-08-063639
+  PASS  ACQ27 A unchanged (every table + every sequence)
+  PASS  ACQ27 B unchanged (every table + every sequence)
+  PASS  ACQ27 no write-capable statement reached A or B (app/import statements logged: 2)
+-- ACQ26 (readonly): rc=0; A before [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0] after [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]; B [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]
+  PASS  ACQ26 exit 0
+  PASS  ACQ26 says: label afl-api-2026-2026-11-08-063641
+  PASS  ACQ26 A unchanged (every table + every sequence)
+  PASS  ACQ26 B unchanged (every table + every sequence)
+  PASS  ACQ26 no write-capable statement reached A or B (app/import statements logged: 2)
+  labels: 2027=afl-api-2027-2026-11-08-063639 2026=afl-api-2026-2026-11-08-063641
+  2027 manifest: afl_api_fixture_snapshot season 2027 files ['00-season-matches.json', 'CD_M20273439011/fixture.json', 'CD_M20273439012/fixture.json']
+
+==================== settle-afl-api-fixtures.ts ====================
+-- fixtures.V (validate): rc=0; A before [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0] after [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]; B [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]
+  PASS  fixtures.V exit 0
+  PASS  fixtures.V says: No connection opened
+  PASS  fixtures.V A unchanged (every table + every sequence)
+  PASS  fixtures.V B unchanged (every table + every sequence)
+  PASS  fixtures.V no write-capable statement reached A or B (app/import statements logged: 0)
+  PASS  fixtures.V opened no connection (zero app/import statements)
+-- fixtures.M1 (refuse): rc=1; A before [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0] after [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]; B [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]
+  PASS  fixtures.M1 exit 1
+  PASS  fixtures.M1 says: control database 'afldb_v2_i343a_test' does not match writer database 'afldb_v2_i343b_test'
+  PASS  fixtures.M1 A unchanged (every table + every sequence)
+  PASS  fixtures.M1 B unchanged (every table + every sequence)
+  PASS  fixtures.M1 no write-capable statement reached A or B (app/import statements logged: 5)
+-- fixtures.M2 (refuse): rc=1; A before [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0] after [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]; B [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]
+  PASS  fixtures.M2 exit 1
+  PASS  fixtures.M2 says: control database 'afldb_v2_i343a_test' does not match writer database 'afldb_v2_i343b_test'
+  PASS  fixtures.M2 A unchanged (every table + every sequence)
+  PASS  fixtures.M2 B unchanged (every table + every sequence)
+  PASS  fixtures.M2 no write-capable statement reached A or B (app/import statements logged: 5)
+-- fixtures.M3 (refuse): rc=1; A before [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0] after [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]; B [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]
+  PASS  fixtures.M3 exit 1
+  PASS  fixtures.M3 says: control database 'afldb_v2_i343a_test' does not match writer database 'afldb_v2_i343b_test'
+  PASS  fixtures.M3 A unchanged (every table + every sequence)
+  PASS  fixtures.M3 B unchanged (every table + every sequence)
+  PASS  fixtures.M3 no write-capable statement reached A or B (app/import statements logged: 5)
+-- fixtures.D1 (refuse): rc=1; A before [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0] after [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]; B [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]
+  PASS  fixtures.D1 exit 1
+  PASS  fixtures.D1 says: AFL API current-season ingestion is disabled
+  PASS  fixtures.D1 A unchanged (every table + every sequence)
+  PASS  fixtures.D1 B unchanged (every table + every sequence)
+  PASS  fixtures.D1 no write-capable statement reached A or B (app/import statements logged: 5)
+-- fixtures.U1 (refuse): rc=1; A before [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0] after [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]; B [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]
+  PASS  fixtures.U1 exit 1
+  PASS  fixtures.U1 says: unable to read the control database or prove live writer identity
+  PASS  fixtures.U1 A unchanged (every table + every sequence)
+  PASS  fixtures.U1 B unchanged (every table + every sequence)
+  PASS  fixtures.U1 no write-capable statement reached A or B (app/import statements logged: 2)
+-- fixtures.U2 (refuse): rc=1; A before [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0] after [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]; B [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]
+  PASS  fixtures.U2 exit 1
+  PASS  fixtures.U2 says: unable to read the control database or prove live writer identity
+  PASS  fixtures.U2 A unchanged (every table + every sequence)
+  PASS  fixtures.U2 B unchanged (every table + every sequence)
+  PASS  fixtures.U2 no write-capable statement reached A or B (app/import statements logged: 4)
+  PASS  fixtures.U2 site_settings ACL restored
+-- fixtures.U3 (refuse): rc=1; A before [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0] after [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]; B [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]
+  PASS  fixtures.U3 exit 1
+  PASS  fixtures.U3 says: DATABASE_URL is not configured for the control database
+  PASS  fixtures.U3 A unchanged (every table + every sequence)
+  PASS  fixtures.U3 B unchanged (every table + every sequence)
+  PASS  fixtures.U3 no write-capable statement reached A or B (app/import statements logged: 0)
+-- fixtures.S1 (refuse): rc=1; A before [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0] after [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]; B [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]
+  PASS  fixtures.S1 exit 1
+  PASS  fixtures.S1 says: sealed
+  PASS  fixtures.S1 A unchanged (every table + every sequence)
+  PASS  fixtures.S1 B unchanged (every table + every sequence)
+  PASS  fixtures.S1 no write-capable statement reached A or B (app/import statements logged: 0)
+  PASS  fixtures.S1 sealed refusal opened no connection
+-- fixtures.OK1 (dryrun): rc=0; A before [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0] after [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]; B [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]
+  PASS  fixtures.OK1 exit 0
+  PASS  fixtures.OK1 says: control database = afldb_v2_i343a_test, writer database = afldb_v2_i343a_test
+  PASS  fixtures.OK1 A tables unchanged after rollback
+  PASS  fixtures.OK1 B unchanged (every table + every sequence)
+-- fixtures.OK2 (apply): rc=0; A before [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0] after [batches=1 records=2 versions=2 payloads=2 fixtures=0 matches=0]; B [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]
+  PASS  fixtures.OK2 exit 0
+  PASS  fixtures.OK2 says: Applied as import batch 2: 2 fixture observation
+  PASS  fixtures.OK2 A changed only allowed tables (changed: public.import_batches,staging.source_payloads,staging.source_records,staging.source_record_versions)
+  PASS  fixtures.OK2 A received its import batch
+  PASS  fixtures.OK2 B unchanged (every table + every sequence)
+  PASS  fixtures.OK2 preflight proved A = A
+
+==================== settle-afl-api-fixture-schedule.ts ====================
+-- schedule.V (validate): rc=0; A before [batches=1 records=2 versions=2 payloads=2 fixtures=0 matches=0] after [batches=1 records=2 versions=2 payloads=2 fixtures=0 matches=0]; B [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]
+  PASS  schedule.V exit 0
+  PASS  schedule.V says: No connection opened
+  PASS  schedule.V A unchanged (every table + every sequence)
+  PASS  schedule.V B unchanged (every table + every sequence)
+  PASS  schedule.V no write-capable statement reached A or B (app/import statements logged: 0)
+  PASS  schedule.V opened no connection (zero app/import statements)
+-- schedule.M1 (refuse): rc=1; A before [batches=1 records=2 versions=2 payloads=2 fixtures=0 matches=0] after [batches=1 records=2 versions=2 payloads=2 fixtures=0 matches=0]; B [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]
+  PASS  schedule.M1 exit 1
+  PASS  schedule.M1 says: control database 'afldb_v2_i343a_test' does not match writer database 'afldb_v2_i343b_test'
+  PASS  schedule.M1 A unchanged (every table + every sequence)
+  PASS  schedule.M1 B unchanged (every table + every sequence)
+  PASS  schedule.M1 no write-capable statement reached A or B (app/import statements logged: 5)
+-- schedule.M2 (refuse): rc=1; A before [batches=1 records=2 versions=2 payloads=2 fixtures=0 matches=0] after [batches=1 records=2 versions=2 payloads=2 fixtures=0 matches=0]; B [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]
+  PASS  schedule.M2 exit 1
+  PASS  schedule.M2 says: control database 'afldb_v2_i343a_test' does not match writer database 'afldb_v2_i343b_test'
+  PASS  schedule.M2 A unchanged (every table + every sequence)
+  PASS  schedule.M2 B unchanged (every table + every sequence)
+  PASS  schedule.M2 no write-capable statement reached A or B (app/import statements logged: 5)
+-- schedule.M3 (refuse): rc=1; A before [batches=1 records=2 versions=2 payloads=2 fixtures=0 matches=0] after [batches=1 records=2 versions=2 payloads=2 fixtures=0 matches=0]; B [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]
+  PASS  schedule.M3 exit 1
+  PASS  schedule.M3 says: control database 'afldb_v2_i343a_test' does not match writer database 'afldb_v2_i343b_test'
+  PASS  schedule.M3 A unchanged (every table + every sequence)
+  PASS  schedule.M3 B unchanged (every table + every sequence)
+  PASS  schedule.M3 no write-capable statement reached A or B (app/import statements logged: 5)
+-- schedule.D1 (refuse): rc=1; A before [batches=1 records=2 versions=2 payloads=2 fixtures=0 matches=0] after [batches=1 records=2 versions=2 payloads=2 fixtures=0 matches=0]; B [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]
+  PASS  schedule.D1 exit 1
+  PASS  schedule.D1 says: AFL API current-season ingestion is disabled
+  PASS  schedule.D1 A unchanged (every table + every sequence)
+  PASS  schedule.D1 B unchanged (every table + every sequence)
+  PASS  schedule.D1 no write-capable statement reached A or B (app/import statements logged: 5)
+-- schedule.U1 (refuse): rc=1; A before [batches=1 records=2 versions=2 payloads=2 fixtures=0 matches=0] after [batches=1 records=2 versions=2 payloads=2 fixtures=0 matches=0]; B [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]
+  PASS  schedule.U1 exit 1
+  PASS  schedule.U1 says: unable to read the control database or prove live writer identity
+  PASS  schedule.U1 A unchanged (every table + every sequence)
+  PASS  schedule.U1 B unchanged (every table + every sequence)
+  PASS  schedule.U1 no write-capable statement reached A or B (app/import statements logged: 2)
+-- schedule.U2 (refuse): rc=1; A before [batches=1 records=2 versions=2 payloads=2 fixtures=0 matches=0] after [batches=1 records=2 versions=2 payloads=2 fixtures=0 matches=0]; B [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]
+  PASS  schedule.U2 exit 1
+  PASS  schedule.U2 says: unable to read the control database or prove live writer identity
+  PASS  schedule.U2 A unchanged (every table + every sequence)
+  PASS  schedule.U2 B unchanged (every table + every sequence)
+  PASS  schedule.U2 no write-capable statement reached A or B (app/import statements logged: 4)
+  PASS  schedule.U2 site_settings ACL restored
+-- schedule.U3 (refuse): rc=1; A before [batches=1 records=2 versions=2 payloads=2 fixtures=0 matches=0] after [batches=1 records=2 versions=2 payloads=2 fixtures=0 matches=0]; B [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]
+  PASS  schedule.U3 exit 1
+  PASS  schedule.U3 says: DATABASE_URL is not configured for the control database
+  PASS  schedule.U3 A unchanged (every table + every sequence)
+  PASS  schedule.U3 B unchanged (every table + every sequence)
+  PASS  schedule.U3 no write-capable statement reached A or B (app/import statements logged: 0)
+-- schedule.S1 (refuse): rc=1; A before [batches=1 records=2 versions=2 payloads=2 fixtures=0 matches=0] after [batches=1 records=2 versions=2 payloads=2 fixtures=0 matches=0]; B [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]
+  PASS  schedule.S1 exit 1
+  PASS  schedule.S1 says: sealed
+  PASS  schedule.S1 A unchanged (every table + every sequence)
+  PASS  schedule.S1 B unchanged (every table + every sequence)
+  PASS  schedule.S1 no write-capable statement reached A or B (app/import statements logged: 0)
+  PASS  schedule.S1 sealed refusal opened no connection
+-- schedule.OK1 (dryrun): rc=0; A before [batches=1 records=2 versions=2 payloads=2 fixtures=0 matches=0] after [batches=1 records=2 versions=2 payloads=2 fixtures=0 matches=0]; B [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]
+  PASS  schedule.OK1 exit 0
+  PASS  schedule.OK1 says: control database = afldb_v2_i343a_test, writer database = afldb_v2_i343a_test
+  PASS  schedule.OK1 A tables unchanged after rollback
+  PASS  schedule.OK1 B unchanged (every table + every sequence)
+-- schedule.OK2 (apply): rc=0; A before [batches=1 records=2 versions=2 payloads=2 fixtures=0 matches=0] after [batches=2 records=2 versions=2 payloads=2 fixtures=2 matches=0]; B [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]
+  PASS  schedule.OK2 exit 0
+  PASS  schedule.OK2 says: Outcome: applied (import batch 4)
+  PASS  schedule.OK2 A changed only allowed tables (changed: public.fixtures,public.import_batches)
+  PASS  schedule.OK2 A received its import batch
+  PASS  schedule.OK2 B unchanged (every table + every sequence)
+  PASS  schedule.OK2 preflight proved A = A
+
+  A rows written: fixtures [CD_M20273439001:scheduled:confirmed CD_M20273439002:scheduled:confirmed]
+  A observations [CD_M20273439011:match CD_M20273439012:match]
+  A batches [settle-afl-api-fixtures.ts/staging.source_record_versions/completed/read=2 settle-afl-api-fixture-schedule.ts/fixtures/completed/read=4]
+  B fixtures=0 observations=0 batches=0
+  PASS  B never received a fixture, observation or batch
+
+==================== deploy/afldb-settle-afl-api-brownlow.sh (unmodified, loopback stub) ====================
+-- W1 (refuse): rc=1; A before [batches=2 records=2 versions=2 payloads=2 fixtures=2 matches=0] after [batches=2 records=2 versions=2 payloads=2 fixtures=2 matches=0]; B [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]
+  PASS  W1 exit 1
+  PASS  W1 says: control database 'afldb_v2_i343a_test' does not match writer database 'afldb_v2_i343b_test'
+  PASS  W1 A unchanged (every table + every sequence)
+  PASS  W1 B unchanged (every table + every sequence)
+  PASS  W1 no write-capable statement reached A or B (app/import statements logged: 7)
+  PASS  W1 reached step 2 (fixture staging) after a real step-1 acquisition
+  PASS  W1 stopped at step 2 (no [3/4])
+  PASS  W1 emitted AFLDB_SETTLE_FAILURE
+  PASS  W1 stub saw exactly the one season-feed request
+-- W1b (refuse): rc=1; A before [batches=2 records=2 versions=2 payloads=2 fixtures=2 matches=0] after [batches=2 records=2 versions=2 payloads=2 fixtures=2 matches=0]; B [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]
+  PASS  W1b exit 1
+  PASS  W1b says: control database 'afldb_v2_i343a_test' does not match writer database 'afldb_v2_i343b_test'
+  PASS  W1b A unchanged (every table + every sequence)
+  PASS  W1b B unchanged (every table + every sequence)
+  PASS  W1b no write-capable statement reached A or B (app/import statements logged: 7)
+  PASS  W1b stopped at step 2 with both switches on
+-- W2 (refuse): rc=1; A before [batches=2 records=2 versions=2 payloads=2 fixtures=2 matches=0] after [batches=2 records=2 versions=2 payloads=2 fixtures=2 matches=0]; B [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]
+  PASS  W2 exit 1
+  PASS  W2 says: AFL API current-season ingestion is disabled
+  PASS  W2 A unchanged (every table + every sequence)
+  PASS  W2 B unchanged (every table + every sequence)
+  PASS  W2 no write-capable statement reached A or B (app/import statements logged: 2)
+  PASS  W2 refused at step 1 (acquire), before fixture staging
+  PASS  W2 made no network request
+-- W3 (apply): rc=1; A before [batches=2 records=2 versions=2 payloads=2 fixtures=2 matches=0] after [batches=3 records=2 versions=2 payloads=2 fixtures=2 matches=0]; B [batches=0 records=0 versions=0 payloads=0 fixtures=0 matches=0]
+  PASS  W3 exit 1
+  FAIL  W3 expected /Brownlow acquisition refused/; tail: Applied as import batch 5: 2 fixture observation(s) recorded to the match family spine. No staging.afl_api_match row, no matches/match_period_scores/player_match_stats write, and no promotion candidate was created — this tool has no code path that could. [3/4] acquire (AFL.com.au bfawards, direct HTTP) Brownlow acquisition is disabled outside the live count window (§10, §D two-key safety): deployment gate (AFLDB_AFL_API_BROWNLOW_ENABLED) is enabled, super-admin setting (site_settings 'acquisition.afl_api_brownlow_enabled') is disabled. Both must be enabled. AFLDB_SETTLE_FAILURE season=2027 exit=1 
+  PASS  W3 A changed only allowed tables (changed: public.import_batches,staging.source_records)
+  PASS  W3 A received its import batch
+  PASS  W3 B unchanged (every table + every sequence)
+  PASS  W3 step 2 applied fixture staging to A
+  PASS  W3 preflight proved A = A
+  PASS  W3 reached step 3, which refused on the (absent) Brownlow admin switch
+  W3 A batches now [settle-afl-api-fixtures.ts/completed settle-afl-api-fixture-schedule.ts/completed settle-afl-api-fixtures.ts/completed]
+
+ISSUE-343 qualification: 156 passed, 1 failed

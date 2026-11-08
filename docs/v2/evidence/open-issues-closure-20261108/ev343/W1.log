@@ -1,0 +1,19 @@
+AFLDB afl_api Brownlow settle — season 2027
+[monitor] exact launcher: /bin/sh deploy/afldb-settle-afl-api-brownlow.sh
+[monitor] launcher PID: 715890
+[monitor] log: journalctl -u afldb-settle-afl-api-brownlow -f
+[monitor] success marker: AFLDB_SETTLE_SUCCESS
+[monitor] failure marker: AFLDB_SETTLE_FAILURE (also inspect REFUSED|ERROR|FAILED|Traceback)
+[monitor] expected during a live count: frequent no-op/head-touch runs between genuine vote changes.
+[1/4] acquire fixture identity (AFL.com.au season feed, --fixtures-only)
+AFLDB-ISSUE-228 acquire — season 2027 (compSeasonId 102), label afl-api-2027-2026-11-08-063736 [--fixtures-only: season fixture feed only, no CFS/token, no playerStats/matchRoster]
+  season feed: 4 match(es); selected: 2
+  CD_M20273439011: fixture acquired (--fixtures-only — no playerStats/matchRoster requested)
+  CD_M20273439012: fixture acquired (--fixtures-only — no playerStats/matchRoster requested)
+  manifest: /mnt/ssd/afldb-close-20261108T061620Z-ops/ws343/data/sources/afl_api/fixtures/afl-api-2027-2026-11-08-063736/manifest.json
+fixtures-only label: afl-api-2027-2026-11-08-063736
+[2/4] settle fixture identity (apply; match-family spine observations only)
+Fixtures-only snapshot 'afl-api-2027-2026-11-08-063736' (season 2027): 2 fixture(s) built, 0 build failure(s).
+Season feed CD_S2027014: 4 match(es), complete; statuses observed: CONCLUDED 2, SCHEDULED 2.
+AFL API ingestion refused: control database 'afldb_v2_i343a_test' does not match writer database 'afldb_v2_i343b_test'. No canonical settle was started.
+AFLDB_SETTLE_FAILURE season=2027 exit=1

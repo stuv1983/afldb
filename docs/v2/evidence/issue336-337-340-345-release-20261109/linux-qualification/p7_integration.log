@@ -1,0 +1,6 @@
+=== admin-lifecycle rc=0
+ Test Files  1 passed (1)
+      Tests  50 passed (50)
+=== admin-draft rc=0
+ Test Files  1 passed (1)
+      Tests  42 passed | 5 skipped (47)

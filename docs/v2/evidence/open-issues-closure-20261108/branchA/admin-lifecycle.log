@@ -1,0 +1,12 @@
+isolated-pg: afldb_v2_bra_test verified (cluster afldb_v2_isolated, 127.0.0.1:55481); running node_modules/.bin/vitest
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-brA-20261108T102607Z[39m
+
+ [32m✓[39m tests/integration/admin-lifecycle.test.ts [2m([22m[2m50 tests[22m[2m)[22m[33m 6251[2mms[22m[39m
+     [33m[2m✓[22m[39m times out, writing nothing, while another transaction holds the issuer row [33m 5060[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m50 passed[39m[22m[90m (50)[39m
+[2m   Start at [22m 21:31:28
+[2m   Duration [22m 7.25s[2m (transform 499ms, setup 224ms, import 530ms, tests 6.25s, environment 0ms)[22m
+

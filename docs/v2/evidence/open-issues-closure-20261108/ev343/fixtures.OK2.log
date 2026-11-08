@@ -1,0 +1,11 @@
+Fixtures-only snapshot 'afl-api-2027-2026-11-08-063639' (season 2027): 2 fixture(s) built, 0 build failure(s).
+Season feed CD_S2027014: 4 match(es), complete; statuses observed: CONCLUDED 2, SCHEDULED 2.
+AFL API ingestion preflight: control database = afldb_v2_i343a_test, writer database = afldb_v2_i343a_test.
+
+Observation
+  observationsSeen: 2
+  versionsAppended: 2
+  observationsUnchanged: 0
+  buildFailures: 0
+
+Applied as import batch 2: 2 fixture observation(s) recorded to the match family spine. No staging.afl_api_match row, no matches/match_period_scores/player_match_stats write, and no promotion candidate was created — this tool has no code path that could.

@@ -1,0 +1,16 @@
+==> Restoring i341-synthetic.dump into afldb_restore_test
+    clearing afldb_restore_test
+    pg_restore exited 1; it completed, ignoring only 2 extension-owner error(s)
+    restored in 1s
+==> Parity checks against the restored database
+    PASS  player_match_stats rows                120000
+    PASS  players rows                           6000
+    PASS  matches rows                           3000
+    PASS  clubs rows                             18
+    PASS  career games total                     120000
+    PASS  career goals total                     270967
+    PASS  Brownlow votes total                   9000
+    PASS  unrecorded disposals                   13320
+    PASS  stat_availability rows                 130
+    recorded restored dump sha256 166ab9acf75c9b78f28049160daf24eb179d7fe2c001f9a569d2fdcbb1900f5d
+==> Restore verified: the backup is proven.

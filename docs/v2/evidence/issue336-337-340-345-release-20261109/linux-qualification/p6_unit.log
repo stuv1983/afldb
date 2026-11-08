@@ -1,0 +1,6 @@
+ ✓ tests/auth.test.ts (211 tests) 828ms
+ ✓ tests/gap029-rookie-selections.test.ts (16 tests) 60ms
+ ✓ tests/catalogue-lookups.test.ts (20 tests) 58ms
+ ✓ tests/like.test.ts (10 tests) 15ms
+ Test Files  4 passed (4)
+      Tests  257 passed (257)

@@ -1,0 +1,10 @@
+create-db: afldb_v2_i336reltmpl_test created and marked
+isolated-pg: afldb_v2_i336reltmpl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55498); running node
+pg_restore exit=0 seconds=6 stderrLines=0
+isolated-pg: afldb_v2_i336reltmpl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55498); running node
+AFLDB migrations -> test (afldb_owner@127.0.0.1:55498/afldb_v2_i336reltmpl_test)
+  118 migration file(s), 118 already applied
+
+Nothing to apply — schema is up to date.
+isolated-pg: afldb_v2_i336reltmpl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55498); running node
+afldb_v2_i336reltmpl_test {"ledger":"118_fixtures_unconfirmed_participants.sql","matches":17056,"fixtures":218,"receipts":5}

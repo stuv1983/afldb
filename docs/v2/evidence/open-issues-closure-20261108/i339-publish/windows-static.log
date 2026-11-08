@@ -1,0 +1,14 @@
+﻿Using Git Bash at C:\Program Files\Git\usr\bin\bash.exe (from registry HKLM:\SOFTWARE\GitForWindows)
+What if: Performing the operation "AFLDB dev deployment (execute)" on target "arm@10.0.40.100".
+What if: Performing the operation "AFLDB dev deployment (execute)" on target "arm@10.0.40.100".
+What if: Performing the operation "AFLDB dev deployment (execute)" on target "arm@10.0.40.100".
+What if: Performing the operation "AFLDB dev deployment (execute)" on target "arm@10.0.40.100".
+What if: Performing the operation "AFLDB dev deployment (assess)" on target "arm@10.0.40.100".
+What if: Performing the operation "AFLDB dev deployment (execute)" on target "arm@10.0.40.100".
+What if: Performing the operation "AFLDB dev deployment (execute)" on target "arm@10.0.40.100".
+What if: Performing the operation "AFLDB dev deployment (execute)" on target "arm@10.0.40.100".
+What if: Performing the operation "AFLDB dev deployment (execute)" on target "arm@10.0.40.100".
+What if: Performing the operation "AFLDB dev deployment (execute)" on target "arm@10.0.40.100".
+What if: Performing the operation "AFLDB dev deployment (assess)" on target "arm@10.0.40.100".
+exported gen-execute.sh and gen-assess.sh to C:\Users\stuar\AppData\Local\Temp\claude\7c1ddba8e80ea2f3\528d77a1-1bc0-4a4f-b022-8a3c8650bde4\scratchpad\i339-export-r4
+PASS: sync-dev PowerShell/static integration (AFLDB-ISSUE-339 gate ordering, refusals, transport, exit status)

@@ -1,0 +1,5 @@
+AFLDB-ISSUE-228 acquire — season 2027 (compSeasonId 102), label afl-api-2027-2026-11-08-063639 [--fixtures-only: season fixture feed only, no CFS/token, no playerStats/matchRoster]
+  season feed: 4 match(es); selected: 2
+  CD_M20273439011: fixture acquired (--fixtures-only — no playerStats/matchRoster requested)
+  CD_M20273439012: fixture acquired (--fixtures-only — no playerStats/matchRoster requested)
+  manifest: /mnt/ssd/afldb-close-20261108T061620Z-ops/ws343/data/sources/afl_api/fixtures/afl-api-2027-2026-11-08-063639/manifest.json

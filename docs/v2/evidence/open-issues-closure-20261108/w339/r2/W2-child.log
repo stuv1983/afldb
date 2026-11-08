@@ -1,0 +1,11 @@
+[w339] H exported: AFLDB_OWNER_DATABASE_URL=<B2> AFLDB_MIGRATE_TARGET=test AFLDB_TEST_DATABASE_URL=<B2>
+
+> afldb@0.1.0 db:migrate
+> tsx tools/db/migrate.ts --target dev
+
+AFLDB migrations -> dev (afldb_owner@127.0.0.1:55481/afldb_v2_w339r2_w2a_test)
+  118 migration file(s), 117 already applied
+
+  applying 118_fixtures_unconfirmed_participants.sql ... ok (12 ms)
+
+Applied 1 migration(s).

@@ -1,0 +1,29 @@
+AFLDB afl_api Brownlow settle — season 2027
+[monitor] exact launcher: /bin/sh deploy/afldb-settle-afl-api-brownlow.sh
+[monitor] launcher PID: 716321
+[monitor] log: journalctl -u afldb-settle-afl-api-brownlow -f
+[monitor] success marker: AFLDB_SETTLE_SUCCESS
+[monitor] failure marker: AFLDB_SETTLE_FAILURE (also inspect REFUSED|ERROR|FAILED|Traceback)
+[monitor] expected during a live count: frequent no-op/head-touch runs between genuine vote changes.
+[1/4] acquire fixture identity (AFL.com.au season feed, --fixtures-only)
+AFLDB-ISSUE-228 acquire — season 2027 (compSeasonId 102), label afl-api-2027-2026-11-08-063744 [--fixtures-only: season fixture feed only, no CFS/token, no playerStats/matchRoster]
+  season feed: 4 match(es); selected: 2
+  CD_M20273439011: fixture acquired (--fixtures-only — no playerStats/matchRoster requested)
+  CD_M20273439012: fixture acquired (--fixtures-only — no playerStats/matchRoster requested)
+  manifest: /mnt/ssd/afldb-close-20261108T061620Z-ops/ws343/data/sources/afl_api/fixtures/afl-api-2027-2026-11-08-063744/manifest.json
+fixtures-only label: afl-api-2027-2026-11-08-063744
+[2/4] settle fixture identity (apply; match-family spine observations only)
+Fixtures-only snapshot 'afl-api-2027-2026-11-08-063744' (season 2027): 2 fixture(s) built, 0 build failure(s).
+Season feed CD_S2027014: 4 match(es), complete; statuses observed: CONCLUDED 2, SCHEDULED 2.
+AFL API ingestion preflight: control database = afldb_v2_i343a_test, writer database = afldb_v2_i343a_test.
+
+Observation
+  observationsSeen: 2
+  versionsAppended: 0
+  observationsUnchanged: 2
+  buildFailures: 0
+
+Applied as import batch 5: 2 fixture observation(s) recorded to the match family spine. No staging.afl_api_match row, no matches/match_period_scores/player_match_stats write, and no promotion candidate was created — this tool has no code path that could.
+[3/4] acquire (AFL.com.au bfawards, direct HTTP)
+Brownlow acquisition is disabled outside the live count window (§10, §D two-key safety): deployment gate (AFLDB_AFL_API_BROWNLOW_ENABLED) is enabled, super-admin setting (site_settings 'acquisition.afl_api_brownlow_enabled') is disabled. Both must be enabled.
+AFLDB_SETTLE_FAILURE season=2027 exit=1

@@ -1,0 +1,3 @@
+Fixtures-only snapshot 'afl-api-2026-2026-11-08-063641' (season 2026): 1 fixture(s) built, 0 build failure(s).
+Season feed CD_S2026014: 1 match(es), complete; statuses observed: CONCLUDED 1.
+Refused: season 2026 is sealed historical data (sealed seasons 1897-2026 per data/reference/seasons.json). Settle and promotion never rewrite sealed history. A change to a sealed season must go through an audited correction workflow (data_editor, promotion_review, identity_adjudication, brownlow_authority, csv_submission_promotion, derived_award_publication, curated_award_approval, brownlow_eligibility_decision), see docs/v2/historical-baseline.md §2.

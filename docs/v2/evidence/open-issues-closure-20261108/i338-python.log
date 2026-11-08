@@ -1,0 +1,229 @@
+WARNING: removing existing lock (pid=688589, host=streamanator, started=2026-11-08T06:17:48Z) because --force-unlock was given
+Checkpoint migrated: schema_version 1 -> 2. Pre-migration backup: /tmp/afldb-i222-bridge-operator-0dkvi0p3/progress.pre-migration-20261108T061748Z-8f0b449e.json
+  PASS  1a valid fixture pack loads cleanly
+  PASS  1b group counts are exactly 44/2/7/30
+  PASS  1c at least one hash-linked input independently verified
+  PASS  1d section 1 ordinals are exactly 1..44
+  PASS  2a declared count != rows[] length is refused
+  PASS  2b rows[] length != the required group total (44) is refused
+  PASS  3 a tampered hash-linked input file is refused with a hash-mismatch message
+  PASS  4a a duplicate draftguru_url within a group is refused
+  PASS  4b a row with a non-blank source operator_verdict is refused
+  PASS  5a an audit-only verdict ('agree') is rejected for the relisting group
+  PASS  5b a group's own positive verdict is accepted with no notes
+  PASS  6a 'undetermined_withhold' without notes is rejected
+  PASS  6b 'undetermined_withhold' with notes is accepted
+  PASS  6c REQUIRES_NOTES covers exactly the five specified negative/undetermined verdicts
+  PASS  7a atomic write leaves no leftover temp file
+  PASS  7b checkpoint file exists after save
+  PASS  8a resumed checkpoint preserves the recorded decision
+  PASS  8b resumed checkpoint's decided_count is 1 of 83
+  PASS  8c resumed checkpoint validates cleanly against the same pack
+  PASS  9 a checkpoint from a different pack is refused on resume
+  PASS  10 finalisation is refused when 82 of 83 rows are decided
+  PASS  11a rerunning finalize() on identical decisions reproduces byte-identical JSON
+  PASS  11b rerunning finalize() reproduces byte-identical CSV
+  PASS  11c rerunning finalize() reproduces byte-identical Markdown
+  PASS  11d rows_sha256 matches across reruns
+  PASS  11e the tool clock is restored after the frozen byte-identity runs
+  PASS  11f the frozen runs stamp exactly the frozen completion time
+  PASS  11g a later run stamps its own, later completion time (truthful, not frozen)
+  PASS  11h a different completion time leaves CSV byte-identical and every row digest unchanged
+  PASS  11i JSON is byte-identical once only review_completed_utc is normalised
+  PASS  11j Markdown is byte-identical once only the completion time is normalised
+  PASS  11k normalising only the completion time still exposes any other JSON or Markdown change
+  PASS  12a totals.overall is 83
+  PASS  12b totals.by_group sums to 83
+  PASS  12c totals.by_verdict sums to 83
+  PASS  12d exactly 83 rows written in source-pack order
+  PASS  12e completion_status is 'complete'
+  PASS  13 the source pack file is byte-identical before and after a full validate+finalize run
+  PASS  14a the tool's own source contains none of the forbidden network/database substrings
+  PASS  15a acquiring a fresh lock writes pid/hostname/started_utc/session_id
+  PASS  15b a second acquire without --force-unlock is refused
+  PASS  15c --force-unlock removes the stale lock and writes a new one
+  PASS  15d release_lock removes the lock file
+  PASS  15e releasing an already-absent lock is a no-op, not an error
+  PASS  16 an all-negative-verdict run (with required notes) finalises cleanly
+  PASS  17 finalisation is refused when a required-notes verdict has blank notes
+  PASS  18a PLACEHOLDER_VERDICT is not a valid verdict for any group
+  PASS  18b a fresh checkpoint has no decisions (blank verdict for every row)
+  PASS  18c decided_count is 0 for a fresh checkpoint (no default verdict)
+  PASS  18d the placeholder value is rejected as a stored verdict
+  PASS  18e navigating rows restores each row's own distinct, independently held verdict
+  PASS  18f clearing a verdict drops decided_count, re-deciding counts it exactly once
+  PASS  18g VERDICT_MEANINGS covers every allowed verdict for every group
+  PASS  19a tools/rebuild/draftguru/README.md exists
+  PASS  19b README documents the exact launch command
+  PASS  19c README documents verdict meanings
+  PASS  19d README documents checkpoint/resume behaviour
+  PASS  19e README documents finalisation behaviour
+  PASS  19f README documents the event-club-appearance-relationship values
+  PASS  19g README documents the --migrate-checkpoint-only flag
+  PASS  20a drafted but never played for the club -> no_senior_appearance_ever
+  PASS  20b played before a same-club re-draft but not afterward -> pre_event_only
+  PASS  20c played both before and after re-listing (event year strictly within the whole career span) -> unknown -- the pack carries no per-club season breakdown to localise it
+  PASS  20d first senior appearance after drafting -> post_event_appearance
+  PASS  20e different event club, absent from every retained club -> no_senior_appearance_ever
+  PASS  20f missing event year -> not_applicable (no meaningful comparison exists)
+  PASS  20g missing event club (e.g. tokenisation/discrepancy rows) -> not_applicable
+  PASS  20h missing club evidence -- retained clubs absent -> unknown, not guessed
+  PASS  20i missing/ambiguous event timing -- career bounds absent -> unknown
+  PASS  20j draft-year vs effective-season boundary: a career starting in the SAME calendar year as the event is never inferred as post_event_appearance (no destination-season '+1' assumption -- that exact heuristic is a forbidden mechanism one layer up in this same DraftGuru contract) -> unknown
+  PASS  20k a career ending exactly in the event year resolves to pre_event_only (inclusive bound, matching this tool's own relisting-signature section's own defining criterion)
+  PASS  20l club alias: 'Kangaroos' event club matches retained 'North Melbourne' (same-organization rename) -> pre_event_only, not no_senior_appearance_ever
+  PASS  20m club merger is never aliased: 'Fitzroy' against retained 'Brisbane Lions' alone -> no_senior_appearance_ever (a merger is a different organization, per src/lib/player-matching/club-identity.ts)
+  PASS  21a no_senior_appearance_ever message names the event club
+  PASS  21b pre_event_only message names the club and event year, and states no appearance after
+  PASS  21c post_event_appearance message names the club and event year
+  PASS  21d unknown message honestly states the evidence cannot establish the relationship
+  PASS  21e not_applicable carries no message
+  PASS  22a acknowledgement required: same-person verdict + no_senior_appearance_ever
+  PASS  22b acknowledgement required: same-person verdict + pre_event_only
+  PASS  22c acknowledgement NOT required for post_event_appearance, even on a same-person verdict (the ordinary case of a player going on to play)
+  PASS  22d acknowledgement NOT required for a non-same-person verdict, even with a no_senior_appearance_ever derivation -- the identity verdict stays independent
+  PASS  22e acknowledgement NOT required with no verdict recorded at all
+  PASS  22f fixture sanity: row 2 derives pre_event_only
+  PASS  22g questioning the derived club-appearance observation never changes the identity verdict, and the derived value is retained alongside the operator's own
+  PASS  23a fixture sanity: row 2's acknowledgement is required for the positive verdict
+  PASS  23b decided_count excludes a row missing only its required club-observation acknowledgement, with everything else in the pack complete
+  PASS  23c finalisation is refused when only the club-observation acknowledgement is missing -- the identity verdict itself is complete and valid
+  PASS  23d finalisation succeeds once the required acknowledgement is recorded
+  PASS  23e a row whose derivation needs no acknowledgement (post_event_appearance) never carries an event_club_observation key and never blocks finalisation
+  PASS  24a migration bumps schema_version to the current version
+  PASS  24b all 11 pre-existing decisions survive with an identical verdict, notes, decided_utc, row_ordinal_in_group, global_order and draftguru_url
+  PASS  24c migration adds a blank event_club_observation (and notes/decided_utc) to every pre-existing decision -- additive only, nothing cleared
+  PASS  24d migration records exactly one migration entry, schema 1 -> current
+  PASS  24e a pre-migration backup file was written
+  PASS  24f the backup is byte-identical to the pre-migration checkpoint
+  PASS  24g re-loading an already-migrated checkpoint is a no-op (no second migration entry)
+  PASS  24h re-loading an already-migrated checkpoint writes no second backup
+  PASS  24i migration is refused outright on a source-pack/checkpoint hash mismatch
+  PASS  24j no backup is written when the migration is refused on a hash mismatch
+  PASS  24k an unrecognised checkpoint schema_version is refused, not guessed at
+  PASS  25a build_afltables_url constructs the exact full URL from a relative href (the example given in the usability-correction request)
+  PASS  25b build_afltables_url passes an already-absolute afltables.com URL through unchanged
+  PASS  25c build_afltables_url accepts the www subdomain
+  PASS  25d build_afltables_url refuses an empty/missing href
+  PASS  25e build_afltables_url refuses an absolute href on an unexpected host
+  PASS  25f validate_evidence_url refuses a non-http(s) scheme
+  PASS  25g validate_evidence_url accepts the real DraftGuru host
+  PASS  25h validate_evidence_url refuses a DraftGuru URL against the AFL Tables allow-list (hosts are never interchangeable)
+  PASS  25i evidence_links_for builds both URLs for a real fixture row, error fields blank
+  PASS  25j evidence_links_for reports errors (never raises) for a row with missing links
+  PASS  26a a valid URL calls the (mocked) opener exactly once and reports ok
+  PASS  26b an unexpected-host URL is refused WITHOUT ever invoking the opener
+  PASS  26c an unexpected scheme is refused WITHOUT ever invoking the opener
+  PASS  26d a browser-launch failure is caught and reported, never raised
+  PASS  26e a missing URL is refused WITHOUT ever invoking the opener
+  PASS  26f a failed browser launch carries no checkpoint reference at all -- open_evidence_url takes no checkpoint argument, so it structurally cannot alter one
+  PASS  27a VERDICT_FRIENDLY_LABELS covers exactly SECTION_SPECS' allowed_verdicts, per group
+  PASS  27b every friendly label round-trips through VERDICT_CODE_BY_LABEL back to its own code
+  PASS  27c relisting friendly labels use the exact wording requested by the operator
+  PASS  27d EVENT_CLUB_OBSERVATION_FRIENDLY_LABELS covers exactly the five stored relationship values
+  PASS  27e every event-club friendly label round-trips through EVENT_CLUB_OBSERVATION_CODE_BY_LABEL
+  PASS  27f the checkpoint/final-output schema is untouched by the friendly-label correction: CHECKPOINT_SCHEMA_VERSION and SCHEMA_VERSION are unchanged from the prior release
+  PASS  28a fixture sanity: the row used below derives pre_event_only
+  PASS  28b confirming the suggested relationship (value == derived, notes == '') validates cleanly
+  PASS  28c choosing a different relationship WITHOUT notes is refused
+  PASS  28d choosing a different relationship WITH notes validates cleanly
+  PASS  28e a freshly created row entry (no decision at all yet) carries no event_club_observation -- never preselected regardless of what the row would derive
+  PASS  29a identity_verdict_entered_count counts all 11 pre-existing verdicts, regardless of any outstanding club-observation acknowledgement
+  PASS  29b decided_count (fully completed) is 1 of the 11 -- only the row needing no acknowledgement -- reproducing the real '11 entered, 1 complete' shape
+  PASS  29c club_acknowledgement_required_count is exactly the other 10
+  PASS  29d the three counters are genuinely independent: entered != fully-completed here, and entered == fully-completed + still-required
+  PASS  29e after an explicit confirmation on one outstanding row: entered unchanged, fully-completed +1, still-required -1
+  PASS  30a finalisation is still refused with only 11 of 83 rows decided (Finalise gating is unchanged by the usability correction)
+  PASS  31 the source pack file is byte-identical after every link/label/counter check above (compared against its sha256 as recorded at load time in section 1)
+  PASS  32a README documents the Open/Copy evidence-link buttons
+  PASS  32b README documents the friendly verdict labels alongside their stored codes
+  PASS  32c README documents the explicit confirm/choose-different workflow
+  PASS  32d README documents the three separate progress counters
+  PASS  32e README states that opening a link never records a decision, no option is preselected, and notes are required for a negative/uncertain/overridden choice
+  PASS  33a no pending change when nothing is selected in the combo (pending_code == '')
+  PASS  33b re-selecting the SAME value/notes already persisted is never a pending change
+  PASS  33c a differing pending selection with blank notes is pending and INVALID -- this is the case the operator believed had happened
+  PASS  33d a differing pending selection with SOME (even minimal) notes is pending but VALID -- would be accepted if Save is clicked, matching this tool's existing (unchanged) notes-required rule
+  PASS  33e a pending, valid, but NOT YET saved edit is never reported as confirmed -- has_pending is True until an explicit Save actually runs; the GUI's Confirmed line is wired to the checkpoint alone, never to this function's output
+  PASS  33f validate_event_club_observation and club_observation_pending_state can never disagree about what Save would accept (same underlying rule, called the same way)
+  PASS  34a no pending change -> may leave, no message
+  PASS  34b invalid pending change -> refused with the exact required message
+  PASS  34c valid-but-unsaved pending change -> also refused (never silently saved on the operator's behalf), with a distinct message directing Save or Discard
+  PASS  35a Previous disabled, with the required status text, on the first displayed row
+  PASS  35b Next disabled, with the required status text, on the last displayed row
+  PASS  35c a middle displayed row has both enabled and no status text
+  PASS  35d a single-row filtered result disables both, with a distinct status message
+  PASS  35e a cursor outside the filtered set is refused rather than guessed at
+  PASS  35f next_cursor respects the CURRENTLY DISPLAYED filtered order, not raw row indices (a non-contiguous filtered set: [5, 12, 40])
+  PASS  35g next_cursor never advances past the last displayed row (defence in depth behind the disabled Next button)
+  PASS  35h Previous works correctly after navigating forward: forward then back returns to the original displayed row
+  PASS  35i next_cursor never retreats past the first displayed row (defence in depth behind the disabled Previous button)
+  PASS  36a the Krakouer-shaped pattern (same club, career ended before the re-draft year) derives pre_event_only, not no_senior_appearance_ever or any club-mismatch outcome
+  PASS  36b a same-person identity verdict is fully valid for this pattern -- validate_decision never considers club identity at all, so a same-club re-draft is never disqualified
+  PASS  36c the acknowledgement requirement still applies (same-club re-draft is one of the two relationships needing explicit confirmation) -- this is by design, not a same-club-specific restriction
+  PASS  36d confirming the suggestion for this exact pattern persists pre_event_only cleanly
+  PASS  37 club_observation_pending_state takes no checkpoint/pack_info argument, so it structurally cannot mutate the real checkpoint or pack
+  PASS  37 can_leave_row takes no checkpoint/pack_info argument, so it structurally cannot mutate the real checkpoint or pack
+  PASS  37 nav_button_states takes no checkpoint/pack_info argument, so it structurally cannot mutate the real checkpoint or pack
+  PASS  37 next_cursor takes no checkpoint/pack_info argument, so it structurally cannot mutate the real checkpoint or pack
+  PASS  37b calling the new pending-state logic never mutates a real-shaped checkpoint dict passed nowhere near it
+  PASS  37c all 11 identity verdicts in the real-shaped fixture remain exactly 'same_person_valid_relisting' with their original notes/timestamps, unaffected by this fix
+  PASS  38a a generous width produces width-minus-margin
+  PASS  38b compute_wraplength never drops below its floor, even for a near-zero width (e.g. a stray startup Configure event before the window has a real size)
+  PASS  38c a custom margin/min_width are honoured
+  PASS  38d compute_wraplength is monotonic in width (wider window -> wider or equal wrap)
+  PASS  39a saved_acknowledgement_text never contains the word 'Confirmed'
+  PASS  39b unsaved_change_text for a currently-valid pending selection never says 'Confirmed' either, and is textually distinct from saved_acknowledgement_text
+  PASS  39c unsaved_change_text for an invalid pending selection includes the refusal reason
+  PASS  39d the two wording functions never produce the same text for the same underlying relationship -- a saved value and an unsaved one can never look identical
+  PASS  40a re-opening the row with the notes cleared is pending (notes text differs from persisted) and INVALID (still differs from the derived suggestion with blank notes), and its wording never says 'Confirmed'
+  PASS  40b the currently-persisted (wrong, pending operator correction) value still renders as a SAVED acknowledgement, honestly reflecting what is actually in the checkpoint
+  PASS  40c explicit confirmation (Confirm suggested relationship) targets pre_event_only with no notes required, and validates cleanly -- this is the operator's own correction path, never taken automatically by this tool
+  PASS  41a a valid, completed final output passes independent validation
+  PASS  41a2 the PASS report never leaks the operator's display name into console output (present in the returned dict for programmatic use only, per the report function)
+  PASS  41b1 a reported canonical-JSON hash mismatch is refused
+  PASS  41b2 a reported CSV hash mismatch is refused
+  PASS  41b3 a reported Markdown hash mismatch is refused
+  PASS  41c a reported source-pack hash mismatch is refused
+  PASS  41d1 a missing decision (a dropped row) is refused
+  PASS  41d2 a duplicated decision (same row twice, another row's identity missing) is refused
+  PASS  41d3 a reordered decision (out of source-pack order) is refused
+  PASS  41e a blank operator_verdict is refused
+  PASS  41f an allowed-verdict-for-a-different-group value is refused
+  PASS  41g a required-notes verdict with blank notes is refused
+  PASS  41h a same-person verdict missing its required club-observation acknowledgement is refused
+  PASS  41i a club-observation differing from the derived suggestion with blank notes is refused
+  PASS  41j a totals.by_verdict mismatch against the actual decision rows is refused
+  PASS  41k a completion_status other than 'complete' is refused
+  PASS  41l an absolute local path in a path-bearing field is refused
+  PASS  41m1 an email address in operator_display_name is refused
+  PASS  41m2 a credential-like keyword in operator_notes is refused
+  PASS  41n a CSV that no longer matches the deterministic re-render is refused
+  PASS  41o a Markdown that no longer matches the deterministic re-render is refused
+  PASS  41p a successful validation run writes no file and creates no new file
+  PASS  41q an all-negative-verdict fixture surfaces every row in negative_rows for awareness (never silently dropped, never itself a validation failure)
+  PASS  41z the REAL completed AFLDB-ISSUE-222 Phase 3 verdict artefacts independently validate and remain byte-identical to the pinned, operator-reported hashes (83/83 decisions)
+  PASS  42a a standalone HTTPS AFL Tables URL in operator_notes is allowed (the exact URL from the operator's bug report)
+  PASS  42b an HTTPS URL embedded in prose is allowed
+  PASS  42c multiple HTTP/HTTPS URLs in one note are allowed (the real Chris O'Dwyer row shape: three newline-separated citation URls)
+  PASS  42d a URL containing underscores and apostrophes is allowed
+  PASS  42e URL query strings and fragments are allowed
+  PASS  42f a Windows drive path (backslash form) is still refused
+  PASS  42g a forward-slash Windows drive path is still refused
+  PASS  42h a UNC path is still refused
+  PASS  42i a POSIX /home path is still refused
+  PASS  42i2 a POSIX /Users path is still refused
+  PASS  42j a file:// URL over a Windows path is still refused
+  PASS  42j2 a file:// URL over a POSIX path is still refused
+  PASS  42k a note carrying both a valid HTTPS URL and a separate local path is still refused
+  PASS  42l a malformed URL smuggling a Windows path into its own netloc does not bypass validation (backslashes are never valid inside a URL)
+  PASS  42l2 a host-less, malformed 'https:///...' string does not bypass validation
+  PASS  42l3 _is_valid_web_url rejects a candidate containing a backslash outright
+  PASS  42l4 _is_valid_web_url rejects a candidate with no hostname
+  PASS  42l5 _is_valid_web_url accepts a genuine http(s) URL with a valid hostname
+  PASS  42m structured path-bearing fields (tool.path etc.) still require a relative repository path -- unaffected by the URL-awareness fix, since they are never URLs
+  PASS  42n a '..' path-traversal segment in a structured path field is refused
+  PASS  42o a well-formed, relative structured path field set passes cleanly
+  PASS  42z an operator note carrying a real evidence-citation URL no longer false-positives end-to-end through validate_final_output (the exact regression the operator hit), and the run remains fully read-only
+
+All DraftGuru operator-adjudication-review checks hold.

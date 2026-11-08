@@ -1,0 +1,27 @@
+candidate tar and snapshot hashes verified (snapshot e77c307d3e0cddcb652e398a946e4c22c2063f13c70edadf96a975c92842826d, 30141895 bytes)
+Note: switching to 'c1c4b22ee15007111eab66f6d354e0b9ecbb2ade'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+HEAD=c1c4b22ee15007111eab66f6d354e0b9ecbb2ade out=0f251c2daa8d7c6c38eacd559376dde41e010fd9 tracked=4998 dirty=0 shallow=true
+--- files R changes against the serving revision (stat)
+ tools/v2/gap029-ops/restore-assemble-host.sh       |    4 +-
+ tools/v2/issue336-predraft-insert-production.ts    |  463 ++++++++
+ 303 files changed, 14470 insertions(+), 238 deletions(-)
+--- migrations at R
+117_brownlow_provider_eligibility_unknown.sql
+118_fixtures_unconfirmed_participants.sql
+118

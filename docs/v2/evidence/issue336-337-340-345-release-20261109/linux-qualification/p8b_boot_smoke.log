@@ -1,0 +1,10 @@
+GET / -> 200
+GET /players -> 200
+GET /clubs -> 200
+GET /seasons -> 200
+GET /draft -> 200
+GET /draft/2025 -> 200
+GET /draft/2024 -> 200
+draft/2024 body bytes=104484
+stopping smoke server pid 42047 (cwd /mnt/ssd/afldb-i336rel-qual-20261108T201140Z/cand/.next/standalone)
+✓ Ready in 0ms

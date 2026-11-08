@@ -1,0 +1,2 @@
+ERROR: AFLDB_OWNER_DATABASE_URL is outside the restore connection contract: it is not a single-host URL with a user and a plain database name.
+       Expected postgresql://USER:PASSWORD@HOST:PORT/DBNAME with no target-changing options.

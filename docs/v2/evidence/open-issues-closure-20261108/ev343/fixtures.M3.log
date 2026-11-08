@@ -1,0 +1,3 @@
+Fixtures-only snapshot 'afl-api-2027-2026-11-08-063639' (season 2027): 2 fixture(s) built, 0 build failure(s).
+Season feed CD_S2027014: 4 match(es), complete; statuses observed: CONCLUDED 2, SCHEDULED 2.
+AFL API ingestion refused: control database 'afldb_v2_i343a_test' does not match writer database 'afldb_v2_i343b_test'. No canonical settle was started.

@@ -1,0 +1,4 @@
+Season 2027 (CD_S2027014): 2 scheduled, 0 transition(s), 2 completed, 0 deferred, 0 refused.
+Observed statuses: CONCLUDED=2, SCHEDULED=2
+Scheduled by confirmation: 2 confirmed, 0 unconfirmed (0 with a provider-label participant, 0 with a placeholder venue).
+AFL API current-season ingestion is disabled (site_settings 'acquisition.afl_api_current_season_enabled').
