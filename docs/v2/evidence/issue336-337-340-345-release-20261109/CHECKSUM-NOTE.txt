@@ -1,0 +1,6 @@
+linux-qualification/build-next.log contains carriage-return progress output from next build.
+Git text normalisation (.gitattributes text=auto, eol=lf) stripped those CR bytes on commit, so
+linux-qualification.SHA256SUMS lists the committed bytes (sha256 204c4bc61dc3ebcbc7b4c52897fb063d4f124a242a9d911a557ed27cd1ca0366).
+The host original is sha256 31d6474fe811018f84ef791002ce5f21653e6537338c299e1d935ec927ba8b43; it is retained in the host workspace
+/mnt/ssd/afldb-i336rel-qual-20261108T201140Z/evidence/ and in evidence.tar.gz there
+(sha256 5f3c5f1e63d35a7f67666d629795848dbe916c75d9ba79849aa91e79c644c51c).
