@@ -151,19 +151,35 @@ export const ROLE_RANK: Record<AdminUser['role'], number> = {
   super_admin: 2,
 };
 
-/** Create a database session and set the admin cookie. */
-export async function createAdminSession(userId: number, email: string): Promise<void> {
+/**
+ * A new admin session's opaque token and the row to store for it
+ * (AFLDB-ISSUE-340). The row is inserted by the caller's credential
+ * transaction (src/db/queries/admin-credentials.ts), under the same user-row
+ * lock as the credential check, and the cookie is set with
+ * `setAdminSessionCookie` only after that transaction commits. There is no
+ * standalone "insert a session" path any more: a session minted outside that
+ * lock could outlive a rotation that had already revoked every session.
+ */
+export async function prepareAdminSession(): Promise<{
+  token: string;
+  row: { tokenHash: string; ttlSeconds: number; ip: string | null; userAgent: string | null };
+}> {
   const token = generateToken();
   const ip = await requestIp();
-  const h = await headers();
+  let userAgent: string | null = null;
+  try {
+    userAgent = (await headers()).get('user-agent')?.slice(0, 300) ?? null;
+  } catch {
+    userAgent = null;
+  }
+  return {
+    token,
+    row: { tokenHash: sha256Hex(token), ttlSeconds: ADMIN_TTL_SECONDS, ip, userAgent },
+  };
+}
 
-  await authSql`
-    INSERT INTO auth_sessions (token_hash, user_id, expires_at, ip, user_agent)
-    VALUES (${sha256Hex(token)}, ${userId},
-            now() + ${ADMIN_TTL_SECONDS} * interval '1 second',
-            ${ip}, ${h.get('user-agent')?.slice(0, 300) ?? null})
-  `;
-
+/** Set the admin cookie for a session row that has already been committed. */
+export async function setAdminSessionCookie(userId: number, token: string): Promise<void> {
   // The cookie carries the claim AND the opaque token: the claim is what
   // middleware can check without a database, the token is what the
   // database session check uses.
@@ -196,7 +212,8 @@ export async function createAdminSession(userId: number, email: string): Promise
  * auth_sessions JOIN. The cache is per request, so nothing is held across
  * requests and a revoked session is still noticed on the next one.
  */
-export const getAdminUser = cache(async function getAdminUser(): Promise<AdminUser | null> {
+/** The opaque session token carried by a validly signed admin cookie, or null. */
+async function adminCookieToken(): Promise<string | null> {
   const jar = await cookies();
   const claim = await verifyClaim(
     jar.get(ADMIN_COOKIE)?.value,
@@ -207,7 +224,22 @@ export const getAdminUser = cache(async function getAdminUser(): Promise<AdminUs
 
   const colon = claim.sub.indexOf(':');
   if (colon <= 0) return null;
-  const token = claim.sub.slice(colon + 1);
+  return claim.sub.slice(colon + 1);
+}
+
+/**
+ * sha256 of the current request's admin session token, or null. The
+ * credential transactions (AFLDB-ISSUE-340) re-check that THIS session is
+ * still live under the user-row lock, since getAdminUser() ran before it.
+ */
+export async function currentAdminSessionTokenHash(): Promise<string | null> {
+  const token = await adminCookieToken();
+  return token === null ? null : sha256Hex(token);
+}
+
+export const getAdminUser = cache(async function getAdminUser(): Promise<AdminUser | null> {
+  const token = await adminCookieToken();
+  if (token === null) return null;
 
   // AFLDB-ISSUE-186 Phase A: 'contributor' is deliberately absent from this
   // list. The role value, and any existing contributor row, are retained

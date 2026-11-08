@@ -42,6 +42,12 @@ vi.mock('next/headers', () => ({
 
 // After the mock, which vitest hoists above the imports.
 import {
+  changeOwnPasswordInTransaction,
+  issueLoginSessionInTransaction,
+  issueTemporaryPasswordInTransaction,
+  type NewSessionRow,
+} from '@/db/queries/admin-credentials';
+import {
   INVITE_REDEMPTION_STATEMENT_TIMEOUT_MS,
   redeemInviteInTransaction,
   type InviteRedemptionTestHooks,
@@ -1282,5 +1288,292 @@ describe('invite redemption cannot overwrite a peer (AFLDB-ISSUE-270)', () => {
       ok: false, reason: 'outranked', existingRole: 'super_admin',
     });
     expect(await credentialsAt(target.email)).toMatchObject({ role: 'super_admin', passwordHash: 'scrypt$test$dummy' });
+  });
+});
+
+/**
+ * AFLDB-ISSUE-340: credential rotation against requests already in flight.
+ *
+ * The "pause" in the defect is the gap between a request verifying a
+ * credential (scrypt/TOTP, outside any transaction) and its write. Here that
+ * gap is represented exactly: the verified snapshot is the fixture's stored
+ * hash/secret read before the competing rotation, and the body is then run
+ * after (sequential cases) or while (blocked cases, waitForBlock) the
+ * rotation holds the row lock. No sleep decides an outcome.
+ */
+describe('credential rotation cannot be undone by a request already in flight (AFLDB-ISSUE-340)', () => {
+  const FIXTURE_HASH = 'scrypt$test$dummy';
+  const FIXTURE_TOTP = 'JBSWY3DPEHPK3PXP';
+
+  async function liveSession(userId: number): Promise<string> {
+    const tokenHash = `i340-${randomUUID()}`;
+    await observer`
+      INSERT INTO auth_sessions (token_hash, user_id, expires_at)
+      VALUES (${tokenHash}, ${userId}, now() + interval '1 day')
+    `;
+    return tokenHash;
+  }
+
+  function newSession(): NewSessionRow {
+    return { tokenHash: `i340-${randomUUID()}`, ttlSeconds: 3600, ip: null, userAgent: null };
+  }
+
+  async function credentialState(id: number) {
+    const [row] = await observer<{
+      passwordHash: string | null; mustChangePassword: boolean; totpLastStep: number | null;
+    }[]>`
+      SELECT password_hash AS "passwordHash", must_change_password AS "mustChangePassword",
+             totp_last_step::int AS "totpLastStep"
+        FROM auth_users WHERE id = ${id}
+    `;
+    return row;
+  }
+
+  async function sessionLive(tokenHash: string): Promise<boolean> {
+    const rows = await observer`
+      SELECT 1 FROM auth_sessions WHERE token_hash = ${tokenHash} AND revoked_at IS NULL
+    `;
+    return rows.length > 0;
+  }
+
+  /** A manager reset of `target` by `boss`, committed on its own connection. */
+  async function reset(boss: Fixture, bossSession: string, target: Fixture, hash = 'scrypt$i340$reset') {
+    return sql.begin((tx) => issueTemporaryPasswordInTransaction(tx, {
+      actorId: boss.id, actorSessionTokenHash: bossSession, targetId: target.id, newPasswordHash: hash,
+    }));
+  }
+
+  it('witness: the pre-fix statements let a stale own change overwrite a committed reset', async () => {
+    // The original defect, reproduced with the exact statements the old
+    // changeOwnPassword ran after its pre-transaction verification. This is
+    // what the guarded body below must refuse.
+    const boss = await createAccount({ role: 'super_admin' });
+    const target = await createAccount({ role: 'admin' });
+    const bossSession = await liveSession(boss.id);
+    await liveSession(target.id);
+    // (1) the change verified FIXTURE_HASH ... (2) the reset commits ...
+    expect(await reset(boss, bossSession, target)).toMatchObject({ ok: true });
+    // (3) the old body: UPDATE by id, revoke, insert -- no snapshot check.
+    await sql.begin(async (tx) => {
+      await tx`UPDATE auth_users SET password_hash = 'scrypt$i340$stale', must_change_password = false WHERE id = ${target.id}`;
+      await tx`UPDATE auth_sessions SET revoked_at = now() WHERE user_id = ${target.id} AND revoked_at IS NULL`;
+    });
+    await observer`INSERT INTO auth_sessions (token_hash, user_id, expires_at) VALUES (${`i340-${randomUUID()}`}, ${target.id}, now() + interval '1 day')`;
+    expect(await credentialState(target.id)).toMatchObject({ passwordHash: 'scrypt$i340$stale', mustChangePassword: false });
+    expect(await liveSessionCount(target.id)).toBe(1);
+  });
+
+  it('a stale own change after a committed reset refuses, keeping the reset and its forced-change flag', async () => {
+    const boss = await createAccount({ role: 'super_admin' });
+    const target = await createAccount({ role: 'admin' });
+    const bossSession = await liveSession(boss.id);
+    const targetSession = await liveSession(target.id);
+
+    expect(await reset(boss, bossSession, target)).toMatchObject({ ok: true });
+    const fresh = newSession();
+    const result = await sql.begin((tx) => changeOwnPasswordInTransaction(tx, {
+      userId: target.id, sessionTokenHash: targetSession, verifiedPasswordHash: FIXTURE_HASH,
+      newPasswordHash: 'scrypt$i340$stale', session: fresh,
+    }));
+
+    expect(result).toEqual({ ok: false, reason: 'stale' });
+    expect(await credentialState(target.id)).toMatchObject({ passwordHash: 'scrypt$i340$reset', mustChangePassword: true });
+    expect(await sessionLive(fresh.tokenHash)).toBe(false);
+    expect(await liveSessionCount(target.id)).toBe(0);
+  });
+
+  it('an own change blocked behind a reset re-reads the rotated row once the lock is granted and refuses', async () => {
+    const boss = await createAccount({ role: 'super_admin' });
+    const target = await createAccount({ role: 'admin' });
+    const bossSession = await liveSession(boss.id);
+    const targetSession = await liveSession(target.id);
+    const fresh = newSession();
+
+    const { t1Result, t2Result } = await withBackground(async (bg) => {
+      const race: { t2?: Promise<unknown> } = {};
+      const t1Result = await sql1.begin(async (tx1) => {
+        const [{ pid: t1Pid }] = await tx1<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
+        return issueTemporaryPasswordInTransaction(tx1, {
+          actorId: boss.id, actorSessionTokenHash: bossSession, targetId: target.id,
+          newPasswordHash: 'scrypt$i340$reset',
+        }, {
+          afterLock: async () => {
+            const t2 = await startTracked(bg, (tx2) => changeOwnPasswordInTransaction(tx2, {
+              userId: target.id, sessionTokenHash: targetSession, verifiedPasswordHash: FIXTURE_HASH,
+              newPasswordHash: 'scrypt$i340$stale', session: fresh,
+            }), 'the stale own change');
+            race.t2 = t2.done;
+            await waitForBlock(t1Pid, t2.pid);
+          },
+        });
+      });
+      if (!race.t2) throw new Error('the stale own change was never started');
+      return { t1Result, t2Result: await race.t2 };
+    });
+
+    expect(t1Result).toMatchObject({ ok: true });
+    expect(t2Result).toEqual({ ok: false, reason: 'stale' });
+    expect(await credentialState(target.id)).toMatchObject({ passwordHash: 'scrypt$i340$reset', mustChangePassword: true });
+    expect(await sessionLive(fresh.tokenHash)).toBe(false);
+  });
+
+  it('of two own changes verified against the same password, only the first commits', async () => {
+    const user = await createAccount({ role: 'admin' });
+    const session = await liveSession(user.id);
+    const first = newSession();
+    expect(await sql.begin((tx) => changeOwnPasswordInTransaction(tx, {
+      userId: user.id, sessionTokenHash: session, verifiedPasswordHash: FIXTURE_HASH,
+      newPasswordHash: 'scrypt$i340$first', session: first,
+    }))).toEqual({ ok: true });
+    const second = newSession();
+    expect(await sql.begin((tx) => changeOwnPasswordInTransaction(tx, {
+      userId: user.id, sessionTokenHash: first.tokenHash, verifiedPasswordHash: FIXTURE_HASH,
+      newPasswordHash: 'scrypt$i340$second', session: second,
+    }))).toEqual({ ok: false, reason: 'stale' });
+    expect((await credentialState(user.id)).passwordHash).toBe('scrypt$i340$first');
+    expect(await sessionLive(first.tokenHash)).toBe(true);
+    expect(await sessionLive(second.tokenHash)).toBe(false);
+  });
+
+  it('an ordinary own change rotates the password, revokes every session and leaves exactly the new one', async () => {
+    const user = await createAccount({ role: 'admin' });
+    const session = await liveSession(user.id);
+    await liveSession(user.id);
+    await observer`UPDATE auth_users SET must_change_password = true WHERE id = ${user.id}`;
+    const fresh = newSession();
+    expect(await sql.begin((tx) => changeOwnPasswordInTransaction(tx, {
+      userId: user.id, sessionTokenHash: session, verifiedPasswordHash: FIXTURE_HASH,
+      newPasswordHash: 'scrypt$i340$new', session: fresh,
+    }))).toEqual({ ok: true });
+    expect(await credentialState(user.id)).toMatchObject({ passwordHash: 'scrypt$i340$new', mustChangePassword: false });
+    expect(await liveSessionCount(user.id)).toBe(1);
+    expect(await sessionLive(fresh.tokenHash)).toBe(true);
+  });
+
+  it('an own change on a revoked session refuses even with the right password', async () => {
+    const user = await createAccount({ role: 'admin' });
+    const session = await liveSession(user.id);
+    await observer`UPDATE auth_sessions SET revoked_at = now() WHERE token_hash = ${session}`;
+    expect(await sql.begin((tx) => changeOwnPasswordInTransaction(tx, {
+      userId: user.id, sessionTokenHash: session, verifiedPasswordHash: FIXTURE_HASH,
+      newPasswordHash: 'scrypt$i340$new', session: newSession(),
+    }))).toEqual({ ok: false, reason: 'stale' });
+    expect((await credentialState(user.id)).passwordHash).toBe(FIXTURE_HASH);
+  });
+
+  it('a login verified before an own change committed mints no session afterwards', async () => {
+    const user = await createAccount({ role: 'admin' });
+    const session = await liveSession(user.id);
+    expect(await sql.begin((tx) => changeOwnPasswordInTransaction(tx, {
+      userId: user.id, sessionTokenHash: session, verifiedPasswordHash: FIXTURE_HASH,
+      newPasswordHash: 'scrypt$i340$new', session: newSession(),
+    }))).toEqual({ ok: true });
+
+    const late = newSession();
+    expect(await sql.begin((tx) => issueLoginSessionInTransaction(tx, {
+      userId: user.id, verifiedPasswordHash: FIXTURE_HASH, verifiedTotpSecret: FIXTURE_TOTP,
+      totpStep: 1000, session: late,
+    }))).toEqual({ ok: false, reason: 'credentials_changed' });
+    expect(await sessionLive(late.tokenHash)).toBe(false);
+    // The TOTP step was not consumed by the refused attempt.
+    expect((await credentialState(user.id)).totpLastStep).toBeNull();
+  });
+
+  it('a session a login commits while holding the lock is revoked by the change that waited for it', async () => {
+    const user = await createAccount({ role: 'admin' });
+    const session = await liveSession(user.id);
+    const loginSession = newSession();
+    const changeSession = newSession();
+
+    const { t1Result, t2Result } = await withBackground(async (bg) => {
+      const race: { t2?: Promise<unknown> } = {};
+      const t1Result = await sql1.begin(async (tx1) => {
+        const [{ pid: t1Pid }] = await tx1<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
+        return issueLoginSessionInTransaction(tx1, {
+          userId: user.id, verifiedPasswordHash: FIXTURE_HASH, verifiedTotpSecret: FIXTURE_TOTP,
+          totpStep: 1000, session: loginSession,
+        }, {
+          afterLock: async () => {
+            const t2 = await startTracked(bg, (tx2) => changeOwnPasswordInTransaction(tx2, {
+              userId: user.id, sessionTokenHash: session, verifiedPasswordHash: FIXTURE_HASH,
+              newPasswordHash: 'scrypt$i340$new', session: changeSession,
+            }), 'the own change');
+            race.t2 = t2.done;
+            await waitForBlock(t1Pid, t2.pid);
+          },
+        });
+      });
+      if (!race.t2) throw new Error('the own change was never started');
+      return { t1Result, t2Result: await race.t2 };
+    });
+
+    expect(t1Result).toEqual({ ok: true });
+    expect(t2Result).toEqual({ ok: true });
+    expect(await sessionLive(loginSession.tokenHash)).toBe(false);
+    expect(await sessionLive(changeSession.tokenHash)).toBe(true);
+    expect(await liveSessionCount(user.id)).toBe(1);
+  });
+
+  it('a TOTP step is consumed exactly once', async () => {
+    const user = await createAccount({ role: 'admin' });
+    const first = newSession();
+    const second = newSession();
+    const login = (session: NewSessionRow) => sql.begin((tx) => issueLoginSessionInTransaction(tx, {
+      userId: user.id, verifiedPasswordHash: FIXTURE_HASH, verifiedTotpSecret: FIXTURE_TOTP,
+      totpStep: 2000, session,
+    }));
+    expect(await login(first)).toEqual({ ok: true });
+    expect(await login(second)).toEqual({ ok: false, reason: 'totp_replay' });
+    expect(await sessionLive(first.tokenHash)).toBe(true);
+    expect(await sessionLive(second.tokenHash)).toBe(false);
+  });
+
+  it('a login verified before the account was disabled or demoted to contributor mints nothing', async () => {
+    const disabled = await createAccount({ role: 'admin' });
+    await observer`UPDATE auth_users SET disabled_at = now() WHERE id = ${disabled.id}`;
+    const contributor = await createAccount({ role: 'admin' });
+    await observer`UPDATE auth_users SET role = 'contributor' WHERE id = ${contributor.id}`;
+    for (const user of [disabled, contributor]) {
+      const session = newSession();
+      expect(await sql.begin((tx) => issueLoginSessionInTransaction(tx, {
+        userId: user.id, verifiedPasswordHash: FIXTURE_HASH, verifiedTotpSecret: FIXTURE_TOTP,
+        totpStep: 3000, session,
+      }))).toEqual({ ok: false, reason: 'credentials_changed' });
+      expect(await sessionLive(session.tokenHash)).toBe(false);
+    }
+  });
+
+  it('a reset re-checks the actor under the lock: a demoted or forced-change actor refuses', async () => {
+    const boss = await createAccount({ role: 'super_admin' });
+    const target = await createAccount({ role: 'admin' });
+    const bossSession = await liveSession(boss.id);
+    await observer`UPDATE auth_users SET role = 'admin' WHERE id = ${boss.id}`;
+    expect(await reset(boss, bossSession, target)).toMatchObject({ ok: false, reason: 'actor_stale' });
+    await observer`UPDATE auth_users SET role = 'super_admin', must_change_password = true WHERE id = ${boss.id}`;
+    expect(await reset(boss, bossSession, target)).toMatchObject({ ok: false, reason: 'actor_stale' });
+    expect((await credentialState(target.id)).passwordHash).toBe(FIXTURE_HASH);
+  });
+
+  it('a delegated manager cannot reset an administrator promoted after the page was rendered', async () => {
+    const manager = await createAccount({ role: 'admin', canManageAdmins: true });
+    const target = await createAccount({ role: 'contributor' });
+    const managerSession = await liveSession(manager.id);
+    await observer`UPDATE auth_users SET role = 'admin' WHERE id = ${target.id}`;
+    expect(await reset(manager, managerSession, target)).toMatchObject({ ok: false, reason: 'outranked' });
+    expect((await credentialState(target.id)).passwordHash).toBe(FIXTURE_HASH);
+  });
+
+  it('rolls the password change and the revocation back together when the session insert fails', async () => {
+    const user = await createAccount({ role: 'admin' });
+    const session = await liveSession(user.id);
+    // A replacement session whose token_hash collides with the live one:
+    // the UNIQUE constraint fails the INSERT after the UPDATE and the revoke.
+    await expect(sql.begin((tx) => changeOwnPasswordInTransaction(tx, {
+      userId: user.id, sessionTokenHash: session, verifiedPasswordHash: FIXTURE_HASH,
+      newPasswordHash: 'scrypt$i340$new',
+      session: { tokenHash: session, ttlSeconds: 3600, ip: null, userAgent: null },
+    }))).rejects.toMatchObject({ code: '23505' });
+    expect((await credentialState(user.id)).passwordHash).toBe(FIXTURE_HASH);
+    expect(await sessionLive(session)).toBe(true);
   });
 });

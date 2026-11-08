@@ -1,10 +1,18 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 
 import { authSql } from '@/db/authClient';
+import { issueTemporaryPasswordInTransaction } from '@/db/queries/admin-credentials';
 import { generateTemporaryPassword, hashPassword } from '@/lib/auth/crypto';
-import { ROLE_RANK, type AdminUser, audit, requireCapability } from '@/lib/auth/session';
+import {
+  ROLE_RANK,
+  type AdminUser,
+  audit,
+  currentAdminSessionTokenHash,
+  requireCapability,
+} from '@/lib/auth/session';
 
 /**
  * Issue a temporary password for somebody else's account.
@@ -74,24 +82,39 @@ export async function issueTemporaryPassword(
 
   const temporaryPassword = generateTemporaryPassword();
   const passwordHash = await hashPassword(temporaryPassword);
+  const actorSessionTokenHash = await currentAdminSessionTokenHash();
+  if (actorSessionTokenHash === null) redirect('/admin/login');
 
-  await authSql.begin(async (tx) => {
-    await tx`
-      UPDATE auth_users
-         SET password_hash        = ${passwordHash},
-             must_change_password = true,
-             password_changed_at  = now()
-       WHERE id = ${target.id}
-    `;
-    // Whatever the account was signed in as is no longer what it is. This
-    // also covers the case the reset exists for -- an account somebody else
-    // has got into -- where leaving the intruder's session alive would make
-    // the reset pointless.
-    await tx`
-      UPDATE auth_sessions SET revoked_at = now()
-       WHERE user_id = ${target.id} AND revoked_at IS NULL
-    `;
-  });
+  // Whatever the account was signed in as is no longer what it is: the
+  // password changes and every session is revoked together. This also
+  // covers the case the reset exists for -- an account somebody else has
+  // got into -- where leaving the intruder's session alive would make the
+  // reset pointless.
+  //
+  // AFLDB-ISSUE-340: both rows are locked (stable id order) and the actor's
+  // authority and the target's rank re-checked under the lock, so a
+  // demotion, a promotion or a rotation of the actor's own credentials that
+  // committed after the checks above cannot be raced past them. The new
+  // hash also invalidates any in-flight login or own-password change that
+  // verified the replaced one (admin-credentials.ts).
+  const outcome = await authSql.begin((tx) => issueTemporaryPasswordInTransaction(tx, {
+    actorId: admin.id,
+    actorSessionTokenHash,
+    targetId: target.id,
+    newPasswordHash: passwordHash,
+  }));
+  if (!outcome.ok) {
+    await audit('admin.password_reset_refused',
+      { targetUserId: target.id, targetEmail: outcome.targetEmail ?? target.email,
+        targetRole: outcome.targetRole, reason: outcome.reason },
+      { userId: admin.id, label: admin.email });
+    return {
+      error: outcome.reason === 'outranked'
+        ? 'That account is an administrator. Only a super admin can reset its password.'
+        : 'Your session or that account changed while this was being saved. Reload and try again.',
+      email: target.email,
+    };
+  }
 
   await audit('admin.password_reset',
     { targetUserId: target.id, targetEmail: target.email },

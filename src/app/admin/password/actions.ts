@@ -3,12 +3,15 @@
 import { redirect } from 'next/navigation';
 
 import { authSql } from '@/db/authClient';
+import { changeOwnPasswordInTransaction } from '@/db/queries/admin-credentials';
 import { MIN_PASSWORD_LENGTH, hashPassword, verifyPassword } from '@/lib/auth/crypto';
 import { RateLimiter } from '@/lib/auth/rate-limit';
 import {
   audit,
-  createAdminSession,
+  currentAdminSessionTokenHash,
+  prepareAdminSession,
   requireSignedIn,
+  setAdminSessionCookie,
 } from '@/lib/auth/session';
 
 /**
@@ -68,28 +71,41 @@ export async function changeOwnPassword(
   }
 
   const passwordHash = await hashPassword(next);
+  const sessionTokenHash = await currentAdminSessionTokenHash();
+  if (sessionTokenHash === null) redirect('/admin/login');
 
-  await authSql.begin(async (tx) => {
-    await tx`
-      UPDATE auth_users
-         SET password_hash        = ${passwordHash},
-             must_change_password = false,
-             password_changed_at  = now()
-       WHERE id = ${admin.id}
-    `;
-    // Every session, this one included. A credential change is the moment to
-    // rotate: any session opened with the OLD password -- on a shared
-    // machine, or by whoever the reset was issued because of -- dies here,
-    // and the caller gets a fresh one below rather than carrying on with the
-    // identifier that was live while the old password was.
-    await tx`
-      UPDATE auth_sessions SET revoked_at = now()
-       WHERE user_id = ${admin.id} AND revoked_at IS NULL
-    `;
-  });
+  // Every session, this one included, is revoked in the same transaction
+  // that changes the password. A credential change is the moment to rotate:
+  // any session opened with the OLD password -- on a shared machine, or by
+  // whoever the reset was issued because of -- dies here, and the caller
+  // gets a fresh one rather than carrying on with the identifier that was
+  // live while the old password was.
+  //
+  // AFLDB-ISSUE-340: all of it happens under the account's row lock, and
+  // only if this request's session is still live and the stored hash is
+  // still the one the current password was verified against above. A reset
+  // committed while this request was hashing has replaced that hash and
+  // revoked this session; overwriting it -- and clearing its
+  // must_change_password -- with a password verified against the replaced
+  // one is exactly what this refuses. The new session is inserted inside the
+  // same transaction and its cookie set only after it commits.
+  const pending = await prepareAdminSession();
+  const outcome = await authSql.begin((tx) => changeOwnPasswordInTransaction(tx, {
+    userId: admin.id,
+    sessionTokenHash,
+    verifiedPasswordHash: row.passwordHash!,
+    newPasswordHash: passwordHash,
+    session: pending.row,
+  }));
+  if (!outcome.ok) {
+    await audit('admin.password_change_stale', null, { userId: admin.id, label: admin.email });
+    return { error: 'Your password or session changed while this was being saved. Sign in again and retry.' };
+  }
 
-  await createAdminSession(admin.id, admin.email);
+  // Committed: the rotation stands even if the cookie cannot be set, in
+  // which case the caller simply signs in again with the new password.
   await audit('admin.password_changed', null, { userId: admin.id, label: admin.email });
+  await setAdminSessionCookie(admin.id, pending.token);
 
   // Contributors have nowhere else to be; everyone else lands on the
   // dashboard, which is what they were trying to reach if they got here by

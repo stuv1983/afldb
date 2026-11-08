@@ -3,9 +3,10 @@
 import { redirect } from 'next/navigation';
 
 import { authSql } from '@/db/authClient';
+import { issueLoginSessionInTransaction } from '@/db/queries/admin-credentials';
 import { verifyPassword, verifyTotpStep } from '@/lib/auth/crypto';
 import { RateLimiter } from '@/lib/auth/rate-limit';
-import { audit, createAdminSession, requestIp } from '@/lib/auth/session';
+import { audit, prepareAdminSession, requestIp, setAdminSessionCookie } from '@/lib/auth/session';
 
 export type LoginState = { error?: string };
 
@@ -39,7 +40,7 @@ export async function adminLogin(
   // password + TOTP, disabled_at still NULL) can no longer establish a
   // session here at all -- interactive sign-in is closed at this query,
   // not merely at a later role check, so the account never even reaches
-  // createAdminSession().
+  // the session insert (issueLoginSessionInTransaction re-checks it too).
   const [user] = await authSql<{
     id: number; email: string; passwordHash: string | null; totpSecret: string | null;
   }[]>`
@@ -67,19 +68,31 @@ export async function adminLogin(
   // over a shoulder or in transit is dead the moment the owner uses it.
   // Claimed only after the password has already passed, so knowing a code
   // alone cannot burn a step the legitimate owner is about to need.
-  const [claimed] = await authSql<{ id: number }[]>`
-    UPDATE auth_users
-       SET totp_last_step = ${totpStep}
-     WHERE id = ${user.id}
-       AND (totp_last_step IS NULL OR totp_last_step < ${totpStep})
-    RETURNING id
-  `;
-  if (!claimed) {
-    await audit('admin.login_totp_replay', { email }, { label: email });
+  //
+  // AFLDB-ISSUE-340: the claim and the session INSERT happen under the
+  // account's row lock, and only if the stored hash and TOTP secret are
+  // still the ones verified above. A password change, reset or re-enrolment
+  // that committed after that verification has rotated the hash and revoked
+  // every session; this request then mints nothing. The cookie is set only
+  // after the transaction commits.
+  const pending = await prepareAdminSession();
+  const outcome = await authSql.begin((tx) => issueLoginSessionInTransaction(tx, {
+    userId: user.id,
+    verifiedPasswordHash: user.passwordHash!,
+    verifiedTotpSecret: user.totpSecret!,
+    totpStep,
+    session: pending.row,
+  }));
+  if (!outcome.ok) {
+    await audit(
+      outcome.reason === 'totp_replay' ? 'admin.login_totp_replay' : 'admin.login_credentials_changed',
+      { email },
+      { label: email },
+    );
     return { error: FAILURE };
   }
 
   await audit('admin.login', null, { userId: user.id, label: user.email });
-  await createAdminSession(user.id, user.email);
+  await setAdminSessionCookie(user.id, pending.token);
   redirect('/admin');
 }
