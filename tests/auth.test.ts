@@ -141,6 +141,8 @@ vi.mock('next/headers', () => ({
 // test can tell /admin/upload from /admin from /admin/login.
 vi.mock('next/navigation', () => ({
   redirect: (to: string): never => { throw new Error(`NEXT_REDIRECT ${to}`); },
+  // requireAudience (AFLDB-ISSUE-345) answers an under-ranked session with a 404.
+  notFound: (): never => { throw new Error('NEXT_NOT_FOUND'); },
 }));
 
 import type postgres from 'postgres';
@@ -169,6 +171,7 @@ import {
   type LifecycleAccountState,
 } from '@/lib/auth/admin-lifecycle';
 import { hasCapability, type Capability, type CapabilityViewer } from '@/lib/auth/capabilities';
+import { requireAudience } from '@/lib/auth/audience';
 import { audit, auditInTransaction, getAdminUser, requireCapability } from '@/lib/auth/session';
 import {
   MIN_PASSWORD_LENGTH,
@@ -2207,6 +2210,83 @@ describe('requireCapability against the real guard (AFLDB-ISSUE-158)', () => {
   it('turns a delegated contributor away from admin management at the guard, not only in the table', async () => {
     await signedIn('contributor', true);
     await expect(requireCapability('people.admins.manage')).rejects.toThrow(/^NEXT_REDIRECT \/admin\/upload$/);
+  });
+});
+
+/**
+ * AFLDB-ISSUE-345: the configurable-audience guard behind /grid-solver,
+ * against the real session guard. Before the fix a super admin holding a
+ * temporary password resolved here (the default audience is super_admin)
+ * and reached the solver's queries; it must now be sent to /admin/password
+ * exactly as every /admin route sends it.
+ */
+describe('requireAudience against the real guard (AFLDB-ISSUE-345)', () => {
+  const signedIn = async (role: 'admin' | 'super_admin', mustChangePassword = false) => {
+    process.env.AFLDB_SESSION_SECRET = 'x'.repeat(48);
+    requestCookie.admin = await signClaim(
+      { v: 1, kind: 'admin', sub: '5:opaque-token', exp: Math.floor(Date.now() / 1000) + 60, epoch: 1 },
+      process.env.AFLDB_SESSION_SECRET,
+    );
+    sessionRow.row = { id: 5, email: `${role}@afldb.test`, role, canManageAdmins: false, mustChangePassword };
+  };
+
+  beforeEach(() => { poolQueries.length = 0; });
+  afterEach(() => {
+    requestCookie.admin = null;
+    sessionRow.row = null;
+  });
+
+  it('public: admits anyone with no session lookup at all', async () => {
+    await signedIn('super_admin', true);
+    await expect(requireAudience('public')).resolves.toBeNull();
+    expect(poolQueries).toHaveLength(0);
+  });
+
+  it('sends a signed-out caller to the login form', async () => {
+    await expect(requireAudience('super_admin')).rejects.toThrow(/^NEXT_REDIRECT \/admin\/login$/);
+  });
+
+  it('sends a revoked, expired or disabled session (no live row) to the login form', async () => {
+    await signedIn('super_admin');
+    sessionRow.row = null;
+    await expect(requireAudience('admin')).rejects.toThrow(/^NEXT_REDIRECT \/admin\/login$/);
+  });
+
+  it('answers an under-ranked session with a 404', async () => {
+    await signedIn('admin');
+    await expect(requireAudience('super_admin')).rejects.toThrow(/^NEXT_NOT_FOUND$/);
+  });
+
+  it('admits a sufficiently ranked normal session', async () => {
+    await signedIn('super_admin');
+    await expect(requireAudience('super_admin')).resolves.toMatchObject({ id: 5, role: 'super_admin' });
+    await signedIn('admin');
+    await expect(requireAudience('admin')).resolves.toMatchObject({ id: 5, role: 'admin' });
+  });
+
+  it('sends a forced-change account to /admin/password at the default restricted audience', async () => {
+    await signedIn('super_admin', true);
+    await expect(requireAudience('super_admin')).rejects.toThrow(/^NEXT_REDIRECT \/admin\/password$/);
+    await signedIn('admin', true);
+    await expect(requireAudience('admin')).rejects.toThrow(/^NEXT_REDIRECT \/admin\/password$/);
+  });
+
+  it('runs the forced-change rule before the role comparison', async () => {
+    await signedIn('admin', true);
+    await expect(requireAudience('super_admin')).rejects.toThrow(/^NEXT_REDIRECT \/admin\/password$/);
+  });
+
+  it('the Grid Solver page calls the guard before any solver query', () => {
+    const source = readSource(join(REPO, 'src', 'app', 'grid-solver', 'page.tsx'));
+    const guard = source.indexOf('await requireAudience(gridAudience);');
+    expect(guard).toBeGreaterThan(0);
+    for (const query of ['getClubOrganizationOptions()', 'getPlayerNames(', 'solveCellSummary(', 'solveCellRows(']) {
+      const at = source.indexOf(query);
+      if (at >= 0) expect(at, query).toBeGreaterThan(guard);
+    }
+    // The audience setting read is the only query allowed ahead of it.
+    expect(source.slice(source.indexOf('export default async function'), guard))
+      .not.toMatch(/get(Club|Venue|Award|Coach|Player)\w*\(|solveCell/);
   });
 });
 
