@@ -1,10 +1,87 @@
-param([string] $ExportDir = '')
+param(
+  [string] $ExportDir = '',
+  [string] $GitBashPath = ''
+)
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $root = Split-Path -Parent $PSScriptRoot
 $syncScript = Join-Path $root 'deploy\sync-dev.ps1'
+
+# Git for Windows Bash only. A bare `bash` may resolve to C:\Windows\System32\bash.exe (the WSL launcher), which is
+# out of scope and can open a WSL repair/install prompt, so Bash is never taken from PATH and is never launched until
+# the file layout below has been checked. An explicit -GitBashPath is used as given (no fallback); otherwise a bounded
+# set of Git for Windows locations is examined: the installer's registry InstallPath, each git.exe on PATH, then the
+# standard install roots.
+function Get-GitBashProblem([string] $Path) {
+  if (-not $Path) { return 'no path' }
+  if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return 'not found' }
+  $full = (Resolve-Path -LiteralPath $Path).Path
+  if ((Split-Path -Leaf $full) -ne 'bash.exe') { return 'not bash.exe' }
+  if ($env:SystemRoot -and $full.StartsWith($env:SystemRoot.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)) {
+    return 'a Windows system (WSL) bash, not Git for Windows'
+  }
+  $dir = Split-Path -Parent $full
+  # msys-2.0.dll identifies Git for Windows usr\bin (its bin\bash.exe launcher lacks it); the rest are the transport's
+  # decoder tools, without which a damaged-payload case could pass for the wrong reason.
+  foreach ($need in @('msys-2.0.dll', 'base64.exe', 'gzip.exe', 'gunzip', 'mktemp.exe')) {
+    if (-not (Test-Path -LiteralPath (Join-Path $dir $need) -PathType Leaf)) { return "no $need beside it (expected Git for Windows usr\bin\bash.exe)" }
+  }
+  return ''
+}
+
+if ($GitBashPath) {
+  $problem = Get-GitBashProblem $GitBashPath
+  if ($problem) {
+    throw "-GitBashPath '$GitBashPath' is not usable: $problem. Pass <Git for Windows root>\usr\bin\bash.exe."
+  }
+  $bash = (Resolve-Path -LiteralPath $GitBashPath).Path
+  $bashSource = '-GitBashPath'
+} else {
+  $roots = New-Object 'System.Collections.Generic.List[object]'
+  foreach ($key in @('HKLM:\SOFTWARE\GitForWindows', 'HKCU:\SOFTWARE\GitForWindows', 'HKLM:\SOFTWARE\WOW6432Node\GitForWindows')) {
+    try {
+      $installPath = (Get-ItemProperty -LiteralPath $key -Name InstallPath -ErrorAction Stop).InstallPath
+      if ($installPath) { $roots.Add(@($installPath, "registry $key")) }
+    } catch { }
+  }
+  $gitOnPath = @()
+  try { $gitOnPath = @(Get-Command -Name git.exe -CommandType Application -All -ErrorAction Stop | ForEach-Object { $_.Path }) } catch { }
+  foreach ($gitExe in $gitOnPath) {
+    # <root>\cmd\git.exe, <root>\bin\git.exe or <root>\mingw64\bin\git.exe (also mingw32, clangarm64).
+    $gitDir = Split-Path -Parent $gitExe
+    $up = Split-Path -Parent $gitDir
+    if ((Split-Path -Leaf $gitDir) -in @('cmd', 'bin')) {
+      if ((Split-Path -Leaf $up) -in @('mingw64', 'mingw32', 'clangarm64')) { $up = Split-Path -Parent $up }
+      $roots.Add(@($up, "git.exe on PATH ($gitExe)"))
+    }
+  }
+  foreach ($base in @($env:ProgramFiles, $env:ProgramW6432, ${env:ProgramFiles(x86)})) {
+    if ($base) { $roots.Add(@((Join-Path $base 'Git'), 'standard location')) }
+  }
+  if ($env:LOCALAPPDATA) { $roots.Add(@((Join-Path $env:LOCALAPPDATA 'Programs\Git'), 'standard per-user location')) }
+  if ($env:USERPROFILE) { $roots.Add(@((Join-Path $env:USERPROFILE 'scoop\apps\git\current'), 'standard Scoop location')) }
+
+  $bash = ''
+  $examined = New-Object 'System.Collections.Generic.List[string]'
+  $seen = @{}
+  foreach ($installRootEntry in $roots) {
+    $candidate = Join-Path $installRootEntry[0] 'usr\bin\bash.exe'
+    if ($seen.ContainsKey($candidate.ToLowerInvariant())) { continue }
+    $seen[$candidate.ToLowerInvariant()] = $true
+    $problem = Get-GitBashProblem $candidate
+    if (-not $problem) { $bash = (Resolve-Path -LiteralPath $candidate).Path; $bashSource = $installRootEntry[1]; break }
+    $examined.Add("  $candidate [$($installRootEntry[1])]: $problem")
+  }
+  if (-not $bash) {
+    $gitNote = 'none'
+    if ($gitOnPath.Count -gt 0) { $gitNote = $gitOnPath -join ', ' }
+    throw ("Git for Windows Bash was not found. git.exe on PATH: $gitNote. Examined:`n" + ($examined -join "`n") +
+      "`nPass -GitBashPath <Git for Windows root>\usr\bin\bash.exe (the directory must also hold msys-2.0.dll, base64.exe, gzip.exe, gunzip and mktemp.exe). WSL bash is not supported by this harness.")
+  }
+}
+Write-Output "Using Git Bash at $bash (from $bashSource)"
 
 function Assert-True {
   param(
@@ -51,11 +128,15 @@ Assert-True ($pinnedScript -notmatch "(?m)^git checkout") 'a deploy must never g
 $gateAt = $pinnedScript.IndexOf("`nafldb_deploy_gate`n")
 Assert-True ($gateAt -gt 0) 'the deploy gate must run as its own step'
 Assert-True ($pinnedScript.IndexOf("`ngit fetch --prune`n") -lt $gateAt) 'the gate must run after the fetch'
-foreach ($mutation in @('git switch --no-guess', $ffLine, "`nnpm ci`n", "`nnpm run db:migrate`n", "`nnpm run build`n", 'kill "$AFLDB_OLD_PID"')) {
+# AFLDB-ISSUE-339 R339-A: the migration child is pinned (explicit target, no exported target/DSN).
+$migrateLine = "`nenv -u AFLDB_MIGRATE_TARGET -u AFLDB_OWNER_DATABASE_URL npm run db:migrate -- --target dev`n"
+Assert-True ($pinnedScript.Contains($migrateLine)) 'the migration must run pinned to --target dev with the target/DSN variables removed'
+Assert-True ($pinnedScript -notmatch "(?m)^npm run db:migrate") 'no unpinned db:migrate may remain'
+foreach ($mutation in @('git switch --no-guess', $ffLine, "`nnpm ci`n", $migrateLine, "`nnpm run build`n", 'kill "$AFLDB_OLD_PID"')) {
   Assert-True ($pinnedScript.IndexOf($mutation) -gt $gateAt) "the gate must precede: $mutation"
 }
-Assert-True ($pinnedScript.IndexOf('afldb_pf_revalidate_before_migration') -lt $pinnedScript.IndexOf("`nnpm run db:migrate`n")) 'migration must be revalidated first'
-Assert-True ($pinnedScript.IndexOf("`nafldb_pf_migration_parity`n") -gt $pinnedScript.IndexOf("`nnpm run db:migrate`n")) 'post-migration parity must follow the migration'
+Assert-True ($pinnedScript.IndexOf('afldb_pf_revalidate_before_migration') -lt $pinnedScript.IndexOf($migrateLine)) 'migration must be revalidated first'
+Assert-True ($pinnedScript.IndexOf("`nafldb_pf_migration_parity`n") -gt $pinnedScript.IndexOf($migrateLine)) 'post-migration parity must follow the migration'
 Assert-True ($pinnedScript.IndexOf("`nafldb_pf_migration_parity`n") -lt $pinnedScript.IndexOf("`nnpm run build`n")) 'parity must be proven before the build'
 Assert-True ($pinnedScript.IndexOf("`nafldb_pf_revalidate_before_restart`n") -lt $pinnedScript.IndexOf('kill "$AFLDB_OLD_PID"')) 'restart must be revalidated first'
 Assert-True ($pinnedScript.IndexOf('unset AFLDB_PF_NOW AFLDB_PF_MEMINFO') -lt $pinnedScript.IndexOf("AFLDB_PF_PHASE='execute'")) 'test-only clock/meminfo hooks must be cleared'
@@ -128,17 +209,11 @@ $badMethodRefused = $false
 try { & { . $syncScript -WhatIf -RestartMethod 'sudo' *> $null } } catch { $badMethodRefused = $true }
 Assert-True $badMethodRefused 'an unknown restart method must be refused on the workstation'
 
-$gitBash = if ($env:ProgramFiles) { Join-Path $env:ProgramFiles 'Git\usr\bin\bash.exe' } else { '' }
-$bash = if ($gitBash -and (Test-Path -LiteralPath $gitBash)) {
-  $gitBash
-} else {
-  (Get-Command bash -ErrorAction Stop).Source
-}
 $tempScript = Join-Path ([IO.Path]::GetTempPath()) ("afldb-sync-dev-{0}.sh" -f [guid]::NewGuid())
 try {
   foreach ($generated in @($defaultScript, $pinnedScript, $assessScript, $respawnScript)) {
     [IO.File]::WriteAllText($tempScript, $generated, [Text.UTF8Encoding]::new($false))
-    & $bash -n $tempScript
+    & $bash -p -n $tempScript
     Assert-True ($LASTEXITCODE -eq 0) 'generated remote Bash script failed syntax validation'
   }
 } finally {
@@ -160,6 +235,59 @@ try {
   }
   Assert-True ($childExit -eq 40) "a blocked gate (40) must survive powershell -File | Tee-Object, got $childExit"
   Assert-True ((Get-Content -LiteralPath $log -Raw) -match 'Phase:\s+execute') 'the logged pipeline must carry the run header'
+
+  # AFLDB-ISSUE-339 R339-C: the real transport command, run by bash, with the payload damaged in
+  # transit. Decoding fails before anything executes, so the shim runs it in an empty directory
+  # and the status must be 47 through powershell -File | Tee-Object. (The full decoder matrix,
+  # including a missing decoder and a complete payload, is tests/sync-dev-remote.test.sh.)
+  $transportTemplate = ([IO.File]::ReadAllText((Join-Path $root 'deploy\sync-dev-transport.sh')) -replace "`r", '').Trim()
+  Assert-True ($transportTemplate -notmatch '"') 'the transport command must hold no double quote (Windows PowerShell 5.1 does not escape them for ssh.exe)'
+  Assert-True ($transportTemplate -notmatch 'bash -s') 'the transport must not stream a decoder pipeline into bash -s'
+  $shim = @'
+param([string] $Target, [string] $Command)
+$mode = $env:AFLDB_FAKE_SSH_MODE
+$m = [regex]::Match($Command, "'([A-Za-z0-9+/=]{40,})'")
+if (-not $m.Success) { exit 90 }
+$p = $m.Groups[1].Value
+$bad = switch ($mode) {
+  'truncate' {
+    $cut = [int]($p.Length / 2)
+    $p.Substring(0, ($cut - ($cut % 4)))
+  }
+  'invalid'  { '!!!not-base64!!!' }
+  'corrupt'  { [Convert]::ToBase64String([byte[]](31, 139, 8, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9)) }
+}
+$Command = $Command.Replace($p, $bad)
+$work = Join-Path ([IO.Path]::GetTempPath()) ([guid]::NewGuid())
+New-Item -ItemType Directory -Path $work | Out-Null
+Push-Location $work
+try {
+  # Replay the received command without a second long Windows command-line handoff.
+  $transportFile = Join-Path $work 'transport.sh'
+  [IO.File]::WriteAllText($transportFile, $Command, [Text.UTF8Encoding]::new($false))
+  $env:PATH = Split-Path -Parent $env:AFLDB_FAKE_BASH
+  & $env:AFLDB_FAKE_BASH -p $transportFile
+  $code = $LASTEXITCODE
+} finally {
+  Pop-Location
+  Remove-Item -LiteralPath $work -Recurse -Force
+}
+exit $code
+'@
+  Set-Content -LiteralPath (Join-Path $fakeBin 'ssh.ps1') -Value $shim -Encoding ascii
+  $stderrLog = Join-Path $fakeBin 'transport.stderr.log'
+  foreach ($mode in @('truncate', 'invalid', 'corrupt')) {
+    $childExit = & {
+      $ErrorActionPreference = 'Continue'
+      $env:PATH = "$fakeBin;$env:PATH"; $env:AFLDB_FAKE_SSH_MODE = $mode; $env:AFLDB_FAKE_BASH = $bash
+      powershell -NoProfile -ExecutionPolicy Bypass -File $syncScript -AcceptanceUrl not-a-url 2>$stderrLog | Tee-Object -FilePath $log | Out-Null
+      $LASTEXITCODE
+    }
+    $diagnostic = Get-Content -LiteralPath $stderrLog -Raw
+    if ($childExit -ne 47 -or $diagnostic -notmatch 'could\s+not\s+be\s+decoded\s+completely') {
+      throw "a $mode payload must report a decode failure and exit 47 through powershell -File | Tee-Object, got $childExit`nBash: $bash`nChild stderr:`n$diagnostic"
+    }
+  }
 } finally {
   Remove-Item -LiteralPath $fakeBin -Recurse -Force -ErrorAction SilentlyContinue
 }

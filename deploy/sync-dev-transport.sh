@@ -1,0 +1,1 @@
+umask 077; d=$(mktemp -d) || exit 47; if printf '%s' '__AFLDB_PAYLOAD__' | base64 -d > $d/p.gz && gunzip -c $d/p.gz > $d/p.sh && [ -s $d/p.sh ]; then bash $d/p.sh < /dev/null; rc=$?; else echo '[deploy] FAILED: the deployment payload could not be decoded completely; nothing was run' >&2; rc=47; fi; rm -rf -- $d; exit $rc

@@ -323,7 +323,11 @@ if (-not $SkipInstall) {
 
 if (-not $SkipMigrate) {
   Add-RemoteStep $remoteCommands 'revalidate before migration' 'afldb_pf_revalidate_before_migration'
-  Add-RemoteStep $remoteCommands 'run database migrations' 'npm run db:migrate'
+  # AFLDB-ISSUE-339 R339-A: the migration child is pinned to the database the gate assessed. The
+  # gate's afldb_pf_migration_binding already refused any exported target/DSN and any .env form
+  # migrate.ts and the gate would read differently; removing both variables here and naming the
+  # target explicitly means the child can only resolve dev -> AFLDB_OWNER_DATABASE_URL from .env.
+  Add-RemoteStep $remoteCommands 'run database migrations' 'env -u AFLDB_MIGRATE_TARGET -u AFLDB_OWNER_DATABASE_URL npm run db:migrate -- --target dev'
 }
 Add-RemoteStep $remoteCommands 'post-migration parity' 'afldb_pf_migration_parity'
 
@@ -434,8 +438,19 @@ Write-Host "Acceptance:    $acceptance"
 Write-Host "Evidence:      $EvidenceDir"
 Write-Host ''
 
+# AFLDB-ISSUE-339 R339-C: the remote outer shell decodes the WHOLE payload to a private temporary
+# file, and runs it only if base64 and gunzip both succeeded (gzip's CRC/length trailer rejects a
+# corrupt or truncated payload) and the result is non-empty. The old `echo | base64 -d | gunzip |
+# bash -s` returned bash's status: a missing or failing decoder fed bash empty (or partial) input
+# and SSH reported success with no gate run. No pipeline status decides anything here, so this
+# holds under any POSIX login shell, with or without pipefail. Exit 47 = transport decode failure.
+$transportPath = Join-Path $PSScriptRoot 'sync-dev-transport.sh'
+$transportTemplate = ([IO.File]::ReadAllText($transportPath) -replace "`r", '').Trim()
+if (-not $transportTemplate.Contains('__AFLDB_PAYLOAD__')) { throw "Transport template is malformed: $transportPath" }
+$transportCommand = $transportTemplate.Replace('__AFLDB_PAYLOAD__', $remotePayload)
+
 if ($PSCmdlet.ShouldProcess($SshTarget, "AFLDB dev deployment ($Phase)")) {
-  ssh $SshTarget "echo $remotePayload | base64 -d | gunzip | bash -s"
+  ssh $SshTarget $transportCommand
   $remoteExit = $LASTEXITCODE
   if ($remoteExit -ne 0) {
     $meaning = switch ($remoteExit) {
@@ -446,6 +461,7 @@ if ($PSCmdlet.ShouldProcess($SshTarget, "AFLDB dev deployment ($Phase)")) {
       44 { 'post-migration parity failed' }
       45 { 'pre-restart revalidation failed' }
       46 { 'preserved-state check failed' }
+      47 { 'the payload could not be decoded on the server; no gate or deployment step ran' }
       default { "look above for the '[deploy] FAILED' line" }
     }
     Write-Error "Remote deployment exited $remoteExit ($meaning)." -ErrorAction Continue

@@ -487,7 +487,14 @@ S
 echo "npm $*" >> "$E2E/calls"
 case "$*" in
   --version) echo 10.0.0 ;;
-  'run db:migrate')
+  'run db:migrate'*)
+    # AFLDB-ISSUE-339 R339-A: model tools/db/migrate.ts's own target resolution (flag, then
+    # exported AFLDB_MIGRATE_TARGET, then .env's, default dev) and record what the child saw.
+    flag=''; [[ "$*" =~ --target\ ([a-z-]+) ]] && flag="${BASH_REMATCH[1]}"
+    envt="${AFLDB_MIGRATE_TARGET:-$(sed -n 's/^AFLDB_MIGRATE_TARGET=//p' .env | head -1)}"
+    echo "MIGRATE_CHILD args=[$*] exported_target=${AFLDB_MIGRATE_TARGET-<unset>} exported_owner_dsn=${AFLDB_OWNER_DATABASE_URL+set}" >> "$E2E/calls"
+    if [[ -n "$flag" && -n "$envt" && "$flag" != "$envt" ]]; then echo 'targets disagree' >&2; exit 1; fi
+    if [[ "${flag:-${envt:-dev}}" != dev ]]; then echo "MIGRATE_CHILD would write ${flag:-$envt}" >> "$E2E/calls"; exit 0; fi
     have="$(wc -l < "$E2E/ledger")"
     i=0
     for f in $(ls src/db/migrations | LC_ALL=C sort); do
@@ -631,6 +638,176 @@ test_e2e_exit_status_survives_a_logging_pipeline() {
   e2e_teardown; return $ok
 }
 
+# --- AFLDB-ISSUE-339 corrections (R339-A/B/C/D) ---
+
+# R339-D: the gate's psql never sees the password in argv, and inherited routing is removed.
+d_case() { # d_case <dsn line written to .env> -> sets D_RC, D_ARGV, D_PW, D_PGDB
+  local root; root="$(mktemp -d)"
+  printf '%s\n' "$1" > "$root/.env"
+  : > "$root/argv"
+  psql() { printf '%s\n' "$*" > "$D_ROOT/argv"; printf '%s' "${PGPASSWORD-<unset>}" > "$D_ROOT/pw"; printf '%s' "${PGDATABASE-<unset>}" > "$D_ROOT/pgdb"; echo 'afldb_dev owner'; }
+  D_ROOT="$root"
+  (cd "$root" && PGDATABASE=afldb_prod PGSERVICE=prod AFLDB_PF_DSN_NAME=AFLDB_OWNER_DATABASE_URL afldb_pf_psql 'SELECT current_database(), current_user' >/dev/null); D_RC=$?
+  D_ARGV="$(cat "$root/argv")"; D_PW="$(cat "$root/pw" 2>/dev/null || true)"; D_PGDB="$(cat "$root/pgdb" 2>/dev/null || true)"
+  unset -f psql; rm -rf -- "$root"
+}
+test_r339d_userinfo_password_moves_to_environment() {
+  d_case 'AFLDB_OWNER_DATABASE_URL=postgres://owner:fake%40pw%2Fx@h:5432/afldb_dev?sslmode=require'
+  (( D_RC == 0 )) && [[ "$D_ARGV" == *'postgres://owner@h:5432/afldb_dev?sslmode=require'* && "$D_ARGV" != *fake* ]] \
+    && [[ "$D_PW" == 'fake@pw/x' && "$D_PGDB" == '<unset>' ]]
+}
+test_r339d_query_password_moves_to_environment() {
+  d_case 'AFLDB_OWNER_DATABASE_URL=postgresql://owner@h/afldb_dev?sslmode=require&pass%77ord=fakepw'
+  (( D_RC == 0 )) && [[ "$D_ARGV" == *'postgresql://owner@h/afldb_dev?sslmode=require'* && "$D_ARGV" != *fakepw* && "$D_PW" == fakepw ]]
+}
+test_r339d_ambiguous_or_unmovable_passwords_refused() {
+  local line
+  for line in 'AFLDB_OWNER_DATABASE_URL=postgres://owner:fakeA@h/afldb_dev?password=fakeB' \
+              'AFLDB_OWNER_DATABASE_URL=postgres://owner:fakeA@h/afldb_dev?pass%77ord=fakeB' \
+              'AFLDB_OWNER_DATABASE_URL=postgres://owner@h/afldb_dev?sslpassword=fakeC' \
+              'AFLDB_OWNER_DATABASE_URL=host=h dbname=afldb_dev password=fakeD' \
+              'AFLDB_OWNER_DATABASE_URL=postgres://owner:fake%4@h/afldb_dev'; do
+    d_case "$line"
+    (( D_RC == 2 )) && [[ -z "$D_ARGV" ]] || { echo "    not refused: ${line%%:*}..."; return 1; }
+  done
+}
+test_r339d_passwordless_dsn_unchanged() {
+  d_case 'AFLDB_OWNER_DATABASE_URL=postgres://owner@h/afldb_dev'
+  (( D_RC == 0 )) && [[ "$D_ARGV" == *'postgres://owner@h/afldb_dev '* && "$D_PW" == '<unset>' ]]
+}
+
+# R339-B: the only permitted preserved-state change is target main moving to the assessed revision.
+test_r339b_expected_state_allows_only_target_main_move() {
+  local a b
+  a="$(printf 'a%.0s' {1..40})"; b="$(printf 'b%.0s' {1..40})"
+  AFLDB_PF_STATE_BEFORE="main=$a stashes=1/x untracked=2/y env=z"
+  [[ "$(AFLDB_PF_TARGET_BRANCH_RESOLVED=main AFLDB_PF_TARGET_REV=$b afldb_pf_expected_state)" == "main=$b stashes=1/x untracked=2/y env=z" ]] \
+    && [[ "$(AFLDB_PF_TARGET_BRANCH_RESOLVED=dev-v2-main AFLDB_PF_TARGET_REV=$b afldb_pf_expected_state)" == "$AFLDB_PF_STATE_BEFORE" ]] \
+    && [[ "$(AFLDB_PF_TARGET_BRANCH_RESOLVED=main AFLDB_PF_TARGET_REV='' afldb_pf_expected_state)" == "$AFLDB_PF_STATE_BEFORE" ]]
+}
+# Make main the deploy target, behind origin/main, with the stash/untracked/.env state kept.
+e2e_make_main_target() {
+  (unset -f git; cd "$E2E/work" && git switch -q main && git reset -q --hard origin/main~2 \
+    && git branch -q --set-upstream-to=origin/main main)
+}
+test_e2e_r339b_pinned_main_fast_forward_completes() {
+  local rc ok=1 pin
+  e2e_setup; e2e_make_main_target; pin="$(e2e_pin)"
+  e2e_run "$SYNC_DEV_GENERATED_DIR/gen-execute.sh" AFLDB_PF_TARGET_BRANCH=main AFLDB_PF_EXPECTED_BRANCH=main; rc=$?
+  if (( rc == 0 )) && [[ "$(e2e_head)" == "$pin" && "$(unset -f git; git -C "$E2E/work" rev-parse refs/heads/main)" == "$pin" ]] \
+      && grep -q 'PASS checkout revalidation -- main at .*main fast-forwarded as assessed' "$E2E/out" \
+      && grep -q 'PASS preserved state after deploy' "$E2E/out" \
+      && [[ "$(unset -f git; git -C "$E2E/work" stash list | wc -l)" == 1 ]]; then ok=0
+  else echo "    rc=$rc"; grep -F '[preflight] FAIL' "$E2E/out" | sed 's/^/    /'; fi
+  e2e_teardown; return $ok
+}
+test_e2e_r339b_unpinned_main_fast_forward_completes() {
+  local rc ok=1 tip
+  e2e_setup; e2e_make_main_target; tip="$(unset -f git; git -C "$E2E/seed" rev-parse HEAD)"
+  e2e_run "$SYNC_DEV_GENERATED_DIR/gen-execute.sh" AFLDB_PF_TARGET_BRANCH=main AFLDB_PF_EXPECTED_BRANCH= AFLDB_PF_EXPECTED_REVISION=; rc=$?
+  if (( rc == 0 )) && [[ "$(e2e_head)" == "$tip" ]] && grep -q 'PASS preserved state after deploy' "$E2E/out"; then ok=0
+  else echo "    rc=$rc"; grep -F '[preflight] FAIL' "$E2E/out" | sed 's/^/    /'; fi
+  e2e_teardown; return $ok
+}
+test_e2e_r339b_non_target_main_still_preserved() {
+  # The existing dev-v2-main deploy: main is not the target and must not have moved.
+  local rc ok=1 main_before
+  e2e_setup; main_before="$(unset -f git; git -C "$E2E/work" rev-parse refs/heads/main)"
+  e2e_run "$SYNC_DEV_GENERATED_DIR/gen-execute.sh"; rc=$?
+  (( rc == 0 )) && [[ "$(unset -f git; git -C "$E2E/work" rev-parse refs/heads/main)" == "$main_before" ]] && ok=0
+  e2e_teardown; return $ok
+}
+
+# R339-A: conflicting migration configuration refuses before checkout; the child is pinned.
+test_e2e_r339a_exported_target_blocks() { AFLDB_MIGRATE_TARGET=prod e2e_case 40 'AFLDB_MIGRATE_TARGET is exported'; }
+test_e2e_r339a_exported_dsn_blocks() {
+  AFLDB_OWNER_DATABASE_URL='postgres://u:fake@h/afldb_other' e2e_case 40 'AFLDB_OWNER_DATABASE_URL is exported in the deploy shell'
+}
+test_e2e_r339a_custom_dsn_name_blocks() {
+  e2e_case 40 'is not what db:migrate --target dev reads' AFLDB_PF_DSN_NAME=AFLDB_CODE_TEST_DATABASE_URL
+}
+e2e_dotenv_case() { # e2e_dotenv_case <line appended to .env> <expected text>
+  local rc ok=1
+  e2e_setup; printf '%s\n' "$1" >> "$E2E/work/.env"
+  e2e_run "$SYNC_DEV_GENERATED_DIR/gen-execute.sh"; rc=$?
+  (( rc == 40 )) && grep -qF -- "$2" "$E2E/out" && e2e_untouched && ok=0
+  e2e_teardown; return $ok
+}
+test_e2e_r339a_dotenv_target_blocks() { e2e_dotenv_case 'AFLDB_MIGRATE_TARGET=prod' '.env sets AFLDB_MIGRATE_TARGET'; }
+test_e2e_r339a_duplicate_dsn_line_blocks() {
+  e2e_dotenv_case 'AFLDB_OWNER_DATABASE_URL=postgres://u:p@h/afldb_other' 'found 2 definition(s)'
+}
+test_e2e_r339a_migration_child_is_pinned() {
+  local rc ok=1
+  e2e_setup
+  e2e_run "$SYNC_DEV_GENERATED_DIR/gen-execute.sh"; rc=$?
+  (( rc == 0 )) && grep -q '^MIGRATE_CHILD args=\[run db:migrate -- --target dev\] exported_target=<unset> exported_owner_dsn=$' "$E2E/calls" \
+    && ! grep -q 'MIGRATE_CHILD would write' "$E2E/calls" && grep -q 'PASS migration target is the assessed database' "$E2E/out" \
+    && ! grep -q 'fake\|u:p@' "$E2E/out" && ok=0
+  e2e_teardown; return $ok
+}
+
+# R339-C: the real transport command (deploy/sync-dev-transport.sh), executed by a POSIX shell.
+C_DIR=''
+c_payload() { printf '%s' "$1" | gzip -c | base64 -w0; }
+c_run() { # c_run <payload> [PATH] -> C_RC; runs under sh with TMPDIR inside C_DIR
+  local template cmd path="${2:-$PATH}"
+  template="$(tr -d '\r' < "$ROOT/deploy/sync-dev-transport.sh")"
+  cmd="${template//__AFLDB_PAYLOAD__/$1}"
+  (cd "$C_DIR/cwd" && TMPDIR="$C_DIR/tmp" MARK="$C_DIR/mark" PATH="$path" sh -c "$cmd" > "$C_DIR/out" 2>&1); C_RC=$?
+}
+c_setup() { C_DIR="$(mktemp -d)"; mkdir -p "$C_DIR/cwd" "$C_DIR/tmp"; }
+c_clean() { [[ -z "$(ls -A "$C_DIR/tmp")" ]]; }
+test_r339c_complete_payload_runs_and_propagates_status() {
+  local ok=1
+  c_setup
+  c_run "$(c_payload 'set -e; echo GATE_RAN > "$MARK"; exit 40')"
+  (( C_RC == 40 )) && [[ "$(cat "$C_DIR/mark" 2>/dev/null)" == GATE_RAN ]] && c_clean && ok=0
+  rm -rf -- "$C_DIR"; return $ok
+}
+c_refused() { # c_refused <payload> [PATH]
+  c_setup; c_run "$@"
+  local ok=1
+  (( C_RC == 47 )) && [[ ! -e "$C_DIR/mark" ]] && grep -q 'could not be decoded completely' "$C_DIR/out" && c_clean && ok=0
+  rm -rf -- "$C_DIR"; return $ok
+}
+test_r339c_invalid_base64_refused() { c_refused '!!!not-base64!!!'; }
+test_r339c_corrupt_gzip_refused() { c_refused "$(printf 'not gzip at all' | base64 -w0)"; }
+test_r339c_truncated_payload_never_runs_partial_input() {
+  # The marker command comes FIRST, followed by padding, so a truncated stream would contain it.
+  local full pad
+  pad="$(head -c 20000 /dev/urandom | base64 -w0)"
+  full="$(c_payload "echo PARTIAL > \"\$MARK\"; : '$pad'")"
+  c_refused "${full:0:$(( ${#full} / 2 / 4 * 4 ))}"
+}
+test_r339c_missing_decoder_refused() {
+  local bin tool found; bin="$(mktemp -d)"
+  # `builtin`: test_diagnostics_are_bounded leaves a global command() stub that returns 1, which
+  # made every lookup fail and left a PATH with no sh at all. Setup now fails loudly instead.
+  for tool in sh bash mktemp gunzip gzip rm ls cat; do
+    found="$(builtin command -v "$tool")" && [[ "$found" == /* ]] \
+      || { echo "missing-decoder setup: cannot link $tool" >&2; rm -rf -- "$bin"; return 1; }
+    ln -s "$found" "$bin/$tool"
+  done
+  [[ ! -e "$bin/base64" ]] || { rm -rf -- "$bin"; return 1; }
+  c_refused "$(c_payload 'echo GATE_RAN > "$MARK"')" "$bin"; local rc=$?
+  rm -rf -- "$bin"; return $rc
+}
+test_r339c_transport_holds_no_double_quote() {
+  ! grep -q '"' "$ROOT/deploy/sync-dev-transport.sh" && ! grep -q 'bash -s' "$ROOT/deploy/sync-dev-transport.sh"
+}
+
+run_test 'R339-D: userinfo password leaves argv for PGPASSWORD (percent-decoded); routing env removed' test_r339d_userinfo_password_moves_to_environment
+run_test 'R339-D: query password (encoded keyword) leaves argv' test_r339d_query_password_moves_to_environment
+run_test 'R339-D: dual/ssl/key-value/malformed passwords are refused before psql' test_r339d_ambiguous_or_unmovable_passwords_refused
+run_test 'R339-D: password-free DSN is passed unchanged' test_r339d_passwordless_dsn_unchanged
+run_test 'R339-B: expected state permits only the target-main move' test_r339b_expected_state_allows_only_target_main_move
+run_test 'R339-C: complete payload runs and its status propagates' test_r339c_complete_payload_runs_and_propagates_status
+run_test 'R339-C: invalid base64 refuses (47) with nothing run' test_r339c_invalid_base64_refused
+run_test 'R339-C: corrupt gzip refuses (47) with nothing run' test_r339c_corrupt_gzip_refused
+run_test 'R339-C: truncated payload refuses (47) without running partial input' test_r339c_truncated_payload_never_runs_partial_input
+run_test 'R339-C: missing decoder refuses (47) with nothing run' test_r339c_missing_decoder_refused
+run_test 'R339-C: transport template has no double quote and no bash -s' test_r339c_transport_holds_no_double_quote
 run_test 'gate: branch namespace collision dev vs dev/v2-main' test_gate_branch_collision_dev_vs_dev_slash
 run_test 'gate: ledger accepts CRLF checksum, refuses drift and reordering' test_gate_ledger_accepts_crlf_checksum_and_refuses_drift
 run_test 'gate: .env presence by name never prints values' test_gate_env_presence_never_prints_values
@@ -649,6 +826,15 @@ if [[ -n "${SYNC_DEV_GENERATED_DIR:-}" && -f "$SYNC_DEV_GENERATED_DIR/gen-execut
   run_test 'e2e: post-migration parity failure stops before build/restart' test_e2e_parity_failure_stops_before_build
   run_test 'e2e: assessment reports every blocker and changes nothing' test_e2e_assessment_reports_all_and_changes_nothing
   run_test 'e2e: exit status survives a tee logging pipeline' test_e2e_exit_status_survives_a_logging_pipeline
+  run_test 'e2e R339-B: pinned main fast-forward completes, stash preserved' test_e2e_r339b_pinned_main_fast_forward_completes
+  run_test 'e2e R339-B: unpinned main fast-forward completes' test_e2e_r339b_unpinned_main_fast_forward_completes
+  run_test 'e2e R339-B: non-target main is still preserved exactly' test_e2e_r339b_non_target_main_still_preserved
+  run_test 'e2e R339-A: exported AFLDB_MIGRATE_TARGET blocks before checkout' test_e2e_r339a_exported_target_blocks
+  run_test 'e2e R339-A: exported owner DSN blocks before checkout' test_e2e_r339a_exported_dsn_blocks
+  run_test 'e2e R339-A: custom -DsnName without -SkipMigrate blocks' test_e2e_r339a_custom_dsn_name_blocks
+  run_test 'e2e R339-A: .env migration target other than dev blocks' test_e2e_r339a_dotenv_target_blocks
+  run_test 'e2e R339-A: duplicate .env DSN line blocks' test_e2e_r339a_duplicate_dsn_line_blocks
+  run_test 'e2e R339-A: migration child is pinned to --target dev with no exported target/DSN' test_e2e_r339a_migration_child_is_pinned
 else
   echo 'NOT RUN: e2e generated-payload cases (set SYNC_DEV_GENERATED_DIR; see tests/sync-dev-static.test.ps1 -ExportDir)'
 fi

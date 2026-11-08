@@ -383,13 +383,81 @@ afldb_pf_env_value() {
   printf '%s' "$value"
 }
 
-# One read-only statement; the DSN and any server error text are never printed.
+# Percent-decode $2 into the variable named $1; refuses (rc 1) anything that cannot be decoded
+# exactly as libpq would (a stray '%', a backslash printf would read as an escape, an encoded NUL).
+afldb_pf_pct_decode() {
+  local __out="$1" raw="$2" bad='%([^0-9A-Fa-f]|[0-9A-Fa-f][^0-9A-Fa-f]|[0-9A-Fa-f]?$)'
+  if [[ "$raw" == *\\* || "$raw" == *%00* || "$raw" =~ $bad ]]; then return 1; fi
+  printf -v "$__out" '%b' "${raw//\%/\\x}"
+}
+
+# AFLDB-ISSUE-339 R339-D: the ISSUE-313 contract (tools/db/psql.ts) for this shell caller. Splits
+# the DSN in $1 into a password-free form (AFLDB_PF_SAFE_DSN, safe for argv) and the password
+# (AFLDB_PF_DSN_PASSWORD, never printed, handed to psql only through its environment). Password
+# sources are the userinfo text after ':' and every `password` query parameter (keyword
+# percent-decoded first); more than one non-empty source, an sslpassword, or a key=value string
+# naming a password is refused (rc 1) rather than guessing libpq's precedence.
+afldb_pf_dsn_split() {
+  local dsn="$1" scheme rest authority tail userinfo user pass_raw='' query='' item key key_raw
+  local -a items=() kept=()
+  local sources=0
+  AFLDB_PF_SAFE_DSN=''; AFLDB_PF_DSN_PASSWORD=''
+  if [[ ! "$dsn" =~ ^(postgres|postgresql):// ]]; then
+    if [[ "$dsn" =~ (^|[[:space:]])(ssl)?password[[:space:]]*= ]]; then return 1; fi
+    AFLDB_PF_SAFE_DSN="$dsn"; return 0
+  fi
+  scheme="${dsn%%://*}://"; rest="${dsn#*://}"
+  authority="${rest%%[/?]*}"; tail="${rest:${#authority}}"
+  if [[ "$tail" == *\?* ]]; then query="${tail#*\?}"; tail="${tail%%\?*}"; fi
+  if [[ "$authority" == *@* ]]; then
+    userinfo="${authority%@*}"; authority="${authority##*@}"
+    user="${userinfo%%:*}"
+    if [[ "$userinfo" == *:* ]]; then pass_raw="${userinfo#*:}"; fi
+    if [[ -n "$pass_raw" ]]; then sources=$((sources + 1)); fi
+    authority="${user}@${authority}"
+  fi
+  if [[ -n "$query" ]]; then
+    IFS='&' read -r -a items <<< "$query"
+    for item in "${items[@]}"; do
+      key_raw="${item%%=*}"
+      afldb_pf_pct_decode key "$key_raw" || return 1
+      case "$key" in
+        sslpassword) return 1 ;;
+        password)
+          if [[ "$item" == *=* && -n "${item#*=}" ]]; then sources=$((sources + 1)); pass_raw="${item#*=}"; fi
+          ;;
+        *) kept+=("$item") ;;
+      esac
+    done
+  fi
+  if (( sources > 1 )); then return 1; fi
+  if (( sources == 1 )); then afldb_pf_pct_decode AFLDB_PF_DSN_PASSWORD "$pass_raw" || return 1; fi
+  AFLDB_PF_SAFE_DSN="${scheme}${authority}${tail}"
+  if (( ${#kept[@]} )); then AFLDB_PF_SAFE_DSN+="?$(IFS='&'; echo "${kept[*]}")"; fi
+  return 0
+}
+
+# The libpq variables that choose WHERE a connection goes (tools/db/psql.ts LIBPQ_ROUTING_ENV,
+# ISSUE-278). Removed from the gate's psql so the assessed database is the one the DSN names.
+AFLDB_PF_LIBPQ_ROUTING='PGHOST PGHOSTADDR PGPORT PGDATABASE PGUSER PGSERVICE PGSERVICEFILE PGSYSCONFDIR PGOPTIONS PGTARGETSESSIONATTRS PGLOADBALANCEHOSTS'
+
+# One read-only statement; the DSN, its password and any server error text are never printed, and
+# the password never reaches psql's argument vector (R339-D).
 afldb_pf_psql() {
   local dsn
   dsn="$(afldb_pf_env_value "$AFLDB_PF_DSN_NAME")"
   if [[ -z "$dsn" ]]; then return 2; fi
-  PGOPTIONS='-c default_transaction_read_only=on' PGAPPNAME='afldb-deploy-gate' \
-    psql "$dsn" -X -q -A -t -F ' ' -v ON_ERROR_STOP=1 -c "$1" </dev/null 2>/dev/null
+  afldb_pf_dsn_split "$dsn" || return 2
+  # A subshell, never `env NAME=value`: env's own argv would carry the password. Shell
+  # assignments and unset change only the child's environment.
+  (
+    local var
+    for var in $AFLDB_PF_LIBPQ_ROUTING; do unset "$var"; done
+    if [[ -n "$AFLDB_PF_DSN_PASSWORD" ]]; then export PGPASSWORD="$AFLDB_PF_DSN_PASSWORD"; fi
+    unset AFLDB_PF_DSN_PASSWORD
+    export PGOPTIONS='-c default_transaction_read_only=on' PGAPPNAME='afldb-deploy-gate'
+    psql "$AFLDB_PF_SAFE_DSN" -X -q -A -t -F ' ' -v ON_ERROR_STOP=1 -c "$1" </dev/null 2>/dev/null
+  )
 }
 afldb_pf_read_ledger() {
   afldb_pf_psql 'SELECT name, checksum FROM afldb_meta.schema_migrations ORDER BY name COLLATE "C"' > "$1"
@@ -448,6 +516,61 @@ afldb_pf_branch_collisions() {
     fi
   done < <(git for-each-ref --format='%(refname)' refs/heads/ 2>/dev/null || true)
   return 0
+}
+
+# AFLDB-ISSUE-339 R339-A: the database db:migrate will write must be the database this gate
+# assessed. tools/db/migrate.ts resolves its target as --target / AFLDB_MIGRATE_TARGET (both
+# exported and from .env, which it loads WITHOUT overriding exported values, first line wins), maps
+# dev to AFLDB_OWNER_DATABASE_URL, and lets an exported DSN win over .env. The deploy runs it as
+# `db:migrate -- --target dev` with AFLDB_MIGRATE_TARGET and the DSN unset (sync-dev.ps1), so the
+# only accepted contract is: the gate reads AFLDB_OWNER_DATABASE_URL, from exactly one plain
+# NAME=value line of .env (the one form both parsers read identically), with no exported DSN or
+# target and no .env target other than dev. Anything else is refused before checkout. A custom
+# -DsnName has no approved migration-target contract (an owner decision), so it is accepted only
+# with -SkipMigrate.
+AFLDB_PF_MIGRATE_DSN_NAME='AFLDB_OWNER_DATABASE_URL'
+afldb_pf_migration_binding() {
+  local label='migration target is the assessed database' lines env_target
+  if [[ "${AFLDB_PF_SKIP_MIGRATE:-0}" == 1 ]]; then
+    afldb_pf_record INFO "$label" 'not evaluated: -SkipMigrate'
+    return 0
+  fi
+  if [[ "$AFLDB_PF_DSN_NAME" != "$AFLDB_PF_MIGRATE_DSN_NAME" ]]; then
+    afldb_pf_record FAIL "$label" "-DsnName $AFLDB_PF_DSN_NAME is not what db:migrate --target dev reads ($AFLDB_PF_MIGRATE_DSN_NAME); use -SkipMigrate or the default"
+    return 0
+  fi
+  if [[ -n "${AFLDB_MIGRATE_TARGET+set}" && "${AFLDB_MIGRATE_TARGET}" != dev ]]; then
+    afldb_pf_record FAIL "$label" "AFLDB_MIGRATE_TARGET is exported in the deploy shell (value withheld); unset it"
+    return 0
+  fi
+  if [[ -n "$(printenv "$AFLDB_PF_MIGRATE_DSN_NAME" 2>/dev/null || true)" ]]; then
+    afldb_pf_record FAIL "$label" "$AFLDB_PF_MIGRATE_DSN_NAME is exported in the deploy shell and would override .env for db:migrate; unset it"
+    return 0
+  fi
+  lines="$(grep -cE "^[[:space:]]*(export[[:space:]]+)?${AFLDB_PF_MIGRATE_DSN_NAME}[[:space:]]*=" .env 2>/dev/null || true)"
+  if [[ "$lines" != 1 ]] || ! grep -Eq "^${AFLDB_PF_MIGRATE_DSN_NAME}=[^\"'[:space:]]" .env; then
+    afldb_pf_record FAIL "$label" ".env must define $AFLDB_PF_MIGRATE_DSN_NAME exactly once as a plain unquoted NAME=value line (found ${lines:-0} definition(s))"
+    return 0
+  fi
+  env_target="$(afldb_pf_env_value AFLDB_MIGRATE_TARGET)"
+  if grep -Eq '^[[:space:]]*(export[[:space:]]+)?AFLDB_MIGRATE_TARGET[[:space:]]*=' .env && [[ "$env_target" != dev ]]; then
+    afldb_pf_record FAIL "$label" ".env sets AFLDB_MIGRATE_TARGET to something other than dev"
+    return 0
+  fi
+  afldb_pf_record PASS "$label" "db:migrate --target dev reads $AFLDB_PF_MIGRATE_DSN_NAME from the same single .env line"
+}
+
+# AFLDB-ISSUE-339 R339-B: the preserved state the deploy is ALLOWED to produce. When the target
+# branch is main, the one permitted change is main moving from its assessed value to the assessed
+# target revision (the fast-forward the gate already proved is an ancestor move); every other
+# component -- stashes, the untracked set, .env -- must stay identical, and a non-target main must
+# stay byte-for-byte the same ref.
+afldb_pf_expected_state() {
+  local state="$AFLDB_PF_STATE_BEFORE"
+  if [[ "$AFLDB_PF_TARGET_BRANCH_RESOLVED" == main && "$AFLDB_PF_TARGET_REV" =~ ^[0-9a-f]{40}$ ]]; then
+    state="main=${AFLDB_PF_TARGET_REV} ${state#main=* }"
+  fi
+  printf '%s' "$state"
 }
 
 # Preserved-state digest: local main, stashes, the untracked set and .env (hashes and counts only).
@@ -685,6 +808,7 @@ afldb_deploy_gate() {
   fi
   AFLDB_PF_STATE_BEFORE="$(afldb_pf_state_digest)"
   afldb_pf_record INFO 'preserved state digest' "$AFLDB_PF_STATE_BEFORE"
+  afldb_pf_migration_binding
 
   # Configuration presence by name.
   for name in ${AFLDB_PF_REQUIRED_CONFIG:-}; do
@@ -796,16 +920,18 @@ afldb_deploy_gate() {
 }
 
 afldb_pf_revalidate_checkout() {
-  local branch head state
+  local branch head state expected
   branch="$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
   head="$(git rev-parse HEAD 2>/dev/null || true)"
   state="$(afldb_pf_state_digest)"
+  expected="$(afldb_pf_expected_state)"
   if [[ "$branch" != "$AFLDB_PF_TARGET_BRANCH_RESOLVED" || "$head" != "$AFLDB_PF_TARGET_REV" \
-        || "${state%% untracked=*}" != "${AFLDB_PF_STATE_BEFORE%% untracked=*}" ]]; then
-    afldb_pf_record FAIL 'checkout revalidation' "branch ${branch:-<detached>} at ${head:-<none>}; $state"
+        || "${state%% untracked=*}" != "${expected%% untracked=*}" ]]; then
+    # The checkout HAS already moved when this fails; say so, with both states, and stop here.
+    afldb_pf_record FAIL 'checkout revalidation' "branch ${branch:-<detached>} at ${head:-<none>} (checkout already moved; install/migrate/build/restart not run); now: $state; expected: $expected"
     return 42
   fi
-  afldb_pf_record PASS 'checkout revalidation' "$branch at $head; main and stashes unchanged"
+  afldb_pf_record PASS 'checkout revalidation' "$branch at $head; $([[ "$AFLDB_PF_TARGET_BRANCH_RESOLVED" == main ]] && echo 'main fast-forwarded as assessed' || echo 'main') and stashes as expected"
 }
 
 afldb_pf_revalidate_before_migration() {
@@ -851,10 +977,11 @@ afldb_pf_revalidate_before_restart() {
 }
 
 afldb_pf_verify_preserved() {
-  local state
+  local state expected
   state="$(afldb_pf_state_digest)"
-  if [[ "$state" != "$AFLDB_PF_STATE_BEFORE" ]]; then
-    afldb_pf_record FAIL 'preserved state after deploy' "before: $AFLDB_PF_STATE_BEFORE; after: $state"
+  expected="$(afldb_pf_expected_state)"
+  if [[ "$state" != "$expected" ]]; then
+    afldb_pf_record FAIL 'preserved state after deploy' "before: $AFLDB_PF_STATE_BEFORE; expected: $expected; after: $state"
     return 46
   fi
   afldb_pf_record PASS 'preserved state after deploy' "$state"
