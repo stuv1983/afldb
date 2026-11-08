@@ -1,0 +1,34 @@
+# Shared helpers for the 2026-11-08 run 2 (Branch A verification + W-339). Sourced. Loopback cluster only.
+export PATH="$HOME/.nvm/versions/node/v22.23.2/bin:$PATH"
+export AFLDB_V2_PG_BIN=/usr/lib/postgresql/16/bin
+export AFLDB_V2_PG_ROOT=/mnt/ssd/afldb-close-20261108T061620Z-pg
+export AFLDB_V2_PG_PORT=55481
+unset DATABASE_URL AFLDB_DATABASE_URL AFLDB_TEST_DATABASE_URL AFLDB_IMPORT_DATABASE_URL AFLDB_OWNER_DATABASE_URL \
+      AFLDB_AUTH_DATABASE_URL AFLDB_BACKUP_DATABASE_URL AFLDB_MIGRATE_TARGET AFLDB_TEST_AUTH_DATABASE_URL \
+      AFLDB_TEST_IMPORT_DATABASE_URL PGHOST PGPORT PGDATABASE PGUSER PGPASSWORD PGSERVICE PGSERVICEFILE PGPASSFILE PGOPTIONS PGHOSTADDR
+PORT=55481
+PGB="$AFLDB_V2_PG_BIN"
+OPS2="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BASE_SHA=7fabc6e51c5c53c4b6f6fe345f21191d9184660b
+load_secrets() {
+  SUPW="$(cat "$AFLDB_V2_PG_ROOT/secrets/superuser.pw")"
+  OWPW="$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))[sys.argv[2]])' "$AFLDB_V2_PG_ROOT/secrets/roles.json" afldb_owner)"
+}
+# The password travels only in psql's environment (subshell export), never in any argv.
+su_sql() { local db="$1"; shift; ( unset PGDATABASE PGSERVICE PGOPTIONS PGHOSTADDR; export PGPASSWORD="$SUPW"; "$PGB/psql" -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -p "$PORT" -U afldb_v2_super -d "$db" -qAt "$@" ); }
+PASSN=0; FAILN=0
+pass() { PASSN=$((PASSN+1)); echo "  PASS  $*"; }
+fail() { FAILN=$((FAILN+1)); echo "  FAIL  $*"; }
+check_eq() { local label="$1" want="$2" got="$3"; if [[ "$want" == "$got" ]]; then pass "$label"; else fail "$label (want=[$want] got=[$got])"; fi; }
+assert_cluster() {
+  local name listen
+  name="$(su_sql postgres -c 'show cluster_name')"; listen="$(su_sql postgres -c 'show listen_addresses')"
+  [[ "$name" == "afldb_v2_isolated" && "$listen" == "127.0.0.1" ]] || { echo "REFUSED: not the isolated loopback cluster ($name/$listen)"; exit 9; }
+  echo "  [cluster verified: $name on $listen:$PORT]"
+}
+cluster_up() {
+  if "$PGB/pg_ctl" -D "$AFLDB_V2_PG_ROOT/data" status >/dev/null 2>&1; then echo "  cluster already running"; else
+    "$PGB/pg_ctl" -D "$AFLDB_V2_PG_ROOT/data" -l "$AFLDB_V2_PG_ROOT/logs/server.log" -w start >/dev/null && echo "  cluster started" || { echo "cluster start FAILED"; exit 9; }
+  fi
+  load_secrets; assert_cluster
+}

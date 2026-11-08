@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Build a fresh disposable workspace from the uploaded tarball. No .env is shipped.
+set -euo pipefail
+WS="$1"
+TAR="$2"
+if [ -e "$WS" ]; then echo "refusing: $WS exists"; exit 2; fi
+mkdir -p "$WS"
+tar -xzf "$TAR" -C "$WS"
+cd "$WS"
+ls -a | grep -c .
+test ! -e .env && echo "no .env: ok"
+node --version
+npm ci --no-audit --no-fund > npm-ci.log 2>&1 && echo "npm ci: ok" || { echo "npm ci FAILED"; tail -30 npm-ci.log; exit 1; }
+sha256sum package-lock.json

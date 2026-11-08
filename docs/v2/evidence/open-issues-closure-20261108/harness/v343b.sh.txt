@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Read-only: inspect the schedule success logs, the wrapper logs and the one recorded harness FAIL.
+cd "$(dirname "$0")/ev343" || exit 1
+for c in schedule.OK1 schedule.OK2; do echo "--$c"; grep -iE 'preflight|applied|dry run|rolled back|inserted|batch' "$c.log" | head -5 | cut -c1-170; done
+for c in W1 W2 W3; do echo "--$c"; grep -E '^\[[0-9]/4\]|refused|disabled|Applied as import batch|AFLDB_SETTLE_FAILURE' "$c.log" | cut -c1-170 | head -8; done
+echo "--FAIL line in run.log:"; grep -E '^ *FAIL' run.log | cut -c1-220

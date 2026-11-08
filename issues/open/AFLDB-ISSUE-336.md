@@ -1,5 +1,7 @@
 # AFLDB-ISSUE-336 — production runbook: the 35-row DraftGuru Pre-Draft insert (stage I336)
 
+> **2026-11-08 review hold — CLEARED 2026-11-08:** the I336 run-name grammar fix is published at `c1c4b22ee15007111eab66f6d354e0b9ecbb2ade` (fast-forward of `origin/main`). `tests/gap029-ops.test.ts` passed 76/76 at that exact revision, and §3 now pins it. D-336-2 execution still needs its own owner approval (section 0).
+
 Prepared 2026-11-06. **Nothing in this runbook has been run against production.** Ledger entry: `issues.md` → AFLDB-ISSUE-336.
 Evidence: `docs/v2/evidence/issue336-draft-categories-20261105/` (README §4 and `prod-tool-rehearsal/`).
 
@@ -32,15 +34,15 @@ constant added.
 
 1. **Application release first** (recommended): the draft-page code and the `Intl Schol` Grid Solver option. The data step does not depend on it, but
    releasing it first means the new rows appear under the right category the moment they land.
-2. **P1 capture (read-only on production):** from the pinned ops checkout at the merged revision R,
-   `bash tools/v2/gap029-ops/prod-stage.sh preflight R I336`, then `bash tools/v2/gap029-ops/prod-stage.sh capture R I336` (one fresh `pg_dump` as
+2. **P1 capture (read-only on production):** from the pinned ops checkout at the merged revision R = `c1c4b22ee15007111eab66f6d354e0b9ecbb2ade` (revised pin R′, published on `origin/main` 2026-11-08 and qualified there; see §6),
+   `bash tools/v2/gap029-ops/prod-stage.sh preflight c1c4b22ee15007111eab66f6d354e0b9ecbb2ade I336`, then `bash tools/v2/gap029-ops/prod-stage.sh capture c1c4b22ee15007111eab66f6d354e0b9ecbb2ade I336` (one fresh `pg_dump` as
    `afldb_backup`; stops on any writer/timer conflict, ledger ≠ the profile's 118, or identity difference).
 3. **P2 restore + assembly (streamanator, outside production):** `STAGE=I336 … bash tools/v2/gap029-ops/restore-assemble-host.sh` exactly as for S3
    (`docs/v2/gap-029-ordered-execution-handoff-2026-11-03-rev3.md` §9 P2-X), producing the sealed `backup.json`, `restore-evidence.json`.
-4. **P3 plan (read-only):** `bash tools/v2/gap029-ops/prod-stage.sh plan R I336 RUN`. Read the summary: it must say 35 to insert, 31 new persons, actor 1.
-5. **Approval (owner act):** `bash tools/v2/gap029-ops/prod-stage.sh approve R I336 RUN <digest> <statement file> <expires>`; the statement is generated
+4. **P3 plan (read-only):** `bash tools/v2/gap029-ops/prod-stage.sh plan c1c4b22ee15007111eab66f6d354e0b9ecbb2ade I336 RUN`. Read the summary: it must say 35 to insert, 31 new persons, actor 1.
+5. **Approval (owner act):** `bash tools/v2/gap029-ops/prod-stage.sh approve c1c4b22ee15007111eab66f6d354e0b9ecbb2ade I336 RUN <digest> <statement file> <expires>`; the statement is generated
    from the plan and names D-336-2, the digest, the evidence hash, actor 1 and D-336-1.
-6. **Apply (once):** `bash tools/v2/gap029-ops/prod-stage.sh apply R I336 RUN`, then `report`, `state`, `accept` (accept runs the read-only verify).
+6. **Apply (once):** `bash tools/v2/gap029-ops/prod-stage.sh apply c1c4b22ee15007111eab66f6d354e0b9ecbb2ade I336 RUN`, then `report`, `state`, `accept` (accept runs the read-only verify).
 7. **After:** read-only reconciliation against the CSVs (expect 5,966 = 5,966), the production draft pages for 2008 and 2025, and close D-336-2.
 
 ## 4. Recovery
@@ -80,3 +82,40 @@ approval.** Production application release and the I336 data step are unaffected
 * Record: `docs/v2/evidence/issue336-draft-categories-20261105/dev-deploy-20261106/README.md`.
 
 This does not change sections 0–4. The production application release and stage I336 still need their own approvals.
+
+## 6. Pre-implementation review hold — 2026-11-08
+
+**Hold cleared 2026-11-08.**
+- **Published:** the fix is commit `c1c4b22ee15007111eab66f6d354e0b9ecbb2ade`, on `origin/main` by fast-forward from `7fabc6e5` and approved by the owner. The commit holds only `prod-stage.sh` and the test.
+- **Qualified:** in a fresh streamanator workspace cloned from GitHub and checked out at exactly that revision, `tests/gap029-ops.test.ts` passed **76/76**, with all 15 ISSUE-336 run-name cases run rather than skipped. Evidence: `docs/v2/evidence/open-issues-closure-20261108/i336-pin/`.
+- **Pin:** step 4 below is done; §3 now pins R′ = that revision.
+- **Still open:** D-336-2 execution approval, the nightly observation, the production application release, and D-336-3. No production approval is implied.
+
+**Grammar fix implemented locally 2026-11-08 (uncommitted), awaiting user-executed verification.** One `STAGE_RE='(S[1-4]|I336)'` now feeds both `stage_arg` and `run_arg` in `tools/v2/gap029-ops/prod-stage.sh`. Test: `tests/gap029-ops.test.ts` "prod-stage.sh run-name grammar (AFLDB-ISSUE-336)" executes the real parsers under bash; run `npx vitest run tests/gap029-ops.test.ts` on Linux. Step 4 (revise the pinned revision) is still pending. **Severity: Medium (existing issue).** This section supersedes execution readiness of sections 3–4 until the wrapper defect is fixed and qualified. D-336-1, D-336-2, D-336-3 and all prior DEV evidence above are preserved; no production approval is implied.
+
+Baseline: 5cba6846ddfcfd5d7a3fd29e14bc8877099d9656; the affected source is identical at locally recorded published origin/main 7fabc6e51c5c53c4b6f6fe345f21191d9184660b. Source-established; no new reproduction or live observation.
+
+### Evidence, trigger and impact
+
+- tools/v2/gap029-ops/prod-stage.sh:63 accepts stage I336, but :64-66 requires run names matching ^S[1-4]-[0-9]{8}T[0-9]{6}Z$ AND the same stage prefix. No run can satisfy both conditions for I336.
+- :175-198 capture generates RUN=$S-$STAMP at :183, hence I336-...; plan at :202 and subsequent approve/apply/report/state/accept commands call run_arg.
+- Sections 3.2–3.6 above prescribe those real wrapper entry points. tests/gap029-ops.test.ts:184-190 tests I336 plan values, not this shell run-name lifecycle.
+
+With a prepared I336 capture, the next plan step refuses before its substantive work. This blocks the prepared production procedure. It does not establish a partial data insert: the rejection precedes the stage tool. Earlier isolated tool/assembler rehearsal expressly did not rehearse a fresh production capture and sealed assembly, so that evidence is not contradicted.
+
+### Root cause and smallest viable fix
+
+The stage allowlist was extended without extending the run-name parser. Define the strict run grammar from the same allowed stage set (S1–S4 and I336), retain the exact stage equality and timestamp checks, and leave all identity, revision, backup, evidence, approval and one-apply gates intact.
+
+### Proposed sequence and focused checks
+
+1. Add a Linux shell wrapper contract to the existing tests/gap029-ops.test.ts home or closest shell harness. Use stub host commands and disposable paths to reach the actual run_arg boundary for all consumers.
+2. Accept a capture-shaped I336 run for I336; refuse S1/I336 mismatches, bad timestamps, arbitrary prefixes and path traversal. Verify S1–S4 remain valid. Assert a refusal cannot invoke the stage writer.
+3. Fix only the shared grammar. Qualify a complete stubbed capture → plan → approve → apply → report/state/accept dispatch. Stubbed approvals are test inputs, never production authorization.
+4. Revise the pinned operational revision before proposing another production run. Only then seek the separate D-336-2 execution decision; pending nightly observation and D-336-3 remain outstanding.
+
+Acceptance: every documented I336 wrapper command accepts its own valid run name and reaches the intended next gate; malformed/mismatched names refuse before mutation; no other production guard changes. Existing plan-value tests continue to pass.
+
+### Failure handling, dependencies and decisions
+
+Do not bypass prod-stage.sh by calling the underlying writer to work around this failure. Preserve any existing capture and assess freshness before reuse; do not repeat capture or apply automatically. A committed insert still follows section 4's no-retry rule. The grammar repair can be grouped with ISSUE-339 wrapper qualification, but neither grants production execution approval. Owner decisions D-336-2 and D-336-3 remain open. No code, host or database action was performed in this review.

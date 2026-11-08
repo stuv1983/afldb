@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+# ISSUE-342: interrupt a real disposable restore after data load and before post-data schema work
+# (deterministic barrier: an advisory-lock event trigger on CREATE INDEX), SIGKILL pg_restore, and prove
+# the wrapper fails with no proof marker. Then a clean control run. Runs only after ISSUE-341 passed.
+set -uo pipefail
+source "$(dirname "$0")/qlib.sh"
+EV="$OPS/ev342"; mkdir -p "$EV"; E341="$OPS/ev341"
+SRC=afldb_v2_i341src_test; BYS=afldb_v2_i341bys_test; RT=afldb_restore_test
+[[ "$(cat "$E341/result.txt")" == */0 ]] || { echo "ISSUE-341 qualification has not passed; refusing"; exit 2; }
+DUMP="$E341/i341-synthetic.dump"; DUMP_SHA="$(sed -n 4p "$E341/tokens.txt")"
+check_eq "dump unchanged since ISSUE-341" "$DUMP_SHA" "$(sha256sum "$DUMP" | awk '{print $1}')"
+assert_cluster
+GOOD="postgresql://afldb_owner:${OWPW}@127.0.0.1:${PORT}/${SRC}"
+marker() { su_sql $RT -c "select coalesce(shobj_description((select oid from pg_database where datname='$RT'),'pg_database'),'<null>')"; }
+fp_other() { for d in $SRC $BYS; do su_sql $d -c "select coalesce(shobj_description((select oid from pg_database where datname=current_database()),'pg_database'),'') || ' ' || (select string_agg(who||'='||token, ',') from i341_sentinel)"; done; su_sql $SRC -c "select count(*)||':'||sum(disposals) from player_match_stats"; }
+PARITY_Q=(
+ "SELECT count(*) FROM player_match_stats" "SELECT count(*) FROM players" "SELECT count(*) FROM matches"
+ "SELECT count(*) FROM clubs" "SELECT sum(games) FROM player_career_stats" "SELECT sum(goals) FROM player_career_stats"
+ "SELECT sum(votes) FROM brownlow_season_votes" "SELECT count(*) FROM player_match_stats WHERE disposals IS NULL"
+ "SELECT count(*) FROM stat_availability")
+parity() { local db="$1" out=""; for q in "${PARITY_Q[@]}"; do out+="$(su_sql "$db" -c "$q" 2>/dev/null || echo '<query failed>')|"; done; echo "$out"; }
+
+M0="$(marker)"; O0="$(fp_other)"
+check_eq "precondition: a proven marker for this dump is present (left by ISSUE-341 C2)" "afldb.restore_test.v1 sha256=$DUMP_SHA" "$M0"
+
+echo "== barrier: event trigger in $RT blocks the first post-data CREATE INDEX on advisory lock 342342 =="
+su_sql $RT <<'SQL'
+CREATE SCHEMA i342_fault;
+CREATE FUNCTION i342_fault.block() RETURNS event_trigger LANGUAGE plpgsql AS $f$
+BEGIN PERFORM pg_advisory_lock(342342); PERFORM pg_advisory_unlock(342342); END $f$;
+CREATE EVENT TRIGGER i342_block_post_data ON ddl_command_start WHEN TAG IN ('CREATE INDEX') EXECUTE FUNCTION i342_fault.block();
+SQL
+# Holder session: takes the lock and sleeps; killed after the injection.
+su_sql $RT -c "select pg_advisory_lock(342342); select pg_sleep(900)" > /dev/null 2>&1 &
+HOLDER=$!
+for _ in $(seq 1 50); do
+  [[ "$(su_sql $RT -c "select count(*) from pg_locks where locktype='advisory' and objid=342342 and granted")" == 1 ]] && break; sleep 0.2
+done
+check_eq "barrier lock held" "1" "$(su_sql $RT -c "select count(*) from pg_locks where locktype='advisory' and objid=342342 and granted")"
+
+echo "== C4: run the wrapper, wait for the barrier with all data loaded, SIGKILL pg_restore =="
+env PATH="$PGB:$PATH" AFLDB_OWNER_DATABASE_URL="$GOOD" bash tools/maintenance/restore-test.sh "$DUMP" > "$EV/c4.log" 2>&1 &
+WPID=$!
+BLOCKED=0
+for _ in $(seq 1 600); do
+  st="$(su_sql $RT -c "select count(*) filter (where wait_event_type='Lock' and wait_event='advisory' and query ilike 'CREATE INDEX%'), count(*) filter (where query ilike 'COPY %' and state='active') from pg_stat_activity where datname='$RT' and pid<>pg_backend_pid()")"
+  # Stable for 5 consecutive polls: no data-load gap between parallel items is mistaken for completion.
+  if [[ "${st%%|*}" -ge 1 && "${st##*|}" == 0 ]]; then STABLE=$((${STABLE:-0}+1)); else STABLE=0; fi
+  if [[ "$STABLE" -ge 5 ]]; then BLOCKED=1; break; fi
+  kill -0 $WPID 2>/dev/null || break
+  sleep 0.2
+done
+check_eq "pg_restore reached the post-data barrier with no COPY in flight" "1" "$BLOCKED"
+su_sql $RT -c "select pid, wait_event_type, wait_event, left(query, 70) from pg_stat_activity where datname='$RT' and pid<>pg_backend_pid() and state<>'idle'" > "$EV/c4-activity-at-kill.txt"
+P_RT="$(parity $RT)"; P_SRC="$(parity $SRC)"
+echo "$P_SRC" > "$EV/c4-parity-source.txt"; echo "$P_RT" > "$EV/c4-parity-restore-at-kill.txt"
+check_eq "at the barrier, all nine parity values already match the source (aggregate checks alone would pass)" "$P_SRC" "$P_RT"
+check_eq "at the barrier, the marker was already cleared by this run" "<null>" "$(marker)"
+PR="$(pgrep -P $WPID -x pg_restore | head -1)"
+[[ -n "$PR" ]] && pass "found the wrapper's pg_restore child (pid $PR)" || fail "no pg_restore child of the wrapper"
+kill -KILL "$PR"
+wait $WPID; WRC=$?
+echo "$WRC" > "$EV/c4.rc"; sed "s/${OWPW}/<redacted>/g" -i "$EV/c4.log"
+# Cleanup of the injected state: release the barrier, stop orphaned parallel workers, end target sessions.
+kill $HOLDER 2>/dev/null; wait $HOLDER 2>/dev/null
+pkill -KILL -f "pg_restore --dbname=postgresql://afldb_owner@127.0.0.1:${PORT}/${RT}" 2>/dev/null
+sleep 1
+su_sql postgres -c "select count(pg_terminate_backend(pid)) from pg_stat_activity where datname='$RT' and pid<>pg_backend_pid()" > /dev/null
+check_eq "C4 wrapper exit 1" "1" "$WRC"
+grep -q 'pg_restore terminated abnormally (exit status 137)' "$EV/c4.log" && pass "C4 reported the abnormal termination (137)" || fail "C4 log: $(tail -4 "$EV/c4.log")"
+if grep -q 'Parity checks' "$EV/c4.log"; then fail "C4 reached parity"; else pass "C4 stopped before any parity check"; fi
+if grep -q 'proven' "$EV/c4.log"; then fail "C4 announced proven"; else pass "C4 never announced the backup proven"; fi
+check_eq "C4 no proof marker remains (prior candidate marker cleared, none written)" "<null>" "$(marker)"
+check_eq "C4 incomplete-schema witness: i342_witness_idx absent" "0" "$(su_sql $RT -c "select count(*) from pg_indexes where indexname='i342_witness_idx'")"
+check_eq "C4 source and bystander unchanged" "$O0" "$(fp_other)"
+cat "$EV/c4.log"
+
+echo "== C5: control, barrier removed: a complete restore still succeeds =="
+su_sql $RT -c "DROP EVENT TRIGGER i342_block_post_data; DROP SCHEMA i342_fault CASCADE"
+check_eq "barrier removed" "0" "$(su_sql $RT -c "select count(*) from pg_event_trigger")"
+env PATH="$PGB:$PATH" AFLDB_OWNER_DATABASE_URL="$GOOD" bash tools/maintenance/restore-test.sh "$DUMP" > "$EV/c5.log" 2>&1; RC5=$?
+sed "s/${OWPW}/<redacted>/g" -i "$EV/c5.log"
+check_eq "C5 exit 0" "0" "$RC5"
+check_eq "C5 marker binds the dump" "afldb.restore_test.v1 sha256=$DUMP_SHA" "$(marker)"
+check_eq "C5 witness index present" "1" "$(su_sql $RT -c "select count(*) from pg_indexes where indexname='i342_witness_idx'")"
+check_eq "C5 source and bystander unchanged" "$O0" "$(fp_other)"
+check_eq "no pg_restore against this cluster left running" "0" "$(pgrep -c -f "pg_restore --dbname=postgresql://afldb_owner@127.0.0.1:${PORT}/" || true)"
+echo
+echo "ISSUE-342 fault injection: $PASSN passed, $FAILN failed"
+echo "$PASSN/$FAILN" > "$EV/result.txt"

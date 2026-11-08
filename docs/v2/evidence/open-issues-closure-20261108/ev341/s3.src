@@ -1,0 +1,3 @@
+afldb-v2-isolated-test | public.brownlow_season_votes,public.clubs,public.i341_sentinel,public.matches,public.player_career_stats,public.player_match_stats,public.players,public.stat_availability | brownlow_season_votes_pkey,clubs_pkey,i341_sentinel_pkey,i342_witness_idx,matches_pkey,player_career_stats_pkey,player_match_stats_pkey,players_name_trgm,players_pkey,stat_availability_pkey
+source=SOURCE-bc9f8982e534ed37
+120000:1600449

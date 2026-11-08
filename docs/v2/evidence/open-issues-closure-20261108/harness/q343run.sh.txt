@@ -1,0 +1,209 @@
+#!/usr/bin/env bash
+# ISSUE-343 real two-database A/B qualification of both fixture entry points and the Brownlow wrapper path.
+# Isolated loopback cluster only; databases afldb_v2_i343a_test (A) and afldb_v2_i343b_test (B); loopback stub feed.
+set -uo pipefail
+source "$(dirname "$0")/qlib.sh"
+EV="$OPS/ev343"; W343="$OPS/ws343"; mkdir -p "$EV"
+exec > >(tee "$EV/run.log") 2>&1
+A=afldb_v2_i343a_test; B=afldb_v2_i343b_test
+STUBPORT=22943
+APPPW="$(role_pw afldb_app)"; IMPPW="$(role_pw afldb_import)"
+guard_db() { [[ "$1" =~ ^afldb_v2_i343[ab]_test$ ]] || { echo "REFUSED: $1 is not an ISSUE-343 database"; exit 9; }; }
+dsn() { guard_db "$3"; printf 'postgresql://%s:%s@127.0.0.1:%s/%s' "$1" "$2" "$PORT" "$3"; }
+APP_A="$(dsn afldb_app "$APPPW" $A)"; APP_B="$(dsn afldb_app "$APPPW" $B)"
+IMP_A="$(dsn afldb_import "$IMPPW" $A)"; IMP_B="$(dsn afldb_import "$IMPPW" $B)"
+APP_A_BADPW="$(dsn afldb_app "wrong-$(openssl rand -hex 4)" $A)"
+DEAD="postgresql://nobody:none@127.0.0.1:1/$A"
+redact() { python3 -I - "$1" "$AFLDB_V2_PG_ROOT/secrets/roles.json" "$AFLDB_V2_PG_ROOT/secrets/superuser.pw" <<'PY'
+import json, sys
+path, roles, su = sys.argv[1:4]
+secrets = list(json.load(open(roles)).values()) + [open(su).read().strip()]
+text = open(path, encoding='utf-8', errors='replace').read()
+for s in secrets:
+    if s: text = text.replace(s, '<redacted>')
+open(path, 'w', encoding='utf-8').write(text)
+PY
+}
+target_ok() { guard_db "$1"; assert_cluster > /dev/null; [[ "$(su_sql "$1" -c 'select current_database()')" == "$1" ]] || { echo "REFUSED: target"; exit 9; }; }
+setsw() { # db true|false  (current-season switch; the Brownlow admin switch is never set: it stays absent = disabled)
+  target_ok "$1"
+  own_sql "$1" -c "INSERT INTO site_settings (key, value) VALUES ('acquisition.afl_api_current_season_enabled', '$2'::jsonb) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value"
+}
+fp() { su_sql "$1" <<'SQL'
+SELECT format('SELECT %L || '' rows='' || count(*) || '' md5='' || md5(coalesce(string_agg(t::text, chr(10) ORDER BY t::text), '''')) FROM %I.%I t',
+              schemaname || '.' || tablename, schemaname, tablename)
+  FROM pg_tables WHERE schemaname NOT IN ('pg_catalog', 'information_schema') ORDER BY schemaname, tablename
+\gexec
+SELECT 'seq ' || schemaname || '.' || sequencename || ' last=' || coalesce(last_value::text, 'null') FROM pg_sequences ORDER BY 1;
+SQL
+}
+counts() { su_sql "$1" -c "select 'batches='||(select count(*) from import_batches)||' records='||(select count(*) from staging.source_records)||' versions='||(select count(*) from staging.source_record_versions)||' payloads='||(select count(*) from staging.source_payloads)||' fixtures='||(select count(*) from fixtures)||' matches='||(select count(*) from matches)"; }
+snapAB() { fp $A > "$EV/$1.A"; fp $B > "$EV/$1.B"; }
+PGLOG="$AFLDB_V2_PG_ROOT/data/$(su_sql postgres -c 'select pg_current_logfile()')"
+logoff() { stat -c %s "$PGLOG"; }
+stubn() { wc -l < "$EV/stub-requests.log"; }
+changed_tables() { diff <(grep -v '^seq ' "$1") <(grep -v '^seq ' "$2") | grep -E '^[<>]' | awk '{print $2}' | sort -u | paste -sd, -; }
+
+evaluate_common() { # tag rc-want rc-got regex
+  check_eq "$1 exit $2" "$2" "$3"
+  if grep -Eq "$4" "$EV/$1.log"; then pass "$1 says: $(grep -Eo "$4" "$EV/$1.log" | head -1)"; else fail "$1 expected /$4/; tail: $(tail -4 "$EV/$1.log" | tr '\n' ' ')"; fi
+}
+run_case() { # tag kind(refuse|validate|dryrun|apply|readonly) rc-want regex allowedA cmd...
+  local tag="$1" kind="$2" want="$3" re="$4" allowed="$5"; shift 5
+  assert_cluster > /dev/null
+  snapAB "$tag.pre"; local before_counts_A; before_counts_A="$(counts $A)"; local off; off="$(logoff)"; local s0; s0="$(stubn)"
+  "$@" > "$EV/$tag.log" 2>&1; local rc=$?
+  sleep 1
+  redact "$EV/$tag.log"
+  tail -c +"$((off + 1))" "$PGLOG" > "$EV/$tag.pglog"; redact "$EV/$tag.pglog"
+  tail -n +"$((s0 + 1))" "$EV/stub-requests.log" > "$EV/$tag.stub"
+  snapAB "$tag.post"
+  echo "-- $tag ($kind): rc=$rc; A before [$before_counts_A] after [$(counts $A)]; B [$(counts $B)]"
+  evaluate_common "$tag" "$want" "$rc" "$re"
+  local writes; writes="$(grep -Eic '(statement|execute [^:]*): *(begin|start transaction|insert|update|delete|truncate|copy|lock|select pg_advisory)' "$EV/$tag.pglog")"
+  local nst; nst="$(grep -Ec 'LOG:  (statement|execute [^:]*):' "$EV/$tag.pglog")"
+  case "$kind" in
+    refuse|validate|readonly)
+      if cmp -s "$EV/$tag.pre.A" "$EV/$tag.post.A"; then pass "$tag A unchanged (every table + every sequence)"; else fail "$tag A changed: $(changed_tables "$EV/$tag.pre.A" "$EV/$tag.post.A")"; fi
+      if cmp -s "$EV/$tag.pre.B" "$EV/$tag.post.B"; then pass "$tag B unchanged (every table + every sequence)"; else fail "$tag B changed: $(changed_tables "$EV/$tag.pre.B" "$EV/$tag.post.B")"; fi
+      check_eq "$tag no write-capable statement reached A or B (app/import statements logged: $nst)" 0 "$writes"
+      [[ "$kind" == validate ]] && check_eq "$tag opened no connection (zero app/import statements)" 0 "$nst"
+      ;;
+    dryrun)
+      check_eq "$tag A tables unchanged after rollback" "" "$(changed_tables "$EV/$tag.pre.A" "$EV/$tag.post.A")"
+      if cmp -s "$EV/$tag.pre.B" "$EV/$tag.post.B"; then pass "$tag B unchanged (every table + every sequence)"; else fail "$tag B changed: $(changed_tables "$EV/$tag.pre.B" "$EV/$tag.post.B")"; fi
+      ;;
+    apply)
+      local ch; ch="$(changed_tables "$EV/$tag.pre.A" "$EV/$tag.post.A")"
+      local bad; bad="$(tr ',' '\n' <<< "$ch" | grep -vxF -f <(tr ',' '\n' <<< "$allowed") | paste -sd, -)"
+      check_eq "$tag A changed only allowed tables (changed: $ch)" "" "$bad"
+      grep -q 'public.import_batches' <<< "$ch" && pass "$tag A received its import batch" || fail "$tag A has no new import batch"
+      if cmp -s "$EV/$tag.pre.B" "$EV/$tag.post.B"; then pass "$tag B unchanged (every table + every sequence)"; else fail "$tag B changed: $(changed_tables "$EV/$tag.pre.B" "$EV/$tag.post.B")"; fi
+      ;;
+  esac
+}
+cli() { # tool label mode ctl-dsn|- imp-dsn|-
+  local tool="$1" label="$2" mode="$3" ctl="$4" imp="$5"; local -a e=(env -u DATABASE_URL -u AFLDB_IMPORT_DATABASE_URL)
+  [[ "$ctl" != - ]] && e+=("DATABASE_URL=$ctl"); [[ "$imp" != - ]] && e+=("AFLDB_IMPORT_DATABASE_URL=$imp")
+  (cd "$W343" && "${e[@]}" node node_modules/tsx/dist/cli.mjs "tools/current-season/$tool" --label "$label" "--$mode")
+}
+acquire() { # season ctl-dsn
+  (cd "$W343" && env -u DATABASE_URL -u AFLDB_IMPORT_DATABASE_URL DATABASE_URL="$2" AFLDB_AFL_API_BASE_URL="http://127.0.0.1:$STUBPORT" \
+     node node_modules/tsx/dist/cli.mjs tools/current-season/acquire-afl-api.ts --season "$1" --fixtures-only)
+}
+wrapper() { # ctl-dsn imp-dsn : the unmodified wrapper, systemd-shaped env, every AFL endpoint on the loopback stub
+  (cd "$W343" && env -u DATABASE_URL -u AFLDB_IMPORT_DATABASE_URL INVOCATION_ID=i343-synthetic AFLDB_PROJECT_ROOT="$W343" \
+     AFLDB_AFL_API_BROWNLOW_ENABLED=true AFLDB_AFL_API_BASE_URL="http://127.0.0.1:$STUBPORT" \
+     AFLDB_AFL_API_CFS_BASE_URL="http://127.0.0.1:$STUBPORT/cfs" AFLDB_AFL_API_SAPI_BASE_URL="http://127.0.0.1:$STUBPORT/sapi" \
+     DATABASE_URL="$1" AFLDB_IMPORT_DATABASE_URL="$2" /bin/sh deploy/afldb-settle-afl-api-brownlow.sh)
+}
+
+cleanup() {
+  [[ -n "${STUBPID:-}" ]] && kill "$STUBPID" 2>/dev/null
+  for d in $A $B; do su_sql postgres -c "ALTER ROLE afldb_app IN DATABASE $d RESET log_statement; ALTER ROLE afldb_import IN DATABASE $d RESET log_statement" 2>/dev/null; done
+}
+trap cleanup EXIT
+
+echo "== setup =="
+assert_cluster
+for d in $A $B; do target_ok $d; echo "  $d ledger rows: $(su_sql $d -c "select count(*)||' (last '||max(filename)||')' from afldb_meta.schema_migrations")"; done
+ss -ltn | grep -q ":$STUBPORT " && { echo "REFUSED: stub port busy"; exit 9; }
+: > "$EV/stub-requests.log"
+python3 -I - "$EV/stub" "$STUBPORT" "$EV/stub-requests.log" <<'PY' &
+import http.server, sys, urllib.parse
+d, port, logf = sys.argv[1], int(sys.argv[2]), sys.argv[3]
+class H(http.server.BaseHTTPRequestHandler):
+    def _go(self):
+        u = urllib.parse.urlparse(self.path); q = urllib.parse.parse_qs(u.query)
+        with open(logf, 'a') as f: f.write(f"{self.command} {self.path}\n")
+        cs = q.get('compSeasonId', [''])[0]
+        if u.path == '/afl/v2/matches' and cs in ('102', '85'):
+            body, code = open(f"{d}/feed-{cs}.json", 'rb').read(), 200
+        else:
+            body, code = b'{"error":"i343 loopback stub: not served"}', 404
+        self.send_response(code); self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body)
+    do_GET = _go
+    do_POST = _go
+    def log_message(self, *a): pass
+http.server.ThreadingHTTPServer(('127.0.0.1', port), H).serve_forever()
+PY
+STUBPID=$!
+sleep 1
+for d in $A $B; do target_ok $d; su_sql postgres -c "ALTER ROLE afldb_app IN DATABASE $d SET log_statement = 'all'; ALTER ROLE afldb_import IN DATABASE $d SET log_statement = 'all'"; done
+echo "  statement logging on for afldb_app/afldb_import in A and B only; server log $(basename "$PGLOG")"
+setsw $A true; setsw $B false
+echo "  switches: A=$(su_sql $A -c "select value from site_settings where key='acquisition.afl_api_current_season_enabled'") B=$(su_sql $B -c "select value from site_settings where key='acquisition.afl_api_current_season_enabled'")"
+
+echo "== snapshots: real acquire-afl-api.ts --fixtures-only against the loopback stub (control = A, read only) =="
+run_case ACQ27 readonly 0 'label afl-api-2027-[0-9-]+' '' acquire 2027 "$APP_A"
+L27="$(sed -n 's/.*, label \([A-Za-z0-9_-]*\).*/\1/p' "$EV/ACQ27.log" | head -1)"
+run_case ACQ26 readonly 0 'label afl-api-2026-[0-9-]+' '' acquire 2026 "$APP_A"
+L26="$(sed -n 's/.*, label \([A-Za-z0-9_-]*\).*/\1/p' "$EV/ACQ26.log" | head -1)"
+echo "  labels: 2027=$L27 2026=$L26"; [[ -n "$L27" && -n "$L26" ]] || { echo "no snapshot labels; stopping"; exit 1; }
+python3 -I -c 'import json,sys; m=json.load(open(sys.argv[1])); print("  2027 manifest:", m["acquisition_kind"], "season", m["season"], "files", [f["file"] for f in m["files"]])' "$W343/data/sources/afl_api/fixtures/$L27/manifest.json"
+
+MISMATCH='control database .afldb_v2_i343a_test. does not match writer database .afldb_v2_i343b_test.'
+UNREAD='unable to read the control database or prove live writer identity'
+NOCTL='DATABASE_URL is not configured for the control database'
+DISABLED='AFL API current-season ingestion is disabled'
+SEALED='[Ss]eal[a-z]*'
+
+for T in fixtures schedule; do
+  if [[ $T == fixtures ]]; then TOOL=settle-afl-api-fixtures.ts; OKRE='Applied as import batch [0-9]+: 2 fixture observation'; ALLOWED='public.import_batches,staging.source_payloads,staging.source_record_versions,staging.source_records'
+  else TOOL=settle-afl-api-fixture-schedule.ts; OKRE='Outcome: applied \(import batch [0-9]+\)'; ALLOWED='public.fixtures,public.import_batches'; fi
+  echo; echo "==================== $TOOL ===================="
+  setsw $A true; setsw $B false
+  run_case "$T.V"  validate 0 'No connection opened' ''  cli $TOOL "$L27" validate-only "$DEAD" "$DEAD"
+  run_case "$T.M1" refuse 1 "$MISMATCH" '' cli $TOOL "$L27" apply   "$APP_A" "$IMP_B"
+  run_case "$T.M2" refuse 1 "$MISMATCH" '' cli $TOOL "$L27" dry-run "$APP_A" "$IMP_B"
+  setsw $B true
+  run_case "$T.M3" refuse 1 "$MISMATCH" '' cli $TOOL "$L27" apply   "$APP_A" "$IMP_B"
+  setsw $B false
+  setsw $A false
+  run_case "$T.D1" refuse 1 "$DISABLED" '' cli $TOOL "$L27" apply "$APP_A" "$IMP_A"
+  setsw $A true
+  run_case "$T.U1" refuse 1 "$UNREAD" '' cli $TOOL "$L27" apply "$APP_A_BADPW" "$IMP_A"
+  target_ok $A
+  ACL0="$(su_sql $A -c "select array_to_string(array(select unnest(relacl)::text order by 1), ' ') from pg_class where oid='public.site_settings'::regclass")"
+  own_sql $A -c 'REVOKE SELECT ON site_settings FROM afldb_app'
+  if [[ "$(su_sql $A -c "select has_table_privilege('afldb_app','site_settings','SELECT')")" == f ]]; then
+    run_case "$T.U2" refuse 1 "$UNREAD" '' cli $TOOL "$L27" apply "$APP_A" "$IMP_A"
+  else echo "  note: afldb_app keeps SELECT on site_settings through another grant; U2 not exercised"; fi
+  target_ok $A; own_sql $A -c 'GRANT SELECT ON site_settings TO afldb_app'
+  check_eq "$T.U2 site_settings ACL restored" "$ACL0" "$(su_sql $A -c "select array_to_string(array(select unnest(relacl)::text order by 1), ' ') from pg_class where oid='public.site_settings'::regclass")"
+  run_case "$T.U3" refuse 1 "$NOCTL" '' cli $TOOL "$L27" apply - "$IMP_A"
+  run_case "$T.S1" refuse 1 "$SEALED" '' cli $TOOL "$L26" apply "$APP_A" "$IMP_A"
+  check_eq "$T.S1 sealed refusal opened no connection" 0 "$(grep -Ec 'LOG:  (statement|execute [^:]*):' "$EV/$T.S1.pglog")"
+  run_case "$T.OK1" dryrun 0 'control database = afldb_v2_i343a_test, writer database = afldb_v2_i343a_test' '' cli $TOOL "$L27" dry-run "$APP_A" "$IMP_A"
+  run_case "$T.OK2" apply 0 "$OKRE" "$ALLOWED" cli $TOOL "$L27" apply "$APP_A" "$IMP_A"
+  grep -q 'control database = afldb_v2_i343a_test, writer database = afldb_v2_i343a_test' "$EV/$T.OK2.log" && pass "$T.OK2 preflight proved A = A" || fail "$T.OK2 no preflight line"
+done
+echo; echo "  A rows written: fixtures [$(su_sql $A -c "select string_agg(source_record_id||':'||status||':'||confirmation, ' ' order by 1) from fixtures")]"
+echo "  A observations [$(su_sql $A -c "select string_agg(external_record_id||':'||family, ' ' order by 1) from staging.source_records")]"
+echo "  A batches [$(su_sql $A -c "select string_agg(tool||'/'||target_table||'/'||status::text||'/read='||records_read, ' ' order by id) from import_batches")]"
+echo "  B fixtures=$(su_sql $B -c 'select count(*) from fixtures') observations=$(su_sql $B -c 'select count(*) from staging.source_records') batches=$(su_sql $B -c 'select count(*) from import_batches')"
+check_eq "B never received a fixture, observation or batch" "0/0/0" "$(su_sql $B -c "select (select count(*) from fixtures)||'/'||(select count(*) from staging.source_records)||'/'||(select count(*) from import_batches)")"
+
+echo; echo "==================== deploy/afldb-settle-afl-api-brownlow.sh (unmodified, loopback stub) ===================="
+setsw $A true; setsw $B false
+run_case W1 refuse 1 "$MISMATCH" '' wrapper "$APP_A" "$IMP_B"
+grep -q '^\[1/4\]' "$EV/W1.log" && grep -q '^\[2/4\]' "$EV/W1.log" && pass "W1 reached step 2 (fixture staging) after a real step-1 acquisition" || fail "W1 steps: $(grep -E '^\[[0-9]/4\]' "$EV/W1.log" | tr '\n' ' ')"
+grep -q '^\[3/4\]' "$EV/W1.log" && fail "W1 continued past the refusal" || pass "W1 stopped at step 2 (no [3/4])"
+grep -q 'AFLDB_SETTLE_FAILURE' "$EV/W1.log" && pass "W1 emitted AFLDB_SETTLE_FAILURE" || fail "W1 no failure marker"
+check_eq "W1 stub saw exactly the one season-feed request" "GET /afl/v2/matches?competitionId=1&compSeasonId=102&pageSize=1000" "$(cat "$EV/W1.stub")"
+setsw $B true
+run_case W1b refuse 1 "$MISMATCH" '' wrapper "$APP_A" "$IMP_B"
+grep -q '^\[3/4\]' "$EV/W1b.log" && fail "W1b continued past the refusal" || pass "W1b stopped at step 2 with both switches on"
+setsw $B false
+run_case W2 refuse 1 "$DISABLED" '' wrapper "$APP_B" "$IMP_B"
+grep -q '^\[2/4\]' "$EV/W2.log" && fail "W2 reached step 2" || pass "W2 refused at step 1 (acquire), before fixture staging"
+check_eq "W2 made no network request" "" "$(cat "$EV/W2.stub")"
+run_case W3 apply 1 'Brownlow acquisition refused' 'public.import_batches,staging.source_payloads,staging.source_record_versions,staging.source_records' wrapper "$APP_A" "$IMP_A"
+grep -Eq 'Applied as import batch [0-9]+: 2 fixture observation' "$EV/W3.log" && pass "W3 step 2 applied fixture staging to A" || fail "W3 step 2 not applied"
+grep -q 'control database = afldb_v2_i343a_test, writer database = afldb_v2_i343a_test' "$EV/W3.log" && pass "W3 preflight proved A = A" || fail "W3 no preflight line"
+grep -q '^\[3/4\]' "$EV/W3.log" && pass "W3 reached step 3, which refused on the (absent) Brownlow admin switch" || fail "W3 did not reach step 3"
+echo "  W3 A batches now [$(su_sql $A -c "select string_agg(tool||'/'||status::text, ' ' order by id) from import_batches")]"
+
+echo; echo "ISSUE-343 qualification: $PASSN passed, $FAILN failed"
+echo "$PASSN/$FAILN" > "$EV/result.txt"

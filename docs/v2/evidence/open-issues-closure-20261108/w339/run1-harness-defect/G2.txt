@@ -1,0 +1,2 @@
+  G2: [preflight] FAIL migration target is the assessed database -- AFLDB_MIGRATE_TARGET is exported in the deploy shell (value withheld); unset it
+  G2: FAILS=1

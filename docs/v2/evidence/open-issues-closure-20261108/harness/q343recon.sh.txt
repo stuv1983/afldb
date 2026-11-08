@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# ISSUE-343 recon: read-only facts about the workspace and the isolated cluster.
+set -uo pipefail
+source "$(dirname "$0")/qlib.sh"
+assert_cluster
+echo "== workspace sizes =="
+du -sh --exclude=node_modules "$WS" 2>/dev/null
+du -sh "$WS"/data "$WS"/data/sources "$WS"/tests "$WS"/src "$WS"/tools "$WS"/packages 2>/dev/null
+ls -la "$WS" | head -60
+ls "$WS"/data/sources/afl_api/fixtures 2>/dev/null | head
+ls -la "$WS"/node_modules/@afldb 2>/dev/null
+echo "== env files =="; ls -a "$WS" | grep -E '^\.env' || echo none
+echo "== cluster logging =="
+for k in logging_collector log_directory log_filename log_destination log_line_prefix log_statement; do echo "$k=$(su_sql postgres -c "show $k")"; done
+ls -la "$AFLDB_V2_PG_ROOT" "$AFLDB_V2_PG_ROOT/logs" 2>/dev/null
+echo "== databases =="
+$IPG list
+echo "== roles.json keys =="
+python3 -I -c 'import json,sys; print(sorted(json.load(open(sys.argv[1])).keys()))' "$AFLDB_V2_PG_ROOT/secrets/roles.json"
+echo "== ops dir =="; ls -la "$OPS" | head -40
+echo "== ports =="; ss -ltn 2>/dev/null | head -30
+echo "== node =="; node --version; ls "$WS"/node_modules/tsx/dist/cli.mjs

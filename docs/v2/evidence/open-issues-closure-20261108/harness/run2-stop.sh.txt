@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Stop the isolated cluster started for this run and confirm shutdown. Data directory retained.
+set -uo pipefail
+source "$(dirname "$0")/lib2.sh"
+"$PGB/pg_ctl" -D "$AFLDB_V2_PG_ROOT/data" -w -m fast stop; echo "stop rc=$?"
+"$PGB/pg_ctl" -D "$AFLDB_V2_PG_ROOT/data" status; echo "status rc=$? (3 = no server running)"
+if ss -ltn 2>/dev/null | grep -q ":$PORT "; then echo "LISTENER STILL ON $PORT"; else echo "no listener on $PORT"; fi
+if pgrep -af "postgres.*$AFLDB_V2_PG_ROOT" >/dev/null; then echo "POSTMASTER STILL RUNNING"; pgrep -af "postgres.*$AFLDB_V2_PG_ROOT"; else echo "no postmaster for $AFLDB_V2_PG_ROOT"; fi

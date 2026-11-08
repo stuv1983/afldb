@@ -104,3 +104,24 @@ Any production mutation, provider request outside the enabled timer, manual sett
 - **June 2027:** open the Brownlow successor (approved action); the C9 ownership-baseline choice (by 2027-06-30; undecided).
 - **Before 2027-09-01:** the Brownlow successor's substantive decision; the count window is the owner's act.
 - **About October 2027:** C9 delivered and reviewed before the 2027 rollover.
+
+## 10. Dated gate register with owners and closing evidence (2026-11-08, open-issues closure run)
+
+Preparation status on 2026-11-08: nothing further can be prepared before Opening Round.
+- Every decision due before 2027-03-17 was taken on 2026-11-04 (section 1, rows 1–5).
+- The instruments in section 2 exist and are qualified.
+- This run made no live check, probe or production read. That is outside its authorisation.
+
+ISSUE-332 stays **open** until every row below has occurred and its evidence is recorded in the ISSUE-332 ledger entry. "Owner" means the project owner. "Operator" means whoever the owner authorises to run the read-only routine.
+
+| # | Date / trigger | Gate | Who acts | Evidence that closes the row |
+|---|---|---|---|---|
+| G1 | From 2027-03-17 (Opening Round), every round | C6 debutant routine (section 3): register and adjudicate debutants before the 05:00 run | Operator (registration and adjudication are admin acts under D-316-5) | A per-round note of any whole-night refusal and its resumption. Nothing is due if there are no debutants. |
+| G2 | First concluded round, March 2027 | **C7 acceptance** against criteria 1–7 and the replaced criterion 8 (section 4), with the observed ISR delay and measurement limits reported (D-316-10) | **Owner** (acceptance is the owner's act), using the observer read by the operator | `tools/v2/c7-observe.ts` output for the round, plus the owner's written PASS or FAIL in the ledger |
+| G3 | After round 2 has settled (follows the fixture) | D-316-5 and D-316-9 reviews: debutant handling, and 2027 coach coverage and back-fill | **Owner** | A review note in the ledger. Commissioning per-unit refusal or a back-fill is a separate approval. |
+| G4 | June 2027 | Open the Brownlow successor, "Brownlow season totals without AFL Tables profile paths" (D-316-7 action, approved 2026-11-04) | Owner approves; any session records it | A new issue ID in `issues.md`, cross-referenced here |
+| G5 | **By 2027-06-30** | **C9 / D-316-6** ownership-baseline option (Option C is a recommendation only) | **Owner** | The decision recorded in section 1, row 7 |
+| G6 | **Before 2027-09-01** | Brownlow successor substantive decision; the C8 count window is the owner's act | **Owner** | Recorded on the successor issue. Activation stays separately unauthorised until then. |
+| G7 | About October 2027, before the 2027 rollover | C9 delivered and reviewed; `rollover-season.ts` and the D-233-3 census pass for 2027 | Owner approves; implementation by a later session | The delivery and review record, and the census result |
+
+Until then, the nightly empty batches (row 10) need no action. Section 8 still applies in full.

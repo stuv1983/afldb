@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# ISSUE-343 step 2: two disposable marked databases on the isolated loopback cluster, migrated, privileged, seeded.
+set -uo pipefail
+source "$(dirname "$0")/qlib.sh"
+EV="$OPS/ev343"; mkdir -p "$EV"
+A=afldb_v2_i343a_test; B=afldb_v2_i343b_test
+for d in $A $B; do
+  assert_cluster
+  $IPG create-db $d || { echo "create-db $d failed"; exit 1; }
+  $IPG run $d -- node_modules/.bin/tsx tools/db/migrate.ts --target test > "$EV/migrate-$d.log" 2>&1 || { echo "migrate $d failed"; tail -20 "$EV/migrate-$d.log"; exit 1; }
+  $IPG run $d -- node_modules/.bin/tsx tools/db/privileges.ts --target test > "$EV/privileges-$d.log" 2>&1 || { echo "privileges $d failed"; tail -20 "$EV/privileges-$d.log"; exit 1; }
+  echo "  $d: ledger $(su_sql $d -c 'select count(*)||'' last=''||max(filename) from schema_migrations' 2>/dev/null || su_sql $d -c "select string_agg(table_name, ',') from information_schema.tables where table_name ilike '%migration%'")"
+  assert_cluster
+  [[ "$(su_sql $d -c 'select current_database()')" == "$d" ]] || { echo "REFUSED: target mismatch"; exit 9; }
+  own_sql $d -f "$EV/stub/seed.sql" > /dev/null || { echo "seed $d failed"; exit 1; }
+  TOK="$(echo "$d" | tr a-z A-Z)-$(openssl rand -hex 6)"
+  own_sql $d -c "CREATE TABLE i343_sentinel (who text PRIMARY KEY, token text NOT NULL); INSERT INTO i343_sentinel VALUES ('$d', '$TOK')"
+  echo "  $d: sources afl_api=$(su_sql $d -c "select count(*) from sources where key='afl_api'") clubs=$(su_sql $d -c 'select count(*) from clubs') venues=$(su_sql $d -c 'select count(*) from venues') sentinel=$TOK"
+  echo "  $d: app may read site_settings=$(su_sql $d -c "select has_table_privilege('afldb_app','site_settings','SELECT')") import may insert fixtures=$(su_sql $d -c "select has_table_privilege('afldb_import','fixtures','INSERT')") import may insert import_batches=$(su_sql $d -c "select has_table_privilege('afldb_import','import_batches','INSERT')")"
+done
+echo "== staging schema tables =="
+su_sql $A -c "select string_agg(schemaname||'.'||tablename, ', ' order by 1) from pg_tables where schemaname='staging'"
+echo "== site_settings keys present =="
+su_sql $A -c "select coalesce(string_agg(key||'='||value::text, ', '), '<none>') from site_settings where key like 'acquisition.%'"

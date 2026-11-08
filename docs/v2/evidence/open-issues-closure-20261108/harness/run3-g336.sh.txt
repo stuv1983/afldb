@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# ISSUE-336 revised pin: run gap029-ops at the exact published merged revision, cloned from GitHub.
+set -uo pipefail
+source "$(dirname "$0")/lib2.sh"
+WSG="$1"; MERGED="$2"
+EV="$OPS2/evPin"; mkdir -p "$EV"
+[ -e "$WSG" ] && { echo "refusing: $WSG exists"; exit 2; }
+git clone -q https://github.com/stuv1983/afldb.git "$WSG" || exit 2
+cd "$WSG"
+REMOTE_MAIN="$(git rev-parse refs/remotes/origin/main)"
+check_eq "published origin/main is the merged revision" "$MERGED" "$REMOTE_MAIN"
+git checkout -q --detach "$MERGED" || exit 2
+check_eq "HEAD is the merged revision" "$MERGED" "$(git rev-parse HEAD)"; echo "$MERGED" > "$EV/tested-sha.txt"
+check_eq "no .env" absent "$([ -e .env ] && echo present || echo absent)"
+grep -q "STAGE_RE='(S\[1-4\]|I336)'" tools/v2/gap029-ops/prod-stage.sh && pass "prod-stage.sh carries the I336 grammar" || fail "grammar missing"
+node --version
+npm ci --no-audit --no-fund > "$EV/npm-ci.log" 2>&1 && pass "npm ci" || { fail "npm ci"; exit 1; }
+sha256sum package-lock.json | tee "$EV/lock.sha256"
+node_modules/.bin/vitest run tests/gap029-ops.test.ts --reporter=verbose > "$EV/gap029.log" 2>&1; rc=$?
+sed -r 's/\x1b\[[0-9;]*m//g' "$EV/gap029.log" > "$EV/gap029.txt"; rm -f "$EV/gap029.log"
+grep -E 'Tests +[0-9]|Test Files' "$EV/gap029.txt"
+check_eq "gap029-ops exit" 0 "$rc"
+check_eq "AFLDB-ISSUE-336 grammar cases skipped" 0 "$(grep -E 'run-name grammar \(AFLDB-ISSUE-336\)' "$EV/gap029.txt" | grep -cE '↓|skipped')"
+echo "  ISSUE-336 grammar cases passed: $(grep -E 'run-name grammar \(AFLDB-ISSUE-336\)' "$EV/gap029.txt" | grep -c '✓')"
+echo
+echo "ISSUE-336 pin check at $MERGED: $PASSN passed, $FAILN failed"
+echo "$PASSN/$FAILN $MERGED" > "$EV/result.txt"

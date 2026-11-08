@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# ISSUE-339 R339-A with the REAL migration runner: for each configuration, the gate's own
+# afldb_pf_migration_binding verdict, and the real tools/db/migrate.ts child's effective target,
+# observed by the write it makes (`CREATE SCHEMA IF NOT EXISTS afldb_meta`, issued even under
+# --status) on two empty disposable databases A and B of the isolated loopback cluster.
+set -uo pipefail
+source "$(dirname "$0")/qlib.sh"
+EV="$OPS/ev339"; mkdir -p "$EV"
+W2="${WS}-i339"
+A=afldb_v2_i339a_test; B=afldb_v2_i339b_test
+assert_cluster
+if [ ! -d "$W2" ]; then
+  mkdir -p "$W2" && tar -xzf "/mnt/ssd/afldb-close-20261108T061620Z.tar.gz" -C "$W2" --warning=no-unknown-keyword
+  (cd "$W2" && npm ci --no-audit --no-fund > npm-ci.log 2>&1) && echo "  W2 npm ci ok" || { echo "W2 npm ci failed"; exit 1; }
+fi
+for d in $A $B; do $IPG create-db $d >/dev/null && echo "  created $d" || { echo "create-db $d failed"; exit 1; }; done
+DSN_A="postgresql://afldb_owner:${OWPW}@127.0.0.1:${PORT}/${A}"
+DSN_B="postgresql://afldb_owner:${OWPW}@127.0.0.1:${PORT}/${B}"
+meta() { own_sql "$1" -c "select count(*) from pg_namespace where nspname='afldb_meta'"; }
+reset() { for d in $A $B; do own_sql $d -c "DROP SCHEMA IF EXISTS afldb_meta CASCADE" >/dev/null 2>&1; done; }
+where() { echo "A=$(meta $A) B=$(meta $B)"; }
+setenvfile() { ( umask 077; printf '%s\n' "$@" > "$W2/.env" ); }
+gate() { # env assignments as args; prints PASS/FAIL line of the binding check
+  (cd "$W2" && env "$@" bash -c '. deploy/sync-dev-remote.sh; AFLDB_PF_EVIDENCE_FILE=; AFLDB_PF_FAILS=0; AFLDB_PF_DSN_NAME="${CASE_DSN_NAME:-AFLDB_OWNER_DATABASE_URL}"; afldb_pf_migration_binding' 2>&1 | grep -E '^\[preflight\]' | sed 's/^\[preflight\] //' | cut -c1-150)
+}
+child() { # $1 fixed|old, rest env; prints the runner target line or its error, plus where it wrote
+  local kind="$1"; shift; local out
+  if [[ "$kind" == fixed ]]; then
+    out="$(cd "$W2" && env "$@" env -u AFLDB_MIGRATE_TARGET -u AFLDB_OWNER_DATABASE_URL npm run --silent db:migrate -- --target dev --status 2>&1)"
+  else
+    out="$(cd "$W2" && env "$@" npm run --silent db:migrate -- --status 2>&1)"
+  fi
+  echo "$out" | grep -m1 -E 'AFLDB migrations ->|ERROR' | cut -c1-140
+}
+row() { # case, gate-env..., -- , child env (same)
+  local name="$1" expect_gate="$2" expect_fixed="$3" expect_old="$4"; shift 4
+  echo "== $name =="
+  local g; g="$(gate "$@")"; echo "  gate:  $g"
+  [[ "$g" == ${expect_gate}* ]] && pass "$name gate verdict $expect_gate" || fail "$name gate verdict (want $expect_gate)"
+  reset; local c; c="$(child fixed "$@")"; local w; w="$(where)"; echo "  fixed child: $c  [$w]"
+  check_eq "$name fixed line writes" "$expect_fixed" "$w"
+  if [[ -n "$expect_old" ]]; then
+    reset; c="$(child old "$@")"; w="$(where)"; echo "  old line:    $c  [$w]"
+    check_eq "$name old unbound line writes" "$expect_old" "$w"
+  fi
+  reset
+}
+CLEAN=(PATH="$PATH" HOME="$HOME")
+setenvfile "AFLDB_OWNER_DATABASE_URL=$DSN_A" "AFLDB_TEST_DATABASE_URL=$DSN_B"
+row K1-admitted-baseline PASS "A=1 B=0" "A=1 B=0" "${CLEAN[@]}"
+row K2-exported-owner-DSN-B FAIL "A=1 B=0" "A=0 B=1" "${CLEAN[@]}" AFLDB_OWNER_DATABASE_URL="$DSN_B"
+row K3-exported-target-test FAIL "A=1 B=0" "A=0 B=1" "${CLEAN[@]}" AFLDB_MIGRATE_TARGET=test AFLDB_TEST_DATABASE_URL="$DSN_B"
+row K8-exported-target-dev PASS "A=1 B=0" "A=1 B=0" "${CLEAN[@]}" AFLDB_MIGRATE_TARGET=dev
+setenvfile "AFLDB_OWNER_DATABASE_URL=$DSN_A" "AFLDB_MIGRATE_TARGET=test" "AFLDB_TEST_DATABASE_URL=$DSN_B"
+row K4-dotenv-target-test FAIL "A=0 B=0" "A=0 B=1" "${CLEAN[@]}"
+setenvfile "AFLDB_OWNER_DATABASE_URL=$DSN_A" "AFLDB_MIGRATE_TARGET=dev"
+row K9-dotenv-target-dev PASS "A=1 B=0" "" "${CLEAN[@]}"
+setenvfile "AFLDB_OWNER_DATABASE_URL=$DSN_B" "AFLDB_OWNER_DATABASE_URL=$DSN_A"
+row K5-dotenv-two-owner-lines FAIL "A=0 B=1" "" "${CLEAN[@]}"
+echo "  note: the gate's .env value reader takes the LAST line (A); migrate.ts keeps the FIRST (B)."
+setenvfile "export AFLDB_OWNER_DATABASE_URL=$DSN_A"
+row K6-dotenv-export-form FAIL "A=0 B=0" "" "${CLEAN[@]}"
+setenvfile "AFLDB_OWNER_DATABASE_URL=$DSN_A" "AFLDB_CODE_TEST_DATABASE_URL=$DSN_B"
+row K7-custom-dsn-name FAIL "A=1 B=0" "" "${CLEAN[@]}" CASE_DSN_NAME=AFLDB_CODE_TEST_DATABASE_URL
+echo "  K7: the gate would assess B (AFLDB_CODE_TEST_DATABASE_URL) while the real child writes A."
+g="$(gate "${CLEAN[@]}" CASE_DSN_NAME=AFLDB_CODE_TEST_DATABASE_URL AFLDB_PF_SKIP_MIGRATE=1)"; echo "  K7 with -SkipMigrate: $g"
+[[ "$g" == INFO* ]] && pass "K7 -SkipMigrate is not evaluated (no migration)" || fail "K7 skip"
+rm -f "$W2/.env"
+check_eq "W2 .env removed" "absent" "$([ -e "$W2/.env" ] && echo present || echo absent)"
+echo
+echo "ISSUE-339 R339-A real-runner matrix: $PASSN passed, $FAILN failed"
+echo "$PASSN/$FAILN" > "$EV/result.txt"

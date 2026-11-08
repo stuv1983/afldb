@@ -1,0 +1,183 @@
+#!/usr/bin/env bash
+# W-339 write-mode rehearsal (issues/open/OPEN-ISSUES-CLOSURE-RUN-20261108.md): G1/G2 gate refusal,
+# W1 gated write, W2 child scrubbing under hostile exports, N1 negative control. Every case starts
+# from fresh disposable databases cloned from a marked ledger-117 template. Loopback cluster only.
+set -uo pipefail
+source "$(dirname "$0")/lib2.sh"
+ROOTW="$1"; BUNDLE="$2"; EXPECT="$3"; SFX="${4:-}"
+CL="$ROOTW/clone"; TPLT="$ROOTW/tpl117"; EV="$OPS2/evW${SFX}"; mkdir -p "$EV"
+M118=118_fixtures_unconfirmed_participants.sql
+TPL=afldb_v2_w339t117${SFX}_test
+# A ledger file must exist with the stated row count before anything is compared against it.
+rows_of() { [ -s "$1" ] && wc -l < "$1" || echo missing; }
+[ -e "$ROOTW" ] && { echo "refusing: $ROOTW exists"; exit 2; }
+mkdir -p "$ROOTW"
+
+echo "== S1 checkout =="
+sha256sum "$BUNDLE" | tee "$EV/bundle.sha256"
+git bundle list-heads "$BUNDLE" | tee "$EV/bundle-heads.txt"
+git clone -q -b claude/issue-339-deploy-preflight "$BUNDLE" "$CL" || exit 2
+cd "$CL"
+git bundle verify -q "$BUNDLE" && echo "  bundle verifies" || { echo "bundle verify failed"; exit 2; }
+git fetch -q "$BUNDLE" '+refs/remotes/origin/main:refs/remotes/origin/main' || exit 2
+HEAD_SHA="$(git rev-parse HEAD)"; echo "$HEAD_SHA" > "$EV/clone-head.txt"
+S1OK=1
+[[ "$HEAD_SHA" == "$EXPECT" ]] && pass "HEAD is B1 ($HEAD_SHA)" || { fail "HEAD is B1 (got $HEAD_SHA)"; S1OK=0; }
+[[ "$(git rev-parse refs/remotes/origin/main)" == "$BASE_SHA" ]] && pass "refs/remotes/origin/main is the verified base $BASE_SHA" || { fail "origin/main is not the base"; S1OK=0; }
+check_eq "migration files at HEAD" 118 "$(ls src/db/migrations/*.sql | wc -l)"
+check_eq "last migration at HEAD" "$M118" "$(ls src/db/migrations/*.sql | xargs -n1 basename | LC_ALL=C sort | tail -1)"
+git cat-file -e "refs/remotes/origin/main:src/db/migrations/$M118" 2>/dev/null && pass "origin/main contains $M118 (not branch-local)" || { fail "origin/main lacks $M118"; S1OK=0; }
+check_eq "B1 migration dir equals base" "" "$(git diff --name-only "$BASE_SHA" HEAD -- src/db/migrations)"
+(( S1OK )) || { echo "BLOCKER: revision checks failed; the migrator is not run"; echo "$PASSN/$FAILN BLOCKED" > "$EV/result.txt"; exit 3; }
+M118_SHA="$(git show "HEAD:src/db/migrations/$M118" | sha256sum | cut -d' ' -f1)"
+echo "  $M118 blob sha256 at HEAD: $M118_SHA" | tee "$EV/m118-checksum.txt"
+npm ci --no-audit --no-fund > "$EV/npm-ci.log" 2>&1 && pass "npm ci" || { fail "npm ci"; exit 1; }
+sha256sum package-lock.json | tee "$EV/lock.sha256"
+
+echo "== S2 template at 117 =="
+mkdir -p "$TPLT"; git archive HEAD | tar -x -C "$TPLT"; rm -f "$TPLT/src/db/migrations/$M118"; ln -s "$CL/node_modules" "$TPLT/node_modules"
+check_eq "template tree migrations" 117 "$(ls "$TPLT"/src/db/migrations/*.sql | wc -l)"
+check_eq "template tree is not a Git checkout" absent "$([ -e "$TPLT/.git" ] && echo present || echo absent)"
+cluster_up
+IPG() { (cd "$TPLT" && node_modules/.bin/tsx tools/v2/isolated-pg.ts "$@"); }
+exists() { [ -n "$(su_sql postgres -c "select 1 from pg_database where datname='$1'")" ]; }
+exists $TPL && { echo "refusing: $TPL exists"; exit 2; }
+assert_cluster; IPG create-db $TPL >/dev/null || { fail "create template"; exit 1; }
+IPG verify $TPL >/dev/null 2>&1 && pass "template $TPL verified isolated" || { fail "template verify"; exit 1; }
+assert_cluster
+IPG run $TPL -- node_modules/.bin/tsx tools/db/migrate.ts --target test > "$EV/tpl-migrate.log" 2>&1 || { fail "template migrate"; tail -5 "$EV/tpl-migrate.log"; exit 1; }
+check_eq "template ledger rows" 117 "$(su_sql $TPL -c 'select count(*) from afldb_meta.schema_migrations')"
+check_eq "template last row" "117_brownlow_provider_eligibility_unknown.sql" "$(su_sql $TPL -c 'select max(name) from afldb_meta.schema_migrations')"
+ledger_sha() { su_sql "$1" -c "select name||' '||checksum from afldb_meta.schema_migrations order by name collate \"C\"" | sha256sum | cut -c1-16; }
+TPL_LEDGER="$(ledger_sha $TPL)"; echo "  template ledger sha: $TPL_LEDGER" | tee "$EV/template.txt"
+
+# --- per-case databases and fingerprints ----------------------------------------------------
+fp() { # ledger count | last | ledger sha | tables sha | sentinel
+  local db="$1" tabs sent
+  tabs="$(su_sql "$db" -c "select table_schema||'.'||table_name from information_schema.tables where table_schema not in ('pg_catalog','information_schema') order by 1" | sha256sum | cut -c1-16)"
+  sent="$(su_sql "$db" -c "select coalesce((select token from public.i339w_sentinel limit 1),'none')" 2>/dev/null || echo none)"
+  echo "n=$(su_sql "$db" -c 'select count(*) from afldb_meta.schema_migrations') last=$(su_sql "$db" -c 'select max(name) from afldb_meta.schema_migrations') ledger=$(ledger_sha "$db") tables=$tabs sentinel=$sent"
+}
+mkcase() { # A B
+  local a="$1" b="$2" d tok
+  for d in "$a" "$b"; do exists "$d" && { echo "refusing: $d exists"; exit 2; }; assert_cluster; IPG create-db "$d" --template $TPL >/dev/null || { fail "create $d"; exit 1; }
+    IPG verify "$d" >/dev/null 2>&1 || { fail "verify $d"; exit 1; }; done
+  tok="$(head -c 12 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+  assert_cluster; su_sql "$b" -c "create table public.i339w_sentinel(token text not null); insert into public.i339w_sentinel values ('$tok')" >/dev/null
+  check_eq "$a starts at 117 from the template" "$TPL_LEDGER" "$(ledger_sha "$a")"
+  check_eq "$b starts at 117 from the template" "$TPL_LEDGER" "$(ledger_sha "$b")"
+}
+dsn() { printf 'postgresql://afldb_owner:%s@127.0.0.1:%s/%s' "$OWPW" "$PORT" "$1"; }
+setenvfile() { ( umask 077; printf 'AFLDB_OWNER_DATABASE_URL=%s\n' "$(dsn "$1")" > "$CL/.env" ); }
+# PATH shim: any npm/tsx invocation leaves a marker, so "no child ran" is observed, not assumed.
+SHIM="$ROOTW/shim"; mkdir -p "$SHIM"
+for t in npm npx tsx; do printf '#!/bin/sh\ntouch %s/child-invoked\nexit 99\n' "$SHIM" > "$SHIM/$t"; chmod +x "$SHIM/$t"; done
+LIB="deploy/sync-dev-remote.sh"
+EXACT='env -u AFLDB_MIGRATE_TARGET -u AFLDB_OWNER_DATABASE_URL npm run db:migrate -- --target dev'
+grep -qF "'$EXACT'" deploy/sync-dev.ps1 && pass "the rehearsed line is sync-dev.ps1's exact migration line" || fail "exact line not found in sync-dev.ps1"
+record_case() { local c="$1" when="$2" a="$3" b="$4"; { echo "$c $when A($a): $(fp "$a")"; echo "$c $when B($b): $(fp "$b")"; } | tee -a "$EV/fingerprints.txt"; su_sql "$a" -c "select name||' '||checksum from afldb_meta.schema_migrations order by name collate \"C\"" > "$EV/$c-$when-A.ledger"; su_sql "$b" -c "select name||' '||checksum from afldb_meta.schema_migrations order by name collate \"C\"" > "$EV/$c-$when-B.ledger"; }
+binding() { # runs in the caller's (hostile) exported environment; prints the binding line
+  (cd "$CL" && PATH="$SHIM:$PATH" bash -c '. deploy/sync-dev-remote.sh; AFLDB_PF_EVIDENCE_FILE=; AFLDB_PF_FAILS=0; AFLDB_PF_DSN_NAME=AFLDB_OWNER_DATABASE_URL; afldb_pf_migration_binding; echo "FAILS=$AFLDB_PF_FAILS"' 2>&1)
+}
+
+# --- G1 / G2 ---------------------------------------------------------------------------------
+echo "== G1/G2 gate refusal =="
+AG=afldb_v2_w339${SFX}_ga_test; BG=afldb_v2_w339${SFX}_gb_test
+mkcase $AG $BG; setenvfile $AG; record_case G before $AG $BG
+FPA0="$(fp $AG)"; FPB0="$(fp $BG)"; rm -f "$SHIM/child-invoked"
+out="$(export AFLDB_OWNER_DATABASE_URL="$(dsn $BG)"; binding)"; echo "$out" | sed 's/^/  G1: /' | tee "$EV/G1.txt"
+echo "$out" | grep -q 'FAIL migration target is the assessed database -- AFLDB_OWNER_DATABASE_URL is exported in the deploy shell' && pass "G1 refused: exported DSN" || fail "G1 refusal text"
+echo "$out" | grep -q '^FAILS=1$' && pass "G1 one blocker" || fail "G1 blocker count"
+check_eq "G1 no child invoked" absent "$([ -e "$SHIM/child-invoked" ] && echo present || echo absent)"
+out="$(export AFLDB_MIGRATE_TARGET=test AFLDB_TEST_DATABASE_URL="$(dsn $BG)"; binding)"; echo "$out" | sed 's/^/  G2: /' | tee "$EV/G2.txt"
+echo "$out" | grep -q 'FAIL migration target is the assessed database -- AFLDB_MIGRATE_TARGET is exported in the deploy shell' && pass "G2 refused: exported target" || fail "G2 refusal text"
+echo "$out" | grep -q '^FAILS=1$' && pass "G2 one blocker" || fail "G2 blocker count"
+check_eq "G2 no child invoked" absent "$([ -e "$SHIM/child-invoked" ] && echo present || echo absent)"
+record_case G after $AG $BG
+check_eq "G ledger files A/B before and after" "117/117/117/117" "$(rows_of "$EV/G-before-A.ledger")/$(rows_of "$EV/G-before-B.ledger")/$(rows_of "$EV/G-after-A.ledger")/$(rows_of "$EV/G-after-B.ledger")"
+check_eq "G Ag unchanged at 117" "$FPA0" "$(fp $AG)"; check_eq "G Bg unchanged at 117" "$FPB0" "$(fp $BG)"
+
+# --- W1 gated write, clean environment ---------------------------------------------------------
+echo "== W1 gated write (clean environment) =="
+A1=afldb_v2_w339${SFX}_w1a_test; B1=afldb_v2_w339${SFX}_w1b_test
+mkcase $A1 $B1; setenvfile $A1; record_case W1 before $A1 $B1; FPB="$(fp $B1)"
+mkdir -p "$EV/W1-gate"
+# The gate's own identity/ledger/transition block, lifted verbatim (backup check excluded).
+awk '/# Database identity, ledger, migration transition, backup and artifact\./{f=1;next} f&&/afldb_pf_backup_check "\$\(grep/{exit} f' "$LIB" > "$EV/W1-gate-block.sh"; echo 'fi' >> "$EV/W1-gate-block.sh"
+check_eq "lifted block size (lines)" 34 "$(wc -l < "$EV/W1-gate-block.sh")"
+assert_cluster; IPG verify $A1 >/dev/null 2>&1 && pass "W1 target $A1 verified isolated before write" || fail "W1 verify"
+(cd "$CL" && env -u AFLDB_MIGRATE_TARGET -u AFLDB_OWNER_DATABASE_URL -u AFLDB_TEST_DATABASE_URL \
+   AFLDB_PF_DSN_NAME=AFLDB_OWNER_DATABASE_URL AFLDB_PF_EXPECTED_DATABASE=$A1 AFLDB_PF_TARGET_REV="$HEAD_SHA" \
+   AFLDB_PF_LEDGER_BEFORE=117 AFLDB_PF_LEDGER_AFTER=118 AFLDB_PF_EVIDENCE_DIR="$EV/W1-gate" AFLDB_PF_PHASE=w339 \
+   BLOCK="$EV/W1-gate-block.sh" EXACT="$EXACT" bash -c '
+     . deploy/sync-dev-remote.sh
+     afldb_pf_open_evidence
+     gate_block() { local ledger db_identity; eval "$(cat "$BLOCK")"; rm -f -- "$ledger"; }
+     gate_block
+     afldb_pf_migration_binding
+     if (( AFLDB_PF_FAILS > 0 )); then afldb_pf_record INFO "gate result" "BLOCKED: $AFLDB_PF_FAILS"; afldb_pf_finish 40; exit 40; fi
+     echo "[w339] running the exact line in write mode: $EXACT"
+     eval "$EXACT"; rc=$?
+     if (( rc != 0 )); then afldb_pf_record FAIL "migration child" "exit $rc"; afldb_pf_finish $rc; exit $rc; fi
+     afldb_pf_migration_parity; rc=$?
+     afldb_pf_finish $rc; exit $rc') > "$EV/W1-run.log" 2>&1; rc=$?
+grep -E '^\[preflight\]|^\[w339\]|AFLDB migrations ->|Applied|ok \(' "$EV/W1-run.log" | sed 's/^/  /'
+check_eq "W1 driver exit" 0 "$rc"
+grep -q 'PASS database identity -- '"$A1"' afldb_owner' "$EV/W1-run.log" && pass "W1 identity is $A1" || fail "W1 identity"
+grep -q 'PASS applied migrations match the target revision -- 117 applied' "$EV/W1-run.log" && pass "W1 applied 117 match target" || fail "W1 applied match"
+grep -q "PASS approved migration transition -- 117 -> 118 (pending $M118)" "$EV/W1-run.log" && pass "W1 transition PASS 117 -> 118" || fail "W1 transition"
+grep -q 'PASS migration target is the assessed database' "$EV/W1-run.log" && pass "W1 binding PASS" || fail "W1 binding"
+grep -q 'PASS post-migration parity -- 118/118, names and checksums equal' "$EV/W1-run.log" && pass "W1 parity 118/118" || fail "W1 parity"
+record_case W1 after $A1 $B1
+check_eq "W1 ledger files A before/after" "117/118" "$(rows_of "$EV/W1-before-A.ledger")/$(rows_of "$EV/W1-after-A.ledger")"
+check_eq "W1 A1 117 rows preserved" "" "$(diff <(cat "$EV/W1-before-A.ledger") <(head -117 "$EV/W1-after-A.ledger"))"
+check_eq "W1 A1 exactly one new row" "1" "$(( $(wc -l < "$EV/W1-after-A.ledger") - $(wc -l < "$EV/W1-before-A.ledger") ))"
+check_eq "W1 A1 new row is $M118 with the HEAD blob checksum" "$M118 $M118_SHA" "$(tail -1 "$EV/W1-after-A.ledger")"
+check_eq "W1 B1 fingerprint unchanged" "$FPB" "$(fp $B1)"
+cp "$EV"/W1-gate/*.txt "$EV/W1-transition-record.txt" 2>/dev/null && pass "W1 gate evidence file kept as the transition record" || fail "W1 gate evidence file"
+
+# --- W2 child scrubbing under hostile exports (write mode, deliberately not gated) -----------
+echo "== W2 exact line under hostile exports H =="
+A2=afldb_v2_w339${SFX}_w2a_test; B2=afldb_v2_w339${SFX}_w2b_test
+mkcase $A2 $B2; setenvfile $A2; record_case W2 before $A2 $B2; FPB="$(fp $B2)"
+assert_cluster; IPG verify $A2 >/dev/null 2>&1 && IPG verify $B2 >/dev/null 2>&1 && pass "W2 $A2 and $B2 verified isolated before write" || fail "W2 verify"
+(cd "$CL" && export AFLDB_OWNER_DATABASE_URL="$(dsn $B2)" AFLDB_MIGRATE_TARGET=test AFLDB_TEST_DATABASE_URL="$(dsn $B2)" \
+   && [ -n "$AFLDB_OWNER_DATABASE_URL" ] && echo "[w339] H exported: AFLDB_OWNER_DATABASE_URL=<B2> AFLDB_MIGRATE_TARGET=test AFLDB_TEST_DATABASE_URL=<B2>" \
+   && eval "$EXACT") > "$EV/W2-child.log" 2>&1; rc=$?
+grep -E '^\[w339\]|AFLDB migrations ->|Applied|ok \(|ERROR' "$EV/W2-child.log" | sed 's/^/  /'
+check_eq "W2 child exit" 0 "$rc"
+grep -q "AFLDB migrations -> dev" "$EV/W2-child.log" && pass "W2 child resolved target dev" || fail "W2 child target"
+record_case W2 after $A2 $B2
+check_eq "W2 ledger files A before/after" "117/118" "$(rows_of "$EV/W2-before-A.ledger")/$(rows_of "$EV/W2-after-A.ledger")"
+check_eq "W2 A2 117 rows preserved" "" "$(diff <(cat "$EV/W2-before-A.ledger") <(head -117 "$EV/W2-after-A.ledger"))"
+check_eq "W2 A2 new row is $M118 with the HEAD blob checksum" "$M118 $M118_SHA" "$(tail -1 "$EV/W2-after-A.ledger")"
+check_eq "W2 A2 rows" 118 "$(wc -l < "$EV/W2-after-A.ledger")"
+check_eq "W2 B2 fingerprint unchanged (117)" "$FPB" "$(fp $B2)"
+mkdir -p "$EV/W2-parity"
+(cd "$CL" && env -u AFLDB_MIGRATE_TARGET -u AFLDB_OWNER_DATABASE_URL -u AFLDB_TEST_DATABASE_URL \
+   AFLDB_PF_DSN_NAME=AFLDB_OWNER_DATABASE_URL AFLDB_PF_TARGET_REV="$HEAD_SHA" AFLDB_PF_LEDGER_AFTER=118 AFLDB_PF_EVIDENCE_DIR="$EV/W2-parity" AFLDB_PF_PHASE=w339-parity \
+   bash -c '. deploy/sync-dev-remote.sh; afldb_pf_open_evidence; afldb_pf_migration_parity; rc=$?; afldb_pf_finish $rc; exit $rc') > "$EV/W2-parity.log" 2>&1; rc=$?
+grep -E '^\[preflight\]' "$EV/W2-parity.log" | sed 's/^/  /'
+check_eq "W2 clean-subshell parity exit" 0 "$rc"
+grep -q 'PASS post-migration parity -- 118/118' "$EV/W2-parity.log" && pass "W2 parity 118/118" || fail "W2 parity"
+
+# --- N1 negative control: H really is hostile -------------------------------------------------
+echo "== N1 old unbound line under H =="
+A3=afldb_v2_w339${SFX}_n1a_test; B3=afldb_v2_w339${SFX}_n1b_test
+mkcase $A3 $B3; setenvfile $A3; record_case N1 before $A3 $B3; FPA="$(fp $A3)"
+assert_cluster; IPG verify $A3 >/dev/null 2>&1 && IPG verify $B3 >/dev/null 2>&1 && pass "N1 $A3 and $B3 verified isolated before write" || fail "N1 verify"
+(cd "$CL" && export AFLDB_OWNER_DATABASE_URL="$(dsn $B3)" AFLDB_MIGRATE_TARGET=test AFLDB_TEST_DATABASE_URL="$(dsn $B3)" && npm run db:migrate) > "$EV/N1-child.log" 2>&1; rc=$?
+grep -E 'AFLDB migrations ->|Applied|ERROR' "$EV/N1-child.log" | sed 's/^/  /'
+check_eq "N1 child exit" 0 "$rc"
+record_case N1 after $A3 $B3
+check_eq "N1 B3 advanced to 118 (misdirected write)" "118 $M118 $M118_SHA" "$(wc -l < "$EV/N1-after-B.ledger") $(tail -1 "$EV/N1-after-B.ledger")"
+check_eq "N1 ledger files B before/after, A after" "117/118/117" "$(rows_of "$EV/N1-before-B.ledger")/$(rows_of "$EV/N1-after-B.ledger")/$(rows_of "$EV/N1-after-A.ledger")"
+check_eq "N1 A3 unchanged at 117" "$FPA" "$(fp $A3)"
+
+rm -f "$CL/.env"; check_eq "throwaway .env removed" absent "$([ -e "$CL/.env" ] && echo present || echo absent)"
+echo "== leak scan =="
+load_secrets
+if grep -rlF -e "$OWPW" -e "$SUPW" "$EV" "$OPS2"/evA 2>/dev/null; then fail "credential string found in evidence (files above)"; else pass "no credential string in evidence"; fi
+echo
+echo "W-339 write-mode rehearsal at $HEAD_SHA: $PASSN passed, $FAILN failed"
+echo "$PASSN/$FAILN $HEAD_SHA" > "$EV/result.txt"

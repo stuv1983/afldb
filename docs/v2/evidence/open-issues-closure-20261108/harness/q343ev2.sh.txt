@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# ISSUE-343: re-check the saved server statement logs with multi-line statements joined (read-only).
+set -uo pipefail
+source "$(dirname "$0")/qlib.sh"
+EV="$OPS/ev343"
+join_log() { awk '/^[0-9]{4}-[0-9]{2}-[0-9]{2} /{ if (buf != "") print buf; buf = $0; next } { gsub(/[\t ]+/, " "); buf = buf " " $0 } END { if (buf != "") print buf }' "$1"; }
+P=0; F=0
+for f in "$EV"/*.pglog; do
+  t="$(basename "$f" .pglog)"
+  join_log "$f" > "$EV/$t.joined"
+  n="$(grep -Ec 'LOG:  (statement|execute [^:]*):' "$EV/$t.joined")"
+  w="$(grep -E 'LOG:  (statement|execute [^:]*):' "$EV/$t.joined" | grep -Eic ': *(begin|start transaction|insert|update|delete|truncate|copy|lock|select pg_advisory|with .* (insert|update|delete))')"
+  case "$t" in
+    *.OK1|*.OK2|W3) echo "  $t (success case): $n statements, $w write-capable";;
+    *) if [[ "$w" == 0 ]]; then P=$((P+1)); echo "  PASS $t: $n app/import statements, 0 write-capable"; else F=$((F+1)); echo "  FAIL $t: $w write-capable"; fi;;
+  esac
+done
+for t in fixtures.M1 schedule.M1 W1 fixtures.U1 fixtures.U2 schedule.D1; do
+  echo "== $t statements (joined) =="
+  grep -E 'LOG:  (statement|execute [^:]*):' "$EV/$t.joined" | sed -E 's/^.*LOG:  execute [^:]*: //; s/^.*LOG:  statement: //' | cut -c1-150
+  grep -E 'DETAIL:  parameters' "$EV/$t.joined" | sed -E 's/^.*DETAIL:  //' | cut -c1-150 | sort -u
+done
+echo "== fixtures.OK2 statements (joined, first verb only) =="
+grep -E 'LOG:  (statement|execute [^:]*):' "$EV/fixtures.OK2.joined" | sed -E 's/^.*LOG:  (execute [^:]*|statement): *//' | awk '{print toupper($1), $2, $3}' | sort | uniq -c
+echo "pglog recheck: $P passed, $F failed"

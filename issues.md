@@ -4,6 +4,22 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
+**Publication state — 2026-11-09 (records-only commit from `origin/main` `8d122f62`):** the closure records below are published without code.
+- **Fixed in this tree:** 337 (`7fabc6e5`), 340 and 345 (`c1c4b22e`), 339 (`8d122f62`). ISSUE-336's `48ff91c7` docs are carried as a cherry-pick.
+- **Not in this tree:** 338, 341, 342, 343 and 344 are **resolved, scoped to the local working tree** only. Their fixes (commit plan B2–B5, `issues/open/OPEN-ISSUES-CLOSURE-RUN-20261108.md`) are not on `origin/main`, so the defects remain here until a separate owner decision publishes them.
+
+**Current state — 2026-11-09 (open-issues closure run 4):** **3 open issues** (332, 336, 346).
+- **ISSUE-339 resolved and published.** The reviewed gate commits were replayed onto `origin/main` `c1c4b22e` without the unpublished `48ff91c7` (ISSUE-336/337 docs). They were published by fast-forward `c1c4b22e..8d122f62`, so the merged revision `8d122f629df6a610ae4e95805e39583cc2ab8aaf` is the tested commit. The owner decided D1–D4; D2 is tracked separately as **ISSUE-346**. R339-D live-host argv exposure is recorded as **unmeasured**. Not deployed.
+- **336:** the §7.2 nightly observation is done (read-only). The 2026-11-08 and 2026-11-09 firings both matched the predicted row. The production release, D-336-2 (35 rows) and D-336-3 stay behind separate owner approvals.
+- 340 and 345 were resolved and published on 2026-11-08. Their closure records are applied in the working tree but not committed.
+
+**Earlier state — 2026-11-08 (open-issues closure run):** **5 open issues** (332, 336, 339, 340, 345).
+- **Resolved this run**, scoped to the local working tree: ISSUE-338 (Python contract 229/0 plus the focused Vitest case), ISSUE-341 (real restore qualification 37/0), ISSUE-342 (real fault injection 20/0) and ISSUE-343 (real A/B qualification of both fixture CLIs and the Brownlow wrapper). ISSUE-344 was resolved earlier the same day.
+- **339:** R339-A status-mode target selection was proven with the real runner (25/0). The write-mode rehearsal is still outstanding.
+- **Next:** see `issues/open/OPEN-ISSUES-CLOSURE-RUN-20261108.md` (resume checkpoint and owner decision packet).
+
+**Earlier state — 2026-11-08 (implementation session):** 10 open issues (332, 336, 338–345). Fixes for 336 (§6), 338–345 are **implemented locally and uncommitted, awaiting user-executed verification**; none is closed. **Review state (earlier 2026-11-08):** six new source-established findings (340–345); existing 336, 338 and 339 updated. [Baseline, coverage, evidence gaps and implementation order](issues/closed/AFLDB-ISSUE-339.md#repository-review-handoff-2026-11-08). Earlier dated counts/status notes are historical.
+
 **ISSUE-334 and ISSUE-335 resolved 2026-11-05**: released to production as `0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN` (revision `0f251c2d`), D3c PASS and D4 PASS. The refusals were proven on isolated Linux and not exercised on production. Full record: the Resolution bullet under each heading below. Both were removed from `IssuesIndex.md` and this table. **Open issues:** 1 (ISSUE-332). **ISSUE-316 resolved 2026-11-03** as "cutover delivered" under the owner's Option A (full record: the first entry under its heading below; runbook `issues/closed/AFLDB-ISSUE-316.md`; removed from `IssuesIndex.md` and this table). **ISSUE-331 resolved 2026-11-04** (Path A; the owner retired the quarantined WSL distributions and the entry records the accepted residuals; runbook `issues/closed/AFLDB-ISSUE-331.md`; removed from `IssuesIndex.md` and this table). **ISSUE-321 resolved 2026-11-04** (accepted source limitations, owner decision O3; the entry records the five limitations and the four reopening triggers; NULL semantics preserved; no runbook existed; removed from `IssuesIndex.md` and this table). **ISSUE-333 resolved 2026-11-04** (O1 and O2 applied once each and verified; the corrected figures observed through the public routes on five pages under the owner's amended visibility criterion; worker-by-worker attribution unmeasured and accepted as a disclosed limitation; full record: the Resolution bullet under its heading below and `docs/v2/issue333-o2-apply-record-2026-11-04.md` section 10; removed from `IssuesIndex.md` and this table; its pre-closure index section is preserved verbatim in `issues/closed/AFLDB-ISSUE-333-INDEX-SECTION-20261104.md`). **Open issues:** 1 (ISSUE-332, the named successor carrying the dated 2027 operating obligations; the owner decided D-316-5, -8, -9, -10, the C7 criteria and the June 2027 opening of the Brownlow successor on 2026-11-04, while C9, the C7 acceptance and the Brownlow count window remain future). Older notes below that give a different count are historical.
 
 **ISSUE-229 resolved 2026-11-02** (all written criteria met; see its entry and `docs/v2/issue229-gap008-closure-2026-11-02.md`; removed from `IssuesIndex.md` and this table). **Open issues at that note (superseded by the ISSUE-316 note above):** 4 (ISSUE-316, ISSUE-321, ISSUE-331 and **ISSUE-332 opened 2026-11-02** as the named successor carrying ISSUE-316's seasonal obligations: C6 to C9 and D-316-5 to D-316-11 with their gates; ISSUE-331, **reopened 2026-11-01**: the quarantined rehearsal distro was booted as a Linux test host in breach of D-331-2; see `docs/v2/issue331-incident-assessment-2026-11-01.md` section 6; the earlier disappearance stays cause UNKNOWN). **ISSUE-330 resolved 2026-10-31**: the players-index sort fix is deployed through the release route and live-accepted; production serves `ad245d602f6f-m0M8pf121326vNSo2B759` (revision `ad245d60`), with `61a95f7397da-JYIBkYn8ynPgYMn1e5nK-` retained as the rollback target. **ISSUE-329 resolved 2026-10-31**: the release route is installed on production and live-accepted; its first route build was `61a95f7397da-JYIBkYn8ynPgYMn1e5nK-`. **On 2026-10-27, under owner decision D-V2-SCOPE-20261027 (approved with amendments; V2 only; `issues/closed/AFLDB-V2-CLOSURE-SCOPE-DECISION-20261027.md`), 13 issues were resolved.** V2 engineering complete: ISSUE-267, 269, 270, 274, 275, 276, 279 and 328. Superseded by retired V2 runtime paths: ISSUE-266, 268, 271, 272 and 273. No deployment, DEV acceptance or PROD acceptance is claimed, and the outstanding live requirements are kept in that decision's checklist. Earlier history follows: (ISSUE-328, registered 2026-10-27 as a port of the source repository's `6ffb893b` fix (admin settle panels named the text-sorted "latest" batch), see below; ISSUE-325, registered 2026-10-24 for the ISSUE-316 J2 rebuild harness's esbuild sampler exemption (F-J06), was resolved on 2026-10-24 by staged harness revision I325-3, see below; ISSUE-323 and ISSUE-324, registered 2026-10-23 during the ISSUE-316 pre-apply work and by its revision I disposable rebuild, were resolved on 2026-10-24 by the revision J2 disposable rebuild, see below; ISSUE-322, registered 2026-10-23 during the ISSUE-316 pre-apply work, was resolved on 2026-10-24, see below; ISSUE-321, registered 2026-10-23 for the successor source data-quality questions the owner deferred; ISSUE-319 and ISSUE-320, registered 2026-10-23 as ISSUE-316 successor gates, were resolved on 2026-10-23, see below; ISSUE-316, registered 2026-10-18 on the uncommitted branch `opus/afl-api-cutover`; ISSUE-229, ISSUE-266–270 and 7 of the 44 review findings ISSUE-271–314; ISSUE-278, ISSUE-302, ISSUE-312, ISSUE-313, ISSUE-314 and ISSUE-315 were resolved on 2026-10-13, and ISSUE-265, ISSUE-281 and ISSUE-288 (the last two DEV-scoped; PROD installation and acceptance pending) on 2026-10-14, its closure documentation merged and pushed as `b8040018` and its ISSUE-265-specific PROD hold released; ISSUE-297 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-290 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-291 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-287 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-286 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-300 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-306 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-298 on 2026-10-14, merge-scoped and not deployed, see below; ISSUE-309, ISSUE-311, ISSUE-310, ISSUE-305, ISSUE-296, ISSUE-285, ISSUE-282, ISSUE-283, ISSUE-284, ISSUE-293, ISSUE-294, ISSUE-295, ISSUE-301, ISSUE-304, ISSUE-307, ISSUE-289, ISSUE-277, ISSUE-292 and ISSUE-299 on 2026-10-15, merge-scoped and not deployed, see below; ISSUE-303 on 2026-10-15, DEV-scoped (deployed to DEV and browser-accepted; PROD installation and acceptance pending), see below; ISSUE-308 on 2026-10-15, DEV-scoped (deployed to DEV and accepted under the owner's D-308-3 amendment; PROD installation and acceptance pending), see below; ISSUE-280 on 2026-10-15, DEV-scoped (deployed to DEV and accepted under the owner's D-280-1 and D-280-2 amendments; PROD installation and acceptance pending), see below)
@@ -18,9 +34,8 @@ This table indexes currently open issues. Detailed historical entries below rema
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
 | AFLDB-ISSUE-332 | AFL API 2027 season operations (successor of ISSUE-316) | Medium | Data acquisition operations, 2027 season | Open, opened 2026-11-02 (owner decisions recorded 2026-11-04). Carries C6 debutant routine, C7 first-concluded-round acceptance, C8 Brownlow 2027, C9 ownership baseline and the D-316 seasonal items, each with its own gate. **Decided 2026-11-04:** D-316-5, -8, -9 and -10 accepted; C7 criteria 1 to 7 approved and criterion 8 replaced; the future opening of the Brownlow successor in June 2027 (D-316-7, action only) approved. **Undecided or future:** C9 (until its June gate; Option C a recommendation only), the Brownlow substantive decision and count window, and the C7 acceptance (the owner's act after the first concluded round); no acceptance, probe or cookie is authorised now; D-316-11 not pursued. The C7 read-only observer is implemented and Linux-qualified, and was run once against production on 2026-11-04 (read-only baseline: `NO_CONCLUDED_MATCHES`, exit 10; not an acceptance, no PASS exists). | Dated obligations: D-316-5 and D-316-9 reviews after round 2; the owner's C7 acceptance after the first concluded round (March 2027); June 2027 open the Brownlow successor and choose the C9 option (by 2027-06-30); Brownlow substantive decision before 2027-09-01; C9 delivered before the rollover (about October 2027). See `docs/v2/afl-api-2027-season-operations-successor-2026-11-02.md` section 9. |
-| AFLDB-ISSUE-336 | Draft pages merge National, Rookie and other categories; 35 DraftGuru Pre-Draft rows missing | Medium | Public draft pages, player draft history, DraftGuru data | Open, opened 2026-11-05. Code on `origin/main` `ea9bddf8`; preview-verified on an isolated restore of DEV data (2026-11-06); **not deployed** (DEV diverged: 18 DEV-only commits, migrations 111–118 pending). D-336-1 accepted; 35-row production insert prepared and rehearsed, not run. Pinned DEV procedure prepared (2026-11-06): candidate `8b024098` verified in isolation (backup rehearsed, rollback proven); not run. Procedure corrected (r2). Published `7fabc6e5` (2026-11-06). **Deployed to DEV 2026-11-07** (pin `8b024098`, branch `dev-v2-main`, ledger 118, build `AlYJjIargpO5esTkTX_zq`); **immediate acceptance PASS** (authenticated browser 76/76). Overnight nightly observation **pending** (2026-11-08 05:08 AEDT). | Observe the 2026-11-08 nightly read-only (§7.2); production application release; D-336-2 execution approval; D-336-3. |
-| AFLDB-ISSUE-338 | DraftGuru operator-review contract's byte-identical rerun check is time-dependent | Low | Test tooling (`tests/python/draftguru_bridge_operator_review_contract.py`, via `tests/draftguru-acquisition.test.ts`) | Open, opened 2026-11-06. Observed once at `8b024098`; 0 of 5 reruns failed. Not fixed. | Make the rerun check independent of `review_completed_utc` (inject or freeze the clock, or compare with that field excluded). |
-| AFLDB-ISSUE-339 | DEV deployment (`sync-dev.ps1`) ran checkout, install, migration, build and restart with no enforced preflight | Medium | Deployment tooling (`deploy/sync-dev.ps1`, `deploy/sync-dev-remote.sh`) | Open, opened 2026-11-07. Host-side deploy gate implemented on local branch `claude/issue-339-deploy-preflight` (unpushed); Linux 43/43; real DEV assessment correctly BLOCKED on stale backup/artifact; nothing deployed. | Owner review, push and merge; decide the standalone `db:migrate` and `preflight --mode deploy` gaps. |
+| AFLDB-ISSUE-336 | Draft categories and 35 missing Pre-Draft rows; I336 wrapper blocker | Medium | Draft / production procedure | Open. DEV immediate acceptance recorded 2026-11-07. The §7.2 nightly was **observed as predicted** on 2026-11-08 (batch 147) and 2026-11-09 (batch 148), read-only, recorded 2026-11-09. I336 run-name grammar published on `origin/main` at `c1c4b22e` (2026-11-08); gap029-ops 76/76 at that merged revision; runbook pin R′ = `c1c4b22e`, §6 hold cleared. Production insert not approved/run. **2026-11-09:** R′ selected as release candidate and Linux-qualified on the approved production snapshot at 118 (all required checks PASS); full approval document prepared. | Production application release (owner §9 statement in `docs/v2/issue336-337-340-345-release-approval-2026-11-09.md`); D-336-2 execution approval; D-336-3. |
+| AFLDB-ISSUE-346 | A standalone `db:migrate` on DEV bypasses the deploy gate's transition approval | Low | Deployment tooling / DEV operations | Open, opened 2026-11-09 (split from ISSUE-339, owner decision D2). Interim operator rule: never run `db:migrate` by hand on DEV. | Design and qualify a gated route (`sync-dev.ps1 -Phase execute -SkipBuild -SkipRestart`, or a small wrapper) when DEV migration work is next planned. |
 
 **AFLDB-ISSUE-323 and AFLDB-ISSUE-324 resolved 2026-10-24** (fixes `481511d2`; `82603dc7`, `14abea5e`, `876dadbf`; local, not pushed). The owner ruled on 2026-10-24 that the ISSUE-316 revision J2 disposable rebuild is the J2 proof, and that its 5 sampler anomalies (F-J06) are an evidence-monitor defect, registered as ISSUE-325. That rebuild was the ordinary successor path at pinned `876dadbf`, under the reviewed native closure (policy `a8e586e0…`) with no provenance, against `afldb_v2_rb_i316_revision_j2_test`. It passed the successor preflight and the real execution boundary, and executed the constrained tsx/npm path under enforcement: runner exit 0, 30 stages, 91 checks PASSED, all 1,640 club-seasons equal, `AFLDB-POST PASSED`, 0 native REFUSED lines and 0 provenance mentions. A focused read-only evidence review of the retained artefacts preceded the closure; it is recorded in the ISSUE-316 entry. No push, deployment, apply, activation or census. Removed from `IssuesIndex.md` and the Open Issues table. Full record: the entries in this file.
 
@@ -53750,6 +53765,16 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 ## AFLDB-ISSUE-332 — AFL API 2027 season operations (successor of ISSUE-316)
 
 - **Status:** **OPEN, opened 2026-11-02** (owner chose Option A of `docs/v2/issue316-closeout-and-seasonal-obligations-2026-11-02.md` section 4, subject to three written conditions). **Current state (2026-11-04, owner decisions; see the last Update below and the table, whose State cells are current): D-316-5, D-316-8, D-316-9 and D-316-10 are DECIDED; C7 criteria 1 to 7 are APPROVED and criterion 8 REPLACED; the future opening of the Brownlow successor (D-316-7, action only) is APPROVED; C9 is UNDECIDED; the C7 acceptance, the Brownlow substantive decision and count window are FUTURE owner acts; D-316-11 not pursued.** The wording "nothing decided or accepted" in the earlier dated updates below is superseded, and kept as history. It exists so the seasonal obligations of ISSUE-316 are carried by name and gate rather than dropped when ISSUE-316 is resolved. ISSUE-316 was resolved 2026-11-03 (see its entry).
+- **Update 2026-11-08 (open-issues closure run; documentation only):** the dated 2027 gates are recorded with owners and closing evidence as G1–G7 in `docs/v2/afl-api-2027-season-operations-successor-2026-11-02.md` section 10.
+  - G1: C6 routine from 2027-03-17.
+  - G2: owner's C7 acceptance after the first concluded round, March 2027.
+  - G3: D-316-5 and D-316-9 reviews after round 2.
+  - G4: open the Brownlow successor, June 2027.
+  - G5: C9 choice by 2027-06-30.
+  - G6: Brownlow substantive decision and count window before 2027-09-01.
+  - G7: C9 delivered before the about-October-2027 rollover.
+
+  Nothing further can be prepared before Opening Round. No live check, probe or production read was made. **The issue stays open** until all seven gates have occurred and their evidence is recorded here.
 - **Update 2026-11-03:** ISSUE-316 was resolved as "cutover delivered" (Option A conditions met; first night, D-316-12 release and the owner's visual acceptance recorded in its entry). **Nothing in this entry changed:** C6, C7, C8, C9 and D-316-5 to D-316-11 and their gates are carried exactly as above; no decision was made or implied by the closure.
 - **Severity / area:** Medium; data acquisition operations for the 2027 season (AFL API match and player ingestion, Brownlow count window, ownership baseline for rebuild, rollover and promotion).
 - **Scope (carried unchanged from ISSUE-316 section 3 of the close-out document):** C6, C7, C8, C9 and D-316-5 to D-316-11, each with its own gate. Nothing is merged, simplified or pre-decided.
@@ -53874,7 +53899,12 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 - **Not done:** the refusal is not exercised on production (that needs a match deletion); after a release its presence rests on provenance plus a bundle literal unique to `R`. Production was not checked for orphaned `match_coaches` overrides from past deletions at release time; the later owner-authorised read-only census found none (zero overrides of that type in any state).
 - **Next action:** none. Resolved 2026-11-05. The read-only orphaned-override census ran afterwards and found zero `match_coaches` overrides on production.
 
+<a id="afldb-issue-336"></a>
+
 ## AFLDB-ISSUE-336 — Draft pages merge National, Rookie and other categories, so unrelated pick numbers read as equivalent; 35 DraftGuru Pre-Draft rows missing
+
+- **Review update (2026-11-08): source-established production-wrapper blocker; proposed, awaiting implementation.** Current DEV status remains deployed/immediate acceptance PASS as recorded on 7 November; the 8 November nightly remains unobserved here. tools/v2/gap029-ops/prod-stage.sh:63 admits I336, but :65 simultaneously requires an S1–S4 run-name regex and an I336 prefix. Capture at :183 emits I336-..., so plan (:202), approve/apply/report/state/accept cannot pass run_arg. The isolated stage-tool rehearsal did not test this wrapper lifecycle. Fix the shared strict grammar without bypassing any gate; extend tests/gap029-ops.test.ts with real shell dispatch/refusal cases. No production data write occurred in this review. **Next action:** review and implement [section 6 of the existing playbook](issues/open/AFLDB-ISSUE-336.md), then qualify before proposing D-336-2 execution. D-336-1 accepted and D-336-3 open are unchanged. Source identical at local published origin/main 7fabc6e51c5c53c4b6f6fe345f21191d9184660b.
+
 
 - **Status:** Open (opened 2026-11-05). **Implementation:** on `origin/main` `ea9bddf8` (pushed 2026-11-06). **Preview verification:** PASS on an isolated restore of DEV's own data at `ea9bddf8` (2026-11-06). **Deployment:** not deployed to DEV or production. **Data repair:** prepared and rehearsed only on isolated clones; not applied anywhere.
 - **Severity / area:** Medium; public draft pages (`/draft`, `/draft/[year]`), player draft history, DraftGuru draft data.
@@ -53938,6 +53968,41 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   - D-336-3 stays open.
 
   DEV acceptance does not authorise the production release or the 35-row insert.
+- **Review hold §6 — wrapper grammar fixed (2026-11-08, local, uncommitted; source-verified only, NOT yet executed):** `tools/v2/gap029-ops/prod-stage.sh` now defines one `STAGE_RE='(S[1-4]|I336)'` used by both `stage_arg` and `run_arg`; exact stage-prefix equality, timestamp shape and every other gate unchanged. Regression: `tests/gap029-ops.test.ts` "prod-stage.sh run-name grammar (AFLDB-ISSUE-336)" executes the real lifted parsers under bash (I336 accepted; S1–S4 still accepted; mismatch/timestamp/prefix/traversal/S5 refused with exit 2) and asserts every run-taking command parses stage then run. **Verified 2026-11-08 on streamanator:** `tests/gap029-ops.test.ts` passed 76/76, with its bash cases run rather than skipped. Next: revise the pinned operational revision before any D-336-2 decision. The 8 Nov nightly observation and D-336-3 remain open.
+- **Candidate pin committed locally and re-verified on the base (2026-11-08, run 2):**
+  - Local commit `c1c4b22ee15007111eab66f6d354e0b9ecbb2ade` (A3) on `claude/issue-340-345-336`, based on `origin/main` `7fabc6e5` and excluding `5cba6846` and `48ff91c7`.
+  - In a fresh streamanator clone at exactly that SHA, `tests/gap029-ops.test.ts` passed **76/76** and the typecheck was clean. Evidence: `docs/v2/evidence/open-issues-closure-20261108/branchA/`.
+  - A3 holds only `prod-stage.sh` and the test. The runbook's §6 update stays on the records branch, because unpublished `48ff91c7` also edits `issues/open/AFLDB-ISSUE-336.md`.
+  - **The pin is still pending:** R′ is named only once the actual merged revision exists and is re-qualified. Push and merge are owner acts.
+- **Revised pin R′ recorded (2026-11-08, owner-approved publication):**
+  - **Published:** `origin/main` was fast-forwarded `7fabc6e5..c1c4b22e`, so the merged revision is `c1c4b22ee15007111eab66f6d354e0b9ecbb2ade`, identical to the tested commit. `merge:ready` (340, 345) and `preflight --mode merge` were READY in a disposable clone.
+  - **Qualified:** in a fresh streamanator workspace cloned from GitHub and checked out at exactly that SHA, `tests/gap029-ops.test.ts` passed **76/76**, with all 15 ISSUE-336 run-name cases run and none skipped. Evidence: `docs/v2/evidence/open-issues-closure-20261108/i336-pin/`.
+  - **Runbook:** §3 steps 2–6 now pin that SHA, and the §6 review hold is cleared.
+  - **Still open:** the 2026-11-08 nightly observation (§7.2), the production application release, the D-336-2 execution approval, and D-336-3. No production approval is implied.
+- **§7.2 nightly observation — OBSERVED AS PREDICTED (2026-11-09; read-only DEV journal read, owner-authorised):**
+  - **2026-11-08 firing** (finished 05:15:03 AEDT): `Season feed CD_S2027014: 218 match(es), complete` (PLACEHOLDER 83, SCHEDULED 135); `Source completeness: COMPLETE`; **import batch 147**: 0 canonical rows inserted, 0 updated, 0 refused at the write, 0 rolled back; `AFLDB_SETTLE_SUCCESS label=afl-api-2027-2026-11-07-181502`.
+  - **2026-11-09 firing** (finished 05:09:08 AEDT): identical counts; **import batch 148** with 0 records read and 0 rejection rows; `AFLDB_SETTLE_SUCCESS label=afl-api-2027-2026-11-08-180907`.
+  - **The 20 "refused (foreign_source_owner)" lines are not settle refusals.** They are the exceptions report's listing of open canonical-apply failures, all first detected 2026-10-01 (11) or 2026-10-03 (9), so they predate the deployment. The batches added no rejection rows. The report truncates at 20 ("more than 20 open"), so beyond that listing "adds none" rests on the batch counters.
+  - **2026 labels:** none since the deploy. The newest 2026 source directories are `afl-api-2026-2026-11-05-…` and `…-11-06-…`, both from before the 2026-11-07 deployment. The Brownlow unit reports `AFLDB_AFL_API_BROWNLOW_ENABLED is not 'true' … Nothing to do`. Both timers are active, and the next settle is 2026-11-10 05:11 AEDT.
+  - **Interpretation (§7.2 table, row 1):** as predicted by r2; the observation is closed. Nothing was triggered, changed or restarted.
+  - Evidence: `docs/v2/evidence/open-issues-closure-20261108/i336-nightly/journal-2026-11-0{8,9}.txt` (unit journal only; secret scan clean).
+  - **Still open, each behind its own owner approval:** the production application release (with ISSUE-337), the D-336-2 execution (the 35-row insert), and D-336-3. **Next:** the release-revision decision. `origin/main` is now `8d122f62`; its only change after R′ `c1c4b22e` is ISSUE-339's workstation and DEV deploy tooling plus tracking docs, so the application tree is unchanged. The packet is in `issues/open/OPEN-ISSUES-CLOSURE-RUN-20261108.md` (P-336).
+- **Release candidate selected and Linux-qualified (2026-11-09, owner-authorised; nothing on DEV or production):**
+  - **Candidate:** the owner selected R = R′ `c1c4b22ee15007111eab66f6d354e0b9ecbb2ade` as the ISSUE-336/337/340/345 release candidate (RD-1: release with all four issues).
+  - **Setup:** a fresh streamanator workspace `/mnt/ssd/afldb-i336rel-qual-20261108T201140Z`, built from a verified bare shallow clone of R (tar sha256 `beaf92d3…afce4`), with `npm ci`. An isolated loopback cluster on 55498 restored the approved, restore-verified production snapshot `afldb_prod-20261104T021037Z.dump` (sha256 `e77c307d…826d`, re-hashed on the host). It is at ledger 118, with 17,056 matches.
+  - **Required checks, all PASS:**
+    - typecheck clean;
+    - unit `catalogue-lookups`, `like`, `gap029-rookie-selections` and `auth` **257/257**;
+    - `admin-lifecycle` **50/50**;
+    - `admin-draft` **42 passed, 5 skipped** (the Python-replay gates);
+    - production build exit 0 (BUILD_ID `Agk-PqLoJQjc23I9yiieX`);
+    - loopback boot smoke 7/7 routes 200, including `/draft/2024` and `/draft/2025`;
+    - D4 literals present in the built bundle.
+  - **Extra delta suites:** 335 passed, 2 failed, 2 skipped. The 2 are the pre-existing environmental `draftguru-acquisition` "frozen Stage B1 sample" cases, which need a gitignored local file. Not a release defect.
+  - **Afterwards:** the cluster is stopped; DEV services were unchanged.
+  - **Package:** [full approval document](docs/v2/issue336-337-340-345-release-approval-2026-11-09.md), with the static delta check and file list in `docs/v2/evidence/issue336-337-340-345-release-20261109/`. The production checkout fast-forwards to R itself, H = R.
+  - **Correction:** the draft packet said `deploy/` is unchanged at R′. In fact two DEV-only `sync-dev` files change; `deploy/release.mjs` does not.
+  - **Still open, each behind its own owner approval:** the production release (approval statement §9, naming the package commit), the D-336-2 steps, and D-336-3.
 
 ## AFLDB-ISSUE-337 — Draft-page name search misses unlinked picks whose stored raw name uses U+00A0
 
@@ -53967,20 +54032,65 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   - Record: `docs/v2/evidence/issue336-draft-categories-20261105/dev-deploy-20261106/README.md` §2.
 - **Follow-up:** production gets the fix only with ISSUE-336's production application release. Until then, production's 1,597 unlinked U+00A0 picks remain affected.
 
+<a id="afldb-issue-338"></a>
+
 ## AFLDB-ISSUE-338 — DraftGuru operator-review contract's byte-identical rerun check is time-dependent
 
-- **Status:** Open (opened 2026-11-06). Not fixed.
+- **Historical review (2026-11-08, before implementation):** Existing one failure/five passing reruns remain the reproduction evidence; no rerun during review. Source at 5cba6846ddfcfd5d7a3fd29e14bc8877099d9656 still uses utc_now() at review_bridge_operator.py:1424 and byte comparisons at draftguru_bridge_operator_review_contract.py:466-469. The [playbook](issues/closed/AFLDB-ISSUE-338.md) proposed freezing the test clock for same-time byte identity and testing a different completion time explicitly, with substantive output checks preserved.
+
+
+- **Opened:** 2026-11-06. See the resolution below.
 - **Severity / area:** Low; test tooling only (no runtime effect).
 - **Source:** the ISSUE-336 follow-up focused unit run at `8b024098` on streamanator (`docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/` §3). Duplicate check: the only earlier mention of `review_completed_utc` is closed ISSUE-222's bridge build, which freezes its own `generated_utc` to that field. That is a different artefact, and it does not cover this rerun check.
 - **Evidence:**
   - `tests/draftguru-acquisition.test.ts` › "DraftGuru operator-adjudication review tool" failed once: checks 11a and 11c, "a rerun of `finalize()` gives byte-identical JSON/Markdown". Check 11b (CSV) passed.
   - Five further runs of `tests/python/draftguru_bridge_operator_review_contract.py` passed (`host/operator-review-reruns.txt`).
 - **Root cause (code read):** `build_final_document` writes `"review_completed_utc": utc_now()` (`tools/rebuild/draftguru/review_bridge_operator.py:1424`). The check compares two `finalize()` outputs byte for byte (`tests/python/draftguru_bridge_operator_review_contract.py:466-469`), so the outputs differ whenever the two calls straddle a second boundary. The CSV has no timestamp.
-- **Next action:** make the check deterministic: freeze or inject the clock for the rerun, or compare with `review_completed_utc` excluded. Do not weaken the byte-identity check for the remaining content.
+- **Next action (superseded 2026-11-08):** make the check deterministic: freeze or inject the clock for the rerun, or compare with `review_completed_utc` excluded. Do not weaken the byte-identity check for the remaining content.
+- **Implementation (2026-11-08, local, uncommitted, test-only):** `tests/python/draftguru_bridge_operator_review_contract.py` now freezes `tool.utc_now` around the two byte-identity `finalize()` runs and restores it in `finally`. The whole-byte JSON/CSV/Markdown comparisons (11a–11c) are kept. New checks: 11e–11f confirm the clock was restored and the frozen time was stamped; 11g–11k run a deliberate later time, which changes `review_completed_utc` and the JSON/Markdown truthfully while the CSV, its digest and `rows_sha256` stay equal, and the outputs are byte-identical once only that field is normalised. Product timestamps are unchanged.
+- **Next action (superseded 2026-11-08):** on the Linux workspace, user runs `python3 tests/python/draftguru_bridge_operator_review_contract.py`, then `npx vitest run tests/draftguru-acquisition.test.ts -t "operator-adjudication review tool"`; close on pass.
+- **Verification (2026-11-08, streamanator, run by Claude under the owner's authorisation for this run):**
+  - **Workspace:** fresh `/mnt/ssd/afldb-close-20261108T061620Z`, built from a tarball of the current local working tree (no `.env`). Node v22.23.2, Python 3.12.3, `npm ci` clean.
+  - **Python contract:** `python3 tests/python/draftguru_bridge_operator_review_contract.py` exited 0, with **229 PASS and 0 FAIL**. Checks 11a–11k all passed, including 11e/11f (clock restored, frozen stamp) and 11g–11k (later run stamps its own time, CSV and digests unchanged, only `review_completed_utc` differs).
+  - **Focused Vitest:** `npx vitest run tests/draftguru-acquisition.test.ts -t "operator-adjudication review tool"` exited 0, **1 passed, 166 skipped**. Its describe (`:3320`) runs this Python contract (`:3325`).
+  - Logs are in `docs/v2/evidence/open-issues-closure-20261108/` (`i338-python.log`, `i338-vitest.log`).
+- **Status:** **Resolved 2026-11-08, scoped to the local working tree** (test-only change, uncommitted). **Root cause:** a byte-identity check across two wall-clock-stamped `finalize()` runs. **Fix:** freeze the tool clock only for the identical-input reruns, plus an explicit different-time case. Product timestamps are unchanged.
+  - **Limits:** this is a deterministic test run, not a proof over many wall-clock boundaries. The committed state is the owner's commit.
+  - Runbook: `issues/closed/AFLDB-ISSUE-338.md`.
+
+<a id="afldb-issue-339"></a>
 
 ## AFLDB-ISSUE-339 — DEV deployment (`sync-dev.ps1`) ran checkout, install, migration, build and restart with no enforced preflight
 
-- **Status:** Open (opened 2026-11-07). **Fix for `sync-dev`:** implemented on local branch `claude/issue-339-deploy-preflight` (not pushed), qualified in isolation on Linux and by one read-only assessment against DEV. **Not deployed:** nothing on DEV changed. The gate ships inside each `sync-dev.ps1` payload, so it takes effect for the next DEV deploy run from a checkout that has this commit.
+- **Resolution (2026-11-09): RESOLVED, published, not deployed.**
+  - **Published revision:** `origin/main` fast-forwarded `c1c4b22e..8d122f62`. The merged revision `8d122f629df6a610ae4e95805e39583cc2ab8aaf` is the tested commit. Remote branch: `claude/issue-339-gate-publish`.
+    - `37bc6a6c` replays `5cba6846` (the gate).
+    - `8d122f62` replays B1 `549c5892` (R339 A–D).
+  - **Replay:** a clean worktree `D:\dev\afldb-i339-publish` from `origin/main` `c1c4b22e`. The unpublished `48ff91c7` (ISSUE-336/337 DEV-deploy docs) is excluded. The one cherry-pick conflict was `CHANGELOG.md`; only the ISSUE-339 entry was kept. Every code, test and runbook blob (`deploy/sync-dev-remote.sh`, `deploy/sync-dev.ps1`, `deploy/sync-dev-transport.sh`, `tests/sync-dev-remote.test.sh`, `tests/sync-dev-static.test.ps1`, `docs/deployment.md`, `issues/open/AFLDB-ISSUE-339.md`) is byte-identical to B1. The tracking hunks (`issues.md`, `IssuesIndex.md`, `CHANGELOG.md`) were reviewed and are ISSUE-339 only. The full candidate diff against `origin/main` (10 files) was reviewed, with no new findings; test fixtures use fake credentials only. The original dirty worktree `D:\dev\afldb` (Branch B, `549c5892`) was preserved untouched.
+  - **Root cause:** `sync-dev.ps1` mutated DEV (checkout, install, migration, build, restart) with no enforced preflight; see Defect below. The 2026-11-08 review then found that the initial gate left four gaps, R339 A–D.
+  - **Fix:** the host-side deploy gate (`afldb_deploy_gate`) plus R339 A–D, as described below.
+  - **Validation at the candidate `8d122f62`:**
+    - `tests/sync-dev-static.test.ps1` PASS on Windows, exporting both payloads.
+    - `tests/sync-dev-remote.test.sh` **63 passed, 0 failed** on streamanator. It ran in a fresh clone of the candidate bundle (sha256 `cdd94c35…4a23`; HEAD verified), with the new export, no `.env` and no skips.
+    - `merge:ready --issue 339` READY (0 blockers; warnings: no runbook metadata block, unexpected-file classification unavailable).
+    - `preflight --mode merge` READY (warning: no `.env`).
+    - The ff-only rehearsal produced the tested tree.
+  - **W-339 61/0 carried forward:** between B1 and the candidate there is no difference in `src/db/migrations/` (118 files, `118_fixtures_unconfirmed_participants.sql` last), `tools/db/`, `package*.json` or `deploy/`. The gate code is byte-identical, so the migration inputs and gate behaviour are unchanged. The R339-A status-mode result (25/0) carries forward on the same basis.
+  - **Owner decisions (2026-11-09):**
+    - **D1:** a custom `-DsnName` stays restricted to `-SkipMigrate`.
+    - **D2:** standalone DEV `db:migrate` approval is tracked separately as **ISSUE-346**.
+    - **D3:** `preflight --mode deploy` stays as it is.
+    - **D4:** publication was authorised after the checks above.
+  - **Limits:**
+    - **R339-D live-host argv exposure is UNMEASURED.** There is no direct evidence from the DEV host. The harness proves only that the fake password never reaches psql's argv and that routing variables are removed. Same-owner and root visibility of the environment is not claimed solved.
+    - The gate is not yet exercised by a real DEV deploy. The next DEV deploy needs a fresh verified backup and artifact.
+    - Production `deploy/release.mjs` was not reviewed.
+  - Evidence: `docs/v2/evidence/open-issues-closure-20261108/i339-publish/`. Runbook: `issues/closed/AFLDB-ISSUE-339.md`.
+
+- **Review update (2026-11-08): preflight correction proposal, awaiting implementation; review hold before merge/deployment decision.** Read-only review of unpublished 5cba6846ddfcfd5d7a3fd29e14bc8877099d9656 found four gaps. **A (Medium):** deploy/sync-dev-remote.sh:378-392 assesses the .env DSN, while sync-dev.ps1:325-326 invokes an unbound db:migrate child; tools/db/migrate.ts:48-60,79-82,118-140 can select another exported DSN/target. An approved transition can therefore mutate a database the gate did not assess. **B (Medium):** state digest :454-463 includes main unconditionally and revalidation :798-808/:853-860 requires it unchanged, so a normal target-main fast-forward (:316-317) fails after moving checkout. **C (Medium):** sync-dev.ps1:438 outer decode pipeline has no pipefail or complete-before-execute boundary; decoder failure with empty output can return bash/SSH success (:439). **D (Low):** remote helper :387-392 puts the raw owner DSN in psql argv; host visibility not measured. The original 43/43 tests and DEV assessment remain valid for their recorded cases, not these failure schedules. [Proposed playbook with exact triggers, fixes, tests, recovery and full review handoff](issues/closed/AFLDB-ISSUE-339.md). **Next action:** review/implement/qualify A–D before any push/merge/deploy decision. Standalone migration approval and deploy-mode preflight remain owner decisions. No code or environment changed in this review.
+
+
+- **Status:** **Resolved 2026-11-09**, published in `8d122f62` (see Resolution above). *(Historical, 2026-11-07:)* Open. **Fix for `sync-dev`:** implemented on local branch `claude/issue-339-deploy-preflight` (not pushed), qualified in isolation on Linux and by one read-only assessment against DEV. **Not deployed:** nothing on DEV changed. The gate ships inside each `sync-dev.ps1` payload, so it takes effect for the next DEV deploy run from a checkout that has this commit.
 - **Severity / area:** Medium; deployment tooling (`deploy/sync-dev.ps1`, `deploy/sync-dev-remote.sh`).
 - **Defect (confirmed by code read, 2026-11-07):**
   - `sync-dev.ps1` ran `git fetch`/`checkout`/`pull`, `npm ci`, `npm run db:migrate`, `npm run build` and the restart. No preflight ran first.
@@ -54021,3 +54131,569 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
     - production `deploy/release.mjs` was not reviewed here;
     - the authenticated sign-in for acceptance stays a manual owner step (the gate proves reachability only).
 - **Next action:** owner review of the branch; push and merge on request. Separately decide whether to route a standalone DEV `db:migrate` through the gate and whether `preflight.ts --mode deploy` should accept an approved transition. The next real DEV deploy needs a fresh verified backup and artifact (the gate refuses the 7 Nov ones).
+- **R339 A–D implemented (2026-11-08, local, uncommitted on top of 5cba6846; verification in progress):**
+  - **A** — `afldb_pf_migration_binding` (gate, before checkout) admits a migration only when the gate's DSN is `AFLDB_OWNER_DATABASE_URL` (what `--target dev` reads), no `AFLDB_MIGRATE_TARGET` or owner DSN is exported, `.env` defines the DSN exactly once as a plain line (the one form `migrate.ts` and the gate parse identically) and sets no non-dev target; the migration step is now `env -u AFLDB_MIGRATE_TARGET -u AFLDB_OWNER_DATABASE_URL npm run db:migrate -- --target dev`. Custom `-DsnName` is accepted only with `-SkipMigrate` (the custom-target contract stays an owner decision).
+  - **B** — `afldb_pf_expected_state` permits exactly one change, target `main` moving to the assessed revision; both revalidations use it; a failure now says the checkout already moved.
+  - **C** — new `deploy/sync-dev-transport.sh`: decode the whole payload to a private temp dir, run it only if base64 and gunzip both succeed and the result is non-empty, else exit 47; no pipeline status decides; no double quotes (PowerShell 5.1 argv). `sync-dev.ps1` reads it and maps 47.
+  - **D** — `afldb_pf_psql` splits the DSN per the ISSUE-313 contract (userinfo or `password` query → `PGPASSWORD`, percent-decoded; dual/sslpassword/key=value/malformed refused), removes libpq routing variables, and runs psql in a subshell (never `env NAME=value`, whose argv would carry it).
+  - Regression: `tests/sync-dev-remote.test.sh` +11 unit and +9 e2e cases (the npm stub models `migrate.ts` target resolution); `tests/sync-dev-static.test.ps1` pins the migration line and runs the real transport with truncated/invalid/corrupt payloads through `powershell -File | Tee-Object` (expects 47).
+  - **Windows verification (2026-11-08):** the truncated-payload case returned 2 instead of 47 and stopped before exporting the generated payloads. Captured stderr on rerun showed local Git Bash `-c` reporting an unmatched single quote before decoding. The fake SSH shim now replays the received command from a temporary UTF-8 file without a BOM, with the exit-47 and Windows pipeline checks retained. Truncation keeps complete base64 groups to exercise incomplete gzip input. Rerun the Windows harness, then use a successful export for Linux qualification. No DEV assessment or deployment authorised.
+  - **Windows environment follow-up (2026-11-08):** a subsequent rerun displayed a WSL repair prompt before producing a pass or export. The transcript did not identify the launching command. The harness now validates an explicit Git Bash executable and its adjacent MSYS runtime, and the fake remote shell searches only Git Bash's tool directory. Rerun using the default Git for Windows location or supply `-GitBashPath` for a custom location.
+  - **Git Bash discovery (2026-11-08, user-executed):** the initial guard stopped because the default path was absent. The first discovery run found no registered install candidate, no `git.exe` on PATH and no Bash at the four standard locations it listed. It stopped before the Windows tests or export.
+  - **Windows harness PASS (2026-11-08, user-executed):** automatic discovery selected `C:\Program Files\Git\usr\bin\bash.exe` from `HKLM:\SOFTWARE\GitForWindows`. The full harness passed gate ordering, refusals, syntax, the three damaged-payload transport cases and exit-status propagation, and exported `gen-execute.sh` and `gen-assess.sh`. Linux qualification with those exports remains pending.
+    - **Explicit path:** `tests/sync-dev-static.test.ps1` still uses `-GitBashPath` exactly as given, with no fallback.
+    - **Discovery without it:** it examines Git for Windows locations only, in this order:
+      - the installer's `InstallPath` (HKLM, HKCU, WOW6432Node `SOFTWARE\GitForWindows`);
+      - the root of each `git.exe` on PATH (`cmd\`, `bin\` or `mingw64\bin\`);
+      - `%ProgramFiles%`/`ProgramW6432`/`ProgramFiles(x86)` `\Git`, `%LOCALAPPDATA%\Programs\Git` and Scoop's `apps\git\current`.
+    - **Validation before any launch:** a candidate must be `bash.exe` outside `%SystemRoot%` (so the WSL launcher is never used). `msys-2.0.dll`, `base64.exe`, `gzip.exe`, `gunzip` and `mktemp.exe` must sit beside it, so a damaged-payload case cannot reach 47 because a decoder tool is missing. Bash is never taken from PATH.
+    - **On failure:** the error lists each git.exe on PATH, every candidate examined with its reason, and the `-GitBashPath` form.
+    - **Unchanged:** the file-replay shim, the syntax checks, the three exit-47 cases, the export and fake SSH. ISSUE-339 stays open until a Windows pass with export and the Linux qualification.
+  - **Linux qualification (2026-11-08, streamanator, executed by Claude under the user's authorisation for the disposable harness only):**
+    - **Environment:** `arm`, no sudo, Node v22.23.2, bash 5.2.21, git 2.43.0.
+    - **Workspace:** a fresh workspace under `/mnt/ssd`. It held only the current local ISSUE-339 files (`deploy/sync-dev-remote.sh`, `deploy/sync-dev-transport.sh`, `deploy/sync-dev.ps1`, `tests/sync-dev-remote.test.sh`, `tests/sync-dev-static.test.ps1`, `tools/db/{migrate,psql,migration-checksum}.ts`) plus the Windows export at the workspace root (`gen-execute.sh` sha256 `da5f0950…`, `gen-assess.sh` `20e56cb9…`). No `.env`, credentials or backups were transferred. The tar was hash-checked on both ends.
+    - **Run 1** (`afldb-339-qual-20261108T000250Z`): **62 passed, 1 failed**, exit 1. All 22 e2e generated-payload cases ran and passed; there was no `NOT RUN` line.
+      - First (only) failure: `R339-C: missing decoder refuses (47) with nothing run`.
+      - Cause, a test defect: `test_diagnostics_are_bounded` leaves a global `command() { return 1; }` stub. The case's `command -v` lookups therefore all failed, and its restricted PATH held no `sh`, so the transport never ran.
+      - A standalone reproduction in the same workspace returned 47 with the decode message, no marker and an empty temp directory.
+    - **Fix (local, uncommitted):** that case now uses `builtin command -v`, fails its setup if any tool cannot be linked, and asserts that `base64` is absent. The `c_refused` assertions are unchanged.
+    - **Run 2** (fresh workspace `afldb-339-qual-20261108T000603Z`, same export): **63 passed, 0 failed**, exit 0. All 22 e2e cases ran and passed (0 e2e failures). All 20 R339 cases passed (11 unit, 9 e2e).
+    - **Outside this run:** no DEV assessment, deployment, real migration or production action. Both workspaces are retained.
+    - **Still open:**
+      - owner review and the push/merge decision;
+      - the three owner decisions above;
+      - R339-A was proven against the stub model of `migrate.ts` target resolution, not a real migration child (**target selection proven in status mode 2026-11-08; write-mode rehearsal W-339 passed 61/0 later on 2026-11-08, below**);
+      - R339-D's argv exposure on the live DEV host was not measured.
+- **R339-A status-mode target selection with the real migration runner (2026-11-08, streamanator, run by Claude under the owner's authorisation for this run): 25 passed, 0 failed.** This is target selection observed in `--status` mode. The playbook's write-mode rehearsal, "matching approved migration touches only A and records its identity/transition", is **still outstanding**; see the packet's W-339 item.
+  - **Setup:**
+    - Second fresh workspace `/mnt/ssd/afldb-close-20261108T061620Z-i339`, built from the same local-tree tarball. Its throwaway `.env` was removed afterwards.
+    - Two empty disposable databases on the isolated loopback cluster `127.0.0.1:55481`: A `afldb_v2_i339a_test` and B `afldb_v2_i339b_test`.
+  - **Method:** for each configuration, the gate's own `afldb_pf_migration_binding` (sourced from `deploy/sync-dev-remote.sh`) gave its verdict. The **real** `tools/db/migrate.ts` child was then run with:
+    - the gate's exact line, `env -u AFLDB_MIGRATE_TARGET -u AFLDB_OWNER_DATABASE_URL npm run db:migrate -- --target dev`, plus `--status`;
+    - where informative, the old unbound `npm run db:migrate`.
+
+    The child's effective target is observed by its own write: it issues `CREATE SCHEMA IF NOT EXISTS afldb_meta` even under `--status`. Each database's `afldb_meta` was then read and reset between runs.
+  - **Results:**
+
+    | Case | Gate | Fixed line writes | Old line writes |
+    |---|---|---|---|
+    | K1 baseline | PASS | A | A |
+    | K8 exported target `dev` | PASS | A | A |
+    | K9 `.env` target `dev` | PASS | A | – |
+    | K2 exported owner DSN → B | FAIL | A | **B** |
+    | K3 exported target `test` with B | FAIL | A | **B** |
+    | K4 `.env` target `test` | FAIL | **nothing** (runner refuses: `--target 'dev'` and `'test'` disagree) | **B** |
+    | K5 `.env` owner DSN twice (B then A) | FAIL | **B** | – |
+    | K6 `.env` `export` form | FAIL | **nothing** (`AFLDB_OWNER_DATABASE_URL is not set`) | – |
+    | K7 custom `-DsnName` = B | FAIL; INFO with `-SkipMigrate` | A, not the assessed B | – |
+
+    For K5, the gate's value reader takes the last line (A) while `migrate.ts` keeps the first (B), so only the gate's refusal prevents a split. The same parser difference explains the K6 refusal.
+  - **Conclusion:** every configuration the gate admits makes the real child write only the assessed database. Every refused configuration is one in which the real child would write elsewhere or refuse itself, so each refusal is necessary, not cosmetic. The fixed line also neutralises an exported DSN or target as defence in depth.
+  - **Limit:** a write-mode `--target dev` run needs `migrate.ts`'s Git inventory (`collectMigrationSources`), and Git is outside this run's authorisation. The applying path was therefore observed through `--status`'s DDL write. Its target resolution is the same code (`migrate.ts:109-150`).
+  - **Evidence:** `docs/v2/evidence/open-issues-closure-20261108/ev339/` and `harness/q339.sh.txt`. This replaces the "stub model only" evidence for **target selection**. A real write-mode migration through the gate's line is not yet rehearsed: it needs a Git checkout, which is outside the run's authorisation.
+- **W-339 write-mode rehearsal (2026-11-08, run 2, streamanator; Git in the disposable clone authorised by the owner): 61 passed, 0 failed.**
+  - **Revision:**
+    - B1 is local commit `549c5892d7e31a962380c9bd0128ae99969f3b75`, holding the six ISSUE-339 files on top of `5cba6846`.
+    - It was bundled with `refs/remotes/origin/main` = `7fabc6e5`, re-confirmed after `git fetch`. Bundle sha256: `7ac7b9a6…02cd`.
+    - In the clone, `HEAD` was B1 and `refs/remotes/origin/main` was `7fabc6e5`, which contains `118_fixtures_unconfirmed_participants.sql`. This was checked before any migrator ran.
+  - **Template:** `afldb_v2_w339t117r2_test`, built from a non-Git copy of B1 with 118 removed, holds 117 rows (ledger sha `0dbd4bab4fe160e5`). Every case used fresh databases cloned from it. The cluster (`afldb_v2_isolated`, `127.0.0.1`) and each target's isolation marker were verified before every write. Each B carried a random sentinel.
+  - **Migration 118:** stored checksum `49e59fcd96aa62142fb2da8141f926997582ef86502b37e22c4796f004498401`, equal to the sha256 of the blob at HEAD.
+  - **G1 (exported owner DSN → B) and G2 (exported `AFLDB_MIGRATE_TARGET=test` plus test DSN → B):** `afldb_pf_migration_binding` recorded exactly one FAIL with the expected text. A PATH shim on `npm`, `npx` and `tsx` proved that no child ran, and Ag and Bg kept identical fingerprints at 117.
+  - **W1 (gated, clean environment):** the gate's own identity, ledger and transition block was lifted verbatim (`sync-dev-remote.sh:869-901`; the backup check was excluded).
+    - It recorded `PASS database identity -- afldb_v2_w339r2_w1a_test afldb_owner`, `PASS applied migrations … 117 applied`, **`PASS approved migration transition -- 117 -> 118`** and binding PASS.
+    - The **exact line** `env -u AFLDB_MIGRATE_TARGET -u AFLDB_OWNER_DATABASE_URL npm run db:migrate -- --target dev` then ran in write mode, followed by `PASS post-migration parity -- 118/118`, gate exit 0.
+    - A1 gained exactly one row (118, matching checksum). The first 117 rows were unchanged. A1's ledger sha moved `0dbd4bab…` → `5bb12f9b…`. B1's fingerprint was unchanged at 117 (sentinel kept).
+    - The gate's evidence file is kept as the transition record.
+  - **W2 (child scrubbing, write mode, deliberately ungated):** the hostile set H was exported (owner DSN → B2, target `test`, test DSN → B2).
+    - The exact line resolved `-> dev (…/afldb_v2_w339r2_w2a_test)` and moved A2 from 117 to 118 with the matching checksum. B2's fingerprint was unchanged at 117.
+    - A clean-subshell `afldb_pf_migration_parity` then gave 118/118.
+    - **This is child scrubbing, not gate refusal.** With H present, the gate refuses (G1/G2); the sanitized child alone still writes only A.
+  - **N1 (negative control):** H plus the old unbound `npm run db:migrate` resolved `-> test (…n1b_test)`. B3 went from 117 to 118 and A3 stayed at 117, so H is genuinely hostile.
+  - **Harness note:** run 1 (52/4) had a harness defect: `record_case` argument order meant the before/after ledger files were never written. Its substantive gate, child and fingerprint checks matched run 2. It was not re-run on the same databases; run 2 used fresh `…r2…` databases and a fresh clone. Both outputs are kept.
+  - **Cleanup:** the throwaway `.env` was removed. The isolated cluster on 55481 was stopped and confirmed (`pg_ctl` status 3, no listener, no postmaster). The data directory and the disposable databases are retained, since deletion was not authorised. A leak scan of every role and superuser password across the ops directory found nothing.
+  - **Evidence:** `docs/v2/evidence/open-issues-closure-20261108/w339/` (`r2/`, `run1-harness-defect/`, `*.out`) and `harness/run2-*.txt`. Host: `/mnt/ssd/afldb-close2-20261108T102607Z-ops/`.
+  - **Effect:** R339-A's write-mode acceptance is met. The issue stays open until the owner's D1–D4 decisions, push and merge of Branch B, and R339-D's live-host argv measurement.
+
+<a id="afldb-issue-340"></a>
+
+## AFLDB-ISSUE-340 — Credential rotation races with old-credential requests and session creation
+
+- **Status:** **Resolved 2026-11-08, committed in `8ef4ae1bf54c40c7cb04f4982dcfe1dd83913aea`** and published by fast-forward of `origin/main` (`7fabc6e5..c1c4b22e`; merged revision `c1c4b22ee15007111eab66f6d354e0b9ecbb2ade`). Owner accepted 2026-11-08. **Severity:** High. **Area:** Authentication and administrator lifecycle.
+- **Root cause:** credential verification, credential mutation, TOTP consumption and session issuance did not share a per-user serialized decision.
+- **Fix:** a row-locked snapshot comparison in `src/db/queries/admin-credentials.ts`, with the cookie set only after commit.
+- **Validation:**
+  - `admin-lifecycle` passed 50/50 on a disposable isolated `_test` database at ledger 118, and the typecheck is clean (streamanator, 2026-11-08). The run was at the tested candidate `c1c4b22e`, which is the merged revision itself.
+  - `merge:ready --issue 340` was READY and `preflight --mode merge` was READY (`docs/v2/evidence/open-issues-closure-20261108/branchA-merge/`).
+- **Limits:** not deployed; existing sessions are unaffected; no schema change. The original statuses are kept below as history.
+- **Original status (2026-11-08):** Open, proposed, awaiting implementation.
+- **Baseline/publication:** 5cba6846ddfcfd5d7a3fd29e14bc8877099d9656; affected source identical at locally recorded published origin/main 7fabc6e51c5c53c4b6f6fe345f21191d9184660b. No live revision/incident claim.
+- **Evidence class:** Source-established; no new executable reproduction.
+
+### Exact evidence
+
+- src/app/admin/login/actions.ts:43-57 reads credentials and verifies them outside a transaction; :70-76 claims only the TOTP step, without comparing the verified credentials; :82-83 creates the session later.
+- src/app/admin/password/actions.ts:46 and :62-70 validate the session and old password before the transaction; :72-89 unconditionally replaces the password by user id, clears must_change_password and revokes existing sessions; :91 inserts the replacement session afterwards.
+- src/app/admin/admins/password-actions.ts:45-73 checks the actor/target before hashing; :75-94 changes the target password and revokes existing sessions.
+- src/lib/auth/session.ts:155-165 inserts sessions independently; :219-233 accepts live sessions without a credential generation check. Only login and own-password change call createAdminSession (source caller search).
+- src/db/migrations/023_auth_submissions.sql:38-49 gives sessions no credential generation.
+
+### Trigger, prerequisites and impact
+
+An already authenticated password-change request verifies the old password, then pauses while another request resets the account and revokes its sessions. The paused change resumes, overwrites the reset, clears the forced-change flag and obtains a fresh session. Separately, login can verify old password + a valid unused TOTP step before a password change, then insert a session after that change has revoked all existing sessions. This requires concurrent requests and the old credentials (plus TOTP for login); it is not anonymous login or a TOTP bypass. A reset that leaves must_change_password true still restricts a late login, but the stale own-password change explicitly clears that flag.
+
+Credential rotation is not a reliable boundary against requests already in flight. A stale authenticated request can undo account recovery; a session minted after revocation is not among the revoked rows. Current disabled/role checks still reject a disabled account on subsequent requests.
+
+### Root cause and proposed fix
+
+Credential verification, credential mutation, TOTP consumption and session issuance do not share a serialized per-user decision. Transactions around UPDATE + revocation cannot cover later independent INSERTs or earlier reads.
+
+Use a common per-user transactional credential/session boundary. Hash outside the lock, then lock and compare the exact verified credential snapshot (or a monotonically changing credential generation), recheck session/status/actor authority, consume the TOTP step and insert the session within that boundary. Every credential mutator must participate. Emit the signed cookie only after commit. Preserve one-time TOTP consumption and role restrictions. Do not solve this with a timing delay or only another pre-transaction read.
+
+### Validation and next action
+
+Extend tests/auth.test.ts and tests/integration/admin-lifecycle.test.ts (or their closest existing transactional helper suite). Exercise login paused after verification versus password change, own change paused after verification versus manager reset, two own changes, session insert versus revocation, TOTP replay, disabled/demoted users, and transaction rollback. Use a disposable database ending in _test with explicit barriers, never probabilistic sleeps. Existing auth tests cover hash/TOTP/session predicates and guards, but do not drive these two createAdminSession callers through the interleaving.
+
+Acceptance: After a credential rotation commits, no request verified against the replaced credentials can change the password or create an accepted session. A concurrent stale change cannot clear the reset flag. Exactly one TOTP consumption is possible, all credential/session mutations roll back together on failure, and ordinary login/password change still work.
+
+**Implementation (2026-11-08, local, uncommitted; source-verified only, NOT yet executed):** chose the snapshot/locking design (no migration): `hashPassword` salts every hash (`src/lib/auth/crypto.ts:50-51`), so the stored hash is a sufficient credential generation. New `src/db/queries/admin-credentials.ts` holds the three transaction bodies — `issueLoginSessionInTransaction`, `changeOwnPasswordInTransaction`, `issueTemporaryPasswordInTransaction` — each taking the `auth_users` row lock(s) `FOR UPDATE` (stable id order), re-comparing the verified hash (+ TOTP secret for login), sign-in eligibility, the request's live session and (reset) actor authority/target rank under the lock, then claiming TOTP / rotating / revoking / inserting the session. Invite redemption already locks the row and rotates both factors (`admin-invites.ts:242-316`), so it participates unchanged. `session.ts`: `createAdminSession` replaced by `prepareAdminSession` + `setAdminSessionCookie` (cookie only after commit) and `currentAdminSessionTokenHash`. Callers moved: `login/actions.ts`, `password/actions.ts`, `admins/password-actions.ts`; scrypt stays outside the lock; no retries; refusals audited (`admin.login_credentials_changed`, `admin.password_change_stale`, `admin.password_reset_refused` with `reason`). Regression: 12 cases in `tests/integration/admin-lifecycle.test.ts` (ISSUE-340 describe), including a pre-fix-statements witness, two `waitForBlock` lock interleavings (stale change behind a reset; login session revoked by the change that waited for it), TOTP once, disabled/demoted, actor recheck and rollback on session-insert failure.
+
+**Verification (2026-11-08, streamanator, run by Claude under the user's authorisation):**
+- **Workspace:** `/mnt/ssd/afldb-verify-20261108T002136Z`, built from the current local working tree with no `.env`. Node v22.23.2; `npm ci` was clean and left the lock unchanged.
+- **Database:** a new isolated loopback cluster (`tools/v2/isolated-pg.ts`, 127.0.0.1:55497) holding the disposable database `afldb_v2_verify_test`. Inside `run`, the connection proved to be `afldb_v2_verify_test` as `afldb_owner`, cluster `afldb_v2_isolated`. It was migrated to ledger 118 (118 rows, last `118_fixtures_unconfirmed_participants.sql`) and given `privileges --target test`. The shared `afldb_test` (ledger 110) and `afldb_dev` were not touched.
+- **Results:**
+  - `tests/integration/admin-lifecycle.test.ts`: **50/50 passed**, including the 12 ISSUE-340 cases.
+  - `npm run typecheck`: **clean**.
+
+**Branch A re-verification (2026-11-08, run 2, streamanator):**
+- **Commit:** local `8ef4ae1bf54c40c7cb04f4982dcfe1dd83913aea` (A1, seven files) on `claude/issue-340-345-336`. Its base is `origin/main` `7fabc6e5`, and it excludes `5cba6846`.
+- **Workspace:** a fresh clone from a bundle, at candidate HEAD `c1c4b22ee15007111eab66f6d354e0b9ecbb2ade` (A1+A2+A3). There was no `.env`, and `npm ci` was clean (lock `984b4422…8e86`).
+- **Database:** `afldb_v2_bra_test`, newly created on the isolated loopback cluster (55481) and migrated to 118 rows, with `privileges --target test`.
+- **Results:** `admin-lifecycle` **50/50**; typecheck clean.
+- **Evidence:** `docs/v2/evidence/open-issues-closure-20261108/branchA/`.
+
+**Next action (superseded 2026-11-08):** owner acceptance, then push and merge of Branch A. **Done:** the owner accepted, `origin/main` was fast-forwarded to `c1c4b22e`, and the issue is resolved (status above). Follow-up: none tracked. Production behaviour changes only with a future application release.
+
+**Duplicate/decision review:** ISSUE-155 established reset/revocation and forced-change semantics; ISSUE-270 fixes invite authority under locking. Neither covers old-credential login/own-change requests completing after rotation. Those decisions remain closed.
+
+<a id="afldb-issue-341"></a>
+
+## AFLDB-ISSUE-341 — Restore target validation can accept a DSN that connects to the source database
+
+- **Status:** **Resolved 2026-11-08, scoped to the local working tree** (opened 2026-11-08; real qualification 37/0, see below). **Severity:** Medium. **Area:** Database restore and wrong-target safety.
+- **Baseline/publication:** 5cba6846ddfcfd5d7a3fd29e14bc8877099d9656; affected source identical at locally recorded published origin/main 7fabc6e51c5c53c4b6f6fe345f21191d9184660b. No live revision/incident claim.
+- **Evidence class:** Source-established; no new executable reproduction. Libpq query precedence is existing ISSUE-278 evidence.
+
+### Exact evidence
+
+- tools/maintenance/restore-test.sh:45-56 replaces the URL path with afldb_restore_test but preserves the query; :65 checks only the path.
+- :83-87 removes a userinfo password, not target-changing query options; :91 tests SELECT 1 without current_database/current_user.
+- :106 clears the named restore database comment; :119-129 drops every non-system table in the actual connected database with CASCADE.
+- :145-152 also passes the same DSN to pg_restore --clean.
+- Closed ISSUE-278 records PostgreSQL 16 fe-connect.c evidence that a URI query dbname overrides its path (issues.md, H-278-1); its fix covers rebuild-test/prove-reset, not this shell entry point.
+
+### Trigger, prerequisites and impact
+
+A configured source URL has a query such as ?dbname=afldb_dev. Rewriting its path produces /afldb_restore_test?dbname=afldb_dev, which passes the textual guard but libpq connects to afldb_dev. The restore database must also exist and the owner must be able to comment on it, allowing line 106 to pass before the destructive loop. A valid input dump and table ownership are also prerequisites. No real DSN or backup was inspected or executed.
+
+The restore verifier can drop source tables before restoring, despite announcing a disposable target. Severity follows the accepted ISSUE-278 Medium classification: nonstandard configuration prerequisite, potentially catastrophic consequence.
+
+### Root cause and proposed fix
+
+The guard validates a representation of the destination rather than the destination selected by libpq. Separate SELECT 1 and COMMENT statements do not prove the identity of the connection that executes DROP.
+
+Reject ambiguous/target-changing connection options, pin the child connection and environment, and assert current_database/current_user in the same SQL stream immediately before any destructive statement. Apply the same pinned identity to pg_restore and parity/comment operations. Use -X for psql and preserve secret-free invocation. Reuse ISSUE-278's target-pinning rules where appropriate, without copying a URL-path-only guard.
+
+### Validation and next action
+
+Use tests/db-test-rebuild.test.ts for shared target semantics if the helper is reused. No existing restore-test shell suite was identified; add a focused maintenance harness only where an existing suite cannot host the entry-point checks. Prove a path/query mismatch refuses before COMMENT, DROP or pg_restore, source sentinel survives, expected disposable target works, and inherited target overrides are refused or neutralized. No private backup is needed: generate a small disposable fixture in the later implementation phase.
+
+Acceptance: Every destructive child is bound to the intended disposable database and expected role. Wrong identity refuses before any marker/table change. Both source and unrelated disposable database sentinels remain unchanged in all refusal cases.
+
+**Implementation (2026-11-08, local, uncommitted; source-verified only, NOT yet executed):** `tools/maintenance/restore-test.sh` now (1) unsets the libpq routing variables (`tools/db/psql.ts` `LIBPQ_ROUTING_ENV`) after `.env`; (2) accepts only `postgres[ql]://USER[:PASSWORD]@HOST[:PORT]/DBNAME[?transport options]` (identifier user/db, single host, query keys limited to sslmode/sslrootcert/sslcert/sslkey/sslcrl/connect_timeout/application_name) and refuses everything else before any child runs (so `?dbname=`, encoded keywords, `service=`, host lists, query passwords and key=value strings are refused); (3) percent-decodes the password into `PGPASSWORD`; (4) runs `psql -X` and starts the connect check, the marker-clear + DROP stream, and the marker write each with an in-session `current_database()`/`current_user` assertion; pg_restore uses the same pinned DSN/environment. Regression: new `tests/restore-test.test.sh` (stubbed psql/pg_restore that model libpq's query-dbname precedence and record every write) — 14 target cases. Real two-database sentinel qualification not yet run.
+
+**Verification (2026-11-08, streamanator, same workspace as ISSUE-340):** `bash tests/restore-test.test.sh` gave **24 passed, 0 failed**. This is a stub harness; no real database was used.
+
+**Next action (superseded 2026-11-08):** a separately authorised two-disposable-database sentinel qualification on the approved test host.
+
+**Real qualification (2026-11-08, streamanator, run by Claude under the owner's authorisation for this run): 37 passed, 0 failed.**
+- **Setup:**
+  - Fresh workspace `/mnt/ssd/afldb-close-20261108T061620Z`, built from the local working tree.
+  - New isolated loopback cluster at `127.0.0.1:55481` (`afldb_v2_isolated`, PG16). Its cluster name and `listen_addresses` were asserted before every state-changing step.
+  - Three disposable databases, each with a distinct random sentinel:
+    - source `afldb_v2_i341src_test`, holding a synthetic schema of the nine parity tables (120,000 `player_match_stats` rows, a GIN trigram index, and `pg_trgm`/`unaccent` owned by the superuser, as in production);
+    - the wrapper's fixed target `afldb_restore_test`, with a prior candidate marker;
+    - bystander `afldb_v2_i341bys_test`.
+  - Synthetic dump: `pg_dump -Fc` of the source, sha256 `166ab9ac…0f5d`.
+- **H0, the hazard is real (read-only):** `psql` on a URL whose path names `afldb_restore_test` with `?dbname=afldb_v2_i341src_test` connected to the source.
+- **C1, refusal before any child:** nine DSNs were refused by the contract with exit 1:
+  - `?dbname=`, `?%64bname=`, `?service=`, `?options=`, `?host=&port=`;
+  - a two-host list, a key=value string, `?target_session_attrs=`, and a host-less URL.
+
+  The fingerprints of all three databases were unchanged: comment, table list, indexes, sentinel and statistics digest.
+- **C3, in-session identity guard:** `ALTER ROLE afldb_owner IN DATABASE afldb_restore_test SET role = i341_decoy` made the target session's `current_user` differ. The wrapper refused at the guard with "landed somewhere else. Nothing has been changed". All three fingerprints were unchanged, including the prior marker.
+- **C2, positive run under hostile inherited routing:**
+  - The environment set `PGHOSTADDR=192.0.2.1`, `PGPORT=1`, `PGDATABASE=<source>`, `PGSERVICE`/`PGSERVICEFILE` naming the source, `PGOPTIONS=-c default_transaction_read_only=on` and `PGTARGETSESSIONATTRS=read-only`. As a control, `PGHOSTADDR` alone breaks a plain connection.
+  - The DSN carried the allowed query `?application_name=i341&connect_timeout=10`.
+  - Result: exit 0, through the real exit-1 extension-owner path, with 9/9 parity checks passing.
+  - The marker is `afldb.restore_test.v1 sha256=<dump sha>`. The target's own sentinel was replaced by the dump's copy, and the witness index was restored. The source and bystander were unchanged.
+- **Evidence:** `docs/v2/evidence/open-issues-closure-20261108/ev341/`; harness copies are in `harness/` (`q341.sh.txt`, `qlib.sh.txt`). The synthetic dump itself stays on the host (sha recorded). No shared database, DEV or production database, or private backup was touched.
+
+**Status:** **Resolved 2026-11-08, scoped to the local working tree** (uncommitted). Every acceptance criterion above is met by the real run:
+- each destructive child is bound to the intended database and role;
+- a wrong identity refuses before any marker or table change;
+- the source and unrelated sentinels are unchanged in every refusal case.
+
+**Follow-up (owner, non-blocking):** the accepted DSN contract is the `.env.example` form only. Widening it, for example to a service name, is a separate owner decision, listed in the 2026-11-08 decision packet (`issues/open/OPEN-ISSUES-CLOSURE-RUN-20261108.md`). Runbook: `issues/closed/AFLDB-ISSUE-341.md`.
+
+**Duplicate/decision review:** Distinct remaining entry point from closed ISSUE-278; ISSUE-250's dump-binding marker does not establish destination identity. Neither issue is reopened.
+
+<a id="afldb-issue-342"></a>
+
+## AFLDB-ISSUE-342 — Restore verification can certify an abnormal pg_restore termination
+
+- **Status:** **Resolved 2026-11-08, scoped to the local working tree** (opened 2026-11-08; real fault injection 20/0, see below). **Severity:** Medium. **Area:** Backup proof and restore failure status.
+- **Baseline/publication:** 5cba6846ddfcfd5d7a3fd29e14bc8877099d9656; affected source identical at locally recorded published origin/main 7fabc6e51c5c53c4b6f6fe345f21191d9184660b. No live revision/incident claim.
+- **Evidence class:** Source-established; no new executable reproduction. The post-data kill timing still needs a disposable fault-injection witness.
+
+### Exact evidence
+
+- tools/maintenance/restore-test.sh:144-154 captures pg_restore exit status.
+- :156-167 fails only on non-filtered log text; :169-173 treats every nonzero exit as tolerated extension errors when that text is empty.
+- :196-204 checks nine row counts/sums, not completion of all post-data definitions.
+- :206-211 writes afldb.restore_test.v1 sha256=... and announces the backup proven when those checks pass.
+
+### Trigger, prerequisites and impact
+
+pg_restore terminates abnormally (for example exit 137) with empty or only filtered output after loading the counted data but before completing post-data constraints/indexes. The aggregate checks can match even though the process did not finish. The acceptance of any nonzero exit with empty log is established by source; the particular kill timing and incomplete-schema witness still require disposable fault injection.
+
+A partial restore can acquire the same proof marker consumed by downstream backup/promotion checks as a complete restore. This is false assurance rather than evidence that any existing retained backup is defective.
+
+### Root cause and proposed fix
+
+Absence of unexpected text is treated as positive proof of a successful/tolerated process completion. The exit status is reported but never used to reject an abnormal termination.
+
+Require successful completion. Prefer avoiding known benign extension ownership commands and requiring exit 0; otherwise explicitly accept only the normal documented error status with positively identified, bounded benign errors and independent completion evidence. Never accept signal exits, empty-log nonzero exits or an arbitrary warning-only failure. Keep the proof marker absent on every failure.
+
+### Validation and next action
+
+Stub pg_restore and psql to make all nine parity values match while injecting nonzero exits; assert no proof comment and nonzero wrapper status. Qualify a real small disposable dump including post-data constraints/indexes. Existing ledger evidence for legitimate extension-owner errors explains the exception, but does not test arbitrary process failure.
+
+Acceptance: Every abnormal or unexplained nonzero pg_restore exit fails the wrapper and produces no restore proof marker, even with matching aggregates. A complete restore still succeeds; any retained benign exception has exact positive evidence and a regression case.
+
+**Implementation (2026-11-08, local, uncommitted; source-verified only, NOT yet executed):** chose the narrowly proven compatibility exception rather than changing the restore command. `restore-test.sh` accepts only exit 0 with no error lines, or exit 1 where every error line is a known extension-owner error (≥1) AND pg_restore's closing `errors ignored on restore: N` summary (its last act, so positive completion evidence) names exactly that count. Any other status (signals such as 137, 126/127, status 1 without the summary, empty log, unknown errors, status 0 with error lines) fails before parity with no marker (cleared beforehand). Regression: 10 completion cases in `tests/restore-test.test.sh`, all with matching parity values. Fault injection on a real disposable restore not yet run.
+
+**Verification (2026-11-08, streamanator):** `bash tests/restore-test.test.sh` gave **24/24**, covering all 10 completion cases.
+
+**Next action (superseded 2026-11-08):** after ISSUE-341's sentinel qualification, and separately authorised, a disposable fault-injected restore (kill after data load) that proves no marker is written.
+
+**Fault injection (2026-11-08, streamanator, after ISSUE-341 passed 37/0; same isolated cluster, dump and databases): 20 passed, 0 failed.**
+- **Barrier:** a deterministic stage at runbook step 3, after data load and before final schema work.
+  - An event trigger in `afldb_restore_test` on `ddl_command_start WHEN TAG IN ('CREATE INDEX')` blocks on an advisory lock held by the harness.
+  - The real wrapper (`--jobs=4`) was run until pg_restore stood blocked on its first post-data `CREATE INDEX` with no `COPY` in flight, stable over 5 consecutive polls.
+- **At the barrier:**
+  - all nine parity values in the target already equalled the source's, so an aggregate-only check would have certified it;
+  - the run had already cleared the prior marker.
+- **Kill:** the wrapper's own pg_restore child was `SIGKILL`ed.
+- **Result:**
+  - The wrapper exited 1 with "pg_restore terminated abnormally (exit status 137)". It reached no parity check and announced nothing as proven.
+  - **No proof marker remained**: the comment is NULL, the prior candidate marker was cleared, and none was written.
+  - The incomplete-schema witness `i342_witness_idx` was absent.
+  - The source and bystander were unchanged.
+- **Control (C5):** with the barrier removed, the same dump restored with exit 0. The marker binds the dump sha and the witness index is present. No pg_restore against the cluster remained.
+- **Evidence:** `docs/v2/evidence/open-issues-closure-20261108/ev342/` (`c4.log`, `c4-parity-*.txt`, `c4-activity-at-kill.txt`, `c5.log`) and `harness/q342.sh.txt`.
+- **Not shown:** the pre-fix script was not re-run against the same barrier (it would need the earlier revision; Git is outside this run's authorisation). The defect remains source-established.
+
+**Status:** **Resolved 2026-11-08, scoped to the local working tree** (uncommitted). The acceptance criteria are met:
+- an abnormal termination fails the wrapper with no marker, despite matching aggregates;
+- a complete restore still succeeds;
+- the retained benign exception (exit 1 with extension-owner errors and a matching closing summary) has positive real evidence (ISSUE-341 C2) and stub regression cases.
+
+**Follow-up (owner, non-blocking):** the runbook leaves the choice between strict exit-0 command selection and this compatibility exception to the owner. The implementation uses the exception; ratifying or replacing it is listed in the 2026-11-08 decision packet. Runbook: `issues/closed/AFLDB-ISSUE-342.md`.
+
+**Duplicate/decision review:** ISSUE-250 covers binding proof to a dump and preserving post-snapshot writes; it does not authorize ignored abnormal exits. No matching open issue found.
+
+<a id="afldb-issue-343"></a>
+
+## AFLDB-ISSUE-343 — Fixture ingestion entry points check admission on a different database from their writer
+
+- **Status:** **Resolved 2026-11-08, scoped to the local working tree** (opened 2026-11-08; real A/B qualification, see below). **Severity:** Medium. **Area:** Ingestion controls and database identity.
+- **Baseline/publication:** 5cba6846ddfcfd5d7a3fd29e14bc8877099d9656; affected source identical at locally recorded published origin/main 7fabc6e51c5c53c4b6f6fe345f21191d9184660b. No live revision/incident claim.
+- **Evidence class:** Source-established; no new executable reproduction.
+
+### Exact evidence
+
+- tools/current-season/settle-afl-api-fixture-schedule.ts:175-190 checks controls, then opens AFLDB_IMPORT_DATABASE_URL; :193 calls the canonical fixture writer.
+- tools/current-season/settle-afl-api-fixtures.ts:158-161 creates its importer client; :243-263 checks the seal and separate controls, then :270-303 begins staging writes.
+- src/lib/acquisition/afl-api-ingestion-control.ts:84-106 reads the controls through DATABASE_URL.
+- src/lib/acquisition/afl-api-ingestion-safety.ts:25-35 and :43-102 provides the live control/writer identity proof; tools/current-season/settle-afl-api.ts:453-468 uses it, unlike these two entry points.
+- package.json:47-48 exposes the fixture commands; deploy/afldb-settle-afl-api-brownlow.sh:175-177 invokes fixture staging before the later Brownlow settle guard.
+
+### Trigger, prerequisites and impact
+
+DATABASE_URL points at database A with ingestion enabled while AFLDB_IMPORT_DATABASE_URL points at database B, where ingestion is disabled. A valid unsealed-season snapshot reaches either fixture CLI. The control read on A allows the write to B. The schedule CLI can change canonical fixtures; the other CLI writes its batch/observation staging records.
+
+The intended database-local ingestion gate is bypassed by configuration mismatch through alternate entry points. The season seal and transactions do not bind the admission decision to the writer database. This requires misconfiguration; no unauthenticated network exploit or live mismatch is established.
+
+### Root cause and proposed fix
+
+Two newer fixture entry points repeat the enabled-switch check but omit the existing control/writer identity proof used by the main match and Brownlow writers.
+
+Apply the established control/writer proof before the first write-capable transaction in both CLIs. Preserve separate roles, validate-only without connections, sealed-season refusal order and fail-closed control-read errors. Avoid a cosmetic DSN string equality check: roles may differ while the database must agree.
+
+### Validation and next action
+
+Extend tests/afl-api-ingestion-safety.test.ts (its :185-220 boundary checks cover only the original main/Brownlow entry points), tests/integration/v2-fixture-writer.test.ts and tests/integration/settle-afl-api-fixtures.test.ts as appropriate. Use disposable databases A/B and sentinel rows; mismatched gate/writer must record zero batches, observations and canonical changes. Validate-only still opens zero clients.
+
+Acceptance: Both real fixture command paths refuse a mismatched gate/writer identity before any write, refuse unreadable/disabled controls, retain sealed historical protection, and succeed with enabled controls on the matching target.
+
+**Implementation (2026-11-08, local, uncommitted; source-verified only, NOT yet executed):**
+
+- **Change:** `tools/current-season/settle-afl-api-fixture-schedule.ts` and `settle-afl-api-fixtures.ts` drop their separate `DATABASE_URL` switch read. Each now calls the existing `proveAflApiIngestionPreflight(sql)` on the writer client, inside its try/finally and before the first write, then applies the enabled and read-failure refusals.
+- **Preserved:** validate-only opens no client, and the sealed-season refusal still comes first.
+- **Test seam:** a test-only `ingestionPreflight` dependency, mirroring `settle-afl-api.ts:453-468`.
+- **Minor order change:** a missing `AFLDB_IMPORT_DATABASE_URL` is now reported before a disabled switch.
+- **Regression (`tests/afl-api-ingestion-safety.test.ts`):** a source-order check, plus a per-CLI boundary matrix. Covers mismatched control/writer identity on both dry-run and apply (only the identity query is issued), disabled, enabled, missing `DATABASE_URL`, and validate-only.
+
+**Verification (2026-11-08, streamanator, DB-free):** `afl-api-ingestion-safety` passed 184/184, `afl-api-settle-cli-gate` 81/81 and `v2-fixture-contract` 80/80. These were part of a 656/656 run.
+
+**Next action (superseded 2026-11-08):** the real A/B qualification across two disposable `*_test` databases, including the Brownlow wrapper path, is still outstanding, so the issue stays open until both are done.
+
+**Real A/B qualification (2026-11-08, streamanator, run under the owner's authorisation for this run; run by one subagent and spot-checked independently): no case failed.**
+
+The harness counted 156/157. The one FAIL is a harness regex defect: it expected "Brownlow acquisition refused", but W3's step 3 prints "Brownlow acquisition is disabled outside the live count window". The log was re-read and the case passes.
+
+- **Setup:**
+  - Isolated loopback cluster `127.0.0.1:55481`.
+  - A `afldb_v2_i343a_test` and B `afldb_v2_i343b_test`, each migrated to ledger 118 with `privileges --target test`.
+  - Seed: 8 clubs and 3 venues in each, plus a distinct random `i343_sentinel` per database.
+  - Roles split as in production: control `DATABASE_URL` is `afldb_app`, writer `AFLDB_IMPORT_DATABASE_URL` is `afldb_import`.
+  - Snapshots come from the real `acquire-afl-api.ts --fixtures-only`, pointed at a loopback stub serving a synthetic 2027 feed (an unsealed season) and a 2026 feed (sealed). No real AFL endpoint was contacted.
+- **Before/after checks** per case:
+  - an md5 and row count of every `public` and `staging` table, plus every sequence's `last_value`, which also catches rolled-back attempts;
+  - per-database `log_statement` for the app and import roles, reset afterwards (0 settings remain).
+- **Cases, with identical results for `settle-afl-api-fixtures.ts` and `settle-afl-api-fixture-schedule.ts`:**
+
+  | Case | Setup | Result |
+  |---|---|---|
+  | V | validate-only, dead-port DSNs | exit 0; 0 statements reached the server |
+  | M1 / M2 / M3 | mismatch on apply and dry-run (control A on, writer B off), and with both switches on | refused: "control database 'afldb_v2_i343a_test' does not match writer database 'afldb_v2_i343b_test'". Only the identity and settings reads ran, and **A and B are byte-identical, sequences included** |
+  | D1 | switch disabled on matching A | disabled refusal |
+  | U1 | wrong control password | unreadable-control refusal |
+  | U2 | SELECT on `site_settings` revoked (since restored) | unreadable-control refusal |
+  | U3 | `DATABASE_URL` unset | not-configured refusal |
+  | S1 | a 2026 snapshot | sealed-season refusal, with no connection opened |
+  | OK1 | dry-run on matching A | preflight "control = writer = afldb_v2_i343a_test"; rolled back with A unchanged |
+  | OK2 | apply on matching A | **writes to A only.** Fixtures CLI: batch 2 plus 2 rows each in `source_records`, `source_record_versions` and `source_payloads`. Schedule CLI: batch 4 plus 2 `fixtures` rows |
+
+  At the end, B held **0 batches, 0 fixtures and 0 versions** (re-read independently).
+- **Brownlow wrapper path:** the unmodified `deploy/afldb-settle-afl-api-brownlow.sh` ran under `/bin/sh` from a hash-checked workspace copy, with a systemd-like environment (`INVOCATION_ID` set, so `AFLDB_SKIP_DOTENV=1`), the real CLIs and the stub base URLs.
+  - **W1/W1b (mismatch):** step 1 acquired the feed (one stub request). **Step 2 refused with the mismatch message**, then `AFLDB_SETTLE_FAILURE season=2027 exit=1`. No `[3/4]` ran, and there were 0 write statements in A and B.
+  - **W2 (matching B, disabled):** refused at step 1 with no request.
+  - **W3 (matching A, enabled):** step 2 applied batch 5 to A only; step 3 refused because the Brownlow super-admin switch is absent; B was unchanged.
+- **Limits:**
+  - Brownlow step 4 (`settle-afl-api-brownlow.ts`) never ran, because step 3 refuses without the count-window switch. It was already covered by ISSUE-244 F016.
+  - systemd's own `EnvironmentFile=`/`UnsetEnvironment=` handling was not exercised.
+  - No live endpoint was used.
+- **Evidence:** `docs/v2/evidence/open-issues-closure-20261108/ev343/` (statement logs excluded; they stay on the host) and `harness/q343*.txt`, `gen343.ts.txt`. Databases A and B are kept on the isolated cluster.
+
+**Status:** **Resolved 2026-11-08, scoped to the local working tree** (uncommitted). The runbook's acceptance criteria are met:
+- both real command paths refuse a mismatched gate/writer identity before any write;
+- they refuse unreadable or disabled controls;
+- they keep the sealed-season protection;
+- they succeed on the matching target;
+- the Brownlow wrapper cannot write fixture staging before the refusal.
+
+Runbook: `issues/closed/AFLDB-ISSUE-343.md`.
+
+**Duplicate/decision review:** ISSUE-244 F005/F016 addressed the two original writers, while ISSUE-229's switch decisions concern bounded operational enabling. These uncovered fixture callers are a distinct remaining gap; accepted seasonal and source limitations are unchanged.
+
+<a id="afldb-issue-344"></a>
+
+## AFLDB-ISSUE-344 — Out-of-range draft pages report zero matches for nonempty results
+
+- **Status:** **Resolved 2026-11-08**, scoped to the local working tree. Opened 2026-11-08. The fix is local and uncommitted; it is not on DEV or production. See **Resolution** below. **Severity:** Low. **Area:** Public and admin draft pagination.
+- **Baseline/publication:** 5cba6846ddfcfd5d7a3fd29e14bc8877099d9656; affected source identical at locally recorded published origin/main 7fabc6e51c5c53c4b6f6fe345f21191d9184660b. No live revision/incident claim.
+- **Evidence class:** Source-established; no new executable reproduction.
+
+### Exact evidence
+
+- src/db/queries/draft.ts:149-184 takes total from count(*) OVER() on returned rows and falls back to 0 for an empty OFFSET page.
+- src/app/draft/[year]/page.tsx:95-125 accepts the requested page; :212-228 renders total as matching and says no selections are recorded/match filters when rows are empty.
+- src/lib/params.ts:9-13 bounds a page number but does not clamp it to the result count; src/components/Pagination.tsx:21-22 hides navigation for total 0.
+- src/db/queries/admin-draft.ts:1946-1958 has the same window-total fallback; src/app/admin/draft/page.tsx:71-84 and :170-176 consumes it for the listing/pager.
+
+### Trigger, prerequisites and impact
+
+A bookmarked, hand-entered or stale page exceeds the last page for otherwise valid year/category/filter results. OFFSET returns no rows, so the window count disappears even though earlier pages contain matches.
+
+Public draft pages falsely say there are zero matching selections (or none recorded for the year); admin draft lists also lose the actual total and pagination recovery. Data is not deleted.
+
+### Root cause and proposed fix
+
+The result-count contract depends on at least one row surviving pagination. Page validation limits numeric size, not the dataset range.
+
+Return the true count for empty offset pages using identical predicates (for example a bounded fallback count), and explicitly handle an out-of-range page by clamping/refetching or rendering a recovery link with the correct total. Keep count/row snapshot semantics clear. Fixing only the count risks invalid from/to pagination text.
+
+### Validation and next action
+
+Extend tests/integration/admin-draft.test.ts and tests/catalogue-lookups.test.ts (existing query/sort checks); add the nearest route/pagination rendering assertions. Cover total 0, one page, final partial page, page beyond final, filters changing while on a later page, and stable category/order. The existing first-page draft/NBSP regressions do not prove this failure case.
+
+Acceptance: A page beyond the final page never reports zero matches when matching selections exist; the true total is retained and a valid page is reachable without losing filters. Genuine no-match views stay correct; ordering and NULL semantics are unchanged.
+
+**Implementation (2026-11-08, local, uncommitted; query layer and both page redirects verified on isolated Linux 2026-11-08, see below):**
+
+- **Count fallback:** `src/db/queries/draft.ts` and `admin-draft.ts` run one count with identical predicates, only when the page is empty and the offset is past zero. The admin query shares one filtered-CTE fragment between the page query and the count.
+- **Clamp and refetch:** `src/app/draft/[year]/page.tsx` and `src/app/admin/draft/page.tsx` use the existing `redirectPastEnd` helper (`src/lib/pagination.ts`, as /players does). It redirects to the last page and keeps view, category, club, text, sort and the admin filters.
+- **Regression:**
+  - `tests/catalogue-lookups.test.ts`: true total past the end; no-match stays 0; no fallback query on normal pages.
+  - `tests/integration/admin-draft.test.ts`: one page, a final partial page, past-the-end totals equal to page 1, a narrowed category on a later page, genuine no-match, and category/NULL-pick ordering, for both admin and public.
+- **Not covered by automated tests:** the redirect itself has no route test. It was verified in a browser on 2026-11-08 (screenshots inspected; see Browser verification).
+
+**Verification record:**
+
+- **Verified 2026-11-08 (streamanator):** `tests/catalogue-lookups.test.ts` passed 24/24.
+- **First attempt (superseded):** `tests/integration/admin-draft.test.ts` did not run on the schema-only `afldb_v2_verify_test`. Setup stopped at `:192` ("need an empty draft year with active club identities"), so all 52 tests were skipped.
+- **Verified 2026-11-08 (streamanator, owner-authorised):** `tests/integration/admin-draft.test.ts` passed: **47 passed, 0 failed, 5 skipped (52)**, vitest exit 0.
+  - **Target:** workspace `/mnt/ssd/afldb-verify-20261108T002136Z`, isolated cluster `afldb_v2_isolated` on `127.0.0.1:55497`, database `afldb_v2_verify_test`.
+  - **Checks before writing:**
+    - `isolated-pg.ts verify` returned ISOLATED TARGET OK;
+    - in-session facts matched (database, cluster, address, port, marker `afldb-v2-isolated-test`);
+    - `afldb_meta.schema_migrations` held 118 rows, the latest `118_fixtures_unconfirmed_participants.sql`.
+  - **Seed:** one transaction that refuses to run against any other target, ledger or a non-empty database. It is kept in the workspace only, as `issue344-seed/seed.sql`, and follows the `match-admin-create.test.ts` fixture pattern. It holds:
+    - seasons 2096 and 2040;
+    - three marked club identities: two with no season bounds, active in 2097, and one bounded to 2040, inactive in 2097;
+    - one 2096 home-and-away match, so the suite's fixture draft year is 2097 with 0 picks;
+    - the `afltables` and `draftguru` source rows, with values from `data/reference/sources.json`.
+  - **Suite:** it created its own picks. The workspace test file matches the local file, ignoring CRLF line endings. The fix files `draft.ts`, `admin-draft.ts` and both `page.tsx` files are byte-identical to the local ones.
+  - **ISSUE-344 cases that ran, all 5 passed:**
+    - admin: one page, the final partial page and every page past it report the same total;
+    - admin: a filter narrowed on a later page reports its own total;
+    - admin: a genuine no-match is still zero;
+    - public: the same pages, with category order and NULL picks unchanged and the true total past the end;
+    - public: a genuine no-match is still zero.
+    - The ISSUE-337 NBSP case also passed.
+  - **Skipped (5):** gate 11 (4 replay cases) and gate 10 (1 fitzRoy guard case). These are `skipIf(!canReplay)`: the workspace has no `.venv`, and the system `python3` has no psycopg. This is not an ISSUE-344 path.
+  - **Teardown:** clean. The run left 0 picks, 0 marker players, 0 overrides, 0 draft persons, 0 auth users and no `issue160_test_*` triggers. Only the 1 seed match and 3 seed clubs remain. The cluster was stopped afterwards.
+  - **Not touched:** shared `afldb_test`, `afldb_dev`, backups.
+- **Redirect checks (formerly open, now verified below):** `/draft/2024?page=999&view=rookie`, and an over-range `/admin/draft` page.
+
+**Browser verification (2026-11-08, streamanator, owner-authorised): PASS on both routes.**
+
+- **Target:** the same workspace, cluster and database as above.
+  - Before writing, `isolated-pg.ts verify` returned ISOLATED TARGET OK.
+  - The in-session facts were database `afldb_v2_verify_test`, cluster `afldb_v2_isolated`, `127.0.0.1:55497`, ledger 118.
+  - The picks SQL refuses any other target, a ledger that is not at 118, a missing 2096/2097 seed, or a non-empty `draft_picks`.
+- **Synthetic picks for 2097** (workspace `issue344-seed/picks.sql`), all unlinked DraftGuru-sourced rows:
+  - 57 Rookie picks, `Issue344 Rookie 01`–`57`, picks 1–57. That makes 2 pages of 50, with 7 rows on the last.
+  - Two controls that change the total if a filter is dropped:
+    - 3 National `Issue344` picks: with `view`/`kind` lost, the total would be 60;
+    - 5 Rookie `Control Rookie` picks with no search term: with `q` lost, the total would be 62.
+- **App:** `next dev --webpack` (Next 16.3.1), started through `isolated-pg.ts run`.
+  - It listened on `127.0.0.1:3344` only, confirmed by `ss`.
+  - Settings: `AFLDB_ENV=development`, beta gate off, session secret generated per run.
+- **Admin account:** the disposable `issue344-verify@example.test`, role `admin` (`data.draft.read` is `ADMIN_AND_UP`), created with `tools/admin/create-admin.ts`.
+  - Sign-in used the normal `/admin/login` form (email, password, TOTP) and landed on `/admin`.
+- **Browser:** Playwright 1.62.1 with the host's own Chromium headless shell (revision 1234), on the host's loopback.
+  - Viewports: desktop 1280×800 and mobile 390×844.
+
+| Route | Requested URL | Final URL | Total shown | Visible rows (last page) |
+|---|---|---|---|---|
+| Public | `/draft/2097?page=999&view=rookie&q=Issue344` | `/draft/2097?q=Issue344&view=rookie&page=2` | "57 matching"; pager "51–57 of 57", "Page 2 of 2" | 7 (Issue344 Rookie 51–57) |
+| Admin | `/admin/draft?page=999&year=2097&kind=rookie&q=Issue344` | `/admin/draft?q=Issue344&year=2097&kind=rookie&page=2` | "Page 2 of 2 · 57 selections matching "Issue344"" | 7 (Issue344 Rookie 51–57) |
+
+- **Redirect and rows:** each requested URL answered `307`, and its target answered `200`. Results were identical at both viewports.
+  - Neither page showed an empty state.
+  - Page 1 of each route held 50 rows. Together with the last page, that is exactly the 57 expected names, with no overlap.
+  - The admin form kept `q=Issue344`, `year=2097` and `kind=rookie`.
+  - The public category chip read "Rookie 57" and "All 60", showing the National control was excluded only by the view.
+  - Neither route overflowed the page horizontally at mobile width.
+- **Visual evidence:** `issues/closed/AFLDB-ISSUE-344-evidence/` (`V-344-{public,admin}-{desktop,mobile}.png`, `results.json`). The screenshots were inspected.
+  - Fixed elements overlap some rows in the full-page captures: the consent banner (admin desktop and mobile) and the mobile bottom navigation. This is a capture artefact, and the DOM row counts are unaffected.
+- **Observation, not an ISSUE-344 defect:** the dev server relayed one browser hydration warning per public visit on the draft page's `<nav>`.
+  - The only differing attribute was `caret-color: transparent`, which the app does not render. Most likely Playwright's screenshot caret-hiding injected it; this was not investigated further.
+  - The admin route logged none.
+- **Shutdown:**
+  - The app was stopped and port 3344 closed. Unrelated pre-existing `next-server` processes on the host were left untouched.
+  - The cluster was stopped.
+  - The admin password, TOTP secret and session-secret files were deleted from the workspace.
+  - Shared `afldb_test`, `afldb_dev`, DEV/production deployments and backups were not touched.
+- **Limits:** `next dev` rather than a production `next start` build. The disposable database holds synthetic data only.
+
+**Resolution (2026-11-08, local scope):**
+
+- **Root cause:** the result total came from `count(*) OVER ()` on the returned rows. A page past the end returned no rows, so the total read as 0. Page validation bounded the number but not the dataset range.
+- **Fix:** a bounded fallback count with identical predicates, run only for an empty page past the start (`draft.ts`, `admin-draft.ts`). Both pages call `redirectPastEnd`, which redirects to the last page and keeps every filter.
+- **Validation:**
+  - `catalogue-lookups` 24/24;
+  - `admin-draft` 47 passed / 0 failed / 5 skipped;
+  - both redirects browser-verified, as above.
+- **Not done:** the change is uncommitted and not deployed. It reaches DEV and production only through a later commit, release and acceptance.
+
+**Duplicate/decision review:** No matching open issue. The similar dormant runAdvancedSearch window count is excluded: /advanced-search redirects to /players (src/app/advanced-search/page.tsx:50-54), so it is not evidence of a reachable public-route defect.
+
+<a id="afldb-issue-345"></a>
+
+## AFLDB-ISSUE-345 — Restricted Grid Solver omits the forced password-change gate
+
+- **Status:** **Resolved 2026-11-08, committed in `65984ab22edf743580fb4caa7e8df97f73e55e3b`** and published by fast-forward of `origin/main` (merged revision `c1c4b22ee15007111eab66f6d354e0b9ecbb2ade`). Owner accepted 2026-11-08. **Severity:** Low. **Area:** Configurable audience access control.
+- **Root cause:** `requireAudience` checked the role without `requireUploader()`'s forced-change redirect.
+- **Fix:** non-public audiences go through `requireUploader()`.
+- **Validation:** `tests/auth.test.ts` passed 211/211 and the typecheck is clean (2026-11-08), at the tested candidate `c1c4b22e`, which is the merged revision. `merge:ready --issue 345` was READY.
+- **Limits:** not deployed; no browser check.
+- **Original status (2026-11-08):** Open, proposed, awaiting implementation.
+- **Baseline/publication:** 5cba6846ddfcfd5d7a3fd29e14bc8877099d9656; affected source identical at locally recorded published origin/main 7fabc6e51c5c53c4b6f6fe345f21191d9184660b. No live revision/incident claim.
+- **Evidence class:** Source-established; no new executable reproduction.
+
+### Exact evidence
+
+- src/lib/auth/audience.ts:24-30 returns immediately for public and otherwise checks getAdminUser plus role only.
+- src/lib/auth/session.ts:259-269 explicitly makes requireUploader enforce mustChangePassword; :295-298 funnels the admin guard through it.
+- src/app/grid-solver/page.tsx:56-57 calls requireAudience, followed by solver data queries at :74-101.
+- src/lib/site-settings.ts:286-291 defaults Grid Solver to super_admin. The /admin/grid-solver redirect does not add a guard to direct /grid-solver requests.
+
+### Trigger, prerequisites and impact
+
+An account with a valid session, sufficient role and must_change_password=true requests /grid-solver directly while its configured audience is restricted. It passes requireAudience before replacing the temporary password.
+
+The temporary-password restriction is bypassed for a restricted feature. This finding does not establish admin mutation access or private credential disclosure; severity is Low. The intentionally public audience remains public.
+
+### Root cause and proposed fix
+
+The configurable audience helper duplicates role/session checks but omits the common credential-state guard, despite its comment describing equivalence to requireAdmin with a movable threshold.
+
+For non-public audiences, use the existing forced-change guard before evaluating the audience role (or factor a shared equivalent). Keep the public early return so public access does not require a session or become cookie-dependent.
+
+### Validation and next action
+
+Extend tests/auth.test.ts with public/no-cookie, missing session, insufficient role, disabled/revoked session, permitted role and forced-change cases. Existing guard coverage centers on /admin boundaries and does not exercise requireAudience's forced-change behavior. Include a focused Grid Solver page assertion that no solver query occurs before redirect.
+
+Acceptance: Every non-public audience refuses data access until must_change_password is cleared; sufficiently privileged normal sessions work; public access still performs no auth lookup.
+
+**Implementation (2026-11-08, local, uncommitted; source-verified only, NOT yet executed):** `requireAudience` (`src/lib/auth/audience.ts`) now calls `requireUploader()` for every non-public audience, so the forced-change redirect runs before the role comparison; public still returns before any cookie or session read. `/grid-solver/page.tsx` is the only caller (no other solver route exists). Regression: `tests/auth.test.ts` "requireAudience against the real guard (AFLDB-ISSUE-345)" — public/no-lookup, signed-out, revoked, under-ranked 404, permitted, forced-change at the default audience, forced-change-before-role, and a source-order check that the page guards before every solver query (`next/navigation` mock gained `notFound`).
+
+**Verification (2026-11-08, streamanator):** `tests/auth.test.ts` passed **211/211**, including the ISSUE-345 cases. Typecheck is clean.
+
+**Branch A re-verification (2026-11-08, run 2, streamanator):** local commit `65984ab22edf743580fb4caa7e8df97f73e55e3b` (A2) on `claude/issue-340-345-336` (base `origin/main` `7fabc6e5`, excludes `5cba6846`). In a fresh clone at candidate HEAD `c1c4b22e…`, `tests/auth.test.ts` passed **211/211** and the typecheck was clean. Evidence: `docs/v2/evidence/open-issues-closure-20261108/branchA/`.
+
+**Next action (superseded 2026-11-08):** owner acceptance, then push and merge of Branch A. **Done:** published at `c1c4b22e`; resolved (status above).
+
+**Duplicate/decision review:** ISSUE-155's forced-change rule supplies the established contract. No accepted exception for restricted Grid Solver was found; public audience behavior is an intentional exception and is preserved.
+
+<a id="afldb-issue-346"></a>
+
+## AFLDB-ISSUE-346 — A standalone `db:migrate` on DEV bypasses the deploy gate's transition approval
+
+- **Status:** Open (opened 2026-11-09). It was split from ISSUE-339 by owner decision D2 ("track standalone DEV migration approval separately").
+- **Severity / area:** Low; deployment tooling and DEV operations.
+- **Defect (established in ISSUE-339, `issues.md` → AFLDB-ISSUE-339, "Remaining gaps"):**
+  - The ISSUE-339 gate (published at `8d122f62`) approves a migration transition (`-ExpectedLedgerBefore/-After`) only inside `sync-dev.ps1`.
+  - An operator who runs `npm run db:migrate` directly on the DEV host applies every pending migration. That run has no approved transition, no backup or artifact evidence, and no evidence record.
+  - `db:migrate`'s own migration-collision and branch-local guards still apply.
+  - This is a procedural bypass that needs a deliberate manual command. It is not reached by any wrapper.
+- **Interim operator rule (owner, 2026-11-09):** never run `db:migrate` by hand on DEV. Migrations reach DEV only through `sync-dev.ps1` with an approved transition.
+- **Candidate fix (to be designed and qualified; nothing implemented):**
+  - route a migration-only DEV change through the gate as `sync-dev.ps1 -Phase execute -SkipBuild -SkipRestart`;
+  - or use a small wrapper that runs `afldb_deploy_gate`'s identity, ledger, transition and migration-binding checks around the same pinned line, `env -u AFLDB_MIGRATE_TARGET -u AFLDB_OWNER_DATABASE_URL npm run db:migrate -- --target dev`.
+  - Qualify it with the ISSUE-339 harnesses (`tests/sync-dev-remote.test.sh`, `tests/sync-dev-static.test.ps1`) and a disposable write-mode rehearsal in the W-339 pattern.
+- **Out of scope:** `preflight --mode deploy` stays as it is (ISSUE-339 D3), and production `deploy/release.mjs` is not reviewed here.
+- **Next action:** when DEV migration work is next planned, design and qualify one of the routes above. Until then, the interim rule applies.

@@ -1,0 +1,135 @@
+== S1 checkout ==
+7ac7b9a6315050e1e55719fbca4be124c5a4d56de0d453b7faa83305cbb702cd  /mnt/ssd/afldb-close2-20261108T102607Z-ops/afldb-w339.bundle
+549c5892d7e31a962380c9bd0128ae99969f3b75 refs/heads/claude/issue-339-deploy-preflight
+7fabc6e51c5c53c4b6f6fe345f21191d9184660b refs/remotes/origin/main
+/mnt/ssd/afldb-close2-20261108T102607Z-ops/afldb-w339.bundle is okay
+  bundle verifies
+  PASS  HEAD is B1 (549c5892d7e31a962380c9bd0128ae99969f3b75)
+  PASS  refs/remotes/origin/main is the verified base 7fabc6e51c5c53c4b6f6fe345f21191d9184660b
+  PASS  migration files at HEAD
+  PASS  last migration at HEAD
+  PASS  origin/main contains 118_fixtures_unconfirmed_participants.sql (not branch-local)
+  PASS  B1 migration dir equals base
+  118_fixtures_unconfirmed_participants.sql blob sha256 at HEAD: 49e59fcd96aa62142fb2da8141f926997582ef86502b37e22c4796f004498401
+  PASS  npm ci
+984b44221f8f72560c7b58f1f8642427cc6ece03d30623a7e2e45d1df23d8e86  package-lock.json
+== S2 template at 117 ==
+  PASS  template tree migrations
+  PASS  template tree is not a Git checkout
+  cluster already running
+  [cluster verified: afldb_v2_isolated on 127.0.0.1:55481]
+  [cluster verified: afldb_v2_isolated on 127.0.0.1:55481]
+  PASS  template afldb_v2_w339t117r2_test verified isolated
+  [cluster verified: afldb_v2_isolated on 127.0.0.1:55481]
+  PASS  template ledger rows
+  PASS  template last row
+  template ledger sha: 0dbd4bab4fe160e5
+  PASS  the rehearsed line is sync-dev.ps1's exact migration line
+== G1/G2 gate refusal ==
+  [cluster verified: afldb_v2_isolated on 127.0.0.1:55481]
+  [cluster verified: afldb_v2_isolated on 127.0.0.1:55481]
+  [cluster verified: afldb_v2_isolated on 127.0.0.1:55481]
+  PASS  afldb_v2_w339r2_ga_test starts at 117 from the template
+  PASS  afldb_v2_w339r2_gb_test starts at 117 from the template
+G before A(afldb_v2_w339r2_ga_test): n=117 last=117_brownlow_provider_eligibility_unknown.sql ledger=0dbd4bab4fe160e5 tables=d33786b2502bb815 sentinel=none
+G before B(afldb_v2_w339r2_gb_test): n=117 last=117_brownlow_provider_eligibility_unknown.sql ledger=0dbd4bab4fe160e5 tables=f282bd80a5dba837 sentinel=4acbd7c59a040c198a77aa3b
+  G1: [preflight] FAIL migration target is the assessed database -- AFLDB_OWNER_DATABASE_URL is exported in the deploy shell and would override .env for db:migrate; unset it
+  G1: FAILS=1
+  PASS  G1 refused: exported DSN
+  PASS  G1 one blocker
+  PASS  G1 no child invoked
+  G2: [preflight] FAIL migration target is the assessed database -- AFLDB_MIGRATE_TARGET is exported in the deploy shell (value withheld); unset it
+  G2: FAILS=1
+  PASS  G2 refused: exported target
+  PASS  G2 one blocker
+  PASS  G2 no child invoked
+G after A(afldb_v2_w339r2_ga_test): n=117 last=117_brownlow_provider_eligibility_unknown.sql ledger=0dbd4bab4fe160e5 tables=d33786b2502bb815 sentinel=none
+G after B(afldb_v2_w339r2_gb_test): n=117 last=117_brownlow_provider_eligibility_unknown.sql ledger=0dbd4bab4fe160e5 tables=f282bd80a5dba837 sentinel=4acbd7c59a040c198a77aa3b
+  PASS  G ledger files A/B before and after
+  PASS  G Ag unchanged at 117
+  PASS  G Bg unchanged at 117
+== W1 gated write (clean environment) ==
+  [cluster verified: afldb_v2_isolated on 127.0.0.1:55481]
+  [cluster verified: afldb_v2_isolated on 127.0.0.1:55481]
+  [cluster verified: afldb_v2_isolated on 127.0.0.1:55481]
+  PASS  afldb_v2_w339r2_w1a_test starts at 117 from the template
+  PASS  afldb_v2_w339r2_w1b_test starts at 117 from the template
+W1 before A(afldb_v2_w339r2_w1a_test): n=117 last=117_brownlow_provider_eligibility_unknown.sql ledger=0dbd4bab4fe160e5 tables=d33786b2502bb815 sentinel=none
+W1 before B(afldb_v2_w339r2_w1b_test): n=117 last=117_brownlow_provider_eligibility_unknown.sql ledger=0dbd4bab4fe160e5 tables=f282bd80a5dba837 sentinel=9c9eb8da276d229ca82955f3
+  PASS  lifted block size (lines)
+  [cluster verified: afldb_v2_isolated on 127.0.0.1:55481]
+  PASS  W1 target afldb_v2_w339r2_w1a_test verified isolated before write
+  [preflight] PASS database identity -- afldb_v2_w339r2_w1a_test afldb_owner via AFLDB_OWNER_DATABASE_URL (read-only session)
+  [preflight] PASS applied migrations match the target revision -- 117 applied, names and checksums equal (ledger sha 0dbd4bab4fe160e5)
+  [preflight] PASS approved migration transition -- 117 -> 118 (pending 118_fixtures_unconfirmed_participants.sql)
+  [preflight] PASS migration target is the assessed database -- db:migrate --target dev reads AFLDB_OWNER_DATABASE_URL from the same single .env line
+  [w339] running the exact line in write mode: env -u AFLDB_MIGRATE_TARGET -u AFLDB_OWNER_DATABASE_URL npm run db:migrate -- --target dev
+  AFLDB migrations -> dev (afldb_owner@127.0.0.1:55481/afldb_v2_w339r2_w1a_test)
+    applying 118_fixtures_unconfirmed_participants.sql ... ok (62 ms)
+  Applied 1 migration(s).
+  [preflight] PASS post-migration parity -- 118/118, names and checksums equal
+  [preflight] evidence: /mnt/ssd/afldb-close2-20261108T102607Z-ops/evWr2/W1-gate/20261108T103435Z-streamanator-549c5892d7e3-w339-968427.txt (exit 0)
+  PASS  W1 driver exit
+  PASS  W1 identity is afldb_v2_w339r2_w1a_test
+  PASS  W1 applied 117 match target
+  PASS  W1 transition PASS 117 -> 118
+  PASS  W1 binding PASS
+  PASS  W1 parity 118/118
+W1 after A(afldb_v2_w339r2_w1a_test): n=118 last=118_fixtures_unconfirmed_participants.sql ledger=5bb12f9b849349e9 tables=d33786b2502bb815 sentinel=none
+W1 after B(afldb_v2_w339r2_w1b_test): n=117 last=117_brownlow_provider_eligibility_unknown.sql ledger=0dbd4bab4fe160e5 tables=f282bd80a5dba837 sentinel=9c9eb8da276d229ca82955f3
+  PASS  W1 ledger files A before/after
+  PASS  W1 A1 117 rows preserved
+  PASS  W1 A1 exactly one new row
+  PASS  W1 A1 new row is 118_fixtures_unconfirmed_participants.sql with the HEAD blob checksum
+  PASS  W1 B1 fingerprint unchanged
+  PASS  W1 gate evidence file kept as the transition record
+== W2 exact line under hostile exports H ==
+  [cluster verified: afldb_v2_isolated on 127.0.0.1:55481]
+  [cluster verified: afldb_v2_isolated on 127.0.0.1:55481]
+  [cluster verified: afldb_v2_isolated on 127.0.0.1:55481]
+  PASS  afldb_v2_w339r2_w2a_test starts at 117 from the template
+  PASS  afldb_v2_w339r2_w2b_test starts at 117 from the template
+W2 before A(afldb_v2_w339r2_w2a_test): n=117 last=117_brownlow_provider_eligibility_unknown.sql ledger=0dbd4bab4fe160e5 tables=d33786b2502bb815 sentinel=none
+W2 before B(afldb_v2_w339r2_w2b_test): n=117 last=117_brownlow_provider_eligibility_unknown.sql ledger=0dbd4bab4fe160e5 tables=f282bd80a5dba837 sentinel=32d4dafa8f4fc27cfca94d83
+  [cluster verified: afldb_v2_isolated on 127.0.0.1:55481]
+  PASS  W2 afldb_v2_w339r2_w2a_test and afldb_v2_w339r2_w2b_test verified isolated before write
+  [w339] H exported: AFLDB_OWNER_DATABASE_URL=<B2> AFLDB_MIGRATE_TARGET=test AFLDB_TEST_DATABASE_URL=<B2>
+  AFLDB migrations -> dev (afldb_owner@127.0.0.1:55481/afldb_v2_w339r2_w2a_test)
+    applying 118_fixtures_unconfirmed_participants.sql ... ok (12 ms)
+  Applied 1 migration(s).
+  PASS  W2 child exit
+  PASS  W2 child resolved target dev
+W2 after A(afldb_v2_w339r2_w2a_test): n=118 last=118_fixtures_unconfirmed_participants.sql ledger=5bb12f9b849349e9 tables=d33786b2502bb815 sentinel=none
+W2 after B(afldb_v2_w339r2_w2b_test): n=117 last=117_brownlow_provider_eligibility_unknown.sql ledger=0dbd4bab4fe160e5 tables=f282bd80a5dba837 sentinel=32d4dafa8f4fc27cfca94d83
+  PASS  W2 ledger files A before/after
+  PASS  W2 A2 117 rows preserved
+  PASS  W2 A2 new row is 118_fixtures_unconfirmed_participants.sql with the HEAD blob checksum
+  PASS  W2 A2 rows
+  PASS  W2 B2 fingerprint unchanged (117)
+  [preflight] PASS post-migration parity -- 118/118, names and checksums equal
+  [preflight] evidence: /mnt/ssd/afldb-close2-20261108T102607Z-ops/evWr2/W2-parity/20261108T103446Z-streamanator-549c5892d7e3-w339-parity-972512.txt (exit 0)
+  PASS  W2 clean-subshell parity exit
+  PASS  W2 parity 118/118
+== N1 old unbound line under H ==
+  [cluster verified: afldb_v2_isolated on 127.0.0.1:55481]
+  [cluster verified: afldb_v2_isolated on 127.0.0.1:55481]
+  [cluster verified: afldb_v2_isolated on 127.0.0.1:55481]
+  PASS  afldb_v2_w339r2_n1a_test starts at 117 from the template
+  PASS  afldb_v2_w339r2_n1b_test starts at 117 from the template
+N1 before A(afldb_v2_w339r2_n1a_test): n=117 last=117_brownlow_provider_eligibility_unknown.sql ledger=0dbd4bab4fe160e5 tables=d33786b2502bb815 sentinel=none
+N1 before B(afldb_v2_w339r2_n1b_test): n=117 last=117_brownlow_provider_eligibility_unknown.sql ledger=0dbd4bab4fe160e5 tables=f282bd80a5dba837 sentinel=ae03539ab8d65c445edd570a
+  [cluster verified: afldb_v2_isolated on 127.0.0.1:55481]
+  PASS  N1 afldb_v2_w339r2_n1a_test and afldb_v2_w339r2_n1b_test verified isolated before write
+  AFLDB migrations -> test (afldb_owner@127.0.0.1:55481/afldb_v2_w339r2_n1b_test)
+  Applied 1 migration(s).
+  PASS  N1 child exit
+N1 after A(afldb_v2_w339r2_n1a_test): n=117 last=117_brownlow_provider_eligibility_unknown.sql ledger=0dbd4bab4fe160e5 tables=d33786b2502bb815 sentinel=none
+N1 after B(afldb_v2_w339r2_n1b_test): n=118 last=118_fixtures_unconfirmed_participants.sql ledger=5bb12f9b849349e9 tables=f282bd80a5dba837 sentinel=ae03539ab8d65c445edd570a
+  PASS  N1 B3 advanced to 118 (misdirected write)
+  PASS  N1 ledger files B before/after, A after
+  PASS  N1 A3 unchanged at 117
+  PASS  throwaway .env removed
+== leak scan ==
+  PASS  no credential string in evidence
+
+W-339 write-mode rehearsal at 549c5892d7e31a962380c9bd0128ae99969f3b75: 61 passed, 0 failed

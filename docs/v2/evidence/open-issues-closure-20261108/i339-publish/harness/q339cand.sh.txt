@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# ISSUE-339 candidate Linux qualification: fresh clone of the candidate bundle, Windows export copied in.
+set -uo pipefail
+W="$1"; EXPECT="$2"
+cd "$W" || exit 2
+sha256sum afldb-i339-cand.bundle
+git clone -q --branch claude/issue-339-gate-publish afldb-i339-cand.bundle clone || exit 3
+cd clone
+echo "HEAD $(git rev-parse HEAD)"
+[ "$(git rev-parse HEAD)" = "$EXPECT" ] || { echo "HEAD mismatch"; exit 4; }
+git status --porcelain | head
+export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh" >/dev/null; nvm use --silent 22.23.2 >/dev/null; echo "node $(node --version) bash $BASH_VERSION"
+SYNC_DEV_GENERATED_DIR="$W/export" bash tests/sync-dev-remote.test.sh > "$W/linux-harness.log" 2>&1; rc=$?
+echo "harness exit=$rc"
+grep -cE '^PASS:' "$W/linux-harness.log"; grep -E '^FAIL:|passed|failed|SKIP' "$W/linux-harness.log" | tail -8

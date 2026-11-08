@@ -1,0 +1,16 @@
+G before A(afldb_v2_w339r2_ga_test): n=117 last=117_brownlow_provider_eligibility_unknown.sql ledger=0dbd4bab4fe160e5 tables=d33786b2502bb815 sentinel=none
+G before B(afldb_v2_w339r2_gb_test): n=117 last=117_brownlow_provider_eligibility_unknown.sql ledger=0dbd4bab4fe160e5 tables=f282bd80a5dba837 sentinel=4acbd7c59a040c198a77aa3b
+G after A(afldb_v2_w339r2_ga_test): n=117 last=117_brownlow_provider_eligibility_unknown.sql ledger=0dbd4bab4fe160e5 tables=d33786b2502bb815 sentinel=none
+G after B(afldb_v2_w339r2_gb_test): n=117 last=117_brownlow_provider_eligibility_unknown.sql ledger=0dbd4bab4fe160e5 tables=f282bd80a5dba837 sentinel=4acbd7c59a040c198a77aa3b
+W1 before A(afldb_v2_w339r2_w1a_test): n=117 last=117_brownlow_provider_eligibility_unknown.sql ledger=0dbd4bab4fe160e5 tables=d33786b2502bb815 sentinel=none
+W1 before B(afldb_v2_w339r2_w1b_test): n=117 last=117_brownlow_provider_eligibility_unknown.sql ledger=0dbd4bab4fe160e5 tables=f282bd80a5dba837 sentinel=9c9eb8da276d229ca82955f3
+W1 after A(afldb_v2_w339r2_w1a_test): n=118 last=118_fixtures_unconfirmed_participants.sql ledger=5bb12f9b849349e9 tables=d33786b2502bb815 sentinel=none
+W1 after B(afldb_v2_w339r2_w1b_test): n=117 last=117_brownlow_provider_eligibility_unknown.sql ledger=0dbd4bab4fe160e5 tables=f282bd80a5dba837 sentinel=9c9eb8da276d229ca82955f3
+W2 before A(afldb_v2_w339r2_w2a_test): n=117 last=117_brownlow_provider_eligibility_unknown.sql ledger=0dbd4bab4fe160e5 tables=d33786b2502bb815 sentinel=none
+W2 before B(afldb_v2_w339r2_w2b_test): n=117 last=117_brownlow_provider_eligibility_unknown.sql ledger=0dbd4bab4fe160e5 tables=f282bd80a5dba837 sentinel=32d4dafa8f4fc27cfca94d83
+W2 after A(afldb_v2_w339r2_w2a_test): n=118 last=118_fixtures_unconfirmed_participants.sql ledger=5bb12f9b849349e9 tables=d33786b2502bb815 sentinel=none
+W2 after B(afldb_v2_w339r2_w2b_test): n=117 last=117_brownlow_provider_eligibility_unknown.sql ledger=0dbd4bab4fe160e5 tables=f282bd80a5dba837 sentinel=32d4dafa8f4fc27cfca94d83
+N1 before A(afldb_v2_w339r2_n1a_test): n=117 last=117_brownlow_provider_eligibility_unknown.sql ledger=0dbd4bab4fe160e5 tables=d33786b2502bb815 sentinel=none
+N1 before B(afldb_v2_w339r2_n1b_test): n=117 last=117_brownlow_provider_eligibility_unknown.sql ledger=0dbd4bab4fe160e5 tables=f282bd80a5dba837 sentinel=ae03539ab8d65c445edd570a
+N1 after A(afldb_v2_w339r2_n1a_test): n=117 last=117_brownlow_provider_eligibility_unknown.sql ledger=0dbd4bab4fe160e5 tables=d33786b2502bb815 sentinel=none
+N1 after B(afldb_v2_w339r2_n1b_test): n=118 last=118_fixtures_unconfirmed_participants.sql ledger=5bb12f9b849349e9 tables=f282bd80a5dba837 sentinel=ae03539ab8d65c445edd570a

@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Independent read-only spot check of the ISSUE-343 evidence.
+set -uo pipefail
+source "$(dirname "$0")/qlib.sh"
+E="$OPS/ev343"
+echo "result: $(cat "$E/result.txt" 2>/dev/null)"
+ls "$E" | sed -n 's/\.log$//p' | tr '\n' ' '; echo
+for f in "$E"/*.log; do b=$(basename "$f" .log); [[ "$b" == run ]] && continue
+  printf '%-28s %s\n' "$b" "$(grep -m1 -oE 'AFL API ingestion refused: control database[^.]*|is disabled \(site_settings[^)]*\)|unable to read the control database|DATABASE_URL is not configured|season 2026 is sealed|No connection opened|Applied as import batch [0-9]+|Dry run\.|AFLDB_SETTLE_FAILURE[^$]*|Brownlow acquisition is disabled' "$f" | head -1)"
+done
+echo "== live counts now (B must be empty of writes) =="
+for d in afldb_v2_i343a_test afldb_v2_i343b_test; do
+  echo "$d: $(su_sql $d -c "select (select count(*) from import_batches)||' batches, '||(select count(*) from fixtures)||' fixtures, '||(select count(*) from staging.source_record_versions)||' versions'")"
+done
+echo "log_statement settings left: $(su_sql postgres -c "select count(*) from pg_db_role_setting s join pg_database d on d.oid=s.setdatabase where d.datname like 'afldb_v2_i343%'")"
+echo "stub listening: $(ss -ltn 2>/dev/null | grep -c ':22943 ')"
+grep -rlE 'afldb_(app|import|owner):[^@ ]{6,}@' "$E" 2>/dev/null | head -3; echo "leak scan done"

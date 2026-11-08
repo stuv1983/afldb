@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Branch A merge readiness in a disposable clone laid out like the operator repo: primary checkout on a
+# clean local main == recorded origin/main, linked worktree on the issue branch. Read-only checks only.
+set -uo pipefail
+source "$(dirname "$0")/lib2.sh"
+ROOTM="$1"; BUNDLE="$2"; EXPECT="$3"
+EV="$OPS2/evMR"; mkdir -p "$EV"
+[ -e "$ROOTM" ] && { echo "refusing: $ROOTM exists"; exit 2; }
+mkdir -p "$ROOTM"
+git bundle list-heads "$BUNDLE"
+git clone -q -b claude/issue-340-345-336 "$BUNDLE" "$ROOTM/main" || exit 2
+cd "$ROOTM/main"
+git fetch -q "$BUNDLE" '+refs/remotes/origin/main:refs/remotes/origin/main' || exit 2
+git checkout -q -B main refs/remotes/origin/main || exit 2
+git worktree add -q "$ROOTM/wt" claude/issue-340-345-336 || exit 2
+check_eq "primary main == recorded origin/main == base" "$BASE_SHA $BASE_SHA" "$(git rev-parse main) $(git rev-parse refs/remotes/origin/main)"
+check_eq "issue worktree HEAD" "$EXPECT" "$(git -C "$ROOTM/wt" rev-parse HEAD)"
+check_eq "branch parent is the base (fast-forward possible)" "$BASE_SHA" "$(git rev-parse "$EXPECT^^^")"
+npm ci --no-audit --no-fund > "$EV/npm-ci.log" 2>&1 && pass "npm ci" || { fail "npm ci"; exit 1; }
+TSX="$ROOTM/main/node_modules/.bin/tsx"
+for i in 340 345; do
+  echo "== merge:ready --issue $i (from the issue worktree) =="
+  (cd "$ROOTM/wt" && "$TSX" tools/dev/merge-readiness.ts --issue "$i") > "$EV/merge-ready-$i.txt" 2>&1; rc=$?
+  grep -E '^(PASS|FAIL|WARN|INFO)|Merge readiness' "$EV/merge-ready-$i.txt" | sed 's/^/  /'
+  check_eq "merge:ready $i exit" 0 "$rc"
+  grep -q 'Merge readiness: READY' "$EV/merge-ready-$i.txt" && pass "merge:ready $i READY" || fail "merge:ready $i not READY"
+done
+echo "== preflight --mode merge (clean primary main) =="
+(cd "$ROOTM/main" && "$TSX" tools/dev/preflight.ts --mode merge) > "$EV/preflight-merge.txt" 2>&1; rc=$?
+grep -E '^(PASS|FAIL|WARN|INFO)|Preflight result' "$EV/preflight-merge.txt" | sed 's/^/  /'
+check_eq "preflight --mode merge exit" 0 "$rc"
+echo "== fast-forward rehearsal in the clone =="
+git merge -q --ff-only claude/issue-340-345-336 && check_eq "ff-only merge result is the tested SHA" "$EXPECT" "$(git rev-parse main)" || fail "ff-only merge"
+check_eq "merged tree equals tested tree" "$(git rev-parse "$EXPECT^{tree}")" "$(git rev-parse 'main^{tree}')"
+echo
+echo "Branch A merge readiness: $PASSN passed, $FAILN failed"
+echo "$PASSN/$FAILN" > "$EV/result.txt"

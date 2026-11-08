@@ -1,0 +1,13 @@
+param([Parameter(Mandatory)][string]$Script, [string[]]$Extra = @())
+# Upload LF-normalised env.sh + script (+ extras) to the ops dir on streamanator and run the script there.
+$sp = 'C:\Users\stuar\AppData\Local\Temp\claude\7c1ddba8e80ea2f3\74febb56-e66c-4be6-b3bd-f26620047396\scratchpad'
+$k = "$HOME\.ssh\afldb_dev"
+$ops = '/mnt/ssd/afldb-close-20261108T061620Z-ops'
+New-Item -ItemType Directory -Force "$sp\lf" | Out-Null
+$up = @()
+foreach ($f in @('env.sh', $Script) + $Extra) {
+  (Get-Content "$sp\$f" -Raw).Replace("`r`n", "`n") | Set-Content -NoNewline -Encoding ascii "$sp\lf\$f"
+  $up += "$sp\lf\$f"
+}
+scp -q -o BatchMode=yes -i $k @up "arm@10.0.40.100:$ops/"
+ssh -o BatchMode=yes -i $k arm@10.0.40.100 "bash $ops/$Script"

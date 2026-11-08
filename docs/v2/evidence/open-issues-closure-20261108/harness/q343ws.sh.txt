@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# ISSUE-343 step 1: disposable project root (copy of the workspace, own empty data/sources) + DB-free feed probe.
+set -uo pipefail
+source "$(dirname "$0")/qlib.sh"
+EV="$OPS/ev343"; W343="$OPS/ws343"; mkdir -p "$EV"
+if [[ ! -d "$W343" ]]; then
+  mkdir -p "$W343"
+  tar -C "$WS" --exclude=./node_modules --exclude=./data/sources --exclude='./*.log' --exclude=./issues.md \
+      --exclude=./CHANGELOG.md --exclude=./tsconfig.tsbuildinfo -cf - . | tar -C "$W343" -xf -
+  ln -s "$WS/node_modules" "$W343/node_modules"
+  mkdir -p "$W343/data/sources/afl_api/fixtures" "$W343/.i343"
+fi
+cp "$OPS/gen343.ts" "$W343/.i343/gen343.ts"
+ls -a "$W343" | grep -E '^\.env' && { echo "REFUSED: .env in disposable root"; exit 9; }
+echo "== byte identity of the code under test (workspace vs disposable root) =="
+for f in tools/current-season/settle-afl-api-fixtures.ts tools/current-season/settle-afl-api-fixture-schedule.ts \
+         src/lib/acquisition/afl-api-ingestion-safety.ts src/lib/acquisition/afl-api-ingestion-control.ts \
+         tools/current-season/acquire-afl-api.ts tools/current-season/settle-season-seal.ts \
+         deploy/afldb-settle-afl-api-brownlow.sh data/reference/seasons.json data/reference/afl-api-identities.json; do
+  a="$(sha256sum "$WS/$f" | cut -c1-16)"; b="$(sha256sum "$W343/$f" | cut -c1-16)"
+  echo "  $a $b $f"; [[ "$a" == "$b" ]] || { echo "MISMATCH $f"; exit 9; }
+done
+grep -n 'proveAflApiIngestionPreflight(sql)' "$W343"/tools/current-season/settle-afl-api-fixture*.ts
+echo "== generate synthetic feeds and probe (DB-free) =="
+mkdir -p "$EV/stub"
+(cd "$W343" && node_modules/.bin/tsx .i343/gen343.ts "$EV/stub") 2>&1
+ls -la "$EV/stub"

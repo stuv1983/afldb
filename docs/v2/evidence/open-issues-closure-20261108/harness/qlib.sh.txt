@@ -1,0 +1,24 @@
+# Shared helpers for the isolated-cluster qualifications (sourced). Loopback cluster only.
+source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
+export AFLDB_V2_PG_ROOT="${WS}-pg" AFLDB_V2_PG_PORT=55481
+PORT=55481
+PGB="$AFLDB_V2_PG_BIN"
+OPS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SUPW="$(cat "$AFLDB_V2_PG_ROOT/secrets/superuser.pw")"
+role_pw() { python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))[sys.argv[2]])' "$AFLDB_V2_PG_ROOT/secrets/roles.json" "$1"; }
+OWPW="$(role_pw afldb_owner)"
+IPG="node_modules/.bin/tsx tools/v2/isolated-pg.ts"
+# Superuser psql against one database of THIS cluster only (explicit host/port, no inherited PG*).
+su_sql() { local db="$1"; shift; env -u PGDATABASE -u PGSERVICE -u PGOPTIONS -u PGHOSTADDR PGPASSWORD="$SUPW" "$PGB/psql" -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -p "$PORT" -U afldb_v2_super -d "$db" -qAt "$@"; }
+own_sql() { local db="$1"; shift; env -u PGDATABASE -u PGSERVICE -u PGOPTIONS -u PGHOSTADDR PGPASSWORD="$OWPW" "$PGB/psql" -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -p "$PORT" -U afldb_owner -d "$db" -qAt "$@"; }
+PASSN=0; FAILN=0
+pass() { PASSN=$((PASSN+1)); echo "  PASS  $*"; }
+fail() { FAILN=$((FAILN+1)); echo "  FAIL  $*"; }
+check_eq() { local label="$1" want="$2" got="$3"; if [[ "$want" == "$got" ]]; then pass "$label"; else fail "$label (want=[$want] got=[$got])"; fi; }
+check_ne() { local label="$1" a="$2" b="$3"; if [[ "$a" != "$b" ]]; then pass "$label"; else fail "$label (both=[$a])"; fi; }
+assert_cluster() {
+  local name; name="$(su_sql postgres -c 'show cluster_name')"
+  local listen; listen="$(su_sql postgres -c 'show listen_addresses')"
+  [[ "$name" == "afldb_v2_isolated" && "$listen" == "127.0.0.1" ]] || { echo "REFUSED: not the isolated loopback cluster ($name/$listen)"; exit 9; }
+  echo "  target cluster: $name on $listen:$PORT (verified)"
+}

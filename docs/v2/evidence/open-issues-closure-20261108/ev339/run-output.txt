@@ -1,0 +1,67 @@
+# q339.sh console output, streamanator, 2026-11-08 (verbatim; captured from the run's stdout; gate lines cut at 150 chars by the harness)
+  target cluster: afldb_v2_isolated on 127.0.0.1:55481 (verified)
+  W2 npm ci ok
+  created afldb_v2_i339a_test
+  created afldb_v2_i339b_test
+== K1-admitted-baseline ==
+  gate:  PASS migration target is the assessed database -- db:migrate --target dev reads AFLDB_OWNER_DATABASE_URL from the same single .env line
+  PASS  K1-admitted-baseline gate verdict PASS
+  fixed child: AFLDB migrations -> dev (afldb_owner@127.0.0.1:55481/afldb_v2_i339a_test)  [A=1 B=0]
+  PASS  K1-admitted-baseline fixed line writes
+  old line:    AFLDB migrations -> dev (afldb_owner@127.0.0.1:55481/afldb_v2_i339a_test)  [A=1 B=0]
+  PASS  K1-admitted-baseline old unbound line writes
+== K2-exported-owner-DSN-B ==
+  gate:  FAIL migration target is the assessed database -- AFLDB_OWNER_DATABASE_URL is exported in the deploy shell and would override .env for db:migrate; uns
+  PASS  K2-exported-owner-DSN-B gate verdict FAIL
+  fixed child: AFLDB migrations -> dev (afldb_owner@127.0.0.1:55481/afldb_v2_i339a_test)  [A=1 B=0]
+  PASS  K2-exported-owner-DSN-B fixed line writes
+  old line:    AFLDB migrations -> dev (afldb_owner@127.0.0.1:55481/afldb_v2_i339b_test)  [A=0 B=1]
+  PASS  K2-exported-owner-DSN-B old unbound line writes
+== K3-exported-target-test ==
+  gate:  FAIL migration target is the assessed database -- AFLDB_MIGRATE_TARGET is exported in the deploy shell (value withheld); unset it
+  PASS  K3-exported-target-test gate verdict FAIL
+  fixed child: AFLDB migrations -> dev (afldb_owner@127.0.0.1:55481/afldb_v2_i339a_test)  [A=1 B=0]
+  PASS  K3-exported-target-test fixed line writes
+  old line:    AFLDB migrations -> test (afldb_owner@127.0.0.1:55481/afldb_v2_i339b_test)  [A=0 B=1]
+  PASS  K3-exported-target-test old unbound line writes
+== K8-exported-target-dev ==
+  gate:  PASS migration target is the assessed database -- db:migrate --target dev reads AFLDB_OWNER_DATABASE_URL from the same single .env line
+  PASS  K8-exported-target-dev gate verdict PASS
+  fixed child: AFLDB migrations -> dev (afldb_owner@127.0.0.1:55481/afldb_v2_i339a_test)  [A=1 B=0]
+  PASS  K8-exported-target-dev fixed line writes
+  old line:    AFLDB migrations -> dev (afldb_owner@127.0.0.1:55481/afldb_v2_i339a_test)  [A=1 B=0]
+  PASS  K8-exported-target-dev old unbound line writes
+== K4-dotenv-target-test ==
+  gate:  FAIL migration target is the assessed database -- .env sets AFLDB_MIGRATE_TARGET to something other than dev
+  PASS  K4-dotenv-target-test gate verdict FAIL
+  fixed child: ERROR: --target 'dev' and AFLDB_MIGRATE_TARGET 'test' disagree.  [A=0 B=0]
+  PASS  K4-dotenv-target-test fixed line writes
+  old line:    AFLDB migrations -> test (afldb_owner@127.0.0.1:55481/afldb_v2_i339b_test)  [A=0 B=1]
+  PASS  K4-dotenv-target-test old unbound line writes
+== K9-dotenv-target-dev ==
+  gate:  PASS migration target is the assessed database -- db:migrate --target dev reads AFLDB_OWNER_DATABASE_URL from the same single .env line
+  PASS  K9-dotenv-target-dev gate verdict PASS
+  fixed child: AFLDB migrations -> dev (afldb_owner@127.0.0.1:55481/afldb_v2_i339a_test)  [A=1 B=0]
+  PASS  K9-dotenv-target-dev fixed line writes
+== K5-dotenv-two-owner-lines ==
+  gate:  FAIL migration target is the assessed database -- .env must define AFLDB_OWNER_DATABASE_URL exactly once as a plain unquoted NAME=value line (found 2
+  PASS  K5-dotenv-two-owner-lines gate verdict FAIL
+  fixed child: AFLDB migrations -> dev (afldb_owner@127.0.0.1:55481/afldb_v2_i339b_test)  [A=0 B=1]
+  PASS  K5-dotenv-two-owner-lines fixed line writes
+  note: the gate's .env value reader takes the LAST line (A); migrate.ts keeps the FIRST (B).
+== K6-dotenv-export-form ==
+  gate:  FAIL migration target is the assessed database -- .env must define AFLDB_OWNER_DATABASE_URL exactly once as a plain unquoted NAME=value line (found 1
+  PASS  K6-dotenv-export-form gate verdict FAIL
+  fixed child: ERROR: AFLDB_OWNER_DATABASE_URL is not set (target 'dev').  [A=0 B=0]
+  PASS  K6-dotenv-export-form fixed line writes
+== K7-custom-dsn-name ==
+  gate:  FAIL migration target is the assessed database -- -DsnName AFLDB_CODE_TEST_DATABASE_URL is not what db:migrate --target dev reads (AFLDB_OWNER_DATABAS
+  PASS  K7-custom-dsn-name gate verdict FAIL
+  fixed child: AFLDB migrations -> dev (afldb_owner@127.0.0.1:55481/afldb_v2_i339a_test)  [A=1 B=0]
+  PASS  K7-custom-dsn-name fixed line writes
+  K7: the gate would assess B (AFLDB_CODE_TEST_DATABASE_URL) while the real child writes A.
+  K7 with -SkipMigrate: INFO migration target is the assessed database -- not evaluated: -SkipMigrate
+  PASS  K7 -SkipMigrate is not evaluated (no migration)
+  PASS  W2 .env removed
+
+ISSUE-339 R339-A real-runner matrix: 25 passed, 0 failed

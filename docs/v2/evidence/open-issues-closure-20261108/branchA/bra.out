@@ -1,0 +1,49 @@
+== bundle ==
+39621d5413bea21298d8aff11be26c8a6a6d9ae9fce5be807035544020c59f9d  /mnt/ssd/afldb-close2-20261108T102607Z-ops/afldb-branchA.bundle
+c1c4b22ee15007111eab66f6d354e0b9ecbb2ade refs/heads/claude/issue-340-345-336
+7fabc6e51c5c53c4b6f6fe345f21191d9184660b refs/remotes/origin/main
+/mnt/ssd/afldb-close2-20261108T102607Z-ops/afldb-branchA.bundle is okay
+  bundle verifies
+  HEAD c1c4b22ee15007111eab66f6d354e0b9ecbb2ade
+  PASS  HEAD is the committed Branch A candidate
+  PASS  origin/main is the verified base
+  PASS  base is an ancestor of HEAD
+  PASS  commits above base
+  PASS  5cba6846 absent from the clone
+  PASS  no .env
+  PASS  git status clean
+== npm ci ==
+v22.23.2
+  PASS  npm ci
+984b44221f8f72560c7b58f1f8642427cc6ece03d30623a7e2e45d1df23d8e86  package-lock.json
+== typecheck ==
+> afldb@0.1.0 typecheck
+> next typegen && tsc --noEmit
+
+Generating route types...
+✓ Types generated successfully
+  PASS  typecheck exit
+== auth.test.ts ==
+  PASS  auth.test.ts exit
+== gap029-ops.test.ts ==
+  PASS  gap029-ops.test.ts exit
+== admin-lifecycle on isolated afldb_v2_bra_test at 118 ==
+  cluster started
+  [cluster verified: afldb_v2_isolated on 127.0.0.1:55481]
+  [cluster verified: afldb_v2_isolated on 127.0.0.1:55481]
+create-db: afldb_v2_bra_test created and marked
+ISOLATED TARGET OK: afldb_v2_bra_test
+  [cluster verified: afldb_v2_isolated on 127.0.0.1:55481]
+  applying 118_fixtures_unconfirmed_participants.sql ... ok (8 ms)
+
+Applied 118 migration(s).
+  PASS  migrate to head exit
+  PASS  ledger rows
+  PASS  last ledger row
+  [cluster verified: afldb_v2_isolated on 127.0.0.1:55481]
+  PASS  privileges --target test exit
+  [cluster verified: afldb_v2_isolated on 127.0.0.1:55481]
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+  PASS  admin-lifecycle exit
+
+Branch A verification at c1c4b22ee15007111eab66f6d354e0b9ecbb2ade: 16 passed, 0 failed

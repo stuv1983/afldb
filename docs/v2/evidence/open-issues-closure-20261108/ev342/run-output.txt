@@ -1,0 +1,36 @@
+# q342.sh console output, streamanator, 2026-11-08 (verbatim from the run's stdout; a server NOTICE on stderr omitted)
+  PASS  dump unchanged since ISSUE-341
+  target cluster: afldb_v2_isolated on 127.0.0.1:55481 (verified)
+  PASS  precondition: a proven marker for this dump is present (left by ISSUE-341 C2)
+== barrier: event trigger in afldb_restore_test blocks the first post-data CREATE INDEX on advisory lock 342342 ==
+  PASS  barrier lock held
+== C4: run the wrapper, wait for the barrier with all data loaded, SIGKILL pg_restore ==
+  PASS  pg_restore reached the post-data barrier with no COPY in flight
+  PASS  at the barrier, all nine parity values already match the source (aggregate checks alone would pass)
+  PASS  at the barrier, the marker was already cleared by this run
+  PASS  found the wrapper's pg_restore child (pid 694802)
+  PASS  C4 wrapper exit 1
+  PASS  C4 reported the abnormal termination (137)
+  PASS  C4 stopped before any parity check
+  PASS  C4 never announced the backup proven
+  PASS  C4 no proof marker remains (prior candidate marker cleared, none written)
+  PASS  C4 incomplete-schema witness: i342_witness_idx absent
+  PASS  C4 source and bystander unchanged
+==> Restoring i341-synthetic.dump into afldb_restore_test
+    clearing afldb_restore_test
+NOTICE:  drop cascades to 2 other objects
+DETAIL:  drop cascades to constraint matches_away_club_id_fkey on table matches
+drop cascades to constraint matches_home_club_id_fkey on table matches
+NOTICE:  drop cascades to constraint brownlow_season_votes_player_id_fkey on table brownlow_season_votes
+tools/maintenance/restore-test.sh: line 225: 694802 Killed                  pg_restore --dbname="$RESTORE_DSN" --clean --if-exists --no-owner --no-privileges --no-comments --jobs=4 "$BACKUP" > "$RESTORE_LOG" 2>&1
+ERROR: pg_restore terminated abnormally (exit status 137).
+       The restore is incomplete and cannot be verified.
+== C5: control, barrier removed: a complete restore still succeeds ==
+  PASS  barrier removed
+  PASS  C5 exit 0
+  PASS  C5 marker binds the dump
+  PASS  C5 witness index present
+  PASS  C5 source and bystander unchanged
+  PASS  no pg_restore against this cluster left running
+
+ISSUE-342 fault injection: 20 passed, 0 failed

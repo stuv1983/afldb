@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# ISSUE-343: read-only digest of the saved evidence (no state change).
+set -uo pipefail
+source "$(dirname "$0")/qlib.sh"
+EV="$OPS/ev343"; A=afldb_v2_i343a_test; B=afldb_v2_i343b_test
+assert_cluster
+for d in $A $B; do
+  echo "$d ledger: $(su_sql $d -c "select count(*) from afldb_meta.schema_migrations") rows; columns: $(su_sql $d -c "select string_agg(column_name, ',') from information_schema.columns where table_schema='afldb_meta' and table_name='schema_migrations'")"
+  echo "  role-in-db settings left: $(su_sql postgres -c "select count(*) from pg_db_role_setting s join pg_database d on d.oid=s.setdatabase where d.datname='$d'")"
+done
+echo "== W3 refusal text re-evaluated against the saved log =="
+grep -E "Brownlow acquisition is disabled.*super-admin setting \(site_settings 'acquisition.afl_api_brownlow_enabled'\) is disabled" "$EV/W3.log" && echo "  PASS W3 step-3 refusal (corrected pattern)"
+grep -E '^\[[0-9]/4\]|preflight|Applied as|AFLDB_SETTLE' "$EV/W3.log"
+for t in fixtures.M1 schedule.M1 W1 fixtures.U2 fixtures.D1; do
+  echo "== $t: every statement afldb_app/afldb_import ran on A or B =="
+  grep -E 'LOG:  (statement|execute [^:]*):' "$EV/$t.pglog" | sed -E 's/^.*LOG:  //' | tr -s ' \t' ' ' | cut -c1-170
+  grep -E 'ERROR|FATAL' "$EV/$t.pglog" | sed -E 's/^[^]]*\] //' | cut -c1-160 | sort | uniq -c
+done
+echo "== W1 wrapper log =="; cat "$EV/W1.log"
+echo "== W1 stub =="; cat "$EV/W1.stub"
+echo "== fixtures.M1 / schedule.M1 / fixtures.S1 / schedule.S1 / fixtures.U3 CLI output (last lines) =="
+for t in fixtures.M1 schedule.M1 fixtures.S1 schedule.S1 fixtures.U3 schedule.D1; do echo "-- $t"; tail -2 "$EV/$t.log"; done
+echo "== snapshot dirs in the disposable root =="; ls "$OPS/ws343/data/sources/afl_api/fixtures"
+grep -rl -E 'postgresql://[^:]+:[^<@]+@' "$EV" 2>/dev/null | head -3 | sed 's/^/  UNREDACTED DSN IN: /' || true
+echo "evidence files: $(ls "$EV" | wc -l)"

@@ -371,7 +371,7 @@ powershell -ExecutionPolicy Bypass -File .\deploy\sync-dev.ps1 -SshTarget stream
    * `list-timers` shows the next nightly at 05:00–05:15 AEDT on the following day;
    * the first Brownlow firing after step 6 (within 5 minutes) logs "Nothing to do" with rc 0.
 
-### 7.2 Overnight observation: PENDING until it occurs
+### 7.2 Overnight observation: OBSERVED 2026-11-09, as predicted (see the record below the table)
 
 The next nightly firing (05:00–05:15 AEDT, D+1) is **recorded as pending observation**. It is **not triggered manually**, and its
 success is **not claimed in advance**.
@@ -389,6 +389,18 @@ ls -d ~/projects/afldb/data/sources/afl_api/matches/afl-api-2027-* | tail -1
 | `Season feed CD_S2027014: <n> match(es)`; "Applied as import batch …: 0 canonical row(s) inserted, 0 updated … 0 refused"; `AFLDB_SETTLE_SUCCESS label=afl-api-2027-…` | As predicted by r2 N | Record as observed; close the observation |
 | `AFLDB_SETTLE_FAILURE` during acquisition (provider or network) | Nothing reached the database | Record. Not a recovery trigger; the next night retries. Report to the owner if it repeats. |
 | Any canonical insert or update, any 2026 label, or a settle refusal | Not predicted | Report to the owner. No automatic action. |
+
+**OBSERVED 2026-11-09 (read-only journal read, owner-authorised): as predicted (row 1); the observation is closed.**
+
+| Firing | Feed | Batch | Write result | Marker |
+|---|---|---|---|---|
+| 2026-11-08 (finished 05:15:03 AEDT) | `CD_S2027014`, 218 matches (PLACEHOLDER 83, SCHEDULED 135), COMPLETE | 147 | 0 inserted, 0 updated, 0 ledger rows, 0 refused at the write, 0 rolled back | `AFLDB_SETTLE_SUCCESS label=afl-api-2027-2026-11-07-181502` |
+| 2026-11-09 (finished 05:09:08 AEDT) | same | 148 (0 records read, 0 rejection rows) | same | `AFLDB_SETTLE_SUCCESS label=afl-api-2027-2026-11-08-180907` |
+
+- **Refusal lines:** the journal's 20 "refused (foreign_source_owner)" lines are the exceptions report's listing of open canonical-apply failures, first detected 2026-10-01 (11) and 2026-10-03 (9). They are not settle refusals, and the runbook grep above does not select them. The report truncates at 20.
+- **2026 labels:** none since the deploy. The newest 2026 source directories are `…-2026-11-05-…` and `…-2026-11-06-…`.
+- **Brownlow and timers:** the Brownlow unit reports disabled ("Nothing to do"). Both timers are active.
+- Evidence: `docs/v2/evidence/open-issues-closure-20261108/i336-nightly/`.
 
 ## 8. Recovery
 

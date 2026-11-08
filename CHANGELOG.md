@@ -15,7 +15,43 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-336/337/340/345 release candidate qualified on Linux (2026-11-09; records only; production unchanged)
+
+- R = R′ `c1c4b22e` was selected and qualified in a fresh streamanator workspace, against the approved production snapshot at ledger 118 in an isolated cluster.
+  - Typecheck clean.
+  - Release-delta unit suites 257/257.
+  - `admin-lifecycle` 50/50 and `admin-draft` 42 passed, 5 skipped (Python replay).
+  - Production-mode build and loopback boot smoke PASS.
+- The full approval package is `docs/v2/issue336-337-340-345-release-approval-2026-11-09.md`, with a static delta check. Nothing was built, promoted or restarted on production.
+- The 2026-11-08/09 closure records were published records-only. The 338 and 341–344 fixes are **not** on `origin/main`: they are resolved, scoped to the local working tree.
+
+### Review fixes for ISSUE-336 and 339–345 (2026-11-08; ISSUE-340, ISSUE-345 and the I336 wrapper fix published on `origin/main` at `c1c4b22e`; ISSUE-339 R339 A–D published at `8d122f62` on 2026-11-09; the rest local and uncommitted; nothing deployed)
+
+Verification state (open-issues closure run, 2026-11-08, streamanator):
+- **Resolved, scoped to the local working tree:**
+  - ISSUE-338: Python contract 229/0, focused Vitest passed.
+  - ISSUE-341: real two-database restore qualification 37/0.
+  - ISSUE-342: real fault-injected restore 20/0, with no marker after a SIGKILL at the post-data barrier.
+  - ISSUE-343: real A/B qualification of both fixture CLIs and the Brownlow wrapper.
+- **ISSUE-339 R339-A:** status-mode target selection proven with the real migration runner (25/0). The W-339 write-mode rehearsal passed 61/0 at local commit `549c5892`, which is not published.
+- **ISSUE-340 and ISSUE-345: resolved and published.** The owner accepted both. They were committed as `8ef4ae1b` and `65984ab2` and fast-forwarded to `origin/main` (`7fabc6e5..c1c4b22e`). Validation at the merged revision: `admin-lifecycle` 50/50, `auth` 211/211, typecheck clean.
+
+- **Admin credentials (ISSUE-340):** login, changing your own password and a manager-issued temporary password now decide under the account's row lock. Each checks that the verified password hash (and the TOTP secret, for login) is still the stored one. A request that verified a since-rotated credential can no longer overwrite a reset, clear its forced-change flag or mint a session. The session cookie is set only after commit. No schema change.
+- **Restricted Grid Solver (ISSUE-345):** a temporary-password account is sent to `/admin/password` before the audience role check; the public audience is unchanged.
+- **Restore verification (ISSUE-341/342):** `tools/maintenance/restore-test.sh` accepts only a plain single-host owner URL with transport-only options. It unsets libpq routing variables and proves the database and role inside each destructive or marker session. It certifies a restore only on pg_restore exit 0, or exit 1 with known extension-owner errors accounted for by its closing summary. New stub harness: `tests/restore-test.test.sh`.
+- **DEV deploy gate (ISSUE-339 R339 A–D):**
+  - migrations are bound to the assessed database (`db:migrate -- --target dev`; conflicting configuration refused before checkout);
+  - a `main` target may fast-forward;
+  - the SSH payload is decoded completely before anything runs (`deploy/sync-dev-transport.sh`; exit 47 on decode failure);
+  - the gate's psql keeps the password out of argv.
+- **I336 production wrapper (ISSUE-336):** `prod-stage.sh` accepts `I336-<stamp>` run names. It is published at `c1c4b22e`, which is now the runbook's pinned revision R′ (`gap029-ops` 76/76 at that revision). No production run is authorised.
+- **Fixture ingestion (ISSUE-343):** both AFL API fixture CLIs prove that the control database and the writer database are the same before writing.
+- **Draft pagination (ISSUE-344):** a page past the end keeps the true total and redirects to the last page with its filters.
+- **DraftGuru review contract (ISSUE-338):** the byte-identical rerun check freezes the test clock; this is a test-only change.
+
 ### DEV deploys are gated by a host-side preflight (AFLDB-ISSUE-339; tooling only, nothing deployed)
+
+- **Published and resolved 2026-11-09:** the gate (`37bc6a6c`) and R339 A–D (`8d122f62`) were published by fast-forward of `origin/main` `c1c4b22e..8d122f62`. The next DEV deploy from a checkout at or after `8d122f62` runs the gate. A standalone DEV `db:migrate` is not gated; it is tracked as ISSUE-346, and the interim rule is never to run it by hand on DEV.
 
 - `deploy/sync-dev.ps1` now runs `afldb_deploy_gate` on the host after `git fetch` and before any checkout change, install, migration, build or restart. It reports every blocker at once.
   - **Identity:** host, repository and origin.

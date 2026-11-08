@@ -1,0 +1,126 @@
+#!/usr/bin/env bash
+# ISSUE-341 real two-database restore qualification (plus a bystander), synthetic dump, isolated loopback cluster.
+set -uo pipefail
+source "$(dirname "$0")/qlib.sh"
+EV="$OPS/ev341"; mkdir -p "$EV"
+SRC=afldb_v2_i341src_test; BYS=afldb_v2_i341bys_test; RT=afldb_restore_test
+echo "== setup =="
+assert_cluster
+for d in $SRC $BYS; do $IPG create-db $d || { echo "create-db $d failed"; exit 1; }; done
+# afldb_restore_test is the wrapper's hard-coded target; create it the way 01_setup_service.sh / the bootstrap do.
+su_sql postgres -c "CREATE DATABASE $RT OWNER afldb_owner"
+su_sql $RT <<'SQL'
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE EXTENSION IF NOT EXISTS unaccent;
+ALTER SCHEMA public OWNER TO afldb_owner;
+REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+SQL
+TOK_SRC="SOURCE-$(openssl rand -hex 8)"; TOK_RT="RESTORE-$(openssl rand -hex 8)"; TOK_BYS="BYSTANDER-$(openssl rand -hex 8)"
+own_sql $SRC <<SQL
+CREATE TABLE clubs (club_id serial PRIMARY KEY, name text NOT NULL);
+CREATE TABLE players (player_id serial PRIMARY KEY, name text NOT NULL);
+CREATE TABLE matches (match_id serial PRIMARY KEY, home_club_id int NOT NULL REFERENCES clubs, away_club_id int NOT NULL REFERENCES clubs);
+CREATE TABLE player_match_stats (match_id int NOT NULL REFERENCES matches, player_id int NOT NULL REFERENCES players, disposals int, PRIMARY KEY (match_id, player_id));
+CREATE TABLE player_career_stats (player_id int PRIMARY KEY REFERENCES players, games int, goals int);
+CREATE TABLE brownlow_season_votes (season int, player_id int REFERENCES players, votes int, PRIMARY KEY (season, player_id));
+CREATE TABLE stat_availability (season int PRIMARY KEY, note text);
+CREATE TABLE i341_sentinel (who text PRIMARY KEY, token text NOT NULL);
+INSERT INTO clubs (name) SELECT 'Club '||g FROM generate_series(1,18) g;
+INSERT INTO players (name) SELECT 'Synthetic Player '||g FROM generate_series(1,6000) g;
+INSERT INTO matches (home_club_id, away_club_id) SELECT 1+(g%18), 1+((g+5)%18) FROM generate_series(1,3000) g;
+INSERT INTO player_match_stats SELECT m, 1+((m*7+k*13)%6000), CASE WHEN m%9=0 THEN NULL ELSE (m+k)%31 END
+  FROM generate_series(1,3000) m, generate_series(1,40) k ON CONFLICT DO NOTHING;
+INSERT INTO player_career_stats SELECT player_id, count(*), sum(coalesce(disposals,0))%97 FROM player_match_stats GROUP BY player_id;
+INSERT INTO brownlow_season_votes SELECT 2000+(p%25), p, p%4 FROM generate_series(1,6000) p;
+INSERT INTO stat_availability SELECT s, 'synthetic' FROM generate_series(1897,2026) s;
+INSERT INTO i341_sentinel VALUES ('source', '$TOK_SRC');
+CREATE INDEX i342_witness_idx ON player_match_stats (player_id, disposals);
+CREATE INDEX players_name_trgm ON players USING gin (name gin_trgm_ops);
+SQL
+own_sql $RT -c "CREATE TABLE i341_sentinel (who text PRIMARY KEY, token text NOT NULL); INSERT INTO i341_sentinel VALUES ('restore_target', '$TOK_RT')"
+own_sql $BYS -c "CREATE TABLE i341_sentinel (who text PRIMARY KEY, token text NOT NULL); INSERT INTO i341_sentinel VALUES ('bystander', '$TOK_BYS')"
+PRIOR="afldb.restore_test.v1 sha256=$(printf 'i341-prior-candidate' | sha256sum | awk '{print $1}')"
+su_sql postgres -c "COMMENT ON DATABASE $RT IS '$PRIOR'"
+DUMP="$EV/i341-synthetic.dump"
+PGPASSWORD="$OWPW" "$PGB/pg_dump" -Fc -h 127.0.0.1 -p $PORT -U afldb_owner -d $SRC -f "$DUMP"
+DUMP_SHA="$(sha256sum "$DUMP" | awk '{print $1}')"
+echo "  dump sha256 $DUMP_SHA ($(stat -c %s "$DUMP") bytes); tokens src=$TOK_SRC rt=$TOK_RT bys=$TOK_BYS"
+printf '%s\n' "$TOK_SRC" "$TOK_RT" "$TOK_BYS" "$DUMP_SHA" > "$EV/tokens.txt"
+
+# Fingerprint: database comment, table list, sentinel rows, and the source's own stats digest.
+fp() {
+  su_sql "$1" <<'SQL'
+SELECT coalesce(shobj_description((SELECT oid FROM pg_database WHERE datname = current_database()), 'pg_database'), '<no comment>')
+  || ' | ' || coalesce((SELECT string_agg(schemaname||'.'||tablename, ',' ORDER BY schemaname, tablename) FROM pg_tables WHERE schemaname NOT IN ('pg_catalog','information_schema')), '<no tables>')
+  || ' | ' || coalesce((SELECT string_agg(indexname, ',' ORDER BY indexname) FROM pg_indexes WHERE schemaname = 'public'), '<no indexes>');
+SQL
+  su_sql "$1" -c "SELECT string_agg(who||'='||token, ',' ORDER BY who) FROM i341_sentinel" 2>/dev/null || echo "<no sentinel table>"
+  su_sql "$1" -c "SELECT count(*)||':'||coalesce(sum(disposals),0) FROM player_match_stats" 2>/dev/null || echo "<no pms>"
+}
+snap() { fp $SRC > "$EV/$1.src"; fp $RT > "$EV/$1.rt"; fp $BYS > "$EV/$1.bys"; }
+same_as() { # $1 label, $2 before-snapshot, $3 after-snapshot, $4 which
+  check_eq "$1: $4 unchanged" "$(cat "$EV/$2.$4")" "$(cat "$EV/$3.$4")"; }
+snap s0
+cat "$EV/s0.src" "$EV/s0.rt" "$EV/s0.bys"
+
+GOOD="postgresql://afldb_owner:${OWPW}@127.0.0.1:${PORT}/${SRC}"
+run_wrapper() { # $1 tag, $2 DSN, extra env via env(1) args after
+  local tag="$1" dsn="$2"; shift 2
+  env PATH="$PGB:$PATH" AFLDB_OWNER_DATABASE_URL="$dsn" AFLDB_BACKUP_DIR="$EV/no-such-dir" "$@" \
+    bash tools/maintenance/restore-test.sh "$DUMP" > "$EV/$tag.log" 2>&1
+  local rc=$?; echo "$rc" > "$EV/$tag.rc"; sed "s/${OWPW}/<redacted>/g" -i "$EV/$tag.log"; return $rc
+}
+
+echo "== H0: the hazard is real (read-only): libpq honours ?dbname over the URL path =="
+H0="$(PGPASSWORD="$OWPW" "$PGB/psql" -X -qAt "postgresql://afldb_owner@127.0.0.1:${PORT}/${RT}?dbname=${SRC}" -c 'select current_database()')"
+check_eq "H0 a URL whose path names $RT connects to the query's $SRC" "$SRC" "$H0"
+
+echo "== C1: target-changing DSNs are refused before any child =="
+i=0
+for bad in \
+  "${GOOD}?dbname=${SRC}" \
+  "${GOOD}?%64bname=${SRC}" \
+  "${GOOD}?service=i341" \
+  "${GOOD}?options=-c%20search_path%3Dx" \
+  "${GOOD}?host=127.0.0.1&port=${PORT}" \
+  "postgresql://afldb_owner:${OWPW}@127.0.0.1:${PORT},127.0.0.1:${PORT}/${SRC}" \
+  "host=127.0.0.1 port=${PORT} user=afldb_owner dbname=${SRC}" \
+  "postgresql://afldb_owner:${OWPW}@127.0.0.1:${PORT}/${SRC}?target_session_attrs=any" \
+  "postgresql:///${SRC}?host=127.0.0.1" ; do
+  i=$((i+1))
+  run_wrapper "c1-$i" "$bad"; rc=$?
+  check_eq "C1.$i exit 1" "1" "$rc"
+  if grep -q 'outside the restore connection contract' "$EV/c1-$i.log"; then pass "C1.$i refused by the contract"; else fail "C1.$i refusal text: $(head -2 "$EV/c1-$i.log")"; fi
+done
+snap s1
+same_as "C1" s0 s1 src; same_as "C1" s0 s1 rt; same_as "C1" s0 s1 bys
+
+echo "== C3: in-session identity guard (role switched inside the target) refuses before any write =="
+su_sql postgres -c "CREATE ROLE i341_decoy NOLOGIN; GRANT i341_decoy TO afldb_owner; ALTER ROLE afldb_owner IN DATABASE $RT SET role = 'i341_decoy'"
+run_wrapper c3 "$GOOD"; rc=$?
+check_eq "C3 exit 1" "1" "$rc"
+if grep -q 'landed somewhere else. Nothing has been changed' "$EV/c3.log"; then pass "C3 refused by the identity guard"; else fail "C3 text: $(cat "$EV/c3.log" | head -3)"; fi
+su_sql postgres -c "ALTER ROLE afldb_owner IN DATABASE $RT RESET role; DROP ROLE i341_decoy"
+snap s3
+same_as "C3" s0 s3 src; same_as "C3" s0 s3 rt; same_as "C3" s0 s3 bys
+
+echo "== C2: valid DSN under hostile inherited libpq routing env restores into $RT only =="
+HOSTILE_SVC="$EV/hostile.pg_service.conf"
+printf '[i341]\nhost=127.0.0.1\nport=%s\ndbname=%s\n' "$PORT" "$SRC" > "$HOSTILE_SVC"
+CTRL="$(env PGHOSTADDR=192.0.2.1 PGPASSWORD="$OWPW" "$PGB/psql" -X -qAt "postgresql://afldb_owner@127.0.0.1:${PORT}/${RT}?connect_timeout=3" -c 'select 1' 2>&1 | head -1)"
+check_ne "C2 control: the hostile PGHOSTADDR alone breaks a plain connection" "1" "$CTRL"
+run_wrapper c2 "${GOOD}?application_name=i341&connect_timeout=10" \
+  PGHOSTADDR=192.0.2.1 PGPORT=1 PGDATABASE=$SRC PGSERVICE=i341 PGSERVICEFILE="$HOSTILE_SVC" \
+  PGOPTIONS='-c default_transaction_read_only=on' PGTARGETSESSIONATTRS=read-only; rc=$?
+check_eq "C2 exit 0" "0" "$rc"
+grep -q 'Restore verified: the backup is proven' "$EV/c2.log" && pass "C2 announced proven" || fail "C2 not proven: $(tail -5 "$EV/c2.log")"
+grep -q 'pg_restore exited 1; it completed, ignoring only' "$EV/c2.log" && pass "C2 took the real exit-1 extension-owner path" || echo "  note  C2 pg_restore status path: $(grep -m1 'pg_restore' "$EV/c2.log")"
+check_eq "C2 PASS lines" "9" "$(grep -c '^    PASS' "$EV/c2.log")"
+snap s2
+same_as "C2" s0 s2 src; same_as "C2" s0 s2 bys
+check_eq "C2 marker binds the synthetic dump" "afldb.restore_test.v1 sha256=$DUMP_SHA" "$(su_sql $RT -c "select shobj_description((select oid from pg_database where datname='$RT'),'pg_database')")"
+check_eq "C2 target's own sentinel replaced by the dump's copy" "source=$TOK_SRC" "$(su_sql $RT -c "select string_agg(who||'='||token, ',' order by who) from i341_sentinel")"
+check_eq "C2 witness index restored" "1" "$(su_sql $RT -c "select count(*) from pg_indexes where indexname='i342_witness_idx'")"
+echo
+echo "ISSUE-341 qualification: $PASSN passed, $FAILN failed"
+echo "$PASSN/$FAILN" > "$EV/result.txt"

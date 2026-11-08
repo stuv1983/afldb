@@ -1,0 +1,3 @@
+== admin-draft skipped cases
+1227:describe.skipIf(!canReplay)('gate 11: the durable record really re-creates a promoted-away row', () => {
+1414:describe.skipIf(!canReplay)('gate 10: the D-2 fitzRoy guard', () => {

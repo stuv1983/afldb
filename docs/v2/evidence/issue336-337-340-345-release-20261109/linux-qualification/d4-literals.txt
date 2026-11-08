@@ -1,0 +1,2 @@
+literal 'Intl Schol' in standalone server files: 1
+literal 'Draft categories' in standalone server files: 1

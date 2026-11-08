@@ -1,0 +1,2 @@
+  G1: [preflight] FAIL migration target is the assessed database -- AFLDB_OWNER_DATABASE_URL is exported in the deploy shell and would override .env for db:migrate; unset it
+  G1: FAILS=1

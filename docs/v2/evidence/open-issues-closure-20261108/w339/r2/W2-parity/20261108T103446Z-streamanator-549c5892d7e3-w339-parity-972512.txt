@@ -1,0 +1,3 @@
+# AFLDB deploy gate (AFLDB-ISSUE-339) phase=w339-parity utc=20261108T103446Z host=streamanator dir=/mnt/ssd/afldb-w339r2-20261108T102607Z/clone head=549c5892d7e31a962380c9bd0128ae99969f3b75
+PASS post-migration parity -- 118/118, names and checksums equal
+RESULT exit=0 utc=2026-11-08T10:34:48Z head=549c5892d7e31a962380c9bd0128ae99969f3b75

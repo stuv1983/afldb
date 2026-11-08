@@ -1,0 +1,22 @@
+AFLDB merge readiness (read-only)
+No fetch, stage, commit, merge, push, migration or test command will run.
+
+PASS current branch: claude/issue-339-gate-publish
+PASS issue worktree is clean
+     staged: 0; unstaged: 0; untracked: 0
+PASS local main equals recorded origin/main
+     main: c1c4b22ee15007111eab66f6d354e0b9ecbb2ade
+     origin/main: c1c4b22ee15007111eab66f6d354e0b9ecbb2ade
+     No fetch was attempted; fetch/update main separately before treating the recorded ref as current.
+PASS base/main relationship
+     ahead of main: 2; behind main: 0
+PASS main worktree is clean: /mnt/ssd/afldb-339-cand-20261109T1940Z/mr/main
+PASS migration collision/checksum parity (refs/remotes/origin/main)
+INFO database migration parity not checked
+     Use the appropriate operational preflight when a database target is part of the merge contract.
+WARN runbook readiness metadata unavailable: issues/open/AFLDB-ISSUE-339.md
+     runbook has no afldb-merge-readiness JSON block
+WARN unexpected-file classification not available
+     10 committed changed file(s); record expectedFiles or pass --expected-file.
+
+Merge readiness: READY (0 blocker(s), 2 warning(s)).

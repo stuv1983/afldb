@@ -1,0 +1,124 @@
+2026-11-09T05:09:06+11:00 streamanator systemd[1]: Starting afldb-settle-afl-api.service - AFLDB — in-season AFL.com.au (afl_api) canonical settle (one run)...
+2026-11-09T05:09:06+11:00 streamanator afldb-settle-afl-api[1420974]: AFLDB afl_api in-season settle — season 2027
+2026-11-09T05:09:06+11:00 streamanator afldb-settle-afl-api[1420974]: [monitor] exact launcher: /bin/sh /home/arm/projects/afldb/deploy/afldb-settle-afl-api.sh
+2026-11-09T05:09:06+11:00 streamanator afldb-settle-afl-api[1420974]: [monitor] launcher PID: 1420974
+2026-11-09T05:09:06+11:00 streamanator afldb-settle-afl-api[1420974]: [monitor] process: watch -n 5 "ps -o pid,ppid,etime,%cpu,%mem,stat,cmd -p 1420974 --ppid 1420974"
+2026-11-09T05:09:06+11:00 streamanator afldb-settle-afl-api[1420974]: [monitor] database (same role): while true; do psql "$AFLDB_IMPORT_DATABASE_URL" -XAtc "SELECT pid,state,wait_event_type,wait_event,now()-xact_start,now()-query_start,left(query,120) FROM pg_stat_activity WHERE datname=current_database() AND usename=current_user AND pid<>pg_backend_pid() ORDER BY query_start;"; sleep 5; done
+2026-11-09T05:09:06+11:00 streamanator afldb-settle-afl-api[1420974]: [monitor] log: journalctl -u afldb-settle-afl-api -f
+2026-11-09T05:09:06+11:00 streamanator afldb-settle-afl-api[1420974]: [monitor] success marker: AFLDB_SETTLE_SUCCESS
+2026-11-09T05:09:06+11:00 streamanator afldb-settle-afl-api[1420974]: [monitor] failure marker: AFLDB_SETTLE_FAILURE (also inspect REFUSED|ERROR|FAILED|Traceback)
+2026-11-09T05:09:06+11:00 streamanator afldb-settle-afl-api[1420974]: [monitor] co-source note: an afltables-owned row observed here is corroborated (Q1), never overwritten.
+2026-11-09T05:09:06+11:00 streamanator afldb-settle-afl-api[1420974]: [1/2] acquire (AFL.com.au direct HTTP)
+2026-11-09T05:09:07+11:00 streamanator afldb-settle-afl-api[1420974]: AFLDB-ISSUE-228 acquire — season 2027 (compSeasonId 102), label afl-api-2027-2026-11-08-180907
+2026-11-09T05:09:07+11:00 streamanator afldb-settle-afl-api[1420974]:   season feed: 218 match(es); selected: 0
+2026-11-09T05:09:07+11:00 streamanator afldb-settle-afl-api[1420974]:   manifest: /home/arm/projects/afldb/data/sources/afl_api/matches/afl-api-2027-2026-11-08-180907/manifest.json
+2026-11-09T05:09:07+11:00 streamanator afldb-settle-afl-api[1420974]: acquired label: afl-api-2027-2026-11-08-180907
+2026-11-09T05:09:07+11:00 streamanator afldb-settle-afl-api[1420974]: [2/2] settle (apply, automatic canonical path)
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]: Bundle v2 'afl-api-2027-2026-11-08-180907' (season 2027): 0 match unit(s) built, 0 build failure(s).
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]: Season feed CD_S2027014: 218 match(es), complete; statuses observed: PLACEHOLDER 83, SCHEDULED 135.
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]: AFL API ingestion preflight: control database = afldb_dev, writer database = afldb_dev.
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]: Snapshot
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   snapshotMatches: 0
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   snapshotPlayerMatchRows: 0
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   buildFailures: 0
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]: Season feed (AFLDB-ISSUE-231 — informational, never a failure)
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   seasonFeedMatches: 218
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   seasonFeedComplete: 1
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   seasonFeedStatusCounts: {"SCHEDULED":135,"PLACEHOLDER":83}
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]: Observation
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   observationsSeen: 0
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   payloadsCreated: 0
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   versionsAppended: 0
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   observationsUnchanged: 0
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]: Deferral (§7.3, T3 — informational, never a failure)
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   recordsDeferred: {}
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]: Participation (AFLDB-ISSUE-255 — informational, never a failure)
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   nonParticipantPlayerRows: 0
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]: Resolution / ownership
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   unresolvedIdentityMatch: 0
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   unresolvedIdentityPlayer: 0
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   foreignOwnedCollision: 0
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   corroboratedForeignOwned: 0
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   sourceDisagreement: 0
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   manualAuthorityRefusals: 0
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   venueProviderUnmapped: 0
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   venueUnmapped: 0
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]: Review
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   candidatesCreated: 0
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   candidatesRefreshed: 0
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   candidatesMootLeftPending: 0
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]: Data issues
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   dataIssuesOpened: 0
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   dataIssuesRefreshed: 0
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   dataIssuesResolved: 0
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]: Canonical
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   canonicalRowsInserted: 0
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   canonicalRowsUpdated: 0
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   canonicalApplicationsLogged: 0
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   canonicalApplyRefusals: 0
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   canonicalApplyFailures: 0
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   attendanceEnrichmentsApplied: 0
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]: Derived recompute
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   derivedRecomputeRuns: 0
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   derivedRecomputePlayers: 0
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]: Source completeness: COMPLETE
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   Source complete: the source supplied no rows for this scope, and none were dropped.
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]: Applied as import batch 148: 0 canonical row(s) inserted, 0 updated, 0 ledger row(s), 0 attendance enrichment(s), 0 refused at the write, 0 unit(s) rolled back.
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]: afl_api settle exceptions — season 2027
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   Latest completed batch 148 (2026-11-09 05:09:08.534853+11): 0 records read, 0 rejection rows.
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]: ACTIVE — requires attention (20)
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   Unresolved identities (0)
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:     (none)
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   Other pending candidates still open (0)
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:     (none)
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   Open canonical apply failures (20)
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:     [warning] afl_api|apply|player_match_stats|CD_M20260140001|CD_T160|CD_I1008198|player_match_stats — first detected 2026-10-03
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:         The automatic canonical application of player_match_stats 'CD_M20260140001|CD_T160|CD_I1008198' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:     [warning] afl_api|apply|player_match_stats|CD_M20260140001|CD_T160|CD_I1011936|player_match_stats — first detected 2026-10-03
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:         The automatic canonical application of player_match_stats 'CD_M20260140001|CD_T160|CD_I1011936' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:     [warning] afl_api|apply|player_match_stats|CD_M20260140003|CD_T80|CD_I998134|player_match_stats — first detected 2026-10-01
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:         The automatic canonical application of player_match_stats 'CD_M20260140003|CD_T80|CD_I998134' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:     [warning] afl_api|apply|player_match_stats|CD_M20260140004|CD_T20|CD_I993834|player_match_stats — first detected 2026-10-01
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:         The automatic canonical application of player_match_stats 'CD_M20260140004|CD_T20|CD_I993834' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:     [warning] afl_api|apply|player_match_stats|CD_M20260140102|CD_T80|CD_I1012857|player_match_stats — first detected 2026-10-01
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:         The automatic canonical application of player_match_stats 'CD_M20260140102|CD_T80|CD_I1012857' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:     [warning] afl_api|apply|player_match_stats|CD_M20260140105|CD_T160|CD_I1020339|player_match_stats — first detected 2026-10-01
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:         The automatic canonical application of player_match_stats 'CD_M20260140105|CD_T160|CD_I1020339' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:     [warning] afl_api|apply|player_match_stats|CD_M20260140202|CD_T10|CD_I1021200|player_match_stats — first detected 2026-10-01
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:         The automatic canonical application of player_match_stats 'CD_M20260140202|CD_T10|CD_I1021200' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:     [warning] afl_api|apply|player_match_stats|CD_M20260140204|CD_T1010|CD_I1006135|player_match_stats — first detected 2026-10-03
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:         The automatic canonical application of player_match_stats 'CD_M20260140204|CD_T1010|CD_I1006135' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:     [warning] afl_api|apply|player_match_stats|CD_M20260140204|CD_T1010|CD_I293884|player_match_stats — first detected 2026-10-03
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:         The automatic canonical application of player_match_stats 'CD_M20260140204|CD_T1010|CD_I293884' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:     [warning] afl_api|apply|player_match_stats|CD_M20260140205|CD_T90|CD_I298264|player_match_stats — first detected 2026-10-03
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:         The automatic canonical application of player_match_stats 'CD_M20260140205|CD_T90|CD_I298264' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:     [warning] afl_api|apply|player_match_stats|CD_M20260140205|CD_T90|CD_I999391|player_match_stats — first detected 2026-10-03
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:         The automatic canonical application of player_match_stats 'CD_M20260140205|CD_T90|CD_I999391' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:     [warning] afl_api|apply|player_match_stats|CD_M20260140207|CD_T100|CD_I1023518|player_match_stats — first detected 2026-10-01
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:         The automatic canonical application of player_match_stats 'CD_M20260140207|CD_T100|CD_I1023518' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:     [warning] afl_api|apply|player_match_stats|CD_M20260140207|CD_T150|CD_I993902|player_match_stats — first detected 2026-10-01
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:         The automatic canonical application of player_match_stats 'CD_M20260140207|CD_T150|CD_I993902' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:     [warning] afl_api|apply|player_match_stats|CD_M20260140303|CD_T130|CD_I1009260|player_match_stats — first detected 2026-10-01
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:         The automatic canonical application of player_match_stats 'CD_M20260140303|CD_T130|CD_I1009260' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:     [warning] afl_api|apply|player_match_stats|CD_M20260140303|CD_T130|CD_I1018018|player_match_stats — first detected 2026-10-01
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:         The automatic canonical application of player_match_stats 'CD_M20260140303|CD_T130|CD_I1018018' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:     [warning] afl_api|apply|player_match_stats|CD_M20260140303|CD_T130|CD_I1027790|player_match_stats — first detected 2026-10-01
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:         The automatic canonical application of player_match_stats 'CD_M20260140303|CD_T130|CD_I1027790' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:     [warning] afl_api|apply|player_match_stats|CD_M20260140403|CD_T60|CD_I1020250|player_match_stats — first detected 2026-10-01
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:         The automatic canonical application of player_match_stats 'CD_M20260140403|CD_T60|CD_I1020250' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:     [warning] afl_api|apply|player_match_stats|CD_M20260140503|CD_T20|CD_I1002312|player_match_stats — first detected 2026-10-03
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:         The automatic canonical application of player_match_stats 'CD_M20260140503|CD_T20|CD_I1002312' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:     [warning] afl_api|apply|player_match_stats|CD_M20260140503|CD_T20|CD_I998133|player_match_stats — first detected 2026-10-03
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:         The automatic canonical application of player_match_stats 'CD_M20260140503|CD_T20|CD_I998133' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:     [warning] afl_api|apply|player_match_stats|CD_M20260140505|CD_T160|CD_I1012210|player_match_stats — first detected 2026-10-03
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:         The automatic canonical application of player_match_stats 'CD_M20260140505|CD_T160|CD_I1012210' was refused (foreign_source_owner): the canonical row is owned by another source. Nothing canonical was written.
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:   Open source disagreements (0)
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:     (none)
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:     … more than 20 open; query data_issues directly for the full list.
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]: MOOT — pending candidates whose record has since applied (0); retained as history under AFLDB-ISSUE-099 F7, nothing to do
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1421073]:     (none)
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1420974]: AFLDB_SETTLE_SUCCESS label=afl-api-2027-2026-11-08-180907
+2026-11-09T05:09:08+11:00 streamanator afldb-settle-afl-api[1420974]: afl_api settle chain complete — label afl-api-2027-2026-11-08-180907
+2026-11-09T05:09:08+11:00 streamanator systemd[1]: afldb-settle-afl-api.service: Deactivated successfully.
+2026-11-09T05:09:08+11:00 streamanator systemd[1]: Finished afldb-settle-afl-api.service - AFLDB — in-season AFL.com.au (afl_api) canonical settle (one run).
+2026-11-09T05:09:08+11:00 streamanator systemd[1]: afldb-settle-afl-api.service: Consumed 3.206s CPU time.

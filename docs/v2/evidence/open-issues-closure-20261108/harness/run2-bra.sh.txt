@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# Branch A (claude/issue-340-345-336) verification in a fresh disposable workspace cloned from the
+# bundle: typecheck, admin-lifecycle (isolated *_test DB at ledger 118), auth, gap029-ops.
+set -uo pipefail
+source "$(dirname "$0")/lib2.sh"
+WSA="$1"; BUNDLE="$2"; EXPECT="$3"
+EV="$OPS2/evA"; mkdir -p "$EV"
+DB=afldb_v2_bra_test
+[ -e "$WSA" ] && { echo "refusing: $WSA exists"; exit 2; }
+echo "== bundle =="; sha256sum "$BUNDLE" | tee "$EV/bundle.sha256"
+git bundle list-heads "$BUNDLE" | tee "$EV/bundle-heads.txt"
+git clone -q -b claude/issue-340-345-336 "$BUNDLE" "$WSA" || exit 2
+cd "$WSA"
+git bundle verify -q "$BUNDLE" && echo "  bundle verifies" || { echo "bundle verify failed"; exit 2; }
+git fetch -q "$BUNDLE" '+refs/remotes/origin/main:refs/remotes/origin/main' || exit 2
+HEAD_SHA="$(git rev-parse HEAD)"; echo "  HEAD $HEAD_SHA"; echo "$HEAD_SHA" > "$EV/tested-sha.txt"
+check_eq "HEAD is the committed Branch A candidate" "$EXPECT" "$HEAD_SHA"
+check_eq "origin/main is the verified base" "$BASE_SHA" "$(git rev-parse refs/remotes/origin/main)"
+git merge-base --is-ancestor "$BASE_SHA" HEAD && pass "base is an ancestor of HEAD" || fail "base ancestry"
+check_eq "commits above base" "3" "$(git rev-list --count "$BASE_SHA..HEAD")"
+git cat-file -e 5cba6846ddfcfd5d7a3fd29e14bc8877099d9656 2>/dev/null && fail "5cba6846 present in the clone" || pass "5cba6846 absent from the clone"
+check_eq "no .env" "absent" "$([ -e .env ] && echo present || echo absent)"
+check_eq "git status clean" "0" "$(git status --porcelain | wc -l)"
+echo "== npm ci =="; node --version
+npm ci --no-audit --no-fund > "$EV/npm-ci.log" 2>&1 && pass "npm ci" || { fail "npm ci"; tail -20 "$EV/npm-ci.log"; }
+sha256sum package-lock.json | tee "$EV/lock.sha256"
+
+echo "== typecheck =="
+npm run typecheck > "$EV/typecheck.log" 2>&1; rc=$?; tail -5 "$EV/typecheck.log"; check_eq "typecheck exit" 0 "$rc"
+echo "== auth.test.ts =="
+node_modules/.bin/vitest run tests/auth.test.ts > "$EV/auth.log" 2>&1; rc=$?; grep -E 'Tests +[0-9]' "$EV/auth.log"; check_eq "auth.test.ts exit" 0 "$rc"
+echo "== gap029-ops.test.ts =="
+node_modules/.bin/vitest run tests/gap029-ops.test.ts > "$EV/gap029.log" 2>&1; rc=$?; grep -E 'Tests +[0-9]' "$EV/gap029.log"; check_eq "gap029-ops.test.ts exit" 0 "$rc"
+
+echo "== admin-lifecycle on isolated $DB at 118 =="
+cluster_up
+IPG="node_modules/.bin/tsx tools/v2/isolated-pg.ts"
+if [ -n "$(su_sql postgres -c "select 1 from pg_database where datname='$DB'")" ]; then echo "refusing: $DB already exists"; exit 2; fi
+assert_cluster; $IPG create-db $DB || { fail "create-db"; exit 1; }
+$IPG verify $DB || { fail "verify $DB"; exit 1; }
+assert_cluster
+$IPG run $DB -- node_modules/.bin/tsx tools/db/migrate.ts --target test > "$EV/migrate.log" 2>&1; rc=$?; tail -3 "$EV/migrate.log"; check_eq "migrate to head exit" 0 "$rc"
+check_eq "ledger rows" 118 "$(su_sql $DB -c 'select count(*) from afldb_meta.schema_migrations')"
+check_eq "last ledger row" "118_fixtures_unconfirmed_participants.sql" "$(su_sql $DB -c 'select max(name) from afldb_meta.schema_migrations')"
+assert_cluster
+$IPG run $DB -- node_modules/.bin/tsx tools/db/privileges.ts --target test > "$EV/privileges.log" 2>&1; rc=$?; check_eq "privileges --target test exit" 0 "$rc"
+assert_cluster
+$IPG run $DB -- node_modules/.bin/vitest run tests/integration/admin-lifecycle.test.ts > "$EV/admin-lifecycle.log" 2>&1; rc=$?
+grep -E 'Tests +[0-9]|Test Files' "$EV/admin-lifecycle.log"; grep -cE 'ISSUE-340' "$EV/admin-lifecycle.log" >/dev/null
+check_eq "admin-lifecycle exit" 0 "$rc"
+grep -E 'skipped' "$EV/admin-lifecycle.log" | head -3
+echo
+echo "Branch A verification at $HEAD_SHA: $PASSN passed, $FAILN failed"
+echo "$PASSN/$FAILN $HEAD_SHA" > "$EV/result.txt"

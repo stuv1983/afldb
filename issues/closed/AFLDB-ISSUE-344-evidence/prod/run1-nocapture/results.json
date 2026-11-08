@@ -1,0 +1,118 @@
+{
+  "run": "run1-nocapture",
+  "capture": false,
+  "startedAt": "2026-11-08T05:35:54.687Z",
+  "public-desktop": {
+    "requested": "/draft/2097?page=999&view=rookie&q=Issue344",
+    "final": "/draft/2097?q=Issue344&view=rookie&page=2",
+    "navigations": [
+      {
+        "phase": "public-page999",
+        "status": 307,
+        "url": "/draft/2097?page=999&view=rookie&q=Issue344"
+      },
+      {
+        "phase": "public-page999",
+        "status": 200,
+        "url": "/draft/2097?q=Issue344&view=rookie&page=2"
+      }
+    ],
+    "keptFilters": true,
+    "matchingNote": "57 matching",
+    "pager": "51–57 of 57",
+    "lastPageRows": 7,
+    "lastPageIsRookie51to57": true,
+    "emptyState": 0,
+    "page1Rows": 50,
+    "unionIsExactly57": true,
+    "horizontalOverflow": false
+  },
+  "admin-desktop": {
+    "afterLogin": "/admin",
+    "requested": "/admin/draft?page=999&year=2097&kind=rookie&q=Issue344",
+    "final": "/admin/draft?q=Issue344&year=2097&kind=rookie&page=2",
+    "navigations": [
+      {
+        "phase": "admin-page999",
+        "status": 307,
+        "url": "/admin/draft?page=999&year=2097&kind=rookie&q=Issue344"
+      },
+      {
+        "phase": "admin-page999",
+        "status": 200,
+        "url": "/admin/draft?q=Issue344&year=2097&kind=rookie&page=2"
+      }
+    ],
+    "keptFilters": true,
+    "summary": "Page 2 of 2 · 57 selections matching \"Issue344\"",
+    "lastPageRows": 7,
+    "lastPageIsRookie51to57": true,
+    "formValues": {
+      "q": "Issue344",
+      "year": "2097",
+      "kind": "rookie"
+    },
+    "page1Rows": 50,
+    "unionIsExactly57": true,
+    "horizontalOverflow": false
+  },
+  "console-desktop": [],
+  "pageerrors-desktop": [],
+  "public-mobile": {
+    "requested": "/draft/2097?page=999&view=rookie&q=Issue344",
+    "final": "/draft/2097?q=Issue344&view=rookie&page=2",
+    "navigations": [
+      {
+        "phase": "public-page999",
+        "status": 307,
+        "url": "/draft/2097?page=999&view=rookie&q=Issue344"
+      },
+      {
+        "phase": "public-page999",
+        "status": 200,
+        "url": "/draft/2097?q=Issue344&view=rookie&page=2"
+      }
+    ],
+    "keptFilters": true,
+    "matchingNote": "57 matching",
+    "pager": "51–57 of 57",
+    "lastPageRows": 7,
+    "lastPageIsRookie51to57": true,
+    "emptyState": 0,
+    "page1Rows": 50,
+    "unionIsExactly57": true,
+    "horizontalOverflow": false
+  },
+  "admin-mobile": {
+    "afterLogin": "/admin",
+    "requested": "/admin/draft?page=999&year=2097&kind=rookie&q=Issue344",
+    "final": "/admin/draft?q=Issue344&year=2097&kind=rookie&page=2",
+    "navigations": [
+      {
+        "phase": "admin-page999",
+        "status": 307,
+        "url": "/admin/draft?page=999&year=2097&kind=rookie&q=Issue344"
+      },
+      {
+        "phase": "admin-page999",
+        "status": 200,
+        "url": "/admin/draft?q=Issue344&year=2097&kind=rookie&page=2"
+      }
+    ],
+    "keptFilters": true,
+    "summary": "Page 2 of 2 · 57 selections matching \"Issue344\"",
+    "lastPageRows": 7,
+    "lastPageIsRookie51to57": true,
+    "formValues": {
+      "q": "Issue344",
+      "year": "2097",
+      "kind": "rookie"
+    },
+    "page1Rows": 50,
+    "unionIsExactly57": true,
+    "horizontalOverflow": false
+  },
+  "console-mobile": [],
+  "pageerrors-mobile": [],
+  "screenshotsWritten": []
+}

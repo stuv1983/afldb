@@ -1,0 +1,7 @@
+# AFLDB deploy gate (AFLDB-ISSUE-339) phase=w339 utc=20261108T103238Z host=streamanator dir=/mnt/ssd/afldb-w339-20261108T102607Z/clone head=549c5892d7e31a962380c9bd0128ae99969f3b75
+PASS database identity -- afldb_v2_w339_w1a_test afldb_owner via AFLDB_OWNER_DATABASE_URL (read-only session)
+PASS applied migrations match the target revision -- 117 applied, names and checksums equal (ledger sha 0dbd4bab4fe160e5)
+PASS approved migration transition -- 117 -> 118 (pending 118_fixtures_unconfirmed_participants.sql)
+PASS migration target is the assessed database -- db:migrate --target dev reads AFLDB_OWNER_DATABASE_URL from the same single .env line
+PASS post-migration parity -- 118/118, names and checksums equal
+RESULT exit=0 utc=2026-11-08T10:32:44Z head=549c5892d7e31a962380c9bd0128ae99969f3b75

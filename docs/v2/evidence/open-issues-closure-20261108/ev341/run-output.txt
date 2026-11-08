@@ -1,0 +1,58 @@
+# q341.sh console output, streamanator, 2026-11-08 (verbatim from the run's stdout)
+== setup ==
+  target cluster: afldb_v2_isolated on 127.0.0.1:55481 (verified)
+create-db: afldb_v2_i341src_test created and marked
+create-db: afldb_v2_i341bys_test created and marked
+  dump sha256 166ab9acf75c9b78f28049160daf24eb179d7fe2c001f9a569d2fdcbb1900f5d (730956 bytes); tokens src=SOURCE-bc9f8982e534ed37 rt=RESTORE-c399c17d1e7da29b bys=BYSTANDER-0eb945428eb614cd
+afldb-v2-isolated-test | public.brownlow_season_votes,public.clubs,public.i341_sentinel,public.matches,public.player_career_stats,public.player_match_stats,public.players,public.stat_availability | brownlow_season_votes_pkey,clubs_pkey,i341_sentinel_pkey,i342_witness_idx,matches_pkey,player_career_stats_pkey,player_match_stats_pkey,players_name_trgm,players_pkey,stat_availability_pkey
+source=SOURCE-bc9f8982e534ed37
+120000:1600449
+afldb.restore_test.v1 sha256=1d274f148162d4fbcf3b4360eca17222bf02d30970c95b4bd1ca030ee17fa9c6 | public.i341_sentinel | i341_sentinel_pkey
+restore_target=RESTORE-c399c17d1e7da29b
+<no pms>
+afldb-v2-isolated-test | public.i341_sentinel | i341_sentinel_pkey
+bystander=BYSTANDER-0eb945428eb614cd
+<no pms>
+== H0: the hazard is real (read-only): libpq honours ?dbname over the URL path ==
+  PASS  H0 a URL whose path names afldb_restore_test connects to the query's afldb_v2_i341src_test
+== C1: target-changing DSNs are refused before any child ==
+  PASS  C1.1 exit 1
+  PASS  C1.1 refused by the contract
+  PASS  C1.2 exit 1
+  PASS  C1.2 refused by the contract
+  PASS  C1.3 exit 1
+  PASS  C1.3 refused by the contract
+  PASS  C1.4 exit 1
+  PASS  C1.4 refused by the contract
+  PASS  C1.5 exit 1
+  PASS  C1.5 refused by the contract
+  PASS  C1.6 exit 1
+  PASS  C1.6 refused by the contract
+  PASS  C1.7 exit 1
+  PASS  C1.7 refused by the contract
+  PASS  C1.8 exit 1
+  PASS  C1.8 refused by the contract
+  PASS  C1.9 exit 1
+  PASS  C1.9 refused by the contract
+  PASS  C1: src unchanged
+  PASS  C1: rt unchanged
+  PASS  C1: bys unchanged
+== C3: in-session identity guard (role switched inside the target) refuses before any write ==
+  PASS  C3 exit 1
+  PASS  C3 refused by the identity guard
+  PASS  C3: src unchanged
+  PASS  C3: rt unchanged
+  PASS  C3: bys unchanged
+== C2: valid DSN under hostile inherited libpq routing env restores into afldb_restore_test only ==
+  PASS  C2 control: the hostile PGHOSTADDR alone breaks a plain connection
+  PASS  C2 exit 0
+  PASS  C2 announced proven
+  PASS  C2 took the real exit-1 extension-owner path
+  PASS  C2 PASS lines
+  PASS  C2: src unchanged
+  PASS  C2: bys unchanged
+  PASS  C2 marker binds the synthetic dump
+  PASS  C2 target's own sentinel replaced by the dump's copy
+  PASS  C2 witness index restored
+
+ISSUE-341 qualification: 37 passed, 0 failed

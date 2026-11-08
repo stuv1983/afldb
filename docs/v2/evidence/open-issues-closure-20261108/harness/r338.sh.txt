@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -uo pipefail
+source "$(dirname "$0")/env.sh"
+node --version
+rm -rf node_modules
+npm ci --no-audit --no-fund > npm-ci.log 2>&1 && echo "npm ci (node22): ok" || { echo "npm ci FAILED"; tail -20 npm-ci.log; exit 1; }
+python3 --version
+echo "=== ISSUE-338: python contract ==="
+python3 tests/python/draftguru_bridge_operator_review_contract.py > i338-python.log 2>&1; echo "python exit=$?"
+tail -15 i338-python.log
+echo "=== ISSUE-338: focused vitest ==="
+npx vitest run tests/draftguru-acquisition.test.ts -t "operator-adjudication review tool" > i338-vitest.log 2>&1; echo "vitest exit=$?"
+tail -12 i338-vitest.log

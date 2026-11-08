@@ -1,0 +1,16 @@
+G afldb_v2_w339_gb_test A(before): n= last= ledger=e3b0c44298fc1c14 tables=e3b0c44298fc1c14 sentinel=none
+G afldb_v2_w339_gb_test B(afldb_v2_w339_ga_test): n=117 last=117_brownlow_provider_eligibility_unknown.sql ledger=0dbd4bab4fe160e5 tables=d33786b2502bb815 sentinel=none
+G afldb_v2_w339_gb_test A(after): n= last= ledger=e3b0c44298fc1c14 tables=e3b0c44298fc1c14 sentinel=none
+G afldb_v2_w339_gb_test B(afldb_v2_w339_ga_test): n=117 last=117_brownlow_provider_eligibility_unknown.sql ledger=0dbd4bab4fe160e5 tables=d33786b2502bb815 sentinel=none
+W1 afldb_v2_w339_w1b_test A(before): n= last= ledger=e3b0c44298fc1c14 tables=e3b0c44298fc1c14 sentinel=none
+W1 afldb_v2_w339_w1b_test B(afldb_v2_w339_w1a_test): n=117 last=117_brownlow_provider_eligibility_unknown.sql ledger=0dbd4bab4fe160e5 tables=d33786b2502bb815 sentinel=none
+W1 afldb_v2_w339_w1b_test A(after): n= last= ledger=e3b0c44298fc1c14 tables=e3b0c44298fc1c14 sentinel=none
+W1 afldb_v2_w339_w1b_test B(afldb_v2_w339_w1a_test): n=118 last=118_fixtures_unconfirmed_participants.sql ledger=5bb12f9b849349e9 tables=d33786b2502bb815 sentinel=none
+W2 afldb_v2_w339_w2b_test A(before): n= last= ledger=e3b0c44298fc1c14 tables=e3b0c44298fc1c14 sentinel=none
+W2 afldb_v2_w339_w2b_test B(afldb_v2_w339_w2a_test): n=117 last=117_brownlow_provider_eligibility_unknown.sql ledger=0dbd4bab4fe160e5 tables=d33786b2502bb815 sentinel=none
+W2 afldb_v2_w339_w2b_test A(after): n= last= ledger=e3b0c44298fc1c14 tables=e3b0c44298fc1c14 sentinel=none
+W2 afldb_v2_w339_w2b_test B(afldb_v2_w339_w2a_test): n=118 last=118_fixtures_unconfirmed_participants.sql ledger=5bb12f9b849349e9 tables=d33786b2502bb815 sentinel=none
+N1 afldb_v2_w339_n1b_test A(before): n= last= ledger=e3b0c44298fc1c14 tables=e3b0c44298fc1c14 sentinel=none
+N1 afldb_v2_w339_n1b_test B(afldb_v2_w339_n1a_test): n=117 last=117_brownlow_provider_eligibility_unknown.sql ledger=0dbd4bab4fe160e5 tables=d33786b2502bb815 sentinel=none
+N1 afldb_v2_w339_n1b_test A(after): n= last= ledger=e3b0c44298fc1c14 tables=e3b0c44298fc1c14 sentinel=none
+N1 afldb_v2_w339_n1b_test B(afldb_v2_w339_n1a_test): n=117 last=117_brownlow_provider_eligibility_unknown.sql ledger=0dbd4bab4fe160e5 tables=d33786b2502bb815 sentinel=none

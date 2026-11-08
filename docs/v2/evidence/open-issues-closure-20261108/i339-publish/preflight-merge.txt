@@ -1,0 +1,23 @@
+AFLDB read-only preflight: merge / dev
+No Git fetch, database write, migration, plan write, deploy, or service action will run.
+
+PASS working directory is this repository root
+     expected: /mnt/ssd/afldb-339-cand-20261109T1940Z/mr/main
+     actual:   /mnt/ssd/afldb-339-cand-20261109T1940Z/mr/main
+PASS branch main is valid for merge
+PASS working tree is clean
+PASS merge uses the primary checkout
+PASS branch contains current local main
+     behind local main: 0
+PASS branch relationship to recorded origin/main
+     ahead: 0; behind: 0
+     Read-only check only: run the operator-approved fetch separately when remote freshness is required.
+PASS migration names are collision-free across relevant refs/worktrees (refs/remotes/origin/main)
+WARN .env file presence
+     Create the local untracked .env before rebuild/promotion/deploy work.
+PASS Git Bash/MSYS path-conversion guard
+PASS git is available
+PASS psql is available
+PASS pg_restore is available
+
+Preflight result: READY (0 blocker(s), 1 warning(s)).

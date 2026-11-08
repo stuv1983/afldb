@@ -1,0 +1,3 @@
+694775|Timeout|PgSleep|select pg_advisory_lock(342342); select pg_sleep(900)
+694808|Lock|advisory|CREATE INDEX i342_witness_idx ON public.player_match_stats USING btree
+694810|Lock|advisory|CREATE INDEX players_name_trgm ON public.players USING gin (name publi

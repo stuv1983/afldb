@@ -1,0 +1,85 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-pin336-20261108
+
+ ✓ tests/gap029-ops.test.ts > production profile > parses cleanly and carries the reviewed production identity 6ms
+ ✓ tests/gap029-ops.test.ts > production profile > refuses code, repeats, unknown and missing keys 2ms
+ ✓ tests/gap029-ops.test.ts > production profile > every wrapper script validates the profile as plain KEY="value" lines before sourcing it 1ms
+ ✓ tests/gap029-ops.test.ts > capture directory check > accepts a correct, fresh capture 6ms
+ ✓ tests/gap029-ops.test.ts > capture directory check > refuses another stage label, class, profile, host, oid, system id or port 13ms
+ ✓ tests/gap029-ops.test.ts > capture directory check > refuses stale, future and out-of-order captures 4ms
+ ✓ tests/gap029-ops.test.ts > capture directory check > refuses a dump, sidecar or listing that was altered after SHA256SUMS 4ms
+ ✓ tests/gap029-ops.test.ts > capture directory check > refuses a non-empty pg_dump stderr, a partial archive, an extra file and a missing SHA256SUMS 7ms
+ ✓ tests/gap029-ops.test.ts > capture directory check > refuses a ledger of another size, another last migration, or one that changed during the capture 8ms
+ ✓ tests/gap029-ops.test.ts > capture directory check > refuses evidence from a different profile (a simulation is not production evidence, and the reverse) 1ms
+ ✓ tests/gap029-ops.test.ts > capture directory check > parses SHA256SUMS strictly 1ms
+ ✓ tests/gap029-ops.test.ts > target check > accepts the production target and refuses any difference 1ms
+ ✓ tests/gap029-ops.test.ts > S1 plan and approval > accepts a correct production plan and describes the changes 1ms
+ ✓ tests/gap029-ops.test.ts > S1 plan and approval > refuses a rehearsal plan, another revision, another target, another dump, an expired plan, another operation 1ms
+ ✓ tests/gap029-ops.test.ts > S1 plan and approval > writes an approval only from the typed digest of THIS plan, with a statement that names it 2ms
+ ✓ tests/gap029-ops.test.ts > S1 plan and approval > refuses another stage's digest, a short or silent statement, a past expiry, and an approval that outlives the plan or the backup 1ms
+ ✓ tests/gap029-ops.test.ts > S1 plan and approval > the apply-time check refuses a missing, wrong-digest, wrong-stage, edited, future, expired or stale-backup approval 2ms
+ ✓ tests/gap029-ops.test.ts > S2 plan and approval > accepts a correct production plan and describes the changes 1ms
+ ✓ tests/gap029-ops.test.ts > S2 plan and approval > refuses a rehearsal plan, another revision, another target, another dump, an expired plan, another operation 1ms
+ ✓ tests/gap029-ops.test.ts > S2 plan and approval > writes an approval only from the typed digest of THIS plan, with a statement that names it 1ms
+ ✓ tests/gap029-ops.test.ts > S2 plan and approval > refuses another stage's digest, a short or silent statement, a past expiry, and an approval that outlives the plan or the backup 1ms
+ ✓ tests/gap029-ops.test.ts > S2 plan and approval > the apply-time check refuses a missing, wrong-digest, wrong-stage, edited, future, expired or stale-backup approval 1ms
+ ✓ tests/gap029-ops.test.ts > S3 plan and approval > accepts a correct production plan and describes the changes 1ms
+ ✓ tests/gap029-ops.test.ts > S3 plan and approval > refuses a rehearsal plan, another revision, another target, another dump, an expired plan, another operation 1ms
+ ✓ tests/gap029-ops.test.ts > S3 plan and approval > writes an approval only from the typed digest of THIS plan, with a statement that names it 1ms
+ ✓ tests/gap029-ops.test.ts > S3 plan and approval > refuses another stage's digest, a short or silent statement, a past expiry, and an approval that outlives the plan or the backup 1ms
+ ✓ tests/gap029-ops.test.ts > S3 plan and approval > the apply-time check refuses a missing, wrong-digest, wrong-stage, edited, future, expired or stale-backup approval 1ms
+ ✓ tests/gap029-ops.test.ts > S4 plan and approval > accepts a correct production plan and describes the changes 1ms
+ ✓ tests/gap029-ops.test.ts > S4 plan and approval > refuses a rehearsal plan, another revision, another target, another dump, an expired plan, another operation 1ms
+ ✓ tests/gap029-ops.test.ts > S4 plan and approval > writes an approval only from the typed digest of THIS plan, with a statement that names it 1ms
+ ✓ tests/gap029-ops.test.ts > S4 plan and approval > refuses another stage's digest, a short or silent statement, a past expiry, and an approval that outlives the plan or the backup 1ms
+ ✓ tests/gap029-ops.test.ts > S4 plan and approval > the apply-time check refuses a missing, wrong-digest, wrong-stage, edited, future, expired or stale-backup approval 1ms
+ ✓ tests/gap029-ops.test.ts > I336 plan and approval > accepts a correct production plan and describes the changes 1ms
+ ✓ tests/gap029-ops.test.ts > I336 plan and approval > refuses a rehearsal plan, another revision, another target, another dump, an expired plan, another operation 1ms
+ ✓ tests/gap029-ops.test.ts > I336 plan and approval > writes an approval only from the typed digest of THIS plan, with a statement that names it 1ms
+ ✓ tests/gap029-ops.test.ts > I336 plan and approval > refuses another stage's digest, a short or silent statement, a past expiry, and an approval that outlives the plan or the backup 1ms
+ ✓ tests/gap029-ops.test.ts > I336 plan and approval > the apply-time check refuses a missing, wrong-digest, wrong-stage, edited, future, expired or stale-backup approval 1ms
+ ✓ tests/gap029-ops.test.ts > stage-specific plan expectations > S1 needs exactly seven rows to insert; S3 exactly eight under actor 1; S2 the pinned label and parent; S4 the pinned digest 1ms
+ ✓ tests/gap029-ops.test.ts > stage-specific plan expectations > I336 (AFLDB-ISSUE-336) needs the pinned evidence, actor 1, and exactly 35 rows to insert 1ms
+ ✓ tests/gap029-ops.test.ts > stage-specific plan expectations > statements name the stage decision, the digest, the revision and the recovery limit where it applies 1ms
+ ✓ tests/gap029-ops.test.ts > prod-stage.sh run-name grammar (AFLDB-ISSUE-336) > lifts the real parsers and the capture derivation from the wrapper 0ms
+ ✓ tests/gap029-ops.test.ts > prod-stage.sh run-name grammar (AFLDB-ISSUE-336) > accepts a capture-shaped I336 run for stage I336 8ms
+ ✓ tests/gap029-ops.test.ts > prod-stage.sh run-name grammar (AFLDB-ISSUE-336) > still accepts S1 runs 5ms
+ ✓ tests/gap029-ops.test.ts > prod-stage.sh run-name grammar (AFLDB-ISSUE-336) > still accepts S2 runs 5ms
+ ✓ tests/gap029-ops.test.ts > prod-stage.sh run-name grammar (AFLDB-ISSUE-336) > still accepts S3 runs 5ms
+ ✓ tests/gap029-ops.test.ts > prod-stage.sh run-name grammar (AFLDB-ISSUE-336) > still accepts S4 runs 5ms
+ ✓ tests/gap029-ops.test.ts > prod-stage.sh run-name grammar (AFLDB-ISSUE-336) > refuses stage I336 with run S1-20261108T010203Z 5ms
+ ✓ tests/gap029-ops.test.ts > prod-stage.sh run-name grammar (AFLDB-ISSUE-336) > refuses stage S1 with run I336-20261108T010203Z 5ms
+ ✓ tests/gap029-ops.test.ts > prod-stage.sh run-name grammar (AFLDB-ISSUE-336) > refuses stage I336 with run I336-2026110T010203Z 5ms
+ ✓ tests/gap029-ops.test.ts > prod-stage.sh run-name grammar (AFLDB-ISSUE-336) > refuses stage I336 with run I336-20261108T010203 5ms
+ ✓ tests/gap029-ops.test.ts > prod-stage.sh run-name grammar (AFLDB-ISSUE-336) > refuses stage I336 with run I337-20261108T010203Z 5ms
+ ✓ tests/gap029-ops.test.ts > prod-stage.sh run-name grammar (AFLDB-ISSUE-336) > refuses stage I336 with run XI336-20261108T010203Z 5ms
+ ✓ tests/gap029-ops.test.ts > prod-stage.sh run-name grammar (AFLDB-ISSUE-336) > refuses stage I336 with run I336-20261108T010203Z/../../x 4ms
+ ✓ tests/gap029-ops.test.ts > prod-stage.sh run-name grammar (AFLDB-ISSUE-336) > refuses stage S5 with run S5-20261108T010203Z 5ms
+ ✓ tests/gap029-ops.test.ts > prod-stage.sh run-name grammar (AFLDB-ISSUE-336) > every run-taking command parses the stage first, then the run, before anything else 1ms
+ ✓ tests/gap029-ops.test.ts > outcome classification > maps each reviewed outcome with a consistent state probe 3ms
+ ✓ tests/gap029-ops.test.ts > outcome classification > treats every contradiction as undetermined and never as "rolled back" 1ms
+ ✓ tests/gap029-ops.test.ts > outcome classification > committed outcomes say so, never offer a retry or an automatic restore, and an unavailable probe on a failure is only a note 1ms
+ ✓ tests/gap029-ops.test.ts > manifest binding > passes when every bound file is byte-identical 1ms
+ ✓ tests/gap029-ops.test.ts > manifest binding > refuses a changed, missing or unbound file, another revision, profile or class 2ms
+ ✓ tests/gap029-ops.test.ts > manifest binding > S2 must also bind its child 0ms
+ ✓ tests/gap029-ops.test.ts > assembled evidence basic check > accepts matching evidence and refuses mismatches 2ms
+ ✓ tests/gap029-ops.test.ts > wrapper script structure (static guarantees) > the production wrapper never restores, drops, retries or runs a mutating statement of its own 1ms
+ ✓ tests/gap029-ops.test.ts > wrapper script structure (static guarantees) > preflight pins actor 1 (enabled, enrolled, non-fixture Super Admin) and exactly one enabled Super Admin 0ms
+ ✓ tests/gap029-ops.test.ts > wrapper script structure (static guarantees) > the apply lock is taken exclusively BEFORE the detached run starts, and a second apply is refused 1ms
+ ✓ tests/gap029-ops.test.ts > wrapper script structure (static guarantees) > the apply gates run before the lock: approval present, manifest, capture, approval check, conflicts 1ms
+ ✓ tests/gap029-ops.test.ts > wrapper script structure (static guarantees) > capture and every later stage are ordered behind acceptance of the previous stage 0ms
+ ✓ tests/gap029-ops.test.ts > wrapper script structure (static guarantees) > credentials are only parsed into the environment: no connection string is echoed, passed in argv or written 1ms
+ ✓ tests/gap029-ops.test.ts > wrapper script structure (static guarantees) > the capture script is read-only: no migration, service, timer, pruning, restore or privilege action 1ms
+ ✓ tests/gap029-ops.test.ts > wrapper script structure (static guarantees) > the restore host script verifies the capture directory before restoring and only restores into the guarded disposable database 1ms
+ ✓ tests/gap029-ops.test.ts > wrapper script structure (static guarantees) > the host CLI never prints a connection string and launches tools with file-path arguments only 1ms
+ ✓ tests/gap029-ops.test.ts > review fixes > the evidence class is bound to the pinned production identity in both directions 1ms
+ ✓ tests/gap029-ops.test.ts > review fixes > approval times need an explicit zone 0ms
+ ✓ tests/gap029-ops.test.ts > review fixes > __apply refuses to run unless started by this run's apply phase, once 0ms
+ ✓ tests/gap029-ops.test.ts > review fixes > an unreadable outcome.json can never become exit 2 (ROLLED_BACK); a stage is applied once across runs and never after acceptance 1ms
+ ✓ tests/gap029-ops.test.ts > review fixes > a simulation profile can never drive the production host 0ms
+
+ Test Files  1 passed (1)
+      Tests  76 passed (76)
+   Start at  21:46:41
+   Duration  805ms (transform 271ms, setup 230ms, import 151ms, tests 176ms, environment 0ms)
+

@@ -1,0 +1,81 @@
+// ISSUE-343 qualification helper (disposable workspace only). Builds the synthetic AFL API season feeds
+// the loopback stub serves, probes them through the real staging/build code (DB-free), and writes the
+// minimal club/venue seed SQL the fixture writer needs. Run from the disposable project root.
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+import { parseSourceFamilyRegistry as parsePkgRegistry, stageAflApiFixtureFeed } from '@afldb/acquisition';
+
+import { parseAflApiIdentities } from '../src/lib/acquisition/afl-api-bundle';
+import { buildAflApiFixtureRecords } from '../src/lib/acquisition/afl-api-fixture-identity';
+import { parseSourceFamilyRegistry } from '../src/lib/acquisition/source-families';
+
+type Json = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+const root = process.cwd();
+const out = process.argv[2];
+if (!out) throw new Error('usage: gen343.ts <outDir>');
+mkdirSync(out, { recursive: true });
+const rj = (...p: string[]): any => JSON.parse(readFileSync(join(root, ...p), 'utf8')); // eslint-disable-line @typescript-eslint/no-explicit-any
+const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x)) as T;
+
+const f27 = rj('tests', 'fixtures', 'afl_api', 'seasons', '01-season-matches-2027.raw.json') as { matches: Json[] };
+const f26 = rj('tests', 'fixtures', 'afl_api', 'seasons', '00-season-matches-2026.raw.json') as { matches: Json[] };
+const sample = rj('tests', 'fixtures', 'afl_api', 'match', '01-fixture-result.json') as Json;
+const regJson = rj('data', 'reference', 'source-families.json');
+const ids = parseAflApiIdentities(rj('data', 'reference', 'afl-api-identities.json'));
+
+const real = (m: Json, status: string) => m.status === status
+  && ids.teams.has(m.home?.team?.providerId) && ids.teams.has(m.away?.team?.providerId) && ids.venues.has(m.venue?.providerId);
+const pool27 = f27.matches.filter((m) => real(m, 'SCHEDULED'));
+const sched = pool27.slice(0, 2).map((m, i) => { const c = clone(m); c.providerId = `CD_M2027343900${i + 1}`; return c; });
+const conc = pool27.slice(2, 4).map((m, i) => {
+  const c = clone(m);
+  c.providerId = `CD_M2027343901${i + 1}`;
+  c.status = 'CONCLUDED';
+  c.home.score = clone(sample.home.score);
+  c.away.score = clone(sample.away.score);
+  return c;
+});
+const hist26 = f26.matches.filter((m) => real(m, 'CONCLUDED')).slice(0, 1).map((m) => { const c = clone(m); c.providerId = 'CD_M20263439001'; return c; });
+
+const envelope = (matches: Json[]) => ({ meta: { code: 200, pagination: { page: 0, numPages: 1, pageSize: 1000, numEntries: matches.length } }, matches });
+const feed27 = envelope([...sched, ...conc]);
+const feed26 = envelope(hist26);
+writeFileSync(join(out, 'feed-102.json'), JSON.stringify(feed27));
+writeFileSync(join(out, 'feed-85.json'), JSON.stringify(feed26));
+
+// DB-free probe through the same code the CLIs run.
+const stage = stageAflApiFixtureFeed(feed27.matches, { registry: parsePkgRegistry(regJson), identities: ids }, { season: 2027 });
+console.log(`stage 2027: scheduled=${stage.scheduled.length} transitions=${stage.transitions.length} completed=${stage.completed.length} `
+  + `deferred=${stage.deferred.length} refused=${stage.refused.length}`);
+for (const r of stage.refused) for (const x of r.refusals) console.log(`  REFUSED ${r.providerId} ${x.code}: ${x.detail}`);
+const built = buildAflApiFixtureRecords(conc, parseSourceFamilyRegistry(regJson), ids);
+console.log(`build 2027 concluded: records=${built.records.length} failures=${built.buildFailures.length}`);
+for (const f of built.buildFailures) console.log(`  BUILD FAILURE ${f.providerMatchId}: ${f.error}`);
+const built26 = buildAflApiFixtureRecords(hist26, parseSourceFamilyRegistry(regJson), ids);
+console.log(`build 2026 concluded: records=${built26.records.length} failures=${built26.buildFailures.length}`);
+
+// Seed SQL: the clubs (by legacy_club_hist) and venues (by legacy_name) these records resolve to.
+const lit = (s: string) => `'${s.replace(/'/g, "''")}'`;
+const all = [...sched, ...conc, ...hist26];
+const hists = [...new Set(all.flatMap((m) => [m.home.team.providerId, m.away.team.providerId]))].map((id) => (ids.teams.get(id) as Json).hist as string);
+const venues = [...new Set(all.map((m) => m.venue.providerId))].map((id) => (ids.venues.get(id) as Json).legacyName as string);
+console.log(`clubs needed: ${hists.join(', ')}`);
+console.log(`venues needed: ${venues.join(', ')}`);
+const lines = ['BEGIN;', 'SET CONSTRAINTS ALL DEFERRED;'];
+hists.forEach((h, n) => {
+  lines.push(`DO $$ DECLARE o bigint; c bigint; BEGIN
+  IF NOT EXISTS (SELECT 1 FROM clubs WHERE legacy_club_hist = ${lit(h)}) THEN
+    INSERT INTO club_organizations (name, slug) VALUES (${lit(`I343 Organization ${n}`)}, ${lit(`i343-org-${n}`)}) RETURNING id INTO o;
+    INSERT INTO clubs (slug, name, short_name, abbreviation, current_identity_id, legacy_club_hist, organization_id)
+      VALUES (${lit(`i343-club-${n}`)}, ${lit(`I343 ${h}`)}, ${lit(`I343 ${n}`)}, ${lit(`I${n}`)}, -1, ${lit(h)}, o) RETURNING id INTO c;
+    UPDATE clubs SET current_identity_id = c WHERE id = c;
+  END IF; END $$;`);
+});
+venues.forEach((v, n) => {
+  lines.push(`INSERT INTO venues (slug, canonical_name, legacy_name) SELECT ${lit(`i343-venue-${n}`)}, ${lit(v)}, ${lit(v)}
+  WHERE NOT EXISTS (SELECT 1 FROM venues WHERE legacy_name = ${lit(v)});`);
+});
+lines.push('COMMIT;');
+writeFileSync(join(out, 'seed.sql'), `${lines.join('\n')}\n`);
+writeFileSync(join(out, 'expect.txt'), `sched=${sched.map((m) => m.providerId).join(',')}\nconc=${conc.map((m) => m.providerId).join(',')}\n`);

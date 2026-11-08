@@ -1,0 +1,13 @@
+PASS p0_resources
+PASS p1_verify_inputs
+PASS p2_deps
+PASS p3_typecheck
+PASS p4_cluster
+PASS p5_template
+PASS mkdbs
+PASS p6_unit
+FAIL p6b_delta_unit rc=1
+PASS p7_integration
+PASS p8_build
+PASS p8b_boot_smoke
+PASS p9_final
