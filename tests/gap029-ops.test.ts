@@ -1,5 +1,8 @@
+import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { EXIT_CODE } from '../tools/v2/gap029-common';
@@ -192,6 +195,80 @@ describe('stage-specific plan expectations', () => {
   it('statements name the stage decision, the digest, the revision and the recovery limit where it applies', () => {
     expect(STATEMENT('S1')).toMatch(/D1-PROD.*plan a1a1/); expect(STATEMENT('S2')).toMatch(/OUTCOME_UNDETERMINED.*owner-decided restore/); expect(STATEMENT('S3')).toMatch(/actor auth_users\.id 1/);
     expect(STATEMENT('S4')).toMatch(/afldb-sibling-supplement:015/); for (const s of STAGE_IDS) expect(STATEMENT(s)).toMatch(/No retry and no automatic restore/);
+  });
+});
+
+/**
+ * AFLDB-ISSUE-336: the wrapper's real run-name boundary, executed. The stage
+ * and run parsers are lifted verbatim from prod-stage.sh (stage_arg through
+ * the line before no_conflicts) and run under bash with `stop` stubbed, so the
+ * case proves the shell grammar itself rather than a TypeScript restatement.
+ * Every consumer (plan, approve, apply, report, state, accept) reaches it
+ * through the same `stage_arg "${3:-}"; run_arg "${4:-}"` pair, asserted below.
+ */
+describe.skipIf(process.platform === 'win32')('prod-stage.sh run-name grammar (AFLDB-ISSUE-336)', () => {
+  const prodStage = read('tools/v2/gap029-ops/prod-stage.sh');
+  const parsers = prodStage.slice(prodStage.indexOf("STAGE_RE='"), prodStage.indexOf('no_conflicts() {'));
+  // The capture step's own derivation of the run name, from the same file.
+  const captureDerivation = /STAMP=\$\{CAPDIR##\*-\}; RUN=\$S-\$STAMP/;
+
+  function runArg(stage: string, run: string): { status: number | null; out: string } {
+    const root = mkdtempSync(join(tmpdir(), 'i336-runarg-'));
+    try {
+      // Directories run_arg requires for a well-formed run, so a refusal can only be the grammar.
+      const stamp = run.includes('-') ? run.slice(run.indexOf('-') + 1) : run;
+      mkdirSync(join(root, 'ops', 'runs', run), { recursive: true });
+      mkdirSync(join(root, 'backups', `gap029-${stage}-${stamp}`), { recursive: true });
+      const script = [
+        'set -u',
+        'stop() { echo "STOP: $1"; exit "${2:-1}"; }',
+        `OPS=${JSON.stringify(join(root, 'ops'))}; BACKUP_ROOT=${JSON.stringify(join(root, 'backups'))}`,
+        parsers,
+        'stage_arg "$1"; run_arg "$2"; echo "RUN_OK $RUN $RUNDIR $CAPDIR"',
+      ].join('\n');
+      const r = spawnSync('bash', ['-c', script, 'harness', stage, run], { encoding: 'utf8' });
+      return { status: r.status, out: `${r.stdout}${r.stderr}` };
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+
+  it('lifts the real parsers and the capture derivation from the wrapper', () => {
+    expect(parsers).toMatch(/stage_arg\(\) \{/);
+    expect(parsers).toMatch(/run_arg\(\) \{/);
+    expect(prodStage).toMatch(captureDerivation);
+  });
+
+  it('accepts a capture-shaped I336 run for stage I336', () => {
+    const r = runArg('I336', 'I336-20261108T010203Z');
+    expect(r.status).toBe(0);
+    expect(r.out).toMatch(/RUN_OK I336-20261108T010203Z .*\/runs\/I336-20261108T010203Z .*\/gap029-I336-20261108T010203Z/);
+  });
+
+  it.each(['S1', 'S2', 'S3', 'S4'])('still accepts %s runs', (stage) => {
+    expect(runArg(stage, `${stage}-20261103T000000Z`).status).toBe(0);
+  });
+
+  it.each([
+    ['I336', 'S1-20261108T010203Z', /is not a I336 run/],
+    ['S1', 'I336-20261108T010203Z', /is not a S1 run/],
+    ['I336', 'I336-2026110T010203Z', /bad run name/],
+    ['I336', 'I336-20261108T010203', /bad run name/],
+    ['I336', 'I337-20261108T010203Z', /bad run name/],
+    ['I336', 'XI336-20261108T010203Z', /bad run name/],
+    ['I336', 'I336-20261108T010203Z/../../x', /bad run name/],
+    ['S5', 'S5-20261108T010203Z', /stage must be/],
+  ])('refuses stage %s with run %s', (stage, run, message) => {
+    const r = runArg(stage, run);
+    expect(r.status).toBe(2);
+    expect(r.out).toMatch(message);
+    expect(r.out).not.toMatch(/RUN_OK/);
+  });
+
+  it('every run-taking command parses the stage first, then the run, before anything else', () => {
+    const calls = prodStage.match(/^.*run_arg "\$\{4:-\}".*$/gm) ?? [];
+    expect(calls.length).toBeGreaterThanOrEqual(6);
+    for (const line of calls) expect(line.trim()).toMatch(/^stage_arg "\$\{3:-\}"; run_arg "\$\{4:-\}"/);
   });
 });
 

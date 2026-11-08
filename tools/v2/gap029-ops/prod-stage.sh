@@ -60,9 +60,13 @@ need_checkout() {
   [ "$(git rev-parse HEAD)" = "$R" ] || stop "pinned checkout is not at $R"
   [ "$(git status --porcelain | wc -l)" = 0 ] || stop "pinned checkout is not clean"
 }
-stage_arg() { S=${1:?stage S1..S4 or I336}; case "$S" in S1|S2|S3|S4|I336) ;; *) stop "stage must be S1, S2, S3, S4 or I336" 2;; esac; }
+# AFLDB-ISSUE-336: ONE stage grammar for both the stage and the run name. The run name is what
+# `capture` generates (RUN=$S-$STAMP, STAMP=%Y%m%dT%H%M%SZ), so it must admit every stage the
+# allowlist admits; before this, I336 was an accepted stage whose every run name was refused.
+STAGE_RE='(S[1-4]|I336)'
+stage_arg() { S=${1:?stage S1..S4 or I336}; [[ "$S" =~ ^${STAGE_RE}$ ]] || stop "stage must be S1, S2, S3, S4 or I336" 2; }
 run_arg() {
-  RUN=${1:?run name (e.g. S1-20261103T000000Z)}; [[ "$RUN" =~ ^S[1-4]-[0-9]{8}T[0-9]{6}Z$ ]] || stop "bad run name" 2; [ "${RUN%%-*}" = "$S" ] || stop "run $RUN is not a $S run" 2
+  RUN=${1:?run name (e.g. S1-20261103T000000Z)}; [[ "$RUN" =~ ^${STAGE_RE}-[0-9]{8}T[0-9]{6}Z$ ]] || stop "bad run name" 2; [ "${RUN%%-*}" = "$S" ] || stop "run $RUN is not a $S run" 2
   RUNDIR=$OPS/runs/$RUN; CAPDIR=$BACKUP_ROOT/gap029-$S-${RUN#*-}; [ -d "$RUNDIR" ] || stop "no run directory $RUNDIR"; [ -d "$CAPDIR" ] || stop "no capture directory $CAPDIR"
 }
 no_conflicts() {
