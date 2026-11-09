@@ -17,22 +17,18 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 [ -f .env ] && set -a && . ./.env && set +a
 
-# Move a postgres DSN's password out of argv and into PGPASSWORD.
-#
-# A DSN on a command line is visible in `ps` and world-readable through
-# /proc/<pid>/cmdline; libpq instead reads PGPASSWORD from the environment
-# (/proc/<pid>/environ, readable only by the owner). This exports PGPASSWORD
-# and assigns a password-less DSN to the named variable.
-dsn_scrub() {
-  local __out_var="$1" dsn="$2"
-  if [[ "$dsn" =~ ^([a-zA-Z][a-zA-Z0-9+.-]*://)([^:/@]+):([^@]*)@(.*)$ ]]; then
-    export PGPASSWORD="${BASH_REMATCH[3]}"
-    printf -v "$__out_var" '%s%s@%s' \
-      "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[4]}"
-  else
-    printf -v "$__out_var" '%s' "$dsn"
-  fi
-}
+# AFLDB-ISSUE-341: libpq chooses WHERE a connection goes from the connection
+# string AND from these environment variables (the routing set tools/db/psql.ts
+# LIBPQ_ROUTING_ENV pins for the destructive rebuild, ISSUE-278). Inherited from
+# the caller or set by .env, any of them can move psql or pg_restore away from
+# the database the URL names. They are removed here, after .env, so the DSN
+# validated below is the ONLY thing that routes every child of this script.
+for __routing_var in PGHOST PGHOSTADDR PGPORT PGDATABASE PGUSER PGSERVICE \
+                     PGSERVICEFILE PGSYSCONFDIR PGOPTIONS PGTARGETSESSIONATTRS \
+                     PGLOADBALANCEHOSTS; do
+  unset "$__routing_var"
+done
+unset __routing_var
 
 BACKUP_DIR="${AFLDB_BACKUP_DIR:-$HOME/backups/afldb}"
 OWNER_DSN="${AFLDB_OWNER_DATABASE_URL:-}"
@@ -44,32 +40,100 @@ fi
 
 RESTORE_DB="afldb_restore_test"
 
-# Replace the database NAME, not a substring of the whole DSN. Substituting
-# "/afldb_dev" left any other source database — production included —
-# untouched, which pointed --clean at the database being backed up.
-strip_query() { printf '%s' "${1%%\?*}"; }
-BASE_DSN="$(strip_query "$OWNER_DSN")"
-SOURCE_DB="${BASE_DSN##*/}"
-RESTORE_DSN="${BASE_DSN%/*}/${RESTORE_DB}"
-case "$OWNER_DSN" in
-  *\?*) RESTORE_DSN="${RESTORE_DSN}?${OWNER_DSN#*\?}" ;;
-esac
-
-if [[ -z "$SOURCE_DB" || "$BASE_DSN" != */* ]]; then
-  echo "ERROR: could not read a database name from AFLDB_OWNER_DATABASE_URL." >&2
+# AFLDB-ISSUE-341: the accepted connection contract.
+#
+# The form .env.example and the installers write, and nothing looser:
+#
+#   postgres[ql]://USER[:PASSWORD]@HOST[:PORT]/DBNAME[?OPTION=VALUE&...]
+#
+# USER and DBNAME are plain identifiers ([A-Za-z0-9_]), HOST is one name or
+# bracketed address (no comma-separated host list), and the query may carry
+# only transport options that cannot change the destination. In particular
+# `?dbname=` overrides the URL path in libpq (PostgreSQL 16 fe-connect.c,
+# closed ISSUE-278 H-278-1), so rewriting only the path used to leave a query
+# that silently pointed the destructive steps back at the source database.
+# Anything outside this contract -- key=value strings, service names, host
+# lists, a percent-encoded keyword -- is refused, never interpreted.
+refuse_dsn() {
+  echo "ERROR: AFLDB_OWNER_DATABASE_URL is outside the restore connection contract: $1." >&2
+  echo "       Expected postgresql://USER:PASSWORD@HOST:PORT/DBNAME with no target-changing options." >&2
   exit 1
+}
+
+DSN_RE='^(postgres|postgresql)://([A-Za-z0-9_]+)(:([^@/?#]*))?@([A-Za-z0-9.-]+|\[[0-9A-Fa-f:.]+\])(:([0-9]{1,5}))?/([A-Za-z0-9_]+)(\?([^#]*))?$'
+if [[ ! "$OWNER_DSN" =~ $DSN_RE ]]; then
+  refuse_dsn "it is not a single-host URL with a user and a plain database name"
+fi
+DSN_SCHEME="${BASH_REMATCH[1]}"
+EXPECTED_USER="${BASH_REMATCH[2]}"
+DSN_HAS_PASSWORD="${BASH_REMATCH[3]:+yes}"
+DSN_PASSWORD_RAW="${BASH_REMATCH[4]}"
+DSN_HOST="${BASH_REMATCH[5]}"
+DSN_PORT="${BASH_REMATCH[7]}"
+SOURCE_DB="${BASH_REMATCH[8]}"
+DSN_QUERY="${BASH_REMATCH[10]}"
+
+# Only these query options are accepted; each is transport, not routing.
+ALLOWED_QUERY_KEYS=" sslmode sslrootcert sslcert sslkey sslcrl connect_timeout application_name "
+if [[ -n "$DSN_QUERY" ]]; then
+  IFS='&' read -r -a __query_items <<< "$DSN_QUERY"
+  for __item in "${__query_items[@]}"; do
+    __key="${__item%%=*}"
+    if [[ "$__item" != *=* || -z "$__key" || "$ALLOWED_QUERY_KEYS" != *" ${__key} "* ]]; then
+      refuse_dsn "query option '${__key:-<empty>}' can change the target or is not supported"
+    fi
+  done
+  unset __query_items __item __key
 fi
 
-# A restore is destructive. Refuse outright unless the target really is the
-# throwaway database, whatever the source happened to be named.
-if [[ "${RESTORE_DSN%%\?*}" != */${RESTORE_DB} ]]; then
-  echo "ERROR: refusing to restore into anything but ${RESTORE_DB}." >&2
-  exit 1
-fi
 if [[ "$SOURCE_DB" == "$RESTORE_DB" ]]; then
   echo "ERROR: source and restore target are the same database (${RESTORE_DB})." >&2
   exit 1
 fi
+
+# Move the password out of argv and into PGPASSWORD. A DSN on a command line is
+# visible in `ps` and /proc/<pid>/cmdline; the environment is readable only by
+# the owner. libpq percent-decodes a URL password, so the same decoding is
+# applied here; a sequence that cannot be decoded exactly is refused rather
+# than guessed at.
+BAD_PERCENT_RE='%([^0-9A-Fa-f]|[0-9A-Fa-f][^0-9A-Fa-f]|[0-9A-Fa-f]?$)'
+if [[ -n "$DSN_HAS_PASSWORD" && -n "$DSN_PASSWORD_RAW" ]]; then
+  # A backslash would be read as an escape by printf %b; a NUL cannot live in
+  # an environment variable. Neither is a password libpq could use either.
+  if [[ "$DSN_PASSWORD_RAW" == *\\* || "$DSN_PASSWORD_RAW" == *%00* ]] \
+     || [[ "$DSN_PASSWORD_RAW" =~ $BAD_PERCENT_RE ]]; then
+    refuse_dsn "the password is not cleanly percent-encoded"
+  fi
+  printf -v PGPASSWORD '%b' "${DSN_PASSWORD_RAW//\%/\\x}"
+  export PGPASSWORD
+fi
+unset DSN_PASSWORD_RAW
+
+DSN_AUTHORITY="${EXPECTED_USER}@${DSN_HOST}${DSN_PORT:+:${DSN_PORT}}"
+DSN_SUFFIX="${DSN_QUERY:+?${DSN_QUERY}}"
+OWNER_DSN="${DSN_SCHEME}://${DSN_AUTHORITY}/${SOURCE_DB}${DSN_SUFFIX}"
+RESTORE_DSN="${DSN_SCHEME}://${DSN_AUTHORITY}/${RESTORE_DB}${DSN_SUFFIX}"
+
+# psql without ~/.psqlrc (which could \connect elsewhere) and stopping on error.
+psql_x() { psql -X -v ON_ERROR_STOP=1 "$@"; }
+
+# The SQL that proves, inside the very session about to act, that it is
+# connected to the disposable database as the expected role. Both names are
+# validated identifiers above, so they are safe to embed. Every destructive or
+# marker-writing stream starts with it; a mismatch aborts that stream (and,
+# through ON_ERROR_STOP and set -e, this script) before its first write.
+identity_guard_sql() {
+  cat <<SQL
+DO \$afldb_identity\$
+BEGIN
+  IF current_database() <> '${RESTORE_DB}' OR current_user <> '${EXPECTED_USER}' THEN
+    RAISE EXCEPTION 'AFLDB restore target identity mismatch: connected to % as %, expected ${RESTORE_DB} as ${EXPECTED_USER}',
+      current_database(), current_user;
+  END IF;
+END
+\$afldb_identity\$;
+SQL
+}
 
 BACKUP="${1:-}"
 if [[ -z "$BACKUP" ]]; then
@@ -80,16 +144,11 @@ if [[ -z "$BACKUP" || ! -f "$BACKUP" ]]; then
   exit 1
 fi
 
-# The DSNs are only used to connect from here on, so move the password out of
-# argv into PGPASSWORD. Both carry the same owner credentials, so either scrub
-# sets the same PGPASSWORD.
-dsn_scrub OWNER_DSN "$OWNER_DSN"
-dsn_scrub RESTORE_DSN "$RESTORE_DSN"
-
 echo "==> Restoring $(basename "$BACKUP") into afldb_restore_test"
 
-if ! psql "$RESTORE_DSN" -c 'SELECT 1' > /dev/null 2>&1; then
-  echo "ERROR: cannot connect to afldb_restore_test." >&2
+if ! identity_guard_sql | psql_x -q "$RESTORE_DSN" > /dev/null 2>&1; then
+  echo "ERROR: cannot connect to afldb_restore_test as ${EXPECTED_USER}, or the connection" >&2
+  echo "       landed somewhere else. Nothing has been changed." >&2
   echo "       Create it first: sudo bash tools/maintenance/01_setup_service.sh" >&2
   exit 1
 fi
@@ -103,7 +162,6 @@ if [[ ! "$BACKUP_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
   echo "ERROR: could not hash ${BACKUP}." >&2
   exit 1
 fi
-psql "$RESTORE_DSN" -v ON_ERROR_STOP=1 -q -c "COMMENT ON DATABASE ${RESTORE_DB} IS NULL"
 
 START=$(date +%s)
 
@@ -115,8 +173,14 @@ START=$(date +%s)
 # Tables are dropped individually rather than by dropping the schema:
 # pg_trgm and unaccent live in public and are owned by another role, so
 # DROP SCHEMA public CASCADE would fail on extension ownership.
+#
+# AFLDB-ISSUE-341: the identity guard, the marker clear and the DROP loop are
+# ONE psql session, so the database proven is the database emptied.
 echo "    clearing ${RESTORE_DB}"
-psql "$RESTORE_DSN" -v ON_ERROR_STOP=1 -q <<'SQL'
+{
+  identity_guard_sql
+  printf 'COMMENT ON DATABASE %s IS NULL;\n' "$RESTORE_DB"
+  cat <<'SQL'
 DO $$
 DECLARE r record;
 BEGIN
@@ -127,6 +191,7 @@ BEGIN
   END LOOP;
 END $$;
 SQL
+} | psql_x -q "$RESTORE_DSN"
 
 # --clean --if-exists makes the restore repeatable.
 #
@@ -135,9 +200,17 @@ SQL
 # "must be owner of extension". Both are harmless: the extensions already
 # exist in the target and must stay.
 #
-# Those two messages are the ONLY tolerated failures. pg_restore's exit
-# status is captured and every other error line is fatal, because a
-# verification tool that swallows errors verifies nothing.
+# AFLDB-ISSUE-342: completion is decided by pg_restore's exit status, never
+# by the absence of text. pg_restore exits 0 when nothing failed and 1 when
+# it ran to the end ignoring errors, in which case its LAST act is the
+# summary "errors ignored on restore: N". So the only accepted outcomes are:
+#   0  with no error lines at all; or
+#   1  with every error line one of the known extension-owner errors, at
+#      least one of them, AND the closing summary naming exactly that count.
+# Anything else -- a signal (128+n, e.g. 137), a missing or unrunnable binary
+# (126/127), a fatal stop with status 1 but no summary, an empty log with a
+# nonzero status, an unknown error -- fails here, before any parity check
+# and with no proof marker (it was cleared above).
 RESTORE_LOG=$(mktemp)
 trap 'rm -f "$RESTORE_LOG"' EXIT
 
@@ -166,11 +239,32 @@ if [[ -n "$UNEXPECTED" ]]; then
   exit 1
 fi
 
-if [[ $RESTORE_STATUS -ne 0 ]]; then
-  # Only the tolerated messages appeared, so a non-zero status here is
-  # pg_restore counting those same errors. Say so rather than hiding it.
-  echo "    pg_restore exited ${RESTORE_STATUS}; only extension-owner errors were reported"
-fi
+TOLERATED_ERRORS=$(grep -c 'must be owner of extension' "$RESTORE_LOG" || true)
+IGNORED_SUMMARY=$(sed -n 's/^pg_restore: warning: errors ignored on restore: \([0-9][0-9]*\)$/\1/p' "$RESTORE_LOG" | tail -1)
+
+case "$RESTORE_STATUS" in
+  0)
+    if [[ "$TOLERATED_ERRORS" -ne 0 || -n "$IGNORED_SUMMARY" ]]; then
+      echo "ERROR: pg_restore exited 0 but its log reports errors; refusing an inconsistent result." >&2
+      exit 1
+    fi
+    ;;
+  1)
+    if [[ "$TOLERATED_ERRORS" -lt 1 || -z "$IGNORED_SUMMARY" \
+          || "$IGNORED_SUMMARY" -ne "$TOLERATED_ERRORS" ]]; then
+      echo "ERROR: pg_restore exited 1 without completing: expected its closing" >&2
+      echo "       'errors ignored on restore: N' summary to account for exactly the" >&2
+      echo "       ${TOLERATED_ERRORS} extension-owner error(s) logged (summary: ${IGNORED_SUMMARY:-absent})." >&2
+      exit 1
+    fi
+    echo "    pg_restore exited 1; it completed, ignoring only ${TOLERATED_ERRORS} extension-owner error(s)"
+    ;;
+  *)
+    echo "ERROR: pg_restore terminated abnormally (exit status ${RESTORE_STATUS})." >&2
+    echo "       The restore is incomplete and cannot be verified." >&2
+    exit 1
+    ;;
+esac
 
 ELAPSED=$(( $(date +%s) - START ))
 echo "    restored in ${ELAPSED}s"
@@ -183,8 +277,8 @@ check() {
   local source_value restored_value
   # A missing table means the restore did not complete. That must read as
   # a failed check, not as an aborted script with no verdict.
-  source_value=$(psql "$OWNER_DSN"   -tAc "$query" 2>/dev/null) || source_value='<query failed>'
-  restored_value=$(psql "$RESTORE_DSN" -tAc "$query" 2>/dev/null) || restored_value='<query failed>'
+  source_value=$(psql -X "$OWNER_DSN"   -tAc "$query" 2>/dev/null) || source_value='<query failed>'
+  restored_value=$(psql -X "$RESTORE_DSN" -tAc "$query" 2>/dev/null) || restored_value='<query failed>'
   if [[ "$source_value" == "$restored_value" && "$restored_value" != '<query failed>' ]]; then
     printf '    PASS  %-38s %s\n' "$label" "$restored_value"
   else
@@ -205,8 +299,11 @@ check "stat_availability rows"   "SELECT count(*) FROM stat_availability"
 
 if [[ $FAILED -eq 0 ]]; then
   # set -e: if the binding cannot be recorded the script fails here, never "proven" without it.
-  psql "$RESTORE_DSN" -v ON_ERROR_STOP=1 -q \
-    -c "COMMENT ON DATABASE ${RESTORE_DB} IS 'afldb.restore_test.v1 sha256=${BACKUP_SHA256}'"
+  # AFLDB-ISSUE-341: the marker is written in the same session that re-proves the target.
+  {
+    identity_guard_sql
+    printf "COMMENT ON DATABASE %s IS 'afldb.restore_test.v1 sha256=%s';\n" "$RESTORE_DB" "$BACKUP_SHA256"
+  } | psql_x -q "$RESTORE_DSN"
   echo "    recorded restored dump sha256 ${BACKUP_SHA256}"
   echo "==> Restore verified: the backup is proven."
 else
