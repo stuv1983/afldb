@@ -453,15 +453,27 @@ checkpoint11["decisions"] = all_decisions_for(pack_info11)
 checkpoint11 = tool.save_checkpoint(ckpt11_path, checkpoint11)
 
 pack_sha_before = tool.sha256_file(fx11["pack_path"])
-result_a = tool.finalize(fx11["pack_path"], checkpoint11, fx11["repo_root"])
-json_bytes_a = result_a["paths"]["json"].read_bytes()
-csv_bytes_a = result_a["paths"]["csv"].read_bytes()
-md_bytes_a = result_a["paths"]["md"].read_bytes()
 
-result_b = tool.finalize(fx11["pack_path"], checkpoint11, fx11["repo_root"])
-json_bytes_b = result_b["paths"]["json"].read_bytes()
-csv_bytes_b = result_b["paths"]["csv"].read_bytes()
-md_bytes_b = result_b["paths"]["md"].read_bytes()
+# AFLDB-ISSUE-338: finalize() legitimately stamps review_completed_utc from the tool's own
+# clock (tool.utc_now, second resolution), so two otherwise identical runs that straddle a
+# second boundary differ in that one field. "Identical decisions AND identical time" is the
+# byte-identity contract, so the tool's clock is frozen ONLY around the two byte-identity
+# runs and restored in a finally block even if a run raises. Product timestamps are unchanged.
+real_utc_now = tool.utc_now
+frozen_completed_utc = real_utc_now()
+tool.utc_now = lambda: frozen_completed_utc
+try:
+    result_a = tool.finalize(fx11["pack_path"], checkpoint11, fx11["repo_root"])
+    json_bytes_a = result_a["paths"]["json"].read_bytes()
+    csv_bytes_a = result_a["paths"]["csv"].read_bytes()
+    md_bytes_a = result_a["paths"]["md"].read_bytes()
+
+    result_b = tool.finalize(fx11["pack_path"], checkpoint11, fx11["repo_root"])
+    json_bytes_b = result_b["paths"]["json"].read_bytes()
+    csv_bytes_b = result_b["paths"]["csv"].read_bytes()
+    md_bytes_b = result_b["paths"]["md"].read_bytes()
+finally:
+    tool.utc_now = real_utc_now
 
 check("11a rerunning finalize() on identical decisions reproduces byte-identical JSON",
       json_bytes_a == json_bytes_b)
@@ -469,6 +481,53 @@ check("11b rerunning finalize() reproduces byte-identical CSV", csv_bytes_a == c
 check("11c rerunning finalize() reproduces byte-identical Markdown", md_bytes_a == md_bytes_b)
 check("11d rows_sha256 matches across reruns",
       result_a["doc"]["rows_sha256"] == result_b["doc"]["rows_sha256"])
+check("11e the tool clock is restored after the frozen byte-identity runs",
+      tool.utc_now is real_utc_now)
+check("11f the frozen runs stamp exactly the frozen completion time",
+      result_a["doc"]["review_completed_utc"] == frozen_completed_utc
+      and result_b["doc"]["review_completed_utc"] == frozen_completed_utc)
+
+# AFLDB-ISSUE-338: a deliberate DIFFERENT completion time. The timestamp must change
+# truthfully, and nothing else may: CSV (which carries no completion time) stays
+# byte-identical, rows_sha256 is unchanged, and JSON/Markdown are byte-identical once ONLY
+# that one known field is normalised back to the frozen value.
+later_completed_utc = "2099-12-31T23:59:59Z"
+tool.utc_now = lambda: later_completed_utc
+try:
+    result_c = tool.finalize(fx11["pack_path"], checkpoint11, fx11["repo_root"])
+    json_bytes_c = result_c["paths"]["json"].read_bytes()
+    csv_bytes_c = result_c["paths"]["csv"].read_bytes()
+    md_bytes_c = result_c["paths"]["md"].read_bytes()
+finally:
+    tool.utc_now = real_utc_now
+
+doc_c = json.loads(json_bytes_c)
+check("11g a later run stamps its own, later completion time (truthful, not frozen)",
+      doc_c["review_completed_utc"] == later_completed_utc
+      and later_completed_utc != frozen_completed_utc
+      and json_bytes_c != json_bytes_a and md_bytes_c != md_bytes_a
+      and result_c["json_sha256"] != result_a["json_sha256"])
+check("11h a different completion time leaves CSV byte-identical and every row digest unchanged",
+      csv_bytes_c == csv_bytes_a
+      and result_c["csv_sha256"] == result_a["csv_sha256"]
+      and result_c["doc"]["rows_sha256"] == result_a["doc"]["rows_sha256"])
+normalised_doc_c = copy.deepcopy(doc_c)
+normalised_doc_c["review_completed_utc"] = frozen_completed_utc
+check("11i JSON is byte-identical once only review_completed_utc is normalised",
+      tool.dump_json_lf(normalised_doc_c) == json_bytes_a)
+completed_line_a = f"Review completed: {frozen_completed_utc}".encode("utf-8")
+completed_line_c = f"Review completed: {later_completed_utc}".encode("utf-8")
+check("11j Markdown is byte-identical once only the completion time is normalised",
+      md_bytes_c.count(completed_line_c) == 1
+      and md_bytes_c.replace(completed_line_c, completed_line_a) == md_bytes_a)
+# The normalisation must not mask any other drift: one changed field elsewhere still fails.
+drifted_doc_c = copy.deepcopy(normalised_doc_c)
+drifted_doc_c["operator_display_name"] = "Someone Else"
+check("11k normalising only the completion time still exposes any other JSON or Markdown change",
+      tool.dump_json_lf(drifted_doc_c) != json_bytes_a
+      and b"Operator: Test Operator" in md_bytes_c
+      and md_bytes_c.replace(completed_line_c, completed_line_a)
+      .replace(b"Operator: Test Operator", b"Operator: Someone Else") != md_bytes_a)
 
 check("12a totals.overall is 83", result_a["doc"]["totals"]["overall"] == 83)
 check("12b totals.by_group sums to 83", sum(result_a["doc"]["totals"]["by_group"].values()) == 83)
