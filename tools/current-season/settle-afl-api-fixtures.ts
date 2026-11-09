@@ -41,9 +41,12 @@ import {
 import { aflApiSeasonFeedTextFrom } from '../../src/lib/acquisition/afl-api-snapshot';
 import {
   describeAflApiIngestionReadFailure,
-  readAflApiIngestionControls,
   type AflApiIngestionControls,
 } from '../../src/lib/acquisition/afl-api-ingestion-control';
+import {
+  proveAflApiIngestionPreflight,
+  type AflApiIngestionPreflight,
+} from '../../src/lib/acquisition/afl-api-ingestion-safety';
 import { asImportBatchId } from '../../src/lib/import-batch-id';
 import { finalizeSettleImportBatch } from '../../src/lib/acquisition/settle-core';
 import { parseSourceFamilyRegistry, type SourceFamilyRegistry } from '../../src/lib/acquisition/source-families';
@@ -180,9 +183,25 @@ export type AflApiFixturesSettleCliDeps = {
   projectRoot?: string;
   sql?: postgres.Sql;
   log?: (line: string) => void;
-  /** Test-only escape hatch for the super-admin ingestion gate below; production always reads the database. */
+  /**
+   * Test-only escape hatch for the super-admin ingestion gate below; production always reads the database.
+   * Injected controls skip the live control/writer identity preflight.
+   */
   ingestionControls?: AflApiIngestionControls;
+  /** Test-only stand-in for `proveAflApiIngestionPreflight` (AFLDB-ISSUE-343); production always uses the real proof. */
+  ingestionPreflight?: (writerSql: postgres.Sql) => Promise<AflApiIngestionPreflight>;
 };
+
+function refuseUnlessCurrentSeasonEnabled(ingestionControls: AflApiIngestionControls): void {
+  if (ingestionControls.currentSeasonEnabled) return;
+  // AFLDB-ISSUE-300: an unreadable control database is not a "disabled" switch.
+  const readFailure = describeAflApiIngestionReadFailure(ingestionControls);
+  if (readFailure) throw new Error(`AFL API current-season ingestion refused: ${readFailure}`);
+  throw new Error(
+    `AFL API current-season ingestion is disabled (site_settings '${SETTING_KEYS.aflApiCurrentSeasonEnabled}'). `
+    + 'A super admin must enable it from /admin/current-season before this tool will write anything.',
+  );
+}
 
 export type AflApiFixturesSettleCliOutcome = {
   args: AflApiFixturesSettleCliArgs;
@@ -247,17 +266,10 @@ export async function runAflApiFixturesSettleCli(
 
   // AFLDB-ISSUE-228 follow-up (§C, §E, §F) — same gate as settle-afl-api.ts:
   // this tool has no `--report` mode, so every path past --validate-only is
-  // write-capable and gated. Fail closed.
-  const ingestionControls = deps.ingestionControls ?? await readAflApiIngestionControls();
-  if (!ingestionControls.currentSeasonEnabled) {
-    // AFLDB-ISSUE-300: an unreadable control database is not a "disabled" switch.
-    const readFailure = describeAflApiIngestionReadFailure(ingestionControls);
-    if (readFailure) throw new Error(`AFL API current-season ingestion refused: ${readFailure}`);
-    throw new Error(
-      `AFL API current-season ingestion is disabled (site_settings '${SETTING_KEYS.aflApiCurrentSeasonEnabled}'). `
-      + 'A super admin must enable it from /admin/current-season before this tool will write anything.',
-    );
-  }
+  // write-capable and gated. Fail closed. Injected (test-only) controls are
+  // decided before any client exists; the real controls are read by the
+  // identity preflight inside the client's try/finally below (AFLDB-ISSUE-343).
+  if (deps.ingestionControls) refuseUnlessCurrentSeasonEnabled(deps.ingestionControls);
 
   const ownsClient = deps.sql === undefined;
   const sql = deps.sql ?? createImportClient();
@@ -274,6 +286,18 @@ export async function runAflApiFixturesSettleCli(
     observationsSeen: 0, versionsAppended: 0, observationsUnchanged: 0,
   };
   try {
+    // AFLDB-ISSUE-343 (as ISSUE-244 F016 for settle-afl-api.ts): the switches are read on the
+    // DATABASE_URL control connection, so prove that connection names the same live database as
+    // this writer before the first write-capable transaction. Fail closed; a refusal propagates
+    // through the catch below and the finally closes an owned writer client.
+    if (!deps.ingestionControls) {
+      const preflight = deps.ingestionPreflight
+        ? await deps.ingestionPreflight(sql)
+        : await proveAflApiIngestionPreflight(sql);
+      refuseUnlessCurrentSeasonEnabled(preflight.controls);
+      log(`AFL API ingestion preflight: control database = ${preflight.control.database}, `
+        + `writer database = ${preflight.writer.database}.`);
+    }
     await sql.begin(async (tx) => {
       const sourceId = await resolveAflApiSourceId(tx);
       const [batch] = await tx<{ id: string }[]>`

@@ -1,5 +1,6 @@
+import { createHash } from 'node:crypto';
 import {
-  mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync,
+  mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -10,9 +11,13 @@ import {
 } from 'vitest';
 
 import { emptyAflApiBrownlowCounters, runSettleAflApiBrownlow } from '@/lib/acquisition/afl-api-brownlow';
+import { AFL_API_FIXTURE_ACQUISITION_KIND } from '@/lib/acquisition/afl-api-fixture-identity';
+import type { AflApiIngestionControls } from '@/lib/acquisition/afl-api-ingestion-control';
 import {
   proveAflApiIngestionPreflight,
   requireSameAflApiDatabase,
+  type AflApiDatabaseIdentity,
+  type AflApiIngestionPreflight,
 } from '@/lib/acquisition/afl-api-ingestion-safety';
 import type { CanonicalApplyTargetInput } from '@/lib/acquisition/canonical-apply';
 import { missingAflApiSeasonEnumeration } from '@/lib/acquisition/afl-api-season-enumeration';
@@ -53,6 +58,9 @@ import {
 import { asImportBatchId } from '@/lib/import-batch-id';
 import { parseSourceFamilyRegistry } from '@/lib/acquisition/source-families';
 import { loadEnv, SKIP_DOTENV_ENV } from '../tools/current-season/load-env';
+import { runAflApiFixturesSettleCli } from '../tools/current-season/settle-afl-api-fixtures';
+import { runFixtureScheduleCli } from '../tools/current-season/settle-afl-api-fixture-schedule';
+import { predecessorText } from './rollover-predecessor-fixture';
 
 const ROOT = join(__dirname, '..');
 const readSource = (path: string): string => readFileSync(join(ROOT, path), 'utf8');
@@ -216,6 +224,196 @@ describe('AFLDB-ISSUE-244 F016 — both canonical writer CLIs preflight before s
       const source = readSource(path);
       expect(source.indexOf('proveAflApiIngestionPreflight(sql)'))
         .toBeLessThan(source.indexOf(settleCall));
+    });
+  }
+});
+
+/* ------------------------------------------------------------------ *
+ * AFLDB-ISSUE-343 — the two fixture ingestion CLIs read the switches
+ * through DATABASE_URL but write through AFLDB_IMPORT_DATABASE_URL, so
+ * they must carry the same control/writer identity proof as the two
+ * canonical writers above before their first write-capable statement.
+ * ------------------------------------------------------------------ */
+
+describe('AFLDB-ISSUE-343 — both fixture ingestion CLIs preflight before their first write', () => {
+  for (const [path, clientCreation, firstWrite] of [
+    ['tools/current-season/settle-afl-api-fixtures.ts', 'const sql = deps.sql ?? createImportClient();', 'await sql.begin(async (tx)'],
+    ['tools/current-season/settle-afl-api-fixture-schedule.ts', 'sql = postgres(dsn,', 'await settleAflApiFixtureStage('],
+  ]) {
+    it(`${path} proves live control/writer identity inside the writer's try/finally, before any write`, () => {
+      const source = readSource(path);
+      const proof = source.indexOf('proveAflApiIngestionPreflight(sql)');
+      expect(proof).toBeGreaterThan(0);
+      expect(proof).toBeLessThan(source.indexOf(firstWrite));
+      // Inside the try whose finally ends an owned client: a refusal closes it.
+      expect(source.lastIndexOf('try {', proof)).toBeGreaterThan(source.indexOf(clientCreation));
+      expect(source.indexOf('if (ownsClient) await sql.end(', proof)).toBeGreaterThan(proof);
+      // The unbound DATABASE_URL-only switch read is gone from the production path.
+      expect(source).not.toContain('readAflApiIngestionControls(');
+    });
+  }
+});
+
+describe('AFLDB-ISSUE-343 — fixture CLI entry boundaries refuse a mismatched control/writer identity', () => {
+  const LABEL = 'issue343-fixtures-snapshot';
+  const ENABLED: AflApiIngestionControls = { currentSeasonEnabled: true, brownlowAdminEnabled: false };
+  const DISABLED: AflApiIngestionControls = { currentSeasonEnabled: false, brownlowAdminEnabled: false };
+  const IDENTITY_QUERY = 'SELECT current_database() AS database, current_user AS role';
+  const scratchRoots: string[] = [];
+  const originalDatabaseUrl = process.env.DATABASE_URL;
+
+  afterEach(() => {
+    for (const dir of scratchRoots.splice(0)) rmSync(dir, { recursive: true, force: true });
+    if (originalDatabaseUrl === undefined) delete process.env.DATABASE_URL;
+    else process.env.DATABASE_URL = originalDatabaseUrl;
+  });
+
+  /**
+   * A scratch project root holding one hash-bound `--fixtures-only` snapshot of the real retained
+   * 2026 season feed (no fixture.json files), COPIES of the tracked reference files, and the
+   * explicit predecessor seasons registry (2026 in progress), so the seal admits a write and both
+   * CLIs reach their database boundary.
+   */
+  function projectRoot(): string {
+    const root = mkdtempSync(join(tmpdir(), 'afldb-issue343-'));
+    scratchRoots.push(root);
+    mkdirSync(join(root, 'data', 'reference'), { recursive: true });
+    for (const name of ['source-families.json', 'afl-api-identities.json']) {
+      writeFileSync(join(root, 'data', 'reference', name), readSource(`data/reference/${name}`));
+    }
+    writeFileSync(join(root, 'data', 'reference', 'seasons.json'), predecessorText('data/reference/seasons.json'));
+    const dir = join(root, 'data', 'sources', 'afl_api', 'fixtures', LABEL);
+    mkdirSync(dir, { recursive: true });
+    const feed = readFileSync(join(ROOT, 'tests', 'fixtures', 'afl_api', 'seasons', '00-season-matches-2026.raw.json'));
+    writeFileSync(join(dir, '00-season-matches.json'), feed);
+    writeFileSync(join(dir, 'manifest.json'), JSON.stringify({
+      source_key: 'afl_api', acquisition_kind: AFL_API_FIXTURE_ACQUISITION_KIND, season: 2026,
+      files: [{ file: '00-season-matches.json', sha256: createHash('sha256').update(feed).digest('hex') }],
+    }));
+    return root;
+  }
+
+  class WriterReached extends Error {
+    constructor(detail: string) { super(`writer reached: ${detail}`); this.name = 'WriterReached'; }
+  }
+
+  /**
+   * A writer client on live database `database`. It answers ONLY the identity query; any other
+   * statement, transaction or unsafe query is a write-capable use and records `writeAttempted`.
+   */
+  function makeWriter(database: string) {
+    const statements: string[] = [];
+    const state = { writeAttempted: false };
+    const reached = (detail: string): never => {
+      state.writeAttempted = true;
+      throw new WriterReached(detail);
+    };
+    const sql = Object.assign(
+      async (strings: TemplateStringsArray) => {
+        const text = strings.join('?').replace(/\s+/g, ' ').trim();
+        statements.push(text);
+        if (text === IDENTITY_QUERY) return [{ database, role: 'afldb_import' }];
+        return reached(text);
+      },
+      {
+        begin: async () => reached('begin'),
+        unsafe: async () => reached('unsafe'),
+        end: async () => undefined,
+      },
+    ) as unknown as postgres.Sql;
+    return { sql, statements, state };
+  }
+
+  /**
+   * The control side of the proof: switches read on `controlDatabase`, compared through the REAL
+   * `requireSameAflApiDatabase` against the writer's own live identity answer.
+   */
+  const preflightOn = (controlDatabase: string, controls: AflApiIngestionControls) =>
+    async (writerSql: postgres.Sql): Promise<AflApiIngestionPreflight> => {
+      const control: AflApiDatabaseIdentity = { database: controlDatabase, role: 'afldb_app' };
+      const [writer] = await writerSql<AflApiDatabaseIdentity[]>`
+        SELECT current_database() AS database, current_user AS role
+      `;
+      requireSameAflApiDatabase(control, writer);
+      return { controls, control, writer };
+    };
+
+  type EntryDeps = {
+    projectRoot: string;
+    sql: postgres.Sql;
+    log: (line: string) => void;
+    ingestionPreflight?: (writerSql: postgres.Sql) => Promise<AflApiIngestionPreflight>;
+  };
+  const ENTRY_POINTS: [string, (argv: string[], deps: EntryDeps) => Promise<unknown>][] = [
+    ['settle-afl-api-fixtures.ts', (argv, deps) => runAflApiFixturesSettleCli(argv, deps)],
+    ['settle-afl-api-fixture-schedule.ts', (argv, deps) => runFixtureScheduleCli(argv, deps)],
+  ];
+
+  for (const [name, run] of ENTRY_POINTS) {
+    describe(name, () => {
+      for (const flag of ['--dry-run', '--apply']) {
+        it(`${flag}: control database A enabled, writer database B — refuses with zero writes`, async () => {
+          const writer = makeWriter('afldb_b_test');
+          const error = await run(['--label', LABEL, flag], {
+            projectRoot: projectRoot(), sql: writer.sql, log: () => {},
+            ingestionPreflight: preflightOn('afldb_a_test', ENABLED),
+          }).then(() => null, (failure: unknown) => failure);
+
+          expect(error).toBeInstanceOf(Error);
+          expect((error as Error).message).toMatch(
+            /control database 'afldb_a_test' does not match writer database 'afldb_b_test'/,
+          );
+          expect(writer.state.writeAttempted).toBe(false);
+          expect(writer.statements).toEqual([IDENTITY_QUERY]);
+        });
+      }
+
+      it('matching identity but a disabled switch refuses with zero writes', async () => {
+        const writer = makeWriter('afldb_test');
+        await expect(run(['--label', LABEL, '--apply'], {
+          projectRoot: projectRoot(), sql: writer.sql, log: () => {},
+          ingestionPreflight: preflightOn('afldb_test', DISABLED),
+        })).rejects.toThrow(/current-season ingestion is disabled/);
+        expect(writer.state.writeAttempted).toBe(false);
+      });
+
+      it('matching identity with the switch enabled proceeds to the writer (gate permits progression)', async () => {
+        const writer = makeWriter('afldb_test');
+        const lines: string[] = [];
+        await expect(run(['--label', LABEL, '--dry-run'], {
+          projectRoot: projectRoot(), sql: writer.sql, log: (line) => lines.push(line),
+          ingestionPreflight: preflightOn('afldb_test', ENABLED),
+        })).rejects.toThrow(WriterReached);
+        expect(writer.state.writeAttempted).toBe(true);
+        expect(writer.statements[0]).toBe(IDENTITY_QUERY);
+        expect(lines).toContain(
+          'AFL API ingestion preflight: control database = afldb_test, writer database = afldb_test.',
+        );
+      });
+
+      it('the real preflight fails closed without a control DSN, before the writer is touched', async () => {
+        const writer = makeWriter('afldb_test');
+        delete process.env.DATABASE_URL;
+        await expect(run(['--label', LABEL, '--dry-run'], {
+          projectRoot: projectRoot(), sql: writer.sql, log: () => {},
+        })).rejects.toThrow('DATABASE_URL is not configured for the control database');
+        expect(writer.statements).toEqual([]);
+        expect(writer.state.writeAttempted).toBe(false);
+      });
+
+      it('--validate-only opens no connection and runs no preflight', async () => {
+        const writer = makeWriter('afldb_b_test');
+        let preflightCalls = 0;
+        await run(['--label', LABEL, '--validate-only'], {
+          projectRoot: projectRoot(), sql: writer.sql, log: () => {},
+          ingestionPreflight: async (writerSql) => {
+            preflightCalls += 1;
+            return preflightOn('afldb_a_test', ENABLED)(writerSql);
+          },
+        });
+        expect(preflightCalls).toBe(0);
+        expect(writer.statements).toEqual([]);
+      });
     });
   }
 });

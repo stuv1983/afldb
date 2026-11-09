@@ -46,9 +46,12 @@ import {
 } from '../../src/lib/acquisition/afl-api-fixture-writer';
 import {
   describeAflApiIngestionReadFailure,
-  readAflApiIngestionControls,
   type AflApiIngestionControls,
 } from '../../src/lib/acquisition/afl-api-ingestion-control';
+import {
+  proveAflApiIngestionPreflight,
+  type AflApiIngestionPreflight,
+} from '../../src/lib/acquisition/afl-api-ingestion-safety';
 import { AFL_API_SEASON_FEED_FILE } from '../../src/lib/acquisition/afl-api-season-enumeration';
 import { aflApiSnapshotManifestSha256 } from '../../src/lib/acquisition/afl-api-snapshot';
 import { SETTING_KEYS } from '../../src/lib/site-settings';
@@ -155,9 +158,21 @@ export type FixtureScheduleCliDeps = {
   projectRoot?: string;
   sql?: postgres.Sql;
   log?: (line: string) => void;
+  /** Test-only escape hatch: injected controls skip the live control/writer identity preflight. */
   ingestionControls?: AflApiIngestionControls;
+  /** Test-only stand-in for `proveAflApiIngestionPreflight` (AFLDB-ISSUE-343); production always uses the real proof. */
+  ingestionPreflight?: (writerSql: postgres.Sql) => Promise<AflApiIngestionPreflight>;
   mintFixtureKey?: () => string;
 };
+
+function refuseUnlessCurrentSeasonEnabled(controls: AflApiIngestionControls): void {
+  if (controls.currentSeasonEnabled) return;
+  const readFailure = describeAflApiIngestionReadFailure(controls);
+  if (readFailure) throw new Error(`AFL API current-season ingestion refused: ${readFailure}`);
+  throw new Error(
+    `AFL API current-season ingestion is disabled (site_settings '${SETTING_KEYS.aflApiCurrentSeasonEnabled}').`,
+  );
+}
 
 export async function runFixtureScheduleCli(
   argv: readonly string[], deps: FixtureScheduleCliDeps = {},
@@ -173,14 +188,8 @@ export async function runFixtureScheduleCli(
   }
 
   refuseSealedSeasonForSettle(projectRoot, stage.season);
-  const controls = deps.ingestionControls ?? await readAflApiIngestionControls();
-  if (!controls.currentSeasonEnabled) {
-    const readFailure = describeAflApiIngestionReadFailure(controls);
-    if (readFailure) throw new Error(`AFL API current-season ingestion refused: ${readFailure}`);
-    throw new Error(
-      `AFL API current-season ingestion is disabled (site_settings '${SETTING_KEYS.aflApiCurrentSeasonEnabled}').`,
-    );
-  }
+  // Injected (test-only) controls are decided before any client exists, exactly as before.
+  if (deps.ingestionControls) refuseUnlessCurrentSeasonEnabled(deps.ingestionControls);
 
   const ownsClient = deps.sql === undefined;
   let sql = deps.sql;
@@ -190,6 +199,18 @@ export async function runFixtureScheduleCli(
     sql = postgres(dsn, { max: 1, onnotice: () => {}, transform: { undefined: null } });
   }
   try {
+    // AFLDB-ISSUE-343 (as ISSUE-244 F016 for settle-afl-api.ts): the switches are read on the
+    // DATABASE_URL control connection, so prove that connection names the same live database as
+    // this writer before the first write-capable statement. Fail closed; the finally closes an
+    // owned writer client on refusal.
+    if (!deps.ingestionControls) {
+      const preflight = deps.ingestionPreflight
+        ? await deps.ingestionPreflight(sql)
+        : await proveAflApiIngestionPreflight(sql);
+      refuseUnlessCurrentSeasonEnabled(preflight.controls);
+      log(`AFL API ingestion preflight: control database = ${preflight.control.database}, `
+        + `writer database = ${preflight.writer.database}.`);
+    }
     const outcome = await settleAflApiFixtureStage(postgresExecutor(sql), {
       stage, mode: args.mode, provenance: { tool: TOOL, snapshotLabel: args.label, manifestSha256 },
       mintFixtureKey: deps.mintFixtureKey,
