@@ -1869,8 +1869,9 @@ export async function listDraftPicksForAdmin(
   filters: DraftAdminListFilters,
 ): Promise<{ rows: DraftAdminListRow[]; total: number }> {
   const offset = Math.max(0, (filters.page - 1) * filters.pageSize);
-  const rows = await sql<(DraftAdminListRow & { sourceKey: string | null; total: string })[]>`
-    WITH filtered AS (
+  // One filtered set, shared by the page read and the AFLDB-ISSUE-344 past-the-end
+  // count below, so both always apply identical predicates.
+  const filtered = sql`
       SELECT dp.id, dp.draft_year, dp.draft_kind, dp.draft_type, dp.pick_number,
              dp.player_name_raw, dp.player_id, dp.player_url, dp.source_id,
              dp.link_status_value, s.key AS source_key,
@@ -1942,7 +1943,9 @@ export async function listDraftPicksForAdmin(
                         SELECT 1 FROM external_identities a
                           JOIN sources asrc ON asrc.id = a.source_id AND asrc.key = 'afltables'
                          WHERE a.player_id = dp.player_id AND a.status IN ('unique', 'resolved'))))
-    )
+  `;
+  const rows = await sql<(DraftAdminListRow & { sourceKey: string | null; total: string })[]>`
+    WITH filtered AS (${filtered})
     SELECT id, draft_year AS "draftYear", draft_kind AS "draftKind", draft_type AS "draftType",
            pick_number AS "pickNumber", player_name_raw AS "playerNameRaw",
            player_id AS "playerId", player_slug AS "playerSlug",
@@ -1954,8 +1957,18 @@ export async function listDraftPicksForAdmin(
      ORDER BY draft_year DESC, draft_kind, pick_number NULLS LAST, id
      LIMIT ${filters.pageSize} OFFSET ${offset}
   `;
+  // AFLDB-ISSUE-344: an offset past the end returns no rows and so no window count.
+  // Only then, count the same filtered set once, so the true total survives.
+  let total = rows.length > 0 ? Number(rows[0].total) : 0;
+  if (rows.length === 0 && offset > 0) {
+    const [counted] = await sql<{ total: string }[]>`
+      WITH filtered AS (${filtered})
+      SELECT count(*)::text AS total FROM filtered
+    `;
+    total = Number(counted.total);
+  }
   return {
-    total: rows.length > 0 ? Number(rows[0].total) : 0,
+    total,
     rows: rows.map((r) => {
       const raw = r as unknown as {
         sourceId: number | null; playerUrl: string | null; sourceKey: string | null;

@@ -16,6 +16,7 @@ import {
 import { hasCapability } from '@/lib/auth/capabilities';
 import { requireCapability } from '@/lib/auth/session';
 import { formatNumber, playerPath } from '@/lib/format';
+import { redirectPastEnd } from '@/lib/pagination';
 import { firstValue } from '@/lib/params';
 
 export const metadata: Metadata = { title: 'Draft administration', robots: { index: false, follow: false } };
@@ -81,6 +82,13 @@ export default async function DraftAdminPage(
     overrideKeys: state === 'override' ? [...overrideKeys] : undefined,
     page, pageSize: PAGE_SIZE,
   });
+  const filterParams: Record<string, string | undefined> = {
+    q: q || undefined, year: year ? String(year) : undefined, kind, club: clubSlug,
+    provenance, linkState, state,
+  };
+  // AFLDB-ISSUE-344: a page past the last one goes to the last page that exists,
+  // keeping every filter, so the count, pager and table describe the same set.
+  redirectPastEnd({ basePath: '/admin/draft', params: filterParams, page, pageSize: PAGE_SIZE, total });
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const canEdit = hasCapability(admin, 'data.draft.edit');
@@ -90,10 +98,7 @@ export default async function DraftAdminPage(
   const canReviewLinks = hasCapability(admin, 'data.playerLinks');
 
   const hrefWith = (overrides: Record<string, string | undefined>) => {
-    const merged: Record<string, string | undefined> = {
-      q: q || undefined, year: year ? String(year) : undefined, kind, club: clubSlug,
-      provenance, linkState, state, ...overrides,
-    };
+    const merged: Record<string, string | undefined> = { ...filterParams, ...overrides };
     const search = new URLSearchParams();
     for (const [key, value] of Object.entries(merged)) if (value) search.set(key, value);
     const qs = search.toString();

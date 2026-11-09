@@ -30,6 +30,7 @@ import {
   type DraftView,
 } from '@/lib/draft-categories';
 import { clubPath, formatNumber, isLinked, playerPath } from '@/lib/format';
+import { redirectPastEnd } from '@/lib/pagination';
 import { firstValue, parsePage } from '@/lib/params';
 import { pageMetadata } from '@/lib/seo';
 import { DEFAULT_PAGE_SIZE } from '@/search/constants';
@@ -140,6 +141,10 @@ export default async function DraftYearPage({
   const listParams = { ...filterParams, ...sortParams, ...(viewParam ? { view: viewParam } : {}) };
   const described = describeFilters(fields, values);
   const basePath = `/draft/${year}`;
+
+  // AFLDB-ISSUE-344: a stale or hand-edited page past the last one goes to the last page
+  // that exists, keeping the view, filters and sort, so the count and table agree.
+  redirectPastEnd({ basePath, params: listParams, page, pageSize: DEFAULT_PAGE_SIZE, total });
 
   const sorted = years.slice().sort((a, b) => a - b);
   const index = sorted.indexOf(yearNumber);

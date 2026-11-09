@@ -1811,3 +1811,103 @@ describe('AFLDB-ISSUE-337: public draft name search across U+00A0', () => {
     expect(miss.rows.map((r) => r.id)).not.toContain(nbspPickId);
   });
 });
+
+/*
+ * AFLDB-ISSUE-344 on a real database: a page past the last one returned no rows, and with them
+ * went the `count(*) OVER ()` total, so a nonempty result read as zero matches. Five selections
+ * under their own name marker, paged two at a time, give one full page, a final partial page
+ * (page 3, one row) and every page past it. Both the admin list and the public list are proved.
+ */
+describe('AFLDB-ISSUE-344: past-the-end draft pages keep the true total', () => {
+  const NAME = `${MARKER} Page344`;
+  const ABSENT = `${MARKER} Page344 Absent`;
+  const PICKS: [string, string, number | null][] = [
+    ['National', 'national', 401],
+    ['National', 'national', 402],
+    ['Rookie', 'rookie', 401],
+    ['Pre-Draft', 'pre_draft', null],
+    ['Pre-Draft', 'pre_draft', null],
+  ];
+  const N = PICKS.length;
+  const ids: number[] = [];
+
+  beforeAll(async () => {
+    for (const [i, [draftType, draftKind, pick]] of PICKS.entries()) {
+      const [row] = await admin<{ id: number }[]>`
+        INSERT INTO draft_picks
+          (draft_year, draft_type, draft_kind, pick_number, player_name_raw,
+           link_status_value, club_id, source_id, source_record_id, player_url)
+        VALUES (${fixtureYear}, ${draftType}, ${draftKind}, ${pick}, ${`${NAME} ${String.fromCharCode(65 + i)}`},
+                'unmatched', ${clubId}, ${draftguruSourceId}, ${`${MARKER}#344-${i}`},
+                ${SOURCE_URL.replace('/1', `/344${i}`)})
+        RETURNING id`;
+      ids.push(row.id);
+      createdPickIds.add(row.id);
+    }
+  });
+
+  it('admin: one page, the final partial page, and every page past it report the same total', async () => {
+    const base = { year: fixtureYear, q: NAME };
+    const single = await listDraftPicksForAdmin({ ...base, page: 1, pageSize: 50 });
+    expect(single.total).toBe(N);
+    expect(single.rows.map((r) => r.id).sort((a, b) => a - b)).toEqual([...ids].sort((a, b) => a - b));
+
+    const pages = await Promise.all([1, 2, 3].map((page) => listDraftPicksForAdmin({ ...base, page, pageSize: 2 })));
+    expect(pages.map((p) => p.rows.length)).toEqual([2, 2, 1]);
+    expect(pages.every((p) => p.total === N)).toBe(true);
+    // Paging never reorders: the pages concatenate to the single-page order.
+    expect(pages.flatMap((p) => p.rows.map((r) => r.id))).toEqual(single.rows.map((r) => r.id));
+
+    for (const page of [4, 1000]) {
+      const past = await listDraftPicksForAdmin({ ...base, page, pageSize: 2 });
+      expect(past.rows, `page ${page}`).toEqual([]);
+      expect(past.total, `page ${page}`).toBe(pages[0].total);
+    }
+  });
+
+  it('admin: a filter narrowed while on a later page reports its own true total', async () => {
+    const narrowed = await listDraftPicksForAdmin({ year: fixtureYear, q: NAME, kind: 'rookie', page: 2, pageSize: 2 });
+    expect(narrowed.rows).toEqual([]);
+    expect(narrowed.total).toBe(1);
+  });
+
+  it('admin: a genuine no-match is still zero, on page one and past it', async () => {
+    for (const page of [1, 4]) {
+      const none = await listDraftPicksForAdmin({ year: fixtureYear, q: ABSENT, page, pageSize: 2 });
+      expect(none).toEqual({ rows: [], total: 0 });
+    }
+  });
+
+  it('public: the same pages, category order and NULL picks unchanged, and the true total past the end', async () => {
+    const { listDraftPicks } = await import('@/db/queries/draft');
+    const base = { year: fixtureYear, q: NAME };
+    const single = await listDraftPicks({ ...base, page: 1, pageSize: 50 });
+    expect(single.total).toBe(N);
+    // ISSUE-336 order: category rank, pick within it (unnumbered last), name, id.
+    expect(single.rows.map((r) => [r.draftKind, r.pickNumber])).toEqual([
+      ['national', 401], ['national', 402], ['rookie', 401], ['pre_draft', null], ['pre_draft', null],
+    ]);
+
+    const pages = await Promise.all([1, 2, 3].map((page) => listDraftPicks({ ...base, page, pageSize: 2 })));
+    expect(pages.map((p) => p.rows.length)).toEqual([2, 2, 1]);
+    expect(pages.every((p) => p.total === N)).toBe(true);
+    expect(pages.flatMap((p) => p.rows.map((r) => r.id))).toEqual(single.rows.map((r) => r.id));
+
+    for (const page of [4, 1000]) {
+      const past = await listDraftPicks({ ...base, page, pageSize: 2 });
+      expect(past.rows, `page ${page}`).toEqual([]);
+      expect(past.total, `page ${page}`).toBe(pages[0].total);
+    }
+    // A category view past its own end keeps that category's total.
+    const rookie = await listDraftPicks({ ...base, kind: 'rookie', page: 2, pageSize: 2 });
+    expect(rookie).toEqual({ rows: [], total: 1 });
+  });
+
+  it('public: a genuine no-match is still zero, on page one and past it', async () => {
+    const { listDraftPicks } = await import('@/db/queries/draft');
+    for (const page of [1, 4]) {
+      const none = await listDraftPicks({ year: fixtureYear, q: ABSENT, page, pageSize: 2 });
+      expect(none).toEqual({ rows: [], total: 0 });
+    }
+  });
+});

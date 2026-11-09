@@ -179,10 +179,26 @@ export async function listDraftPicks(
      LIMIT ${filters.pageSize} OFFSET ${offset}
   `;
 
-  return {
-    rows: rows.map(({ total: _total, ...rest }) => rest),
-    total: rows.length > 0 ? Number(rows[0].total) : 0,
-  };
+  if (rows.length > 0 || offset <= 0) {
+    return {
+      rows: rows.map(({ total: _total, ...rest }) => rest),
+      total: rows.length > 0 ? Number(rows[0].total) : 0,
+    };
+  }
+
+  // AFLDB-ISSUE-344: an offset past the end returns no rows, so the window count
+  // vanishes with them and a nonempty result would read as "0 matching". Count the
+  // same FROM/JOIN/WHERE once, only on this empty past-the-end page (as listPlayers
+  // does), so the caller can report the true total and redirect to a page that exists.
+  const [counted] = await sql<{ total: string }[]>`
+    SELECT count(*) AS total
+      FROM draft_picks dp
+      LEFT JOIN players p ON p.id = dp.player_id
+      LEFT JOIN player_career_stats pcs ON pcs.player_id = dp.player_id
+      LEFT JOIN clubs c ON c.id = dp.club_id
+     WHERE ${where}
+  `;
+  return { rows: [], total: Number(counted.total) };
 }
 
 export async function getDraftYears(): Promise<number[]> {

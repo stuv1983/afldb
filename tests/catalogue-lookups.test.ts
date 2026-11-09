@@ -119,13 +119,15 @@ describe('getRecordCategory', () => {
  */
 type Recorded = { strings: readonly string[]; values: unknown[] };
 const recordedQueries: Recorded[] = [];
+/** AFLDB-ISSUE-344: results for the next awaited statements, in order; empty means the default row. */
+const scriptedResults: unknown[][] = [];
 
 function fakeFragment(strings: readonly string[], values: unknown[]) {
   const fragment: Recorded & PromiseLike<unknown[]> = {
     strings,
     values,
     // One row with a window total, so each query returns after its first statement.
-    then: (resolve, reject) => Promise.resolve([{ total: '1' }]).then(resolve, reject),
+    then: (resolve, reject) => Promise.resolve(scriptedResults.shift() ?? [{ total: '1' }]).then(resolve, reject),
   };
   return fragment;
 }
@@ -283,6 +285,67 @@ describe('match-log and draft ORDER BY', () => {
       await listDraftPicks({ ...draftFilters, sort, dir });
       expect(lastOrderBy()).toBe(DRAFT_DEFAULT);
     }
+  });
+});
+
+/*
+ * AFLDB-ISSUE-344: the total came only from `count(*) OVER ()` on the returned rows, so a page
+ * past the last one (no rows) reported zero matches for a nonempty result. The fallback count
+ * runs only for that empty past-the-end page, with the page query's own WHERE.
+ */
+describe('AFLDB-ISSUE-344 draft list total past the last page', () => {
+  const whereOf = (text: string): string => {
+    const match = /WHERE (.*?)(?: ORDER BY .*)?$/.exec(text);
+    if (!match) throw new Error(`no WHERE in: ${text}`);
+    return match[1].trim();
+  };
+  const textOf = (q: Recorded | undefined) => render(q).replace(/\s+/g, ' ').trim();
+  const filters = {
+    year: 2025, kind: 'rookie', clubSlug: 'carlton', q: 'Jake Long', sort: 'pick', dir: 'asc', pageSize: 50,
+  };
+
+  it('a page beyond the final one reports the true total, counted with identical predicates', async () => {
+    scriptedResults.push([], [{ total: '73' }]);
+    const before = recordedQueries.length;
+    const result = await listDraftPicks({ ...filters, page: 3 });
+    expect(result).toEqual({ rows: [], total: 73 });
+
+    const top = recordedQueries.slice(before).filter((q) => /\bFROM draft_picks dp\b/.test(textOf(q)));
+    expect(top).toHaveLength(2);
+    const [pageQuery, countQuery] = top.map(textOf);
+    expect(countQuery).toMatch(/^SELECT count\(\*\) AS total FROM draft_picks dp /);
+    expect(countQuery).not.toContain('LIMIT');
+    // Same joins and the same WHERE text; the bound values are the page's minus LIMIT/OFFSET.
+    expect(countQuery.slice(countQuery.indexOf('FROM'), countQuery.indexOf(' WHERE ')))
+      .toBe(pageQuery.slice(pageQuery.indexOf('FROM'), pageQuery.indexOf(' WHERE ')));
+    expect(whereOf(countQuery)).toBe(whereOf(pageQuery).replace(/ LIMIT .*$/, ''));
+    expect(leafValues(top[1])).toEqual(leafValues(top[0]).slice(0, -2));
+    expect(leafValues(top[0]).slice(-2)).toEqual([50, 100]);
+    scriptedResults.length = 0;
+  });
+
+  it('a past-the-end page whose filters now match nothing is still zero', async () => {
+    scriptedResults.push([], [{ total: '0' }]);
+    expect(await listDraftPicks({ ...filters, page: 4 })).toEqual({ rows: [], total: 0 });
+    scriptedResults.length = 0;
+  });
+
+  it('page one with no rows is a genuine no-match and issues no second statement', async () => {
+    scriptedResults.push([]);
+    const before = recordedQueries.length;
+    expect(await listDraftPicks({ ...filters, page: 1 })).toEqual({ rows: [], total: 0 });
+    const statements = recordedQueries.slice(before).filter((q) => /\bFROM draft_picks dp\b/.test(textOf(q)));
+    expect(statements).toHaveLength(1);
+    scriptedResults.length = 0;
+  });
+
+  it('a normal nonempty page takes its total from the window count and never runs the fallback', async () => {
+    const before = recordedQueries.length;
+    const result = await listDraftPicks({ ...filters, page: 2 });
+    expect(result.total).toBe(1);
+    const statements = recordedQueries.slice(before).filter((q) => /\bFROM draft_picks dp\b/.test(textOf(q)));
+    expect(statements).toHaveLength(1);
+    expect(textOf(statements[0])).toContain('count(*) OVER () AS total');
   });
 });
 
