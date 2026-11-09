@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-341 — Restore target validation can accept a DSN that connects to the source database
 
-**Status: RESOLVED 2026-11-08, scoped to the local working tree (uncommitted).** Real two-database restore qualification on an isolated loopback cluster on streamanator: **37 passed, 0 failed**. Distinct source, target and bystander sentinels. The cases:
+**Status: RESOLVED 2026-11-08; fix published 2026-11-09 in `532dcd77` (`origin/main` `c5959bbf..ae28bd70`; not deployed; evidence carried forward, `docs/v2/evidence/open-issues-closure-20261108/b2b5-publish/`).** Real two-database restore qualification on an isolated loopback cluster on streamanator: **37 passed, 0 failed**. Distinct source, target and bystander sentinels. The cases:
 - H0 reproduced the `?dbname=` hazard read-only;
 - nine contract refusals;
 - the in-session identity guard;

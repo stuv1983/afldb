@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# B2-B5 publication, step A: fresh disposable clone of origin/main + incremental candidate bundle,
+# then a per-file comparison of the candidate tree against the two workspaces where the recorded
+# 338/341/342/343 (W1) and 344 (WV) evidence was produced. Read-only against those workspaces.
+set -uo pipefail
+W="$1"; BUNDLE_SHA="$2"; EXPECT="$3"; BASE="$4"
+W1=/mnt/ssd/afldb-close-20261108T061620Z
+WV=/mnt/ssd/afldb-verify-20261108T002136Z
+P=0; F=0; pass(){ echo "PASS $1"; P=$((P+1)); }; fail(){ echo "FAIL $1"; F=$((F+1)); }
+check_eq(){ if [ "$2" = "$3" ]; then pass "$1"; else fail "$1 (want '$2' got '$3')"; fi; }
+cd "$W" || exit 2
+check_eq "bundle sha256" "$BUNDLE_SHA" "$(sha256sum b2b5.bundle | cut -d' ' -f1)"
+[ -e "$W/cand" ] && { echo "refusing: $W/cand exists"; exit 2; }
+git clone -q https://github.com/stuv1983/afldb.git "$W/cand" || exit 2
+cd "$W/cand"
+check_eq "GitHub origin/main is the recorded base" "$BASE" "$(git rev-parse refs/remotes/origin/main)"
+git fetch -q "$W/b2b5.bundle" "+refs/heads/claude/issue-338-341-344-publish:refs/heads/claude/issue-338-341-344-publish" || exit 2
+git checkout -q claude/issue-338-341-344-publish || exit 2
+check_eq "candidate HEAD" "$EXPECT" "$(git rev-parse HEAD)"
+check_eq "candidate parent^4 is the base" "$BASE" "$(git rev-parse HEAD~4)"
+check_eq "clean checkout" "" "$(git status --porcelain)"
+
+compare() {  # $1 label, $2 workspace root
+  local label="$1" root="$2" out="$W/cmp-$1.txt" same=0 crlf=0 diff=0 miss=0
+  : > "$out"
+  while IFS= read -r -d '' f; do
+    if [ ! -f "$root/$f" ]; then echo "MISSING $f" >> "$out"; miss=$((miss+1)); continue; fi
+    if cmp -s "$f" "$root/$f"; then same=$((same+1))
+    elif cmp -s <(tr -d '\r' < "$f") <(tr -d '\r' < "$root/$f"); then echo "EOL-ONLY $f" >> "$out"; crlf=$((crlf+1))
+    else echo "DIFF $f" >> "$out"; diff=$((diff+1)); fi
+  done < <(git ls-files -z)
+  # Untracked-in-candidate files the workspace had in code/test paths (could have influenced a run).
+  (cd "$root" && find src tests tools data/reference package.json package-lock.json tsconfig.json vitest.config.* next.config.* \
+      -path '*/node_modules' -prune -o -type f -print 2>/dev/null) | sort > "$W/ws-$label-files.txt"
+  git ls-files | sort > "$W/cand-files.txt"
+  comm -23 "$W/ws-$label-files.txt" "$W/cand-files.txt" | sed 's/^/EXTRA /' >> "$out"
+  echo "== $label ($root): same=$same eol-only=$crlf diff=$diff missing=$miss extra=$(grep -c '^EXTRA' "$out")"
+  grep -E '^(DIFF|MISSING|EXTRA)' "$out" | grep -v -E '^(DIFF|MISSING) (issues/|docs/|IssuesIndex.md|CHANGELOG.md|blockers.md|issues.md)' | head -60
+  echo "   (record-only paths: $(grep -E '^(DIFF|MISSING) (issues/|docs/|IssuesIndex.md|CHANGELOG.md|blockers.md|issues.md)' "$out" | wc -l))"
+  grep '^EOL-ONLY' "$out" | head -10
+}
+compare W1 "$W1"
+compare WV "$WV"
+echo; echo "step A: $P passed, $F failed"

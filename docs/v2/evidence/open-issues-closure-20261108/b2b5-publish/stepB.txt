@@ -1,0 +1,43 @@
+PASS primary main == origin/main == base
+PASS issue worktree HEAD
+PASS base is HEAD~4 (fast-forward possible)
+PASS npm ci
+== merge:ready --issue 338
+  WARN issue/runbook readiness metadata unavailable
+       changed: 12; expected rules: 12; unexpected: 0
+  Merge readiness: READY (0 blocker(s), 1 warning(s)).
+PASS merge:ready 338 exit
+PASS merge:ready 338 READY
+== merge:ready --issue 341
+  WARN issue/runbook readiness metadata unavailable
+       changed: 12; expected rules: 12; unexpected: 0
+  Merge readiness: READY (0 blocker(s), 1 warning(s)).
+PASS merge:ready 341 exit
+PASS merge:ready 341 READY
+== merge:ready --issue 342
+  WARN issue/runbook readiness metadata unavailable
+       changed: 12; expected rules: 12; unexpected: 0
+  Merge readiness: READY (0 blocker(s), 1 warning(s)).
+PASS merge:ready 342 exit
+PASS merge:ready 342 READY
+== merge:ready --issue 343
+  WARN issue/runbook readiness metadata unavailable
+       changed: 12; expected rules: 12; unexpected: 0
+  Merge readiness: READY (0 blocker(s), 1 warning(s)).
+PASS merge:ready 343 exit
+PASS merge:ready 343 READY
+== merge:ready --issue 344
+  WARN issue/runbook readiness metadata unavailable
+       changed: 12; expected rules: 12; unexpected: 0
+  Merge readiness: READY (0 blocker(s), 1 warning(s)).
+PASS merge:ready 344 exit
+PASS merge:ready 344 READY
+== preflight --mode merge (clean primary main)
+  WARN .env file presence
+  Preflight result: READY (0 blocker(s), 1 warning(s)).
+PASS preflight --mode merge exit
+== fast-forward rehearsal
+PASS ff-only result is the tested SHA
+PASS merged tree equals candidate tree
+
+B2-B5 merge readiness: 17 passed, 0 failed

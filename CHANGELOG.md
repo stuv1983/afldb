@@ -15,6 +15,12 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-338 and ISSUE-341–344 fixes published (2026-11-09; not deployed)
+
+- The verified fixes are on `origin/main` by fast-forward `c5959bbf..ae28bd70`: ISSUE-341/342 restore verification `532dcd77`, ISSUE-343 fixture-CLI identity preflight `3ec73bcf`, ISSUE-338 review-contract clock `d3d38025`, ISSUE-344 draft pagination total `ae28bd70`.
+- The recorded validation carries forward: the candidate's code and test inputs are byte-identical to the workspaces that produced it. `merge:ready` (338, 341–344) and `preflight --mode merge` were READY.
+- Nothing was deployed to DEV or production. `origin/main` is now past the ISSUE-336/337/340/345 release package commit PKG `c5959bbf`. As written, the approval document's D0 and D1 require `origin/main` = PKG and its §1 says to re-derive the package on a mismatch, so the release needs an owner decision on that check first. R′ `c1c4b22e`, H = R and the static delta check are unaffected; the package was not edited.
+
 ### ISSUE-336/337/340/345 release candidate qualified on Linux (2026-11-09; records only; production unchanged)
 
 - R = R′ `c1c4b22e` was selected and qualified in a fresh streamanator workspace, against the approved production snapshot at ledger 118 in an isolated cluster.
@@ -23,12 +29,12 @@ commit.
   - `admin-lifecycle` 50/50 and `admin-draft` 42 passed, 5 skipped (Python replay).
   - Production-mode build and loopback boot smoke PASS.
 - The full approval package is `docs/v2/issue336-337-340-345-release-approval-2026-11-09.md`, with a static delta check. Nothing was built, promoted or restarted on production.
-- The 2026-11-08/09 closure records were published records-only. The 338 and 341–344 fixes are **not** on `origin/main`: they are resolved, scoped to the local working tree.
+- The 2026-11-08/09 closure records were published records-only. The 338 and 341–344 fixes are **not** on `origin/main`: they are resolved, scoped to the local working tree. *(Superseded 2026-11-09: published at `ae28bd70`, see above.)*
 
 ### Review fixes for ISSUE-336 and 339–345 (2026-11-08; ISSUE-340, ISSUE-345 and the I336 wrapper fix published on `origin/main` at `c1c4b22e`; ISSUE-339 R339 A–D published at `8d122f62` on 2026-11-09; the rest local and uncommitted; nothing deployed)
 
 Verification state (open-issues closure run, 2026-11-08, streamanator):
-- **Resolved, scoped to the local working tree:**
+- **Resolved, scoped to the local working tree** *(published 2026-11-09, `c5959bbf..ae28bd70`)*:
   - ISSUE-338: Python contract 229/0, focused Vitest passed.
   - ISSUE-341: real two-database restore qualification 37/0.
   - ISSUE-342: real fault-injected restore 20/0, with no marker after a SIGKILL at the post-data barrier.

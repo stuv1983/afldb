@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-342 — Restore verification can certify an abnormal pg_restore termination
 
-**Status: RESOLVED 2026-11-08, scoped to the local working tree (uncommitted).** Fault injection on the ISSUE-341 cluster: **20 passed, 0 failed**.
+**Status: RESOLVED 2026-11-08; fix published 2026-11-09 in `532dcd77` (`origin/main` `c5959bbf..ae28bd70`; not deployed; evidence carried forward, `docs/v2/evidence/open-issues-closure-20261108/b2b5-publish/`).** Fault injection on the ISSUE-341 cluster: **20 passed, 0 failed**.
 - A real `--jobs=4` restore was held at its first post-data `CREATE INDEX` by an advisory-lock event trigger. All nine parity values already matched at that point.
 - pg_restore was then SIGKILLed. The wrapper exited 1 ("exit status 137"), reached no parity check, and left **no proof marker**. The prior candidate was cleared, and the witness index was absent.
 - The control restore without the barrier succeeded.

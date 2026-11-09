@@ -4,11 +4,15 @@
 
 This table indexes currently open issues. Detailed historical entries below remain authoritative.
 
-**Publication state — 2026-11-09 (records-only commit from `origin/main` `8d122f62`):** the closure records below are published without code.
-- **Fixed in this tree:** 337 (`7fabc6e5`), 340 and 345 (`c1c4b22e`), 339 (`8d122f62`). ISSUE-336's `48ff91c7` docs are carried as a cherry-pick.
-- **Not in this tree:** 338, 341, 342, 343 and 344 are **resolved, scoped to the local working tree** only. Their fixes (commit plan B2–B5, `issues/open/OPEN-ISSUES-CLOSURE-RUN-20261108.md`) are not on `origin/main`, so the defects remain here until a separate owner decision publishes them.
+**Publication state — 2026-11-09, updated after the B2–B5 publication (closure run 6):** every fix of the closure run is on `origin/main`.
+- **Fixed in this tree:** 337 (`7fabc6e5`), 340 and 345 (`c1c4b22e`), 339 (`8d122f62`), and since run 6: 341 and 342 (`532dcd77`), 343 (`3ec73bcf`), 338 (`d3d38025`) and 344 (`ae28bd70`), published by fast-forward `origin/main` `c5959bbf..ae28bd70`. The merged revision `ae28bd70423e5c9f7e2c53c46353faa396678cc7` is the tested commit. ISSUE-336's `48ff91c7` docs are carried as a cherry-pick.
+- **Not deployed:** none of 338 or 341–344 is on DEV or production.
+- **Release package:** `origin/main` is now past the ISSUE-336/337/340/345 release package commit PKG `c5959bbf`. As written, the approval document's D0 and D1 require `origin/main` = PKG and its §1 says to re-derive the package on a mismatch, so the release needs an owner decision on that check first. R′ `c1c4b22e`, H = R and the static delta check are unaffected; the package was not edited.
+- *Superseded (records-only commit `c5959bbf` from `8d122f62`):* 338, 341, 342, 343 and 344 are **resolved, scoped to the local working tree** only. Their fixes (commit plan B2–B5, `issues/open/OPEN-ISSUES-CLOSURE-RUN-20261108.md`) are not on `origin/main`, so the defects remain here until a separate owner decision publishes them.
 
-**Current state — 2026-11-09 (open-issues closure run 4):** **3 open issues** (332, 336, 346).
+**Current state — 2026-11-09 (open-issues closure run 6):** **3 open issues** (332, 336, 346). The B2–B5 fixes for 338 and 341–344 were published (`origin/main` `c5959bbf..ae28bd70`); their recorded evidence was carried forward because the candidate's code and test inputs are byte-identical to the tested workspaces. Resume checkpoint: `issues/open/OPEN-ISSUES-CLOSURE-RUN-20261108.md` (Run 6).
+
+**Earlier state — 2026-11-09 (open-issues closure run 4):** **3 open issues** (332, 336, 346).
 - **ISSUE-339 resolved and published.** The reviewed gate commits were replayed onto `origin/main` `c1c4b22e` without the unpublished `48ff91c7` (ISSUE-336/337 docs). They were published by fast-forward `c1c4b22e..8d122f62`, so the merged revision `8d122f629df6a610ae4e95805e39583cc2ab8aaf` is the tested commit. The owner decided D1–D4; D2 is tracked separately as **ISSUE-346**. R339-D live-host argv exposure is recorded as **unmeasured**. Not deployed.
 - **336:** the §7.2 nightly observation is done (read-only). The 2026-11-08 and 2026-11-09 firings both matched the predicted row. The production release, D-336-2 (35 rows) and D-336-3 stay behind separate owner approvals.
 - 340 and 345 were resolved and published on 2026-11-08. Their closure records are applied in the working tree but not committed.
@@ -54054,7 +54058,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   - **Python contract:** `python3 tests/python/draftguru_bridge_operator_review_contract.py` exited 0, with **229 PASS and 0 FAIL**. Checks 11a–11k all passed, including 11e/11f (clock restored, frozen stamp) and 11g–11k (later run stamps its own time, CSV and digests unchanged, only `review_completed_utc` differs).
   - **Focused Vitest:** `npx vitest run tests/draftguru-acquisition.test.ts -t "operator-adjudication review tool"` exited 0, **1 passed, 166 skipped**. Its describe (`:3320`) runs this Python contract (`:3325`).
   - Logs are in `docs/v2/evidence/open-issues-closure-20261108/` (`i338-python.log`, `i338-vitest.log`).
-- **Status:** **Resolved 2026-11-08, scoped to the local working tree** (test-only change, uncommitted). **Root cause:** a byte-identity check across two wall-clock-stamped `finalize()` runs. **Fix:** freeze the tool clock only for the identical-input reruns, plus an explicit different-time case. Product timestamps are unchanged.
+- **Status:** **Resolved 2026-11-08; published 2026-11-09 in `d3d38025`** (`origin/main` `c5959bbf..ae28bd70`; test-only change; recorded evidence carried forward, see `docs/v2/evidence/open-issues-closure-20261108/b2b5-publish/`). *(Until run 6: scoped to the local working tree, uncommitted.)* **Root cause:** a byte-identity check across two wall-clock-stamped `finalize()` runs. **Fix:** freeze the tool clock only for the identical-input reruns, plus an explicit different-time case. Product timestamps are unchanged.
   - **Limits:** this is a deterministic test run, not a proof over many wall-clock boundaries. The committed state is the owner's commit.
   - Runbook: `issues/closed/AFLDB-ISSUE-338.md`.
 
@@ -54279,7 +54283,7 @@ Acceptance: After a credential rotation commits, no request verified against the
 
 ## AFLDB-ISSUE-341 — Restore target validation can accept a DSN that connects to the source database
 
-- **Status:** **Resolved 2026-11-08, scoped to the local working tree** (opened 2026-11-08; real qualification 37/0, see below). **Severity:** Medium. **Area:** Database restore and wrong-target safety.
+- **Status:** **Resolved 2026-11-08; published 2026-11-09 in `532dcd77`** (`origin/main` `c5959bbf..ae28bd70`; not deployed) (opened 2026-11-08; real qualification 37/0, see below; evidence carried forward, `docs/v2/evidence/open-issues-closure-20261108/b2b5-publish/`). **Severity:** Medium. **Area:** Database restore and wrong-target safety.
 - **Baseline/publication:** 5cba6846ddfcfd5d7a3fd29e14bc8877099d9656; affected source identical at locally recorded published origin/main 7fabc6e51c5c53c4b6f6fe345f21191d9184660b. No live revision/incident claim.
 - **Evidence class:** Source-established; no new executable reproduction. Libpq query precedence is existing ISSUE-278 evidence.
 
@@ -54351,7 +54355,7 @@ Acceptance: Every destructive child is bound to the intended disposable database
 
 ## AFLDB-ISSUE-342 — Restore verification can certify an abnormal pg_restore termination
 
-- **Status:** **Resolved 2026-11-08, scoped to the local working tree** (opened 2026-11-08; real fault injection 20/0, see below). **Severity:** Medium. **Area:** Backup proof and restore failure status.
+- **Status:** **Resolved 2026-11-08; published 2026-11-09 in `532dcd77`** (`origin/main` `c5959bbf..ae28bd70`; not deployed) (opened 2026-11-08; real fault injection 20/0, see below; evidence carried forward, `docs/v2/evidence/open-issues-closure-20261108/b2b5-publish/`). **Severity:** Medium. **Area:** Backup proof and restore failure status.
 - **Baseline/publication:** 5cba6846ddfcfd5d7a3fd29e14bc8877099d9656; affected source identical at locally recorded published origin/main 7fabc6e51c5c53c4b6f6fe345f21191d9184660b. No live revision/incident claim.
 - **Evidence class:** Source-established; no new executable reproduction. The post-data kill timing still needs a disposable fault-injection witness.
 
@@ -54416,7 +54420,7 @@ Acceptance: Every abnormal or unexplained nonzero pg_restore exit fails the wrap
 
 ## AFLDB-ISSUE-343 — Fixture ingestion entry points check admission on a different database from their writer
 
-- **Status:** **Resolved 2026-11-08, scoped to the local working tree** (opened 2026-11-08; real A/B qualification, see below). **Severity:** Medium. **Area:** Ingestion controls and database identity.
+- **Status:** **Resolved 2026-11-08; published 2026-11-09 in `3ec73bcf`** (`origin/main` `c5959bbf..ae28bd70`; not deployed) (opened 2026-11-08; real A/B qualification, see below; evidence carried forward, `docs/v2/evidence/open-issues-closure-20261108/b2b5-publish/`). **Severity:** Medium. **Area:** Ingestion controls and database identity.
 - **Baseline/publication:** 5cba6846ddfcfd5d7a3fd29e14bc8877099d9656; affected source identical at locally recorded published origin/main 7fabc6e51c5c53c4b6f6fe345f21191d9184660b. No live revision/incident claim.
 - **Evidence class:** Source-established; no new executable reproduction.
 
@@ -54511,7 +54515,7 @@ Runbook: `issues/closed/AFLDB-ISSUE-343.md`.
 
 ## AFLDB-ISSUE-344 — Out-of-range draft pages report zero matches for nonempty results
 
-- **Status:** **Resolved 2026-11-08**, scoped to the local working tree. Opened 2026-11-08. The fix is local and uncommitted; it is not on DEV or production. See **Resolution** below. **Severity:** Low. **Area:** Public and admin draft pagination.
+- **Status:** **Resolved 2026-11-08; published 2026-11-09 in `ae28bd70`** (`origin/main` `c5959bbf..ae28bd70`; evidence carried forward, `docs/v2/evidence/open-issues-closure-20261108/b2b5-publish/`). Opened 2026-11-08. It is not on DEV or production. The pinned ISSUE-336 release R′ `c1c4b22e` does not carry it, so production keeps this defect after that release. See **Resolution** below. **Severity:** Low. **Area:** Public and admin draft pagination.
 - **Baseline/publication:** 5cba6846ddfcfd5d7a3fd29e14bc8877099d9656; affected source identical at locally recorded published origin/main 7fabc6e51c5c53c4b6f6fe345f21191d9184660b. No live revision/incident claim.
 - **Evidence class:** Source-established; no new executable reproduction.
 

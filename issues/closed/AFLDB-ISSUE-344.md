@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-344 — Out-of-range draft pages report zero matches for nonempty results
 
-**Status: RESOLVED 2026-11-08, scoped to the local working tree.** The fix is uncommitted and is not on DEV or production. Verified on isolated Linux (streamanator, disposable `afldb_v2_verify_test`, ledger 118):
+**Status: RESOLVED 2026-11-08; fix published 2026-11-09 in `ae28bd70` (`origin/main` `c5959bbf..ae28bd70`; evidence carried forward, `docs/v2/evidence/open-issues-closure-20261108/b2b5-publish/`).** It is not on DEV or production. The pinned ISSUE-336 release R′ `c1c4b22e` does not carry it, so production keeps this defect after that release. Verified on isolated Linux (streamanator, disposable `afldb_v2_verify_test`, ledger 118):
 - `catalogue-lookups` passed 24/24.
 - `tests/integration/admin-draft.test.ts` passed 47, failed 0 and skipped 5, and all 5 ISSUE-344 cases passed.
 - **Browser, both routes PASS** (loopback-only `next dev`, desktop 1280×800 and mobile 390×844):

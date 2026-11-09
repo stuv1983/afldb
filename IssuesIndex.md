@@ -11,7 +11,8 @@
 
 **Publication state of the 2026-11-08/09 closure records (records-only commit from `origin/main` `8d122f62`, 2026-11-09).** These records were published without code. On `origin/main`:
 - **Fixed in the tree:** 337 (`7fabc6e5`), 340 and 345 (`c1c4b22e`), 339 (`8d122f62`). The ISSUE-336 draft-page code is also there (`7fabc6e5`). The unpublished ISSUE-336/337 DEV-deploy docs commit `48ff91c7` is carried as a cherry-pick.
-- **Not in the tree:** 338, 341, 342, 343 and 344 are recorded below as **resolved, scoped to the local working tree**. Their fixes (commit plan B2–B5 in `issues/open/OPEN-ISSUES-CLOSURE-RUN-20261108.md`) are **not on `origin/main`**, so the defects remain in this tree until a separate owner decision publishes those fixes.
+- **Published 2026-11-09 (closure run 6):** the B2–B5 fixes for 338 and 341–344 are now on `origin/main`: 341/342 `532dcd77`, 343 `3ec73bcf`, 338 `d3d38025`, 344 `ae28bd70` (`origin/main` `c5959bbf..ae28bd70`; merged revision = tested commit). Not deployed. `origin/main` is now past the ISSUE-336/337/340/345 release package commit PKG `c5959bbf`. As written, the approval document's D0 and D1 require `origin/main` = PKG and its §1 says to re-derive the package on a mismatch, so the release needs an owner decision on that check first. R′ `c1c4b22e`, H = R and the static delta check are unaffected; the package was not edited.
+- *Superseded by the line above:* 338, 341, 342, 343 and 344 are recorded below as **resolved, scoped to the local working tree**. Their fixes (commit plan B2–B5 in `issues/open/OPEN-ISSUES-CLOSURE-RUN-20261108.md`) are **not on `origin/main`**, so the defects remain in this tree until a separate owner decision publishes those fixes.
 - **Open issues:** 3 (332, 336, 346).
 
 **ISSUE-339 resolved 2026-11-09 (published, not deployed).** The reviewed gate commits were replayed onto `origin/main` `c1c4b22e`. The unpublished ISSUE-336/337 docs commit `48ff91c7` was left out. They were published by fast-forward `c1c4b22e..8d122f62`, so the merged revision `8d122f62` is the tested commit.
@@ -24,16 +25,16 @@ Record: their `issues.md` entries; runbook `issues/closed/AFLDB-ISSUE-339.md`; p
 
 **ISSUE-340 and ISSUE-345 resolved 2026-11-08 (published).** The owner accepted both. They were committed as `8ef4ae1b` (340, credential decisions under the account row lock) and `65984ab2` (345, restricted Grid Solver via `requireUploader()`), and published by fast-forward of `origin/main` `7fabc6e5..c1c4b22e`; the merged revision is the tested commit. Validation at `c1c4b22e`: `admin-lifecycle` 50/50 (isolated `_test` database at ledger 118), `auth` 211/211, typecheck clean; `merge:ready` and `preflight --mode merge` READY. Neither is deployed. Records: their `issues.md` entries; runbooks in `issues/closed/`; the pre-closure sections are in `issues/closed/AFLDB-ISSUE-340-345-INDEX-SECTION-20261108.md`. **Open issues:** 3 (332, 336, 339).
 
-**ISSUE-343 resolved 2026-11-08, scoped to the local working tree.** The real A/B qualification across both fixture CLIs and the Brownlow wrapper found no failing case. Mismatched control and writer refuse with both databases byte-identical; the matching target writes to A only. Record: its `issues.md` entry and `issues/closed/AFLDB-ISSUE-343.md`. The pre-closure index section is in `issues/closed/AFLDB-ISSUE-343-INDEX-SECTION-20261108.md`. **Open issues:** 5 (332, 336, 339, 340, 345).
+**ISSUE-343 resolved 2026-11-08; fix published 2026-11-09 in `3ec73bcf`** (until then scoped to the local working tree). The real A/B qualification across both fixture CLIs and the Brownlow wrapper found no failing case. Mismatched control and writer refuse with both databases byte-identical; the matching target writes to A only. Record: its `issues.md` entry and `issues/closed/AFLDB-ISSUE-343.md`. The pre-closure index section is in `issues/closed/AFLDB-ISSUE-343-INDEX-SECTION-20261108.md`. **Open issues:** 5 (332, 336, 339, 340, 345).
 
-**ISSUE-338, ISSUE-341 and ISSUE-342 resolved 2026-11-08, scoped to the local working tree** (fixes uncommitted; open-issues closure run, verified on streamanator in a fresh workspace and an isolated loopback cluster).
+**ISSUE-338, ISSUE-341 and ISSUE-342 resolved 2026-11-08; fixes published 2026-11-09 in `d3d38025` (338) and `532dcd77` (341/342)** (until then uncommitted; open-issues closure run, verified on streamanator in a fresh workspace and an isolated loopback cluster).
 - **338:** Python contract 229/0 and the focused Vitest case passed.
 - **341:** the real two-database restore qualification passed 37/0 with distinct sentinels.
 - **342:** the real fault injection (SIGKILL at the post-data barrier) passed 20/0 and left no proof marker.
 
 Records: their `issues.md` entries; runbooks in `issues/closed/`; evidence in `docs/v2/evidence/open-issues-closure-20261108/`. The pre-closure index sections are in `issues/closed/AFLDB-ISSUE-338-341-342-INDEX-SECTION-20261108.md`. Resume checkpoint and owner decision packet: `issues/open/OPEN-ISSUES-CLOSURE-RUN-20261108.md`. **Open issues:** 6 (332, 336, 339, 340, 343, 345).
 
-**ISSUE-344 resolved 2026-11-08, scoped to the local working tree.** The fix is local and uncommitted; it is not on DEV or production.
+**ISSUE-344 resolved 2026-11-08; fix published 2026-11-09 in `ae28bd70`.** It is not on DEV or production.
 - **Query layer:** `catalogue-lookups` passed 24/24, and `admin-draft` passed 47/0/5 on a seeded isolated database.
 - **Redirects:** both were browser-verified on a loopback-only isolated instance. Each landed on page 2 of 2 with its filters kept, a total of 57 and 7 rows.
 

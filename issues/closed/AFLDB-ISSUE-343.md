@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-343 — Fixture ingestion entry points check admission on a different database from their writer
 
-**Status: RESOLVED 2026-11-08, scoped to the local working tree (uncommitted).** A real A/B qualification on two disposable databases of an isolated loopback cluster on streamanator found no failing case.
+**Status: RESOLVED 2026-11-08; fix published 2026-11-09 in `3ec73bcf` (`origin/main` `c5959bbf..ae28bd70`; not deployed; evidence carried forward, `docs/v2/evidence/open-issues-closure-20261108/b2b5-publish/`).** A real A/B qualification on two disposable databases of an isolated loopback cluster on streamanator found no failing case.
 - **Both fixture CLIs:** a mismatch refuses with A and B byte-identical, sequences included; disabled, unreadable and unset controls refuse; the sealed season refuses; validate-only opens no connection; dry-run and apply on the matching target write to A only.
 - **Brownlow wrapper:** it refuses at step 2 on a mismatch, before any fixture-staging write.
 

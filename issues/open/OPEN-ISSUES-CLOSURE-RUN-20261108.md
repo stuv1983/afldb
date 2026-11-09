@@ -8,6 +8,63 @@
 - The working tree stays uncommitted.
 - **Run 2 (owner, 2026-11-08):** additionally authorised Git fetch and inspection, local worktrees and branches, scoped staging and local commits, the W-339 bundle, transfer to streamanator, and Git, tests and migrations inside disposable clones on isolated test databases. Push, merge, live DEV, production, shared databases, private backups and WSL stores stay behind owner gates.
 
+## Run 6 — 2026-11-09: B2–B5 fixes published (338, 341–344) (owner-approved)
+
+**Owner instructions (2026-11-09):**
+- Publish the already verified fixes for ISSUE-338 and ISSUE-341 to ISSUE-344. Authorised: a fresh worktree, scoped local commits, disposable verification on streamanator, and push and merge through the documented readiness checks.
+- Start from current `origin/main`. Use B2–B5 to identify the intended changes and verify them against the actual diffs. Bring over only the unpublished fixes and tests; the closure records are already on main. Preserve the original working tree and keep the superseded gate branch local.
+- Carry the recorded test evidence forward where the relevant code and test inputs match, and rerun focused checks only for meaningful differences. Review the complete candidate diff before publishing.
+- Keep the production release pinned at R′ `c1c4b22e` and its approval packet at PKG `c5959bbf`. The release and each D-336-2 step remain separate owner approvals.
+
+**Candidate:**
+- `git fetch`: `origin/main` was `c5959bbf`. Worktree `D:\dev\afldb-b2b5-publish`, new branch `claude/issue-338-341-344-publish` from it.
+- **Identification.** The working tree of `D:\dev\afldb` differs from `origin/main` in exactly the 12 B2–B5 code and test files. None of them changed between `549c5892` and `c5959bbf`. Every other code change in that tree (340, 345, 336, 339) is byte-identical to main, and the B2–B5 records (closed runbooks, index sections, `ev341/`, `ev342/`, `ev343/`, `i338-*.log`, the ISSUE-344 evidence) were already on main, byte-identical.
+- **Commits:**
+  - B2 `532dcd77b66d55cac273b1afad4589d093bb217f`: ISSUE-341/342, `tools/maintenance/restore-test.sh` and the new `tests/restore-test.test.sh`.
+  - B3 `3ec73bcfcd03674de03d88084f2b559b619bda0f`: ISSUE-343, both fixture CLIs and `tests/afl-api-ingestion-safety.test.ts`.
+  - B4 `d3d380253065d4f985a7057c2fe3484c605d3b80`: ISSUE-338, `tests/python/draftguru_bridge_operator_review_contract.py`.
+  - B5 `ae28bd70423e5c9f7e2c53c46353faa396678cc7`: ISSUE-344, `src/db/queries/draft.ts`, `src/db/queries/admin-draft.ts`, both draft pages, `tests/integration/admin-draft.test.ts`, `tests/catalogue-lookups.test.ts`.
+  - Every committed blob equals the original working-tree file (`git hash-object`; the CRLF working copy of `admin-draft.test.ts` normalises to the same blob).
+- **Diff review** (12 files, +946/−100) found no defects. The new APIs the code relies on (`proveAflApiIngestionPreflight`, `redirectPastEnd`, `listParams`, the test fixtures) all exist on main. One cosmetic note only: the header comment of `tests/restore-test.test.sh` still names `issues/open/AFLDB-ISSUE-341.md` and `-342.md`, now in `issues/closed/`. It was left unchanged so the tested bytes are published.
+
+**Evidence carried forward (no reruns needed):**
+- Fresh streamanator workspace `/mnt/ssd/afldb-b2b5-cand-20261109T0717Z`: a clone of GitHub `origin/main` (verified `c5959bbf`) plus an incremental bundle (sha256 `8eafc93d…0a94519`), HEAD verified `ae28bd70`.
+- Per-file comparison of every tracked candidate file against the two workspaces that produced the recorded evidence: W1 `/mnt/ssd/afldb-close-20261108T061620Z` (338, 341, 342, 343) and WV `/mnt/ssd/afldb-verify-20261108T002136Z` (344).
+  - In `src/`, `tests/`, `tools/`, `data/`, `deploy/`, `package*.json` and the root configs: **no content difference and no missing file**.
+  - 17 files differ only by CRLF line endings in the Windows-sourced tarballs (among them `tests/integration/admin-draft.test.ts`). The extra files are Python `__pycache__` bytecode only.
+  - Every content difference is a record file. The lockfile (`984b4422…`) and Node v22.23.2 are the same.
+- So the recorded results stand for the published code: 338 Python contract 229/0 and focused Vitest; 341 stub 24/24 and real qualification 37/0; 342 fault injection 20/0; 343 unit suite and real A/B; 344 `catalogue-lookups` 24/24, `admin-draft` 47/0/5 and build PASS.
+
+**Readiness (17/0)** in an operator-layout clone (primary `main` = `origin/main` = `c5959bbf`, linked worktree on the issue branch):
+- `npm ci` clean.
+- `merge:ready --issue N` **READY** for 338, 341, 342, 343 and 344: all 12 committed files in the declared scope, 0 blockers, 1 warning each (the runbooks are already closed).
+- `preflight --mode merge` **READY** (1 warning: no `.env`).
+- The ff-only rehearsal gave the tested SHA and tree.
+
+**Published:**
+- The new remote branch `claude/issue-338-341-344-publish`.
+- Then, after a re-fetch confirmed the base, `ae28bd70:refs/heads/main` without force: **`origin/main` `c5959bbf..ae28bd70`**. The published merged revision `ae28bd70423e5c9f7e2c53c46353faa396678cc7` is the tested commit.
+- Nothing was deployed to DEV or production.
+
+**Release package impact (owner decision before the release):**
+- `origin/main` no longer equals PKG `c5959bbf`. As written, the approval document stops at D0: §1 records `ORIGIN_HEAD` = PKG, D0 and D1 assert `origin/main` = PKG, and §9's wording names it. §1 says a mismatch means the package is re-derived, never edited in place.
+- Unaffected: R′ `c1c4b22e`, H = R (the checkout goes to R, not to `origin/main`), the static delta check (read from PKG's own bytes) and the Linux qualification. None of B2–B5 is in R, so the release as qualified ships without them. B5 does modify two of the 16 release files (`src/db/queries/draft.ts`, `src/app/draft/[year]/page.tsx`): production keeps the ISSUE-344 defect after the release, and carrying 344 would need a new R and a new qualification (not proposed; R stays pinned).
+- The package was **not** edited, as instructed. This records commit moves `origin/main` again.
+- Owner options: (a) re-derive the package at the then-current `origin/main` (new PKG, same R); or (b) an owner-authorised deviation that replaces `origin/main` = PKG with "PKG is an ancestor of `origin/main`" in D0/D1 and §9. The publication check should not have been missed before the push; it was found during this records update.
+
+**Remaining approvals:**
+1. The production release (approval document §9), now including the D0/D1 decision above.
+2. D-336-2 steps P1–P3, approve and apply, each separately.
+3. D-336-3.
+4. ISSUE-332 gates G1–G7; ISSUE-346's interim rule: no hand-run `db:migrate` on DEV.
+5. Non-blocking ratifications: the 341 DSN contract and the 342 exit-1 exception.
+
+**Local state:**
+- `D:\dev\afldb` (Branch B, HEAD `549c5892`) was left untouched. Its uncommitted B2–B5 files are now duplicated on main. Never publish `5cba6846` or `549c5892`.
+- Worktree `D:\dev\afldb-b2b5-publish` is kept.
+- The streamanator workspace is retained; it holds no database and runs no service.
+- Evidence: `docs/v2/evidence/open-issues-closure-20261108/b2b5-publish/` (leak scan clean). This records commit's own SHA is reported in the session report, since a commit cannot record its own hash.
+
 ## Run 5 — 2026-11-09: R′ release qualification; closure records published (owner-approved)
 
 **Owner instructions (2026-11-09):**
@@ -170,11 +227,11 @@ They are not on `origin/main`. On `origin/main`, the runbooks for 339, 340 and 3
 
 | Issue | Result this run | Records |
 |---|---|---|
-| 338 | **PASS → RESOLVED** (local tree). Python contract 229/0, including 11a–11k; focused Vitest 1 passed / 166 skipped | ledger, index, runbook moved to `issues/closed/` |
-| 341 | **PASS → RESOLVED** (local tree). Real restore qualification 37/0: H0 hazard reproduced; 9 refusals; identity guard; hostile-env positive restore; three distinct sentinels | ledger, index, runbook moved |
-| 342 | **PASS → RESOLVED** (local tree). Fault injection 20/0: SIGKILL at the post-data barrier gives exit 1 (137 reported), no marker, witness index absent; the control restore succeeds | ledger, index, runbook moved |
+| 338 | **PASS → RESOLVED, published** (run 6, `d3d38025`). Python contract 229/0, including 11a–11k; focused Vitest 1 passed / 166 skipped | ledger, index, runbook moved to `issues/closed/` |
+| 341 | **PASS → RESOLVED, published** (run 6, `532dcd77`). Real restore qualification 37/0: H0 hazard reproduced; 9 refusals; identity guard; hostile-env positive restore; three distinct sentinels | ledger, index, runbook moved |
+| 342 | **PASS → RESOLVED, published** (run 6, `532dcd77`). Fault injection 20/0: SIGKILL at the post-data barrier gives exit 1 (137 reported), no marker, witness index absent; the control restore succeeds | ledger, index, runbook moved |
 | 339 | **R339-A status-mode target selection** 25/0: real `migrate.ts` child in `--status`, gate's exact line, disposable A/B. Windows pass and Linux 63/63 carried forward. **W-339 write-mode rehearsal PASS 61/0 (run 2) at B1 `549c5892`** | ledger, index. Owner decisions D1–D4 below; R339-D live measurement |
-| 343 | **PASS → RESOLVED** (local tree). Real A/B qualification, both CLIs and the Brownlow wrapper; no failing case. The harness counted 156/157; the 1 is its own regex, and the log was re-read. B ended with 0 batches, fixtures and versions | ledger, index, runbook moved; evidence `ev343/` |
+| 343 | **PASS → RESOLVED, published** (run 6, `3ec73bcf`). Real A/B qualification, both CLIs and the Brownlow wrapper; no failing case. The harness counted 156/157; the 1 is its own regex, and the log was re-read. B ended with 0 batches, fixtures and versions | ledger, index, runbook moved; evidence `ev343/` |
 | 340, 345 | **PASS → RESOLVED, published** (run 3): `8ef4ae1b` and `65984ab2`, on `origin/main` via fast-forward to `c1c4b22e`. `admin-lifecycle` 50/50, `auth` 211/211, typecheck clean at the merged revision. P-340/P-345 applied | ledger, index section moved, runbooks in `issues/closed/` |
 | 339 | **PASS → RESOLVED, published** (run 4): `origin/main` `c1c4b22e..8d122f62` (= tested commit). Windows PASS, Linux 63/0, W-339 61/0 carried forward, `merge:ready`/`preflight --mode merge` READY. D2 → ISSUE-346 | ledger, index section moved, runbook in `issues/closed/` |
 | 336 | Pin R′ = `c1c4b22e` (published merged revision); `gap029-ops` 76/76 there (run 3); runbook §3 pinned, §6 hold cleared. **Nightly observed as predicted (run 4, 8 and 9 Nov).** Release packet drafted. **Open:** production release, D-336-2 approval, D-336-3 | packet P-336 items 3–5 |

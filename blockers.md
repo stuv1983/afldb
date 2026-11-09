@@ -8,7 +8,7 @@
 > - Open issues: 3 (332, 336, 346).
 
 > **2026-11-08 open-issues closure run (documentation of verification only; this register's counts are NOT recomputed).** Record: [OPEN-ISSUES-CLOSURE-RUN-20261108.md](issues/open/OPEN-ISSUES-CLOSURE-RUN-20261108.md), which holds the resume checkpoint and the consolidated owner decision packet.
-> - **Resolved, scoped to the local working tree:** ISSUE-338 (229/0), ISSUE-341 (real restore qualification 37/0), ISSUE-342 (real fault injection 20/0) and ISSUE-343 (real A/B qualification, Brownlow wrapper included).
+> - **Resolved; fixes published 2026-11-09 (`origin/main` `c5959bbf..ae28bd70`):** ISSUE-338 (229/0), ISSUE-341 (real restore qualification 37/0), ISSUE-342 (real fault injection 20/0) and ISSUE-343 (real A/B qualification, Brownlow wrapper included).
 > - **ISSUE-339:** R339-A status-mode target selection proven (25/0). The write-mode rehearsal W-339 is still outstanding and needs owner authorisation for a disposable Git checkout. Owner decisions remain: the custom-DSN contract, standalone `db:migrate`, `preflight --mode deploy`, and the commit, push and merge.
 > - **Waiting only on owner acceptance and commit:** ISSUE-340 and ISSUE-345.
 > - **ISSUE-336:** blocked on owner approvals: the revised pin, the nightly observation, and the production release and data packets.

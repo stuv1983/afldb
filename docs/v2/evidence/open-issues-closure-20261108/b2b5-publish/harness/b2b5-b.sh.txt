@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# B2-B5 publication, step B: merge readiness in the step-A clone laid out like the operator repo:
+# primary checkout on a clean local main == origin/main, linked worktree on the issue branch.
+# Read-only checks only (no DB, no network writes).
+set -uo pipefail
+W="$1"; EXPECT="$2"; BASE="$3"; BR=claude/issue-338-341-344-publish; M="$W/cand"; WT="$W/wt"; EV="$W/evMR"
+P=0; F=0; pass(){ echo "PASS $1"; P=$((P+1)); }; fail(){ echo "FAIL $1"; F=$((F+1)); }
+check_eq(){ if [ "$2" = "$3" ]; then pass "$1"; else fail "$1 (want '$2' got '$3')"; fi; }
+[ -e "$WT" ] && { echo "refusing: $WT exists"; exit 2; }
+mkdir -p "$EV"
+export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh" >/dev/null; nvm use --silent 22.23.2 >/dev/null
+cd "$M" || exit 2
+git checkout -q -B main refs/remotes/origin/main || exit 2
+git worktree add -q "$WT" "$BR" || exit 2
+check_eq "primary main == origin/main == base" "$BASE $BASE" "$(git rev-parse main) $(git rev-parse refs/remotes/origin/main)"
+check_eq "issue worktree HEAD" "$EXPECT" "$(git -C "$WT" rev-parse HEAD)"
+check_eq "base is HEAD~4 (fast-forward possible)" "$BASE" "$(git rev-parse "$EXPECT~4")"
+npm ci --no-audit --no-fund > "$EV/npm-ci.log" 2>&1 && pass "npm ci" || { fail "npm ci"; exit 1; }
+TSX="$M/node_modules/.bin/tsx"
+EXP=(); for f in $(git diff --name-only "$BASE" "$EXPECT"); do EXP+=(--expected-file "$f"); done
+for i in 338 341 342 343 344; do
+  (cd "$WT" && "$TSX" tools/dev/merge-readiness.ts --issue "$i" "${EXP[@]}") > "$EV/merge-ready-$i.txt" 2>&1; rc=$?
+  echo "== merge:ready --issue $i"; grep -E '^(FAIL|WARN)|Merge readiness|changed:' "$EV/merge-ready-$i.txt" | sed 's/^/  /'
+  check_eq "merge:ready $i exit" 0 "$rc"
+  grep -q 'Merge readiness: READY' "$EV/merge-ready-$i.txt" && pass "merge:ready $i READY" || fail "merge:ready $i not READY"
+done
+echo "== preflight --mode merge (clean primary main)"
+(cd "$M" && "$TSX" tools/dev/preflight.ts --mode merge) > "$EV/preflight-merge.txt" 2>&1; rc=$?
+grep -E '^(FAIL|WARN)|Preflight result' "$EV/preflight-merge.txt" | sed 's/^/  /'
+check_eq "preflight --mode merge exit" 0 "$rc"
+echo "== fast-forward rehearsal"
+git merge -q --ff-only "$BR" && check_eq "ff-only result is the tested SHA" "$EXPECT" "$(git rev-parse main)" || fail "ff-only merge"
+check_eq "merged tree equals candidate tree" "$(git rev-parse "$EXPECT^{tree}")" "$(git rev-parse 'main^{tree}')"
+git checkout -q -B main refs/remotes/origin/main
+echo; echo "B2-B5 merge readiness: $P passed, $F failed"; echo "$P/$F" > "$EV/result.txt"

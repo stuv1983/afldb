@@ -1,6 +1,6 @@
 # AFLDB-ISSUE-338 — Time-dependent DraftGuru finalize contract
 
-**Status: RESOLVED 2026-11-08, scoped to the local working tree (test-only, uncommitted).** Verified on streamanator in a fresh workspace: Python contract 229 PASS / 0 FAIL (11a–11k included), focused Vitest 1 passed / 166 skipped. Evidence `docs/v2/evidence/open-issues-closure-20261108/` (`i338-*.log`); record: the ISSUE-338 entry in `issues.md`. Historical status follows.
+**Status: RESOLVED 2026-11-08; test-only fix published 2026-11-09 in `d3d38025` (`origin/main` `c5959bbf..ae28bd70`; recorded evidence carried forward, `docs/v2/evidence/open-issues-closure-20261108/b2b5-publish/`).** Verified on streamanator in a fresh workspace: Python contract 229 PASS / 0 FAIL (11a–11k included), focused Vitest 1 passed / 166 skipped. Evidence `docs/v2/evidence/open-issues-closure-20261108/` (`i338-*.log`); record: the ISSUE-338 entry in `issues.md`. Historical status follows.
 
 **Earlier status: implemented locally 2026-11-08 (test-only, uncommitted), awaiting user-executed verification.** `tool.utc_now` is frozen around the byte-identity reruns and restored in `finally`. New checks 11e–11k cover clock restoration and the deliberate different-time case. **Severity: Low.** Test tooling only. Existing issue opened 2026-11-06; review update 2026-11-08. [Detailed ledger](../../issues.md#afldb-issue-338).
 
