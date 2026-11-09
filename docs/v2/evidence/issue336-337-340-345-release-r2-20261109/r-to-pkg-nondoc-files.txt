@@ -1,0 +1,17 @@
+deploy/sync-dev-remote.sh
+deploy/sync-dev-transport.sh
+deploy/sync-dev.ps1
+src/app/admin/draft/page.tsx
+src/app/draft/[year]/page.tsx
+src/db/queries/admin-draft.ts
+src/db/queries/draft.ts
+tests/afl-api-ingestion-safety.test.ts
+tests/catalogue-lookups.test.ts
+tests/integration/admin-draft.test.ts
+tests/python/draftguru_bridge_operator_review_contract.py
+tests/restore-test.test.sh
+tests/sync-dev-remote.test.sh
+tests/sync-dev-static.test.ps1
+tools/current-season/settle-afl-api-fixture-schedule.ts
+tools/current-season/settle-afl-api-fixtures.ts
+tools/maintenance/restore-test.sh

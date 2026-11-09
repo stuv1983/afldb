@@ -90,7 +90,7 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
   - **2026-11-09, release packet drafted:** `docs/v2/issue336-337-340-345-release-packet-2026-11-09.md`. Recommended R = R′ `c1c4b22e`, which also carries 340 and 345 and no migration. Linux release qualification and the full approval document are still to do. The production release, D-336-2 and D-336-3 each stay behind their own owner approval.
   - **2026-11-09, R′ selected and Linux-qualified:** the qualification ran on the approved production snapshot at 118 in an isolated cluster, now stopped.
     - Typecheck clean; release-delta unit 257/257; `admin-lifecycle` 50/50; `admin-draft` 42/0/5; production build and boot smoke PASS.
-    - The full approval document is `docs/v2/issue336-337-340-345-release-approval-2026-11-09.md`, with H = R and a static check read from the package commit.
+    - The full approval document is `docs/v2/issue336-337-340-345-release-approval-2026-11-09.md`, with H = R and a static check read from the package commit. **Superseded 2026-11-09 by r2** `docs/v2/issue336-337-340-345-release-approval-r2-2026-11-09.md` (same R, re-derived after `origin/main` moved; ISSUE-344 is on `main` and not in this release). Keep `main` frozen from the r2 PKG until D1 PASS.
     - **Next:** the owner's §9 approval statement, which names the package commit and the window. D-336-2 and D-336-3 stay separate.
   - **2026-11-08, prepared (not executed):** the revised-pin procedure (commit, re-run `gap029-ops` at R′, then update runbook §3), the exact §7.2 nightly read (live DEV, owner action), the release decision and the D-336-2 step list are all in packet P-336 of `issues/open/OPEN-ISSUES-CLOSURE-RUN-20261108.md`.
 

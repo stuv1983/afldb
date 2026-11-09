@@ -8,6 +8,33 @@
 - The working tree stays uncommitted.
 - **Run 2 (owner, 2026-11-08):** additionally authorised Git fetch and inspection, local worktrees and branches, scoped staging and local commits, the W-339 bundle, transfer to streamanator, and Git, tests and migrations inside disposable clones on isolated test databases. Push, merge, live DEV, production, shared databases, private backups and WSL stores stay behind owner gates.
 
+## Run 7 — 2026-11-09: ISSUE-336/337/340/345 release package re-derived as r2 (owner-approved)
+
+**Owner instructions (2026-11-09):**
+- Re-derive the production approval packet from current `origin/main`. Authorised: Git inspection, disposable verification, and publication of the replacement packet as a records-only change.
+- Keep the qualified production revision and the I336 data pin at `c1c4b22e`. Keep the strict D0 and D1 head checks.
+- Preserve the previous packet as superseded. Re-derive the static delta and rerun its checks against the exact production candidate.
+- After publishing, record the final package SHA and rehearse D0 and D1 offline with it: they must pass at the expected head and stop if the head moves.
+- The production release and each D-336-2 step remain separate owner approvals. Coordinate any further `main` updates before the release.
+
+**What was re-derived** (from `origin/main` `98a4b1987313bea84e31bed4d64ed6458bb2f509`, worktree `D:\dev\afldb-i336-packet-r2`, branch `claude/records-i336-packet-r2-20261109`):
+- **New:** `docs/v2/issue336-337-340-345-release-approval-r2-2026-11-09.md`. It was generated from r1 by enumerated replacements only: the status block, the H, PKG and `ORIGIN_HEAD` rows, the new §2a, the §3 evidence pointers, `PKGD` in §5, D2's evidence string and the §9 path, plus an explicit ISSUE-344 exclusion.
+- **New:** the package directory `docs/v2/evidence/issue336-337-340-345-release-r2-20261109/`:
+  - `static-delta-check.sh` (r2);
+  - `prod-checkout-to-r-nondoc-files.txt` (37 lines, byte-identical to r1);
+  - `r-to-pkg-nondoc-files.txt` (17 lines).
+- **Superseded:** r1 (`…-approval-2026-11-09.md`) gets a banner only; its body and its package directory are unchanged.
+- **Why the static check changed:** r1 required R and PKG to have identical application trees. After `ae28bd70` that is false; r1's own check against `98a4b198` prints `STATIC DELTA CHECK FAIL: application tree src differs between R and PKG`. r2 keeps every r1 check of what R ships and replaces that one invariant with an exact enumeration of `main` after R:
+  - build inputs identical;
+  - `src/` differs only in the four ISSUE-344 files;
+  - `deploy/` differs only in the three DEV-only sync-dev files;
+  - all non-documentation files match `r-to-pkg-nondoc-files.txt`.
+- **Not rerun:** R's Linux qualification. R is unchanged (tree `10413828…`).
+
+**Publication and verification results:** the package cannot record its own SHA or its own rehearsal results, and any later commit would break its strict head checks. So the PKG SHA and the W0/D0/D1 rehearsal results are in the owner report and the session memory. They are written into the repository only in the post-release records update.
+
+**Main is frozen** from PKG until D1 PASS (or until the owner decides otherwise). Any push re-derives the package again.
+
 ## Run 6 — 2026-11-09: B2–B5 fixes published (338, 341–344) (owner-approved)
 
 **Owner instructions (2026-11-09):**

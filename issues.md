@@ -54005,6 +54005,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
   - **Extra delta suites:** 335 passed, 2 failed, 2 skipped. The 2 are the pre-existing environmental `draftguru-acquisition` "frozen Stage B1 sample" cases, which need a gitignored local file. Not a release defect.
   - **Afterwards:** the cluster is stopped; DEV services were unchanged.
   - **Package:** [full approval document](docs/v2/issue336-337-340-345-release-approval-2026-11-09.md), with the static delta check and file list in `docs/v2/evidence/issue336-337-340-345-release-20261109/`. The production checkout fast-forwards to R itself, H = R.
+  - **Package r2 (2026-11-09, replaces the above):** [replacement approval document](docs/v2/issue336-337-340-345-release-approval-r2-2026-11-09.md), package `docs/v2/evidence/issue336-337-340-345-release-r2-20261109/`. It was re-derived from `origin/main` `98a4b198` after the ISSUE-338/341–344 publication moved `main` past r1's PKG `c5959bbf`. R, H and the qualification are unchanged, and the strict W0/D0/D1 `origin/main` = PKG checks are kept. **ISSUE-344 is published on `main` and outside this pinned release.** `main` stays frozen from the r2 PKG until D1 PASS.
   - **Correction:** the draft packet said `deploy/` is unchanged at R′. In fact two DEV-only `sync-dev` files change; `deploy/release.mjs` does not.
   - **Still open, each behind its own owner approval:** the production release (approval statement §9, naming the package commit), the D-336-2 steps, and D-336-3.
 

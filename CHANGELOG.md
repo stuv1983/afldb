@@ -15,6 +15,12 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-336/337/340/345 release package re-derived as r2 (2026-11-09; records only; production unchanged)
+
+- `docs/v2/issue336-337-340-345-release-approval-r2-2026-11-09.md` replaces the 2026-11-09 package, which is marked superseded. Publishing the ISSUE-338/341–344 fixes had moved `origin/main` past that package's commit.
+- R = `c1c4b22e` is unchanged: the qualified build revision and the I336 data pin. The strict `origin/main` = PKG checks are kept. The re-derived static delta check enumerates everything on `main` after R: build inputs identical, only the four ISSUE-344 source files and three DEV-only deploy files.
+- ISSUE-344 is published on `main` and is not part of this production release.
+
 ### ISSUE-338 and ISSUE-341–344 fixes published (2026-11-09; not deployed)
 
 - The verified fixes are on `origin/main` by fast-forward `c5959bbf..ae28bd70`: ISSUE-341/342 restore verification `532dcd77`, ISSUE-343 fixture-CLI identity preflight `3ec73bcf`, ISSUE-338 review-contract clock `d3d38025`, ISSUE-344 draft pagination total `ae28bd70`.
