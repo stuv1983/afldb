@@ -455,6 +455,7 @@ e2e_setup() {
     echo OLDBUILD > .next/standalone/.next/BUILD_ID
     tar -cf "$E2E/backup/app.tar" .next/standalone/.next/BUILD_ID
     (cd "$E2E/backup" && sha256sum app.tar > SHA256SUMS-app)
+    git rev-parse HEAD > "$E2E/start"
   )
   local lf1 lf2 now
   lf1="$(printf 'create table a();\n' | sha256sum | cut -d' ' -f1)"
@@ -546,6 +547,9 @@ e2e_run() {
             "AFLDB_PF_ARTIFACT=$E2E/backup/app.tar" 'AFLDB_PF_MIN_FREE_GIB=0' 'AFLDB_PF_MIN_MEM_MIB=0' \
             'AFLDB_PF_REQUIRED_CONFIG=DATABASE_URL AFLDB_OWNER_DATABASE_URL' 'AFLDB_PF_LEDGER_BEFORE=2' 'AFLDB_PF_LEDGER_AFTER=3' "$@"; do
     name="${kv%%=*}"; value="${kv#*=}"
+    # AFLDB-ISSUE-346: a pin published by a case's preparation is resolved here, after it exists.
+    if [[ "$value" == __TIP__ ]]; then value="$(e2e_seed_rev main)"; fi
+    if [[ "$value" == __RELEASE__ ]]; then value="$(e2e_seed_rev release)"; fi
     sed -i -e "s#^${name}=.*\$#${name}='${value}'#" "$script"
   done
   if ! grep -q '^MemAvailable:' /proc/meminfo 2>/dev/null; then
@@ -567,7 +571,8 @@ e2e_node_dir() {
 e2e_head() { (unset -f git; git -C "$E2E/work" rev-parse HEAD); }
 e2e_untouched() {
   # No checkout change, install, migration, build or restart.
-  local start; start="$(unset -f git; git -C "$E2E/work" rev-parse dev-v2-main@{upstream}~2)"
+  # The head e2e_setup left (upstream~2 at setup); recorded, because some cases publish to origin.
+  local start; start="$(cat "$E2E/start")"
   [[ "$(e2e_head)" == "$start" ]] && ! grep -q '^npm ci\|^npm run' "$E2E/calls" 2>/dev/null \
     && kill -0 "$(cat "$E2E/victim")" 2>/dev/null && [[ "$(cat "$E2E/work/.next/standalone/.next/BUILD_ID")" == OLDBUILD ]] \
     && [[ "$(wc -l < "$E2E/ledger")" == 2 ]]
@@ -576,7 +581,9 @@ e2e_case() { # name expected_rc expected_text [NAME=value ...]
   local expected_rc="$1" text="$2" rc ok=1
   shift 2
   e2e_setup
-  e2e_run "$SYNC_DEV_GENERATED_DIR/gen-execute.sh" "$@"; rc=$?
+  # AFLDB-ISSUE-346: optional payload (E2E_GEN) and per-case preparation (E2E_PREP); defaults unchanged.
+  if [[ -n "${E2E_PREP:-}" ]]; then "$E2E_PREP"; fi
+  e2e_run "${E2E_GEN:-$SYNC_DEV_GENERATED_DIR/gen-execute.sh}" "$@"; rc=$?
   if (( rc == expected_rc )) && grep -qF -- "$text" "$E2E/out" && e2e_untouched \
       && grep -q "^RESULT exit=$expected_rc " "$E2E"/evidence/*.txt; then ok=0
   else echo "    rc=$rc; blockers and tail:"; { grep -F "[preflight] FAIL" "$E2E/out"; tail -n 3 "$E2E/out"; } | sed 's/^/    /'; fi
@@ -729,7 +736,7 @@ test_e2e_r339a_custom_dsn_name_blocks() {
 e2e_dotenv_case() { # e2e_dotenv_case <line appended to .env> <expected text>
   local rc ok=1
   e2e_setup; printf '%s\n' "$1" >> "$E2E/work/.env"
-  e2e_run "$SYNC_DEV_GENERATED_DIR/gen-execute.sh"; rc=$?
+  e2e_run "${E2E_GEN:-$SYNC_DEV_GENERATED_DIR/gen-execute.sh}"; rc=$?
   (( rc == 40 )) && grep -qF -- "$2" "$E2E/out" && e2e_untouched && ok=0
   e2e_teardown; return $ok
 }
@@ -745,6 +752,129 @@ test_e2e_r339a_migration_child_is_pinned() {
     && ! grep -q 'MIGRATE_CHILD would write' "$E2E/calls" && grep -q 'PASS migration target is the assessed database' "$E2E/out" \
     && ! grep -q 'fake\|u:p@' "$E2E/out" && ok=0
   e2e_teardown; return $ok
+}
+
+# --- AFLDB-ISSUE-346: the migration-only route (-SkipBuild -SkipRestart), the real generated payload ---
+m_gen() { printf '%s' "$SYNC_DEV_GENERATED_DIR/gen-migrate-only.sh"; }
+m_case() { E2E_GEN="$(m_gen)" e2e_case "$@"; }
+# No migration child ran (and the ledger, checkout, build and service are as e2e_setup left them).
+m_no_child() { ! grep -q 'MIGRATE_CHILD' "$E2E/calls" 2>/dev/null && e2e_untouched; }
+e2e_commit() { # e2e_commit <branch> <file> <content>: commit on <branch> in the seed and publish it to origin
+  (unset -f git; set -e; cd "$E2E/seed"
+   export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@e.invalid GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@e.invalid
+   if [[ "$1" != main ]]; then git switch -q -C "$1" main; fi
+   printf '%s\n' "$3" > "src/db/migrations/$2"; git add . && git commit -qm "$2"
+   git push -q "$E2E/origin.git" "$1"; git switch -q main)
+}
+e2e_seed_rev() { (unset -f git; git -C "$E2E/seed" rev-parse "$1"); }
+test_e2e_346_migrate_only_applies_exactly_the_approved_transition() {
+  local rc ok=1 pin ev
+  e2e_setup; pin="$(e2e_pin)"
+  e2e_run "$(m_gen)"; rc=$?
+  ev="$(cat "$E2E"/evidence/*.txt 2>/dev/null)"
+  if (( rc == 0 )) && [[ "$(e2e_head)" == "$pin" && "$(wc -l < "$E2E/ledger")" == 3 ]] \
+      && [[ "$(sed -n 3p "$E2E/ledger" | cut -d' ' -f1)" == 003_c.sql ]] \
+      && [[ "$(grep -c '^MIGRATE_CHILD' "$E2E/calls")" == 1 ]] \
+      && grep -q '^MIGRATE_CHILD args=\[run db:migrate -- --target dev\] exported_target=<unset> exported_owner_dsn=$' "$E2E/calls" \
+      && ! grep -q '^npm run build' "$E2E/calls" && ! grep -q -- '--property Restart ' "$E2E/calls" \
+      && kill -0 "$(cat "$E2E/victim")" 2>/dev/null && [[ "$(cat "$E2E/work/.next/standalone/.next/BUILD_ID")" == OLDBUILD ]] \
+      && grep -q 'serving BUILD_ID (not rebuilt): OLDBUILD' "$E2E/out" \
+      && grep -q '^INFO planned mutation steps -- checkout install migrate health (migration-only route, AFLDB-ISSUE-346' <<<"$ev" \
+      && grep -q '^PASS migration set is one db:migrate accepts -- 3 well-formed' <<<"$ev" \
+      && grep -q '^PASS approved migration transition -- 2 -> 3 (pending 003_c.sql)' <<<"$ev" \
+      && grep -q '^PASS post-migration parity -- 3/3' <<<"$ev" && grep -q '^PASS preserved state after deploy' <<<"$ev" \
+      && ! grep -q 'pre-restart revalidation' <<<"$ev" && grep -q '^RESULT exit=0 ' <<<"$ev" \
+      && ! grep -q 'p@h' "$E2E"/evidence/*.txt "$E2E/out"; then ok=0
+  else echo "    rc=$rc; blockers and tail:"; { grep -F "[preflight] FAIL" "$E2E/out"; tail -n 3 "$E2E/out"; } | sed 's/^/    /'; fi
+  e2e_teardown; return $ok
+}
+test_e2e_346_full_deploy_records_its_steps() {
+  local rc ok=1
+  e2e_setup; e2e_run "$SYNC_DEV_GENERATED_DIR/gen-execute.sh"; rc=$?
+  (( rc == 0 )) && grep -q '^INFO planned mutation steps -- checkout install migrate build restart:respawn health$' "$E2E"/evidence/*.txt \
+    && grep -q '^npm run build' "$E2E/calls" && ! kill -0 "$(cat "$E2E/victim")" 2>/dev/null && grep -q 'built BUILD_ID: NEWBUILD' "$E2E/out" && ok=0
+  e2e_teardown; return $ok
+}
+m_refused() { # m_refused <rc> <text> [NAME=value ...]: refused with that status and text, and no child
+  local expected_rc="$1" text="$2" rc ok=1
+  shift 2
+  e2e_setup
+  if [[ -n "${E2E_PREP:-}" ]]; then "$E2E_PREP"; fi
+  e2e_run "$(m_gen)" "$@"; rc=$?
+  if (( rc == expected_rc )) && grep -qF -- "$text" "$E2E/out" && m_no_child \
+      && grep -q "^RESULT exit=$expected_rc " "$E2E"/evidence/*.txt; then ok=0
+  else echo "    rc=$rc; blockers and tail:"; { grep -F "[preflight] FAIL" "$E2E/out"; tail -n 3 "$E2E/out"; } | sed 's/^/    /'; fi
+  e2e_teardown; return $ok
+}
+test_e2e_346_no_approval_refused() { m_refused 40 'unapproved pending: 003_c.sql' AFLDB_PF_LEDGER_BEFORE= AFLDB_PF_LEDGER_AFTER=; }
+test_e2e_346_wrong_before_refused() { m_refused 40 'ledger has 2, approval expects 1 before' AFLDB_PF_LEDGER_BEFORE=1; }
+test_e2e_346_wrong_after_refused() { m_refused 40 'target has 3, approval expects 4 after' AFLDB_PF_LEDGER_AFTER=4; }
+test_e2e_346_wrong_database_refused() { STUB_DB=afldb_prod m_refused 40 "connected to 'afldb_prod', expected 'afldb_dev'"; }
+test_e2e_346_wrong_host_refused() { STUB_HOST=elsewhere m_refused 40 "FAIL expected host -- on 'elsewhere'"; }
+test_e2e_346_exported_owner_dsn_refused() {
+  AFLDB_OWNER_DATABASE_URL='postgres://u:fake@h/afldb_other' m_refused 40 'AFLDB_OWNER_DATABASE_URL is exported in the deploy shell'
+}
+test_e2e_346_exported_test_target_refused() {
+  AFLDB_MIGRATE_TARGET=test AFLDB_TEST_DATABASE_URL='postgres://u:fake@h/afldb_other_test' m_refused 40 'AFLDB_MIGRATE_TARGET is exported'
+}
+m_dotenv_prep() { printf '%s\n' "$M_DOTENV_LINE" >> "$E2E/work/.env"; }
+test_e2e_346_dotenv_target_refused() { M_DOTENV_LINE='AFLDB_MIGRATE_TARGET=test' E2E_PREP=m_dotenv_prep m_refused 40 '.env sets AFLDB_MIGRATE_TARGET'; }
+test_e2e_346_duplicate_dsn_line_refused() {
+  M_DOTENV_LINE='AFLDB_OWNER_DATABASE_URL=postgres://u:p@h/afldb_other' E2E_PREP=m_dotenv_prep m_refused 40 'found 2 definition(s)'
+}
+m_dirty_prep() { echo '# local edit' >> "$E2E/work/.gitignore"; }
+test_e2e_346_dirty_tree_refused() { E2E_PREP=m_dirty_prep m_refused 40 'FAIL working tree holds only permitted operational files'; }
+test_e2e_346_unpublished_pin_refused() {
+  m_refused 40 'is not a commit here after the fetch' AFLDB_PF_EXPECTED_REVISION=0123456789abcdef0123456789abcdef01234567
+}
+m_drift_prep() { sed -i '1s/ .*$/ 0000000000000000000000000000000000000000000000000000000000000000/' "$E2E/ledger"; }
+test_e2e_346_ledger_checksum_drift_refused() { E2E_PREP=m_drift_prep m_refused 40 'applied 001_a.sql checksum differs from the target revision'; }
+m_collide_prep() { e2e_commit main 003_x.sql 'create table x();'; }
+test_e2e_346_colliding_migration_refused_before_checkout() {
+  # The approved counts match (2 -> 4), so only the migration-set check can refuse it before the child.
+  E2E_PREP=m_collide_prep m_refused 40 'migration number 003 is claimed by 003_c.sql and 003_x.sql' \
+    AFLDB_PF_EXPECTED_REVISION=__TIP__ AFLDB_PF_LEDGER_AFTER=4
+}
+m_badname_prep() { e2e_commit main '004-d.sql' 'create table d();'; }
+test_e2e_346_malformed_name_refused() {
+  E2E_PREP=m_badname_prep m_refused 40 '004-d.sql is not named NNN_description.sql' AFLDB_PF_EXPECTED_REVISION=__TIP__ AFLDB_PF_LEDGER_AFTER=4
+}
+m_missing_base_prep() { e2e_commit main 004_d.sql 'create table d();'; }
+test_e2e_346_missing_base_migration_refused() {
+  # The pin (one behind the old tip's child) lacks 004_d.sql that origin/main now has: migrate.ts would refuse it.
+  E2E_PREP=m_missing_base_prep m_refused 40 'the target is missing 004_d.sql from origin/main'
+}
+m_branch_local_prep() {
+  e2e_commit release 004_d.sql 'create table d();'
+  (unset -f git; cd "$E2E/work" && git fetch -q origin && git branch -q --set-upstream-to=origin/release dev-v2-main)
+}
+test_e2e_346_branch_local_migration_refused() {
+  E2E_PREP=m_branch_local_prep m_refused 40 '004_d.sql is branch-local (not on origin/main)' \
+    AFLDB_PF_EXPECTED_UPSTREAM=origin/release AFLDB_PF_EXPECTED_REVISION=__RELEASE__ AFLDB_PF_LEDGER_AFTER=4
+}
+test_e2e_346_running_job_refused() { STUB_RUNNING=afldb-settle-afl-api.service m_refused 40 'afldb-settle-afl-api.service is running'; }
+test_e2e_346_missing_preparation_refused() { m_refused 41 'PREP verified database backup' AFLDB_PF_BACKUP_DIR=; }
+test_e2e_346_parity_failure_stops_with_44() {
+  local rc ok=1
+  e2e_setup
+  STUB_MIGRATE_BAD=1 e2e_run "$(m_gen)"; rc=$?
+  (( rc == 44 )) && grep -q 'FAIL post-migration parity' "$E2E/out" && ! grep -q '^npm run build' "$E2E/calls" \
+    && kill -0 "$(cat "$E2E/victim")" 2>/dev/null && grep -q '^RESULT exit=44 ' "$E2E"/evidence/*.txt && ok=0
+  e2e_teardown; return $ok
+}
+test_e2e_346_exported_test_url_alone_cannot_misdirect() {
+  # Not a refusal: --target dev never reads AFLDB_TEST_DATABASE_URL, so the child still writes dev only.
+  local rc ok=1
+  e2e_setup
+  AFLDB_TEST_DATABASE_URL='postgres://u:fake@h/afldb_other_test' e2e_run "$(m_gen)"; rc=$?
+  (( rc == 0 )) && grep -q '^MIGRATE_CHILD args=\[run db:migrate -- --target dev\] exported_target=<unset> exported_owner_dsn=$' "$E2E/calls" \
+    && ! grep -q 'MIGRATE_CHILD would write' "$E2E/calls" && [[ "$(wc -l < "$E2E/ledger")" == 3 ]] && ok=0
+  e2e_teardown; return $ok
+}
+test_346_migration_set_skipped_with_skip_migrate() {
+  local out
+  out="$(AFLDB_PF_SKIP_MIGRATE=1 AFLDB_PF_TARGET_REV=x AFLDB_PF_EVIDENCE_FILE='' afldb_pf_migration_set)"
+  [[ "$out" == '[preflight] INFO migration set is one db:migrate accepts -- not evaluated: -SkipMigrate' ]]
 }
 
 # R339-C: the real transport command (deploy/sync-dev-transport.sh), executed by a POSIX shell.
@@ -812,6 +942,7 @@ run_test 'gate: branch namespace collision dev vs dev/v2-main' test_gate_branch_
 run_test 'gate: ledger accepts CRLF checksum, refuses drift and reordering' test_gate_ledger_accepts_crlf_checksum_and_refuses_drift
 run_test 'gate: .env presence by name never prints values' test_gate_env_presence_never_prints_values
 run_test 'gate: approval window missing/expired/too long/future/open' test_gate_window_states
+run_test 'gate 346: migration-set check is not evaluated under -SkipMigrate' test_346_migration_set_skipped_with_skip_migrate
 if [[ -n "${SYNC_DEV_GENERATED_DIR:-}" && -f "$SYNC_DEV_GENERATED_DIR/gen-execute.sh" && -f "$SYNC_DEV_GENERATED_DIR/gen-assess.sh" ]]; then
   run_test 'e2e: READY pin behind tip deploys, migrates exactly, preserves main/stash' test_e2e_ready_pin_deploys_and_preserves
   run_test 'e2e: wrong host blocks before any change' test_e2e_wrong_host_blocks
@@ -835,6 +966,32 @@ if [[ -n "${SYNC_DEV_GENERATED_DIR:-}" && -f "$SYNC_DEV_GENERATED_DIR/gen-execut
   run_test 'e2e R339-A: .env migration target other than dev blocks' test_e2e_r339a_dotenv_target_blocks
   run_test 'e2e R339-A: duplicate .env DSN line blocks' test_e2e_r339a_duplicate_dsn_line_blocks
   run_test 'e2e R339-A: migration child is pinned to --target dev with no exported target/DSN' test_e2e_r339a_migration_child_is_pinned
+  run_test 'e2e 346: a full deploy records its planned steps (build and restart unchanged)' test_e2e_346_full_deploy_records_its_steps
+  if [[ -f "$SYNC_DEV_GENERATED_DIR/gen-migrate-only.sh" ]]; then
+    run_test 'e2e 346: migration-only applies exactly the approved 2->3, no build, no restart, evidence recorded' test_e2e_346_migrate_only_applies_exactly_the_approved_transition
+    run_test 'e2e 346: no approval refused (40), no child' test_e2e_346_no_approval_refused
+    run_test 'e2e 346: wrong ledger-before refused (40), no child' test_e2e_346_wrong_before_refused
+    run_test 'e2e 346: wrong ledger-after refused (40), no child' test_e2e_346_wrong_after_refused
+    run_test 'e2e 346: wrong database identity refused (40), no child' test_e2e_346_wrong_database_refused
+    run_test 'e2e 346: wrong host refused (40), no child' test_e2e_346_wrong_host_refused
+    run_test 'e2e 346: exported owner DSN refused (40), no child' test_e2e_346_exported_owner_dsn_refused
+    run_test 'e2e 346: exported AFLDB_MIGRATE_TARGET=test with TEST_URL refused (40), no child' test_e2e_346_exported_test_target_refused
+    run_test 'e2e 346: .env migration target refused (40), no child' test_e2e_346_dotenv_target_refused
+    run_test 'e2e 346: duplicate .env DSN line refused (40), no child' test_e2e_346_duplicate_dsn_line_refused
+    run_test 'e2e 346: dirty tree refused (40), no child' test_e2e_346_dirty_tree_refused
+    run_test 'e2e 346: unpublished pin refused (40), no child' test_e2e_346_unpublished_pin_refused
+    run_test 'e2e 346: ledger checksum drift refused (40), no child' test_e2e_346_ledger_checksum_drift_refused
+    run_test 'e2e 346: colliding migration number refused before checkout (40), no child' test_e2e_346_colliding_migration_refused_before_checkout
+    run_test 'e2e 346: malformed migration name refused (40), no child' test_e2e_346_malformed_name_refused
+    run_test 'e2e 346: missing base migration refused (40), no child' test_e2e_346_missing_base_migration_refused
+    run_test 'e2e 346: branch-local migration refused (40), no child' test_e2e_346_branch_local_migration_refused
+    run_test 'e2e 346: running job refused (40), no child' test_e2e_346_running_job_refused
+    run_test 'e2e 346: missing preparation refused (41), no child' test_e2e_346_missing_preparation_refused
+    run_test 'e2e 346: parity failure stops with 44, no build or restart' test_e2e_346_parity_failure_stops_with_44
+    run_test 'e2e 346: exported TEST_URL alone cannot misdirect the child (proceeds, dev only)' test_e2e_346_exported_test_url_alone_cannot_misdirect
+  else
+    echo 'NOT RUN: e2e 346 migration-only cases (gen-migrate-only.sh missing)'
+  fi
 else
   echo 'NOT RUN: e2e generated-payload cases (set SYNC_DEV_GENERATED_DIR; see tests/sync-dev-static.test.ps1 -ExportDir)'
 fi

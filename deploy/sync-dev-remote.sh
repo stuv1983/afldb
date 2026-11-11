@@ -560,6 +560,76 @@ afldb_pf_migration_binding() {
   afldb_pf_record PASS "$label" "db:migrate --target dev reads $AFLDB_PF_MIGRATE_DSN_NAME from the same single .env line"
 }
 
+# AFLDB-ISSUE-346: migrate.ts's pre-connection refusals decidable from the target, before checkout:
+# bad name (migration-safety.ts:37), a number (string) on two names, and set parity with its base
+# (branch-local, missing, changed). Other refs/worktrees stay migrate.ts's own check.
+AFLDB_PF_MIGRATION_NAME_RE='^([0-9]+)_([A-Za-z0-9][A-Za-z0-9_-]*)\.sql$'
+afldb_pf_migration_content() { # = migrationContentId
+  git cat-file blob "$1:src/db/migrations/$2" 2>/dev/null | perl -0777 -pe 's/\r\n/\n/g' | sha256sum | cut -d' ' -f1
+}
+afldb_pf_migration_set() {
+  local label='migration set is one db:migrate accepts' rev="${AFLDB_PF_TARGET_REV:-}" base where name number
+  local LC_ALL=C
+  local -a target=() based=() problems=()
+  local -A owner=() in_base=() in_target=()
+  if [[ "${AFLDB_PF_SKIP_MIGRATE:-0}" == 1 ]]; then
+    afldb_pf_record INFO "$label" 'not evaluated: -SkipMigrate'
+    return 0
+  fi
+  if [[ -z "$rev" ]]; then
+    afldb_pf_record INFO "$label" 'not evaluated: no target revision'
+    return 0
+  fi
+  if git show-ref --verify --quiet refs/remotes/origin/main; then base=refs/remotes/origin/main
+  elif git show-ref --verify --quiet refs/heads/main; then base=refs/heads/main
+  else base="$rev"; fi
+  where="${base#refs/remotes/}"
+  mapfile -t target < <(afldb_pf_revision_migrations "$rev")
+  mapfile -t based < <(afldb_pf_revision_migrations "$base")
+  for name in "${target[@]}"; do
+    in_target["$name"]=1
+    if [[ ! "$name" =~ $AFLDB_PF_MIGRATION_NAME_RE ]]; then
+      problems+=("$name is not named NNN_description.sql")
+      continue
+    fi
+    number="${BASH_REMATCH[1]}"
+    if [[ -n "${owner[$number]:-}" ]]; then
+      problems+=("migration number $number is claimed by ${owner[$number]} and $name")
+    else
+      owner["$number"]="$name"
+    fi
+  done
+  for name in "${based[@]}"; do
+    in_base["$name"]=1
+    if [[ -z "${in_target[$name]:-}" ]]; then
+      problems+=("the target is missing $name from $where")
+    elif [[ "$(git rev-parse "$rev:src/db/migrations/$name")" != "$(git rev-parse "$base:src/db/migrations/$name")" ]] \
+        && [[ "$(afldb_pf_migration_content "$rev" "$name")" != "$(afldb_pf_migration_content "$base" "$name")" ]]; then
+      problems+=("$name has different contents in the target and $where")
+    fi
+  done
+  for name in "${target[@]}"; do
+    if [[ -z "${in_base[$name]:-}" ]]; then problems+=("$name is branch-local (not on $where)"); fi
+  done
+  if (( ${#problems[@]} )); then
+    afldb_pf_record FAIL "$label" "$(IFS=';'; echo "${problems[*]}")"
+  else
+    afldb_pf_record PASS "$label" "${#target[@]} well-formed, unique-numbered name(s), the same set as $where"
+  fi
+}
+
+# AFLDB-ISSUE-346: non-migration files the checkout changes (on the migration-only route the
+# supervisor, timers and tools run them against the old build). Recorded, never decided.
+afldb_pf_checkout_scope() {
+  local rev="${AFLDB_PF_TARGET_REV:-}" changed n notes=''
+  if [[ -z "$rev" ]]; then return 0; fi
+  changed="$(git diff --name-only HEAD "$rev" 2>/dev/null | grep -v '^src/db/migrations/' || true)"
+  n="$(printf '%s' "$changed" | grep -c . || true)"
+  if grep -qx 'deploy/server-cluster.mjs' <<<"$changed"; then notes+='; includes deploy/server-cluster.mjs (the supervisor)'; fi
+  if grep -qx 'package-lock.json' <<<"$changed"; then notes+='; includes package-lock.json'; fi
+  afldb_pf_record INFO 'checkout change outside src/db/migrations' "${n:-0} file(s)$notes"
+}
+
 # AFLDB-ISSUE-339 R339-B: the preserved state the deploy is ALLOWED to produce. When the target
 # branch is main, the one permitted change is main moving from its assessed value to the assessed
 # target revision (the fast-forward the gate already proved is an ancestor move); every other
@@ -722,6 +792,7 @@ afldb_deploy_gate() {
   AFLDB_PF_TARGET_REV=''; AFLDB_PF_TARGET_BRANCH_RESOLVED=''; AFLDB_PF_LEDGER_SHA=''
   afldb_pf_open_evidence
   afldb_pf_record INFO 'phase' "${AFLDB_PF_PHASE:-execute}"
+  afldb_pf_record INFO 'planned mutation steps' "${AFLDB_PF_STEPS:-<not supplied>}"
 
   # Host and repository.
   host="$(afldb_pf_hostname 2>/dev/null || true)"
@@ -809,6 +880,8 @@ afldb_deploy_gate() {
   AFLDB_PF_STATE_BEFORE="$(afldb_pf_state_digest)"
   afldb_pf_record INFO 'preserved state digest' "$AFLDB_PF_STATE_BEFORE"
   afldb_pf_migration_binding
+  afldb_pf_migration_set
+  afldb_pf_checkout_scope
 
   # Configuration presence by name.
   for name in ${AFLDB_PF_REQUIRED_CONFIG:-}; do

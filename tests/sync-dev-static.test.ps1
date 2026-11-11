@@ -209,9 +209,45 @@ $badMethodRefused = $false
 try { & { . $syncScript -WhatIf -RestartMethod 'sudo' *> $null } } catch { $badMethodRefused = $true }
 Assert-True $badMethodRefused 'an unknown restart method must be refused on the workstation'
 
+# AFLDB-ISSUE-346: the migration-only DEV route is the same gated payload with no build and no restart.
+$migrateOnlyArgs = @{ RemoteRef = 'dev-v2-main'; ExpectedBranch = 'dev-v2-main'; ExpectedRevision = $pin
+  ExpectedLedgerBefore = 117; ExpectedLedgerAfter = 118; SkipBuild = $true; SkipRestart = $true }
+$migrateOnlyScript = & { . $syncScript -WhatIf @migrateOnlyArgs *> $null; $remoteScript }
+$moGate = $migrateOnlyScript.IndexOf("`nafldb_deploy_gate`n")
+$moMigrate = $migrateOnlyScript.IndexOf($migrateLine)
+$moParity = $migrateOnlyScript.IndexOf("`nafldb_pf_migration_parity`n")
+Assert-True ($moGate -gt $migrateOnlyScript.IndexOf("`ngit fetch --prune`n")) 'migration-only: the gate must run after the fetch'
+foreach ($mutation in @('git switch --no-guess', $ffLine, "`nnpm ci`n", $migrateLine)) {
+  Assert-True ($migrateOnlyScript.IndexOf($mutation) -gt $moGate) "migration-only: the gate must precede: $mutation"
+}
+Assert-True (([regex]::Matches($migrateOnlyScript, [regex]::Escape($migrateLine))).Count -eq 1) 'migration-only: exactly one pinned migration child'
+Assert-True ($migrateOnlyScript -notmatch '(?m)^(env [^\n]*)?npm run db:migrate(?! -- --target dev$)') 'migration-only: no other db:migrate form'
+Assert-True ($migrateOnlyScript.IndexOf("`nafldb_pf_revalidate_before_migration`n") -lt $moMigrate -and $moMigrate -lt $moParity) 'migration-only: revalidate, migrate, parity in that order'
+Assert-True ($migrateOnlyScript -notmatch '(?m)^npm run build') 'migration-only: no build'
+foreach ($forbidden in @('kill "$AFLDB_OLD_PID"', 'sudo', "`nafldb_pf_revalidate_before_restart`n", 'systemctl restart', 'built BUILD_ID:')) {
+  Assert-True (-not $migrateOnlyScript.Contains($forbidden)) "migration-only must not contain: $forbidden"
+}
+Assert-True ($migrateOnlyScript.IndexOf('serving BUILD_ID (not rebuilt)') -gt $moParity) 'migration-only: the serving build is reported, not called built'
+Assert-True ($migrateOnlyScript.IndexOf('afldb_wait_for_readiness ') -gt $moParity) 'migration-only: the untouched service is still probed after the migration'
+Assert-True ($migrateOnlyScript.IndexOf("echo '[deploy] >>> verify preserved state'`nafldb_pf_verify_preserved") -gt $moParity) 'migration-only: preserved state is still verified'
+Assert-True ($migrateOnlyScript -match "(?m)^AFLDB_PF_LEDGER_BEFORE='117'$" -and $migrateOnlyScript -match "(?m)^AFLDB_PF_LEDGER_AFTER='118'$") 'migration-only: the approved transition reaches the gate'
+Assert-True ($migrateOnlyScript -match "(?m)^AFLDB_PF_STEPS='checkout install migrate health \(migration-only route, AFLDB-ISSUE-346; build and restart skipped\)'$") 'migration-only: the planned steps must name the route'
+# The existing build and restart paths keep their steps and labels.
+Assert-True ($defaultScript -match "(?m)^AFLDB_PF_STEPS='checkout install migrate build restart:auto health'$") 'default deploy: planned steps changed'
+Assert-True ($respawnScript -match "(?m)^AFLDB_PF_STEPS='checkout install migrate build restart:respawn health'$") 'respawn deploy: planned steps changed'
+Assert-True ($assessScript -match "(?m)^AFLDB_PF_STEPS='none \(assessment\)'$") 'assessment: planned steps must be none'
+Assert-True ($pinnedScript.Contains('built BUILD_ID:') -and -not $pinnedScript.Contains('serving BUILD_ID (not rebuilt)')) 'a building deploy keeps its built BUILD_ID step'
+$migrateOnlyPayload = & { . $syncScript -WhatIf @migrateOnlyArgs *> $null; $remotePayload }
+Assert-True ((ConvertFrom-Payload $migrateOnlyPayload) -ceq $migrateOnlyScript -and $migrateOnlyPayload.Length -le 24000) 'migration-only payload transport or size'
+# The gate's migration-name pattern mirrors tools/db/migration-safety.ts:37; drift in either trips here.
+$safetySource = [IO.File]::ReadAllText((Join-Path $root 'tools\db\migration-safety.ts'))
+$remoteSource = [IO.File]::ReadAllText((Join-Path $root 'deploy\sync-dev-remote.sh'))
+Assert-True ($safetySource.Contains('const MIGRATION_NAME = /^(\d+)_([a-z0-9][a-z0-9_-]*)\.sql$/i;')) 'migration-safety.ts MIGRATION_NAME changed; update the gate mirror (AFLDB-ISSUE-346)'
+Assert-True ($remoteSource.Contains("AFLDB_PF_MIGRATION_NAME_RE='^([0-9]+)_([A-Za-z0-9][A-Za-z0-9_-]*)\.sql$'")) 'the gate migration-name mirror changed (AFLDB-ISSUE-346)'
+
 $tempScript = Join-Path ([IO.Path]::GetTempPath()) ("afldb-sync-dev-{0}.sh" -f [guid]::NewGuid())
 try {
-  foreach ($generated in @($defaultScript, $pinnedScript, $assessScript, $respawnScript)) {
+  foreach ($generated in @($defaultScript, $pinnedScript, $assessScript, $respawnScript, $migrateOnlyScript)) {
     [IO.File]::WriteAllText($tempScript, $generated, [Text.UTF8Encoding]::new($false))
     & $bash -p -n $tempScript
     Assert-True ($LASTEXITCODE -eq 0) 'generated remote Bash script failed syntax validation'
@@ -300,7 +336,10 @@ if ($ExportDir) {
   $assess = & { . $syncScript -WhatIf -Phase assess @common *> $null; $remoteScript }
   [IO.File]::WriteAllText((Join-Path $ExportDir 'gen-execute.sh'), $exec, [Text.UTF8Encoding]::new($false))
   [IO.File]::WriteAllText((Join-Path $ExportDir 'gen-assess.sh'), $assess, [Text.UTF8Encoding]::new($false))
-  Write-Output "exported gen-execute.sh and gen-assess.sh to $ExportDir"
+  # AFLDB-ISSUE-346: the migration-only route (ledger values are substituted per case).
+  $migrateOnly = & { . $syncScript -WhatIf @common -SkipBuild -SkipRestart -ExpectedLedgerBefore 2 -ExpectedLedgerAfter 3 *> $null; $remoteScript }
+  [IO.File]::WriteAllText((Join-Path $ExportDir 'gen-migrate-only.sh'), $migrateOnly, [Text.UTF8Encoding]::new($false))
+  Write-Output "exported gen-execute.sh, gen-assess.sh and gen-migrate-only.sh to $ExportDir"
 }
 
-Write-Output 'PASS: sync-dev PowerShell/static integration (AFLDB-ISSUE-339 gate ordering, refusals, transport, exit status)'
+Write-Output 'PASS: sync-dev PowerShell/static integration (AFLDB-ISSUE-339 gate ordering, refusals, transport, exit status; AFLDB-ISSUE-346 migration-only route)'

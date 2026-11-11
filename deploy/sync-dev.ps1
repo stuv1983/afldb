@@ -61,6 +61,11 @@ artifact of the serving build (-ArtifactArchive).
                   pre-migration (43), post-migration parity (44), pre-restart
                   (45) and preserved-state (46) revalidations stop the run.
 
+MIGRATION-ONLY ROUTE (AFLDB-ISSUE-346). `-Phase execute -SkipBuild -SkipRestart` with a pin and an
+approved transition applies exactly the approved migrations through the same gate, binding, child line
+and parity check, and neither builds nor restarts. The checkout (and npm ci) still advance to the pin;
+the old build keeps serving until a full deploy at the same pin follows. Never run db:migrate by hand.
+
 The remote exit status is returned as this script's exit code. -WhatIf only
 generates the payload; it never contacts the host and is not an inspection mode.
 #>
@@ -225,6 +230,18 @@ function Test-AcceptanceAccess {
 }
 $acceptance = if ($WhatIfPreference) { 'unchecked:whatif' } elseif ($AcceptanceUrl) { Test-AcceptanceAccess $AcceptanceUrl } else { 'unchecked:no-url' }
 
+# AFLDB-ISSUE-346: the mutation steps this run will generate, recorded by the gate in the evidence
+# file. -SkipBuild -SkipRestart with migrations on is the gated migration-only DEV route.
+$plannedSteps = if ($Phase -eq 'assess') { 'none (assessment)' } else {
+  $stepNames = @('checkout')
+  if (-not $SkipInstall) { $stepNames += 'install' }
+  if (-not $SkipMigrate) { $stepNames += 'migrate' }
+  if (-not $SkipBuild) { $stepNames += 'build' }
+  if (-not $SkipRestart) { $stepNames += "restart:$RestartMethod" }
+  if (-not $SkipHealth) { $stepNames += 'health' }
+  ($stepNames -join ' ') + $(if (-not $SkipMigrate -and $SkipBuild -and $SkipRestart) { ' (migration-only route, AFLDB-ISSUE-346; build and restart skipped)' } else { '' })
+}
+
 $remoteHelperPath = Join-Path $PSScriptRoot 'sync-dev-remote.sh'
 if (-not (Test-Path -LiteralPath $remoteHelperPath -PathType Leaf)) {
   throw "Remote deployment helper was not found: $remoteHelperPath"
@@ -243,6 +260,7 @@ Add-RemoteCommand $remoteCommands $remoteHelper
 # Gate inputs: every value single-quoted, so nothing expands on either side.
 $gateInputs = [ordered] @{
   AFLDB_PF_PHASE = $Phase
+  AFLDB_PF_STEPS = $plannedSteps
   AFLDB_PF_EXPECTED_HOST = $ExpectedHost
   AFLDB_PF_PROJECT_DIR = $ProjectDir
   AFLDB_PF_EXPECTED_ORIGIN = $ExpectedOrigin
@@ -335,7 +353,12 @@ if (-not $SkipBuild) {
   Add-RemoteStep $remoteCommands 'build Next.js standalone output' 'npm run build'
 }
 
-Add-RemoteStep $remoteCommands 'capture standalone build identity' 'test -s .next/standalone/.next/BUILD_ID; AFLDB_BUILT_BUILD_ID="$(tr -d ''\r\n'' < .next/standalone/.next/BUILD_ID)"; test -n "$AFLDB_BUILT_BUILD_ID"; echo "[deploy] built BUILD_ID: $AFLDB_BUILT_BUILD_ID"'
+if (-not $SkipBuild) {
+  Add-RemoteStep $remoteCommands 'capture standalone build identity' 'test -s .next/standalone/.next/BUILD_ID; AFLDB_BUILT_BUILD_ID="$(tr -d ''\r\n'' < .next/standalone/.next/BUILD_ID)"; test -n "$AFLDB_BUILT_BUILD_ID"; echo "[deploy] built BUILD_ID: $AFLDB_BUILT_BUILD_ID"'
+} else {
+  # AFLDB-ISSUE-346: nothing was built; report the existing (serving) build without calling it built.
+  Add-RemoteStep $remoteCommands 'capture serving build identity (build skipped)' 'test -s .next/standalone/.next/BUILD_ID; AFLDB_BUILT_BUILD_ID="$(tr -d ''\r\n'' < .next/standalone/.next/BUILD_ID)"; test -n "$AFLDB_BUILT_BUILD_ID"; echo "[deploy] serving BUILD_ID (not rebuilt): $AFLDB_BUILT_BUILD_ID"'
+}
 
 if (-not $SkipRestart) {
   Add-RemoteStep $remoteCommands 'revalidate before restart' 'afldb_pf_revalidate_before_restart'
@@ -434,6 +457,7 @@ if ($ExpectedRevision) {
 Write-Host ''
 
 Write-Host "Phase:         $Phase$(if ($Phase -eq 'assess') { ' (gate only; nothing changes)' } else { ' (gate, then mutation)' })"
+Write-Host "Steps:         $plannedSteps"
 Write-Host "Acceptance:    $acceptance"
 Write-Host "Evidence:      $EvidenceDir"
 Write-Host ''
