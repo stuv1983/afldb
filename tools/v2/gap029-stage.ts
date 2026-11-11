@@ -17,7 +17,7 @@ import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, wri
 import { join, resolve } from 'node:path';
 
 import { loadProfile, RUN_FILES } from './gap029-ops';
-import { STAGES, backupEvidenceBasicProblems, approvalStatement, isStage, sha256Hex, type Manifest, type Profile, type StageId } from './gap029-ops-lib';
+import { STAGES, backupEvidenceBasicProblems, approvalStatement, isStage, restoreTag, sha256Hex, type Manifest, type Profile, type StageId } from './gap029-ops-lib';
 
 const fail = (why: string): never => { throw new Error(`GAP-029 stage runner refused: ${why}`); };
 const SAFE = /^[A-Za-z0-9_./:@%+=,~-]+$/;
@@ -132,7 +132,7 @@ async function prepare(c: Ctx, tar: string, tarSha: string): Promise<void> {
   record.dumpSha256 = dumpSha; record.dumpBytes = readFileSync(join(local, 'capture', dumpName)).length;
 
   step(`4 copy to ${c.restoreHost} (private workspace), restore into a guarded disposable database and assemble the sealed evidence`);
-  const W = c.restoreWorkspace; const tag = `${c.stage.toLowerCase()}_${run.slice(3, 11)}_${run.slice(12, 18)}`.toLowerCase();
+  const W = c.restoreWorkspace; const tag = restoreTag(c.stage, run);
   const rin = `${W}/in/${run}`;
   must(await ssh(c.restoreHost, `umask 077; mkdir -p -m 700 ${q(W)}/in && mkdir -m 700 ${q(rin)}`), 'creating the restore-host staging directory');
   must(await scp(local, ['capture', 'target.json'], `${c.restoreHost}:${rin}/`, true), 'upload to the restore host');

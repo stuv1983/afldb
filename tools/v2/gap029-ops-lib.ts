@@ -29,6 +29,15 @@ export const STAGE_IDS = ['S1', 'S2', 'S3', 'S4', 'I336'] as const;
 export type StageId = (typeof STAGE_IDS)[number];
 export const isStage = (s: unknown): s is StageId => typeof s === 'string' && (STAGE_IDS as readonly string[]).includes(s);
 
+/** AFLDB-ISSUE-347: the restore-host TAG for a capture run `<stage>-<YYYYMMDD>T<HHMMSS>Z` (the run name prod-stage.sh `capture` generates).
+ * Parsed from the stage's own length, never a fixed offset: the earlier `run.slice(3, 11)` assumed a two-character stage, so an I336 run
+ * produced `i336_6-202611_…`, which restore-assemble-host.sh refuses (TAG must match [a-z0-9_]+). S1-S4 tags are unchanged. */
+export function restoreTag(stage: StageId, run: string): string {
+  const m = new RegExp(`^${stage}-([0-9]{8})T([0-9]{6})Z$`).exec(run);
+  if (!isStage(stage) || !m) throw new Error(`run ${run} is not a ${String(stage)} capture run name`);
+  return `${stage.toLowerCase()}_${m[1]}_${m[2]}`;
+}
+
 export interface StageSpec {
   id: StageId; title: string; decision: string; operation: string; tool: string; runner: 'tsx' | 'python'; conditions: boolean;
   /** Reviewed pinned inputs the plan command needs beyond the backup evidence. */

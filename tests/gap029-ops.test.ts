@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { EXIT_CODE } from '../tools/v2/gap029-common';
 import {
   APPLY_MIN_BACKUP_LEFT_MS, GENUINE, I336_EVIDENCE_SHA256, STAGES, STAGE_IDS, approvalProblems, approvalStatement, backupEvidenceBasicProblems, buildApproval, captureProblems, classifyOutcome,
-  manifestProblems, parseProfile, parseSha256Sums, planProblems, sha256Hex, targetProblems, type Manifest, type Profile, type StageId,
+  manifestProblems, parseProfile, parseSha256Sums, planProblems, restoreTag, sha256Hex, targetProblems, type Manifest, type Profile, type StageId,
 } from '../tools/v2/gap029-ops-lib';
 
 const read = (p: string) => readFileSync(p, 'utf8').replace(/\r\n/g, '\n');
@@ -263,6 +263,35 @@ describe.skipIf(process.platform === 'win32')('prod-stage.sh run-name grammar (A
     expect(r.status).toBe(2);
     expect(r.out).toMatch(message);
     expect(r.out).not.toMatch(/RUN_OK/);
+  });
+
+  // AFLDB-ISSUE-347: the workstation runner derived the restore TAG with fixed offsets (run.slice(3, 11)), so an I336 run produced
+  // "i336_6-202611_…" and restore-assemble-host.sh refused it (exit 2) after the production capture had been taken.
+  it.each([
+    ['S1', 'S1-20261103T000000Z', 's1_20261103_000000'],
+    ['S4', 'S4-20261103T235959Z', 's4_20261103_235959'],
+    ['I336', 'I336-20261111T015440Z', 'i336_20261111_015440'],
+  ] as const)('derives the restore TAG for %s run %s as the restore host accepts it', (stage, run, tag) => {
+    expect(restoreTag(stage, run)).toBe(tag);
+    const hostTagRule = /\[\[ "\$TAG" =~ \^\[a-z0-9_\]\+\$ \]\]/;
+    expect(read('tools/v2/gap029-ops/restore-assemble-host.sh')).toMatch(hostTagRule);
+    expect(tag).toMatch(/^[a-z0-9_]+$/);
+    expect(`afldb_v2_gap029_${tag}_rst_test`.length).toBeLessThanOrEqual(63);
+  });
+
+  it.each([
+    ['I336', 'S1-20261108T010203Z'],
+    ['S1', 'I336-20261108T010203Z'],
+    ['I336', 'I336-2026110T010203Z'],
+    ['I336', 'I336-20261108T010203Z/../x'],
+  ] as const)('refuses a TAG for stage %s from run %s', (stage, run) => {
+    expect(() => restoreTag(stage, run)).toThrow(/is not a/);
+  });
+
+  it('the runner takes its restore TAG from restoreTag, not from fixed offsets', () => {
+    const runner = read('tools/v2/gap029-stage.ts');
+    expect(runner).toMatch(/const tag = restoreTag\(c\.stage, run\);/);
+    expect(runner).not.toMatch(/run\.slice\(3, 11\)/);
   });
 
   it('every run-taking command parses the stage first, then the run, before anything else', () => {
