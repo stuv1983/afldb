@@ -54759,6 +54759,7 @@ Acceptance: Every non-public audience refuses data access until must_change_pass
   - **R1–R5 accepted** with the exact runbook §4a statement, as recorded at `50da084c`. Every operator restriction in it is binding: runbook §2 "Binding operator restrictions".
   - **Publication approved** under OD-6 after the ISSUE-336 r2 release's D1 PASS. The ISSUE-346 runbook blob differs from the qualified `0c47ca04` because §4a was added, so OD-6's re-run branch applies: `gap029-ops` and `sync-dev-remote` are re-run at the rebased tip. The code, test, `docs/deployment.md` and evidence blobs are byte-identical to `87653d5e`/`817ca8e9`.
   - **Resolve after publication** (merged = tested).
+  - **OD-6 extended (2026-11-11)** to the decision records `076cea9b` and later records-only commits. The prerequisites are unchanged, and the complete publication delta is reviewed before the push.
 - **Next action:** OD-6 publication after D1 PASS, then resolve. **The rule "never run `db:migrate` by hand on DEV" is now permanent (R1).**
 
 ## AFLDB-ISSUE-347 — The GAP-029 workstation runner cannot prepare an I336 run: its restore TAG is derived with fixed offsets

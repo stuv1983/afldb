@@ -44,7 +44,13 @@ Tooling and records only: no `src/`, migration, dependency or build-input change
 - **OD-6 approved exactly as recorded**, including the D1 PASS prerequisite. **Consequence to note:** the ISSUE-346 runbook blob already differs from the qualified `0c47ca04` (§4a, and now §2). OD-6's own "otherwise re-run" branch therefore applies: re-run `gap029-ops` and `sync-dev-remote` at the rebased tip. Every code, test, `docs/deployment.md` and evidence blob is byte-identical (verified 2026-11-11).
 - **OD-2 and OD-3 (D-336-2 A+B, C+D) approved**, to run after the application release passes acceptance. They stop at the read-only plan, then present the digest, backup hash and a proposed window for OD-4.
 - **OD-1 is NOT yet approved.** The r2 §9 statement still needs the owner's window. OD-2, OD-3 and OD-6 all wait on it.
-- **Branch layout:** `claude/records-catchup-20261111` stays at the approved tip `50da084c`. These decision records sit on the local branch `claude/records-decisions-20261111`, one commit stacked on it. OD-6 names `12aa6e29..50da084c`, so including the stacked records commit in the same fast-forward needs the owner's word. Otherwise it travels with the post-publication resolution records.
+- **Branch layout and OD-6 extension (owner, 2026-11-11):** `claude/records-catchup-20261111` stays at `50da084c`. The local branch `claude/records-decisions-20261111` stacks the decision records `076cea9b` and later records on it. **OD-6 now also covers `076cea9b` and later records-only commits** that document the approved decisions, the release execution, qualification results and D-336-2 preparation. Every OD-6 prerequisite still applies:
+  - D1 PASS;
+  - the post-release records commit first, then a rebase;
+  - the byte-identity check, with `gap029-ops` and `sync-dev-remote` re-run at the rebased tip (the runbook blob differs);
+  - `merge:ready --issue 347/346` and `preflight --mode merge` READY in a streamanator clone;
+  - fast-forward only.
+  Before pushing, review the **complete publication delta** (`git diff --stat` and `--name-only` from `origin/main` to the tip). Confirm it carries only records plus the qualified tooling of `2207986f` and `87653d5e`, with no other executable change (`src/`, `deploy/`, `tools/`, `tests/`, migrations, dependencies, build inputs). Any further executable change needs its own review, qualification and approval.
 
 **Remaining gaps (not owner decisions):**
 - ~~The 141 unclassified D-336-3 origin diffs need the owner CSV location.~~ Done (second session).
@@ -128,7 +134,7 @@ Tooling and records only: no `src/`, migration, dependency or build-input change
 | OD-3 | **APPROVED 2026-11-11 (after release acceptance).** **D-336-2 C+D**: restore, assemble and plan | That capture | Streamanator only, plus a read-only plan | — | packet §5 |
 | OD-4 | **D-336-2 E+F**: apply once | Plan digest printed at step D | +35 picks, +31 persons, 35 audit rows (actor 1). Accept the afldb_test contract divergence | Never retried or reversed; restoring the stage backup is a separate decision | packet §5 |
 | OD-5 | **DECIDED (A) 2026-11-11; carried as ISSUE-348.** **D-336-3** | Classification `d3363-classification-20261111/` | (A) none / (B) a later acquisition, gated by the classifier / (C′) a new 184-row additive stage / (C) a new 187-row stage | — | "I choose D-336-3 option (A then B / C′ / C)…"; the CSVs are retained, so no location is needed |
-| OD-6 | **APPROVED 2026-11-11 as recorded (after D1 PASS).** **Publish the run 8 range after D1 PASS** | `12aa6e29..` the tip of the publication branch (below), rebased onto the post-release records commit | 347 fix, 346 route, records. Tooling only, no app or build input | Revert commits; no deployed effect | "I approve publishing … by fast-forward after D1 PASS" |
+| OD-6 | **APPROVED 2026-11-11 as recorded (after D1 PASS); EXTENDED 2026-11-11 to `076cea9b` and later records-only commits.** **Publish the run 8 range after D1 PASS** | `12aa6e29..` the tip of the publication branch (below), rebased onto the post-release records commit | 347 fix, 346 route, records. Tooling only, no app or build input | Revert commits; no deployed effect | "I approve publishing … by fast-forward after D1 PASS" |
 | OD-7 | ISSUE-344 follow-up release | A later revision ≥ `ae28bd70` | Fixes the zero-match out-of-range draft page on production | Standard release route | A new release packet (not prepared: it needs OD-1 first) |
 | OD-8 | Ratify 341 (DSN contract) and 342 (exit-1 exception) | — | None (records only) | — | "ratify" or a new decision |
 
