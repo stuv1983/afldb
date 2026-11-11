@@ -1,0 +1,4 @@
+id	year	cat	player	pick	club	player_id	in_original_46	class	positions	added	removed	stored_origin	csv_origin
+5961	2020	National	Finlay Macrae	19	Collingwood	4274	False	REPLACE_CLUB		Kew Rovers	Surrey Park	Surrey Park/Xavier College/Oakleigh U18	Kew Rovers/Xavier College/Oakleigh U18
+6626	2024	Rookie	Blake Leidler	14	Sydney		False	REPLACE_CLUB		Surrey Park	Collegians	Collegians/Wesley College/Oakleigh U18	Surrey Park/Wesley College/Oakleigh U18
+6784	2025	Post-Draft	Finlay Macrae		West Coast	4274	False	REPLACE_CLUB		Kew Rovers	Surrey Park	Surrey Park/Xavier College/Oakleigh U18	Kew Rovers/Xavier College/Oakleigh U18

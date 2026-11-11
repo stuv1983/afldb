@@ -3,8 +3,10 @@
 - **Status:** OPEN. Implemented and qualified in isolation on local branch `claude/issue-346-gated-migrate`
   (from `origin/main` `12aa6e29`). **Not pushed:** `origin/main` is frozen until the ISSUE-336 production
   release D1 passes. Resolve only after publication.
-- **Interim owner rule (still in force):** never run `npm run db:migrate` by hand on DEV. It stays in force until
-  the owner publishes this route.
+- **Owner decisions 2026-11-11:** residuals R1–R5 **accepted** with the exact §4a statement, as recorded at `50da084c`.
+  Publication is approved under OD-6, after the ISSUE-336 D1 PASS. Resolve after publication.
+- **Permanent owner rule (R1):** never run `npm run db:migrate` by hand on DEV. Migrations reach DEV only through
+  `sync-dev.ps1` (a full deploy, or this route) with an approved transition.
 - Ledger entry: [`issues.md` → AFLDB-ISSUE-346](../../issues.md#afldb-issue-346). Gate background:
   [`issues/closed/AFLDB-ISSUE-339.md`](../closed/AFLDB-ISSUE-339.md).
 
@@ -70,6 +72,20 @@ powershell -ExecutionPolicy Bypass -File .\deploy\sync-dev.ps1 -Phase assess -Sk
   full deploy at the same pin in the same window. No ledger arguments are needed then, because nothing is pending.
 - Read `INFO checkout change outside src/db/migrations` in the assessment. If it is not `0 file(s)`, the
   supervisor, timers and tools will run new code against the old build until that full deploy.
+
+**Binding operator restrictions (owner acceptance of R1–R5, 2026-11-11; §4a):**
+1. **R1.** Never run `npm run db:migrate` by hand on DEV. Use only `sync-dev.ps1` with an approved transition.
+2. **R2.** Use this route only when a full deploy at the same pin follows in the same approval window. Read the
+   assessment's `checkout change outside src/db/migrations` line first. If it names `deploy/server-cluster.mjs` or
+   `package-lock.json`, or a DEV timer would fire before the follow-up full deploy, run the full deploy instead.
+3. **R3.** If the migration child fails (for example exit 1 on a ref or worktree collision), do not retry. Read its
+   message, remove the cause, then start again from assess. Never combine this route with `-AllowDirtyServer`.
+4. **R4.** An exported `AFLDB_TEST_DATABASE_URL` is not a refusal and needs no action (`--target dev` never reads it).
+5. **R5.** Before execute, confirm that the role in the assessment's `database identity` line is DEV's migration owner
+   role. Stop if it is not.
+
+`docs/deployment.md` (a qualified file read by unit suites) is unchanged, so it states only R1 and the follow-up rule.
+Fold R2's exceptions, R3 and R5 into it in a later documentation change, run with the suites that read it.
 
 ## 3. Qualification (2026-11-11)
 

@@ -38,6 +38,14 @@ Tooling and records only: no `src/`, migration, dependency or build-input change
 - **D-336-2 A+B made exact.** The simulation-qualified tarball `3160b9d3…5b8a` (`-simpack-`) was re-verified at R and is recorded in the packet §4 and §5 as the recommended TARSHA. Keep `/mnt/ssd/afldb-i336-simpack-20261111` until D-336-2 is accepted.
 - **OD-1 pins re-verified.** `git fetch`: `origin/main` = PKG `12aa6e29d51099eb6d3fbc901bbe488c5dbd7ab3`, unchanged. No qualification was repeated: no code, input or evidence of a passed check changed.
 
+**Owner decisions (2026-11-11, after the second session):**
+- **OD-5 D-336-3 = (A).** The stored origins are kept. The classification is preserved and the 3 club replacements are presented separately, both carried to the next DraftGuru acquisition as new **ISSUE-348**.
+- **ISSUE-346 R1–R5 accepted** with the exact §4a statement at `50da084c`. The operator restrictions are binding (runbook §2). Resolve after publication.
+- **OD-6 approved exactly as recorded**, including the D1 PASS prerequisite. **Consequence to note:** the ISSUE-346 runbook blob already differs from the qualified `0c47ca04` (§4a, and now §2). OD-6's own "otherwise re-run" branch therefore applies: re-run `gap029-ops` and `sync-dev-remote` at the rebased tip. Every code, test, `docs/deployment.md` and evidence blob is byte-identical (verified 2026-11-11).
+- **OD-2 and OD-3 (D-336-2 A+B, C+D) approved**, to run after the application release passes acceptance. They stop at the read-only plan, then present the digest, backup hash and a proposed window for OD-4.
+- **OD-1 is NOT yet approved.** The r2 §9 statement still needs the owner's window. OD-2, OD-3 and OD-6 all wait on it.
+- **Branch layout:** `claude/records-catchup-20261111` stays at the approved tip `50da084c`. These decision records sit on the local branch `claude/records-decisions-20261111`, one commit stacked on it. OD-6 names `12aa6e29..50da084c`, so including the stacked records commit in the same fast-forward needs the owner's word. Otherwise it travels with the post-publication resolution records.
+
 **Remaining gaps (not owner decisions):**
 - ~~The 141 unclassified D-336-3 origin diffs need the owner CSV location.~~ Done (second session).
 - The ISSUE-344 follow-up release packet waits for OD-1.
@@ -115,12 +123,12 @@ Tooling and records only: no `src/`, migration, dependency or build-input change
 
 | # | Decision | Exact revision / object | Effect | Recovery | Approval text |
 |---|---|---|---|---|---|
-| OD-1 | **Production application release** (336/337 with 340/345, RD-1) | R = H = `c1c4b22ee15007111eab66f6d354e0b9ecbb2ade`; PKG `12aa6e29d51099eb6d3fbc901bbe488c5dbd7ab3` | New draft pages and Intl Schol; serialised credentials (340); restricted Grid Solver forced-change gate (345). No migration or DB write. ISSUE-344 is not shipped | Roll back to `0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN` only (r2 §8). The checkout stays at R | r2 §9 with `<PKG, 40 hex>` = `12aa6e29d51099eb6d3fbc901bbe488c5dbd7ab3`, plus a window |
-| OD-2 | **D-336-2 A+B**: pin the ops checkout and capture | R `c1c4b22e`; tarball sha256 `3160b9d339d0d23747bb53ab9a597ccf54737c31218fe867762885a407a55b8a` (the simulation-qualified pack, packet §4), or a fresh `pack`'s | One read-only `pg_dump` and `$OPS` files on production | None needed (no data change) | D-336-2 packet §5 |
-| OD-3 | **D-336-2 C+D**: restore, assemble and plan | That capture | Streamanator only, plus a read-only plan | — | packet §5 |
+| OD-1 | **Not yet approved (window needed).** **Production application release** (336/337 with 340/345, RD-1) | R = H = `c1c4b22ee15007111eab66f6d354e0b9ecbb2ade`; PKG `12aa6e29d51099eb6d3fbc901bbe488c5dbd7ab3` | New draft pages and Intl Schol; serialised credentials (340); restricted Grid Solver forced-change gate (345). No migration or DB write. ISSUE-344 is not shipped | Roll back to `0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN` only (r2 §8). The checkout stays at R | r2 §9 with `<PKG, 40 hex>` = `12aa6e29d51099eb6d3fbc901bbe488c5dbd7ab3`, plus a window |
+| OD-2 | **APPROVED 2026-11-11 (after release acceptance).** **D-336-2 A+B**: pin the ops checkout and capture | R `c1c4b22e`; tarball sha256 `3160b9d339d0d23747bb53ab9a597ccf54737c31218fe867762885a407a55b8a` (the simulation-qualified pack, packet §4), or a fresh `pack`'s | One read-only `pg_dump` and `$OPS` files on production | None needed (no data change) | D-336-2 packet §5 |
+| OD-3 | **APPROVED 2026-11-11 (after release acceptance).** **D-336-2 C+D**: restore, assemble and plan | That capture | Streamanator only, plus a read-only plan | — | packet §5 |
 | OD-4 | **D-336-2 E+F**: apply once | Plan digest printed at step D | +35 picks, +31 persons, 35 audit rows (actor 1). Accept the afldb_test contract divergence | Never retried or reversed; restoring the stage backup is a separate decision | packet §5 |
-| OD-5 | **D-336-3** | Classification `d3363-classification-20261111/` | (A) none / (B) a later acquisition, gated by the classifier / (C′) a new 184-row additive stage / (C) a new 187-row stage | — | "I choose D-336-3 option (A then B / C′ / C)…"; the CSVs are retained, so no location is needed |
-| OD-6 | **Publish the run 8 range after D1 PASS** | `12aa6e29..` the tip of the publication branch (below), rebased onto the post-release records commit | 347 fix, 346 route, records. Tooling only, no app or build input | Revert commits; no deployed effect | "I approve publishing … by fast-forward after D1 PASS" |
+| OD-5 | **DECIDED (A) 2026-11-11; carried as ISSUE-348.** **D-336-3** | Classification `d3363-classification-20261111/` | (A) none / (B) a later acquisition, gated by the classifier / (C′) a new 184-row additive stage / (C) a new 187-row stage | — | "I choose D-336-3 option (A then B / C′ / C)…"; the CSVs are retained, so no location is needed |
+| OD-6 | **APPROVED 2026-11-11 as recorded (after D1 PASS).** **Publish the run 8 range after D1 PASS** | `12aa6e29..` the tip of the publication branch (below), rebased onto the post-release records commit | 347 fix, 346 route, records. Tooling only, no app or build input | Revert commits; no deployed effect | "I approve publishing … by fast-forward after D1 PASS" |
 | OD-7 | ISSUE-344 follow-up release | A later revision ≥ `ae28bd70` | Fixes the zero-match out-of-range draft page on production | Standard release route | A new release packet (not prepared: it needs OD-1 first) |
 | OD-8 | Ratify 341 (DSN contract) and 342 (exit-1 exception) | — | None (records only) | — | "ratify" or a new decision |
 

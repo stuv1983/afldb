@@ -9,10 +9,11 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Current state — 2026-11-11 (closure run 8, local records branch `claude/records-catchup-20261111`, unpublished while `main` is frozen at PKG `12aa6e29`):** **4 open issues: 332, 336, 346, and the new 347.**
-- **336:** the r2 release awaits the owner's §9 statement. D-336-2 was simulated end to end at R′ and its packet is ready (A+B tarball pinned). D-336-3 is classified (174 school insertions, 7 club insertions, 3 renames, 3 conflicts) and awaits the owner's authority decision.
+**Current state — 2026-11-11 (closure run 8, local records branch `claude/records-catchup-20261111`, unpublished while `main` is frozen at PKG `12aa6e29`):** **5 open issues: 332, 336, 346, 347, and the new 348.** Owner decisions of 2026-11-11 are recorded on the stacked local branch `claude/records-decisions-20261111`.
+- **336:** the r2 release awaits the owner's §9 statement (window). D-336-2 A+B and C+D are approved to run after release acceptance, stopping at the read-only plan; E+F (OD-4) is pending. D-336-3 is decided (A): stored origins kept, carried as 348.
 - **347:** fix `2207986f`, qualified, local.
-- **346:** the gated migration-only route is implemented and qualified locally (unpublished). Its residuals are reconciled in runbook §4a and await the owner's acceptance statement; publication waits for D1 PASS.
+- **346:** the route is implemented and qualified locally. R1–R5 accepted 2026-11-11; the operator restrictions are binding (runbook §2) and "never `db:migrate` by hand on DEV" is permanent. Publication approved under OD-6 after D1 PASS; resolve after publication.
+- **348 (new, Low):** carry the D-336-3 classification to the Nov–Dec DraftGuru re-acquisition as its origin-review gate. Present 3 club replacements (ids 5961, 6784, 6626) for owner adjudication.
 - **332:** dated gates only, the first from 2027-03-17.
 
 Resume point: `issues/open/OPEN-ISSUES-CLOSURE-RUN-20261108.md` (Run 8). The counts below are historical.

@@ -104,3 +104,9 @@ python -I ../reconcile.py <work>                      # = ../reconcile-before.tx
 python -I scripts/extract_pairs.py .. <work>          # 187
 python -I scripts/classify.py <work>                  # = classify-output.txt, writes d3363-classification.json
 ```
+
+## 6. Owner decision (2026-11-11)
+
+**D-336-3 = option (A).** The stored origin values are kept; no production write. This classification is preserved for the next planned
+DraftGuru acquisition (the Nov–Dec re-acquisition), tracked as **AFLDB-ISSUE-348**. The three REPLACE_CLUB rows are listed separately for
+adjudication in `replacements-for-adjudication.tsv`.

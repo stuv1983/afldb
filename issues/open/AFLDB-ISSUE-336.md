@@ -10,8 +10,8 @@ Evidence: `docs/v2/evidence/issue336-draft-categories-20261105/` (README §4 and
 | Decision | State |
 |---|---|
 | D-336-1 accept the signing head `Intl Schol` | **Accepted** by the owner 2026-11-06; in the contract (`data/reference/draftguru-event-kinds.json`, `post_stage_a_additions`) and `GRID_SIGNING_KINDS`. |
-| D-336-2 insert the 35 rows on production | **Prepared, not approved for execution.** The approval below is a separate owner act. |
-| D-336-3 refresh the 187 revised origin paths | Open, owner decision; not part of this runbook. **Classified 2026-11-11** against the owner CSVs: 174 school insertions, 7 junior-club insertions, 3 `Brighton` → `Brighton Districts & Old Scholars`, 3 genuine club replacements. Recommendation: (A) now, (B) at the next full DraftGuru acquisition, with the 3 replacements checked explicitly; (C′), 184 additive rows, only if an earlier correction is wanted. Evidence: `docs/v2/evidence/issue336-draft-categories-20261105/d3363-classification-20261111/README.md`. |
+| D-336-2 insert the 35 rows on production | **Steps A+B and C+D approved 2026-11-11**, with the packet's populated statements, to run after the application release passes acceptance (capture, restore, assembly, read-only plan). **E+F (apply) not approved**: it waits for the actual plan digest, backup hash and window (OD-4). |
+| D-336-3 refresh the 187 revised origin paths | **Decided (A) 2026-11-11:** the stored values are kept and nothing is written. The classification and the 3 club replacements are carried to the next DraftGuru acquisition as **ISSUE-348**. **Classified 2026-11-11** against the owner CSVs: 174 school insertions, 7 junior-club insertions, 3 `Brighton` → `Brighton Districts & Old Scholars`, 3 genuine club replacements. Recommendation: (A) now, (B) at the next full DraftGuru acquisition, with the 3 replacements checked explicitly; (C′), 184 additive rows, only if an earlier correction is wanted. Evidence: `docs/v2/evidence/issue336-draft-categories-20261105/d3363-classification-20261111/README.md`. |
 
 ## 1. What the write is
 

@@ -1,6 +1,6 @@
 # ISSUE-336 D-336-2: the 35-row production insert (stage I336) — approval packet (2026-11-11)
 
-**Status: PREPARED. NOT GRANTED. NOT EXECUTED.** This packet is the exact executable form of `issues/open/AFLDB-ISSUE-336.md` §3 steps 2–7. Each numbered step needs its own owner approval, using the text in §5. No production host was contacted while preparing it.
+**Status (2026-11-11): A+B and C+D GRANTED, conditional on the application release passing acceptance; E+F NOT GRANTED; NOT EXECUTED.** The owner approved Steps A+B and C+D with the §5 statements as populated, including the prepared tarball `3160b9d3…5b8a`. They run only after the r2 release passes acceptance, and stop at the read-only plan. E+F needs a separate approval (OD-4) on the actual plan digest, backup hash and window. This packet is the exact executable form of `issues/open/AFLDB-ISSUE-336.md` §3 steps 2–7. Each numbered step needs its own owner approval, using the text in §5. No production host was contacted while preparing it.
 
 ## 1. Pins and preconditions
 
@@ -131,4 +131,4 @@ ssh afldb "bash $P report $R I336 $RUN"; ssh afldb "bash $P state $R I336 $RUN";
 
 ## 6. Next executable action
 
-After the r2 release (or independently, if the owner prefers): the owner's D-336-2/A+B approval, then Step A.
+After the r2 release passes acceptance: Steps A–D under the granted A+B and C+D approvals, with the prepared tarball. Stop at the plan. Then present the plan digest, the stage backup's sha256 and a proposed apply window for OD-4.
