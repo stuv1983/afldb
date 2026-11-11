@@ -29,7 +29,8 @@ Additive changes:
 1. `sync-dev.ps1` passes the planned mutation steps to the gate as `AFLDB_PF_STEPS` and prints them in the header.
    On this route the value is `checkout install migrate health (migration-only route, AFLDB-ISSUE-346; build and
    restart skipped)`. With `-SkipBuild`, the identity step reports `serving BUILD_ID (not rebuilt)` instead of
-   `built BUILD_ID`.
+   `built BUILD_ID`. This label change also applies to a `-SkipBuild` run that restarts, which is not this route.
+   The commands, and the variable `AFLDB_BUILT_BUILD_ID`, are unchanged.
 2. The gate records `INFO planned mutation steps` and `INFO checkout change outside src/db/migrations`. The second
    line counts the non-migration files the checkout changes, and flags `deploy/server-cluster.mjs` and
    `package-lock.json`.
