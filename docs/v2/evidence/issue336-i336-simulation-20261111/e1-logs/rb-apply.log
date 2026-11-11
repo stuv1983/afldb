@@ -1,0 +1,66 @@
+sim cluster: 127.0.0.1|55494|/mnt/ssd/afldb-i336-sim-20261111/pg-sim/data
+draft_picks total=6818 pre_draft=370 y1991_2025=5939 i336_marked=0
+draft_persons=5057
+i336_audit rows=0 picks=0 actors=-
+ledger=118 last=118_fixtures_unconfirmed_participants.sql
+== apply I336 (I336-20261111T015440Z): wrapper gates (nothing is written by them) 2026-11-11T01:57:14Z
+MANIFEST VERIFY PASS stage I336 revision c1c4b22ee15007111eab66f6d354e0b9ecbb2ade plan 10c71c64ee7eb0a9dd6df93cc25fe666286f3933cae7ad67ec731af5c7c34b1e class SIMULATION
+CAPTURE CHECK PASS stage I336 class SIMULATION profile sim dump afldb_prod-20261111T015440Z.dump bytes 30004831 sha256 0b15aa35c25c20f955492d77a734a600e7a28772653364f0768ffcc5b21b67c2 captured 2026-11-11T01:54:40.478526Z ledger 118
+APPROVAL CHECK PASS for I336 plan 10c71c64ee7eb0a9dd6df93cc25fe666286f3933cae7ad67ec731af5c7c34b1e
+no conflicting writer, migration or dump process
+app: active MainPID=1730
+apply launched detached (a dropped session does not stop it); waiting up to 1800 s for the recorded outcome
+== apply I336 (I336-20261111T015440Z): tool apply (single attempt) 2026-11-11T01:57:16Z
+OUTCOME COMMITTED_VERIFIED (exit 0)
+COMMITTED AND VERIFIED: the transaction committed and an independent read-only check of the committed state passed.
+[tool log /mnt/ssd/afldb-i336-sim-20261111/ops/c1c4b22e/runs/I336-20261111T015440Z/logs/apply-1.log exit 0]
+== apply I336 (I336-20261111T015440Z): read-only post-run state probe 2026-11-11T01:57:19Z
+tool exit 0; state probe exit 0
+== apply I336 (I336-20261111T015440Z): outcome 2026-11-11T01:57:20Z
+WRAPPER OUTCOME COMMITTED_VERIFIED (exit 0) stage I336
+COMMITTED AND VERIFIED: the transaction committed and an independent read-only check of the committed state passed.
+post-run state probe: PLANNED RESULT PRESENT
+Next: run `accept` (read-only state + verification); only then prepare the next stage with its OWN fresh backup.
+The wrapper never retries an apply, never claims rollback after a commit and never restores a backup.
+apply exit=0
+RECORDED OUTCOME:
+{
+  "stage": "I336",
+  "classification": "COMMITTED_VERIFIED",
+  "exitCode": 0,
+  "committed": true,
+  "notes": [],
+  "toolLogSha256": "f8b31dd9e59571306b0c04d22af4c68c27e14d6a3e7bafb7055e69b51363bf12",
+  "at": "2026-11-11T01:57:20.615Z"
+}
+
+== apply I336 (I336-20261111T015440Z): tool apply (single attempt) 2026-11-11T01:57:16Z
+OUTCOME COMMITTED_VERIFIED (exit 0)
+COMMITTED AND VERIFIED: the transaction committed and an independent read-only check of the committed state passed.
+[tool log /mnt/ssd/afldb-i336-sim-20261111/ops/c1c4b22e/runs/I336-20261111T015440Z/logs/apply-1.log exit 0]
+== apply I336 (I336-20261111T015440Z): read-only post-run state probe 2026-11-11T01:57:19Z
+tool exit 0; state probe exit 0
+== apply I336 (I336-20261111T015440Z): outcome 2026-11-11T01:57:20Z
+WRAPPER OUTCOME COMMITTED_VERIFIED (exit 0) stage I336
+COMMITTED AND VERIFIED: the transaction committed and an independent read-only check of the committed state passed.
+post-run state probe: PLANNED RESULT PRESENT
+Next: run `accept` (read-only state + verification); only then prepare the next stage with its OWN fresh backup.
+The wrapper never retries an apply, never claims rollback after a commit and never restores a backup.
+report exit=0
+STATE PLANNED RESULT PRESENT (every reviewed row is present)
+[tool log /mnt/ssd/afldb-i336-sim-20261111/ops/c1c4b22e/runs/I336-20261111T015440Z/logs/state-4.log exit 0]
+state exit=0
+MANIFEST VERIFY PASS stage I336 revision c1c4b22ee15007111eab66f6d354e0b9ecbb2ade plan 10c71c64ee7eb0a9dd6df93cc25fe666286f3933cae7ad67ec731af5c7c34b1e class SIMULATION
+STATE PLANNED RESULT PRESENT (every reviewed row is present)
+[tool log /mnt/ssd/afldb-i336-sim-20261111/ops/c1c4b22e/runs/I336-20261111T015440Z/logs/state-5.log exit 0]
+Read-only verification: 35/35 rows present; pre-existing rows unchanged: true
+[tool log /mnt/ssd/afldb-i336-sim-20261111/ops/c1c4b22e/runs/I336-20261111T015440Z/logs/verify-1.log exit 0]
+ACCEPTANCE RECORDED for I336 plan 10c71c64ee7eb0a9dd6df93cc25fe666286f3933cae7ad67ec731af5c7c34b1e
+ACCEPTED stage=I336 run=I336-20261111T015440Z
+ANALYZE is not run by this wrapper (no privilege grant is authorised); the stage tools and autovacuum own statistics.
+== DONE accept 2026-11-11T01:57:27Z
+accept exit=0
+draft_picks total=6853 pre_draft=405 y1991_2025=5974 i336_marked=35
+draft_persons=5088
+i336_audit rows=35 picks=35 actors=1
+ledger=118 last=118_fixtures_unconfirmed_participants.sql

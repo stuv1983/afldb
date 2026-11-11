@@ -30,6 +30,21 @@ assembler's I336 derivation (`baseline --rehearsal`) produced the stage fields. 
 I336` (the only dump available is older than 24 hours, which the assembler correctly refuses); these are the unchanged GAP-029 steps with the stage
 constant added.
 
+**End-to-end SIMULATION at R′ `c1c4b22e` (2026-11-11, closure run 8).** This closes the "not rehearsed" items above.
+- **Setup:** the real wrapper in production mode against a simulated production host. That is a separate loopback cluster with its own system identifier, holding the same 2026-11-04 snapshot (`e77c307d…`); evidence class SIMULATION.
+- **Capture:** `CAPTURE_COMPLETE`, actor 1 checked.
+- **Sealed assembly:** `assemble --stage I336`, `ASSEMBLY_COMPLETE`.
+- **Plan:** 35 to insert, 31 new persons, 0 present.
+- **Refusals before approval, nothing written:**
+  - apply without approval: exit 3;
+  - wrong digest: exit 6;
+  - wrong revision: exit 20;
+  - stage or run mismatches and a malformed run name: exit 2.
+- **Apply:** `COMMITTED_VERIFIED`; verify 35/35 with pre-existing rows unchanged; accepted.
+- **After acceptance:** apply, capture and plan each refused with exit 21.
+- **Found:** ISSUE-347. The GAP-029 *runner's* `prepare` cannot complete an I336 run (fixed-offset TAG; fix `2207986f`, unpublished). Steps 2–6 below use the direct scripts and are unaffected.
+- **Exact command blocks and approval texts:** `docs/v2/issue336-d3362-approval-packet-2026-11-11.md`. Evidence: `docs/v2/evidence/issue336-i336-simulation-20261111/`.
+
 ## 3. Order of work (each line is a separate owner approval)
 
 1. **Application release first** (recommended): the draft-page code and the `Intl Schol` Grid Solver option. The data step does not depend on it, but

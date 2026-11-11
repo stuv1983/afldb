@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# SIMULATION ONLY (AFLDB-ISSUE-336 I336 simulation, streamanator). Local stand-in for scp used as GAP029_SCP: "dev:<path>" names a
+# path on this machine. Any other host prefix is refused. Remote globs ("dev:/dir/*") are expanded locally, as the remote shell would.
+REC=
+while [ $# -gt 0 ]; do case "$1" in -o) shift 2 ;; -q) shift ;; -r) REC=-r; shift ;; *) break ;; esac; done
+[ "$(hostname)" = streamanator ] || { echo "lscp: not on streamanator" >&2; exit 255; }
+args=("$@"); n=${#args[@]}; [ "$n" -ge 2 ] || { echo "lscp: need source(s) and a destination" >&2; exit 255; }
+to=${args[$((n-1))]}
+strip() { case "$1" in dev:*) printf '%s' "${1#dev:}" ;; *:*) return 1 ;; *) printf '%s' "$1" ;; esac; }
+dst=$(strip "$to") || { echo "lscp: refusing host in $to" >&2; exit 255; }
+srcs=()
+for ((i = 0; i < n - 1; i++)); do
+  p=$(strip "${args[$i]}") || { echo "lscp: refusing host in ${args[$i]}" >&2; exit 255; }
+  if [[ "$p" == *'*'* ]]; then for g in $p; do [ -e "$g" ] || { echo "lscp: no match for $p" >&2; exit 1; }; srcs+=("$g"); done; else srcs+=("$p"); fi
+done
+exec cp -p $REC "${srcs[@]}" "$dst"

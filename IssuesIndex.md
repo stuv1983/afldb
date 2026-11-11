@@ -9,6 +9,14 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
+**Current state — 2026-11-11 (closure run 8, local records branch `claude/records-catchup-20261111`, unpublished while `main` is frozen at PKG `12aa6e29`):** **4 open issues: 332, 336, 346, and the new 347.**
+- **336:** the r2 release awaits the owner's §9 statement. D-336-2 was simulated end to end at R′ and its packet is ready. D-336-3 awaits a decision.
+- **347:** fix `2207986f`, qualified, local.
+- **346:** a gated migration-only route is being designed and qualified locally.
+- **332:** dated gates only, the first from 2027-03-17.
+
+Resume point: `issues/open/OPEN-ISSUES-CLOSURE-RUN-20261108.md` (Run 8). The counts below are historical.
+
 **Publication state of the 2026-11-08/09 closure records (records-only commit from `origin/main` `8d122f62`, 2026-11-09).** These records were published without code. On `origin/main`:
 - **Fixed in the tree:** 337 (`7fabc6e5`), 340 and 345 (`c1c4b22e`), 339 (`8d122f62`). The ISSUE-336 draft-page code is also there (`7fabc6e5`). The unpublished ISSUE-336/337 DEV-deploy docs commit `48ff91c7` is carried as a cherry-pick.
 - **Published 2026-11-09 (closure run 6):** the B2–B5 fixes for 338 and 341–344 are now on `origin/main`: 341/342 `532dcd77`, 343 `3ec73bcf`, 338 `d3d38025`, 344 `ae28bd70` (`origin/main` `c5959bbf..ae28bd70`; merged revision = tested commit). Not deployed. `origin/main` is now past the ISSUE-336/337/340/345 release package commit PKG `c5959bbf`. As written, the approval document's D0 and D1 require `origin/main` = PKG and its §1 says to re-derive the package on a mismatch, so the release needs an owner decision on that check first. R′ `c1c4b22e`, H = R and the static delta check are unaffected; the package was not edited.
@@ -62,37 +70,30 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 ### AFLDB-ISSUE-336 — Draft pages merge National, Rookie and other categories; 35 DraftGuru Pre-Draft rows missing
 
 - **Severity / area:** Medium; public draft pages, player draft history, DraftGuru draft data.
-- **State:** Open, opened 2026-11-05.
-  - **Implementation** is on `origin/main` `ea9bddf8` (pushed 2026-11-06).
-  - **Preview verification:** PASS on an isolated restore of DEV's own data (2026-11-06).
-  - **Pinned DEV procedure** prepared 2026-11-06: candidate `8b024098` (local, not pushed) verified in isolation (browser 76/76, backup rehearsed to `BACKUP-VERIFIED`, rollback to `242fa276` proven on the 118 schema, timers checked offline).
-  - **Procedure r2** (2026-11-06):
-    - sudo-free `-RestartMethod respawn` (tooling `b82dfcea`, about 10 s outage, executed in isolation);
-    - corrected 2027 nightly account, with production's Brownlow timer disabled;
-    - DEV artifact preserved and restorable without rebuild;
-    - next nightly recorded as pending observation.
-  - **Published** `7fabc6e5` (A1, 2026-11-06).
-  - **Deployed to DEV 2026-11-07:**
-    - pin `8b024098` on branch `dev-v2-main` (owner-approved name, since `dev/v2-main` is blocked by DEV's `dev` branch);
-    - ledger 118, build `AlYJjIargpO5esTkTX_zq`;
-    - **immediate acceptance PASS**: authenticated browser 76/76, 4 workers, timers unchanged.
-  - The 2026-11-08 nightly observation is **pending**.
-  - D-336-1 accepted. The 35-row production insert (stage I336) is prepared and rehearsed; **not run**.
-- **Key files:** `src/lib/draft-categories.ts`, `src/db/queries/draft.ts`, `src/app/draft/[year]/page.tsx`, `src/app/draft/page.tsx`, `src/components/DraftCategoryNav.tsx`, `src/app/players/[slug]/page.tsx`, `tools/v2/issue336-predraft-insert-production.ts`; runbook `issues/open/AFLDB-ISSUE-336.md`; evidence `docs/v2/evidence/issue336-draft-categories-20261105/` (DEV preview and DEV recommendation: `dev-preview-20261106/README.md`).
-- **Key files (DEV deployment):** `issues/open/AFLDB-ISSUE-336-DEV-DEPLOYMENT.md`; evidence `docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/`, `dev-procedure-corrections-20261106/`, and the execution record `dev-deploy-20261106/README.md`.
-- **Next action:**
-  - read-only observation of the 2026-11-08 05:08 AEDT nightly (procedure §7.2);
-  - production application release (it also carries ISSUE-337, resolved DEV-scoped 2026-11-07);
-  - **review hold:** I336 run-name grammar fixed locally 2026-11-08 (`STAGE_RE` in `prod-stage.sh`), `tests/gap029-ops.test.ts` verified 76/76 on streamanator on 2026-11-08; next, revise the pinned revision before D-336-2 execution approval ([runbook section 6](issues/open/AFLDB-ISSUE-336.md));
-  - D-336-3 (187 revised origin paths).
-  - **2026-11-08, published and pinned:** the grammar fix is on `origin/main` at `c1c4b22e` (fast-forward from `7fabc6e5`, owner-approved). `gap029-ops` passed 76/76 at that exact merged revision, in a fresh clone from GitHub on streamanator. Runbook §3 now pins R′ = `c1c4b22e`, and the §6 review hold is cleared. Remaining: the nightly read, the production release, D-336-2 execution approval and D-336-3.
-  - **2026-11-09, nightly observed (read-only):** the 2026-11-08 firing (batch 147) and the 2026-11-09 firing (batch 148) both matched §7.2 row 1. Each read the 2027 feed `CD_S2027014` (218 matches, COMPLETE), applied 0 inserts, 0 updates and 0 refused at the write, and ended `AFLDB_SETTLE_SUCCESS label=afl-api-2027-…`. No 2026 label has appeared since the deploy. The 20 listed apply failures predate the deploy (first detected 1–3 Oct). The observation is closed. Evidence: `docs/v2/evidence/open-issues-closure-20261108/i336-nightly/`.
-  - **2026-11-09, release packet drafted:** `docs/v2/issue336-337-340-345-release-packet-2026-11-09.md`. Recommended R = R′ `c1c4b22e`, which also carries 340 and 345 and no migration. Linux release qualification and the full approval document are still to do. The production release, D-336-2 and D-336-3 each stay behind their own owner approval.
-  - **2026-11-09, R′ selected and Linux-qualified:** the qualification ran on the approved production snapshot at 118 in an isolated cluster, now stopped.
-    - Typecheck clean; release-delta unit 257/257; `admin-lifecycle` 50/50; `admin-draft` 42/0/5; production build and boot smoke PASS.
-    - The full approval document is `docs/v2/issue336-337-340-345-release-approval-2026-11-09.md`, with H = R and a static check read from the package commit. **Superseded 2026-11-09 by r2** `docs/v2/issue336-337-340-345-release-approval-r2-2026-11-09.md` (same R, re-derived after `origin/main` moved; ISSUE-344 is on `main` and not in this release). Keep `main` frozen from the r2 PKG until D1 PASS.
-    - **Next:** the owner's §9 approval statement, which names the package commit and the window. D-336-2 and D-336-3 stay separate.
-  - **2026-11-08, prepared (not executed):** the revised-pin procedure (commit, re-run `gap029-ops` at R′, then update runbook §3), the exact §7.2 nightly read (live DEV, owner action), the release decision and the D-336-2 step list are all in packet P-336 of `issues/open/OPEN-ISSUES-CLOSURE-RUN-20261108.md`.
+- **State (2026-11-11, closure run 8):** Open, opened 2026-11-05.
+  - **Code:** on `origin/main` since `ea9bddf8`.
+  - **DEV:** deployed 2026-11-07 at `8b024098` (branch `dev-v2-main`). Immediate acceptance PASS. The 8–9 Nov nightlies were observed as predicted; that observation is closed.
+  - **Production release:** packaged as r2 in `docs/v2/issue336-337-340-345-release-approval-r2-2026-11-09.md`.
+    - R = H = R′ `c1c4b22e`, Linux-qualified. It also carries 337, 340 and 345 (RD-1). ISSUE-344 is not shipped.
+    - PKG `12aa6e29`; the static check re-ran PASS on 2026-11-11.
+    - **`main` is frozen until D1 PASS.** Awaiting the owner's §9 statement.
+  - **D-336-2 (35 rows):**
+    - The end-to-end SIMULATION at R′ passed on 2026-11-11: capture, the first sealed I336 assembly, plan 35/31/actor 1, refusals, `COMMITTED_VERIFIED`, accepted, 5,966 = 5,966.
+    - The exact approval packet is `docs/v2/issue336-d3362-approval-packet-2026-11-11.md`.
+    - The runner route is blocked by **ISSUE-347**; the direct route is unaffected.
+  - **D-336-3 (187 revised origin paths):** open. Recommendation in the run 8 decision packet.
+- **Key files:** `src/lib/draft-categories.ts`, `src/db/queries/draft.ts`, `src/app/draft/[year]/page.tsx`, `tools/v2/issue336-predraft-insert-production.ts`, `tools/v2/gap029-ops/`; runbooks `issues/open/AFLDB-ISSUE-336.md` and `issues/open/AFLDB-ISSUE-336-DEV-DEPLOYMENT.md`; evidence `docs/v2/evidence/issue336-draft-categories-20261105/` and `docs/v2/evidence/issue336-i336-simulation-20261111/`.
+- **Next action:** the owner's r2 §9 release approval, then the D-336-2 step approvals (packet §5), then the D-336-3 decision. Full history: the `issues.md` entry and `issues/open/AFLDB-ISSUE-336-INDEX-SECTION-20261111.md`.
+
+### AFLDB-ISSUE-347 — The GAP-029 workstation runner cannot prepare an I336 run (fixed-offset restore TAG)
+
+- **Severity / area:** Low; production data-operation tooling (GAP-029 framework, stage I336).
+- **State:** Open, opened 2026-11-11.
+  - The runner's `prepare` derived the restore TAG as `run.slice(3, 11)`, so an I336 run stops at restore and assembly (exit 2) after the production capture.
+  - The fix is local commit `2207986f` (`restoreTag()`, plus tests). It was qualified on Linux: `gap029-ops` 84/84, typecheck clean, and the runner-path simulation.
+  - It is not published, because `main` is frozen.
+- **Key files:** `tools/v2/gap029-stage.ts`, `tools/v2/gap029-ops-lib.ts`, `tests/gap029-ops.test.ts`.
+- **Next action:** publish in the first push after the r2 release's D1 PASS, then resolve.
 
 ### AFLDB-ISSUE-346 — A standalone `db:migrate` on DEV bypasses the deploy gate's transition approval
 

@@ -1,0 +1,20 @@
+sim cluster: 127.0.0.1|55494|/mnt/ssd/afldb-i336-sim-20261111/pg-sim/data
+2026-11-11T01:57:34Z P1 second apply of the accepted stage (expect refusal)
+== apply I336 (I336-20261111T015440Z): wrapper gates (nothing is written by them) 2026-11-11T01:57:34Z
+STOP: I336 is already accepted; no further plan, approval or apply for it
+P1 exit=21
+2026-11-11T01:57:34Z P2 capture after acceptance (expect refusal; no backup taken)
+== preflight I336: order gate 2026-11-11T01:57:34Z
+STOP: I336 is already accepted; no further plan, approval or apply for it
+P2 exit=21 backups before=1 after=1
+2026-11-11T01:57:34Z P3 plan after acceptance (expect refusal)
+STOP: I336 is already accepted; no further plan, approval or apply for it
+P3 exit=21
+2026-11-11T01:57:34Z P4 state after (expect the planned result present)
+STATE PLANNED RESULT PRESENT (every reviewed row is present)
+[tool log /mnt/ssd/afldb-i336-sim-20261111/ops/c1c4b22e/runs/I336-20261111T015440Z/logs/state-6.log exit 0]
+P4 exit=0
+draft_picks total=6853 pre_draft=405 y1991_2025=5974 i336_marked=35
+draft_persons=5088
+i336_audit rows=35 picks=35 actors=1
+ledger=118 last=118_fixtures_unconfirmed_participants.sql

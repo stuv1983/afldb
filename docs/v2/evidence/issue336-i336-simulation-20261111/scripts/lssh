@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# SIMULATION ONLY (AFLDB-ISSUE-336 I336 simulation, streamanator). Local stand-in for ssh used as GAP029_SSH: the simulated
+# production host and the restore host are both this machine. Drops ssh -o options, accepts only the simulation host alias "dev",
+# and runs the remote command line locally under bash (stdin passed through), exactly as sshd would hand it to the login shell.
+while [ $# -gt 0 ]; do case "$1" in -o) shift 2 ;; -*) shift ;; *) break ;; esac; done
+host=${1:-}; shift || true
+[ "$host" = dev ] || { echo "lssh: refusing unexpected host '$host'" >&2; exit 255; }
+[ "$(hostname)" = streamanator ] || { echo "lssh: not on streamanator" >&2; exit 255; }
+exec bash -c "$*"

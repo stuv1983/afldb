@@ -1,0 +1,44 @@
+2026-11-11T01:52:47Z pack R from the clean R checkout (runner pack: shallow fetch into a fresh repository)
+PACKED revision c1c4b22ee15007111eab66f6d354e0b9ecbb2ade tar /mnt/ssd/afldb-i336-simpack-20261111/pack-c1c4b22e/cand.tar.gz sha256 3160b9d339d0d23747bb53ab9a597ccf54737c31218fe867762885a407a55b8a tracked 4998
+2026-11-11T01:53:21Z sim-setup (from R's own tools)
+2026-11-11T01:53:21Z extract the pinned checkout twice: the simulated production checkout and the restore workspace
+2026-11-11T01:53:29Z initialise and start the simulated production cluster on port 55494
+The files belonging to this database system will be owned by user "arm".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C".
+The default text search configuration will be set to "english".
+
+Data page checksums are disabled.
+
+creating directory /mnt/ssd/afldb-i336-sim-20261111/pg-sim/data ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default max_connections ... 100
+selecting default shared_buffers ... 128MB
+selecting default time zone ... Australia/Melbourne
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+init: cluster initialised
+pg_ctl: server is running (PID: 3203662)
+/usr/lib/postgresql/16/bin/postgres "-D" "/mnt/ssd/afldb-i336-sim-20261111/pg-sim/data"
+roles: afldb_owner, afldb_app, afldb_import, afldb_backup, afldb_auth present
+LISTEN 0      600        127.0.0.1:55494      0.0.0.0:*    
+2026-11-11T01:53:40Z create afldb_simprod (owner afldb_owner) as the cluster superuser and restore the retained dump with the production role names
+pg_restore exit=0 stderr_lines=0
+2026-11-11T01:53:47Z initialise the restore-host cluster root (/mnt/ssd/afldb-i336-sim-20261111/rw/pg-root, port 55493) with the five roles; the restore script starts and stops it
+roles: afldb_owner, afldb_app, afldb_import, afldb_backup, afldb_auth present
+waiting for server to shut down.... done
+server stopped
+2026-11-11T01:53:54Z generate the credential file and the SIMULATION profile from the live simulated cluster
+sim profile written: db=afldb_simprod oid=16390 system=7706726153494630905 cluster=afldb_v2_isolated ledger=118/118_fixtures_unconfirmed_participants.sql ext=pg_trgm=1.6 plpgsql=1.0 unaccent=1.1
+SIM_READY /mnt/ssd/afldb-i336-sim-20261111
+OUTPUT profile.sim.env 97cf0f0798316f8fbfa00decd387a7f602943eec2960013386192a70f9d6220b
+sim cluster: 127.0.0.1|55494|/mnt/ssd/afldb-i336-sim-20261111/pg-sim/data
+ERROR:  column "source" does not exist
+LINE 2: ...||count(*)||' draftguru='||count(*) FILTER (WHERE source='dr...
+                                                             ^
+HINT:  Perhaps you meant to reference the column "draft_picks.source_id".
+TAR /mnt/ssd/afldb-i336-simpack-20261111/pack-c1c4b22e/cand.tar.gz 3160b9d339d0d23747bb53ab9a597ccf54737c31218fe867762885a407a55b8a

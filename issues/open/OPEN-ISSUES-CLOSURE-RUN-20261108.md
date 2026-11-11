@@ -8,6 +8,88 @@
 - The working tree stays uncommitted.
 - **Run 2 (owner, 2026-11-08):** additionally authorised Git fetch and inspection, local worktrees and branches, scoped staging and local commits, the W-339 bundle, transfer to streamanator, and Git, tests and migrations inside disposable clones on isolated test databases. Push, merge, live DEV, production, shared databases, private backups and WSL stores stay behind owner gates.
 
+## Run 8 — 2026-11-11: catch-up engineering and release preparation (IN PROGRESS checkpoint)
+
+**Owner instructions (2026-11-11):**
+- Catch up all outstanding work under standing authority: repository tools, Git inspection and fetch, shell, transfers, SSH, read-only SQL, Playwright, isolated clusters, local worktrees and commits.
+- Production writes, deployments, live service changes and publication of new commit ranges keep their established approvals.
+
+**Local branch:** `claude/records-catchup-20261111` in worktree `D:\dev\afldb-catchup-20261111`, from `origin/main` = PKG `12aa6e29`. **Main stays frozen until D1 PASS**, so nothing here is pushed.
+
+**Reconciliation (verified 2026-11-11):**
+- `git fetch`: `origin/main` = `12aa6e29d51099eb6d3fbc901bbe488c5dbd7ab3` (PKG r2), unchanged since run 7.
+- Every closure-run fix is published: 337, 340, 345, 336 pin `c1c4b22e`, 339 `8d122f62`, 338 and 341–344 `532dcd77..ae28bd70`.
+- `D:\dev\afldb` (branch `claude/issue-339-deploy-preflight`, HEAD `549c5892`) holds no unique work:
+  - all 22 modified or untracked code and test files are byte-identical to `origin/main`;
+  - its records are older states of the published records (only "scoped to the local working tree" wording differs);
+  - `48ff91c7` is patch-identical to the published `02593f23`;
+  - `5cba6846` and `549c5892` are superseded by `37bc6a6c` and `8d122f62`, and must never be published;
+  - `.codex/` is another tool's untracked configuration, left as is.
+- Every `claude/*` worktree branch is an ancestor of `origin/main`.
+- The only unpublished material is the run 7 post-publication evidence, untracked in `D:\dev\afldb-i336-packet-r2` (`…-r2-20261109/post-publication-evidence-UNCOMMITTED/`). It belongs to the post-release records commit.
+- **r2 static check re-run 2026-11-11** at PKG `12aa6e29`: `STATIC DELTA CHECK PASS r2` (exit 0).
+
+**Work streams:**
+- ISSUE-346: gated migration-only route (separate branch `claude/issue-346-gated-migrate`);
+- the I336 end-to-end SIMULATION at R′ (below);
+- D-336-3 recommendation;
+- backlog and tracking reconciliation.
+
+**I336 end-to-end SIMULATION at R′ (DONE 2026-11-11).**
+- **Setup:**
+  - workspace `/mnt/ssd/afldb-i336-sim-20261111`;
+  - simulated production cluster on 55494 (system identifier `7706726153494630905`), holding `afldb_simprod` from the approved snapshot `e77c307d…826d`;
+  - driver `/mnt/ssd/afldb-i336-simtools-20261111/i336-sim.sh`, plus local ssh/scp stand-ins that accept only the alias `dev`.
+- **Results:**
+  - capture `CAPTURE_COMPLETE`;
+  - **first sealed `assemble --stage I336`** `ASSEMBLY_COMPLETE`;
+  - plan `10c71c64…` (35/31/0);
+  - refusals N1 to N6 (exits 3, 6, 20, 2, 2, 2), with N7 still BASELINE;
+  - approve, then apply `COMMITTED_VERIFIED`;
+  - verify 35/35, accepted;
+  - P1 to P3 after acceptance: exit 21, no new backup;
+  - facts: picks 6,818 → 6,853, persons +31, audit 35 rows by actor 1.
+- Packet: `docs/v2/issue336-d3362-approval-packet-2026-11-11.md`.
+- **Found: ISSUE-347.** The runner's `prepare` failed at step 4 (`STOP TAG must match`), after the capture. The fix is commit `2207986f` on this branch.
+  - At `2207986f` in a fresh clone (`/mnt/ssd/afldb-i347-qual-20261111`): `gap029-ops` 84/84 and `tsc` exit 0.
+  - Runner-path episodes with the fixed runner and the ops checkout pinned at R:
+    - **e2** passed step 4, which failed in e1. It was then refused at plan by the exclusivity gate, because the ISSUE-346 rehearsal was running concurrently on the host.
+    - **e3** was refused because port 55493 was still held (e2's `pg_ctl stop` timed out under IO load).
+    - **e4** ran the full runner lifecycle: `PREPARATION COMPLETE`, approve, `COMMITTED_VERIFIED`, `ACCEPTED`, with facts identical to e1.
+  - Both clusters are stopped. Evidence: `docs/v2/evidence/issue336-i336-simulation-20261111/`.
+
+**D-336-3 (187 revised origin paths): evidence-based recommendation (the owner decides the data authority).**
+- **Evidence** (`docs/v2/evidence/issue336-draft-categories-20261105/reconcile-before.txt`, owner CSVs against the 2026-11-04 production dump):
+  - Of the 5,931 matched DraftGuru rows, 187 (3.2%) differ **only** in `original_club_raw`. Category, pick, pick note, club and signing agree exactly.
+  - 46 of the 187: the CSV value *extends* the stored one (stored is a suffix, so DraftGuru prepended earlier junior clubs, e.g. `Glenorchy/North Hobart` against `North Hobart`).
+  - 0: stored NULL with the CSV set.
+  - 141: other revisions, not classified. The owner CSVs are not in the repository or on streamanator; their location is needed to classify them.
+- **Impact:** public only. The `/draft/[year]` and player draft-history "original club" text, and the `origin` filter (`ILIKE`), which does not find the prepended clubs. There is no identity, link, count, pick or category effect, and no NULL-versus-value semantic change.
+- **Options:**
+  - **(A) Keep the stored values** (the acquisition snapshot stays authoritative): no write; the staleness stays.
+  - **(B) Full DraftGuru re-acquisition and keyed reload** (the runbook's recommendation): every field comes from current DraftGuru.
+    - Needs a new acquisition and Stage A head proof review, and updated contracts: `draftguru-contract.json` `total_rows`, `DRAFTGURU_EXPECTED.picks/persons` in `tools/db/rebuild-test.ts`, `EXPECT_STAGE_A_EVENTS` in `build_person_bridge_v2.py`, and the linkage-check SQL (all 6,810 today). Then a GAP-029-style production stage.
+    - It can import other unreviewed DraftGuru drift, so its blast radius is all 6,810+ rows.
+  - **(C) A bounded 187-row audited correction** (a new GAP-029 stage modelled on I336, `recordDataEdit` under the season seal, actor 1) with the owner CSV export as the authority. This is the smallest write, but it needs a new tool, review and rehearsal.
+- **Recommendation: (A) now, then (B) folded into the next planned full DraftGuru acquisition**, not a separate data operation.
+  - The impact is presentational and low, and 46 of the 187 are additive history.
+  - (C) builds a new production writer for text-only drift.
+  - The next acquisition must update the 6,810 contracts anyway, because after D-336-2 production holds 6,845 DraftGuru picks against the frozen snapshot's 6,810. **D-336-2 consequence the owner should accept explicitly:** the `afldb_test` rebuild contract (6,810 picks, 5,057 persons) will differ from production by the 35 audited rows until that acquisition.
+  - **If the owner prefers the CSV export as the authority now**, choose (C). It needs the CSV location and a new tool cycle.
+
+**Consolidated owner decision packet (run 8).** Each item is a separate approval. Exact texts are in the referenced documents.
+
+| # | Decision | Exact revision / object | Effect | Recovery | Approval text |
+|---|---|---|---|---|---|
+| OD-1 | **Production application release** (336/337 with 340/345, RD-1) | R = H = `c1c4b22ee15007111eab66f6d354e0b9ecbb2ade`; PKG `12aa6e29d51099eb6d3fbc901bbe488c5dbd7ab3` | New draft pages and Intl Schol; serialised credentials (340); restricted Grid Solver forced-change gate (345). No migration or DB write. ISSUE-344 is not shipped | Roll back to `0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN` only (r2 §8). The checkout stays at R | r2 §9 with `<PKG, 40 hex>` = `12aa6e29d51099eb6d3fbc901bbe488c5dbd7ab3`, plus a window |
+| OD-2 | **D-336-2 A+B**: pin the ops checkout and capture | R `c1c4b22e`; tarball sha printed by `pack` | One read-only `pg_dump` and `$OPS` files on production | None needed (no data change) | D-336-2 packet §5 |
+| OD-3 | **D-336-2 C+D**: restore, assemble and plan | That capture | Streamanator only, plus a read-only plan | — | packet §5 |
+| OD-4 | **D-336-2 E+F**: apply once | Plan digest printed at step D | +35 picks, +31 persons, 35 audit rows (actor 1). Accept the afldb_test contract divergence | Never retried or reversed; restoring the stage backup is a separate decision | packet §5 |
+| OD-5 | **D-336-3** | — | (A) none / (B) a later acquisition / (C) a new 187-row stage | — | "I choose D-336-3 option (A/B/C)…"; for (C), give the CSV location |
+| OD-6 | **Publish the run 8 range after D1 PASS** | `12aa6e29..` the tip of the publication branch (below), rebased onto the post-release records commit | 347 fix, 346 route, records. Tooling only, no app or build input | Revert commits; no deployed effect | "I approve publishing … by fast-forward after D1 PASS" |
+| OD-7 | ISSUE-344 follow-up release | A later revision ≥ `ae28bd70` | Fixes the zero-match out-of-range draft page on production | Standard release route | A new release packet (not prepared: it needs OD-1 first) |
+| OD-8 | Ratify 341 (DSN contract) and 342 (exit-1 exception) | — | None (records only) | — | "ratify" or a new decision |
+
 ## Run 7 — 2026-11-09: ISSUE-336/337/340/345 release package re-derived as r2 (owner-approved)
 
 **Owner instructions (2026-11-09):**

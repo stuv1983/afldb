@@ -15,6 +15,21 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-347: the GAP-029 runner prepares I336 runs; D-336-2 simulated end to end (2026-11-11; local, unpublished while `main` is frozen)
+
+- **Defect:** the workstation runner (`tools/v2/gap029-stage.ts prepare`) derived its restore-host TAG with fixed offsets that assumed a two-character stage. Every I336 run therefore stopped at restore and assembly (exit 2) after the production capture had been taken.
+- **Fix:** `restoreTag()` (`tools/v2/gap029-ops-lib.ts`) now derives the TAG from the stage's own length; S1–S4 tags are unchanged. Covered by `tests/gap029-ops.test.ts` (84/84).
+- **D-336-2 simulation:** the first end-to-end I336 SIMULATION at R′ `c1c4b22e` (production-mode wrapper, simulated production host restored from the approved snapshot) passed:
+  - capture;
+  - the first sealed I336 assembly;
+  - plan 35/31/actor 1;
+  - six refusals before approval;
+  - `COMMITTED_VERIFIED`;
+  - acceptance;
+  - three refusals after acceptance.
+- **Approval packet:** `docs/v2/issue336-d3362-approval-packet-2026-11-11.md`.
+- Production is unchanged.
+
 ### ISSUE-336/337/340/345 release package re-derived as r2 (2026-11-09; records only; production unchanged)
 
 - `docs/v2/issue336-337-340-345-release-approval-r2-2026-11-09.md` replaces the 2026-11-09 package, which is marked superseded. Publishing the ISSUE-338/341–344 fixes had moved `origin/main` past that package's commit.

@@ -1,0 +1,8 @@
+cluster 127.0.0.1|/mnt/ssd/afldb-i336-sim-20261111/pg-sim/data
+pg_restore exit=0 stderr_lines=0
+sim profile written: db=afldb_simprod oid=24456 system=7706726153494630905 cluster=afldb_v2_isolated ledger=118/118_fixtures_unconfirmed_participants.sql ext=pg_trgm=1.6 plpgsql=1.0 unaccent=1.1
+EPISODE_READY e2
+draft_picks total=6818 pre_draft=370 y1991_2025=5939 i336_marked=0
+draft_persons=5057
+i336_audit rows=0 picks=0 actors=-
+ledger=118 last=118_fixtures_unconfirmed_participants.sql

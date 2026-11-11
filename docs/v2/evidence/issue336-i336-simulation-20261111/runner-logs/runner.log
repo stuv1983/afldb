@@ -1,0 +1,494 @@
+2026-11-11T02:19:14Z FIXED runner prepare (ops checkout pinned at R)
+
+##### 2026-11-11T02:19:17.095Z 1 upload the pinned checkout to dev (private staging directory /mnt/ssd/afldb-i336-sim-20261111/ops-e2/c1c4b22e/in) and bootstrap
+== prep: verify upload, extract, pin (idempotent) 2026-11-11T02:19:40Z
+pinned_checkout=/mnt/ssd/afldb-i336-sim-20261111/ops-e2/c1c4b22e/cand HEAD=c1c4b22ee15007111eab66f6d354e0b9ecbb2ade tracked=4998 dirty=0 node=v22.23.2
+prod_checkout_unchanged: head=c1c4b22ee15007111eab66f6d354e0b9ecbb2ade status_lines=0
+wrapper library loads; stages S1,S2,S3,S4,I336
+python 3.12.3 psycopg 3.3.4
+profile=sim class=SIMULATION profile_sha256=e8c8bb7bf776a82ab4f32d50bb23c1e6c0ced8137223a88fb1dc3b043bfc3757
+== DONE prep 2026-11-11T02:19:50Z
+
+##### 2026-11-11T02:19:50.190Z 2 I336: capture on dev (preflight, actor check, ONE fresh backup, target identity)
+== preflight I336: order gate 2026-11-11T02:19:50Z
+== preflight I336: exclusivity (read-only) 2026-11-11T02:19:50Z
+no conflicting writer, migration or dump process
+== preflight I336: live identity, ledger and extensions (read-only session) 2026-11-11T02:19:50Z
+live identity: db=afldb_simprod user=afldb_backup oid=24456 system=7706726153494630905 ledger=118/118_fixtures_unconfirmed_participants.sql
+== preflight I336: actor auth_users.id 1 (migration-105 predicate by plain SELECTs; no function call) 2026-11-11T02:19:50Z
+actor1 (id, role, enabled, enrolled, non_fixture_email, owner_email_match): 1	super_admin	true	true	true	unchecked; enabled super_admin count: 1
+== capture I336: ONE fresh backup (capture-prod-stage.sh) 2026-11-11T02:19:50Z
+== P0 host, tools, target directory (profile sim, evidence class SIMULATION) 2026-11-11T02:19:50Z
+host=streamanator user=arm kernel=6.8.0-149-generic boot_id=40bff929-3b09-4de1-b12c-d500033022a5
+pg_dump (PostgreSQL) 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+pg_restore (PostgreSQL) 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+== P1 writer and service state (read-only systemctl queries) 2026-11-11T02:19:50Z
+afldb-sim-writer-nonexistent.service active=inactive enabled=not-found
+afldb-sim-timer-nonexistent.timer active=inactive enabled=not-found
+afldb-sim-timer-nonexistent.timer next=
+no settle/migrate/dump process
+deployed_checkout=c1c4b22ee15007111eab66f6d354e0b9ecbb2ade build_id=SIMULATION
+== P2 disk 2026-11-11T02:19:50Z
+backup_root_avail_bytes=592569196544
+== P3 credential channel (values never printed) 2026-11-11T02:19:50Z
+env_file_mode=600 arm:arm
+dsn_identity user=afldb_backup host=127.0.0.1 port=55494 database=afldb_simprod
+== P4 identity, ledger and inspection (each a single statement, so one snapshot, in a read-only session) 2026-11-11T02:19:50Z
+identity afldb_simprod	afldb_backup	24456	7706726153494630905	160015	127.0.0.1	55494	on	f	t	afldb_owner	16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+extensions pg_trgm=1.6 plpgsql=1.0 unaccent=1.1
+ledger rows=118 last=118_fixtures_unconfirmed_participants.sql digest=573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57
+inspect access_exclusive_relation_locks	0
+inspect visible_nonidle_sessions	0
+inspect staging_default_acl_entries	1
+inspect staged_brownlow_seasons	2025:621
+inspect public_base_tables	83
+== P5 capture: one full custom-format pg_dump (single MVCC snapshot; writers stay enabled) 2026-11-11T02:19:50Z
+CAPTURE_DIR=/mnt/ssd/afldb-i336-sim-20261111/backups-e2/gap029-I336-20261111T021950Z
+pg_dump exit=0 start=2026-11-11T02:19:50.810184Z end=2026-11-11T02:20:03.305129Z stderr_bytes=0
+archive afldb_prod-20261111T021950Z.dump bytes=30004831 sha256=896920203484f533ebad3492baa388355b802366cf7407303e3adb3f68b8b09e toc_entries=1329
+== P6 post-capture drift checks 2026-11-11T02:20:03Z
+writers_before: afltables_service=inactive timer=not-found/inactive app=active
+writers_after:  afltables_service=inactive timer=not-found/inactive app=active
+== P7 sidecar (exclusive create; no credential) 2026-11-11T02:20:03Z
+== P8 manifest and result 2026-11-11T02:20:03Z
+896920203484f533ebad3492baa388355b802366cf7407303e3adb3f68b8b09e  afldb_prod-20261111T021950Z.dump
+367fc48d7e2508c75ae72ce5ff66dca708a6e14cd279de33bc86acd4250d572f  afldb_prod-20261111T021950Z.provenance.json
+3dcc284a823317ff4368ac94d74928708a2955d64034760397eef38d91f418ea  archive.toc
+573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57  ledger-before.tsv
+573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57  ledger-after.tsv
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  pg-dump.stderr
+total 29460
+drwx------ 2 arm arm     4096 Nov 11 13:20 .
+drwx------ 3 arm arm     4096 Nov 11 13:19 ..
+-rw------- 1 arm arm      535 Nov 11 13:20 SHA256SUMS
+-rw------- 1 arm arm 30004831 Nov 11 13:20 afldb_prod-20261111T021950Z.dump
+-rw------- 1 arm arm    20150 Nov 11 13:20 afldb_prod-20261111T021950Z.provenance.json
+-rw------- 1 arm arm   100180 Nov 11 13:20 archive.toc
+-rw------- 1 arm arm    11355 Nov 11 13:20 ledger-after.tsv
+-rw------- 1 arm arm    11355 Nov 11 13:19 ledger-before.tsv
+-rw------- 1 arm arm        0 Nov 11 13:19 pg-dump.stderr
+elapsed_seconds=13
+RESULT PASS stamp=20261111T021950Z archive_sha256=896920203484f533ebad3492baa388355b802366cf7407303e3adb3f68b8b09e bytes=30004831 toc=1329 staged_brownlow=2025:621 class=SIMULATION
+== capture I336: independent check of the capture directory and target identity 2026-11-11T02:20:03Z
+CAPTURE CHECK PASS stage I336 class SIMULATION profile sim dump afldb_prod-20261111T021950Z.dump bytes 30004831 sha256 896920203484f533ebad3492baa388355b802366cf7407303e3adb3f68b8b09e captured 2026-11-11T02:19:50.810184Z ledger 118
+TARGET CHECK PASS
+RUN=I336-20261111T021950Z
+RUN_DIR=/mnt/ssd/afldb-i336-sim-20261111/ops-e2/c1c4b22e/runs/I336-20261111T021950Z
+CAPTURE_DIR=/mnt/ssd/afldb-i336-sim-20261111/backups-e2/gap029-I336-20261111T021950Z
+TARGET_SHA256=0c8232441b848c14330ba0c9dc0533554539631fab0f3a8a22f7678253fa7868
+CAPTURE_COMPLETE stage=I336 run=I336-20261111T021950Z class=SIMULATION
+== DONE capture 2026-11-11T02:20:04Z
+
+##### 2026-11-11T02:20:04.808Z 3 fetch the capture directory and target.json, verify every hash locally
+CAPTURE CHECK PASS stage I336 class SIMULATION profile sim dump afldb_prod-20261111T021950Z.dump bytes 30004831 sha256 896920203484f533ebad3492baa388355b802366cf7407303e3adb3f68b8b09e captured 2026-11-11T02:19:50.810184Z ledger 118
+
+##### 2026-11-11T02:20:06.203Z 4 copy to dev (private workspace), restore into a guarded disposable database and assemble the sealed evidence
+restore host holds identical bytes (dump 896920203484f533..., target 0c8232441b848c14...)
+2026-11-11T02:20:06Z A0 inputs (profile sim, evidence class SIMULATION)
+CAPTURE CHECK PASS stage I336 class SIMULATION profile sim dump afldb_prod-20261111T021950Z.dump bytes 30004831 sha256 896920203484f533ebad3492baa388355b802366cf7407303e3adb3f68b8b09e captured 2026-11-11T02:19:50.810184Z ledger 118
+TARGET CHECK PASS
+dump sha256 896920203484f533ebad3492baa388355b802366cf7407303e3adb3f68b8b09e verified by check-capture; candidate clean at c1c4b22ee15007111eab66f6d354e0b9ecbb2ade; stage I336
+DEV services BEFORE:
+afldb.service active MainPID=1730
+postgresql@16-main.service active MainPID=1555
+2026-11-11T02:20:07Z A1 start the guarded cluster
+pg_ctl: server is running (PID: 3321557)
+/usr/lib/postgresql/16/bin/postgres "-D" "/mnt/ssd/afldb-i336-sim-20261111/rw/pg-root/data"
+LISTEN 0      600        127.0.0.1:55493      0.0.0.0:*    users:(("postgres",pid=3321557,fd=7))        
+2026-11-11T02:20:12Z A2 restore into a guarded disposable database
+create-db: afldb_v2_gap029_i336_20261111_021950_rst_test created and marked
+isolated-pg: afldb_v2_gap029_i336_20261111_021950_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running node
+pg_restore exit=0 seconds=251 stderrLines=0
+restore_started=2026-11-11T02:20:17.806Z restored_at=2026-11-11T02:24:29.156Z
+isolated-pg: afldb_v2_gap029_i336_20261111_021950_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running node
+afldb_v2_gap029_i336_20261111_021950_rst_test {"ledger":"118_fixtures_unconfirmed_participants.sql","matches":17056,"fixtures":218,"receipts":5}
+archive toc entries: 1329
+2026-11-11T02:24:29Z A3 restore evidence (identity proven by query inside the guarded database; source identity from the capture provenance, checked against the production target)
+isolated-pg: afldb_v2_gap029_i336_20261111_021950_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running bash
+Restore evidence written (118 ledger rows, 1329 archive entries); sha256 6032c5878e4de5dc98cf1376ad73f67fcfb6dc21616f769e392b7ef41b0102c3
+2026-11-11T02:24:30Z A4 assemble the sealed backup evidence for I336 from the restored copy
+isolated-pg: afldb_v2_gap029_i336_20261111_021950_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running bash
+Assembled I336 restore evidence at revision c1c4b22ee150; backup sha256 896920203484; seal 3da557ccd605; sha256 382d87bc0a2dd404f9eddcd9141d5330d7708e6f75135d532ab12c720a8bca20
+OUTPUT backup.json 382d87bc0a2dd404f9eddcd9141d5330d7708e6f75135d532ab12c720a8bca20
+OUTPUT restore-evidence.json 6032c5878e4de5dc98cf1376ad73f67fcfb6dc21616f769e392b7ef41b0102c3
+ASSEMBLY_COMPLETE stage=I336 class=SIMULATION evidence_dir=/mnt/ssd/afldb-i336-sim-20261111/rw/evidence-private/i336_20261111_021950
+2026-11-11T02:24:32Z A9 stop the cluster and prove isolation
+waiting for server to shut down............................................................... failed
+pg_ctl: server does not shut down
+127.0.0.1:55493
+WARN port still listening
+DEV services AFTER:
+afldb.service active MainPID=1730
+postgresql@16-main.service active MainPID=1555
+DEV services unchanged
+2026-11-11T02:25:35Z DONE rc=0
+
+##### 2026-11-11T02:25:35.403Z 5 fetch the assembled evidence and verify it
+assembled evidence verified: stage I336 revision c1c4b22ee150 dump 896920203484f533... restoreTarget afldb_v2_gap029_i336_20261111_021950_rst_test
+
+##### 2026-11-11T02:25:35.486Z 6 upload the evidence to dev and generate the read-only plan
+== plan I336 (I336-20261111T021950Z): inputs 2026-11-11T02:25:35Z
+CAPTURE CHECK PASS stage I336 class SIMULATION profile sim dump afldb_prod-20261111T021950Z.dump bytes 30004831 sha256 896920203484f533ebad3492baa388355b802366cf7407303e3adb3f68b8b09e captured 2026-11-11T02:19:50.810184Z ledger 118
+TARGET CHECK PASS
+3327481 sh -c tsx tools/db/migrate.ts --target test
+3327482 node /mnt/ssd/afldb-i346-w346-20261111/tpl117/node_modules/.bin/tsx tools/db/migrate.ts --target test
+3327493 /home/arm/.nvm/versions/node/v22.23.2/bin/node --require /mnt/ssd/afldb-i346-w346-20261111/tpl117/node_modules/tsx/dist/preflight.cjs --import file:///mnt/ssd/afldb-i346-w346-20261111/tpl117/node_modules/tsx/dist/loader.mjs tools/db/migrate.ts --target test
+STOP: a writer, migration, dump or correction process is running
+GAP-029 stage runner refused: plan failed (exit 4); nothing further was run. Left behind: the production host keeps capture /mnt/ssd/afldb-i336-sim-20261111/backups-e2/gap029-I336-20261111T021950Z and run /mnt/ssd/afldb-i336-sim-20261111/ops-e2/c1c4b22e/runs/I336-20261111T021950Z (private, mode 700, never deleted by this tool); the workstation keeps /mnt/ssd/afldb-i336-sim-20261111/ws-runs-e2/I336-20261111T021950Z. Nothing is retried; prepare a NEW run (a fresh backup) or ask for a decision
+prepare exit=1
+STOP no run.json
+===== e3 2026-11-11T02:26:17Z
+2026-11-11T02:27:15Z FIXED runner prepare (ops checkout pinned at R)
+
+##### 2026-11-11T02:27:17.532Z 1 upload the pinned checkout to dev (private staging directory /mnt/ssd/afldb-i336-sim-20261111/ops-e3/c1c4b22e/in) and bootstrap
+== prep: verify upload, extract, pin (idempotent) 2026-11-11T02:27:24Z
+pinned_checkout=/mnt/ssd/afldb-i336-sim-20261111/ops-e3/c1c4b22e/cand HEAD=c1c4b22ee15007111eab66f6d354e0b9ecbb2ade tracked=4998 dirty=0 node=v22.23.2
+prod_checkout_unchanged: head=c1c4b22ee15007111eab66f6d354e0b9ecbb2ade status_lines=0
+wrapper library loads; stages S1,S2,S3,S4,I336
+python 3.12.3 psycopg 3.3.4
+profile=sim class=SIMULATION profile_sha256=8b26ae575307d29c4cf4dcfdc51947bef27eb92b14f18f9b255bc9a1bac2353d
+== DONE prep 2026-11-11T02:27:34Z
+
+##### 2026-11-11T02:27:34.342Z 2 I336: capture on dev (preflight, actor check, ONE fresh backup, target identity)
+== preflight I336: order gate 2026-11-11T02:27:34Z
+== preflight I336: exclusivity (read-only) 2026-11-11T02:27:34Z
+no conflicting writer, migration or dump process
+== preflight I336: live identity, ledger and extensions (read-only session) 2026-11-11T02:27:34Z
+live identity: db=afldb_simprod user=afldb_backup oid=24457 system=7706726153494630905 ledger=118/118_fixtures_unconfirmed_participants.sql
+== preflight I336: actor auth_users.id 1 (migration-105 predicate by plain SELECTs; no function call) 2026-11-11T02:27:34Z
+actor1 (id, role, enabled, enrolled, non_fixture_email, owner_email_match): 1	super_admin	true	true	true	unchecked; enabled super_admin count: 1
+== capture I336: ONE fresh backup (capture-prod-stage.sh) 2026-11-11T02:27:34Z
+== P0 host, tools, target directory (profile sim, evidence class SIMULATION) 2026-11-11T02:27:34Z
+host=streamanator user=arm kernel=6.8.0-149-generic boot_id=40bff929-3b09-4de1-b12c-d500033022a5
+pg_dump (PostgreSQL) 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+pg_restore (PostgreSQL) 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+== P1 writer and service state (read-only systemctl queries) 2026-11-11T02:27:34Z
+afldb-sim-writer-nonexistent.service active=inactive enabled=not-found
+afldb-sim-timer-nonexistent.timer active=inactive enabled=not-found
+afldb-sim-timer-nonexistent.timer next=
+no settle/migrate/dump process
+deployed_checkout=c1c4b22ee15007111eab66f6d354e0b9ecbb2ade build_id=SIMULATION
+== P2 disk 2026-11-11T02:27:34Z
+backup_root_avail_bytes=576577859584
+== P3 credential channel (values never printed) 2026-11-11T02:27:34Z
+env_file_mode=600 arm:arm
+dsn_identity user=afldb_backup host=127.0.0.1 port=55494 database=afldb_simprod
+== P4 identity, ledger and inspection (each a single statement, so one snapshot, in a read-only session) 2026-11-11T02:27:34Z
+identity afldb_simprod	afldb_backup	24457	7706726153494630905	160015	127.0.0.1	55494	on	f	t	afldb_owner	16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+extensions pg_trgm=1.6 plpgsql=1.0 unaccent=1.1
+ledger rows=118 last=118_fixtures_unconfirmed_participants.sql digest=573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57
+inspect access_exclusive_relation_locks	0
+inspect visible_nonidle_sessions	0
+inspect staging_default_acl_entries	1
+inspect staged_brownlow_seasons	2025:621
+inspect public_base_tables	83
+== P5 capture: one full custom-format pg_dump (single MVCC snapshot; writers stay enabled) 2026-11-11T02:27:34Z
+CAPTURE_DIR=/mnt/ssd/afldb-i336-sim-20261111/backups-e3/gap029-I336-20261111T022734Z
+pg_dump exit=0 start=2026-11-11T02:27:34.929895Z end=2026-11-11T02:27:48.093372Z stderr_bytes=0
+archive afldb_prod-20261111T022734Z.dump bytes=30004831 sha256=469ee97ad3a4654c363cdb6c93129831c9f453fbcb0a031e42a0d5fca8cdef7e toc_entries=1329
+== P6 post-capture drift checks 2026-11-11T02:27:48Z
+writers_before: afltables_service=inactive timer=not-found/inactive app=active
+writers_after:  afltables_service=inactive timer=not-found/inactive app=active
+== P7 sidecar (exclusive create; no credential) 2026-11-11T02:27:48Z
+== P8 manifest and result 2026-11-11T02:27:48Z
+469ee97ad3a4654c363cdb6c93129831c9f453fbcb0a031e42a0d5fca8cdef7e  afldb_prod-20261111T022734Z.dump
+599723f17668afcbe899344fd9be0e0d60de69fe092cf7ce9cde31463a260528  afldb_prod-20261111T022734Z.provenance.json
+cdeec3fddaad24b3abf856498ea7af0682bc86e21b11e550f1a699b0cf1c866e  archive.toc
+573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57  ledger-before.tsv
+573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57  ledger-after.tsv
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  pg-dump.stderr
+total 29460
+drwx------ 2 arm arm     4096 Nov 11 13:27 .
+drwx------ 3 arm arm     4096 Nov 11 13:27 ..
+-rw------- 1 arm arm      535 Nov 11 13:27 SHA256SUMS
+-rw------- 1 arm arm 30004831 Nov 11 13:27 afldb_prod-20261111T022734Z.dump
+-rw------- 1 arm arm    20150 Nov 11 13:27 afldb_prod-20261111T022734Z.provenance.json
+-rw------- 1 arm arm   100180 Nov 11 13:27 archive.toc
+-rw------- 1 arm arm    11355 Nov 11 13:27 ledger-after.tsv
+-rw------- 1 arm arm    11355 Nov 11 13:27 ledger-before.tsv
+-rw------- 1 arm arm        0 Nov 11 13:27 pg-dump.stderr
+elapsed_seconds=14
+RESULT PASS stamp=20261111T022734Z archive_sha256=469ee97ad3a4654c363cdb6c93129831c9f453fbcb0a031e42a0d5fca8cdef7e bytes=30004831 toc=1329 staged_brownlow=2025:621 class=SIMULATION
+== capture I336: independent check of the capture directory and target identity 2026-11-11T02:27:48Z
+CAPTURE CHECK PASS stage I336 class SIMULATION profile sim dump afldb_prod-20261111T022734Z.dump bytes 30004831 sha256 469ee97ad3a4654c363cdb6c93129831c9f453fbcb0a031e42a0d5fca8cdef7e captured 2026-11-11T02:27:34.929895Z ledger 118
+TARGET CHECK PASS
+RUN=I336-20261111T022734Z
+RUN_DIR=/mnt/ssd/afldb-i336-sim-20261111/ops-e3/c1c4b22e/runs/I336-20261111T022734Z
+CAPTURE_DIR=/mnt/ssd/afldb-i336-sim-20261111/backups-e3/gap029-I336-20261111T022734Z
+TARGET_SHA256=3e1dbd084108fcbaa543b7778708ab29def58299e4ebceb395ff1b2784d24c09
+CAPTURE_COMPLETE stage=I336 run=I336-20261111T022734Z class=SIMULATION
+== DONE capture 2026-11-11T02:27:49Z
+
+##### 2026-11-11T02:27:49.632Z 3 fetch the capture directory and target.json, verify every hash locally
+CAPTURE CHECK PASS stage I336 class SIMULATION profile sim dump afldb_prod-20261111T022734Z.dump bytes 30004831 sha256 469ee97ad3a4654c363cdb6c93129831c9f453fbcb0a031e42a0d5fca8cdef7e captured 2026-11-11T02:27:34.929895Z ledger 118
+
+##### 2026-11-11T02:27:50.945Z 4 copy to dev (private workspace), restore into a guarded disposable database and assemble the sealed evidence
+restore host holds identical bytes (dump 469ee97ad3a4654c..., target 3e1dbd084108fcba...)
+2026-11-11T02:27:51Z A0 inputs (profile sim, evidence class SIMULATION)
+CAPTURE CHECK PASS stage I336 class SIMULATION profile sim dump afldb_prod-20261111T022734Z.dump bytes 30004831 sha256 469ee97ad3a4654c363cdb6c93129831c9f453fbcb0a031e42a0d5fca8cdef7e captured 2026-11-11T02:27:34.929895Z ledger 118
+TARGET CHECK PASS
+127.0.0.1:55493
+STOP port 55493 already listening
+GAP-029 stage runner refused: restore and evidence assembly failed (exit 3); nothing further was run. Left behind: the production host keeps capture /mnt/ssd/afldb-i336-sim-20261111/backups-e3/gap029-I336-20261111T022734Z and run /mnt/ssd/afldb-i336-sim-20261111/ops-e3/c1c4b22e/runs/I336-20261111T022734Z (private, mode 700, never deleted by this tool); the workstation keeps /mnt/ssd/afldb-i336-sim-20261111/ws-runs-e3/I336-20261111T022734Z. Nothing is retried; prepare a NEW run (a fresh backup) or ask for a decision
+prepare exit=1
+STOP no run.json
+===== e4 2026-11-11T02:28:13Z
+2026-11-11T02:29:10Z FIXED runner prepare (ops checkout pinned at R)
+
+##### 2026-11-11T02:29:12.334Z 1 upload the pinned checkout to dev (private staging directory /mnt/ssd/afldb-i336-sim-20261111/ops-e4/c1c4b22e/in) and bootstrap
+== prep: verify upload, extract, pin (idempotent) 2026-11-11T02:29:20Z
+pinned_checkout=/mnt/ssd/afldb-i336-sim-20261111/ops-e4/c1c4b22e/cand HEAD=c1c4b22ee15007111eab66f6d354e0b9ecbb2ade tracked=4998 dirty=0 node=v22.23.2
+prod_checkout_unchanged: head=c1c4b22ee15007111eab66f6d354e0b9ecbb2ade status_lines=0
+wrapper library loads; stages S1,S2,S3,S4,I336
+python 3.12.3 psycopg 3.3.4
+profile=sim class=SIMULATION profile_sha256=c50210d1db99a6012ada5d308cd60d6dce4e0b410eae1d706912468ca2c034b9
+== DONE prep 2026-11-11T02:29:29Z
+
+##### 2026-11-11T02:29:29.923Z 2 I336: capture on dev (preflight, actor check, ONE fresh backup, target identity)
+== preflight I336: order gate 2026-11-11T02:29:29Z
+== preflight I336: exclusivity (read-only) 2026-11-11T02:29:29Z
+no conflicting writer, migration or dump process
+== preflight I336: live identity, ledger and extensions (read-only session) 2026-11-11T02:29:30Z
+live identity: db=afldb_simprod user=afldb_backup oid=24458 system=7706726153494630905 ledger=118/118_fixtures_unconfirmed_participants.sql
+== preflight I336: actor auth_users.id 1 (migration-105 predicate by plain SELECTs; no function call) 2026-11-11T02:29:30Z
+actor1 (id, role, enabled, enrolled, non_fixture_email, owner_email_match): 1	super_admin	true	true	true	unchecked; enabled super_admin count: 1
+== capture I336: ONE fresh backup (capture-prod-stage.sh) 2026-11-11T02:29:30Z
+== P0 host, tools, target directory (profile sim, evidence class SIMULATION) 2026-11-11T02:29:30Z
+host=streamanator user=arm kernel=6.8.0-149-generic boot_id=40bff929-3b09-4de1-b12c-d500033022a5
+pg_dump (PostgreSQL) 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+pg_restore (PostgreSQL) 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+== P1 writer and service state (read-only systemctl queries) 2026-11-11T02:29:30Z
+afldb-sim-writer-nonexistent.service active=inactive enabled=not-found
+afldb-sim-timer-nonexistent.timer active=inactive enabled=not-found
+afldb-sim-timer-nonexistent.timer next=
+no settle/migrate/dump process
+deployed_checkout=c1c4b22ee15007111eab66f6d354e0b9ecbb2ade build_id=SIMULATION
+== P2 disk 2026-11-11T02:29:30Z
+backup_root_avail_bytes=573012516864
+== P3 credential channel (values never printed) 2026-11-11T02:29:30Z
+env_file_mode=600 arm:arm
+dsn_identity user=afldb_backup host=127.0.0.1 port=55494 database=afldb_simprod
+== P4 identity, ledger and inspection (each a single statement, so one snapshot, in a read-only session) 2026-11-11T02:29:30Z
+identity afldb_simprod	afldb_backup	24458	7706726153494630905	160015	127.0.0.1	55494	on	f	t	afldb_owner	16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+extensions pg_trgm=1.6 plpgsql=1.0 unaccent=1.1
+ledger rows=118 last=118_fixtures_unconfirmed_participants.sql digest=573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57
+inspect access_exclusive_relation_locks	0
+inspect visible_nonidle_sessions	0
+inspect staging_default_acl_entries	1
+inspect staged_brownlow_seasons	2025:621
+inspect public_base_tables	83
+== P5 capture: one full custom-format pg_dump (single MVCC snapshot; writers stay enabled) 2026-11-11T02:29:30Z
+CAPTURE_DIR=/mnt/ssd/afldb-i336-sim-20261111/backups-e4/gap029-I336-20261111T022930Z
+pg_dump exit=0 start=2026-11-11T02:29:30.547667Z end=2026-11-11T02:29:42.464901Z stderr_bytes=0
+archive afldb_prod-20261111T022930Z.dump bytes=30004831 sha256=9ac7d2031a7197186be3dd44d7066a44549dc28c918925aef51f6273a260446b toc_entries=1329
+== P6 post-capture drift checks 2026-11-11T02:29:42Z
+writers_before: afltables_service=inactive timer=not-found/inactive app=active
+writers_after:  afltables_service=inactive timer=not-found/inactive app=active
+== P7 sidecar (exclusive create; no credential) 2026-11-11T02:29:42Z
+== P8 manifest and result 2026-11-11T02:29:42Z
+9ac7d2031a7197186be3dd44d7066a44549dc28c918925aef51f6273a260446b  afldb_prod-20261111T022930Z.dump
+2ae3e3fad1cacd258d0e619553195364f02796fd1eb71c623c4a1198c4d71ddd  afldb_prod-20261111T022930Z.provenance.json
+693241924a788c7043ac54d67c9c25c74b5e86c058aba6b8ce7658d29aef654b  archive.toc
+573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57  ledger-before.tsv
+573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57  ledger-after.tsv
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  pg-dump.stderr
+total 29460
+drwx------ 2 arm arm     4096 Nov 11 13:29 .
+drwx------ 3 arm arm     4096 Nov 11 13:29 ..
+-rw------- 1 arm arm      535 Nov 11 13:29 SHA256SUMS
+-rw------- 1 arm arm 30004831 Nov 11 13:29 afldb_prod-20261111T022930Z.dump
+-rw------- 1 arm arm    20150 Nov 11 13:29 afldb_prod-20261111T022930Z.provenance.json
+-rw------- 1 arm arm   100180 Nov 11 13:29 archive.toc
+-rw------- 1 arm arm    11355 Nov 11 13:29 ledger-after.tsv
+-rw------- 1 arm arm    11355 Nov 11 13:29 ledger-before.tsv
+-rw------- 1 arm arm        0 Nov 11 13:29 pg-dump.stderr
+elapsed_seconds=12
+RESULT PASS stamp=20261111T022930Z archive_sha256=9ac7d2031a7197186be3dd44d7066a44549dc28c918925aef51f6273a260446b bytes=30004831 toc=1329 staged_brownlow=2025:621 class=SIMULATION
+== capture I336: independent check of the capture directory and target identity 2026-11-11T02:29:42Z
+CAPTURE CHECK PASS stage I336 class SIMULATION profile sim dump afldb_prod-20261111T022930Z.dump bytes 30004831 sha256 9ac7d2031a7197186be3dd44d7066a44549dc28c918925aef51f6273a260446b captured 2026-11-11T02:29:30.547667Z ledger 118
+TARGET CHECK PASS
+RUN=I336-20261111T022930Z
+RUN_DIR=/mnt/ssd/afldb-i336-sim-20261111/ops-e4/c1c4b22e/runs/I336-20261111T022930Z
+CAPTURE_DIR=/mnt/ssd/afldb-i336-sim-20261111/backups-e4/gap029-I336-20261111T022930Z
+TARGET_SHA256=09493a897d14fcf8246e2893b89cf27bb90cbb0417ca1acbb8d81adb71ec98cd
+CAPTURE_COMPLETE stage=I336 run=I336-20261111T022930Z class=SIMULATION
+== DONE capture 2026-11-11T02:29:43Z
+
+##### 2026-11-11T02:29:43.981Z 3 fetch the capture directory and target.json, verify every hash locally
+CAPTURE CHECK PASS stage I336 class SIMULATION profile sim dump afldb_prod-20261111T022930Z.dump bytes 30004831 sha256 9ac7d2031a7197186be3dd44d7066a44549dc28c918925aef51f6273a260446b captured 2026-11-11T02:29:30.547667Z ledger 118
+
+##### 2026-11-11T02:29:45.250Z 4 copy to dev (private workspace), restore into a guarded disposable database and assemble the sealed evidence
+restore host holds identical bytes (dump 9ac7d2031a719718..., target 09493a897d14fcf8...)
+2026-11-11T02:29:45Z A0 inputs (profile sim, evidence class SIMULATION)
+CAPTURE CHECK PASS stage I336 class SIMULATION profile sim dump afldb_prod-20261111T022930Z.dump bytes 30004831 sha256 9ac7d2031a7197186be3dd44d7066a44549dc28c918925aef51f6273a260446b captured 2026-11-11T02:29:30.547667Z ledger 118
+TARGET CHECK PASS
+dump sha256 9ac7d2031a7197186be3dd44d7066a44549dc28c918925aef51f6273a260446b verified by check-capture; candidate clean at c1c4b22ee15007111eab66f6d354e0b9ecbb2ade; stage I336
+DEV services BEFORE:
+afldb.service active MainPID=1730
+postgresql@16-main.service active MainPID=1555
+2026-11-11T02:29:46Z A1 start the guarded cluster
+pg_ctl: server is running (PID: 3360341)
+/usr/lib/postgresql/16/bin/postgres "-D" "/mnt/ssd/afldb-i336-sim-20261111/rw/pg-root/data"
+LISTEN 0      600        127.0.0.1:55493      0.0.0.0:*    users:(("postgres",pid=3360341,fd=7))        
+2026-11-11T02:29:51Z A2 restore into a guarded disposable database
+create-db: afldb_v2_gap029_i336_20261111_022930_rst_test created and marked
+isolated-pg: afldb_v2_gap029_i336_20261111_022930_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running node
+pg_restore exit=0 seconds=264 stderrLines=0
+restore_started=2026-11-11T02:29:54.933Z restored_at=2026-11-11T02:34:19.661Z
+isolated-pg: afldb_v2_gap029_i336_20261111_022930_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running node
+afldb_v2_gap029_i336_20261111_022930_rst_test {"ledger":"118_fixtures_unconfirmed_participants.sql","matches":17056,"fixtures":218,"receipts":5}
+archive toc entries: 1329
+2026-11-11T02:34:21Z A3 restore evidence (identity proven by query inside the guarded database; source identity from the capture provenance, checked against the production target)
+isolated-pg: afldb_v2_gap029_i336_20261111_022930_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running bash
+Restore evidence written (118 ledger rows, 1329 archive entries); sha256 f035ef16fec721bd2962c796b6c3f8a21960a7ce993d1e647cac182538105b3a
+2026-11-11T02:34:22Z A4 assemble the sealed backup evidence for I336 from the restored copy
+isolated-pg: afldb_v2_gap029_i336_20261111_022930_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running bash
+Assembled I336 restore evidence at revision c1c4b22ee150; backup sha256 9ac7d2031a71; seal f15a83e20e1b; sha256 0d28f87b75009a2fc6a8239adc54fad21e8f57a933c331be952b3381f53aac11
+OUTPUT backup.json 0d28f87b75009a2fc6a8239adc54fad21e8f57a933c331be952b3381f53aac11
+OUTPUT restore-evidence.json f035ef16fec721bd2962c796b6c3f8a21960a7ce993d1e647cac182538105b3a
+ASSEMBLY_COMPLETE stage=I336 class=SIMULATION evidence_dir=/mnt/ssd/afldb-i336-sim-20261111/rw/evidence-private/i336_20261111_022930
+2026-11-11T02:34:24Z A9 stop the cluster and prove isolation
+waiting for server to shut down............................................................... failed
+pg_ctl: server does not shut down
+127.0.0.1:55493
+WARN port still listening
+DEV services AFTER:
+afldb.service active MainPID=1730
+postgresql@16-main.service active MainPID=1555
+DEV services unchanged
+2026-11-11T02:35:26Z DONE rc=0
+
+##### 2026-11-11T02:35:26.993Z 5 fetch the assembled evidence and verify it
+assembled evidence verified: stage I336 revision c1c4b22ee150 dump 9ac7d2031a719718... restoreTarget afldb_v2_gap029_i336_20261111_022930_rst_test
+
+##### 2026-11-11T02:35:27.163Z 6 upload the evidence to dev and generate the read-only plan
+== plan I336 (I336-20261111T022930Z): inputs 2026-11-11T02:35:27Z
+CAPTURE CHECK PASS stage I336 class SIMULATION profile sim dump afldb_prod-20261111T022930Z.dump bytes 30004831 sha256 9ac7d2031a7197186be3dd44d7066a44549dc28c918925aef51f6273a260446b captured 2026-11-11T02:29:30.547667Z ledger 118
+TARGET CHECK PASS
+no conflicting writer, migration or dump process
+== plan I336 (I336-20261111T022930Z): tool plan (read-only; writes only the plan file) 2026-11-11T02:35:28Z
+Review plan 23209294bc9f679946b90fa02efc2abf7d49264c56ec0a238c35f4a3cfce1278; no writes (35 to insert, 31 new persons, 0 already present); actor 1 is asserted only at apply
+[tool log /mnt/ssd/afldb-i336-sim-20261111/ops-e4/c1c4b22e/runs/I336-20261111T022930Z/logs/plan-1.log exit 0]
+cp: warning: behavior of -n is non-portable and may change in future; use --update=none instead
+== plan I336 (I336-20261111T022930Z): manifest 2026-11-11T02:35:30Z
+MANIFEST WRITTEN stage I336 revision c1c4b22ee15007111eab66f6d354e0b9ecbb2ade plan 23209294bc9f679946b90fa02efc2abf7d49264c56ec0a238c35f4a3cfce1278 class SIMULATION sha256 6e4dff0fe50ecead5dd648a0c7d6080a193b8c24f316a20c3490357a9c02f2d2
+== plan I336 (I336-20261111T022930Z): read-only state against the new plan (also re-verifies the plan digest) 2026-11-11T02:35:31Z
+STATE BASELINE (the plan has not been applied)
+[tool log /mnt/ssd/afldb-i336-sim-20261111/ops-e4/c1c4b22e/runs/I336-20261111T022930Z/logs/state-1.log exit 0]
+PLAN I336 35 DraftGuru Pre-Draft rows (draft_picks, audited under the season seal)
+  digest 23209294bc9f679946b90fa02efc2abf7d49264c56ec0a238c35f4a3cfce1278
+  plan file sha256 2e63e6daef326bcb4724ad8c37d9296ea24e41df84479c2bf8a1d645e10576bc
+  revision c1c4b22ee15007111eab66f6d354e0b9ecbb2ade
+  evidence class SIMULATION
+  target afldb_simprod OID 24458 system 7706726153494630905 as afldb_backup
+  backup sha256 9ac7d2031a7197186be3dd44d7066a44549dc28c918925aef51f6273a260446b captured 2026-11-11T02:29:30.547Z restored 2026-11-11T02:34:19.661Z
+  restore evidence sha256 f035ef16fec721bd2962c796b6c3f8a21960a7ce993d1e647cac182538105b3a
+  plan expires 2026-11-12T02:35:29.913Z; approvals must expire before 2026-11-12T02:09:30.547Z (backup 24 h limit minus 20 min)
+  expected changes:
+    INSERT 35 draft_picks rows (source draftguru, Pre-Draft, unnumbered), 31 new unmatched draft_persons rows, and one data_edits audit row per pick as actor auth_users.id 1; nothing updated or deleted; no override written
+      https://www.draftguru.com.au/years/2008#6 -> to insert (new person)
+      https://www.draftguru.com.au/years/2008#7 -> to insert (new person)
+      https://www.draftguru.com.au/years/2008#8 -> to insert (new person)
+      https://www.draftguru.com.au/years/2008#9 -> to insert (new person)
+      https://www.draftguru.com.au/years/2009#23 -> to insert (new person)
+      https://www.draftguru.com.au/years/2009#24 -> to insert (new person)
+      https://www.draftguru.com.au/years/2009#25 -> to insert (person 2753, unique)
+      https://www.draftguru.com.au/years/2009#26 -> to insert (new person)
+      https://www.draftguru.com.au/years/2009#27 -> to insert (new person)
+      https://www.draftguru.com.au/years/2009#28 -> to insert (new person)
+      https://www.draftguru.com.au/years/2009#29 -> to insert (new person)
+      https://www.draftguru.com.au/years/2009#30 -> to insert (new person)
+      https://www.draftguru.com.au/years/2009#31 -> to insert (new person)
+      https://www.draftguru.com.au/years/2009#32 -> to insert (person 1717, unmatched)
+      https://www.draftguru.com.au/years/2009#33 -> to insert (new person)
+      https://www.draftguru.com.au/years/2010#21 -> to insert (new person)
+      https://www.draftguru.com.au/years/2010#22 -> to insert (person 4410, unmatched)
+      https://www.draftguru.com.au/years/2011#28 -> to insert (new person)
+      https://www.draftguru.com.au/years/2011#29 -> to insert (new person)
+      https://www.draftguru.com.au/years/2011#30 -> to insert (new person)
+      https://www.draftguru.com.au/years/2011#31 -> to insert (new person)
+      https://www.draftguru.com.au/years/2011#32 -> to insert (new person)
+      https://www.draftguru.com.au/years/2012#45 -> to insert (new person)
+      https://www.draftguru.com.au/years/2012#46 -> to insert (new person)
+      https://www.draftguru.com.au/years/2012#47 -> to insert (new person)
+      https://www.draftguru.com.au/years/2012#48 -> to insert (new person)
+      https://www.draftguru.com.au/years/2013#43 -> to insert (new person)
+      https://www.draftguru.com.au/years/2014#36 -> to insert (new person)
+      https://www.draftguru.com.au/years/2015#48 -> to insert (new person)
+      https://www.draftguru.com.au/years/2015#49 -> to insert (new person)
+      https://www.draftguru.com.au/years/2017#35 -> to insert (person 1875, unique)
+      https://www.draftguru.com.au/years/2021#27 -> to insert (new person)
+      https://www.draftguru.com.au/years/2025#35 -> to insert (new person)
+      https://www.draftguru.com.au/years/2025#36 -> to insert (new person)
+      https://www.draftguru.com.au/years/2025#37 -> to insert (new person)
+PLAN_COMPLETE stage=I336 run=I336-20261111T022930Z
+== DONE plan 2026-11-11T02:35:32Z
+
+##### 2026-11-11T02:35:32.528Z 7 fetch the plan and manifest; record the run
+
+PREPARATION COMPLETE stage I336 run I336-20261111T022930Z plan 23209294bc9f679946b90fa02efc2abf7d49264c56ec0a238c35f4a3cfce1278 class SIMULATION
+
+===== COPY-READY OWNER COMMANDS (each line is labelled with the machine it runs on) =====
+
+[WORKSTATION  D:\dev\afldb]
+  node --import tsx tools/v2/gap029-stage.ts approve --run-dir /mnt/ssd/afldb-i336-sim-20261111/ws-runs-e4/I336-20261111T022930Z --digest 23209294bc9f679946b90fa02efc2abf7d49264c56ec0a238c35f4a3cfce1278 --expires <ISO-8601 UTC, before the plan/backup limits>
+  expect: APPROVAL WRITTEN for I336 plan 23209294bc9f679946b90fa02efc2abf7d49264c56ec0a238c35f4a3cfce1278 ... (refused if the digest is not this plan's)
+
+[WORKSTATION  D:\dev\afldb]
+  node --import tsx tools/v2/gap029-stage.ts apply --run-dir /mnt/ssd/afldb-i336-sim-20261111/ws-runs-e4/I336-20261111T022930Z
+  expect: WRAPPER OUTCOME COMMITTED_VERIFIED (exit 0) ... or the named non-zero outcome; the apply runs ONCE, detached on the production host
+
+[WORKSTATION  D:\dev\afldb]
+  node --import tsx tools/v2/gap029-stage.ts report --run-dir /mnt/ssd/afldb-i336-sim-20261111/ws-runs-e4/I336-20261111T022930Z
+  expect: RECORDED OUTCOME (use this if the apply session drops; it never starts another apply)
+
+[WORKSTATION  D:\dev\afldb]
+  node --import tsx tools/v2/gap029-stage.ts accept --run-dir /mnt/ssd/afldb-i336-sim-20261111/ws-runs-e4/I336-20261111T022930Z
+  expect: ACCEPTED stage=I336 (read-only; only after a COMMITTED_VERIFIED or NOTHING_WRITTEN outcome)
+
+(production-host equivalent for the apply step: ssh dev "bash /mnt/ssd/afldb-i336-sim-20261111/ops-e4/c1c4b22e/cand/tools/v2/gap029-ops/prod-stage.sh apply c1c4b22ee15007111eab66f6d354e0b9ecbb2ade I336 I336-20261111T022930Z")
+prepare exit=0
+2026-11-11T02:35:32Z runner approve (simulated owner act)
+Statement being recorded as the approval reference:
+I approve D-336-2: apply, once, to afldb_simprod (database OID 24458, system identifier 7706726153494630905) the digest-pinned I336 plan 23209294bc9f679946b90fa02efc2abf7d49264c56ec0a238c35f4a3cfce1278 (35 DraftGuru Pre-Draft rows (draft_picks, audited under the season seal)), at execution revision c1c4b22ee15007111eab66f6d354e0b9ecbb2ade, after this stage's own fresh restore-verified backup 9ac7d2031a7197186be3dd44d7066a44549dc28c918925aef51f6273a260446b (restore evidence f035ef16fec721bd2962c796b6c3f8a21960a7ce993d1e647cac182538105b3a; evidence class SIMULATION). Exactly the 35 DraftGuru Pre-Draft rows of reviewed evidence 6a207cfe3b1408d6ff747040cecfac1cde9ebd9a43f584711c573eb20ff511cb named in the plan, each audited through recordDataEdit under the season seal as actor auth_users.id 1, my active, fully enrolled Super Admin; signing head 'Intl Schol' accepted under D-336-1. Nothing else. No retry and no automatic restore. Window: from 2026-11-11T02:34:33.370Z until 2026-11-11T04:05:32Z.
+
+MANIFEST VERIFY PASS stage I336 revision c1c4b22ee15007111eab66f6d354e0b9ecbb2ade plan 23209294bc9f679946b90fa02efc2abf7d49264c56ec0a238c35f4a3cfce1278 class SIMULATION
+APPROVAL WRITTEN for I336 plan 23209294bc9f679946b90fa02efc2abf7d49264c56ec0a238c35f4a3cfce1278 window 2026-11-11T02:34:33.370Z .. 2026-11-11T04:05:32.000Z
+== DONE approve 2026-11-11T02:35:34Z
+approve exit=0
+2026-11-11T02:35:34Z runner apply
+== apply I336 (I336-20261111T022930Z): wrapper gates (nothing is written by them) 2026-11-11T02:35:34Z
+MANIFEST VERIFY PASS stage I336 revision c1c4b22ee15007111eab66f6d354e0b9ecbb2ade plan 23209294bc9f679946b90fa02efc2abf7d49264c56ec0a238c35f4a3cfce1278 class SIMULATION
+CAPTURE CHECK PASS stage I336 class SIMULATION profile sim dump afldb_prod-20261111T022930Z.dump bytes 30004831 sha256 9ac7d2031a7197186be3dd44d7066a44549dc28c918925aef51f6273a260446b captured 2026-11-11T02:29:30.547667Z ledger 118
+APPROVAL CHECK PASS for I336 plan 23209294bc9f679946b90fa02efc2abf7d49264c56ec0a238c35f4a3cfce1278
+no conflicting writer, migration or dump process
+app: active MainPID=1730
+apply launched detached (a dropped session does not stop it); waiting up to 1800 s for the recorded outcome
+== apply I336 (I336-20261111T022930Z): tool apply (single attempt) 2026-11-11T02:35:35Z
+OUTCOME COMMITTED_VERIFIED (exit 0)
+COMMITTED AND VERIFIED: the transaction committed and an independent read-only check of the committed state passed.
+[tool log /mnt/ssd/afldb-i336-sim-20261111/ops-e4/c1c4b22e/runs/I336-20261111T022930Z/logs/apply-1.log exit 0]
+== apply I336 (I336-20261111T022930Z): read-only post-run state probe 2026-11-11T02:35:43Z
+tool exit 0; state probe exit 0
+== apply I336 (I336-20261111T022930Z): outcome 2026-11-11T02:35:44Z
+WRAPPER OUTCOME COMMITTED_VERIFIED (exit 0) stage I336
+COMMITTED AND VERIFIED: the transaction committed and an independent read-only check of the committed state passed.
+post-run state probe: PLANNED RESULT PRESENT
+Next: run `accept` (read-only state + verification); only then prepare the next stage with its OWN fresh backup.
+The wrapper never retries an apply, never claims rollback after a commit and never restores a backup.
+apply exit=0
+2026-11-11T02:35:46Z runner accept
+MANIFEST VERIFY PASS stage I336 revision c1c4b22ee15007111eab66f6d354e0b9ecbb2ade plan 23209294bc9f679946b90fa02efc2abf7d49264c56ec0a238c35f4a3cfce1278 class SIMULATION
+STATE PLANNED RESULT PRESENT (every reviewed row is present)
+[tool log /mnt/ssd/afldb-i336-sim-20261111/ops-e4/c1c4b22e/runs/I336-20261111T022930Z/logs/state-3.log exit 0]
+Read-only verification: 35/35 rows present; pre-existing rows unchanged: true
+[tool log /mnt/ssd/afldb-i336-sim-20261111/ops-e4/c1c4b22e/runs/I336-20261111T022930Z/logs/verify-1.log exit 0]
+ACCEPTANCE RECORDED for I336 plan 23209294bc9f679946b90fa02efc2abf7d49264c56ec0a238c35f4a3cfce1278
+ACCEPTED stage=I336 run=I336-20261111T022930Z
+ANALYZE is not run by this wrapper (no privilege grant is authorised); the stage tools and autovacuum own statistics.
+== DONE accept 2026-11-11T02:35:49Z
+accept exit=0
+draft_picks total=6853 pre_draft=405 y1991_2025=5974 i336_marked=35
+draft_persons=5088
+i336_audit rows=35 picks=35 actors=1
+ledger=118 last=118_fixtures_unconfirmed_participants.sql
