@@ -1,0 +1,17 @@
+npm --version
+systemctl show -p ExecStart --value afldb-i346-rehearsal
+systemctl list-units --type=service --state=active,activating,deactivating,reloading --no-legend --plain afldb-*
+systemctl show -p NextElapseUSecRealtime --value afldb-settle-afl-api.timer
+systemctl show -p NextElapseUSecRealtime --value afldb-settle-afltables.timer
+systemctl show -p NextElapseUSecRealtime --value afldb-email-intake.timer
+systemctl show --timestamp=unix -p ExecMainStartTimestamp --value afldb-settle-afl-api.service
+systemctl show --timestamp=unix -p ExecMainStartTimestamp --value afldb-settle-afltables.service
+systemctl show --timestamp=unix -p ExecMainStartTimestamp --value afldb-email-intake.service
+npm ci
+systemctl list-units --type=service --state=active,activating,deactivating,reloading --no-legend --plain afldb-*
+systemctl show -p NextElapseUSecRealtime --value afldb-settle-afl-api.timer
+systemctl show -p NextElapseUSecRealtime --value afldb-settle-afltables.timer
+systemctl show -p NextElapseUSecRealtime --value afldb-email-intake.timer
+npm run db:migrate -- --target dev
+MIGRATE_CHILD args=[run db:migrate -- --target dev] exported_target=<unset> exported_owner_dsn= exported_test_dsn=set
+curl --silent --show-error --connect-timeout 2 --max-time 5 --dump-header /tmp/tmp.tfITF0DoWT/headers --output /tmp/tmp.tfITF0DoWT/body --write-out %{http_code} http://127.0.0.1:9/api/health

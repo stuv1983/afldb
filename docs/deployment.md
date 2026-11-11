@@ -106,6 +106,27 @@ powershell -ExecutionPolicy Bypass -File .\deploy\sync-dev.ps1 -Phase assess `
 - The defaults allow no pending migration.
 - A backup must be in the `dev-backup-verify.sh` layout. It must match the live database and ledger, be at most 12 h old, and be newer than any writer job's last start.
 
+**Migration-only DEV route (AFLDB-ISSUE-346).** Never run `npm run db:migrate` by hand on DEV. To apply
+approved migrations without a build or restart, run the same pinned, approved command (assess first) with
+`-SkipBuild -SkipRestart`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\deploy\sync-dev.ps1 -Phase execute -SkipBuild -SkipRestart `
+  -RemoteRef <branch> -ExpectedBranch <branch> -ExpectedRevision <40-hex> `
+  -ExpectedLedgerBefore <n> -ExpectedLedgerAfter <m> `
+  -BackupDir <verified backup dir> -ArtifactArchive <archive of the serving build> `
+  -ApprovalWindowStart <ISO+offset> -ApprovalWindowEnd <ISO+offset>
+```
+
+- Every gate check, the migration binding, the pinned child line and post-migration parity apply unchanged.
+  The gate also refuses, before checkout, a target whose migration set `db:migrate` would refuse (a bad
+  name, a reused number, or a branch-local, missing or changed migration against `origin/main`).
+- The evidence record names the planned steps and how many non-migration files the checkout changes.
+- The checkout and `npm ci` still advance to the pin; the old build keeps serving. Follow with a full
+  deploy at the same pin in the same window (no transition arguments are needed then).
+- Always pass both ledger arguments. Pending migrations without them are refused; with nothing pending the
+  run only moves the checkout.
+
 The sections below describe the classifier the gate reuses.
 
 Before fetching, `sync-dev.ps1` classifies the remote checkout instead of treating every

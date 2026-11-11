@@ -1,0 +1,18 @@
+case	expected_rc	rc	migration_child	result	notes
+w1	0	0	yes	PASS	
+x1	0	0	yes	PASS	
+r01	40	40	no	PASS	
+r02	40	40	no	PASS	
+r03	40	40	no	PASS	
+r04	40	40	no	PASS	
+r05	40	40	no	PASS	
+r06	40	40	no	PASS	
+r07	40	40	no	PASS	
+r08	40	40	no	PASS	
+r09	40	40	no	PASS	
+r10	40	40	no	PASS	
+r11	40	40	no	PASS	
+r12	40	40	no	PASS	
+r13	40	40	no	PASS	
+r14	40	40	no	PASS	
+r15	40	40	no	PASS	

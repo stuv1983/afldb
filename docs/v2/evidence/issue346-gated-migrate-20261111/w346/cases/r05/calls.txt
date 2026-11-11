@@ -1,0 +1,9 @@
+npm --version
+systemctl show -p ExecStart --value afldb-i346-rehearsal
+systemctl list-units --type=service --state=active,activating,deactivating,reloading --no-legend --plain afldb-*
+systemctl show -p NextElapseUSecRealtime --value afldb-settle-afl-api.timer
+systemctl show -p NextElapseUSecRealtime --value afldb-settle-afltables.timer
+systemctl show -p NextElapseUSecRealtime --value afldb-email-intake.timer
+systemctl show --timestamp=unix -p ExecMainStartTimestamp --value afldb-settle-afl-api.service
+systemctl show --timestamp=unix -p ExecMainStartTimestamp --value afldb-settle-afltables.service
+systemctl show --timestamp=unix -p ExecMainStartTimestamp --value afldb-email-intake.service

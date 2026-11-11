@@ -1,0 +1,9 @@
+
+Using Git Bash at C:\Program Files\Git\usr\bin\bash.exe (from registry HKLM:\SOFTWARE\GitForWindows)
+exported gen-execute.sh, gen-assess.sh and gen-migrate-only.sh to 
+<workstation scratch>/gen
+PASS: sync-dev PowerShell/static integration (AFLDB-ISSUE-339 gate ordering, refusals, transport, exit status; 
+AFLDB-ISSUE-346 migration-only route)
+
+
+powershell -File tests/sync-dev-static.test.ps1 -ExportDir <scratch>\gen  ->  process exit 0 (2026-11-11, at 87653d5e)

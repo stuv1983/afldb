@@ -1,0 +1,48 @@
+[deploy] >>> enter project directory
+[deploy] >>> show host
+[deploy] host: streamanator
+[deploy] >>> show directory
+[deploy] directory: /mnt/ssd/afldb-i346-w346-20261111/cases/r14/work
+[deploy] >>> select nvm-managed Node when present
+[deploy] node binary: /home/arm/.nvm/versions/node/v22.23.2/bin/node
+[deploy] >>> show node version
+[deploy] node: v22.23.2
+[deploy] >>> enforce Next.js Node floor
+[deploy] >>> show npm version
+[deploy] npm: 10.9.8
+[deploy] >>> show current revision
+[deploy] before: 12aa6e29 dev-v2-main
+[deploy] >>> fetch Git refs with prune
+[deploy] >>> deploy gate (readiness to mutate)
+[preflight] INFO phase -- execute
+[preflight] INFO planned mutation steps -- checkout install migrate health (migration-only route, AFLDB-ISSUE-346; build and restart skipped)
+[preflight] PASS expected host -- streamanator
+[preflight] PASS expected repository (primary checkout at the project directory) -- /mnt/ssd/afldb-i346-w346-20261111/cases/r14/work
+[preflight] PASS expected origin -- /mnt/ssd/afldb-i346-w346-20261111/cases/r14/origin.git
+[deploy] Remote working tree:
+[deploy] - tracked modifications: 0
+[deploy] - known operational untracked: 0
+[deploy] - unknown untracked: 0
+[preflight] PASS working tree holds only permitted operational files -- exact allowlist
+[preflight] PASS branch namespace and existence -- dev-v2-main (current: dev-v2-main)
+[preflight] PASS expected upstream -- origin/main at 8ec68b1b
+[preflight] PASS target revision -- 8ec68b1b50031ed16ddbb47247c3fc97a983d8b6 on dev-v2-main; 0 commit(s) behind the published tip of origin/main
+[preflight] INFO preserved state digest -- main=none stashes=0/e3b0c44298fc1c14 untracked=0/e3b0c44298fc1c14 env=d5d034e61ed5dc76
+[preflight] PASS migration target is the assessed database -- db:migrate --target dev reads AFLDB_OWNER_DATABASE_URL from the same single .env line
+[preflight] FAIL migration set is one db:migrate accepts -- migration number 118 is claimed by 118_fixtures_unconfirmed_participants.sql and 118_i346_collide.sql
+[preflight] INFO checkout change outside src/db/migrations -- 4 file(s)
+[preflight] PASS required configuration present in .env (names only) -- 1 name(s)
+[preflight] PASS free disk space -- 520 GiB >= 10 GiB
+[preflight] PASS available memory -- 25656 MiB >= 2100 MiB
+[preflight] PASS runtime matches the service -- build and service both v22.23.2
+[preflight] PASS no running job or writer timer inside the deploy window -- 45 min; timers: afldb-settle-afl-api afldb-settle-afltables afldb-email-intake
+[preflight] PASS approval window -- open until 2026-11-11T03:36:50Z
+[preflight] PASS acceptance address reachable from the workstation -- HTTP 200; owner sign-in is still a manual step
+[preflight] PASS database identity -- afldb_v2_i346r14a_test afldb_owner via AFLDB_OWNER_DATABASE_URL (read-only session)
+[preflight] PASS applied migrations match the target revision -- 117 applied, names and checksums equal (ledger sha 0dbd4bab4fe160e5)
+[preflight] PASS approved migration transition -- 117 -> 119 (pending 118_fixtures_unconfirmed_participants.sql 118_i346_collide.sql)
+[preflight] PASS verified database backup -- /mnt/ssd/afldb-i346-w346-20261111/cases/r14/backup (ledger 117/117_brownlow_provider_eligibility_unknown.sql, read 2026-11-11T01:36:46Z)
+[preflight] PASS recoverable application artifact -- /mnt/ssd/afldb-i346-w346-20261111/cases/r14/backup/app.tar (BUILD_ID I346REHEARSAL)
+[preflight] INFO gate result -- BLOCKED: 1 blocker(s), 0 preparation item(s); nothing was changed
+[deploy] FAILED line 1114: return 40
+[preflight] evidence: /mnt/ssd/afldb-i346-w346-20261111/cases/r14/evidence/20261111T023653Z-streamanator-12aa6e29d510-execute-3393316.txt (exit 40)

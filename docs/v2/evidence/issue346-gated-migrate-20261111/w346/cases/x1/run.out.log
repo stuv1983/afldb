@@ -1,0 +1,77 @@
+[deploy] >>> enter project directory
+[deploy] >>> show host
+[deploy] host: streamanator
+[deploy] >>> show directory
+[deploy] directory: /mnt/ssd/afldb-i346-w346-20261111/cases/x1/work
+[deploy] >>> select nvm-managed Node when present
+[deploy] node binary: /home/arm/.nvm/versions/node/v22.23.2/bin/node
+[deploy] >>> show node version
+[deploy] node: v22.23.2
+[deploy] >>> enforce Next.js Node floor
+[deploy] >>> show npm version
+[deploy] npm: 10.9.8
+[deploy] >>> show current revision
+[deploy] before: 12aa6e29 dev-v2-main
+[deploy] >>> fetch Git refs with prune
+[deploy] >>> deploy gate (readiness to mutate)
+[preflight] INFO phase -- execute
+[preflight] INFO planned mutation steps -- checkout install migrate health (migration-only route, AFLDB-ISSUE-346; build and restart skipped)
+[preflight] PASS expected host -- streamanator
+[preflight] PASS expected repository (primary checkout at the project directory) -- /mnt/ssd/afldb-i346-w346-20261111/cases/x1/work
+[preflight] PASS expected origin -- /mnt/ssd/afldb-i346-w346-20261111/cases/x1/origin.git
+[deploy] Remote working tree:
+[deploy] - tracked modifications: 0
+[deploy] - known operational untracked: 0
+[deploy] - unknown untracked: 0
+[preflight] PASS working tree holds only permitted operational files -- exact allowlist
+[preflight] PASS branch namespace and existence -- dev-v2-main (current: dev-v2-main)
+[preflight] PASS expected upstream -- origin/main at 87653d5e
+[preflight] PASS target revision -- 87653d5e1b090cef2175e4154a46489eb22b1adf on dev-v2-main; 0 commit(s) behind the published tip of origin/main
+[preflight] INFO preserved state digest -- main=none stashes=0/e3b0c44298fc1c14 untracked=0/e3b0c44298fc1c14 env=766db1993f5389da
+[preflight] PASS migration target is the assessed database -- db:migrate --target dev reads AFLDB_OWNER_DATABASE_URL from the same single .env line
+[preflight] PASS migration set is one db:migrate accepts -- 118 well-formed, unique-numbered name(s), the same set as origin/main
+[preflight] INFO checkout change outside src/db/migrations -- 4 file(s)
+[preflight] PASS required configuration present in .env (names only) -- 1 name(s)
+[preflight] PASS free disk space -- 538 GiB >= 10 GiB
+[preflight] PASS available memory -- 26005 MiB >= 2100 MiB
+[preflight] PASS runtime matches the service -- build and service both v22.23.2
+[preflight] PASS no running job or writer timer inside the deploy window -- 45 min; timers: afldb-settle-afl-api afldb-settle-afltables afldb-email-intake
+[preflight] PASS approval window -- open until 2026-11-11T03:26:51Z
+[preflight] PASS acceptance address reachable from the workstation -- HTTP 200; owner sign-in is still a manual step
+[preflight] PASS database identity -- afldb_v2_i346x1a_test afldb_owner via AFLDB_OWNER_DATABASE_URL (read-only session)
+[preflight] PASS applied migrations match the target revision -- 117 applied, names and checksums equal (ledger sha 0dbd4bab4fe160e5)
+[preflight] PASS approved migration transition -- 117 -> 118 (pending 118_fixtures_unconfirmed_participants.sql)
+[preflight] PASS verified database backup -- /mnt/ssd/afldb-i346-w346-20261111/cases/x1/backup (ledger 117/117_brownlow_provider_eligibility_unknown.sql, read 2026-11-11T01:26:48Z)
+[preflight] PASS recoverable application artifact -- /mnt/ssd/afldb-i346-w346-20261111/cases/x1/backup/app.tar (BUILD_ID I346REHEARSAL)
+[preflight] INFO gate result -- READY: target 87653d5e1b090cef2175e4154a46489eb22b1adf on dev-v2-main
+[deploy] >>> switch to the target branch if needed
+[deploy] >>> fast-forward to the assessed revision
+[deploy] pinned revision: dev-v2-main at 87653d5e1b090cef2175e4154a46489eb22b1adf (upstream origin/main at 87653d5e)
+[deploy] >>> revalidate the checkout
+[preflight] PASS checkout revalidation -- dev-v2-main at 87653d5e1b090cef2175e4154a46489eb22b1adf; main and stashes as expected
+[deploy] >>> show deployed revision
+[deploy] after: 87653d5e dev-v2-main
+[deploy] >>> install dependencies
+[w346 stub] npm ci skipped (node_modules pre-installed)
+[deploy] >>> revalidate before migration
+[preflight] PASS pre-migration revalidation -- ledger unchanged since the gate; no running job
+[deploy] >>> run database migrations
+
+> afldb@0.1.0 db:migrate
+> tsx tools/db/migrate.ts --target dev
+
+AFLDB migrations -> dev (afldb_owner@127.0.0.1:55546/afldb_v2_i346x1a_test)
+  118 migration file(s), 117 already applied
+
+  applying 118_fixtures_unconfirmed_participants.sql ... ok (227 ms)
+
+Applied 1 migration(s).
+[deploy] >>> post-migration parity
+[preflight] PASS post-migration parity -- 118/118, names and checksums equal
+[deploy] >>> capture serving build identity (build skipped)
+[deploy] serving BUILD_ID (not rebuilt): I346REHEARSAL
+[deploy] >>> wait for healthy service readiness
+[deploy] health ready after 1s and 1 probe(s): {"status":"ok","database":"ok"}
+[deploy] >>> verify preserved state
+[preflight] PASS preserved state after deploy -- main=none stashes=0/e3b0c44298fc1c14 untracked=0/e3b0c44298fc1c14 env=766db1993f5389da
+[preflight] evidence: /mnt/ssd/afldb-i346-w346-20261111/cases/x1/evidence/20261111T022654Z-streamanator-12aa6e29d510-execute-3338451.txt (exit 0)

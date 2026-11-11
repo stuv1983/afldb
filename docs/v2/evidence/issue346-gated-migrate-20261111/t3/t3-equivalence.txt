@@ -1,0 +1,28 @@
+# T3 baseline equivalence (AFLDB-ISSUE-346): generated remote step sections, 12aa6e29 vs 87653d5e (sync-dev.ps1 -WhatIf, Windows PowerShell 5.1)
+== default
++AFLDB_PF_STEPS='checkout install migrate build restart:auto health'
+== pinned
++AFLDB_PF_STEPS='checkout install migrate build restart:auto health'
+== pinned-approved
++AFLDB_PF_STEPS='checkout install migrate build restart:auto health'
+== pinned-issue107
++AFLDB_PF_STEPS='checkout install migrate build restart:auto health'
+== pinned-issue107-respawn
++AFLDB_PF_STEPS='checkout install migrate build restart:respawn health'
+== assess
++AFLDB_PF_STEPS='none (assessment)'
+== skip-migrate
++AFLDB_PF_STEPS='checkout install build restart:auto health'
+== custom-dirty
++AFLDB_PF_STEPS='checkout install migrate build restart:auto health'
+== migrate-only
++AFLDB_PF_STEPS='checkout install migrate health (migration-only route, AFLDB-ISSUE-346; build and restart skipped)'
+-echo '[deploy] >>> capture standalone build identity'
+-test -s .next/standalone/.next/BUILD_ID; AFLDB_BUILT_BUILD_ID="$(tr -d '\r\n' < .next/standalone/.next/BUILD_ID)"; test -n "$AFLDB_BUILT_BUILD_ID"; echo "[deploy] built BUILD_ID: $AFLDB_BUILT_BUILD_ID"
++echo '[deploy] >>> capture serving build identity (build skipped)'
++test -s .next/standalone/.next/BUILD_ID; AFLDB_BUILT_BUILD_ID="$(tr -d '\r\n' < .next/standalone/.next/BUILD_ID)"; test -n "$AFLDB_BUILT_BUILD_ID"; echo "[deploy] serving BUILD_ID (not rebuilt): $AFLDB_BUILT_BUILD_ID"
+
+# helper (sync-dev-remote.sh) diff hunks: additions only
+@@ -562,0 +563,70 @@ afldb_pf_migration_binding() {
+@@ -724,0 +795 @@ afldb_deploy_gate() {
+@@ -811,0 +883,2 @@ afldb_deploy_gate() {

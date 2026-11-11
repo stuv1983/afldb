@@ -1,0 +1,114 @@
+PASS: clean tree continues
+PASS: tracked modification blocks
+PASS: staged and renamed changes block
+PASS: known operational artifacts warn and continue
+PASS: unknown untracked file blocks
+PASS: known plus unknown mixture blocks
+PASS: AllowDirtyServer bypass is explicit
+PASS: operational allowlist is narrow
+PASS: immediate healthy readiness succeeds
+PASS: transient connection refusal then healthy succeeds
+PASS: failed service stops readiness early
+PASS: readiness timeout fails with diagnostics
+PASS: unhealthy HTTP 200 payload is refused
+PASS: expected build identity remains enforced
+PASS: curl connection reset is a retryable probe failure
+PASS: curl probe validates healthy JSON and build header
+PASS: failure diagnostics are bounded and actionable
+PASS: classification performs no repository cleanup
+warning: remote HEAD refers to nonexistent ref, unable to checkout
+PASS: pin fast-forwards to exactly the pin, not the upstream tip
+warning: remote HEAD refers to nonexistent ref, unable to checkout
+PASS: pin already current is a no-op
+warning: remote HEAD refers to nonexistent ref, unable to checkout
+PASS: pin refuses a short or malformed id
+warning: remote HEAD refers to nonexistent ref, unable to checkout
+PASS: pin refuses a detached HEAD
+warning: remote HEAD refers to nonexistent ref, unable to checkout
+PASS: pin refuses an unpublished commit
+warning: remote HEAD refers to nonexistent ref, unable to checkout
+PASS: pin refuses a diverged branch without rewriting it
+warning: remote HEAD refers to nonexistent ref, unable to checkout
+PASS: pin refuses a branch without an upstream
+PASS: pin helper never resets, cleans, checks out or pulls
+PASS: R339-D: userinfo password leaves argv for PGPASSWORD (percent-decoded); routing env removed
+PASS: R339-D: query password (encoded keyword) leaves argv
+PASS: R339-D: dual/ssl/key-value/malformed passwords are refused before psql
+PASS: R339-D: password-free DSN is passed unchanged
+PASS: R339-B: expected state permits only the target-main move
+PASS: R339-C: complete payload runs and its status propagates
+PASS: R339-C: invalid base64 refuses (47) with nothing run
+PASS: R339-C: corrupt gzip refuses (47) with nothing run
+PASS: R339-C: truncated payload refuses (47) without running partial input
+PASS: R339-C: missing decoder refuses (47) with nothing run
+PASS: R339-C: transport template has no double quote and no bash -s
+PASS: gate: branch namespace collision dev vs dev/v2-main
+PASS: gate: ledger accepts CRLF checksum, refuses drift and reordering
+PASS: gate: .env presence by name never prints values
+PASS: gate: approval window missing/expired/too long/future/open
+PASS: gate 346: migration-set check is not evaluated under -SkipMigrate
+PASS: e2e: READY pin behind tip deploys, migrates exactly, preserves main/stash
+PASS: e2e: wrong host blocks before any change
+PASS: e2e: branch namespace collision blocks before any change
+PASS: e2e: unapproved pending migration blocks
+PASS: e2e: approved transition mismatch blocks
+PASS: e2e: wrong database blocks
+PASS: e2e: stale backup (writer ran after it) blocks
+PASS: e2e: unpublished/absent pin blocks
+PASS: e2e: running afldb job blocks
+PASS: e2e: missing preparation (41) stops execute
+PASS: e2e: post-migration parity failure stops before build/restart
+PASS: e2e: assessment reports every blocker and changes nothing
+PASS: e2e: exit status survives a tee logging pipeline
+PASS: e2e R339-B: pinned main fast-forward completes, stash preserved
+PASS: e2e R339-B: unpinned main fast-forward completes
+PASS: e2e R339-B: non-target main is still preserved exactly
+PASS: e2e R339-A: exported AFLDB_MIGRATE_TARGET blocks before checkout
+PASS: e2e R339-A: exported owner DSN blocks before checkout
+PASS: e2e R339-A: custom -DsnName without -SkipMigrate blocks
+PASS: e2e R339-A: .env migration target other than dev blocks
+PASS: e2e R339-A: duplicate .env DSN line blocks
+PASS: e2e R339-A: migration child is pinned to --target dev with no exported target/DSN
+PASS: e2e 346: a full deploy records its planned steps (build and restart unchanged)
+    rc=0; blockers and tail:
+    [deploy] >>> verify preserved state
+    [preflight] PASS preserved state after deploy -- main=f1a3fe6d73491026859a7e63745498797fad2767 stashes=1/4362b24b546f1f92 untracked=1/a68dc017b1a5d776 env=ea0bcb6d4b266f3c
+    [preflight] evidence: /tmp/tmp.ZmraVHauO8/evidence/20261111T021259Z-streamanator-8d3efd106e43-execute-3285004.txt (exit 0)
+FAIL: e2e 346: migration-only applies exactly the approved 2->3, no build, no restart, evidence recorded
+PASS: e2e 346: no approval refused (40), no child
+PASS: e2e 346: wrong ledger-before refused (40), no child
+PASS: e2e 346: wrong ledger-after refused (40), no child
+PASS: e2e 346: wrong database identity refused (40), no child
+PASS: e2e 346: wrong host refused (40), no child
+PASS: e2e 346: exported owner DSN refused (40), no child
+PASS: e2e 346: exported AFLDB_MIGRATE_TARGET=test with TEST_URL refused (40), no child
+PASS: e2e 346: .env migration target refused (40), no child
+PASS: e2e 346: duplicate .env DSN line refused (40), no child
+PASS: e2e 346: dirty tree refused (40), no child
+PASS: e2e 346: unpublished pin refused (40), no child
+PASS: e2e 346: ledger checksum drift refused (40), no child
+    rc=0; blockers and tail:
+    [deploy] >>> verify preserved state
+    [preflight] PASS preserved state after deploy -- main=342c26c03cbc8bb1835a1195708a2b82fefc19c6 stashes=1/229d7e2c537acc41 untracked=1/a68dc017b1a5d776 env=ea0bcb6d4b266f3c
+    [preflight] evidence: /tmp/tmp.GFn9rxcOKT/evidence/20261111T021310Z-streamanator-8cedc0668e0d-execute-3290671.txt (exit 0)
+FAIL: e2e 346: colliding migration number refused before checkout (40), no child
+    rc=0; blockers and tail:
+    [deploy] >>> verify preserved state
+    [preflight] PASS preserved state after deploy -- main=d12dcf79c00a528aa820b6bbef847156b63eea5c stashes=1/be61cd050a09d17c untracked=1/a68dc017b1a5d776 env=ea0bcb6d4b266f3c
+    [preflight] evidence: /tmp/tmp.c91okVYrij/evidence/20261111T021311Z-streamanator-7aa345f04236-execute-3291345.txt (exit 0)
+FAIL: e2e 346: malformed migration name refused (40), no child
+    rc=0; blockers and tail:
+    [deploy] >>> verify preserved state
+    [preflight] PASS preserved state after deploy -- main=69a9742d98e93dd0f9fcf64864e4a5b810bd8a13 stashes=1/1e254ee5786e9a6d untracked=1/a68dc017b1a5d776 env=ea0bcb6d4b266f3c
+    [preflight] evidence: /tmp/tmp.QMPzIMzL2X/evidence/20261111T021313Z-streamanator-362709c9e6b5-execute-3292099.txt (exit 0)
+FAIL: e2e 346: missing base migration refused (40), no child
+    rc=0; blockers and tail:
+    [deploy] >>> verify preserved state
+    [preflight] PASS preserved state after deploy -- main=6393c8964dba2307d9f49005cb0ab688ddca4663 stashes=1/d58ec44afb3277f4 untracked=1/a68dc017b1a5d776 env=ea0bcb6d4b266f3c
+    [preflight] evidence: /tmp/tmp.G2tO6AdL1M/evidence/20261111T021314Z-streamanator-04228e4cd0f4-execute-3292789.txt (exit 0)
+FAIL: e2e 346: branch-local migration refused (40), no child
+PASS: e2e 346: running job refused (40), no child
+PASS: e2e 346: missing preparation refused (41), no child
+PASS: e2e 346: parity failure stops with 44, no build or restart
+PASS: e2e 346: exported TEST_URL alone cannot misdirect the child (proceeds, dev only)
+81 passed, 5 failed
