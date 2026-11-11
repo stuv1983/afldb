@@ -67,3 +67,22 @@ The episodes, `runner-logs/reset.log`, `episode.log` and `runner.log`, start fro
 - No real writers, timers or systemd units. Writer and timer checks ran only in their "not running" branch.
 - Production's data volume and `pg_dump` duration are not simulated.
 - The approval in e1 is a simulated owner act.
+
+## After-state visual check (Visual Evidence Mandate for D-336-2 runbook step 7; SIMULATION data)
+
+- **Build:** R's existing production build (`BUILD_ID Agk-PqLoJQjc23I9yiieX`, from the release qualification checkout at `c1c4b22e`) served on loopback `127.0.0.1:55581`.
+- **Database:** a marked `_test` copy of the post-apply simulated database (35 I336 rows present).
+- **Browser:** headless Chromium, one fresh context per viewport. Scripts `scripts/vis336.sh` and `scripts/vis336.cjs`; results `visual/results.json`; screenshots `visual/*.png`.
+- **First attempt, 0/8:**
+  - The server logged `AFLDB_SESSION_SECRET is not set`, causing an HTTP 500 resource error and React error #441 on every page.
+  - This was an environment artefact: production sets the secret.
+  - Re-run with a throwaway local secret.
+- **Result: VISUAL 10/10 PASS.** Pages `/draft/2008?view=pre-draft`, `/draft/2009?view=pre-draft`, `/draft/2025?view=pre-draft`, `/draft/2025` and `/draft/2025?view=rookie`, each at 1280×800 and 390×844:
+  - HTTP 200;
+  - no horizontal overflow;
+  - no console or page errors;
+  - `Intl Schol` shown on the 2008 Pre-Draft view (4 rows: the tab reads `Pre-Draft 4`, all inserted) and the 2009 view (11 mentions);
+  - Willem Duursma on the 2025 all view; Fred Rodriguez on the 2025 Rookie view.
+- **Sample-name text matches did not hit:** the DraftGuru names carry U+00A0, which is why the plain-space match missed. The 2008 screenshot shows the rows (`Amua Pirika`, `Inoke Ratu`, Gold Coast / Western Bulldogs, Intl Schol).
+- **Limit:** the cookie banner overlays part of each full-page screenshot.
+- **Teardown:** the server and the cluster were stopped, and ports 55581 and 55494 are closed.

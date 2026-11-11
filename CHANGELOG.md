@@ -15,6 +15,14 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-346: gated migration-only DEV route (2026-11-11; local, unpublished while `main` is frozen)
+
+- `sync-dev.ps1 -SkipBuild -SkipRestart` with `-ExpectedRevision` and an approved `-ExpectedLedgerBefore/-After` is the gated migration-only DEV route. It reuses the ISSUE-339 gate, migration binding and pinned migration line unchanged.
+- The deploy gate also records its planned steps and the checkout scope.
+- Before checkout, the gate refuses a target revision whose migration set `db:migrate` would refuse: exit 40, instead of exit 1 after checkout.
+- Qualification: Linux harness 86/0; isolated write-mode rehearsal 17/17 (15 refusals, no migration child).
+- The interim rule stays in force until publication: never run `db:migrate` by hand on DEV.
+
 ### ISSUE-347: the GAP-029 runner prepares I336 runs; D-336-2 simulated end to end (2026-11-11; local, unpublished while `main` is frozen)
 
 - **Defect:** the workstation runner (`tools/v2/gap029-stage.ts prepare`) derived its restore-host TAG with fixed offsets that assumed a two-character stage. Every I336 run therefore stopped at restore and assembly (exit 2) after the production capture had been taken.

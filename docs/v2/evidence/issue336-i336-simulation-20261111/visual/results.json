@@ -1,0 +1,122 @@
+[
+ {
+  "vp": "desktop",
+  "name": "2008-pre-draft",
+  "path": "/draft/2008?view=pre-draft",
+  "status": 200,
+  "overflowPx": 0,
+  "intlScholMentions": 4,
+  "sampleNamesSeen": [],
+  "missing": [],
+  "consoleErrors": [],
+  "pass": true
+ },
+ {
+  "vp": "desktop",
+  "name": "2009-pre-draft",
+  "path": "/draft/2009?view=pre-draft",
+  "status": 200,
+  "overflowPx": 0,
+  "intlScholMentions": 11,
+  "sampleNamesSeen": [],
+  "missing": [],
+  "consoleErrors": [],
+  "pass": true
+ },
+ {
+  "vp": "desktop",
+  "name": "2025-pre-draft",
+  "path": "/draft/2025?view=pre-draft",
+  "status": 200,
+  "overflowPx": 0,
+  "intlScholMentions": 0,
+  "sampleNamesSeen": [],
+  "missing": [],
+  "consoleErrors": [],
+  "pass": true
+ },
+ {
+  "vp": "desktop",
+  "name": "2025-all",
+  "path": "/draft/2025",
+  "status": 200,
+  "overflowPx": 0,
+  "intlScholMentions": 0,
+  "sampleNamesSeen": [],
+  "missing": [],
+  "consoleErrors": [],
+  "pass": true
+ },
+ {
+  "vp": "desktop",
+  "name": "2025-rookie",
+  "path": "/draft/2025?view=rookie",
+  "status": 200,
+  "overflowPx": 0,
+  "intlScholMentions": 0,
+  "sampleNamesSeen": [],
+  "missing": [],
+  "consoleErrors": [],
+  "pass": true
+ },
+ {
+  "vp": "mobile",
+  "name": "2008-pre-draft",
+  "path": "/draft/2008?view=pre-draft",
+  "status": 200,
+  "overflowPx": 0,
+  "intlScholMentions": 4,
+  "sampleNamesSeen": [],
+  "missing": [],
+  "consoleErrors": [],
+  "pass": true
+ },
+ {
+  "vp": "mobile",
+  "name": "2009-pre-draft",
+  "path": "/draft/2009?view=pre-draft",
+  "status": 200,
+  "overflowPx": 0,
+  "intlScholMentions": 11,
+  "sampleNamesSeen": [],
+  "missing": [],
+  "consoleErrors": [],
+  "pass": true
+ },
+ {
+  "vp": "mobile",
+  "name": "2025-pre-draft",
+  "path": "/draft/2025?view=pre-draft",
+  "status": 200,
+  "overflowPx": 0,
+  "intlScholMentions": 0,
+  "sampleNamesSeen": [],
+  "missing": [],
+  "consoleErrors": [],
+  "pass": true
+ },
+ {
+  "vp": "mobile",
+  "name": "2025-all",
+  "path": "/draft/2025",
+  "status": 200,
+  "overflowPx": 0,
+  "intlScholMentions": 0,
+  "sampleNamesSeen": [],
+  "missing": [],
+  "consoleErrors": [],
+  "pass": true
+ },
+ {
+  "vp": "mobile",
+  "name": "2025-rookie",
+  "path": "/draft/2025?view=rookie",
+  "status": 200,
+  "overflowPx": 0,
+  "intlScholMentions": 0,
+  "sampleNamesSeen": [],
+  "missing": [],
+  "consoleErrors": [],
+  "pass": true
+ }
+]

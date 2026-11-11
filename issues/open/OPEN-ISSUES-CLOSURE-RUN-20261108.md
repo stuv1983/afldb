@@ -8,7 +8,33 @@
 - The working tree stays uncommitted.
 - **Run 2 (owner, 2026-11-08):** additionally authorised Git fetch and inspection, local worktrees and branches, scoped staging and local commits, the W-339 bundle, transfer to streamanator, and Git, tests and migrations inside disposable clones on isolated test databases. Push, merge, live DEV, production, shared databases, private backups and WSL stores stay behind owner gates.
 
-## Run 8 — 2026-11-11: catch-up engineering and release preparation (IN PROGRESS checkpoint)
+## Run 8 — 2026-11-11: catch-up engineering and release preparation (COMPLETE; nothing published, nothing deployed)
+
+**Resume here.** Open issues: 332, 336, 346 and 347. Every remaining item is owner-gated (decision packet OD-1 to OD-8 below), apart from ISSUE-332's dated gates.
+
+**Local publication branch:** `claude/records-catchup-20261111` (worktree `D:\dev\afldb-catchup-20261111`). On `12aa6e29`, in order:
+1. `2207986f` ISSUE-347 fix;
+2. `ba9710e3` records;
+3. `feca4f11` ISSUE-346 code (cherry-pick of `87653d5e`);
+4. `b0243ef4` ISSUE-346 runbook and evidence (of `817ca8e9`);
+5. `bf494c8c` ISSUE-346 runbook note (of `0c47ca04`);
+6. the final run 8 records commit.
+
+Tooling and records only: no `src/`, migration, dependency or build-input change.
+
+**Publication plan (OD-6, after D1 PASS):**
+- First the post-release records commit: the release execution record, the PKG SHA, and the run 7 post-publication evidence from `D:\dev\afldb-i336-packet-r2`.
+- Then rebase this branch onto it. The run 8 files do not overlap the release records, so expect only tracking-file conflicts (`issues.md`, `IssuesIndex.md`, `CHANGELOG.md`, this file); resolve them by keeping both.
+- Re-verify that the code, test, doc and runbook blobs are byte-identical to the qualified commits (`2207986f`, `87653d5e`, `817ca8e9`, `0c47ca04`). Otherwise re-run `gap029-ops` and `sync-dev-remote` at the rebased tip.
+- Run `merge:ready --issue 347` and `--issue 346`, and `preflight --mode merge`, in a streamanator clone.
+- Fast-forward `main`. Then resolve 347; resolve 346 once the owner accepts its residuals.
+
+**ISSUE-346 (done locally, 2026-11-11).** The orchestrator agent implemented route (a), which `afldb-closure` reviewed with no drift. Results and residuals are in the `issues.md` entry and runbook §4. The workspaces `/mnt/ssd/afldb-i346-w346-20261111` and `/mnt/ssd/afldb-i346-dev` are retained; their cluster is stopped. The harness flagged one of the agent's actions as an "unrequested commit in a connected app". It was checked and found to be the three local commits its brief authorised: `origin/main` was still `12aa6e29`, no remote branch was created, and no other worktree changed.
+
+**Remaining gaps (not owner decisions):**
+- The 141 unclassified D-336-3 origin diffs need the owner CSV location.
+- The ISSUE-344 follow-up release packet waits for OD-1.
+- Production state in r2 (`OLD_ID`, `PROD_HEAD`) was last recorded 2026-11-05. It is re-observed only at P-A, under the owner's approval.
 
 **Owner instructions (2026-11-11):**
 - Catch up all outstanding work under standing authority: repository tools, Git inspection and fetch, shell, transfers, SSH, read-only SQL, Playwright, isolated clusters, local worktrees and commits.
