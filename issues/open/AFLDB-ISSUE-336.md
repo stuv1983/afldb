@@ -11,7 +11,7 @@ Evidence: `docs/v2/evidence/issue336-draft-categories-20261105/` (README §4 and
 |---|---|
 | D-336-1 accept the signing head `Intl Schol` | **Accepted** by the owner 2026-11-06; in the contract (`data/reference/draftguru-event-kinds.json`, `post_stage_a_additions`) and `GRID_SIGNING_KINDS`. |
 | D-336-2 insert the 35 rows on production | **Prepared, not approved for execution.** The approval below is a separate owner act. |
-| D-336-3 refresh the 187 revised origin paths | Open; not part of this runbook (recommend only a full DraftGuru re-acquisition and keyed reload, whose `EXPECTED_ROWS = 6810` would need updating). |
+| D-336-3 refresh the 187 revised origin paths | Open, owner decision; not part of this runbook. **Classified 2026-11-11** against the owner CSVs: 174 school insertions, 7 junior-club insertions, 3 `Brighton` → `Brighton Districts & Old Scholars`, 3 genuine club replacements. Recommendation: (A) now, (B) at the next full DraftGuru acquisition, with the 3 replacements checked explicitly; (C′), 184 additive rows, only if an earlier correction is wanted. Evidence: `docs/v2/evidence/issue336-draft-categories-20261105/d3363-classification-20261111/README.md`. |
 
 ## 1. What the write is
 

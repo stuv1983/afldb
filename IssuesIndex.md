@@ -10,9 +10,9 @@
 > filename only; resolved ones are in `issues/closed/`.
 
 **Current state — 2026-11-11 (closure run 8, local records branch `claude/records-catchup-20261111`, unpublished while `main` is frozen at PKG `12aa6e29`):** **4 open issues: 332, 336, 346, and the new 347.**
-- **336:** the r2 release awaits the owner's §9 statement. D-336-2 was simulated end to end at R′ and its packet is ready. D-336-3 awaits a decision.
+- **336:** the r2 release awaits the owner's §9 statement. D-336-2 was simulated end to end at R′ and its packet is ready (A+B tarball pinned). D-336-3 is classified (174 school insertions, 7 club insertions, 3 renames, 3 conflicts) and awaits the owner's authority decision.
 - **347:** fix `2207986f`, qualified, local.
-- **346:** a gated migration-only route is being designed and qualified locally.
+- **346:** the gated migration-only route is implemented and qualified locally (unpublished). Its residuals are reconciled in runbook §4a and await the owner's acceptance statement; publication waits for D1 PASS.
 - **332:** dated gates only, the first from 2027-03-17.
 
 Resume point: `issues/open/OPEN-ISSUES-CLOSURE-RUN-20261108.md` (Run 8). The counts below are historical.

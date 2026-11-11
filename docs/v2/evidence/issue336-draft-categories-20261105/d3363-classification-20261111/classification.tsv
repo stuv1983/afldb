@@ -1,0 +1,188 @@
+id	year	cat	player	pick	club	player_id	in_original_46	class	positions	added	removed	stored_origin	csv_origin
+1097	1991	Mid-Season	Daryn Cresswell	39	Sydney	3400	True	INSERT_CLUB	prefix	Glenorchy		North Hobart	Glenorchy/North Hobart
+1388	1993	Trade	Bradley Plain		Collingwood	2099	True	INSERT_CLUB	prefix	North Hobart		Clarence	North Hobart/Clarence
+1753	1995	Trade	Bradley Plain		North Melbourne	2099	True	INSERT_CLUB	prefix	North Hobart		Clarence	North Hobart/Clarence
+3795	2007	Pre-Season	Tom Bellchambers	8	Essendon	12477	True	INSERT_CLUB	prefix	Launceston		North Launceston/Tasmania U18	Launceston/North Launceston/Tasmania U18
+3912	2008	National	Aaron Cornelius	57	Brisbane	4	True	INSERT_CLUB	prefix	Glenorchy		Tasmania U18/Tasmania (VFL)	Glenorchy/Tasmania U18/Tasmania (VFL)
+4163	2009	Rookie	Daniel Archer	36	St Kilda	3209	True	INSERT_CLUB	prefix	Kingborough		Clarence/Tasmania U18	Kingborough/Clarence/Tasmania U18
+5961	2020	National	Finlay Macrae	19	Collingwood	4274	False	REPLACE_CLUB		Kew Rovers	Surrey Park	Surrey Park/Xavier College/Oakleigh U18	Kew Rovers/Xavier College/Oakleigh U18
+5965	2020	National	Reef McInnes	23	Collingwood	10879	True	INSERT_CLUB	interior,prefix	Canterbury JFC; Surrey Park; Boroondara Hawks JFC		Scotch College/Oakleigh U18	Canterbury JFC/Surrey Park/Boroondara Hawks JFC/Scotch College/Oakleigh U18
+6085	2021	National	Jason Horne-Francis	1	North Melbourne	6841	False	INSERT_SCHOOL	interior	Wirreanda SS		Christies Beach/South Adelaide	Christies Beach/Wirreanda SS/South Adelaide
+6092	2021	National	Jye Amiss	8	Fremantle	7949	False	INSERT_SCHOOL	interior	Cape Naturaliste College		Busselton/East Perth	Busselton/Cape Naturaliste College/East Perth
+6096	2021	National	Josh Sinn	12	Port Adelaide	7893	False	INSERT_SCHOOL	interior	Xavier College		East Brighton/Old Xavs/Sandringham U18	East Brighton/Old Xavs/Xavier College/Sandringham U18
+6113	2021	National	Sam Banks	29	Richmond	11601	False	INSERT_SCHOOL	interior	Guilford Young College		Clarence/Tasmania U18	Clarence/Guilford Young College/Tasmania U18
+6119	2021	National	Paul Curtis	35	North Melbourne	10282	False	INSERT_SCHOOL	interior	Maribyrnong College		Melton South/Keilor/Western U18	Melton South/Keilor/Maribyrnong College/Western U18
+6126	2021	National	Josh Fahey	42	GWS	7866	False	INSERT_SCHOOL	interior	Erindale College		Queanbeyan/Greater Western Sydney (NEAFL)	Queanbeyan/Erindale College/Greater Western Sydney (NEAFL)
+6127	2021	National	Arthur Jones	43	Western Bulldogs	812	False	INSERT_SCHOOL	interior	Wesley College (WA)		Mt Barker (WA)/Claremont	Mt Barker (WA)/Wesley College (WA)/Claremont
+6135	2021	National	Oscar Adams	51	St Kilda	10137	False	INSERT_SCHOOL	interior	Tenison Woods College		South Gambier/Glenelg	South Gambier/Tenison Woods College/Glenelg
+6139	2021	National	Hugh Jackson	55	Port Adelaide	5929	False	INSERT_SCHOOL	interior	Rostrevor College		Crystal Brook/North Adelaide	Crystal Brook/Rostrevor College/North Adelaide
+6141	2021	National	Jack Williams	57	West Coast	6619	False	INSERT_SCHOOL	interior	Willetton SHS		Rossmoyne JFC/East Fremantle	Rossmoyne JFC/Willetton SHS/East Fremantle
+6143	2021	National	Jackson Archer	59	North Melbourne	6635	False	INSERT_SCHOOL	interior	Whitefriars College		Park Orchards/Northern U18	Park Orchards/Whitefriars College/Northern U18
+6144	2021	National	Jase Burgoyne	60	Port Adelaide	6823	True	INSERT_SCHOOL	prefix	Henley HS		Woodville-West Torrens	Henley HS/Woodville-West Torrens
+6145	2021	National	Luke Cleary	61	Western Bulldogs	8917	False	INSERT_SCHOOL	interior	Haileybury College		Beaumaris/Sandringham U18	Beaumaris/Haileybury College/Sandringham U18
+6149	2021	National	Taj Woewodin	65	Melbourne	12189	False	INSERT_SCHOOL	interior	Aquinas College (WA)		Coorparoo JAFC/Booragoon/East Fremantle	Coorparoo JAFC/Booragoon/Aquinas College (WA)/East Fremantle
+6154	2021	Rookie	Karl Worner	8	Fremantle	7978	False	INSERT_SCHOOL	interior	Carey Grammar		Ashburton/East Burwood/Oakleigh U18	Ashburton/East Burwood/Carey Grammar/Oakleigh U18
+6160	2021	Rookie	Judd McVee	16	Melbourne	7913	False	INSERT_SCHOOL	interior	Geraldton SHS		Swanbourne JFC/Mullewa/East Fremantle	Swanbourne JFC/Mullewa/Geraldton SHS/East Fremantle
+6163	2021	Rookie	Bodhi Uwland	26	Gold Coast	2044	False	INSERT_SCHOOL	interior	All Saints Anglican		Broadbeach/Gold Coast (NEAFL)	Broadbeach/All Saints Anglican/Gold Coast (NEAFL)
+6171	2021	Post-Draft	Jack Hayes		St Kilda	6330	True	INSERT_SCHOOL	prefix	Sacred Heart College		Woodville-West Torrens	Sacred Heart College/Woodville-West Torrens
+6175	2021	Post-Draft	Nic Martin		Essendon	9896	False	INSERT_SCHOOL	interior	Trinity College (WA)		Noranda JFC/Subiaco	Noranda JFC/Trinity College (WA)/Subiaco
+6182	2021	Mid-Season	Kallan Dawson	2	North Melbourne	7962	False	INSERT_SCHOOL	interior	Williamstown HS		Williamstown Juniors/Williamstown	Williamstown Juniors/Williamstown HS/Williamstown
+6183	2021	Mid-Season	Massimo D'Ambrosio	3	Essendon	9197	False	INSERT_SCHOOL	interior	Maribyrnong College		Point Cook/Western U18/Richmond (VFL)	Point Cook/Maribyrnong College/Western U18/Richmond (VFL)
+6219	2022	Trade	Jason Horne-Francis		Port Adelaide	6841	False	INSERT_SCHOOL	interior	Wirreanda SS		Christies Beach/South Adelaide	Christies Beach/Wirreanda SS/South Adelaide
+6236	2022	Pre-Draft	Darryl McDowell-White		Brisbane		True	INSERT_SCHOOL	prefix	Anglican Church Grammar		Basketball	Anglican Church Grammar/Basketball
+6240	2022	National	Aaron Cadman	1	GWS	3	False	INSERT_SCHOOL	interior	St Patrick's College		Darley/North Ballarat U18	Darley/St Patrick's College/North Ballarat U18
+6241	2022	National	Will Ashcroft	2	Brisbane	13180	False	INSERT_SCHOOL	interior	Brighton Grammar		Southport/Sandringham U18	Southport/Brighton Grammar/Sandringham U18
+6242	2022	National	Harry Sheezel	3	North Melbourne	5700	False	INSERT_SCHOOL	interior	Mount Scopus		Ajax/Sandringham U18	Ajax/Mount Scopus/Sandringham U18
+6243	2022	National	George Wardlaw	4	North Melbourne	5071	False	INSERT_SCHOOL	interior	St Kevin's College		St Peters/Oakleigh U18	St Peters/St Kevin's College/Oakleigh U18
+6244	2022	National	Elijah Tsatas	5	Essendon	4095	False	INSERT_SCHOOL	interior	Wesley College		Surrey Park/Oakleigh U18	Surrey Park/Wesley College/Oakleigh U18
+6245	2022	National	Bailey Humphrey	6	Gold Coast	940	False	INSERT_SCHOOL	interior	Lowanna College		Moe/Gippsland U18	Moe/Lowanna College/Gippsland U18
+6246	2022	National	Cam Mackenzie	7	Hawthorn	2484	False	INSERT_SCHOOL	interior	Brighton Grammar		Beaumaris/Sandringham U18	Beaumaris/Brighton Grammar/Sandringham U18
+6248	2022	National	Reuben Ginbey	9	West Coast	10954	False	INSERT_SCHOOL	interior	Wesley College (WA)		Dunsborough/East Perth	Dunsborough/Wesley College (WA)/East Perth
+6249	2022	National	Mattaes Phillipou	10	St Kilda	9245	False	INSERT_SCHOOL	interior	Henley HS		PHOS Camden/Woodville-West Torrens	PHOS Camden/Henley HS/Woodville-West Torrens
+6250	2022	National	Oliver Hollands	11	Carlton	10125	False	INSERT_SCHOOL	interior	Geelong Grammar		Wodonga FC/Murray U18	Wodonga FC/Geelong Grammar/Murray U18
+6251	2022	National	Jaspa Fletcher	12	Brisbane	6864	False	INSERT_SCHOOL	interior	Brisbane SHS		Coorparoo/Brisbane (NEAFL)	Coorparoo/Brisbane SHS/Brisbane (NEAFL)
+6253	2022	National	Elijah Hewett	14	West Coast	4092	False	INSERT_SCHOOL	interior	Guildford Grammar; Scotch College (WA)		Caversham JFC/Swan Districts	Caversham JFC/Guildford Grammar/Scotch College (WA)/Swan Districts
+6254	2022	National	Matthew Jefferson	15	Melbourne	9281	False	INSERT_SCHOOL	interior	Wesley College		Ashburton/Oakleigh U18	Ashburton/Wesley College/Oakleigh U18
+6255	2022	National	Harry Rowston	16	GWS	5693	False	INSERT_SCHOOL	suffix	Assumption College		Griffith	Griffith/Assumption College
+6256	2022	National	Max Michalanney	17	Adelaide	9409	False	INSERT_SCHOOL	interior	Rostrevor College		Glenunga/Norwood	Glenunga/Rostrevor College/Norwood
+6257	2022	National	Josh Weddle	18	Hawthorn	7905	False	INSERT_SCHOOL	interior	Carey Grammar		Templestowe/Oakleigh U18	Templestowe/Carey Grammar/Oakleigh U18
+6258	2022	National	Ed Allan	19	Collingwood	4081	False	INSERT_SCHOOL	interior	Scotch College (WA)		Mosman Park JFC/Claremont	Mosman Park JFC/Scotch College (WA)/Claremont
+6261	2022	National	Max Gruzewski	22	GWS	9384	False	INSERT_SCHOOL	interior	Caulfield Grammar		Surrey Park/Oakleigh U18	Surrey Park/Caulfield Grammar/Oakleigh U18
+6262	2022	National	Harry Barnett	23	West Coast	5550	False	INSERT_SCHOOL	interior	Mercedes College		Goodwood/West Adelaide	Goodwood/Mercedes College/West Adelaide
+6264	2022	National	Lewis Hayes	25	Essendon	8784	False	INSERT_SCHOOL	interior	Rowville SC		Lysterfield JFC/Eastern U18	Lysterfield JFC/Rowville SC/Eastern U18
+6267	2022	National	Jakob Ryan	28	Collingwood	6698	False	INSERT_SCHOOL	interior	Sacred Heart College		Brighton Districts & Old Scholars/Glenelg	Brighton Districts & Old Scholars/Sacred Heart College/Glenelg
+6268	2022	National	Coby Burgiel	29	West Coast		True	INSERT_SCHOOL	prefix	Wesley College		Gippsland U18	Wesley College/Gippsland U18
+6269	2022	National	Lachie Cowan	30	Carlton	8363	False	INSERT_SCHOOL	interior	St Brendan-Shaw College		Devonport/Tasmania U18	Devonport/St Brendan-Shaw College/Tasmania U18
+6270	2022	National	James Van Es	31	St Kilda		False	INSERT_SCHOOL	interior	St Patrick's College		North Ballarat/North Ballarat U18	North Ballarat/St Patrick's College/North Ballarat U18
+6271	2022	National	Jaxon Binns	32	Carlton	6867	False	INSERT_SCHOOL	interior	Caulfield Grammar		Berwick/Dandenong U18	Berwick/Caulfield Grammar/Dandenong U18
+6272	2022	National	Hugh Davies	33	Fremantle	5919	True	INSERT_SCHOOL	prefix	Christ Church Grammar		Claremont	Christ Church Grammar/Claremont
+6274	2022	National	Olli Hotton	35	St Kilda		False	INSERT_SCHOOL	interior	Haileybury College		Hampton Rovers/Sandringham U18	Hampton Rovers/Haileybury College/Sandringham U18
+6275	2022	National	Tom McCallum	36	Port Adelaide		False	INSERT_SCHOOL	interior	Guilford Young College		Clarence/Tasmania U18	Clarence/Guilford Young College/Tasmania U18
+6280	2022	National	Tom Emmett	41	Fremantle	12529	False	INSERT_SCHOOL	interior	Pembroke School		Payneham Norwood Union/Sturt	Payneham Norwood Union/Pembroke School/Sturt
+6282	2022	National	Billy Dowling	43	Adelaide	1726	False	INSERT_SCHOOL	interior	St Peter's College (SA)		Walkerville/North Adelaide	Walkerville/St Peter's College (SA)/North Adelaide
+6284	2022	National	Alwyn Davey	45	Essendon	536	False	INSERT_SCHOOL	interior	Xavier College		Palmerston/Oakleigh U18	Palmerston/Xavier College/Oakleigh U18
+6285	2022	National	Jack O'Sullivan	46	Hawthorn		False	INSERT_SCHOOL	interior	Xavier College		Kyneton/Oakleigh U18	Kyneton/Xavier College/Oakleigh U18
+6288	2022	National	Kaleb Smith	49	Richmond	7960	False	INSERT_SCHOOL	interior	Wesley College (WA)		Melville JFC/East Fremantle	Melville JFC/Wesley College (WA)/East Fremantle
+6289	2022	National	Hugh Bond	50	Adelaide	5911	False	INSERT_SCHOOL	interior	Ballarat Grammar		North Ballarat/North Ballarat U18	North Ballarat/Ballarat Grammar/North Ballarat U18
+6290	2022	National	Bailey Macdonald	51	Hawthorn	942	False	INSERT_SCHOOL	interior	Wesley College		Surrey Park/Oakleigh U18	Surrey Park/Wesley College/Oakleigh U18
+6293	2022	National	Jayden Davey	54	Essendon		False	INSERT_SCHOOL	interior	Xavier College		Palmerston/Oakleigh U18	Palmerston/Xavier College/Oakleigh U18
+6295	2022	National	Cooper Harvey	56	North Melbourne	3048	False	INSERT_SCHOOL	interior	Assumption College		Yarrambat/Northern U18	Yarrambat/Assumption College/Northern U18
+6297	2022	National	Noah Long	58	West Coast	9966	False	INSERT_SCHOOL	interior	Geelong Grammar		Echuca/Bendigo U18	Echuca/Geelong Grammar/Bendigo U18
+6298	2022	National	Kyle Marshall	59	Port Adelaide		False	INSERT_SCHOOL	interior	Cardijn College		McLaren/South Adelaide	McLaren/Cardijn College/South Adelaide
+6303	2022	Rookie	Liam Reidy	13	Fremantle	8811	False	INSERT_SCHOOL	interior	Brighton SC		East Brighton/Frankston	East Brighton/Brighton SC/Frankston
+6311	2022	Rookie	Jaiden Magor	31	Sydney		False	INSERT_SCHOOL	interior	Sacred Heart College		Myponga-Sellicks/South Adelaide	Myponga-Sellicks/Sacred Heart College/South Adelaide
+6330	2022	Post-Draft	Kaelan Bradtke		Richmond		False	INSERT_SCHOOL	interior	Xavier HS (Albury)		Corowa-Rutherglen/Sydney (NEAFL)	Corowa-Rutherglen/Xavier HS (Albury)/Sydney (NEAFL)
+6333	2022	Post-Draft	Alex Cincotta		Carlton	303	False	INSERT_SCHOOL	interior	Geelong College		Newtown & Chilwell/Geelong (VFL)/Carlton (VFL)	Newtown & Chilwell/Geelong College/Geelong (VFL)/Carlton (VFL)
+6339	2022	Post-Draft	Hudson O'Keeffe		Carlton	5909	False	INSERT_SCHOOL	interior	Camberwell HS		Camberwell/Oakleigh U18	Camberwell/Camberwell HS/Oakleigh U18
+6343	2022	Post-Draft	Kye Turner		Melbourne		False	INSERT_SCHOOL	interior	Haileybury College		Beaumaris/Sandringham U18/Old Haileybury/Frankston	Beaumaris/Haileybury College/Sandringham U18/Old Haileybury/Frankston
+6345	2022	Mid-Season	Robert Hansen	2	North Melbourne	11095	True	INSERT_SCHOOL	prefix	Trinity College (WA)		Subiaco	Trinity College (WA)/Subiaco
+6350	2022	Mid-Season	Ethan Stanley	8	Fremantle	4259	True	INSERT_SCHOOL	prefix	Mornington SC		Box Hill	Mornington SC/Box Hill
+6351	2022	Mid-Season	Jaiden Hunter	9	Essendon		True	INSERT_SCHOOL	prefix	Aquinas College (WA)		Perth	Aquinas College (WA)/Perth
+6355	2022	Mid-Season	James Trezise	13	Richmond	6750	False	INSERT_SCHOOL	interior	St Francis Xavier College (Beaconsfield)		Tooradin-Dalmore/Richmond (VFL)	Tooradin-Dalmore/St Francis Xavier College (Beaconsfield)/Richmond (VFL)
+6356	2022	Mid-Season	Jack Buller	15	Sydney	6165	False	INSERT_SCHOOL	interior	Scotch College (WA)		Cottesloe JFC/Claremont	Cottesloe JFC/Scotch College (WA)/Claremont
+6374	2023	Trade	Massimo D'Ambrosio		Hawthorn	9197	False	INSERT_SCHOOL	interior	Maribyrnong College		Point Cook/Western U18/Richmond (VFL)	Point Cook/Maribyrnong College/Western U18/Richmond (VFL)
+6399	2023	Pre-Draft	Oliver Hayes-Brown		Richmond	13351	True	INSERT_SCHOOL	prefix	Peninsula Grammar		Basketball	Peninsula Grammar/Basketball
+6445	2023	National	Bodie Ryan	46	Hawthorn	13340	False	RENAME_EXPAND		Brighton Districts & Old Scholars	Brighton	Brighton/Sacred Heart College/Glenelg	Brighton Districts & Old Scholars/Sacred Heart College/Glenelg
+6454	2023	National	Aiden O'Driscoll	55	Western Bulldogs		False	INSERT_SCHOOL	interior	Wesley College (WA)		Northam Saints JFC/Perth	Northam Saints JFC/Wesley College (WA)/Perth
+6460	2023	National	Oli Wiltshire	61	Geelong	10126	False	INSERT_SCHOOL	interior	St Joseph's College		Barwon Heads/Geelong U18	Barwon Heads/St Joseph's College/Geelong U18
+6466	2023	Rookie	Finnbar Maley	2	North Melbourne	4278	False	INSERT_SCHOOL	interior	Eltham HS		Research/Eltham/Northern U18/Northern Bullants	Research/Eltham/Eltham HS/Northern U18/Northern Bullants
+6471	2023	Rookie	Xavier Walsh	13	Port Adelaide		False	INSERT_SCHOOL	interior	Trinity College (WA)		Mt Lawley Inglewood JFC/East Perth	Mt Lawley Inglewood JFC/Trinity College (WA)/East Perth
+6473	2023	Rookie	Will Rowlands	18	Gold Coast		False	INSERT_SCHOOL	interior	Rostrevor College		Southern Districts/Norwood	Southern Districts/Rostrevor College/Norwood
+6479	2023	Post-Draft	Coen Livingstone		West Coast		True	INSERT_SCHOOL	prefix	Scotch College (WA)		Perth	Scotch College (WA)/Perth
+6486	2023	Post-Draft	Tyler Sellers		North Melbourne	12899	False	INSERT_SCHOOL	interior	Scotch College		Old Scotch/North Melbourne (VFL)	Old Scotch/Scotch College/North Melbourne (VFL)
+6488	2023	Post-Draft	Lachie Sullivan		Collingwood	8375	True	INSERT_SCHOOL	prefix	St Kevin's College		Footscray (VFL)	St Kevin's College/Footscray (VFL)
+6491	2023	Mid-Season	Jacob Blight	2	Richmond	6653	True	INSERT_SCHOOL	prefix	Wesley College (WA)		Peel	Wesley College (WA)/Peel
+6495	2023	Mid-Season	Will McLachlan	6	Brisbane	13199	True	INSERT_SCHOOL	prefix	Trinity College (Colac)		Geelong U18	Trinity College (Colac)/Geelong U18
+6497	2023	Mid-Season	Kelsey Rypstra	8	Western Bulldogs		True	INSERT_SCHOOL	prefix	Blackfriars		North Adelaide	Blackfriars/North Adelaide
+6498	2023	Mid-Season	Cooper Lord	9	Carlton	3050	True	INSERT_SCHOOL	prefix	Scotch College		North Melbourne (VFL)	Scotch College/North Melbourne (VFL)
+6503	2023	Mid-Season	Tom Hanily	14	Sydney	12555	True	INSERT_SCHOOL	prefix	Xavier College		Gippsland U18	Xavier College/Gippsland U18
+6505	2023	Mid-Season	Campbell Gray	16	Richmond	2520	True	INSERT_SCHOOL	prefix	Overnewton College		Essendon (VFL)	Overnewton College/Essendon (VFL)
+6545	2024	Pre-Draft	Matt Hill		Hawthorn	13358	True	INSERT_SCHOOL	prefix	St Brendan's College (Yeppoon)		Rugby League	St Brendan's College (Yeppoon)/Rugby League
+6590	2024	National	Ben Camporeale	43	Carlton		False	RENAME_EXPAND		Brighton Districts & Old Scholars	Brighton	Brighton/Sacred Heart College/Glenelg	Brighton Districts & Old Scholars/Sacred Heart College/Glenelg
+6601	2024	National	Lucas Camporeale	54	Carlton	8903	False	RENAME_EXPAND		Brighton Districts & Old Scholars	Brighton	Brighton/Sacred Heart College/Glenelg	Brighton Districts & Old Scholars/Sacred Heart College/Glenelg
+6626	2024	Rookie	Blake Leidler	14	Sydney		False	REPLACE_CLUB		Surrey Park	Collegians	Collegians/Wesley College/Oakleigh U18	Surrey Park/Wesley College/Oakleigh U18
+6631	2024	Post-Draft	Josaia Delana		GWS	7845	False	INSERT_SCHOOL	suffix	Oakhill College		Kellyville-Rouse Hill	Kellyville-Rouse Hill/Oakhill College
+6632	2024	Post-Draft	Lachlan Gulbin		Gold Coast	8365	True	INSERT_SCHOOL	prefix	All Saints Anglican		Burleigh	All Saints Anglican/Burleigh
+6633	2024	Post-Draft	Jayden Nguyen		Essendon	6883	False	INSERT_SCHOOL	interior	Maribyrnong College		Avondale Heights/Aberfeldie/Calder U18	Avondale Heights/Aberfeldie/Maribyrnong College/Calder U18
+6634	2024	Post-Draft	Ricky Mentha		Melbourne		False	INSERT_SCHOOL	interior	Lowanna College		Palmerston/Morwell/Gippsland U18	Palmerston/Morwell/Lowanna College/Gippsland U18
+6641	2024	Post-Draft	Isaiah Dudley		Fremantle	6085	True	INSERT_SCHOOL	prefix	Prince Alfred College		Central District	Prince Alfred College/Central District
+6644	2024	Post-Draft	Jack Henderson		Melbourne	6333	True	INSERT_SCHOOL	prefix	Geelong College		Werribee	Geelong College/Werribee
+6646	2024	Post-Draft	Josh Lai		Port Adelaide	13332	False	INSERT_SCHOOL	suffix	Mentone Grammar		Cheltenham	Cheltenham/Mentone Grammar
+6650	2024	Post-Draft	Will White		Carlton	13212	True	INSERT_SCHOOL	prefix	Emmanuel College (Warrnambool)		North Ballarat U18/Carlton (VFL)	Emmanuel College (Warrnambool)/North Ballarat U18/Carlton (VFL)
+6653	2024	Mid-Season	Harrison Ramm	3	Port Adelaide	5542	True	INSERT_SCHOOL	prefix	Sacred Heart College		Glenelg	Sacred Heart College/Glenelg
+6655	2024	Mid-Season	Michael Sellwood	5	Western Bulldogs	13354	True	INSERT_SCHOOL	prefix	Aquinas College (WA)		Peel	Aquinas College (WA)/Peel
+6656	2024	Mid-Season	Archie May	6	Essendon	729	True	INSERT_SCHOOL	prefix	Brighton Grammar		Richmond (VFL)/Subiaco	Brighton Grammar/Richmond (VFL)/Subiaco
+6657	2024	Mid-Season	Oscar Adams	7	Gold Coast	10137	False	INSERT_SCHOOL	interior	Tenison Woods College		South Gambier/Glenelg	South Gambier/Tenison Woods College/Glenelg
+6659	2024	Mid-Season	Jacob Newton	9	West Coast	6661	True	INSERT_SCHOOL	prefix	Rostrevor College		Norwood	Rostrevor College/Norwood
+6660	2024	Mid-Season	Cooper Trembath	10	North Melbourne	3054	True	INSERT_SCHOOL	prefix	Whitefriars College		Eastern U18/North Melbourne (VFL)	Whitefriars College/Eastern U18/North Melbourne (VFL)
+6661	2024	Mid-Season	Ewan Mackinlay	11	Port Adelaide	4263	True	INSERT_SCHOOL	prefix	Billabong HS		North Adelaide	Billabong HS/North Adelaide
+6664	2024	Mid-Season	Caleb Lewis	14	Gold Coast	13320	True	INSERT_SCHOOL	prefix	Brighton Grammar		Sandringham U18/St Bedes Mentone (VAFA)/Footscray (VFL)/Dingley/Casey	Brighton Grammar/Sandringham U18/St Bedes Mentone (VAFA)/Footscray (VFL)/Dingley/Casey
+6667	2024	Mid-Season	Oskar Smartt	17	Essendon	10146	True	INSERT_SCHOOL	prefix	St Joseph's College (Echuca)		Essendon (VFL)	St Joseph's College (Echuca)/Essendon (VFL)
+6679	2025	Trade	Jack Buller		Collingwood	6165	False	INSERT_SCHOOL	interior	Scotch College (WA)		Cottesloe JFC/Claremont	Cottesloe JFC/Scotch College (WA)/Claremont
+6689	2025	Trade	Finnbar Maley		Adelaide	4278	False	INSERT_SCHOOL	interior	Eltham HS		Research/Eltham/Northern U18/Northern Bullants	Research/Eltham/Eltham HS/Northern U18/Northern Bullants
+6690	2025	Trade	Judd McVee		Fremantle	7913	False	INSERT_SCHOOL	interior	Geraldton SHS		Swanbourne JFC/Mullewa/East Fremantle	Swanbourne JFC/Mullewa/Geraldton SHS/East Fremantle
+6694	2025	Trade	Liam Reidy		Carlton	8811	False	INSERT_SCHOOL	interior	Brighton SC		East Brighton/Frankston	East Brighton/Brighton SC/Frankston
+6703	2025	Pre-Draft	Kalani White		Melbourne		False	INSERT_SCHOOL	interior	All Saints Anglican		Surfers Paradise/Broadbeach	Surfers Paradise/All Saints Anglican/Broadbeach
+6704	2025	National	Willem Duursma	1	West Coast	13362	False	INSERT_SCHOOL	interior	Foster SC		Foster/Gippsland U18	Foster/Foster SC/Gippsland U18
+6705	2025	National	Zeke Uwland	2	Gold Coast	13296	True	INSERT_SCHOOL	prefix	All Saints Anglican		Burleigh	All Saints Anglican/Burleigh
+6706	2025	National	Harry Dean	3	Carlton	13341	False	INSERT_SCHOOL	interior	Scots School (Albury)		Lavington/Murray U18	Lavington/Scots School (Albury)/Murray U18
+6708	2025	National	Dylan Patterson	5	Gold Coast	13345	True	INSERT_SCHOOL	prefix	Palm Beach Currumbin SHS		Palm Beach Currumbin	Palm Beach Currumbin SHS/Palm Beach Currumbin
+6709	2025	National	Daniel Annable	6	Brisbane	13325	True	INSERT_SCHOOL	prefix	Cleveland SHS		Redland-Victoria Point	Cleveland SHS/Redland-Victoria Point
+6710	2025	National	Sam Cumming	7	Richmond	13298	False	INSERT_SCHOOL	interior	Prince Alfred College		Wentworth/North Adelaide	Wentworth/Prince Alfred College/North Adelaide
+6711	2025	National	Sam Grlj	8	Richmond	13295	False	INSERT_SCHOOL	interior	Camberwell Grammar		Canterbury/Oakleigh U18	Canterbury/Camberwell Grammar/Oakleigh U18
+6712	2025	National	Sullivan Robey	9	Essendon	13294	False	INSERT_SCHOOL	interior	Mazenod College		Rowville/Eastern U18	Rowville/Mazenod College/Eastern U18
+6713	2025	National	Jacob Farrow	10	Essendon	13347	False	INSERT_SCHOOL	interior	Mater Dei College		Joondalup Kinross JFC/West Perth	Joondalup Kinross JFC/Mater Dei College/West Perth
+6714	2025	National	Xavier Taylor	11	Melbourne	13300	False	INSERT_SCHOOL	interior	Rowville SC		East Ringwood/Eastern U18	East Ringwood/Rowville SC/Eastern U18
+6716	2025	National	Dyson Sharp	13	Essendon	13329	False	INSERT_SCHOOL	interior	Xavier College (SA)		Barossa/Central District	Barossa/Xavier College (SA)/Central District
+6717	2025	National	Harry Kyle	14	Sydney	13327	True	INSERT_SCHOOL	prefix	Scots College		UNSW-Eastern Suburbs	Scots College/UNSW-Eastern Suburbs
+6718	2025	National	Oskar Taylor	15	GWS		False	INSERT_SCHOOL	interior	St Joseph's College (Ferntree Gully)		Upwey-Tecoma/Eastern U18	Upwey-Tecoma/St Joseph's College (Ferntree Gully)/Eastern U18
+6719	2025	National	Lachy Dovaston	16	North Melbourne	13304	False	INSERT_SCHOOL	interior	Rowville SC		Blackburn/Eastern U18	Blackburn/Rowville SC/Eastern U18
+6720	2025	National	Jai Murray	17	Gold Coast	13314	True	INSERT_SCHOOL	prefix	Palm Beach Currumbin SHS		Burleigh	Palm Beach Currumbin SHS/Burleigh
+6721	2025	National	Beau Addinsall	18	Gold Coast	13308	True	INSERT_SCHOOL	prefix	All Saints Anglican		Burleigh	All Saints Anglican/Burleigh
+6722	2025	National	Josh Lindsay	19	West Coast	13360	False	INSERT_SCHOOL	interior	Geelong Grammar		Newtown & Chilwell/Geelong U18	Newtown & Chilwell/Geelong Grammar/Geelong U18
+6723	2025	National	Cam Nairn	20	Hawthorn	13318	False	INSERT_SCHOOL	interior	Kapunda HS		Willaston/Central District	Willaston/Kapunda HS/Central District
+6724	2025	National	Lachlan Carmichael	21	Western Bulldogs	13310	False	INSERT_SCHOOL	suffix	Scots College		North Shore (NSW)	North Shore (NSW)/Scots College
+6726	2025	National	Aidan Schubert	23	Hawthorn	13284	False	INSERT_SCHOOL	interior	Trinity College (SA)		Gawler Central/Central District	Gawler Central/Trinity College (SA)/Central District
+6728	2025	National	Adam Sweid	25	Fremantle		False	INSERT_SCHOOL	interior	Islamic College of Sport		Pascoe Vale/Calder U18	Pascoe Vale/Islamic College of Sport/Calder U18
+6730	2025	National	Louis Emmett	27	Western Bulldogs	13342	False	INSERT_SCHOOL	interior	Scotch College		Glen Iris/Oakleigh U18	Glen Iris/Scotch College/Oakleigh U18
+6732	2025	National	Sam Allen	29	West Coast		False	INSERT_SCHOOL	interior	Scotch College		Glen Iris/Oakleigh U18	Glen Iris/Scotch College/Oakleigh U18
+6733	2025	National	Thomas Matthews	30	Melbourne		False	INSERT_SCHOOL	interior	Lowanna College		Moe/Gippsland U18	Moe/Lowanna College/Gippsland U18
+6734	2025	National	Zane Peucker	31	Richmond	13299	False	INSERT_SCHOOL	interior	St Michael's College (SA)		Port District/Woodville-West Torrens	Port District/St Michael's College (SA)/Woodville-West Torrens
+6735	2025	National	Tyan Prindable	32	Collingwood		True	INSERT_SCHOOL	prefix	St Laurence's College (Qld)		Coorparoo	St Laurence's College (Qld)/Coorparoo
+6736	2025	National	Hunter Holmes	33	Geelong		False	INSERT_SCHOOL	interior	Melbourne Grammar		Prahran/Oakleigh U18	Prahran/Melbourne Grammar/Oakleigh U18
+6737	2025	National	Jack Dalton	34	Hawthorn	13317	False	INSERT_SCHOOL	interior	Xavier College		East Malvern/Sandringham U18	East Malvern/Xavier College/Sandringham U18
+6739	2025	National	Max Kondogiannis	36	Essendon	13285	False	INSERT_SCHOOL	interior	Carey Grammar		Kew Rovers/Oakleigh U18	Kew Rovers/Carey Grammar/Oakleigh U18
+6740	2025	National	Sam Swadling	37	Collingwood	13331	False	INSERT_SCHOOL	interior	Sacred Heart College (WA)		Whitford/West Perth	Whitford/Sacred Heart College (WA)/West Perth
+6741	2025	National	Koby Evans	38	Brisbane		False	INSERT_SCHOOL	interior	Darling Range Sports College		Kenwick/Perth	Kenwick/Darling Range Sports College/Perth
+6742	2025	National	Tylah Williams	39	West Coast		False	INSERT_SCHOOL	interior	Darling Range Sports College		Redcliffe JFC/Swan Districts	Redcliffe JFC/Darling Range Sports College/Swan Districts
+6744	2025	National	Charlie Banfield	41	St Kilda	13321	False	INSERT_SCHOOL	interior	Scotch College (WA)		Swanbourne JFC/Claremont	Swanbourne JFC/Scotch College (WA)/Claremont
+6745	2025	National	Billy Cootee	42	Sydney	13283	False	INSERT_SCHOOL	interior	Maribyrnong College		Doutta Stars/Norwood	Doutta Stars/Maribyrnong College/Norwood
+6746	2025	National	Cody Curtin	43	Brisbane	13301	False	INSERT_SCHOOL	interior	Scotch College (WA)		West Coast JFC/Claremont	West Coast JFC/Scotch College (WA)/Claremont
+6748	2025	National	Talor Byrne	45	Carlton	13335	False	INSERT_SCHOOL	interior	Emmanuel College (Warrnambool)		Koroit/North Ballarat U18	Koroit/Emmanuel College (Warrnambool)/North Ballarat U18
+6749	2025	National	Koby Coulson	46	Gold Coast		True	INSERT_SCHOOL	prefix	All Saints Anglican		Broadbeach	All Saints Anglican/Broadbeach
+6750	2025	National	Jack Ison	47	Carlton	13288	False	INSERT_SCHOOL	interior	Scotch College		Parkside/Oakleigh U18	Parkside/Scotch College/Oakleigh U18
+6752	2025	National	Max King	49	Sydney		True	INSERT_SCHOOL	prefix	Warners Bay HS		Cardiff	Warners Bay HS/Cardiff
+6753	2025	National	Archie Ludowyke	50	Adelaide	13292	False	INSERT_SCHOOL	interior	Brighton Grammar		East Sandringham/Sandringham U18	East Sandringham/Brighton Grammar/Sandringham U18
+6755	2025	National	Kye Fincher	52	St Kilda		False	INSERT_SCHOOL	interior	Brighton Grammar		East Brighton/Sandringham U18	East Brighton/Brighton Grammar/Sandringham U18
+6757	2025	National	Noah Roberts-Thomson	54	Richmond	13277	False	INSERT_SCHOOL	interior	Pembroke School		Unley/Sturt	Unley/Pembroke School/Sturt
+6758	2025	National	Zac McCarthy	55	Collingwood		False	INSERT_SCHOOL	interior	Carey Grammar		Kew Comets/Oakleigh U18	Kew Comets/Carey Grammar/Oakleigh U18
+6759	2025	National	Matthew LeRay	56	Hawthorn		False	INSERT_SCHOOL	interior	Prince Alfred College		Golden Grove/Central District	Golden Grove/Prince Alfred College/Central District
+6761	2025	National	Will Darcy	60	Western Bulldogs		False	INSERT_SCHOOL	interior	Scotch College		Glen Iris/Oakleigh U18	Glen Iris/Scotch College/Oakleigh U18
+6764	2025	Rookie	Riley Onley	3	Melbourne	13365	False	INSERT_SCHOOL	interior	Scotch College		Shepparton United/Murray U18	Shepparton United/Scotch College/Murray U18
+6766	2025	Rookie	Leon Kickett	8	Fremantle		False	INSERT_SCHOOL	interior	Newton Moore SHS		South Bunbury/Swan Districts	South Bunbury/Newton Moore SHS/Swan Districts
+6767	2025	Rookie	Ollie Greeves	12	Hawthorn	13307	False	INSERT_SCHOOL	interior	Caulfield Grammar		Vermont/Eastern U18	Vermont/Caulfield Grammar/Eastern U18
+6768	2025	Rookie	Nick Driscoll	28	Geelong		False	INSERT_SCHOOL	interior	Eltham College		Eltham/Northern U18	Eltham/Eltham College/Northern U18
+6770	2025	Post-Draft	Noah Chamberlain		Sydney		False	INSERT_SCHOOL	suffix	Endeavour Sports HS		East Sydney	East Sydney/Endeavour Sports HS
+6784	2025	Post-Draft	Finlay Macrae		West Coast	4274	False	REPLACE_CLUB		Kew Rovers	Surrey Park	Surrey Park/Xavier College/Oakleigh U18	Kew Rovers/Xavier College/Oakleigh U18
+6786	2025	Post-Draft	Balyn O'Brien		Port Adelaide	13303	False	INSERT_SCHOOL	interior	Rostrevor College		Central Eyre United/Norwood	Central Eyre United/Rostrevor College/Norwood
+6789	2025	Post-Draft	Chris Scerri		Fremantle	13343	False	INSERT_SCHOOL	interior	St Bernard's College		Strathmore/Northern Bullants	Strathmore/St Bernard's College/Northern Bullants
+6793	2025	Mid-Season	Jaxon Artemis	1	Essendon	13348	False	INSERT_SCHOOL	interior	Trinity College (WA)		Jandakot JFC/South Fremantle/Tasmania (VFL)	Jandakot JFC/Trinity College (WA)/South Fremantle/Tasmania (VFL)
+6794	2025	Mid-Season	Kye Annand	2	Richmond	13311	False	INSERT_SCHOOL	interior	St Ignatius (Geelong)		South Barwon/Ocean Grove/Geelong West/Queenscliff/Geelong (VFL)	South Barwon/Ocean Grove/Geelong West/Queenscliff/St Ignatius (Geelong)/Geelong (VFL)
+6795	2025	Mid-Season	Oliver Francou	3	West Coast	13346	False	INSERT_SCHOOL	interior	St Peter's College (SA)		Walkerville/North Adelaide	Walkerville/St Peter's College (SA)/North Adelaide
+6796	2025	Mid-Season	Flynn Riley	4	Carlton	13363	False	INSERT_SCHOOL	interior	Parade College		South Morang/Montmorency/Northern U18/Aberfeldie/Carlton (VFL)	South Morang/Montmorency/Parade College/Northern U18/Aberfeldie/Carlton (VFL)
+6797	2025	Mid-Season	Xavier Bamert	5	Port Adelaide	13286	False	INSERT_SCHOOL	interior	Wesley College		East Malvern/Sandringham U18/North Melbourne (VFL)	East Malvern/Wesley College/Sandringham U18/North Melbourne (VFL)
+6799	2025	Mid-Season	Campbell Lake	7	St Kilda	13306	False	INSERT_SCHOOL	interior	Ormeau Woods SHS		Labrador/Southport	Labrador/Ormeau Woods SHS/Southport
+6803	2025	Mid-Season	Lukas Cooke	11	Melbourne	13355	False	INSERT_SCHOOL	interior	Westminster School		Lockleys/Woodville-West Torrens	Lockleys/Westminster School/Woodville-West Torrens
+6805	2025	Mid-Season	Marcus Herbert	13	West Coast	13309	False	INSERT_SCHOOL	interior	Emmanuel College (Warrnambool)		South Warrnambool/Leopold/Heidelberg/Geelong (VFL)	South Warrnambool/Emmanuel College (Warrnambool)/Leopold/Heidelberg/Geelong (VFL)
+6809	2025	Mid-Season	Mitch Podhajski	18	Collingwood	13315	False	INSERT_SCHOOL	interior	St Bernard's College		Greenvale/Calder U18/Coburg	Greenvale/St Bernard's College/Calder U18/Coburg
+6810	2025	Mid-Season	Max Mapley	19	Melbourne		False	INSERT_SCHOOL	interior	Indooroopilly SHS		Jindalee/Tasmania (VFL)	Jindalee/Indooroopilly SHS/Tasmania (VFL)

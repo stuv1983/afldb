@@ -63,6 +63,16 @@ R=c1c4b22ee15007111eab66f6d354e0b9ecbb2ade; OPS=/home/arm/ops/gap029-stages/c1c4
 STAMP=$(date -u +%Y%m%dT%H%M%SZ); W=/mnt/ssd/afldb-i336-prod-$STAMP          # new restore workspace on streamanator
 ```
 
+**Prepared tarball (2026-11-11, recommended; replaces the pack line below).** The tarball the simulation qualified
+is retained on streamanator: `/mnt/ssd/afldb-i336-simpack-20261111/pack-c1c4b22e/cand.tar.gz`, sha256
+`3160b9d339d0d23747bb53ab9a597ccf54737c31218fe867762885a407a55b8a`. It was packed by `gap029-stage.ts pack` from a
+clean checkout at R (`e1-logs/setup.log`: `PACKED revision c1c4b22e… tracked 4998`) and re-verified on 2026-11-11: the
+same sha256, and its `cand` is at R with an empty `git status --porcelain`. `tar -czf` is not reproducible (file times
+and the gzip header), so a fresh pack would print a different TARSHA. To use it: set
+`WP=/mnt/ssd/afldb-i336-simpack-20261111; TARSHA=3160b9d339d0d23747bb53ab9a597ccf54737c31218fe867762885a407a55b8a`,
+skip the `pack` line, and write `$WP` for `$W-pack` in Step A's `scp` and Step C's `TAR=`. Keep `-simpack-` until
+D-336-2 is accepted.
+
 **Step A: pin the ops checkout (production writes only under `$OPS`).** Pack on streamanator from a clean checkout at R, then upload to production and `prep`:
 ```bash
 $SM "cd /mnt/ssd/afldb-i336rel-qual-20261108T201140Z/cand && test \"\$(git rev-parse HEAD)\" = $R && test -z \"\$(git status --porcelain)\" && PATH=\$HOME/.nvm/versions/node/v22.23.2/bin:\$PATH node --import tsx tools/v2/gap029-stage.ts pack --rev $R --out-dir $W-pack"
@@ -115,7 +125,7 @@ ssh afldb "bash $P report $R I336 $RUN"; ssh afldb "bash $P state $R I336 $RUN";
 
 ## 5. Approval texts (one per step; nothing is granted until the owner writes it)
 
-- **D-336-2/A+B (pin and capture):** "I approve, on afldb-prod as arm, uploading the R-pinned ops checkout `c1c4b22ee15007111eab66f6d354e0b9ecbb2ade` (tarball sha256 `<TARSHA>`) to `/home/arm/ops/gap029-stages/c1c4b22e` and running `prod-stage.sh prep`, `preflight` and ONE `capture` for stage I336: one read-only `pg_dump` of `afldb_prod` as `afldb_backup` into a new mode-700 directory under `/home/arm/backups/afldb`. No database write, service, timer or application change."
+- **D-336-2/A+B (pin and capture):** "I approve, on afldb-prod as arm, uploading the R-pinned ops checkout `c1c4b22ee15007111eab66f6d354e0b9ecbb2ade` (tarball sha256 `<TARSHA>`; with the prepared tarball, `3160b9d339d0d23747bb53ab9a597ccf54737c31218fe867762885a407a55b8a`) to `/home/arm/ops/gap029-stages/c1c4b22e` and running `prod-stage.sh prep`, `preflight` and ONE `capture` for stage I336: one read-only `pg_dump` of `afldb_prod` as `afldb_backup` into a new mode-700 directory under `/home/arm/backups/afldb`. No database write, service, timer or application change."
 - **D-336-2/C+D (restore, assemble, plan):** "I approve copying that capture to a new mode-700 workspace on streamanator, restoring it into a guarded disposable database there, assembling the sealed I336 evidence, uploading `backup.json` and `restore-evidence.json` to the run directory, and running the read-only I336 `plan`."
 - **D-336-2/E+F (apply):** "I approve D-336-2: apply, once, to `afldb_prod` (OID 66668, system identifier 7674454702926115004) the digest-pinned I336 plan `<digest>`, at execution revision `c1c4b22ee15007111eab66f6d354e0b9ecbb2ade`, after this stage's own fresh restore-verified backup `<dump sha256>`. Exactly the 35 DraftGuru Pre-Draft rows of reviewed evidence `6a207cfe…11cb`, with 31 new unmatched persons, each audited through `recordDataEdit` under the season seal as actor `auth_users.id 1`, in the window `<NB>` to `<EXP>`. Then report, state and accept. Nothing else." (The `approve` step records the generated statement itself; this text is the owner's instruction to run it.)
 

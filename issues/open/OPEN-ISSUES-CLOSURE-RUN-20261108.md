@@ -18,7 +18,8 @@
 3. `feca4f11` ISSUE-346 code (cherry-pick of `87653d5e`);
 4. `b0243ef4` ISSUE-346 runbook and evidence (of `817ca8e9`);
 5. `bf494c8c` ISSUE-346 runbook note (of `0c47ca04`);
-6. the final run 8 records commit.
+6. the final run 8 records commit (`3218abf9`);
+7. the second-session records commit (D-336-3 classification, ISSUE-346 §4a, D-336-2 tarball pin): the branch tip.
 
 Tooling and records only: no `src/`, migration, dependency or build-input change.
 
@@ -31,8 +32,14 @@ Tooling and records only: no `src/`, migration, dependency or build-input change
 
 **ISSUE-346 (done locally, 2026-11-11).** The orchestrator agent implemented route (a), which `afldb-closure` reviewed with no drift. Results and residuals are in the `issues.md` entry and runbook §4. The workspaces `/mnt/ssd/afldb-i346-w346-20261111` and `/mnt/ssd/afldb-i346-dev` are retained; their cluster is stopped. The harness flagged one of the agent's actions as an "unrequested commit in a connected app". It was checked and found to be the three local commits its brief authorised: `origin/main` was still `12aa6e29`, no remote branch was created, and no other worktree changed.
 
+**Second session (2026-11-11, same branch and worktree; read-only apart from local records):**
+- **D-336-3 classified.** The owner CSV location was `C:\Users\stuar\OneDrive\Desktop\New folder`; 35/35 hashes equal the 5 Nov inventory. A read-only copy is retained at streamanator `/mnt/ssd/afldb/records/d3363-owner-draftguru-csv-20261111/` (the originals were re-hashed afterwards: unchanged). The inventory and the 187-row reconciliation reproduce byte-for-byte. Results and the refined recommendation are in the D-336-3 block below. Evidence: `docs/v2/evidence/issue336-draft-categories-20261105/d3363-classification-20261111/`.
+- **ISSUE-346 residuals reconciled.** The `issues.md` summary (7 items) now matches runbook §4's six. §4a gives each one's consequence, protection, operator action and disposition, and one acceptance statement (R1–R5). It does not depend on OD-1.
+- **D-336-2 A+B made exact.** The simulation-qualified tarball `3160b9d3…5b8a` (`-simpack-`) was re-verified at R and is recorded in the packet §4 and §5 as the recommended TARSHA. Keep `/mnt/ssd/afldb-i336-simpack-20261111` until D-336-2 is accepted.
+- **OD-1 pins re-verified.** `git fetch`: `origin/main` = PKG `12aa6e29d51099eb6d3fbc901bbe488c5dbd7ab3`, unchanged. No qualification was repeated: no code, input or evidence of a passed check changed.
+
 **Remaining gaps (not owner decisions):**
-- The 141 unclassified D-336-3 origin diffs need the owner CSV location.
+- ~~The 141 unclassified D-336-3 origin diffs need the owner CSV location.~~ Done (second session).
 - The ISSUE-344 follow-up release packet waits for OD-1.
 - Production state in r2 (`OLD_ID`, `PROD_HEAD`) was last recorded 2026-11-05. It is re-observed only at P-A, under the owner's approval.
 
@@ -89,7 +96,7 @@ Tooling and records only: no `src/`, migration, dependency or build-input change
   - Of the 5,931 matched DraftGuru rows, 187 (3.2%) differ **only** in `original_club_raw`. Category, pick, pick note, club and signing agree exactly.
   - 46 of the 187: the CSV value *extends* the stored one (stored is a suffix, so DraftGuru prepended earlier junior clubs, e.g. `Glenorchy/North Hobart` against `North Hobart`).
   - 0: stored NULL with the CSV set.
-  - 141: other revisions, not classified. The owner CSVs are not in the repository or on streamanator; their location is needed to classify them.
+  - 141: other revisions, not classified at the time. **Classified in the second session:** 135 add one school (130 between the junior club and the representative club, 5 appended), 3 expand `Brighton` to `Brighton Districts & Old Scholars`, and 3 replace a junior club (5961/6784 Finlay Macrae, 6626 Blake Leidler). Of the original 46, 39 prepend a school and 7 prepend junior clubs. In total, 184 of 187 keep every stored segment or canonicalise a name. The cause is a DraftGuru back-fill: National picks with a school, stored → CSV, 2022 2 → 41 of 59 and 2025 0 → 45 of 58.
 - **Impact:** public only. The `/draft/[year]` and player draft-history "original club" text, and the `origin` filter (`ILIKE`), which does not find the prepended clubs. There is no identity, link, count, pick or category effect, and no NULL-versus-value semantic change.
 - **Options:**
   - **(A) Keep the stored values** (the acquisition snapshot stays authoritative): no write; the staleness stays.
@@ -102,16 +109,17 @@ Tooling and records only: no `src/`, migration, dependency or build-input change
   - (C) builds a new production writer for text-only drift.
   - The next acquisition must update the 6,810 contracts anyway, because after D-336-2 production holds 6,845 DraftGuru picks against the frozen snapshot's 6,810. **D-336-2 consequence the owner should accept explicitly:** the `afldb_test` rebuild contract (6,810 picks, 5,057 persons) will differ from production by the 35 audited rows until that acquisition.
   - **If the owner prefers the CSV export as the authority now**, choose (C). It needs the CSV location and a new tool cycle.
+- **Refined after classification (second session):** still **(A) now, then (B)**, with the classifier as (B)'s origin-review gate (insertions and renames accepted, the 3 replacements checked explicitly by the owner). If an earlier correction is wanted, choose **(C′)**: 184 additive rows with the CSV as authority, excluding the 3 replacements, run after D-336-2. (C′) never removes a stored segment, but it still needs a new tool cycle. (C) for all 187 is no longer recommended, because it would settle the 3 conflicts on the CSV's word alone. A single row can be ruled on through the existing admin draft editor; this writes an audited override that pins the value against later reloads. Details: the evidence README §4.
 
 **Consolidated owner decision packet (run 8).** Each item is a separate approval. Exact texts are in the referenced documents.
 
 | # | Decision | Exact revision / object | Effect | Recovery | Approval text |
 |---|---|---|---|---|---|
 | OD-1 | **Production application release** (336/337 with 340/345, RD-1) | R = H = `c1c4b22ee15007111eab66f6d354e0b9ecbb2ade`; PKG `12aa6e29d51099eb6d3fbc901bbe488c5dbd7ab3` | New draft pages and Intl Schol; serialised credentials (340); restricted Grid Solver forced-change gate (345). No migration or DB write. ISSUE-344 is not shipped | Roll back to `0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN` only (r2 §8). The checkout stays at R | r2 §9 with `<PKG, 40 hex>` = `12aa6e29d51099eb6d3fbc901bbe488c5dbd7ab3`, plus a window |
-| OD-2 | **D-336-2 A+B**: pin the ops checkout and capture | R `c1c4b22e`; tarball sha printed by `pack` | One read-only `pg_dump` and `$OPS` files on production | None needed (no data change) | D-336-2 packet §5 |
+| OD-2 | **D-336-2 A+B**: pin the ops checkout and capture | R `c1c4b22e`; tarball sha256 `3160b9d339d0d23747bb53ab9a597ccf54737c31218fe867762885a407a55b8a` (the simulation-qualified pack, packet §4), or a fresh `pack`'s | One read-only `pg_dump` and `$OPS` files on production | None needed (no data change) | D-336-2 packet §5 |
 | OD-3 | **D-336-2 C+D**: restore, assemble and plan | That capture | Streamanator only, plus a read-only plan | — | packet §5 |
 | OD-4 | **D-336-2 E+F**: apply once | Plan digest printed at step D | +35 picks, +31 persons, 35 audit rows (actor 1). Accept the afldb_test contract divergence | Never retried or reversed; restoring the stage backup is a separate decision | packet §5 |
-| OD-5 | **D-336-3** | — | (A) none / (B) a later acquisition / (C) a new 187-row stage | — | "I choose D-336-3 option (A/B/C)…"; for (C), give the CSV location |
+| OD-5 | **D-336-3** | Classification `d3363-classification-20261111/` | (A) none / (B) a later acquisition, gated by the classifier / (C′) a new 184-row additive stage / (C) a new 187-row stage | — | "I choose D-336-3 option (A then B / C′ / C)…"; the CSVs are retained, so no location is needed |
 | OD-6 | **Publish the run 8 range after D1 PASS** | `12aa6e29..` the tip of the publication branch (below), rebased onto the post-release records commit | 347 fix, 346 route, records. Tooling only, no app or build input | Revert commits; no deployed effect | "I approve publishing … by fast-forward after D1 PASS" |
 | OD-7 | ISSUE-344 follow-up release | A later revision ≥ `ae28bd70` | Fixes the zero-match out-of-range draft page on production | Standard release route | A new release packet (not prepared: it needs OD-1 first) |
 | OD-8 | Ratify 341 (DSN contract) and 342 (exit-1 exception) | — | None (records only) | — | "ratify" or a new decision |
