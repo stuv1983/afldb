@@ -1,0 +1,32 @@
+sim cluster: 127.0.0.1|55494|/mnt/ssd/afldb-i349-20261112/green-sim/pg-sim/data
+run=I336-20261112T022223Z digest=a0c9d075a65a33c7b25e7d1396d0027115ab7320f9b8e1b8a413a19e07af2cf0
+statement exit=0
+2026-11-12T02:23:02Z N1 apply with no approval (expect refusal before mutation)
+== apply I336 (I336-20261112T022223Z): wrapper gates (nothing is written by them) 2026-11-12T02:23:02Z
+STOP: no owner approval: the owner has not approved this plan
+N1 exit=3
+2026-11-12T02:23:02Z N2 approval with a wrong digest (expect refusal)
+MANIFEST VERIFY PASS stage I336 revision a25306f930015acef602bcc60d76613bdcc3d466 plan a0c9d075a65a33c7b25e7d1396d0027115ab7320f9b8e1b8a413a19e07af2cf0 class SIMULATION
+APPROVAL REFUSED: the typed digest 000000000000... is not this I336 plan's digest a0c9d075a65a...: the approval must name the actual plan
+STOP: approval refused
+N2 exit=6
+2026-11-12T02:23:03Z N3 wrong revision (no pinned checkout for it)
+STOP: no pinned checkout at /mnt/ssd/afldb-i349-20261112/green-sim/ops/09acd432/cand: run prep first
+N3 exit=20
+2026-11-12T02:23:03Z N4 stage/run mismatch (an I336 run named under S3)
+STOP: run I336-20261112T022223Z is not a S3 run
+N4 exit=2
+2026-11-12T02:23:03Z N5 malformed run name
+STOP: bad run name
+N5 exit=2
+2026-11-12T02:23:03Z N6 S1-S4 run name under I336
+STOP: run S3-20261111T015440Z is not a I336 run
+N6 exit=2
+2026-11-12T02:23:03Z N7 state after the refusals (expect BASELINE)
+STATE BASELINE (the plan has not been applied)
+[tool log /mnt/ssd/afldb-i349-20261112/green-sim/ops/a25306f9/runs/I336-20261112T022223Z/logs/state-2.log exit 0]
+N7 exit=0
+draft_picks total=6818 pre_draft=370 y1991_2025=5939 i336_marked=0
+draft_persons=5057
+i336_audit rows=0 picks=0 actors=-
+ledger=118 last=118_fixtures_unconfirmed_participants.sql

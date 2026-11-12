@@ -1,0 +1,27 @@
+sim cluster: 127.0.0.1|55494|/mnt/ssd/afldb-i349-20261112/green-sim/pg-sim/data
+PLAN I336 35 DraftGuru Pre-Draft rows (draft_picks, audited under the season seal)
+  digest a0c9d075a65a33c7b25e7d1396d0027115ab7320f9b8e1b8a413a19e07af2cf0
+  plan file sha256 3111d127cb29bd792def927356d5e8a8271fed67225476d168ff8a0bb636b216
+  revision a25306f930015acef602bcc60d76613bdcc3d466
+  evidence class SIMULATION
+  target afldb_simprod OID 16390 system 7707104500976143694 as afldb_backup
+  backup sha256 47fd37f12189f9a1b091d9900fb3ef085a116c56e11393eb7668e2f27090d597 captured 2026-11-12T02:22:23.430Z restored 2026-11-12T02:22:51.377Z
+  restore evidence sha256 f1cf07b60797f548494cd7a82557ed939d39e1416dec40381756d8955b6af539
+  plan expires 2026-11-13T02:22:59.601Z; approvals must expire before 2026-11-13T02:02:23.430Z (backup 24 h limit minus 20 min)
+  expected changes:
+    INSERT 35 draft_picks rows (source draftguru, Pre-Draft, unnumbered), 31 new unmatched draft_persons rows, and one data_edits audit row per pick as actor auth_users.id 1; nothing updated or deleted; no override written
+      https://www.draftguru.com.au/years/2008#6 -> to insert (new person)
+      https://www.draftguru.com.au/years/2008#7 -> to insert (new person)
+      https://www.draftguru.com.au/years/2008#8 -> to insert (new person)
+      https://www.draftguru.com.au/years/2008#9 -> to insert (new person)
+      https://www.draftguru.com.au/years/2009#23 -> to insert (new person)
+      https://www.draftguru.com.au/years/2009#24 -> to insert (new person)
+      https://www.draftguru.com.au/years/2009#25 -> to insert (person 2753, unique)
+      https://www.draftguru.com.au/years/2009#26 -> to insert (new person)
+      https://www.draftguru.com.au/years/2009#27 -> to insert (new person)
+statement exit=0
+I approve D-336-2: apply, once, to afldb_simprod (database OID 16390, system identifier 7707104500976143694) the digest-pinned I336 plan a0c9d075a65a33c7b25e7d1396d0027115ab7320f9b8e1b8a413a19e07af2cf0 (35 DraftGuru Pre-Draft rows (draft_picks, audited under the season seal)), at execution revision a25306f930015acef602bcc60d76613bdcc3d466, after this stage's own fresh restore-verified backup 47fd37f12189f9a1b091d9900fb3ef085a116c56e11393eb7668e2f27090d597 (restore evidence f1cf07b60797f548494cd7a82557ed939d39e1416dec40381756d8955b6af539; evidence class SIMULATION). Exactly the 35 DraftGuru Pre-Draft rows of reviewed evidence 6a207cfe3b1408d6ff747040cecfac1cde9ebd9a43f584711c573eb20ff511cb named in the plan, each audited through recordDataEdit under the season seal as actor auth_users.id 1, my active, fully enrolled Super Admin; signing head 'Intl Schol' accepted under D-336-1. Nothing else. No retry and no automatic restore. Window: from 2026-11-12T02:22:04Z until 2026-11-12T03:53:04Z.
+MANIFEST VERIFY PASS stage I336 revision a25306f930015acef602bcc60d76613bdcc3d466 plan a0c9d075a65a33c7b25e7d1396d0027115ab7320f9b8e1b8a413a19e07af2cf0 class SIMULATION
+APPROVAL WRITTEN for I336 plan a0c9d075a65a33c7b25e7d1396d0027115ab7320f9b8e1b8a413a19e07af2cf0 window 2026-11-12T02:22:04.000Z .. 2026-11-12T03:53:04.000Z
+== DONE approve 2026-11-12T02:23:05Z
+approve exit=0

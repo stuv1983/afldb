@@ -1,0 +1,5 @@
+waiting for server to shut down.... done
+server stopped
+simulated production cluster stopped
+retained (contains restored production data, mode 700): /mnt/ssd/afldb-i349-20261112/red-sim
+ports 55493/55494 closed

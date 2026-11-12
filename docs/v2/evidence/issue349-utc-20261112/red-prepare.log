@@ -1,0 +1,137 @@
+sim cluster: 127.0.0.1|55494|/mnt/ssd/afldb-i349-20261112/red-sim/pg-sim/data
+
+##### 2026-11-12T02:20:05.178Z 1 upload the pinned checkout to dev (private staging directory /mnt/ssd/afldb-i349-20261112/red-sim/ops/595dc394/in) and bootstrap
+== prep: verify upload, extract, pin (idempotent) 2026-11-12T02:20:11Z
+pinned_checkout=/mnt/ssd/afldb-i349-20261112/red-sim/ops/595dc394/cand HEAD=595dc39423cdcad060729c7ca63e3d70a8e72078 tracked=5801 dirty=0 node=v22.23.2
+prod_checkout_unchanged: head=595dc39423cdcad060729c7ca63e3d70a8e72078 status_lines=0
+wrapper library loads; stages S1,S2,S3,S4,I336
+python 3.12.3 psycopg 3.3.4
+profile=sim class=SIMULATION profile_sha256=1391afa788d052102fa776a7077738e67e356a0edaf7e80a1a0c34e01a317fc3
+== DONE prep 2026-11-12T02:20:20Z
+
+##### 2026-11-12T02:20:20.876Z 2 I336: capture on dev (preflight, actor check, ONE fresh backup, target identity)
+== preflight I336: order gate 2026-11-12T02:20:20Z
+== preflight I336: exclusivity (read-only) 2026-11-12T02:20:20Z
+no conflicting writer, migration or dump process
+== preflight I336: live identity, ledger and extensions (read-only session) 2026-11-12T02:20:20Z
+live identity: db=afldb_simprod user=afldb_backup oid=16390 system=7707103978110131980 ledger=118/118_fixtures_unconfirmed_participants.sql
+== preflight I336: actor auth_users.id 1 (migration-105 predicate by plain SELECTs; no function call) 2026-11-12T02:20:21Z
+actor1 (id, role, enabled, enrolled, non_fixture_email, owner_email_match): 1	super_admin	true	true	true	unchecked; enabled super_admin count: 1
+== capture I336: ONE fresh backup (capture-prod-stage.sh) 2026-11-12T02:20:21Z
+== P0 host, tools, target directory (profile sim, evidence class SIMULATION) 2026-11-12T02:20:21Z
+host=streamanator user=arm kernel=6.8.0-149-generic boot_id=40bff929-3b09-4de1-b12c-d500033022a5
+pg_dump (PostgreSQL) 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+pg_restore (PostgreSQL) 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+== P1 writer and service state (read-only systemctl queries) 2026-11-12T02:20:21Z
+afldb-sim-writer-nonexistent.service active=inactive enabled=not-found
+afldb-sim-timer-nonexistent.timer active=inactive enabled=not-found
+afldb-sim-timer-nonexistent.timer next=
+no settle/migrate/dump process
+deployed_checkout=595dc39423cdcad060729c7ca63e3d70a8e72078 build_id=SIMULATION
+== P2 disk 2026-11-12T02:20:21Z
+backup_root_avail_bytes=589435117568
+== P3 credential channel (values never printed) 2026-11-12T02:20:21Z
+env_file_mode=600 arm:arm
+dsn_identity user=afldb_backup host=127.0.0.1 port=55494 database=afldb_simprod
+== P4 identity, ledger and inspection (each a single statement, so one snapshot, in a read-only session) 2026-11-12T02:20:21Z
+identity afldb_simprod	afldb_backup	16390	7707103978110131980	160015	127.0.0.1	55494	on	f	t	afldb_owner	16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+extensions pg_trgm=1.6 plpgsql=1.0 unaccent=1.1
+ledger rows=118 last=118_fixtures_unconfirmed_participants.sql digest=573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57
+inspect access_exclusive_relation_locks	0
+inspect visible_nonidle_sessions	0
+inspect staging_default_acl_entries	1
+inspect staged_brownlow_seasons	2025:621
+inspect public_base_tables	83
+== P5 capture: one full custom-format pg_dump (single MVCC snapshot; writers stay enabled) 2026-11-12T02:20:21Z
+CAPTURE_DIR=/mnt/ssd/afldb-i349-20261112/red-sim/backups/gap029-I336-20261112T022021Z
+pg_dump exit=0 start=2026-11-12T02:20:21.479636Z end=2026-11-12T02:20:30.261813Z stderr_bytes=0
+archive afldb_prod-20261112T022021Z.dump bytes=30008492 sha256=747f38b3536006b1993fee8c895d5543dec45982c4becfaa2959ebb98296b6d3 toc_entries=1329
+== P6 post-capture drift checks 2026-11-12T02:20:30Z
+writers_before: afltables_service=inactive timer=not-found/inactive app=active
+writers_after:  afltables_service=inactive timer=not-found/inactive app=active
+== P7 sidecar (exclusive create; no credential) 2026-11-12T02:20:30Z
+== P8 manifest and result 2026-11-12T02:20:30Z
+747f38b3536006b1993fee8c895d5543dec45982c4becfaa2959ebb98296b6d3  afldb_prod-20261112T022021Z.dump
+b88a73a6c09f72d8dd62b89f607ea4e2f6cdf00ac5a49c9168c78d4026b929b9  afldb_prod-20261112T022021Z.provenance.json
+6a21933c8296fcfcaf5927157825d8c73396d1ca05a3aaa0075743700211b9f4  archive.toc
+573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57  ledger-before.tsv
+573594e9365b642ec518c252b17de11d3a423872c53c3020ab525db5904aaf57  ledger-after.tsv
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  pg-dump.stderr
+total 29464
+drwx------ 2 arm arm     4096 Nov 12 13:20 .
+drwx------ 3 arm arm     4096 Nov 12 13:20 ..
+-rw------- 1 arm arm      535 Nov 12 13:20 SHA256SUMS
+-rw------- 1 arm arm 30008492 Nov 12 13:20 afldb_prod-20261112T022021Z.dump
+-rw------- 1 arm arm    20150 Nov 12 13:20 afldb_prod-20261112T022021Z.provenance.json
+-rw------- 1 arm arm   100180 Nov 12 13:20 archive.toc
+-rw------- 1 arm arm    11355 Nov 12 13:20 ledger-after.tsv
+-rw------- 1 arm arm    11355 Nov 12 13:20 ledger-before.tsv
+-rw------- 1 arm arm        0 Nov 12 13:20 pg-dump.stderr
+elapsed_seconds=9
+RESULT PASS stamp=20261112T022021Z archive_sha256=747f38b3536006b1993fee8c895d5543dec45982c4becfaa2959ebb98296b6d3 bytes=30008492 toc=1329 staged_brownlow=2025:621 class=SIMULATION
+== capture I336: independent check of the capture directory and target identity 2026-11-12T02:20:30Z
+CAPTURE CHECK PASS stage I336 class SIMULATION profile sim dump afldb_prod-20261112T022021Z.dump bytes 30008492 sha256 747f38b3536006b1993fee8c895d5543dec45982c4becfaa2959ebb98296b6d3 captured 2026-11-12T02:20:21.479636Z ledger 118
+TARGET CHECK PASS
+RUN=I336-20261112T022021Z
+RUN_DIR=/mnt/ssd/afldb-i349-20261112/red-sim/ops/595dc394/runs/I336-20261112T022021Z
+CAPTURE_DIR=/mnt/ssd/afldb-i349-20261112/red-sim/backups/gap029-I336-20261112T022021Z
+TARGET_SHA256=b988b9c37cd8bf70b70595cd6664cb2173a9f558b0773a37781b03ff9e6749b2
+CAPTURE_COMPLETE stage=I336 run=I336-20261112T022021Z class=SIMULATION
+== DONE capture 2026-11-12T02:20:31Z
+
+##### 2026-11-12T02:20:31.729Z 3 fetch the capture directory and target.json, verify every hash locally
+CAPTURE CHECK PASS stage I336 class SIMULATION profile sim dump afldb_prod-20261112T022021Z.dump bytes 30008492 sha256 747f38b3536006b1993fee8c895d5543dec45982c4becfaa2959ebb98296b6d3 captured 2026-11-12T02:20:21.479636Z ledger 118
+
+##### 2026-11-12T02:20:32.828Z 4 copy to dev (private workspace), restore into a guarded disposable database and assemble the sealed evidence
+restore host holds identical bytes (dump 747f38b3536006b1..., target b988b9c37cd8bf70...)
+2026-11-12T02:20:33Z A0 inputs (profile sim, evidence class SIMULATION)
+CAPTURE CHECK PASS stage I336 class SIMULATION profile sim dump afldb_prod-20261112T022021Z.dump bytes 30008492 sha256 747f38b3536006b1993fee8c895d5543dec45982c4becfaa2959ebb98296b6d3 captured 2026-11-12T02:20:21.479636Z ledger 118
+TARGET CHECK PASS
+dump sha256 747f38b3536006b1993fee8c895d5543dec45982c4becfaa2959ebb98296b6d3 verified by check-capture; candidate clean at 595dc39423cdcad060729c7ca63e3d70a8e72078; stage I336
+DEV services BEFORE:
+afldb.service active MainPID=1730
+postgresql@16-main.service active MainPID=1555
+2026-11-12T02:20:38Z A1 start the guarded cluster
+pg_ctl: server is running (PID: 669295)
+/usr/lib/postgresql/16/bin/postgres "-D" "/mnt/ssd/afldb-i349-20261112/red-sim/rw/pg-root/data"
+LISTEN 0      600        127.0.0.1:55493      0.0.0.0:*    users:(("postgres",pid=669295,fd=7))         
+2026-11-12T02:20:42Z A2 restore into a guarded disposable database
+create-db: afldb_v2_gap029_i336_20261112_022021_rst_test created and marked
+isolated-pg: afldb_v2_gap029_i336_20261112_022021_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running node
+pg_restore exit=0 seconds=7 stderrLines=0
+restore_started=2026-11-12T02:20:42.956Z restored_at=2026-11-12T02:20:50.240Z
+isolated-pg: afldb_v2_gap029_i336_20261112_022021_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running node
+afldb_v2_gap029_i336_20261112_022021_rst_test {"ledger":"118_fixtures_unconfirmed_participants.sql","matches":17056,"fixtures":218,"receipts":5}
+archive toc entries: 1329
+2026-11-12T02:20:50Z A3 restore evidence (identity proven by query inside the guarded database; source identity from the capture provenance, checked against the production target)
+isolated-pg: afldb_v2_gap029_i336_20261112_022021_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running bash
+Restore evidence written (118 ledger rows, 1329 archive entries); sha256 42403017f9835fb11c535b500b81029e9a008d7bbfac75a3f6ee5ed800da5ea4
+2026-11-12T02:20:52Z A4 assemble the sealed backup evidence for I336 from the restored copy
+isolated-pg: afldb_v2_gap029_i336_20261112_022021_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running bash
+Assembled I336 restore evidence at revision 595dc39423cd; backup sha256 747f38b35360; seal 1236425c9363; sha256 4d1a04707a7c8d783a16fa6b3544beffd8b2c39c5da2ecd949e4af857b0e6d70
+OUTPUT backup.json 4d1a04707a7c8d783a16fa6b3544beffd8b2c39c5da2ecd949e4af857b0e6d70
+OUTPUT restore-evidence.json 42403017f9835fb11c535b500b81029e9a008d7bbfac75a3f6ee5ed800da5ea4
+ASSEMBLY_COMPLETE stage=I336 class=SIMULATION evidence_dir=/mnt/ssd/afldb-i349-20261112/red-sim/rw/evidence-private/i336_20261112_022021
+2026-11-12T02:20:53Z A9 stop the cluster and prove isolation
+waiting for server to shut down.... done
+server stopped
+DEV services AFTER:
+afldb.service active MainPID=1730
+postgresql@16-main.service active MainPID=1555
+DEV services unchanged
+2026-11-12T02:20:56Z DONE rc=0
+
+##### 2026-11-12T02:20:56.684Z 5 fetch the assembled evidence and verify it
+assembled evidence verified: stage I336 revision 595dc39423cd dump 747f38b3536006b1... restoreTarget afldb_v2_gap029_i336_20261112_022021_rst_test
+
+##### 2026-11-12T02:20:56.710Z 6 upload the evidence to dev and generate the read-only plan
+== plan I336 (I336-20261112T022021Z): inputs 2026-11-12T02:20:56Z
+CAPTURE CHECK PASS stage I336 class SIMULATION profile sim dump afldb_prod-20261112T022021Z.dump bytes 30008492 sha256 747f38b3536006b1993fee8c895d5543dec45982c4becfaa2959ebb98296b6d3 captured 2026-11-12T02:20:21.479636Z ledger 118
+TARGET CHECK PASS
+no conflicting writer, migration or dump process
+== plan I336 (I336-20261112T022021Z): tool plan (read-only; writes only the plan file) 2026-11-12T02:20:57Z
+ISSUE-336 insert refused: baseline drift: the restored backup no longer matches the live target
+[tool log /mnt/ssd/afldb-i349-20261112/red-sim/ops/595dc394/runs/I336-20261112T022021Z/logs/plan-1.log exit 1]
+STOP: the stage plan refused (exit 1); nothing was written to the database
+GAP-029 stage runner refused: plan failed (exit 6); nothing further was run. Left behind: the production host keeps capture /mnt/ssd/afldb-i349-20261112/red-sim/backups/gap029-I336-20261112T022021Z and run /mnt/ssd/afldb-i349-20261112/red-sim/ops/595dc394/runs/I336-20261112T022021Z (private, mode 700, never deleted by this tool); the workstation keeps /mnt/ssd/afldb-i349-20261112/red-sim/ws-runs/I336-20261112T022021Z. Nothing is retried; prepare a NEW run (a fresh backup) or ask for a decision
+prepare exit=1
