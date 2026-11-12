@@ -243,7 +243,7 @@ async function run(): Promise<void> {
   if (existsSync(out)) fail('output already exists; preserve evidence and choose another path');
   const write = (v: unknown) => writeFileSync(out, `${JSON.stringify(v, null, 2)}\n`, { flag: 'wx', mode: 0o600 });
   const dsn = process.env.AFLDB_GAP029_DSN ?? '';
-  const readOnly = () => postgres(dsn, { max: 1, connect_timeout: 5, onnotice: () => {}, connection: { default_transaction_read_only: true } });
+  const readOnly = () => postgres(dsn, { max: 1, connect_timeout: 5, onnotice: () => {}, connection: { default_transaction_read_only: true, TimeZone: 'Etc/UTC' } });
   const identity = async (s: Db): Promise<Omit<Target, 'host' | 'port'>> => {
     const [row] = await s<Record<string, string | null>[]>`SELECT current_database() AS database, current_user AS "user", c.system_identifier::text AS "systemIdentifier",
       d.oid::text AS "databaseOid", current_setting('cluster_name') AS "clusterName", shobj_description(d.oid,'pg_database') AS "databaseComment"
@@ -357,7 +357,7 @@ async function run(): Promise<void> {
     process.env.DATABASE_URL = dsn; process.env.AFLDB_AUTH_DATABASE_URL = dsn;
     const { recordDataEdit } = await import('../../src/db/queries/audit-log');
     const byKey = new Map(entries.map((e) => [e.key, e]));
-    const writer = postgres(process.env.AFLDB_GAP029_WRITE_DSN ?? '', { max: 1, connect_timeout: 5, onnotice: () => {} });
+    const writer = postgres(process.env.AFLDB_GAP029_WRITE_DSN ?? '', { max: 1, connect_timeout: 5, onnotice: () => {}, connection: { TimeZone: 'Etc/UTC' } });
     try {
       const report = await runApply<Info>({
         preflight: async () => {

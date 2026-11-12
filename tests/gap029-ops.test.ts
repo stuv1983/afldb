@@ -450,3 +450,13 @@ describe('review fixes', () => {
     expect(read('tools/v2/gap029-ops/capture-prod-stage.sh')).toContain('only the production profile may run on the production host');
   });
 });
+
+
+// ISSUE-349: both clients must canonicalise timestamp rendering, including reconnects.
+describe('I336 session time zone', () => {
+  it('pins both read-only and writer connections to UTC', () => {
+    const source = read('tools/v2/issue336-predraft-insert-production.ts');
+    expect(source.match(/TimeZone: 'Etc\/UTC'/g)).toHaveLength(2);
+    expect(source).toContain("connection: { default_transaction_read_only: true, TimeZone: 'Etc/UTC' }");
+  });
+});
