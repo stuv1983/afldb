@@ -1,5 +1,7 @@
 # AFLDB-ISSUE-346 — gated migration-only DEV route (runbook)
 
+> **RESOLVED 2026-11-12.** Published by fast-forward of `origin/main` `12aa6e29..9e8a85b7` (OD-6); Linux harness 86/0 and `merge:ready --issue 346` READY at that tip. R1–R5 accepted 2026-11-11; §2's operator restrictions stay binding and "never `db:migrate` by hand on DEV" is permanent. Moved from `issues/open/`.
+
 - **Status:** OPEN. Implemented and qualified in isolation on local branch `claude/issue-346-gated-migrate`
   (from `origin/main` `12aa6e29`). **Not pushed:** `origin/main` is frozen until the ISSUE-336 production
   release D1 passes. Resolve only after publication.

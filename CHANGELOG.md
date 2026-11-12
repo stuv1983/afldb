@@ -21,15 +21,15 @@ commit.
 - No schema, data, timer, setting or `.env` change. The beta gate stays on. Rollback target: `0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN`.
 - Acceptance: D3c, D4-A, D4-P (81/81, desktop and mobile) and D4-V passed on 11 Nov and again in the owner's re-approved window on 12 Nov; the owner's D4-O is late evidence. Record: `docs/v2/evidence/issue336-337-340-345-release-execution-20261111/`.
 
-### ISSUE-346: gated migration-only DEV route (2026-11-11; local, unpublished while `main` is frozen)
+### ISSUE-346: gated migration-only DEV route (2026-11-11; published 2026-11-12 at `9e8a85b7`)
 
 - `sync-dev.ps1 -SkipBuild -SkipRestart` with `-ExpectedRevision` and an approved `-ExpectedLedgerBefore/-After` is the gated migration-only DEV route. It reuses the ISSUE-339 gate, migration binding and pinned migration line unchanged.
 - The deploy gate also records its planned steps and the checkout scope.
 - Before checkout, the gate refuses a target revision whose migration set `db:migrate` would refuse: exit 40, instead of exit 1 after checkout.
 - Qualification: Linux harness 86/0; isolated write-mode rehearsal 17/17 (15 refusals, no migration child).
-- The interim rule stays in force until publication: never run `db:migrate` by hand on DEV.
+- Never run `db:migrate` by hand on DEV: the owner made this rule permanent (2026-11-11). Use the gated route.
 
-### ISSUE-347: the GAP-029 runner prepares I336 runs; D-336-2 simulated end to end (2026-11-11; local, unpublished while `main` is frozen)
+### ISSUE-347: the GAP-029 runner prepares I336 runs; D-336-2 simulated end to end (2026-11-11; published 2026-11-12 at `9e8a85b7`)
 
 - **Defect:** the workstation runner (`tools/v2/gap029-stage.ts prepare`) derived its restore-host TAG with fixed offsets that assumed a two-character stage. Every I336 run therefore stopped at restore and assembly (exit 2) after the production capture had been taken.
 - **Fix:** `restoreTag()` (`tools/v2/gap029-ops-lib.ts`) now derives the TAG from the stage's own length; S1–S4 tags are unchanged. Covered by `tests/gap029-ops.test.ts` (84/84).
