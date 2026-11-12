@@ -2,6 +2,8 @@
 
 > **2026-11-08 review hold — CLEARED 2026-11-08:** the I336 run-name grammar fix is published at `c1c4b22ee15007111eab66f6d354e0b9ecbb2ade` (fast-forward of `origin/main`). `tests/gap029-ops.test.ts` passed 76/76 at that exact revision, and §3 now pins it. D-336-2 execution still needs its own owner approval (section 0).
 
+> **2026-11-12: §3 step 1 (application release) is DONE.** Production serves `c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x`, accepted 2026-11-12 (record `docs/v2/evidence/issue336-337-340-345-release-execution-20261111/execution-record.md`). Steps 2–4 run through the D-336-2 packet `docs/v2/issue336-d3362-approval-packet-2026-11-11.md` (A+B, C+D approved); steps 5–6 (E+F) need OD-4.
+
 Prepared 2026-11-06. **Nothing in this runbook has been run against production.** Ledger entry: `issues.md` → AFLDB-ISSUE-336.
 Evidence: `docs/v2/evidence/issue336-draft-categories-20261105/` (README §4 and `prod-tool-rehearsal/`).
 

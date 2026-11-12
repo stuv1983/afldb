@@ -53914,6 +53914,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 
 ## AFLDB-ISSUE-336 — Draft pages merge National, Rookie and other categories, so unrelated pick numbers read as equivalent; 35 DraftGuru Pre-Draft rows missing
 
+- **Production release (2026-11-12): ACCEPTED.** Production serves `c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x` (revision `c1c4b22e`; restart 2026-11-11 17:08:51 AEDT by the owner). D3c, D4-A (owner amendment: the beta gate is on, so anonymous loopback expects the 307 to `/beta`), D4-P 81/81 and D4-V (24 screenshots, desktop and mobile) passed on 11 Nov and again in the owner's re-approved window on 12 Nov. The owner's D4-O missed the original 18:08:51 AEDT deadline and is recorded as late evidence. The first nightly under the release (12 Nov 05:05) ended `AFLDB_SETTLE_SUCCESS`. Rollback target `0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN`. Record: `docs/v2/evidence/issue336-337-340-345-release-execution-20261111/execution-record.md`. Still open: D-336-2 (35 rows) and the 348 carry-over of D-336-3.
 - **Update 2026-11-11 (closure run 8; supersedes the stale lines below):**
   - **The "Review update (2026-11-08)" wrapper blocker is resolved.** It was fixed at `c1c4b22e` and is the runbook pin.
   - **"Deployment: not deployed" is superseded.** DEV was deployed 2026-11-07, accepted immediately, and the 8–9 Nov nightlies were observed as predicted.
@@ -54044,6 +54045,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 
 ## AFLDB-ISSUE-337 — Draft-page name search misses unlinked picks whose stored raw name uses U+00A0
 
+- **Production (2026-11-12):** installed and accepted with the ISSUE-336 release (`c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x`). The signed-in production check finds Jake Long (2014 Rookie Pick 47, Father–Son) with an ordinary space, NBSP and lower case. Record: `docs/v2/evidence/issue336-337-340-345-release-execution-20261111/execution-record.md`.
 - **Status:** **Resolved 2026-11-07 (DEV-scoped).** Fixed in `8b024098`, published in `origin/main` `7fabc6e5` on 2026-11-06, and deployed to DEV with ISSUE-336's pinned procedure and accepted there on 2026-11-07. **Production installation and acceptance are pending** with ISSUE-336's production application release, which stays a separate owner approval. Opened 2026-11-06.
 - **Severity / area:** Low; public draft pages (`/draft/[year]?q=…`).
 - **Source:** found by the ISSUE-336 isolated preview on a restore of DEV data (`docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/`). Duplicate check: `issues.md` U+00A0 entries concern `draft_persons` name matching (ISSUE-164, migration 099), not this search.
@@ -54256,6 +54258,7 @@ implementation batch (operator, 2026-10-10): ISSUE-271 and ISSUE-272.
 
 ## AFLDB-ISSUE-340 — Credential rotation races with old-credential requests and session creation
 
+- **Production (2026-11-12):** installed with the ISSUE-336 release (`c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x`) and accepted. The owner's D4-O admin sign-in and sign-out checks were done on 12 Nov 10:30 AEDT, after the original deadline (late evidence). Record: `docs/v2/evidence/issue336-337-340-345-release-execution-20261111/execution-record.md`.
 - **Status:** **Resolved 2026-11-08, committed in `8ef4ae1bf54c40c7cb04f4982dcfe1dd83913aea`** and published by fast-forward of `origin/main` (`7fabc6e5..c1c4b22e`; merged revision `c1c4b22ee15007111eab66f6d354e0b9ecbb2ade`). Owner accepted 2026-11-08. **Severity:** High. **Area:** Authentication and administrator lifecycle.
 - **Root cause:** credential verification, credential mutation, TOTP consumption and session issuance did not share a per-user serialized decision.
 - **Fix:** a row-locked snapshot comparison in `src/db/queries/admin-credentials.ts`, with the cookie set only after commit.
@@ -54673,6 +54676,7 @@ Acceptance: A page beyond the final page never reports zero matches when matchin
 
 ## AFLDB-ISSUE-345 — Restricted Grid Solver omits the forced password-change gate
 
+- **Production (2026-11-12):** installed with the ISSUE-336 release (`c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x`) and accepted. The forced-change redirect was **not exercised on production** (no temporary-password account was used); its runtime proof is the Linux qualification. Record: `docs/v2/evidence/issue336-337-340-345-release-execution-20261111/execution-record.md`.
 - **Status:** **Resolved 2026-11-08, committed in `65984ab22edf743580fb4caa7e8df97f73e55e3b`** and published by fast-forward of `origin/main` (merged revision `c1c4b22ee15007111eab66f6d354e0b9ecbb2ade`). Owner accepted 2026-11-08. **Severity:** Low. **Area:** Configurable audience access control.
 - **Root cause:** `requireAudience` checked the role without `requireUploader()`'s forced-change redirect.
 - **Fix:** non-public audiences go through `requireUploader()`.

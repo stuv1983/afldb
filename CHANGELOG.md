@@ -15,6 +15,12 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-336/337/340/345 released to production (restart 2026-11-11; accepted 2026-11-12)
+
+- Production serves `c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x` (revision `c1c4b22e`): separated draft categories with category-specific pick numbering (336), NBSP-tolerant draft name search (337), serialized credential rotation (340), and the forced password-change gate on restricted Grid Solver audiences (345). ISSUE-344 is not included.
+- No schema, data, timer, setting or `.env` change. The beta gate stays on. Rollback target: `0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN`.
+- Acceptance: D3c, D4-A, D4-P (81/81, desktop and mobile) and D4-V passed on 11 Nov and again in the owner's re-approved window on 12 Nov; the owner's D4-O is late evidence. Record: `docs/v2/evidence/issue336-337-340-345-release-execution-20261111/`.
+
 ### ISSUE-346: gated migration-only DEV route (2026-11-11; local, unpublished while `main` is frozen)
 
 - `sync-dev.ps1 -SkipBuild -SkipRestart` with `-ExpectedRevision` and an approved `-ExpectedLedgerBefore/-After` is the gated migration-only DEV route. It reuses the ISSUE-339 gate, migration binding and pinned migration line unchanged.

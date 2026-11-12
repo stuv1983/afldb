@@ -10,7 +10,7 @@
 > filename only; resolved ones are in `issues/closed/`.
 
 **Current state — 2026-11-11 (closure run 8, local records branch `claude/records-catchup-20261111`, unpublished while `main` is frozen at PKG `12aa6e29`):** **5 open issues: 332, 336, 346, 347, and the new 348.** Owner decisions of 2026-11-11 are recorded on the stacked local branch `claude/records-decisions-20261111`.
-- **336:** the r2 release awaits the owner's §9 statement (window). D-336-2 A+B and C+D are approved to run after release acceptance, stopping at the read-only plan; E+F (OD-4) is pending. D-336-3 is decided (A): stored origins kept, carried as 348.
+- **336:** **the r2 application release is on production and ACCEPTED (2026-11-12)**: `c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x`, carrying 337, 340 and 345; rollback target `0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN`. The owner's D4-O missed the original deadline and is recorded as late evidence; every check re-passed in the owner's re-approved window. Record `docs/v2/evidence/issue336-337-340-345-release-execution-20261111/`. D-336-2 A+B and C+D are next, stopping at the read-only plan; E+F (OD-4) is pending. D-336-3 is decided (A): stored origins kept, carried as 348.
 - **347:** fix `2207986f`, qualified, local.
 - **346:** the route is implemented and qualified locally. R1–R5 accepted 2026-11-11; the operator restrictions are binding (runbook §2) and "never `db:migrate` by hand on DEV" is permanent. Publication approved under OD-6 after D1 PASS; resolve after publication.
 - **348 (new, Low):** carry the D-336-3 classification to the Nov–Dec DraftGuru re-acquisition as its origin-review gate. Present 3 club replacements (ids 5961, 6784, 6626) for owner adjudication.
@@ -74,17 +74,17 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 - **State (2026-11-11, closure run 8):** Open, opened 2026-11-05.
   - **Code:** on `origin/main` since `ea9bddf8`.
   - **DEV:** deployed 2026-11-07 at `8b024098` (branch `dev-v2-main`). Immediate acceptance PASS. The 8–9 Nov nightlies were observed as predicted; that observation is closed.
-  - **Production release:** packaged as r2 in `docs/v2/issue336-337-340-345-release-approval-r2-2026-11-09.md`.
-    - R = H = R′ `c1c4b22e`, Linux-qualified. It also carries 337, 340 and 345 (RD-1). ISSUE-344 is not shipped.
-    - PKG `12aa6e29`; the static check re-ran PASS on 2026-11-11.
-    - **`main` is frozen until D1 PASS.** Awaiting the owner's §9 statement.
+  - **Production release: ACCEPTED 2026-11-12.** r2 (`docs/v2/issue336-337-340-345-release-approval-r2-2026-11-09.md`), PKG `12aa6e29`, R `c1c4b22e`; also carries 337, 340 and 345 (RD-1); ISSUE-344 is not shipped.
+    - Serving `c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x` since the owner's restart at 2026-11-11 17:08:51 AEDT. D1 PASS 2026-11-11 16:10 AEDT.
+    - Acceptance amendment D4-A (beta gate on). D4-O was late; acceptance was recorded in the owner's re-approved window, 12 Nov 11:00–14:00 AEDT.
+    - Record: `docs/v2/evidence/issue336-337-340-345-release-execution-20261111/execution-record.md`.
   - **D-336-2 (35 rows):**
     - The end-to-end SIMULATION at R′ passed on 2026-11-11: capture, the first sealed I336 assembly, plan 35/31/actor 1, refusals, `COMMITTED_VERIFIED`, accepted, 5,966 = 5,966.
     - The exact approval packet is `docs/v2/issue336-d3362-approval-packet-2026-11-11.md`.
     - The runner route is blocked by **ISSUE-347**; the direct route is unaffected.
   - **D-336-3 (187 revised origin paths):** open. Recommendation in the run 8 decision packet.
 - **Key files:** `src/lib/draft-categories.ts`, `src/db/queries/draft.ts`, `src/app/draft/[year]/page.tsx`, `tools/v2/issue336-predraft-insert-production.ts`, `tools/v2/gap029-ops/`; runbooks `issues/open/AFLDB-ISSUE-336.md` and `issues/open/AFLDB-ISSUE-336-DEV-DEPLOYMENT.md`; evidence `docs/v2/evidence/issue336-draft-categories-20261105/` and `docs/v2/evidence/issue336-i336-simulation-20261111/`.
-- **Next action:** the owner's r2 §9 release approval, then the D-336-2 step approvals (packet §5), then the D-336-3 decision. Full history: the `issues.md` entry and `issues/open/AFLDB-ISSUE-336-INDEX-SECTION-20261111.md`.
+- **Next action:** D-336-2 Steps A–D (approved; stop at the read-only plan), then the owner's OD-4 decision on E+F. D-336-3 is decided (A) and carried as 348. Full history: the `issues.md` entry and `issues/open/AFLDB-ISSUE-336-INDEX-SECTION-20261111.md`.
 
 ### AFLDB-ISSUE-347 — The GAP-029 workstation runner cannot prepare an I336 run (fixed-offset restore TAG)
 

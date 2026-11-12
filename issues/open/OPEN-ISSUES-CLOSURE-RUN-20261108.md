@@ -8,6 +8,13 @@
 - The working tree stays uncommitted.
 - **Run 2 (owner, 2026-11-08):** additionally authorised Git fetch and inspection, local worktrees and branches, scoped staging and local commits, the W-339 bundle, transfer to streamanator, and Git, tests and migrations inside disposable clones on isolated test databases. Push, merge, live DEV, production, shared databases, private backups and WSL stores stay behind owner gates.
 
+## Run 9 — 2026-11-11/12: r2 application release executed and accepted; OD-6 publication
+
+**Resume here.** Open issues: 332, 336, 346, 347, 348.
+- **OD-1 executed.** W0, P-A, D0, D1 (16:10 AEDT 11 Nov), D2, D3a, the owner's restart (17:08:51 AEDT), D3c, D4-A (owner amendment: beta gate on), D4-P 81/81 and D4-V all PASS on 11 Nov. The owner's D4-O missed the 18:08:51 deadline; no recovery was given. The owner re-approved a verification window (12 Nov 11:00–14:00 AEDT): identity unchanged, the first nightly under the release succeeded, D3c, D4-A, D4-P 81/81 and D4-V re-passed; D4-O recorded as late evidence. **ACCEPTED 2026-11-12.** Record: `docs/v2/evidence/issue336-337-340-345-release-execution-20261111/execution-record.md`.
+- **OD-6:** post-release records commit `e751b87f` on PKG (execution record, PKG SHA, run 7 post-publication evidence). The run 8 and decision stack was rebased onto it as local branch `claude/records-publish-20261112` (no conflicts). Executable files and `docs/deployment.md` are byte-identical to `2207986f` and `0c47ca04`; the ISSUE-346 runbook differs, so `gap029-ops` and `sync-dev-remote` are re-run at the rebased tip, then `merge:ready` 347 and 346 and `preflight --mode merge` in a streamanator clone, the full delta review, and a fast-forward push.
+- **Next:** D-336-2 Steps A–D (OD-2, OD-3), stopping before apply with the plan digest, backup hash and a proposed OD-4 window.
+
 ## Run 8 — 2026-11-11: catch-up engineering and release preparation (COMPLETE; nothing published, nothing deployed)
 
 **Resume here.** Open issues: 332, 336, 346 and 347. Every remaining item is owner-gated (decision packet OD-1 to OD-8 below), apart from ISSUE-332's dated gates.
