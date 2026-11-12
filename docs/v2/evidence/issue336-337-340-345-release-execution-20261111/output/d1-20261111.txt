@@ -1,0 +1,546 @@
+session 2026-11-11T05:10:03Z host afldb-prod user arm
+From github.com-afldb-deploy:stuv1983/afldb
+   f32d44f0..12aa6e29  main       -> origin/main
+ * [new branch]        claude/issue-336-draft-categories -> origin/claude/issue-336-draft-categories
+ * [new branch]        claude/issue-338-341-344-publish -> origin/claude/issue-338-341-344-publish
+ * [new branch]        claude/issue-339-gate-publish -> origin/claude/issue-339-gate-publish
+ * [new branch]        claude/issue-340-345-336 -> origin/claude/issue-340-345-336
+ * [new branch]        claude/records-b2b5-published-20261109 -> origin/claude/records-b2b5-published-20261109
+ * [new branch]        claude/records-closure-20261109 -> origin/claude/records-closure-20261109
+ * [new branch]        claude/records-i336-packet-r2-20261109 -> origin/claude/records-i336-packet-r2-20261109
+STATIC DELTA CHECK PASS r2 (R=c1c4b22ee15007111eab66f6d354e0b9ecbb2ade PKG=12aa6e29d51099eb6d3fbc901bbe488c5dbd7ab3; ships: 37 enumerated non-documentation files, 16 application source files, deploy/ = 2 DEV-only files; main after R, not shipped: 17 enumerated non-documentation files, 4 ISSUE-344 source files, 3 DEV-only deploy files, build inputs identical)
+Updating f32d44f0..c1c4b22e
+Fast-forward
+ CHANGELOG.md                                       |   56 +
+ IssuesIndex.md                                     |   50 +-
+ data/reference/draftguru-event-kinds.json          |   11 +-
+ deploy/sync-dev-remote.sh                          |   44 +
+ deploy/sync-dev.ps1                                |   93 +-
+ .../census-match-coaches-overrides-prod.out        |    8 +
+ .../d0-20261105.log                                |    5 +
+ .../d1-20261105.log                                | 1241 ++++++++++++++++++++
+ .../d2-v-20261105.log                              |   64 +
+ .../d3c-d4-20261105.log                            |   93 ++
+ .../execution-record.md                            |  130 ++
+ .../pa-20261105.log                                |   48 +
+ .../phase.sh                                       |  199 ++++
+ .../provenance-20261105.log                        |   86 ++
+ .../provenance.sh                                  |   23 +
+ .../scripts/census-match-coaches-overrides-prod.sh |  129 ++
+ .../w0-20261105.log                                |   10 +
+ .../issue336-draft-categories-20261105/README.md   |   80 ++
+ .../csv-inventory.txt                              |   15 +
+ .../csv_inventory.py                               |   72 ++
+ .../dev-preview-20261106/README.md                 |  125 ++
+ .../dev-preview-20261106/app-status.txt            |    2 +
+ .../dev-preview-20261106/base-vs-candidate.txt     |   18 +
+ .../dev-preview-20261106/build-id.txt              |    1 +
+ .../dev-preview-20261106/checkout.txt              |    1 +
+ .../dev-preview-20261106/cmp-base.fails            |    6 +
+ .../dev-preview-20261106/cmp-cand.fails            |    6 +
+ .../dev-preview-20261106/dev-backup.json           |    1 +
+ .../dev-preview-20261106/dev-backup.txt            |    3 +
+ .../dev-preview-20261106/dev-health-after.txt      |    5 +
+ .../dev-preview-20261106/dev-health-before.txt     |    5 +
+ .../integration-focused-summary.txt                |   16 +
+ .../dev-preview-20261106/ledger-after.json         |    1 +
+ .../dev-preview-20261106/ledger-before.json        |    1 +
+ .../dev-preview-20261106/migrate-rerun.txt         |    3 +
+ .../dev-preview-20261106/migrate-status-before.txt |  123 ++
+ .../dev-preview-20261106/migrate.txt               |   14 +
+ .../dev-preview-20261106/pg-status.txt             |    2 +
+ .../dev-preview-20261106/privileges.txt            |   16 +
+ .../dev-preview-20261106/restore.txt               |    1 +
+ .../screens/desktop-empty-mini.png                 |  Bin 0 -> 83294 bytes
+ .../screens/desktop-father-son-1995.png            |  Bin 0 -> 120822 bytes
+ .../screens/desktop-father-son-2021.png            |  Bin 0 -> 120905 bytes
+ .../dev-preview-20261106/screens/desktop-index.png |  Bin 0 -> 112181 bytes
+ .../screens/desktop-national-pick-desc.png         |  Bin 0 -> 119135 bytes
+ .../screens/desktop-national.png                   |  Bin 0 -> 115578 bytes
+ .../screens/desktop-player-fred.png                |  Bin 0 -> 125280 bytes
+ .../screens/desktop-rookie.png                     |  Bin 0 -> 114709 bytes
+ .../screens/desktop-trade-2021.png                 |  Bin 0 -> 126325 bytes
+ .../screens/desktop-year-all.png                   |  Bin 0 -> 111962 bytes
+ .../screens/mobile-empty-mini.png                  |  Bin 0 -> 54811 bytes
+ .../screens/mobile-father-son-1995.png             |  Bin 0 -> 69327 bytes
+ .../screens/mobile-father-son-2021.png             |  Bin 0 -> 67533 bytes
+ .../dev-preview-20261106/screens/mobile-index.png  |  Bin 0 -> 61275 bytes
+ .../screens/mobile-national-pick-desc.png          |  Bin 0 -> 65041 bytes
+ .../screens/mobile-national.png                    |  Bin 0 -> 64015 bytes
+ .../screens/mobile-player-fred.png                 |  Bin 0 -> 100829 bytes
+ .../dev-preview-20261106/screens/mobile-rookie.png |  Bin 0 -> 66314 bytes
+ .../screens/mobile-trade-2021.png                  |  Bin 0 -> 65098 bytes
+ .../screens/mobile-year-all.png                    |  Bin 0 -> 66191 bytes
+ .../dev-preview-20261106/screens/results.json      |  342 ++++++
+ .../dev-preview-20261106/scripts/basecmp.sh        |   25 +
+ .../dev-preview-20261106/scripts/dump-dev.cjs      |   18 +
+ .../dev-preview-20261106/scripts/ledger.mjs        |   38 +
+ .../dev-preview-20261106/scripts/prev.sh           |   99 ++
+ .../dev-preview-20261106/scripts/restore.mjs       |   22 +
+ .../dev-preview-20261106/scripts/shots-preview.cjs |  107 ++
+ .../dev-preview2-20261106/README.md                |  154 +++
+ .../backup-rehearsal/SHA256SUMS                    |    3 +
+ .../backup-rehearsal/live-counts.json              |   29 +
+ .../backup-rehearsal/migrated-counts.json          |   29 +
+ .../backup-rehearsal/rehearsal.out                 |   69 ++
+ .../backup-rehearsal/restored-counts.json          |   29 +
+ .../backup-rehearsal/verify-privileges.txt         |   15 +
+ .../dev-preview2-20261106/browser-candidate.txt    |   81 ++
+ .../browser-first-preview-ea9bddf8.txt             |   81 ++
+ .../dev-preview2-20261106/host/app-status.txt      |    2 +
+ .../dev-preview2-20261106/host/app.log             |    7 +
+ .../dev-preview2-20261106/host/build-id.txt        |    1 +
+ .../dev-preview2-20261106/host/checkout.txt        |   15 +
+ .../host/dev-health-after-p3b.txt                  |    1 +
+ .../host/dev-health-after-p3c.txt                  |    1 +
+ .../host/dev-health-after.txt                      |    4 +
+ .../host/dev-health-before-p3.txt                  |    1 +
+ .../host/dev-health-before-p3b.txt                 |    1 +
+ .../host/dev-health-before-p3c.txt                 |    1 +
+ .../host/dev-health-before.txt                     |    4 +
+ .../dev-preview2-20261106/host/eslint.log          |    7 +
+ .../dev-preview2-20261106/host/facts-devdata.json  |   44 +
+ .../host/facts-previewdb.json                      |   44 +
+ .../dev-preview2-20261106/host/facts-proddata.json |   40 +
+ .../dev-preview2-20261106/host/int-devdata-337.txt |    1 +
+ .../host/int-devdata-vs-first.txt                  |    1 +
+ .../dev-preview2-20261106/host/int-devdata.fails   |    6 +
+ .../host/int-proddata-children.txt                 |    8 +
+ .../host/int-proddata-six.txt                      |    7 +
+ .../dev-preview2-20261106/host/int-proddata.fails  |    2 +
+ .../dev-preview2-20261106/host/npm-ci.log          |    3 +
+ .../host/operator-review-reruns.txt                |    5 +
+ .../dev-preview2-20261106/host/proddump.txt        |    5 +
+ .../dev-preview2-20261106/host/red-unit.txt        |    2 +
+ .../dev-preview2-20261106/host/rollback-app.log    |    7 +
+ .../dev-preview2-20261106/host/rollback-db.txt     |   12 +
+ .../dev-preview2-20261106/host/rollback-npm-ci.log |    3 +
+ .../host/rollback-privileges.txt                   |   15 +
+ .../dev-preview2-20261106/host/rollback-source.txt |    1 +
+ .../dev-preview2-20261106/host/smoke-33361.txt     |   36 +
+ .../dev-preview2-20261106/host/smoke-33362.txt     |   36 +
+ .../host/smoke-33363-rollback.txt                  |   36 +
+ .../host/smoke-candidate-vs-rollback.txt           |   36 +
+ .../dev-preview2-20261106/host/smoke-compare.txt   |   36 +
+ .../dev-preview2-20261106/host/snapshots.txt       |    2 +
+ .../dev-preview2-20261106/host/sync-dev-remote.log |   35 +
+ .../dev-preview2-20261106/host/timers-offline.txt  |   17 +
+ .../dev-preview2-20261106/host/typecheck.log       |    7 +
+ .../dev-preview2-20261106/runners/bkrehearse.sh    |   23 +
+ .../dev-preview2-20261106/runners/devcfg.sh        |   38 +
+ .../dev-preview2-20261106/runners/facts.mjs        |   32 +
+ .../dev-preview2-20261106/runners/prev2.sh         |  145 +++
+ .../dev-preview2-20261106/runners/prev3.sh         |   83 ++
+ .../dev-preview2-20261106/runners/prev3b.sh        |   67 ++
+ .../dev-preview2-20261106/runners/prev3c.sh        |   54 +
+ .../screens/desktop-empty-mini.png                 |  Bin 0 -> 83294 bytes
+ .../screens/desktop-father-son-1995.png            |  Bin 0 -> 120822 bytes
+ .../screens/desktop-father-son-2021.png            |  Bin 0 -> 120905 bytes
+ .../screens/desktop-index.png                      |  Bin 0 -> 112181 bytes
+ .../screens/desktop-issue337-jake-long.png         |  Bin 0 -> 106833 bytes
+ .../screens/desktop-national-pick-desc.png         |  Bin 0 -> 119135 bytes
+ .../screens/desktop-national.png                   |  Bin 0 -> 115578 bytes
+ .../screens/desktop-player-fred.png                |  Bin 0 -> 125280 bytes
+ .../screens/desktop-rookie.png                     |  Bin 0 -> 114709 bytes
+ .../screens/desktop-trade-2021.png                 |  Bin 0 -> 126325 bytes
+ .../screens/desktop-year-all.png                   |  Bin 0 -> 111962 bytes
+ .../screens/mobile-empty-mini.png                  |  Bin 0 -> 54811 bytes
+ .../screens/mobile-father-son-1995.png             |  Bin 0 -> 69327 bytes
+ .../screens/mobile-father-son-2021.png             |  Bin 0 -> 67533 bytes
+ .../dev-preview2-20261106/screens/mobile-index.png |  Bin 0 -> 61275 bytes
+ .../screens/mobile-issue337-jake-long.png          |  Bin 0 -> 55109 bytes
+ .../screens/mobile-national-pick-desc.png          |  Bin 0 -> 65041 bytes
+ .../screens/mobile-national.png                    |  Bin 0 -> 64015 bytes
+ .../screens/mobile-player-fred.png                 |  Bin 0 -> 100829 bytes
+ .../screens/mobile-rookie.png                      |  Bin 0 -> 66314 bytes
+ .../screens/mobile-trade-2021.png                  |  Bin 0 -> 65098 bytes
+ .../screens/mobile-year-all.png                    |  Bin 0 -> 66191 bytes
+ .../dev-preview2-20261106/screens/results.json     |  382 ++++++
+ .../dev-preview2-20261106/scripts/counts.mjs       |   39 +
+ .../scripts/dev-backup-verify.sh                   |   69 ++
+ .../dev-preview2-20261106/scripts/dump-dev.cjs     |   18 +
+ .../dev-preview2-20261106/scripts/restore.mjs      |   22 +
+ .../scripts/shots-acceptance.cjs                   |  121 ++
+ .../dev-preview2-20261106/scripts/smoke.sh         |   26 +
+ .../dev-procedure-corrections-20261106/README.md   |  130 ++
+ .../host/N-db.txt                                  |    3 +
+ .../host/N-facts-0-before.json                     |   69 ++
+ ...facts-after-afl-api-2027-2026-11-01-012026.json |   70 ++
+ ...facts-after-afl-api-2027-2026-11-02-012026.json |   70 ++
+ .../host/N-npm-ci.log                              |    3 +
+ .../host/N-privileges.txt                          |   15 +
+ .../N-settle-afl-api-2027-2026-11-01-012026.log    |  122 ++
+ .../N-settle-afl-api-2027-2026-11-02-012026.log    |  122 ++
+ .../host/N-settle.txt                              |   29 +
+ .../host/N-snapshot.txt                            |    2 +
+ .../host/O-db.txt                                  |    4 +
+ .../host/O-facts-after.json                        |   69 ++
+ .../host/O-facts-before.json                       |   69 ++
+ .../host/O-settle-apply.log                        |  122 ++
+ .../host/O-settle.txt                              |   19 +
+ .../host/P-preserve.txt                            |    5 +
+ .../host/P-smoke-33365.txt                         |   36 +
+ .../host/P-smoke-compare.txt                       |    1 +
+ .../host/P-workers.txt                             |    1 +
+ .../host/R-env-names.txt                           |    1 +
+ .../host/R-poll.txt                                |   64 +
+ .../host/R-restart.out                             |   34 +
+ .../host/R-summary.txt                             |   18 +
+ .../host/R-unit.txt                                |    2 +
+ .../host/R-workers-after.txt                       |    1 +
+ .../host/R-workers-before.txt                      |    1 +
+ .../host/dev-health-after.txt                      |    1 +
+ .../host/dev-health-before.txt                     |    1 +
+ .../host/dev-nightly-20261106-journal.txt          |   12 +
+ .../runners/build-match-snapshot.mjs               |   24 +
+ .../runners/dev-nightly-journal.sh                 |    4 +
+ .../runners/devinspect2.out                        |  104 ++
+ .../runners/devinspect2.sh                         |   26 +
+ .../runners/nightly-facts.mjs                      |   26 +
+ .../runners/prev4.sh                               |  109 ++
+ .../runners/prev4n.sh                              |   45 +
+ .../runners/prev4o.sh                              |   39 +
+ .../runners/probe-restart.sh                       |  335 ++++++
+ .../runners/sync-dev-generated-default.diff        |    4 +
+ .../sync-dev-generated-step6-auto-vs-respawn.diff  |   44 +
+ .../dg_fetch_parse.py                              |   54 +
+ .../export-draft.mjs                               |   34 +
+ .../fullunit-cand.fails                            |  107 ++
+ .../fullunit-i336c.fails                           |  106 ++
+ .../predraft-insert-plan.json                      |  777 ++++++++++++
+ .../prod-tool-rehearsal/apply.json                 |  273 +++++
+ .../prod-tool-rehearsal/baseline-rehearsal.json    |   19 +
+ .../prod-tool-rehearsal/find-actor.mjs             |   15 +
+ .../prod-tool-rehearsal/plan.json                  |  340 ++++++
+ .../prod-tool-rehearsal/reconcile-after.txt        |   21 +
+ .../prod-tool-rehearsal/rehearse336.sh             |   41 +
+ .../prod-tool-rehearsal/state-after.json           |    9 +
+ .../prod-tool-rehearsal/state-before.json          |    9 +
+ .../prod-tool-rehearsal/target.json                |   10 +
+ .../prod-tool-rehearsal/verify.json                |    9 +
+ .../issue336-draft-categories-20261105/qual.sh     |   51 +
+ .../reconcile-after-rehearsal.txt                  |   21 +
+ .../reconcile-before.txt                           |   21 +
+ .../reconcile.py                                   |  106 ++
+ .../screens/desktop-empty-mini.png                 |  Bin 0 -> 69926 bytes
+ .../screens/desktop-father-son-1995.png            |  Bin 0 -> 99900 bytes
+ .../screens/desktop-father-son-2021.png            |  Bin 0 -> 102371 bytes
+ .../screens/desktop-index.png                      |  Bin 0 -> 105543 bytes
+ .../screens/desktop-national-pick-desc.png         |  Bin 0 -> 104921 bytes
+ .../screens/desktop-national.png                   |  Bin 0 -> 100156 bytes
+ .../screens/desktop-player-fred.png                |  Bin 0 -> 97889 bytes
+ .../screens/desktop-rookie.png                     |  Bin 0 -> 96064 bytes
+ .../screens/desktop-trade-2021.png                 |  Bin 0 -> 110367 bytes
+ .../screens/desktop-year-all.png                   |  Bin 0 -> 98655 bytes
+ .../screens/mobile-empty-mini.png                  |  Bin 0 -> 46682 bytes
+ .../screens/mobile-father-son-1995.png             |  Bin 0 -> 57020 bytes
+ .../screens/mobile-father-son-2021.png             |  Bin 0 -> 55839 bytes
+ .../screens/mobile-index.png                       |  Bin 0 -> 49312 bytes
+ .../screens/mobile-national-pick-desc.png          |  Bin 0 -> 54522 bytes
+ .../screens/mobile-national.png                    |  Bin 0 -> 53898 bytes
+ .../screens/mobile-player-fred.png                 |  Bin 0 -> 81441 bytes
+ .../screens/mobile-rookie.png                      |  Bin 0 -> 55838 bytes
+ .../screens/mobile-trade-2021.png                  |  Bin 0 -> 54587 bytes
+ .../screens/mobile-year-all.png                    |  Bin 0 -> 52970 bytes
+ .../screens/results.json                           |  342 ++++++
+ .../issue336-draft-categories-20261105/setup.sh    |   34 +
+ .../issue336-draft-categories-20261105/shots.cjs   |  105 ++
+ issues.md                                          |  126 +-
+ .../AFLDB-ISSUE-334-335-INDEX-SECTION-20261105.md  |   17 +
+ issues/open/AFLDB-ISSUE-336-DEV-DEPLOYMENT.md      |  435 +++++++
+ issues/open/AFLDB-ISSUE-336.md                     |   74 ++
+ issues/open/AFLDB-ISSUE-340.md                     |   64 +
+ issues/open/AFLDB-ISSUE-345.md                     |   52 +
+ src/app/admin/admins/password-actions.ts           |   59 +-
+ src/app/admin/login/actions.ts                     |   37 +-
+ src/app/admin/password/actions.ts                  |   56 +-
+ src/app/draft/[year]/page.tsx                      |  287 +++--
+ src/app/draft/page.tsx                             |   40 +-
+ src/app/players/[slug]/page.tsx                    |   24 +-
+ src/components/DraftCategoryNav.tsx                |   80 ++
+ src/db/queries/admin-credentials.ts                |  275 +++++
+ src/db/queries/draft.ts                            |  116 +-
+ src/lib/auth/audience.ts                           |   15 +-
+ src/lib/auth/session.ts                            |   56 +-
+ src/lib/draft-categories.ts                        |  145 +++
+ src/lib/like.ts                                    |   24 +
+ src/search/grid-solver-spec.ts                     |    1 +
+ src/search/list-filters.ts                         |   14 +-
+ src/styles/globals.css                             |   56 +
+ tests/auth.test.ts                                 |   80 ++
+ tests/catalogue-lookups.test.ts                    |  131 ++-
+ tests/draftguru-acquisition.test.ts                |   12 +-
+ tests/gap029-assembly.test.ts                      |    5 +
+ tests/gap029-ops.test.ts                           |   91 +-
+ tests/gap029-rookie-selections.test.ts             |   88 ++
+ tests/integration/admin-draft.test.ts              |   40 +
+ tests/integration/admin-lifecycle.test.ts          |  293 +++++
+ tests/like.test.ts                                 |   39 +
+ tests/sync-dev-remote.test.sh                      |  100 ++
+ tests/sync-dev-static.test.ps1                     |   38 +-
+ tests/v2-season-seal.test.ts                       |    2 +
+ tools/v2/gap029-assemble-restore-evidence.ts       |   15 +-
+ tools/v2/gap029-ops-lib.ts                         |   25 +-
+ tools/v2/gap029-ops/capture-prod-stage.sh          |    4 +-
+ tools/v2/gap029-ops/prod-stage.sh                  |   16 +-
+ tools/v2/gap029-ops/restore-assemble-host.sh       |    4 +-
+ tools/v2/issue336-predraft-insert-production.ts    |  463 ++++++++
+ 274 files changed, 13160 insertions(+), 258 deletions(-)
+ create mode 100644 docs/v2/evidence/issue334-335-release-execution-20261105/census-match-coaches-overrides-prod.out
+ create mode 100644 docs/v2/evidence/issue334-335-release-execution-20261105/d0-20261105.log
+ create mode 100644 docs/v2/evidence/issue334-335-release-execution-20261105/d1-20261105.log
+ create mode 100644 docs/v2/evidence/issue334-335-release-execution-20261105/d2-v-20261105.log
+ create mode 100644 docs/v2/evidence/issue334-335-release-execution-20261105/d3c-d4-20261105.log
+ create mode 100644 docs/v2/evidence/issue334-335-release-execution-20261105/execution-record.md
+ create mode 100644 docs/v2/evidence/issue334-335-release-execution-20261105/pa-20261105.log
+ create mode 100644 docs/v2/evidence/issue334-335-release-execution-20261105/phase.sh
+ create mode 100644 docs/v2/evidence/issue334-335-release-execution-20261105/provenance-20261105.log
+ create mode 100644 docs/v2/evidence/issue334-335-release-execution-20261105/provenance.sh
+ create mode 100644 docs/v2/evidence/issue334-335-release-execution-20261105/scripts/census-match-coaches-overrides-prod.sh
+ create mode 100644 docs/v2/evidence/issue334-335-release-execution-20261105/w0-20261105.log
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/README.md
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/csv-inventory.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/csv_inventory.py
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/README.md
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/app-status.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/base-vs-candidate.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/build-id.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/checkout.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/cmp-base.fails
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/cmp-cand.fails
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/dev-backup.json
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/dev-backup.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/dev-health-after.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/dev-health-before.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/integration-focused-summary.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/ledger-after.json
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/ledger-before.json
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/migrate-rerun.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/migrate-status-before.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/migrate.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/pg-status.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/privileges.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/restore.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/screens/desktop-empty-mini.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/screens/desktop-father-son-1995.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/screens/desktop-father-son-2021.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/screens/desktop-index.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/screens/desktop-national-pick-desc.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/screens/desktop-national.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/screens/desktop-player-fred.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/screens/desktop-rookie.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/screens/desktop-trade-2021.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/screens/desktop-year-all.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/screens/mobile-empty-mini.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/screens/mobile-father-son-1995.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/screens/mobile-father-son-2021.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/screens/mobile-index.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/screens/mobile-national-pick-desc.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/screens/mobile-national.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/screens/mobile-player-fred.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/screens/mobile-rookie.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/screens/mobile-trade-2021.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/screens/mobile-year-all.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/screens/results.json
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/scripts/basecmp.sh
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/scripts/dump-dev.cjs
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/scripts/ledger.mjs
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/scripts/prev.sh
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/scripts/restore.mjs
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/scripts/shots-preview.cjs
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/README.md
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/backup-rehearsal/SHA256SUMS
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/backup-rehearsal/live-counts.json
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/backup-rehearsal/migrated-counts.json
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/backup-rehearsal/rehearsal.out
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/backup-rehearsal/restored-counts.json
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/backup-rehearsal/verify-privileges.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/browser-candidate.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/browser-first-preview-ea9bddf8.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/app-status.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/app.log
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/build-id.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/checkout.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/dev-health-after-p3b.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/dev-health-after-p3c.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/dev-health-after.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/dev-health-before-p3.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/dev-health-before-p3b.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/dev-health-before-p3c.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/dev-health-before.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/eslint.log
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/facts-devdata.json
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/facts-previewdb.json
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/facts-proddata.json
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/int-devdata-337.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/int-devdata-vs-first.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/int-devdata.fails
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/int-proddata-children.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/int-proddata-six.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/int-proddata.fails
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/npm-ci.log
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/operator-review-reruns.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/proddump.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/red-unit.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/rollback-app.log
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/rollback-db.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/rollback-npm-ci.log
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/rollback-privileges.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/rollback-source.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/smoke-33361.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/smoke-33362.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/smoke-33363-rollback.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/smoke-candidate-vs-rollback.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/smoke-compare.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/snapshots.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/sync-dev-remote.log
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/timers-offline.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/host/typecheck.log
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/runners/bkrehearse.sh
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/runners/devcfg.sh
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/runners/facts.mjs
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/runners/prev2.sh
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/runners/prev3.sh
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/runners/prev3b.sh
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/runners/prev3c.sh
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/screens/desktop-empty-mini.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/screens/desktop-father-son-1995.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/screens/desktop-father-son-2021.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/screens/desktop-index.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/screens/desktop-issue337-jake-long.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/screens/desktop-national-pick-desc.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/screens/desktop-national.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/screens/desktop-player-fred.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/screens/desktop-rookie.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/screens/desktop-trade-2021.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/screens/desktop-year-all.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/screens/mobile-empty-mini.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/screens/mobile-father-son-1995.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/screens/mobile-father-son-2021.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/screens/mobile-index.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/screens/mobile-issue337-jake-long.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/screens/mobile-national-pick-desc.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/screens/mobile-national.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/screens/mobile-player-fred.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/screens/mobile-rookie.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/screens/mobile-trade-2021.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/screens/mobile-year-all.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/screens/results.json
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/scripts/counts.mjs
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/scripts/dev-backup-verify.sh
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/scripts/dump-dev.cjs
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/scripts/restore.mjs
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/scripts/shots-acceptance.cjs
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-preview2-20261106/scripts/smoke.sh
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/README.md
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/host/N-db.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/host/N-facts-0-before.json
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/host/N-facts-after-afl-api-2027-2026-11-01-012026.json
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/host/N-facts-after-afl-api-2027-2026-11-02-012026.json
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/host/N-npm-ci.log
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/host/N-privileges.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/host/N-settle-afl-api-2027-2026-11-01-012026.log
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/host/N-settle-afl-api-2027-2026-11-02-012026.log
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/host/N-settle.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/host/N-snapshot.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/host/O-db.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/host/O-facts-after.json
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/host/O-facts-before.json
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/host/O-settle-apply.log
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/host/O-settle.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/host/P-preserve.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/host/P-smoke-33365.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/host/P-smoke-compare.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/host/P-workers.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/host/R-env-names.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/host/R-poll.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/host/R-restart.out
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/host/R-summary.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/host/R-unit.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/host/R-workers-after.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/host/R-workers-before.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/host/dev-health-after.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/host/dev-health-before.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/host/dev-nightly-20261106-journal.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/runners/build-match-snapshot.mjs
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/runners/dev-nightly-journal.sh
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/runners/devinspect2.out
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/runners/devinspect2.sh
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/runners/nightly-facts.mjs
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/runners/prev4.sh
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/runners/prev4n.sh
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/runners/prev4o.sh
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/runners/probe-restart.sh
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/runners/sync-dev-generated-default.diff
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dev-procedure-corrections-20261106/runners/sync-dev-generated-step6-auto-vs-respawn.diff
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/dg_fetch_parse.py
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/export-draft.mjs
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/fullunit-cand.fails
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/fullunit-i336c.fails
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/predraft-insert-plan.json
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/prod-tool-rehearsal/apply.json
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/prod-tool-rehearsal/baseline-rehearsal.json
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/prod-tool-rehearsal/find-actor.mjs
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/prod-tool-rehearsal/plan.json
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/prod-tool-rehearsal/reconcile-after.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/prod-tool-rehearsal/rehearse336.sh
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/prod-tool-rehearsal/state-after.json
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/prod-tool-rehearsal/state-before.json
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/prod-tool-rehearsal/target.json
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/prod-tool-rehearsal/verify.json
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/qual.sh
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/reconcile-after-rehearsal.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/reconcile-before.txt
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/reconcile.py
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/screens/desktop-empty-mini.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/screens/desktop-father-son-1995.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/screens/desktop-father-son-2021.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/screens/desktop-index.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/screens/desktop-national-pick-desc.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/screens/desktop-national.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/screens/desktop-player-fred.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/screens/desktop-rookie.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/screens/desktop-trade-2021.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/screens/desktop-year-all.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/screens/mobile-empty-mini.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/screens/mobile-father-son-1995.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/screens/mobile-father-son-2021.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/screens/mobile-index.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/screens/mobile-national-pick-desc.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/screens/mobile-national.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/screens/mobile-player-fred.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/screens/mobile-rookie.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/screens/mobile-trade-2021.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/screens/mobile-year-all.png
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/screens/results.json
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/setup.sh
+ create mode 100644 docs/v2/evidence/issue336-draft-categories-20261105/shots.cjs
+ create mode 100644 issues/closed/AFLDB-ISSUE-334-335-INDEX-SECTION-20261105.md
+ create mode 100644 issues/open/AFLDB-ISSUE-336-DEV-DEPLOYMENT.md
+ create mode 100644 issues/open/AFLDB-ISSUE-336.md
+ create mode 100644 issues/open/AFLDB-ISSUE-340.md
+ create mode 100644 issues/open/AFLDB-ISSUE-345.md
+ create mode 100644 src/components/DraftCategoryNav.tsx
+ create mode 100644 src/db/queries/admin-credentials.ts
+ create mode 100644 src/lib/draft-categories.ts
+ create mode 100644 tools/v2/issue336-predraft-insert-production.ts
+release: current  0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN revision 0f251c2daa8d7c6c38eacd559376dde41e010fd9 BUILD_ID 3t0xWKI76Jgna2tB8a9oN production
+release: previous a0b1080f5b98-B8kdpO6PO1tUCHus0j1za revision a0b1080f5b98aee7191894c138be27bb524c7b1b BUILD_ID B8kdpO6PO1tUCHus0j1za
+release: memory   afldb MemoryCurrent 475 MB
+release: process  3427584 runs in /home/arm/afldb-releases/releases/0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN
+release: health   200 status=ok database=ok
+release: build    /_next/static/3t0xWKI76Jgna2tB8a9oN/_buildManifest.js 200
+release: build    /_next/static/B8kdpO6PO1tUCHus0j1za/_buildManifest.js 404 (previous; expect 404)
+release: STATUS PASS 0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN
+state probe 2026-11-11T05:10:09Z
+  OLD_ID   0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN
+  NEW_ID   (not set)
+  current  0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN
+  previous a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+  unit     afldb ActiveState=active Result=success MainPID=3427584
+  process  runs 0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN (/home/arm/afldb-releases/releases/0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN)
+  health   {"status":"ok","database":"ok","latencyMs":0}
+  locks    none
+STATE OLD_SERVING
+D1 PASS
+D1 exit=0 HEAD=c1c4b22ee15007111eab66f6d354e0b9ecbb2ade at 2026-11-11T05:10:09Z

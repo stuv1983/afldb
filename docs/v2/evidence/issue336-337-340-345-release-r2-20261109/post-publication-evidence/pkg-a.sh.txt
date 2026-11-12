@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# r2 package, pre-publication: fresh disposable clone of GitHub origin/main + candidate bundle; r2 static check against the
+# exact candidate with negative controls; merge readiness in operator layout; ff rehearsal. Synthetic commits live only in
+# throwaway branches of this clone. No network writes, no database.
+set -uo pipefail
+W="$1"; BSHA="$2"; C="$3"; BASE="$4"; BR=claude/records-i336-packet-r2-20261109
+R=c1c4b22ee15007111eab66f6d354e0b9ecbb2ade
+SD=docs/v2/evidence/issue336-337-340-345-release-r2-20261109/static-delta-check.sh
+SD1=docs/v2/evidence/issue336-337-340-345-release-20261109/static-delta-check.sh
+P=0; F=0; pass(){ echo "PASS $1"; P=$((P+1)); }; fail(){ echo "FAIL $1"; F=$((F+1)); }
+check_eq(){ if [ "$2" = "$3" ]; then pass "$1"; else fail "$1 (want '$2' got '$3')"; fi; }
+expect_fail(){ local label="$1" want="$2" pkg="$3" script="${4:-$SD}" src="${5:-$C}" out rc
+  out=$(git show "$src:$script" | bash -s -- "$pkg" 2>&1); rc=$?
+  if [ $rc -ne 0 ] && grep -qF "$want" <<<"$out"; then pass "$label -> exit $rc: $out"; else fail "$label (rc=$rc): $out"; fi; }
+cd "$W" || exit 2
+check_eq "bundle sha256" "$BSHA" "$(sha256sum pkg.bundle | cut -d' ' -f1)"
+[ -e "$W/c" ] && { echo "refusing: $W/c exists"; exit 2; }
+git clone -q https://github.com/stuv1983/afldb.git "$W/c" || exit 2
+cd "$W/c"; git config user.email rehearsal@example.test; git config user.name rehearsal
+check_eq "GitHub origin/main is the derivation base" "$BASE" "$(git rev-parse refs/remotes/origin/main)"
+git fetch -q "$W/pkg.bundle" "+refs/heads/$BR:refs/heads/$BR" || exit 2
+check_eq "candidate SHA" "$C" "$(git rev-parse "refs/heads/$BR")"
+check_eq "candidate parent is the base" "$BASE" "$(git rev-parse "$C^")"
+check_eq "R tree is the qualified tree" "10413828ee2fbb6dc78feb8f0e0fd8a523d25ce0" "$(git rev-parse "$R^{tree}")"
+
+echo "== positive: r2 static check against the exact candidate"
+out=$(git show "$C:$SD" | bash -s -- "$C" 2>&1); rc=$?; echo "$out"
+check_eq "r2 static check exit at candidate" 0 "$rc"
+grep -q '^STATIC DELTA CHECK PASS r2 ' <<<"$out" && pass "PASS line printed" || fail "no PASS line"
+
+echo "== negative controls"
+expect_fail "N1 superseded r1 script at candidate" "application tree src differs between R and PKG" "$C" "$SD1"
+expect_fail "N2 r2 script with r1 PKG c5959bbf" "STATIC DELTA CHECK FAIL" "c5959bbf6e2eae9b80467180a20919367afc9475"
+expect_fail "N3 malformed PKG" "PKG must be 40 lowercase hex" "REPLACE_WITH_40_HEX_PKG"
+mk(){ git checkout -q -B "neg-$1" "$C" && eval "$2" && git add -A && git commit -q -m "synthetic $1" && git rev-parse HEAD; }
+N4=$(mk n4 'echo "// synthetic" >> src/lib/like.ts'); expect_fail "N4 extra application source after R" "R to PKG changes application source other than the four ISSUE-344 files" "$N4" "$SD" "$N4"
+N5=$(mk n5 'sed -i "s/\"private\": true/\"private\": true /" package.json; git diff --quiet && echo " " >> package.json'); expect_fail "N5 build input package.json changed" "build input package.json differs between R and PKG" "$N5" "$SD" "$N5"
+N6=$(mk n6 'echo "#!/bin/sh" > tools/maintenance/synthetic-extra.sh'); expect_fail "N6 unlisted non-documentation file" "R to PKG non-documentation files differ" "$N6" "$SD" "$N6"
+N7=$(mk n7 'sed -i "/restore-test.sh/d" docs/v2/evidence/issue336-337-340-345-release-r2-20261109/r-to-pkg-nondoc-files.txt'); expect_fail "N7 tampered R-to-PKG list" "R to PKG non-documentation files differ" "$N7" "$SD" "$N7"
+N8=$(mk n8 'echo "# synthetic" >> deploy/release.mjs'); expect_fail "N8 deploy/release.mjs changed after R" "R to PKG changes deploy/ files other than" "$N8" "$SD" "$N8"
+git checkout -q "$BR"; for b in n4 n5 n6 n7 n8; do git branch -q -D "neg-$b"; done
+
+echo "== merge readiness (operator layout) and ff rehearsal"
+git checkout -q -B main refs/remotes/origin/main
+git worktree add -q "$W/wt" "$BR" || exit 2
+export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh" >/dev/null; nvm use --silent 22.23.2 >/dev/null
+npm ci --no-audit --no-fund > "$W/npm-ci.txt" 2>&1 && pass "npm ci" || { fail "npm ci"; exit 1; }
+TSX="$W/c/node_modules/.bin/tsx"
+(cd "$W/wt" && "$TSX" tools/dev/merge-readiness.ts --issue 336 --expected-file docs/v2/ --expected-file issues/ \
+   --expected-file IssuesIndex.md --expected-file CHANGELOG.md --expected-file issues.md) > "$W/merge-ready-336.txt" 2>&1; rc=$?
+grep -E '^(FAIL|WARN)|Merge readiness|changed:' "$W/merge-ready-336.txt" | sed 's/^/  /'
+check_eq "merge:ready 336 exit" 0 "$rc"
+(cd "$W/c" && "$TSX" tools/dev/preflight.ts --mode merge) > "$W/preflight-merge.txt" 2>&1; rc=$?
+grep -E '^(FAIL|WARN)|Preflight result' "$W/preflight-merge.txt" | sed 's/^/  /'
+check_eq "preflight --mode merge exit" 0 "$rc"
+git merge -q --ff-only "$BR" && check_eq "ff-only result is the candidate" "$C" "$(git rev-parse main)" || fail "ff-only"
+git checkout -q -B main refs/remotes/origin/main
+echo; echo "r2 pre-publication: $P passed, $F failed"

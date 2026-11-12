@@ -1,0 +1,88 @@
+session 2026-11-12T00:27:17Z host afldb-prod user arm
+== D3c
+AFLDB post-install check 2026-11-12T00:27:17Z: expect c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x (BUILD_ID bTVyci1eHVcKvSKDVZl_x, previous 3t0xWKI76Jgna2tB8a9oN)
+release route status
+        release: current  c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x revision c1c4b22ee15007111eab66f6d354e0b9ecbb2ade BUILD_ID bTVyci1eHVcKvSKDVZl_x production
+        release: previous 0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN revision 0f251c2daa8d7c6c38eacd559376dde41e010fd9 BUILD_ID 3t0xWKI76Jgna2tB8a9oN
+        release: memory   afldb MemoryCurrent 433 MB
+        release: process  3666648 runs in /home/arm/afldb-releases/releases/c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x
+        release: health   200 status=ok database=ok
+        release: build    /_next/static/bTVyci1eHVcKvSKDVZl_x/_buildManifest.js 200
+        release: build    /_next/static/3t0xWKI76Jgna2tB8a9oN/_buildManifest.js 404 (previous; expect 404)
+        release: STATUS PASS c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x
+  ok    status --expect c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x PASS
+current build and health through loopback and the public endpoint
+  ok    http://127.0.0.1:3100/api/health {"status":"ok","database":"ok","latencyMs":0}
+  ok    http://127.0.0.1:3100 _buildManifest.js for bTVyci1eHVcKvSKDVZl_x 200
+  ok    https://beta.afldb.com/api/health {"status":"ok","database":"ok","latencyMs":1}
+  ok    https://beta.afldb.com _buildManifest.js for bTVyci1eHVcKvSKDVZl_x 200
+previous build 3t0xWKI76Jgna2tB8a9oN must be absent at the origin
+  ok    origin (loopback) previous 3t0xWKI76Jgna2tB8a9oN 404
+  ok    origin (public, cache-busted) previous 3t0xWKI76Jgna2tB8a9oN 404, cf-cache-status BYPASS
+  ok    public previous 3t0xWKI76Jgna2tB8a9oN 404
+pages and every referenced asset (public endpoint, redirects followed)
+  ok    page / -> 200 https://beta.afldb.com/beta
+  ok    page /beta -> 200 https://beta.afldb.com/beta
+  ok    page /players -> 200 https://beta.afldb.com/beta?from=%2Fplayers
+  ok    page /matches -> 200 https://beta.afldb.com/beta?from=%2Fmatches
+  ok    page /seasons -> 200 https://beta.afldb.com/beta?from=%2Fseasons
+  ok    page /clubs -> 200 https://beta.afldb.com/beta?from=%2Fclubs
+  ok    page /records -> 200 https://beta.afldb.com/beta?from=%2Frecords
+  ok    page /search -> 200 https://beta.afldb.com/beta?from=%2Fsearch
+  ok    page /admin/operations -> 200 https://beta.afldb.com/admin/login
+  ok    8 assets 200 with the right type
+  ok    all 8 served assets are byte-identical to c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x's files
+  ok    POST /api/admin/email-intake 410 (retired)
+journal since the service started
+  ok    primary start line present since Wed 2026-11-11 17:09:01 AEDT
+        [afldb] serving build bTVyci1eHVcKvSKDVZl_x release c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x revision c1c4b22ee15007111eab66f6d354e0b9ecbb2ade
+  ok    0 error/fatal/unhandled lines
+  info  NRestarts 0, MemoryCurrent 436 MB
+POST-INSTALL CHECK PASS c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x
+state probe 2026-11-12T00:27:20Z
+  OLD_ID   0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN
+  NEW_ID   c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x
+  current  c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x
+  previous 0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN
+  unit     afldb ActiveState=active Result=success MainPID=3666648
+  process  runs c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x (/home/arm/afldb-releases/releases/c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x)
+  health   {"status":"ok","database":"ok","latencyMs":1}
+  locks    none
+STATE NEW_SERVING
+Hint: You are currently not seeing messages from other users and the system.
+      Users in groups 'adm', 'systemd-journal' can see all messages.
+      Pass -q to turn off this notice.
+== c5-observe timer 2026-11-12T00:27:20Z N=c1c4b22ee15007111eab66f6d354e0b9ecbb2ade (host local 2026-11-12 11:27:20 AEDT)
+identity ok (afldb_prod, OID 66668, read-only session)
+match timer is-enabled = [enabled] (expected [enabled])
+match timer ActiveState = [active] (expected [active])
+next elapse: [Fri 2026-11-13 05:13:06 AEDT]
+Brownlow timer enabled/active = [disabled/inactive] (expected [disabled/inactive])
+AFL Tables timer enabled/active = [disabled/inactive] (expected [disabled/inactive])
+match service ActiveState (nothing running yet) = [inactive] (expected [inactive])
+settle/acquire processes = [0] (expected [0])
+setting still true = [true] (expected [true])
+afldb timers known to systemd:
+    Fri 2026-11-13 05:13:06 AEDT           17h Thu 2026-11-12 05:05:45 AEDT       6h ago afldb-settle-afl-api.timer     afldb-settle-afl-api.service
+C5-OBSERVE timer PASS
+D3c PASS
+D3c exit=0 at 2026-11-12T00:27:20Z
+== D4 (amendment D4-A, owner-approved 2026-11-11)
+release: c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x: 378 server-output file(s) differ (ISR; allowed)
+release: VERIFY PASS c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x (revision c1c4b22ee15007111eab66f6d354e0b9ecbb2ade, BUILD_ID bTVyci1eHVcKvSKDVZl_x, 12997 files)
+state probe 2026-11-12T00:27:26Z
+  OLD_ID   0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN
+  NEW_ID   c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x
+  current  c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x
+  previous 0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN
+  unit     afldb ActiveState=active Result=success MainPID=3666648
+  process  runs c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x (/home/arm/afldb-releases/releases/c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x)
+  health   {"status":"ok","database":"ok","latencyMs":4}
+  locks    none
+STATE NEW_SERVING
+GET /draft -> 307 https://beta.afldb.com/beta?from=%2Fdraft
+GET /draft/2025 -> 307 https://beta.afldb.com/beta?from=%2Fdraft%2F2025
+GET /draft/2014?view=rookie -> 307 https://beta.afldb.com/beta?from=%2Fdraft%2F2014
+release: smoke: health ok, _buildManifest.js 200, /_next/static/css/c578d4a77e7354d2.css 200, pages {"/":"200 HIT","/players":"200","/clubs":"200","/seasons":"200","/draft":"200"} (beta claim)
+D4 PASS (automated part, amendment D4-A; D4-P, D4-V and D4-O follow)
+D4 exit=0 at 2026-11-12T00:27:28Z

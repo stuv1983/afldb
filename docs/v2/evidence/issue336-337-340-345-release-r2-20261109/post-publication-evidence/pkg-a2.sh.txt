@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Re-run of negative controls N5 and N6 (pkg-a.sh harness defect: N5's edit did not commit and its dirty package.json
+# leaked into N6). Each synthetic commit now starts from a forced, cleaned checkout of the candidate.
+set -uo pipefail
+W="$1"; C="$2"; SD=docs/v2/evidence/issue336-337-340-345-release-r2-20261109/static-delta-check.sh
+P=0; F=0; pass(){ echo "PASS $1"; P=$((P+1)); }; fail(){ echo "FAIL $1"; F=$((F+1)); }
+cd "$W/c" || exit 2
+echo "state before: branch=$(git rev-parse --abbrev-ref HEAD) dirty=[$(git status --porcelain | tr '\n' ' ')]"
+mk(){ git checkout -q -f -B "neg-$1" "$C" && git clean -fdq && eval "$2" && git add -A && git commit -q -m "synthetic $1" && git rev-parse HEAD; }
+expect_fail(){ local label="$1" want="$2" pkg="$3" out rc
+  [ -n "$pkg" ] || { fail "$label: synthetic commit not created"; return; }
+  [ "$(git rev-parse "$pkg^")" = "$C" ] || { fail "$label: synthetic commit is not a child of the candidate"; return; }
+  echo "   $label touches: $(git diff --name-only "$C" "$pkg" | tr '\n' ' ')"
+  out=$(git show "$pkg:$SD" | bash -s -- "$pkg" 2>&1); rc=$?
+  if [ $rc -ne 0 ] && grep -qF "$want" <<<"$out"; then pass "$label -> exit $rc: $out"; else fail "$label (rc=$rc): $out"; fi; }
+N5=$(mk n5 'printf "\n" >> package.json'); expect_fail "N5 build input package.json changed" "build input package.json differs between R and PKG" "$N5"
+N6=$(mk n6 'printf "#!/bin/sh\n" > tools/maintenance/synthetic-extra.sh'); expect_fail "N6 unlisted non-documentation file" "R to PKG non-documentation files differ" "$N6"
+git checkout -q -f main && git clean -fdq; git branch -q -D neg-n5 neg-n6
+echo "state after: branch=$(git rev-parse --abbrev-ref HEAD) head=$(git rev-parse HEAD) dirty=[$(git status --porcelain | tr '\n' ' ')]"
+echo; echo "negative-control re-run: $P passed, $F failed"

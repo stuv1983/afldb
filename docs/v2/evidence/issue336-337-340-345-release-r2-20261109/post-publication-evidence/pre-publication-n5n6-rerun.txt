@@ -1,0 +1,8 @@
+state before: branch=main dirty=[]
+   N5 build input package.json changed touches: package.json 
+PASS N5 build input package.json changed -> exit 1: STATIC DELTA CHECK FAIL: build input package.json differs between R and PKG
+   N6 unlisted non-documentation file touches: tools/maintenance/synthetic-extra.sh 
+PASS N6 unlisted non-documentation file -> exit 1: STATIC DELTA CHECK FAIL: R to PKG non-documentation files differ from docs/v2/evidence/issue336-337-340-345-release-r2-20261109/r-to-pkg-nondoc-files.txt: > tools/maintenance/synthetic-extra.sh 
+state after: branch=main head=98a4b1987313bea84e31bed4d64ed6458bb2f509 dirty=[]
+
+negative-control re-run: 2 passed, 0 failed

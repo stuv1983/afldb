@@ -1,0 +1,38 @@
+GET /draft -> 307 https://beta.afldb.com/beta?from=%2Fdraft
+GET /draft/2025 -> 307 https://beta.afldb.com/beta?from=%2Fdraft%2F2025
+GET /draft/2014?view=rookie -> 307 https://beta.afldb.com/beta?from=%2Fdraft%2F2014
+1
+===LOG
+session 2026-11-11T05:10:33Z host afldb-prod user arm
+state probe 2026-11-11T05:10:33Z
+  OLD_ID   0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN
+  NEW_ID   (not set)
+  current  0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN
+  previous a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+  unit     afldb ActiveState=active Result=success MainPID=3427584
+  process  runs 0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN (/home/arm/afldb-releases/releases/0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN)
+  health   {"status":"ok","database":"ok","latencyMs":2}
+  locks    none
+STATE OLD_SERVING
+release: admission: MemAvailable 2773 MB of 3915 MB, swap 0 MB, free disk 46.9 GB
+release: workspace /home/arm/afldb-releases/builds/20261111T051033Z-c1c4b22ee150-750ab4
+release: npm ci: 16 s, min MemAvailable 1893 MB, peak RSS 912 MB
+release: build: 229 s, min MemAvailable 1189 MB, peak RSS 1738 MB
+release: candidate c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x passed V1-V5; boot smoke on 127.0.0.1:3199
+release: smoke: health ok, _buildManifest.js 200, /_next/static/css/c578d4a77e7354d2.css 200, pages {"/":"200 HIT","/players":"200","/clubs":"200","/seasons":"200","/draft":"200"} (beta claim)
+release: RELEASE READY c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x (12997 files, manifest 4437e7d6eebf…) at /home/arm/afldb-releases/releases/c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x
+release: next: node deploy/release.mjs promote c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x
+release: VERIFY PASS c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x (revision c1c4b22ee15007111eab66f6d354e0b9ecbb2ade, BUILD_ID bTVyci1eHVcKvSKDVZl_x, 12997 files)
+state probe 2026-11-11T05:15:07Z
+  OLD_ID   0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN
+  NEW_ID   c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x
+  current  0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN
+  previous a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+  unit     afldb ActiveState=active Result=success MainPID=3427584
+  process  runs 0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN (/home/arm/afldb-releases/releases/0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN)
+  health   {"status":"ok","database":"ok","latencyMs":3}
+  locks    none
+STATE OLD_SERVING
+D2 PASS NEW_ID=c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x
+D2 exit=0 at 2026-11-11T05:15:07Z
+D2-WRAPPER-EXIT=0

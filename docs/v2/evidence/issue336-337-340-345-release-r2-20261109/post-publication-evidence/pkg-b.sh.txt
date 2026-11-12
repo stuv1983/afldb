@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# Offline rehearsal of the r2 packet's W0, D0 and D1 blocks, extracted verbatim from the PUBLISHED packet (PKG's own bytes).
+# A local bare repository stands in for GitHub; a clone stands in for the workstation; a clone checked out at PROD_HEAD
+# stands in for the production checkout. Substitutions (printed below): the workstation path, CHK, and D1's two
+# production-state reads (`release.mjs status`, `state-probe.sh`), which need the production release tree and are NOT
+# rehearsed. Case A: origin/main = PKG (expected head). Case B: origin/main moved one commit past PKG. Case C: wrong PKG.
+set -uo pipefail
+W="$1"; PKG="$2"
+DOC=docs/v2/issue336-337-340-345-release-approval-r2-2026-11-09.md
+P=0; F=0; pass(){ echo "PASS $1"; P=$((P+1)); }; fail(){ echo "FAIL $1"; F=$((F+1)); }
+check_eq(){ if [ "$2" = "$3" ]; then pass "$1"; else fail "$1 (want '$2' got '$3')"; fi; }
+[ -e "$W/origin.git" ] && { echo "refusing: $W/origin.git exists"; exit 2; }
+git clone -q --bare https://github.com/stuv1983/afldb.git "$W/origin.git" || exit 2
+check_eq "published GitHub main is PKG" "$PKG" "$(git -C "$W/origin.git" rev-parse refs/heads/main)"
+# --- from here on, no network: everything below talks to $W/origin.git only ---
+git -C "$W/origin.git" show "$PKG:$DOC" > "$W/packet.md" || exit 2
+block(){ awk -v m="$1" 'index($0, m) == 1 {f = 1; next} f && /^```bash$/ {g = 1; next} g && /^```$/ {exit} g {print}' "$W/packet.md"; }
+vars(){ awk -v m="$1" '$0 == m {g = 1; next} g && /^```$/ {exit} g {print}' "$W/packet.md"; }
+block '**W0 (Claude, workstation).**' > "$W/W0.orig"; block '**D0 publication check' > "$W/D0.orig"; block '**D1 fast-forward the production checkout' > "$W/D1.orig"
+awk '/^```bash$/ {n++} n == 1 && !/^```/ {print} /^```$/ && n == 1 {exit}' <(sed -n '/^## 5\. Variables/,/^## 6\./p' "$W/packet.md") > "$W/vars-ws.orig"
+awk '/^```bash$/ {n++} n == 2 && !/^```/ {print} /^```$/ && n == 2 {exit}' <(sed -n '/^## 5\. Variables/,/^## 6\./p' "$W/packet.md") > "$W/vars-prod.orig"
+for f in W0 D0 D1 vars-ws vars-prod; do [ -s "$W/$f.orig" ] && pass "extracted $f ($(wc -l < "$W/$f.orig") lines)" || { fail "extract $f"; exit 1; }; done
+sed "s#cd /d/dev/afldb#cd \"\$WS\"#" "$W/W0.orig" > "$W/W0.sh"; sed "s#cd /d/dev/afldb#cd \"\$WS\"#" "$W/D0.orig" > "$W/D0.sh"
+sed -e 's#^\(  "\$N" deploy/release.mjs status.*\)$#  echo "OFFLINE-SKIP (production release state): release.mjs status"#' \
+    -e 's#^\(  bash "\$PKGG/state-probe.sh".*\)$#  echo "OFFLINE-SKIP (production release state): state-probe OLD_SERVING"#' "$W/D1.orig" > "$W/D1.sh"
+sed "s/REPLACE_WITH_40_HEX_PKG/$PKG/" "$W/vars-ws.orig" > "$W/vars-ws.sh"
+{ sed "s/REPLACE_WITH_40_HEX_PKG/$PKG/" "$W/vars-prod.orig"; echo "CHK=\"\$PRODCLONE\""; } > "$W/vars-prod.sh"
+echo "== substitutions (original vs rehearsed)"; for f in W0 D0 D1; do diff "$W/$f.orig" "$W/$f.sh" | sed "s/^/  $f: /"; done
+diff "$W/vars-ws.orig" "$W/vars-ws.sh" | sed 's/^/  vars-ws: /'; diff "$W/vars-prod.orig" "$W/vars-prod.sh" | sed 's/^/  vars-prod: /'
+
+fresh(){  # $1 case dir: workstation clone + production clone at PROD_HEAD, both with origin = $W/origin.git
+  rm -rf "$1"; mkdir -p "$1"; git clone -q "$W/origin.git" "$1/ws"; git clone -q "$W/origin.git" "$1/prod"
+  git -C "$1/prod" checkout -q -B main f32d44f07b3f81129aad4cce2feef1629a37fef1 && git -C "$1/prod" branch -q --set-upstream-to=origin/main main; }
+run(){  # $1 case dir, $2 block, $3 vars file, [$4 PKG override] -> prints output, returns exit status
+  ( export WS="$1/ws" PRODCLONE="$1/prod"; . "$3"; [ -n "${4:-}" ] && PKG="$4"; cd "$1"; . "$W/$2.sh" ) 2>&1; }
+
+echo "== Case A: origin/main = PKG (expected head)"
+A="$W/caseA"; fresh "$A"
+out=$(run "$A" W0 "$W/vars-ws.sh"); rc=$?; echo "$out" | sed 's/^/  W0| /'; [ $rc -eq 0 ] && grep -q '^W0 PASS$' <<<"$out" && pass "A W0 PASS" || fail "A W0 (rc=$rc)"
+out=$(run "$A" D0 "$W/vars-ws.sh"); rc=$?; echo "$out" | sed 's/^/  D0| /'; [ $rc -eq 0 ] && grep -q '^D0 PASS$' <<<"$out" && pass "A D0 PASS" || fail "A D0 (rc=$rc)"
+out=$(run "$A" D1 "$W/vars-prod.sh"); rc=$?; echo "$out" | sed 's/^/  D1| /'; [ $rc -eq 0 ] && grep -q '^D1 PASS$' <<<"$out" && pass "A D1 PASS" || fail "A D1 (rc=$rc)"
+check_eq "A production clone HEAD after D1 is H = R" c1c4b22ee15007111eab66f6d354e0b9ecbb2ade "$(git -C "$A/prod" rev-parse HEAD)"
+check_eq "A production clone clean after D1" "" "$(git -C "$A/prod" status --porcelain)"
+
+echo "== Case B: origin/main moved one records-only commit past PKG"
+B="$W/caseB"; rm -rf "$W/mover"; git clone -q "$W/origin.git" "$W/mover"
+( cd "$W/mover" && git config user.email rehearsal@example.test && git config user.name rehearsal && echo "synthetic" > docs/v2/synthetic-head-move.md && git add -A && git commit -q -m "synthetic head move" && git push -q origin HEAD:main )
+MOVED=$(git -C "$W/origin.git" rev-parse refs/heads/main); [ "$MOVED" != "$PKG" ] && [ "$(git -C "$W/origin.git" rev-parse "$MOVED^")" = "$PKG" ] && pass "B origin/main moved to $MOVED (child of PKG)" || fail "B head move"
+fresh "$B"; git -C "$B/prod" checkout -q -B main f32d44f07b3f81129aad4cce2feef1629a37fef1
+for blk in W0 D0; do out=$(run "$B" $blk "$W/vars-ws.sh"); rc=$?; echo "$out" | sed "s/^/  $blk| /"
+  [ $rc -ne 0 ] && ! grep -q "^$blk PASS$" <<<"$out" && pass "B $blk STOPS (exit $rc, no PASS line)" || fail "B $blk did not stop (rc=$rc)"; done
+out=$(run "$B" D1 "$W/vars-prod.sh"); rc=$?; echo "$out" | sed 's/^/  D1| /'
+[ $rc -ne 0 ] && ! grep -q '^D1 PASS$' <<<"$out" && pass "B D1 STOPS (exit $rc, no PASS line)" || fail "B D1 did not stop (rc=$rc)"
+check_eq "B production clone NOT fast-forwarded (still PROD_HEAD)" f32d44f07b3f81129aad4cce2feef1629a37fef1 "$(git -C "$B/prod" rev-parse HEAD)"
+check_eq "B production clone clean" "" "$(git -C "$B/prod" status --porcelain)"
+
+echo "== Case C: origin/main = PKG, but the approval names a different PKG (r1 c5959bbf)"
+git -C "$W/origin.git" update-ref refs/heads/main "$PKG" "$MOVED" && check_eq "C origin/main restored to PKG" "$PKG" "$(git -C "$W/origin.git" rev-parse refs/heads/main)"
+C="$W/caseC"; fresh "$C"
+for blk in W0 D0; do out=$(run "$C" $blk "$W/vars-ws.sh" c5959bbf6e2eae9b80467180a20919367afc9475); rc=$?
+  [ $rc -ne 0 ] && ! grep -q "^$blk PASS$" <<<"$out" && pass "C $blk STOPS with the wrong PKG (exit $rc)" || fail "C $blk (rc=$rc)"; done
+out=$(run "$C" D1 "$W/vars-prod.sh" c5959bbf6e2eae9b80467180a20919367afc9475); rc=$?
+[ $rc -ne 0 ] && ! grep -q '^D1 PASS$' <<<"$out" && pass "C D1 STOPS with the wrong PKG (exit $rc)" || fail "C D1 (rc=$rc)"
+check_eq "C production clone NOT fast-forwarded" f32d44f07b3f81129aad4cce2feef1629a37fef1 "$(git -C "$C/prod" rev-parse HEAD)"
+echo; echo "offline D0/D1 rehearsal: $P passed, $F failed"

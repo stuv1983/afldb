@@ -1,0 +1,97 @@
+[2026-11-11T05:39:53.719Z] READY: the browser shows the site's normal sign-in page (https://beta.afldb.com/beta). Owner: sign in there (beta link pasted into THIS window, or /admin/login). Waiting up to 30 minutes.
+[2026-11-11T05:41:19.313Z] AUTHENTICATED
+[2026-11-11T05:41:19.354Z] PASS anonymous /draft is redirected to /beta (gate on) - 307 https://beta.afldb.com/beta?from=%2Fdraft
+[2026-11-11T05:41:19.425Z] PASS authenticated /draft renders 200 - 200
+[2026-11-11T05:41:19.516Z] PASS authenticated /draft/2021 renders 200 - 200
+[2026-11-11T05:41:19.619Z] PASS authenticated /players renders 200 - 200
+[2026-11-11T05:41:19.710Z] PASS authenticated /seasons/2026 renders 200 - 200
+[2026-11-11T05:41:19.752Z] PASS /api/health 200 database ok - 200 {"status":"ok","database":"ok","latencyMs":1}
+[2026-11-11T05:41:19.753Z] session cookie names (values never read out): afldb_beta; x-afldb-build null
+[2026-11-11T05:41:19.753Z] VERDICT validate-1 PASS (6/6)
+[2026-11-11T06:09:46.238Z] PASS served build is the new release (_buildManifest.js of EXPECT_BUILD is 200) - 200 /_next/static/bTVyci1eHVcKvSKDVZl_x/_buildManifest.js
+[2026-11-11T06:09:46.861Z] PASS desktop /draft status 200, no horizontal page overflow - status 200 overflow -15px url /draft
+[2026-11-11T06:09:47.608Z] PASS desktop index card states categories
+[2026-11-11T06:09:47.960Z] PASS desktop /draft/2025 status 200, no horizontal page overflow - status 200 overflow -15px url /draft/2025
+[2026-11-11T06:09:48.521Z] PASS desktop 2025 All groups by category - NATIONAL DRAFT58
+[2026-11-11T06:09:48.524Z] PASS desktop 2025 All labels each row with its category - National — Pick 1 | National — Pick 2
+[2026-11-11T06:09:48.767Z] PASS desktop /draft/2014?view=rookie status 200, no horizontal page overflow - status 200 overflow -15px url /draft/2014
+[2026-11-11T06:09:49.258Z] PASS desktop 2014 Rookie view: Rookie tab current, rows numbered within the Rookie draft - 50 rows; tab Rookie 53; first Pick 1 | Pick 2 | Pick 4
+[2026-11-11T06:09:49.524Z] PASS desktop /draft/2025?view=rookie status 200, no horizontal page overflow - status 200 overflow -15px url /draft/2025
+[2026-11-11T06:09:50.077Z] PASS desktop Fred Rodriguez 2025 Rookie Pick 1 West Coast - ["Pick 1","Fred Rodriguez","West Coast"]
+[2026-11-11T06:09:50.081Z] PASS desktop rookie tab is current
+[2026-11-11T06:09:50.276Z] PASS desktop /draft/2025?view=national status 200, no horizontal page overflow - status 200 overflow -15px url /draft/2025
+[2026-11-11T06:09:50.817Z] PASS desktop Willem Duursma 2025 National Pick 1 West Coast - ["Pick 1","Willem Duursma","West Coast"]
+[2026-11-11T06:09:51.075Z] PASS desktop /draft/2021?view=father-son status 200, no horizontal page overflow - status 200 overflow -15px url /draft/2021
+[2026-11-11T06:09:51.612Z] PASS desktop Nick Daicos under Father–Son as National — Pick 4 — Father–Son - ["National — Pick 4 — Father–Son","Nick Daicos","Collingwood"]
+[2026-11-11T06:09:51.616Z] PASS desktop Father–Son count is a subset, All not inflated - (database 2021 rows 141) Father–Son
+5 / All
+141
+[2026-11-11T06:09:51.773Z] PASS desktop /draft/1995?view=father-son status 200, no horizontal page overflow - status 200 overflow -15px url /draft/1995
+[2026-11-11T06:09:52.342Z] PASS desktop 1995 Father–Son Pre-Draft keeps its category - Pre-Draft — Father–Son | Pre-Draft — Father–Son | Pre-Draft — Father–Son | Pre-Draft — Father–Son | Pre-Draft — Father–Son | Pre-Draft — Father–Son
+[2026-11-11T06:09:52.532Z] PASS desktop /draft/2014?view=rookie&q=Jake+Long status 200, no horizontal page overflow - status 200 overflow -15px url /draft/2014
+[2026-11-11T06:09:52.989Z] PASS desktop 2014 Father–Son Rookie keeps its category - ["Pick 47 — Father–Son","Jake Long"]
+[2026-11-11T06:09:53.173Z] PASS desktop /draft/2014?view=rookie&q=Jake%C2%A0Long status 200, no horizontal page overflow - status 200 overflow -15px url /draft/2014
+[2026-11-11T06:09:53.644Z] PASS desktop ISSUE-337 q=Jake%C2%A0Long finds Rookie Pick 47 — Father–Son - ["Pick 47 — Father–Son","Jake Long"]
+[2026-11-11T06:09:53.815Z] PASS desktop /draft/2014?view=rookie&q=jake+long status 200, no horizontal page overflow - status 200 overflow -15px url /draft/2014
+[2026-11-11T06:09:54.364Z] PASS desktop ISSUE-337 q=jake+long finds Rookie Pick 47 — Father–Son - ["Pick 47 — Father–Son","Jake Long"]
+[2026-11-11T06:09:54.508Z] PASS desktop /draft/2021?view=trade status 200, no horizontal page overflow - status 200 overflow -15px url /draft/2021
+[2026-11-11T06:09:55.054Z] PASS desktop trades stay unnumbered - 15 rows
+[2026-11-11T06:09:55.302Z] PASS desktop /draft/2025?view=national&sort=pick&dir=desc status 200, no horizontal page overflow - status 200 overflow -15px url /draft/2025
+[2026-11-11T06:09:55.837Z] PASS desktop category-specific pick sort descending - 60,57,56
+[2026-11-11T06:09:56.001Z] PASS desktop /draft/2025?club=west-coast&view=rookie status 200, no horizontal page overflow - status 200 overflow -15px url /draft/2025
+[2026-11-11T06:09:56.438Z] PASS desktop club filter within category - 1 rows
+[2026-11-11T06:09:56.621Z] PASS desktop /draft/2025?page=2 status 200, no horizontal page overflow - status 200 overflow -15px url /draft/2025
+[2026-11-11T06:09:57.087Z] PASS desktop pagination page 2 renders and the category link resets page - 50 rows; /draft/2025?view=rookie
+[2026-11-11T06:09:57.258Z] PASS desktop /draft/2025?view=mini-draft status 200, no horizontal page overflow - status 200 overflow -15px url /draft/2025
+[2026-11-11T06:09:57.762Z] PASS desktop empty category state
+[2026-11-11T06:09:57.887Z] PASS desktop /draft/2025?view=rookie&q=zzzzqq status 200, no horizontal page overflow - status 200 overflow -15px url /draft/2025
+[2026-11-11T06:09:58.342Z] PASS desktop empty filtered state
+[2026-11-11T06:09:58.480Z] PASS desktop /draft/2021?type=Rookie status 200, no horizontal page overflow - status 200 overflow -15px url /draft/2021
+[2026-11-11T06:09:58.919Z] PASS desktop legacy ?type=Rookie opens the Rookie category
+[2026-11-11T06:09:59.082Z] PASS desktop /draft/2025?view=rookie status 200, no horizontal page overflow - status 200 overflow -15px url /draft/2025
+[2026-11-11T06:09:59.608Z] PASS desktop player page labels Fred Rodriguez as 2025 Rookie Draft — Pick 1 - 2025 Rookie Draft — Pick 1
+[2026-11-11T06:09:59.726Z] PASS desktop no page errors
+[2026-11-11T06:10:00.157Z] PASS mobile /draft status 200, no horizontal page overflow - status 200 overflow 0px url /draft
+[2026-11-11T06:10:00.855Z] PASS mobile index card states categories
+[2026-11-11T06:10:01.052Z] PASS mobile /draft/2025 status 200, no horizontal page overflow - status 200 overflow 0px url /draft/2025
+[2026-11-11T06:10:01.554Z] PASS mobile 2025 All groups by category - NATIONAL DRAFT58
+[2026-11-11T06:10:01.555Z] PASS mobile 2025 All labels each row with its category - National — Pick 1 | National — Pick 2
+[2026-11-11T06:10:01.763Z] PASS mobile /draft/2014?view=rookie status 200, no horizontal page overflow - status 200 overflow 0px url /draft/2014
+[2026-11-11T06:10:02.269Z] PASS mobile 2014 Rookie view: Rookie tab current, rows numbered within the Rookie draft - 50 rows; tab Rookie 53; first Pick 1 | Pick 2 | Pick 4
+[2026-11-11T06:10:02.807Z] PASS mobile /draft/2025?view=rookie status 200, no horizontal page overflow - status 200 overflow 0px url /draft/2025
+[2026-11-11T06:10:03.313Z] PASS mobile Fred Rodriguez 2025 Rookie Pick 1 West Coast - ["Pick 1","Fred Rodriguez","West Coast"]
+[2026-11-11T06:10:03.315Z] PASS mobile rookie tab is current
+[2026-11-11T06:10:03.498Z] PASS mobile /draft/2025?view=national status 200, no horizontal page overflow - status 200 overflow 0px url /draft/2025
+[2026-11-11T06:10:04.000Z] PASS mobile Willem Duursma 2025 National Pick 1 West Coast - ["Pick 1","Willem Duursma","West Coast"]
+[2026-11-11T06:10:04.193Z] PASS mobile /draft/2021?view=father-son status 200, no horizontal page overflow - status 200 overflow 0px url /draft/2021
+[2026-11-11T06:10:04.705Z] PASS mobile Nick Daicos under Father–Son as National — Pick 4 — Father–Son - ["National — Pick 4 — Father–Son","Nick Daicos","Collingwood"]
+[2026-11-11T06:10:04.715Z] PASS mobile Father–Son count is a subset, All not inflated - (database 2021 rows 141) Father–Son
+5 / All
+141
+[2026-11-11T06:10:04.856Z] PASS mobile /draft/1995?view=father-son status 200, no horizontal page overflow - status 200 overflow 0px url /draft/1995
+[2026-11-11T06:10:05.355Z] PASS mobile 1995 Father–Son Pre-Draft keeps its category - Pre-Draft — Father–Son | Pre-Draft — Father–Son | Pre-Draft — Father–Son | Pre-Draft — Father–Son | Pre-Draft — Father–Son | Pre-Draft — Father–Son
+[2026-11-11T06:10:05.500Z] PASS mobile /draft/2014?view=rookie&q=Jake+Long status 200, no horizontal page overflow - status 200 overflow 0px url /draft/2014
+[2026-11-11T06:10:05.946Z] PASS mobile 2014 Father–Son Rookie keeps its category - ["Pick 47 — Father–Son","Jake Long"]
+[2026-11-11T06:10:06.100Z] PASS mobile /draft/2014?view=rookie&q=Jake%C2%A0Long status 200, no horizontal page overflow - status 200 overflow 0px url /draft/2014
+[2026-11-11T06:10:06.557Z] PASS mobile ISSUE-337 q=Jake%C2%A0Long finds Rookie Pick 47 — Father–Son - ["Pick 47 — Father–Son","Jake Long"]
+[2026-11-11T06:10:06.721Z] PASS mobile /draft/2014?view=rookie&q=jake+long status 200, no horizontal page overflow - status 200 overflow 0px url /draft/2014
+[2026-11-11T06:10:07.285Z] PASS mobile ISSUE-337 q=jake+long finds Rookie Pick 47 — Father–Son - ["Pick 47 — Father–Son","Jake Long"]
+[2026-11-11T06:10:07.423Z] PASS mobile /draft/2021?view=trade status 200, no horizontal page overflow - status 200 overflow 0px url /draft/2021
+[2026-11-11T06:10:07.956Z] PASS mobile trades stay unnumbered - 15 rows
+[2026-11-11T06:10:08.205Z] PASS mobile /draft/2025?view=national&sort=pick&dir=desc status 200, no horizontal page overflow - status 200 overflow 0px url /draft/2025
+[2026-11-11T06:10:08.767Z] PASS mobile category-specific pick sort descending - 60,57,56
+[2026-11-11T06:10:08.917Z] PASS mobile /draft/2025?club=west-coast&view=rookie status 200, no horizontal page overflow - status 200 overflow 0px url /draft/2025
+[2026-11-11T06:10:09.364Z] PASS mobile club filter within category - 1 rows
+[2026-11-11T06:10:09.566Z] PASS mobile /draft/2025?page=2 status 200, no horizontal page overflow - status 200 overflow 0px url /draft/2025
+[2026-11-11T06:10:10.032Z] PASS mobile pagination page 2 renders and the category link resets page - 50 rows; /draft/2025?view=rookie
+[2026-11-11T06:10:10.186Z] PASS mobile /draft/2025?view=mini-draft status 200, no horizontal page overflow - status 200 overflow 0px url /draft/2025
+[2026-11-11T06:10:10.670Z] PASS mobile empty category state
+[2026-11-11T06:10:10.810Z] PASS mobile /draft/2025?view=rookie&q=zzzzqq status 200, no horizontal page overflow - status 200 overflow 0px url /draft/2025
+[2026-11-11T06:10:11.259Z] PASS mobile empty filtered state
+[2026-11-11T06:10:11.411Z] PASS mobile /draft/2021?type=Rookie status 200, no horizontal page overflow - status 200 overflow 0px url /draft/2021
+[2026-11-11T06:10:11.835Z] PASS mobile legacy ?type=Rookie opens the Rookie category
+[2026-11-11T06:10:12.067Z] PASS mobile /draft/2025?view=rookie status 200, no horizontal page overflow - status 200 overflow 0px url /draft/2025
+[2026-11-11T06:10:12.603Z] PASS mobile player page labels Fred Rodriguez as 2025 Rookie Draft — Pick 1 - 2025 Rookie Draft — Pick 1
+[2026-11-11T06:10:12.681Z] PASS mobile no page errors
+[2026-11-11T06:10:16.294Z] VERDICT accept-1 PASS (81/81)
+[2026-11-11T06:10:58.688Z] closing the browser; the session is discarded

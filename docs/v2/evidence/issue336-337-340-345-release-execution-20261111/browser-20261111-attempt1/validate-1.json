@@ -1,0 +1,43 @@
+{
+ "command": "validate",
+ "n": 1,
+ "at": "2026-11-11T05:39:16.203Z",
+ "base": "https://beta.afldb.com",
+ "checks": [
+  {
+   "name": "anonymous /draft is redirected to /beta (gate on)",
+   "ok": true,
+   "detail": "307 https://beta.afldb.com/beta?from=%2Fdraft"
+  },
+  {
+   "name": "authenticated /draft renders 200",
+   "ok": true,
+   "detail": "200"
+  },
+  {
+   "name": "authenticated /draft/2021 renders 200",
+   "ok": true,
+   "detail": "200"
+  },
+  {
+   "name": "authenticated /players renders 200",
+   "ok": true,
+   "detail": "200"
+  },
+  {
+   "name": "authenticated /seasons/2026 renders 200",
+   "ok": true,
+   "detail": "200"
+  },
+  {
+   "name": "/api/health 200 database ok",
+   "ok": true,
+   "detail": "200 {\"status\":\"ok\",\"database\":\"ok\",\"latencyMs\":8}"
+  }
+ ],
+ "cookieNames": [
+  "afldb_beta"
+ ],
+ "x_afldb_build": null,
+ "verdict": "PASS"
+}

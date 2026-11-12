@@ -1,0 +1,30 @@
+PASS bundle sha256
+PASS GitHub origin/main is the derivation base
+PASS candidate SHA
+PASS candidate parent is the base
+PASS R tree is the qualified tree
+== positive: r2 static check against the exact candidate
+STATIC DELTA CHECK PASS r2 (R=c1c4b22ee15007111eab66f6d354e0b9ecbb2ade PKG=12aa6e29d51099eb6d3fbc901bbe488c5dbd7ab3; ships: 37 enumerated non-documentation files, 16 application source files, deploy/ = 2 DEV-only files; main after R, not shipped: 17 enumerated non-documentation files, 4 ISSUE-344 source files, 3 DEV-only deploy files, build inputs identical)
+PASS r2 static check exit at candidate
+PASS PASS line printed
+== negative controls
+PASS N1 superseded r1 script at candidate -> exit 1: STATIC DELTA CHECK FAIL: application tree src differs between R and PKG
+PASS N2 r2 script with r1 PKG c5959bbf -> exit 1: STATIC DELTA CHECK FAIL: docs/v2/evidence/issue336-337-340-345-release-r2-20261109/prod-checkout-to-r-nondoc-files.txt is not in PKG
+PASS N3 malformed PKG -> exit 1: STATIC DELTA CHECK FAIL: PKG must be 40 lowercase hex (got 'REPLACE_WITH_40_HEX_PKG')
+PASS N4 extra application source after R -> exit 1: STATIC DELTA CHECK FAIL: R to PKG changes application source other than the four ISSUE-344 files: src/app/admin/draft/page.tsx src/app/draft/[year]/page.tsx src/db/queries/admin-draft.ts src/db/queries/draft.ts src/lib/like.ts 
+FAIL N5 build input package.json changed (rc=1): STATIC DELTA CHECK FAIL: PKG must be 40 lowercase hex (got '')
+FAIL N6 unlisted non-documentation file (rc=1): STATIC DELTA CHECK FAIL: build input package.json differs between R and PKG
+PASS N7 tampered R-to-PKG list -> exit 1: STATIC DELTA CHECK FAIL: R to PKG non-documentation files differ from docs/v2/evidence/issue336-337-340-345-release-r2-20261109/r-to-pkg-nondoc-files.txt: > tools/maintenance/restore-test.sh 
+PASS N8 deploy/release.mjs changed after R -> exit 1: STATIC DELTA CHECK FAIL: R to PKG changes deploy/ files other than the three DEV-only sync-dev files: deploy/release.mjs deploy/sync-dev-remote.sh deploy/sync-dev-transport.sh deploy/sync-dev.ps1 
+== merge readiness (operator layout) and ff rehearsal
+PASS npm ci
+  WARN runbook readiness metadata unavailable: issues/open/AFLDB-ISSUE-336.md
+       changed: 10; expected rules: 5; unexpected: 0
+  Merge readiness: READY (0 blocker(s), 1 warning(s)).
+PASS merge:ready 336 exit
+  WARN .env file presence
+  Preflight result: READY (0 blocker(s), 1 warning(s)).
+PASS preflight --mode merge exit
+PASS ff-only result is the candidate
+
+r2 pre-publication: 17 passed, 2 failed

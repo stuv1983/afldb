@@ -1,0 +1,24 @@
+session 2026-11-12T00:27:05Z host afldb-prod user arm
+state probe 2026-11-12T00:27:05Z
+  OLD_ID   0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN
+  NEW_ID   c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x
+  current  c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x
+  previous 0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN
+  unit     afldb ActiveState=active Result=success MainPID=3666648
+  process  runs c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x (/home/arm/afldb-releases/releases/c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x)
+  health   {"status":"ok","database":"ok","latencyMs":0}
+  locks    none
+STATE NEW_SERVING
+HEAD c1c4b22ee15007111eab66f6d354e0b9ecbb2ade dirty=0
+0 Wed 2026-11-11 17:09:01 AEDT 
+journal errors since start: 0
+-- nightly match settle since restart:
+2026-11-12T05:05:45+11:00 afldb-prod afldb-settle-afl-api[3685948]: [monitor] success marker: AFLDB_SETTLE_SUCCESS
+2026-11-12T05:05:45+11:00 afldb-prod afldb-settle-afl-api[3685948]: [monitor] failure marker: AFLDB_SETTLE_FAILURE (also inspect REFUSED|ERROR|FAILED|Traceback)
+2026-11-12T05:05:47+11:00 afldb-prod afldb-settle-afl-api[3685948]: AFLDB_SETTLE_SUCCESS label=afl-api-2027-2026-11-11-180546
+success Thu 2026-11-12 05:05:47 AEDT 0 
+Fri 2026-11-13 05:13:06 AEDT  17h Thu 2026-11-12 05:05:45 AEDT 6h ago afldb-settle-afl-api.timer afldb-settle-afl-api.service
+beta gate lines: 1
+GET /draft -> 307 https://beta.afldb.com/beta?from=%2Fdraft
+GET /draft/2025 -> 307 https://beta.afldb.com/beta?from=%2Fdraft%2F2025
+GET /draft/2014?view=rookie -> 307 https://beta.afldb.com/beta?from=%2Fdraft%2F2014
