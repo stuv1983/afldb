@@ -1,0 +1,10 @@
+632b10327a3b50aa7f0a99e58890d99e6bedf167ca58e66e77732d9139a7eb0f  /home/arm/ops/gap029-stages/a25306f9/runs/I336-20261112T025001Z/backup.json
+c44872bd2c00e23aa18a40a1307b43fd77ba75baafabd7e69c76a4c8aefe8b53  /home/arm/ops/gap029-stages/a25306f9/runs/I336-20261112T025001Z/restore-evidence.json
+total 32
+drwx------ 3 arm arm 4096 Nov 12 13:51 .
+drwx------ 3 arm arm 4096 Nov 12 13:50 ..
+-rw------- 1 arm arm   69 Nov 12 13:50 actor.txt
+-rw-rw-r-- 1 arm arm 5189 Nov 12 13:51 backup.json
+drwx------ 2 arm arm 4096 Nov 12 13:50 logs
+-rw-rw-r-- 1 arm arm 1124 Nov 12 13:51 restore-evidence.json
+-rw------- 1 arm arm  212 Nov 12 13:50 target.json

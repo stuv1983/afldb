@@ -1,0 +1,62 @@
+== plan I336 (I336-20261112T025001Z): inputs 2026-11-12T02:52:00Z
+CAPTURE CHECK PASS stage I336 class GENUINE_PRODUCTION profile production dump afldb_prod-20261112T025001Z.dump bytes 29953917 sha256 0d517f5a3db7ccb887615df2c3fa3f136918f5dd4941df939e7e1a8d843a34c6 captured 2026-11-12T02:50:02.929352Z ledger 118
+TARGET CHECK PASS
+no conflicting writer, migration or dump process
+== plan I336 (I336-20261112T025001Z): tool plan (read-only; writes only the plan file) 2026-11-12T02:52:01Z
+Review plan afa26158781c0538166302be05d440a79af9ab805f8143f218c5cf804e90f608; no writes (35 to insert, 31 new persons, 0 already present); actor 1 is asserted only at apply
+[tool log /home/arm/ops/gap029-stages/a25306f9/runs/I336-20261112T025001Z/logs/plan-1.log exit 0]
+cp: warning: behavior of -n is non-portable and may change in future; use --update=none instead
+== plan I336 (I336-20261112T025001Z): manifest 2026-11-12T02:52:03Z
+MANIFEST WRITTEN stage I336 revision a25306f930015acef602bcc60d76613bdcc3d466 plan afa26158781c0538166302be05d440a79af9ab805f8143f218c5cf804e90f608 class GENUINE_PRODUCTION sha256 636d83ea9c40d5657ab1b2185b9f93ebc68e07aa9bc6359ab3228abaf2f60710
+== plan I336 (I336-20261112T025001Z): read-only state against the new plan (also re-verifies the plan digest) 2026-11-12T02:52:04Z
+STATE BASELINE (the plan has not been applied)
+[tool log /home/arm/ops/gap029-stages/a25306f9/runs/I336-20261112T025001Z/logs/state-1.log exit 0]
+PLAN I336 35 DraftGuru Pre-Draft rows (draft_picks, audited under the season seal)
+  digest afa26158781c0538166302be05d440a79af9ab805f8143f218c5cf804e90f608
+  plan file sha256 3c7580acf30d036e642813a054857f3b0d05607eb99703d13d16c710a94cbaed
+  revision a25306f930015acef602bcc60d76613bdcc3d466
+  evidence class GENUINE_PRODUCTION
+  target afldb_prod OID 66668 system 7674454702926115004 as afldb_backup
+  backup sha256 0d517f5a3db7ccb887615df2c3fa3f136918f5dd4941df939e7e1a8d843a34c6 captured 2026-11-12T02:50:02.929Z restored 2026-11-12T02:51:31.332Z
+  restore evidence sha256 c44872bd2c00e23aa18a40a1307b43fd77ba75baafabd7e69c76a4c8aefe8b53
+  plan expires 2026-11-13T02:52:02.953Z; approvals must expire before 2026-11-13T02:30:02.929Z (backup 24 h limit minus 20 min)
+  expected changes:
+    INSERT 35 draft_picks rows (source draftguru, Pre-Draft, unnumbered), 31 new unmatched draft_persons rows, and one data_edits audit row per pick as actor auth_users.id 1; nothing updated or deleted; no override written
+      https://www.draftguru.com.au/years/2008#6 -> to insert (new person)
+      https://www.draftguru.com.au/years/2008#7 -> to insert (new person)
+      https://www.draftguru.com.au/years/2008#8 -> to insert (new person)
+      https://www.draftguru.com.au/years/2008#9 -> to insert (new person)
+      https://www.draftguru.com.au/years/2009#23 -> to insert (new person)
+      https://www.draftguru.com.au/years/2009#24 -> to insert (new person)
+      https://www.draftguru.com.au/years/2009#25 -> to insert (person 2753, unique)
+      https://www.draftguru.com.au/years/2009#26 -> to insert (new person)
+      https://www.draftguru.com.au/years/2009#27 -> to insert (new person)
+      https://www.draftguru.com.au/years/2009#28 -> to insert (new person)
+      https://www.draftguru.com.au/years/2009#29 -> to insert (new person)
+      https://www.draftguru.com.au/years/2009#30 -> to insert (new person)
+      https://www.draftguru.com.au/years/2009#31 -> to insert (new person)
+      https://www.draftguru.com.au/years/2009#32 -> to insert (person 1717, unmatched)
+      https://www.draftguru.com.au/years/2009#33 -> to insert (new person)
+      https://www.draftguru.com.au/years/2010#21 -> to insert (new person)
+      https://www.draftguru.com.au/years/2010#22 -> to insert (person 4410, unmatched)
+      https://www.draftguru.com.au/years/2011#28 -> to insert (new person)
+      https://www.draftguru.com.au/years/2011#29 -> to insert (new person)
+      https://www.draftguru.com.au/years/2011#30 -> to insert (new person)
+      https://www.draftguru.com.au/years/2011#31 -> to insert (new person)
+      https://www.draftguru.com.au/years/2011#32 -> to insert (new person)
+      https://www.draftguru.com.au/years/2012#45 -> to insert (new person)
+      https://www.draftguru.com.au/years/2012#46 -> to insert (new person)
+      https://www.draftguru.com.au/years/2012#47 -> to insert (new person)
+      https://www.draftguru.com.au/years/2012#48 -> to insert (new person)
+      https://www.draftguru.com.au/years/2013#43 -> to insert (new person)
+      https://www.draftguru.com.au/years/2014#36 -> to insert (new person)
+      https://www.draftguru.com.au/years/2015#48 -> to insert (new person)
+      https://www.draftguru.com.au/years/2015#49 -> to insert (new person)
+      https://www.draftguru.com.au/years/2017#35 -> to insert (person 1875, unique)
+      https://www.draftguru.com.au/years/2021#27 -> to insert (new person)
+      https://www.draftguru.com.au/years/2025#35 -> to insert (new person)
+      https://www.draftguru.com.au/years/2025#36 -> to insert (new person)
+      https://www.draftguru.com.au/years/2025#37 -> to insert (new person)
+PLAN_COMPLETE stage=I336 run=I336-20261112T025001Z
+== DONE plan 2026-11-12T02:52:05Z
+PLAN-EXIT=0

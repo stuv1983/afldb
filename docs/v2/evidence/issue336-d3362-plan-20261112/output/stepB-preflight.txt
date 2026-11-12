@@ -1,0 +1,10 @@
+== preflight I336: order gate 2026-11-12T02:49:51Z
+== preflight I336: exclusivity (read-only) 2026-11-12T02:49:51Z
+no conflicting writer, migration or dump process
+== preflight I336: live identity, ledger and extensions (read-only session) 2026-11-12T02:49:51Z
+live identity: db=afldb_prod user=afldb_backup oid=66668 system=7674454702926115004 ledger=118/118_fixtures_unconfirmed_participants.sql
+== preflight I336: actor auth_users.id 1 (migration-105 predicate by plain SELECTs; no function call) 2026-11-12T02:49:51Z
+actor1 (id, role, enabled, enrolled, non_fixture_email, owner_email_match): 1	super_admin	true	true	true	unchecked; enabled super_admin count: 1
+PREFLIGHT_OK stage=I336 class=GENUINE_PRODUCTION
+== DONE preflight 2026-11-12T02:49:51Z
+PREFLIGHT-EXIT=0

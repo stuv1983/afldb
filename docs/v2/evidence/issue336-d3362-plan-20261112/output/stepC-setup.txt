@@ -1,0 +1,7 @@
+setup script compare unavailable or differs
+ports_free
+roles: afldb_owner, afldb_app, afldb_import, afldb_backup, afldb_auth present
+waiting for server to shut down.... done
+server stopped
+RESTORE_WORKSPACE_READY /mnt/ssd/afldb-i336-prod-20261112T025043Z revision a25306f930015acef602bcc60d76613bdcc3d466
+SETUP-EXIT=0

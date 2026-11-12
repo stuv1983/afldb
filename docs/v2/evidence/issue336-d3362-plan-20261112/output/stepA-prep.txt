@@ -1,0 +1,8 @@
+== prep: verify upload, extract, pin (idempotent) 2026-11-12T02:49:34Z
+pinned_checkout=/home/arm/ops/gap029-stages/a25306f9/cand HEAD=a25306f930015acef602bcc60d76613bdcc3d466 tracked=5801 dirty=0 node=v22.23.2
+prod_checkout_unchanged: head=c1c4b22ee15007111eab66f6d354e0b9ecbb2ade status_lines=0
+wrapper library loads; stages S1,S2,S3,S4,I336
+python 3.12.3 psycopg 3.3.4
+profile=production class=GENUINE_PRODUCTION profile_sha256=9bee98b5b071694100a867d14008b9316652f93894568a5db01fd0833baa8170
+== DONE prep 2026-11-12T02:49:41Z
+PREP-EXIT=0

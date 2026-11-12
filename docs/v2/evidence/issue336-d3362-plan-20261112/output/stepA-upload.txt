@@ -1,0 +1,13 @@
+48f43dc840a6f97e0b24b588ff50cd04463521eb6377c94f1a3527780d353685  /home/arm/ops/gap029-stages/a25306f9/in/cand.tar.gz
+/home/arm/ops/gap029-stages/a25306f9:
+total 12
+drwx------ 3 arm arm 4096 Nov 12 13:48 .
+drwx------ 5 arm arm 4096 Nov 12 13:48 ..
+drwx------ 2 arm arm 4096 Nov 12 13:48 in
+
+/home/arm/ops/gap029-stages/a25306f9/in:
+total 301936
+drwx------ 2 arm arm      4096 Nov 12 13:48 .
+drwx------ 3 arm arm      4096 Nov 12 13:48 ..
+-rw------- 1 arm arm 309167386 Nov 12 13:49 cand.tar.gz
+/home/arm/ops/gap029-stages/c1c4b22e/runs/I336-20261112T010605Z

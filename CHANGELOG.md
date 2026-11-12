@@ -15,7 +15,10 @@ commit.
 
 ## [Unreleased]
 
-- ISSUE-349 (local): pin I336 read-only and writer sessions to UTC so timestamp-based baseline digests do not depend on the database server time zone. Linux unit 85/85, typecheck and non-UTC red/green end-to-end simulation PASS; no production execution.
+### ISSUE-349: I336 sessions pinned to UTC (published 2026-11-12 at `ae47f94f`); D-336-2 planned on production
+
+- `tools/v2/issue336-predraft-insert-production.ts` opens its read-only and writer sessions with `TimeZone=Etc/UTC`, so the I336 baseline digest no longer depends on the database server's time zone (production runs `Australia/Melbourne`). Linux `gap029-ops` 85/85, typecheck and a Melbourne/UTC red-green simulation passed.
+- D-336-2 Steps A–D re-ran at ops pin `a25306f9` and reached PLAN_COMPLETE on production (plan digest `afa26158…f608`, backup `0d517f5a…34c6`). No database write; E+F needs the owner's OD-4.
 
 ### ISSUE-336/337/340/345 released to production (restart 2026-11-11; accepted 2026-11-12)
 

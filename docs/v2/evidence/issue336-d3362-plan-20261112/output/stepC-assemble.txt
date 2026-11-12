@@ -1,0 +1,39 @@
+CAPTURE_SUMS_OK
+2026-11-12T02:51:18Z A0 inputs (profile production, evidence class GENUINE_PRODUCTION)
+CAPTURE CHECK PASS stage I336 class GENUINE_PRODUCTION profile production dump afldb_prod-20261112T025001Z.dump bytes 29953917 sha256 0d517f5a3db7ccb887615df2c3fa3f136918f5dd4941df939e7e1a8d843a34c6 captured 2026-11-12T02:50:02.929352Z ledger 118
+TARGET CHECK PASS
+dump sha256 0d517f5a3db7ccb887615df2c3fa3f136918f5dd4941df939e7e1a8d843a34c6 verified by check-capture; candidate clean at a25306f930015acef602bcc60d76613bdcc3d466; stage I336
+DEV services BEFORE:
+afldb.service active MainPID=1730
+postgresql@16-main.service active MainPID=1555
+2026-11-12T02:51:19Z A1 start the guarded cluster
+pg_ctl: server is running (PID: 703784)
+/usr/lib/postgresql/16/bin/postgres "-D" "/mnt/ssd/afldb-i336-prod-20261112T025043Z/pg-root/data"
+LISTEN 0      600        127.0.0.1:55493      0.0.0.0:*    users:(("postgres",pid=703784,fd=7))         
+2026-11-12T02:51:24Z A2 restore into a guarded disposable database
+create-db: afldb_v2_gap029_i336_20261112_025001_rst_test created and marked
+isolated-pg: afldb_v2_gap029_i336_20261112_025001_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running node
+pg_restore exit=0 seconds=6 stderrLines=0
+restore_started=2026-11-12T02:51:24.723Z restored_at=2026-11-12T02:51:31.332Z
+isolated-pg: afldb_v2_gap029_i336_20261112_025001_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running node
+afldb_v2_gap029_i336_20261112_025001_rst_test {"ledger":"118_fixtures_unconfirmed_participants.sql","matches":17056,"fixtures":218,"receipts":5}
+archive toc entries: 1651
+2026-11-12T02:51:31Z A3 restore evidence (identity proven by query inside the guarded database; source identity from the capture provenance, checked against the production target)
+isolated-pg: afldb_v2_gap029_i336_20261112_025001_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running bash
+Restore evidence written (118 ledger rows, 1651 archive entries); sha256 c44872bd2c00e23aa18a40a1307b43fd77ba75baafabd7e69c76a4c8aefe8b53
+2026-11-12T02:51:33Z A4 assemble the sealed backup evidence for I336 from the restored copy
+isolated-pg: afldb_v2_gap029_i336_20261112_025001_rst_test verified (cluster afldb_v2_isolated, 127.0.0.1:55493); running bash
+Assembled I336 restore evidence at revision a25306f93001; backup sha256 0d517f5a3db7; seal 90aaa768f420; sha256 632b10327a3b50aa7f0a99e58890d99e6bedf167ca58e66e77732d9139a7eb0f
+OUTPUT backup.json 632b10327a3b50aa7f0a99e58890d99e6bedf167ca58e66e77732d9139a7eb0f
+OUTPUT restore-evidence.json c44872bd2c00e23aa18a40a1307b43fd77ba75baafabd7e69c76a4c8aefe8b53
+ASSEMBLY_COMPLETE stage=I336 class=GENUINE_PRODUCTION evidence_dir=/mnt/ssd/afldb-i336-prod-20261112T025043Z/evidence-private/i336_20261112_025001
+2026-11-12T02:51:34Z A9 stop the cluster and prove isolation
+waiting for server to shut down.... done
+server stopped
+DEV services AFTER:
+afldb.service active MainPID=1730
+postgresql@16-main.service active MainPID=1555
+DEV services unchanged
+2026-11-12T02:51:37Z DONE rc=0
+ASSEMBLE-EXIT=0
+port_55493_closed

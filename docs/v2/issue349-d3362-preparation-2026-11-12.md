@@ -1,6 +1,6 @@
 # ISSUE-349: proposed D-336-2 preparation at the UTC ops pin
 
-Status: LOCAL PREPARATION. Not approved for executable publication or production use.
+Status: EXECUTED 2026-11-12. The owner approved publication and fresh A+B/C+D; the fix range was published (`origin/main` `ae47f94f`) and Steps A–D at this pin reached PLAN_COMPLETE (`docs/v2/evidence/issue336-d3362-plan-20261112/README.md`). E+F is not approved. Originally: LOCAL PREPARATION.
 The owner approved local implementation/qualification and separately approved publication
 of records 633e4390/595dc394 (completed).
 

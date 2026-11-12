@@ -1,0 +1,397 @@
+{
+  "operation": "issue336-predraft-insert",
+  "revision": "a25306f930015acef602bcc60d76613bdcc3d466",
+  "target": {
+    "host": "localhost",
+    "port": 5432,
+    "database": "afldb_prod",
+    "user": "afldb_backup",
+    "systemIdentifier": "7674454702926115004",
+    "databaseOid": "66668",
+    "clusterName": "16/main",
+    "databaseComment": null
+  },
+  "rehearsal": false,
+  "actorUserId": 1,
+  "evidenceSha256": "6a207cfe3b1408d6ff747040cecfac1cde9ebd9a43f584711c573eb20ff511cb",
+  "baselineDigest": "6a5c7dfd8c0439ac793561e0da44a3f24e6a70496f28dc89cbf9aec2b5ba21ae",
+  "importBatchesBefore": 84,
+  "backup": {
+    "target": {
+      "host": "localhost",
+      "port": 5432,
+      "database": "afldb_prod",
+      "user": "afldb_backup",
+      "systemIdentifier": "7674454702926115004",
+      "databaseOid": "66668",
+      "clusterName": "16/main",
+      "databaseComment": null
+    },
+    "sha256": "0d517f5a3db7ccb887615df2c3fa3f136918f5dd4941df939e7e1a8d843a34c6",
+    "restoreEvidenceSha256": "c44872bd2c00e23aa18a40a1307b43fd77ba75baafabd7e69c76a4c8aefe8b53",
+    "capturedAt": "2026-11-12T02:50:02.929Z",
+    "restoredAt": "2026-11-12T02:51:31.332Z",
+    "baselineDigest": "6a5c7dfd8c0439ac793561e0da44a3f24e6a70496f28dc89cbf9aec2b5ba21ae",
+    "importBatchesBefore": 84,
+    "assembly": {
+      "format": "afldb.gap029.restore-evidence-assembly.1",
+      "stage": "I336",
+      "operation": "issue336-predraft-insert",
+      "revision": "a25306f930015acef602bcc60d76613bdcc3d466",
+      "assembledAt": "2026-11-12T02:51:34.669Z",
+      "restoreTarget": {
+        "host": "127.0.0.1",
+        "port": 55493,
+        "database": "afldb_v2_gap029_i336_20261112_025001_rst_test",
+        "user": "afldb_owner",
+        "systemIdentifier": "7707112027996174900",
+        "databaseOid": "16390",
+        "clusterName": "afldb_v2_isolated",
+        "databaseComment": "afldb-v2-isolated-test"
+      },
+      "inputs": {
+        "dumpSha256": "0d517f5a3db7ccb887615df2c3fa3f136918f5dd4941df939e7e1a8d843a34c6",
+        "restoreEvidenceSha256": "c44872bd2c00e23aa18a40a1307b43fd77ba75baafabd7e69c76a4c8aefe8b53",
+        "toolSha256": {
+          "tools/v2/issue336-predraft-insert-production.ts": "d0f32981d460e5bb3ea0e1ead9f43475d2d92344b86248908554ed314d7b7765",
+          "tools/v2/gap029-common.ts": "9a42b41bbeffa9b73dec9d8b1d34cc164194cc29ed2319e2512dab971522fe55",
+          "src/db/queries/audit-log.ts": "21c0934482a527bb273b6a3996e16d45c19e99b90f17460371df66277c61517c",
+          "src/lib/seasons/sealed-editor-guard.ts": "f772a5e517e5721efe462700ec5f06a1f42e2159d317c82a6d3abd311254776b",
+          "data/reference/draftguru-event-kinds.json": "cbf93a3061ec0f69b02cb2035c6b1b807f9eb525694a3408085733c461c2d0c6",
+          "tools/rebuild/draftguru/draftguru-contract.json": "a1ce814ab7e1d7ad89054ce9d3736de78a63f2321f237452713688290c8bd130",
+          "docs/v2/evidence/issue336-draft-categories-20261105/predraft-insert-plan.json": "6a207cfe3b1408d6ff747040cecfac1cde9ebd9a43f584711c573eb20ff511cb"
+        }
+      },
+      "derived": {
+        "mode": "baseline --rehearsal",
+        "outputSha256": "5c7b395447d4cda3ccb9e1088d2bbd23acd750c9838e7d071ba9e698d77871a8",
+        "values": {
+          "baselineDigest": "6a5c7dfd8c0439ac793561e0da44a3f24e6a70496f28dc89cbf9aec2b5ba21ae",
+          "importBatchesBefore": 84
+        }
+      },
+      "sealedBody": "{\"assembly\":{\"assembledAt\":\"2026-11-12T02:51:34.669Z\",\"derived\":{\"mode\":\"baseline --rehearsal\",\"outputSha256\":\"5c7b395447d4cda3ccb9e1088d2bbd23acd750c9838e7d071ba9e698d77871a8\",\"values\":{\"baselineDigest\":\"6a5c7dfd8c0439ac793561e0da44a3f24e6a70496f28dc89cbf9aec2b5ba21ae\",\"importBatchesBefore\":84}},\"format\":\"afldb.gap029.restore-evidence-assembly.1\",\"inputs\":{\"dumpSha256\":\"0d517f5a3db7ccb887615df2c3fa3f136918f5dd4941df939e7e1a8d843a34c6\",\"restoreEvidenceSha256\":\"c44872bd2c00e23aa18a40a1307b43fd77ba75baafabd7e69c76a4c8aefe8b53\",\"toolSha256\":{\"data/reference/draftguru-event-kinds.json\":\"cbf93a3061ec0f69b02cb2035c6b1b807f9eb525694a3408085733c461c2d0c6\",\"docs/v2/evidence/issue336-draft-categories-20261105/predraft-insert-plan.json\":\"6a207cfe3b1408d6ff747040cecfac1cde9ebd9a43f584711c573eb20ff511cb\",\"src/db/queries/audit-log.ts\":\"21c0934482a527bb273b6a3996e16d45c19e99b90f17460371df66277c61517c\",\"src/lib/seasons/sealed-editor-guard.ts\":\"f772a5e517e5721efe462700ec5f06a1f42e2159d317c82a6d3abd311254776b\",\"tools/rebuild/draftguru/draftguru-contract.json\":\"a1ce814ab7e1d7ad89054ce9d3736de78a63f2321f237452713688290c8bd130\",\"tools/v2/gap029-common.ts\":\"9a42b41bbeffa9b73dec9d8b1d34cc164194cc29ed2319e2512dab971522fe55\",\"tools/v2/issue336-predraft-insert-production.ts\":\"d0f32981d460e5bb3ea0e1ead9f43475d2d92344b86248908554ed314d7b7765\"}},\"operation\":\"issue336-predraft-insert\",\"restoreTarget\":{\"clusterName\":\"afldb_v2_isolated\",\"database\":\"afldb_v2_gap029_i336_20261112_025001_rst_test\",\"databaseComment\":\"afldb-v2-isolated-test\",\"databaseOid\":\"16390\",\"host\":\"127.0.0.1\",\"port\":55493,\"systemIdentifier\":\"7707112027996174900\",\"user\":\"afldb_owner\"},\"revision\":\"a25306f930015acef602bcc60d76613bdcc3d466\",\"stage\":\"I336\"},\"baselineDigest\":\"6a5c7dfd8c0439ac793561e0da44a3f24e6a70496f28dc89cbf9aec2b5ba21ae\",\"capturedAt\":\"2026-11-12T02:50:02.929Z\",\"importBatchesBefore\":84,\"restoreEvidenceSha256\":\"c44872bd2c00e23aa18a40a1307b43fd77ba75baafabd7e69c76a4c8aefe8b53\",\"restoredAt\":\"2026-11-12T02:51:31.332Z\",\"sha256\":\"0d517f5a3db7ccb887615df2c3fa3f136918f5dd4941df939e7e1a8d843a34c6\",\"target\":{\"clusterName\":\"16/main\",\"database\":\"afldb_prod\",\"databaseComment\":null,\"databaseOid\":\"66668\",\"host\":\"localhost\",\"port\":5432,\"systemIdentifier\":\"7674454702926115004\",\"user\":\"afldb_backup\"}}",
+      "sealedBodySha256": "90aaa768f4201a39405f90e8e2041d361d855cf5c8e2e1730d4fba5ae351760e"
+    }
+  },
+  "createdAt": "2026-11-12T02:52:02.953Z",
+  "expiresAt": "2026-11-13T02:52:02.953Z",
+  "entries": [
+    {
+      "key": "[\"https://www.draftguru.com.au/players/solomoni_loki/1\",2008,\"pre_draft\"]",
+      "sourceRecordId": "https://www.draftguru.com.au/years/2008#6",
+      "clubId": 24,
+      "personId": null,
+      "playerId": null,
+      "linkStatus": "unmatched",
+      "action": "to insert"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/amua_pirika/1\",2008,\"pre_draft\"]",
+      "sourceRecordId": "https://www.draftguru.com.au/years/2008#7",
+      "clubId": 11,
+      "personId": null,
+      "playerId": null,
+      "linkStatus": "unmatched",
+      "action": "to insert"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/inoke_ratu/1\",2008,\"pre_draft\"]",
+      "sourceRecordId": "https://www.draftguru.com.au/years/2008#8",
+      "clubId": 24,
+      "personId": null,
+      "playerId": null,
+      "linkStatus": "unmatched",
+      "action": "to insert"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/stanis_susuve/1\",2008,\"pre_draft\"]",
+      "sourceRecordId": "https://www.draftguru.com.au/years/2008#9",
+      "clubId": 11,
+      "personId": null,
+      "playerId": null,
+      "linkStatus": "unmatched",
+      "action": "to insert"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/donald_barry/1\",2009,\"pre_draft\"]",
+      "sourceRecordId": "https://www.draftguru.com.au/years/2009#23",
+      "clubId": null,
+      "personId": null,
+      "playerId": null,
+      "linkStatus": "unmatched",
+      "action": "to insert"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/brendan_beno/1\",2009,\"pre_draft\"]",
+      "sourceRecordId": "https://www.draftguru.com.au/years/2009#24",
+      "clubId": null,
+      "personId": null,
+      "playerId": null,
+      "linkStatus": "unmatched",
+      "action": "to insert"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/kurt_heatherley/1\",2009,\"pre_draft\"]",
+      "sourceRecordId": "https://www.draftguru.com.au/years/2009#25",
+      "clubId": 13,
+      "personId": 2753,
+      "playerId": 8331,
+      "linkStatus": "unique",
+      "action": "to insert"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/ezra_kautu/1\",2009,\"pre_draft\"]",
+      "sourceRecordId": "https://www.draftguru.com.au/years/2009#26",
+      "clubId": null,
+      "personId": null,
+      "playerId": null,
+      "linkStatus": "unmatched",
+      "action": "to insert"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/peter_labi/1\",2009,\"pre_draft\"]",
+      "sourceRecordId": "https://www.draftguru.com.au/years/2009#27",
+      "clubId": 4,
+      "personId": null,
+      "playerId": null,
+      "linkStatus": "unmatched",
+      "action": "to insert"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/max_lavai/1\",2009,\"pre_draft\"]",
+      "sourceRecordId": "https://www.draftguru.com.au/years/2009#28",
+      "clubId": 6,
+      "personId": null,
+      "playerId": null,
+      "linkStatus": "unmatched",
+      "action": "to insert"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/nathan_malbak/1\",2009,\"pre_draft\"]",
+      "sourceRecordId": "https://www.draftguru.com.au/years/2009#29",
+      "clubId": 18,
+      "personId": null,
+      "playerId": null,
+      "linkStatus": "unmatched",
+      "action": "to insert"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/david_meli/1\",2009,\"pre_draft\"]",
+      "sourceRecordId": "https://www.draftguru.com.au/years/2009#30",
+      "clubId": 6,
+      "personId": null,
+      "playerId": null,
+      "linkStatus": "unmatched",
+      "action": "to insert"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/victor_rame/1\",2009,\"pre_draft\"]",
+      "sourceRecordId": "https://www.draftguru.com.au/years/2009#31",
+      "clubId": 6,
+      "personId": null,
+      "playerId": null,
+      "linkStatus": "unmatched",
+      "action": "to insert"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/gideon_simon/1\",2009,\"pre_draft\"]",
+      "sourceRecordId": "https://www.draftguru.com.au/years/2009#32",
+      "clubId": 18,
+      "personId": 1717,
+      "playerId": null,
+      "linkStatus": "unmatched",
+      "action": "to insert"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/bayanda_sobetwa/1\",2009,\"pre_draft\"]",
+      "sourceRecordId": "https://www.draftguru.com.au/years/2009#33",
+      "clubId": 12,
+      "personId": null,
+      "playerId": null,
+      "linkStatus": "unmatched",
+      "action": "to insert"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/rhys_panui-leth/1\",2010,\"pre_draft\"]",
+      "sourceRecordId": "https://www.draftguru.com.au/years/2010#21",
+      "clubId": 13,
+      "personId": null,
+      "playerId": null,
+      "linkStatus": "unmatched",
+      "action": "to insert"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/shem_tatupu/1\",2010,\"pre_draft\"]",
+      "sourceRecordId": "https://www.draftguru.com.au/years/2010#22",
+      "clubId": 13,
+      "personId": 4410,
+      "playerId": null,
+      "linkStatus": "unmatched",
+      "action": "to insert"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/charlton_brown/1\",2011,\"pre_draft\"]",
+      "sourceRecordId": "https://www.draftguru.com.au/years/2011#28",
+      "clubId": 12,
+      "personId": null,
+      "playerId": null,
+      "linkStatus": "unmatched",
+      "action": "to insert"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/theo_gavuri/1\",2011,\"pre_draft\"]",
+      "sourceRecordId": "https://www.draftguru.com.au/years/2011#29",
+      "clubId": 12,
+      "personId": null,
+      "playerId": null,
+      "linkStatus": "unmatched",
+      "action": "to insert"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/yoshi_harris/1\",2011,\"pre_draft\"]",
+      "sourceRecordId": "https://www.draftguru.com.au/years/2011#30",
+      "clubId": 12,
+      "personId": null,
+      "playerId": null,
+      "linkStatus": "unmatched",
+      "action": "to insert"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/peni_mahina/1\",2011,\"pre_draft\"]",
+      "sourceRecordId": "https://www.draftguru.com.au/years/2011#31",
+      "clubId": 12,
+      "personId": null,
+      "playerId": null,
+      "linkStatus": "unmatched",
+      "action": "to insert"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/ben_miller/4\",2011,\"pre_draft\"]",
+      "sourceRecordId": "https://www.draftguru.com.au/years/2011#32",
+      "clubId": 13,
+      "personId": null,
+      "playerId": null,
+      "linkStatus": "unmatched",
+      "action": "to insert"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/joe_baker-thomas/1\",2012,\"pre_draft\"]",
+      "sourceRecordId": "https://www.draftguru.com.au/years/2012#45",
+      "clubId": 20,
+      "personId": null,
+      "playerId": null,
+      "linkStatus": "unmatched",
+      "action": "to insert"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/aksel_bang/1\",2012,\"pre_draft\"]",
+      "sourceRecordId": "https://www.draftguru.com.au/years/2012#46",
+      "clubId": 12,
+      "personId": null,
+      "playerId": null,
+      "linkStatus": "unmatched",
+      "action": "to insert"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/siope_ngata/1\",2012,\"pre_draft\"]",
+      "sourceRecordId": "https://www.draftguru.com.au/years/2012#47",
+      "clubId": 13,
+      "personId": null,
+      "playerId": null,
+      "linkStatus": "unmatched",
+      "action": "to insert"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/maia_westrupp/1\",2012,\"pre_draft\"]",
+      "sourceRecordId": "https://www.draftguru.com.au/years/2012#48",
+      "clubId": 15,
+      "personId": null,
+      "playerId": null,
+      "linkStatus": "unmatched",
+      "action": "to insert"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/giovanni_mountain-silbery/1\",2013,\"pre_draft\"]",
+      "sourceRecordId": "https://www.draftguru.com.au/years/2013#43",
+      "clubId": 20,
+      "personId": null,
+      "playerId": null,
+      "linkStatus": "unmatched",
+      "action": "to insert"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/barclay_miller/1\",2014,\"pre_draft\"]",
+      "sourceRecordId": "https://www.draftguru.com.au/years/2014#36",
+      "clubId": 20,
+      "personId": null,
+      "playerId": null,
+      "linkStatus": "unmatched",
+      "action": "to insert"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/shaoliang_chen/1\",2015,\"pre_draft\"]",
+      "sourceRecordId": "https://www.draftguru.com.au/years/2015#48",
+      "clubId": 17,
+      "personId": null,
+      "playerId": null,
+      "linkStatus": "unmatched",
+      "action": "to insert"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/brandon_kaufman/1\",2015,\"pre_draft\"]",
+      "sourceRecordId": "https://www.draftguru.com.au/years/2015#49",
+      "clubId": 11,
+      "personId": null,
+      "playerId": null,
+      "linkStatus": "unmatched",
+      "action": "to insert"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/hewago%20paul_oea/1\",2017,\"pre_draft\"]",
+      "sourceRecordId": "https://www.draftguru.com.au/years/2017#35",
+      "clubId": 11,
+      "personId": 1875,
+      "playerId": 5867,
+      "linkStatus": "unique",
+      "action": "to insert"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/bassirou_faye/1\",2021,\"pre_draft\"]",
+      "sourceRecordId": "https://www.draftguru.com.au/years/2021#27",
+      "clubId": 5,
+      "personId": null,
+      "playerId": null,
+      "linkStatus": "unmatched",
+      "action": "to insert"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/cillian_bourke/1\",2025,\"pre_draft\"]",
+      "sourceRecordId": "https://www.draftguru.com.au/years/2025#35",
+      "clubId": 6,
+      "personId": null,
+      "playerId": null,
+      "linkStatus": "unmatched",
+      "action": "to insert"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/kobe_mcdonald/1\",2025,\"pre_draft\"]",
+      "sourceRecordId": "https://www.draftguru.com.au/years/2025#36",
+      "clubId": 20,
+      "personId": null,
+      "playerId": null,
+      "linkStatus": "unmatched",
+      "action": "to insert"
+    },
+    {
+      "key": "[\"https://www.draftguru.com.au/players/jake_miles-wrency/1\",2025,\"pre_draft\"]",
+      "sourceRecordId": "https://www.draftguru.com.au/years/2025#37",
+      "clubId": 23,
+      "personId": null,
+      "playerId": null,
+      "linkStatus": "unmatched",
+      "action": "to insert"
+    }
+  ],
+  "digest": "afa26158781c0538166302be05d440a79af9ab805f8143f218c5cf804e90f608"
+}

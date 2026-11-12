@@ -1,0 +1,58 @@
+{
+  "target": {
+    "host": "localhost",
+    "port": 5432,
+    "database": "afldb_prod",
+    "user": "afldb_backup",
+    "systemIdentifier": "7674454702926115004",
+    "databaseOid": "66668",
+    "clusterName": "16/main",
+    "databaseComment": null
+  },
+  "sha256": "0d517f5a3db7ccb887615df2c3fa3f136918f5dd4941df939e7e1a8d843a34c6",
+  "restoreEvidenceSha256": "c44872bd2c00e23aa18a40a1307b43fd77ba75baafabd7e69c76a4c8aefe8b53",
+  "capturedAt": "2026-11-12T02:50:02.929Z",
+  "restoredAt": "2026-11-12T02:51:31.332Z",
+  "baselineDigest": "6a5c7dfd8c0439ac793561e0da44a3f24e6a70496f28dc89cbf9aec2b5ba21ae",
+  "importBatchesBefore": 84,
+  "assembly": {
+    "format": "afldb.gap029.restore-evidence-assembly.1",
+    "stage": "I336",
+    "operation": "issue336-predraft-insert",
+    "revision": "a25306f930015acef602bcc60d76613bdcc3d466",
+    "assembledAt": "2026-11-12T02:51:34.669Z",
+    "restoreTarget": {
+      "host": "127.0.0.1",
+      "port": 55493,
+      "database": "afldb_v2_gap029_i336_20261112_025001_rst_test",
+      "user": "afldb_owner",
+      "systemIdentifier": "7707112027996174900",
+      "databaseOid": "16390",
+      "clusterName": "afldb_v2_isolated",
+      "databaseComment": "afldb-v2-isolated-test"
+    },
+    "inputs": {
+      "dumpSha256": "0d517f5a3db7ccb887615df2c3fa3f136918f5dd4941df939e7e1a8d843a34c6",
+      "restoreEvidenceSha256": "c44872bd2c00e23aa18a40a1307b43fd77ba75baafabd7e69c76a4c8aefe8b53",
+      "toolSha256": {
+        "tools/v2/issue336-predraft-insert-production.ts": "d0f32981d460e5bb3ea0e1ead9f43475d2d92344b86248908554ed314d7b7765",
+        "tools/v2/gap029-common.ts": "9a42b41bbeffa9b73dec9d8b1d34cc164194cc29ed2319e2512dab971522fe55",
+        "src/db/queries/audit-log.ts": "21c0934482a527bb273b6a3996e16d45c19e99b90f17460371df66277c61517c",
+        "src/lib/seasons/sealed-editor-guard.ts": "f772a5e517e5721efe462700ec5f06a1f42e2159d317c82a6d3abd311254776b",
+        "data/reference/draftguru-event-kinds.json": "cbf93a3061ec0f69b02cb2035c6b1b807f9eb525694a3408085733c461c2d0c6",
+        "tools/rebuild/draftguru/draftguru-contract.json": "a1ce814ab7e1d7ad89054ce9d3736de78a63f2321f237452713688290c8bd130",
+        "docs/v2/evidence/issue336-draft-categories-20261105/predraft-insert-plan.json": "6a207cfe3b1408d6ff747040cecfac1cde9ebd9a43f584711c573eb20ff511cb"
+      }
+    },
+    "derived": {
+      "mode": "baseline --rehearsal",
+      "outputSha256": "5c7b395447d4cda3ccb9e1088d2bbd23acd750c9838e7d071ba9e698d77871a8",
+      "values": {
+        "baselineDigest": "6a5c7dfd8c0439ac793561e0da44a3f24e6a70496f28dc89cbf9aec2b5ba21ae",
+        "importBatchesBefore": 84
+      }
+    },
+    "sealedBody": "{\"assembly\":{\"assembledAt\":\"2026-11-12T02:51:34.669Z\",\"derived\":{\"mode\":\"baseline --rehearsal\",\"outputSha256\":\"5c7b395447d4cda3ccb9e1088d2bbd23acd750c9838e7d071ba9e698d77871a8\",\"values\":{\"baselineDigest\":\"6a5c7dfd8c0439ac793561e0da44a3f24e6a70496f28dc89cbf9aec2b5ba21ae\",\"importBatchesBefore\":84}},\"format\":\"afldb.gap029.restore-evidence-assembly.1\",\"inputs\":{\"dumpSha256\":\"0d517f5a3db7ccb887615df2c3fa3f136918f5dd4941df939e7e1a8d843a34c6\",\"restoreEvidenceSha256\":\"c44872bd2c00e23aa18a40a1307b43fd77ba75baafabd7e69c76a4c8aefe8b53\",\"toolSha256\":{\"data/reference/draftguru-event-kinds.json\":\"cbf93a3061ec0f69b02cb2035c6b1b807f9eb525694a3408085733c461c2d0c6\",\"docs/v2/evidence/issue336-draft-categories-20261105/predraft-insert-plan.json\":\"6a207cfe3b1408d6ff747040cecfac1cde9ebd9a43f584711c573eb20ff511cb\",\"src/db/queries/audit-log.ts\":\"21c0934482a527bb273b6a3996e16d45c19e99b90f17460371df66277c61517c\",\"src/lib/seasons/sealed-editor-guard.ts\":\"f772a5e517e5721efe462700ec5f06a1f42e2159d317c82a6d3abd311254776b\",\"tools/rebuild/draftguru/draftguru-contract.json\":\"a1ce814ab7e1d7ad89054ce9d3736de78a63f2321f237452713688290c8bd130\",\"tools/v2/gap029-common.ts\":\"9a42b41bbeffa9b73dec9d8b1d34cc164194cc29ed2319e2512dab971522fe55\",\"tools/v2/issue336-predraft-insert-production.ts\":\"d0f32981d460e5bb3ea0e1ead9f43475d2d92344b86248908554ed314d7b7765\"}},\"operation\":\"issue336-predraft-insert\",\"restoreTarget\":{\"clusterName\":\"afldb_v2_isolated\",\"database\":\"afldb_v2_gap029_i336_20261112_025001_rst_test\",\"databaseComment\":\"afldb-v2-isolated-test\",\"databaseOid\":\"16390\",\"host\":\"127.0.0.1\",\"port\":55493,\"systemIdentifier\":\"7707112027996174900\",\"user\":\"afldb_owner\"},\"revision\":\"a25306f930015acef602bcc60d76613bdcc3d466\",\"stage\":\"I336\"},\"baselineDigest\":\"6a5c7dfd8c0439ac793561e0da44a3f24e6a70496f28dc89cbf9aec2b5ba21ae\",\"capturedAt\":\"2026-11-12T02:50:02.929Z\",\"importBatchesBefore\":84,\"restoreEvidenceSha256\":\"c44872bd2c00e23aa18a40a1307b43fd77ba75baafabd7e69c76a4c8aefe8b53\",\"restoredAt\":\"2026-11-12T02:51:31.332Z\",\"sha256\":\"0d517f5a3db7ccb887615df2c3fa3f136918f5dd4941df939e7e1a8d843a34c6\",\"target\":{\"clusterName\":\"16/main\",\"database\":\"afldb_prod\",\"databaseComment\":null,\"databaseOid\":\"66668\",\"host\":\"localhost\",\"port\":5432,\"systemIdentifier\":\"7674454702926115004\",\"user\":\"afldb_backup\"}}",
+    "sealedBodySha256": "90aaa768f4201a39405f90e8e2041d361d855cf5c8e2e1730d4fba5ae351760e"
+  }
+}
