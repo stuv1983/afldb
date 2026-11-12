@@ -1,0 +1,47 @@
+{
+ "transaction_read_only": "on",
+ "serverTimeZone": "Australia/Melbourne",
+ "importBatches": 84,
+ "timestampColumns": [
+  "data_overrides.created_at:timestamp with time zone",
+  "data_overrides.updated_at:timestamp with time zone"
+ ],
+ "defaultTz": {
+  "digest": "b6679e30ddf169b206db9f6ebba0ecdbc94f1f88fa4dc8695c21904c3c2cc656",
+  "p": {
+   "n": 6818,
+   "mx": 6818,
+   "d": "37cc643600bfc1131617767b9145507f"
+  },
+  "q": {
+   "n": 5057,
+   "mx": 5057,
+   "d": "fd49dc7e7f771672775d4fba4e025d1f"
+  },
+  "o": {
+   "n": 8,
+   "mx": 165,
+   "d": "4c4344888c1ffea1dc7b3552aa85ec77"
+  }
+ },
+ "utc": {
+  "digest": "6a5c7dfd8c0439ac793561e0da44a3f24e6a70496f28dc89cbf9aec2b5ba21ae",
+  "p": {
+   "n": 6818,
+   "mx": 6818,
+   "d": "37cc643600bfc1131617767b9145507f"
+  },
+  "q": {
+   "n": 5057,
+   "mx": 5057,
+   "d": "fd49dc7e7f771672775d4fba4e025d1f"
+  },
+  "o": {
+   "n": 8,
+   "mx": 165,
+   "d": "7ed622396e63878b946a72654e22ce3c"
+  }
+ }
+}
+DIAG-EXIT=0
+cand dirty=0

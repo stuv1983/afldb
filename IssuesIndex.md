@@ -9,7 +9,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Current state — 2026-11-12 (run 9):** **3 open issues: 332, 336, 348.** The ISSUE-336 r2 application release is on production and accepted. ISSUE-346 and ISSUE-347 are resolved after publication (published by fast-forward of `origin/main` `12aa6e29..9e8a85b7` on 2026-11-12). Next: D-336-2 Steps A–D.
+**Current state — 2026-11-12 (run 9):** **4 open issues: 332, 336, 348, and the new 349.** D-336-2 Steps A–D ran and stopped at the plan: the I336 tool refused with a false "baseline drift" caused by a session time-zone dependency (349). No database write. Evidence `docs/v2/evidence/issue336-d3362-production-20261112/README.md`. The ISSUE-336 r2 application release is on production and accepted. ISSUE-346 and ISSUE-347 are resolved after publication (published by fast-forward of `origin/main` `12aa6e29..9e8a85b7` on 2026-11-12). Next: the owner's decision on 349's fix route.
 
 **Earlier state — 2026-11-11 (closure run 8, local records branch `claude/records-catchup-20261111`, unpublished while `main` is frozen at PKG `12aa6e29`):** **5 open issues: 332, 336, 346, 347, and the new 348.** Owner decisions of 2026-11-11 are recorded on the stacked local branch `claude/records-decisions-20261111`.
 - **336:** **the r2 application release is on production and ACCEPTED (2026-11-12)**: `c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x`, carrying 337, 340 and 345; rollback target `0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN`. The owner's D4-O missed the original deadline and is recorded as late evidence; every check re-passed in the owner's re-approved window. Record `docs/v2/evidence/issue336-337-340-345-release-execution-20261111/`. D-336-2 A+B and C+D are next, stopping at the read-only plan; E+F (OD-4) is pending. D-336-3 is decided (A): stored origins kept, carried as 348.
@@ -86,7 +86,15 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
     - The runner route is blocked by **ISSUE-347**; the direct route is unaffected.
   - **D-336-3 (187 revised origin paths):** open. Recommendation in the run 8 decision packet.
 - **Key files:** `src/lib/draft-categories.ts`, `src/db/queries/draft.ts`, `src/app/draft/[year]/page.tsx`, `tools/v2/issue336-predraft-insert-production.ts`, `tools/v2/gap029-ops/`; runbooks `issues/open/AFLDB-ISSUE-336.md` and `issues/open/AFLDB-ISSUE-336-DEV-DEPLOYMENT.md`; evidence `docs/v2/evidence/issue336-draft-categories-20261105/` and `docs/v2/evidence/issue336-i336-simulation-20261111/`.
-- **Next action:** D-336-2 Steps A–D (approved; stop at the read-only plan), then the owner's OD-4 decision on E+F. D-336-3 is decided (A) and carried as 348. Full history: the `issues.md` entry and `issues/open/AFLDB-ISSUE-336-INDEX-SECTION-20261111.md`.
+- **D-336-2 (2026-11-12):** Steps A–D ran on production under the A+B and C+D approvals: capture `I336-20261112T010605Z` (dump sha256 `d61c7865…fbcc`) and sealed assembly passed; **the plan refused** ("baseline drift", a false positive: ISSUE-349). No database write.
+- **Next action:** fix ISSUE-349, then a fresh D-336-2 A–D under new approvals, then OD-4 (E+F). D-336-3 is decided (A) and carried as 348. Full history: the `issues.md` entry and `issues/open/AFLDB-ISSUE-336-INDEX-SECTION-20261111.md`.
+
+### AFLDB-ISSUE-349 — The I336 baseline digest depends on the session time zone, so every production plan refuses
+
+- **Severity / area:** Low (fail-safe; blocks D-336-2); production data-operation tooling (GAP-029, stage I336).
+- **State:** Open, opened 2026-11-12. The tool's `surfaceDigest` renders `timestamptz` through the session time zone: production `Australia/Melbourne`, the restore cluster `Etc/UTC`. Under UTC the live digest equals the backup's exactly; the data is identical.
+- **Key files:** `tools/v2/issue336-predraft-insert-production.ts` (`surfaceDigest`, the `postgres()` clients), `tools/v2/isolated-pg.ts:228`.
+- **Next action:** owner decision on the fix route (recommended: pin `TimeZone` to `Etc/UTC` on the tool's connections), then review and a non-UTC qualification. Evidence `docs/v2/evidence/issue336-d3362-production-20261112/README.md`.
 
 **AFLDB-ISSUE-346 and AFLDB-ISSUE-347 resolved 2026-11-12** (published by fast-forward of `origin/main` `12aa6e29..9e8a85b7` on 2026-11-12, OD-6; tooling and records only, nothing deployed). 347: `restoreTag()` derives the GAP-029 runner's restore TAG from the stage length (`718d39c6`); `gap029-ops` 84/84 at the published tip. 346: the gated migration-only DEV route `sync-dev.ps1 -SkipBuild -SkipRestart` (`4b6f9410`, `5c1c8704`, `17f63993`); Linux harness 86/0 at the published tip; R1–R5 accepted 2026-11-11; the runbook §2 operator restrictions bind and "never `db:migrate` by hand on DEV" is permanent. `merge:ready` 347 and 346 and `preflight --mode merge` READY in a fresh streamanator clone. Removed from this index and the Open Issues table. Records: their `issues.md` entries; runbook `issues/closed/AFLDB-ISSUE-346.md`.
 

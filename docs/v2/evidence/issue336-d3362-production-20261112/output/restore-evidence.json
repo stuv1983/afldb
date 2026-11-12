@@ -1,0 +1,34 @@
+{
+  "format": "afldb.gap029.restore-evidence.1",
+  "revision": "c1c4b22ee15007111eab66f6d354e0b9ecbb2ade",
+  "backup": {
+    "archive": "afldb_prod-20261112T010605Z.dump",
+    "sha256": "d61c7865cbea14e3e3f86a975b5e5d716fcd729d9965fa2f1c52afd81163fbcc",
+    "bytes": 29953917,
+    "provenanceSha256": "9d6a4e858dbe5f7a3483f35d9040f3a5c9bdd36fef8e44fd1b44d0dd1da80b9f"
+  },
+  "source": {
+    "host": "afldb-prod",
+    "database": "afldb_prod",
+    "systemIdentifier": "7674454702926115004",
+    "databaseOid": "66668",
+    "ledgerRows": 118,
+    "ledgerLast": "118_fixtures_unconfirmed_participants.sql"
+  },
+  "restore": {
+    "target": {
+      "host": "127.0.0.1",
+      "port": 55493,
+      "database": "afldb_v2_gap029_i336_20261112_010605_rst_test",
+      "user": "afldb_owner",
+      "systemIdentifier": "7707085348249968827",
+      "databaseOid": "16390",
+      "clusterName": "afldb_v2_isolated",
+      "databaseComment": "afldb-v2-isolated-test"
+    },
+    "restoredAt": "2026-11-12T01:07:57.265Z",
+    "tocEntries": 1651
+  },
+  "capturedAt": "2026-11-12T01:06:06.340Z",
+  "restoredAt": "2026-11-12T01:07:57.265Z"
+}

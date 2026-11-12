@@ -1,0 +1,14 @@
+pre: ls: cannot access '/home/arm/ops/gap029-stages/c1c4b22e': No
+ls: cannot access '/home/arm/ops/gap029-stages/c1c4b22e': No such file or directory
+3160b9d339d0d23747bb53ab9a597ccf54737c31218fe867762885a407a55b8a  /home/arm/ops/gap029-stages/c1c4b22e/in/cand.tar.gz
+/home/arm/ops/gap029-stages/c1c4b22e:
+total 12
+drwx------ 3 arm arm 4096 Nov 12 12:04 .
+drwx------ 4 arm arm 4096 Nov 12 12:04 ..
+drwx------ 2 arm arm 4096 Nov 12 12:04 in
+
+/home/arm/ops/gap029-stages/c1c4b22e/in:
+total 286056
+drwx------ 2 arm arm      4096 Nov 12 12:04 .
+drwx------ 3 arm arm      4096 Nov 12 12:04 ..
+-rw------- 1 arm arm 292911851 Nov 12 12:04 cand.tar.gz

@@ -1,0 +1,11 @@
+065940c4eb4ffb43a7546e70b4ed95582339daa13d173c5e2098dbe98d968c03  /home/arm/ops/gap029-stages/c1c4b22e/runs/I336-20261112T010605Z/backup.json
+1a3a26f3e93e2033929d2839b4f37f495aedea8eb772b61118a1cc66dcb5c1b5  /home/arm/ops/gap029-stages/c1c4b22e/runs/I336-20261112T010605Z/restore-evidence.json
+== plan I336 (I336-20261112T010605Z): inputs 2026-11-12T01:08:35Z
+CAPTURE CHECK PASS stage I336 class GENUINE_PRODUCTION profile production dump afldb_prod-20261112T010605Z.dump bytes 29953917 sha256 d61c7865cbea14e3e3f86a975b5e5d716fcd729d9965fa2f1c52afd81163fbcc captured 2026-11-12T01:06:06.340467Z ledger 118
+TARGET CHECK PASS
+no conflicting writer, migration or dump process
+== plan I336 (I336-20261112T010605Z): tool plan (read-only; writes only the plan file) 2026-11-12T01:08:36Z
+ISSUE-336 insert refused: baseline drift: the restored backup no longer matches the live target
+[tool log /home/arm/ops/gap029-stages/c1c4b22e/runs/I336-20261112T010605Z/logs/plan-1.log exit 1]
+STOP: the stage plan refused (exit 1); nothing was written to the database
+PLAN-EXIT=6

@@ -1,0 +1,20 @@
+/home/arm/ops/gap029-stages/c1c4b22e/runs/I336-20261112T010605Z:
+total 32
+drwx------ 3 arm arm 4096 Nov 12 12:08 .
+drwx------ 3 arm arm 4096 Nov 12 12:06 ..
+-rw------- 1 arm arm   69 Nov 12 12:06 actor.txt
+-rw------- 1 arm arm 5189 Nov 12 12:08 backup.json
+drwx------ 2 arm arm 4096 Nov 12 12:08 logs
+-rw------- 1 arm arm 1124 Nov 12 12:08 restore-evidence.json
+-rw------- 1 arm arm  212 Nov 12 12:06 target.json
+
+/home/arm/ops/gap029-stages/c1c4b22e/runs/I336-20261112T010605Z/logs:
+total 16
+drwx------ 2 arm arm 4096 Nov 12 12:08 .
+drwx------ 3 arm arm 4096 Nov 12 12:08 ..
+-rw------- 1 arm arm 4025 Nov 12 12:06 capture.log
+-rw------- 1 arm arm  267 Nov 12 12:08 plan-1.log
+====
+# 2026-11-12T01:08:37.078Z I336 plan #1: tsx tools/v2/issue336-predraft-insert-production.ts plan (arguments are file paths only; no connection string is logged)
+ISSUE-336 insert refused: baseline drift: the restored backup no longer matches the live target
+# exit 1
