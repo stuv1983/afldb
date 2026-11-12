@@ -15,6 +15,8 @@ commit.
 
 ## [Unreleased]
 
+- ISSUE-349 (local): pin I336 read-only and writer sessions to UTC so timestamp-based baseline digests do not depend on the database server time zone. Linux unit 85/85, typecheck and non-UTC red/green end-to-end simulation PASS; no production execution.
+
 ### ISSUE-336/337/340/345 released to production (restart 2026-11-11; accepted 2026-11-12)
 
 - Production serves `c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x` (revision `c1c4b22e`): separated draft categories with category-specific pick numbering (336), NBSP-tolerant draft name search (337), serialized credential rotation (340), and the forced password-change gate on restricted Grid Solver audiences (345). ISSUE-344 is not included.

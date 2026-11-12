@@ -1,0 +1,4 @@
+warning: remote HEAD refers to nonexistent ref, unable to checkout
+RED reproduced baseline drift
+GREEN planned, committed verified, accepted
+QUALIFICATION_PASS
