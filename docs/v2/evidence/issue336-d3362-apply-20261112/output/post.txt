@@ -1,0 +1,5 @@
+{"transaction_read_only":"on","picks":6853,"persons":5088,"new_picks":35,"audit_rows":35,"audit_actor1":35,"audited_picks":35,"overrides":8}
+POST-EXIT=0
+cand dirty=0
+app: active MainPID=3666648 NRestarts=0
+Fri 2026-11-13 05:13:06 AEDT  13h Thu 2026-11-12 05:05:45 AEDT 10h ago afldb-settle-afl-api.timer afldb-settle-afl-api.service

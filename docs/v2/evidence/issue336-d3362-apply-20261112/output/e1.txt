@@ -1,0 +1,35 @@
+in window: 2026-11-12T05:00:21Z
+== E1 recheck
+no approval yet
+ops checkout clean at R
+3c7580acf30d036e642813a054857f3b0d05607eb99703d13d16c710a94cbaed  /home/arm/ops/gap029-stages/a25306f9/runs/I336-20261112T025001Z/plan.json
+636d83ea9c40d5657ab1b2185b9f93ebc68e07aa9bc6359ab3228abaf2f60710  /home/arm/ops/gap029-stages/a25306f9/runs/I336-20261112T025001Z/manifest.json
+632b10327a3b50aa7f0a99e58890d99e6bedf167ca58e66e77732d9139a7eb0f  /home/arm/ops/gap029-stages/a25306f9/runs/I336-20261112T025001Z/backup.json
+c44872bd2c00e23aa18a40a1307b43fd77ba75baafabd7e69c76a4c8aefe8b53  /home/arm/ops/gap029-stages/a25306f9/runs/I336-20261112T025001Z/restore-evidence.json
+5b0a54ee050f4d2d277efa0a8f557838f06e20c26e4eff8cf9d38c1d79f8a3b9  /home/arm/ops/gap029-stages/a25306f9/runs/I336-20261112T025001Z/target.json
+== preflight I336: order gate 2026-11-12T05:00:21Z
+== preflight I336: exclusivity (read-only) 2026-11-12T05:00:21Z
+no conflicting writer, migration or dump process
+== preflight I336: live identity, ledger and extensions (read-only session) 2026-11-12T05:00:21Z
+live identity: db=afldb_prod user=afldb_backup oid=66668 system=7674454702926115004 ledger=118/118_fixtures_unconfirmed_participants.sql
+== preflight I336: actor auth_users.id 1 (migration-105 predicate by plain SELECTs; no function call) 2026-11-12T05:00:21Z
+actor1 (id, role, enabled, enrolled, non_fixture_email, owner_email_match): 1	super_admin	true	true	true	unchecked; enabled super_admin count: 1
+PREFLIGHT_OK stage=I336 class=GENUINE_PRODUCTION
+== DONE preflight 2026-11-12T05:00:21Z
+== plan summary
+PLAN I336 35 DraftGuru Pre-Draft rows (draft_picks, audited under the season seal)
+  digest afa26158781c0538166302be05d440a79af9ab805f8143f218c5cf804e90f608
+  plan file sha256 3c7580acf30d036e642813a054857f3b0d05607eb99703d13d16c710a94cbaed
+  revision a25306f930015acef602bcc60d76613bdcc3d466
+  evidence class GENUINE_PRODUCTION
+  target afldb_prod OID 66668 system 7674454702926115004 as afldb_backup
+  backup sha256 0d517f5a3db7ccb887615df2c3fa3f136918f5dd4941df939e7e1a8d843a34c6 captured 2026-11-12T02:50:02.929Z restored 2026-11-12T02:51:31.332Z
+  restore evidence sha256 c44872bd2c00e23aa18a40a1307b43fd77ba75baafabd7e69c76a4c8aefe8b53
+  plan expires 2026-11-13T02:52:02.953Z; approvals must expire before 2026-11-13T02:30:02.929Z (backup 24 h limit minus 20 min)
+  expected changes:
+    INSERT 35 draft_picks rows (source draftguru, Pre-Draft, unnumbered), 31 new unmatched draft_persons rows, and one data_edits audit row per pick as actor auth_users.id 1; nothing updated or deleted; no override written
+      https://www.draftguru.com.au/years/2008#6 -> to insert (new person)
+== state
+STATE BASELINE (the plan has not been applied)
+[tool log /home/arm/ops/gap029-stages/a25306f9/runs/I336-20261112T025001Z/logs/state-2.log exit 0]
+E1_RECHECK_OK

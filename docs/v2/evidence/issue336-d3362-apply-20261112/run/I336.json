@@ -1,0 +1,9 @@
+{
+  "stage": "I336",
+  "run": "I336-20261112T025001Z",
+  "planDigest": "afa26158781c0538166302be05d440a79af9ab805f8143f218c5cf804e90f608",
+  "revision": "a25306f930015acef602bcc60d76613bdcc3d466",
+  "outcomeSha256": "e0ea46b860566e361847c0bbedcebc8feb53883da1f6399d9b84e5ed7ae0a36b",
+  "stateLogSha256": "d3f437a923b02f27dde5a9ad83517d78dc51b86e993a7c80db17caf24b7606ea",
+  "acceptedAt": "2026-11-12T05:01:13.091Z"
+}

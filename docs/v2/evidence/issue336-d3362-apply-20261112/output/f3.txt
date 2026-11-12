@@ -1,0 +1,12 @@
+in window: 2026-11-12T05:01:10Z
+== F3 accept
+MANIFEST VERIFY PASS stage I336 revision a25306f930015acef602bcc60d76613bdcc3d466 plan afa26158781c0538166302be05d440a79af9ab805f8143f218c5cf804e90f608 class GENUINE_PRODUCTION
+STATE PLANNED RESULT PRESENT (every reviewed row is present)
+[tool log /home/arm/ops/gap029-stages/a25306f9/runs/I336-20261112T025001Z/logs/state-5.log exit 0]
+Read-only verification: 35/35 rows present; pre-existing rows unchanged: true
+[tool log /home/arm/ops/gap029-stages/a25306f9/runs/I336-20261112T025001Z/logs/verify-1.log exit 0]
+ACCEPTANCE RECORDED for I336 plan afa26158781c0538166302be05d440a79af9ab805f8143f218c5cf804e90f608
+ACCEPTED stage=I336 run=I336-20261112T025001Z
+ANALYZE is not run by this wrapper (no privilege grant is authorised); the stage tools and autovacuum own statistics.
+== DONE accept 2026-11-12T05:01:13Z
+ACCEPT-EXIT=0

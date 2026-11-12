@@ -1,0 +1,7 @@
+in window: 2026-11-12T05:00:32Z
+== E2 statement + approval
+I approve D-336-2: apply, once, to afldb_prod (database OID 66668, system identifier 7674454702926115004) the digest-pinned I336 plan afa26158781c0538166302be05d440a79af9ab805f8143f218c5cf804e90f608 (35 DraftGuru Pre-Draft rows (draft_picks, audited under the season seal)), at execution revision a25306f930015acef602bcc60d76613bdcc3d466, after this stage's own fresh restore-verified backup 0d517f5a3db7ccb887615df2c3fa3f136918f5dd4941df939e7e1a8d843a34c6 (restore evidence c44872bd2c00e23aa18a40a1307b43fd77ba75baafabd7e69c76a4c8aefe8b53; evidence class GENUINE_PRODUCTION). Exactly the 35 DraftGuru Pre-Draft rows of reviewed evidence 6a207cfe3b1408d6ff747040cecfac1cde9ebd9a43f584711c573eb20ff511cb named in the plan, each audited through recordDataEdit under the season seal as actor auth_users.id 1, my active, fully enrolled Super Admin; signing head 'Intl Schol' accepted under D-336-1. Nothing else. No retry and no automatic restore. Window: from 2026-11-12T05:00:00Z until 2026-11-12T06:30:00Z (16:00-17:30 AEDT, 12 November 2026).
+MANIFEST VERIFY PASS stage I336 revision a25306f930015acef602bcc60d76613bdcc3d466 plan afa26158781c0538166302be05d440a79af9ab805f8143f218c5cf804e90f608 class GENUINE_PRODUCTION
+APPROVAL WRITTEN for I336 plan afa26158781c0538166302be05d440a79af9ab805f8143f218c5cf804e90f608 window 2026-11-12T05:00:00.000Z .. 2026-11-12T06:30:00.000Z
+== DONE approve 2026-11-12T05:00:33Z
+APPROVE-EXIT=0

@@ -15,6 +15,10 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-336 D-336-2: the 35 missing Pre-Draft rows inserted on production (2026-11-12)
+
+- Production `draft_picks` gained the 35 reviewed DraftGuru Pre-Draft rows (draft years 2008–2025), with 31 new unmatched `draft_persons` and one `data_edits` audit row per pick as actor 1 (seal `audited_correction`). Applied once in the owner's OD-4 window as plan `afa26158…f608`; COMMITTED_VERIFIED and ACCEPTED. Evidence `docs/v2/evidence/issue336-d3362-apply-20261112/`.
+
 ### ISSUE-349: I336 sessions pinned to UTC (published 2026-11-12 at `ae47f94f`); D-336-2 planned on production
 
 - `tools/v2/issue336-predraft-insert-production.ts` opens its read-only and writer sessions with `TimeZone=Etc/UTC`, so the I336 baseline digest no longer depends on the database server's time zone (production runs `Australia/Melbourne`). Linux `gap029-ops` 85/85, typecheck and a Melbourne/UTC red-green simulation passed.

@@ -1,0 +1,2 @@
+Read-only verification: 35/35 rows present; pre-existing rows unchanged: true
+[tool log /home/arm/ops/gap029-stages/a25306f9/runs/I336-20261112T025001Z/logs/verify-1.log exit 0]
