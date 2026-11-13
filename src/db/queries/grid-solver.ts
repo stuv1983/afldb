@@ -259,16 +259,25 @@ function ledSeasonRows(statKey: GridStatKey): SqlFragment {
                       WHERE pcs2.season = pcs.season AND pcs2.club_id = pcs.club_id
                         AND pcs2.${col} > pcs.${col})`;
   }
+  // A season whose every match row is NULL for the stat was never recorded
+  // (docs/data-dictionary.md): its sum() is NULL, `t2.total > NULL` is never
+  // true, and without this guard every such player-season "led" its club
+  // (AFLDB-ISSUE-355). HAVING ... IS NOT NULL is the same guard the
+  // precomputed branch above, league_season_stat_rank_top and
+  // player-season.ts apply. Both sides carry it, so an unrecorded season
+  // neither leads nor competes.
   return sql`SELECT t.player_id, t.season, t.club_id FROM (
                 SELECT pms.player_id, m.season, pms.club_id, sum(pms.${col}) AS total
                   FROM player_match_stats pms JOIN matches m ON m.id = pms.match_id
                  GROUP BY pms.player_id, m.season, pms.club_id
+                HAVING sum(pms.${col}) IS NOT NULL
               ) t
               WHERE NOT EXISTS (
                 SELECT 1 FROM (
                   SELECT pms2.player_id, m2.season, pms2.club_id, sum(pms2.${col}) AS total
                     FROM player_match_stats pms2 JOIN matches m2 ON m2.id = pms2.match_id
                    GROUP BY pms2.player_id, m2.season, pms2.club_id
+                  HAVING sum(pms2.${col}) IS NOT NULL
                 ) t2
                 WHERE t2.season = t.season AND t2.club_id = t.club_id AND t2.total > t.total)`;
 }

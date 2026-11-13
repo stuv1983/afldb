@@ -14,7 +14,7 @@ import { performance } from 'node:perf_hooks';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { sql } from '@/db/client';
-import { compileAxis, solveCellRows, solveCellSummary } from '@/db/queries/grid-solver';
+import { axisPlayerIds, compileAxis, solveCellRows, solveCellSummary } from '@/db/queries/grid-solver';
 import { getPlayerOverlapSummary } from '@/db/queries/player-compare';
 import {
   GRID_BUILDER_KEYS,
@@ -1022,6 +1022,85 @@ describe('grid solver correctness', () => {
       `;
       expect(led.found, `player ${r.id} (${r.displayName})`).toBe(true);
     }
+  });
+});
+
+/**
+ * AFLDB-ISSUE-355 -- "led a club in a stat" for the live-only statistics.
+ *
+ * Those statistics were not recorded before 1998/2003, so a player-season
+ * total there is NULL ("not recorded", never zero). `t2.total > NULL` is never
+ * true, so without a guard every such player-season looked like the top of its
+ * club and ~10,000 players "led" their club in clearances. The expected sets
+ * below are an independent, guarded hand-written query.
+ */
+describe('AFLDB-ISSUE-355 club season stat leaders ignore unrecorded (NULL) seasons', () => {
+  const ledPlayerIds = async (stat: string): Promise<number[]> => {
+    const col = sql.unsafe(stat);
+    const rows = await sql<{ playerId: number }[]>`
+      WITH t AS (
+        SELECT pms.player_id, m.season, pms.club_id, sum(pms.${col}) AS total
+          FROM player_match_stats pms JOIN matches m ON m.id = pms.match_id
+         GROUP BY pms.player_id, m.season, pms.club_id)
+      SELECT DISTINCT t.player_id AS "playerId" FROM t
+       WHERE t.total IS NOT NULL
+         AND NOT EXISTS (SELECT 1 FROM t t2
+                          WHERE t2.season = t.season AND t2.club_id = t.club_id AND t2.total > t.total)
+       ORDER BY 1`;
+    return rows.map((r) => r.playerId);
+  };
+
+  it.each(['clearances', 'rebounds', 'inside_50s', 'goal_assists'] as const)(
+    'club_season_stat_leader(%s) is exactly the players with a recorded leading season',
+    async (stat) => {
+      const expected = await ledPlayerIds(stat);
+      // Oracle-independent (holds on the production snapshot and on a rebuilt
+      // afldb_test): equality with the guarded reference query on the same
+      // database, plus a relational invariant -- no literal count.
+      expect(expected.length).toBeGreaterThan(0);
+      const got = [...await axisPlayerIds({ builder: 'club_season_stat_leader', params: { stat } })]
+        .sort((a, b) => a - b);
+      expect(got.length).toBe(expected.length);
+      expect(got).toEqual(expected);
+      const col = sql.unsafe(stat);
+      const [{ unrecordedLeaders }] = await sql<{ unrecordedLeaders: number }[]>`
+        SELECT count(*)::int AS "unrecordedLeaders"
+          FROM unnest(${got}::int[]) AS g(player_id)
+         WHERE NOT EXISTS (SELECT 1 FROM player_match_stats pms
+                            WHERE pms.player_id = g.player_id AND pms.${col} IS NOT NULL)`;
+      expect(unrecordedLeaders, 'a leader with no recorded value for the statistic').toBe(0);
+    },
+  );
+
+  it('club_season_stat_leader_min_times(clearances, 5) counts only recorded leading seasons', async () => {
+    const [{ n }] = await sql<{ n: number }[]>`
+      WITH t AS (
+        SELECT pms.player_id, m.season, pms.club_id, sum(pms.clearances) AS total
+          FROM player_match_stats pms JOIN matches m ON m.id = pms.match_id
+         GROUP BY pms.player_id, m.season, pms.club_id),
+      led AS (SELECT t.player_id FROM t WHERE t.total IS NOT NULL
+               AND NOT EXISTS (SELECT 1 FROM t t2
+                                WHERE t2.season = t.season AND t2.club_id = t.club_id AND t2.total > t.total))
+      SELECT count(*)::int AS n FROM (SELECT player_id FROM led GROUP BY player_id HAVING count(*) >= 5) x`;
+    expect(n).toBeGreaterThan(0);
+    const got = await axisPlayerIds({
+      builder: 'club_season_stat_leader_min_times', params: { stat: 'clearances', times: '5' },
+    });
+    expect(got.size).toBe(n);
+  });
+
+  it('a player whose every season is unrecorded for the stat never led a club in it', async () => {
+    // Players whose whole career ended before clearances were recorded.
+    const [{ firstRecorded }] = await sql<{ firstRecorded: number }[]>`
+      SELECT min(m.season)::int AS "firstRecorded"
+        FROM player_match_stats pms JOIN matches m ON m.id = pms.match_id
+       WHERE pms.clearances IS NOT NULL`;
+    const preCoverage = await sql<{ id: number }[]>`
+      SELECT c.player_id AS id FROM player_career_stats c
+       WHERE c.final_season < ${firstRecorded} ORDER BY c.player_id LIMIT 200`;
+    expect(preCoverage.length).toBeGreaterThan(0);
+    const leaders = await axisPlayerIds({ builder: 'club_season_stat_leader', params: { stat: 'clearances' } });
+    expect(preCoverage.filter((r) => leaders.has(r.id))).toEqual([]);
   });
 });
 
