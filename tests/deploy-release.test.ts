@@ -21,6 +21,7 @@ import {
   isServerOutput,
   migrationHeadOf,
   needrestartHold,
+  APT_RUN_COMMAND_PATTERN,
   parseAptHistory,
   parseArgs,
   parseExecStartNode,
@@ -216,6 +217,21 @@ describe('AFLDB-ISSUE-329 — the systemd drop-in and the supervisor', () => {
  */
 describe('AFLDB-ISSUE-351 — the attended gate and the activation audit (pure)', () => {
   const NOW = Date.UTC(2026, 10, 14, 0, 0, 0);
+
+  it('recognises a RUNNING upgrade by command line, and never the always-on shutdown handler', () => {
+    // pgrep -f uses an ERE; the pattern is plain enough that a JS RegExp is the same language here.
+    const re = new RegExp(APT_RUN_COMMAND_PATTERN);
+    // real command lines of a running upgrade
+    expect(re.test('/usr/bin/python3 /usr/bin/unattended-upgrade')).toBe(true);
+    expect(re.test('/usr/bin/unattended-upgrade --download-only')).toBe(true);
+    expect(re.test('/usr/lib/apt/apt.systemd.daily install')).toBe(true);
+    // the handler that is always running on production (and on the DEV host): found by the real-systemd smoke
+    expect(re.test('/usr/bin/python3 /usr/share/unattended-upgrades/unattended-upgrade-shutdown --wait-for-signal')).toBe(false);
+    expect(re.test('unattended-upgrade-shutdown')).toBe(false);
+    expect(re.test('/usr/share/unattended-upgrades/other')).toBe(false);
+    expect(re.test('node deploy/release.mjs host-gate')).toBe(false);
+  });
+
   const clear = () => ({
     nowMs: NOW,
     aptActive: [] as string[],

@@ -1213,7 +1213,15 @@ function systemctlUnit(unit) {
 }
 
 /**
- * The host facts the gate reads. READ-ONLY: `systemctl show/is-active/list-timers`, `pgrep -x`, two world-readable
+ * Command lines (ERE, for `pgrep -f`) of a RUNNING apt upgrade: the `unattended-upgrade` binary itself or the
+ * `apt.systemd.daily` driver. The long-lived `unattended-upgrade-shutdown --wait-for-signal` handler (always running, so
+ * not evidence of an upgrade) and a path merely containing "unattended-upgrades/" do not match (ISSUE-351, found by the
+ * real-systemd smoke of host-gate: matching the process name refused a clear host).
+ */
+export const APT_RUN_COMMAND_PATTERN = '(^|/)(unattended-upgrade( |$)|apt\\.systemd\\.daily)';
+
+/**
+ * The host facts the gate reads. READ-ONLY: `systemctl show/is-active/list-timers`, `pgrep`, two world-readable
  * paths. Nothing here runs apt, needrestart or unattended-upgrade. `--host-state <json>` replaces the reads with a
  * fixture (tests, rehearsal) and is reported as such. With `--pid` (a service that is not the systemd unit) the
  * unit is not read at all.
@@ -1228,9 +1236,11 @@ export function collectHostState(opts) {
   for (const unit of ['apt-daily.service', 'apt-daily-upgrade.service']) {
     if (['active', 'activating', 'reloading'].includes(quiet('systemctl', ['is-active', unit]).stdout.trim())) state.aptActive.push(unit);
   }
-  for (const name of ['unattended-upgr', 'apt', 'apt-get', 'dpkg']) {
+  for (const name of ['apt', 'apt-get', 'dpkg']) {
     if (quiet('pgrep', ['-x', name]).status === 0) state.aptProcesses.push(name);
   }
+  // NOT `pgrep -x unattended-upgr`: the always-running shutdown handler has that process name and would refuse every promote.
+  if (quiet('pgrep', ['-f', APT_RUN_COMMAND_PATTERN]).status === 0) state.aptProcesses.push('unattended-upgrade');
   try {
     const timers = JSON.parse(quiet('systemctl', ['list-timers', 'apt-daily-upgrade.timer', '--all', '-o', 'json', '--no-pager']).stdout);
     const next = timers.find((t) => t.unit === 'apt-daily-upgrade.timer')?.next;
