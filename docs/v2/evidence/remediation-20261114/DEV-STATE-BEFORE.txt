@@ -1,0 +1,7 @@
+# DEV (streamanator) service state before the first remediation heavy job — read-only, 2026-11-14T08:51:08+11:00
+afldb.service active MainPID=1732 since=Sat 2026-11-14 03:01:41 AEDT
+postgresql@16-main.service active MainPID=1531 since=Sat 2026-11-14 03:01:41 AEDT
+caddy.service active MainPID=1683 since=Sat 2026-11-14 03:01:42 AEDT
+listeners: 127.0.0.1:2019 (DEV Caddy admin), 127.0.0.1:3000 (DEV app), 127.0.0.1:5432 (DEV PostgreSQL)
+timers: afldb-settle-afl-api-brownlow.timer (every 5 min); afldb-settle-afl-api.timer next Sun 2026-11-15 05:13:06 AEDT
+load 10.21 6.13 2.84; mem 31 GiB total, 20 available; /mnt/ssd 506 GB free
