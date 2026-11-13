@@ -1,0 +1,17 @@
+[Unit]
+Description=AFLDB — a scheduled backup or restore verification failed (ISSUE-352)
+
+# PREPARED, NOT INSTALLED. Started by OnFailure= of afldb-backup.service and afldb-backup-verify.service. There is no
+# outbound alert channel on this host yet (ISSUE-332 is preparing one): until then this leaves an error-priority journal
+# line a monitor can match and a marker file. `scheduled-backup.sh status` is the probe a check can run.
+[Service]
+Type=oneshot
+User=arm
+Group=arm
+ExecStart=/usr/bin/logger -p user.err -t afldb-backup "AFLDB_BACKUP_FAILURE a scheduled backup or restore verification unit failed; see: journalctl -u afldb-backup -u afldb-backup-verify"
+ExecStart=/bin/sh -c 'date -u +%%FT%%TZ > /home/arm/backups/afldb-scheduled/.state/FAILED-unit'
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/arm/backups/afldb-scheduled

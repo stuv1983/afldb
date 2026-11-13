@@ -1,0 +1,36 @@
+[Unit]
+Description=AFLDB — scheduled database backup (ISSUE-352)
+Documentation=https://github.com/afldb
+After=postgresql.service
+Requires=postgresql.service
+# A failed run leaves a loud journal line and a marker; point this at the ISSUE-332 failure notifier when it lands.
+OnFailure=afldb-backup-failed.service
+
+# PREPARED, NOT INSTALLED. Install as /etc/systemd/system/afldb-backup.service together with afldb-backup.timer
+# (docs/backup-restore.md §3 has the owner procedure). PRODUCTION; DEV keeps manual backups.
+#
+# This wraps tools/maintenance/backup.sh (never edited here). backup.sh reads the checkout's .env itself, so this unit carries
+# NO EnvironmentFile=: no DSN reaches the unit's environment, and the process holds only the read-only afldb_backup role.
+# The target directory is DEDICATED: backup.sh prunes every afldb_prod-*.dump in its directory down to --keep, and the
+# per-operation dumps in ~/backups/afldb (promotion pre-cutover dumps, ISSUE-250) must never be in that set.
+
+[Service]
+Type=oneshot
+User=arm
+Group=arm
+WorkingDirectory=/home/arm/projects/afldb
+Environment=AFLDB_BACKUP_DIR=/home/arm/backups/afldb-scheduled
+Environment=AFLDB_BACKUP_KEEP=14
+# Optional off-host volume (see the proposal in docs/backup-restore.md §4); unset = no push here.
+# Environment=AFLDB_OFFHOST_DEST=/mnt/afldb-offhost
+# Environment=AFLDB_OFFHOST_REQUIRE_MOUNT=1
+ExecStart=/bin/bash /home/arm/projects/afldb/tools/maintenance/scheduled-backup.sh backup
+# pg_dump of ~0.5 GB takes seconds; bound a stalled one rather than holding the unit open until the next firing.
+TimeoutStartSec=30min
+Nice=10
+IOSchedulingClass=idle
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/arm/backups/afldb-scheduled

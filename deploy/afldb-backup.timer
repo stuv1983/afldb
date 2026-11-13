@@ -1,0 +1,16 @@
+[Unit]
+Description=AFLDB — nightly scheduled database backup (ISSUE-352)
+
+[Timer]
+# PREPARED, NOT INSTALLED. OnCalendar is evaluated in the host's timezone (Australia/Melbourne on production).
+# 02:20 (+ up to 10 min) sits outside the 05:00-05:30 afldb-settle-afl-api window and the 06:00-07:00 apt-daily-upgrade
+# window (RandomizedDelaySec=60m, ISSUE-351), after the 00:00 logrotate/dpkg-db-backup jobs, and a nightly dump taken
+# BEFORE the settle means the settle's writes are the only data newer than the newest dump (re-derivable from the source).
+OnCalendar=*-*-* 02:20
+RandomizedDelaySec=10min
+AccuracySec=1min
+# A missed run catches up once on the next boot instead of skipping that night.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

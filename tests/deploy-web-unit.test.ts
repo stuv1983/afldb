@@ -1,4 +1,5 @@
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -300,5 +301,177 @@ describe('AFLDB-ISSUE-220 — docs/deployment.md agrees with the unit', () => {
     for (const name of allDsnNames) {
       expect(doc).toContain(name);
     }
+  });
+});
+
+/**
+ * AFLDB-ISSUE-352 — a scheduled backup, a weekly restore verification, an off-host copy and a monitor probe.
+ *
+ * `tools/maintenance/scheduled-backup.sh` WRAPS backup.sh and restore-test.sh (whose text is pinned by
+ * tests/restore-test.test.sh and tests/db-promotion-check.test.ts) and is exercised here against stub tools in a sandbox:
+ * no database is touched and nothing is written outside the sandbox. The real wrapper over a real cluster was rehearsed
+ * separately (docs/v2/evidence/remediation-20261114/hostops/README.md).
+ */
+describe.runIf(process.platform === 'linux')('AFLDB-ISSUE-352 — scheduled backup wrapper and units', () => {
+  const WRAPPER = join(process.cwd(), 'tools', 'maintenance', 'scheduled-backup.sh');
+  const root = mkdtempSync(join(tmpdir(), 'afldb-352-'));
+  const tools = join(root, 'tools');
+  const bin = join(root, 'bin');
+  mkdirSync(tools);
+  mkdirSync(bin);
+  writeFileSync(join(tools, 'backup.sh'), [
+    '#!/usr/bin/env bash',
+    "dir=''; while [ $# -gt 0 ]; do case $1 in --dir) dir=$2; shift 2;; *) shift;; esac; done",
+    '[ "${FAKE_BACKUP_RC:-0}" != 0 ] && { echo "pg_dump failed" >&2; exit "$FAKE_BACKUP_RC"; }',
+    'stamp=$(date +%Y%m%d-%H%M%S)$RANDOM; target="$dir/afldb_prod-$stamp.dump"',
+    'echo "==> Backing up afldb_prod to $target"; printf "dump %s" "$stamp" > "$target"; echo "==> Done."',
+  ].join('\n'));
+  // restore-test.sh stub: the Nth call exits with the Nth number of FAKE_RESTORE_SEQ (comma separated; the last repeats).
+  writeFileSync(join(tools, 'restore-test.sh'), [
+    '#!/usr/bin/env bash',
+    'n=$(cat "$FAKE_RESTORE_COUNT" 2>/dev/null || echo 0); n=$((n + 1)); echo "$n" > "$FAKE_RESTORE_COUNT"',
+    'echo "restore-test stub got $1" >> "$FAKE_RESTORE_COUNT.args"',
+    'IFS=, read -r -a seq <<< "${FAKE_RESTORE_SEQ:-0}"; i=$((n - 1)); [ "$i" -ge "${#seq[@]}" ] && i=$((${#seq[@]} - 1))',
+    'exit "${seq[$i]}"',
+  ].join('\n'));
+  writeFileSync(join(bin, 'pg_restore'), '#!/usr/bin/env bash\nexit 0\n');
+  for (const f of [join(tools, 'backup.sh'), join(tools, 'restore-test.sh'), join(bin, 'pg_restore')]) chmodSync(f, 0o755);
+
+  let n = 0;
+  const baseEnv = (dir: string, extra: Record<string, string | undefined> = {}) => {
+    const full: Record<string, string | undefined> = {
+      PATH: `${bin}:${process.env.PATH}`, HOME: root, AFLDB_BACKUP_TOOLS_DIR: tools, AFLDB_BACKUP_DIR: dir,
+      AFLDB_VERIFY_RETRY_SECONDS: '0', FAKE_RESTORE_COUNT: join(root, `count${n}`), ...extra,
+    };
+    for (const key of Object.keys(full)) if (full[key] === undefined) delete full[key];
+    return full as NodeJS.ProcessEnv;
+  };
+  const run = (mode: string, env: Record<string, string | undefined> = {}) => {
+    n += 1;
+    const dir = join(root, `case${n}`);
+    const r = spawnSync('bash', [WRAPPER, mode], { encoding: 'utf8', env: baseEnv(dir, env) });
+    return {
+      ...r, dir, out: `${r.stdout}${r.stderr}`,
+      state: (f: string) => (existsSync(join(dir, '.state', f)) ? readFileSync(join(dir, '.state', f), 'utf8') : null),
+    };
+  };
+  const status = (dir: string) => spawnSync('bash', [WRAPPER, 'status'], { encoding: 'utf8', env: baseEnv(dir) });
+
+  it('refuses to guess its target: no AFLDB_BACKUP_DIR, or a relative one, is a configuration error and writes nothing', () => {
+    const none = run('backup', { AFLDB_BACKUP_DIR: undefined });
+    expect(none.status).toBe(2);
+    expect(none.out).toMatch(/AFLDB_BACKUP_DIR must be set to an absolute path \(no default/);
+    expect(run('backup', { AFLDB_BACKUP_DIR: 'backups' }).status).toBe(2);
+    expect(run('nonsense').status).toBe(2);
+    expect(existsSync(join(root, 'backups'))).toBe(false);
+  });
+
+  it('backup: writes a verifiable sha256 sidecar and state, logs the resolved target first, drops orphaned sidecars', () => {
+    const dir = join(root, `case${n + 1}`);
+    mkdirSync(join(dir, '.state'), { recursive: true });
+    writeFileSync(join(dir, 'afldb_prod-gone.dump.sha256'), 'x  afldb_prod-gone.dump\n'); // its dump was pruned
+    const ok = run('backup');
+    expect(ok.status, ok.out).toBe(0);
+    expect(ok.out.split('\n')[0]).toContain(`scheduled-backup: target: mode=backup dir=${dir} keep=14 offhost=none`);
+    const dump = readdirSync(dir).find((f) => f.endsWith('.dump'))!;
+    expect(readdirSync(dir)).not.toContain('afldb_prod-gone.dump.sha256');
+    expect(spawnSync('sha256sum', ['-c', `${dump}.sha256`], { cwd: dir }).status).toBe(0);
+    expect(JSON.parse(ok.state('last-backup.json')!)).toMatchObject({ file: dump, offhost: 'skipped' });
+    expect(ok.state('FAILED')).toBeNull();
+  });
+
+  it('a failing backup exits 1 and leaves a FAILED marker naming the step; the next success clears it', () => {
+    const bad = run('backup', { FAKE_BACKUP_RC: '3' });
+    expect(bad.status).toBe(1);
+    expect(bad.out).toMatch(/AFLDB_BACKUP_FAILURE mode=backup step=backup exit=3/);
+    expect(JSON.parse(bad.state('FAILED')!)).toMatchObject({ mode: 'backup', step: 'backup', exit: 3 });
+    expect(status(bad.dir).status).toBe(1);
+    const again = spawnSync('bash', [WRAPPER, 'backup'], { encoding: 'utf8', env: baseEnv(bad.dir) });
+    expect(again.status, again.stderr).toBe(0);
+    expect(existsSync(join(bad.dir, '.state', 'FAILED'))).toBe(false);
+  });
+
+  it('verify: restores the FRESH dump itself, retries a failed parity check once, and fails loudly after the second', () => {
+    const pass = run('verify', { FAKE_RESTORE_SEQ: '1,0' });
+    expect(pass.status, pass.out).toBe(0);
+    expect(pass.out).toMatch(/restore verification failed; one retry/);
+    const dump = readdirSync(pass.dir).find((f) => f.endsWith('.dump'))!;
+    const arg = `restore-test stub got ${join(pass.dir, dump)}`;
+    expect(readFileSync(`${join(root, `count${n}`)}.args`, 'utf8').trim().split('\n')).toEqual([arg, arg]);
+    expect(JSON.parse(pass.state('last-verify.json')!)).toMatchObject({ file: dump, attempts: 2 });
+    const fail = run('verify', { FAKE_RESTORE_SEQ: '1' });
+    expect(fail.status).toBe(1);
+    expect(JSON.parse(fail.state('FAILED')!)).toMatchObject({ mode: 'verify', step: 'restore-test' });
+    expect(existsSync(join(fail.dir, '.state', 'last-verify.json'))).toBe(false); // never "verified"
+  });
+
+  it('off-host: copies, re-hashes and prunes at the destination; a missing destination keeps the local dump and fails the run', () => {
+    const dest = join(root, 'offhost');
+    mkdirSync(dest);
+    for (const stamp of ['20250101-000000', '20250102-000000']) {
+      writeFileSync(join(dest, `afldb_prod-${stamp}.dump`), 'old');
+      writeFileSync(join(dest, `afldb_prod-${stamp}.dump.sha256`), 'x');
+    }
+    const ok = run('backup', { AFLDB_OFFHOST_DEST: dest, AFLDB_OFFHOST_KEEP: '2' });
+    expect(ok.status, ok.out).toBe(0);
+    const held = readdirSync(dest).filter((f) => f.endsWith('.dump'));
+    expect(held).toHaveLength(2); // retention at the destination: the newest two by name
+    const newest = readdirSync(ok.dir).find((f) => f.endsWith('.dump'))!;
+    expect(held).toContain(newest);
+    expect(spawnSync('sha256sum', ['-c', `${newest}.sha256`], { cwd: dest }).status).toBe(0);
+    expect(readdirSync(dest).some((f) => f.endsWith('.partial'))).toBe(false);
+    expect(JSON.parse(ok.state('last-backup.json')!).offhost).toBe('ok');
+
+    const missing = run('backup', { AFLDB_OFFHOST_DEST: join(root, 'unmounted') });
+    expect(missing.status).toBe(1);
+    expect(missing.out).toMatch(/is not a directory \(a missing mount must fail, not be created\)/);
+    expect(existsSync(join(root, 'unmounted'))).toBe(false);
+    expect(readdirSync(missing.dir).filter((f) => f.endsWith('.dump'))).toHaveLength(1);
+    expect(JSON.parse(missing.state('last-backup.json')!).offhost).toBe('failed');
+    expect(JSON.parse(missing.state('FAILED')!)).toMatchObject({ step: 'offhost' });
+  });
+
+  it('status is the monitor probe: ok after a recent backup and verification, failing on staleness or a never-verified restore', () => {
+    const ver = run('verify');
+    expect(ver.status, ver.out).toBe(0);
+    const first = status(ver.dir);
+    expect(first.status, first.stdout).toBe(0);
+    // A backup older than the limit fails.
+    const stale = readFileSync(join(ver.dir, '.state', 'last-backup.json'), 'utf8').replace(/"epoch":\d+/, '"epoch":1000');
+    writeFileSync(join(ver.dir, '.state', 'last-backup.json'), stale);
+    const old = status(ver.dir);
+    expect(old.stdout).toMatch(/STATUS FAIL backup: last success \d+h ago \(limit 30h\)/);
+    expect(old.status).toBe(1);
+    // A directory that has only ever taken backups has never proven a restore.
+    const only = run('backup');
+    const onlyProbe = status(only.dir);
+    expect(onlyProbe.status).toBe(1);
+    expect(onlyProbe.stdout).toMatch(/STATUS FAIL restore verification: never recorded/);
+  });
+
+  it('the prepared units sit outside the settle and apt windows, carry no credentials, and use a dedicated directory', () => {
+    const read = (f: string) => readFileSync(join('deploy', f), 'utf8');
+    const calendar = (f: string) => /^OnCalendar=(.+)$/m.exec(read(f))![1];
+    const hhmm = (text: string) => { const m = /(\d{2}):(\d{2})$/.exec(text)!; return Number(m[1]) * 60 + Number(m[2]); };
+    for (const timer of ['afldb-backup.timer', 'afldb-backup-verify.timer']) {
+      const start = hhmm(calendar(timer));
+      const random = Number(/^RandomizedDelaySec=(\d+)min$/m.exec(read(timer))![1]);
+      // The whole run (start + jitter + 30 min) ends before the 05:00 settle window, after the 00:00 housekeeping jobs.
+      expect(start).toBeGreaterThan(60);
+      expect(start + random + 30).toBeLessThan(5 * 60);
+      expect(read(timer)).toMatch(/^Persistent=true$/m);
+    }
+    expect(calendar('afldb-backup-verify.timer')).toMatch(/^Wed /); // not Sunday: e2scrub_all.timer 03:10
+    for (const unit of ['afldb-backup.service', 'afldb-backup-verify.service']) {
+      const text = read(unit);
+      expect(text).not.toMatch(/^EnvironmentFile=/m); // backup.sh and restore-test.sh read .env themselves; no DSN in the unit
+      expect(text).toMatch(/^Environment=AFLDB_BACKUP_DIR=\/home\/arm\/backups\/afldb-scheduled$/m);
+      expect(text).not.toMatch(/AFLDB_BACKUP_DIR=\/home\/arm\/backups\/afldb$/m); // never the per-operation dump directory
+      expect(text).toMatch(/^OnFailure=afldb-backup-failed\.service$/m);
+      expect(text).toMatch(/^ExecStart=\/bin\/bash \/home\/arm\/projects\/afldb\/tools\/maintenance\/scheduled-backup\.sh (backup|verify)$/m);
+      expect(text).toMatch(/^ReadWritePaths=\/home\/arm\/backups\/afldb-scheduled$/m);
+    }
+    // The wrapper wraps; it does not edit what other suites pin.
+    expect(readFileSync('tools/maintenance/scheduled-backup.sh', 'utf8')).toContain('never edits or reimplements them');
   });
 });

@@ -1,0 +1,13 @@
+[Unit]
+Description=AFLDB — weekly backup restore verification (ISSUE-352)
+
+[Timer]
+# PREPARED, NOT INSTALLED. Wednesday 03:30 (+ up to 10 min), host timezone. Not Sunday: e2scrub_all.timer runs Sunday 03:10.
+# Clear of the 02:20 nightly backup (the wrapper also serialises on a lock), the 05:00-05:30 settle and the apt window.
+OnCalendar=Wed *-*-* 03:30
+RandomizedDelaySec=10min
+AccuracySec=1min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

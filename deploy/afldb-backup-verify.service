@@ -1,0 +1,33 @@
+[Unit]
+Description=AFLDB — weekly backup + restore verification (ISSUE-352)
+Documentation=https://github.com/afldb
+After=postgresql.service
+Requires=postgresql.service
+OnFailure=afldb-backup-failed.service
+
+# PREPARED, NOT INSTALLED (docs/backup-restore.md §3). Takes a FRESH dump and restores exactly that dump into
+# afldb_restore_test through tools/maintenance/restore-test.sh (ISSUE-341/342 contract: identity-guarded, exit-status
+# decided, nine parity checks against the live database, sha256 recorded as the database comment). A fresh dump is used
+# so the parity comparison is not racing a nightly settle. restore-test.sh needs the owner role (afldb_restore_test is
+# owned by afldb_owner); it reads AFLDB_OWNER_DATABASE_URL from the checkout's .env itself, so no EnvironmentFile= here.
+#
+# Requires afldb_restore_test to exist on the production cluster (probed read-only 2026-11-14: present, ~0.4 GB).
+
+[Service]
+Type=oneshot
+User=arm
+Group=arm
+WorkingDirectory=/home/arm/projects/afldb
+Environment=AFLDB_BACKUP_DIR=/home/arm/backups/afldb-scheduled
+Environment=AFLDB_BACKUP_KEEP=14
+# Environment=AFLDB_OFFHOST_DEST=/mnt/afldb-offhost
+# Environment=AFLDB_OFFHOST_REQUIRE_MOUNT=1
+ExecStart=/bin/bash /home/arm/projects/afldb/tools/maintenance/scheduled-backup.sh verify
+TimeoutStartSec=60min
+Nice=10
+IOSchedulingClass=idle
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/arm/backups/afldb-scheduled
