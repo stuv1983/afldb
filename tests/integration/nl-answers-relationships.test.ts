@@ -26,6 +26,9 @@
  */
 import './guard';
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { sql } from '@/db/client';
@@ -40,6 +43,10 @@ afterAll(async () => {
   await sql.end();
 });
 
+// The tracked rebuild input's own measure (see M_D1.hasBrother).
+const TRACKED_SIBLING_MEASURES = JSON.parse(readFileSync(
+  join(process.cwd(), 'data', 'players', 'sibling-relationships.source.json'), 'utf8')).measures as { players_with_brother: number };
+
 /**
  * The evidence run of 2026-09-09 against `afldb_test`, as the fixture
  * contract. `parentChildFathers` equalling `fatherSonFathers` is the
@@ -49,7 +56,11 @@ afterAll(async () => {
  * could distinguish the two readings.
  */
 const M_D1 = {
-  hasBrother: 658,
+  // ISSUE-358 (P-3, R-4): read from the REBUILD INPUT, not from a snapshot. 658 at the 2026-09-09 run;
+  // V2-GAP-029 D4 (c16d7fad) added the owner-approved McGovern pair, so the tracked provenance measure
+  // `players_with_brother` is 660. This suite's oracle is the rebuilt `afldb_test`, which loads that file;
+  // the production snapshot agrees (660) but is not the source of this value.
+  hasBrother: TRACKED_SIBLING_MEASURES.players_with_brother,
   parentOrChild: 181,
   fatherSonFathers: 107,
   parentChildFathers: 107,
@@ -193,7 +204,7 @@ describe('C2 — has_brother', () => {
 
   /**
    * MEASURED 2026-09-09: at PLAYER level the label-backed set and the
-   * unsexed `relationship = 'sibling'` set are the same 658 people --
+   * unsexed `relationship = 'sibling'` set are the same people (658 when measured, 660 since the McGovern pair) --
    * every player reachable through a `siblings`/`twins`-labelled row is
    * already reachable through a `brothers` row, and the 8 sister rows
    * have no linked side at all. The label restriction is still required,

@@ -3797,7 +3797,12 @@ function manifestSha256(path: string): string | null {
 export const REVIEWED_INPUT_PINS: Readonly<Record<string, string>> = Object.freeze({
   [WIKIPEDIA_HEIGHT_CSV]: '3d809e60afe996b8d939ae6348d26386ccc2b844954bfcef0ae7d9ada115a13b',
   [FATHER_SON_CSV]: 'dbba21cb64d74e943d431d696d9e435632cb3dfa4030c49f0a84f309fe833d27',
-  [SIBLINGS_CSV]: 'dc8d618015125103c42b66acd243962277185e703c7ecca3c428042b0c650bab',
+  // AFLDB-ISSUE-358: re-pinned from dc8d6180… (498 pairs) to b1f0ff4e… (499 pairs). V2-GAP-029 D4
+  // (c16d7fad) added the owner-approved first-party McGovern pair (supplement 015); S4 applied the
+  // identical artefact (sha256 b1f0ff4e…d318) to production on 2026-11-03, COMMITTED_VERIFIED
+  // (docs/v2/gap-029-s4-outcome-and-closure-2026-11-03.md). The rebuild's expected counts derive
+  // from the tracked provenance measures (499 pairs), so this pin was the only stale part.
+  [SIBLINGS_CSV]: 'b1f0ff4ed0bfcf23b53fc8e0007c08ffee636cfd7077b39c3d07aa3b842bd318',
   [AFTER_SIREN_CSV]: 'f3fd67e23e65c552db3976b212dc3422acf9cb20b72da4ca40ba0f1502365527',
 });
 

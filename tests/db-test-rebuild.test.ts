@@ -14807,3 +14807,32 @@ describe('ISSUE-316 a pending rollover apply blocks the rebuild', () => {
     expect(() => assertNoPendingRolloverApply(() => false)).not.toThrow();
   });
 });
+
+describe('ISSUE-358 every reviewed input pin is recomputed from the tracked bytes', () => {
+  // DB-free and independent of assertReviewedInputPins(): a pin can only go stale loudly, and one
+  // failure names every stale pin with its recomputed digest (the reviewed edit to make).
+  const lfSha256 = (path: string) => createHash('sha256')
+    .update(readFileSync(join(process.cwd(), path)).toString('utf8').replace(/\r\n/g, '\n'), 'utf8').digest('hex');
+
+  it('pins exactly the four tracked loader inputs, and each pin equals the sha256 of its file', () => {
+    expect(Object.keys(REVIEWED_INPUT_PINS).sort())
+      .toEqual([AFTER_SIREN_CSV, FATHER_SON_CSV, SIBLINGS_CSV, WIKIPEDIA_HEIGHT_CSV].sort());
+    const stale: string[] = [];
+    for (const [path, pin] of Object.entries(REVIEWED_INPUT_PINS)) {
+      expect(pin, path).toMatch(/^[0-9a-f]{64}$/);
+      const actual = lfSha256(path);
+      if (actual !== pin) stale.push(`${path}: pinned ${pin} but the tracked file is ${actual}`);
+    }
+    expect(stale).toEqual([]);
+    expect(() => assertReviewedInputPins()).not.toThrow();
+  });
+
+  it('the sibling pin is the artefact whose pair count the rebuild expects (pin, provenance and CSV move together)', () => {
+    const provenance = JSON.parse(readFileSync(join(process.cwd(), 'data', 'players', 'sibling-relationships.source.json'), 'utf8'));
+    const csvRows = readFileSync(join(process.cwd(), SIBLINGS_CSV), 'utf8').replace(/\r\n/g, '\n').split('\n').filter((l) => l !== '').length - 1;
+    // `pairs` counts normalised relationship rows; the CSV carries one physical row per pair (a
+    // quoted field never spans a line here, which the loader's own --validate-only also proves).
+    expect(provenance.measures.pairs).toBe(csvRows);
+    expect(lfSha256(SIBLINGS_CSV)).toBe(REVIEWED_INPUT_PINS[SIBLINGS_CSV]);
+  });
+});
