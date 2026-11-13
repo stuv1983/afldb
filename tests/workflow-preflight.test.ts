@@ -15,6 +15,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { computeChecksumRepresentations } from '../tools/db/migration-checksum';
+import { compareToBaseline, serialiseBaseline, summariseErrors } from '../tools/dev/lint-gate';
 import {
   collectMigrationSources,
   compareAppliedMigrations,
@@ -673,5 +674,46 @@ describe('merge readiness report', () => {
     const run = tool(fixture.target, readinessCli, '--issue', '145');
     expect(run.status).toBe(1);
     expect(run.stdout).toContain('blocker: operator decision pending');
+  });
+});
+
+describe('AFLDB-ISSUE-364 ratcheting lint gate', () => {
+  const root = '/repo';
+  const error = (ruleId: string | null) => ({ ruleId, severity: 2 });
+  const warning = (ruleId: string) => ({ ruleId, severity: 1 });
+
+  it('counts error severity per repository-relative file and rule, and ignores warnings', () => {
+    const summary = summariseErrors([
+      { filePath: '/repo/src/a.ts', messages: [error('no-x'), error('no-x'), error('no-y'), warning('no-z')] },
+      { filePath: '/repo/tests/b.ts', messages: [warning('no-z')] },
+      { filePath: '/repo/src/broken.ts', messages: [error(null)] },
+    ], root);
+    expect(summary).toEqual({
+      'src/a.ts': { 'no-x': 2, 'no-y': 1 },
+      'src/broken.ts': { '(no rule: parse or config error)': 1 },
+    });
+  });
+
+  it('fails a new error, a new file and a rule above its baseline', () => {
+    const baseline = { 'src/a.ts': { 'no-x': 2 } };
+    expect(compareToBaseline({ 'src/a.ts': { 'no-x': 2 } }, baseline).regressions).toEqual([]);
+    expect(compareToBaseline({ 'src/a.ts': { 'no-x': 3 } }, baseline).regressions)
+      .toEqual(['src/a.ts: no-x 2 -> 3']);
+    expect(compareToBaseline({ 'src/a.ts': { 'no-x': 2, 'no-y': 1 } }, baseline).regressions)
+      .toEqual(['src/a.ts: no-y 0 -> 1']);
+    expect(compareToBaseline({ 'src/new.ts': { 'no-x': 1 } }, baseline).regressions)
+      .toEqual(['src/new.ts: no-x 0 -> 1']);
+  });
+
+  it('passes and reports paid-down debt without failing', () => {
+    const baseline = { 'src/a.ts': { 'no-x': 2 }, 'src/gone.ts': { 'no-y': 1 } };
+    const verdict = compareToBaseline({ 'src/a.ts': { 'no-x': 1 } }, baseline);
+    expect(verdict.regressions).toEqual([]);
+    expect(verdict.improvements).toEqual(['src/a.ts: no-x 2 -> 1', 'src/gone.ts: no-y 1 -> 0']);
+  });
+
+  it('serialises with stable key order so a baseline diff shows only real change', () => {
+    expect(serialiseBaseline({ 'b.ts': { z: 1, a: 2 }, 'a.ts': { m: 1 } }))
+      .toBe('{\n  "a.ts": {\n    "m": 1\n  },\n  "b.ts": {\n    "a": 2,\n    "z": 1\n  }\n}\n');
   });
 });

@@ -8,6 +8,7 @@
     "build": "next build --webpack && node tools/build/prepare-standalone.mjs",
     "start": "next start -p ${PORT:-3100}",
     "lint": "eslint .",
+    "lint:gate": "tsx tools/dev/lint-gate.ts",
     "typecheck": "next typegen && tsc --noEmit",
     "db:migrate": "tsx tools/db/migrate.ts",
     "db:status": "tsx tools/db/migrate.ts --status",

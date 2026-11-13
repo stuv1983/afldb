@@ -1,0 +1,135 @@
+{
+  ".phaneslight/scripts/api-diff.js": {
+    "@typescript-eslint/no-require-imports": 2
+  },
+  ".phaneslight/scripts/cli.js": {
+    "@typescript-eslint/no-require-imports": 2
+  },
+  ".phaneslight/scripts/regen-registry.js": {
+    "@typescript-eslint/no-require-imports": 3
+  },
+  ".phaneslight/scripts/registry-lib.js": {
+    "@typescript-eslint/no-require-imports": 5
+  },
+  "src/app/admin/AdminNav.tsx": {
+    "react-hooks/set-state-in-effect": 1
+  },
+  "src/app/admin/AdminSection.tsx": {
+    "react-hooks/set-state-in-effect": 1
+  },
+  "src/app/admin/nl-search/ClearTelemetryForm.tsx": {
+    "react-hooks/set-state-in-effect": 1
+  },
+  "src/app/admin/settings/SearchPlaceholderSettings.tsx": {
+    "react-hooks/set-state-in-effect": 2
+  },
+  "src/components/CoachOpponentHistoryClient.tsx": {
+    "react-hooks/set-state-in-effect": 1
+  },
+  "src/components/ConsentBanner.tsx": {
+    "react-hooks/set-state-in-effect": 1
+  },
+  "src/components/PlayerPicker.tsx": {
+    "react-hooks/set-state-in-effect": 1
+  },
+  "src/components/ReorderableSections.tsx": {
+    "react-hooks/set-state-in-effect": 1
+  },
+  "src/components/SearchBox.tsx": {
+    "react-hooks/set-state-in-effect": 2
+  },
+  "src/db/queries/data-edits.ts": {
+    "@typescript-eslint/no-explicit-any": 2
+  },
+  "tests/afl-api-match.test.ts": {
+    "@typescript-eslint/no-explicit-any": 3
+  },
+  "tests/afl-api-settle-plan.test.ts": {
+    "@typescript-eslint/no-explicit-any": 3
+  },
+  "tests/award-definitions-source.test.ts": {
+    "@typescript-eslint/no-explicit-any": 1
+  },
+  "tests/coleman-derivation.test.ts": {
+    "@typescript-eslint/no-explicit-any": 2
+  },
+  "tests/db-test-rebuild.test.ts": {
+    "@next/next/no-assign-module-variable": 1,
+    "@typescript-eslint/no-explicit-any": 45
+  },
+  "tests/draftguru-acquisition.test.ts": {
+    "@typescript-eslint/no-explicit-any": 49
+  },
+  "tests/expandable-table-frame.test.ts": {
+    "react/no-children-prop": 3
+  },
+  "tests/fitzroy-acquisition.test.ts": {
+    "@typescript-eslint/no-explicit-any": 6
+  },
+  "tests/fitzroy-core-import.test.ts": {
+    "@typescript-eslint/no-explicit-any": 35
+  },
+  "tests/gap029-assembly.test.ts": {
+    "@typescript-eslint/no-explicit-any": 15
+  },
+  "tests/gap029-ops.test.ts": {
+    "@typescript-eslint/no-explicit-any": 16
+  },
+  "tests/integration/dob-enrichment-issues.test.ts": {
+    "@typescript-eslint/no-explicit-any": 15
+  },
+  "tests/integration/player-link-concurrency.test.ts": {
+    "@typescript-eslint/no-explicit-any": 15
+  },
+  "tests/integration/settle-afl-api-brownlow-backtest.test.ts": {
+    "@typescript-eslint/no-explicit-any": 3
+  },
+  "tests/integration/settle-afl-api-brownlow-reschedule.test.ts": {
+    "@typescript-eslint/no-explicit-any": 3
+  },
+  "tests/integration/settle-afl-api-brownlow.test.ts": {
+    "@typescript-eslint/no-explicit-any": 3
+  },
+  "tests/integration/settle-afl-api-fixtures.test.ts": {
+    "@typescript-eslint/no-explicit-any": 3
+  },
+  "tests/nl-ui-corpus.test.ts": {
+    "@typescript-eslint/no-require-imports": 2
+  },
+  "tests/player-identity-source.test.ts": {
+    "@typescript-eslint/no-explicit-any": 1
+  },
+  "tests/player-link-mutations.test.ts": {
+    "@typescript-eslint/no-explicit-any": 20
+  },
+  "tests/reference-data.test.ts": {
+    "@typescript-eslint/no-explicit-any": 31
+  },
+  "tests/rising-star-winners-source.test.ts": {
+    "@typescript-eslint/no-explicit-any": 1
+  },
+  "tools/db/rebuild-test.ts": {
+    "@typescript-eslint/no-explicit-any": 7
+  },
+  "tools/v2/brownlow-isolated-e2e.mts": {
+    "prefer-const": 2
+  },
+  "tools/v2/gap029-assemble-restore-evidence.ts": {
+    "@typescript-eslint/no-explicit-any": 2
+  },
+  "tools/v2/gap029-common.ts": {
+    "@typescript-eslint/no-explicit-any": 1
+  },
+  "tools/v2/gap029-ops-lib.ts": {
+    "@typescript-eslint/no-explicit-any": 13
+  },
+  "tools/v2/gap029-ops.ts": {
+    "@typescript-eslint/no-explicit-any": 9
+  },
+  "tools/v2/gap029-stage.ts": {
+    "@typescript-eslint/no-explicit-any": 4
+  },
+  "tools/v2/rehearsal-package.d.mts": {
+    "@typescript-eslint/no-explicit-any": 1
+  }
+}

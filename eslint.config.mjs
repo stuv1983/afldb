@@ -74,6 +74,13 @@ const eslintConfig = defineConfig([
     // AFLDB-ISSUE-265: a byte-preserved historical CommonJS preload, retained with the Phase A
     // reproduction tooling. Its bytes are hash-recorded, so it is ignored rather than edited.
     "issues/closed/AFLDB-ISSUE-265-phase-a/tools/block-network.cjs",
+    // AFLDB-ISSUE-364: archived evidence, not source. Runbook-side scripts under issues/ and
+    // run-evidence scripts under docs/**/evidence/ are one-off operator tooling kept byte-for-byte
+    // as the record of what was executed (several are hash-recorded); linting them would only
+    // invite edits to historical evidence. Everything under src/, tests/, tools/, deploy/ and
+    // packages/ stays linted.
+    "issues/**",
+    "docs/**/evidence/**",
   ]),
 ]);
 
