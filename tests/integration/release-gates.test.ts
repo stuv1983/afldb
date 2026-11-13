@@ -29,6 +29,7 @@ import {
   lockHonoursTables, unlockHonoursTables,
   lockBirthDateEnrichment, unlockBirthDateEnrichment,
 } from './draft-lock';
+import { assertNoLeakedFixtureSeasons } from './leaked-fixtures';
 import { runAdvancedSearch } from '@/db/queries/advanced-search';
 import { runMatchSearch } from '@/db/queries/match-search';
 import { parseAdvancedQuery } from '@/search/advanced-spec';
@@ -41,6 +42,9 @@ const integrationDsn = process.env.AFLDB_TEST_DATABASE_URL as string;
 // also writes. File-level, beside the honours lock, so the whole read/write
 // window is covered rather than just one describe block. Acquisition order
 // (documented in draft-lock.ts): honours -> birth dates -> draft.
+// TST-9: the "only season in progress" gate reads the whole seasons table; a fixture season leaked by an
+// interrupted committed-fixture suite would fail it with a bare year. Say what happened instead.
+beforeAll(() => assertNoLeakedFixtureSeasons(sql));
 beforeAll(() => lockHonoursTables(integrationDsn), 300_000);
 beforeAll(() => lockBirthDateEnrichment(integrationDsn), 300_000);
 afterAll(async () => {

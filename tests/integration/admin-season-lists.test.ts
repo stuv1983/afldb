@@ -51,6 +51,7 @@ import {
   transferSeasonListMember,
 } from '@/db/queries/admin-season-lists';
 import { clearFixtureSeasonOpen, setFixtureSeasonOpen } from './sealed-registry-fixture';
+import { assertNoLeakedFixtureSeasons } from './leaked-fixtures';
 
 // V2-GAP-006: the real registry applies unless a test seals the fixture season through the seam (setFixtureSeasonOpen).
 vi.mock('@/lib/seasons/sealed-seasons', async (importOriginal) =>
@@ -188,6 +189,8 @@ async function auditRows(playerId: number, fieldGroup: string) {
 }
 
 beforeAll(async () => {
+  // TST-9: the two test seasons come from max(year); a fixture season leaked by an interrupted run shifts them.
+  await assertNoLeakedFixtureSeasons(sql);
   const [bound] = await sql<{ maxYear: number }[]>`SELECT max(year)::int AS "maxYear" FROM seasons`;
   maxYear = bound.maxYear;
   seasonA = maxYear + 1;

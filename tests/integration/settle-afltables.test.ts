@@ -22,7 +22,7 @@
  * afterwards. The invariant it proves is NOT "no database change" — it is that
  * **no canonical FACT row is written by the settle pass**:
  *
- *   fixtures COMMITTED here      seasons(2094), one players row, one
+ *   fixtures COMMITTED here      seasons(2076), one players row, one
  *                                external_identities row, and an `afltables`
  *                                sources row ONLY if none already exists
  *   settle OUTPUT committed here import_batches, the migration-074 spine, the
@@ -55,12 +55,17 @@
  * and the per-transaction xid scan asks whether any surviving canonical tuple
  * was written by a settle transaction, which a harness INSERT never is.
  *
- * Everything this suite owns is namespaced: season **2094** and the
- * `issue099-` external-record-id prefix. 2094 is deliberately NOT 2099:
+ * Everything this suite owns is namespaced: season **2076** and the
+ * `issue099-` external-record-id prefix. 2076 is deliberately NOT 2099:
  * `observation-spine.test.ts` seeds `seasons(2099)` inside a transaction that
  * always rolls back, and this suite COMMITS its fixture season, so sharing the
  * key would make a parallel full-suite run collide on the seasons primary key.
- * 2094 appears in no other test and nowhere else in the repository.
+ * 2076 appears in no other test and nowhere else in the repository.
+ * (AFLDB-ISSUE-363 TST-9: this suite used to take 2094, which `awards-reload-links.test.ts` also
+ * claims for its identity block, so the "appears in no other test" statement was false and one
+ * suite's pre-clean could delete the other's season row. The two now hold different seasons.
+ * 2093, which the ISSUE-122 block below shares with the import-role lock fixture, is a separate,
+ * deliberate pairing recorded in tests/integration/leaked-fixtures.ts.)
  *
  * Cleanup runs BEFORE setup as well as in `afterAll`, because an interrupted
  * earlier run can have left committed rows behind. That cleanup deletes THIS
@@ -148,7 +153,7 @@ import { createImportRoleParityHarness } from './import-role-parity';
  * ------------------------------------------------------------------ */
 
 /** Unused by every other suite, and inside seasons_year_ck (1897-2100). */
-const SEASON = 2094;
+const SEASON = 2076;
 const LABEL = 'issue099-settle-test';
 const PREFIX = 'issue099-';
 const SCOPE = `season=${SEASON}`;
@@ -189,26 +194,26 @@ const FOREIGN_ISSUE_OWNER = 'AFLDB-ISSUE-098';
 
 /** Ordered observation times. Increasing, so every interval check holds. */
 const T = {
-  seed: '2094-03-01T00:00:00Z',
-  dryRunFirst: '2094-03-02T00:00:00Z',
-  applyFirst: '2094-03-03T00:00:00Z',
-  rerun: '2094-03-04T00:00:00Z',
-  sweep: '2094-03-05T00:00:00Z',
-  reappear: '2094-03-06T00:00:00Z',
-  corrected: '2094-03-07T00:00:00Z',
-  restored: '2094-03-08T00:00:00Z',
+  seed: '2076-03-01T00:00:00Z',
+  dryRunFirst: '2076-03-02T00:00:00Z',
+  applyFirst: '2076-03-03T00:00:00Z',
+  rerun: '2076-03-04T00:00:00Z',
+  sweep: '2076-03-05T00:00:00Z',
+  reappear: '2076-03-06T00:00:00Z',
+  corrected: '2076-03-07T00:00:00Z',
+  restored: '2076-03-08T00:00:00Z',
   // The T7 data_issues lifecycle, ordered inside the 03-08 day so it stays
   // between the A -> B -> A restoration and the closing dry-run.
-  issueOpen: '2094-03-08T06:00:00Z',
-  issueRefresh: '2094-03-08T12:00:00Z',
-  issueResolve: '2094-03-08T18:00:00Z',
-  issueRerun: '2094-03-08T20:00:00Z',
-  issueForeign: '2094-03-08T22:00:00Z',
-  dryRunLast: '2094-03-09T00:00:00Z',
+  issueOpen: '2076-03-08T06:00:00Z',
+  issueRefresh: '2076-03-08T12:00:00Z',
+  issueResolve: '2076-03-08T18:00:00Z',
+  issueRerun: '2076-03-08T20:00:00Z',
+  issueForeign: '2076-03-08T22:00:00Z',
+  dryRunLast: '2076-03-09T00:00:00Z',
   /** T8 D2, after the closing dry-run and before the role-parity run. */
-  unlinked: '2094-03-09T12:00:00Z',
-  unlinkedZero: '2094-03-09T18:00:00Z',
-  parity: '2094-03-10T00:00:00Z',
+  unlinked: '2076-03-09T12:00:00Z',
+  unlinkedZero: '2076-03-09T18:00:00Z',
+  parity: '2076-03-10T00:00:00Z',
 } as const;
 
 const CANONICAL_FACT_TABLES = [
@@ -348,7 +353,7 @@ function matchPayload(over: Record<string, JsonValue> = {}): JsonValue {
     issue099_fixture: true,
     season: SEASON,
     round_code: '1',
-    match_date: '2094-03-05',
+    match_date: '2076-03-05',
     home_team_raw: 'Issue099 Home',
     away_team_raw: 'Issue099 Away',
     home_goals: 20, home_behinds: 12, home_points: 132,
@@ -380,7 +385,7 @@ function matchProjection(
     round_number: 1,
     round_type: 'home_and_away',
     is_final: false,
-    match_date: '2094-03-05',
+    match_date: '2076-03-05',
     match_time: '7:30 PM',
     // Mapped by no venue, on purpose: venue_id stays NULL, venue_raw carries
     // the real string, and no venues or venue_aliases row is ever created.
@@ -498,7 +503,7 @@ function bundleJson(options: BundleOptions = {}): JsonValue {
       // The payload is what moves between runs; the PROJECTION deliberately
       // does not, so the proposal put to corroboration is identical every
       // time and only the source version and the provider's claim change.
-      payload: matchPayload({ round_code: '3', match_date: '2094-03-19', ...options.disagreePayloadOver }),
+      payload: matchPayload({ round_code: '3', match_date: '2076-03-19', ...options.disagreePayloadOver }),
       observed_columns: [...(matchContract.knownColumns ?? [])],
       // Attendance is the one proposed field that differs from the canonical
       // fixture row, so `diffFields()` is never empty. Without a changed
@@ -547,7 +552,7 @@ function bundleJson(options: BundleOptions = {}): JsonValue {
 function omittedPayload(): JsonValue {
   return matchPayload({
     round_code: '2',
-    match_date: '2094-03-12',
+    match_date: '2076-03-12',
     home_team_raw: 'Issue099 Away',
     away_team_raw: 'Issue099 Home',
   });
@@ -947,7 +952,7 @@ beforeAll(async () => {
       attendance, attendance_status, attendance_source_id, source_id
     ) VALUES (
       ${DISAGREE_MATCH_KEY}, ${SEASON}, '1', 1, 'home_and_away'::round_type, false,
-      '2094-03-05', '7:30 PM', ${VENUE_RAW}, ${clubs[0].id}, ${clubs[1].id},
+      '2076-03-05', '7:30 PM', ${VENUE_RAW}, ${clubs[0].id}, ${clubs[1].id},
       20, 12, 132, 10, 9, 69,
       'home_win'::match_result, ${clubs[0].id}, 63,
       41000, 'complete'::coverage_status, ${sourceId}, ${sourceId}
@@ -966,7 +971,7 @@ beforeAll(async () => {
       home_score, away_score, raw_payload
     ) VALUES (
       ${providerSourceId}, ${PROVIDER_GAME_ID}, ${SEASON}, 'Round 1', 1,
-      '2094-03-05', ${VENUE_RAW}, 'Issue099 Home', 'Issue099 Away',
+      '2076-03-05', ${VENUE_RAW}, 'Issue099 Home', 'Issue099 Away',
       ${clubs[0].id}, ${clubs[1].id}, ${disagreeMatch.id},
       130, 69, ${sql.json({ issue099_fixture: true } as never)}
     )
@@ -1020,7 +1025,7 @@ beforeAll(async () => {
       result, winner_club_id, margin, attendance_status, projected_by_batch_id
     ) VALUES (
       ${fixtures.sourceId}, 'match', ${SENTINEL_MATCH}, 1,
-      ${SEASON}, 'issue099', 1, 'home_and_away'::round_type, false, '2094-03-01',
+      ${SEASON}, 'issue099', 1, 'home_and_away'::round_type, false, '2076-03-01',
       'ISSUE-099 Sentinel Ground', ${fixtures.homeClubId}, ${fixtures.awayClubId}, 1, 0,
       'home_win'::match_result, ${fixtures.homeClubId}, 1,
       'not_collected'::coverage_status, ${fixtures.batchId}
@@ -1313,7 +1318,7 @@ describe('AFLDB-ISSUE-099 settle — the transaction against PostgreSQL', () => 
     // Its last_seen_at advanced with the sweep run, so the sweep that marked
     // the genuinely omitted record could not reach it.
     expect(rejected?.absentSince).toBeNull();
-    expect(rejected?.lastSeenAt.startsWith('2094-03-05')).toBe(true);
+    expect(rejected?.lastSeenAt.startsWith('2076-03-05')).toBe(true);
 
     // Present in full, projected not at all.
     expect(await countEq(
