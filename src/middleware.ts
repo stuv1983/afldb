@@ -137,9 +137,21 @@ export async function middleware(request: NextRequest) {
       request.cookies.get(BETA_COOKIE)?.value, secret, { kind: 'beta', minEpoch },
     );
     // An admin session passes the beta gate: the people running the beta
-    // should not need to admit themselves to it.
+    // should not need to admit themselves to it. It is held to the SAME epoch
+    // as a beta cookie (AFLDB-ISSUE-362 SEC-2): this door cannot see the
+    // database, so without it a revoked, deactivated or password-reset admin
+    // cookie kept public access for its whole 12 h TTL and the AFLDB_BETA_EPOCH
+    // kill switch never reached it. Admin cookies are minted at the epoch
+    // current at sign-in (setAdminSessionCookie).
+    //
+    // Residual, by design: within one epoch this door still honours a validly
+    // signed, unexpired admin claim for up to ADMIN_TTL_SECONDS (12 h) after
+    // that admin's database session is revoked. It grants only what a beta
+    // cookie grants (the public pages); /admin re-checks the database on every
+    // request. To cut it sooner, bump AFLDB_BETA_EPOCH (this also drops beta
+    // admissions) or rotate AFLDB_SESSION_SECRET (this drops every cookie).
     const admin = beta ? null : await verifyClaim(
-      request.cookies.get(ADMIN_COOKIE)?.value, secret, { kind: 'admin' },
+      request.cookies.get(ADMIN_COOKIE)?.value, secret, { kind: 'admin', minEpoch },
     );
     if (!beta && !admin) {
       // Return the visitor to what they asked for once admitted.

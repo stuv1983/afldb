@@ -124,7 +124,11 @@ const requestHeaders = vi.hoisted(() => ({
   outsideRequestScope: false,
 }));
 /** The signed admin cookie a test wants getAdminUser() to read, if any. */
-const requestCookie = vi.hoisted(() => ({ admin: null as string | null }));
+const requestCookie = vi.hoisted(() => ({
+  admin: null as string | null,
+  /** Cookies the code under test set through `cookies().set`, in order. */
+  written: [] as { name: string; value: string }[],
+}));
 vi.mock('next/headers', () => ({
   headers: async () => {
     // What next/headers actually does outside a request scope, which is
@@ -135,6 +139,7 @@ vi.mock('next/headers', () => ({
   cookies: async () => ({
     get: () => (requestCookie.admin === null ? undefined : { value: requestCookie.admin }),
     delete: () => undefined,
+    set: (name: string, value: string) => { requestCookie.written.push({ name, value }); },
   }),
 }));
 // What Next's redirect() does: throw. The message carries the target so a
@@ -2360,5 +2365,96 @@ describe('denial reaches the HTTP layer (AFLDB-ISSUE-166)', () => {
     const session = readSource(join(REPO, 'src', 'lib', 'auth', 'session.ts'));
     expect(session).toContain("redirect('/admin/login')");
     expect(session).toMatch(/requireCapability[\s\S]*?redirect\(admin\.role === 'contributor' \? '\/admin\/upload' : '\/admin'\)/);
+  });
+});
+
+/**
+ * AFLDB-ISSUE-362 SEC-2. The beta gate runs on the edge with no database, so a
+ * signed admin claim used to pass it for its whole 12 h TTL with no epoch: a
+ * revoked, deactivated or password-reset admin cookie kept public access and
+ * AFLDB_BETA_EPOCH (the kill switch) never reached it. Admin claims are now
+ * minted at the epoch current at sign-in and held to the same minimum as a
+ * beta cookie at this door, and only here.
+ */
+describe('the beta gate holds admin claims to the beta epoch (AFLDB-ISSUE-362 SEC-2)', () => {
+  const SECRET = 'sec2-test-secret-0123456789abcdef0123456789abcd';
+  const saved = { ...process.env };
+
+  beforeEach(() => {
+    process.env.AFLDB_BETA_GATE = 'on';
+    process.env.AFLDB_SESSION_SECRET = SECRET;
+    delete process.env.AFLDB_BETA_EPOCH;
+    requestCookie.written.length = 0;
+  });
+  afterEach(() => {
+    process.env = { ...saved };
+  });
+
+  const inOneHour = () => Math.floor(Date.now() / 1000) + 3600;
+  const adminCookie = async (epoch: number) => signClaim(
+    { v: 1, kind: 'admin', sub: '42:opaque-session-token', exp: inOneHour(), epoch }, SECRET,
+  );
+
+  async function door(path: string, cookie: string) {
+    const { NextRequest } = await import('next/server');
+    const { middleware } = await import('@/middleware');
+    const res = await middleware(new NextRequest(`http://127.0.0.1:3100${path}`, { headers: { cookie } }));
+    return { status: res.status, location: res.headers.get('location'), next: res.headers.get('x-middleware-next') };
+  }
+
+  it('refuses an admin claim from before the kill switch was bumped, like a beta cookie', async () => {
+    process.env.AFLDB_BETA_EPOCH = '5';
+    const stale = await door('/players', `afldb_admin=${await adminCookie(1)}`);
+    expect(stale.status).toBe(307);
+    expect(stale.location).toContain('/beta?from=%2Fplayers');
+    expect(stale.next).toBeNull();
+
+    const betaStale = await door('/players', `afldb_beta=${await signClaim(
+      { v: 1, kind: 'beta', sub: 'code:1', exp: inOneHour(), epoch: 1 }, SECRET)}`);
+    expect(betaStale.status).toBe(307);
+  });
+
+  it('still admits an admin claim minted at or after the current epoch', async () => {
+    process.env.AFLDB_BETA_EPOCH = '5';
+    for (const epoch of [5, 6]) {
+      const ok = await door('/players', `afldb_admin=${await adminCookie(epoch)}`);
+      expect(ok.status, `epoch ${epoch}`).toBe(200);
+      expect(ok.next).toBe('1');
+    }
+  });
+
+  it('changes nothing while AFLDB_BETA_EPOCH is unset: a legacy epoch-1 admin cookie still passes', async () => {
+    const ok = await door('/players', `afldb_admin=${await adminCookie(1)}`);
+    expect(ok.status).toBe(200);
+    expect(ok.next).toBe('1');
+  });
+
+  it('leaves /admin and its sign-in reachable for a legacy cookie, so there is no redirect loop', async () => {
+    process.env.AFLDB_BETA_EPOCH = '5';
+    const legacy = `afldb_admin=${await adminCookie(1)}`;
+    // The admin door never applies minEpoch: the database session decides.
+    expect((await door('/admin', legacy)).next).toBe('1');
+    // The sign-in form and the beta page the stale claim is bounced to are
+    // public paths, so a bounced admin lands somewhere that renders.
+    expect((await door('/admin/login', legacy)).next).toBe('1');
+    expect((await door('/beta', legacy)).next).toBe('1');
+  });
+
+  it('mints new admin claims at the current beta epoch', async () => {
+    process.env.AFLDB_BETA_EPOCH = '7';
+    const { setAdminSessionCookie } = await import('@/lib/auth/session');
+    await setAdminSessionCookie(42, 'opaque-session-token');
+    const written = requestCookie.written.find((c) => c.name === 'afldb_admin');
+    expect(written).toBeDefined();
+    expect(await verifyClaim(written!.value, SECRET, { kind: 'admin', minEpoch: 7 })).not.toBeNull();
+    expect(await verifyClaim(written!.value, SECRET, { kind: 'admin', minEpoch: 8 })).toBeNull();
+  });
+
+  it('mints at epoch 1 when AFLDB_BETA_EPOCH is unset, as before', async () => {
+    const { setAdminSessionCookie } = await import('@/lib/auth/session');
+    await setAdminSessionCookie(42, 'opaque-session-token');
+    const written = requestCookie.written.find((c) => c.name === 'afldb_admin');
+    const claim = await verifyClaim(written!.value, SECRET, { kind: 'admin' });
+    expect(claim?.epoch).toBe(1);
   });
 });

@@ -428,10 +428,20 @@ serves disallow-all. Two ways in, both managed at `/admin/access`:
 
 Admission sets a signed 90-day cookie carrying a **revocation epoch**.
 Bumping `AFLDB_BETA_EPOCH` invalidates every outstanding admission at
-once — the kill switch. Admin sessions pass the beta gate.
+once — the kill switch. Admin sessions pass the beta gate, held to the same
+epoch: an admin cookie is minted at the epoch current at sign-in, so a bump
+also retires admin cookies issued before it at the beta gate (AFLDB-ISSUE-362).
+An admin holding a pre-bump cookie keeps `/admin` (the database session is
+what decides there) but is sent to `/beta` on public pages until they sign out
+and in again, or redeem a beta code.
 
 Middleware verifies signatures only (edge runtime, no database); admin
-pages re-check their session against the database on every request.
+pages re-check their session against the database on every request. The
+residual: within one epoch the beta gate cannot see an individual admin
+revocation, so a revoked, deactivated or password-reset admin's cookie still
+opens the public pages (nothing under `/admin`) until it expires, at most 12 h.
+To cut that short bump `AFLDB_BETA_EPOCH` (also drops every beta admission) or
+rotate `AFLDB_SESSION_SECRET` (drops every cookie, including `/admin` doors).
 
 ## 4. Vetted data uploads
 

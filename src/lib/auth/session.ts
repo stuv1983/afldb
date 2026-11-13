@@ -188,7 +188,12 @@ export async function setAdminSessionCookie(userId: number, token: string): Prom
     kind: 'admin',
     sub: `${userId}:${token}`,
     exp: Math.floor(Date.now() / 1000) + ADMIN_TTL_SECONDS,
-    epoch: 1,
+    // The beta epoch current at sign-in (AFLDB-ISSUE-362 SEC-2). Middleware
+    // admits an admin claim through the beta gate only at or above the
+    // current AFLDB_BETA_EPOCH, so the kill switch also retires admin cookies
+    // issued before the bump. /admin itself is unaffected: it never applies
+    // minEpoch, and every admin page re-checks its database session.
+    epoch: betaEpoch(),
   }, sessionSecret());
 
   const jar = await cookies();
