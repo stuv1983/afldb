@@ -79,20 +79,21 @@ export type PlayerListFilters = {
   ranges?: FilterValues;
 };
 
-/**
- * Paged player index.
- *
- * Club names are aggregated in the same query rather than fetched per
- * player, so a 50-row page costs one round trip, not 51.
- */
-export async function listPlayers(options: PlayerListFilters & {
+export type PlayerListOptions = PlayerListFilters & {
   sort: PlayerSort;
   dir?: PlayerSortDir;
   limit: number;
   offset: number;
-}): Promise<{ rows: PlayerListRow[]; total: number }> {
+};
+
+/**
+ * The paged player index as two lazy statements: the page itself and the
+ * unpaged count used only when the offset is past the end. Exported so the
+ * integration suite can EXPLAIN the exact statement the page runs.
+ */
+export function playerListQueries(options: PlayerListOptions) {
   const { sort, dir = 'desc', limit, offset, club, season, name, ranges } = options;
-  
+
   // Base column for the sort
   const sortCol = PLAYER_SORTS[sort];
   const sqlDir = dir === 'asc' ? sql`ASC` : sql`DESC`;
@@ -130,7 +131,7 @@ export async function listPlayers(options: PlayerListFilters & {
   }
   const where = allOf(conditions);
 
-  const rows = await sql<(PlayerListRow & { total: string })[]>`
+  const page = sql<(PlayerListRow & { total: string })[]>`
     SELECT p.id,
            p.slug,
            p.display_name       AS "displayName",
@@ -153,6 +154,26 @@ export async function listPlayers(options: PlayerListFilters & {
      LIMIT ${limit} OFFSET ${offset}
   `;
 
+  const count = () => sql<{ total: string }[]>`
+    SELECT count(*) AS total
+      FROM players p
+      LEFT JOIN player_career_stats c ON c.player_id = p.id
+     WHERE ${where}
+  `;
+
+  return { page, count };
+}
+
+/**
+ * Paged player index.
+ *
+ * Club names are aggregated in the same query rather than fetched per
+ * player, so a 50-row page costs one round trip, not 51.
+ */
+export async function listPlayers(options: PlayerListOptions): Promise<{ rows: PlayerListRow[]; total: number }> {
+  const { page, count } = playerListQueries(options);
+  const rows = await page;
+
   if (rows.length > 0) {
     return {
       rows: rows.map(({ total: _total, ...rest }) => rest),
@@ -164,12 +185,7 @@ export async function listPlayers(options: PlayerListFilters & {
   // those rows would report the collection as empty. Count separately so
   // "13,361 players" stays true on a page that happens to be past the last
   // one, and so the caller can redirect to a page that exists.
-  const [counted] = await sql<{ total: string }[]>`
-    SELECT count(*) AS total
-      FROM players p
-      LEFT JOIN player_career_stats c ON c.player_id = p.id
-     WHERE ${where}
-  `;
+  const [counted] = await count();
   return { rows: [], total: Number(counted.total) };
 }
 

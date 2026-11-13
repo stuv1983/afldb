@@ -15,7 +15,7 @@ import { reconcileCareerTotals } from '@/db/queries/db-health';
 import { searchAdminMatches } from '@/db/queries/match-admin';
 import { runMatchSearch } from '@/db/queries/match-search';
 import { getSeasonMatches } from '@/db/queries/matches';
-import { getPlayerMatches, listPlayers } from '@/db/queries/players';
+import { getPlayerMatches, listPlayers, PLAYER_SORTS, playerListQueries } from '@/db/queries/players';
 import { getSeasonRoundLadder } from '@/db/queries/rounds';
 import { searchRounds } from '@/db/queries/search';
 import { formatRound, formatRoundShort } from '@/lib/format';
@@ -554,6 +554,130 @@ describe('AFLDB-ISSUE-330 player index places career-less players last', () => {
     });
   }
 });
+
+/**
+ * AFLDB-ISSUE-361 (FE-5) — the player index computed each player's club names for every row it
+ * skipped (OFFSET 13,300: 372.7 ms against 28.1 ms at the review; the same query also ran on the
+ * empty past-the-end page). The names are now looked up for the returned page only.
+ *
+ * `legacyPage` is the pre-fix statement kept verbatim as the equality oracle: the page must hold the
+ * same rows, in the same order, with the same total, for every sort, direction, offset and filter.
+ * The plan check counts how often the club-name sub-select ran, so it fails on the legacy shape
+ * (loops = rows scanned) without depending on wall-clock time.
+ */
+describe('AFLDB-ISSUE-361 player index looks up club names for the returned page only', () => {
+  const sortKeys = ['games', 'goals', 'name', 'debut', 'final_game', 'brownlow_votes', 'finals', 'premierships'] as const;
+  let totalPlayers = 0;
+  let clubSlug = '';
+  let season = 0;
+
+  type Filters = { club?: string; season?: number; name?: string };
+
+  async function legacyPage(
+    sort: (typeof sortKeys)[number], dir: 'asc' | 'desc', limit: number, offset: number, filters: Filters,
+  ) {
+    const col = PLAYER_SORTS[sort];
+    const d = dir === 'asc' ? sql`ASC` : sql`DESC`;
+    let orderBy;
+    if (sort === 'name') orderBy = sql`${sql.unsafe(col)} ${d}`;
+    else if (sort === 'debut' || sort === 'final_game') orderBy = sql`${sql.unsafe(col)} ${d} NULLS LAST, p.sort_name ASC`;
+    else if (sort === 'premierships') orderBy = sql`${sql.unsafe(col)} ${d} NULLS LAST, c.games ${d} NULLS LAST, p.sort_name ASC`;
+    else orderBy = sql`${sql.unsafe(col)} ${d} NULLS LAST, p.sort_name ASC`;
+
+    const where = sql`
+      true
+      ${filters.name ? sql`AND p.display_name ILIKE ${'%' + filters.name + '%'}` : sql``}
+      ${filters.club ? sql`AND EXISTS (SELECT 1 FROM player_clubs pc JOIN clubs cl ON cl.id = pc.club_id
+                                        WHERE pc.player_id = p.id AND cl.slug = ${filters.club})` : sql``}
+      ${filters.season !== undefined ? sql`AND EXISTS (SELECT 1 FROM player_season_stats ps
+                                                        WHERE ps.player_id = p.id AND ps.season = ${filters.season})` : sql``}
+    `;
+    const rows = await sql<Record<string, unknown>[]>`
+      SELECT p.id, p.slug, p.display_name AS "displayName",
+             c.debut_season AS "debutSeason", c.final_season AS "finalSeason",
+             COALESCE(c.games, 0) AS games, COALESCE(c.goals, 0) AS goals,
+             COALESCE(c.finals, 0) AS finals, COALESCE(c.premierships, 0) AS premierships,
+             COALESCE(c.brownlow_votes, 0) AS "brownlowVotes", COALESCE(c.clubs_played, 0) AS "clubsPlayed",
+             (SELECT string_agg(DISTINCT cl.short_name, ', ' ORDER BY cl.short_name)
+                FROM player_clubs pc JOIN clubs cl ON cl.id = pc.club_id
+               WHERE pc.player_id = p.id) AS "clubNames",
+             count(*) OVER () AS total
+        FROM players p LEFT JOIN player_career_stats c ON c.player_id = p.id
+       WHERE ${where}
+       ORDER BY ${orderBy}
+       LIMIT ${limit} OFFSET ${offset}
+    `;
+    if (rows.length > 0) {
+      return { rows: rows.map(({ total: _t, ...rest }) => rest), total: Number(rows[0].total) };
+    }
+    const [counted] = await sql<{ total: string }[]>`
+      SELECT count(*) AS total FROM players p LEFT JOIN player_career_stats c ON c.player_id = p.id WHERE ${where}
+    `;
+    return { rows: [], total: Number(counted.total) };
+  }
+
+  beforeAll(async () => {
+    const [counts] = await sql<{ players: number; club: string; season: number }[]>`
+      SELECT (SELECT count(*)::int FROM players) AS players,
+             (SELECT cl.slug FROM clubs cl JOIN player_clubs pc ON pc.club_id = cl.id
+               GROUP BY cl.slug ORDER BY count(*) DESC, cl.slug LIMIT 1) AS club,
+             (SELECT max(season)::int FROM player_season_stats) AS season
+    `;
+    totalPlayers = counts.players;
+    clubSlug = counts.club;
+    season = counts.season;
+  });
+
+  it('runs against a database large enough for a skipped-row cost to show', () => {
+    expect(totalPlayers).toBeGreaterThan(200);
+    expect(clubSlug).not.toBe('');
+  });
+
+  for (const sort of sortKeys) {
+    for (const dir of ['asc', 'desc'] as const) {
+      it(`sort=${sort} ${dir}: pages, totals and club names equal the legacy statement`, async () => {
+        const last = Math.max(0, totalPlayers - 40);
+        for (const offset of [0, 100, last, totalPlayers + 100]) {
+          const actual = await listPlayers({ sort, dir, limit: 25, offset });
+          const expected = await legacyPage(sort, dir, 25, offset, {});
+          expect(actual).toEqual(expected);
+        }
+        const filters: Filters[] = [{ name: 'son' }, { club: clubSlug }, { season }, { club: clubSlug, season }];
+        for (const f of filters) {
+          const actual = await listPlayers({ sort, dir, limit: 25, offset: 25, ...f });
+          const expected = await legacyPage(sort, dir, 25, 25, f);
+          expect(actual).toEqual(expected);
+        }
+      }, 120_000);
+    }
+  }
+
+  it('looks up club names for the returned page, not for every skipped row', async () => {
+    const limit = 5;
+    const offset = totalPlayers - limit;
+    const { page } = playerListQueries({ sort: 'games', dir: 'desc', limit, offset });
+    const [row] = await sql<{ 'QUERY PLAN': unknown }[]>`EXPLAIN (ANALYZE, FORMAT JSON) ${page}`;
+    const raw = row['QUERY PLAN'];
+    const plan = (typeof raw === 'string' ? JSON.parse(raw) : raw) as Array<{ Plan: PlanNode }>;
+    const loops: number[] = [];
+    const visit = (node: PlanNode) => {
+      if (typeof node['Subplan Name'] === 'string' && node['Subplan Name'].startsWith('SubPlan')) {
+        loops.push(Number(node['Actual Loops']));
+      }
+      for (const child of node.Plans ?? []) visit(child);
+    };
+    visit(plan[0].Plan);
+    // The only sub-select in the statement is the club-name lookup.
+    expect(loops.length).toBeGreaterThan(0);
+    expect(Math.max(...loops)).toBeLessThanOrEqual(limit);
+  });
+});
+
+type PlanNode = {
+  'Subplan Name'?: string;
+  'Actual Loops'?: number;
+  Plans?: PlanNode[];
+};
 
 /**
  * AFLDB-ISSUE-129 §11 T9 and T10 — the player-career and ladder halves of the
