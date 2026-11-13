@@ -1400,6 +1400,14 @@ label {
   font-variant-numeric: tabular-nums;
   color: var(--accent);
 }
+/* Holders tied on the cutoff value that the compact panel does not list. */
+.meter-more {
+  margin: -0.25rem 0 1rem;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--text-faint);
+}
+.meter-more a { text-decoration: underline; }
 /* Track and fill are deliberately NOT scoped to `.meter`: the same bar is
    what a record board draws in its leading column. See `.meter-inline`. */
 .meter-track {

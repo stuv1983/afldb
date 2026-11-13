@@ -68,7 +68,7 @@ function formattedValue(value: number, unit: string): string {
 }
 
 export function HomeRecordPanel({ result }: { result: HomeRecordResult }) {
-  const { definition, rows } = result;
+  const { definition, rows, moreTied } = result;
   const top = rows[0]?.value ?? 0;
 
   return (
@@ -97,6 +97,16 @@ export function HomeRecordPanel({ result }: { result: HomeRecordResult }) {
           </div>
         </div>
       ))}
+
+      {moreTied && (
+        <p className="meter-more">
+          and {moreTied.exact ? '' : 'at least '}{formatNumber(moreTied.count)} more tied on{' '}
+          {formattedValue(moreTied.value, definition.unit)}
+          {definition.destination && (
+            <> · <Link href={definition.destination}>see the full record</Link></>
+          )}
+        </p>
+      )}
 
       {definition.coverage && <p className="footnote">{definition.coverage}</p>}
     </section>

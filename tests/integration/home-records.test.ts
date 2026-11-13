@@ -3,6 +3,8 @@ import './guard';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { sql } from '@/db/client';
+import { getAfterSirenRecords } from '@/db/queries/after-siren';
+import { getCoachRecordsByMetric } from '@/db/queries/coaches';
 import { getHomeRecord } from '@/db/queries/home-records';
 
 afterAll(async () => {
@@ -78,5 +80,33 @@ describe('AFL home record catalogue against afldb_test', () => {
     expect(attempts.rows[0]).toMatchObject({ displayName: 'Barry Hall', value: 2 });
     expect(goalsToWin.rows[0]).toMatchObject({ displayName: 'Barry Hall', value: 2 });
     expect(firstKick.rows[0]).toMatchObject({ displayName: 'Clen Denning', value: 6, season: 1935 });
+  });
+
+  // AFLDB-ISSUE-360 FE-4: a tie at the fifth place must be shown or disclosed,
+  // never silently cut. The expected holder counts come from the same queries
+  // with no LIMIT, so the test holds on any database that has ties.
+  it.each([
+    ['after-siren-most-attempts', () => getAfterSirenRecords({ metric: 'attempts' }).then((r) => r.map((x) => x.attempts))],
+    ['after-siren-most-goals', () => getAfterSirenRecords({ metric: 'goals' }).then((r) => r.map((x) => x.goals))],
+    ['coach-most-premierships', () => getCoachRecordsByMetric('premierships', 100_000).then((r) => r.map((x) => x.premierships))],
+  ] as const)('%s never hides a holder tied on the cutoff value', async (value, allValues) => {
+    const all = await allValues();
+    expect(all.length).toBeGreaterThan(5);
+    const cutoff = all[4];
+    const holdersAtCutoff = all.filter((v) => v === cutoff).length;
+    // Relational invariant, oracle-independent: it holds with or without a
+    // cutoff tie. Ties exist on the production snapshot (9 / 64 / 8 holders)
+    // and the unit tests in tests/home-records.test.ts cover them synthetically.
+
+    const result = await getHomeRecord(value, 5);
+    const shownAtCutoff = result.rows.filter((row) => row.value === cutoff).length;
+    expect(shownAtCutoff + (result.moreTied?.count ?? 0)).toBe(holdersAtCutoff);
+    expect(result.rows.every((row) => row.value >= cutoff)).toBe(true);
+    if (result.moreTied) {
+      expect(result.rows).toHaveLength(5);
+      expect(result.moreTied.value).toBe(cutoff);
+    } else {
+      expect(result.rows).toHaveLength(all.filter((v) => v > cutoff).length + holdersAtCutoff);
+    }
   });
 });

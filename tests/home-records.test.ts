@@ -2,7 +2,11 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HomeRecordPanel } from '@/components/HomeRecordPanel';
-import { getHomeRecordDefinition } from '@/lib/home-records';
+import {
+  getHomeRecordDefinition,
+  HOME_RECORD_TIE_WINDOW,
+  selectHomeRecordRows,
+} from '@/lib/home-records';
 
 const mocks = vi.hoisted(() => ({
   career: vi.fn(),
@@ -99,7 +103,117 @@ describe('home record provider dispatch', () => {
     const { getHomeRecord } = await import('@/db/queries/home-records');
     const result = await getHomeRecord('drop table players', 5);
     expect(result.definition.value).toBe('most-goals');
-    expect(mocks.career).toHaveBeenCalledWith('most-goals', 5);
+    // The provider is read through the tie window, not the bare panel limit
+    // (AFLDB-ISSUE-360 FE-4), so a tie at the cutoff can be seen.
+    expect(mocks.career).toHaveBeenCalledWith('most-goals', HOME_RECORD_TIE_WINDOW);
+  });
+});
+
+/** A provider that honours its LIMIT the way the real queries do. */
+function afterSirenHolders(values: number[]) {
+  return values.map((attempts, i) => ({
+    playerId: 100 + i, slug: `holder-${i}`, displayName: `Holder ${i}`,
+    attempts, goals: attempts, goalsToWin: attempts,
+  }));
+}
+
+describe('home record tied holders at the cutoff (AFLDB-ISSUE-360 FE-4)', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  function provide(values: number[]) {
+    const all = afterSirenHolders(values);
+    mocks.afterSiren.mockImplementation(async ({ limit }: { limit?: number }) =>
+      limit === undefined ? all : all.slice(0, limit));
+  }
+
+  it('lists every holder when nine are tied on the record (5 shown before the fix)', async () => {
+    provide([2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1]);
+    const { getHomeRecord } = await import('@/db/queries/home-records');
+    const result = await getHomeRecord('after-siren-most-attempts', 5);
+    expect(result.rows).toHaveLength(9);
+    expect(result.rows.every((row) => row.value === 2)).toBe(true);
+    expect(result.moreTied).toBeUndefined();
+  });
+
+  it('lists a short tie straddling the cutoff but not the places below it', async () => {
+    provide([6, 5, 4, 3, 3, 3, 3, 2, 1]);
+    const { getHomeRecord } = await import('@/db/queries/home-records');
+    const result = await getHomeRecord('after-siren-most-attempts', 5);
+    expect(result.rows.map((row) => row.value)).toEqual([6, 5, 4, 3, 3, 3, 3]);
+    expect(result.moreTied).toBeUndefined();
+  });
+
+  it('discloses the true count of a long tie instead of implying five holders', async () => {
+    provide([2, 2, ...Array<number>(64).fill(1), 0]);
+    const { getHomeRecord } = await import('@/db/queries/home-records');
+    const result = await getHomeRecord('after-siren-most-goals', 5);
+    expect(result.rows).toHaveLength(5);
+    expect(result.moreTied).toEqual({ count: 61, exact: true, value: 1 });
+  });
+
+  it('says "at least" when the provider window ends inside the tie', async () => {
+    provide(Array<number>(HOME_RECORD_TIE_WINDOW + 50).fill(1));
+    const { getHomeRecord } = await import('@/db/queries/home-records');
+    const result = await getHomeRecord('after-siren-most-goals', 5);
+    expect(result.moreTied).toEqual({
+      count: HOME_RECORD_TIE_WINDOW - 5, exact: false, value: 1,
+    });
+  });
+
+  it('adds nothing when the fifth place is not tied', async () => {
+    provide([9, 8, 7, 6, 5, 4, 4]);
+    const { getHomeRecord } = await import('@/db/queries/home-records');
+    const result = await getHomeRecord('after-siren-most-attempts', 5);
+    expect(result.rows).toHaveLength(5);
+    expect(result.moreTied).toBeUndefined();
+  });
+});
+
+describe('selectHomeRecordRows', () => {
+  const rows = (...values: number[]) => values.map((value) => ({ value }));
+
+  it('never relabels or reorders, and never invents a tie below the cutoff', () => {
+    const { rows: shown, moreTied } = selectHomeRecordRows(rows(5, 4, 3, 2, 1, 1, 0), 5);
+    expect(shown.map((row) => row.value)).toEqual([5, 4, 3, 2, 1, 1]);
+    expect(moreTied).toBeNull();
+  });
+
+  it('returns fewer rows than the limit untouched', () => {
+    expect(selectHomeRecordRows(rows(3, 2), 5)).toEqual({ rows: rows(3, 2), moreTied: null });
+  });
+});
+
+describe('HomeRecordPanel tied-holder marker', () => {
+  it('states how many holders are not listed, the shared value, and links the full record', () => {
+    const html = renderToStaticMarkup(HomeRecordPanel({ result: {
+      definition: getHomeRecordDefinition('after-siren-most-goals'),
+      rows: [{
+        kind: 'special-player-total', playerId: 1, playerSlug: 'a-one', displayName: 'A One', value: 1,
+      }],
+      moreTied: { count: 61, exact: true, value: 1 },
+    } }));
+    expect(html).toContain('and 61 more tied on 1 Goals');
+    expect(html).toContain('href="/records/after-the-siren">see the full record</a>');
+  });
+
+  it('flags a lower bound and omits the link when the record has no full page', () => {
+    const html = renderToStaticMarkup(HomeRecordPanel({ result: {
+      definition: getHomeRecordDefinition('venue-most-grand-finals'),
+      rows: [{ kind: 'venue-total', venueSlug: 'mcg', venueName: 'MCG', value: 1 }],
+      moreTied: { count: 195, exact: false, value: 1 },
+    } }));
+    expect(html).toContain('and at least 195 more tied on 1 Grand Finals');
+    expect(html).not.toContain('see the full record');
+  });
+
+  it('renders no marker when nothing is hidden', () => {
+    const html = renderToStaticMarkup(HomeRecordPanel({ result: {
+      definition: getHomeRecordDefinition('most-goals'),
+      rows: [{
+        kind: 'player-total', playerId: 1, playerSlug: 'tony-lockett', displayName: 'Tony Lockett', value: 1360,
+      }],
+    } }));
+    expect(html).not.toContain('more tied');
   });
 });
 

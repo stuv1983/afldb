@@ -12,7 +12,10 @@ import { getCareerRecord, getMatchRecord, getSeasonRecord } from '@/db/queries/r
 import { getVenueRecordLeaders } from '@/db/queries/venues';
 import {
   getHomeRecordDefinition,
+  HOME_RECORD_TIE_WINDOW,
+  selectHomeRecordRows,
   type HomeRecordDefinition,
+  type HomeRecordMoreTied,
   type HomeRecordProvider,
 } from '@/lib/home-records';
 
@@ -78,6 +81,8 @@ export type HomeRecordRow =
 export type HomeRecordResult = {
   definition: HomeRecordDefinition;
   rows: HomeRecordRow[];
+  /** Holders tied on the cutoff value that the compact panel does not list (AFLDB-ISSUE-360). */
+  moreTied?: HomeRecordMoreTied;
 };
 
 function coachValue(row: CoachRecordRow, metric: CoachProvider): number {
@@ -108,8 +113,22 @@ async function coachRows(
   }));
 }
 
-/** Resolve one safe catalogue entry and execute only its selected provider. */
+/**
+ * Resolve one safe catalogue entry and execute only its selected provider.
+ * The panel shows `limit` places, but a tie at the cutoff is never cut in two
+ * silently: the provider is read through a wider window and
+ * `selectHomeRecordRows` either lists every tied holder (a short tie) or
+ * discloses how many more are tied (`moreTied`).
+ */
 export async function getHomeRecord(value: unknown, limit = 5): Promise<HomeRecordResult> {
+  const wide = await fetchHomeRecord(value, Math.max(limit, HOME_RECORD_TIE_WINDOW));
+  const { rows, moreTied } = selectHomeRecordRows(wide.rows, limit);
+  return moreTied
+    ? { definition: wide.definition, rows, moreTied }
+    : { definition: wide.definition, rows };
+}
+
+async function fetchHomeRecord(value: unknown, limit: number): Promise<HomeRecordResult> {
   const definition = getHomeRecordDefinition(value);
   const { provider } = definition;
 

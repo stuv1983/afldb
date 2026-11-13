@@ -301,6 +301,58 @@ export function getHomeRecordDefinition(value: unknown): HomeRecordDefinition {
   return HOME_RECORD_BY_VALUE[parseHomeRecordValue(value)];
 }
 
+/**
+ * Tied holders at the cutoff of the home panel (AFLDB-ISSUE-360 FE-4).
+ *
+ * The panel names the top `limit` places. A tie that straddles the cutoff must
+ * not be silently cut in two: with a plain LIMIT, nine players tied on the
+ * record showed five and implied they were the only holders. Providers are
+ * therefore asked for TIE_WINDOW rows and this selection decides what shows:
+ *
+ *  - every holder tied on the cutoff value is shown when the whole group fits
+ *    in `maxRows` rows (the panel stays compact; a tie of nine adds four rows);
+ *  - a longer tie shows the first `limit` rows and discloses the rest with a
+ *    count, the cutoff value and (the caller links) the full record. When the
+ *    window itself ends inside the tie, the count is a lower bound (`exact`
+ *    false) rather than a guess.
+ */
+export const HOME_RECORD_TIE_WINDOW = 200;
+export const HOME_RECORD_MAX_ROWS = 10;
+
+export type HomeRecordMoreTied = {
+  /** Holders on the cutoff value that are not shown. */
+  count: number;
+  /** False when the provider window ended inside the tie: `count` is a lower bound. */
+  exact: boolean;
+  /** The value they share. */
+  value: number;
+};
+
+export function selectHomeRecordRows<T extends { value: number }>(
+  rows: readonly T[],
+  limit: number,
+  options: { window?: number; maxRows?: number } = {},
+): { rows: T[]; moreTied: HomeRecordMoreTied | null } {
+  const window = options.window ?? HOME_RECORD_TIE_WINDOW;
+  const maxRows = Math.max(limit, options.maxRows ?? HOME_RECORD_MAX_ROWS);
+  if (limit < 1 || rows.length <= limit) return { rows: rows.slice(0, Math.max(limit, 0)), moreTied: null };
+
+  const cutoff = rows[limit - 1].value;
+  let tieEnd = limit; // exclusive end of the run tied on the cutoff value
+  while (tieEnd < rows.length && rows[tieEnd].value === cutoff) tieEnd += 1;
+  if (tieEnd === limit) return { rows: rows.slice(0, limit), moreTied: null };
+
+  if (tieEnd <= maxRows) return { rows: rows.slice(0, tieEnd), moreTied: null };
+  return {
+    rows: rows.slice(0, limit),
+    moreTied: {
+      count: tieEnd - limit,
+      exact: !(tieEnd === rows.length && rows.length >= window),
+      value: cutoff,
+    },
+  };
+}
+
 export type HomeRecordOptionGroup = {
   id: HomeRecordGroup;
   label: string;
