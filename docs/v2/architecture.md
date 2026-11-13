@@ -162,7 +162,7 @@ a test fails if this table and the code disagree (every cited `path:line` must h
 | reconcile | `packages/acquisition/src/reconciliation-report.ts:136` | `buildAflApiReconciliationReport` | nothing |
 | reconcile | `packages/acquisition/src/reconciliation-report.ts:248` | `validateAflApiReconciliationReport` | nothing |
 | promote | `tools/current-season/settle-afl-api.ts:152` | `loadAflApiSettleBundle` | canonical |
-| promote | `tools/current-season/settle-afl-api.ts:356` | `runAflApiSettleCli` | canonical |
+| promote | `tools/current-season/settle-afl-api.ts:357` | `runAflApiSettleCli` | canonical |
 | promote | `tools/current-season/settle-season-seal.ts:30` | `refuseSealedSeasonForSettle` | canonical |
 | promote | `packages/domain/src/season-seal.ts:124` | `evaluateSeasonWrite` | canonical |
 | promote | `packages/domain/src/season-seal.ts:170` | `assertSeasonWritable` | canonical |

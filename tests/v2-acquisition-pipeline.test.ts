@@ -371,7 +371,13 @@ describe('(d) the pipeline contract names real exports', () => {
 describe('(e) docs/v2/architecture.md §9 is the rendered stage map', () => {
   it('equals renderAflApiStageMap output', () => {
     const document = diskReader('docs/v2/architecture.md') as string;
-    expect(extractStageMap(document)).toBe(renderAflApiStageMap(diskReader));
+    // ISSUE-358: the citations are export line numbers, so any edit that shifts a cited file (for example
+    // src/lib/acquisition/settle-afl-api.ts) makes this stale. One command regenerates it (then commit the doc):
+    //   npx tsx tools/v2/acquisition-stage-map.ts --write
+    expect(
+      extractStageMap(document),
+      'docs/v2/architecture.md §9 is stale: run `npx tsx tools/v2/acquisition-stage-map.ts --write`',
+    ).toBe(renderAflApiStageMap(diskReader));
   });
 
   it('spliceStageMap touches only the marked region and preserves the line ending', () => {
