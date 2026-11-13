@@ -8,6 +8,38 @@
 # The production configuration is set out in docs/production-cutover.md
 # and must not be applied until the readiness gate passes.
 
+# ACCESS LOGS CARRY NO SECRETS (AFLDB-ISSUE-362 SEC-1).
+#
+# Caddy's JSON access log records the whole request URI and the Referer, so a
+# plain `format json` writes /beta/verify?token=<magic-link token>,
+# /admin/invite/<invite token> and every search query verbatim, whatever
+# `level` says. This filter rewrites the logged `uri` (invite token replaced,
+# whole query string dropped) and cuts Referer to its origin. It is imported by
+# the site log AND the global default log: when the upstream is down Caddy
+# writes an ERROR record with the whole request to its own stderr, which the
+# site log never sees. Keep it identical to deploy/Caddyfile.production.
+(afldb_log_format) {
+	format filter {
+		wrap json
+		fields {
+			request>uri multi_regexp {
+				regexp "^/admin/invite/[^/?#]+" "/admin/invite/REDACTED"
+				regexp "\?.*$" ""
+			}
+			request>headers>Referer regexp "^(https?://[^/?#]+).*$" "${1}/"
+		}
+	}
+}
+
+# Global options. The snippet above is defined first because a global block
+# cannot import a snippet that is defined after it.
+{
+	# Caddy's default log (stderr, so the journal).
+	log {
+		import afldb_log_format
+	}
+}
+
 :8090 {
 	# Next.js listens on loopback only; the proxy is the sole public face.
 	# PostgreSQL is never exposed.
@@ -57,8 +89,9 @@
 			roll_size 20MiB
 			roll_keep 5
 		}
-		format json
-		# Do not log query strings: Advanced Search URLs are user input.
+		# Query strings and the invite token stay out of the logs: see the
+		# (afldb_log_format) snippet at the top of this file.
+		import afldb_log_format
 		level INFO
 	}
 }

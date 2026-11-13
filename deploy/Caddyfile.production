@@ -29,6 +29,53 @@
 # reads the RIGHTMOST entry, which is only trustworthy because Caddy
 # overwrites rather than appends.
 
+# ACCESS LOGS CARRY NO SECRETS (AFLDB-ISSUE-362 SEC-1).
+#
+# Caddy's JSON access log records the whole request URI and the Referer, and
+# three kinds of URL carry a credential or private input:
+#
+#   /beta/verify?token=<magic-link token>   spends into a beta admission
+#   /admin/invite/<invite token>            lets its holder set an admin
+#                                           password and TOTP, valid 7 days
+#   /search?q=... and every other query     user-typed text
+#
+# A plain `format json` logs all of them verbatim, whatever `level` says: the
+# level selects which records are kept, never what a record contains. The
+# filter below therefore rewrites the logged `uri` before it is written: the
+# invite token is replaced, and the whole query string is dropped. Referer is
+# cut to its origin, because the browser sends the full same-origin URL
+# (invite token and query included) with every asset request the page makes.
+# Cookie, Set-Cookie and Authorization are already redacted by Caddy itself.
+# Routing and the proxied request are untouched: the filter only rewrites
+# what the log encoder writes.
+#
+# The same filter is imported by BOTH site logs and by the global default log.
+# The default log matters: when the upstream is down (every release restart),
+# Caddy writes an ERROR record to its own stderr/journal that carries the whole
+# request, URI included — a second path to the same tokens that the per-site
+# access logs never see. One snippet keeps all three from drifting apart.
+(afldb_log_format) {
+	format filter {
+		wrap json
+		fields {
+			request>uri multi_regexp {
+				regexp "^/admin/invite/[^/?#]+" "/admin/invite/REDACTED"
+				regexp "\?.*$" ""
+			}
+			request>headers>Referer regexp "^(https?://[^/?#]+).*$" "${1}/"
+		}
+	}
+}
+
+# Global options. The snippet above is defined first because a global block
+# cannot import a snippet that is defined after it.
+{
+	# Caddy's default log (stderr, so the journal).
+	log {
+		import afldb_log_format
+	}
+}
+
 beta.afldb.com {
 	reverse_proxy 127.0.0.1:3100 {
 		health_uri /api/health
@@ -87,8 +134,9 @@ beta.afldb.com {
 			roll_size 20MiB
 			roll_keep 5
 		}
-		format json
-		# Query strings stay out of the logs: Advanced Search URLs are user input.
+		# Query strings and the invite token stay out of the logs: see the
+		# (afldb_log_format) snippet at the top of this file.
+		import afldb_log_format
 		level INFO
 	}
 }
@@ -200,7 +248,8 @@ afldb.com {
 			roll_size 20MiB
 			roll_keep 5
 		}
-		format json
+		# Carries no token route, but shares the snippet so every log keeps one policy.
+		import afldb_log_format
 		level INFO
 	}
 }

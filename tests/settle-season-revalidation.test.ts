@@ -1069,6 +1069,40 @@ describe('AFLDB-ISSUE-134 — the reverse-proxy contract the loopback gate rests
     expect((source.match(/header_up\s+-Forwarded/g) ?? []).length).toBe(proxies);
   });
 
+  // AFLDB-ISSUE-362 SEC-1. A plain `format json` log writes the whole request
+  // URI, so /beta/verify?token=, /admin/invite/<token> and search text were
+  // recorded while a comment claimed otherwise. Behaviour is proven against a
+  // real Caddy in docs/v2/evidence/remediation-20261114/auth/; this keeps the
+  // source from regressing: every log (per-site AND the global default log,
+  // which receives Caddy's error records) must import the redacting format.
+  describe('access logs carry no tokens or query strings (AFLDB-ISSUE-362)', () => {
+    it.each(CADDYFILES)('%s defines the redacting log format with the invite, query and Referer rules', (path) => {
+      const source = read(path);
+      const snippet = source.match(/\(afldb_log_format\) \{[\s\S]*?\n\}\n/)?.[0] ?? '';
+      expect(snippet).toContain('format filter');
+      expect(snippet).toContain('request>uri multi_regexp');
+      expect(snippet).toContain('regexp "^/admin/invite/[^/?#]+" "/admin/invite/REDACTED"');
+      expect(snippet).toContain('regexp "\\?.*$" ""');
+      expect(snippet).toContain('request>headers>Referer regexp');
+    });
+
+    it.each(CADDYFILES)('%s imports it in every log block and in the global default log', (path) => {
+      const source = read(path);
+      expect(source).not.toMatch(/^\s*format json\s*$/m);
+      // Every `log` is one tab deep (inside a site block or the global block);
+      // nested `output file { }` closes deeper, so the first one-tab `}` ends it.
+      const logBlocks = source.match(/^\tlog \{\n[\s\S]*?\n\t\}\n/gm) ?? [];
+      // Site logs plus the global block's log.
+      expect(logBlocks.length).toBeGreaterThanOrEqual(2);
+      for (const block of logBlocks) expect(block).toContain('import afldb_log_format');
+      expect(source).toMatch(/^\{\n(?:\t#.*\n)*\tlog \{\n\t\timport afldb_log_format\n\t\}\n\}/m);
+    });
+
+    it.each(CADDYFILES)('%s no longer claims query strings are absent without removing them', (path) => {
+      expect(read(path)).not.toMatch(/(Query strings stay out of the logs|Do not log query strings):/);
+    });
+  });
+
   it('binds the application to loopback, so the proxy is the only way in', () => {
     expect(read('deploy/afldb.service')).toContain('Environment=HOSTNAME=127.0.0.1');
   });
