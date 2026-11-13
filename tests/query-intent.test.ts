@@ -11,6 +11,7 @@ import {
   resolveIntent,
 } from '@/search/query-intent';
 import { parseBoardState } from '@/search/grid-solver-spec';
+import { parseMatchSearchQuery } from '@/search/match-spec';
 
 const CLUBS: IntentClub[] = [
   { slug: 'richmond', name: 'Richmond' },
@@ -69,7 +70,21 @@ describe('extractMatchupQuery', () => {
   it('builds a Match Search link for all meetings in the year', () => {
     const matchup = extractMatchupQuery('richmond v essendon 1984', CLUBS);
     expect(matchup).not.toBeNull();
-    expect(matchupMatchSearchHref(matchup!)).toBe('/match-search?search=1&season_min=1984&season_max=1984&club=richmond%2Cessendon');
+    // AFLDB-ISSUE-360 (SRCH-5): the link carries club_match=both. Without it
+    // Match Search read the two clubs as EITHER club, so "Richmond v Carlton"
+    // linked to every game either played, not their meetings.
+    expect(matchupMatchSearchHref(matchup!)).toBe('/match-search?search=1&season_min=1984&season_max=1984&club=richmond%2Cessendon&club_match=both');
+  });
+
+  it('links a matchup as head-to-head, and the link parses back to head-to-head', () => {
+    const matchup = extractMatchupQuery('richmond v essendon', CLUBS);
+    expect(matchup).not.toBeNull();
+    const href = matchupMatchSearchHref(matchup!);
+    expect(href).toContain('club_match=both');
+    const params = Object.fromEntries(new URL(href, 'http://x').searchParams.entries());
+    const { query } = parseMatchSearchQuery(params);
+    expect(query.clubSlugs).toEqual(['richmond', 'essendon']);
+    expect(query.clubMode).toBe('both');
   });
 
   it('does not treat result wording as a bare matchup search', () => {

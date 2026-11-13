@@ -172,8 +172,13 @@ export default async function MatchSearchPage({
                 style={{ fontSize: '0.72rem', color: 'var(--text-faint)', marginTop: '0.2rem' }}
               >
                 Select up to two. Leave empty for any club; two clubs match games
-                involving either.
+                involving either, or choose &ldquo;between the two&rdquo; below.
               </div>
+              <label htmlFor="club_match">Two clubs</label>
+              <select id="club_match" name="club_match" defaultValue={query.clubMode ?? 'any'}>
+                <option value="any">Games involving either club</option>
+                <option value="both">Games between the two clubs</option>
+              </select>
             </div>
             <div>
               <label htmlFor="outcome">Result</label>
@@ -231,8 +236,10 @@ export default async function MatchSearchPage({
             {selectedClubs.length > 0 && (
               <>
                 {' · '}
-                {selectedClubs.length > 1 ? 'Clubs (either): ' : 'Club: '}
-                {selectedClubs.map((club) => club.name).join(' or ')}
+                {selectedClubs.length > 1
+                  ? (query.clubMode === 'both' ? 'Clubs (head-to-head): ' : 'Clubs (either): ')
+                  : 'Club: '}
+                {selectedClubs.map((club) => club.name).join(query.clubMode === 'both' ? ' v ' : ' or ')}
               </>
             )}
           </p>

@@ -95,9 +95,18 @@ export type MatchRangeFilter = {
 export type MatchOutcome = keyof typeof MATCH_OUTCOMES;
 export type MatchType = keyof typeof MATCH_TYPES;
 
+/**
+ * How two selected clubs combine. `any` (the default, and the only reading
+ * before AFLDB-ISSUE-360) matches games involving EITHER club; `both` matches
+ * only games between the two. Meaningful only with exactly two clubs.
+ */
+export type MatchClubMode = 'any' | 'both';
+
 export type MatchSearchQuery = {
   filters: MatchRangeFilter[];
   clubSlugs: string[];
+  /** Absent means `any`; always `any` unless two clubs are selected. */
+  clubMode?: MatchClubMode;
   outcome: MatchOutcome;
   matchType: MatchType;
   sort: string;
@@ -176,6 +185,12 @@ export function parseMatchSearchQuery(
     );
   }
 
+  // Only an explicit club_match=both with two distinct clubs narrows to
+  // head-to-head; anything else stays the historical "either club" reading.
+  const clubMode: MatchClubMode = first(params.club_match) === 'both' && clubSlugs.length === 2
+    ? 'both'
+    : 'any';
+
   const outcomeRaw = first(params.outcome);
   const outcome: MatchOutcome = outcomeRaw && Object.hasOwn(MATCH_OUTCOMES, outcomeRaw)
     ? outcomeRaw as MatchOutcome
@@ -203,6 +218,7 @@ export function parseMatchSearchQuery(
     query: {
       filters,
       clubSlugs,
+      ...(clubMode === 'both' ? { clubMode } : {}),
       outcome,
       matchType,
       sort,
@@ -226,6 +242,7 @@ export function buildMatchQueryString(query: Partial<MatchSearchQuery>): string 
     }
   }
   if (query.clubSlugs?.length) params.set('club', query.clubSlugs.join(','));
+  if (query.clubMode === 'both' && query.clubSlugs?.length === 2) params.set('club_match', 'both');
   if (query.outcome && query.outcome !== 'all') params.set('outcome', query.outcome);
   if (query.matchType && query.matchType !== 'all') {
     params.set('match_type', query.matchType);

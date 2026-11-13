@@ -69,7 +69,14 @@ export async function runMatchSearch(
     }
   }
 
-  if (query.clubSlugs.length > 0) {
+  if (query.clubMode === 'both' && query.clubSlugs.length === 2) {
+    // Head-to-head: one club at home and the other away, in either order.
+    // Both slugs are bound parameters (AFLDB-ISSUE-360).
+    const [slugA, slugB] = query.clubSlugs;
+    conditions.push(sql`
+      ((h.slug = ${slugA} AND a.slug = ${slugB}) OR (h.slug = ${slugB} AND a.slug = ${slugA}))
+    `);
+  } else if (query.clubSlugs.length > 0) {
     conditions.push(sql`
       (h.slug = ANY(${query.clubSlugs}) OR a.slug = ANY(${query.clubSlugs}))
     `);

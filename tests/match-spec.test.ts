@@ -151,3 +151,33 @@ describe('describeMatchQuery', () => {
     expect(describeMatchQuery(query)).toHaveLength(4);
   });
 });
+
+// AFLDB-ISSUE-360 (SRCH-5): two clubs are EITHER club by default (the form's
+// documented reading), and head-to-head only on an explicit club_match=both.
+describe('club_match: head-to-head versus either club', () => {
+  it('defaults to either club and says nothing in the canonical URL', () => {
+    const { query } = parseMatchSearchQuery({ club: 'collingwood,carlton' });
+    expect(query.clubMode ?? 'any').toBe('any');
+    expect(buildMatchQueryString(query)).not.toContain('club_match');
+  });
+
+  it('reads club_match=both with exactly two clubs and round-trips it', () => {
+    const { query } = parseMatchSearchQuery({ club: 'collingwood,carlton', club_match: 'both' });
+    expect(query.clubMode).toBe('both');
+    const rebuilt = parseMatchSearchQuery(
+      Object.fromEntries(new URLSearchParams(buildMatchQueryString(query))),
+    );
+    expect(rebuilt.query).toEqual(query);
+  });
+
+  it('ignores club_match=both without two clubs (one club, or none)', () => {
+    expect(parseMatchSearchQuery({ club: 'carlton', club_match: 'both' }).query.clubMode ?? 'any').toBe('any');
+    expect(parseMatchSearchQuery({ club_match: 'both' }).query.clubMode ?? 'any').toBe('any');
+    expect(buildMatchQueryString({ clubSlugs: ['carlton'], clubMode: 'both' })).not.toContain('club_match');
+  });
+
+  it('ignores any other club_match value', () => {
+    const { query } = parseMatchSearchQuery({ club: 'collingwood,carlton', club_match: 'everything' });
+    expect(query.clubMode ?? 'any').toBe('any');
+  });
+});

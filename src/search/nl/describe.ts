@@ -20,6 +20,21 @@ import type {
 } from '@/search/nl/answer-types';
 
 
+/** What the capped tie headline needs: the true tied-row total and what one row is. */
+export type TieCap = { total: number; noun: string };
+
+/**
+ * The cap descriptor, or undefined when the headline can name every tied row.
+ * Only a max/min ranking qualifies: its rank cutoff is 1, so the query's
+ * window total IS the number of rows tied at the lead. A top-N's total counts
+ * every ranked row, ties at the lead or not, and must not be read as a tie.
+ */
+function tieCap(plan: NlQueryPlan, rowsShown: number, total: number, noun: string): TieCap | undefined {
+  return (plan.agg.kind === 'max' || plan.agg.kind === 'min') && total > rowsShown
+    ? { total, noun }
+    : undefined;
+}
+
 /**
  * "Gordon Coventry" for a clean leader, or a tie-aware subject when more
  * than one row shares the lead value: "Gordon Coventry and Gary Ablett
@@ -34,8 +49,22 @@ import type {
  * preserved, so pass labels in the same order the row query already
  * ranks them.
  */
-export function tiedSubject(labels: string[]): { subject: string; tied: boolean } {
+export function tiedSubject(
+  labels: string[],
+  capped?: TieCap,
+): { subject: string; tied: boolean } {
   if (labels.length <= 1) return { subject: labels[0] ?? '', tied: false };
+  // AFLDB-ISSUE-356/360 (SRCH-7): when the rows were capped, `labels` counts
+  // the rows SHOWN, not the rows tied. "Alb Thomas and 24 others" for 465,695
+  // tied performances was the cap, stated as a count. The true count of tied
+  // rows comes from the query's own window total, named in the row noun
+  // because a holder can occupy more than one row.
+  if (capped) {
+    return {
+      subject: `${labels[0]} and ${(capped.total - 1).toLocaleString('en-AU')} other ${capped.noun}`,
+      tied: true,
+    };
+  }
   if (labels.length === 2) return { subject: `${labels[0]} and ${labels[1]}`, tied: true };
   const rest = labels.length - 1;
   return { subject: `${labels[0]} and ${rest} other${rest === 1 ? '' : 's'}`, tied: true };
@@ -95,7 +124,7 @@ export function describeAnswer(plan: NlQueryPlan, payload: NlAnswerPayload): { h
     return describePlayerSeasonAnswer(plan, payload.lead, payload.rows, payload.total);
   }
   if (payload.kind === 'team_match') {
-    return describeTeamMatchAnswer(plan, payload.lead, payload.rows);
+    return describeTeamMatchAnswer(plan, payload.lead, payload.rows, payload.total);
   }
   if (payload.kind === 'team_aggregate') {
     return describeTeamAggregateAnswer(plan, payload.rows, payload.total);
@@ -104,7 +133,7 @@ export function describeAnswer(plan: NlQueryPlan, payload: NlAnswerPayload): { h
     return describeHeadToHeadAnswer(plan, payload.row);
   }
   if (payload.kind === 'team_streak') {
-    return describeTeamStreakAnswer(plan, payload.lead, payload.rows);
+    return describeTeamStreakAnswer(plan, payload.lead, payload.rows, payload.total);
   }
   if (payload.kind === 'club_season') {
     return describeClubSeasonAnswer(plan, payload.lead, payload.rows, payload.total);
@@ -208,6 +237,7 @@ function describeTeamStreakAnswer(
   plan: NlQueryPlan,
   lead: NlTeamStreakRow | null,
   rows: NlTeamStreakRow[],
+  total: number,
 ): { headline: string; interpretation: string } {
   if (!lead) return { headline: 'No matching streak found', interpretation: '' };
   const seen = new Set<number>();
@@ -217,7 +247,7 @@ function describeTeamStreakAnswer(
     seen.add(row.clubId);
     labels.push(row.clubName);
   }
-  const { subject, tied } = tiedSubject(labels);
+  const { subject, tied } = tiedSubject(labels, tieCap(plan, rows.length, total, 'streaks'));
   const kind = plan.streakDefinition?.kind ?? 'result';
   return {
     headline: `${subject} \u2014 ${lead.streakLength.toLocaleString('en-AU')}-match ${kind} streak${tied ? ' (tied)' : ''}`,
@@ -287,6 +317,7 @@ function describeTeamMatchAnswer(
   plan: NlQueryPlan,
   lead: NlTeamMatchRow | null,
   rows: NlTeamMatchRow[],
+  total: number,
 ): { headline: string; interpretation: string } {
   if (!lead) return { headline: 'No matching match found', interpretation: '' };
   const metricLabel = (plan.metric ?? '').replace(/_/g, ' ');
@@ -298,7 +329,7 @@ function describeTeamMatchAnswer(
     (r) => r.matchId,
     (r) => `${r.clubName} vs ${r.opponentName} (${r.season})`,
   );
-  const { subject, tied } = tiedSubject(labels);
+  const { subject, tied } = tiedSubject(labels, tieCap(plan, rows.length, total, 'matches'));
   return {
     headline: `${subject} — ${lead.value.toLocaleString('en-AU')} ${metricLabel}${tied ? ' (tied)' : ''}`,
     interpretation: plan.agg.kind === 'top_n'
@@ -330,7 +361,7 @@ function describeClubSeasonAnswer(
     (r) => `${r.clubId}-${r.season}`,
     (r) => `${r.clubName} (${r.season})`,
   );
-  const { subject, tied } = tiedSubject(labels);
+  const { subject, tied } = tiedSubject(labels, tieCap(plan, rows.length, total, 'club seasons'));
   return {
     headline: `${subject} — ${formattedValue} ${metricLabel}${tied ? ' (tied)' : ''}`,
     interpretation: plan.agg.kind === 'top_n'
@@ -365,7 +396,10 @@ function describePlayerGameAnswer(
   // Identity is the player: two rows for the same player at the lead
   // value are the same record held twice, not two different holders.
   const labels = dedupeByIdentity(rows, lead.value, (r) => r.playerId, (r) => r.playerName);
-  const { subject, tied } = tiedSubject(labels);
+  // A sum-mode row is one player's scoped total; a single-match row is one performance.
+  const { subject, tied } = tiedSubject(
+    labels, tieCap(plan, rows.length, total, lead.games !== null ? 'players' : 'performances'),
+  );
   if (lead.games !== null) {
     // Sum mode: a scoped career total, no single match to name.
     return {
@@ -397,7 +431,7 @@ function describePlayerSeasonAnswer(
     };
   }
   const labels = dedupeByIdentity(rows, lead.value, (r) => r.playerId, (r) => r.displayName);
-  const { subject, tied } = tiedSubject(labels);
+  const { subject, tied } = tiedSubject(labels, tieCap(plan, rows.length, total, 'player-seasons'));
   return {
     headline: `${subject} — ${lead.value.toLocaleString('en-AU')} ${metricLabel} (${lead.season})${tied ? ', tied' : ''}`,
     interpretation: plan.agg.kind === 'top_n'
@@ -489,7 +523,7 @@ function describeCoachRecordAnswer(
   }
 
   const labels = dedupeByIdentity(rows, lead.value, (r) => r.coachId, (r) => r.displayName);
-  const { subject, tied } = tiedSubject(labels);
+  const { subject, tied } = tiedSubject(labels, tieCap(plan, rows.length, total, 'coaches'));
   const value = coachMetricValue(plan.metric, lead.value ?? 0);
   // The win-percentage qualifier is never left implicit: without it the
   // board reads as wrong to anyone expecting an all-time great rather than
@@ -539,7 +573,7 @@ function describeFamilyAnswer(
   // Identity is the family_key: two rows tied at the lead value are two
   // different families, never the same one counted twice.
   const labels = dedupeByIdentity(rows, lead.value, (r) => r.familyKey, (r) => r.familyName);
-  const { subject, tied } = tiedSubject(labels);
+  const { subject, tied } = tiedSubject(labels, tieCap(plan, rows.length, total, 'families'));
   const value = (lead.value ?? 0).toLocaleString('en-AU');
   const ranked = plan.agg.kind === 'top_n'
     ? `Top ${plan.agg.n} sibling families by ${metricLabel}.`
@@ -649,7 +683,7 @@ function describeAfterSirenPlayerAnswer(
   // 2 kicks, 2 goals and 2 winning kicks -- so an answer that names one
   // player is wrong by construction.
   const labels = dedupeByIdentity(rows, lead.value, (r) => r.playerId, (r) => r.displayName);
-  const { subject, tied } = tiedSubject(labels);
+  const { subject, tied } = tiedSubject(labels, tieCap(plan, rows.length, total, 'players'));
   const noun = lead.value === 1 ? 'kick' : 'kicks';
   return {
     headline: `${subject} \u2014 ${lead.value.toLocaleString('en-AU')} ${noun} after the siren${tied ? ' (tied)' : ''}`,
@@ -987,7 +1021,7 @@ function describePlayerCareerAnswer(
     ? ` among ${relationship.charAt(0).toLowerCase()}${relationship.slice(1)}`
     : '';
   const labels = dedupeByIdentity(rows, lead.value, (r) => r.playerId, (r) => r.displayName);
-  const { subject, tied } = tiedSubject(labels);
+  const { subject, tied } = tiedSubject(labels, tieCap(plan, rows.length, total, 'players'));
   return {
     headline: `${subject} — ${lead.value.toLocaleString('en-AU')} ${metricLabel}${tied ? ' (tied)' : ''}`,
     interpretation: plan.agg.kind === 'top_n'

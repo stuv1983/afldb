@@ -996,6 +996,31 @@ describe('gate: Match Search', () => {
     }
   });
 
+  // AFLDB-ISSUE-360 (SRCH-5). Oracle-independent: the expected count is an
+  // independent SQL over the same two slugs, not a figure from any snapshot.
+  it('club_match=both returns only the games between the two clubs', async () => {
+    const either = await runMatchSearch(
+      parseMatchSearchQuery({ club: 'collingwood,carlton' }).query,
+    );
+    const headToHead = await runMatchSearch(
+      parseMatchSearchQuery({ club: 'collingwood,carlton', club_match: 'both' }).query,
+    );
+    const [expected] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n
+        FROM matches m
+        JOIN clubs h ON h.id = m.home_club_id
+        JOIN clubs a ON a.id = m.away_club_id
+       WHERE (h.slug = 'collingwood' AND a.slug = 'carlton')
+          OR (h.slug = 'carlton' AND a.slug = 'collingwood')
+    `;
+    expect(headToHead.total).toBe(expected.n);
+    expect(headToHead.total).toBeGreaterThan(0);
+    expect(headToHead.total).toBeLessThan(either.total);
+    for (const row of headToHead.rows) {
+      expect([row.homeSlug, row.awaySlug].sort()).toEqual(['carlton', 'collingwood']);
+    }
+  });
+
   it('keeps the true total on a page past the last result', async () => {
     const first = await runMatchSearch(
       parseMatchSearchQuery({ outcome: 'draw', match_type: 'finals' }).query,

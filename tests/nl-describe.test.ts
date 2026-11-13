@@ -1251,3 +1251,62 @@ describe('describeAnswer — family (AFLDB-ISSUE-153 Stage 6, D6)', () => {
     expect(truncated[1]).toContain('40 families qualify');
   });
 });
+
+// ------------------------------------- capped tie headline (AFLDB-ISSUE-360 SRCH-7)
+
+describe('tie headline counts the tied rows, not the capped rows (AFLDB-ISSUE-360 SRCH-7)', () => {
+  // The executors return at most NL_LIMITS.maxTiedRows (25) rows but report the
+  // window total of every row tied at the lead. "Alb Thomas and 24 others" for
+  // 465,695 tied performances was the cap, stated as a count.
+  const tiedSeasons = (n: number) => Array.from({ length: n }, (_, i) => seasonRow({
+    playerId: i + 1, displayName: `Player ${i + 1}`, value: 0, season: 1897,
+  }));
+
+  it('tiedSubject uses the supplied total when the rows were capped', () => {
+    expect(tiedSubject(['A', 'B', 'C'], { total: 4321, noun: 'player-seasons' })).toEqual({
+      subject: 'A and 4,320 other player-seasons', tied: true,
+    });
+  });
+
+  it('a capped player-season tie names the true tied count', () => {
+    const rows = tiedSeasons(25);
+    const { headline } = describeAnswer(
+      plan({ grain: 'player_season', metric: 'goals', mode: undefined, agg: { kind: 'min' } }),
+      { kind: 'player_season', lead: rows[0], rows, total: 4321 },
+    );
+    expect(headline).toBe('Player 1 and 4,320 other player-seasons — 0 goals (1897), tied');
+    expect(headline).not.toContain('24 others');
+  });
+
+  it('a capped single-match tie counts performances, not players', () => {
+    const rows = Array.from({ length: 25 }, (_, i) => gameRow({ playerId: i + 1, playerName: `P${i + 1}`, value: 0 }));
+    const { headline } = describeAnswer(
+      plan({ agg: { kind: 'min' } }),
+      { kind: 'player_game', lead: rows[0], rows, total: 465695 },
+    );
+    expect(headline).toBe('P1 and 465,694 other performances — 0 goals (tied)');
+  });
+
+  it('an uncapped tie keeps the existing wording (total equals the rows shown)', () => {
+    const rows = tiedSeasons(3);
+    const { headline } = describeAnswer(
+      plan({ grain: 'player_season', metric: 'goals', mode: undefined, agg: { kind: 'min' } }),
+      { kind: 'player_season', lead: rows[0], rows, total: 3 },
+    );
+    expect(headline).toBe('Player 1 and 2 others — 0 goals (1897), tied');
+  });
+
+  it('a top-N does not read its ranked-row total as a tie at the lead', () => {
+    // top_n totals count every ranked row; the lead here is held by two.
+    const rows = [
+      seasonRow({ playerId: 1, displayName: 'One', value: 60 }),
+      seasonRow({ playerId: 2, displayName: 'Two', value: 60 }),
+      seasonRow({ playerId: 3, displayName: 'Three', value: 55 }),
+    ];
+    const { headline } = describeAnswer(
+      plan({ grain: 'player_season', metric: 'goals', mode: undefined, agg: { kind: 'top_n', n: 5 } }),
+      { kind: 'player_season', lead: rows[0], rows, total: 50 },
+    );
+    expect(headline).toBe('One and Two — 60 goals (2017), tied');
+  });
+});

@@ -164,9 +164,12 @@ export function matchupMatchSearchHref(matchup: MatchupQuery): string {
   const filters = matchup.year !== null
     ? [{ field: 'season', min: matchup.year, max: matchup.year }]
     : [];
+  // clubMode 'both': "Richmond v Carlton" is the games between the two, not
+  // every game either club played (4,879 vs 231 on the review snapshot).
   return `/match-search?${buildMatchQueryString({
     filters,
     clubSlugs: [matchup.clubA.slug, matchup.clubB.slug],
+    clubMode: 'both',
     sort: 'date_desc',
   })}`;
 }
