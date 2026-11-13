@@ -8,6 +8,7 @@ import postgres from 'postgres';
 
 import { recordDataEdit } from '@/db/queries/audit-log';
 import { isSealedEditorRefusal } from '@/lib/seasons/sealed-editor-guard';
+import { mergeOverrideDelta, overrideMergeAudit } from '@/lib/override-merge';
 import { sql } from '@/db/client';
 
 /**
@@ -590,18 +591,22 @@ export async function saveCoachMetadata(input: SaveCoachMetadataInput): Promise<
         };
 
         const entityKey = coachOverrideEntityKey(before.afltablesCoachPath);
-        const [existing] = await tx<{ overrideValues: Record<string, unknown> }[]>`
-          SELECT override_values AS "overrideValues" FROM data_overrides
+        // AFLDB-ISSUE-354: merge only into an ACTIVE override. A retired row (the documented
+        // hand-back to the source) is never read back, so an edit of one field cannot
+        // re-activate the values the admin retired; what is carried or dropped is audited.
+        const [existing] = await tx<{ overrideValues: Record<string, unknown>; isActive: boolean }[]>`
+          SELECT override_values AS "overrideValues", is_active AS "isActive" FROM data_overrides
            WHERE entity_type = 'coaches' AND entity_key = ${entityKey} AND field_group = 'identity'
         `;
-        const merged: Record<string, unknown> = { ...(existing?.overrideValues ?? {}) };
+        const delta: Record<string, unknown> = {};
         for (const key of Object.keys(values)) {
-          if (values[key] !== oldValues[key]) merged[key] = values[key];
+          if (values[key] !== oldValues[key]) delta[key] = values[key];
         }
-        if (Object.keys(merged).length > 0) {
+        const merge = mergeOverrideDelta(existing, delta);
+        if (Object.keys(merge.payload).length > 0) {
           await tx`
             INSERT INTO data_overrides (entity_type, entity_key, field_group, override_values, admin_user_id, is_active, updated_at)
-            VALUES ('coaches', ${entityKey}, 'identity', ${tx.json(merged as postgres.JSONValue)}, ${input.adminUserId}, true, now())
+            VALUES ('coaches', ${entityKey}, 'identity', ${tx.json(merge.payload as postgres.JSONValue)}, ${input.adminUserId}, true, now())
             ON CONFLICT (entity_type, entity_key, field_group) DO UPDATE SET
               override_values = EXCLUDED.override_values, admin_user_id = EXCLUDED.admin_user_id,
               is_active = true, updated_at = now()
@@ -610,7 +615,8 @@ export async function saveCoachMetadata(input: SaveCoachMetadataInput): Promise<
 
         await recordDataEdit(tx, {
           tableName: 'coaches', rowId: input.coachId, fieldGroup: 'identity',
-          oldValues, newValues: values, adminUserId: input.adminUserId, note: input.note,
+          oldValues, newValues: { ...values, ...overrideMergeAudit(merge) },
+          adminUserId: input.adminUserId, note: input.note,
           seal: { kind: 'reference' },
         });
       });

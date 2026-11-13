@@ -568,3 +568,84 @@ describe('retireCoachOverride', () => {
     expect(overrides.find((o) => o.fieldGroup === 'identity')?.isActive).toBe(false);
   });
 });
+
+/**
+ * AFLDB-ISSUE-354 (the ISSUE-160 contract: "a retired selection is never resurrected"). Retiring
+ * an override is the documented hand-back to the source, so a later edit of ANOTHER field of the
+ * same group must not read the retired payload back and re-activate it. Oracle-independent: the
+ * subject is a throwaway sourced coach seeded here, not a snapshot row.
+ */
+describe('AFLDB-ISSUE-354: an edit after a retire does not revive the retired override', () => {
+  const overrideOf = async (path: string) => {
+    const [row] = await admin<{ isActive: boolean; values: Record<string, unknown> }[]>`
+      SELECT is_active AS "isActive", override_values AS "values" FROM data_overrides
+       WHERE entity_type = 'coaches' AND entity_key = ${`afltables:${path}`} AND field_group = 'identity'
+    `;
+    return row;
+  };
+  const editsOf = (coachId: number) => sql<{ oldValues: Record<string, unknown>; newValues: Record<string, unknown> }[]>`
+    SELECT old_values AS "oldValues", new_values AS "newValues" FROM data_edits
+     WHERE table_name = 'coaches' AND row_id = ${coachId} AND field_group = 'identity' ORDER BY id
+  `;
+
+  it('writes only the newly changed field, keeps the retired values recoverable from the audit, and audits what it dropped', async () => {
+    const path = `coaches/${MARKER}-Retire354.html`;
+    const [coach] = await admin<{ id: number }[]>`
+      INSERT INTO coaches (afltables_coach_path, name_key, display_name, given_name, source_id, source_record_id)
+      VALUES (${path}, ${`${MARKER}, Retire354`}, 'Retire354 Coach', 'Original',
+              (SELECT id FROM sources WHERE key = 'afltables'), ${MARKER})
+      RETURNING id
+    `;
+    const base = { coachId: coach.id, displayName: 'Retire354 Coach', surname: null, dob: null, adminUserId: actorId };
+
+    // 1. A notes edit creates the active override {notes}.
+    expect((await saveCoachMetadata({ ...base, givenName: 'Original', notes: 'decision A', note: 'n1' })).ok).toBe(true);
+    expect((await overrideOf(path)).values).toEqual({ notes: 'decision A' });
+
+    // 2. Retire it: the hand-back to the source. The retired payload is in the retire audit row.
+    expect((await retireCoachOverride({ coachId: coach.id, fieldGroup: 'identity', adminUserId: actorId })).ok).toBe(true);
+    expect((await overrideOf(path)).isActive).toBe(false);
+
+    // 3. An edit of a DIFFERENT field (canonical notes stay 'decision A', so notes is unchanged).
+    expect((await saveCoachMetadata({ ...base, givenName: 'Changed', notes: 'decision A', note: 'n2' })).ok).toBe(true);
+
+    // The override carries only the new field; the retired {notes} is not revived.
+    const after = await overrideOf(path);
+    expect(after.isActive).toBe(true);
+    expect(after.values).toEqual({ given_name: 'Changed' });
+
+    // What was dropped is audited, and the retired values stay recoverable from data_edits.
+    const edits = await editsOf(coach.id);
+    expect(edits.at(-1)!.newValues.override_retired_keys_dropped).toEqual(['notes']);
+    expect(edits.at(-1)!.newValues.override_carried_keys).toBeUndefined();
+    const retire = edits.find((e) => e.newValues.retired === true)!;
+    expect(retire.oldValues).toEqual({ notes: 'decision A' });
+  });
+
+  it('a no-change edit leaves a retired override retired, and an edit on an ACTIVE override still carries its keys (audited)', async () => {
+    const path = `coaches/${MARKER}-Retire354b.html`;
+    const [coach] = await admin<{ id: number }[]>`
+      INSERT INTO coaches (afltables_coach_path, name_key, display_name, given_name, source_id, source_record_id)
+      VALUES (${path}, ${`${MARKER}, Retire354b`}, 'Retire354b Coach', 'Original',
+              (SELECT id FROM sources WHERE key = 'afltables'), ${MARKER})
+      RETURNING id
+    `;
+    const base = { coachId: coach.id, displayName: 'Retire354b Coach', surname: null, dob: null, adminUserId: actorId };
+
+    expect((await saveCoachMetadata({ ...base, givenName: 'Original', notes: 'keep me' })).ok).toBe(true);
+    expect((await retireCoachOverride({ coachId: coach.id, fieldGroup: 'identity', adminUserId: actorId })).ok).toBe(true);
+    // Nothing changed: no override is written and the retired row stays retired.
+    expect((await saveCoachMetadata({ ...base, givenName: 'Original', notes: 'keep me' })).ok).toBe(true);
+    expect((await overrideOf(path)).isActive).toBe(false);
+
+    // An active override is still merged into, and the carried key is recorded.
+    expect((await saveCoachMetadata({ ...base, givenName: 'Second', notes: 'keep me' })).ok).toBe(true);
+    expect((await overrideOf(path)).values).toEqual({ given_name: 'Second' });
+    expect((await saveCoachMetadata({ ...base, givenName: 'Second', notes: 'edited again' })).ok).toBe(true);
+    const merged = await overrideOf(path);
+    expect(merged.isActive).toBe(true);
+    expect(merged.values).toEqual({ given_name: 'Second', notes: 'edited again' });
+    const last = (await editsOf(coach.id)).at(-1)!;
+    expect(last.newValues.override_carried_keys).toEqual(['given_name']);
+  });
+});

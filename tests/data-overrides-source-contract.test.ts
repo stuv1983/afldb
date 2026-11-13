@@ -250,8 +250,10 @@ describe('AFLDB-ISSUE-086 Source Contract', () => {
   });
 
   test('Delta-only override payload behaviour', () => {
-    expect(tsContent).toMatch(/const overrides: Record<string, any> = existing \? \{ \.\.\.existing\.override_values \} : \{\};/);
-    expect(tsContent).toMatch(/for \(const field of group\.fields\) \{\s+if \(values\[field\] !== before\[field\]\) \{\s+overrides\[field\] = values\[field\];\s+\}\s+\}/);
+    // AFLDB-ISSUE-354: the payload is still the changed fields only (a delta), now merged ONLY into an
+    // active stored override (src/lib/override-merge.ts), never into a retired one.
+    expect(tsContent).toMatch(/const delta: Record<string, unknown> = \{\};\s+for \(const field of group\.fields\) \{\s+if \(values\[field\] !== before\[field\]\) \{\s+delta\[field\] = values\[field\];\s+\}\s+\}\s+overrideMerge = mergeOverrideDelta\(existing, delta\);/);
+    expect(tsContent).toMatch(/SELECT override_values AS "overrideValues", is_active AS "isActive" FROM data_overrides/);
   });
 
   test('Transaction placement before commit', () => {
@@ -1791,5 +1793,46 @@ describe('AFLDB-ISSUE-257 Slice 5 — player_match_stats replay placement', () =
     const at = tables.indexOf('player_match_stats');
     expect(at).toBeGreaterThan(tables.indexOf('players'));
     expect(at).toBeGreaterThan(tables.indexOf('matches'));
+  });
+});
+
+describe('AFLDB-ISSUE-354 mergeOverrideDelta: merge only into an active override', () => {
+  test('starts from the active payload and reports the keys it carried', async () => {
+    const { mergeOverrideDelta, overrideMergeAudit } = await import('@/lib/override-merge');
+    const merge = mergeOverrideDelta({ overrideValues: { a: 1, b: 2 }, isActive: true }, { b: 3, c: 4 });
+    expect(merge.payload).toEqual({ a: 1, b: 3, c: 4 });
+    expect(merge.carriedKeys).toEqual(['a']);
+    expect(merge.retiredKeysDropped).toEqual([]);
+    expect(overrideMergeAudit(merge)).toEqual({ override_carried_keys: ['a'] });
+  });
+
+  test('never reads a retired payload back, and reports what it dropped', async () => {
+    const { mergeOverrideDelta, overrideMergeAudit } = await import('@/lib/override-merge');
+    const merge = mergeOverrideDelta({ overrideValues: { a: 1, b: 2 }, isActive: false }, { b: 3 });
+    expect(merge.payload).toEqual({ b: 3 });
+    expect(merge.carriedKeys).toEqual([]);
+    expect(merge.retiredKeysDropped).toEqual(['a']);
+    expect(overrideMergeAudit(merge)).toEqual({ override_retired_keys_dropped: ['a'] });
+    // No change at all against a retired row: nothing to write (the row stays retired).
+    expect(mergeOverrideDelta({ overrideValues: { a: 1 }, isActive: false }, {}).payload).toEqual({});
+  });
+
+  test('leaves a first edit (no stored row) with an empty audit addition', async () => {
+    const { mergeOverrideDelta, overrideMergeAudit } = await import('@/lib/override-merge');
+    for (const none of [undefined, null]) {
+      const merge = mergeOverrideDelta(none, { a: 1 });
+      expect(merge.payload).toEqual({ a: 1 });
+      expect(overrideMergeAudit(merge)).toEqual({});
+    }
+  });
+
+  test('is used by every merge-into-existing editor path and none reads data_overrides without is_active', () => {
+    for (const file of [
+      'src/db/queries/admin-coaches.ts', 'src/db/queries/admin-draft.ts', 'src/db/queries/data-edits.ts',
+    ]) {
+      const source = fs.readFileSync(path.join(process.cwd(), file), 'utf8');
+      expect(source, file).toContain('mergeOverrideDelta(');
+      expect(source, file).toContain('is_active AS "isActive"');
+    }
   });
 });

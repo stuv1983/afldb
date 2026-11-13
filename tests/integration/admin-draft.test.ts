@@ -814,6 +814,76 @@ describe('source-owned corrections (6.1, 6.2)', () => {
     }
   });
 
+  it('AFLDB-ISSUE-354: an edit after a retire does not revive the retired override (ISSUE-160 contract)', async () => {
+    /*
+     * Retiring is the hand-back to the source: a later edit of ANOTHER field of the same group
+     * must write only its own delta, never read the retired payload back and re-activate it.
+     * Same self-cleaning shape as J-18 (this is the only other case that writes the shared
+     * fixture's `notes` group, and gate 8's 6.1 proves a forced failure leaves NO `notes` record).
+     */
+    const detail = await getDraftPickAdminDetail(sourcePickId);
+    const [floor] = await admin<{ id: string | null }[]>`
+      SELECT max(id)::text AS id FROM data_edits
+       WHERE table_name = 'draft_picks' AND row_id = ${sourcePickId}`;
+    const auditFloor = floor?.id ?? '0';
+    try {
+      const first = await saveSourcePickFields({
+        pickId: sourcePickId, groupKey: 'notes',
+        raw: { pick_note: `${MARKER} n354 note`, detail: `${MARKER} n354 detail one` },
+        adminUserId: actorId,
+      });
+      expect(first.ok, JSON.stringify(first)).toBe(true);
+      expect((await overrideRow(entityKey(), 'notes'))?.overrideValues).toEqual({
+        pick_note: `${MARKER} n354 note`, detail: `${MARKER} n354 detail one`,
+      });
+
+      const retired = await retireSourcePickOverride({
+        pickId: sourcePickId, groupKey: 'notes', adminUserId: actorId,
+      });
+      expect(retired.ok, JSON.stringify(retired)).toBe(true);
+      expect((await overrideRow(entityKey(), 'notes'))?.isActive).toBe(false);
+
+      // pick_note is unchanged against the canonical row (the retire left it as last written).
+      const second = await saveSourcePickFields({
+        pickId: sourcePickId, groupKey: 'notes',
+        raw: { pick_note: `${MARKER} n354 note`, detail: `${MARKER} n354 detail two` },
+        adminUserId: actorId,
+      });
+      expect(second.ok, JSON.stringify(second)).toBe(true);
+      if (second.ok) {
+        expect(Object.keys((second as { changed: Record<string, unknown> }).changed)).toEqual(['detail']);
+      }
+
+      const record = await overrideRow(entityKey(), 'notes');
+      expect(record?.isActive).toBe(true);
+      expect(record?.overrideValues).toEqual({ detail: `${MARKER} n354 detail two` });
+
+      // The audit says what was dropped; the retired values stay recoverable from the retire row.
+      const audits = await admin<{ oldValues: Record<string, unknown>; newValues: Record<string, unknown>; note: string | null }[]>`
+        SELECT old_values AS "oldValues", new_values AS "newValues", note FROM data_edits
+         WHERE table_name = 'draft_picks' AND row_id = ${sourcePickId} AND field_group = 'notes'
+           AND id > ${auditFloor}::bigint ORDER BY id`;
+      expect(audits.at(-1)!.newValues.override_retired_keys_dropped).toEqual(['pick_note']);
+      const retire = audits.find((a) => a.note?.endsWith('override retired'))!;
+      expect(retire.oldValues).toEqual({
+        pick_note: `${MARKER} n354 note`, detail: `${MARKER} n354 detail one`,
+      });
+    } finally {
+      await admin`
+        DELETE FROM data_overrides
+         WHERE entity_type = 'draft_picks' AND entity_key = ${entityKey()}
+           AND field_group = 'notes'`;
+      await admin`
+        UPDATE draft_picks
+           SET pick_note = ${detail?.pickNote ?? null}, detail = ${detail?.detail ?? null}
+         WHERE id = ${sourcePickId}`;
+      await admin`
+        DELETE FROM data_edits
+         WHERE table_name = 'draft_picks' AND row_id = ${sourcePickId}
+           AND id > ${auditFloor}::bigint`;
+    }
+  });
+
   it('refuses to edit a manual selection through the source path', async () => {
     const created = await createManualPick({
       ...manualFields({ draftKind: 'free_agency', draftType: 'Free Agency', pickNumber: null }),

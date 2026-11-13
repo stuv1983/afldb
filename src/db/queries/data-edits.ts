@@ -4,6 +4,7 @@ import postgres from 'postgres';
 
 import { recordDataEdit, type DataEditTableName } from '@/db/queries/audit-log';
 import { isSealedEditorRefusal } from '@/lib/seasons/sealed-editor-guard';
+import { mergeOverrideDelta, overrideMergeAudit, type OverrideMerge } from '@/lib/override-merge';
 import { sql } from '@/db/client';
 import {
   recomputeClubSeasons,
@@ -261,24 +262,28 @@ export async function saveEdit(input: {
         await applyMatchEdit(tx, input.rowId, input.groupKey, values);
       }
 
+      let overrideMerge: OverrideMerge | null = null;
       if (naturalKey !== null) {
-        const [existing] = await tx<{ override_values: Record<string, any> }[]>`
-          SELECT override_values FROM data_overrides
+        // AFLDB-ISSUE-354: merge only into an ACTIVE override (a retired row is the hand-back
+        // to the source and is never read back). Carried / dropped keys go to the audit row.
+        const [existing] = await tx<{ overrideValues: Record<string, unknown>; isActive: boolean }[]>`
+          SELECT override_values AS "overrideValues", is_active AS "isActive" FROM data_overrides
            WHERE entity_type = ${input.entityKey} AND entity_key = ${naturalKey} AND field_group = ${input.groupKey}
         `;
 
-        const overrides: Record<string, any> = existing ? { ...existing.override_values } : {};
+        const delta: Record<string, unknown> = {};
         for (const field of group.fields) {
           if (values[field] !== before[field]) {
-            overrides[field] = values[field];
+            delta[field] = values[field];
           }
         }
+        overrideMerge = mergeOverrideDelta(existing, delta);
 
         // Upsert the active override so importers can replay it
-        if (Object.keys(overrides).length > 0) {
+        if (Object.keys(overrideMerge.payload).length > 0) {
           await tx`
             INSERT INTO data_overrides (entity_type, entity_key, field_group, override_values, admin_user_id, is_active, updated_at)
-            VALUES (${input.entityKey}, ${naturalKey}, ${input.groupKey}, ${tx.json(overrides)}, ${input.adminUserId}, true, now())
+            VALUES (${input.entityKey}, ${naturalKey}, ${input.groupKey}, ${tx.json(overrideMerge.payload as postgres.JSONValue)}, ${input.adminUserId}, true, now())
             ON CONFLICT (entity_type, entity_key, field_group) DO UPDATE SET
               override_values = EXCLUDED.override_values,
               admin_user_id = EXCLUDED.admin_user_id,
@@ -295,7 +300,7 @@ export async function saveEdit(input: {
         rowId: input.rowId,
         fieldGroup: input.groupKey,
         oldValues: before,
-        newValues: values,
+        newValues: overrideMerge === null ? values : { ...values, ...overrideMergeAudit(overrideMerge) },
         adminUserId: input.adminUserId,
         note: input.note,
         seal: entity.table === 'matches' ? { kind: 'row' } : { kind: 'reference' },

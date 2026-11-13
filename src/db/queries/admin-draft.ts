@@ -8,6 +8,7 @@ import postgres from 'postgres';
 
 import { recordDataEdit } from '@/db/queries/audit-log';
 import { isSealedEditorRefusal } from '@/lib/seasons/sealed-editor-guard';
+import { mergeOverrideDelta, overrideMergeAudit } from '@/lib/override-merge';
 import { authSql } from '@/db/authClient';
 import { sql } from '@/db/client';
 import {
@@ -764,21 +765,25 @@ export async function saveSourcePickFields(
           sourceId: pick.sourceId, playerUrl: pick.playerUrl,
           draftYear: pick.draftYear, draftKind: pick.draftKind,
         });
-        const [existing] = await tx<{ overrideValues: Record<string, unknown> }[]>`
-          SELECT override_values AS "overrideValues" FROM data_overrides
+        // AFLDB-ISSUE-354 (the ISSUE-160 contract): merge only into an ACTIVE override. A retired
+        // row is never read back, so editing one field cannot re-activate the values the admin
+        // retired; what is carried or dropped is recorded in the audit row below.
+        const [existing] = await tx<{ overrideValues: Record<string, unknown>; isActive: boolean }[]>`
+          SELECT override_values AS "overrideValues", is_active AS "isActive" FROM data_overrides
            WHERE entity_type = 'draft_picks' AND entity_key = ${entityKey}
              AND field_group = ${groupKey}
         `;
-        const overrides: Record<string, unknown> = existing ? { ...existing.overrideValues } : {};
+        const delta: Record<string, unknown> = {};
         for (const fieldKey of Object.keys(values)) {
-          if (values[fieldKey] !== before[fieldKey]) overrides[fieldKey] = values[fieldKey];
+          if (values[fieldKey] !== before[fieldKey]) delta[fieldKey] = values[fieldKey];
         }
-        if (Object.keys(overrides).length > 0) {
+        const merge = mergeOverrideDelta(existing, delta);
+        if (Object.keys(merge.payload).length > 0) {
           await tx`
             INSERT INTO data_overrides
                   (entity_type, entity_key, field_group, override_values, admin_user_id, is_active, updated_at)
             VALUES ('draft_picks', ${entityKey}, ${groupKey},
-                    ${tx.json(overrides as postgres.JSONValue)}, ${input.adminUserId}, true, now())
+                    ${tx.json(merge.payload as postgres.JSONValue)}, ${input.adminUserId}, true, now())
             ON CONFLICT (entity_type, entity_key, field_group) DO UPDATE SET
               override_values = EXCLUDED.override_values,
               admin_user_id = EXCLUDED.admin_user_id,
@@ -792,7 +797,7 @@ export async function saveSourcePickFields(
           rowId: pick.id,
           fieldGroup: groupKey,
           oldValues: before,
-          newValues: values,
+          newValues: { ...values, ...overrideMergeAudit(merge) },
           adminUserId: input.adminUserId,
           note: input.note,
           seal: { kind: 'row', previousSeasons: [pick.draftYear] },
