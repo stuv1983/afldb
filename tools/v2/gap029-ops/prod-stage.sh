@@ -13,7 +13,7 @@
 #   bash prod-stage.sh apply     R S RUN                      gates, approval, ONE detached apply, post-run state probe, outcome report
 #   bash prod-stage.sh report    R S RUN                      print (or, for an unrecorded apply, derive) the outcome
 #   bash prod-stage.sh state     R S RUN                      read-only classification of the live database against the plan
-#   bash prod-stage.sh accept    R S RUN                      read-only acceptance: outcome + state (+ S3/I336 verify) -> accepted/S.json
+#   bash prod-stage.sh accept    R S RUN                      read-only acceptance: outcome + state (+ S3/I336/I350 verify) -> accepted/S.json
 #
 # There is NO retry, NO rollback claim after a commit and NO restore in this script. Connection strings are read from <checkout>/.env into environment
 # variables of the child process only; they are never in argv and never printed. GAP029_PROFILE overrides the production profile (a simulation passes its own).
@@ -63,8 +63,8 @@ need_checkout() {
 # AFLDB-ISSUE-336: ONE stage grammar for both the stage and the run name. The run name is what
 # `capture` generates (RUN=$S-$STAMP, STAMP=%Y%m%dT%H%M%SZ), so it must admit every stage the
 # allowlist admits; before this, I336 was an accepted stage whose every run name was refused.
-STAGE_RE='(S[1-4]|I336)'
-stage_arg() { S=${1:?stage S1..S4 or I336}; [[ "$S" =~ ^${STAGE_RE}$ ]] || stop "stage must be S1, S2, S3, S4 or I336" 2; }
+STAGE_RE='(S[1-4]|I336|I350)'
+stage_arg() { S=${1:?stage S1..S4, I336 or I350}; [[ "$S" =~ ^${STAGE_RE}$ ]] || stop "stage must be S1, S2, S3, S4, I336 or I350" 2; }
 run_arg() {
   RUN=${1:?run name (e.g. S1-20261103T000000Z)}; [[ "$RUN" =~ ^${STAGE_RE}-[0-9]{8}T[0-9]{6}Z$ ]] || stop "bad run name" 2; [ "${RUN%%-*}" = "$S" ] || stop "run $RUN is not a $S run" 2
   RUNDIR=$OPS/runs/$RUN; CAPDIR=$BACKUP_ROOT/gap029-$S-${RUN#*-}; [ -d "$RUNDIR" ] || stop "no run directory $RUNDIR"; [ -d "$CAPDIR" ] || stop "no capture directory $CAPDIR"
@@ -313,7 +313,7 @@ accept)
   load_dsns
   OPSCLI run-tool --stage "$S" --phase state --run-dir "$RUNDIR" --capture-dir "$CAPDIR" --profile "$PROFILE" > "$RUNDIR/logs/accept-state.txt" 2>&1; cat "$RUNDIR/logs/accept-state.txt"
   grep -q '^STATE PLANNED RESULT PRESENT' "$RUNDIR/logs/accept-state.txt" || { drop_dsns; stop "the live state is not the planned result" 24; }
-  if [ "$S" = S3 ] || [ "$S" = I336 ]; then
+  if [ "$S" = S3 ] || [ "$S" = I336 ] || [ "$S" = I350 ]; then
     OPSCLI run-tool --stage "$S" --phase verify --run-dir "$RUNDIR" --capture-dir "$CAPDIR" --profile "$PROFILE" > "$RUNDIR/logs/accept-verify.txt" 2>&1 \
       || { cat "$RUNDIR/logs/accept-verify.txt"; drop_dsns; stop "$S read-only verify failed" 24; }
     cat "$RUNDIR/logs/accept-verify.txt"

@@ -24,8 +24,8 @@ const HEX40 = /^[0-9a-f]{40}$/;
 /* Stage table                                                                                                                           */
 /* ------------------------------------------------------------------------------------------------------------------------------------- */
 
-/** S1-S4 are V2-GAP-029; I336 is AFLDB-ISSUE-336 (D-336-2), which reuses this capture, plan, approval and outcome machinery unchanged. */
-export const STAGE_IDS = ['S1', 'S2', 'S3', 'S4', 'I336'] as const;
+/** S1-S4 are V2-GAP-029; I336 is AFLDB-ISSUE-336 (D-336-2) and I350 is AFLDB-ISSUE-350 (D-350-1, season opening); both reuse this capture, plan, approval and outcome machinery unchanged. */
+export const STAGE_IDS = ['S1', 'S2', 'S3', 'S4', 'I336', 'I350'] as const;
 export type StageId = (typeof STAGE_IDS)[number];
 export const isStage = (s: unknown): s is StageId => typeof s === 'string' && (STAGE_IDS as readonly string[]).includes(s);
 
@@ -131,6 +131,26 @@ export const STAGES: Readonly<Record<StageId, StageSpec>> = {
       return [`INSERT ${e.filter((x) => x.action === 'to insert').length} draft_picks rows (source draftguru, Pre-Draft, unnumbered), ${e.filter((x) => x.action === 'to insert' && x.personId === null).length} new unmatched draft_persons rows, `
         + `and one data_edits audit row per pick as actor auth_users.id ${String(p.actorUserId)}; nothing updated or deleted; no override written`,
       ...e.map((x) => `  ${String(x.sourceRecordId)} -> ${x.action}${x.personId === null ? ' (new person)' : ` (person ${String(x.personId)}, ${String(x.linkStatus)})`}`)];
+    },
+  },
+  I350: {
+    id: 'I350', title: 'open the in-progress season (the seasons row and the current clubs last_season)', decision: 'D-350-1', operation: 'issue350-season-open',
+    tool: 'tools/v2/issue350-season-open-production.ts', runner: 'tsx', conditions: false, needsChild: false, needsActor: false, hasVerify: true,
+    approvalExtras: (p) => ({ year: p.year, seasonsSha256: p.seasonsSha256, clubsSha256: p.clubsSha256 }),
+    planProblems: (p) => {
+      const c = (p.changes ?? {}) as Record<string, unknown>; const out: string[] = [];
+      if (!Number.isInteger(p.year)) out.push('I350 plan names no season year');
+      if (p.state !== 'NOT_OPEN') out.push(`I350 plan state is ${String(p.state)}, not NOT_OPEN (an already-open or refused state needs review)`);
+      if (!HEX64.test(String(p.seasonsSha256 ?? '')) || !HEX64.test(String(p.clubsSha256 ?? ''))) out.push('I350 plan does not bind the sha256 of the tracked seasons.json and clubs.json');
+      if (c.insertSeason !== true && arr(c.clubIds).length === 0 && arr(c.orgIds).length === 0) out.push('I350 plan changes nothing (the season is already open)');
+      return out;
+    },
+    changes: (p) => {
+      const c = (p.changes ?? {}) as Record<string, unknown>;
+      return [`${c.insertSeason === true ? 'INSERT 1 seasons row' : 'no seasons row insert (already present as contracted)'} for ${String(p.year)} (league and status from the tracked contract, every measured column and date NULL), `
+        + `UPDATE clubs.last_season to ${String(p.year)} for ${arr(c.clubIds).length} identities and club_organizations.last_season for ${arr(c.orgIds).length} organisations (only identities open in clubs.json that hold ${String(Number(p.year) - 1)}), `
+        + 'and one audit import_batches row; nothing else, no DELETE, no first_season, no closed identity, no club_seasons',
+        `  club ids ${JSON.stringify(arr(c.clubIds))}; organisation ids ${JSON.stringify(arr(c.orgIds))}`];
     },
   },
 };
@@ -412,6 +432,7 @@ export function approvalStatement(stage: StageId, plan: Record<string, any>, ev:
     S2: `Through gap029-draft-link-production.py with child sha256 ${plan.childSha256} and label ${plan.label}. I accept that the importer commits in its own transaction, that a failure mid-write may be reported as OUTCOME_UNDETERMINED, and that recovery is an owner-decided restore.`,
     S3: `Exactly the eight manual rookie selections named in the plan, through the audited editor path as actor auth_users.id ${String(plan.actorUserId)}, my active, fully enrolled Super Admin.`,
     S4: `Exactly the sibling key afldb-sibling-supplement:015 through family_siblings.py load, artefact ${plan.artefactSha256}, expecting content digest ${plan.expectAfterContentDigest}. I accept the same recovery limit as S2.`,
+    I350: `Exactly the opening of season ${String(plan.year)} named in the plan (the tracked contract seasons.json ${String(plan.seasonsSha256)}, clubs.json ${String(plan.clubsSha256)}): one seasons row with every measured column NULL, last_season set to ${String(plan.year)} on the clubs and organisations named in the plan, and one audit import_batches row. I accept that a committed opening is never retried or restored automatically and that, before any row depends on the new season, recovery is the owner-run reversal statement.`,
     I336: `Exactly the 35 DraftGuru Pre-Draft rows of reviewed evidence ${plan.evidenceSha256} named in the plan, each audited through recordDataEdit under the season seal as actor auth_users.id ${String(plan.actorUserId)}, my active, fully enrolled Super Admin; signing head 'Intl Schol' accepted under D-336-1.`,
   };
   return `${common}${own[stage]} Nothing else. No retry and no automatic restore. Window: ${ev.window}.`;

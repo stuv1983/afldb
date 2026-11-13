@@ -122,6 +122,7 @@ function plan(stage: StageId, over: Record<string, unknown> = {}): Record<string
   if (stage === 'S4') Object.assign(base, { artefactSha256: 'b1b7fe41'.padEnd(64, '0'), expectAfterContentDigest: 'd6fceb338d5f37e8fdef18443da696c52225db9caa80cedb9261e401aea212ec' });
   if (stage === 'I336') Object.assign(base, { evidenceSha256: I336_EVIDENCE_SHA256, actorUserId: 1,
     entries: Array.from({ length: 35 }, (_v, i) => ({ sourceRecordId: `https://www.draftguru.com.au/years/2010#${i}`, action: 'to insert', personId: i < 31 ? null : 100 + i, linkStatus: 'unmatched' })) });
+  if (stage === 'I350') Object.assign(base, { year: 2027, state: 'NOT_OPEN', seasonsSha256: 'a5'.repeat(32), clubsSha256: 'c7'.repeat(32), changes: { insertSeason: true, clubIds: [1, 3, 4], orgIds: [1, 3, 4] } });
   return { ...base, ...over };
 }
 const STATEMENT = (stage: StageId, p = plan(stage)) => approvalStatement(stage, p, { dumpSha256: 'd'.repeat(64), restoreEvidenceSha256: 'e'.repeat(64), evidenceClass: GENUINE, window: 'from now until later' });
@@ -192,6 +193,15 @@ describe('stage-specific plan expectations', () => {
     expect(STAGES.I336.changes(plan('I336'))[0]).toMatch(/INSERT 35 draft_picks rows .* 31 new unmatched draft_persons rows/);
     expect(STATEMENT('I336')).toMatch(/D-336-2.*35 DraftGuru Pre-Draft rows.*actor auth_users\.id 1.*D-336-1/);
   });
+  it('I350 (AFLDB-ISSUE-350) needs a NOT_OPEN plan that binds the contract hashes and changes something', () => {
+    expect(planProblems('I350', plan('I350', { state: 'OPEN' }), ctx).join()).toMatch(/not NOT_OPEN/);
+    expect(planProblems('I350', plan('I350', { year: 'x' }), ctx).join()).toMatch(/no season year/);
+    expect(planProblems('I350', plan('I350', { seasonsSha256: 'x' }), ctx).join()).toMatch(/seasons\.json and clubs\.json/);
+    expect(planProblems('I350', plan('I350', { changes: { insertSeason: false, clubIds: [], orgIds: [] } }), ctx).join()).toMatch(/already open/);
+    expect(STAGES.I350.changes(plan('I350'))[0]).toMatch(/INSERT 1 seasons row.* 2027 .*3 identities .*3 organisations.*no DELETE, no first_season/);
+    expect(STATEMENT('I350')).toMatch(/D-350-1.*season 2027.*seasons\.json a5a5.*reversal statement/);
+    expect(STAGES.I350.approvalExtras(plan('I350'))).toEqual({ year: 2027, seasonsSha256: 'a5'.repeat(32), clubsSha256: 'c7'.repeat(32) });
+  });
   it('statements name the stage decision, the digest, the revision and the recovery limit where it applies', () => {
     expect(STATEMENT('S1')).toMatch(/D1-PROD.*plan a1a1/); expect(STATEMENT('S2')).toMatch(/OUTCOME_UNDETERMINED.*owner-decided restore/); expect(STATEMENT('S3')).toMatch(/actor auth_users\.id 1/);
     expect(STATEMENT('S4')).toMatch(/afldb-sibling-supplement:015/); for (const s of STAGE_IDS) expect(STATEMENT(s)).toMatch(/No retry and no automatic restore/);
@@ -245,12 +255,20 @@ describe.skipIf(process.platform === 'win32')('prod-stage.sh run-name grammar (A
     expect(r.out).toMatch(/RUN_OK I336-20261108T010203Z .*\/runs\/I336-20261108T010203Z .*\/gap029-I336-20261108T010203Z/);
   });
 
+  it('accepts a capture-shaped I350 run for stage I350 (AFLDB-ISSUE-350)', () => {
+    const r = runArg('I350', 'I350-20261116T010203Z');
+    expect(r.status).toBe(0);
+    expect(r.out).toMatch(/RUN_OK I350-20261116T010203Z .*\/gap029-I350-20261116T010203Z/);
+  });
+
   it.each(['S1', 'S2', 'S3', 'S4'])('still accepts %s runs', (stage) => {
     expect(runArg(stage, `${stage}-20261103T000000Z`).status).toBe(0);
   });
 
   it.each([
     ['I336', 'S1-20261108T010203Z', /is not a I336 run/],
+    ['I350', 'I336-20261108T010203Z', /is not a I350 run/],
+    ['I350', 'I351-20261108T010203Z', /bad run name/],
     ['S1', 'I336-20261108T010203Z', /is not a S1 run/],
     ['I336', 'I336-2026110T010203Z', /bad run name/],
     ['I336', 'I336-20261108T010203', /bad run name/],
@@ -271,6 +289,7 @@ describe.skipIf(process.platform === 'win32')('prod-stage.sh run-name grammar (A
     ['S1', 'S1-20261103T000000Z', 's1_20261103_000000'],
     ['S4', 'S4-20261103T235959Z', 's4_20261103_235959'],
     ['I336', 'I336-20261111T015440Z', 'i336_20261111_015440'],
+    ['I350', 'I350-20261116T010203Z', 'i350_20261116_010203'],
   ] as const)('derives the restore TAG for %s run %s as the restore host accepts it', (stage, run, tag) => {
     expect(restoreTag(stage, run)).toBe(tag);
     const hostTagRule = /\[\[ "\$TAG" =~ \^\[a-z0-9_\]\+\$ \]\]/;
@@ -453,6 +472,18 @@ describe('review fixes', () => {
 
 
 // ISSUE-349: both clients must canonicalise timestamp rendering, including reconnects.
+describe('I350 session time zone (AFLDB-ISSUE-350, ISSUE-349 class)', () => {
+  it('pins both read-only and writer connections of the season-opening tool to UTC', () => {
+    const source = read('tools/v2/issue350-season-open-production.ts');
+    expect(source.match(/TimeZone: 'Etc\/UTC'/g)).toHaveLength(2);
+    expect(source).toContain("connection: { default_transaction_read_only: true, TimeZone: 'Etc/UTC' }");
+  });
+  it('every wrapper stage allowlist admits I350 and the assembler registers it', () => {
+    for (const f of ['prod-stage.sh', 'capture-prod-stage.sh', 'restore-assemble-host.sh']) expect(read(`tools/v2/gap029-ops/${f}`), f).toContain('I350');
+    expect(read('tools/v2/gap029-assemble-restore-evidence.ts')).toContain("'I336', 'I350'");
+  });
+});
+
 describe('I336 session time zone', () => {
   it('pins both read-only and writer connections to UTC', () => {
     const source = read('tools/v2/issue336-predraft-insert-production.ts');
