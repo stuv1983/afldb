@@ -10,6 +10,13 @@
  * could move.
  *
  * Mirrors issues/closed/ISSUE-150-venue-evidence.sql, which is the semantic contract.
+ *
+ * AFLDB-ISSUE-363 TST-4: the NULL-versus-zero attendance case does not wait for the
+ * data to contain a recorded-zero crowd. A production-shaped database has none, and
+ * the case used to `return` quietly there. It now seeds its own committed venue (see
+ * `seedCrowdVenue`) in a reserved season, so it asserts on every database, and it
+ * fails loudly if the seed is missing. Both oracles hold: the assertions concern only
+ * the synthetic venue's own three matches.
  */
 import './guard';
 
@@ -44,6 +51,73 @@ async function rawMatches(venueId: number): Promise<RawMatch[]> {
       FROM matches m
      WHERE m.venue_id = ${venueId}
   `;
+}
+
+/**
+ * Reserved namespace for the zero-crowd fixture: season 2064 (above every real season,
+ * inside seasons_year_ck, and named by no other suite), the `issue363-zero-crowd`
+ * venue slug and match-key prefix. COMMITTED, not transactional, because the query
+ * functions read through the shared client (the convention of wildcard-final-fixture).
+ * `clubs` are read, never written.
+ */
+const CROWD_NS = 'issue363-zero-crowd';
+const CROWD_SEASON = 2064;
+
+/** Remove everything the fixture can have committed, children first. Used as pre-clean and teardown. */
+async function removeCrowdVenue(): Promise<void> {
+  await sql`DELETE FROM matches WHERE match_key LIKE ${`${CROWD_NS}-%`}`;
+  await sql`DELETE FROM venues WHERE slug = ${CROWD_NS}`;
+  // Only the season row this fixture created (marked by its note); a real season is never deleted.
+  await sql`DELETE FROM seasons WHERE year = ${CROWD_SEASON} AND notes = ${CROWD_NS}`;
+}
+
+type CrowdVenue = { venueId: number; zero: number; recorded: number; unrecorded: number };
+
+/**
+ * One synthetic venue with three matches: a RECORDED crowd of 0, a recorded crowd of
+ * 1500 and a crowd that was never collected (attendance NULL, status not_collected).
+ * Fails closed if anything already sits on the reserved season or keys.
+ */
+async function seedCrowdVenue(): Promise<CrowdVenue> {
+  await removeCrowdVenue();
+  const foreign = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM seasons WHERE year = ${CROWD_SEASON}`;
+  if (foreign[0].n > 0) throw new Error(`Refusing to run: seasons(${CROWD_SEASON}) exists and is not this fixture's.`);
+
+  const clubs = await sql<{ id: number }[]>`SELECT id::int AS id FROM clubs ORDER BY id LIMIT 2`;
+  if (clubs.length < 2) throw new Error('the zero-crowd fixture needs two existing club identities');
+  const [home, away] = clubs.map((c) => c.id);
+
+  // A recorded zero crowd must cite a source (matches_zero_attendance_ck, migration 020); migration 057 seeds this one.
+  const [manual] = await sql<{ id: number }[]>`SELECT id::int AS id FROM sources WHERE key = 'manual_admin_edit'`;
+  if (!manual) throw new Error("the zero-crowd fixture needs the 'manual_admin_edit' source (migration 057)");
+
+  await sql`INSERT INTO seasons (year, league, status, notes) VALUES (${CROWD_SEASON}, 'AFL', 'complete'::season_status, ${CROWD_NS})`;
+  const [venue] = await sql<{ id: number }[]>`
+    INSERT INTO venues (slug, canonical_name, legacy_name)
+    VALUES (${CROWD_NS}, 'ISSUE-363 zero-crowd fixture ground', 'ISSUE-363 zero-crowd fixture ground')
+    RETURNING id::int AS id`;
+
+  const insert = async (n: number, attendance: number | null) => {
+    const [m] = await sql<{ id: number }[]>`
+      INSERT INTO matches (
+        match_key, season, round_code, round_number, round_type, is_final, match_date, venue_id, venue_raw,
+        home_club_id, away_club_id, home_score, away_score, result, winner_club_id, margin,
+        attendance, attendance_status, attendance_source_id)
+      VALUES (
+        ${`${CROWD_NS}-${n}`}, ${CROWD_SEASON}, ${String(n)}, ${n}, 'home_and_away'::round_type, false,
+        ${`${CROWD_SEASON}-04-0${n}`}::date, ${venue.id}, 'ISSUE-363 zero-crowd fixture ground',
+        ${home}, ${away}, 100, 80, 'home_win'::match_result, ${home}, 20,
+        ${attendance}, ${attendance === null ? 'not_collected' : 'complete'}::coverage_status,
+        ${attendance === 0 ? manual.id : null})
+      RETURNING id::int AS id`;
+    return m.id;
+  };
+  return {
+    venueId: venue.id,
+    zero: await insert(1, 0),
+    recorded: await insert(2, 1500),
+    unrecorded: await insert(3, null),
+  };
 }
 
 async function busiestVenueId(): Promise<number> {
@@ -205,19 +279,34 @@ describe('getVenueRecords', () => {
     expect(records.biggestMargin?.margin).toBe(maxMargin);
   });
 
-  it('a genuine recorded attendance of 0 is a valid minimum', async () => {
-    const [row] = await sql<{ venueId: number }[]>`
-      SELECT venue_id AS "venueId"
-        FROM matches
-       WHERE venue_id IS NOT NULL AND attendance = 0
-       GROUP BY venue_id
-       ORDER BY venue_id
-       LIMIT 1
-    `;
-    if (!row) return; // no recorded-zero crowd anywhere in this dataset
+  it('a genuine recorded attendance of 0 is a valid minimum, and an unrecorded crowd is neither minimum nor maximum', async () => {
+    // Seeded, not discovered: a production-shaped database holds no recorded-zero crowd (TST-4).
+    const fixture = await seedCrowdVenue();
+    try {
+      const raw = await rawMatches(fixture.venueId);
+      expect(raw, 'the seeded venue must hold exactly its three matches').toHaveLength(3);
+      expect(raw.filter((r) => r.attendance === 0)).toHaveLength(1);
+      expect(raw.filter((r) => r.attendance === null)).toHaveLength(1);
 
-    const records = await getVenueRecords(row.venueId);
-    expect(records.lowestAttendance?.attendance).toBe(0);
+      const records = await getVenueRecords(fixture.venueId);
+
+      // 0 is a recorded crowd: it IS the minimum (not skipped as falsy, not NULL).
+      expect(records.lowestAttendance?.attendance).toBe(0);
+      expect(records.lowestAttendance?.id).toBe(fixture.zero);
+      // The never-collected match wins neither end: ASC would put NULL last, DESC first.
+      expect(records.highestAttendance?.attendance).toBe(1500);
+      expect(records.highestAttendance?.id).toBe(fixture.recorded);
+      expect(records.highestAttendance?.id).not.toBe(fixture.unrecorded);
+      expect(records.lowestAttendance?.id).not.toBe(fixture.unrecorded);
+
+      // And the overview agrees: the zero counts as recorded and pulls the mean down; the NULL does not.
+      const overview = await getVenueOverview(fixture.venueId);
+      expect(overview.matches).toBe(3);
+      expect(overview.matchesWithAttendance).toBe(2);
+      expect(overview.avgAttendance).toBe(750);
+    } finally {
+      await removeCrowdVenue();
+    }
   });
 
   it('an unknown venue id returns all-null records', async () => {

@@ -10,6 +10,13 @@
  *
  * Nothing here writes, and no player or link is hardcoded: rows are
  * discovered at runtime so the suite survives a data reload.
+ *
+ * ONE EXCEPTION (AFLDB-ISSUE-363 TST-4): the apostrophe case seeds its own
+ * synthetic player (`seedApostrophePlayer`, committed, removed in `finally`).
+ * It used to discover a real `O[A-Z]...` player and `return` when there was
+ * none, which is every production-shaped database: AFLDB stores those names
+ * without the apostrophe, but the snapshot holds no such name starting with O.
+ * The seed makes it assert everywhere, and it fails loudly if absent.
  */
 import './guard';
 
@@ -28,6 +35,25 @@ import { resolutionKey, type SourceEvidence } from '@/lib/player-matching/types'
 afterAll(async () => {
   await sql.end({ timeout: 5 });
 });
+
+/** Reserved synthetic player for the apostrophe case. COMMITTED (the blocking SQL reads through the shared client). */
+const APOSTROPHE_SLUG = 'issue363-apostrophe-player';
+const APOSTROPHE_LEGACY_ID = -363_000_001;
+
+async function removeApostrophePlayer(): Promise<void> {
+  await sql`DELETE FROM players WHERE slug = ${APOSTROPHE_SLUG}`;
+}
+
+/** A player whose display name begins `O` + capital and carries no apostrophe, keyed as an import stores it. */
+async function seedApostrophePlayer(): Promise<{ id: number; searchName: string; displayName: string }> {
+  await removeApostrophePlayer();
+  const [player] = await sql<{ id: number; searchName: string; displayName: string }[]>`
+    INSERT INTO players (legacy_player_id, display_name, sort_name, search_name, slug, given_name, surname)
+    VALUES (${APOSTROPHE_LEGACY_ID}, 'OBrienzzfixture', 'OBrienzzfixture, Issue', afldb_normalise_name('OBrienzzfixture'),
+            ${APOSTROPHE_SLUG}, 'Issue', 'OBrienzzfixture')
+    RETURNING id::int AS id, search_name AS "searchName", display_name AS "displayName"`;
+  return player;
+}
 
 function sourceFor(id: number, normalisedName: string, rawName: string): SourceEvidence {
   return {
@@ -184,26 +210,29 @@ describe('candidate blocking', () => {
     // AFLDB stores many names without their apostrophe ("Gary
     // ODonnell") while the sources keep it. afldb_normalise_name strips
     // it from both, which is the only reason those rows can ever link.
-    const [player] = await sql<{ id: number; searchName: string; displayName: string }[]>`
-      SELECT id, search_name AS "searchName", display_name AS "displayName"
-        FROM players
-       WHERE display_name ~ '^O[A-Z]'
-       ORDER BY id
-       LIMIT 1
-    `;
-    if (!player) return;
+    // Seeded, not discovered (TST-4): the stored side is written by the same
+    // SQL normaliser a real import uses, so the proof is that the SOURCE side
+    // ("O'Brienzzfixture") normalises to exactly that stored key and blocks to the player.
+    const player = await seedApostrophePlayer();
+    try {
+      expect(player.displayName, 'the seeded player must exist').toMatch(/^O[A-Z]/);
+      expect(player.displayName).not.toContain("'");
 
-    const withApostrophe = player.displayName.replace(/^O/, 'O@');
-    const [{ normalised }] = await sql<{ normalised: string }[]>`
-      SELECT afldb_normalise_name(replace(${withApostrophe}, '@', chr(39))) AS normalised
-    `;
-    expect(normalised).toBe(player.searchName);
+      const withApostrophe = player.displayName.replace(/^O/, 'O@');
+      const [{ normalised }] = await sql<{ normalised: string }[]>`
+        SELECT afldb_normalise_name(replace(${withApostrophe}, '@', chr(39))) AS normalised
+      `;
+      expect(normalised).toBe(player.searchName);
+      expect(normalised).not.toContain("'");
 
-    const candidates = await fetchCandidateEvidence(
-      sql,
-      [sourceFor(2, normalised, player.displayName)],
-    );
-    expect((candidates.get('award_winners:2') ?? []).map((c) => c.playerId)).toContain(player.id);
+      const candidates = await fetchCandidateEvidence(
+        sql,
+        [sourceFor(2, normalised, player.displayName)],
+      );
+      expect((candidates.get('award_winners:2') ?? []).map((c) => c.playerId)).toContain(player.id);
+    } finally {
+      await removeApostrophePlayer();
+    }
   });
 
   it('recalls the true player for confirmed links', async () => {

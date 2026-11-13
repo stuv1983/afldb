@@ -12,6 +12,12 @@
  * (Richmond by slug, multi-club / multi-tenure / outsider coaches by
  * query) -- never a hardcoded coach id, and never the full list of 42
  * Richmond coaches.
+ *
+ * AFLDB-ISSUE-363 TST-4: "a club with no per-match coaching data" is seeded
+ * (`seedBareClub`: a synthetic organisation and club, committed, removed in
+ * `finally`) instead of discovered. A production-shaped database has coaching
+ * data for every club, so the discovered case used to `return` quietly. The
+ * seeded club exists on every database and the test fails loudly if it does not.
  */
 import './guard';
 
@@ -23,6 +29,31 @@ import { getClubCoachRecords } from '@/db/queries/coaches';
 afterAll(async () => {
   await sql.end();
 });
+
+/** Reserved synthetic organisation + club for the no-coaching-data case. COMMITTED; read through the shared client. */
+const BARE_NS = 'issue363-bare-club';
+
+async function removeBareClub(): Promise<void> {
+  await sql`DELETE FROM clubs WHERE slug = ${BARE_NS}`;
+  await sql`DELETE FROM club_organizations WHERE slug = ${`${BARE_NS}-org`}`;
+}
+
+/** Create one club with its own organisation (the clubs_current_identity_id FK is deferred, as the other fixtures do). */
+async function seedBareClub(): Promise<number> {
+  await removeBareClub();
+  return sql.begin(async (tx) => {
+    await tx`SET CONSTRAINTS clubs_current_identity_id_fkey DEFERRED`;
+    const [org] = await tx<{ id: number }[]>`
+      INSERT INTO club_organizations (name, slug) VALUES ('ISSUE-363 bare club organisation', ${`${BARE_NS}-org`})
+      RETURNING id::int AS id`;
+    const [club] = await tx<{ id: number }[]>`
+      INSERT INTO clubs (slug, name, short_name, abbreviation, current_identity_id, legacy_club_hist, organization_id)
+      VALUES (${BARE_NS}, 'ISSUE-363 Bare Club', 'Bare 363', 'B363', -1, ${BARE_NS}, ${org.id})
+      RETURNING id::int AS id`;
+    await tx`UPDATE clubs SET current_identity_id = ${club.id} WHERE id = ${club.id}`;
+    return club.id;
+  });
+}
 
 async function clubIdBySlug(slug: string): Promise<number> {
   const [row] = await sql<{ id: number }[]>`SELECT id FROM clubs WHERE slug = ${slug}`;
@@ -218,18 +249,20 @@ describe('getClubCoachRecords', () => {
   });
 
   it('a club with no per-match coaching data returns an empty list', async () => {
-    const [bare] = await sql<{ id: number }[]>`
-      SELECT c.id
-        FROM clubs c
-       WHERE NOT EXISTS (
-         SELECT 1 FROM match_coaches mc
+    const bare = await seedBareClub();
+    try {
+      // The subject is genuinely bare: no coaching row for any identity of its organisation.
+      const [{ n }] = await sql<{ n: number }[]>`
+        SELECT count(*)::int AS n
+          FROM match_coaches mc
           JOIN clubs l ON l.id = mc.club_id
-         WHERE l.organization_id = c.organization_id
-       )
-       LIMIT 1
-    `;
-    if (!bare) return; // every club in this DB has coaching data
-    expect(await getClubCoachRecords(bare.id)).toEqual([]);
+         WHERE l.organization_id = (SELECT organization_id FROM clubs WHERE id = ${bare})`;
+      expect(n, 'the seeded club must have no match_coaches').toBe(0);
+
+      expect(await getClubCoachRecords(bare)).toEqual([]);
+    } finally {
+      await removeBareClub();
+    }
   });
 
   it('an unknown club id returns an empty list, never throws', async () => {
