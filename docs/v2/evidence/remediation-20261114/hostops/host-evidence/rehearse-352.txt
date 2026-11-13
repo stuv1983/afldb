@@ -1,0 +1,148 @@
+2026-11-13T22:53:54Z == guards
+2026-11-13T22:53:54Z checkout de640826d13489c58392563e7ae1ff62403ed293 .env files: none
+127.0.0.1:55620
+2026-11-13T22:53:54Z isolated cluster listening on 127.0.0.1:55620 (DEV 5432 is never named)
+2026-11-13T22:53:54Z backup dir /mnt/ssd/afldb-rem-hostops-20261114/rehearsal/backups (not the DEV ~/backups/afldb)
+2026-11-13T22:53:54Z == databases
+afldb_v2_remhostops_tmpl_test	marked	407133207
+postgres	unmarked	7683095
+create-db: afldb_v2_remhostops_src_test created from afldb_v2_remhostops_tmpl_test and marked
+afldb_restore_test created on isolated cluster port 55620
+afldb_restore_test bootstrapped (extensions owned by the superuser, as on production)
+2026-11-13T22:54:00Z isolated-pg create-db refuses afldb_restore_test: refused: afldb_restore_test is not an afldb_v2_*_test name
+2026-11-13T22:54:00Z == 1. status before any backup must FAIL
+2026-11-13T22:54:00Z scheduled-backup: STATUS FAIL backup: never recorded (/mnt/ssd/afldb-rem-hostops-20261114/rehearsal/backups/.state/last-backup.json absent)
+2026-11-13T22:54:00Z scheduled-backup: STATUS FAIL restore verification: never recorded (/mnt/ssd/afldb-rem-hostops-20261114/rehearsal/backups/.state/last-verify.json absent)
+2026-11-13T22:54:00Z   status rc=1 (expect 1)
+2026-11-13T22:54:00Z == 2. backup (real backup.sh, afldb_backup role, isolated source copy)
+    isolated-pg: afldb_v2_remhostops_src_test verified (cluster afldb_v2_isolated, 127.0.0.1:55620); running bash
+    2026-11-13T22:54:00Z scheduled-backup: target: mode=backup dir=/mnt/ssd/afldb-rem-hostops-20261114/rehearsal/backups keep=14 offhost=none tools=/mnt/ssd/afldb-rem-hostops-20261114/cand/tools/maintenance
+    ==> Backing up afldb_v2_remhostops_src_test to /mnt/ssd/afldb-rem-hostops-20261114/rehearsal/backups/afldb_v2_remhostops_src_test-20261114-095400.dump
+        wrote 29M in 9s
+        archive readable, 1329 objects
+        a dump is not proven until restored: tools/maintenance/restore-test.sh
+    ==> Pruning backups older than the newest 14
+    ==> Done. 1 backup(s) of afldb_v2_remhostops_src_test retained in /mnt/ssd/afldb-rem-hostops-20261114/rehearsal/backups
+    2026-11-13T22:54:09Z scheduled-backup: backup ok: afldb_v2_remhostops_src_test-20261114-095400.dump 30004893 bytes sha256 ad533c9a89168d7b offhost=skipped
+    2026-11-13T22:54:09Z   elapsed 9s rc=0
+/mnt/ssd/afldb-rem-hostops-20261114/rehearsal/backups:
+total 29320
+drwx------ 3 arm arm     4096 Nov 14 09:54 .
+drwxrwxr-x 7 arm arm     4096 Nov 14 09:54 ..
+-rw------- 1 arm arm 30004893 Nov 14 09:54 afldb_v2_remhostops_src_test-20261114-095400.dump
+-rw------- 1 arm arm      116 Nov 14 09:54 afldb_v2_remhostops_src_test-20261114-095400.dump.sha256
+drwx------ 2 arm arm     4096 Nov 14 09:54 .state
+
+/mnt/ssd/afldb-rem-hostops-20261114/rehearsal/backups/.state:
+total 12
+drwx------ 2 arm arm 4096 Nov 14 09:54 .
+drwx------ 3 arm arm 4096 Nov 14 09:54 ..
+-rw-rw-r-- 1 arm arm  221 Nov 14 09:54 last-backup.json
+-rw-rw-r-- 1 arm arm    0 Nov 14 09:54 lock
+afldb_v2_remhostops_src_test-20261114-095400.dump: OK
+2026-11-13T22:54:09Z == 3. verify (fresh dump + real restore-test.sh into afldb_restore_test on the isolated cluster)
+    isolated-pg: afldb_v2_remhostops_src_test verified (cluster afldb_v2_isolated, 127.0.0.1:55620); running bash
+    2026-11-13T22:54:10Z scheduled-backup: target: mode=verify dir=/mnt/ssd/afldb-rem-hostops-20261114/rehearsal/backups keep=14 offhost=none tools=/mnt/ssd/afldb-rem-hostops-20261114/cand/tools/maintenance
+    ==> Backing up afldb_v2_remhostops_src_test to /mnt/ssd/afldb-rem-hostops-20261114/rehearsal/backups/afldb_v2_remhostops_src_test-20261114-095410.dump
+        wrote 29M in 9s
+        archive readable, 1329 objects
+        a dump is not proven until restored: tools/maintenance/restore-test.sh
+    ==> Pruning backups older than the newest 14
+    ==> Done. 2 backup(s) of afldb_v2_remhostops_src_test retained in /mnt/ssd/afldb-rem-hostops-20261114/rehearsal/backups
+    2026-11-13T22:54:19Z scheduled-backup: backup ok: afldb_v2_remhostops_src_test-20261114-095410.dump 30004893 bytes sha256 4fd19b2066dda3fd offhost=skipped
+    ==> Restoring afldb_v2_remhostops_src_test-20261114-095410.dump into afldb_restore_test
+        clearing afldb_restore_test
+        pg_restore exited 1; it completed, ignoring only 2 extension-owner error(s)
+        restored in 6s
+    ==> Parity checks against the restored database
+        PASS  player_match_stats rows                695499
+        PASS  players rows                           13365
+        PASS  matches rows                           17056
+        PASS  clubs rows                             24
+        PASS  career games total                     695499
+        PASS  career goals total                     413607
+        PASS  Brownlow votes total                   79113
+        PASS  unrecorded disposals                   248996
+        PASS  stat_availability rows                 3120
+        recorded restored dump sha256 4fd19b2066dda3fd8bf54ce9090948c7a8e3d1d2197d7751124144a580a6e430
+    ==> Restore verified: the backup is proven.
+    2026-11-13T22:54:26Z scheduled-backup: verify ok: afldb_v2_remhostops_src_test-20261114-095410.dump restored and proven (attempt 1)
+    2026-11-13T22:54:26Z   elapsed 17s rc=0
+2026-11-13T22:54:26Z scheduled-backup: STATUS ok   backup: afldb_v2_remhostops_src_test-20261114-095410.dump 0h ago
+2026-11-13T22:54:26Z scheduled-backup: STATUS ok   restore verification: afldb_v2_remhostops_src_test-20261114-095410.dump 0h ago
+2026-11-13T22:54:26Z   status rc=0 (expect 0)
+2026-11-13T22:54:26Z == 4. off-host push to a local stand-in directory (copy + sha256 + pg_restore --list + retention)
+    isolated-pg: afldb_v2_remhostops_src_test verified (cluster afldb_v2_isolated, 127.0.0.1:55620); running bash
+    2026-11-13T22:54:26Z scheduled-backup: target: mode=backup dir=/mnt/ssd/afldb-rem-hostops-20261114/rehearsal/backups keep=14 offhost=/mnt/ssd/afldb-rem-hostops-20261114/rehearsal/offhost tools=/mnt/ssd/afldb-rem-hostops-20261114/cand/tools/maintenance
+    ==> Backing up afldb_v2_remhostops_src_test to /mnt/ssd/afldb-rem-hostops-20261114/rehearsal/backups/afldb_v2_remhostops_src_test-20261114-095426.dump
+        wrote 29M in 9s
+        archive readable, 1329 objects
+        a dump is not proven until restored: tools/maintenance/restore-test.sh
+    ==> Pruning backups older than the newest 14
+    ==> Done. 3 backup(s) of afldb_v2_remhostops_src_test retained in /mnt/ssd/afldb-rem-hostops-20261114/rehearsal/backups
+    2026-11-13T22:54:35Z scheduled-backup: backup ok: afldb_v2_remhostops_src_test-20261114-095426.dump 30004893 bytes sha256 027d6d08e95679ac offhost=ok
+    2026-11-13T22:54:35Z   elapsed 9s rc=0
+total 29316
+drwxrwxr-x 2 arm arm     4096 Nov 14 09:54 .
+drwxrwxr-x 7 arm arm     4096 Nov 14 09:54 ..
+-rw------- 1 arm arm 30004893 Nov 14 09:54 afldb_v2_remhostops_src_test-20261114-095426.dump
+-rw------- 1 arm arm      116 Nov 14 09:54 afldb_v2_remhostops_src_test-20261114-095426.dump.sha256
+afldb_v2_remhostops_src_test-20261114-095426.dump: OK
+2026-11-13T22:54:35Z == 5. off-host PULL run (offhost-pull.sh) from the backup dir into a separate directory
+    2026-11-13T22:54:35Z offhost-pull: pull /mnt/ssd/afldb-rem-hostops-20261114/rehearsal/backups/ -> /mnt/ssd/afldb-rem-hostops-20261114/rehearsal/pulled keep=3
+    2026-11-13T22:54:36Z offhost-pull: verified afldb_v2_remhostops_src_test-20261114-095400.dump
+    2026-11-13T22:54:36Z offhost-pull: verified afldb_v2_remhostops_src_test-20261114-095410.dump
+    2026-11-13T22:54:36Z offhost-pull: verified afldb_v2_remhostops_src_test-20261114-095426.dump
+    2026-11-13T22:54:36Z offhost-pull: done: 3 newly verified, 0 pending, 0 failed; 3 dump(s) held
+    2026-11-13T22:54:36Z   elapsed 1s rc=0
+2026-11-13T22:54:36Z   second pull is a no-op:
+    2026-11-13T22:54:36Z offhost-pull: pull /mnt/ssd/afldb-rem-hostops-20261114/rehearsal/backups/ -> /mnt/ssd/afldb-rem-hostops-20261114/rehearsal/pulled keep=3
+    2026-11-13T22:54:36Z offhost-pull: done: 0 newly verified, 0 pending, 0 failed; 3 dump(s) held
+2026-11-13T22:54:36Z   a corrupted source dump is quarantined at the destination and fails the run:
+    2026-11-13T22:54:36Z offhost-pull: pull /mnt/ssd/afldb-rem-hostops-20261114/rehearsal/backups/ -> /mnt/ssd/afldb-rem-hostops-20261114/rehearsal/pulled keep=3
+    2026-11-13T22:54:36Z offhost-pull: FAILED verification, quarantined: afldb_v2_remhostops_src_test-99990101-000000.dump
+    2026-11-13T22:54:36Z offhost-pull: done: 0 newly verified, 0 pending, 1 failed; 3 dump(s) held
+2026-11-13T22:54:36Z   pull rc=1 (expect 1)
+/mnt/ssd/afldb-rem-hostops-20261114/rehearsal/pulled:
+total 87936
+drwx------ 3 arm arm     4096 Nov 14 09:54 .
+drwxrwxr-x 7 arm arm     4096 Nov 14 09:54 ..
+-rw------- 1 arm arm 30004893 Nov 14 09:54 afldb_v2_remhostops_src_test-20261114-095400.dump
+-rw------- 1 arm arm      116 Nov 14 09:54 afldb_v2_remhostops_src_test-20261114-095400.dump.sha256
+-rw------- 1 arm arm 30004893 Nov 14 09:54 afldb_v2_remhostops_src_test-20261114-095410.dump
+-rw------- 1 arm arm      116 Nov 14 09:54 afldb_v2_remhostops_src_test-20261114-095410.dump.sha256
+-rw------- 1 arm arm 30004893 Nov 14 09:54 afldb_v2_remhostops_src_test-20261114-095426.dump
+-rw------- 1 arm arm      116 Nov 14 09:54 afldb_v2_remhostops_src_test-20261114-095426.dump.sha256
+drwxrwxr-x 2 arm arm     4096 Nov 14 09:54 quarantine
+-rw-rw-r-- 1 arm arm        0 Nov 14 09:54 .verified-afldb_v2_remhostops_src_test-20261114-095400.dump
+-rw-rw-r-- 1 arm arm        0 Nov 14 09:54 .verified-afldb_v2_remhostops_src_test-20261114-095410.dump
+-rw-rw-r-- 1 arm arm        0 Nov 14 09:54 .verified-afldb_v2_remhostops_src_test-20261114-095426.dump
+
+/mnt/ssd/afldb-rem-hostops-20261114/rehearsal/pulled/quarantine:
+total 20
+drwxrwxr-x 2 arm arm 4096 Nov 14 09:54 .
+drwx------ 3 arm arm 4096 Nov 14 09:54 ..
+-rw------- 1 arm arm 4103 Nov 14 09:54 afldb_v2_remhostops_src_test-99990101-000000.dump
+-rw------- 1 arm arm  116 Nov 14 09:54 afldb_v2_remhostops_src_test-99990101-000000.dump.sha256
+2026-11-13T22:54:36Z == 6. failure handling: a wrong backup-role password fails the run, writes FAILED, status fails; success clears it
+    isolated-pg: afldb_v2_remhostops_src_test verified (cluster afldb_v2_isolated, 127.0.0.1:55620); running env
+    2026-11-13T22:54:37Z scheduled-backup: target: mode=backup dir=/mnt/ssd/afldb-rem-hostops-20261114/rehearsal/backups keep=14 offhost=none tools=/mnt/ssd/afldb-rem-hostops-20261114/cand/tools/maintenance
+    ==> Backing up afldb_v2_remhostops_src_test to /mnt/ssd/afldb-rem-hostops-20261114/rehearsal/backups/afldb_v2_remhostops_src_test-20261114-095437.dump
+    pg_dump: error: connection to server at "127.0.0.1", port 55620 failed: FATAL:  password authentication failed for user "afldb_backup"
+    2026-11-13T22:54:37Z scheduled-backup: AFLDB_BACKUP_FAILURE mode=backup step=backup exit=1
+2026-11-13T22:54:37Z   wrapper rc=1 (expect 1); FAILED: {"ts":"2026-11-13T22:54:37Z","mode":"backup","step":"backup","exit":1}
+    2026-11-13T22:54:37Z scheduled-backup: STATUS ok   backup: afldb_v2_remhostops_src_test-20261114-095426.dump 0h ago
+    2026-11-13T22:54:37Z scheduled-backup: STATUS ok   restore verification: afldb_v2_remhostops_src_test-20261114-095410.dump 0h ago
+    2026-11-13T22:54:37Z scheduled-backup: STATUS FAIL a run failed: {"ts":"2026-11-13T22:54:37Z","mode":"backup","step":"backup","exit":1}
+2026-11-13T22:54:46Z   recovery backup rc=0; FAILED present: no
+2026-11-13T22:54:46Z == 7. concurrency: a second run while one holds the lock exits 75 without a marker
+2026-11-13T22:54:46Z   second run rc=75 (expect 75)
+2026-11-13T22:54:46Z == 8. sizes
+115M	/mnt/ssd/afldb-rem-hostops-20261114/rehearsal/backups
+29M	/mnt/ssd/afldb-rem-hostops-20261114/rehearsal/offhost
+86M	/mnt/ssd/afldb-rem-hostops-20261114/rehearsal/pulled
+30004893 /mnt/ssd/afldb-rem-hostops-20261114/rehearsal/backups/afldb_v2_remhostops_src_test-20261114-095400.dump
+30004893 /mnt/ssd/afldb-rem-hostops-20261114/rehearsal/backups/afldb_v2_remhostops_src_test-20261114-095410.dump
+30004893 /mnt/ssd/afldb-rem-hostops-20261114/rehearsal/backups/afldb_v2_remhostops_src_test-20261114-095426.dump
+30004893 /mnt/ssd/afldb-rem-hostops-20261114/rehearsal/backups/afldb_v2_remhostops_src_test-20261114-095437.dump
+2026-11-13T22:54:46Z == done

@@ -1,0 +1,66 @@
+ 
+=== needrestart restart-mode resolution (/usr/sbin/needrestart 258-282)
+$nrconf{ui} = qq(NeedRestart::UI::stdio) if($nrconf{verbosity} > 1);
+
+$opt_m = $nrconf{ui_mode} unless(defined($opt_m));
+die "ERROR: Unknown UI mode '$opt_m'!\n" unless($opt_m =~ /^(e|a|u)$/);
+
+if ($opt_m eq 'u') {
+    if(defined $nrconf{restart}) {
+        print "Disabling Ubuntu mode, explicit restart mode configured";
+        $opt_m = $nrconf{ui_mode};
+    } elsif (defined $nrconf{ui}) {
+        print "Disabling Ubuntu mode, explicit UI configured";
+        $opt_m = $nrconf{ui_mode};
+        $nrconf{restart} = 'i';
+    } else {
+        $nrconf{restart} = 'a';
+        $nrconf{ui} = 'NeedRestart::UI::Ubuntu';
+    }
+}
+
+die "Hook directory '$nrconf{hook_d}' is invalid!\n" unless(-d $nrconf{hook_d} || $opt_b);
+$opt_r = $ENV{NEEDRESTART_MODE} if(!defined($opt_r) && exists($ENV{NEEDRESTART_MODE}));
+$opt_r = $nrconf{restart} unless(defined($opt_r));
+die "ERROR: Unknown restart option '$opt_r'!\n" unless($opt_r =~ /^(l|i|a)$/);
+$is_tty = 0 if($opt_r eq 'i' && $debian_noninteractive);
+$opt_r = 'l' if(!$is_tty && $opt_r eq 'i');
+=== needrestart.conf comments on restart mode
+26:# Restart mode: (l)ist only, (i)nteractive or (a)utomatically.
+28:# ATTENTION: If needrestart is configured to run in interactive mode but is run
+31:# UBUNTU: the default restart mode when running as part of the APT hook is 'a',
+33:#$nrconf{restart} = 'i';
+36:# UBUNTU: the default UI when running as part of the APT hook is
+37:# 'Needrestart::UI::Ubuntu'.
+=== running services and ActiveEnterTimestamp
+afldb.service | Sat 2026-11-14 06:35:21 AEDT
+caddy.service | Sun 2026-08-16 13:18:12 AEST
+cron.service | Sat 2026-11-14 06:35:16 AEDT
+dbus.service | Sun 2026-08-16 12:14:52 AEST
+do-agent.service | Fri 2026-10-09 06:32:30 AEDT
+droplet-agent.service | Thu 2026-10-22 08:05:57 AEDT
+fwupd.service | Sat 2026-11-14 06:35:17 AEDT
+getty@tty1.service | Sun 2026-08-16 12:14:53 AEST
+ModemManager.service | Sat 2026-11-14 06:35:17 AEDT
+multipathd.service | Sat 2026-11-14 06:35:16 AEDT
+polkit.service | Sat 2026-11-14 06:35:16 AEDT
+postgresql@16-main.service | Sat 2026-11-14 06:35:19 AEDT
+rsyslog.service | Sat 2026-11-14 06:35:17 AEDT
+serial-getty@ttyS0.service | Sun 2026-08-16 12:14:53 AEST
+ssh.service | Sat 2026-11-14 06:35:16 AEDT
+systemd-journald.service | Sat 2026-11-14 06:35:16 AEDT
+systemd-logind.service | Sun 2026-08-16 12:14:52 AEST
+systemd-networkd.service | Sat 2026-11-14 06:35:16 AEDT
+systemd-resolved.service | Sat 2026-11-14 06:35:17 AEDT
+systemd-timesyncd.service | Sat 2026-11-14 06:35:16 AEDT
+systemd-udevd.service | Sat 2026-11-14 06:35:16 AEDT
+udisks2.service | Sat 2026-11-14 06:35:16 AEDT
+unattended-upgrades.service | Sun 2026-08-16 12:14:53 AEST
+user@1000.service | Sun 2026-08-16 12:18:47 AEST
+=== apt unit files
+apt-daily-upgrade.service                    static          -
+apt-daily.service                            static          -
+unattended-upgrades.service                  enabled         enabled
+apt-daily-upgrade.timer                      enabled         enabled
+apt-daily.timer                              enabled         enabled
+END

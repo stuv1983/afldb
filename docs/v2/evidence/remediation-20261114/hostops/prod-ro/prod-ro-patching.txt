@@ -1,0 +1,367 @@
+ 
+
+=== identity ===
+afldb-prod
+arm
+2026-11-14T08:47:29+11:00
+6.8.0-137-generic
+2026-08-16 12:14:44
+
+=== unattended-upgrades package + services ===
+ii apt 2.8.4ubuntu0.1
+ii needrestart 3.6-7ubuntu4.5
+ii unattended-upgrades 2.9.1+nmu4ubuntu1
+enabled
+enabled
+enabled
+active
+inactive
+inactive
+
+=== timers (apt + afldb) ===
+NEXT                              LEFT LAST                                PASSED UNIT                           ACTIVATES
+Sat 2026-11-14 16:12:40 AEDT        7h Fri 2026-11-13 21:03:01 AEDT       11h ago apt-daily.timer                apt-daily.service
+Sun 2026-11-15 00:00:00 AEDT       15h Sat 2026-11-14 00:00:01 AEDT        8h ago dpkg-db-backup.timer           dpkg-db-backup.service
+Sun 2026-11-15 05:13:03 AEDT       20h Sat 2026-11-14 05:14:45 AEDT  3h 32min ago afldb-settle-afl-api.timer     afldb-settle-afl-api.service
+Sun 2026-11-15 06:45:13 AEDT       21h Sat 2026-11-14 06:34:15 AEDT  2h 13min ago apt-daily-upgrade.timer        apt-daily-upgrade.service
+
+=== systemctl cat apt-daily-upgrade.timer (and drop-ins) ===
+# /usr/lib/systemd/system/apt-daily-upgrade.timer
+[Unit]
+Description=Daily apt upgrade and clean activities
+After=apt-daily.timer
+
+[Timer]
+OnCalendar=*-*-* 6:00
+RandomizedDelaySec=60m
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+NextElapseUSecRealtime=Sun 2026-11-15 06:45:13 AEDT
+LastTriggerUSec=Sat 2026-11-14 06:34:15 AEDT
+RandomizedDelayUSec=1h
+
+=== /etc/apt/apt.conf.d listing ===
+total 76
+drwxr-xr-x 2 root root 4096 Nov  6 06:10 .
+drwxr-xr-x 8 root root 4096 Jun 15 23:47 ..
+-rw-r--r-- 1 root root   92 Mar 22  2024 01-vendor-ubuntu
+-rw-r--r-- 1 root root  399 Apr  1  2024 01autoremove
+-r--r--r-- 1 root root  496 Aug 16 12:43 02autoremove-postgresql
+-rw-r--r-- 1 root root  129 Apr  2  2025 10periodic
+-rw-r--r-- 1 root root  108 Apr  2  2025 15update-stamp
+-rw-r--r-- 1 root root  392 Apr  8  2026 20apt-esm-hook.conf
+-rw-r--r-- 1 root root   85 Apr  2  2025 20archive
+-rw-r--r-- 1 root root   80 Feb 13  2024 20auto-upgrades
+-rw-r--r-- 1 root root 1037 Nov  9  2023 20packagekit
+-rw-r--r-- 1 root root  127 Mar 31  2026 20snapd.conf
+-rw-r--r-- 1 root root 2569 Feb 25  2024 50appstream
+-rw-r--r-- 1 root root  625 Jan 21  2023 50command-not-found
+-rw-r--r-- 1 root root 6155 Feb 13  2024 50unattended-upgrades
+-rw-r--r-- 1 root root  182 Apr 12  2024 70debconf
+-rw-r--r-- 1 root root  343 Dec  5  2024 99needrestart
+-rw-r--r-- 1 root root  305 Apr  2  2025 99update-notifier
+
+=== 20auto-upgrades ===
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+
+=== 50unattended-upgrades (non-comment lines) ===
+Unattended-Upgrade::Allowed-Origins {
+	"${distro_id}:${distro_codename}";
+	"${distro_id}:${distro_codename}-security";
+	"${distro_id}ESMApps:${distro_codename}-apps-security";
+	"${distro_id}ESM:${distro_codename}-infra-security";
+};
+Unattended-Upgrade::Package-Blacklist {
+};
+Unattended-Upgrade::DevRelease "auto";
+
+=== other apt.conf.d files mentioning Unattended/Periodic/needrestart ===
+/etc/apt/apt.conf.d/10periodic
+/etc/apt/apt.conf.d/15update-stamp
+/etc/apt/apt.conf.d/20auto-upgrades
+/etc/apt/apt.conf.d/50unattended-upgrades
+/etc/apt/apt.conf.d/99needrestart
+
+=== apt-config effective (Unattended-Upgrade, Periodic) ===
+APT::Periodic "";
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Download-Upgradeable-Packages "0";
+APT::Periodic::AutocleanInterval "0";
+APT::Periodic::Unattended-Upgrade "1";
+Unattended-Upgrade "";
+Unattended-Upgrade::Allowed-Origins "";
+Unattended-Upgrade::Allowed-Origins:: "${distro_id}:${distro_codename}";
+Unattended-Upgrade::Allowed-Origins:: "${distro_id}:${distro_codename}-security";
+Unattended-Upgrade::Allowed-Origins:: "${distro_id}ESMApps:${distro_codename}-apps-security";
+Unattended-Upgrade::Allowed-Origins:: "${distro_id}ESM:${distro_codename}-infra-security";
+Unattended-Upgrade::DevRelease "auto";
+
+=== needrestart.conf (non-comment) ===
+$nrconf{blacklist} = [
+    qr(^/usr/bin/sudo(\.dpkg-new)?$),
+    qr(^/sbin/(dhclient|dhcpcd5|pump|udhcpc)(\.dpkg-new)?$),
+    qr(^/usr/bin/apt-get(\.dpkg-new)?$),
+];
+$nrconf{override_rc} = {
+    qr(^dbus) => 0,
+    qr(^gdm) => 0,
+    qr(^kdm) => 0,
+    qr(^nodm) => 0,
+    qr(^sddm) => 0,
+    qr(^wdm) => 0,
+    qr(^xdm) => 0,
+    qr(^lightdm) => 0,
+    qr(^slim) => 0,
+    qr(^lxdm) => 0,
+    qr(^bird) => 0,
+    qr(^network) => 0,
+    qr(^NetworkManager) => 0,
+    qr(^ModemManager) => 0,
+    qr(^wpa_supplicant) => 0,
+    qr(^openvpn) => 0,
+    qr(^quagga) => 0,
+    qr(^frr) => 0,
+    qr(^tinc) => 0,
+    qr(^(open|free|libre|strong)swan) => 0,
+    qr(^bluetooth) => 0,
+    qr(^getty@.+\.service) => 0,
+    qr(^serial-getty@.+\.service) => 0,
+    qr(^user@\d+\.service) => 0,
+    qr(^zfs-fuse) => 0,
+    qr(^mythtv-backend) => 0,
+    qr(^xendomains) => 0,
+    qr(^lxcfs) => 0,
+    qr(^libvirt) => 0,
+    qr(^virtlogd) => 0,
+    qr(^virtlockd) => 0,
+    qr(^docker) => 0,
+    qr(^google-(shutdown|startup)-scripts\.service$) => 0,
+    qr(^emergency\.service$) => 0,
+    qr(^rescue\.service$) => 0,
+    qr(^elogind) => 0,
+    qr(^apt-daily\.service$) => 0,
+    qr(^apt-daily-upgrade\.service$) => 0,
+    qr(^unattended-upgrades\.service$) => 0,
+    qr(^cloud-(init-local|init|config|final)\.service$) => 0,
+    qr(^cron-.*\.service$) => 0,
+    qr(^rc-local\.service$) => 0,
+    qr(^systemd-logind) => 0,
+};
+$nrconf{override_cont} = {
+};
+$nrconf{blacklist_interp} = [
+    qr(^/tmp/),
+    qr(^/var/),
+    qr(^/run/),
+];
+$nrconf{blacklist_mappings} = [
+    qr(^/(SYSV00000000( \(deleted\))?|drm(\s|$)|dev/)),
+    qr(^/memfd:),
+    qr(^/\[aio\]),
+    qr#/orcexec\.[\w\d]+( \(deleted\))?$#,
+    qr(/#\d+( \(deleted\))?$),
+    qr#/jna\d+\.tmp( \(deleted\))?$#,
+    qr#^(/var)?/tmp/#,
+    qr#^(/var)?/run/#,
+];
+$nrconf{skip_mapfiles} = -1;
+if(-d q(/etc/needrestart/conf.d)) {
+      foreach my $fn (sort </etc/needrestart/conf.d/*.conf>) {
+	      print STDERR "$LOGPREF eval $fn\n" if($nrconf{verbosity} > 1);
+	      eval do { local(@ARGV, $/) = $fn; <>};
+	      die "Error parsing $fn: $@" if($@);
+      }
+}
+
+=== needrestart conf.d ===
+total 12
+drwxr-xr-x 2 root root 4096 Jun 15 23:45 .
+drwxr-xr-x 6 root root 4096 Jun 15 23:45 ..
+-rw-r--r-- 1 root root  241 Dec  5  2024 README.needrestart
+--- /etc/needrestart/conf.d/README.needrestart
+Files ending with .conf and located in the /etc/needrestart/conf.d
+directory are parsed by needrestart's default configuration file.
+Files are parsed in order (using Perl's sort sub) and override or
+modify any previously set config option.
+
+=== needrestart dpkg hook + apt hook ===
+/etc/needrestart/:
+total 40
+drwxr-xr-x   6 root root 4096 Jun 15 23:45 .
+drwxr-xr-x 114 root root 4096 Nov 14 06:35 ..
+drwxr-xr-x   2 root root 4096 Jun 15 23:45 conf.d
+drwxr-xr-x   2 root root 4096 Jun 15 23:45 hook.d
+-rw-r--r--   1 root root  650 Dec  5  2024 iucode.sh
+-rw-r--r--   1 root root 6531 Dec  5  2024 needrestart.conf
+-rw-r--r--   1 root root  545 Dec  5  2024 notify.conf
+drwxr-xr-x   2 root root 4096 Jun 15 23:45 notify.d
+drwxr-xr-x   2 root root 4096 Jun 15 23:45 restart.d
+
+/usr/lib/needrestart/:
+total 28
+drwxr-xr-x  2 root root 4096 Jun 15 23:45 .
+drwxr-xr-x 86 root root 4096 Nov 14 06:35 ..
+-rwxr-xr-x  1 root root 1564 Dec  5  2024 apt-pinvoke
+-rwxr-xr-x  1 root root 1045 Dec  5  2024 dpkg-status
+-rwxr-xr-x  1 root root 2414 Dec  5  2024 iucode-scan-versions
+-rw-r--r--  1 root root  921 Dec  5  2024 notify.d.sh
+-rwxr-xr-x  1 root root 1948 Dec  5  2024 vmlinuz-get-version
+/etc/apt/apt.conf.d/99needrestart
+/etc/dpkg/dpkg.cfg.d/needrestart
+# needrestart - Restart daemons after library updates.
+#
+# Call needrestart after package upgrades/installations and check
+# for pending service restarts. Should only be triggered if there
+# was no error during installation.
+#
+
+DPkg::Post-Invoke {"test -x /usr/lib/needrestart/apt-pinvoke && /usr/lib/needrestart/apt-pinvoke -m u || true"; };
+
+=== reboot-required ===
+-rw-r--r-- 1 root root  32 Nov 14 06:35 /var/run/reboot-required
+-rw-r--r-- 1 root root 258 Nov 14 06:35 /var/run/reboot-required.pkgs
+linux-image-6.8.0-138-generic
+linux-base
+linux-image-6.8.0-139-generic
+linux-base
+libc6
+linux-image-6.8.0-142-generic
+linux-base
+linux-image-6.8.0-146-generic
+linux-base
+linux-image-6.8.0-147-generic
+linux-base
+linux-image-6.8.0-149-generic
+linux-base
+libc6
+
+=== afldb + postgres unit state ===
+--- afldb.service
+Restart=always
+MainPID=3774230
+NRestarts=0
+Id=afldb.service
+Requires=-.mount sysinit.target system.slice postgresql.service
+BindsTo=
+PartOf=
+RequiredBy=
+After=system.slice tmp.mount sysinit.target network-online.target systemd-journald.socket systemd-tmpfiles-setup.service postgresql.service -.mount basic.target
+ActiveState=active
+SubState=running
+ActiveEnterTimestamp=Sat 2026-11-14 06:35:21 AEDT
+InvocationID=a2584da119f84c5bb47e2c5a58f85755
+--- postgresql.service
+Restart=no
+MainPID=0
+NRestarts=0
+Id=postgresql.service
+Requires=sysinit.target system.slice
+BindsTo=
+PartOf=
+RequiredBy=afldb.service
+After=basic.target sysinit.target system.slice systemd-journald.socket postgresql@16-main.service
+ActiveState=active
+SubState=exited
+ActiveEnterTimestamp=Sun 2026-08-16 12:43:47 AEST
+InvocationID=0a73c7da2bae43dcb6f35ec3a8d918f5
+--- postgresql@16-main.service
+Restart=no
+MainPID=3774184
+NRestarts=0
+Id=postgresql@16-main.service
+Requires=sysinit.target -.mount system-postgresql.slice
+BindsTo=
+PartOf=postgresql.service
+RequiredBy=
+After=systemd-journald.socket network.target sysinit.target -.mount basic.target system-postgresql.slice
+ActiveState=active
+SubState=running
+ActiveEnterTimestamp=Sat 2026-11-14 06:35:19 AEDT
+InvocationID=b8a69e7dae9d4faf8c2a735108621507
+
+=== needrestart restart/ignore evaluation inputs: services listing config only ===
+58:$nrconf{blacklist} = [
+76:$nrconf{override_rc} = {
+149:$nrconf{override_cont} = {
+156:$nrconf{blacklist_interp} = [
+165:$nrconf{blacklist_mappings} = [
+193:$nrconf{skip_mapfiles} = -1;
+229:if(-d q(/etc/needrestart/conf.d)) {
+230:      foreach my $fn (sort </etc/needrestart/conf.d/*.conf>) {
+231:	      print STDERR "$LOGPREF eval $fn\n" if($nrconf{verbosity} > 1);
+
+=== apt history tail (readable?) ===
+total 136
+drwxr-xr-x  2 root root    4096 Nov 14 06:35 .
+drwxr-xr-x 11 root syslog  4096 Nov  8 00:00 ..
+-rw-r--r--  1 root root   34304 Nov 14 06:35 eipp.log.xz
+-rw-r--r--  1 root root    4253 Nov 14 06:35 history.log
+-rw-r--r--  1 root root    1630 Oct 28 06:26 history.log.1.gz
+-rw-r--r--  1 root root    5034 Sep 30 06:53 history.log.2.gz
+-rw-r--r--  1 root root    2562 Aug 29 06:17 history.log.3.gz
+-rw-r-----  1 root adm    24803 Nov 14 06:35 term.log
+-rw-r-----  1 root adm     4122 Oct 28 06:26 term.log.1.gz
+-rw-r-----  1 root adm    13369 Sep 30 06:53 term.log.2.gz
+-rw-r-----  1 root adm     8199 Aug 29 06:17 term.log.3.gz
+End-Date: 2026-11-06  06:10:19
+Start-Date: 2026-11-06  06:10:24
+Commandline: /usr/bin/unattended-upgrade
+Upgrade: apt:amd64 (2.8.3, 2.8.4ubuntu0.1), libapt-pkg6.0t64:amd64 (2.8.3, 2.8.4ubuntu0.1), apt-transport-https:amd64 (2.8.3, 2.8.4ubuntu0.1), apt-utils:amd64 (2.8.3, 2.8.4ubuntu0.1)
+End-Date: 2026-11-06  06:10:29
+Start-Date: 2026-11-08  06:02:54
+Commandline: /usr/bin/unattended-upgrade
+Upgrade: ca-certificates:amd64 (20260816ubuntu0.24.04.1, 20260816ubuntu0.24.04.2)
+End-Date: 2026-11-08  06:03:00
+Start-Date: 2026-11-11  06:37:01
+Commandline: /usr/bin/unattended-upgrade
+Upgrade: perl:amd64 (5.38.2-3.2ubuntu0.6, 5.38.2-3.2ubuntu0.7), perl-base:amd64 (5.38.2-3.2ubuntu0.6, 5.38.2-3.2ubuntu0.7), perl-modules-5.38:amd64 (5.38.2-3.2ubuntu0.6, 5.38.2-3.2ubuntu0.7), libperl5.38t64:amd64 (5.38.2-3.2ubuntu0.6, 5.38.2-3.2ubuntu0.7)
+End-Date: 2026-11-11  06:37:04
+Start-Date: 2026-11-11  06:37:09
+Commandline: /usr/bin/unattended-upgrade
+Upgrade: python3-pyasn1:amd64 (0.4.8-4ubuntu0.3, 0.4.8-4ubuntu0.4)
+End-Date: 2026-11-11  06:37:10
+Start-Date: 2026-11-14  06:34:30
+Commandline: /usr/bin/unattended-upgrade
+Upgrade: linux-tools-common:amd64 (6.8.0-147.147, 6.8.0-149.149), linux-virtual:amd64 (6.8.0-147.147, 6.8.0-149.149), linux-headers-generic:amd64 (6.8.0-147.147, 6.8.0-149.149), linux-image-virtual:amd64 (6.8.0-147.147, 6.8.0-149.149), linux-headers-virtual:amd64 (6.8.0-147.147, 6.8.0-149.149), linux-libc-dev:amd64 (6.8.0-147.147, 6.8.0-149.149)
+End-Date: 2026-11-14  06:34:55
+Start-Date: 2026-11-14  06:35:01
+Commandline: /usr/bin/unattended-upgrade
+Upgrade: libc6:amd64 (2.39-0ubuntu8.9, 2.39-0ubuntu8.12), locales:amd64 (2.39-0ubuntu8.9, 2.39-0ubuntu8.12), libc-dev-bin:amd64 (2.39-0ubuntu8.9, 2.39-0ubuntu8.12), libc-bin:amd64 (2.39-0ubuntu8.9, 2.39-0ubuntu8.12), libc-devtools:amd64 (2.39-0ubuntu8.9, 2.39-0ubuntu8.12), libc6-dev:amd64 (2.39-0ubuntu8.9, 2.39-0ubuntu8.12)
+End-Date: 2026-11-14  06:35:14
+Start-Date: 2026-11-14  06:35:28
+Commandline: /usr/bin/unattended-upgrade
+End-Date: 2026-11-14  06:35:29
+Start-Date: 2026-11-14  06:35:33
+Commandline: /usr/bin/unattended-upgrade
+End-Date: 2026-11-14  06:35:35
+Start-Date: 2026-11-14  06:35:40
+Commandline: /usr/bin/unattended-upgrade
+End-Date: 2026-11-14  06:35:40
+Start-Date: 2026-11-14  06:35:45
+Commandline: /usr/bin/unattended-upgrade
+End-Date: 2026-11-14  06:35:45
+Start-Date: 2026-11-14  06:35:50
+Commandline: /usr/bin/unattended-upgrade
+End-Date: 2026-11-14  06:35:53
+
+=== unattended-upgrades log readable? ===
+ls: cannot open directory '/var/log/unattended-upgrades/': Permission denied
+
+=== apt periodic stamps ===
+total 8
+drwxr-xr-x 2 root root 4096 2026-08-17 06:23:32.787322096 +1000 .
+drwxr-xr-x 5 root root 4096 2026-11-14 06:35:50.576165805 +1100 ..
+-rw-r--r-- 1 root root    0 2026-11-13 12:47:12.769873251 +1100 download-upgradeable-stamp
+-rw-r--r-- 1 root root    0 2026-11-14 06:35:57.364292030 +1100 unattended-upgrades-stamp
+-rw-r--r-- 1 root root    0 2026-11-13 12:46:59.287817342 +1100 update-stamp
+-rw-r--r-- 1 root root    0 2026-11-14 06:39:30.525568855 +1100 update-success-stamp
+-rw-r--r-- 1 root root    0 2026-11-14 06:35:57.424300256 +1100 upgrade-stamp
+
+=== dpkg needrestart-related: kernel/microcode/services ===
+linux-image-6.8.0-137-generic 6.8.0-137.137
+linux-image-6.8.0-149-generic 6.8.0-149.149
+linux-image-virtual 6.8.0-149.149
+END

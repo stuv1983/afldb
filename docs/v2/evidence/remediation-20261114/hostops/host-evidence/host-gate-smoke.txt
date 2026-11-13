@@ -1,0 +1,37 @@
+=== host-gate --mode promote
+release: host gate (host, promote) at 2026-11-13T22:57:22.004Z
+release:   next apt-daily-upgrade in 1246 min
+release:   afldb active MainPID=1732 InvocationID=c15b39a7e5554f30a8d1806333c9e880 NRestarts=0 ActiveEnter=2026-11-13T16:01:41.000Z
+release:   postgresql@16-main.service active MainPID=1531 InvocationID=f21f38b180c74c3e9baf2a87bad28e21 NRestarts=0 ActiveEnter=2026-11-13T16:01:41.000Z
+release:   WARNING needrestart hold missing for afldb and postgresql: an unattended upgrade restarts it
+release: HOST GATE PASS
+exit 0
+=== host-gate --mode rollback
+release: host gate (host, rollback) at 2026-11-13T22:57:22.508Z
+release:   next apt-daily-upgrade in 1246 min
+release:   afldb active MainPID=1732 InvocationID=c15b39a7e5554f30a8d1806333c9e880 NRestarts=0 ActiveEnter=2026-11-13T16:01:41.000Z
+release:   postgresql@16-main.service active MainPID=1531 InvocationID=f21f38b180c74c3e9baf2a87bad28e21 NRestarts=0 ActiveEnter=2026-11-13T16:01:41.000Z
+release:   WARNING needrestart hold missing for afldb and postgresql: an unattended upgrade restarts it
+release: HOST GATE PASS
+exit 0
+=== host-gate --mode promote --strict
+release: host gate (host, promote) at 2026-11-13T22:57:23.019Z
+release:   next apt-daily-upgrade in 1246 min
+release:   afldb active MainPID=1732 InvocationID=c15b39a7e5554f30a8d1806333c9e880 NRestarts=0 ActiveEnter=2026-11-13T16:01:41.000Z
+release:   postgresql@16-main.service active MainPID=1531 InvocationID=f21f38b180c74c3e9baf2a87bad28e21 NRestarts=0 ActiveEnter=2026-11-13T16:01:41.000Z
+release: REFUSE needrestart hold missing for afldb and postgresql: an unattended upgrade restarts it
+release: HOST GATE REFUSED
+exit 1
+=== host-gate --mode promote --window-min 1
+release: host gate (host, promote) at 2026-11-13T22:57:23.519Z
+release:   next apt-daily-upgrade in 1246 min
+release:   afldb active MainPID=1732 InvocationID=c15b39a7e5554f30a8d1806333c9e880 NRestarts=0 ActiveEnter=2026-11-13T16:01:41.000Z
+release:   postgresql@16-main.service active MainPID=1531 InvocationID=f21f38b180c74c3e9baf2a87bad28e21 NRestarts=0 ActiveEnter=2026-11-13T16:01:41.000Z
+release:   WARNING needrestart hold missing for afldb and postgresql: an unattended upgrade restarts it
+release: HOST GATE PASS
+exit 0
+=== unit state read-only (DEV afldb unit is only SHOWN, never touched)
+MainPID=1732
+NRestarts=0
+ActiveEnterTimestamp=Sat 2026-11-14 03:01:41 AEDT
+InvocationID=<elided>

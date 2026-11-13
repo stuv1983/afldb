@@ -1,0 +1,33 @@
+127.0.0.1:55620
+2026-11-13T22:55:16Z dump afldb_v2_remhostops_src_test-20261114-095437.dump 30004893 bytes
+afldb_v2_remhostops_src_test-20261114-095437.dump: OK
+2026-11-13T22:55:16Z == step 3: candidate database (isolated-pg create-db gives the owner role, extensions and schema ownership the superuser step gives on production)
+create-db: afldb_v2_remhostops_dr_test created and marked
+isolated-pg: afldb_v2_remhostops_dr_test verified (cluster afldb_v2_isolated, 127.0.0.1:55620); running bash
+2026-11-13T22:55:23Z pg_restore rc=0 elapsed 7s
+2026-11-13T22:55:23Z == step 4: db:privileges against the candidate
+DO
+DO
+psql:tools/maintenance/privileges.sql:899: NOTICE:  afldb_backup: pg_read_all_data needs a superuser; unchanged
+DO
+2026-11-13T22:55:24Z privileges elapsed 1s
+2026-11-13T22:55:24Z == step 5: verification queries
+ledger_head 118_fixtures_unconfirmed_participants.sql
+players 13365
+matches 17056
+player_match_stats 695499
+auth_users 4
+data_edits 168
+app_reads_auth_users f
+app_reads_players t
+2026-11-13T22:55:25Z == same queries on the SOURCE copy for comparison
+ledger_head 118_fixtures_unconfirmed_participants.sql
+players 13365
+matches 17056
+player_match_stats 695499
+auth_users 4
+data_edits 168
+app_reads_auth_users f
+app_reads_players t
+2026-11-13T22:55:25Z candidate equals source on every verification query
+2026-11-13T22:55:25Z == done

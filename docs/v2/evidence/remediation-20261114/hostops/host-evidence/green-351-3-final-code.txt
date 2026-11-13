@@ -1,0 +1,23 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem-hostops-20261114/cand
+
+ ✓ tests/deploy-release.test.ts (47 tests) 23130ms
+     ✓ check-node-modules exits 1 on drift, 0 on a matching or unrecorded tree; the settle wrapper only warns  320ms
+     ✓ builds outside the checkout, validates, boots the candidate and promotes it  2912ms
+     ✓ a failing build leaves the serving release, its assets and the links untouched  1294ms
+     ✓ a type error fails the build; off-host type-checking needs recorded evidence; nothing changes  1288ms
+     ✓ a build interrupted by SIGTERM is stopped with its whole process group; nothing changes  1297ms
+     ✓ a build interrupted by SIGHUP is stopped with its whole process group; nothing changes  1283ms
+     ✓ a SIGKILLed tool leaves an orphan only in its workspace; the next build reaps it  2429ms
+     ✓ the memory guard kills a build that drives MemAvailable below the floor; nothing changes  2042ms
+     ✓ promotes a second release, then rolls back to the retained one without building, even mid-build  6572ms
+     ✓ ISSUE-351: promote and rollback are attended; the host gate and the ledger check refuse before any link moves  607ms
+     ✓ ISSUE-351: status --expect fails a restart that coincides with an apt run, and names the owner's way past it  675ms
+     ✓ fails a public asset whose bytes are not the release's, and one that is missing  368ms
+ ✓ tests/deploy-web-unit.test.ts (38 tests) 748ms
+
+ Test Files  2 passed (2)
+      Tests  85 passed (85)
+   Start at  09:57:25
+   Duration  25.25s (transform 657ms, setup 224ms, import 683ms, tests 23.88s, environment 1ms)
+

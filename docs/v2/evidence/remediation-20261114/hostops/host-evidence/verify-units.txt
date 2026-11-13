@@ -1,0 +1,23 @@
+== systemd-analyze verify (files under /mnt/ssd/afldb-rem-hostops-20261114/rehearsal/units; verify reads them, registers nothing)
+-- afldb-backup.service rc=0
+-- afldb-backup-verify.service rc=0
+-- afldb-backup-failed.service rc=0
+-- afldb-backup.timer rc=0
+-- afldb-backup-verify.timer rc=0
+== calendars
+  Original form: *-*-* 02:20
+Normalized form: *-*-* 02:20:00
+    Next elapse: Sun 2026-11-15 02:20:00 AEDT
+  Original form: Wed *-*-* 03:30
+Normalized form: Wed *-*-* 03:30:00
+    Next elapse: Wed 2026-11-18 03:30:00 AEDT
+== shell syntax
+bash -n ok tools/maintenance/scheduled-backup.sh
+bash -n ok tools/maintenance/offhost-pull.sh
+bash -n ok deploy/afldb-settle-afl-api.sh
+sh -n ok deploy/afldb-settle-afl-api.sh
+shellcheck: not installed
+== DEV user manager untouched: no files created under ~/.config/systemd by this script
+total 8
+drwx------ 2 arm arm 4096 2026-10-31 08:35 .
+drwx------ 3 arm arm 4096 2026-10-31 08:28 ..

@@ -1,0 +1,16 @@
+== check-node-modules on the real npm ci tree (HEAD de640826 + working changes)
+release: NODE_MODULES OK (427 installed packages match the lock)
+exit 0
+{"status":"ok","checked":427,"changed":0,"extraneous":0,"missing":0}
+== negative control A: copy of the two lock files, one installed version altered (must exit 1)
+altered node_modules/@babel/code-frame
+release: node_modules differ from package-lock.json: changed 1 [node_modules/@babel/code-frame installed 0.0.0-tampered locked 7.29.7]
+release: NODE_MODULES MISMATCH
+exit 1
+== negative control B: an extraneous package added (must exit 1)
+release: node_modules differ from package-lock.json: extraneous 1 [node_modules/zz-not-in-lock]
+release: NODE_MODULES MISMATCH
+exit 1
+== control C: no installed record (must exit 0, unknown)
+release: NODE_MODULES UNKNOWN (no installed record; not verified)
+exit 0

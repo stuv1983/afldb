@@ -1,0 +1,8 @@
+override_rc (?^:^postgresql(@.+)?\.service$) => 0
+override_rc (?^:^afldb\.service$) => 0
+  afldb.service                held (rc 0)
+  postgresql.service           held (rc 0)
+  postgresql@16-main.service   held (rc 0)
+  caddy.service                not held
+  ssh.service                  not held
+  cron.service                 not held

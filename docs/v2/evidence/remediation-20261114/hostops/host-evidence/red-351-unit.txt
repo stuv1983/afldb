@@ -1,0 +1,250 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem-hostops-20261114/cand
+
+ ❯ tests/deploy-release.test.ts (45 tests | 13 failed) 22322ms
+     ✓ names a release by revision prefix and BUILD_ID, and refuses anything else 10ms
+     ✓ classifies only the server's own ISR output as allowed drift 3ms
+     ✓ fails a missing, changed or added code file and reports ISR drift without failing 5ms
+     ✓ round-trips a sha256sum-format manifest in path order 2ms
+     ✓ treats Next render failures and health errors in the smoke log as failures 2ms
+     ✓ reads MemAvailable and swap from /proc/meminfo 1ms
+     ✓ parses its CLI options with the documented defaults 2ms
+     ✓ signs a smoke beta claim the application middleware accepts, and none without a secret 12ms
+     ✓ derives the deny list from the unit, so every DSN the unit drops is dropped 3ms
+     ✓ applies EnvironmentFile, then UnsetEnvironment, then Environment=, as systemd does 2ms
+     ✓ moves only the working directory and the writable path to the release root 2ms
+     ✓ logs the build identity at every start, outside the opt-in tracing branch 1ms
+     ✓ needs nothing but Node built-ins and the env-file guard, so it runs before npm ci 1ms
+     × reads systemctl show properties and UTC timestamps, and nothing it cannot be sure of 14ms
+     × refuses promote while apt runs or is due inside the window, and lets a clear host through 2ms
+     × never refuses a rollback on host state: the emergency path stays open, with a warning 1ms
+     × reports a pending reboot, and treats a missing needrestart hold as a warning unless strict 1ms
+     × recognises the owner needrestart hold, and not the stock configuration production runs today 1ms
+     × flags a restart that coincides with an unattended-upgrade run as not the owner's, and accepts a confirmed one 1ms
+     × refuses rollback only on a PROVEN schema mismatch, and never because the database is unreachable 1ms
+     × compares the installed tree with the lock: version, integrity, extraneous and missing, but not optional or omitted dev packages 1ms
+     × check-node-modules exits 1 on drift, 0 on a matching or unrecorded tree; the settle wrapper only warns 81ms
+     × adds the attended and host-state options to the CLI without changing its defaults 2ms
+     ✓ builds outside the checkout, validates, boots the candidate and promotes it  3087ms
+     ✓ a failing build leaves the serving release, its assets and the links untouched  1196ms
+     ✓ a type error fails the build; off-host type-checking needs recorded evidence; nothing changes  1297ms
+     ✓ a build interrupted by SIGTERM is stopped with its whole process group; nothing changes  1297ms
+     ✓ a build interrupted by SIGHUP is stopped with its whole process group; nothing changes  1174ms
+     ✓ a SIGKILLed tool leaves an orphan only in its workspace; the next build reaps it  2440ms
+     ✓ the memory guard kills a build that drives MemAvailable below the floor; nothing changes  2573ms
+     ✓ promotes a second release, then rolls back to the retained one without building, even mid-build  6549ms
+     × ISSUE-351: promote and rollback are attended; the host gate and the ledger check refuse before any link moves 91ms
+     × ISSUE-351: status --expect fails a restart that coincides with an apt run, and names the owner's way past it 78ms
+     × verify fails a tampered release and tolerates the server's ISR output 271ms
+     ✓ adopt --from-manifest takes a settled regenerated ISR page live and refuses a changed code file 200ms
+     ✓ finds a symlink that leaves the release, and accepts one that stays inside 3ms
+     ✓ switches a link by rename and refuses a link that points outside releases/ 2ms
+     ✓ passes when the previous build is 404 everywhere, deriving it from the retained previous release 191ms
+     ✓ reports an old Cloudflare cache HIT of the previous build separately and still passes 189ms
+     ✓ fails when the origin still serves the previous build on loopback 190ms
+     ✓ fails when the cache-busted public request reaches an origin serving the previous build, even beside a cache HIT 192ms
+     ✓ fails a public 200 for the previous build that is not a cache HIT 189ms
+     ✓ fails when status --expect fails (identity) 209ms
+     ✓ fails when the public health check reports a database error 199ms
+     ✓ fails a public asset whose bytes are not the release's, and one that is missing  370ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 13 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/deploy-release.test.ts > AFLDB-ISSUE-351 — the attended gate and the activation audit (pure) > reads systemctl show properties and UTC timestamps, and nothing it cannot be sure of
+TypeError: parseShowProps is not a function
+ ❯ tests/deploy-release.test.ts:230:19
+    228|
+    229|   it('reads systemctl show properties and UTC timestamps, and nothing …
+    230|     const props = parseShowProps('ActiveState=active\nMainPID=3774230\…
+       |                   ^
+    231|     expect(unitSnapshot(props)).toEqual({ activeState: 'active', mainP…
+    232|     // A local-zone abbreviation (what systemctl prints for timer prop…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/13]⎯
+
+ FAIL  tests/deploy-release.test.ts > AFLDB-ISSUE-351 — the attended gate and the activation audit (pure) > refuses promote while apt runs or is due inside the window, and lets a clear host through
+TypeError: evaluateHostGate is not a function
+ ❯ tests/deploy-release.test.ts:238:12
+    236|
+    237|   it('refuses promote while apt runs or is due inside the window, and …
+    238|     expect(evaluateHostGate(clear()).ok).toBe(true);
+       |            ^
+    239|     expect(evaluateHostGate({ ...clear(), aptActive: ['apt-daily-upgra…
+    240|     expect(evaluateHostGate({ ...clear(), aptProcesses: ['unattended-u…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/13]⎯
+
+ FAIL  tests/deploy-release.test.ts > AFLDB-ISSUE-351 — the attended gate and the activation audit (pure) > never refuses a rollback on host state: the emergency path stays open, with a warning
+TypeError: evaluateHostGate is not a function
+ ❯ tests/deploy-release.test.ts:250:21
+    248|
+    249|   it('never refuses a rollback on host state: the emergency path stays…
+    250|     const verdict = evaluateHostGate({ ...clear(), aptActive: ['apt-da…
+       |                     ^
+    251|     expect(verdict.ok).toBe(true);
+    252|     expect(verdict.warnings.join(' | ')).toMatch(/apt is running now.*…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/13]⎯
+
+ FAIL  tests/deploy-release.test.ts > AFLDB-ISSUE-351 — the attended gate and the activation audit (pure) > reports a pending reboot, and treats a missing needrestart hold as a warning unless strict
+TypeError: evaluateHostGate is not a function
+ ❯ tests/deploy-release.test.ts:256:20
+    254|
+    255|   it('reports a pending reboot, and treats a missing needrestart hold …
+    256|     const reboot = evaluateHostGate({ ...clear(), rebootRequired: { pr…
+       |                    ^
+    257|     expect(reboot.ok).toBe(true);
+    258|     expect(reboot.warnings.join()).toMatch(/reboot pending \(1 kernel …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/13]⎯
+
+ FAIL  tests/deploy-release.test.ts > AFLDB-ISSUE-351 — the attended gate and the activation audit (pure) > recognises the owner needrestart hold, and not the stock configuration production runs today
+TypeError: needrestartHold is not a function
+ ❯ tests/deploy-release.test.ts:272:12
+    270|       '$nrconf{override_rc}->{qr(^postgresql(@.+)?\\.service$)} = 0;',
+    271|     ].join('\n');
+    272|     expect(needrestartHold(policy)).toEqual({ afldb: true, postgresql:…
+       |            ^
+    273|     expect(needrestartHold('# $nrconf{override_rc}->{qr(^afldb)} = 0;'…
+    274|     // Production's stock needrestart.conf (probed read-only 2026-11-1…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/13]⎯
+
+ FAIL  tests/deploy-release.test.ts > AFLDB-ISSUE-351 — the attended gate and the activation audit (pure) > flags a restart that coincides with an unattended-upgrade run as not the owner's, and accepts a confirmed one
+TypeError: parseAptHistory is not a function
+ ❯ tests/deploy-release.test.ts:293:21
+    291|
+    292|   it('flags a restart that coincides with an unattended-upgrade run as…
+    293|     const entries = parseAptHistory(HISTORY);
+       |                     ^
+    294|     expect(entries).toHaveLength(1);
+    295|     expect(entries[0].command).toBe('/usr/bin/unattended-upgrade');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/13]⎯
+
+ FAIL  tests/deploy-release.test.ts > AFLDB-ISSUE-351 — the attended gate and the activation audit (pure) > refuses rollback only on a PROVEN schema mismatch, and never because the database is unreachable
+TypeError: migrationHeadOf is not a function
+ ❯ tests/deploy-release.test.ts:316:12
+    314|
+    315|   it('refuses rollback only on a PROVEN schema mismatch, and never bec…
+    316|     expect(migrationHeadOf(['src/db/migrations/009_a.sql', 'src/db/mig…
+       |            ^
+    317|     expect(migrationHeadOf([])).toBeNull();
+    318|     // Database down: no ledger head supplied -> proceeds, says nothin…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/13]⎯
+
+ FAIL  tests/deploy-release.test.ts > AFLDB-ISSUE-351 — the attended gate and the activation audit (pure) > compares the installed tree with the lock: version, integrity, extraneous and missing, but not optional or omitted dev packages
+TypeError: compareNodeModulesToLock is not a function
+ ❯ tests/deploy-release.test.ts:342:12
+    340|     } };
+    341|     const installedOk = { packages: { 'node_modules/a': { version: '1.…
+    342|     expect(compareNodeModulesToLock(lock, installedOk)).toMatchObject(…
+       |            ^
+    343|     expect(compareNodeModulesToLock(lock, { packages: { 'node_modules/…
+    344|       .toEqual(['node_modules/a installed 1.0.1 locked 1.0.0']);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/13]⎯
+
+ FAIL  tests/deploy-release.test.ts > AFLDB-ISSUE-351 — the attended gate and the activation audit (pure) > check-node-modules exits 1 on drift, 0 on a matching or unrecorded tree; the settle wrapper only warns
+AssertionError: expected '' to match /NODE_MODULES UNKNOWN/
+
+- Expected:
+/NODE_MODULES UNKNOWN/
+
++ Received:
+""
+
+ ❯ tests/deploy-release.test.ts:356:28
+    354|       const run = () => spawnSync(process.execPath, [join(REPO, 'deplo…
+    355|       writeFileSync(join(dir, 'package-lock.json'), JSON.stringify({ p…
+    356|       expect(run().stdout).toMatch(/NODE_MODULES UNKNOWN/); // no inst…
+       |                            ^
+    357|       expect(run().status).toBe(0);
+    358|       mkdirSync(join(dir, 'node_modules'));
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/13]⎯
+
+ FAIL  tests/deploy-release.test.ts > AFLDB-ISSUE-351 — the attended gate and the activation audit (pure) > adds the attended and host-state options to the CLI without changing its defaults
+AssertionError: expected '--confirm-attended-restart' to be true // Object.is equality
+
+- Expected:
+true
+
++ Received:
+"--confirm-attended-restart"
+
+ ❯ tests/deploy-release.test.ts:378:27
+    376|   it('adds the attended and host-state options to the CLI without chan…
+    377|     const { opts } = parseArgs(['promote', 'x', '--attended', '--confi…
+    378|     expect(opts.attended).toBe(true);
+       |                           ^
+    379|     expect(opts['confirm-attended-restart']).toBe(true);
+    380|     expect(opts['host-state']).toBe('/f.json');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/13]⎯
+
+ FAIL  tests/deploy-release.test.ts > AFLDB-ISSUE-329 — route on Linux: failed builds never touch the serving release > ISSUE-351: promote and rollback are attended; the host gate and the ledger check refuse before any link moves
+AssertionError: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ tests/deploy-release.test.ts:795:23
+    793|     // A bare promote or rollback is refused outright (the unattended-…
+    794|     const bare = await tool('promote', ids[1], ...live());
+    795|     expect(bare.code).toBe(1);
+       |                       ^
+    796|     expect(bare.out).toMatch(/promote switches the release the service…
+    797|     const bareBack = await tool('rollback', ...live());
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/13]⎯
+
+ FAIL  tests/deploy-release.test.ts > AFLDB-ISSUE-329 — route on Linux: failed builds never touch the serving release > ISSUE-351: status --expect fails a restart that coincides with an apt run, and names the owner's way past it
+AssertionError: release: REFUSED: 50b6666fddaa-Z_MLzgOxq-_Cx78r is already current
+: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ tests/deploy-release.test.ts:850:37
+    848|     // Open an attended window with the service identity recorded (mat…
+    849|     const opened = await tool('rollback', '--to', ids[1], '--attended'…
+    850|     expect(opened.code, opened.out).toBe(0);
+       |                                     ^
+    851|     const audit = (...extra: string[]) => tool('status', '--expect', i…
+    852|       '--apt-history', join(base, 'apt-history.log'), ...extra, ...liv…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/13]⎯
+
+ FAIL  tests/deploy-release.test.ts > AFLDB-ISSUE-329 — route on Linux: failed builds never touch the serving release > verify fails a tampered release and tolerates the server's ISR output
+AssertionError: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ tests/deploy-release.test.ts:881:27
+    879|     // A tampered rollback target is refused before any link moves.
+    880|     const rollback = await tool('rollback', ...att());
+    881|     expect(rollback.code).toBe(1);
+       |                           ^
+    882|     expect(readReleaseLink(root, 'current')).toBe(ids[0]);
+    883|   }, 60_000);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/13]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  13 failed | 32 passed (45)
+   Start at  09:05:00
+   Duration  23.17s (transform 368ms, setup 243ms, import 344ms, tests 22.32s, environment 0ms)
+

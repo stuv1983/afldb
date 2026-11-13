@@ -1,0 +1,53 @@
+     14 Error: Reviewed input pin: data/players/sibling-relationships.csv sha256 b1f0ff4ed0bf… does not match the reviewed pin dc8d61801512…. Nothing has been destroyed.
+     14     3819|         `Reviewed input pin: ${path} sha256 ${actual.slice(0, 12)}… do…
+      4 "Error: Reviewed input pin: data/players/sibling-relationships.csv sha256 b1f0ff4ed0bf… does not match the reviewed pin dc8d61801512…. Nothing has been destroyed."
+      3 AssertionError: expected [Function] to not throw an error but 'Error: Reviewed input pin: data/playe…' was thrown
+      1 AssertionError: expected 6858 to be less than -1
+      1 AssertionError: expected 'Error: Reviewed input pin: data/playe…' to match /AFL API roster preflight failed/
+      1  Test Files  2 failed | 4 passed (6)
+      1  FAIL  tests/db-test-rebuild.test.ts > stage graph > sibling pairs (AFLDB-ISSUE-118 §23.31 family F) > preflights the tracked files and the loader's offline validation before the destructive stage
+      1  FAIL  tests/db-test-rebuild.test.ts > stage graph > ladder witness cross-check (AFLDB-ISSUE-095 D7) > proves the witness offline BEFORE anything is destroyed
+      1  FAIL  tests/db-test-rebuild.test.ts > stage graph > height enrichment (AFLDB-ISSUE-118 §23.19) > preflights both snapshots offline before the destructive stage and refuses on failure
+      1  FAIL  tests/db-test-rebuild.test.ts > stage graph > height enrichment (AFLDB-ISSUE-118 §23.19) > follows fitzroy (identities and match facts) and precedes everything that reads players
+      1  FAIL  tests/db-test-rebuild.test.ts > stage graph > height enrichment (AFLDB-ISSUE-118 §23.19) > explicit shared height/coach stats inputs (ISSUE-316) > supplemented_baseline uses the same ordered stats inputs in both loaders, sta
+      1  FAIL  tests/db-test-rebuild.test.ts > stage graph > height enrichment (AFLDB-ISSUE-118 §23.19) > explicit shared height/coach stats inputs (ISSUE-316) > supplemented_baseline stops on baseline/register/stats, configured supplement
+      1  FAIL  tests/db-test-rebuild.test.ts > stage graph > height enrichment (AFLDB-ISSUE-118 §23.19) > explicit shared height/coach stats inputs (ISSUE-316) > baseline_only uses the same ordered stats inputs in both loaders, stages, pre
+      1  FAIL  tests/db-test-rebuild.test.ts > stage graph > height enrichment (AFLDB-ISSUE-118 §23.19) > explicit shared height/coach stats inputs (ISSUE-316) > baseline_only stops on baseline/register/stats, configured supplement, API, W
+      1  FAIL  tests/db-test-rebuild.test.ts > stage graph > first-kick goal (AFLDB-ISSUE-249) > preflights the tracked pair and the pinned --validate-only before the destructive stage
+      1  FAIL  tests/db-test-rebuild.test.ts > stage graph > father–son selections (AFLDB-ISSUE-118 §23.29 family F) > preflights the tracked files and the loader's offline validation before the destructive stage
+      1  FAIL  tests/db-test-rebuild.test.ts > stage graph > coaches (AFLDB-ISSUE-118 §23.27 Stage E2) > preflights the snapshot offline before the destructive stage and refuses on failure
+      1  FAIL  tests/db-test-rebuild.test.ts > stage graph > coaches (AFLDB-ISSUE-118 §23.27 Stage E2) > mandatory raw replay outside the predecessor (AFLDB-ISSUE-319) > c2-2026-successor: preflight replays raw through the loader and refus
+      1  FAIL  tests/db-test-rebuild.test.ts > stage graph > coaches (AFLDB-ISSUE-118 §23.27 Stage E2) > mandatory raw replay outside the predecessor (AFLDB-ISSUE-319) > c2-2026-rehearsal-only: preflight replays raw through the loader and 
+      1  FAIL  tests/db-test-rebuild.test.ts > stage graph > brownlow season (AFLDB-ISSUE-113 §8.6) > preflights the tracked artefact, manifest and adjudication file offline
+      1  FAIL  tests/db-test-rebuild.test.ts > stage graph > birth dates (AFLDB-ISSUE-118 §23.24 Stage D1) > preflights the snapshot offline before the destructive stage and refuses on failure
+      1  FAIL  tests/db-test-rebuild.test.ts > stage graph > after-siren events (AFLDB-ISSUE-118 §23.33–§23.35) > preflights the tracked files and the loader's offline validation before the destructive stage
+      1  FAIL  tests/db-test-rebuild.test.ts > fitzRoy preflight > runs the independent validator BEFORE any destructive stage
+      1  FAIL  tests/db-test-rebuild.test.ts > DraftGuru preflight validates the label the data stage will import > propagates --draftguru-label through to the preflight validator
+      1  FAIL  tests/db-test-rebuild.test.ts > DraftGuru preflight validates the label the data stage will import > makes preflight/data label equality contractual, for any label
+      1  FAIL  tests/db-test-rebuild.test.ts > DraftGuru preflight validates the label the data stage will import > keeps the default label correct, and identical on both sides, with no override
+      1  FAIL  tests/db-test-rebuild.test.ts > DraftGuru preflight validates the label the data stage will import > gives the data stage the same label the preflight proved
+      1  FAIL  tests/db-promotion-check.test.ts > AFLDB-ISSUE-250 — the promotion freeze > source shape > restore-test.sh hashes before restoring, clears first, and binds only after parity passes
+      1    Duration  87.51s (transform 5.58s, setup 342ms, import 7.59s, tests 78.09s, environment 1ms)
+      1      × runs the independent validator BEFORE any destructive stage 70ms
+      1      × propagates --draftguru-label through to the preflight validator 8ms
+      1      × makes preflight/data label equality contractual, for any label 47ms
+      1      × keeps the default label correct, and identical on both sides, with no override 44ms
+      1      × gives the data stage the same label the preflight proved 47ms
+      1       Tests  22 failed | 2510 passed (2532)
+      1        × restore-test.sh hashes before restoring, clears first, and binds only after parity passes 51ms
+      1        × proves the witness offline BEFORE anything is destroyed 14ms
+      1        × preflights the tracked pair and the pinned --validate-only before the destructive stage 8ms
+      1        × preflights the tracked files and the loader's offline validation before the destructive stage 9ms
+      1        × preflights the tracked files and the loader's offline validation before the destructive stage 8ms
+      1        × preflights the tracked files and the loader's offline validation before the destructive stage 10ms
+      1        × preflights the tracked artefact, manifest and adjudication file offline 9ms
+      1        × preflights the snapshot offline before the destructive stage and refuses on failure 9ms
+      1        × preflights the snapshot offline before the destructive stage and refuses on failure 10ms
+      1        × preflights both snapshots offline before the destructive stage and refuses on failure 12ms
+      1        × follows fitzroy (identities and match facts) and precedes everything that reads players 7ms
+      1          × supplemented_baseline uses the same ordered stats inputs in both loaders, stages, preflight and strict final gates 56ms
+      1          × supplemented_baseline stops on baseline/register/stats, configured supplement, API, Wikipedia or coach-page preflight failure before reset 19ms
+      1          × c2-2026-successor: preflight replays raw through the loader and refuses, with nothing destroyed, on any failure 10ms
+      1          × c2-2026-rehearsal-only: preflight replays raw through the loader and refuses, with nothing destroyed, on any failure 12ms
+      1          × baseline_only uses the same ordered stats inputs in both loaders, stages, preflight and strict final gates 63ms
+      1          × baseline_only stops on baseline/register/stats, configured supplement, API, Wikipedia or coach-page preflight failure before reset 22ms

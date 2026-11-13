@@ -1,0 +1,191 @@
+ 
+=== unit files (afldb*)
+UNIT FILE                             STATE    PRESET
+afldb-settle-afl-api-brownlow.service static   -
+afldb-settle-afl-api.service          static   -
+afldb-settle-afltables.service        static   -
+afldb.service                         enabled  enabled
+afldb-settle-afl-api-brownlow.timer   disabled enabled
+afldb-settle-afl-api.timer            enabled  enabled
+afldb-settle-afltables.timer          disabled enabled
+
+7 unit files listed.
+=== settle timer + service
+# /etc/systemd/system/afldb-settle-afl-api.timer
+[Unit]
+Description=AFLDB — nightly in-season AFL.com.au (afl_api) settle pass
+[Timer]
+# Fires after the AFL Tables timer's own 04:30 window
+# (deploy/afldb-settle-afltables.timer) plus its RandomizedDelaySec, so a
+# nightly afl_api run corroborates against AFL Tables data that has already
+# had its own chance to settle first — not a correctness requirement (Q1
+# co-source corroboration works in either order), just fewer transient
+# `source_disagreement` advisories on a freshly-changed match. OnCalendar is
+# evaluated in the host's timezone (Australia/Melbourne on both AFLDB hosts).
+#
+# Out of season the unit exits 0 without doing anything (no in-progress
+# season in data/reference/seasons.json), so this timer is left enabled all
+# year, same convention as the AFL Tables timer.
+OnCalendar=*-*-* 05:00
+RandomizedDelaySec=15min
+AccuracySec=1min
+# A missed run catches up once on the next boot instead of skipping that
+# night entirely.
+Persistent=true
+[Install]
+WantedBy=timers.target
+# /etc/systemd/system/afldb-settle-afl-api.service
+[Unit]
+Description=AFLDB — in-season AFL.com.au (afl_api) canonical settle (one run)
+Documentation=https://github.com/afldb
+After=network-online.target postgresql.service afldb.service
+Wants=network-online.target
+[Service]
+Type=oneshot
+User=arm
+Group=arm
+WorkingDirectory=/home/arm/projects/afldb
+# The AFLDB-ISSUE-228 S8 chain, in one script so both steps agree on one
+# season and one acquired snapshot label:
+#
+#   acquire-afl-api.ts --season <S>
+#     -> settle-afl-api.ts --label <L> --apply --auto-apply --require-complete-source
+#
+# Runs under `set -e`: a failed acquisition never reaches settle and
+# PostgreSQL is never opened. acquire-afl-api.ts writes its manifest LAST and
+# self-cleans a manifest-less partial snapshot on the way out (its own
+# `cleanupPartialSnapshot()`), so this unit needs no separate cleanup step.
+#
+# This unit and afldb-settle-afltables.service are independent and may run
+# concurrently: they settle different sources against the co-source
+# ownership policy (§7.5, Q1) — an afltables-owned row observed here is
+# corroborated, never overwritten, and vice versa. Neither unit names the
+# other.
+# Invoked through /bin/sh rather than relying on an executable bit, same
+# convention as afldb-settle-afltables.service.
+ExecStart=/bin/sh /home/arm/projects/afldb/deploy/afldb-settle-afl-api.sh
+# A season's CONCLUDED-match acquisition plus settle is bounded network and
+# database work, but AFL.com.au is a third party. Bound the run rather than
+# letting a stalled fetch hold the unit open until the next firing.
+TimeoutStartSec=3600
+# PostgreSQL is co-located on a 2 vCPU droplet and this job is not urgent.
+Nice=10
+# Credential boundary (AFLDB-ISSUE-232). The run keeps exactly two DSNs:
+# DATABASE_URL (afldb_app — the ingestion-switch read) and
+# AFLDB_IMPORT_DATABASE_URL (afldb_import — the settle's only writer). Every
+# other *_DATABASE_URL .env.example defines is dropped below: the schema
+# owner, auth, backup, every test/code-test DSN and the DEV/PROD operator
+# maintenance DSNs. So are the secrets this run never uses: session, SMTP,
+# e-mail intake (route secret and IMAP login), revalidation (D-232-3: no
+# automatic revalidateSeason()) and the Kali API key. Non-secret settings
+# (the AFL API base URLs, the outbound User-Agent) are kept.
+#
+# This is a hand-typed deny list, the shape AFLDB-ISSUE-220 found drifting
+# on the web unit. tests/afl-api-ingestion-safety.test.ts derives every
+# *_DATABASE_URL name and every credential-shaped name from .env.example on
+# each run and fails if one is missing here; a failure there is a credential
+# leak in waiting, never a test to adjust.
+EnvironmentFile=/home/arm/projects/afldb/.env
+UnsetEnvironment=AFLDB_OWNER_DATABASE_URL AFLDB_AUTH_DATABASE_URL AFLDB_TEST_DATABASE_URL AFLDB_TEST_IMPORT_DATABASE_URL AFLDB_TEST_AUTH_DATABASE_URL AFLDB_CODE_TEST_DATABASE_URL AFLDB_CODE_TEST_IMPORT_DATABASE_URL AFLDB_DEV_DATABASE_URL AFLDB_DEV_IMPORT_DATABASE_URL AFLDB_BACKUP_DATABASE_URL AFLDB_PROD_DATABASE_URL AFLDB_PROD_IMPORT_DATABASE_URL AFLDB_PROD_AUTH_DATABASE_URL AFLDB_SESSION_SECRET AFLDB_SMTP_USER AFLDB_SMTP_PASSWORD AFLDB_EMAIL_INTAKE_SECRET AFLDB_INTAKE_IMAP_USER AFLDB_INTAKE_IMAP_PASSWORD AFLDB_REVALIDATE_SECRET KALI_AFL_API_KEY
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=afldb-settle-afl-api
+# --- Hardening -------------------------------------------------------
+=== all timers
+NEXT                              LEFT LAST                                PASSED UNIT                           ACTIVATES
+Sat 2026-11-14 08:50:00 AEDT       34s Sat 2026-11-14 08:40:01 AEDT      9min ago sysstat-collect.timer          sysstat-collect.service
+Sat 2026-11-14 09:14:29 AEDT     25min Sat 2026-11-14 08:06:15 AEDT     43min ago droplet-agent-update.timer     droplet-agent-update.service
+Sat 2026-11-14 09:43:12 AEDT     53min Sat 2026-11-14 08:12:33 AEDT     36min ago fwupd-refresh.timer            fwupd-refresh.service
+Sat 2026-11-14 13:39:03 AEDT  4h 49min Fri 2026-11-13 13:39:03 AEDT       19h ago update-notifier-download.timer update-notifier-download.service
+Sat 2026-11-14 13:49:45 AEDT   5h 0min Fri 2026-11-13 13:49:45 AEDT       18h ago systemd-tmpfiles-clean.timer   systemd-tmpfiles-clean.service
+Sat 2026-11-14 16:12:40 AEDT        7h Fri 2026-11-13 21:03:01 AEDT       11h ago apt-daily.timer                apt-daily.service
+Sat 2026-11-14 22:20:22 AEDT       13h Sat 2026-11-14 01:39:45 AEDT        7h ago motd-news.timer                motd-news.service
+Sun 2026-11-15 00:00:00 AEDT       15h Sat 2026-11-14 00:00:01 AEDT        8h ago dpkg-db-backup.timer           dpkg-db-backup.service
+Sun 2026-11-15 00:00:00 AEDT       15h Sat 2026-11-14 00:00:01 AEDT        8h ago logrotate.timer                logrotate.service
+Sun 2026-11-15 00:07:00 AEDT       15h Sat 2026-11-14 00:07:01 AEDT        8h ago sysstat-summary.timer          sysstat-summary.service
+Sun 2026-11-15 03:10:00 AEDT       18h Sun 2026-11-08 03:10:21 AEDT    6 days ago e2scrub_all.timer              e2scrub_all.service
+Sun 2026-11-15 05:13:03 AEDT       20h Sat 2026-11-14 05:14:45 AEDT  3h 34min ago afldb-settle-afl-api.timer     afldb-settle-afl-api.service
+Sun 2026-11-15 06:45:13 AEDT       21h Sat 2026-11-14 06:34:15 AEDT  2h 15min ago apt-daily-upgrade.timer        apt-daily-upgrade.service
+Sun 2026-11-15 07:30:18 AEDT       22h Sat 2026-11-14 03:26:25 AEDT  5h 22min ago man-db.timer                   man-db.service
+Mon 2026-11-16 00:50:55 AEDT 1 day 16h Mon 2026-11-09 00:09:45 AEDT    5 days ago fstrim.timer                   fstrim.service
+Wed 2026-11-18 04:11:36 AEDT    3 days Thu 2026-11-12 10:08:55 AEDT 1 day 22h ago update-notifier-motd.timer     update-notifier-motd.service
+-                                    - -                                        - apport-autoreport.timer        apport-autoreport.service
+-                                    - -                                        - snapd.snap-repair.timer        snapd.snap-repair.service
+-                                    - -                                        - ua-timer.timer                 ua-timer.service
+
+19 timers listed.
+=== arm crontab / cron.d / linger
+no crontab for arm
+/etc/cron.d:
+e2scrub_all
+sysstat
+
+/etc/cron.daily:
+apport
+apt-compat
+do-agent
+dpkg
+logrotate
+man-db
+sysstat
+Linger=no
+=== backups dir
+total 248416
+drwx------ 34 arm arm    12288 2026-11-12 13:50 .
+drwxrwxr-x  3 arm arm     4096 2026-08-18 23:36 ..
+-rw-------  1 arm arm 21173044 2026-09-03 18:56 afldb_prod-20260903-185612.dump
+-rw-------  1 arm arm 21238290 2026-09-04 11:54 afldb_prod-20260904-115413.dump
+-rw-------  1 arm arm 21543086 2026-09-04 20:10 afldb_prod-20260904-201037.dump
+-rw-rw-r--  1 arm arm      122 2026-09-04 20:10 afldb_prod-20260904-201037.dump.sha256
+-rw-------  1 arm arm 22962432 2026-09-07 23:41 afldb_prod-20260907-234124.dump
+-rw-------  1 arm arm 23021327 2026-09-08 01:04 afldb_prod-20260908-010422.dump
+-rw-------  1 arm arm 23903094 2026-09-14 15:24 afldb_prod-20260914-152441.dump
+-rw-------  1 arm arm 24006070 2026-09-26 21:36 afldb_prod-20260926-213612.dump
+-rw-------  1 arm arm 24010174 2026-09-27 13:28 afldb_prod-20260927-132829.dump
+-rw-------  1 arm arm 24031238 2026-09-27 14:32 afldb_prod-20260927-143214.dump
+-rw-------  1 arm arm 24031238 2026-09-28 10:22 afldb_prod-20260928-102249.dump
+-rw-rw-r--  1 arm arm 23705660 2026-09-12 13:13 afldb_prod-pre-admin-centre-20260912-131349.dump
+-rw-rw-r--  1 arm arm      139 2026-09-12 13:13 afldb_prod-pre-admin-centre-20260912-131349.dump.sha256
+drwx------  2 arm arm     4096 2026-11-02 13:41 blockb-b0-20261102T024137Z
+drwx------  2 arm arm     4096 2026-11-02 14:14 blockb-b1-20261102T031356Z
+drwx------  2 arm arm     4096 2026-11-02 14:19 blockb-b2-20261102T031919Z
+drwx------  2 arm arm     4096 2026-11-02 14:24 blockb-b3-20261102T032439Z
+drwx------  2 arm arm     4096 2026-11-02 14:29 blockb-e-20261102T032927Z
+drwx------  2 arm arm     4096 2026-11-02 12:47 blockm-a-20261102T014742Z
+drwx------  2 arm arm     4096 2026-11-02 13:23 blockm-b-20261102T022308Z
+drwx------  2 arm arm     4096 2026-11-02 19:37 c4b-924ff273-r2
+drwx------  2 arm arm     4096 2026-11-02 16:27 c4b-ea98a35f-r1
+drwx------  2 arm arm     4096 2026-10-29 06:23 current-shadow-20261028T192336Z
+drwx------  2 arm arm     4096 2026-11-02 14:54 gap016-recon-20261102T035406Z
+drwx------  2 arm arm     4096 2026-11-12 12:06 gap029-I336-20261112T010605Z
+drwx------  2 arm arm     4096 2026-11-12 13:50 gap029-I336-20261112T025001Z
+drwx------  2 arm arm     4096 2026-11-03 18:44 gap029-S1-20261103T074434Z
+880M	/home/arm/backups/afldb
+=== disk
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/vda1        77G   33G   45G  42% /
+/dev/vda1        77G   33G   45G  42% /
+=== tools present
+pg_dump: /usr/bin/pg_dump
+pg_restore: /usr/bin/pg_restore
+psql: /usr/bin/psql
+rsync: /usr/bin/rsync
+scp: /usr/bin/scp
+sha256sum: /usr/bin/sha256sum
+rclone: absent
+age: absent
+gpg: /usr/bin/gpg
+flock: /usr/bin/flock
+nice: /usr/bin/nice
+ionice: /usr/bin/ionice
+systemd-analyze: /usr/bin/systemd-analyze
+systemd 255 (255.4-1ubuntu8.18)
+pg_dump (PostgreSQL) 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+=== serving checkout backup scripts present
+-rw-rw-r-- 1 arm arm 4510 Aug 16 12:37 /home/arm/projects/afldb/tools/maintenance/backup.sh
+-rw-rw-r-- 1 arm arm 8255 Sep 26 20:39 /home/arm/projects/afldb/tools/maintenance/restore-test.sh
+c1c4b22e
+=== env var NAMES in serving .env (no values)
+AFLDB_APEX_DIR AFLDB_AUTH_DATABASE_URL AFLDB_BACKUP_DATABASE_URL AFLDB_BACKUP_DIR AFLDB_BASE_URL AFLDB_BETA_EPOCH AFLDB_BETA_GATE AFLDB_ENV AFLDB_IMPORT_DATABASE_URL AFLDB_MAX_FILTERS AFLDB_MAX_PAGE_SIZE AFLDB_OWNER_DATABASE_URL AFLDB_POOL_MAX AFLDB_PROD_DATABASE_URL AFLDB_SESSION_SECRET AFLDB_SETTLE_TRIGGER AFLDB_SMTP_FROM AFLDB_SMTP_HOST AFLDB_SMTP_PASSWORD AFLDB_SMTP_PORT AFLDB_SMTP_SECURE AFLDB_SMTP_USER AFLDB_STATEMENT_TIMEOUT_MS AFLDB_WORKERS 
+{"identity":{"db":"afldb_prod","oid":"66668","sysid":"7674454702926115004","ro":"on"},"dbs":[{"datname":"afldb_prod","bytes":"517921815","comment":null},{"datname":"afldb_prod_auth_recovery","bytes":"256842775","comment":null},{"datname":"afldb_prod_candidate_20260926-213225","bytes":"274963479","comment":null},{"datname":"afldb_prod_candidate_20260927-142540","bytes":"274979863","comment":null},{"datname":"afldb_prod_pre_rebuild_20260907-234124","bytes":"381631511","comment":null},{"datname":"afldb_prod_pre_rebuild_20260928-101642","bytes":"412564503","comment":"afldb.promotion_freeze.v1 token=4edef055231179137680209113bc1844 environment=prod database=afldb_prod"},{"datname":"afldb_restore_test","bytes":"397622295","comment":"afldb.restore_test.v1 sha256=599e32a1a0034b30f49c203ba6f306fe07f410e44f966a0554b00c21056731eb"},{"datname":"postgres","bytes":"7691287","comment":"default administrative connection database"}],"ver":"16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)","role":[{"u":"afldb_backup","su":false,"rad":true}],"ledger":"118_fixtures_unconfirmed_participants.sql"}
+END

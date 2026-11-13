@@ -1,0 +1,27 @@
+== bash tests/restore-test.test.sh
+PASS: test_bad_percent_encoding_refused
+PASS: test_complete_restore_with_known_errors_certified
+PASS: test_connection_landing_elsewhere_refuses_before_writes
+PASS: test_empty_log_status1_refused
+PASS: test_encoded_query_keyword_refused
+PASS: test_host_list_refused
+PASS: test_inherited_routing_env_neutralised
+PASS: test_keyword_value_string_refused
+PASS: test_known_errors_without_summary_refused
+PASS: test_marker_and_drop_share_the_identity_session
+PASS: test_missing_binary_status_refused
+PASS: test_parity_mismatch_still_withholds_marker
+PASS: test_query_dbname_refused_before_any_child
+PASS: test_query_password_refused
+PASS: test_routing_env_from_dotenv_neutralised
+PASS: test_same_source_and_target_refused
+PASS: test_service_query_refused
+PASS: test_signal_after_known_errors_refused
+PASS: test_signal_exit_never_certified
+PASS: test_standard_url_restores_only_the_disposable_target
+PASS: test_status0_with_error_lines_refused
+PASS: test_summary_count_mismatch_refused
+PASS: test_transport_option_still_accepted
+PASS: test_unknown_error_refused
+restore-test harness: 24 passed, 0 failed
+exit 0
