@@ -256,6 +256,56 @@ describe("DraftGuru importer — privileges and transaction", () => {
 });
 
 /*
+ * AFLDB-ISSUE-348 — the reload guard (tools/rebuild/draftguru/reload_guard.py). The behavioural
+ * proofs are tests/python/draftguru_import_atomicity_contract.py §6 (run above, scripted
+ * connection) and tests/integration/draftguru-import.test.ts "reload guard" (real PostgreSQL).
+ * These are the static pins that keep the guard where it must be.
+ */
+describe("DraftGuru importer — reload guard (AFLDB-ISSUE-348)", () => {
+  const guardSource = readFileSync(
+    join(root, "tools", "rebuild", "draftguru", "reload_guard.py"), "utf8").replace(/\r\n/g, "\n");
+  const guardCode = guardSource.slice(
+    guardSource.indexOf('"""', guardSource.indexOf('"""') + 3) + 3);
+  const runImport = importerSource.slice(
+    importerSource.indexOf("def run_import("), importerSource.indexOf("def main("));
+  const enforceFn = importerSource.slice(
+    importerSource.indexOf("def enforce_reload_guard("), importerSource.indexOf("def run_import("));
+
+  it("runs before apply_authority (which can mint player seeds) and before import_batch opens", () => {
+    const guard = runImport.indexOf("enforce_reload_guard(pg, rep, args, prepared)");
+    expect(guard).toBeGreaterThan(-1);
+    expect(guard).toBeLessThan(runImport.indexOf("with import_batch(pg, SOURCE_KEY"));
+    expect(guard).toBeLessThan(runImport.indexOf("apply_authority("));
+  });
+
+  it("is read-only: the guard module sends no statement that writes", () => {
+    expect(guardCode).not.toMatch(/\b(INSERT|UPDATE|DELETE|TRUNCATE|DROP|CREATE|ALTER|GRANT)\b/);
+    expect(guardCode).not.toMatch(/\.(commit|executemany|copy)\(/);
+    expect(guardCode).toMatch(/SELECT e\.id, i\.ord FROM public\.draft_picks e JOIN/);
+  });
+
+  it("decides 'same key' with the reload's own predicates, not a re-implementation", () => {
+    expect(guardCode).toContain("from common import _key_match, _scope_clause");
+    expect(guardCode).toContain("_key_match(\"e\", \"i\", pick_key)");
+    expect(enforceFn).toContain("pick_key=PICK_KEY, person_key=PERSON_KEY");
+  });
+
+  it("is not satisfied by --acknowledge-population-drop, and --link-only refuses its flags", () => {
+    expect(enforceFn).not.toContain("acknowledge_population_drop");
+    expect(guardCode).not.toContain("acknowledge_population_drop");
+    expect(importerSource).toContain('"--reconciliation", default=None');
+    expect(importerSource).toContain('"--reconciliation-sha256", default=None');
+    expect(importerSource).toContain(
+      "--link-only refuses --reconciliation, --reconciliation-sha256 and");
+  });
+
+  it("does not move the Stage A contract: the expected counts stay in the importer", () => {
+    expect(importerSource).toContain("EXPECTED_ROWS = 6810");
+    expect(importerSource).toContain("EXPECTED_PERSONS = 5057");
+  });
+});
+
+/*
  * AFLDB-ISSUE-222 Phase 4b — --link-only.
  *
  * Applies the reviewed trusted linkage to an already-loaded DraftGuru population and rewrites

@@ -51,6 +51,19 @@ exception inside the block, ``--dry-run`` included, rolls the whole data transac
 before the ``failed`` batch row is recorded. ``tests/python/draftguru_import_atomicity_contract.py``
 proves this order against a scripted connection without a database.
 
+Reload guard (AFLDB-ISSUE-348, 2026-11-14)
+------------------------------------------
+A normal-mode run reloads ``draft_picks`` with ``delete_missing=True`` and rewrites every column
+of every matched pick, so it would delete audited rows the snapshot does not carry (the 35
+D-336-2 picks and their persons) and overwrite ``original_club_raw`` before any origin review.
+``enforce_reload_guard`` therefore runs first -- before ``apply_authority`` and before
+``import_batch`` opens, on SELECT statements only -- and REFUSES (``--dry-run`` included, which
+reports the refusal) unless the run's deletions, audited rewrites and ``original_club_raw``
+changes are empty or all named by a reviewed ``--reconciliation`` file pinned by
+``--reconciliation-sha256``. ``--acknowledge-population-drop`` does not satisfy it. The design,
+the file format and the matching rules are in ``reload_guard.py``. ``--link-only`` never deletes
+or rewrites a source-owned row and is unchanged (it refuses the new flags).
+
 ``--link-only`` (AFLDB-ISSUE-222 Phase 4b, 2026-09-19)
 ------------------------------------------------------
 A second, separate write path that applies ONLY the already-reviewed trusted linkage to a
@@ -117,6 +130,7 @@ sys.path.insert(0, str(TOOL_DIR))
 sys.path.insert(0, str(REPO_ROOT / "tools" / "migration"))
 
 import parse_draft_snapshot as parser_mod  # noqa: E402  (tested Stage A parser, no psycopg)
+import reload_guard  # noqa: E402  (AFLDB-ISSUE-348 pre-write guard, no psycopg)
 
 SOURCE_KEY = "draftguru"
 AFLTABLES_SOURCE_KEY = "afltables"
@@ -1346,6 +1360,12 @@ def link_only_cli_refusal(args) -> str | None:
     if args.snapshot_root is not None:
         return ("--link-only refuses --snapshot-root: no Stage A page, manifest or parsed "
                 "artefact is read in this mode, so naming a snapshot root would be misleading")
+    if (getattr(args, "reconciliation", None) is not None
+            or getattr(args, "reconciliation_sha256", None) is not None
+            or getattr(args, "guard_report", None) is not None):
+        return ("--link-only refuses --reconciliation, --reconciliation-sha256 and "
+                "--guard-report: the mode never deletes or rewrites a source-owned row, so "
+                "there is nothing for the AFLDB-ISSUE-348 reload guard to review")
     return None
 
 
@@ -1387,6 +1407,33 @@ def validate(args) -> dict:
     }
 
 
+def enforce_reload_guard(pg, rep, args, prepared: dict) -> None:
+    """AFLDB-ISSUE-348: refuse a full reload that would delete or rewrite audited rows, or
+    change ``original_club_raw``, unless a reviewed reconciliation names every such key.
+
+    Runs on SELECT statements only, BEFORE ``apply_authority`` (which can mint player seeds)
+    and BEFORE ``import_batch`` opens, so a refusal -- ``--dry-run`` included -- writes
+    nothing at all, not even a failed ``import_batches`` row. ``--acknowledge-population-drop``
+    is deliberately not consulted: it is the external_identities gate's acknowledgement.
+    """
+    try:
+        with pg.cursor() as cur:
+            source_id = resolve_source_id(cur, SOURCE_KEY)
+            club_ids = resolve_club_ids(cur)
+            reload_guard.enforce(
+                cur, rep, source_id=source_id, picks=prepared["picks"],
+                persons=list(prepared["persons"].values()), club_ids=club_ids,
+                label=args.label, reconciliation=prepared.get("reconciliation"),
+                report_path=getattr(args, "guard_report", None),
+                pick_key=PICK_KEY, person_key=PERSON_KEY)
+    except reload_guard.ReloadRefused as exc:
+        pg.rollback()
+        raise ImportFailure(str(exc)) from None
+    except BaseException:
+        pg.rollback()
+        raise
+
+
 def run_import(args, prepared: dict, rep) -> int:
     from common import (analyze, connect_pg, import_batch, reload_keyed,
                         replay_admin_overrides, report_reload, require_env, safe_dsn)
@@ -1397,6 +1444,8 @@ def run_import(args, prepared: dict, rep) -> int:
     dsn = require_env("AFLDB_IMPORT_DATABASE_URL")
     print(f"  target: {safe_dsn(dsn)}")
     pg = connect_pg(dsn)
+
+    enforce_reload_guard(pg, rep, args, prepared)
 
     with import_batch(pg, SOURCE_KEY, "import_draftguru.py", "draft_picks") as batch:
         batch.records_read = len(picks)
@@ -1547,7 +1596,19 @@ def main(argv: list[str] | None = None) -> int:
                     help="run the whole transaction, then roll it back")
     ap.add_argument("--no-seed", action="store_true",
                     help="refuse to mint a minimal canonical player shell")
-    ap.add_argument("--acknowledge-population-drop", action="store_true")
+    ap.add_argument("--acknowledge-population-drop", action="store_true",
+                    help="acknowledge the external_identities population-drop gate ONLY; it "
+                         "does not satisfy the AFLDB-ISSUE-348 reload guard")
+    ap.add_argument("--reconciliation", default=None,
+                    help="AFLDB-ISSUE-348: path to the reviewed reconciliation file that names "
+                         "every pick/person deletion, audited rewrite and original_club_raw "
+                         "change this full reload makes (see tools/rebuild/draftguru/"
+                         "reload_guard.py). Requires --reconciliation-sha256.")
+    ap.add_argument("--reconciliation-sha256", default=None,
+                    help="the sha256 of the reviewed reconciliation file (pins what was reviewed)")
+    ap.add_argument("--guard-report", default=None,
+                    help="write the reload guard's effects and digest to this new JSON file "
+                         "(also on refusal), to build the reconciliation from")
     ap.add_argument("--quiet", action="store_true")
     args = ap.parse_args(argv)
     args.label_explicit = args.label is not None
@@ -1561,6 +1622,13 @@ def main(argv: list[str] | None = None) -> int:
     try:
         prepared = validate(args)
     except (ImportFailure, parser_mod.ParseFailure) as exc:
+        print(f"\nREFUSED: {exc}")
+        return 1
+
+    try:
+        prepared["reconciliation"] = reload_guard.load_reconciliation(
+            args.reconciliation, args.reconciliation_sha256)
+    except reload_guard.ReloadRefused as exc:
         print(f"\nREFUSED: {exc}")
         return 1
 

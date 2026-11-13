@@ -1349,3 +1349,33 @@ the person's stored `player_id`, with the bridge (or agreeing human) state. Neve
 under the tracked ISSUE-136 `profile_url_continuity` rules, and that join fans out onto the
 continuing path (the 2026-09-19 false failure). `tests/draft-linkage-invariants.ts` holds the
 invariant; multi-identity players are reported and must be rule-explained.
+
+## `import_draftguru.py` reload guard -- audited rows and origin review (2026-11-14, AFLDB-ISSUE-348)
+
+A normal-mode (full) run reloads `draft_picks` keyed on migration 069's key, **deletes every stored
+DraftGuru pick the incoming snapshot does not carry**, removes the persons left childless and rewrites
+every column of every matched pick. `reload_guard.py` therefore runs first -- before `apply_authority`
+and before `import_batch` opens, on SELECT statements only -- and **refuses** (`--dry-run` included,
+which reports the refusal and writes nothing, not even an `import_batches` row) unless the run's
+effects are empty or fully named by a reviewed reconciliation:
+
+| Effect | Refused unless |
+|---|---|
+| a stored pick / person the snapshot does not carry (would be deleted) | named in `acknowledged_deletions` / `acknowledged_person_deletions`; an audited pick also needs `acknowledge_audit_orphans: true` (its `data_edits` rows would point at a deleted id) |
+| a pick with a `data_edits` row, an active `data_overrides` row, or an audited insert (`source_insert` data_edits row / I336 provenance note) whose source columns would change (columns an active override covers excluded) | named in `acknowledged_protected_rewrites` |
+| such a protected person whose `dg_person_id` (per-load rank), name or name key would change | named in `acknowledged_protected_person_rewrites` |
+| any `original_club_raw` that would change | an `origin_review` entry (the D-336-3 classifier's JSON row, verbatim) whose `id`, `year`, `db`, `csv` and `class` match; `REPLACE_CLUB` / `OTHER` / `INSERT_MIXED` also need an `owner_rulings` entry `{id, decision: "accept_incoming", reference}` -- the guard never adjudicates them |
+
+"Same key" and "would delete" are decided by PostgreSQL with `common._key_match` / `common._scope_clause`,
+the predicates `reload_keyed` generates (NULL-safe). `--acknowledge-population-drop` is the
+`external_identities` gate's acknowledgement and does **not** satisfy this guard. `--link-only` is
+unchanged (it refuses the new flags).
+
+Procedure: run once with `--dry-run --guard-report <new.json>`; the refusal names the counts and an
+`effect_digest`, and the report lists every key. Build the reconciliation (`format`
+`afldb-draftguru-reconciliation/1`; keys `stage_a_label`, `effect_digest`, `acknowledged_deletions`,
+`acknowledged_person_deletions`, `acknowledged_protected_rewrites`,
+`acknowledged_protected_person_rewrites`, `origin_review`, `owner_rulings`), have it reviewed, and run
+`--reconciliation FILE --reconciliation-sha256 <sha256 of FILE>`. The digest binds the file to the exact
+effects it was reviewed against. Full design and evidence:
+`docs/v2/evidence/remediation-20261114/draftguru/README.md`.

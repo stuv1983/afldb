@@ -21,7 +21,9 @@
  * number, the importer's own reload key and source_record_id), a new UNMATCHED `draft_persons` row for a person URL not already stored (a stored URL
  * keeps its row and its link; nothing is matched by name), and one `data_edits` audit row per pick through `recordDataEdit`, so the V2-GAP-006 season
  * seal judges every sealed-season insert (2008-2025 are sealed) against the reviewed correction note, exactly as for an editor write. No override row:
- * these are source rows, which a later keyed DraftGuru reload reproduces under the same key. No career statistic, height or award is taken from the CSV.
+ * these are source rows under the importer's own reload key. A later FULL DraftGuru reload keeps them only if its snapshot carries those keys (and renumbers
+ * their persons' dg_person_id); otherwise it would delete them and orphan these audit rows, so import_draftguru.py refuses that reload unless a reviewed
+ * reconciliation names them (AFLDB-ISSUE-348; corrects the earlier "a later reload reproduces them"). No career statistic, height or award is taken from the CSV.
  *
  * CONTROLS (as the V2-GAP-029 production tools): the actor is a real `auth_users.id`, proven an enabled, fully enrolled, non-fixture Super Admin by
  * `assert_viable_super_admin_actor` and row-locked until commit; the plan digest binds target, revision, evidence, baseline, actor and every resolved

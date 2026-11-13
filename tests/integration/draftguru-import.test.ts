@@ -1,6 +1,7 @@
 import './guard';
 
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -1291,4 +1292,306 @@ describe.skipIf(!canRun)(
       expect(ok.status).toBe('completed');
     }, 1_200_000);
   });
+});
+
+/**
+ * AFLDB-ISSUE-348 — the reload guard, against a real database.
+ *
+ * `tools/rebuild/draftguru/reload_guard.py` refuses a normal-mode (full) reload that would delete
+ * or rewrite an audited row, renumber an audited person or change `original_club_raw` without a
+ * reviewed reconciliation. The scripted-connection contract
+ * (tests/python/draftguru_import_atomicity_contract.py §6) proves the decision logic; this block
+ * proves the parts only PostgreSQL can: the NULL-safe key matching (`IS NOT DISTINCT FROM`, the
+ * predicate reload_keyed itself generates), the real SELECTs under the restricted afldb_import
+ * role (migration 108 grants data_edits), and that a refusal — normal run and --dry-run — leaves
+ * the whole draft surface, import_batches included, byte-identical.
+ *
+ * The Stage A snapshot (gitignored) is not needed: the driver
+ * (tests/python/draftguru_reload_guard_db_driver.py) builds the incoming frame from the target's
+ * own stored rows and runs the REAL `import_draftguru.main` through the restricted role.
+ * Fixtures are written in exactly the shape tools/v2/issue336-predraft-insert-production.ts
+ * writes: Pre-Draft / pre_draft, pick_number NULL, the importer's reload key, provenance note, a
+ * `source_insert` data_edits row, and an unmatched person whose dg_person_id lies past the stored
+ * maximum.
+ */
+const canRunGuard = hasPsycopg() && importRole.isConfigured;
+const GUARD_DRIVER = 'tests/python/draftguru_reload_guard_db_driver.py';
+const GUARD_URL = 'https://www.draftguru.com.au/players/issue-348-guard-fixture/1';
+const GUARD_ADMIN_EMAIL = 'issue-348-guard@example.invalid';
+const SURFACE_TABLES = [
+  'draft_picks', 'draft_persons', 'external_identities', 'import_batches', 'players',
+  'data_edits', 'data_overrides',
+] as const;
+
+type Surface = Record<(typeof SURFACE_TABLES)[number], string>;
+
+/** count + md5 of every row's jsonb text, per table. Table names come from the constant above. */
+async function surface(): Promise<Surface> {
+  const out: Record<string, string> = {};
+  for (const table of SURFACE_TABLES) {
+    const [row] = await sql.unsafe<{ n: number; h: string }[]>(
+      `SELECT count(*)::int AS n,
+              md5(coalesce(string_agg(to_jsonb(t)::text, '' ORDER BY to_jsonb(t)::text), '')) AS h
+         FROM ${table} t`);
+    out[table] = `${row.n}:${row.h}`;
+  }
+  return out as Surface;
+}
+
+function guardRun(driverArgs: string[], importerArgs: string[]) {
+  return importRole.spawn(
+    python,
+    [GUARD_DRIVER, ...driverArgs, '--', '--no-seed', ...importerArgs],
+    { cwd: root },
+  );
+}
+
+describe.skipIf(!canRunGuard)(`DraftGuru reload guard, AFLDB-ISSUE-348 (afldb_test)${roleParitySuffix}`, () => {
+  let dgSource = 0;
+  let pickId = 0;
+  let personId = 0;
+  let workDir = '';
+
+  async function cleanup(): Promise<void> {
+    const admins = await sql<{ id: number }[]>`SELECT id FROM auth_users WHERE email = ${GUARD_ADMIN_EMAIL}`;
+    for (const a of admins) await sql`DELETE FROM data_edits WHERE admin_user_id = ${a.id}`;
+    await sql`DELETE FROM draft_picks WHERE player_url = ${GUARD_URL}`;
+    await sql`DELETE FROM draft_persons WHERE player_url = ${GUARD_URL}`;
+    await sql`DELETE FROM auth_users WHERE email = ${GUARD_ADMIN_EMAIL}`;
+  }
+
+  async function seedAuditedFixture(): Promise<void> {
+    const [admin] = await sql<{ id: number }[]>`
+      INSERT INTO auth_users (email, role) VALUES (${GUARD_ADMIN_EMAIL}, 'super_admin')
+      ON CONFLICT (email) DO UPDATE SET role = EXCLUDED.role RETURNING id`;
+    const [club] = await sql<{ id: number; name: string }[]>`SELECT id, name FROM clubs ORDER BY id LIMIT 1`;
+    const [{ next }] = await sql<{ next: number }[]>`
+      SELECT (COALESCE(max(dg_person_id), 0) + 1)::int AS next FROM draft_persons WHERE source_id = ${dgSource}`;
+    const [person] = await sql<{ id: number }[]>`
+      INSERT INTO draft_persons (source_id, dg_person_id, player_url, display_name_raw, name_key,
+          player_id, link_status, candidate_count, match_method, confidence_notes,
+          reported_games, reported_goals, is_matching_backlog)
+      VALUES (${dgSource}, ${next}, ${GUARD_URL}, 'Guard Fixture', 'guard fixture', NULL,
+          'unmatched', 0, NULL,
+          'AFLDB-ISSUE-336 bounded insert: identity unresolved; dg_person_id assigned past the stored maximum and renumbered by the next full reload',
+          NULL, NULL, false)
+      RETURNING id::int AS id`;
+    personId = person.id;
+    const [pick] = await sql<{ id: number }[]>`
+      INSERT INTO draft_picks (draft_year, draft_type, draft_kind, pick_number, pick_note, player_id,
+          player_name_raw, link_status_value, candidate_count, match_method, confidence_notes,
+          club_id, club_name_raw, original_club_raw, draft_age, height_cm, signing, signing_kind,
+          detail, source_id, source_record_id, draft_person_id, dg_person_id, player_url)
+      VALUES (2025, 'Pre-Draft', 'pre_draft', NULL, NULL, NULL, 'Guard Fixture', 'unmatched', 0, NULL,
+          'AFLDB-ISSUE-336 bounded insert from https://www.draftguru.com.au/drafts/2025 (fetched 2026-11-06T00:00:00Z, sha256 0123456789abcdef)',
+          ${club.id}, ${club.name}, 'Fixture Juniors', 17, NULL, 'Signed', 'signed', NULL,
+          ${dgSource}, 'https://www.draftguru.com.au/drafts/2025#348', ${person.id}, ${next}, ${GUARD_URL})
+      RETURNING id::int AS id`;
+    pickId = pick.id;
+    await sql`
+      INSERT INTO data_edits (table_name, row_id, field_group, old_values, new_values, admin_user_id, note)
+      VALUES ('draft_picks', ${pick.id}, 'source_insert', ${sql.json({})},
+          ${sql.json({ draft_year: 2025, draft_kind: 'pre_draft', player_url: GUARD_URL })},
+          ${admin.id}, 'AFLDB-ISSUE-336 owner-approved correction (fixture)')`;
+  }
+
+  beforeAll(async () => {
+    await importRole.validate();
+    await lockDraftTables(process.env.AFLDB_TEST_DATABASE_URL!);
+    dgSource = await sourceId('draftguru');
+    await cleanup();
+    await seedAuditedFixture();
+    workDir = mkdtempSync(join(tmpdir(), 'afldb-dg348-'));
+  }, 120_000);
+
+  afterAll(async () => {
+    try {
+      await cleanup();
+      if (workDir) rmSync(workDir, { recursive: true, force: true });
+    } finally {
+      await unlockDraftTables();
+    }
+  }, 120_000);
+
+  it('an identity reload that carries the audited pick (NULL pick_number) unchanged is not refused',
+    async () => {
+    const run = guardRun([], ['--dry-run']);
+    const out = run.stdout + run.stderr;
+    expect(run.status, out).toBe(0);
+    expect(out).toContain('DRY RUN');
+    expect(out).toMatch(/reload guard\s*:?\s*clear/);
+  }, 900_000);
+
+  it('refuses an audited pick the snapshot does not carry — normal run and --dry-run — and writes nothing',
+    async () => {
+    expect(pickId).toBeGreaterThan(0);
+    const before = await surface();
+
+    for (const importerArgs of [[], ['--dry-run'], ['--dry-run', '--acknowledge-population-drop']]) {
+      const run = guardRun(['--omit-url', GUARD_URL], importerArgs);
+      const out = run.stdout + run.stderr;
+      expect(run.status, `${importerArgs.join(' ')}\n${out}`).toBe(1);
+      expect(out).toContain('REFUSED');
+      expect(out).toContain('reload guard (AFLDB-ISSUE-348)');
+      expect(out).toContain('1 pick deletion(s) (1 audited)');
+      expect(out).toContain('1 person deletion(s) (1 audited)');
+      // The whole draft surface is unchanged: not even a failed import_batches row (D-2).
+      expect(await surface(), `surface changed after: ${importerArgs.join(' ')}`).toEqual(before);
+    }
+  }, 900_000);
+
+  it('a changed dg_person_id on an audited person is a refused rewrite (D-5)', async () => {
+    const [{ rank }] = await sql<{ rank: number }[]>`
+      SELECT dg_person_id::int AS rank FROM draft_persons WHERE id = ${personId}`;
+    const before = await surface();
+    const renumbered = guardRun(['--incoming-rank', `${GUARD_URL}=${rank - 1}`], ['--dry-run']);
+    const out = renumbered.stdout + renumbered.stderr;
+    expect(renumbered.status, out).toBe(1);
+    expect(out).toContain('1 audited person rewrite(s)');
+    expect(await surface()).toEqual(before);
+  }, 900_000);
+
+  it('a reviewed reconciliation naming the exact keys and digest is the only way past; '
+    + 'REPLACE_CLUB needs an owner ruling', async () => {
+    const donors = await sql<{ id: number; origin: string }[]>`
+      SELECT id::int AS id, original_club_raw AS origin FROM draft_picks
+       WHERE source_id = ${dgSource} AND original_club_raw IS NOT NULL
+         AND position('/' in original_club_raw) = 0 AND id <> ${pickId}
+       ORDER BY id LIMIT 2`;
+    expect(donors.length).toBe(2);
+    const [school, replaced] = donors;
+    const report = join(workDir, 'report.json');
+    const driverArgs = [
+      '--omit-url', GUARD_URL,
+      '--incoming-origin', `${school.id}=${school.origin}/Fixture College`,
+      '--incoming-origin', `${replaced.id}=Replacement Fixture Club`,
+    ];
+    const before = await surface();
+    const refused = guardRun(driverArgs, ['--dry-run', '--guard-report', report]);
+    const out = refused.stdout + refused.stderr;
+    expect(refused.status, out).toBe(1);
+    expect(out).toContain('2 original_club_raw change(s)');
+    expect(out).toContain('1 pick deletion(s) (1 audited)');
+    expect(await surface()).toEqual(before);
+
+    const { effect_digest, effects } = JSON.parse(readFileSync(report, 'utf8')) as {
+      effect_digest: string;
+      effects: {
+        deleted_picks: { id: number; key: unknown; reasons: string[] }[];
+        deleted_persons: { player_url: string }[];
+        origin_changes: { id: number; year: number; before: string; after: string; class: string }[];
+      };
+    };
+    const classes = Object.fromEntries(effects.origin_changes.map((c) => [c.id, c.class]));
+    expect(classes).toEqual({ [school.id]: 'INSERT_SCHOOL', [replaced.id]: 'REPLACE_CLUB' });
+
+    const reconciliation = (rulings: unknown[]) => ({
+      format: 'afldb-draftguru-reconciliation/1',
+      stage_a_label: 'annual-html-20260826',
+      effect_digest,
+      acknowledged_deletions: effects.deleted_picks.map((d) => ({
+        id: d.id, key: d.key, acknowledge_audit_orphans: d.reasons.length > 0 })),
+      acknowledged_person_deletions: effects.deleted_persons.map((d) => ({ player_url: d.player_url })),
+      acknowledged_protected_rewrites: [],
+      acknowledged_protected_person_rewrites: [],
+      origin_review: effects.origin_changes.map((c) => ({
+        id: c.id, year: c.year, db: c.before, csv: c.after, class: c.class })),
+      owner_rulings: rulings,
+    });
+    const withFile = (doc: unknown, name: string) => {
+      const path = join(workDir, name);
+      const body = JSON.stringify(doc);
+      writeFileSync(path, body, 'utf8');
+      return ['--reconciliation', path, '--reconciliation-sha256',
+        createHash('sha256').update(body).digest('hex')];
+    };
+
+    const noRuling = guardRun(driverArgs, ['--dry-run', ...withFile(reconciliation([]), 'no-ruling.json')]);
+    expect(noRuling.status, noRuling.stdout + noRuling.stderr).toBe(1);
+    expect(noRuling.stdout + noRuling.stderr).toContain(`pick ${replaced.id} is REPLACE_CLUB`);
+    expect(await surface()).toEqual(before);
+
+    const ruled = guardRun(driverArgs, ['--dry-run', ...withFile(reconciliation([
+      { id: replaced.id, decision: 'accept_incoming', reference: 'issue-348 integration fixture' },
+    ]), 'ruled.json')]);
+    const ruledOut = ruled.stdout + ruled.stderr;
+    expect(ruled.status, ruledOut).toBe(0);
+    expect(ruledOut).toContain('DRY RUN');
+    // A dry run rolled its data writes back: only the retained failed import_batches row differs.
+    const after = await surface();
+    for (const table of SURFACE_TABLES.filter((t) => t !== 'import_batches')) {
+      expect(after[table], table).toBe(before[table]);
+    }
+  }, 1_800_000);
+
+  it('a column an active override covers is not an effect: the replay restores it (ISSUE-160)',
+    async () => {
+    const [donor] = await sql<{ id: number; url: string; year: number; kind: string; origin: string }[]>`
+      SELECT id::int AS id, player_url AS url, draft_year::int AS year, draft_kind AS kind,
+             original_club_raw AS origin
+        FROM draft_picks
+       WHERE source_id = ${dgSource} AND original_club_raw IS NOT NULL AND draft_kind IS NOT NULL
+         AND id <> ${pickId}
+       ORDER BY id DESC LIMIT 1`;
+    const [admin] = await sql<{ id: number }[]>`SELECT id FROM auth_users WHERE email = ${GUARD_ADMIN_EMAIL}`;
+    const entityKey = `${dgSource}|${donor.url}|${donor.year}|${donor.kind}`;
+    try {
+      // The state saveSourcePickFields leaves: the row carries the owner's value, an active
+      // override and a data_edits audit row. The incoming source still carries its own value.
+      await sql`UPDATE draft_picks SET original_club_raw = 'Owner Fixture Value' WHERE id = ${donor.id}`;
+      await sql`
+        INSERT INTO data_overrides (entity_type, entity_key, field_group, override_values, is_active, admin_user_id)
+        VALUES ('draft_picks', ${entityKey}, 'player_info',
+                ${sql.json({ original_club_raw: 'Owner Fixture Value' })}, true, ${admin.id})`;
+      await sql`
+        INSERT INTO data_edits (table_name, row_id, field_group, old_values, new_values, admin_user_id, note)
+        VALUES ('draft_picks', ${donor.id}, 'player_info',
+                ${sql.json({ original_club_raw: donor.origin })},
+                ${sql.json({ original_club_raw: 'Owner Fixture Value' })}, ${admin.id}, 'issue-348 fixture')`;
+      const run = guardRun(['--incoming-origin', `${donor.id}=${donor.origin}`], ['--dry-run']);
+      const out = run.stdout + run.stderr;
+      expect(run.status, out).toBe(0);
+      expect(out).toMatch(/reload guard\s*:?\s*clear/);
+
+      // Retire the override (ISSUE-160: a retired selection is never resurrected): the audited
+      // row now WOULD be reverted to the source value, which the guard refuses.
+      await sql`UPDATE data_overrides SET is_active = false WHERE entity_key = ${entityKey}`;
+      const retired = guardRun(['--incoming-origin', `${donor.id}=${donor.origin}`], ['--dry-run']);
+      const retiredOut = retired.stdout + retired.stderr;
+      expect(retired.status, retiredOut).toBe(1);
+      expect(retiredOut).toContain('1 audited pick rewrite(s)');
+      expect(retiredOut).toContain('1 original_club_raw change(s)');
+    } finally {
+      await sql`DELETE FROM data_overrides WHERE entity_key = ${entityKey}`;
+      await sql`DELETE FROM data_edits WHERE row_id = ${donor.id} AND note = 'issue-348 fixture'`;
+      await sql`UPDATE draft_picks SET original_club_raw = ${donor.origin} WHERE id = ${donor.id}`;
+    }
+  }, 900_000);
+
+  it('matches a reload key with a NULL component NULL-safely, as reload_keyed does', async () => {
+    const [nullKind] = await sql<{ id: number }[]>`
+      INSERT INTO draft_picks (draft_year, draft_type, draft_kind, pick_number, player_name_raw,
+          link_status_value, candidate_count, source_id, source_record_id, draft_person_id,
+          dg_person_id, player_url)
+      VALUES (2024, 'Pre-Draft', NULL, NULL, 'Guard Fixture', 'unmatched', 0, ${dgSource},
+          'https://www.draftguru.com.au/drafts/2024#348', ${personId},
+          (SELECT dg_person_id FROM draft_persons WHERE id = ${personId}), ${GUARD_URL})
+      RETURNING id::int AS id`;
+    // A plain `=` never matches NULL; the guard must (IS NOT DISTINCT FROM, via common._key_match).
+    const [plain] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM draft_picks e
+       WHERE e.id = ${nullKind.id} AND e.draft_kind = (SELECT NULL::text)`;
+    expect(plain.n).toBe(0);
+    const probe = importRole.spawn(python, [GUARD_DRIVER, '--probe-null-key', GUARD_URL, '2024'],
+      { cwd: root });
+    expect(probe.status, probe.stdout + probe.stderr).toBe(0);
+    const { matched_pick_ids, deleted_pick_count, matched_person_ids } =
+      JSON.parse(probe.stdout.trim().split('\n').pop()!) as {
+        matched_pick_ids: number[]; deleted_pick_count: number; matched_person_ids: number[] };
+    expect(matched_pick_ids).toEqual([nullKind.id]);
+    expect(matched_person_ids).toEqual([personId]);
+    const [{ total }] = await sql<{ total: number }[]>`
+      SELECT count(*)::int AS total FROM draft_picks WHERE source_id = ${dgSource}`;
+    expect(deleted_pick_count).toBe(total - 1);
+  }, 300_000);
 });
