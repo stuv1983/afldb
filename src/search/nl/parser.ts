@@ -82,7 +82,7 @@ import {
   CLUB_SUBJECT_LEADING, CLUB_SUBJECT_CUE, COMPARE_OP_WORDS,
   IN_A_FINAL, IN_A_GRAND_FINAL, IN_ONE_GAME, IN_ONE_SEASON,
   MATCH_TYPE_WORDS, METRIC_HIGHER_IS_WORSE, METRIC_WORDS, NEGATION_WORDS, NUMBER_PLUS_RE,
-  NUMBER_WORDS, OVER_CAREER, POLARITY_AGG_RE,
+  NON_PLAYER_NAME_WORDS, NUMBER_WORDS, OVER_CAREER, POLARITY_AGG_RE,
   PLAYER_NICKNAMES, SINCE_RE, STAT_GAMES_IDIOM_WORDS, STOPWORDS, TEAM_METRIC_WORDS, STREAK_WORDS, PERIOD_SPLIT_WORDS, TOP_N_RE,
   TEAM_MATCH_RESULT_HOW_MUCH_RE, TEAM_MATCH_RESULT_LOPSIDED_RE,
   UNANSWERABLE_TOPICS, YEAR_TO_YEAR_RE, canonicalise, readCount,
@@ -942,6 +942,12 @@ type MarqueeExtraction = {
   text: string;
   predicates: GridAxisState[];
   consumed: string[];
+  /**
+   * Rivalry words REWRITTEN into matchup wording (AFLDB-ISSUE-356 (b)). Unlike
+   * `consumed` they are understood unconditionally -- the rewritten text, not a
+   * predicate, carries their meaning -- so the caller always counts them.
+   */
+  rewritten: string[];
 };
 
 /**
@@ -952,6 +958,23 @@ type MarqueeExtraction = {
  * answering "players with 1+ such games" as though it were the ranking.
  */
 const SUPERLATIVE_GOVERNS = /\b(?:most|fewest|top|highest|lowest|best|worst)\s+$/;
+
+/**
+ * AFLDB-ISSUE-356 (b): a ranking word anywhere in the question, and the two
+ * ways a marquee/rivalry phrase can sit in a ranked question.
+ *
+ * The career predicates ask "has played at least N such matches". That is the
+ * right reading when the phrase says who is in the population ("most goals by
+ * players who played on anzac day", "3 showdowns"). It is the WRONG reading
+ * when the phrase is the setting of the ranked statistic ("most goals in a
+ * showdown", "most goals on anzac day"): the predicate was attached, the
+ * stat was ranked over whole careers, and Wayne Carey's 727 career goals was
+ * returned for a question about one match. The superlative governs only
+ * directly adjacent phrases (SUPERLATIVE_GOVERNS looks 12 characters back),
+ * so "most goals in a showdown" never tripped it.
+ */
+const MARQUEE_RANKING_CUE = /(?<!\bat )\b(?:most|fewest|least|highest|lowest|best|worst|biggest|largest)\b|\btop\b/;
+const MARQUEE_PARTICIPATION_LEAD = /\b(?:played|play|plays|playing|appeared|featured|participated|competed)\b(?:\s+(?:in|on|at|during))?(?:\s+(?:a|an|the|any|one))?\s*$/;
 
 /**
  * "played on anzac day", "3+ showdowns", "two western derbies" -- each
@@ -972,14 +995,17 @@ function extractMarqueeMatches(
 ): MarqueeExtraction {
   const predicates: GridAxisState[] = [];
   const consumed: string[] = [];
+  const rewritten: string[] = [];
   let working = text;
 
-  const entries: [RegExp, (times: number) => GridAxisState | null][] = [
-    ...MATCH_EVENT_WORDS.map(([re, event]): [RegExp, (times: number) => GridAxisState | null] => [
+  type MarqueeEntry = [RegExp, (times: number) => GridAxisState | null, readonly [string, string] | null];
+  const entries: MarqueeEntry[] = [
+    ...MATCH_EVENT_WORDS.map(([re, event]): MarqueeEntry => [
       re,
       (times) => ({ builder: 'match_event_min', params: { event, times: String(times) } }),
+      null,
     ]),
-    ...RIVALRY_WORDS.map(([re, [nameA, nameB]]): [RegExp, (times: number) => GridAxisState | null] => [
+    ...RIVALRY_WORDS.map(([re, [nameA, nameB]]): MarqueeEntry => [
       re,
       (times) => {
         const a = findClub(nameA, clubs);
@@ -994,10 +1020,13 @@ function extractMarqueeMatches(
           },
         };
       },
+      [nameA, nameB],
     ]),
   ];
+  // Read once, on the whole question: the loop below strips as it goes.
+  const rankedQuestion = MARQUEE_RANKING_CUE.test(text);
 
-  for (const [re, build] of entries) {
+  for (const [re, build, rivalry] of entries) {
     const match = re.exec(working);
     if (!match) continue;
     const before = working.slice(Math.max(0, match.index - 12), match.index);
@@ -1023,6 +1052,33 @@ function extractMarqueeMatches(
       }
     }
 
+    // AFLDB-ISSUE-356 (b): in a ranked question a phrase that is not read as
+    // participation ("played in", an explicit count) is the SETTING of the
+    // statistic, not a population filter.
+    const explicitCount = !!digits || (countWord !== null && times > 1);
+    const asSetting = rankedQuestion && !explicitCount
+      && !MARQUEE_PARTICIPATION_LEAD.test(working.slice(Math.max(0, match.index - 40), match.index));
+    if (asSetting) {
+      if (rivalry) {
+        // A club-pair rivalry IS a matchup, and the plan grammar already
+        // answers "most goals in a game richmond v carlton" at match grain
+        // and "most goals in richmond v carlton" as a total across the
+        // pair's meetings. Rewrite the phrase into that wording rather than
+        // add a second ranking path; the singular ("a showdown") is one
+        // game. An unresolvable side leaves the phrase alone to decline.
+        const a = findClub(rivalry[0], clubs);
+        const b = findClub(rivalry[1], clubs);
+        if (!a || !b) continue;
+        const pair = `${a.entity.name} v ${b.entity.name}`.toLowerCase();
+        const singular = !/(?:s|ies)$/.test(match[0]);
+        working = `${working.slice(0, match.index)}${singular ? 'game ' : ''}${pair}${working.slice(match.index + match[0].length)}`;
+        rewritten.push(match[0]);
+      }
+      // A marquee EVENT (Anzac Day...) has no match-level ranking in the
+      // plan grammar: left in the text so the question declines honestly.
+      continue;
+    }
+
     const predicate = build(times);
     if (!predicate) continue;
     predicates.push(predicate);
@@ -1039,7 +1095,7 @@ function extractMarqueeMatches(
     }
   }
 
-  return { text: working, predicates, consumed };
+  return { text: working, predicates, consumed, rewritten };
 }
 
 // ---------------------------------------------------------- career phrases
@@ -2174,6 +2230,7 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // deferred to plan assembly -- see extractMarqueeMatches.
   const marqueeResult = extractMarqueeMatches(text, ctx.clubs);
   text = marqueeResult.text;
+  consumedTokens.push(...marqueeResult.rewritten);
 
   // 2. Venue extraction, BEFORE any club extraction.
   //
@@ -3085,7 +3142,14 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // resolver couldn't confidently pick ONE candidate but the mention
   // plausibly spells a small, real set of them. See NlMatchScope.playerIdIn.
   let ambiguousCandidateIds: number[] | undefined;
-  if (candidateRaw && candidateRaw.length >= 3) {
+  if (candidateRaw && candidateRaw.split(' ').every((t) => NON_PLAYER_NAME_WORDS.has(t))) {
+    // AFLDB-ISSUE-356 (c): a span made only of period/statistic nouns
+    // ("quarter") is never offered to the player resolver, which reads a
+    // whole-word prefix as a plausible surname (Quartermain). It stays an
+    // unresolved mention, so the question declines instead of answering
+    // for two unrelated players at certainty 1.
+    unresolvedPlayerMention = candidateRaw;
+  } else if (candidateRaw && candidateRaw.length >= 3) {
     // `Object.hasOwn`, not a plain index: the key is reader-typed text, so
     // `constructor` and friends come back off the prototype chain as truthy
     // non-strings and get passed on as the name to resolve.

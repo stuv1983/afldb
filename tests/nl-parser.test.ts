@@ -5208,3 +5208,113 @@ describe('AFLDB-ISSUE-219: trailing-apostrophe plural club-alias possessives ("B
     });
   });
 });
+
+// ------------------------------------------------------------------ AFLDB-ISSUE-356
+// Three questions answered as a DIFFERENT question at confidence 1 (full review
+// 2026-11-14). Parser version 68.
+
+describe('AFLDB-ISSUE-356 (a): bare "least" is the minimum', () => {
+  it.each([
+    ['least goals in a season', 'fewest goals in a season'],
+    ['the least goals in a season', 'fewest goals in a season'],
+    ['who kicked the least goals in 2020', 'who kicked the fewest goals in 2020'],
+    ['least disposals in a game', 'fewest disposals in a game'],
+    ['least brownlow votes in a career', 'fewest brownlow votes in a career'],
+  ])('"%s" reads exactly as "%s"', async (least, fewest) => {
+    const a = await plan(least);
+    expect(a.agg).toEqual({ kind: 'min' });
+    expect(a).toEqual(await plan(fewest));
+  });
+
+  it('"at least" stays an operator, never a minimum ranking', async () => {
+    const p = await plan('players with at least 300 games');
+    expect(p.agg).toEqual({ kind: 'list' });
+    expect(p.careerConditions).toEqual([{ kind: 'column', column: 'games', op: 'gte', value: 300 }]);
+    const q = await plan('who has played at least 100 games');
+    expect(q.agg.kind).not.toBe('min');
+    expect(q.careerConditions).toEqual([{ kind: 'column', column: 'games', op: 'gte', value: 100 }]);
+  });
+});
+
+describe('AFLDB-ISSUE-356 (b): a marquee phrase as the setting of a ranked statistic', () => {
+  it('"most goals in a showdown" is one game between the pair, not career totals of players who played in one', async () => {
+    const p = await plan('most goals in a showdown');
+    expect(p.careerPredicates).toEqual([]);
+    expect(p.grain).toBe('player_game');
+    expect(p.mode).toBe('single');
+    expect(p.metric).toBe('goals');
+    expect(p.agg).toEqual({ kind: 'max' });
+    const pair = [p.scope.matchup?.clubA.organizationId, p.scope.matchup?.clubB.organizationId].sort();
+    expect(pair).toEqual([5, 6]);
+    expect(validatePlan(p)).not.toHaveProperty('error');
+  });
+
+  it('plural "most goals in showdowns" is the total across the pair\'s meetings', async () => {
+    const p = await plan('most goals in showdowns');
+    expect(p.careerPredicates).toEqual([]);
+    expect(p.mode).toBe('sum');
+    expect([p.scope.matchup?.clubA.organizationId, p.scope.matchup?.clubB.organizationId].sort()).toEqual([5, 6]);
+  });
+
+  it('a marquee EVENT has no match-level ranking, so the question declines rather than ranking careers', async () => {
+    for (const q of ['most goals on anzac day', 'most goals in an anzac day game', 'who has the most goals on anzac day']) {
+      const result = await parse(q);
+      expect(result.status, q).toBe('none');
+    }
+  });
+
+  it('participation wording keeps the population-filter reading', async () => {
+    const p = await plan('players who played in a showdown');
+    expect(p.careerPredicates).toContainEqual({ builder: 'matchup_played_min', params: { clubA: '5', clubB: '6', times: '1' } });
+    const q = await plan('most goals by players who played in a showdown');
+    expect(q.careerPredicates).toContainEqual({ builder: 'matchup_played_min', params: { clubA: '5', clubB: '6', times: '1' } });
+    expect(q.scope.matchup).toBeUndefined();
+  });
+});
+
+describe('AFLDB-ISSUE-356 (c): period words never resolve as a player-name prefix', () => {
+  const quartermains: NlPlayerCandidate[] = [
+    { ref: { id: 3885, slug: 'don-quartermain', name: 'Don Quartermain' }, score: 300 },
+    { ref: { id: 508, slug: 'allan-quartermain', name: 'Allan Quartermain' }, score: 300 },
+  ];
+
+  function quartermainCtx(calls: string[], resolvePlayerScore = 300): NlParseContext {
+    return {
+      ...ctx,
+      // The real resolver reads "quarter" as a whole-word prefix of "quartermain".
+      resolvePlayer: (name: string) => {
+        calls.push(`resolvePlayer:${name}`);
+        return Promise.resolve(/^quarter/.test(name) ? quartermains.map((c) => ({ ...c, score: resolvePlayerScore })) : []);
+      },
+      resolvePlayerFamily: (tokens: string[]) => {
+        calls.push(`resolvePlayerFamily:${tokens.join(' ')}`);
+        return Promise.resolve(tokens.some((t) => /^quarter/.test(t)) ? quartermains : []);
+      },
+    };
+  }
+
+  it.each([
+    'most goals in a quarter',
+    'most disposals in a quarter',
+  ])('"%s" declines and never consults the player resolver', async (question) => {
+    const calls: string[] = [];
+    const result = await parseNlQuestion(question, quartermainCtx(calls));
+    expect(result.status).toBe('none');
+    expect(result.report.entityResolution).toEqual([]);
+    expect(calls).toEqual([]);
+  });
+
+  it('the guard holds for a prefix resolution committed at accept strength too', async () => {
+    const calls: string[] = [];
+    const result = await parseNlQuestion('most goals in a quarter', quartermainCtx(calls, 1000));
+    expect(result.status).toBe('none');
+    expect(calls).toEqual([]);
+  });
+
+  it('a real surname is untouched: "most goals by quartermain" still resolves the family', async () => {
+    const calls: string[] = [];
+    const result = await parseNlQuestion('most goals by quartermain', quartermainCtx(calls));
+    expect(result.status).toBe('plan');
+    expect(calls.length).toBeGreaterThan(0);
+  });
+});

@@ -12,6 +12,7 @@ import {
   PARSER_VERSION,
   validatePlan,
   type NlDeclineReason,
+  type NlDescribeContext,
   type NlParseReport,
   type NlQueryPlan,
 } from '@/search/nl/plan';
@@ -95,6 +96,9 @@ export async function answerNlQuestion(
   try {
     const ctx = await buildNlParseContext();
     const parsed = await parseNlQuestion(question, ctx);
+    const describeContext: NlDescribeContext = {
+      clubNames: new Map(ctx.clubs.map((club) => [club.organizationId, club.name])),
+    };
 
     if (parsed.status === 'unanswerable') {
       log({
@@ -159,7 +163,7 @@ export async function answerNlQuestion(
     const payload = await executePlan(validated);
     const resultCount = payloadTotal(payload);
     if (resultCount === 0) {
-      const answer = buildAnswer(validated, payload, parsed.report.notes, clientRef);
+      const answer = buildAnswer(validated, payload, parsed.report.notes, clientRef, describeContext);
       log({
         outcome: 'no_results', failureReason: 'empty_result',
         grain: validated.grain, metric: validated.metric, plan: validated,
@@ -170,7 +174,7 @@ export async function answerNlQuestion(
       return answer;
     }
 
-    const answer = buildAnswer(validated, payload, parsed.report.notes, clientRef);
+    const answer = buildAnswer(validated, payload, parsed.report.notes, clientRef, describeContext);
     log({
       outcome: (answer.caveats.length > 0 || answer.coverageNote) ? 'answered_caveat' : 'answered',
       grain: validated.grain, metric: validated.metric, plan: validated,
@@ -213,6 +217,7 @@ function buildAnswer(
   payload: NlAnswerPayload,
   notes: string[],
   clientRef: string,
+  describeContext: NlDescribeContext,
 ): NlAnswer {
   // One source of truth for what is recorded and when. nlCoverageFor
   // applies the rule's own grain scope, so a career or season Brownlow
@@ -234,7 +239,7 @@ function buildAnswer(
     // filtered set, counted at answer time rather than hard-coded.
     caveats: [...notes, ...answerCaveats(plan, payload)],
     coverageNote,
-    explain: describePlan(plan),
+    explain: describePlan(plan, describeContext),
     planToken: encodePlanToken(plan),
     clientRef,
     payload,

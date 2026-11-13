@@ -1502,3 +1502,37 @@ describe('validatePlan: unsupported career metrics (AFLDB-ISSUE-256)', () => {
     }
   });
 });
+
+// ------------------- marquee/rivalry explain lines (AFLDB-ISSUE-356 (b))
+
+describe('describePlan: marquee and rivalry predicates fill their label and list their parameters', () => {
+  const listPlan = { metric: null, agg: { kind: 'list' } } as const;
+  const showdown = { builder: 'matchup_played_min', params: { clubA: '5', clubB: '6', times: '3' } };
+  const anzac = { builder: 'match_event_min', params: { event: 'Anzac Day', times: '1' } };
+
+  it('fills the X+ count and names both clubs when the names are supplied', () => {
+    const lines = describePlan(
+      basePlan({ ...listPlan, careerPredicates: [showdown] }),
+      { clubNames: new Map([[5, 'Adelaide'], [6, 'Port Adelaide']]) },
+    );
+    expect(lines).toContain('Condition: 3+ matches between two clubs (Club A: Adelaide; Club B: Port Adelaide).');
+    expect(lines.join(' ')).not.toContain('X+');
+  });
+
+  it('falls back to the raw organisation id when no name is known, never to an empty parameter', () => {
+    const lines = describePlan(basePlan({ ...listPlan, careerPredicates: [showdown] }));
+    expect(lines).toContain('Condition: 3+ matches between two clubs (Club A: 5; Club B: 6).');
+  });
+
+  it('renders the marquee event and its count', () => {
+    const lines = describePlan(basePlan({ ...listPlan, careerPredicates: [anzac] }));
+    expect(lines).toContain('Condition: 1+ marquee matches (Marquee match: Anzac Day).');
+  });
+
+  it('leaves every other builder label-only (the pinned Phase E decision)', () => {
+    const lines = describePlan(basePlan({
+      ...listPlan, careerPredicates: [{ builder: 'first_kick_goal_consecutive_min', params: { kicks: '3' } }],
+    }));
+    expect(lines).toContain('Condition: Goal with each of their first X kicks.');
+  });
+});

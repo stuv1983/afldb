@@ -248,10 +248,15 @@ export const AGG_WORDS: [RegExp, AggWord][] = [
   // unconditional word -> max mapping, not a team-match-only special case
   // -- exactly the discipline the other words in this list already follow.
   [/\b(?:highest|best|biggest|largest|widest|greatest|longest|maximum|record|holder|holders|leader|leaders|leading|led|heaviest)\b|(?<!\bat )\bmost\b/, 'max'],
-  // Bare "least" is deliberately excluded: "at least" (an operator
-  // phrase, handled by COMPARE_OP_WORDS) is far more common in real
-  // questions than "least" meaning minimum, and the two must not compete.
-  [/\b(?:fewest|lowest|smallest|minimum|worst)\b/, 'min'],
+  // AFLDB-ISSUE-356 (a): bare "least" IS the minimum ("least goals in a
+  // season"). It used to be excluded outright and listed as an ignored
+  // connective, so the superlative vanished and the question answered its
+  // exact opposite ("least goals in a season" -> Pratt and Hudson, 150) at
+  // confidence 1. Only the operator phrase "at least" (COMPARE_OP_WORDS)
+  // must stay out, so it is excluded by lookbehind exactly as "at most" is
+  // above; extractAggregation strips what it matches, so a missed "at least"
+  // here would hand extractCareerConditions a number with no operator.
+  [/\b(?:fewest|lowest|smallest|minimum|worst)\b|(?<!\bat )\bleast\b/, 'min'],
   [/\bhow many\b/, 'count'],
   [/\b(?:players?|teams?|clubs?) with\b/, 'list'],
   [/\bwho (?:has|have|played|kicked|holds?)\b/, 'max'],
@@ -1155,6 +1160,23 @@ export const STOPWORDS = new Set([
   // the token ratio nor be swallowed into a player-name span. None is ever a
   // fragment of an AFL player, club or venue name.
   'i', 'me', 'my', 'you', 'your', 'us', 'we',
+]);
+
+/**
+ * AFLDB-ISSUE-356 (c): period and statistic NOUNS that name part of a
+ * question's structure, never a person. A leftover span made only of these
+ * words is not offered to the player resolver at all: the resolver reads a
+ * whole-word PREFIX as a plausible surname, so "quarter" resolved to Allan and
+ * Don Quartermain at certainty 1 and "most goals in a quarter" answered
+ * "Quartermain — 0 goals (tied)". Only a span made ENTIRELY of these words is
+ * refused: "mark williams" (a real given name) still reaches the resolver, and
+ * a vocabulary word that an extractor consumed never reaches this stage.
+ */
+export const NON_PLAYER_NAME_WORDS: ReadonlySet<string> = new Set([
+  'quarter', 'quarters', 'half', 'halves', 'term', 'terms', 'period', 'periods',
+  'game', 'games', 'match', 'matches', 'season', 'seasons', 'round', 'rounds',
+  'goal', 'goals', 'behind', 'behinds', 'kick', 'kicks', 'handball', 'handballs',
+  'disposal', 'disposals', 'mark', 'marks', 'tackle', 'tackles', 'hitout', 'hitouts',
 ]);
 
 /**

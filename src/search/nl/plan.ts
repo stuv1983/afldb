@@ -754,7 +754,21 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
 // invisible. The same gap hid a real-user wrong answer: "most goals in 1980
 // to 1989" answered 1980 alone with 1989 dropped. YEAR_TO_YEAR_RE now reads
 // it as the inclusive range BETWEEN_RE already gives "between X and Y".
-export const PARSER_VERSION = 67;
+// v68 -- AFLDB-ISSUE-356 (full review 2026-11-14), three questions answered
+// as a different question at confidence 1. (a) Bare "least" is now the `min`
+// aggregation (vocab.ts AGG_WORDS, "at least" excluded by lookbehind): "least
+// goals in a season" answered the MAXIMUM. (b) A marquee/rivalry phrase in a
+// RANKED question that is not read as participation is the setting of the
+// statistic, not a population filter: a club-pair rivalry ("most goals in a
+// showdown") is rewritten into the existing matchup wording (match grain for
+// the singular, a total across the meetings for the plural), and a marquee
+// event ("most goals on anzac day"), which the plan grammar cannot rank
+// within, declines. "played in"/an explicit count keeps the predicate reading.
+// describePlan now fills the "X+" label and lists the rivalry/marquee
+// parameters. (c) A leftover span made only of period/statistic nouns
+// ("quarter") never reaches the player resolver (NON_PLAYER_NAME_WORDS), which
+// had read it as a prefix of Quartermain.
+export const PARSER_VERSION = 68;
 
 // ------------------------------------------------------------------ grain
 
@@ -1594,6 +1608,12 @@ export const NL_LIMITS = {
   maxTiedRows: 25,
   /** Display cap for a top-N or list answer, ties at the boundary included. */
   maxListRows: 100,
+  /**
+   * Display cap for the "qualifying matches" drill-down page, which lists every
+   * match behind one club's grouped count. The unbounded list ran to 2,721 rows
+   * for a single club (AFLDB-ISSUE-359); the page discloses the true total.
+   */
+  maxDrilldownRows: 500,
   minTopN: 1,
   maxTopN: 50,
   maxCareerConditions: 8,
@@ -2712,7 +2732,44 @@ function metricLabelOf(grain: NlGrain, metric: string | null): string | null {
  * this calculated?" panel. Deliberately mechanical rather than a natural
  * sentence -- it is a trace of what was searched, not marketing copy.
  */
-export function describePlan(plan: NlQueryPlan): string[] {
+export type NlDescribeContext = {
+  /** organization id -> display name, so a rivalry predicate names its clubs rather than their ids. */
+  clubNames?: ReadonlyMap<number, string>;
+};
+
+/**
+ * AFLDB-ISSUE-356 (b): the marquee/rivalry builders' labels carry a bare "X+"
+ * ("X+ matches between two clubs") and their parameters (the event, the two
+ * clubs, the count) never reached the explanation. The count fills the label
+ * when it is unambiguous (one "X+", one integer parameter); every other
+ * parameter is listed. Limited to this builder group on purpose: other
+ * predicates stay label-only (the pinned Phase E decision in
+ * tests/nl-plan.test.ts), and a null return means "use the plain label".
+ */
+function describeMarqueeAxis(axis: GridAxisState, context: NlDescribeContext): string | null {
+  const def = GRID_BUILDERS[axis.builder];
+  if (!def || def.group !== 'Rivalries & marquee matches' || def.params.length === 0) return null;
+  let label = def.label;
+  const filled = new Set<string>();
+  const integers = def.params.filter((p) => p.kind === 'integer');
+  if (integers.length === 1 && (label.match(/\bX\+/g) ?? []).length === 1 && !/\bY\b/.test(label)) {
+    const value = axis.params[integers[0].key];
+    if (value !== undefined) {
+      label = label.replace(/\bX\+/, `${value}+`);
+      filled.add(integers[0].key);
+    }
+  }
+  const rest = def.params
+    .filter((p) => !filled.has(p.key) && axis.params[p.key] !== undefined)
+    .map((p) => {
+      const raw = axis.params[p.key];
+      const name = p.kind === 'club' ? context.clubNames?.get(Number(raw)) : undefined;
+      return `${p.label}: ${name ?? raw}`;
+    });
+  return rest.length > 0 ? `${label} (${rest.join('; ')})` : label;
+}
+
+export function describePlan(plan: NlQueryPlan, context: NlDescribeContext = {}): string[] {
   const lines: string[] = [];
 
   const metricLabel = metricLabelOf(plan.grain, plan.metric);
@@ -2786,7 +2843,7 @@ export function describePlan(plan: NlQueryPlan): string[] {
     }
   }
   for (const axis of plan.careerPredicates) {
-    lines.push(`Condition: ${GRID_BUILDERS[axis.builder]?.label ?? axis.builder}.`);
+    lines.push(`Condition: ${describeMarqueeAxis(axis, context) ?? GRID_BUILDERS[axis.builder]?.label ?? axis.builder}.`);
   }
   for (const cond of plan.clubSeasonConditions) {
     lines.push(`Condition: ${CLUB_SEASON_CONDITION_LABEL[cond.kind]}.`);
