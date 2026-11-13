@@ -13,10 +13,12 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { resolveTestPython } from './python-interpreter';
+
 import { HEIGHT_ADJUDICATION_COLUMNS, adjudicationStaleness, loadHeightAdjudications } from './height-adjudications';
 
 const repositoryRoot = join(__dirname, '..');
-const python = process.env.PYTHON ?? (process.platform === 'win32' ? 'python' : 'python3');
+const python = resolveTestPython(repositoryRoot); // ISSUE-363 TST-6: AFLDB_PYTHON, then PYTHON, .venv, system
 
 type Result = { status: string; url: string | null; height: number | null; candidates: string[]; jumper: boolean | null };
 

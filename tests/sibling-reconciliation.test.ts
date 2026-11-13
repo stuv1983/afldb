@@ -28,10 +28,12 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { resolveTestPython } from './python-interpreter';
+
 import { parseCsvRows } from '../tools/db/rebuild-test';
 
 const repositoryRoot = join(__dirname, '..');
-const python = process.env.PYTHON ?? (process.platform === 'win32' ? 'python' : 'python3');
+const python = resolveTestPython(repositoryRoot); // ISSUE-363 TST-6: AFLDB_PYTHON, then PYTHON, .venv, system
 
 type Cand = { player_id: number; profile: string; display_name: string; debut_season: number | null; games: number | null; birth_year: number | null; club_games: Record<string, number> };
 type Member = { id: string; name: string; url?: string; clubs?: string; legacy_status?: string; legacy_id?: string; family?: string };

@@ -24,8 +24,10 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { resolveTestPython } from './python-interpreter';
+
 const repositoryRoot = join(__dirname, '..');
-const python = process.env.PYTHON ?? (process.platform === 'win32' ? 'python' : 'python3');
+const python = resolveTestPython(repositoryRoot); // ISSUE-363 TST-6: AFLDB_PYTHON, then PYTHON, .venv, system
 
 type Cand = { player_id: number; profile: string; display_name: string; given_name?: string | null; surname?: string | null; debut_season: number | null; games: number | null; club_games: Record<string, number> };
 type Raw = { line?: number; year: number; drafted_player: string; club: string; father: string; selection?: string; games?: string; father_games?: string };

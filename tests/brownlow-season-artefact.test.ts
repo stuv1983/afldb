@@ -21,6 +21,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
+import { resolveTestPython } from './python-interpreter';
 import { acceptedBrownlowRowsSql, brownlowAcceptedSql, brownlowStatusSql } from '@/db/queries/brownlow-readiness';
 
 const root = process.cwd();
@@ -29,7 +30,7 @@ const builder = resolve(root, 'tools/migration/build_brownlow_season_artefact.py
 const artefactCsv = resolve(root, 'data/brownlow/season-votes.csv');
 const manifestJson = resolve(root, 'data/brownlow/season-votes.manifest.json');
 const identityCsv = resolve(root, 'data/brownlow/player-identity.csv');
-const python = process.env.PYTHON ?? (process.platform === 'win32' ? 'python' : 'python3');
+const python = resolveTestPython(root); // ISSUE-363 TST-6: AFLDB_PYTHON, then PYTHON, .venv, system
 
 describe('Brownlow readiness is an explicit decision, independent of football completion', () => {
   const cases = [

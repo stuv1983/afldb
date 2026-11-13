@@ -24,8 +24,10 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { resolveTestPython } from './python-interpreter';
+
 const repositoryRoot = join(__dirname, '..');
-const python = process.env.PYTHON ?? (process.platform === 'win32' ? 'python' : 'python3');
+const python = resolveTestPython(repositoryRoot); // ISSUE-363 TST-6: AFLDB_PYTHON, then PYTHON, .venv, system
 
 type CoachRow = {
   path: string; nameKey: string; display: string; given: string | null; surname: string | null; dob: string | null;
