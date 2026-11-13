@@ -8,10 +8,20 @@
  */
 import './guard';
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import postgres from 'postgres';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { classifyC7, readC7Facts } from '../../src/lib/acquisition/afl-api-c7-observation';
+import { missingAflApiSeasonEnumeration } from '../../src/lib/acquisition/afl-api-season-enumeration';
+import { runSettleAflApi } from '../../src/lib/acquisition/settle-afl-api';
+import { parseSourceFamilyRegistry } from '../../src/lib/acquisition/source-families';
+import {
+  changesOf, classifyOpening, expectedOpening, readOpeningFacts, surfaceDigest, transitionProblems, writeOpening,
+  type OpeningExpectation,
+} from '../../src/lib/rollover/season-opening';
 
 const SEASON = 2098;
 const url = process.env.AFLDB_TEST_DATABASE_URL!;
@@ -157,5 +167,134 @@ describe('readC7Facts against PostgreSQL (rolled back)', () => {
       throw new Rollback();
     }).catch((error: unknown) => { if (!(error instanceof Rollback)) throw error; });
     expect(seen!.canonical.matches).toBe(1);
+  });
+});
+
+/*
+ * AFLDB-ISSUE-350 / ISSUE-332 gate: the season-opening reader and writer against real PostgreSQL, all inside ONE rolled-back
+ * transaction. Two oracles, chosen by what the database holds (a stated property of the oracle, never a literal count):
+ *   - clubs present (a rebuilt `afldb_test`, or a production snapshot): the REAL tracked contract. A rebuilt database already
+ *     has the season (state OPEN, which is also the proof that the tracked register and a fresh load agree); the snapshot is
+ *     production's pre-opening state. Either way the test first restores production's pre-opening state INSIDE the transaction
+ *     (open identities back to year - 1, season row removed) and then runs the real write.
+ *   - schema-only (no clubs): a synthetic register of three identities and a synthetic previous season.
+ */
+describe('season opening (AFLDB-ISSUE-350) against PostgreSQL (rolled back)', () => {
+  const root = process.cwd();
+  const seasonsDoc = JSON.parse(readFileSync(join(root, 'data/reference/seasons.json'), 'utf8'));
+  const clubsDoc = JSON.parse(readFileSync(join(root, 'data/reference/clubs.json'), 'utf8'));
+
+  /** The synthetic world of a schema-only database: three open identities, one previous season, one next. */
+  async function syntheticWorld(tx: postgres.TransactionSql) {
+    await tx`INSERT INTO seasons (year, league, status) VALUES (2096, 'AFL', 'complete'::season_status)`;
+    await tx`SET CONSTRAINTS clubs_current_identity_id_fkey DEFERRED`;
+    const identities: Record<string, unknown>[] = [];
+    for (let i = 0; i < 3; i += 1) {
+      const slug = `s350-club-${i}`;
+      const [org] = await tx<{ id: number }[]>`INSERT INTO club_organizations (name, slug, first_season, last_season) VALUES (${`S350 org ${i}`}, ${`${slug}-org`}, 2000, 2096) RETURNING id`;
+      const [club] = await tx<{ id: number }[]>`
+        INSERT INTO clubs (slug, name, short_name, abbreviation, current_identity_id, legacy_club_hist, organization_id, succession, is_current_afl_club, first_season, last_season)
+        VALUES (${slug}, ${`S350 Club ${i}`}, ${`S${i}`}, ${`S3${i}`}, -1, ${slug}, ${org.id}, 'current', true, ${2096}, ${2096}) RETURNING id`;
+      await tx`UPDATE clubs SET current_identity_id = ${club.id} WHERE id = ${club.id}`;
+      identities.push({ hist: slug, slug, succession: 'current', is_current_afl_club: true, first_season: 2096, last_season: null });
+    }
+    return {
+      seasonsDoc: { first_season: 1897, last_season: 2097, league_eras: [{ league: 'AFL', first_season: 1990, last_season: null }], in_progress_seasons: [2097], season_notes: { '2097': 'synthetic' } },
+      clubsDoc: { identities },
+    };
+  }
+
+  /** Real data: put production's pre-opening state back inside the transaction. */
+  async function productionLike(tx: postgres.TransactionSql, exp: OpeningExpectation) {
+    const [{ m }] = await tx<{ m: number }[]>`SELECT max(year)::int AS m FROM seasons`;
+    expect(m, `seasons must end at ${exp.year} (open) or ${exp.previousYear} (production-like); a fixture season above is left over from another run`).toBeGreaterThanOrEqual(exp.previousYear);
+    expect([exp.previousYear, exp.year]).toContain(m);
+    if (m === exp.year) {
+      await tx`UPDATE clubs SET last_season = ${exp.previousYear}::smallint WHERE is_current_afl_club AND last_season = ${exp.year}::smallint`;
+      await tx`UPDATE club_organizations SET last_season = ${exp.previousYear}::smallint WHERE last_season = ${exp.year}::smallint`;
+      // fails loudly if anything already depends on the season row
+      await tx`DELETE FROM seasons WHERE year = ${exp.year}::smallint`;
+    }
+  }
+
+  async function rolledBack(work: (tx: postgres.TransactionSql) => Promise<void>): Promise<void> {
+    await db.begin(async (tx) => { await work(tx); throw new Rollback(); })
+      .catch((error: unknown) => { if (!(error instanceof Rollback)) throw error; });
+  }
+
+  it('production-like state classifies NOT_OPEN, the write opens it, the proof holds, a second write is a no-op and a divergent row is refused', async () => {
+    let ran = false;
+    await rolledBack(async (tx) => {
+      const [{ n }] = await tx<{ n: number }[]>`SELECT count(*)::int AS n FROM clubs`;
+      const world = n === 0 ? await syntheticWorld(tx) : { seasonsDoc, clubsDoc };
+      const exp = expectedOpening(world.seasonsDoc, world.clubsDoc);
+      if (n > 0) await productionLike(tx, exp);
+
+      const before = await readOpeningFacts(tx, exp.year);
+      const verdict = classifyOpening(exp, before);
+      expect(verdict.problems).toEqual([]);
+      expect(verdict.state).toBe('NOT_OPEN');
+      const changes = changesOf(verdict);
+      expect(changes.insertSeason).toBe(true);
+      expect(changes.clubIds).toHaveLength(exp.open.length);
+      expect(before.identityForYear.every((r) => r.club === null)).toBe(true); // the defect: no club resolves for the season
+
+      await writeOpening(tx, exp, changes);
+      const after = await readOpeningFacts(tx, exp.year);
+      expect(transitionProblems(exp, changes, before, after)).toEqual([]);
+      expect(classifyOpening(exp, after).state).toBe('OPEN');
+      expect(after.identityForYear.filter((r) => r.club !== null)).toHaveLength(exp.open.length);
+
+      // idempotent: the open state has nothing left to change, and writing nothing touches nothing
+      const again = changesOf(classifyOpening(exp, after));
+      expect(again).toEqual({ insertSeason: false, clubIds: [], orgIds: [] });
+      await writeOpening(tx, exp, again);
+      expect(surfaceDigest(await readOpeningFacts(tx, exp.year))).toBe(surfaceDigest(after));
+
+      // present and different is a refusal, never an adoption
+      await tx`UPDATE seasons SET status = 'complete'::season_status WHERE year = ${exp.year}::smallint`;
+      const refused = classifyOpening(exp, await readOpeningFacts(tx, exp.year));
+      expect(refused.state).toBe('REFUSED');
+      expect(refused.problems.join('\n')).toMatch(/differs from the tracked contract/);
+      ran = true;
+    });
+    expect(ran).toBe(true);
+  });
+
+  it('a count mismatch between the plan and the live rows throws, so the transaction cannot commit a wrong write', async () => {
+    await rolledBack(async (tx) => {
+      const [{ n }] = await tx<{ n: number }[]>`SELECT count(*)::int AS n FROM clubs`;
+      const world = n === 0 ? await syntheticWorld(tx) : { seasonsDoc, clubsDoc };
+      const exp = expectedOpening(world.seasonsDoc, world.clubsDoc);
+      if (n > 0) await productionLike(tx, exp);
+      const verdict = classifyOpening(exp, await readOpeningFacts(tx, exp.year));
+      const changes = changesOf(verdict);
+      // a plan naming a club that no longer holds year - 1 is refused by the bounded UPDATE itself
+      await tx`INSERT INTO seasons (year, league, status, notes) VALUES (${exp.year}::smallint, ${exp.league}, 'in_progress'::season_status, ${exp.notes})`;
+      await tx`UPDATE clubs SET last_season = ${exp.year}::smallint WHERE id = ${changes.clubIds[0]}`;
+      await expect(writeOpening(tx, exp, { ...changes, insertSeason: false })).rejects.toThrow(/updated \d+ clubs rows/);
+    });
+  });
+
+  it('the settle HALT precondition is the same row the operation creates: season absent before, present after', async () => {
+    await rolledBack(async (tx) => {
+      const [{ n }] = await tx<{ n: number }[]>`SELECT count(*)::int AS n FROM clubs`;
+      const world = n === 0 ? await syntheticWorld(tx) : { seasonsDoc, clubsDoc };
+      const exp = expectedOpening(world.seasonsDoc, world.clubsDoc);
+      if (n > 0) await productionLike(tx, exp);
+      const seasonRow = () => tx<{ year: number }[]>`SELECT year FROM seasons WHERE year = ${exp.year}`;
+      expect(await seasonRow()).toHaveLength(0);
+      // The real settle, run inside this rolled-back transaction (begin runs the callback on `tx`), halts by name before any write.
+      const registry = parseSourceFamilyRegistry(JSON.parse(readFileSync(join(root, 'data/reference/source-families.json'), 'utf8')));
+      const halted = await runSettleAflApi({ begin: async (callback: (t: postgres.TransactionSql) => unknown) => callback(tx) } as unknown as postgres.Sql, {
+        registry, apply: true, autoApply: true, requireCompleteSource: true, inProgressSeasons: [exp.year],
+        bundle: { snapshotLabel: 'issue350-halt', season: exp.year, bundleContractVersion: 2, units: [{ bundle: {} as never, settleRecords: [] }], buildFailures: [], seasonFeed: missingAflApiSeasonEnumeration(exp.year, 'CD_S350') },
+      });
+      expect(halted.halt?.reason).toBe('season_row_missing');
+      expect(halted.applied).toBe(false);
+      expect(halted.batchId).toBeNull();
+      await writeOpening(tx, exp, changesOf(classifyOpening(exp, await readOpeningFacts(tx, exp.year))));
+      expect(await seasonRow()).toHaveLength(1);
+    });
   });
 });

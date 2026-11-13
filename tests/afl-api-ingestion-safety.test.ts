@@ -626,6 +626,8 @@ type BatchStubOptions = {
   closedRows?: number;
   /** Makes the finalising UPDATE itself fail. */
   closeError?: Error;
+  /** AFLDB-ISSUE-350: the season existence read reports no `seasons` row for the bundle's season. */
+  seasonRowMissing?: boolean;
 };
 
 /**
@@ -648,6 +650,7 @@ function makeBatchLifecycleSql(options: BatchStubOptions = {}) {
       if (text.startsWith('SELECT pg_advisory_xact_lock_shared(')) return [];
       if (text === 'SELECT id, key FROM sources') return [{ id: 1, key: 'afl_api' }];
       if (text === "SELECT id FROM sources WHERE key = 'afl_api'") return [{ id: 1 }];
+      if (text === 'SELECT year FROM seasons WHERE year = ?') return options.seasonRowMissing ? [] : [{ year: values[0] }];
       if (text.startsWith('INSERT INTO import_batches')) return [{ id: '42' }];
       if (text.startsWith('SELECT count(*)::int AS n FROM import_rejections')) {
         return [{ n: options.rejectionRows ?? 0 }];
@@ -784,6 +787,38 @@ describe('AFLDB-ISSUE-244 F008 — runSettleAflApi() batch lifecycle', () => {
     await expect(runSettleAflApi(dbError.sql, { ...base, bundle: emptyBundle(), apply: true }))
       .rejects.toThrow(/permission denied/);
     expect(dbError.state.outcome).toBe('rolled_back');
+  });
+});
+
+// AFLDB-ISSUE-350: the settle never creates a `seasons` row. With matches to write and no row it stops with a named
+// HALT before the batch row and every write (instead of 23503 afl_api_match_season_fkey after the unit loop began);
+// a run with no units (every off-season night) never reads the season at all.
+describe('AFLDB-ISSUE-350 — runSettleAflApi() with a season that has no seasons row', () => {
+  const base = { registry: SOURCE_FAMILIES, autoApply: true, inProgressSeasons: [2026] } as const;
+  const withUnits = (): AflApiSettleBundle => ({ ...emptyBundle(), units: [{ bundle: {} as never, settleRecords: [] }] });
+
+  it('HALTs season_row_missing before the batch row, names the remedy and commits nothing', async () => {
+    const { sql, state, statements } = makeBatchLifecycleSql({ seasonRowMissing: true });
+    const result = await runSettleAflApi(sql, { ...base, bundle: withUnits(), apply: true, requireCompleteSource: true });
+
+    expect(result.halt?.reason).toBe('season_row_missing');
+    expect(result.halt?.detail).toMatchObject({ season: 2026, units: 1 });
+    expect(String(result.halt?.detail.remedy)).toMatch(/issue350-season-open-production/);
+    expect(result.applied).toBe(false);
+    expect(result.batchId).toBeNull();
+    expect(state.outcome).toBe('rolled_back');
+    expect(statements.some((s) => s.text.startsWith('INSERT INTO import_batches'))).toBe(false);
+    expect(statements.filter((s) => s.text === 'SELECT year FROM seasons WHERE year = ?')).toHaveLength(1);
+  });
+
+  it('a run with no units never reads the season: the off-season nightly is untouched', async () => {
+    const { sql, state, statements } = makeBatchLifecycleSql({ seasonRowMissing: true });
+    const result = await runSettleAflApi(sql, { ...base, bundle: emptyBundle(), apply: true });
+
+    expect(result.halt).toBeNull();
+    expect(result.applied).toBe(true);
+    expect(state.outcome).toBe('committed');
+    expect(statements.some((s) => s.text.includes('FROM seasons'))).toBe(false);
   });
 });
 

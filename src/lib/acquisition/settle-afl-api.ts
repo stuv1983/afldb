@@ -341,6 +341,9 @@ function emptyAflApiCounters(): AflApiSettleCounters {
  * HALT (§14) — a run-level stop, never a per-record refusal.
  * ------------------------------------------------------------------ */
 
+/** AFLDB-ISSUE-350: a run with matches to write whose season has no `seasons` row. */
+export const AFL_API_SEASON_ROW_MISSING_HALT_REASON = 'season_row_missing';
+
 export class AflApiSettleHalt extends Error {
   constructor(
     public readonly reason: string,
@@ -1997,6 +2000,21 @@ export async function runSettleAflApi(
       // on a timeout the run fails here with nothing written.
       await acquireSettlePromotionGate(tx);
       const refs = await loadRefs(tx, refusalEvidence);
+      // AFLDB-ISSUE-350: the settle never creates a `seasons` row (the audited season-opening operation does).
+      // When this run has matches to write and the season row is absent, stop here with a named HALT instead of
+      // the opaque `23503 afl_api_match_season_fkey` after the unit loop has begun. A run with no units
+      // (every off-season night) is untouched: it never needed the row.
+      if (bundle.units.length > 0) {
+        const [seasonRow] = await tx<{ year: number }[]>`SELECT year FROM seasons WHERE year = ${bundle.season}`;
+        if (!seasonRow) {
+          throw new AflApiSettleHalt(AFL_API_SEASON_ROW_MISSING_HALT_REASON, {
+            season: bundle.season,
+            units: bundle.units.length,
+            remedy: 'the season row does not exist; the settle never creates it. Run the audited season-opening operation '
+              + '(tools/v2/issue350-season-open-production.ts, AFLDB-ISSUE-350) and re-run; nothing was written.',
+          });
+        }
+      }
       const [batch] = await tx<{ id: string }[]>`
         INSERT INTO import_batches (source_id, tool, target_table, records_read, notes)
         VALUES (${refs.sourceId}, ${SETTLE_BATCH_TOOL}, 'staging.source_record_versions',

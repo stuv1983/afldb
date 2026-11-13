@@ -99,6 +99,17 @@ import {
   validateActivationStates, validateProposedRebuildState, type ProposedDocuments,
 } from '../tools/db/rollover-proposed-state';
 import { predecessorText } from './rollover-predecessor-fixture';
+import {
+  OpeningRefused,
+  changesOf,
+  classifyOpening,
+  expectedOpening,
+  stable,
+  surfaceDigest,
+  transitionProblems,
+  type OpeningFacts,
+} from '../src/lib/rollover/season-opening';
+import * as SeasonOpenTool from '../tools/v2/issue350-season-open-production';
 
 const root = process.cwd();
 
@@ -4115,3 +4126,191 @@ function mapIo(fs: Map<string, string>): FileIo {
     remove: (p) => { fs.delete(p); },
   };
 }
+
+/* ------------------------------------------------------------------------------------------------------------------ *
+ * AFLDB-ISSUE-350 — opening the in-progress season in a LIVE database (src/lib/rollover/season-opening.ts and
+ * tools/v2/issue350-season-open-production.ts). DB-free: the contract is the REAL tracked seasons.json / clubs.json,
+ * the "live" facts are built from the real clubs.json so a register change that this operation would mishandle fails here.
+ * The DB-backed proof is tests/integration/season-opening.test.ts (a snapshot copy is production-like; a rebuilt DB is open).
+ * ------------------------------------------------------------------------------------------------------------------ */
+describe('AFLDB-ISSUE-350 season opening: the contract and the classifier', () => {
+  const seasonsDoc = JSON.parse(repoText('data/reference/seasons.json')) as Record<string, any>;
+  const clubsDoc = JSON.parse(repoText('data/reference/clubs.json')) as { identities: Record<string, any>[] };
+  const exp = expectedOpening(seasonsDoc, clubsDoc);
+  const Y = exp.year;
+
+  /** Live facts shaped like a database: 'rebuilt' = identities end at Y and the row exists; 'production' = Y - 1, no row. */
+  function facts(mode: 'production' | 'rebuilt', patch: (f: OpeningFacts) => void = () => undefined): OpeningFacts {
+    const ids = new Map(clubsDoc.identities.map((c, i) => [c.hist as string, i + 1]));
+    const clubs: Record<string, any>[] = clubsDoc.identities.map((c) => ({
+      id: ids.get(c.hist)!, slug: c.slug, legacy_club_hist: c.hist, succession: c.succession, is_current_afl_club: c.is_current_afl_club,
+      first_season: c.first_season, last_season: c.last_season === null ? (mode === 'rebuilt' ? Y : Y - 1) : c.last_season,
+      current_identity_id: ids.get(c.successor_hist ?? c.hist)!, organization_id: ids.get(c.successor_hist ?? c.hist)!,
+    }));
+    const orgIds = [...new Set(clubs.map((c) => c.organization_id as number))].sort((a, b) => a - b);
+    const orgs: Record<string, any>[] = orgIds.map((id) => ({
+      id, last_season: clubs.filter((c) => c.organization_id === id).reduce((m, c) => Math.max(m, c.last_season as number), 0),
+    }));
+    const seasons: Record<string, any>[] = [{ year: Y - 1, league: 'AFL', status: 'complete', notes: null }];
+    if (mode === 'rebuilt') seasons.push({ year: Y, league: exp.league, status: 'in_progress', notes: exp.notes });
+    const f: OpeningFacts = {
+      maxYear: mode === 'rebuilt' ? Y : Y - 1, seasons, clubs, orgs, identityHistoryDigest: 'h', identityForYear: [],
+      listPrevious: [1], listYear: [1], batches: { n: 5, maxId: 9 },
+    };
+    patch(f);
+    return f;
+  }
+
+  it('derives exactly what load_seasons and load_clubs derive from the tracked documents', () => {
+    expect(Y).toBe(seasonsDoc.last_season);
+    expect(exp.league).toBe('AFL');
+    expect(exp.status).toBe('in_progress');
+    expect(exp.notes).toBe(seasonsDoc.season_notes[String(Y)] ?? null);
+    const open = clubsDoc.identities.filter((c) => c.last_season === null).map((c) => c.hist).sort();
+    expect(exp.open.map((o) => o.hist).sort()).toEqual(open);
+    expect(open.length).toBeGreaterThan(0);
+    // no closed identity (Fitzroy, South Melbourne ...) is ever in the open set
+    for (const c of clubsDoc.identities.filter((x) => x.last_season !== null)) expect(open).not.toContain(c.hist);
+  });
+
+  it('refuses a year the register does not end at, an unregistered in-progress season and an incoherent club register', () => {
+    expect(() => expectedOpening(seasonsDoc, clubsDoc, Y + 1)).toThrow(/does not cover season/);
+    expect(() => expectedOpening(seasonsDoc, clubsDoc, Y - 1)).toThrow(OpeningRefused);
+    expect(() => expectedOpening({ ...seasonsDoc, in_progress_seasons: [] }, clubsDoc)).toThrow(/does not declare/);
+    const broken = { identities: clubsDoc.identities.map((c, i) => (i === 0 ? { ...c, last_season: null, succession: 'renamed', is_current_afl_club: false } : c)) };
+    expect(() => expectedOpening(seasonsDoc, broken)).toThrow(/not a current AFL club/);
+    expect(() => expectedOpening(seasonsDoc, { identities: [] })).toThrow(/no identities/);
+  });
+
+  it('production-like state: the row is absent and every open identity holds Y-1 -> NOT_OPEN with exactly the contracted changes', () => {
+    const v = classifyOpening(exp, facts('production'));
+    expect(v.problems).toEqual([]);
+    expect(v.state).toBe('NOT_OPEN');
+    const c = changesOf(v);
+    expect(c.insertSeason).toBe(true);
+    expect(c.clubIds).toHaveLength(exp.open.length);
+    expect(c.orgIds.length).toBeGreaterThan(0);
+  });
+
+  it('a rebuilt database is OPEN and idempotent: nothing to change', () => {
+    const v = classifyOpening(exp, facts('rebuilt'));
+    expect(v.state).toBe('OPEN');
+    expect(changesOf(v)).toEqual({ insertSeason: false, clubIds: [], orgIds: [] });
+  });
+
+  it('a hand-inserted row with the clubs still at Y-1 is a partial state: only the clubs and organisations change', () => {
+    const f = facts('production', (x) => {
+      x.seasons.push({ year: Y, league: exp.league, status: 'in_progress', notes: exp.notes }); x.maxYear = Y;
+    });
+    const v = classifyOpening(exp, f);
+    expect(v.state).toBe('NOT_OPEN');
+    expect(changesOf(v).insertSeason).toBe(false);
+    expect(changesOf(v).clubIds).toHaveLength(exp.open.length);
+  });
+
+  it.each([
+    ['an existing row with the wrong league', (f: OpeningFacts) => { f.seasons.push({ year: Y, league: 'VFL', status: 'in_progress', notes: exp.notes }); f.maxYear = Y; }, /differs from the tracked contract/],
+    ['an existing row already complete', (f: OpeningFacts) => { f.seasons.push({ year: Y, league: exp.league, status: 'complete', notes: exp.notes }); f.maxYear = Y; }, /differs from the tracked contract/],
+    ['an existing row with other notes', (f: OpeningFacts) => { f.seasons.push({ year: Y, league: exp.league, status: 'in_progress', notes: 'x' }); f.maxYear = Y; }, /differs from the tracked contract/],
+    ['a gap: the table ends later than Y-1', (f: OpeningFacts) => { f.maxYear = Y + 40; }, /would not be the next season/],
+    ['an open identity at an unexpected last_season', (f: OpeningFacts) => { f.clubs.find((c) => c.is_current_afl_club)!.last_season = 2000; }, /expected .* \(to open\)/],
+    ['a current club the register does not list', (f: OpeningFacts) => { f.clubs.push({ ...f.clubs.find((c) => c.is_current_afl_club)!, id: 999, legacy_club_hist: 'Ghost FC', slug: 'ghost' }); }, /current clubs differ from the register/],
+    ['a register identity missing from the database', (f: OpeningFacts) => { f.clubs = f.clubs.filter((c) => c.legacy_club_hist !== exp.open[0].hist); }, /resolves to 0 clubs rows/],
+    ['a slug that differs from the register', (f: OpeningFacts) => { f.clubs.find((c) => c.legacy_club_hist === exp.open[0].hist)!.slug = 'other'; }, /differs from the register/],
+    ['a first_season that differs from the register', (f: OpeningFacts) => { f.clubs.find((c) => c.legacy_club_hist === exp.open[0].hist)!.first_season = 1; }, /never changed here/],
+    ['an organisation at an unexpected last_season', (f: OpeningFacts) => { f.orgs[0].last_season = 1999; }, /organisation .* last_season/],
+  ])('REFUSES %s', (_name, patch, message) => {
+    const v = classifyOpening(exp, facts('production', patch));
+    expect(v.state).toBe('REFUSED');
+    expect(v.problems.join('\n')).toMatch(message);
+  });
+
+  /** What the write does to the facts, so the proof of the transition can be exercised without a database. */
+  function after(before: OpeningFacts): OpeningFacts {
+    const v = classifyOpening(exp, before);
+    const c = changesOf(v);
+    const next: OpeningFacts = JSON.parse(JSON.stringify(before));
+    if (c.insertSeason) next.seasons.push({ year: Y, league: exp.league, status: 'in_progress', notes: exp.notes, first_match_date: null, match_count: null });
+    next.maxYear = Y;
+    for (const club of next.clubs) if (c.clubIds.includes(Number(club.id))) club.last_season = Y;
+    for (const org of next.orgs) if (c.orgIds.includes(Number(org.id))) org.last_season = Y;
+    next.identityForYear = next.clubs.filter((x) => x.is_current_afl_club).map((x) => ({ org: Number(x.organization_id), club: Number(x.id) }));
+    return next;
+  }
+
+  it('the transition proof is empty for exactly the planned change and catches every deviation (O-1, O-2)', () => {
+    const before = facts('production');
+    const c = changesOf(classifyOpening(exp, before));
+    expect(transitionProblems(exp, c, before, after(before))).toEqual([]);
+    const cases: [string, (f: OpeningFacts) => void, RegExp][] = [
+      ['a club first_season moved', (f) => { f.clubs[0].first_season = 1; }, /clubs \d+ is not exactly/],
+      ['a closed identity moved', (f) => { const closed = f.clubs.find((x) => !x.is_current_afl_club)!; closed.last_season = 1; }, /clubs \d+ is not exactly/],
+      ['another season row moved', (f) => { f.seasons[0].status = 'in_progress'; }, /seasons row/],
+      ['identity history changed', (f) => { f.identityHistoryDigest = 'other'; }, /afldb_identity_for_season changed/],
+      ['the previous season list changed', (f) => { f.listPrevious = []; }, /season_list_clubs/],
+      ['the season list for the year changed', (f) => { f.listYear = [1, 2]; }, /season_list_clubs/],
+      ['a measured column was written', (f) => { f.seasons.find((x) => x.year === Y)!.match_count = 0; }, /not NULL/],
+      ['the year resolves for a closed identity', (f) => { f.identityForYear.push({ org: 9999, club: 9999 }); }, /exactly the open identities/],
+    ];
+    for (const [name, patch, message] of cases) {
+      const bad = after(before); patch(bad);
+      expect(transitionProblems(exp, c, before, bad).join('\n'), name).toMatch(message);
+    }
+  });
+
+  it('the surface digest is key-order independent, ignores import_batches, and moves with any row', () => {
+    const f = facts('production');
+    const reordered: OpeningFacts = { ...f, clubs: f.clubs.map((c) => Object.fromEntries(Object.entries(c).reverse())) };
+    expect(surfaceDigest(reordered)).toBe(surfaceDigest(f));
+    expect(surfaceDigest({ ...f, batches: { n: 99, maxId: 123 } })).toBe(surfaceDigest(f));
+    expect(surfaceDigest(facts('rebuilt'))).not.toBe(surfaceDigest(f));
+    expect(stable({ b: 1, a: { d: 1, c: 2 } })).toBe('{"a":{"c":2,"d":1},"b":1}');
+  });
+});
+
+describe('AFLDB-ISSUE-350 season opening: the production tool controls', () => {
+  const target = { host: 'afldb-prod', port: 5432, database: 'afldb_prod', user: 'afldb_backup', systemIdentifier: '7674454702926115004', databaseOid: '66668', clusterName: '16/main', databaseComment: null };
+  const ctx = { now: Date.parse('2026-11-14T12:00:00Z'), revision: 'a'.repeat(40), seasonsSha256: 's'.repeat(64), clubsSha256: 'c'.repeat(64) };
+  const body = {
+    operation: SeasonOpenTool.OPERATION, revision: ctx.revision, target, rehearsal: false, year: 2027, seasonsSha256: ctx.seasonsSha256, clubsSha256: ctx.clubsSha256,
+    baselineDigest: 'b'.repeat(64), changes: { insertSeason: true, clubIds: [1], orgIds: [1] }, state: 'NOT_OPEN',
+    backup: { target, sha256: 'd'.repeat(64), restoreEvidenceSha256: 'e'.repeat(64), capturedAt: '2026-11-14T10:00:00Z', restoredAt: '2026-11-14T10:30:00Z', baselineDigest: 'b'.repeat(64) },
+    createdAt: '2026-11-14T11:00:00Z', expiresAt: '2026-11-15T11:00:00Z',
+  };
+  const plan = { ...body, digest: SeasonOpenTool.planDigest(body) };
+  const approval = { planDigest: plan.digest, target, revision: ctx.revision, operation: SeasonOpenTool.OPERATION, seasonsSha256: ctx.seasonsSha256, clubsSha256: ctx.clubsSha256,
+    approvedAt: '2026-11-14T11:30:00Z', expiresAt: '2026-11-15T10:00:00Z', reference: 'owner approval ref' };
+
+  it('an approval binds only to this plan, target, revision and contract bytes, and must be written, unexpired and inside the plan window', () => {
+    expect(SeasonOpenTool.approvalProblem(plan, approval, ctx)).toBeNull();
+    for (const bad of [{ planDigest: 'f'.repeat(64) }, { revision: 'b'.repeat(40) }, { seasonsSha256: 'x' }, { clubsSha256: 'x' }, { operation: 'other' },
+      { target: { ...target, databaseOid: '1' } }, { reference: ' ' }, { expiresAt: '2026-11-14T11:45:00Z' }, { expiresAt: '2026-11-16T10:00:00Z' }, { approvedAt: '2026-11-14T13:00:00Z' }]) {
+      expect(SeasonOpenTool.approvalProblem(plan, { ...approval, ...bad }, ctx), JSON.stringify(bad)).not.toBeNull();
+    }
+    expect(SeasonOpenTool.approvalProblem(plan, null, ctx)).not.toBeNull();
+    expect(SeasonOpenTool.approvalProblem({ ...plan, changes: { insertSeason: false, clubIds: [], orgIds: [] } }, approval, ctx)).toMatch(/digest differs/);
+    expect(SeasonOpenTool.approvalProblem(plan, approval, { ...ctx, seasonsSha256: 'z' })).toMatch(/contract differs/);
+    const rehearsal = { ...body, rehearsal: true, backup: null };
+    expect(SeasonOpenTool.approvalProblem({ ...rehearsal, digest: SeasonOpenTool.planDigest(rehearsal) }, null, ctx)).toBeNull();
+  });
+
+  it('refuses hand-written backup evidence (stage I350 is machine-assembled and sealed)', () => {
+    expect(SeasonOpenTool.backupProblem(plan.backup, target, { now: ctx.now, revision: ctx.revision }, {})).toMatch(/not machine-assembled/);
+    expect(SeasonOpenTool.STAGE).toBe('I350');
+  });
+
+  it('writes only through the reviewed statements: no ON CONFLICT, no DELETE, no TRUNCATE, no first_season, no club_seasons', () => {
+    for (const path of ['tools/v2/issue350-season-open-production.ts', 'src/lib/rollover/season-opening.ts']) {
+      const code = repoText(path).split('\n').filter((l) => !/^\s*(\*|\/\*|\/\/)/.test(l)).join('\n');
+      expect(code, path).not.toMatch(/ON CONFLICT|DELETE\s+FROM|TRUNCATE|DROP\s/i);
+      expect(code, path).not.toMatch(/UPDATE\s+club_seasons|SET\s+first_season/i);
+    }
+    const lib = repoText('src/lib/rollover/season-opening.ts');
+    expect((lib.match(/INSERT INTO seasons/g) ?? []).length).toBe(1);
+    expect((lib.match(/UPDATE (clubs|club_organizations) SET last_season/g) ?? []).length).toBe(2);
+    // every session pins the time zone (ISSUE-349 class)
+    const tool = repoText('tools/v2/issue350-season-open-production.ts');
+    expect((tool.match(/TimeZone: 'Etc\/UTC'/g) ?? []).length).toBe(2);
+    expect(repoText('tools/v2/season-opening-check.ts')).toMatch(/TimeZone: 'Etc\/UTC'/);
+  });
+});

@@ -65,6 +65,11 @@ describe('stage values are read from the tool output, validated, and nothing els
     expect(() => stageFieldsFrom('I336', { baselineDigest: h('8') })).toThrow(/not a count/);
     expect(() => stageFieldsFrom('I336', { importBatchesBefore: 70 })).toThrow(/not a sha256/);
   });
+  it('I350 (AFLDB-ISSUE-350, season opening) binds the baseline digest only: that digest covers the whole surface the operation can affect and ignores import_batches by design', () => {
+    expect(stageFieldsFrom('I350', { baselineDigest: h('9') })).toEqual({ baselineDigest: h('9') });
+    expect(stageFieldsFrom('I350', { baselineDigest: h('9'), importBatchesBefore: 70 })).toEqual({ baselineDigest: h('9') });
+    expect(() => stageFieldsFrom('I350', {})).toThrow(/not a sha256/);
+  });
   it('S2 needs exactly the four expectation hashes and records the baseline from them', () => {
     const out = { expect: S2_FIELDS.draftLinkRestorePlanExpect, batchesBefore: 66 };
     expect(stageFieldsFrom('S2', out)).toEqual(S2_FIELDS);
