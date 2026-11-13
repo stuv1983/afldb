@@ -9,7 +9,9 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Current state — 2026-11-13 (run 9, Step G):** **2 open issues: 332, 348.** **ISSUE-336 resolved.** D-336-2 Step G (read-only) complete: reconciliation against the owner CSVs **5,966 = 5,966** (0 unmatched either side, no per-category count difference; the only field differences are the 187 D-336-3 origins, kept by decision (A)); `draft_picks` 6,853 including ids 6819–6853; 8 manual rows and 8 active draft overrides; serving release `c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x` status and health PASS; the beta-gated page check of `/draft/2008`, `/draft/2025` and `/draft/2009?view=pre-draft` (plus the 2008 and 2025 Pre-Draft views) at desktop 1280×800 and mobile 390×844: Pre-Draft 4, 4 and 36, every inserted name present, Pre-Draft selections unnumbered, no page or console errors, anonymous requests still 307 to `/beta`. **Automated runner verdict: FAIL 77/83** (raw `browser/result.json` preserved unmodified). All six failures are the "authenticated HTTP 200" URL check. **Documented assessment, not an automated pass:** the check's predicate `page.url().includes('/beta')` also matches the host `https://beta.afldb.com`, so it cannot pass on that host; each of the six pages returned HTTP 200, passed every content check on the same page, and its screenshot shows the draft page, while anonymous requests for the same paths returned 307 to `/beta`. All 10 screenshots inspected. No database write, restart, deployment, timer, configuration or cache change. Evidence `docs/v2/evidence/issue336-d3362-stepg-20261113/README.md`. Published by fast-forward of `origin/main` `800cded0..ea077434` on 2026-11-13 (owner-approved; remote re-read).
+**Current state — 2026-11-14 (full review):** **17 open issues: 332, 348, 350–364.** A review-only full review of `origin/main` `de640826` (production serves `c1c4b22e`; DEV `8b024098`) opened ISSUE-350 to ISSUE-364, raised ISSUE-348 to Medium and updated ISSUE-332. Nothing was implemented, deployed or written to production or DEV. **Most urgent: ISSUE-350 (High)**: production has no 2027 `seasons` row, so every nightly from Opening Round 2027-03-17 would fail; an owner decision on the write is needed before then. Report: `issues/reviews/AFLDB-FULL-REVIEW-2026-11-14.md` (remediation batches §5, owner decisions §6); evidence `docs/v2/evidence/full-review-20261114/`.
+
+**Earlier state — 2026-11-13 (run 9, Step G):** **2 open issues: 332, 348.** **ISSUE-336 resolved.** D-336-2 Step G (read-only) complete: reconciliation against the owner CSVs **5,966 = 5,966** (0 unmatched either side, no per-category count difference; the only field differences are the 187 D-336-3 origins, kept by decision (A)); `draft_picks` 6,853 including ids 6819–6853; 8 manual rows and 8 active draft overrides; serving release `c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x` status and health PASS; the beta-gated page check of `/draft/2008`, `/draft/2025` and `/draft/2009?view=pre-draft` (plus the 2008 and 2025 Pre-Draft views) at desktop 1280×800 and mobile 390×844: Pre-Draft 4, 4 and 36, every inserted name present, Pre-Draft selections unnumbered, no page or console errors, anonymous requests still 307 to `/beta`. **Automated runner verdict: FAIL 77/83** (raw `browser/result.json` preserved unmodified). All six failures are the "authenticated HTTP 200" URL check. **Documented assessment, not an automated pass:** the check's predicate `page.url().includes('/beta')` also matches the host `https://beta.afldb.com`, so it cannot pass on that host; each of the six pages returned HTTP 200, passed every content check on the same page, and its screenshot shows the draft page, while anonymous requests for the same paths returned 307 to `/beta`. All 10 screenshots inspected. No database write, restart, deployment, timer, configuration or cache change. Evidence `docs/v2/evidence/issue336-d3362-stepg-20261113/README.md`. Published by fast-forward of `origin/main` `800cded0..ea077434` on 2026-11-13 (owner-approved; remote re-read).
 
 **Earlier state — 2026-11-12 (run 9, evening):** **3 open issues: 332, 336, 348.** D-336-2 E+F applied on production 2026-11-12 at 05:00:43Z (16:00 AEDT), inside the approved window: plan `afa26158…f608`, run `I336-20261112T025001Z`, backup `0d517f5a…34c6`, ops `a25306f9`. **COMMITTED_VERIFIED** (exit 0) and **ACCEPTED**: `draft_picks` 6,818 → 6,853 (+35, ids 6819–6853), `draft_persons` 5,057 → 5,088 (+31), 35 `data_edits` rows by actor 1 (seal `audited_correction`); pre-existing rows unchanged; no restart or other change. Evidence `docs/v2/evidence/issue336-d3362-apply-20261112/README.md`.
 
@@ -75,6 +77,74 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 - **State:** Open, opened 2026-11-02; **owner decisions recorded 2026-11-04** (supersede the earlier "keep pending" position for these items only). **Decided:** D-316-5 (manual debutant registration and adjudication, whole-night refusal kept; resumption is on a scheduled run after identity resolution, not guaranteed to take one night; review after round 2), D-316-8 (NULL, `attendance_status='not_collected'`), D-316-9 (incomplete 2027 coach coverage accepted; optional audited back-fill; review after round 2; 2026 correction preserved), D-316-10 (existing ISR behaviour; no `AFLDB_REVALIDATE_SECRET` in nightly units; no maximum delay promised); C7 criteria 1 to 7 approved, criterion 8 replaced (settled round shown correctly on public season and match responses; delay and limits reported; no latency guarantee or worker attribution; unobserved or incorrect content fails); the June 2027 opening of the Brownlow successor (D-316-7, action only) approved. **Not decided / future:** C9 (D-316-6; undecided until its June gate; Option C recommendation only), the Brownlow substantive decision and count window, the C7 acceptance (owner's act after the first concluded round); D-316-11 not pursued. **No acceptance, probe, cookie or Brownlow activation is authorised.**
 - **Key files:** `docs/v2/afl-api-2027-season-operations-successor-2026-11-02.md` (the single operating record: decision register, C7 criteria, per-round routine, ISR measurement plan, ownership guards, Brownlow gates), `tools/v2/c7-observe.ts`, `src/lib/acquisition/afl-api-c7-observation.ts`.
 - **Next action (dated; nothing is due before Opening Round 2027-03-17T00:00Z):** after round 2, the D-316-5 and D-316-9 reviews; after the first concluded round (March 2027), the owner's C7 acceptance with observed delay and measurement limits reported; June 2027, open the Brownlow successor and choose the C9 option (by 2027-06-30); before 2027-09-01, the Brownlow substantive decision (the count window is the owner's act); about October 2027, C9 delivered and reviewed before the rollover. The original recommendations are in `docs/v2/post-release-closeout-2026-11-04.md` section 4; the current state is in the operating record (section 9). **2026-11-08:** gate register G1–G7 recorded in the operating record's section 10, with owners and the evidence that closes each gate. Nothing more can be prepared before Opening Round. The issue stays open until all seven gates have occurred and their evidence is recorded.
+- **Update 2026-11-14 (full review):** prerequisite ISSUE-350 (2027 `seasons` row) before Opening Round; a failed nightly is neither retried nor alerted (recommend `OnFailure=`).
+
+### AFLDB-ISSUE-348 — The next DraftGuru re-acquisition must carry forward the D-336-3 origin revisions and adjudicate three club replacements
+
+- **Severity / area:** **Medium (raised 2026-11-14, was Low)**; draft data / DraftGuru acquisition.
+- **State:** Open, opened 2026-11-11 (D-336-3 = A). Full review: a default-label normal-mode import would delete the 35 audited D-336-2 picks and 31 persons with no gate (ING-2); the origin classifier is manual (ING-3).
+- **Key files:** `tools/rebuild/draftguru/import_draftguru.py`, `tools/rebuild/draftguru/common.py`, `docs/v2/evidence/issue336-draft-categories-20261105/d3363-classification-20261111/`.
+- **Next action:** owner decides whether the subset/audited-row guard is enforced in code before the Nov–Dec acquisition; at the acquisition, run the classifier and present the replacements (5961, 6784, 6626).
+
+### AFLDB-ISSUE-350 — Production has no 2027 `seasons` row and the AFL API settle never creates one
+
+- **Severity / area:** **High**; AFL API ingestion, 2027 operations.
+- **State:** Open, opened 2026-11-14. Reproduced (`23503 afl_api_match_season_fkey`); live: seasons stop at 2026, 18 current clubs `last_season = 2026`.
+- **Key files:** `src/lib/acquisition/settle-afl-api.ts:1973-2128`, `src/db/queries/match-admin.ts:204-223`, `tools/db/rollover-season.ts`, `tools/migration/load_reference_data.py:220-268`.
+- **Next action:** owner decision on the audited season-row and club-identity write before 2027-03-17; add a read-only check to the ISSUE-332 gate register.
+
+### AFLDB-ISSUE-351 — Unattended upgrades restart production app and PostgreSQL; promote/rollback activation window
+
+- **Severity / area:** Medium; production operations.
+- **State:** Open, opened 2026-11-14. Restart observed live 2026-11-14 06:35 AEDT; reboot pending.
+- **Key files:** `deploy/release.mjs:1029-1091`, `deploy/afldb.service`, `deploy/afldb.service.d/release-route.conf`, r2 release packet.
+- **Next action:** owner patching and restart policy; release-packet apt/needrestart gate.
+
+### AFLDB-ISSUE-352 — No scheduled production backup, restore verification or off-host copy
+
+- **Severity / area:** Medium; backup and recovery.
+- **State:** Open, opened 2026-11-14. Live: per-operation backups only; `docs/backup-restore.md` §6 stale.
+- **Next action:** owner decision: schedule, or accept a stated data-loss window.
+
+### AFLDB-ISSUE-353 — Match Sheet player removal orphans Brownlow round votes and curated special records
+
+- **Severity / area:** Medium; admin, data integrity. **State:** Open, opened 2026-11-14; reproduced 4/4; live 0 orphans.
+- **Key files:** `src/db/queries/match-sheet.ts:243-250,662-666`, `src/lib/acquisition/match-sheet-authority.ts:704-720`.
+- **Next action:** refuse removal with dependents (review batch 3).
+
+### AFLDB-ISSUE-354 — Retired coach/draft overrides re-activated unaudited by the next edit
+
+- **Severity / area:** Medium; admin overrides and audit. **State:** Open, opened 2026-11-14; reproduced 2/2; live 0 inactive overrides.
+- **Key files:** `src/db/queries/admin-coaches.ts:593-605`, `src/db/queries/admin-draft.ts:767-788`, `src/db/queries/data-edits.ts:265-288`.
+- **Next action:** merge only from active rows (review batch 3).
+
+### AFLDB-ISSUE-355 — Grid Solver club-lead builder counts NULL seasons as leads
+
+- **Severity / area:** Medium; Grid Solver. **State:** Open, opened 2026-11-14; reproduced 5/5.
+- **Key files:** `src/db/queries/grid-solver.ts:262-273`. **Next action:** NULL guard and integration case (batch 4).
+
+### AFLDB-ISSUE-356 — NL search answers a different question at confidence 1
+
+- **Severity / area:** Medium; NL search. **State:** Open, opened 2026-11-14; reproduced; live log 0 matches.
+- **Key files:** `src/search/nl/vocab.ts:251-254,1141`, `src/search/nl/parser.ts:953-1035,3075-3140,4076`, `src/db/queries/nl/resolve.ts:181-245`.
+- **Next action:** parser/plan fixes with focused tests and the V5 corpus (batch 4).
+
+### AFLDB-ISSUE-357 — ISR persists a page per non-canonical id spelling and per 404 path
+
+- **Severity / area:** Medium; public frontend. **State:** Open, opened 2026-11-14; reproduced locally, latent live.
+- **Key files:** `src/lib/format.ts:539-545`, `src/lib/params.ts:25-29`, `src/app/matches/[id]/page.tsx`, `src/app/players/[slug]/page.tsx`.
+- **Next action:** strict id parsing and canonical redirects before the beta gate is lifted (batch 6).
+
+### AFLDB-ISSUE-358 — Linux unit suite red at `main`; `afldb_test` rebuild blocked by a stale input pin
+
+- **Severity / area:** Medium; test/rebuild tooling. **State:** Open, opened 2026-11-14; reproduced.
+- **Key files:** `tools/db/rebuild-test.ts:3800`, `docs/v2/architecture.md` §9, `tests/db-promotion-check.test.ts:7592-7606`.
+- **Next action:** owner confirms the McGovern sibling row; reviewed pin update (batch 5).
+
+### AFLDB-ISSUE-359 to AFLDB-ISSUE-364 (Low)
+
+- **359** public parameter hardening; **360** tied holders and misleading links; **361** public performance hot spots; **362** Caddy token logging and admin cookie at the beta gate; **363** test reliability; **364** tooling drift (`next dev`, serving-checkout `node_modules`, lint).
+- **State:** Open, opened 2026-11-14; details and key files in their `issues.md` entries. **Next action:** review batches 4–6.
 
 **AFLDB-ISSUE-336 resolved 2026-11-13** (production data verified; records only, nothing further deployed). The draft pages separate the categories and number picks within their own draft (released to production in r2, `c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x`, accepted 2026-11-12); D-336-2 inserted the 35 missing DraftGuru Pre-Draft rows (COMMITTED_VERIFIED and ACCEPTED 2026-11-12); Step G (2026-11-13, read-only): reconciliation against the owner CSVs **5,966 = 5,966** (0 unmatched either side, no per-category count difference; the only field differences are the 187 D-336-3 origins, kept by decision (A)); `draft_picks` 6,853 including ids 6819–6853; 8 manual rows and 8 active draft overrides; serving release `c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x` status and health PASS; the beta-gated page check of `/draft/2008`, `/draft/2025` and `/draft/2009?view=pre-draft` (plus the 2008 and 2025 Pre-Draft views) at desktop 1280×800 and mobile 390×844: Pre-Draft 4, 4 and 36, every inserted name present, Pre-Draft selections unnumbered, no page or console errors, anonymous requests still 307 to `/beta`. **Automated runner verdict: FAIL 77/83** (raw `browser/result.json` preserved unmodified). All six failures are the "authenticated HTTP 200" URL check. **Documented assessment, not an automated pass:** the check's predicate `page.url().includes('/beta')` also matches the host `https://beta.afldb.com`, so it cannot pass on that host; each of the six pages returned HTTP 200, passed every content check on the same page, and its screenshot shows the draft page, while anonymous requests for the same paths returned 307 to `/beta`. All 10 screenshots inspected. D-336-3 was decided (A) and is carried by ISSUE-348. Removed from this index and the Open Issues table. Record: its `issues.md` entry; runbooks `issues/closed/AFLDB-ISSUE-336.md` and `issues/closed/AFLDB-ISSUE-336-DEV-DEPLOYMENT.md`; pre-closure index sections `issues/closed/AFLDB-ISSUE-336-INDEX-SECTION-20261111.md` and `issues/closed/AFLDB-ISSUE-336-INDEX-SECTION-20261113.md`; evidence `docs/v2/evidence/issue336-d3362-stepg-20261113/README.md`.
 

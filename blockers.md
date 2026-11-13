@@ -1,5 +1,10 @@
 # AFLDB Waiting and Blocker Register
 
+> **2026-11-14 full review (this register's counts are NOT recomputed).** Record: `issues/reviews/AFLDB-FULL-REVIEW-2026-11-14.md` §6.
+> - **Owner decisions needed:** ISSUE-350 (High), the 2027 `seasons` row and club identities on production, before 2027-03-17; ISSUE-351, host patching and restart policy; ISSUE-352, backup schedule or an accepted data-loss window; ISSUE-348, the DraftGuru import guard before the Nov–Dec acquisition; ISSUE-358, confirm the McGovern sibling row in the canonical rebuild.
+> - **Actionable after authorisation:** ISSUE-353 to ISSUE-364 (review remediation batches 3–6).
+> - Open issues: 17 (332, 348, 350–364).
+
 > **2026-11-09 closure run 4 (this register's counts are NOT recomputed).** Record: the Run 4 section of [OPEN-ISSUES-CLOSURE-RUN-20261108.md](issues/open/OPEN-ISSUES-CLOSURE-RUN-20261108.md).
 > - **ISSUE-339 RESOLVED:** published at `8d122f62` (fast-forward from `c1c4b22e`); not deployed. D1–D4 were decided. R339-D argv exposure is unmeasured.
 > - **ISSUE-346 (new, Low):** a standalone DEV `db:migrate` is not gated. It waits until DEV migration work is next planned; the interim rule is no hand-run migrations on DEV.

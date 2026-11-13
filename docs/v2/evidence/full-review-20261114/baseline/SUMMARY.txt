@@ -1,0 +1,13 @@
+PASS p0_resources
+PASS p1_clone
+PASS p2_deps
+PASS p3_typecheck
+FAIL p3b_lint rc=1
+PASS p4_cluster
+PASS p5_template
+PASS mkdbs
+FAIL p6_unit rc=1
+FAIL p7_integration rc=1
+PASS p7b_shell
+PASS p8_build
+PASS p9_stop

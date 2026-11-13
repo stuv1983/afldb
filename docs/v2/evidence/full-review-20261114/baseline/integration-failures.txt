@@ -1,0 +1,119 @@
+files total=99 tests=3578 passed=3048 failed=99 pending=408
+FILE tests/integration/admin-brownlow.test.ts failed=1
+  x migration 094 objects and backfill resolved every historical round row to exactly one match (preflight P2)
+FILE tests/integration/admin-draft.test.ts failed=0 (collect/hook: need an empty draft year with active club identities: expected 0 to be greater than 0)
+FILE tests/integration/admin-season-lists.test.ts failed=1
+  x add (§12.1) refuses every season below FIRST_LIST_SEASON, and writes nothing (D-2, I-4)
+FILE tests/integration/club-comparison-route.test.ts failed=2
+  x Stage 7 route budget loads adelaide vs brisbane-lions inside the route budget
+  x Stage 7 route budget loads carlton vs collingwood inside the route budget
+FILE tests/integration/club-comparison.test.ts failed=28
+  x club comparison: head-to-head core summarises Adelaide vs Brisbane Lions to the canonical witness and to independent SQL
+  x club comparison: head-to-head core filters by match type so that home-and-away and finals partition the complete history
+  x club comparison: head-to-head core filters by era (Club Rivalry Explorer follow-up, FR-2) so the decades partition the complete history
+  x club comparison: head-to-head core paginates the complete meetings list deterministically at 25 rows per page
+  x club comparison: head-to-head core groups venue records by canonical venue and agrees with an independent grouping
+  x club comparison: head-to-head core reads streaks from chronological order, with a draw breaking a winning streak
+  x club comparison: head-to-head core keeps Brisbane Bears and Fitzroy out of Brisbane Lions head-to-head totals
+  x club comparison: head-to-head core handles the Carlton vs Collingwood long rivalry, including Grand Finals
+  x club comparison: crossover players lists everyone who represented both organisations, agreeing with independent SQL
+  x club comparison: crossover players reports Ben Keays as Brisbane Lions first, then Adelaide, in both argument orders
+  x club comparison: crossover players summarises the first and most recent players to complete both representations
+  x club comparison: head-to-head player leaders ranks H2H games leaders against independent SQL and the measured witnesses
+  x club comparison: head-to-head player leaders ranks H2H goals leaders without ever treating an unrecorded goal as nought
+  x club comparison: head-to-head player leaders consolidates a player who represented both organisations into one row
+  x club comparison: head-to-head player leaders keeps every tied holder of the single-match goals and disposals records
+  x club comparison: head-to-head Brownlow counts eligible and covered meetings from home-and-away matches only
+  x club comparison: maximum canonical season runs the complete selected season path for the maximum canonical season without naming it
+  x club comparison: head-to-head by decade reproduces the Adelaide vs Brisbane Lions decade witness and independent SQL
+  x club comparison: head-to-head by decade sums every Carlton vs Collingwood decade back to the complete 268-meeting population
+  x club comparison: period-score rivalry records exposes pair-level period-score coverage for both witness rivalries
+  x club comparison: head-to-head player averages reuses the comparison metric registry rather than defining a second one
+  x club comparison: head-to-head player averages ranks the disposals average board on recorded games and matches independent SQL
+  x club comparison: head-to-head player averages applies the five-recorded-game minimum, per metric and never per rivalry appearance
+  x club comparison: head-to-head player averages retains every tie at the rank-ten boundary and reports the recorded-game denominator
+  x club comparison: head-to-head player averages splits a crossover player average across both organisations
+  x club comparison: long rivalry performance keeps every warm H2H query under the query ceiling for both rivalry scales
+  x club comparison: long rivalry performance keeps each independent parallel query group under the group ceiling
+  x club comparison: long rivalry performance keeps the route-equivalent composed data load under the route ceiling
+FILE tests/integration/database.test.ts failed=5
+  x data integrity has the full player-match dataset
+  x Brownlow correctness separates the war years from merely uncollected seasons
+  x advanced search regression cases 200-249 games with 16 or more finals
+  x advanced search regression cases 50-199 goals and no Brownlow votes
+  x advanced search regression cases 200+ games, 100+ goals and 15+ finals
+FILE tests/integration/derived-rebuild-parity.test.ts failed=1
+  x AFLDB-ISSUE-254 — rebuild_derived.py equals the targeted recompute produces the same frees aggregates and the same zero-games career row, and invents none
+FILE tests/integration/draft-linkage.test.ts failed=2
+  x DraftGuru bridge on afldb_test — §6.1 reconciliation (read-only) persons partition exactly as the child + ledger predict
+  x DraftGuru bridge on afldb_test — §6.4 negative controls (read-only) withheld persons stay unlinked by the bridge; the rejected identities are reached by nobody
+FILE tests/integration/gridley-corpus.test.ts failed=1
+  x Gridley corpus -- every cell through solveCellSummary writes the run report and has no failing cells
+FILE tests/integration/nl-answers-relationships.test.ts failed=2
+  x C2 — has_brother returns exactly the hand-written label-backed set
+  x the list cap is disclosed, never silently applied counts the whole qualifying set even when the rows are capped
+FILE tests/integration/player-link-concurrency.test.ts failed=4
+  x AFLDB-ISSUE-235 S6 (I8–I10): afl_api adjudication races I8 — two links for the same provider to different players, released together from the provider lock: one resolved row, one audit row, the other refused as stale
+  x AFLDB-ISSUE-235 S6 (I8–I10): afl_api adjudication races I9 — two providers linked to the same player, released together from the player lock: one wins, the other is refused as a collision; the index backs it up
+  x AFLDB-ISSUE-235 S6 (I8–I10): afl_api adjudication races I10 — an admin link racing a raw bridge-style INSERT of the same provider: exactly one row, and the admin side reports stale on 23505; loader-second fails closed on
+  x AFLDB-ISSUE-235 S6 (I8–I10): afl_api adjudication races I10 (revoke race; the brief's I10) — a revoke racing an in-flight consumer of the link waits for it, sees its committed use, and refuses: one serial order, no lost 
+FILE tests/integration/player-matching.test.ts failed=6
+  x source evidence extraction reads draft picks at draft_person grain, never per pick
+  x source evidence extraction keeps the known player id out of the evidence the scorer sees
+  x candidate blocking recalls the true player for confirmed links
+  x club lineage and club text against real clubs carries the lineage on every source row and candidate club
+  x club lineage and club text against real clubs gates lineage-aware club matching to the authorised sources
+  x assessment over real rows raises no contradiction against links AFLDB already confirmed
+FILE tests/integration/release-gates.test.ts failed=9
+  x gate: Brownlow authority agrees with the canonical round votes for every career inside their coverage
+  x gate: Advanced Search regression cases 50-199 goals and zero Brownlow votes returns the exact 261 players
+  x gate: club organizations and identities attaches every ladder row to the identity trading that season
+  x gate: absence is never zero records why each attendance is missing
+  x gate: birth dates matches players on the profile URL rather than the name
+  x gate: birth dates leaves the remaining players honestly without a date
+  x gate: 2026 is provisional (snapshot-pinned) reports 2026 Brownlow as pending, never as zero
+  x gate: 2026 is provisional (snapshot-pinned) awards no premier and no wooden spoon for 2026
+  x gate: 2026 is provisional (snapshot-pinned) is the only season still in progress
+FILE tests/integration/settle-afl-api-issue276.test.ts failed=0 (collect/hook: ISSUE-276 cases cannot run: these existing canonical rows are not ISSUE-276 fixtures and would make the settle refuse possible_existing_match. They were NOT tou)
+FILE tests/integration/settle-afl-api.test.ts failed=20
+  x AFLDB-ISSUE-235 S6 (I2–I7, I6b–I6d): human afl_api adjudication against afldb_test I2 → I6 (revoke before I5) → re-link → I5 (re-settle) → I6 (revoke after I5) → I6c: one provider through the real settle, link, revoke an
+  x AFLDB-ISSUE-235 S6 (I2–I7, I6b–I6d): human afl_api adjudication against afldb_test I2 (D8 audit shape) — the linked and revoked audit rows store evidence and previous_state as jsonb OBJECTS, not JSON text
+  x AFLDB-ISSUE-235 S6 (I2–I7, I6b–I6d): human afl_api adjudication against afldb_test I3 — atomicity: an audit INSERT refused by its CHECK after the identity INSERT leaves zero rows on both sides
+  x AFLDB-ISSUE-235 S6 (I2–I7, I6b–I6d): human afl_api adjudication against afldb_test I4/T2 (the brief's I3) — a second link of the same provider to the same player is refused as already linked; no duplicate row or audit
+  x AFLDB-ISSUE-235 S6 (I2–I7, I6b–I6d): human afl_api adjudication against afldb_test I4/T3 (the brief's I4) — a link of an already-linked provider to a DIFFERENT player is refused; no reassignment, no audit
+  x AFLDB-ISSUE-235 S6 (I2–I7, I6b–I6d): human afl_api adjudication against afldb_test I4/T4 — a link to a player who already holds another afl_api provider is refused, naming that provider
+  x AFLDB-ISSUE-235 S6 (I2–I7, I6b–I6d): human afl_api adjudication against afldb_test I4/T6 (the brief's I7) — a stale fingerprint is refused for link and for revoke after a real database change; nothing is written
+  x AFLDB-ISSUE-235 S6 (I2–I7, I6b–I6d): human afl_api adjudication against afldb_test I4/T7 — a link to a player with no stable identity is refused; nothing is written
+  x AFLDB-ISSUE-235 S6 (I2–I7, I6b–I6d): human afl_api adjudication against afldb_test I4/T8 — every action on an anomalous (NULL-player) row is refused; the row is unchanged
+  x AFLDB-ISSUE-235 S6 (I2–I7, I6b–I6d): human afl_api adjudication against afldb_test I4/T9 — a surname disagreement is refused without the acknowledgement, and recorded when acknowledged
+  x AFLDB-ISSUE-235 S6 (I2–I7, I6b–I6d): human afl_api adjudication against afldb_test I6b (Brownlow, OD-2) — a human link used only by a Brownlow settle is refused as used through D10 (a) and (b), with no projection row
+  x AFLDB-ISSUE-235 S6 (I2–I7, I6b–I6d): human afl_api adjudication against afldb_test I6d (lock) — while another session holds a read of external_identities the revoke refuses on lock_timeout and writes nothing
+  x AFLDB-ISSUE-235 S6 (I2–I7, I6b–I6d): human afl_api adjudication against afldb_test I6-LI (LINK_INDEPENDENT; the brief's I6d) — an afl_api player_height_evidence row does not block a revoke and survives it
+  x AFLDB-ISSUE-235 S6 (I2–I7, I6b–I6d): human afl_api adjudication against afldb_test I7 — link and revoke against the BRIDGED importer (unique) provider are refused; its status, player_id and match_method are unchanged
+  x AFLDB-ISSUE-235 S6 (I15, I16): the D15 replay fails closed and is idempotent against afldb_test I16 (replay idempotence) — over a ledger written by the real link/revoke API, a first replay re-creates exactly the net-link
+  x AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreSQL (post-COMMIT, pre-archive recovery) OD-5 recovery — a committed reinstatement whose capture was never archived is verified, archived and captured a
+  x AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreSQL (post-COMMIT, pre-archive recovery) OD-5 reinstate (rolled back, no rebuild) — reinstateAndReplay() puts a captured ledger back byte-for-byte under
+  x AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreSQL (post-COMMIT, pre-archive recovery) OD-5 recovery — a missing human identity is refused as already_reinstated_unverified; the pending capture is le
+  x AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreSQL (post-COMMIT, pre-archive recovery) OD-5 recovery — a human identity with no ledger entry is refused; the pending capture is left in place
+  x AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreSQL (post-COMMIT, pre-archive recovery) OD-5 recovery — ledger drift is refused before any observation; the pending capture is left in place
+FILE tests/integration/settle-afltables.test.ts failed=17
+  x AFLDB-ISSUE-099 settle — the transaction against PostgreSQL runs the whole write path in --dry-run and retains nothing (§22)
+  x AFLDB-ISSUE-099 settle — the transaction against PostgreSQL applies observations, projections and candidates, and refuses to sweep an incomplete scope (I2)
+  x AFLDB-ISSUE-099 settle — the transaction against PostgreSQL reruns idempotently: no payload, no version, no candidate, no rejection
+  x AFLDB-ISSUE-099 settle — the transaction against PostgreSQL marks a genuine omission absent inside a proven-complete scope, and nowhere else (I3)
+  x AFLDB-ISSUE-099 settle — the transaction against PostgreSQL keeps an observed-but-rejected record present and unprojected (I1)
+  x AFLDB-ISSUE-099 settle — the transaction against PostgreSQL clears absence on reappearance without appending a version (I4)
+  x AFLDB-ISSUE-099 settle — the transaction against PostgreSQL keeps A -> B -> A as three ordered versions over two payloads
+  x AFLDB-ISSUE-099 settle — the transaction against PostgreSQL the data_issues disagreement lifecycle opens exactly one row for a genuine independent score disagreement
+  x AFLDB-ISSUE-099 settle — the transaction against PostgreSQL the data_issues disagreement lifecycle refreshes the SAME row when the disagreement recurs, keeping detected_at
+  x AFLDB-ISSUE-099 settle — the transaction against PostgreSQL the data_issues disagreement lifecycle resolves on positive agreement even though the AFL Tables payload did not move
+  x AFLDB-ISSUE-099 settle — the transaction against PostgreSQL the data_issues disagreement lifecycle does not resolve an already-resolved row a second time
+  x AFLDB-ISSUE-099 settle — the transaction against PostgreSQL the data_issues disagreement lifecycle never resolves an open row another writer owns
+  x AFLDB-ISSUE-099 settle — the transaction against PostgreSQL leaves every ISSUE-099-owned relation byte-identical after a --dry-run
+  x AFLDB-ISSUE-099 settle — the transaction against PostgreSQL obligation O1 left both projection sentinels in place across every run
+  x AFLDB-ISSUE-099 settle — the transaction against PostgreSQL opens no Brownlow target for an unlinked player with an NA vote (D2)
+  x AFLDB-ISSUE-099 settle — the transaction against PostgreSQL wrote no canonical fact row in any settle transaction (§15)
+  x AFLDB-ISSUE-099 settle — the transaction against PostgreSQL executes the whole write path under the restricted afldb_import role
+FILE tests/integration/v2-brownlow-eligibility-2025-rehearsal.test.ts failed=0 (collect/hook: Dedicated 2025 twelve-ruling clone required)
+FILE tests/integration/v2-brownlow-production-correction.test.ts failed=0 (collect/hook: Dedicated Brownlow package clone required)
+FILE tests/integration/v2-coleman-publication.test.ts failed=0 (collect/hook: refusing to run: 1 Coleman 2001 row(s) already exist that this suite did not create)

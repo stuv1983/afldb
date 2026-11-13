@@ -15,6 +15,12 @@ commit.
 
 ## [Unreleased]
 
+### Full review of `origin/main` `de640826` (2026-11-14; records only)
+
+- A review-only full review (application, data integrity, auth, admin, search and Grid Solver, frontend, performance, ingestion, deployment, backup and recovery, tests) opened ISSUE-350 to ISSUE-364 and raised ISSUE-348 to Medium. Nothing was implemented, deployed or written to production or DEV. Report: `issues/reviews/AFLDB-FULL-REVIEW-2026-11-14.md`.
+- **ISSUE-350 (High):** production has no 2027 `seasons` row and the AFL API settle never creates one. Without an owner-approved write, every nightly from Opening Round 2027-03-17 fails on a foreign key.
+- Baseline at the reviewed revision on Linux (isolated snapshot): typecheck and build pass; unit 107 failed / 11,739 passed (21 of them real: ISSUE-358); integration 99 failed / 3,046 passed (load, snapshot-oracle and environment effects, characterised in the report). Lint fails (607 errors) and is in no gate.
+
 ### ISSUE-336 resolved: D-336-2 verified on production (2026-11-13)
 
 - Read-only Step G: production's DraftGuru draft rows reconcile 5,966 = 5,966 with the owner CSVs (only the 187 D-336-3 origins differ, kept by decision and carried by ISSUE-348), and `/draft/2008`, `/draft/2025` and `/draft/2009?view=pre-draft` show the inserted unnumbered Pre-Draft rows (4, 4 and 36) on desktop and mobile with the beta gate still on. ISSUE-336 is resolved. Evidence `docs/v2/evidence/issue336-d3362-stepg-20261113/`.
