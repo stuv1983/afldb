@@ -17,6 +17,8 @@ import { predecessorJson } from './rollover-predecessor-fixture';
 
 import { describe, expect, it } from 'vitest';
 
+import { resolveTestPython } from './python-interpreter';
+
 import {
   areCoSources,
   assertProjectableColumns,
@@ -1264,5 +1266,66 @@ describe('source families dataset (AFLDB-ISSUE-096 S1)', () => {
     });
     // ...and a declared one may not drop it.
     refuses((data) => { familyIn(data, 'afl_api', 'roster').known_columns = null; });
+  });
+});
+
+/*
+ * AFLDB-ISSUE-363 TST-5 — the standalone `tests/python/*_contract.py` scripts that no other suite runs.
+ *
+ * Seven contracts existed with no caller, so nothing noticed when one went stale
+ * (`fitzroy_profile_continuity_contract.py` expected 79 renumbered rows after the contract moved to
+ * 150). This is their wrapper: one row per contract, run with the documented interpreter
+ * (AFLDB_PYTHON, see tests/python-interpreter.ts), exit status 0 AND the script's own closing line.
+ * No skip: a host that cannot run them is a failing host, not a passing one. A contract that is
+ * already wired into a topical suite stays there; a NEW `*_contract.py` must be wired into some suite
+ * or into this table, and the inventory test below fails until it is.
+ */
+describe('standalone Python contracts (ISSUE-363 TST-5)', () => {
+  const contractRoot = join(__dirname, '..');
+  const python = resolveTestPython(contractRoot);
+  const CONTRACTS: ReadonlyArray<readonly [file: string, closing: RegExp]> = [
+    ['brownlow_afl_api_season_rehearsal_contract.py', /All Brownlow AFL API season rehearsal contract checks passed\./],
+    ['draftguru_bridge_v2_contract.py', /All DraftGuru bridge-v2 generation checks hold\./],
+    ['draftguru_child_validation_v3_contract.py', /All ISSUE-224 v3 child-validation contract checks hold\./],
+    ['draftguru_population_scan_contract.py', /^All checks passed\.$/m],
+    ['fitzroy_profile_continuity_contract.py', /^all checks passed$/m],
+    ['issue333_o2_contract.py', /^(\d+) of \1 checks passed$/m],
+    ['settle_emit_contract.py', /All in-season observation-bundle scenarios hold\./],
+  ];
+
+  it.each(CONTRACTS)('%s exits 0 and prints its closing line', (file, closing) => {
+    const run = spawnSync(python, [join('tests', 'python', file)],
+      { cwd: contractRoot, encoding: 'utf8', timeout: 110_000 });
+    expect(run.error, `could not run ${python}`).toBeUndefined();
+    expect(run.status, `${run.stdout}\n${run.stderr}`).toBe(0);
+    expect(run.stdout).toMatch(closing);
+  }, 120_000);
+
+  it('every tests/python/*_contract.py is run by a suite (this table or another test file)', () => {
+    const testsDir = join(contractRoot, 'tests');
+    const sources: string[] = [];
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const path = join(dir, entry.name);
+        if (entry.isDirectory()) walk(path);
+        else if (entry.name.endsWith('.test.ts')) sources.push(readFileSync(path, 'utf8'));
+      }
+    };
+    walk(testsDir);
+    const unwired = readdirSync(join(testsDir, 'python'))
+      .filter((name) => name.endsWith('_contract.py'))
+      .filter((name) => !sources.some((text) => text.includes(name)));
+    expect(unwired, 'contracts no suite runs: add a row to the CONTRACTS table in tests/reference-data.test.ts').toEqual([]);
+  });
+});
+
+describe('the Python-backed suites resolve the interpreter the documented way (ISSUE-363 TST-6)', () => {
+  const none = () => false;
+  it('AFLDB_PYTHON wins, PYTHON is the legacy fallback, then the in-tree venv, then the system interpreter', () => {
+    expect(resolveTestPython('/r', { AFLDB_PYTHON: '/v/py', PYTHON: '/o/py' }, none, 'linux')).toBe('/v/py');
+    expect(resolveTestPython('/r', { AFLDB_PYTHON: '  ', PYTHON: '/o/py' }, none, 'linux')).toBe('/o/py');
+    expect(resolveTestPython('/r', {}, (p) => p === join('/r', '.venv', 'bin', 'python'), 'linux')).toBe(join('/r', '.venv', 'bin', 'python'));
+    expect(resolveTestPython('/r', {}, none, 'linux')).toBe('python3');
+    expect(resolveTestPython('/r', {}, none, 'win32')).toBe('python');
   });
 });

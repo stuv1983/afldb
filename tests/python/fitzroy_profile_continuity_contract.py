@@ -74,8 +74,13 @@ check("1b every rule names player_stats_2025.csv and normalised paths",
       all(r["file"] == "player_stats_2025.csv"
           and fz.PROFILE_PATH_SHAPE.match(r["continuing_url"])
           and fz.PROFILE_PATH_SHAPE.match(r["renumbered_url"]) for r in rules))
-check("1c the renumbered rows sum to the 79 measured blank-ID renumbered rows",
-      sum(r["expect"]["renumbered_rows"] for r in rules) == 79)
+# AFLDB-ISSUE-363 TST-5: 79 when the 2025 snapshot was reviewed (25 + 18 + 23 + 13); the 2026 rollover
+# (c7e17da2, State B) deliberately extended each rule to renumbered_last_season 2026 and re-bound the
+# counts to 52 + 31 + 42 + 25 = 150 (the same four profiles, 71 further 2026 rows).
+check("1c the renumbered rows are the 150 reviewed blank-ID rows of the 2025-2026 snapshot (52 + 31 + 42 + 25)",
+      [r["expect"]["renumbered_rows"] for r in rules] == [52, 31, 42, 25]
+      and sum(r["expect"]["renumbered_rows"] for r in rules) == 150
+      and all(r["expect"]["renumbered_last_season"] == 2026 for r in rules))
 check("1d Billy Wilson (career-game-1 debut) is named by no rule",
       not any("Billy_Wilson" in json.dumps(r) for r in rules))
 
