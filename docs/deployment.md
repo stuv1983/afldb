@@ -324,7 +324,7 @@ procedure in `docs/v2/evidence/remediation-20261114/hostops/README.md`):
    order PostgreSQL then `afldb`, then `release.mjs status`.
 4. `node deploy/release.mjs host-gate [--strict]` in every release packet: refuses while apt is running or
    `apt-daily-upgrade` is due inside `--window-min` (default 90); reports a pending reboot; `--strict` also requires the
-   needrestart hold. It is read-only (`systemctl show/is-active/list-timers`, `pgrep -x`, two world-readable paths); it
+   needrestart hold. It is read-only (`systemctl show/is-active/list-timers`, `pgrep`, two world-readable paths); it
    never runs apt, needrestart or unattended-upgrade.
 5. `status --expect` records the service `InvocationID`, `NRestarts` and `ActiveEnterTimestamp` and compares them with the
    window recorded at `promote`/`rollback`. A (re)start inside or just after an apt run is flagged as not yours;
