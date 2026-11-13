@@ -85,7 +85,7 @@
 > behaviour are explicitly untested, and are listed as open rather than
 > folded into the ticks around them.
 
-> **Restarting the service needs root.** `sudo systemctl restart afldb` prompts for a password, so a deployment cannot complete unattended. The service does pick up a new build on its next restart, but do not assume a build alone has deployed it.
+> **Restarting the service needs root.** `sudo systemctl restart afldb` prompts for a password, so a deployment cannot complete unattended. The service does pick up a new build on its next restart, but do not assume a build alone has deployed it. **Any** next restart counts, not only yours: on production an unattended security upgrade restarts `afldb` and PostgreSQL by itself (needrestart's stock automatic mode; 2026-11-14 06:35, AFLDB-ISSUE-351), so on the release route (`docs/deployment.md` §3a) a promoted-but-not-yet-restarted release can be activated without the status gate. Promote and your restart are one attended step (`release.mjs promote --attended`, gated by `release.mjs host-gate`); see §3a "Patching and restarts".
 
 ## 2. Outstanding data-quality items
 

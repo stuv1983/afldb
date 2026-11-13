@@ -19,9 +19,11 @@
  *   node deploy/release.mjs build    --checkout <dir> --revision <sha> --afldb-env production
  *                                    [--typecheck off-host --typecheck-evidence <text>] [--smoke-paths /a,/b]
  *   node deploy/release.mjs verify   <id>
- *   node deploy/release.mjs promote  <id>
- *   node deploy/release.mjs rollback [--to <id>]
- *   node deploy/release.mjs status   [--expect <id>] [--url http://127.0.0.1:3100]
+ *   node deploy/release.mjs promote  <id> --attended [--skip-host-gate "<reason>"] [--window-min 90] [--strict]
+ *   node deploy/release.mjs rollback [--to <id>] --attended [--ledger-head <name> [--accept-schema-ahead <name>]]
+ *   node deploy/release.mjs status   [--expect <id>] [--url http://127.0.0.1:3100] [--confirm-attended-restart] [--checkout <dir>]
+ *   node deploy/release.mjs host-gate [--mode promote|rollback] [--strict] [--window-min 90]     read-only packet gate
+ *   node deploy/release.mjs check-node-modules --checkout <dir>                                  installed tree vs lock
  *   node deploy/release.mjs adopt    --checkout <dir> --revision <sha> --afldb-env production
  *                                    [--from-manifest <sha256sum file>] [--expect-build-id <id>]
  *
@@ -61,6 +63,7 @@ export const DEFAULTS = Object.freeze({
   typecheck: 'in-build', // or 'off-host': skip the build's type-check (about 1 GB less peak; needs --typecheck-evidence)
   url: 'http://127.0.0.1:3100',
   unit: 'afldb',
+  pgUnit: 'postgresql@16-main.service',
 });
 const MANIFEST = 'MANIFEST.sha256';
 const RELEASE_JSON = 'release.json';
@@ -190,6 +193,177 @@ export function classifyDrift(expected, actual) {
   }
   result.ok = result.missing.length === 0 && result.changed.length === 0 && result.added.length === 0;
   return result;
+}
+
+// ------------------------------------------------------------------ AFLDB-ISSUE-351: host patching gate (pure)
+
+/** `systemctl show -p A -p B` output as an object (first `=` splits). */
+export function parseShowProps(text) {
+  const out = {};
+  for (const line of String(text).split('\n')) {
+    const i = line.indexOf('=');
+    if (i > 0) out[line.slice(0, i)] = line.slice(i + 1).trim();
+  }
+  return out;
+}
+
+/** `Sat 2026-11-14 06:35:21 UTC` (systemctl --timestamp=utc) as epoch ms; null for anything else, including local-zone text. */
+export function parseSystemdTimestampUtc(text) {
+  const m = /^(?:\w{3} )?(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})(?:\.\d+)? UTC$/.exec(String(text).trim());
+  return m ? Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) : null;
+}
+
+/** The unit snapshot recorded at promote time and compared by `status`. */
+export function unitSnapshot(props) {
+  return {
+    activeState: props.ActiveState ?? null,
+    mainPid: props.MainPID && props.MainPID !== '0' ? Number(props.MainPID) : null,
+    invocationId: props.InvocationID || null,
+    nRestarts: props.NRestarts !== undefined && props.NRestarts !== '' ? Number(props.NRestarts) : null,
+    activeEnterMs: parseSystemdTimestampUtc(props.ActiveEnterTimestamp ?? ''),
+  };
+}
+
+/**
+ * /var/log/apt/history.log blocks as `{startMs, endMs, command}`. Start-Date/End-Date are in the host's
+ * local zone, which is also this process's zone on the host (tests pin TZ).
+ */
+export function parseAptHistory(text) {
+  const entries = [];
+  let cur = null;
+  const when = (v) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})$/.exec(v.trim());
+    return m ? new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]).getTime() : null;
+  };
+  for (const line of String(text).split('\n')) {
+    const m = /^(Start-Date|End-Date|Commandline):\s*(.*)$/.exec(line);
+    if (!m) continue;
+    if (m[1] === 'Start-Date') { cur = { startMs: when(m[2]), endMs: null, command: '' }; entries.push(cur); }
+    else if (cur && m[1] === 'End-Date') cur.endMs = when(m[2]);
+    else if (cur) cur.command = m[2];
+  }
+  return entries.filter((e) => e.startMs !== null);
+}
+
+/** Apt runs overlapping [fromMs, toMs]; an unfinished run counts as running until toMs. */
+export function aptRunsBetween(entries, fromMs, toMs) {
+  return entries.filter((e) => (e.endMs ?? toMs) >= fromMs && e.startMs <= toMs);
+}
+
+/** True when the service (re)started during or just after an apt run: the unattended-upgrade signature (needrestart). */
+export function restartCoincidesWithApt(entries, activeEnterMs, slackMs = 5 * 60_000) {
+  if (activeEnterMs === null) return null;
+  return entries.find((e) => activeEnterMs >= e.startMs && activeEnterMs <= (e.endMs ?? e.startMs) + slackMs) ?? null;
+}
+
+/**
+ * Does needrestart config (conf.d/*.conf text) stop it restarting `afldb` and PostgreSQL? Recognises the two
+ * documented single-line forms: `$nrconf{override_rc}->{qr(^afldb)} = 0;` and the hash form `qr(^afldb) => 0,`.
+ */
+export function needrestartHold(confText) {
+  const live = String(confText).split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
+  const holds = (name) => new RegExp(`override_rc[^\\n]*\\b${name}\\b[^\\n]*=\\s*0\\b|qr\\(\\^?${name}[^\\n]*=>\\s*0\\b`).test(live);
+  return { afldb: holds('afldb'), postgresql: holds('postgresql') };
+}
+
+/**
+ * The gate over a host-state snapshot. Refusals stop promote; warnings are reported and recorded.
+ * `mode` 'rollback' never refuses (it only moves links; the emergency path must stay open), it warns instead.
+ */
+export function evaluateHostGate(state, { windowMin = 90, strict = false, mode = 'promote' } = {}) {
+  const refusals = [];
+  const warnings = [];
+  const facts = [];
+  const nowMs = state.nowMs;
+  const problem = (message) => (mode === 'rollback' ? warnings : refusals).push(message);
+  if ((state.aptActive ?? []).length > 0) problem(`apt is running now (${state.aptActive.join(', ')}): a restart could land during the activation window`);
+  if ((state.aptProcesses ?? []).length > 0) problem(`package-manager process(es) running: ${state.aptProcesses.join(', ')}`);
+  if (state.nextAptUpgradeMs === undefined || state.nextAptUpgradeMs === null) {
+    warnings.push('the next apt-daily-upgrade time could not be read (timer absent or systemctl unavailable)');
+  } else {
+    const inMin = Math.round((state.nextAptUpgradeMs - nowMs) / 60_000);
+    facts.push(`next apt-daily-upgrade in ${inMin} min`);
+    if (inMin <= windowMin) problem(`apt-daily-upgrade is due in ${inMin} min (gate window ${windowMin} min); it may restart the service`);
+  }
+  if (state.rebootRequired?.present) {
+    warnings.push(`reboot pending (${(state.rebootRequired.pkgs ?? []).filter((p) => p.startsWith('linux-image')).length} kernel package(s)); `
+      + 'a reboot is a separate owner operation (docs/deployment.md §3a)');
+  }
+  const hold = state.needrestartHold;
+  if (hold === null || hold === undefined) warnings.push('needrestart configuration unreadable');
+  else if (!hold.afldb || !hold.postgresql) {
+    const text = `needrestart hold missing for ${[!hold.afldb && 'afldb', !hold.postgresql && 'postgresql'].filter(Boolean).join(' and ')}: `
+      + 'an unattended upgrade restarts it';
+    (strict ? refusals : warnings).push(text);
+  } else facts.push('needrestart holds afldb and postgresql');
+  for (const [unit, snap] of Object.entries(state.units ?? {})) {
+    facts.push(`${unit} ${snap.activeState ?? '?'} MainPID=${snap.mainPid ?? '-'} InvocationID=${snap.invocationId ?? '-'} NRestarts=${snap.nRestarts ?? '-'} ActiveEnter=${snap.activeEnterMs ? new Date(snap.activeEnterMs).toISOString() : '-'}`);
+  }
+  return { ok: refusals.length === 0, refusals, warnings, facts };
+}
+
+/** `118_x.sql` -> 118; null when the name has no numeric prefix. */
+export function migrationNumber(name) {
+  const m = /^(\d+)_/.exec(String(name ?? ''));
+  return m ? Number(m[1]) : null;
+}
+
+/** Highest migration file name in a list of paths/names (numeric prefix), or null. */
+export function migrationHeadOf(names) {
+  let best = null;
+  for (const raw of names) {
+    const name = String(raw).split('/').pop();
+    if (/\.sql$/.test(name) && migrationNumber(name) !== null && (best === null || migrationNumber(name) > migrationNumber(best))) best = name;
+  }
+  return best;
+}
+
+/**
+ * Rollback compatibility with the database ledger. Refuses ONLY a proven mismatch: the ledger head is known (the
+ * operator read it) and the target release was built before it, or after it. Everything unknown proceeds with a
+ * recorded warning: rollback is the emergency path and must work when the database is down (ISSUE-351 H-6).
+ */
+export function checkRollbackLedger({ targetHead, ledgerHead, accept }) {
+  if (!ledgerHead) return { ok: true, status: 'not-checked', message: 'database ledger head not supplied (--ledger-head): compatibility NOT checked' };
+  if (migrationNumber(ledgerHead) === null) return { ok: false, status: 'bad-input', message: `--ledger-head ${ledgerHead} is not a migration file name` };
+  if (!targetHead) return { ok: true, status: 'target-unknown', message: 'the target release records no migration head (built before ISSUE-351): compatibility NOT checked' };
+  const t = migrationNumber(targetHead);
+  const l = migrationNumber(ledgerHead);
+  if (t === l) return { ok: true, status: 'match', message: `target migration head ${targetHead} equals the ledger head` };
+  const direction = t < l ? `the database is ${l - t} migration(s) ahead of the target (${ledgerHead} applied, target built at ${targetHead})`
+    : `the target expects ${t - l} migration(s) the database has not applied (${targetHead} vs ledger ${ledgerHead})`;
+  if (accept === ledgerHead) return { ok: true, status: 'accepted', message: `${direction}; accepted with --accept-schema-ahead ${accept}` };
+  return { ok: false, status: 'mismatch', message: `${direction}; confirm the older/newer application tolerates this schema (docs/deployment.md §11, `
+    + `ISSUE-257 guard), then repeat with --accept-schema-ahead ${ledgerHead}` };
+}
+
+/**
+ * Installed tree versus the lock (ISSUE-364): every package in npm's hidden lockfile (node_modules/.package-lock.json,
+ * the record of what is installed) must be in package-lock.json with the same version and integrity, and every
+ * non-optional locked package must be installed. `unknown` when the installed record is missing.
+ */
+export function compareNodeModulesToLock(lock, installed) {
+  if (!installed?.packages) return { status: 'unknown', changed: [], extraneous: [], missing: [], checked: 0 };
+  const want = lock?.packages ?? {};
+  const have = installed.packages;
+  const changed = [];
+  const extraneous = [];
+  const missing = [];
+  for (const [path, pkg] of Object.entries(have)) {
+    const locked = want[path];
+    if (!locked) { extraneous.push(path); continue; }
+    if (pkg.link || locked.link) continue;
+    if (pkg.version !== locked.version || (pkg.integrity && locked.integrity && pkg.integrity !== locked.integrity)) {
+      changed.push(`${path} installed ${pkg.version} locked ${locked.version}`);
+    }
+  }
+  // An install made with --omit=dev holds no dev package at all; that is a choice, not drift.
+  const devOmitted = !Object.entries(want).some(([path, locked]) => locked.dev && have[path]);
+  for (const [path, locked] of Object.entries(want)) {
+    if (path === '' || locked.optional || locked.link || have[path] || (devOmitted && locked.dev)) continue;
+    missing.push(path);
+  }
+  return { status: changed.length + extraneous.length + missing.length === 0 ? 'ok' : 'mismatch', changed, extraneous, missing, checked: Object.keys(have).length };
 }
 
 // ------------------------------------------------------------------ filesystem helpers
@@ -958,6 +1132,7 @@ async function cmdBuild(opts) {
         buildId,
         afldbEnv,
         createdBy: 'build',
+        migrationHead: gitMigrationHead(checkout, revision),
         createdAt: new Date().toISOString(),
         host: hostname(),
         node: process.version,
@@ -1014,11 +1189,114 @@ function serviceRelease(opts) {
   return { pid, cwd: readlinkSync(`/proc/${pid}/cwd`) };
 }
 
-function afterSwitch(id, root) {
-  log('next: sudo systemctl restart afldb');
+function afterSwitch(id, root, attendedWindow) {
+  log('next, NOW and attended: sudo systemctl restart afldb');
   log(`then: node deploy/release.mjs status --expect ${id}${rootArg(root)}`);
+  if (attendedWindow) {
+    log('the activation window is OPEN: `current` names the new release but the service still runs the old one; any '
+      + 'restart before yours (an unattended upgrade, a PostgreSQL restart) activates it without the gate (ISSUE-351)');
+  }
   log('the database is not rolled back: migrations are forward-only (docs/deployment.md §11, including the '
     + 'ISSUE-257 guard); check a release older than an applied migration against it before the restart');
+}
+
+// ------------------------------------------------------------------ AFLDB-ISSUE-351: host state and the attended gate
+
+function systemctlUnit(unit) {
+  try {
+    const r = runQuiet('systemctl', ['show', unit, '--timestamp=utc', '-p', 'ActiveState', '-p', 'MainPID', '-p', 'InvocationID',
+      '-p', 'NRestarts', '-p', 'ActiveEnterTimestamp']);
+    return r.status === 0 ? unitSnapshot(parseShowProps(r.stdout)) : null;
+  } catch {
+    return null; // no systemd (a test host): unknown, never a guess
+  }
+}
+
+/**
+ * The host facts the gate reads. READ-ONLY: `systemctl show/is-active/list-timers`, `pgrep -x`, two world-readable
+ * paths. Nothing here runs apt, needrestart or unattended-upgrade. `--host-state <json>` replaces the reads with a
+ * fixture (tests, rehearsal) and is reported as such. With `--pid` (a service that is not the systemd unit) the
+ * unit is not read at all.
+ */
+export function collectHostState(opts) {
+  if (opts['host-state']) {
+    const fixture = JSON.parse(readFileSync(resolve(opts['host-state']), 'utf8'));
+    return { ...fixture, nowMs: fixture.nowMs ?? Date.now(), source: 'fixture' };
+  }
+  const state = { source: 'host', nowMs: Date.now(), aptActive: [], aptProcesses: [], nextAptUpgradeMs: null, rebootRequired: null, needrestartHold: null, units: {} };
+  const quiet = (command, args) => { try { return runQuiet(command, args); } catch { return { status: 127, stdout: '' }; } };
+  for (const unit of ['apt-daily.service', 'apt-daily-upgrade.service']) {
+    if (['active', 'activating', 'reloading'].includes(quiet('systemctl', ['is-active', unit]).stdout.trim())) state.aptActive.push(unit);
+  }
+  for (const name of ['unattended-upgr', 'apt', 'apt-get', 'dpkg']) {
+    if (quiet('pgrep', ['-x', name]).status === 0) state.aptProcesses.push(name);
+  }
+  try {
+    const timers = JSON.parse(quiet('systemctl', ['list-timers', 'apt-daily-upgrade.timer', '--all', '-o', 'json', '--no-pager']).stdout);
+    const next = timers.find((t) => t.unit === 'apt-daily-upgrade.timer')?.next;
+    state.nextAptUpgradeMs = next ? Math.floor(next / 1000) : null;
+  } catch { /* leave null: reported as unknown */ }
+  if (existsSync('/var/run/reboot-required')) {
+    let pkgs = [];
+    try { pkgs = readFileSync('/var/run/reboot-required.pkgs', 'utf8').split('\n').filter(Boolean); } catch { /* optional file */ }
+    state.rebootRequired = { present: true, pkgs };
+  } else {
+    state.rebootRequired = { present: false, pkgs: [] };
+  }
+  try {
+    const dir = '/etc/needrestart/conf.d';
+    state.needrestartHold = needrestartHold(readdirSync(dir).filter((n) => n.endsWith('.conf')).sort()
+      .map((n) => readFileSync(join(dir, n), 'utf8')).join('\n'));
+  } catch { /* leave null */ }
+  if (!opts.pid) {
+    for (const unit of [opts.unit, opts['pg-unit']]) state.units[unit] = systemctlUnit(unit) ?? { activeState: null, mainPid: null, invocationId: null, nRestarts: null, activeEnterMs: null };
+  }
+  return state;
+}
+
+/** ISSUE-351: promote and rollback are one attended step with the owner's restart, never a standalone switch. */
+function requireAttended(opts, what) {
+  if (opts.attended) return;
+  throw new Refusal(`${what} switches the release the service starts from, and the service restarts on any unattended `
+    + 'package upgrade or PostgreSQL restart (ISSUE-351). Run it only as one attended step with your own restart and '
+    + `status gate, and say so with --attended. Nothing was changed.`);
+}
+
+/** The pre-switch host gate; returns what is recorded in the event. Rollback only warns; promote refuses. */
+function runHostGate(opts, mode) {
+  if (opts['no-live']) return { skipped: '--no-live (service deliberately stopped)', window: null };
+  if (opts['skip-host-gate']) {
+    log(`WARNING host gate skipped: ${opts['skip-host-gate']}`);
+    return { skipped: String(opts['skip-host-gate']), window: null };
+  }
+  const state = collectHostState(opts);
+  const verdict = evaluateHostGate(state, { windowMin: opts['window-min'] ? num(opts, 'window-min') : 90, strict: Boolean(opts.strict), mode });
+  log(`host gate (${state.source}, ${mode}):`);
+  for (const fact of verdict.facts) log(`  ${fact}`);
+  for (const w of verdict.warnings) log(`  WARNING ${w}`);
+  for (const r of verdict.refusals) log(`  REFUSE ${r}`);
+  if (!verdict.ok) {
+    throw new Refusal(`host gate refused ${mode}: ${verdict.refusals.join('; ')}. Wait, or pass --skip-host-gate "<reason>" (recorded)`);
+  }
+  return {
+    skipped: null,
+    window: {
+      at: new Date(state.nowMs).toISOString(),
+      afldb: state.units?.[opts.unit] ?? null,
+      postgres: state.units?.[opts['pg-unit']] ?? null,
+      warnings: verdict.warnings,
+    },
+  };
+}
+
+/** Migration head recorded in a release, or derived from a checkout for a release built before ISSUE-351. */
+function gitMigrationHead(checkout, revision) {
+  try {
+    const r = runQuiet('git', ['-C', checkout, 'ls-tree', '--name-only', '-r', revision, '--', 'src/db/migrations']);
+    return r.status === 0 ? migrationHeadOf(r.stdout.split('\n').filter(Boolean)) : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -1028,6 +1306,7 @@ function afterSwitch(id, root) {
  */
 async function cmdPromote(opts, id) {
   const root = resolve(opts.root);
+  requireAttended(opts, 'promote');
   return withLock(root, 'links', 'promote', async () => {
     const { drift } = await verifyRelease(root, id);
     reportDrift(id, drift);
@@ -1042,11 +1321,12 @@ async function cmdPromote(opts, id) {
           + 'when the service is deliberately stopped');
       }
     }
+    const gate = runHostGate(opts, 'promote');
     if (current) switchLink(root, 'previous', `releases/${current}`);
     switchLink(root, 'current', `releases/${id}`);
-    event(root, 'promote', { id, previous: current });
+    event(root, 'promote', { id, previous: current, attended: true, hostGateSkipped: gate.skipped, window: gate.window });
     log(`PROMOTED ${id}; previous ${current ?? '(none)'}. The running service is unchanged until it restarts.`);
-    afterSwitch(id, root);
+    afterSwitch(id, root, true);
     return 0;
   });
 }
@@ -1067,22 +1347,68 @@ function everPassed(root, id) {
  */
 async function cmdRollback(opts) {
   const root = resolve(opts.root);
+  requireAttended(opts, 'rollback');
   return withLock(root, 'links', 'rollback', async () => {
     const current = readReleaseLink(root, 'current');
     const target = opts.to ?? readReleaseLink(root, 'previous');
     if (!target) throw new Refusal('no previous release; name one with --to <id>');
     if (target === current) throw new Refusal(`${target} is already current`);
-    const { drift } = await verifyRelease(root, target);
+    const { info, drift } = await verifyRelease(root, target);
     reportDrift(target, drift);
     if (!everPassed(root, target)) log(`warning: ${target} has no recorded status PASS in events.log`);
+    // ISSUE-351: schema compatibility. Refuses only a PROVEN mismatch against a ledger head the operator supplied;
+    // with no ledger head (database down) it proceeds and records that nothing was checked.
+    const targetHead = info.migrationHead ?? (opts.checkout ? gitMigrationHead(resolve(opts.checkout), info.revision) : null);
+    const ledger = checkRollbackLedger({ targetHead, ledgerHead: opts['ledger-head'], accept: opts['accept-schema-ahead'] });
+    log(`ledger: ${ledger.message}`);
+    if (!ledger.ok) throw new Refusal(`rollback: ${ledger.message}`);
+    const gate = runHostGate(opts, 'rollback');
     event(root, 'rollback-start', { id: target, from: current });
     switchLink(root, 'current', `releases/${target}`);
     if (current) switchLink(root, 'previous', `releases/${current}`);
-    event(root, 'rollback', { id: target, from: current });
+    event(root, 'rollback', { id: target, from: current, attended: true, ledger: ledger.status, targetMigrationHead: targetHead,
+      ledgerHead: opts['ledger-head'] ?? null, hostGateSkipped: gate.skipped, window: gate.window });
     log(`ROLLED BACK to ${target} (no rebuild); previous is now ${current ?? '(none)'}.`);
-    afterSwitch(target, root);
+    afterSwitch(target, root, true);
     return 0;
   });
+}
+
+// ------------------------------------------------------------------ AFLDB-ISSUE-351 status: the activation window audit
+
+function readEvents(root) {
+  try {
+    return readFileSync(join(root, 'events.log'), 'utf8').split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Was the restart that made `id` live an unattended one? Compares the service identity recorded at promote time with now,
+ * and whether the (re)start coincides with an apt run (the unattended-upgrade + needrestart signature). Read-only.
+ * @returns {{ problems: string[], notes: string[] }}
+ */
+export function auditActivation({ events, id, now, aptEntries, confirmed, nowMs }) {
+  const out = { problems: [], notes: [] };
+  const opened = [...events].reverse().find((e) => (e.op === 'promote' || e.op === 'rollback') && e.id === id);
+  if (!now) return out;
+  out.notes.push(`service InvocationID ${now.invocationId ?? '?'} NRestarts ${now.nRestarts ?? '?'} ActiveEnter ${now.activeEnterMs ? new Date(now.activeEnterMs).toISOString() : '?'}`);
+  if (!opened?.window?.afldb) { out.notes.push(`no recorded activation window for ${id} (promoted before ISSUE-351 or with the gate skipped)`); return out; }
+  const before = opened.window.afldb;
+  const openedMs = Date.parse(opened.window.at);
+  if (before.invocationId && now.invocationId && before.invocationId !== now.invocationId) {
+    out.notes.push(`restarted since ${opened.op} (InvocationID ${before.invocationId} -> ${now.invocationId})`);
+    const hit = restartCoincidesWithApt(aptEntries ?? [], now.activeEnterMs);
+    if (hit && !confirmed) {
+      out.problems.push(`the service (re)started at ${new Date(now.activeEnterMs).toISOString()}, during/after an apt run `
+        + `(${new Date(hit.startMs).toISOString()} ${hit.command}): that is the unattended-upgrade signature, so this may not be your attended restart. `
+        + 'If it was yours, rerun with --confirm-attended-restart');
+    }
+  }
+  const runs = aptRunsBetween(aptEntries ?? [], openedMs, nowMs);
+  if (runs.length > 0) out.notes.push(`${runs.length} apt run(s) since the ${opened.op}: ${runs.map((r) => new Date(r.startMs).toISOString()).join(', ')}`);
+  return out;
 }
 
 /**
@@ -1139,15 +1465,85 @@ async function cmdStatus(opts) {
       problems.push(`HTTP probe of ${base} failed: ${error.message}`);
     }
   }
+  // ISSUE-351: who made this release live? Service identity (InvocationID, NRestarts, ActiveEnter) against the window
+  // recorded at promote/rollback, and against apt activity. Read-only; a host without systemd reports nothing.
+  let serviceNow = null;
+  if (!opts['no-live'] && cur.id) {
+    let nowMs = Date.now();
+    if (opts['host-state']) {
+      const fixture = collectHostState(opts);
+      serviceNow = fixture.units?.[opts.unit] ?? null;
+      nowMs = fixture.nowMs;
+    } else if (!opts.pid) {
+      serviceNow = systemctlUnit(opts.unit);
+    }
+    const hostState = { nowMs };
+    let aptEntries = [];
+    try { aptEntries = parseAptHistory(readFileSync(opts['apt-history'] ?? '/var/log/apt/history.log', 'utf8')); } catch { log('apt history unreadable: activation audit limited to service identity'); }
+    const audit = auditActivation({ events: readEvents(root), id: cur.id, now: serviceNow, aptEntries, confirmed: Boolean(opts['confirm-attended-restart']), nowMs: hostState.nowMs });
+    for (const note of audit.notes) log(`activation ${note}`);
+    if (opts.expect) problems.push(...audit.problems);
+    const lastPass = [...readEvents(root)].reverse().find((e) => e.op === 'status-pass' && e.id === cur.id);
+    if (!opts.expect && lastPass?.invocationId && serviceNow?.invocationId && lastPass.invocationId !== serviceNow.invocationId) {
+      log(`note: the service restarted since the last attested PASS (InvocationID ${lastPass.invocationId} -> ${serviceNow.invocationId}); `
+        + 'compare with your maintenance log: this was not a restart you attested');
+    }
+  }
+  if (opts.checkout) {
+    const nm = checkNodeModules(resolve(opts.checkout));
+    log(`node_modules ${nm.status}${nm.status === 'unknown' ? ' (no installed record)' : `, ${nm.checked} installed packages`}`);
+    if (nm.status === 'mismatch') problems.push(`node_modules differ from package-lock.json: ${nodeModulesSummary(nm)}`);
+  }
   if (problems.length > 0) {
     for (const p of problems) console.error(`release: FAIL ${p}`);
     log('STATUS FAIL');
     return 1;
   }
   // A live, expected PASS is what makes a release a known-good rollback target.
-  if (opts.expect && !opts['no-live']) event(root, 'status-pass', { id: cur.id });
+  if (opts.expect && !opts['no-live']) {
+    event(root, 'status-pass', { id: cur.id, invocationId: serviceNow?.invocationId ?? null, nRestarts: serviceNow?.nRestarts ?? null });
+  }
   log(`STATUS PASS ${cur.id}`);
   return 0;
+}
+
+/** ISSUE-364: the serving checkout's installed tree against its lockfile (the settle timers run from it). */
+export function checkNodeModules(checkout) {
+  const read = (file) => { try { return JSON.parse(readFileSync(join(checkout, file), 'utf8')); } catch { return null; } };
+  const lock = read('package-lock.json');
+  if (!lock) return { status: 'unknown', changed: [], extraneous: [], missing: [], checked: 0, reason: 'package-lock.json unreadable' };
+  return compareNodeModulesToLock(lock, read(join('node_modules', '.package-lock.json')));
+}
+
+function nodeModulesSummary(nm) {
+  const part = (label, list) => (list.length ? `${label} ${list.length} [${list.slice(0, 3).join('; ')}]` : null);
+  return [part('changed', nm.changed), part('extraneous', nm.extraneous), part('missing', nm.missing)].filter(Boolean).join(', ');
+}
+
+/** `check-node-modules --checkout <dir>`: exit 0 ok/unknown, 1 mismatch. The settle wrapper only warns on 1 (H-7). */
+async function cmdCheckNodeModules(opts) {
+  const nm = checkNodeModules(resolve(required(opts, 'checkout')));
+  if (nm.status === 'mismatch') {
+    console.error(`release: node_modules differ from package-lock.json: ${nodeModulesSummary(nm)}`);
+    log('NODE_MODULES MISMATCH');
+    return 1;
+  }
+  log(`NODE_MODULES ${nm.status.toUpperCase()}${nm.status === 'ok' ? ` (${nm.checked} installed packages match the lock)` : ` (${nm.reason ?? 'no installed record'}; not verified)`}`);
+  return 0;
+}
+
+/** `host-gate [--mode promote|rollback] [--strict] [--window-min N]`: the packet gate. Read-only; exit 1 on refusal. */
+async function cmdHostGate(opts) {
+  const mode = opts.mode ?? 'promote';
+  if (!['promote', 'rollback'].includes(mode)) throw new Refusal('--mode must be promote or rollback');
+  const state = collectHostState(opts);
+  const verdict = evaluateHostGate(state, { windowMin: opts['window-min'] ? num(opts, 'window-min') : 90, strict: Boolean(opts.strict), mode });
+  log(`host gate (${state.source}, ${mode}) at ${new Date(state.nowMs).toISOString()}`);
+  for (const fact of verdict.facts) log(`  ${fact}`);
+  for (const w of verdict.warnings) log(`  WARNING ${w}`);
+  for (const r of verdict.refusals) console.error(`release: REFUSE ${r}`);
+  log(verdict.ok ? 'HOST GATE PASS' : 'HOST GATE REFUSED');
+  return verdict.ok ? 0 : 1;
 }
 
 /**
@@ -1246,6 +1642,7 @@ async function cmdAdopt(opts) {
       buildId,
       afldbEnv,
       createdBy: 'adopt',
+      migrationHead: gitMigrationHead(checkout, revision),
       createdAt: new Date().toISOString(),
       host: hostname(),
       adoptedFrom: source,
@@ -1290,9 +1687,10 @@ export function parseArgs(argv) {
     typecheck: DEFAULTS.typecheck,
     url: DEFAULTS.url,
     unit: DEFAULTS.unit,
+    'pg-unit': DEFAULTS.pgUnit,
   };
   const positional = [];
-  const flags = new Set(['no-live', 'allow-node-mismatch']);
+  const flags = new Set(['no-live', 'allow-node-mismatch', 'attended', 'strict', 'confirm-attended-restart']);
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (!arg.startsWith('--')) { positional.push(arg); continue; }
@@ -1318,8 +1716,10 @@ export async function main(argv) {
     case 'rollback': return cmdRollback(opts);
     case 'status': return cmdStatus(opts);
     case 'adopt': return cmdAdopt(opts);
+    case 'host-gate': return cmdHostGate(opts);
+    case 'check-node-modules': return cmdCheckNodeModules(opts);
     default:
-      console.error('usage: node deploy/release.mjs build|verify|promote|rollback|status|adopt [options]; see the file header');
+      console.error('usage: node deploy/release.mjs build|verify|promote|rollback|status|adopt|host-gate|check-node-modules [options]; see the file header');
       return 2;
   }
 }

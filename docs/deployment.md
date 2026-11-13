@@ -220,13 +220,30 @@ the in-place route above.
 # as arm, from the serving checkout, with the unit's pinned Node first on PATH
 R=deploy/release.mjs
 node $R build --checkout ~/projects/afldb --revision <40-hex> --afldb-env production
-node $R promote <rev12>-<BUILD_ID>            # refuses unless the service runs `current`
-sudo systemctl restart afldb                   # owner
-node $R status --expect <rev12>-<BUILD_ID>     # the identity gate
+# ATTENDED STEP (AFLDB-ISSUE-351): the gate, the switch, your restart and the identity gate are one sitting
+node $R host-gate                              # read-only: apt/needrestart/reboot-required/next apt-daily-upgrade
+node $R promote <rev12>-<BUILD_ID> --attended  # runs the same gate; refuses unless the service runs `current`
+sudo systemctl restart afldb                   # owner, NOW: the activation window is open until this
+node $R status --expect <rev12>-<BUILD_ID>     # the identity gate; also audits who restarted the service
 bash deploy/post-install-check.sh <rev12>-<BUILD_ID>   # origin, public assets, journal
 # if the gate fails: switch back to the retained release (no build), restart, gate again
-node $R rollback && sudo systemctl restart afldb && node $R status --expect <previous id>
+node $R rollback --attended [--ledger-head <name>] && sudo systemctl restart afldb && node $R status --expect <previous id>
 ```
+
+`promote` and `rollback` refuse without `--attended` (nothing is changed): switching `current` is only half of an
+activation, and until the owner's restart any restart of the service activates the switched release without the
+status gate (ISSUE-351). The two commands that changed meaning, and every caller that must now carry the flag:
+this block, §11 Rollback, `docs/production-cutover.md` (release step), and any release packet written before
+2026-11-14 (those keep their historical text; a new packet copies this block). `deploy/post-install-check.sh` and
+`status` are unchanged callers. `--skip-host-gate "<reason>"` bypasses the host gate only (recorded in `events.log`).
+`rollback` never refuses on host state (the emergency path stays open); it warns.
+
+- **Rollback and the schema.** `release.json` records the migration head of the revision a release was built from
+  (`migrationHead`; releases built before this change have none, or take `--checkout <dir>` to derive it from Git).
+  Give `rollback` the database's head, read read-only: `SELECT max(name) FROM afldb_meta.schema_migrations`, as
+  `--ledger-head <name>`. If the database is ahead of (or behind) the target, `rollback` refuses until you repeat it with
+  `--accept-schema-ahead <the same name>` (check §11 and the ISSUE-257 guard first). **Without `--ledger-head` it proceeds
+  and records `ledger: not-checked`**: rollback must keep working when the database is down.
 
 - **Layout.** `/home/arm/afldb-releases/releases/<rev12>-<BUILD_ID>/` holds one release: the bundle,
   the revision's `deploy/server-cluster.mjs`, `release.json` and `MANIFEST.sha256`. `current` and
@@ -283,6 +300,38 @@ node $R rollback && sudo systemctl restart afldb && node $R status --expect <pre
   `SIGHUP`, which stops the build safely but wastes it.
 - **Retention.** Nothing is deleted automatically. A release is about 0.8 GB. `rollback --to <id>`
   names any retained release. Migrations stay forward-only: see §11 before rolling back across one.
+- **Node modules of the serving checkout.** The settle timers run `tsx` and every tool from the serving checkout's
+  `node_modules`, which no release check covers. `node deploy/release.mjs check-node-modules --checkout <dir>` compares
+  `node_modules/.package-lock.json` (npm's record of what is installed) with `package-lock.json` (version and integrity,
+  extraneous and missing packages; optional and, when none are installed, dev packages are not drift). The settle
+  wrapper runs it and **only warns** (`AFLDB_NODE_MODULES_DRIFT` in the journal): a refusing preflight would lose a
+  night silently. `status --checkout <dir>` makes the same finding a FAIL for the attended gate.
+
+### Patching and restarts (`AFLDB-ISSUE-351`)
+
+Production applies Ubuntu security updates unattended (`apt-daily-upgrade.timer`, 06:00 plus up to 60 minutes, daily).
+Left at its stock settings, `needrestart` then **restarts `afldb` and `postgresql@16-main` itself**: the 2026-11-14 libc6
+upgrade did so at 06:35:16-21, and `Requires=postgresql.service` makes the app follow the database. Under the release
+route that is also an unattended activation of whatever `current` names. What is prepared (not installed; owner action,
+procedure in `docs/v2/evidence/remediation-20261114/hostops/README.md`):
+
+1. `deploy/host-policy/needrestart-afldb-hold.conf` → `/etc/needrestart/conf.d/50-afldb-hold.conf`: needrestart no longer
+   restarts those two units. Security updates still install daily; the old libraries stay mapped until you restart.
+2. `deploy/host-policy/apt-52-afldb-unattended.conf` → `/etc/apt/apt.conf.d/52-afldb-unattended`: PostgreSQL server
+   packages leave the unattended set, because their postinst restarts the cluster regardless of needrestart.
+3. An **owned window** (suggested: weekly, after the apt run and outside 05:00-05:30): `sudo needrestart -r l` (list only;
+   shows what is owed), `sudo apt-get install --only-upgrade` for any held PostgreSQL package, then your restarts in the
+   order PostgreSQL then `afldb`, then `release.mjs status`.
+4. `node deploy/release.mjs host-gate [--strict]` in every release packet: refuses while apt is running or
+   `apt-daily-upgrade` is due inside `--window-min` (default 90); reports a pending reboot; `--strict` also requires the
+   needrestart hold. It is read-only (`systemctl show/is-active/list-timers`, `pgrep -x`, two world-readable paths); it
+   never runs apt, needrestart or unattended-upgrade.
+5. `status --expect` records the service `InvocationID`, `NRestarts` and `ActiveEnterTimestamp` and compares them with the
+   window recorded at `promote`/`rollback`. A (re)start inside or just after an apt run is flagged as not yours;
+   `--confirm-attended-restart` is your explicit way past it.
+
+A **pending reboot** (kernel packages; `/var/run/reboot-required`) is a separate owner operation, never an unattended one:
+there is no `Automatic-Reboot`. Procedure and recovery: the README above.
 
 ## 4. Service management
 
@@ -1624,8 +1673,9 @@ back to development.
 
 ## 11. Rollback
 
-On a host that uses the release route (§3a), roll back with `node deploy/release.mjs rollback`, then
-restart. That reuses the retained release and rebuilds nothing. The in-place commands below rebuild
+On a host that uses the release route (§3a), roll back with `node deploy/release.mjs rollback --attended`
+(add `--ledger-head <name>` when the database is reachable; §3a), then restart. That reuses the retained release and
+rebuilds nothing. The in-place commands below rebuild
 in the serving checkout: they take the live assets down while they run, and a failed run leaves the
 site broken (AFLDB-ISSUE-329).
 

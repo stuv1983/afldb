@@ -10,23 +10,34 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { verifyClaim } from '../src/lib/auth/tokens';
 import {
   DEFAULTS,
+  auditActivation,
+  checkRollbackLedger,
   classifyDrift,
+  compareNodeModulesToLock,
+  evaluateHostGate,
   formatManifest,
   hashTree,
   isReleaseId,
   isServerOutput,
+  migrationHeadOf,
+  needrestartHold,
+  parseAptHistory,
   parseArgs,
   parseExecStartNode,
   parseManifest,
   parseMeminfo,
+  parseShowProps,
+  parseSystemdTimestampUtc,
   parseUnsetEnvironment,
   linksOutside,
   readReleaseLink,
   releaseId,
+  restartCoincidesWithApt,
   serviceEnvironment,
   smokeClaimCookie,
   smokeLogErrors,
   switchLink,
+  unitSnapshot,
 } from '../deploy/release.mjs';
 
 /**
@@ -193,6 +204,191 @@ describe('AFLDB-ISSUE-329 — the systemd drop-in and the supervisor', () => {
   it('needs nothing but Node built-ins and the env-file guard, so it runs before npm ci', () => {
     const imports = [...TOOL.matchAll(/^import .* from '([^']+)';$/gm)].map((m) => m[1]);
     expect(imports.filter((s) => !s.startsWith('node:'))).toEqual(['../tools/build/env-in-standalone.mjs']);
+  });
+});
+
+// ---------------------------------------------------------------------------- AFLDB-ISSUE-351
+
+/**
+ * AFLDB-ISSUE-351 — unattended upgrades restarted the production app and PostgreSQL (2026-11-14 06:35 AEDT), and
+ * promote/rollback leave a window in which any restart activates the switched release without the status gate.
+ * Pure rules; the CLI wiring is exercised in the Linux block below.
+ */
+describe('AFLDB-ISSUE-351 — the attended gate and the activation audit (pure)', () => {
+  const NOW = Date.UTC(2026, 10, 14, 0, 0, 0);
+  const clear = () => ({
+    nowMs: NOW,
+    aptActive: [] as string[],
+    aptProcesses: [] as string[],
+    nextAptUpgradeMs: NOW + 20 * 3_600_000 as number | null,
+    rebootRequired: { present: false, pkgs: [] as string[] },
+    needrestartHold: { afldb: true, postgresql: true } as { afldb: boolean; postgresql: boolean } | null,
+    units: {},
+  });
+
+  it('reads systemctl show properties and UTC timestamps, and nothing it cannot be sure of', () => {
+    const props = parseShowProps('ActiveState=active\nMainPID=3774230\nInvocationID=a2584da119f84c5bb47e2c5a58f85755\nNRestarts=0\nActiveEnterTimestamp=Fri 2026-11-13 19:35:21 UTC\n');
+    expect(unitSnapshot(props)).toEqual({ activeState: 'active', mainPid: 3774230, invocationId: 'a2584da119f84c5bb47e2c5a58f85755', nRestarts: 0, activeEnterMs: Date.UTC(2026, 10, 13, 19, 35, 21) });
+    // A local-zone abbreviation (what systemctl prints for timer properties) is not guessed at.
+    expect(parseSystemdTimestampUtc('Sat 2026-11-14 06:35:21 AEDT')).toBeNull();
+    expect(unitSnapshot({ MainPID: '0' }).mainPid).toBeNull();
+  });
+
+  it('refuses promote while apt runs or is due inside the window, and lets a clear host through', () => {
+    expect(evaluateHostGate(clear()).ok).toBe(true);
+    expect(evaluateHostGate({ ...clear(), aptActive: ['apt-daily-upgrade.service'] }).refusals[0]).toMatch(/apt is running now/);
+    expect(evaluateHostGate({ ...clear(), aptProcesses: ['unattended-upgr'] }).refusals[0]).toMatch(/package-manager process/);
+    const due = evaluateHostGate({ ...clear(), nextAptUpgradeMs: NOW + 45 * 60_000 });
+    expect(due.ok).toBe(false);
+    expect(due.refusals[0]).toMatch(/apt-daily-upgrade is due in 45 min \(gate window 90 min\)/);
+    expect(evaluateHostGate({ ...clear(), nextAptUpgradeMs: NOW + 45 * 60_000 }, { windowMin: 30 }).ok).toBe(true);
+    // An unreadable timer is reported, never read as "nothing due".
+    expect(evaluateHostGate({ ...clear(), nextAptUpgradeMs: null }).warnings.join()).toMatch(/could not be read/);
+  });
+
+  it('never refuses a rollback on host state: the emergency path stays open, with a warning', () => {
+    const verdict = evaluateHostGate({ ...clear(), aptActive: ['apt-daily-upgrade.service'], nextAptUpgradeMs: NOW + 60_000 }, { mode: 'rollback' });
+    expect(verdict.ok).toBe(true);
+    expect(verdict.warnings.join(' | ')).toMatch(/apt is running now.*apt-daily-upgrade is due in 1 min/);
+  });
+
+  it('reports a pending reboot, and treats a missing needrestart hold as a warning unless strict', () => {
+    const reboot = evaluateHostGate({ ...clear(), rebootRequired: { present: true, pkgs: ['linux-image-6.8.0-138-generic', 'libc6'] } });
+    expect(reboot.ok).toBe(true);
+    expect(reboot.warnings.join()).toMatch(/reboot pending \(1 kernel package/);
+    const none = { ...clear(), needrestartHold: { afldb: false, postgresql: true } };
+    expect(evaluateHostGate(none).warnings.join()).toMatch(/hold missing for afldb:/);
+    expect(evaluateHostGate(none).ok).toBe(true);
+    expect(evaluateHostGate(none, { strict: true }).refusals.join()).toMatch(/hold missing for afldb:/);
+    expect(evaluateHostGate({ ...clear(), needrestartHold: null }).warnings.join()).toMatch(/needrestart configuration unreadable/);
+  });
+
+  it('recognises the owner needrestart hold, and not the stock configuration production runs today', () => {
+    const policy = [
+      '# afldb and PostgreSQL restarts are owner-scheduled (ISSUE-351)',
+      '$nrconf{override_rc}->{qr(^afldb\\.service$)} = 0;',
+      '$nrconf{override_rc}->{qr(^postgresql(@.+)?\\.service$)} = 0;',
+    ].join('\n');
+    expect(needrestartHold(policy)).toEqual({ afldb: true, postgresql: true });
+    expect(needrestartHold('# $nrconf{override_rc}->{qr(^afldb)} = 0;')).toEqual({ afldb: false, postgresql: false });
+    // Production's stock needrestart.conf (probed read-only 2026-11-14): its override_rc list names neither unit.
+    const stock = '$nrconf{override_rc} = {\n    qr(^dbus) => 0,\n    qr(^docker) => 0,\n    qr(^systemd-logind) => 0,\n};\n';
+    expect(needrestartHold(stock)).toEqual({ afldb: false, postgresql: false });
+    expect(needrestartHold('$nrconf{override_rc} = {\n    qr(^afldb) => 0,\n    qr(^postgresql) => 0,\n};')).toEqual({ afldb: true, postgresql: true });
+  });
+
+  it('the shipped needrestart policy is the one the gate recognises, and the apt policy keeps security updates', () => {
+    const conf = readFileSync(join(REPO, 'deploy', 'host-policy', 'needrestart-afldb-hold.conf'), 'utf8');
+    expect(needrestartHold(conf)).toEqual({ afldb: true, postgresql: true });
+    const apt = readFileSync(join(REPO, 'deploy', 'host-policy', 'apt-52-afldb-unattended.conf'), 'utf8');
+    // It only blacklists PostgreSQL packages: no Allowed-Origins or Automatic-Reboot change.
+    expect(apt).toMatch(/Unattended-Upgrade::Package-Blacklist \{[^}]*"postgresql-16";/);
+    expect(apt.split('\n').filter((l) => !l.startsWith('//')).join('\n')).not.toMatch(/Allowed-Origins|Automatic-Reboot/);
+  });
+
+  const local = (y: number, mo: number, d: number, h: number, mi: number, s: number) => new Date(y, mo - 1, d, h, mi, s).getTime();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const stampOf = (ms: number) => {
+    const d = new Date(ms);
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}  ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  };
+  // The 2026-11-14 06:35 libc6 upgrade as /var/log/apt/history.log recorded it (production, read-only).
+  const HISTORY = [
+    `Start-Date: ${stampOf(local(2026, 11, 14, 6, 35, 1))}`, 'Commandline: /usr/bin/unattended-upgrade', 'Upgrade: libc6:amd64 (2.39-0ubuntu8.9, 2.39-0ubuntu8.12)',
+    `End-Date: ${stampOf(local(2026, 11, 14, 6, 35, 14))}`, '',
+  ].join('\n');
+
+  it('flags a restart that coincides with an unattended-upgrade run as not the owner\'s, and accepts a confirmed one', () => {
+    const entries = parseAptHistory(HISTORY);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].command).toBe('/usr/bin/unattended-upgrade');
+    const restartedAt = local(2026, 11, 14, 6, 35, 21); // afldb ActiveEnterTimestamp that morning
+    expect(restartCoincidesWithApt(entries, restartedAt)?.command).toMatch(/unattended-upgrade/);
+    expect(restartCoincidesWithApt(entries, local(2026, 11, 14, 9, 12, 0))).toBeNull();
+    expect(restartCoincidesWithApt(entries, null)).toBeNull();
+
+    const opened = { op: 'promote', id: 'X', window: { at: new Date(local(2026, 11, 14, 6, 30, 0)).toISOString(), afldb: { invocationId: 'OLD' } } };
+    const now = { invocationId: 'NEW', nRestarts: 0, activeEnterMs: restartedAt };
+    const base = { events: [opened], id: 'X', now, aptEntries: entries, nowMs: local(2026, 11, 14, 7, 0, 0) };
+    const hit = auditActivation({ ...base, confirmed: false });
+    expect(hit.problems[0]).toMatch(/unattended-upgrade signature, so this may not be your attended restart/);
+    expect(auditActivation({ ...base, confirmed: true }).problems).toEqual([]);
+    // A restart nowhere near an apt run is not flagged; the same identity change is only noted.
+    const calm = auditActivation({ ...base, now: { ...now, activeEnterMs: local(2026, 11, 14, 6, 50, 0) }, confirmed: false });
+    expect(calm.problems).toEqual([]);
+    expect(calm.notes.join(' | ')).toMatch(/restarted since promote \(InvocationID OLD -> NEW\)/);
+    // No recorded window (promoted before ISSUE-351, or the gate skipped): said so, never failed.
+    expect(auditActivation({ ...base, events: [], confirmed: false }).notes.join()).toMatch(/no recorded activation window/);
+  });
+
+  it('refuses rollback only on a PROVEN schema mismatch, and never because the database is unreachable', () => {
+    expect(migrationHeadOf(['src/db/migrations/009_a.sql', 'src/db/migrations/118_b.sql', 'src/db/migrations/README.md'])).toBe('118_b.sql');
+    expect(migrationHeadOf([])).toBeNull();
+    // Database down: no ledger head supplied -> proceeds, says nothing was checked.
+    const down = checkRollbackLedger({ targetHead: '117_x.sql', ledgerHead: undefined, accept: undefined });
+    expect(down).toMatchObject({ ok: true, status: 'not-checked' });
+    expect(down.message).toMatch(/NOT checked/);
+    expect(checkRollbackLedger({ targetHead: undefined, ledgerHead: '118_y.sql', accept: undefined })).toMatchObject({ ok: true, status: 'target-unknown' });
+    expect(checkRollbackLedger({ targetHead: '118_y.sql', ledgerHead: '118_y.sql', accept: undefined })).toMatchObject({ ok: true, status: 'match' });
+    const ahead = checkRollbackLedger({ targetHead: '117_x.sql', ledgerHead: '118_y.sql', accept: undefined });
+    expect(ahead.ok).toBe(false);
+    expect(ahead.message).toMatch(/the database is 1 migration\(s\) ahead of the target \(118_y\.sql applied, target built at 117_x\.sql\).*--accept-schema-ahead 118_y\.sql/);
+    expect(checkRollbackLedger({ targetHead: '117_x.sql', ledgerHead: '118_y.sql', accept: '118_y.sql' })).toMatchObject({ ok: true, status: 'accepted' });
+    // The acknowledgement must name THIS ledger head; another value does not pass.
+    expect(checkRollbackLedger({ targetHead: '117_x.sql', ledgerHead: '118_y.sql', accept: '117_x.sql' }).ok).toBe(false);
+    expect(checkRollbackLedger({ targetHead: '119_z.sql', ledgerHead: '118_y.sql', accept: undefined }).message).toMatch(/expects 1 migration\(s\) the database has not applied/);
+    expect(checkRollbackLedger({ targetHead: '117_x.sql', ledgerHead: 'garbage', accept: undefined })).toMatchObject({ ok: false, status: 'bad-input' });
+  });
+
+  it('compares the installed tree with the lock: version, integrity, extraneous and missing, but not optional or omitted dev packages', () => {
+    const lock = { packages: {
+      '': {},
+      'node_modules/a': { version: '1.0.0', integrity: 'sha512-A' },
+      'node_modules/b': { version: '2.0.0', integrity: 'sha512-B', dev: true },
+      'node_modules/c': { version: '3.0.0', optional: true },
+    } };
+    const installedOk = { packages: { 'node_modules/a': { version: '1.0.0', integrity: 'sha512-A' }, 'node_modules/b': { version: '2.0.0', integrity: 'sha512-B' } } };
+    expect(compareNodeModulesToLock(lock, installedOk)).toMatchObject({ status: 'ok', checked: 2 });
+    expect(compareNodeModulesToLock(lock, { packages: { 'node_modules/a': { version: '1.0.1', integrity: 'sha512-A' }, 'node_modules/b': installedOk.packages['node_modules/b'] } }).changed)
+      .toEqual(['node_modules/a installed 1.0.1 locked 1.0.0']);
+    expect(compareNodeModulesToLock(lock, { packages: { ...installedOk.packages, 'node_modules/z': { version: '9.9.9' } } }).extraneous).toEqual(['node_modules/z']);
+    expect(compareNodeModulesToLock(lock, { packages: { 'node_modules/b': installedOk.packages['node_modules/b'] } }).missing).toEqual(['node_modules/a']);
+    expect(compareNodeModulesToLock(lock, { packages: { 'node_modules/a': installedOk.packages['node_modules/a'] } }).status).toBe('ok'); // dev omitted: a choice
+    expect(compareNodeModulesToLock(lock, null).status).toBe('unknown');
+  });
+
+  it.runIf(process.platform === 'linux')('check-node-modules exits 1 on drift, 0 on a matching or unrecorded tree; the settle wrapper only warns', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'afldb-364-nm-'));
+    try {
+      const run = () => spawnSync(process.execPath, [join(REPO, 'deploy', 'release.mjs'), 'check-node-modules', '--checkout', dir], { encoding: 'utf8' });
+      writeFileSync(join(dir, 'package-lock.json'), JSON.stringify({ packages: { '': {}, 'node_modules/a': { version: '1.0.0', integrity: 'sha512-A' } } }));
+      expect(run().stdout).toMatch(/NODE_MODULES UNKNOWN/); // no installed record: not verified, not failed
+      expect(run().status).toBe(0);
+      mkdirSync(join(dir, 'node_modules'));
+      writeFileSync(join(dir, 'node_modules', '.package-lock.json'), JSON.stringify({ packages: { 'node_modules/a': { version: '1.0.0', integrity: 'sha512-A' } } }));
+      expect(run().stdout).toMatch(/NODE_MODULES OK \(1 installed packages match the lock\)/);
+      writeFileSync(join(dir, 'node_modules', '.package-lock.json'), JSON.stringify({ packages: { 'node_modules/a': { version: '1.0.1', integrity: 'sha512-A' } } }));
+      const drift = run();
+      expect(drift.status).toBe(1);
+      expect(drift.stderr).toMatch(/node_modules differ from package-lock\.json: changed 1 \[node_modules\/a installed 1\.0\.1 locked 1\.0\.0\]/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+    // The nightly wrapper records the drift marker and carries on: no new silent missed night (ISSUE-332 has no alerting yet).
+    const wrapper = readFileSync(join(REPO, 'deploy', 'afldb-settle-afl-api.sh'), 'utf8').replace(/\r\n/g, '\n');
+    const check = wrapper.indexOf('deploy/release.mjs check-node-modules --checkout "$PROJECT_ROOT"');
+    expect(check).toBeGreaterThan(wrapper.indexOf('export AFLDB_SKIP_DOTENV=1'));
+    expect(check).toBeLessThan(wrapper.indexOf('"$NODE" "$TSX"'));
+    expect(wrapper.slice(check, check + 220)).toMatch(/\|\| echo "AFLDB_NODE_MODULES_DRIFT/);
+  });
+
+  it('adds the attended and host-state options to the CLI without changing its defaults', () => {
+    const { opts } = parseArgs(['promote', 'x', '--attended', '--confirm-attended-restart', '--host-state', '/f.json']);
+    expect(opts.attended).toBe(true);
+    expect(opts['confirm-attended-restart']).toBe(true);
+    expect(opts['host-state']).toBe('/f.json');
+    expect(parseArgs(['status']).opts.attended).toBeUndefined();
+    expect(parseArgs(['status']).opts['pg-unit']).toBe('postgresql@16-main.service');
   });
 });
 
@@ -380,6 +576,8 @@ describe.runIf(linux)('AFLDB-ISSUE-329 — route on Linux: failed builds never t
   };
 
   const live = () => ['--pid', String(server!.pid), '--url', `http://127.0.0.1:${servePort}`];
+  // ISSUE-351: promote and rollback are attended steps; the host gate reads a fixture, never this machine's apt or systemd.
+  const att = (state = 'clear') => ['--attended', '--host-state', join(base, `host-state-${state}.json`)];
 
   const assertIntact = async (current: string, previous: string | null) => {
     expect(readReleaseLink(root, 'current')).toBe(current);
@@ -419,12 +617,23 @@ describe.runIf(linux)('AFLDB-ISSUE-329 — route on Linux: failed builds never t
     copyFileSync(join(REPO, 'deploy', 'afldb.service'), join(checkout, 'deploy', 'afldb.service'));
     // The serving checkout's .env: the owner DSN must not reach the smoke-started server.
     writeFileSync(join(checkout, '.env'), 'DATABASE_URL=postgres://fixture-app\nAFLDB_OWNER_DATABASE_URL=postgres://fixture-owner\nPORT=3100\n');
+    mkdirSync(join(checkout, 'src', 'db', 'migrations'), { recursive: true });
+    writeFileSync(join(checkout, 'src', 'db', 'migrations', '001_init.sql'), 'select 1;\n');
     revs.good1 = commit('good', 'red');
     revs.fail = commit('fail', 'red');
     revs.hang = commit('hang', 'red');
     revs.hog = commit('hog', 'red');
     revs.typefail = commit('typefail', 'red');
+    // good2 carries one more migration than good1: its release records a newer migration head (ISSUE-351).
+    writeFileSync(join(checkout, 'src', 'db', 'migrations', '002_more.sql'), 'select 2;\n');
     revs.good2 = commit('good', 'blue');
+    // Host-state fixtures for the attended gate (ISSUE-351): the gate never reads this machine's apt or systemd here.
+    const hostState = (over: Record<string, unknown>) => JSON.stringify({
+      aptActive: [], aptProcesses: [], nextAptUpgradeMs: Date.now() + 20 * 3_600_000,
+      rebootRequired: { present: false, pkgs: [] }, needrestartHold: { afldb: true, postgresql: true }, units: {}, ...over,
+    });
+    writeFileSync(join(base, 'host-state-clear.json'), hostState({}));
+    writeFileSync(join(base, 'host-state-apt.json'), hostState({ aptActive: ['apt-daily-upgrade.service'] }));
   });
 
   afterAll(async () => {
@@ -445,7 +654,7 @@ describe.runIf(linux)('AFLDB-ISSUE-329 — route on Linux: failed builds never t
     expect(info.build.peakBuildRssMb).toBeGreaterThan(0);
     expect(readdirSync(join(root, 'releases', id, '.next', 'standalone')).some((n) => n.startsWith('.env'))).toBe(false);
 
-    const promoted = await tool('promote', id);
+    const promoted = await tool('promote', id, ...att());
     expect(promoted.code, promoted.out).toBe(0);
     await startServer();
     await assertIntact(id, null);
@@ -538,13 +747,13 @@ describe.runIf(linux)('AFLDB-ISSUE-329 — route on Linux: failed builds never t
     expect(run.code, run.out).toBe(0);
     const id2 = /RELEASE READY (\S+)/.exec(run.out)![1];
     ids.push(id2);
-    expect((await tool('promote', id2, ...live())).code).toBe(0);
+    expect((await tool('promote', id2, ...att(), ...live())).code).toBe(0);
     // Switching `current` does not touch the running server: it is pinned to the release it started in.
     const stale = await tool('status', '--expect', id2, ...live());
     expect(stale.code).toBe(1);
     expect(stale.out).toMatch(/restart pending/);
     // A second promotion before that restart would make `previous` a release that never served.
-    const early = await tool('promote', ids[0], ...live());
+    const early = await tool('promote', ids[0], ...att(), ...live());
     expect(early.code).toBe(1);
     expect(early.out).toMatch(/is not running current/);
     await stopServer();
@@ -557,7 +766,7 @@ describe.runIf(linux)('AFLDB-ISSUE-329 — route on Linux: failed builds never t
     const inFlight = build(revs.hang);
     await waitFor(() => buildPid() !== null, 60_000, 'a build to be in flight');
     const buildsBefore = readdirSync(join(root, 'builds')).length;
-    const back = await tool('rollback');
+    const back = await tool('rollback', ...att());
     expect(back.code, back.out).toBe(0);
     expect(back.out).toMatch(/ROLLED BACK to \S+ \(no rebuild\)/);
     expect(back.out).toMatch(/migrations are forward-only/);
@@ -572,17 +781,97 @@ describe.runIf(linux)('AFLDB-ISSUE-329 — route on Linux: failed builds never t
     expect(events.filter((op) => op === 'status-pass').length).toBeGreaterThan(0);
 
     // An explicit target: forward again to id2 by name.
-    const forward = await tool('rollback', '--to', id2);
+    const forward = await tool('rollback', '--to', id2, ...att());
     expect(forward.code, forward.out).toBe(0);
     expect(readReleaseLink(root, 'current')).toBe(id2);
     await stopServer();
     await startServer();
     await assertIntact(id2, ids[0]);
-    expect((await tool('rollback')).code).toBe(0);
+    expect((await tool('rollback', ...att())).code).toBe(0);
     await stopServer();
     await startServer();
     await assertIntact(ids[0], id2);
   }, 180_000);
+
+  it('ISSUE-351: promote and rollback are attended; the host gate and the ledger check refuse before any link moves', async () => {
+    const same = () => {
+      expect(readReleaseLink(root, 'current')).toBe(ids[0]);
+      expect(readReleaseLink(root, 'previous')).toBe(ids[1]);
+    };
+    same();
+    // A bare promote or rollback is refused outright (the unattended-activation window), and nothing changes.
+    const bare = await tool('promote', ids[1], ...live());
+    expect(bare.code).toBe(1);
+    expect(bare.out).toMatch(/promote switches the release the service starts from.*say so with --attended\. Nothing was changed\./);
+    const bareBack = await tool('rollback', ...live());
+    expect(bareBack.code).toBe(1);
+    expect(bareBack.out).toMatch(/rollback switches the release the service starts from/);
+    same();
+    // apt running refuses promote; the links stay.
+    const busy = await tool('promote', ids[1], ...att('apt'), ...live());
+    expect(busy.code).toBe(1);
+    expect(busy.out).toMatch(/host gate refused promote: apt is running now \(apt-daily-upgrade\.service\)/);
+    same();
+    // The releases record the migration head of the revision they were built from.
+    expect(JSON.parse(readFileSync(join(root, 'releases', ids[0], 'release.json'), 'utf8')).migrationHead).toBe('001_init.sql');
+    expect(JSON.parse(readFileSync(join(root, 'releases', ids[1], 'release.json'), 'utf8')).migrationHead).toBe('002_more.sql');
+    // A PROVEN mismatch (the operator read ledger head 003; the target was built at 002) is refused ...
+    const ahead = await tool('rollback', '--to', ids[1], ...att(), '--ledger-head', '003_later.sql');
+    expect(ahead.code).toBe(1);
+    expect(ahead.out).toMatch(/the database is 1 migration\(s\) ahead of the target \(003_later\.sql applied, target built at 002_more\.sql\)/);
+    same();
+    // ... and only an acknowledgement that names that ledger head passes.
+    const wrongAck = await tool('rollback', '--to', ids[1], ...att(), '--ledger-head', '003_later.sql', '--accept-schema-ahead', '002_more.sql');
+    expect(wrongAck.code).toBe(1);
+    same();
+    const accepted = await tool('rollback', '--to', ids[1], ...att(), '--ledger-head', '003_later.sql', '--accept-schema-ahead', '003_later.sql');
+    expect(accepted.code, accepted.out).toBe(0);
+    expect(readReleaseLink(root, 'current')).toBe(ids[1]);
+    // Database down: no ledger head. Rollback is not blocked; it says nothing was checked and records that.
+    const back = await tool('rollback', '--to', ids[0], ...att());
+    expect(back.code, back.out).toBe(0);
+    expect(back.out).toMatch(/ledger: database ledger head not supplied \(--ledger-head\): compatibility NOT checked/);
+    same();
+    const rollbacks = readFileSync(join(root, 'events.log'), 'utf8').split('\n').filter((l) => l.includes('"op":"rollback"'));
+    expect(JSON.parse(rollbacks[rollbacks.length - 1])).toMatchObject({ attended: true, ledger: 'not-checked', ledgerHead: null });
+    expect(JSON.parse(rollbacks[rollbacks.length - 2])).toMatchObject({ ledger: 'accepted', ledgerHead: '003_later.sql', targetMigrationHead: '002_more.sql' });
+  }, 60_000);
+
+  it('ISSUE-351: status --expect fails a restart that coincides with an apt run, and names the owner\'s way past it', async () => {
+    const unitState = (invocationId: string, activeEnterMs: number) => JSON.stringify({
+      aptActive: [], aptProcesses: [], nextAptUpgradeMs: Date.now() + 20 * 3_600_000, rebootRequired: { present: false, pkgs: [] },
+      needrestartHold: { afldb: true, postgresql: true },
+      units: { afldb: { activeState: 'active', mainPid: 1, invocationId, nRestarts: 0, activeEnterMs } },
+    });
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const stamp = (ms: number) => {
+      const d = new Date(ms);
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}  ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    };
+    const t = Date.now();
+    writeFileSync(join(base, 'host-state-before.json'), unitState('AAAA', t - 3_600_000));
+    writeFileSync(join(base, 'host-state-after.json'), unitState('BBBB', t));
+    writeFileSync(join(base, 'apt-history.log'), [
+      `Start-Date: ${stamp(t - 20_000)}`, 'Commandline: /usr/bin/unattended-upgrade', `End-Date: ${stamp(t - 5_000)}`, '',
+    ].join('\n'));
+    // Open an attended window with the service identity recorded (matching ledger head: no acknowledgement needed).
+    const opened = await tool('rollback', '--to', ids[1], '--attended', '--host-state', join(base, 'host-state-before.json'), '--ledger-head', '002_more.sql');
+    expect(opened.code, opened.out).toBe(0);
+    const audit = (...extra: string[]) => tool('status', '--expect', ids[1], '--host-state', join(base, 'host-state-after.json'),
+      '--apt-history', join(base, 'apt-history.log'), ...extra, ...live());
+    const unattended = await audit();
+    expect(unattended.code).toBe(1);
+    expect(unattended.out).toMatch(/activation restarted since rollback \(InvocationID AAAA -> BBBB\)/);
+    expect(unattended.out).toMatch(/unattended-upgrade signature, so this may not be your attended restart/);
+    const confirmed = await audit('--confirm-attended-restart');
+    expect(confirmed.out).toMatch(/activation restarted since rollback/);
+    expect(confirmed.out).not.toMatch(/unattended-upgrade signature/);
+    // Restore the previous order (current ids[0], previous ids[1]) for the tests that follow.
+    const restored = await tool('rollback', '--to', ids[0], ...att());
+    expect(restored.code, restored.out).toBe(0);
+    expect(readReleaseLink(root, 'current')).toBe(ids[0]);
+    expect(readReleaseLink(root, 'previous')).toBe(ids[1]);
+  }, 60_000);
 
   it('verify fails a tampered release and tolerates the server\'s ISR output', async () => {
     const isr = join(root, 'releases', ids[0], '.next', 'standalone', '.next', 'server', 'app', 'matches');
@@ -597,7 +886,7 @@ describe.runIf(linux)('AFLDB-ISSUE-329 — route on Linux: failed builds never t
     expect(bad.code).toBe(1);
     expect(bad.out).toMatch(/changed 1 \[\.next\/standalone\/server\.js\]/);
     // A tampered rollback target is refused before any link moves.
-    const rollback = await tool('rollback');
+    const rollback = await tool('rollback', ...att());
     expect(rollback.code).toBe(1);
     expect(readReleaseLink(root, 'current')).toBe(ids[0]);
   }, 60_000);

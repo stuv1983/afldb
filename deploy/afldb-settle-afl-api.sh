@@ -59,6 +59,17 @@ if [ -n "${INVOCATION_ID:-}" ]; then
   export AFLDB_SKIP_DOTENV=1
 fi
 
+# --- AFLDB-ISSUE-364: is the installed tree the locked tree? ------------------
+# This wrapper runs tsx and every tool from the serving checkout's node_modules,
+# which no release check covers (release.mjs verifies release bundles only). Compare
+# node_modules/.package-lock.json with package-lock.json and say so in the journal.
+# WARN-AND-RECORD, NEVER FAIL: a refusing preflight would be a new way to lose a night
+# silently (ISSUE-332 has no alerting yet); the marker below is what a monitor greps for.
+if [ -f deploy/release.mjs ]; then
+  "$NODE" deploy/release.mjs check-node-modules --checkout "$PROJECT_ROOT" \
+    || echo "AFLDB_NODE_MODULES_DRIFT: node_modules differ from package-lock.json; the run continues (ISSUE-364)" >&2
+fi
+
 # --- the season -------------------------------------------------------------
 # The same in-progress register the AFL Tables chain reads (§ R7/Q7: one
 # season-of-record, never a second one this source could disagree with).
