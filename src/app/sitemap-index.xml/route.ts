@@ -10,6 +10,11 @@ import { siteUrl } from '@/lib/seo';
  * search engines fetch it, so without this route the segments exist but
  * nothing points at them. This emits the index that ties them together,
  * built from the same segment list the segments themselves come from.
+ *
+ * Served publicly at /sitemap.xml through the `beforeFiles` rewrite in
+ * next.config.ts. The handler lives at /sitemap-index.xml because
+ * `src/app/sitemap.xml/route.ts` collides with `src/app/sitemap.ts` in the
+ * development server (AFLDB-ISSUE-364).
  */
 export const revalidate = 86400;
 

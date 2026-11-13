@@ -1924,4 +1924,33 @@ describe('Stage 4 — the public read model', () => {
       if (previousGate !== undefined) process.env.AFLDB_BETA_GATE = previousGate;
     }
   });
+
+  // AFLDB-ISSUE-360 FE-7. /awards/brownlow-medal and /awards/brownlow-medal/<season>
+  // permanently redirect to /brownlow[/<season>] (src/app/awards/[slug]), so a
+  // sitemap that lists them names URLs that 308. Oracle-independent: the Brownlow
+  // award must exist with active season winners on both a snapshot copy and a
+  // rebuilt database, so the exclusion is exercised rather than vacuous.
+  it('lists no /awards/brownlow-medal URL, only the canonical /brownlow ones', async () => {
+    const [{ n }] = await admin<{ n: number }[]>`
+      SELECT count(*)::int AS n
+        FROM award_winners w JOIN awards a ON a.id = w.award_id
+       WHERE a.slug = 'brownlow-medal' AND w.status = 'active' AND w.season IS NOT NULL`;
+    expect(n, 'the exclusion is vacuous unless brownlow-medal has season winners').toBeGreaterThan(0);
+
+    const previousIndexing = process.env.AFLDB_INDEXING;
+    const previousGate = process.env.AFLDB_BETA_GATE;
+    process.env.AFLDB_INDEXING = 'on';
+    delete process.env.AFLDB_BETA_GATE;
+    try {
+      const urls = (await sitemap({ id: 1 })).map((entry) => entry.url);
+      expect(urls.filter((u) => /\/awards\/brownlow-medal(\/|$)/.test(u))).toEqual([]);
+      expect(urls.some((u) => /\/brownlow\/\d{4}$/.test(u))).toBe(true);
+      // Nothing else in the award list was dropped.
+      expect(urls.some((u) => /\/awards\/all-australian$/.test(u))).toBe(true);
+    } finally {
+      if (previousIndexing === undefined) delete process.env.AFLDB_INDEXING;
+      else process.env.AFLDB_INDEXING = previousIndexing;
+      if (previousGate !== undefined) process.env.AFLDB_BETA_GATE = previousGate;
+    }
+  });
 });

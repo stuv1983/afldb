@@ -23,7 +23,7 @@ predicate, so they cannot disagree:
 
 - the root layout's `robots` metadata (`src/app/layout.tsx`)
 - `robots.txt` (`src/app/robots.ts`)
-- the sitemap index (`src/app/sitemap.xml/route.ts` — 404 when off)
+- the sitemap index (`src/app/sitemap-index.xml/route.ts`, served at `/sitemap.xml` by a `beforeFiles` rewrite in `next.config.ts` — 404 when off)
 - every sitemap segment (`src/app/sitemap.ts` — empty when off)
 
 `deploy/Caddyfile.production` adds `X-Robots-Tag: noindex, nofollow` on the
@@ -180,7 +180,7 @@ Rules:
 
 ## 5. Sitemaps
 
-`/sitemap.xml` is an index over segments at `/sitemap/{id}.xml`.
+`/sitemap.xml` is an index over segments at `/sitemap/{id}.xml`. The handler lives at `src/app/sitemap-index.xml/route.ts` and `next.config.ts` rewrites `/sitemap.xml` to it: a route handler at `src/app/sitemap.xml/route.ts` collides with `src/app/sitemap.ts` in the development server (AFLDB-ISSUE-364). A sitemap lists canonical, 200-status URLs only, so `/awards/brownlow-medal` and its seasons (which 308 to `/brownlow`) are not listed (AFLDB-ISSUE-360).
 
 | Segment | Contents |
 | --- | --- |

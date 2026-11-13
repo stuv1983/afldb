@@ -137,7 +137,14 @@ export default async function sitemap({
       sql<{ season: number }[]>`
         SELECT DISTINCT season FROM brownlow_season_votes ORDER BY season
       `,
-      sql<{ slug: string }[]>`SELECT slug FROM awards ORDER BY slug`,
+      // The Brownlow Medal is not listed under /awards: /awards/brownlow-medal and
+      // /awards/brownlow-medal/<season> permanently redirect to /brownlow and
+      // /brownlow/<season> (AFLDB-ISSUE-360 FE-7), which this segment already
+      // lists from `brownlow_season_votes`. A sitemap names canonical, 200
+      // URLs only; the redirecting aliases were 47 entries (1 + 46 seasons).
+      sql<{ slug: string }[]>`
+        SELECT slug FROM awards WHERE slug <> 'brownlow-medal' ORDER BY slug
+      `,
       // `status = 'active'` on both (AFLDB-ISSUE-165 §4.5): these enumerate
       // URLs, and /awards/[slug]/[season] and /honour-teams/[slug] render
       // from `getAwardSeason` / `getHonourTeam`, which now return nothing at
@@ -148,6 +155,7 @@ export default async function sitemap({
           FROM award_winners w
           JOIN awards a ON a.id = w.award_id
          WHERE w.season IS NOT NULL AND w.status = 'active'
+           AND a.slug <> 'brownlow-medal'
          ORDER BY a.slug, w.season
       `,
       sql<{ teamName: string }[]>`

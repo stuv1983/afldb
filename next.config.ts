@@ -111,6 +111,27 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
   },
+
+  /**
+   * `/sitemap.xml` is the sitemap INDEX, and it is served by the route handler
+   * at `src/app/sitemap-index.xml/route.ts`.
+   *
+   * It cannot live at `src/app/sitemap.xml/route.ts`, which is where it used to
+   * be: `src/app/sitemap.ts` (the segments, via `generateSitemaps`) resolves to
+   * the same internal route in the development server, and Turbopack refuses to
+   * start with "Conflicting route and metadata at /sitemap.xml" (AFLDB-ISSUE-364;
+   * `next build --webpack` accepted it, so production was never affected).
+   * Rewriting before the filesystem keeps the public URL, its body and its
+   * headers exactly as they were. `beforeFiles` is required: in development
+   * the metadata route owns `/sitemap.xml` and would otherwise win.
+   */
+  async rewrites() {
+    return {
+      beforeFiles: [{ source: '/sitemap.xml', destination: '/sitemap-index.xml' }],
+      afterFiles: [],
+      fallback: [],
+    };
+  },
 };
 
 export default nextConfig;
