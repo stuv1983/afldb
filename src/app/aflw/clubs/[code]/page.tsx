@@ -20,6 +20,7 @@ import {
   formatNumber,
   formatPercentage,
 } from '@/lib/format';
+import { aflwKeyFromMetadataParam, aflwKeyFromPageParam } from '@/lib/params';
 import { isFilteredView, notFoundMetadata, pageMetadata } from '@/lib/seo';
 import { type FilterField, parseFilterValues } from '@/search/table-filters';
 
@@ -35,7 +36,7 @@ export async function generateMetadata({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }): Promise<Metadata> {
   const [{ code }, query] = await Promise.all([params, searchParams]);
-  const club = await getAflwClub(decodeURIComponent(code));
+  const club = await getAflwClub(aflwKeyFromMetadataParam(code));
   if (!club) return notFoundMetadata('AFLW club');
   return pageMetadata({
     title: `${club.name} AFLW — Players, Seasons & Record`,
@@ -55,7 +56,8 @@ export default async function AflwClubPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const [{ code: rawCode }, query] = await Promise.all([params, searchParams]);
-  const code = decodeURIComponent(rawCode);
+  const code = aflwKeyFromPageParam(rawCode);
+  if (code === null) notFound();
 
   // Everything except the player list depends only on the code, so one
   // wave rather than three: the season options exist to build the filter

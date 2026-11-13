@@ -18,6 +18,13 @@ import {
   playerPath,
   shouldShowUnmatched,
 } from '@/lib/format';
+import {
+  isOversizedCanonicalId,
+  MAX_INT4_ID,
+  parseCanonicalId,
+  parseSeason,
+  safeDecodeParam,
+} from '@/lib/params';
 
 it('Brownlow award links use its canonical publication, not retained named-medal rows', () => {
   expect(awardPath('brownlow-medal')).toBe('/brownlow');
@@ -143,6 +150,66 @@ describe('parseEntitySlug', () => {
       slug: 'gary-ablett',
       id: 1105,
     });
+  });
+
+  // AFLDB-ISSUE-357: one canonical spelling per id. `Number()` used to accept
+  // every one of these, so the same player rendered (and was persisted by ISR)
+  // at as many URLs as there are spellings.
+  it('refuses a non-canonical id spelling', () => {
+    for (const spelling of ['011724', '0000011724', '00', '0']) {
+      expect(parseEntitySlug(`scott-pendlebury-${spelling}`), spelling).toBeNull();
+    }
+    expect(parseEntitySlug('scott-pendlebury-11724')).toEqual({ slug: 'scott-pendlebury', id: 11724 });
+  });
+
+  // AFLDB-ISSUE-359: an id above int4 is well-formed but can never exist, and
+  // binding it to an int4 comparison raised 22003 (HTTP 500).
+  it('refuses an id that does not fit a PostgreSQL integer', () => {
+    expect(parseEntitySlug(`x-${MAX_INT4_ID}`)).toEqual({ slug: 'x', id: MAX_INT4_ID });
+    for (const big of ['2147483648', '99999999999', '9007199254740993', '9'.repeat(40)]) {
+      expect(parseEntitySlug(`x-${big}`), big).toBeNull();
+    }
+  });
+});
+
+describe('route parameter parsing (AFLDB-ISSUE-357, 359)', () => {
+  it('accepts only the canonical spelling of a positive int4 id', () => {
+    expect(parseCanonicalId('1')).toBe(1);
+    expect(parseCanonicalId('16592')).toBe(16592);
+    expect(parseCanonicalId(String(MAX_INT4_ID))).toBe(MAX_INT4_ID);
+    for (const bad of ['', '0', '-1', '+1', '01', '1e0', '0x1', '1.0', ' 1', '1 ', '1\n', 'abc', '2147483648',
+      '99999999999', '9007199254740993']) {
+      expect(parseCanonicalId(bad), JSON.stringify(bad)).toBeUndefined();
+    }
+    expect(parseCanonicalId(undefined)).toBeUndefined();
+  });
+
+  it('tells an oversized canonical id from malformed text', () => {
+    expect(isOversizedCanonicalId('2147483648')).toBe(true);
+    expect(isOversizedCanonicalId('9007199254740993')).toBe(true);
+    expect(isOversizedCanonicalId(String(MAX_INT4_ID))).toBe(false);
+    for (const notNumber of ['abc', '01', '1e9', '-5', '']) {
+      expect(isOversizedCanonicalId(notNumber), notNumber).toBe(false);
+    }
+  });
+
+  it('parses a season only in its canonical four-digit spelling and range', () => {
+    expect(parseSeason('2024')).toBe(2024);
+    expect(parseSeason('1897')).toBe(1897);
+    expect(parseSeason('2100')).toBe(2100);
+    for (const bad of ['02024', '002024', '2024.0', '2.024e3', '0x7e8', ' 2024', '+2024', '1896', '2101', 'abc', '', '99999']) {
+      expect(parseSeason(bad), JSON.stringify(bad)).toBeUndefined();
+    }
+    expect(parseSeason(undefined)).toBeUndefined();
+  });
+
+  // AFLDB-ISSUE-359: AFLW keys are percent-encoded when linked and 17 live
+  // slugs contain a literal "%27", so a malformed escape must not become a 500.
+  it('decodes a route key once and reports a malformed escape as null', () => {
+    expect(safeDecodeParam('Aasta_O%2527Connor')).toBe('Aasta_O%27Connor');
+    expect(safeDecodeParam('Plain_Name')).toBe('Plain_Name');
+    expect(safeDecodeParam('%E0%A4%A')).toBeNull();
+    expect(safeDecodeParam('%')).toBeNull();
   });
 });
 

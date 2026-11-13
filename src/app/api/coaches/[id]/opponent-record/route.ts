@@ -4,6 +4,7 @@ import { getCoach } from '@/db/queries/coaches';
 import { RateLimiter } from '@/lib/auth/rate-limit';
 import { requestIp } from '@/lib/auth/session';
 import { resolveCoachOpponentSelection, type CoachOpponentSelection } from '@/lib/coach-opponent-history';
+import { isOversizedCanonicalId, parseCanonicalId } from '@/lib/params';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,9 +22,14 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse<CoachOpponentSelection>> {
   const { id } = await params;
-  const coachId = Number(id);
-  if (!Number.isSafeInteger(coachId) || coachId <= 0) {
-    return NextResponse.json({ kind: 'invalid', requested: id }, { status: 400 });
+  // Canonical id only (AFLDB-ISSUE-357). A well-formed id above int4 can never
+  // name a coach, so it answers exactly as an unknown id does (AFLDB-ISSUE-359)
+  // instead of reaching the database and raising 22003 as a 500.
+  const coachId = parseCanonicalId(id);
+  if (coachId === undefined) {
+    return isOversizedCanonicalId(id)
+      ? NextResponse.json({ kind: 'invalid', requested: id }, { status: 404 })
+      : NextResponse.json({ kind: 'invalid', requested: id }, { status: 400 });
   }
 
   if (RATE_LIMIT.check(`ip:${(await requestIp()) ?? 'unknown'}`)) {

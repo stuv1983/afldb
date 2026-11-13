@@ -25,7 +25,12 @@ import {
   formatSpanLabel,
 } from '@/lib/format';
 import { redirectPastEnd } from '@/lib/pagination';
-import { firstValue, parsePage } from '@/lib/params';
+import {
+  aflwKeyFromMetadataParam,
+  aflwKeyFromPageParam,
+  firstValue,
+  parsePage,
+} from '@/lib/params';
 import { isFilteredView, notFoundMetadata, pageMetadata } from '@/lib/seo';
 import { filterQueryParams, parseFilterValues, type FilterField } from '@/search/table-filters';
 
@@ -49,7 +54,7 @@ export async function generateMetadata({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }): Promise<Metadata> {
   const [{ slug }, query] = await Promise.all([params, searchParams]);
-  const player = await getAflwPlayer(decodeURIComponent(slug));
+  const player = await getAflwPlayer(aflwKeyFromMetadataParam(slug));
   if (!player) return notFoundMetadata('AFLW player');
   return pageMetadata({
     title: `${player.displayName} — AFLW Stats, Games & Career Record`,
@@ -71,7 +76,8 @@ export default async function AflwPlayerPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const [{ slug: rawSlug }, query] = await Promise.all([params, searchParams]);
-  const slug = decodeURIComponent(rawSlug);
+  const slug = aflwKeyFromPageParam(rawSlug);
+  if (slug === null) notFound();
 
   // All three are keyed by the slug alone, so they run together rather
   // than one waiting on the last.

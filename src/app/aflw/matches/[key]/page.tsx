@@ -20,6 +20,7 @@ import {
   formatRound,
   formatScore,
 } from '@/lib/format';
+import { aflwKeyFromMetadataParam, aflwKeyFromPageParam } from '@/lib/params';
 import { notFoundMetadata, pageMetadata } from '@/lib/seo';
 
 export const dynamic = 'force-dynamic';
@@ -30,7 +31,7 @@ export async function generateMetadata({
   params: Promise<{ key: string }>;
 }): Promise<Metadata> {
   const { key } = await params;
-  const match = await getAflwMatch(decodeURIComponent(key));
+  const match = await getAflwMatch(aflwKeyFromMetadataParam(key));
   if (!match) return notFoundMetadata('AFLW match');
   return pageMetadata({
     title:
@@ -51,7 +52,8 @@ export default async function AflwMatchPage({
   params: Promise<{ key: string }>;
 }) {
   const { key: rawKey } = await params;
-  const matchKey = decodeURIComponent(rawKey);
+  const matchKey = aflwKeyFromPageParam(rawKey);
+  if (matchKey === null) notFound();
 
   // The team sheet and the scoring events are keyed by the match key, not
   // by anything on the match row, so all three run together.

@@ -25,6 +25,7 @@ import {
   formatRoundShort,
   formatScore,
 } from '@/lib/format';
+import { aflwKeyFromMetadataParam, aflwKeyFromPageParam } from '@/lib/params';
 import { isFilteredView, notFoundMetadata, pageMetadata } from '@/lib/seo';
 import { AFLW_MATCH_TYPES } from '@/search/aflw-filters';
 import { type FilterField, parseFilterValues } from '@/search/table-filters';
@@ -41,7 +42,7 @@ export async function generateMetadata({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }): Promise<Metadata> {
   const [{ key }, query] = await Promise.all([params, searchParams]);
-  const season = await getAflwSeason(decodeURIComponent(key));
+  const season = await getAflwSeason(aflwKeyFromMetadataParam(key));
   if (!season) return notFoundMetadata('AFLW season');
   return pageMetadata({
     // AFLW seasons are NAMED, not numbered — two of them fall in calendar
@@ -64,7 +65,8 @@ export default async function AflwSeasonPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const [{ key: rawKey }, query] = await Promise.all([params, searchParams]);
-  const seasonKey = decodeURIComponent(rawKey);
+  const seasonKey = aflwKeyFromPageParam(rawKey);
+  if (seasonKey === null) notFound();
 
   // Nothing in this wave depends on anything else in it: every query is
   // keyed by the season alone, and the club list only fills a dropdown.

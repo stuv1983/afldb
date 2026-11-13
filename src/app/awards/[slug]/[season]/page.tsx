@@ -23,6 +23,7 @@ import {
   seasonPath,
   shouldShowUnmatched,
 } from '@/lib/format';
+import { parseSeason as parseSharedSeason } from '@/lib/params';
 import { notFoundMetadata, pageMetadata } from '@/lib/seo';
 
 export const revalidate = 86400;
@@ -41,10 +42,9 @@ const STAT_ORDER: { key: string; label: string }[] = [
   { key: 'hitouts', label: 'HO' },
 ];
 
+/** The shared strict season parse (AFLDB-ISSUE-357), kept null-returning for this route. */
 function parseSeason(value: string): number | null {
-  const year = Number(value);
-  if (!Number.isInteger(year) || year < 1897 || year > 2100) return null;
-  return year;
+  return parseSharedSeason(value) ?? null;
 }
 
 export async function generateMetadata({
@@ -53,7 +53,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string; season: string }>;
 }): Promise<Metadata> {
   const { slug, season } = await params;
-  if (slug === 'brownlow-medal' && parseSeason(season) !== null) permanentRedirect(`/brownlow/${Number(season)}`);
+  if (slug === 'brownlow-medal' && parseSeason(season) !== null) permanentRedirect(`/brownlow/${parseSeason(season)}`);
   const award = await getAward(slug);
   const year = parseSeason(season);
   if (!award || year === null) return notFoundMetadata('Award season');

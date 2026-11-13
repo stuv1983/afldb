@@ -25,6 +25,7 @@ import {
   seasonPath,
   venuePath,
 } from '@/lib/format';
+import { parseCanonicalId } from '@/lib/params';
 import { notFoundMetadata, pageMetadata } from '@/lib/seo';
 import { matchSchema } from '@/lib/structured-data';
 
@@ -46,8 +47,8 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const matchId = Number(id);
-  if (!Number.isSafeInteger(matchId)) return notFoundMetadata('Match');
+  const matchId = parseCanonicalId(id);
+  if (matchId === undefined) return notFoundMetadata('Match');
 
   const match = await getMatch(matchId);
   if (!match) return notFoundMetadata('Match');
@@ -78,8 +79,8 @@ export default async function MatchPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const matchId = Number(id);
-  if (!Number.isSafeInteger(matchId) || matchId <= 0) notFound();
+  const matchId = parseCanonicalId(id);
+  if (matchId === undefined) notFound();
 
   const match = await getMatch(matchId);
   if (!match) notFound();

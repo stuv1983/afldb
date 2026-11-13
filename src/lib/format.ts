@@ -8,6 +8,7 @@
  * zero and a statistic that was never collected. `formatStat` renders
  * `null` as an em dash, never as `0`.
  */
+import { parseCanonicalId } from '@/lib/params';
 
 export const NOT_RECORDED = '—';
 
@@ -534,13 +535,15 @@ export function isLinked(status: string): boolean {
 
 /**
  * Split "gary-ablett-jr-12345" into its slug and id.
- * Returns null when the trailing id is absent or not a number.
+ * Returns null when the trailing id is absent, is not the canonical spelling
+ * of a positive integer (`011724` is not `11724`: AFLDB-ISSUE-357), or is
+ * larger than a PostgreSQL `integer` can hold (AFLDB-ISSUE-359).
  */
 export function parseEntitySlug(param: string): { slug: string; id: number } | null {
-  const match = /^(.*)-(\d+)$/.exec(param);
+  const match = /^(.*)-([0-9]+)$/.exec(param);
   if (!match) return null;
-  const id = Number(match[2]);
-  if (!Number.isSafeInteger(id) || id <= 0) return null;
+  const id = parseCanonicalId(match[2]);
+  if (id === undefined) return null;
   return { slug: match[1], id };
 }
 
