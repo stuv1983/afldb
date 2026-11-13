@@ -46,7 +46,10 @@ export default async function QualifyingMatchesPage({
       </div>
 
       <section className="section">
-        <CollapsibleTable title="Every qualifying game" note={`${formatNumber(result.total)} total`}>
+        <CollapsibleTable
+          title={result.total > rows.length ? 'Most recent qualifying games' : 'Every qualifying game'}
+          note={`${formatNumber(result.total)} total`}
+        >
           <div className="table-wrap">
             <table>
               <thead>
@@ -78,7 +81,7 @@ export default async function QualifyingMatchesPage({
         </CollapsibleTable>
         {result.total > rows.length && (
           <p className="muted" style={{ marginTop: '0.6rem' }}>
-            Showing {rows.length} of {formatNumber(result.total)}.
+            Showing the {formatNumber(rows.length)} most recent of {formatNumber(result.total)} qualifying games.
           </p>
         )}
       </section>

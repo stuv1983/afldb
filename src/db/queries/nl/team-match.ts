@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { sql } from '@/db/client';
-import { type NlAggregation, type NlMatchScope, type NlMatchType, type NlQueryPlan } from '@/search/nl/plan';
+import { NL_LIMITS, type NlAggregation, type NlMatchScope, type NlMatchType, type NlQueryPlan } from '@/search/nl/plan';
 import type { NlAnswerPayload, NlTeamAggregateRow, NlTeamMatchRow } from '@/search/nl/answer-types';
 
 type SqlFragment = ReturnType<typeof sql>;
@@ -303,6 +303,7 @@ async function answerTeamAggregate(plan: NlQueryPlan, limit: number): Promise<Nl
 export async function answerTeamAggregateDrilldown(
   plan: NlQueryPlan,
   clubSlug: string,
+  limit: number = NL_LIMITS.maxDrilldownRows,
 ): Promise<{ rows: NlTeamMatchRow[]; total: number }> {
   const having = plan.havingClause!;
   const clauses = scopeClauses(plan.scope);
@@ -345,6 +346,7 @@ export async function answerTeamAggregateDrilldown(
       LEFT JOIN venues v ON v.id = t.venue_id
      WHERE ${where}
      ORDER BY t.match_date DESC, t.match_id DESC
+     LIMIT ${limit}
   `;
   const total = rows[0] ? Number(rows[0].total) : 0;
   const clean = rows.map(({ total: _total, ...row }) => row);

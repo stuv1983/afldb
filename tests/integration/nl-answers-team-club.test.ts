@@ -476,6 +476,29 @@ describe('team_match matches hand-written SQL', () => {
     }
   });
 
+  // AFLDB-ISSUE-359 (SRCH-6). Oracle-independent: asserts a relational invariant
+  // (the cap bounds the rows, the total is unchanged, the capped rows are the
+  // newest prefix of the full list), not a count taken from any one snapshot.
+  it('drilldown caps the listed rows and discloses the true total', async () => {
+    const [club] = await sql<{ slug: string }[]>`
+      SELECT cl.slug
+        FROM matches m JOIN clubs cl ON cl.id IN (m.home_club_id, m.away_club_id)
+       GROUP BY cl.slug ORDER BY count(*) DESC, cl.slug LIMIT 1
+    `;
+    const { answerTeamAggregateDrilldown } = await import('@/db/queries/nl/team-match');
+    const plan = basePlan({
+      metric: null, agg: { kind: 'list' }, havingClause: { metric: 'games', op: 'gte', value: 0 },
+    });
+    const full = await answerTeamAggregateDrilldown(plan, club.slug, 1_000_000);
+    expect(full.total).toBeGreaterThan(5);
+    expect(full.rows.length).toBe(full.total);
+
+    const capped = await answerTeamAggregateDrilldown(plan, club.slug, 5);
+    expect(capped.rows.length).toBe(5);
+    expect(capped.total).toBe(full.total);
+    expect(capped.rows.map((r) => r.matchId)).toEqual(full.rows.slice(0, 5).map((r) => r.matchId));
+  });
+
   describe('AFLDB-ISSUE-192 symmetric metrics rank one row per match', () => {
     it('unscoped "highest attendance" returns distinct matchIds with total equal to the distinct count', async () => {
       const { rows, total } = await teamMatch({ metric: 'attendance', agg: { kind: 'top_n', n: 5 } }, 100);
