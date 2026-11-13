@@ -16,15 +16,30 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // `rows` lets one test hand back rows for a query it names; every other
 // test, and every other query, still gets an empty result.
 const mockedSql = vi.hoisted(() => {
-  const state: { rows: (text: string) => unknown[] } = { rows: () => [] };
+  const state: {
+    rows: (text: string, values: unknown[]) => unknown[];
+    /** The text of every query issued, so a test can prove none was. */
+    calls: string[];
+  } = { rows: () => [], calls: [] };
   return state;
 });
 
 vi.mock('@/db/client', () => ({
   sql: Object.assign(
-    (strings: unknown) => mockedSql.rows(Array.isArray(strings) ? strings.join('?') : ''),
+    (strings: unknown, ...values: unknown[]) => {
+      const text = Array.isArray(strings) ? strings.join('?') : '';
+      mockedSql.calls.push(text);
+      return mockedSql.rows(text, values);
+    },
     { unsafe: () => [] },
   ),
+}));
+
+// notFound()/permanentRedirect() are `never`-returning throws in Next; the
+// throw is what stops the page, so it is reproduced rather than stubbed.
+vi.mock('next/navigation', () => ({
+  notFound: () => { throw new Error('NEXT_NOT_FOUND'); },
+  permanentRedirect: (url: string) => { throw new Error(`NEXT_REDIRECT ${url}`); },
 }));
 
 const KEYS = ['AFLDB_BASE_URL', 'AFLDB_INDEXING', 'AFLDB_BETA_GATE', 'AFLDB_ENV'] as const;
@@ -35,6 +50,7 @@ beforeEach(() => {
   for (const key of KEYS) delete process.env[key];
   process.env.AFLDB_BASE_URL = 'https://afldb.com';
   mockedSql.rows = () => [];
+  mockedSql.calls = [];
 });
 
 afterEach(() => {
@@ -310,6 +326,100 @@ describe('sitemap', () => {
       expect(url).not.toContain('club2=');
       expect(url).not.toContain('matchType=');
     }
+  });
+});
+
+/**
+ * AFLDB-ISSUE-357 / 359. A public route parameter is refused BEFORE any query is
+ * built from it: an id above int4 is well-formed but can never exist (binding it
+ * raised 22003, a 500), and every non-canonical spelling (`02024`, `1e0`) used to
+ * render the whole page at a second URL that ISR then persisted to disk. The
+ * mocked `sql` records every query, so "refused" means "issued none".
+ */
+describe('route parameters are refused before any query', () => {
+  const none = () => expect(mockedSql.calls, 'a query was issued for a refused parameter').toEqual([]);
+
+  it('answers an id that does not fit int4 with not-found, on every id route', async () => {
+    const big = '2147483648';
+    const { default: Player, generateMetadata: playerMeta } = await import('@/app/players/[slug]/page');
+    const { default: Coach } = await import('@/app/coaches/[slug]/page');
+    const { default: Match, generateMetadata: matchMeta } = await import('@/app/matches/[id]/page');
+    mockedSql.calls = []; // some modules query while they load; only the renders below count
+
+    await expect(Player({ params: Promise.resolve({ slug: `x-${big}` }) })).rejects.toThrow('NEXT_NOT_FOUND');
+    await expect(Coach({ params: Promise.resolve({ slug: `x-${big}` }), searchParams: Promise.resolve({}) }))
+      .rejects.toThrow('NEXT_NOT_FOUND');
+    await expect(Match({ params: Promise.resolve({ id: big }) })).rejects.toThrow('NEXT_NOT_FOUND');
+    expect(String((await playerMeta({ params: Promise.resolve({ slug: `x-${big}` }) })).title)).toContain('not found');
+    expect(String((await matchMeta({ params: Promise.resolve({ id: big }) })).title)).toContain('not found');
+    none();
+  });
+
+  it('answers a non-canonical id or season spelling with not-found', async () => {
+    const { default: Match } = await import('@/app/matches/[id]/page');
+    const { default: Season } = await import('@/app/seasons/[year]/page');
+    const { default: Brownlow } = await import('@/app/brownlow/[year]/page');
+    const { default: Player } = await import('@/app/players/[slug]/page');
+    mockedSql.calls = [];
+
+    for (const id of ['01', '1e0', '0x1', '1.0']) {
+      await expect(Match({ params: Promise.resolve({ id }) }), `/matches/${id}`).rejects.toThrow('NEXT_NOT_FOUND');
+    }
+    for (const year of ['02024', '2024.0', '2.024e3']) {
+      await expect(Season({ params: Promise.resolve({ year }) }), `/seasons/${year}`).rejects.toThrow('NEXT_NOT_FOUND');
+      await expect(Brownlow({ params: Promise.resolve({ year }) }), `/brownlow/${year}`).rejects.toThrow('NEXT_NOT_FOUND');
+    }
+    await expect(Player({ params: Promise.resolve({ slug: 'scott-pendlebury-011724' }) }))
+      .rejects.toThrow('NEXT_NOT_FOUND');
+    none();
+  });
+
+  it('does query for a canonical id (the mock sees queries, so the checks above are not vacuous)', async () => {
+    const { default: Match } = await import('@/app/matches/[id]/page');
+    await expect(Match({ params: Promise.resolve({ id: '16592' }) })).rejects.toThrow('NEXT_NOT_FOUND');
+    expect(mockedSql.calls.length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * AFLDB-ISSUE-359 FE-3. Seventeen live AFLW slugs contain a literal "%27", which
+ * is linked as "%2527". Next gives the PAGE that segment still percent-encoded
+ * and gives generateMetadata the same segment already decoded once; decoding
+ * both made the metadata read "AFLW player not found" (noindex, no canonical)
+ * on a page that rendered fine, and a malformed escape threw a URIError (500).
+ */
+describe('AFLW route keys', () => {
+  const stored = 'Aasta_O%27Connor';
+  const row = { slug: stored, displayName: "Aasta O'Connor", games: 10, goals: 1, disposals: 100, clubNames: 'Kuwarna' };
+  const served = (text: string, values: unknown[]) =>
+    /FROM aflw\.players p/.test(text) && values[0] === stored ? [row] : [];
+
+  it('titles and canonicalises a slug that contains a literal percent escape', async () => {
+    mockedSql.rows = served;
+    const { generateMetadata } = await import('@/app/aflw/players/[slug]/page');
+
+    // generateMetadata receives the segment decoded once: %2527 -> %27.
+    const meta = await generateMetadata({
+      params: Promise.resolve({ slug: stored }),
+      searchParams: Promise.resolve({}),
+    });
+    expect(String(meta.title)).toContain("Aasta O'Connor");
+    expect(meta.alternates?.canonical).toBe('/aflw/players/Aasta_O%2527Connor');
+  });
+
+  it('turns a malformed escape into not-found instead of a URIError', async () => {
+    const { default: Player } = await import('@/app/aflw/players/[slug]/page');
+    const { default: Match } = await import('@/app/aflw/matches/[key]/page');
+    const { default: Season } = await import('@/app/aflw/seasons/[key]/page');
+    const { default: Club } = await import('@/app/aflw/clubs/[code]/page');
+    mockedSql.calls = [];
+    const searchParams = Promise.resolve({});
+
+    await expect(Player({ params: Promise.resolve({ slug: '%E0%A4%A' }), searchParams })).rejects.toThrow('NEXT_NOT_FOUND');
+    await expect(Match({ params: Promise.resolve({ key: '%E0%A4%A' }) })).rejects.toThrow('NEXT_NOT_FOUND');
+    await expect(Season({ params: Promise.resolve({ key: '%E0%A4%A' }), searchParams })).rejects.toThrow('NEXT_NOT_FOUND');
+    await expect(Club({ params: Promise.resolve({ code: '%E0%A4%A' }), searchParams })).rejects.toThrow('NEXT_NOT_FOUND');
+    expect(mockedSql.calls).toEqual([]);
   });
 });
 
