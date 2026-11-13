@@ -16,7 +16,7 @@ export interface SortableColumn<TKey extends string> {
 
 export interface SortableItem<TKey extends string> {
   id: string | number;
-  values: Record<TKey, any>;
+  values: Record<TKey, unknown>;
   element: React.ReactNode;
 }
 

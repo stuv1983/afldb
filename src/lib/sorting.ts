@@ -6,8 +6,8 @@ export type SortDirection = 'asc' | 'desc';
  * Null/undefined values are always placed at the bottom regardless of sort direction.
  */
 export function compareValues(
-  a: any,
-  b: any,
+  a: unknown,
+  b: unknown,
   type: SortType = 'text',
   dir: SortDirection = 'asc'
 ): number {
@@ -26,8 +26,8 @@ export function compareValues(
     const numB = Number(b);
     result = numA - numB;
   } else if (type === 'date') {
-    const dateA = new Date(a).getTime();
-    const dateB = new Date(b).getTime();
+    const dateA = new Date(a as string | number | Date).getTime();
+    const dateB = new Date(b as string | number | Date).getTime();
     result = dateA - dateB;
   } else {
     // text

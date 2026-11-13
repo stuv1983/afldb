@@ -80,7 +80,7 @@ export function NlAnswerFeedbackControls() {
             style={{ width: '100%', fontSize: '0.85rem' }}
           />
           <p className="muted" style={{ fontSize: '0.75rem', marginTop: '0.3rem' }}>
-            Please don't include anything personal - this is stored anonymously.
+            Please don&apos;t include anything personal - this is stored anonymously.
           </p>
         </div>
       )}
