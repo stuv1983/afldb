@@ -1,0 +1,5 @@
+== lint gate with a deliberate new error (must fail)
+Lint gate: 341 error(s) now; baseline allows 340.
+  REGRESSION: src/lib/sorting.ts: @typescript-eslint/no-explicit-any 0 -> 1
+Lint gate: FAILED (1).
+exit=1

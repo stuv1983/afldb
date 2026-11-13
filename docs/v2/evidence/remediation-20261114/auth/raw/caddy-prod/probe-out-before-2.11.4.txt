@@ -1,0 +1,87 @@
+== caddy: v2.11.4 h1:XKxkMTgNSizEvKG6QHue6cAsFOteU2qA61w2tKkCWi0=
+== sha256 of binary: b7105518e3ed1c0761f232e44fc09345535533c9cb0abf0e12809416c7ac64d9
+== Caddyfile under test: /mnt/ssd/afldb-rem-auth-20261114/inputs/Caddyfile.production.before  sha256 65478a2371183468e70986d763005217cd8f2e4411765ac745cdaf9411f54313
+== admin guard: test config has admin disabled (adapted JSON: "admin":{"disabled":true,"config":{"persist":false})
+== adapt of the UNMODIFIED deploy file (syntax only):
+adapt rc=0
+{"level":"warn","ts":1794606778.9666548,"logger":"caddyfile","msg":"Unnecessary header_up X-Forwarded-For: the reverse proxy's default behavior is to pass headers to the upstream"}
+{"level":"warn","ts":1794606778.96855,"logger":"caddyfile","msg":"Unnecessary header_up X-Forwarded-For: the reverse proxy's default behavior is to pass headers to the upstream"}
+== validate of the sed-rewritten copy:
+{"level":"info","ts":1794606779.0277493,"logger":"tls.cache.maintenance","msg":"stopped background certificate maintenance","cache":"0x117fe3ad3a00"}
+{"level":"info","ts":1794606779.027776,"logger":"http","msg":"servers shutting down with eternal grace period"}
+Valid configuration
+validate rc=0
+magic http=200
+invite http=200
+asset http=200
+search http=200
+postinv http=200
+redir http=307
+health http=200
+forged http=200
+apexroot http=200
+apexq http=200
+apexea http=200
+apexbig http=413
+apex404 http=404
+www http=301
+down http=502
+== upstream saw (forwarded headers):
+{"method":"GET","url":"/beta/verify?token=PROBE-MAGIC-aaa111","xff":"127.0.0.1","realIp":null,"forwarded":null}
+{"method":"GET","url":"/admin/invite/PROBE-INVITE-bbb222","xff":"127.0.0.1","realIp":null,"forwarded":null}
+{"method":"GET","url":"/_next/static/x.js","xff":"127.0.0.1","realIp":null,"forwarded":null}
+{"method":"GET","url":"/search?q=PROBE-SEARCH-ddd444&sort=name","xff":"127.0.0.1","realIp":null,"forwarded":null}
+{"method":"POST","url":"/admin/invite/PROBE-INVITE-bbb222","xff":"127.0.0.1","realIp":null,"forwarded":null}
+{"method":"GET","url":"/redir","xff":"127.0.0.1","realIp":null,"forwarded":null}
+{"method":"GET","url":"/players/1","xff":"127.0.0.1","realIp":null,"forwarded":null}
+{"method":"POST","url":"/api/early-access","xff":"127.0.0.1","realIp":null,"forwarded":null}
+{"method":"POST","url":"/api/early-access","xff":"127.0.0.1","realIp":null,"forwarded":null}
+== sentinel scan (count of lines containing each probe secret):
+PROBE-MAGIC-aaa111       afldb-access.log             1
+PROBE-MAGIC-aaa111       afldb-apex.log               0
+PROBE-MAGIC-aaa111       caddy-stderr.log             0
+PROBE-INVITE-bbb222      afldb-access.log             3
+PROBE-INVITE-bbb222      afldb-apex.log               0
+PROBE-INVITE-bbb222      caddy-stderr.log             0
+PROBE-REFERER-ccc333     afldb-access.log             1
+PROBE-REFERER-ccc333     afldb-apex.log               0
+PROBE-REFERER-ccc333     caddy-stderr.log             0
+PROBE-SEARCH-ddd444      afldb-access.log             1
+PROBE-SEARCH-ddd444      afldb-apex.log               0
+PROBE-SEARCH-ddd444      caddy-stderr.log             0
+PROBE-COOKIE-fff666      afldb-access.log             0
+PROBE-COOKIE-fff666      afldb-apex.log               0
+PROBE-COOKIE-fff666      caddy-stderr.log             0
+PROBE-APEXQ-ggg777       afldb-access.log             0
+PROBE-APEXQ-ggg777       afldb-apex.log               1
+PROBE-APEXQ-ggg777       caddy-stderr.log             0
+PROBE-DOWN-eee555        afldb-access.log             1
+PROBE-DOWN-eee555        afldb-apex.log               0
+PROBE-DOWN-eee555        caddy-stderr.log             1
+== logged uri fields:
+"uri":"/beta/verify?token=PROBE-MAGIC-aaa111"
+"uri":"/admin/invite/PROBE-INVITE-bbb222"
+"uri":"/_next/static/x.js"
+"uri":"/search?q=PROBE-SEARCH-ddd444&sort=name"
+"uri":"/admin/invite/PROBE-INVITE-bbb222"
+"uri":"/redir"
+"uri":"/api/health"
+"uri":"/players/1"
+"uri":"/beta/verify?token=PROBE-DOWN-eee555"
+"uri":"/"
+"uri":"/?utm=PROBE-APEXQ-ggg777"
+"uri":"/api/early-access"
+"uri":"/api/early-access"
+"uri":"/nothing-here"
+== logged Referer headers:
+"Referer":["https://beta.afldb.com/search?q=PROBE-REFERER-ccc333"]
+"Referer":["https://beta.afldb.com/admin/invite/PROBE-INVITE-bbb222"]
+== logged Cookie headers:
+"Cookie":["REDACTED"]
+== log line count per file:
+    9 /mnt/ssd/afldb-rem-auth-20261114/probe-out/before-2.11.4/logs/afldb-access.log
+    5 /mnt/ssd/afldb-rem-auth-20261114/probe-out/before-2.11.4/logs/afldb-apex.log
+   14 total
+== caddy stderr error-level lines (uri/request excerpt):
+{"level":"error","ts":1794606783.320094,"logger":"http.log.error.log0","msg":"dial tcp 127.0.0.1:3411: connect: connection refused","request":{"remote_ip":"127.0.0.1","remote_port":"55088","client_ip":"127.0.0.1","proto":"HTTP/1.1","method":"GET","host":"beta.afldb.com:3410","uri":"/beta/verify?token=PROBE-DOWN-eee555","headers":{"User-Agent":["curl/8.5.0"],"Accept":["*/*"]}},"duration":0.000494532,"status":502,"err_id":"j6m9jcpcw","err_trace":"reverseproxy.statusError (reverseproxy.go:1626)"}
+PROBE-DONE before-2.11.4

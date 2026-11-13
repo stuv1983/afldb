@@ -1,0 +1,21 @@
+== caddy: v2.11.9 h1:bhZtcRKQOq0fuLvEgCdPYvUxXyGn9kzjG4lh2332DTE=
+== admin guard: admin disabled in the test config
+Valid configuration
+magic http=200
+invite http=200
+search http=200
+down http=502
+PROBE-MAGIC-aaa111     afldb-access.log         0
+PROBE-MAGIC-aaa111     caddy-stderr.log         0
+PROBE-INVITE-bbb222    afldb-access.log         0
+PROBE-INVITE-bbb222    caddy-stderr.log         0
+PROBE-SEARCH-ddd444    afldb-access.log         0
+PROBE-SEARCH-ddd444    caddy-stderr.log         0
+PROBE-DOWN-eee555      afldb-access.log         0
+PROBE-DOWN-eee555      caddy-stderr.log         0
+== logged uri fields:
+"uri":"/beta/verify"
+"uri":"/admin/invite/REDACTED"
+"uri":"/search"
+"uri":"/beta/verify"
+PROBE-DONE dev-after-system

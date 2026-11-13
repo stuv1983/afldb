@@ -1,0 +1,21 @@
+{"level":"info","ts":1794606785.1109633,"msg":"maxprocs: Leaving GOMAXPROCS=24: CPU quota undefined"}
+{"level":"info","ts":1794606785.1110287,"msg":"GOMEMLIMIT is updated","GOMEMLIMIT":30216377548,"previous":9223372036854775807}
+{"level":"info","ts":1794606785.1110451,"msg":"using config from file","file":"/mnt/ssd/afldb-rem-auth-20261114/probe-out/after-2.11.4/Caddyfile.test"}
+{"level":"warn","ts":1794606785.1110556,"msg":"Unnecessary header_up X-Forwarded-For: the reverse proxy's default behavior is to pass headers to the upstream"}
+{"level":"warn","ts":1794606785.1110635,"msg":"Unnecessary header_up X-Forwarded-For: the reverse proxy's default behavior is to pass headers to the upstream"}
+{"level":"info","ts":1794606785.1110713,"msg":"adapted config to JSON","adapter":"caddyfile"}
+{"level":"warn","ts":1794606785.111658,"logger":"admin","msg":"admin endpoint disabled"}
+{"level":"info","ts":1794606785.112021,"logger":"http.auto_https","msg":"automatic HTTPS is completely disabled for server","server_name":"srv0"}
+{"level":"info","ts":1794606785.1121435,"logger":"tls.cache.maintenance","msg":"started background certificate maintenance","cache":"0x333698d73c00"}
+{"level":"warn","ts":1794606785.1141932,"logger":"http","msg":"HTTP/2 skipped because it requires TLS","network":"tcp","addr":":3410"}
+{"level":"warn","ts":1794606785.1142225,"logger":"http","msg":"HTTP/3 skipped because it requires TLS","network":"tcp","addr":":3410"}
+{"level":"info","ts":1794606785.1142356,"logger":"http.log","msg":"server running","name":"srv0","protocols":["h1","h2","h3"]}
+{"level":"info","ts":1794606785.1143723,"msg":"serving initial configuration"}
+{"level":"info","ts":1794606785.1174324,"logger":"tls","msg":"cleaning storage unit","storage":"FileStorage:/mnt/ssd/afldb-rem-auth-20261114/probe-out/after-2.11.4/xdg/data/caddy"}
+{"level":"info","ts":1794606785.1184635,"logger":"tls","msg":"finished cleaning storage units"}
+{"level":"info","ts":1794606788.210126,"logger":"http.log.access","msg":"handled request","request":{"remote_ip":"127.0.0.1","remote_port":"37754","client_ip":"127.0.0.1","proto":"HTTP/1.1","method":"GET","host":"www.afldb.com:3410","uri":"/x","headers":{"User-Agent":["curl/8.5.0"],"Accept":["*/*"]}},"bytes_read":0,"user_id":"","duration":0.00006696,"size":0,"status":301,"resp_headers":{"Location":["https://afldb.com/x?y=1"],"Content-Type":[],"Server":["Caddy"]}}
+{"level":"error","ts":1794606789.2266178,"logger":"http.log.error.log0","msg":"dial tcp 127.0.0.1:3411: connect: connection refused","request":{"remote_ip":"127.0.0.1","remote_port":"37762","client_ip":"127.0.0.1","proto":"HTTP/1.1","method":"GET","host":"beta.afldb.com:3410","uri":"/beta/verify","headers":{"User-Agent":["curl/8.5.0"],"Accept":["*/*"]}},"duration":0.000418746,"status":502,"err_id":"4b8ttiys8","err_trace":"reverseproxy.statusError (reverseproxy.go:1626)"}
+{"level":"info","ts":1794606790.2303257,"msg":"shutting down apps, then terminating","signal":"SIGTERM"}
+{"level":"warn","ts":1794606790.230429,"msg":"exiting; byeee!! 👋","signal":"SIGTERM"}
+{"level":"info","ts":1794606790.2304776,"logger":"http","msg":"servers shutting down with eternal grace period"}
+{"level":"info","ts":1794606790.230699,"msg":"shutdown complete","signal":"SIGTERM","exit_code":0}

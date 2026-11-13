@@ -1,0 +1,134 @@
+== vitest
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem-auth-20261114/cand
+
+ ✓ tests/player-link-mutations.test.ts (160 tests) 500ms
+ ✓ tests/v2-admin-operations.test.ts (95 tests) 10995ms
+     ✓ the scope constants are the writers' own stamps (drift guard)  474ms
+ ✓ tests/auth.test.ts (217 tests) 844ms
+     ✓ round-trips and rejects a wrong password  433ms
+ ✓ tests/v2-admin-operations-ui.test.ts (101 tests) 691ms
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > invalidates exactly the season page it was given
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 619052)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > reports the worker identity the caller needs to prove coverage
+[revalidate-season] /seasons/2026 invalidated on worker 3 (pid 619052)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > reports a single-process server truthfully rather than guessing
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 619052)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > takes the worker identity from process state, never from the request
+[revalidate-season] /seasons/2026 invalidated on worker 2 (pid 619052)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > refuses to believe a nonsensical worker count rather than reporting it
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 619052)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > refuses to believe a nonsensical worker count rather than reporting it
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 619052)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > refuses to believe a nonsensical worker count rather than reporting it
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 619052)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > refuses to believe a nonsensical worker count rather than reporting it
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 619052)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > refuses to believe a nonsensical worker count rather than reporting it
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 619052)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > serves a loopback caller carrying the forwarding headers Next synthesises
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 619052)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > serves every loopback form the deployment can emit
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 619052)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > serves every loopback form the deployment can emit
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 619052)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > serves every loopback form the deployment can emit
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 619052)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > serves every loopback form the deployment can emit
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 619052)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > serves every loopback form the deployment can emit
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 619052)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > ignores x-forwarded-host, which is client input on every path
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 619052)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > serves a request with no forwarding identity at all
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 619052)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > charges only failed secret checks against the limiter
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 619052)
+
+ ✓ tests/settle-season-revalidation.test.ts (75 tests) 172ms
+ ✓ tests/admin-current-season-settle.test.ts (58 tests) 111ms
+ ✓ tests/deploy-release.test.ts (33 tests) 22205ms
+     ✓ builds outside the checkout, validates, boots the candidate and promotes it  2913ms
+     ✓ a failing build leaves the serving release, its assets and the links untouched  1301ms
+     ✓ a type error fails the build; off-host type-checking needs recorded evidence; nothing changes  1287ms
+     ✓ a build interrupted by SIGTERM is stopped with its whole process group; nothing changes  1180ms
+     ✓ a build interrupted by SIGHUP is stopped with its whole process group; nothing changes  1284ms
+     ✓ a SIGKILLed tool leaves an orphan only in its workspace; the next build reaps it  2483ms
+     ✓ the memory guard kills a build that drives MemAvailable below the floor; nothing changes  2467ms
+     ✓ promotes a second release, then rolls back to the retained one without building, even mid-build  6676ms
+     ✓ fails a public asset whose bytes are not the release's, and one that is missing  418ms
+stderr | tests/v2-shadow-award-reports.test.ts > Brownlow capture > equals the operations-centre report for the same data and clock
+Operations centre: provider team identities unavailable Error: not attempted by the capture tool
+    at Object.loadProviderTeamIdentities (/mnt/ssd/afldb-rem-auth-20261114/cand/tests/v2-shadow-award-reports.test.ts:437:49)
+    at readProviderTeamIdentities (/mnt/ssd/afldb-rem-auth-20261114/cand/src/lib/admin/operations-centre.ts:1043:28)
+    at /mnt/ssd/afldb-rem-auth-20261114/cand/src/lib/admin/operations-centre.ts:987:24
+    at runRead (/mnt/ssd/afldb-rem-auth-20261114/cand/src/lib/admin/operations-centre.ts:347:34)
+    at Module.reconcileBrownlowSeasonForAdmin (/mnt/ssd/afldb-rem-auth-20261114/cand/src/lib/admin/operations-centre.ts:976:10)
+    at /mnt/ssd/afldb-rem-auth-20261114/cand/tests/v2-shadow-award-reports.test.ts:439:26
+    at file:///mnt/ssd/afldb-rem-auth-20261114/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+ ✓ tests/v2-shadow-award-reports.test.ts (59 tests) 6213ms
+ ✓ tests/workflow-preflight.test.ts (41 tests) 3188ms
+ ✓ tests/submission-review-actions.test.ts (42 tests) 72ms
+ ✓ tests/awards-replace-panel.test.ts (25 tests) 69ms
+ ✓ tests/admin-upload-route.test.ts (36 tests) 137ms
+ ✓ tests/admin-audit-viewer.test.ts (33 tests) 59ms
+ ✓ tests/admin-lifecycle-actions.test.ts (35 tests) 87ms
+ ✓ tests/admin-brownlow-actions.test.ts (32 tests) 77ms
+ ✓ tests/player-links-page.test.ts (8 tests) 218ms
+ ✓ tests/admin-access-actions.test.ts (13 tests) 58ms
+ ✓ tests/beta-verify.test.ts (12 tests) 63ms
+ ✓ tests/email-intake-route.test.ts (7 tests) 33ms
+ ✓ tests/admin-nl-search-actions.test.ts (11 tests) 55ms
+ ✓ tests/nl-feedback.test.ts (31 tests) 21ms
+ ✓ tests/admin-settings-actions.test.ts (4 tests) 41ms
+stderr | tests/search-rate-limit.test.ts > runNlSearchWithRateLimit > fails open if IP resolution or the limiter throws
+[search] rate limiter unavailable; failing open Error: headers unavailable
+    at /mnt/ssd/afldb-rem-auth-20261114/cand/tests/search-rate-limit.test.ts:76:39
+    at file:///mnt/ssd/afldb-rem-auth-20261114/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///mnt/ssd/afldb-rem-auth-20261114/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///mnt/ssd/afldb-rem-auth-20261114/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///mnt/ssd/afldb-rem-auth-20261114/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///mnt/ssd/afldb-rem-auth-20261114/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///mnt/ssd/afldb-rem-auth-20261114/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///mnt/ssd/afldb-rem-auth-20261114/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:2955:64
+
+stderr | tests/search-rate-limit.test.ts > runNlSearchWithRateLimit > fails open if the limiter check itself throws
+[search] rate limiter unavailable; failing open Error: limiter unavailable
+    at Object.<anonymous> (/mnt/ssd/afldb-rem-auth-20261114/cand/tests/search-rate-limit.test.ts:90:13)
+    at Object.Mock [as check] (file:///mnt/ssd/afldb-rem-auth-20261114/cand/node_modules/@vitest/spy/dist/index.js:332:34)
+    at RateLimiter.check (/mnt/ssd/afldb-rem-auth-20261114/cand/tests/search-rate-limit.test.ts:18:20)
+    at Module.runNlSearchWithRateLimit (/mnt/ssd/afldb-rem-auth-20261114/cand/src/app/search/rate-limit.ts:17:25)
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at /mnt/ssd/afldb-rem-auth-20261114/cand/tests/search-rate-limit.test.ts:94:20
+
+ ✓ tests/search-rate-limit.test.ts (6 tests) 26ms
+ ✓ tests/health-event-route.test.ts (3 tests) 25ms
+ ✓ tests/nl-answer-feedback-boundary.test.ts (2 tests) 41ms
+ ✓ tests/unit/sorting.test.ts (4 tests) 10ms
+
+ Test Files  26 passed (26)
+      Tests  1143 passed (1143)
+   Start at  09:48:22
+   Duration  61.77s (transform 5.73s, setup 1.22s, import 8.44s, tests 46.01s, environment 7ms)
+
+exit=0

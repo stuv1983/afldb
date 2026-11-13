@@ -1,0 +1,8 @@
+== lint gate (must pass at the baseline)
+Lint gate: 340 error(s) now; baseline allows 340.
+Lint gate: PASSED.
+
+real	1m47.014s
+user	2m48.089s
+sys	0m3.225s
+exit=0

@@ -1,0 +1,174 @@
+### magic
+
+Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'
+Content-Type: text/plain
+HTTP/1.1 200 OK
+Referrer-Policy: strict-origin-when-cross-origin
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Transfer-Encoding: chunked
+Via: 1.1 Caddy
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+X-Robots-Tag: noindex, nofollow
+body-sha256: ca7882764c8b51048436e75508f0890ce31b5c6901fd87ea114ea01dd18d97ec
+### invite
+
+Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'
+Content-Type: text/plain
+HTTP/1.1 200 OK
+Referrer-Policy: strict-origin-when-cross-origin
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Transfer-Encoding: chunked
+Via: 1.1 Caddy
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+X-Robots-Tag: noindex, nofollow
+body-sha256: da3e76a8ea222d209a8592ef3a9f423f4a1280dff460ae0001d609a9484c23d0
+### asset
+
+Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'
+Content-Type: text/plain
+HTTP/1.1 200 OK
+Referrer-Policy: strict-origin-when-cross-origin
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Transfer-Encoding: chunked
+Via: 1.1 Caddy
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+X-Robots-Tag: noindex, nofollow
+body-sha256: b71fc7cb0bdeaa80eff64715bac2a8f67d1b40327f3cd0b796590786136fa4ba
+### search
+
+Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'
+Content-Type: text/plain
+HTTP/1.1 200 OK
+Referrer-Policy: strict-origin-when-cross-origin
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Transfer-Encoding: chunked
+Via: 1.1 Caddy
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+X-Robots-Tag: noindex, nofollow
+body-sha256: a7e79650d772570e8657a8ca80a55c5f24a02e2fe86b9a7370b040e3babbc8aa
+### postinv
+
+Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'
+Content-Type: text/plain
+HTTP/1.1 200 OK
+Referrer-Policy: strict-origin-when-cross-origin
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Transfer-Encoding: chunked
+Via: 1.1 Caddy
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+X-Robots-Tag: noindex, nofollow
+body-sha256: 1b611fc85e3ebea3b386ae966bcff4c6aa3c49a500634da0504715e49a39c7de
+### redir
+
+Content-Length: 0
+Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'
+HTTP/1.1 307 Temporary Redirect
+Location: /beta?from=%2Fplayers
+Referrer-Policy: strict-origin-when-cross-origin
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Via: 1.1 Caddy
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+X-Robots-Tag: noindex, nofollow
+body-sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+### health
+
+Cache-Control: no-store
+Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'
+Content-Type: text/plain
+HTTP/1.1 200 OK
+Referrer-Policy: strict-origin-when-cross-origin
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Transfer-Encoding: chunked
+Via: 1.1 Caddy
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+X-Robots-Tag: noindex, nofollow
+body-sha256: 3a8ead7e9141e1a57f764a982192808edaa00a316c4546cf2efd7b7ab20b12a2
+### forged
+
+Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'
+Content-Type: text/plain
+HTTP/1.1 200 OK
+Referrer-Policy: strict-origin-when-cross-origin
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Transfer-Encoding: chunked
+Via: 1.1 Caddy
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+X-Robots-Tag: noindex, nofollow
+body-sha256: 358ee89d0b50854a1f0dd0fd0f08f65afa3bc31541ff09b480fc4cfc34c63426
+### apexroot
+
+Accept-Ranges: bytes
+Cache-Control: public, max-age=300, must-revalidate
+Content-Length: 14
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'
+Content-Type: text/html; charset=utf-8
+Etag: "dfct6ww35s00-e"
+HTTP/1.1 200 OK
+Last-Modified: Thu, 01 Jan 2026 00:00:00 GMT
+Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()
+Referrer-Policy: strict-origin-when-cross-origin
+Vary: Accept-Encoding
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+body-sha256: 4bd562af747550526167ee7c16e92ff9c0e8141d81a1d6a3b9da857b4da101f7
+### apexq
+
+Accept-Ranges: bytes
+Cache-Control: public, max-age=300, must-revalidate
+Content-Length: 14
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'
+Content-Type: text/html; charset=utf-8
+Etag: "dfct6ww35s00-e"
+HTTP/1.1 200 OK
+Last-Modified: Thu, 01 Jan 2026 00:00:00 GMT
+Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()
+Referrer-Policy: strict-origin-when-cross-origin
+Vary: Accept-Encoding
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+body-sha256: 4bd562af747550526167ee7c16e92ff9c0e8141d81a1d6a3b9da857b4da101f7
+### apexea
+
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'
+Content-Type: text/plain
+HTTP/1.1 200 OK
+Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()
+Referrer-Policy: strict-origin-when-cross-origin
+Transfer-Encoding: chunked
+Via: 1.1 Caddy
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+body-sha256: 7162a4aee3b77d87382c024f30551ac860d76f049068800a5b5170af666a37b3
+### apexbig
+
+Content-Length: 0
+HTTP/1.1 413 Request Entity Too Large
+Server: Caddy
+body-sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+### apex404
+
+Content-Length: 0
+HTTP/1.1 404 Not Found
+Server: Caddy
+body-sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+### www
+
+Content-Length: 0
+HTTP/1.1 301 Moved Permanently
+Location: https://afldb.com/x?y=1
+Server: Caddy
+body-sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+### down
+
+Content-Length: 0
+HTTP/1.1 502 Bad Gateway
+Server: Caddy
+body-sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855

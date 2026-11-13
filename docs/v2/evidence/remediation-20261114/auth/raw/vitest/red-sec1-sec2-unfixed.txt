@@ -1,0 +1,978 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem-auth-20261114/cand
+
+ ↓ tests/auth.test.ts > password hashing > round-trips and rejects a wrong password
+ ↓ tests/auth.test.ts > password hashing > rejects malformed stored hashes rather than throwing
+ ↓ tests/auth.test.ts > temporary passwords > is long enough to be accepted by the form it will be typed into
+ ↓ tests/auth.test.ts > temporary passwords > omits the characters nobody can tell apart when reading one out
+ ↓ tests/auth.test.ts > temporary passwords > does not repeat itself
+ ↓ tests/auth.test.ts > TOTP (RFC 6238 SHA-1 test vectors, truncated to 6 digits) > at t=59000ms the code is 287082
+ ↓ tests/auth.test.ts > TOTP (RFC 6238 SHA-1 test vectors, truncated to 6 digits) > at t=1111111109000ms the code is 081804
+ ↓ tests/auth.test.ts > TOTP (RFC 6238 SHA-1 test vectors, truncated to 6 digits) > at t=1234567890000ms the code is 005924
+ ↓ tests/auth.test.ts > TOTP (RFC 6238 SHA-1 test vectors, truncated to 6 digits) > at t=2000000000000ms the code is 279037
+ ↓ tests/auth.test.ts > TOTP (RFC 6238 SHA-1 test vectors, truncated to 6 digits) > accepts one step of clock drift and no more
+ ↓ tests/auth.test.ts > TOTP (RFC 6238 SHA-1 test vectors, truncated to 6 digits) > rejects junk
+ ↓ tests/auth.test.ts > TOTP (RFC 6238 SHA-1 test vectors, truncated to 6 digits) > reports which step a code matched, so a code can be spent once
+ ↓ tests/auth.test.ts > TOTP (RFC 6238 SHA-1 test vectors, truncated to 6 digits) > generates 32-character base32 secrets
+ ↓ tests/auth.test.ts > signed access claims > round-trips a valid claim
+ ↓ tests/auth.test.ts > signed access claims > rejects a tampered payload
+ ↓ tests/auth.test.ts > signed access claims > rejects the wrong kind, an old epoch, an expiry in the past and the wrong secret
+ ↓ tests/auth.test.ts > sha256Hex > matches a known digest
+ ↓ tests/auth.test.ts > hidden-prompt line input > returns null until a complete line arrives
+ ↓ tests/auth.test.ts > hidden-prompt line input > splits one line and keeps the remainder for the next prompt
+ ↓ tests/auth.test.ts > hidden-prompt line input > treats CRLF as one terminator, not an empty second line
+ ↓ tests/auth.test.ts > hidden-prompt line input > applies backspace and delete, and drops stray control codes
+ ↓ tests/auth.test.ts > hidden-prompt line input > preserves spaces and punctuation in a password
+ ↓ tests/auth.test.ts > CSV parsing > parses quoted fields, escaped quotes, CRLF and a BOM
+ ↓ tests/auth.test.ts > CSV parsing > rejects ragged rows with the offending line number
+ ↓ tests/auth.test.ts > CSV parsing > rejects an unterminated quote and an empty file
+ ↓ tests/auth.test.ts > capability policy > opens legacy intake to every staff role, including a contributor
+ ↓ tests/auth.test.ts > capability policy > opens the operations centre to an admin and a super admin, never to a contributor (AFLDB V2 Stage 5, plan D9)
+ ↓ tests/auth.test.ts > capability policy > reserves the super-admin-only capabilities from a contributor and a plain admin
+ ↓ tests/auth.test.ts > capability policy > opens beta access and the admin list to any admin, but not a contributor
+ ↓ tests/auth.test.ts > capability policy > never delegates admin management to a contributor, flag or no flag (AFLDB-ISSUE-158)
+ ↓ tests/auth.test.ts > capability policy > delegates admin management to a plain admin only when can_manage_admins is set
+ ↓ tests/auth.test.ts > capability policy > does not let the admin-management delegation reach the account lifecycle
+ ↓ tests/auth.test.ts > capability policy > splits Brownlow drafting from finalisation (§27.8)
+ ↓ tests/auth.test.ts > capability policy > does not let the admin-management delegation reach Brownlow finalisation
+ ↓ tests/auth.test.ts > capability policy > opens special-record reading to any admin and never to a contributor (AFLDB-ISSUE-167 D-4)
+ ↓ tests/auth.test.ts > capability policy > keeps every special-record WRITE to a super admin (AFLDB-ISSUE-167 D-4, Stage 6)
+ ↓ tests/auth.test.ts > capability policy > guards every special-record Server Action and the revalidate route with .edit
+ ↓ tests/auth.test.ts > capability policy > never calls revalidatePath() inside a special-record Server Action (R-7)
+ ↓ tests/auth.test.ts > capability policy > opens the audit trail to any admin and never to a contributor (AFLDB-ISSUE-157)
+ ↓ tests/auth.test.ts > admin lifecycle policy > viability > counts an enabled, fully enrolled super admin, temporary password or not
+ ↓ tests/auth.test.ts > admin lifecycle policy > viability > never counts a disabled, half-enrolled or lower-ranked account
+ ↓ tests/auth.test.ts > admin lifecycle policy > viability > reads disabled_at as the active flag, exactly as getAdminUser does
+ ↓ tests/auth.test.ts > admin lifecycle policy > who may act > admits only an enabled super admin
+ ↓ tests/auth.test.ts > admin lifecycle policy > who may act > refuses every action to a non-super-admin actor
+ ↓ tests/auth.test.ts > admin lifecycle policy > who may act > agrees with the capability table about who holds the lifecycle
+ ↓ tests/auth.test.ts > admin lifecycle policy > promotion > offers promotion for an active plain admin only
+ ↓ tests/auth.test.ts > admin lifecycle policy > promotion > leaves can_manage_admins alone and lands on super_admin
+ ↓ tests/auth.test.ts > admin lifecycle policy > demotion > needs another viable super admin to remain
+ ↓ tests/auth.test.ts > admin lifecycle policy > demotion > refuses your own account before it counts anything
+ ↓ tests/auth.test.ts > admin lifecycle policy > demotion > clears the admin-management delegation on the way down
+ ↓ tests/auth.test.ts > admin lifecycle policy > deactivation > refuses your own account
+ ↓ tests/auth.test.ts > admin lifecycle policy > deactivation > applies the invariant to a super admin target and to no one else
+ ↓ tests/auth.test.ts > admin lifecycle policy > deactivation > protects a super admin who has lost their own credentials too
+ ↓ tests/auth.test.ts > admin lifecycle policy > deactivation > keeps the role and the flag, and only ends the account
+ ↓ tests/auth.test.ts > admin lifecycle policy > reactivation > is offered for a deactivated account and refused for a live one
+ ↓ tests/auth.test.ts > admin lifecycle policy > reactivation > restores the account as it was, and nothing else
+ ↓ tests/auth.test.ts > admin lifecycle policy > reactivation > offers no other action while the account is deactivated
+ ↓ tests/auth.test.ts > admin lifecycle policy > wording and input > names one audit action per mutation
+ ↓ tests/auth.test.ts > admin lifecycle policy > wording and input > says the account is the last one by name, and never leaks an id
+ ↓ tests/auth.test.ts > admin lifecycle policy > wording and input > requires a short, trimmed deactivation reason
+ ↓ tests/auth.test.ts > admin lifecycle policy > never assigns the retired contributor role to an account that did not already have it
+ ↓ tests/auth.test.ts > admin lifecycle policy > promote and demote always land on a fixed, non-contributor role, regardless of the starting role
+ ↓ tests/auth.test.ts > admin lifecycle policy > deactivate and reactivate preserve an existing contributor role rather than assigning it
+ ↓ tests/auth.test.ts > admin lifecycle policy > reactivating an existing contributor clears disabled_at but leaves the role -- and the ban -- in place
+ ↓ tests/auth.test.ts > getAdminUser rejects a disabled account and a revoked session > asks for both, on every request
+ ↓ tests/auth.test.ts > getAdminUser rejects a disabled account and a revoked session > never admits the retired contributor role, disabled_at or not (AFLDB-ISSUE-186)
+ ↓ tests/auth.test.ts > the retired contributor role cannot be granted through an invite (AFLDB-ISSUE-186) > createInvite refuses a request for role=contributor at the server, not just in the UI
+ ↓ tests/auth.test.ts > the retired contributor role cannot be granted through an invite (AFLDB-ISSUE-186) > beginEnrolment refuses to redeem an invite already issued with role=contributor
+ ↓ tests/auth.test.ts > the retired contributor role cannot be granted through an invite (AFLDB-ISSUE-186) > confirmEnrolment refuses the same stale invite at its own step too
+ ↓ tests/auth.test.ts > invite redemption is authorised at the account write (AFLDB-ISSUE-270) > locks the stored issuer and the target together, in id order, before any write
+ ↓ tests/auth.test.ts > invite redemption is authorised at the account write (AFLDB-ISSUE-270) > refuses a delegated manager's invite against an existing admin, writing nothing
+ ↓ tests/auth.test.ts > invite redemption is authorised at the account write (AFLDB-ISSUE-270) > a spare invite cannot overwrite the admin its sibling invite created
+ ↓ tests/auth.test.ts > invite redemption is authorised at the account write (AFLDB-ISSUE-270) > refuses when the target was a contributor at issuance and has since been promoted
+ ↓ tests/auth.test.ts > invite redemption is authorised at the account write (AFLDB-ISSUE-270) > guards the upsert itself, so a target created after the lock read is refused
+ ↓ tests/auth.test.ts > invite redemption is authorised at the account write (AFLDB-ISSUE-270) > lets a current super admin's invite reset an existing admin
+ ↓ tests/auth.test.ts > invite redemption is authorised at the account write (AFLDB-ISSUE-270) > does not let a super admin demoted since issuance reset a peer
+ ↓ tests/auth.test.ts > invite redemption is authorised at the account write (AFLDB-ISSUE-270) > does not let a deactivated super admin reset a peer either
+ ↓ tests/auth.test.ts > invite redemption is authorised at the account write (AFLDB-ISSUE-270) > still lets a delegated manager's invite enrol over an existing contributor
+ ↓ tests/auth.test.ts > invite redemption is authorised at the account write (AFLDB-ISSUE-270) > still lets a delegated manager's invite enrol a free address
+ ↓ tests/auth.test.ts > invite redemption is authorised at the account write (AFLDB-ISSUE-270) > keeps refusing an account that outranks the invite, whoever issued it
+ ↓ tests/auth.test.ts > invite redemption is authorised at the account write (AFLDB-ISSUE-270) > refuses 'a manager whose delegation was removed' at 'a free address', writing nothing ('issuer_not_admin_manager')
+ ↓ tests/auth.test.ts > invite redemption is authorised at the account write (AFLDB-ISSUE-270) > refuses 'a manager whose delegation was removed' at 'an existing contributor', writing nothing ('issuer_not_admin_manager')
+ ↓ tests/auth.test.ts > invite redemption is authorised at the account write (AFLDB-ISSUE-270) > refuses 'a deactivated delegated manager' at 'a free address', writing nothing ('issuer_deactivated')
+ ↓ tests/auth.test.ts > invite redemption is authorised at the account write (AFLDB-ISSUE-270) > refuses 'a deactivated delegated manager' at 'an existing contributor', writing nothing ('issuer_deactivated')
+ ↓ tests/auth.test.ts > invite redemption is authorised at the account write (AFLDB-ISSUE-270) > refuses 'a super admin since demoted (demotion…' at 'a free address', writing nothing ('issuer_not_admin_manager')
+ ↓ tests/auth.test.ts > invite redemption is authorised at the account write (AFLDB-ISSUE-270) > refuses 'a super admin since demoted (demotion…' at 'an existing contributor', writing nothing ('issuer_not_admin_manager')
+ ↓ tests/auth.test.ts > invite redemption is authorised at the account write (AFLDB-ISSUE-270) > refuses 'a deactivated super admin' at 'a free address', writing nothing ('issuer_deactivated')
+ ↓ tests/auth.test.ts > invite redemption is authorised at the account write (AFLDB-ISSUE-270) > refuses 'a deactivated super admin' at 'an existing contributor', writing nothing ('issuer_deactivated')
+ ↓ tests/auth.test.ts > invite redemption is authorised at the account write (AFLDB-ISSUE-270) > refuses 'an issuer now a contributor, even one…' at 'a free address', writing nothing ('issuer_not_admin_manager')
+ ↓ tests/auth.test.ts > invite redemption is authorised at the account write (AFLDB-ISSUE-270) > refuses 'an issuer now a contributor, even one…' at 'an existing contributor', writing nothing ('issuer_not_admin_manager')
+ ↓ tests/auth.test.ts > invite redemption is authorised at the account write (AFLDB-ISSUE-270) > refuses 'an issuer with no account row' at 'a free address', writing nothing ('issuer_missing')
+ ↓ tests/auth.test.ts > invite redemption is authorised at the account write (AFLDB-ISSUE-270) > refuses 'an issuer with no account row' at 'an existing contributor', writing nothing ('issuer_missing')
+ ↓ tests/auth.test.ts > invite redemption is authorised at the account write (AFLDB-ISSUE-270) > refuses 'a stale super_admin grant from a now-…' at 'a free address', writing nothing ('grant_exceeds_issuer')
+ ↓ tests/auth.test.ts > invite redemption is authorised at the account write (AFLDB-ISSUE-270) > refuses 'a stale super_admin grant from a now-…' at 'an existing contributor', writing nothing ('grant_exceeds_issuer')
+ ↓ tests/auth.test.ts > invite redemption is authorised at the account write (AFLDB-ISSUE-270) > refuses 'a stale can_manage_admins grant from …' at 'a free address', writing nothing ('grant_exceeds_issuer')
+ ↓ tests/auth.test.ts > invite redemption is authorised at the account write (AFLDB-ISSUE-270) > refuses 'a stale can_manage_admins grant from …' at 'an existing contributor', writing nothing ('grant_exceeds_issuer')
+ ↓ tests/auth.test.ts > invite redemption is authorised at the account write (AFLDB-ISSUE-270) > lets a current super admin grant super_admin with the delegation at 'a free address'
+ ↓ tests/auth.test.ts > invite redemption is authorised at the account write (AFLDB-ISSUE-270) > lets a current super admin grant super_admin with the delegation at 'an existing contributor'
+ ↓ tests/auth.test.ts > invite redemption is authorised at the account write (AFLDB-ISSUE-270) > never reports a database failure as an enrolment, and logs no bound parameter
+ ↓ tests/auth.test.ts > invite redemption is authorised at the account write (AFLDB-ISSUE-270) > bounds the dedicated connection, and treats a statement timeout as a failure, not an enrolment
+ ↓ tests/auth.test.ts > invite redemption is authorised at the account write (AFLDB-ISSUE-270) > treats a refused row that cannot then be read back as a failure, not an enrolment
+ ↓ tests/auth.test.ts > invite redemption is authorised at the account write (AFLDB-ISSUE-270) > decides issuer authority by the capability policy and the createInvite grant line
+ ↓ tests/auth.test.ts > invite redemption is authorised at the account write (AFLDB-ISSUE-270) > decides every target/issuer pair by one rule, which the upsert guard mirrors
+ ↓ tests/auth.test.ts > the interactive login predicate excludes the retired contributor role (AFLDB-ISSUE-186) > src/app/admin/login/actions.ts no longer admits role=contributor
+ ↓ tests/auth.test.ts > the admin invite form no longer offers the retired contributor role (AFLDB-ISSUE-186) > src/app/admin/admins/InviteManager.tsx has no Contributor <option>
+ ↓ tests/auth.test.ts > adminNavFor > gives a contributor exactly their own password: the retired upload form is not listed (V2 Launch F)
+ ↓ tests/auth.test.ts > adminNavFor > never lists the grid solver: it left the admin area when audience became a setting
+ ↓ tests/auth.test.ts > adminNavFor > omits a group entirely for a viewer with no capability it contains, rather than showing it empty
+ ↓ tests/auth.test.ts > adminNavFor > lists the audit trail last in Operations for a super admin, and never for a contributor (AFLDB-ISSUE-157)
+ ↓ tests/auth.test.ts > adminNavFor > gives a super admin every group, in the runbook's section order
+ ↓ tests/auth.test.ts > adminNavFor > shows the Brownlow link to every staff role above contributor, and never to a contributor
+ ↓ tests/auth.test.ts > adminNavFor > keeps the Data group in section order: data editor, Brownlow, player links, coaches, draft, season lists, fixtures, awards, special records
+ ↓ tests/auth.test.ts > adminNavFor > shows Special records to an admin and never to a contributor (AFLDB-ISSUE-167 §9)
+ ↓ tests/auth.test.ts > adminNavFor > shows Awards & honours to an admin and never to a contributor (AFLDB-ISSUE-165 §5.2)
+ ↓ tests/auth.test.ts > adminNavFor > lists only current-season acquisition for a super admin: the legacy file intake link is retired (AFLDB V2 Stage 5)
+ ↓ tests/auth.test.ts > adminNavFor > lists the operations centre right after the dashboard for an admin and a super admin, and never legacy file intake (AFLDB V2 Stage 5)
+ ↓ tests/auth.test.ts > adminNavFor > always keeps the account group last, for every non-contributor role
+ ↓ tests/auth.test.ts > isCurrentAdminPath > matches an exact link only at its own pathname, never a nested one
+ ↓ tests/auth.test.ts > isCurrentAdminPath > matches a non-exact link at its own path and any path nested under it
+ ↓ tests/auth.test.ts > auth_audit_log writer > writes the row on the caller's transaction and never on the pool
+ ↓ tests/auth.test.ts > auth_audit_log writer > preserves actor id, email label, action, detail and request IP
+ ↓ tests/auth.test.ts > auth_audit_log writer > nulls the actor columns, the detail and an unavailable IP, as the pooled form does
+ ↓ tests/auth.test.ts > auth_audit_log writer > leaves audit() writing on the pool, unchanged
+ ↓ tests/auth.test.ts > auth_audit_log writer > emits identical SQL from both forms, because there is only one INSERT
+ ↓ tests/auth.test.ts > auth_audit_log writer > binds detail as a jsonb OBJECT, not a jsonb string, on both forms (AFLDB-ISSUE-119)
+ ↓ tests/auth.test.ts > auth_audit_log writer > propagates a failed insert instead of swallowing it, so the caller rolls back
+ ↓ tests/auth.test.ts > capability enforcement contract (AFLDB-ISSUE-158) > finds the admin boundaries it is about to check
+ ↓ tests/auth.test.ts > capability enforcement contract (AFLDB-ISSUE-158) > enforces every declared capability at a real page, route or action boundary
+ ↓ tests/auth.test.ts > capability enforcement contract (AFLDB-ISSUE-158) > guards every admin page, route handler and Server Action before it awaits anything else
+ ↓ tests/auth.test.ts > capability enforcement contract (AFLDB-ISSUE-158) > keeps a role guard only where policy names it, and every guard policy names
+ ↓ tests/auth.test.ts > capability enforcement contract (AFLDB-ISSUE-158) > lists the pre-auth surfaces exactly, and none of them has grown a guard
+ ↓ tests/auth.test.ts > capability enforcement contract (AFLDB-ISSUE-158) > asserts people.admins.lifecycle beside requireSuperAdmin(), never instead of it
+ ↓ tests/auth.test.ts > capability enforcement contract (AFLDB-ISSUE-158) > leaves the shared account-list actions on the door every admin may open
+ ↓ tests/auth.test.ts > capability enforcement contract (AFLDB-ISSUE-158) > enforces the capabilities the sidebar shows, so a hidden link is never the only gate
+ ↓ tests/auth.test.ts > capabilities are exactly as strict as the role guards they replaced (AFLDB-ISSUE-158) > places every declared capability
+ ↓ tests/auth.test.ts > capabilities are exactly as strict as the role guards they replaced (AFLDB-ISSUE-158) > data.playerLinks admits the same viewers as requireSuperAdmin()
+ ↓ tests/auth.test.ts > capabilities are exactly as strict as the role guards they replaced (AFLDB-ISSUE-158) > data.dataEditor admits the same viewers as requireSuperAdmin()
+ ↓ tests/auth.test.ts > capabilities are exactly as strict as the role guards they replaced (AFLDB-ISSUE-158) > data.brownlow.read admits the same viewers as requireAdmin()
+ ↓ tests/auth.test.ts > capabilities are exactly as strict as the role guards they replaced (AFLDB-ISSUE-158) > data.brownlow.draft admits the same viewers as requireAdmin()
+ ↓ tests/auth.test.ts > capabilities are exactly as strict as the role guards they replaced (AFLDB-ISSUE-158) > data.brownlow.finalise admits the same viewers as requireSuperAdmin()
+ ↓ tests/auth.test.ts > capabilities are exactly as strict as the role guards they replaced (AFLDB-ISSUE-158) > data.coaches.read admits the same viewers as requireAdmin()
+ ↓ tests/auth.test.ts > capabilities are exactly as strict as the role guards they replaced (AFLDB-ISSUE-158) > data.coaches.edit admits the same viewers as requireSuperAdmin()
+ ↓ tests/auth.test.ts > capabilities are exactly as strict as the role guards they replaced (AFLDB-ISSUE-158) > data.draft.read admits the same viewers as requireAdmin()
+ ↓ tests/auth.test.ts > capabilities are exactly as strict as the role guards they replaced (AFLDB-ISSUE-158) > data.draft.edit admits the same viewers as requireSuperAdmin()
+ ↓ tests/auth.test.ts > capabilities are exactly as strict as the role guards they replaced (AFLDB-ISSUE-158) > data.seasonLists.read admits the same viewers as requireAdmin()
+ ↓ tests/auth.test.ts > capabilities are exactly as strict as the role guards they replaced (AFLDB-ISSUE-158) > data.seasonLists.edit admits the same viewers as requireSuperAdmin()
+ ↓ tests/auth.test.ts > capabilities are exactly as strict as the role guards they replaced (AFLDB-ISSUE-158) > data.fixtures.read admits the same viewers as requireAdmin()
+ ↓ tests/auth.test.ts > capabilities are exactly as strict as the role guards they replaced (AFLDB-ISSUE-158) > data.fixtures.edit admits the same viewers as requireSuperAdmin()
+ ↓ tests/auth.test.ts > capabilities are exactly as strict as the role guards they replaced (AFLDB-ISSUE-158) > data.awards.read admits the same viewers as requireAdmin()
+ ↓ tests/auth.test.ts > capabilities are exactly as strict as the role guards they replaced (AFLDB-ISSUE-158) > data.awards.edit admits the same viewers as requireSuperAdmin()
+ ↓ tests/auth.test.ts > capabilities are exactly as strict as the role guards they replaced (AFLDB-ISSUE-158) > data.specialRecords.read admits the same viewers as requireAdmin()
+ ↓ tests/auth.test.ts > capabilities are exactly as strict as the role guards they replaced (AFLDB-ISSUE-158) > data.specialRecords.edit admits the same viewers as requireSuperAdmin()
+ ↓ tests/auth.test.ts > capabilities are exactly as strict as the role guards they replaced (AFLDB-ISSUE-158) > acquisition.legacyIntake admits the same viewers as requireUploader()
+ ↓ tests/auth.test.ts > capabilities are exactly as strict as the role guards they replaced (AFLDB-ISSUE-158) > acquisition.currentSeason admits the same viewers as requireSuperAdmin()
+ ↓ tests/auth.test.ts > capabilities are exactly as strict as the role guards they replaced (AFLDB-ISSUE-158) > people.betaAccess admits the same viewers as requireAdmin()
+ ↓ tests/auth.test.ts > capabilities are exactly as strict as the role guards they replaced (AFLDB-ISSUE-158) > people.admins.read admits the same viewers as requireAdmin()
+ ↓ tests/auth.test.ts > capabilities are exactly as strict as the role guards they replaced (AFLDB-ISSUE-158) > people.admins.manage admits the same viewers as requireAdminManager()
+ ↓ tests/auth.test.ts > capabilities are exactly as strict as the role guards they replaced (AFLDB-ISSUE-158) > people.admins.lifecycle admits the same viewers as requireSuperAdmin()
+ ↓ tests/auth.test.ts > capabilities are exactly as strict as the role guards they replaced (AFLDB-ISSUE-158) > site.content admits the same viewers as requireSuperAdmin()
+ ↓ tests/auth.test.ts > capabilities are exactly as strict as the role guards they replaced (AFLDB-ISSUE-158) > site.settings admits the same viewers as requireSuperAdmin()
+ ↓ tests/auth.test.ts > capabilities are exactly as strict as the role guards they replaced (AFLDB-ISSUE-158) > operations.queryBuilder admits the same viewers as requireSuperAdmin()
+ ↓ tests/auth.test.ts > capabilities are exactly as strict as the role guards they replaced (AFLDB-ISSUE-158) > operations.dbHealth admits the same viewers as requireSuperAdmin()
+ ↓ tests/auth.test.ts > capabilities are exactly as strict as the role guards they replaced (AFLDB-ISSUE-158) > operations.appHealth admits the same viewers as requireSuperAdmin()
+ ↓ tests/auth.test.ts > capabilities are exactly as strict as the role guards they replaced (AFLDB-ISSUE-158) > operations.nlTelemetry admits the same viewers as requireSuperAdmin()
+ ↓ tests/auth.test.ts > capabilities are exactly as strict as the role guards they replaced (AFLDB-ISSUE-158) > operations.audit.read admits the same viewers as requireAdmin()
+ ↓ tests/auth.test.ts > capabilities are exactly as strict as the role guards they replaced (AFLDB-ISSUE-158) > operations.centre.read admits the same viewers as requireAdmin()
+ ↓ tests/auth.test.ts > requireCapability against the real guard (AFLDB-ISSUE-158) > data.playerLinks: admits the viewers the table names and bounces the rest where the role guards did
+ ↓ tests/auth.test.ts > requireCapability against the real guard (AFLDB-ISSUE-158) > data.dataEditor: admits the viewers the table names and bounces the rest where the role guards did
+ ↓ tests/auth.test.ts > requireCapability against the real guard (AFLDB-ISSUE-158) > data.brownlow.read: admits the viewers the table names and bounces the rest where the role guards did
+ ↓ tests/auth.test.ts > requireCapability against the real guard (AFLDB-ISSUE-158) > data.brownlow.draft: admits the viewers the table names and bounces the rest where the role guards did
+ ↓ tests/auth.test.ts > requireCapability against the real guard (AFLDB-ISSUE-158) > data.brownlow.finalise: admits the viewers the table names and bounces the rest where the role guards did
+ ↓ tests/auth.test.ts > requireCapability against the real guard (AFLDB-ISSUE-158) > data.coaches.read: admits the viewers the table names and bounces the rest where the role guards did
+ ↓ tests/auth.test.ts > requireCapability against the real guard (AFLDB-ISSUE-158) > data.coaches.edit: admits the viewers the table names and bounces the rest where the role guards did
+ ↓ tests/auth.test.ts > requireCapability against the real guard (AFLDB-ISSUE-158) > data.draft.read: admits the viewers the table names and bounces the rest where the role guards did
+ ↓ tests/auth.test.ts > requireCapability against the real guard (AFLDB-ISSUE-158) > data.draft.edit: admits the viewers the table names and bounces the rest where the role guards did
+ ↓ tests/auth.test.ts > requireCapability against the real guard (AFLDB-ISSUE-158) > data.seasonLists.read: admits the viewers the table names and bounces the rest where the role guards did
+ ↓ tests/auth.test.ts > requireCapability against the real guard (AFLDB-ISSUE-158) > data.seasonLists.edit: admits the viewers the table names and bounces the rest where the role guards did
+ ↓ tests/auth.test.ts > requireCapability against the real guard (AFLDB-ISSUE-158) > data.fixtures.read: admits the viewers the table names and bounces the rest where the role guards did
+ ↓ tests/auth.test.ts > requireCapability against the real guard (AFLDB-ISSUE-158) > data.fixtures.edit: admits the viewers the table names and bounces the rest where the role guards did
+ ↓ tests/auth.test.ts > requireCapability against the real guard (AFLDB-ISSUE-158) > data.awards.read: admits the viewers the table names and bounces the rest where the role guards did
+ ↓ tests/auth.test.ts > requireCapability against the real guard (AFLDB-ISSUE-158) > data.awards.edit: admits the viewers the table names and bounces the rest where the role guards did
+ ↓ tests/auth.test.ts > requireCapability against the real guard (AFLDB-ISSUE-158) > data.specialRecords.read: admits the viewers the table names and bounces the rest where the role guards did
+ ↓ tests/auth.test.ts > requireCapability against the real guard (AFLDB-ISSUE-158) > data.specialRecords.edit: admits the viewers the table names and bounces the rest where the role guards did
+ ↓ tests/auth.test.ts > requireCapability against the real guard (AFLDB-ISSUE-158) > acquisition.legacyIntake: admits the viewers the table names and bounces the rest where the role guards did
+ ↓ tests/auth.test.ts > requireCapability against the real guard (AFLDB-ISSUE-158) > acquisition.currentSeason: admits the viewers the table names and bounces the rest where the role guards did
+ ↓ tests/auth.test.ts > requireCapability against the real guard (AFLDB-ISSUE-158) > people.betaAccess: admits the viewers the table names and bounces the rest where the role guards did
+ ↓ tests/auth.test.ts > requireCapability against the real guard (AFLDB-ISSUE-158) > people.admins.read: admits the viewers the table names and bounces the rest where the role guards did
+ ↓ tests/auth.test.ts > requireCapability against the real guard (AFLDB-ISSUE-158) > people.admins.manage: admits the viewers the table names and bounces the rest where the role guards did
+ ↓ tests/auth.test.ts > requireCapability against the real guard (AFLDB-ISSUE-158) > people.admins.lifecycle: admits the viewers the table names and bounces the rest where the role guards did
+ ↓ tests/auth.test.ts > requireCapability against the real guard (AFLDB-ISSUE-158) > site.content: admits the viewers the table names and bounces the rest where the role guards did
+ ↓ tests/auth.test.ts > requireCapability against the real guard (AFLDB-ISSUE-158) > site.settings: admits the viewers the table names and bounces the rest where the role guards did
+ ↓ tests/auth.test.ts > requireCapability against the real guard (AFLDB-ISSUE-158) > operations.queryBuilder: admits the viewers the table names and bounces the rest where the role guards did
+ ↓ tests/auth.test.ts > requireCapability against the real guard (AFLDB-ISSUE-158) > operations.dbHealth: admits the viewers the table names and bounces the rest where the role guards did
+ ↓ tests/auth.test.ts > requireCapability against the real guard (AFLDB-ISSUE-158) > operations.appHealth: admits the viewers the table names and bounces the rest where the role guards did
+ ↓ tests/auth.test.ts > requireCapability against the real guard (AFLDB-ISSUE-158) > operations.nlTelemetry: admits the viewers the table names and bounces the rest where the role guards did
+ ↓ tests/auth.test.ts > requireCapability against the real guard (AFLDB-ISSUE-158) > operations.audit.read: admits the viewers the table names and bounces the rest where the role guards did
+ ↓ tests/auth.test.ts > requireCapability against the real guard (AFLDB-ISSUE-158) > operations.centre.read: admits the viewers the table names and bounces the rest where the role guards did
+ ↓ tests/auth.test.ts > requireCapability against the real guard (AFLDB-ISSUE-158) > sends an anonymous caller to the login form, whatever the capability
+ ↓ tests/auth.test.ts > requireCapability against the real guard (AFLDB-ISSUE-158) > sends an outstanding temporary password to the change-password page before any capability is consulted
+ ↓ tests/auth.test.ts > requireCapability against the real guard (AFLDB-ISSUE-158) > turns a delegated contributor away from admin management at the guard, not only in the table
+ ↓ tests/auth.test.ts > requireAudience against the real guard (AFLDB-ISSUE-345) > public: admits anyone with no session lookup at all
+ ↓ tests/auth.test.ts > requireAudience against the real guard (AFLDB-ISSUE-345) > sends a signed-out caller to the login form
+ ↓ tests/auth.test.ts > requireAudience against the real guard (AFLDB-ISSUE-345) > sends a revoked, expired or disabled session (no live row) to the login form
+ ↓ tests/auth.test.ts > requireAudience against the real guard (AFLDB-ISSUE-345) > answers an under-ranked session with a 404
+ ↓ tests/auth.test.ts > requireAudience against the real guard (AFLDB-ISSUE-345) > admits a sufficiently ranked normal session
+ ↓ tests/auth.test.ts > requireAudience against the real guard (AFLDB-ISSUE-345) > sends a forced-change account to /admin/password at the default restricted audience
+ ↓ tests/auth.test.ts > requireAudience against the real guard (AFLDB-ISSUE-345) > runs the forced-change rule before the role comparison
+ ↓ tests/auth.test.ts > requireAudience against the real guard (AFLDB-ISSUE-345) > the Grid Solver page calls the guard before any solver query
+ ↓ tests/auth.test.ts > denial reaches the HTTP layer (AFLDB-ISSUE-166) > opens no route-level loading boundary at or above any guarded admin page
+ ↓ tests/auth.test.ts > denial reaches the HTTP layer (AFLDB-ISSUE-166) > wraps no admin layout's children in a Suspense boundary
+ ↓ tests/auth.test.ts > denial reaches the HTTP layer (AFLDB-ISSUE-166) > still expects the guards themselves to deny by redirect, which only 307s from the shell
+ × tests/auth.test.ts > the beta gate holds admin claims to the beta epoch (AFLDB-ISSUE-362 SEC-2) > refuses an admin claim from before the kill switch was bumped, like a beta cookie 82ms
+   → expected 200 to be 307 // Object.is equality
+ ✓ tests/auth.test.ts > the beta gate holds admin claims to the beta epoch (AFLDB-ISSUE-362 SEC-2) > still admits an admin claim minted at or after the current epoch 9ms
+ ✓ tests/auth.test.ts > the beta gate holds admin claims to the beta epoch (AFLDB-ISSUE-362 SEC-2) > changes nothing while AFLDB_BETA_EPOCH is unset: a legacy epoch-1 admin cookie still passes 2ms
+ ✓ tests/auth.test.ts > the beta gate holds admin claims to the beta epoch (AFLDB-ISSUE-362 SEC-2) > leaves /admin and its sign-in reachable for a legacy cookie, so there is no redirect loop 5ms
+ × tests/auth.test.ts > the beta gate holds admin claims to the beta epoch (AFLDB-ISSUE-362 SEC-2) > mints new admin claims at the current beta epoch 3ms
+   → expected null not to be null
+ ✓ tests/auth.test.ts > the beta gate holds admin claims to the beta epoch (AFLDB-ISSUE-362 SEC-2) > mints at epoch 1 when AFLDB_BETA_EPOCH is unset, as before 1ms
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the transaction boundary > publishes when an applied run wrote canonical rows
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the transaction boundary > publishes when an applied run only UPDATED canonical rows
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the transaction boundary > does nothing for the idempotent 0 canonical / 0 ledger rerun
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the transaction boundary > does nothing for a rolled-back run, however much it would have written
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the transaction boundary > does nothing when there is no run at all
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the settle CLI publishes only what it committed > invalidates the bundle's own season after an applied run that changed data
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the settle CLI publishes only what it committed > makes no request at all on an identical 0/0 rerun
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the settle CLI publishes only what it committed > makes no request on a dry run, whatever the run would have written
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the settle CLI publishes only what it committed > makes no request when the settle transaction itself failed
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the settle CLI publishes only what it committed > reports a failed invalidation without disturbing the committed run
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the settle CLI publishes only what it committed > turns a bad host configuration into a reported invalidation failure, not a lost settle
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the settle CLI publishes only what it committed > stays inert on a host that has configured nothing
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the settle CLI publishes only what it committed > leaves the existing counters and outcome shape untouched
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — host configuration > is inert when neither name is set
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — host configuration > refuses a half configuration rather than silently doing nothing
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — host configuration > refuses to send the shared secret anywhere but this host
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — host configuration > accepts the three loopback spellings
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — host configuration > refuses a non-HTTP scheme and unparseable rubbish
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — every worker, or a reported failure > keeps posting until every worker of a 4-worker cluster has answered
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — every worker, or a reported failure > covers the 2-worker production cluster
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — every worker, or a reported failure > tolerates a rotation disturbed by ordinary reader traffic
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — every worker, or a reported failure > accepts a single answer from a single-process server
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — every worker, or a reported failure > FAILS rather than reporting success when a worker never answers
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — every worker, or a reported failure > fails observably when the route refuses, and never throws
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — every worker, or a reported failure > fails observably when the socket does, and never throws
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — every worker, or a reported failure > bounds an unbounded error message rather than logging a blob
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — every worker, or a reported failure > the coverage contract > counts DISTINCT ordinals: repeats never accumulate towards coverage
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — every worker, or a reported failure > the coverage contract > is not satisfied by 3 of 4 workers
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — every worker, or a reported failure > the coverage contract > takes the LARGEST cluster size reported, so a restart cannot shrink coverage
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — every worker, or a reported failure > the coverage contract > opens a FRESH connection per attempt, which is what makes the rotation work
+ ↓ tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > invalidates exactly the season page it was given
+ ↓ tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > reports the worker identity the caller needs to prove coverage
+ ↓ tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > reports a single-process server truthfully rather than guessing
+ ↓ tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > takes the worker identity from process state, never from the request
+ ↓ tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > refuses to believe a nonsensical worker count rather than reporting it
+ ↓ tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > is 503 and inert on a host that has configured no secret
+ ↓ tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > refuses a wrong, empty or absent secret
+ ↓ tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > serves a loopback caller carrying the forwarding headers Next synthesises
+ ↓ tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > serves every loopback form the deployment can emit
+ ↓ tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > ignores x-forwarded-host, which is client input on every path
+ ↓ tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > refuses a non-loopback forwarded client even with the correct secret
+ ↓ tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > refuses a forwarded chain rather than trusting either end of it
+ ↓ tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > refuses a malformed forwarded client
+ ↓ tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > serves a request with no forwarding identity at all
+ ↓ tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > checks the caller BEFORE the secret, so a public probe learns nothing
+ ↓ tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > charges only failed secret checks against the limiter
+ ↓ tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > refuses once the failure limiter has tripped
+ ↓ tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > admits no arbitrary path, pattern or tag
+ ↓ tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > refuses a body that is not JSON at all
+ ↓ tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > bounds the season a caller may name
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the season route contract this depends on > still declares the ISR window and prerenders every season
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the season route contract this depends on > is reachable without a session, like the other machine-to-machine route
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the season route contract this depends on > is told the cluster size by the supervisor, since a worker cannot derive it
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the season route contract this depends on > decides the exit code AFTER the run returns, so a cache failure costs no data
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the season route contract this depends on > reaches the boundary only after runSettleAfltables has returned
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — classifying the forwarded client > accepts only the loopback forms this deployment can emit
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — classifying the forwarded client > calls a real non-loopback address remote, whatever family it is in
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — classifying the forwarded client > refuses anything that is not an address, including octal-looking octets
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — classifying the forwarded client > refuses a chain rather than picking a hop out of it
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — classifying the forwarded client > reports an absent header as absent rather than as an address
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — classifying the forwarded client > serves loopback and absent, and nothing else
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the reverse-proxy contract the loopback gate rests on > deploy/Caddyfile overwrites X-Forwarded-For on every proxy block
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the reverse-proxy contract the loopback gate rests on > deploy/Caddyfile.production overwrites X-Forwarded-For on every proxy block
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the reverse-proxy contract the loopback gate rests on > deploy/Caddyfile never appends or forwards a client-supplied hop
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the reverse-proxy contract the loopback gate rests on > deploy/Caddyfile.production never appends or forwards a client-supplied hop
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the reverse-proxy contract the loopback gate rests on > deploy/Caddyfile drops the other client-supplied address headers
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the reverse-proxy contract the loopback gate rests on > deploy/Caddyfile.production drops the other client-supplied address headers
+ × tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the reverse-proxy contract the loopback gate rests on > access logs carry no tokens or query strings (AFLDB-ISSUE-362) > deploy/Caddyfile defines the redacting log format with the invite, query and Referer rules 26ms
+   → expected '' to contain 'format filter'
+ × tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the reverse-proxy contract the loopback gate rests on > access logs carry no tokens or query strings (AFLDB-ISSUE-362) > deploy/Caddyfile.production defines the redacting log format with the invite, query and Referer rules 2ms
+   → expected '' to contain 'format filter'
+ × tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the reverse-proxy contract the loopback gate rests on > access logs carry no tokens or query strings (AFLDB-ISSUE-362) > deploy/Caddyfile imports it in every log block and in the global default log 3ms
+   → expected '# AFLDB reverse proxy — DEVELOPMENT S…' not to match /^\s*format json\s*$/m
+ × tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the reverse-proxy contract the loopback gate rests on > access logs carry no tokens or query strings (AFLDB-ISSUE-362) > deploy/Caddyfile.production imports it in every log block and in the global default log 2ms
+   → expected '# AFLDB reverse proxy — PRODUCTION DR…' not to match /^\s*format json\s*$/m
+ × tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the reverse-proxy contract the loopback gate rests on > access logs carry no tokens or query strings (AFLDB-ISSUE-362) > deploy/Caddyfile no longer claims query strings are absent without removing them 2ms
+   → expected '# AFLDB reverse proxy — DEVELOPMENT S…' not to match /(Query strings stay out of the logs|D…/
+ × tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the reverse-proxy contract the loopback gate rests on > access logs carry no tokens or query strings (AFLDB-ISSUE-362) > deploy/Caddyfile.production no longer claims query strings are absent without removing them 1ms
+   → expected '# AFLDB reverse proxy — PRODUCTION DR…' not to match /(Query strings stay out of the logs|D…/
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the reverse-proxy contract the loopback gate rests on > binds the application to loopback, so the proxy is the only way in
+ ↓ tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the reverse-proxy contract the loopback gate rests on > relies on Next filling x-forwarded-for only when the proxy did not
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/auth.test.ts > the beta gate holds admin claims to the beta epoch (AFLDB-ISSUE-362 SEC-2) > refuses an admin claim from before the kill switch was bumped, like a beta cookie
+AssertionError: expected 200 to be 307 // Object.is equality
+
+- Expected
++ Received
+
+- 307
++ 200
+
+ ❯ tests/auth.test.ts:2408:26
+    2406|     process.env.AFLDB_BETA_EPOCH = '5';
+    2407|     const stale = await door('/players', `afldb_admin=${await adminCoo…
+    2408|     expect(stale.status).toBe(307);
+       |                          ^
+    2409|     expect(stale.location).toContain('/beta?from=%2Fplayers');
+    2410|     expect(stale.next).toBeNull();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  tests/auth.test.ts > the beta gate holds admin claims to the beta epoch (AFLDB-ISSUE-362 SEC-2) > mints new admin claims at the current beta epoch
+AssertionError: expected null not to be null
+ ❯ tests/auth.test.ts:2449:91
+    2447|     const written = requestCookie.written.find((c) => c.name === 'afld…
+    2448|     expect(written).toBeDefined();
+    2449|     expect(await verifyClaim(written!.value, SECRET, { kind: 'admin', …
+       |                                                                                           ^
+    2450|     expect(await verifyClaim(written!.value, SECRET, { kind: 'admin', …
+    2451|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+ FAIL  tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the reverse-proxy contract the loopback gate rests on > access logs carry no tokens or query strings (AFLDB-ISSUE-362) > deploy/Caddyfile defines the redacting log format with the invite, query and Referer rules
+ FAIL  tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the reverse-proxy contract the loopback gate rests on > access logs carry no tokens or query strings (AFLDB-ISSUE-362) > deploy/Caddyfile.production defines the redacting log format with the invite, query and Referer rules
+AssertionError: expected '' to contain 'format filter'
+
+- Expected
++ Received
+
+- format filter
+
+ ❯ tests/settle-season-revalidation.test.ts:1082:23
+    1080|       const source = read(path);
+    1081|       const snippet = source.match(/\(afldb_log_format\) \{[\s\S]*?\n\…
+    1082|       expect(snippet).toContain('format filter');
+       |                       ^
+    1083|       expect(snippet).toContain('request>uri multi_regexp');
+    1084|       expect(snippet).toContain('regexp "^/admin/invite/[^/?#]+" "/adm…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯
+
+ FAIL  tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the reverse-proxy contract the loopback gate rests on > access logs carry no tokens or query strings (AFLDB-ISSUE-362) > deploy/Caddyfile imports it in every log block and in the global default log
+AssertionError: expected '# AFLDB reverse proxy — DEVELOPMENT S…' not to match /^\s*format json\s*$/m
+
+- Expected:
+/^\s*format json\s*$/m
+
++ Received:
+"# AFLDB reverse proxy — DEVELOPMENT SERVER ONLY
+#
+# This configuration deliberately does NOT reference afldb.com. It binds
+# a dedicated port on the development server so it cannot disturb the
+# other services already running on this host, and so the production
+# domain remains untouched.
+#
+# The production configuration is set out in docs/production-cutover.md
+# and must not be applied until the readiness gate passes.
+
+:8090 {
+	# Next.js listens on loopback only; the proxy is the sole public face.
+	# PostgreSQL is never exposed.
+	reverse_proxy 127.0.0.1:3100 {
+		health_uri /api/health
+		health_interval 30s
+		health_timeout 5s
+
+		# Overwrite (not append) X-Forwarded-For with the real client address,
+		# so a client-supplied \"X-Forwarded-For: 1.2.3.4\" cannot reach the app
+		# and forge the IP recorded in auth_sessions / auth_audit_log. The app
+		# (requestIp) reads the rightmost hop; the two together keep the audit
+		# trail honest. The production reverse proxy MUST do the same.
+		header_up X-Forwarded-For {remote_host}
+
+		# Drop the other address headers a client might send. The app does not
+		# read these, and removing them here means it never can by accident:
+		# a future reader of X-Real-IP would otherwise be trusting whatever the
+		# client typed. The production reverse proxy MUST do the same.
+		header_up -X-Real-IP
+		header_up -Forwarded
+	}
+
+	encode gzip zstd
+
+	header {
+		# Next.js also sets these; the proxy enforces them for any
+		# response it serves itself (errors, health failures).
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+
+		# Do NOT send HSTS here: the dev server is reached over plain
+		# HTTP on the LAN, and HSTS would poison browsers for this host.
+
+		# Never advertise the stack.
+		-Server
+		-X-Powered-By
+	}
+
+	# Health checks should not be cached anywhere.
+	@health path /api/health
+	header @health Cache-Control \"no-store\"
+
+	log {
+		output file /var/log/caddy/afldb-access.log {
+			roll_size 20MiB
+			roll_keep 5
+		}
+		format json
+		# Do not log query strings: Advanced Search URLs are user input.
+		level INFO
+	}
+}
+"
+
+ ❯ tests/settle-season-revalidation.test.ts:1091:26
+    1089|     it.each(CADDYFILES)('%s imports it in every log block and in the g…
+    1090|       const source = read(path);
+    1091|       expect(source).not.toMatch(/^\s*format json\s*$/m);
+       |                          ^
+    1092|       // Every `log` is one tab deep (inside a site block or the globa…
+    1093|       // nested `output file { }` closes deeper, so the first one-tab …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/8]⎯
+
+ FAIL  tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the reverse-proxy contract the loopback gate rests on > access logs carry no tokens or query strings (AFLDB-ISSUE-362) > deploy/Caddyfile.production imports it in every log block and in the global default log
+AssertionError: expected '# AFLDB reverse proxy — PRODUCTION DR…' not to match /^\s*format json\s*$/m
+
+- Expected:
+/^\s*format json\s*$/m
+
++ Received:
+"# AFLDB reverse proxy — PRODUCTION DROPLET (afldb-prod, SYD1)
+#
+#   sudo cp deploy/Caddyfile.production /etc/caddy/Caddyfile
+#   sudo caddy validate --config /etc/caddy/Caddyfile
+#   sudo systemctl reload caddy
+#
+# Caddy obtains and renews certificates automatically once the hostname
+# resolves to this droplet. Nothing here requests one explicitly.
+#
+# TWO HOSTNAMES, TWO JOBS.
+#
+#   beta.afldb.com   the application, gated, noindex — the staging-hostname
+#                    step docs/production-cutover.md §3 recommended.
+#   afldb.com        a static coming-soon page, indexable, served from disk.
+#   www.afldb.com    a permanent redirect to the apex, nothing else.
+#
+# The apex does NOT proxy to the application, with one exception (the
+# early-access form endpoint). See the comment on that block for why. This
+# keeps the original property of the beta-first ordering — a mistake in the
+# application cannot take down the domain that matters for search — while
+# still putting a real page at the apex instead of a parked one.
+#
+# See docs/apex-coming-soon.md for the deployment steps.
+#
+# THE header_up LINES ARE NOT OPTIONAL. Without them a client can send
+# its own X-Forwarded-For and forge the IP recorded in auth_sessions and
+# auth_audit_log. deploy/Caddyfile (development) carries the same three
+# lines and says the production proxy must match. src/lib/auth/session.ts
+# reads the RIGHTMOST entry, which is only trustworthy because Caddy
+# overwrites rather than appends.
+
+beta.afldb.com {
+	reverse_proxy 127.0.0.1:3100 {
+		health_uri /api/health
+		health_interval 30s
+		health_timeout 5s
+
+		# Overwrite, never append: the app must see only Caddy's own value.
+		header_up X-Forwarded-For {remote_host}
+
+		# Drop the other address headers entirely, so no future reader of
+		# them can end up trusting client input.
+		header_up -X-Real-IP
+		header_up -Forwarded
+	}
+
+	encode gzip zstd
+
+	header {
+		# The beta host runs AFLDB_ENV=production, because three security
+		# behaviours key off it: Secure session cookies
+		# (src/lib/auth/session.ts), the CSP that drops 'unsafe-eval', and
+		# HSTS. It must, being a public HTTPS host — without it the admin
+		# session cookie goes out with no Secure attribute.
+		#
+		# Indexing is a SEPARATE flag (AFLDB_INDEXING, see
+		# src/lib/indexing.ts) and stays off here: a beta must never enter
+		# search results, and duplicate content on a subdomain would compete
+		# with the eventual apex. The app therefore already serves noindex
+		# on every page and Disallow:/ from robots.txt. This header is the
+		# belt to that braces, and covers responses the proxy itself
+		# generates — errors, health-check failures — which never reach the
+		# application's own metadata.
+		#
+		# REMOVE THIS when this file is switched to serve the apex.
+		X-Robots-Tag \"noindex, nofollow\"
+
+		# Next.js sets these too; the proxy enforces them for responses it
+		# serves itself, such as errors and health-check failures (see changeLog.md).
+		Strict-Transport-Security \"max-age=31536000; includeSubDomains\"
+		Content-Security-Policy \"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'\"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+
+		# Never advertise the stack.
+		-Server
+		-X-Powered-By
+	}
+
+	# Health checks must not be cached anywhere.
+	@health path /api/health
+	header @health Cache-Control \"no-store\"
+
+	log {
+		output file /var/log/caddy/afldb-access.log {
+			roll_size 20MiB
+			roll_keep 5
+		}
+		format json
+		# Query strings stay out of the logs: Advanced Search URLs are user input.
+		level INFO
+	}
+}
+
+# --- Apex: the coming-soon page ----------------------------------------
+#
+# The apex and www MUST be separate blocks. Naming both on one block and
+# redirecting to the apex makes the apex redirect to itself — an infinite
+# loop that takes the site down the moment DNS resolves. `caddy validate`
+# does not catch it; only the separation does.
+
+www.afldb.com {
+	redir https://afldb.com{uri} permanent
+}
+
+# afldb.com serves STATIC FILES, not the application.
+#
+# The apex is the hostname that accumulates search history, so it is the one
+# that must always answer. A static file server cannot 502 because the app is
+# restarting, cannot time out because a query got slow, and does not care
+# whether PostgreSQL is up. Until the beta is proven, that reliability is
+# worth more at the apex than the application is — and when the application
+# does launch here, the SEO history is already attached to this hostname.
+#
+# The ONE dynamic path is the early-access form's endpoint, proxied to the app
+# below. Same origin, so the form posts without CORS and the page's own
+# form-action/connect-src 'self' policy covers it.
+#
+# AT LAUNCH: delete the `handle` blocks and give this site the same
+# `reverse_proxy` body the beta.afldb.com block above has. Nothing else here
+# changes — same hostname, same certificate, same logs.
+afldb.com {
+	# Must come first: `handle` blocks are evaluated in order and the bare
+	# one below matches everything.
+	handle /api/early-access* {
+		# The one unauthenticated write path on this host, so the body is
+		# capped before a byte of it reaches Node. The handler applies the
+		# same 32 KB ceiling itself — a host with no proxy in front still
+		# needs it — while this refuses the request at the edge, which is
+		# where an oversized body costs least.
+		request_body {
+			max_size 32KB
+		}
+
+		reverse_proxy 127.0.0.1:3100 {
+			health_uri /api/health
+			health_interval 30s
+			health_timeout 5s
+
+			# Identical to the beta block, and for the same reason: the app
+			# records the RIGHTMOST X-Forwarded-For entry, which is only
+			# trustworthy because Caddy overwrites rather than appends. The
+			# early-access endpoint rate-limits on that value.
+			header_up X-Forwarded-For {remote_host}
+			header_up -X-Real-IP
+			header_up -Forwarded
+		}
+	}
+
+	handle {
+		root * /var/www/afldb-soon
+		file_server
+	}
+
+	encode gzip zstd
+
+	header {
+		# NO X-Robots-Tag here. This host is meant to be indexed — that is
+		# the entire point of serving a real page at the apex instead of
+		# leaving it parked. /var/www/afldb-soon/robots.txt allows crawling
+		# and points at the one-URL sitemap beside it.
+
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy \"camera=(), microphone=(), geolocation=(), interest-cohort=()\"
+
+		# The page loads no third-party anything, and its CSS and JS are
+		# separate files rather than inline, so this needs no 'unsafe-inline'
+		# — unlike the application's own CSP, which does.
+		Content-Security-Policy \"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'\"
+
+		# Never advertise the stack.
+		-Server
+		-X-Powered-By
+
+		# HSTS IS DELIBERATELY ABSENT until HTTPS here is confirmed working.
+		# `includeSubDomains` on the apex also binds beta.afldb.com, and
+		# max-age=31536000 means browsers refuse plain HTTP for a year — close
+		# to irreversible on a first deployment. Once the certificate has
+		# issued and the site has served cleanly for a day or two, add it
+		# ramped: 300, then 86400, then 31536000. `preload` is a separate,
+		# later decision and is not on that ramp.
+		# Strict-Transport-Security \"max-age=300\"
+	}
+
+	# The HTML must not be cached hard: switching the early-access form on or
+	# off changes what the page offers, and a week-old copy in a CDN or a
+	# browser would not know. The fingerprint-free assets beside it are
+	# cheap enough to revalidate.
+	@html path / /index.html
+	header @html Cache-Control \"public, max-age=300, must-revalidate\"
+
+	@assets path /img/* /favicon.svg
+	header @assets Cache-Control \"public, max-age=86400\"
+
+	log {
+		output file /var/log/caddy/afldb-apex.log {
+			roll_size 20MiB
+			roll_keep 5
+		}
+		format json
+		level INFO
+	}
+}
+"
+
+ ❯ tests/settle-season-revalidation.test.ts:1091:26
+    1089|     it.each(CADDYFILES)('%s imports it in every log block and in the g…
+    1090|       const source = read(path);
+    1091|       expect(source).not.toMatch(/^\s*format json\s*$/m);
+       |                          ^
+    1092|       // Every `log` is one tab deep (inside a site block or the globa…
+    1093|       // nested `output file { }` closes deeper, so the first one-tab …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/8]⎯
+
+ FAIL  tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the reverse-proxy contract the loopback gate rests on > access logs carry no tokens or query strings (AFLDB-ISSUE-362) > deploy/Caddyfile no longer claims query strings are absent without removing them
+AssertionError: expected '# AFLDB reverse proxy — DEVELOPMENT S…' not to match /(Query strings stay out of the logs|D…/
+
+- Expected:
+/(Query strings stay out of the logs|Do not log query strings):/
+
++ Received:
+"# AFLDB reverse proxy — DEVELOPMENT SERVER ONLY
+#
+# This configuration deliberately does NOT reference afldb.com. It binds
+# a dedicated port on the development server so it cannot disturb the
+# other services already running on this host, and so the production
+# domain remains untouched.
+#
+# The production configuration is set out in docs/production-cutover.md
+# and must not be applied until the readiness gate passes.
+
+:8090 {
+	# Next.js listens on loopback only; the proxy is the sole public face.
+	# PostgreSQL is never exposed.
+	reverse_proxy 127.0.0.1:3100 {
+		health_uri /api/health
+		health_interval 30s
+		health_timeout 5s
+
+		# Overwrite (not append) X-Forwarded-For with the real client address,
+		# so a client-supplied \"X-Forwarded-For: 1.2.3.4\" cannot reach the app
+		# and forge the IP recorded in auth_sessions / auth_audit_log. The app
+		# (requestIp) reads the rightmost hop; the two together keep the audit
+		# trail honest. The production reverse proxy MUST do the same.
+		header_up X-Forwarded-For {remote_host}
+
+		# Drop the other address headers a client might send. The app does not
+		# read these, and removing them here means it never can by accident:
+		# a future reader of X-Real-IP would otherwise be trusting whatever the
+		# client typed. The production reverse proxy MUST do the same.
+		header_up -X-Real-IP
+		header_up -Forwarded
+	}
+
+	encode gzip zstd
+
+	header {
+		# Next.js also sets these; the proxy enforces them for any
+		# response it serves itself (errors, health failures).
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+
+		# Do NOT send HSTS here: the dev server is reached over plain
+		# HTTP on the LAN, and HSTS would poison browsers for this host.
+
+		# Never advertise the stack.
+		-Server
+		-X-Powered-By
+	}
+
+	# Health checks should not be cached anywhere.
+	@health path /api/health
+	header @health Cache-Control \"no-store\"
+
+	log {
+		output file /var/log/caddy/afldb-access.log {
+			roll_size 20MiB
+			roll_keep 5
+		}
+		format json
+		# Do not log query strings: Advanced Search URLs are user input.
+		level INFO
+	}
+}
+"
+
+ ❯ tests/settle-season-revalidation.test.ts:1102:30
+    1100|
+    1101|     it.each(CADDYFILES)('%s no longer claims query strings are absent …
+    1102|       expect(read(path)).not.toMatch(/(Query strings stay out of the l…
+       |                              ^
+    1103|     });
+    1104|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/8]⎯
+
+ FAIL  tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the reverse-proxy contract the loopback gate rests on > access logs carry no tokens or query strings (AFLDB-ISSUE-362) > deploy/Caddyfile.production no longer claims query strings are absent without removing them
+AssertionError: expected '# AFLDB reverse proxy — PRODUCTION DR…' not to match /(Query strings stay out of the logs|D…/
+
+- Expected:
+/(Query strings stay out of the logs|Do not log query strings):/
+
++ Received:
+"# AFLDB reverse proxy — PRODUCTION DROPLET (afldb-prod, SYD1)
+#
+#   sudo cp deploy/Caddyfile.production /etc/caddy/Caddyfile
+#   sudo caddy validate --config /etc/caddy/Caddyfile
+#   sudo systemctl reload caddy
+#
+# Caddy obtains and renews certificates automatically once the hostname
+# resolves to this droplet. Nothing here requests one explicitly.
+#
+# TWO HOSTNAMES, TWO JOBS.
+#
+#   beta.afldb.com   the application, gated, noindex — the staging-hostname
+#                    step docs/production-cutover.md §3 recommended.
+#   afldb.com        a static coming-soon page, indexable, served from disk.
+#   www.afldb.com    a permanent redirect to the apex, nothing else.
+#
+# The apex does NOT proxy to the application, with one exception (the
+# early-access form endpoint). See the comment on that block for why. This
+# keeps the original property of the beta-first ordering — a mistake in the
+# application cannot take down the domain that matters for search — while
+# still putting a real page at the apex instead of a parked one.
+#
+# See docs/apex-coming-soon.md for the deployment steps.
+#
+# THE header_up LINES ARE NOT OPTIONAL. Without them a client can send
+# its own X-Forwarded-For and forge the IP recorded in auth_sessions and
+# auth_audit_log. deploy/Caddyfile (development) carries the same three
+# lines and says the production proxy must match. src/lib/auth/session.ts
+# reads the RIGHTMOST entry, which is only trustworthy because Caddy
+# overwrites rather than appends.
+
+beta.afldb.com {
+	reverse_proxy 127.0.0.1:3100 {
+		health_uri /api/health
+		health_interval 30s
+		health_timeout 5s
+
+		# Overwrite, never append: the app must see only Caddy's own value.
+		header_up X-Forwarded-For {remote_host}
+
+		# Drop the other address headers entirely, so no future reader of
+		# them can end up trusting client input.
+		header_up -X-Real-IP
+		header_up -Forwarded
+	}
+
+	encode gzip zstd
+
+	header {
+		# The beta host runs AFLDB_ENV=production, because three security
+		# behaviours key off it: Secure session cookies
+		# (src/lib/auth/session.ts), the CSP that drops 'unsafe-eval', and
+		# HSTS. It must, being a public HTTPS host — without it the admin
+		# session cookie goes out with no Secure attribute.
+		#
+		# Indexing is a SEPARATE flag (AFLDB_INDEXING, see
+		# src/lib/indexing.ts) and stays off here: a beta must never enter
+		# search results, and duplicate content on a subdomain would compete
+		# with the eventual apex. The app therefore already serves noindex
+		# on every page and Disallow:/ from robots.txt. This header is the
+		# belt to that braces, and covers responses the proxy itself
+		# generates — errors, health-check failures — which never reach the
+		# application's own metadata.
+		#
+		# REMOVE THIS when this file is switched to serve the apex.
+		X-Robots-Tag \"noindex, nofollow\"
+
+		# Next.js sets these too; the proxy enforces them for responses it
+		# serves itself, such as errors and health-check failures (see changeLog.md).
+		Strict-Transport-Security \"max-age=31536000; includeSubDomains\"
+		Content-Security-Policy \"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'\"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+
+		# Never advertise the stack.
+		-Server
+		-X-Powered-By
+	}
+
+	# Health checks must not be cached anywhere.
+	@health path /api/health
+	header @health Cache-Control \"no-store\"
+
+	log {
+		output file /var/log/caddy/afldb-access.log {
+			roll_size 20MiB
+			roll_keep 5
+		}
+		format json
+		# Query strings stay out of the logs: Advanced Search URLs are user input.
+		level INFO
+	}
+}
+
+# --- Apex: the coming-soon page ----------------------------------------
+#
+# The apex and www MUST be separate blocks. Naming both on one block and
+# redirecting to the apex makes the apex redirect to itself — an infinite
+# loop that takes the site down the moment DNS resolves. `caddy validate`
+# does not catch it; only the separation does.
+
+www.afldb.com {
+	redir https://afldb.com{uri} permanent
+}
+
+# afldb.com serves STATIC FILES, not the application.
+#
+# The apex is the hostname that accumulates search history, so it is the one
+# that must always answer. A static file server cannot 502 because the app is
+# restarting, cannot time out because a query got slow, and does not care
+# whether PostgreSQL is up. Until the beta is proven, that reliability is
+# worth more at the apex than the application is — and when the application
+# does launch here, the SEO history is already attached to this hostname.
+#
+# The ONE dynamic path is the early-access form's endpoint, proxied to the app
+# below. Same origin, so the form posts without CORS and the page's own
+# form-action/connect-src 'self' policy covers it.
+#
+# AT LAUNCH: delete the `handle` blocks and give this site the same
+# `reverse_proxy` body the beta.afldb.com block above has. Nothing else here
+# changes — same hostname, same certificate, same logs.
+afldb.com {
+	# Must come first: `handle` blocks are evaluated in order and the bare
+	# one below matches everything.
+	handle /api/early-access* {
+		# The one unauthenticated write path on this host, so the body is
+		# capped before a byte of it reaches Node. The handler applies the
+		# same 32 KB ceiling itself — a host with no proxy in front still
+		# needs it — while this refuses the request at the edge, which is
+		# where an oversized body costs least.
+		request_body {
+			max_size 32KB
+		}
+
+		reverse_proxy 127.0.0.1:3100 {
+			health_uri /api/health
+			health_interval 30s
+			health_timeout 5s
+
+			# Identical to the beta block, and for the same reason: the app
+			# records the RIGHTMOST X-Forwarded-For entry, which is only
+			# trustworthy because Caddy overwrites rather than appends. The
+			# early-access endpoint rate-limits on that value.
+			header_up X-Forwarded-For {remote_host}
+			header_up -X-Real-IP
+			header_up -Forwarded
+		}
+	}
+
+	handle {
+		root * /var/www/afldb-soon
+		file_server
+	}
+
+	encode gzip zstd
+
+	header {
+		# NO X-Robots-Tag here. This host is meant to be indexed — that is
+		# the entire point of serving a real page at the apex instead of
+		# leaving it parked. /var/www/afldb-soon/robots.txt allows crawling
+		# and points at the one-URL sitemap beside it.
+
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy \"camera=(), microphone=(), geolocation=(), interest-cohort=()\"
+
+		# The page loads no third-party anything, and its CSS and JS are
+		# separate files rather than inline, so this needs no 'unsafe-inline'
+		# — unlike the application's own CSP, which does.
+		Content-Security-Policy \"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'\"
+
+		# Never advertise the stack.
+		-Server
+		-X-Powered-By
+
+		# HSTS IS DELIBERATELY ABSENT until HTTPS here is confirmed working.
+		# `includeSubDomains` on the apex also binds beta.afldb.com, and
+		# max-age=31536000 means browsers refuse plain HTTP for a year — close
+		# to irreversible on a first deployment. Once the certificate has
+		# issued and the site has served cleanly for a day or two, add it
+		# ramped: 300, then 86400, then 31536000. `preload` is a separate,
+		# later decision and is not on that ramp.
+		# Strict-Transport-Security \"max-age=300\"
+	}
+
+	# The HTML must not be cached hard: switching the early-access form on or
+	# off changes what the page offers, and a week-old copy in a CDN or a
+	# browser would not know. The fingerprint-free assets beside it are
+	# cheap enough to revalidate.
+	@html path / /index.html
+	header @html Cache-Control \"public, max-age=300, must-revalidate\"
+
+	@assets path /img/* /favicon.svg
+	header @assets Cache-Control \"public, max-age=86400\"
+
+	log {
+		output file /var/log/caddy/afldb-apex.log {
+			roll_size 20MiB
+			roll_keep 5
+		}
+		format json
+		level INFO
+	}
+}
+"
+
+ ❯ tests/settle-season-revalidation.test.ts:1102:30
+    1100|
+    1101|     it.each(CADDYFILES)('%s no longer claims query strings are absent …
+    1102|       expect(read(path)).not.toMatch(/(Query strings stay out of the l…
+       |                              ^
+    1103|     });
+    1104|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/8]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  8 failed | 4 passed | 280 skipped (292)
+   Start at  08:57:58
+   Duration  2.37s (transform 1.08s, setup 211ms, import 1.45s, tests 148ms, environment 1ms)
+
