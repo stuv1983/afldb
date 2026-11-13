@@ -1,0 +1,6 @@
+--- unfixed (de640826) rebuild-test.ts in the red copy:
+pinned files: data/players/height-evidence-wikipedia.csv, data/players/father-son-selections.csv, data/players/sibling-relationships.csv, data/records/after-siren-events.csv
+assertReviewedInputPins: REFUSED: Reviewed input pin: data/players/sibling-relationships.csv sha256 b1f0ff4ed0bf… does not match the reviewed pin dc8d61801512…. Nothing has been destroyed.
+--- fixed (4d2234bc) in the final checkout:
+pinned files: data/players/height-evidence-wikipedia.csv, data/players/father-son-selections.csv, data/players/sibling-relationships.csv, data/records/after-siren-events.csv
+assertReviewedInputPins: PASS (all pins match)

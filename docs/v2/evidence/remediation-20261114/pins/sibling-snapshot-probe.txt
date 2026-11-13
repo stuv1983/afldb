@@ -1,0 +1,5 @@
+isolated-pg: afldb_v2_rempins_tmpl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55611); running node
+{"db":"afldb_v2_rempins_tmpl_test","port":55611}
+{"pairs":499,"brother_rows":475,"mcgovern_rows":1}
+[{"a":6937,"b":9714}]
+{"players_with_brother_games_gt0":660}

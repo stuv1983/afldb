@@ -1,0 +1,101 @@
+HEAD=de640826d13489c58392563e7ae1ff62403ed293 dirty=0
+=== A: three focused suites (no python vars)
+       × the real checkout (its WHOLE node_modules tree is walked) agrees with a direct lstat of its own node_modules chain (a linked install refuses by design) 35842ms
+     × runs the independent validator BEFORE any destructive stage 20ms
+         × baseline_only uses the same ordered stats inputs in both loaders, stages, preflight and strict final gates 51ms
+         × supplemented_baseline uses the same ordered stats inputs in both loaders, stages, preflight and strict final gates 53ms
+         × baseline_only stops on baseline/register/stats, configured supplement, API, Wikipedia or coach-page preflight failure before reset 20ms
+         × supplemented_baseline stops on baseline/register/stats, configured supplement, API, Wikipedia or coach-page preflight failure before reset 19ms
+       × follows fitzroy (identities and match facts) and precedes everything that reads players 6ms
+       × preflights both snapshots offline before the destructive stage and refuses on failure 9ms
+       × preflights the snapshot offline before the destructive stage and refuses on failure 11ms
+       × preflights the snapshot offline before the destructive stage and refuses on failure 10ms
+         × c2-2026-rehearsal-only: preflight replays raw through the loader and refuses, with nothing destroyed, on any failure 13ms
+         × c2-2026-successor: preflight replays raw through the loader and refuses, with nothing destroyed, on any failure 10ms
+       × preflights the tracked files and the loader's offline validation before the destructive stage 8ms
+       × preflights the tracked files and the loader's offline validation before the destructive stage 9ms
+       × preflights the tracked files and the loader's offline validation before the destructive stage 8ms
+       × preflights the tracked pair and the pinned --validate-only before the destructive stage 9ms
+       × preflights the tracked artefact, manifest and adjudication file offline 9ms
+       × proves the witness offline BEFORE anything is destroyed 13ms
+     × propagates --draftguru-label through to the preflight validator 8ms
+     × gives the data stage the same label the preflight proved 44ms
+     × makes preflight/data label equality contractual, for any label 45ms
+     × keeps the default label correct, and identical on both sides, with no override 43ms
+       × restore-test.sh hashes before restoring, clears first, and binds only after parity passes 66ms
+     × equals renderAflApiStageMap output 142ms
+⎯⎯⎯⎯⎯⎯ Failed Tests 24 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/db-promotion-check.test.ts > AFLDB-ISSUE-250 — the promotion freeze > source shape > restore-test.sh hashes before restoring, clears first, and binds only after parity passes
+ FAIL  tests/db-test-rebuild.test.ts > AFLDB-ISSUE-324 -- the ordinary child-process boundary (npx tsx / npm run become bound node) > entry-point verification (the real path of the executed tsx stays inside the pinned checkout) > the real checkout (its WHOLE node_modules tree is walked) agrees with a direct lstat of its own node_modules chain (a linked install refuses by design)
+ FAIL  tests/db-test-rebuild.test.ts > fitzRoy preflight > runs the independent validator BEFORE any destructive stage
+ FAIL  tests/db-test-rebuild.test.ts > stage graph > height enrichment (AFLDB-ISSUE-118 §23.19) > explicit shared height/coach stats inputs (ISSUE-316) > baseline_only uses the same ordered stats inputs in both loaders, stages, preflight and strict final gates
+ FAIL  tests/db-test-rebuild.test.ts > stage graph > height enrichment (AFLDB-ISSUE-118 §23.19) > explicit shared height/coach stats inputs (ISSUE-316) > supplemented_baseline uses the same ordered stats inputs in both loaders, stages, preflight and strict final gates
+ FAIL  tests/db-test-rebuild.test.ts > stage graph > height enrichment (AFLDB-ISSUE-118 §23.19) > explicit shared height/coach stats inputs (ISSUE-316) > baseline_only stops on baseline/register/stats, configured supplement, API, Wikipedia or coach-page preflight failure before reset
+ FAIL  tests/db-test-rebuild.test.ts > stage graph > height enrichment (AFLDB-ISSUE-118 §23.19) > explicit shared height/coach stats inputs (ISSUE-316) > supplemented_baseline stops on baseline/register/stats, configured supplement, API, Wikipedia or coach-page preflight failure before reset
+ FAIL  tests/db-test-rebuild.test.ts > stage graph > height enrichment (AFLDB-ISSUE-118 §23.19) > follows fitzroy (identities and match facts) and precedes everything that reads players
+ FAIL  tests/db-test-rebuild.test.ts > stage graph > height enrichment (AFLDB-ISSUE-118 §23.19) > preflights both snapshots offline before the destructive stage and refuses on failure
+ FAIL  tests/db-test-rebuild.test.ts > stage graph > birth dates (AFLDB-ISSUE-118 §23.24 Stage D1) > preflights the snapshot offline before the destructive stage and refuses on failure
+ FAIL  tests/db-test-rebuild.test.ts > stage graph > coaches (AFLDB-ISSUE-118 §23.27 Stage E2) > preflights the snapshot offline before the destructive stage and refuses on failure
+ FAIL  tests/db-test-rebuild.test.ts > stage graph > coaches (AFLDB-ISSUE-118 §23.27 Stage E2) > mandatory raw replay outside the predecessor (AFLDB-ISSUE-319) > c2-2026-rehearsal-only: preflight replays raw through the loader and refuses, with nothing destroyed, on any failure
+ FAIL  tests/db-test-rebuild.test.ts > stage graph > coaches (AFLDB-ISSUE-118 §23.27 Stage E2) > mandatory raw replay outside the predecessor (AFLDB-ISSUE-319) > c2-2026-successor: preflight replays raw through the loader and refuses, with nothing destroyed, on any failure
+ FAIL  tests/db-test-rebuild.test.ts > stage graph > father–son selections (AFLDB-ISSUE-118 §23.29 family F) > preflights the tracked files and the loader's offline validation before the destructive stage
+ FAIL  tests/db-test-rebuild.test.ts > stage graph > sibling pairs (AFLDB-ISSUE-118 §23.31 family F) > preflights the tracked files and the loader's offline validation before the destructive stage
+ FAIL  tests/db-test-rebuild.test.ts > stage graph > after-siren events (AFLDB-ISSUE-118 §23.33–§23.35) > preflights the tracked files and the loader's offline validation before the destructive stage
+ FAIL  tests/db-test-rebuild.test.ts > stage graph > first-kick goal (AFLDB-ISSUE-249) > preflights the tracked pair and the pinned --validate-only before the destructive stage
+ FAIL  tests/db-test-rebuild.test.ts > stage graph > brownlow season (AFLDB-ISSUE-113 §8.6) > preflights the tracked artefact, manifest and adjudication file offline
+ FAIL  tests/db-test-rebuild.test.ts > stage graph > ladder witness cross-check (AFLDB-ISSUE-095 D7) > proves the witness offline BEFORE anything is destroyed
+ FAIL  tests/db-test-rebuild.test.ts > DraftGuru preflight validates the label the data stage will import > propagates --draftguru-label through to the preflight validator
+ FAIL  tests/db-test-rebuild.test.ts > DraftGuru preflight validates the label the data stage will import > gives the data stage the same label the preflight proved
+ FAIL  tests/db-test-rebuild.test.ts > DraftGuru preflight validates the label the data stage will import > makes preflight/data label equality contractual, for any label
+ FAIL  tests/db-test-rebuild.test.ts > DraftGuru preflight validates the label the data stage will import > keeps the default label correct, and identical on both sides, with no override
+ FAIL  tests/v2-acquisition-pipeline.test.ts > (e) docs/v2/architecture.md §9 is the rendered stage map > equals renderAflApiStageMap output
+ Test Files  3 failed (3)
+      Tests  24 failed | 1635 passed (1659)
+=== B: six python suites, nothing set (host python3)
+⎯⎯⎯⎯⎯⎯ Failed Tests 78 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  6 failed (6)
+      Tests  78 failed | 34 passed (112)
+=== C: six python suites, ONLY AFLDB_PYTHON=venv
+     × classifies each file by its name and derives scored / effect / result per table 222ms
+     × keeps other-competition rows with their competition, supergoal notation and no premiership flag 195ms
+     × refuses a score that does not add up, a separator that disagrees with the margin, and a category that disagrees with the scores 203ms
+     × Shuey 2017: the [a] footnote is refused without an adjudication and is a goal to win after the extra-time siren with one 204ms
+     × King 1994: a miss in a 23-point win is refused until the end_of_regulation adjudication types it as a miss with no effect 198ms
+     × an uncited row needs a citation adjudication, and a score that does not add up needs a score_arithmetic one; both are recorded, neither may be stale 193ms
+     × strips the repeat marker from the name, refuses the same event in two files, and orders deterministically 201ms
+     × keys on season, round and both club organisations, and takes the clubs from the match 213ms
+     × reads the kicker first whichever side of the fixture the club was on 192ms
+     × separates a drawn final from its replay on the source's own points 195ms
+     × retries one round higher only in a season shaped by an Opening Round 198ms
+     × leaves match_id NULL for a season this database does not carry, and says so 194ms
+     × leaves match_id NULL for another competition without ever looking for one 194ms
+     × refuses a season it carries whose fixture it cannot find 195ms
+     × refuses a fixture whose score disagrees with the source's 204ms
+     × refuses a club name that is not exactly one organisation 193ms
+     × links the one player of that name in the match for the kicker club 197ms
+     × never reaches across to the opponent, and leaves the source spelling when nobody matches 194ms
+     × leaves same-name team-mates ambiguous rather than picking one 196ms
+     × separates same-name candidates by a generational suffix, and records that it did 212ms
+     × confirms a goal against the kicker's own scoring line 220ms
+     × treats an unrecorded statistic as unknown, never as zero 209ms
+     × refuses a recorded zero, which contradicts the source 204ms
+     × checks nothing for a kick that scored nothing 201ms
+     × refuses a header that is not the tracked shape 196ms
+     × refuses a duplicated event key 200ms
+     × refuses an unknown enum value 193ms
+     × refuses a premiership row of another competition 193ms
+     × accepts the tracked artefact through load --validate-only, and its provenance agrees 233ms
+     × writes only columns migration 089 declares 193ms
+     × passes the loader's own offline validation through its CLI 219ms
+     × passes the AFL API Brownlow season artefact contract (builder + D-233-2 loader) 197ms
+     × refuses a tampered artefact (hash mismatch) through the same CLI 203ms
+     × applies all five adjudications when the row names the exact recovery path 195ms
+     × carries an unadjudicated mismatched recovery path through unchanged (no correction) 196ms
+     × fails hard when an override names a recovery path the export does not carry 206ms
+     × fails hard when an override names a legacy player the export lacks 198ms
+     × refuses a gap-fill row (no recovery path) for a player the export already bridges 195ms
+     × rejects each original recovery path and resolves each adjudicated path 195ms
+     × agrees on the real tracked contract, and folds Jack Ross to players/J/Jack_Ross.html 219ms
+=== D: six python suites, ONLY PYTHON=venv (control)
+ Test Files  6 passed (6)
+      Tests  150 passed | 1 skipped (151)

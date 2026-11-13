@@ -1,0 +1,7 @@
+HEAD=de640826d13489c58392563e7ae1ff62403ed293 porcelain=15
+=== A: three focused suites + wrapper (only AFLDB_PYTHON=venv, no DB vars)
+ Test Files  4 passed (4)
+      Tests  1729 passed (1729)
+=== B: six python suites, ONLY AFLDB_PYTHON=venv
+ Test Files  6 passed (6)
+      Tests  150 passed | 1 skipped (151)

@@ -1,0 +1,59 @@
+unfixed sources, new tests: HEAD=de640826d13489c58392563e7ae1ff62403ed293 changed= M tests/after-siren-normalisation.test.ts  M tests/brownlow-season-artefact.test.ts  M tests/coach-reconciliation.test.ts  M tests/db-promotion-check.test.ts  M tests/db-test-rebuild.test.ts  M tests/father-son-reconciliation.test.ts  M tests/height-reconciliation.test.ts  M tests/reference-data.test.ts  M tests/sibling-reconciliation.test.ts  M tests/v2-acquisition-pipeline.test.ts ?? node_modules ?? tests/python-interpreter.ts 
+=== R1 recompute-every-pin test + stage map + restore order vs UNFIXED rebuild-test.ts / architecture.md / restore pin source
+         ↓ refuses before the reset when the marker or the capture is stale capture time in the marker
+           ↓ carries the counts into the pinned policy file the launcher writes
+           ↓ verifies a version 3 record and derives the pinned auditor policy; version 2 carries none of it
+             ↓ passes only when named, pinned, mapped from the bound inode and holding the bound bytes
+     ↓ psqlConnection(pinned) drops PGHOSTADDR & co but still moves the DSN password into PGPASSWORD (ISSUE-313)
+     ↓ pinned psql starts with -X and keeps the shared flags; unpinned argv is unchanged
+     ↓ the rebuild's real psql path (createCliDeps) is pinned for the reset AND the validation streams
+     ↓ the proof runs psql through the same pinned options as the rebuild (source pin)
+     ↓ is run with ON_ERROR_STOP and --single-transaction on the shared pinned argv, so the first error ends it before the reset
+     ↓ binds the completed range 1897-2026 to the tracked contract and its pinned versions
+       ↓ gates the rebuilt heights on the pinned measurements
+       ↓ loads the coach-page snapshot the AFL Tables contract accepts, beside the baseline and every pinned supplement
+       ↓ preflights the tracked pair and the pinned --validate-only before the destructive stage
+     ↓ FAILS the rebuild when the database does not match
+       ↓ treats a ZERO psql exit as a FAILURE, and says which kind
+     ↓ AFLDB-ISSUE-238 Stage 22 (DB-free): SAT-1 PASSes for the corrected provider; a wrong or missing resolved row, or an orphan, FAILs; a remaining marker still FAILs; zero-corrected never runs SAT-1
+       ↓ any MOVE or DELETE STOPs: Pc still implicated (class 3 FAIL), or a non-empty closure reaching the gate
+     ↓ is hard-pinned to code_test_db through its own variables, never another target's
+     × pins exactly the four tracked loader inputs, and each pin equals the sha256 of its file 61ms
+     × the sibling pin is the artefact whose pair count the rebuild expects (pin, provenance and CSV move together) 11ms
+=== R2 six suites with ONLY AFLDB_PYTHON on the UNFIXED suites (de640826 test files)
+     11      45|   if (proc.status !== 0) throw new Error(`python exited ${proc.status}…
+     11 Error: python exited 1: Traceback (most recent call last):
+      1 ⎯⎯⎯⎯⎯⎯ Failed Tests 12 ⎯⎯⎯⎯⎯⎯⎯
+     12 ModuleNotFoundError: No module named 'psycopg'
+      1  Test Files  1 failed (1)
+      1       Tests  12 failed (12)
+=== R3 new wrapper vs UNFIXED fitzroy contract (only the 1c row must fail)
+     × fitzroy_profile_continuity_contract.py exits 0 and prints its closing line 120ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/reference-data.test.ts > standalone Python contracts (ISSUE-363 TST-5) > fitzroy_profile_continuity_contract.py exits 0 and prints its closing line
+  FAIL  1c the renumbered rows sum to the 79 measured blank-ID renumbered rows
+1 check(s) FAILED: ['1c the renumbered rows sum to the 79 measured blank-ID renumbered rows']
+      Tests  1 failed | 7 passed | 60 skipped (68)
+=== R4 new restore-order pin: mutations of tools/maintenance/restore-test.sh (candidate tests, mutated script)
+       × restore-test.sh hashes before restoring, clears first, and binds only after parity passes 60ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+AssertionError: expected -1 to be greater than 6858
+      Tests  1 failed | 479 skipped (480)
+       × restore-test.sh hashes before restoring, clears first, and binds only after parity passes 59ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+AssertionError: expected 9341 to be less than 7043
+      Tests  1 failed | 479 skipped (480)
+=== R5 stage-map test vs UNFIXED docs/v2/architecture.md
+     × equals renderAflApiStageMap output 119ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+AssertionError: docs/v2/architecture.md §9 is stale: run `npx tsx tools/v2/acquisition-stage-map.ts --write`: expected '| Stage | Location | Symbol | Writes …' to be '| Stage | Location | Symbol | Writes …' // Object.is equality
+- | promote | `tools/current-season/settle-afl-api.ts:357` | `runAflApiSettleCli` | canonical |
++ | promote | `tools/current-season/settle-afl-api.ts:356` | `runAflApiSettleCli` | canonical |
+    379|       'docs/v2/architecture.md §9 is stale: run `npx tsx tools/v2/acqu…
+      Tests  1 failed | 1 passed | 22 skipped (24)
+=== R6 new inventory test: a contract nobody runs
+     × every tests/python/*_contract.py is run by a suite (this table or another test file) 167ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+AssertionError: contracts no suite runs: add a row to the CONTRACTS table in tests/reference-data.test.ts: expected [ 'zz_unwired_contract.py' ] to deeply equal []
++   "zz_unwired_contract.py",
+      Tests  1 failed | 67 skipped (68)

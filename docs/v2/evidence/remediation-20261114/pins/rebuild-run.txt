@@ -1,0 +1,12 @@
+isolated-pg: afldb_v2_rb_rempins_test verified (cluster afldb_v2_isolated, 127.0.0.1:55611); running node
+AFLDB clean test rebuild (AFLDB-ISSUE-093 §10)
+  target        : afldb_v2_rb_rempins_test (V2 isolated local rebuild (tools/v2/isolated-pg.ts cluster); --target)
+  credentials   : AFLDB_TEST_DATABASE_URL + AFLDB_TEST_IMPORT_DATABASE_URL
+  fitzRoy label : c2-2026-final-core-v1 (ACCEPTED canonical full-history baseline)
+  draftguru     : annual-html-20260826 (no bridge dataset)
+  afl_api owner : census of 1897..2026 excluding in-progress 2027 before the capture; any afl_api-owned completed-season match refuses the rebuild (AFLDB-ISSUE-233 D-233-3)
+  afl_api ids   : captured to /mnt/ssd/afldb-rem-pins-20261114/capture/afldb_v2_rb_rempins_test/, reinstated after draftguru
+ERROR: snapshot file missing: /mnt/ssd/afldb-rem-pins-20261114/cand/data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1897.csv
+REFUSED: fitzRoy preflight failed. Nothing has been destroyed.
+ERROR: snapshot file missing: /mnt/ssd/afldb-rem-pins-20261114/cand/data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1897.csv
+

@@ -1,0 +1,40 @@
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/db-test-rebuild.test.ts > ISSUE-358 every reviewed input pin is recomputed from the tracked bytes > pins exactly the four tracked loader inputs, and each pin equals the sha256 of its file
+AssertionError: expected [ Array(1) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "data/players/sibling-relationships.csv: pinned dc8d618015125103c42b66acd243962277185e703c7ecca3c428042b0c650bab but the tracked file is b1f0ff4ed0bfcf23b53fc8e0007c08ffee636cfd7077b39c3d07aa3b842bd318",
++ ]
+
+ ❯ tests/db-test-rebuild.test.ts:14826:19
+    14824|       if (actual !== pin) stale.push(`${path}: pinned ${pin} but the t…
+    14825|     }
+    14826|     expect(stale).toEqual([]);
+       |                   ^
+    14827|     expect(() => assertReviewedInputPins()).not.toThrow();
+    14828|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  tests/db-test-rebuild.test.ts > ISSUE-358 every reviewed input pin is recomputed from the tracked bytes > the sibling pin is the artefact whose pair count the rebuild expects (pin, provenance and CSV move together)
+AssertionError: expected 'b1f0ff4ed0bfcf23b53fc8e0007c08ffee636…' to be 'dc8d618015125103c42b66acd243962277185…' // Object.is equality
+
+Expected: "dc8d618015125103c42b66acd243962277185e703c7ecca3c428042b0c650bab"
+Received: "b1f0ff4ed0bfcf23b53fc8e0007c08ffee636cfd7077b39c3d07aa3b842bd318"
+
+ ❯ tests/db-test-rebuild.test.ts:14836:36
+    14834|     // quoted field never spans a line here, which the loader's own --…
+    14835|     expect(provenance.measures.pairs).toBe(csvRows);
+    14836|     expect(lfSha256(SIBLINGS_CSV)).toBe(REVIEWED_INPUT_PINS[SIBLINGS_C…
+       |                                    ^
+    14837|   });
+    14838| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+

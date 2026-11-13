@@ -1,0 +1,3 @@
+⎯⎯⎯⎯⎯⎯ Failed Tests 78 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  6 failed (6)
+      Tests  78 failed | 34 passed (112)

@@ -1,0 +1,7 @@
+draftguru-acquisition.test.ts | rebuilds byte-identically from the accepted Stage A snapshot | AssertionError: Required frozen sample is missing: /mnt/ssd/afldb-rem-pins-20261114/final/data/sources/draftguru/person-html-20260826/sample
+draftguru-acquisition.test.ts | is the frozen 120 / 8 / 68 / 30 / 14 contract over the accepted Stage A label | Error: ENOENT: no such file or directory, open '/mnt/ssd/afldb-rem-pins-20261114/final/data/sources/draftguru/person-html-20260826/sample.js
+draftguru-acquisition.test.ts | DSN guard, read-only discipline, hash pins, classification refusals, verify chec | AssertionError: 
+fitzroy-core-import.test.ts | leaves exactly the two genuine Round 10 rows | Error: ENOENT: no such file or directory, open '/mnt/ssd/afldb-rem-pins-20261114/final/data/sources/afltables/fitzroy_core/full-history-2026
+fitzroy-core-import.test.ts | leaves the younger player's other appearances untouched | Error: ENOENT: no such file or directory, open '/mnt/ssd/afldb-rem-pins-20261114/final/data/sources/afltables/fitzroy_core/full-history-2026
+fitzroy-core-import.test.ts | corrects exactly two rows and nothing else in 1909 | Error: ENOENT: no such file or directory, open '/mnt/ssd/afldb-rem-pins-20261114/final/data/sources/afltables/fitzroy_core/full-history-2026
+fitzroy-core-import.test.ts | covers the four real 2025 players, retaining all 79 rows | Error: ENOENT: no such file or directory, open '/mnt/ssd/afldb-rem-pins-20261114/final/data/sources/afltables/fitzroy_core/full-history-2026

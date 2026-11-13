@@ -1,0 +1,26 @@
+FINAL HEAD=4d2234bc38099a3e6ca6923dd14844211b0b9046
+porcelain lines: 0
+4d2234bc ISSUE-363: run the seven uninvoked tests/python contracts, guard the inventory, fix the stale 1c bound
+7aab3174 ISSUE-363: six Python-backed suites honour the documented AFLDB_PYTHON
+1675bec4 ISSUE-358: re-pin the ISSUE-250 restore-test.sh order on the ISSUE-341/342 printf form
+86df8734 ISSUE-358: regenerate the architecture stage map (settle-afl-api.ts:357) and name the one-command fix
+3524a1a3 ISSUE-358: re-pin the sibling CSV (McGovern pair) and recompute every reviewed input pin in a DB-free test
+5035ed96 review: full AFLDB review of origin/main de640826 (records only)
+de640826 Records: ISSUE-336 Step G wording as a documented assessment; run 9 handoff
+4bca6867546d0c9b68a952f41d12d917de8ce8a9bb40eeb06293dd4d543f0591  /mnt/ssd/afldb-rem-pins-20261114/pins.bundle
+=== F1 whole unit gate once (all non-integration suites, no DB variables, only AFLDB_PYTHON=venv)
+unit rc=1
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  2 failed | 213 passed | 1 skipped (216)
+      Tests  7 failed | 11899 passed | 31 skipped (11937)
+   Duration  623.69s (transform 23.62s, setup 8.69s, import 152.05s, tests 410.93s, environment 57ms)
+=== F2 the named focused suites alone
+ Test Files  10 passed (10)
+      Tests  1879 passed | 1 skipped (1880)
+=== F3 nl-answers-relationships on a fresh snapshot copy (final checkout)
+create-db: afldb_v2_rempins_fin_test created from afldb_v2_rempins_tmpl_test and marked
+ Test Files  1 passed (1)
+      Tests  49 passed (49)
+drop-db: afldb_v2_rempins_fin_test dropped
+porcelain lines after: 0
+HEAD after=4d2234bc38099a3e6ca6923dd14844211b0b9046

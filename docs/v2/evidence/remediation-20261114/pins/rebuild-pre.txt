@@ -1,0 +1,44 @@
+HEAD=de640826d13489c58392563e7ae1ff62403ed293 porcelain=15
+pg_ctl: server is running (PID: 363851)
+/usr/lib/postgresql/16/bin/postgres "-D" "/mnt/ssd/afldb-rem-pins-20261114/pg-root/data"
+create-db: afldb_v2_rb_rempins_test created and marked
+isolated-pg: afldb_v2_rb_rempins_test verified (cluster afldb_v2_isolated, 127.0.0.1:55611); running env
+AFLDB_TEST_DATABASE_URL: host=127.0.0.1 port=55611 database=afldb_v2_rb_rempins_test
+AFLDB_IMPORT_DATABASE_URL: host=127.0.0.1 port=55611 database=afldb_v2_rb_rempins_test
+AFLDB_V2_ISOLATED_PG=1 AFLDB_V2_ISOLATED_PORT=55611
+TARGET PROVEN: 127.0.0.1:55611 afldb_v2_rb_rempins_test
+=== --plan (prints the resolved target; nothing executed)
+isolated-pg: afldb_v2_rb_rempins_test verified (cluster afldb_v2_isolated, 127.0.0.1:55611); running node
+AFLDB clean test rebuild (AFLDB-ISSUE-093 §10)
+  target        : afldb_v2_rb_rempins_test (V2 isolated local rebuild (tools/v2/isolated-pg.ts cluster); --target)
+  credentials   : AFLDB_TEST_DATABASE_URL + AFLDB_TEST_IMPORT_DATABASE_URL
+  fitzRoy label : c2-2026-final-core-v1 (ACCEPTED canonical full-history baseline)
+  draftguru     : annual-html-20260826 (no bridge dataset)
+  afl_api owner : census of 1897..2026 excluding in-progress 2027 before the capture; any afl_api-owned completed-season match refuses the rebuild (AFLDB-ISSUE-233 D-233-3)
+  afl_api ids   : captured to /mnt/ssd/afldb-rem-pins-20261114/capture/afldb_v2_rb_rempins_test/, reinstated after draftguru
+
+--plan: the stage graph only, nothing executed and nothing destroyed.
+
+  1. [precheck] precheck — PRECHECK — every required input, before anything is destroyed
+  2. [validation] afl-api-ownership-census — AFL API OWNERSHIP CENSUS — refuse if any completed season in 1897..2026 excluding in-progress 2027 holds an afl_api-owned canonical match (read-only, before anything is captured or destroyed)
+  3. [capture] afl-api-adjudications-capture — AFL API ADJUDICATIONS — capture the human identity ledger, the importer-created identities AND the manual player registrations before anything is destroyed
+       npx tsx tools/migration/rebuild_afl_api_adjudications.ts capture
+  4. [destructive] recreate — DATABASE RESET — clear afldb_v2_rb_rempins_test
+  5. [schema] migrations — MIGRATIONS — the complete tracked set
+       npm run db:migrate:test
+  6. [privileges] privileges — PRIVILEGES — reconcile roles from the registries
+       npm run db:privileges:test
+=== preflight (runs before any destruction; a failure refuses with 'Nothing has been destroyed')
+rebuild rc=1
+isolated-pg: afldb_v2_rb_rempins_test verified (cluster afldb_v2_isolated, 127.0.0.1:55611); running node
+AFLDB clean test rebuild (AFLDB-ISSUE-093 §10)
+  target        : afldb_v2_rb_rempins_test (V2 isolated local rebuild (tools/v2/isolated-pg.ts cluster); --target)
+  credentials   : AFLDB_TEST_DATABASE_URL + AFLDB_TEST_IMPORT_DATABASE_URL
+  fitzRoy label : c2-2026-final-core-v1 (ACCEPTED canonical full-history baseline)
+  draftguru     : annual-html-20260826 (no bridge dataset)
+  afl_api owner : census of 1897..2026 excluding in-progress 2027 before the capture; any afl_api-owned completed-season match refuses the rebuild (AFLDB-ISSUE-233 D-233-3)
+  afl_api ids   : captured to /mnt/ssd/afldb-rem-pins-20261114/capture/afldb_v2_rb_rempins_test/, reinstated after draftguru
+ERROR: snapshot file missing: /mnt/ssd/afldb-rem-pins-20261114/cand/data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1897.csv
+REFUSED: fitzRoy preflight failed. Nothing has been destroyed.
+ERROR: snapshot file missing: /mnt/ssd/afldb-rem-pins-20261114/cand/data/sources/afltables/fitzroy_core/c2-2026-final-core-v1/player_stats_1897.csv
+

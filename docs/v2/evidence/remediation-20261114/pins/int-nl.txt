@@ -1,0 +1,13 @@
+create-db: afldb_v2_rempins_int_test created from afldb_v2_rempins_tmpl_test and marked
+=== RED: de640826 test file (hasBrother 658) on the snapshot copy
+     × returns exactly the hand-written label-backed set 63ms
+     × counts the whole qualifying set even when the rows are capped 16ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+AssertionError: expected 660 to be 658 // Object.is equality
+AssertionError: expected 660 to be 658 // Object.is equality
+ Test Files  1 failed (1)
+      Tests  2 failed | 47 passed (49)
+=== GREEN: fixed test file on the same snapshot copy (hasBrother from the tracked provenance measure)
+ Test Files  1 passed (1)
+      Tests  49 passed (49)
+drop-db: afldb_v2_rempins_int_test dropped
