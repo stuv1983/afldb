@@ -1,4 +1,4 @@
-# D-336-2 Step G on production (2026-11-13): read-only reconciliation and page check, PASS
+# D-336-2 Step G on production (2026-11-13): reconciliation PASS; page check automated FAIL 77/83 with a documented assessment
 
 Contract: `docs/v2/issue336-d3362-approval-packet-2026-11-11.md` §4 Step G (runbook `issues/closed/AFLDB-ISSUE-336.md` §3 step 7),
 after Steps E+F were applied and ACCEPTED on 2026-11-12 (`docs/v2/evidence/issue336-d3362-apply-20261112/README.md`). Every
@@ -42,12 +42,12 @@ acquisition as ISSUE-348). Codex confirmed all 187 retained stored values match 
 Runner `browser/stepg.cjs`, using the repository's Playwright with the owner signed in through `/beta` in the runner's own
 window. The session was used only inside the runner and discarded at exit. Nothing from it was read out or saved. The first
 launch timed out with no sign-in (`browser/browser-console-attempt1-timeout.txt`). The second run is recorded:
-`browser/browser-console.txt`, `browser/result.json` (raw verdict **FAIL 77/83**, kept unmodified).
+`browser/browser-console.txt`, `browser/result.json`. **Automated runner verdict: FAIL 77/83**, kept unmodified as the record of the automated run.
 
-**The 6 raw failures are a runner predicate defect, not a page failure.** The "authenticated HTTP 200" check was
+**Documented assessment of the 6 failures (a judgment from the evidence below, not an automated result): a runner predicate defect, not a page failure.** The "authenticated HTTP 200" check was
 `resp.status()===200 && !page.url().includes('/beta')`. The base URL is `https://beta.afldb.com`, whose `//beta.` contains `/beta`,
-so the predicate is false for every URL on that host. All six recorded the status `200`. Corrected evaluation, from evidence the
-same page objects produced:
+so the predicate is false for every URL on that host. All six recorded the status `200`. Supporting evidence, produced by the same
+page objects:
 
 - each of the six pages also passed its Pre-Draft tab count, row count, inserted names, unnumbered selections and no-rendered-error
   checks, which read `main` content that the `/beta` gate page does not have;
@@ -55,12 +55,12 @@ same page objects produced:
 - anonymous requests for the same three paths returned **307 to `https://beta.afldb.com/beta?from=…`**, so the gate is on and a
   200 means authenticated.
 
-**Corrected verdict: 83/83 PASS.** A rerun was not needed for this conclusion and was not made, because another owner sign-in
-would add nothing.
+On that assessment, no rendered-page check failed. The automated result stays **FAIL 77/83**: it is not restated as an automated
+83/83. The runner was not corrected and rerun, so no automated run with a fixed predicate exists.
 
 | Check (desktop 1280×800 and mobile 390×844) | Result |
 |---|---|
-| `/draft/2008`, `/draft/2025`, `/draft/2009?view=pre-draft`: authenticated 200 | PASS (corrected, above) |
+| `/draft/2008`, `/draft/2025`, `/draft/2009?view=pre-draft`: authenticated 200 | Automated **FAIL** ×6 (predicate defect); HTTP 200 recorded each time; assessed as authenticated, see above |
 | 2008 and 2025 Pre-Draft views: HTTP 200 | PASS |
 | Pre-Draft tab count and table rows: 2008 **4**, 2025 **4**, 2009 **36** | PASS, both viewports |
 | Inserted names present: 2008 Solomoni Loki, Amua Pirika, Inoke Ratu, Stanis Susuve; 2025 Cillian Bourke, Kobe McDonald, Jake Miles-Wrency; 2009 the 11 names in `reconcile/expected.json` | PASS, both viewports |
@@ -78,7 +78,8 @@ would add nothing.
 
 ## Result
 
-Step G PASS. D-336-2 is complete, and ISSUE-336 is resolved on 2026-11-13. ISSUE-348 stays open for the next DraftGuru
+Step G complete. The reconciliation passed. The page check passed every content, error and gate check, with the automated verdict
+FAIL 77/83 and the six URL-check failures assessed above. D-336-2 is complete, and ISSUE-336 is resolved on 2026-11-13. ISSUE-348 stays open for the next DraftGuru
 acquisition.
 
 Not retained in the repository: the owner CSVs (the read-only copy stays on streamanator), and the derived `csv_rows.json` and
