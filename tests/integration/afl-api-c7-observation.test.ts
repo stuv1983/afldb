@@ -191,11 +191,13 @@ describe('season opening (AFLDB-ISSUE-350) against PostgreSQL (rolled back)', ()
     const identities: Record<string, unknown>[] = [];
     for (let i = 0; i < 3; i += 1) {
       const slug = `s350-club-${i}`;
-      const [org] = await tx<{ id: number }[]>`INSERT INTO club_organizations (name, slug, first_season, last_season) VALUES (${`S350 org ${i}`}, ${`${slug}-org`}, 2000, 2096) RETURNING id`;
+      const [org] = await tx<{ id: number }[]>`INSERT INTO club_organizations (name, slug, first_season, last_season) VALUES (${`S350 org ${i}`}, ${`${slug}-org`}, 2096, 2096) RETURNING id`;
       const [club] = await tx<{ id: number }[]>`
         INSERT INTO clubs (slug, name, short_name, abbreviation, current_identity_id, legacy_club_hist, organization_id, succession, is_current_afl_club, first_season, last_season)
         VALUES (${slug}, ${`S350 Club ${i}`}, ${`S${i}`}, ${`S3${i}`}, -1, ${slug}, ${org.id}, 'current', true, ${2096}, ${2096}) RETURNING id`;
       await tx`UPDATE clubs SET current_identity_id = ${club.id} WHERE id = ${club.id}`;
+      // the historical arm of afldb_season_list_clubs needs a club_seasons row for the previous season, as every real club has
+      await tx`INSERT INTO club_seasons (season, club_id, played, wins, draws, losses, points_for, points_against) VALUES (2096, ${club.id}, 0, 0, 0, 0, 0, 0)`;
       identities.push({ hist: slug, slug, succession: 'current', is_current_afl_club: true, first_season: 2096, last_season: null });
     }
     return {

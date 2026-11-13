@@ -1,5 +1,5 @@
 -- AFLDB-ISSUE-350: the REVERSAL of the season opening. NOT an application path, NOT run by any tool: an owner-run recovery, used only if the
--- opening must be undone while NOTHING depends on the new season row yet. It is rehearsed on a disposable clone (REHEARSAL.md).
+-- opening must be undone while NOTHING depends on the new season row yet. It is rehearsed on a disposable clone (README.md, section 6).
 --
 -- Run as the schema owner (afldb_owner) in ONE transaction (docs/v2/evidence/.../rollover/run-sql.mjs does this; or psql --single-transaction).
 -- Replace the two id lists below with `changes.clubIds` and `changes.orgIds` of the APPROVED plan (the plan file is the single source of truth;
