@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   authSql: vi.fn(),
   sql: vi.fn(),
   requireCapability: vi.fn(),
+  requestIp: vi.fn(),
+  getAdminUser: vi.fn(),
   audit: vi.fn(),
   revalidatePath: vi.fn(),
   fetchSourceEvidence: vi.fn(),
@@ -24,6 +26,8 @@ vi.mock('@/db/client', () => ({ sql: mocks.sql }));
 vi.mock('@/lib/auth/session', () => ({
   // data.playerLinks / data.dataEditor, both super-admin-only (AFLDB-ISSUE-158).
   requireCapability: mocks.requireCapability,
+  requestIp: mocks.requestIp,
+  getAdminUser: mocks.getAdminUser,
   audit: mocks.audit,
 }));
 vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }));
@@ -35,6 +39,7 @@ vi.mock('@/db/queries/player-match-candidates', () => ({
 }));
 
 import { createPlayerAction } from '@/app/admin/data-editor/actions';
+import { submitPlayerLinkSuggestion } from '@/app/player-link-suggestion-action';
 import {
   approveSuggestion,
   bulkApproveSuggestions,
@@ -3893,5 +3898,114 @@ describe('AFLDB-ISSUE-310: linkAflApiProvider stable identity (DB-free)', () => 
     );
     expect(recorded).toContain('readPlayerStableIdentity(db, playerId)');
     expect(source).not.toContain('ORDER BY (s.key <> \'afltables\'), ei.external_id');
+  });
+});
+
+describe('submitPlayerLinkSuggestion: the anonymous public tip (AFLDB-ISSUE-363 TST-7)', () => {
+  const NAME_ERROR = 'Please give the player’s name.';
+  const LIMIT_ERROR = 'Thanks — that is enough suggestions for now. Try again later.';
+  const INVALID_ERROR = 'That suggestion could not be linked to a record.';
+
+  let ipCounter = 0;
+  const inserts = () => mocks.authSql.mock.calls.filter(
+    ([strings]) => /INSERT\s+INTO\s+player_link_suggestions/.test((strings as TemplateStringsArray).join(' ? ')),
+  );
+  const tip = (fields: Record<string, string>) => {
+    const data = new FormData();
+    for (const [key, value] of Object.entries(fields)) data.set(key, value);
+    return data;
+  };
+  const valid = { targetTable: 'award_winners', targetId: '42', suggestedName: 'Jim Smith', note: 'Played for Norwood' };
+
+  beforeEach(() => {
+    // The limiter is module state, keyed on the caller: a fresh caller per test.
+    ipCounter += 1;
+    mocks.requestIp.mockReset();
+    mocks.requestIp.mockResolvedValue(`198.51.100.${ipCounter}`);
+    mocks.getAdminUser.mockReset();
+  });
+
+  it('records a valid tip as one parameterised row, trimmed, and thanks the reader', async () => {
+    const result = await submitPlayerLinkSuggestion({ status: 'idle' }, tip({ ...valid, suggestedName: '  Jim Smith  ' }));
+
+    expect(result).toEqual({ status: 'thanks' });
+    expect(inserts()).toHaveLength(1);
+    // Every value is a bound parameter: target table, id, name, note.
+    expect(inserts()[0].slice(1)).toEqual(['award_winners', 42, 'Jim Smith', 'Played for Norwood']);
+  });
+
+  it('stores NULL for an empty note, and caps the name at 120 and the note at 1000 characters', async () => {
+    await submitPlayerLinkSuggestion({ status: 'idle' }, tip({ ...valid, note: '' }));
+    expect(inserts()[0].slice(1)[3]).toBeNull();
+
+    await submitPlayerLinkSuggestion(
+      { status: 'idle' }, tip({ ...valid, suggestedName: 'n'.repeat(300), note: 'x'.repeat(2000) }),
+    );
+    const [, , , name, note] = [...inserts()[1]];
+    expect(name).toBe('n'.repeat(120));
+    expect(note).toBe('x'.repeat(1000));
+  });
+
+  it('is anonymous: it reads no admin session and needs no capability', async () => {
+    await submitPlayerLinkSuggestion({ status: 'idle' }, tip(valid));
+
+    expect(mocks.requireCapability).not.toHaveBeenCalled();
+    expect(mocks.getAdminUser).not.toHaveBeenCalled();
+    expect(mocks.requestIp).toHaveBeenCalled(); // the only identity it reads: the rate-limit key
+  });
+
+  it.each([
+    ['empty', ''],
+    ['blank', '   \t '],
+  ])('refuses a %s name before touching the limiter or the database', async (_label, suggestedName) => {
+    const result = await submitPlayerLinkSuggestion({ status: 'idle' }, tip({ ...valid, suggestedName }));
+
+    expect(result).toEqual({ status: 'error', message: NAME_ERROR });
+    expect(inserts()).toHaveLength(0);
+    expect(mocks.requestIp).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a table outside the allowlist', { targetTable: 'players' }],
+    ['an injection attempt in the table name', { targetTable: 'draft_picks; DROP TABLE players' }],
+    ['a missing table', { targetTable: '' }],
+    ['a zero id', { targetId: '0' }],
+    ['a negative id', { targetId: '-5' }],
+    ['a fractional id', { targetId: '1.5' }],
+    ['a non-numeric id', { targetId: 'abc' }],
+    ['a missing id', { targetId: '' }],
+  ])('refuses %s with the "could not be linked" message and writes nothing', async (_label, override) => {
+    const result = await submitPlayerLinkSuggestion({ status: 'idle' }, tip({ ...valid, ...override }));
+
+    expect(result).toEqual({ status: 'error', message: INVALID_ERROR });
+    expect(inserts()).toHaveLength(0);
+  });
+
+  it('still thanks the reader when storage fails, and logs the failure server-side', async () => {
+    const boom = new Error('insert refused');
+    mocks.authSql.mockRejectedValueOnce(boom);
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const result = await submitPlayerLinkSuggestion({ status: 'idle' }, tip(valid));
+
+      expect(result).toEqual({ status: 'thanks' });
+      expect(logged).toHaveBeenCalledWith('player-link suggestion could not be recorded', boom);
+    } finally {
+      logged.mockRestore();
+    }
+  });
+
+  it('rate-limits per caller: tip 13 inside the window is refused and written nowhere; another caller is unaffected', async () => {
+    for (let i = 0; i < 12; i += 1) {
+      expect(await submitPlayerLinkSuggestion({ status: 'idle' }, tip(valid))).toEqual({ status: 'thanks' });
+    }
+    expect(inserts()).toHaveLength(12);
+
+    expect(await submitPlayerLinkSuggestion({ status: 'idle' }, tip(valid))).toEqual({ status: 'error', message: LIMIT_ERROR });
+    expect(inserts()).toHaveLength(12);
+
+    mocks.requestIp.mockResolvedValue('198.51.100.250');
+    expect(await submitPlayerLinkSuggestion({ status: 'idle' }, tip(valid))).toEqual({ status: 'thanks' });
+    expect(inserts()).toHaveLength(13);
   });
 });

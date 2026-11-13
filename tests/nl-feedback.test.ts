@@ -6,14 +6,26 @@
  * decides whether a cookie is written at all. The rules are pinned here
  * rather than trusted to the shape of the code.
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { analyticsAllowed, CONSENT_COOKIE, isConsentChoice, readConsentCookie } from '@/lib/consent';
+import { setConsent } from '@/app/consent-action';
+import {
+  analyticsAllowed, CONSENT_COOKIE, CONSENT_MAX_AGE_SECONDS, isConsentChoice, readConsentCookie,
+} from '@/lib/consent';
 import { secureCookies } from '@/lib/cookie-security';
 import {
   isNlFeedbackVerdict, NL_FEEDBACK_MAX_LENGTH, NL_FEEDBACK_VERDICTS,
 } from '@/search/nl/feedback-spec';
-import { isUuid, isValidNlSessionId } from '@/lib/nl-session';
+import { isUuid, isValidNlSessionId, NL_SESSION_COOKIE } from '@/lib/nl-session';
+
+// AFLDB-ISSUE-363 TST-7: the consent server action writes cookies through next/headers.
+const jar = vi.hoisted(() => ({ set: vi.fn(), delete: vi.fn(), requested: vi.fn() }));
+vi.mock('next/headers', () => ({
+  cookies: async () => {
+    jar.requested();
+    return { set: jar.set, delete: jar.delete };
+  },
+}));
 
 describe('analytics consent fails closed', () => {
   // Everything that is not an explicit acceptance must read as "no".
@@ -106,6 +118,72 @@ describe('cookie transport security', () => {
       if (original === undefined) delete process.env.AFLDB_ENV;
       else process.env.AFLDB_ENV = original;
     }
+  });
+});
+
+describe('setConsent (the banner server action, AFLDB-ISSUE-363 TST-7)', () => {
+  const choice = (value?: string) => {
+    const data = new FormData();
+    if (value !== undefined) data.set('choice', value);
+    return data;
+  };
+
+  beforeEach(() => {
+    jar.set.mockClear();
+    jar.delete.mockClear();
+    jar.requested.mockClear();
+    vi.stubEnv('AFLDB_ENV', 'development');
+  });
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('records "accepted" as a one-year, root-path, script-readable, SameSite=Lax cookie, and leaves nl_sid alone', async () => {
+    await setConsent(choice('accepted'));
+
+    expect(jar.set).toHaveBeenCalledTimes(1);
+    expect(jar.set).toHaveBeenCalledWith(CONSENT_COOKIE, 'accepted', {
+      httpOnly: false, // the banner reads it in the browser; there is nothing in it to steal
+      secure: false,
+      sameSite: 'lax',
+      maxAge: CONSENT_MAX_AGE_SECONDS,
+      path: '/',
+    });
+    expect(CONSENT_MAX_AGE_SECONDS).toBe(31_536_000);
+    expect(jar.delete).not.toHaveBeenCalled();
+  });
+
+  it('records "declined" and DELETES an existing nl_sid, path-qualified, so decline does not mean "eventually"', async () => {
+    await setConsent(choice('declined'));
+
+    expect(jar.set).toHaveBeenCalledWith(CONSENT_COOKIE, 'declined', expect.objectContaining({ path: '/' }));
+    expect(jar.delete).toHaveBeenCalledTimes(1);
+    // A delete whose path does not match the cookie's removes nothing.
+    expect(jar.delete).toHaveBeenCalledWith({ name: NL_SESSION_COOKIE, path: '/' });
+  });
+
+  it('marks the consent cookie Secure wherever the session cookies are (production)', async () => {
+    vi.stubEnv('AFLDB_ENV', 'production');
+
+    await setConsent(choice('accepted'));
+
+    expect(jar.set).toHaveBeenCalledWith(CONSENT_COOKIE, 'accepted', expect.objectContaining({ secure: true }));
+  });
+
+  it.each(['', 'dismissed', 'ACCEPTED', 'accepted ', 'true', 'declined\n', '<script>'])(
+    'writes nothing and deletes nothing for the non-choice %j',
+    async (value) => {
+      await setConsent(choice(value));
+
+      expect(jar.set).not.toHaveBeenCalled();
+      expect(jar.delete).not.toHaveBeenCalled();
+      expect(jar.requested).not.toHaveBeenCalled();
+    },
+  );
+
+  it('writes nothing when no choice field is submitted at all', async () => {
+    await setConsent(choice());
+
+    expect(jar.set).not.toHaveBeenCalled();
+    expect(jar.delete).not.toHaveBeenCalled();
   });
 });
 
