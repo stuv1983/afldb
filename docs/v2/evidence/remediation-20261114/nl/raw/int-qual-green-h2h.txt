@@ -1,0 +1,13 @@
+head=ecc3403e4a0f623e17a12f9a7a6e3fcdbdf24298 dirty=0 db=afldb_v2_remnl_q3_test args=tests/integration/release-gates.test.ts -t club_match=both
+isolated-pg: afldb_v2_remnl_q3_test verified (cluster afldb_v2_isolated, 127.0.0.1:55615); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem-nl-20261114/qual
+
+ ✓ tests/integration/release-gates.test.ts (67 tests | 66 skipped) 140ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 66 skipped (67)
+   Start at  09:23:32
+   Duration  913ms (transform 350ms, setup 167ms, import 358ms, tests 140ms, environment 0ms)
+
+rc=0

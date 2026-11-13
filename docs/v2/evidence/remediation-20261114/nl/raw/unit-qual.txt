@@ -1,0 +1,17 @@
+head=ecc3403e4a0f623e17a12f9a7a6e3fcdbdf24298 dirty=0
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem-nl-20261114/qual
+
+ ✓ tests/nl-parser.test.ts (646 tests) 707ms
+ ✓ tests/nl-plan.test.ts (224 tests) 90ms
+ ✓ tests/nl-describe.test.ts (94 tests) 78ms
+ ✓ tests/query-intent.test.ts (47 tests) 41ms
+ ✓ tests/match-spec.test.ts (24 tests) 33ms
+ ✓ tests/unit/qualifying-matches-gate.test.ts (15 tests) 18ms
+
+ Test Files  6 passed (6)
+      Tests  1050 passed (1050)
+   Start at  09:22:27
+   Duration  4.10s (transform 1.16s, setup 367ms, import 1.42s, tests 967ms, environment 1ms)
+
+rc=0

@@ -1,0 +1,46 @@
+tag=fix1 head=de640826d13489c58392563e7ae1ff62403ed293 dirty=20
+corpus sha256=f8a7f42a7eb106b6b1880f7eb203b0d86f875c491d936a0e2c0806128d339bff
+== parse-only 21:59:35
+parse rc=0
+== execute 22:07:38
+exec rc=0
+== done 22:37:13
+{
+  "corpus": "/mnt/ssd/afldb-rem-nl-20261114/in/nl-stress-corpus-v5.csv",
+  "database": "afldb_v2_remnl_work_test",
+  "mode": "parse only",
+  "parserVersion": 68,
+  "concurrency": 6,
+  "ran": "2026-11-13T22:07:38.643Z",
+  "wallClockSeconds": 8,
+  "inputRows": 12000,
+  "auditRequired": 0,
+  "total": 12000,
+  "pass": 12000,
+  "softFail": 0,
+  "fail": 0,
+  "noResults": 0,
+  "errors": 0,
+  "byClass": {}
+}
+{
+  "corpus": "/mnt/ssd/afldb-rem-nl-20261114/in/nl-stress-corpus-v5.csv",
+  "database": "afldb_v2_remnl_work_test",
+  "mode": "parse + execute",
+  "parserVersion": 68,
+  "concurrency": 4,
+  "ran": "2026-11-13T22:37:12.864Z",
+  "wallClockSeconds": 50,
+  "inputRows": 12000,
+  "auditRequired": 0,
+  "total": 12000,
+  "pass": 11997,
+  "softFail": 0,
+  "fail": 3,
+  "noResults": 2049,
+  "errors": 0,
+  "byClass": {
+    "WRONG_VERIFIED_ANSWER": 3,
+    "WRONG_VERIFIED_VALUE": 3
+  }
+}

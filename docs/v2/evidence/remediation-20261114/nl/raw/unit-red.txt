@@ -1,0 +1,1519 @@
+head=de640826d13489c58392563e7ae1ff62403ed293 dirty=8
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem-nl-20261114/cand
+
+ ❯ tests/nl-parser.test.ts (646 tests | 11 failed) 865ms
+     ✓ dusty most disposals -> single-game peak 58ms
+     ✓ dustin martin most goals -> single-game peak 18ms
+     ✓ top 5 disposal games by dusty 3ms
+     ✓ richmond biggest loss 3ms
+     ✓ richmond biggest win since 2000 3ms
+     ✓ biggest loss at the mcg 2ms
+     ✓ adelaide biggest win against gws giants -> clubAgainst resolves and no leftover "gws" 4ms
+     ✓ adelaide biggest win versus gws giants -> same identity behaviour 2ms
+     ✓ adelaide biggest win over gws giants -> same identity behaviour 2ms
+     ✓ adelaide worst loss to gws giants -> same identity behaviour 2ms
+     ✓ adelaide highest score against gws giants -> score metric intact, identity fully consumed 2ms
+     ✓ adelaide biggest win against gws giants since 2000 -> season bound preserved, identity fully consumed 1ms
+     ✓ bare "GWS" alone still resolves (unchanged single-word alias) 1ms
+     ✓ bare "Giants" alone still resolves (unchanged single-word alias) 1ms
+     ✓ negative: "gws" adjacent to a genuinely unsupported word still declines unsupported_term -- proves this is not a blanket ignore of "gws" 2ms
+     ✓ adelaide biggest three quarter time comeback -> q3_deficit_overcome, not a decline 2ms
+     ✓ adelaide biggest three quarter time comeback since 2000 -> season bound preserved 1ms
+     ✓ who has the biggest three quarter time comeback for adelaide -> same metric, trailing club phrasing 1ms
+     ✓ adelaide three quarter time comeback -> metric still resolves with no explicit superlative word 2ms
+     ✓ adelaide 3qt comeback -> short form, was never affected by the checkpoint collision (no "time" word to collide with) 1ms
+     ✓ negative: "adelaide score at three quarter time" keeps the genuine checkpoint reading, not q3_deficit_overcome 1ms
+     ✓ negative: "who was leading at three quarter time" never reads as q3_deficit_overcome regardless of how it otherwise resolves 1ms
+     ✓ negative: "adelaide score at quarter time" keeps the genuine Q1 checkpoint reading, unaffected by the "three "-exclusion guard 1ms
+     ✓ negative: "who was leading at quarter time" never reads as a comeback metric, and the Q1 checkpoint still resolves where a metric word is present 1ms
+     ✓ negative: "adelaide largest comeback from quarter time" (Q1, not Q3) still declines unsupported_term -- no q1_deficit_overcome metric exists, and AFLDB-ISSUE-205 does not add one 1ms
+     ✓ most goals at the mcg -> ranks every player, summed at that venue 6ms
+     ✓ most disposals in a grand final at the mcg -> single-game, matchType + venue scoped 2ms
+     ✓ players with 200 games and no premiership 2ms
+     ✓ players with 250 games and exactly two clubs 1ms
+     ✓ most games without kicking a goal 1ms
+     ✓ reads "drawn"/"drew" as the same career draws total as "draws" 2ms
+     ✓ AFLDB-ISSUE-203: players with 200 games and zero goals 1ms
+     ✓ AFLDB-ISSUE-203: single-condition control -- a bare "zero goals" clause still binds eq 0 1ms
+     ✓ AFLDB-ISSUE-203: digit "0" reaches the same eq-default fix as the word "zero" 1ms
+     ✓ AFLDB-ISSUE-203: a positive number word keeps its existing gte default -- zero is the only value whose default op changes 1ms
+     ✓ AFLDB-ISSUE-203: an explicit comparator on zero wins over the eq default 2ms
+     ✓ AFLDB-ISSUE-203: existing negative-trigger zero forms are unaffected 2ms
+     ✓ AFLDB-ISSUE-203: a bound zero does not get dropped through a truthiness check 1ms
+     ✓ AFLDB-ISSUE-203: a genuinely unsupported word next to "zero" still declines unsupported_term, and not on "zero" 1ms
+     ✓ most brownlow votes 1ms
+     ✓ most brownlow votes without winning a brownlow 1ms
+     ✓ most all-australian selections without a premiership 1ms
+     ✓ most disposals in a grand final 1ms
+     ✓ grand final record phrasing scopes the player-game metric 4ms
+     ✓ record-holder phrasing scopes opponent career totals like leader phrasing 1ms
+     ✓ dusty top 5 disposal games in finals 1ms
+     ✓ reads a wildcard final as its own match type, not as generic finals 2ms
+     ✓ leaves the generic finals reading unchanged 1ms
+     ✓ most finals played without winning a premiership 1ms
+     ✓ bare finals still stays a career metric without record/leader context 1ms
+     ✓ reads a qualified finals count as its own builder, not the generic any-type total 2ms
+     ✓ players whose first game was a grand final 1ms
+     ✓ players whose last game was a grand final 1ms
+     ✓ "who kicked the first goal in a grand final" does not elect a boundary plan 1ms
+     ✓ "highest first quarter score in a grand final" plans as a period-split team_match 1ms
+     ✓ "players who debuted in a grand final" still reads as a boundary 1ms
+       ✓ "in" YEAR names one exact debut season 1ms
+       ✓ "since" YEAR is a lower bound only 1ms
+       ✓ "before" YEAR is an upper bound of year - 1, the existing convention 1ms
+       ✓ last_game takes the same three date forms 2ms
+       ✓ the plain "final" boundary target also carries the season range 1ms
+       ✓ a plain career aggregate in the same season range carries no boundary 1ms
+     ✓ most goals by a Richmond player in a final at the MCG since 1980 1ms
+     ✓ top 10 players by brownlow votes with no medal 1ms
+     ✓ dusty resolves to Dustin Martin 1ms
+     ✓ tigers resolves to Richmond 1ms
+     ✓ pies resolves to Collingwood 1ms
+     ✓ touches resolves to disposals 1ms
+     ✓ AA resolves to All-Australian 1ms
+     ✓ GF resolves to Grand Final 1ms
+     ✓ MCG resolves to Melbourne Cricket Ground 1ms
+     ✓ top 10 1ms
+     ✓ most / least / highest / lowest all resolve to max/min 3ms
+     ✓ since / before as season bounds 2ms
+     ✓ at least / more than / less than / exactly as comparison operators 3ms
+     ✓ without / never as negation 2ms
+     ✓ most goals in 2017 -> player_season, a bare year is captured as an exact season 1ms
+     ✓ most goals by a richmond player in 2017 -> player_season, a club-scoped season leaderboard 1ms
+     ✓ dusty most goals in 2017 -> a named player still defaults to single-game peak, now filtered to that season 1ms
+       ✓ which player posted the highest season tally of handballs for Collingwood during the 2010s -> player_season, max, decade range preserved 2ms
+       ✓ which player posted the highest season tally of kicks for Richmond after 1999 -> player_season, exclusive lower bound 1ms
+       ✓ which player posted the highest season tally of goal assists for Geelong in 2017 -> player_season, exact year 1ms
+       ✓ find the Port Adelaide player with the best seasonal goal assists total after 1999 -> player_season, NOT player_game/sum 2ms
+       ✓ find the Geelong player with the best seasonal kicks total before 2019 -> player_season, inclusive upper bound 1ms
+       ✓ find the Sydney player with the best seasonal handballs total in 2017 -> player_season, exact year 1ms
+       ✓ regression: "most goals by a richmond player in 2017" (already-supported wording) is unchanged by the new cues 1ms
+       ✓ regression: "dusty total goals against Carlton" (named player, scoped running total) is unchanged -- player_game/sum, not player_season 1ms
+       ✓ regression: bare "seasonal" with no player metric word still declines (richmond seasonal vibes) 1ms
+       ✓ regression: bare "tally" with no "season" still declines as an unsupported term 1ms
+       ✓ regression: bare "posted" alone (no season-tally/seasonal construction) does not become a universal request wrapper 1ms
+       ✓ regression: "total" is still not globally consumed away from its meaning -- club_season "seasonal" cue from ISSUE-214 is unchanged 1ms
+       ✓ regression: career leaderboard wording stays career-grained, not misread as a season leaderboard 1ms
+       ✓ regression: single-game leaderboard wording stays game-grained, not misread as a season leaderboard 1ms
+       ✓ what was Dustin Martin's biggest Brownlow votes haul in one match during the 2010s 2ms
+       ✓ what was Chris Judd's biggest goals haul in one match in 2009 1ms
+       ✓ what was Patrick Dangerfield's biggest marks haul in one match since 2000 1ms
+       ✓ find Lance Franklin's peak single-game clearances in 2017 1ms
+       ✓ find Nat Fyfe's peak single-game inside 50s in 2009 1ms
+       ✓ find Dustin Martin's peak single-game kicks since 2000 1ms
+       ✓ which match saw Patrick Dangerfield collect the most goal assists since 2000 2ms
+       ✓ which match saw Patrick Dangerfield collect the most kicks in 2017 1ms
+       ✓ which match saw Chris Judd collect the most handballs during the 2010s 1ms
+       ✓ find the single-match disposals record for Shane Crawford against Brisbane Lions at Gabba in 2009 2ms
+       ✓ find the single-match marks record for Jason Akermanis against Port Adelaide at Optus Stadium since 2000 2ms
+       ✓ existing single-game wording ("dusty most disposals") is unchanged 1ms
+       ✓ "haul" in unrelated text (no single-game cue) still declines 1ms
+       ✓ "peak" in unrelated text (no single-game cue) still declines 1ms
+       ✓ bare "single-game" with no supported player/stat construction still declines 1ms
+       ✓ "record" is not globally ignored -- a bare "record" with no metric/player still declines 1ms
+       ✓ "collect" outside the "which match saw...collect" construction still declines 1ms
+       ✓ named-player scoped totals still remain player_game/sum, not single 1ms
+       ✓ career record questions remain player_career 1ms
+       ✓ player-season leaderboard wording (AFLDB-ISSUE-216) remains player_season 1ms
+       ✓ club/team match records are not hijacked by the new player-game cues 1ms
+     ✓ teams with the most wins in a season 1ms
+     ✓ clubs with the most losses in a season 1ms
+     ✓ fewest wins by a premier -> "premier" alone is enough of a club-season cue, no leading "teams" needed 1ms
+     ✓ most losses by a premiership team 1ms
+     ✓ teams that won the wooden spoon -> a conditions-only list, no ranked metric 1ms
+     ✓ clubs that made finals 1ms
+     ✓ clubs that missed finals 1ms
+     ✓ a club-scoped player question is NOT misread as club_season ("richmond" alone is too weak a cue) 1ms
+       ✓ for Richmond, what season had the lowest wins during the 2010s -> club_season, min, decade range preserved 1ms
+       ✓ for Swans, what season had the highest losses -> club_season, max, no explicit year required 1ms
+       ✓ for Carlton, what season had the highest losses in 2017 -> club_season, explicit year preserved 1ms
+       ✓ north melbourne's highest seasonal losses -> club_season, max, no explicit year required 1ms
+       ✓ sydney's highest seasonal draws in 2017 -> club_season, draws stays a distinct metric, year preserved 1ms
+       ✓ greater western sydney's highest seasonal losses in 2023 -> club_season, year preserved 1ms
+       ✓ regression: "teams with the most wins in a season" is unchanged by the new cues 1ms
+       ✓ regression: "which club had the most losses in 2017" is unchanged by the new cues 1ms
+       ✓ regression: "which team has the most wins" (no season wording) still declines -- bare "season"/"seasonal" was not made globally ignorable 2ms
+       ✓ regression: a genuinely unsupported term next to "seasonal" still declines (the word is only read this way alongside a club-season metric) 1ms
+     ✓ players who have won 3 premierships -> a player_career condition, not a having clause 1ms
+     ✓ players who won 2 brownlow medals -> a player_career condition, not a having clause 1ms
+     ✓ players with more than 100 wins -> no having clause 1ms
+     ✓ richmond players who have won 3 premierships -> a club-scoped player condition, not a club having clause 1ms
+     ✓ clubs that have won more than 10 premierships -> declines, not a club having clause on match wins 1ms
+     ✓ teams that have won 5 flags -> declines, not a club having clause on match wins 1ms
+     ✓ teams with more than 2 wins against Richmond -> unchanged club-subject grouped having clause 2ms
+     ✓ teams to lose 5 times by more than 100 points -> unchanged club-subject grouped having clause 1ms
+     ✓ 7 or more wins by over 50 points -> wins keeps the bare-number default, margin keeps "over" 1ms
+     ✓ 7 or more losses by over 50 points -> same shape, losses metric 1ms
+     ✓ at least 7 wins by more than 50 points -> wins keeps "at least", margin keeps "more than" 1ms
+     ✓ more than 7 wins by at least 50 points -> the reverse pairing, proving list-order does not decide it 1ms
+     ✓ over 7 wins by over 50 points -> the same operator word on both sides still binds independently 1ms
+     ✓ fewer than 7 losses by at least 50 points 1ms
+     ✓ control: at least 7 wins alone -> unaffected by there being no margin clause 1ms
+     ✓ control: more than 7 wins alone -> unaffected by there being no margin clause 1ms
+     ✓ control: "won by over 50 points" with no explicit wins count still declines, unaffected by the fix 1ms
+     ✓ control: "won by at least 50 points" with no explicit wins count still declines, unaffected by the fix 1ms
+     ✓ known gap (out of scope): "7 wins by 50 or more points" still declines -- trailing margin operator wording is unsupported, not an ownership defect 1ms
+       ✓ who kicked the most behinds after the siren to win for Geelong between 2005 and 2015 -> subject club, no opponent 4ms
+       ✓ who kicked the most goals after the siren to win for Carlton -> subject club, no opponent 2ms
+       ✓ who had the most kicks after the siren to win for Richmond -> subject club, no opponent 1ms
+       ✓ control: an explicit opponent alongside "for" still resolves both roles correctly 1ms
+       ✓ against Collingwood, what was Carlton's largest lead at three quarter time since 2000 -> subject club survives stripping the opponent 1ms
+       ✓ against Richmond, what was Carlton's score at half time in 2017 -> subject club survives stripping the opponent 1ms
+       ✓ against Collingwood, what was Geelong's largest lead at quarter time -> subject club survives stripping the opponent 1ms
+       ✓ Richmond biggest win against Carlton -> unchanged 1ms
+       ✓ Richmond biggest win versus Carlton -> unchanged 1ms
+       ✓ Richmond biggest win vs Carlton -> unchanged 1ms
+       ✓ Richmond biggest win v Carlton -> unchanged 1ms
+       ✓ Richmond worst loss to Carlton -> "to" still governs the opponent when it genuinely is the nearest word 1ms
+       ✓ Richmond biggest win over Carlton -> "over" still governs the opponent when it genuinely is the nearest word 1ms
+       ✓ richmond biggest loss -> a single, ungoverned club still defaults to the subject side 1ms
+       ✓ who has the biggest three quarter time comeback for Adelaide -> trailing "for" still governs the subject, not the opponent 1ms
+       ✓ which club has won the most premierships 1ms
+       ✓ teams with more than 5 premierships 1ms
+       ✓ clubs with 10 flags 1ms
+       ✓ teams with 5 premierships 1ms
+       ✓ teams with the most premierships 1ms
+       ✓ which team has the most wins 1ms
+       ✓ teams with the most wins (behaviour change: was previously answered as a season record) 1ms
+       ✓ which team has the most wins since 2000 -> a season range still reads as a total over a span 1ms
+       ✓ top 5 teams by percentage 1ms
+       ✓ which team has the most wins in a season 1ms
+       ✓ which club had the most losses in 2017 1ms
+       ✓ the side with the fewest wins in a season 1ms
+       ✓ which clubs won the wooden spoon -> a conditions-only list, no ranked metric 1ms
+       ✓ which team has the longest winning streak 1ms
+       ✓ which player has the most premierships -> player_career, no club cue 1ms
+       ✓ players who played for the most clubs -> player_career, a bare non-leading "clubs" is not a subject cue 1ms
+       ✓ teams that won the premiership and the wooden spoon -> both conditions, not a silent narrow to wooden_spoon alone 1ms
+       ✓ teams that won the flag and the wooden spoon -> positive control, already-recognised wording 1ms
+       ✓ teams that were premiers and won the wooden spoon -> alternate phrasing 1ms
+       ✓ premiership teams that won the wooden spoon -> plural "premiership teams" form 1ms
+       ✓ teams that won the premiership -> standalone gated wording 1ms
+       ✓ teams that played the finals and won the wooden spoon -> guard proof: declines rather than silently answering the wooden spoon half alone 1ms
+       ✓ which clubs won the wooden spoon -> clubs_played carve-out still green 1ms
+       ✓ clubs that made finals -> clubs_played carve-out still green 1ms
+       ✓ clubs that missed finals -> clubs_played carve-out still green 1ms
+     ✓ dusty total goals against carlton -> "total" overrides the single-game default to a scoped sum 1ms
+     ✓ dusty combined disposals -> "combined" also reads as a sum cue 1ms
+     ✓ dusty career goals against carlton -> a scoped "career" reads as a sum, not a dropped scope 1ms
+     ✓ dusty career goals (no scope) -> stays the true unscoped player_career reading 1ms
+     ✓ most goals against carlton ever (no player) -> scoped sum, not a dropped opponent 1ms
+     ✓ coaching questions are no longer declined as unsupported (AFLDB-ISSUE-152 F2) 4ms
+     ✓ streak questions are parsed 1ms
+     ✓ youngest/oldest questions are declined pending dob completeness 0ms
+     ✓ gibberish declines rather than fabricating a plan 1ms
+     ✓ an unresolvable player mention declines rather than dropping the reference 1ms
+     ✓ a plain entity search ("michael tuck") is not forced into a plan 1ms
+     ✓ an executed plan always clears the configured execute threshold 1ms
+     ✓ most goals after 2019 -> exclusive lower bound, seasonMin 2020 1ms
+     ✓ richmond biggest win after 2000 -> exclusive lower bound, seasonMin 2001 1ms
+     ✓ most brownlow votes after 2010 -> exclusive lower bound, seasonMin 2011 1ms
+     ✓ most disposals at the MCG after 1995 -> exclusive lower bound, seasonMin 1996 1ms
+     ✓ teams with the most wins in a season after 2000 -> club_season, exclusive lower bound 1ms
+     ✓ dusty most goals after 2015 -> named player, exclusive lower bound, no interference with player identity 1ms
+     ✓ adelaide biggest win against gws giants after 2000 -> composition with opponent, no interference with club identity 1ms
+     ✓ after 2000 -> seasonMin 2001; since 2000 -> seasonMin 2000 (direct semantic contrast) 2ms
+       ✓ who kicked the most goals after the siren -> unchanged after-siren plan, no season bound 1ms
+       ✓ who kicked a goal after the siren to win -> unchanged after-siren plan, no season bound 1ms
+       ✓ who has kicked the most goals after the siren for richmond in the finals after 2000 -> composed: after-siren untouched, season bound applied 1ms
+       ✓ after 1896 -> seasonMin 1897, the first legal season 1ms
+       ✓ after 2026 -> parses, seasonMin 2027, within NL_LIMITS.maxSeason (may return empty results at execution) 1ms
+       ✓ after 9999 -> seasonMin 10000 exceeds NL_LIMITS.maxSeason, refused by validatePlan like any equally out-of-range season bound 3ms
+     ✓ most goals in 2017 1ms
+     ✓ richmond biggest win since 2000 1ms
+     ✓ most disposals since 1990 1ms
+     ✓ players with at least 300 games since 1980 1ms
+     ✓ most goals by a Richmond player in a final at the MCG since 1980 1ms
+     ✓ dusty most goals in 2017 1ms
+     ✓ dusty total goals against carlton since 2015 1ms
+     ✓ most goals in 1980 to 1989 -> the inclusive range 1ms
+     ✓ who had the most kicks in 2020 to 2025 -> the inclusive range 1ms
+     ✓ most goals in 1989 to 1980 -> the inclusive range 1ms
+     ✓ Adelaide goals 200 40 -> declines, naming the stray numbers 1ms
+     ✓ Richmond disposals 200 40 in 2017 -> declines, naming the stray numbers 1ms
+     ✓ Collingwood marks 200 40 during the 2010s -> declines, naming the stray numbers 1ms
+     ✓ most goals in 1980 and 1989 -> declines, naming the stray numbers 1ms
+     ✓ most premierships -> player_career premierships, ranked, not a condition 1ms
+     ✓ most wins -> player_career wins, ranked, not a condition 1ms
+     ✓ most losses -> player_career losses, ranked, not a condition 1ms
+     ✓ most draws -> player_career draws, ranked, not a condition 1ms
+     ✓ most brownlow medals -> player_career brownlow_medals, ranked, not a condition 1ms
+     ✓ most clubs -> player_career clubs_played, ranked, not a condition 1ms
+     ✓ most premierships survives validatePlan, not just the parser 2ms
+     ✓ most wins survives validatePlan, not just the parser 1ms
+     ✓ most losses survives validatePlan, not just the parser 1ms
+     ✓ most draws survives validatePlan, not just the parser 1ms
+     ✓ most brownlow medals survives validatePlan, not just the parser 1ms
+     ✓ most clubs survives validatePlan, not just the parser 1ms
+     ✓ every bare career metric the parser can emit is a real player_career metric 5ms
+     ✓ "most flags" ranks by premierships rather than filtering to zero premierships 1ms
+     ✓ "no flags" still reads as the negative condition it always meant 1ms
+     ✓ most career time on ground has no validated plan 1ms
+     ✓ most career tog has no validated plan 1ms
+     ✓ most career centre bounce attendances has no validated plan 1ms
+     ✓ most career cba has no validated plan 1ms
+     ✓ most career disposal efficiency has no validated plan 1ms
+     ✓ most career de has no validated plan 1ms
+     ✓ most career si has no validated plan 1ms
+     ✓ most si has no validated plan 1ms
+     ✓ top 10 career cba has no validated plan 1ms
+     ✓ fewest career tog has no validated plan 1ms
+     ✓ "most career score involvements" still declines as an unanswerable topic 0ms
+     ✓ supported: most career inside 50s -> player_career inside_50s, validated 1ms
+     ✓ supported: most career clearances -> player_career clearances, validated 1ms
+     ✓ supported: most career goal assists -> player_career goal_assists, validated 1ms
+     ✓ supported: most career frees for -> player_career frees_for, validated 1ms
+     ✓ supported: most career frees against -> player_career frees_against, validated 2ms
+     ✓ supported: most career contested possessions -> player_career contested, validated 1ms
+     ✓ supported: most career uncontested possessions -> player_career uncontested, validated 1ms
+     ✓ dusty most games -> career total, not a single-game reading 1ms
+     ✓ dusty most premierships -> career total 1ms
+     ✓ genuine per-game stats are unaffected: dusty most goals still asks for his record game 1ms
+     ✓ dusty most sausages -> metric goals 1ms
+     ✓ dusty most sausage rolls -> metric goals 1ms
+     ✓ dusty find the sticks the most -> metric goals 1ms
+     ✓ dusty most grabs -> metric marks 1ms
+     ✓ dusty most clunks -> metric marks 1ms
+     ✓ dusty most handpasses -> metric handballs 1ms
+     ✓ dusty most assists -> metric goal_assists 1ms
+     ✓ dusty most inside 50s -> inside_50s 1ms
+     ✓ dusty most inside-50s -> inside_50s 1ms
+     ✓ dusty most forward entries -> inside_50s 1ms
+     ✓ dusty most rebound 50s declines as an unsupported NL statistic 0ms
+     ✓ dusty most rebound-50s declines as an unsupported NL statistic 0ms
+     ✓ "most goals in the big dance" reads as a grand_final match type 1ms
+     ✓ "most goals in September" reads as the finals series 1ms
+     ✓ bare "spoon" reads as the wooden-spoon condition 1ms
+     ✓ a 3-digit number does not bleed into an adjacent clause 1ms
+     ✓ two clauses with the same number both survive 1ms
+     ✓ neither clause is misread as a bare ranking metric 1ms
+     ✓ a later-processed stat keeps its own number, not an earlier clause's 1ms
+     ✓ goals keeps its own condition rather than becoming the ranking subject 1ms
+     ✓ AFLDB-ISSUE-196: "at" no longer lets clubs_played steal games' number 1ms
+     ✓ AFLDB-ISSUE-196: the same defect via "for" instead of "at" 1ms
+     ✓ AFLDB-ISSUE-196: "across" safely declines on unsupported vocabulary, not the old clubs_played misbinding 1ms
+     ✓ AFLDB-ISSUE-196: reversed sentence order still binds each clause to its own number 1ms
+     ✓ AFLDB-ISSUE-196: a comparator word binds to its own clause, not a neighbouring one 1ms
+     ✓ AFLDB-ISSUE-196: "over N" as a comparator also binds to its own clause 1ms
+     ✓ AFLDB-ISSUE-196: a number-word clause is bound in sentence order too 1ms
+     ✓ AFLDB-ISSUE-196: single-condition control -- a bare games clause is unaffected 1ms
+     ✓ AFLDB-ISSUE-196: single-condition control -- a bare clubs clause is unaffected 1ms
+       ✓ lists players, with no metric to rank by 4ms
+       ✓ validates, so the plan actually reaches a compiler 2ms
+       ✓ players who kicked a goal with their first kick 1ms
+       ✓ players to goal with their first kick 1ms
+       ✓ players who goaled with their first kick 1ms
+       ✓ first kick goal players 1ms
+       ✓ players who scored with their first kick 1ms
+       ✓ players to score a goal with their first AFL kick 1ms
+       ✓ who kicked a goal with their first VFL kick 1ms
+       ✓ who kicked a goal with their first career kick 1ms
+       ✓ every phrasing produces the identical plan, not merely a similar one 5ms
+       ✓ a club filter scopes the achievement, not the player 1ms
+       ✓ a decade filter uses the season the feat happened in 1ms
+       ✓ a "before" filter bounds the upper end 1ms
+       ✓ a "since" filter bounds the lower end 1ms
+       ✓ "how many" is still a list; the count comes from its total 1ms
+       ✓ which club has had the most 1ms
+       ✓ by club 1ms
+       ✓ by decade 1ms
+       ✓ which clubs have never had one 1ms
+       ✓ who was the first 1ms
+       ✓ who was the most recent 1ms
+       ✓ a summary cue alone never elects the grain 1ms
+       ✓ players who kicked a goal in their first game does not resolve to the achievement 1ms
+       ✓ players who kicked their first goal does not resolve to the achievement 1ms
+       ✓ players with one career goal does not resolve to the achievement 1ms
+       ✓ players who scored on debut does not resolve to the achievement 1ms
+       ✓ players who kicked a goal on debut does not resolve to the achievement 1ms
+       ✓ "one career goal" still parses as an ordinary career condition 1ms
+     ✓ a named player stays pinned to the plan 1ms
+     ✓ a career condition combines with the achievement 1ms
+     ✓ players who kicked a goal with their first kick at the mcg is rejected rather than silently unscoped 1ms
+     ✓ players who kicked a goal with their first kick against collingwood is rejected rather than silently unscoped 1ms
+     ✓ players who kicked a goal with their first kick in a grand final is rejected rather than silently unscoped 1ms
+     ✓ players who never kicked a goal with their first kick declines instead of answering inverted 1ms
+     ✓ players who did not kick a goal with their first kick declines instead of answering inverted 1ms
+     ✓ "this decade" declines instead of answering all-time 1ms
+     ✓ a summary keeps its season scope 1ms
+     ✓ a summary keeps its club scope 1ms
+     ✓ clubs_without scoped to one club is rejected 1ms
+     ✓ a summary with a named player is rejected 1ms
+     ✓ played on anzac day -> match_event_min with the exact tagged value 2ms
+     ✓ 3+ anzac day games reads the count 1ms
+     ✓ king's birthday survives canonicalisation to the exact match_event value 1ms
+     ✓ dreamtime at the g is the fixture, not the MCG venue 1ms
+     ✓ played in 3 showdowns -> matchup_played_min with both organizations resolved 1ms
+     ✓ a number word counts too: two showdowns 1ms
+     ✓ a rivalry whose clubs are not in the directory declines instead of guessing 1ms
+     ✓ most anzac day games declines -- the count is the ranked subject 1ms
+     ✓ a marquee predicate alongside a season range declines rather than dropping the seasons 1ms
+     ✓ debuted in the 1990s -> debuted_between with the decade as the parameter 1ms
+     ✓ debuted between 2000 and 2009 -> the explicit range 1ms
+     ✓ played their first career game during the 1990s -> the same predicate 1ms
+     ✓ a debut window composes with a career condition 1ms
+     ✓ debuted in a grand final still reads as a boundary, not a debut window 1ms
+     ✓ a coach cue elects the coach_record grain, and an unranked club question is a list 2ms
+     ✓ "how many coaches has richmond had" is a count, not a ranking 1ms
+     ✓ a coach name resolves from the coach directory, never as a player 1ms
+     ✓ a whole career and a record at one club are different plans 1ms
+     ✓ a coach-only person carries no player link 1ms
+     ✓ "players coached by X" is a player question, answered by the coached_by predicate 1ms
+     ✓ "premiership coaches" is a player predicate, NOT the coach-grain premierships metric 1ms
+     ✓ "coaches with the most premierships" is the coach-grain metric, NOT the player predicate 1ms
+     ✓ reads each coaching metric word behind the cue 3ms
+     ✓ a coaching threshold becomes the grain's own metricCondition and lists qualifiers 1ms
+     ✓ "coached more than one club" counts organizations, not raw club identities 1ms
+     ✓ a top-N count belongs to the aggregation, never to the metric 1ms
+     ✓ a win-percentage ranking carries the 50-game qualifier by default 1ms
+     ✓ a reader-stated minimum is honoured instead of the default 1ms
+     ✓ "no minimum" refuses rather than ranking a one-game sample 1ms
+     ✓ a season before 1902 is refused by the coaching coverage floor 1ms
+     ✓ a season inside coverage is answered, and a future season is left to the empty result 1ms
+     ✓ an ambiguous coach surname declines rather than picking one of two real people 1ms
+     ✓ a per-season coaching split declines rather than answering the all-time total 1ms
+     ✓ "Richmond players coached by X" declines: no builder owns the club (ISSUE-110 ownership) 1ms
+     ✓ an absent coach directory declines rather than half-resolving a coaching question 1ms
+       ✓ "most wins" stays a career question 1ms
+       ✓ "most games" stays a career question 1ms
+       ✓ "richmond most wins in a season" stays a club-season question 1ms
+       ✓ "most premierships" stays a career question 1ms
+     ✓ the cue is required: "most goals" alone is still a career-goals ranking 1ms
+     ✓ "goals" is claimed as the kickScored dimension, never as the career goals metric 1ms
+     ✓ a bare "kicks after the siren" carries NO kickScored: any kick, including a miss 1ms
+     ✓ a goal after the siren and a goal after the siren TO WIN are different plans 1ms
+     ✓ "to draw" is the drew effect, distinct from the drawn-match result 1ms
+     ✓ the kicker result is read BEFORE the effect, so "and lost" is never an effect 1ms
+     ✓ "and won" is the kicker result, not the winning-kick effect 1ms
+     ✓ occurrence words elect first / most recent, at event subject 1ms
+     ✓ a count cue is an event count, never a player leaderboard 1ms
+     ✓ an unranked question is an event list, not a rank-one leader 1ms
+     ✓ the opponent role is the kicked-against club 1ms
+     ✓ a named player takes the event subject: his events, not a leaderboard of one 1ms
+     ✓ leaves "finals" for match-type extraction rather than claiming it 1ms
+     ✓ combines finals, club lineage and a season range at player subject 1ms
+     ✓ a coaching cue and a siren cue together fail closed 1ms
+     ✓ a bare "siren" with nothing else declines 1ms
+     ✓ C-D1  round scope declines or fails validation 1ms
+     ✓ C-D2  venue declines or fails validation 1ms
+     ✓ C-D3  matchup declines or fails validation 1ms
+     ✓ C-D4  coach + siren declines or fails validation 0ms
+     ✓ C-D5  min declines or fails validation 1ms
+     ✓ C-D6  coverage floor declines or fails validation 1ms
+     ✓ C-D7  per-season grain declines or fails validation 0ms
+     ✓ C-D8  siren subtype declines or fails validation 1ms
+     ✓ C-D9  shot detail declines or fails validation 0ms
+     ✓ C-D10 source scores declines or fails validation 1ms
+     ✓ C-D11 competition name declines or fails validation 1ms
+     ✓ C-D13 cross-grain declines or fails validation 1ms
+     ✓ C-D14 supergoal declines or fails validation 1ms
+     ✓ C-D15 out of family declines or fails validation 1ms
+       ✓ word numeral -> first_kick_goal_consecutive_min with the exact bound 2ms
+       ✓ bare numeral -> first_kick_goal_consecutive_min with the exact bound 1ms
+       ✓ each of the -> first_kick_goal_consecutive_min with the exact bound 1ms
+       ✓ verb form -> first_kick_goal_consecutive_min with the exact bound 1ms
+       ✓ scored form -> first_kick_goal_consecutive_min with the exact bound 1ms
+       ✓ subject form -> first_kick_goal_consecutive_min with the exact bound 1ms
+       ✓ N = 1 is the plain family, not a consecutive bound 1ms
+       ✓ leaves the base wording exactly as it was 1ms
+       ✓ players whose first-kick goal was their only career goal -> first_kick_goal_only_career_goal, with no metric misread 1ms
+       ✓ players whose first kick goal was their only goal -> first_kick_goal_only_career_goal, with no metric misread 1ms
+       ✓ players who kicked a goal with their first kick and never kicked another goal -> first_kick_goal_only_career_goal, with no metric misread 1ms
+       ✓ players who goaled with their first kick and never scored again -> first_kick_goal_only_career_goal, with no metric misread 1ms
+       ✓ the E8 cue owns the negation it contains 1ms
+       ✓ club + E7 -> the club is owned by first_kick_goal_for_club 1ms
+       ✓ season range + E7 -> the range is owned by first_kick_goal_between 1ms
+       ✓ club + season + E8 -> all three, in a stable order 1ms
+       ✓ a named player keeps the pin and the modifier together 1ms
+       ✓ E-DEC-1  kick-level (E9) declines rather than answering something narrower 1ms
+       ✓ E-DEC-1b kick-level (E9) declines rather than answering something narrower 0ms
+       ✓ E-DEC-3  polarity inversion declines rather than answering something narrower 1ms
+       ✓ E-DEC-4  summary + E7 declines rather than answering something narrower 1ms
+       ✓ E-DEC-5  summary + E8 declines rather than answering something narrower 0ms
+       ✓ E-DEC-8  N = 0 declines rather than answering something narrower 0ms
+       ✓ E-DEC-8b N negative declines rather than answering something narrower 0ms
+       ✓ E-DEC-8c N absurd declines rather than answering something narrower 0ms
+       ✓ E-DEC-2  kickless matches (E9) declines rather than answering something narrower 1ms
+       ✓ E-DEC-9  bare decade declines rather than answering something narrower 1ms
+       ✓ E-DEC-6  venue is rejected rather than silently unscoped 1ms
+       ✓ E-DEC-6b opponent is rejected rather than silently unscoped 1ms
+       ✓ E-DEC-6c match type is rejected rather than silently unscoped 1ms
+       ✓ E-DEC-10 club + decade + venue is rejected rather than silently unscoped 1ms
+       ✓ E-DEC-2b kickless matches never reaches this family 1ms
+       ✓ E-DEC-11 kicks before first goal never reaches this family 1ms
+     ✓ the after-siren suppression still wins over step 5a 1ms
+     ✓ leaves the summary grain untouched when no modifier is present 1ms
+       ✓ which players had a brother who played AFL -> the label-backed has_brother predicate 2ms
+       ✓ players with a brother who also played VFL/AFL -> the label-backed has_brother predicate 1ms
+       ✓ which AFL players had brothers who played -> the label-backed has_brother predicate 1ms
+       ✓ composes with a career ranking rather than replacing it 1ms
+       ✓ a named player is a pinned yes/no, not a list of his brothers 1ms
+       ✓ players who are the parent or child of another AFL player -> the symmetric predicate 1ms
+       ✓ which AFL players are a parent and child -> the symmetric predicate 1ms
+       ✓ the father direction 1ms
+       ✓ the son direction 1ms
+       ✓ the two directions are different predicates, never one 1ms
+       ✓ who are Dustin Martin’s brothers 1ms
+       ✓ brothers of Brent Harvey (the "of" wording) 1ms
+       ✓ who is Brent Harvey’s son 1ms
+       ✓ who is Cooper Harvey’s father 1ms
+       ✓ an ambiguous name fails closed rather than picking a Gary Ablett 1ms
+       ✓ a name AFLDB cannot identify fails closed 1ms
+       ✓ players whose son was selected under the father-son rule -> father_son_father 1ms
+       ✓ which players had a son drafted under the father-son rule -> father_son_father 1ms
+       ✓ fathers of father-son selections -> father_son_father 1ms
+       ✓ composes with a ranking 1ms
+       ✓ a father-side ranking with the rule spelled out 1ms
+       ✓ a pinned father-side yes/no 1ms
+       ✓ the rule itself -> father_son_selection 2ms
+       ✓ the selection noun -> father_son_selection 1ms
+       ✓ picks -> father_son_selection 1ms
+       ✓ draftees -> father_son_selection 1ms
+       ✓ the role noun (Q1a), mirroring rel_024 -> father_son_selection 1ms
+       ✓ the son-side mirror of rel_024 ranks, exactly as the father side does 1ms
+       ✓ counts the qualifying set 1ms
+       ✓ an FS1 cue never takes a question the FATHER side already owns 2ms
+       ✓ bare players 1ms
+       ✓ pairs 1ms
+       ✓ duos 1ms
+       ✓ families 1ms
+       ✓ by club 1ms
+       ✓ per club 1ms
+       ✓ by year 1ms
+       ✓ by draft year 1ms
+       ✓ "by club" is the selecting club, never the clubs_played metric 1ms
+       ✓ a scope the distribution cannot honour fails closed 1ms
+       ✓ does not lend its grouping to any other relationship 1ms
+       ✓ FS2: the club is the SELECTING club, and it is owned by the builder 1ms
+       ✓ FS3: the year is a DRAFT year, owned by the builder and labelled as one 2ms
+       ✓ both scopes compose, each owned by its own builder 1ms
+       ✓ a draft year mixed with a playing-season reading fails closed 1ms
+       ✓ the son side composes 2ms
+       ✓ the father side composes too — the 11 players the old guard also blocked 1ms
+       ✓ the collective form still declines by name inside the composition 0ms
+       ✓ a club named on one side only still fails closed (F-D3) 1ms
+       ✓ the temporal readings are still refused by name (D9/F-D2) 1ms
+       ✓ sisters 0ms
+       ✓ twins 0ms
+       ✓ cousins 0ms
+       ✓ mothers 0ms
+       ✓ vague family wording 0ms
+       ✓ vague relatedness 0ms
+       ✓ pairings, not players 0ms
+       ✓ C1 "biggest football families" ranks combined career games 1ms
+       ✓ C1 "which family has the most AFL players" ranks linked members, never combined games 1ms
+       ✓ C5 "families with three AFL players" thresholds linked members as a list, never a ranking 1ms
+       ✓ C5 honours an explicit comparison word instead of defaulting to gte 1ms
+       ✓ C5 reads "more than" as a strict bound, not the bare-number default 1ms
+       ✓ every other family/relatives wording keeps declining (no regression) 1ms
+       ✓ the family grain has no club, season or player to filter by -- refused, never discarded 1ms
+       ✓ the two metrics never share a phrasing 1ms
+       ✓ a count question counts the qualifying set 1ms
+       ✓ two relationships compose as two predicates, ANDed 1ms
+       ✓ a career threshold survives alongside a per-player relationship 1ms
+       ✓ a club 1ms
+       ✓ a season range 1ms
+       ✓ a venue 1ms
+       ✓ a season-grain ranking declines rather than dropping the relationship 1ms
+       ✓ a surname that is also a relationship word is still a player 1ms
+       ✓ players who also coached -> has_coached at career grain 1ms
+       ✓ which players both played and coached -> has_coached at career grain 1ms
+       ✓ players who played and coached -> has_coached at career grain 1ms
+       ✓ players who played vfl afl and also coached -> has_coached at career grain 1ms
+       ✓ "how many" is a count of the same population 1ms
+       ✓ a career metric ranks players WITHIN the composition 1ms
+       ✓ players who played for richmond and also coached richmond -> both clubs as builder parameters 3ms
+       ✓ who both played for and coached richmond -> both clubs as builder parameters 2ms
+       ✓ richmond players who also coached richmond -> both clubs as builder parameters 1ms
+       ✓ the asymmetric form binds two different organizations 1ms
+       ✓ players who later coached richmond 0ms
+       ✓ players who went on to coach 0ms
+       ✓ players who became a coach 0ms
+       ✓ players who played and then coached 0ms
+       ✓ players who coached after they retired 0ms
+       ✓ richmond players who also coached 1ms
+       ✓ players who coached richmond and also played 0ms
+       ✓ an opponent declines at parse -- this reading clears clubAgainst 0ms
+       ✓ a season is refused at validatePlan 1ms
+       ✓ a venue is refused at validatePlan 1ms
+       ✓ a round is refused at validatePlan 1ms
+       ✓ a match type is refused at validatePlan 1ms
+       ✓ a games count held to the played club is refused at validatePlan 1ms
+       ✓ the opponent guard keeps its wide window 1ms
+       ✓ the son-side father-son composition is still deferred (F-D1) 1ms
+       ✓ a coaching record is still a coaching record 1ms
+       ✓ coached_by is untouched 1ms
+       ✓ premiership_coach is untouched 1ms
+       ✓ "Richmond players coached by Damien Hardwick" still fails the ownership gate 1ms
+     ✓ 2 plausible candidates ranks the complete family 2ms
+     ✓ exactly 12 plausible candidates (the low boundary) ranks the complete family 2ms
+     ✓ exactly 13 plausible candidates (the high boundary) declines as ambiguous, not >= 12 1ms
+     ✓ 0 or 1 plausible family candidates stays an unknown-spelling decline, not ambiguity 1ms
+     ✓ a candidate that does not satisfy the whole-word-prefix predicate is dropped before ranking (defence-in-depth) 1ms
+     ✓ a resolvePlayer top score at/above PLAYER_ACCEPT_SCORE still commits via the accept branch, never reaching resolvePlayerFamily 1ms
+     ✓ 13-candidate family with 2 hyphenated-surname members declines as ambiguous (true count 13, not undercounted 11) 1ms
+     ✓ 12-candidate family with 2 hyphenated-surname members ranks the complete family, hyphenated members included 1ms
+     ✓ a 7-candidate family (the real Ablett shape) still ranks completely -- unaffected by the hyphen fix 1ms
+     ✓ a full-name mention with a literal hyphen resolves via the accept branch with no leftover unjustified token 1ms
+     ✓ an apostrophe-surname full-name mention resolves via the accept branch (apostrophe is a deletion, not a word split) 1ms
+     ✓ apostrophe behaviour does not become word-splitting: a bare apostrophe surname stays one word against a plausible family 1ms
+     ✓ a bare hyphenated surname mention (no given name) reaches resolvePlayerFamily with flattened, per-word tokens 1ms
+     ✓ underscore and slash separators behave as word breaks too, matching a plain multi-word family mention 1ms
+     ✓ a candidate that fails the whole-word-prefix predicate is still dropped after the hyphen fix (defence-in-depth intact) 2ms
+       ✓ "find" + season query (player_season, bare year) 1ms
+       ✓ "give me" + club-scoped season leaderboard (player_season) 1ms
+       ✓ "show" (bare, no "me") + club result/extrema (team_match) 1ms
+       ✓ "show me" + club result/extrema -- regression guard for the pre-existing CONVERSATIONAL_FILLER entry, unchanged by this fix 1ms
+       ✓ "list" + career threshold (player_career) 2ms
+       ✓ "find" + venue/opponent-scoped named-player stat (player_game) 2ms
+       ✓ "list" + head-to-head compare_wins (AFLDB-ISSUE-209 family) 2ms
+       ✓ "give me" + a coaching record (coach_record) 2ms
+       ✓ leading "find the big sticks" (the goals idiom) is untouched -- the metric is not lost 2ms
+       ✓ fail-closed: a wrapper around genuine gibberish still declines, not rescued by consuming the leading word 1ms
+       ✓ fail-closed: a wrapper around a recognised-but-unsupported topic still declines the same way as the bare form 1ms
+       ✓ Largest winning margin for North Melbourne versus Melbourne at Adelaide Oval -> unordered matchup, both clubs, no clubFor/clubAgainst 2ms
+       ✓ reverse order: Largest winning margin for Melbourne versus North Melbourne at Adelaide Oval -> unordered matchup, both clubs 1ms
+       ✓ Largest winning margin for Port Adelaide versus Adelaide -> unordered matchup, both clubs 1ms
+       ✓ reverse order: Largest winning margin for Adelaide versus Port Adelaide -> unordered matchup, both clubs 1ms
+       ✓ Largest winning margin for Greater Western Sydney versus Sydney -> unordered matchup, both clubs 1ms
+       ✓ reverse order: Largest winning margin for Sydney versus Greater Western Sydney -> unordered matchup, both clubs 1ms
+       ✓ Largest winning margin for Sydney versus Richmond -> unordered matchup 1ms
+       ✓ Largest winning margin for Collingwood vs Carlton -> unordered matchup 1ms
+       ✓ Largest winning margin for Essendon v Hawthorn -> unordered matchup 1ms
+       ✓ North Melbourne biggest win against Melbourne -> clubFor/clubAgainst, no matchup 1ms
+       ✓ biggest win by Port Adelaide against Adelaide -> clubFor/clubAgainst, no matchup 1ms
+       ✓ Largest winning margin for Adelaide versus Greater Western Sydney -> unordered matchup ("Adelaide" is not a whole-word substring of "Greater Western Sydney") 1ms
+       ✓ club-scoped, a positive "at least" clause plus a "zero" equality clause 2ms
+       ✓ club-scoped, two "at least"/"fewer than" clauses 1ms
+       ✓ club-scoped, a "no" negative clause plus an "at most" clause 2ms
+       ✓ a comparator clause plus a "no" negative clause ("no more than"-length boundary not involved) 1ms
+       ✓ two positive comparator clauses, the second a long "no more than" phrase (boundary-lookback widening) 2ms
+       ✓ a long "no more than" comparator clause plus a "no" negative clause (both fixes needed together) 2ms
+       ✓ ranked metric distinct from both conditions 2ms
+       ✓ ranked metric (clubs_played) distinct from both conditions 2ms
+       ✓ metric/condition collision -- the ranked metric shares its column with a "zero" condition stated later in the same sentence 2ms
+       ✓ metric/condition collision on the OTHER field ("games" is both the ranked metric and a bound condition) 2ms
+       ✓ "and"-joined conditions still bind both exactly as before 1ms
+       ✓ comma-joined conditions still bind both exactly as before 1ms
+       ✓ trailing-metric wording ("of players with A and B, who has the fewest career S") is unaffected 2ms
+       ✓ a valid single career numeric condition (no conjunction at all) is unchanged 1ms
+       ✓ "most flags" still ranks by premierships (single occurrence, no adjacent number anywhere) rather than the occurrence-retry loop finding a spurious match 1ms
+       ✓ three chained conditions ("and" then "plus") each bind to their own clause, not a farther one 1ms
+       ✓ "plus" beside a genuinely unsupported second clause still declines, not silently swallowed 1ms
+       ✓ "plus" with no preceding bound numeric clause at all still declines 1ms
+       ✓ "plus" outside the career-numeric-binding construction entirely still declines 1ms
+       ✓ "among" with no numeric career condition present is not swallowed by the new gated consumption 1ms
+       ✓ a bare mid-sentence "find" with no leading "for" scope clause in front of it still declines (not a blanket strip) 1ms
+       ✓ Collingwood loses to Carlton at Adelaide Oval after 1999 -- direction, venue and exclusive lower bound all preserved 2ms
+       ✓ Hawthorn loses to Geelong at the MCG since 2000 -- a different club pair/venue and the inclusive "since" bound 2ms
+       ✓ Richmond loses to Carlton in 2017 -- no venue named at all 2ms
+       ✓ distinguishes "Pies lose to Carlton" (Collingwood loses) from "Pies beat Carlton" (Collingwood wins) 3ms
+       ✓ Collingwood's widest win to North Melbourne at the MCG in 2023 2ms
+       ✓ Greater Western Sydney's widest loss to Sydney at Docklands in 2017 -- a multi-word club name plus the noun "loss" instead of the verb 2ms
+       ✓ Richmond's widest win to Carlton at Adelaide Oval since 2000 2ms
+       ✓ "Bombers' biggest victory against Pies at Optus Stadium in 2017" now resolves correctly (AFLDB-ISSUE-219), superseding this issue's deferred decline 2ms
+       ✓ an already-supported directional WIN query is unchanged 1ms
+       ✓ an already-supported directional LOSS query is unchanged 1ms
+       ✓ an ordinary head-to-head query still reads as head-to-head, not a result-record query 1ms
+       ✓ symmetric "versus" matchup parsing (AFLDB-ISSUE-213) is unaffected 1ms
+       ✓ venue ownership stays intact alongside the new wrapper consumption 1ms
+       ✓ "find" is still not globally ignored -- a bare mid-sentence "find" with no leading "for"/"at" scope clause still declines 1ms
+       ✓ "widest" contributes aggregation only, exactly like "biggest" -- it does not rescue an otherwise-unsupported question 1ms
+       ✓ "widest" still generalises beyond this issue's two templates -- e.g. "widest lead" 1ms
+       ✓ "meeting" is not globally ignored -- only the specific "lopsided meeting" idiom is consumed, a bare "meeting" still declines 1ms
+       ✓ unrelated "lost" usage still declines on its own genuinely unsupported term, not rescued by the new loss_margin verb reading 1ms
+       ✓ team score/crowd record queries remain in their own family, unaffected by the new verb vocabulary 1ms
+       ✓ team streak queries remain unaffected by the new "lose"/"beat" verb vocabulary 1ms
+       ✓ team_match_result: "Bombers' biggest victory against Pies" -> win_margin, clubFor/clubAgainst resolve, no leftover "pies'"/"bombers'" 2ms
+       ✓ club_season_rank: "Pies' highest seasonal wins in 2017" -> the exact AFLDB-ISSUE-214 §10c residual family, now clean 2ms
+       ✓ team_streak: "What is Bombers' longest winning streak against Pies" -> streakDefinition/clubFor/clubAgainst all resolve 1ms
+       ✓ multi-word combined alias: "What was GWS Giants' biggest win against Adelaide" -> the possessive still lands on the whole combined alias 1ms
+       ✓ the plain, non-possessive alias is unchanged 1ms
+       ✓ a singular club's ordinary "'s" possessive is unchanged (pre-existing behaviour, not touched by this fix) 1ms
+       ✓ multi-word club names without a possessive are unchanged 1ms
+       ✓ a player name containing a mid-word apostrophe is unaffected -- the fix only strips a trailing apostrophe before whitespace/end-of-string 2ms
+       ✓ an unknown word with a trailing apostrophe still fails closed, not silently accepted as a club 1ms
+       ✓ a bare, cue-less trailing apostrophe with no supported construction around it still declines 1ms
+     × "least goals in a season" reads exactly as "fewest goals in a season" 42ms
+     × "the least goals in a season" reads exactly as "fewest goals in a season" 4ms
+     × "who kicked the least goals in 2020" reads exactly as "who kicked the fewest goals in 2020" 4ms
+     × "least disposals in a game" reads exactly as "fewest disposals in a game" 2ms
+     × "least brownlow votes in a career" reads exactly as "fewest brownlow votes in a career" 3ms
+     ✓ "at least" stays an operator, never a minimum ranking 2ms
+     × "most goals in a showdown" is one game between the pair, not career totals of players who played in one 3ms
+     × plural "most goals in showdowns" is the total across the pair's meetings 2ms
+     × a marquee EVENT has no match-level ranking, so the question declines rather than ranking careers 3ms
+     ✓ participation wording keeps the population-filter reading 2ms
+     × "most goals in a quarter" declines and never consults the player resolver 2ms
+     × "most disposals in a quarter" declines and never consults the player resolver 2ms
+     × the guard holds for a prefix resolution committed at accept strength too 2ms
+     ✓ a real surname is untouched: "most goals by quartermain" still resolves the family 1ms
+ ❯ tests/nl-plan.test.ts (224 tests | 3 failed) 127ms
+     ✓ accepts a well-formed plan unchanged (aside from clamping) 5ms
+     ✓ rejects an unknown grain 1ms
+     ✓ rejects a metric not in the grain's allowlist 0ms
+     ✓ requires mode on a player_game plan, and forbids it elsewhere 1ms
+       ✓ accepts a player_game single list qualified by a metric condition 2ms
+       ✓ accepts a player_game sum list qualified by a metric condition 1ms
+       ✓ accepts a player_season list qualified by a metric condition 1ms
+       ✓ rejects a metric condition on a grain whose compiler cannot consume it 0ms
+       ✓ rejects a malformed comparator or value 1ms
+       ✓ rejects a ranked aggregation alongside a metric condition 0ms
+       ✓ still requires mode on a player_game metric-condition plan 0ms
+       ✓ fails a player game/season list with no threshold closed instead of collapsing it to a leader 1ms
+       ✓ rejects a metric condition smuggled into a head-to-head plan 0ms
+       ✓ describes the applied threshold in the plan trace 2ms
+       ✓ rejects a career-condition plan carrying opponent scope its compiler cannot consume 1ms
+       ✓ rejects venue, match-type, and round scope on any career plan 1ms
+       ✓ rejects season bounds on every non-predicate career execution path 1ms
+       ✓ still accepts unscoped all-time, condition-list, and clubFor career shapes 1ms
+         ✓ rejects a season range no predicate consumes 1ms
+         ✓ accepts a season range a predicate takes as a builder parameter 0ms
+         ✓ rejects a club no predicate consumes, with or without a season range 1ms
+         ✓ accepts a club a predicate takes as a builder parameter 0ms
+         ✓ leaves the predicate-free club and predicate-only shapes exactly as they were 0ms
+         ✓ refuses a ranked club-scoped plan carrying a non-games column condition 1ms
+         ✓ refuses a ranked club-scoped plan carrying an award condition 0ms
+         ✓ refuses a ranked club-scoped plan when a games condition is mixed with another 0ms
+         ✓ refuses the unranked form identically 1ms
+         ✓ keeps club-scoped plans whose conditions are all on games 1ms
+         ✓ keeps whole-career plans with any condition valid when no club is set 0ms
+       ✓ rejects opponent scope on a season threshold list its executor cannot consume 0ms
+       ✓ rejects venue, match-type, and round scope on a season threshold list 1ms
+       ✓ rejects the same scope on a ranked season leaderboard, not just threshold lists 0ms
+       ✓ still accepts the season shapes the executor genuinely consumes 1ms
+       ✓ keeps the executor-supported all-ties policy valid 1ms
+       ✓ rejects first-tie selection until the player-season executor supports it 0ms
+     ✓ rejects career conditions on a non-career grain 0ms
+     ✓ caps the number of career conditions and predicates 0ms
+     ✓ rejects an unknown career column, award key or grid builder 0ms
+     ✓ accepts a real award condition and a real grid predicate 0ms
+     ✓ rejects a boundary on a non-career grain, and an unknown boundary shape 0ms
+       ✓ accepts a debut/grand_final boundary with a season range (exact year) 0ms
+       ✓ accepts a debut/grand_final boundary with a season range (since) 0ms
+       ✓ accepts a debut/grand_final boundary with a season range (before) 0ms
+       ✓ accepts last_game with a season range 0ms
+       ✓ accepts the plain "final" boundary target with a season range 0ms
+       ✓ does not broaden the exemption to a boundary-free plan 0ms
+     ✓ rejects a malformed entity reference 0ms
+     ✓ rejects an unknown match type 0ms
+     ✓ rejects an out-of-range or backwards season 0ms
+     ✓ declines an era-limited metric whose coverage starts after the requested range 0ms
+     ✓ allows an era-limited metric when the range overlaps its coverage 0ms
+     ✓ clamps top_n to the configured maximum rather than rejecting it 0ms
+     ✓ rejects a non-positive top_n 0ms
+     ✓ clamps limit to the tied-rows cap for max/min, and the list cap for top_n/list 0ms
+     ✓ accepts only executable grouped team-result shapes 1ms
+     ✓ rejects plan fields on grains whose compilers cannot consume them 1ms
+     ✓ limits period splits to meaningful team scoring metrics 0ms
+     ✓ never throws on a wildly malformed plan 1ms
+     ✓ produces a non-empty, ordered trace including every set field 1ms
+     ✓ calls a scoped total a total, not a single-match performance (AFLDB-ISSUE-110) 1ms
+     ✓ describes career conditions and predicates in plain words 1ms
+       ✓ prints no SQL alias or column identifier for any career condition column 5ms
+       ✓ names each column in reader-facing words, keeping its operator and value 1ms
+       ✓ keeps one line per condition, in plan order, for a multi-condition plan 0ms
+       ✓ labels a ranked plan's condition the same way 1ms
+       ✓ still names a club-scoped games condition after the club, and an award by its label 0ms
+     ✓ uses the answer grain in tie prose and describes grouped counts without a fake metric 1ms
+     ✓ refuses count on grains whose compiler ranks rather than counts 1ms
+     ✓ still accepts a count of a plain, unranked player_career/club_season list 0ms
+     ✓ still accepts count on head_to_head, coach_record and after_siren 1ms
+     ✓ refuses a metric-less, condition-less club_season ranking (max) 0ms
+     ✓ refuses a metric-less, condition-less club_season ranking (min and top_n) 0ms
+     ✓ still accepts a metric-less club_season list with a condition 0ms
+     ✓ encodes and decodes a plan losslessly 1ms
+     ✓ returns null for garbage input rather than throwing 0ms
+     ✓ accepts the four whole-vs-scoped shapes plus a league ranking 1ms
+     ✓ accepts every coaching metric and refuses one from another grain 1ms
+     ✓ refuses a coaching plan carrying player 0ms
+     ✓ refuses a coaching plan carrying playerIdIn 0ms
+     ✓ refuses a coaching plan carrying clubAgainst 0ms
+     ✓ refuses a coaching plan carrying matchup 0ms
+     ✓ refuses a coaching plan carrying venue 0ms
+     ✓ refuses a coaching plan carrying matchType 0ms
+     ✓ refuses a coaching plan carrying roundNumber 0ms
+     ✓ refuses a coaching plan carrying careerConditions 0ms
+     ✓ refuses a coaching plan carrying careerPredicates 0ms
+     ✓ refuses a coaching plan carrying clubSeasonConditions 0ms
+     ✓ refuses a coaching plan carrying achievementSummary 0ms
+     ✓ refuses a coaching plan carrying headToHead 0ms
+     ✓ refuses a coaching plan carrying streakDefinition 0ms
+     ✓ refuses a coaching plan carrying periodSplit 0ms
+     ✓ refuses a coaching plan carrying scoreCheckpoint 0ms
+     ✓ refuses a coaching plan carrying resultFilter 0ms
+     ✓ refuses a coaching plan carrying debutGame 0ms
+     ✓ refuses a coaching plan carrying havingClause 0ms
+     ✓ refuses a coaching plan carrying matchFilter 0ms
+     ✓ refuses a coaching plan carrying boundary 0ms
+     ✓ refuses a coaching plan carrying mode 0ms
+     ✓ allows no metric only for a list or a count 1ms
+     ✓ refuses a bare coaching question with no coach, club or statistic 0ms
+     ✓ refuses a threshold with nothing to qualify, and accepts one on a real metric 0ms
+     ✓ a threshold lists qualifiers rather than ranking one 0ms
+     ✓ refuses a win-percentage ranking with no games qualifier, and accepts one with 1ms
+     ✓ refuses a coach reference or a coaching qualifier on any other grain 0ms
+     ✓ refuses a coach and a player in the same plan 0ms
+     ✓ refuses a season below the 1902 coaching floor whatever the metric 1ms
+     ✓ names the coach and states the win-percentage qualifier verbatim 1ms
+     ✓ echoes a reader-stated minimum rather than the default 0ms
+     ✓ accepts the plain event list 0ms
+     ✓ requires the typed descriptor: the grain cannot be reached without one 0ms
+     ✓ refuses the descriptor on any other grain 0ms
+     ✓ refuses "siren_kicks" as a metric for any other grain 0ms
+     ✓ refuses coach by name 0ms
+     ✓ refuses coachQualifier by name 0ms
+     ✓ refuses scope.matchup by name 0ms
+     ✓ refuses scope.venue by name 0ms
+     ✓ refuses scope.roundNumber by name 0ms
+     ✓ refuses scope.playerIdIn by name 0ms
+     ✓ refuses careerConditions by name 0ms
+     ✓ refuses careerPredicates by name 0ms
+     ✓ refuses clubSeasonConditions by name 0ms
+     ✓ refuses achievementSummary by name 0ms
+     ✓ refuses headToHead by name 0ms
+     ✓ refuses streakDefinition by name 0ms
+     ✓ refuses periodSplit by name 0ms
+     ✓ refuses scoreCheckpoint by name 0ms
+     ✓ refuses resultFilter by name 0ms
+     ✓ refuses debutGame by name 0ms
+     ✓ refuses havingClause by name 0ms
+     ✓ refuses matchFilter by name 0ms
+     ✓ refuses boundary by name 0ms
+     ✓ refuses mode by name 0ms
+     ✓ refuses min: the set is DEFINED by having at least one after-siren kick (D15) 0ms
+     ✓ accepts max/top_n at player subject, and refuses a player ranking at event subject 0ms
+     ✓ a named player takes the event subject; a leaderboard of one is refused 0ms
+     ✓ a threshold requires the player subject and a list 0ms
+     ✓ refuses an unknown dimension value 1ms
+     ✓ applies the 1913 coverage floor, and does NOT inherit the 1965 "kicks" floor 0ms
+     ✓ event list requires a match link: {} 0ms
+     ✓ event count requires a match link: { agg: { kind: 'count' } } 0ms
+     ✓ club scope requires a match link: { scope: { clubFor: { organizationId: 1, slug: 'r', name: 'R' } } } 0ms
+     ✓ opponent scope requires a match link: { scope: { clubAgainst: { organizationId: 1, slug: 'r', name: 'R' } } } 0ms
+     ✓ season scope requires a match link: { scope: { seasonMin: 2000 } } 0ms
+     ✓ kickScored requires a match link: { afterSiren: { subject: 'event', kickScored: 'goal' } } 0ms
+     ✓ kickEffect requires a match link: { afterSiren: { subject: 'event', kickEffect: 'won' } } 0ms
+     ✓ kickerResult requires a match link: { afterSiren: { subject: 'event', kickerResult: 'loss' } } 0ms
+     ✓ player ranking requires a match link: { agg: { kind: 'max' }, afterSiren: { subject: 'player' } } 0ms
+     ✓ finals scope requires a match link: { scope: { matchType: 'finals' } } 0ms
+     ✓ home_and_away scope requires a match link: { scope: { matchType: 'home_and_away' } } 0ms
+     ✓ occurrence first requires a match link: { afterSiren: { subject: 'event', occurrence: 'first' } } 0ms
+     ✓ occurrence most_recent requires a match link: { afterSiren: { subject: 'event', occurrence: 'most_recent' } } 0ms
+     ✓ premiership_season alone never requires a match link 0ms
+     ✓ accepts each modifier on its own 0ms
+     ✓ accepts the three composed shapes 0ms
+     ✓ refuses a club or a season range that no modifier owns, by name 0ms
+     ✓ refuses venue scope no predicate can see 0ms
+     ✓ refuses opponent scope no predicate can see 0ms
+     ✓ refuses match type scope no predicate can see 0ms
+     ✓ describes each modifier by its builder label 1ms
+     ✓ accepts each population predicate 1ms
+     ✓ accepts a per-player question whose halves agree 0ms
+     ✓ rejects a per-player predicate with nobody named 0ms
+     ✓ rejects a named relative with no predicate to use them 0ms
+     ✓ rejects halves that name different people 0ms
+     ✓ rejects a plan that both names a relative and pins a player 0ms
+     ✓ rejects a relationship question at any other grain 0ms
+     ✓ owns neither a club nor a season, so both are refused 0ms
+     ✓ accepts X1 and X2 as the parser builds them 1ms
+     ✓ V1/V4: a club in match scope is refused, because neither builder owns one 0ms
+     ✓ V2/V3: season, venue, opponent, round and match type are all refused 1ms
+     ✓ a games condition is refused when the played club is a builder parameter 0ms
+     ✓ V5: the club-scoped and unscoped coaching predicates never coexist 0ms
+     ✓ V9: the composition never leaks into the coach-only grain 0ms
+     ✓ V10: the composition exists at career grain and nowhere else 0ms
+     ✓ V6: a father–son selection COMPOSED with coaching is a list, never a ranking 0ms
+     ✓ V6: the UNcomposed father–son selection ranking answers, mirroring the father side 0ms
+     ✓ V7 is retired: a father–son selection on its own is FS1 and answers 0ms
+     ✓ V6b: a father–son selection never answers a clubs_played reading of "by club" 0ms
+     ✓ the named clubs and the bound ids are one fact, and cannot drift apart 0ms
+     ✓ accepts a ranked plan (C1) for either metric 0ms
+     ✓ accepts a thresholded list (C5) and refuses a threshold with no list agg 0ms
+     ✓ refuses a family list with no threshold to qualify against 0ms
+     ✓ requires a recognised family metric, and refuses a metric from another grain 0ms
+     ✓ refuses a family plan carrying player -- no club, season, player or career condition applies 0ms
+     ✓ refuses a family plan carrying coach -- no club, season, player or career condition applies 0ms
+     ✓ refuses a family plan carrying playerIdIn -- no club, season, player or career condition applies 0ms
+     ✓ refuses a family plan carrying clubFor -- no club, season, player or career condition applies 0ms
+     ✓ refuses a family plan carrying clubAgainst -- no club, season, player or career condition applies 0ms
+     ✓ refuses a family plan carrying venue -- no club, season, player or career condition applies 0ms
+     ✓ refuses a family plan carrying matchType -- no club, season, player or career condition applies 0ms
+     ✓ refuses a family plan carrying roundNumber -- no club, season, player or career condition applies 0ms
+     ✓ refuses a family plan carrying seasonMin/Max -- no club, season, player or career condition applies 0ms
+     ✓ refuses a family plan carrying careerConditions -- no club, season, player or career condition applies 0ms
+     ✓ refuses a family plan carrying careerPredicates -- no club, season, player or career condition applies 0ms
+     ✓ refuses a family plan carrying clubSeasonConditions -- no club, season, player or career condition applies 0ms
+     ✓ refuses a family plan carrying achievementSummary -- no club, season, player or career condition applies 0ms
+     ✓ refuses a family plan carrying headToHead -- no club, season, player or career condition applies 0ms
+     ✓ refuses a family plan carrying streakDefinition -- no club, season, player or career condition applies 0ms
+     ✓ refuses a family plan carrying boundary -- no club, season, player or career condition applies 0ms
+     ✓ refuses a family plan carrying debutGame -- no club, season, player or career condition applies 0ms
+     ✓ refuses a hand-built player_career plan ranking time_on_ground 0ms
+     ✓ refuses a hand-built player_career plan ranking centre_bounce_attendances 0ms
+     ✓ refuses a hand-built player_career plan ranking disposal_efficiency 0ms
+     ✓ refuses a hand-built player_career plan ranking score_involvements 0ms
+     ✓ refuses a club-scoped hand-built player_career plan ranking time_on_ground 0ms
+     ✓ refuses a club-scoped hand-built player_career plan ranking centre_bounce_attendances 0ms
+     ✓ refuses a club-scoped hand-built player_career plan ranking disposal_efficiency 0ms
+     ✓ refuses a club-scoped hand-built player_career plan ranking score_involvements 0ms
+     ✓ time_on_ground is not admitted at any grain 1ms
+     ✓ centre_bounce_attendances is not admitted at any grain 1ms
+     ✓ disposal_efficiency is not admitted at any grain 1ms
+     ✓ score_involvements is not admitted at any grain 1ms
+     ✓ still accepts the supported live career metric inside_50s, with and without club scope 0ms
+     ✓ still accepts the supported live career metric clearances, with and without club scope 0ms
+     ✓ still accepts the supported live career metric goal_assists, with and without club scope 0ms
+     ✓ still accepts the supported live career metric frees_for, with and without club scope 0ms
+     ✓ still accepts the supported live career metric frees_against, with and without club scope 0ms
+     ✓ still accepts the supported live career metric contested, with and without club scope 0ms
+     ✓ still accepts the supported live career metric uncontested, with and without club scope 0ms
+     ✓ every statKey exposed by every NL_METRICS grain is a real GRID_STATS key 6ms
+     × fills the X+ count and names both clubs when the names are supplied 15ms
+     × falls back to the raw organisation id when no name is known, never to an empty parameter 1ms
+     × renders the marquee event and its count 1ms
+     ✓ leaves every other builder label-only (the pinned Phase E decision) 0ms
+ ❯ tests/nl-describe.test.ts (94 tests | 3 failed) 117ms
+     ✓ names a sole holder without calling it a tie 5ms
+     ✓ names both holders of a two-way tie in full 1ms
+     ✓ summarises a tie too wide to name in a headline 1ms
+     ✓ does not produce a dangling subject when there are no rows 1ms
+     ✓ keeps only rows at the lead value 1ms
+     ✓ counts one holder once even when they hold the record twice 0ms
+     ✓ preserves the order the query ranked them in 1ms
+     ✓ treats a null lead value as matching only null rows 1ms
+     ✓ names both holders of a shared single-game record 30ms
+     ✓ leaves an outright record unmarked 1ms
+     ✓ keeps the sum-mode interpretation while still marking a tie 1ms
+     ✓ still reports no match found when there is no lead 0ms
+     ✓ marks a shared career record 1ms
+     ✓ marks a shared player-season record without mangling the season suffix 1ms
+     ✓ marks two different matches tied on the same margin 1ms
+     ✓ marks a shared club-season record 1ms
+     ✓ leaves the condition-list headline alone, which has no lead to tie 0ms
+     ✓ uses lowest wording for min-ranked answers instead of describing them as highest 1ms
+     ✓ describes a HAVING result as grouped clubs, never as Highest with a blank metric 1ms
+     ✓ names the real streak grain and tied club organizations 1ms
+     ✓ rejects a payload whose kind cannot represent the plan grain 2ms
+     ✓ a by-decade headline names the decade with the most, not the earliest row 1ms
+     ✓ a tied by-decade lead names every decade sharing the true maximum 0ms
+     ✓ counts SELECTIONS, and says so — never "players" 1ms
+     ✓ names the draft year as the grouping, never a season 0ms
+     ✓ discloses the linked-player coverage as a caveat, not as the denominator 1ms
+     ✓ an achievement summary is unaffected and still counts players 0ms
+     ✓ describes a single-game threshold as a qualifying-performance count with the bound restated 1ms
+     ✓ describes a scoped-sum threshold as players qualifying on the aggregate 0ms
+     ✓ describes a season threshold as qualifying player-seasons 0ms
+     ✓ a whole career and a record at one club do not produce the same sentence 1ms
+     ✓ renders a split stint as seasons in charge, never as a continuous tenure 0ms
+     ✓ names every coach tied at the lead value 1ms
+     ✓ states the qualifier verbatim on every win-percentage answer 0ms
+     ✓ a club list is a count, and a threshold is a qualifying set 1ms
+     ✓ answers a count question with the count itself 0ms
+     ✓ says a season scope out loud rather than answering a wider question silently 0ms
+     ✓ names every holder of a tied record rather than one of them 1ms
+     ✓ "a goal after the siren" and "a goal after the siren to win" read differently 1ms
+     ✓ a miss and a miss-and-lost read differently 1ms
+     ✓ an occurrence answer names the event, not a count 0ms
+     ✓ an event count is worded as kicks, never as coaches 0ms
+     ✓ an empty result is honest, not a decline 0ms
+     ✓ always carries the curated-list caveat (D12) 1ms
+     ✓ names the excluded unlinked rows, and only when there are any 0ms
+     ✓ says what a match-link-required answer left out 0ms
+     ✓ carries no after-siren caveat on any other grain 0ms
+     ✓ answers yes, and names the condition it answered 1ms
+     ✓ answers no on an empty result rather than "0 players match" 0ms
+     ✓ names both conditions when the question composed them 0ms
+     ✓ states the curated, linked-only boundary on this family only 0ms
+     ✓ leaves an unpinned list on the count wording it has always had 0ms
+     ✓ leaves a ranked answer for one player alone 0ms
+     ✓ has_brother says which relationship it answered 0ms
+     ✓ has_afl_father says which relationship it answered 0ms
+     ✓ has_afl_son says which relationship it answered 0ms
+     ✓ has_afl_parent_or_child says which relationship it answered 0ms
+     ✓ the father-son father wording names the RULE, not a parent-child link 0ms
+     ✓ a per-player answer names the person it is about 0ms
+     ✓ a ranked relationship answer says what it ranked WITHIN 0ms
+     ✓ a pinned player answers yes/no in the relationship’s own words 0ms
+     ✓ always states the linked-only boundary 0ms
+     ✓ says out loud that an over-cap list is not the whole list 0ms
+     ✓ D20: the headline is the TRUE total, not the number of rows shown 2ms
+     ✓ D20: the disclosure names BOTH numbers, so the shortfall is visible 1ms
+     ✓ D20: 658 answers with disclosure rather than refusing 1ms
+     ✓ D20: 181 answers with disclosure rather than refusing 0ms
+     ✓ D20: 107 answers with disclosure rather than refusing 0ms
+     ✓ says nothing about a cap when nothing was capped 0ms
+     ✓ leaves every other family’s wording untouched 0ms
+     ✓ X1 says what the composition was 0ms
+     ✓ X2 names both clubs, each on its own side of the sentence 0ms
+     ✓ the asymmetric form keeps the two clubs apart 0ms
+     ✓ a ranked composition says what it ranked WITHIN 0ms
+     ✓ never says "later", in any branch 1ms
+     ✓ states the cap in the answer itself: 100 of 365 1ms
+     ✓ says nothing when the whole list is shown 0ms
+     ✓ invents no coaching-completeness claim in either direction 0ms
+     ✓ X3: a father–son selection who also coached says both, not just the rule 0ms
+     ✓ the father side: a father–son father who also coached says both 0ms
+     ✓ composes rather than matching a sentence: the scope survives too 0ms
+     ✓ never drops the coaching conjunct from a relationship sentence 1ms
+     ✓ leaves each family alone when it is the only one present 0ms
+     ✓ C1 "biggest football family" names the family and its combined games 1ms
+     ✓ two families tied at the lead value are both named, never one silently dropped 0ms
+     ✓ C1 "most AFL players" ranks and describes linked_members, never combined games 0ms
+     ✓ C5 "families with three AFL players" lists a qualifying count, never ranks one 0ms
+     ✓ no matching family names the empty result honestly 0ms
+     ✓ answerCaveats always states the unlinked-side boundary, and the cap only when truncated 1ms
+     × tiedSubject uses the supplied total when the rows were capped 24ms
+     × a capped player-season tie names the true tied count 5ms
+     × a capped single-match tie counts performances, not players 2ms
+     ✓ an uncapped tie keeps the existing wording (total equals the rows shown) 0ms
+     ✓ a top-N does not read its ranked-row total as a tie at the lead 0ms
+ ❯ tests/query-intent.test.ts (47 tests | 2 failed) 63ms
+     ✓ finds a club by whole-word match and strips it from the topic words 6ms
+     ✓ does not match a club name inside another word 1ms
+     ✓ finds a plausible season year and rejects out-of-range numbers 1ms
+     ✓ finds a multi-word club name 0ms
+     ✓ reads club pair, season and round from richmond v essendon 1984 round 5 3ms
+     ✓ reads club pair, season and round from Richmond v essendon round 5 1984 1ms
+     ✓ reads club pair, season and round from richmond vs essendon 1984 r5 1ms
+     × builds a Match Search link for all meetings in the year 14ms
+     × links a matchup as head-to-head, and the link parses back to head-to-head 5ms
+     ✓ does not treat result wording as a bare matchup search 0ms
+     ✓ routes a plain brownlow query to the dedicated page 1ms
+     ✓ routes a club-qualified query to winners by season, filtered 1ms
+     ✓ routes a "leaders"/"career" query to the career leaders table 0ms
+     ✓ routes via the awards-table hit even without the word "brownlow" 1ms
+     ✓ adds a season range when a year is present with no club 1ms
+     ✓ treats a bare club as "drafted to" 1ms
+     ✓ treats "from"/"out of" wording as the feeder club 1ms
+     ✓ reads a feeder club straight off the query, since most are not AFL clubs 0ms
+     ✓ falls back to a bare link when no club or year is present 0ms
+     ✓ links a confident record match with a club to the filtered category page 0ms
+     ✓ ignores a weak record match even with a club present 0ms
+     ✓ links a confident non-Brownlow award match with a club 0ms
+     ✓ does not fire a record/award match without a club 0ms
+     ✓ parses the draws example with a number word and "or more" 2ms
+     ✓ does not require the "in one season" phrase for outcome questions 2ms
+     ✓ reads "won" as premierships or finals before season wins 1ms
+     ✓ parses grand final questions at the right grain 1ms
+     ✓ never reads the "one" of "in one season" as the count 1ms
+     ✓ reads outcome words before the generic "games" 0ms
+     ✓ parses career games and season games separately 1ms
+     ✓ parses a stat at game, season and career grain 2ms
+     ✓ does not read the 50 of "inside 50s" as the count 0ms
+     ✓ parses premierships with and without a count 0ms
+     ✓ returns null for text naming no question 0ms
+     ✓ reads preliminary finals as their own question, not a generic finals count 1ms
+     ✓ reads a bare "drawn match/game" as career-wide, distinct from season draws 1ms
+     ✓ parses the teams example 1ms
+     ✓ needs an explicit club subject, which is all that separates it from the player question 1ms
+     ✓ accepts team, club and side as the subject 1ms
+     ✓ reads the standalone season achievements 1ms
+     ✓ reads minor premiership before the premiership inside it 0ms
+     ✓ reads season win and loss counts 0ms
+     ✓ returns null for club text naming no question 0ms
+     ✓ is not turned into a grid-solver intent link 1ms
+     ✓ still builds a refine board with one solvable cell 2ms
+     ✓ returns null for a query the registry does not recognise 0ms
+     ✓ returns null for an empty query 0ms
+ ❯ tests/match-spec.test.ts (24 tests | 1 failed) 41ms
+     ✓ parses a range filter 5ms
+     ✓ ignores unknown parameters rather than failing 1ms
+     ✓ reports an inverted range instead of running it 3ms
+     ✓ falls back to the default sort for an unknown sort key 1ms
+     ✓ drops club values that are not slug-shaped 1ms
+     ✓ keeps a slug that matches no club rather than erroring 1ms
+     ✓ says so when a bound is above the field maximum 1ms
+     ✓ says nothing when the value is already in range 1ms
+     ✓ reports a page beyond the cap 2ms
+     ✓ reports clubs dropped past the limit 1ms
+     ✓ shows the clamped value, not the raw one 1ms
+     ✓ is empty for a field with no filter 0ms
+     ✓ accepts a comma-separated list 0ms
+     ✓ accepts a repeated parameter, as a multiple-select posts it 1ms
+     ✓ de-duplicates 0ms
+     ✓ keeps both clubs in the canonical URL 1ms
+     ✓ round-trips a full query 1ms
+     ✓ omits defaults so the shareable URL stays short 1ms
+     ✓ describes a two-sided range 1ms
+     ✓ describes each active filter, not just the first 1ms
+     ✓ defaults to either club and says nothing in the canonical URL 0ms
+     × reads club_match=both with exactly two clubs and round-trips it 12ms
+     ✓ ignores club_match=both without two clubs (one club, or none) 1ms
+     ✓ ignores any other club_match value 0ms
+ ❯ tests/unit/qualifying-matches-gate.test.ts (15 tests | 6 failed) 65ms
+     ✓ rejects a syntactically valid team_aggregate token that contains a resultFilter 7ms
+     ✓ rejects an invalid token 1ms
+     ✓ accepts a valid supported team_aggregate request 1ms
+     × does not throw for a token missing scope, and says invalid_plan 13ms
+     × does not throw for a token missing careerConditions 14ms
+     × refuses a string seasonMin as invalid_plan 9ms
+     × refuses an injection-shaped seasonMin as invalid_plan 7ms
+     × refuses a fractional seasonMin as invalid_plan 2ms
+     ✓ refuses a seasonMax beyond int4 as invalid_plan 1ms
+     ✓ refuses a string roundNumber as invalid_plan 1ms
+     ✓ refuses an unknown matchType as invalid_plan 1ms
+     ✓ refuses a club with a string organizationId as invalid_plan 1ms
+     × refuses a matchup missing one club as invalid_plan 2ms
+     ✓ refuses a venue with a string id as invalid_plan 0ms
+     ✓ still accepts a fully typed scope 1ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 26 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/match-spec.test.ts > club_match: head-to-head versus either club > reads club_match=both with exactly two clubs and round-trips it
+AssertionError: expected undefined to be 'both' // Object.is equality
+
+- Expected:
+"both"
+
++ Received:
+undefined
+
+ ❯ tests/match-spec.test.ts:166:28
+    164|   it('reads club_match=both with exactly two clubs and round-trips it'…
+    165|     const { query } = parseMatchSearchQuery({ club: 'collingwood,carlt…
+    166|     expect(query.clubMode).toBe('both');
+       |                            ^
+    167|     const rebuilt = parseMatchSearchQuery(
+    168|       Object.fromEntries(new URLSearchParams(buildMatchQueryString(que…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/26]⎯
+
+ FAIL  tests/nl-describe.test.ts > tie headline counts the tied rows, not the capped rows (AFLDB-ISSUE-360 SRCH-7) > tiedSubject uses the supplied total when the rows were capped
+AssertionError: expected { subject: 'A and 2 others', …(1) } to deeply equal { …(2) }
+
+- Expected
++ Received
+
+  {
+-   "subject": "A and 4,320 other player-seasons",
++   "subject": "A and 2 others",
+    "tied": true,
+  }
+
+ ❯ tests/nl-describe.test.ts:1266:83
+    1264|
+    1265|   it('tiedSubject uses the supplied total when the rows were capped', …
+    1266|     expect(tiedSubject(['A', 'B', 'C'], { total: 4321, noun: 'player-s…
+       |                                                                                   ^
+    1267|       subject: 'A and 4,320 other player-seasons', tied: true,
+    1268|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/26]⎯
+
+ FAIL  tests/nl-describe.test.ts > tie headline counts the tied rows, not the capped rows (AFLDB-ISSUE-360 SRCH-7) > a capped player-season tie names the true tied count
+AssertionError: expected 'Player 1 and 24 others — 0 goals (189…' to be 'Player 1 and 4,320 other player-seaso…' // Object.is equality
+
+Expected: "Player 1 and 4,320 other player-seasons — 0 goals (1897), tied"
+Received: "Player 1 and 24 others — 0 goals (1897), tied"
+
+ ❯ tests/nl-describe.test.ts:1277:22
+    1275|       { kind: 'player_season', lead: rows[0], rows, total: 4321 },
+    1276|     );
+    1277|     expect(headline).toBe('Player 1 and 4,320 other player-seasons — 0…
+       |                      ^
+    1278|     expect(headline).not.toContain('24 others');
+    1279|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/26]⎯
+
+ FAIL  tests/nl-describe.test.ts > tie headline counts the tied rows, not the capped rows (AFLDB-ISSUE-360 SRCH-7) > a capped single-match tie counts performances, not players
+AssertionError: expected 'P1 and 24 others — 0 goals (tied)' to be 'P1 and 465,694 other performances — 0…' // Object.is equality
+
+Expected: "P1 and 465,694 other performances — 0 goals (tied)"
+Received: "P1 and 24 others — 0 goals (tied)"
+
+ ❯ tests/nl-describe.test.ts:1287:22
+    1285|       { kind: 'player_game', lead: rows[0], rows, total: 465695 },
+    1286|     );
+    1287|     expect(headline).toBe('P1 and 465,694 other performances — 0 goals…
+       |                      ^
+    1288|   });
+    1289|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/26]⎯
+
+ FAIL  tests/nl-parser.test.ts > AFLDB-ISSUE-356 (a): bare "least" is the minimum > "least goals in a season" reads exactly as "fewest goals in a season"
+ FAIL  tests/nl-parser.test.ts > AFLDB-ISSUE-356 (a): bare "least" is the minimum > "the least goals in a season" reads exactly as "fewest goals in a season"
+ FAIL  tests/nl-parser.test.ts > AFLDB-ISSUE-356 (a): bare "least" is the minimum > "who kicked the least goals in 2020" reads exactly as "who kicked the fewest goals in 2020"
+ FAIL  tests/nl-parser.test.ts > AFLDB-ISSUE-356 (a): bare "least" is the minimum > "least disposals in a game" reads exactly as "fewest disposals in a game"
+ FAIL  tests/nl-parser.test.ts > AFLDB-ISSUE-356 (a): bare "least" is the minimum > "least brownlow votes in a career" reads exactly as "fewest brownlow votes in a career"
+AssertionError: expected { kind: 'max' } to deeply equal { kind: 'min' }
+
+- Expected
++ Received
+
+  {
+-   "kind": "min",
++   "kind": "max",
+  }
+
+ ❯ tests/nl-parser.test.ts:5225:19
+    5223|   ])('"%s" reads exactly as "%s"', async (least, fewest) => {
+    5224|     const a = await plan(least);
+    5225|     expect(a.agg).toEqual({ kind: 'min' });
+       |                   ^
+    5226|     expect(a).toEqual(await plan(fewest));
+    5227|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/26]⎯
+
+ FAIL  tests/nl-parser.test.ts > AFLDB-ISSUE-356 (b): a marquee phrase as the setting of a ranked statistic > "most goals in a showdown" is one game between the pair, not career totals of players who played in one
+AssertionError: expected [ { …(2) } ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "builder": "matchup_played_min",
++     "params": {
++       "clubA": "5",
++       "clubB": "6",
++       "times": "1",
++     },
++   },
++ ]
+
+ ❯ tests/nl-parser.test.ts:5242:32
+    5240|   it('"most goals in a showdown" is one game between the pair, not car…
+    5241|     const p = await plan('most goals in a showdown');
+    5242|     expect(p.careerPredicates).toEqual([]);
+       |                                ^
+    5243|     expect(p.grain).toBe('player_game');
+    5244|     expect(p.mode).toBe('single');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/26]⎯
+
+ FAIL  tests/nl-parser.test.ts > AFLDB-ISSUE-356 (b): a marquee phrase as the setting of a ranked statistic > plural "most goals in showdowns" is the total across the pair's meetings
+AssertionError: expected [ { …(2) } ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "builder": "matchup_played_min",
++     "params": {
++       "clubA": "5",
++       "clubB": "6",
++       "times": "1",
++     },
++   },
++ ]
+
+ ❯ tests/nl-parser.test.ts:5254:32
+    5252|   it('plural "most goals in showdowns" is the total across the pair\'s…
+    5253|     const p = await plan('most goals in showdowns');
+    5254|     expect(p.careerPredicates).toEqual([]);
+       |                                ^
+    5255|     expect(p.mode).toBe('sum');
+    5256|     expect([p.scope.matchup?.clubA.organizationId, p.scope.matchup?.cl…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/26]⎯
+
+ FAIL  tests/nl-parser.test.ts > AFLDB-ISSUE-356 (b): a marquee phrase as the setting of a ranked statistic > a marquee EVENT has no match-level ranking, so the question declines rather than ranking careers
+AssertionError: most goals on anzac day: expected 'plan' to be 'none' // Object.is equality
+
+Expected: "none"
+Received: "plan"
+
+ ❯ tests/nl-parser.test.ts:5262:32
+    5260|     for (const q of ['most goals on anzac day', 'most goals in an anza…
+    5261|       const result = await parse(q);
+    5262|       expect(result.status, q).toBe('none');
+       |                                ^
+    5263|     }
+    5264|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/26]⎯
+
+ FAIL  tests/nl-parser.test.ts > AFLDB-ISSUE-356 (c): period words never resolve as a player-name prefix > "most goals in a quarter" declines and never consults the player resolver
+ FAIL  tests/nl-parser.test.ts > AFLDB-ISSUE-356 (c): period words never resolve as a player-name prefix > "most disposals in a quarter" declines and never consults the player resolver
+AssertionError: expected 'plan' to be 'none' // Object.is equality
+
+Expected: "none"
+Received: "plan"
+
+ ❯ tests/nl-parser.test.ts:5302:27
+    5300|     const calls: string[] = [];
+    5301|     const result = await parseNlQuestion(question, quartermainCtx(call…
+    5302|     expect(result.status).toBe('none');
+       |                           ^
+    5303|     expect(result.report.entityResolution).toEqual([]);
+    5304|     expect(calls).toEqual([]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/26]⎯
+
+ FAIL  tests/nl-parser.test.ts > AFLDB-ISSUE-356 (c): period words never resolve as a player-name prefix > the guard holds for a prefix resolution committed at accept strength too
+AssertionError: expected [ 'resolvePlayer:quarter' ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "resolvePlayer:quarter",
++ ]
+
+ ❯ tests/nl-parser.test.ts:5311:19
+    5309|     const result = await parseNlQuestion('most goals in a quarter', qu…
+    5310|     expect(result.status).toBe('none');
+    5311|     expect(calls).toEqual([]);
+       |                   ^
+    5312|   });
+    5313|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/26]⎯
+
+ FAIL  tests/nl-plan.test.ts > describePlan: marquee and rivalry predicates fill their label and list their parameters > fills the X+ count and names both clubs when the names are supplied
+AssertionError: expected [ …(2) ] to include 'Condition: 3+ matches between two clu…'
+ ❯ tests/nl-plan.test.ts:1518:19
+    1516|       { clubNames: new Map([[5, 'Adelaide'], [6, 'Port Adelaide']]) },
+    1517|     );
+    1518|     expect(lines).toContain('Condition: 3+ matches between two clubs (…
+       |                   ^
+    1519|     expect(lines.join(' ')).not.toContain('X+');
+    1520|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/26]⎯
+
+ FAIL  tests/nl-plan.test.ts > describePlan: marquee and rivalry predicates fill their label and list their parameters > falls back to the raw organisation id when no name is known, never to an empty parameter
+AssertionError: expected [ …(2) ] to include 'Condition: 3+ matches between two clu…'
+ ❯ tests/nl-plan.test.ts:1524:19
+    1522|   it('falls back to the raw organisation id when no name is known, nev…
+    1523|     const lines = describePlan(basePlan({ ...listPlan, careerPredicate…
+    1524|     expect(lines).toContain('Condition: 3+ matches between two clubs (…
+       |                   ^
+    1525|   });
+    1526|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/26]⎯
+
+ FAIL  tests/nl-plan.test.ts > describePlan: marquee and rivalry predicates fill their label and list their parameters > renders the marquee event and its count
+AssertionError: expected [ …(2) ] to include 'Condition: 1+ marquee matches (Marque…'
+ ❯ tests/nl-plan.test.ts:1529:19
+    1527|   it('renders the marquee event and its count', () => {
+    1528|     const lines = describePlan(basePlan({ ...listPlan, careerPredicate…
+    1529|     expect(lines).toContain('Condition: 1+ marquee matches (Marquee ma…
+       |                   ^
+    1530|   });
+    1531|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/26]⎯
+
+ FAIL  tests/query-intent.test.ts > extractMatchupQuery > builds a Match Search link for all meetings in the year
+AssertionError: expected '/match-search?search=1&season_min=198…' to be '/match-search?search=1&season_min=198…' // Object.is equality
+
+Expected: "/match-search?search=1&season_min=1984&season_max=1984&club=richmond%2Cessendon&club_match=both"
+Received: "/match-search?search=1&season_min=1984&season_max=1984&club=richmond%2Cessendon"
+
+ ❯ tests/query-intent.test.ts:76:46
+     74|     // Match Search read the two clubs as EITHER club, so "Richmond v …
+     75|     // linked to every game either played, not their meetings.
+     76|     expect(matchupMatchSearchHref(matchup!)).toBe('/match-search?searc…
+       |                                              ^
+     77|   });
+     78|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/26]⎯
+
+ FAIL  tests/query-intent.test.ts > extractMatchupQuery > links a matchup as head-to-head, and the link parses back to head-to-head
+AssertionError: expected '/match-search?search=1&club=richmond%…' to contain 'club_match=both'
+
+Expected: "club_match=both"
+Received: "/match-search?search=1&club=richmond%2Cessendon"
+
+ ❯ tests/query-intent.test.ts:83:18
+     81|     expect(matchup).not.toBeNull();
+     82|     const href = matchupMatchSearchHref(matchup!);
+     83|     expect(href).toContain('club_match=both');
+       |                  ^
+     84|     const params = Object.fromEntries(new URL(href, 'http://x').search…
+     85|     const { query } = parseMatchSearchQuery(params);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/26]⎯
+
+ FAIL  tests/unit/qualifying-matches-gate.test.ts > qualifying-matches-gate: crafted tokens are refused up front > does not throw for a token missing scope, and says invalid_plan
+AssertionError: expected [Function] to not throw an error but 'TypeError: Cannot read properties of …' was thrown
+
+- Expected:
+undefined
+
++ Received:
+"TypeError: Cannot read properties of undefined (reading 'playerIdIn')"
+
+ ❯ tests/unit/qualifying-matches-gate.test.ts:50:84
+     48|   it('does not throw for a token missing scope, and says invalid_plan'…
+     49|     const { scope: _scope, ...noScope } = base;
+     50|     expect(() => validateQualifyingMatchesRequest(token(noScope), 'ric…
+       |                                                                                    ^
+     51|     expect(validateQualifyingMatchesRequest(token(noScope), 'richmond'…
+     52|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/26]⎯
+
+ FAIL  tests/unit/qualifying-matches-gate.test.ts > qualifying-matches-gate: crafted tokens are refused up front > does not throw for a token missing careerConditions
+TypeError: Cannot read properties of undefined (reading 'length')
+ ❯ validatePlan src/search/nl/plan.ts:2243:62
+    2241|   }
+    2242|
+    2243|   if (raw.grain !== 'player_career' && (raw.careerConditions.length > …
+       |                                                              ^
+    2244|     return { error: 'Career conditions only apply to a career-grain qu…
+    2245|   }
+ ❯ validateQualifyingMatchesRequest src/search/nl/qualifying-matches-gate.ts:30:22
+ ❯ tests/unit/qualifying-matches-gate.test.ts:56:12
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/26]⎯
+
+ FAIL  tests/unit/qualifying-matches-gate.test.ts > qualifying-matches-gate: crafted tokens are refused up front > refuses a string seasonMin as invalid_plan
+AssertionError: expected { rawPlan: { v: 1, …(10) }, …(1) } to deeply equal { error: 'invalid_plan' }
+
+- Expected
++ Received
+
+  {
+-   "error": "invalid_plan",
++   "clubParam": "richmond",
++   "rawPlan": {
++     "agg": {
++       "kind": "list",
++     },
++     "careerConditions": [],
++     "careerPredicates": [],
++     "clubSeasonConditions": [],
++     "grain": "team_match",
++     "havingClause": {
++       "metric": "wins",
++       "op": "gte",
++       "value": 1,
++     },
++     "limit": 50,
++     "metric": null,
++     "scope": {
++       "seasonMin": "abc",
++     },
++     "tiePolicy": "all",
++     "v": 1,
++   },
+  }
+
+ ❯ tests/unit/qualifying-matches-gate.test.ts:70:85
+     68|     ['a venue with a string id', { venue: { id: 'x', slug: 'x', name: …
+     69|   ])('refuses %s as invalid_plan', (_label, scope) => {
+     70|     expect(validateQualifyingMatchesRequest(token({ ...base, scope }),…
+       |                                                                                     ^
+     71|   });
+     72|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/26]⎯
+
+ FAIL  tests/unit/qualifying-matches-gate.test.ts > qualifying-matches-gate: crafted tokens are refused up front > refuses an injection-shaped seasonMin as invalid_plan
+AssertionError: expected { rawPlan: { v: 1, …(10) }, …(1) } to deeply equal { error: 'invalid_plan' }
+
+- Expected
++ Received
+
+  {
+-   "error": "invalid_plan",
++   "clubParam": "richmond",
++   "rawPlan": {
++     "agg": {
++       "kind": "list",
++     },
++     "careerConditions": [],
++     "careerPredicates": [],
++     "clubSeasonConditions": [],
++     "grain": "team_match",
++     "havingClause": {
++       "metric": "wins",
++       "op": "gte",
++       "value": 1,
++     },
++     "limit": 50,
++     "metric": null,
++     "scope": {
++       "seasonMin": "1990; select 1",
++     },
++     "tiePolicy": "all",
++     "v": 1,
++   },
+  }
+
+ ❯ tests/unit/qualifying-matches-gate.test.ts:70:85
+     68|     ['a venue with a string id', { venue: { id: 'x', slug: 'x', name: …
+     69|   ])('refuses %s as invalid_plan', (_label, scope) => {
+     70|     expect(validateQualifyingMatchesRequest(token({ ...base, scope }),…
+       |                                                                                     ^
+     71|   });
+     72|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/26]⎯
+
+ FAIL  tests/unit/qualifying-matches-gate.test.ts > qualifying-matches-gate: crafted tokens are refused up front > refuses a fractional seasonMin as invalid_plan
+AssertionError: expected { rawPlan: { v: 1, …(10) }, …(1) } to deeply equal { error: 'invalid_plan' }
+
+- Expected
++ Received
+
+  {
+-   "error": "invalid_plan",
++   "clubParam": "richmond",
++   "rawPlan": {
++     "agg": {
++       "kind": "list",
++     },
++     "careerConditions": [],
++     "careerPredicates": [],
++     "clubSeasonConditions": [],
++     "grain": "team_match",
++     "havingClause": {
++       "metric": "wins",
++       "op": "gte",
++       "value": 1,
++     },
++     "limit": 50,
++     "metric": null,
++     "scope": {
++       "seasonMin": 1990.5,
++     },
++     "tiePolicy": "all",
++     "v": 1,
++   },
+  }
+
+ ❯ tests/unit/qualifying-matches-gate.test.ts:70:85
+     68|     ['a venue with a string id', { venue: { id: 'x', slug: 'x', name: …
+     69|   ])('refuses %s as invalid_plan', (_label, scope) => {
+     70|     expect(validateQualifyingMatchesRequest(token({ ...base, scope }),…
+       |                                                                                     ^
+     71|   });
+     72|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/26]⎯
+
+ FAIL  tests/unit/qualifying-matches-gate.test.ts > qualifying-matches-gate: crafted tokens are refused up front > refuses a matchup missing one club as invalid_plan
+TypeError: Cannot read properties of undefined (reading 'organizationId')
+ ❯ validatePlan src/search/nl/plan.ts:2544:76
+    2542|     const bErr = validateRef(raw.scope.matchup.clubB, 'organizationId'…
+    2543|     if (bErr) return bErr;
+    2544|     if (raw.scope.matchup.clubA.organizationId === raw.scope.matchup.c…
+       |                                                                            ^
+    2545|       return { error: 'A matchup needs two different clubs.' };
+    2546|     }
+ ❯ validateQualifyingMatchesRequest src/search/nl/qualifying-matches-gate.ts:30:22
+ ❯ tests/unit/qualifying-matches-gate.test.ts:70:12
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/26]⎯
+
+
+ Test Files  6 failed (6)
+      Tests  26 failed | 1024 passed (1050)
+   Start at  08:57:37
+   Duration  4.99s (transform 908ms, setup 454ms, import 1.14s, tests 1.28s, environment 2ms)
+
+rc=1

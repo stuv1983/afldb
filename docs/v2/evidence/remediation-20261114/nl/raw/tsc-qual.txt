@@ -1,0 +1,23 @@
+head=ecc3403e4a0f623e17a12f9a7a6e3fcdbdf24298 dirty=0
+Generating route types...
+✓ Types generated successfully
+tsc rc=0
+
+/mnt/ssd/afldb-rem-nl-20261114/qual/src/db/queries/match-search.ts
+  147:20  warning  '_total' is defined but never used  @typescript-eslint/no-unused-vars
+
+/mnt/ssd/afldb-rem-nl-20261114/qual/src/db/queries/nl/team-match.ts
+  249:36  warning  '_t' is defined but never used      @typescript-eslint/no-unused-vars
+  249:45  warning  '_r' is defined but never used      @typescript-eslint/no-unused-vars
+  299:36  warning  '_total' is defined but never used  @typescript-eslint/no-unused-vars
+  352:36  warning  '_total' is defined but never used  @typescript-eslint/no-unused-vars
+
+/mnt/ssd/afldb-rem-nl-20261114/qual/src/search/nl/parser.ts
+  159:10  warning  'consume' is defined but never used  @typescript-eslint/no-unused-vars
+
+/mnt/ssd/afldb-rem-nl-20261114/qual/tests/nl-plan.test.ts
+  1008:25  warning  '_omitted' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+✖ 7 problems (0 errors, 7 warnings)
+
+eslint rc=0

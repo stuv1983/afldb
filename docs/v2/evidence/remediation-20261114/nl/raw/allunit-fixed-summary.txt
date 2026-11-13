@@ -1,0 +1,4 @@
+head=de640826d13489c58392563e7ae1ff62403ed293 dirty=20
+ Test Files  11 failed | 204 passed | 1 skipped (216)
+      Tests  107 failed | 11779 passed | 41 skipped (11927)
+rc=1

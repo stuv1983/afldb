@@ -1,0 +1,21 @@
+{
+  "corpus": "/mnt/ssd/afldb-rem-nl-20261114/in/nl-stress-corpus-v5.csv",
+  "database": "afldb_v2_remnl_work_test",
+  "mode": "parse + execute",
+  "parserVersion": 67,
+  "concurrency": 4,
+  "ran": "2026-11-13T21:53:52.357Z",
+  "wallClockSeconds": 46,
+  "inputRows": 12000,
+  "auditRequired": 0,
+  "total": 12000,
+  "pass": 11997,
+  "softFail": 0,
+  "fail": 3,
+  "noResults": 2049,
+  "errors": 0,
+  "byClass": {
+    "WRONG_VERIFIED_ANSWER": 3,
+    "WRONG_VERIFIED_VALUE": 3
+  }
+}

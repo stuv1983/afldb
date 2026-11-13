@@ -1,0 +1,131 @@
+head=de640826d13489c58392563e7ae1ff62403ed293 dirty=20 db=afldb_v2_remnl_int5_test args=tests/integration/nl-
+isolated-pg: afldb_v2_remnl_int5_test verified (cluster afldb_v2_isolated, 127.0.0.1:55615); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem-nl-20261114/cand
+
+ ❯ tests/integration/nl-answers-relationships.test.ts (49 tests | 2 failed) 682ms
+     ✓ matches the populations measured on 2026-09-09 26ms
+     ✓ holds no parent_child row whose roles are anything but father -> son 2ms
+     ✓ holds sibling rows that are NOT brothers 2ms
+     × returns exactly the hand-written label-backed set 79ms
+     ✓ is never larger than the unsexed sibling set it must not be confused with 35ms
+     ✓ answers a pinned player as one row or none, never a leaderboard 4ms
+     ✓ the symmetric builder returns exactly the hand-written set 19ms
+     ✓ the father direction returns the SONS of a father who played 11ms
+     ✓ the son direction returns the FATHERS of a son who played 9ms
+     ✓ the two directions are different populations, and both sit inside the symmetric one 24ms
+     ✓ excludes a player whose father is UNLINKED (fails closed) 7ms
+     ✓ brother_of_player answers with the brother, not the subject 4ms
+     ✓ son_of_player and father_of_player are inverses of one another 10ms
+     ✓ matches hand-written SQL for every father of a father-son selection 4ms
+     ✓ keeps two same-named relatives apart by id 5ms
+     ✓ an unlinked relative is a name, and returns nobody 3ms
+     ✓ returns exactly the hand-written linked-father set 9ms
+     ✓ coincides with the role-typed parent_child fathers, today 14ms
+     ✓ ranks by career games without losing the relationship 8ms
+     × counts the whole qualifying set even when the rows are capped 16ms
+     ✓ is 99 players, and the builder agrees with a hand-written query 6ms
+     ✓ differs from has_afl_father by exactly the three unmatched-father witnesses 11ms
+     ✓ needs no games filter — every selected player has played 1ms
+     ✓ the father side is unchanged at 107 — the binding is symmetric, not a swap 7ms
+     ✓ folds a RENAME through organization lineage: the Bulldogs are one club 13ms
+     ✓ does NOT fold a merger: Fitzroy is not Brisbane 3ms
+     ✓ draft_year and the debut season are disjoint — 0 of 99 debut in their draft year 2ms
+     ✓ scopes to a draft year, and to that year alone 4ms
+     ✓ the denominator is 127 selection events, never the 99 linked players 38ms
+     ✓ groups by organization, one row per lineage 3ms
+     ✓ Carlton counts its selections, not its linked players 4ms
+     ✓ groups by DRAFT year, chronologically, and links no year to a season page 3ms
+     ✓ discloses the linked-player coverage without letting it become the denominator 2ms
+     ✓ is exactly Rhyce Shaw 6ms
+     ✓ the father side is 11 players, and they all actually coached 8ms
+     ✓ a linked coach identity is not enough — the coaching must have happened 2ms
+     ✓ same provenance: one source, one import batch 3ms
+     ✓ sons: neither side holds a player the other does not 2ms
+     ✓ fathers: neither side holds a player the other does not 2ms
+     ✓ pairs: neither side holds a (father, son) pair the other does not 2ms
+     ✓ one projection row per selection, and no more 1ms
+     ✓ no parent_child row carries a family_key, so the sibling board is unaffected 1ms
+     ✓ C1 "biggest football family" agrees with the existing /records/family board 45ms
+     ✓ C1 "most AFL players" ranks a DIFFERENT metric than "biggest" -- never the same phrasing 61ms
+     ✓ excludes every size-1 family, fail-closed (§4.6: 46 of them today) 44ms
+     ✓ C5 "families with three AFL players" matches an independently-filtered count 40ms
+     ✓ disambiguates the Ablett family by id: 4700 and 4701 both display "Gary Ablett" 38ms
+     ✓ every linked member is counted once, matching the independent oracle's own summary 24ms
+     ✓ validatePlan refuses a family plan carrying a club, season or player (no regression) 1ms
+ ✓ tests/integration/nl-semantic-mapping.test.ts (29 tests) 5624ms
+     ✓ ranks games played for the requested organization lineage rather than whole-career games  1639ms
+     ✓ an ordinary organization-backed answer works through the bare alias  1676ms
+ ✓ tests/integration/nl-answers.test.ts (33 tests) 7418ms
+     ✓ "most all-australian selections without a premiership" matches a hand-written award_winners count  1821ms
+     ✓ renders club appearances under the Games column, not the whole-career total  1163ms
+     ✓ keeps the club filter in the SQL when a career predicate is present  1445ms
+     ✓ "most clangers" (a live_only stat) matches a hand-written SUM over player_match_stats  2165ms
+ ✓ tests/integration/nl-answers-game-season.test.ts (24 tests) 5235ms
+     ✓ "most goals in a game" (unscoped) matches a hand-written MAX over player_match_stats  1272ms
+     ✓ "top 5 goals in a game" includes every hand-written top-5, with ties at the cutoff  1176ms
+     ✓ answers the review's exact opponent-scoped wording without discarding the opponent  414ms
+     ✓ a broad live_only season leaderboard pre-aggregates once instead of timing out  775ms
+ ✓ tests/integration/nl-answers-team-club.test.ts (36 tests) 4406ms
+     ✓ derives H2 from final minus half-time, never by summing cumulative Q3 and Q4 checkpoints  421ms
+     ✓ derives Q3 as the three-quarter checkpoint minus half-time  406ms
+     ✓ derives half-time margin from cumulative checkpoints  345ms
+     ✓ applies "but won" against the final result, not only the checkpoint leader  324ms
+ ✓ tests/integration/nl-search-telemetry-clear.test.ts (9 tests) 263ms
+ ✓ tests/integration/nl-answers-after-siren.test.ts (20 tests) 222ms
+ ✓ tests/integration/nl-answers-cross-domain.test.ts (22 tests) 537ms
+ ✓ tests/integration/nl-answers-first-kick-goal.test.ts (20 tests) 207ms
+ ✓ tests/integration/nl-answers-coaching.test.ts (23 tests) 2114ms
+     ✓ every decline row declines, or refuses honestly at validation  1000ms
+ ✓ tests/integration/nl-answer-boundary.test.ts (4 tests) 1379ms
+     ✓ returns an NlAnswer and logs no_results for a valid supported plan with zero rows  671ms
+     ✓ leaves the same semantic family unchanged when rows exist  598ms
+ ✓ tests/integration/nl-vocab.test.ts (5 tests) 58ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/nl-answers-relationships.test.ts > C2 — has_brother > returns exactly the hand-written label-backed set
+AssertionError: expected 660 to be 658 // Object.is equality
+
+- Expected
++ Received
+
+- 658
++ 660
+
+ ❯ tests/integration/nl-answers-relationships.test.ts:191:19
+    189|     `);
+    190|     expect(total).toBe(handWritten);
+    191|     expect(total).toBe(M_D1.hasBrother);
+       |                   ^
+    192|   });
+    193|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  tests/integration/nl-answers-relationships.test.ts > the list cap is disclosed, never silently applied > counts the whole qualifying set even when the rows are capped
+AssertionError: expected 660 to be 658 // Object.is equality
+
+- Expected
++ Received
+
+- 658
++ 660
+
+ ❯ tests/integration/nl-answers-relationships.test.ts:431:19
+    429|     const { rows, total } = await career(population('has_brother'), 10…
+    430|     expect(rows).toHaveLength(100);
+    431|     expect(total).toBe(M_D1.hasBrother);
+       |                   ^
+    432|     expect(total).toBeGreaterThan(rows.length);
+    433|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed | 11 passed (12)
+      Tests  2 failed | 272 passed (274)
+   Start at  09:12:51
+   Duration  35.60s (transform 1.41s, setup 656ms, import 3.92s, tests 28.14s, environment 3ms)
+
+rc=1

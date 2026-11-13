@@ -1,0 +1,102 @@
+head=de640826d13489c58392563e7ae1ff62403ed293 dirty=17 db=afldb_v2_remnl_int_test args=tests/integration/release-gates.test.ts -t club_match=both
+isolated-pg: afldb_v2_remnl_int_test verified (cluster afldb_v2_isolated, 127.0.0.1:55615); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem-nl-20261114/cand
+
+ ❯ tests/integration/release-gates.test.ts (67 tests | 1 failed | 66 skipped) 184ms
+     ↓ season votes total exactly 79,113
+     ↓ career totals sum to the authoritative total, not the per-game total
+     ↓ season-grain table cannot inflate the total
+     ↓ the club-grained table carries no award column at all
+     ↓ stores at most one season row per player
+     ↓ never reads the broken legacy career_brownlow column
+     ↓ reports representative career totals, resolved by profile identity
+     ↓ agrees with the canonical round votes for every career inside their coverage
+     ↓ distinguishes "no medal" from "polled nothing"
+     ↓ records a genuine zero for a player who polled none in a decided season
+     ↓ constrains votes and status so the two cannot disagree
+     ↓ publishes the three Brownlow grains separately
+     ↓ 50-199 goals and zero Brownlow votes returns the exact 261 players
+     ↓ debuted in the 1960s with exactly two clubs returns the exact 110 players
+     ↓ keeps the two Ron Barassis distinct
+     ↓ returns six distinct players named Peter Brown
+     ↓ returns more than one Ted Whitten
+     ↓ has 24 identities across 21 organizations
+     ↓ gives every club identity an organization
+     ↓ groups exactly the three renamed clubs into shared organizations
+     ↓ keeps Fitzroy, Brisbane Bears and University as separate organizations
+     ↓ records the merger as a navigable link without combining records
+     ↓ attaches every ladder row to the identity trading that season
+     ↓ resolves a season to exactly one identity per organization
+     ↓ prefers the narrower identity where spans nest
+     ↓ counts a rename once but a merger twice in clubs played
+     ↓ retains all 6,810 DraftGuru rows, including unresolved ones, plus durable manual selections
+     ↓ keeps the raw name on every row whether linked or not
+     ↓ retains exactly 5,057 draft persons
+     ↓ resolves identity once per person across 5,057 people
+     ↓ propagates a person link to every row of that person
+     ↓ refuses a trusted link that points at no player
+     ↓ separates genuine non-players from a real matching backlog
+     ↓ never flags a linked or non-playing person as backlog
+     ↓ records the backlog as open data issues
+     ↓ does not stack duplicate issues when a pass is re-run
+     ↓ keeps the source person key as the durable identity
+     ↓ keeps unknown attendance NULL rather than 0
+     ↓ records why each attendance is missing
+     ↓ does not infer empty pandemic crowds as zero
+     ↓ refuses a zero crowd that cites no source
+     ↓ refuses a status that disagrees with the figure
+     ↓ keeps era-limited statistics NULL before they were collected
+     ↓ populates 13,255 canonical dates with no conflicts
+     ↓ retains the existing date wherever a source disagrees
+     ↓ opens a data issue for every disputed date
+     ↓ keeps the evidence behind every recovered date
+     ↓ matches players on the profile URL rather than the name
+     ↓ stores the profile URL it matched on, not a legacy row id
+     ↓ keeps the same profile key on the evidence rows
+     ↓ never claims a date whose origin is unknown
+     ↓ leaves the remaining players honestly without a date
+     ↓ has two Grand Final rows in each replay season
+     ↓ resolves each replay season to exactly one premier
+     ↓ does not duplicate seasons when joining the premier
+     ↓ finds the drawn Grand Finals and nothing else
+     ↓ applies a range filter on both bounds
+     ↓ treats two clubs as either, not both
+     × club_match=both returns only the games between the two clubs 123ms
+     ↓ keeps the true total on a page past the last result
+     ↓ reconciles every returned scoreline with its components
+     ↓ sorts by the requested key
+     ↓ marks the season in progress with an explicit as-at date
+     ↓ reports 2026 Brownlow as pending, never as zero
+     ↓ awards no premier and no wooden spoon for 2026
+     ↓ preserves the raw ladder untouched in staging
+     ↓ is the only season still in progress
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/release-gates.test.ts > gate: Match Search > club_match=both returns only the games between the two clubs
+AssertionError: expected 5123 to be 270 // Object.is equality
+
+- Expected
++ Received
+
+- 270
++ 5123
+
+ ❯ tests/integration/release-gates.test.ts:1012:30
+    1010|           OR (h.slug = 'carlton' AND a.slug = 'collingwood')
+    1011|     `;
+    1012|     expect(headToHead.total).toBe(expected.n);
+       |                              ^
+    1013|     expect(headToHead.total).toBeGreaterThan(0);
+    1014|     expect(headToHead.total).toBeLessThan(either.total);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 66 skipped (67)
+   Start at  09:10:17
+   Duration  1.07s (transform 370ms, setup 158ms, import 405ms, tests 184ms, environment 0ms)
+
+rc=1

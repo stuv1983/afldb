@@ -1,0 +1,71 @@
+head=de640826d13489c58392563e7ae1ff62403ed293 dirty=17 db=afldb_v2_remnl_int_test args=tests/integration/nl-answers-team-club.test.ts -t drilldown caps
+isolated-pg: afldb_v2_remnl_int_test verified (cluster afldb_v2_isolated, 127.0.0.1:55615); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem-nl-20261114/cand
+
+ ❯ tests/integration/nl-answers-team-club.test.ts (36 tests | 1 failed | 35 skipped) 208ms
+     ↓ unscoped "biggest win ever" matches matches.margin (already the winner's advantage)
+     ↓ unscoped "biggest loss ever" matches the same margin distribution from the loser's side
+     ↓ a club-scoped biggest loss matches a hand-written per-club margin query
+     ↓ a venue-scoped highest score matches a hand-written per-venue query
+     ↓ "top 5 highest scores" includes every hand-written top-5, with ties at the cutoff
+     ↓ derives H2 from final minus half-time, never by summing cumulative Q3 and Q4 checkpoints
+     ↓ derives Q3 as the three-quarter checkpoint minus half-time
+     ↓ AFLDB-ISSUE-205: q3_deficit_overcome answers the biggest three-quarter-time deficit the eventual winner overcame
+     ↓ derives half-time margin from cumulative checkpoints
+     ↓ applies "but won" against the final result, not only the checkpoint leader
+     ↓ returns organization-level win counts for HAVING queries rather than one arbitrary match
+     ↓ counts every match in scope for a grouped games threshold (gt)
+     ↓ counts every match in scope for a grouped games threshold (gte)
+     ↓ counts every match in scope for a grouped games threshold (lte)
+     ↓ a grouped games count is not silently read as a draws count
+     ↓ filters 100-point losses before grouping and applying the requested count threshold
+     ↓ drilldown preserves and executes a combined complex predicate exact set
+     × drilldown caps the listed rows and discloses the true total 199ms
+       ↓ unscoped "highest attendance" returns distinct matchIds with total equal to the distinct count
+       ↓ unscoped "highest combined score" (total_score) returns each match once
+       ↓ "top 5" by total_score returns five distinct matches, not three matches in six rows
+       ↓ a clubFor-scoped total_score ranking still returns one row per that club's match (side-specific scope preserved)
+         ↓ matchup-scoped "biggest crowd" (attendance) returns the top-5 physical matches, not doubled perspective rows
+         ↓ matchup-scoped "highest combined score" (total_score) returns the top-5 physical matches, not doubled perspective rows
+         ↓ matchup scope cannot coexist with clubFor/clubAgainst (validatePlan rejects it, confirming matchup and side scope are mutually exclusive)
+       ↓ side-dependent metrics (team_score) are unaffected and keep ranking both sides
+     ↓ unscoped "most wins in a season" matches a hand-written MAX
+     ↓ a club-scoped percentage ranking matches a hand-written per-club MAX
+     ↓ "fewest wins by a premier" matches a hand-written MIN scoped to is_premier
+     ↓ "teams that won the wooden spoon" (a conditions-only list) matches a hand-written COUNT
+     ↓ "clubs that made finals" vs "missed finals" partition club_seasons with finals_played recorded
+     ↓ computes a club lineage winning streak across historical identity rows
+     ↓ a club that loses a Wildcard Final and plays no other final has finals_played = 0
+     ↓ that club answers "missed finals", and never "made finals"
+     ↓ shows 0 finals appearances on the club page for the wildcard loser
+     ↓ counts the wildcard winner's Elimination Final ONCE, not twice
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/nl-answers-team-club.test.ts > team_match matches hand-written SQL > drilldown caps the listed rows and discloses the true total
+AssertionError: expected 2721 to be 5 // Object.is equality
+
+- Expected
++ Received
+
+- 5
++ 2721
+
+ ❯ tests/integration/nl-answers-team-club.test.ts:497:32
+    495|
+    496|     const capped = await answerTeamAggregateDrilldown(plan, club.slug,…
+    497|     expect(capped.rows.length).toBe(5);
+       |                                ^
+    498|     expect(capped.total).toBe(full.total);
+    499|     expect(capped.rows.map((r) => r.matchId)).toEqual(full.rows.slice(…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 35 skipped (36)
+   Start at  09:10:14
+   Duration  1.19s (transform 478ms, setup 160ms, import 558ms, tests 208ms, environment 0ms)
+
+rc=1

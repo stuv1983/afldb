@@ -1,0 +1,13 @@
+head=ecc3403e4a0f623e17a12f9a7a6e3fcdbdf24298 dirty=0 db=afldb_v2_remnl_q2_test args=tests/integration/nl-answers-team-club.test.ts -t drilldown caps
+isolated-pg: afldb_v2_remnl_q2_test verified (cluster afldb_v2_isolated, 127.0.0.1:55615); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem-nl-20261114/qual
+
+ ✓ tests/integration/nl-answers-team-club.test.ts (36 tests | 35 skipped) 166ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 35 skipped (36)
+   Start at  09:23:12
+   Duration  1.13s (transform 473ms, setup 159ms, import 517ms, tests 166ms, environment 0ms)
+
+rc=0
