@@ -25,15 +25,46 @@
  */
 import './guard';
 
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 
 import { generateMetadata } from '@/app/clubs/compare/page';
 import {
+  clubComparePairGate,
+  COMPARE_MAX_CONCURRENT_DEFAULT,
   resolveClubComparisonMetadata,
   resolveClubComparisonState,
 } from '@/app/clubs/compare/state';
 import { sql } from '@/db/client';
 import { MEETINGS_PAGE_SIZE } from '@/db/queries/club-comparison';
+
+/**
+ * AFLDB-ISSUE-361 (FE-6) instrumentation: a transparent pass-through around the pair loaders that
+ * counts how many are in flight at once. Nothing here changes what any loader returns.
+ */
+const loaders = vi.hoisted(() => ({ current: 0, peak: 0 }));
+vi.mock('@/db/queries/club-comparison', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/db/queries/club-comparison')>();
+  const names = [
+    'getHeadToHeadSummary', 'getHeadToHeadVenueRecords', 'getHeadToHeadStreaks', 'getCrossoverSummary',
+    'getCrossoverPlayers', 'getHeadToHeadPlayerLeaders', 'getHeadToHeadBrownlow', 'getClubBrownlowHistory',
+    'getHeadToHeadByDecade', 'getHeadToHeadPeriodRecords', 'getHeadToHeadPlayerAverages',
+    'getHeadToHeadRecords', 'getHeadToHeadMeetings',
+  ] as const;
+  const wrapped: Record<string, unknown> = { ...actual };
+  for (const name of names) {
+    const original = actual[name] as (...args: unknown[]) => Promise<unknown>;
+    wrapped[name] = async (...args: unknown[]) => {
+      loaders.current += 1;
+      loaders.peak = Math.max(loaders.peak, loaders.current);
+      try {
+        return await original(...args);
+      } finally {
+        loaders.current -= 1;
+      }
+    };
+  }
+  return wrapped;
+});
 
 afterAll(async () => {
   await sql.end();
@@ -499,4 +530,36 @@ describe('Stage 9 club page comparison seed', () => {
       expect(state.kind, `${club.slug} seeds ${club.seed}`).toBe('unselected');
     }
   });
+});
+
+/**
+ * AFLDB-ISSUE-361 (FE-6) — simultaneous comparisons are bounded, and bounding them changes no result.
+ *
+ * One comparison starts twelve loaders at once (two more follow), each issuing several statements.
+ * Ungated, N simultaneous comparisons start 12 x N loaders and queue their statements ahead of every
+ * unrelated page's query on the ten-connection pool. The pair gate lets only `limit` comparisons
+ * load at a time. Oracle: the same pair resolved on its own (relational, no snapshot literal), so it
+ * holds on the production-derived snapshot and on the rebuilt afldb_test alike.
+ */
+describe('AFLDB-ISSUE-361 pair comparisons are bounded and unchanged', () => {
+  const LOADERS_PER_COMPARISON = 12;
+
+  it('loads at most the default number of comparisons at once and returns what a lone load returns', async () => {
+    const params = { club1: 'carlton', club2: 'collingwood' };
+
+    const alone = await resolveClubComparisonState(params);
+    if (alone.kind !== 'comparison') throw new Error('the pair must resolve');
+
+    loaders.peak = 0;
+    const many = await Promise.all(Array.from({ length: 6 }, () => resolveClubComparisonState(params)));
+
+    for (const state of many) {
+      if (state.kind !== 'comparison') throw new Error('every concurrent load must resolve');
+      expect(state.data).toEqual(alone.data);
+      expect(state.notices).toEqual(alone.notices);
+    }
+    expect(loaders.peak).toBeLessThanOrEqual(COMPARE_MAX_CONCURRENT_DEFAULT * LOADERS_PER_COMPARISON);
+    expect(loaders.peak).toBeGreaterThanOrEqual(LOADERS_PER_COMPARISON);
+    expect(clubComparePairGate.stats()).toMatchObject({ active: 0, waiting: 0 });
+  }, 120_000);
 });

@@ -60,7 +60,24 @@ import {
   clubComparePath,
   isMatchType,
 } from '@/lib/club-comparison-url';
+import { createConcurrencyGate, gateLimitFromEnv } from '@/lib/concurrency-gate';
 import { firstValue, parsePage, parseSlug } from '@/lib/params';
+
+/**
+ * How many pair comparisons one server process loads at once.
+ *
+ * One comparison issues about thirty statements (a dozen composite queries, six
+ * of them per club for Brownlow history) against a pool of ten connections.
+ * Unbounded, a handful of simultaneous comparisons queue hundreds of statements
+ * and an unrelated page's single query waits behind all of them (AFLDB-ISSUE-361,
+ * FE-6). Excess comparisons wait here, holding no connection, and run in arrival
+ * order. Results are unchanged: only when each comparison starts moves.
+ * `AFLDB_COMPARE_MAX_CONCURRENT=0` disables the gate.
+ */
+export const COMPARE_MAX_CONCURRENT_DEFAULT = 2;
+export const clubComparePairGate = createConcurrencyGate(
+  gateLimitFromEnv(process.env.AFLDB_COMPARE_MAX_CONCURRENT, COMPARE_MAX_CONCURRENT_DEFAULT),
+);
 
 export type RawSearchParams = Record<string, string | string[] | undefined>;
 
@@ -288,96 +305,102 @@ export async function resolveClubComparisonState(
   const a = organizationA.id;
   const b = organizationB.id;
 
-  // 4. Everything that does not depend on `era` runs at once, INCLUDING
-  //    the decade breakdown -- it is the pair's own era population, and
-  //    an `era` in the URL cannot be told legitimate from invented
-  //    without it. This is the one way this composition differs from the
-  //    Stage 5 route-equivalent shape it otherwise matches.
-  const [
-    summary,
-    venues,
-    streaks,
-    crossoverSummary,
-    crossoverPlayers,
-    playerLeaders,
-    h2hBrownlow,
-    brownlowA,
-    brownlowB,
-    decades,
-    periodRecords,
-    playerAverages,
-  ] = await Promise.all([
-    getHeadToHeadSummary(a, b),
-    getHeadToHeadVenueRecords(a, b),
-    getHeadToHeadStreaks(a, b),
-    getCrossoverSummary(a, b),
-    getCrossoverPlayers(a, b),
-    getHeadToHeadPlayerLeaders(a, b),
-    getHeadToHeadBrownlow(a, b),
-    getClubBrownlowHistory(a),
-    getClubBrownlowHistory(b),
-    getHeadToHeadByDecade(a, b),
-    getHeadToHeadPeriodRecords(a, b),
-    getHeadToHeadPlayerAverages(a, b),
-  ]);
-
-  // 5. An `era` is legitimate only when it names one of this pair's own
-  //    decades -- never a hard-coded list, and never a decade the two
-  //    organisations simply never met in. A reader who hand-edits the
-  //    URL to an era outside this rivalry's history is owed the sentence
-  //    explaining that, exactly as an invalid matchType or page is.
-  let era: number | null = null;
-  if (parsed.rawEra !== undefined) {
-    if (parsed.era !== null && decades.some((decade) => decade.decade === parsed.era)) {
-      era = parsed.era;
-    } else {
-      notices.push({
-        field: 'era',
-        message: 'That era is not part of this rivalry’s recorded history; showing all time.',
-      });
-    }
-  }
-
-  const effectiveParams: ComparisonEffectiveParams = { ...params, era };
-
-  // 6. Only rivalry records and the meetings list are ever era-scoped
-  //    (FR-2's contract): streaks, venues, players and Brownlow above are
-  //    already resolved all-time and are never recomputed for an era.
-  const [records, meetings] = await Promise.all([
-    getHeadToHeadRecords(a, b, { era: era ?? undefined }),
-    getHeadToHeadMeetings(a, b, {
-      matchType: effectiveParams.matchType,
-      page: effectiveParams.page,
-      era: era ?? undefined,
-    }),
-  ]);
-
-  return {
-    ...base,
-    kind: 'comparison',
-    params: effectiveParams,
-    sharePath: clubComparePath(effectiveParams),
-    organizationA,
-    organizationB,
-    canonicalPath: canonicalClubComparePath(organizationA.slug, organizationB.slug),
-    noindex: false,
-    data: {
+  // Hold a slot for the whole pair load, not per query: see clubComparePairGate.
+  const releaseSlot = await clubComparePairGate.acquire();
+  try {
+    // 4. Everything that does not depend on `era` runs at once, INCLUDING
+    //    the decade breakdown -- it is the pair's own era population, and
+    //    an `era` in the URL cannot be told legitimate from invented
+    //    without it. This is the one way this composition differs from the
+    //    Stage 5 route-equivalent shape it otherwise matches.
+    const [
       summary,
-      meetings,
       venues,
-      records,
       streaks,
       crossoverSummary,
       crossoverPlayers,
       playerLeaders,
+      h2hBrownlow,
       brownlowA,
       brownlowB,
-      h2hBrownlow,
       decades,
       periodRecords,
       playerAverages,
-    },
-  };
+    ] = await Promise.all([
+      getHeadToHeadSummary(a, b),
+      getHeadToHeadVenueRecords(a, b),
+      getHeadToHeadStreaks(a, b),
+      getCrossoverSummary(a, b),
+      getCrossoverPlayers(a, b),
+      getHeadToHeadPlayerLeaders(a, b),
+      getHeadToHeadBrownlow(a, b),
+      getClubBrownlowHistory(a),
+      getClubBrownlowHistory(b),
+      getHeadToHeadByDecade(a, b),
+      getHeadToHeadPeriodRecords(a, b),
+      getHeadToHeadPlayerAverages(a, b),
+    ]);
+
+    // 5. An `era` is legitimate only when it names one of this pair's own
+    //    decades -- never a hard-coded list, and never a decade the two
+    //    organisations simply never met in. A reader who hand-edits the
+    //    URL to an era outside this rivalry's history is owed the sentence
+    //    explaining that, exactly as an invalid matchType or page is.
+    let era: number | null = null;
+    if (parsed.rawEra !== undefined) {
+      if (parsed.era !== null && decades.some((decade) => decade.decade === parsed.era)) {
+        era = parsed.era;
+      } else {
+        notices.push({
+          field: 'era',
+          message: 'That era is not part of this rivalry’s recorded history; showing all time.',
+        });
+      }
+    }
+
+    const effectiveParams: ComparisonEffectiveParams = { ...params, era };
+
+    // 6. Only rivalry records and the meetings list are ever era-scoped
+    //    (FR-2's contract): streaks, venues, players and Brownlow above are
+    //    already resolved all-time and are never recomputed for an era.
+    const [records, meetings] = await Promise.all([
+      getHeadToHeadRecords(a, b, { era: era ?? undefined }),
+      getHeadToHeadMeetings(a, b, {
+        matchType: effectiveParams.matchType,
+        page: effectiveParams.page,
+        era: era ?? undefined,
+      }),
+    ]);
+
+    return {
+      ...base,
+      kind: 'comparison',
+      params: effectiveParams,
+      sharePath: clubComparePath(effectiveParams),
+      organizationA,
+      organizationB,
+      canonicalPath: canonicalClubComparePath(organizationA.slug, organizationB.slug),
+      noindex: false,
+      data: {
+        summary,
+        meetings,
+        venues,
+        records,
+        streaks,
+        crossoverSummary,
+        crossoverPlayers,
+        playerLeaders,
+        brownlowA,
+        brownlowB,
+        h2hBrownlow,
+        decades,
+        periodRecords,
+        playerAverages,
+      },
+    };
+  } finally {
+    releaseSlot();
+  }
 }
 
 export type ClubComparisonMetadataState = {

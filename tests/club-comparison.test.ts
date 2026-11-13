@@ -8,6 +8,8 @@
  */
 import { describe, expect, it } from 'vitest';
 
+import { createConcurrencyGate, gateLimitFromEnv } from '@/lib/concurrency-gate';
+
 import {
   CLUB_COMPARE_PATH,
   canonicalClubComparePath,
@@ -116,5 +118,70 @@ describe('AFLDB-ISSUE-144 Stage 7: pagination base parameters', () => {
   it('drops an absent era', () => {
     expect(clubCompareBaseParams({ club1: 'carlton', club2: 'collingwood' }))
       .toEqual({ club1: 'carlton', club2: 'collingwood', matchType: undefined, era: undefined });
+  });
+});
+
+describe('AFLDB-ISSUE-361 (FE-6): the concurrency gate behind pair comparisons', () => {
+  const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
+
+  it('never runs more than its limit at once and runs every task in arrival order', async () => {
+    const gate = createConcurrencyGate(2);
+    let running = 0;
+    let highest = 0;
+    const started: number[] = [];
+    const tasks = Array.from({ length: 7 }, (_, i) => gate.run(async () => {
+      started.push(i);
+      running += 1;
+      highest = Math.max(highest, running);
+      for (let n = 0; n < 3; n += 1) await tick();
+      running -= 1;
+      return i * 10;
+    }));
+    expect(await Promise.all(tasks)).toEqual([0, 10, 20, 30, 40, 50, 60]);
+    expect(highest).toBe(2);
+    expect(started).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    expect(gate.stats()).toEqual({ active: 0, waiting: 0, peakActive: 2 });
+  });
+
+  it('gives the slot back when a task rejects, and passes the rejection on', async () => {
+    const gate = createConcurrencyGate(1);
+    const failing = gate.run(async () => { throw new Error('boom'); });
+    const next = gate.run(async () => 'after');
+    await expect(failing).rejects.toThrow('boom');
+    await expect(next).resolves.toBe('after');
+    expect(gate.stats().active).toBe(0);
+  });
+
+  it('releases a slot once even when the release function is called twice', async () => {
+    const gate = createConcurrencyGate(1);
+    const release = await gate.acquire();
+    const waiter = gate.acquire();
+    release();
+    release();
+    const second = await waiter;
+    const third = gate.acquire();
+    await tick();
+    expect(gate.stats()).toEqual({ active: 1, waiting: 1, peakActive: 1 });
+    second();
+    (await third)();
+    expect(gate.stats().active).toBe(0);
+  });
+
+  it('treats a limit of 0 as ungated', async () => {
+    const gate = createConcurrencyGate(0);
+    const releases = await Promise.all(Array.from({ length: 5 }, () => gate.acquire()));
+    expect(gate.stats()).toEqual({ active: 5, waiting: 0, peakActive: 5 });
+    for (const release of releases) release();
+    expect(gate.limit).toBe(0);
+  });
+
+  it('reads the environment limit: blank or junk fall back, 0 disables', () => {
+    expect(gateLimitFromEnv(undefined, 2)).toBe(2);
+    expect(gateLimitFromEnv('  ', 2)).toBe(2);
+    expect(gateLimitFromEnv('abc', 2)).toBe(2);
+    expect(gateLimitFromEnv('-1', 2)).toBe(2);
+    expect(gateLimitFromEnv('1.5', 2)).toBe(2);
+    expect(gateLimitFromEnv('0', 2)).toBe(0);
+    expect(gateLimitFromEnv('4', 2)).toBe(4);
   });
 });
