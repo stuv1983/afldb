@@ -1,0 +1,48 @@
+[Unit]
+Description=AFLDB — record the failure of %i (notifier; never a retry)
+Documentation=https://github.com/afldb
+# AFLDB-ISSUE-332 (OPS-4). Started only by deploy/afldb-settle-afl-api.service.d/on-failure.conf (OnFailure=), which is
+# a SEPARATE drop-in that no installer or sync path copies: installing this template does nothing until the owner
+# installs that drop-in, in that order (this unit first, then the drop-in, then `systemctl daemon-reload`).
+
+[Service]
+Type=oneshot
+User=arm
+Group=arm
+WorkingDirectory=/home/arm/projects/afldb
+
+# The marker directory: /var/lib/afldb-settle-failure, created and owned by arm by systemd; passed to the script as
+# STATE_DIRECTORY. It is the only writable path.
+StateDirectory=afldb-settle-failure
+StateDirectoryMode=0750
+
+# One short shell script, no database, no network, no credential: it validates the instance name, writes a marker and
+# appends a line. No EnvironmentFile= on purpose (the settle .env holds the import DSN); the optional transport hook is
+# set, if ever, by a separate owner-installed drop-in, never here.
+ExecStart=/bin/sh /home/arm/projects/afldb/deploy/afldb-settle-failure-notify.sh %i
+TimeoutStartSec=60
+Nice=10
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=afldb-settle-failure
+
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+PrivateNetwork=true
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictAddressFamilies=AF_UNIX
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
