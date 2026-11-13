@@ -7590,15 +7590,32 @@ describe('AFLDB-ISSUE-250 — the promotion freeze', () => {
     });
 
     it('restore-test.sh hashes before restoring, clears first, and binds only after parity passes', () => {
-      const script = readFileSync(join(REPO, 'tools', 'maintenance', 'restore-test.sh'), 'utf8');
+      const script = readFileSync(join(REPO, 'tools', 'maintenance', 'restore-test.sh'), 'utf8').replace(/\r\n/g, '\n');
+      // ISSUE-341/342 emit the marker statements through printf (the identity guard shares their psql
+      // session); ISSUE-358 re-pinned the ISSUE-250 order on those literals, not on the earlier inline SQL.
       const hash = script.indexOf('BACKUP_SHA256=$(sha256sum "$BACKUP"');
-      const clear = script.indexOf('COMMENT ON DATABASE ${RESTORE_DB} IS NULL');
-      const restore = script.indexOf('pg_restore \\');
-      const bind = script.indexOf("COMMENT ON DATABASE ${RESTORE_DB} IS 'afldb.restore_test.v1 sha256=${BACKUP_SHA256}'");
+      const clearLiteral = String.raw`printf 'COMMENT ON DATABASE %s IS NULL;\n' "$RESTORE_DB"`;
+      const bindLiteral = String.raw`printf "COMMENT ON DATABASE %s IS 'afldb.restore_test.v1 sha256=%s';\n" "$RESTORE_DB" "$BACKUP_SHA256"`;
+      const clear = script.indexOf(clearLiteral);
+      const restore = script.indexOf('pg_restore \\\n');
+      const bind = script.indexOf(bindLiteral);
       expect(hash).toBeGreaterThan(0);
+      expect(clear).toBeGreaterThan(0);
+      expect(restore).toBeGreaterThan(0);
+      expect(bind).toBeGreaterThan(0);
+      // Each marker statement is written exactly once.
+      expect(script.split(clearLiteral)).toHaveLength(2);
+      expect(script.split(bindLiteral)).toHaveLength(2);
       expect(hash).toBeLessThan(clear);
       expect(clear).toBeLessThan(restore);
       expect(restore).toBeLessThan(bind);
+      // ISSUE-341: the identity guard is the first statement of the same psql stream as the clear and the bind.
+      const clearGuard = script.lastIndexOf('identity_guard_sql\n', clear);
+      const bindGuard = script.lastIndexOf('identity_guard_sql\n', bind);
+      expect(clearGuard).toBeGreaterThan(hash);
+      expect(clear - clearGuard).toBeLessThan(60);
+      expect(bindGuard).toBeGreaterThan(restore);
+      expect(bind - bindGuard).toBeLessThan(200);
       expect(bind).toBeGreaterThan(script.indexOf('if [[ $FAILED -eq 0 ]]; then'));
       expect(bind).toBeLessThan(script.indexOf('Restore verified: the backup is proven.'));
       // The literal the script writes is exactly what the checker parses.
