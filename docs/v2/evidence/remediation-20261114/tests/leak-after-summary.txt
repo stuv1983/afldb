@@ -1,0 +1,13 @@
+== [after] before: PROBE {"seasons_ge_2060":[],"issue099_matches":0}
+== [after] fixture season 2076 seen before kill: 1; killed pids: 457154 457156 457181 
+== [after] after SIGKILL: PROBE {"seasons_ge_2060":[{"year":2076,"status":"in_progress"}],"issue099_matches":1}
+== [after] admin-season-lists:  Tests 42 skipped (42)
+     Error: Committed fixture season(s) left in the test database by an interrupted earlier run: 2076 (in_progress; reserved by tests/integration/settle-afltables.test.ts). This suite reads the whole seasons table and cannot pass with them present. Re-run the owning suite alone (it pre-cleans in beforeAll and removes its fixtures in 
+          62|     'Committed fixture season(s) left in the test database by an inter…
+== [after] release-gates:  Tests 66 skipped (66)
+     Error: Committed fixture season(s) left in the test database by an interrupted earlier run: 2076 (in_progress; reserved by tests/integration/settle-afltables.test.ts). This suite reads the whole seasons table and cannot pass with them present. Re-run the owning suite alone (it pre-cleans in beforeAll and removes its fixtures in 
+          62|     'Committed fixture season(s) left in the test database by an inter…
+== [after] recovery (settle alone, pre-cleans):  Tests 85 passed (85)
+== [after] after recovery: PROBE {"seasons_ge_2060":[],"issue099_matches":0}
+== [after] admin-season-lists after recovery:  Tests 42 passed (42)
+== [after] release-gates after recovery:  Tests 8 failed | 51 passed | 7 skipped (66) ; leak message present: 0

@@ -1,0 +1,19 @@
+== unit (no DB variables): beta-verify, nl-feedback, player-link-mutations
+ Test Files  3 passed (3)
+      Tests  257 passed (257)
+== int venue-records on fresh copy afldb_v2_remtests_fin1_test:  Test Files 1 passed (1) /  Tests 15 passed (15)
+== int player-matching on fresh copy afldb_v2_remtests_fin2_test:  Test Files 1 passed (1) /  Tests 23 passed (23)
+== int club-coach-records on fresh copy afldb_v2_remtests_fin3_test:  Test Files 1 passed (1) /  Tests 9 passed (9)
+== int settle-afltables on fresh copy afldb_v2_remtests_fin4_test:  Test Files 1 passed (1) /  Tests 85 passed (85)
+== int admin-season-lists on fresh copy afldb_v2_remtests_fin5_test:  Test Files 1 passed (1) /  Tests 42 passed (42)
+== int release-gates on fresh copy afldb_v2_remtests_fin6_test:  Test Files 1 failed (1) /  Tests 8 failed | 51 passed | 7 skipped (66)
+== release-gates failing tests (snapshot-pinned classification):
+     × agrees with the canonical round votes for every career inside their coverage
+     × 50-199 goals and zero Brownlow votes returns the exact 261 players
+     × attaches every ladder row to the identity trading that season
+     × records why each attendance is missing
+     × leaves the remaining players honestly without a date
+     × reports 2026 Brownlow as pending, never as zero
+     × awards no premier and no wooden spoon for 2026
+     × is the only season still in progress
+FINAL-DONE

@@ -1,0 +1,20 @@
+MUTATION V1-highest-attendance-no-longer-excludes-NULL: Tests  2 failed | 13 passed (15)
+    × attendance and score records re-derive from the raw table; NULL attendance never wins 51ms
+    × a genuine recorded attendance of 0 is a valid minimum, and an unrecorded crowd is neither minimum nor maximum 710ms
+    AssertionError: expected null to be 121696 // Object.is equality
+    AssertionError: expected null to be 1500 // Object.is equality
+MUTATION V2-recorded-zero-treated-as-unrecorded: Tests  1 failed | 14 passed (15)
+    × a genuine recorded attendance of 0 is a valid minimum, and an unrecorded crowd is neither minimum nor maximum 164ms
+    AssertionError: expected 1500 to be +0 // Object.is equality
+isolated-pg: afldb_v2_remtests_m4b3_test verified (cluster afldb_v2_isolated, 127.0.0.1:55612); running node
+MUTATION P1-normaliser-keeps-apostrophes: Tests  5 failed | 18 passed (23)
+    × canonicalises U+00A0 to an ordinary space 20ms
+    × canonicalises the other Unicode space separators the same way 2ms
+    × keeps every behaviour migrations 008 and 009 established 3ms
+    × collapses and trims whitespace deterministically, Unicode included 2ms
+MUTATION C1-club-record-no-longer-scoped-to-the-club: Tests  7 failed | 2 passed (9)
+    × Richmond: every row is games = W + D + L and agrees with independent scoreline truth 137ms
+    × a coach who also coached another club contributes only their matches for this club 81ms
+    × a coach who never coached this club is absent 98ms
+    × separate periods in charge for one coach at one club aggregate into a single row 109ms
+src dirty after run: ""

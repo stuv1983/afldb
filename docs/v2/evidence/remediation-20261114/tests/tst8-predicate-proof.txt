@@ -1,0 +1,11 @@
+PASS corrected=true (expected true) legacy=true  recorded production detail: "https://beta.afldb.com/beta?from=%2Fdraft"
+PASS corrected=true (expected true) legacy=true  recorded DEV detail: "http://10.0.40.100:8090/beta?from=%2Fdraft"
+PASS corrected=true (expected true) legacy=true  relative gate redirect: "/beta?from=%2Fdraft"
+PASS corrected=true (expected true) legacy=true  gate page without query: "https://beta.afldb.com/beta"
+PASS corrected=false (expected false) legacy=true [LEGACY WRONG]  canonical-host redirect that is NOT the gate: "https://beta.afldb.com/draft"
+PASS corrected=false (expected false) legacy=true [LEGACY WRONG]  the magic-link verifier is not the gate page: "https://beta.afldb.com/beta/verify"
+PASS corrected=false (expected false) legacy=true [LEGACY WRONG]  other origin with a /beta path: "https://evil.example/beta"
+PASS corrected=false (expected false) legacy=true [LEGACY WRONG]  lookalike host: "https://beta.afldb.com.evil.example/beta"
+PASS corrected=false (expected false) legacy=false  empty header: ""
+PASS corrected=false (expected false) legacy=false  garbage header: "http://[::1"
+ALL CORRECTED-PREDICATE CASES PASS

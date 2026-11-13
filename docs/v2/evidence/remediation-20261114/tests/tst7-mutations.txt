@@ -1,0 +1,47 @@
+MUTATION M1-safeDestination-only-rejects-double-slash [src/app/beta/actions.ts] vitest exit=1: Tests  6 failed | 34 passed (40)
+    × admits the visitor but refuses a backslash folded to // as a destination: lands on / 11ms
+    × admits the visitor but refuses a leading backslash as a destination: lands on / 3ms
+    × admits the visitor but refuses an absolute URL as a destination: lands on / 1ms
+MUTATION M2-safeDestination-no-control-char-check [src/app/beta/actions.ts] vitest exit=1: Tests  3 failed | 37 passed (40)
+    × admits the visitor but refuses a path carrying a CR/LF (header splitting) as a destination: lands on / 13ms
+    × admits the visitor but refuses a path carrying a tab as a destination: lands on / 3ms
+    × admits the visitor but refuses a path carrying DEL as a destination: lands on / 2ms
+MUTATION M3-redeem-drops-NULL-unlimited-predicate [src/app/beta/actions.ts] vitest exit=1: Tests  1 failed | 39 passed (40)
+    × spends a live code once, audits it, grants code:<id> access and lands on the requested internal path 16ms
+    FAIL  tests/beta-verify.test.ts > redeemAccessCode (the code door) > spends a live code once, audits it, grants code:<id> access and lands on the requested internal path
+MUTATION M4-redeem-binds-plaintext-code [src/app/beta/actions.ts] vitest exit=1: Tests  1 failed | 39 passed (40)
+    × spends a live code once, audits it, grants code:<id> access and lands on the requested internal path 15ms
+    FAIL  tests/beta-verify.test.ts > redeemAccessCode (the code door) > spends a live code once, audits it, grants code:<id> access and lands on the requested internal path
+MUTATION M5-magic-link-stores-plaintext-token [src/app/beta/actions.ts] vitest exit=1: Tests  2 failed | 38 passed (40)
+    × for an allowlisted address stores only the HASH of the token, mails the link, audits delivery, and says "sent" 18ms
+    × prints the link to the dev log when nothing is configured outside production (the operator hands it on) 3ms
+    FAIL  tests/beta-verify.test.ts > requestMagicLink (the allowlisted-email door) > for an allowlisted address stores only the HASH of the token, mails the link, audits del
+MUTATION M6-magic-link-reveals-allowlist-membership [src/app/beta/actions.ts] vitest exit=1: Tests  1 failed | 39 passed (40)
+    × for an address that is not on the list sends nothing and stores nothing, yet returns the identical response 17ms
+    FAIL  tests/beta-verify.test.ts > requestMagicLink (the allowlisted-email door) > for an address that is not on the list sends nothing and stores nothing, yet returns the
+MUTATION M7-redeem-limit-keyed-on-code-content [src/app/beta/actions.ts] vitest exit=1: Tests  5 failed | 35 passed (40)
+    × admits the visitor but refuses an empty string as a destination: lands on / 13ms
+    × lands on / when no destination, or a non-string destination (a file part), is supplied 2ms
+    × keeps a legitimate nested path with a query and fragment intact 2ms
+MUTATION M8-join-name-uncapped [src/app/beta/actions.ts] vitest exit=1: Tests  1 failed | 39 passed (40)
+    × queues a pending row with trimmed, length-capped fields and the caller address, audits it, and never admits anyone 13ms
+    FAIL  tests/beta-verify.test.ts > requestJoin (the ask-to-join door) > queues a pending row with trimmed, length-capped fields and the caller address, audits it, and neve
+MUTATION M13-magic-link-opens-an-outbound-dns-lookup [src/app/beta/actions.ts] vitest exit=1: Tests  6 failed | 34 passed (40)
+    × for an allowlisted address stores only the HASH of the token, mails the link, audits delivery, and says "sent" 33ms
+    × for an address that is not on the list sends nothing and stores nothing, yet returns the identical response 6ms
+    × withholds the live link from the production log when the relay refuses, but reports the failure 4ms
+MUTATION M9-decline-keeps-nl_sid [src/app/consent-action.ts] vitest exit=1: Tests  1 failed | 41 passed (42)
+    × records "declined" and DELETES an existing nl_sid, path-qualified, so decline does not mean "eventually" 10ms
+    FAIL  tests/nl-feedback.test.ts > setConsent (the banner server action, AFLDB-ISSUE-363 TST-7) > records "declined" and DELETES an existing nl_sid, path-qualified, so dec
+MUTATION M10-consent-accepts-any-value [src/app/consent-action.ts] vitest exit=1: Tests  8 failed | 34 passed (42)
+    × writes nothing and deletes nothing for the non-choice "" 9ms
+    × writes nothing and deletes nothing for the non-choice "dismissed" 2ms
+    × writes nothing and deletes nothing for the non-choice "ACCEPTED" 1ms
+MUTATION M11-suggestion-limiter-bypassed [src/app/player-link-suggestion-action.ts] vitest exit=1: Tests  2 failed | 173 passed (175)
+    × is anonymous: it reads no admin session and needs no capability 21ms
+    × rate-limits per caller: tip 13 inside the window is refused and written nowhere; another caller is unaffected 8ms
+    FAIL  tests/player-link-mutations.test.ts > submitPlayerLinkSuggestion: the anonymous public tip (AFLDB-ISSUE-363 TST-7) > is anonymous: it reads no admin session and nee
+MUTATION M12-suggestion-surfaces-storage-failure [src/app/player-link-suggestion-action.ts] vitest exit=1: Tests  1 failed | 174 passed (175)
+    × still thanks the reader when storage fails, and logs the failure server-side 26ms
+    FAIL  tests/player-link-mutations.test.ts > submitPlayerLinkSuggestion: the anonymous public tip (AFLDB-ISSUE-363 TST-7) > still thanks the reader when storage fails, and
+src dirty after run: ""

@@ -1,0 +1,10 @@
+== [before] before: PROBE {"seasons_ge_2060":[],"issue099_matches":0}
+== [before] fixture season 2094 seen before kill: 1; killed pids: 466439 466441 466485 
+== [before] after SIGKILL: PROBE {"seasons_ge_2060":[{"year":2094,"status":"in_progress"}],"issue099_matches":1}
+== [before] admin-season-lists:  Tests 1 failed | 41 passed (42)
+     AssertionError: 2094: expected true to be false // Object.is equality
+== [before] release-gates:  Tests 9 failed | 50 passed | 7 skipped (66)
+     AssertionError: expected 183 to be +0 // Object.is equality
+     AssertionError: expected 268 to be 261 // Object.is equality
+     AssertionError: expected { slug: 'western-bulldogs', …(3) } to match object { from: 1997, to: 2025 }
+     AssertionError: expected [ …(2) ] to deeply equal [ …(2) ]
