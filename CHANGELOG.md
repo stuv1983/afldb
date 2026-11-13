@@ -15,6 +15,10 @@ commit.
 
 ## [Unreleased]
 
+### ISSUE-336 resolved: D-336-2 verified on production (2026-11-13)
+
+- Read-only Step G: production's DraftGuru draft rows reconcile 5,966 = 5,966 with the owner CSVs (only the 187 D-336-3 origins differ, kept by decision and carried by ISSUE-348), and `/draft/2008`, `/draft/2025` and `/draft/2009?view=pre-draft` show the inserted unnumbered Pre-Draft rows (4, 4 and 36) on desktop and mobile with the beta gate still on. ISSUE-336 is resolved. Evidence `docs/v2/evidence/issue336-d3362-stepg-20261113/`.
+
 ### ISSUE-336 D-336-2: the 35 missing Pre-Draft rows inserted on production (2026-11-12)
 
 - Production `draft_picks` gained the 35 reviewed DraftGuru Pre-Draft rows (draft years 2008–2025), with 31 new unmatched `draft_persons` and one `data_edits` audit row per pick as actor 1 (seal `audited_correction`). Applied once in the owner's OD-4 window as plan `afa26158…f608`; COMMITTED_VERIFIED and ACCEPTED. Evidence `docs/v2/evidence/issue336-d3362-apply-20261112/`.

@@ -1,0 +1,426 @@
+{
+  "at": "2026-11-13T02:30:17.544Z",
+  "base": "https://beta.afldb.com",
+  "viewports": [
+    "1280x800",
+    "390x844"
+  ],
+  "checks": [
+    {
+      "name": "desktop /draft/2008 authenticated HTTP 200",
+      "ok": false,
+      "detail": "200"
+    },
+    {
+      "name": "desktop 2008 Pre-Draft HTTP 200",
+      "ok": true,
+      "detail": "200"
+    },
+    {
+      "name": "desktop 2008 Pre-Draft tab/count",
+      "ok": true,
+      "detail": "Pre-Draft\n4"
+    },
+    {
+      "name": "desktop 2008 row count matches production",
+      "ok": true,
+      "detail": "4"
+    },
+    {
+      "name": "desktop 2008 inserted Solomoni Loki",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop 2008 inserted Amua Pirika",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop 2008 inserted Inoke Ratu",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop 2008 inserted Stanis Susuve",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop 2008 Pre-Draft is unnumbered",
+      "ok": true,
+      "detail": "Unnumbered | Unnumbered | Unnumbered | Unnumbered"
+    },
+    {
+      "name": "desktop 2008 no horizontal overflow",
+      "ok": true,
+      "detail": "-15"
+    },
+    {
+      "name": "desktop 2008 no rendered error",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop /draft/2025 authenticated HTTP 200",
+      "ok": false,
+      "detail": "200"
+    },
+    {
+      "name": "desktop 2025 Pre-Draft HTTP 200",
+      "ok": true,
+      "detail": "200"
+    },
+    {
+      "name": "desktop 2025 Pre-Draft tab/count",
+      "ok": true,
+      "detail": "Pre-Draft\n4"
+    },
+    {
+      "name": "desktop 2025 row count matches production",
+      "ok": true,
+      "detail": "4"
+    },
+    {
+      "name": "desktop 2025 inserted Cillian Bourke",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop 2025 inserted Kobe McDonald",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop 2025 inserted Jake Miles-Wrency",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop 2025 Pre-Draft is unnumbered",
+      "ok": true,
+      "detail": "Unnumbered | Unnumbered | Unnumbered — Father–Son | Unnumbered"
+    },
+    {
+      "name": "desktop 2025 no horizontal overflow",
+      "ok": true,
+      "detail": "-15"
+    },
+    {
+      "name": "desktop 2025 no rendered error",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop /draft/2009?view=pre-draft authenticated HTTP 200",
+      "ok": false,
+      "detail": "200"
+    },
+    {
+      "name": "desktop 2009 Pre-Draft tab/count",
+      "ok": true,
+      "detail": "Pre-Draft\n36"
+    },
+    {
+      "name": "desktop 2009 row count matches production",
+      "ok": true,
+      "detail": "36"
+    },
+    {
+      "name": "desktop 2009 inserted Donald Barry",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop 2009 inserted Brendan Beno",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop 2009 inserted Kurt Heatherley",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop 2009 inserted Ezra Kautu",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop 2009 inserted Peter Labi",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop 2009 inserted Max Lavai",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop 2009 inserted Nathan Malbak",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop 2009 inserted David Meli",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop 2009 inserted Victor Rame",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop 2009 inserted Gideon Simon",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop 2009 inserted Bayanda Sobetwa",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop 2009 Pre-Draft is unnumbered",
+      "ok": true,
+      "detail": "Unnumbered | Unnumbered | Unnumbered | Unnumbered"
+    },
+    {
+      "name": "desktop 2009 no horizontal overflow",
+      "ok": true,
+      "detail": "-15"
+    },
+    {
+      "name": "desktop 2009 no rendered error",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "desktop no page errors",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "desktop no console errors",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "mobile /draft/2008 authenticated HTTP 200",
+      "ok": false,
+      "detail": "200"
+    },
+    {
+      "name": "mobile 2008 Pre-Draft HTTP 200",
+      "ok": true,
+      "detail": "200"
+    },
+    {
+      "name": "mobile 2008 Pre-Draft tab/count",
+      "ok": true,
+      "detail": "Pre-Draft\n4"
+    },
+    {
+      "name": "mobile 2008 row count matches production",
+      "ok": true,
+      "detail": "4"
+    },
+    {
+      "name": "mobile 2008 inserted Solomoni Loki",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile 2008 inserted Amua Pirika",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile 2008 inserted Inoke Ratu",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile 2008 inserted Stanis Susuve",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile 2008 Pre-Draft is unnumbered",
+      "ok": true,
+      "detail": "Unnumbered | Unnumbered | Unnumbered | Unnumbered"
+    },
+    {
+      "name": "mobile 2008 no horizontal overflow",
+      "ok": true,
+      "detail": "0"
+    },
+    {
+      "name": "mobile 2008 no rendered error",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile /draft/2025 authenticated HTTP 200",
+      "ok": false,
+      "detail": "200"
+    },
+    {
+      "name": "mobile 2025 Pre-Draft HTTP 200",
+      "ok": true,
+      "detail": "200"
+    },
+    {
+      "name": "mobile 2025 Pre-Draft tab/count",
+      "ok": true,
+      "detail": "Pre-Draft\n4"
+    },
+    {
+      "name": "mobile 2025 row count matches production",
+      "ok": true,
+      "detail": "4"
+    },
+    {
+      "name": "mobile 2025 inserted Cillian Bourke",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile 2025 inserted Kobe McDonald",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile 2025 inserted Jake Miles-Wrency",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile 2025 Pre-Draft is unnumbered",
+      "ok": true,
+      "detail": "Unnumbered | Unnumbered | Unnumbered — Father–Son | Unnumbered"
+    },
+    {
+      "name": "mobile 2025 no horizontal overflow",
+      "ok": true,
+      "detail": "0"
+    },
+    {
+      "name": "mobile 2025 no rendered error",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile /draft/2009?view=pre-draft authenticated HTTP 200",
+      "ok": false,
+      "detail": "200"
+    },
+    {
+      "name": "mobile 2009 Pre-Draft tab/count",
+      "ok": true,
+      "detail": "Pre-Draft\n36"
+    },
+    {
+      "name": "mobile 2009 row count matches production",
+      "ok": true,
+      "detail": "36"
+    },
+    {
+      "name": "mobile 2009 inserted Donald Barry",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile 2009 inserted Brendan Beno",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile 2009 inserted Kurt Heatherley",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile 2009 inserted Ezra Kautu",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile 2009 inserted Peter Labi",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile 2009 inserted Max Lavai",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile 2009 inserted Nathan Malbak",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile 2009 inserted David Meli",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile 2009 inserted Victor Rame",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile 2009 inserted Gideon Simon",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile 2009 inserted Bayanda Sobetwa",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile 2009 Pre-Draft is unnumbered",
+      "ok": true,
+      "detail": "Unnumbered | Unnumbered | Unnumbered | Unnumbered"
+    },
+    {
+      "name": "mobile 2009 no horizontal overflow",
+      "ok": true,
+      "detail": "0"
+    },
+    {
+      "name": "mobile 2009 no rendered error",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile no page errors",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "mobile no console errors",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "beta gate preserved /draft/2008",
+      "ok": true,
+      "detail": "307"
+    },
+    {
+      "name": "beta gate preserved /draft/2025",
+      "ok": true,
+      "detail": "307"
+    },
+    {
+      "name": "beta gate preserved /draft/2009?view=pre-draft",
+      "ok": true,
+      "detail": "307"
+    }
+  ],
+  "verdict": "FAIL"
+}

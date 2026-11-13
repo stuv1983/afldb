@@ -1,0 +1,2 @@
+READY: sign in in this browser through /beta or /admin/login. Waiting up to 30 minutes.
+STOP Error: Sign-in timed out; session discarded

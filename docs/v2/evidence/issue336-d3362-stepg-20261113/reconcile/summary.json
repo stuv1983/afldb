@@ -1,0 +1,21 @@
+{
+  "identity": {
+    "db": "afldb_prod",
+    "oid": "66668",
+    "sysid": "7674454702926115004",
+    "ro": "on"
+  },
+  "totalPicks": 6853,
+  "draftguru1991to2025": 5966,
+  "manual1991to2025": 8,
+  "insertedIds6819to6853": 35,
+  "overrides": [
+    {
+      "field_group": "selection",
+      "n": 8,
+      "active": 8,
+      "gap029": 8
+    }
+  ],
+  "retainedOriginRowsUnchanged": 187
+}

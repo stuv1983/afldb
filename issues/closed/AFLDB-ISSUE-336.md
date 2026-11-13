@@ -1,5 +1,7 @@
 # AFLDB-ISSUE-336 — production runbook: the 35-row DraftGuru Pre-Draft insert (stage I336)
 
+> **RESOLVED 2026-11-13; moved from `issues/open/AFLDB-ISSUE-336.md`.** §3 is complete: step 1 (r2 application release, accepted 2026-11-12), steps 2–6 (D-336-2 A–F; COMMITTED_VERIFIED and ACCEPTED 2026-11-12, plan `afa26158…f608`, run `I336-20261112T025001Z`, ops `a25306f9`) and step 7 (read-only Step G, PASS 2026-11-13: 5,966 = 5,966 against the owner CSVs; `/draft/2008`, `/draft/2025`, `/draft/2009?view=pre-draft` verified on desktop and mobile; evidence `docs/v2/evidence/issue336-d3362-stepg-20261113/README.md`). D-336-3 decided (A), carried by ISSUE-348. The text below is the runbook as it stood.
+
 > **2026-11-08 review hold — CLEARED 2026-11-08:** the I336 run-name grammar fix is published at `c1c4b22ee15007111eab66f6d354e0b9ecbb2ade` (fast-forward of `origin/main`). `tests/gap029-ops.test.ts` passed 76/76 at that exact revision, and §3 now pins it. D-336-2 execution still needs its own owner approval (section 0).
 
 > **2026-11-12: §3 step 1 (application release) is DONE.** Production serves `c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x`, accepted 2026-11-12 (record `docs/v2/evidence/issue336-337-340-345-release-execution-20261111/execution-record.md`). Steps 2–4 run through the D-336-2 packet `docs/v2/issue336-d3362-approval-packet-2026-11-11.md` (A+B, C+D approved); steps 5–6 (E+F) need OD-4.
@@ -78,7 +80,7 @@ backup, a new local branch tracking `origin/main` with local `main` kept, `sync-
 in `docs/v2/evidence/issue336-draft-categories-20261105/dev-preview-20261106/README.md` §4. **Any live DEV migration or replacement is a separate owner
 approval.** Production application release and the I336 data step are unaffected by this and still need their own approvals.
 
-**Superseded for DEV (2026-11-06, follow-up):** the single DEV procedure is now `issues/open/AFLDB-ISSUE-336-DEV-DEPLOYMENT.md`.
+**Superseded for DEV (2026-11-06, follow-up):** the single DEV procedure is now `issues/closed/AFLDB-ISSUE-336-DEV-DEPLOYMENT.md`.
 
 * It is pinned to `8b024098`, which adds the ISSUE-337 fix and `sync-dev.ps1 -ExpectedRevision`.
 * It needs no timer pause, no sudo and no unit change.

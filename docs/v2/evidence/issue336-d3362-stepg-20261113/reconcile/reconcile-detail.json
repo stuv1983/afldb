@@ -1,0 +1,56 @@
+{
+ "unmatched_csv": [],
+ "unmatched_db": [],
+ "examples": {
+  "origin": [
+   {
+    "year": 1991,
+    "cat": "Mid-Season",
+    "player": "Daryn Cresswell",
+    "csv": "Glenorchy/North Hobart",
+    "db": "North Hobart",
+    "id": 1097
+   },
+   {
+    "year": 1993,
+    "cat": "Trade",
+    "player": "Bradley Plain",
+    "csv": "North Hobart/Clarence",
+    "db": "Clarence",
+    "id": 1388
+   },
+   {
+    "year": 1995,
+    "cat": "Trade",
+    "player": "Bradley Plain",
+    "csv": "North Hobart/Clarence",
+    "db": "Clarence",
+    "id": 1753
+   },
+   {
+    "year": 2007,
+    "cat": "Pre-Season",
+    "player": "Tom Bellchambers",
+    "csv": "Launceston/North Launceston/Tasmania U18",
+    "db": "North Launceston/Tasmania U18",
+    "id": 3795
+   },
+   {
+    "year": 2008,
+    "cat": "National",
+    "player": "Aaron Cornelius",
+    "csv": "Glenorchy/Tasmania U18/Tasmania (VFL)",
+    "db": "Tasmania U18/Tasmania (VFL)",
+    "id": 3912
+   },
+   {
+    "year": 2009,
+    "cat": "Rookie",
+    "player": "Daniel Archer",
+    "csv": "Kingborough/Clarence/Tasmania U18",
+    "db": "Clarence/Tasmania U18",
+    "id": 4163
+   }
+  ]
+ }
+}

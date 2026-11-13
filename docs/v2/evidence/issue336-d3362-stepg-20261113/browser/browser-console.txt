@@ -1,0 +1,93 @@
+READY: sign in in this browser through /beta or /admin/login. Waiting up to 30 minutes.
+AUTHENTICATED
+FAIL desktop /draft/2008 authenticated HTTP 200 200
+PASS desktop 2008 Pre-Draft HTTP 200 200
+PASS desktop 2008 Pre-Draft tab/count Pre-Draft
+4
+PASS desktop 2008 row count matches production 4
+PASS desktop 2008 inserted Solomoni Loki 
+PASS desktop 2008 inserted Amua Pirika 
+PASS desktop 2008 inserted Inoke Ratu 
+PASS desktop 2008 inserted Stanis Susuve 
+PASS desktop 2008 Pre-Draft is unnumbered Unnumbered | Unnumbered | Unnumbered | Unnumbered
+PASS desktop 2008 no horizontal overflow -15
+PASS desktop 2008 no rendered error 
+FAIL desktop /draft/2025 authenticated HTTP 200 200
+PASS desktop 2025 Pre-Draft HTTP 200 200
+PASS desktop 2025 Pre-Draft tab/count Pre-Draft
+4
+PASS desktop 2025 row count matches production 4
+PASS desktop 2025 inserted Cillian Bourke 
+PASS desktop 2025 inserted Kobe McDonald 
+PASS desktop 2025 inserted Jake Miles-Wrency 
+PASS desktop 2025 Pre-Draft is unnumbered Unnumbered | Unnumbered | Unnumbered — Father–Son | Unnumbered
+PASS desktop 2025 no horizontal overflow -15
+PASS desktop 2025 no rendered error 
+FAIL desktop /draft/2009?view=pre-draft authenticated HTTP 200 200
+PASS desktop 2009 Pre-Draft tab/count Pre-Draft
+36
+PASS desktop 2009 row count matches production 36
+PASS desktop 2009 inserted Donald Barry 
+PASS desktop 2009 inserted Brendan Beno 
+PASS desktop 2009 inserted Kurt Heatherley 
+PASS desktop 2009 inserted Ezra Kautu 
+PASS desktop 2009 inserted Peter Labi 
+PASS desktop 2009 inserted Max Lavai 
+PASS desktop 2009 inserted Nathan Malbak 
+PASS desktop 2009 inserted David Meli 
+PASS desktop 2009 inserted Victor Rame 
+PASS desktop 2009 inserted Gideon Simon 
+PASS desktop 2009 inserted Bayanda Sobetwa 
+PASS desktop 2009 Pre-Draft is unnumbered Unnumbered | Unnumbered | Unnumbered | Unnumbered
+PASS desktop 2009 no horizontal overflow -15
+PASS desktop 2009 no rendered error 
+PASS desktop no page errors []
+PASS desktop no console errors []
+FAIL mobile /draft/2008 authenticated HTTP 200 200
+PASS mobile 2008 Pre-Draft HTTP 200 200
+PASS mobile 2008 Pre-Draft tab/count Pre-Draft
+4
+PASS mobile 2008 row count matches production 4
+PASS mobile 2008 inserted Solomoni Loki 
+PASS mobile 2008 inserted Amua Pirika 
+PASS mobile 2008 inserted Inoke Ratu 
+PASS mobile 2008 inserted Stanis Susuve 
+PASS mobile 2008 Pre-Draft is unnumbered Unnumbered | Unnumbered | Unnumbered | Unnumbered
+PASS mobile 2008 no horizontal overflow 0
+PASS mobile 2008 no rendered error 
+FAIL mobile /draft/2025 authenticated HTTP 200 200
+PASS mobile 2025 Pre-Draft HTTP 200 200
+PASS mobile 2025 Pre-Draft tab/count Pre-Draft
+4
+PASS mobile 2025 row count matches production 4
+PASS mobile 2025 inserted Cillian Bourke 
+PASS mobile 2025 inserted Kobe McDonald 
+PASS mobile 2025 inserted Jake Miles-Wrency 
+PASS mobile 2025 Pre-Draft is unnumbered Unnumbered | Unnumbered | Unnumbered — Father–Son | Unnumbered
+PASS mobile 2025 no horizontal overflow 0
+PASS mobile 2025 no rendered error 
+FAIL mobile /draft/2009?view=pre-draft authenticated HTTP 200 200
+PASS mobile 2009 Pre-Draft tab/count Pre-Draft
+36
+PASS mobile 2009 row count matches production 36
+PASS mobile 2009 inserted Donald Barry 
+PASS mobile 2009 inserted Brendan Beno 
+PASS mobile 2009 inserted Kurt Heatherley 
+PASS mobile 2009 inserted Ezra Kautu 
+PASS mobile 2009 inserted Peter Labi 
+PASS mobile 2009 inserted Max Lavai 
+PASS mobile 2009 inserted Nathan Malbak 
+PASS mobile 2009 inserted David Meli 
+PASS mobile 2009 inserted Victor Rame 
+PASS mobile 2009 inserted Gideon Simon 
+PASS mobile 2009 inserted Bayanda Sobetwa 
+PASS mobile 2009 Pre-Draft is unnumbered Unnumbered | Unnumbered | Unnumbered | Unnumbered
+PASS mobile 2009 no horizontal overflow 0
+PASS mobile 2009 no rendered error 
+PASS mobile no page errors []
+PASS mobile no console errors []
+PASS beta gate preserved /draft/2008 307
+PASS beta gate preserved /draft/2025 307
+PASS beta gate preserved /draft/2009?view=pre-draft 307
+VERDICT FAIL 77/83
+Browser closed; session discarded.

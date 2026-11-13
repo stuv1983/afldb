@@ -1,5 +1,7 @@
 # AFLDB-ISSUE-336 — index section as it stood before the 2026-11-11 rewrite (closure run 8)
 
+> Moved from `issues/open/` on 2026-11-13 when ISSUE-336 was resolved. The later pre-closure section is `issues/closed/AFLDB-ISSUE-336-INDEX-SECTION-20261113.md`.
+
 Kept verbatim for history; the current section is in `IssuesIndex.md`.
 
 ### AFLDB-ISSUE-336 — Draft pages merge National, Rookie and other categories; 35 DraftGuru Pre-Draft rows missing

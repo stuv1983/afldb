@@ -1,5 +1,7 @@
 # AFLDB-ISSUE-336: DEV deployment recommendation (consolidated, pinned)
 
+> **RESOLVED 2026-11-13 (ISSUE-336); moved from `issues/open/AFLDB-ISSUE-336-DEV-DEPLOYMENT.md`.** Executed on DEV 2026-11-07 and accepted; the §7.2 nightly was observed as predicted on 2026-11-08 and 2026-11-09. Ledger: `issues.md` → AFLDB-ISSUE-336.
+
 Prepared 2026-11-06; **revised 2026-11-06 (r2)**.
 
 **Executed 2026-11-07; immediate acceptance (§7.1) PASS; §7.2 overnight observation PENDING (Sun 2026-11-08 05:08:36 AEDT).**
