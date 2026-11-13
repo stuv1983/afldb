@@ -560,7 +560,7 @@ describe('AFLDB-ISSUE-330 player index places career-less players last', () => {
  * skipped (OFFSET 13,300: 372.7 ms against 28.1 ms at the review; the same query also ran on the
  * empty past-the-end page). The names are now looked up for the returned page only.
  *
- * `legacyPage` is the pre-fix statement kept verbatim as the equality oracle: the page must hold the
+ * `legacyPage` is the pre-fix statement (plus a final p.id tie-break, see below) kept as the equality oracle: the page must hold the
  * same rows, in the same order, with the same total, for every sort, direction, offset and filter.
  * The plan check counts how often the club-name sub-select ran, so it fails on the legacy shape
  * (loops = rows scanned) without depending on wall-clock time.
@@ -583,6 +583,10 @@ describe('AFLDB-ISSUE-361 player index looks up club names for the returned page
     else if (sort === 'debut' || sort === 'final_game') orderBy = sql`${sql.unsafe(col)} ${d} NULLS LAST, p.sort_name ASC`;
     else if (sort === 'premierships') orderBy = sql`${sql.unsafe(col)} ${d} NULLS LAST, c.games ${d} NULLS LAST, p.sort_name ASC`;
     else orderBy = sql`${sql.unsafe(col)} ${d} NULLS LAST, p.sort_name ASC`;
+    // The one deliberate difference from the pre-fix statement: a final p.id key. Homonyms tie on
+    // every other key, and their relative order is plan-dependent, so equality is only defined once
+    // both sides break ties the same way.
+    orderBy = sql`${orderBy}, p.id ASC`;
 
     const where = sql`
       true

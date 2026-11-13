@@ -114,6 +114,11 @@ export function playerListQueries(options: PlayerListOptions) {
     orderBy = sql`${sql.unsafe(sortCol)} ${sqlDir} NULLS LAST, p.sort_name ASC`;
   }
 
+  // Rows that tie on every key above (homonyms share a sort_name) have no defined order, so two
+  // executions of different plan shapes could cut a page boundary through them differently.
+  // The id makes the order total and a page reproducible (AFLDB-ISSUE-361).
+  orderBy = sql`${orderBy}, p.id ASC`;
+
   const conditions = ranges ? rangeConditions(ranges, PLAYER_FILTER_COLUMNS) : [];
   if (name) conditions.push(sql`p.display_name ILIKE ${containsPattern(name)}`);
   if (club) {
@@ -131,27 +136,51 @@ export function playerListQueries(options: PlayerListOptions) {
   }
   const where = allOf(conditions);
 
+  // The club-name sub-select is deliberately outside the paged statement.
+  // PostgreSQL evaluates a correlated sub-select in the select list for every
+  // row the OFFSET walks past (13,350 evaluations for the last 50-row page), so
+  // the page is cut first and names are looked up for those rows only
+  // (AFLDB-ISSUE-361). `rn` repeats the ordering as an explicit sequence, so the
+  // outer statement returns the page in exactly the order the inner one cut it
+  // rather than relying on a sub-select preserving it.
   const page = sql<(PlayerListRow & { total: string })[]>`
-    SELECT p.id,
-           p.slug,
-           p.display_name       AS "displayName",
-           c.debut_season       AS "debutSeason",
-           c.final_season       AS "finalSeason",
-           COALESCE(c.games, 0) AS games,
-           COALESCE(c.goals, 0) AS goals,
-           COALESCE(c.finals, 0) AS finals,
-           COALESCE(c.premierships, 0) AS premierships,
-           COALESCE(c.brownlow_votes, 0) AS "brownlowVotes",
-           COALESCE(c.clubs_played, 0) AS "clubsPlayed",
+    WITH page AS (
+      SELECT p.id,
+             p.slug,
+             p.display_name       AS "displayName",
+             c.debut_season       AS "debutSeason",
+             c.final_season       AS "finalSeason",
+             COALESCE(c.games, 0) AS games,
+             COALESCE(c.goals, 0) AS goals,
+             COALESCE(c.finals, 0) AS finals,
+             COALESCE(c.premierships, 0) AS premierships,
+             COALESCE(c.brownlow_votes, 0) AS "brownlowVotes",
+             COALESCE(c.clubs_played, 0) AS "clubsPlayed",
+             count(*) OVER ()     AS total,
+             row_number() OVER (ORDER BY ${orderBy}) AS rn
+        FROM players p
+        LEFT JOIN player_career_stats c ON c.player_id = p.id
+       WHERE ${where}
+       ORDER BY ${orderBy}
+       LIMIT ${limit} OFFSET ${offset}
+    )
+    SELECT page.id,
+           page.slug,
+           page."displayName",
+           page."debutSeason",
+           page."finalSeason",
+           page.games,
+           page.goals,
+           page.finals,
+           page.premierships,
+           page."brownlowVotes",
+           page."clubsPlayed",
            (SELECT string_agg(DISTINCT cl.short_name, ', ' ORDER BY cl.short_name)
               FROM player_clubs pc JOIN clubs cl ON cl.id = pc.club_id
-             WHERE pc.player_id = p.id) AS "clubNames",
-           count(*) OVER ()     AS total
-      FROM players p
-      LEFT JOIN player_career_stats c ON c.player_id = p.id
-     WHERE ${where}
-     ORDER BY ${orderBy}
-     LIMIT ${limit} OFFSET ${offset}
+             WHERE pc.player_id = page.id) AS "clubNames",
+           page.total
+      FROM page
+     ORDER BY page.rn
   `;
 
   const count = () => sql<{ total: string }[]>`
