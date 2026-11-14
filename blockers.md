@@ -1,5 +1,12 @@
 # AFLDB Waiting and Blocker Register
 
+> **2026-11-14 remediation run 2 (this register's counts are NOT recomputed).** Records: `docs/v2/evidence/remediation-20261114/run2/` (`RESIDUALS.md`, `QUALIFICATION-2.md`, `APPROVAL-PACKET-2.md`). Final executable revision `f10e47ad`, **local, not published, nothing installed**.
+> - **Fixed locally (publication pending):** review residuals B-03 (with REVIEW-C MED-1 and REVIEW-D LOW-3), B-04, B-06, B-08, A-05 and B-05; ISSUE-363 per-file disposable test databases; ISSUE-364 lint ratchet at preflight/merge:ready.
+> - **Awaiting installation (owner, after publication):** the combined Caddy install (ISSUE-357 deny plus ISSUE-362 redaction plus beta-host HSTS/CSP), the host policy, the reboot, the backup units, the notifier/pull check.
+> - **Awaiting owner decision:** D-332-1 amendment (pull check) and G0b/G0c; O-A05-1; O-B06-1/2; ISSUE-357 O-1 residual and prune job; ISSUE-362 O-1 pre-fix logs; ISSUE-364 O-2 acceptance; D-350-1; D-HO-1..7.
+> - **Not accepted:** no residual graded LOW by an agent is accepted; each waits on the owner (`RESIDUALS.md`).
+> - Open issues: 9 (332, 348, 350, 351, 352, 357, 362, 363, 364).
+
 > **2026-11-14 remediation run (this register's counts are NOT recomputed).** Records: `docs/v2/evidence/remediation-20261114/` (`HANDOFF.md`, `QUALIFICATION.md`, `APPROVAL-PACKET.md`). Everything is **local on `claude/remediation-20261114`, qualified, not published, not deployed**; nothing was installed or written on production or DEV.
 > - **Resolved locally (publication pending):** ISSUE-353, 354, 355, 356, 358, 359, 360, 361.
 > - **Blocked on owner approval (publication):** the whole candidate (push / merge to `main`).

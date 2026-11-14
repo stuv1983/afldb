@@ -9,7 +9,9 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Current state — 2026-11-14 (remediation run, local):** **9 open issues: 332, 348, 350, 351, 352, 357, 362, 363, 364.** The remediation run implemented and qualified fixes for ISSUE-348 and 350–364 on branch `claude/remediation-20261114` (**local, not published, not deployed**; no production or DEV write). Resolved locally: 353, 354, 355, 356, 358, 359, 360, 361. The nine still open wait on owner decisions or production operations; **most urgent: ISSUE-350** (publish, release, then the approved I350 season opening before 2027-03-17). Approval packet: `docs/v2/evidence/remediation-20261114/APPROVAL-PACKET.md`.
+**Current state — 2026-11-14 (remediation run 2, local):** **9 open issues: 332, 348, 350, 351, 352, 357, 362, 363, 364** (unchanged). Run 2 is on branch `claude/remediation-20261114`, **final executable revision `f10e47ad`, local, not published, not deployed, nothing installed**. It closed the agent-review residuals: B-03 "round" with REVIEW-C MED-1 and REVIEW-D LOW-3, B-04, B-06, B-08, A-05 and B-05. It also added the ISSUE-357 Caddy path-shape deny, redaction of invite and magic-link tokens in any spelling and in redirect headers, the ISSUE-363 per-file disposable test databases, the ISSUE-364 lint ratchet in preflight/merge:ready, and the ISSUE-332 read-only pull check. It also wrote six operating procedures and corrected the evidence integrity records. Qualification: `docs/v2/evidence/remediation-20261114/run2/QUALIFICATION-2.md`. Residuals: `docs/v2/evidence/remediation-20261114/run2/RESIDUALS.md`. Approvals: `docs/v2/evidence/remediation-20261114/run2/APPROVAL-PACKET-2.md`.
+
+**Earlier state — 2026-11-14 (remediation run 1, local):** **9 open issues: 332, 348, 350, 351, 352, 357, 362, 363, 364.** The remediation run implemented and qualified fixes for ISSUE-348 and 350–364 on branch `claude/remediation-20261114` (**local, not published, not deployed**; no production or DEV write). Resolved locally: 353, 354, 355, 356, 358, 359, 360, 361. The nine still open wait on owner decisions or production operations; **most urgent: ISSUE-350** (publish, release, then the approved I350 season opening before 2027-03-17). Approval packet: `docs/v2/evidence/remediation-20261114/APPROVAL-PACKET.md`.
 
 **Earlier state — 2026-11-14 (full review):** **17 open issues: 332, 348, 350–364.** A review-only full review of `origin/main` `de640826` (production serves `c1c4b22e`; DEV `8b024098`) opened ISSUE-350 to ISSUE-364, raised ISSUE-348 to Medium and updated ISSUE-332. Nothing was implemented, deployed or written to production or DEV. **Most urgent: ISSUE-350 (High)**: production has no 2027 `seasons` row, so every nightly from Opening Round 2027-03-17 would fail; an owner decision on the write is needed before then. Report: `issues/reviews/AFLDB-FULL-REVIEW-2026-11-14.md` (remediation batches §5, owner decisions §6); evidence `docs/v2/evidence/full-review-20261114/`.
 
@@ -81,6 +83,8 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 - **Next action (dated; nothing is due before Opening Round 2027-03-17T00:00Z):** after round 2, the D-316-5 and D-316-9 reviews; after the first concluded round (March 2027), the owner's C7 acceptance with observed delay and measurement limits reported; June 2027, open the Brownlow successor and choose the C9 option (by 2027-06-30); before 2027-09-01, the Brownlow substantive decision (the count window is the owner's act); about October 2027, C9 delivered and reviewed before the rollover. The original recommendations are in `docs/v2/post-release-closeout-2026-11-04.md` section 4; the current state is in the operating record (section 9). **2026-11-08:** gate register G1–G7 recorded in the operating record's section 10, with owners and the evidence that closes each gate. Nothing more can be prepared before Opening Round. The issue stays open until all seven gates have occurred and their evidence is recorded.
 - **Update 2026-11-14 (full review):** prerequisite ISSUE-350 (2027 `seasons` row) before Opening Round; a failed nightly is neither retried nor alerted (recommend `OnFailure=`).
 - **Update 2026-11-14 (remediation, local, not published):** ISSUE-350 season opening and gate check prepared; settle failure notifier (`OnFailure` template + drop-in) PREPARED, NOT INSTALLED; gates G0/G0b proposed; owner D-332-1 (install the notifier, choose a transport).
+- **Update 2026-11-14 (run 2):** production delivers **no** failure notification (no MTA or monitor; the sealed notifier cannot deliver). A read-only pull check is prepared and returned OK against production. Proposed amendment to D-332-1 (option A, pull from an owner host) and a G0b/G0c split; neither is adopted. **Next:** owner D-332-1.
+
 
 ### AFLDB-ISSUE-348 — The next DraftGuru re-acquisition must carry forward the D-336-3 origin revisions and adjudicate three club replacements
 
@@ -95,6 +99,8 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 - **State:** Open. **2026-11-14 (local, qualified, not published):** audited I350 season-opening operation, read-only `season-opening-check.ts` and the settle `season_row_missing` HALT implemented and rehearsed on snapshot copies (digest `de1f574b…` equal to production; apply, verify, idempotent re-apply, reversal). Production still NOT_OPEN (read-only 2026-11-14).
 - **Key files:** `src/lib/rollover/season-opening.ts`, `tools/v2/issue350-season-open-production.ts`, `tools/v2/season-opening-check.ts`, `src/lib/acquisition/settle-afl-api.ts`, `docs/v2/evidence/remediation-20261114/rollover/README.md`.
 - **Next action:** publish and release (stage I350 must be in the production checkout); owner D-350-1 (recommended: open at least a week before 2027-03-17); the approved I350 ceremony on production; gate G0 in ISSUE-332.
+- **Update 2026-11-14 (run 2):** procedure `docs/v2/evidence/remediation-20261114/run2/ops/procedures/01-season-opening.md`; A-06 verified.
+
 
 ### AFLDB-ISSUE-351 — Unattended upgrades restart production app and PostgreSQL; promote/rollback activation window
 
@@ -102,23 +108,33 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 - **State:** Open. **2026-11-14 (local, qualified, not published):** `release.mjs` promote/rollback require `--attended`, `host-gate`, activation audit (`InvocationID`/`NRestarts`), rollback ledger check; needrestart hold and PostgreSQL apt blacklist PREPARED, NOT INSTALLED. Reboot pending on production (separate owner operation).
 - **Key files:** `deploy/release.mjs`, `deploy/host-policy/`, `docs/deployment.md`, `docs/v2/evidence/remediation-20261114/hostops/README.md`.
 - **Next action:** publish; owner D-HO-1 (install policy + weekly owned window), D-HO-4 (`--attended`), D-HO-6 (attended reboot).
+- **Update 2026-11-14 (run 2):** `--attended` is a declaration only (documented). Procedures 02 (weekly owned window; the owner holds PostgreSQL updates) and 03 (reboot; GRUB is hidden, so the console fallback is unverified).
+
 
 ### AFLDB-ISSUE-352 — No scheduled production backup, restore verification or off-host copy
 
 - **Severity / area:** Medium; backup and recovery.
 - **State:** Open. **2026-11-14 (local, qualified, not published; not installed):** `scheduled-backup.sh` (backup/verify/status), backup units, `offhost-pull.sh`, V2 DR runbook (`docs/backup-restore.md`); proposed RPO 24 h, RTO 1 h (database, host intact).
 - **Next action:** publish; owner D-HO-2 (install units), D-HO-3 (off-host destination; recommended pull), D-HO-5, D-HO-7.
+- **Update 2026-11-14 (run 2):** procedure 05; A-04 verified. The serving checkout's bare `backup.sh` prunes dumps, so always use `--dir`.
+
 
 ### AFLDB-ISSUE-357 — ISR persists a page per non-canonical id spelling and per 404 path
 
 - **Severity / area:** Medium; public frontend. **State:** Open, narrowed 2026-11-14: strict canonical id/season parsing implemented locally (non-canonical spellings are 404s, 10–70× less disk per path); every distinct 404 or slug-redirect path still persists about 50 KB.
 - **Next action:** publish; owner O-1 (Caddy deny of junk paths and accept the residual, recommended).
+- **Update 2026-11-14 (run 2):** O-1 (A) implemented: the Caddy path-shape deny, 0 mismatches over 35,340 legitimate and 2,131 deny paths. **Residual MED:** unknown well-formed slugs persist about 76 KiB each, and only the beta gate protects against that. **Next:** publish; owner installs (combined Caddy install, packet B7); keep the gate on until a bound and a disk alert exist; operational acceptance is the owner's.
+
 
 ### AFLDB-ISSUE-362 to AFLDB-ISSUE-364 (Low)
 
 - **362** Caddy log filter and epoch-held admin claims implemented locally; **next:** owner O-3 install the Caddyfile, O-1 delete pre-fix logs.
 - **363** TST-4..9 implemented locally; the integrated run still shows `settle-afltables` timing out under full parallel load and leaking its season; **next:** owner decisions (per-file disposable DB recommended).
 - **364** `next dev` fixed, `node_modules` check (warn-only), lint ratchet `npm run lint:gate`; **next:** owner O-2 wire the lint gate.
+- **Run 2 (2026-11-14):**
+  - **362:** B-05 re-authentication; redaction in any spelling and in the `Location`/`Refresh` headers. **Next:** combined Caddy install (B7), then O-1 logs.
+  - **363:** per-file disposable databases (opt-in, `MODE=all`), hardened after REVIEW-D. **Next:** publish; decision (3) needs a rebuilt `afldb_test`; follow-up for `settle-afl-api-state-b`.
+  - **364:** the lint gate is wired into preflight/merge:ready as a **ratchet** (338 errors allowed; not clean lint). **Next:** publish; the owner accepts the merge-time ratchet as O-2.
 - Details: their `issues.md` entries.
 
 **Resolved locally 2026-11-14 (qualified, not published, not deployed):** ISSUE-353 (Match Sheet dependent refusals), 354 (active-only override merge), 355 (Grid Solver NULL guard), 356 (NL least/marquee/period words, `PARSER_VERSION` 68), 358 (pins, stage map, restore-order test), 359 (parameter hardening, drill-down cap), 360 (tied holders, head-to-head link, sitemap), 361 (players index CTE, compare gate). Removed from the open list; full records in `issues.md`.

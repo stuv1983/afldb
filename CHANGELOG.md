@@ -15,6 +15,19 @@ commit.
 
 ## [Unreleased]
 
+### Remediation run 2 of the 2026-11-14 review (local, qualified at `f10e47ad`, not published, not deployed)
+
+Nothing was pushed, deployed, installed, or written on production or DEV. Records: `docs/v2/evidence/remediation-20261114/run2/`.
+
+- **NL search (ISSUE-356):** a bare "round" is read as the surname only where the question reads it as a person. "round with most goals" and "which was round with most goals" decline instead of answering for Barry Round. The singular rivalry rewrite no longer invents "game" (`PARSER_VERSION` 69).
+- **Public hardening (ISSUE-359, 361):** crafted out-of-range NL plan values are 404s. The club-compare queue is bounded (`AFLDB_COMPARE_MAX_QUEUE` 24, `AFLDB_COMPARE_MAX_WAIT_MS` 10000); a refused comparison shows a noindex "busy" state.
+- **Admin (ISSUE-353, 362):** the Match Sheet refuses removing a player whose only vote is an unattributed round row, and says how to clear it. A below-epoch admin is offered re-authentication on `/admin/login`.
+- **Caddy (ISSUE-357, 362; prepared, not installed):** a path-shape deny keeps non-canonical ISR paths out of Next. A trailing slash on the protected routes is now a 404, match ids are capped at 99,999, and slugs are limited to `[a-z0-9-]`. The access log redacts invite and magic-link tokens in any spelling of the raw target and in the logged `Location` and `Refresh` response headers.
+- **Test harness (ISSUE-363):** opt-in per-file disposable integration databases (`AFLDB_TEST_PER_FILE_DB=all`) with a run-level reaper and an age-bounded sweep. The DSN is shape-checked and the server's port and database are verified before every create or drop. `awards-reload-links` fixture seasons moved to 2061/2062.
+- **Tooling (ISSUE-364):** `npm run lint:gate` runs in `preflight --mode implementation|merge` and `merge:ready` as a **ratchet** against the existing 338 errors; this is not clean lint. The settle wrapper tells `node_modules` drift apart from a failed check.
+- **Operations (ISSUE-332, 350-352, 362; nothing installed):** a read-only settle pull check and an optional transport unit. Production currently delivers no failure notification. Six owner procedures: season opening, patching, reboot, notifier, backups and off-host, Caddy logging.
+- **Evidence integrity:** five CR-bearing evidence logs restored byte for byte (`-text`); an all-manifest verifier; every failing test id of run 1 classified. Corrections are appended to `QUALIFICATION.md` §7.
+
 ### Remediation of the 2026-11-14 full review (local, qualified, not published, not deployed)
 
 Branch `claude/remediation-20261114`. Nothing was pushed, deployed, installed or written on production or DEV. Results: `docs/v2/evidence/remediation-20261114/QUALIFICATION.md`; approvals: `APPROVAL-PACKET.md`.
