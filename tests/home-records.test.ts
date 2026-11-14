@@ -160,6 +160,35 @@ describe('home record tied holders at the cutoff (AFLDB-ISSUE-360 FE-4)', () => 
     });
   });
 
+  // ISSUE-360, run 2: the panel prints what it printed before only when the tie fits in the window.
+  // A tie LONGER than the window can never be counted from the window alone, so the count is
+  // labelled a lower bound in the rendered text: tied holders are never truncated silently.
+  it('a 260-way tie (longer than the window) renders "at least 195 more", never an exact count', async () => {
+    provide([2, 2, ...Array<number>(260).fill(1)]);
+    const { getHomeRecord } = await import('@/db/queries/home-records');
+    const result = await getHomeRecord('after-siren-most-goals', 5);
+    expect(result.rows).toHaveLength(5);
+    expect(result.moreTied).toEqual({ count: HOME_RECORD_TIE_WINDOW - 5, exact: false, value: 1 });
+    const html = renderToStaticMarkup(HomeRecordPanel({ result }));
+    expect(html).toContain('and at least 195 more tied on 1 Goals');
+    expect(html).toContain('see the full record');
+    expect(html).not.toContain('and 195 more tied');
+    expect(html).not.toContain('and 260 more tied');
+  });
+
+  it('a tie ending exactly one row inside the window is exact; one ending on the window edge is a lower bound', async () => {
+    const { getHomeRecord } = await import('@/db/queries/home-records');
+    // Two leaders, 197 tied on 1, then zeros: the tie occupies rows 3-199 of the 200-row window and a
+    // 0 follows inside it, so nothing is cut: 199 rows through the tie minus the 5 shown = 194, exact.
+    provide([2, 2, ...Array<number>(HOME_RECORD_TIE_WINDOW - 3).fill(1), 0, 0]);
+    const inside = await getHomeRecord('after-siren-most-goals', 5);
+    expect(inside.moreTied).toEqual({ count: 194, exact: true, value: 1 });
+    // The tie fills the window to its last row: the provider cut it, so the count is only a lower bound.
+    provide([2, 2, ...Array<number>(HOME_RECORD_TIE_WINDOW - 2).fill(1), 1, 1, 1]);
+    const edge = await getHomeRecord('after-siren-most-goals', 5);
+    expect(edge.moreTied).toEqual({ count: HOME_RECORD_TIE_WINDOW - 5, exact: false, value: 1 });
+  });
+
   it('adds nothing when the fifth place is not tied', async () => {
     provide([9, 8, 7, 6, 5, 4, 4]);
     const { getHomeRecord } = await import('@/db/queries/home-records');
