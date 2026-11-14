@@ -48,7 +48,6 @@ const FIXTURE_SOURCE_KEY = 'issue_167_fixture_source';
 const LIFECYCLE_COLUMNS = ['status', 'status_reason', 'updated_at'] as const;
 
 let fixtureSourceId: number;
-let adminUserId: number;
 let achievementId: number;
 let kickId: number;
 
@@ -60,9 +59,6 @@ beforeAll(async () => {
     ON CONFLICT (key) DO UPDATE SET name = EXCLUDED.name
     RETURNING id`;
   fixtureSourceId = source.id;
-
-  const [operator] = await admin<{ id: number }[]>`SELECT min(id)::int AS id FROM auth_users`;
-  adminUserId = operator.id;
 
   const [achievement] = await admin<{ id: number }[]>`
     INSERT INTO player_achievements (
@@ -300,6 +296,13 @@ describe('migration 102 allowlist widenings', () => {
     // The CHECK definition is not the contract; what the database accepts is.
     // Rolled back, so the suite writes neither ledger.
     await expect(admin.begin(async (tx) => {
+      // Run 4 (rbfail): the operator is suite-owned and exists only inside this rolled-back transaction. The suite used to
+      // read `min(id)` of the database's own auth_users, which is NULL on a database with no administrator (the accepted rebuild
+      // holds none) and made `admin_user_id` NULL here.
+      const [operator] = await tx<{ id: number }[]>`
+        INSERT INTO auth_users (email, role)
+        VALUES ('CD_I4060-special-records-lifecycle@example.invalid', 'super_admin') RETURNING id::int AS id`;
+      const adminUserId = operator.id;
       for (const table of SPECIAL_RECORD_TABLES) {
         await tx`
           INSERT INTO data_overrides (entity_type, entity_key, field_group,

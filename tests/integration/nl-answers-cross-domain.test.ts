@@ -31,7 +31,7 @@
  */
 import './guard';
 
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { sql } from '@/db/client';
 import { answerPlayerCareer } from '@/db/queries/nl/player-career';
@@ -65,48 +65,89 @@ const M_F = {
 
 const RICHMOND: NlClubRef = { organizationId: 18, slug: 'richmond', name: 'Richmond' };
 
-/** afldb_test player ids, from the evidence transcripts. Identity is by id, never by name. */
-const X2_POSITIVES = {
-  'Tom Hafey': 12550,
-  'Jack Dyer': 6244,
-  'Perce Bentley': 10377,
-  'Frank Hughes': 4386,
-  'Tony Jewell': 12775,
-  'Dan Minogue': 3195,
-  'Terry Wallace': 12378,
-  'Kevin Bartlett': 8193,
+/**
+ * Run 4 (rbfail): the people the assertions pin are resolved by STABLE identity -- the AFL Tables profile path in
+ * `external_identities` (source `afltables`, status `unique`), the provider's own key. They were bare `players.id` literals ("afldb_test
+ * player ids, from the evidence transcripts"); a surrogate id is an artefact of the load that created it and differs between the 4 Nov
+ * snapshot and the accepted rebuild, so on the rebuild every one of these named a different person (and the negative lists below
+ * could pass without asking about the person they name at all).
+ *
+ * Provenance of every path: the AFL Tables profile of the person the old literal named on the 4 Nov 2026 snapshot (one identity each).
+ * Display names are the keys.
+ */
+const X2_POSITIVE_PROFILES = {
+  'Tom Hafey': 'players/T/Tom_Hafey.html',
+  'Jack Dyer': 'players/J/Jack_Dyer0.html',
+  'Perce Bentley': 'players/P/Perce_Bentley.html',
+  'Frank Hughes': 'players/F/Frank_Hughes1.html',
+  'Tony Jewell': 'players/T/Tony_Jewell.html',
+  'Dan Minogue': 'players/D/Dan_Minogue.html',
+  'Terry Wallace': 'players/T/Terry_Wallace.html',
+  'Kevin Bartlett': 'players/K/Kevin_Bartlett.html',
 } as const;
 
 /** Coached Richmond; never played for Richmond. The 14 that separate 41 from 27. */
-const COACHED_RICHMOND_ONLY = {
-  'Adem Yze': 67,
-  'Allan Jeans': 481,
-  'Andrew McQualter': 600,
-  'Damien Hardwick': 3175,
-  'Danny Frawley': 3266,
-  'Jade Rawlings': 6669,
-  'Jeff Gieschen': 6912,
-  'Robert Walls': 11145,
+const COACHED_RICHMOND_ONLY_PROFILES = {
+  'Adem Yze': 'players/A/Adem_Yze.html',
+  'Allan Jeans': 'players/A/Allan_Jeans.html',
+  'Andrew McQualter': 'players/A/Andrew_McQualter.html',
+  'Damien Hardwick': 'players/D/Damien_Hardwick.html',
+  'Danny Frawley': 'players/D/Danny_Frawley.html',
+  'Jade Rawlings': 'players/J/Jade_Rawlings.html',
+  'Jeff Gieschen': 'players/J/Jeff_Gieschen.html',
+  'Robert Walls': 'players/R/Robert_Walls.html',
 } as const;
 
 /** Played for Richmond; never coached Richmond. */
-const PLAYED_RICHMOND_ONLY = {
-  'Aaron Edwards': 6,
-  'Aaron Fiora': 7,
-  'Adam Pattison': 51,
+const PLAYED_RICHMOND_ONLY_PROFILES = {
+  'Aaron Edwards': 'players/A/Aaron_Edwards.html',
+  'Aaron Fiora': 'players/A/Aaron_Fiora.html',
+  'Adam Pattison': 'players/A/Adam_Pattison.html',
 } as const;
 
 /** Never coached at all -- X1 negatives. Both "Aaron Black" ids are here (F6/F8). */
-const NEVER_COACHED = {
-  'Aaron Black (1)': 1,
-  'Aaron Black (2)': 2,
-  'Aaron Cadman': 3,
-  'Aaron Davey': 5,
-  'Adam Cerra': 28,
+const NEVER_COACHED_PROFILES = {
+  'Aaron Black (1)': 'players/A/Aaron_Black0.html',
+  'Aaron Black (2)': 'players/A/Aaron_Black1.html',
+  'Aaron Cadman': 'players/A/Aaron_Cadman.html',
+  'Aaron Davey': 'players/A/Aaron_Davey.html',
+  'Adam Cerra': 'players/A/Adam_Cerra.html',
 } as const;
 
 /** The F4 lineage witnesses: raw club identities outnumber organizations. */
-const LINEAGE_TRAPS = { 'Denis Pagan': 3651, 'Terry Wallace': 12378, 'Dani Laidley': 3208 } as const;
+const LINEAGE_TRAP_PROFILES = {
+  'Denis Pagan': 'players/D/Denis_Pagan.html',
+  'Terry Wallace': 'players/T/Terry_Wallace.html',
+  'Dani Laidley': 'players/D/Dani_Laidley.html',
+} as const;
+
+/** Resolved once in `beforeAll` (empty until then): display name -> `players.id` of THIS database. */
+let X2_POSITIVES: Record<string, number> = {};
+let COACHED_RICHMOND_ONLY: Record<string, number> = {};
+let PLAYED_RICHMOND_ONLY: Record<string, number> = {};
+let NEVER_COACHED: Record<string, number> = {};
+let LINEAGE_TRAPS: Record<string, number> = {};
+
+async function resolveProfiles(profiles: Readonly<Record<string, string>>): Promise<Record<string, number>> {
+  const out: Record<string, number> = {};
+  for (const [who, path] of Object.entries(profiles)) {
+    const rows = await sql<{ id: number }[]>`
+      SELECT e.player_id AS id
+        FROM external_identities e JOIN sources s ON s.id = e.source_id
+       WHERE s.key = 'afltables' AND e.external_id = ${path} AND e.status IN ('unique', 'resolved') AND e.player_id IS NOT NULL`;
+    if (rows.length !== 1) throw new Error(`fixture identity ${who} (${path}) must resolve to exactly one player; found ${rows.length}`);
+    out[who] = rows[0].id;
+  }
+  return out;
+}
+
+beforeAll(async () => {
+  X2_POSITIVES = await resolveProfiles(X2_POSITIVE_PROFILES);
+  COACHED_RICHMOND_ONLY = await resolveProfiles(COACHED_RICHMOND_ONLY_PROFILES);
+  PLAYED_RICHMOND_ONLY = await resolveProfiles(PLAYED_RICHMOND_ONLY_PROFILES);
+  NEVER_COACHED = await resolveProfiles(NEVER_COACHED_PROFILES);
+  LINEAGE_TRAPS = await resolveProfiles(LINEAGE_TRAP_PROFILES);
+});
 
 function plan(overrides: Partial<NlQueryPlan>): NlQueryPlan {
   const raw: NlQueryPlan = {
@@ -273,7 +314,8 @@ describe('X1 -- played and also coached', () => {
     // Both "Aaron Black" rows are distinct identities and neither is
     // merged into the other by name.
     const [row] = await sql<{ n: string }[]>`
-      SELECT count(*) AS n FROM players WHERE id IN (1, 2) AND display_name = 'Aaron Black'
+      SELECT count(*) AS n FROM players
+       WHERE id IN (${NEVER_COACHED['Aaron Black (1)']}, ${NEVER_COACHED['Aaron Black (2)']}) AND display_name = 'Aaron Black'
     `;
     expect(Number(row.n)).toBe(2);
   });
@@ -353,7 +395,8 @@ describe('X2 -- played for a club and also coached a club', () => {
  * result would look wrong.
  */
 describe('T7: coached clubs fold through organization lineage, never raw club ids', () => {
-  it.each(Object.entries(LINEAGE_TRAPS))('%s satisfies coached_club for every organization coached, and no other', async (who, playerId) => {
+  it.each(Object.keys(LINEAGE_TRAP_PROFILES))('%s satisfies coached_club for every organization coached, and no other', async (who) => {
+    const playerId = LINEAGE_TRAPS[who];
     const coachedOrgs = (await sql<{ organization_id: number }[]>`
       SELECT DISTINCT cl.organization_id
         FROM coaches c

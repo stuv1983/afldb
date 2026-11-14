@@ -41,7 +41,18 @@ afterAll(async () => {
  */
 const M_E1 = {
   total: 334,
-  linked: 330,
+  /**
+   * Run 4 (rbfail): `linked` was a single pin, 330, and the four rows left over (the 2026 debutants Milan Murdock, Noah Roberts-Thomson,
+   * Zane Peucker and Jay Polkinghorne: fkg-331..334) were called "deliberately not linked". They are unlinked on the 4 Nov snapshot
+   * only because that snapshot holds no player row for them yet; the accepted rebuild loads the same 334 extract rows (manifest_active 334
+   * in data/records/first-kick-goal.source.json) against a players table that does hold the 2026 debutants, and links all 334. Whether a
+   * 2026 row links is therefore a property of the database's 2026 player data, not of the extract, so the pin is split: every row
+   * through season 2025 links on both bases (330 of 330), and the 2026 rows (4) link or not by the base. Provenance: measured on the
+   * 4 Nov snapshot (330 linked of 330 through 2025; 0 of 4 in 2026) and on the accepted rebuild (330 of 330; 4 of 4), 2026-11-15.
+   */
+  linkedThrough2025: 330,
+  rowsThrough2025: 330,
+  rowsFrom2026: 4,
   multiKick: 44,
   maxConsecutive: 6,
   onlyCareerGoal: 23,
@@ -83,6 +94,14 @@ async function scalar(query: Promise<{ n: string | number }[]>): Promise<number>
   return Number(row?.n ?? 0);
 }
 
+/** Rows of the extract that link to a canonical player, measured directly from the table (independent of the code under test). */
+async function linkedRows(): Promise<number> {
+  return scalar(sql<{ n: string }[]>`
+    SELECT count(*) AS n FROM player_achievements
+     WHERE achievement_type = 'first_kick_goal' AND player_id IS NOT NULL AND link_status_value IN ('unique','resolved')
+  `);
+}
+
 const CONSECUTIVE = (kicks: number) => ({
   builder: 'first_kick_goal_consecutive_min', params: { kicks: String(kicks) },
 });
@@ -94,12 +113,15 @@ const HOLDER = { builder: 'first_kick_goal_player', params: {} };
 describe('the loaded curated extract (D11 / M-E1)', () => {
   it('matches the measurement the corpus thresholds were finalised from', async () => {
     const [row] = await sql<{
-      total: string; linked: string; multi_kick: string; max_consecutive: number;
+      total: string; rows_through_2025: string; linked_through_2025: string; rows_from_2026: string;
+      multi_kick: string; max_consecutive: number;
       only_career_goal: string; no_further_kicks: string; min_season: number; max_season: number;
     }[]>`
       SELECT count(*) AS total,
-             count(*) FILTER (WHERE player_id IS NOT NULL
-                                AND link_status_value IN ('unique','resolved')) AS linked,
+             count(*) FILTER (WHERE season <= 2025) AS rows_through_2025,
+             count(*) FILTER (WHERE season <= 2025 AND player_id IS NOT NULL
+                                AND link_status_value IN ('unique','resolved')) AS linked_through_2025,
+             count(*) FILTER (WHERE season >= 2026) AS rows_from_2026,
              count(*) FILTER (WHERE consecutive_goal_kicks > 1) AS multi_kick,
              max(consecutive_goal_kicks) AS max_consecutive,
              count(*) FILTER (WHERE no_further_career_goals) AS only_career_goal,
@@ -108,7 +130,13 @@ describe('the loaded curated extract (D11 / M-E1)', () => {
         FROM player_achievements WHERE achievement_type = 'first_kick_goal'
     `;
     expect(Number(row.total)).toBe(M_E1.total);
-    expect(Number(row.linked)).toBe(M_E1.linked);
+    expect(Number(row.rows_through_2025)).toBe(M_E1.rowsThrough2025);
+    expect(Number(row.linked_through_2025)).toBe(M_E1.linkedThrough2025);
+    expect(Number(row.rows_from_2026)).toBe(M_E1.rowsFrom2026);
+    // the 2026 rows link only where the database holds the 2026 players: 0..4 by base, never more than the rows there are
+    const linkedFrom2026 = await linkedRows() - M_E1.linkedThrough2025;
+    expect(linkedFrom2026).toBeGreaterThanOrEqual(0);
+    expect(linkedFrom2026).toBeLessThanOrEqual(M_E1.rowsFrom2026);
     expect(Number(row.multi_kick)).toBe(M_E1.multiKick);
     expect(Number(row.max_consecutive)).toBe(M_E1.maxConsecutive);
     expect(Number(row.only_career_goal)).toBe(M_E1.onlyCareerGoal);
@@ -152,9 +180,9 @@ describe('the already-supported subfamilies, now proven against data', () => {
                         AND a.link_status_value IN ('unique','resolved'))
     `);
     expect(total).toBe(expected);
-    // And it is the linked total from M-E1: a difference would mean a
+    // And it is the linked total of the table itself: a difference would mean a
     // linked achievement whose player has no career-stats row at all.
-    expect(total).toBe(M_E1.linked);
+    expect(total).toBe(await linkedRows());
   });
 
   it('W2 a named holder answers about that player alone', async () => {
@@ -311,7 +339,7 @@ describe('E8 — the first-kick goal was their only career goal', () => {
   it('W12 the NL totals are the board summary minus its unlinked rows', async () => {
     const summary = await getFirstKickGoalSummary();
     expect(summary.total).toBe(M_E1.total);
-    expect(summary.unlinked).toBe(M_E1.total - M_E1.linked);
+    expect(summary.unlinked).toBe(M_E1.total - await linkedRows());
 
     const multiKickUnlinked = await scalar(sql<{ n: string }[]>`
       SELECT count(*) AS n FROM player_achievements
@@ -386,28 +414,64 @@ describe('composition and the link boundary', () => {
   });
 
   /**
-   * W13. Four rows of the curated extract are deliberately not linked to a
-   * canonical player. Every one of them is absent from every NL answer,
-   * which is exactly why the answer states the boundary in its own
-   * sentence rather than implying completeness.
+   * W13. Rows of the curated extract that do not link to a canonical player
+   * (the 2026 debutants, where the database holds no player row for them yet)
+   * are absent from every NL answer, which is exactly why the answer states
+   * the boundary in its own sentence rather than implying completeness.
+   *
+   * Run 4 (rbfail): the accepted rebuild links all 334 rows, so on it the real unlinked set is empty and this claim would be
+   * asserted about nothing. The test therefore also creates ONE unlinked row of its own (synthetic source and record id, prefix
+   * CD_I4060, the test database's own connection), asserts the exclusion with it present, and removes it in `finally`.
    */
   it('W13 no unlinked row reaches an NL answer', async () => {
-    const unlinked = await sql<{ id: number; player_id: number | null; name: string }[]>`
-      SELECT id, player_id, player_name_clean AS name FROM player_achievements
+    const FIXTURE_SOURCE_KEY = 'cd_i4060_fkg_fixture_source';
+    const MARKER = 'CD_I4060 first-kick-goal fixture';
+    const clean = async () => {
+      await sql`DELETE FROM player_achievements WHERE source_id IN (SELECT id FROM sources WHERE key = ${FIXTURE_SOURCE_KEY})`;
+      await sql`DELETE FROM sources WHERE key = ${FIXTURE_SOURCE_KEY}`;
+    };
+    await clean(); // debris of a crashed earlier run
+
+    const unlinkedNow = () => sql<{ id: number; player_id: number | null; name: string; season: number }[]>`
+      SELECT id, player_id, player_name_clean AS name, season::int AS season FROM player_achievements
        WHERE achievement_type = 'first_kick_goal'
          AND NOT (player_id IS NOT NULL AND link_status_value IN ('unique','resolved'))
        ORDER BY id
     `;
-    expect(unlinked).toHaveLength(M_E1.total - M_E1.linked);
+    const linked = await linkedRows();
+    const real = await unlinkedNow();
+    expect(real).toHaveLength(M_E1.total - linked);
+    // an extract row can only be left unlinked by a database that lacks the player: the 2026 debutants, nobody earlier
+    for (const row of real) expect(row.season, row.name).toBeGreaterThanOrEqual(2026);
 
-    const { rows, total } = await career(plan({ careerPredicates: [HOLDER] }));
-    expect(total).toBe(M_E1.linked);
-    const answered = new Set(rows.map((r) => r.playerId));
-    for (const row of unlinked) {
-      if (row.player_id !== null) expect(answered.has(row.player_id), row.name).toBe(false);
+    try {
+      const [source] = await sql<{ id: number }[]>`
+        INSERT INTO sources (key, name, kind, url)
+        VALUES (${FIXTURE_SOURCE_KEY}, ${MARKER}, 'manual', 'https://example.invalid/i4060') RETURNING id`;
+      await sql`
+        INSERT INTO player_achievements (
+          achievement_type, player_name_raw, player_name_clean, link_status_value,
+          candidate_count, club_name_raw, season, round_raw,
+          source_id, source_record_id, notes
+        ) VALUES (
+          'first_kick_goal', ${MARKER}, ${MARKER}, 'unmatched', 0, ${MARKER}, 1897, ${MARKER},
+          ${source.id}, 'CD_I4060-fkg-unlinked', ${MARKER}
+        )`;
+
+      const unlinked = await unlinkedNow();
+      expect(unlinked).toHaveLength(real.length + 1);
+
+      const { rows, total } = await career(plan({ careerPredicates: [HOLDER] }));
+      expect(total).toBe(linked);
+      const answered = new Set(rows.map((r) => r.playerId));
+      for (const row of unlinked) {
+        if (row.player_id !== null) expect(answered.has(row.player_id), row.name).toBe(false);
+      }
+      // The board is wider by exactly those rows -- stated, never absorbed.
+      const board = await getFirstKickGoalList();
+      expect(board.length - unlinked.length).toBe(total);
+    } finally {
+      await clean();
     }
-    // The board is wider by exactly those rows -- stated, never absorbed.
-    const board = await getFirstKickGoalList();
-    expect(board.length - unlinked.length).toBe(total);
   });
 });

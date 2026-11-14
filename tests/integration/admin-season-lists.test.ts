@@ -114,7 +114,13 @@ function runReplay(...tables: string[]) {
 }
 
 let actorId = 0;
-let createdThrowawayAdmin = false;
+/**
+ * Run 4 (rbfail): the acting administrator is ALWAYS suite-owned. The suite used to borrow the database's first `auth_users` row, which
+ * is production's real administrator on a snapshot and absent on the accepted rebuild (no `auth_users` rows at all); the rows it wrote
+ * (data_overrides, data_edits) then referenced a user the suite did not own. Every row keyed to this user is the suite's, so the
+ * teardown removes them by that key before removing the user.
+ */
+const SUITE_ADMIN_EMAIL = 'CD_I4060-admin-season-lists@example.invalid';
 let maxYear = 0;
 let seasonA = 0;
 let seasonB = 0;
@@ -180,6 +186,13 @@ async function clearFixtureAudits(): Promise<void> {
        AND (new_values->>'season')::int IN (${seasonA}, ${seasonB})`;
 }
 
+/** Remove the suite-owned administrator and every ledger row that references it (and only those). */
+async function removeSuiteAdmin(): Promise<void> {
+  await admin`DELETE FROM data_overrides WHERE admin_user_id IN (SELECT id FROM auth_users WHERE email = ${SUITE_ADMIN_EMAIL})`;
+  await admin`DELETE FROM data_edits WHERE admin_user_id IN (SELECT id FROM auth_users WHERE email = ${SUITE_ADMIN_EMAIL})`;
+  await admin`DELETE FROM auth_users WHERE email = ${SUITE_ADMIN_EMAIL}`;
+}
+
 async function auditRows(playerId: number, fieldGroup: string) {
   return admin<{ newValues: Record<string, unknown>; oldValues: Record<string, unknown>; note: string | null }[]>`
     SELECT new_values AS "newValues", old_values AS "oldValues", note
@@ -202,16 +215,10 @@ beforeAll(async () => {
   // authoritative row for a season below 2027.
   process.env.AFLDB_SEASON_LIST_TEST_MAX_SEASON = String(seasonA);
 
-  const [existingAdmin] = await sql<{ id: number }[]>`SELECT id FROM auth_users ORDER BY id LIMIT 1`;
-  if (existingAdmin) {
-    actorId = existingAdmin.id;
-  } else {
-    const [created] = await admin<{ id: number }[]>`
-      INSERT INTO auth_users (email, role)
-      VALUES ('issue-161-season-list-test@example.test', 'super_admin') RETURNING id`;
-    actorId = created.id;
-    createdThrowawayAdmin = true;
-  }
+  await removeSuiteAdmin(); // debris of a crashed earlier run
+  const [created] = await admin<{ id: number }[]>`
+    INSERT INTO auth_users (email, role) VALUES (${SUITE_ADMIN_EMAIL}, 'super_admin') RETURNING id`;
+  actorId = created.id;
 
   const eligible = await eligibleClubsForSeason(seasonA);
   expect(eligible.length, 'need eligible clubs for the first list season').toBeGreaterThan(1);
@@ -329,7 +336,7 @@ afterAll(async () => {
   await admin`DELETE FROM external_identities WHERE player_id = ANY(${ids}::int[])`;
   await admin`DELETE FROM player_club_season_stats WHERE player_id = ANY(${ids}::int[])`;
   await admin`DELETE FROM players WHERE id = ANY(${ids}::int[])`;
-  if (createdThrowawayAdmin) await admin`DELETE FROM auth_users WHERE id = ${actorId}`;
+  await removeSuiteAdmin();
 
   delete process.env.AFLDB_SEASON_LIST_TEST_MAX_SEASON;
   await admin.end({ timeout: 5 });
@@ -446,7 +453,10 @@ describe('add (§12.1)', () => {
   });
 
   it('refuses every season below FIRST_LIST_SEASON, and writes nothing (D-2, I-4)', async () => {
-    for (const season of [maxYear, FIRST_LIST_SEASON - 1, 1990]) {
+    // Seasons the test knows are below the bound. It used to include `maxYear` (the register's last season), which is
+    // FIRST_LIST_SEASON - 1 only while no 2027 season row exists; the accepted rebuild already holds one (maxYear 2027), so the
+    // "refused" claim was made about a season the rule rightly accepts, and the write it then made leaked committed rows.
+    for (const season of [FIRST_LIST_SEASON - 1, FIRST_LIST_SEASON - 2, 1990]) {
       const result = await addSeasonListMember({
         season, clubSlug: clubA.slug, playerId: manualPlayerId, adminUserId: actorId,
       });

@@ -97,6 +97,7 @@ let createdAward = false;
 let actorId = 0;
 let awardId = 0;
 let firstImportBatchId = 0; // batches the offline loader creates during this run are removed again
+let importBatchBaselineKnown = false; // false until seed() has recorded the baseline: until then there is nothing the suite created to remove
 const playerIds = {} as Record<Letter, number>;
 const clubIds: number[] = [];
 const matchIds = {} as Record<string, number>;
@@ -108,6 +109,7 @@ const matchIds = {} as Record<string, number>;
 async function seed(): Promise<void> {
   const [batch] = await owner<{ id: number }[]>`SELECT coalesce(max(id), 0)::int AS id FROM import_batches`;
   firstImportBatchId = batch.id;
+  importBatchBaselineKnown = true;
   for (const [key, kind] of [['afltables', 'scrape'], ['manual_admin_edit', 'manual'], ['draftguru', 'scrape']] as const) {
     const created = await owner`
       INSERT INTO sources (key, name, kind) VALUES (${key}, ${`${MARKER} ${key}`}, ${kind})
@@ -184,10 +186,27 @@ async function purge(): Promise<void> {
   await owner`DELETE FROM data_edits WHERE table_name = 'award_winners' AND admin_user_id IN (SELECT id FROM auth_users WHERE email = ${`${MARKER}@example.invalid`})`;
   await owner`DELETE FROM data_overrides WHERE entity_type = 'award_winners' AND entity_key LIKE ${`%${MARKER}%`}`;
   await owner`DELETE FROM player_link_resolutions WHERE target_table = 'award_winners' AND admin_user_id IN (SELECT id FROM auth_users WHERE email = ${`${MARKER}@example.invalid`})`;
-  await owner`DELETE FROM award_winners WHERE award_id = ${awardId} AND season = ${SEASON}`;
-  await owner`DELETE FROM import_batches WHERE id > ${firstImportBatchId}`;
-  await owner`DELETE FROM derived_award_projections WHERE award_slug = 'coleman' AND season = ${SEASON}`;
-  await owner`DELETE FROM derived_award_results WHERE award_slug = 'coleman' AND season = ${SEASON}`;
+  // Run 4 (baseline finding F-001): only rows the suite OWNS. Every row this suite writes carries one of its own keys: its
+  // synthetic players (`${MARKER}-<letter>`), a source_record_id naming the marker, or its acting user. A real Coleman 2001 row
+  // (present on any populated database, which is why beforeAll refuses to run there) has none of them, so a refused run's
+  // teardown can no longer delete it. This was `WHERE award_id = ... AND season = 2001`, which removed the real row.
+  await owner`
+    DELETE FROM award_winners
+     WHERE season = ${SEASON}
+       AND award_id IN (SELECT id FROM awards WHERE slug = 'coleman')
+       AND (player_id IN (SELECT id FROM players WHERE slug LIKE ${`${MARKER}-%`})
+            OR source_record_id LIKE ${`%${MARKER}%`})`;
+  // Import batches created during this run only; with no recorded baseline nothing was created, so nothing is deleted
+  // (`id > 0` on a populated database would have named every batch).
+  if (importBatchBaselineKnown) await owner`DELETE FROM import_batches WHERE id > ${firstImportBatchId}`;
+  await owner`
+    DELETE FROM derived_award_projections
+     WHERE award_slug = 'coleman' AND season = ${SEASON}
+       AND projected_by IN (SELECT id FROM auth_users WHERE email = ${`${MARKER}@example.invalid`})`;
+  await owner`
+    DELETE FROM derived_award_results
+     WHERE award_slug = 'coleman' AND season = ${SEASON}
+       AND published_by IN (SELECT id FROM auth_users WHERE email = ${`${MARKER}@example.invalid`})`;
 }
 
 async function teardown(): Promise<void> {

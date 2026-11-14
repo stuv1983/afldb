@@ -162,15 +162,21 @@ describe('coaching thresholds match a hand-written HAVING', () => {
     ['wins >= 25', 'wins', 25, 14],
   ];
 
-  it.each(cases)('Richmond coaches with %s', async (_label, metric, value, expectedCount) => {
+  // Run 4 (rbfail), owner decision 363-W: the pinned counts are a measurement of Richmond's coaching THROUGH 2025 (the evidence run
+  // predates any 2026 coaching assignment). A database that also holds the 2026 season (the accepted rebuild) has Adem Yze's 2026
+  // games on top, which lifts him past 50 games (15, not 14), so the unbounded count is not a stable fact. Each case is therefore
+  // asserted twice: bounded at 2025 against the pinned count, and unbounded against the hand-written HAVING only (no pin).
+  async function richmondCoachesAtLeast(metric: 'games' | 'wins', value: number, throughSeason: number | null) {
     const richmond = await clubRef('Richmond');
     const { total } = await coachRecord(plan({
-      scope: { clubFor: richmond }, metric, metricCondition: { op: 'gte', value },
+      scope: throughSeason === null ? { clubFor: richmond } : { clubFor: richmond, seasonMax: throughSeason },
+      metric, metricCondition: { op: 'gte', value },
     }));
 
     const measured = metric === 'games'
       ? sql`count(*) >= ${value}`
       : sql`count(*) FILTER (WHERE m.winner_club_id = mc.club_id) >= ${value}`;
+    const bound = throughSeason === null ? sql`TRUE` : sql`m.season <= ${throughSeason}`;
     const [expected] = await sql<{ count: string }[]>`
       SELECT count(*) AS count FROM (
         SELECT c.id
@@ -178,12 +184,22 @@ describe('coaching thresholds match a hand-written HAVING', () => {
           JOIN matches m ON m.id = mc.match_id
           JOIN coaches c ON c.id = mc.coach_id
          WHERE mc.club_id IN (SELECT id FROM clubs WHERE organization_id = ${richmond.organizationId})
+           AND ${bound}
          GROUP BY c.id
         HAVING ${measured}
       ) q
     `;
-    expect(Number(expected.count)).toBe(expectedCount);
-    expect(total).toBe(expectedCount);
+    return { total, handWritten: Number(expected.count) };
+  }
+
+  it.each(cases)('Richmond coaches with %s', async (_label, metric, value, expectedCount) => {
+    const bounded = await richmondCoachesAtLeast(metric, value, 2025);
+    expect(bounded.handWritten).toBe(expectedCount);
+    expect(bounded.total).toBe(expectedCount);
+
+    const unbounded = await richmondCoachesAtLeast(metric, value, null);
+    expect(unbounded.total).toBe(unbounded.handWritten);
+    expect(unbounded.handWritten).toBeGreaterThanOrEqual(expectedCount); // later seasons only ever add games
   });
 });
 

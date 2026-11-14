@@ -29,7 +29,7 @@ import './guard';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { sql } from '@/db/client';
 import { getFamilyRecords, getFamilyRecordsSummary } from '@/db/queries/family-records';
@@ -67,14 +67,54 @@ const M_D1 = {
   parentChildRows: 127,
 } as const;
 
-/** afldb_test ids, from the evidence transcript. */
-const BRENT_HARVEY = 2164;
-const SHANE_HARVEY = 11789;
-const COOPER_HARVEY = 3048;
-const ROBERT_WALLS = 11145;      // son David Walls is UNLINKED
-const SHANE_MORRISON = 11802;    // father Peter Morrison is UNLINKED
-const GARY_ABLETT_SNR = 4700;    // same display name as 4701
-const GARY_ABLETT_JNR = 4701;
+/**
+ * The people the assertions pin, resolved by STABLE identity (run 4, rbfail): the AFL Tables profile path in
+ * `external_identities`, the provider's own key, which does not change when a database is rebuilt. These were bare `players.id`
+ * literals ("afldb_test ids, from the evidence transcript"), and a player's surrogate id is an artefact of the load that created it: the
+ * accepted rebuild numbers the same people differently (Brent Harvey is 2164 on the 4 Nov snapshot and 2172 on the rebuild, where 2164 is
+ * Brent Crosswell; the two Gary Abletts are 4700/4701 and 4720/4721; Rhyce Shaw is 10974 and 11043), so every assertion that named one
+ * silently asked about a different player there (measured 2026-11-15, rebuild restored per RESTORE.md, aggregates and ids only).
+ *
+ * Provenance of each path: the AFL Tables profile of the person the old literal named on the 4 Nov 2026 snapshot (read from
+ * `external_identities`, source `afltables`, status `unique`; one identity each; display names in the comments).
+ */
+const PROFILE = {
+  BRENT_HARVEY: 'players/B/Brent_Harvey.html',
+  SHANE_HARVEY: 'players/S/Shane_Harvey.html',
+  COOPER_HARVEY: 'players/C/Cooper_Harvey.html',
+  ROBERT_WALLS: 'players/R/Robert_Walls.html',          // son David Walls is UNLINKED
+  SHANE_MORRISON: 'players/S/Shane_Morrison.html',      // father Peter Morrison is UNLINKED
+  GARY_ABLETT_SNR: 'players/G/Gary_Ablett0.html',       // same display name as the Jnr below
+  GARY_ABLETT_JNR: 'players/G/Gary_Ablett1.html',
+  RHYCE_SHAW: 'players/R/Rhyce_Shaw.html',
+} as const;
+
+/** Resolved once in `beforeAll`; zero until then. */
+let BRENT_HARVEY = 0;
+let SHANE_HARVEY = 0;
+let COOPER_HARVEY = 0;
+let ROBERT_WALLS = 0;
+let SHANE_MORRISON = 0;
+let GARY_ABLETT_SNR = 0;
+let GARY_ABLETT_JNR = 0;
+let RHYCE_SHAW = 0;
+
+async function playerIdByProfile(path: string): Promise<number> {
+  const rows = await sql<{ id: number }[]>`
+    SELECT e.player_id AS id
+      FROM external_identities e JOIN sources s ON s.id = e.source_id
+     WHERE s.key = 'afltables' AND e.external_id = ${path} AND e.status IN ('unique', 'resolved') AND e.player_id IS NOT NULL`;
+  if (rows.length !== 1) throw new Error(`fixture identity ${path} must resolve to exactly one player; found ${rows.length}`);
+  return rows[0].id;
+}
+
+beforeAll(async () => {
+  [BRENT_HARVEY, SHANE_HARVEY, COOPER_HARVEY, ROBERT_WALLS, SHANE_MORRISON, GARY_ABLETT_SNR, GARY_ABLETT_JNR, RHYCE_SHAW] =
+    await Promise.all([
+      PROFILE.BRENT_HARVEY, PROFILE.SHANE_HARVEY, PROFILE.COOPER_HARVEY, PROFILE.ROBERT_WALLS, PROFILE.SHANE_MORRISON,
+      PROFILE.GARY_ABLETT_SNR, PROFILE.GARY_ABLETT_JNR, PROFILE.RHYCE_SHAW,
+    ].map(playerIdByProfile));
+});
 
 function plan(overrides: Partial<NlQueryPlan>): NlQueryPlan {
   const raw: NlQueryPlan = {
@@ -470,8 +510,7 @@ const M_153 = {
   fathersWhoCoached: 11,
 } as const;
 
-/** Rhyce Shaw -- the whole of X3 (Stage 0 §4.7). */
-const RHYCE_SHAW = 10974;
+/** Rhyce Shaw -- the whole of X3 (Stage 0 §4.7); resolved by profile identity above (PROFILE.RHYCE_SHAW). */
 
 describe('FS1 — players selected under the father-son rule (AFLDB-ISSUE-153)', () => {
   it('is 99 players, and the builder agrees with a hand-written query', async () => {
@@ -976,6 +1015,7 @@ describe('the family grain (AFLDB-ISSUE-153 Stage 6, D6)', () => {
     expect(answer.rows).toHaveLength(expected);
   });
 
+  // The ids in the title are the 4 Nov snapshot's (the title is kept so the test keeps its identity); the people are resolved by profile above.
   it('disambiguates the Ablett family by id: 4700 and 4701 both display "Gary Ablett"', async () => {
     const board = await getFamilyRecords(1000);
     const ablett = board.find((r) => r.members.some((m) => m.playerId === GARY_ABLETT_SNR)

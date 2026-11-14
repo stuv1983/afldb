@@ -57,6 +57,14 @@ import type { GridAxisState } from '@/search/grid-solver-spec';
 
 const VOID_REASON = 'AFLDB-ISSUE-167 Stage 5 suppression test';
 
+/** The suite-owned source of the unlinked first-kick fixture row, created only when the database holds none (see `beforeAll`). */
+const UNLINKED_FIXTURE_SOURCE_KEY = 'cd_i4060_suppression_fixture_source';
+
+async function removeUnlinkedFixture(): Promise<void> {
+  await sql`DELETE FROM player_achievements WHERE source_id IN (SELECT id FROM sources WHERE key = ${UNLINKED_FIXTURE_SOURCE_KEY})`;
+  await sql`DELETE FROM sources WHERE key = ${UNLINKED_FIXTURE_SOURCE_KEY}`;
+}
+
 afterAll(async () => {
   await sql.end();
 });
@@ -148,10 +156,30 @@ beforeAll(async () => {
        AND a.imported_at = (SELECT max(imported_at) FROM player_achievements
                              WHERE achievement_type = 'first_kick_goal')`;
 
-  const [unlinked] = await sql<{ id: number; playerName: string }[]>`
+  const discoverUnlinked = () => sql<{ id: number; playerName: string }[]>`
     SELECT a.id::int, a.player_name_raw AS "playerName" FROM player_achievements a
      WHERE a.achievement_type = 'first_kick_goal' AND a.link_status_value = 'unmatched'
      ORDER BY a.id LIMIT 1`;
+  let [unlinked] = await discoverUnlinked();
+  if (!unlinked) {
+    // Run 4 (rbfail): a database with no unlinked first-kick row (the accepted rebuild links all 334) used to fail here with "this
+    // database has not been loaded". The fixture is a row the suite creates when none exists: synthetic source and record id
+    // (prefix CD_I4060), an `imported_at` older than every real row so it cannot become the "newest import" fixture below, season 2026
+    // (present on every base), removed again in `afterAll`.
+    const [source] = await sql<{ id: number }[]>`
+      INSERT INTO sources (key, name, kind, url)
+      VALUES (${UNLINKED_FIXTURE_SOURCE_KEY}, 'CD_I4060 suppression fixture source', 'manual', 'https://example.invalid/i4060') RETURNING id`;
+    await sql`
+      INSERT INTO player_achievements (
+        achievement_type, player_name_raw, player_name_clean, link_status_value,
+        candidate_count, club_name_raw, season, round_raw,
+        source_id, source_record_id, notes, imported_at
+      ) VALUES (
+        'first_kick_goal', 'CD_I4060 Unlinked', 'CD_I4060 Unlinked', 'unmatched', 0, 'CD_I4060 Club', 2026, '1',
+        ${source.id}, 'CD_I4060-suppression-unlinked', 'CD_I4060 fixture', '1970-01-01T00:00:00Z'
+      )`;
+    [unlinked] = await discoverUnlinked();
+  }
 
   const [soleWinner] = await sql<{ id: number; playerId: number; season: number }[]>`
     SELECT min(k.id)::int AS id, k.player_id::int AS "playerId", min(k.season)::int AS season
@@ -182,8 +210,12 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  expect(await voidCounts(), 'this suite must leave no void row behind')
-    .toEqual({ achievements: 0, kicks: 0 });
+  try {
+    expect(await voidCounts(), 'this suite must leave no void row behind')
+      .toEqual({ achievements: 0, kicks: 0 });
+  } finally {
+    await removeUnlinkedFixture();
+  }
 });
 
 function achievementPlan(kind: 'by_club' | 'by_season' | 'clubs_without' | 'earliest'): NlQueryPlan {
