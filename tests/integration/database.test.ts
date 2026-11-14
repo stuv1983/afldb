@@ -213,7 +213,12 @@ describe('data integrity', () => {
     // AFLDB-ISSUE-108: re-pinned to the accepted canonical baseline
     // full-history-20260827 (measured.player_match_rows = 685,471). 694,210 was
     // the retired legacy SQLite import.
-    expect(row.n).toBe(685_471);
+    // AFLDB-ISSUE-363 (run 3, integb): re-pinned to the accepted baseline c2-2026-final-core-v1
+    // (data/reference/fitzroy-accepted-baselines.json, measured.player_match_rows = 695,499). The
+    // 685,471 witness was measured on the retired full-history-20260827 baseline, which stopped
+    // before 2026 was completed: on the rebuilt c2 database the rows of seasons <= 2025 are still
+    // exactly 685,471 and the 10,028 rows of 2026 are the whole difference.
+    expect(row.n).toBe(695_499);
   });
 
   it('has no orphan player-match rows', async () => {
@@ -474,7 +479,10 @@ describe('advanced search regression cases', () => {
     // AFLDB-ISSUE-136: 115 → 114 — Charlie Cameron is one canonical player with
     // 254 games / 27 finals once his renumbered AFL Tables profile was folded, so
     // he has left the 200-249 band.
-    expect(row.n).toBe(114);
+    // AFLDB-ISSUE-363 (run 3, integb): 114 -> 120 on the accepted c2 baseline. 114 was measured on the
+    // retired full-history-20260902 baseline; derived independently from player_match_stats the cohort
+    // over seasons <= 2025 is still 114 and the 2026 season (complete in c2) adds the rest.
+    expect(row.n).toBe(120);
   });
 
   // AFLDB-ISSUE-108: skipped while no canonical career-Brownlow acquisition existed.
@@ -486,7 +494,10 @@ describe('advanced search regression cases', () => {
       SELECT count(*)::int AS n FROM player_career_stats
        WHERE goals BETWEEN 50 AND 199 AND brownlow_votes = 0
     `;
-    expect(row.n).toBe(261);
+    // AFLDB-ISSUE-363 (run 3, integb): 261 -> 268 on the accepted c2 baseline (261 was measured on the
+    // retired canonical rebuild before 2026 completed; goals through season 2025 from the fact table,
+    // with career Brownlow votes = 0, still give 261).
+    expect(row.n).toBe(268);
   });
 
   it('200+ games, 100+ goals and 15+ finals', async () => {
@@ -494,7 +505,11 @@ describe('advanced search regression cases', () => {
       SELECT count(*)::int AS n FROM player_career_stats
        WHERE games >= 200 AND goals >= 100 AND finals >= 15
     `;
-    expect(row.n).toBe(219);
+    // AFLDB-ISSUE-363 (run 3, integb): 219 -> 223 on the accepted c2 baseline. 219 was measured before
+    // 2026 completed: derived independently from player_match_stats the cohort over seasons <= 2025
+    // is still 219, and over all seasons (finals counted as player_career_stats counts them,
+    // is_finals_series) it is 223.
+    expect(row.n).toBe(223);
   });
 });
 
