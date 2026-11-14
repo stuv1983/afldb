@@ -1,0 +1,968 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem2-lint364-20261114/cand
+
+ ❯ tests/deploy-release.test.ts (54 tests | 7 failed) 23783ms
+     ✓ names a release by revision prefix and BUILD_ID, and refuses anything else 6ms
+     ✓ classifies only the server's own ISR output as allowed drift 2ms
+     ✓ fails a missing, changed or added code file and reports ISR drift without failing 3ms
+     ✓ round-trips a sha256sum-format manifest in path order 1ms
+     ✓ treats Next render failures and health errors in the smoke log as failures 1ms
+     ✓ reads MemAvailable and swap from /proc/meminfo 1ms
+     ✓ parses its CLI options with the documented defaults 1ms
+     ✓ signs a smoke beta claim the application middleware accepts, and none without a secret 8ms
+     ✓ derives the deny list from the unit, so every DSN the unit drops is dropped 3ms
+     ✓ applies EnvironmentFile, then UnsetEnvironment, then Environment=, as systemd does 1ms
+     ✓ moves only the working directory and the writable path to the release root 2ms
+     ✓ logs the build identity at every start, outside the opt-in tracing branch 1ms
+     ✓ needs nothing but Node built-ins and the env-file guard, so it runs before npm ci 1ms
+     ✓ recognises a RUNNING upgrade by command line, and never the always-on shutdown handler 1ms
+     ✓ reads systemctl show properties and UTC timestamps, and nothing it cannot be sure of 1ms
+     ✓ refuses promote while apt runs or is due inside the window, and lets a clear host through 1ms
+     ✓ never refuses a rollback on host state: the emergency path stays open, with a warning 0ms
+     ✓ reports a pending reboot, and treats a missing needrestart hold as a warning unless strict 1ms
+     ✓ recognises the owner needrestart hold, and not the stock configuration production runs today 1ms
+     ✓ the shipped needrestart policy is the one the gate recognises, and the apt policy keeps security updates 2ms
+     ✓ flags a restart that coincides with an unattended-upgrade run as not the owner's, and accepts a confirmed one 3ms
+     ✓ refuses rollback only on a PROVEN schema mismatch, and never because the database is unreachable 2ms
+     ✓ compares the installed tree with the lock: version, integrity, extraneous and missing, but not optional or omitted dev packages 2ms
+     × check-node-modules exits 1 on drift, 0 on a matching or unrecorded tree; the settle wrapper only warns 319ms
+       × real drift: the DRIFT marker, not the CHECK_FAILED one, and the run continues 94ms
+       ✓ a matching or unrecorded tree prints neither marker 154ms
+       × a refusal or crash that exits 1 (the same code as drift): the CHECK_FAILED marker with the exit code, never the DRIFT marker, and the run continues 65ms
+       × a usage refusal that exits 2: the CHECK_FAILED marker with the exit code, never the DRIFT marker, and the run continues 63ms
+       × an interrupt that exits 130: the CHECK_FAILED marker with the exit code, never the DRIFT marker, and the run continues 51ms
+       × a Node that cannot be executed is a failed check, not drift 5ms
+       × a check that merely mentions the drift text in a failure is still a failed check 59ms
+     ✓ adds the attended and host-state options to the CLI without changing its defaults 1ms
+     ✓ builds outside the checkout, validates, boots the candidate and promotes it  2888ms
+     ✓ a failing build leaves the serving release, its assets and the links untouched  1308ms
+     ✓ a type error fails the build; off-host type-checking needs recorded evidence; nothing changes  1288ms
+     ✓ a build interrupted by SIGTERM is stopped with its whole process group; nothing changes  1302ms
+     ✓ a build interrupted by SIGHUP is stopped with its whole process group; nothing changes  1299ms
+     ✓ a SIGKILLed tool leaves an orphan only in its workspace; the next build reaps it  2462ms
+     ✓ the memory guard kills a build that drives MemAvailable below the floor; nothing changes  1918ms
+     ✓ promotes a second release, then rolls back to the retained one without building, even mid-build  6659ms
+     ✓ ISSUE-351: promote and rollback are attended; the host gate and the ledger check refuse before any link moves  637ms
+     ✓ ISSUE-351: status --expect fails a restart that coincides with an apt run, and names the owner's way past it  726ms
+     ✓ verify fails a tampered release and tolerates the server's ISR output 278ms
+     ✓ adopt --from-manifest takes a settled regenerated ISR page live and refuses a changed code file 218ms
+     ✓ finds a symlink that leaves the release, and accepts one that stays inside 3ms
+     ✓ switches a link by rename and refuses a link that points outside releases/ 2ms
+     ✓ passes when the previous build is 404 everywhere, deriving it from the retained previous release 197ms
+     ✓ reports an old Cloudflare cache HIT of the previous build separately and still passes 195ms
+     ✓ fails when the origin still serves the previous build on loopback 194ms
+     ✓ fails when the cache-busted public request reaches an origin serving the previous build, even beside a cache HIT 198ms
+     ✓ fails a public 200 for the previous build that is not a cache HIT 197ms
+     ✓ fails when status --expect fails (identity) 192ms
+     ✓ fails when the public health check reports a database error 194ms
+     ✓ fails a public asset whose bytes are not the release's, and one that is missing  389ms
+stdout | tests/workflow-preflight.test.ts > AFLDB-ISSUE-364 ratcheting lint gate > refusals (exit 2) never fall through to a pass > the CLI refuses with exit 2 for a missing or malformed baseline, never a stack trace
+Lint gate: 0 error(s) now; baseline allows 338.
+  paid down (tighten with --update): .phaneslight/scripts/api-diff.js: @typescript-eslint/no-require-imports 2 -> 0
+  paid down (tighten with --update): .phaneslight/scripts/cli.js: @typescript-eslint/no-require-imports 2 -> 0
+  paid down (tighten with --update): .phaneslight/scripts/regen-registry.js: @typescript-eslint/no-require-imports 3 -> 0
+  paid down (tighten with --update): .phaneslight/scripts/registry-lib.js: @typescript-eslint/no-require-imports 5 -> 0
+  paid down (tighten with --update): src/app/admin/AdminNav.tsx: react-hooks/set-state-in-effect 1 -> 0
+  paid down (tighten with --update): src/app/admin/AdminSection.tsx: react-hooks/set-state-in-effect 1 -> 0
+  paid down (tighten with --update): src/app/admin/nl-search/ClearTelemetryForm.tsx: react-hooks/set-state-in-effect 1 -> 0
+  paid down (tighten with --update): src/app/admin/settings/SearchPlaceholderSettings.tsx: react-hooks/set-state-in-effect 2 -> 0
+  paid down (tighten with --update): src/components/CoachOpponentHistoryClient.tsx: react-hooks/set-state-in-effect 1 -> 0
+  paid down (tighten with --update): src/components/ConsentBanner.tsx: react-hooks/set-state-in-effect 1 -> 0
+  paid down (tighten with --update): src/components/PlayerPicker.tsx: react-hooks/set-state-in-effect 1 -> 0
+  paid down (tighten with --update): src/components/ReorderableSections.tsx: react-hooks/set-state-in-effect 1 -> 0
+  paid down (tighten with --update): src/components/SearchBox.tsx: react-hooks/set-state-in-effect 2 -> 0
+  paid down (tighten with --update): tests/afl-api-match.test.ts: @typescript-eslint/no-explicit-any 3 -> 0
+  paid down (tighten with --update): tests/afl-api-settle-plan.test.ts: @typescript-eslint/no-explicit-any 3 -> 0
+  paid down (tighten with --update): tests/award-definitions-source.test.ts: @typescript-eslint/no-explicit-any 1 -> 0
+  paid down (tighten with --update): tests/coleman-derivation.test.ts: @typescript-eslint/no-explicit-any 2 -> 0
+  paid down (tighten with --update): tests/db-test-rebuild.test.ts: @next/next/no-assign-module-variable 1 -> 0
+  paid down (tighten with --update): tests/db-test-rebuild.test.ts: @typescript-eslint/no-explicit-any 45 -> 0
+  paid down (tighten with --update): tests/draftguru-acquisition.test.ts: @typescript-eslint/no-explicit-any 49 -> 0
+  paid down (tighten with --update): tests/expandable-table-frame.test.ts: react/no-children-prop 3 -> 0
+  paid down (tighten with --update): tests/fitzroy-acquisition.test.ts: @typescript-eslint/no-explicit-any 6 -> 0
+  paid down (tighten with --update): tests/fitzroy-core-import.test.ts: @typescript-eslint/no-explicit-any 35 -> 0
+  paid down (tighten with --update): tests/gap029-assembly.test.ts: @typescript-eslint/no-explicit-any 15 -> 0
+  paid down (tighten with --update): tests/gap029-ops.test.ts: @typescript-eslint/no-explicit-any 16 -> 0
+  paid down (tighten with --update): tests/integration/dob-enrichment-issues.test.ts: @typescript-eslint/no-explicit-any 15 -> 0
+  paid down (tighten with --update): tests/integration/player-link-concurrency.test.ts: @typescript-eslint/no-explicit-any 15 -> 0
+  paid down (tighten with --update): tests/integration/settle-afl-api-brownlow-backtest.test.ts: @typescript-eslint/no-explicit-any 3 -> 0
+  paid down (tighten with --update): tests/integration/settle-afl-api-brownlow-reschedule.test.ts: @typescript-eslint/no-explicit-any 3 -> 0
+  paid down (tighten with --update): tests/integration/settle-afl-api-brownlow.test.ts: @typescript-eslint/no-explicit-any 3 -> 0
+  paid down (tighten with --update): tests/integration/settle-afl-api-fixtures.test.ts: @typescript-eslint/no-explicit-any 3 -> 0
+  paid down (tighten with --update): tests/nl-ui-corpus.test.ts: @typescript-eslint/no-require-imports 2 -> 0
+  paid down (tighten with --update): tests/player-identity-source.test.ts: @typescript-eslint/no-explicit-any 1 -> 0
+  paid down (tighten with --update): tests/player-link-mutations.test.ts: @typescript-eslint/no-explicit-any 20 -> 0
+  paid down (tighten with --update): tests/reference-data.test.ts: @typescript-eslint/no-explicit-any 31 -> 0
+  paid down (tighten with --update): tests/rising-star-winners-source.test.ts: @typescript-eslint/no-explicit-any 1 -> 0
+  paid down (tighten with --update): tools/db/rebuild-test.ts: @typescript-eslint/no-explicit-any 7 -> 0
+  paid down (tighten with --update): tools/v2/brownlow-isolated-e2e.mts: prefer-const 2 -> 0
+  paid down (tighten with --update): tools/v2/gap029-assemble-restore-evidence.ts: @typescript-eslint/no-explicit-any 2 -> 0
+  paid down (tighten with --update): tools/v2/gap029-common.ts: @typescript-eslint/no-explicit-any 1 -> 0
+  paid down (tighten with --update): tools/v2/gap029-ops-lib.ts: @typescript-eslint/no-explicit-any 13 -> 0
+  paid down (tighten with --update): tools/v2/gap029-ops.ts: @typescript-eslint/no-explicit-any 9 -> 0
+  paid down (tighten with --update): tools/v2/gap029-stage.ts: @typescript-eslint/no-explicit-any 4 -> 0
+  paid down (tighten with --update): tools/v2/rehearsal-package.d.mts: @typescript-eslint/no-explicit-any 1 -> 0
+Lint gate: PASSED.
+
+ ❯ tests/workflow-preflight.test.ts (61 tests | 20 failed) 5548ms
+     ✓ keeps the current checkout migration numbers and names unique 27ms
+     ✓ parses the tracked migration naming contract 1ms
+     ✓ refuses a numeric-prefix collision across a branch and worktree 2ms
+     ✓ refuses one migration name with different contents, but collapses identical copies 1ms
+     ✓ treats checkout-only CRLF/LF differences as identical migration content 1ms
+     ✓ reports stale and branch-local migration sets deterministically 1ms
+     ✓ refuses pending, unknown and checksum-mismatched applied migrations 1ms
+     ✓ scans a detached HEAD with the base, main, origin/main and unmerged refs 236ms
+     ✓ still scans an unmerged branch from a detached HEAD 150ms
+     ✓ still throws on a genuine git symbolic-ref failure 147ms
+     ✓ keeps main merge-only without blocking merge or read-only sessions 4ms
+     ✓ accepts only environment-variable names for database configuration 2ms
+     ✓ refuses test-vs-dev target mistakes 2ms
+     ✓ detects the exact Git Bash path conversion seen in ISSUE-139 1ms
+     ✓ resolves source to afldb_test and target to the exact environment database 1ms
+     ✓ refuses invalid side combinations before any database contact 4ms
+     ✓ judges the connected database by side 1ms
+     ✓ proves target import/backup identity without reading the migration ledger 6ms
+     ✓ still requires migration parity on the source 5ms
+     ✓ shares the exact settle-manifest pattern with the DEV deploy classifier 1ms
+     ✓ downgrades only untracked settle manifests to WARN in promotion mode 1ms
+     ✓ keeps every other dirty path a promotion blocker 2ms
+     ✓ does not relax rebuild, deploy, implementation or merge 1ms
+     ✓ classifies real git -z output from a checkout 96ms
+     ✓ creates a fresh branch/worktree at the exact fetched main SHA 168ms
+     ✓ refuses an existing target directory without deleting its contents 107ms
+     ✓ refuses an existing branch instead of silently reusing stale state 135ms
+     ✓ copies only an explicitly approved same-issue handoff 158ms
+     ✓ does not copy or ignore arbitrary untracked files 108ms
+     ✓ reports a clean, current, scoped issue branch READY with ahead/behind evidence 210ms
+     ✓ blocks staged/unstaged changes and lists their path 211ms
+     ✓ does not count an unstaged-only first path as staged 216ms
+     ✓ blocks and lists untracked files 219ms
+     ✓ blocks a branch behind current clean origin/main and reports both counts 239ms
+     ✓ blocks a migration-number collision 212ms
+     ✓ blocks a committed file outside the declared issue scope 211ms
+     ✓ blocks an explicitly unresolved hard blocker in the runbook 205ms
+       × runs the gate and reports it as a ratchet against recorded debt, not clean lint 237ms
+       × blocks when a file's error count rises 208ms
+       × blocks a new rule in an old file and a new file with errors 205ms
+       × passes a decrease but warns that the baseline is not yet tightened (ratchet slack is not forced out) 221ms
+       × refuses, with a named reason, when the baseline is missing 200ms
+       × refuses a malformed baseline (not JSON) 203ms
+       × refuses a malformed baseline (an array) 204ms
+       × refuses a malformed baseline (a negative count) 212ms
+       × refuses a malformed baseline (a fractional count) 213ms
+       × refuses a malformed baseline (a non-object rule map) 276ms
+       × refuses, with a named reason, when ESLint is not installed or prints no JSON 197ms
+     ✓ counts error severity per repository-relative file and rule, and ignores warnings 1ms
+     ✓ fails a new error, a new file and a rule above its baseline 1ms
+     ✓ passes and reports paid-down debt without failing 0ms
+     × B-07: a failed ESLint spawn is a named refusal (exit 2), not a TypeError 2ms
+       × ESLint ending abnormally or printing a non-list is refused, whatever it printed 2ms
+       × an unspawnable ESLint is a refusal through the evaluation used by preflight too 2ms
+       × the CLI refuses with exit 2 for a missing or malformed baseline, never a stack trace 56ms
+       × runs only for implementation and merge, never read-only, rebuild, promotion or deploy 1ms
+       × a regression is a FAIL naming the pair, so the preflight is BLOCKED 1ms
+       × a refusal and a thrown gate are both FAIL with the reason, never skipped 1ms
+       × preflight.ts feeds every finding of the step into the report that decides BLOCKED 2ms
+       × parses, and holds no more than the 338 errors in 43 files recorded when the gate was wired 1ms
+     ✓ serialises with stable key order so a baseline diff shows only real change 0ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 27 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/deploy-release.test.ts > AFLDB-ISSUE-351 — the attended gate and the activation audit (pure) > check-node-modules exits 1 on drift, 0 on a matching or unrecorded tree; the settle wrapper only warns
+AssertionError: expected 'deploy/release.mjs check-node-modules…' to match /\|\| nm_status=\$\?/
+
+- Expected:
+/\|\| nm_status=\$\?/
+
++ Received:
+"deploy/release.mjs check-node-modules --checkout \"$PROJECT_ROOT\" \\
+    || echo \"AFLDB_NODE_MODULES_DRIFT: node_modules differ from package-lock.json; the run continues (ISSUE-364)\" >&2
+fi
+
+# --- the season --------------"
+
+ ❯ tests/deploy-release.test.ts:398:47
+    396|     expect(check).toBeGreaterThan(wrapper.indexOf('export AFLDB_SKIP_D…
+    397|     expect(check).toBeLessThan(wrapper.indexOf('"$NODE" "$TSX"'));
+    398|     expect(wrapper.slice(check, check + 220)).toMatch(/\|\| nm_status=…
+       |                                               ^
+    399|     expect(wrapper).toContain('AFLDB_NODE_MODULES_DRIFT');
+    400|     expect(wrapper).toContain('AFLDB_NODE_MODULES_CHECK_FAILED');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/27]⎯
+
+ FAIL  tests/deploy-release.test.ts > AFLDB-ISSUE-351 — the attended gate and the activation audit (pure) > the settle wrapper tells drift from a check that failed to run (ISSUE-364 A-09) > real drift: the DRIFT marker, not the CHECK_FAILED one, and the run continues
+AssertionError: expected 'REACHED_THE_SEASON_STEP\n' to contain 'NODE_MODULES MISMATCH'
+
+- Expected
++ Received
+
+- NODE_MODULES MISMATCH
++ REACHED_THE_SEASON_STEP
++
+
+ ❯ tests/deploy-release.test.ts:436:26
+    434|       const run = runBlock(process.execPath, dir);
+    435|       expect(run.status).toBe(0);
+    436|       expect(run.stdout).toContain('NODE_MODULES MISMATCH');
+       |                          ^
+    437|       expect(run.stderr).toContain('AFLDB_NODE_MODULES_DRIFT: node_mod…
+    438|       expect(run.stderr).not.toContain('AFLDB_NODE_MODULES_CHECK_FAILE…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/27]⎯
+
+ FAIL  tests/deploy-release.test.ts > AFLDB-ISSUE-351 — the attended gate and the activation audit (pure) > the settle wrapper tells drift from a check that failed to run (ISSUE-364 A-09) > a refusal or crash that exits 1 (the same code as drift): the CHECK_FAILED marker with the exit code, never the DRIFT marker, and the run continues
+AssertionError: expected 'release: ERROR: boom\nAFLDB_NODE_MODU…' to contain 'AFLDB_NODE_MODULES_CHECK_FAILED: the …'
+
+- Expected
++ Received
+
+- AFLDB_NODE_MODULES_CHECK_FAILED: the node_modules check did not reach a verdict (exit 1); node_modules is NOT verified
++ release: ERROR: boom
++ AFLDB_NODE_MODULES_DRIFT: node_modules differ from package-lock.json; the run continues (ISSUE-364)
++
+
+ ❯ tests/deploy-release.test.ts:460:26
+    458|       const run = runBlock(process.execPath, dir);
+    459|       expect(run.status).toBe(0);
+    460|       expect(run.stderr).toContain(`AFLDB_NODE_MODULES_CHECK_FAILED: t…
+       |                          ^
+    461|       expect(run.stderr).not.toContain('AFLDB_NODE_MODULES_DRIFT');
+    462|       expect(run.stdout).toContain('REACHED_THE_SEASON_STEP');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/27]⎯
+
+ FAIL  tests/deploy-release.test.ts > AFLDB-ISSUE-351 — the attended gate and the activation audit (pure) > the settle wrapper tells drift from a check that failed to run (ISSUE-364 A-09) > a usage refusal that exits 2: the CHECK_FAILED marker with the exit code, never the DRIFT marker, and the run continues
+AssertionError: expected 'usage: node deploy/release.mjs ...\nA…' to contain 'AFLDB_NODE_MODULES_CHECK_FAILED: the …'
+
+- Expected
++ Received
+
+- AFLDB_NODE_MODULES_CHECK_FAILED: the node_modules check did not reach a verdict (exit 2); node_modules is NOT verified
++ usage: node deploy/release.mjs ...
++ AFLDB_NODE_MODULES_DRIFT: node_modules differ from package-lock.json; the run continues (ISSUE-364)
++
+
+ ❯ tests/deploy-release.test.ts:460:26
+    458|       const run = runBlock(process.execPath, dir);
+    459|       expect(run.status).toBe(0);
+    460|       expect(run.stderr).toContain(`AFLDB_NODE_MODULES_CHECK_FAILED: t…
+       |                          ^
+    461|       expect(run.stderr).not.toContain('AFLDB_NODE_MODULES_DRIFT');
+    462|       expect(run.stdout).toContain('REACHED_THE_SEASON_STEP');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/27]⎯
+
+ FAIL  tests/deploy-release.test.ts > AFLDB-ISSUE-351 — the attended gate and the activation audit (pure) > the settle wrapper tells drift from a check that failed to run (ISSUE-364 A-09) > an interrupt that exits 130: the CHECK_FAILED marker with the exit code, never the DRIFT marker, and the run continues
+AssertionError: expected 'AFLDB_NODE_MODULES_DRIFT: node_module…' to contain 'AFLDB_NODE_MODULES_CHECK_FAILED: the …'
+
+- Expected
++ Received
+
+- AFLDB_NODE_MODULES_CHECK_FAILED: the node_modules check did not reach a verdict (exit 130); node_modules is NOT verified
++ AFLDB_NODE_MODULES_DRIFT: node_modules differ from package-lock.json; the run continues (ISSUE-364)
++
+
+ ❯ tests/deploy-release.test.ts:460:26
+    458|       const run = runBlock(process.execPath, dir);
+    459|       expect(run.status).toBe(0);
+    460|       expect(run.stderr).toContain(`AFLDB_NODE_MODULES_CHECK_FAILED: t…
+       |                          ^
+    461|       expect(run.stderr).not.toContain('AFLDB_NODE_MODULES_DRIFT');
+    462|       expect(run.stdout).toContain('REACHED_THE_SEASON_STEP');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/27]⎯
+
+ FAIL  tests/deploy-release.test.ts > AFLDB-ISSUE-351 — the attended gate and the activation audit (pure) > the settle wrapper tells drift from a check that failed to run (ISSUE-364 A-09) > a Node that cannot be executed is a failed check, not drift
+AssertionError: expected 'sh: 6: /nonexistent/node: not found\n…' to match /AFLDB_NODE_MODULES_CHECK_FAILED: .*\(…/
+
+- Expected:
+/AFLDB_NODE_MODULES_CHECK_FAILED: .*\(exit 127\)/
+
++ Received:
+"sh: 6: /nonexistent/node: not found
+AFLDB_NODE_MODULES_DRIFT: node_modules differ from package-lock.json; the run continues (ISSUE-364)
+"
+
+ ❯ tests/deploy-release.test.ts:469:26
+    467|       const run = runBlock('/nonexistent/node', dir);
+    468|       expect(run.status).toBe(0);
+    469|       expect(run.stderr).toMatch(/AFLDB_NODE_MODULES_CHECK_FAILED: .*\…
+       |                          ^
+    470|       expect(run.stderr).not.toContain('AFLDB_NODE_MODULES_DRIFT');
+    471|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/27]⎯
+
+ FAIL  tests/deploy-release.test.ts > AFLDB-ISSUE-351 — the attended gate and the activation audit (pure) > the settle wrapper tells drift from a check that failed to run (ISSUE-364 A-09) > a check that merely mentions the drift text in a failure is still a failed check
+AssertionError: expected 'release: node_modules differ from pac…' to contain 'AFLDB_NODE_MODULES_CHECK_FAILED'
+
+- Expected
++ Received
+
+- AFLDB_NODE_MODULES_CHECK_FAILED
++ release: node_modules differ from package-lock.json: pretend
++ AFLDB_NODE_MODULES_DRIFT: node_modules differ from package-lock.json; the run continues (ISSUE-364)
++
+
+ ❯ tests/deploy-release.test.ts:476:26
+    474|       const dir = checkoutWith(`console.error('release: node_modules d…
+    475|       const run = runBlock(process.execPath, dir);
+    476|       expect(run.stderr).toContain('AFLDB_NODE_MODULES_CHECK_FAILED');
+       |                          ^
+    477|       expect(run.stderr).not.toContain('AFLDB_NODE_MODULES_DRIFT');
+    478|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/27]⎯
+
+ FAIL  tests/workflow-preflight.test.ts > merge readiness report > AFLDB-ISSUE-364 lint ratchet gate in merge:ready > runs the gate and reports it as a ratchet against recorded debt, not clean lint
+AssertionError: expected 'AFLDB merge readiness (read-only)\nNo…' to contain 'lint ratchet gate: no error count rose'
+
+- Expected
++ Received
+
+- lint ratchet gate: no error count rose
++ AFLDB merge readiness (read-only)
++ No fetch, stage, commit, merge, push, migration or test command will run.
++
++ PASS current branch: codex/issue-145
++ PASS issue worktree is clean
++      staged: 0; unstaged: 0; untracked: 0
++ PASS local main equals recorded origin/main
++      main: 30f7b93acf754d5314913e74c941756235181156
++      origin/main: 30f7b93acf754d5314913e74c941756235181156
++      No fetch was attempted; fetch/update main separately before treating the recorded ref as current.
++ PASS base/main relationship
++      ahead of main: 1; behind main: 0
++ PASS main worktree is clean: /tmp/afldb-workflow-z6hQL5/main
++ PASS migration collision/checksum parity (refs/remotes/origin/main)
++ INFO database migration parity not checked
++      Use the appropriate operational preflight when a database target is part of the merge contract.
++ PASS runbook readiness: issues/open/AFLDB-ISSUE-145.md
++      status: ready
++      hard blockers: 0
++ PASS recorded validation evidence
++      npm test -- focused: PASS
++ PASS committed files match the declared issue scope
++      changed: 2; expected rules: 2; unexpected: 0
++
++ Merge readiness: READY (0 blocker(s), 0 warning(s)).
+
+ ❯ tests/workflow-preflight.test.ts:750:26
+    748|       });
+    749|       expect(run.status, run.stdout).toBe(0);
+    750|       expect(run.stdout).toContain('lint ratchet gate: no error count …
+       |                          ^
+    751|       expect(run.stdout).toContain('2 error(s) in 1 file(s) now; the r…
+    752|       expect(run.stdout).toContain('Merge readiness: READY');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/27]⎯
+
+ FAIL  tests/workflow-preflight.test.ts > merge readiness report > AFLDB-ISSUE-364 lint ratchet gate in merge:ready > blocks when a file's error count rises
+AssertionError: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ tests/workflow-preflight.test.ts:760:26
+    758|         baseline: { 'src/a.ts': { 'no-x': 2 } },
+    759|       });
+    760|       expect(run.status).toBe(1);
+       |                          ^
+    761|       expect(run.stdout).toContain('REGRESSION: src/a.ts: no-x 2 -> 3'…
+    762|       expect(run.stdout).toContain('Merge readiness: BLOCKED');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/27]⎯
+
+ FAIL  tests/workflow-preflight.test.ts > merge readiness report > AFLDB-ISSUE-364 lint ratchet gate in merge:ready > blocks a new rule in an old file and a new file with errors
+AssertionError: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ tests/workflow-preflight.test.ts:770:26
+    768|         baseline: { 'src/a.ts': { 'no-x': 1 } },
+    769|       });
+    770|       expect(run.status).toBe(1);
+       |                          ^
+    771|       expect(run.stdout).toContain('REGRESSION: src/a.ts: no-y 0 -> 1'…
+    772|       expect(run.stdout).toContain('REGRESSION: src/new.ts: no-x 0 -> …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/27]⎯
+
+ FAIL  tests/workflow-preflight.test.ts > merge readiness report > AFLDB-ISSUE-364 lint ratchet gate in merge:ready > passes a decrease but warns that the baseline is not yet tightened (ratchet slack is not forced out)
+AssertionError: expected 'AFLDB merge readiness (read-only)\nNo…' to contain 'WARN lint baseline has 2 paid-down pa…'
+
+- Expected
++ Received
+
+- WARN lint baseline has 2 paid-down pair(s) not yet tightened
++ AFLDB merge readiness (read-only)
++ No fetch, stage, commit, merge, push, migration or test command will run.
++
++ PASS current branch: codex/issue-145
++ PASS issue worktree is clean
++      staged: 0; unstaged: 0; untracked: 0
++ PASS local main equals recorded origin/main
++      main: 8fa0c1004308a13734be1754fa14521f719593b2
++      origin/main: 8fa0c1004308a13734be1754fa14521f719593b2
++      No fetch was attempted; fetch/update main separately before treating the recorded ref as current.
++ PASS base/main relationship
++      ahead of main: 1; behind main: 0
++ PASS main worktree is clean: /tmp/afldb-workflow-CAeut4/main
++ PASS migration collision/checksum parity (refs/remotes/origin/main)
++ INFO database migration parity not checked
++      Use the appropriate operational preflight when a database target is part of the merge contract.
++ PASS runbook readiness: issues/open/AFLDB-ISSUE-145.md
++      status: ready
++      hard blockers: 0
++ PASS recorded validation evidence
++      npm test -- focused: PASS
++ PASS committed files match the declared issue scope
++      changed: 2; expected rules: 2; unexpected: 0
++
++ Merge readiness: READY (0 blocker(s), 0 warning(s)).
+
+ ❯ tests/workflow-preflight.test.ts:781:26
+    779|       });
+    780|       expect(run.status, run.stdout).toBe(0);
+    781|       expect(run.stdout).toContain('WARN lint baseline has 2 paid-down…
+       |                          ^
+    782|       expect(run.stdout).toContain('src/a.ts: no-x 3 -> 1');
+    783|       expect(run.stdout).toContain('src/gone.ts: no-y 1 -> 0');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/27]⎯
+
+ FAIL  tests/workflow-preflight.test.ts > merge readiness report > AFLDB-ISSUE-364 lint ratchet gate in merge:ready > refuses, with a named reason, when the baseline is missing
+AssertionError: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ tests/workflow-preflight.test.ts:788:26
+    786|     it('refuses, with a named reason, when the baseline is missing', (…
+    787|       const run = readiness({ baseline: 'missing' });
+    788|       expect(run.status).toBe(1);
+       |                          ^
+    789|       expect(run.stdout).toContain('lint ratchet gate refused (no verd…
+    790|       expect(run.stdout).toContain('tools/dev/lint-baseline.json is mi…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/27]⎯
+
+ FAIL  tests/workflow-preflight.test.ts > merge readiness report > AFLDB-ISSUE-364 lint ratchet gate in merge:ready > refuses a malformed baseline (not JSON)
+ FAIL  tests/workflow-preflight.test.ts > merge readiness report > AFLDB-ISSUE-364 lint ratchet gate in merge:ready > refuses a malformed baseline (an array)
+ FAIL  tests/workflow-preflight.test.ts > merge readiness report > AFLDB-ISSUE-364 lint ratchet gate in merge:ready > refuses a malformed baseline (a negative count)
+ FAIL  tests/workflow-preflight.test.ts > merge readiness report > AFLDB-ISSUE-364 lint ratchet gate in merge:ready > refuses a malformed baseline (a fractional count)
+ FAIL  tests/workflow-preflight.test.ts > merge readiness report > AFLDB-ISSUE-364 lint ratchet gate in merge:ready > refuses a malformed baseline (a non-object rule map)
+AssertionError: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ tests/workflow-preflight.test.ts:801:26
+    799|     ])('refuses a malformed baseline (%s)', (_label, baseline, reason)…
+    800|       const run = readiness({ baseline });
+    801|       expect(run.status).toBe(1);
+       |                          ^
+    802|       expect(run.stdout).toContain('lint ratchet gate refused (no verd…
+    803|       expect(run.stdout).toMatch(reason);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/27]⎯
+
+ FAIL  tests/workflow-preflight.test.ts > merge readiness report > AFLDB-ISSUE-364 lint ratchet gate in merge:ready > refuses, with a named reason, when ESLint is not installed or prints no JSON
+AssertionError: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ tests/workflow-preflight.test.ts:809:30
+    807|     it('refuses, with a named reason, when ESLint is not installed or …
+    808|       const missing = readiness({ eslint: false });
+    809|       expect(missing.status).toBe(1);
+       |                              ^
+    810|       expect(missing.stdout).toContain('ESLint is not installed at');
+    811|       const garbage = readiness({ output: 'this is not json' });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/27]⎯
+
+ FAIL  tests/workflow-preflight.test.ts > AFLDB-ISSUE-364 ratcheting lint gate > B-07: a failed ESLint spawn is a named refusal (exit 2), not a TypeError
+TypeError: results is not iterable
+ ❯ summariseErrors tools/dev/lint-gate.ts:29:22
+     27| export function summariseErrors(results: readonly LintFileResult[], ro…
+     28|   const summary: LintBaseline = {};
+     29|   for (const file of results) {
+       |                      ^
+     30|     const path = relative(root, file.filePath).replace(/\\/g, '/');
+     31|     for (const message of file.messages) {
+ ❯ Module.runLintGate tools/dev/lint-gate.ts:94:19
+ ❯ tests/workflow-preflight.test.ts:860:14
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/27]⎯
+
+ FAIL  tests/workflow-preflight.test.ts > AFLDB-ISSUE-364 ratcheting lint gate > refusals (exit 2) never fall through to a pass > ESLint ending abnormally or printing a non-list is refused, whatever it printed
+TypeError: evaluateLintGate is not a function
+ ❯ tests/workflow-preflight.test.ts:878:22
+    876|       const dir = fixtureRoot();
+    877|       childProcess.nodeOverride = () => ({ status: 2, stdout: '[]', st…
+    878|       const config = evaluateLintGate(dir);
+       |                      ^
+    879|       expect(config.exitCode).toBe(2);
+    880|       expect(config.summary).toContain('ESLint ended abnormally (exit …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/27]⎯
+
+ FAIL  tests/workflow-preflight.test.ts > AFLDB-ISSUE-364 ratcheting lint gate > refusals (exit 2) never fall through to a pass > an unspawnable ESLint is a refusal through the evaluation used by preflight too
+TypeError: evaluateLintGate is not a function
+ ❯ tests/workflow-preflight.test.ts:890:14
+    888|       const dir = fixtureRoot();
+    889|       childProcess.nodeOverride = () => ({ status: null, stdout: null,…
+    890|       expect(evaluateLintGate(dir)).toMatchObject({ exitCode: 2, summa…
+       |              ^
+    891|     });
+    892|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/27]⎯
+
+ FAIL  tests/workflow-preflight.test.ts > AFLDB-ISSUE-364 ratcheting lint gate > refusals (exit 2) never fall through to a pass > the CLI refuses with exit 2 for a missing or malformed baseline, never a stack trace
+AssertionError: expected +0 to be 2 // Object.is equality
+
+- Expected
++ Received
+
+- 2
++ 0
+
+ ❯ tests/workflow-preflight.test.ts:899:40
+    897|         const spy = vi.spyOn(console, 'error').mockImplementation((...…
+    898|         try {
+    899|           expect(runLintGate([], dir)).toBe(2);
+       |                                        ^
+    900|         } finally {
+    901|           spy.mockRestore();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/27]⎯
+
+ FAIL  tests/workflow-preflight.test.ts > AFLDB-ISSUE-364 ratcheting lint gate > the gate through the preflight step > runs only for implementation and merge, never read-only, rebuild, promotion or deploy
+TypeError: LINT_GATE_MODES is not iterable
+ ❯ tests/workflow-preflight.test.ts:913:18
+    911|
+    912|     it('runs only for implementation and merge, never read-only, rebui…
+    913|       expect([...LINT_GATE_MODES]).toEqual(['implementation', 'merge']…
+       |                  ^
+    914|       for (const mode of ['implementation', 'merge'] as const) {
+    915|         const evaluate = vi.fn(() => outcome({}));
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/27]⎯
+
+ FAIL  tests/workflow-preflight.test.ts > AFLDB-ISSUE-364 ratcheting lint gate > the gate through the preflight step > a regression is a FAIL naming the pair, so the preflight is BLOCKED
+TypeError: lintGateStep is not a function
+ ❯ tests/workflow-preflight.test.ts:927:24
+    925|
+    926|     it('a regression is a FAIL naming the pair, so the preflight is BL…
+    927|       const findings = lintGateStep('implementation', '/r', () => outc…
+       |                        ^
+    928|         exitCode: 1, summary: 'Lint gate: FAILED', problems: ['src/a.t…
+    929|       }));
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/27]⎯
+
+ FAIL  tests/workflow-preflight.test.ts > AFLDB-ISSUE-364 ratcheting lint gate > the gate through the preflight step > a refusal and a thrown gate are both FAIL with the reason, never skipped
+TypeError: lintGateStep is not a function
+ ❯ tests/workflow-preflight.test.ts:936:23
+    934|
+    935|     it('a refusal and a thrown gate are both FAIL with the reason, nev…
+    936|       const refused = lintGateStep('merge', '/r', () => outcome({
+       |                       ^
+    937|         exitCode: 2, summary: 'Lint gate: REFUSED - baseline gone', pr…
+    938|       }));
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/27]⎯
+
+ FAIL  tests/workflow-preflight.test.ts > AFLDB-ISSUE-364 ratcheting lint gate > the gate through the preflight step > preflight.ts feeds every finding of the step into the report that decides BLOCKED
+AssertionError: expected '/**\n * One read-only operator prefli…' to match /for \(const finding of lintGateStep\(…/
+
+- Expected:
+/for \(const finding of lintGateStep\(options\.mode, PROJECT_ROOT\)\) \{\n\s+report\.add\(finding\.status, finding\.label, finding\.details\);/
+
++ Received:
+"/**
+ * One read-only operator preflight for implementation, merge, inspection, rebuild,
+ * promotion and deploy work.
+ * It never fetches Git refs, writes a plan, applies a migration, or changes a database.
+ */
+import { spawnSync } from 'node:child_process';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import {
+  collectMigrationSources,
+  compareMigrationSets,
+  findMigrationConflicts,
+  type AppliedMigration,
+  type MigrationFinding,
+} from '../db/migration-safety';
+import { assertContractCoherent, historicalOnlyTables } from '../db/promotion-inventory';
+import {
+  branchPolicyProblems,
+  defaultsFor,
+  migrationFindingStatus,
+  msysEnvironmentProblem,
+  parsePreflightArgs,
+  probeDatabase,
+  worktreeFinding,
+  type PreflightMode,
+  type PreflightStatus,
+  type PromotionSide,
+} from './preflight-core';
+
+const PROJECT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+type Status = PreflightStatus;
+
+class Report {
+  failed = 0;
+  warned = 0;
+
+  add(status: Status, label: string, details: readonly string[] = []): void {
+    if (status === 'FAIL') this.failed += 1;
+    if (status === 'WARN') this.warned += 1;
+    console.log(`${status.padEnd(4)} ${label}`);
+    for (const detail of details) console.log(`     ${detail}`);
+  }
+}
+
+function run(command: string, args: readonly string[], cwd = PROJECT_ROOT) {
+  const result = spawnSync(command, args, { cwd, encoding: 'utf8', windowsHide: true });
+  return {
+    status: result.status ?? 1,
+    stdout: result.stdout ?? '',
+    stderr: result.stderr ?? result.error?.message ?? '',
+  };
+}
+
+function git(args: readonly string[]) {
+  return run('git', args);
+}
+
+function gitText(args: readonly string[]): string {
+  const result = git(args);
+  if (result.status !== 0) throw new Error(result.stderr.trim() || `git ${args[0]} failed`);
+  return result.stdout.trim();
+}
+
+function samePath(a: string, b: string): boolean {
+  return resolve(a).toLowerCase() === resolve(b).toLowerCase();
+}
+
+function loadEnvFile(path: string): Map<string, string> {
+  const values = new Map<string, string>();
+  if (!existsSync(path)) return values;
+  for (const line of readFileSync(path, 'utf8').split(/\\r?\\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#') || !trimmed.includes('=')) continue;
+    const [rawName, ...rest] = trimmed.split('=');
+    const name = rawName.trim();
+    if (/^[A-Z][A-Z0-9_]*$/.test(name)) values.set(name, rest.join('=').trim());
+  }
+  return values;
+}
+
+function envValue(name: string, file: ReadonlyMap<string, string>): string | undefined {
+  return process.env[name] || file.get(name) || undefined;
+}
+
+function redactConnectionError(message: string, dsn: string): string {
+  let redacted = message.replaceAll(dsn, '<redacted DSN>');
+  try {
+    const url = new URL(dsn);
+    for (const secret of [url.username, url.password, decodeURIComponent(url.username), decodeURIComponent(url.password)]) {
+      if (secret) redacted = redacted.replaceAll(secret, '<redacted>');
+    }
+  } catch {
+    return 'Connection failed (details withheld because the DSN could not be safely parsed).';
+  }
+  return redacted;
+}
+
+function toolCheck(report: Report, command: string, required: boolean): void {
+  const result = run(command, ['--version']);
+  if (result.status === 0) report.add('PASS', `${command} is available`);
+  else report.add(required ? 'FAIL' : 'WARN', `${command} is unavailable`, [
+    required ? `Install/put ${command} on PATH before this operation.` : 'Not required for this preflight mode.',
+  ]);
+}
+
+function reportMigrationFinding(report: Report, finding: MigrationFinding, inspectionOnly = false): void {
+  report.add(migrationFindingStatus(finding, inspectionOnly), `migration ${finding.code}`, [finding.message]);
+}
+
+function checkGit(report: Report, mode: PreflightMode): void {
+  const top = gitText(['rev-parse', '--show-toplevel']);
+  const cwd = realpathSync(process.cwd());
+  const topReal = realpathSync(top);
+  report.add(samePath(topReal, PROJECT_ROOT) && samePath(cwd, PROJECT_ROOT) ? 'PASS' : 'FAIL',
+    'working directory is this repository root', [
+      `expected: ${PROJECT_ROOT}`,
+      `actual:   ${cwd}`,
+      ...(samePath(topReal, PROJECT_ROOT) ? [] : ['Git resolved a different repository; stop and change directories.']),
+    ]);
+
+  const branch = gitText(['branch', '--show-current']);
+  const branchProblems = branchPolicyProblems(mode, branch);
+  report.add(branchProblems.length ? 'FAIL' : 'PASS',
+    branch ? `branch ${branch} is valid for ${mode}` : 'branch is attached', branchProblems);
+
+  // Raw -z output: trimming would eat the leading space of an unstaged ' M' status.
+  const status = git(['status', '--porcelain=v1', '-z', '--untracked-files=all']);
+  if (status.status !== 0) throw new Error(status.stderr.trim() || 'git status failed');
+  const worktree = worktreeFinding(mode, status.stdout);
+  report.add(worktree.status, worktree.label, worktree.details);
+
+  const gitDir = resolve(PROJECT_ROOT, gitText(['rev-parse', '--git-dir']));
+  const commonDir = resolve(PROJECT_ROOT, gitText(['rev-parse', '--git-common-dir']));
+  if (mode === 'implementation') {
+    report.add(!samePath(gitDir, commonDir) ? 'PASS' : 'FAIL', 'implementation uses a linked worktree',
+      samePath(gitDir, commonDir) ? ['The primary checkout is merge-only; create a linked worktree.'] : []);
+  } else if (mode === 'merge') {
+    report.add(samePath(gitDir, commonDir) ? 'PASS' : 'FAIL', 'merge uses the primary checkout',
+      samePath(gitDir, commonDir) ? [] : ['Run operator merges from the clean primary main checkout.']);
+  } else {
+    report.add('INFO', samePath(gitDir, commonDir) ? 'primary checkout' : 'linked worktree checkout');
+  }
+
+  const hasMain = git(['show-ref', '--verify', '--quiet', 'refs/heads/main']).status === 0;
+  if (!hasMain) {
+    report.add(mode === 'read-only' ? 'WARN' : 'FAIL', 'local main ref exists',
+      ['Fetch/update the repository before continuing.']);
+    return;
+  }
+  const ancestor = git(['merge-base', '--is-ancestor', 'refs/heads/main', 'HEAD']).status === 0;
+  const behind = Number(gitText(['rev-list', '--count', 'HEAD..refs/heads/main']));
+  report.add(ancestor && behind === 0 ? 'PASS' : mode === 'read-only' ? 'WARN' : 'FAIL',
+    'branch contains current local main', [
+    `behind local main: ${behind}`,
+    ...(ancestor ? [] : ['Current local main is not an ancestor of HEAD; rebase/recreate the worktree before work.']),
+  ]);
+
+  const hasOriginMain = git(['show-ref', '--verify', '--quiet', 'refs/remotes/origin/main']).status === 0;
+  if (!hasOriginMain) {
+    report.add('WARN', 'origin/main ref is unavailable', ['No fetch was attempted; freshness cannot be proven.']);
+  } else {
+    const [aheadOrigin, behindOrigin] = gitText([
+      'rev-list', '--left-right', '--count', 'HEAD...refs/remotes/origin/main',
+    ]).split(/\\s+/).map(Number);
+    const unsafe = behindOrigin > 0 || (mode === 'deploy' && aheadOrigin > 0);
+    report.add(unsafe ? (mode === 'read-only' ? 'WARN' : 'FAIL') : 'PASS',
+      'branch relationship to recorded origin/main', [
+      `ahead: ${aheadOrigin}; behind: ${behindOrigin}`,
+      'Read-only check only: run the operator-approved fetch separately when remote freshness is required.',
+    ]);
+  }
+}
+
+async function checkDatabase(
+  report: Report,
+  mode: PreflightMode,
+  promotionSide: PromotionSide | undefined,
+  dsnEnv: string,
+  dsn: string,
+  expectedDatabase: string | undefined,
+  expectedRole: string | undefined,
+  localMigrations: ReturnType<typeof collectMigrationSources>['current']['migrations'],
+): Promise<void> {
+  const postgres = (await import('postgres')).default;
+  const sql = postgres(dsn, {
+    max: 1,
+    connect_timeout: 5,
+    idle_timeout: 5,
+    onnotice: () => {},
+    connection: { application_name: `afldb-preflight:${mode}` },
+  });
+  try {
+    await sql.unsafe('SET default_transaction_read_only = on');
+    await probeDatabase({
+      identity: async () => (await sql<{ database: string; role: string }[]>`
+        SELECT current_database() AS database, current_user AS role
+      `)[0],
+      appliedMigrations: () => sql<AppliedMigration[]>`
+        SELECT name, checksum FROM afldb_meta.schema_migrations ORDER BY name
+      `,
+    }, { mode, promotionSide, dsnEnv, expectedDatabase, expectedRole, localMigrations },
+    (finding) => report.add(finding.status, finding.label, finding.details));
+  } catch (error) {
+    report.add('FAIL', `database preflight via ${dsnEnv}`, [
+      error instanceof Error ? redactConnectionError(error.message, dsn) : 'connection/query failed',
+      'Verify the tunnel/host, environment variable, role grants, and expected database name.',
+    ]);
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+
+function usage(): void {
+  console.log(`Usage: npm run preflight -- [options]
+
+  --mode implementation|merge|read-only|rebuild|promotion|deploy
+                                                   default: implementation
+  --environment dev|prod                           default: dev
+  --promotion-side source|target                   required with --mode promotion, refused otherwise
+  --issue NNN                                      optional issue/workflow label
+  --dsn-env NAME                                   DSN variable name; never pass the DSN
+  --expect-database NAME                           exact database identity
+  --expect-role NAME                               optional exact PostgreSQL role
+  --ssh-host HOST                                  require a read-only BatchMode SSH probe
+
+Promotion sides:
+  source  a *_test database (default AFLDB_TEST_DATABASE_URL / afldb_test); migration parity required
+  target  exactly afldb_dev (dev) or afldb_prod (prod); --dsn-env required; identity, role and
+          connectivity only, so a restricted import/backup credential needs no afldb_meta access
+
+The command is read-only. It does not fetch refs, write plans, migrate, deploy, or mutate a database.`);
+}
+
+async function main(): Promise<void> {
+  let options;
+  try {
+    options = defaultsFor(parsePreflightArgs(process.argv.slice(2)));
+  } catch (error) {
+    console.error(`FAIL arguments: ${error instanceof Error ? error.message : error}`);
+    usage();
+    process.exitCode = 1;
+    return;
+  }
+  if (options.help) { usage(); return; }
+
+  const report = new Report();
+  console.log(`AFLDB read-only preflight: ${options.mode} / ${options.environment}`
+    + (options.promotionSide ? ` / ${options.promotionSide}` : '')
+    + (options.issue ? ` / ${options.issue.toUpperCase()}` : ''));
+  console.log('No Git fetch, database write, migration, plan write, deploy, or service action will run.\\n');
+
+  try {
+    checkGit(report, options.mode);
+  } catch (error) {
+    report.add('FAIL', 'Git/repository checks could not run', [error instanceof Error ? error.message : String(error)]);
+  }
+
+  let collected: ReturnType<typeof collectMigrationSources> | undefined;
+  try {
+    collected = collectMigrationSources(PROJECT_ROOT);
+    const conflicts = findMigrationConflicts(collected.sources);
+    for (const finding of conflicts) reportMigrationFinding(report, finding, options.mode === 'read-only');
+    const parity = compareMigrationSets(
+      collected.current,
+      collected.base,
+      ['rebuild', 'promotion', 'deploy'].includes(options.mode),
+    );
+    for (const finding of parity) reportMigrationFinding(report, finding, options.mode === 'read-only');
+    if (conflicts.length === 0 && parity.length === 0) {
+      report.add('PASS', `migration names are collision-free across relevant refs/worktrees (${collected.baseRef})`);
+    }
+  } catch (error) {
+    report.add(options.mode === 'read-only' ? 'WARN' : 'FAIL', 'migration inventory',
+      [error instanceof Error ? error.message : String(error)]);
+  }
+
+  const envPath = join(PROJECT_ROOT, '.env');
+  const envFile = loadEnvFile(envPath);
+  const needsEnvironment = ['rebuild', 'promotion', 'deploy'].includes(options.mode);
+  report.add(existsSync(envPath) ? 'PASS' : (needsEnvironment ? 'FAIL' : 'WARN'), '.env file presence',
+    existsSync(envPath) ? [] : ['Create the local untracked .env before rebuild/promotion/deploy work.']);
+
+  const msys = msysEnvironmentProblem(options.mode, process.env);
+  report.add(msys ? 'FAIL' : 'PASS', 'Git Bash/MSYS path-conversion guard', msys ? [msys] : []);
+
+  toolCheck(report, 'git', true);
+  toolCheck(report, 'psql', needsEnvironment);
+  toolCheck(report, 'pg_restore', options.mode === 'promotion');
+
+  if (options.mode === 'promotion') {
+    try {
+      assertContractCoherent();
+      const withheld = historicalOnlyTables(options.environment);
+      report.add('PASS', 'promotion plan/disposition contract is coherent', [
+        `${withheld.length} historical-only table(s) declared for ${options.environment}.`,
+      ]);
+    } catch (error) {
+      report.add('FAIL', 'promotion plan/disposition contract', [error instanceof Error ? error.message : String(error)]);
+    }
+  }
+
+  if (options.sshHost) {
+    const ssh = run('ssh', [
+      '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5', options.sshHost, 'true',
+    ]);
+    report.add(ssh.status === 0 ? 'PASS' : 'FAIL', `SSH host ${options.sshHost} is reachable`,
+      ssh.status === 0 ? [] : ['Verify the host alias/key/tunnel before the expensive operation.']);
+  } else if (needsEnvironment) {
+    report.add('WARN', 'SSH reachability was not requested', ['Pass --ssh-host <alias> when the operation crosses hosts.']);
+  }
+
+  if (options.dsnEnv) {
+    const dsn = envValue(options.dsnEnv, envFile);
+    report.add(dsn ? 'PASS' : 'FAIL', `${options.dsnEnv} is present`,
+      dsn ? ['value is set and intentionally not printed'] : ['Set it in the environment or untracked .env.']);
+    if (dsn && collected) {
+      await checkDatabase(
+        report, options.mode, options.promotionSide, options.dsnEnv, dsn, options.expectDatabase, options.expectRole,
+        collected.current.migrations,
+      );
+    }
+  }
+
+  console.log(`\\nPreflight result: ${report.failed ? 'BLOCKED' : 'READY'} `
+    + `(${report.failed} blocker(s), ${report.warned} warning(s)).`);
+  if (report.failed) {
+    console.log('Resolve every FAIL and rerun this same command before the expensive or state-changing step.');
+    process.exitCode = 1;
+  }
+}
+
+void main();
+"
+
+ ❯ tests/workflow-preflight.test.ts:948:22
+    946|     it('preflight.ts feeds every finding of the step into the report t…
+    947|       const source = readFileSync(join(__dirname, '..', 'tools', 'dev'…
+    948|       expect(source).toMatch(
+       |                      ^
+    949|         /for \(const finding of lintGateStep\(options\.mode, PROJECT_R…
+    950|       expect(source).toContain("if (report.failed) {");
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/27]⎯
+
+ FAIL  tests/workflow-preflight.test.ts > AFLDB-ISSUE-364 ratcheting lint gate > the committed baseline is a ceiling, never a licence to grow > parses, and holds no more than the 338 errors in 43 files recorded when the gate was wired
+TypeError: parseBaseline is not a function
+ ❯ tests/workflow-preflight.test.ts:956:24
+    954|   describe('the committed baseline is a ceiling, never a licence to gr…
+    955|     it('parses, and holds no more than the 338 errors in 43 files reco…
+    956|       const baseline = parseBaseline(readFileSync(join(__dirname, '..'…
+       |                        ^
+    957|       const totals = baselineTotals(baseline);
+    958|       expect(totals.errors).toBeLessThanOrEqual(338);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/27]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  27 failed | 88 passed (115)
+   Start at  16:01:10
+   Duration  30.77s (transform 666ms, setup 235ms, import 638ms, tests 29.33s, environment 1ms)
+

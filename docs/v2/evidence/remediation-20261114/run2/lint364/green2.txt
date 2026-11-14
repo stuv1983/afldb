@@ -1,0 +1,25 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem2-lint364-20261114/cand
+
+ ✓ tests/deploy-release.test.ts (54 tests) 23680ms
+     ✓ check-node-modules exits 1 on drift, 0 on a matching or unrecorded tree; the settle wrapper only warns  311ms
+     ✓ builds outside the checkout, validates, boots the candidate and promotes it  2873ms
+     ✓ a failing build leaves the serving release, its assets and the links untouched  1303ms
+     ✓ a type error fails the build; off-host type-checking needs recorded evidence; nothing changes  1304ms
+     ✓ a build interrupted by SIGTERM is stopped with its whole process group; nothing changes  1288ms
+     ✓ a build interrupted by SIGHUP is stopped with its whole process group; nothing changes  1294ms
+     ✓ a SIGKILLed tool leaves an orphan only in its workspace; the next build reaps it  2510ms
+     ✓ the memory guard kills a build that drives MemAvailable below the floor; nothing changes  2021ms
+     ✓ promotes a second release, then rolls back to the retained one without building, even mid-build  6565ms
+     ✓ ISSUE-351: promote and rollback are attended; the host gate and the ledger check refuse before any link moves  614ms
+     ✓ ISSUE-351: status --expect fails a restart that coincides with an apt run, and names the owner's way past it  676ms
+     ✓ fails a public asset whose bytes are not the release's, and one that is missing  376ms
+ ✓ tests/workflow-preflight.test.ts (61 tests) 6247ms
+     ✓ blocks a branch behind current clean origin/main and reports both counts  314ms
+       ✓ refuses, with a named reason, when ESLint is not installed or prints no JSON  453ms
+
+ Test Files  2 passed (2)
+      Tests  115 passed (115)
+   Start at  16:02:40
+   Duration  31.22s (transform 589ms, setup 217ms, import 577ms, tests 29.93s, environment 1ms)
+

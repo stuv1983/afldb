@@ -1,0 +1,337 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem2-lint364-20261114/cand
+
+ ❯ tests/deploy-release.test.ts (54 tests | 5 failed | 47 skipped) 454ms
+     ↓ names a release by revision prefix and BUILD_ID, and refuses anything else
+     ↓ classifies only the server's own ISR output as allowed drift
+     ↓ fails a missing, changed or added code file and reports ISR drift without failing
+     ↓ round-trips a sha256sum-format manifest in path order
+     ↓ treats Next render failures and health errors in the smoke log as failures
+     ↓ reads MemAvailable and swap from /proc/meminfo
+     ↓ parses its CLI options with the documented defaults
+     ↓ signs a smoke beta claim the application middleware accepts, and none without a secret
+     ↓ derives the deny list from the unit, so every DSN the unit drops is dropped
+     ↓ applies EnvironmentFile, then UnsetEnvironment, then Environment=, as systemd does
+     ↓ moves only the working directory and the writable path to the release root
+     ↓ logs the build identity at every start, outside the opt-in tracing branch
+     ↓ needs nothing but Node built-ins and the env-file guard, so it runs before npm ci
+     ↓ recognises a RUNNING upgrade by command line, and never the always-on shutdown handler
+     ↓ reads systemctl show properties and UTC timestamps, and nothing it cannot be sure of
+     ↓ refuses promote while apt runs or is due inside the window, and lets a clear host through
+     ↓ never refuses a rollback on host state: the emergency path stays open, with a warning
+     ↓ reports a pending reboot, and treats a missing needrestart hold as a warning unless strict
+     ↓ recognises the owner needrestart hold, and not the stock configuration production runs today
+     ↓ the shipped needrestart policy is the one the gate recognises, and the apt policy keeps security updates
+     ↓ flags a restart that coincides with an unattended-upgrade run as not the owner's, and accepts a confirmed one
+     ↓ refuses rollback only on a PROVEN schema mismatch, and never because the database is unreachable
+     ↓ compares the installed tree with the lock: version, integrity, extraneous and missing, but not optional or omitted dev packages
+     ↓ check-node-modules exits 1 on drift, 0 on a matching or unrecorded tree; the settle wrapper only warns
+       ✓ real drift: the DRIFT marker, not the CHECK_FAILED one, and the run continues 69ms
+       ✓ a matching or unrecorded tree prints neither marker 131ms
+       × a refusal or crash that exits 1 (the same code as drift): the CHECK_FAILED marker with the exit code, never the DRIFT marker, and the run continues 68ms
+       × a usage refusal that exits 2: the CHECK_FAILED marker with the exit code, never the DRIFT marker, and the run continues 62ms
+       × an interrupt that exits 130: the CHECK_FAILED marker with the exit code, never the DRIFT marker, and the run continues 47ms
+       × a Node that cannot be executed is a failed check, not drift 7ms
+       × a check that merely mentions the drift text in a failure is still a failed check 59ms
+     ↓ adds the attended and host-state options to the CLI without changing its defaults
+     ↓ builds outside the checkout, validates, boots the candidate and promotes it
+     ↓ a failing build leaves the serving release, its assets and the links untouched
+     ↓ a type error fails the build; off-host type-checking needs recorded evidence; nothing changes
+     ↓ a build interrupted by SIGTERM is stopped with its whole process group; nothing changes
+     ↓ a build interrupted by SIGHUP is stopped with its whole process group; nothing changes
+     ↓ a SIGKILLed tool leaves an orphan only in its workspace; the next build reaps it
+     ↓ the memory guard kills a build that drives MemAvailable below the floor; nothing changes
+     ↓ promotes a second release, then rolls back to the retained one without building, even mid-build
+     ↓ ISSUE-351: promote and rollback are attended; the host gate and the ledger check refuse before any link moves
+     ↓ ISSUE-351: status --expect fails a restart that coincides with an apt run, and names the owner's way past it
+     ↓ verify fails a tampered release and tolerates the server's ISR output
+     ↓ adopt --from-manifest takes a settled regenerated ISR page live and refuses a changed code file
+     ↓ finds a symlink that leaves the release, and accepts one that stays inside
+     ↓ switches a link by rename and refuses a link that points outside releases/
+     ↓ passes when the previous build is 404 everywhere, deriving it from the retained previous release
+     ↓ reports an old Cloudflare cache HIT of the previous build separately and still passes
+     ↓ fails when the origin still serves the previous build on loopback
+     ↓ fails when the cache-busted public request reaches an origin serving the previous build, even beside a cache HIT
+     ↓ fails a public 200 for the previous build that is not a cache HIT
+     ↓ fails when status --expect fails (identity)
+     ↓ fails when the public health check reports a database error
+     ↓ fails a public asset whose bytes are not the release's, and one that is missing
+stdout | tests/workflow-preflight.test.ts > AFLDB-ISSUE-364 ratcheting lint gate > refusals (exit 2) never fall through to a pass > the CLI refuses with exit 2 for a missing or malformed baseline, never a stack trace
+Lint gate: 0 error(s) now; baseline allows 338.
+  paid down (tighten with --update): .phaneslight/scripts/api-diff.js: @typescript-eslint/no-require-imports 2 -> 0
+  paid down (tighten with --update): .phaneslight/scripts/cli.js: @typescript-eslint/no-require-imports 2 -> 0
+  paid down (tighten with --update): .phaneslight/scripts/regen-registry.js: @typescript-eslint/no-require-imports 3 -> 0
+  paid down (tighten with --update): .phaneslight/scripts/registry-lib.js: @typescript-eslint/no-require-imports 5 -> 0
+  paid down (tighten with --update): src/app/admin/AdminNav.tsx: react-hooks/set-state-in-effect 1 -> 0
+  paid down (tighten with --update): src/app/admin/AdminSection.tsx: react-hooks/set-state-in-effect 1 -> 0
+  paid down (tighten with --update): src/app/admin/nl-search/ClearTelemetryForm.tsx: react-hooks/set-state-in-effect 1 -> 0
+  paid down (tighten with --update): src/app/admin/settings/SearchPlaceholderSettings.tsx: react-hooks/set-state-in-effect 2 -> 0
+  paid down (tighten with --update): src/components/CoachOpponentHistoryClient.tsx: react-hooks/set-state-in-effect 1 -> 0
+  paid down (tighten with --update): src/components/ConsentBanner.tsx: react-hooks/set-state-in-effect 1 -> 0
+  paid down (tighten with --update): src/components/PlayerPicker.tsx: react-hooks/set-state-in-effect 1 -> 0
+  paid down (tighten with --update): src/components/ReorderableSections.tsx: react-hooks/set-state-in-effect 1 -> 0
+  paid down (tighten with --update): src/components/SearchBox.tsx: react-hooks/set-state-in-effect 2 -> 0
+  paid down (tighten with --update): tests/afl-api-match.test.ts: @typescript-eslint/no-explicit-any 3 -> 0
+  paid down (tighten with --update): tests/afl-api-settle-plan.test.ts: @typescript-eslint/no-explicit-any 3 -> 0
+  paid down (tighten with --update): tests/award-definitions-source.test.ts: @typescript-eslint/no-explicit-any 1 -> 0
+  paid down (tighten with --update): tests/coleman-derivation.test.ts: @typescript-eslint/no-explicit-any 2 -> 0
+  paid down (tighten with --update): tests/db-test-rebuild.test.ts: @next/next/no-assign-module-variable 1 -> 0
+  paid down (tighten with --update): tests/db-test-rebuild.test.ts: @typescript-eslint/no-explicit-any 45 -> 0
+  paid down (tighten with --update): tests/draftguru-acquisition.test.ts: @typescript-eslint/no-explicit-any 49 -> 0
+  paid down (tighten with --update): tests/expandable-table-frame.test.ts: react/no-children-prop 3 -> 0
+  paid down (tighten with --update): tests/fitzroy-acquisition.test.ts: @typescript-eslint/no-explicit-any 6 -> 0
+  paid down (tighten with --update): tests/fitzroy-core-import.test.ts: @typescript-eslint/no-explicit-any 35 -> 0
+  paid down (tighten with --update): tests/gap029-assembly.test.ts: @typescript-eslint/no-explicit-any 15 -> 0
+  paid down (tighten with --update): tests/gap029-ops.test.ts: @typescript-eslint/no-explicit-any 16 -> 0
+  paid down (tighten with --update): tests/integration/dob-enrichment-issues.test.ts: @typescript-eslint/no-explicit-any 15 -> 0
+  paid down (tighten with --update): tests/integration/player-link-concurrency.test.ts: @typescript-eslint/no-explicit-any 15 -> 0
+  paid down (tighten with --update): tests/integration/settle-afl-api-brownlow-backtest.test.ts: @typescript-eslint/no-explicit-any 3 -> 0
+  paid down (tighten with --update): tests/integration/settle-afl-api-brownlow-reschedule.test.ts: @typescript-eslint/no-explicit-any 3 -> 0
+  paid down (tighten with --update): tests/integration/settle-afl-api-brownlow.test.ts: @typescript-eslint/no-explicit-any 3 -> 0
+  paid down (tighten with --update): tests/integration/settle-afl-api-fixtures.test.ts: @typescript-eslint/no-explicit-any 3 -> 0
+  paid down (tighten with --update): tests/nl-ui-corpus.test.ts: @typescript-eslint/no-require-imports 2 -> 0
+  paid down (tighten with --update): tests/player-identity-source.test.ts: @typescript-eslint/no-explicit-any 1 -> 0
+  paid down (tighten with --update): tests/player-link-mutations.test.ts: @typescript-eslint/no-explicit-any 20 -> 0
+  paid down (tighten with --update): tests/reference-data.test.ts: @typescript-eslint/no-explicit-any 31 -> 0
+  paid down (tighten with --update): tests/rising-star-winners-source.test.ts: @typescript-eslint/no-explicit-any 1 -> 0
+  paid down (tighten with --update): tools/db/rebuild-test.ts: @typescript-eslint/no-explicit-any 7 -> 0
+  paid down (tighten with --update): tools/v2/brownlow-isolated-e2e.mts: prefer-const 2 -> 0
+  paid down (tighten with --update): tools/v2/gap029-assemble-restore-evidence.ts: @typescript-eslint/no-explicit-any 2 -> 0
+  paid down (tighten with --update): tools/v2/gap029-common.ts: @typescript-eslint/no-explicit-any 1 -> 0
+  paid down (tighten with --update): tools/v2/gap029-ops-lib.ts: @typescript-eslint/no-explicit-any 13 -> 0
+  paid down (tighten with --update): tools/v2/gap029-ops.ts: @typescript-eslint/no-explicit-any 9 -> 0
+  paid down (tighten with --update): tools/v2/gap029-stage.ts: @typescript-eslint/no-explicit-any 4 -> 0
+  paid down (tighten with --update): tools/v2/rehearsal-package.d.mts: @typescript-eslint/no-explicit-any 1 -> 0
+Lint gate: PASSED.
+
+ ❯ tests/workflow-preflight.test.ts (61 tests | 7 failed | 54 skipped) 1153ms
+     ↓ keeps the current checkout migration numbers and names unique
+     ↓ parses the tracked migration naming contract
+     ↓ refuses a numeric-prefix collision across a branch and worktree
+     ↓ refuses one migration name with different contents, but collapses identical copies
+     ↓ treats checkout-only CRLF/LF differences as identical migration content
+     ↓ reports stale and branch-local migration sets deterministically
+     ↓ refuses pending, unknown and checksum-mismatched applied migrations
+     ↓ scans a detached HEAD with the base, main, origin/main and unmerged refs
+     ↓ still scans an unmerged branch from a detached HEAD
+     ↓ still throws on a genuine git symbolic-ref failure
+     ↓ keeps main merge-only without blocking merge or read-only sessions
+     ↓ accepts only environment-variable names for database configuration
+     ↓ refuses test-vs-dev target mistakes
+     ↓ detects the exact Git Bash path conversion seen in ISSUE-139
+     ↓ resolves source to afldb_test and target to the exact environment database
+     ↓ refuses invalid side combinations before any database contact
+     ↓ judges the connected database by side
+     ↓ proves target import/backup identity without reading the migration ledger
+     ↓ still requires migration parity on the source
+     ↓ shares the exact settle-manifest pattern with the DEV deploy classifier
+     ↓ downgrades only untracked settle manifests to WARN in promotion mode
+     ↓ keeps every other dirty path a promotion blocker
+     ↓ does not relax rebuild, deploy, implementation or merge
+     ↓ classifies real git -z output from a checkout
+     ↓ creates a fresh branch/worktree at the exact fetched main SHA
+     ↓ refuses an existing target directory without deleting its contents
+     ↓ refuses an existing branch instead of silently reusing stale state
+     ↓ copies only an explicitly approved same-issue handoff
+     ↓ does not copy or ignore arbitrary untracked files
+     ↓ reports a clean, current, scoped issue branch READY with ahead/behind evidence
+     ↓ blocks staged/unstaged changes and lists their path
+     ↓ does not count an unstaged-only first path as staged
+     ↓ blocks and lists untracked files
+     ↓ blocks a branch behind current clean origin/main and reports both counts
+     ↓ blocks a migration-number collision
+     ↓ blocks a committed file outside the declared issue scope
+     ↓ blocks an explicitly unresolved hard blocker in the runbook
+       ↓ runs the gate and reports it as a ratchet against recorded debt, not clean lint
+       ↓ blocks when a file's error count rises
+       ↓ blocks a new rule in an old file and a new file with errors
+       ↓ passes a decrease but warns that the baseline is not yet tightened (ratchet slack is not forced out)
+       ↓ refuses, with a named reason, when the baseline is missing
+       × refuses a malformed baseline (not JSON) 232ms
+       × refuses a malformed baseline (an array) 215ms
+       × refuses a malformed baseline (a negative count) 207ms
+       × refuses a malformed baseline (a fractional count) 207ms
+       × refuses a malformed baseline (a non-object rule map) 208ms
+       ↓ refuses, with a named reason, when ESLint is not installed or prints no JSON
+     ↓ counts error severity per repository-relative file and rule, and ignores warnings
+     ↓ fails a new error, a new file and a rule above its baseline
+     ↓ passes and reports paid-down debt without failing
+     × B-07: a failed ESLint spawn is a named refusal (exit 2), not a TypeError 5ms
+       ↓ ESLint ending abnormally or printing a non-list is refused, whatever it printed
+       ↓ an unspawnable ESLint is a refusal through the evaluation used by preflight too
+       × the CLI refuses with exit 2 for a missing or malformed baseline, never a stack trace 75ms
+       ↓ runs only for implementation and merge, never read-only, rebuild, promotion or deploy
+       ↓ a regression is a FAIL naming the pair, so the preflight is BLOCKED
+       ↓ a refusal and a thrown gate are both FAIL with the reason, never skipped
+       ↓ preflight.ts feeds every finding of the step into the report that decides BLOCKED
+       ↓ parses, and holds no more than the 338 errors in 43 files recorded when the gate was wired
+     ↓ serialises with stable key order so a baseline diff shows only real change
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 12 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/deploy-release.test.ts > AFLDB-ISSUE-351 — the attended gate and the activation audit (pure) > the settle wrapper tells drift from a check that failed to run (ISSUE-364 A-09) > a refusal or crash that exits 1 (the same code as drift): the CHECK_FAILED marker with the exit code, never the DRIFT marker, and the run continues
+AssertionError: expected 'release: ERROR: boom\nAFLDB_NODE_MODU…' to contain 'AFLDB_NODE_MODULES_CHECK_FAILED: the …'
+
+- Expected
++ Received
+
+- AFLDB_NODE_MODULES_CHECK_FAILED: the node_modules check did not reach a verdict (exit 1); node_modules is NOT verified
++ release: ERROR: boom
++ AFLDB_NODE_MODULES_DRIFT: node_modules differ from package-lock.json; the run continues (ISSUE-364)
++
+
+ ❯ tests/deploy-release.test.ts:465:26
+    463|       const run = runBlock(process.execPath, dir);
+    464|       expect(run.status).toBe(0);
+    465|       expect(run.stderr).toContain(`AFLDB_NODE_MODULES_CHECK_FAILED: t…
+       |                          ^
+    466|       expect(run.stderr).not.toContain('AFLDB_NODE_MODULES_DRIFT');
+    467|       expect(run.stdout).toContain('REACHED_THE_SEASON_STEP');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/12]⎯
+
+ FAIL  tests/deploy-release.test.ts > AFLDB-ISSUE-351 — the attended gate and the activation audit (pure) > the settle wrapper tells drift from a check that failed to run (ISSUE-364 A-09) > a usage refusal that exits 2: the CHECK_FAILED marker with the exit code, never the DRIFT marker, and the run continues
+AssertionError: expected 'usage: node deploy/release.mjs ...\nA…' to contain 'AFLDB_NODE_MODULES_CHECK_FAILED: the …'
+
+- Expected
++ Received
+
+- AFLDB_NODE_MODULES_CHECK_FAILED: the node_modules check did not reach a verdict (exit 2); node_modules is NOT verified
++ usage: node deploy/release.mjs ...
++ AFLDB_NODE_MODULES_DRIFT: node_modules differ from package-lock.json; the run continues (ISSUE-364)
++
+
+ ❯ tests/deploy-release.test.ts:465:26
+    463|       const run = runBlock(process.execPath, dir);
+    464|       expect(run.status).toBe(0);
+    465|       expect(run.stderr).toContain(`AFLDB_NODE_MODULES_CHECK_FAILED: t…
+       |                          ^
+    466|       expect(run.stderr).not.toContain('AFLDB_NODE_MODULES_DRIFT');
+    467|       expect(run.stdout).toContain('REACHED_THE_SEASON_STEP');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/12]⎯
+
+ FAIL  tests/deploy-release.test.ts > AFLDB-ISSUE-351 — the attended gate and the activation audit (pure) > the settle wrapper tells drift from a check that failed to run (ISSUE-364 A-09) > an interrupt that exits 130: the CHECK_FAILED marker with the exit code, never the DRIFT marker, and the run continues
+AssertionError: expected 'AFLDB_NODE_MODULES_DRIFT: node_module…' to contain 'AFLDB_NODE_MODULES_CHECK_FAILED: the …'
+
+- Expected
++ Received
+
+- AFLDB_NODE_MODULES_CHECK_FAILED: the node_modules check did not reach a verdict (exit 130); node_modules is NOT verified
++ AFLDB_NODE_MODULES_DRIFT: node_modules differ from package-lock.json; the run continues (ISSUE-364)
++
+
+ ❯ tests/deploy-release.test.ts:465:26
+    463|       const run = runBlock(process.execPath, dir);
+    464|       expect(run.status).toBe(0);
+    465|       expect(run.stderr).toContain(`AFLDB_NODE_MODULES_CHECK_FAILED: t…
+       |                          ^
+    466|       expect(run.stderr).not.toContain('AFLDB_NODE_MODULES_DRIFT');
+    467|       expect(run.stdout).toContain('REACHED_THE_SEASON_STEP');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/12]⎯
+
+ FAIL  tests/deploy-release.test.ts > AFLDB-ISSUE-351 — the attended gate and the activation audit (pure) > the settle wrapper tells drift from a check that failed to run (ISSUE-364 A-09) > a Node that cannot be executed is a failed check, not drift
+AssertionError: expected 'sh: 6: /nonexistent/node: not found\n…' to match /AFLDB_NODE_MODULES_CHECK_FAILED: .*\(…/
+
+- Expected:
+/AFLDB_NODE_MODULES_CHECK_FAILED: .*\(exit 127\)/
+
++ Received:
+"sh: 6: /nonexistent/node: not found
+AFLDB_NODE_MODULES_DRIFT: node_modules differ from package-lock.json; the run continues (ISSUE-364)
+"
+
+ ❯ tests/deploy-release.test.ts:474:26
+    472|       const run = runBlock('/nonexistent/node', dir);
+    473|       expect(run.status).toBe(0);
+    474|       expect(run.stderr).toMatch(/AFLDB_NODE_MODULES_CHECK_FAILED: .*\…
+       |                          ^
+    475|       expect(run.stderr).not.toContain('AFLDB_NODE_MODULES_DRIFT');
+    476|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/12]⎯
+
+ FAIL  tests/deploy-release.test.ts > AFLDB-ISSUE-351 — the attended gate and the activation audit (pure) > the settle wrapper tells drift from a check that failed to run (ISSUE-364 A-09) > a check that merely mentions the drift text in a failure is still a failed check
+AssertionError: expected 'release: node_modules differ from pac…' to contain 'AFLDB_NODE_MODULES_CHECK_FAILED'
+
+- Expected
++ Received
+
+- AFLDB_NODE_MODULES_CHECK_FAILED
++ release: node_modules differ from package-lock.json: pretend
++ AFLDB_NODE_MODULES_DRIFT: node_modules differ from package-lock.json; the run continues (ISSUE-364)
++
+
+ ❯ tests/deploy-release.test.ts:481:26
+    479|       const dir = checkoutWith(`console.error('release: node_modules d…
+    480|       const run = runBlock(process.execPath, dir);
+    481|       expect(run.stderr).toContain('AFLDB_NODE_MODULES_CHECK_FAILED');
+       |                          ^
+    482|       expect(run.stderr).not.toContain('AFLDB_NODE_MODULES_DRIFT');
+    483|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/12]⎯
+
+ FAIL  tests/workflow-preflight.test.ts > merge readiness report > AFLDB-ISSUE-364 lint ratchet gate in merge:ready > refuses a malformed baseline (not JSON)
+ FAIL  tests/workflow-preflight.test.ts > merge readiness report > AFLDB-ISSUE-364 lint ratchet gate in merge:ready > refuses a malformed baseline (an array)
+ FAIL  tests/workflow-preflight.test.ts > merge readiness report > AFLDB-ISSUE-364 lint ratchet gate in merge:ready > refuses a malformed baseline (a negative count)
+ FAIL  tests/workflow-preflight.test.ts > merge readiness report > AFLDB-ISSUE-364 lint ratchet gate in merge:ready > refuses a malformed baseline (a fractional count)
+ FAIL  tests/workflow-preflight.test.ts > merge readiness report > AFLDB-ISSUE-364 lint ratchet gate in merge:ready > refuses a malformed baseline (a non-object rule map)
+AssertionError: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ tests/workflow-preflight.test.ts:801:26
+    799|     ])('refuses a malformed baseline (%s)', (_label, baseline, reason)…
+    800|       const run = readiness({ baseline });
+    801|       expect(run.status).toBe(1);
+       |                          ^
+    802|       expect(run.stdout).toContain('lint ratchet gate refused (no verd…
+    803|       expect(run.stdout).toMatch(reason);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/12]⎯
+
+ FAIL  tests/workflow-preflight.test.ts > AFLDB-ISSUE-364 ratcheting lint gate > B-07: a failed ESLint spawn is a named refusal (exit 2), not a TypeError
+TypeError: results is not iterable
+ ❯ summariseErrors tools/dev/lint-gate.ts:29:22
+     27| export function summariseErrors(results: readonly LintFileResult[], ro…
+     28|   const summary: LintBaseline = {};
+     29|   for (const file of results) {
+       |                      ^
+     30|     const path = relative(root, file.filePath).replace(/\\/g, '/');
+     31|     for (const message of file.messages) {
+ ❯ Module.runLintGate tools/dev/lint-gate.ts:94:19
+ ❯ tests/workflow-preflight.test.ts:863:14
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/12]⎯
+
+ FAIL  tests/workflow-preflight.test.ts > AFLDB-ISSUE-364 ratcheting lint gate > refusals (exit 2) never fall through to a pass > the CLI refuses with exit 2 for a missing or malformed baseline, never a stack trace
+AssertionError: expected +0 to be 2 // Object.is equality
+
+- Expected
++ Received
+
+- 2
++ 0
+
+ ❯ tests/workflow-preflight.test.ts:902:40
+    900|         const spy = vi.spyOn(console, 'error').mockImplementation((...…
+    901|         try {
+    902|           expect(runLintGate([], dir)).toBe(2);
+       |                                        ^
+    903|         } finally {
+    904|           spy.mockRestore();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/12]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  12 failed | 2 passed | 101 skipped (115)
+   Start at  16:03:20
+   Duration  2.97s (transform 495ms, setup 175ms, import 748ms, tests 1.61s, environment 0ms)
+

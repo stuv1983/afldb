@@ -1,0 +1,30 @@
+== NEGATIVE lint:gate (baseline lowered by one)
+> afldb@0.1.0 lint:gate
+> tsx tools/dev/lint-gate.ts
+
+Lint gate (ratchet): 1 regression(s); 338 error(s) in 43 file(s) now; the ratchet baseline allows 337 in 43 (existing debt, not clean lint).
+  REGRESSION: .phaneslight/scripts/api-diff.js: @typescript-eslint/no-require-imports 1 -> 2
+Lint gate: FAILED (1).
+gate_exit=1
+== NEGATIVE preflight --mode implementation
+The lint ratchet gate (ESLint, read-only) will run; it can take a minute or two.
+
+PASS working directory is this repository root
+     expected: /mnt/ssd/afldb-rem2-lint364-20261114/final-neg
+     actual:   /mnt/ssd/afldb-rem2-lint364-20261114/final-neg
+PASS branch rem2-lint364 is valid for implementation
+FAIL working tree is clean
+     2 changed/untracked path(s); review and resolve them before the operation.
+FAIL implementation uses a linked worktree
+     The primary checkout is merge-only; create a linked worktree.
+FAIL local main ref exists
+     Fetch/update the repository before continuing.
+--
+FAIL lint ratchet gate: error count rose or a new file has errors
+     Lint gate: FAILED - 1 regression(s); 338 error(s) in 43 file(s) now; the ratchet baseline allows 337 in 43 (existing debt, not clean lint).
+     REGRESSION: .phaneslight/scripts/api-diff.js: @typescript-eslint/no-require-imports 1 -> 2
+     Fix the new errors; never raise tools/dev/lint-baseline.json.
+
+Preflight result: BLOCKED (4 blocker(s), 1 warning(s)).
+Resolve every FAIL and rerun this same command before the expensive or state-changing step.
+preflight_exit=1

@@ -1,0 +1,55 @@
+== focused tests
+     ✓ ISSUE-351: promote and rollback are attended; the host gate and the ledger check refuse before any link moves  623ms
+     ✓ ISSUE-351: status --expect fails a restart that coincides with an apt run, and names the owner's way past it  691ms
+     ✓ fails a public asset whose bytes are not the release's, and one that is missing  383ms
+ ✓ tests/workflow-preflight.test.ts (61 tests) 6399ms
+     ✓ blocks and lists untracked files  312ms
+       ✓ refuses, with a named reason, when ESLint is not installed or prints no JSON  472ms
+
+ Test Files  3 passed (3)
+      Tests  306 passed (306)
+   Start at  16:08:27
+   Duration  33.62s (transform 1.50s, setup 238ms, import 1.76s, tests 30.87s, environment 1ms)
+
+== typecheck
+> next typegen && tsc --noEmit
+
+Generating route types...
+✓ Types generated successfully
+tsc_exit=0
+== lint:gate (clean final checkout)
+> afldb@0.1.0 lint:gate
+> tsx tools/dev/lint-gate.ts
+
+Lint gate (ratchet): 338 error(s) in 43 file(s) now; the ratchet baseline allows 338 in 43 (existing debt, not clean lint).
+Lint gate: PASSED (ratchet; existing debt remains).
+wall 111.29s
+gate_exit=0
+== baseline diff e8666c17..HEAD
+0
+== preflight --mode implementation (clone, not a linked worktree: git lines are expected FAIL; the lint line is the subject)
+AFLDB read-only preflight: implementation / dev
+No Git fetch, database write, migration, plan write, deploy, or service action will run.
+The lint ratchet gate (ESLint, read-only) will run; it can take a minute or two.
+PASS working directory is this repository root
+     expected: /mnt/ssd/afldb-rem2-lint364-20261114/final
+     actual:   /mnt/ssd/afldb-rem2-lint364-20261114/final
+PASS branch rem2-lint364 is valid for implementation
+PASS working tree is clean
+FAIL implementation uses a linked worktree
+     The primary checkout is merge-only; create a linked worktree.
+FAIL local main ref exists
+     Fetch/update the repository before continuing.
+PASS migration names are collision-free across relevant refs/worktrees (refs/remotes/origin/main)
+WARN .env file presence
+     Create the local untracked .env before rebuild/promotion/deploy work.
+PASS Git Bash/MSYS path-conversion guard
+PASS git is available
+PASS psql is available
+PASS pg_restore is available
+PASS lint ratchet gate: no error count rose
+     Lint gate: PASSED - 338 error(s) in 43 file(s) now; the ratchet baseline allows 338 in 43 (existing debt, not clean lint).
+Preflight result: BLOCKED (2 blocker(s), 1 warning(s)).
+Resolve every FAIL and rerun this same command before the expensive or state-changing step.
+preflight_exit=1
+status_end=[]
