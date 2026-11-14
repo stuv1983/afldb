@@ -1,0 +1,14 @@
+# DEV (streamanator) service state — read-only, 2026-11-15T05:43:15+11:00
+afldb.service 1732 0 active c15b39a7e5554f30a8d1806333c9e880  since=Sat 2026-11-14 03:01:41 AEDT
+postgresql@16-main.service 1531 0 active f21f38b180c74c3e9baf2a87bad28e21  since=Sat 2026-11-14 03:01:41 AEDT
+caddy.service 1683 0 active e18d81237bc044ef829f5c17ead441ec  since=Sat 2026-11-14 03:01:42 AEDT
+listeners (DEV): 127.0.0.1:2019 127.0.0.1:3000 127.0.0.1:5432 
+listeners (556xx/557xx): 
+timer: Sun 2026-11-15 05:45:00 AEDT       1min 44s Sun 2026-11-15 05:40:01 AEDT 3min 14s ago afldb-settle-afl-api-brownlow.timer afldb-settle-afl-api-brownlow.service
+timer: Mon 2026-11-16 05:11:56 AEDT            23h Sun 2026-11-15 05:13:14 AEDT    30min ago afldb-settle-afl-api.timer          afldb-settle-afl-api.service
+DEV checkout HEAD: 8b024098a6771fc5e5be2f8bf006c9c3ca8ab55a
+load 0.44 0.30 0.42; /mnt/ssd free  440G
+mem: total 31Gi used 4.4Gi avail 26Gi
+rem3 workspaces: /mnt/ssd/afldb-rem3-base /mnt/ssd/afldb-rem3-closure-20261114 /mnt/ssd/afldb-rem3-closure-20261114-pg /mnt/ssd/afldb-rem3-integ-20261114 /mnt/ssd/afldb-rem3-integ-20261114-pg /mnt/ssd/afldb-rem3-integb-20261114 /mnt/ssd/afldb-rem3-integb-20261114-pg /mnt/ssd/afldb-rem3-qual-20261114 /mnt/ssd/afldb-rem3-qual-20261114-pg /mnt/ssd/afldb-rem3-rebuild-20261114 /mnt/ssd/afldb-rem3-rebuild-20261114-pg /mnt/ssd/afldb-rem3-stateb-20261114 /mnt/ssd/afldb-rem3-stateb-20261114-pg 
+rem4 workspaces: 
+postgres processes (any user, cmd): /usr/lib/postgresql/16/bin/postgres -D /var/lib/postgresql/16/main -c config_file=/etc/postgresql/16/main/postgresql.conf;

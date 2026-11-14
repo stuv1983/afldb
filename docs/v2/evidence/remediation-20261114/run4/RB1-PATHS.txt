@@ -1,0 +1,15 @@
+# RB-1 path check, read-only (ls -ld, readlink -f, stat -c %i, ls of package/data), 2026-11-15 ~05:43 AEDT, streamanator
+lrwxrwxrwx 1 arm arm   56 Nov  5 18:36 /mnt/ssd/afldb-i316-rb-I-20261023T0905Z -> /mnt/ssd/afldb/workspaces/afldb-i316-rb-I-20261023T0905Z
+drwx------ 9 arm arm 4096 Oct 23 19:44 /mnt/ssd/afldb/workspaces/afldb-i316-rb-I-20261023T0905Z
+/mnt/ssd/afldb/workspaces/afldb-i316-rb-I-20261023T0905Z
+23068673 /mnt/ssd/afldb/workspaces/afldb-i316-rb-I-20261023T0905Z
+23068673 /mnt/ssd/afldb-i316-rb-I-20261023T0905Z/
+total 32
+drwx------  8 arm arm 4096 Oct 23 19:44 .
+drwx------ 18 arm arm 4096 Oct 23 19:44 ..
+drwx------  2 arm arm 4096 Oct 23 19:44 awards
+drwx------  2 arm arm 4096 Oct 23 19:44 brownlow
+drwx------  2 arm arm 4096 Oct 23 19:44 players
+drwx------  2 arm arm 4096 Oct 23 19:44 records
+drwx------  2 arm arm 4096 Oct 23 19:44 reference
+drwx------  5 arm arm 4096 Oct 23 19:44 sources
