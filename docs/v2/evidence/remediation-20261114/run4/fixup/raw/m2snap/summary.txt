@@ -1,0 +1,19 @@
+label=m2snap base=snap mode=shared db=afldb_v2_rem4fixup_m2snap_test HEAD=0e1a0d9f24b2d56d7db0353b01238099445c290b porcelain=1
+args: tests/integration/settle-afl-api-state-b.test.ts
+2026-11-14T23:25:11Z
+create-db: afldb_v2_rem4fixup_m2snap_test created from afldb_v2_rem4fixup_snap_tmpl_test and marked
+tcounts afldb_v2_rem4fixup_m2snap_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/m2snap/counts.before.tsv
+AUTH_USERS_BEFORE count=4 md5=0f816df1586b93d407888f5a0dba8571
+REAL_IDENTITY_BEFORE rows=1 md5=cf04e8f54805716e81742d4dbe3d5af4
+vitest start-order file(s): tests/integration/settle-afl-api-state-b.test.ts rc=1 (23:25:20)
+ Test Files  1 failed (1)
+      Tests  1 passed (1)
+   Duration  3.06s (transform 746ms, setup 160ms, import 843ms, tests 1.65s, environment 0ms)
+ FAIL  tests/integration/settle-afl-api-state-b.test.ts [ tests/integration/settle-afl-api-state-b.test.ts ]
+AssertionError: a pre-existing row changed: expected { matches: 17056, …(22) } to deeply equal { matches: 17056, …(22) }
+tcounts afldb_v2_rem4fixup_m2snap_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/m2snap/counts.after.tsv
+COUNTDIFF=0 tables=83
+AUTH_USERS_AFTER count=4 md5=274ca4439c3831375a6fc367d3044837
+REAL_IDENTITY_AFTER rows=1 md5=cf04e8f54805716e81742d4dbe3d5af4
+2026-11-14T23:25:22Z
+drop-db: afldb_v2_rem4fixup_m2snap_test dropped

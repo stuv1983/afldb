@@ -1,0 +1,23 @@
+label=m1rb base=rb mode=shared db=afldb_v2_rem4fixup_m1rb_test HEAD=0e1a0d9f24b2d56d7db0353b01238099445c290b porcelain=1
+args: tests/integration/settle-afl-api-state-b.test.ts
+2026-11-14T23:24:51Z
+create-db: afldb_v2_rem4fixup_m1rb_test created from afldb_v2_rem4fixup_rb_tmpl_test and marked
+tcounts afldb_v2_rem4fixup_m1rb_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/m1rb/counts.before.tsv
+AUTH_USERS_BEFORE count=0 md5=none
+REAL_IDENTITY_BEFORE rows=0 md5=none
+vitest start-order file(s): tests/integration/settle-afl-api-state-b.test.ts rc=1 (23:24:58)
+ Test Files  1 failed (1)
+      Tests  1 passed (1)
+   Duration  2.68s (transform 763ms, setup 161ms, import 861ms, tests 1.29s, environment 0ms)
+ FAIL  tests/integration/settle-afl-api-state-b.test.ts [ tests/integration/settle-afl-api-state-b.test.ts ]
+AssertionError: no fixture row may remain: expected { seasons: +0, matches: +0, …(16) } to deeply equal { seasons: +0, matches: +0, …(16) }
+tcounts afldb_v2_rem4fixup_m1rb_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/m1rb/counts.after.tsv
+COUNTDIFF=NONZERO
+7c7
+< auth_users	0
+---
+> auth_users	1
+AUTH_USERS_AFTER count=1 md5=1d5cab9ab56fedba9671a3346d2e2ed5
+REAL_IDENTITY_AFTER rows=0 md5=none
+2026-11-14T23:25:00Z
+drop-db: afldb_v2_rem4fixup_m1rb_test dropped

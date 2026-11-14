@@ -1,0 +1,6 @@
+identity of the restored accepted rebuild (aggregates only):
+ledger_max=118_fixtures_unconfirmed_participants.sql ledger_count=118
+matches=17056 players=13365 auth_users=0 seasons=131 season2026=complete
+seasons_in_progress=2027
+brownlow_season_votes_2026=0
+stat_availability_2026=brownlow_match_votes:pending,brownlow_round_votes:pending,brownlow_season_total:pending

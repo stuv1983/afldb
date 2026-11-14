@@ -1,0 +1,17 @@
+create-db: afldb_v2_rem4fixup_snap_tmpl_test created and marked
+isolated-pg: afldb_v2_rem4fixup_snap_tmpl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55692); running node
+pg_restore exit=0 seconds=6 stderrLines=0
+isolated-pg: afldb_v2_rem4fixup_snap_tmpl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55692); running node
+AFLDB migrations -> test (afldb_owner@127.0.0.1:55692/afldb_v2_rem4fixup_snap_tmpl_test)
+  118 migration file(s), 118 already applied
+
+Nothing to apply — schema is up to date.
+isolated-pg: afldb_v2_rem4fixup_snap_tmpl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55692); running node
+afldb_v2_rem4fixup_snap_tmpl_test {"ledger":"118_fixtures_unconfirmed_participants.sql","matches":17056,"fixtures":218,"receipts":5}
+ISOLATED TARGET OK: afldb_v2_rem4fixup_snap_tmpl_test
+identity of the snapshot template (aggregates only):
+ledger_max=118_fixtures_unconfirmed_participants.sql ledger_count=118
+matches=17056 players=13365 auth_users=4 seasons=130 season2026=complete
+brownlow_season_votes_2026=0
+stat_availability_2026=brownlow_match_votes:pending,brownlow_round_votes:pending,brownlow_season_total:pending
+tcounts afldb_v2_rem4fixup_snap_tmpl_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/snap-template.table-counts.tsv

@@ -1,0 +1,83 @@
+isolated-pg: afldb_v2_rem4fixup_c1snap_test verified (cluster afldb_v2_isolated, 127.0.0.1:55692); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem4-fixup-20261115/cand
+
+stdout | tests/integration/club-comparison.test.ts > club comparison: long rivalry performance
+┌─────────┬─────────────────────────────────────┬──────────────────────────────────────┬──────┬────────┬───────────┬────────┐
+│ (index) │ group                               │ label                                │ runs │ min_ms │ median_ms │ max_ms │
+├─────────┼─────────────────────────────────────┼──────────────────────────────────────┼──────┼────────┼───────────┼────────┤
+│ 0       │ 'adelaide/brisbane-lions'           │ 'getHeadToHeadSummary'               │ 5    │ 5.9    │ 6         │ 7.3    │
+│ 1       │ 'adelaide/brisbane-lions'           │ 'getHeadToHeadMeetings (page 1)'     │ 5    │ 11.4   │ 11.7      │ 15.4   │
+│ 2       │ 'adelaide/brisbane-lions'           │ 'getHeadToHeadMeetings (finals)'     │ 5    │ 13.3   │ 14.7      │ 17.2   │
+│ 3       │ 'adelaide/brisbane-lions'           │ 'getHeadToHeadVenueRecords'          │ 5    │ 7      │ 7.6       │ 8.3    │
+│ 4       │ 'adelaide/brisbane-lions'           │ 'getHeadToHeadRecords'               │ 5    │ 7.1    │ 8.8       │ 9.2    │
+│ 5       │ 'adelaide/brisbane-lions'           │ 'getHeadToHeadStreaks'               │ 5    │ 5.3    │ 5.9       │ 6      │
+│ 6       │ 'adelaide/brisbane-lions'           │ 'getCrossoverPlayers'                │ 5    │ 6.4    │ 8.6       │ 8.9    │
+│ 7       │ 'adelaide/brisbane-lions'           │ 'getCrossoverSummary'                │ 5    │ 7.6    │ 7.6       │ 7.9    │
+│ 8       │ 'adelaide/brisbane-lions'           │ 'getHeadToHeadPlayerLeaders'         │ 5    │ 14.4   │ 16.3      │ 23.9   │
+│ 9       │ 'adelaide/brisbane-lions'           │ 'getHeadToHeadBrownlow'              │ 5    │ 26.7   │ 27.2      │ 27.9   │
+│ 10      │ 'adelaide/brisbane-lions'           │ 'getClubBrownlowHistory (A)'         │ 5    │ 229.5  │ 229.8     │ 238    │
+│ 11      │ 'adelaide/brisbane-lions'           │ 'getClubBrownlowHistory (B)'         │ 5    │ 203.7  │ 207.7     │ 210.9  │
+│ 12      │ 'carlton/collingwood'               │ 'getHeadToHeadSummary'               │ 5    │ 7.8    │ 7.9       │ 7.9    │
+│ 13      │ 'carlton/collingwood'               │ 'getHeadToHeadMeetings (page 1)'     │ 5    │ 12.8   │ 12.9      │ 13.4   │
+│ 14      │ 'carlton/collingwood'               │ 'getHeadToHeadMeetings (finals)'     │ 5    │ 13.7   │ 13.9      │ 21.1   │
+│ 15      │ 'carlton/collingwood'               │ 'getHeadToHeadVenueRecords'          │ 5    │ 6.5    │ 6.6       │ 7.2    │
+│ 16      │ 'carlton/collingwood'               │ 'getHeadToHeadRecords'               │ 5    │ 9.6    │ 10.2      │ 10.8   │
+│ 17      │ 'carlton/collingwood'               │ 'getHeadToHeadStreaks'               │ 5    │ 6.7    │ 6.8       │ 7.3    │
+│ 18      │ 'carlton/collingwood'               │ 'getCrossoverPlayers'                │ 5    │ 10.6   │ 10.6      │ 11.1   │
+│ 19      │ 'carlton/collingwood'               │ 'getCrossoverSummary'                │ 5    │ 10.5   │ 10.5      │ 11.5   │
+│ 20      │ 'carlton/collingwood'               │ 'getHeadToHeadPlayerLeaders'         │ 5    │ 25.1   │ 25.8      │ 39.9   │
+│ 21      │ 'carlton/collingwood'               │ 'getHeadToHeadBrownlow'              │ 5    │ 65.5   │ 66.5      │ 80.7   │
+│ 22      │ 'carlton/collingwood'               │ 'getClubBrownlowHistory (A)'         │ 5    │ 196.6  │ 235.1     │ 239.9  │
+│ 23      │ 'carlton/collingwood'               │ 'getClubBrownlowHistory (B)'         │ 5    │ 164.4  │ 165.2     │ 167.4  │
+│ 24      │ 'adelaide 2026'                     │ 'getSeasonIdentity'                  │ 5    │ 1.5    │ 1.6       │ 1.6    │
+│ 25      │ 'adelaide 2026'                     │ 'getClubSeasonRecord'                │ 5    │ 0.6    │ 0.7       │ 1.1    │
+│ 26      │ 'adelaide 2026'                     │ 'getClubSeasonTeamMetrics'           │ 5    │ 3.2    │ 3.3       │ 4.3    │
+│ 27      │ 'adelaide 2026'                     │ 'getClubSeasonPlayerLeaders'         │ 5    │ 1.9    │ 2.1       │ 2.4    │
+│ 28      │ 'adelaide 2026'                     │ 'getClubSeasonBrownlowSummary'       │ 5    │ 2.1    │ 2.1       │ 2.7    │
+│ 29      │ 'adelaide 2026'                     │ 'getClubSeasonComparison (composed)' │ 5    │ 3.6    │ 3.7       │ 5.2    │
+│ 30      │ 'brisbane-lions 2026'               │ 'getSeasonIdentity'                  │ 5    │ 1.4    │ 1.5       │ 1.5    │
+│ 31      │ 'brisbane-lions 2026'               │ 'getClubSeasonRecord'                │ 5    │ 0.6    │ 0.7       │ 0.7    │
+│ 32      │ 'brisbane-lions 2026'               │ 'getClubSeasonTeamMetrics'           │ 5    │ 3.3    │ 3.3       │ 3.5    │
+│ 33      │ 'brisbane-lions 2026'               │ 'getClubSeasonPlayerLeaders'         │ 5    │ 1.9    │ 1.9       │ 2.3    │
+│ 34      │ 'brisbane-lions 2026'               │ 'getClubSeasonBrownlowSummary'       │ 5    │ 2.1    │ 2.9       │ 4      │
+│ 35      │ 'brisbane-lions 2026'               │ 'getClubSeasonComparison (composed)' │ 5    │ 3.7    │ 4         │ 5.3    │
+│ 36      │ 'max season 2026 (18 participants)' │ 'getMaximumComparisonSeason'         │ 5    │ 0.3    │ 0.5       │ 0.5    │
+│ 37      │ 'max season 2026 (18 participants)' │ 'getComparisonSeasons'               │ 5    │ 0.9    │ 1.1       │ 1.1    │
+│ 38      │ 'max season 2026 (18 participants)' │ 'getSeasonParticipants'              │ 5    │ 0.9    │ 1.3       │ 1.4    │
+│ 39      │ 'max season 2026 (18 participants)' │ 'getClubSeasonComparison (composed)' │ 5    │ 4.4    │ 5.2       │ 5.6    │
+│ 40      │ 'adelaide/brisbane-lions'           │ 'getHeadToHeadByDecade'              │ 5    │ 4.8    │ 5.6       │ 5.8    │
+│ 41      │ 'adelaide/brisbane-lions'           │ 'getHeadToHeadPeriodRecords'         │ 5    │ 8      │ 10.4      │ 13.4   │
+│ 42      │ 'adelaide/brisbane-lions'           │ 'getHeadToHeadPlayerAverages'        │ 5    │ 25     │ 25.9      │ 30.4   │
+│ 43      │ 'carlton/collingwood'               │ 'getHeadToHeadByDecade'              │ 5    │ 5      │ 5         │ 5.5    │
+│ 44      │ 'carlton/collingwood'               │ 'getHeadToHeadPeriodRecords'         │ 5    │ 13.5   │ 14        │ 22.2   │
+│ 45      │ 'carlton/collingwood'               │ 'getHeadToHeadPlayerAverages'        │ 5    │ 64.8   │ 66.7      │ 68.2   │
+│ 46      │ 'adelaide/brisbane-lions'           │ 'extended-rivalry parallel group'    │ 5    │ 25.5   │ 26.2      │ 26.7   │
+│ 47      │ 'carlton/collingwood'               │ 'extended-rivalry parallel group'    │ 5    │ 65.6   │ 66.2      │ 67.7   │
+│ 48      │ 'adelaide/brisbane-lions'           │ 'H2H parallel group'                 │ 5    │ 26.8   │ 30.7      │ 33.9   │
+│ 49      │ 'adelaide/brisbane-lions'           │ 'selected-season parallel group'     │ 5    │ 6.2    │ 6.7       │ 7.1    │
+│ 50      │ 'carlton/collingwood'               │ 'H2H parallel group'                 │ 5    │ 71.7   │ 73.2      │ 77.1   │
+│ 51      │ 'carlton/collingwood'               │ 'selected-season parallel group'     │ 5    │ 5.2    │ 7         │ 8      │
+│ 52      │ 'adelaide/brisbane-lions'           │ 'route-equivalent composed load'     │ 5    │ 296.4  │ 308.2     │ 388.1  │
+│ 53      │ 'carlton/collingwood'               │ 'route-equivalent composed load'     │ 5    │ 316.1  │ 357.9     │ 362.4  │
+└─────────┴─────────────────────────────────────┴──────────────────────────────────────┴──────┴────────┴───────────┴────────┘
+
+ ✓ tests/integration/club-comparison.test.ts (70 tests) 20607ms
+     ✓ lists everyone who represented both organisations, agreeing with independent SQL  618ms
+     ✓ reports Ben Keays as Brisbane Lions first, then Adelaide, in both argument orders  560ms
+     ✓ treats Footscray and Western Bulldogs as one continuing organisation  590ms
+     ✓ summarises the first and most recent players to complete both representations  570ms
+     ✓ takes winners only from is_winner, never from vote rank or maximum votes  309ms
+     ✓ excludes ambiguous multi-club seasons and discloses them instead of forcing them  309ms
+     ✓ keeps every warm H2H query under the query ceiling for both rivalry scales  8023ms
+     ✓ keeps every warm Stage 6 extended-rivalry query under the query ceiling  919ms
+     ✓ keeps the parallel Stage 6 extended-rivalry group under the group ceiling  653ms
+     ✓ keeps each independent parallel query group under the group ceiling  824ms
+     ✓ keeps the route-equivalent composed data load under the route ceiling  4580ms
+
+ Test Files  1 passed (1)
+      Tests  70 passed (70)
+   Start at  10:22:15
+   Duration  21.55s (transform 393ms, setup 162ms, import 420ms, tests 20.61s, environment 0ms)
+
+JSON report written to /mnt/ssd/afldb-rem4-fixup-20261115/evidence/c1snap/vitest.json

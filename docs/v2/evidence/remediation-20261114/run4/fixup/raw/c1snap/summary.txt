@@ -1,0 +1,17 @@
+label=c1snap base=snap mode=shared db=afldb_v2_rem4fixup_c1snap_test HEAD=0e1a0d9f24b2d56d7db0353b01238099445c290b porcelain=0
+args: tests/integration/club-comparison.test.ts
+2026-11-14T23:22:10Z
+create-db: afldb_v2_rem4fixup_c1snap_test created from afldb_v2_rem4fixup_snap_tmpl_test and marked
+tcounts afldb_v2_rem4fixup_c1snap_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/c1snap/counts.before.tsv
+AUTH_USERS_BEFORE count=4 md5=0f816df1586b93d407888f5a0dba8571
+REAL_IDENTITY_BEFORE rows=1 md5=cf04e8f54805716e81742d4dbe3d5af4
+vitest start-order file(s): tests/integration/club-comparison.test.ts rc=0 (23:22:37)
+ Test Files  1 passed (1)
+      Tests  70 passed (70)
+   Duration  21.55s (transform 393ms, setup 162ms, import 420ms, tests 20.61s, environment 0ms)
+tcounts afldb_v2_rem4fixup_c1snap_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/c1snap/counts.after.tsv
+COUNTDIFF=0 tables=83
+AUTH_USERS_AFTER count=4 md5=0f816df1586b93d407888f5a0dba8571
+REAL_IDENTITY_AFTER rows=1 md5=cf04e8f54805716e81742d4dbe3d5af4
+2026-11-14T23:22:39Z
+drop-db: afldb_v2_rem4fixup_c1snap_test dropped

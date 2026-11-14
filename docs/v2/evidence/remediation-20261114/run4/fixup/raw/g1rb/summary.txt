@@ -1,0 +1,15 @@
+label=g1rb base=rb mode=shared db=afldb_v2_rem4fixup_g1rb_test HEAD=0e1a0d9f24b2d56d7db0353b01238099445c290b porcelain=0
+args: tests/integration/settle-afl-api-state-b.test.ts
+2026-11-14T23:13:20Z
+create-db: afldb_v2_rem4fixup_g1rb_test created from afldb_v2_rem4fixup_rb_tmpl_test and marked
+tcounts afldb_v2_rem4fixup_g1rb_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/g1rb/counts.before.tsv
+AUTH_USERS_BEFORE=0
+vitest rc=0
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Duration  3.26s (transform 919ms, setup 174ms, import 1.03s, tests 1.64s, environment 0ms)
+tcounts afldb_v2_rem4fixup_g1rb_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/g1rb/counts.after.tsv
+COUNTDIFF=0 tables=83
+AUTH_USERS_AFTER=0
+2026-11-14T23:13:29Z
+drop-db: afldb_v2_rem4fixup_g1rb_test dropped

@@ -1,0 +1,23 @@
+label=ordsbfirstrb base=rb mode=shared db=afldb_v2_rem4fixup_ordsbfirstrb_test HEAD=0e1a0d9f24b2d56d7db0353b01238099445c290b porcelain=0
+args: tests/integration/settle-afl-api-state-b.test.ts tests/integration/settle-afl-api.test.ts
+2026-11-14T23:15:17Z
+create-db: afldb_v2_rem4fixup_ordsbfirstrb_test created from afldb_v2_rem4fixup_rb_tmpl_test and marked
+tcounts afldb_v2_rem4fixup_ordsbfirstrb_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/ordsbfirstrb/counts.before.tsv
+AUTH_USERS_BEFORE count=0 md5=none
+REAL_IDENTITY_BEFORE rows=0 md5=none
+vitest-step1 start-order file(s): tests/integration/settle-afl-api-state-b.test.ts rc=0 (23:15:25)
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Duration  3.16s (transform 892ms, setup 163ms, import 1.00s, tests 1.61s, environment 0ms)
+vitest-step2 start-order file(s): tests/integration/settle-afl-api.test.ts rc=1 (23:16:10)
+ Test Files  1 failed (1)
+      Tests  1 failed | 73 passed (74)
+   Duration  44.17s (transform 2.04s, setup 156ms, import 2.38s, tests 41.23s, environment 0ms)
+ FAIL  tests/integration/settle-afl-api.test.ts > AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreSQL (post-COMMIT, pre-archive recovery) > OD-5 reinstate (rolled back, no rebuild) — reinstateAndReplay() puts a captured ledger back byte-for-byte under its original ids, replays it and passes the bijection
+Error: Refusing to rebuild 'afldb_v2_rem4fixup_ordsbfirstrb_test': the only explicit rebuild targets are 'afldb_test' (normal test/integration rebuild), 'code_test_db' (disposable full-rebuild rehearsal). A target is never inferred from a DSN.
+tcounts afldb_v2_rem4fixup_ordsbfirstrb_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/ordsbfirstrb/counts.after.tsv
+COUNTDIFF=0 tables=83
+AUTH_USERS_AFTER count=0 md5=none
+REAL_IDENTITY_AFTER rows=0 md5=none
+2026-11-14T23:16:12Z
+drop-db: afldb_v2_rem4fixup_ordsbfirstrb_test dropped

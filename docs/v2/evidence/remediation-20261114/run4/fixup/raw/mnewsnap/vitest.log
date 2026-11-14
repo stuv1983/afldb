@@ -1,0 +1,104 @@
+isolated-pg: afldb_v2_rem4fixup_mnewsnap_test verified (cluster afldb_v2_isolated, 127.0.0.1:55692); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem4-fixup-20261115/cand
+
+ ❯ tests/integration/club-comparison.test.ts (70 tests | 1 failed | 69 skipped) 139ms
+     ↓ summarises Adelaide vs Brisbane Lions to the canonical witness and to independent SQL
+     ↓ filters by match type so that home-and-away and finals partition the complete history
+     ↓ filters by era (Club Rivalry Explorer follow-up, FR-2) so the decades partition the complete history
+     ↓ paginates the complete meetings list deterministically at 25 rows per page
+     ↓ groups venue records by canonical venue and agrees with an independent grouping
+     ↓ derives every head-to-head record from independent extremes and keeps ties
+     ↓ scopes records to one decade of the rivalry when an era is given (Club Rivalry Explorer follow-up, FR-2)
+     ↓ reads streaks from chronological order, with a draw breaking a winning streak
+     ↓ includes Footscray and South Melbourne meetings through organization_id
+     ↓ keeps Brisbane Bears and Fitzroy out of Brisbane Lions head-to-head totals
+     ↓ handles the Carlton vs Collingwood long rivalry, including Grand Finals
+     ↓ refuses to compare an organisation with itself
+     ↓ lists everyone who represented both organisations, agreeing with independent SQL
+     ↓ reports Ben Keays as Brisbane Lions first, then Adelaide, in both argument orders
+     ↓ reports Jarryd Lyons as Adelaide first, then Brisbane Lions, with Gold Coast in between
+     ↓ treats Footscray and Western Bulldogs as one continuing organisation
+     ↓ keeps Brisbane Bears, Fitzroy and Brisbane Lions as three distinct organisations
+     ↓ summarises the first and most recent players to complete both representations
+     ↓ refuses to look for crossover players inside one organisation
+     ↓ ranks H2H games leaders against independent SQL and the measured witnesses
+     ↓ ranks H2H goals leaders without ever treating an unrecorded goal as nought
+     ↓ consolidates a player who represented both organisations into one row
+     ↓ keeps every tied holder of the single-match goals and disposals records
+     ↓ reports an unrecorded single-match statistic as unavailable rather than nought
+     ↓ refuses to build leaders for an organisation against itself
+     ↓ attributes season Brownlow votes through the nullable club_id contract
+     ↓ takes winners only from is_winner, never from vote rank or maximum votes
+     ↓ includes only complete-coverage seasons and ranks all-time vote leaders
+     ↓ excludes ambiguous multi-club seasons and discloses them instead of forcing them
+     × exposes selected-season Brownlow coverage without presenting a partial total 95ms
+     ↓ agrees with the all-time history when a season is read on its own
+     ↓ counts eligible and covered meetings from home-and-away matches only
+     ↓ never lets a finals meeting contribute to the H2H Brownlow population
+     ↓ totals H2H votes per player against independent SQL over covered meetings
+     ↓ reports partial coverage for a rivalry that predates match-vote recording
+     ↓ refuses to build H2H Brownlow for an organisation against itself
+     ↓ discovers canonical seasons and defaults to the maximum one
+     ↓ resolves the selected season identity through the canonical lineage function
+     ↓ returns an explicit no-participation state rather than borrowing a season or identity
+     ↓ computes the selected season home-and-away record against independent SQL
+     ↓ reports the selected season completed state from canonical metadata
+     ↓ ranks selected season player leaders densely and keeps every tie at the cut
+     ↓ reads the selected season Brownlow through the Stage 3 attribution primitive
+     ↓ aggregates team metrics match by match, never by averaging player rows
+     ↓ covers every approved metric family and maps marks inside 50 to its canonical column
+     ↓ keeps a pre-1965 uncollected metric unavailable instead of reporting zero
+     ↓ reports a mixed-coverage historical season as partial with an honest denominator
+     ↓ fails safely to unavailable when a selected season has no coverage metadata at all
+     ↓ contains no hard-coded season year in the selected season code path
+     ↓ runs the complete selected season path for the maximum canonical season without naming it
+     ↓ reproduces the Adelaide vs Brisbane Lions decade witness and independent SQL
+     ↓ sums every Carlton vs Collingwood decade back to the complete 268-meeting population
+     ↓ exposes pair-level period-score coverage for both witness rivalries
+     ↓ drops a meeting whose period structure is incomplete rather than reading a gap as nought
+     ↓ matches independent SQL on the biggest lead at every named break
+     ↓ defines a comeback as trailing at the break and winning on the canonical result
+     ↓ computes the largest consecutive-break turnaround from the canonical full-time score, never period 4
+     ↓ reuses the comparison metric registry rather than defining a second one
+     ↓ ranks the disposals average board on recorded games and matches independent SQL
+     ↓ applies the five-recorded-game minimum, per metric and never per rivalry appearance
+     ↓ retains every tie at the rank-ten boundary and reports the recorded-game denominator
+     ↓ reads average availability from runtime stat_availability over the rivalry seasons
+     ↓ splits a crossover player average across both organisations
+     ↓ keeps every warm H2H query under the query ceiling for both rivalry scales
+     ↓ keeps every warm selected-season query under the query ceiling
+     ↓ keeps the maximum canonical season path under the query ceiling
+     ↓ keeps every warm Stage 6 extended-rivalry query under the query ceiling
+     ↓ keeps the parallel Stage 6 extended-rivalry group under the group ceiling
+     ↓ keeps each independent parallel query group under the group ceiling
+     ↓ keeps the route-equivalent composed data load under the route ceiling
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: club Brownlow history > exposes selected-season Brownlow coverage without presenting a partial total
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ tests/integration/club-comparison.test.ts:1881:39
+    1879|
+    1880|     for (const summary of [notApplicable, pending, missing]) {
+    1881|       expect(summary.isAuthoritative).toBe(false);
+       |                                       ^
+    1882|       expect(summary.totalVotes).toBeNull();
+    1883|       expect(summary.playersWithVotes).toBeNull();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 69 skipped (70)
+   Start at  10:23:49
+   Duration  1.11s (transform 397ms, setup 163ms, import 430ms, tests 139ms, environment 0ms)
+
+JSON report written to /mnt/ssd/afldb-rem4-fixup-20261115/evidence/mnewsnap/vitest.json

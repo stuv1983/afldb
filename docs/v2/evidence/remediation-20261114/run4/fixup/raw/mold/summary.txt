@@ -1,0 +1,27 @@
+label=mold base=rb mode=shared db=afldb_v2_rem4fixup_mold_test HEAD=0e1a0d9f24b2d56d7db0353b01238099445c290b porcelain=1
+args: tests/integration/club-comparison.test.ts -t exposes selected-season Brownlow coverage
+2026-11-14T23:23:13Z
+create-db: afldb_v2_rem4fixup_mold_test created from afldb_v2_rem4fixup_rb_tmpl_test and marked
+tcounts afldb_v2_rem4fixup_mold_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/mold/counts.before.tsv
+AUTH_USERS_BEFORE count=0 md5=none
+REAL_IDENTITY_BEFORE rows=0 md5=none
+PRESEED: INSERT INTO brownlow_season_votes (season, player_id, club_id, votes) SELECT 2026, (SELECT min(id) FROM players), NULL, 1; UPDATE stat_availability SET coverage = 'complete', is_recorded = true WHERE stat_key = 'brownlow_season_total' AND season = 2026
+INSERT 0 1
+UPDATE 1
+AUTH_USERS_SEEDED count=0 md5=none
+vitest start-order file(s): tests/integration/club-comparison.test.ts -t exposes selected-season Brownlow coverage rc=1 (23:23:20)
+ Test Files  1 failed (1)
+      Tests  1 failed | 69 skipped (70)
+   Duration  1.16s (transform 421ms, setup 173ms, import 442ms, tests 136ms, environment 0ms)
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: club Brownlow history > exposes selected-season Brownlow coverage without presenting a partial total
+AssertionError: expected 'complete' to be 'pending' // Object.is equality
+tcounts afldb_v2_rem4fixup_mold_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/mold/counts.after.tsv
+COUNTDIFF=NONZERO
+21c21
+< brownlow_season_votes	16120
+---
+> brownlow_season_votes	16121
+AUTH_USERS_AFTER count=0 md5=none
+REAL_IDENTITY_AFTER rows=0 md5=none
+2026-11-14T23:23:22Z
+drop-db: afldb_v2_rem4fixup_mold_test dropped

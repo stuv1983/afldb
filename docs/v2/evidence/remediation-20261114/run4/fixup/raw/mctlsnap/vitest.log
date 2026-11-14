@@ -1,0 +1,12 @@
+isolated-pg: afldb_v2_rem4fixup_mctlsnap_test verified (cluster afldb_v2_isolated, 127.0.0.1:55692); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem4-fixup-20261115/cand
+
+ ✓ tests/integration/club-comparison.test.ts (70 tests | 69 skipped) 115ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 69 skipped (70)
+   Start at  10:24:16
+   Duration  1.08s (transform 407ms, setup 164ms, import 438ms, tests 115ms, environment 0ms)
+
+JSON report written to /mnt/ssd/afldb-rem4-fixup-20261115/evidence/mctlsnap/vitest.json

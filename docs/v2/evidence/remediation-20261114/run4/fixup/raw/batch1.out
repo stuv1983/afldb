@@ -1,0 +1,189 @@
+BATCH1 HEAD=0e1a0d9f24b2d56d7db0353b01238099445c290b porcelain=0 2026-11-14T23:14:19Z
+label=g2rb base=rb mode=all db=afldb_v2_rem4fixup_g2rb_test HEAD=0e1a0d9f24b2d56d7db0353b01238099445c290b porcelain=0
+args: tests/integration/settle-afl-api-state-b.test.ts
+2026-11-14T23:14:19Z
+create-db: afldb_v2_rem4fixup_g2rb_test created from afldb_v2_rem4fixup_rb_tmpl_test and marked
+tcounts afldb_v2_rem4fixup_g2rb_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/g2rb/counts.before.tsv
+AUTH_USERS_BEFORE count=0 md5=none
+REAL_IDENTITY_BEFORE rows=0 md5=none
+vitest start-order file(s): tests/integration/settle-afl-api-state-b.test.ts rc=0 (23:14:29)
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Duration  5.34s (transform 758ms, setup 1.52s, import 853ms, tests 2.60s, environment 0ms)
+tcounts afldb_v2_rem4fixup_g2rb_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/g2rb/counts.after.tsv
+COUNTDIFF=0 tables=83
+AUTH_USERS_AFTER count=0 md5=none
+REAL_IDENTITY_AFTER rows=0 md5=none
+2026-11-14T23:14:31Z
+drop-db: afldb_v2_rem4fixup_g2rb_test dropped
+label=g1snap base=snap mode=shared db=afldb_v2_rem4fixup_g1snap_test HEAD=0e1a0d9f24b2d56d7db0353b01238099445c290b porcelain=0
+args: tests/integration/settle-afl-api-state-b.test.ts
+2026-11-14T23:14:32Z
+create-db: afldb_v2_rem4fixup_g1snap_test created from afldb_v2_rem4fixup_snap_tmpl_test and marked
+tcounts afldb_v2_rem4fixup_g1snap_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/g1snap/counts.before.tsv
+AUTH_USERS_BEFORE count=4 md5=0f816df1586b93d407888f5a0dba8571
+REAL_IDENTITY_BEFORE rows=1 md5=cf04e8f54805716e81742d4dbe3d5af4
+vitest start-order file(s): tests/integration/settle-afl-api-state-b.test.ts rc=0 (23:14:40)
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Duration  3.05s (transform 763ms, setup 158ms, import 874ms, tests 1.65s, environment 0ms)
+tcounts afldb_v2_rem4fixup_g1snap_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/g1snap/counts.after.tsv
+COUNTDIFF=0 tables=83
+AUTH_USERS_AFTER count=4 md5=0f816df1586b93d407888f5a0dba8571
+REAL_IDENTITY_AFTER rows=1 md5=cf04e8f54805716e81742d4dbe3d5af4
+2026-11-14T23:14:42Z
+drop-db: afldb_v2_rem4fixup_g1snap_test dropped
+label=g2snap base=snap mode=all db=afldb_v2_rem4fixup_g2snap_test HEAD=0e1a0d9f24b2d56d7db0353b01238099445c290b porcelain=0
+args: tests/integration/settle-afl-api-state-b.test.ts
+2026-11-14T23:14:43Z
+create-db: afldb_v2_rem4fixup_g2snap_test created from afldb_v2_rem4fixup_snap_tmpl_test and marked
+tcounts afldb_v2_rem4fixup_g2snap_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/g2snap/counts.before.tsv
+AUTH_USERS_BEFORE count=4 md5=0f816df1586b93d407888f5a0dba8571
+REAL_IDENTITY_BEFORE rows=1 md5=cf04e8f54805716e81742d4dbe3d5af4
+vitest start-order file(s): tests/integration/settle-afl-api-state-b.test.ts rc=0 (23:14:54)
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Duration  5.82s (transform 779ms, setup 2.04s, import 866ms, tests 2.55s, environment 0ms)
+tcounts afldb_v2_rem4fixup_g2snap_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/g2snap/counts.after.tsv
+COUNTDIFF=0 tables=83
+AUTH_USERS_AFTER count=4 md5=0f816df1586b93d407888f5a0dba8571
+REAL_IDENTITY_AFTER rows=1 md5=cf04e8f54805716e81742d4dbe3d5af4
+2026-11-14T23:14:56Z
+drop-db: afldb_v2_rem4fixup_g2snap_test dropped
+label=leftrb base=rb mode=shared db=afldb_v2_rem4fixup_leftrb_test HEAD=0e1a0d9f24b2d56d7db0353b01238099445c290b porcelain=0
+args: tests/integration/settle-afl-api-state-b.test.ts
+2026-11-14T23:14:56Z
+create-db: afldb_v2_rem4fixup_leftrb_test created from afldb_v2_rem4fixup_rb_tmpl_test and marked
+tcounts afldb_v2_rem4fixup_leftrb_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/leftrb/counts.before.tsv
+AUTH_USERS_BEFORE count=0 md5=none
+REAL_IDENTITY_BEFORE rows=0 md5=none
+PRESEED: INSERT INTO auth_users (email, role, password_hash, totp_secret, disabled_at) VALUES ('CD_I4080-stateb-2071-actor@example.invalid', 'admin', NULL, NULL, now())
+INSERT 0 1
+AUTH_USERS_SEEDED count=1 md5=b94b3b4eecfcbe171996750c349e0cb5
+vitest start-order file(s): tests/integration/settle-afl-api-state-b.test.ts rc=1 (23:15:04)
+ Test Files  1 failed (1)
+      Tests  1 skipped (1)
+   Duration  1.54s (transform 767ms, setup 160ms, import 875ms, tests 133ms, environment 0ms)
+ FAIL  tests/integration/settle-afl-api-state-b.test.ts [ tests/integration/settle-afl-api-state-b.test.ts ]
+AssertionError: a leftover fixture row exists; remove it deliberately, this file will not adopt it: expected { seasons: +0, matches: +0, …(16) } to deeply equal { seasons: +0, matches: +0, …(16) }
+tcounts afldb_v2_rem4fixup_leftrb_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/leftrb/counts.after.tsv
+COUNTDIFF=0 tables=83
+AUTH_USERS_AFTER count=0 md5=none
+REAL_IDENTITY_AFTER rows=0 md5=none
+2026-11-14T23:15:06Z
+drop-db: afldb_v2_rem4fixup_leftrb_test dropped
+label=leftsnap base=snap mode=shared db=afldb_v2_rem4fixup_leftsnap_test HEAD=0e1a0d9f24b2d56d7db0353b01238099445c290b porcelain=0
+args: tests/integration/settle-afl-api-state-b.test.ts
+2026-11-14T23:15:06Z
+create-db: afldb_v2_rem4fixup_leftsnap_test created from afldb_v2_rem4fixup_snap_tmpl_test and marked
+tcounts afldb_v2_rem4fixup_leftsnap_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/leftsnap/counts.before.tsv
+AUTH_USERS_BEFORE count=4 md5=0f816df1586b93d407888f5a0dba8571
+REAL_IDENTITY_BEFORE rows=1 md5=cf04e8f54805716e81742d4dbe3d5af4
+PRESEED: INSERT INTO auth_users (email, role, password_hash, totp_secret, disabled_at) VALUES ('CD_I4080-stateb-2071-actor@example.invalid', 'admin', NULL, NULL, now())
+INSERT 0 1
+AUTH_USERS_SEEDED count=5 md5=3506ce86cd14923a1577be8c1f62cb61
+vitest start-order file(s): tests/integration/settle-afl-api-state-b.test.ts rc=1 (23:15:14)
+ Test Files  1 failed (1)
+      Tests  1 skipped (1)
+   Duration  1.74s (transform 847ms, setup 182ms, import 982ms, tests 197ms, environment 0ms)
+ FAIL  tests/integration/settle-afl-api-state-b.test.ts [ tests/integration/settle-afl-api-state-b.test.ts ]
+AssertionError: a leftover fixture row exists; remove it deliberately, this file will not adopt it: expected { seasons: +0, matches: +0, …(16) } to deeply equal { seasons: +0, matches: +0, …(16) }
+tcounts afldb_v2_rem4fixup_leftsnap_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/leftsnap/counts.after.tsv
+COUNTDIFF=0 tables=83
+AUTH_USERS_AFTER count=4 md5=0f816df1586b93d407888f5a0dba8571
+REAL_IDENTITY_AFTER rows=1 md5=cf04e8f54805716e81742d4dbe3d5af4
+2026-11-14T23:15:16Z
+drop-db: afldb_v2_rem4fixup_leftsnap_test dropped
+label=ordsbfirstrb base=rb mode=shared db=afldb_v2_rem4fixup_ordsbfirstrb_test HEAD=0e1a0d9f24b2d56d7db0353b01238099445c290b porcelain=0
+args: tests/integration/settle-afl-api-state-b.test.ts tests/integration/settle-afl-api.test.ts
+2026-11-14T23:15:17Z
+create-db: afldb_v2_rem4fixup_ordsbfirstrb_test created from afldb_v2_rem4fixup_rb_tmpl_test and marked
+tcounts afldb_v2_rem4fixup_ordsbfirstrb_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/ordsbfirstrb/counts.before.tsv
+AUTH_USERS_BEFORE count=0 md5=none
+REAL_IDENTITY_BEFORE rows=0 md5=none
+vitest-step1 start-order file(s): tests/integration/settle-afl-api-state-b.test.ts rc=0 (23:15:25)
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Duration  3.16s (transform 892ms, setup 163ms, import 1.00s, tests 1.61s, environment 0ms)
+vitest-step2 start-order file(s): tests/integration/settle-afl-api.test.ts rc=1 (23:16:10)
+ Test Files  1 failed (1)
+      Tests  1 failed | 73 passed (74)
+   Duration  44.17s (transform 2.04s, setup 156ms, import 2.38s, tests 41.23s, environment 0ms)
+ FAIL  tests/integration/settle-afl-api.test.ts > AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreSQL (post-COMMIT, pre-archive recovery) > OD-5 reinstate (rolled back, no rebuild) — reinstateAndReplay() puts a captured ledger back byte-for-byte under its original ids, replays it and passes the bijection
+Error: Refusing to rebuild 'afldb_v2_rem4fixup_ordsbfirstrb_test': the only explicit rebuild targets are 'afldb_test' (normal test/integration rebuild), 'code_test_db' (disposable full-rebuild rehearsal). A target is never inferred from a DSN.
+tcounts afldb_v2_rem4fixup_ordsbfirstrb_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/ordsbfirstrb/counts.after.tsv
+COUNTDIFF=0 tables=83
+AUTH_USERS_AFTER count=0 md5=none
+REAL_IDENTITY_AFTER rows=0 md5=none
+2026-11-14T23:16:12Z
+drop-db: afldb_v2_rem4fixup_ordsbfirstrb_test dropped
+label=ordsafirstrb base=rb mode=shared db=afldb_v2_rem4fixup_ordsafirstrb_test HEAD=0e1a0d9f24b2d56d7db0353b01238099445c290b porcelain=0
+args: tests/integration/settle-afl-api.test.ts tests/integration/settle-afl-api-state-b.test.ts
+2026-11-14T23:16:13Z
+create-db: afldb_v2_rem4fixup_ordsafirstrb_test created from afldb_v2_rem4fixup_rb_tmpl_test and marked
+tcounts afldb_v2_rem4fixup_ordsafirstrb_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/ordsafirstrb/counts.before.tsv
+AUTH_USERS_BEFORE count=0 md5=none
+REAL_IDENTITY_BEFORE rows=0 md5=none
+vitest-step1 start-order file(s): tests/integration/settle-afl-api.test.ts rc=1 (23:17:01)
+ Test Files  1 failed (1)
+      Tests  1 failed | 73 passed (74)
+   Duration  43.57s (transform 1.79s, setup 162ms, import 2.10s, tests 40.93s, environment 0ms)
+ FAIL  tests/integration/settle-afl-api.test.ts > AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreSQL (post-COMMIT, pre-archive recovery) > OD-5 reinstate (rolled back, no rebuild) — reinstateAndReplay() puts a captured ledger back byte-for-byte under its original ids, replays it and passes the bijection
+Error: Refusing to rebuild 'afldb_v2_rem4fixup_ordsafirstrb_test': the only explicit rebuild targets are 'afldb_test' (normal test/integration rebuild), 'code_test_db' (disposable full-rebuild rehearsal). A target is never inferred from a DSN.
+vitest-step2 start-order file(s): tests/integration/settle-afl-api-state-b.test.ts rc=0 (23:17:05)
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Duration  2.93s (transform 762ms, setup 162ms, import 862ms, tests 1.54s, environment 0ms)
+tcounts afldb_v2_rem4fixup_ordsafirstrb_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/ordsafirstrb/counts.after.tsv
+COUNTDIFF=0 tables=83
+AUTH_USERS_AFTER count=0 md5=none
+REAL_IDENTITY_AFTER rows=0 md5=none
+2026-11-14T23:17:07Z
+drop-db: afldb_v2_rem4fixup_ordsafirstrb_test dropped
+label=ordsbfirstsnap base=snap mode=shared db=afldb_v2_rem4fixup_ordsbfirstsnap_test HEAD=0e1a0d9f24b2d56d7db0353b01238099445c290b porcelain=0
+args: tests/integration/settle-afl-api-state-b.test.ts tests/integration/settle-afl-api.test.ts
+2026-11-14T23:17:08Z
+create-db: afldb_v2_rem4fixup_ordsbfirstsnap_test created from afldb_v2_rem4fixup_snap_tmpl_test and marked
+tcounts afldb_v2_rem4fixup_ordsbfirstsnap_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/ordsbfirstsnap/counts.before.tsv
+AUTH_USERS_BEFORE count=4 md5=0f816df1586b93d407888f5a0dba8571
+REAL_IDENTITY_BEFORE rows=1 md5=cf04e8f54805716e81742d4dbe3d5af4
+vitest-step1 start-order file(s): tests/integration/settle-afl-api-state-b.test.ts rc=0 (23:17:16)
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Duration  3.08s (transform 763ms, setup 164ms, import 864ms, tests 1.65s, environment 0ms)
+vitest-step2 start-order file(s): tests/integration/settle-afl-api.test.ts rc=1 (23:18:09)
+ Test Files  1 failed (1)
+      Tests  1 failed | 73 passed (74)
+   Duration  51.85s (transform 1.85s, setup 161ms, import 2.19s, tests 49.13s, environment 0ms)
+ FAIL  tests/integration/settle-afl-api.test.ts > AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreSQL (post-COMMIT, pre-archive recovery) > OD-5 reinstate (rolled back, no rebuild) — reinstateAndReplay() puts a captured ledger back byte-for-byte under its original ids, replays it and passes the bijection
+Error: Refusing to rebuild 'afldb_v2_rem4fixup_ordsbfirstsnap_test': the only explicit rebuild targets are 'afldb_test' (normal test/integration rebuild), 'code_test_db' (disposable full-rebuild rehearsal). A target is never inferred from a DSN.
+tcounts afldb_v2_rem4fixup_ordsbfirstsnap_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/ordsbfirstsnap/counts.after.tsv
+COUNTDIFF=0 tables=83
+AUTH_USERS_AFTER count=4 md5=0f816df1586b93d407888f5a0dba8571
+REAL_IDENTITY_AFTER rows=1 md5=cf04e8f54805716e81742d4dbe3d5af4
+2026-11-14T23:18:11Z
+drop-db: afldb_v2_rem4fixup_ordsbfirstsnap_test dropped
+label=ordsafirstsnap base=snap mode=shared db=afldb_v2_rem4fixup_ordsafirstsnap_test HEAD=0e1a0d9f24b2d56d7db0353b01238099445c290b porcelain=0
+args: tests/integration/settle-afl-api.test.ts tests/integration/settle-afl-api-state-b.test.ts
+2026-11-14T23:18:12Z
+create-db: afldb_v2_rem4fixup_ordsafirstsnap_test created from afldb_v2_rem4fixup_snap_tmpl_test and marked
+tcounts afldb_v2_rem4fixup_ordsafirstsnap_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/ordsafirstsnap/counts.before.tsv
+AUTH_USERS_BEFORE count=4 md5=0f816df1586b93d407888f5a0dba8571
+REAL_IDENTITY_BEFORE rows=1 md5=cf04e8f54805716e81742d4dbe3d5af4
+vitest-step1 start-order file(s): tests/integration/settle-afl-api.test.ts rc=1 (23:19:21)
+ Test Files  1 failed (1)
+      Tests  1 failed | 73 passed (74)
+   Duration  52.51s (transform 1.87s, setup 160ms, import 2.25s, tests 49.73s, environment 0ms)
+ FAIL  tests/integration/settle-afl-api.test.ts > AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreSQL (post-COMMIT, pre-archive recovery) > OD-5 reinstate (rolled back, no rebuild) — reinstateAndReplay() puts a captured ledger back byte-for-byte under its original ids, replays it and passes the bijection
+Error: Refusing to rebuild 'afldb_v2_rem4fixup_ordsafirstsnap_test': the only explicit rebuild targets are 'afldb_test' (normal test/integration rebuild), 'code_test_db' (disposable full-rebuild rehearsal). A target is never inferred from a DSN.
+vitest-step2 start-order file(s): tests/integration/settle-afl-api-state-b.test.ts rc=0 (23:19:25)
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Duration  3.05s (transform 791ms, setup 158ms, import 902ms, tests 1.63s, environment 0ms)
+tcounts afldb_v2_rem4fixup_ordsafirstsnap_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/ordsafirstsnap/counts.after.tsv
+COUNTDIFF=0 tables=83
+AUTH_USERS_AFTER count=4 md5=0f816df1586b93d407888f5a0dba8571
+REAL_IDENTITY_AFTER rows=1 md5=cf04e8f54805716e81742d4dbe3d5af4
+2026-11-14T23:19:27Z
+drop-db: afldb_v2_rem4fixup_ordsafirstsnap_test dropped
+BATCH1 DONE 2026-11-14T23:19:27Z

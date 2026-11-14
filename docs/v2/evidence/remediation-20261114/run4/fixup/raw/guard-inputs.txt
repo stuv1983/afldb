@@ -1,0 +1,2 @@
+afldb_v2_rem4fixup_snap_tmpl_test decided2026=0 status2026=complete votes2026=0
+afldb_v2_rem4fixup_rb_tmpl_test decided2026=0 status2026=complete votes2026=0

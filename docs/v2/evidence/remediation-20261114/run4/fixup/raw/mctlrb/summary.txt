@@ -1,0 +1,17 @@
+label=mctlrb base=rb mode=shared db=afldb_v2_rem4fixup_mctlrb_test HEAD=0e1a0d9f24b2d56d7db0353b01238099445c290b porcelain=0
+args: tests/integration/club-comparison.test.ts -t exposes selected-season Brownlow coverage
+2026-11-14T23:24:02Z
+create-db: afldb_v2_rem4fixup_mctlrb_test created from afldb_v2_rem4fixup_rb_tmpl_test and marked
+tcounts afldb_v2_rem4fixup_mctlrb_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/mctlrb/counts.before.tsv
+AUTH_USERS_BEFORE count=0 md5=none
+REAL_IDENTITY_BEFORE rows=0 md5=none
+vitest start-order file(s): tests/integration/club-comparison.test.ts -t exposes selected-season Brownlow coverage rc=0 (23:24:08)
+ Test Files  1 passed (1)
+      Tests  1 passed | 69 skipped (70)
+   Duration  1.10s (transform 411ms, setup 168ms, import 440ms, tests 120ms, environment 0ms)
+tcounts afldb_v2_rem4fixup_mctlrb_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/mctlrb/counts.after.tsv
+COUNTDIFF=0 tables=83
+AUTH_USERS_AFTER count=0 md5=none
+REAL_IDENTITY_AFTER rows=0 md5=none
+2026-11-14T23:24:10Z
+drop-db: afldb_v2_rem4fixup_mctlrb_test dropped

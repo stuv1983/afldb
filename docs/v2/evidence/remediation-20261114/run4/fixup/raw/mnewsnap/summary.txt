@@ -1,0 +1,27 @@
+label=mnewsnap base=snap mode=shared db=afldb_v2_rem4fixup_mnewsnap_test HEAD=0e1a0d9f24b2d56d7db0353b01238099445c290b porcelain=0
+args: tests/integration/club-comparison.test.ts -t exposes selected-season Brownlow coverage
+2026-11-14T23:23:42Z
+create-db: afldb_v2_rem4fixup_mnewsnap_test created from afldb_v2_rem4fixup_snap_tmpl_test and marked
+tcounts afldb_v2_rem4fixup_mnewsnap_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/mnewsnap/counts.before.tsv
+AUTH_USERS_BEFORE count=4 md5=0f816df1586b93d407888f5a0dba8571
+REAL_IDENTITY_BEFORE rows=1 md5=cf04e8f54805716e81742d4dbe3d5af4
+PRESEED: INSERT INTO brownlow_season_votes (season, player_id, club_id, votes) SELECT 2026, (SELECT min(id) FROM players), NULL, 1; UPDATE stat_availability SET coverage = 'complete', is_recorded = true WHERE stat_key = 'brownlow_season_total' AND season = 2026
+INSERT 0 1
+UPDATE 1
+AUTH_USERS_SEEDED count=4 md5=0f816df1586b93d407888f5a0dba8571
+vitest start-order file(s): tests/integration/club-comparison.test.ts -t exposes selected-season Brownlow coverage rc=1 (23:23:50)
+ Test Files  1 failed (1)
+      Tests  1 failed | 69 skipped (70)
+   Duration  1.11s (transform 397ms, setup 163ms, import 430ms, tests 139ms, environment 0ms)
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: club Brownlow history > exposes selected-season Brownlow coverage without presenting a partial total
+AssertionError: expected true to be false // Object.is equality
+tcounts afldb_v2_rem4fixup_mnewsnap_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/mnewsnap/counts.after.tsv
+COUNTDIFF=NONZERO
+21c21
+< brownlow_season_votes	16120
+---
+> brownlow_season_votes	16121
+AUTH_USERS_AFTER count=4 md5=0f816df1586b93d407888f5a0dba8571
+REAL_IDENTITY_AFTER rows=1 md5=cf04e8f54805716e81742d4dbe3d5af4
+2026-11-14T23:23:52Z
+drop-db: afldb_v2_rem4fixup_mnewsnap_test dropped

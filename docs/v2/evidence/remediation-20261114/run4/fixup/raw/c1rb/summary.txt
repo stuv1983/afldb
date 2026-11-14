@@ -1,0 +1,17 @@
+label=c1rb base=rb mode=shared db=afldb_v2_rem4fixup_c1rb_test HEAD=0e1a0d9f24b2d56d7db0353b01238099445c290b porcelain=0
+args: tests/integration/club-comparison.test.ts
+2026-11-14T23:21:12Z
+create-db: afldb_v2_rem4fixup_c1rb_test created from afldb_v2_rem4fixup_rb_tmpl_test and marked
+tcounts afldb_v2_rem4fixup_c1rb_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/c1rb/counts.before.tsv
+AUTH_USERS_BEFORE count=0 md5=none
+REAL_IDENTITY_BEFORE rows=0 md5=none
+vitest start-order file(s): tests/integration/club-comparison.test.ts rc=0 (23:21:38)
+ Test Files  1 passed (1)
+      Tests  70 passed (70)
+   Duration  21.01s (transform 416ms, setup 169ms, import 446ms, tests 20.02s, environment 0ms)
+tcounts afldb_v2_rem4fixup_c1rb_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/c1rb/counts.after.tsv
+COUNTDIFF=0 tables=83
+AUTH_USERS_AFTER count=0 md5=none
+REAL_IDENTITY_AFTER rows=0 md5=none
+2026-11-14T23:21:40Z
+drop-db: afldb_v2_rem4fixup_c1rb_test dropped

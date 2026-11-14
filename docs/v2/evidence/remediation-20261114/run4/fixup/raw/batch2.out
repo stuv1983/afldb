@@ -1,0 +1,244 @@
+BATCH2 HEAD=0e1a0d9f24b2d56d7db0353b01238099445c290b porcelain=0 2026-11-14T23:21:12Z
+label=c1rb base=rb mode=shared db=afldb_v2_rem4fixup_c1rb_test HEAD=0e1a0d9f24b2d56d7db0353b01238099445c290b porcelain=0
+args: tests/integration/club-comparison.test.ts
+2026-11-14T23:21:12Z
+create-db: afldb_v2_rem4fixup_c1rb_test created from afldb_v2_rem4fixup_rb_tmpl_test and marked
+tcounts afldb_v2_rem4fixup_c1rb_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/c1rb/counts.before.tsv
+AUTH_USERS_BEFORE count=0 md5=none
+REAL_IDENTITY_BEFORE rows=0 md5=none
+vitest start-order file(s): tests/integration/club-comparison.test.ts rc=0 (23:21:38)
+ Test Files  1 passed (1)
+      Tests  70 passed (70)
+   Duration  21.01s (transform 416ms, setup 169ms, import 446ms, tests 20.02s, environment 0ms)
+tcounts afldb_v2_rem4fixup_c1rb_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/c1rb/counts.after.tsv
+COUNTDIFF=0 tables=83
+AUTH_USERS_AFTER count=0 md5=none
+REAL_IDENTITY_AFTER rows=0 md5=none
+2026-11-14T23:21:40Z
+drop-db: afldb_v2_rem4fixup_c1rb_test dropped
+label=c2rb base=rb mode=all db=afldb_v2_rem4fixup_c2rb_test HEAD=0e1a0d9f24b2d56d7db0353b01238099445c290b porcelain=0
+args: tests/integration/club-comparison.test.ts
+2026-11-14T23:21:40Z
+create-db: afldb_v2_rem4fixup_c2rb_test created from afldb_v2_rem4fixup_rb_tmpl_test and marked
+tcounts afldb_v2_rem4fixup_c2rb_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/c2rb/counts.before.tsv
+AUTH_USERS_BEFORE count=0 md5=none
+REAL_IDENTITY_BEFORE rows=0 md5=none
+vitest start-order file(s): tests/integration/club-comparison.test.ts rc=0 (23:22:07)
+ Test Files  1 passed (1)
+      Tests  70 passed (70)
+   Duration  22.82s (transform 334ms, setup 1.31s, import 354ms, tests 20.84s, environment 0ms)
+tcounts afldb_v2_rem4fixup_c2rb_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/c2rb/counts.after.tsv
+COUNTDIFF=0 tables=83
+AUTH_USERS_AFTER count=0 md5=none
+REAL_IDENTITY_AFTER rows=0 md5=none
+2026-11-14T23:22:09Z
+drop-db: afldb_v2_rem4fixup_c2rb_test dropped
+label=c1snap base=snap mode=shared db=afldb_v2_rem4fixup_c1snap_test HEAD=0e1a0d9f24b2d56d7db0353b01238099445c290b porcelain=0
+args: tests/integration/club-comparison.test.ts
+2026-11-14T23:22:10Z
+create-db: afldb_v2_rem4fixup_c1snap_test created from afldb_v2_rem4fixup_snap_tmpl_test and marked
+tcounts afldb_v2_rem4fixup_c1snap_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/c1snap/counts.before.tsv
+AUTH_USERS_BEFORE count=4 md5=0f816df1586b93d407888f5a0dba8571
+REAL_IDENTITY_BEFORE rows=1 md5=cf04e8f54805716e81742d4dbe3d5af4
+vitest start-order file(s): tests/integration/club-comparison.test.ts rc=0 (23:22:37)
+ Test Files  1 passed (1)
+      Tests  70 passed (70)
+   Duration  21.55s (transform 393ms, setup 162ms, import 420ms, tests 20.61s, environment 0ms)
+tcounts afldb_v2_rem4fixup_c1snap_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/c1snap/counts.after.tsv
+COUNTDIFF=0 tables=83
+AUTH_USERS_AFTER count=4 md5=0f816df1586b93d407888f5a0dba8571
+REAL_IDENTITY_AFTER rows=1 md5=cf04e8f54805716e81742d4dbe3d5af4
+2026-11-14T23:22:39Z
+drop-db: afldb_v2_rem4fixup_c1snap_test dropped
+label=c2snap base=snap mode=all db=afldb_v2_rem4fixup_c2snap_test HEAD=0e1a0d9f24b2d56d7db0353b01238099445c290b porcelain=0
+args: tests/integration/club-comparison.test.ts
+2026-11-14T23:22:39Z
+create-db: afldb_v2_rem4fixup_c2snap_test created from afldb_v2_rem4fixup_snap_tmpl_test and marked
+tcounts afldb_v2_rem4fixup_c2snap_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/c2snap/counts.before.tsv
+AUTH_USERS_BEFORE count=4 md5=0f816df1586b93d407888f5a0dba8571
+REAL_IDENTITY_BEFORE rows=1 md5=cf04e8f54805716e81742d4dbe3d5af4
+vitest start-order file(s): tests/integration/club-comparison.test.ts rc=0 (23:23:10)
+ Test Files  1 passed (1)
+      Tests  70 passed (70)
+   Duration  25.90s (transform 394ms, setup 2.01s, import 413ms, tests 23.11s, environment 0ms)
+tcounts afldb_v2_rem4fixup_c2snap_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/c2snap/counts.after.tsv
+COUNTDIFF=0 tables=83
+AUTH_USERS_AFTER count=4 md5=0f816df1586b93d407888f5a0dba8571
+REAL_IDENTITY_AFTER rows=1 md5=cf04e8f54805716e81742d4dbe3d5af4
+2026-11-14T23:23:12Z
+drop-db: afldb_v2_rem4fixup_c2snap_test dropped
+=== OLD file (c9b2c3e7) on the loaded-2026 rb copy
+swapped in old: porcelain=1
+label=mold base=rb mode=shared db=afldb_v2_rem4fixup_mold_test HEAD=0e1a0d9f24b2d56d7db0353b01238099445c290b porcelain=1
+args: tests/integration/club-comparison.test.ts -t exposes selected-season Brownlow coverage
+2026-11-14T23:23:13Z
+create-db: afldb_v2_rem4fixup_mold_test created from afldb_v2_rem4fixup_rb_tmpl_test and marked
+tcounts afldb_v2_rem4fixup_mold_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/mold/counts.before.tsv
+AUTH_USERS_BEFORE count=0 md5=none
+REAL_IDENTITY_BEFORE rows=0 md5=none
+PRESEED: INSERT INTO brownlow_season_votes (season, player_id, club_id, votes) SELECT 2026, (SELECT min(id) FROM players), NULL, 1; UPDATE stat_availability SET coverage = 'complete', is_recorded = true WHERE stat_key = 'brownlow_season_total' AND season = 2026
+INSERT 0 1
+UPDATE 1
+AUTH_USERS_SEEDED count=0 md5=none
+vitest start-order file(s): tests/integration/club-comparison.test.ts -t exposes selected-season Brownlow coverage rc=1 (23:23:20)
+ Test Files  1 failed (1)
+      Tests  1 failed | 69 skipped (70)
+   Duration  1.16s (transform 421ms, setup 173ms, import 442ms, tests 136ms, environment 0ms)
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: club Brownlow history > exposes selected-season Brownlow coverage without presenting a partial total
+AssertionError: expected 'complete' to be 'pending' // Object.is equality
+tcounts afldb_v2_rem4fixup_mold_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/mold/counts.after.tsv
+COUNTDIFF=NONZERO
+21c21
+< brownlow_season_votes	16120
+---
+> brownlow_season_votes	16121
+AUTH_USERS_AFTER count=0 md5=none
+REAL_IDENTITY_AFTER rows=0 md5=none
+2026-11-14T23:23:22Z
+drop-db: afldb_v2_rem4fixup_mold_test dropped
+label=moldsnap base=snap mode=shared db=afldb_v2_rem4fixup_moldsnap_test HEAD=0e1a0d9f24b2d56d7db0353b01238099445c290b porcelain=1
+args: tests/integration/club-comparison.test.ts -t exposes selected-season Brownlow coverage
+2026-11-14T23:23:23Z
+create-db: afldb_v2_rem4fixup_moldsnap_test created from afldb_v2_rem4fixup_snap_tmpl_test and marked
+tcounts afldb_v2_rem4fixup_moldsnap_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/moldsnap/counts.before.tsv
+AUTH_USERS_BEFORE count=4 md5=0f816df1586b93d407888f5a0dba8571
+REAL_IDENTITY_BEFORE rows=1 md5=cf04e8f54805716e81742d4dbe3d5af4
+PRESEED: INSERT INTO brownlow_season_votes (season, player_id, club_id, votes) SELECT 2026, (SELECT min(id) FROM players), NULL, 1; UPDATE stat_availability SET coverage = 'complete', is_recorded = true WHERE stat_key = 'brownlow_season_total' AND season = 2026
+INSERT 0 1
+UPDATE 1
+AUTH_USERS_SEEDED count=4 md5=0f816df1586b93d407888f5a0dba8571
+vitest start-order file(s): tests/integration/club-comparison.test.ts -t exposes selected-season Brownlow coverage rc=1 (23:23:30)
+ Test Files  1 failed (1)
+      Tests  1 failed | 69 skipped (70)
+   Duration  1.11s (transform 402ms, setup 168ms, import 427ms, tests 134ms, environment 0ms)
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: club Brownlow history > exposes selected-season Brownlow coverage without presenting a partial total
+AssertionError: expected 'complete' to be 'pending' // Object.is equality
+tcounts afldb_v2_rem4fixup_moldsnap_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/moldsnap/counts.after.tsv
+COUNTDIFF=NONZERO
+21c21
+< brownlow_season_votes	16120
+---
+> brownlow_season_votes	16121
+AUTH_USERS_AFTER count=4 md5=0f816df1586b93d407888f5a0dba8571
+REAL_IDENTITY_AFTER rows=1 md5=cf04e8f54805716e81742d4dbe3d5af4
+2026-11-14T23:23:32Z
+drop-db: afldb_v2_rem4fixup_moldsnap_test dropped
+restored: HEAD=0e1a0d9f24b2d56d7db0353b01238099445c290b porcelain=0
+=== NEW file on the loaded-2026 copies
+label=mnew base=rb mode=shared db=afldb_v2_rem4fixup_mnew_test HEAD=0e1a0d9f24b2d56d7db0353b01238099445c290b porcelain=0
+args: tests/integration/club-comparison.test.ts -t exposes selected-season Brownlow coverage
+2026-11-14T23:23:33Z
+create-db: afldb_v2_rem4fixup_mnew_test created from afldb_v2_rem4fixup_rb_tmpl_test and marked
+tcounts afldb_v2_rem4fixup_mnew_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/mnew/counts.before.tsv
+AUTH_USERS_BEFORE count=0 md5=none
+REAL_IDENTITY_BEFORE rows=0 md5=none
+PRESEED: INSERT INTO brownlow_season_votes (season, player_id, club_id, votes) SELECT 2026, (SELECT min(id) FROM players), NULL, 1; UPDATE stat_availability SET coverage = 'complete', is_recorded = true WHERE stat_key = 'brownlow_season_total' AND season = 2026
+INSERT 0 1
+UPDATE 1
+AUTH_USERS_SEEDED count=0 md5=none
+vitest start-order file(s): tests/integration/club-comparison.test.ts -t exposes selected-season Brownlow coverage rc=1 (23:23:40)
+ Test Files  1 failed (1)
+      Tests  1 failed | 69 skipped (70)
+   Duration  1.15s (transform 406ms, setup 168ms, import 437ms, tests 143ms, environment 0ms)
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: club Brownlow history > exposes selected-season Brownlow coverage without presenting a partial total
+AssertionError: expected true to be false // Object.is equality
+tcounts afldb_v2_rem4fixup_mnew_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/mnew/counts.after.tsv
+COUNTDIFF=NONZERO
+21c21
+< brownlow_season_votes	16120
+---
+> brownlow_season_votes	16121
+AUTH_USERS_AFTER count=0 md5=none
+REAL_IDENTITY_AFTER rows=0 md5=none
+2026-11-14T23:23:42Z
+drop-db: afldb_v2_rem4fixup_mnew_test dropped
+label=mnewsnap base=snap mode=shared db=afldb_v2_rem4fixup_mnewsnap_test HEAD=0e1a0d9f24b2d56d7db0353b01238099445c290b porcelain=0
+args: tests/integration/club-comparison.test.ts -t exposes selected-season Brownlow coverage
+2026-11-14T23:23:42Z
+create-db: afldb_v2_rem4fixup_mnewsnap_test created from afldb_v2_rem4fixup_snap_tmpl_test and marked
+tcounts afldb_v2_rem4fixup_mnewsnap_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/mnewsnap/counts.before.tsv
+AUTH_USERS_BEFORE count=4 md5=0f816df1586b93d407888f5a0dba8571
+REAL_IDENTITY_BEFORE rows=1 md5=cf04e8f54805716e81742d4dbe3d5af4
+PRESEED: INSERT INTO brownlow_season_votes (season, player_id, club_id, votes) SELECT 2026, (SELECT min(id) FROM players), NULL, 1; UPDATE stat_availability SET coverage = 'complete', is_recorded = true WHERE stat_key = 'brownlow_season_total' AND season = 2026
+INSERT 0 1
+UPDATE 1
+AUTH_USERS_SEEDED count=4 md5=0f816df1586b93d407888f5a0dba8571
+vitest start-order file(s): tests/integration/club-comparison.test.ts -t exposes selected-season Brownlow coverage rc=1 (23:23:50)
+ Test Files  1 failed (1)
+      Tests  1 failed | 69 skipped (70)
+   Duration  1.11s (transform 397ms, setup 163ms, import 430ms, tests 139ms, environment 0ms)
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: club Brownlow history > exposes selected-season Brownlow coverage without presenting a partial total
+AssertionError: expected true to be false // Object.is equality
+tcounts afldb_v2_rem4fixup_mnewsnap_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/mnewsnap/counts.after.tsv
+COUNTDIFF=NONZERO
+21c21
+< brownlow_season_votes	16120
+---
+> brownlow_season_votes	16121
+AUTH_USERS_AFTER count=4 md5=0f816df1586b93d407888f5a0dba8571
+REAL_IDENTITY_AFTER rows=1 md5=cf04e8f54805716e81742d4dbe3d5af4
+2026-11-14T23:23:52Z
+drop-db: afldb_v2_rem4fixup_mnewsnap_test dropped
+=== NEW file, votes loaded but stat_availability NOT recomputed (inconsistent)
+label=mvotes base=rb mode=shared db=afldb_v2_rem4fixup_mvotes_test HEAD=0e1a0d9f24b2d56d7db0353b01238099445c290b porcelain=0
+args: tests/integration/club-comparison.test.ts -t exposes selected-season Brownlow coverage
+2026-11-14T23:23:52Z
+create-db: afldb_v2_rem4fixup_mvotes_test created from afldb_v2_rem4fixup_rb_tmpl_test and marked
+tcounts afldb_v2_rem4fixup_mvotes_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/mvotes/counts.before.tsv
+AUTH_USERS_BEFORE count=0 md5=none
+REAL_IDENTITY_BEFORE rows=0 md5=none
+PRESEED: INSERT INTO brownlow_season_votes (season, player_id, club_id, votes) SELECT 2026, (SELECT min(id) FROM players), NULL, 1
+INSERT 0 1
+AUTH_USERS_SEEDED count=0 md5=none
+vitest start-order file(s): tests/integration/club-comparison.test.ts -t exposes selected-season Brownlow coverage rc=1 (23:23:59)
+ Test Files  1 failed (1)
+      Tests  1 failed | 69 skipped (70)
+   Duration  1.13s (transform 412ms, setup 166ms, import 442ms, tests 144ms, environment 0ms)
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: club Brownlow history > exposes selected-season Brownlow coverage without presenting a partial total
+AssertionError: expected 'pending' to be 'complete' // Object.is equality
+tcounts afldb_v2_rem4fixup_mvotes_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/mvotes/counts.after.tsv
+COUNTDIFF=NONZERO
+21c21
+< brownlow_season_votes	16120
+---
+> brownlow_season_votes	16121
+AUTH_USERS_AFTER count=0 md5=none
+REAL_IDENTITY_AFTER rows=0 md5=none
+2026-11-14T23:24:01Z
+drop-db: afldb_v2_rem4fixup_mvotes_test dropped
+=== NEW file, targeted test on the unmutated bases (control)
+label=mctlrb base=rb mode=shared db=afldb_v2_rem4fixup_mctlrb_test HEAD=0e1a0d9f24b2d56d7db0353b01238099445c290b porcelain=0
+args: tests/integration/club-comparison.test.ts -t exposes selected-season Brownlow coverage
+2026-11-14T23:24:02Z
+create-db: afldb_v2_rem4fixup_mctlrb_test created from afldb_v2_rem4fixup_rb_tmpl_test and marked
+tcounts afldb_v2_rem4fixup_mctlrb_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/mctlrb/counts.before.tsv
+AUTH_USERS_BEFORE count=0 md5=none
+REAL_IDENTITY_BEFORE rows=0 md5=none
+vitest start-order file(s): tests/integration/club-comparison.test.ts -t exposes selected-season Brownlow coverage rc=0 (23:24:08)
+ Test Files  1 passed (1)
+      Tests  1 passed | 69 skipped (70)
+   Duration  1.10s (transform 411ms, setup 168ms, import 440ms, tests 120ms, environment 0ms)
+tcounts afldb_v2_rem4fixup_mctlrb_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/mctlrb/counts.after.tsv
+COUNTDIFF=0 tables=83
+AUTH_USERS_AFTER count=0 md5=none
+REAL_IDENTITY_AFTER rows=0 md5=none
+2026-11-14T23:24:10Z
+drop-db: afldb_v2_rem4fixup_mctlrb_test dropped
+label=mctlsnap base=snap mode=shared db=afldb_v2_rem4fixup_mctlsnap_test HEAD=0e1a0d9f24b2d56d7db0353b01238099445c290b porcelain=0
+args: tests/integration/club-comparison.test.ts -t exposes selected-season Brownlow coverage
+2026-11-14T23:24:10Z
+create-db: afldb_v2_rem4fixup_mctlsnap_test created from afldb_v2_rem4fixup_snap_tmpl_test and marked
+tcounts afldb_v2_rem4fixup_mctlsnap_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/mctlsnap/counts.before.tsv
+AUTH_USERS_BEFORE count=4 md5=0f816df1586b93d407888f5a0dba8571
+REAL_IDENTITY_BEFORE rows=1 md5=cf04e8f54805716e81742d4dbe3d5af4
+vitest start-order file(s): tests/integration/club-comparison.test.ts -t exposes selected-season Brownlow coverage rc=0 (23:24:17)
+ Test Files  1 passed (1)
+      Tests  1 passed | 69 skipped (70)
+   Duration  1.08s (transform 407ms, setup 164ms, import 438ms, tests 115ms, environment 0ms)
+tcounts afldb_v2_rem4fixup_mctlsnap_test: 83 tables -> /mnt/ssd/afldb-rem4-fixup-20261115/evidence/mctlsnap/counts.after.tsv
+COUNTDIFF=0 tables=83
+AUTH_USERS_AFTER count=4 md5=0f816df1586b93d407888f5a0dba8571
+REAL_IDENTITY_AFTER rows=1 md5=cf04e8f54805716e81742d4dbe3d5af4
+2026-11-14T23:24:19Z
+drop-db: afldb_v2_rem4fixup_mctlsnap_test dropped
+BATCH2 DONE HEAD=0e1a0d9f24b2d56d7db0353b01238099445c290b porcelain=0 2026-11-14T23:24:19Z

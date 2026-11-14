@@ -1,0 +1,19 @@
+isolated-pg: afldb_v2_rem4fixup_g2rb_test verified (cluster afldb_v2_isolated, 127.0.0.1:55692); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem4-fixup-20261115/cand
+
+stdout | tests/integration/settle-afl-api-state-b.test.ts
+[ISSUE-275 state-b fixture] {"database":"afldb_v2_pf_20261114231424_3541030_5f7daaac_test","role":"afldb_owner","season":2071,"namespace":"CD_M2071ISSUE275SB","providerMatchId":"CD_M2071ISSUE275SBN","matchKey":"2071|PF|2071-06-03|Hawthorn|Brisbane Lions","keepaliveMatchId":17057,"keepaliveMatchKey":"CD_M2071ISSUE275SB-keepalive","bridgedPlayerId":13366,"syntheticLegacyPlayerId":-275000001,"providerPlayerId":"CD_I2071275001","afltablesIdentity":"players/Z/Issue275-state-b-bridged-test.html","adminUserId":1,"actorEmail":"CD_I4080-stateb-2071-actor@example.invalid","note":"issue-275 state-b afl_api ownership test","snapshotLabel":"issue275-stateb-integration","aflApiSourceId":6,"afltablesSourceId":10}
+
+stdout | tests/integration/settle-afl-api-state-b.test.ts > AFLDB-ISSUE-257 §17.8 on a fixture season — Match Sheet authority over an afl_api-owned row survives a re-settle > keeps the corrected field, lets an unrelated field follow the source, and never changes ownership
+[ISSUE-275 state-b fixture] {"createdMatchId":17058,"createdMatchKey":"2071|PF|2071-06-03|Hawthorn|Brisbane Lions"}
+
+ ✓ tests/integration/settle-afl-api-state-b.test.ts (1 test) 2604ms
+     ✓ keeps the corrected field, lets an unrelated field follow the source, and never changes ownership  362ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  10:14:24
+   Duration  5.34s (transform 758ms, setup 1.52s, import 853ms, tests 2.60s, environment 0ms)
+
+JSON report written to /mnt/ssd/afldb-rem4-fixup-20261115/evidence/g2rb/vitest.json
