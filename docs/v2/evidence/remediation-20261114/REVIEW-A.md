@@ -1,0 +1,62 @@
+# REVIEW-A: independent code review, half A of the 2026-11-14 remediation candidate
+
+- Worktree `D:\dev\afldb-rem-20261114`, branch `claude/remediation-20261114`, HEAD `a119a999`, base `5035ed96`.
+- Reviewer: `afldb-reviewer` (CLAUDE.md section 13 Review). Read-only: no command was run, no code was edited. This file is the only file written.
+- Method: the whole of `A-code.diff` was read; every finding below was then checked against the file on disk in the worktree. Line numbers are worktree lines.
+- Result: **no CRIT, no HIGH. 3 MED, 6 LOW.** Nothing here was executed, so every finding is from reading, not from a failing run.
+
+## MED
+
+### A-01 (MED) An edit after retiring a MANUAL coach's identity override writes a partial active override
+
+`src/db/queries/admin-coaches.ts:593-615` with `src/lib/override-merge.ts` (`mergeOverrideDelta`), against `tools/migration/common.py:2256-2258` and `:2284-2300`.
+
+For an admin-created coach (`afltables_coach_path` = `manual:<token>`, entity key `manual_admin_edit:<token>`) the `identity` override is not a patch over a source row: it is the only thing `replay_admin_overrides(coaches)` re-creates the row from. After the ISSUE-354 change, an edit made while that override is retired upserts `is_active = true` with the delta only.
+
+Failure scenarios (the coach row still exists and is editable between the retire and the next reload):
+
+1. Retire the identity override of manual coach M, then save a change to `notes` (or `dob`, `surname`, `given_name`). Stored payload becomes `{"notes": "..."}`, active. The next destructive reload or promotion stops: `replay_admin_overrides(coaches): refusing to commit ... manual coach override carries no display_name to re-create the row with` (`common.py:2256-2258`, raised at `:2274-2278`). The whole coaches replay is blocked until the row is repaired by hand.
+2. Same, but the edit changes `display_name`. Payload is `{"display_name": "..."}`, active, and passes the check. The next reload re-creates M from the payload alone (`common.py:2285-2295`): `given_name`, `surname`, `dob` and `notes` come back NULL although the admin page showed them as present when the edit was saved. Silent loss of curated values.
+
+Before the change the retired payload was merged back, so neither happened (that resurrection is the ISSUE-354 defect for source-owned coaches, and the fix is right for them). The new tests cover only a source-owned coach (`tests/integration/admin-coaches.test.ts`); no test covers a manual coach.
+
+Smallest fix: in `saveCoachMetadata`, when the path starts with `manual:` and the stored override is not active, either refuse the edit ("this coach's override is retired; nothing was saved") or write the full five-field `values` as the payload. Acceptance check: extend the ISSUE-354 block in `tests/integration/admin-coaches.test.ts` with a manual coach: create, retire identity, edit `notes`, then assert the active payload carries `display_name` (or that the edit was refused).
+
+### A-02 (MED) A nightly backup success erases the marker of a failed restore verification
+
+`tools/maintenance/scheduled-backup.sh:142` (backup mode `rm -f "$STATE/FAILED" "$STATE/FAILED-unit"`), markers written at `:85-89` and by `deploy/afldb-backup-failed.service`.
+
+Scenario: Wednesday 03:30 `verify` fails in `restore-test.sh` (the dump does not restore or parity fails). `FAILED` (`mode=verify step=restore-test`) and `FAILED-unit` are written. Thursday 02:20 the ordinary `backup` succeeds and deletes both. `scheduled-backup.sh status` is then green: `last-verify.json` is the previous week's and stays inside the 216 h limit until Friday 03:30. For about 25 hours the only probe says nothing failed, then it fails on age with no record of why; the specific failure survives only in the journal. A dump that cannot be restored is exactly what this job exists to report.
+
+Smallest fix: `backup` success clears only a marker whose `mode` is `backup` (or use separate `FAILED-backup` / `FAILED-verify` files, each cleared by a success of its own mode), and never clears `FAILED-unit` from `backup` mode when the failed unit was the verify unit. Acceptance check: a case in the existing shell test home for this script: fail verify, run a successful backup, assert `status` still exits 1.
+
+### A-03 (MED) Off-host retention is by file name, so the source host can evict every genuine off-host copy
+
+`tools/maintenance/offhost-pull.sh:53-55` (retention), `:34-35` (rsync includes any `*.dump`), header claim at `:10-14`.
+
+The header states that a compromised production host "cannot take its own backups with it". Retention keeps the newest N dumps sorted by name, and the name is chosen by the source. Scenario: the source directory gains 30 valid custom-format dumps with later-sorting names (for example `afldb_prod-20991231-000000.dump`, each with a correct sidecar; `pg_restore --list` passes on any small valid archive). One pull copies them, verifies them, and the `tail -n +31` loop deletes every genuine dump, sidecar and marker at the destination. The same result follows without an attacker from a source clock set forward.
+
+A second, smaller gap in the same loop: the sidecar is source-supplied and `sha256sum -c "$b.sha256"` checks whatever file name the sidecar lists, not necessarily `$b`; with `pg_restore --list` reading only the table of contents, a truncated dump whose sidecar names another file is marked verified.
+
+Smallest fix: prune only verified dumps older than a minimum age by the destination's own clock (mtime of the `.verified-` marker), never by count alone; refuse names whose embedded stamp is in the future; and check the hash explicitly (`sha256sum "$b"` compared with the first field of the sidecar). Acceptance check: a fixture run with 31 future-named valid dumps asserts the genuine ones survive.
+
+## LOW (no work required; recorded for the owner)
+
+- **A-04** `deploy/afldb-backup.service`, `deploy/afldb-backup-verify.service`, `scheduled-backup.sh:82`: the script documents exit 75 (lock held) as "not a failure", but neither unit sets `SuccessExitStatus=75`. With `Persistent=true` on both timers, a boot after downtime starts both units together; the loser exits 75, the unit fails, `OnFailure` writes `FAILED-unit` and the error-priority journal line. If the loser is `verify`, that week's verification is skipped with only a false-alarm marker (later erased, see A-02).
+- **A-05** `src/db/queries/match-sheet.ts:507-512`: the Brownlow dependents read matches `brownlow_round_votes.match_id = <match>`. Migration 094 keeps `match_id` nullable for unresolved legacy rows (`094_brownlow_admin_workflow.sql:56`, `:103`), and the row's own `player_match_stats.brownlow_votes` is not consulted. A removal of a player whose only vote record for that round is an unresolved legacy row (NULL `match_id`) is not refused. Migration 094 records zero unresolved rows at backfill time, so this is latent; a `brownlow_votes > 0` test on the locked row would close it.
+- **A-06** `tools/v2/issue350-season-open-production.ts:237-241`: the transaction is REPEATABLE READ and `prove()` runs a SELECT before `LOCK TABLE`, so the snapshot predates the lock. The comment "nothing changes between the re-read and the commit" is not what happens: a writer that commits between the snapshot and the lock is invisible to the re-read. Every case I could construct ends in a serialization failure or unique violation (fail closed), and the independent post-commit `verify` re-reads; taking the lock as the first statement of the transaction would make the comment true.
+- **A-07** `deploy/afldb-settle-failure@.service:33,47` (`PrivateNetwork=true`, `RestrictAddressFamilies=AF_UNIX`) against `deploy/afldb-settle-failure-notify.sh` step 4: the documented future transport ("a mail relay command, a webhook wrapper") cannot reach the network from this unit. A later drop-in that sets only `AFLDB_FAILURE_TRANSPORT` will log "transport exited non-zero" every time and deliver nothing. No transport is configured today.
+- **A-08** `tools/v2/season-opening-check.ts:67`: the identity query reads `afldb_meta.schema_migrations`. I found no grant of `USAGE` on schema `afldb_meta` to `afldb_app` in `tools/maintenance/privileges.sql` or the migrations, and the default `--dsn-env` is `DATABASE_URL`. If that role cannot read the ledger the default invocation exits 2 (helper error), never 0/10/11. The runbook and both rehearsal scripts pass `--dsn-env AFLDB_BACKUP_DATABASE_URL`, which works. Unverified against a live role (no command was run); non-zero, so fail closed.
+- **A-09** `deploy/afldb-settle-afl-api.sh:68-71`: any non-zero exit of `release.mjs check-node-modules` (including a crash or a usage refusal, not only a mismatch) prints `AFLDB_NODE_MODULES_DRIFT: node_modules differ from package-lock.json`. The run continues as designed; only the journal text can be wrong.
+
+## Checked and found sound (so the next reviewer need not repeat it)
+
+- **Match Sheet dependents (ISSUE-353).** `saveMatchSheet` holds `matches ... FOR UPDATE` and every line-up row `FOR UPDATE` before the dependents read (`match-sheet.ts:158`, `:184`, `:202-217`); the Brownlow entry workflow takes the same match lock (`admin-brownlow.ts:704-714`), and special-record creation now takes `FOR SHARE` on the line-up row (`admin-special-records.ts`). The `club_slug` delta key the club-change test relies on is the key `planMatchSheetChanges` produces (`match-sheet-authority.ts:688`, `:743-745`). All reads are parameterised; the import role already reads the same four tables in `deleteMatch`.
+- **Override merge (ISSUE-354)** for source-owned coaches, draft picks and Data Editor entities: correct, and `data_edits.new_values` has no consumer that applies its keys as columns (only `audit-view.ts` diffing), so the two new audit keys are display-only. `tests/data-overrides-source-contract.test.ts` replaces its pinned text rather than dropping the pin.
+- **Settle HALT (ISSUE-350).** Thrown inside the settle transaction before the batch row; handled by the existing `AflApiSettleHalt` branch (`settle-afl-api.ts:2127-2136`); the CLI exits 1 on any halt (`tools/current-season/settle-afl-api.ts:569-572`). A run with no units is untouched.
+- **Season opening.** Three-valued classification, no `ON CONFLICT`, row-count checks on both UPDATEs, before/after proof inside the transaction, NULL measured columns asserted. GAP-029 registration is complete: `gap029-ops.ts` builds exactly the arguments the tool parses for plan, apply, state and verify; every stage allowlist (`STAGE_IDS`, `STAGES`, three shell scripts, `STAGE_RE`) carries I350.
+- **DraftGuru reload guard (ISSUE-348).** Deletion and match prediction use the reload's own predicates and scope; the person-deletion prediction agrees with the importer's actual `DELETE` (`import_draftguru.py:1540-1546`); `OVERRIDE_COVERS` matches the columns `replay_admin_overrides(draft_picks)` restores and the entity-key format (`common.py:2193-2216`); type mismatches in the Python comparisons can only add refusals. Residual, not graded: the guard reads before `import_batch` opens, so an admin edit landing in the seconds between the guard and the reload is not seen (the importer had no such lock before either).
+- **release.mjs.** No script or tool in `deploy/`, `tools/` or `package.json` calls `promote` or `rollback`, so `--attended` breaks no caller; the test edits add the flag and add bare-call refusal cases rather than removing coverage. Rollback cannot be blocked by the host gate (every host read is wrapped; rollback mode only warns). `status --checkout` is opt-in.
+- **Settle failure notifier.** Instance name is allowlisted before use, marker write is atomic, no credential or database is touched, `%n`/`%i` resolve to the full unit name the `case` expects.
+- **Caddyfiles.** Snippet-before-global ordering and the `multi_regexp` filter are recorded as validated on Caddy 2.11.4 in `auth/README.md`; the two token-bearing routes in the application (`/admin/invite/<token>`, `/beta/verify?token=`) are both covered and neither is redirected with the token in a `from=` parameter (`src/middleware.ts:107-115`, `:158`). External Caddy behaviour was not re-verified here (no `context7` grant); the `caddy validate` step in the install procedure remains the acceptance check.
+- **Tests.** No assertion in the half-A test files was removed without a stronger replacement; no `.skip`/`.only`/`.todo` was added anywhere in `tests.diff`.
