@@ -86,6 +86,66 @@ const nextRound = () => 9500 + (counter += 1);
 
 let actorId = 0;
 let createdThrowawayAdmin = false;
+let auditFloor = '0';
+let overrideFloor = '0';
+let derivedCapture: Record<string, string> | null = null;
+
+/**
+ * Run-4 `leaks` (F-003): createMatch and deleteMatch recompute, for the REAL seasons this suite uses (1990 and 2026),
+ * the `seasons` row, the `club_seasons` ladder and `player_season_stats` from the matches that remain; the fixture
+ * matches are then removed. Against the 4 Nov snapshot that left the 2026 and 1990 `seasons` rows and 1,207
+ * `player_season_stats` rows with different values than they were found with (the stored derived values are not what
+ * the recompute produces), which no later file expects. The suite captures the three structures for its two seasons
+ * before it writes anything, puts back exactly those rows in `afterAll`, and proves it did (the recaptured text must
+ * equal the captured text, surrogate `id` included).
+ */
+const RECOMPUTED = [
+  { table: 'seasons', column: 'year' },
+  { table: 'club_seasons', column: 'season' },
+  { table: 'player_season_stats', column: 'season' },
+] as const; // table and column names are constants here, never input
+
+async function captureDerived(seasons: readonly number[]): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  for (const { table, column } of RECOMPUTED) {
+    const [row] = await owner.unsafe<{ j: string }[]>(
+      `SELECT coalesce(jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text)::text, '[]') AS j
+         FROM ${table} t WHERE t.${column} = ANY($1::int[])`,
+      [seasons as number[]],
+    );
+    out[table] = row.j;
+  }
+  return out;
+}
+
+async function restoreDerived(seasons: readonly number[], capture: Record<string, string>): Promise<void> {
+  const columnsOf = async (table: string): Promise<string[]> => (await owner<{ name: string }[]>`
+    SELECT column_name::text AS name FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = ${table} AND is_generated = 'NEVER'
+     ORDER BY ordinal_position`)
+    .map((c) => `"${c.name.replace(/"/g, '""')}"`); // names come from the catalogue, quoted anyway
+  for (const { table, column } of RECOMPUTED) {
+    const cols = await columnsOf(table);
+    if (table === 'seasons') {
+      // A season row is only ever updated (other tables reference it): put back every column but its key.
+      const sets = cols.filter((c) => c !== '"year"').map((c) => `${c} = r.${c}`).join(', ');
+      await owner.unsafe(
+        `UPDATE seasons s SET ${sets} FROM jsonb_populate_recordset(NULL::seasons, $1::text::jsonb) r WHERE s.year = r.year`,
+        [capture[table]],
+      );
+    } else {
+      await owner.unsafe(`DELETE FROM ${table} WHERE ${column} = ANY($1::int[])`, [seasons as number[]]);
+      await owner.unsafe(
+        `INSERT INTO ${table} (${cols.join(', ')}) OVERRIDING SYSTEM VALUE
+           SELECT ${cols.join(', ')} FROM jsonb_populate_recordset(NULL::${table}, $1::text::jsonb)`,
+        [capture[table]],
+      );
+    }
+  }
+  const restored = await captureDerived(seasons);
+  const wrong = RECOMPUTED.filter(({ table }) => restored[table] !== capture[table]).map(({ table }) => table);
+  if (wrong.length > 0) throw new Error(`fixture teardown could not restore the captured ${wrong.join(', ')} rows`);
+}
 let clubA = 0;
 let clubB = 0;
 let sealedClubA = 0;
@@ -174,6 +234,14 @@ beforeAll(async () => {
     createdThrowawayAdmin = true;
   }
   fixtureAdmin.id = actorId;
+  // Run-4 `leaks` (F-003): high-water marks of the two audit tables, taken before the suite's first edit, so afterAll can
+  // remove exactly the audit and override rows its own edits wrote (see afterAll).
+  const [floor] = await owner<{ edits: string; overrides: string }[]>`
+    SELECT (SELECT coalesce(max(id), 0) FROM data_edits)::text AS edits,
+           (SELECT coalesce(max(id), 0) FROM data_overrides)::text AS overrides`;
+  auditFloor = floor.edits;
+  overrideFloor = floor.overrides;
+  derivedCapture = await captureDerived([SEALED, OPEN]); // as found, before the first recompute (see RECOMPUTED)
   setFixtureSeasonsOpen([OPEN]);
   await cleanupLeftovers(); // a crashed earlier run must not collide with this one's round numbers
   [sealedClubA, sealedClubB] = await eligibleClubs(SEALED);
@@ -187,8 +255,17 @@ afterAll(async () => {
     await deleteMatch({ matchId: id, adminUserId: actorId, reason: `${MARKER}: fixture teardown` }).catch(() => undefined);
   }
   await owner`DELETE FROM matches WHERE notes LIKE ${`${MARKER}%`}`.catch(() => undefined);
+  if (derivedCapture) await restoreDerived([SEALED, OPEN], derivedCapture);
   await owner`DELETE FROM data_edits WHERE note LIKE ${`${MARKER}%`}`.catch(() => undefined);
-  if (createdThrowawayAdmin) await owner`DELETE FROM auth_users WHERE id = ${actorId}`.catch(() => undefined);
+  // Run-4 `leaks` (F-003): the marker filter above misses the audit rows whose note is the correction note itself
+  // (GOOD_NOTE, the 20 and 2000 character boundary notes, ...), and the throwaway admin's delete below used to be
+  // swallowed when those rows still referenced it -- so the admin, 4 audit rows and 2 override rows survived every run.
+  // Every audit and override row written after beforeAll's high-water mark by the admin this suite acted as is the
+  // suite's own (the files run serially against one database); they are removed, and the admin only if created here.
+  // These deletes are not swallowed: a leftover must fail the file, not pass silently.
+  await owner`DELETE FROM data_overrides WHERE id > ${overrideFloor}::bigint AND admin_user_id = ${actorId}`;
+  await owner`DELETE FROM data_edits WHERE id > ${auditFloor}::bigint AND admin_user_id = ${actorId}`;
+  if (createdThrowawayAdmin) await owner`DELETE FROM auth_users WHERE id = ${actorId}`;
   await importSql.end({ timeout: 5 });
   await owner.end({ timeout: 5 });
 }, 60_000);

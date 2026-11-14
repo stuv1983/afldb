@@ -142,6 +142,9 @@ const MARKER = 'AFLDB-ISSUE-175';
 const FIXTURE_EMAIL = 'issue-175-promotion-test-fixture@afldb.test';
 
 let fixtureAdminId: number;
+// Run-4 `leaks` (F-003): true only when THIS run inserted the fixture admin (it is then removed in afterAll); a row that
+// already existed is never adopted or deleted.
+let fixtureAdminCreated = false;
 const submissionIds = new Set<number>();
 const playerIds = new Set<number>();
 
@@ -215,11 +218,13 @@ beforeAll(async () => {
     expect(proof.restricted.database).toMatch(/_test$/);
   }
 
-  await owner`
+  const inserted = await owner<{ id: number }[]>`
     INSERT INTO auth_users (email, role)
     VALUES (${FIXTURE_EMAIL}, 'super_admin')
     ON CONFLICT (email) DO NOTHING
+    RETURNING id
   `;
+  fixtureAdminCreated = inserted.length === 1;
   const [admin] = await owner<{ id: number }[]>`
     SELECT id FROM auth_users WHERE email = ${FIXTURE_EMAIL}
   `;
@@ -305,9 +310,22 @@ afterAll(async () => {
   if (playerIds.size > 0) {
     await owner`DELETE FROM players WHERE id = ANY(${[...playerIds]}::int[])`;
   }
-  // The fixture auth_users row is intentionally retained (see
-  // tests/integration/email-intake.test.ts for the same rationale): deleting
-  // it would race a concurrent run that reused it.
+  // Run-4 `leaks` (F-003): remove what this run left, so the suite leaves every table as it found it. (Before, the
+  // promotion batches and the fixture admin were retained "to avoid racing a concurrent run"; the harness runs files
+  // serially, one database per run, so there is no concurrent run, and a retained auth_users row made the empty
+  // `auth_users` of the accepted rebuild look populated to every later file in shared mode.) The batches this file's
+  // promotions wrote are identified by their own notes ('submission <id>' for the ids it inserted), after the
+  // submissions that reference them are gone; the admin only if this run inserted it.
+  if (submissionIds.size > 0) {
+    await owner`
+      DELETE FROM import_batches
+       WHERE tool = 'admin-upload'
+         AND notes = ANY(${[...submissionIds].map((id) => `submission ${id}`)}::text[])
+    `;
+  }
+  if (fixtureAdminCreated) {
+    await owner`DELETE FROM auth_users WHERE id = ${fixtureAdminId}`;
+  }
 
   await owner.end({ timeout: 5 });
   throwBackgroundFailures(failures);

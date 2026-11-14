@@ -1351,6 +1351,7 @@ describe.skipIf(!canRunGuard)(`DraftGuru reload guard, AFLDB-ISSUE-348 (afldb_te
   let pickId = 0;
   let personId = 0;
   let workDir = '';
+  let batchFloor = '0';
 
   async function cleanup(): Promise<void> {
     const admins = await sql<{ id: number }[]>`SELECT id FROM auth_users WHERE email = ${GUARD_ADMIN_EMAIL}`;
@@ -1399,6 +1400,10 @@ describe.skipIf(!canRunGuard)(`DraftGuru reload guard, AFLDB-ISSUE-348 (afldb_te
     await importRole.validate();
     await lockDraftTables(process.env.AFLDB_TEST_DATABASE_URL!);
     dgSource = await sourceId('draftguru');
+    // Run-4 `leaks` (F-003): the real importer records an import_batches row for a dry run it completes (and a
+    // failed one for a refusal, by design); remember the high-water mark so afterAll removes exactly this block's.
+    const [floor] = await sql<{ id: string }[]>`SELECT coalesce(max(id), 0)::text AS id FROM import_batches`;
+    batchFloor = floor.id;
     await cleanup();
     await seedAuditedFixture();
     workDir = mkdtempSync(join(tmpdir(), 'afldb-dg348-'));
@@ -1407,6 +1412,7 @@ describe.skipIf(!canRunGuard)(`DraftGuru reload guard, AFLDB-ISSUE-348 (afldb_te
   afterAll(async () => {
     try {
       await cleanup();
+      await sql`DELETE FROM import_batches WHERE id > ${batchFloor}::bigint AND tool = 'import_draftguru.py'`;
       if (workDir) rmSync(workDir, { recursive: true, force: true });
     } finally {
       await unlockDraftTables();

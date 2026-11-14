@@ -164,12 +164,17 @@ async function withJoinDeniedAuditFailure<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
+// Run-4 `leaks` (F-003): true only when this run's own INSERT created the fixture admin; only then is it removed in afterAll.
+let fixtureAdminCreated = false;
+
 beforeAll(async () => {
-  await owner`
+  const inserted = await owner<{ id: number }[]>`
     INSERT INTO auth_users (email, role)
     VALUES (${FIXTURE_ADMIN_EMAIL}, 'admin')
     ON CONFLICT (email) DO NOTHING
+    RETURNING id
   `;
+  fixtureAdminCreated = inserted.length === 1;
   const [admin] = await owner<{ id: number }[]>`
     SELECT id FROM auth_users WHERE email = ${FIXTURE_ADMIN_EMAIL}
   `;
@@ -193,9 +198,18 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
-  // The fixture admin row is intentionally retained -- shared afldb_test,
-  // same rationale as tests/integration/submission-promotion.test.ts.
-  await owner.end({ timeout: 5 });
+  // Run-4 `leaks` (F-003): the fixture admin is removed when this run created it. It was retained before
+  // ("shared afldb_test, may race a concurrent run"); the files run serially against one database, and a retained
+  // auth_users row made the accepted rebuild's empty table look populated to every later file in shared mode.
+  // A row that already existed is never deleted.
+  try {
+    if (fixtureAdminCreated) {
+      await owner`DELETE FROM auth_audit_log WHERE actor_user_id = ${fixtureAdmin.id}`;
+      await owner`DELETE FROM auth_users WHERE id = ${fixtureAdmin.id}`;
+    }
+  } finally {
+    await owner.end({ timeout: 5 });
+  }
 });
 
 describe('AFLDB-ISSUE-178 approveJoinRequest happy path', () => {

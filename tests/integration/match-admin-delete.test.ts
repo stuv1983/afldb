@@ -92,6 +92,68 @@ let fixturePlayerId: number;
 let voterPlayerIds: number[];
 let fixtureSeason: number;
 let seeded = 0;
+let derivedCapture: Record<string, string> | null = null;
+let auditFloor = '0';
+
+/**
+ * Run-4 `leaks` (F-003): a successful `deleteMatch` recomputes the fixture season's `seasons` row, its `club_seasons`
+ * ladder and its `player_season_stats` from the matches that remain (`recomputeSeasonMetadata`, `recomputeClubSeasons`,
+ * the season stat rebuild); the fixture matches are then removed with a plain DELETE (no recompute). The fixture season
+ * is `max(seasons.year)`, a REAL season. On the accepted rebuild (latest season 2027, no ladder rows yet) that left 2
+ * `club_seasons` rows and a rewritten `seasons` row, and `afl-api-c7-observation`'s own `DELETE FROM seasons` then
+ * failed with `club_seasons_season_fkey` in shared mode. On the 4 Nov snapshot (latest season 2026, with a ladder) it
+ * rewrote the season row, the ladder and the season's player stats with different values. The suite therefore
+ * captures the three structures for the fixture season before it writes, puts back exactly those rows in `afterAll`
+ * and proves it did (the recaptured text must equal the captured text, surrogate `id` included). It also removes
+ * the deletion audit rows it caused (`data_edits`), which it previously removed only when it had created its own admin.
+ */
+const RECOMPUTED = [
+  { table: 'seasons', column: 'year' },
+  { table: 'club_seasons', column: 'season' },
+  { table: 'player_season_stats', column: 'season' },
+] as const; // table and column names are constants here, never input
+
+async function captureDerived(seasons: readonly number[]): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  for (const { table, column } of RECOMPUTED) {
+    const [row] = await owner.unsafe<{ j: string }[]>(
+      `SELECT coalesce(jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text)::text, '[]') AS j
+         FROM ${table} t WHERE t.${column} = ANY($1::int[])`,
+      [seasons as number[]],
+    );
+    out[table] = row.j;
+  }
+  return out;
+}
+
+async function restoreDerived(seasons: readonly number[], capture: Record<string, string>): Promise<void> {
+  const columnsOf = async (table: string): Promise<string[]> => (await owner<{ name: string }[]>`
+    SELECT column_name::text AS name FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = ${table} AND is_generated = 'NEVER'
+     ORDER BY ordinal_position`)
+    .map((c) => `"${c.name.replace(/"/g, '""')}"`); // names come from the catalogue, quoted anyway
+  for (const { table, column } of RECOMPUTED) {
+    const cols = await columnsOf(table);
+    if (table === 'seasons') {
+      // A season row is only ever updated (other tables reference it): put back every column but its key.
+      const sets = cols.filter((c) => c !== '"year"').map((c) => `${c} = r.${c}`).join(', ');
+      await owner.unsafe(
+        `UPDATE seasons s SET ${sets} FROM jsonb_populate_recordset(NULL::seasons, $1::text::jsonb) r WHERE s.year = r.year`,
+        [capture[table]],
+      );
+    } else {
+      await owner.unsafe(`DELETE FROM ${table} WHERE ${column} = ANY($1::int[])`, [seasons as number[]]);
+      await owner.unsafe(
+        `INSERT INTO ${table} (${cols.join(', ')}) OVERRIDING SYSTEM VALUE
+           SELECT ${cols.join(', ')} FROM jsonb_populate_recordset(NULL::${table}, $1::text::jsonb)`,
+        [capture[table]],
+      );
+    }
+  }
+  const restored = await captureDerived(seasons);
+  const wrong = RECOMPUTED.filter(({ table }) => restored[table] !== capture[table]).map(({ table }) => table);
+  if (wrong.length > 0) throw new Error(`fixture teardown could not restore the captured ${wrong.join(', ')} rows`);
+}
 
 const nextKey = (prefix: string) => `${MARKER.toLowerCase()}-${prefix}-${Date.now().toString(36)}-${seeded += 1}`;
 
@@ -187,6 +249,11 @@ beforeAll(async () => {
   const [season] = await owner<{ year: number }[]>`SELECT max(year)::int AS year FROM seasons`;
   fixtureSeason = season.year;
 
+  // Capture, before any fixture match exists, the rows deleteMatch will recompute (see RECOMPUTED).
+  derivedCapture = await captureDerived([fixtureSeason]);
+  const [floor] = await owner<{ id: string }[]>`SELECT coalesce(max(id), 0)::text AS id FROM data_edits`;
+  auditFloor = floor.id;
+
   const [existingAdmin] = await owner<{ id: number }[]>`
     SELECT id FROM auth_users ORDER BY id LIMIT 1`;
   if (existingAdmin) {
@@ -213,13 +280,19 @@ afterAll(async () => {
   await owner`DELETE FROM import_batches WHERE source_id = ${fixtureSourceId}`;
   await owner`DELETE FROM sources WHERE key = ${FIXTURE_SOURCE_KEY}`;
   await owner`DELETE FROM matches WHERE venue_raw = ${MARKER}`;
-  if (createdThrowawayAdmin) {
-    // Successful deletion audits intentionally outlive the deleted matches.
-    await owner`DELETE FROM data_edits WHERE admin_user_id = ${actorId}
+  try {
+    // The fixture matches are gone: put back the season row and ladder deleteMatch recomputed (see RECOMPUTED).
+    if (derivedCapture) await restoreDerived([fixtureSeason], derivedCapture);
+    // Successful deletion audits intentionally outlive the deleted matches; they are this suite's own rows (marked
+    // note, written after beforeAll) whichever admin it used, so they go whether or not the admin was created here.
+    await owner`DELETE FROM data_edits WHERE id > ${auditFloor}::bigint AND admin_user_id = ${actorId}
       AND table_name = 'matches' AND field_group = 'match_deletion' AND note LIKE ${`${MARKER}%`}`;
-    await owner`DELETE FROM auth_users WHERE id = ${actorId}`;
+    if (createdThrowawayAdmin) {
+      await owner`DELETE FROM auth_users WHERE id = ${actorId}`;
+    }
+  } finally {
+    await owner.end({ timeout: 5 });
   }
-  await owner.end({ timeout: 5 });
 });
 
 describe('AFLDB-ISSUE-177 -- a match still linked by current-season staging cannot be deleted', () => {

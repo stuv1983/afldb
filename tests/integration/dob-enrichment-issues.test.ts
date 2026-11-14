@@ -289,6 +289,8 @@ describe.skipIf(!canRun)(
     severity: string; description: string; details: unknown; detectedAt: string;
     resolvedAt: string | null; resolution: string | null;
   }> = [];
+  let batchFloor = '0';
+  let fixtureSourceCreated = false;
   let playerSnapshot: Array<{
     id: number; dob: string | null; dobDisputed: boolean; dobConfidence: string;
     birthYear: number | null; birthYearMin: number | null; birthYearMax: number | null;
@@ -302,12 +304,18 @@ describe.skipIf(!canRun)(
     // §5.1: dedicated fixture source, seeded idempotently at runtime (not
     // a migration). external_identities_uq is (source_id, external_id), so
     // rows under this source can never collide with real `afltables` rows.
-    await sql`
+    // Run-4 `leaks` (F-003): remember what this file's importer runs will add (import_batches high-water mark) and
+    // whether this run created the fixture source, so afterAll can remove exactly those rows.
+    const [floor] = await sql<{ id: string }[]>`SELECT coalesce(max(id), 0)::text AS id FROM import_batches`;
+    batchFloor = floor.id;
+    const createdSource = await sql<{ id: number }[]>`
       INSERT INTO sources (key, name, kind, description)
       VALUES (${FIXTURE_SOURCE_KEY}, 'ISSUE-090 test fixture source', 'manual',
               'Runtime fixture for dob-enrichment-issues.test.ts; never holds real data.')
       ON CONFLICT (key) DO NOTHING
+      RETURNING id
     `;
+    fixtureSourceCreated = createdSource.length === 1;
     const [src] = await sql<{ id: number }[]>`
       SELECT id FROM sources WHERE key = ${FIXTURE_SOURCE_KEY}
     `;
@@ -408,6 +416,22 @@ describe.skipIf(!canRun)(
          WHERE id = ${row.id}
       `;
     }
+
+    // Run-4 `leaks` (F-003): the importer passes record one import_batches row per run (and the rejections of the
+    // club-list pass cascade off their batch). They are this file's own rows -- written after beforeAll's high-water
+    // mark by the two tools it spawns -- and were previously left in the table: 34 batches, 3 rejections and the
+    // fixture source per run. Removed here with the fixture source, which only a run that created it removes.
+    // The shared client carries a short statement_timeout, and deleting a batch row checks every referencing foreign
+    // key, so lift the limit for this one transaction.
+    await sql.begin(async (tx) => {
+      await tx`SET LOCAL statement_timeout = '300s'`;
+      await tx`
+        DELETE FROM import_batches
+         WHERE id > ${batchFloor}::bigint
+           AND tool IN ('enrich_birth_dates.py', 'enrich_birth_dates_from_club_lists.py')
+      `;
+    });
+    if (fixtureSourceCreated) await sql`DELETE FROM sources WHERE id = ${fixtureSourceId}`;
 
     await unlockBirthDateEnrichment();
     await sql.end();

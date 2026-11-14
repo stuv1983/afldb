@@ -92,6 +92,7 @@ const FIXTURE_SEASON = 2073;
 const FIXTURE_EMAIL = 'issue-185-promotion-test-fixture@afldb.test';
 
 let fixtureAdminId: number;
+let fixtureAdminCreated = false; // true only when this run's own INSERT created the fixture super_admin
 let homeClubId: number;
 let homeClubName: string;
 let awayClubId: number;
@@ -162,7 +163,7 @@ async function assertNamespaceFree(): Promise<void> {
       + `(${taken.join(', ')}). Nothing was written and nothing will be deleted; remove that residue by hand first.`,
     );
   }
-  // The one retained shared row (never deleted): refuse to adopt it unless it is the fixture super_admin.
+  // A pre-existing fixture admin row is never deleted: refuse to adopt it unless it is the fixture super_admin.
   if (seen.adminRole !== null && seen.adminRole !== 'super_admin') {
     throw new Error(`${FIXTURE_EMAIL} exists with role ${seen.adminRole}, not super_admin; refusing to use it`);
   }
@@ -332,11 +333,13 @@ beforeAll(async () => {
   if (!source) throw new Error("sources.key = 'sports_data_lab' could not be resolved or seeded");
   sportsDataLabSourceId = source.id;
 
-  await owner`
+  const insertedAdmin = await owner<{ id: number }[]>`
     INSERT INTO auth_users (email, role)
     VALUES (${FIXTURE_EMAIL}, 'super_admin')
     ON CONFLICT (email) DO NOTHING
+    RETURNING id
   `;
+  fixtureAdminCreated = insertedAdmin.length === 1;
   const [admin] = await owner<{ id: number }[]>`
     SELECT id FROM auth_users WHERE email = ${FIXTURE_EMAIL}
   `;
@@ -357,16 +360,31 @@ afterAll(async () => {
           DELETE FROM data_submissions WHERE id = ANY(${[...submissionIds]}::int[])
         `);
       }
-      // import_batches rows are left in place, matching submission-promotion.test.ts's
-      // own convention -- import_batches/sources are append-only (001_foundations.sql).
+      // Run-4 `leaks` (F-003): the import_batches this file's own promotions wrote ('submission <id>' for the ids it
+      // inserted, written by the pipeline as tool 'admin-upload') go once the submissions and matches that reference
+      // them are gone. They were retained before ("append-only", 001_foundations.sql), but that is a grant on the
+      // application roles, not a property of the fixture owner, and 60 retained batches are rows no other suite
+      // reads. Failures are recorded as residue like every other step.
+      if (submissionIds.size > 0) {
+        await cleanStep('import batches', () => owner`
+          DELETE FROM import_batches
+           WHERE tool = 'admin-upload'
+             AND notes = ANY(${[...submissionIds].map((id) => `submission ${id}`)}::text[])
+        `);
+      }
       // The season goes only if this run inserted it; a foreign row still referencing it fails the
       // DELETE, which is recorded as residue rather than forced.
       if (seasonOwned) {
         await cleanStep('season', () => owner`DELETE FROM seasons WHERE year = ${FIXTURE_SEASON}`);
       }
-      // The fixture auth_users row and the sports_data_lab source are intentionally retained (never
-      // deleted), matching submission-promotion.test.ts's rationale: deleting them would race a
-      // concurrent run that reused them.
+      // The fixture super_admin goes only if this run inserted it (a pre-existing row is never adopted
+      // or deleted). The files run serially against one database, so there is no concurrent run to race
+      // (the earlier reason for retaining it); a retained row made the rebuild's empty auth_users look
+      // populated to every later file. The sports_data_lab source is not this file's row: it is a seeded
+      // source and is left alone.
+      if (fixtureAdminCreated) {
+        await cleanStep('fixture admin', () => owner`DELETE FROM auth_users WHERE id = ${fixtureAdminId}`);
+      }
     }
   } finally {
     await owner.end({ timeout: 5 });
