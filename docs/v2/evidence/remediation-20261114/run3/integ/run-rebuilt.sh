@@ -213,6 +213,10 @@ console.log(bad);' "$CAND/docs/rebuild-manifests/draftguru/annual-html-20260826.
   say "bridge: $TMPLB = $TMPL + import_draftguru.py --label annual-html-20260826 --bridge <child> (the only preparatory statement)"
   mkcopy "$TMPLB"
   (cd "$CAND" && flock "$LOCK" timeout 1800 node --import tsx tools/v2/isolated-pg.ts run "$TMPLB" -- "$AFLDB_PYTHON" tools/rebuild/draftguru/import_draftguru.py --label annual-html-20260826 --bridge "$BRIDGE") > "$EV/bridge-import.log" 2>&1 && say "bridge import rc=0" || say "bridge import FAILED rc=$? (see bridge-import.log)"
+  # ISSUE-363 (integb): the import leaves the copy without planner statistics (56 pg_stats rows against 546 on the pristine template), which
+  # made the three club-comparison "long rivalry performance" ceilings fail (2.8 s medians) on this copy only; ANALYZE (no data change) restores them.
+  IR run "$TMPLB" -- bash -c '"$AFLDB_V2_PG_BIN/psql" -X -q "$AFLDB_TEST_DATABASE_URL" -c ANALYZE' 2>&1 < /dev/null | strip > "$EV/bridge-analyze.log" || true
+  say "bridge: ANALYZE after import (planner statistics only), log bridge-analyze.log"
   { Q "$TMPLB" "SELECT 'draft_picks='||(SELECT count(*) FROM draft_picks)||' draft_persons='||(SELECT count(*) FROM draft_persons)||' bridge_identities='||(SELECT count(*) FROM external_identities WHERE match_method='draftguru_person_page_afltables_bridge')"; } 2>&1 | tee "$EV/bridged-identity.txt"
 fi
 
