@@ -124,3 +124,19 @@ suits `curl` and `sh`, not a Node transport.
 - Production egress, DNS inside the sandbox, any DigitalOcean panel alert policy, sudoers, the journal contents.
 - That an `OnFailure=` unit starts when this particular oneshot fails by non-zero exit (standard systemd behaviour; not rehearsed under
   systemd here; the rollover evidence verified the units statically only).
+
+## 8. What the pull check cannot see (review REVIEW-C LOW-5, LOW-9; added by the orchestrator)
+
+- **A reboot erases the failure.** `Result` is systemd runtime state: a failed nightly followed by a reboot (procedure 03) reads
+  `success` again and the check answers OK. Run the check, and act on a FAILED, **before** any reboot, and record its output.
+- **"Nothing was settled" reads OK.** The settle wrapper exits 0 on `AMBIGUOUS:0` (no in-progress season in `seasons.json`,
+  `deploy/afldb-settle-afl-api.sh`), so outside a season, and before 2027 is opened, every night is OK. Season opening and the
+  first clean nightly are proved by procedure 01 (gate G0 / proposed G0c), not by this check. The `season_row_missing` HALT is
+  visible: it exits 1, the unit fails, the check answers FAILED.
+- **After a reboot, last-trigger age.** The nightly timer is `Persistent=true` in the repository (`deploy/afldb-settle-afl-api.timer:21`), so
+  its last-trigger stamp survives a reboot. The installed timer's setting was not compared here; if it is not persistent, the check
+  answers UNKNOWN (exit 2) until the next firing. UNKNOWN means look, not failed.
+- **Transport unit (option B), first use:** `ProtectHome=tmpfs` hides a transport placed under `/home` outside `deploy/` (the example
+  uses `/usr/local/sbin`). `RestrictAddressFamilies` omits `AF_NETLINK`, which some resolvers and HTTP clients open. Both fail visibly:
+  exit 4, or the unit appears in `systemctl --failed`. On first use, run one deliberate test delivery and confirm it **arrived**. A log
+  line on the host does not count as delivery.

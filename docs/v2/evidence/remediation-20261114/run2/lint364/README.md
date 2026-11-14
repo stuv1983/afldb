@@ -125,6 +125,9 @@ requires the check to be placed after `AFLDB_SKIP_DOTENV` and before the first `
    nothing was silenced or changed.
 5. **A-09 relies on a stdout line** until `release.mjs` gets a dedicated exit code (section 5).
 6. **11 `src` errors remain** (`react-hooks/set-state-in-effect`); fixing them is out of scope here (baseline must not move).
+7. **`--update` can move debt between pairs** (review REVIEW-C LOW-8): it writes whatever ESLint reports, and the ceiling test bounds
+   only the totals (338 / 43), so one fixed error plus one new error elsewhere passes. Protection: review of the baseline diff in the
+   commit that runs `--update`. Operator action: refuse any baseline commit whose diff raises a pair. Recommendation: keep as is.
 
 ## 7. Operator procedure text for the orchestrator (owner running the gate before a merge)
 
