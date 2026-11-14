@@ -1103,6 +1103,14 @@ describe('AFLDB-ISSUE-134 — the reverse-proxy contract the loopback gate rests
     });
   });
 
+  // AFLDB-ISSUE-362 / review LOW-7: the token is redacted wherever the raw target spells the invite route.
+  it.each(CADDYFILES)('%s redacts the invite token in any spelling of the raw target', (path) => {
+    const snippet = read(path).match(/\(afldb_log_format\) \{[\s\S]*?\n\}\n/)?.[0] ?? '';
+    expect(snippet).toContain('regexp "(?i)(?:i|%[46]9)(?:n|%[46]e)(?:v|%[57]6)(?:i|%[46]9)(?:t|%[57]4)(?:e|%[46]5)(?:/|%2f|[\\\\]|%5c)+[^?#]*" "invite/REDACTED"');
+    // The invite rules run before the query-drop rule.
+    expect(snippet.indexOf('"invite/REDACTED"')).toBeLessThan(snippet.indexOf('regexp "\\?.*$" ""'));
+  });
+
   // AFLDB-ISSUE-357 O-1. Behaviour is proven against a real Caddy (2.11.4 and 2.11.9) in
   // docs/v2/evidence/remediation-20261114/run2/caddy357/; this keeps the source from regressing.
   describe('path-shape deny keeps non-canonical ISR paths out of Next (AFLDB-ISSUE-357)', () => {

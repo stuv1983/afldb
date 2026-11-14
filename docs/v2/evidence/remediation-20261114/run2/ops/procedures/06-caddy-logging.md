@@ -1,5 +1,12 @@
 # Procedure 06: Caddy access-log redaction and the pre-fix logs (ISSUE-362: O-3 install, then O-1 old logs)
 
+> **Orchestrator note (run 2 integration, review REVIEW-C MED-2):** the candidate `deploy/Caddyfile.production`
+> (sha256 `5078bc975a2128d32a09b07887420ec06bc919e66fc3978ddbfcf53e109eed5e`) carries three changes: the ISSUE-362 log
+> filter, the beta-host HSTS/CSP headers the installed file lacks, and the ISSUE-357 path-shape deny. **The single
+> install procedure (O-3 + ISSUE-357 O-1) is `run2/caddy357/README.md` §10** (one backup name, prerequisites, validate
+> as `caddy`, one owner reload, every probe, one rollback). Do not install with §2 below on its own. §1 facts and §3
+> (pre-fix logs, O-1 of ISSUE-362) remain this procedure's content and run after §10 succeeds.
+
 Status: **procedure, not executed; the Caddyfile is PREPARED, NOT INSTALLED.** Author: scope `ops`, remediation run 2.
 **Pending combination:** the ISSUE-357 path-shape deny (`run2/caddy357/README.md`, scope `caddy357`, not yet read by this scope) will be
 merged into the same `deploy/Caddyfile.production` by the orchestrator. Until that file is final, the commands below name
