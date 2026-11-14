@@ -25,7 +25,7 @@
 #   AFLDB_BACKUP_TOOLS_DIR        where backup.sh and restore-test.sh live (default: this script's directory)
 #
 # backup.sh / restore-test.sh read the DSNs from the checkout's .env themselves (a DSN is never put on a command line).
-# Exit codes: 0 ok; 1 failed (FAILED marker written); 2 usage/configuration; 75 another run holds the lock (no marker).
+# Exit codes: 0 ok; 1 failed (FAILED-<mode> marker written); 2 usage/configuration; 75 another run holds the lock (no marker).
 #
 set -uo pipefail
 
@@ -66,7 +66,10 @@ if [[ "$MODE" == status ]]; then
   }
   check "backup" "$STATE/last-backup.json" "$MAX_BACKUP_H"
   check "restore verification" "$STATE/last-verify.json" "$MAX_VERIFY_H"
-  if [[ -f "$STATE/FAILED" ]]; then log "STATUS FAIL a run failed: $(cat "$STATE/FAILED")"; rc=1; fi
+  # Per-mode markers (review A-02): a backup success must not erase a failed restore verification.
+  for marker in FAILED-backup FAILED-verify; do
+    if [[ -f "$STATE/$marker" ]]; then log "STATUS FAIL a run failed: $(cat "$STATE/$marker")"; rc=1; fi
+  done
   if [[ -f "$STATE/FAILED-unit" ]]; then log "STATUS FAIL the failure unit fired at $(cat "$STATE/FAILED-unit")"; rc=1; fi
   [[ -f "$STATE/last-backup.json" ]] && grep -q '"offhost":"failed"' "$STATE/last-backup.json" && { log "STATUS FAIL the last off-host copy failed"; rc=1; }
   exit "$rc"
@@ -82,7 +85,7 @@ exec 9> "$STATE/lock"
 flock -n 9 || { log "another run holds $STATE/lock; nothing done"; exit 75; }
 
 fail() { # step exit-code
-  printf '{"ts":"%s","mode":"%s","step":"%s","exit":%s}\n' "$(date -u +%FT%TZ)" "$MODE" "$1" "$2" > "$STATE/FAILED"
+  printf '{"ts":"%s","mode":"%s","step":"%s","exit":%s}\n' "$(date -u +%FT%TZ)" "$MODE" "$1" "$2" > "$STATE/FAILED-$MODE"
   log "AFLDB_BACKUP_FAILURE mode=$MODE step=$1 exit=$2"
   exit 1
 }
@@ -90,6 +93,15 @@ write_state() { # file json
   printf '%s\n' "$2" > "$1.tmp" && mv "$1.tmp" "$1"
 }
 scrub() { sed -E 's#postgres(ql)?://[^[:space:]]+#<dsn>#g'; }
+# A success clears only the markers it disproves (review A-02): backup clears FAILED-backup; verify (which also takes a
+# backup) clears both. FAILED-unit cannot name its mode, so it clears only once BOTH a backup and a verification have
+# succeeded after it fired.
+clear_markers() { # marker...
+  local m; for m in "$@"; do rm -f "$STATE/$m"; done
+  if [[ -f "$STATE/FAILED-unit" && "$STATE/last-backup.json" -nt "$STATE/FAILED-unit" && "$STATE/last-verify.json" -nt "$STATE/FAILED-unit" ]]; then
+    rm -f "$STATE/FAILED-unit"
+  fi
+}
 
 NEW_DUMP=''
 run_backup() {
@@ -139,7 +151,7 @@ backup_flow() {
 case "$MODE" in
   backup)
     backup_flow
-    rm -f "$STATE/FAILED" "$STATE/FAILED-unit"
+    clear_markers FAILED-backup
     ;;
   verify)
     backup_flow
@@ -152,7 +164,7 @@ case "$MODE" in
     done
     write_state "$STATE/last-verify.json" "$(printf '{"epoch":%s,"ts":"%s","file":"%s","sha256":"%s","attempts":%s}' \
       "$(date +%s)" "$(date -u +%FT%TZ)" "$(basename "$NEW_DUMP")" "$(cut -d' ' -f1 "$NEW_DUMP.sha256")" "$attempt")"
-    rm -f "$STATE/FAILED" "$STATE/FAILED-unit"
+    clear_markers FAILED-backup FAILED-verify
     log "verify ok: $(basename "$NEW_DUMP") restored and proven (attempt $attempt)"
     ;;
 esac

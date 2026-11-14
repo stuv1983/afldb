@@ -648,4 +648,33 @@ describe('AFLDB-ISSUE-354: an edit after a retire does not revive the retired ov
     const last = (await editsOf(coach.id)).at(-1)!;
     expect(last.newValues.override_carried_keys).toEqual(['given_name']);
   });
+
+  it('a manual coach edited after its identity retire re-activates the WHOLE record, never a delta (review A-01)', async () => {
+    const created = await createCoach({
+      displayName: `${MARKER} Manual354`, givenName: 'Given354', surname: 'Sur354', dob: '1950-01-02', notes: 'curated',
+      adminUserId: actorId,
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    const detail = await getCoachAdminDetail(created.coachId);
+    const key = `manual_admin_edit:${detail!.afltablesCoachPath.slice('manual:'.length)}`;
+    const read = async () => (await admin<{ isActive: boolean; values: Record<string, unknown> }[]>`
+      SELECT is_active AS "isActive", override_values AS "values" FROM data_overrides
+       WHERE entity_type = 'coaches' AND entity_key = ${key} AND field_group = 'identity'
+    `)[0];
+
+    expect((await retireCoachOverride({ coachId: created.coachId, fieldGroup: 'identity', adminUserId: actorId })).ok).toBe(true);
+    expect((await read()).isActive).toBe(false);
+
+    // A notes-only edit: the replay needs display_name and would NULL every absent field.
+    expect((await saveCoachMetadata({
+      coachId: created.coachId, displayName: `${MARKER} Manual354`, givenName: 'Given354', surname: 'Sur354',
+      dob: '1950-01-02', notes: 'curated, edited', adminUserId: actorId,
+    })).ok).toBe(true);
+    const after = await read();
+    expect(after.isActive).toBe(true);
+    expect(after.values).toEqual({
+      display_name: `${MARKER} Manual354`, given_name: 'Given354', surname: 'Sur354', dob: '1950-01-02', notes: 'curated, edited',
+    });
+  });
 });

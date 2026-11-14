@@ -377,18 +377,18 @@ describe.runIf(process.platform === 'linux')('AFLDB-ISSUE-352 — scheduled back
     expect(readdirSync(dir)).not.toContain('afldb_prod-gone.dump.sha256');
     expect(spawnSync('sha256sum', ['-c', `${dump}.sha256`], { cwd: dir }).status).toBe(0);
     expect(JSON.parse(ok.state('last-backup.json')!)).toMatchObject({ file: dump, offhost: 'skipped' });
-    expect(ok.state('FAILED')).toBeNull();
+    expect(ok.state('FAILED-backup')).toBeNull();
   });
 
   it('a failing backup exits 1 and leaves a FAILED marker naming the step; the next success clears it', () => {
     const bad = run('backup', { FAKE_BACKUP_RC: '3' });
     expect(bad.status).toBe(1);
     expect(bad.out).toMatch(/AFLDB_BACKUP_FAILURE mode=backup step=backup exit=3/);
-    expect(JSON.parse(bad.state('FAILED')!)).toMatchObject({ mode: 'backup', step: 'backup', exit: 3 });
+    expect(JSON.parse(bad.state('FAILED-backup')!)).toMatchObject({ mode: 'backup', step: 'backup', exit: 3 });
     expect(status(bad.dir).status).toBe(1);
     const again = spawnSync('bash', [WRAPPER, 'backup'], { encoding: 'utf8', env: baseEnv(bad.dir) });
     expect(again.status, again.stderr).toBe(0);
-    expect(existsSync(join(bad.dir, '.state', 'FAILED'))).toBe(false);
+    expect(existsSync(join(bad.dir, '.state', 'FAILED-backup'))).toBe(false);
   });
 
   it('verify: restores the FRESH dump itself, retries a failed parity check once, and fails loudly after the second', () => {
@@ -401,8 +401,69 @@ describe.runIf(process.platform === 'linux')('AFLDB-ISSUE-352 — scheduled back
     expect(JSON.parse(pass.state('last-verify.json')!)).toMatchObject({ file: dump, attempts: 2 });
     const fail = run('verify', { FAKE_RESTORE_SEQ: '1' });
     expect(fail.status).toBe(1);
-    expect(JSON.parse(fail.state('FAILED')!)).toMatchObject({ mode: 'verify', step: 'restore-test' });
+    expect(JSON.parse(fail.state('FAILED-verify')!)).toMatchObject({ mode: 'verify', step: 'restore-test' });
     expect(existsSync(join(fail.dir, '.state', 'last-verify.json'))).toBe(false); // never "verified"
+  });
+
+  it('a backup success does not erase a failed verification; only a verify success does (review A-02)', () => {
+    const ok = run('verify');
+    expect(ok.status, ok.out).toBe(0);
+    const env = (extra: Record<string, string> = {}) => baseEnv(ok.dir, extra);
+    const failedVerify = spawnSync('bash', [WRAPPER, 'verify'], { encoding: 'utf8', env: env({ FAKE_RESTORE_SEQ: '1' }) });
+    expect(failedVerify.status).toBe(1);
+    // A failure unit firing is recorded too (it cannot name its mode).
+    writeFileSync(join(ok.dir, '.state', 'FAILED-unit'), '2026-11-14T00:00:00Z\n');
+    const backup = spawnSync('bash', [WRAPPER, 'backup'], { encoding: 'utf8', env: env() });
+    expect(backup.status, backup.stderr).toBe(0);
+    expect(existsSync(join(ok.dir, '.state', 'FAILED-verify'))).toBe(true);
+    const probe = status(ok.dir);
+    expect(probe.status).toBe(1);
+    expect(probe.stdout).toMatch(/STATUS FAIL a run failed: .*"mode":"verify"/);
+    // FAILED-unit survives a backup alone: the verify since its firing is older than it.
+    expect(existsSync(join(ok.dir, '.state', 'FAILED-unit'))).toBe(true);
+    const verified = spawnSync('bash', [WRAPPER, 'verify'], { encoding: 'utf8', env: env({ FAKE_RESTORE_SEQ: '0' }) });
+    expect(verified.status, verified.stderr).toBe(0);
+    expect(existsSync(join(ok.dir, '.state', 'FAILED-verify'))).toBe(false);
+    expect(existsSync(join(ok.dir, '.state', 'FAILED-unit'))).toBe(false);
+    expect(status(ok.dir).status).toBe(0);
+  });
+
+  it('offhost-pull: binds each sidecar to its dump, refuses future stamps, and a flood cannot evict genuine copies (review A-03)', () => {
+    const src = join(root, 'pull-src');
+    const dest = join(root, 'pull-dest');
+    mkdirSync(src); mkdirSync(dest);
+    const env = { ...process.env, PATH: `${bin}:${process.env.PATH}` };
+    const put = (name: string, sidecarName = name) => {
+      writeFileSync(join(src, name), `dump ${name}`);
+      const sha = spawnSync('sha256sum', [name], { cwd: src, encoding: 'utf8' }).stdout.split(' ')[0];
+      writeFileSync(join(src, `${name}.sha256`), `${sha}  ${sidecarName}\n`);
+    };
+    const pull = (keep = 3) => spawnSync('bash', ['tools/maintenance/offhost-pull.sh', src, dest, '--keep', String(keep)], { encoding: 'utf8', env });
+    const held = () => readdirSync(dest).filter((f) => f.endsWith('.dump')).sort();
+
+    const genuine = ['afldb_prod-20261101-022000.dump', 'afldb_prod-20261102-022000.dump', 'afldb_prod-20261103-022000.dump'];
+    genuine.forEach((g) => put(g));
+    const seed = pull();
+    expect(seed.status, `${seed.stdout}${seed.stderr}`).toBe(0);
+    expect(held()).toEqual(genuine);
+
+    // A sidecar naming another (valid) file, and a dump stamped in the future, are quarantined, not kept.
+    put('afldb_prod-20261104-022000.dump', genuine[0]);
+    put('afldb_prod-29991231-000000.dump');
+    const bad = pull();
+    expect(bad.status).toBe(1);
+    expect(bad.stdout).toMatch(/sidecar does not name this dump.*afldb_prod-20261104-022000\.dump/);
+    expect(bad.stdout).toMatch(/stamped in the future.*afldb_prod-29991231-000000\.dump/);
+    expect(held()).toEqual(genuine);
+    for (const f of readdirSync(src)) if (f.startsWith('afldb_prod-20261104') || f.startsWith('afldb_prod-2999')) rmSync(join(src, f));
+    for (const f of readdirSync(join(dest, 'quarantine'))) rmSync(join(dest, 'quarantine', f));
+
+    // A flood of valid, later-named dumps in one pull prunes nothing and fails loudly.
+    for (let d = 10; d < 41; d += 1) put(`afldb_prod-202610${String(d - 9).padStart(2, '0')}-0${String(d % 10)}0000.dump`);
+    const flood = pull();
+    expect(flood.status).toBe(1);
+    expect(flood.stdout).toMatch(/ALERT: 31 new dumps verified in one run \(limit 3\); retention skipped/);
+    for (const g of genuine) expect(held()).toContain(g);
   });
 
   it('off-host: copies, re-hashes and prunes at the destination; a missing destination keeps the local dump and fails the run', () => {
@@ -428,7 +489,7 @@ describe.runIf(process.platform === 'linux')('AFLDB-ISSUE-352 — scheduled back
     expect(existsSync(join(root, 'unmounted'))).toBe(false);
     expect(readdirSync(missing.dir).filter((f) => f.endsWith('.dump'))).toHaveLength(1);
     expect(JSON.parse(missing.state('last-backup.json')!).offhost).toBe('failed');
-    expect(JSON.parse(missing.state('FAILED')!)).toMatchObject({ step: 'offhost' });
+    expect(JSON.parse(missing.state('FAILED-backup')!)).toMatchObject({ step: 'offhost' });
   });
 
   it('status is the monitor probe: ok after a recent backup and verification, failing on staleness or a never-verified restore', () => {

@@ -235,9 +235,12 @@ async function run(): Promise<void> {
           if (refused) fail(refused);
         },
         transact: (marks) => writer.begin('isolation level repeatable read', async (tx) => {
-          await prove(tx, true);
           // Writers of these tables (createMatch, the settle's FK checks) wait here; nothing changes between the re-read and the commit.
+          // The LOCK is the transaction's first statement: under REPEATABLE READ the snapshot is taken by the first query, so a
+          // lock taken after prove() would let the re-read below miss a commit made before the lock (review A-06). LOCK takes
+          // no snapshot; on a wrong database the identity proof that follows still refuses before any write.
           await tx`LOCK TABLE seasons, clubs, club_organizations IN SHARE ROW EXCLUSIVE MODE`;
+          await prove(tx, true);
           const before = await readOpeningFacts(tx, exp.year);
           if (surfaceDigest(before) !== plan.baselineDigest) fail('baseline drift; re-plan and obtain new execution approval');
           const verdict = classifyOpening(exp, before);

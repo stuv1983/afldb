@@ -87,7 +87,7 @@ owner action (procedure below). DEV keeps manual backups.
 
 | Piece | What it does |
 |---|---|
-| `scheduled-backup.sh backup` | one `backup.sh` run into a **dedicated** directory, a `sha256sum -c` sidecar per dump, state under `<dir>/.state/`, an optional off-host copy, a `FAILED` marker on any failure |
+| `scheduled-backup.sh backup` | one `backup.sh` run into a **dedicated** directory, a `sha256sum -c` sidecar per dump, state under `<dir>/.state/`, an optional off-host copy, a `FAILED-backup` or `FAILED-verify` marker on any failure (each cleared only by a success of its own mode) |
 | `scheduled-backup.sh verify` | a **fresh** dump, then `restore-test.sh` on exactly that dump (identity-guarded, exit-status decided, nine parity checks, sha256 recorded as the database comment). A failed parity check is retried once after 60 s: a live write between dump and comparison is the only benign cause |
 | `scheduled-backup.sh status` | read-only monitor probe: exit 1 if the newest backup is older than 30 h, the newest verification older than 9 days, a run failed, or the last off-host copy failed |
 | `deploy/afldb-backup.{service,timer}` | nightly at 02:20 (+ up to 10 min), `Persistent=true` |
@@ -138,7 +138,7 @@ systemctl list-timers 'afldb-backup*'
 Monitoring until an alert channel exists: run `scheduled-backup.sh status` from any existing check (exit 1 = act) and
 look for `AFLDB_BACKUP_FAILURE` in `journalctl -u afldb-backup -u afldb-backup-verify`. **A failed run is not a retry loop:** the
 next timer firing is the retry; a failed verification leaves the previous `last-verify.json` in place, so `status` turns red
-after 9 days at the latest and immediately while `FAILED` exists.
+after 9 days at the latest and immediately while a `FAILED-*` marker exists.
 
 ## 4. Off-host copies
 
@@ -147,7 +147,7 @@ must not be deletable by the host it protects.
 
 | Option | Shape | Assessment |
 |---|---|---|
-| **A. Pull to streamanator (recommended)** | `tools/maintenance/offhost-pull.sh` runs **on the other host** (cron/user timer), `rsync`s only `*.dump` and `*.sha256`, never overwrites, verifies every new dump (sha256 sidecar + `pg_restore --list`), quarantines a failure, keeps the newest 30 | no credential on production can delete the copies; the second site proves on every pull that its copy is intact (hash and archive table of contents); needs an SSH key limited (forced command `rsync --server --sender` on the dedicated directory) on production, and the other host to be treated as holding production secrets (dumps contain auth data) |
+| **A. Pull to streamanator (recommended)** | `tools/maintenance/offhost-pull.sh` runs **on the other host** (cron/user timer), `rsync`s only `*.dump` and `*.sha256`, never overwrites, verifies every new dump (sha256 sidecar + `pg_restore --list`), quarantines a failure (including a sidecar that does not name its dump, or a future-stamped name), keeps the 30 most recently verified by its own clock and prunes nothing in a run that verifies more than 3 new dumps | no credential on production can delete the copies; the second site proves on every pull that its copy is intact (hash and archive table of contents); needs an SSH key limited (forced command `rsync --server --sender` on the dedicated directory) on production, and the other host to be treated as holding production secrets (dumps contain auth data) |
 | B. Object storage (for example DigitalOcean Spaces) | push from production with a write-only key; client-side encryption (`gpg` is installed; `rclone`/`age` are not) | independent failure domain, no home-network dependency; adds a vendor, a key on production, and an encryption key to look after |
 | C. Mounted volume via `AFLDB_OFFHOST_DEST` | the wrapper copies, re-hashes, lists and prunes into a mounted directory (`AFLDB_OFFHOST_REQUIRE_MOUNT=1` refuses an unmounted path) | simplest; a block volume attached to the same droplet does **not** survive droplet loss unless it is detached and re-attachable elsewhere |
 

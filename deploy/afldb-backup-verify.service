@@ -23,6 +23,8 @@ Environment=AFLDB_BACKUP_KEEP=14
 # Environment=AFLDB_OFFHOST_DEST=/mnt/afldb-offhost
 # Environment=AFLDB_OFFHOST_REQUIRE_MOUNT=1
 ExecStart=/bin/bash /home/arm/projects/afldb/tools/maintenance/scheduled-backup.sh verify
+# Exit 75: another run holds the lock (e.g. both timers catching up after downtime). Not a failure, no OnFailure (review A-04).
+SuccessExitStatus=75
 TimeoutStartSec=60min
 Nice=10
 IOSchedulingClass=idle

@@ -3,7 +3,7 @@
  * identities for that season exist in a database, judged against the tracked contract
  * (`data/reference/seasons.json`, `data/reference/clubs.json`).
  *
- *   node --import tsx tools/v2/season-opening-check.ts [--season 2027] [--dsn-env DATABASE_URL] [--json]
+ *   node --import tsx tools/v2/season-opening-check.ts [--season 2027] [--dsn-env AFLDB_BACKUP_DATABASE_URL] [--json]
  *        [--expect-database N --expect-oid N --expect-sysid N]
  *
  * Reads the DSN from the named environment variable and never prints it. Opens ONE `read only` transaction
@@ -43,7 +43,7 @@ export function parseArgs(argv: readonly string[]) {
   const season = values.has('season') ? Number(values.get('season')) : undefined;
   if (season !== undefined && (!Number.isInteger(season) || season < 1897 || season > 2100)) throw new Error(`--season must be a year\n${USAGE}`);
   return {
-    season, json, dsnEnv: values.get('dsn-env') ?? 'DATABASE_URL',
+    season, json, dsnEnv: values.get('dsn-env') ?? 'AFLDB_BACKUP_DATABASE_URL',
     expect: { database: values.get('expect-database'), oid: values.get('expect-oid'), sysid: values.get('expect-sysid') },
   };
 }

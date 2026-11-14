@@ -602,7 +602,12 @@ export async function saveCoachMetadata(input: SaveCoachMetadataInput): Promise<
         for (const key of Object.keys(values)) {
           if (values[key] !== oldValues[key]) delta[key] = values[key];
         }
-        const merge = mergeOverrideDelta(existing, delta);
+        // An admin-created (manual:) coach has no source: its identity override is the whole
+        // record replay_admin_overrides re-creates the row from (display_name required, the rest
+        // NULL when absent). A changing edit therefore writes all five fields, never a delta, so
+        // an edit after a retire cannot leave a partial record (full review A-01).
+        const manualCoach = before.afltablesCoachPath.startsWith('manual:');
+        const merge = mergeOverrideDelta(existing, manualCoach && Object.keys(delta).length > 0 ? values : delta);
         if (Object.keys(merge.payload).length > 0) {
           await tx`
             INSERT INTO data_overrides (entity_type, entity_key, field_group, override_values, admin_user_id, is_active, updated_at)
