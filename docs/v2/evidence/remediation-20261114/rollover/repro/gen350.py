@@ -37,13 +37,15 @@ if mode in ('C', 'N'):
     head = head.replace(a, "const NO_RESIDUE = {\n  seasons: 1,", 1)
 # The snapshot copy holds the REAL afl_api identity row for the fixture's home-side player (CD_I297354) and earlier modes leave this harness's
 # own synthetic player and identity rows behind (afterAll is replaced). The harness fails closed on any such row, so the generated file first
-# removes exactly those keyed rows from this DISPOSABLE copy (never the season row, never anything by season or namespace).
+# removes exactly those keyed rows, and the import_batches rows of this harness's own snapshot label (the off-season mode commits one), from this
+# DISPOSABLE copy (never the season row, never anything by season or namespace).
 a = "  // ---- fail closed: nothing of the fixture namespace may exist (a leftover is an unknown row) ----\n"
 assert a in head
 head = head.replace(a, """  // rem350: disposable copy only; exact keys only
   await sql`DELETE FROM external_identities WHERE (source_id = ${aflApiSourceId} AND external_id = ${BRIDGED_PROVIDER_PLAYER_ID})
     OR (source_id = ${afltablesSourceId} AND external_id = ${BRIDGED_AFLTABLES_ID})`;
   await sql`DELETE FROM players WHERE legacy_player_id = ${SYNTHETIC_PLAYER_LEGACY_ID}`;
+  await sql`DELETE FROM import_batches WHERE notes LIKE ${`%${SNAPSHOT_LABEL}%`}`;
 """ + a, 1)
 head, n = re.subn(r"afterAll\(async \(\) => \{\n  try \{.*?\n\}, 300_000\);", "afterAll(async () => { await sql.end({ timeout: 10 }); }, 300_000);", head, count=1, flags=re.S)
 assert n == 1, 'afterAll block not replaced'

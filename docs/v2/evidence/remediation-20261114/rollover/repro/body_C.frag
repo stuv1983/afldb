@@ -15,7 +15,7 @@ describe('rem350 C: the same nightly-shaped settle for season 2027 after the ope
         canonicalRowsInserted: r.counters.canonicalRowsInserted, completeness: r.sourceCompleteness?.status ?? null };
     } catch (error) {
       const e = error as { message?: string; code?: string; constraint_name?: string; table_name?: string; schema_name?: string };
-      outcome = { threw: true, code: e.code, constraint: e.constraint_name, schema: e.schema_name, table: e.table_name };
+      outcome = { threw: true, message: String(e.message ?? '').slice(0, 300), code: e.code, constraint: e.constraint_name, schema: e.schema_name, table: e.table_name };
     }
     const [{ m }] = await sql<{ m: number }[]>`SELECT count(*)::int AS m FROM matches WHERE season = ${FIXTURE_SEASON}`;
     console.log(`[rem350] C: ${JSON.stringify({ seasonRowBefore: n, units: bundle.units.length, buildFailures: bundle.buildFailures.length, ...outcome, matchesAfter: m })}`);

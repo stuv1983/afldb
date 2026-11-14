@@ -2234,7 +2234,7 @@ describe('AFLDB-ISSUE-332 — settle failure notifier (prepared, not installed)'
     afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
     const run = (instance: string, extra: Record<string, string> = {}) => spawnSync('sh', [join(ROOT, 'deploy/afldb-settle-failure-notify.sh'), instance], {
       encoding: 'utf8',
-      env: { PATH: process.env.PATH ?? '', AFLDB_FAILURE_STATE_DIR: join(dir, 'state'), AFLDB_FAILURE_SYSTEMCTL: join(dir, 'fake-systemctl'), ...extra },
+      env: { PATH: process.env.PATH ?? '', AFLDB_FAILURE_STATE_DIR: join(dir, 'state'), AFLDB_FAILURE_SYSTEMCTL: join(dir, 'fake-systemctl'), ...extra } as NodeJS.ProcessEnv,
     });
 
     it('records one marker and one history line for a settle unit and sends nothing by itself', () => {
@@ -2263,7 +2263,7 @@ describe('AFLDB-ISSUE-332 — settle failure notifier (prepared, not installed)'
 
     it('refuses to run with no state directory, and calls a configured transport only with the marker path (stub transport; a failing transport never loses the marker)', () => {
       expect(spawnSync('sh', [join(ROOT, 'deploy/afldb-settle-failure-notify.sh'), 'afldb-settle-afl-api.service'], {
-        encoding: 'utf8', env: { PATH: process.env.PATH ?? '', AFLDB_FAILURE_SYSTEMCTL: join(dir, 'fake-systemctl') },
+        encoding: 'utf8', env: { PATH: process.env.PATH ?? '', AFLDB_FAILURE_SYSTEMCTL: join(dir, 'fake-systemctl') } as NodeJS.ProcessEnv,
       }).status).toBe(3);
       writeFileSync(join(dir, 'stub-transport'), `#!/bin/sh\necho "$#:$1" > "${join(dir, 'transport.out')}"\nexit 7\n`);
       chmodSync(join(dir, 'stub-transport'), 0o755);

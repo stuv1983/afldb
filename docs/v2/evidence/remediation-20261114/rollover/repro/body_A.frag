@@ -15,7 +15,7 @@ describe('rem350 A: the nightly-shaped settle for season 2027 before the opening
         canonicalRowsInserted: r.counters.canonicalRowsInserted };
     } catch (error) {
       const e = error as { message?: string; code?: string; constraint_name?: string; table_name?: string; schema_name?: string };
-      outcome = { threw: true, code: e.code, constraint: e.constraint_name, schema: e.schema_name, table: e.table_name };
+      outcome = { threw: true, message: String(e.message ?? '').slice(0, 300), code: e.code, constraint: e.constraint_name, schema: e.schema_name, table: e.table_name };
     }
     const [{ m }] = await sql<{ m: number }[]>`SELECT count(*)::int AS m FROM matches WHERE season = ${FIXTURE_SEASON}`;
     const [{ b }] = await sql<{ b: number }[]>`SELECT count(*)::int AS b FROM import_batches WHERE notes LIKE ${`%${SNAPSHOT_LABEL}-A%`}`;
