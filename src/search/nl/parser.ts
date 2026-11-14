@@ -974,7 +974,9 @@ const SUPERLATIVE_GOVERNS = /\b(?:most|fewest|top|highest|lowest|best|worst)\s+$
  * so "most goals in a showdown" never tripped it.
  */
 const MARQUEE_RANKING_CUE = /(?<!\bat )\b(?:most|fewest|least|highest|lowest|best|worst|biggest|largest)\b|\btop\b/;
-const MARQUEE_PARTICIPATION_NOUN = /^\s*(?:players?|participants?|veterans?)\b/;
+/** The lead IN_ONE_GAME needs in front of "game"/"match": "in a|one|any|(a )single|the same". */
+const SINGLE_GAME_LEAD_RE = /\bin (?:a|one|any|(?:a )?single|the same) $/;
+const MARQUEE_PARTICIPATION_NOUN =/^\s*(?:players?|participants?|veterans?)\b/;
 const MARQUEE_PARTICIPATION_LEAD =/\b(?:played|play|plays|playing|appeared|featured|participated|competed)\b(?:\s+(?:in|on|at|during))?(?:\s+(?:a|an|the|any|one))?\s*$/;
 
 /**
@@ -1079,6 +1081,14 @@ function extractMarqueeMatches(
         if (!a || !b) continue;
         const pair = `${a.entity.name} v ${b.entity.name}`.toLowerCase();
         const singular = !/(?:s|ies)$/.test(match[0]);
+        // Review B-08: "game " is only a meaning-preserving insertion where it
+        // completes the single-game cue ("in a game ...", IN_ONE_GAME). Behind
+        // "the" or nothing ("most goals in the showdown", "... in showdown
+        // history") it left a stray "game" the reader never typed, so the
+        // question declined naming "game" as the unsupported term. The phrase is
+        // left alone instead and declines naming what was actually typed;
+        // "the showdown" is as plausibly the one match as the whole rivalry.
+        if (singular && !SINGLE_GAME_LEAD_RE.test(working.slice(0, match.index))) continue;
         working = `${working.slice(0, match.index)}${singular ? 'game ' : ''}${pair}${working.slice(match.index + match[0].length)}`;
         rewritten.push(match[0]);
       }
@@ -2137,6 +2147,25 @@ function candidatePlayerSpan(text: string): string | null {
   return alphaRun.slice(0, 4).join(' ');
 }
 
+/**
+ * Review B-03. "round" is a period noun ("most goals in a round") and also a real
+ * surname (Barry Round, David Round). ISSUE-356 (c) refused the bare word outright,
+ * which stopped "most goals in a round" answering for Barry Round but also stopped
+ * "round's career goals". The two are told apart by what stands directly before the
+ * word: a determiner or preposition ("in a round", "by round", "each round") makes it
+ * a period noun; the start of the question ("round most goals", "round brownlow votes";
+ * the possessive is stripped by canonicalise) or an auxiliary verb ("has round kicked")
+ * makes it a subject. Positive cues only, so any other position keeps the ISSUE-356
+ * decline; EVERY occurrence of the word must read as a subject.
+ */
+const ROUND_AS_SUBJECT_RE = /(?:^|\b(?:did|does|do|has|have|had|was|were|is|are|will|would|can|could)\s+)round\b/g;
+
+function roundIsSurnameSubject(normalisedQuestion: string): boolean {
+  const all = normalisedQuestion.match(/\brounds?\b/g)?.length ?? 0;
+  const asSubject = normalisedQuestion.match(ROUND_AS_SUBJECT_RE)?.length ?? 0;
+  return all > 0 && all === asSubject;
+}
+
 /** Player suffix spelling is part of identity, but common variants are equivalent for lookup. */
 function normalisePlayerSuffixes(name: string): string {
   return name
@@ -3150,12 +3179,19 @@ export async function parseNlQuestion(query: string, ctx: NlParseContext): Promi
   // resolver couldn't confidently pick ONE candidate but the mention
   // plausibly spells a small, real set of them. See NlMatchScope.playerIdIn.
   let ambiguousCandidateIds: number[] | undefined;
-  if (candidateRaw && candidateRaw.split(' ').every((t) => NON_PLAYER_NAME_WORDS.has(t))) {
+  if (
+    candidateRaw
+    && candidateRaw.split(' ').every((t) => NON_PLAYER_NAME_WORDS.has(t))
+    && !(candidateRaw === 'round' && roundIsSurnameSubject(normalised))
+  ) {
     // AFLDB-ISSUE-356 (c): a span made only of period/statistic nouns
     // ("quarter") is never offered to the player resolver, which reads a
     // whole-word prefix as a plausible surname (Quartermain). It stays an
     // unresolved mention, so the question declines instead of answering
-    // for two unrelated players at certainty 1.
+    // for two unrelated players at certainty 1. Review B-03: a bare "round"
+    // is the one listed word that is also a real surname (Barry and David
+    // Round) and reaches the resolver where the text reads as a person
+    // (roundIsSurnameSubject).
     unresolvedPlayerMention = candidateRaw;
   } else if (candidateRaw && candidateRaw.length >= 3) {
     // `Object.hasOwn`, not a plain index: the key is reader-typed text, so

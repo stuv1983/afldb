@@ -768,7 +768,15 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
 // parameters. (c) A leftover span made only of period/statistic nouns
 // ("quarter") never reaches the player resolver (NON_PLAYER_NAME_WORDS), which
 // had read it as a prefix of Quartermain.
-export const PARSER_VERSION = 68;
+// v69 -- run-2 review residuals B-03 and B-08. B-03: the bare span "round" (a
+// real surname: Barry and David Round) reaches the player resolver again where
+// the question reads it as a person -- at the start of the question or after
+// an auxiliary verb ("round's career goals", "has round kicked"); after a
+// determiner or preposition ("in a round", "by round") it stays a period noun
+// and declines. B-08: the singular rivalry rewrite inserts "game" only behind
+// the single-game lead ("in a showdown"); "in the showdown" / "in showdown
+// history" are left unrewritten and decline naming what was typed.
+export const PARSER_VERSION = 69;
 
 // ------------------------------------------------------------------ grain
 

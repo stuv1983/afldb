@@ -942,3 +942,53 @@ describe('AFLDB-ISSUE-198 hyphen/apostrophe word-boundary consistency', () => {
     expect(parsed.report.unsupportedTerms).toEqual([]);
   });
 });
+
+// -----------------------------------------------------------------------
+// Review B-03 (remediation run 2): "round" is a period noun and a real surname
+// (Barry Round, David Round). ISSUE-356 (c) refused the bare word, which also
+// refused the surname. It now reaches the real resolver only where the question
+// reads it as a person; the period-noun readings keep the ISSUE-356 decline.
+// Real players, not fixtures: the point is the real directory's Round family.
+// -----------------------------------------------------------------------
+describe('Review B-03: a bare "round" is a surname only where the question reads it as a person', () => {
+  it.each(['round most goals', "round's career goals"])('"%s" answers for the Round family', async (question) => {
+    const roundIds = (await sql<{ id: number }[]>`
+      SELECT id::int AS id FROM players WHERE display_name IN ('Barry Round', 'David Round') ORDER BY id`).map((r) => r.id);
+    expect(roundIds.length, 'Barry and David Round must exist in the test database').toBe(2);
+
+    const ctx = await buildNlParseContext();
+    const parsed = await parseNlQuestion(question, ctx);
+    expect(parsed.status, parsed.status === 'plan' ? '' : JSON.stringify(parsed.report)).toBe('plan');
+    if (parsed.status !== 'plan') return;
+    expect(parsed.plan.player).toBeUndefined();
+    expect(parsed.plan.scope.playerIdIn).toEqual(expect.arrayContaining(roundIds));
+
+    const validated = validatePlan(parsed.plan);
+    if ('error' in validated) throw new Error(validated.error);
+    const payload = await answerPlayerCareer(validated, 25);
+    if (payload.kind !== 'player_career' || !payload.lead) throw new Error('expected a career leader');
+    expect(roundIds).toContain(payload.lead.playerId);
+    const lead = await sql<{ display_name: string }[]>`SELECT display_name FROM players WHERE id = ${payload.lead.playerId}`;
+    expect(lead[0].display_name).toMatch(/\bRound$/);
+  });
+
+  it.each([
+    'most goals in a round',
+    'most disposals in a round',
+    'most goals in the round',
+    'most wins in a round',
+    'most goals by round',
+  ])('"%s" still declines: the period noun is not a player', async (question) => {
+    const ctx = await buildNlParseContext();
+    const parsed = await parseNlQuestion(question, ctx);
+    expect(parsed.status, parsed.status === 'plan' ? JSON.stringify(parsed.plan) : '').toBe('none');
+    expect(parsed.report.entityResolution).toEqual([]);
+  });
+
+  it('"most goals in round 5" is untouched: a round filter, not a player', async () => {
+    const ctx = await buildNlParseContext();
+    const parsed = await parseNlQuestion('most goals in round 5', ctx);
+    expect(parsed.status).toBe('plan');
+    if (parsed.status === 'plan') expect(parsed.plan.scope.roundNumber).toBe(5);
+  });
+});

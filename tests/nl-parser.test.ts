@@ -5300,6 +5300,96 @@ describe('AFLDB-ISSUE-356 (b): a marquee phrase as the setting of a ranked stati
       expect(result.status, question).toBe('none');
     }
   });
+
+  // Review B-08: the singular rewrite inserted a bare "game" behind "the" or nothing, so
+  // the stray token, which the reader never typed, was the named unsupported term.
+  it.each([
+    'most goals in the showdown',
+    'most goals in showdown history',
+    'most goals in showdown',
+    'most disposals in the showdown',
+  ])('"%s" declines naming what was typed, not an invented "game"', async (question) => {
+    const result = await parse(question);
+    expect(result.status, question).toBe('none');
+    expect(result.report.unsupportedTerms.join(' '), question).not.toMatch(/\bgame\b/);
+    expect(result.report.unsupportedTerms.join(' '), question).toMatch(/showdown|history/);
+  });
+
+  it.each([
+    'most goals in a showdown',
+    'most goals in one showdown',
+    'most goals in a single showdown',
+    'most goals in any showdown',
+  ])('"%s" still reads as one game between the pair', async (question) => {
+    const p = await plan(question);
+    expect(p.grain, question).toBe('player_game');
+    expect(p.careerPredicates, question).toEqual([]);
+    expect([p.scope.matchup?.clubA.organizationId, p.scope.matchup?.clubB.organizationId].sort(), question).toEqual([5, 6]);
+  });
+});
+
+describe('Review B-03: a bare "round" resolves as a surname only where the question reads it as a person', () => {
+  // Barry and David Round are real players (and "Luke Rounds" is a prefix match).
+  const roundFamily: NlPlayerCandidate[] = [
+    { ref: { id: 1030, slug: 'barry-round', name: 'Barry Round' }, score: 300 },
+    { ref: { id: 3567, slug: 'david-round', name: 'David Round' }, score: 300 },
+  ];
+
+  function roundCtx(calls: string[]): NlParseContext {
+    return {
+      ...ctx,
+      resolvePlayer: (name: string) => {
+        calls.push(`resolvePlayer:${name}`);
+        return Promise.resolve(/^round/.test(name) ? roundFamily : []);
+      },
+      resolvePlayerFamily: (tokens: string[]) => {
+        calls.push(`resolvePlayerFamily:${tokens.join(' ')}`);
+        return Promise.resolve(tokens.includes('round') ? roundFamily : []);
+      },
+    };
+  }
+
+  it.each([
+    'round most goals',
+    "round's career goals",
+    'round brownlow votes',
+    'how many goals has round kicked',
+  ])('"%s" reaches the family resolver and plans for the Round family', async (question) => {
+    const calls: string[] = [];
+    const result = await parseNlQuestion(question, roundCtx(calls));
+    expect(result.status, `${question}: ${JSON.stringify(result.report)}`).toBe('plan');
+    if (result.status !== 'plan') return;
+    expect(calls.length, question).toBeGreaterThan(0);
+    expect([...(result.plan.scope.playerIdIn ?? [])].sort((a, b) => a - b), question).toEqual([1030, 3567]);
+  });
+
+  // The ISSUE-356 (c) false positives, which the word list exists to stop: "round" here
+  // is the period noun, and answering for Barry Round ("most goals in a round" ->
+  // "Barry Round - 293 goals") was a different question answered at confidence 1.
+  it.each([
+    'most goals in a round',
+    'most goals in the round',
+    'most disposals in a round',
+    'most wins in a round',
+    'highest score in a round',
+    'most goals by round',
+    'goals by round',
+  ])('"%s" still declines and never consults the player resolver', async (question) => {
+    const calls: string[] = [];
+    const result = await parseNlQuestion(question, roundCtx(calls));
+    expect(result.status, question).toBe('none');
+    expect(calls, question).toEqual([]);
+  });
+
+  it('the full name still resolves ("barry round most goals")', async () => {
+    const calls: string[] = [];
+    const result = await parseNlQuestion('barry round most goals', {
+      ...roundCtx(calls),
+      resolvePlayer: () => Promise.resolve([{ ref: { id: 1030, slug: 'barry-round', name: 'Barry Round' }, score: 1000 }]),
+    });
+    expect(result.status).toBe('plan');
+    if (result.status === 'plan') expect(result.plan.player?.id).toBe(1030);
+  });
 });
 
 describe('AFLDB-ISSUE-356 (c): period words never resolve as a player-name prefix', () => {
