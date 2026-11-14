@@ -1,0 +1,100 @@
+# manifest-map.tsv: the ONLY non-default resolution rules of run4/evidence/verify-manifests.sh. Columns are TAB-separated:
+#   directive  manifest  arg1  arg2  reason
+# `manifest` is relative to docs/v2/evidence/remediation-20261114/ (the "BASE"). Paths in args are BASE-relative unless stated.
+# DEFAULT (no row): an entry resolves to <manifest directory>/<entry> (leading `*` and `./` removed) in the committed tree at REV,
+#   and, when the entry is an absolute path under the read-only allow-list, to that host path. Nothing is ever searched for by basename or suffix.
+# Directives
+#   include   M  -  -        M is a hash list whose name does not match the manifest name rule; treat it as a manifest
+#   format    M  hash-path | hash-bytes-path | hash-marker-path   (default hash-path; marker = the literal word host-only)
+#   croot     M  <BASE-rel root>|@|-   committed root(s) tried as <root>/<entry>; `@` = the manifest's directory (the default); `-` = none
+#   hroot     M  <absolute host dir>   host root(s) tried as <dir>/<entry> when no committed candidate exists (read-only allow-list applies)
+#   alias     M  <entry>  <BASE-rel committed path>     the entry is committed under another name (reason cites the README line)
+#   aliaspfx  M  <entry prefix/>  <BASE-rel committed root/>    same, for every entry under a prefix
+#   abs2c     M  <absolute prefix/>  <BASE-rel committed root, `.` = BASE>   absolute entries whose committed copy lives under a root
+#   xform     M  <entry | prefix/ | *>  bom-crlf       the committed copy is a documented LF/BOM-stripped copy; compare after re-adding UTF-8 BOM + CRLF
+#   hxform    M  <entry | prefix/ | *>  strip-ansi-dsn  the recorded hash is of the committed-style stripped copy (ANSI colour codes removed and `postgres://` lines
+#                                                         dropped, the strip() of run2/qualification-2/qual.sh.txt:17); the host original is hashed raw AND after that strip
+#   notret    M  <entry | prefix/ | *>  -              only applies when the host file is ABSENT; otherwise the host file is hashed as usual
+#   super     M  <entry>  <successor manifest>:<entry>   the recorded hash was superseded; accepted only if the host file now equals the
+#                                                         successor manifest's recorded hash (otherwise HOST-MISMATCH)
+# A rule is cited in the output note as map:L<line>. Every non-default rule carries the README line that documents it.
+#
+# ---- manifests that the name rule (SHA256SUMS | *sha256* | *.sha, case-insensitive) does not pick up -------------------------------
+include	run2/ops/raw/host-hashes.txt	-	-	run2/ops/README.md:146 lists raw/host-hashes.txt among the checksum files ("Checksums of the originals and committed copies")
+include	run2/public/raw/corpus-hashes.txt	-	-	hash list of host corpus results (content sniff: 2 hash lines); host workspace named at run2/public/README.md:4
+include	run2/public/raw/low3-corpus-hashes.txt	-	-	hash list of host corpus results (content sniff: 3 hash lines); run2/public/README.md:4
+include	run2/public/raw/med1-corpus-hashes.txt	-	-	hash list of host corpus results (content sniff: 3 hash lines); run2/public/README.md:4
+include	run2/tests363/MANIFEST.txt	-	-	hash list of the files of run2/tests363 (content sniff: 49 hash lines); run2/tests363/README.md:157 names it with SHA256SUMS-host.txt
+#
+# ---- run 1 scopes ---------------------------------------------------------------------------------------------------------------
+croot	answers/host-scripts-sha256.txt	-	-	host scripts are never committed (answers/README.md:159-160, section 8)
+hroot	answers/host-scripts-sha256.txt	/mnt/ssd/afldb-rem-answers-20261114	-	answers/README.md:5,159 (host workspace; the scripts live inside it)
+croot	answers/raw-sha256.txt	@	-	committed beside the manifest (final/*.log)
+croot	answers/raw-sha256.txt	answers/fe4	-	answers/README.md:116-117: the *-panel.png images are committed under fe4/
+hroot	answers/raw-sha256.txt	/mnt/ssd/afldb-rem-answers-20261114/evidence	-	answers/README.md:93 (gridley-{before,after}.{json,log} under evidence/)
+hroot	answers/raw-sha256.txt	/mnt/ssd/afldb-rem-answers-20261114/evidence/fe4	-	answers/README.md:117 (the *-page.png images stay under evidence/fe4/)
+croot	auth/raw/sha256-inputs-and-binaries.txt	-	-	inputs/ and caddy-bin/ are host files (auth/README.md:4)
+hroot	auth/raw/sha256-inputs-and-binaries.txt	/mnt/ssd/afldb-rem-auth-20261114	-	auth/README.md:4 (host workspace holds inputs/, caddy-bin/)
+notret	auth/raw/sha256-inputs-and-binaries.txt	caddy-bin/	-	run2/evidence/README.md:66: the two Caddy binaries "also removed" (applies only if the host file is absent)
+croot	perf/scripts.sha256	perf/scripts	-	perf/README.md:186,204: committed copies are scripts/<name>.txt, listed in scripts.sha256
+hroot	qualification/iso-3aa82166/stagea-dst.sha	/mnt/ssd/afldb-rem-int-20261114/cand/data/sources/draftguru/annual-html-20260826	-	run2/evidence/README.md:65 names this location for the removed Stage A copy
+croot	qualification/iso-3aa82166/stagea-dst.sha	-	-	Stage A pages are host data, never committed (QUALIFICATION.md:106)
+notret	qualification/iso-3aa82166/stagea-dst.sha	*	-	run2/evidence/README.md:65: "the checkout that held the Stage A copy ... was removed at the end of run 1" (applies only if the host file is absent)
+croot	qualification/iso-3aa82166/stagea-src.sha	-	-	Stage A pages are host data, never committed (QUALIFICATION.md:106)
+hroot	qualification/iso-3aa82166/stagea-src.sha	/mnt/ssd/afldb-rem3-qual-20261114/cand/data/sources/draftguru/annual-html-20260826	-	original source is the DEV checkout (not read: hard stop); the same 90 names and hashes are verified on the retained run-3 copy (run3/qualification-3/README.md:82-84, stagea-provenance.txt)
+croot	routes/host-evidence.sha256	-	-	absolute host paths (routes/README.md:238-239)
+# ---- run 2 scopes ---------------------------------------------------------------------------------------------------------------
+hroot	run2/admin/SHA256SUMS.host	/mnt/ssd/afldb-rem2-admin-20261114/evidence	-	run2/admin/README.md:3,6 (host workspace; "host hashes in SHA256SUMS.host")
+hroot	run2/caddy357/MANIFEST-host-sha256.txt	/mnt/ssd/afldb-rem2-caddy357-20261114	-	run2/caddy357/MANIFEST-host-sha256.txt:1 names the host workspace; run2/caddy357/README.md:313-316 (committed copies are a subset)
+super	run2/caddy357/MANIFEST-host-sha256.txt	in/cf/Caddyfile.production	run2/caddy357/raw/r2-caddyfile-sha256.txt:in/cf/Caddyfile.production	run2/caddy357/README.md:365-367: the round-2 hashes "supersede the hashes in section 3" (the host copy was rewritten in round 2)
+super	run2/caddy357/MANIFEST-host-sha256.txt	in/cf/Caddyfile	run2/caddy357/raw/r2-caddyfile-sha256.txt:in/cf/Caddyfile	run2/caddy357/README.md:365-367 (same)
+hroot	run2/caddy357/MANIFEST-r2-host-sha256.txt	/mnt/ssd/afldb-rem2-caddy357-20261114	-	run2/caddy357/MANIFEST-r2-host-sha256.txt:1 ("round 2 (LOW-7): sha256 of the HOST originals"); run2/caddy357/README.md:313-316
+croot	run2/caddy357/raw/final-caddyfile-sha256.txt	-	-	in/cf/* are host files (run2/caddy357/README.md:61-64)
+hroot	run2/caddy357/raw/final-caddyfile-sha256.txt	/mnt/ssd/afldb-rem2-caddy357-20261114	-	run2/caddy357/MANIFEST-host-sha256.txt:1 (host workspace)
+super	run2/caddy357/raw/final-caddyfile-sha256.txt	in/cf/Caddyfile.production	run2/caddy357/raw/r2-caddyfile-sha256.txt:in/cf/Caddyfile.production	run2/caddy357/README.md:365-367 (section 3 hashes superseded by round 2)
+super	run2/caddy357/raw/final-caddyfile-sha256.txt	in/cf/Caddyfile	run2/caddy357/raw/r2-caddyfile-sha256.txt:in/cf/Caddyfile	run2/caddy357/README.md:365-367 (same)
+croot	run2/caddy357/raw/r2-caddyfile-sha256.txt	-	-	in/cf/* are host files (run2/caddy357/README.md:365-367)
+hroot	run2/caddy357/raw/r2-caddyfile-sha256.txt	/mnt/ssd/afldb-rem2-caddy357-20261114	-	run2/caddy357/MANIFEST-r2-host-sha256.txt:1 (host workspace)
+croot	run2/fixtures/fh-expected.sha256	-	-	the 131 fitzRoy files are gitignored host data (run2/fixtures/README.md:22)
+hroot	run2/fixtures/fh-expected.sha256	/mnt/ssd/afldb-rem3-qual-20261114/cand/data/sources/afltables/fitzroy_core/full-history-20260902	-	original source is the DEV checkout (not read: hard stop); the retained run-3 copy was verified 131/131 against this very manifest (run3/qualification-3/README.md:80, fixtures-provenance.txt:2)
+aliaspfx	run2/ops/raw/SHA256SUMS-originals.txt	hostout/	run2/ops/raw/	run2/ops/README.md:146 (the six hostout/* entries hash the cleaned host outputs; equal to the committed raw/ copies and to host-hashes.txt *.clean.txt)
+xform	run2/ops/raw/SHA256SUMS-originals.txt	prod-ro-ops-notify-logs.txt	bom-crlf	run2/ops/README.md:146: committed copy is LF/BOM-stripped; the original (UTF-8 BOM + CRLF) is recomputed deterministically
+xform	run2/ops/raw/SHA256SUMS-originals.txt	prod-ro-ops-procedures.txt	bom-crlf	run2/ops/README.md:146 (same)
+xform	run2/ops/raw/SHA256SUMS-originals.txt	prod-ro-ops-logs2.txt	bom-crlf	run2/ops/README.md:146 (same)
+xform	run2/ops/raw/SHA256SUMS-originals.txt	prod-caddyfile-installed.txt	bom-crlf	run2/ops/README.md:146 (same)
+croot	run2/ops/raw/host-hashes.txt	-	-	these hash the HOST originals in out/ (some differ from the committed LF/BOM-stripped copies by design, run2/ops/README.md:146)
+hroot	run2/ops/raw/host-hashes.txt	/mnt/ssd/afldb-rem2-ops-20261114/out	-	run2/ops/README.md:137,146 (host workspace; originals and .clean.txt copies in out/)
+hroot	run2/public/HOST-PACK-SHA256SUMS	/mnt/ssd/afldb-rem2-public-20261114/evidence/pack	-	run2/public/README.md:4,7-8: host manifest of the pack; two superseded outputs were dropped from the committed copy
+croot	run2/public/raw/corpus-hashes.txt	-	-	hashes of host corpus results
+hroot	run2/public/raw/corpus-hashes.txt	/mnt/ssd/afldb-rem2-public-20261114/evidence	-	run2/public/README.md:4 (host workspace; corpus-*/parse/results.jsonl under evidence/)
+croot	run2/public/raw/low3-corpus-hashes.txt	-	-	hashes of host corpus results
+hroot	run2/public/raw/low3-corpus-hashes.txt	/mnt/ssd/afldb-rem2-public-20261114/evidence	-	run2/public/README.md:4
+croot	run2/public/raw/med1-corpus-hashes.txt	-	-	hashes of host corpus results
+hroot	run2/public/raw/med1-corpus-hashes.txt	/mnt/ssd/afldb-rem2-public-20261114/evidence	-	run2/public/README.md:4
+hroot	run2/qualification-2/SHA256SUMS	/mnt/ssd/afldb-rem2-int-20261114/evidence/q-f10e47ad	-	run2/QUALIFICATION-2.md:8,17 ("Raw output stays on the host under evidence/q-f10e47ad/")
+hxform	run2/qualification-2/SHA256SUMS	unit-stagea2.log	strip-ansi-dsn	run2/qualification-2/qual.sh.txt:17 strip() and QUALIFICATION.md:7 (logs are committed with ANSI codes and DSN lines removed); this one copy was never committed (*.log is gitignored), so only its stripped hash is recorded
+hroot	run2/qualification-2/SHA256SUMS-host.txt	/mnt/ssd/afldb-rem2-int-20261114/evidence/q-f10e47ad	-	run2/QUALIFICATION-2.md:8,17
+croot	run2/qualification-2/stagea-src.sha256	-	-	Stage A pages are host data
+hroot	run2/qualification-2/stagea-src.sha256	/mnt/ssd/afldb-rem3-qual-20261114/cand/data/sources/draftguru/annual-html-20260826	-	original source is the DEV checkout (not read: hard stop); same 90 names and hashes verified on the retained run-3 copy (run3/qualification-3/README.md:82-84)
+format	run2/tests363/SHA256SUMS-host.txt	hash-bytes-path	-	run2/tests363/SHA256SUMS-host.txt:2 header: "sha256  bytes  path"
+croot	run2/tests363/SHA256SUMS-host.txt	-	-	these are the host originals (run2/tests363/README.md:171)
+hroot	run2/tests363/SHA256SUMS-host.txt	/mnt/ssd/afldb-rem2-tests363-20261114/evidence	-	run2/tests363/README.md:171 and SHA256SUMS-host.txt:2 ("relative to .../evidence")
+alias	run2/tests363/SHA256SUMS-host.txt	full-all-audit.jsonl	run2/tests363/audit-residue.jsonl	run2/tests363/README.md:174: "full-all-audit.jsonl is committed as audit-residue.jsonl"
+format	run2/tests363/SHA256SUMS-reviewd-host.txt	hash-marker-path	-	lines are "sha256 host-only  name"
+croot	run2/tests363/SHA256SUMS-reviewd-host.txt	-	-	marked host-only by the file itself
+hroot	run2/tests363/SHA256SUMS-reviewd-host.txt	/mnt/ssd/afldb-rem2-tests363-20261114/evidence	-	run2/tests363/README.md:171,180 (reviewd-* outputs beside the other host raw outputs)
+# ---- run 3 scopes ---------------------------------------------------------------------------------------------------------------
+croot	run3/integ/evidence/brownlow/fixture-root.files.sha256	-	-	paths are relative to the extracted fixture-root.tar, not to the committed evidence
+hroot	run3/integ/evidence/brownlow/fixture-root.files.sha256	/mnt/ssd/afldb-rem3-integ-20261114/brownlow/fixture/fixture-root	-	run3/integ/README.md:110-112 (fixture-root.tar extracted, 258 files, under $W/brownlow)
+alias	run3/integ/evidence/brownlow/retained-artefacts.SHA256SUMS	template-identity.txt	run3/integ/evidence/brownlow/template-identity.restored.txt	run3/integ/README.md:116 (restored template identity equals the exported template-identity.txt); run3/qualification-3/README.md:140-141; run3/RESIDUALS-3.md section 2.5 (the ISSUE-363 cross-folder false positive)
+croot	run3/integ/evidence/brownlow/retained-artefacts.SHA256SUMS	-	-	the three large artefacts are host files; template-identity.txt is reached only by the alias above
+hroot	run3/integ/evidence/brownlow/retained-artefacts.SHA256SUMS	/mnt/ssd/afldb-rem3-integ-20261114/brownlow/in	-	run3/integ/README.md:109-111 ("copied read-only into $W/brownlow/in")
+hroot	run3/qualification-3/SHA256SUMS-host.txt	/mnt/ssd/afldb-rem3-qual-20261114/evidence/q-692b1902	-	run3/qualification-3/README.md:34,45 ("Raw output stays on the host under evidence/q-692b1902/")
+abs2c	run3/qualification-3/scripts.sha256	/mnt/ssd/afldb-rem3-qual-20261114/cand/docs/v2/evidence/remediation-20261114/	.	run3/qualification-3/README.md:28 (host copies of the three scripts are the committed ones)
+croot	run3/qualification-3/stagea-expected.sha256	-	-	Stage A pages are host data
+hroot	run3/qualification-3/stagea-expected.sha256	/mnt/ssd/afldb-rem3-qual-20261114/cand/data/sources/draftguru/annual-html-20260826	-	run3/qualification-3/README.md:82-84, stagea-provenance.txt
+croot	run3/qualification-3/stagea-src.sha256	-	-	Stage A pages are host data
+hroot	run3/qualification-3/stagea-src.sha256	/mnt/ssd/afldb-rem3-qual-20261114/cand/data/sources/draftguru/annual-html-20260826	-	run3/qualification-3/README.md:82-84, stagea-provenance.txt
+croot	run3/rebuild/inputs-files.sha256	-	-	gitignored source inputs, copied read-only into the rebuild checkout (run3/rebuild/README.md:35-39)
+hroot	run3/rebuild/inputs-files.sha256	/mnt/ssd/afldb-rem3-rebuild-20261114/cand/data	-	run3/rebuild/README.md:38-39 (copied into $W/cand/data/, re-verified in place, per-file inputs-files.sha256, 752 lines)
+hroot	tests/host-log-sha256.txt	/mnt/ssd/afldb-rem-tests-20261114/evidence	-	tests/README.md:4,81 ("Raw logs on the host under evidence/final/; sha256 in host-log-sha256.txt"; entries are final/<log>)

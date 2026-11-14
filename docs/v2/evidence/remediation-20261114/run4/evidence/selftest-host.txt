@@ -1,0 +1,40 @@
+selftest: bash 5.2.21(1)-release; git version 2.43.0; Linux x86_64; new=78443813b090b210 old=0a48c77403038a2e
+== (a) cross-folder false positive
+  ok    RED   run-2 script: entry template-identity.txt                COMMITTED-MISMATCH
+  ok    RED   run-2 script: exit status (1 = it reports a mismatch)    1
+  ok    GREEN run-4 script, no map: no cross-folder comparison         UNRESOLVED
+  ok    GREEN run-4 script, no map: exit status 0                      0
+  ok    GREEN run-4 script, alias map: entry template-identity.txt     COMMITTED-OK-ALIAS
+  ok    GREEN run-4 script, alias map: exit status 0                   0
+  ok    GREEN wrong alias target is COMMITTED-MISMATCH (a like-named correct file in run3/y is NOT used) COMMITTED-MISMATCH
+  ok    GREEN wrong alias: exit status 1                               1
+== (b) masked real mismatch
+  ok    RED   run-2 script: altered run3/a/data.txt is reported        COMMITTED-OK
+  ok    RED   run-2 script: exit status 0 (the corruption is hidden)   0
+  ok    GREEN run-4 script: altered file at the manifest's own path    COMMITTED-MISMATCH
+  ok    GREEN run-4 script: exit status 1                              1
+== AMBIGUOUS, transform, discovery, empty manifest
+  ok    GREEN two existing candidates for one entry                    AMBIGUOUS
+  ok    GREEN AMBIGUOUS exit status 1                                  1
+  ok    GREEN bom-crlf transform with a map rule                       COMMITTED-OK-ALIAS
+  ok    GREEN same bytes without a rule are a mismatch                 COMMITTED-MISMATCH
+  ok    GREEN manifest without entries is reported, not skipped        UNRESOLVED
+  ok    GREEN run-4 manifest SHA256SUMS discovered with no map row (committed, relative) COMMITTED-OK
+  ok    GREEN run-4 manifest HOST-SHA256SUMS discovered (absolute host path) HOST-OK
+  ok    GREEN discovery: exit status 0                                 0
+== host classes through the local stub
+  ok    GREEN host file equal                                          HOST-OK
+  ok    GREEN host file differs                                        HOST-MISMATCH
+  ok    GREEN host file absent, directory present                      HOST-MISSING
+  ok    GREEN host file absent, declared not retained (notret)         DECLARED-NOT-RETAINED
+  ok    GREEN superseded hash, host equals the successor's hash        DECLARED-NOT-RETAINED
+  ok    GREEN RB-1 path is never read                                  UNRESOLVED
+  ok    GREEN path outside the allow-list is never read                UNRESOLVED
+  ok    GREEN manifest with no host root declared is UNRESOLVED, not guessed UNRESOLVED
+  ok    GREEN HOST-MISMATCH makes the exit status 1                    1
+  ok    GREEN committed mismatch is not rescued by a matching host file COMMITTED-MISMATCH
+== NO_HOST=1
+  ok    GREEN NO_HOST=1: host-tier entries are UNRESOLVED (never reported OK) UNRESOLVED
+  ok    GREEN NO_HOST=1: exit status does not claim a mismatch it did not see 0
+  ok    GREEN every fixture run reports at least one row per entry     0
+selftest: 33 passed, 0 failed
