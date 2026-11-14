@@ -1,0 +1,2 @@
+9daa63acedb948e6bc9f1c1328ec0a25bead1de4afd5215d3f57c31f1e6d0466  tests/integration/club-comparison.test.ts
+d209f1a4b2acb24d6099187970a5cab00926cf7582a9afa17d4550446f75a61c  tests/integration/database.test.ts

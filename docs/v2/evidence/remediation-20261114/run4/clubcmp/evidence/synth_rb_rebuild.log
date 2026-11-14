@@ -1,0 +1,8 @@
+isolated-pg: afldb_v2_rem4clubcmp_synth_rb_base_test verified (cluster afldb_v2_isolated, 127.0.0.1:55683); running /home/arm/i250/afldb/.venv/bin/python
+AFLDB derived-data rebuild
+  target: afldb_import@127.0.0.1:55683/afldb_v2_rem4clubcmp_synth_rb_base_test
+
+    player_clubs                          16,842  (5.4s)
+    player_career_stats                   13,363  (5.4s)
+
+Completed in 10.9s

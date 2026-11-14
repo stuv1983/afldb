@@ -1,0 +1,2 @@
+total 70 passed 69 failed 1 skipped 0 files 1
+tests/integration/club-comparison.new.test.ts	club comparison: long rivalry performance keeps every warm H2H query under the query ceiling for both rivalry scales	AssertionError: carlton/collingwood getClubBrownlowHistory (A) warm median 255.8 ms: expected 255.76485200000025 to be less than 250

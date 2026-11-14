@@ -1,0 +1,2 @@
+total 70 passed 69 failed 1 skipped 0 files 1
+tests/integration/club-comparison.test.ts	club comparison: long rivalry performance keeps every warm H2H query under the query ceiling for both rivalry scales	AssertionError: adelaide/brisbane-lions getClubBrownlowHistory (A) warm median 257.4 ms: expected 257.42106199999944 to be less than 250
