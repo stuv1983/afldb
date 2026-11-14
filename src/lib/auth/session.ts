@@ -178,6 +178,25 @@ export async function prepareAdminSession(): Promise<{
   };
 }
 
+/**
+ * The epoch an admin claim is minted at. setAdminSessionCookie runs AFTER the
+ * credential transaction has committed (session row, consumed TOTP step,
+ * audit; or a password rotation that revoked every session), so a throw here
+ * would lock every admin out of /admin over a beta-gate misconfiguration that
+ * /admin does not depend on. A malformed AFLDB_BETA_EPOCH therefore mints at
+ * an epoch no integer setting can admit: the cookie still opens /admin (which
+ * never applies minEpoch) and can never pass the beta door, which itself
+ * fails closed on the malformed value (middleware). Full review B-01.
+ */
+function adminMintEpoch(): number {
+  try {
+    return betaEpoch();
+  } catch (error) {
+    console.error(`[auth] ${(error as Error).message} Admin claim minted below every valid epoch.`);
+    return Number.MIN_SAFE_INTEGER;
+  }
+}
+
 /** Set the admin cookie for a session row that has already been committed. */
 export async function setAdminSessionCookie(userId: number, token: string): Promise<void> {
   // The cookie carries the claim AND the opaque token: the claim is what
@@ -193,7 +212,7 @@ export async function setAdminSessionCookie(userId: number, token: string): Prom
     // current AFLDB_BETA_EPOCH, so the kill switch also retires admin cookies
     // issued before the bump. /admin itself is unaffected: it never applies
     // minEpoch, and every admin page re-checks its database session.
-    epoch: betaEpoch(),
+    epoch: adminMintEpoch(),
   }, sessionSecret());
 
   const jar = await cookies();

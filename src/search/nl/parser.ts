@@ -974,7 +974,8 @@ const SUPERLATIVE_GOVERNS = /\b(?:most|fewest|top|highest|lowest|best|worst)\s+$
  * so "most goals in a showdown" never tripped it.
  */
 const MARQUEE_RANKING_CUE = /(?<!\bat )\b(?:most|fewest|least|highest|lowest|best|worst|biggest|largest)\b|\btop\b/;
-const MARQUEE_PARTICIPATION_LEAD = /\b(?:played|play|plays|playing|appeared|featured|participated|competed)\b(?:\s+(?:in|on|at|during))?(?:\s+(?:a|an|the|any|one))?\s*$/;
+const MARQUEE_PARTICIPATION_NOUN = /^\s*(?:players?|participants?|veterans?)\b/;
+const MARQUEE_PARTICIPATION_LEAD =/\b(?:played|play|plays|playing|appeared|featured|participated|competed)\b(?:\s+(?:in|on|at|during))?(?:\s+(?:a|an|the|any|one))?\s*$/;
 
 /**
  * "played on anzac day", "3+ showdowns", "two western derbies" -- each
@@ -1055,8 +1056,15 @@ function extractMarqueeMatches(
     // AFLDB-ISSUE-356 (b): in a ranked question a phrase that is not read as
     // participation ("played in", an explicit count) is the SETTING of the
     // statistic, not a population filter.
-    const explicitCount = !!digits || (countWord !== null && times > 1);
-    const asSetting = rankedQuestion && !explicitCount
+    // A count word of one is explicit only as a minimum ("at least one
+    // showdown", "with one showdown"); "in one showdown" is the setting.
+    // A noun use ("showdown players") is participation. Full review B-02:
+    // both were read as the setting, unlike the "1+ showdowns" spelling.
+    const minimumOne = countWord === 'one'
+      && /\b(?:at least|with|having|had)\s+one\s*$/.test(working.slice(Math.max(0, match.index - 24), match.index));
+    const explicitCount = !!digits || (countWord !== null && (times > 1 || minimumOne));
+    const participationNoun = MARQUEE_PARTICIPATION_NOUN.test(working.slice(match.index + match[0].length));
+    const asSetting = rankedQuestion && !explicitCount && !participationNoun
       && !MARQUEE_PARTICIPATION_LEAD.test(working.slice(Math.max(0, match.index - 40), match.index));
     if (asSetting) {
       if (rivalry) {

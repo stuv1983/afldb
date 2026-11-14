@@ -5270,6 +5270,36 @@ describe('AFLDB-ISSUE-356 (b): a marquee phrase as the setting of a ranked stati
     expect(q.careerPredicates).toContainEqual({ builder: 'matchup_played_min', params: { clubA: '5', clubB: '6', times: '1' } });
     expect(q.scope.matchup).toBeUndefined();
   });
+
+  // Full review B-02: a minimum of one and a noun use are participation, as "1+ showdowns" is.
+  it.each([
+    'most goals by players with at least one showdown',
+    'most goals by players with 1+ showdowns',
+    'most games by showdown players',
+  ])('"%s" keeps the population-filter reading', async (question) => {
+    const p = await plan(question);
+    expect(p.careerPredicates).toContainEqual({ builder: 'matchup_played_min', params: { clubA: '5', clubB: '6', times: '1' } });
+    expect(p.scope.matchup).toBeUndefined();
+  });
+
+  it('"in one showdown" is still the setting: one game between the pair', async () => {
+    const p = await plan('most goals in one showdown');
+    expect(p.careerPredicates).toEqual([]);
+    expect(p.grain).toBe('player_game');
+    expect([p.scope.matchup?.clubA.organizationId, p.scope.matchup?.clubB.organizationId].sort()).toEqual([5, 6]);
+  });
+
+  it.each([
+    'most goals in the showdown',
+    'most goals in showdown history',
+  ])('"%s" never ranks career totals of showdown participants', async (question) => {
+    const result = await parse(question);
+    if (result.status === 'plan') {
+      expect(result.plan.careerPredicates, question).toEqual([]);
+    } else {
+      expect(result.status, question).toBe('none');
+    }
+  });
 });
 
 describe('AFLDB-ISSUE-356 (c): period words never resolve as a player-name prefix', () => {

@@ -2450,6 +2450,24 @@ describe('the beta gate holds admin claims to the beta epoch (AFLDB-ISSUE-362 SE
     expect(await verifyClaim(written!.value, SECRET, { kind: 'admin', minEpoch: 8 })).toBeNull();
   });
 
+  it('still sets the admin cookie when AFLDB_BETA_EPOCH is malformed, below every valid epoch (review B-01)', async () => {
+    process.env.AFLDB_BETA_EPOCH = 'epoch-2';
+    const { setAdminSessionCookie } = await import('@/lib/auth/session');
+    await expect(setAdminSessionCookie(42, 'opaque-session-token')).resolves.toBeUndefined();
+    const written = requestCookie.written.find((c) => c.name === 'afldb_admin');
+    expect(written).toBeDefined();
+    // /admin applies no minEpoch, so the claim still verifies there ...
+    const claim = await verifyClaim(written!.value, SECRET, { kind: 'admin' });
+    expect(claim).not.toBeNull();
+    // ... but it cannot pass a beta door at any integer epoch, however low.
+    for (const minEpoch of [-1_000_000, 0, 1, 2]) {
+      expect(await verifyClaim(written!.value, SECRET, { kind: 'admin', minEpoch }), `minEpoch ${minEpoch}`).toBeNull();
+    }
+    // The public door itself stays fail-closed on the malformed value.
+    const blocked = await door('/players', `afldb_admin=${written!.value}`);
+    expect(blocked.next).toBeNull();
+  });
+
   it('mints at epoch 1 when AFLDB_BETA_EPOCH is unset, as before', async () => {
     const { setAdminSessionCookie } = await import('@/lib/auth/session');
     await setAdminSessionCookie(42, 'opaque-session-token');
