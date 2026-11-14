@@ -1,0 +1,32 @@
+isolated-pg: afldb_v2_rem3stateb_ffamrev_test verified (cluster afldb_v2_isolated, 127.0.0.1:55671); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem3-stateb-20261114/cand
+
+ ❯ tests/integration/settle-afl-api-issue276.test.ts (4 tests | 4 skipped) 1857ms
+     ↓ a contradictory roster for a FRESH match writes the match but no period rows, and opens one finding; a repeat refreshes it in place; a corrected roster resolves it and writes the periods
+     ↓ a contradictory roster leaves EXISTING canonical period rows byte-identical: nothing is rewritten, deleted or ledgered
+     ↓ an open finding is resolved only by positive evidence: missing score evidence, a deferred roster and a blocked match each leave it open
+     ↓ a finding opened before another source created the match is closed on the corroborated path by positive roster evidence, and only by it
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/settle-afl-api-issue276.test.ts [ tests/integration/settle-afl-api-issue276.test.ts ]
+Error: ISSUE-276 cases cannot run: these existing canonical rows are not ISSUE-276 fixtures and would make the settle refuse possible_existing_match. They were NOT touched: 2026|PF|2026-09-19|Hawthorn|Brisbane Lions (matches.id 17266)
+ ❯ assertNoForeignFixtureConflicts tests/integration/settle-afl-api-issue276.test.ts:914:11
+    912|   }
+    913|   if (conflicts.length > 0) {
+    914|     throw new Error(
+       |           ^
+    915|       'ISSUE-276 cases cannot run: these existing canonical rows are n…
+    916|       + `the settle refuse possible_existing_match. They were NOT touc…
+ ❯ tests/integration/settle-afl-api-issue276.test.ts:970:3
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 skipped (4)
+   Start at  21:32:03
+   Duration  3.45s (transform 885ms, setup 242ms, import 984ms, tests 1.86s, environment 0ms)
+
+JSON report written to /mnt/ssd/afldb-rem3-stateb-20261114/evidence/ffamrev/3-settle-afl-api-issue276.json

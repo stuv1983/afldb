@@ -1,0 +1,11 @@
+snapshot verified e77c307d3e0cddcb652e398a946e4c22c2063f13c70edadf96a975c92842826d
+create-db: afldb_v2_rem3stateb_tmpl_test created and marked
+isolated-pg: afldb_v2_rem3stateb_tmpl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55671); running node
+pg_restore exit=0 seconds=6 stderrLines=0
+isolated-pg: afldb_v2_rem3stateb_tmpl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55671); running node
+AFLDB migrations -> test (afldb_owner@127.0.0.1:55671/afldb_v2_rem3stateb_tmpl_test)
+  118 migration file(s), 118 already applied
+
+Nothing to apply — schema is up to date.
+isolated-pg: afldb_v2_rem3stateb_tmpl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55671); running node
+afldb_v2_rem3stateb_tmpl_test {"ledger":"118_fixtures_unconfirmed_participants.sql","matches":17056,"fixtures":218,"receipts":5}

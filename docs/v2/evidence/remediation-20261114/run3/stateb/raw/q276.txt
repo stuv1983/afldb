@@ -1,0 +1,5 @@
+Transcribed from the terminal output of scripts/final1.sh (host run, 2026-11-14, fresh template copy afldb_v2_rem3stateb_q276_test, aggregates only; the database was dropped afterwards):
+create-db: afldb_v2_rem3stateb_q276_test created from afldb_v2_rem3stateb_tmpl_test and marked
+{"db":"afldb_v2_rem3stateb_q276_test","pf_rows":1,"pf_id":17266}
+drop-db: afldb_v2_rem3stateb_q276_test dropped
+(query: scripts/q276.mjs; the match_key '2026|PF|2026-09-19|Hawthorn|Brisbane Lions' count and id in matches on the template)

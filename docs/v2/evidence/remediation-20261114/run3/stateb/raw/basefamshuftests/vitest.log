@@ -1,0 +1,352 @@
+isolated-pg: afldb_v2_rem3stateb_basefamshuftests_test verified (cluster afldb_v2_isolated, 127.0.0.1:55671); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem3-stateb-20261114/cand
+      Running tests with seed "20261114"
+
+ ❯ tests/integration/settle-afl-api-brownlow-reschedule.test.ts (3 tests | 1 failed) 1922ms
+     ✓ stages an ordinary match (Round 5 -> canonical 6) and a "rescheduled" one (staged as Opening Round -> canonical 1) as two distinct canonical matches carrying their OWN, different round_number 2ms
+     ✓ writes brownlow_round_votes.round_number from the RESOLVED CANONICAL MATCH's own round, never from translateAflApiBrownlowRound()'s translated provider round, for BOTH matches — even though both Brownlow votes below are reported under the SAME provider round (api_round_number 5, translated 6) 134ms
+     × the same player voting under the SAME provider round in the two DIFFERENT matches above lands as TWO DISTINCT canonical rows, never one overwriting the other 23ms
+ ❯ tests/integration/settle-afl-api.test.ts (74 tests | 2 failed) 47148ms
+     ✓ §19: a new CONCLUDED match auto-applies match, period scores and the bridged player; the unbridged player is refused without blocking it  412ms
+     ✓ §19: an identical rerun is idempotent — no new canonical writes  700ms
+     ✓ §14: a provider-id hit whose season/clubs contradict the incoming record HALTs the whole run  677ms
+     ✓ §19.1: an afltables-owned match observed by afl_api with agreeing scores is corroborated, not written, ownership unchanged  636ms
+     ✓ §19.1 (AFLDB-ISSUE-293): a score disagreement with the owner opens a finding, and agreement restored closes it and is counted  409ms
+     ✓ §19.2: AFL Tables attendance enriches an afl_api-owned match without changing its ownership  441ms
+     ✓ I244-F001: a new afl_api-owned final updates club_seasons.finals_played and seasons metadata, gated on the write  425ms
+     ✓ I244-F001: a score correction to an afl_api-owned final recomputes club_seasons/seasons rather than accumulating them  732ms
+     ✓ I244-F001: a genuinely new afl_api-owned H&A match updates club_seasons W/L/points/percentage/ladder and seasons metadata  670ms
+     ✓ I244-F001: an H&A score correction that flips home_win to away_win replaces club_seasons W/L/points/percentage rather than accumulating them 258ms
+     ✓ I244-F003 §11.2: a provider venue CD_V absent from afl-api-identities.json.venues refuses auto-apply, counts venueProviderUnmapped and opens a data_issues finding  599ms
+     ✓ I244-F003 §11.3: a mapped legacy_name with no matching venues row refuses auto-apply and counts venueUnmapped, distinctly from a provider map miss  355ms
+     ✓ I244-F003 §11.4: correcting a provider venue mapping self-heals a previously-refused afl_api match on re-settle  431ms
+     ✓ I244-F004: require-complete-source refuses an incomplete apply before commit, while explicit partial apply and dry-run keep their contracts 227ms
+     ✓ I244-F008: a committed apply leaves a terminal batch that agrees with the run, its import_rejections and the canonical data; an identical replay is a terminal zero-change batch 173ms
+     ✓ I244-F008: a dry-run leaves no batch row at all, even though it ran the real finalising UPDATE  907ms
+     ✓ V2-GAP-027: the settle CLI writes a valid reconciliation report for a real dry-run and a real apply  776ms
+     ✓ I244-F008: a failure while finalising the batch rolls the whole run back — no batch, no canonical row, no spine row  421ms
+     ✓ the spine keeps the row; nothing canonical, typed, ledger, candidate, rejection or data-issue is written for it; played rows still apply; a replay is idempotent  320ms
+     ✓ a foreign-owned player row is refused with a durable machine-readable finding; a replay refreshes it in place; it self-heals when the row becomes applicable — canonical state and ownership untouched while refused  1896ms
+     ✓ a refusal that no longer differs from canonical state is closed as moot; a finding a human resolved is never rewritten, and a persisting refusal opens exactly one fresh row  356ms
+     ✓ keeps the corrected field, lets an unrelated field follow the source, and never changes ownership  1336ms
+     ✓ a provider date correction is withheld while non-identity corrections still apply; the finding is replay-safe, heals when the sides agree again, and never rewrites a human resolution  1503ms
+     ✓ a correction whose proposed identity is already another match's is refused with both rows untouched; a round correction is withheld as one group; a supervised repair of the canonical row is recognised and heals the finding  808ms
+     ✓ a DATE disagreement with a foreign-owned fixture refuses the INSERT durably; a replay refreshes the one finding; nothing dependent is written and the foreign row is byte-identical  661ms
+     ✓ a ROUND disagreement (same date, a different round) refuses in exactly the same way  691ms
+     ✓ SELF-HEAL: once a supervised correction makes the renderings agree the record resolves normally, ownership is unchanged, the open finding closes, and a human resolution is never rewritten  650ms
+     ✓ NEGATIVE CONTROL: a genuine second meeting — round AND date both differ — is not blocked and inserts normally  413ms
+     ✓ a fixture from a DIFFERENT SEASON never blocks the INSERT, even one that would otherwise be one day from the record  1419ms
+     ✓ club ORIENTATION is exact: the same clubs with home and away swapped are a different fixture, not a candidate 163ms
+     ✓ MULTIPLE plausible fixtures (any owner, either component) refuse with every candidate listed and none chosen  431ms
+     ✓ APPLY-TIME RECHECK: a plausible fixture committed AFTER planning is still refused inside the savepoint — no match, period or player row, a durable finding naming the reason  504ms
+     ✓ exists, with predicate source_id = <afl_api id> AND player_id IS NOT NULL 75ms
+     ✓ raises 23505 on a second afl_api row for the same player 102ms
+     × still allows two rows for the same player under another source (the predicate binds on source_id) 44ms
+     ✓ I14 — the replay re-derives the current player_id from player_identity (never trusts a stale stored value), is idempotent, and passes the bijection check 78ms
+     ✓ readAflApiImporterRows — returns the unprefixed identity, and excludes (never silently captures) a two-path player 82ms
+     ✓ renumbering — the replay never trusts the captured playerId, only the re-derived identity 78ms
+     ✓ D9 STOPs against the real UNIQUE constraint and the per-player index 91ms
+     ✓ D15 supersede (OD-2) against the real table — the id is kept, the bijection passes, a second replay is a no-op 89ms
+     ✓ the combined invariant passes on this fixture set, and fails for an injected anomaly 111ms
+     ✓ P-M point 2 (D11d) — the database marker survives RESET_SQL, entirely inside one rolled-back transaction  450ms
+     ✓ whole-table isolation guarding — I237_OWNERSHIP never overlaps ISSUE235_OWNERSHIP (DB-free) 65ms
+     ✓ §10/E13 — the settle resolver (resolveAflApiPlayer) resolves a replayed importer row through the intended identity path, and refuses one it never replayed 105ms
+     ✓ I17 (R1/R2 live pin) — the live afldb_test catalogue matches the D10 manifest exactly  572ms
+     ✓ I2 → I6 (revoke before I5) → re-link → I5 (re-settle) → I6 (revoke after I5) → I6c: one provider through the real settle, link, revoke and replay  691ms
+     ✓ I2 (D8 audit shape) — the linked and revoked audit rows store evidence and previous_state as jsonb OBJECTS, not JSON text  560ms
+     ✓ I3 — atomicity: an audit INSERT refused by its CHECK after the identity INSERT leaves zero rows on both sides  510ms
+     ✓ I4/T2 (the brief's I3) — a second link of the same provider to the same player is refused as already linked; no duplicate row or audit  543ms
+     ✓ I4/T3 (the brief's I4) — a link of an already-linked provider to a DIFFERENT player is refused; no reassignment, no audit  547ms
+     ✓ I4/T4 — a link to a player who already holds another afl_api provider is refused, naming that provider  498ms
+     ✓ I4/T5 — a link with no pending evidence (U0) is refused; nothing is written  2284ms
+     ✓ I4/T6 (the brief's I7) — a stale fingerprint is refused for link and for revoke after a real database change; nothing is written  1460ms
+     ✓ I4/T7 — a link to a player with no stable identity is refused; nothing is written  505ms
+     ✓ I4/T8 — every action on an anomalous (NULL-player) row is refused; the row is unchanged  583ms
+     ✓ I4/T9 — a surname disagreement is refused without the acknowledgement, and recorded when acknowledged  535ms
+     ✓ I6b (Brownlow, OD-2) — a human link used only by a Brownlow settle is refused as used through D10 (a) and (b), with no projection row  917ms
+     ✓ I6d (lock) — while another session holds a read of external_identities the revoke refuses on lock_timeout and writes nothing  2610ms
+     ✓ I6-LI (LINK_INDEPENDENT; the brief's I6d) — an afl_api player_height_evidence row does not block a revoke and survives it  557ms
+     ✓ I7 — link and revoke against the BRIDGED importer (unique) provider are refused; its status, player_id and match_method are unchanged  351ms
+     ✓ I15 — an unresolvable player_identity stops the replay; nothing is written 217ms
+     ✓ I15 — an ambiguous player_identity (an afltables and a manual_admin_edit identity naming two players) stops the replay  747ms
+     ✓ I15 — an importer unique row for the CD_I naming a DIFFERENT player stops the replay; the importer row is untouched 227ms
+     ✓ I15 — an importer unique row for the CD_I and the SAME player still stops the replay (it is not the identical human row) 222ms
+     ✓ I15 — a conflicting HUMAN row for the CD_I (another player) stops the replay 223ms
+     ✓ I15 — a remapped player already holding another afl_api row stops the replay 222ms
+     ✓ I16 (replay idempotence) — over a ledger written by the real link/revoke API, a first replay re-creates exactly the net-linked rows and a second is a pure no-op  1260ms
+     ✓ OD-5 recovery — a committed reinstatement whose capture was never archived is verified, archived and captured afresh; the database is not written  1168ms
+     × OD-5 reinstate (rolled back, no rebuild) — reinstateAndReplay() puts a captured ledger back byte-for-byte under its original ids, replays it and passes the bijection 1197ms
+     ✓ OD-5 recovery — a missing human identity is refused as already_reinstated_unverified; the pending capture is left in place  1179ms
+     ✓ OD-5 recovery — a human identity with no ledger entry is refused; the pending capture is left in place  1228ms
+     ✓ OD-5 recovery — ledger drift is refused before any observation; the pending capture is left in place  1323ms
+     ✓ S6 fixture-leftover gate — afldb_test holds zero ISSUE-235 fixture rows  882ms
+     ✓ I237 fixture-leftover gate — afldb_test holds zero I237 fixture rows 145ms
+stdout | tests/integration/settle-afl-api-state-b.test.ts
+[ISSUE-275 state-b fixture] {"database":"afldb_v2_rem3stateb_basefamshuftests_test","role":"afldb_owner","season":2071,"namespace":"CD_M2071ISSUE275SB","providerMatchId":"CD_M2071ISSUE275SBN","matchKey":"2071|PF|2071-06-03|Hawthorn|Brisbane Lions","keepaliveMatchId":17389,"keepaliveMatchKey":"CD_M2071ISSUE275SB-keepalive","bridgedPlayerId":13506,"syntheticLegacyPlayerId":-275000001,"providerPlayerId":"CD_I297354","afltablesIdentity":"players/Z/Issue275-state-b-bridged-test.html","adminUserId":1,"note":"issue-275 state-b afl_api ownership test","snapshotLabel":"issue275-stateb-integration","aflApiSourceId":6,"afltablesSourceId":10}
+
+stdout | tests/integration/settle-afl-api-state-b.test.ts > AFLDB-ISSUE-257 §17.8 on a fixture season — Match Sheet authority over an afl_api-owned row survives a re-settle > keeps the corrected field, lets an unrelated field follow the source, and never changes ownership
+[ISSUE-275 state-b fixture] {"createdMatchId":17390,"createdMatchKey":"2071|PF|2071-06-03|Hawthorn|Brisbane Lions"}
+
+ ✓ tests/integration/settle-afl-api-state-b.test.ts (1 test) 1611ms
+     ✓ keeps the corrected field, lets an unrelated field follow the source, and never changes ownership  390ms
+ ✓ tests/integration/settle-afl-api-fixtures.test.ts (16 tests) 3998ms
+ ❯ tests/integration/settle-afl-api-brownlow.test.ts (21 tests | 3 failed) 12365ms
+     ✓ resolves and plans vote sets for TWO distinct matches once the match family has staged them (the operator's unknown_match -> voteSetsPlanned/voteSetsWouldAutoApply target), and creates no duplicate canonical match 276ms
+     × auto-applies a complete 3/2/1 vote set to brownlow_round_votes atomically, and a replay is a no-op (the canonical write path itself — every prior case in this suite ran `observe-only`/`apply: false` and never reached applyAflApiBrownlowVoteSet at all) 19ms
+     × refuses whole-set canonical promotion when a required staging.afl_api_brownlow_vote row is unavailable — never falling back to the in-memory vote payload for the missing row, and never partially promoting the other two (AFLDB-ISSUE-228 S7 typed-projection closure, match q, untouched by the p-only cases above) 11ms
+     ✓ refuses a genuinely unknown provider match id (unknown_match) — never inferring one, never a run-level HALT 24ms
+       ✓ a corrected recipient swap (A3 B2 C1 -> A3 B2 D1) demotes C to 0 through the ledger, writes D, and leaves exactly three positive recipients summing to 6 — the pre-F002 code left C = 1 beside D = 1 148ms
+       ✓ an identical replay of the corrected version is a no-op: no write, no counter, no repeated demotion, no provenance churn 175ms
+       ✓ a later correction can reverse the swap (D -> 0, C -> 1): the retained zero row is reused, never recreated 193ms
+       ✓ never touches another match's row in the SAME season and round, nor a foreign-owned row that merely reuses this match's source_record_id — the correction is bounded by (source_id, source_record_id), not by round 152ms
+       ✓ rolls the WHOLE vote set back when one part of a swap cannot apply — C is never zeroed while D is missing — and the identical call succeeds once the failure is removed 144ms
+       ✓ refuses the WHOLE set when the replacement recipient's row belongs to another source — the stale recipient is not left demoted, the foreign row is neither adopted nor changed, and the failure is a visible data issue 147ms
+       ✓ heals a vote set a pre-F002 run left stale (A3 B2 C1 + D1 all positive) on its next replay, and (AFLDB-ISSUE-244 I244-F007) heals D's NULL match_id in the SAME replay with no extra vote change, recomputing coverage once as part of the same committed transaction 171ms
+       ✓ AFLDB-ISSUE-244 I244-F007: a two-way permutation (A3 B2 C1 -> A2 B3 C1) succeeds without violating UNIQUE (match_id, votes): A and B are released to 0 first, then claim their final values — and neither temporary release is counted as a stale demotion 195ms
+       ✓ AFLDB-ISSUE-244 I244-F007: a three-way permutation (A3 B2 C1 -> C3 A2 B1) succeeds — no single-row write order can — by releasing all three recipients before claiming any final value; none is a stale demotion 195ms
+       ✓ AFLDB-ISSUE-244 I244-F007: refuses the WHOLE vote set (match_identity_conflict) before any write when a 'CURRENT recipient (A stays in A3 B2 D…' row already carries a different non-null match_id — nothing demoted, claimed, healed or logged 150ms
+       ✓ AFLDB-ISSUE-244 I244-F007: refuses the WHOLE vote set (match_identity_conflict) before any write when a 'STALE recipient (C is the one A3 B2 D…' row already carries a different non-null match_id — nothing demoted, claimed, healed or logged 138ms
+       ✓ AFLDB-ISSUE-244 I244-F007: a foreign-owned row that borrows this provider match's source_record_id and a contradicting match_id is not "this set's" stale row — it neither blocks the set nor is touched by it 164ms
+       ✓ a committed apply with one refused set leaves a terminal batch: records_rejected = the persisted import_rejections rows, validation_result = the run counters; an identical replay is a terminal zero-change batch 152ms
+       ✓ a committed observe-only run is a committed batch and is terminal; it writes no import_rejections, so records_rejected is 0 even though the run counted a refused set 66ms
+       ✓ a dry-run leaves no batch row, even though it ran the real finalising UPDATE 102ms
+       ✓ a failure while finalising the batch rolls the whole run back — no batch, no vote rows, no ledger rows 114ms
+     × cleanup() self-heals a stale player_clubs pointer left by a crashed prior teardown (one that deleted player_match_stats but never reached the recompute/DELETE FROM matches that follows it — the exact partial state a reported failed run left behind). Runs last: it deletes matches p and q outright, which every test above this one depends on existing. 18ms
+ ❯ tests/integration/settle-afl-api-issue276.test.ts (4 tests | 4 skipped) 1843ms
+     ↓ a contradictory roster for a FRESH match writes the match but no period rows, and opens one finding; a repeat refreshes it in place; a corrected roster resolves it and writes the periods
+     ↓ a contradictory roster leaves EXISTING canonical period rows byte-identical: nothing is rewritten, deleted or ledgered
+     ↓ an open finding is resolved only by positive evidence: missing score evidence, a deferred roster and a blocked match each leave it open
+     ↓ a finding opened before another source created the match is closed on the corroborated path by positive roster evidence, and only by it
+ ❯ tests/integration/settle-afl-api-brownlow-backtest.test.ts (6 tests | 4 failed) 2577ms
+     × #1 refuses season_not_in_progress without the backtest authority, exactly as default behaviour requires 49ms
+     × #2/#3/#4 authorised afldb_test override writes exactly one atomic 3/2/1 set, with its canonical_applications ledger 42ms
+     × #5 an identical replay (still authorised, still a completed season) is a no-op 97ms
+     ✓ #6 the override does not permit an invalid vote set (duplicate canonical player identity) 38ms
+     ✓ #7 the override does not permit an unresolved/untrusted identity 25ms
+     × #8 finals remain excluded even with the override active 66ms
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/settle-afl-api-issue276.test.ts [ tests/integration/settle-afl-api-issue276.test.ts ]
+Error: ISSUE-276 cases cannot run: these existing canonical rows are not ISSUE-276 fixtures and would make the settle refuse possible_existing_match. They were NOT touched: 2026|PF|2026-09-19|Hawthorn|Brisbane Lions (matches.id 17266)
+ ❯ assertNoForeignFixtureConflicts tests/integration/settle-afl-api-issue276.test.ts:914:11
+    912|   }
+    913|   if (conflicts.length > 0) {
+    914|     throw new Error(
+       |           ^
+    915|       'ISSUE-276 cases cannot run: these existing canonical rows are n…
+    916|       + `the settle refuse possible_existing_match. They were NOT touc…
+ ❯ tests/integration/settle-afl-api-issue276.test.ts:970:3
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/11]⎯
+
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 10 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/settle-afl-api-brownlow-reschedule.test.ts > AFLDB-ISSUE-228 S7 canonical round-selection correction against afldb_test > the same player voting under the SAME provider round in the two DIFFERENT matches above lands as TWO DISTINCT canonical rows, never one overwriting the other
+AssertionError: expected [] to deeply equal [ …(2) ]
+
+- Expected
++ Received
+
+- [
+-   {
+-     "roundNumber": 1,
+-     "sourceRecordId": "CD_M2026I228RSRESCHED",
+-     "votes": 3,
+-   },
+-   {
+-     "roundNumber": 6,
+-     "sourceRecordId": "CD_M2026I228RSORD",
+-     "votes": 3,
+-   },
+- ]
++ []
+
+ ❯ tests/integration/settle-afl-api-brownlow-reschedule.test.ts:430:18
+    428|     `;
+    429|     // Both ORD_ID and RESCHED_ID gave this player 3 votes (voteRecord…
+    430|     expect(rows).toEqual([
+       |                  ^
+    431|       { roundNumber: 1, votes: 3, sourceRecordId: RESCHED_ID },
+    432|       { roundNumber: 6, votes: 3, sourceRecordId: ORD_ID },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/11]⎯
+
+ FAIL  tests/integration/settle-afl-api.test.ts > AFLDB-ISSUE-235 (I1): migration 104 one-afl_api-provider-per-player index > still allows two rows for the same player under another source (the predicate binds on source_id)
+AssertionError: expected [ { source_id: 10, …(1) } ] to deeply equal ArrayContaining{…}
+
+- Expected
++ Received
+
+- ArrayContaining [
+-   {
+-     "external_id": "CD_I9990000001",
+-     "source_id": 6,
+-   },
++ [
+    {
+      "external_id": "players/Z/Issue235-I1-test.html",
+      "source_id": 10,
+    },
+  ]
+
+ ❯ tests/integration/settle-afl-api.test.ts:3943:18
+    3941|       SELECT source_id, external_id FROM external_identities WHERE pla…
+    3942|     `;
+    3943|     expect(rows).toEqual(expect.arrayContaining([
+       |                  ^
+    3944|       { source_id: i1AflApiSourceId, external_id: I1_PROVIDER_A },
+    3945|       { source_id: i1AfltablesSourceId, external_id: I1_AFLTABLES_EXTE…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/11]⎯
+
+ FAIL  tests/integration/settle-afl-api.test.ts > AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreSQL (post-COMMIT, pre-archive recovery) > OD-5 reinstate (rolled back, no rebuild) — reinstateAndReplay() puts a captured ledger back byte-for-byte under its original ids, replays it and passes the bijection
+Error: Refusing to rebuild 'afldb_v2_rem3stateb_basefamshuftests_test': the only explicit rebuild targets are 'afldb_test' (normal test/integration rebuild), 'code_test_db' (disposable full-rebuild rehearsal). A target is never inferred from a DSN.
+ ❯ assertRebuildTargetName tools/db/rebuild-test.ts:790:11
+    788|   const isolatedName = isIsolatedRebuildName(database) && isolatedRunP…
+    789|   if (!isRebuildTarget(database) && !isolatedName) {
+    790|     throw new RebuildRefused(
+       |           ^
+    791|       `Refusing to rebuild '${database}': the only explicit rebuild ta…
+    792|       + `${describeRebuildTargets()}. A target is never inferred from …
+ ❯ setRebuildMarker tools/migration/rebuild_afl_api_adjudications.ts:1183:3
+ ❯ tests/integration/settle-afl-api.test.ts:5544:15
+ ❯ scope node_modules/postgres/src/index.js:260:18
+ ❯ Function.begin node_modules/postgres/src/index.js:243:14
+ ❯ tests/integration/settle-afl-api.test.ts:5535:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/11]⎯
+
+ FAIL  tests/integration/settle-afl-api-brownlow.test.ts > AFLDB-ISSUE-228 S7 — Brownlow match resolution against afldb_test > auto-applies a complete 3/2/1 vote set to brownlow_round_votes atomically, and a replay is a no-op (the canonical write path itself — every prior case in this suite ran `observe-only`/`apply: false` and never reached applyAflApiBrownlowVoteSet at all)
+AssertionError: expected { unknown_match: 1 } to deeply equal {}
+
+- Expected
++ Received
+
+- {}
++ {
++   "unknown_match": 1,
++ }
+
+ ❯ tests/integration/settle-afl-api-brownlow.test.ts:879:52
+    877|       expect(applyResult.halt).toBeNull();
+    878|       expect(applyResult.applied).toBe(true);
+    879|       expect(applyResult.counters.voteSetsRefused).toEqual({});
+       |                                                    ^
+    880|       expect(applyResult.counters.voteSetsApplyFailed).toBe(0);
+    881|       expect(applyResult.counters.voteSetsNoOp).toBe(0);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/11]⎯
+
+ FAIL  tests/integration/settle-afl-api-brownlow.test.ts > AFLDB-ISSUE-228 S7 — Brownlow match resolution against afldb_test > refuses whole-set canonical promotion when a required staging.afl_api_brownlow_vote row is unavailable — never falling back to the in-memory vote payload for the missing row, and never partially promoting the other two (AFLDB-ISSUE-228 S7 typed-projection closure, match q, untouched by the p-only cases above)
+AssertionError: expected { unknown_match: 1 } to deeply equal {}
+
+- Expected
++ Received
+
+- {}
++ {
++   "unknown_match": 1,
++ }
+
+ ❯ tests/integration/settle-afl-api-brownlow.test.ts:1049:54
+    1047|       expect(projectResult.halt).toBeNull();
+    1048|       expect(projectResult.applied).toBe(true);
+    1049|       expect(projectResult.counters.voteSetsRefused).toEqual({});
+       |                                                      ^
+    1050|       expect(projectResult.counters.voteSetsPlanned).toBe(1);
+    1051|       expect(projectResult.counters.voteSetsWouldAutoApply).toBe(1);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/11]⎯
+
+ FAIL  tests/integration/settle-afl-api-brownlow.test.ts > AFLDB-ISSUE-228 S7 — Brownlow match resolution against afldb_test > cleanup() self-heals a stale player_clubs pointer left by a crashed prior teardown (one that deleted player_match_stats but never reached the recompute/DELETE FROM matches that follows it — the exact partial state a reported failed run left behind). Runs last: it deletes matches p and q outright, which every test above this one depends on existing.
+AssertionError: expected undefined to be defined
+ ❯ tests/integration/settle-afl-api-brownlow.test.ts:1895:22
+    1893|       `;
+    1894|       // both matches p and q must still exist at this point in the su…
+    1895|       expect(matchP).toBeDefined();
+       |                      ^
+    1896|       expect(matchQ).toBeDefined();
+    1897|       const ids = [matchP.id, matchQ.id];
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/11]⎯
+
+ FAIL  tests/integration/settle-afl-api-brownlow-backtest.test.ts > AFLDB-ISSUE-228 §10 follow-up — the completed-season Brownlow backtest authority against afldb_test > #1 refuses season_not_in_progress without the backtest authority, exactly as default behaviour requires
+AssertionError: expected '3' to be '0' // Object.is equality
+
+Expected: "0"
+Received: "3"
+
+ ❯ tests/integration/settle-afl-api-brownlow-backtest.test.ts:365:19
+    363|       SELECT count(*)::text AS count FROM brownlow_round_votes WHERE s…
+    364|     `;
+    365|     expect(count).toBe('0');
+       |                   ^
+    366|   });
+    367|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/11]⎯
+
+ FAIL  tests/integration/settle-afl-api-brownlow-backtest.test.ts > AFLDB-ISSUE-228 §10 follow-up — the completed-season Brownlow backtest authority against afldb_test > #2/#3/#4 authorised afldb_test override writes exactly one atomic 3/2/1 set, with its canonical_applications ledger
+AssertionError: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ tests/integration/settle-afl-api-brownlow-backtest.test.ts:382:42
+    380|     expect(result.counters.voteSetsRefused).toEqual({});
+    381|     expect(result.counters.voteSetsApplyFailed).toBe(0);
+    382|     expect(result.counters.voteSetsNoOp).toBe(0);
+       |                                          ^
+    383|     expect(result.counters.canonicalRowsInserted).toBe(3);
+    384|     expect(result.counters.canonicalRowsUpdated).toBe(0);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/11]⎯
+
+ FAIL  tests/integration/settle-afl-api-brownlow-backtest.test.ts > AFLDB-ISSUE-228 §10 follow-up — the completed-season Brownlow backtest authority against afldb_test > #5 an identical replay (still authorised, still a completed season) is a no-op
+AssertionError: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ tests/integration/settle-afl-api-brownlow-backtest.test.ts:420:42
+    418|     expect(result.applied).toBe(true);
+    419|     expect(result.counters.voteSetsApplyFailed).toBe(0);
+    420|     expect(result.counters.voteSetsNoOp).toBe(1);
+       |                                          ^
+    421|     expect(result.counters.canonicalRowsInserted).toBe(0);
+    422|     expect(result.counters.canonicalRowsUpdated).toBe(0);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/11]⎯
+
+ FAIL  tests/integration/settle-afl-api-brownlow-backtest.test.ts > AFLDB-ISSUE-228 §10 follow-up — the completed-season Brownlow backtest authority against afldb_test > #8 finals remain excluded even with the override active
+AssertionError: expected '0' to be '3' // Object.is equality
+
+Expected: "3"
+Received: "0"
+
+ ❯ tests/integration/settle-afl-api-brownlow-backtest.test.ts:482:19
+    480|       SELECT count(*)::text AS count FROM brownlow_round_votes WHERE s…
+    481|     `;
+    482|     expect(count).toBe('3');
+       |                   ^
+    483|   });
+    484| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/11]⎯
+
+
+ Test Files  5 failed | 2 passed (7)
+      Tests  10 failed | 111 passed | 4 skipped (125)
+   Start at  21:44:45
+   Duration  77.23s (transform 2.11s, setup 500ms, import 3.51s, tests 71.46s, environment 2ms)
+
+JSON report written to /mnt/ssd/afldb-rem3-stateb-20261114/evidence/basefamshuftests/vitest.json

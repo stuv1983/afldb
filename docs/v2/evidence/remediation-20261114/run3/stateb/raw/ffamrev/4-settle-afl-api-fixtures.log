@@ -1,0 +1,12 @@
+isolated-pg: afldb_v2_rem3stateb_ffamrev_test verified (cluster afldb_v2_isolated, 127.0.0.1:55671); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem3-stateb-20261114/cand
+
+ ✓ tests/integration/settle-afl-api-fixtures.test.ts (16 tests) 4166ms
+
+ Test Files  1 passed (1)
+      Tests  16 passed (16)
+   Start at  21:32:08
+   Duration  5.57s (transform 733ms, setup 236ms, import 798ms, tests 4.17s, environment 0ms)
+
+JSON report written to /mnt/ssd/afldb-rem3-stateb-20261114/evidence/ffamrev/4-settle-afl-api-fixtures.json

@@ -1,0 +1,9 @@
+label=green2 mode=all db=afldb_v2_rem3stateb_green2_test CAND=/mnt/ssd/afldb-rem3-stateb-20261114/cand HEAD=e9400741594cc2b7f25270f018a73d2ddc9e33a0 porcelain=0
+args: tests/integration/settle-afl-api-state-b.test.ts
+2026-11-14T10:17:20Z
+create-db: afldb_v2_rem3stateb_green2_test created from afldb_v2_rem3stateb_tmpl_test and marked
+BEFORE afldb_v2_rem3stateb_green2_test {"snapshotRows":1,"snapshotRowMd5":"cf04e8f54805716e81742d4dbe3d5af4","snapshotPlayerId":7974,"externalIdentitiesTotal":19319,"aflApiIdentities":803,"ownIdRows":0,"minCdILen":10,"maxCdILen":11,"fixtureSeasonsLeft":0,"ownPlayers":0,"matches":17056}
+vitest rc=0
+AFTER afldb_v2_rem3stateb_green2_test {"snapshotRows":1,"snapshotRowMd5":"cf04e8f54805716e81742d4dbe3d5af4","snapshotPlayerId":7974,"externalIdentitiesTotal":19319,"aflApiIdentities":803,"ownIdRows":0,"minCdILen":10,"maxCdILen":11,"fixtureSeasonsLeft":0,"ownPlayers":0,"matches":17056}
+2026-11-14T10:17:30Z
+drop-db: afldb_v2_rem3stateb_green2_test dropped

@@ -1,0 +1,12 @@
+isolated-pg: afldb_v2_rem3stateb_ffamrev_test verified (cluster afldb_v2_isolated, 127.0.0.1:55671); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem3-stateb-20261114/cand
+
+ ✓ tests/integration/settle-afl-api-brownlow-backtest.test.ts (6 tests) 2707ms
+
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+   Start at  21:32:38
+   Duration  4.07s (transform 722ms, setup 166ms, import 827ms, tests 2.71s, environment 0ms)
+
+JSON report written to /mnt/ssd/afldb-rem3-stateb-20261114/evidence/ffamrev/7-settle-afl-api-brownlow-backtest.json

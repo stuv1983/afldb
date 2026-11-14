@@ -1,0 +1,17 @@
+isolated-pg: afldb_v2_rem3stateb_ffamrev_test verified (cluster afldb_v2_isolated, 127.0.0.1:55671); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem3-stateb-20261114/cand
+
+ ✓ tests/integration/settle-afl-api-brownlow.test.ts (21 tests) 14594ms
+     ✓ resolves and plans vote sets for TWO distinct matches once the match family has staged them (the operator's unknown_match -> voteSetsPlanned/voteSetsWouldAutoApply target), and creates no duplicate canonical match  599ms
+     ✓ auto-applies a complete 3/2/1 vote set to brownlow_round_votes atomically, and a replay is a no-op (the canonical write path itself — every prior case in this suite ran `observe-only`/`apply: false` and never reached applyAflApiBrownlowVoteSet at all)  334ms
+       ✓ an identical replay of the corrected version is a no-op: no write, no counter, no repeated demotion, no provenance churn  365ms
+       ✓ a later correction can reverse the swap (D -> 0, C -> 1): the retained zero row is reused, never recreated  385ms
+     ✓ cleanup() self-heals a stale player_clubs pointer left by a crashed prior teardown (one that deleted player_match_stats but never reached the recompute/DELETE FROM matches that follows it — the exact partial state a reported failed run left behind). Runs last: it deletes matches p and q outright, which every test above this one depends on existing.  10124ms
+
+ Test Files  1 passed (1)
+      Tests  21 passed (21)
+   Start at  21:32:15
+   Duration  16.25s (transform 951ms, setup 247ms, import 1.04s, tests 14.59s, environment 0ms)
+
+JSON report written to /mnt/ssd/afldb-rem3-stateb-20261114/evidence/ffamrev/5-settle-afl-api-brownlow.json

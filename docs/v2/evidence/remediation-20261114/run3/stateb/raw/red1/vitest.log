@@ -1,0 +1,46 @@
+isolated-pg: afldb_v2_rem3stateb_red1_test verified (cluster afldb_v2_isolated, 127.0.0.1:55671); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem3-stateb-20261114/cand
+
+ ❯ tests/integration/settle-afl-api-state-b.test.ts (1 test | 1 skipped) 156ms
+     ↓ keeps the corrected field, lets an unrelated field follow the source, and never changes ownership
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/settle-afl-api-state-b.test.ts [ tests/integration/settle-afl-api-state-b.test.ts ]
+AssertionError: a leftover fixture row exists; remove it deliberately, this file will not adopt it: expected { seasons: +0, matches: +0, …(15) } to deeply equal { seasons: +0, matches: +0, …(15) }
+
+- Expected
++ Received
+
+@@ -4,11 +4,11 @@
+    "canonicalApplications": 0,
+    "clubSeasons": 0,
+    "dataEdits": 0,
+    "dataIssues": 0,
+    "dataOverrides": 0,
+-   "externalIdentities": 0,
++   "externalIdentities": 1,
+    "importBatches": 0,
+    "importRejections": 0,
+    "matches": 0,
+    "playerMatchStats": 0,
+    "players": 0,
+
+ ❯ tests/integration/settle-afl-api-state-b.test.ts:310:102
+    308|   // ---- fail closed: nothing of the fixture namespace may exist (a l…
+    309|   const left = await residue();
+    310|   expect(left, 'a leftover fixture row exists; remove it deliberately,…
+       |                                                                                                      ^
+    311|   const clash = await sql<{ n: number }[]>`
+    312|     SELECT count(*)::int AS n FROM matches WHERE match_key = ${KEEPALI…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 skipped (1)
+   Start at  21:16:18
+   Duration  2.38s (transform 1.40s, setup 274ms, import 1.55s, tests 156ms, environment 0ms)
+
+JSON report written to /mnt/ssd/afldb-rem3-stateb-20261114/evidence/vitest.json

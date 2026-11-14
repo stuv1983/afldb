@@ -1,0 +1,43 @@
+label=ffamrev mode=shared db=afldb_v2_rem3stateb_ffamrev_test CAND=/mnt/ssd/afldb-rem3-stateb-20261114/cand HEAD=50fbde9d5be8c247613803fa6c64e1a7156f41de porcelain=0
+order requested: tests/integration/settle-afl-api.test.ts tests/integration/settle-afl-api-state-b.test.ts tests/integration/settle-afl-api-issue276.test.ts tests/integration/settle-afl-api-fixtures.test.ts tests/integration/settle-afl-api-brownlow.test.ts tests/integration/settle-afl-api-brownlow-reschedule.test.ts tests/integration/settle-afl-api-brownlow-backtest.test.ts
+2026-11-14T10:30:57Z
+create-db: afldb_v2_rem3stateb_ffamrev_test created from afldb_v2_rem3stateb_tmpl_test and marked
+BEFORE afldb_v2_rem3stateb_ffamrev_test {"snapshotRows":1,"snapshotRowMd5":"cf04e8f54805716e81742d4dbe3d5af4","snapshotPlayerId":7974,"externalIdentitiesTotal":19319,"aflApiIdentities":803,"ownIdRows":0,"minCdILen":10,"maxCdILen":11,"fixtureSeasonsLeft":0,"ownPlayers":0,"matches":17056}
+--- step 1: tests/integration/settle-afl-api.test.ts  start 10:31:00.684
+step 1 rc=1 end 10:31:56.988
+AFTER-step-1 afldb_v2_rem3stateb_ffamrev_test {"snapshotRows":1,"snapshotRowMd5":"cf04e8f54805716e81742d4dbe3d5af4","snapshotPlayerId":7974,"externalIdentitiesTotal":19319,"aflApiIdentities":803,"ownIdRows":0,"minCdILen":10,"maxCdILen":11,"fixtureSeasonsLeft":0,"ownPlayers":0,"matches":17056}
+--- step 2: tests/integration/settle-afl-api-state-b.test.ts  start 10:31:57.555
+step 2 rc=0 end 10:32:01.992
+AFTER-step-2 afldb_v2_rem3stateb_ffamrev_test {"snapshotRows":1,"snapshotRowMd5":"cf04e8f54805716e81742d4dbe3d5af4","snapshotPlayerId":7974,"externalIdentitiesTotal":19319,"aflApiIdentities":803,"ownIdRows":0,"minCdILen":10,"maxCdILen":11,"fixtureSeasonsLeft":0,"ownPlayers":0,"matches":17056}
+--- step 3: tests/integration/settle-afl-api-issue276.test.ts  start 10:32:02.547
+step 3 rc=1 end 10:32:07.124
+AFTER-step-3 afldb_v2_rem3stateb_ffamrev_test {"snapshotRows":1,"snapshotRowMd5":"cf04e8f54805716e81742d4dbe3d5af4","snapshotPlayerId":7974,"externalIdentitiesTotal":19319,"aflApiIdentities":803,"ownIdRows":0,"minCdILen":10,"maxCdILen":11,"fixtureSeasonsLeft":0,"ownPlayers":0,"matches":17056}
+--- step 4: tests/integration/settle-afl-api-fixtures.test.ts  start 10:32:07.698
+step 4 rc=0 end 10:32:14.374
+AFTER-step-4 afldb_v2_rem3stateb_ffamrev_test {"snapshotRows":1,"snapshotRowMd5":"cf04e8f54805716e81742d4dbe3d5af4","snapshotPlayerId":7974,"externalIdentitiesTotal":19319,"aflApiIdentities":803,"ownIdRows":0,"minCdILen":10,"maxCdILen":11,"fixtureSeasonsLeft":0,"ownPlayers":0,"matches":17056}
+--- step 5: tests/integration/settle-afl-api-brownlow.test.ts  start 10:32:14.951
+step 5 rc=0 end 10:32:32.286
+AFTER-step-5 afldb_v2_rem3stateb_ffamrev_test {"snapshotRows":1,"snapshotRowMd5":"cf04e8f54805716e81742d4dbe3d5af4","snapshotPlayerId":7974,"externalIdentitiesTotal":19319,"aflApiIdentities":803,"ownIdRows":0,"minCdILen":10,"maxCdILen":11,"fixtureSeasonsLeft":0,"ownPlayers":0,"matches":17056}
+--- step 6: tests/integration/settle-afl-api-brownlow-reschedule.test.ts  start 10:32:32.842
+step 6 rc=0 end 10:32:37.263
+AFTER-step-6 afldb_v2_rem3stateb_ffamrev_test {"snapshotRows":1,"snapshotRowMd5":"cf04e8f54805716e81742d4dbe3d5af4","snapshotPlayerId":7974,"externalIdentitiesTotal":19319,"aflApiIdentities":803,"ownIdRows":0,"minCdILen":10,"maxCdILen":11,"fixtureSeasonsLeft":0,"ownPlayers":0,"matches":17056}
+--- step 7: tests/integration/settle-afl-api-brownlow-backtest.test.ts  start 10:32:37.845
+step 7 rc=0 end 10:32:43.006
+AFTER-step-7 afldb_v2_rem3stateb_ffamrev_test {"snapshotRows":1,"snapshotRowMd5":"cf04e8f54805716e81742d4dbe3d5af4","snapshotPlayerId":7974,"externalIdentitiesTotal":19319,"aflApiIdentities":803,"ownIdRows":0,"minCdILen":10,"maxCdILen":11,"fixtureSeasonsLeft":0,"ownPlayers":0,"matches":17056}
+== /mnt/ssd/afldb-rem3-stateb-20261114/evidence/ffamrev/1-settle-afl-api.json: files tests total=74 passed=73 failed=1 pending=0 todo=0; suites failed=2; startTime=1794652261691
+  10:31:05.111 failed  tests/integration/settle-afl-api.test.ts p=73 f=1 s=0
+      x AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreSQL (post-COMMIT, pre-archive recovery) OD-5 reinstate (rolled back, no rebuild)  :: Error: Refusing to rebuild 'afldb_v2_rem3stateb_ffamrev_test': the only explicit rebuild targets are 'afldb_test' (normal test/integration rebuild), 'code_test_
+== /mnt/ssd/afldb-rem3-stateb-20261114/evidence/ffamrev/2-settle-afl-api-state-b.json: files tests total=1 passed=1 failed=0 pending=0 todo=0; suites failed=0; startTime=1794652318556
+  10:32:00.422 passed  tests/integration/settle-afl-api-state-b.test.ts p=1 f=0 s=0
+== /mnt/ssd/afldb-rem3-stateb-20261114/evidence/ffamrev/3-settle-afl-api-issue276.json: files tests total=4 passed=0 failed=0 pending=4 todo=0; suites failed=1; startTime=1794652323548
+  10:32:03.548 failed  tests/integration/settle-afl-api-issue276.test.ts p=0 f=0 s=4 FILE-ERR: ISSUE-276 cases cannot run: these existing canonical rows are not ISSUE-276 fixtures and would make the settle refuse possible_existing_match. They were NOT touched: 2026|PF|2026-09-19|Hawthorn|Brisba
+== /mnt/ssd/afldb-rem3-stateb-20261114/evidence/ffamrev/4-settle-afl-api-fixtures.json: files tests total=16 passed=16 failed=0 pending=0 todo=0; suites failed=0; startTime=1794652328698
+  10:32:10.236 passed  tests/integration/settle-afl-api-fixtures.test.ts p=16 f=0 s=0
+== /mnt/ssd/afldb-rem3-stateb-20261114/evidence/ffamrev/5-settle-afl-api-brownlow.json: files tests total=21 passed=21 failed=0 pending=0 todo=0; suites failed=0; startTime=1794652335955
+  10:32:17.806 passed  tests/integration/settle-afl-api-brownlow.test.ts p=21 f=0 s=0
+== /mnt/ssd/afldb-rem3-stateb-20261114/evidence/ffamrev/6-settle-afl-api-brownlow-reschedule.json: files tests total=3 passed=3 failed=0 pending=0 todo=0; suites failed=0; startTime=1794652353864
+  10:32:35.843 passed  tests/integration/settle-afl-api-brownlow-reschedule.test.ts p=3 f=0 s=0
+== /mnt/ssd/afldb-rem3-stateb-20261114/evidence/ffamrev/7-settle-afl-api-brownlow-backtest.json: files tests total=6 passed=6 failed=0 pending=0 todo=0; suites failed=0; startTime=1794652358853
+  10:32:40.643 passed  tests/integration/settle-afl-api-brownlow-backtest.test.ts p=6 f=0 s=0
+2026-11-14T10:32:43Z
+drop-db: afldb_v2_rem3stateb_ffamrev_test dropped
