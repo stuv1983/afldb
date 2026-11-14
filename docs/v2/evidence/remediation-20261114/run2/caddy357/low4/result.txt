@@ -1,0 +1,51 @@
+mode=open health=200 BUILD_ID=EILJAA4NowINsjUcj8YGG port=55663
+loc-production-before-caddy-2.11.4 /admin/invite/<TOK>/ -> HTTP/1.1 308 Permanent Redirect Location: /admin/invite/<TOK>
+loc-production-before-caddy-2.11.4 /admin/invite/<TOK>/?x=1 -> HTTP/1.1 308 Permanent Redirect Location: /admin/invite/<TOK>?x=1
+loc-production-before-caddy-2.11.4 /Admin/invite/<TOK>/ -> HTTP/1.1 308 Permanent Redirect Location: /Admin/invite/<TOK>
+loc-production-before-caddy-2.11.4 /beta/verify/?token=<TOK> -> HTTP/1.1 308 Permanent Redirect Location: /beta/verify?token=<TOK>
+loc-production-before-caddy-2.11.4 /admin/invite/<TOK> -> HTTP/1.1 200 OK 
+loc-production-before-caddy-2.11.4 log lines=6 lines-with-token=4 logged-Location:       1 "Location":["/admin/invite/<TOK>"]       1 "Location":["/Admin/invite/<TOK>"]       1 "Location":["/admin/invite/<TOK>?x=1"]       1 "Location":["/beta/verify?token=<TOK>"] 
+loc-dev-before-caddy-2.11.4 /admin/invite/<TOK>/ -> HTTP/1.1 308 Permanent Redirect Location: /admin/invite/<TOK>
+loc-dev-before-caddy-2.11.4 /admin/invite/<TOK>/?x=1 -> HTTP/1.1 308 Permanent Redirect Location: /admin/invite/<TOK>?x=1
+loc-dev-before-caddy-2.11.4 /Admin/invite/<TOK>/ -> HTTP/1.1 308 Permanent Redirect Location: /Admin/invite/<TOK>
+loc-dev-before-caddy-2.11.4 /beta/verify/?token=<TOK> -> HTTP/1.1 308 Permanent Redirect Location: /beta/verify?token=<TOK>
+loc-dev-before-caddy-2.11.4 /admin/invite/<TOK> -> HTTP/1.1 200 OK 
+loc-dev-before-caddy-2.11.4 log lines=6 lines-with-token=4 logged-Location:       1 "Location":["/admin/invite/<TOK>"]       1 "Location":["/Admin/invite/<TOK>"]       1 "Location":["/admin/invite/<TOK>?x=1"]       1 "Location":["/beta/verify?token=<TOK>"] 
+loc-production-after-caddy-2.11.4 /admin/invite/<TOK>/ -> HTTP/1.1 308 Permanent Redirect Location: /admin/invite/<TOK>
+loc-production-after-caddy-2.11.4 /admin/invite/<TOK>/?x=1 -> HTTP/1.1 308 Permanent Redirect Location: /admin/invite/<TOK>?x=1
+loc-production-after-caddy-2.11.4 /Admin/invite/<TOK>/ -> HTTP/1.1 308 Permanent Redirect Location: /Admin/invite/<TOK>
+loc-production-after-caddy-2.11.4 /beta/verify/?token=<TOK> -> HTTP/1.1 308 Permanent Redirect Location: /beta/verify?token=<TOK>
+loc-production-after-caddy-2.11.4 /admin/invite/<TOK> -> HTTP/1.1 200 OK 
+loc-production-after-caddy-2.11.4 log lines=6 lines-with-token=0 logged-Location:       2 "Location":["/admin/invite/REDACTED"]       1 "Location":["/Admin/invite/REDACTED"]       1 "Location":["/beta/verify"] 
+loc-dev-after-caddy-2.11.4 /admin/invite/<TOK>/ -> HTTP/1.1 308 Permanent Redirect Location: /admin/invite/<TOK>
+loc-dev-after-caddy-2.11.4 /admin/invite/<TOK>/?x=1 -> HTTP/1.1 308 Permanent Redirect Location: /admin/invite/<TOK>?x=1
+loc-dev-after-caddy-2.11.4 /Admin/invite/<TOK>/ -> HTTP/1.1 308 Permanent Redirect Location: /Admin/invite/<TOK>
+loc-dev-after-caddy-2.11.4 /beta/verify/?token=<TOK> -> HTTP/1.1 308 Permanent Redirect Location: /beta/verify?token=<TOK>
+loc-dev-after-caddy-2.11.4 /admin/invite/<TOK> -> HTTP/1.1 200 OK 
+loc-dev-after-caddy-2.11.4 log lines=6 lines-with-token=0 logged-Location:       2 "Location":["/admin/invite/REDACTED"]       1 "Location":["/Admin/invite/REDACTED"]       1 "Location":["/beta/verify"] 
+loc-production-before-caddy-system /admin/invite/<TOK>/ -> HTTP/1.1 308 Permanent Redirect Location: /admin/invite/<TOK>
+loc-production-before-caddy-system /admin/invite/<TOK>/?x=1 -> HTTP/1.1 308 Permanent Redirect Location: /admin/invite/<TOK>?x=1
+loc-production-before-caddy-system /Admin/invite/<TOK>/ -> HTTP/1.1 308 Permanent Redirect Location: /Admin/invite/<TOK>
+loc-production-before-caddy-system /beta/verify/?token=<TOK> -> HTTP/1.1 308 Permanent Redirect Location: /beta/verify?token=<TOK>
+loc-production-before-caddy-system /admin/invite/<TOK> -> HTTP/1.1 200 OK 
+loc-production-before-caddy-system log lines=6 lines-with-token=4 logged-Location:       1 "Location":["/admin/invite/<TOK>"]       1 "Location":["/Admin/invite/<TOK>"]       1 "Location":["/admin/invite/<TOK>?x=1"]       1 "Location":["/beta/verify?token=<TOK>"] 
+loc-dev-before-caddy-system /admin/invite/<TOK>/ -> HTTP/1.1 308 Permanent Redirect Location: /admin/invite/<TOK>
+loc-dev-before-caddy-system /admin/invite/<TOK>/?x=1 -> HTTP/1.1 308 Permanent Redirect Location: /admin/invite/<TOK>?x=1
+loc-dev-before-caddy-system /Admin/invite/<TOK>/ -> HTTP/1.1 308 Permanent Redirect Location: /Admin/invite/<TOK>
+loc-dev-before-caddy-system /beta/verify/?token=<TOK> -> HTTP/1.1 308 Permanent Redirect Location: /beta/verify?token=<TOK>
+loc-dev-before-caddy-system /admin/invite/<TOK> -> HTTP/1.1 200 OK 
+loc-dev-before-caddy-system log lines=6 lines-with-token=4 logged-Location:       1 "Location":["/admin/invite/<TOK>"]       1 "Location":["/Admin/invite/<TOK>"]       1 "Location":["/admin/invite/<TOK>?x=1"]       1 "Location":["/beta/verify?token=<TOK>"] 
+loc-production-after-caddy-system /admin/invite/<TOK>/ -> HTTP/1.1 308 Permanent Redirect Location: /admin/invite/<TOK>
+loc-production-after-caddy-system /admin/invite/<TOK>/?x=1 -> HTTP/1.1 308 Permanent Redirect Location: /admin/invite/<TOK>?x=1
+loc-production-after-caddy-system /Admin/invite/<TOK>/ -> HTTP/1.1 308 Permanent Redirect Location: /Admin/invite/<TOK>
+loc-production-after-caddy-system /beta/verify/?token=<TOK> -> HTTP/1.1 308 Permanent Redirect Location: /beta/verify?token=<TOK>
+loc-production-after-caddy-system /admin/invite/<TOK> -> HTTP/1.1 200 OK 
+loc-production-after-caddy-system log lines=6 lines-with-token=0 logged-Location:       2 "Location":["/admin/invite/REDACTED"]       1 "Location":["/Admin/invite/REDACTED"]       1 "Location":["/beta/verify"] 
+loc-dev-after-caddy-system /admin/invite/<TOK>/ -> HTTP/1.1 308 Permanent Redirect Location: /admin/invite/<TOK>
+loc-dev-after-caddy-system /admin/invite/<TOK>/?x=1 -> HTTP/1.1 308 Permanent Redirect Location: /admin/invite/<TOK>?x=1
+loc-dev-after-caddy-system /Admin/invite/<TOK>/ -> HTTP/1.1 308 Permanent Redirect Location: /Admin/invite/<TOK>
+loc-dev-after-caddy-system /beta/verify/?token=<TOK> -> HTTP/1.1 308 Permanent Redirect Location: /beta/verify?token=<TOK>
+loc-dev-after-caddy-system /admin/invite/<TOK> -> HTTP/1.1 200 OK 
+loc-dev-after-caddy-system log lines=6 lines-with-token=0 logged-Location:       2 "Location":["/admin/invite/REDACTED"]       1 "Location":["/Admin/invite/REDACTED"]       1 "Location":["/beta/verify"] 
+stopped; no listener on 55663
+listeners left: 0

@@ -1,0 +1,119 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem2-int-20261114/loc-probe/co
+
+ ❯ tests/settle-season-revalidation.test.ts (86 tests | 2 failed | 84 skipped) 32ms
+     ↓ publishes when an applied run wrote canonical rows
+     ↓ publishes when an applied run only UPDATED canonical rows
+     ↓ does nothing for the idempotent 0 canonical / 0 ledger rerun
+     ↓ does nothing for a rolled-back run, however much it would have written
+     ↓ does nothing when there is no run at all
+     ↓ invalidates the bundle's own season after an applied run that changed data
+     ↓ makes no request at all on an identical 0/0 rerun
+     ↓ makes no request on a dry run, whatever the run would have written
+     ↓ makes no request when the settle transaction itself failed
+     ↓ reports a failed invalidation without disturbing the committed run
+     ↓ turns a bad host configuration into a reported invalidation failure, not a lost settle
+     ↓ stays inert on a host that has configured nothing
+     ↓ leaves the existing counters and outcome shape untouched
+     ↓ is inert when neither name is set
+     ↓ refuses a half configuration rather than silently doing nothing
+     ↓ refuses to send the shared secret anywhere but this host
+     ↓ accepts the three loopback spellings
+     ↓ refuses a non-HTTP scheme and unparseable rubbish
+     ↓ keeps posting until every worker of a 4-worker cluster has answered
+     ↓ covers the 2-worker production cluster
+     ↓ tolerates a rotation disturbed by ordinary reader traffic
+     ↓ accepts a single answer from a single-process server
+     ↓ FAILS rather than reporting success when a worker never answers
+     ↓ fails observably when the route refuses, and never throws
+     ↓ fails observably when the socket does, and never throws
+     ↓ bounds an unbounded error message rather than logging a blob
+       ↓ counts DISTINCT ordinals: repeats never accumulate towards coverage
+       ↓ is not satisfied by 3 of 4 workers
+       ↓ takes the LARGEST cluster size reported, so a restart cannot shrink coverage
+       ↓ opens a FRESH connection per attempt, which is what makes the rotation work
+     ↓ invalidates exactly the season page it was given
+     ↓ reports the worker identity the caller needs to prove coverage
+     ↓ reports a single-process server truthfully rather than guessing
+     ↓ takes the worker identity from process state, never from the request
+     ↓ refuses to believe a nonsensical worker count rather than reporting it
+     ↓ is 503 and inert on a host that has configured no secret
+     ↓ refuses a wrong, empty or absent secret
+     ↓ serves a loopback caller carrying the forwarding headers Next synthesises
+     ↓ serves every loopback form the deployment can emit
+     ↓ ignores x-forwarded-host, which is client input on every path
+     ↓ refuses a non-loopback forwarded client even with the correct secret
+     ↓ refuses a forwarded chain rather than trusting either end of it
+     ↓ refuses a malformed forwarded client
+     ↓ serves a request with no forwarding identity at all
+     ↓ checks the caller BEFORE the secret, so a public probe learns nothing
+     ↓ charges only failed secret checks against the limiter
+     ↓ refuses once the failure limiter has tripped
+     ↓ admits no arbitrary path, pattern or tag
+     ↓ refuses a body that is not JSON at all
+     ↓ bounds the season a caller may name
+     ↓ still declares the ISR window and prerenders every season
+     ↓ is reachable without a session, like the other machine-to-machine route
+     ↓ is told the cluster size by the supervisor, since a worker cannot derive it
+     ↓ decides the exit code AFTER the run returns, so a cache failure costs no data
+     ↓ reaches the boundary only after runSettleAfltables has returned
+     ↓ accepts only the loopback forms this deployment can emit
+     ↓ calls a real non-loopback address remote, whatever family it is in
+     ↓ refuses anything that is not an address, including octal-looking octets
+     ↓ refuses a chain rather than picking a hop out of it
+     ↓ reports an absent header as absent rather than as an address
+     ↓ serves loopback and absent, and nothing else
+     ↓ deploy/Caddyfile overwrites X-Forwarded-For on every proxy block
+     ↓ deploy/Caddyfile.production overwrites X-Forwarded-For on every proxy block
+     ↓ deploy/Caddyfile never appends or forwards a client-supplied hop
+     ↓ deploy/Caddyfile.production never appends or forwards a client-supplied hop
+     ↓ deploy/Caddyfile drops the other client-supplied address headers
+     ↓ deploy/Caddyfile.production drops the other client-supplied address headers
+       ↓ deploy/Caddyfile defines the redacting log format with the invite, query and Referer rules
+       ↓ deploy/Caddyfile.production defines the redacting log format with the invite, query and Referer rules
+       ↓ deploy/Caddyfile imports it in every log block and in the global default log
+       ↓ deploy/Caddyfile.production imports it in every log block and in the global default log
+       ↓ deploy/Caddyfile no longer claims query strings are absent without removing them
+       ↓ deploy/Caddyfile.production no longer claims query strings are absent without removing them
+     ↓ deploy/Caddyfile redacts the invite token in any spelling of the raw target
+     ↓ deploy/Caddyfile.production redacts the invite token in any spelling of the raw target
+     × deploy/Caddyfile redacts the token and query in the logged Location and Refresh response headers 25ms
+     × deploy/Caddyfile.production redacts the token and query in the logged Location and Refresh response headers 2ms
+       ↓ deploy/Caddyfile defines the four layers on the raw request target
+       ↓ deploy/Caddyfile.production defines the four layers on the raw request target
+       ↓ deploy/Caddyfile matches the raw target, never the decoded or cleaned path
+       ↓ deploy/Caddyfile.production matches the raw target, never the decoded or cleaned path
+       ↓ deploy/Caddyfile imports the snippet before the proxy in the application block
+       ↓ deploy/Caddyfile.production imports the snippet before the proxy in the application block
+       ↓ keeps the two Caddyfiles on the same snippet body
+     ↓ binds the application to loopback, so the proxy is the only way in
+     ↓ relies on Next filling x-forwarded-for only when the proxy did not
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the reverse-proxy contract the loopback gate rests on > deploy/Caddyfile redacts the token and query in the logged Location and Refresh response headers
+ FAIL  tests/settle-season-revalidation.test.ts > AFLDB-ISSUE-134 — the reverse-proxy contract the loopback gate rests on > deploy/Caddyfile.production redacts the token and query in the logged Location and Refresh response headers
+AssertionError: Location: expected '' to contain '(?:/|%2f|[\\]|%5c)+[^?#]*" "invite/RE…'
+
+- Expected
++ Received
+
+- (?:/|%2f|[\\]|%5c)+[^?#]*" "invite/REDACTED"
+
+ ❯ tests/settle-season-revalidation.test.ts:1121:29
+    1119|     for (const header of ['Location', 'Refresh']) {
+    1120|       const block = snippet.match(new RegExp(`resp_headers>${header} m…
+    1121|       expect(block, header).toContain('(?:/|%2f|[\\\\]|%5c)+[^?#]*" "i…
+       |                             ^
+    1122|       expect(block, header).toContain('regexp "\\?.*$" ""');
+    1123|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 84 skipped (86)
+   Start at  18:40:34
+   Duration  1.45s (transform 691ms, setup 220ms, import 799ms, tests 32ms, environment 0ms)
+
+red rc=1

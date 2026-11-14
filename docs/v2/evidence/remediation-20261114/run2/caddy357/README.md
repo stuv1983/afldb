@@ -445,3 +445,13 @@ Procedure:
 8. After success: record the new installed `sha256sum` and the commit in the deployment record. At launch add
    `import afldb_path_shape` to the apex block (section 6 step 8); widen the match cap when `max(matches.id)` nears
    20,000.
+
+## 11. Orchestrator addendum: REVIEW-D LOW-4 (redirect response headers)
+
+The redaction now also covers the logged `Location` and `Refresh` response headers (commit `cdf2bce5`; evidence and red/green
+in `low4/README.md`). **The final file sha256 values supersede section 10's:**
+
+- `deploy/Caddyfile.production` `f00859d5c834be09f064d516ea4fa12612da379e377128e784b3523016a6086d`
+- `deploy/Caddyfile`           `4a4dc08e0855242782291abecb72cd24a7e92a198532b3a48b18bda84fe66d33`
+
+Section 10's procedure is otherwise unchanged; step 3's `sha256sum` must equal the production value above.

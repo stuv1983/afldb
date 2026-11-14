@@ -1,7 +1,7 @@
 # Procedure 06: Caddy access-log redaction and the pre-fix logs (ISSUE-362: O-3 install, then O-1 old logs)
 
 > **Orchestrator note (run 2 integration, review REVIEW-C MED-2):** the candidate `deploy/Caddyfile.production`
-> (sha256 `5078bc975a2128d32a09b07887420ec06bc919e66fc3978ddbfcf53e109eed5e`) carries three changes: the ISSUE-362 log
+> (sha256 `f00859d5c834be09f064d516ea4fa12612da379e377128e784b3523016a6086d` after REVIEW-D LOW-4, `caddy357/README.md` §11) carries three changes: the ISSUE-362 log
 > filter, the beta-host HSTS/CSP headers the installed file lacks, and the ISSUE-357 path-shape deny. **The single
 > install procedure (O-3 + ISSUE-357 O-1) is `run2/caddy357/README.md` §10** (one backup name, prerequisites, validate
 > as `caddy`, one owner reload, every probe, one rollback). Do not install with §2 below on its own. §1 facts and §3

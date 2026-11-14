@@ -1,0 +1,65 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem2-int-20261114/loc-probe/co
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > invalidates exactly the season page it was given
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 1962112)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > reports the worker identity the caller needs to prove coverage
+[revalidate-season] /seasons/2026 invalidated on worker 3 (pid 1962112)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > reports a single-process server truthfully rather than guessing
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 1962112)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > takes the worker identity from process state, never from the request
+[revalidate-season] /seasons/2026 invalidated on worker 2 (pid 1962112)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > refuses to believe a nonsensical worker count rather than reporting it
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 1962112)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > refuses to believe a nonsensical worker count rather than reporting it
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 1962112)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > refuses to believe a nonsensical worker count rather than reporting it
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 1962112)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > refuses to believe a nonsensical worker count rather than reporting it
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 1962112)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > refuses to believe a nonsensical worker count rather than reporting it
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 1962112)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > serves a loopback caller carrying the forwarding headers Next synthesises
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 1962112)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > serves every loopback form the deployment can emit
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 1962112)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > serves every loopback form the deployment can emit
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 1962112)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > serves every loopback form the deployment can emit
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 1962112)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > serves every loopback form the deployment can emit
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 1962112)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > serves every loopback form the deployment can emit
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 1962112)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > ignores x-forwarded-host, which is client input on every path
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 1962112)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > serves a request with no forwarding identity at all
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 1962112)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > charges only failed secret checks against the limiter
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 1962112)
+
+ ✓ tests/settle-season-revalidation.test.ts (86 tests) 190ms
+
+ Test Files  1 passed (1)
+      Tests  86 passed (86)
+   Start at  18:40:36
+   Duration  1.50s (transform 652ms, setup 180ms, import 777ms, tests 190ms, environment 0ms)
+
+green rc=0
