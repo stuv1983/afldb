@@ -20,15 +20,15 @@ export LC_ALL=C
 umask 077
 export PATH="$HOME/.nvm/versions/node/v22.23.2/bin:$PATH"
 export PYTHON=/home/arm/i250/afldb/.venv/bin/python AFLDB_PYTHON=/home/arm/i250/afldb/.venv/bin/python AFLDB_TEST_PYTHON=/home/arm/i250/afldb/.venv/bin/python
-WS="${WS:-/mnt/ssd/afldb-rem3-integ-20261114}"
-PORT="${AFLDB_V2_PG_PORT:-55673}"
+WS="${WS:-/mnt/ssd/afldb-rem3-integb-20261114}"
+PORT="${AFLDB_V2_PG_PORT:-55675}"
 case "$PORT" in 5432|55432|55651|55660) echo "forbidden port $PORT" >&2; exit 2 ;; esac
 export AFLDB_V2_PG_ROOT="$WS-pg" AFLDB_V2_PG_BIN=/usr/lib/postgresql/16/bin AFLDB_V2_PG_PORT="$PORT"
 CAND="$WS/cand"; B="$WS/brownlow"; X="$B/in"; LOCK=/mnt/ssd/afldb-rem3-base/heavy.lock
 case "${1:-}" in all) E="${2:-$WS/evidence}/brownlow" ;; *) E="$WS/evidence/brownlow" ;; esac
 PGBIN=$AFLDB_V2_PG_BIN
 SRC=/home/arm/afldb-v2-brownlowverify-20261028
-TPL=afldb_v2_rem3integ_bl2025_tmpl_test
+TPL=afldb_v2_rem3integb_bl2025_tmpl_test
 FR=$B/fixture/fixture-root
 mkdir -p "$E"
 say() { echo "$(date -u +%FT%TZ) $*" | tee -a "$E/brownlow.log"; }

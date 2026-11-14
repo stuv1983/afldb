@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ISSUE-363 run 3, scope `integ`, phase B runner: the integration suites that are pinned to a rebuilt `afldb_test`, run on the
+# ISSUE-363 run 3, scope `integb` (phase B), runner: the integration suites that are pinned to a rebuilt `afldb_test`, run on the
 # sibling scope's rebuilt database (published under /mnt/ssd/afldb-rem3-base/rebuilt/) instead of the 4 Nov production snapshot.
 #
 #   run-rebuilt.sh --dump <rebuilt.dump> --sha256 <64 hex> --bridge <child.json> [options]
@@ -13,8 +13,8 @@
 #                       `oracle6` group uses, as RESTORE.md "DraftGuru bridge child" prescribes)
 # Options
 #   --restore-md <path> override RESTORE.md (default: <dump dir>/RESTORE.md); copied into the evidence with its sha256
-#   --workspace <dir>   default /mnt/ssd/afldb-rem3-integ-20261114 (checkout in <dir>/cand, cluster in <dir>-pg)
-#   --port <n>          default 55673 (refused: 5432, 55432, 55651, 55660, anything below 1024 or above 65535)
+#   --workspace <dir>   default /mnt/ssd/afldb-rem3-integb-20261114 (checkout in <dir>/cand, cluster in <dir>-pg)
+#   --port <n>          default 55675 (refused: 5432, 55432, 55651, 55660, anything below 1024 or above 65535)
 #   --tag <label>       evidence directory <workspace>/evidence/b-<label> (default: UTC timestamp)
 #   --groups <list>     comma list of: restore,oracle6,data-editor,awards,war-years,coleman,issue276,od5,brownlow
 #                       (default: all but brownlow; `restore` must have run once on this cluster before any other group)
@@ -35,7 +35,7 @@
 # by the stateb scope) and the war-years id with what this run observed; template-identity.txt holds the base's aggregates.
 set -euo pipefail
 
-DUMP="" SHA="" BRIDGE="" RESTORE_MD="" WS=/mnt/ssd/afldb-rem3-integ-20261114 PORT=55673 TAG="" GROUPS_ARG=""
+DUMP="" SHA="" BRIDGE="" RESTORE_MD="" WS=/mnt/ssd/afldb-rem3-integb-20261114 PORT=55675 TAG="" GROUPS_ARG=""
 WITH_BROWNLOW=0 BASELINE="" KEEP=0 DRY=0
 LOCK=/mnt/ssd/afldb-rem3-base/heavy.lock
 DG_SRC=/home/arm/projects/afldb/data/sources/draftguru/annual-html-20260826   # DEV checkout data: READ ONLY (copy only)
@@ -71,7 +71,7 @@ case "$PORT" in 5432|55432|55651|55660) die "--port $PORT is forbidden (shared/D
 [ -z "${AFLDB_TEST_DATABASE_URL:-}" ] || die "an ambient AFLDB_TEST_DATABASE_URL is set: refused (every database command must go through isolated-pg run)"
 [ -f "$DUMP" ] || die "--dump not found: $DUMP"
 [ -f "$BRIDGE" ] || die "--bridge not found: $BRIDGE"
-case "$WS" in /mnt/ssd/afldb-rem3-integ-*) ;; *) die "--workspace must be this scope's /mnt/ssd/afldb-rem3-integ-* directory" ;; esac
+case "$WS" in /mnt/ssd/afldb-rem3-integb-*) ;; *) die "--workspace must be this scope's /mnt/ssd/afldb-rem3-integb-* directory" ;; esac
 CAND="$WS/cand"
 [ -d "$CAND/.git" ] || die "no checkout at $CAND (run in/setup.sh first)"
 [ ! -e "$CAND/.env" ] || die "$CAND/.env exists (the workspace must contain no .env)"
@@ -131,8 +131,8 @@ grep "pid=$PM," "$EV/listener.txt" >/dev/null || die "the listener on $PORT is n
 cp "$RESTORE_MD" "$EV/RESTORE.md.txt"; sha256sum "$RESTORE_MD" > "$EV/RESTORE.md.sha256"
 grep -E 'fitzRoy baseline|ledger head|DraftGuru|commit ' "$RESTORE_MD" | head -6 > "$EV/rebuild-identity-quote.txt" || true
 
-TMPL=afldb_v2_rem3integ_rb_tmpl_test            # the pristine restored rebuild
-TMPLB=afldb_v2_rem3integ_rb_bridged_test        # the same, with the DraftGuru bridge child imported (RESTORE.md)
+TMPL=afldb_v2_rem3integb_rb_tmpl_test            # the pristine restored rebuild
+TMPLB=afldb_v2_rem3integb_rb_bridged_test        # the same, with the DraftGuru bridge child imported (RESTORE.md)
 mkcopy() { IR create-db "$1" --template "${2:-$TMPL}" 2>&1 | strip | tail -1; }
 
 # vitest summary and failing ids (file<TAB>full name<TAB>first line of the message)
@@ -217,48 +217,48 @@ console.log(bad);' "$CAND/docs/rebuild-manifests/draftguru/annual-html-20260826.
 fi
 
 if want oracle6; then
-  B=afldb_v2_rem3integ_b_oracle_test; mkcopy "$B" "$TMPLB"
+  B=afldb_v2_rem3integb_b_oracle_test; mkcopy "$B" "$TMPLB"
   HEAVY=1 pf "$B" oracle6 7200 tests/integration/club-comparison.test.ts tests/integration/database.test.ts tests/integration/draft-linkage.test.ts \
      tests/integration/admin-brownlow.test.ts tests/integration/gridley-corpus.test.ts tests/integration/release-gates.test.ts
 fi
 if want data-editor; then
-  B=afldb_v2_rem3integ_b_de_test; mkcopy "$B"
+  B=afldb_v2_rem3integb_b_de_test; mkcopy "$B"
   pf "$B" data-editor 3600 tests/integration/data-editor.test.ts
 fi
 if want awards; then
-  B=afldb_v2_rem3integ_b_aw_test; mkcopy "$B"
+  B=afldb_v2_rem3integb_b_aw_test; mkcopy "$B"
   pf "$B" awards 3600 tests/integration/awards-reload-links.test.ts
 fi
 if want war-years; then
   for n in 1 2 3; do
-    D=afldb_v2_rem3integ_b_war${n}_test; mkcopy "$D"
+    D=afldb_v2_rem3integb_b_war${n}_test; mkcopy "$D"
     vt "$D" "war-shared-$n" 1800 tests/integration/database.test.ts
   done
-  B=afldb_v2_rem3integ_b_warpf_test; mkcopy "$B"
+  B=afldb_v2_rem3integb_b_warpf_test; mkcopy "$B"
   pf "$B" war-perfile 1800 tests/integration/database.test.ts
   # the mechanism check (phase A): settle-afl-api-brownlow first, then the war-years case, on one shared copy
-  M=afldb_v2_rem3integ_b_warmech_test; mkcopy "$M"
+  M=afldb_v2_rem3integb_b_warmech_test; mkcopy "$M"
   vt "$M" war-mech-settle 2400 tests/integration/settle-afl-api-brownlow.test.ts
   vt "$M" war-mech-after 1200 tests/integration/database.test.ts -t 'separates the war years'
 fi
 if want coleman; then
   # (a) the rebuilt base (per-file copy): records whether it holds a Coleman 2001 row (the suite refuses if so, by design)
-  B=afldb_v2_rem3integ_b_cole_test; mkcopy "$B"
+  B=afldb_v2_rem3integb_b_cole_test; mkcopy "$B"
   pf "$B" coleman-rebuilt 1800 tests/integration/v2-coleman-publication.test.ts
   # (b) the suite's documented base: a schema-only database (docs/v2/final-report.md:86, local-release-review.md:289-290)
-  S=afldb_v2_rem3integ_b_coleschema_test
+  S=afldb_v2_rem3integb_b_coleschema_test
   IR create-db "$S" 2>&1 | strip | tail -1
   (cd "$CAND" && node --import tsx tools/v2/isolated-pg.ts run "$S" -- node --import tsx tools/db/migrate.ts --target test) > "$EV/coleschema-migrate.log" 2>&1 || die "schema-only migrate failed"
   (cd "$CAND" && node --import tsx tools/v2/isolated-pg.ts run "$S" -- node --import tsx tools/db/privileges.ts --target test) > "$EV/coleschema-privileges.log" 2>&1 || die "schema-only privileges failed"
   vt "$S" coleman-schema-only 1800 tests/integration/v2-coleman-publication.test.ts
 fi
 if want issue276; then
-  B=afldb_v2_rem3integ_b_276_test; mkcopy "$B"
+  B=afldb_v2_rem3integb_b_276_test; mkcopy "$B"
   pf "$B" issue276 1800 tests/integration/settle-afl-api-issue276.test.ts
 fi
 if want od5; then
   # a dedicated afldb_v2_rb_<x>_test clone (never the rebuilt base itself), shared mode, the exact -t filter
-  D=afldb_v2_rb_rem3io5_test; mkcopy "$D"
+  D=afldb_v2_rb_rem3bio5_test; mkcopy "$D"
   # -t is a regex: the parentheses in the case name must be escaped or the filter matches nothing (all 74 cases skip)
   vt "$D" od5 3600 tests/integration/settle-afl-api.test.ts -t 'OD-5 reinstate \(rolled back, no rebuild\)'
 fi
