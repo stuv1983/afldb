@@ -1,4 +1,52 @@
-# Remediation run 2026-11-14 — handoff (run complete; candidate local, not published)
+# Remediation run 2026-11-14 — handoff (runs 1 and 2 complete; candidate local, not published)
+
+## Run 2 (2026-11-14, read this first)
+
+**Start from `run2/APPROVAL-PACKET-2.md`** (it supersedes `APPROVAL-PACKET.md`). Records:
+- `run2/QUALIFICATION-2.md` (final checks at executable revision **`f10e47ad`**);
+- `run2/RESIDUALS.md` (every residual, none accepted on the owner's behalf);
+- `run2/REVIEW-C.md` and `run2/REVIEW-D.md` (independent reviews, all MED fixed);
+- `run2/RUN-PLAN-2.md`, `run2/PLAN-REVIEW-2.md`;
+- scope READMEs under `run2/<scope>/`;
+- corrections appended to `QUALIFICATION.md` §7.
+
+**Nothing was pushed, merged, deployed, installed, restarted or written on production or DEV.**
+
+| Issue | State after run 2 |
+|---|---|
+| 353, 356, 359, 360, 361 | resolved locally (run 1). Run-2 residual fixes are **fixed locally and qualified**, awaiting publication. 353 has owner decision O-A05-1 (recommended: leave); 361 has O-B06-1/2 |
+| 357 | open: **fixed locally** (Caddy deny), qualified, **awaiting publication and installation** (B7); MED residual; operational acceptance is the owner's |
+| 362 | open: fixed locally (B-05, redaction in any spelling and in the redirect headers); **awaiting publication, installation (B7) and the owner's log decision (B8)** |
+| 363 | open: decisions (1)+(2) **fixed locally and qualified**; decision (3) **awaiting a rebuilt `afldb_test`**; `state-b` follow-up |
+| 364 | open: gate wired as a ratchet, **fixed locally and qualified**; **awaiting owner acceptance** of the merge-time ratchet as O-2 |
+| 332 | open: pull check prepared; **awaiting owner decision** (D-332-1 option A, G0b/G0c) and installation (B3) |
+| 350, 351, 352 | open: procedures written; **awaiting publication, release and the owner's operations** B2, B4, B5, B6 |
+| 348 | open: unchanged by run 2 |
+
+**Run-2 commits** (dependency order, `git log --reverse e8666c17..claude/remediation-20261114`):
+1. Plan: `d380cc7c`.
+2. lint364: `c79d7d06`, `c2c57443`, `bb78fae7`.
+3. Fixtures: `3234875e`.
+4. Ops: `eecea3b7`, `87615e80`, `c78ead61`.
+5. Evidence: `3cda9127` … `697c6f55`.
+6. Public: `f06cb3c8`, `a7c04ea7`, `bb0ad0d9`, `5497cbd5`, `66376ac4`.
+7. Admin: `c0e7e9a7`, `8015f590`, `7f6ce0f6`, `628c215c`.
+8. caddy357: `e9554f81`, `52efe47e`.
+9. REVIEW-C and its fixes: `378f7d75`, `547444c6`, `8bbe7b62`, `e03d0d5b`, `c3984b99`, `42637e58`, `a563320a`, `3e158e14`, `8e65d0ec`.
+10. ISSUE-363: `fb9e94a6`, `20280244`, `acd3a8c9`.
+11. REVIEW-D and its fixes: `cdf2bce5`, `48cc4af3`, `88e14e6a`, `26844758`, `0efb276d`, `ade11cc6`, `2e95612f`, `f10e47ad` (**Q**, last code change).
+12. Records only after Q: `0f5ca7ee`, then the commits adding `QUALIFICATION-2.md`, the ledger sync and this packet.
+
+Scope commits were cherry-picked from `claude/rem2-<scope>-20261114`.
+
+**Housekeeping (run 2):**
+- Host workspaces `/mnt/ssd/afldb-rem2-<scope>-20261114` and `/mnt/ssd/afldb-rem2-int-20261114` are **left in place**, with their clusters stopped. Sizes: public about 23 G, tests363 about 7 G, int and caddy357 also present. Scratch `D:\tmp\afldb-rem2-<scope>\` and the worktrees `D:\dev\afldb-rem2-<scope>` are left in place.
+- The heavy lock file `/mnt/ssd/afldb-rem2-base/heavy.lock` and the base bundle are kept.
+- DEV is unchanged: `run2/DEV-STATE-AFTER-2.txt` against `run2/DEV-STATE-BEFORE-2.txt`.
+
+---
+
+## Run 1 (as recorded at `e8666c17`)
 
 Integration branch `claude/remediation-20261114` in worktree `D:\dev\afldb-rem-20261114`. It is based on review commit
 `5035ed96`, which sits on `origin/main` `de640826`. **Nothing was pushed, merged, deployed, installed, restarted or written on

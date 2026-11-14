@@ -1,5 +1,9 @@
 # Remediation run 2026-11-14 — approval packet
 
+> **SUPERSEDED (2026-11-14, remediation run 2) by `run2/APPROVAL-PACKET-2.md`.** Do not approve from this file: its candidate, pins,
+> B3 (notifier: it delivers nothing on its own) and B7 (the Caddy install is now one combined file with a different hash) are
+> out of date. It is kept unchanged below as the run-1 record.
+
 One packet, two kinds of approval: **A. publication** (Git only), then **B. production operations**, each a separate owner
 approval in the order given. Nothing in this packet has been executed. Pins below were read on 2026-11-14 (read-only) and
 must be re-read immediately before each step; any difference is a stop.
