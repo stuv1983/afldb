@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# MED-1/LOW-4 follow-up: committed-form copies (ANSI stripped, DSN lines removed, LF) of the new raw outputs under $E/pack3/raw
+set -u -o pipefail
+W=/mnt/ssd/afldb-rem2-public-20261114
+E=$W/evidence; P=$E/pack3
+rm -rf $P; mkdir -p $P/raw
+put() { # <src> <dest name>
+  [ -f "$1" ] || { echo "MISSING $1"; return; }
+  case "$1" in
+    *.jsonl|*.json) tr -d '\r' < "$1" | grep -a -v -i 'postgres://' > "$P/raw/$2";;
+    *) sed 's/\x1b\[[0-9;]*m//g' "$1" | tr -d '\r' | grep -a -v -i 'postgres://' > "$P/raw/$2";;
+  esac
+}
+put $W/in/q-med1.txt med1-questions.txt
+put $W/in/q-med1b.txt med1b-questions.txt
+put $E/probe-med1-red.jsonl med1-probe-red-cb75e3b3.jsonl
+put $E/probe-med1-green-final.jsonl med1-probe-green-a65ca3b4.jsonl
+put $E/probe-med1b-green-final.jsonl med1b-probe-green-a65ca3b4.jsonl
+put $E/med1-unit-red.keep med1-unit-red-cb75e3b3.txt
+put $E/med1b-unit-red.keep med1b-unit-red-1333f04f.txt
+put $E/med1b-unit-green.out med1b-unit-green-cand.txt
+put $E/med1-int-red.out med1-int-red-cb75e3b3.txt
+put $E/qual3-run.out med1-qual3-static-run.txt
+put $E/qual3b-run.out med1-qual3-run.txt
+put $E/qual3/static-tsc.txt med1-qual3-static-tsc.txt
+put $E/qual3/static-eslint.txt med1-qual3-static-eslint.txt
+put $E/qual3/static-eslint-files.txt med1-qual3-static-eslint-files.txt
+put $E/qual3/unit-focused.log med1-qual3-unit-focused.txt
+for j in k1 k2 k4 k5 k6 k7 k8; do put $E/qual3/integ-$j.log med1-qual3-integ-$j.txt; done
+put $E/corpus-fix4/run.log med1-corpus-fix4-run.txt
+put $E/corpus-fix4/parse/summary.json med1-corpus-fix4-parse-summary.json
+cp $E/corpus-diff4-vs-base.txt $P/raw/med1-corpus-diff-vs-base.txt
+cp $E/corpus-diff4-vs-base.jsonl $P/raw/med1-corpus-diff-vs-base.jsonl
+cp $E/corpus-diff4-vs-cb75.txt $P/raw/med1-corpus-diff-vs-cb75.txt
+cp $E/corpus-diff4-vs-cb75.jsonl $P/raw/med1-corpus-diff-vs-cb75.jsonl
+cp $E/corpus-hashes4.txt $P/raw/med1-corpus-hashes.txt
+cp $E/corpus-round-shapes.txt $P/raw/med1-corpus-round-shapes.txt
+(cd $P/raw && ls -l | awk '{print $5, $9}')

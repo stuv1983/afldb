@@ -1,0 +1,15 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem2-public-20261114/cand
+
+ ✓ tests/nl-parser.test.ts (681 tests) 827ms
+ ✓ tests/nl-audit-acceptance.test.ts (10 tests) 240ms
+ ✓ tests/nl-plan.test.ts (224 tests) 109ms
+ ✓ tests/nl-describe.test.ts (94 tests) 91ms
+ ✓ tests/query-intent.test.ts (47 tests) 45ms
+
+ Test Files  5 passed (5)
+      Tests  1056 passed (1056)
+   Start at  17:33:36
+   Duration  4.13s (transform 934ms, setup 340ms, import 1.23s, tests 1.31s, environment 1ms)
+
+rc=0

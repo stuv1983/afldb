@@ -1,0 +1,77 @@
+isolated-pg: afldb_v2_rem2public_m1red_test verified (cluster afldb_v2_isolated, 127.0.0.1:55654); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem2-public-20261114/cand
+
+ ❯ tests/integration/nl-semantic-mapping.test.ts (42 tests | 5 failed) 5739ms
+     ✓ returns exact counts and last draw for record 31ms
+     ✓ returns exact counts and last draw for compare_wins 15ms
+     ✓ returns exact counts and last draw for draw_count 15ms
+     ✓ returns exact counts and last draw for last_draw 15ms
+     ✓ ranks games played for the requested organization lineage rather than whole-career games  1596ms
+     ✓ filters organization-lineage appearances with gte rather than whole-career games 88ms
+     ✓ filters organization-lineage appearances with gt rather than whole-career games 83ms
+     ✓ filters organization-lineage appearances with eq rather than whole-career games 83ms
+     ✓ orders and projects a club-scoped list by lineage appearances 112ms
+     ✓ preserves whole-career games projection when no club scope is present 5ms
+     ✓ resolves Jr/Jnr/Junior to the exact junior player and keeps senior distinct 190ms
+     ✓ richmond wins against carlton parses to head_to_head/record and answers with the existing record payload 31ms
+     ✓ richmond losses against carlton parses to head_to_head/record and answers with the existing record payload 24ms
+     ✓ bulldogs, dogs, footscray and western bulldogs are one directory entry 9ms
+     ✓ an ordinary organization-backed answer works through the bare alias  1692ms
+     ✓ a same-organization head-to-head through aliases refuses honestly 9ms
+     ✓ a draw question resolves the alias into the typed matchup 8ms
+     ✓ matches an exact alias, keeps the canonical title, and exposes the alias as matchedName 6ms
+     ✓ returns a player once when the primary name and its primary-name alias both match, preferring the primary form 6ms
+     ✓ keeps exact canonical-name ranking for a player with no aliases 6ms
+     ✓ resolves an alternate alias through the database-backed NL path to the canonical player 15ms
+     ✓ still declines an unrelated leftover token beside a valid alias match 63ms
+     ✓ ranks the complete 6-identity family and picks the true leader; the old 5-row resolver could not have 54ms
+     ✓ more than 12 plausible identities declines as ambiguous through the real resolver boundary 47ms
+     ✓ a 2-identity family (the smallest ambiguous case) resolves through the real resolver boundary 46ms
+     ✓ a 13-identity family with 2 hyphenated-surname members declines as ambiguous through the real resolver boundary 47ms
+     ✓ a 12-identity family with 2 hyphenated-surname members ranks completely, and a hyphenated member is the true leader 54ms
+     ✓ a full-name mention of a hyphenated-surname player resolves to that player, not a same-given-name decoy with more games 13ms
+     ✓ a full-name mention of an apostrophe-surname player resolves to that player, not a same-given-name decoy with more games 10ms
+     ✓ "round most goals" answers for the Round family 85ms
+     ✓ "round's career goals" answers for the Round family 61ms
+     ✓ "most goals in a round" still declines: the period noun is not a player 8ms
+     ✓ "most disposals in a round" still declines: the period noun is not a player 8ms
+     ✓ "most goals in the round" still declines: the period noun is not a player 11ms
+     ✓ "most wins in a round" still declines: the period noun is not a player 8ms
+     ✓ "most goals by round" still declines: the period noun is not a player 7ms
+     × "round with most goals" still declines: the period noun is not a player 91ms
+     × "round with the most goals" still declines: the period noun is not a player 75ms
+     × "round of most goals" still declines: the period noun is not a player 78ms
+     × "round for most goals" still declines: the period noun is not a player 77ms
+     × "round that had the most goals" still declines: the period noun is not a player 77ms
+     ✓ "most goals in round 5" is untouched: a round filter, not a player 7ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/nl-semantic-mapping.test.ts > Review B-03: a bare "round" is a surname only where the question reads it as a person > "round with most goals" still declines: the period noun is not a player
+ FAIL  tests/integration/nl-semantic-mapping.test.ts > Review B-03: a bare "round" is a surname only where the question reads it as a person > "round with the most goals" still declines: the period noun is not a player
+ FAIL  tests/integration/nl-semantic-mapping.test.ts > Review B-03: a bare "round" is a surname only where the question reads it as a person > "round of most goals" still declines: the period noun is not a player
+ FAIL  tests/integration/nl-semantic-mapping.test.ts > Review B-03: a bare "round" is a surname only where the question reads it as a person > "round for most goals" still declines: the period noun is not a player
+ FAIL  tests/integration/nl-semantic-mapping.test.ts > Review B-03: a bare "round" is a surname only where the question reads it as a person > "round that had the most goals" still declines: the period noun is not a player
+AssertionError: {"v":1,"grain":"player_career","metric":"goals","agg":{"kind":"max"},"scope":{"playerIdIn":[1030,8950,3567]},"careerConditions":[],"careerPredicates":[],"clubSeasonConditions":[],"tiePolicy":"all","limit":25}: expected 'plan' to be 'none' // Object.is equality
+
+Expected: "none"
+Received: "plan"
+
+ ❯ tests/integration/nl-semantic-mapping.test.ts:989:88
+    987|     const ctx = await buildNlParseContext();
+    988|     const parsed = await parseNlQuestion(question, ctx);
+    989|     expect(parsed.status, parsed.status === 'plan' ? JSON.stringify(pa…
+       |                                                                                        ^
+    990|     expect(parsed.report.entityResolution).toEqual([]);
+    991|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 37 passed (42)
+   Start at  17:19:57
+   Duration  7.61s (transform 1.22s, setup 225ms, import 1.39s, tests 5.74s, environment 0ms)
+
+rc=1

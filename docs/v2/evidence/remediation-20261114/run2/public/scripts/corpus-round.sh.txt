@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+C=/mnt/ssd/afldb-rem-nl-20261114/in/nl-stress-corpus-v5.csv
+echo -n "rows containing the whole word round (any case): "; grep -c -i -w round "$C"
+echo -n "rows with round as the first word of the question: "; grep -c -i -E '(^|,)"?round[ ]' "$C"
+echo "samples:"; grep -i -w round "$C" | head -5 | cut -c1-160

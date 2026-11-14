@@ -1,0 +1,68 @@
+##### unit 07:17:21
+ Test Files  9 passed (9)
+      Tests  1170 passed (1170)
+unit-focused rc=0
+##### integ 07:17:28
+== tests/integration/nl-semantic-mapping.test.ts
+ Test Files  1 passed (1)
+      Tests  42 passed (42)
+rc=0
+== tests/integration/club-comparison-route.test.ts
+ Test Files  1 passed (1)
+      Tests  31 passed (31)
+rc=0
+== tests/integration/nl-answers.test.ts
+ Test Files  1 passed (1)
+      Tests  33 passed (33)
+rc=0
+== tests/integration/nl-answers-game-season.test.ts
+ Test Files  1 passed (1)
+      Tests  24 passed (24)
+rc=0
+== tests/integration/nl-answers-team-club.test.ts
+ Test Files  1 passed (1)
+      Tests  36 passed (36)
+rc=0
+== tests/integration/nl-answer-boundary.test.ts
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+rc=0
+== tests/integration/nl-vocab.test.ts
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+rc=0
+##### corpus 07:18:47
+tag=fix3 head=a65ca3b48a38684d5de2ce7f1f6590b07550f6d7 dirty=0
+corpus sha256=f8a7f42a7eb106b6b1880f7eb203b0d86f875c491d936a0e2c0806128d339bff
+create-db: afldb_v2_rem2public_corpusfix3_test created from afldb_v2_rem2public_tmpl_test and marked
+== parse-only 07:18:50
+parse rc=0
+== done 07:19:00
+{
+  "corpus": "/mnt/ssd/afldb-rem-nl-20261114/in/nl-stress-corpus-v5.csv",
+  "database": "afldb_v2_rem2public_corpusfix3_test",
+  "mode": "parse only",
+  "parserVersion": 69,
+  "concurrency": 6,
+  "ran": "2026-11-14T07:19:00.405Z",
+  "wallClockSeconds": 8,
+  "inputRows": 12000,
+  "auditRequired": 0,
+  "total": 12000,
+  "pass": 12000,
+  "softFail": 0,
+  "fail": 0,
+  "noResults": 0,
+  "errors": 0,
+  "byClass": {}
+}
+5bc9e325a143c2b097072e0a8677e3b8f6f1a0cb911983507f95f7a99869821f  corpus-fix3/parse/results.jsonl
+fbfe4b9d066e738d18d0aa75277f836235f3e1d6ebd145ffe535aa3257347463  corpus-base/parse/results.jsonl
+158a1ad60222ceb7ef69c64fe71abf45a5c1b2ed3a3f9f3bda507eca96652d96  corpus-fix/parse/results.jsonl
+### fix3 (a65ca3b4) vs base (e8666c17, v68)
+base=12000 fix=12000 identical=12000 changed=0
+{}
+### fix3 (a65ca3b4) vs fix (cb75e3b3 v69)
+base=12000 fix=12000 identical=12000 changed=0
+{}
+##### done 07:19:01

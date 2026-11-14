@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# clean single corpus run on the clean qual checkout (a65ca3b4); replaces the corpus-fix3 run, whose run.log was clobbered by a second qual3 runner
+set -u -o pipefail
+export W=/mnt/ssd/afldb-rem2-public-20261114
+export PATH="$HOME/.nvm/versions/node/v22.23.2/bin:$PATH"
+export AFLDB_V2_PG_ROOT=$W/pg-root AFLDB_V2_PG_BIN=/usr/lib/postgresql/16/bin AFLDB_V2_PG_PORT=55654
+Q=$W/qual
+cd $Q && echo "qual HEAD=$(git rev-parse HEAD) porcelain=$(git status --porcelain | wc -l)"
+bash $W/in/corpus-parse.sh fix4 $Q corpusfix4 | tail -22
+cd $W/evidence
+rm -f corpus-hashes4.txt
+sha256sum corpus-fix4/parse/results.jsonl corpus-base/parse/results.jsonl corpus-fix/parse/results.jsonl | tee corpus-hashes4.txt
+echo "### fix4 (a65ca3b4) vs base (e8666c17, v68)"
+SHOW=40 node $W/in/corpus-diff.mjs corpus-base/parse/results.jsonl corpus-fix4/parse/results.jsonl corpus-diff4-vs-base.jsonl | tee corpus-diff4-vs-base.txt
+echo "### fix4 (a65ca3b4) vs fix (cb75e3b3 v69)"
+SHOW=40 node $W/in/corpus-diff.mjs corpus-fix/parse/results.jsonl corpus-fix4/parse/results.jsonl corpus-diff4-vs-cb75.jsonl | tee corpus-diff4-vs-cb75.txt

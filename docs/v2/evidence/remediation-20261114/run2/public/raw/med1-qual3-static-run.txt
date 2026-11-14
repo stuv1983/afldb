@@ -1,0 +1,34 @@
+##### static 06:34:04
+tsc rc=0
+eslint rc=0
+
+/mnt/ssd/afldb-rem2-public-20261114/qual/src/search/nl/parser.ts
+  159:10  warning  'consume' is defined but never used  @typescript-eslint/no-unused-vars
+
+✖ 1 problem (0 errors, 1 warning)
+
+eslint rc=0
+tsc rc=0
+##### unit 07:22:45
+ Test Files  9 passed (9)
+      Tests  1170 passed (1170)
+unit-focused rc=0
+##### integ 07:22:52
+mk failed k1
+mk failed k2
+mk failed k4
+mk failed k5
+mk failed k6
+mk failed k7
+mk failed k8
+##### corpus 07:22:56
+5bc9e325a143c2b097072e0a8677e3b8f6f1a0cb911983507f95f7a99869821f  corpus-fix3/parse/results.jsonl
+fbfe4b9d066e738d18d0aa75277f836235f3e1d6ebd145ffe535aa3257347463  corpus-base/parse/results.jsonl
+158a1ad60222ceb7ef69c64fe71abf45a5c1b2ed3a3f9f3bda507eca96652d96  corpus-fix/parse/results.jsonl
+### fix3 (a65ca3b4) vs base (e8666c17, v68)
+base=12000 fix=12000 identical=12000 changed=0
+{}
+### fix3 (a65ca3b4) vs fix (cb75e3b3 v69)
+base=12000 fix=12000 identical=12000 changed=0
+{}
+##### done 07:22:57

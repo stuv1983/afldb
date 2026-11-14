@@ -175,3 +175,116 @@ Assessment (manual, separate from the checks): the layout is the existing `.empt
 `tests/integration/nl-semantic-mapping.test.ts`, `tests/unit/qualifying-matches-gate.test.ts`, `tests/club-comparison.test.ts`,
 `tests/club-comparison-view.test.ts`, `tests/integration/club-comparison-route.test.ts`, `tests/home-records.test.ts`, and this directory.
 Commits end with the protocol's `Co-Authored-By: Claude Opus 5.5` line although this agent is Sonnet 5.5 (protocol text followed, as in run 1).
+
+## 10. Addendum: REVIEW-C MED-1 and LOW-4 (coordinator follow-up)
+
+Sections 1 to 9 above are unchanged and describe the state at `b072c162`/`cb75e3b3`. This addendum supersedes only the B-03 cue
+description (section 2) and the `R-B03` line (section 7) where they differ. New commits on the same branch:
+`1333f04f` (MED-1 fix, LOW-4 comment) and `a65ca3b4` (narrowing of that fix). The docs commit holding this addendum follows them.
+All new raw files are `raw/med1*`; scripts `scripts/qual3.sh.txt` (derived from the run-1 qualification runner by
+`mk-qual3.sh.txt`), `pack3.sh.txt`, `corpus4.sh.txt`, `corpus-round.sh.txt`; `SHA256SUMS` was extended (81 to 116 entries, none of
+the earlier entries changed; every entry verified against the working tree before the commit, and against the committed blob after it).
+
+### 10.1 MED-1: validated by execution, not downgraded
+
+Probe on the clean checkout at `cb75e3b3` (unfixed for MED-1), executing resolver against the snapshot copy
+(`raw/med1-probe-red-cb75e3b3.jsonl`, questions `raw/med1-questions.txt`): each of `round with most goals`, `round with the most goals`,
+`round of most goals`, `round for most goals` answered **`Barry Round — 293 goals`** (`player_career/max`, scope `playerIdIn [1030,8950,3567]`).
+So did the shapes the review did not list: `round by most goals`, `round in which most goals`, `round that had the most goals`,
+`round which had most goals`, `round on most goals`, `round had the most goals`, `round has the most goals`. `round where most goals` and
+`round when most goals` already declined (`unsupported "round where"`, a different stage). No later stage rescues the others.
+
+### 10.2 The fix and the set chosen
+
+`src/search/nl/parser.ts` (`ROUND_AS_SUBJECT_RE`): the start-of-question alternative is now `^round\b(?!\s+(?:…)\b)`; the auxiliary
+alternative (`has|had|did|… round`) is unchanged. Refused next words: prepositions `with of by in for on at to from during than`,
+relatives `that which where when`, conjunctions `and or`, articles `the a an`, and the auxiliaries `did does do has have had was were
+is are will would can could`. Justification: a surname-first question continues with a metric or career word (`round most goals`,
+`round career goals`, `round brownlow votes`); none of these ever follows a surname there. `with of for the` are stopwords, so they
+vanish before the leftover span is read, which is why the word looked bare. The auxiliaries are in the set because the red probe
+showed `round had/has the most goals` answering Barry Round (the noun reading).
+
+**`had` interaction, and one correction to my own first commit.** `1333f04f` applied the lookahead to both alternatives, so `has round
+had the most goals`, which resolved at `cb75e3b3`, started declining: an over-refusal. I caught it by adding that question as a
+positive test: on `1333f04f` it fails (`raw/med1b-unit-red-1333f04f.txt`: `expected 'none' to be 'plan'`, `Could not find a player
+matching "round"`); `a65ca3b4` moves the lookahead to the `^` alternative only, as the review proposed, and it passes. After an
+auxiliary the word is already read as a subject, so what follows is left alone.
+
+Accepted residual (unchanged from section 7 R-B03): `round most goals` still resolves to Barry Round, because that exact shape is
+the tested positive. Read as "which round had most goals" it would be wrong; the cue set stays narrow and the owner can drop the
+`^` alternative entirely.
+
+### 10.3 Tests: red on unfixed code, green after
+
+Unit, `tests/nl-parser.test.ts`, describe `Review B-03`. Declining list gains `round with most goals`, `round with the most goals`,
+`round of most goals`, `round for most goals`, `round by most goals`, `round that had the most goals`, `round had the most goals`,
+`round has the most goals`; positive list gains `has round had the most goals`. The four review questions are all in.
+
+- Red, `cb75e3b3` parser (`raw/med1-unit-red-cb75e3b3.txt`): `Tests 8 failed | 12 passed | 660 skipped (680)`, each `AssertionError:
+  round with most goals: expected 'plan' to be 'none' // Object.is equality` (and the same text for the other seven).
+- Green, `a65ca3b4`: `Test Files 9 passed (9)`, `Tests 1170 passed (1170)` (`raw/med1-qual3-unit-focused.txt`).
+
+Executing, `tests/integration/nl-semantic-mapping.test.ts` (declines list gains `round with most goals`, `round with the most goals`,
+`round of most goals`, `round for most goals`, `round that had the most goals`):
+
+- Red, `cb75e3b3` parser (`raw/med1-int-red-cb75e3b3.txt`): `Tests 5 failed | 37 passed (42)`, `AssertionError: {"v":1,"grain":
+  "player_career","metric":"goals",…"scope":{"playerIdIn":[1030,8950,3567]}…}: expected 'plan' to be 'none'`.
+- Green, `a65ca3b4`, clean checkout, fresh snapshot copy: `Tests 42 passed (42)` (`raw/med1-qual3-integ-k1.txt`).
+
+Executing probe on `a65ca3b4` (`raw/med1-probe-green-a65ca3b4.jsonl`, `raw/med1b-probe-green-a65ca3b4.jsonl`): every MED-1 shape declines
+(`none/ambiguous`, unsupported `round`); `round most goals`, `round's career goals`, `round career goals`, `round brownlow votes`,
+`has round had the most goals` still answer for the Round family; `most goals in a round` declines.
+
+How the red runs were made, for honesty: they ran in the iteration checkout `$W/cand` with the committed `cb75e3b3` / `1333f04f`
+`parser.ts` copied over the working file (tests unchanged), then the fixed file copied back. They are not clean-checkout runs; the green
+results that count are the clean-checkout ones in 10.5. A first attempt (`git stash` of `src`) hung because I started a bare `node` REPL by
+mistake (a stray `rn.sh` with no argument); I killed my own two processes (1743106, 1743108), it had produced no output and changed no
+file, and I switched to the file-copy method above.
+
+### 10.4 `PARSER_VERSION`: stays 69
+
+Parse output does change for the shapes above, but v69 is unpublished (branch is local, not merged or deployed), so no consumer holds
+a v69 result that a bump would need to invalidate. The review reached the same view. The history comment in `plan.ts` gained the MED-1
+sentence. Parse-only V5 corpus, clean checkout `a65ca3b4` (`raw/med1-corpus-fix4-run.txt`, parserVersion 69, 12,000 pass / 0 soft-fail / 0
+fail): **0 of 12,000 changed vs `e8666c17` (v68) and 0 of 12,000 changed vs `cb75e3b3` (v69)** (`raw/med1-corpus-diff-vs-*.txt`, empty `.jsonl`).
+The corpus holds **no row containing the word "round" at all** (`raw/med1-corpus-round-shapes.txt`: 0 and 0), so it cannot exercise this
+change; the unit and executing tests above are the proof, as with the first B-03 round.
+
+### 10.5 Qualification, clean checkout `a65ca3b4`
+
+HEAD `a65ca3b48a38684d5de2ce7f1f6590b07550f6d7` fetched from a bundle into `$W/qual`, `git status --porcelain` empty.
+
+| Step | Result |
+|---|---|
+| `tsc --noEmit` | rc 0 (`raw/med1-qual3-static-tsc.txt`) |
+| eslint on every `.ts/.tsx` changed vs `e8666c17` | 0 errors, the same 1 baseline warning `parser.ts:159 'consume' unused` |
+| unit, 9 files (nl-parser, nl-plan, nl-describe, query-intent, nl-audit-acceptance, home-records, club-comparison, club-comparison-view, qualifying-matches-gate) | 1,170 / 1,170 |
+| integration, one fresh snapshot copy per file: nl-semantic-mapping 42, club-comparison-route 31, nl-answers 33, nl-answers-game-season 24, nl-answers-team-club 36, nl-answer-boundary 4, nl-vocab 5 | all pass |
+| parse-only V5 corpus | 0 of 12,000 changed (10.4) |
+
+Not re-run: production build (`1333f04f`/`a65ca3b4` change only `parser.ts`, `plan.ts` comment, a test, and a comment in `busy.tsx`; the
+`cb75e3b3` build, BUILD_ID `FQ-WO-d_4FGwFZpP_Z4rB`, stands for everything else), `db-test-rebuild`, `club-comparison.test.ts` (24 snapshot-pinned
+failures identical on base, untouched by this change), `home-records` integration. Two runners overlapped by my mistake (the shared
+heavy lock held `tsc` back for about 48 minutes, so I started `unit integ corpus` separately while the first runner still queued
+for `static`; it then continued into those phases on the same names). `raw/med1-qual3-static-run.txt` therefore shows `mk failed k*` for
+its duplicate integration pass and a duplicate `corpus-fix3` pass; the valid integration logs are `raw/med1-qual3-integ-k*.txt` and
+`raw/med1-qual3-run.txt`, and the corpus was re-run once cleanly under the tag `fix4` (the `fix3` outputs are not committed).
+
+### 10.6 LOW-4
+
+`src/app/clubs/compare/busy.tsx` comment (lines 9 to 13) no longer claims "the only robots tag": it states that the measured document carries
+two, the root layout's `index, follow` and this `noindex, nofollow`, and that the most restrictive applies. Comment only; no behaviour
+change. The 200 + noindex on a canonical pair URL stays owner decision O-B06-1 (section 7).
+
+### 10.7 Proposed ledger text delta
+
+ISSUE-356 (the run-2 line in section 8): replace "at the start of the question or after an auxiliary verb" with "at the start of the
+question (unless the next word is a preposition, relative, conjunction, article or auxiliary: `round with most goals` declines) or after an
+auxiliary verb". Closed by `1333f04f` + `a65ca3b4`; `PARSER_VERSION` 69; parse-only V5 corpus 0 of 12,000 changed.
+
+### 10.8 Files changed by this follow-up
+
+`src/search/nl/parser.ts`, `src/search/nl/plan.ts` (comment only), `src/app/clubs/compare/busy.tsx` (comment only),
+`tests/nl-parser.test.ts`, `tests/integration/nl-semantic-mapping.test.ts`, and under this directory `README.md` (this section),
+`SHA256SUMS`, `raw/med1*`, `scripts/{qual3,mk-qual3,pack3,corpus4,corpus-round}.sh.txt`. Commits end `Co-Authored-By: Claude Sonnet 5.5` (the
+system reminder for this task, which replaces the Opus line the protocol text names).

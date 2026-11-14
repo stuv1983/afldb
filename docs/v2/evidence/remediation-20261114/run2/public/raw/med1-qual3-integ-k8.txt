@@ -1,0 +1,12 @@
+isolated-pg: afldb_v2_rem2public_k8_test verified (cluster afldb_v2_isolated, 127.0.0.1:55654); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem2-public-20261114/qual
+
+ ✓ tests/integration/nl-vocab.test.ts (5 tests) 58ms
+
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+   Start at  18:18:45
+   Duration  1.74s (transform 1.06s, setup 177ms, import 1.26s, tests 58ms, environment 0ms)
+
+rc=0

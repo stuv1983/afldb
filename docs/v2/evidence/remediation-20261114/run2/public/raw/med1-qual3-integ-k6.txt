@@ -1,0 +1,16 @@
+isolated-pg: afldb_v2_rem2public_k6_test verified (cluster afldb_v2_isolated, 127.0.0.1:55654); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem2-public-20261114/qual
+
+ ✓ tests/integration/nl-answers-team-club.test.ts (36 tests) 3490ms
+     ✓ derives H2 from final minus half-time, never by summing cumulative Q3 and Q4 checkpoints  399ms
+     ✓ derives Q3 as the three-quarter checkpoint minus half-time  409ms
+     ✓ derives half-time margin from cumulative checkpoints  350ms
+     ✓ applies "but won" against the final result, not only the checkpoint leader  325ms
+
+ Test Files  1 passed (1)
+      Tests  36 passed (36)
+   Start at  18:18:28
+   Duration  4.48s (transform 520ms, setup 156ms, import 578ms, tests 3.49s, environment 0ms)
+
+rc=0

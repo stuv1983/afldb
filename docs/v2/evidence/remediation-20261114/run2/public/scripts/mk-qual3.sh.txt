@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# derive qual3.sh (a65ca3b4) from qual2.sh (1333f04f): new evidence dir, new DB suffixes, new corpus tag
+W=/mnt/ssd/afldb-rem2-public-20261114
+sed -e 's#evidence/qual2#evidence/qual3#' \
+    -e 's/integ_one j/integ_one k/' \
+    -e 's/corpus-parse.sh fix2 \$Q corpusfix2/corpus-parse.sh fix3 $Q corpusfix3/' \
+    -e 's#corpus-fix2#corpus-fix3#g' \
+    -e 's#corpus-hashes2#corpus-hashes3#g' \
+    -e 's#corpus-diff2-vs-base#corpus-diff3-vs-base#g' \
+    -e 's#corpus-diff2-vs-cb75#corpus-diff3-vs-cb75#g' \
+    -e 's#fix2 (1333f04f)#fix3 (a65ca3b4)#g' \
+    -e 's#qual2.sh#qual3.sh#g' \
+    $W/in/qual2.sh > $W/in/qual3.sh
+grep -nE 'qual3|corpus-fix3|integ_one k|fix3 \(' $W/in/qual3.sh | head -20
