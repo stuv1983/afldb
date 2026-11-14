@@ -6,8 +6,11 @@
  * CREDENTIALS. A test connects as `afldb_owner`, which is NOCREATEDB by design, so creation needs a role that may
  * create databases. `AFLDB_TEST_PER_FILE_ADMIN_USER` and `AFLDB_TEST_PER_FILE_ADMIN_PASSWORD_FILE` name that role and
  * a file holding its password (the isolated cluster's `secrets/superuser.pw`). The password is read from the file
- * once per connection and is never placed in the environment, so no test, imported module or child process can see
- * it. Neither variable contains `DATABASE_URL`, which keeps `isolated-pg run` (it strips every `*DATABASE_URL*`
+ * once per connection and is never placed in the environment, argv or a log line. The PATH is in the environment and
+ * the file is readable by the same uid, so this keeps the password out of env dumps and logs; it is not a boundary
+ * against code running as that uid. Before any create, drop, reap, sweep or audit statement the admin connection
+ * asks the server for `inet_server_port()` and `current_database()` and refuses a port that is NULL, 5432 or not
+ * the DSN's (REVIEW-D MED-1). Neither variable contains `DATABASE_URL`, which keeps `isolated-pg run` (it strips every `*DATABASE_URL*`
  * variable) from removing them. The admin connection goes to the same host and port as the base DSN, database
  * `postgres`; with neither variable set the base DSN's own role is used (this works only if that role has CREATEDB).
  *
@@ -44,6 +47,8 @@ import type postgres from 'postgres';
 
 import { databaseNameOf } from './dsn-policy';
 import {
+  assertAdminServerIdentity,
+  assertPerFileAdminDsnAllowed,
   assertPerFileBaseAllowed,
   assertPerFileDroppable,
   perFileDatabaseName,
@@ -97,7 +102,23 @@ export function adminDsnFor(baseDsn: string, env: Env, readPasswordFile: (path: 
   const pwFile = env[PER_FILE_ADMIN_PASSWORD_FILE_ENV];
   if (user) url.username = user;
   if (pwFile) url.password = readPasswordFile(pwFile).replace(/[\r\n]+$/, '');
-  return url.toString();
+  const dsn = url.toString();
+  assertPerFileAdminDsnAllowed(dsn);
+  return dsn;
+}
+
+/**
+ * Ask the SERVER which port and database this admin connection reached, and refuse unless that is what the DSN named
+ * and is not 5432 (REVIEW-D MED-1). No DSN-string check can see a tunnel to DEV's 5432 or a multi-host fallback; the
+ * server cannot be wrong about its own port. Run before the first create, drop, reap, sweep or audit statement.
+ */
+async function verifyAdminServer(admin: AdminSql, adminDsn: string): Promise<void> {
+  const rows = await admin<{ port: number | null; db: string | null }[]>`SELECT inet_server_port() AS port, current_database()::text AS db`;
+  const row = rows[0];
+  assertAdminServerIdentity(
+    { port: row ? row.port : null, database: row ? row.db : null },
+    { port: new URL(adminDsn).port, database: 'postgres' },
+  );
 }
 
 function strategyOf(env: Env): 'WAL_LOG' | 'FILE_COPY' {
@@ -127,10 +148,12 @@ export async function createPerFileDatabase(
   const strategy = strategyOf(opts.env);
   const sleep = deps.sleep ?? defaultSleep;
   const maxAttempts = opts.maxAttempts ?? 20;
-  const admin = await (deps.connect ?? defaultConnect)(adminDsnFor(opts.baseDsn, opts.env));
+  const adminDsn = adminDsnFor(opts.baseDsn, opts.env);
+  const admin = await (deps.connect ?? defaultConnect)(adminDsn);
   const t0 = Date.now();
   let locked = false;
   try {
+    await verifyAdminServer(admin, adminDsn);
     await admin`SELECT pg_advisory_lock(hashtext(${`afldb-per-file-db:${baseName}`}))`;
     locked = true;
     const [base] = await admin<{ owner: string; comment: string | null }[]>`
@@ -192,8 +215,10 @@ export async function dropPerFileDatabase(
   deps: PerFileDeps = {},
 ): Promise<void> {
   assertPerFileDroppable(db.name, { createdByThisProcess: CREATED_BY_THIS_PROCESS, baseName: databaseNameOf(opts.baseDsn), prefix: db.prefix });
-  const admin = await (deps.connect ?? defaultConnect)(adminDsnFor(opts.baseDsn, opts.env));
+  const adminDsn = adminDsnFor(opts.baseDsn, opts.env);
+  const admin = await (deps.connect ?? defaultConnect)(adminDsn);
   try {
+    await verifyAdminServer(admin, adminDsn);
     await admin.unsafe(`DROP DATABASE IF EXISTS "${db.name}" WITH (FORCE)`);
     CREATED_BY_THIS_PROCESS.delete(db.name);
     forgetInLedger(opts.env, db.name);
@@ -239,8 +264,10 @@ export async function reapLedgerDatabases(
   const baseName = databaseNameOf(opts.baseDsn);
   const recorded = readdirSync(opts.ledgerDir);
   if (recorded.length > 0) {
-    const admin = await (deps.connect ?? defaultConnect)(adminDsnFor(opts.baseDsn, opts.env));
+    const adminDsn = adminDsnFor(opts.baseDsn, opts.env);
+    const admin = await (deps.connect ?? defaultConnect)(adminDsn);
     try {
+      await verifyAdminServer(admin, adminDsn);
       const inLedger = new Set(recorded);
       for (const name of recorded) {
         try {
@@ -285,6 +312,7 @@ export async function auditPerFileResidue(
   let sizeBytes = 0;
   let clusterPerFileDatabases = 0;
   try {
+    await verifyAdminServer(maint, adminDsn);
     await maint`SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = ${db.name} AND pid <> pg_backend_pid()`;
     const [size] = await maint<{ bytes: string }[]>`SELECT pg_database_size(${db.name})::text AS bytes`;
     sizeBytes = Number(size.bytes);
@@ -358,8 +386,10 @@ export async function sweepStalePerFileDatabases(
   const prefix = perFilePrefixOf(opts.env);
   const baseName = databaseNameOf(opts.baseDsn);
   const now = (deps.now ?? (() => new Date()))();
-  const admin = await (deps.connect ?? defaultConnect)(adminDsnFor(opts.baseDsn, opts.env));
+  const adminDsn = adminDsnFor(opts.baseDsn, opts.env);
+  const admin = await (deps.connect ?? defaultConnect)(adminDsn);
   try {
+    await verifyAdminServer(admin, adminDsn);
     const rows = await admin<{ name: string; comment: string | null }[]>`
       SELECT datname::text AS name, shobj_description(oid, 'pg_database') AS comment
         FROM pg_database WHERE NOT datistemplate AND datname LIKE ${`${prefix}%`}`;

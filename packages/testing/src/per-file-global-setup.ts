@@ -7,6 +7,11 @@
  * (3) at the end of the run (pass, fail or interrupt, but not SIGKILL) drops every database a worker created and did
  * not drop itself. A file whose tests are all skipped never runs its `afterAll`, which is why the worker-level drop
  * alone is not enough. Relative imports only.
+ *
+ * DSN SOURCE (REVIEW-D LOW-5). This runs in the vitest main process, where tests/setup.ts has NOT run: that file
+ * loads `.env` inside each worker. So the base DSN must already be in the process environment (exported, or set by
+ * `isolated-pg run`, which forbids `.env` anyway). A DSN that exists only in `.env` is therefore refused here with a
+ * message naming that cause, rather than the generic "is not set".
  */
 import { perFileModeOf, assertPerFileBaseAllowed, PER_FILE_DB_ENV } from './per-file-db-policy';
 import { PER_FILE_LEDGER_ENV, createPerFileLedger, reapLedgerDatabases } from './per-file-db';
@@ -14,11 +19,18 @@ import { PER_FILE_LEDGER_ENV, createPerFileLedger, reapLedgerDatabases } from '.
 export default function setup(): (() => Promise<void>) | undefined {
   if (perFileModeOf(process.env[PER_FILE_DB_ENV]) === 'off') return undefined;
   const baseDsn = process.env.AFLDB_TEST_DATABASE_URL;
+  if (!baseDsn) {
+    throw new Error(
+      `${PER_FILE_DB_ENV} is on but AFLDB_TEST_DATABASE_URL is not in the vitest main process environment. `
+      + 'Per-file mode reads it before tests/setup.ts loads .env (that happens inside each worker), so a DSN that is '
+      + 'only in .env is not seen. Export AFLDB_TEST_DATABASE_URL in the shell, or run under isolated-pg run.',
+    );
+  }
   assertPerFileBaseAllowed(baseDsn);
   const ledgerDir = createPerFileLedger();
   process.env[PER_FILE_LEDGER_ENV] = ledgerDir;
   return async () => {
-    const result = await reapLedgerDatabases({ env: process.env, baseDsn: baseDsn as string, ledgerDir });
+    const result = await reapLedgerDatabases({ env: process.env, baseDsn, ledgerDir });
     for (const name of result.dropped) console.log(`per-file databases: reaped ${name} (its file did not run its teardown)`);
     for (const r of result.refused) console.error(`per-file databases: NOT dropped ${r.name}: ${r.reason}`);
   };

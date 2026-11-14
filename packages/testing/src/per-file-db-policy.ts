@@ -76,10 +76,84 @@ export function checkPerFileBase(baseDsn: string | undefined): PerFileFinding[] 
   if (url.port === '' || url.port === FORBIDDEN_PORT) {
     findings.push({ check: 'port', detail: `port ${url.port === '' ? '(default 5432)' : url.port} is DEV's PostgreSQL port; per-file databases are never created there` });
   }
-  for (const key of ['service', 'host', 'hostaddr', 'port', 'dbname']) {
-    if (url.searchParams.has(key)) findings.push({ check: 'libpq_redirect', detail: `query parameter ${key} can redirect the connection` });
+  findings.push(...checkDsnShape(url));
+  return findings;
+}
+
+const LIBPQ_REDIRECT_KEYS: ReadonlySet<string> = new Set(['service', 'host', 'hostaddr', 'port', 'dbname']);
+
+/**
+ * Shape checks on a parsed base or admin DSN that the port and name checks cannot see (REVIEW-D MED-1):
+ *   - a comma in the host is a multi-host list; postgres.js dials each host with the DEFAULT port 5432 unless the
+ *     entry carries its own, so `new URL` reading port 55651 proves nothing about where the connection goes;
+ *   - ANY query parameter is refused. postgres.js sends every parameter it does not know as a startup parameter,
+ *     and those override `user` and `database` (`?database=x` is a live redirect); libpq-style `host`, `hostaddr`,
+ *     `service`, `port`, `dbname` are named separately because they redirect a libpq child such as psql.
+ */
+export function checkDsnShape(url: URL): PerFileFinding[] {
+  const findings: PerFileFinding[] = [];
+  if (url.hostname.includes(',')) {
+    findings.push({ check: 'multi_host', detail: 'a comma in the host is a multi-host list, whose entries without their own port use 5432' });
+  }
+  const seen = new Set<string>();
+  for (const key of url.searchParams.keys()) {
+    if (seen.has(key)) continue;
+    seen.add(key);
+    findings.push(LIBPQ_REDIRECT_KEYS.has(key)
+      ? { check: 'libpq_redirect', detail: `query parameter ${key} can redirect the connection` }
+      : { check: 'query_parameter', detail: `query parameter ${key} is sent as a startup parameter and may override the user or database` });
+  }
+  if (seen.size === 0 && url.search !== '') {
+    findings.push({ check: 'query_parameter', detail: 'a query string is not allowed on a per-file base or admin DSN' });
   }
   return findings;
+}
+
+/** The admin DSN (same host and port as the base, database `postgres`) gets the same shape and port refusals as the base. */
+export function assertPerFileAdminDsnAllowed(adminDsn: string): void {
+  let url: URL;
+  try {
+    url = new URL(adminDsn);
+  } catch {
+    throw new Error('Per-file test databases refused: the admin DSN is not a URL.');
+  }
+  const findings = checkDsnShape(url);
+  if (url.port === '' || url.port === FORBIDDEN_PORT) {
+    findings.push({ check: 'port', detail: `admin port ${url.port === '' ? '(default 5432)' : url.port} is DEV's PostgreSQL port` });
+  }
+  if (findings.length > 0) {
+    throw new Error(`Per-file test databases refused: ${findings.map((f) => `${f.check} (${f.detail})`).join('; ')}.`);
+  }
+}
+
+/**
+ * What the SERVER says about the admin connection (`SELECT inet_server_port(), current_database()`), judged against
+ * what the DSN asked for. A tunnel to DEV's 5432 or a multi-host fallback reports the server's real port, so this
+ * catches what no DSN-string check can. A NULL port (Unix socket) is refused. Names checks only.
+ */
+export function checkAdminServerIdentity(
+  answer: { port: number | string | null | undefined; database: string | null | undefined },
+  expected: { port: string; database: string },
+): PerFileFinding[] {
+  const findings: PerFileFinding[] = [];
+  const port = answer.port === null || answer.port === undefined ? null : String(answer.port);
+  if (port === null) findings.push({ check: 'server_port', detail: 'the server reports no TCP port (a Unix socket connection)' });
+  else if (port === FORBIDDEN_PORT) findings.push({ check: 'server_port', detail: `the server answering is listening on ${FORBIDDEN_PORT}, DEV's PostgreSQL port` });
+  else if (port !== expected.port) findings.push({ check: 'server_port', detail: `the server reports port ${port} but the DSN names ${expected.port || '(none)'}` });
+  if (answer.database !== expected.database) {
+    findings.push({ check: 'server_database', detail: `the connection is on database ${JSON.stringify(answer.database ?? null)}, expected ${JSON.stringify(expected.database)}` });
+  }
+  return findings;
+}
+
+export function assertAdminServerIdentity(
+  answer: { port: number | string | null | undefined; database: string | null | undefined },
+  expected: { port: string; database: string },
+): void {
+  const findings = checkAdminServerIdentity(answer, expected);
+  if (findings.length > 0) {
+    throw new Error(`Per-file test databases refused: ${findings.map((f) => `${f.check} (${f.detail})`).join('; ')}.`);
+  }
 }
 
 export function assertPerFileBaseAllowed(baseDsn: string | undefined): void {
@@ -180,7 +254,7 @@ export interface SweepCandidate {
 /**
  * Names a sweep may drop: generated shape for `prefix`, `_test`, at least `maxAgeMs` old by the stamp in the name
  * (and never younger than {@link MIN_SWEEP_AGE_MS}), not the base, and — when the base carries a marker comment —
- * carrying the same marker. Anything that does not satisfy every condition is returned in `kept` with the reason.
+ * carrying the same marker or no comment at all (an interrupted create). Anything that does not satisfy every condition is returned in `kept` with the reason.
  */
 export function selectStalePerFileDatabases(
   candidates: readonly SweepCandidate[],
@@ -197,7 +271,9 @@ export function selectStalePerFileDatabases(
     if (c.name === opts.baseName) kept.push({ name: c.name, reason: 'base database' });
     else if (!c.name.startsWith(opts.prefix)) kept.push({ name: c.name, reason: 'different prefix' });
     else if (!parsed) kept.push({ name: c.name, reason: 'prefix matches but not the generated shape' });
-    else if (opts.baseComment !== null && c.comment !== opts.baseComment) kept.push({ name: c.name, reason: 'marker comment differs from the base' });
+    // A NULL comment on a generated-shape name is what a kill during CREATE DATABASE leaves (the marker is applied
+    // by a second statement), so it is sweepable (REVIEW-D MED-2). A DIFFERENT non-null comment is not ours.
+    else if (opts.baseComment !== null && c.comment !== null && c.comment !== opts.baseComment) kept.push({ name: c.name, reason: 'marker comment differs from the base' });
     else if (opts.now.getTime() - parsed.createdAt.getTime() < opts.maxAgeMs) kept.push({ name: c.name, reason: 'younger than the age bound' });
     else drop.push(c.name);
   }

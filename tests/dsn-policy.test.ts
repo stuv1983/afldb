@@ -22,9 +22,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   adminDsnFor,
   applyTestDsnPolicy,
+  assertAdminServerIdentity,
+  assertPerFileAdminDsnAllowed,
   assertPerFileBaseAllowed,
   assertPerFileDroppable,
   assertPerFilePrefix,
+  checkAdminServerIdentity,
   createPerFileDatabase,
   createPerFileLedger,
   dropPerFileDatabase,
@@ -307,6 +310,35 @@ const NOW = new Date(Date.UTC(2026, 10, 14, 5, 30, 0));
 const GOOD_NAME = perFileDatabaseName({ prefix: 'afldb_v2_pf_', now: NOW, pid: 4242, nonce: 'a1b2c3d4' });
 const BASE_55651 = 'postgresql://afldb_owner:pw@127.0.0.1:55651/afldb_v2_base_test';
 const NEVER_CONNECT = async (): Promise<AdminSql> => { throw new Error('a connection was opened but the refusal must come first'); };
+const MARKER = 'afldb-v2-isolated-test';
+
+/**
+ * A scripted fake admin connection. `answer` is what the fake "server" says to `inet_server_port(), current_database()`.
+ * Tagged-template statements and `unsafe` statements are logged separately so a test can assert that NOTHING but the
+ * identity query ran when the server is refused.
+ */
+interface FakeLog { sql: string[]; unsafe: string[] }
+function scriptedAdmin(
+  answer: { port: number | null; db: string | null },
+  log: FakeLog,
+  sweepRows: { name: string; comment: string | null }[] = [],
+): () => Promise<AdminSql> {
+  const sql = Object.assign(
+    async (strings: TemplateStringsArray) => {
+      const text = strings.join('?');
+      log.sql.push(text);
+      if (/inet_server_port/.test(text)) return [answer];
+      if (/datdba/.test(text)) return [{ owner: 'afldb_owner', comment: MARKER }];
+      if (/txid_current/.test(text)) return [{ xid: '1' }];
+      if (/NOT datistemplate/.test(text)) return sweepRows;
+      if (/WHERE datname = /.test(text)) return [{ comment: MARKER }];
+      return [];
+    },
+    { unsafe: async (text: string) => { log.unsafe.push(text); return []; }, end: async () => {} },
+  );
+  return async () => sql as unknown as AdminSql;
+}
+const GOOD_SERVER = { port: 55651, db: 'postgres' };
 
 describe('per-file databases: mode and base refusals', () => {
   it('is off unless asked for, accepts 1 / all, and rejects a typo instead of silently running shared mode', () => {
@@ -333,6 +365,34 @@ describe('per-file databases: mode and base refusals', () => {
     expect(() => assertPerFileBaseAllowed(undefined)).toThrow(/is not set/);
   });
 
+  it('refuses a multi-host DSN, whose entries without their own port use 5432 (REVIEW-D MED-1)', () => {
+    expect(() => assertPerFileBaseAllowed('postgresql://u:p@10.0.40.100,127.0.0.1:55651/afldb_v2_base_test')).toThrow(/multi_host/);
+    expect(() => assertPerFileBaseAllowed('postgresql://u:p@127.0.0.1,10.0.40.100:55651/afldb_v2_base_test')).toThrow(/multi_host/);
+    expect(() => assertPerFileAdminDsnAllowed('postgresql://u:p@10.0.40.100,127.0.0.1:55651/postgres')).toThrow(/multi_host/);
+  });
+
+  it('refuses ANY query parameter on the base or admin DSN, not only five libpq names (REVIEW-D MED-1)', () => {
+    for (const q of ['?database=x', '?user=y', '?application_name=x', '?options=-c%20search_path%3Dx', '?sslmode=disable', '?&']) {
+      expect(() => assertPerFileBaseAllowed(`${BASE_55651}${q}`), q).toThrow(/query_parameter/);
+    }
+    expect(() => assertPerFileAdminDsnAllowed('postgresql://u:p@127.0.0.1:55651/postgres?database=x')).toThrow(/query_parameter/);
+    // the named libpq redirects keep their own check name
+    expect(() => assertPerFileBaseAllowed(`${BASE_55651}?host=10.0.40.100`)).toThrow(/libpq_redirect/);
+  });
+
+  it('refuses an admin DSN on port 5432 or with no port, and accepts a plain one', () => {
+    expect(() => assertPerFileAdminDsnAllowed('postgresql://u:p@127.0.0.1:5432/postgres')).toThrow(/port/);
+    expect(() => assertPerFileAdminDsnAllowed('postgresql://u:p@127.0.0.1/postgres')).toThrow(/default 5432/);
+    expect(() => assertPerFileAdminDsnAllowed('not a url')).toThrow(/admin DSN is not a URL/);
+    expect(() => assertPerFileAdminDsnAllowed('postgresql://u:p@127.0.0.1:55651/postgres')).not.toThrow();
+  });
+
+  it('adminDsnFor refuses a base the policy refuses even if the caller skipped the base check', () => {
+    expect(() => adminDsnFor('postgresql://u:p@10.0.40.100,127.0.0.1:55651/afldb_v2_base_test', {})).toThrow(/multi_host/);
+    expect(() => adminDsnFor(`${BASE_55651}?database=x`, {})).toThrow(/query_parameter/);
+    expect(() => adminDsnFor('postgresql://u:p@127.0.0.1:5432/afldb_v2_base_test', {})).toThrow(/port/);
+  });
+
   it('never puts a credential in a refusal message', () => {
     let message = '';
     try {
@@ -354,6 +414,73 @@ describe('per-file databases: mode and base refusals', () => {
     await expect(createPerFileDatabase(
       { env: { AFLDB_TEST_PER_FILE_DB_PREFIX: 'Bad-Prefix_' }, baseDsn: BASE_55651 }, { connect: NEVER_CONNECT },
     )).rejects.toThrow(/prefix .* refused/);
+  });
+});
+
+describe('per-file databases: the SERVER is asked which port and database the admin connection reached (REVIEW-D MED-1)', () => {
+  const expected = { port: '55651', database: 'postgres' };
+
+  it('accepts the expected answer and refuses a NULL port, 5432, another port and another database', () => {
+    expect(checkAdminServerIdentity({ port: 55651, database: 'postgres' }, expected)).toEqual([]);
+    expect(() => assertAdminServerIdentity({ port: 55651, database: 'postgres' }, expected)).not.toThrow();
+    expect(() => assertAdminServerIdentity({ port: null, database: 'postgres' }, expected)).toThrow(/server_port.*no TCP port/);
+    expect(() => assertAdminServerIdentity({ port: undefined, database: 'postgres' }, expected)).toThrow(/server_port/);
+    expect(() => assertAdminServerIdentity({ port: 5432, database: 'postgres' }, expected)).toThrow(/DEV's PostgreSQL port/);
+    expect(() => assertAdminServerIdentity({ port: '5432', database: 'postgres' }, { port: '5432', database: 'postgres' })).toThrow(/DEV's PostgreSQL port/);
+    expect(() => assertAdminServerIdentity({ port: 6543, database: 'postgres' }, expected)).toThrow(/reports port 6543 but the DSN names 55651/);
+    expect(() => assertAdminServerIdentity({ port: 55651, database: 'afldb_dev' }, expected)).toThrow(/server_database/);
+    expect(() => assertAdminServerIdentity({ port: 55651, database: null }, expected)).toThrow(/server_database/);
+  });
+
+  it('create: a tunnel whose server answers port 5432 is refused before the lock, the base lookup or any CREATE', async () => {
+    const log: FakeLog = { sql: [], unsafe: [] };
+    await expect(createPerFileDatabase(
+      { env: {}, baseDsn: BASE_55651 }, { connect: scriptedAdmin({ port: 5432, db: 'postgres' }, log) },
+    )).rejects.toThrow(/server_port.*DEV's PostgreSQL port/);
+    expect(log.unsafe).toEqual([]);
+    expect(log.sql).toHaveLength(1);
+    expect(log.sql[0]).toMatch(/inet_server_port/);
+    expect(perFileDatabasesCreatedByThisProcess().size).toBe(0);
+  });
+
+  it('create: a NULL port (Unix socket) and a wrong database are refused the same way', async () => {
+    for (const answer of [{ port: null, db: 'postgres' }, { port: 55651, db: 'afldb_v2_base_test' }, { port: 4444, db: 'postgres' }]) {
+      const log: FakeLog = { sql: [], unsafe: [] };
+      await expect(createPerFileDatabase({ env: {}, baseDsn: BASE_55651 }, { connect: scriptedAdmin(answer, log) }))
+        .rejects.toThrow(/Per-file test databases refused/);
+      expect(log.unsafe).toEqual([]);
+      expect(log.sql).toHaveLength(1);
+    }
+  });
+
+  it('create passes the identity check on the expected server, drop then refuses a server that answers 5432 before any DROP', async () => {
+    const okLog: FakeLog = { sql: [], unsafe: [] };
+    const db = await createPerFileDatabase(
+      { env: {}, baseDsn: BASE_55651 }, { connect: scriptedAdmin(GOOD_SERVER, okLog), now: () => NOW, pid: 4242, randomHex: () => 'a1b2c3d4' },
+    );
+    try {
+      expect(db.name).toBe(GOOD_NAME);
+      expect(okLog.unsafe[0]).toMatch(/^CREATE DATABASE "afldb_v2_pf_20261114053000_4242_a1b2c3d4_test"/);
+      const dropLog: FakeLog = { sql: [], unsafe: [] };
+      await expect(dropPerFileDatabase(db, { env: {}, baseDsn: BASE_55651 }, { connect: scriptedAdmin({ port: 5432, db: 'postgres' }, dropLog) }))
+        .rejects.toThrow(/server_port/);
+      expect(dropLog.unsafe).toEqual([]);
+      const goodDrop: FakeLog = { sql: [], unsafe: [] };
+      await dropPerFileDatabase(db, { env: {}, baseDsn: BASE_55651 }, { connect: scriptedAdmin(GOOD_SERVER, goodDrop) });
+      expect(goodDrop.unsafe).toEqual([`DROP DATABASE IF EXISTS "${GOOD_NAME}" WITH (FORCE)`]);
+    } finally {
+      expect(perFileDatabasesCreatedByThisProcess().has(GOOD_NAME)).toBe(false);
+    }
+  });
+
+  it('sweep: a server answering 5432 is refused before any listing or DROP', async () => {
+    const log: FakeLog = { sql: [], unsafe: [] };
+    await expect(sweepStalePerFileDatabases(
+      { env: {}, baseDsn: BASE_55651, maxAgeMs: 6 * 3600_000, dryRun: false },
+      { connect: scriptedAdmin({ port: 5432, db: 'postgres' }, log, [{ name: 'afldb_v2_pf_20200101000000_1_00000001_test', comment: MARKER }]) },
+    )).rejects.toThrow(/server_port/);
+    expect(log.unsafe).toEqual([]);
+    expect(log.sql).toHaveLength(1);
   });
 });
 
@@ -445,12 +572,54 @@ describe('per-file databases: sweep selection', () => {
       { name: 'afldb_v2_base_test', comment: marker },
       { name: 'afldb_v2_pf_notgenerated_test', comment: marker },
       { name: 'afldb_v2_pf2_20200101000000_1_00000003_test', comment: marker },
-      { name: old.replace('00000001', '00000009'), comment: null },
+      { name: old.replace('00000001', '00000009'), comment: 'some-other-marker' },
     ], opts);
     expect(drop).toEqual([old]);
     expect(kept.map((k) => k.reason).sort()).toEqual([
       'base database', 'different prefix', 'marker comment differs from the base', 'prefix matches but not the generated shape', 'younger than the age bound',
     ]);
+  });
+
+  it('drops an old generated-shape database with a NULL comment (a kill during CREATE DATABASE) but keeps a young one and a different non-null comment (REVIEW-D MED-2)', () => {
+    const orphan = old.replace('00000001', '0000000a');
+    const youngOrphan = young.replace('00000002', '0000000b');
+    const { drop, kept } = selectStalePerFileDatabases([
+      { name: orphan, comment: null },
+      { name: youngOrphan, comment: null },
+      { name: old.replace('00000001', '0000000c'), comment: 'someone-elses-marker' },
+      { name: old.replace('00000001', '0000000d'), comment: '' },
+    ], opts);
+    expect(drop).toEqual([orphan]);
+    expect(kept.map((k) => [k.name === youngOrphan, k.reason])).toEqual([
+      [true, 'younger than the age bound'],
+      [false, 'marker comment differs from the base'],
+      [false, 'marker comment differs from the base'],
+    ]);
+    // a NULL comment never bypasses the name shape, the prefix, the base exclusion or the age bound
+    const refused = selectStalePerFileDatabases([
+      { name: 'afldb_v2_base_test', comment: null },
+      { name: 'afldb_v2_pf_notgenerated_test', comment: null },
+      { name: 'afldb_dev', comment: null },
+    ], opts);
+    expect(refused.drop).toEqual([]);
+  });
+
+  it('sweepStalePerFileDatabases removes the NULL-comment orphan end to end and nothing else', async () => {
+    const orphan = old.replace('00000001', '0000000a');
+    const log: FakeLog = { sql: [], unsafe: [] };
+    const result = await sweepStalePerFileDatabases(
+      { env: {}, baseDsn: BASE_55651, maxAgeMs: 6 * 3600_000, dryRun: false },
+      {
+        now: () => NOW,
+        connect: scriptedAdmin(GOOD_SERVER, log, [
+          { name: orphan, comment: null },
+          { name: old.replace('00000001', '0000000c'), comment: 'someone-elses-marker' },
+          { name: young, comment: MARKER },
+        ]),
+      },
+    );
+    expect(result.dropped).toEqual([orphan]);
+    expect(log.unsafe).toEqual([`DROP DATABASE IF EXISTS "${orphan}" WITH (FORCE)`]);
   });
 
   it('refuses an age bound below the minimum so a live run is never reaped', () => {
@@ -516,9 +685,9 @@ describe('per-file databases: redirection and selection', () => {
 describe('per-file databases: the run-level reaper drops only what the run recorded', () => {
   const recordedName = perFileDatabaseName({ prefix: 'afldb_v2_pf_', now: NOW, pid: 31, nonce: '0badc0de' });
 
-  function fakeAdmin(statements: string[]): () => Promise<AdminSql> {
-    const sql = { unsafe: async (text: string) => { statements.push(text); return []; }, end: async () => {} };
-    return async () => sql as unknown as AdminSql;
+  // The admin connection now asks the server who it is before the first DROP (REVIEW-D MED-1), so the fake answers.
+  function fakeAdmin(statements: string[], answer: { port: number | null; db: string | null } = GOOD_SERVER): () => Promise<AdminSql> {
+    return scriptedAdmin(answer, { sql: [], unsafe: statements });
   }
 
   it('drops a recorded generated name, refuses the base and look-alikes found in the ledger, and removes the ledger', async () => {
@@ -538,6 +707,19 @@ describe('per-file databases: the run-level reaper drops only what the run recor
     }
   });
 
+  it('refuses a server that answers port 5432 before dropping anything it recorded (REVIEW-D MED-1)', async () => {
+    const ledgerDir = createPerFileLedger();
+    try {
+      writeFileSync(join(ledgerDir, recordedName), '');
+      const statements: string[] = [];
+      await expect(reapLedgerDatabases({ env: {}, baseDsn: BASE_55651, ledgerDir }, { connect: fakeAdmin(statements, { port: 5432, db: 'postgres' }) }))
+        .rejects.toThrow(/server_port.*DEV's PostgreSQL port/);
+      expect(statements).toEqual([]);
+    } finally {
+      rmSync(ledgerDir, { recursive: true, force: true });
+    }
+  });
+
   it('opens no connection when nothing was recorded or the ledger is gone', async () => {
     const ledgerDir = createPerFileLedger();
     try {
@@ -548,6 +730,32 @@ describe('per-file databases: the run-level reaper drops only what the run recor
     } finally {
       rmSync(ledgerDir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('per-file databases: the vitest globalSetup reads the DSN from the main process environment (REVIEW-D LOW-5)', () => {
+  afterEach(() => { vi.unstubAllEnvs(); });
+
+  it('is a no-op with the mode off, so default runs are unchanged', async () => {
+    vi.stubEnv('AFLDB_TEST_PER_FILE_DB', '');
+    const { default: setup } = await import('../packages/testing/src/per-file-global-setup');
+    expect(setup()).toBeUndefined();
+  });
+
+  it('with the mode on and no DSN in the process environment, refuses and names the cause (.env is loaded only in workers)', async () => {
+    vi.stubEnv('AFLDB_TEST_PER_FILE_DB', 'all');
+    vi.stubEnv('AFLDB_TEST_DATABASE_URL', '');
+    const { default: setup } = await import('../packages/testing/src/per-file-global-setup');
+    expect(() => setup()).toThrow(/not in the vitest main process environment.*\.env/s);
+  });
+
+  it('with the mode on and a refused DSN, refuses before creating a ledger', async () => {
+    vi.stubEnv('AFLDB_TEST_PER_FILE_DB', 'all');
+    vi.stubEnv('AFLDB_TEST_DATABASE_URL', 'postgresql://u:p@10.0.40.100,127.0.0.1:55651/afldb_v2_base_test');
+    vi.stubEnv('AFLDB_TEST_PER_FILE_LEDGER', '');
+    const { default: setup } = await import('../packages/testing/src/per-file-global-setup');
+    expect(() => setup()).toThrow(/multi_host/);
+    expect(process.env.AFLDB_TEST_PER_FILE_LEDGER).toBe('');
   });
 });
 
