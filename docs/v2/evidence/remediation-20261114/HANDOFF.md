@@ -1,6 +1,38 @@
-# Remediation run 2026-11-14 — handoff (runs 1 and 2 complete; candidate local, not published)
+# Remediation run 2026-11-14 — handoff (runs 1, 2 and 3 complete; candidate local, not published)
 
-## Run 2 (2026-11-14, read this first)
+## Run 3 (2026-11-14/15, read this first)
+
+**Start from `run3/APPROVAL-PACKET-3.md`** (it supersedes packet 2 and packet 1). Records: `run3/QUALIFICATION-3.md` (Q′ **`692b1902`**),
+`run3/RESIDUALS-3.md` (with `run2/RESIDUALS.md` for unchanged rows), `run3/RUN-PLAN-3.md`, `run3/PLAN-REVIEW-3.md` (PROCEED, 0 CRIT/HIGH),
+`run3/AGENT-BRIEF-COMMON-3.md`, and the scope READMEs `run3/{stateb,rebuild,integ,integb,qualification-3}/README.md`.
+
+**Nothing was pushed, merged, deployed, installed, restarted or written on production or DEV; there was no production contact.**
+
+| Issue | State after run 3 |
+|---|---|
+| 363 | open, **partially resolved locally and qualified**: T363-1, the `settle-afl-api` snapshot-row deletion, the war-years contamination and the issue276 collision fixed; 4 `database` witnesses re-pinned; isolated accepted-baseline rebuild PASS; 53 ids classified. Remaining: shared-mode T363-2/T363-3 and owner decisions 363-W/G/C/B/3 (packet 3 §C1) |
+| 365 (new, Medium) | open: Brownlow coverage recompute of a completed season; **awaiting owner D-365-1**; production rows unread (B0) |
+| all others | unchanged from run 2 (table below) |
+
+**Run-3 commits** (`git log --reverse 6d5388ea..claude/remediation-20261114`): plan `38b08a2a`; stateb `18cbde7b`, `69168858`, `5270f678`;
+rebuild `a6532ec2`; integ `aae066c4`; integb `a38f98f5`, `6edf4f99`, `532e234d`, `bb81cbc9`, `0c66f3e3`, `ed256295`; qualification `692b1902` (**Q′**,
+last executable change), `9cb06c53`, `6575bc95`; records `b9a43343` (**publication candidate**), then the commit adding packet 3 and this section
+(records only). Scope commits were cherry-picked (`-x`) from `claude/rem3-<scope>-20261114`; the qualification branch was fast-forwarded.
+
+**Successor record:** candidate `b9a43343272c8ee982a89d9f50f65fee53466313`; Q′ `692b1902cbcc321cea76a30857a03e15f02db6b7`; `origin/main`
+`de640826` (re-fetched 2026-11-15); `git diff --stat 692b1902 b9a43343` lists only `issues.md`, `IssuesIndex.md`, `blockers.md`, `CHANGELOG.md`
+and `docs/…`. Next actions, in order: owner approval A (publication); B0 read-only production probe; B1; owner decisions §C1 (D-365-1 first, then
+363-W/G/C/B), each implemented and qualified in a new run; B2 before 2027-03-10.
+
+**Housekeeping (run 3):** host workspaces `/mnt/ssd/afldb-rem3-{stateb,rebuild,integ,integb,qual}-20261114` (+ `-pg` clusters, all stopped; no listener on
+55671–55677) and `/mnt/ssd/afldb-rem3-base` (bundle, heavy lock, the rebuilt dump and bridge child under `rebuilt/`) are left in place (sizes in
+`RESIDUALS-3.md` §4). Worktrees `D:\dev\afldb-rem3-{stateb,rebuild,integ,integb,qual}` and scratch `D:\tmp\afldb-rem3-*` are left for the owner to remove.
+Agent returns are persisted (gitignored) under `.phaneslight/returns/rem3-20261114/` of the integration worktree. DEV unchanged:
+`run3/DEV-STATE-BEFORE-3.txt` vs `run3/DEV-STATE-AFTER-3.txt`.
+
+---
+
+## Run 2 (2026-11-14)
 
 **Start from `run2/APPROVAL-PACKET-2.md`** (it supersedes `APPROVAL-PACKET.md`). Records:
 - `run2/QUALIFICATION-2.md` (final checks at executable revision **`f10e47ad`**);
