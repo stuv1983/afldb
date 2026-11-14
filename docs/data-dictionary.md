@@ -186,6 +186,16 @@ Season Brownlow totals per player, scraped from AFL Tables, 1924–2025. 112 win
 
 Round-by-round votes, **1984–2025 only**, keyed (`result_id`, `round_number`) across 8,570 results.
 
+### 3.2a Brownlow coverage in AFLDB PostgreSQL — "no medal" is declared, never inferred (AFLDB-ISSUE-365, D-365-1)
+
+This dictionary describes the legacy source, but the PostgreSQL rebuild records Brownlow availability per season and per grain (`stat_availability`: `brownlow_season_total`, `brownlow_round_votes`, `brownlow_match_votes`). One rule governs the status `not_applicable` ("there was no medal"):
+
+- A season is `not_applicable` **only** if it lies in an explicitly declared no-medal range: **1897–1923** (before the medal) and **1942–1945** (the war years). The declaration is `data/reference/stat-availability.json` `coverage_ranges`, mirrored by `BROWNLOW_DECLARED_NO_MEDAL_SEASONS` in `src/db/queries/player-derived.ts`, and a unit test holds the two equal.
+- A **completed** season with no loaded Brownlow results (no `brownlow_season_votes` rows) and no workflow decisions is `pending`, **not** `not_applicable`. Missing data never implies no medal; 2026 is the live example.
+- Precedence of the recompute (`recomputeBrownlowCoverage`), first match wins. Season total: medal loaded → `complete`; season in progress → `pending`; finalised/voided decisions held → `partial`; declared no-medal → `not_applicable`; anything else → `pending`. Round and match grains: accounted → `complete`; some rows or a void → `partial`; in progress → `pending`; medal loaded → `not_collected`; declared no-medal → `not_applicable`; anything else → `pending`.
+- The rule never reads a season's existing `stat_availability` row, and the registry status `unsupported` (also carried by 2027) is not a no-medal declaration.
+- Not changed by this rule: migration `016` and the retired `import_legacy_afl.py` still derive `not_applicable` from the absence of a medal when run in bulk; neither is on the rebuild or settle path, and neither is edited. A database whose 2026 rows were already recomputed under the old rule keeps `not_applicable` until a coverage recompute is run for that season.
+
 ### 3.3 `awards` — 1,810 rows — **SOURCE**
 
 38 distinct award types across `award`, `club_best_and_fairest` and `draft_pick` categories: Brownlow, Coleman, Norm Smith, All-Australian squad, Rising Star, AFLPA MVP, every club best-and-fairest, plus state-league medals (Magarey, Sandover, Liston, Morrish) and junior awards (Larke, Hunter Harrison). Most series begin 1980. Player identity is via `dg_person_id` → `dg_people` → `person_links` → `player_id`, **not** a direct `player_id`.

@@ -13,6 +13,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { rebuildCensusScope } from '../src/lib/rollover/afl-api-ownership-census';
+import { BROWNLOW_DECLARED_NO_MEDAL_SEASONS } from '../src/db/queries/player-derived';
 import { predecessorJson } from './rollover-predecessor-fixture';
 
 import { describe, expect, it } from 'vitest';
@@ -225,6 +226,41 @@ describe('stat availability dataset', () => {
       expect(gap, `brownlow_match_votes ${y} missing from grid`).toBeDefined();
       expect(gap.coverage).toBe(y >= 1942 && y <= 1945 ? 'not_applicable' : 'not_collected');
     }
+  });
+
+  // AFLDB-ISSUE-365, owner decision D-365-1: the ONLY evidence that "no medal was awarded" is an explicit
+  // declaration. The recompute's constant is pinned to literals AND to this committed JSON, never to
+  // `coverage-registry` status (registry `unsupported` also covers 2027, for a different reason).
+  it('D-365-1: the declared no-medal season constant is exactly 1897-1923 and 1942-1945 and equals the reference grid', () => {
+    expect(BROWNLOW_DECLARED_NO_MEDAL_SEASONS).toEqual([
+      { firstSeason: 1897, lastSeason: 1923 },
+      { firstSeason: 1942, lastSeason: 1945 },
+    ]);
+    for (const key of ['brownlow_season_total', 'brownlow_round_votes', 'brownlow_match_votes']) {
+      const declared = statAvail.coverage_ranges
+        .filter((r: any) => r.stat_key === key && r.coverage === 'not_applicable')
+        .map((r: any) => ({ firstSeason: r.first_season, lastSeason: r.last_season }));
+      expect(declared, `${key} not_applicable ranges`).toEqual([...BROWNLOW_DECLARED_NO_MEDAL_SEASONS]);
+    }
+    // No fixture, in-progress or completed-but-unloaded season may ever be declared.
+    for (const year of [2026, 2027, 2063, 2084, 2089]) {
+      expect(BROWNLOW_DECLARED_NO_MEDAL_SEASONS.some((r) => r.firstSeason <= year && year <= r.lastSeason)).toBe(false);
+    }
+  });
+
+  it('D-365-1: the recompute reads neither the registry status nor the season\'s existing coverage row', () => {
+    const source = readFileSync(join(root, 'src', 'db', 'queries', 'player-derived.ts'), 'utf8');
+    // (The comment above the constant names the registry to say why it is NOT the source; an import is the test.)
+    expect(source).not.toMatch(/^import[^;]*(coverage-registry|@afldb\/domain)/m);
+    const start = source.indexOf('export async function recomputeBrownlowCoverage');
+    const end = source.indexOf('\nexport ', start + 1);
+    const body = source.slice(start, end === -1 ? undefined : end);
+    expect(body.length).toBeGreaterThan(500);
+    // It writes stat_availability; it must never SELECT from it, which would let an existing not_applicable row survive.
+    expect(body).not.toMatch(/FROM\s+stat_availability/i);
+    // Every grain's final branch is the declared-or-pending pair, and none infers absence from a missing medal.
+    expect(body.match(/WHEN c\.declared_no_medal\s+THEN 'not_applicable'\s+ELSE 'pending'/g)).toHaveLength(3);
+    expect(body).not.toMatch(/ELSE 'not_applicable'/);
   });
 });
 

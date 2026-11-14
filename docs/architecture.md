@@ -131,6 +131,8 @@ A boolean cannot carry that distinction, so `coverage_status` records **why** a 
 | `not_applicable` | there was nothing to collect |
 | `pending` | expected to exist, not yet published |
 
+**`not_applicable` is declared, never inferred (AFLDB-ISSUE-365, owner decision D-365-1).** "Nothing to collect" is a claim about the world, so only an explicit declaration can make it: the no-medal seasons **1897–1923** and **1942–1945**, committed in `data/reference/stat-availability.json` and mirrored as `BROWNLOW_DECLARED_NO_MEDAL_SEASONS` in `src/db/queries/player-derived.ts`. A completed season whose Brownlow results are simply not loaded (2026 today) reads `pending` at all three grains until they are, and the Brownlow admin workflow, which refuses a `not_applicable` season, stays open for it. A missing medal is never evidence that none was awarded, and the recompute never reads a season's existing coverage row to decide.
+
 Availability is recorded **per season, per grain**. The three Brownlow grains genuinely disagree — season totals run 1924–2025 bar the war years, round votes only from 1984, and match votes are `partial` even inside 1931–1934, because no season in that window has every home-and-away match fully polled. Conflating them into one `brownlow` key is what let the 40.6% shortfall pass unnoticed.
 
 The same rule governs attendance: 1,651 matches have none, and `attendance_status` distinguishes *not recorded* from a genuine zero. A zero crowd must cite a source; several 2020–21 matches truly were played to empty stands, but "we have no figure" and "the figure was zero" are different claims.

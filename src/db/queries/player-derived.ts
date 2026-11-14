@@ -625,12 +625,70 @@ export async function recomputeBrownlowCareerTotals(
 }
 
 /**
+ * The seasons for which an explicit, committed, authoritative declaration says
+ * NO BROWNLOW MEDAL WAS AWARDED (AFLDB-ISSUE-365, owner decision D-365-1).
+ *
+ *   1897-1923  before the medal existed (first awarded for 1924)
+ *   1942-1945  the war years, when no medal was awarded
+ *
+ * Provenance: `data/reference/stat-availability.json` `coverage_ranges`, the
+ * `brownlow_season_total` rows with `coverage: "not_applicable"`
+ * (`first_season` 1897 / `last_season` 1923, and 1942 / 1945). That file is the
+ * single committed, hashable declaration and is what the rebuild loads into
+ * `stat_availability`; `tests/reference-data.test.ts` proves this constant equal
+ * to those ranges. It is NOT derived from `packages/domain/src/coverage-registry.ts`:
+ * a registry `unsupported` row is not a no-medal declaration (2027 carries the
+ * same status for a different reason).
+ *
+ * Passed to the recompute as bound parameters. No synthetic or fixture season
+ * may ever be added here: a test that needs a no-medal season seeds its own
+ * `stat_availability` row and must not recompute it through this function.
+ */
+export const BROWNLOW_DECLARED_NO_MEDAL_SEASONS: ReadonlyArray<{
+  readonly firstSeason: number;
+  readonly lastSeason: number;
+}> = [
+  { firstSeason: 1897, lastSeason: 1923 },
+  { firstSeason: 1942, lastSeason: 1945 },
+];
+
+/**
  * Per-season Brownlow coverage after a workflow mutation (§27.10 item 5).
  *
  * The season-scoped counterpart of migration 016 and of
  * `import_legacy_afl.py::_brownlow_availability`, which compute the same
- * three `stat_availability` rows for every season at once. Keep all three
- * definitions in lockstep.
+ * three `stat_availability` rows for every season at once. They are NOT in
+ * lockstep any more: both still infer `not_applicable` ("no medal") from the
+ * mere absence of a loaded medal, which AFLDB-ISSUE-365 / owner decision
+ * D-365-1 forbids. Migration 016 is applied and never edited, and
+ * `import_legacy_afl.py` is a retired manual path (nothing in the rebuild
+ * plan, the settle, the admin surface or the deploy scripts invokes it).
+ * This function is the only live writer of these rows after load, and it
+ * carries the D-365-1 rule below.
+ *
+ * D-365-1 (owner, 2026-11-15): "a completed season without loaded Brownlow
+ * results remains pending unless an explicit authoritative decision
+ * establishes that no medal was awarded. Missing data must not imply no
+ * medal." The only such decision in the repository is
+ * `BROWNLOW_DECLARED_NO_MEDAL_SEASONS`. PRECEDENCE, per grain, first match
+ * wins:
+ *
+ *   season_total  1 a medal is loaded (brownlow_season_votes rows) -> complete
+ *                 2 the season is in progress                       -> pending
+ *                 3 this workflow holds finalised/voided decisions  -> partial
+ *                 4 the season is a DECLARED no-medal season        -> not_applicable
+ *                 5 anything else                                   -> pending
+ *   round / match 1 accounted (round: 3/2/1 or void; match: 6 votes or void)
+ *                                                                   -> complete
+ *                 2 some rows or a void                             -> partial
+ *                 3 the season is in progress                       -> pending
+ *                 4 a medal is loaded                               -> not_collected
+ *                 5 the season is a DECLARED no-medal season        -> not_applicable
+ *                 6 anything else                                   -> pending
+ *
+ * The rule never reads the season's existing `stat_availability` row, and a
+ * missing medal is never evidence of absence: `medal_awarded` only ever
+ * promotes a season (complete / not_collected), it never demotes one.
  *
  * ONE RULE DIFFERS, deliberately (operator decision D1). Migration 016
  * calls the round grain `complete` when the season holds ANY round row,
@@ -659,28 +717,40 @@ export async function recomputeBrownlowCareerTotals(
  * A SECOND RULE DIFFERS, and unlike D1 this one is not a choice. The
  * season-total grain gains a `partial` branch for a season this workflow
  * holds finalised or voided matches for. `lockMatch` refuses a mutation
- * in any season whose season_total coverage is `not_applicable`, so
- * recomputing that grain from `medal_awarded` alone would have locked the
- * workflow out of a season it had just started: a completed season with
- * no brownlow_season_votes rows yet is exactly the state a NEW season
- * occupies between its first finalisation and its publication, and it
- * would have flipped to `not_applicable` on that first finalisation.
+ * in any season whose season_total coverage is `not_applicable`, so a
+ * `partial` season is the state that keeps the workflow able to continue
+ * between a NEW season's first finalisation and its publication. That
+ * branch used to be the only thing standing between a completed season
+ * with no loaded medal and `not_applicable`; since D-365-1 such a season
+ * reads `pending` before any decision exists, so `lockMatch` admits its
+ * first finalisation, and the branch's remaining job is to move
+ * `pending` to `partial` once decisions exist.
  * Found by the runtime validation in tests/integration/admin-brownlow.test.ts.
  */
 export async function recomputeBrownlowCoverage(tx: Tx, season: number): Promise<void> {
+  const declaredFirst = BROWNLOW_DECLARED_NO_MEDAL_SEASONS.map((range) => range.firstSeason);
+  const declaredLast = BROWNLOW_DECLARED_NO_MEDAL_SEASONS.map((range) => range.lastSeason);
   await tx`
     WITH season_ctx AS (
       SELECT s.year   AS season,
              s.status AS season_status,
              EXISTS (SELECT 1 FROM brownlow_season_votes b WHERE b.season = s.year)
-               AS medal_awarded
+               AS medal_awarded,
+             -- D-365-1: the ONLY evidence of "no medal awarded" is the declared
+             -- range list, passed as bound parameters. Never the absence of
+             -- rows, and never the season's existing stat_availability row.
+             EXISTS (SELECT 1
+                       FROM unnest(${declaredFirst}::int[], ${declaredLast}::int[])
+                              AS declared(first_season, last_season)
+                      WHERE s.year BETWEEN declared.first_season AND declared.last_season)
+               AS declared_no_medal
         FROM seasons s
        WHERE s.year = ${season}
     ),
     workflow_ctx AS (
-      -- Decisions this workflow holds for the season. They are what keeps
-      -- season_total off not_applicable between the first finalisation and
-      -- the publication; see the CASE below.
+      -- Decisions this workflow holds for the season. They are what moves
+      -- season_total to partial between the first finalisation and the
+      -- publication; see the CASE below.
       SELECT count(*) AS decided
         FROM brownlow_vote_entry_state es
         JOIN matches mt ON mt.id = es.match_id
@@ -719,24 +789,24 @@ export async function recomputeBrownlowCoverage(tx: Tx, season: number): Promise
     ),
     resolved AS (
       SELECT c.season,
-             -- The 016 rule, plus one branch that 016 could not have needed.
+             -- D-365-1 (see the precedence table in the function comment).
              --
-             -- lockMatch refuses every Brownlow mutation in a season whose
-             -- season_total coverage is not_applicable, which is how 1942-45
-             -- stays un-enterable. Recomputing this grain from medal_awarded
-             -- alone would therefore lock the workflow out of the exact season
-             -- it is being used on: a completed season with no
-             -- brownlow_season_votes rows yet -- the state a NEW season is in
-             -- between its first finalisation and its publication -- would
-             -- flip to not_applicable on that first finalisation and refuse
-             -- every match after it, with no way back but a hand-edit. A
-             -- season this workflow holds decisions for is partial: some of
-             -- its totals are settled, none of them are published.
+             -- not_applicable means "there was no medal", and only the declared
+             -- seasons (BROWNLOW_DECLARED_NO_MEDAL_SEASONS) may say so. A
+             -- completed season with no loaded medal and no declaration is
+             -- pending: the data is missing, not the medal.
+             --
+             -- It must be pending, and not just "not not_applicable", because
+             -- lockMatch refuses every Brownlow mutation in a not_applicable
+             -- season: the first finalisation of a NEW season has to find it
+             -- pending (it then becomes partial, since this workflow holds
+             -- decisions for it: some totals are settled, none published).
              CASE
                WHEN c.medal_awarded                 THEN 'complete'
                WHEN c.season_status = 'in_progress' THEN 'pending'
                WHEN w.decided > 0                   THEN 'partial'
-               ELSE 'not_applicable'
+               WHEN c.declared_no_medal             THEN 'not_applicable'
+               ELSE 'pending'
              END::coverage_status AS season_total,
              -- D1: accounted matches, not "any row at all".
              CASE
@@ -747,7 +817,8 @@ export async function recomputeBrownlowCoverage(tx: Tx, season: number): Promise
                  OR COALESCE(m.ha_void, 0) > 0      THEN 'partial'
                WHEN c.season_status = 'in_progress' THEN 'pending'
                WHEN c.medal_awarded                 THEN 'not_collected'
-               ELSE 'not_applicable'
+               WHEN c.declared_no_medal             THEN 'not_applicable'
+               ELSE 'pending'
              END::coverage_status AS round_votes,
              CASE
                WHEN COALESCE(m.ha_matches, 0) > 0
@@ -757,7 +828,8 @@ export async function recomputeBrownlowCoverage(tx: Tx, season: number): Promise
                  OR COALESCE(m.ha_void, 0) > 0      THEN 'partial'
                WHEN c.season_status = 'in_progress' THEN 'pending'
                WHEN c.medal_awarded                 THEN 'not_collected'
-               ELSE 'not_applicable'
+               WHEN c.declared_no_medal             THEN 'not_applicable'
+               ELSE 'pending'
              END::coverage_status AS match_votes,
              COALESCE(m.ha_complete, 0) AS ha_complete,
              COALESCE(m.ha_matches, 0)  AS ha_matches

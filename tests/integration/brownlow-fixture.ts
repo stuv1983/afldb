@@ -34,6 +34,9 @@
  *                   case (ISSUE-284) that needs a season no earlier case has
  *                   touched. Seeded by that case's own `beforeAll`, not the
  *                   file-level one, and swept with the others.
+ *   2063  PENDING   two full home-and-away matches in a COMPLETED season with no
+ *                   loaded medal and no coverage row (ISSUE-365 / D-365-1), for
+ *                   brownlow-pending-coverage.test.ts.
  *
  * FAILS CLOSED on a key collision, like the ISSUE-129 fixture: a row already
  * sitting on an ISSUE-155 key is an unknown row, and adopting it would corrupt
@@ -53,6 +56,13 @@ export const BROWNLOW_MAIN_SEASON = 2089;
 export const BROWNLOW_SHORT_SEASON = 2085;
 export const BROWNLOW_NO_MEDAL_SEASON = 2084;
 export const BROWNLOW_ACCOUNTING_SEASON = 2075;
+/**
+ * ISSUE-365 / D-365-1 (remediation run 4, `brownlow` scope; fixture seasons 2063-2064 were allocated, but 2064 is
+ * already `CROWD_SEASON` in venue-records.test.ts, so only 2063 is used). A COMPLETED season with NO loaded Brownlow
+ * medal and NO `stat_availability` row at all: the state a real completed-but-unloaded season (2026) is in. It is
+ * seeded with no coverage row so that the code under test, not the fixture, decides what the season reads.
+ */
+export const BROWNLOW_PENDING_SEASON = 2063;
 
 /** §27.6: fewer than this on either side and a match cannot be finalised. */
 const FULL_SIDE = 18;
@@ -227,8 +237,8 @@ type FixtureShape = {
   finals: boolean;
   /** Seed source-published `brownlow_season_votes` rows for this many players. */
   sourcePublishedPlayers: number;
-  /** `brownlow_season_total` coverage for the season. */
-  coverage: 'complete' | 'not_applicable';
+  /** `brownlow_season_total` coverage for the season; `absent` seeds NO `stat_availability` row (D-365-1). */
+  coverage: 'complete' | 'not_applicable' | 'absent';
 };
 
 const SHAPES: Record<number, FixtureShape> = {
@@ -260,6 +270,15 @@ const SHAPES: Record<number, FixtureShape> = {
     finals: false,
     sourcePublishedPlayers: 0,
     coverage: 'complete',
+  },
+  [BROWNLOW_PENDING_SEASON]: {
+    homeAndAway: [
+      { home: 0, away: 1, round: 1, homeSide: FULL_SIDE, awaySide: FULL_SIDE },
+      { home: 2, away: 3, round: 1, homeSide: FULL_SIDE, awaySide: FULL_SIDE },
+    ],
+    finals: false,
+    sourcePublishedPlayers: 0,
+    coverage: 'absent',
   },
   [BROWNLOW_NO_MEDAL_SEASON]: {
     homeAndAway: [
@@ -564,13 +583,15 @@ export async function seedBrownlowSeason(season: number): Promise<BrownlowFixtur
     // administrable at all.
     const coverage = shape.coverage;
     abortIfCancelled();
-    await seedSql`
-      INSERT INTO stat_availability (stat_key, season, is_recorded, coverage)
-      VALUES ('brownlow_season_total', ${season}, ${coverage === 'complete'},
-              ${coverage}::coverage_status)
-      ON CONFLICT (stat_key, season) DO UPDATE
-         SET is_recorded = EXCLUDED.is_recorded, coverage = EXCLUDED.coverage
-    `;
+    if (coverage !== 'absent') {
+      await seedSql`
+        INSERT INTO stat_availability (stat_key, season, is_recorded, coverage)
+        VALUES ('brownlow_season_total', ${season}, ${coverage === 'complete'},
+                ${coverage}::coverage_status)
+        ON CONFLICT (stat_key, season) DO UPDATE
+           SET is_recorded = EXCLUDED.is_recorded, coverage = EXCLUDED.coverage
+      `;
+    }
 
     // Source-published season totals: the state §27.9 calls `source_published`
     // and the state every real season is in before anyone administers it.

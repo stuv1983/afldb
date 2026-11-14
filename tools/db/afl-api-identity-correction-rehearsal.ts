@@ -1536,11 +1536,23 @@ async function checkLedgerAndIdentity(
 }
 
 /** The `stat_availability` rows the settled baseline must hold for fixture season 2092: one H&A
- * match whose 3/2/1 vote set is complete, no medal, no admin decisions, no mirrored match votes. */
+ * match whose 3/2/1 vote set is complete, no medal, no admin decisions, no mirrored match votes.
+ *
+ * ISSUE-365 / owner decision D-365-1. These literals follow from the owner's rule, not from a run:
+ * "a completed season without loaded Brownlow results remains pending unless an explicit authoritative
+ * decision establishes that no medal was awarded". 2092 is a completed fixture season, NOT a declared
+ * no-medal season (`BROWNLOW_DECLARED_NO_MEDAL_SEASONS`: 1897-1923, 1942-1945), so with no loaded medal
+ * and no decisions:
+ *   brownlow_season_total  pending (not recorded, no counts): no medal row, not in progress, nothing decided;
+ *   brownlow_round_votes   complete: its one home-and-away match is accounted for by a 3/2/1 vote set;
+ *   brownlow_match_votes   pending, populated 0 of 1: no mirrored votes (a 3/2/1 round fact is not a mirror), so
+ *                          neither complete nor partial, and again nothing declares "no medal".
+ * Before D-365-1 the season total and match votes here read `not_applicable` ("no medal awarded"), the inference
+ * that missing data meant no medal. */
 const SETTLED_BROWNLOW_COVERAGE: Record<string, { is_recorded: boolean; coverage: string; populated_rows: number | null; total_rows: number | null }> = {
-  brownlow_match_votes: { is_recorded: false, coverage: 'not_applicable', populated_rows: 0, total_rows: 1 },
+  brownlow_match_votes: { is_recorded: false, coverage: 'pending', populated_rows: 0, total_rows: 1 },
   brownlow_round_votes: { is_recorded: true, coverage: 'complete', populated_rows: null, total_rows: null },
-  brownlow_season_total: { is_recorded: false, coverage: 'not_applicable', populated_rows: null, total_rows: null },
+  brownlow_season_total: { is_recorded: false, coverage: 'pending', populated_rows: null, total_rows: null },
 };
 
 /**
@@ -4154,7 +4166,9 @@ const MANUAL_SOURCE_KEY = 'manual_admin_edit';
 /** The real Brownlow admin writers refuse a season whose `brownlow_season_total` coverage is
  * `not_applicable` (`admin-brownlow.ts` `lockMatch`, `publishBrownlowSeason`). 2092 becomes a season
  * IN PROGRESS -- the state a new season is in when first administered -- and the real
- * `recomputeBrownlowCoverage` then derives `pending` itself: no stat_availability row is hand-written. */
+ * `recomputeBrownlowCoverage` then derives `pending` itself: no stat_availability row is hand-written.
+ * (Since D-365-1 a COMPLETED, undeclared season with no loaded medal also derives `pending`, so the writers
+ * would admit it either way; this stays in-progress so every case keeps its existing pre-state.) */
 async function seasonInProgress(tx: TransactionSql, w: World): Promise<void> {
   await tx`UPDATE seasons SET status = 'in_progress' WHERE year = ${w.season}`;
 }
