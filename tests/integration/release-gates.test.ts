@@ -15,14 +15,44 @@
  *               played. These are pinned to the loaded snapshot and are
  *               EXPECTED to change when newer data is imported. A failure
  *               means "re-pin", not "bug".
+ *
+ * AFLDB-ISSUE-363 (owner decisions 363-W, 363-G, 363-B, run 4) changed how the
+ * calendar enters this file:
+ *
+ *   - A HISTORICAL figure is asserted over an explicit season bound (through
+ *     2025, the last season the retired baselines measured) and over stable
+ *     keys (AFL Tables profile path, club slug), never a surrogate id.
+ *   - A figure about the data as it is NOW is asserted as an equality with an
+ *     independent raw-SQL oracle written in the test, not as a literal that
+ *     goes stale when a season completes.
+ *   - No test assumes that the current calendar year has an open season. The
+ *     provisional-season contracts run on a season this file establishes itself
+ *     inside a transaction that is always rolled back (2065, 2066: the `gates`
+ *     fixture range, synthetic prefix CD_I4020), so this file never commits.
+ *   - The accepted-rebuild pins (the birth-date population counts) stay
+ *     baseline-pinned: they hold on the accepted c2-2026-final-core-v1 rebuild
+ *     and are EXPECTED to fail on the 4 Nov production snapshot, where the 92
+ *     2026 debutants carry no birth date. They will go stale when the next
+ *     baseline is accepted (a season added to the fitzRoy core, or a club-list
+ *     snapshot newer than club-lists-20260905). Each says so where it is pinned.
  */
 import './guard';
 
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
+import type postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { sql } from '@/db/client';
+import {
+  recomputeBrownlowCoverage,
+  recomputeClubSeasons,
+  recomputePlayerDerivedStats,
+  recomputeSeasonBrownlowStatus,
+  recomputeSeasonMetadata,
+} from '@/db/queries/player-derived';
 
 import {
   lockDraftTables, unlockDraftTables,
@@ -271,8 +301,8 @@ describe('gate: Advanced Search regression cases', () => {
    *    under no other tried ordering; that equality is the proof the cohorts' membership is unchanged,
    *    and it holds on any database collation because the ordering is applied here, not in SQL.
    */
-  async function identityDigests(ids: number[]) {
-    const keys = (await sql<{ externalId: string }[]>`
+  async function profileKeysOf(ids: number[]): Promise<string[]> {
+    return (await sql<{ externalId: string }[]>`
       SELECT ei.external_id AS "externalId"
         FROM external_identities ei
         JOIN sources s ON s.id = ei.source_id AND s.key = 'afltables'
@@ -281,6 +311,10 @@ describe('gate: Advanced Search regression cases', () => {
          AND ei.player_id = ANY(${ids})
        ORDER BY ei.external_id COLLATE "C"
     `).map((r) => r.externalId);
+  }
+
+  /** The two digests of a C-ordered list of profile keys (see the note above). */
+  function digestKeys(keys: string[]) {
     const hash = (ordered: string[]) => createHash('sha256').update(ordered.join(',')).digest('hex').slice(0, 16);
     const weight = (k: string) => k.replace(/[^A-Za-z0-9]/g, '').toLowerCase();
     const legacyOrder = [...keys].sort((a, b) => {
@@ -292,29 +326,95 @@ describe('gate: Advanced Search regression cases', () => {
     return { keys: keys.length, canonical: hash(keys), legacy: hash(legacyOrder) };
   }
 
+  async function identityDigests(ids: number[]) {
+    return digestKeys(await profileKeysOf(ids));
+  }
+
+  /**
+   * INDEPENDENT ORACLE for the 50-199 goals / zero Brownlow votes cohort (AFLDB-ISSUE-363, 363-W).
+   *
+   * Written from the raw fact tables and shares nothing with the search service, the query builder
+   * or the derived `player_career_stats` row the service filters on: career goals are summed from
+   * `player_match_stats`, career Brownlow votes from `brownlow_season_votes` (the authoritative
+   * season grain, summed per player; a player with no row has polled nothing, which the coverage
+   * semantics make a decided zero only inside a season with a medal and is identical here because
+   * no season outside the recorded ones has rows). Returns the cohort as AFL Tables profile keys,
+   * C-ordered, so it is comparable across databases that number players differently.
+   *
+   * `through` bounds BOTH sums to that season (inclusive); null means every season.
+   */
+  async function oracleCohortKeys(through: number | null): Promise<string[]> {
+    const bound = through ?? 32_767;
+    return (await sql<{ externalId: string }[]>`
+      WITH goals AS (
+        SELECT s.player_id, sum(s.goals)::int AS goals
+          FROM player_match_stats s JOIN matches m ON m.id = s.match_id
+         WHERE m.season <= ${bound}::int
+         GROUP BY s.player_id
+      ), votes AS (
+        SELECT player_id, sum(votes)::int AS votes
+          FROM brownlow_season_votes
+         WHERE season <= ${bound}::int
+         GROUP BY player_id
+      )
+      SELECT ei.external_id AS "externalId"
+        FROM goals g
+        LEFT JOIN votes v ON v.player_id = g.player_id
+        JOIN external_identities ei ON ei.player_id = g.player_id
+        JOIN sources src ON src.id = ei.source_id AND src.key = 'afltables'
+       WHERE ei.match_method = 'afltables_profile_url'
+         AND ei.status IN ('unique', 'resolved')
+         AND g.goals BETWEEN 50 AND 199
+         AND COALESCE(v.votes, 0) = 0
+       ORDER BY ei.external_id COLLATE "C"
+    `).map((r) => r.externalId);
+  }
+
   // AFLDB-ISSUE-108: this gate measured the legacy per-game Brownlow correction
   // (269, down from the legacy 750). AFLDB-ISSUE-113 restored the season-grain
-  // acquisition and RE-MEASURED the cohort on the canonically rebuilt afldb_test
-  // (§8.17.3): 261 players (career goals are now fitzRoy-sourced; the legacy 269
-  // was 262 on the pre-ISSUE-136 baseline and 261 once the four renumbered-profile
-  // careers were folded). The membership digest is taken over the AFL Tables
-  // profile identity, as the 1960s-debut gate below does, so it survives the
-  // surrogate players.id re-seed of every rebuild.
-  it('50-199 goals and zero Brownlow votes returns the exact 261 players', async () => {
+  // acquisition and RE-MEASURED the cohort on the canonically rebuilt afltables
+  // baseline (§8.17.3): 261 players (career goals are now fitzRoy-sourced; the
+  // legacy 269 was 262 on the pre-ISSUE-136 baseline and 261 once the four
+  // renumbered-profile careers were folded). The membership digest is taken over
+  // the AFL Tables profile identity, as the 1960s-debut gate below does, so it
+  // survives the surrogate players.id re-seed of every rebuild.
+  //
+  // AFLDB-ISSUE-363 (363-W): 261 is a statement about 1897-2025. Once 2026 completed
+  // (c2-2026-final-core-v1 and the 4 Nov snapshot both hold it) the cohort over every loaded
+  // season is 268, not 261, because the 2026 goals move players across the 50 and 199 bounds.
+  // Two claims, kept apart: (1) the service returns exactly the cohort the independent oracle derives, over
+  // whatever seasons are loaded, so it cannot go stale when another season completes; and
+  // (2) the oracle bounded to seasons <= 2025 is the historical 261, with its ISSUE-113
+  // membership digests, so the fixed past cannot drift. Provenance of (2): 261 measured on
+  // the accepted rebuild AND the 4 Nov snapshot with the raw SQL above bounded to 2025
+  // (run4/gates/README.md), equal to the ISSUE-113 pin and to run 3's independent
+  // `player_match_stats` derivation (run3/integb/evidence/facts/facts3-*.txt: 261); the
+  // digests are the original ISSUE-113 pins, reproduced here from the oracle, not read back
+  // from the service. This gate and database.test.ts "50-199 goals and no Brownlow votes"
+  // measure one fact (run 4 brief 3a), so both use the same oracle shape.
+  it('50-199 goals and zero Brownlow votes returns the cohort an independent oracle derives (261 through 2025)', async () => {
     const ids = await idsFor({
       goals_min: '50',
       goals_max: '199',
       brownlow_votes_min: '0',
       brownlow_votes_max: '0',
     });
-    // The headline correction. The legacy per-game derivation returned
-    // 750 here; the difference is all polled votes between 1935 and 1983.
-    expect(ids.length).toBe(261);
 
-    const digest = await identityDigests(ids);
-    // Every returned player carries one, so a silently dropped identity cannot
-    // hide behind a matching digest.
-    expect(digest.keys).toBe(261);
+    // (1) The service result, as stable profile keys, equals the oracle over every loaded season.
+    const served = await profileKeysOf(ids);
+    // Every returned player carries exactly one key, so a silently dropped identity (or a
+    // duplicated one) cannot hide behind a matching list.
+    expect(served.length).toBe(ids.length);
+    const everySeason = await oracleCohortKeys(null);
+    expect(everySeason.length).toBeGreaterThan(0);
+    // The headline correction: the legacy per-game derivation returned 750 here; the
+    // difference was all polled votes between 1935 and 1983.
+    expect(served).toEqual(everySeason);
+
+    // (2) The historical cohort, through 2025.
+    const historical = await oracleCohortKeys(2025);
+    expect(historical.length).toBe(261);
+    const digest = digestKeys(historical);
     // The original ISSUE-113 pin, reproduced exactly: membership unchanged.
     expect(digest.legacy).toBe('ca65f15239aaf0b5');
     expect(digest.canonical).toBe('79d3e6eea83a4620');
@@ -467,25 +567,29 @@ describe('gate: club organizations and identities', () => {
   });
 
   it('attaches every ladder row to the identity trading that season', async () => {
-    const rows = await sql<{
+    const SIX = ['footscray', 'western-bulldogs', 'south-melbourne', 'sydney', 'kangaroos', 'north-melbourne'];
+    const ladder = (through: number) => sql<{
       slug: string; n: number; from: number; to: number;
     }[]>`
       SELECT c.slug, count(cs.season)::int AS n,
              min(cs.season)::int AS from, max(cs.season)::int AS to
         FROM clubs c JOIN club_seasons cs ON cs.club_id = c.id
-       WHERE c.slug IN ('footscray', 'western-bulldogs',
-                        'south-melbourne', 'sydney',
-                        'kangaroos', 'north-melbourne')
+       WHERE c.slug = ANY(${SIX}) AND cs.season <= ${through}
        GROUP BY c.slug ORDER BY c.slug
     `;
-    const by = Object.fromEntries(rows.map((r) => [r.slug, r]));
+    // The bound is explicit (AFLDB-ISSUE-363, 363-W): the figures below are the ladder
+    // through 2025, the last season the retired baselines measured. They are keyed by
+    // club slug (stable identity), never by club id.
+    const by = Object.fromEntries((await ladder(2025)).map((r) => [r.slug, r]));
 
     // Before this was fixed, the source ladder's modern-only club names
     // gave Sydney rows back to 1897 and Footscray none at all.
     // AFLDB-ISSUE-095 re-pinned the upper bound from 2026 to 2025. club_seasons is now
-    // derived from the canonical match set, whose accepted baseline is 1897-2025; the
-    // in-progress season belongs to the current-season pipeline (ISSUE-098/-099), not
-    // here. The old 2026 bound was inherited from the retired legacy ladder.
+    // derived from the canonical match set; 2026 is a loaded, completed season on the
+    // c2-2026-final-core-v1 rebuild and on the 4 Nov snapshot, so the unbounded ladder
+    // now ends 2026 for the three open identities (western-bulldogs, sydney,
+    // north-melbourne: measured 1997-2026 / 1982-2026 / 1925-2026 on both bases). The
+    // bound therefore belongs in the query, where it is stated, not in the data.
     expect(by['footscray']).toMatchObject({ from: 1925, to: 1996 });
     expect(by['western-bulldogs']).toMatchObject({ from: 1997, to: 2025 });
     expect(by['south-melbourne']).toMatchObject({ from: 1897, to: 1981 });
@@ -502,6 +606,25 @@ describe('gate: club organizations and identities', () => {
     expect(by['footscray'].n + by['western-bulldogs'].n).toBe(101);
     expect(by['south-melbourne'].n + by['sydney'].n).toBe(128);
     expect(by['kangaroos'].n + by['north-melbourne'].n).toBe(101);
+
+    // Every season, with no calendar assumption: no ladder row of these six identities sits
+    // outside the years that identity traded. The windows are the club history itself
+    // (Footscray 1925-1996, renamed Western Bulldogs from 1997; South Melbourne 1897-1981,
+    // relocated as Sydney from 1982; the Kangaroos name 1999-2007, inside North Melbourne,
+    // whose own rows therefore skip those nine years). The open-ended identities have no
+    // upper bound, so a season added later cannot fail this and a row filed under the
+    // wrong identity in any season does.
+    const [stray] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n
+        FROM club_seasons cs JOIN clubs c ON c.id = cs.club_id
+       WHERE (c.slug = 'footscray'        AND cs.season NOT BETWEEN 1925 AND 1996)
+          OR (c.slug = 'western-bulldogs' AND cs.season < 1997)
+          OR (c.slug = 'south-melbourne'  AND cs.season NOT BETWEEN 1897 AND 1981)
+          OR (c.slug = 'sydney'           AND cs.season < 1982)
+          OR (c.slug = 'kangaroos'        AND cs.season NOT BETWEEN 1999 AND 2007)
+          OR (c.slug = 'north-melbourne'  AND (cs.season < 1925 OR cs.season BETWEEN 1999 AND 2007))
+    `;
+    expect(stray.n).toBe(0);
   });
 
   it('resolves a season to exactly one identity per organization', async () => {
@@ -712,13 +835,33 @@ describe('gate: absence is never zero', () => {
   });
 
   it('records why each attendance is missing', async () => {
+    // (1) Every season loaded, no calendar assumption (AFLDB-ISSUE-363, 363-W): a match with a
+    // figure is `complete`, a match without one is `not_collected`, and no other pairing exists.
+    // That is the contract itself (absence says why it is absent and is never a zero); the
+    // `matches` check constraints enforce the same pairing on write, so this proves the stored
+    // data honours it.
+    const pairing = await sql<{ status: string; missing: boolean }[]>`
+      SELECT DISTINCT attendance_status AS status, attendance IS NULL AS missing
+        FROM matches ORDER BY 1, 2
+    `;
+    expect(pairing).toEqual([
+      { status: 'complete', missing: false },
+      { status: 'not_collected', missing: true },
+    ]);
+
+    // (2) The historical counts, through 2025.
     const rows = await sql<{ status: string; n: number }[]>`
       SELECT attendance_status AS status, count(*)::int AS n
-        FROM matches GROUP BY 1 ORDER BY 2 DESC
+        FROM matches WHERE season <= 2025 GROUP BY 1 ORDER BY 2 DESC
     `;
     // AFLDB-ISSUE-108: re-pinned to the canonical baseline full-history-20260827
     // (measured.attendance_known = 15,187; 16,838 matches - 15,187 = 1,651
     // not_collected). The old 15,376 was the retired legacy snapshot.
+    // AFLDB-ISSUE-363 (363-W): the same two figures, now bounded to season <= 2025 in the
+    // query. The unbounded counts moved to 15,405 / 1,651 when 2026 completed with every
+    // crowd recorded (data/reference/fitzroy-accepted-baselines.json, accepted entry
+    // c2-2026-final-core-v1 measured.attendance_known = 15,405 = 15,187 + 218 matches of
+    // 2026; measured 15,187 through 2025 and 218 in 2026 on both bases, run4/gates/README.md).
     expect(rows).toEqual([
       { status: 'complete', n: 15_187 },
       { status: 'not_collected', n: 1_651 },
@@ -782,18 +925,73 @@ describe('gate: absence is never zero', () => {
 // Hayes -- recorded as evidence, adjudication is separate, dob_disputed stays 0).
 // The two conflict-adjudication tests are still skipped: no conflict was
 // adjudicated into dob_disputed, so there is nothing to exercise.
+//
+// AFLDB-ISSUE-363 (owner decision 363-B, run 4). PROVENANCE of the re-pin. The 13,255 /
+// 14,110 / 13,275 below were measured 2026-09-06 on the rebuild over the 2025-terminal
+// fitzRoy baseline. The accepted rebuild (c2-2026-final-core-v1, the register's single
+// accepted entry) adds season 2026, and with it 92 players who debuted in 2026: players
+// 13,273 -> 13,365, every one of the 92 carries a fitzRoy per-match date (855 -> 947
+// fitzRoy-dated) and a club-list row (the 12,400 club-list-filled dates are unchanged),
+// so dated players are 947 + 12,400 = 13,347, evidence rows 947 + 13,347 = 14,294 and
+// unique profile identities 13,275 + 92 = 13,367. That is what the tracked contract
+// already records as its "C2 SUCCESSOR" (tools/rebuild/afltables/afltables-contract.json
+// club_player_lists.accepted_snapshot.measured.players_with_dob = 13,347, reproduced by
+// the isolated rehearsal at 5643f5c2) and what the register records for the baseline
+// (data/reference/fitzroy-accepted-baselines.json c2-2026-final-core-v1
+// identity_scan.distinct_urls = 13,367). Those two tracked files are read below and must
+// agree with the database, so the pins are cross-checked against a source the loader did
+// not write; the loader (tools/migration/enrich_birth_dates_afltables.py) and the rebuild
+// inputs (run3/rebuild/inputs.tsv: club-lists-20260905 manifest sha256 e6d5ae26...) are
+// unchanged between the two measurements.
+//
+// TWO SCOPES, kept apart. HISTORICAL: every player except a player who first appears
+// after 2025 (`min(season) > 2025`, the 2026 debutants today). Asserted with the 2026-09
+// literals, which hold on every database that contains the accepted history, so they
+// are a calendar-independent guard of the fixed past and pass on the 4 Nov snapshot too.
+// POPULATION: every player, pinned to the accepted rebuild. BASE-DEPENDENT, ON PURPOSE:
+// on the 4 Nov production snapshot the 92 2026 debutants have no birth date (13,255
+// dated, 14,110 evidence rows, 13,275 unique profile identities, 110 undated), so the
+// population pins fail there with exactly those values. That is a real difference
+// between the two databases, not a stale test, and these tests are deliberately not
+// made base-adaptive: a lost date would otherwise hide inside the adaptation.
+// BASELINE-PINNED (ISSUE-363 F-021): the population pins go stale when the next
+// baseline is accepted (another season in the fitzRoy core, or a club-list snapshot
+// newer than club-lists-20260905), and then need that baseline's measured values.
+const REPO_ROOT = join(__dirname, '..', '..');
+const readTrackedJson = (path: string) => JSON.parse(readFileSync(join(REPO_ROOT, path), 'utf8'));
+
 describe('gate: birth dates', () => {
-  it('populates 13,255 canonical dates with no conflicts', async () => {
-    const [row] = await sql<{ withDob: number; disputed: number }[]>`
-      SELECT count(*) FILTER (WHERE dob IS NOT NULL)::int AS "withDob",
-             count(*) FILTER (WHERE dob_disputed)::int    AS disputed
-        FROM players
+  it('populates the canonical dates with no conflicts (13,255 historical, 13,347 on the accepted rebuild)', async () => {
+    const [row] = await sql<{
+      withDob: number; disputed: number; historicalWithDob: number; filledFromLists: number;
+    }[]>`
+      WITH debutants AS (
+        SELECT s.player_id FROM player_match_stats s JOIN matches m ON m.id = s.match_id
+         GROUP BY s.player_id HAVING min(m.season) > 2025
+      )
+      SELECT count(*) FILTER (WHERE p.dob IS NOT NULL)::int AS "withDob",
+             count(*) FILTER (WHERE p.dob_disputed)::int    AS disputed,
+             count(*) FILTER (WHERE p.dob IS NOT NULL
+                                AND p.id NOT IN (SELECT player_id FROM debutants))::int
+                                                            AS "historicalWithDob",
+             (SELECT count(*)::int FROM players q
+                JOIN player_birth_evidence e ON e.id = q.dob_evidence_id
+               WHERE e.evidence_type = 'afltables_club_list')  AS "filledFromLists"
+        FROM players p
     `;
-    // Deterministic rebuild (§23.25): 855 fitzRoy per-match dates + 12,400 filled
-    // from the club lists = 13,255. Proven by a full afldb_test rebuild 2026-09-06
-    // (FINAL VALIDATION players_with_dob_after_birth_dates = 13255).
-    expect(row.withDob).toBe(13_255);
+    // HISTORICAL (holds on the snapshot too): §23.25's 855 fitzRoy per-match dates + 12,400
+    // filled from the club lists = 13,255 players who played by 2025. Proven by a full
+    // afldb_test rebuild 2026-09-06 (FINAL VALIDATION players_with_dob_after_birth_dates =
+    // 13255); re-measured 13,255 on the accepted rebuild and on the 4 Nov snapshot.
+    expect(row.historicalWithDob).toBe(13_255);
+    expect(row.filledFromLists).toBe(12_400);
     expect(row.disputed).toBe(0);
+    // POPULATION (accepted rebuild; fails on the 4 Nov snapshot with 13255, see above):
+    // 947 fitzRoy per-match dates (855 + the 92 debutants) + 12,400 = 13,347, equal to the
+    // tracked contract's C2 successor value.
+    const contract = readTrackedJson('tools/rebuild/afltables/afltables-contract.json');
+    expect(contract.club_player_lists.accepted_snapshot.measured.players_with_dob).toBe(13_347);
+    expect(row.withDob).toBe(13_347);
   });
 
   it.skip('retains the existing date wherever a source disagrees', async () => {
@@ -816,28 +1014,64 @@ describe('gate: birth dates', () => {
     expect(row.n).toBe(2);
   });
 
-  it('keeps the evidence behind every recovered date', async () => {
-    const [row] = await sql<{ evidence: number; linked: number; unevidenced: number }[]>`
+  it('keeps the evidence behind every recovered date (14,110 historical, 14,294 on the accepted rebuild)', async () => {
+    const [row] = await sql<{
+      evidence: number; linked: number; unevidenced: number;
+      historicalEvidence: number; historicalLinked: number; clubListRows: number;
+    }[]>`
+      WITH debutants AS (
+        SELECT s.player_id FROM player_match_stats s JOIN matches m ON m.id = s.match_id
+         GROUP BY s.player_id HAVING min(m.season) > 2025
+      )
       SELECT (SELECT count(*)::int FROM player_birth_evidence)          AS evidence,
              (SELECT count(*)::int FROM players WHERE dob_evidence_id IS NOT NULL)
                                                                         AS linked,
              (SELECT count(*)::int FROM players
-               WHERE dob IS NOT NULL AND dob_evidence_id IS NULL)       AS unevidenced
+               WHERE dob IS NOT NULL AND dob_evidence_id IS NULL)       AS unevidenced,
+             (SELECT count(*)::int FROM player_birth_evidence
+               WHERE player_id NOT IN (SELECT player_id FROM debutants))
+                                                                        AS "historicalEvidence",
+             (SELECT count(*)::int FROM players
+               WHERE dob_evidence_id IS NOT NULL
+                 AND id NOT IN (SELECT player_id FROM debutants))       AS "historicalLinked",
+             (SELECT count(*)::int FROM player_birth_evidence
+               WHERE evidence_type = 'afltables_club_list')             AS "clubListRows"
     `;
     // AFLDB-ISSUE-118 §23.25 (Stage D1): a player can now carry more than one
     // birth-evidence row (a fitzRoy per-match date plus one or more club-list
     // dates), so the raw count exceeds the dated-player count. Rebuild-measured
     // 2026-09-06: 14,110 evidence rows behind 13,255 dated players.
-    expect(row.evidence).toBe(14_110);
+    // HISTORICAL (players who played by 2025; holds on the snapshot too, re-measured):
+    expect(row.historicalEvidence).toBe(14_110);
+    expect(row.historicalLinked).toBe(13_255);
     // Every filled date points back at the row that justified it -- the rebuild's
-    // dob_without_evidence gate is 0, so linked equals players_with_dob.
-    expect(row.linked).toBe(13_255);
+    // dob_without_evidence gate is 0, so linked equals players_with_dob. And every dated
+    // player is reached by a club-list row (contract players_with_club_list_birth_evidence
+    // equals players_with_dob), so the club-list evidence rows are exactly the dated players:
+    // an independent decomposition of the evidence count on either database.
     expect(row.unevidenced).toBe(0);
+    expect(row.clubListRows).toBe(row.linked);
+    // POPULATION (accepted rebuild; fails on the 4 Nov snapshot with 14110 / 13255, see above):
+    // 947 fitzRoy rows + 13,347 club-list rows = 14,294 rows behind 13,347 dated players.
+    // The linked count is the tracked contract's C2 successor value
+    // (club_player_lists.accepted_snapshot.measured.players_with_club_list_birth_evidence).
+    const contract = readTrackedJson('tools/rebuild/afltables/afltables-contract.json');
+    expect(contract.club_player_lists.accepted_snapshot.measured.players_with_club_list_birth_evidence)
+      .toBe(13_347);
+    expect(row.evidence).toBe(14_294);
+    expect(row.linked).toBe(13_347);
   });
 
-  it('matches players on the profile URL rather than the name', async () => {
-    const [row] = await sql<{ n: number }[]>`
-      SELECT count(*)::int AS n FROM external_identities
+  it('matches players on the profile URL rather than the name (13,275 historical, 13,367 on the accepted rebuild)', async () => {
+    const [row] = await sql<{ n: number; historical: number }[]>`
+      WITH debutants AS (
+        SELECT s.player_id FROM player_match_stats s JOIN matches m ON m.id = s.match_id
+         GROUP BY s.player_id HAVING min(m.season) > 2025
+      )
+      SELECT count(*)::int AS n,
+             count(*) FILTER (WHERE player_id NOT IN (SELECT player_id FROM debutants))::int
+                                                                        AS historical
+        FROM external_identities
        WHERE match_method = 'afltables_profile_url' AND status = 'unique'
     `;
     // AFLDB-ISSUE-090: re-pinned 12,472 -> 13,275 as a test-baseline repair
@@ -848,7 +1082,19 @@ describe('gate: birth dates', () => {
     // players = 13,275 with identity_scan.distinct_urls = 13,275 and
     // missing_url = 0. The player_birth_evidence pin above is a DIFFERENT
     // population and is deliberately not changed with this one.
-    expect(row.n).toBe(13_275);
+    // HISTORICAL (players who played by 2025; holds on the snapshot too, re-measured):
+    expect(row.historical).toBe(13_275);
+    // POPULATION (accepted rebuild; fails on the 4 Nov snapshot with 13275, see above).
+    // AFLDB-ISSUE-363 (363-B): 13,275 + the 92 players who debuted in 2026 = 13,367, equal to
+    // the register's identity_scan.distinct_urls for its accepted entry c2-2026-final-core-v1
+    // (data/reference/fitzroy-accepted-baselines.json), read here so the literal is checked
+    // against a tracked file rather than only against itself.
+    const register = readTrackedJson('data/reference/fitzroy-accepted-baselines.json');
+    const accepted = register.baselines.find(
+      (b: { snapshot_label: string }) => b.snapshot_label === 'c2-2026-final-core-v1',
+    );
+    expect(accepted.identity_scan.distinct_urls).toBe(13_367);
+    expect(row.n).toBe(13_367);
   });
 
   it('stores the profile URL it matched on, not a legacy row id', async () => {
@@ -882,14 +1128,26 @@ describe('gate: birth dates', () => {
   });
 
   it('leaves the remaining players honestly without a date', async () => {
-    const [row] = await sql<{ n: number }[]>`
-      SELECT count(*)::int AS n FROM players
+    const [row] = await sql<{ n: number; historical: number }[]>`
+      WITH debutants AS (
+        SELECT s.player_id FROM player_match_stats s JOIN matches m ON m.id = s.match_id
+         GROUP BY s.player_id HAVING min(m.season) > 2025
+      )
+      SELECT count(*)::int AS n,
+             count(*) FILTER (WHERE id NOT IN (SELECT player_id FROM debutants))::int AS historical
+        FROM players
        WHERE dob IS NULL AND dob_confidence = 'unknown'
     `;
     // AFLDB-ISSUE-118 §23.25 (Stage D1): the club-list birth-date stage filled all
     // but 18 of the previously undated players. Those 18 are genuinely undated in
     // every canonical source and are shown as "Not recorded", never a guess.
     // Rebuild-measured 2026-09-06: 13,255 dated + 18 undated = 13,273 players.
+    // AFLDB-ISSUE-363 (363-B): the 18 are all historical, so the figure is unchanged on the
+    // accepted rebuild (13,347 dated + 18 = 13,365 players, the 92 debutants all dated). On the
+    // 4 Nov snapshot the population count is 110 = 18 + the 92 undated debutants: that
+    // difference is base-dependent and unchanged from B4 (run4/gates/README.md); the
+    // historical 18 holds on both.
+    expect(row.historical).toBe(18);
     expect(row.n).toBe(18);
   });
 });
@@ -1058,17 +1316,46 @@ describe('gate: Match Search', () => {
 });
 
 // ---------------------------------------------------------------------
-// SNAPSHOT — 2026 is still being played
+// PROVISIONAL SEASONS — a season this file establishes, never committed
 // ---------------------------------------------------------------------
-// AFLDB-ISSUE-108: three tests in this block assert current-season pipeline state
-// (seasons.data_through_date / last_loaded_round, 2026 player_season_stats,
-// staging.team_seasons) that only the current-season import (AFLDB-ISSUE-099) and
-// the retired legacy ladder load produce. The historical canonical rebuild
-// (db:test:rebuild) neither runs nor should run them, so on a clean afldb_test
-// those artefacts are absent. They are skipped here and belong to a gate run
-// after a current-season import, not to the historical rebuild's guarded suite.
-// The 2026 structural guarantees (no premier/spoon, only-season-in-progress) still
-// run against the seasons.json projection.
+// History. These gates were "2026 is provisional (snapshot-pinned)": they asserted on the
+// real 2026 row that no premier, no wooden spoon and no Brownlow vote existed for a season
+// still being played, and that 2026 was the only season in progress. 2026 completed, so on
+// the accepted c2-2026-final-core-v1 rebuild they failed with "expected 'complete' to be
+// 'in_progress'", "expected 1 to be +0" and "expected [ 2027 ] to deeply equal [ 2026 ]",
+// and on the 4 Nov snapshot, which holds no in-progress season at all, "expected [] to
+// deeply equal [ 2026 ]". Re-pointing them at "the in-progress season" would pass
+// vacuously on that snapshot (the TST-4 defect this issue exists to remove), so there is no
+// lookup here.
+//
+// AFLDB-ISSUE-363 (owner decision 363-G): no test assumes the current calendar year has an
+// open season. Two different claims were fused in the old tests and are separated:
+//
+//   1. THE CONTRACTS OF A PROVISIONAL SEASON (no premier, no wooden spoon, Brownlow
+//      pending and never zero, an explicit as-at date). They are about what the
+//      derivation does with a season still in progress, so they are asserted on a season
+//      the test itself establishes: season 2065, four real clubs (read by slug, never
+//      written), four home-and-away matches over two rounds, eight synthetic players
+//      (prefix CD_I4020), built by the production recompute functions, inside a
+//      transaction that always ends in a throw. Nothing is committed, so this file stays a
+//      non-committing file in both shared and per-file mode and no fixture can leak. The
+//      fixture is built so each contract has something to protect: the ladder has a unique
+//      last place (a spoon WOULD be awarded were the season complete) and the season has
+//      player rows (a vote could be written to one).
+//   2. THE STRUCTURE OF THE SEASONS TABLE (at most one season in progress, and it is the
+//      latest). This is about the real table, so it is asserted there. On the 4 Nov
+//      snapshot no season is in progress and on the accepted rebuild 2027 is: BOTH satisfy
+//      it, so it asserts the invariant and never that a season is open.
+//
+// Each assertion is shown to be able to fail: a `detects ...` test corrupts the same
+// fixture (writes a premier, a zero vote, a second open season, ...) and requires the check
+// to say so. Expected values are literals chosen here (pending, 0, '2065-03-20'); none is
+// computed by the code under test. The completed-season "no medal published yet" case is
+// not here: it belongs to the D-365-1 regression (ISSUE-365).
+//
+// The two skipped tests keep their original text: they assert current-season PIPELINE state
+// (seasons.data_through_date as loaded by the ISSUE-099 import, staging.team_seasons) that
+// no historical rebuild produces.
 describe('gate: 2026 is provisional (snapshot-pinned)', () => {
   it.skip('marks the season in progress with an explicit as-at date', async () => {
     const [row] = await sql<{
@@ -1085,56 +1372,6 @@ describe('gate: 2026 is provisional (snapshot-pinned)', () => {
     expect(row.round).not.toBeNull();
   });
 
-  // AFLDB-ISSUE-113: re-armed with the season-grain writer, which never emits a row
-  // for an in-progress season (the loader refuses one), so 2026 derives as pending.
-  // The accepted canonical baseline ends at 2025: matches, player_match_stats and
-  // player_season_stats hold NO 2026 rows on a canonical rebuild, so the pending
-  // state is asserted through the season-level stat_availability contract, never
-  // through a player_season_stats row count the baseline cannot produce. The
-  // per-row clause is vacuous on the baseline and binds once a settle populates
-  // 2026: no 2026 row may carry a vote or a status other than 'pending'.
-  it('reports 2026 Brownlow as pending, never as zero', async () => {
-    const coverage = await sql<{ season: number; coverage: string }[]>`
-      SELECT season, coverage FROM stat_availability
-       WHERE stat_key = 'brownlow_season_total' AND season IN (2025, 2026)
-       ORDER BY season
-    `;
-    expect(coverage).toEqual([
-      { season: 2025, coverage: 'complete' },
-      { season: 2026, coverage: 'pending' },
-    ]);
-
-    const [season] = await sql<{ status: string }[]>`
-      SELECT status FROM seasons WHERE year = 2026
-    `;
-    expect(season.status).toBe('in_progress');
-
-    const [rows] = await sql<{ seasonRows: number; badRows: number }[]>`
-      SELECT (SELECT count(*)::int FROM brownlow_season_votes WHERE season = 2026)
-               AS "seasonRows",
-             (SELECT count(*)::int FROM player_season_stats
-               WHERE season = 2026
-                 AND (brownlow_votes IS NOT NULL OR brownlow_status <> 'pending'))
-               AS "badRows"
-    `;
-    // No season-grain row exists for a pending award, and no 2026 player-season
-    // may claim a vote or any status but pending — a 0 here would be a lie.
-    expect(rows.seasonRows).toBe(0);
-    expect(rows.badRows).toBe(0);
-  });
-
-  it('awards no premier and no wooden spoon for 2026', async () => {
-    const [row] = await sql<{ premiers: number; spoons: number }[]>`
-      SELECT count(*) FILTER (WHERE is_premier)::int   AS premiers,
-             count(*) FILTER (WHERE wooden_spoon)::int AS spoons
-        FROM club_seasons WHERE season = 2026
-    `;
-    expect(row.premiers).toBe(0);
-    // The raw ladder does flag a last-placed club; that is a standing,
-    // not an honour, and must not survive into the derived table.
-    expect(row.spoons).toBe(0);
-  });
-
   it.skip('preserves the raw ladder untouched in staging', async () => {
     const [row] = await sql<{ n: number }[]>`
       SELECT count(*)::int AS n FROM staging.team_seasons
@@ -1144,11 +1381,432 @@ describe('gate: 2026 is provisional (snapshot-pinned)', () => {
     // the ability to reprocess.
     expect(row.n).toBe(1);
   });
+});
 
-  it('is the only season still in progress', async () => {
-    const rows = await sql<{ year: number }[]>`
-      SELECT year FROM seasons WHERE status = 'in_progress' ORDER BY year
+/** Seasons allocated to this file (run 4 brief 3a): rolled back only. */
+const PROVISIONAL_SEASON = 2065;
+const LATER_SEASON = 2066;
+/** Synthetic provider/key prefix allocated to this file. */
+const FIXTURE_PREFIX = 'CD_I4020';
+/** Stable club keys. The fixture reads these identities and never writes `clubs`. */
+const FIXTURE_CLUB_SLUGS = ['adelaide', 'carlton', 'collingwood', 'essendon'] as const;
+/** The as-at date a provisional season with these four matches must report. */
+const FIXTURE_AS_AT = '2065-03-20';
+
+type Tx = postgres.TransactionSql;
+type Q = typeof sql;
+class Rollback extends Error {}
+
+/** Run `work` in a transaction that is always rolled back; resolve with what it returned. */
+async function inRolledBackTransaction<T>(work: (tx: Tx) => Promise<T>): Promise<T> {
+  let out!: T;
+  try {
+    await sql.begin(async (tx) => {
+      out = await work(tx);
+      throw new Rollback('release-gates provisional-season fixture: always rolled back');
+    });
+  } catch (error) {
+    if (!(error instanceof Rollback)) throw error;
+  }
+  return out;
+}
+
+/**
+ * Insert a fixture season, refusing to adopt one that already exists. Seasons 2065 and 2066 are this
+ * file's, but a committed fixture of another suite (or a leak) on the same year would otherwise
+ * surface as a bare duplicate-key error.
+ */
+async function insertFixtureSeason(q: Q, year: number, status: 'in_progress' | 'complete'): Promise<void> {
+  const [{ n }] = await q<{ n: number }[]>`SELECT count(*)::int AS n FROM seasons WHERE year = ${year}`;
+  if (n !== 0) {
+    throw new Error(
+      `season ${year} already exists: refusing to build a release-gates provisional-season fixture over it `
+      + '(a committed fixture of another suite, or a leak; this file only ever uses 2065 and 2066, rolled back)',
+    );
+  }
+  await q`INSERT INTO seasons (year, league, status) VALUES (${year}, 'AFL', ${status}::season_status)`;
+}
+
+/**
+ * Establish `year` as a season in progress inside `tx`, with the production recompute
+ * functions, and return the synthetic player ids.
+ *
+ * Round 1: A 100-80 B, C 90-70 D. Round 2: A 95-85 C, B 88-60 D. Four clubs, so the
+ * ladder is A (8 points), C (4, 106.1%), B (4, 105.0%), D (0): D is the unique last place.
+ * Refuses to adopt a `seasons` row that is already there (insertFixtureSeason).
+ */
+async function establishProvisionalSeason(tx: Tx, year: number): Promise<number[]> {
+  const q = tx as unknown as Q;
+  const clubs = await q<{ id: number; slug: string }[]>`
+    SELECT id::int AS id, slug FROM clubs WHERE slug = ANY(${[...FIXTURE_CLUB_SLUGS]}::text[])
+  `;
+  if (clubs.length !== FIXTURE_CLUB_SLUGS.length) {
+    throw new Error(`the provisional-season fixture needs the clubs ${FIXTURE_CLUB_SLUGS.join(', ')}`);
+  }
+  const idOf = Object.fromEntries(clubs.map((c) => [c.slug, c.id]));
+  const [a, b, c, d] = FIXTURE_CLUB_SLUGS.map((slug) => idOf[slug]);
+  const [{ id: sourceId }] = await q<{ id: number }[]>`SELECT id::int AS id FROM sources WHERE key = 'afltables'`;
+
+  await insertFixtureSeason(q, year, 'in_progress');
+
+  const games = [
+    { key: 'r1m1', round: 1, date: '03-12', home: a, away: b, homeScore: 100, awayScore: 80 },
+    { key: 'r1m2', round: 1, date: '03-13', home: c, away: d, homeScore: 90, awayScore: 70 },
+    { key: 'r2m1', round: 2, date: '03-19', home: a, away: c, homeScore: 95, awayScore: 85 },
+    { key: 'r2m2', round: 2, date: '03-20', home: b, away: d, homeScore: 88, awayScore: 60 },
+  ];
+  const playersByClub = new Map<number, number[]>();
+  for (const [index, clubId] of [a, b, c, d].entries()) {
+    const ids: number[] = [];
+    for (let n = 0; n < 2; n += 1) {
+      const name = `${FIXTURE_PREFIX} ${year} C${index} P${n}`;
+      const [row] = await q<{ id: number }[]>`
+        INSERT INTO players (display_name, sort_name, search_name, slug)
+        VALUES (${name}, ${name}, ${name.toLowerCase()}, ${`${FIXTURE_PREFIX}-${year}-c${index}-p${n}`})
+        RETURNING id::int AS id
+      `;
+      ids.push(row.id);
+    }
+    playersByClub.set(clubId, ids);
+  }
+  for (const game of games) {
+    const [match] = await q<{ id: number }[]>`
+      INSERT INTO matches (
+        match_key, season, round_code, round_number, round_type, is_final,
+        match_date, venue_raw, home_club_id, away_club_id,
+        home_score, away_score, result, winner_club_id, margin,
+        attendance, attendance_status, source_id
+      ) VALUES (
+        ${`${FIXTURE_PREFIX}-${year}-${game.key}`}, ${year}, ${String(game.round)}, ${game.round},
+        'home_and_away'::round_type, false,
+        ${`${year}-${game.date}`}, ${`${FIXTURE_PREFIX} Oval`}, ${game.home}, ${game.away},
+        ${game.homeScore}, ${game.awayScore}, 'home_win'::match_result, ${game.home},
+        ${game.homeScore - game.awayScore},
+        NULL, 'not_collected'::coverage_status, ${sourceId}
+      )
+      RETURNING id::int AS id
     `;
-    expect(rows.map((r) => r.year)).toEqual([2026]);
+    for (const clubId of [game.home, game.away]) {
+      let jumper = 1;
+      for (const playerId of playersByClub.get(clubId) ?? []) {
+        await q`
+          INSERT INTO player_match_stats (
+            player_id, match_id, club_id, jumper_number, kicks, marks, handballs,
+            disposals, goals, behinds, hitouts, tackles, frees_for, frees_against, source_id
+          ) VALUES (
+            ${playerId}, ${match.id}, ${clubId}, ${String(jumper)}, 11, 4, 7,
+            18, 1, 1, 0, 3, 1, 1, ${sourceId}
+          )
+        `;
+        jumper += 1;
+      }
+    }
+  }
+
+  const playerIds = [...playersByClub.values()].flat();
+  // The production order: season metadata first (the wooden-spoon gate reads seasons.status),
+  // then the ladder, the player rows, and the Brownlow coverage grid and statuses.
+  await recomputeSeasonMetadata(tx, year);
+  await recomputeClubSeasons(tx, year);
+  await recomputePlayerDerivedStats(tx, playerIds, year);
+  await recomputeBrownlowCoverage(tx, year);
+  await recomputeSeasonBrownlowStatus(tx, year);
+  return playerIds;
+}
+
+const BROWNLOW_GRAINS = ['brownlow_season_total', 'brownlow_round_votes', 'brownlow_match_votes'];
+
+/** Status and as-at date of a season in progress. Empty means the contract holds. */
+async function seasonStatusViolations(q: Q, year: number, asAt: string): Promise<string[]> {
+  const [row] = await q<{ status: string; completed: string | null; through: string | null; round: string | null }[]>`
+    SELECT status::text AS status, completed_at::text AS completed,
+           data_through_date::text AS through, last_loaded_round AS round
+      FROM seasons WHERE year = ${year}
+  `;
+  if (!row) return [`no seasons row for ${year}`];
+  const out: string[] = [];
+  if (row.status !== 'in_progress') out.push(`status is ${row.status}, not in_progress`);
+  if (row.completed !== null) out.push(`completed_at is ${row.completed}, not NULL`);
+  if (row.through !== asAt) out.push(`data_through_date is ${row.through}, not ${asAt}`);
+  if (row.round === null) out.push('last_loaded_round is NULL');
+  return out;
+}
+
+/** Brownlow of a season in progress: pending, never zero. Empty means the contract holds. */
+async function brownlowPendingViolations(q: Q, year: number): Promise<string[]> {
+  const out: string[] = [];
+  const grains = await q<{ key: string; coverage: string; recorded: boolean }[]>`
+    SELECT stat_key AS key, coverage::text AS coverage, is_recorded AS recorded
+      FROM stat_availability WHERE season = ${year} AND stat_key = ANY(${BROWNLOW_GRAINS}::text[])
+  `;
+  for (const key of BROWNLOW_GRAINS) {
+    const grain = grains.find((g) => g.key === key);
+    if (!grain) out.push(`${key}: no stat_availability row`);
+    else if (grain.coverage !== 'pending' || grain.recorded) {
+      out.push(`${key}: coverage ${grain.coverage} (recorded ${grain.recorded}), not pending and unrecorded`);
+    }
+  }
+  const [n] = await q<{
+    seasonRows: number; roundRows: number; matchVotes: number; playerVotes: number; playerNotPending: number;
+  }[]>`
+    SELECT (SELECT count(*)::int FROM brownlow_season_votes WHERE season = ${year})   AS "seasonRows",
+           (SELECT count(*)::int FROM brownlow_round_votes  WHERE season = ${year})   AS "roundRows",
+           (SELECT count(*)::int FROM player_match_stats s JOIN matches m ON m.id = s.match_id
+             WHERE m.season = ${year} AND s.brownlow_votes IS NOT NULL)               AS "matchVotes",
+           (SELECT count(*)::int FROM player_season_stats
+             WHERE season = ${year} AND brownlow_votes IS NOT NULL)                   AS "playerVotes",
+           (SELECT count(*)::int FROM player_season_stats
+             WHERE season = ${year} AND brownlow_status <> 'pending')                 AS "playerNotPending"
+  `;
+  if (n.seasonRows > 0) out.push(`${n.seasonRows} brownlow_season_votes rows for an unawarded season`);
+  if (n.roundRows > 0) out.push(`${n.roundRows} brownlow_round_votes rows for an unawarded season`);
+  // A 0 here would be a lie: nobody has polled nothing in a season nobody has polled in yet.
+  if (n.matchVotes > 0) out.push(`${n.matchVotes} player_match_stats rows carry a vote (a 0 counts)`);
+  if (n.playerVotes > 0) out.push(`${n.playerVotes} player_season_stats rows carry a vote total (a 0 counts)`);
+  if (n.playerNotPending > 0) out.push(`${n.playerNotPending} player_season_stats rows have a status other than pending`);
+  return out;
+}
+
+/** Honours of a season in progress: none awarded. Empty means the contract holds. */
+async function honoursViolations(q: Q, year: number): Promise<string[]> {
+  const [n] = await q<{ premiers: number; spoons: number; playerPremierships: number }[]>`
+    SELECT (SELECT count(*) FILTER (WHERE is_premier)::int   FROM club_seasons WHERE season = ${year})
+             AS premiers,
+           (SELECT count(*) FILTER (WHERE wooden_spoon)::int FROM club_seasons WHERE season = ${year})
+             AS spoons,
+           (SELECT count(*) FILTER (WHERE is_premier)::int   FROM player_season_stats WHERE season = ${year})
+             AS "playerPremierships"
+  `;
+  const out: string[] = [];
+  if (n.premiers > 0) out.push(`${n.premiers} club_seasons rows are premier`);
+  // The raw ladder does flag a last-placed club; that is a standing, not an honour, and
+  // must not survive into the derived table.
+  if (n.spoons > 0) out.push(`${n.spoons} club_seasons rows hold the wooden spoon`);
+  if (n.playerPremierships > 0) out.push(`${n.playerPremierships} player_season_stats rows record a premiership`);
+  return out;
+}
+
+/** Build the fixture, apply `corrupt`, and report what `check` finds. */
+async function checkAfter(
+  corrupt: (q: Q, year: number) => Promise<unknown>,
+  check: (q: Q, year: number) => Promise<string[]>,
+): Promise<string[]> {
+  return inRolledBackTransaction(async (tx) => {
+    await establishProvisionalSeason(tx, PROVISIONAL_SEASON);
+    await corrupt(tx as unknown as Q, PROVISIONAL_SEASON);
+    return check(tx as unknown as Q, PROVISIONAL_SEASON);
+  });
+}
+
+describe('gate: a season in progress is provisional (established by this file, rolled back)', () => {
+  it('is a genuine in-progress season with something for each contract to protect', async () => {
+    const proof = await inRolledBackTransaction(async (tx) => {
+      await establishProvisionalSeason(tx, PROVISIONAL_SEASON);
+      const q = tx as unknown as Q;
+      const [ladder] = await q<{ clubs: number; lastRank: number | null; lastPlaceClubs: number }[]>`
+        SELECT count(*)::int AS clubs, max(ladder_rank)::int AS "lastRank",
+               count(*) FILTER (WHERE ladder_rank = 4)::int AS "lastPlaceClubs"
+          FROM club_seasons WHERE season = ${PROVISIONAL_SEASON}
+      `;
+      const [players] = await q<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM player_season_stats WHERE season = ${PROVISIONAL_SEASON}
+      `;
+      return {
+        status: await seasonStatusViolations(q, PROVISIONAL_SEASON, FIXTURE_AS_AT),
+        ladder,
+        players: players.n,
+      };
+    });
+    expect(proof.status.join(' | ')).toBe('');
+    // Four clubs, one of them uniquely last: a wooden spoon would exist on a completed season.
+    expect(proof.ladder).toEqual({ clubs: 4, lastRank: 4, lastPlaceClubs: 1 });
+    // Eight player-season rows, each of which could carry a vote.
+    expect(proof.players).toBe(8);
+  });
+
+  it('reports Brownlow as pending, never as zero', async () => {
+    const found = await checkAfter(async () => undefined, brownlowPendingViolations);
+    expect(found.join(' | ')).toBe('');
+  });
+
+  it('awards no premier and no wooden spoon', async () => {
+    const found = await checkAfter(async () => undefined, honoursViolations);
+    expect(found.join(' | ')).toBe('');
+  });
+
+  it('carries an explicit as-at date and is not completed', async () => {
+    const found = await checkAfter(
+      async () => undefined,
+      (q, year) => seasonStatusViolations(q, year, FIXTURE_AS_AT),
+    );
+    expect(found.join(' | ')).toBe('');
+  });
+
+  it('leaves nothing behind: the fixture is rolled back', async () => {
+    const [row] = await sql<{ seasons: number; matches: number; players: number }[]>`
+      SELECT (SELECT count(*)::int FROM seasons WHERE year = ANY(${[PROVISIONAL_SEASON, LATER_SEASON]}::int[]))
+               AS seasons,
+             (SELECT count(*)::int FROM matches WHERE match_key LIKE ${`${FIXTURE_PREFIX}%`})
+               AS matches,
+             (SELECT count(*)::int FROM players WHERE slug LIKE ${`${FIXTURE_PREFIX}%`})
+               AS players
+    `;
+    expect(row).toEqual({ seasons: 0, matches: 0, players: 0 });
+  });
+
+  // Non-vacuity: every contract above is shown able to fail on this same fixture.
+  it('detects a zero vote, a settled status and a published Brownlow on a season in progress', async () => {
+    // pss_brownlow_grain_ck already refuses a vote under a status other than `complete`, so a
+    // zero vote is only writable together with a settled status: that is the lie to catch.
+    const zeroPlayerVote = await checkAfter(
+      (q, year) => q`
+        UPDATE player_season_stats SET brownlow_votes = 0, brownlow_status = 'complete'
+         WHERE season = ${year}`,
+      brownlowPendingViolations,
+    );
+    expect(zeroPlayerVote).toContainEqual(expect.stringContaining('player_season_stats rows carry a vote total'));
+    expect(zeroPlayerVote).toContainEqual(expect.stringContaining('status other than pending'));
+
+    const zeroMatchVote = await checkAfter(
+      (q, year) => q`
+        UPDATE player_match_stats SET brownlow_votes = 0
+         WHERE match_id IN (SELECT id FROM matches WHERE season = ${year})`,
+      brownlowPendingViolations,
+    );
+    expect(zeroMatchVote).toContainEqual(expect.stringContaining('player_match_stats rows carry a vote'));
+
+    const noMedalStatus = await checkAfter(
+      (q, year) => q`UPDATE player_season_stats SET brownlow_status = 'not_applicable' WHERE season = ${year}`,
+      brownlowPendingViolations,
+    );
+    expect(noMedalStatus).toContainEqual(expect.stringContaining('status other than pending'));
+
+    const completeGrain = await checkAfter(
+      (q, year) => q`
+        UPDATE stat_availability SET coverage = 'complete', is_recorded = true
+         WHERE season = ${year} AND stat_key = 'brownlow_season_total'`,
+      brownlowPendingViolations,
+    );
+    expect(completeGrain).toContainEqual(expect.stringContaining('brownlow_season_total: coverage complete'));
+
+    const noMedalGrain = await checkAfter(
+      (q, year) => q`
+        UPDATE stat_availability SET coverage = 'not_applicable'
+         WHERE season = ${year} AND stat_key = 'brownlow_round_votes'`,
+      brownlowPendingViolations,
+    );
+    expect(noMedalGrain).toContainEqual(expect.stringContaining('brownlow_round_votes: coverage not_applicable'));
+
+    const publishedRow = await checkAfter(
+      (q, year) => q`
+        INSERT INTO brownlow_season_votes (season, player_id, votes)
+        SELECT ${year}::smallint, player_id, 2 FROM player_season_stats WHERE season = ${year} LIMIT 1`,
+      brownlowPendingViolations,
+    );
+    expect(publishedRow).toContainEqual(expect.stringContaining('brownlow_season_votes rows for an unawarded season'));
+  });
+
+  it('detects a premier and a wooden spoon on a season in progress', async () => {
+    const premier = await checkAfter(
+      (q, year) => q`UPDATE club_seasons SET is_premier = true WHERE season = ${year} AND ladder_rank = 1`,
+      honoursViolations,
+    );
+    expect(premier).toContainEqual(expect.stringContaining('club_seasons rows are premier'));
+
+    const spoon = await checkAfter(
+      (q, year) => q`UPDATE club_seasons SET wooden_spoon = true WHERE season = ${year} AND ladder_rank = 4`,
+      honoursViolations,
+    );
+    expect(spoon).toContainEqual(expect.stringContaining('club_seasons rows hold the wooden spoon'));
+
+    const playerPremiership = await checkAfter(
+      (q, year) => q`UPDATE player_season_stats SET is_premier = true WHERE season = ${year}`,
+      honoursViolations,
+    );
+    expect(playerPremiership).toContainEqual(expect.stringContaining('player_season_stats rows record a premiership'));
+  });
+
+  it('detects a completed season and a missing as-at date', async () => {
+    const completed = await checkAfter(
+      (q, year) => q`UPDATE seasons SET status = 'complete', completed_at = data_through_date WHERE year = ${year}`,
+      (q, year) => seasonStatusViolations(q, year, FIXTURE_AS_AT),
+    );
+    expect(completed).toContainEqual(expect.stringContaining('status is complete, not in_progress'));
+    expect(completed).toContainEqual(expect.stringContaining('completed_at is'));
+
+    const noAsAt = await checkAfter(
+      (q, year) => q`UPDATE seasons SET data_through_date = NULL WHERE year = ${year}`,
+      (q, year) => seasonStatusViolations(q, year, FIXTURE_AS_AT),
+    );
+    expect(noAsAt).toContainEqual(expect.stringContaining('data_through_date is null'));
+  });
+});
+
+// ---------------------------------------------------------------------
+// STRUCTURE — which seasons may be in progress
+// ---------------------------------------------------------------------
+/**
+ * The invariant: at most one season is in progress, and it is the latest season. Empty means
+ * it holds. Deliberately silent about whether any season is open: the 4 Nov snapshot has none
+ * and the accepted rebuild has 2027, and both are correct.
+ */
+async function inProgressStructureViolations(q: Q): Promise<string[]> {
+  const open = await q<{ year: number; latest: boolean }[]>`
+    SELECT year::int AS year, year = (SELECT max(year) FROM seasons) AS latest
+      FROM seasons WHERE status = 'in_progress' ORDER BY year
+  `;
+  const out: string[] = [];
+  if (open.length > 1) out.push(`${open.length} seasons in progress: ${open.map((s) => s.year).join(', ')}`);
+  for (const season of open) {
+    if (!season.latest) out.push(`season ${season.year} is in progress but is not the latest season`);
+  }
+  return out;
+}
+
+describe('gate: season status structure', () => {
+  it('has at most one season in progress, and it is the latest', async () => {
+    // TST-9: a fixture season leaked by an interrupted committed-fixture suite would fail this
+    // with a bare year; the file-level beforeAll names the leak first.
+    expect((await inProgressStructureViolations(sql)).join(' | ')).toBe('');
+  });
+
+  it('detects a second season in progress and an in-progress season that is not the latest', async () => {
+    const two = await inRolledBackTransaction(async (tx) => {
+      const q = tx as unknown as Q;
+      await insertFixtureSeason(q, PROVISIONAL_SEASON, 'in_progress');
+      await insertFixtureSeason(q, LATER_SEASON, 'in_progress');
+      return inProgressStructureViolations(q);
+    });
+    // Two fixture seasons are open whatever the real table holds, so this holds on both bases.
+    expect(two).toContainEqual(expect.stringContaining('seasons in progress'));
+    expect(two).toContainEqual(expect.stringContaining(`season ${PROVISIONAL_SEASON} is in progress but is not the latest`));
+
+    const notLatest = await inRolledBackTransaction(async (tx) => {
+      const q = tx as unknown as Q;
+      await q`UPDATE seasons SET status = 'complete' WHERE status = 'in_progress'`;
+      await insertFixtureSeason(q, PROVISIONAL_SEASON, 'in_progress');
+      await insertFixtureSeason(q, LATER_SEASON, 'complete');
+      return inProgressStructureViolations(q);
+    });
+    expect(notLatest).toEqual([`season ${PROVISIONAL_SEASON} is in progress but is not the latest season`]);
+  });
+
+  it('accepts exactly one season in progress when it is the latest, and none at all', async () => {
+    // The positive controls, so the check above cannot be "always violating": normalise the real
+    // table inside the rolled-back transaction, then add the one legal shape.
+    const one = await inRolledBackTransaction(async (tx) => {
+      const q = tx as unknown as Q;
+      await q`UPDATE seasons SET status = 'complete' WHERE status = 'in_progress'`;
+      await insertFixtureSeason(q, PROVISIONAL_SEASON, 'in_progress');
+      return inProgressStructureViolations(q);
+    });
+    expect(one.join(' | ')).toBe('');
+
+    const none = await inRolledBackTransaction(async (tx) => {
+      const q = tx as unknown as Q;
+      await q`UPDATE seasons SET status = 'complete' WHERE status = 'in_progress'`;
+      return inProgressStructureViolations(q);
+    });
+    expect(none.join(' | ')).toBe('');
   });
 });
