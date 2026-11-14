@@ -11,6 +11,9 @@ export default defineConfig({
     testTimeout: 30_000,
     hookTimeout: 30_000,
     setupFiles: ['tests/setup.ts'],
+    // AFLDB-ISSUE-363: per-file disposable databases. A no-op unless AFLDB_TEST_PER_FILE_DB is set; when set it
+    // refuses a disallowed base before any worker starts and reaps databases whose files never ran afterAll.
+    globalSetup: ['packages/testing/src/per-file-global-setup.ts'],
     // AFLDB-ISSUE-108: every integration suite shares the one mutable afldb_test.
     // Under file parallelism one suite's fixture mutations (a transient season,
     // in-flight draft links, moving canonical counts) are observed by another

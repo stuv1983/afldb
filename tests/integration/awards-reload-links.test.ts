@@ -4246,15 +4246,19 @@ const FIXTURE_VENUE = 'AFLDB-ISSUE-111 fixture venue';
 const ISOLATION_AWARD_SLUG = 'afldb-issue-111-isolation';
 
 /**
- * Reserved seasons. 2090–2093 are above every real season and below the
- * `seasons_year_ck` ceiling of 2100; the boundary case must be the season
+ * Reserved seasons. All are above every real season and below the
+ * `seasons_year_ck` ceiling of 2100. AFLDB-ISSUE-363 (decision 2): 2091 and 2093
+ * were also claimed by admin-coaches, v2-curated-awards, settle-afltables and
+ * import-role-match-lock, so the multi-club and finals seasons moved to 2061 and
+ * 2062, which no other suite uses (ownership table:
+ * tests/integration/leaked-fixtures.ts). The boundary case must be the season
  * immediately before the contract's own first_season, so it is read from the
  * contract rather than written as a literal.
  */
 const TIE_SEASON = 2090;
-const MULTI_CLUB_SEASON = 2091;
+const MULTI_CLUB_SEASON = 2061;
 const IN_PROGRESS_SEASON = 2092;
-const FINALS_SEASON = 2093;
+const FINALS_SEASON = 2062;
 const BOUNDARY_SEASON = coleman.first_season - 1;
 const CREATED_SEASONS: { year: number; status: 'complete' | 'in_progress' }[] = [
   { year: BOUNDARY_SEASON, status: 'complete' },

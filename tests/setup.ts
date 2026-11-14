@@ -17,8 +17,21 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { applyTestDsnPolicy } from '@afldb/testing';
+import { afterAll, expect } from 'vitest';
+
+import {
+  PER_FILE_AUDIT_ENV,
+  PER_FILE_DB_ENV,
+  applyTestDsnPolicy,
+  auditPerFileResidue,
+  createPerFileDatabase,
+  dropPerFileDatabase,
+  perFileAppliesTo,
+  perFileModeOf,
+  redirectEnvToDatabase,
+} from '@afldb/testing';
 import { validateImportRoleParityDsnTargets } from './integration/import-role-parity';
+import { COMMITTING_SUITES } from './integration/leaked-fixtures';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -39,6 +52,28 @@ try {
 // connection variables are removed (never a throw), so no test, imported module or spawned
 // child can reach a non-test database. The pre-V2 refusals throw exactly as before.
 applyTestDsnPolicy(process.env);
+
+// AFLDB-ISSUE-363 owner decision (1): opt-in per-file disposable databases (AFLDB_TEST_PER_FILE_DB=1|all). Off by
+// default and then nothing below runs. When on, an integration file gets a fresh copy of the base database
+// (CREATE DATABASE ... TEMPLATE <base>) BEFORE anything is imported, every DSN variable naming the base is redirected
+// to the copy, and the copy is dropped when the file ends (afterAll registered here runs after the file's own
+// afterAll hooks). Every refusal (non-_test base, port 5432, malformed prefix, dropping a name this process did not
+// generate) lives in packages/testing/src/per-file-db-policy.ts and is unit-tested in tests/dsn-policy.test.ts.
+const perFileMode = perFileModeOf(process.env[PER_FILE_DB_ENV]);
+const perFileTestPath = expect.getState().testPath;
+if (perFileAppliesTo(perFileMode, perFileTestPath, COMMITTING_SUITES)) {
+  const baseDsn = process.env.AFLDB_TEST_DATABASE_URL as string;
+  const database = await createPerFileDatabase({ env: process.env, baseDsn });
+  redirectEnvToDatabase(process.env, baseDsn, database.name);
+  const auditPath = process.env[PER_FILE_AUDIT_ENV];
+  afterAll(async () => {
+    try {
+      if (auditPath) await auditPerFileResidue(database, { env: process.env, baseDsn, testPath: perFileTestPath as string, auditPath });
+    } finally {
+      await dropPerFileDatabase(database, { env: process.env, baseDsn });
+    }
+  });
+}
 
 const testUrl = process.env.AFLDB_TEST_DATABASE_URL;
 const restrictedImportTestUrl = process.env.AFLDB_TEST_IMPORT_DATABASE_URL;

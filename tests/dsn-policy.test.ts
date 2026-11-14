@@ -13,16 +13,35 @@
  * The present-DSN branch is proved here on env objects only: it is unverified on a live database
  * (none exists on the V2 workstation; docs/v2/known-gaps.md).
  */
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  adminDsnFor,
   applyTestDsnPolicy,
+  assertPerFileBaseAllowed,
+  assertPerFileDroppable,
+  assertPerFilePrefix,
+  createPerFileDatabase,
+  createPerFileLedger,
+  dropPerFileDatabase,
   isDsnVariable,
   LIBPQ_CONNECTION_VARIABLES,
+  MIN_SWEEP_AGE_MS,
+  parsePerFileDatabaseName,
+  perFileAppliesTo,
+  perFileDatabaseName,
+  perFileDatabasesCreatedByThisProcess,
+  perFileModeOf,
+  reapLedgerDatabases,
+  redirectDsn,
+  redirectEnvToDatabase,
+  selectStalePerFileDatabases,
+  sweepStalePerFileDatabases,
+  type AdminSql,
   type DsnEnv,
 } from '@afldb/testing';
 import {
@@ -31,6 +50,7 @@ import {
   testProcessDsnRefusal,
 } from '@/db/test-process-guard';
 import { isConnectionVariableName, loadEnv } from '../tools/current-season/load-env';
+import { COMMITTED_FIXTURE_SEASONS, COMMITTING_SUITES } from './integration/leaked-fixtures';
 
 // Captured at module evaluation, i.e. immediately after tests/setup.ts applied the policy and
 // before any test in this file could change process.env.
@@ -276,5 +296,280 @@ describe('tools/current-season/load-env.ts inside and outside a test process', (
       delete process.env.AFLDB_IMPORT_DATABASE_URL;
       delete process.env.PGPASSWORD;
     }
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// AFLDB-ISSUE-363 owner decision (1): per-file disposable databases. Every refusal is proved on plain values or
+// with an injected connection that fails the test if it is ever opened, so no database is needed.
+// ---------------------------------------------------------------------------------------------
+const NOW = new Date(Date.UTC(2026, 10, 14, 5, 30, 0));
+const GOOD_NAME = perFileDatabaseName({ prefix: 'afldb_v2_pf_', now: NOW, pid: 4242, nonce: 'a1b2c3d4' });
+const BASE_55651 = 'postgresql://afldb_owner:pw@127.0.0.1:55651/afldb_v2_base_test';
+const NEVER_CONNECT = async (): Promise<AdminSql> => { throw new Error('a connection was opened but the refusal must come first'); };
+
+describe('per-file databases: mode and base refusals', () => {
+  it('is off unless asked for, accepts 1 / all, and rejects a typo instead of silently running shared mode', () => {
+    expect(perFileModeOf(undefined)).toBe('off');
+    expect(perFileModeOf('')).toBe('off');
+    expect(perFileModeOf('0')).toBe('off');
+    expect(perFileModeOf('1')).toBe('registered');
+    expect(perFileModeOf('all')).toBe('all');
+    expect(() => perFileModeOf('yes please')).toThrow(/not recognised/);
+  });
+
+  it('refuses a base database that does not end in _test', () => {
+    expect(() => assertPerFileBaseAllowed('postgresql://u:p@127.0.0.1:55651/afldb_dev')).toThrow(/base_name/);
+    expect(() => assertPerFileBaseAllowed('postgresql://u:p@127.0.0.1:55651/afldb_prod')).toThrow(/does not end in _test/);
+    expect(() => assertPerFileBaseAllowed(BASE_55651)).not.toThrow();
+  });
+
+  it("refuses DEV's port 5432, an unstated (default 5432) port, a libpq redirect and a non-URL", () => {
+    expect(() => assertPerFileBaseAllowed('postgresql://u:p@10.0.40.100:5432/afldb_test')).toThrow(/port 5432 is DEV/);
+    expect(() => assertPerFileBaseAllowed('postgresql://u:p@127.0.0.1:5432/afldb_v2_base_test')).toThrow(/port \(/);
+    expect(() => assertPerFileBaseAllowed('postgresql://u:p@localhost/afldb_v2_base_test')).toThrow(/default 5432/);
+    expect(() => assertPerFileBaseAllowed(`${BASE_55651}?host=10.0.40.100`)).toThrow(/libpq_redirect/);
+    expect(() => assertPerFileBaseAllowed('not a url')).toThrow(/base_dsn/);
+    expect(() => assertPerFileBaseAllowed(undefined)).toThrow(/is not set/);
+  });
+
+  it('never puts a credential in a refusal message', () => {
+    let message = '';
+    try {
+      assertPerFileBaseAllowed('postgresql://afldb_owner:s3cret-pw@10.0.40.100:5432/afldb_prod');
+    } catch (error) {
+      message = String((error as Error).message);
+    }
+    expect(message).toMatch(/refused/);
+    expect(message).not.toContain('s3cret');
+  });
+
+  it('refuses before any connection is opened', async () => {
+    await expect(createPerFileDatabase(
+      { env: {}, baseDsn: 'postgresql://u:p@127.0.0.1:5432/afldb_v2_base_test' }, { connect: NEVER_CONNECT },
+    )).rejects.toThrow(/Per-file test databases refused/);
+    await expect(createPerFileDatabase(
+      { env: {}, baseDsn: 'postgresql://u:p@127.0.0.1:55651/afldb_dev' }, { connect: NEVER_CONNECT },
+    )).rejects.toThrow(/does not end in _test/);
+    await expect(createPerFileDatabase(
+      { env: { AFLDB_TEST_PER_FILE_DB_PREFIX: 'Bad-Prefix_' }, baseDsn: BASE_55651 }, { connect: NEVER_CONNECT },
+    )).rejects.toThrow(/prefix .* refused/);
+  });
+});
+
+describe('per-file databases: generated names and prefix', () => {
+  it('generates <prefix><utc stamp>_<pid>_<nonce>_test, which the isolated-target name rule also accepts', () => {
+    expect(GOOD_NAME).toBe('afldb_v2_pf_20261114053000_4242_a1b2c3d4_test');
+    expect(/^afldb_v2_[a-z0-9]+(?:_[a-z0-9]+)*_test$/.test(GOOD_NAME)).toBe(true);
+    expect(parsePerFileDatabaseName(GOOD_NAME, 'afldb_v2_pf_')).toEqual({ createdAt: NOW, pid: 4242, nonce: 'a1b2c3d4' });
+  });
+
+  it.each([
+    ['empty', ''],
+    ['no afldb_v2_ start', 'pf_'],
+    ['uppercase', 'afldb_v2_PF_'],
+    ['no trailing underscore', 'afldb_v2_pf'],
+    ['punctuation', 'afldb_v2_p-f_'],
+    ['too long', 'afldb_v2_abcdefghijklm_'],
+    ['injection', 'afldb_v2_x"; DROP DATABASE y; --_'],
+    ['bare afldb_', 'afldb_'],
+  ])('refuses a malformed prefix: %s', (_label, prefix) => {
+    expect(() => assertPerFilePrefix(prefix)).toThrow(/prefix .* refused/);
+    expect(() => perFileDatabaseName({ prefix, now: NOW, pid: 1, nonce: 'a1b2c3d4' })).toThrow(/prefix .* refused/);
+    expect(() => parsePerFileDatabaseName(GOOD_NAME, prefix)).toThrow(/prefix .* refused/);
+  });
+
+  it('refuses a malformed nonce or pid', () => {
+    expect(() => perFileDatabaseName({ prefix: 'afldb_v2_pf_', now: NOW, pid: 1, nonce: 'XYZ' })).toThrow(/nonce/);
+    expect(() => perFileDatabaseName({ prefix: 'afldb_v2_pf_', now: NOW, pid: 0, nonce: 'a1b2c3d4' })).toThrow(/pid/);
+  });
+
+  it('does not parse a look-alike name', () => {
+    for (const name of [
+      'afldb_v2_pf_20261114053000_4242_a1b2c3d4', // no _test
+      'afldb_v2_pf_20261114053000_4242_a1b2c3d_test', // short nonce
+      'afldb_v2_pf_20261399053000_4242_a1b2c3d4_test', // impossible date
+      'afldb_v2_other_20261114053000_4242_a1b2c3d4_test', // other prefix
+      'afldb_v2_base_test',
+    ]) expect(parsePerFileDatabaseName(name, 'afldb_v2_pf_')).toBeNull();
+  });
+});
+
+describe('per-file databases: only a name this process generated may be dropped', () => {
+  const created = new Set<string>([GOOD_NAME]);
+  const opts = { createdByThisProcess: created, baseName: 'afldb_v2_base_test', prefix: 'afldb_v2_pf_' };
+
+  it('allows the name this process generated', () => {
+    expect(() => assertPerFileDroppable(GOOD_NAME, opts)).not.toThrow();
+  });
+
+  it('refuses the DSN-named base even if it were somehow registered', () => {
+    expect(() => assertPerFileDroppable('afldb_v2_base_test', { ...opts, createdByThisProcess: new Set(['afldb_v2_base_test']) }))
+      .toThrow(/base database named by the DSN/);
+  });
+
+  it('refuses a well-formed name that another process generated', () => {
+    const other = perFileDatabaseName({ prefix: 'afldb_v2_pf_', now: NOW, pid: 999, nonce: 'deadbeef' });
+    expect(() => assertPerFileDroppable(other, opts)).toThrow(/this process did not generate it/);
+  });
+
+  it.each([
+    'afldb_dev', 'afldb_prod', 'afldb_test', 'postgres', 'template1', 'afldb_v2_rem2tests363_tmpl_test',
+    'afldb_v2_pf_20261114053000_4242_a1b2c3d4', // right prefix, no _test
+  ])('refuses %s even when it is in the registry', (name) => {
+    expect(() => assertPerFileDroppable(name, { ...opts, createdByThisProcess: new Set([name]) })).toThrow(/Refusing to drop/);
+  });
+
+  it('dropPerFileDatabase refuses an unregistered name before opening any connection', async () => {
+    const stranger = perFileDatabaseName({ prefix: 'afldb_v2_pf_', now: NOW, pid: 7, nonce: 'cafebabe' });
+    expect(perFileDatabasesCreatedByThisProcess().has(stranger)).toBe(false);
+    await expect(dropPerFileDatabase(
+      { name: stranger, baseName: 'afldb_v2_base_test', prefix: 'afldb_v2_pf_' }, { env: {}, baseDsn: BASE_55651 }, { connect: NEVER_CONNECT },
+    )).rejects.toThrow(/this process did not generate it/);
+    await expect(dropPerFileDatabase(
+      { name: 'afldb_v2_base_test', baseName: 'afldb_v2_base_test', prefix: 'afldb_v2_pf_' }, { env: {}, baseDsn: BASE_55651 }, { connect: NEVER_CONNECT },
+    )).rejects.toThrow(/Refusing to drop/);
+  });
+});
+
+describe('per-file databases: sweep selection', () => {
+  const old = perFileDatabaseName({ prefix: 'afldb_v2_pf_', now: new Date(NOW.getTime() - 24 * 3600_000), pid: 1, nonce: '00000001' });
+  const young = perFileDatabaseName({ prefix: 'afldb_v2_pf_', now: new Date(NOW.getTime() - 60_000), pid: 2, nonce: '00000002' });
+  const marker = 'afldb-v2-isolated-test';
+  const opts = { prefix: 'afldb_v2_pf_', baseName: 'afldb_v2_base_test', baseComment: marker, now: NOW, maxAgeMs: 6 * 3600_000 };
+
+  it('drops only old, generated-shape, marked, same-prefix databases', () => {
+    const { drop, kept } = selectStalePerFileDatabases([
+      { name: old, comment: marker },
+      { name: young, comment: marker },
+      { name: 'afldb_v2_base_test', comment: marker },
+      { name: 'afldb_v2_pf_notgenerated_test', comment: marker },
+      { name: 'afldb_v2_pf2_20200101000000_1_00000003_test', comment: marker },
+      { name: old.replace('00000001', '00000009'), comment: null },
+    ], opts);
+    expect(drop).toEqual([old]);
+    expect(kept.map((k) => k.reason).sort()).toEqual([
+      'base database', 'different prefix', 'marker comment differs from the base', 'prefix matches but not the generated shape', 'younger than the age bound',
+    ]);
+  });
+
+  it('refuses an age bound below the minimum so a live run is never reaped', () => {
+    expect(() => selectStalePerFileDatabases([], { ...opts, maxAgeMs: MIN_SWEEP_AGE_MS - 1 })).toThrow(/minimum/);
+    expect(() => selectStalePerFileDatabases([], { ...opts, maxAgeMs: Number.NaN })).toThrow(/minimum/);
+  });
+
+  it('refuses a base the mode refuses, before any connection', async () => {
+    await expect(sweepStalePerFileDatabases(
+      { env: {}, baseDsn: 'postgresql://u:p@127.0.0.1:5432/afldb_v2_base_test', maxAgeMs: 6 * 3600_000, dryRun: true }, { connect: NEVER_CONNECT },
+    )).rejects.toThrow(/Per-file test databases refused/);
+  });
+});
+
+describe('per-file databases: redirection and selection', () => {
+  const base = { host: '127.0.0.1', port: '55651', database: 'afldb_v2_base_test' };
+
+  it('redirects only URLs that name the base on the same host and port', () => {
+    expect(redirectDsn(BASE_55651, base, GOOD_NAME)).toBe(`postgresql://afldb_owner:pw@127.0.0.1:55651/${GOOD_NAME}`);
+    expect(redirectDsn('postgresql://u:p@127.0.0.1:55651/other_test', base, GOOD_NAME)).toBeNull();
+    expect(redirectDsn('postgresql://u:p@10.0.40.100:55651/afldb_v2_base_test', base, GOOD_NAME)).toBeNull();
+    expect(redirectDsn('postgresql://u:p@127.0.0.1:5432/afldb_v2_base_test', base, GOOD_NAME)).toBeNull();
+    expect(redirectDsn('garbage', base, GOOD_NAME)).toBeNull();
+  });
+
+  it('rewrites every DSN variable naming the base and reports names, not values', () => {
+    const env: DsnEnv = {
+      AFLDB_TEST_DATABASE_URL: BASE_55651,
+      DATABASE_URL: 'postgresql://afldb_app:pw2@127.0.0.1:55651/afldb_v2_base_test',
+      AFLDB_TEST_IMPORT_DATABASE_URL: 'postgresql://afldb_import:pw3@127.0.0.1:55651/afldb_v2_base_test',
+      AFLDB_ELSEWHERE_DATABASE_URL: 'postgresql://x:y@127.0.0.1:55651/elsewhere_test',
+      HOME: '/home/u',
+    };
+    const changed = redirectEnvToDatabase(env, BASE_55651, GOOD_NAME);
+    expect(changed.sort()).toEqual(['AFLDB_TEST_DATABASE_URL', 'AFLDB_TEST_IMPORT_DATABASE_URL', 'DATABASE_URL']);
+    expect(JSON.stringify(changed)).not.toContain('pw');
+    expect(env.AFLDB_TEST_DATABASE_URL).toContain(`/${GOOD_NAME}`);
+    expect(env.AFLDB_ELSEWHERE_DATABASE_URL).toContain('/elsewhere_test');
+    expect(env.HOME).toBe('/home/u');
+  });
+
+  it('applies to integration files only: all, the registered list, or nothing', () => {
+    const registered = ['tests/integration/settle-afltables.test.ts'];
+    const settle = '/repo/tests/integration/settle-afltables.test.ts';
+    const other = '/repo/tests/integration/venue-records.test.ts';
+    expect(perFileAppliesTo('off', settle, registered)).toBe(false);
+    expect(perFileAppliesTo('registered', settle, registered)).toBe(true);
+    expect(perFileAppliesTo('registered', other, registered)).toBe(false);
+    expect(perFileAppliesTo('all', other, registered)).toBe(true);
+    expect(perFileAppliesTo('all', '/repo/tests/dsn-policy.test.ts', registered)).toBe(false);
+    expect(perFileAppliesTo('all', 'C:\\repo\\tests\\integration\\venue-records.test.ts', registered)).toBe(true);
+    expect(perFileAppliesTo('all', undefined, registered)).toBe(false);
+  });
+
+  it('builds the admin DSN from a password FILE, never from the environment, on the base host and port', () => {
+    const dsn = adminDsnFor(BASE_55651, { AFLDB_TEST_PER_FILE_ADMIN_USER: 'afldb_v2_super', AFLDB_TEST_PER_FILE_ADMIN_PASSWORD_FILE: '/x/superuser.pw' }, () => 'file-pw\n');
+    const u = new URL(dsn);
+    expect([u.hostname, u.port, u.pathname, u.username, u.password]).toEqual(['127.0.0.1', '55651', '/postgres', 'afldb_v2_super', 'file-pw']);
+    expect(new URL(adminDsnFor(BASE_55651, {}, () => 'unused')).username).toBe('afldb_owner');
+  });
+});
+
+describe('per-file databases: the run-level reaper drops only what the run recorded', () => {
+  const recordedName = perFileDatabaseName({ prefix: 'afldb_v2_pf_', now: NOW, pid: 31, nonce: '0badc0de' });
+
+  function fakeAdmin(statements: string[]): () => Promise<AdminSql> {
+    const sql = { unsafe: async (text: string) => { statements.push(text); return []; }, end: async () => {} };
+    return async () => sql as unknown as AdminSql;
+  }
+
+  it('drops a recorded generated name, refuses the base and look-alikes found in the ledger, and removes the ledger', async () => {
+    const ledgerDir = createPerFileLedger();
+    try {
+      for (const entry of [recordedName, 'afldb_v2_base_test', 'afldb_prod', 'afldb_v2_pf_notgenerated_test']) {
+        writeFileSync(join(ledgerDir, entry), '');
+      }
+      const statements: string[] = [];
+      const result = await reapLedgerDatabases({ env: {}, baseDsn: BASE_55651, ledgerDir }, { connect: fakeAdmin(statements) });
+      expect(result.dropped).toEqual([recordedName]);
+      expect(result.refused.map((r) => r.name).sort()).toEqual(['afldb_prod', 'afldb_v2_base_test', 'afldb_v2_pf_notgenerated_test']);
+      expect(statements).toEqual([`DROP DATABASE IF EXISTS "${recordedName}" WITH (FORCE)`]);
+      expect(existsSync(ledgerDir)).toBe(false);
+    } finally {
+      rmSync(ledgerDir, { recursive: true, force: true });
+    }
+  });
+
+  it('opens no connection when nothing was recorded or the ledger is gone', async () => {
+    const ledgerDir = createPerFileLedger();
+    try {
+      await expect(reapLedgerDatabases({ env: {}, baseDsn: BASE_55651, ledgerDir }, { connect: NEVER_CONNECT }))
+        .resolves.toEqual({ dropped: [], refused: [] });
+      await expect(reapLedgerDatabases({ env: {}, baseDsn: BASE_55651, ledgerDir }, { connect: NEVER_CONNECT }))
+        .resolves.toEqual({ dropped: [], refused: [] });
+    } finally {
+      rmSync(ledgerDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('per-file databases: the committed-fixture registry', () => {
+  it('names only integration suites that exist, once each, and every named fixture-season owner', () => {
+    expect(new Set(COMMITTING_SUITES).size).toBe(COMMITTING_SUITES.length);
+    for (const suite of COMMITTING_SUITES) {
+      expect(suite, suite).toMatch(/^tests\/integration\/[a-z0-9-]+\.test\.ts$/);
+      expect(existsSync(join(process.cwd(), suite)), `${suite} does not exist`).toBe(true);
+    }
+    // The suites that own a reserved fixture season must be per-file in `=1` mode.
+    for (const owner of Object.values(COMMITTED_FIXTURE_SEASONS)) {
+      for (const path of owner.match(/tests\/integration\/[a-z0-9-]+\.test\.ts/g) ?? []) {
+        expect(COMMITTING_SUITES, `${path} reserves a fixture season but is not registered`).toContain(path);
+      }
+    }
+  });
+
+  it("awards-reload-links' multi-club and finals seasons are used by no other suite (decision 2)", () => {
+    expect(COMMITTED_FIXTURE_SEASONS[2061]).toBe('tests/integration/awards-reload-links.test.ts');
+    expect(COMMITTED_FIXTURE_SEASONS[2062]).toBe('tests/integration/awards-reload-links.test.ts');
+    expect(COMMITTED_FIXTURE_SEASONS[2093]).not.toContain('awards-reload-links');
+    expect(COMMITTED_FIXTURE_SEASONS[2091]).not.toContain('awards-reload-links');
   });
 });
