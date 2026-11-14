@@ -1877,7 +1877,12 @@ describe('club comparison: club Brownlow history', () => {
     // The fallback attribution path is what put these players here.
     expect(complete.leaders.every((l) => l.attributionSource === 'primary')).toBe(true);
 
-    for (const summary of [notApplicable, pending, missing]) {
+    // ISSUE-363 (F-FX-1): once 2026 Brownlow results load, the 2026 summary is authoritative like 2002's.
+    if (expected2026 === 'complete') {
+      expect(pending.isAuthoritative).toBe(true);
+      expect(pending.totalVotes).toBeGreaterThan(0);
+    }
+    for (const summary of [notApplicable, missing, ...(expected2026 === 'complete' ? [] : [pending])]) {
       expect(summary.isAuthoritative).toBe(false);
       expect(summary.totalVotes).toBeNull();
       expect(summary.playersWithVotes).toBeNull();
