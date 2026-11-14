@@ -14,7 +14,7 @@
  * one of these, never anything the caller supplied verbatim.
  */
 
-const FIXED_PATHS = new Set(['/coaches', '/records/coaches', '/sitemap.xml']);
+const FIXED_PATHS = new Set(['/coaches', '/records/coaches', '/sitemap-index.xml']);
 const COACH_PATH = /^\/coaches\/[a-z0-9-]+-\d+$/;
 const CLUB_PATH = /^\/clubs\/[a-z0-9-]+$/;
 const PLAYER_PATH = /^\/players\/[a-z0-9-]+-\d+$/;

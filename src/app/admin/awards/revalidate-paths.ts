@@ -19,7 +19,7 @@
  * a path the server itself computed.
  */
 
-const FIXED_PATHS = new Set(['/awards', '/hall-of-fame', '/sitemap.xml']);
+const FIXED_PATHS = new Set(['/awards', '/hall-of-fame', '/sitemap-index.xml']);
 const AWARD_PATH = /^\/awards\/[a-z0-9-]+$/;
 const AWARD_SEASON_PATH = /^\/awards\/[a-z0-9-]+\/\d{4}$/;
 const HONOUR_TEAM_PATH = /^\/honour-teams\/[a-z0-9-]+$/;

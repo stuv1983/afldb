@@ -481,7 +481,7 @@ describe('Stage 2: parseEventPair', () => {
 describe('Stage 2: isAllowedRevalidatePath (/admin/draft/revalidate)', () => {
   it('accepts the two cached public shapes a draft mutation can touch', () => {
     expect(isAllowedRevalidatePath('/players/chris-fagan-123')).toBe(true);
-    expect(isAllowedRevalidatePath('/sitemap.xml')).toBe(true);
+    expect(isAllowedRevalidatePath('/sitemap-index.xml')).toBe(true);
   });
 
   it('refuses every force-dynamic draft/player surface -- they need no revalidation', () => {

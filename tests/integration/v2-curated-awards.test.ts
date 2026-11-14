@@ -348,7 +348,7 @@ describe('approval by another administrator (four eyes satisfied)', () => {
 
     // V2-GAP-024: the paths are computed server-side from the created row and the revalidate route admits every one.
     expect(approved.promotion.revalidatePaths).toEqual(expect.arrayContaining([
-      '/awards', awardPath(award.slug), '/sitemap.xml', awardSeasonPath(award.slug, OPEN_SEASON), seasonPath(OPEN_SEASON),
+      '/awards', awardPath(award.slug), '/sitemap-index.xml', awardSeasonPath(award.slug, OPEN_SEASON), seasonPath(OPEN_SEASON),
       playerPath(players[0].slug, players[0].id),
     ]));
     for (const path of approved.promotion.revalidatePaths ?? []) expect(isAllowedRevalidatePath(path), path).toBe(true);

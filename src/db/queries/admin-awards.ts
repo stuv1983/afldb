@@ -890,7 +890,7 @@ export async function recomputeAwardSpan(tx: Tx, awardId: number): Promise<void>
  *     both of which now exclude voided rows;
  *   - `/seasons/<year>` is ISR 1h and renders that season's club
  *     best-and-fairest winners and its Hall of Fame inductees;
- *   - `/sitemap.xml` enumerates award seasons and honour-team names, and
+ *   - `/sitemap.xml` (revalidated at its rewrite destination `/sitemap-index.xml`) enumerates award seasons and honour-team names, and
  *     §4.5 now drops a season or a team whose every row is void.
  *
  * `/hall-of-fame` is `force-dynamic` and needs no invalidation; it is listed
@@ -901,7 +901,7 @@ export function awardWinnerPaths(row: {
   awardSlug: string; season: number | null; playerId: number | null;
   playerSlug: string | null; clubSlug: string | null;
 }): string[] {
-  const paths = ['/awards', awardPath(row.awardSlug), '/sitemap.xml'];
+  const paths = ['/awards', awardPath(row.awardSlug), '/sitemap-index.xml'];
   if (row.season !== null) {
     paths.push(awardSeasonPath(row.awardSlug, row.season), seasonPath(row.season));
   }
@@ -924,7 +924,7 @@ function hallOfFamePaths(row: {
 function honourTeamPaths(row: {
   teamName: string; playerId: number | null; playerSlug: string | null;
 }): string[] {
-  const paths = [honourTeamPath(honourTeamSlug(row.teamName)), '/sitemap.xml'];
+  const paths = [honourTeamPath(honourTeamSlug(row.teamName)), '/sitemap-index.xml'];
   if (row.playerId !== null && row.playerSlug) paths.push(playerPath(row.playerSlug, row.playerId));
   return [...new Set(paths)];
 }

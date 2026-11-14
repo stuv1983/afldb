@@ -1129,7 +1129,7 @@ describe('the production ports: revalidation paths and the approved-winner revis
 
   it('every path the server computes for a winner is admitted by the /admin/awards/revalidate allowlist', () => {
     const computed = [
-      '/awards', awardPath('synthetic-medal'), '/sitemap.xml', awardSeasonPath('synthetic-medal', 1990),
+      '/awards', awardPath('synthetic-medal'), '/sitemap-index.xml', awardSeasonPath('synthetic-medal', 1990),
       seasonPath(1990), playerPath('synthetic-player-one', 101), clubPath('synthetic-club'),
     ];
     for (const path of computed) expect(isAllowedRevalidatePath(path), path).toBe(true);

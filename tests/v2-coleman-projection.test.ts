@@ -517,7 +517,7 @@ describe('publishColemanResult with a projection port (FAKE executor, SYNTHETIC)
 describe('/admin/awards/revalidate admits every path a Coleman row can return (SYNTHETIC)', () => {
   it('the award, award-season, season, player, club, awards index and sitemap paths', () => {
     // The same set admin-awards `awardWinnerPaths` builds for a Coleman winner row.
-    const paths = ['/awards', awardPath('coleman'), '/sitemap.xml', awardSeasonPath('coleman', 2001), seasonPath(2001),
+    const paths = ['/awards', awardPath('coleman'), '/sitemap-index.xml', awardSeasonPath('coleman', 2001), seasonPath(2001),
       playerPath('synthetic-player-a', 1234), clubPath('synthetic-club')];
     for (const path of paths) expect(isAllowedRevalidatePath(path), path).toBe(true);
   });

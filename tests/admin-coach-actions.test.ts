@@ -154,7 +154,7 @@ describe('isAllowedRevalidatePath', () => {
   it('accepts every shape the interaction contract (§9) names', () => {
     expect(isAllowedRevalidatePath('/coaches')).toBe(true);
     expect(isAllowedRevalidatePath('/records/coaches')).toBe(true);
-    expect(isAllowedRevalidatePath('/sitemap.xml')).toBe(true);
+    expect(isAllowedRevalidatePath('/sitemap-index.xml')).toBe(true);
     expect(isAllowedRevalidatePath('/coaches/chris-fagan-123')).toBe(true);
     expect(isAllowedRevalidatePath('/clubs/carlton')).toBe(true);
     expect(isAllowedRevalidatePath('/players/chris-fagan-456')).toBe(true);

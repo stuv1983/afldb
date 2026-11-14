@@ -1155,7 +1155,7 @@ async function cmdBuild(opts) {
       const target = await publishWhenFree(root, candidate, id);
       event(root, 'build-pass', { id, revision, buildId, manifest: record.manifest.sha256, workspace });
       log(`RELEASE READY ${id} (${record.manifest.files} files, manifest ${record.manifest.sha256.slice(0, 12)}…) at ${target}`);
-      log(`next: node deploy/release.mjs promote ${id}${rootArg(root)}`);
+      log(`next: node deploy/release.mjs promote ${id} --attended${rootArg(root)}`);
       return 0;
     } catch (error) {
       // Keep the logs and the source for inspection; drop the dependency tree and the build

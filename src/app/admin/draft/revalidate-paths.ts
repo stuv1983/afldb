@@ -7,7 +7,7 @@
  * `/draft/[year]`, `/players`) and needs no cache invalidation at all
  * (AFLDB-ISSUE-160 runbook §7 / `issues/closed/AFLDB-ISSUE-156.md` §7 row P3b); club pages
  * do not render draft data (§0.1). Only two surfaces are actually cached:
- * `/players/[slug]` (ISR, one hour) and `/sitemap.xml` (enumerates players,
+ * `/players/[slug]` (ISR, one hour) and `/sitemap.xml` (revalidated at its rewrite destination `/sitemap-index.xml`; enumerates players,
  * so a newly created player needs it). Those are the only two shapes this
  * allowlist admits.
  *
@@ -17,7 +17,7 @@
  * the client claims changed.
  */
 
-const FIXED_PATHS = new Set(['/sitemap.xml']);
+const FIXED_PATHS = new Set(['/sitemap-index.xml']);
 const PLAYER_PATH = /^\/players\/[a-z0-9-]+-\d+$/;
 
 export function isAllowedRevalidatePath(path: string): boolean {

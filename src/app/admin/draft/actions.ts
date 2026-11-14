@@ -60,7 +60,7 @@ async function playerRevalidatePaths(playerIds: number[], options: { includeSite
     const rows = await sql<{ id: number; slug: string }[]>`SELECT id, slug FROM players WHERE id = ANY(${ids})`;
     for (const row of rows) paths.push(playerPath(row.slug, row.id));
   }
-  if (options.includeSitemap) paths.push('/sitemap.xml');
+  if (options.includeSitemap) paths.push('/sitemap-index.xml');
   return paths;
 }
 

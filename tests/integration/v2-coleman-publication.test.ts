@@ -386,7 +386,7 @@ describe('first publication (SYNTHETIC, PostgreSQL)', () => {
     const [award] = await owner<{ first_season: number; last_season: number }[]>`SELECT first_season, last_season FROM awards WHERE id = ${awardId}`;
     expect(award).toEqual({ first_season: SEASON, last_season: SEASON });
     expect(outcome.projection.revalidatePaths).toEqual(expect.arrayContaining([
-      '/awards', '/awards/coleman', `/awards/coleman/${SEASON}`, `/seasons/${SEASON}`, '/sitemap.xml',
+      '/awards', '/awards/coleman', `/awards/coleman/${SEASON}`, `/seasons/${SEASON}`, '/sitemap-index.xml',
       `/players/${MARKER}-a-${playerIds.A}`, `/clubs/${MARKER}-club-0`,
     ]));
     // The /admin/awards/revalidate allowlist admits every path (the client posts them after success).
