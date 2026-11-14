@@ -206,3 +206,43 @@ and it is appended only when an unlinked vote is among the dependents (`match-sh
 - The settle revalidation endpoint is loopback to the app and does not pass through Caddy.
 - The combined install in `caddy357/README.md` section 10 names all three changes, one backup and one rollback, and
   answers REVIEW-C MED-2.
+
+## § Re-check of fixes (f10e47ad)
+
+Same rules: read-only, nothing executed. Files read at `f10e47ad`: `packages/testing/src/per-file-db-policy.ts`,
+`per-file-db.ts`, `per-file-global-setup.ts`, `src/search/nl/parser.ts:2150-2190`, both Caddyfiles' log snippet,
+`caddy357/low4/README.md`, `tools/v2/isolated-pg.ts:184-186`. The new unit tests were located by grep
+(`tests/dsn-policy.test.ts:368-481, :583-615, :688-757`), not read line by line, and the REVIEW-D addendum in
+`tests363/README.md` was not opened.
+
+**All five findings FIXED. No new defect found. The supported wrapper path is not broken by the new checks.**
+
+| Finding | Status | Where |
+|---|---|---|
+| MED-1 DSN checks string-only | **FIXED** | `per-file-db-policy.ts:93-110` (`checkDsnShape`: comma in host, ANY query parameter), `:113-127` (same checks plus the port rule on the admin DSN), `:134-157` (server identity); `per-file-db.ts:106` (admin DSN asserted where it is built), `:115-122` (`verifyAdminServer`), called before the first statement at `:156` (create), `:221` (drop), `:270` (reaper), `:315` (audit), `:392` (sweep) |
+| MED-2 comment-less orphan unsweepable | **FIXED** | `per-file-db-policy.ts:274-276`: a NULL comment on a generated-shape name is sweepable; a different non-null comment is still kept; base exclusion, shape and age bound unchanged |
+| LOW-3 auxiliary cue | **FIXED** | `parser.ts:2179-2184`: the auxiliary alternative now carries a lookahead on the non-verb words only; `has round had the most goals` still reads as a surname; declining cases added at `tests/nl-parser.test.ts:5392-5394` and `tests/integration/nl-semantic-mapping.test.ts:986-987` |
+| LOW-4 token in `Location` | **FIXED**, and wider than I reported | `deploy/Caddyfile.production:79-86`, `deploy/Caddyfile:37-44`: the any-spelling invite rule and the query-drop rule on `resp_headers>Location` and `resp_headers>Refresh`, identical in both files; contract test `tests/settle-season-revalidation.test.ts:1117`. The measurement (`low4/README.md`) confirmed both external facts I could not (Caddy logs `resp_headers`; Next answers the trailing slash with a 308) and found `Refresh` and the magic-link token as well |
+| LOW-5 misleading "not set" | **FIXED** | `per-file-global-setup.ts:22-28` names the `.env` cause before the generic check |
+
+**Wrapper path (`isolated-pg run`).** `dsnFor` (`tools/v2/isolated-pg.ts:184-186`) builds
+`postgresql://<user>:<pw>@127.0.0.1:<port>/<db>`: one host, an explicit port, no query string, so `checkDsnShape`
+returns nothing for the base and for the admin DSN derived from it. The connection is TCP to loopback, so
+`inet_server_port()` is the cluster's own port (not NULL) and equals `new URL(adminDsn).port`; `adminDsnFor` sets the
+path to `/postgres`, so `current_database()` matches. Not executed; the qualification running at `f10e47ad` is the
+proof.
+
+**Residuals, all INFO (no work):**
+- A percent-encoded comma in the host (`h1%2Ch2:55651`) is not a literal comma to `new URL`, so the string check
+  passes, and postgres.js decodes it into a host list. Both entries then use the stated port, never 5432, and the
+  server check still requires that port, so the 5432 rule holds.
+- The audit's second and third connections (`per-file-db.ts:326, :347`) are not themselves server-checked; they reuse
+  the host and port just verified on the maintenance connection.
+- A non-isolated DSN that legitimately needs a query parameter (`?sslmode=require`) is now refused for per-file mode.
+  Fail closed, and the message names the parameter.
+- The other `*DATABASE_URL*` variables are not shape-checked; `redirectDsn` still carries a query string onto the
+  per-file DSN. Under the wrapper none has one. The shared-mode `_test` allowlist has the same gap and predates
+  this run.
+- LOW-3 makes `did round in 1975 kick goals` decline. A decline, not a wrong answer.
+- `Location` is now logged without its query (`/beta` instead of `/beta?from=...`). Log content only; responses
+  are unchanged per `low4/README.md`.

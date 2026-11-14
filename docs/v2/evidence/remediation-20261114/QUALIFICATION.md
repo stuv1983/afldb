@@ -159,3 +159,26 @@ brownlow-medal lines). No sitemap code changed after that scope.
   production build `usjtEO0IiR7zLqQnwkgzz` (`routes/hyd-final.txt`: `/aflw/players/Aasta_O%2527Connor` 200, title
   "Aasta O'Connor — AFLW Stats, Games & Career Record | AFLDB", canonical kept encoded, desktop and mobile). It was **not
   re-measured on the integrated build**; the AFLW code is unchanged since that scope's head.
+
+## 7. Corrections appended by remediation run 2 (sections 1-6 above are unchanged)
+
+Source: `run2/evidence/FAILURE-CLASSIFICATION.md` ("Points where QUALIFICATION.md's wording is stronger than the evidence"), which classifies
+every failing id behind sections 1-4. Raw verdicts are not altered; where a statement above is stronger than its evidence it is corrected here.
+
+1. **Section 4, "No failure is attributable to a remediation change"** is too strong for the run as a whole. It holds for the isolated runs at
+   `3aa82166`, but unit failure U1 row 8 (special-records contract) **was caused by `85b73c53`** and fixed in `fb6ac276`.
+2. **Section 1, "the seventh (bridge import gate) is a new test path"** is wrong. The test also fails at the baseline once the Python interpreter
+   resolves (`B-R:venv-draftguru-acquisition`). At the baseline the interpreter failure hid it. It passes at `6c8b02cd` only because that
+   workspace held a copy of the Stage A snapshot.
+3. **Section 1, "92 common"** should be **91**: 86 test ids plus 5 file-level failures, recounted from the two JSON files. The one-off difference is
+   not explained by the committed evidence, and it changes no class.
+4. **Section 4, club comparison: "Every failure is a fixed-number witness"** holds only for the 24 that fail when run alone. The other 4 in the
+   full run are 3 performance ceilings (load) and one TypeError (inferred fixture leak, not traced).
+5. **Gaps that section 6 did not list:**
+   - The DraftGuru "vitest 215 passed / 2 failed / 1 skipped" count in section 3 has no committed JSON and was not verified.
+   - The full-run-only `database` failure "Brownlow correctness separates the war years" is **unclassified**: no mechanism was established.
+   - `settle-afl-api-issue276`, `v2-coleman-publication` and the two dedicated-clone Brownlow files were not re-run alone or with their clones.
+   - The snapshot-oracle rows show only that the remediation did not cause them ("same value at baseline"); they say nothing about the cause.
+   - Five committed evidence files did not hash to their manifest because of CRLF normalisation. They were restored byte for byte (`run2/evidence/README.md` §1).
+   - 94 manifest entries are HOST-MISSING and 117 UNRESOLVED (`run2/evidence/manifest-verify-e771e471.tsv`). None is regenerated or dropped.
+6. **Section 6, AFLW `%27`:** re-measured on run 2's integrated build; see `run2/QUALIFICATION-2.md`.
