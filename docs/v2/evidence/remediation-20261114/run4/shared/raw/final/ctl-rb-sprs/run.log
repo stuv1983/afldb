@@ -1,0 +1,9 @@
+create-db: afldb_v2_rem4shared_ctl_rb_sprs_test created from afldb_v2_rem4shared_rb_tmpl_test and marked
+2026-11-14T23:09:45Z [ctl-rb-sprs] step 1 seq tests/integration/special-records-public-suppression.test.ts
+step 1 rc=1
+total 23 passed 0 failed 0 skipped 23 files 1
+tests/integration/special-records-public-suppression.test.ts	<file-level>	no fixture found for "unlinked" — this database has not been loaded: expected undefined to be defined
+-- digest diff step 0 -> 1
+(none)
+-- digest diff step 0 -> 1 (cumulative)
+(identical)

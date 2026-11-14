@@ -1,0 +1,35 @@
+FAIL tests/integration/data-editor.test.ts :: Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) (2a) replay re-applies a field correction over a reset source value
+AssertionError: afldb_test must hold no player_match_stats authority before this suite (the replay would apply it): expected 1 to be +0 // Object.is equality
+    at requireCleanAuthority (/mnt/ssd/afldb-rem4-shared-20261115/cand-s2/tests/integration/data-editor.test.ts:2451:5)
+    at /mnt/ssd/afldb-rem4-shared-20261115/cand-s2/tests/integration/data-editor.test.ts:2604:5
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+=====
+FAIL tests/integration/data-editor.test.ts :: Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) (2b) replay recreates a durable addition the reload did not supply
+AssertionError: afldb_test must hold no player_match_stats authority before this suite (the replay would apply it): expected 1 to be +0 // Object.is equality
+    at requireCleanAuthority (/mnt/ssd/afldb-rem4-shared-20261115/cand-s2/tests/integration/data-editor.test.ts:2451:5)
+    at /mnt/ssd/afldb-rem4-shared-20261115/cand-s2/tests/integration/data-editor.test.ts:2625:5
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+=====
+FAIL tests/integration/data-editor.test.ts :: Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) (2c) replay deletes a reinserted row under a durable removal
+AssertionError: afldb_test must hold no player_match_stats authority before this suite (the replay would apply it): expected 1 to be +0 // Object.is equality
+    at requireCleanAuthority (/mnt/ssd/afldb-rem4-shared-20261115/cand-s2/tests/integration/data-editor.test.ts:2451:5)
+    at /mnt/ssd/afldb-rem4-shared-20261115/cand-s2/tests/integration/data-editor.test.ts:2644:5
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+=====
+FAIL tests/integration/data-editor.test.ts :: Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) (3a) an active key whose match_key is absent from matches refuses before any write
+AssertionError: afldb_test must hold no player_match_stats authority before this suite (the replay would apply it): expected 1 to be +0 // Object.is equality
+    at requireCleanAuthority (/mnt/ssd/afldb-rem4-shared-20261115/cand-s2/tests/integration/data-editor.test.ts:2451:5)
+    at /mnt/ssd/afldb-rem4-shared-20261115/cand-s2/tests/integration/data-editor.test.ts:2675:5
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+=====
+FAIL tests/integration/data-editor.test.ts :: Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) (3b) an active key whose identity names no accepted external identity refuses before any write
+AssertionError: afldb_test must hold no player_match_stats authority before this suite (the replay would apply it): expected 1 to be +0 // Object.is equality
+    at requireCleanAuthority (/mnt/ssd/afldb-rem4-shared-20261115/cand-s2/tests/integration/data-editor.test.ts:2451:5)
+    at /mnt/ssd/afldb-rem4-shared-20261115/cand-s2/tests/integration/data-editor.test.ts:2686:5
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+=====

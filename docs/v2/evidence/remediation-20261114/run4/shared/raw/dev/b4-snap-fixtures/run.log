@@ -1,0 +1,10 @@
+create-db: afldb_v2_rem4shared_b4_snap_fixtures_test created from afldb_v2_rem4shared_snap_tmpl_test and marked
+2026-11-14T21:05:12Z [b4-snap-fixtures] step 1 seq tests/integration/admin-fixtures.test.ts
+step 1 rc=0
+total 45 passed 45 failed 0 skipped 0 files 1
+
+-- digest diff step 0 -> 1
+> fixtures|0|d41d8cd98f00b204e9800998ecf8427e
+(none)
+-- digest diff step 0 -> 1 (cumulative)
+> fixtures|0|d41d8cd98f00b204e9800998ecf8427e

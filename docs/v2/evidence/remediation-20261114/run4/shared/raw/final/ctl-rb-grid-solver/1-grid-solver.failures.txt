@@ -1,0 +1,6 @@
+FAIL tests/integration/grid-solver.test.ts :: grid solver correctness drafted_by_club_never_played matches a hand-written equivalent for a real club
+AssertionError: linked draft selections are required to exercise the criterion: expected 0 to be greater than 0
+    at /mnt/ssd/afldb-rem4-shared-20261115/cand/tests/integration/grid-solver.test.ts:926:102
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+=====

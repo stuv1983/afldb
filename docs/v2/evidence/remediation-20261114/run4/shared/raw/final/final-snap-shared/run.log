@@ -1,0 +1,21 @@
+create-db: afldb_v2_rem4shared_final_snap_shared_test created from afldb_v2_rem4shared_snap_tmpl_test and marked
+2026-11-14T22:24:13Z [final-snap-shared] step 1 seq tests/integration/admin-fixtures.test.ts
+step 1 rc=0
+total 46 passed 46 failed 0 skipped 0 files 1
+
+-- digest diff step 0 -> 1
+(none)
+2026-11-14T22:24:25Z [final-snap-shared] step 2 seq tests/integration/after-siren.test.ts
+step 2 rc=0
+total 11 passed 11 failed 0 skipped 0 files 1
+
+-- digest diff step 1 -> 2
+(none)
+2026-11-14T22:24:34Z [final-snap-shared] step 3 seq tests/integration/nl-answers-after-siren.test.ts
+step 3 rc=0
+total 20 passed 20 failed 0 skipped 0 files 1
+
+-- digest diff step 2 -> 3
+(none)
+-- digest diff step 0 -> 3 (cumulative)
+(identical)

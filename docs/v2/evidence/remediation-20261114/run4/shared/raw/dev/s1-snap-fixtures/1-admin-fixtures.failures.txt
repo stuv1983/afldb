@@ -1,0 +1,6 @@
+FAIL tests/integration/admin-fixtures.test.ts :: the shared database after this suite (ISSUE-363 T363-2) leaves every fixtures, data_overrides and data_edits row it did not create exactly as it found it
+AssertionError: expected { fixtures: { n: +0, …(1) }, …(2) } to deeply equal { fixtures: { n: 218, …(1) }, …(2) }
+    at /mnt/ssd/afldb-rem4-shared-20261115/cand-s1/tests/integration/admin-fixtures.test.ts:1458:41
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+=====

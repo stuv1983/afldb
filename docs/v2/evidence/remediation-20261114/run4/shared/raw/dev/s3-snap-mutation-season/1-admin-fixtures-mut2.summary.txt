@@ -1,0 +1,2 @@
+total 46 passed 45 failed 1 skipped 0 files 1
+tests/integration/admin-fixtures-mut2.test.ts	the shared database after this suite (ISSUE-363 T363-2) leaves every fixtures, data_overrides and data_edits row it did not create exactly as it found it	AssertionError: expected { fixtures: { n: 218, …(1) }, …(4) } to deeply equal { fixtures: { n: 218, …(1) }, …(4) }

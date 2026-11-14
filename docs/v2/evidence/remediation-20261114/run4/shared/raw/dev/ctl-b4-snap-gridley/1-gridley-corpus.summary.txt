@@ -1,0 +1,2 @@
+total 1212 passed 1211 failed 1 skipped 0 files 1
+tests/integration/gridley-corpus.test.ts	Gridley corpus -- every cell through solveCellSummary writes the run report and has no failing cells	AssertionError: expected [ …(40) ] to deeply equal []

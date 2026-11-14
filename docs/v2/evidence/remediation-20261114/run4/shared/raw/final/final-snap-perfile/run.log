@@ -1,0 +1,12 @@
+2026-11-14T22:24:39Z [final-snap-perfile] step 1 pfseq tests/integration/admin-fixtures.test.ts
+step 1 rc=0
+total 46 passed 46 failed 0 skipped 0 files 1
+
+2026-11-14T22:25:01Z [final-snap-perfile] step 2 pfseq tests/integration/after-siren.test.ts
+step 2 rc=0
+total 11 passed 11 failed 0 skipped 0 files 1
+
+2026-11-14T22:25:21Z [final-snap-perfile] step 3 pfseq tests/integration/nl-answers-after-siren.test.ts
+step 3 rc=0
+total 20 passed 20 failed 0 skipped 0 files 1
+

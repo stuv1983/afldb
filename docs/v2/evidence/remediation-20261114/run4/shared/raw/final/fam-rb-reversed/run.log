@@ -1,0 +1,89 @@
+create-db: afldb_v2_rem4shared_fam_rb_reversed_test created from afldb_v2_rem4shared_rb_tmpl_test and marked
+2026-11-14T22:53:12Z [fam-rb-reversed] step 1 seq tests/integration/v2-fixture-writer.test.ts
+step 1 rc=0
+total 29 passed 29 failed 0 skipped 0 files 1
+
+-- digest diff step 0 -> 1
+(none)
+2026-11-14T22:53:23Z [fam-rb-reversed] step 2 seq tests/integration/special-records-public-suppression.test.ts
+step 2 rc=1
+total 23 passed 0 failed 0 skipped 23 files 1
+tests/integration/special-records-public-suppression.test.ts	<file-level>	no fixture found for "unlinked" — this database has not been loaded: expected undefined to be defined
+-- digest diff step 1 -> 2
+(none)
+2026-11-14T22:53:26Z [fam-rb-reversed] step 3 seq tests/integration/special-records-lifecycle.test.ts
+step 3 rc=1
+total 16 passed 14 failed 1 skipped 1 files 1
+tests/integration/special-records-lifecycle.test.ts	migration 102 allowlist widenings actually accepts an override and an audit row for both tables	Error: expected [Function] to throw error including 'rollback' but got 'null value in column "admin_user_id" …
+-- digest diff step 2 -> 3
+(none)
+2026-11-14T22:53:29Z [fam-rb-reversed] step 4 seq tests/integration/settle-afl-api-fixtures.test.ts
+step 4 rc=0
+total 16 passed 16 failed 0 skipped 0 files 1
+
+-- digest diff step 3 -> 4
+(none)
+2026-11-14T22:53:36Z [fam-rb-reversed] step 5 seq tests/integration/nl-answers-after-siren.test.ts
+step 5 rc=0
+total 20 passed 20 failed 0 skipped 0 files 1
+
+-- digest diff step 4 -> 5
+(none)
+2026-11-14T22:53:39Z [fam-rb-reversed] step 6 seq tests/integration/match-admin-create.test.ts
+step 6 rc=0
+total 10 passed 10 failed 0 skipped 0 files 1
+
+-- digest diff step 5 -> 6
+(none)
+2026-11-14T22:53:43Z [fam-rb-reversed] step 7 seq tests/integration/home-records.test.ts
+step 7 rc=0
+total 7 passed 7 failed 0 skipped 0 files 1
+
+-- digest diff step 6 -> 7
+(none)
+2026-11-14T22:53:46Z [fam-rb-reversed] step 8 seq tests/integration/gridley-corpus.test.ts
+step 8 rc=1
+total 1212 passed 1209 failed 3 skipped 0 files 1
+tests/integration/gridley-corpus.test.ts	Gridley corpus -- criteria has no probed dataset gap, unless run in diagnostic mode	AssertionError: expected [ 'anzac-playedin-1', …(9) ] to deeply equal []
+tests/integration/gridley-corpus.test.ts	Gridley corpus -- every cell through solveCellSummary conforms to the bounded approved-deferral policy, independently of diagnostic mode	AssertionError: expected [ …(322) ] to deeply equal []
+tests/integration/gridley-corpus.test.ts	Gridley corpus -- every cell through solveCellSummary writes the run report and has no failing cells	AssertionError: expected [ …(40) ] to deeply equal []
+-- digest diff step 7 -> 8
+(none)
+2026-11-14T22:59:43Z [fam-rb-reversed] step 9 seq tests/integration/grid-solver.test.ts
+step 9 rc=1
+total 222 passed 221 failed 1 skipped 0 files 1
+tests/integration/grid-solver.test.ts	grid solver correctness drafted_by_club_never_played matches a hand-written equivalent for a real club	AssertionError: linked draft selections are required to exercise the criterion: expected 0 to be greater than 0
+-- digest diff step 8 -> 9
+(none)
+2026-11-14T23:00:09Z [fam-rb-reversed] step 10 seq tests/integration/database.test.ts
+step 10 rc=0
+total 69 passed 69 failed 0 skipped 0 files 1
+
+-- digest diff step 9 -> 10
+(none)
+2026-11-14T23:00:29Z [fam-rb-reversed] step 11 seq tests/integration/data-editor.test.ts
+step 11 rc=0
+total 64 passed 63 failed 0 skipped 1 files 1
+
+-- digest diff step 10 -> 11
+(none)
+2026-11-14T23:01:26Z [fam-rb-reversed] step 12 seq tests/integration/after-siren.test.ts
+step 12 rc=0
+total 11 passed 11 failed 0 skipped 0 files 1
+
+-- digest diff step 11 -> 12
+(none)
+2026-11-14T23:01:34Z [fam-rb-reversed] step 13 seq tests/integration/admin-special-records.test.ts
+step 13 rc=0
+total 43 passed 43 failed 0 skipped 0 files 1
+
+-- digest diff step 12 -> 13
+(none)
+2026-11-14T23:01:41Z [fam-rb-reversed] step 14 seq tests/integration/admin-fixtures.test.ts
+step 14 rc=0
+total 46 passed 46 failed 0 skipped 0 files 1
+
+-- digest diff step 13 -> 14
+(none)
+-- digest diff step 0 -> 14 (cumulative)
+(identical)

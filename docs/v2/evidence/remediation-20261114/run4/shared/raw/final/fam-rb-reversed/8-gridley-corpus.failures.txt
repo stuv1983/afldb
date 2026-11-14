@@ -1,0 +1,39 @@
+FAIL tests/integration/gridley-corpus.test.ts :: Gridley corpus -- criteria has no probed dataset gap, unless run in diagnostic mode
+AssertionError: expected [ 'anzac-playedin-1', …(9) ] to deeply equal []
+    at /mnt/ssd/afldb-rem4-shared-20261115/cand/tests/integration/gridley-corpus.test.ts:515:40
+    at file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:2955:64
+=====
+FAIL tests/integration/gridley-corpus.test.ts :: Gridley corpus -- every cell through solveCellSummary writes the run report and has no failing cells
+AssertionError: expected [ …(40) ] to deeply equal []
+    at /mnt/ssd/afldb-rem4-shared-20261115/cand/tests/integration/gridley-corpus.test.ts:833:152
+    at file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:2955:64
+=====
+FAIL tests/integration/gridley-corpus.test.ts :: Gridley corpus -- every cell through solveCellSummary conforms to the bounded approved-deferral policy, independently of diagnostic mode
+AssertionError: expected [ …(322) ] to deeply equal []
+    at /mnt/ssd/afldb-rem4-shared-20261115/cand/tests/integration/gridley-corpus.test.ts:842:68
+    at file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+    at file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:2272:10)
+    at file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:2955:64
+=====

@@ -1,0 +1,9 @@
+create-db: afldb_v2_rem4shared_s2_snap_mutation_test created from afldb_v2_rem4shared_snap_tmpl_test and marked
+2026-11-14T21:28:26Z [s2-snap-mutation] step 1 seq tests/integration/admin-fixtures-mut.test.ts
+step 1 rc=1
+total 47 passed 46 failed 1 skipped 0 files 1
+tests/integration/admin-fixtures-mut.test.ts	the shared database after this suite (ISSUE-363 T363-2) leaves every fixtures, data_overrides and data_edits row it did not create exactly as it found it	AssertionError: expected { fixtures: { n: 217, …(1) }, …(
+-- digest diff step 0 -> 1
+(none)
+-- digest diff step 0 -> 1 (cumulative)
+(identical)

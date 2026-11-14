@@ -1,0 +1,2 @@
+total 222 passed 221 failed 1 skipped 0 files 1
+tests/integration/grid-solver.test.ts	grid solver correctness drafted_by_club_never_played matches a hand-written equivalent for a real club	AssertionError: linked draft selections are required to exercise the criterion: expected 0 to be greater than 0

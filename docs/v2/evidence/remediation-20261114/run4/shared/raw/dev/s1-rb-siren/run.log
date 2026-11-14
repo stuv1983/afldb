@@ -1,0 +1,22 @@
+create-db: afldb_v2_rem4shared_s1_rb_siren_test created from afldb_v2_rem4shared_rb_tmpl_test and marked
+2026-11-14T21:49:13Z [s1-rb-siren] step 1 seq tests/integration/after-siren.test.ts
+step 1 rc=1
+total 11 passed 10 failed 1 skipped 0 files 1
+tests/integration/after-siren.test.ts	after-siren durable admin decisions (AFLDB-ISSUE-167 Stage 4) leaves every row it did not create exactly as it found it (ISSUE-363 T363-3)	AssertionError: expected { after_siren_kicks: { …(2) }, …(3) } to deeply equal 
+-- digest diff step 0 -> 1
+> after_siren_kicks|126|9d86ab878ac253725d0e8009445c1fc4
+> auth_users|1|070c163983e45262b1966d70480ad0e1
+> import_batches|33|d2008a7c821a44ed9ac4ae09cd5abe77
+(none)
+2026-11-14T21:49:23Z [s1-rb-siren] step 2 seq tests/integration/nl-answers-after-siren.test.ts
+step 2 rc=1
+total 20 passed 17 failed 3 skipped 0 files 1
+tests/integration/nl-answers-after-siren.test.ts	after_siren — ranking is always a tie most kicks after the siren is a wider tie than most goals	AssertionError: expected [ 'Barry Hall', 'Brad Johnson', …(8) ] to deeply equal [ 'Barry Hall', 'Brad Johnson',
+tests/integration/nl-answers-after-siren.test.ts	after_siren — the match-link boundary (D10 §7.1) the most recent kick is match-linked and is NEVER an unlinked later row	AssertionError: expected 'Tim Membrey' to be 'Nasiah Wanganeen-Milera' // Object.is equ
+tests/integration/nl-answers-after-siren.test.ts	after_siren — the trusted player link a player-subject answer counts only trusted-linked kickers, and says how many it left out	AssertionError: expected 1 to be 6 // Object.is equality
+-- digest diff step 1 -> 2
+(none)
+-- digest diff step 0 -> 2 (cumulative)
+> after_siren_kicks|126|9d86ab878ac253725d0e8009445c1fc4
+> auth_users|1|070c163983e45262b1966d70480ad0e1
+> import_batches|33|d2008a7c821a44ed9ac4ae09cd5abe77

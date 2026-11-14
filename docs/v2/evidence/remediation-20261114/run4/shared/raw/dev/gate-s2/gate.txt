@@ -1,0 +1,2 @@
+typecheck rc=0
+lint:gate rc=0

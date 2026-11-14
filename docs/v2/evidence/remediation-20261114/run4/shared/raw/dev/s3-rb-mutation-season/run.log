@@ -1,0 +1,9 @@
+create-db: afldb_v2_rem4shared_s3_rb_mutation_season_test created from afldb_v2_rem4shared_rb_tmpl_test and marked
+2026-11-14T21:55:22Z [s3-rb-mutation-season] step 1 seq tests/integration/admin-fixtures-mut2.test.ts
+step 1 rc=1
+total 46 passed 45 failed 1 skipped 0 files 1
+tests/integration/admin-fixtures-mut2.test.ts	the shared database after this suite (ISSUE-363 T363-2) leaves every fixtures, data_overrides and data_edits row it did not create exactly as it found it	AssertionError: expected { fixtures: { n: +0, …(1) }, …(
+-- digest diff step 0 -> 1
+(none)
+-- digest diff step 0 -> 1 (cumulative)
+(identical)

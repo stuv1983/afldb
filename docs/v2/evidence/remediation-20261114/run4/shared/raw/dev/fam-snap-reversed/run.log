@@ -1,0 +1,91 @@
+create-db: afldb_v2_rem4shared_fam_snap_reversed_test created from afldb_v2_rem4shared_snap_tmpl_test and marked
+2026-11-14T22:06:19Z [fam-snap-reversed] step 1 seq tests/integration/v2-fixture-writer.test.ts
+step 1 rc=0
+total 29 passed 29 failed 0 skipped 0 files 1
+
+-- digest diff step 0 -> 1
+(none)
+2026-11-14T22:06:31Z [fam-snap-reversed] step 2 seq tests/integration/special-records-public-suppression.test.ts
+step 2 rc=0
+total 23 passed 23 failed 0 skipped 0 files 1
+
+-- digest diff step 1 -> 2
+(none)
+2026-11-14T22:06:35Z [fam-snap-reversed] step 3 seq tests/integration/special-records-lifecycle.test.ts
+step 3 rc=0
+total 16 passed 15 failed 0 skipped 1 files 1
+
+-- digest diff step 2 -> 3
+(none)
+2026-11-14T22:06:38Z [fam-snap-reversed] step 4 seq tests/integration/settle-afl-api-fixtures.test.ts
+step 4 rc=0
+total 16 passed 16 failed 0 skipped 0 files 1
+
+-- digest diff step 3 -> 4
+(none)
+2026-11-14T22:06:45Z [fam-snap-reversed] step 5 seq tests/integration/nl-answers-after-siren.test.ts
+step 5 rc=0
+total 20 passed 20 failed 0 skipped 0 files 1
+
+-- digest diff step 4 -> 5
+(none)
+2026-11-14T22:06:48Z [fam-snap-reversed] step 6 seq tests/integration/match-admin-create.test.ts
+step 6 rc=0
+total 10 passed 10 failed 0 skipped 0 files 1
+
+-- digest diff step 5 -> 6
+(none)
+2026-11-14T22:06:52Z [fam-snap-reversed] step 7 seq tests/integration/home-records.test.ts
+step 7 rc=0
+total 7 passed 7 failed 0 skipped 0 files 1
+
+-- digest diff step 6 -> 7
+(none)
+2026-11-14T22:06:56Z [fam-snap-reversed] step 8 seq tests/integration/gridley-corpus.test.ts
+step 8 rc=1
+total 1212 passed 1211 failed 1 skipped 0 files 1
+tests/integration/gridley-corpus.test.ts	Gridley corpus -- every cell through solveCellSummary writes the run report and has no failing cells	AssertionError: expected [ …(40) ] to deeply equal []
+-- digest diff step 7 -> 8
+(none)
+2026-11-14T22:13:11Z [fam-snap-reversed] step 9 seq tests/integration/grid-solver.test.ts
+step 9 rc=0
+total 222 passed 222 failed 0 skipped 0 files 1
+
+-- digest diff step 8 -> 9
+(none)
+2026-11-14T22:13:45Z [fam-snap-reversed] step 10 seq tests/integration/database.test.ts
+step 10 rc=0
+total 69 passed 69 failed 0 skipped 0 files 1
+
+-- digest diff step 9 -> 10
+(none)
+2026-11-14T22:14:06Z [fam-snap-reversed] step 11 seq tests/integration/data-editor.test.ts
+step 11 rc=1
+total 64 passed 58 failed 5 skipped 1 files 1
+tests/integration/data-editor.test.ts	Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) (2a) replay re-applies a field correction over a reset source value	AssertionError: afldb_test must hold no player_match_stats author
+tests/integration/data-editor.test.ts	Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) (2b) replay recreates a durable addition the reload did not supply	AssertionError: afldb_test must hold no player_match_stats authori
+tests/integration/data-editor.test.ts	Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) (2c) replay deletes a reinserted row under a durable removal	AssertionError: afldb_test must hold no player_match_stats authority bef
+tests/integration/data-editor.test.ts	Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) (3a) an active key whose match_key is absent from matches refuses before any write	AssertionError: afldb_test must hold no player_mat
+tests/integration/data-editor.test.ts	Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) (3b) an active key whose identity names no accepted external identity refuses before any write	AssertionError: afldb_test must hold n
+-- digest diff step 10 -> 11
+(none)
+2026-11-14T22:15:02Z [fam-snap-reversed] step 12 seq tests/integration/after-siren.test.ts
+step 12 rc=0
+total 11 passed 11 failed 0 skipped 0 files 1
+
+-- digest diff step 11 -> 12
+(none)
+2026-11-14T22:15:10Z [fam-snap-reversed] step 13 seq tests/integration/admin-special-records.test.ts
+step 13 rc=0
+total 43 passed 43 failed 0 skipped 0 files 1
+
+-- digest diff step 12 -> 13
+(none)
+2026-11-14T22:15:18Z [fam-snap-reversed] step 14 seq tests/integration/admin-fixtures.test.ts
+step 14 rc=0
+total 46 passed 46 failed 0 skipped 0 files 1
+
+-- digest diff step 13 -> 14
+(none)
+-- digest diff step 0 -> 14 (cumulative)
+(identical)

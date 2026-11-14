@@ -1,0 +1,18 @@
+FAIL tests/integration/nl-answers-after-siren.test.ts :: after_siren — ranking is always a tie most kicks after the siren is a wider tie than most goals
+AssertionError: expected [ 'Barry Hall', 'Brad Johnson', …(8) ] to deeply equal [ 'Barry Hall', 'Brad Johnson', …(7) ]
+    at /mnt/ssd/afldb-rem4-shared-20261115/cand-s1/tests/integration/nl-answers-after-siren.test.ts:181:57
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+=====
+FAIL tests/integration/nl-answers-after-siren.test.ts :: after_siren — the match-link boundary (D10 §7.1) the most recent kick is match-linked and is NEVER an unlinked later row
+AssertionError: expected 'Tim Membrey' to be 'Nasiah Wanganeen-Milera' // Object.is equality
+    at /mnt/ssd/afldb-rem4-shared-20261115/cand-s1/tests/integration/nl-answers-after-siren.test.ts:348:30
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+=====
+FAIL tests/integration/nl-answers-after-siren.test.ts :: after_siren — the trusted player link a player-subject answer counts only trusted-linked kickers, and says how many it left out
+AssertionError: expected 1 to be 6 // Object.is equality
+    at /mnt/ssd/afldb-rem4-shared-20261115/cand-s1/tests/integration/nl-answers-after-siren.test.ts:379:35
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+=====

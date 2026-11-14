@@ -1,0 +1,6 @@
+FAIL tests/integration/after-siren.test.ts :: after-siren durable admin decisions (AFLDB-ISSUE-167 Stage 4) leaves every row it did not create exactly as it found it (ISSUE-363 T363-3)
+AssertionError: expected { after_siren_kicks: { …(2) }, …(3) } to deeply equal { after_siren_kicks: { …(2) }, …(3) }
+    at /mnt/ssd/afldb-rem4-shared-20261115/cand-s1/tests/integration/after-siren.test.ts:418:38
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+=====

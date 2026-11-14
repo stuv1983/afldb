@@ -1,0 +1,13 @@
+FAIL tests/integration/special-records-lifecycle.test.ts :: migration 102 allowlist widenings actually accepts an override and an audit row for both tables
+Error: expected [Function] to throw error including 'rollback' but got 'null value in column "admin_user_id" …'
+    at _Assertion.__VITEST_REJECTS__ (file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/expect/dist/index.js:1747:17)
+    at _Assertion.propertyGetter (file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/chai/index.js:1570:27)
+    at Reflect.get (<anonymous>)
+    at Object.proxyGetter [as get] (file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/chai/index.js:1659:22)
+    at /mnt/ssd/afldb-rem4-shared-20261115/cand/tests/integration/special-records-lifecycle.test.ts:317:8
+    at file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:302:11
+    at file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:26
+    at file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///mnt/ssd/afldb-rem4-shared-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:2323:10)
+=====

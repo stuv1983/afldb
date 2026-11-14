@@ -1,0 +1,14 @@
+create-db: afldb_v2_rem4shared_mech_b4_siren_test created from afldb_v2_rem4shared_snap_tmpl_test and marked
+2026-11-14T21:34:17Z [mech-b4-siren] step 1 seq tests/integration/after-siren.test.ts
+step 1 rc=0
+total 10 passed 10 failed 0 skipped 0 files 1
+
+-- digest diff step 0 -> 1
+> after_siren_kicks|126|34e2895e9162bffecbfe9071bb03bfdf
+> auth_users|5|ec0375cb96686ac6d278e81c48071491
+> import_batches|81|9ce4f7abdd25f68a1213b8c18c93f0d8
+(none)
+-- digest diff step 0 -> 1 (cumulative)
+> after_siren_kicks|126|34e2895e9162bffecbfe9071bb03bfdf
+> auth_users|5|ec0375cb96686ac6d278e81c48071491
+> import_batches|81|9ce4f7abdd25f68a1213b8c18c93f0d8

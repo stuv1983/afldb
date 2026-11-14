@@ -1,0 +1,9 @@
+create-db: afldb_v2_rem4shared_ctl_rb_grid_solver_test created from afldb_v2_rem4shared_rb_tmpl_test and marked
+2026-11-14T23:02:19Z [ctl-rb-grid-solver] step 1 seq tests/integration/grid-solver.test.ts
+step 1 rc=1
+total 222 passed 221 failed 1 skipped 0 files 1
+tests/integration/grid-solver.test.ts	grid solver correctness drafted_by_club_never_played matches a hand-written equivalent for a real club	AssertionError: linked draft selections are required to exercise the criterion: expected 0 to be greater than 0
+-- digest diff step 0 -> 1
+(none)
+-- digest diff step 0 -> 1 (cumulative)
+(identical)
