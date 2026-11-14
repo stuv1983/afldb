@@ -1,0 +1,187 @@
+# search 2026-11-14T15:54:48+11:00 roots: /mnt/ssd/afldb/records /mnt/ssd/afldb/workspaces /home/arm/projects/afldb/data /mnt/ssd/afldb-rem-admin-20261114 /mnt/ssd/afldb-rem-answers-20261114 /mnt/ssd/afldb-rem-auth-20261114 /mnt/ssd/afldb-rem-draftguru-20261114 /mnt/ssd/afldb-rem-hostops-20261114 /mnt/ssd/afldb-rem-int-20261114 /mnt/ssd/afldb-rem-nl-20261114 /mnt/ssd/afldb-rem-perf-20261114 /mnt/ssd/afldb-rem-pins-20261114 /mnt/ssd/afldb-rem-rollover-20261114 /mnt/ssd/afldb-rem-routes-20261114 /mnt/ssd/afldb-rem-tests-20261114
+## directory name: full-history-20260902
+DIR /home/arm/projects/afldb/data/sources/afltables/fitzroy_core/full-history-20260902 files=131 bytes=268984684
+## directory name: c2-2026-final-core-v1
+DIR /mnt/ssd/afldb/workspaces/afldb-i316-rb-I-20261023T0905Z/package/data/sources/afltables/fitzroy_core/c2-2026-final-core-v1 files=132 bytes=272800291
+DIR /mnt/ssd/afldb/workspaces/afldb-i316-rb-J2-20261024T034905Z/package/data/sources/afltables/fitzroy_core/c2-2026-final-core-v1 files=132 bytes=272800291
+DIR /mnt/ssd/afldb/workspaces/afldb-i316-rb-I-20261023T0900Z/package/data/sources/afltables/fitzroy_core/c2-2026-final-core-v1 files=132 bytes=272800291
+DIR /mnt/ssd/afldb/workspaces/afldb-v2-coach2026-20261104/repo/data/sources/afltables/fitzroy_core/c2-2026-final-core-v1 files=132 bytes=272800291
+## directory name: person-html-20260826
+DIR /mnt/ssd/afldb/workspaces/i336-preview2-20261106/checkout/data/sources/draftguru/person-html-20260826 files=247 bytes=2117409
+## directory name: annual-html-20260826
+DIR /mnt/ssd/afldb/workspaces/i336-preview2-20261106/checkout/data/sources/draftguru/annual-html-20260826 files=90 bytes=13650445
+DIR /mnt/ssd/afldb/workspaces/afldb-i316-rb-I-20261023T0905Z/package/data/sources/draftguru/annual-html-20260826 files=42 bytes=7752722
+DIR /mnt/ssd/afldb/workspaces/afldb-i316-rb-J2-20261024T034905Z/package/data/sources/draftguru/annual-html-20260826 files=42 bytes=7752722
+DIR /mnt/ssd/afldb/workspaces/afldb-i316-rb-I-20261023T0900Z/package/data/sources/draftguru/annual-html-20260826 files=42 bytes=7752722
+DIR /home/arm/projects/afldb/data/sources/draftguru/annual-html-20260826 files=90 bytes=13650445
+## sample.json under person-html-20260826
+FILE /mnt/ssd/afldb/workspaces/i336-preview2-20261106/checkout/data/sources/draftguru/person-html-20260826/sample.json size=102052 mtime=2026-10-19 19:14:53.000000000 +1100 sha256=d8d743fbcfca39a4c9e708a1198c7e34592270d32628d4fc0003aea88068db28
+## fitzroy core manifests (json) named full-history-20260902 / c2-2026-final-core-v1
+FILE /mnt/ssd/afldb/workspaces/i336-preview2-20261106/checkout/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/i336-preview2-20261106/checkout/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/i336-preview2-20261106/checkout/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/i336-preview2-20261106/rollback-242fa276-b/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-qual-20261101T095239Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-qual-20261101T095239Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-qual-20261101T095239Z/cand/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/i336-preview-20261106/checkout/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/i336-preview-20261106/checkout/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/i336-preview-20261106/checkout/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029-prod-20261103/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029-prod-20261103/cand/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029-prod-20261103/cand/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-blockb-20261101T233017Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-blockb-20261101T233017Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-blockb-20261101T233017Z/cand/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-blockm-20261101T225607Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-blockm-20261101T225607Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-blockm-20261101T225607Z/cand/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029l-20261101T204205Z/head/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029l-20261101T204205Z/head/cand/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029l-20261101T204205Z/head/cand/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029l-20261101T204205Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029l-20261101T204205Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029l-20261101T204205Z/cand/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-i316-rb-I-20261023T0905Z/package/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/afldb-i316-rb-I-20261023T0905Z/package/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029l-20261101T203642Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029l-20261101T203642Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029l-20261101T203642Z/cand/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-issue333-o2-20261104/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/afldb-issue333-o2-20261104/cand/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-issue333-o2-20261104/cand/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/i336-draft-20261105/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/i336-draft-20261105/cand/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/i336-draft-20261105/cand/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/i336-draft-20261105/i336c/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/i336-draft-20261105/i336c/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/i336-draft-20261105/i336c/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-i335-qual-20261104T235919Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/afldb-i335-qual-20261104T235919Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-i335-qual-20261104T235919Z/cand/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029h-20261103T044914Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029h-20261103T044914Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029h-20261103T044914Z/cand/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-blockb-20261101T235531Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-blockb-20261101T235531Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-blockb-20261101T235531Z/cand/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/ops/ec667f76/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/ops/ec667f76/cand/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/ops/ec667f76/cand/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/rw2/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/rw2/cand/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/rw2/cand/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/rw/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/rw/cand/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/rw/cand/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/ops-e8/65b68758/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/ops-e8/65b68758/cand/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/ops-e8/65b68758/cand/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/ops-e5/ec667f76/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/ops-e5/ec667f76/cand/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/ops-e5/ec667f76/cand/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/ops-e4/ec667f76/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/ops-e4/ec667f76/cand/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/ops-e4/ec667f76/cand/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/ops-e3/ec667f76/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/ops-e3/ec667f76/cand/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/ops-e3/ec667f76/cand/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/prodco/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/prodco/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/prodco/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/ops-e7/ec667f76/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/ops-e7/ec667f76/cand/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/ops-e7/ec667f76/cand/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/ops-e2/ec667f76/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/ops-e2/ec667f76/cand/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/ops-e2/ec667f76/cand/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/ops-e6/ec667f76/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/ops-e6/ec667f76/cand/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/ops-e6/ec667f76/cand/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-blockb-rv-20261101T235635Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-blockb-rv-20261101T235635Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-blockb-rv-20261101T235635Z/cand/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-i335-qual-20261104T235053Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/afldb-i335-qual-20261104T235053Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-i335-qual-20261104T235053Z/cand/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-qual-20261101T103404Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-qual-20261101T103404Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-qual-20261101T103404Z/cand/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-i316-J-int-20261023T2154Z/package/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/afldb-c4b-fix-qual-20261102T055414Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/afldb-c4b-fix-qual-20261102T055414Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-c4b-fix-qual-20261102T055414Z/cand/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-blockb-20261101T232629Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-blockb-20261101T232629Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-blockb-20261101T232629Z/cand/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-blockb-prod-20261102T024241Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-blockb-prod-20261102T024241Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-blockb-prod-20261102T024241Z/cand/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-i316-rb-J2-20261024T034905Z/package/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/afldb-i316-rb-J2-20261024T034905Z/package/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/i336-prep4-20261106/nightly-co/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/i336-prep4-20261106/nightly-co/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/i336-prep4-20261106/nightly-co/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-blockm-20261101T231338Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-blockm-20261101T231338Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-blockm-20261101T231338Z/cand/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-blockm-20261101T230500Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-blockm-20261101T230500Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-blockm-20261101T230500Z/cand/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-i316-rb-I-20261023T0900Z/package/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/afldb-i316-rb-I-20261023T0900Z/package/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-coach2026-20261104/repo/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json sha256=2bd66e3df5ce80411363da9e15c6dddadc9eefe5c5c9eca3f5b7bd7106b0a0c1
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-coach2026-20261104/repo/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+FILE /mnt/ssd/afldb/workspaces/afldb-v2-coach2026-20261104/repo/issues/open/AFLDB-ISSUE-316-dp-proposal-20261025/inputs/docs/rebuild-manifests/afltables_fitzroy_core/c2-2026-final-core-v1.json sha256=02bbcf932ef71d411c5d5077ae85000ebdbc0896323cf3f57c0e9fa417cf9988
+## tarballs/archives that may hold them (names only)
+/mnt/ssd/afldb/workspaces/i336-preview2-20261106/checkout/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json
+/mnt/ssd/afldb/workspaces/i336-preview2-20261106/checkout/docs/rebuild-manifests/draftguru/person-html-20260826.json
+/mnt/ssd/afldb/workspaces/i336-preview2-20261106/rollback-242fa276-b/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json
+/mnt/ssd/afldb/workspaces/i336-preview2-20261106/rollback-242fa276-b/docs/rebuild-manifests/draftguru/person-html-20260826.json
+/mnt/ssd/afldb/workspaces/afldb-v2-qual-20261101T095239Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json
+/mnt/ssd/afldb/workspaces/afldb-v2-qual-20261101T095239Z/cand/docs/rebuild-manifests/draftguru/person-html-20260826.json
+/mnt/ssd/afldb/workspaces/i336-preview-20261106/checkout/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json
+/mnt/ssd/afldb/workspaces/i336-preview-20261106/checkout/docs/rebuild-manifests/draftguru/person-html-20260826.json
+/mnt/ssd/afldb/workspaces/afldb-v2-gap029-prod-20261103/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json
+/mnt/ssd/afldb/workspaces/afldb-v2-gap029-prod-20261103/cand/docs/rebuild-manifests/draftguru/person-html-20260826.json
+/mnt/ssd/afldb/workspaces/afldb-v2-blockb-20261101T233017Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json
+/mnt/ssd/afldb/workspaces/afldb-v2-blockb-20261101T233017Z/cand/docs/rebuild-manifests/draftguru/person-html-20260826.json
+/mnt/ssd/afldb/workspaces/afldb-v2-blockm-20261101T225607Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json
+/mnt/ssd/afldb/workspaces/afldb-v2-blockm-20261101T225607Z/cand/docs/rebuild-manifests/draftguru/person-html-20260826.json
+/mnt/ssd/afldb/workspaces/afldb-v2-gap029l-20261101T204205Z/head/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json
+/mnt/ssd/afldb/workspaces/afldb-v2-gap029l-20261101T204205Z/head/cand/docs/rebuild-manifests/draftguru/person-html-20260826.json
+/mnt/ssd/afldb/workspaces/afldb-v2-gap029l-20261101T204205Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json
+/mnt/ssd/afldb/workspaces/afldb-v2-gap029l-20261101T204205Z/cand/docs/rebuild-manifests/draftguru/person-html-20260826.json
+/mnt/ssd/afldb/workspaces/afldb-i316-rb-I-20261023T0905Z/package/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json
+/mnt/ssd/afldb/workspaces/afldb-i316-rb-I-20261023T0905Z/package/docs/rebuild-manifests/draftguru/person-html-20260826.json
+/mnt/ssd/afldb/workspaces/afldb-v2-gap029l-20261101T203642Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json
+/mnt/ssd/afldb/workspaces/afldb-v2-gap029l-20261101T203642Z/cand/docs/rebuild-manifests/draftguru/person-html-20260826.json
+/mnt/ssd/afldb/workspaces/afldb-issue333-o2-20261104/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json
+/mnt/ssd/afldb/workspaces/afldb-issue333-o2-20261104/cand/docs/rebuild-manifests/draftguru/person-html-20260826.json
+/mnt/ssd/afldb/workspaces/i336-draft-20261105/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json
+/mnt/ssd/afldb/workspaces/i336-draft-20261105/cand/docs/rebuild-manifests/draftguru/person-html-20260826.json
+/mnt/ssd/afldb/workspaces/i336-draft-20261105/i336c/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json
+/mnt/ssd/afldb/workspaces/i336-draft-20261105/i336c/docs/rebuild-manifests/draftguru/person-html-20260826.json
+/mnt/ssd/afldb/workspaces/afldb-i335-qual-20261104T235919Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json
+/mnt/ssd/afldb/workspaces/afldb-i335-qual-20261104T235919Z/cand/docs/rebuild-manifests/draftguru/person-html-20260826.json
+/mnt/ssd/afldb/workspaces/afldb-v2-gap029h-20261103T044914Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json
+/mnt/ssd/afldb/workspaces/afldb-v2-gap029h-20261103T044914Z/cand/docs/rebuild-manifests/draftguru/person-html-20260826.json
+/mnt/ssd/afldb/workspaces/afldb-v2-blockb-20261101T235531Z/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json
+/mnt/ssd/afldb/workspaces/afldb-v2-blockb-20261101T235531Z/cand/docs/rebuild-manifests/draftguru/person-html-20260826.json
+/mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/ops/ec667f76/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json
+/mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/ops/ec667f76/cand/docs/rebuild-manifests/draftguru/person-html-20260826.json
+/mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/rw2/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json
+/mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/rw2/cand/docs/rebuild-manifests/draftguru/person-html-20260826.json
+/mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/rw/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json
+/mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/rw/cand/docs/rebuild-manifests/draftguru/person-html-20260826.json
+/mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/ops-e8/65b68758/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json
+/mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/ops-e8/65b68758/cand/docs/rebuild-manifests/draftguru/person-html-20260826.json
+/mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/ops-e5/ec667f76/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json
+/mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/ops-e5/ec667f76/cand/docs/rebuild-manifests/draftguru/person-html-20260826.json
+/mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/ops-e4/ec667f76/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json
+/mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/ops-e4/ec667f76/cand/docs/rebuild-manifests/draftguru/person-html-20260826.json
+/mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/ops-e3/ec667f76/cand/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json
+/mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/ops-e3/ec667f76/cand/docs/rebuild-manifests/draftguru/person-html-20260826.json
+/mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/prodco/docs/rebuild-manifests/afltables_fitzroy_core/full-history-20260902.json
+/mnt/ssd/afldb/workspaces/afldb-v2-gap029-sim-20261103a/prodco/docs/rebuild-manifests/draftguru/person-html-20260826.json
+# done
