@@ -5354,6 +5354,9 @@ describe('Review B-03: a bare "round" resolves as a surname only where the quest
     "round's career goals",
     'round brownlow votes',
     'how many goals has round kicked',
+    // After an auxiliary the word is already read as a subject, so what follows it (here a
+    // second auxiliary) must not refuse it: only the start-of-question cue checks the next word.
+    'has round had the most goals',
   ])('"%s" reaches the family resolver and plans for the Round family', async (question) => {
     const calls: string[] = [];
     const result = await parseNlQuestion(question, roundCtx(calls));

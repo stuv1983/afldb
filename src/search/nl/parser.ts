@@ -2165,14 +2165,16 @@ function candidatePlayerSpan(text: string): string | null {
  * the leftover span is read, so the word looked like a bare surname and answered
  * "Barry Round - 293 goals". A surname-first question continues with a metric or career
  * word ("round most goals", "round career goals", "round brownlow votes"), never with one
- * of these. The auxiliaries are in the set because "round has/had X" reads equally as the
- * noun; a surname with an auxiliary is still read in the other direction ("has round kicked").
+ * of these. The auxiliaries are in the set because a leading "round has/had X" reads as the
+ * noun. The check applies to the start-of-question cue ONLY: after an auxiliary the word is
+ * already read as a subject ("has round kicked", "has round had a good year"), so what
+ * follows it there is left alone.
  */
+const ROUND_AUXILIARIES = 'did|does|do|has|have|had|was|were|is|are|will|would|can|could';
 const ROUND_NEXT_WORD_NOT_A_SURNAME_CONTEXT =
-  'with|of|by|in|for|that|which|where|when|on|at|to|from|during|than|and|or|the|a|an'
-  + '|did|does|do|has|have|had|was|were|is|are|will|would|can|could';
+  `with|of|by|in|for|that|which|where|when|on|at|to|from|during|than|and|or|the|a|an|${ROUND_AUXILIARIES}`;
 const ROUND_AS_SUBJECT_RE = new RegExp(
-  `(?:^|\\b(?:did|does|do|has|have|had|was|were|is|are|will|would|can|could)\\s+)round\\b(?!\\s+(?:${ROUND_NEXT_WORD_NOT_A_SURNAME_CONTEXT})\\b)`,
+  `(?:^round\\b(?!\\s+(?:${ROUND_NEXT_WORD_NOT_A_SURNAME_CONTEXT})\\b)|\\b(?:${ROUND_AUXILIARIES})\\s+round\\b)`,
   'g',
 );
 
