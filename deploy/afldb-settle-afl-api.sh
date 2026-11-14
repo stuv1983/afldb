@@ -64,10 +64,26 @@ fi
 # which no release check covers (release.mjs verifies release bundles only). Compare
 # node_modules/.package-lock.json with package-lock.json and say so in the journal.
 # WARN-AND-RECORD, NEVER FAIL: a refusing preflight would be a new way to lose a night
-# silently (ISSUE-332 has no alerting yet); the marker below is what a monitor greps for.
+# silently (ISSUE-332 has no alerting yet); the markers below are what a monitor greps for.
+# Two different non-zero outcomes must not share a marker (review A-09). `check-node-modules` exits 1
+# for drift, but a refusal or crash also exits 1, so the exit code alone cannot tell them apart:
+# drift is recognised by the check's own verdict line on stdout (`release: NODE_MODULES MISMATCH`,
+# printed immediately before it returns 1). Anything else non-zero means the check never reached a
+# verdict, and node_modules was NOT verified.
 if [ -f deploy/release.mjs ]; then
-  "$NODE" deploy/release.mjs check-node-modules --checkout "$PROJECT_ROOT" \
-    || echo "AFLDB_NODE_MODULES_DRIFT: node_modules differ from package-lock.json; the run continues (ISSUE-364)" >&2
+  nm_status=0
+  nm_out=$("$NODE" deploy/release.mjs check-node-modules --checkout "$PROJECT_ROOT") || nm_status=$?
+  if [ -n "$nm_out" ]; then printf '%s\n' "$nm_out"; fi
+  if [ "$nm_status" -ne 0 ]; then
+    case "$nm_out" in
+      *"release: NODE_MODULES MISMATCH"*)
+        echo "AFLDB_NODE_MODULES_DRIFT: node_modules differ from package-lock.json; the run continues (ISSUE-364)" >&2
+        ;;
+      *)
+        echo "AFLDB_NODE_MODULES_CHECK_FAILED: the node_modules check did not reach a verdict (exit $nm_status); node_modules is NOT verified; the run continues (ISSUE-364)" >&2
+        ;;
+    esac
+  fi
 fi
 
 # --- the season -------------------------------------------------------------

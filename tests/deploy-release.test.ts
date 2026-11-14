@@ -395,7 +395,92 @@ describe('AFLDB-ISSUE-351 — the attended gate and the activation audit (pure)'
     const check = wrapper.indexOf('deploy/release.mjs check-node-modules --checkout "$PROJECT_ROOT"');
     expect(check).toBeGreaterThan(wrapper.indexOf('export AFLDB_SKIP_DOTENV=1'));
     expect(check).toBeLessThan(wrapper.indexOf('"$NODE" "$TSX"'));
-    expect(wrapper.slice(check, check + 220)).toMatch(/\|\| echo "AFLDB_NODE_MODULES_DRIFT/);
+    expect(wrapper.slice(check, check + 220)).toMatch(/\|\| nm_status=\$\?/);
+    expect(wrapper).toContain('AFLDB_NODE_MODULES_DRIFT');
+    expect(wrapper).toContain('AFLDB_NODE_MODULES_CHECK_FAILED');
+  });
+
+  // Review A-09: drift and "the check never reached a verdict" must not share a journal marker, and
+  // neither may ever stop the settle. The real wrapper block runs under `set -eu` with a fake NODE.
+  describe.runIf(process.platform === 'linux')('the settle wrapper tells drift from a check that failed to run (ISSUE-364 A-09)', () => {
+    const wrapperText = () => readFileSync(join(REPO, 'deploy', 'afldb-settle-afl-api.sh'), 'utf8').replace(/\r\n/g, '\n');
+    const block = () => {
+      const text = wrapperText();
+      const start = text.indexOf('if [ -f deploy/release.mjs ]; then');
+      const end = text.indexOf('\nfi\n', start);
+      expect(start).toBeGreaterThan(0);
+      expect(end).toBeGreaterThan(start);
+      return text.slice(start, end + 4);
+    };
+    const runBlock = (node: string, checkout: string) => spawnSync('sh', ['-c',
+      `set -eu\nNODE=${JSON.stringify(node)}\nPROJECT_ROOT=${JSON.stringify(checkout)}\ncd "$PROJECT_ROOT"\n${block()}\necho REACHED_THE_SEASON_STEP`,
+    ], { encoding: 'utf8' });
+    const checkoutWith = (release: 'real' | string, installedVersion?: string) => {
+      const dir = mkdtempSync(join(tmpdir(), 'afldb-364-wrap-'));
+      mkdirSync(join(dir, 'deploy'));
+      if (release === 'real') {
+        // A copy, not a symlink: release.mjs only runs main() when argv[1] equals its own real path.
+        copyFileSync(join(REPO, 'deploy', 'release.mjs'), join(dir, 'deploy', 'release.mjs'));
+        mkdirSync(join(dir, 'tools', 'build'), { recursive: true });
+        copyFileSync(join(REPO, 'tools', 'build', 'env-in-standalone.mjs'), join(dir, 'tools', 'build', 'env-in-standalone.mjs'));
+      } else writeFileSync(join(dir, 'deploy', 'release.mjs'), release);
+      writeFileSync(join(dir, 'package-lock.json'), JSON.stringify({ packages: { '': {}, 'node_modules/a': { version: '1.0.0', integrity: 'sha512-A' } } }));
+      if (installedVersion) {
+        mkdirSync(join(dir, 'node_modules'));
+        writeFileSync(join(dir, 'node_modules', '.package-lock.json'), JSON.stringify({ packages: { 'node_modules/a': { version: installedVersion, integrity: 'sha512-A' } } }));
+      }
+      return dir;
+    };
+    const cleanup: string[] = [];
+    afterAll(() => { for (const dir of cleanup) rmSync(dir, { recursive: true, force: true }); });
+
+    it('real drift: the DRIFT marker, not the CHECK_FAILED one, and the run continues', () => {
+      const dir = checkoutWith('real', '1.0.1'); cleanup.push(dir);
+      const run = runBlock(process.execPath, dir);
+      expect(run.status).toBe(0);
+      expect(run.stdout).toContain('NODE_MODULES MISMATCH');
+      expect(run.stderr).toContain('AFLDB_NODE_MODULES_DRIFT: node_modules differ from package-lock.json');
+      expect(run.stderr).not.toContain('AFLDB_NODE_MODULES_CHECK_FAILED');
+      expect(run.stdout).toContain('REACHED_THE_SEASON_STEP');
+    });
+
+    it('a matching or unrecorded tree prints neither marker', () => {
+      for (const installed of ['1.0.0', undefined]) {
+        const dir = checkoutWith('real', installed); cleanup.push(dir);
+        const run = runBlock(process.execPath, dir);
+        expect(run.status).toBe(0);
+        expect(run.stderr).not.toMatch(/AFLDB_NODE_MODULES_(DRIFT|CHECK_FAILED)/);
+        expect(run.stdout).toContain('REACHED_THE_SEASON_STEP');
+      }
+    });
+
+    it.each([
+      ['a refusal or crash that exits 1 (the same code as drift)', `console.error('release: ERROR: boom'); process.exitCode = 1;`, 1],
+      ['a usage refusal that exits 2', `console.error('usage: node deploy/release.mjs ...'); process.exitCode = 2;`, 2],
+      ['an interrupt that exits 130', `process.exitCode = 130;`, 130],
+    ])('%s: the CHECK_FAILED marker with the exit code, never the DRIFT marker, and the run continues', (_label, body, code) => {
+      const dir = checkoutWith(body); cleanup.push(dir);
+      const run = runBlock(process.execPath, dir);
+      expect(run.status).toBe(0);
+      expect(run.stderr).toContain(`AFLDB_NODE_MODULES_CHECK_FAILED: the node_modules check did not reach a verdict (exit ${code}); node_modules is NOT verified`);
+      expect(run.stderr).not.toContain('AFLDB_NODE_MODULES_DRIFT');
+      expect(run.stdout).toContain('REACHED_THE_SEASON_STEP');
+    });
+
+    it('a Node that cannot be executed is a failed check, not drift', () => {
+      const dir = checkoutWith('real', '1.0.1'); cleanup.push(dir);
+      const run = runBlock('/nonexistent/node', dir);
+      expect(run.status).toBe(0);
+      expect(run.stderr).toMatch(/AFLDB_NODE_MODULES_CHECK_FAILED: .*\(exit 127\)/);
+      expect(run.stderr).not.toContain('AFLDB_NODE_MODULES_DRIFT');
+    });
+
+    it('a check that merely mentions the drift text in a failure is still a failed check', () => {
+      const dir = checkoutWith(`console.error('release: node_modules differ from package-lock.json: pretend'); process.exitCode = 1;`); cleanup.push(dir);
+      const run = runBlock(process.execPath, dir);
+      expect(run.stderr).toContain('AFLDB_NODE_MODULES_CHECK_FAILED');
+      expect(run.stderr).not.toContain('AFLDB_NODE_MODULES_DRIFT');
+    });
   });
 
   it('adds the attended and host-state options to the CLI without changing its defaults', () => {
