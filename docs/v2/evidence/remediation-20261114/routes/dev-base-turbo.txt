@@ -1,0 +1,30 @@
+GET /api/health -> 500 3604B <!DOCTYPE html><html><head><meta charSet="utf-8" data-next-head=""/><meta name="viewport" content="w
+GET /sitemap.xml -> 500 3604B <!DOCTYPE html><html><head><meta charSet="utf-8" data-next-head=""/><meta name="viewport" content="w
+GET /sitemap/1.xml -> 500 3604B <!DOCTYPE html><html><head><meta charSet="utf-8" data-next-head=""/><meta name="viewport" content="w
+GET /sitemap/0.xml -> 500 3604B <!DOCTYPE html><html><head><meta charSet="utf-8" data-next-head=""/><meta name="viewport" content="w
+stopped
+isolated-pg: afldb_v2_remroutes_base_test verified (cluster afldb_v2_isolated, 127.0.0.1:55617); running bash
+▲ Next.js 16.3.1 (Turbopack)
+- Local:         http://127.0.0.1:3205
+- Network:       http://127.0.0.1:3205
+✓ Ready in 751ms
+✓ Running next.config.ts took 67ms
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead.
+  To migrate automatically, run:
+  npx @next/codemod@canary middleware-to-proxy .
+  Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+⚠ Duplicate page detected. src/app/sitemap.ts and src/app/sitemap.xml/route.ts resolve to /sitemap.xml
+⚠ Duplicate page detected. src/app/sitemap.ts and src/app/sitemap.xml/route.ts resolve to /sitemap.xml
+⨯ ./src/app
+Error: An issue occurred while preparing your Next.js app
+Conflicting route and metadata at /sitemap.xml: route at /sitemap.xml/route and metadata at /sitemap.xml/route
+ GET /api/health 500 in 2.1s (next.js: 1777ms, proxy.ts: 180ms, application-code: 181ms)
+⨯ ./src/app
+Error: An issue occurred while preparing your Next.js app
+Conflicting route and metadata at /sitemap.xml: route at /sitemap.xml/route and metadata at /sitemap.xml/route
+ GET /sitemap.xml 500 in 316ms (next.js: 293ms, proxy.ts: 5ms, application-code: 18ms)
+⨯ ./src/app
+Error: An issue occurred while preparing your Next.js app
+Conflicting route and metadata at /sitemap.xml: route at /sitemap.xml/route and metadata at /sitemap.xml/route
+ GET /sitemap/1.xml 500 in 49ms (next.js: 26ms, proxy.ts: 5ms, application-code: 17ms)
+⨯ ./src/app

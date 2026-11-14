@@ -1,0 +1,23 @@
+isolated-pg: afldb_v2_remroutes_base_test verified (cluster afldb_v2_isolated, 127.0.0.1:55617); running bash
+▲ Next.js 16.3.1 (webpack)
+- Local:         http://127.0.0.1:3231
+- Network:       http://127.0.0.1:3231
+✓ Ready in 748ms
+✓ Running next.config.ts took 61ms
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead.
+
+  To migrate automatically, run:
+  npx @next/codemod@canary middleware-to-proxy .
+
+  Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+⚠ Duplicate page detected. src/app/sitemap.ts and src/app/sitemap.xml/route.ts resolve to /sitemap.xml
+⚠ Duplicate page detected. src/app/sitemap.ts and src/app/sitemap.xml/route.ts resolve to /sitemap.xml
+
+○ Compiling /api/health ...
+ GET /api/health 200 in 4.9s (next.js: 4.5s, proxy.ts: 255ms, application-code: 121ms)
+⨯ TypeError: Cannot read properties of undefined (reading 'then')
+    at ignore-listed frames
+ GET /sitemap.xml 500 in 957ms (next.js: 679ms, proxy.ts: 12ms, application-code: 266ms)
+ GET /sitemap/1.xml 200 in 1183ms (next.js: 260ms, proxy.ts: 10ms, generate-params: 819ms, application-code: 94ms)
+ GET /sitemap/0.xml 200 in 287ms (next.js: 17ms, proxy.ts: 11ms, generate-params: 18ms, application-code: 242ms)
+[?25h

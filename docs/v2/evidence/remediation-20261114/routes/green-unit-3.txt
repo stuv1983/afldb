@@ -1,0 +1,14 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem-routes-20261114/dev
+
+ ✓ tests/seo.test.ts (30 tests) 1524ms
+     ✓ answers an id that does not fit int4 with not-found, on every id route  786ms
+     ✓ answers a non-canonical id or season spelling with not-found  327ms
+ ✓ tests/coach-profile-route.test.ts (18 tests) 451ms
+ ✓ tests/format.test.ts (49 tests) 64ms
+
+ Test Files  3 passed (3)
+      Tests  97 passed (97)
+   Start at  09:41:56
+   Duration  3.29s (transform 1.35s, setup 249ms, import 279ms, tests 2.04s, environment 1ms)
+

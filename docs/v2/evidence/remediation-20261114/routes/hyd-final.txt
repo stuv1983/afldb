@@ -1,0 +1,30 @@
+desktop 200 / overflowX=0 msgs=0 title="AFL & VFL Statistics, Records and Match History | AFLDB" canonical=https://aflroutes.test
+desktop 200 /players/scott-pendlebury-11724 overflowX=0 msgs=0 title="Scott Pendlebury — AFL Stats, Games & Career Record | AFLDB" canonical=https://aflroutes.test/players/scott-pendlebury-11724
+desktop 200 /players/scott-pendlebury-11724/matches overflowX=0 msgs=0 title="Scott Pendlebury — Complete Match Log | AFLDB" canonical=https://aflroutes.test/players/scott-pendlebury-11724/matches
+desktop 200 /matches/16592 overflowX=0 msgs=0 title="North Melbourne v West Coast — Round 23, 2024 AFL | AFLDB" canonical=https://aflroutes.test/matches/16592
+desktop 200 /seasons/2024 overflowX=0 msgs=0 title="2024 AFL Season — Ladder, Results & Finals | AFLDB" canonical=https://aflroutes.test/seasons/2024
+desktop 200 /brownlow/2024 overflowX=0 msgs=0 title="2024 Brownlow Medal — Winner, Votes & Leaderboard | AFLDB" canonical=https://aflroutes.test/brownlow/2024
+desktop 200 /clubs/carlton overflowX=0 msgs=0 title="Carlton — Players, Seasons, Records & History | AFLDB" canonical=https://aflroutes.test/clubs/carlton
+desktop 200 /venues/adelaide-oval overflowX=0 msgs=0 title="Adelaide Oval — AFL/VFL Venue Record | AFLDB" canonical=https://aflroutes.test/venues/adelaide-oval
+desktop 200 /coaches/mick-malthouse-1 overflowX=0 msgs=0 title="Mick Malthouse — VFL/AFL Coaching Record | AFLDB" canonical=https://aflroutes.test/coaches/mick-malthouse-1
+desktop 200 /aflw/players/Aasta_O%2527Connor overflowX=0 msgs=0 title="Aasta O'Connor — AFLW Stats, Games & Career Record | AFLDB" canonical=https://aflroutes.test/aflw/players/Aasta_O%2527Connor
+desktop 200 /aflw/matches/2017-1-ade-gws overflowX=0 msgs=0 title="Kuwarna v GWS Giants — 2017 AFLW Match | AFLDB" canonical=https://aflroutes.test/aflw/matches/2017-1-ade-gws
+desktop 200 /aflw/seasons/2017 overflowX=0 msgs=0 title="2017 AFLW Season — Ladder, Results & Stats | AFLDB" canonical=https://aflroutes.test/aflw/seasons/2017
+desktop 200 /aflw/clubs/ade overflowX=0 msgs=0 title="Kuwarna AFLW — Players, Seasons & Record | AFLDB" canonical=https://aflroutes.test/aflw/clubs/ade
+desktop 404 /seasons/02024 overflowX=0 msgs=0 title="Season not found | AFLDB" canonical=
+desktop 404 /players/x-2147483648 overflowX=0 msgs=0 title="Player not found | AFLDB" canonical=
+mobile 200 / overflowX=0 msgs=0 title="AFL & VFL Statistics, Records and Match History | AFLDB" canonical=https://aflroutes.test
+mobile 200 /players/scott-pendlebury-11724 overflowX=0 msgs=0 title="Scott Pendlebury — AFL Stats, Games & Career Record | AFLDB" canonical=https://aflroutes.test/players/scott-pendlebury-11724
+mobile 200 /players/scott-pendlebury-11724/matches overflowX=0 msgs=0 title="Scott Pendlebury — Complete Match Log | AFLDB" canonical=https://aflroutes.test/players/scott-pendlebury-11724/matches
+mobile 200 /matches/16592 overflowX=0 msgs=0 title="North Melbourne v West Coast — Round 23, 2024 AFL | AFLDB" canonical=https://aflroutes.test/matches/16592
+mobile 200 /seasons/2024 overflowX=0 msgs=0 title="2024 AFL Season — Ladder, Results & Finals | AFLDB" canonical=https://aflroutes.test/seasons/2024
+mobile 200 /brownlow/2024 overflowX=0 msgs=0 title="2024 Brownlow Medal — Winner, Votes & Leaderboard | AFLDB" canonical=https://aflroutes.test/brownlow/2024
+mobile 200 /clubs/carlton overflowX=0 msgs=0 title="Carlton — Players, Seasons, Records & History | AFLDB" canonical=https://aflroutes.test/clubs/carlton
+mobile 200 /venues/adelaide-oval overflowX=0 msgs=0 title="Adelaide Oval — AFL/VFL Venue Record | AFLDB" canonical=https://aflroutes.test/venues/adelaide-oval
+mobile 200 /coaches/mick-malthouse-1 overflowX=0 msgs=0 title="Mick Malthouse — VFL/AFL Coaching Record | AFLDB" canonical=https://aflroutes.test/coaches/mick-malthouse-1
+mobile 200 /aflw/players/Aasta_O%2527Connor overflowX=0 msgs=0 title="Aasta O'Connor — AFLW Stats, Games & Career Record | AFLDB" canonical=https://aflroutes.test/aflw/players/Aasta_O%2527Connor
+mobile 200 /aflw/matches/2017-1-ade-gws overflowX=0 msgs=0 title="Kuwarna v GWS Giants — 2017 AFLW Match | AFLDB" canonical=https://aflroutes.test/aflw/matches/2017-1-ade-gws
+mobile 200 /aflw/seasons/2017 overflowX=0 msgs=0 title="2017 AFLW Season — Ladder, Results & Stats | AFLDB" canonical=https://aflroutes.test/aflw/seasons/2017
+mobile 200 /aflw/clubs/ade overflowX=0 msgs=0 title="Kuwarna AFLW — Players, Seasons & Record | AFLDB" canonical=https://aflroutes.test/aflw/clubs/ade
+mobile 404 /seasons/02024 overflowX=0 msgs=0 title="Season not found | AFLDB" canonical=
+mobile 404 /players/x-2147483648 overflowX=0 msgs=0 title="Player not found | AFLDB" canonical=

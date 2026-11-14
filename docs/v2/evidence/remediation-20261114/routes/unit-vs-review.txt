@@ -1,0 +1,4 @@
+review failed 107 mine failed 30 mine not failing in review: 1
+tests/draftguru-acquisition.test.ts > DraftGuru bridge import gate (plan / verify, read-only) DSN guard, read-only discipline, hash pins, classification refusals, verify checks and the no-artefact guarantee all hold on the real tool
+review total 11887 passed 11739 mine total 11937
+review failing files 10 tests/after-siren-normalisation.test.ts,tests/brownlow-season-artefact.test.ts,tests/db-promotion-check.test.ts,tests/db-test-rebuild.test.ts,tests/draftguru-acquisition.test.ts,tests/father-son-reconciliation.test.ts,tests/fitzroy-core-import.test.ts,tests/height-reconciliation.test.ts,tests/sibling-reconciliation.test.ts,tests/v2-acquisition-pipeline.test.ts

@@ -1,0 +1,15 @@
+BUILD_ID=kIK11V2UdpErY6kn0i2JS port=3202
+served build id: 
+malformed player slug (no -id): n=20 statuses:     20 500  files+=0 bytes+=0
+well-formed unknown player id: n=20 statuses:     20 500  files+=0 bytes+=0
+wrong slug, real id (308): n=20 statuses:     20 500  files+=0 bytes+=0
+leading-zero player id: n=7 statuses:      7 500  files+=0 bytes+=0
+unknown match ids: n=20 statuses:     20 500  files+=0 bytes+=0
+non-canonical match ids: n=10 statuses:     10 500  files+=0 bytes+=0
+season spellings: n=10 statuses:     10 500  files+=0 bytes+=0
+unknown seasons: n=10 statuses:     10 500  files+=0 bytes+=0
+brownlow spellings: n=5 statuses:      5 500  files+=0 bytes+=0
+unknown clubs: n=20 statuses:     20 500  files+=0 bytes+=0
+unknown venues: n=20 statuses:     20 500  files+=0 bytes+=0
+unknown honour teams: n=20 statuses:     20 500  files+=0 bytes+=0
+unknown award seasons: n=10 statuses:     10 404  files+=0 bytes+=0

@@ -1,0 +1,161 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem-routes-20261114/cand
+
+ ❯ tests/format.test.ts (49 tests | 6 failed) 79ms
+   ✓ Brownlow award links use its canonical publication, not retained named-medal rows 4ms
+     ✓ renders null as "not recorded", never as zero 1ms
+     ✓ renders a genuine zero as 0 29ms
+     ✓ groups thousands 0ms
+     ✓ renders goals, behinds and points 0ms
+     ✓ falls back to points when the breakdown was not recorded 1ms
+     ✓ renders a closed career span 1ms
+     ✓ renders a single season without a range 0ms
+     ✓ leaves an ongoing career open-ended 1ms
+     ✓ reports an unknown span as not recorded 0ms
+     ✓ renders a span between two season labels 0ms
+     ✓ collapses a single season to one label 0ms
+     ✓ reports an unknown span as not recorded 0ms
+     ✓ numbers a home-and-away round 0ms
+     ✓ names a final from its type 0ms
+     ✓ names a Wildcard Final with no fallback available 0ms
+     ✓ falls back to the source label for an unknown type 0ms
+     ✓ falls back when a home-and-away round has no number 0ms
+     ✓ splits a slug and trailing id 2ms
+     ✓ handles a name that itself ends in a number 0ms
+     ✓ rejects a slug with no id 0ms
+     ✓ rejects a non-positive id 0ms
+     ✓ round-trips with playerPath 0ms
+     × refuses a non-canonical id spelling 16ms
+     × refuses an id that does not fit a PostgreSQL integer 2ms
+     × accepts only the canonical spelling of a positive int4 id 1ms
+     × tells an oversized canonical id from malformed text 1ms
+     × parses a season only in its canonical four-digit spelling and range 1ms
+     × decodes a route key once and reports a malformed escape as null 1ms
+     ✓ identifies non-player categories 1ms
+     ✓ returns false for player, coach, legend, or null 1ms
+     ✓ returns null for non-player categories 0ms
+     ✓ appends (AFLW) for AFLW player inductees 0ms
+     ✓ avoids duplicating (AFLW) if already present 0ms
+     ✓ returns raw club name for regular AFL players 0ms
+     ✓ returns null when clubNameRaw is empty or null 0ms
+     ✓ identifies state-league and regional non-AFL clubs 1ms
+     ✓ returns false for recognized AFL clubs 1ms
+     ✓ returns false if club has a valid clubId integer 0ms
+     ✓ returns false for compound entries containing an AFL club 0ms
+     ✓ returns false for null or empty strings 0ms
+     ✓ hides unmatched badge for linked players 0ms
+     ✓ hides unmatched badge for AFLW matched players 0ms
+     ✓ hides unmatched badge for non-player categories 0ms
+     ✓ hides unmatched badge for non-AFL clubs 0ms
+     ✓ shows unmatched badge for unlinked players with AFL clubs or unknown clubs 0ms
+     ✓ sends a player-linked coach to their own coach page, not to /players 1ms
+     ✓ sends a coach-only person to the coach route, never to /players 0ms
+     ✓ is the coach id that identifies the page, not the player id 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/format.test.ts > parseEntitySlug > refuses a non-canonical id spelling
+AssertionError: 011724: expected { slug: 'scott-pendlebury', id: 11724 } to be null
+
+- Expected:
+null
+
++ Received:
+{
+  "id": 11724,
+  "slug": "scott-pendlebury",
+}
+
+ ❯ tests/format.test.ts:160:73
+    158|   it('refuses a non-canonical id spelling', () => {
+    159|     for (const spelling of ['011724', '0000011724', '00', '0']) {
+    160|       expect(parseEntitySlug(`scott-pendlebury-${spelling}`), spelling…
+       |                                                                         ^
+    161|     }
+    162|     expect(parseEntitySlug('scott-pendlebury-11724')).toEqual({ slug: …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+ FAIL  tests/format.test.ts > parseEntitySlug > refuses an id that does not fit a PostgreSQL integer
+AssertionError: expected null to deeply equal { slug: 'x', id: undefined }
+
+- Expected:
+{
+  "id": undefined,
+  "slug": "x",
+}
+
++ Received:
+null
+
+ ❯ tests/format.test.ts:168:49
+    166|   // binding it to an int4 comparison raised 22003 (HTTP 500).
+    167|   it('refuses an id that does not fit a PostgreSQL integer', () => {
+    168|     expect(parseEntitySlug(`x-${MAX_INT4_ID}`)).toEqual({ slug: 'x', i…
+       |                                                 ^
+    169|     for (const big of ['2147483648', '99999999999', '9007199254740993'…
+    170|       expect(parseEntitySlug(`x-${big}`), big).toBeNull();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯
+
+ FAIL  tests/format.test.ts > route parameter parsing (AFLDB-ISSUE-357, 359) > accepts only the canonical spelling of a positive int4 id
+TypeError: parseCanonicalId is not a function
+ ❯ tests/format.test.ts:177:12
+    175| describe('route parameter parsing (AFLDB-ISSUE-357, 359)', () => {
+    176|   it('accepts only the canonical spelling of a positive int4 id', () =…
+    177|     expect(parseCanonicalId('1')).toBe(1);
+       |            ^
+    178|     expect(parseCanonicalId('16592')).toBe(16592);
+    179|     expect(parseCanonicalId(String(MAX_INT4_ID))).toBe(MAX_INT4_ID);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
+
+ FAIL  tests/format.test.ts > route parameter parsing (AFLDB-ISSUE-357, 359) > tells an oversized canonical id from malformed text
+TypeError: isOversizedCanonicalId is not a function
+ ❯ tests/format.test.ts:188:12
+    186|
+    187|   it('tells an oversized canonical id from malformed text', () => {
+    188|     expect(isOversizedCanonicalId('2147483648')).toBe(true);
+       |            ^
+    189|     expect(isOversizedCanonicalId('9007199254740993')).toBe(true);
+    190|     expect(isOversizedCanonicalId(String(MAX_INT4_ID))).toBe(false);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
+
+ FAIL  tests/format.test.ts > route parameter parsing (AFLDB-ISSUE-357, 359) > parses a season only in its canonical four-digit spelling and range
+AssertionError: "02024": expected 2024 to be undefined
+
+- Expected:
+undefined
+
++ Received:
+2024
+
+ ❯ tests/format.test.ts:201:53
+    199|     expect(parseSeason('2100')).toBe(2100);
+    200|     for (const bad of ['02024', '002024', '2024.0', '2.024e3', '0x7e8'…
+    201|       expect(parseSeason(bad), JSON.stringify(bad)).toBeUndefined();
+       |                                                     ^
+    202|     }
+    203|     expect(parseSeason(undefined)).toBeUndefined();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯
+
+ FAIL  tests/format.test.ts > route parameter parsing (AFLDB-ISSUE-357, 359) > decodes a route key once and reports a malformed escape as null
+TypeError: safeDecodeParam is not a function
+ ❯ tests/format.test.ts:209:12
+    207|   // slugs contain a literal "%27", so a malformed escape must not bec…
+    208|   it('decodes a route key once and reports a malformed escape as null'…
+    209|     expect(safeDecodeParam('Aasta_O%2527Connor')).toBe('Aasta_O%27Conn…
+       |            ^
+    210|     expect(safeDecodeParam('Plain_Name')).toBe('Plain_Name');
+    211|     expect(safeDecodeParam('%E0%A4%A')).toBeNull();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  6 failed | 43 passed (49)
+   Start at  09:28:36
+   Duration  679ms (transform 200ms, setup 187ms, import 97ms, tests 79ms, environment 0ms)
+

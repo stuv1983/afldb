@@ -1,0 +1,20 @@
+GET /api/health -> 200 46B {"status":"ok","database":"ok","latencyMs":32}
+GET /sitemap.xml -> 200 828B <?xml version="1.0" encoding="UTF-8"?> <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/
+GET /sitemap/1.xml -> 200 234217B <?xml version="1.0" encoding="UTF-8"?> <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"> 
+GET /sitemap/0.xml -> 200 76505B <?xml version="1.0" encoding="UTF-8"?> <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"> 
+stopped
+isolated-pg: afldb_v2_remroutes_base_test verified (cluster afldb_v2_isolated, 127.0.0.1:55617); running bash
+▲ Next.js 16.3.1 (Turbopack)
+- Local:         http://127.0.0.1:3204
+- Network:       http://127.0.0.1:3204
+✓ Ready in 753ms
+✓ Running next.config.ts took 67ms
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead.
+  To migrate automatically, run:
+  npx @next/codemod@canary middleware-to-proxy .
+  Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+ GET /api/health 200 in 914ms (next.js: 621ms, proxy.ts: 174ms, application-code: 118ms)
+ GET /sitemap.xml 200 in 318ms (next.js: 281ms, proxy.ts: 9ms, application-code: 28ms)
+ GET /sitemap/1.xml 200 in 1421ms (next.js: 310ms, proxy.ts: 7ms, generate-params: 989ms, application-code: 114ms)
+ GET /sitemap/0.xml 200 in 56ms (next.js: 14ms, proxy.ts: 6ms, generate-params: 15ms, application-code: 21ms)
+[?25h

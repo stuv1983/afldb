@@ -1,0 +1,14 @@
+BUILD_ID=jmjDphdHkdO6Wu8ybJAVn port=3201
+malformed player slug (no -id): n=20 statuses:     20 404  files+=140 bytes+=1005668
+well-formed unknown player id: n=20 statuses:     20 404  files+=140 bytes+=1006884
+wrong slug, real id (308): n=20 statuses:     20 308  files+=140 bytes+=967898
+leading-zero player id: n=7 statuses:      7 200  files+=49 bytes+=3188848
+unknown match ids: n=20 statuses:     20 404  files+=140 bytes+=1004613
+non-canonical match ids: n=10 statuses:     10 200  files+=70 bytes+=2272514
+season spellings: n=10 statuses:     10 200  files+=70 bytes+=33869265
+unknown seasons: n=10 statuses:     10 404  files+=70 bytes+=504093
+brownlow spellings: n=5 statuses:      5 200  files+=35 bytes+=3207325
+unknown clubs: n=20 statuses:     20 404  files+=140 bytes+=1005083
+unknown venues: n=20 statuses:     20 404  files+=140 bytes+=1004957
+unknown honour teams: n=20 statuses:     20 404  files+=140 bytes+=1006520
+unknown award seasons: n=10 statuses:     10 404  files+=0 bytes+=0

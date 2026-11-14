@@ -1,0 +1,26 @@
+isolated-pg: afldb_v2_remroutes_base_test verified (cluster afldb_v2_isolated, 127.0.0.1:55617); running bash
+▲ Next.js 16.3.1 (webpack)
+- Local:         http://127.0.0.1:3233
+- Network:       http://127.0.0.1:3233
+✓ Ready in 626ms
+✓ Running next.config.ts took 51ms
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead.
+
+  To migrate automatically, run:
+  npx @next/codemod@canary middleware-to-proxy .
+
+  Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+
+○ Compiling /aflw/players/[slug] ...
+PARAMPROBE metadata slug="Aasta_O%27Connor"
+PARAMPROBE page slug="Aasta_O%2527Connor"
+ GET /aflw/players/Aasta_O%2527Connor 200 in 11.8s (next.js: 10.3s, proxy.ts: 214ms, application-code: 1294ms)
+PARAMPROBE metadata slug="Aasta_O'Connor"
+PARAMPROBE page slug="Aasta_O'Connor"
+ GET /aflw/players/Aasta_O%27Connor 404 in 187ms (next.js: 33ms, proxy.ts: 10ms, application-code: 143ms)
+PARAMPROBE metadata slug="Aasta_Smith"
+PARAMPROBE page slug="Aasta_Smith"
+ GET /aflw/players/Aasta_Smith 404 in 133ms (next.js: 8ms, proxy.ts: 8ms, application-code: 117ms)
+○ Compiling /_error ...
+ GET /aflw/players/%E0%A4%A 400 in 5.3s (next.js: 5.3s, proxy.ts: 7ms, application-code: 52ms)
+[?25h

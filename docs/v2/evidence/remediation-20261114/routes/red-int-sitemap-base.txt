@@ -1,0 +1,125 @@
+isolated-pg: afldb_v2_remroutes_int1_test verified (cluster afldb_v2_isolated, 127.0.0.1:55617); running bash
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem-routes-20261114/cand
+
+ ❯ tests/integration/admin-awards.test.ts (43 tests | 1 failed | 42 skipped) 363ms
+     ↓ applies cleanly: three columns and two CHECKs on each of the three tables
+     ↓ makes the identity keys active-row-only, and leaves award_winners alone
+     ↓ admits the three entity types and no settle target
+     ↓ B-1 holds on this database: every award winner carries a durable key
+     ↓ corrects a source-owned row as a DELTA, and audits it atomically
+     ↓ refuses a stale expectedUpdatedAt without writing anything
+     ↓ refuses to correct an identity-bearing field at all
+     ↓ refuses a row with no durable key (B-1 defensive path)
+     ↓ voids, reinstates, and moves the award span inside the same transaction (D-11)
+     ↓ voids a voided row no further, and refuses a second void
+     ↓ replaces the wrong winner with the right one, cross-linked by natural key
+     ↓ replacing onto a season the player already holds refuses the duplicate, then honours the confirmation (ISSUE-285)
+     ↓ surfaces a same-player duplicate for confirmation rather than refusing it (R-5)
+     ↓ rolls the canonical write back when its audit row cannot be written
+     ↓ D-10: a voided winner leaves the admin player-link queue
+     ↓ refuses to write a Brownlow winner into award_winners at all
+     ↓ stamps the HISTORICAL club identity on a club best-and-fairest season
+     ↓ corrects removed_year without touching status, and vice versa
+     ↓ replaces a source-owned entry under the same name and year
+     ↓ replacing an entry into another induction year revalidates both years (ISSUE-282)
+     ↓ records, corrects and voids a linked row and a raw-name row
+     ↓ replacing a selection revalidates the old AND the new team and player pages (ISSUE-282)
+     ↓ an award winner create records the admin note, and keeps the row note in new_values
+     ↓ a create without an admin note leaves the audit note empty rather than copying the row note
+     ↓ a Hall of Fame create records the admin note, and keeps the biography in new_values
+     ↓ an honour-team create records the admin note, and keeps the row note in new_values
+     ↓ an award winner replacement records the admin note on BOTH audit halves
+     ↓ a Hall of Fame replacement records the admin note on BOTH audit halves
+     ↓ an honour-team replacement records the admin note on BOTH audit halves
+     ↓ an ORDINARY reload leaves the lifecycle alone and reverts a correction
+     ↓ a DESTRUCTIVE rebuild re-creates a manual row from its record override
+     ↓ D-9: a missing CORRECTION target fails the reload closed
+     ↓ D-9: a missing LIFECYCLE target warns and RETAINS the override
+     ↓ re-creates a manual Hall of Fame row and a manual honour-team row
+     ↓ a VOIDED out-of-scope row no longer refuses the awards import
+     ↓ refuses a promotion over a row carrying an active lifecycle override
+     ↓ changes nothing at all while nothing is voided (gate 6)
+     ↓ takes a voided award winner out of every public surface, and puts it back (gate 7)
+     ↓ takes a voided Hall of Fame entry out of every public surface
+     ↓ keeps a REMOVED Hall of Fame inductee public: removal is history, not lifecycle (§6.6)
+     ↓ takes a voided honour-team selection out of every public surface
+     ↓ stops advertising a season and a team the sitemap can no longer fill (§4.5)
+     × lists no /awards/brownlow-medal URL, only the canonical /brownlow ones 62ms
+ ↓ tests/coach-comparison-url.test.ts (6 tests | 6 skipped)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/admin-awards.test.ts > Stage 4 — the public read model > lists no /awards/brownlow-medal URL, only the canonical /brownlow ones
+AssertionError: expected [ …(47) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "http://localhost:3100/awards/brownlow-medal",
++   "http://localhost:3100/awards/brownlow-medal/1980",
++   "http://localhost:3100/awards/brownlow-medal/1981",
++   "http://localhost:3100/awards/brownlow-medal/1982",
++   "http://localhost:3100/awards/brownlow-medal/1983",
++   "http://localhost:3100/awards/brownlow-medal/1984",
++   "http://localhost:3100/awards/brownlow-medal/1985",
++   "http://localhost:3100/awards/brownlow-medal/1986",
++   "http://localhost:3100/awards/brownlow-medal/1987",
++   "http://localhost:3100/awards/brownlow-medal/1988",
++   "http://localhost:3100/awards/brownlow-medal/1989",
++   "http://localhost:3100/awards/brownlow-medal/1990",
++   "http://localhost:3100/awards/brownlow-medal/1991",
++   "http://localhost:3100/awards/brownlow-medal/1992",
++   "http://localhost:3100/awards/brownlow-medal/1993",
++   "http://localhost:3100/awards/brownlow-medal/1994",
++   "http://localhost:3100/awards/brownlow-medal/1995",
++   "http://localhost:3100/awards/brownlow-medal/1996",
++   "http://localhost:3100/awards/brownlow-medal/1997",
++   "http://localhost:3100/awards/brownlow-medal/1998",
++   "http://localhost:3100/awards/brownlow-medal/1999",
++   "http://localhost:3100/awards/brownlow-medal/2000",
++   "http://localhost:3100/awards/brownlow-medal/2001",
++   "http://localhost:3100/awards/brownlow-medal/2002",
++   "http://localhost:3100/awards/brownlow-medal/2003",
++   "http://localhost:3100/awards/brownlow-medal/2004",
++   "http://localhost:3100/awards/brownlow-medal/2005",
++   "http://localhost:3100/awards/brownlow-medal/2006",
++   "http://localhost:3100/awards/brownlow-medal/2007",
++   "http://localhost:3100/awards/brownlow-medal/2008",
++   "http://localhost:3100/awards/brownlow-medal/2009",
++   "http://localhost:3100/awards/brownlow-medal/2010",
++   "http://localhost:3100/awards/brownlow-medal/2011",
++   "http://localhost:3100/awards/brownlow-medal/2012",
++   "http://localhost:3100/awards/brownlow-medal/2013",
++   "http://localhost:3100/awards/brownlow-medal/2014",
++   "http://localhost:3100/awards/brownlow-medal/2015",
++   "http://localhost:3100/awards/brownlow-medal/2016",
++   "http://localhost:3100/awards/brownlow-medal/2017",
++   "http://localhost:3100/awards/brownlow-medal/2018",
++   "http://localhost:3100/awards/brownlow-medal/2019",
++   "http://localhost:3100/awards/brownlow-medal/2020",
++   "http://localhost:3100/awards/brownlow-medal/2021",
++   "http://localhost:3100/awards/brownlow-medal/2022",
++   "http://localhost:3100/awards/brownlow-medal/2023",
++   "http://localhost:3100/awards/brownlow-medal/2024",
++   "http://localhost:3100/awards/brownlow-medal/2025",
++ ]
+
+ ❯ tests/integration/admin-awards.test.ts:1946:76
+    1944|     try {
+    1945|       const urls = (await sitemap({ id: 1 })).map((entry) => entry.url…
+    1946|       expect(urls.filter((u) => /\/awards\/brownlow-medal(\/|$)/.test(…
+       |                                                                            ^
+    1947|       expect(urls.some((u) => /\/brownlow\/\d{4}$/.test(u))).toBe(true…
+    1948|       // Nothing else in the award list was dropped.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 1 skipped (2)
+      Tests  1 failed | 48 skipped (49)
+   Start at  09:30:23
+   Duration  3.37s (transform 1.88s, setup 203ms, import 2.31s, tests 363ms, environment 1ms)
+

@@ -1,0 +1,12 @@
+isolated-pg: afldb_v2_remroutes_int1_test verified (cluster afldb_v2_isolated, 127.0.0.1:55617); running bash
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem-routes-20261114/dev
+
+ ✓ tests/integration/admin-awards.test.ts (43 tests | 42 skipped) 203ms
+ ↓ tests/coach-comparison-url.test.ts (6 tests | 6 skipped)
+
+ Test Files  1 passed | 1 skipped (2)
+      Tests  1 passed | 48 skipped (49)
+   Start at  09:30:13
+   Duration  2.33s (transform 1.01s, setup 196ms, import 1.43s, tests 203ms, environment 1ms)
+
