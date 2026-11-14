@@ -221,7 +221,33 @@ async function clearFixtureState(): Promise<void> {
   await admin`DELETE FROM fixtures WHERE season IN (${seasonNow}, ${seasonNext})`;
 }
 
+/**
+ * ISSUE-363 (T363-2): the rows of the three tables this suite writes, as one digest each. In the DEFAULT
+ * shared mode (one database, files run serially) whatever this suite leaves behind -- or deletes -- is what
+ * the next file reads. Provenance: raw SQL over the tables, no function under test; `chr(10)` is the row
+ * separator. Used twice: at the start (the pre-existing set) and at the end (the same set must remain).
+ */
+async function fixtureTablesDigest(): Promise<Record<string, { n: number; md5: string }>> {
+  const rows = await admin<{ t: string; n: number; h: string }[]>`
+    SELECT 'fixtures' AS t, count(*)::int AS n,
+           md5(coalesce(string_agg(x::text, chr(10) ORDER BY x.id), '')) AS h
+      FROM fixtures x
+    UNION ALL
+    SELECT 'data_overrides[fixtures]', count(*)::int,
+           md5(coalesce(string_agg(x::text, chr(10) ORDER BY x.id), ''))
+      FROM data_overrides x WHERE x.entity_type = 'fixtures'
+    UNION ALL
+    SELECT 'data_edits[fixtures]', count(*)::int,
+           md5(coalesce(string_agg(x::text, chr(10) ORDER BY x.id), ''))
+      FROM data_edits x WHERE x.table_name = 'fixtures'
+  `;
+  return Object.fromEntries(rows.map((r) => [r.t, { n: r.n, md5: r.h }]));
+}
+
+let digestBefore: Record<string, { n: number; md5: string }> = {};
+
 beforeAll(async () => {
+  digestBefore = await fixtureTablesDigest();
   const [bound] = await sql<{ maxYear: number }[]>`SELECT max(year)::int AS "maxYear" FROM seasons`;
   maxYear = bound.maxYear;
   seasonNow = maxYear;
@@ -1423,5 +1449,12 @@ describe('the REAL replay (§20)', () => {
       expect(replay.stderr, path).toContain(message);
       await clearFixtureState();
     }
+  });
+});
+
+describe('the shared database after this suite (ISSUE-363 T363-2)', () => {
+  it('leaves every fixtures, data_overrides and data_edits row it did not create exactly as it found it', async () => {
+    await clearFixtureState();
+    expect(await fixtureTablesDigest()).toEqual(digestBefore);
   });
 });

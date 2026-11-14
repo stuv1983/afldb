@@ -156,6 +156,36 @@ async function clearFixtures(): Promise<void> {
   await sql`DELETE FROM after_siren_kicks WHERE source_record_id LIKE ${`%${MARKER}%`}`;
 }
 
+/**
+ * ISSUE-363 (T363-3): the rows this suite can touch, as one digest per table. The suite runs the REAL
+ * loader (which rewrites `after_siren_kicks`, writes `import_batches`, and re-asserts overrides) and
+ * needs an administrator, so in the DEFAULT shared mode (one database, files run serially) anything it
+ * leaves behind is read by the next file. Provenance: the digest is computed here by raw SQL over the
+ * tables; it calls nothing under test. `chr(10)` is the row separator (no backslash in a template).
+ */
+async function ownedRowDigest(): Promise<Record<string, { n: number; md5: string }>> {
+  const rows = await sql<{ t: string; n: number; h: string }[]>`
+    SELECT 'after_siren_kicks' AS t, count(*)::int AS n,
+           md5(coalesce(string_agg(x::text, chr(10) ORDER BY x.id), '')) AS h
+      FROM after_siren_kicks x
+    UNION ALL
+    SELECT 'data_overrides[after_siren_kicks]', count(*)::int,
+           md5(coalesce(string_agg(x::text, chr(10) ORDER BY x.id), ''))
+      FROM data_overrides x WHERE x.entity_type = 'after_siren_kicks'
+    UNION ALL
+    SELECT 'import_batches[after_siren.py]', count(*)::int,
+           md5(coalesce(string_agg(x::text, chr(10) ORDER BY x.id), ''))
+      FROM import_batches x WHERE x.tool = 'after_siren.py'
+    UNION ALL
+    SELECT 'auth_users[fixture email]', count(*)::int,
+           md5(coalesce(string_agg(x::text, chr(10) ORDER BY x.id), ''))
+      FROM auth_users x WHERE x.email = ${FIXTURE_EMAIL}
+  `;
+  return Object.fromEntries(rows.map((r) => [r.t, { n: r.n, md5: r.h }]));
+}
+
+let digestBefore: Record<string, { n: number; md5: string }> = {};
+
 /** One event key the artefact carries, and the row it loaded to. */
 async function anyLoadedEvent(): Promise<{ id: number; key: string }> {
   const [row] = await sql<{ id: number; key: string }[]>`
@@ -180,6 +210,8 @@ describe.skipIf(!canLoad)(
   `after-siren durable admin decisions (AFLDB-ISSUE-167 Stage 4)${canLoad ? '' : ` — ${skipNote}`}`,
   () => {
     beforeAll(async () => {
+      await clearFixtures();
+      digestBefore = await ownedRowDigest();
       const [admin] = await sql<{ id: number }[]>`
         INSERT INTO auth_users (email, role)
         VALUES (${FIXTURE_EMAIL}, 'admin')
@@ -187,7 +219,6 @@ describe.skipIf(!canLoad)(
         RETURNING id
       `;
       adminUserId = admin.id;
-      await clearFixtures();
     });
 
     afterAll(async () => {
@@ -378,6 +409,13 @@ describe.skipIf(!canLoad)(
       expect(batchesAfter.n, 'a refused run writes no batch row').toBe(batchesBefore.n);
 
       await clearFixtures();
+    }, 300_000);
+
+    it('leaves every row it did not create exactly as it found it (ISSUE-363 T363-3)', async () => {
+      await clearFixtures();
+      const restore = runLoad(ARTEFACT);
+      expect(restore.status, loadOutput(restore)).toBe(0);
+      expect(await ownedRowDigest()).toEqual(digestBefore);
     }, 300_000);
   },
 );
