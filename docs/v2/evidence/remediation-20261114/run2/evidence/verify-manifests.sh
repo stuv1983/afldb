@@ -152,14 +152,38 @@ for i in "${!DS[@]}"; do
   else row HOST-MISSING "$src" "$label" "$exp" "" "${HP[0]}" "file absent ($state) at the path the scope README names${note:+; $note}"; fi
 done
 
-# --- 4. truncated hashes in README prose: match against what this run verified ---
-while IFS=: read -r f ln pre; do
+# --- 4. truncated hashes in README prose ---
+# Matched first against what this run verified; if still unmatched, against EVERY committed blob of the README's own scope
+# and every file under that scope's host evidence dir (/mnt/ssd/afldb-rem-<scope>-20261114/evidence[-raw]), read-only.
+PRE="$T/prefixes"
+for p in "${PATHS[@]}"; do case "$p" in "$BASE"/run2/*) ;; "$BASE"/*.md)
+  blobtxt "$p" | grep -noE '[0-9a-f]{8,63}(…|\.\.\.)' | sed -E "s#^([0-9]+):([0-9a-f]+).*#$p\t\1\t\2#";; esac; done > "$PRE"
+declare -A SCOPEH; NEEDED=""
+while IFS=$'\t' read -r f ln pre; do
   [ -z "$pre" ] && continue
   hit=""; for h in "${!VERIFIED[@]}"; do [[ $h == "$pre"* ]] && { hit=$h; break; }; done
-  rd=${f#$BASE/}
-  if [ -n "$hit" ]; then row "${VERIFIED[$hit]%%|*}" "$rd:$ln (prefix)" "${VERIFIED[$hit]#*|}" "$pre…" "$hit" "" "truncated hash is a prefix of the hash verified for the entry named in column 3"
-  else row UNRESOLVED "$rd:$ln (prefix)" "$pre…" "$pre…" "" "" "truncated hash in prose; names no verifiable whole-file location"; fi
-done < <(for p in "${PATHS[@]}"; do case "$p" in "$BASE"/run2/*) ;; "$BASE"/*.md) blobtxt "$p" | grep -noE '[0-9a-f]{8,63}(…|\.\.\.)' | sed -E "s#^([0-9]+):([0-9a-f]+).*#$p:\1:\2#";; esac; done)
+  [ -n "$hit" ] && continue
+  rd=${f#$BASE/}; sc=${rd%%/*}; case "$rd" in */*) NEEDED="$NEEDED $sc";; esac
+done < "$PRE"
+for sc in $(printf '%s\n' $NEEDED | sort -u); do
+  : > "$T/sc-$sc"
+  for p in "${PATHS[@]}"; do case "$p" in "$BASE/$sc/"*) csha "$p"; printf '%s\t%s\t%s\n' "$REPLY" COMMITTED "${p#$BASE/}" >> "$T/sc-$sc";; esac; done
+  if [ "$HOSTUP" = 1 ]; then
+    timeout 300 ssh -o BatchMode=yes -o ConnectTimeout=20 -i "$KEY" "$HOST" \
+      "for d in $HR/afldb-rem-$sc-20261114/evidence $HR/afldb-rem-$sc-20261114/evidence-raw; do [ -d \"\$d\" ] && find \"\$d\" -type f -size -300000k -exec sha256sum {} +; done" 2>/dev/null \
+      | awk '{h=$1; $1=""; sub(/^ +/,""); printf "%s\tHOST\t%s\n", h, $0}' >> "$T/sc-$sc"
+  fi
+done
+while IFS=$'\t' read -r f ln pre; do
+  [ -z "$pre" ] && continue
+  rd=${f#$BASE/}; sc=${rd%%/*}; src="$rd:$ln (prefix)"
+  hit=""; for h in "${!VERIFIED[@]}"; do [[ $h == "$pre"* ]] && { hit=$h; break; }; done
+  if [ -n "$hit" ]; then row "${VERIFIED[$hit]%%|*}" "$src" "${VERIFIED[$hit]#*|}" "$pre…" "$hit" "" "truncated hash is a prefix of the hash verified for the entry named in column 3"; continue; fi
+  m=""; [ -f "$T/sc-$sc" ] && m=$(awk -F'\t' -v p="$pre" 'index($1,p)==1 {print $2"\t"$1"\t"$3; exit}' "$T/sc-$sc")
+  if [ -n "$m" ]; then IFS=$'\t' read -r kind full where <<< "$m"
+    row "$([ "$kind" = COMMITTED ] && echo COMMITTED-OK || echo HOST-OK)" "$src" "$pre…" "$pre…" "$full" "$where" "prefix matches a file in the scope's own $([ "$kind" = COMMITTED ] && echo committed files || echo host evidence dir) (no file name stated in the prose)"
+  else row UNRESOLVED "$src" "$pre…" "$pre…" "" "" "truncated hash in prose; matches no verified hash, no committed file of the scope and no file in its host evidence dir (may be a git commit/release id or a database digest rather than a file hash)"; fi
+done < "$PRE"
 
 sort -t$'\t' -k1,1 -k2,2 -k3,3 "$ROWS"
 echo "--- summary ---" >&2
