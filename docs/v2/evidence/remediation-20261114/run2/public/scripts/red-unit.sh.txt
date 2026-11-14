@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# red proof (unit): run the given unit files against the committed (unfixed) tracked src of cand; untracked new files stay
+set -u
+W=/mnt/ssd/afldb-rem2-public-20261114
+cd $W/cand
+git stash push -q -- src || exit 1
+git status --short | head -20
+HEADN=${HEADN:-80} bash $W/in/ut.sh "$@"
+git stash pop -q
+git status --short | head -30

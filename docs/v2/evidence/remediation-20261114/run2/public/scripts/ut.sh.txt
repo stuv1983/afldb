@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# usage: ut.sh <outfile> <test files...>   (unit run in $W/cand, bounded)
+set -u -o pipefail
+export W=/mnt/ssd/afldb-rem2-public-20261114
+export PATH="$HOME/.nvm/versions/node/v22.23.2/bin:$PATH"
+export PYTHON=/home/arm/i250/afldb/.venv/bin/python AFLDB_PYTHON=/home/arm/i250/afldb/.venv/bin/python
+OUT=$1; shift
+cd ${CAND:-$W/cand}
+timeout 900 nice -n 10 node node_modules/vitest/vitest.mjs run "$@" > "$OUT" 2>&1
+echo "rc=$?" >> "$OUT"
+sed 's/\x1b\[[0-9;]*m//g' "$OUT" | grep -a -E "^ *(FAIL|×|✗)|Test Files|Tests |AssertionError|rc=" | head -${HEADN:-60}

@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# serve the qual production build on loopback :55664 (own range), gate: 1 slot, no queue; capture the busy state; stop.
+set -u -o pipefail
+export W=/mnt/ssd/afldb-rem2-public-20261114
+export PATH="$HOME/.nvm/versions/node/v22.23.2/bin:$PATH"
+export AFLDB_V2_PG_ROOT=$W/pg-root AFLDB_V2_PG_BIN=/usr/lib/postgresql/16/bin AFLDB_V2_PG_PORT=55654
+CAND=$W/qual; EV=$W/evidence/qual/visual; mkdir -p "$EV"
+DB=afldb_v2_rem2public_build_test; PORT=55664
+cd "$CAND" || exit 1
+ss -ltn | awk '{print $4}' | grep -qE ":$PORT$" && { echo "port $PORT busy"; exit 1; }
+SECRET=$(head -c 48 /dev/urandom | base64 | tr -d '\n/+=')
+AFLDB_COMPARE_MAX_CONCURRENT=1 AFLDB_COMPARE_MAX_QUEUE=0 AFLDB_INDEXING=on AFLDB_SESSION_SECRET="$SECRET" PORT=$PORT HOSTNAME=127.0.0.1 NODE_ENV=production \
+  setsid node --import tsx tools/v2/isolated-pg.ts run $DB -- sh -c 'cd .next/standalone && exec node server.js' > "$EV/server.log" 2>&1 < /dev/null &
+echo $! > "$EV/server.pid"
+for i in $(seq 1 60); do curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/" 2>/dev/null | grep -q 200 && break; sleep 1; done
+echo "BUILD_ID=$(cat .next/BUILD_ID) home=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:$PORT/)"
+cp $W/in/busy-shoot.mjs "$CAND/.busy-shoot.mjs"
+timeout 600 node "$CAND/.busy-shoot.mjs" "http://127.0.0.1:$PORT" "$EV" > "$EV/shoot.out" 2>&1; echo "shoot rc=$?"
+rm -f "$CAND/.busy-shoot.mjs"
+pkill -TERM -s "$(ps -o sid= -p "$(cat "$EV/server.pid")" | tr -d ' ')" 2>/dev/null; sleep 2
+ss -ltn | awk '{print $4}' | grep -qE ":$PORT$" && echo "server still listening" || echo "server stopped"
+grep -v -i 'postgres://' "$EV/server.log" | grep -i -E 'error|warn' | head -10
+echo "porcelain: $(git -C $CAND status --porcelain | wc -l)"

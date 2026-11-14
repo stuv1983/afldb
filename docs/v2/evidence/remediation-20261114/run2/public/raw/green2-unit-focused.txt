@@ -1,0 +1,17 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem2-public-20261114/cand
+
+ ✓ tests/nl-parser.test.ts (672 tests) 785ms
+ ✓ tests/nl-plan.test.ts (224 tests) 114ms
+ ✓ tests/nl-describe.test.ts (94 tests) 93ms
+ ✓ tests/club-comparison-view.test.ts (35 tests) 344ms
+ ✓ tests/club-comparison.test.ts (28 tests) 43ms
+ ✓ tests/home-records.test.ts (21 tests) 102ms
+ ✓ tests/unit/qualifying-matches-gate.test.ts (28 tests) 32ms
+
+ Test Files  7 passed (7)
+      Tests  1102 passed (1102)
+   Start at  16:07:27
+   Duration  5.73s (transform 1.37s, setup 429ms, import 2.10s, tests 1.51s, environment 2ms)
+
+rc=0

@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# creates $W/pre356: a checkout of de640826 (pre-ISSUE-356) sharing cand's node_modules (read-only comparison)
+set -eu
+W=/mnt/ssd/afldb-rem2-public-20261114
+[ -d $W/pre356 ] && { echo exists; exit 0; }
+git clone -q $W/cand $W/pre356
+cd $W/pre356
+git checkout -q --detach de640826d13489c58392563e7ae1ff62403ed293 2>/dev/null || git -C $W/pre356 fetch -q /mnt/ssd/afldb-review-20261114T0640Z/cand de640826d13489c58392563e7ae1ff62403ed293 && git -C $W/pre356 checkout -q --detach de640826d13489c58392563e7ae1ff62403ed293
+ln -s $W/cand/node_modules $W/pre356/node_modules
+git rev-parse HEAD

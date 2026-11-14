@@ -1,0 +1,47 @@
+##### integ 05:26:13
+== tests/integration/nl-semantic-mapping.test.ts
+ Test Files  1 passed (1)
+      Tests  37 passed (37)
+rc=0
+== tests/integration/club-comparison-route.test.ts
+ Test Files  1 passed (1)
+      Tests  31 passed (31)
+rc=0
+== tests/integration/home-records.test.ts
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+rc=0
+== tests/integration/nl-answers.test.ts
+ Test Files  1 passed (1)
+      Tests  33 passed (33)
+rc=0
+== tests/integration/nl-answers-game-season.test.ts
+ Test Files  1 passed (1)
+      Tests  24 passed (24)
+rc=0
+== tests/integration/nl-answers-team-club.test.ts
+ Test Files  1 passed (1)
+      Tests  36 passed (36)
+rc=0
+== tests/integration/nl-answer-boundary.test.ts
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+rc=0
+== tests/integration/nl-vocab.test.ts
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+rc=0
+== tests/integration/club-comparison.test.ts
+⎯⎯⎯⎯⎯⎯ Failed Tests 24 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head core > summarises Adelaide vs Brisbane Lions to the canonical witness and to independent SQL
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head core > filters by match type so that home-and-away and finals partition the complete history
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head core > filters by era (Club Rivalry Explorer follow-up, FR-2) so the decades partition the complete history
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head core > paginates the complete meetings list deterministically at 25 rows per page
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head core > groups venue records by canonical venue and agrees with an independent grouping
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head core > reads streaks from chronological order, with a draw breaking a winning streak
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head core > keeps Brisbane Bears and Fitzroy out of Brisbane Lions head-to-head totals
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head core > handles the Carlton vs Collingwood long rivalry, including Grand Finals
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: crossover players > lists everyone who represented both organisations, agreeing with independent SQL
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: crossover players > reports Ben Keays as Brisbane Lions first, then Adelaide, in both argument orders
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: crossover players > summarises the first and most recent players to complete both representations
+##### done 05:28:02

@@ -1,0 +1,12 @@
+isolated-pg: afldb_v2_rem2public_i3_test verified (cluster afldb_v2_isolated, 127.0.0.1:55654); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem2-public-20261114/qual
+
+ ✓ tests/integration/home-records.test.ts (7 tests) 656ms
+
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+   Start at  16:26:51
+   Duration  1.31s (transform 300ms, setup 132ms, import 316ms, tests 656ms, environment 0ms)
+
+rc=0

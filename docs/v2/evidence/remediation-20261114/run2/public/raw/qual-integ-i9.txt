@@ -1,0 +1,627 @@
+isolated-pg: afldb_v2_rem2public_i9_test verified (cluster afldb_v2_isolated, 127.0.0.1:55654); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem2-public-20261114/qual
+
+stdout | tests/integration/club-comparison.test.ts > club comparison: long rivalry performance
+┌─────────┬─────────────────────────────────────┬──────────────────────────────────────┬──────┬────────┬───────────┬────────┐
+│ (index) │ group                               │ label                                │ runs │ min_ms │ median_ms │ max_ms │
+├─────────┼─────────────────────────────────────┼──────────────────────────────────────┼──────┼────────┼───────────┼────────┤
+│ 0       │ 'adelaide/brisbane-lions'           │ 'getHeadToHeadSummary'               │ 5    │ 6.1    │ 6.7       │ 9.8    │
+│ 1       │ 'adelaide/brisbane-lions'           │ 'getHeadToHeadMeetings (page 1)'     │ 5    │ 11.4   │ 11.8      │ 15.1   │
+│ 2       │ 'adelaide/brisbane-lions'           │ 'getHeadToHeadMeetings (finals)'     │ 5    │ 12.9   │ 15.3      │ 19.2   │
+│ 3       │ 'adelaide/brisbane-lions'           │ 'getHeadToHeadVenueRecords'          │ 5    │ 6.4    │ 6.6       │ 11.4   │
+│ 4       │ 'adelaide/brisbane-lions'           │ 'getHeadToHeadRecords'               │ 5    │ 7.3    │ 8.5       │ 9.1    │
+│ 5       │ 'adelaide/brisbane-lions'           │ 'getHeadToHeadStreaks'               │ 5    │ 5.9    │ 6         │ 9.8    │
+│ 6       │ 'adelaide/brisbane-lions'           │ 'getCrossoverPlayers'                │ 5    │ 6.7    │ 9.2       │ 11.6   │
+│ 7       │ 'adelaide/brisbane-lions'           │ 'getCrossoverSummary'                │ 5    │ 8      │ 8.3       │ 13.4   │
+│ 8       │ 'adelaide/brisbane-lions'           │ 'getHeadToHeadPlayerLeaders'         │ 5    │ 14.6   │ 15.5      │ 17.5   │
+│ 9       │ 'adelaide/brisbane-lions'           │ 'getHeadToHeadBrownlow'              │ 5    │ 26.9   │ 29.9      │ 55.5   │
+│ 10      │ 'adelaide/brisbane-lions'           │ 'getClubBrownlowHistory (A)'         │ 5    │ 212.5  │ 232.7     │ 236.5  │
+│ 11      │ 'adelaide/brisbane-lions'           │ 'getClubBrownlowHistory (B)'         │ 5    │ 203.9  │ 204.8     │ 244    │
+│ 12      │ 'carlton/collingwood'               │ 'getHeadToHeadSummary'               │ 5    │ 8      │ 8.8       │ 15.2   │
+│ 13      │ 'carlton/collingwood'               │ 'getHeadToHeadMeetings (page 1)'     │ 5    │ 13.1   │ 13.9      │ 18.7   │
+│ 14      │ 'carlton/collingwood'               │ 'getHeadToHeadMeetings (finals)'     │ 5    │ 13.2   │ 14        │ 19.2   │
+│ 15      │ 'carlton/collingwood'               │ 'getHeadToHeadVenueRecords'          │ 5    │ 6.5    │ 6.6       │ 7.3    │
+│ 16      │ 'carlton/collingwood'               │ 'getHeadToHeadRecords'               │ 5    │ 10.1   │ 10.4      │ 18.6   │
+│ 17      │ 'carlton/collingwood'               │ 'getHeadToHeadStreaks'               │ 5    │ 6.8    │ 6.9       │ 12.7   │
+│ 18      │ 'carlton/collingwood'               │ 'getCrossoverPlayers'                │ 5    │ 10.9   │ 12        │ 12.6   │
+│ 19      │ 'carlton/collingwood'               │ 'getCrossoverSummary'                │ 5    │ 10.9   │ 11.1      │ 19.5   │
+│ 20      │ 'carlton/collingwood'               │ 'getHeadToHeadPlayerLeaders'         │ 5    │ 25     │ 26        │ 34.1   │
+│ 21      │ 'carlton/collingwood'               │ 'getHeadToHeadBrownlow'              │ 5    │ 65.8   │ 66.5      │ 70.5   │
+│ 22      │ 'carlton/collingwood'               │ 'getClubBrownlowHistory (A)'         │ 5    │ 243.3  │ 245.5     │ 248.2  │
+│ 23      │ 'carlton/collingwood'               │ 'getClubBrownlowHistory (B)'         │ 5    │ 206.7  │ 209.4     │ 317.9  │
+│ 24      │ 'adelaide 2026'                     │ 'getSeasonIdentity'                  │ 5    │ 1.8    │ 2         │ 2.6    │
+│ 25      │ 'adelaide 2026'                     │ 'getClubSeasonRecord'                │ 5    │ 0.8    │ 1.1       │ 1.2    │
+│ 26      │ 'adelaide 2026'                     │ 'getClubSeasonTeamMetrics'           │ 5    │ 4.1    │ 4.2       │ 8.7    │
+│ 27      │ 'adelaide 2026'                     │ 'getClubSeasonPlayerLeaders'         │ 5    │ 2.3    │ 2.9       │ 3.2    │
+│ 28      │ 'adelaide 2026'                     │ 'getClubSeasonBrownlowSummary'       │ 5    │ 2.6    │ 2.8       │ 4.1    │
+│ 29      │ 'adelaide 2026'                     │ 'getClubSeasonComparison (composed)' │ 5    │ 4.7    │ 4.9       │ 9.3    │
+│ 30      │ 'brisbane-lions 2026'               │ 'getSeasonIdentity'                  │ 5    │ 1.7    │ 1.8       │ 1.9    │
+│ 31      │ 'brisbane-lions 2026'               │ 'getClubSeasonRecord'                │ 5    │ 0.7    │ 0.8       │ 0.8    │
+│ 32      │ 'brisbane-lions 2026'               │ 'getClubSeasonTeamMetrics'           │ 5    │ 4.3    │ 4.4       │ 4.5    │
+│ 33      │ 'brisbane-lions 2026'               │ 'getClubSeasonPlayerLeaders'         │ 5    │ 2.3    │ 2.7       │ 3.1    │
+│ 34      │ 'brisbane-lions 2026'               │ 'getClubSeasonBrownlowSummary'       │ 5    │ 2.6    │ 2.6       │ 5.3    │
+│ 35      │ 'brisbane-lions 2026'               │ 'getClubSeasonComparison (composed)' │ 5    │ 5      │ 5.9       │ 6.9    │
+│ 36      │ 'max season 2026 (18 participants)' │ 'getMaximumComparisonSeason'         │ 5    │ 0.4    │ 0.6       │ 0.7    │
+│ 37      │ 'max season 2026 (18 participants)' │ 'getComparisonSeasons'               │ 5    │ 1.6    │ 1.6       │ 2      │
+│ 38      │ 'max season 2026 (18 participants)' │ 'getSeasonParticipants'              │ 5    │ 1.1    │ 1.1       │ 1.7    │
+│ 39      │ 'max season 2026 (18 participants)' │ 'getClubSeasonComparison (composed)' │ 5    │ 4.4    │ 4.7       │ 6.7    │
+│ 40      │ 'adelaide/brisbane-lions'           │ 'getHeadToHeadByDecade'              │ 5    │ 6      │ 6         │ 6.3    │
+│ 41      │ 'adelaide/brisbane-lions'           │ 'getHeadToHeadPeriodRecords'         │ 5    │ 11.7   │ 12.1      │ 17.5   │
+│ 42      │ 'adelaide/brisbane-lions'           │ 'getHeadToHeadPlayerAverages'        │ 5    │ 34     │ 34.5      │ 59.1   │
+│ 43      │ 'carlton/collingwood'               │ 'getHeadToHeadByDecade'              │ 5    │ 6.3    │ 8.2       │ 12.6   │
+│ 44      │ 'carlton/collingwood'               │ 'getHeadToHeadPeriodRecords'         │ 5    │ 18.1   │ 18.8      │ 25.1   │
+│ 45      │ 'carlton/collingwood'               │ 'getHeadToHeadPlayerAverages'        │ 5    │ 83.3   │ 85.3      │ 90.5   │
+│ 46      │ 'adelaide/brisbane-lions'           │ 'extended-rivalry parallel group'    │ 5    │ 31.4   │ 31.9      │ 34.4   │
+│ 47      │ 'carlton/collingwood'               │ 'extended-rivalry parallel group'    │ 5    │ 83.4   │ 86.3      │ 89.9   │
+│ 48      │ 'adelaide/brisbane-lions'           │ 'H2H parallel group'                 │ 5    │ 35.6   │ 40.4      │ 59.6   │
+│ 49      │ 'adelaide/brisbane-lions'           │ 'selected-season parallel group'     │ 5    │ 6.9    │ 7.6       │ 10.4   │
+│ 50      │ 'carlton/collingwood'               │ 'H2H parallel group'                 │ 5    │ 73.4   │ 76.2      │ 93.4   │
+│ 51      │ 'carlton/collingwood'               │ 'selected-season parallel group'     │ 5    │ 5.9    │ 7.3       │ 10.3   │
+│ 52      │ 'adelaide/brisbane-lions'           │ 'route-equivalent composed load'     │ 5    │ 302.9  │ 304.4     │ 389.1  │
+│ 53      │ 'carlton/collingwood'               │ 'route-equivalent composed load'     │ 5    │ 325.9  │ 365.2     │ 415.4  │
+└─────────┴─────────────────────────────────────┴──────────────────────────────────────┴──────┴────────┴───────────┴────────┘
+
+ ❯ tests/integration/club-comparison.test.ts (70 tests | 24 failed) 20080ms
+     × summarises Adelaide vs Brisbane Lions to the canonical witness and to independent SQL 40ms
+     × filters by match type so that home-and-away and finals partition the complete history 25ms
+     × filters by era (Club Rivalry Explorer follow-up, FR-2) so the decades partition the complete history 29ms
+     × paginates the complete meetings list deterministically at 25 rows per page 19ms
+     × groups venue records by canonical venue and agrees with an independent grouping 10ms
+     ✓ derives every head-to-head record from independent extremes and keeps ties 15ms
+     ✓ scopes records to one decade of the rivalry when an era is given (Club Rivalry Explorer follow-up, FR-2) 13ms
+     × reads streaks from chronological order, with a draw breaking a winning streak 10ms
+     ✓ includes Footscray and South Melbourne meetings through organization_id 34ms
+     × keeps Brisbane Bears and Fitzroy out of Brisbane Lions head-to-head totals 11ms
+     × handles the Carlton vs Collingwood long rivalry, including Grand Finals 16ms
+     ✓ refuses to compare an organisation with itself 4ms
+     × lists everyone who represented both organisations, agreeing with independent SQL 61ms
+     × reports Ben Keays as Brisbane Lions first, then Adelaide, in both argument orders 14ms
+     ✓ reports Jarryd Lyons as Adelaide first, then Brisbane Lions, with Gold Coast in between 41ms
+     ✓ treats Footscray and Western Bulldogs as one continuing organisation 59ms
+     ✓ keeps Brisbane Bears, Fitzroy and Brisbane Lions as three distinct organisations 72ms
+     × summarises the first and most recent players to complete both representations 49ms
+     ✓ refuses to look for crossover players inside one organisation 1ms
+     × ranks H2H games leaders against independent SQL and the measured witnesses 28ms
+     × ranks H2H goals leaders without ever treating an unrecorded goal as nought 17ms
+     × consolidates a player who represented both organisations into one row 17ms
+     × keeps every tied holder of the single-match goals and disposals records 19ms
+     ✓ reports an unrecorded single-match statistic as unavailable rather than nought 28ms
+     ✓ refuses to build leaders for an organisation against itself 1ms
+     ✓ attributes season Brownlow votes through the nullable club_id contract 273ms
+     ✓ takes winners only from is_winner, never from vote rank or maximum votes  311ms
+     ✓ includes only complete-coverage seasons and ranks all-time vote leaders 240ms
+     ✓ excludes ambiguous multi-club seasons and discloses them instead of forcing them  334ms
+     ✓ exposes selected-season Brownlow coverage without presenting a partial total 15ms
+     ✓ agrees with the all-time history when a season is read on its own 264ms
+     × counts eligible and covered meetings from home-and-away matches only 40ms
+     ✓ never lets a finals meeting contribute to the H2H Brownlow population 32ms
+     ✓ totals H2H votes per player against independent SQL over covered meetings 54ms
+     ✓ reports partial coverage for a rivalry that predates match-vote recording 98ms
+     ✓ refuses to build H2H Brownlow for an organisation against itself 1ms
+     ✓ discovers canonical seasons and defaults to the maximum one 4ms
+     ✓ resolves the selected season identity through the canonical lineage function 23ms
+     ✓ returns an explicit no-participation state rather than borrowing a season or identity 15ms
+     ✓ computes the selected season home-and-away record against independent SQL 13ms
+     ✓ reports the selected season completed state from canonical metadata 2ms
+     ✓ ranks selected season player leaders densely and keeps every tie at the cut 23ms
+     ✓ reads the selected season Brownlow through the Stage 3 attribution primitive 71ms
+     ✓ aggregates team metrics match by match, never by averaging player rows 92ms
+     ✓ covers every approved metric family and maps marks inside 50 to its canonical column 2ms
+     ✓ keeps a pre-1965 uncollected metric unavailable instead of reporting zero 22ms
+     ✓ reports a mixed-coverage historical season as partial with an honest denominator 19ms
+     ✓ fails safely to unavailable when a selected season has no coverage metadata at all 9ms
+     ✓ contains no hard-coded season year in the selected season code path 1ms
+     ✓ runs the complete selected season path for the maximum canonical season without naming it 36ms
+     × reproduces the Adelaide vs Brisbane Lions decade witness and independent SQL 16ms
+     × sums every Carlton vs Collingwood decade back to the complete 268-meeting population 17ms
+     × exposes pair-level period-score coverage for both witness rivalries 24ms
+     ✓ drops a meeting whose period structure is incomplete rather than reading a gap as nought 35ms
+     ✓ matches independent SQL on the biggest lead at every named break 18ms
+     ✓ defines a comeback as trailing at the break and winning on the canonical result 19ms
+     ✓ computes the largest consecutive-break turnaround from the canonical full-time score, never period 4 44ms
+     × reuses the comparison metric registry rather than defining a second one 37ms
+     × ranks the disposals average board on recorded games and matches independent SQL 42ms
+     × applies the five-recorded-game minimum, per metric and never per rivalry appearance 55ms
+     × retains every tie at the rank-ten boundary and reports the recorded-game denominator 39ms
+     ✓ reads average availability from runtime stat_availability over the rivalry seasons 59ms
+     × splits a crossover player average across both organisations 54ms
+     ✓ keeps every warm H2H query under the query ceiling for both rivalry scales  8765ms
+     ✓ keeps every warm selected-season query under the query ceiling 273ms
+     ✓ keeps the maximum canonical season path under the query ceiling 66ms
+     ✓ keeps every warm Stage 6 extended-rivalry query under the query ceiling  1221ms
+     ✓ keeps the parallel Stage 6 extended-rivalry group under the group ceiling  833ms
+     ✓ keeps each independent parallel query group under the group ceiling  963ms
+     ✓ keeps the route-equivalent composed data load under the route ceiling  4757ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 24 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head core > summarises Adelaide vs Brisbane Lions to the canonical witness and to independent SQL
+AssertionError: expected 43 to be 41 // Object.is equality
+
+- Expected
++ Received
+
+- 41
++ 43
+
+ ❯ tests/integration/club-comparison.test.ts:187:30
+    185|
+    186|     // The measured canonical witness.
+    187|     expect(summary.meetings).toBe(41);
+       |                              ^
+    188|     expect(summary.aWins).toBe(19);
+    189|     expect(summary.bWins).toBe(21);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/24]⎯
+
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head core > filters by match type so that home-and-away and finals partition the complete history
+AssertionError: expected 43 to be 41 // Object.is equality
+
+- Expected
++ Received
+
+- 41
++ 43
+
+ ❯ tests/integration/club-comparison.test.ts:226:31
+    224|     ]);
+    225|
+    226|     expect(all.totalMeetings).toBe(41);
+       |                               ^
+    227|     expect(finals.totalMeetings).toBe(2);
+    228|     expect(homeAndAway.totalMeetings).toBe(39);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/24]⎯
+
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head core > filters by era (Club Rivalry Explorer follow-up, FR-2) so the decades partition the complete history
+AssertionError: expected 10 to be 8 // Object.is equality
+
+- Expected
++ Received
+
+- 8
++ 10
+
+ ❯ tests/integration/club-comparison.test.ts:263:34
+    261|     expect(s2000s.totalMeetings).toBe(15);
+    262|     expect(s2010s.totalMeetings).toBe(13);
+    263|     expect(s2020s.totalMeetings).toBe(8);
+       |                                  ^
+    264|     expect(
+    265|       s1990s.totalMeetings + s2000s.totalMeetings + s2010s.totalMeetin…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/24]⎯
+
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head core > paginates the complete meetings list deterministically at 25 rows per page
+AssertionError: expected [ { matchId: 13184, …(22) }, …(17) ] to have a length of 16 but got 18
+
+- Expected
++ Received
+
+- 16
++ 18
+
+ ❯ tests/integration/club-comparison.test.ts:288:28
+    286|
+    287|     expect(page1.meetings).toHaveLength(25);
+    288|     expect(page2.meetings).toHaveLength(16);
+       |                            ^
+    289|     expect(page3.meetings).toHaveLength(0);
+    290|     expect(page1.totalPages).toBe(2);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/24]⎯
+
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head core > groups venue records by canonical venue and agrees with an independent grouping
+AssertionError: expected 43 to be 41 // Object.is equality
+
+- Expected
++ Received
+
+- 41
++ 43
+
+ ❯ tests/integration/club-comparison.test.ts:335:56
+    333|
+    334|     expect(venues).toHaveLength(expected.size);
+    335|     expect(venues.reduce((n, v) => n + v.meetings, 0)).toBe(41);
+       |                                                        ^
+    336|     for (const venue of venues) {
+    337|       const key = venue.venueId === null ? `raw:${venue.venueName ?? '…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/24]⎯
+
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head core > reads streaks from chronological order, with a draw breaking a winning streak
+AssertionError: expected 'b-win' to be 'a-win' // Object.is equality
+
+Expected: "a-win"
+Received: "b-win"
+
+ ❯ tests/integration/club-comparison.test.ts:461:38
+    459|     // The 2024 draw broke Brisbane Lions' run, so the current streak …
+    460|     // Adelaide's single 2025 win rather than anything longer.
+    461|     expect(streaks.current?.outcome).toBe('a-win');
+       |                                      ^
+    462|     expect(streaks.current?.length).toBe(1);
+    463|     expect(streaks.current?.fromMatchId).toBe(16729);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/24]⎯
+
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head core > keeps Brisbane Bears and Fitzroy out of Brisbane Lions head-to-head totals
+AssertionError: expected [ …(43) ] to have a length of 41 but got 43
+
+- Expected
++ Received
+
+- 41
++ 43
+
+ ❯ tests/integration/club-comparison.test.ts:519:27
+    517|     expect(lionsOrgs.has(bears)).toBe(false);
+    518|     expect(lionsOrgs.has(fitzroy)).toBe(false);
+    519|     expect(lionsMeetings).toHaveLength(41);
+       |                           ^
+    520|
+    521|     const [bearsMeetings, fitzroyMeetings] = await Promise.all([
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/24]⎯
+
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head core > handles the Carlton vs Collingwood long rivalry, including Grand Finals
+AssertionError: expected 270 to be 268 // Object.is equality
+
+- Expected
++ Received
+
+- 268
++ 270
+
+ ❯ tests/integration/club-comparison.test.ts:538:30
+    536|     ]);
+    537|
+    538|     expect(summary.meetings).toBe(268);
+       |                              ^
+    539|     expect(summary.meetings).toBe(oracle.meetings);
+    540|     expect(summary.aWins).toBe(oracle.aWins);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/24]⎯
+
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: crossover players > lists everyone who represented both organisations, agreeing with independent SQL
+AssertionError: expected [ { playerId: 2604, …(13) }, …(11) ] to have a length of 11 but got 12
+
+- Expected
++ Received
+
+- 11
++ 12
+
+ ❯ tests/integration/club-comparison.test.ts:676:21
+    674|
+    675|     // The measured witness for this pair.
+    676|     expect(players).toHaveLength(11);
+       |                     ^
+    677|     expect(players).toHaveLength(oracle.length);
+    678|     expect(new Set(players.map((p) => p.playerId)))
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/24]⎯
+
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: crossover players > reports Ben Keays as Brisbane Lions first, then Adelaide, in both argument orders
+AssertionError: expected 156 to be 131 // Object.is equality
+
+- Expected
++ Received
+
+- 131
++ 156
+
+ ❯ tests/integration/club-comparison.test.ts:742:24
+    740|     expect(day(a?.a.firstMatchDate ?? null)).toBe('2020-06-13');
+    741|     expect(a?.b.games).toBe(30);
+    742|     expect(a?.a.games).toBe(131);
+       |                        ^
+    743|
+    744|     // Swapping the arguments swaps the label and nothing else.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/24]⎯
+
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: crossover players > summarises the first and most recent players to complete both representations
+AssertionError: expected 12 to be 11 // Object.is equality
+
+- Expected
++ Received
+
+- 11
++ 12
+
+ ❯ tests/integration/club-comparison.test.ts:898:29
+    896|     ]);
+    897|
+    898|     expect(summary.players).toBe(11);
+       |                             ^
+    899|     expect(summary.players).toBe(players.length);
+    900|     expect(summary.players).toBe(oracle.length);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/24]⎯
+
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head player leaders > ranks H2H games leaders against independent SQL and the measured witnesses
+AssertionError: expected 22 to be 20 // Object.is equality
+
+- Expected
++ Received
+
+- 20
++ 22
+
+ ❯ tests/integration/club-comparison.test.ts:1142:43
+    1140|     // Measured witnesses from the evidence pack.
+    1141|     const named = (name: string) => leaders.games.find((l) => l.displa…
+    1142|     expect(named('Taylor Walker')?.games).toBe(20);
+       |                                           ^
+    1143|     expect(named('Michael Voss')?.games).toBe(16);
+    1144|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/24]⎯
+
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head player leaders > ranks H2H goals leaders without ever treating an unrecorded goal as nought
+AssertionError: expected 57 to be 54 // Object.is equality
+
+- Expected
++ Received
+
+- 54
++ 57
+
+ ❯ tests/integration/club-comparison.test.ts:1154:22
+    1152|     const scored = oracle.filter((r) => r.goalRows > 0);
+    1153|     const topGoals = Math.max(...scored.map((r) => r.goals as number));
+    1154|     expect(topGoals).toBe(54);
+       |                      ^
+    1155|     expect(leaders.goals[0].displayName).toBe('Taylor Walker');
+    1156|     expect(leaders.goals[0].goals).toBe(54);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/24]⎯
+
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head player leaders > consolidates a player who represented both organisations into one row
+AssertionError: expected 16 to be 14 // Object.is equality
+
+- Expected
++ Received
+
+- 14
++ 16
+
+ ❯ tests/integration/club-comparison.test.ts:1191:30
+    1189|     const cameron = leaders.goals.filter((l) => l.displayName === 'Cha…
+    1190|     expect(cameron).toHaveLength(1);
+    1191|     expect(cameron[0].games).toBe(14);
+       |                              ^
+    1192|     expect(cameron[0].a.games).toBe(5);
+    1193|     expect(cameron[0].b.games).toBe(9);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/24]⎯
+
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head player leaders > keeps every tied holder of the single-match goals and disposals records
+AssertionError: expected 42 to be 40 // Object.is equality
+
+- Expected
++ Received
+
+- 40
++ 42
+
+ ❯ tests/integration/club-comparison.test.ts:1234:26
+    1232|     const maxDisposals = Math.max(...disposalRows.map((r) => r.value));
+    1233|     const tiedDisposals = disposalRows.filter((r) => r.value === maxDi…
+    1234|     expect(maxDisposals).toBe(40);
+       |                          ^
+    1235|     expect(tiedDisposals).toHaveLength(4);
+    1236|     expect(leaders.singleMatchDisposals.value).toBe(maxDisposals);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/24]⎯
+
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head Brownlow > counts eligible and covered meetings from home-and-away matches only
+AssertionError: expected [ { matchId: 11178, …(4) }, …(39) ] to have a length of 39 but got 40
+
+- Expected
++ Received
+
+- 39
++ 40
+
+ ❯ tests/integration/club-comparison.test.ts:1534:22
+    1532|     const eligible = matches.filter((m) => !m.isFinal);
+    1533|     const covered = eligible.filter(isCovered);
+    1534|     expect(eligible).toHaveLength(39);
+       |                      ^
+    1535|     expect(covered).toHaveLength(39);
+    1536|     expect(brownlow.eligibleMeetings).toBe(eligible.length);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/24]⎯
+
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head by decade > reproduces the Adelaide vs Brisbane Lions decade witness and independent SQL
+AssertionError: expected [ [ 1990, 5, 2, 3, +0 ], …(3) ] to deeply equal [ [ 1990, 5, 2, 3, +0 ], …(3) ]
+
+- Expected
++ Received
+
+@@ -20,11 +20,11 @@
+      3,
+      0,
+    ],
+    [
+      2020,
+-     8,
++     10,
+      2,
+-     5,
++     7,
+      1,
+    ],
+  ]
+
+ ❯ tests/integration/club-comparison.test.ts:2694:83
+    2692|
+    2693|     // The measured V1.7 witness: decade, meetings, A wins, B wins, dr…
+    2694|     expect(decades.map((d) => [d.decade, d.meetings, d.aWins, d.bWins,…
+       |                                                                                   ^
+    2695|       [1990, 5, 2, 3, 0],
+    2696|       [2000, 15, 5, 10, 0],
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/24]⎯
+
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head by decade > sums every Carlton vs Collingwood decade back to the complete 268-meeting population
+AssertionError: expected 270 to be 268 // Object.is equality
+
+- Expected
++ Received
+
+- 268
++ 270
+
+ ❯ tests/integration/club-comparison.test.ts:2753:38
+    2751|     const total = (pick: (d: (typeof decades)[number]) => number) =>
+    2752|       decades.reduce((sum, d) => sum + pick(d), 0);
+    2753|     expect(total((d) => d.meetings)).toBe(268);
+       |                                      ^
+    2754|     expect(total((d) => d.meetings)).toBe(summary.meetings);
+    2755|     expect(total((d) => d.aWins)).toBe(summary.aWins);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/24]⎯
+
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: period-score rivalry records > exposes pair-level period-score coverage for both witness rivalries
+AssertionError: expected 43 to be 41 // Object.is equality
+
+- Expected
++ Received
+
+- 41
++ 43
+
+ ❯ tests/integration/club-comparison.test.ts:2794:37
+    2792|     // answerable for both pairs -- which is the contract, whatever the
+    2793|     // numbers happen to be today.
+    2794|     expect(short.coverage.meetings).toBe(41);
+       |                                     ^
+    2795|     expect(short.coverage.usableMeetings).toBe(41);
+    2796|     expect(short.coverage.incompleteMeetings).toBe(0);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/24]⎯
+
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head player averages > reuses the comparison metric registry rather than defining a second one
+AssertionError: expected 43 to be 41 // Object.is equality
+
+- Expected
++ Received
+
+- 41
++ 43
+
+ ❯ tests/integration/club-comparison.test.ts:3066:31
+    3064|     const averages = await getHeadToHeadPlayerAverages(adelaide, lions…
+    3065|     expect(averages.boards.map((b) => b.key)).toEqual(H2H_AVERAGE_METR…
+    3066|     expect(averages.meetings).toBe(41);
+       |                               ^
+    3067|     expect(averages.minimumRecordedGames).toBe(5);
+    3068|     expect(averages.rankLimit).toBe(H2H_AVERAGE_RANK_LIMIT);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/24]⎯
+
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head player averages > ranks the disposals average board on recorded games and matches independent SQL
+AssertionError: expected [ [ 'Matt Crouch', 7, 30.71 ], …(2) ] to deeply equal [ [ 'Matt Crouch', 7, 30.71 ], …(2) ]
+
+- Expected
++ Received
+
+@@ -4,14 +4,14 @@
+      7,
+      30.71,
+    ],
+    [
+      "Lachie Neale",
+-     8,
+-     29.75,
++     10,
++     30.1,
+    ],
+    [
+      "Rory Laird",
+-     14,
+-     28.86,
++     16,
++     28.38,
+    ],
+  ]
+
+ ❯ tests/integration/club-comparison.test.ts:3081:9
+    3079|     expect(board.leaders.slice(0, 3).map((l) => [
+    3080|       l.displayName, l.recordedGames, Number(l.average.toFixed(2)),
+    3081|     ])).toEqual([
+       |         ^
+    3082|       ['Matt Crouch', 7, 30.71],
+    3083|       ['Lachie Neale', 8, 29.75],
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/24]⎯
+
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head player averages > applies the five-recorded-game minimum, per metric and never per rivalry appearance
+AssertionError: expected 7 to be 5 // Object.is equality
+
+- Expected
++ Received
+
+- 5
++ 7
+
+ ❯ tests/integration/club-comparison.test.ts:3137:36
+    3135|     const dunkley = disposals.leaders.find((l) => l.displayName === 'J…
+    3136|     expect(dunkley).toBeDefined();
+    3137|     expect(dunkley!.recordedGames).toBe(5);
+       |                                    ^
+    3138|     expect(await oracleRecordedGames(adelaide, lions, dunkley!.playerI…
+    3139|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/24]⎯
+
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head player averages > retains every tie at the rank-ten boundary and reports the recorded-game denominator
+AssertionError: expected 1 to be 2 // Object.is equality
+
+- Expected
++ Received
+
+- 2
++ 1
+
+ ❯ tests/integration/club-comparison.test.ts:3174:26
+    3172|     // kept at rank ten -- the board is therefore longer than ten rows.
+    3173|     const atCut = board.leaders.filter((l) => l.rank === H2H_AVERAGE_R…
+    3174|     expect(atCut.length).toBe(2);
+       |                          ^
+    3175|     expect(atCut.map((l) => l.displayName).sort()).toEqual(['Andrew Mc…
+    3176|     expect(atCut.every((l) => l.recordedGames === 11 && l.total === 9)…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[23/24]⎯
+
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head player averages > splits a crossover player average across both organisations
+AssertionError: expected 16 to be 14 // Object.is equality
+
+- Expected
++ Received
+
+- 14
++ 16
+
+ ❯ tests/integration/club-comparison.test.ts:3262:31
+    3260|     expect(cameron.length).toBe(1);
+    3261|     const [row] = cameron;
+    3262|     expect(row.recordedGames).toBe(14);
+       |                               ^
+    3263|     expect(row.a.recordedGames).toBe(5);
+    3264|     expect(row.b.recordedGames).toBe(9);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[24/24]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  24 failed | 46 passed (70)
+   Start at  16:27:41
+   Duration  21.17s (transform 479ms, setup 163ms, import 505ms, tests 20.08s, environment 0ms)
+
+rc=1

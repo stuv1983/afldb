@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# red proof: run integration file(s) with the committed (unfixed) src of cand, then restore working-tree src
+set -u
+W=/mnt/ssd/afldb-rem2-public-20261114
+cd $W/cand
+git stash push -q -- src || exit 1
+git status --short | head
+CAND=$W/cand bash $W/in/it.sh "$@"
+git stash pop -q
+git status --short

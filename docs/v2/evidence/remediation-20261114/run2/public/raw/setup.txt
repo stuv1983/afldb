@@ -1,0 +1,44 @@
+== phase_clone
+snapshot verified
+bundle verified
+e8666c17e6f99591d68704240d7c029036bcaf81
+npm warn deprecated eslint@9.39.5: This version is no longer supported. Please see https://eslint.org/version-support for other options.
+
+added 427 packages in 14s
+0
+== phase_cluster
+The files belonging to this database system will be owned by user "arm".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C".
+The default text search configuration will be set to "english".
+
+Data page checksums are disabled.
+
+creating directory /mnt/ssd/afldb-rem2-public-20261114/pg-root/data ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default max_connections ... 100
+selecting default shared_buffers ... 128MB
+selecting default time zone ... Australia/Melbourne
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+init: cluster initialised
+roles: afldb_owner, afldb_app, afldb_import, afldb_backup, afldb_auth present
+pg_ctl: server is running (PID: 1350034)
+/usr/lib/postgresql/16/bin/postgres "-D" "/mnt/ssd/afldb-rem2-public-20261114/pg-root/data"
+LISTEN 0      600        127.0.0.1:55654      0.0.0.0:*    users:(("postgres",pid=1350034,fd=7))       
+== phase_template
+create-db: afldb_v2_rem2public_tmpl_test created and marked
+isolated-pg: afldb_v2_rem2public_tmpl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55654); running node
+pg_restore exit=0 seconds=6 stderrLines=0
+isolated-pg: afldb_v2_rem2public_tmpl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55654); running node
+AFLDB migrations -> test (afldb_owner@127.0.0.1:55654/afldb_v2_rem2public_tmpl_test)
+  118 migration file(s), 118 already applied
+
+Nothing to apply — schema is up to date.
+isolated-pg: afldb_v2_rem2public_tmpl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55654); running node
+afldb_v2_rem2public_tmpl_test {"ledger":"118_fixtures_unconfirmed_participants.sql","matches":17056,"fixtures":218,"receipts":5}
+SETUP-DONE

@@ -1,0 +1,5 @@
+import fs from 'node:fs';
+for (const l of fs.readFileSync(process.argv[2], 'utf8').split('\n').filter(Boolean)) {
+  const o = JSON.parse(l);
+  console.log(`${o.q} => ${o.status} | ${o.headline ?? ''} | rowsShown=${o.rowsShown} total=${o.total} | ${o.interpretation ?? ''}`);
+}

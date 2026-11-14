@@ -1,0 +1,84 @@
+isolated-pg: afldb_v2_rem2public_red1_test verified (cluster afldb_v2_isolated, 127.0.0.1:55654); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem2-public-20261114/cand
+
+ ❯ tests/integration/nl-semantic-mapping.test.ts (37 tests | 2 failed) 5328ms
+     ✓ returns exact counts and last draw for record 26ms
+     ✓ returns exact counts and last draw for compare_wins 15ms
+     ✓ returns exact counts and last draw for draw_count 14ms
+     ✓ returns exact counts and last draw for last_draw 15ms
+     ✓ ranks games played for the requested organization lineage rather than whole-career games  1604ms
+     ✓ filters organization-lineage appearances with gte rather than whole-career games 89ms
+     ✓ filters organization-lineage appearances with gt rather than whole-career games 86ms
+     ✓ filters organization-lineage appearances with eq rather than whole-career games 86ms
+     ✓ orders and projects a club-scoped list by lineage appearances 83ms
+     ✓ preserves whole-career games projection when no club scope is present 5ms
+     ✓ resolves Jr/Jnr/Junior to the exact junior player and keeps senior distinct 182ms
+     ✓ richmond wins against carlton parses to head_to_head/record and answers with the existing record payload 30ms
+     ✓ richmond losses against carlton parses to head_to_head/record and answers with the existing record payload 25ms
+     ✓ bulldogs, dogs, footscray and western bulldogs are one directory entry 10ms
+     ✓ an ordinary organization-backed answer works through the bare alias  1776ms
+     ✓ a same-organization head-to-head through aliases refuses honestly 10ms
+     ✓ a draw question resolves the alias into the typed matchup 9ms
+     ✓ matches an exact alias, keeps the canonical title, and exposes the alias as matchedName 7ms
+     ✓ returns a player once when the primary name and its primary-name alias both match, preferring the primary form 7ms
+     ✓ keeps exact canonical-name ranking for a player with no aliases 7ms
+     ✓ resolves an alternate alias through the database-backed NL path to the canonical player 16ms
+     ✓ still declines an unrelated leftover token beside a valid alias match 73ms
+     ✓ ranks the complete 6-identity family and picks the true leader; the old 5-row resolver could not have 72ms
+     ✓ more than 12 plausible identities declines as ambiguous through the real resolver boundary 62ms
+     ✓ a 2-identity family (the smallest ambiguous case) resolves through the real resolver boundary 61ms
+     ✓ a 13-identity family with 2 hyphenated-surname members declines as ambiguous through the real resolver boundary 63ms
+     ✓ a 12-identity family with 2 hyphenated-surname members ranks completely, and a hyphenated member is the true leader 66ms
+     ✓ a full-name mention of a hyphenated-surname player resolves to that player, not a same-given-name decoy with more games 14ms
+     ✓ a full-name mention of an apostrophe-surname player resolves to that player, not a same-given-name decoy with more games 13ms
+     × "round most goals" answers for the Round family 25ms
+     × "round's career goals" answers for the Round family 12ms
+     ✓ "most goals in a round" still declines: the period noun is not a player 8ms
+     ✓ "most disposals in a round" still declines: the period noun is not a player 7ms
+     ✓ "most goals in the round" still declines: the period noun is not a player 9ms
+     ✓ "most wins in a round" still declines: the period noun is not a player 7ms
+     ✓ "most goals by round" still declines: the period noun is not a player 7ms
+     ✓ "most goals in round 5" is untouched: a round filter, not a player 7ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/nl-semantic-mapping.test.ts > Review B-03: a bare "round" is a surname only where the question reads it as a person > "round most goals" answers for the Round family
+AssertionError: {"confidence":0.65,"components":{"tokenRatio":1,"playerCertainty":1,"structuralPenalty":1,"unresolvedPenalty":0.35},"normalisedQuery":"round most goals","consumed":["most","goals"],"unsupportedTerms":["round"],"notes":["Could not find a player matching \"round\"."],"entityResolution":[]}: expected 'none' to be 'plan' // Object.is equality
+
+Expected: "plan"
+Received: "none"
+
+ ❯ tests/integration/nl-semantic-mapping.test.ts:961:90
+    959|     const ctx = await buildNlParseContext();
+    960|     const parsed = await parseNlQuestion(question, ctx);
+    961|     expect(parsed.status, parsed.status === 'plan' ? '' : JSON.stringi…
+       |                                                                                          ^
+    962|     if (parsed.status !== 'plan') return;
+    963|     expect(parsed.plan.player).toBeUndefined();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  tests/integration/nl-semantic-mapping.test.ts > Review B-03: a bare "round" is a surname only where the question reads it as a person > "round's career goals" answers for the Round family
+AssertionError: {"confidence":0.65,"components":{"tokenRatio":1,"playerCertainty":1,"structuralPenalty":1,"unresolvedPenalty":0.35},"normalisedQuery":"round career goals","consumed":["career","goals"],"unsupportedTerms":["round"],"notes":["Could not find a player matching \"round\"."],"entityResolution":[]}: expected 'none' to be 'plan' // Object.is equality
+
+Expected: "plan"
+Received: "none"
+
+ ❯ tests/integration/nl-semantic-mapping.test.ts:961:90
+    959|     const ctx = await buildNlParseContext();
+    960|     const parsed = await parseNlQuestion(question, ctx);
+    961|     expect(parsed.status, parsed.status === 'plan' ? '' : JSON.stringi…
+       |                                                                                          ^
+    962|     if (parsed.status !== 'plan') return;
+    963|     expect(parsed.plan.player).toBeUndefined();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 35 passed (37)
+   Start at  16:02:18
+   Duration  7.06s (transform 1.09s, setup 160ms, import 1.32s, tests 5.33s, environment 0ms)
+
+rc=1

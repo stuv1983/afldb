@@ -1,0 +1,13 @@
+// usage: node cmp.mjs a.jsonl b.jsonl  -- compact side-by-side
+import fs from 'node:fs';
+const load = (f) => fs.readFileSync(f, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
+const a = load(process.argv[2]); const b = load(process.argv[3] ?? process.argv[2]);
+const s = (o) => o.status === 'plan'
+  ? `PLAN ${o.grain}/${o.agg?.kind} ${o.player ?? ''}${o.playerIdIn ? ' ids=' + JSON.stringify(o.playerIdIn) : ''} :: ${o.headline}${o.scope && Object.keys(o.scope).length ? ' scope=' + JSON.stringify(o.scope).slice(0, 90) : ''}`
+  : `${o.status}/${o.reason ?? ''} unsup=${JSON.stringify(o.unsupported ?? [])} res=${JSON.stringify(o.resolved ?? [])}`;
+const m = new Map(b.map((o) => [o.q, o]));
+for (const o of a) {
+  console.log(`Q: ${o.q}`);
+  console.log(`  A: ${s(o)}`);
+  if (process.argv[3]) console.log(`  B: ${m.has(o.q) ? s(m.get(o.q)) : '-'}`);
+}

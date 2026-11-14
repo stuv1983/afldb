@@ -1,0 +1,34 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem2-public-20261114/base0
+
+ ✓ tests/db-test-rebuild.test.ts (1157 tests) 31434ms
+         ✓ loads a real bound dependency through mjs and the actual tsx preload  470ms
+         ✓ loads a real bound dependency through cjs and the actual tsx preload  444ms
+         ✓ loads a real bound dependency through ts and the actual tsx preload  582ms
+         ✓ loads the runner-style CommonJS TypeScript path with real type transformation  520ms
+         ✓ refuses ancestor imports on the runner-style CommonJS TypeScript path  495ms
+         ✓ refuses resolvable ancestor dependency before sentinel execution via mjs  466ms
+         ✓ refuses resolvable ancestor dependency before sentinel execution via cjs  502ms
+         ✓ refuses resolvable ancestor dependency before sentinel execution via ts  557ms
+         ✓ rejects changed bound dependency bytes at module load via mjs  452ms
+         ✓ rejects changed bound dependency bytes at module load via cjs  403ms
+         ✓ rejects changed bound dependency bytes at module load via ts  553ms
+         ✓ uses the real TS loader for an inventoried workspace alias and transitive import  539ms
+         ✓ refuses an unbound workspace alias target before its code executes  516ms
+         ✓ loads a real hard-linked module only when the policy declares that exact link count  2979ms
+       ✓ resolves the isolated candidate to 1640 with all 2026 included and preserves full stage order  384ms
+       ✓ refuses drift before fingerprints without its next-stage effect  313ms
+       ✓ cannot skip provenance, plan stages, scope SQL or the independent live target guard  310ms
+         ✓ a real capture swaps the comment for the marker and the capture-bound check passes before the reset  315ms
+         ✓ the ordinary and final checks still reject a pending marker, and the capture recheck still needs the resting one  358ms
+         ✓ db:privileges (direct run): runs its work, refusing rather than skipping  1291ms
+         ✓ the ownership census CLI refuses before reading its evidence or launching psql  504ms
+         ✓ the reset proof CLI refuses before opening a session or launching psql  1230ms
+         ✓ the convergence rehearsal refuses before connecting or seeding anything  1527ms
+
+ Test Files  1 passed (1)
+      Tests  1157 passed (1157)
+   Start at  16:32:03
+   Duration  34.81s (transform 2.32s, setup 169ms, import 2.93s, tests 31.43s, environment 0ms)
+
+rc=0

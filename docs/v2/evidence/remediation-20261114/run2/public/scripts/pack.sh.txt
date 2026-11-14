@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# build $W/evidence/pack: committed-form copies (ANSI stripped, DSN lines removed, LF) of the kept raw outputs + SHA256SUMS of those copies
+set -u -o pipefail
+W=/mnt/ssd/afldb-rem2-public-20261114
+E=$W/evidence; P=$E/pack
+rm -rf $P; mkdir -p $P/raw $P/visual
+clean() { sed 's/\x1b\[[0-9;]*m//g' "$1" | tr -d '\r' | grep -a -v -i 'postgres://' > "$2"; }
+put() { # <src> <dest name under raw>
+  [ -f "$1" ] || { echo "MISSING $1"; return; }
+  case "$1" in *.jsonl|*.json) tr -d '\r' < "$1" | grep -a -v -i 'postgres://' > "$P/raw/$2";; *) clean "$1" "$P/raw/$2";; esac
+}
+for f in setup.log tmpl-probe.txt probe-pre356-b03.jsonl probe-base-b03.jsonl probe-fix1-b03.jsonl probe-base-b03b08.jsonl probe-fix1-b03b08.jsonl \
+         probe-fix1-ties-nl.jsonl ties-measure.txt red-b03-b04-b08.txt green1-b03-b04-b08.txt red-int-b03.txt green-int-b03.txt \
+         red-b06-unit.txt red-int-b06.txt green-int-b06.txt green2-unit-focused.txt green3-home.txt qual-setup.log; do
+  case $f in *.txt|*.log) put $E/$f $(echo $f | sed 's/\.log$/.txt/');; *) put $E/$f $f;; esac
+done
+# qual/
+for f in $E/qual/*.log $E/qual/static-*.txt; do [ -f "$f" ] && put "$f" "qual-$(basename "$f" | sed 's/\.log$/.txt/')"; done
+for f in qual-integ.out qual-corpus.out qual-static.out qual-build.out; do [ -f $E/$f ] && put $E/$f "$f.txt"; done
+# corpus
+for t in base fix; do
+  [ -f $E/corpus-$t/run.log ] && put $E/corpus-$t/run.log corpus-$t-run.txt
+  [ -f $E/corpus-$t/parse/summary.json ] && put $E/corpus-$t/parse/summary.json corpus-$t-parse-summary.json
+done
+[ -f $E/corpus-diff-parse.jsonl ] && cp $E/corpus-diff-parse.jsonl $P/raw/corpus-diff-parse.jsonl
+[ -f $E/corpus-diff-summary.txt ] && cp $E/corpus-diff-summary.txt $P/raw/corpus-diff-summary.txt
+[ -f $E/corpus-hashes.txt ] && cp $E/corpus-hashes.txt $P/raw/corpus-hashes.txt
+# visual
+if [ -d $E/qual/visual ]; then
+  cp $E/qual/visual/*.png $P/visual/ 2>/dev/null
+  [ -f $E/qual/visual/report.json ] && cp $E/qual/visual/report.json $P/visual/report.json
+  [ -f $E/qual/visual/shoot.out ] && put $E/qual/visual/shoot.out visual-shoot-out.txt
+  [ -f $E/qual/visual/server.log ] && put $E/qual/visual/server.log visual-server-log.txt
+fi
+(cd $P && find . -type f ! -name SHA256SUMS | sort | xargs sha256sum > SHA256SUMS)
+wc -l $P/SHA256SUMS; du -sh $P

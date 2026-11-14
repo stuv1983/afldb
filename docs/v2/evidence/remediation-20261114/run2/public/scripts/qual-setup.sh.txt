@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# usage: qual-setup.sh <bundle> <expected HEAD sha>  -- fresh clean checkout $W/qual at the commit, plus $W/base0 at e8666c17
+set -u -o pipefail
+export W=/mnt/ssd/afldb-rem2-public-20261114
+export PATH="$HOME/.nvm/versions/node/v22.23.2/bin:$PATH"
+BUNDLE=$1; WANT=$2
+cd $W
+rm -rf $W/qual
+git clone -q /mnt/ssd/afldb-review-20261114T0640Z/cand $W/qual || exit 1
+cd $W/qual
+git fetch -q /mnt/ssd/afldb-rem2-base/base-e8666c17.bundle claude/remediation-20261114:refs/heads/base || exit 1
+git fetch -q "$BUNDLE" claude/rem2-public-20261114:refs/heads/rem2-public || exit 1
+git checkout -q rem2-public
+echo "qual HEAD=$(git rev-parse HEAD) want=$WANT"
+[ "$(git rev-parse HEAD)" = "$WANT" ] || { echo "HEAD MISMATCH"; exit 1; }
+timeout 900 npm ci --no-audit --no-fund 2>&1 | tail -3
+echo "qual porcelain lines: $(git status --porcelain | wc -l)"
+# base checkout for the corpus N-1 run
+if [ ! -d $W/base0 ]; then
+  git clone -q $W/qual $W/base0 && (cd $W/base0 && git checkout -q --detach e8666c17e6f99591d68704240d7c029036bcaf81 && ln -s $W/qual/node_modules $W/base0/node_modules)
+fi
+echo "base0 HEAD=$(git -C $W/base0 rev-parse HEAD) porcelain=$(git -C $W/base0 status --porcelain | wc -l)"

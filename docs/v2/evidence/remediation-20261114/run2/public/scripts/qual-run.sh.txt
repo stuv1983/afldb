@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# usage: qual-run.sh <phase...>   phases: static unit integ corpus build   (on $W/qual, results under $W/evidence/qual)
+set -u -o pipefail
+export W=/mnt/ssd/afldb-rem2-public-20261114
+export PATH="$HOME/.nvm/versions/node/v22.23.2/bin:$PATH"
+export PYTHON=/home/arm/i250/afldb/.venv/bin/python AFLDB_PYTHON=/home/arm/i250/afldb/.venv/bin/python
+export AFLDB_V2_PG_ROOT=$W/pg-root AFLDB_V2_PG_BIN=/usr/lib/postgresql/16/bin AFLDB_V2_PG_PORT=55654
+Q=$W/qual; E=$W/evidence/qual; mkdir -p $E
+LOCK=/mnt/ssd/afldb-rem2-base/heavy.lock
+strip() { sed 's/\x1b\[[0-9;]*m//g' | grep -v -i 'postgres://'; }
+
+phase_static() {
+  bash $W/in/tsc-lint.sh $Q $E/static
+}
+
+phase_unit() {
+  cd $Q
+  # focused suites for the changed areas + the suites that read .env.example
+  timeout 1200 nice -n 10 node node_modules/vitest/vitest.mjs run \
+    tests/nl-parser.test.ts tests/nl-plan.test.ts tests/nl-describe.test.ts tests/query-intent.test.ts \
+    tests/home-records.test.ts tests/club-comparison.test.ts tests/club-comparison-view.test.ts \
+    tests/unit/qualifying-matches-gate.test.ts \
+    tests/deploy-web-unit.test.ts tests/v2-shadow-target.test.ts tests/afl-api-ingestion-safety.test.ts \
+    > $E/unit-focused.log 2>&1
+  echo "unit-focused rc=$?" >> $E/unit-focused.log
+  strip < $E/unit-focused.log | grep -a -E "Test Files|Tests |FAIL|rc=" | head -30
+}
+
+integ_one() { # <suffix> <file>
+  local suf=$1 f=$2 db=afldb_v2_rem2public_$1_test
+  cd $Q
+  node --import tsx tools/v2/isolated-pg.ts create-db "$db" --template afldb_v2_rem2public_tmpl_test > $E/integ-$suf.mk 2>&1 || { echo "mk failed $suf"; return 1; }
+  timeout 1500 nice -n 10 node --import tsx tools/v2/isolated-pg.ts run "$db" -- node node_modules/vitest/vitest.mjs run "$f" > $E/integ-$suf.log 2>&1
+  echo "rc=$?" >> $E/integ-$suf.log
+  echo "== $f"; strip < $E/integ-$suf.log | grep -a -E "Test Files|Tests |^ *FAIL|rc=" | head -12
+}
+
+phase_integ() {
+  integ_one i1 tests/integration/nl-semantic-mapping.test.ts
+  integ_one i2 tests/integration/club-comparison-route.test.ts
+  integ_one i3 tests/integration/home-records.test.ts
+  integ_one i4 tests/integration/nl-answers.test.ts
+  integ_one i5 tests/integration/nl-answers-game-season.test.ts
+  integ_one i6 tests/integration/nl-answers-team-club.test.ts
+  integ_one i7 tests/integration/nl-answer-boundary.test.ts
+  integ_one i8 tests/integration/nl-vocab.test.ts
+  integ_one i9 tests/integration/club-comparison.test.ts
+}
+
+phase_corpus() {
+  bash $W/in/corpus-parse.sh base $W/base0 corpusbase
+  bash $W/in/corpus-parse.sh fix $Q corpusfix
+  cd $W/evidence
+  for t in base fix; do sha256sum corpus-$t/parse/results.jsonl | tee -a corpus-hashes.txt; done
+  SHOW=40 node $W/in/corpus-diff.mjs corpus-base/parse/results.jsonl corpus-fix/parse/results.jsonl corpus-diff-parse.jsonl | tee corpus-diff-summary.txt
+}
+
+phase_build() {
+  cd $Q
+  node --import tsx tools/v2/isolated-pg.ts create-db afldb_v2_rem2public_build_test --template afldb_v2_rem2public_tmpl_test > $E/build-mk.log 2>&1 || exit 1
+  (flock $LOCK nice -n 10 node --import tsx tools/v2/isolated-pg.ts run afldb_v2_rem2public_build_test -- env NODE_ENV=production node node_modules/next/dist/bin/next build --webpack) > $E/build-next.log 2>&1; local b=$?
+  echo "build rc=$b"; strip < $E/build-next.log | grep -v -E '^\s*$' | tail -8
+  [ $b -eq 0 ] || return 1
+  node --import tsx tools/v2/isolated-pg.ts run afldb_v2_rem2public_build_test -- node tools/build/prepare-standalone.mjs > $E/build-standalone.log 2>&1; echo "standalone rc=$? BUILD_ID=$(cat .next/BUILD_ID)"
+  echo "porcelain after build: $(git status --porcelain | wc -l)"
+}
+
+for ph in "$@"; do echo "##### $ph $(date -u +%T)"; phase_$ph; done
+echo "##### done $(date -u +%T)"

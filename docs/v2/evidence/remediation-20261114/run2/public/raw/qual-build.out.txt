@@ -1,0 +1,13 @@
+##### build 05:32:44
+build rc=0
+│ ├ ● /venues/albury                                        1d      1y
+│ ├ ● /venues/arden-st                                      1d      1y
+│ └ ● [+49 more paths]
+└ ƒ /venues/[slug]/matches
+ƒ Proxy (Middleware)
+○  (Static)   prerendered as static content
+●  (SSG)      prerendered as static HTML (uses generateStaticParams)
+ƒ  (Dynamic)  server-rendered on demand
+standalone rc=0 BUILD_ID=FQ-WO-d_4FGwFZpP_Z4rB
+porcelain after build: 0
+##### done 05:50:21

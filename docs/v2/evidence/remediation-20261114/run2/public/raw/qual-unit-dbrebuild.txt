@@ -1,0 +1,32 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem2-public-20261114/cand
+
+ ✓ tests/db-test-rebuild.test.ts (1157 tests) 32271ms
+         ✓ loads a real bound dependency through mjs and the actual tsx preload  471ms
+         ✓ loads a real bound dependency through cjs and the actual tsx preload  445ms
+         ✓ loads a real bound dependency through ts and the actual tsx preload  538ms
+         ✓ loads the runner-style CommonJS TypeScript path with real type transformation  526ms
+         ✓ refuses ancestor imports on the runner-style CommonJS TypeScript path  503ms
+         ✓ refuses resolvable ancestor dependency before sentinel execution via mjs  462ms
+         ✓ refuses resolvable ancestor dependency before sentinel execution via cjs  475ms
+         ✓ refuses resolvable ancestor dependency before sentinel execution via ts  602ms
+         ✓ rejects changed bound dependency bytes at module load via mjs  402ms
+         ✓ rejects changed bound dependency bytes at module load via cjs  394ms
+         ✓ rejects changed bound dependency bytes at module load via ts  521ms
+         ✓ uses the real TS loader for an inventoried workspace alias and transitive import  528ms
+         ✓ refuses an unbound workspace alias target before its code executes  556ms
+         ✓ loads a real hard-linked module only when the policy declares that exact link count  2909ms
+       ✓ resolves the isolated candidate to 1640 with all 2026 included and preserves full stage order  407ms
+         ✓ the ordinary and final checks still reject a pending marker, and the capture recheck still needs the resting one  393ms
+       ✓ the real checkout (its WHOLE node_modules tree is walked) agrees with a direct lstat of its own node_modules chain (a linked install refuses by design)  802ms
+         ✓ db:privileges (direct run): runs its work, refusing rather than skipping  1298ms
+         ✓ the ownership census CLI refuses before reading its evidence or launching psql  480ms
+         ✓ the reset proof CLI refuses before opening a session or launching psql  1236ms
+         ✓ the convergence rehearsal refuses before connecting or seeding anything  1442ms
+
+ Test Files  1 passed (1)
+      Tests  1157 passed (1157)
+   Start at  16:31:27
+   Duration  35.93s (transform 2.53s, setup 195ms, import 3.18s, tests 32.27s, environment 0ms)
+
+rc=0

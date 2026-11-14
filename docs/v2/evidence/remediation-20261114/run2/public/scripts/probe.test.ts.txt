@@ -1,0 +1,52 @@
+import { verifyIsolatedIntegrationDatabase } from './guard';
+
+import { afterAll, describe, it } from 'vitest';
+
+import { sql } from '@/db/client';
+import { executePlan } from '@/db/queries/nl/execute';
+import { buildNlParseContext } from '@/db/queries/nl/resolve';
+import { describePlan, validatePlan } from '@/search/nl/plan';
+import { parseNlQuestion } from '@/search/nl/parser';
+import { describeAnswer } from '@/search/nl/describe';
+
+void verifyIsolatedIntegrationDatabase;
+afterAll(async () => { await sql.end(); });
+
+// scope public probe. Never committed. Mirrors answerNlQuestion without logging.
+const QUESTIONS = (process.env.RV_QUESTIONS ?? '').split('|').filter(Boolean);
+
+describe('public NL probe', () => {
+  it('probes', async () => {
+    const ctx = await buildNlParseContext();
+    for (const q of QUESTIONS) {
+      const out: Record<string, unknown> = { q };
+      try {
+        const parsed = await parseNlQuestion(q, ctx);
+        out.status = parsed.status;
+        out.confidence = parsed.report.confidence;
+        out.resolved = parsed.report.entityResolution.map((r) => `${r.mention}->${r.resolvedTo}@${r.certainty}`);
+        out.consumed = parsed.report.consumed;
+        if (parsed.status === 'plan') {
+          const v = validatePlan(parsed.plan);
+          if ('error' in v) { out.validateError = v.error; out.plan = parsed.plan; }
+          else {
+            const payload = await executePlan(v);
+            const d = describeAnswer(v, payload);
+            const p = payload as { total?: number; rows?: unknown[] };
+            out.grain = v.grain; out.metric = v.metric; out.agg = v.agg;
+            out.scope = v.scope; out.player = v.player?.name; out.playerIdIn = v.scope?.playerIdIn;
+            out.careerPredicates = v.careerPredicates;
+            out.headline = d.headline; out.interpretation = d.interpretation;
+            out.rowsShown = p.rows?.length; out.total = p.total;
+            out.explain = describePlan(v);
+          }
+        } else {
+          out.reason = parsed.reason; out.unsupported = parsed.report.unsupportedTerms;
+        }
+      } catch (e) {
+        out.THROW = `${(e as Error).name}: ${(e as Error).message}`;
+      }
+      console.log(JSON.stringify(out));
+    }
+  }, 300_000);
+});

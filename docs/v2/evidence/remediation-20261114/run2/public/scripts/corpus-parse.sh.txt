@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# usage: corpus-parse.sh <tag> <checkout dir> <db suffix>   -- parse-only V5 corpus (12,000), heavy lock + nice/ionice
+set -u -o pipefail
+export W=/mnt/ssd/afldb-rem2-public-20261114
+export PATH="$HOME/.nvm/versions/node/v22.23.2/bin:$PATH"
+export AFLDB_V2_PG_ROOT=$W/pg-root AFLDB_V2_PG_BIN=/usr/lib/postgresql/16/bin AFLDB_V2_PG_PORT=55654
+TAG=$1; CAND=$2; SUF=$3
+DB=afldb_v2_rem2public_${SUF}_test
+CORPUS=/mnt/ssd/afldb-rem-nl-20261114/in/nl-stress-corpus-v5.csv
+OUT=$W/evidence/corpus-$TAG
+mkdir -p "$OUT"
+cd "$CAND"
+echo "tag=$TAG head=$(git rev-parse HEAD) dirty=$(git status --porcelain | wc -l)" > "$OUT/run.log"
+echo "corpus sha256=$(sha256sum $CORPUS | cut -d' ' -f1)" >> "$OUT/run.log"
+node --import tsx tools/v2/isolated-pg.ts create-db "$DB" --template afldb_v2_rem2public_tmpl_test >> "$OUT/run.log" 2>&1 || { echo "create-db failed" >> "$OUT/run.log"; exit 1; }
+echo "== parse-only $(date -u +%T)" >> "$OUT/run.log"
+nice -n 10 ionice -c3 \
+  node --import tsx tools/v2/isolated-pg.ts run $DB -- sh -c 'echo target=$(echo $DATABASE_URL | sed -E "s#.*/([^/?]+).*#\1#"); node node_modules/tsx/dist/cli.mjs --conditions=react-server tools/nl/stress-test.ts --corpus '$CORPUS' --out '$OUT'/parse --parse-only' >> "$OUT/parse.log" 2>&1
+echo "parse rc=$?" >> "$OUT/run.log"
+echo "== done $(date -u +%T)" >> "$OUT/run.log"
+cat "$OUT/parse/summary.json" >> "$OUT/run.log" 2>&1
+tail -25 "$OUT/run.log"

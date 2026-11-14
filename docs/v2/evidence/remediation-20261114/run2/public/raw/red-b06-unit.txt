@@ -1,0 +1,133 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem2-public-20261114/cand
+
+ ✓ tests/club-comparison-view.test.ts (35 tests) 448ms
+ ❯ tests/club-comparison.test.ts (28 tests | 7 failed) 180438ms
+     ✓ carries the pair in the order it was asked for 5ms
+     ✓ carries match filter and page 1ms
+     ✓ carries the era (Club Rivalry Explorer follow-up, FR-2) 1ms
+     ✓ omits the defaults so the shared URL stays the short one 1ms
+     ✓ is the bare surface when nothing is selected 1ms
+     ✓ orders the pair alphabetically whichever way it was requested 1ms
+     ✓ omits match filter and page 2ms
+     ✓ never invents a pair from an incomplete selection 1ms
+     ✓ sorts independently of presentation order 3ms
+     ✓ accepts exactly the three canonical filters 1ms
+     ✓ rejects anything else 1ms
+     ✓ carries the view state the pager must preserve, without the page 1ms
+     ✓ drops the default match filter 0ms
+     ✓ carries the era so an era-filtered match history keeps its era across pages 0ms
+     ✓ drops an absent era 1ms
+     ✓ never runs more than its limit at once and runs every task in arrival order 10ms
+     ✓ gives the slot back when a task rejects, and passes the rejection on 5ms
+     ✓ releases a slot once even when the release function is called twice 5ms
+     ✓ treats a limit of 0 as ungated 1ms
+     ✓ reads the environment limit: blank or junk fall back, 0 disables 1ms
+     × refuses a waiter beyond maxQueue with queue_full, without queueing it 30019ms
+     × maxQueue 0 lets nobody wait: refused as soon as the slots are full 30015ms
+     × refuses a waiter whose wait runs out with timeout, and the slot it never took is not leaked 30101ms
+     × a timed-out waiter leaves the line without disturbing the others, and a granted waiter never times out later 30101ms
+     × leaves the normal flow unchanged when the bounds are generous 30054ms
+     × run() passes a refusal on and holds nothing 30101ms
+     ✓ an ungated gate (limit 0) never queues, so the bounds never apply 1ms
+     × reads the wait bound from the environment: blank, junk, zero and negative fall back 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/club-comparison.test.ts > review B-06: the concurrency gate bounds its queue and its wait > refuses a waiter beyond maxQueue with queue_full, without queueing it
+Error: Test timed out in 30000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ tests/club-comparison.test.ts:199:3
+    197|   const tick = () => new Promise<void>((resolve) => setImmediate(resol…
+    198|
+    199|   it('refuses a waiter beyond maxQueue with queue_full, without queuei…
+       |   ^
+    200|     const gate = createConcurrencyGate(1, { maxQueue: 2 });
+    201|     const holder = await gate.acquire();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/7]⎯
+
+ FAIL  tests/club-comparison.test.ts > review B-06: the concurrency gate bounds its queue and its wait > maxQueue 0 lets nobody wait: refused as soon as the slots are full
+Error: Test timed out in 30000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ tests/club-comparison.test.ts:218:3
+    216|   });
+    217|
+    218|   it('maxQueue 0 lets nobody wait: refused as soon as the slots are fu…
+       |   ^
+    219|     const gate = createConcurrencyGate(2, { maxQueue: 0 });
+    220|     const a = await gate.acquire();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/7]⎯
+
+ FAIL  tests/club-comparison.test.ts > review B-06: the concurrency gate bounds its queue and its wait > refuses a waiter whose wait runs out with timeout, and the slot it never took is not leaked
+Error: Test timed out in 30000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ tests/club-comparison.test.ts:231:3
+    229|   });
+    230|
+    231|   it('refuses a waiter whose wait runs out with timeout, and the slot …
+       |   ^
+    232|     vi.useFakeTimers();
+    233|     try {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/7]⎯
+
+ FAIL  tests/club-comparison.test.ts > review B-06: the concurrency gate bounds its queue and its wait > a timed-out waiter leaves the line without disturbing the others, and a granted waiter never times out later
+Error: Test timed out in 30000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ tests/club-comparison.test.ts:258:3
+    256|   });
+    257|
+    258|   it('a timed-out waiter leaves the line without disturbing the others…
+       |   ^
+    259|     vi.useFakeTimers();
+    260|     try {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/7]⎯
+
+ FAIL  tests/club-comparison.test.ts > review B-06: the concurrency gate bounds its queue and its wait > leaves the normal flow unchanged when the bounds are generous
+Error: Test timed out in 30000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ tests/club-comparison.test.ts:283:3
+    281|   });
+    282|
+    283|   it('leaves the normal flow unchanged when the bounds are generous', …
+       |   ^
+    284|     const gate = createConcurrencyGate(2, { maxQueue: 50, maxWaitMs: 6…
+    285|     const started: number[] = [];
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/7]⎯
+
+ FAIL  tests/club-comparison.test.ts > review B-06: the concurrency gate bounds its queue and its wait > run() passes a refusal on and holds nothing
+Error: Test timed out in 30000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ tests/club-comparison.test.ts:297:3
+    295|   });
+    296|
+    297|   it('run() passes a refusal on and holds nothing', async () => {
+       |   ^
+    298|     const gate = createConcurrencyGate(1, { maxQueue: 0 });
+    299|     const holder = await gate.acquire();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/7]⎯
+
+ FAIL  tests/club-comparison.test.ts > review B-06: the concurrency gate bounds its queue and its wait > reads the wait bound from the environment: blank, junk, zero and negative fall back
+TypeError: gateWaitMsFromEnv is not a function
+ ❯ tests/club-comparison.test.ts:315:12
+    313|
+    314|   it('reads the wait bound from the environment: blank, junk, zero and…
+    315|     expect(gateWaitMsFromEnv(undefined, 10_000)).toBe(10_000);
+       |            ^
+    316|     expect(gateWaitMsFromEnv(' ', 10_000)).toBe(10_000);
+    317|     expect(gateWaitMsFromEnv('abc', 10_000)).toBe(10_000);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/7]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  7 failed | 56 passed (63)
+   Start at  16:07:45
+   Duration  182.76s (transform 641ms, setup 312ms, import 914ms, tests 180.89s, environment 1ms)
+
+rc=1

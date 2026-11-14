@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -u
+export PATH="$HOME/.nvm/versions/node/v22.23.2/bin:$PATH"
+W=/mnt/ssd/afldb-rem2-public-20261114
+cd $W/evidence
+head -c 400 corpus-base/parse/summary.json | grep -E 'parserVersion|pass|fail|total'
+head -c 400 corpus-fix/parse/summary.json | grep -E 'parserVersion|pass|fail|total'
+SHOW=${SHOW:-60} node $W/in/corpus-diff.mjs corpus-base/parse/results.jsonl corpus-fix/parse/results.jsonl corpus-diff-parse.jsonl | tee corpus-diff-summary.txt | cut -c1-1500

@@ -1,0 +1,14 @@
+src/app/clubs/compare/busy.tsx
+src/app/clubs/compare/page.tsx
+src/app/clubs/compare/state.ts
+src/lib/concurrency-gate.ts
+src/search/nl/parser.ts
+src/search/nl/plan.ts
+src/search/nl/qualifying-matches-gate.ts
+tests/club-comparison.test.ts
+tests/club-comparison-view.test.ts
+tests/home-records.test.ts
+tests/integration/club-comparison-route.test.ts
+tests/integration/nl-semantic-mapping.test.ts
+tests/nl-parser.test.ts
+tests/unit/qualifying-matches-gate.test.ts

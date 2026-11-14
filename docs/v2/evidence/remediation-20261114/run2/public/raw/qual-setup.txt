@@ -1,0 +1,6 @@
+qual HEAD=b072c1622fd04b50393684b25ca6cc73b3e11984 want=b072c1622fd04b50393684b25ca6cc73b3e11984
+npm warn deprecated eslint@9.39.5: This version is no longer supported. Please see https://eslint.org/version-support for other options.
+
+added 427 packages in 14s
+qual porcelain lines: 0
+base0 HEAD=e8666c17e6f99591d68704240d7c029036bcaf81 porcelain=1

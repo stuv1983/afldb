@@ -1,0 +1,51 @@
+import { verifyIsolatedIntegrationDatabase } from './guard';
+
+import { afterAll, describe, it } from 'vitest';
+
+import { sql } from '@/db/client';
+import { getHomeRecord } from '@/db/queries/home-records';
+import { HOME_RECORD_CATALOGUE, HOME_RECORD_MAX_ROWS, HOME_RECORD_TIE_WINDOW } from '@/lib/home-records';
+
+void verifyIsolatedIntegrationDatabase;
+afterAll(async () => { await sql.end(); });
+
+// scope public / ISSUE-360 measurement. Never committed as a test. For each home-record provider:
+// the panel as the page asks for it (limit 5), and the provider's FULL ordered output (limit 100000),
+// so the true tie size at the cutoff can be set against the 200-row window.
+describe('home record tie measurement', () => {
+  it('measures', async () => {
+    console.log(`TIEPROBE_CONFIG ${JSON.stringify({ window: HOME_RECORD_TIE_WINDOW, maxRows: HOME_RECORD_MAX_ROWS, entries: HOME_RECORD_CATALOGUE.length })}`);
+    for (const entry of HOME_RECORD_CATALOGUE) {
+      const out: Record<string, unknown> = { value: entry.value, provider: entry.provider.kind };
+      try {
+        const panel = await getHomeRecord(entry.value, 5);
+        const full = await getHomeRecord(entry.value, 100000);
+        const fullRows = full.rows;
+        const values = fullRows.map((r) => r.value);
+        let monotone = true;
+        for (let i = 1; i < values.length; i += 1) if (values[i] > values[i - 1]) monotone = false;
+        const cutoff = values.length >= 5 ? values[4] : null;
+        const tieAtCutoff = cutoff === null ? 0 : values.filter((v) => v === cutoff).length;
+        // rows strictly above the cutoff value (places before the tie begins)
+        const above = cutoff === null ? 0 : values.filter((v) => v > cutoff).length;
+        out.fullRows = values.length;
+        out.monotoneNonIncreasing = monotone;
+        out.cutoffValue = cutoff;
+        out.tieSizeAtCutoff = tieAtCutoff;
+        out.rowsAboveCutoff = above;
+        out.tieEndsAtRow = above + tieAtCutoff;
+        out.panelRows = panel.rows.length;
+        out.panelMoreTied = panel.moreTied ?? null;
+        // what the panel SHOULD show if nothing were truncated: all tied if they fit, else 5 + disclosure
+        const trueCount = above + tieAtCutoff;
+        out.expectedPanel = trueCount <= HOME_RECORD_MAX_ROWS
+          ? `all ${trueCount} rows, no marker`
+          : `5 rows + marker count ${trueCount - 5} exact=${trueCount < HOME_RECORD_TIE_WINDOW}`;
+        out.exceedsWindow = tieAtCutoff + above > HOME_RECORD_TIE_WINDOW;
+      } catch (e) {
+        out.THROW = `${(e as Error).name}: ${(e as Error).message}`;
+      }
+      console.log(`TIEPROBE ${JSON.stringify(out)}`);
+    }
+  }, 600_000);
+});

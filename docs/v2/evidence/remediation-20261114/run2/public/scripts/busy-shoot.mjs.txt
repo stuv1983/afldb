@@ -1,0 +1,86 @@
+// SCOPE-TAG: afldb-rem2-public visual evidence for the /clubs/compare "busy" state (review B-06)
+// Declared before capture: viewports desktop 1280x800 and mobile 390x844.
+//  B1 control: /clubs/compare?club1=carlton&club2=collingwood on an idle server (AFLDB_COMPARE_MAX_CONCURRENT=1,
+//     AFLDB_COMPARE_MAX_QUEUE=0): the comparison renders, no busy text.
+//  B2 busy: the same URL while two flooders keep the one slot taken and nobody may queue: heading
+//     "Comparisons are busy right now", a "Try again" link to the same view, the selectors still present, a
+//     noindex robots meta in the document head, HTTP status 200, no horizontal overflow.
+//  B3 recovery: flood stopped, same URL renders the comparison again and the busy text is gone.
+// usage: node busy-shoot.mjs <baseUrl> <outDir>   (run from the checkout so 'playwright' resolves)
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { chromium } from 'playwright';
+
+const [baseUrl, outDir] = process.argv.slice(2);
+mkdirSync(outDir, { recursive: true });
+const pairPath = '/clubs/compare?club1=carlton&club2=collingwood';
+const viewports = { desktop: { width: 1280, height: 800 }, mobile: { width: 390, height: 844 } };
+const report = { baseUrl, pairPath, results: [] };
+const save = () => writeFileSync(`${outDir}/report.json`, JSON.stringify(report, null, 1));
+const overflow = (page) => page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+
+let stop = false;
+const flooder = async () => {
+  while (!stop) {
+    await Promise.allSettled(Array.from({ length: 4 }, () => fetch(baseUrl + pairPath).then((r) => r.text())));
+  }
+};
+
+async function facts(page, resp) {
+  const bodyText = await page.locator('body').innerText();
+  return {
+    status: resp?.status(),
+    build: resp?.headers()['x-afldb-build'] ?? null,
+    busyHeading: bodyText.includes('Comparisons are busy right now'),
+    comparisonHeading: await page.locator('h1', { hasText: 'Carlton v Collingwood' }).count(),
+    robots: await page.locator('meta[name="robots"]').evaluateAll((els) => els.map((e) => e.getAttribute('content'))),
+    inHead: await page.locator('head meta[name="robots"]').count(),
+    title: await page.title(),
+    tryAgainHref: await page.locator('a', { hasText: 'Try again' }).first().getAttribute('href').catch(() => null),
+    selectors: [await page.locator('select[name="club1"]').count(), await page.locator('select[name="club2"]').count()],
+    overflow: await overflow(page),
+  };
+}
+
+const browser = await chromium.launch();
+for (const [vp, viewport] of Object.entries(viewports)) {
+  const ctx = await browser.newContext({ viewport, deviceScaleFactor: 1 });
+  await ctx.addCookies([{ name: 'afldb_consent', value: 'declined', url: baseUrl }]);
+  const page = await ctx.newPage();
+
+  // B1 control (idle)
+  stop = true;
+  let resp = await page.goto(baseUrl + pairPath, { waitUntil: 'load', timeout: 60000 });
+  report.results.push({ scene: 'B1', vp, ...(await facts(page, resp)) });
+  await page.screenshot({ path: `${outDir}/B1-compare-idle-${vp}.png`, fullPage: false });
+  save();
+
+  // B2 busy (flood)
+  stop = false;
+  const flooders = [flooder(), flooder()];
+  let got = null;
+  for (let attempt = 1; attempt <= 40 && !got; attempt += 1) {
+    resp = await page.goto(baseUrl + pairPath, { waitUntil: 'load', timeout: 60000 });
+    const f = await facts(page, resp);
+    if (f.busyHeading) got = { attempt, ...f };
+  }
+  if (got) {
+    report.results.push({ scene: 'B2', vp, ...got });
+    await page.screenshot({ path: `${outDir}/B2-compare-busy-${vp}.png`, fullPage: false });
+    await page.screenshot({ path: `${outDir}/B2-compare-busy-${vp}-full.png`, fullPage: true });
+  } else {
+    report.results.push({ scene: 'B2', vp, busyHeading: false, note: 'busy state never observed in 40 attempts' });
+  }
+  save();
+  stop = true;
+  await Promise.all(flooders);
+
+  // B3 recovery
+  resp = await page.goto(baseUrl + pairPath, { waitUntil: 'load', timeout: 60000 });
+  report.results.push({ scene: 'B3', vp, ...(await facts(page, resp)) });
+  await page.screenshot({ path: `${outDir}/B3-compare-recovered-${vp}.png`, fullPage: false });
+  save();
+  await ctx.close();
+}
+await browser.close();
+save();
+console.log(JSON.stringify(report.results));

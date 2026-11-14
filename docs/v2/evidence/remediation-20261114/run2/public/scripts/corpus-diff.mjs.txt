@@ -1,0 +1,37 @@
+// usage: node corpus-diff.mjs <base results.jsonl> <fix results.jsonl> [out.jsonl]   (same comparison as remediation run 1)
+import fs from 'node:fs';
+const [baseF, fixF, outF] = process.argv.slice(2);
+const load = (f) => {
+  const m = new Map();
+  for (const l of fs.readFileSync(f, 'utf8').split('\n').filter(Boolean)) {
+    const o = JSON.parse(l);
+    m.set(o.expected.id, o);
+  }
+  return m;
+};
+const base = load(baseF); const fix = load(fixF);
+const sig = (o) => JSON.stringify({
+  status: o.actual.status, executed: o.actual.executed, plan: o.actual.plan ?? null,
+  conf: o.actual.confidence, unsupported: o.actual.unsupportedTerms ?? [],
+  leadName: o.actual.leadName ?? null, leadValue: o.actual.leadValue ?? null,
+  total: o.actual.total ?? null, tieCount: o.actual.tieCount ?? null,
+});
+let same = 0; const changed = [];
+for (const [id, b] of base) {
+  const f = fix.get(id);
+  if (!f) { changed.push({ id, q: b.expected.question, missing: true }); continue; }
+  if (b.expected.question !== f.expected.question) throw new Error(`question mismatch at id ${id}`);
+  if (sig(b) === sig(f)) { same++; continue; }
+  changed.push({
+    id, q: b.expected.question, category: b.expected.category,
+    base: { status: b.actual.status, agg: b.actual.plan?.agg, scope: b.actual.plan?.scope, preds: b.actual.plan?.careerPredicates, lead: b.actual.leadName, val: b.actual.leadValue, total: b.actual.total, tie: b.actual.tieCount, conf: b.actual.confidence, unsupported: b.actual.unsupportedTerms },
+    fix: { status: f.actual.status, agg: f.actual.plan?.agg, scope: f.actual.plan?.scope, preds: f.actual.plan?.careerPredicates, lead: f.actual.leadName, val: f.actual.leadValue, total: f.actual.total, tie: f.actual.tieCount, conf: f.actual.confidence, unsupported: f.actual.unsupportedTerms },
+    expectedStatus: b.expected.status,
+  });
+}
+console.log(`base=${base.size} fix=${fix.size} identical=${same} changed=${changed.length}`);
+if (outF) fs.writeFileSync(outF, changed.map((c) => JSON.stringify(c)).join('\n') + (changed.length ? '\n' : ''));
+const byCat = {};
+for (const c of changed) byCat[c.category ?? '?'] = (byCat[c.category ?? '?'] ?? 0) + 1;
+console.log(JSON.stringify(byCat));
+for (const c of changed.slice(0, Number(process.env.SHOW ?? 15))) console.log(JSON.stringify(c).slice(0, 900));

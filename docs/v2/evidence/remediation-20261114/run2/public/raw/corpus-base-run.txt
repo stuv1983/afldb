@@ -1,0 +1,24 @@
+tag=base head=e8666c17e6f99591d68704240d7c029036bcaf81 dirty=1
+corpus sha256=f8a7f42a7eb106b6b1880f7eb203b0d86f875c491d936a0e2c0806128d339bff
+create-db: afldb_v2_rem2public_corpusbase2_test created from afldb_v2_rem2public_tmpl_test and marked
+== parse-only 05:45:56
+parse rc=0
+== done 05:46:06
+{
+  "corpus": "/mnt/ssd/afldb-rem-nl-20261114/in/nl-stress-corpus-v5.csv",
+  "database": "afldb_v2_rem2public_corpusbase2_test",
+  "mode": "parse only",
+  "parserVersion": 68,
+  "concurrency": 6,
+  "ran": "2026-11-14T05:46:06.314Z",
+  "wallClockSeconds": 8,
+  "inputRows": 12000,
+  "auditRequired": 0,
+  "total": 12000,
+  "pass": 12000,
+  "softFail": 0,
+  "fail": 0,
+  "noResults": 0,
+  "errors": 0,
+  "byClass": {}
+}

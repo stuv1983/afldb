@@ -1,0 +1,14 @@
+isolated-pg: afldb_v2_rem2public_i7_test verified (cluster afldb_v2_isolated, 127.0.0.1:55654); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem2-public-20261114/qual
+
+ ✓ tests/integration/nl-answer-boundary.test.ts (4 tests) 1324ms
+     ✓ returns an NlAnswer and logs no_results for a valid supported plan with zero rows  646ms
+     ✓ leaves the same semantic family unchanged when rows exist  578ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  16:27:27
+   Duration  3.02s (transform 1.14s, setup 164ms, import 1.29s, tests 1.32s, environment 0ms)
+
+rc=0

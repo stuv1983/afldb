@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# tsc --noEmit + eslint on changed files, no lock (not a build / full integration run), nice'd
+set -u -o pipefail
+W=/mnt/ssd/afldb-rem2-public-20261114
+export PATH="$HOME/.nvm/versions/node/v22.23.2/bin:$PATH"
+CAND=$W/qual; OUT=$W/evidence/qual/static
+mkdir -p $W/evidence/qual
+cd "$CAND"
+echo "HEAD=$(git rev-parse HEAD) porcelain=$(git status --porcelain | wc -l)" > "$OUT-tsc.txt"
+nice -n 10 timeout 900 node node_modules/typescript/bin/tsc --noEmit >> "$OUT-tsc.txt" 2>&1
+echo "tsc rc=$?" | tee -a "$OUT-tsc.txt"
+FILES=$( (git diff --name-only base; git ls-files --others --exclude-standard) 2>/dev/null | grep -E '\.(ts|tsx)$' | sort -u)
+echo "$FILES" > "$OUT-eslint-files.txt"
+# shellcheck disable=SC2086
+timeout 600 node node_modules/eslint/bin/eslint.js $FILES > "$OUT-eslint.txt" 2>&1
+echo "eslint rc=$?" | tee -a "$OUT-eslint.txt"
+tail -8 "$OUT-eslint.txt"
+echo "porcelain after: $(git status --porcelain | wc -l)"

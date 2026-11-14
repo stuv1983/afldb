@@ -1,0 +1,22 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem2-public-20261114/qual
+
+ ✓ tests/nl-parser.test.ts (672 tests) 773ms
+ ✓ tests/afl-api-ingestion-safety.test.ts (191 tests) 780ms
+ ✓ tests/nl-plan.test.ts (224 tests) 113ms
+ ✓ tests/nl-describe.test.ts (94 tests) 92ms
+ ✓ tests/deploy-web-unit.test.ts (40 tests) 2280ms
+     ✓ offhost-pull: binds each sidecar to its dump, refuses future stamps, and a flood cannot evict genuine copies (review A-03)  1169ms
+ ✓ tests/club-comparison-view.test.ts (35 tests) 375ms
+ ✓ tests/query-intent.test.ts (47 tests) 45ms
+ ✓ tests/v2-shadow-target.test.ts (72 tests) 54ms
+ ✓ tests/club-comparison.test.ts (28 tests) 43ms
+ ✓ tests/home-records.test.ts (23 tests) 102ms
+ ✓ tests/unit/qualifying-matches-gate.test.ts (28 tests) 31ms
+
+ Test Files  11 passed (11)
+      Tests  1454 passed (1454)
+   Start at  16:31:10
+   Duration  11.67s (transform 2.57s, setup 568ms, import 3.71s, tests 4.69s, environment 3ms)
+
+unit-focused rc=0
