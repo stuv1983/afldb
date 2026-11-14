@@ -176,7 +176,21 @@ const SEASON = 2026;
 // through the one-component ambiguity guard. These are test clubs, never historical aliases.
 const HOME_HIST = 'ISSUE-228 synthetic home';
 const AWAY_HIST = 'ISSUE-228 synthetic away';
-const BRIDGED_PROVIDER_PLAYER_ID = 'CD_I297354'; // Karl Amon, home side, in the fixture
+/**
+ * ISSUE-363 (T363-1): the provider player id the SHARED fixture files name for their home-side player (Karl Amon).
+ * It is a REAL id: the production snapshot holds a real `afl_api` `external_identities` row for it. This suite
+ * never writes, links or deletes that row. It renames the id inside its in-memory copy of the fixture
+ * (`unitSourceFor`) and asserts that the row is exactly as it found it (content, or absence) when it finishes.
+ */
+const FIXTURE_FILE_PROVIDER_PLAYER_ID = 'CD_I297354';
+/** How many times the shared fixture files name it: the roster once, the player stats twice. A change fails loudly. */
+const FIXTURE_FILE_PLAYER_ID_OCCURRENCES = { roster: 1, stats: 2 } as const;
+/**
+ * This suite's own bridged provider player id (`CD_I<digits>`: fixture season, issue, serial). It is 10 digits where
+ * every real `afl_api` provider player id on the production snapshot has 6 or 7, so no real row can hold it and every
+ * row keyed on it is one this suite created.
+ */
+const BRIDGED_PROVIDER_PLAYER_ID = 'CD_I2026228001';
 /**
  * AFLDB-ISSUE-237: the bridged fixture player's own AFL Tables identity. A real importer row's
  * player always holds exactly one (D7: Stage 2 refuses to capture one that does not), and
@@ -186,6 +200,38 @@ const BRIDGED_PROVIDER_PLAYER_ID = 'CD_I297354'; // Karl Amon, home side, in the
  */
 const BRIDGED_AFLTABLES_ID = 'players/Z/Issue228-bridged-test.html';
 const UNBRIDGED_PROVIDER_PLAYER_ID = 'CD_I500001'; // "Test Forward", away side — deliberately never bridged
+
+/**
+ * Rename the shared fixture's real provider player id to this suite's own id in an in-memory copy. The number of
+ * occurrences is asserted, so a fixture that gains or loses one fails here instead of leaving the real id in.
+ */
+function renameFixturePlayer(raw: RawJson, label: string, expected: number): RawJson {
+  const parts = JSON.stringify(raw).split(`"${FIXTURE_FILE_PROVIDER_PLAYER_ID}"`);
+  if (parts.length - 1 !== expected) {
+    throw new Error(
+      `The shared fixture ${label} names ${FIXTURE_FILE_PROVIDER_PLAYER_ID} ${parts.length - 1} time(s), expected ${expected}; `
+      + 'this suite cannot rename it onto its own provider player id.',
+    );
+  }
+  return JSON.parse(parts.join(`"${BRIDGED_PROVIDER_PLAYER_ID}"`)) as RawJson;
+}
+
+/**
+ * The full content of the snapshot's real `(afl_api, FIXTURE_FILE_PROVIDER_PLAYER_ID)` identity row as one JSON
+ * string, or `null` when no such row exists. `(source_id, external_id)` is unique (migration 002), so there is at
+ * most one. Read only; compared before and after to prove this suite neither created, changed nor deleted it.
+ */
+async function snapshotProviderIdentity(): Promise<string | null> {
+  const rows = await sql<{ row: string }[]>`
+    SELECT to_jsonb(e)::text AS row
+      FROM external_identities e
+     WHERE e.source_id = (SELECT id FROM sources WHERE key = 'afl_api')
+       AND e.external_id = ${FIXTURE_FILE_PROVIDER_PLAYER_ID}
+  `;
+  return rows.length === 0 ? null : rows[0].row;
+}
+/** The snapshot's real identity row for the fixture file's player id, read first in `beforeAll` (`null` = absent). */
+let snapshotIdentityBefore: { row: string | null } | undefined;
 
 /**
  * One match unit's three raw payloads, cloned from the proven-valid fixture
@@ -224,8 +270,13 @@ function unitSourceFor(providerMatchId: string, mutate?: (raw: {
   fixture: RawJson; roster: RawJson; stats: RawJson;
 }) => void): AflApiSettleUnitSource {
   const fixture = clone(readFixture('01-fixture-result.json')) as RawJson;
-  const roster = clone(readFixture('03-match-roster.raw.json')) as RawJson;
-  const stats = clone(readFixture('02-player-stats.raw.json')) as RawJson;
+  // The real snapshot player id never reaches the settle: it is renamed to this suite's own id first.
+  const roster = renameFixturePlayer(
+    readFixture('03-match-roster.raw.json') as RawJson, 'roster', FIXTURE_FILE_PLAYER_ID_OCCURRENCES.roster,
+  );
+  const stats = renameFixturePlayer(
+    readFixture('02-player-stats.raw.json') as RawJson, 'player stats', FIXTURE_FILE_PLAYER_ID_OCCURRENCES.stats,
+  );
   const matchDate = matchDateFor(providerMatchId);
 
   fixture.providerId = providerMatchId;
@@ -819,6 +870,8 @@ async function recompute2026SeasonDerivedState(): Promise<void> {
 }
 
 beforeAll(async () => {
+  // ISSUE-363: the snapshot's own identity row for the fixture file's player id, read first and read only.
+  snapshotIdentityBefore = { row: await snapshotProviderIdentity() };
   registry = parseSourceFamilyRegistry(
     JSON.parse(readFileSync(join(PROJECT_ROOT, 'data', 'reference', 'source-families.json'), 'utf8')),
   );
@@ -964,6 +1017,9 @@ beforeEach(async () => {
 
 afterAll(async () => {
   await cleanup();
+  // ISSUE-363: read here, asserted at the end (after the connection is released), so a change still lets every
+  // restoring step below run.
+  const snapshotIdentityAfter = snapshotIdentityBefore ? await snapshotProviderIdentity() : null;
   // I244-F001 test-harness fix: this suite's cases legitimately drove real
   // recomputes of seasons/club_seasons (§36 of afldb-issue244.md); cleanup()
   // above removes the matches that produced that state but does not itself
@@ -976,6 +1032,13 @@ afterAll(async () => {
   await sql`DELETE FROM clubs WHERE legacy_club_hist IN (${HOME_HIST}, ${AWAY_HIST})`;
   await sql`DELETE FROM club_organizations WHERE name IN (${HOME_HIST}, ${AWAY_HIST})`;
   await sql.end({ timeout: 5 });
+  if (snapshotIdentityBefore) {
+    // The snapshot's real identity row is exactly as this suite found it (content, or absence).
+    expect(
+      snapshotIdentityAfter,
+      `the snapshot's (afl_api, ${FIXTURE_FILE_PROVIDER_PLAYER_ID}) identity row changed`,
+    ).toEqual(snapshotIdentityBefore.row);
+  }
 }, 30_000);
 
 /* ------------------------------------------------------------------ *
