@@ -30,6 +30,11 @@ import {
   validateMatchSheetPayload,
   type PlayerMatchStatInput,
 } from '@/lib/match-sheet';
+import {
+  matchSheetDependentsRefusal,
+  type MatchSheetDependentAction,
+  type MatchSheetDependents,
+} from '@/lib/match-sheet-dependents';
 
 export type { PlayerMatchStatInput } from '@/lib/match-sheet';
 
@@ -193,6 +198,23 @@ export async function saveMatchSheet(input: SaveMatchSheetInput): Promise<SaveMa
         clubSlugById: new Map(clubs.map((c) => [Number(c.id), c.slug])),
       });
       if (!plan.ok) throw new MatchSheetRefusal(plan.error);
+
+      // 3b. AFLDB-ISSUE-353: a removal (or a club change) must not leave a Brownlow vote, a
+      // Brownlow vote entry or a curated special record naming a player who is no longer a
+      // participant (or who played for the other club). Same refusal shape as `deleteMatch`;
+      // read under the match lock and the locked rows of step 2, before any write.
+      const removedPlayerIdsInPlan = plan.items
+        .filter((item) => item.kind === 'remove').map((item) => item.playerId);
+      const clubChangedPlayerIds = plan.items
+        .filter((item) => item.kind === 'update' && Object.hasOwn(item.delta, 'club_slug'))
+        .map((item) => item.playerId);
+      for (const [action, ids] of [
+        ['remove', removedPlayerIdsInPlan],
+        ['club_change', clubChangedPlayerIds],
+      ] as const) {
+        const dependentsRefusal = await matchSheetDependentsRefusalFor(tx, match, action, ids);
+        if (dependentsRefusal !== null) throw new MatchSheetRefusal(dependentsRefusal);
+      }
 
       // 4. Authority plan. Probe first: under State A nothing may be attempted.
       let storable = true;
@@ -465,6 +487,74 @@ async function loadPlayerNames(db: Db, playerIds: readonly number[]): Promise<Ma
 }
 
 /**
+ * AFLDB-ISSUE-353: the refusal for deleting (or moving to another club) the line-up rows of
+ * `playerIds` in `match`, or `null` when nothing hangs off them. Parameterised reads inside the
+ * caller's transaction (the caller holds the match lock and the locked `player_match_stats`
+ * rows); it writes nothing. See `src/lib/match-sheet-dependents.ts` for what blocks and why.
+ */
+async function matchSheetDependentsRefusalFor(
+  tx: Db,
+  match: { id: number; season: number },
+  action: MatchSheetDependentAction,
+  playerIds: readonly number[],
+): Promise<string | null> {
+  const ids = [...new Set(playerIds)].filter((id) => Number.isInteger(id) && id > 0);
+  if (ids.length === 0) return null;
+
+  const [round] = await tx<{ roundCode: string }[]>`
+    SELECT round_code AS "roundCode" FROM matches WHERE id = ${match.id}
+  `;
+  const votes = await tx<{ playerId: number; votes: number }[]>`
+    SELECT player_id::int AS "playerId", votes::int AS votes
+      FROM brownlow_round_votes
+     WHERE match_id = ${match.id} AND player_id = ANY(${ids}::int[]) AND votes > 0
+     ORDER BY player_id
+  `;
+  const [entry] = await tx<{
+    status: string; three: number | null; two: number | null; one: number | null;
+  }[]>`
+    SELECT status, three_player_id::int AS three, two_player_id::int AS two, one_player_id::int AS one
+      FROM brownlow_vote_entry_state
+     WHERE match_id = ${match.id}
+  `;
+  const voteEntries: MatchSheetDependents['voteEntries'][number][] = [];
+  if (entry) {
+    for (const [slot, playerId] of [[3, entry.three], [2, entry.two], [1, entry.one]] as const) {
+      if (playerId !== null && ids.includes(playerId)) {
+        voteEntries.push({ playerId, status: entry.status, slot });
+      }
+    }
+  }
+  const records = await tx<{
+    playerId: number; family: 'first-kick-goal' | 'after-the-siren';
+    recordId: string | null; rowId: number; status: string;
+  }[]>`
+    SELECT player_id::int AS "playerId", 'first-kick-goal' AS family,
+           source_record_id AS "recordId", id::int AS "rowId", status
+      FROM player_achievements
+     WHERE match_id = ${match.id} AND player_id = ANY(${ids}::int[])
+    UNION ALL
+    SELECT player_id::int, 'after-the-siren', source_record_id, id::int, status
+      FROM after_siren_kicks
+     WHERE match_id = ${match.id} AND player_id = ANY(${ids}::int[])
+     ORDER BY 1, 2, 4
+  `;
+
+  const names = await loadPlayerNames(tx, ids);
+  return matchSheetDependentsRefusal(action, names, {
+    matchId: match.id,
+    season: match.season,
+    roundCode: round?.roundCode ?? '',
+    brownlowVotes: votes.map((v) => ({ playerId: Number(v.playerId), votes: Number(v.votes) })),
+    voteEntries,
+    specialRecords: records.map((r) => ({
+      playerId: Number(r.playerId), family: r.family,
+      recordId: r.recordId, rowId: Number(r.rowId), status: r.status,
+    })),
+  });
+}
+
+/**
  * D-257-5: `deleteMatch` must refuse while ANY active Match Sheet authority exists under
  * the match's key (fail closed: an active record that does not decode or resolve still
  * blocks). Returns the refusal text, or `null` when nothing active exists. Runs inside
@@ -644,6 +734,16 @@ export async function returnMatchSheetToSource(
       });
       if (!plan.ok) {
         throw new MatchSheetRefusal(`Cannot return this player to source: ${plan.error}. Nothing was changed.`);
+      }
+
+      // AFLDB-ISSUE-353: withdrawing a still-unowned manual addition deletes the line-up row, so
+      // the same dependents refusal as a Match Sheet removal applies. Thrown before the authority
+      // is deactivated; the whole transaction rolls back either way.
+      if (plan.action === 'withdraw_delete_row' && row) {
+        const dependentsRefusal = await matchSheetDependentsRefusalFor(
+          tx, match, 'return_to_source', [input.playerId],
+        );
+        if (dependentsRefusal !== null) throw new MatchSheetRefusal(dependentsRefusal);
       }
 
       const active = keyRows.filter((r) => r.isActive);

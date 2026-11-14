@@ -1318,3 +1318,47 @@ describe('Stage 6 — a match carrying a curated record cannot be deleted (§8.3
     expect(await readFirstKickGoal(achievementId)).not.toBeNull();
   });
 });
+
+/**
+ * AFLDB-ISSUE-353 (plan review A-2). The Match Sheet removal guard reads the special records of a
+ * player under the locks it already holds (the match row and the player's line-up row, FOR UPDATE).
+ * Record creation takes neither lock, so without a lock of its own the two race: the creator reads
+ * the line-up row, the removal deletes it and commits, and the creator inserts a record naming a
+ * non-participant. Creation now takes FOR SHARE on the line-up row it validates, which conflicts
+ * with the removal's FOR UPDATE. Proved here: a creator started while the line-up row is locked
+ * FOR UPDATE waits, and completes once the lock holder commits.
+ */
+describe('AFLDB-ISSUE-353: record creation waits for a lock held on the line-up row it names', () => {
+  it('createFirstKickGoal does not complete while the line-up row is locked FOR UPDATE, then succeeds', async () => {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    let locked!: () => void;
+    const lockTaken = new Promise<void>((resolve) => { locked = resolve; });
+    const holder = owner.begin(async (tx) => {
+      await tx`SELECT id FROM player_match_stats WHERE match_id = ${s6MatchId} AND player_id = ${s6PlayerId} FOR UPDATE`;
+      locked();
+      await held;
+    });
+    await lockTaken;
+    try {
+      const creator = createFirstKickGoal({
+        playerId: s6PlayerId, clubNameRaw: S6, season: s6MatchSeason, roundRaw: `${S6}-R-lock`, notes: S6,
+        consecutiveGoalKicks: 2, matchId: s6MatchId, adminUserId: actorId,
+        adminNote: 'Integration fixture: deliberate write to a sealed season.',
+      });
+      const early = await Promise.race([
+        creator.then(() => 'completed'),
+        new Promise<string>((resolve) => setTimeout(() => resolve('waiting'), 1500)),
+      ]);
+      expect(early).toBe('waiting');
+      release();
+      await holder;
+      const result = await creator;
+      expect(result.ok, result.ok ? '' : result.error).toBe(true);
+    } finally {
+      release();
+      await holder.catch(() => undefined);
+      await purgeStage6();
+    }
+  }, 60_000);
+});

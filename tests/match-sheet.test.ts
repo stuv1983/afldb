@@ -1084,3 +1084,59 @@ describe('ISSUE-257 Slice 7 return to source and deletion guard', () => {
     expect(inside).not.toMatch(/DELETE FROM data_overrides/);
   });
 });
+
+describe('AFLDB-ISSUE-353 line-up row dependents refusal', () => {
+  const base = {
+    matchId: 77, season: 2024, roundCode: '5',
+    brownlowVotes: [], voteEntries: [], specialRecords: [],
+  } as const;
+  const names = new Map([[10, 'Ann Able'], [11, 'Bob Baker']]);
+
+  it('is null when nothing hangs off the players (a published zero is not a dependent)', async () => {
+    const { matchSheetDependentsRefusal } = await import('@/lib/match-sheet-dependents');
+    expect(matchSheetDependentsRefusal('remove', names, base)).toBeNull();
+  });
+
+  it('names each carried fact, in player order, and where to clear it', async () => {
+    const { matchSheetDependentsRefusal } = await import('@/lib/match-sheet-dependents');
+    const text = matchSheetDependentsRefusal('remove', names, {
+      ...base,
+      brownlowVotes: [{ playerId: 11, votes: 1 }],
+      voteEntries: [{ playerId: 10, status: 'final', slot: 3 }],
+      specialRecords: [
+        { playerId: 10, family: 'first-kick-goal', recordId: 'fkg-001', rowId: 1, status: 'active' },
+        { playerId: 11, family: 'after-the-siren', recordId: null, rowId: 4, status: 'void' },
+      ],
+    });
+    expect(text).toBe(
+      'Cannot remove a player from the Match Sheet of match #77: '
+      + 'Ann Able (player #10) carries a Brownlow vote entry (final) naming them for 3 votes, first-kick-goal record fkg-001; '
+      + 'Bob Baker (player #11) carries 1 Brownlow vote in this match, after-the-siren record #4 (already suppressed). '
+      + 'Deleting the line-up row would leave that record naming a non-participant. Nothing was saved. '
+      + 'Resolve them in Brownlow administration (/admin/brownlow/2024/5) and Special records '
+      + '(/admin/records/after-the-siren, /admin/records/first-kick-goal) first.',
+    );
+  });
+
+  it('words a club change and a return-to-source row deletion for what they would do', async () => {
+    const { matchSheetDependentsRefusal } = await import('@/lib/match-sheet-dependents');
+    const facts = { ...base, brownlowVotes: [{ playerId: 10, votes: 2 }] };
+    expect(matchSheetDependentsRefusal('club_change', names, facts)).toBe(
+      'Cannot change a player\'s club in the Match Sheet of match #77: Ann Able (player #10) carries 2 Brownlow votes in this match. '
+      + 'Changing the club would leave that record attributed to a club the player did not play for in this match. '
+      + 'Nothing was saved. Resolve it in Brownlow administration (/admin/brownlow/2024/5) first.',
+    );
+    expect(matchSheetDependentsRefusal('return_to_source', new Map(), facts)).toBe(
+      'Cannot return a player to source in match #77, which would delete their line-up row: player #10 carries 2 Brownlow votes in this match. '
+      + 'Deleting the line-up row would leave that record naming a non-participant. Nothing was saved. '
+      + 'Resolve it in Brownlow administration (/admin/brownlow/2024/5) first.',
+    );
+  });
+
+  it('is guarded on both line-up-row delete paths and never reads a Brownlow vote of zero as a dependent', () => {
+    const source = fs.readFileSync(path.join(process.cwd(), 'src/db/queries/match-sheet.ts'), 'utf8');
+    expect(source).toContain("matchSheetDependentsRefusalFor(tx, match, action, ids)");
+    expect(source).toContain("'return_to_source', [input.playerId]");
+    expect(source).toMatch(/FROM brownlow_round_votes\s+WHERE match_id = \$\{match\.id\} AND player_id = ANY\(\$\{ids\}::int\[\]\) AND votes > 0/);
+  });
+});

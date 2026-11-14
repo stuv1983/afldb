@@ -1156,8 +1156,13 @@ async function validateSpecialRecordMatchLink(
       + "record's match must belong to the record's own season.");
   }
   if (playerId !== null) {
+    // AFLDB-ISSUE-353: FOR SHARE, so a Match Sheet removal (or return to source) that holds this
+    // line-up row FOR UPDATE and checks the special records first cannot interleave with this
+    // creation: either the creation waits and then finds the row gone, or the removal waits and
+    // then sees (and refuses on) the committed record.
     const [played] = await tx<{ id: number }[]>`
       SELECT id FROM player_match_stats WHERE match_id = ${matchId} AND player_id = ${playerId}
+        FOR SHARE
     `;
     if (!played) {
       throw new RollbackRefusal('validation',

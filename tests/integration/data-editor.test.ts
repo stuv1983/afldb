@@ -200,6 +200,11 @@ async function cleanup257(): Promise<void> {
   // Fresh fragments per use (postgres.js fragments are single-use query objects).
   const players = () => sql`(SELECT id FROM players WHERE starts_with(slug, ${SLUG_257}::text))`;
   const matches = () => sql`(SELECT id FROM matches WHERE starts_with(match_key, ${KEY_ROOT_257}::text))`;
+  // AFLDB-ISSUE-353: the dependents the line-up-row guard cases seed (children of matches/players).
+  await sql`DELETE FROM brownlow_vote_entry_state WHERE match_id IN ${matches()}`;
+  await sql`DELETE FROM brownlow_round_votes WHERE match_id IN ${matches()} OR player_id IN ${players()}`;
+  await sql`DELETE FROM player_achievements WHERE match_id IN ${matches()} OR player_id IN ${players()}`;
+  await sql`DELETE FROM after_siren_kicks WHERE match_id IN ${matches()} OR player_id IN ${players()}`;
   await sql`
     DELETE FROM data_overrides
      WHERE entity_type IN ('player_match_stats', 'match_coaches')
@@ -248,6 +253,7 @@ const NO_RESIDUE_257 = {
   dataOverrides: 0, dataEdits: 0, playerMatchStats: 0, playerClubs: 0, playerClubSeasonStats: 0,
   playerSeasonStats: 0, playerCareerStats: 0, clubSeasons: 0, externalIdentities: 0,
   players: 0, matches: 0, seasons: 0, coaches: 0, matchCoaches: 0,
+  brownlowRoundVotes: 0, brownlowVoteEntries: 0, playerAchievements: 0, afterSirenKicks: 0,
 };
 
 /** Counts of every namespace row, by namespace prefix AND by the ids this run seeded. */
@@ -281,7 +287,14 @@ async function residue257(): Promise<typeof NO_RESIDUE_257> {
       (SELECT count(*) FROM match_coaches
         WHERE match_id = ANY(${mids})
            OR coach_id IN (SELECT id FROM coaches
-                            WHERE starts_with(afltables_coach_path, ${COACH_ROOT_335}::text)))::int AS "matchCoaches"
+                            WHERE starts_with(afltables_coach_path, ${COACH_ROOT_335}::text)))::int AS "matchCoaches",
+      (SELECT count(*) FROM brownlow_round_votes
+        WHERE match_id = ANY(${mids}) OR player_id = ANY(${pids}))::int AS "brownlowRoundVotes",
+      (SELECT count(*) FROM brownlow_vote_entry_state WHERE match_id = ANY(${mids}))::int AS "brownlowVoteEntries",
+      (SELECT count(*) FROM player_achievements
+        WHERE match_id = ANY(${mids}) OR player_id = ANY(${pids}))::int AS "playerAchievements",
+      (SELECT count(*) FROM after_siren_kicks
+        WHERE match_id = ANY(${mids}) OR player_id = ANY(${pids}))::int AS "afterSirenKicks"
   `;
   return r;
 }
@@ -1850,6 +1863,288 @@ describe('Durable Match Sheet authority: delete guard and Return to source (AFLD
     expect(result).toMatchObject({ ok: true, rowDeleted: false, rowKept: false });
     expect(await rowOf(p)).toBeUndefined();
     expect(await records(p)).toEqual([{ fieldGroup: 'lineup', isActive: false }]);
+  }, FX_TIMEOUT);
+});
+
+/* ---------------------------------------------------------------------------------------
+ * AFLDB-ISSUE-353: a Match Sheet removal (or club change) of a line-up row must not leave a
+ * Brownlow vote, a Brownlow vote entry or a curated special record naming a player who is no
+ * longer a participant. The review reproduced all of these as `ok: true`; here each is the
+ * refusal (the exact text, dependents and rows unchanged, no audit row) and the control cases
+ * prove nothing over-refuses.
+ *
+ * ORACLE-INDEPENDENT (run-wide R-4): every subject is an ISSUE-257 synthetic season-2079
+ * match/player seeded here (committed, cleaned by cleanup257 with residue assertions), so the
+ * cases hold identically on a production-derived snapshot copy and on a rebuilt afldb_test.
+ * ------------------------------------------------------------------------------------ */
+describe('AFLDB-ISSUE-353: a line-up row with Brownlow or special-record dependents cannot be removed or re-clubbed', () => {
+  const NOTE = 'issue-257 issue-353 dependents test';
+  const storable353 = () => playerMatchStatsAuthorityStorable(sql);
+
+  /** A second line-up player in the fixture's match (same club, durable AFL Tables identity). */
+  const addPlayer = async (fx: Fx257, name: string): Promise<{ id: number; token: string }> => {
+    const token = name.replace(/[^A-Za-z0-9]/g, '');
+    const id = await sql.begin(async (tx) => {
+      const [player] = await tx<{ id: number }[]>`
+        INSERT INTO players (display_name, sort_name, search_name, slug)
+        VALUES (${`Issue257 ${token}`}, ${`${token}, Issue257`}, ${`issue257 ${token.toLowerCase()}`},
+                ${`${SLUG_257}${token.toLowerCase()}`})
+        RETURNING id::int AS id
+      `;
+      await tx`
+        INSERT INTO external_identities (source_id, external_id, player_id, status, match_method)
+        VALUES (${fx.sourceId}, ${`${PATH_ROOT_257}${token.charAt(0).toUpperCase()}/${token}0.html`},
+                ${player.id}, 'unique', 'afltables_profile_url')
+      `;
+      await tx`
+        INSERT INTO player_match_stats (
+          player_id, match_id, club_id, jumper_number, kicks, marks, handballs, disposals,
+          goals, behinds, hitouts, tackles, frees_for, frees_against, source_id
+        ) VALUES (
+          ${player.id}, ${fx.matchId}, ${fx.clubId}, '9', ${STAT_257.kicks}, ${STAT_257.marks},
+          ${STAT_257.handballs}, ${STAT_257.disposals}, ${STAT_257.goals}, ${STAT_257.behinds},
+          ${STAT_257.hitouts}, ${STAT_257.tackles}, ${STAT_257.freesFor}, ${STAT_257.freesAgainst}, ${fx.sourceId}
+        )
+      `;
+      await recomputePlayerDerivedStats(tx, [player.id], SEASON_257);
+      return player.id;
+    });
+    seededPlayerIds257.push(id);
+    return { id, token };
+  };
+
+  const seedVote = (fx: Fx257, playerId: number, votes: number) => sql`
+    INSERT INTO brownlow_round_votes (season, player_id, round_number, played, votes, match_id)
+    VALUES (${SEASON_257}, ${playerId}, 1, true, ${votes}, ${fx.matchId})
+  `;
+  const seedEntry = (fx: Fx257, threePlayerId: number) => sql`
+    INSERT INTO brownlow_vote_entry_state (match_id, season, status, three_player_id, created_by, updated_by)
+    VALUES (${fx.matchId}, ${SEASON_257}, 'draft', ${threePlayerId}, ${adminUserId}, ${adminUserId})
+  `;
+  const seedFirstKickGoal = async (fx: Fx257, playerId: number) => {
+    const [row] = await sql<{ id: number }[]>`
+      INSERT INTO player_achievements (
+        achievement_type, player_id, player_name_raw, player_name_clean, link_status_value,
+        club_id, club_name_raw, season, round_raw, match_id
+      ) VALUES (
+        'first_kick_goal', ${playerId}, 'Issue257 FKG', 'issue257 fkg', 'resolved',
+        ${fx.clubId}, 'Fixture Club', ${SEASON_257}, '1', ${fx.matchId}
+      )
+      RETURNING id::int AS id
+    `;
+    return row.id;
+  };
+  const seedAfterSiren = async (fx: Fx257, playerId: number) => {
+    const [row] = await sql<{ id: number }[]>`
+      INSERT INTO after_siren_kicks (
+        player_id, player_name_raw, player_name_clean, link_status_value, club_id, club_name_raw,
+        opponent_name_raw, competition, premiership_season, season, round_raw, match_id,
+        kick_scored, kick_effect, kicker_result, kicker_score_raw, opponent_score_raw,
+        kicker_points, opponent_points
+      ) VALUES (
+        ${playerId}, 'Issue257 Siren', 'issue257 siren', 'resolved', ${fx.clubId}, 'Fixture Club',
+        'Opponent', 'AFL', true, ${SEASON_257}, '1', ${fx.matchId},
+        'none', 'none', 'loss', '10.10.70', '12.10.82', 70, 82
+      )
+      RETURNING id::int AS id
+    `;
+    return row.id;
+  };
+
+  const removeIt = async (fx: Fx257, playerId: number) => saveMatchSheet({
+    matchId: fx.matchId, syncMatchScores: false, players: [], removedPlayerIds: [playerId],
+    adminUserId, note: NOTE, staleToken: await tokenOf(fx.matchId),
+  });
+
+  /** Everything the guard must leave exactly as it was. */
+  const state = async (fx: Fx257) => ({
+    lineup: await sql`SELECT player_id::int AS p, club_id::int AS c FROM player_match_stats WHERE match_id = ${fx.matchId} ORDER BY player_id`,
+    votes: await sql`SELECT player_id::int AS p, votes::int AS v FROM brownlow_round_votes WHERE match_id = ${fx.matchId} ORDER BY player_id`,
+    entries: await sql`SELECT status, three_player_id::int AS three FROM brownlow_vote_entry_state WHERE match_id = ${fx.matchId}`,
+    fkg: await sql`SELECT id::int AS id, player_id::int AS p, status FROM player_achievements WHERE match_id = ${fx.matchId} ORDER BY id`,
+    siren: await sql`SELECT id::int AS id, player_id::int AS p FROM after_siren_kicks WHERE match_id = ${fx.matchId} ORDER BY id`,
+    overrides: await authorityOf257(fx),
+    audits: await auditCountOf257(fx),
+  });
+
+  const expectRefused = async (
+    fx: Fx257, run: () => Promise<{ ok: boolean; error?: string }>, text: string,
+  ) => {
+    const before = await state(fx);
+    const result = await run();
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe(text);
+    expect(await state(fx)).toEqual(before);
+    expect(before.audits).toBe(0);
+  };
+
+  const brownlowWhere = `Brownlow administration (/admin/brownlow/${SEASON_257}/1)`;
+  const tail = 'Deleting the line-up row would leave that record naming a non-participant. Nothing was saved.';
+
+  it('refuses removing a player who holds Brownlow votes; an unvoted player of the same match (published zero) is removable', async () => {
+    const fx = await seedFixture257('t353-vote');
+    const other = await addPlayer(fx, 't353-vote-b');
+    await seedVote(fx, fx.playerId, 3);
+    await seedVote(fx, other.id, 0);
+
+    await expectRefused(fx, () => removeIt(fx, fx.playerId),
+      `Cannot remove a player from the Match Sheet of match #${fx.matchId}: `
+      + `Issue257 t353vote (player #${fx.playerId}) carries 3 Brownlow votes in this match. `
+      + `${tail} Resolve it in ${brownlowWhere} first.`);
+
+    // No over-refusal: the zero-vote player of the SAME match is removable (State B authority path).
+    if (!(await storable353())) return;
+    expect(await removeIt(fx, other.id)).toMatchObject({ ok: true });
+    const after = await state(fx);
+    expect(after.lineup).toEqual([{ p: fx.playerId, c: fx.clubId }]);
+    expect(after.votes).toEqual([{ p: fx.playerId, v: 3 }, { p: other.id, v: 0 }]);
+  }, FX_TIMEOUT);
+
+  it('refuses removing a player named by the match\'s Brownlow vote entry, but not an unnamed player of that match', async () => {
+    const fx = await seedFixture257('t353-entry');
+    const other = await addPlayer(fx, 't353-entry-b');
+    await seedEntry(fx, fx.playerId);
+
+    await expectRefused(fx, () => removeIt(fx, fx.playerId),
+      `Cannot remove a player from the Match Sheet of match #${fx.matchId}: `
+      + `Issue257 t353entry (player #${fx.playerId}) carries a Brownlow vote entry (draft) naming them for 3 votes. `
+      + `${tail} Resolve it in ${brownlowWhere} first.`);
+
+    if (!(await storable353())) return;
+    expect(await removeIt(fx, other.id)).toMatchObject({ ok: true });
+    expect((await state(fx)).entries).toEqual([{ status: 'draft', three: fx.playerId }]);
+  }, FX_TIMEOUT);
+
+  it('refuses removing the player of a first-kick-goal record (a suppressed one too), naming where to clear it', async () => {
+    const fx = await seedFixture257('t353-fkg');
+    const id = await seedFirstKickGoal(fx, fx.playerId);
+    await expectRefused(fx, () => removeIt(fx, fx.playerId),
+      `Cannot remove a player from the Match Sheet of match #${fx.matchId}: `
+      + `Issue257 t353fkg (player #${fx.playerId}) carries first-kick-goal record #${id}. `
+      + `${tail} Resolve it in Special records (/admin/records/first-kick-goal) first.`);
+
+    await sql`UPDATE player_achievements SET status = 'void', status_reason = 'issue-353 test' WHERE id = ${id}`;
+    await expectRefused(fx, () => removeIt(fx, fx.playerId),
+      `Cannot remove a player from the Match Sheet of match #${fx.matchId}: `
+      + `Issue257 t353fkg (player #${fx.playerId}) carries first-kick-goal record #${id} (already suppressed). `
+      + `${tail} Resolve it in Special records (/admin/records/first-kick-goal) first.`);
+  }, FX_TIMEOUT);
+
+  it('refuses removing the kicker of an after-the-siren record', async () => {
+    const fx = await seedFixture257('t353-siren');
+    const id = await seedAfterSiren(fx, fx.playerId);
+    await expectRefused(fx, () => removeIt(fx, fx.playerId),
+      `Cannot remove a player from the Match Sheet of match #${fx.matchId}: `
+      + `Issue257 t353siren (player #${fx.playerId}) carries after-the-siren record #${id}. `
+      + `${tail} Resolve it in Special records (/admin/records/after-the-siren) first.`);
+  }, FX_TIMEOUT);
+
+  it('refuses a club change of a player carrying a vote, allows it for a free player, and allows a stat-only edit of the voted player', async () => {
+    const fx = await seedFixture257('t353-club');
+    const other = await addPlayer(fx, 't353-club-b');
+    const [m] = await sql<{ away: number }[]>`SELECT away_club_id::int AS away FROM matches WHERE id = ${fx.matchId}`;
+    await seedVote(fx, fx.playerId, 2);
+
+    const reclub = async (playerId: number) => saveMatchSheet({
+      matchId: fx.matchId, syncMatchScores: false,
+      players: [{ ...sheetInput257(fx), playerId, clubId: m.away }], removedPlayerIds: [],
+      adminUserId, note: NOTE, staleToken: await tokenOf(fx.matchId),
+    });
+    await expectRefused(fx, () => reclub(fx.playerId),
+      `Cannot change a player's club in the Match Sheet of match #${fx.matchId}: `
+      + `Issue257 t353club (player #${fx.playerId}) carries 2 Brownlow votes in this match. `
+      + 'Changing the club would leave that record attributed to a club the player did not play for in this match. '
+      + `Nothing was saved. Resolve it in ${brownlowWhere} first.`);
+
+    if (!(await storable353())) return;
+    // A stat-only edit of the voted player does not touch the club: allowed.
+    const edit = await saveMatchSheet({
+      matchId: fx.matchId, syncMatchScores: false,
+      players: [{ ...sheetInput257(fx), goals: fx.goals + 1 }], removedPlayerIds: [],
+      adminUserId, note: NOTE, staleToken: await tokenOf(fx.matchId),
+    });
+    expect(edit).toMatchObject({ ok: true });
+    // A club change of the dependent-free player of the same match is allowed.
+    expect(await reclub(other.id)).toMatchObject({ ok: true });
+    expect((await state(fx)).lineup).toEqual([{ p: fx.playerId, c: fx.clubId }, { p: other.id, c: m.away }]);
+  }, FX_TIMEOUT);
+
+  it('Return to source refuses the row deletion of a manual addition that a Brownlow vote names, changing nothing', async () => {
+    if (!(await storable353())) return;
+    const fx = await seedFixture257('t353-return');
+    for (const group of ['lineup', 'match_sheet'] as const) {
+      await sql`
+        INSERT INTO data_overrides (entity_type, entity_key, field_group, override_values, admin_user_id, is_active)
+        VALUES ('player_match_stats', ${`${fx.matchKey}|afltables:${fx.path}`}, ${group},
+                ${sql.json((group === 'lineup' ? { present: true } : { goals: 1 }) as never)}, ${adminUserId}, true)
+      `;
+    }
+    await sql`UPDATE player_match_stats SET source_id = NULL WHERE match_id = ${fx.matchId} AND player_id = ${fx.playerId}`;
+    await seedVote(fx, fx.playerId, 1);
+
+    await expectRefused(fx, () => returnMatchSheetToSource({
+      matchId: fx.matchId, playerId: fx.playerId, adminUserId, note: NOTE,
+    }),
+    `Cannot return a player to source in match #${fx.matchId}, which would delete their line-up row: `
+      + `Issue257 t353return (player #${fx.playerId}) carries 1 Brownlow vote in this match. `
+      + `${tail} Resolve it in ${brownlowWhere} first.`);
+    expect((await authorityOf257(fx)).every((r) => r.isActive)).toBe(true);
+  }, FX_TIMEOUT);
+});
+
+/**
+ * AFLDB-ISSUE-354, the shared Data Editor path (`saveEdit`, src/db/queries/data-edits.ts): an edit
+ * after the override of its group was retired (no app retire path reaches this entity today, so the
+ * test retires the row directly) writes only its own delta; an ACTIVE override is still merged into
+ * and the carried keys are audited. Oracle-independent: a synthetic ISSUE-257 player with one
+ * accepted AFL Tables identity (the override's natural key).
+ */
+describe('AFLDB-ISSUE-354: saveEdit merges only into an active override', () => {
+  it('does not revive a retired override, keeps its values in the audit trail, and audits carried keys of an active one', async () => {
+    const fx = await seedFixture257('t354-edit');
+    const key = `afltables:${fx.path}`;
+    const overrideOf = async () => (await sql<{ isActive: boolean; values: Record<string, unknown> }[]>`
+      SELECT is_active AS "isActive", override_values AS "values" FROM data_overrides
+       WHERE entity_type = 'players' AND entity_key = ${key} AND field_group = 'birth_year'
+    `)[0];
+    const save = (raw: Record<string, string>) => saveEdit({
+      entityKey: 'players', rowId: fx.playerId, groupKey: 'birth_year',
+      raw: { birth_year_min: '', birth_year_max: '', ...raw }, adminUserId, note: 'issue-257 issue-354 test',
+    });
+    try {
+      expect(await save({ birth_year: '1990', birth_year_confidence: 'estimated' })).toMatchObject({ ok: true });
+      expect((await overrideOf()).values).toEqual({ birth_year: 1990, birth_year_confidence: 'estimated' });
+
+      // The hand-back to the source (what a retire path does): the row is inactive.
+      await sql`
+        UPDATE data_overrides SET is_active = false
+         WHERE entity_type = 'players' AND entity_key = ${key} AND field_group = 'birth_year'
+      `;
+      // Only the confidence changes (the canonical birth year stays as last written).
+      expect(await save({ birth_year: '1990', birth_year_confidence: 'sourced' })).toMatchObject({ ok: true });
+      const revived = await overrideOf();
+      expect(revived.isActive).toBe(true);
+      expect(revived.values).toEqual({ birth_year_confidence: 'sourced' });
+
+      // An ACTIVE override is merged into, and what is carried is audited.
+      expect(await save({ birth_year: '1991', birth_year_confidence: 'sourced' })).toMatchObject({ ok: true });
+      expect((await overrideOf()).values).toEqual({ birth_year_confidence: 'sourced', birth_year: 1991 });
+
+      const edits = await sql<{ newValues: Record<string, unknown> }[]>`
+        SELECT new_values AS "newValues" FROM data_edits
+         WHERE table_name = 'players' AND row_id = ${fx.playerId} AND field_group = 'birth_year' ORDER BY id
+      `;
+      expect(edits).toHaveLength(3);
+      expect(edits[0].newValues.override_carried_keys).toBeUndefined();
+      expect(edits[1].newValues.override_retired_keys_dropped).toEqual(['birth_year']);
+      expect(edits[2].newValues.override_carried_keys).toEqual(['birth_year_confidence']);
+    } finally {
+      await sql`DELETE FROM data_edits WHERE table_name = 'players' AND row_id = ${fx.playerId}`;
+      await sql`
+        DELETE FROM data_overrides
+         WHERE entity_type = 'players' AND entity_key = ${key} AND field_group = 'birth_year'
+      `;
+    }
   }, FX_TIMEOUT);
 });
 
