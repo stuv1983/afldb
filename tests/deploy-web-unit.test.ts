@@ -439,7 +439,7 @@ describe.runIf(process.platform === 'linux')('AFLDB-ISSUE-352 — scheduled back
       writeFileSync(join(src, `${name}.sha256`), `${sha}  ${sidecarName}\n`);
     };
     const pull = (keep = 3) => spawnSync('bash', ['tools/maintenance/offhost-pull.sh', src, dest, '--keep', String(keep)], { encoding: 'utf8', env });
-    const held = () => readdirSync(dest).filter((f) => f.endsWith('.dump')).sort();
+    const held = () => readdirSync(dest).filter((f) => f.endsWith('.dump') && !f.startsWith('.')).sort();
 
     const genuine = ['afldb_prod-20261101-022000.dump', 'afldb_prod-20261102-022000.dump', 'afldb_prod-20261103-022000.dump'];
     genuine.forEach((g) => put(g));
