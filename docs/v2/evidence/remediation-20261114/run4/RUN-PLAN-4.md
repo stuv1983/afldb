@@ -36,10 +36,11 @@ directory, two names. Both names are protected in every brief.
 | 3 | `clubcmp`: `club-comparison` 24 + 2 surrogate-id ids (stable keys, explicit ≤ 2025 scope); item 4 (`database` 4 witnesses); classify the two rebuild-only Gridley assertions (no oracle edit) | worker | 55683 | 0 | 363-W, item 4 |
 | 4 | `coleman276`: 363-C (`awards-reload-links` Coleman contract after provenance, independently derived legacy-transition expectation); item 2 (issue276 finals coverage) | worker | 55684 | 0 | 363-C, item 2 |
 | 5 | `shared`: shared-mode cross-file defects T363-2 (`admin-fixtures`) and T363-3 (`after-siren`), red/green in shared mode | worker | 55685 | 0 | item 5/6 (363 criterion) |
+| 5b | `baseline`: the three cells run 3 never measured, at B4 (F-009): accepted rebuild × per-file (`=all`), accepted rebuild × shared, snapshot × shared (file order recorded); raw verdicts only, no code | worker | 55686 | 0 | items 5, 6 |
 | 6 | `evidence`: fixed manifest checker (full-relative-path resolution, every manifest incl. run 2, explicit host map), self-test red/green, original failure preserved | worker | — | 0 (starts when a slot frees; ≤ 5 in flight) | item 1 |
 | 7 | integrate (`cherry-pick -x`) into `claude/remediation-20261114`; conflicts resolved by the orchestrator; commit qualification scripts → **Q″** (last executable commit) | orchestrator | — | 1–6 | — |
 | 8 | `qual`: fresh host workspace at Q″ — typecheck, lint ratchet, unit (all fixtures), shell harnesses, build; rebuild-reachability decision (rebuild again only if a changed file is reachable from the rebuild plan); integration per-file **and** shared on the accepted rebuild, per-file **and** shared on the snapshot, dedicated clones (two Brownlow clone suites, OD-5 rebuild-named clone, Coleman schema-only base); raw verdicts | worker | 55687 | 7 | items 5, 7 |
-| 9 | failure ledger `FAILURE-LEDGER-4.{tsv,md}` (every failing id per mode/base, one class each, gone/new/continuing vs run 3); fix-loop for any demonstrated in-scope defect (→ Q‴, requalify only what changed, reuse justified) | orchestrator (+ worker if a fix) | 55687 | 8 | item 6 |
+| 9 | failure ledger `FAILURE-LEDGER-4.{tsv,md}` (every failing id per mode/base, one class each, gone/new/continuing vs run 3); fix-loop for any demonstrated in-scope defect (→ Q‴, requalify only what changed, reuse justified) | orchestrator (+ worker if a fix) | 55689 | 8 | item 6 |
 | 10 | records: `QUALIFICATION-4`, `RESIDUALS-4`, `issues.md` (363, 365, Open Issues table), `IssuesIndex.md`, `CHANGELOG.md`, `blockers.md`, `HANDOFF.md`, `APPROVAL-PACKET-4`, DEV state after; manifest verification with the fixed checker in a fresh clone of this pre-final tip (committed) | orchestrator | — | 9 | item 8 |
 | 11 | `afldb-closure` phase A on the pre-final tip: re-derive the delta from `c8ea9ef8` and from `de640826`, re-run focused checks, re-verify manifests in a fresh clone, check packet numbers and ledgers | closure | 55688 | 10 | item 8 |
 | 12 | LOW corrections + `CLOSURE-4.md` committed → **final candidate C**; create the durable refs (§2); nothing is committed after C | orchestrator | — | 11 | — |
@@ -73,6 +74,62 @@ The accepted-baseline dump `/mnt/ssd/afldb-rem3-base/rebuilt/afldb_v2_rb_rem3-6d
 `tools/rebuild`, `tools/records`, `src/db/migrations`, `data/reference`, and any `src/` module transitively imported by a TypeScript stage
 entry). If reachable, rebuild at Q″ in `/mnt/ssd/afldb-rem4-qual-20261115` from the run-3 rebuild workspace's hash-verified input copies
 (re-verified against their tracked manifests), never by writing to RB-1.
+
+## 3a. Plan-review mitigations adopted (PLAN-REVIEW-4: PROCEED WITH MITIGATIONS, 0 CRIT/HIGH, 15 MED; all MED binding)
+
+- **B4** is the commit that adds this amended plan, the amended brief and `PLAN-REVIEW-4.md` (F-010); the host bundle and its sha256 are cut after it.
+  Fan-out order: wave 1 = `brownlow`, `gates`, `clubcmp`, `coleman276`, `baseline`; wave 2 = `shared`, `evidence` as slots free (≤ 5 in flight).
+  Allocation of files, fixture seasons and provider-id prefixes: brief §3a. Only the orchestrator edits `leaked-fixtures.ts` (step 7).
+- **F-001 (363-C):** the Coleman contract `data/reference/coleman-derivation.json` and `tests/coleman-derivation.test.ts` stay frozen; only the
+  awards-reload-links test's family-size precondition/row counts are reconciled (legacy size 46 for 1980–2025 kept as an explicitly scoped quantity;
+  current family size from an independent raw-SQL oracle). Acceptance: red at B4 on both bases; green per-file and shared on both; the two frozen
+  files byte-identical to B4; a mutation proof that a 2026 row left in legacy scope makes the rekey refuse.
+- **F-002..F-005 (D-365-1):** one named constant of declared no-medal ranges, exactly 1897–1923 and 1942–1945, with provenance
+  (`data/reference/stat-availability.json` `coverage_ranges`), bound as parameters, governing the final `ELSE` of all three grains (declared →
+  `not_applicable`, otherwise `pending`); the rule never reads the season's existing `stat_availability` row and never treats a missing medal as
+  evidence of absence; no table/column/migration (stop and report if one seems needed); `docs/data-dictionary.md` and `docs/architecture.md` updated
+  before Q″. Consumers: the rehearsal tool's `SETTLED_BROWNLOW_COVERAGE` pins re-derived as literals from the rule; the rehearsal tool and both Brownlow
+  clone suites run at the scope tip and again at Q″ (no run-3 reuse for them). Seven acceptance checks (PLAN-REVIEW-4 F-004). The change does **not**
+  repair a row a past recompute already wrote `not_applicable`: the packet says "fixed locally for future recomputes", keeps the read-only production
+  probe of 2026 as its own approval, and offers a separately approved conditional repair with its acceptance query; ISSUE-365 stays open until the
+  probe result is known (F-005).
+- **F-006 (public text):** decided now: **no UI change in run 4.** `brownlowStatusNote('pending')` ("The season is still in progress; the Brownlow
+  Medal has not been awarded.") is wrong for a completed season whose results are not loaded; it is carried to the packet as a substantive owner
+  decision with proposed neutral wording. No worker edits it.
+- **F-007 (item 1):** exact resolution only (manifest directory + entry path, or an explicit committed per-manifest map with root/host-root/alias);
+  more than one candidate is its own error class; both halves of the defect (false positive, masked real mismatch) shown red on the run-2 script and
+  green on the new one; run-2 manifests included. **Pass criterion:** COMMITTED-MISMATCH 0, AMBIGUOUS 0, every manifest entry in exactly one class
+  (committed exact, committed by alias, host-verified, host-missing, declared not retained), manifest UNRESOLVED 0 or each listed with its reason;
+  README prose prefixes reported as a separate informational class. Run-2 script byte-identical; its failing output kept; the original run once more
+  at B4 as the red; explanation in the run-4 record plus a new `run2/evidence/ERRATA.md` (the one run-2-tree file granted). Run-4 manifests list
+  committed files relative to their directory; host-only hashes go in a separately named file with absolute paths. The packet reports counts per class.
+- **F-008 (candidate):** record-path **allowlist** for "records only": `issues.md`, `IssuesIndex.md`, `blockers.md`, `CHANGELOG.md`, `issues/**/*.md`,
+  and `docs/v2/evidence/remediation-20261114/**` **except** files ending `.sh .mjs .cjs .js .ts .py .tsv` under any `evidence/` checker directory and the
+  checker's map (any change to a script, the checker or its map makes a new executable revision with stated requalification). Phase B: on failure,
+  delete the local tag and branch (never pushed), correct, cut C′, recreate, rerun phase B in full; assert empty porcelain and tag^{commit} = final
+  branch = integration branch; re-read origin `main` (unchanged) and prove `de640826` is an ancestor of C; rehearse the refspec against a throwaway local
+  bare repository. Packet push command: `git push origin "remediation-final-20261115^{commit}:refs/heads/main"`; the tag annotation and the final
+  report carry the same command with the full SHA; shell-neutral print `git rev-list -n 1 remediation-final-20261115`. The tag is not part of Approval A
+  and is not pushed. Verification of C lives outside C; the packet says where and that its committed manifest figures are for the pre-final tip.
+- **F-009 (ledger cells):** four cells, named base × `AFLDB_TEST_PER_FILE_DB`: snapshot × `all` (run-3 diff vocabulary gone/new/continuing),
+  rebuild × `all`, rebuild × unset (shared), snapshot × unset (shared) — for the last three the B4 measurement of step 5b is the baseline. Mode `1` is
+  not run. Shared runs record their file order. Pre-registered base-dependent changes: the three birth-date ids fail on the snapshot once pinned to the
+  rebuild (363-B); surrogate-id fingerprints differ by base.
+- **F-011 (rebuild):** reachability computed mechanically (import closure of each TypeScript stage entry ∩ `git diff --name-only 6d5388ea Q″`, plus the
+  path prefixes) and committed. Expected to fire; then rebuild at Q″ from the run-3 rebuild workspace's input copies (RB-1 not read), and integration
+  runs on the Q″ rebuild with recorded equivalence to the run-3 dump (83-table counts and every season's Brownlow `stat_availability` rows).
+  `QUALIFICATION-4` carries a reuse table with the exact `git diff` for each reused check.
+- **F-012 (363-G):** provisional-season contracts asserted on a season the test establishes inside an always-rolled-back transaction; the structural
+  invariant (at most one in-progress season, and it is the latest) asserted separately on the real table; mutation reds on both bases; fingerprints
+  over stable keys.
+- **F-013 (item 4):** application result equals an independent raw-SQL oracle, and the oracle bounded to seasons ≤ 2025 equals 685,471 / 114 / 261 /
+  219; acceptance: a synthetic later completed season on a scratch copy makes the B4 assertions fail and the new ones pass.
+- **F-014 (RB-1):** owned by the orchestrator at step 7: `docs/v2/isolated-rebuild.md` (before Q″), `blockers.md`, `HANDOFF.md`, `RESIDUALS-4`; a
+  proposed `CLAUDE.md` line goes in the packet only. Run-3 workspaces and the review workspace are read-only and excluded from cleanup (brief §1).
+- **F-015/F-016/F-017/F-019:** clone database names permitted (brief §2); ports: baseline 55686, qual 55687, closure 55688, fix-loop 55689;
+  `lint:gate --update` forbidden; "shared mode" ≠ shared `afldb_test`.
+- **F-020/F-021/F-022:** closure phase A carries brief §3 as a checklist over `B4..Q″`; `RESIDUALS-4` records that the approved release-gates re-pins
+  remain baseline-pinned; the packet states the item-4 interpretation.
 
 ## 4. Stop conditions
 

@@ -10,9 +10,13 @@ Where they differ, **this file wins**. Plan: `RUN-PLAN-4.md`; plan review: `PLAN
   (except read-only copying of named, hash-verified inputs, where your brief says so), `/home/arm/afldb-*` (read-only named inputs only).
   DEV stays at `8b024098`.
 - **No live Brownlow state** anywhere except your own isolated databases. No host-policy install, no `sudo`, no `wsl` command, no log deletion.
-- **Lint allowance:** `tools/dev/lint-baseline.json` may not be expanded or edited to absorb an error (338 errors / 43 files may only go down).
-  Never silence lint mechanically.
-- **Never rebuild, connect to or write the shared `afldb_test`** (port 5432).
+- **Lint allowance:** `tools/dev/lint-baseline.json` may not be expanded or edited to absorb an error (338 errors / 43 files may only go down);
+  never run `npm run lint:gate -- --update` (or any `--update`) and never silence lint mechanically.
+- **Never rebuild, connect to or write the shared `afldb_test` database** (DEV port 5432). Terminology (F-019): "**shared mode**" means vitest
+  with `AFLDB_TEST_PER_FILE_DB` unset, all files serially against ONE of *your own* isolated databases; it never means the shared `afldb_test`.
+- **Read-only host inputs, excluded from every cleanup:** `/mnt/ssd/afldb-rem3-*` (run-3 workspaces, the accepted-baseline dump and its input
+  copies), `/mnt/ssd/afldb-review-20261114T0640Z`, `/mnt/ssd/afldb/workspaces/afldb-issue333-o2-20261104`. No cleanup command (rm, find -delete,
+  glob) may name anything wider than `/mnt/ssd/afldb-rem4-<your scope>-*`.
 - **RB-1 is protected:** never write, move, rename, `chmod`, delete or clean anything under `/mnt/ssd/afldb-i316-rb-I-20261023T0905Z` **or**
   `/mnt/ssd/afldb/workspaces/afldb-i316-rb-I-20261023T0905Z` (the first is a symlink to the second). They are excluded from every cleanup.
   Read-only hashing/copying of named inputs only if your brief explicitly grants it (only the `qual` brief may, and only if a rebuild is required).
@@ -26,7 +30,9 @@ Where they differ, **this file wins**. Plan: `RUN-PLAN-4.md`; plan review: `PLAN
 - Workstation scratch: `D:\tmp\afldb-rem4-<scope>\` only. Scripts you run on the host: write them there (LF, Write tool), `scp` them.
 - Host `ssh -o BatchMode=yes -i ~/.ssh/afldb_dev arm@10.0.40.100` (the `streamanator` alias is broken; from PowerShell use `$HOME\.ssh\afldb_dev`).
   Workspace `W=/mnt/ssd/afldb-rem4-<scope>-20261115`, cluster root `/mnt/ssd/afldb-rem4-<scope>-20261115-pg`, **your port only**.
-  Databases `afldb_v2_rem4<scope>*_test`, or `afldb_v2_rb_rem4<scope>*_test` only where a suite requires the rebuild-name pattern.
+  Databases `afldb_v2_rem4<scope>*_test`, or `afldb_v2_rb_rem4<scope>*_test` only where a suite requires the rebuild-name pattern, or (F-015)
+  exactly `afldb_v2_brownlow_tristate_twelve_test` / `afldb_v2_brownlow_policy_final_test` on your own cluster and port when running the two
+  Brownlow clone suites, built only from their documented recipe and retained artefacts (`../run3/integ/README.md` §5, `brownlow-clones.sh`).
   Always export `AFLDB_V2_PG_ROOT`, `AFLDB_V2_PG_PORT`, `AFLDB_V2_PG_BIN=/usr/lib/postgresql/16/bin` (never ports 5432, 55432, 55651, 55660,
   or 55671–55678 which belong to run-3 workspaces).
 - Host checkout: `git clone -q /mnt/ssd/afldb-review-20261114T0640Z/cand $W/cand && cd $W/cand &&
@@ -66,7 +72,29 @@ Where they differ, **this file wins**. Plan: `RUN-PLAN-4.md`; plan review: `PLAN
   `node .phaneslight/scripts/cli.js new-file <module> <path> "<≥5-word description>"`, and only if no existing suite is a sensible home.
 - Frozen pins stay frozen unless your scope brief names the owner decision that unfreezes one (`DRAFTGURU_EXPECTED` 6,810/5,057,
   `draftguru-contract.json`, `EXPECT_STAGE_A_EVENTS`, linkage SQL, labels, `AWARDS_HONOURS_EXPECTED`, the ladder witness tuple, the accepted-baseline
-  register). 363-C unfreezes the Coleman contract's row expectation **only** for the `coleman276` scope; 363-B the birth-date pins **only** for `gates`.
+  register). **363-C** (PLAN-REVIEW-4 F-001) unfreezes **only** the family-size precondition and row-count expectations inside
+  `tests/integration/awards-reload-links.test.ts`, for the `coleman276` scope. `data/reference/coleman-derivation.json` (its `expected_rows` 46 is the
+  measured 1980–2025 legacy-transition size and the `--rekey-coleman` guard) and `tests/coleman-derivation.test.ts` stay **frozen**; if the contract
+  itself must change, stop and report. **363-B** unfreezes the birth-date pins in `release-gates.test.ts` **only** for `gates`.
+
+## 3a. Allocation across parallel scopes (PLAN-REVIEW-4 F-010; binding)
+
+| Scope | Files it alone may edit (tests) | Fixture seasons | Synthetic provider-id prefix |
+|---|---|---|---|
+| `brownlow` | `src/db/queries/player-derived.ts` (the coverage rule only), `tests/integration/settle-afl-api-brownlow*.test.ts`, `settle-afl-api.test.ts`, `settle-afl-api-state-b.test.ts`, `brownlow-fixture.ts`, `admin-brownlow.test.ts`, `brownlow-pending-*.test.ts`, the D-365-1 unit test home, `tools/db/afl-api-identity-correction-rehearsal.ts` pins, `docs/data-dictionary.md`, `docs/architecture.md` (coverage text) | 2063–2064 | `CD_I4010` |
+| `gates` | `tests/integration/release-gates.test.ts` | 2065–2066 (rolled back only) | `CD_I4020` |
+| `clubcmp` | `tests/integration/club-comparison.test.ts`, `tests/integration/database.test.ts` | 2067–2068 (scratch staleness probes only) | `CD_I4030` |
+| `coleman276` | `tests/integration/settle-afl-api-issue276.test.ts`, `tests/integration/awards-reload-links.test.ts` | 2069–2070 | `CD_I4040` |
+| `shared` | `tests/integration/admin-fixtures.test.ts`, `after-siren.test.ts`, `nl-answers-after-siren.test.ts` | 2071–2072 | `CD_I4050` |
+| `evidence` | `docs/v2/evidence/remediation-20261114/run4/evidence/**` and one new `../run2/evidence/ERRATA.md` | — | — |
+
+Before using a season or prefix, prove it is unused on both bases (`seasons`, `matches`, `external_identities`) and by a repository grep;
+report a collision instead of picking another value. **Only the orchestrator edits `tests/integration/leaked-fixtures.ts`** (at integration):
+report the seasons you commit and your file's `COMMITTING_SUITES` membership need. A file outside your row: stop and report (a one-line
+need goes to the orchestrator). The `database` "50-199 goals and no Brownlow votes" witness and the release-gates "exact 261 players"
+gate measure one fact: `clubcmp` owns the treatment and `gates` adopts the same oracle (coordinate through the orchestrator).
+**Per-scope exit gate:** typecheck rc 0, `lint:gate` passing at the ratchet, and every changed suite green on both bases (accepted rebuild,
+4 Nov snapshot) in both modes (per-file `AFLDB_TEST_PER_FILE_DB=all`, and shared), or each failure classified with evidence.
 
 ## 4. Classification vocabulary (every failing integration id gets exactly one)
 1 passes under intended conditions (environment-only failure before); 2 actual defect (fixed with red/green, or reported if out of scope);
