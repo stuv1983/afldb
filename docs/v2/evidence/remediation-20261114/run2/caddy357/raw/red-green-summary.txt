@@ -1,0 +1,9 @@
+previous files (commit 70e9a736): 70e9a73678963fd06ce3672280e026ecd549beed  prod 7149da9a055e dev 71e604f4acb4
+RED   red-prod-2.11.9: token in access log = 20
+RED   red-prod-2.11.4: token in access log = 20
+RED   red-dev-2.11.9: token in access log = 20
+RED   red-dev-2.11.4: token in access log = 20
+GREEN r2-prod-2.11.9: token in access log = 0, in stderr = 0
+GREEN r2-prod-2.11.4: token in access log = 0, in stderr = 0
+GREEN r2-dev-2.11.9: token in access log = 0, in stderr = 0
+GREEN r2-dev-2.11.4: token in access log = 0, in stderr = 0

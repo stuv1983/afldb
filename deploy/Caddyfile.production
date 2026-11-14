@@ -54,12 +54,22 @@
 # Caddy writes an ERROR record to its own stderr/journal that carries the whole
 # request, URI included — a second path to the same tokens that the per-site
 # access logs never see. One snippet keeps all three from drifting apart.
+#
+# The second `request>uri` rule is deliberately NOT anchored to `^/admin/invite/`.
+# A denied request is still logged (the path-shape deny below answers `//admin/
+# invite/<token>`, `/./admin/invite/...`, `/%2Fadmin/...` with a 404 before Next),
+# and Next decodes `/admin/%69nvite/<token>` to the invite route, so the raw
+# target can spell the route many ways. The rule redacts everything after the
+# word `invite` (any case, any letter percent-encoded) and a separator (`/`,
+# `%2F`, `\`, `%5C`, repeated), up to the query. The first rule is kept as the
+# exact-shape rule; the second is idempotent on its output.
 (afldb_log_format) {
 	format filter {
 		wrap json
 		fields {
 			request>uri multi_regexp {
 				regexp "^/admin/invite/[^/?#]+" "/admin/invite/REDACTED"
+				regexp "(?i)(?:i|%[46]9)(?:n|%[46]e)(?:v|%[57]6)(?:i|%[46]9)(?:t|%[57]4)(?:e|%[46]5)(?:/|%2f|[\\]|%5c)+[^?#]*" "invite/REDACTED"
 				regexp "\?.*$" ""
 			}
 			request>headers>Referer regexp "^(https?://[^/?#]+).*$" "${1}/"

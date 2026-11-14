@@ -18,12 +18,16 @@
 # the site log AND the global default log: when the upstream is down Caddy
 # writes an ERROR record with the whole request to its own stderr, which the
 # site log never sees. Keep it identical to deploy/Caddyfile.production.
+# The second rule redacts the token wherever `invite` and a separator appear in
+# the raw target, so a denied or odd spelling (`//admin/invite/<token>`,
+# `/./admin/invite/...`, `%2F`, `/%69nvite/`, any case) is logged without it too.
 (afldb_log_format) {
 	format filter {
 		wrap json
 		fields {
 			request>uri multi_regexp {
 				regexp "^/admin/invite/[^/?#]+" "/admin/invite/REDACTED"
+				regexp "(?i)(?:i|%[46]9)(?:n|%[46]e)(?:v|%[57]6)(?:i|%[46]9)(?:t|%[57]4)(?:e|%[46]5)(?:/|%2f|[\\]|%5c)+[^?#]*" "invite/REDACTED"
 				regexp "\?.*$" ""
 			}
 			request>headers>Referer regexp "^(https?://[^/?#]+).*$" "${1}/"

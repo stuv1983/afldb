@@ -1,0 +1,63 @@
+== binary: v2.11.9 h1:bhZtcRKQOq0fuLvEgCdPYvUxXyGn9kzjG4lh2332DTE=  sha256 a563843e11cbce39c557bd429ebb787d56f49d51d9bbb3292cd9b36b37a60cdf
+== file under test: /mnt/ssd/afldb-rem2-caddy357-20261114/in/cf/Caddyfile.production sha256 5078bc975a2128d32a09b07887420ec06bc919e66fc3978ddbfcf53e109eed5e
+adapt(test copy) rc=0
+== admin guard: admin disabled in the adapted test config
+validate(test copy) rc=0 : Valid configuration
+validate(production shape: real host names, TLS automation; only admin off + log/web paths rewritten) rc=0 : Valid configuration
+adapt(UNMODIFIED deploy file) rc=0
+validate(UNMODIFIED deploy file) rc=1 : {"level":"error","ts":1794636644.4329116,"msg":"setting up custom log 'log1': opening log writer using &logging.FileWrit
+  hook /mnt/ssd/afldb-rem2-caddy357-20261114/in/redact.sh written to /mnt/ssd/afldb-rem2-caddy357-20261114/matrix/green-prod-2.11.9/hook.out (56 lines); upstream received 10 requests during the hook
+== sentinel scan of the logs (0 expected everywhere)
+  PROBE-DENY-TOKEN-ddd444    afldb-access.log         0
+  PROBE-DENY-TOKEN-ddd444    afldb-apex.log           0
+  PROBE-DENY-TOKEN-ddd444    caddy-stderr.log         0
+  PROBE-PATHSECRET-eee555    afldb-access.log         0
+  PROBE-PATHSECRET-eee555    afldb-apex.log           0
+  PROBE-PATHSECRET-eee555    caddy-stderr.log         0
+  PROBE-QUERY-fff666         afldb-access.log         0
+  PROBE-QUERY-fff666         afldb-apex.log           0
+  PROBE-QUERY-fff666         caddy-stderr.log         0
+  PROBE-INVITE-bbb222        afldb-access.log         0
+  PROBE-INVITE-bbb222        afldb-apex.log           0
+  PROBE-INVITE-bbb222        caddy-stderr.log         0
+  PROBE-REFQ-hhh888          afldb-access.log         0
+  PROBE-REFQ-hhh888          afldb-apex.log           0
+  PROBE-REFQ-hhh888          caddy-stderr.log         0
+  PROBE-COOKIE-iii999        afldb-access.log         0
+  PROBE-COOKIE-iii999        afldb-apex.log           0
+  PROBE-COOKIE-iii999        caddy-stderr.log         0
+  PROBE-LONG-jjj000          afldb-access.log         0
+  PROBE-LONG-jjj000          afldb-apex.log           0
+  PROBE-LONG-jjj000          caddy-stderr.log         0
+  PROBE-BAD-kkk111           afldb-access.log         0
+  PROBE-BAD-kkk111           afldb-apex.log           0
+  PROBE-BAD-kkk111           caddy-stderr.log         0
+  PROBE-MAGIC-aaa111         afldb-access.log         0
+  PROBE-MAGIC-aaa111         afldb-apex.log           0
+  PROBE-MAGIC-aaa111         caddy-stderr.log         0
+  PROBE-SEARCH-ccc333        afldb-access.log         0
+  PROBE-SEARCH-ccc333        afldb-apex.log           0
+  PROBE-SEARCH-ccc333        caddy-stderr.log         0
+== logged records of the hook (status uri), in order
+  404 /%2Fadmin/invite/REDACTED
+  404 /admin%2Finvite/REDACTED
+  404 /admin/invite/REDACTED
+  404 /%61dmin/invite/REDACTED
+  200 /admin/invite/REDACTED
+  200 /admin/invite/REDACTED
+  200 /admin/invite/REDACTED
+  200 /Admin/invite/REDACTED
+  404 /admin/invite/REDACTED
+  404 /admin/invite/REDACTED
+  404 /admin/invite/REDACTED
+  200 /admin/invite/REDACTED
+  404 /admin/invite/REDACTED
+  404 /admin\\invite/REDACTED
+  200 /search
+  200 /admin/invites
+  200 /admin/uninvited/x
+  404 http://beta.afldb.com:55653//admin/invite/REDACTED
+  404 http://beta.afldb.com:55653/./admin/invite/REDACTED
+stopped: no listener on 55653/55663
+no process of this run left
+MATRIX-DONE green-prod-2.11.9

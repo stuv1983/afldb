@@ -1,0 +1,56 @@
+=== r2-prod-2.11.9
+== binary: v2.11.9 h1:bhZtcRKQOq0fuLvEgCdPYvUxXyGn9kzjG4lh2332DTE=  sha256 a563843e11cbce39c557bd429ebb787d56f49d51d9bbb3292cd9b36b37a60cdf
+== file under test: /mnt/ssd/afldb-rem2-caddy357-20261114/in/cf/Caddyfile.production sha256 5078bc975a2128d32a09b07887420ec06bc919e66fc3978ddbfcf53e109eed5e
+adapt(test copy) rc=0
+validate(test copy) rc=0 : Valid configuration
+validate(production shape: real host names, TLS automation; only admin off + log/web paths rewritten) rc=0 : V
+adapt(UNMODIFIED deploy file) rc=0
+validate(UNMODIFIED deploy file) rc=1 : {"level":"error","ts":1794636665.2178986,"msg":"setting up custom log 
+corpora: 8; total:mismatches 35340:0 2131:0 219:0 2131:47 5:0 150:0 85:0 41:0 
+upstream EQUAL: 8  DIFFERENT: 0  curl-I rechecks:  re-checked with curl -I: 47 400 ;
+sentinels non-zero:  PROBE-PATHSECRET-eee555 afldb-access.log 1;
+invite probes logged with the token: 0
+no process of this run left
+MATRIX-DONE r2-prod-2.11.9
+=== r2-prod-2.11.4
+== binary: v2.11.4 h1:XKxkMTgNSizEvKG6QHue6cAsFOteU2qA61w2tKkCWi0=  sha256 b7105518e3ed1c0761f232e44fc09345535533c9cb0abf0e12809416c7ac64d9
+== file under test: /mnt/ssd/afldb-rem2-caddy357-20261114/in/cf/Caddyfile.production sha256 5078bc975a2128d32a09b07887420ec06bc919e66fc3978ddbfcf53e109eed5e
+adapt(test copy) rc=0
+validate(test copy) rc=0 : Valid configuration
+validate(production shape: real host names, TLS automation; only admin off + log/web paths rewritten) rc=0 : V
+adapt(UNMODIFIED deploy file) rc=0
+validate(UNMODIFIED deploy file) rc=1 : Error: setting up custom log 'log1': opening log writer using &logging
+corpora: 8; total:mismatches 35340:0 2131:0 219:0 2131:47 5:0 150:0 85:0 41:0 
+upstream EQUAL: 8  DIFFERENT: 0  curl-I rechecks:  re-checked with curl -I: 47 400 ;
+sentinels non-zero:  PROBE-PATHSECRET-eee555 afldb-access.log 1;
+invite probes logged with the token: 0
+no process of this run left
+MATRIX-DONE r2-prod-2.11.4
+=== r2-dev-2.11.9
+== binary: v2.11.9 h1:bhZtcRKQOq0fuLvEgCdPYvUxXyGn9kzjG4lh2332DTE=  sha256 a563843e11cbce39c557bd429ebb787d56f49d51d9bbb3292cd9b36b37a60cdf
+== file under test: /mnt/ssd/afldb-rem2-caddy357-20261114/in/cf/Caddyfile sha256 d190a7d365911e4345ea0b2bdbf027e2909006b0b63038d8cc16d4760389f0ef
+adapt(test copy) rc=0
+validate(test copy) rc=0 : Valid configuration
+validate(production shape: real host names, TLS automation; only admin off + log/web paths rewritten) rc=0 : V
+adapt(UNMODIFIED deploy file) rc=0
+validate(UNMODIFIED deploy file) rc=1 : {"level":"error","ts":1794636705.4619114,"msg":"setting up custom log 
+corpora: 8; total:mismatches 35340:0 2131:0 219:0 2131:47 5:0 150:0 85:0 41:0 
+upstream EQUAL: 8  DIFFERENT: 0  curl-I rechecks:  re-checked with curl -I: 47 400 ;
+sentinels non-zero:  PROBE-PATHSECRET-eee555 afldb-access.log 1;
+invite probes logged with the token: 0
+no process of this run left
+MATRIX-DONE r2-dev-2.11.9
+=== r2-dev-2.11.4
+== binary: v2.11.4 h1:XKxkMTgNSizEvKG6QHue6cAsFOteU2qA61w2tKkCWi0=  sha256 b7105518e3ed1c0761f232e44fc09345535533c9cb0abf0e12809416c7ac64d9
+== file under test: /mnt/ssd/afldb-rem2-caddy357-20261114/in/cf/Caddyfile sha256 d190a7d365911e4345ea0b2bdbf027e2909006b0b63038d8cc16d4760389f0ef
+adapt(test copy) rc=0
+validate(test copy) rc=0 : Valid configuration
+validate(production shape: real host names, TLS automation; only admin off + log/web paths rewritten) rc=0 : V
+adapt(UNMODIFIED deploy file) rc=0
+validate(UNMODIFIED deploy file) rc=1 : Error: setting up custom log 'log0': opening log writer using &logging
+corpora: 8; total:mismatches 35340:0 2131:0 219:0 2131:47 5:0 150:0 85:0 41:0 
+upstream EQUAL: 8  DIFFERENT: 0  curl-I rechecks:  re-checked with curl -I: 47 400 ;
+sentinels non-zero:  PROBE-PATHSECRET-eee555 afldb-access.log 1;
+invite probes logged with the token: 0
+no process of this run left
+MATRIX-DONE r2-dev-2.11.4

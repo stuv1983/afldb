@@ -324,3 +324,124 @@ Scope disclosures:
 - One command extracting the Caddy tarball and running it in one step was refused by the permission classifier; it was
   split into extract, hash, then `version`.
 - Scripts are in `scripts/` as written in the scratch directory; they are evidence, not product code.
+
+---
+
+# Addendum 2 (review REVIEW-C LOW-7 and MED-2). Earlier sections above are unchanged.
+
+## 9. LOW-7: invite token logged unredacted for denied and odd spellings (fixed)
+
+Finding (reviewer): the ISSUE-362 redaction was anchored `^/admin/invite/`, so a request such as
+`//admin/invite/<token>`, denied by the path-shape deny, was still written to the access log with the token.
+
+RED (the files of commit 70e9a736, prod `7149da9a...`, dev `71e604f4...`): `scripts/redact.sh` sends the fake token
+`PROBE-INVITE-bbb222` in 25 raw-target spellings plus 2 negative controls (leading `//` and `///`, `/./`, `/../`, `%2F` in several places,
+encoded first segment, `%69nvite` / `%49nvite` / all letters encoded, `Admin/Invite`, `invite//T`, `invite/./T`,
+`invite/../invite/T`, trailing segment, `%5C` and `\`, absolute-form `//` and `/./`, a token inside another URL's
+query, and a Go-malformed `%zz` after the token) and then counts the token in the access log. Result on all four
+combinations (`raw/red-green-summary.txt`, `raw/red-prod-2.11.9-hook.out`): **20 occurrences of the token in the
+access log** for Caddy 2.11.9 and 2.11.4 on both files. Most are denied requests, but four
+(`/admin/%69nvite/T`, `/admin/%49nvite/T`, `/admin/%69%6e%76%69%74%65/T`, `/Admin/Invite/T`) are NOT denied (the stub
+returned 200; Next decodes an encoded segment to the invite route), so the fix is needed independent of the deny.
+The negative controls (`/admin/invites`, `/admin/uninvited/x`) stay readable.
+
+Fix (both files, same line): a second `request>uri` rule between the exact-shape rule and the query-drop rule:
+
+```
+regexp "(?i)(?:i|%[46]9)(?:n|%[46]e)(?:v|%[57]6)(?:i|%[46]9)(?:t|%[57]4)(?:e|%[46]5)(?:/|%2f|[\\]|%5c)+[^?#]*" "invite/REDACTED"
+```
+
+It redacts everything after the word `invite` (any case, any letter percent-encoded) and a run of separators (`/`,
+`%2F`, `\`, `%5C`), up to the query, wherever that word sits in the raw target (an absolute-form target included). The
+first rule is kept byte for byte, so the existing contract test
+(`toContain('regexp "^/admin/invite/[^/?#]+" ...')`) still holds, and the second rule is idempotent on its output.
+`/admin/invites` (the list page) and `/admin/uninvited/x` are untouched (`invite` must be followed directly by a
+separator).
+
+GREEN on the final files: token occurrences in the access log 0 and in Caddy stderr 0 on all four combinations; the
+logged uri of every probe ends `/admin/invite/REDACTED` (`raw/green-prod-2.11.9-hook.out`, `matrix/r2-*/hook.out`).
+The Go-malformed escape (400 before any handler) is not logged at all.
+
+Final file sha256 (these supersede the hashes in section 3; `raw/r2-caddyfile-sha256.txt`):
+
+- `deploy/Caddyfile.production` `5078bc975a2128d32a09b07887420ec06bc919e66fc3978ddbfcf53e109eed5e`
+- `deploy/Caddyfile`           `d190a7d365911e4345ea0b2bdbf027e2909006b0b63038d8cc16d4760389f0ef`
+
+Full matrix re-run on these hashes with both hooks (special request forms plus `redact.sh`), 4 runs
+(`raw/matrix-r2-{prod,dev}-{2.11.9,2.11.4}.txt`, `raw/r2-matrix-summary.txt`): legit GET 35,340 / 0 mismatches
+(upstream 35,339 = expected), deny GET 2,131 / 0, legit HEAD 219 / 0, deny HEAD 2,131 (47 Node
+`HPE_CLOSED_CONNECTION`, all re-checked with `curl -I`: 400), legit POST 5 / 0, deny POST 150 / 0, boundary 85 / 0,
+open 41 / 0, upstream EQUAL on all 8 corpora, `adapt` and `validate` "Valid configuration" on all, sentinels 0
+everywhere except the deliberate path sentinel `PROBE-PATHSECRET-eee555` (1, as in section 3). The responses do not
+depend on the log filter, so the real-app and browser runs of section 3 were not repeated.
+
+Proposed addition to the contract test (P2-07: text only, same home as section 7), after the existing
+`access logs carry no tokens` describe, inside `describe('AFLDB-ISSUE-134 ...')`:
+
+```ts
+  // AFLDB-ISSUE-362 / review LOW-7: the token is redacted wherever the raw target spells the invite route.
+  it.each(CADDYFILES)('%s redacts the invite token in any spelling of the raw target', (path) => {
+    const snippet = read(path).match(/\(afldb_log_format\) \{[\s\S]*?\n\}\n/)?.[0] ?? '';
+    expect(snippet).toContain('regexp "(?i)(?:i|%[46]9)(?:n|%[46]e)(?:v|%[57]6)(?:i|%[46]9)(?:t|%[57]4)(?:e|%[46]5)(?:/|%2f|[\\\\]|%5c)+[^?#]*" "invite/REDACTED"');
+    // The invite rules run before the query-drop rule.
+    expect(snippet.indexOf('"invite/REDACTED"')).toBeLessThan(snippet.indexOf('regexp "\\?.*$" ""'));
+  });
+```
+
+## 10. MED-2: single combined install (for ops procedure 06)
+
+One install, three changes, one backup, one rollback. It replaces any per-issue install steps: a separate ISSUE-362
+install would be a second reload of the same file. Run by the owner or root on the droplet; no agent runs any of it
+(CLAUDE.md section 9).
+
+Approval text (name all three changes; the owner approves exactly this):
+
+> I approve replacing `/etc/caddy/Caddyfile` on the production droplet with `deploy/Caddyfile.production` at commit
+> `<SHA of the integrated commit>` (sha256 `<hash>`), followed by one `systemctl reload caddy`. This one file change
+> carries THREE changes. (1) The ISSUE-362 access-log filter: the invite token (in any spelling, denied requests
+> included) and every query string are no longer written to `/var/log/caddy/afldb-access.log`, `afldb-apex.log` or
+> the Caddy default log, and the Referer is cut to its origin. (2) The beta-host response headers
+> `Strict-Transport-Security: max-age=31536000; includeSubDomains` and the repository's `Content-Security-Policy`;
+> the installed file lacks both (commit `3ae20fe4`). (3) The ISSUE-357 O-1 path-shape deny: on `beta.afldb.com` a
+> path that cannot be a canonical ISR URL is answered `404 Not Found` by Caddy and never reaches the app. This
+> INCLUDES A BEHAVIOUR CHANGE: a trailing slash on a protected route (`/seasons/2024/`, `/clubs/carlton/`, ...) is
+> now a Caddy 404 where the app answered a 308 redirect; the denied body is Caddy's `Not Found` rather than the app's
+> 404 page; matches are capped at id 99,999; slugs must be lower-case `[a-z0-9-]`. The beta gate stays on. The deny
+> does not bound well-formed ids or slugs that name nothing (residual, section 4).
+
+Procedure:
+
+1. Production prerequisites (read-only, owner or the read role; record the output):
+   - slug charset: no players, clubs, venues or honour-teams slug fails `^[a-z0-9-]{1,100}$` (clubs, venues and
+     honour-teams `{1,80}`): 0 rows expected. On the 4 Nov copy: 0 bad characters, longest 27/22/24/35.
+   - `select max(id) from matches;` is below about 20,000 (17,274 on the 4 Nov copy).
+   - for the ISSUE-362 log-deletion decision the invite table is `admin_invites` (not `auth_invites`).
+2. Backup, one name: `B=/etc/caddy/Caddyfile.pre-combined-$(date +%Y%m%d%H%M)`; `sudo cp -p /etc/caddy/Caddyfile "$B"`;
+   `sha256sum /etc/caddy/Caddyfile "$B"` (the installed hash starts `4f6972ec`, ends `7af036` at the ops probe).
+3. Install the candidate: `sudo cp deploy/Caddyfile.production /etc/caddy/Caddyfile`; `sha256sum` must equal the
+   hash in the approval text (for this branch, the section 9 hash).
+4. Validate as the service user (validate opens the log writers, so another user fails on the log file):
+   `sudo -u caddy caddy validate --config /etc/caddy/Caddyfile`; expect "Valid configuration". Anything else: restore
+   `"$B"` and stop; do not reload.
+5. Owner reload: `sudo systemctl reload caddy` (graceful; never restart). `systemctl status caddy` and the journal
+   show no error.
+6. Probes against `https://beta.afldb.com`, all read-only, none reads a production log:
+   - legitimate pages: `/`, `/players/scott-pendlebury-11724`, `/seasons/2024`, `/matches/1`, `/clubs/carlton`,
+     `/brownlow/2024`, an AFLW player with `%2527`, `/sitemap/0.xml`: 200 (or the beta gate's 307 to `/beta` when not
+     admitted, exactly as before the install);
+   - deny probes: `/seasons/02024`, `/seasons/%32024`, `//seasons/2024`, `/players/x-1.json`, `/matches/100000`,
+     `/clubs/Carlton`, `/seasons/2024/` (the trailing-slash change), `/sitemap/1000.xml` return 404 with body
+     `Not Found`; `/seasons/%zz` returns 400;
+   - headers: `curl -sI https://beta.afldb.com/` shows `strict-transport-security` and `content-security-policy`;
+   - full-page load: open one player page and one season page in a real browser (admitted session); the DevTools
+     console shows no CSP violation and scripts, styles, fonts and images load;
+   - redaction probe: request `https://beta.afldb.com/admin/invite/ISSUE362-PROBE-0001?q=ISSUE362-PROBE-0002`, then
+     `https://beta.afldb.com//admin/invite/ISSUE362-PROBE-0003` (a denied spelling; use `curl --path-as-is`), and have
+     the owner look at ONLY those newest lines of the access log: `uri` must read `/admin/invite/REDACTED` for both
+     and no probe string may appear. I do not read production logs.
+7. Single rollback (any failed validate or probe): `sudo cp -p "$B" /etc/caddy/Caddyfile`;
+   `sudo -u caddy caddy validate --config /etc/caddy/Caddyfile`; `sudo systemctl reload caddy`; repeat the
+   legitimate-page probes and confirm `sha256sum /etc/caddy/Caddyfile` equals the backup's.
+8. After success: record the new installed `sha256sum` and the commit in the deployment record. At launch add
+   `import afldb_path_shape` to the apex block (section 6 step 8); widen the match cap when `max(matches.id)` nears
+   20,000.

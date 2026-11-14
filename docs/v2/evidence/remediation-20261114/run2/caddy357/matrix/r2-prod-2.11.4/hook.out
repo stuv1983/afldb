@@ -1,0 +1,86 @@
+## absolute-form request target (RFC 9112 3.2.2) and HTTP/1.0
+abs-form canonical /seasons/2024 (pass)      http=200  body=upstream saw GET /seasons/2024 
+abs-form /seasons/02024 (deny)               http=404  body=Not Found
+abs-form /seasons/%32024 (deny)              http=404  body=Not Found
+abs-form //seasons/2024 (deny)               http=404  body=Not Found
+abs-form /players/x-1?q=1 (pass)             http=200  body=upstream saw GET /players/x-1?q=1 
+HTTP/1.0 /seasons/02024 (deny)               http=404  body=Not Found
+HTTP/1.0 /seasons/2024 (pass)                http=200  body=upstream saw GET /seasons/2024 
+h2c prior knowledge /seasons/02024 (deny)    http=404  body=Not Found
+h2c prior knowledge /seasons/2024 (pass)     http=200  body=upstream saw GET /seasons/2024 
+h2c prior knowledge /seasons/%32024 (deny)   http=404  body=Not Found
+## the apex host (static, never proxies to the app): the rules are not applied there
+apex /seasons/02024 (static 404)             http=404  body=
+## rewrite headers must not change the verdict
+X-Original-URL junk, canonical path (pass)   http=200  body=upstream saw GET /seasons/2024 
+X-Original-URL canonical, junk path (deny)   http=404  body=Not Found
+## log redaction for DENIED requests (sentinels are fake)
+denied, query token                          http=404  body=Not Found
+denied, secret in path and query             http=404  body=Not Found
+denied, Referer carries an invite token      http=404  body=Not Found
+denied, Cookie header                        http=404  body=Not Found
+denied, long path                            http=404  body=Not Found
+malformed escape (Go 400) with token         http=400  body=400 Bad Request
+passed: invite path                          http=200  body=upstream saw GET /admin/invite/PROBE-INVITE-bbb222 
+passed: magic link                           http=200  body=upstream saw GET /beta/verify?token=PROBE-MAGIC-aaa111 
+passed: search text                          http=200  body=upstream saw GET /search?q=PROBE-SEARCH-ccc333 
+## invite-token spellings, one request each (token = PROBE-INVITE-bbb222)
+canonical                                      http=200
+canonical + query                              http=200
+leading //                                     http=404
+leading ///                                    http=404
+dot segment first                              http=404
+dot segment inside                             http=404
+dotdot                                         http=404
+encoded slash prefix                           http=404
+encoded slashes in the path                    http=404
+encoded slash before token                     http=404
+encoded first segment                          http=404
+encoded invite (lower hex)                     http=200
+encoded invite (upper letter)                  http=200
+all of invite encoded                          http=200
+upper case                                     http=200
+double slash before token                      http=404
+dot segment before token                       http=404
+dotdot before token                            http=404
+extra segment after token                      http=200
+encoded backslash                              http=404
+backslash                                      http=404
+token then malformed escape (400)              http=400
+token in a query, canonical path               http=200
+list page (must stay readable)                 http=200
+words that only contain invite                 http=200
+absolute-form //admin/invite/T                  http=404
+absolute-form /./admin/invite/T                 http=404
+## logged uri of each probe, in order (the token must not appear in any)
+"uri":"/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+"uri":"/admin/invite/REDACTED"
+"uri":"/beta/verify"
+"uri":"/search"
+"uri":"/admin/invite/REDACTED"
+"uri":"/admin/invite/REDACTED"
+"uri":"//admin/invite/REDACTED"
+"uri":"///admin/invite/REDACTED"
+"uri":"/./admin/invite/REDACTED"
+"uri":"/admin/./invite/REDACTED"
+"uri":"/x/../admin/invite/REDACTED"
+"uri":"/%2Fadmin/invite/REDACTED"
+"uri":"/admin%2Finvite/REDACTED"
+"uri":"/admin/invite/REDACTED"
+"uri":"/%61dmin/invite/REDACTED"
+"uri":"/admin/invite/REDACTED"
+"uri":"/admin/invite/REDACTED"
+"uri":"/admin/invite/REDACTED"
+"uri":"/Admin/invite/REDACTED"
+"uri":"/admin/invite/REDACTED"
+"uri":"/admin/invite/REDACTED"
+"uri":"/admin/invite/REDACTED"
+"uri":"/admin/invite/REDACTED"
+"uri":"/admin/invite/REDACTED"
+"uri":"/admin\\invite/REDACTED"
+"uri":"/search"
+"uri":"/admin/invites"
+"uri":"/admin/uninvited/x"
+"uri":"http://beta.afldb.com:55653//admin/invite/REDACTED"
+"uri":"http://beta.afldb.com:55653/./admin/invite/REDACTED"
+## token occurrences in the access log: 0  in stderr: 0
