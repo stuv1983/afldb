@@ -79,6 +79,9 @@ const NON_PUBLIC: Record<string, string> = {
     'the Stage 3 admin surface, which deliberately shows active AND void (the whole point of the surface)',
   'src/db/queries/match-admin.ts':
     'an administrative DELETE, not a read; Stage 6 replaces it with a refusal',
+  'src/db/queries/match-sheet.ts':
+    'the admin Match Sheet dependent check (AFLDB-ISSUE-353): it counts active AND suppressed records, so a line-up '
+    + 'row a suppressed record still names cannot be removed; never rendered publicly',
 };
 
 function walk(dir: string, out: string[] = []): string[] {
