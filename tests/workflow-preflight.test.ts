@@ -15,7 +15,16 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { computeChecksumRepresentations } from '../tools/db/migration-checksum';
-import { compareToBaseline, serialiseBaseline, summariseErrors } from '../tools/dev/lint-gate';
+import {
+  baselineTotals,
+  compareToBaseline,
+  evaluateLintGate,
+  parseBaseline,
+  runLintGate,
+  serialiseBaseline,
+  summariseErrors,
+  type LintGateOutcome,
+} from '../tools/dev/lint-gate';
 import {
   collectMigrationSources,
   compareAppliedMigrations,
@@ -31,6 +40,8 @@ import {
   classifyWorktreeStatus,
   databaseTargetProblems,
   defaultsFor,
+  LINT_GATE_MODES,
+  lintGateStep,
   linuxHostPathProblems,
   msysEnvironmentProblem,
   parsePreflightArgs,
@@ -50,11 +61,15 @@ import { runMergeReadiness } from '../tools/dev/merge-readiness';
 type SpawnSyncResult = { status: number | null; stdout: string | null; stderr: string | null; error?: Error };
 const childProcess = vi.hoisted(() => ({
   gitOverride: undefined as undefined | ((args: readonly string[]) => SpawnSyncResult | undefined),
+  // AFLDB-ISSUE-364 B-07: answers the lint gate's `node eslint.js` spawn (command === process.execPath).
+  nodeOverride: undefined as undefined | ((args: readonly string[]) => SpawnSyncResult | undefined),
 }));
 vi.mock('node:child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:child_process')>();
   const spawnSync = (command: string, args: readonly string[], options: object) => {
-    const answered = command === 'git' ? childProcess.gitOverride?.(args) : undefined;
+    const answered = command === 'git'
+      ? childProcess.gitOverride?.(args)
+      : command === process.execPath ? childProcess.nodeOverride?.(args) : undefined;
     return answered ?? actual.spawnSync(command, args, options);
   };
   return { ...actual, spawnSync };
@@ -94,7 +109,47 @@ function tool(cwd: string, script: string, ...args: string[]) {
   }
 }
 
-function makeRepository() {
+/*
+ * AFLDB-ISSUE-364: a fixture checkout carries its own fake ESLint and ratchet baseline, so merge:ready
+ * (and evaluateLintGate) run the REAL gate code against a tree whose lint result the test controls.
+ * `output` is the JSON ESLint would print (`__ROOT__` is replaced by the checkout root) or raw text;
+ * `baseline` is an object, raw text, or 'missing'; `eslint: false` leaves ESLint uninstalled.
+ */
+type LintFixture = {
+  output?: unknown[] | string;
+  baseline?: Record<string, Record<string, number>> | string | 'missing';
+  eslint?: boolean;
+};
+const FAKE_ESLINT = `'use strict';
+const fs = require('node:fs');
+const path = require('node:path');
+const raw = fs.readFileSync(path.join(__dirname, '..', 'output.json'), 'utf8');
+process.stdout.write(raw.split('__ROOT__').join(process.cwd().replace(/\\\\/g, '/')));
+process.exit(1);
+`;
+
+function writeLintFixture(root: string, lint: LintFixture = {}): void {
+  if (lint.eslint !== false) {
+    mkdirSync(join(root, 'node_modules', 'eslint', 'bin'), { recursive: true });
+    writeFileSync(join(root, 'node_modules', 'eslint', 'bin', 'eslint.js'), FAKE_ESLINT);
+    const output = lint.output ?? [];
+    writeFileSync(join(root, 'node_modules', 'eslint', 'output.json'),
+      typeof output === 'string' ? output : JSON.stringify(output));
+  }
+  if (lint.baseline !== 'missing') {
+    mkdirSync(join(root, 'tools', 'dev'), { recursive: true });
+    const baseline = lint.baseline ?? {};
+    writeFileSync(join(root, 'tools', 'dev', 'lint-baseline.json'),
+      typeof baseline === 'string' ? baseline : JSON.stringify(baseline));
+  }
+}
+
+const lintResult = (file: string, ...rules: string[]) => ({
+  filePath: `__ROOT__/${file}`,
+  messages: rules.map((ruleId) => ({ ruleId, severity: 2 })),
+});
+
+function makeRepository(lint: LintFixture = {}) {
   const root = mkdtempSync(join(tmpdir(), 'afldb-workflow-'));
   scratch.push(root);
   const origin = join(root, 'origin.git');
@@ -107,6 +162,7 @@ function makeRepository() {
   mkdirSync(join(main, 'src', 'db', 'migrations'), { recursive: true });
   writeFileSync(join(main, 'README.md'), 'fixture\n');
   writeFileSync(join(main, 'src', 'db', 'migrations', '001_base.sql'), 'SELECT 1;\n');
+  writeLintFixture(main, lint);
   git(main, 'add', '.');
   git(main, 'commit', '-m', 'fixture base');
   git(main, 'remote', 'add', 'origin', origin);
@@ -148,6 +204,7 @@ function commitReadyFeature(target: string, overrides = {}): void {
 
 afterEach(() => {
   childProcess.gitOverride = undefined;
+  childProcess.nodeOverride = undefined;
   for (const root of scratch.splice(0)) {
     rmSync(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
   }
@@ -675,6 +732,87 @@ describe('merge readiness report', () => {
     expect(run.status).toBe(1);
     expect(run.stdout).toContain('blocker: operator decision pending');
   });
+
+  describe('AFLDB-ISSUE-364 lint ratchet gate in merge:ready', () => {
+    const readiness = (lint: LintFixture) => {
+      const fixture = makeRepository(lint);
+      addFeature(fixture.main, fixture.target);
+      commitReadyFeature(fixture.target);
+      return tool(fixture.target, readinessCli, '--issue', '145');
+    };
+
+    it('runs the gate and reports it as a ratchet against recorded debt, not clean lint', () => {
+      const run = readiness({
+        output: [lintResult('src/a.ts', 'no-x', 'no-x')],
+        baseline: { 'src/a.ts': { 'no-x': 2 } },
+      });
+      expect(run.status, run.stdout).toBe(0);
+      expect(run.stdout).toContain('lint ratchet gate: no error count rose');
+      expect(run.stdout).toContain('2 error(s) in 1 file(s) now; the ratchet baseline allows 2 in 1 (existing debt, not clean lint)');
+      expect(run.stdout).toContain('Merge readiness: READY');
+    });
+
+    it('blocks when a file\'s error count rises', () => {
+      const run = readiness({
+        output: [lintResult('src/a.ts', 'no-x', 'no-x', 'no-x')],
+        baseline: { 'src/a.ts': { 'no-x': 2 } },
+      });
+      expect(run.status).toBe(1);
+      expect(run.stdout).toContain('REGRESSION: src/a.ts: no-x 2 -> 3');
+      expect(run.stdout).toContain('Merge readiness: BLOCKED');
+    });
+
+    it('blocks a new rule in an old file and a new file with errors', () => {
+      const run = readiness({
+        output: [lintResult('src/a.ts', 'no-x', 'no-y'), lintResult('src/new.ts', 'no-x')],
+        baseline: { 'src/a.ts': { 'no-x': 1 } },
+      });
+      expect(run.status).toBe(1);
+      expect(run.stdout).toContain('REGRESSION: src/a.ts: no-y 0 -> 1');
+      expect(run.stdout).toContain('REGRESSION: src/new.ts: no-x 0 -> 1');
+    });
+
+    it('passes a decrease but warns that the baseline is not yet tightened (ratchet slack is not forced out)', () => {
+      const run = readiness({
+        output: [lintResult('src/a.ts', 'no-x')],
+        baseline: { 'src/a.ts': { 'no-x': 3 }, 'src/gone.ts': { 'no-y': 1 } },
+      });
+      expect(run.status, run.stdout).toBe(0);
+      expect(run.stdout).toContain('WARN lint baseline has 2 paid-down pair(s) not yet tightened');
+      expect(run.stdout).toContain('src/a.ts: no-x 3 -> 1');
+      expect(run.stdout).toContain('src/gone.ts: no-y 1 -> 0');
+    });
+
+    it('refuses, with a named reason, when the baseline is missing', () => {
+      const run = readiness({ baseline: 'missing' });
+      expect(run.status).toBe(1);
+      expect(run.stdout).toContain('lint ratchet gate refused (no verdict)');
+      expect(run.stdout).toContain('tools/dev/lint-baseline.json is missing');
+    });
+
+    it.each([
+      ['not JSON', '{not json', /is malformed: not valid JSON/],
+      ['an array', '[]', /is malformed: top level must be an object/],
+      ['a negative count', '{"src/a.ts":{"no-x":-1}}', /must be a non-negative integer count/],
+      ['a fractional count', '{"src/a.ts":{"no-x":1.5}}', /must be a non-negative integer count/],
+      ['a non-object rule map', '{"src/a.ts":3}', /must be an object of rule -> count/],
+    ])('refuses a malformed baseline (%s)', (_label, baseline, reason) => {
+      const run = readiness({ baseline });
+      expect(run.status).toBe(1);
+      expect(run.stdout).toContain('lint ratchet gate refused (no verdict)');
+      expect(run.stdout).toMatch(reason);
+      expect(run.stdout).toContain('Merge readiness: BLOCKED');
+    });
+
+    it('refuses, with a named reason, when ESLint is not installed or prints no JSON', () => {
+      const missing = readiness({ eslint: false });
+      expect(missing.status).toBe(1);
+      expect(missing.stdout).toContain('ESLint is not installed at');
+      const garbage = readiness({ output: 'this is not json' });
+      expect(garbage.status).toBe(1);
+      expect(garbage.stdout).toContain('ESLint produced no JSON (exit 1)');
+    });
+  });
 });
 
 describe('AFLDB-ISSUE-364 ratcheting lint gate', () => {
@@ -710,6 +848,119 @@ describe('AFLDB-ISSUE-364 ratcheting lint gate', () => {
     const verdict = compareToBaseline({ 'src/a.ts': { 'no-x': 1 } }, baseline);
     expect(verdict.regressions).toEqual([]);
     expect(verdict.improvements).toEqual(['src/a.ts: no-x 2 -> 1', 'src/gone.ts: no-y 1 -> 0']);
+  });
+
+  it('B-07: a failed ESLint spawn is a named refusal (exit 2), not a TypeError', () => {
+    childProcess.nodeOverride = () => ({
+      status: null, stdout: null, stderr: null, error: new Error('spawnSync node ENOENT'),
+    });
+    const dir = mkdtempSync(join(tmpdir(), 'afldb-lintgate-b07-'));
+    scratch.push(dir);
+    writeLintFixture(dir); // ESLint file and baseline present, so only the spawn itself fails
+    const stderr: string[] = [];
+    const spy = vi.spyOn(console, 'error').mockImplementation((...values) => stderr.push(values.join(' ')));
+    try {
+      expect(runLintGate([], dir)).toBe(2);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(stderr.join('\n')).toMatch(/could not start ESLint.*ENOENT/);
+  });
+
+  describe('refusals (exit 2) never fall through to a pass', () => {
+    const fixtureRoot = (lint: LintFixture = {}) => {
+      const dir = mkdtempSync(join(tmpdir(), 'afldb-lintgate-'));
+      scratch.push(dir);
+      writeLintFixture(dir, lint);
+      return dir;
+    };
+
+    it('ESLint ending abnormally or printing a non-list is refused, whatever it printed', () => {
+      const dir = fixtureRoot();
+      childProcess.nodeOverride = () => ({ status: 2, stdout: '[]', stderr: 'Oops! Something went wrong', error: undefined });
+      const config = evaluateLintGate(dir);
+      expect(config.exitCode).toBe(2);
+      expect(config.summary).toContain('ESLint ended abnormally (exit 2)');
+      childProcess.nodeOverride = () => ({ status: null, stdout: '', stderr: '', error: undefined });
+      expect(evaluateLintGate(dir).summary).toContain('ESLint ended abnormally (exit signal');
+      childProcess.nodeOverride = () => ({ status: 0, stdout: '{}', stderr: '', error: undefined });
+      expect(evaluateLintGate(dir)).toMatchObject({ exitCode: 2, summary: expect.stringContaining('not a list of file results') });
+    });
+
+    it('an unspawnable ESLint is a refusal through the evaluation used by preflight too', () => {
+      const dir = fixtureRoot();
+      childProcess.nodeOverride = () => ({ status: null, stdout: null, stderr: null, error: new Error('spawnSync ENOBUFS') });
+      expect(evaluateLintGate(dir)).toMatchObject({ exitCode: 2, summary: expect.stringContaining('could not start ESLint (spawnSync ENOBUFS)') });
+    });
+
+    it('the CLI refuses with exit 2 for a missing or malformed baseline, never a stack trace', () => {
+      for (const baseline of ['missing', '{not json'] as const) {
+        const dir = fixtureRoot({ baseline });
+        const stderr: string[] = [];
+        const spy = vi.spyOn(console, 'error').mockImplementation((...values) => stderr.push(values.join(' ')));
+        try {
+          expect(runLintGate([], dir)).toBe(2);
+        } finally {
+          spy.mockRestore();
+        }
+        expect(stderr.join('\n')).toMatch(baseline === 'missing' ? /baseline.*is missing/ : /is malformed/);
+      }
+    });
+  });
+
+  describe('the gate through the preflight step', () => {
+    const outcome = (partial: Partial<LintGateOutcome>): LintGateOutcome =>
+      ({ exitCode: 0, summary: 'summary line', problems: [], improvements: [], ...partial });
+
+    it('runs only for implementation and merge, never read-only, rebuild, promotion or deploy', () => {
+      expect([...LINT_GATE_MODES]).toEqual(['implementation', 'merge']);
+      for (const mode of ['implementation', 'merge'] as const) {
+        const evaluate = vi.fn(() => outcome({}));
+        expect(lintGateStep(mode, '/r', evaluate)).toMatchObject([{ status: 'PASS' }]);
+        expect(evaluate).toHaveBeenCalledWith('/r');
+      }
+      for (const mode of ['read-only', 'rebuild', 'promotion', 'deploy'] as const) {
+        const evaluate = vi.fn(() => outcome({}));
+        expect(lintGateStep(mode, '/r', evaluate)).toEqual([]);
+        expect(evaluate).not.toHaveBeenCalled();
+      }
+    });
+
+    it('a regression is a FAIL naming the pair, so the preflight is BLOCKED', () => {
+      const findings = lintGateStep('implementation', '/r', () => outcome({
+        exitCode: 1, summary: 'Lint gate: FAILED', problems: ['src/a.ts: no-x 2 -> 3'],
+      }));
+      expect(findings).toHaveLength(1);
+      expect(findings[0].status).toBe('FAIL');
+      expect(findings[0].details).toContain('REGRESSION: src/a.ts: no-x 2 -> 3');
+    });
+
+    it('a refusal and a thrown gate are both FAIL with the reason, never skipped', () => {
+      const refused = lintGateStep('merge', '/r', () => outcome({
+        exitCode: 2, summary: 'Lint gate: REFUSED - baseline gone', problems: ['baseline gone', 'extra'],
+      }));
+      expect(refused[0]).toMatchObject({ status: 'FAIL', label: 'lint ratchet gate refused (no verdict)' });
+      expect(refused[0].details).toContain('Lint gate: REFUSED - baseline gone');
+      const thrown = lintGateStep('merge', '/r', () => { throw new Error('boom'); });
+      expect(thrown[0]).toMatchObject({ status: 'FAIL', label: 'lint ratchet gate could not run' });
+      expect(thrown[0].details).toContain('boom');
+    });
+
+    it('preflight.ts feeds every finding of the step into the report that decides BLOCKED', () => {
+      const source = readFileSync(join(__dirname, '..', 'tools', 'dev', 'preflight.ts'), 'utf8').replace(/\r\n/g, '\n');
+      expect(source).toMatch(
+        /for \(const finding of lintGateStep\(options\.mode, PROJECT_ROOT\)\) \{\n\s+report\.add\(finding\.status, finding\.label, finding\.details\);/);
+      expect(source).toContain("if (report.failed) {");
+    });
+  });
+
+  describe('the committed baseline is a ceiling, never a licence to grow', () => {
+    it('parses, and holds no more than the 338 errors in 43 files recorded when the gate was wired', () => {
+      const baseline = parseBaseline(readFileSync(join(__dirname, '..', 'tools', 'dev', 'lint-baseline.json'), 'utf8'));
+      const totals = baselineTotals(baseline);
+      expect(totals.errors).toBeLessThanOrEqual(338);
+      expect(totals.files).toBeLessThanOrEqual(43);
+    });
   });
 
   it('serialises with stable key order so a baseline diff shows only real change', () => {

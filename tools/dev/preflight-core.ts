@@ -6,6 +6,7 @@ import {
   type MigrationEntry,
   type MigrationFinding,
 } from '../db/migration-safety';
+import { lintGateFindings, type LintGateOutcome } from './lint-gate';
 
 export type PreflightMode =
   | 'implementation'
@@ -184,6 +185,26 @@ export function databaseTargetProblems(
 
 export type PreflightStatus = 'PASS' | 'WARN' | 'FAIL' | 'INFO';
 export type PreflightFinding = { status: PreflightStatus; label: string; details: string[] };
+
+/**
+ * AFLDB-ISSUE-364 (O-2). The lint ratchet gate runs in the two modes that precede a merge:
+ * `implementation` (the start of work, so a branch never starts from a red gate) and `merge` (the
+ * operator's last look). It is not run for read-only, rebuild, promotion or deploy: those do not
+ * change what lint guards. The gate is evaluated here, in the same process, because there is no
+ * recorded result to trust: a stored verdict would not be bound to the tree it describes, and
+ * ESLint is read-only (about a minute or two on a busy host). A refusal or a rise is a FAIL, so the
+ * preflight result is BLOCKED and exits non-zero.
+ */
+export const LINT_GATE_MODES: readonly PreflightMode[] = ['implementation', 'merge'];
+
+export function lintGateStep(
+  mode: PreflightMode,
+  root: string,
+  evaluate?: (root: string) => LintGateOutcome,
+): PreflightFinding[] {
+  if (!LINT_GATE_MODES.includes(mode)) return [];
+  return lintGateFindings(root, evaluate);
+}
 
 /**
  * A promotion target is replaced, not read, so its ledger is not evidence; the source's parity is

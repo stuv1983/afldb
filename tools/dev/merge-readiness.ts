@@ -10,6 +10,7 @@ import {
   findMigrationConflicts,
   type MigrationFinding,
 } from '../db/migration-safety';
+import { lintGateFindings } from './lint-gate';
 
 type Status = 'PASS' | 'WARN' | 'FAIL' | 'INFO';
 type Options = { issue?: string; runbook?: string; expectedFiles: string[]; help: boolean };
@@ -40,6 +41,9 @@ function usage(): void {
   --expected-file PATH     repeatable exact path or directory prefix ending in /
 
 The command is read-only: it does not fetch, stage, commit, merge, push, migrate or run tests.
+It runs the lint ratchet gate (npm run lint:gate; ESLint, a minute or two): a ratchet against the recorded
+existing errors, not clean lint. An increase in any file's error count, a new file with errors, or a gate
+that cannot reach a verdict makes the result BLOCKED.
 It ends with Merge readiness: READY or BLOCKED.`);
 }
 
@@ -169,7 +173,8 @@ export function runMergeReadiness(argv: readonly string[], cwd = process.cwd()):
 
     report = new Report();
     console.log('AFLDB merge readiness (read-only)');
-    console.log('No fetch, stage, commit, merge, push, migration or test command will run.\n');
+    console.log('No fetch, stage, commit, merge, push, migration or test command will run.');
+    console.log('The lint ratchet gate (ESLint, read-only) will run; it can take a minute or two.\n');
 
     const branch = gitText(root, ['branch', '--show-current']);
     report.add(branch && branch !== 'main' && branch !== 'master' ? 'PASS' : 'FAIL',
@@ -232,6 +237,10 @@ export function runMergeReadiness(argv: readonly string[], cwd = process.cwd()):
     report.add('INFO', 'database migration parity not checked', [
       'Use the appropriate operational preflight when a database target is part of the merge contract.',
     ]);
+
+    // AFLDB-ISSUE-364 (O-2): a ratchet against recorded existing errors, not clean lint. A rise, a
+    // new file with errors, or no verdict at all blocks the merge.
+    for (const finding of lintGateFindings(root)) report.add(finding.status, finding.label, finding.details);
 
     let record: ReadinessRecord | undefined;
     const runbook = locateRunbook(root, options);

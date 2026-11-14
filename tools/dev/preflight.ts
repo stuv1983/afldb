@@ -19,6 +19,8 @@ import { assertContractCoherent, historicalOnlyTables } from '../db/promotion-in
 import {
   branchPolicyProblems,
   defaultsFor,
+  LINT_GATE_MODES,
+  lintGateStep,
   migrationFindingStatus,
   msysEnvironmentProblem,
   parsePreflightArgs,
@@ -231,6 +233,11 @@ Promotion sides:
   target  exactly afldb_dev (dev) or afldb_prod (prod); --dsn-env required; identity, role and
           connectivity only, so a restricted import/backup credential needs no afldb_meta access
 
+--mode implementation and --mode merge also run the lint ratchet gate (npm run lint:gate: ESLint, read-only,
+about a minute or two). It is a ratchet against the recorded existing errors (tools/dev/lint-baseline.json),
+not clean lint: it blocks on an increase in any file's error count, a new file with errors, or a gate that
+cannot reach a verdict.
+
 The command is read-only. It does not fetch refs, write plans, migrate, deploy, or mutate a database.`);
 }
 
@@ -250,7 +257,11 @@ async function main(): Promise<void> {
   console.log(`AFLDB read-only preflight: ${options.mode} / ${options.environment}`
     + (options.promotionSide ? ` / ${options.promotionSide}` : '')
     + (options.issue ? ` / ${options.issue.toUpperCase()}` : ''));
-  console.log('No Git fetch, database write, migration, plan write, deploy, or service action will run.\n');
+  console.log('No Git fetch, database write, migration, plan write, deploy, or service action will run.');
+  if (LINT_GATE_MODES.includes(options.mode)) {
+    console.log('The lint ratchet gate (ESLint, read-only) will run; it can take a minute or two.');
+  }
+  console.log('');
 
   try {
     checkGit(report, options.mode);
@@ -289,6 +300,12 @@ async function main(): Promise<void> {
   toolCheck(report, 'git', true);
   toolCheck(report, 'psql', needsEnvironment);
   toolCheck(report, 'pg_restore', options.mode === 'promotion');
+
+  // AFLDB-ISSUE-364: implementation and merge only; a rise in any file's error count, a new file
+  // with errors, or a gate that cannot reach a verdict is a FAIL (BLOCKED, exit 1).
+  for (const finding of lintGateStep(options.mode, PROJECT_ROOT)) {
+    report.add(finding.status, finding.label, finding.details);
+  }
 
   if (options.mode === 'promotion') {
     try {

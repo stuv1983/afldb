@@ -207,6 +207,15 @@ and reports dirt as a warning. `npm run merge:ready` is read-only and ends in `R
 with the branch relationship, dirt/staging/untracked paths, main freshness, migration collisions,
 declared scope, recorded validation and explicit hard blockers.
 
+`preflight --mode implementation`, `preflight --mode merge` and `merge:ready` also run the lint
+ratchet gate (`npm run lint:gate`, ESLint, read-only, about one to two minutes). It is a **ratchet
+against the 338 existing errors in 43 files recorded in `tools/dev/lint-baseline.json`, not clean
+lint**: it blocks on an increase in any file's error count, a new file (or new rule in a file) with
+errors, or a gate that cannot reach a verdict (ESLint missing or not startable, baseline missing or
+malformed; exit 2). A decrease passes with a warning to tighten the baseline (`npm run lint:gate --
+--update`, in a reviewed commit that only lowers counts). The baseline never expands. Other
+preflight modes, `deploy/release.mjs` and `deploy/sync-dev.ps1` do not run it.
+
 ---
 
 # 6. Command Ownership
