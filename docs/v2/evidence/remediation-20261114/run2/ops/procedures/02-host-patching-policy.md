@@ -78,9 +78,13 @@ sudo needrestart -r l                                        # what is owed (pro
 apt list --upgradable 2>/dev/null | grep -E '^(postgresql|libpq)'      # held PostgreSQL updates, readable by arm
 sudo apt-get install --only-upgrade postgresql-16 postgresql-client-16 postgresql-common postgresql-client-common   # only if listed
 sudo systemctl restart postgresql@16-main afldb              # PostgreSQL then the app; ~5 s outage
-node deploy/release.mjs status --expect <current id>         # as arm
+node deploy/release.mjs status --expect <current id> --confirm-attended-restart   # as arm; this restart was yours
 bash deploy/post-install-check.sh <current id>
 ```
+
+`--confirm-attended-restart` is required here: the owner's own `apt-get` and restart in this window coincide with an apt run,
+which `status --expect` otherwise fails as a possible unattended-upgrade restart (`deploy/release.mjs` restart audit; review
+REVIEW-C LOW-3). Use it only for a restart you made yourself in this window.
 
 A PostgreSQL package upgrade restarts the cluster from its own postinst: the explicit restart that follows is then a no-op
 for PostgreSQL and the app restart is the one that matters. Do not start the window within 90 minutes of
