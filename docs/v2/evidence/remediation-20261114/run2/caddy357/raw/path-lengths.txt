@@ -1,0 +1,4 @@
+longest legit path in the corpus (query excluded): 68 /_next/static/chunks/app/players/%5Bslug%5D/page-0123456789abcdef.js
+longest /_next/static path of this build: 89 /_next/static/chunks/app/admin/player-links/afl-api/[providerId]/page-510d4fa7572618b2.js
+longest AFLW player path: 71 /aflw/players/Aasta_O%2527Connor?season=2024&club=carlton&x=%2F..%2F%00
+longest player path: 40 /players/anthony-mcdonald-tipungwuti-695

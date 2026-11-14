@@ -1,0 +1,11 @@
+isolated-pg: afldb_v2_rem2caddy357_tmpl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55673); running node
+players [{"n":13365,"maxlen":27,"badchars":0,"empty":0,"maxid":13365,"minid":1,"maxseg":31}]
+players-bad-sample-chars []
+clubs [{"n":24,"maxlen":22,"bad":0}]
+venues [{"n":52,"maxlen":24,"bad":0}]
+awards [{"n":47,"maxlen":28,"bad":0}]
+honour-teams [{"n":5,"maxlen":35}]
+seasons [{"miny":1897,"maxy":2026,"n":130}]
+matches [{"minid":1,"maxid":17274,"n":17056}]
+aflw-players [{"n":960,"maxlen":27,"pct27":17,"unusual":17}]
+aflw-keys [{"mk":15,"cc":3,"sk":4}]

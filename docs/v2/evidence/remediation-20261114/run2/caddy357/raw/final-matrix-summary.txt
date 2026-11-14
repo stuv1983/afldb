@@ -1,0 +1,56 @@
+=== prod-2.11.9
+== binary: v2.11.9 h1:bhZtcRKQOq0fuLvEgCdPYvUxXyGn9kzjG4lh2332DTE=  sha256 a563843e11cbce39c557bd429ebb787d56f49d51d9bbb3292cd9b36b37a60cdf
+== file under test: /mnt/ssd/afldb-rem2-caddy357-20261114/in/cf/Caddyfile.production sha256 7149da9a055e2947851ea0811f87b34ff96bbb89e999213c40eae10552c9a7e2
+adapt(test copy) rc=0
+validate(test copy) rc=0 : Valid configuration
+validate(production shape: real host names, TLS automation; only admin off + log/web paths rewritten) rc=0 : Valid configuration
+adapt(UNMODIFIED deploy file) rc=0
+validate(UNMODIFIED deploy file) rc=1 : {"level":"error","ts":1794635546.166126,"msg":"setting up custom log 'log0': opening log writer using &logging
+corpora: 8; mismatches: 35340:0 2131:0 219:0 2131:47 5:0 150:0 85:0 41:0 
+upstream EQUAL: 8  DIFFERENT: 0  curl-I rechecks:  re-checked with curl -I: 47 400 ;
+sentinels non-zero:  PROBE-PATHSECRET-eee555 afldb-access.log 1;
+stopped: no listener on 55653/55663
+no process of this run left
+MATRIX-DONE prod-2.11.9
+=== prod-2.11.4
+== binary: v2.11.4 h1:XKxkMTgNSizEvKG6QHue6cAsFOteU2qA61w2tKkCWi0=  sha256 b7105518e3ed1c0761f232e44fc09345535533c9cb0abf0e12809416c7ac64d9
+== file under test: /mnt/ssd/afldb-rem2-caddy357-20261114/in/cf/Caddyfile.production sha256 7149da9a055e2947851ea0811f87b34ff96bbb89e999213c40eae10552c9a7e2
+adapt(test copy) rc=0
+validate(test copy) rc=0 : {"level":"info","ts":1794635566.9726057,"logger":"http.handlers.reverse_proxy.health_checker.active","msg":"HTTP request
+validate(production shape: real host names, TLS automation; only admin off + log/web paths rewritten) rc=0 : Valid configuration
+adapt(UNMODIFIED deploy file) rc=0
+validate(UNMODIFIED deploy file) rc=1 : Error: setting up custom log 'log0': opening log writer using &logging.FileWriter{Filename:"/var/log/caddy/afl
+corpora: 8; mismatches: 35340:0 2131:0 219:0 2131:47 5:0 150:0 85:0 41:0 
+upstream EQUAL: 8  DIFFERENT: 0  curl-I rechecks:  re-checked with curl -I: 47 400 ;
+sentinels non-zero:  PROBE-PATHSECRET-eee555 afldb-access.log 1;
+stopped: no listener on 55653/55663
+no process of this run left
+MATRIX-DONE prod-2.11.4
+=== dev-2.11.9
+== binary: v2.11.9 h1:bhZtcRKQOq0fuLvEgCdPYvUxXyGn9kzjG4lh2332DTE=  sha256 a563843e11cbce39c557bd429ebb787d56f49d51d9bbb3292cd9b36b37a60cdf
+== file under test: /mnt/ssd/afldb-rem2-caddy357-20261114/in/cf/Caddyfile sha256 71e604f4acb4e460957a3996d86c5d15203f445cf6922ca3faf1f0415cca6b93
+adapt(test copy) rc=0
+validate(test copy) rc=0 : Valid configuration
+validate(production shape: real host names, TLS automation; only admin off + log/web paths rewritten) rc=0 : Valid configuration
+adapt(UNMODIFIED deploy file) rc=0
+validate(UNMODIFIED deploy file) rc=1 : {"level":"error","ts":1794635586.7366292,"msg":"setting up custom log 'log0': opening log writer using &loggin
+corpora: 8; mismatches: 35340:0 2131:0 219:0 2131:47 5:0 150:0 85:0 41:0 
+upstream EQUAL: 8  DIFFERENT: 0  curl-I rechecks:  re-checked with curl -I: 47 400 ;
+sentinels non-zero:  PROBE-PATHSECRET-eee555 afldb-access.log 1;
+stopped: no listener on 55653/55663
+no process of this run left
+MATRIX-DONE dev-2.11.9
+=== dev-2.11.4
+== binary: v2.11.4 h1:XKxkMTgNSizEvKG6QHue6cAsFOteU2qA61w2tKkCWi0=  sha256 b7105518e3ed1c0761f232e44fc09345535533c9cb0abf0e12809416c7ac64d9
+== file under test: /mnt/ssd/afldb-rem2-caddy357-20261114/in/cf/Caddyfile sha256 71e604f4acb4e460957a3996d86c5d15203f445cf6922ca3faf1f0415cca6b93
+adapt(test copy) rc=0
+validate(test copy) rc=0 : Valid configuration
+validate(production shape: real host names, TLS automation; only admin off + log/web paths rewritten) rc=0 : Valid configuration
+adapt(UNMODIFIED deploy file) rc=0
+validate(UNMODIFIED deploy file) rc=1 : Error: setting up custom log 'log0': opening log writer using &logging.FileWriter{Filename:"/var/log/caddy/afl
+corpora: 8; mismatches: 35340:0 2131:0 219:0 2131:47 5:0 150:0 85:0 41:0 
+upstream EQUAL: 8  DIFFERENT: 0  curl-I rechecks:  re-checked with curl -I: 47 400 ;
+sentinels non-zero:  PROBE-PATHSECRET-eee555 afldb-access.log 1;
+stopped: no listener on 55653/55663
+no process of this run left
+MATRIX-DONE dev-2.11.4

@@ -1,0 +1,23 @@
+{
+	admin off
+	auto_https off
+	persist_config off
+}
+
+http://127.0.0.1:55653 {
+	route {
+		@path path /seasons/*
+		@pathre path_regexp ^/seasons/
+		@pathre_digits path_regexp ^/seasons/[0-9]+$
+		@expr_uri expression {http.request.uri}.matches("^/seasons/[0-9]+$")
+		@vars_uri vars_regexp {http.request.uri} ^/seasons/[0-9]+$
+		@vars_path vars_regexp {http.request.uri.path} ^/seasons/[0-9]+$
+		header @path X-M-path yes
+		header @pathre X-M-pathre yes
+		header @pathre_digits X-M-pathre-digits yes
+		header @expr_uri X-M-expr-uri-digits yes
+		header @vars_uri X-M-vars-uri-digits yes
+		header @vars_path X-M-vars-path-digits yes
+		respond "uri={http.request.uri}|uripath={http.request.uri.path}|orig={http.request.orig_uri}|origpath={http.request.orig_uri.path}|uriquery={http.request.uri.query}"
+	}
+}

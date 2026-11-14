@@ -1,0 +1,63 @@
+404	/players/probe-x-900001	files+=7	bytes+=50586	server/app/players/probe-x-900001.html server/app/players/probe-x-900001.meta server/app/players/probe-x-900001.rsc server/app/players/probe-x-900001.segments/_full.segment.rsc server/app/players/probe-x-900001.segments/_index.segment.rsc server/app/players/probe-x-900001.segments/players/$d$slug/__PAGE__.segment.rsc server/app/players/probe-x-900001.segments/_tree.segment.rsc 
+404	/matches/99998	files+=7	bytes+=50246	server/app/matches/99998.html server/app/matches/99998.meta server/app/matches/99998.rsc server/app/matches/99998.segments/_full.segment.rsc server/app/matches/99998.segments/_index.segment.rsc server/app/matches/99998.segments/matches/$d$id/__PAGE__.segment.rsc server/app/matches/99998.segments/_tree.segment.rsc 
+404	/seasons/2099	files+=7	bytes+=50468	server/app/seasons/2099.html server/app/seasons/2099.meta server/app/seasons/2099.rsc server/app/seasons/2099.segments/_full.segment.rsc server/app/seasons/2099.segments/_index.segment.rsc server/app/seasons/2099.segments/seasons/$d$year/__PAGE__.segment.rsc server/app/seasons/2099.segments/_tree.segment.rsc 
+404	/brownlow/2099	files+=7	bytes+=47214	server/app/brownlow/2099.html server/app/brownlow/2099.meta server/app/brownlow/2099.rsc server/app/brownlow/2099.segments/brownlow/$d$year/__PAGE__.segment.rsc server/app/brownlow/2099.segments/_full.segment.rsc server/app/brownlow/2099.segments/_index.segment.rsc server/app/brownlow/2099.segments/_tree.segment.rsc 
+404	/clubs/probeclub1	files+=7	bytes+=50302	server/app/clubs/probeclub1.html server/app/clubs/probeclub1.meta server/app/clubs/probeclub1.rsc server/app/clubs/probeclub1.segments/clubs/$d$slug/__PAGE__.segment.rsc server/app/clubs/probeclub1.segments/_full.segment.rsc server/app/clubs/probeclub1.segments/_index.segment.rsc server/app/clubs/probeclub1.segments/_tree.segment.rsc 
+404	/venues/probevenue1	files+=7	bytes+=50300	server/app/venues/probevenue1.html server/app/venues/probevenue1.meta server/app/venues/probevenue1.rsc server/app/venues/probevenue1.segments/_full.segment.rsc server/app/venues/probevenue1.segments/_index.segment.rsc server/app/venues/probevenue1.segments/_tree.segment.rsc server/app/venues/probevenue1.segments/venues/$d$slug/__PAGE__.segment.rsc 
+404	/honour-teams/probeteam1	files+=7	bytes+=50333	server/app/honour-teams/probeteam1.html server/app/honour-teams/probeteam1.meta server/app/honour-teams/probeteam1.rsc server/app/honour-teams/probeteam1.segments/_full.segment.rsc server/app/honour-teams/probeteam1.segments/honour-teams/$d$slug/__PAGE__.segment.rsc server/app/honour-teams/probeteam1.segments/_index.segment.rsc server/app/honour-teams/probeteam1.segments/_tree.segment.rsc 
+404	/awards/probeaward	files+=0	bytes+=0	 
+404	/awards/all-australian/2099	files+=0	bytes+=0	 
+404	/records/probecat	files+=0	bytes+=0	 
+404	/players/probe-malformed	files+=7	bytes+=50551	server/app/players/probe-malformed.html server/app/players/probe-malformed.meta server/app/players/probe-malformed.rsc server/app/players/probe-malformed.segments/_full.segment.rsc server/app/players/probe-malformed.segments/_index.segment.rsc server/app/players/probe-malformed.segments/players/$d$slug/__PAGE__.segment.rsc server/app/players/probe-malformed.segments/_tree.segment.rsc 
+404	/seasons/02024	files+=7	bytes+=50433	server/app/seasons/02024.html server/app/seasons/02024.meta server/app/seasons/02024.rsc server/app/seasons/02024.segments/_full.segment.rsc server/app/seasons/02024.segments/_index.segment.rsc server/app/seasons/02024.segments/seasons/$d$year/__PAGE__.segment.rsc server/app/seasons/02024.segments/_tree.segment.rsc 
+200	/seasons/%32024	files+=0	bytes+=0	 
+404	/seasons/%302024	files+=0	bytes+=0	 
+308	/seasons/2024/	files+=0	bytes+=0	 
+308	//seasons/2024	files+=0	bytes+=0	 
+200	/./seasons/2024	files+=0	bytes+=0	 
+200	/seasons/./2024	files+=0	bytes+=0	 
+200	/seasons/x/../2024	files+=0	bytes+=0	 
+404	/seasons/2024;a=1	files+=7	bytes+=50473	server/app/seasons/2024;a=1.html server/app/seasons/2024;a=1.meta server/app/seasons/2024;a=1.rsc server/app/seasons/2024;a=1.segments/_full.segment.rsc server/app/seasons/2024;a=1.segments/_index.segment.rsc server/app/seasons/2024;a=1.segments/seasons/$d$year/__PAGE__.segment.rsc server/app/seasons/2024;a=1.segments/_tree.segment.rsc 
+404	/seasons/2024%3Ba=1	files+=0	bytes+=0	 
+404	/Seasons/2024	files+=0	bytes+=0	 
+404	/%73easons/2024	files+=0	bytes+=0	 
+404	/%2573easons/2024	files+=0	bytes+=0	 
+404	/seasons/2024.json	files+=7	bytes+=50465	server/app/seasons/2024.json.html server/app/seasons/2024.json.meta server/app/seasons/2024.json.rsc server/app/seasons/2024.json.segments/_full.segment.rsc server/app/seasons/2024.json.segments/_index.segment.rsc server/app/seasons/2024.json.segments/seasons/$d$year/__PAGE__.segment.rsc server/app/seasons/2024.json.segments/_tree.segment.rsc 
+404	/seasons/2024.rsc	files+=7	bytes+=50445	server/app/seasons/2024.rsc.html server/app/seasons/2024.rsc.meta server/app/seasons/2024.rsc.rsc server/app/seasons/2024.rsc.segments/_full.segment.rsc server/app/seasons/2024.rsc.segments/_index.segment.rsc server/app/seasons/2024.rsc.segments/seasons/$d$year/__PAGE__.segment.rsc server/app/seasons/2024.rsc.segments/_tree.segment.rsc 
+200	/seasons/2024?x=1	files+=0	bytes+=0	 
+308	/seasons/2024/..	files+=0	bytes+=0	 
+404	/seasons/2024%2F..	files+=7	bytes+=50465	server/app/seasons/2024%2F...html server/app/seasons/2024%2F...meta server/app/seasons/2024%2F...rsc server/app/seasons/2024%2F...segments/_full.segment.rsc server/app/seasons/2024%2F...segments/_index.segment.rsc server/app/seasons/2024%2F...segments/seasons/$d$year/__PAGE__.segment.rsc server/app/seasons/2024%2F...segments/_tree.segment.rsc 
+404	/seasons;a=1/2024	files+=0	bytes+=0	 
+404	/seasons%5C2024	files+=0	bytes+=0	 
+404	/seasons%2F2024	files+=0	bytes+=0	 
+200	/seasons/%32%30%32%34	files+=0	bytes+=0	 
+404	/seasons/%2B2024	files+=7	bytes+=50447	server/app/seasons/+2024.html server/app/seasons/+2024.meta server/app/seasons/+2024.rsc server/app/seasons/+2024.segments/_full.segment.rsc server/app/seasons/+2024.segments/_index.segment.rsc server/app/seasons/+2024.segments/seasons/$d$year/__PAGE__.segment.rsc server/app/seasons/+2024.segments/_tree.segment.rsc 
+404	/seasons/+2024	files+=0	bytes+=0	 
+308	/seasons/	files+=0	bytes+=0	 
+404	/seasons/%252024	files+=7	bytes+=50447	server/app/seasons/%2024.html server/app/seasons/%2024.meta server/app/seasons/%2024.rsc server/app/seasons/%2024.segments/_full.segment.rsc server/app/seasons/%2024.segments/_index.segment.rsc server/app/seasons/%2024.segments/seasons/$d$year/__PAGE__.segment.rsc server/app/seasons/%2024.segments/_tree.segment.rsc 
+404	/players/scott-pendlebury-011724	files+=7	bytes+=50615	server/app/players/scott-pendlebury-011724.html server/app/players/scott-pendlebury-011724.meta server/app/players/scott-pendlebury-011724.rsc server/app/players/scott-pendlebury-011724.segments/_full.segment.rsc server/app/players/scott-pendlebury-011724.segments/_index.segment.rsc server/app/players/scott-pendlebury-011724.segments/players/$d$slug/__PAGE__.segment.rsc server/app/players/scott-pendlebury-011724.segments/_tree.segment.rsc 
+308	/players/Scott-Pendlebury-11724	files+=7	bytes+=48668	server/app/players/Scott-Pendlebury-11724.html server/app/players/Scott-Pendlebury-11724.meta server/app/players/Scott-Pendlebury-11724.rsc server/app/players/Scott-Pendlebury-11724.segments/_full.segment.rsc server/app/players/Scott-Pendlebury-11724.segments/_index.segment.rsc server/app/players/Scott-Pendlebury-11724.segments/players/$d$slug/__PAGE__.segment.rsc server/app/players/Scott-Pendlebury-11724.segments/_tree.segment.rsc 
+200	/players/scott-pendlebury-%31%31724	files+=0	bytes+=0	 
+200	/players/scott%2Dpendlebury-11724	files+=0	bytes+=0	 
+308	/players/-scott-pendlebury-11724	files+=7	bytes+=48633	server/app/players/-scott-pendlebury-11724.html server/app/players/-scott-pendlebury-11724.meta server/app/players/-scott-pendlebury-11724.rsc server/app/players/-scott-pendlebury-11724.segments/_full.segment.rsc server/app/players/-scott-pendlebury-11724.segments/_index.segment.rsc server/app/players/-scott-pendlebury-11724.segments/players/$d$slug/__PAGE__.segment.rsc server/app/players/-scott-pendlebury-11724.segments/_tree.segment.rsc 
+308	/players/scott-pendlebury-11724/	files+=0	bytes+=0	 
+308	/players/wrongslug-11724	files+=7	bytes+=48569	server/app/players/wrongslug-11724.html server/app/players/wrongslug-11724.meta server/app/players/wrongslug-11724.rsc server/app/players/wrongslug-11724.segments/_full.segment.rsc server/app/players/wrongslug-11724.segments/_index.segment.rsc server/app/players/wrongslug-11724.segments/players/$d$slug/__PAGE__.segment.rsc server/app/players/wrongslug-11724.segments/_tree.segment.rsc 
+404	/players/probe-x-900001/matches	files+=0	bytes+=0	 
+308	/players/	files+=0	bytes+=0	 
+308	/clubs/Carlton	files+=7	bytes+=47540	server/app/clubs/Carlton.html server/app/clubs/Carlton.meta server/app/clubs/Carlton.rsc server/app/clubs/Carlton.segments/clubs/$d$slug/__PAGE__.segment.rsc server/app/clubs/Carlton.segments/_full.segment.rsc server/app/clubs/Carlton.segments/_index.segment.rsc server/app/clubs/Carlton.segments/_tree.segment.rsc 
+404	/clubs/-carlton	files+=7	bytes+=50243	server/app/clubs/-carlton.html server/app/clubs/-carlton.meta server/app/clubs/-carlton.rsc server/app/clubs/-carlton.segments/clubs/$d$slug/__PAGE__.segment.rsc server/app/clubs/-carlton.segments/_full.segment.rsc server/app/clubs/-carlton.segments/_index.segment.rsc server/app/clubs/-carlton.segments/_tree.segment.rsc 
+308	/clubs/carlton/	files+=0	bytes+=0	 
+308	/clubs/.	files+=0	bytes+=0	 
+200	/clubs/..	files+=0	bytes+=0	 
+308	/clubs/%2e	files+=0	bytes+=0	 
+308	/clubs/carlton/..	files+=0	bytes+=0	 
+308	/clubs/	files+=0	bytes+=0	 
+404	/clubs/carlton;x=1	files+=7	bytes+=50283	server/app/clubs/carlton;x=1.html server/app/clubs/carlton;x=1.meta server/app/clubs/carlton;x=1.rsc server/app/clubs/carlton;x=1.segments/clubs/$d$slug/__PAGE__.segment.rsc server/app/clubs/carlton;x=1.segments/_full.segment.rsc server/app/clubs/carlton;x=1.segments/_index.segment.rsc server/app/clubs/carlton;x=1.segments/_tree.segment.rsc 
+308	/venues/mcg/	files+=0	bytes+=0	 
+404	/venues/MCG	files+=7	bytes+=50236	server/app/venues/MCG.html server/app/venues/MCG.meta server/app/venues/MCG.rsc server/app/venues/MCG.segments/_full.segment.rsc server/app/venues/MCG.segments/_index.segment.rsc server/app/venues/MCG.segments/_tree.segment.rsc server/app/venues/MCG.segments/venues/$d$slug/__PAGE__.segment.rsc 
+404	/honour-teams/Probeteam	files+=7	bytes+=50325	server/app/honour-teams/Probeteam.html server/app/honour-teams/Probeteam.meta server/app/honour-teams/Probeteam.rsc server/app/honour-teams/Probeteam.segments/_full.segment.rsc server/app/honour-teams/Probeteam.segments/honour-teams/$d$slug/__PAGE__.segment.rsc server/app/honour-teams/Probeteam.segments/_index.segment.rsc server/app/honour-teams/Probeteam.segments/_tree.segment.rsc 
+404	/brownlow/02024	files+=7	bytes+=50349	server/app/brownlow/02024.html server/app/brownlow/02024.meta server/app/brownlow/02024.rsc server/app/brownlow/02024.segments/brownlow/$d$year/__PAGE__.segment.rsc server/app/brownlow/02024.segments/_full.segment.rsc server/app/brownlow/02024.segments/_index.segment.rsc server/app/brownlow/02024.segments/_tree.segment.rsc 
+404	/matches/012345	files+=7	bytes+=50211	server/app/matches/012345.html server/app/matches/012345.meta server/app/matches/012345.rsc server/app/matches/012345.segments/_full.segment.rsc server/app/matches/012345.segments/_index.segment.rsc server/app/matches/012345.segments/matches/$d$id/__PAGE__.segment.rsc server/app/matches/012345.segments/_tree.segment.rsc 
+308	/matches/12345/	files+=0	bytes+=0	 
+200	/matches/%31%32345	files+=7	bytes+=249940	server/app/matches/12345.html server/app/matches/12345.meta server/app/matches/12345.rsc server/app/matches/12345.segments/_full.segment.rsc server/app/matches/12345.segments/_index.segment.rsc server/app/matches/12345.segments/matches/$d$id/__PAGE__.segment.rsc server/app/matches/12345.segments/_tree.segment.rsc 
+TOTAL(direct-open) files+=189 bytes+=1548787

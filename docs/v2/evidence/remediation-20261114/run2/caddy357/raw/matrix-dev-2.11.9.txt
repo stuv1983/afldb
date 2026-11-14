@@ -1,0 +1,70 @@
+== binary: v2.11.9 h1:bhZtcRKQOq0fuLvEgCdPYvUxXyGn9kzjG4lh2332DTE=  sha256 a563843e11cbce39c557bd429ebb787d56f49d51d9bbb3292cd9b36b37a60cdf
+== file under test: /mnt/ssd/afldb-rem2-caddy357-20261114/in/cf/Caddyfile sha256 71e604f4acb4e460957a3996d86c5d15203f445cf6922ca3faf1f0415cca6b93
+adapt(test copy) rc=0
+== admin guard: admin disabled in the adapted test config
+validate(test copy) rc=0 : Valid configuration
+validate(production shape: real host names, TLS automation; only admin off + log/web paths rewritten) rc=0 : Valid configuration
+adapt(UNMODIFIED deploy file) rc=0
+validate(UNMODIFIED deploy file) rc=1 : {"level":"error","ts":1794635586.7366292,"msg":"setting up custom log 'log0': opening log writer using &logging.FileWrit
+corpus=corpus/legit.tsv total=35340 expect_pass=35340 expect_deny=0 mismatches=0
+  upstream received 35339 requests; corpus expects 35339 to pass  EQUAL
+corpus=corpus/deny.tsv total=2131 expect_pass=0 expect_deny=2131 mismatches=0
+  upstream received 0 requests; corpus expects 0 to pass  EQUAL
+corpus=corpus/legit-head.tsv total=219 expect_pass=219 expect_deny=0 mismatches=0
+  upstream received 218 requests; corpus expects 218 to pass  EQUAL
+corpus=corpus/deny-head.tsv total=2131 expect_pass=0 expect_deny=2131 mismatches=47
+  re-checked with curl -I:      47 400 
+  upstream received 0 requests; corpus expects 0 to pass  EQUAL
+corpus=corpus/legit-post.tsv total=5 expect_pass=5 expect_deny=0 mismatches=0
+  upstream received 5 requests; corpus expects 5 to pass  EQUAL
+corpus=corpus/deny-post.tsv total=150 expect_pass=0 expect_deny=150 mismatches=0
+  upstream received 0 requests; corpus expects 0 to pass  EQUAL
+corpus=corpus/boundary.tsv total=85 expect_pass=57 expect_deny=28 mismatches=0
+  upstream received 57 requests; corpus expects 57 to pass  EQUAL
+corpus=corpus/open.tsv total=41 expect_pass=41 expect_deny=0 mismatches=0
+  upstream received 41 requests; corpus expects 41 to pass  EQUAL
+  hook /mnt/ssd/afldb-rem2-caddy357-20261114/in/special.sh written to /mnt/ssd/afldb-rem2-caddy357-20261114/matrix/dev-2.11.9/hook.out (26 lines); upstream received 8 requests during the hook
+== sentinel scan of the logs (0 expected everywhere)
+  PROBE-DENY-TOKEN-ddd444    afldb-access.log         0
+  PROBE-DENY-TOKEN-ddd444    caddy-stderr.log         0
+  PROBE-PATHSECRET-eee555    afldb-access.log         1
+  PROBE-PATHSECRET-eee555    caddy-stderr.log         0
+  PROBE-QUERY-fff666         afldb-access.log         0
+  PROBE-QUERY-fff666         caddy-stderr.log         0
+  PROBE-INVITE-bbb222        afldb-access.log         0
+  PROBE-INVITE-bbb222        caddy-stderr.log         0
+  PROBE-REFQ-hhh888          afldb-access.log         0
+  PROBE-REFQ-hhh888          caddy-stderr.log         0
+  PROBE-COOKIE-iii999        afldb-access.log         0
+  PROBE-COOKIE-iii999        caddy-stderr.log         0
+  PROBE-LONG-jjj000          afldb-access.log         0
+  PROBE-LONG-jjj000          caddy-stderr.log         0
+  PROBE-BAD-kkk111           afldb-access.log         0
+  PROBE-BAD-kkk111           caddy-stderr.log         0
+  PROBE-MAGIC-aaa111         afldb-access.log         0
+  PROBE-MAGIC-aaa111         caddy-stderr.log         0
+  PROBE-SEARCH-ccc333        afldb-access.log         0
+  PROBE-SEARCH-ccc333        caddy-stderr.log         0
+== logged records of the hook (status uri), in order
+  404 http://beta.afldb.com:55653/seasons/02024
+  404 http://beta.afldb.com:55653/seasons/%32024
+  404 http://beta.afldb.com:55653//seasons/2024
+  200 http://beta.afldb.com:55653/players/x-1
+  404 /seasons/02024
+  200 /seasons/2024
+  404 /seasons/02024
+  200 /seasons/2024
+  404 /seasons/%32024
+  200 /seasons/2024
+  404 /seasons/02024
+  404 /seasons/02024
+  404 /players/PROBE-PATHSECRET-eee555
+  404 /matches/0123
+  404 /clubs/CARLTON
+  404 /aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  200 /admin/invite/REDACTED
+  200 /beta/verify
+  200 /search
+stopped: no listener on 55653/55663
+no process of this run left
+MATRIX-DONE dev-2.11.9

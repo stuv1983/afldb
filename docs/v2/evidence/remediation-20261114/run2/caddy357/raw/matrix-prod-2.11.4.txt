@@ -1,0 +1,80 @@
+== binary: v2.11.4 h1:XKxkMTgNSizEvKG6QHue6cAsFOteU2qA61w2tKkCWi0=  sha256 b7105518e3ed1c0761f232e44fc09345535533c9cb0abf0e12809416c7ac64d9
+== file under test: /mnt/ssd/afldb-rem2-caddy357-20261114/in/cf/Caddyfile.production sha256 7149da9a055e2947851ea0811f87b34ff96bbb89e999213c40eae10552c9a7e2
+adapt(test copy) rc=0
+== admin guard: admin disabled in the adapted test config
+validate(test copy) rc=0 : {"level":"info","ts":1794635566.9726057,"logger":"http.handlers.reverse_proxy.health_checker.active","msg":"HTTP request
+validate(production shape: real host names, TLS automation; only admin off + log/web paths rewritten) rc=0 : Valid configuration
+adapt(UNMODIFIED deploy file) rc=0
+validate(UNMODIFIED deploy file) rc=1 : Error: setting up custom log 'log0': opening log writer using &logging.FileWriter{Filename:"/var/log/caddy/afldb-access.
+corpus=corpus/legit.tsv total=35340 expect_pass=35340 expect_deny=0 mismatches=0
+  upstream received 35339 requests; corpus expects 35339 to pass  EQUAL
+corpus=corpus/deny.tsv total=2131 expect_pass=0 expect_deny=2131 mismatches=0
+  upstream received 0 requests; corpus expects 0 to pass  EQUAL
+corpus=corpus/legit-head.tsv total=219 expect_pass=219 expect_deny=0 mismatches=0
+  upstream received 218 requests; corpus expects 218 to pass  EQUAL
+corpus=corpus/deny-head.tsv total=2131 expect_pass=0 expect_deny=2131 mismatches=47
+  re-checked with curl -I:      47 400 
+  upstream received 0 requests; corpus expects 0 to pass  EQUAL
+corpus=corpus/legit-post.tsv total=5 expect_pass=5 expect_deny=0 mismatches=0
+  upstream received 5 requests; corpus expects 5 to pass  EQUAL
+corpus=corpus/deny-post.tsv total=150 expect_pass=0 expect_deny=150 mismatches=0
+  upstream received 0 requests; corpus expects 0 to pass  EQUAL
+corpus=corpus/boundary.tsv total=85 expect_pass=57 expect_deny=28 mismatches=0
+  upstream received 57 requests; corpus expects 57 to pass  EQUAL
+corpus=corpus/open.tsv total=41 expect_pass=41 expect_deny=0 mismatches=0
+  upstream received 41 requests; corpus expects 41 to pass  EQUAL
+  hook /mnt/ssd/afldb-rem2-caddy357-20261114/in/special.sh written to /mnt/ssd/afldb-rem2-caddy357-20261114/matrix/prod-2.11.4/hook.out (26 lines); upstream received 8 requests during the hook
+== sentinel scan of the logs (0 expected everywhere)
+  PROBE-DENY-TOKEN-ddd444    afldb-access.log         0
+  PROBE-DENY-TOKEN-ddd444    afldb-apex.log           0
+  PROBE-DENY-TOKEN-ddd444    caddy-stderr.log         0
+  PROBE-PATHSECRET-eee555    afldb-access.log         1
+  PROBE-PATHSECRET-eee555    afldb-apex.log           0
+  PROBE-PATHSECRET-eee555    caddy-stderr.log         0
+  PROBE-QUERY-fff666         afldb-access.log         0
+  PROBE-QUERY-fff666         afldb-apex.log           0
+  PROBE-QUERY-fff666         caddy-stderr.log         0
+  PROBE-INVITE-bbb222        afldb-access.log         0
+  PROBE-INVITE-bbb222        afldb-apex.log           0
+  PROBE-INVITE-bbb222        caddy-stderr.log         0
+  PROBE-REFQ-hhh888          afldb-access.log         0
+  PROBE-REFQ-hhh888          afldb-apex.log           0
+  PROBE-REFQ-hhh888          caddy-stderr.log         0
+  PROBE-COOKIE-iii999        afldb-access.log         0
+  PROBE-COOKIE-iii999        afldb-apex.log           0
+  PROBE-COOKIE-iii999        caddy-stderr.log         0
+  PROBE-LONG-jjj000          afldb-access.log         0
+  PROBE-LONG-jjj000          afldb-apex.log           0
+  PROBE-LONG-jjj000          caddy-stderr.log         0
+  PROBE-BAD-kkk111           afldb-access.log         0
+  PROBE-BAD-kkk111           afldb-apex.log           0
+  PROBE-BAD-kkk111           caddy-stderr.log         0
+  PROBE-MAGIC-aaa111         afldb-access.log         0
+  PROBE-MAGIC-aaa111         afldb-apex.log           0
+  PROBE-MAGIC-aaa111         caddy-stderr.log         0
+  PROBE-SEARCH-ccc333        afldb-access.log         0
+  PROBE-SEARCH-ccc333        afldb-apex.log           0
+  PROBE-SEARCH-ccc333        caddy-stderr.log         0
+== logged records of the hook (status uri), in order
+  404 http://beta.afldb.com:55653/seasons/02024
+  404 http://beta.afldb.com:55653/seasons/%32024
+  404 http://beta.afldb.com:55653//seasons/2024
+  200 http://beta.afldb.com:55653/players/x-1
+  404 /seasons/02024
+  200 /seasons/2024
+  404 /seasons/02024
+  200 /seasons/2024
+  404 /seasons/%32024
+  200 /seasons/2024
+  404 /seasons/02024
+  404 /seasons/02024
+  404 /players/PROBE-PATHSECRET-eee555
+  404 /matches/0123
+  404 /clubs/CARLTON
+  404 /aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  200 /admin/invite/REDACTED
+  200 /beta/verify
+  200 /search
+stopped: no listener on 55653/55663
+no process of this run left
+MATRIX-DONE prod-2.11.4

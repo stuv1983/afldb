@@ -1,0 +1,10 @@
+/sitemap/0.xml: 606
+/sitemap/1.xml: 1797
+/sitemap/100.xml: 5000
+/sitemap/101.xml: 5000
+/sitemap/102.xml: 3365
+/sitemap/200.xml: 5000
+/sitemap/201.xml: 5000
+/sitemap/202.xml: 5000
+/sitemap/203.xml: 2056
+/sitemap/300.xml: 1705

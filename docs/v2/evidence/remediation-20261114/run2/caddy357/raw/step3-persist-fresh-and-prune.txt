@@ -1,0 +1,69 @@
+== body differences: does the app render those pages differently on every request?
+      1 VARIES-BY-ITSELF direct-vs-direct /awards/sandover-medal/1997
+      1 VARIES-BY-ITSELF direct-vs-direct /awards/bf-fremantle/2011
+      1 SAME direct-vs-direct /players/probe-x-900001/matches
+      1 SAME direct-vs-direct /coaches/syd-coventry-214
+      1 SAME direct-vs-direct /coaches/ross-lyon-14
+      1 SAME direct-vs-direct /coaches/roger-merrett-314
+      1 SAME direct-vs-direct /awards/x/2101
+      1 SAME direct-vs-direct /awards/rising-star?season=2024
+      1 SAME direct-vs-direct /awards/bf-west-coast
+      1 SAME direct-vs-direct /awards/all-australian/2019
+      1 SAME direct-vs-direct /awards/ALL/2024
+      1 SAME direct-vs-direct /aflw/matches/7-6-stk-col
+      1 SAME direct-vs-direct /aflw/matches/2025-5-ric-gee
+      1 SAME direct-vs-direct /aflw/matches/2024-6-ess-syd
+      1 SAME direct-vs-direct /aflw/matches/2022-4-car-kan
+      1 SAME direct-vs-direct /aflw/matches/2018-2-fre-col
+admin guard ok; binary v2.11.4
+caddy pid 1572865; health via caddy: 200
+== fresh names through Caddy (first 6 are well-formed unknown: expected to reach Next and persist; the rest are junk: expected 0)
+404	/players/fresh-unknown-name-871001	files+=7	bytes+=50631	server/app/players/fresh-unknown-name-871001.html server/app/players/fresh-unknown-name-8
+404	/matches/88001	files+=7	bytes+=50246	server/app/matches/88001.html server/app/matches/88001.meta server/app/matches/88001.rsc server/app/matches/8
+404	/seasons/2098	files+=0	bytes+=0	 
+404	/clubs/fresh-unknown-club	files+=7	bytes+=50323	server/app/clubs/fresh-unknown-club.html server/app/clubs/fresh-unknown-club.meta server/app/clubs
+404	/venues/fresh-unknown-venue	files+=7	bytes+=50321	server/app/venues/fresh-unknown-venue.html server/app/venues/fresh-unknown-venue.meta server/app
+404	/honour-teams/fresh-unknown-team	files+=7	bytes+=50397	server/app/honour-teams/fresh-unknown-team.html server/app/honour-teams/fresh-unknown-team.
+308	/players/fresh-wrong-slug-11724	files+=7	bytes+=48625	server/app/players/fresh-wrong-slug-11724.html server/app/players/fresh-wrong-slug-11724.met
+404	/players/fresh-junk-0871002	files+=0	bytes+=0	 
+404	/players/fresh-junk-871003.json	files+=0	bytes+=0	 
+404	/players/Fresh-Junk-871004	files+=0	bytes+=0	 
+404	/matches/0088002	files+=0	bytes+=0	 
+404	/matches/88003.rsc	files+=0	bytes+=0	 
+404	/matches/100001	files+=0	bytes+=0	 
+404	/seasons/02098	files+=0	bytes+=0	 
+404	/seasons/2098.json	files+=0	bytes+=0	 
+404	/seasons/%32098	files+=0	bytes+=0	 
+404	/clubs/Fresh-Junk-Club	files+=0	bytes+=0	 
+404	/clubs/fresh-junk-club.rsc	files+=0	bytes+=0	 
+404	/venues/fresh%2Djunk	files+=0	bytes+=0	 
+404	/honour-teams/fresh-junk-team/	files+=0	bytes+=0	 
+404	/sitemap/998.xml	files+=2	bytes+=256	server/app/sitemap/998.xml.body server/app/sitemap/998.xml.meta 
+404	/sitemap/fresh-junk.xml	files+=0	bytes+=0	 
+404	/players/fresh-junk-871005/../fresh-junk-871006	files+=0	bytes+=0	 
+404	//players/fresh-junk-871007	files+=0	bytes+=0	 
+TOTAL(via-caddy-fresh) files+=44 bytes+=300799
+== /search?q=most+goals in Chromium, direct vs through Caddy
+direct: load status=200 after 8584ms, requests=31, still pending after 8s=1, title="Search | AFLDB"
+via-caddy: load status=200 after 8724ms, requests=31, still pending after 8s=1, title="Search | AFLDB"
+stopped: no listener on 55653
+no caddyapp process left
+== prune test on the disposable .next (dry run first)
+/mnt/ssd/afldb-rem2-caddy357-20261114/cand/.next/server/app/players/fresh-unknown-name-871001.html
+/mnt/ssd/afldb-rem2-caddy357-20261114/cand/.next/server/app/players/fresh-unknown-name-871001.meta
+/mnt/ssd/afldb-rem2-caddy357-20261114/cand/.next/server/app/players/fresh-unknown-name-871001.rsc
+
+/mnt/ssd/afldb-rem2-caddy357-20261114/cand/.next/server/app/players/fresh-unknown-name-871001.segments:
+would delete (dry run): entries=9835 disk_KiB=746748
+-- delete:
+deleted: entries=9835 disk_KiB=746748
+-- after: dry run again (expect 0) and the entry is gone:
+would delete (dry run): entries=0 disk_KiB=0
+ls: cannot access '/mnt/ssd/afldb-rem2-caddy357-20261114/cand/.next/server/app/players/fresh-unknown-name-871001.*': No such file or directory
+-- the app still answers the pruned path the same way, and re-persists it:
+status=404
+ls: cannot access '/mnt/ssd/afldb-rem2-caddy357-20261114/cand/.next/server/app/players/fresh-unknown-name-871001.*': No such file or directory
+-- a legit canonical page is untouched:
+status=200
+/mnt/ssd/afldb-rem2-caddy357-20261114/cand/.next/server/app/seasons/2024.html
+STEP3-DONE

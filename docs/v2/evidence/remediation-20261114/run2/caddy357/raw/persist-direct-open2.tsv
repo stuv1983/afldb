@@ -1,0 +1,43 @@
+404	/sitemap/999.xml	files+=2	bytes+=256	server/app/sitemap/999.xml.body server/app/sitemap/999.xml.meta 
+404	/sitemap/abc.xml	files+=2	bytes+=256	server/app/sitemap/abc.xml.body server/app/sitemap/abc.xml.meta 
+200	/sitemap/0.xml	files+=0	bytes+=0	 
+404	/awards/x/02024	files+=0	bytes+=0	 
+404	/awards/all-australian/02024	files+=0	bytes+=0	 
+404	/awards/nonexistent	files+=0	bytes+=0	 
+404	/awards/nonexistent/2024	files+=0	bytes+=0	 
+404	/records/Most_Games	files+=0	bytes+=0	 
+404	/records/probe-category-1	files+=0	bytes+=0	 
+404	/seasons;a=1/2024	files+=0	bytes+=0	 
+404	/x/%2e%2e/seasons/02024	files+=0	bytes+=0	 
+404	/x/../seasons/02024	files+=0	bytes+=0	 
+404	/./seasons/02024	files+=0	bytes+=0	 
+308	//seasons/02024	files+=0	bytes+=0	 
+308	/seasons//02024	files+=0	bytes+=0	 
+404	/seasons/%2e%2e/seasons/02024	files+=0	bytes+=0	 
+308	/seasons/02024/..	files+=0	bytes+=0	 
+308	/coaches/probe-9	files+=0	bytes+=0	 
+404	/coaches/probe-99999	files+=0	bytes+=0	 
+404	/draft/9999	files+=0	bytes+=0	 
+404	/draft/02024	files+=0	bytes+=0	 
+404	/draft/abc	files+=0	bytes+=0	 
+404	/aflw/players/PROBE_NAME	files+=0	bytes+=0	 
+404	/aflw/clubs/ZZZ	files+=0	bytes+=0	 
+404	/aflw/matches/ZZZ	files+=0	bytes+=0	 
+404	/aflw/seasons/ZZZ	files+=0	bytes+=0	 
+404	/players/probe-x-900002/matches	files+=0	bytes+=0	 
+404	/venues/probevenue2/matches	files+=0	bytes+=0	 
+200	/search?q=zzz	files+=0	bytes+=0	 
+404	/api/coaches/999999/opponent-record	files+=0	bytes+=0	 
+307	/beta/verify?token=x	files+=0	bytes+=0	 
+307	/beta	files+=0	bytes+=0	 
+200	/robots.txt	files+=0	bytes+=0	 
+200	/sitemap-index.xml	files+=0	bytes+=0	 
+200	/opengraph-image	files+=0	bytes+=0	 
+404	/this/path/does/not/exist	files+=0	bytes+=0	 
+404	/zz-probe-1	files+=0	bytes+=0	 
+404	/players/probe-x-900003.json	files+=7	bytes+=50583	server/app/players/probe-x-900003.json.html server/app/players/probe-x-900003.json.meta server/app/players/probe-x-900003.json.rsc server/app/players/probe-x-900003.json.segments/_full.segment.rsc server/app/players/probe-x-900003.json.segments/_index.segment.rsc server/app/players/probe-x-900003.json.segments/players/$d$slug/__PAGE__.segment.rsc server/app/players/probe-x-900003.json.segments/_tree.segment.rsc 
+404	/clubs/probeclub2.rsc	files+=7	bytes+=50279	server/app/clubs/probeclub2.rsc.html server/app/clubs/probeclub2.rsc.meta server/app/clubs/probeclub2.rsc.rsc server/app/clubs/probeclub2.rsc.segments/clubs/$d$slug/__PAGE__.segment.rsc server/app/clubs/probeclub2.rsc.segments/_full.segment.rsc server/app/clubs/probeclub2.rsc.segments/_index.segment.rsc server/app/clubs/probeclub2.rsc.segments/_tree.segment.rsc 
+404	/matches/12345.rsc	files+=7	bytes+=50223	server/app/matches/12345.rsc.html server/app/matches/12345.rsc.meta server/app/matches/12345.rsc.rsc server/app/matches/12345.rsc.segments/_full.segment.rsc server/app/matches/12345.rsc.segments/_index.segment.rsc server/app/matches/12345.rsc.segments/matches/$d$id/__PAGE__.segment.rsc server/app/matches/12345.rsc.segments/_tree.segment.rsc 
+404	/seasons/2024.segments/_tree.segment.rsc	files+=0	bytes+=0	 
+404	/seasons/2024/__next._tree.txt	files+=0	bytes+=0	 
+TOTAL(direct-open2) files+=25 bytes+=151597

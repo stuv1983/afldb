@@ -1,0 +1,26 @@
+## absolute-form request target (RFC 9112 3.2.2) and HTTP/1.0
+abs-form canonical /seasons/2024 (pass)      http=200  body=upstream saw GET /seasons/2024 
+abs-form /seasons/02024 (deny)               http=404  body=Not Found
+abs-form /seasons/%32024 (deny)              http=404  body=Not Found
+abs-form //seasons/2024 (deny)               http=404  body=Not Found
+abs-form /players/x-1?q=1 (pass)             http=200  body=upstream saw GET /players/x-1?q=1 
+HTTP/1.0 /seasons/02024 (deny)               http=404  body=Not Found
+HTTP/1.0 /seasons/2024 (pass)                http=200  body=upstream saw GET /seasons/2024 
+h2c prior knowledge /seasons/02024 (deny)    http=404  body=Not Found
+h2c prior knowledge /seasons/2024 (pass)     http=200  body=upstream saw GET /seasons/2024 
+h2c prior knowledge /seasons/%32024 (deny)   http=404  body=Not Found
+## the apex host (static, never proxies to the app): the rules are not applied there
+apex /seasons/02024 (static 404)             http=404  body=
+## rewrite headers must not change the verdict
+X-Original-URL junk, canonical path (pass)   http=200  body=upstream saw GET /seasons/2024 
+X-Original-URL canonical, junk path (deny)   http=404  body=Not Found
+## log redaction for DENIED requests (sentinels are fake)
+denied, query token                          http=404  body=Not Found
+denied, secret in path and query             http=404  body=Not Found
+denied, Referer carries an invite token      http=404  body=Not Found
+denied, Cookie header                        http=404  body=Not Found
+denied, long path                            http=404  body=Not Found
+malformed escape (Go 400) with token         http=400  body=400 Bad Request
+passed: invite path                          http=200  body=upstream saw GET /admin/invite/PROBE-INVITE-bbb222 
+passed: magic link                           http=200  body=upstream saw GET /beta/verify?token=PROBE-MAGIC-aaa111 
+passed: search text                          http=200  body=upstream saw GET /search?q=PROBE-SEARCH-ccc333 

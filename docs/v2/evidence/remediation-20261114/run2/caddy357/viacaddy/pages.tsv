@@ -1,0 +1,27 @@
+/	status=200	title="AFL & VFL Statistics, Records and Match History | "	h1="Every player. Every game. Since 1897."	scripts=9	hsts=yes	csp=yes	requests=63
+/players/scott-pendlebury-11724	status=200	title="Scott Pendlebury — AFL Stats, Games & Career Recor"	h1="Scott Pendlebury"	scripts=10	hsts=yes	csp=yes	requests=33
+/players/scott-pendlebury-11724/matches	status=200	title="Scott Pendlebury — Complete Match Log | AFLDB"	h1="Scott Pendlebury — Match Log"	scripts=5	hsts=yes	csp=yes	requests=67
+/matches/16592	status=200	title="North Melbourne v West Coast — Round 23, 2024 AFL "	h1="North Melbourne v West Coast"	scripts=9	hsts=yes	csp=yes	requests=44
+/seasons/2024	status=200	title="2024 AFL Season — Ladder, Results & Finals | AFLDB"	h1="2024 AFL Season"	scripts=10	hsts=yes	csp=yes	requests=31
+/seasons	status=200	title="AFL & VFL Seasons — Ladders, Premiers & Results Si"	h1="Seasons"	scripts=5	hsts=yes	csp=yes	requests=54
+/brownlow/2024	status=200	title="2024 Brownlow Medal — Winner, Votes & Leaderboard "	h1="2024 Brownlow Medal"	scripts=9	hsts=yes	csp=yes	requests=49
+/clubs/carlton	status=200	title="Carlton — Players, Seasons, Records & History | AF"	h1="Carlton"	scripts=9	hsts=yes	csp=yes	requests=39
+/venues/adelaide-oval	status=200	title="Adelaide Oval — AFL/VFL Venue Record | AFLDB"	h1="Adelaide Oval"	scripts=8	hsts=yes	csp=yes	requests=42
+/honour-teams/afl-vfl-team-of-the-century	status=200	title="AFL/VFL Team of the Century — Full Team and Every "	h1="AFL/VFL Team of the Century"	scripts=8	hsts=yes	csp=yes	requests=46
+/awards	status=200	title="AFL & VFL Awards and Honours — Every Winner | AFLD"	h1="Awards and Honours"	scripts=9	hsts=yes	csp=yes	requests=38
+/awards/all-australian	status=200	title="All-Australian Team — Every Winner and Full Histor"	h1="All-Australian Team"	scripts=5	hsts=yes	csp=yes	requests=50
+/awards/all-australian/2024	status=200	title="2024 All-Australian Team — Winner and Full Result "	h1="2024 All-Australian Team"	scripts=5	hsts=yes	csp=yes	requests=65
+/records	status=200	title="AFL & VFL Records — Career, Season and Single-Matc"	h1="Records"	scripts=8	hsts=yes	csp=yes	requests=47
+/records/most-games	status=200	title="Most Games — Career VFL/AFL Record | AFLDB"	h1="Most Games"	scripts=5	hsts=yes	csp=yes	requests=41
+/players	status=200	title="AFL & VFL Players — Every Player Since 1897 | AFLD"	h1="Players"	scripts=5	hsts=yes	csp=yes	requests=46
+/clubs	status=200	title="AFL & VFL Clubs — Every Club, Current and Historic"	h1="Clubs"	scripts=5	hsts=yes	csp=yes	requests=52
+/clubs/compare	status=200	title="Compare AFL & VFL Clubs — Head-to-Head Records and"	h1="Compare clubs"	scripts=5	hsts=yes	csp=yes	requests=24
+/players/compare	status=200	title="Compare AFL Players — Career Statistics Side by Si"	h1="Compare players"	scripts=7	hsts=yes	csp=yes	requests=25
+/coaches	status=200	title="AFL & VFL Coaches | AFLDB"	h1="Coaches"	scripts=8	hsts=yes	csp=yes	requests=42
+/aflw	status=200	title="AFLW Statistics — Players, Clubs, Seasons & Matche"	h1="Every player. Every game. Since 2017."	scripts=8	hsts=yes	csp=yes	requests=47
+/aflw/players/Aasta_O%2527Connor	status=200	title="Aasta O'Connor — AFLW Stats, Games & Career Record"	h1="Aasta O'Connor"	scripts=5	hsts=yes	csp=yes	requests=51
+/search?q=most+goals	ERROR TimeoutError: page.goto: Timeout 60000ms exceeded.
+Call log:
+  - navigating to "http://beta.afldb.co
+/grid-solver	status=200	title="Administrator sign-in | AFLDB"	h1="Administrator sign-in"	scripts=5	hsts=yes	csp=yes	requests=24
+/about	status=200	title="About AFLDB | AFLDB"	h1="About AFLDB"	scripts=9	hsts=yes	csp=yes	requests=22

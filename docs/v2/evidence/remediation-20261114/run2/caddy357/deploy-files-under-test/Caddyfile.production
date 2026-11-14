@@ -1,0 +1,384 @@
+# AFLDB reverse proxy — PRODUCTION DROPLET (afldb-prod, SYD1)
+#
+#   sudo cp deploy/Caddyfile.production /etc/caddy/Caddyfile
+#   sudo caddy validate --config /etc/caddy/Caddyfile
+#   sudo systemctl reload caddy
+#
+# Caddy obtains and renews certificates automatically once the hostname
+# resolves to this droplet. Nothing here requests one explicitly.
+#
+# TWO HOSTNAMES, TWO JOBS.
+#
+#   beta.afldb.com   the application, gated, noindex — the staging-hostname
+#                    step docs/production-cutover.md §3 recommended.
+#   afldb.com        a static coming-soon page, indexable, served from disk.
+#   www.afldb.com    a permanent redirect to the apex, nothing else.
+#
+# The apex does NOT proxy to the application, with one exception (the
+# early-access form endpoint). See the comment on that block for why. This
+# keeps the original property of the beta-first ordering — a mistake in the
+# application cannot take down the domain that matters for search — while
+# still putting a real page at the apex instead of a parked one.
+#
+# See docs/apex-coming-soon.md for the deployment steps.
+#
+# THE header_up LINES ARE NOT OPTIONAL. Without them a client can send
+# its own X-Forwarded-For and forge the IP recorded in auth_sessions and
+# auth_audit_log. deploy/Caddyfile (development) carries the same three
+# lines and says the production proxy must match. src/lib/auth/session.ts
+# reads the RIGHTMOST entry, which is only trustworthy because Caddy
+# overwrites rather than appends.
+
+# ACCESS LOGS CARRY NO SECRETS (AFLDB-ISSUE-362 SEC-1).
+#
+# Caddy's JSON access log records the whole request URI and the Referer, and
+# three kinds of URL carry a credential or private input:
+#
+#   /beta/verify?token=<magic-link token>   spends into a beta admission
+#   /admin/invite/<invite token>            lets its holder set an admin
+#                                           password and TOTP, valid 7 days
+#   /search?q=... and every other query     user-typed text
+#
+# A plain `format json` logs all of them verbatim, whatever `level` says: the
+# level selects which records are kept, never what a record contains. The
+# filter below therefore rewrites the logged `uri` before it is written: the
+# invite token is replaced, and the whole query string is dropped. Referer is
+# cut to its origin, because the browser sends the full same-origin URL
+# (invite token and query included) with every asset request the page makes.
+# Cookie, Set-Cookie and Authorization are already redacted by Caddy itself.
+# Routing and the proxied request are untouched: the filter only rewrites
+# what the log encoder writes.
+#
+# The same filter is imported by BOTH site logs and by the global default log.
+# The default log matters: when the upstream is down (every release restart),
+# Caddy writes an ERROR record to its own stderr/journal that carries the whole
+# request, URI included — a second path to the same tokens that the per-site
+# access logs never see. One snippet keeps all three from drifting apart.
+(afldb_log_format) {
+	format filter {
+		wrap json
+		fields {
+			request>uri multi_regexp {
+				regexp "^/admin/invite/[^/?#]+" "/admin/invite/REDACTED"
+				regexp "\?.*$" ""
+			}
+			request>headers>Referer regexp "^(https?://[^/?#]+).*$" "${1}/"
+		}
+	}
+}
+
+# PATH-SHAPE PROTECTION FOR THE ISR ROUTES (AFLDB-ISSUE-357, owner option O-1).
+#
+# Next.js writes every rendered page of an ISR route to disk, and that includes
+# a notFound() and a redirect: each distinct path costs about 7 files / 50 KB
+# under .next/server/app whatever it answers (players, matches, seasons,
+# brownlow, clubs, venues, honour-teams; /sitemap/<id>.xml about 2 small files).
+# The app already 404s every non-canonical id spelling, but the 404 is itself
+# persisted, so a client that invents paths grows the serving tree without
+# bound. This snippet answers a path that CANNOT be a canonical URL with a 404
+# straight from Caddy, so it never reaches Next and nothing is written.
+#
+# Four layers, in order, each a `respond ... 404`:
+#   1. an implausibly long raw path (over 512 characters, query excluded);
+#   2. path aliasing: `//`, a `.` or `..` segment, an encoded slash, backslash
+#      or dot (`%2F`, `%5C`, `%2E`, either case);
+#   3. an encoded character in the first segment (`/%73easons/...`);
+#   4. one allow-list per ISR route: under that route's prefix only the
+#      canonical shape passes, with an optional query string.
+#
+# HOW CADDY SEES A PATH (measured with Caddy 2.11.4 and 2.11.9; see
+# docs/v2/evidence/remediation-20261114/run2/caddy357/README.md):
+#   * `path` and `path_regexp` match the DECODED path (%32024 is 2024), `path`
+#     also cleans `//`, `/./` and `/x/../` and ignores case. Matching on them
+#     would let every encoded or aliased spelling through as "canonical".
+#   * {http.request.uri} is the RAW request target, byte for byte what the
+#     client sent and what is proxied upstream, query string included. Every
+#     rule here matches on it, so a percent-encoded digit, a double encoding,
+#     `;`, `+`, a trailing slash, an upper-case letter or an overlong UTF-8
+#     sequence is simply not canonical.
+#
+# CANONICAL SHAPES (lower-case, no `%`, no sign, no leading zero):
+#   player  /players/<slug>-<id>[/matches], and /players/compare
+#           slug [a-z0-9-], 1 to 100 characters; id 1 to 2147483647 (the
+#           PostgreSQL int4 range the app enforces, written out as a regexp)
+#   match   /matches/<1 to 99999>: 5 digits, 5.8 times the largest id today
+#           (17,274). This bounds the route at 99,999 persisted paths. If
+#           max(matches.id) ever approaches 20,000, widen it.
+#   year    /seasons/<year>, /brownlow/<year>: 1897 to 2100 (the app's bounds)
+#   slug    /clubs/<slug>, /venues/<slug>[/matches], /honour-teams/<slug>:
+#           [a-z0-9-], 1 to 80 characters
+#   sitemap /sitemap/<0 to 999>.xml
+# Left alone, on purpose: the list pages (`/seasons/`, `/players/?page=2` are
+# answered by the app), /awards and /records (they read searchParams, so Next
+# renders them per request and persists nothing: 0 files measured), the AFLW
+# and coach routes (force-dynamic), `/_next`, `/api`, `/admin`, `/beta`.
+#
+# This does NOT bound a well-formed id or slug that simply does not exist:
+# /players/not-a-real-name-4711 has a canonical shape and still reaches Next,
+# which renders and persists a 404. See the README for the residual, its growth
+# model and the protections that already limit it.
+#
+# WHEN THE APEX STARTS PROXYING THE APPLICATION (see "AT LAUNCH" below),
+# `import afldb_path_shape` in that block too.
+(afldb_path_shape) {
+	# 1. An implausibly long raw path (query string excluded). The longest path
+	#    of a build (a /_next asset) is about 100 characters and the longest
+	#    player page 40; 512 leaves ample room.
+	@afldb_path_long vars_regexp {http.request.uri} ^[^?]{513,}
+	respond @afldb_path_long "Not Found" 404
+
+	# 2. Path aliasing: a doubled slash, a `.` or `..` segment, or an encoded
+	#    slash, backslash or dot. No URL the application emits contains one, and
+	#    each is a way to name an ISR path that the allow-lists below would not
+	#    recognise as protected.
+	@afldb_path_alias vars_regexp {http.request.uri} ^[^?]*(//|/[.]{1,2}(/|[?]|$)|%2[EeFf]|%5[Cc])
+	respond @afldb_path_alias "Not Found" 404
+
+	# 3. An encoded character in the FIRST segment (`/%73easons/...`): every
+	#    route here starts with a plain word.
+	@afldb_path_first_segment vars_regexp {http.request.uri} ^/[^/?]*%
+	respond @afldb_path_first_segment "Not Found" 404
+
+	# 4. One allow-list per ISR route. The trigger is the raw prefix followed by
+	#    at least one path character (so `/seasons/` and `/seasons/?x=1`, the
+	#    list page, are left to the application). Allowed: the canonical shape
+	#    with an optional query string, nothing else.
+	@afldb_bad_player {
+		vars_regexp {http.request.uri} ^/players/[^?]
+		not vars_regexp {http.request.uri} ^/players/(compare|[a-z0-9-]{1,100}-([1-9][0-9]{0,8}|1[0-9]{9}|20[0-9]{8}|21[0-3][0-9]{7}|214[0-6][0-9]{6}|2147[0-3][0-9]{5}|21474[0-7][0-9]{4}|214748[0-2][0-9]{3}|2147483[0-5][0-9]{2}|21474836[0-3][0-9]|214748364[0-7])(/matches)?)([?].*)?$
+	}
+	respond @afldb_bad_player "Not Found" 404
+
+	@afldb_bad_match {
+		vars_regexp {http.request.uri} ^/matches/[^?]
+		not vars_regexp {http.request.uri} ^/matches/[1-9][0-9]{0,4}([?].*)?$
+	}
+	respond @afldb_bad_match "Not Found" 404
+
+	@afldb_bad_season {
+		vars_regexp {http.request.uri} ^/seasons/[^?]
+		not vars_regexp {http.request.uri} ^/seasons/(189[7-9]|19[0-9][0-9]|20[0-9][0-9]|2100)([?].*)?$
+	}
+	respond @afldb_bad_season "Not Found" 404
+
+	@afldb_bad_brownlow {
+		vars_regexp {http.request.uri} ^/brownlow/[^?]
+		not vars_regexp {http.request.uri} ^/brownlow/(189[7-9]|19[0-9][0-9]|20[0-9][0-9]|2100)([?].*)?$
+	}
+	respond @afldb_bad_brownlow "Not Found" 404
+
+	@afldb_bad_club {
+		vars_regexp {http.request.uri} ^/clubs/[^?]
+		not vars_regexp {http.request.uri} ^/clubs/[a-z0-9-]{1,80}([?].*)?$
+	}
+	respond @afldb_bad_club "Not Found" 404
+
+	@afldb_bad_venue {
+		vars_regexp {http.request.uri} ^/venues/[^?]
+		not vars_regexp {http.request.uri} ^/venues/[a-z0-9-]{1,80}(/matches)?([?].*)?$
+	}
+	respond @afldb_bad_venue "Not Found" 404
+
+	@afldb_bad_honour_team {
+		vars_regexp {http.request.uri} ^/honour-teams/[^?]
+		not vars_regexp {http.request.uri} ^/honour-teams/[a-z0-9-]{1,80}([?].*)?$
+	}
+	respond @afldb_bad_honour_team "Not Found" 404
+
+	@afldb_bad_sitemap {
+		vars_regexp {http.request.uri} ^/sitemap/[^?]
+		not vars_regexp {http.request.uri} ^/sitemap/[0-9]{1,3}[.]xml([?].*)?$
+	}
+	respond @afldb_bad_sitemap "Not Found" 404
+}
+
+# Global options. The snippets above are defined first because a global block
+# cannot import a snippet that is defined after it.
+{
+	# Caddy's default log (stderr, so the journal).
+	log {
+		import afldb_log_format
+	}
+}
+
+beta.afldb.com {
+	# Refuse a path that cannot be a canonical URL before it reaches Next's
+	# ISR cache (AFLDB-ISSUE-357): see the (afldb_path_shape) snippet.
+	import afldb_path_shape
+
+	reverse_proxy 127.0.0.1:3100 {
+		health_uri /api/health
+		health_interval 30s
+		health_timeout 5s
+
+		# Overwrite, never append: the app must see only Caddy's own value.
+		header_up X-Forwarded-For {remote_host}
+
+		# Drop the other address headers entirely, so no future reader of
+		# them can end up trusting client input.
+		header_up -X-Real-IP
+		header_up -Forwarded
+	}
+
+	encode gzip zstd
+
+	header {
+		# The beta host runs AFLDB_ENV=production, because three security
+		# behaviours key off it: Secure session cookies
+		# (src/lib/auth/session.ts), the CSP that drops 'unsafe-eval', and
+		# HSTS. It must, being a public HTTPS host — without it the admin
+		# session cookie goes out with no Secure attribute.
+		#
+		# Indexing is a SEPARATE flag (AFLDB_INDEXING, see
+		# src/lib/indexing.ts) and stays off here: a beta must never enter
+		# search results, and duplicate content on a subdomain would compete
+		# with the eventual apex. The app therefore already serves noindex
+		# on every page and Disallow:/ from robots.txt. This header is the
+		# belt to that braces, and covers responses the proxy itself
+		# generates — errors, health-check failures — which never reach the
+		# application's own metadata.
+		#
+		# REMOVE THIS when this file is switched to serve the apex.
+		X-Robots-Tag "noindex, nofollow"
+
+		# Next.js sets these too; the proxy enforces them for responses it
+		# serves itself, such as errors and health-check failures (see changeLog.md).
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+
+		# Never advertise the stack.
+		-Server
+		-X-Powered-By
+	}
+
+	# Health checks must not be cached anywhere.
+	@health path /api/health
+	header @health Cache-Control "no-store"
+
+	log {
+		output file /var/log/caddy/afldb-access.log {
+			roll_size 20MiB
+			roll_keep 5
+		}
+		# Query strings and the invite token stay out of the logs: see the
+		# (afldb_log_format) snippet at the top of this file.
+		import afldb_log_format
+		level INFO
+	}
+}
+
+# --- Apex: the coming-soon page ----------------------------------------
+#
+# The apex and www MUST be separate blocks. Naming both on one block and
+# redirecting to the apex makes the apex redirect to itself — an infinite
+# loop that takes the site down the moment DNS resolves. `caddy validate`
+# does not catch it; only the separation does.
+
+www.afldb.com {
+	redir https://afldb.com{uri} permanent
+}
+
+# afldb.com serves STATIC FILES, not the application.
+#
+# The apex is the hostname that accumulates search history, so it is the one
+# that must always answer. A static file server cannot 502 because the app is
+# restarting, cannot time out because a query got slow, and does not care
+# whether PostgreSQL is up. Until the beta is proven, that reliability is
+# worth more at the apex than the application is — and when the application
+# does launch here, the SEO history is already attached to this hostname.
+#
+# The ONE dynamic path is the early-access form's endpoint, proxied to the app
+# below. Same origin, so the form posts without CORS and the page's own
+# form-action/connect-src 'self' policy covers it.
+#
+# AT LAUNCH: delete the `handle` blocks and give this site the same
+# `reverse_proxy` body the beta.afldb.com block above has. Nothing else here
+# changes — same hostname, same certificate, same logs.
+afldb.com {
+	# Must come first: `handle` blocks are evaluated in order and the bare
+	# one below matches everything.
+	handle /api/early-access* {
+		# The one unauthenticated write path on this host, so the body is
+		# capped before a byte of it reaches Node. The handler applies the
+		# same 32 KB ceiling itself — a host with no proxy in front still
+		# needs it — while this refuses the request at the edge, which is
+		# where an oversized body costs least.
+		request_body {
+			max_size 32KB
+		}
+
+		reverse_proxy 127.0.0.1:3100 {
+			health_uri /api/health
+			health_interval 30s
+			health_timeout 5s
+
+			# Identical to the beta block, and for the same reason: the app
+			# records the RIGHTMOST X-Forwarded-For entry, which is only
+			# trustworthy because Caddy overwrites rather than appends. The
+			# early-access endpoint rate-limits on that value.
+			header_up X-Forwarded-For {remote_host}
+			header_up -X-Real-IP
+			header_up -Forwarded
+		}
+	}
+
+	handle {
+		root * /var/www/afldb-soon
+		file_server
+	}
+
+	encode gzip zstd
+
+	header {
+		# NO X-Robots-Tag here. This host is meant to be indexed — that is
+		# the entire point of serving a real page at the apex instead of
+		# leaving it parked. /var/www/afldb-soon/robots.txt allows crawling
+		# and points at the one-URL sitemap beside it.
+
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+
+		# The page loads no third-party anything, and its CSS and JS are
+		# separate files rather than inline, so this needs no 'unsafe-inline'
+		# — unlike the application's own CSP, which does.
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
+
+		# Never advertise the stack.
+		-Server
+		-X-Powered-By
+
+		# HSTS IS DELIBERATELY ABSENT until HTTPS here is confirmed working.
+		# `includeSubDomains` on the apex also binds beta.afldb.com, and
+		# max-age=31536000 means browsers refuse plain HTTP for a year — close
+		# to irreversible on a first deployment. Once the certificate has
+		# issued and the site has served cleanly for a day or two, add it
+		# ramped: 300, then 86400, then 31536000. `preload` is a separate,
+		# later decision and is not on that ramp.
+		# Strict-Transport-Security "max-age=300"
+	}
+
+	# The HTML must not be cached hard: switching the early-access form on or
+	# off changes what the page offers, and a week-old copy in a CDN or a
+	# browser would not know. The fingerprint-free assets beside it are
+	# cheap enough to revalidate.
+	@html path / /index.html
+	header @html Cache-Control "public, max-age=300, must-revalidate"
+
+	@assets path /img/* /favicon.svg
+	header @assets Cache-Control "public, max-age=86400"
+
+	log {
+		output file /var/log/caddy/afldb-apex.log {
+			roll_size 20MiB
+			roll_keep 5
+		}
+		# Carries no token route, but shares the snippet so every log keeps one policy.
+		import afldb_log_format
+		level INFO
+	}
+}

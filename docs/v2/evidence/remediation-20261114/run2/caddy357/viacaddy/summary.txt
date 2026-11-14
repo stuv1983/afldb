@@ -1,0 +1,24 @@
+pages=25 responses=1073 statuses={"200":1072,"307":1}
+CADDY-DENIED responses seen by the browser: 0
+console errors/warnings: 0
+failed requests: 143
+http://beta.afldb.com:55653/records/most-disposals-in-a-game?_rsc=1r34m net::ERR_ABORTED
+http://beta.afldb.com:55653/search?q=Michael+Tuck&_rsc=p37cr net::ERR_ABORTED
+http://beta.afldb.com:55653/records/most-goals?_rsc=p37cr net::ERR_ABORTED
+http://beta.afldb.com:55653/records/most-disposals-in-a-game?_rsc=p37cr net::ERR_ABORTED
+http://beta.afldb.com:55653/records/most-brownlow-votes?_rsc=p37cr net::ERR_ABORTED
+http://beta.afldb.com:55653/seasons/1989 net::ERR_ABORTED
+http://beta.afldb.com:55653/seasons?_rsc=zjq2s net::ERR_ABORTED
+http://beta.afldb.com:55653/players?_rsc=z9wue net::ERR_ABORTED
+http://beta.afldb.com:55653/draft/2005?view=national&_rsc=z9wue net::ERR_ABORTED
+http://beta.afldb.com:55653/players?_rsc=3lu9v net::ERR_ABORTED
+http://beta.afldb.com:55653/players/compare?a=11724&_rsc=3lu9v net::ERR_ABORTED
+http://beta.afldb.com:55653/draft/2005?view=national&_rsc=3lu9v net::ERR_ABORTED
+http://beta.afldb.com:55653/players/compare?_rsc=z9wue net::ERR_ABORTED
+http://beta.afldb.com:55653/players?_rsc=otwh5 net::ERR_ABORTED
+http://beta.afldb.com:55653/players/scott-pendlebury-11724/matches?sort=no&dir=desc&_rsc=9og6a net::ERR_ABORTED
+http://beta.afldb.com:55653/players/scott-pendlebury-11724/matches?sort=date&dir=asc&_rsc=9og6a net::ERR_ABORTED
+http://beta.afldb.com:55653/players/scott-pendlebury-11724/matches?sort=rd&dir=asc&_rsc=9og6a net::ERR_ABORTED
+http://beta.afldb.com:55653/players/scott-pendlebury-11724/matches?sort=club&dir=asc&_rsc=9og6a net::ERR_ABORTED
+http://beta.afldb.com:55653/seasons?_rsc=354ka net::ERR_ABORTED
+http://beta.afldb.com:55653/seasons?_rsc=a8pzf net::ERR_ABORTED

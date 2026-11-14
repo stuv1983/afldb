@@ -1,0 +1,2 @@
+total=600 parallel=8 seconds=1.5 rate=388.0 paths/s files+=0 disk_KiB+=0 (0.0 KiB/path) growth=0.00 MiB/s = 0.0 GiB/hour
+load: 3.64 4.40 4.15

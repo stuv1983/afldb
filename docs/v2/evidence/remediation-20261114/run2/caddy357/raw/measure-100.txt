@@ -1,0 +1,11 @@
+BUILD_ID=EILJAA4NowINsjUcj8YGG N=100  baseline: files=10820 apparent=1165744233 disk_KiB=1182840
+players: unknown slug + unknown id (404)       n=100 statuses:     100 404 | files+=700 (7.00/path) apparent_bytes+=5058377 (50584/path) disk_KiB+=7632 (76.3/path) ms/request=50
+players: wrong slug, real id (308)             n=100 statuses:     100 308 | files+=700 (7.00/path) apparent_bytes+=4860960 (48610/path) disk_KiB+=7200 (72.0/path) ms/request=48
+matches: unknown id, 5 digits (404)            n=100 statuses:     100 404 | files+=700 (7.00/path) apparent_bytes+=5020902 (50209/path) disk_KiB+=7620 (76.2/path) ms/request=47
+seasons: unknown year (404; <=204 distinct)    n=100 statuses:     100 404 | files+=693 (6.93/path) apparent_bytes+=4992912 (49929/path) disk_KiB+=7544 (75.4/path) ms/request=47
+brownlow: unknown year (404; <=204 distinct)   n=100 statuses:     100 404 | files+=693 (6.93/path) apparent_bytes+=4754196 (47542/path) disk_KiB+=7248 (72.5/path) ms/request=46
+clubs: unknown slug (404)                      n=100 statuses:     100 404 | files+=700 (7.00/path) apparent_bytes+=5027160 (50272/path) disk_KiB+=7616 (76.2/path) ms/request=43
+venues: unknown slug (404)                     n=100 statuses:     100 404 | files+=700 (7.00/path) apparent_bytes+=5028121 (50281/path) disk_KiB+=7616 (76.2/path) ms/request=44
+honour-teams: unknown slug (404)               n=100 statuses:     100 404 | files+=700 (7.00/path) apparent_bytes+=5031765 (50318/path) disk_KiB+=7616 (76.2/path) ms/request=43
+sitemap: unknown segment id (404)              n=100 statuses:     100 404 | files+=200 (2.00/path) apparent_bytes+=25600 (256/path) disk_KiB+=808 (8.1/path) ms/request=34
+END files=16606 apparent=1205544226 disk_KiB=1243740

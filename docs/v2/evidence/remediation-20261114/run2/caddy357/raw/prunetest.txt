@@ -1,0 +1,9 @@
+new files for the 44 requests: 129
+prebuilt 200 entries before: 656 players without a status in .meta
+would delete (dry run): entries=41 disk_KiB=2952
+deleted: entries=41 disk_KiB=2952
+would delete (dry run): entries=0 disk_KiB=0
+prebuilt 200 entries after:  656
+a prebuilt player and season still on disk: 2/2
+pruned paths still answer: 308 404 308
+refuses a wrong directory: refusing: /tmp does not look like .next/server/app

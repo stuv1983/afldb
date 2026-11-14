@@ -1,0 +1,2 @@
+total=3000 parallel=8 seconds=58.7 rate=51.1 paths/s files+=21000 disk_KiB+=228568 (76.2 KiB/path) growth=3.80 MiB/s = 13.4 GiB/hour
+load: 4.88 4.61 4.15
