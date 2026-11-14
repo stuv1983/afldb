@@ -1,0 +1,7 @@
+[
+ {
+  "name": "phase1 epoch-1 admin passes the beta door on a public page",
+  "ok": true,
+  "detail": "200 http://127.0.0.1:55675/players"
+ }
+]

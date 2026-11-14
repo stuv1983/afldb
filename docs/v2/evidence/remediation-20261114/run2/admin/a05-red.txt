@@ -1,0 +1,34 @@
+create-db: afldb_v2_rem2admin_red_test created from afldb_v2_rem2admintmpl_test and marked
+== unit match-sheet (RED)
+     ✓ is null when nothing hangs off the players (a published zero is not a dependent) 10ms
+     ✓ names each carried fact, in player order, and where to clear it 1ms
+     ✓ words a club change and a return-to-source row deletion for what they would do 1ms
+     × refuses a positive round vote that has no match link, in its own words, and keeps a linked vote apart (review A-05) 20ms
+     × reads the unlinked-vote rows by the player's own season, home-and-away round and id, only above zero, never writing (review A-05) 3ms
+     ✓ is guarded on both line-up-row delete paths and never reads a Brownlow vote of zero as a dependent 1ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/match-sheet.test.ts > AFLDB-ISSUE-353 line-up row dependents refusal > refuses a positive round vote that has no match link, in its own words, and keeps a linked vote apart (review A-05)
+AssertionError: expected 'Cannot remove a player from the Match…' to be 'Cannot remove a player from the Match…' // Object.is equality
+Expected: "Cannot remove a player from the Match Sheet of match #77: Ann Able (player #10) carries 3 Brownlow votes in round 5 with no match link (unresolved); Bob Baker (player #11) carries 1 Brownlow vote in this match. Deleting the line-up row would leave that record naming a non-participant. Nothing was saved. Resolve them in Brownlow administration (/admin/brownlow/2024/5) first."
+Received: "Cannot remove a player from the Match Sheet of match #77: Bob Baker (player #11) carries 1 Brownlow vote in this match. Deleting the line-up row would leave that record naming a non-participant. Nothing was saved. Resolve it in Brownlow administration (/admin/brownlow/2024/5) first."
+ FAIL  tests/match-sheet.test.ts > AFLDB-ISSUE-353 line-up row dependents refusal > reads the unlinked-vote rows by the player's own season, home-and-away round and id, only above zero, never writing (review A-05)
+AssertionError: expected '' to match /WHERE rv\.match_id IS NULL/
+- Expected:
++ Received:
+ Test Files  1 failed (1)
+      Tests  2 failed | 4 passed | 91 skipped (97)
+== integration data-editor 353 (RED)
+     ✓ refuses removing a player who holds Brownlow votes; an unvoted player of the same match (published zero) is removable  575ms
+     × refuses removing or re-clubbing a player whose only vote is a NULL-match_id round row of this season and round (review A-05); zero, unrecorded and other-round rows do not block 564ms
+     ✓ refuses removing a player named by the match's Brownlow vote entry, but not an unnamed player of that match  486ms
+     ✓ refuses removing the player of a first-kick-goal record (a suppressed one too), naming where to clear it  424ms
+     ✓ refuses removing the kicker of an after-the-siren record  382ms
+     ✓ refuses a club change of a player carrying a vote, allows it for a free player, and allows a stat-only edit of the voted player  550ms
+     ✓ Return to source refuses the row deletion of a manual addition that a Brownlow vote names, changing nothing  390ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/integration/data-editor.test.ts > AFLDB-ISSUE-353: a line-up row with Brownlow or special-record dependents cannot be removed or re-clubbed > refuses removing or re-clubbing a player whose only vote is a NULL-match_id round row of this season and round (review A-05); zero, unrecorded and other-round rows do not block
+AssertionError: expected true to be false // Object.is equality
+- Expected
++ Received
+ Test Files  1 failed (1)
+      Tests  1 failed | 6 passed | 57 skipped (64)

@@ -1,0 +1,57 @@
+[
+ {
+  "name": "below-epoch admin is sent to /beta from a public page",
+  "ok": true,
+  "detail": "http://127.0.0.1:55675/beta?from=%2Fplayers"
+ },
+ {
+  "name": "...while /admin still works",
+  "ok": true,
+  "detail": "200 http://127.0.0.1:55675/admin"
+ },
+ {
+  "name": "/admin/login does not bounce back to /admin",
+  "ok": true,
+  "detail": "http://127.0.0.1:55675/admin/login"
+ },
+ {
+  "name": "the re-authentication notice is shown",
+  "ok": true,
+  "detail": "Your administrator session predates the current beta access setting, so the public pages are asking you to enter the beta. Sign in again to refresh it. You are still signed in to the admin area until then."
+ },
+ {
+  "name": "the sign-in form is shown",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "mobile: no horizontal overflow",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "fresh sign-in lands on /admin",
+  "ok": true,
+  "detail": "http://127.0.0.1:55675/admin"
+ },
+ {
+  "name": "after the fresh sign-in the public page passes the beta door",
+  "ok": true,
+  "detail": "200 http://127.0.0.1:55675/players"
+ },
+ {
+  "name": "a current-epoch admin on /admin/login is redirected to /admin (no notice)",
+  "ok": true,
+  "detail": "http://127.0.0.1:55675/admin"
+ },
+ {
+  "name": "control: signed-out visitor sees the plain form, no notice",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "control: signed-out public page still goes to /beta",
+  "ok": true,
+  "detail": "200 http://127.0.0.1:55675/beta?from=%2Fplayers"
+ }
+]

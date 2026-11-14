@@ -1,0 +1,16 @@
+create-db: afldb_v2_rem2admin_green_test created from afldb_v2_rem2admintmpl_test and marked
+== unit match-sheet (GREEN)
+ ✓ tests/match-sheet.test.ts (97 tests | 91 skipped) 20ms
+ Test Files  1 passed (1)
+      Tests  6 passed | 91 skipped (97)
+== integration data-editor 353 (GREEN)
+ ✓ tests/integration/data-editor.test.ts (64 tests | 57 skipped) 4569ms
+     ✓ refuses removing a player who holds Brownlow votes; an unvoted player of the same match (published zero) is removable  589ms
+     ✓ refuses removing or re-clubbing a player whose only vote is a NULL-match_id round row of this season and round (review A-05); zero, unrecorded and other-round rows do not block  819ms
+     ✓ refuses removing a player named by the match's Brownlow vote entry, but not an unnamed player of that match  490ms
+     ✓ refuses removing the player of a first-kick-goal record (a suppressed one too), naming where to clear it  428ms
+     ✓ refuses removing the kicker of an after-the-siren record  385ms
+     ✓ refuses a club change of a player carrying a vote, allows it for a free player, and allows a stat-only edit of the voted player  602ms
+     ✓ Return to source refuses the row deletion of a manual addition that a Brownlow vote names, changing nothing  400ms
+ Test Files  1 passed (1)
+      Tests  7 passed | 57 skipped (64)

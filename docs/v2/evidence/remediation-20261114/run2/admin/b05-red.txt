@@ -1,0 +1,15 @@
+== unit auth.test.ts (RED)
+       × flags only a valid admin claim below the current epoch, with the gate on and a valid epoch 14ms
+       × offers nothing when the gate is off or the epoch is malformed (the epoch is not what is wrong) 1ms
+       × shows the sign-in form with the reason, instead of redirecting, to a signed-in admin below the epoch 72ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/auth.test.ts > the beta gate holds admin claims to the beta epoch (AFLDB-ISSUE-362 SEC-2) > re-authentication of a below-epoch admin (review B-05) > flags only a valid admin claim below the current epoch, with the gate on and a valid epoch
+TypeError: adminClaimBelowBetaEpoch is not a function
+ FAIL  tests/auth.test.ts > the beta gate holds admin claims to the beta epoch (AFLDB-ISSUE-362 SEC-2) > re-authentication of a below-epoch admin (review B-05) > offers nothing when the gate is off or the epoch is malformed (the epoch is not what is wrong)
+TypeError: adminClaimBelowBetaEpoch is not a function
+ FAIL  tests/auth.test.ts > the beta gate holds admin claims to the beta epoch (AFLDB-ISSUE-362 SEC-2) > re-authentication of a below-epoch admin (review B-05) > shows the sign-in form with the reason, instead of redirecting, to a signed-in admin below the epoch
+Error: NEXT_REDIRECT /admin
+    148|   redirect: (to: string): never => { throw new Error(`NEXT_REDIRECT ${…
+    150|   notFound: (): never => { throw new Error('NEXT_NOT_FOUND'); },
+ Test Files  1 failed (1)
+      Tests  3 failed | 220 passed (223)

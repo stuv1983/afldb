@@ -1,0 +1,7 @@
+rv totals [{"total":330383,"null_match":9522,"null_pos":621,"null_votes_null":0,"resolved_pos":22239}]
+null by season [{"season":2026,"n":9522,"pos":621,"nullv":0}]
+pms rows [{"total":695499,"mirror_pos":23486,"mirror_null":358678}]
+classes [{"lineups":695499,"a_existing":22239,"b_null_round_pos":621,"b_newly":621,"c_mirror":23486,"c_only_newly":1247,"b_or_c_newly":1868,"a_not_c":0}]
+c_only by season [{"season":1931,"n":324},{"season":1932,"n":294},{"season":1933,"n":306},{"season":1934,"n":323}]
+multi-lineup ambiguity (null pos rows with >1 H&A lineup) [{"count":0}]
+null pos rows with no lineup [{"count":0}]

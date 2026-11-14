@@ -1,0 +1,29 @@
+seeded rem2-admin-e2e@example.test
+server epoch 1 launcher pid 1452033
+ready code=200
+JAR-BEFORE-CLICK []
+POST 200 http://127.0.0.1:55675/admin/login {"redirect":"/admin;push","setCookie":["afldb_admin=<v>; Path=/; Expires=Sat, 14 Nov 2026 17:16:45 GMT; Max-Age=43200; HttpOnly; SameSite=lax"]}
+JAR-PHASE1-AFTER [{"name":"afldb_admin","path":"/","expires":1794676605.398945,"claim":{"v":1,"kind":"admin","exp":1794676605,"epoch":1}}]
+PASS phase1 epoch-1 admin passes the beta door on a public page 200 http://127.0.0.1:55675/players
+server stopped, no listener on 55675
+server epoch 2 launcher pid 1452842
+ready code=200
+PASS below-epoch admin is sent to /beta from a public page http://127.0.0.1:55675/beta?from=%2Fplayers
+PASS ...while /admin still works 200 http://127.0.0.1:55675/admin
+PASS /admin/login does not bounce back to /admin http://127.0.0.1:55675/admin/login
+PASS the re-authentication notice is shown Your administrator session predates the current beta access setting, so the public pages are asking you to enter the beta. Sign in again to refresh it. You are still signed in to the admin area until then.
+PASS the sign-in form is shown 
+PASS mobile: no horizontal overflow 
+JAR-BEFORE-CLICK [{"name":"afldb_admin","path":"/","expires":1794676605.398945,"claim":{"v":1,"kind":"admin","exp":1794676605,"epoch":1}}]
+POST 200 http://127.0.0.1:55675/admin/login {"redirect":"/admin;push","setCookie":["afldb_admin=<v>; Path=/; Expires=Sat, 14 Nov 2026 17:17:01 GMT; Max-Age=43200; HttpOnly; SameSite=lax"]}
+PASS fresh sign-in lands on /admin http://127.0.0.1:55675/admin
+PASS after the fresh sign-in the public page passes the beta door 200 http://127.0.0.1:55675/players
+PASS a current-epoch admin on /admin/login is redirected to /admin (no notice) http://127.0.0.1:55675/admin
+PASS control: signed-out visitor sees the plain form, no notice 
+PASS control: signed-out public page still goes to /beta 200 http://127.0.0.1:55675/beta?from=%2Fplayers
+server stopped, no listener on 55675
+phase1 rc=0 phase2 rc=0
+1353566 /usr/lib/postgresql/16/bin/postgres -D /mnt/ssd/afldb-rem2-admin-20261114/pg-root/data
+1451983 bash -c timeout 600 bash /mnt/ssd/afldb-rem2-admin-20261114/e2e.sh > /mnt/ssd/afldb-rem2-admin-20261114/evidence/b05-e2e.txt 2>&1; grep 'POST\|JAR\|CONSOLE\|PAGEERR\|PASS\|FAIL\|rc=\|stopped' /mnt/ssd/afldb-rem2-admin-20261114/evidence/b05-e2e.txt
+1451984 timeout 600 bash /mnt/ssd/afldb-rem2-admin-20261114/e2e.sh
+1451985 bash /mnt/ssd/afldb-rem2-admin-20261114/e2e.sh
