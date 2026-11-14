@@ -2468,6 +2468,111 @@ describe('the beta gate holds admin claims to the beta epoch (AFLDB-ISSUE-362 SE
     expect(blocked.next).toBeNull();
   });
 
+  /**
+   * Review B-05. After a bump a signed-in admin is below the current epoch: the public pages send
+   * them to /beta while /admin works, and the sign-in page used to bounce them straight back to
+   * /admin. The sign-in page now shows the form (and says why) for exactly that case, and only
+   * that case; the form's action is the unchanged password + TOTP check, so nothing is re-minted
+   * from the old claim.
+   */
+  describe('re-authentication of a below-epoch admin (review B-05)', () => {
+    const liveAdminRow = { id: 42, email: 'a@example.test', role: 'admin' as const, canManageAdmins: false, mustChangePassword: false };
+
+    afterEach(() => {
+      requestCookie.admin = null;
+      sessionRow.row = null;
+    });
+
+    async function renderLogin(): Promise<string> {
+      const { default: AdminLoginPage } = await import('@/app/admin/login/page');
+      const { renderToStaticMarkup } = await import('react-dom/server');
+      return renderToStaticMarkup(await AdminLoginPage());
+    }
+
+    it('flags only a valid admin claim below the current epoch, with the gate on and a valid epoch', async () => {
+      const { adminClaimBelowBetaEpoch } = await import('@/lib/auth/session');
+      process.env.AFLDB_BETA_EPOCH = '5';
+
+      requestCookie.admin = await adminCookie(1);
+      expect(await adminClaimBelowBetaEpoch()).toBe(true);
+      requestCookie.admin = await adminCookie(4);
+      expect(await adminClaimBelowBetaEpoch()).toBe(true);
+      for (const epoch of [5, 6]) {
+        requestCookie.admin = await adminCookie(epoch);
+        expect(await adminClaimBelowBetaEpoch(), `epoch ${epoch}`).toBe(false);
+      }
+
+      // No cookie, a tampered cookie, an expired claim and a beta-kind claim are not an admin claim.
+      requestCookie.admin = null;
+      expect(await adminClaimBelowBetaEpoch()).toBe(false);
+      requestCookie.admin = `${await adminCookie(1)}x`;
+      expect(await adminClaimBelowBetaEpoch()).toBe(false);
+      requestCookie.admin = await signClaim(
+        { v: 1, kind: 'admin', sub: '42:t', exp: Math.floor(Date.now() / 1000) - 5, epoch: 1 }, SECRET);
+      expect(await adminClaimBelowBetaEpoch()).toBe(false);
+      requestCookie.admin = await signClaim(
+        { v: 1, kind: 'beta', sub: 'code:1', exp: inOneHour(), epoch: 1 }, SECRET);
+      expect(await adminClaimBelowBetaEpoch()).toBe(false);
+    });
+
+    it('offers nothing when the gate is off or the epoch is malformed (the epoch is not what is wrong)', async () => {
+      const { adminClaimBelowBetaEpoch } = await import('@/lib/auth/session');
+      requestCookie.admin = await adminCookie(1);
+
+      process.env.AFLDB_BETA_EPOCH = '5';
+      process.env.AFLDB_BETA_GATE = 'off';
+      expect(await adminClaimBelowBetaEpoch()).toBe(false);
+
+      process.env.AFLDB_BETA_GATE = 'on';
+      process.env.AFLDB_BETA_EPOCH = 'epoch-2';
+      expect(await adminClaimBelowBetaEpoch()).toBe(false);
+    });
+
+    it('shows the sign-in form with the reason, instead of redirecting, to a signed-in admin below the epoch', async () => {
+      process.env.AFLDB_BETA_EPOCH = '5';
+      requestCookie.admin = await adminCookie(1);
+      sessionRow.row = liveAdminRow;
+
+      const html = await renderLogin();
+      expect(html).toContain('data-testid="admin-reauth-notice"');
+      expect(html).toContain('Sign in again to refresh it');
+      expect(html).toContain('name="email"');
+      expect(html).toContain('name="totp"');
+      expect(html).toContain('href="/admin"');
+    });
+
+    it('still redirects a signed-in admin at the current epoch to /admin, and shows a signed-out visitor the plain form', async () => {
+      process.env.AFLDB_BETA_EPOCH = '5';
+      requestCookie.admin = await adminCookie(5);
+      sessionRow.row = liveAdminRow;
+      await expect(renderLogin()).rejects.toThrow('NEXT_REDIRECT /admin');
+
+      // Gate off, or the epoch never bumped: an epoch-1 claim is current, so /admin as before.
+      delete process.env.AFLDB_BETA_EPOCH;
+      requestCookie.admin = await adminCookie(1);
+      await expect(renderLogin()).rejects.toThrow('NEXT_REDIRECT /admin');
+
+      // A below-epoch claim whose database session is gone/revoked is not a signed-in admin: no
+      // "you are still signed in" notice, just the plain form.
+      process.env.AFLDB_BETA_EPOCH = '5';
+      sessionRow.row = null;
+      const html = await renderLogin();
+      expect(html).not.toContain('admin-reauth-notice');
+      expect(html).toContain('name="password"');
+    });
+
+    it('keeps the re-authentication path a full credential check that mints at the current epoch, never from the old claim', async () => {
+      const actions = readSource(join(REPO, 'src', 'app', 'admin', 'login', 'actions.ts'));
+      expect(actions).toMatch(/verifyPassword\(/);
+      expect(actions).toMatch(/verifyTotpStep\(/);
+      expect(actions).toMatch(/issueLoginSessionInTransaction\(/);
+      expect(actions).toMatch(/setAdminSessionCookie\(user\.id, pending\.token\)/);
+      // The page itself imports no signing or minting function.
+      const page = readSource(join(REPO, 'src', 'app', 'admin', 'login', 'page.tsx'));
+      expect(page).not.toMatch(/signClaim|setAdminSessionCookie|prepareAdminSession/);
+    });
+  });
+
   it('mints at epoch 1 when AFLDB_BETA_EPOCH is unset, as before', async () => {
     const { setAdminSessionCookie } = await import('@/lib/auth/session');
     await setAdminSessionCookie(42, 'opaque-session-token');

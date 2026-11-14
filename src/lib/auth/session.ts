@@ -252,6 +252,34 @@ async function adminCookieToken(): Promise<string | null> {
 }
 
 /**
+ * True when the request carries a validly signed, unexpired admin claim whose epoch is BELOW the
+ * current AFLDB_BETA_EPOCH while the beta gate is on: the beta door (src/middleware.ts) refuses
+ * such a claim, but /admin never applies the epoch, so the admin still works there and is sent to
+ * /beta from every public page (AFLDB-ISSUE-362 SEC-2; review B-05). Only the sign-in page reads
+ * this, to offer a fresh sign-in instead of bouncing back to /admin.
+ *
+ * This is a hint about the COOKIE, not an authentication: it grants nothing, mints nothing and
+ * re-mints nothing. The only way to a current-epoch cookie stays `adminLogin` (password + TOTP +
+ * a new database session row). False when the gate is off (the epoch is never consulted then),
+ * when AFLDB_BETA_EPOCH is malformed (the door itself fails closed for everyone; signing in
+ * again would change nothing, and a loop must not be offered), and when there is no valid claim.
+ */
+export async function adminClaimBelowBetaEpoch(): Promise<boolean> {
+  if (!betaGateOn()) return false;
+  let minEpoch: number;
+  try {
+    minEpoch = betaEpoch();
+  } catch {
+    return false;
+  }
+  const jar = await cookies();
+  const claim = await verifyClaim(jar.get(ADMIN_COOKIE)?.value, sessionSecret(), { kind: 'admin' });
+  if (!claim) return false;
+  // The same comparison verifyClaim applies for the door (`claim.epoch < minEpoch`).
+  return claim.epoch < minEpoch;
+}
+
+/**
  * sha256 of the current request's admin session token, or null. The
  * credential transactions (AFLDB-ISSUE-340) re-check that THIS session is
  * still live under the user-row lock, since getAdminUser() ran before it.
