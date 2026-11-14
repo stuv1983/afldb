@@ -77,3 +77,14 @@ issues/*/AFLDB-ISSUE-265-phase-a/issue265-db-probe.mjs           -text
 issues/*/AFLDB-ISSUE-265-phase-a/tools/import-graph.mjs          -text
 issues/*/AFLDB-ISSUE-265-phase-a/tools/block-network.cjs         -text
 issues/*/AFLDB-ISSUE-265-phase-a/tools/Invoke-Issue265SkipCheck.ps1 -text
+
+# remediation-20261114 run 2 (evidence) — five captured logs whose exact bytes are pinned by
+# docs/v2/evidence/remediation-20261114/qualification/SHA256SUMS. Each holds CR bytes (npm/next progress output, curl
+# progress). `* text=auto eol=lf` stripped them at commit and the committed blobs no longer matched the manifest.
+# `-text` keeps the raw bytes under every checkout rule. Scoped to exactly these paths; see
+# docs/v2/evidence/remediation-20261114/run2/evidence/README.md.
+docs/v2/evidence/remediation-20261114/qualification/iso-3aa82166/build-next.log -text
+docs/v2/evidence/remediation-20261114/qualification/iso-3aa82166/serve.out      -text
+docs/v2/evidence/remediation-20261114/qualification/iso-3aa82166/serve2.out     -text
+docs/v2/evidence/remediation-20261114/qualification/iso-3aa82166/serve3.out     -text
+docs/v2/evidence/remediation-20261114/qualification/visual/serve3.out           -text
