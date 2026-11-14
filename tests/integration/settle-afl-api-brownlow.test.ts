@@ -233,6 +233,65 @@ let homeClubId: number;
 let homeClubName: string;
 let awayClubName: string;
 
+/**
+ * ISSUE-363 (run 3, integb; phase A finding F-1(b)) TEST HYGIENE. This suite works on the real SEASON,
+ * whose `stat_availability` rows it must leave exactly as it found them. Its former cleanup ended with
+ * `recomputeBrownlowCoverage(tx, SEASON)`, which on a base where SEASON is `complete` with no accepted
+ * medal rewrites the PRE-EXISTING Brownlow rows (`brownlow_season_total` -> `not_applicable`) and so
+ * contaminated the next file of a shared run (`database` "Brownlow correctness separates the war
+ * years ...", order dependent). `beforeAll` now captures every `stat_availability` row of SEASON before
+ * anything writes, and `afterAll` restores exactly that content. The recompute survives ONLY as crash
+ * repair: when `beforeAll` finds this suite's own residue the captured rows may already describe its
+ * synthetic fixtures, so `startedClean` is false and `cleanup()` recomputes them from what remains.
+ */
+type AvailabilityRow = {
+  statKey: string; isRecorded: boolean; coverage: string; populatedRows: number | null; totalRows: number | null;
+};
+let availabilityBefore: AvailabilityRow[] = [];
+let startedClean = true;
+
+async function readSeasonAvailability(): Promise<AvailabilityRow[]> {
+  const rows = await sql<AvailabilityRow[]>`
+    SELECT stat_key AS "statKey", is_recorded AS "isRecorded", coverage::text AS coverage,
+           populated_rows AS "populatedRows", total_rows AS "totalRows"
+      FROM stat_availability
+     WHERE season = ${SEASON}
+     ORDER BY stat_key
+  `;
+  return rows.map((r) => ({ ...r })); // plain objects: the postgres.js result array carries extra members
+}
+
+/** True when an earlier run of this suite died before its teardown finished. */
+async function suiteResidueExists(): Promise<boolean> {
+  const [row] = await sql<{ n: number }[]>`
+    SELECT (SELECT count(*) FROM matches WHERE match_key = ANY(${allMatchKeys()}::text[]))::int
+         + (SELECT count(*) FROM players WHERE legacy_player_id = ANY(${[...SUITE_PLAYER_LEGACY_IDS]}::bigint[]))::int
+         + (SELECT count(*) FROM brownlow_round_votes WHERE source_record_id LIKE ${`${NS}%`})::int
+         + (SELECT count(*) FROM staging.afl_api_match WHERE external_record_id LIKE ${`${NS}%`})::int AS n
+  `;
+  return row.n > 0;
+}
+
+/** Puts SEASON's `stat_availability` back to exactly `rows`: rows this suite added go, changed rows revert. */
+async function restoreSeasonAvailability(rows: readonly AvailabilityRow[]): Promise<void> {
+  await sql.begin(async (tx) => {
+    await tx`
+      DELETE FROM stat_availability
+       WHERE season = ${SEASON} AND NOT (stat_key = ANY(${rows.map((r) => r.statKey)}::text[]))
+    `;
+    for (const r of rows) {
+      await tx`
+        INSERT INTO stat_availability (stat_key, season, is_recorded, coverage, populated_rows, total_rows)
+        VALUES (${r.statKey}, ${SEASON}, ${r.isRecorded}, ${r.coverage}::coverage_status, ${r.populatedRows}, ${r.totalRows})
+        ON CONFLICT (stat_key, season) DO UPDATE
+           SET is_recorded = EXCLUDED.is_recorded, coverage = EXCLUDED.coverage,
+               populated_rows = EXCLUDED.populated_rows, total_rows = EXCLUDED.total_rows
+      `;
+    }
+  });
+  expect(await readSeasonAvailability()).toEqual(rows);
+}
+
 function matchKeyFor(providerMatchId: string): string {
   const date = CASE_DATES[providerMatchId];
   if (!date) throw new Error(`No CASE_DATES entry for provider match id '${providerMatchId}'.`);
@@ -394,16 +453,20 @@ async function cleanup(): Promise<void> {
   // AFLDB-ISSUE-244 I244-F007 TEST HYGIENE. Since F007 the automatic Brownlow settle recomputes
   // `stat_availability` (`recomputeBrownlowCoverage()`) inside its own committed transaction, so
   // every `apply: true` case above leaves SEASON's Brownlow coverage rows describing this suite's
-  // synthetic votes and matches — rows the deletes above just removed. Recompute them from what
-  // genuinely remains, with the SAME canonical helper (no hard-coded values), so afldb_test is not
-  // left reporting coverage for deleted fixtures. Runs last: it reads `matches`,
-  // `brownlow_round_votes` and `player_match_stats`, all cleaned above. Also runs from beforeAll's
-  // cleanup(), which repairs coverage a crashed earlier run left behind. Test-only: no production
-  // behaviour depends on it.
-  await sql.begin((tx) => recomputeBrownlowCoverage(tx, SEASON));
+  // synthetic votes and matches — rows the deletes above just removed. ISSUE-363 (integb): a CLEAN
+  // run (`startedClean`) no longer recomputes here — `afterAll` restores the rows `beforeAll` captured,
+  // byte for byte, because a recompute rewrites pre-existing rows of a complete season (see
+  // `availabilityBefore`). Only CRASH REPAIR recomputes: when `beforeAll` found this suite's own
+  // residue, recompute SEASON's rows from what genuinely remains, with the SAME canonical helper (no
+  // hard-coded values), so afldb_test is not left reporting coverage for deleted fixtures. Runs last:
+  // it reads `matches`, `brownlow_round_votes` and `player_match_stats`, all cleaned above. Test-only:
+  // no production behaviour depends on it.
+  if (!startedClean) await sql.begin((tx) => recomputeBrownlowCoverage(tx, SEASON));
 }
 
 beforeAll(async () => {
+  // First statement, before anything of this suite writes: the rows `afterAll` must put back.
+  availabilityBefore = await readSeasonAvailability();
   registry = parseSourceFamilyRegistry(
     JSON.parse(readFileSync(join(PROJECT_ROOT, 'data', 'reference', 'source-families.json'), 'utf8')),
   );
@@ -426,6 +489,7 @@ beforeAll(async () => {
   homeClubName = home.name;
   awayClubName = away.name;
 
+  startedClean = !(await suiteResidueExists());
   await cleanup();
 
   for (let i = 0; i < VOTER_PROVIDER_IDS.length; i += 1) {
@@ -454,8 +518,13 @@ beforeAll(async () => {
 }, 30_000);
 
 afterAll(async () => {
-  await cleanup();
-  await sql.end({ timeout: 5 });
+  try {
+    await cleanup();
+    // Clean start: leave every pre-existing SEASON `stat_availability` row exactly as found.
+    if (startedClean) await restoreSeasonAvailability(availabilityBefore);
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
 }, 30_000);
 
 /* ------------------------------------------------------------------ *
