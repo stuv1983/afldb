@@ -1,0 +1,1 @@
+{"file":"tests/integration/admin-season-lists.test.ts","database":"afldb_v2_pf_20261114074217_1969444_397044d3_test","createMs":2211,"sizeBytes":407288855,"perFileDatabasesInCluster":1,"residue":[],"touchedOnly":["public.data_edits","public.data_overrides","public.external_identities","public.player_club_season_stats","public.players","public.season_list_members"]}

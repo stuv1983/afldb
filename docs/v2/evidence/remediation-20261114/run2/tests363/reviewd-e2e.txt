@@ -1,0 +1,13 @@
+2026-11-14T07:42:10Z HEAD 20b4c9df5e2808f4107ab556c5d13ad344773e02, porcelain lines 0
+2026-11-14T07:42:10Z cluster start rc=0
+2026-11-14T07:42:12Z listener on 55651: 1
+create-db: afldb_v2_rem2tests363rd_test created from afldb_v2_rem2tests363_tmpl_test and marked
+2026-11-14T07:42:30Z single-file run rc=0 seconds=14
+ Test Files  1 passed | 1 skipped (2)
+      Tests  42 passed | 11 skipped (53)
+per-file databases: reaped afldb_v2_pf_20261114074226_1969588_b2042c66_test (its file did not run its teardown)
+2026-11-14T07:42:30Z audit lines: 1
+2026-11-14T07:42:30Z per-file databases left after the run: 0
+2026-11-14T07:42:30Z sweep dry run (60 minute bound):
+isolated-pg: afldb_v2_rem2tests363rd_test verified (cluster afldb_v2_isolated, 127.0.0.1:55651); running node
+sweep: 0 would be dropped, 0 kept

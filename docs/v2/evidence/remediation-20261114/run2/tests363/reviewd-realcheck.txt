@@ -1,0 +1,30 @@
+# 2026-11-14T07:43:14Z HEAD 20b4c9df5e2808f4107ab556c5d13ad344773e02; cluster 55651; the DSN passwords below are dummies, the admin role comes from the password file
+## RED 1: base DSN names 55652, a TCP forwarder to the real server on 55651 (stands in for an SSH tunnel)
+Per-file test databases refused: server_port (the server reports port 55651 but the DSN names 55652).
+## RED 2: multi-host DSN
+Per-file test databases refused: multi_host (a comma in the host is a multi-host list, whose entries without their own port use 5432). Unset AFLDB_TEST_PER_FILE_DB to run against the shared database.
+## RED 3: query parameter database=x and application_name=x
+Per-file test databases refused: query_parameter (query parameter database is sent as a startup parameter and may override the user or database). Unset AFLDB_TEST_PER_FILE_DB to run against the shared database.
+Per-file test databases refused: query_parameter (query parameter application_name is sent as a startup parameter and may override the user or database). Unset AFLDB_TEST_PER_FILE_DB to run against the shared database.
+## GREEN: the same sweep against the real DSN on 55651 (no orphans yet)
+sweep: 0 would be dropped, 0 kept
+## MED-2: orphans from an interrupted create (made as the superuser, template0, stamped 2020 so they are past any bound)
+created afldb_v2_pf_20200101000000_4242_0000000a_test with NULL comment
+created afldb_v2_pf_20200101000000_4242_0000000b_test with a comment
+## base comment / orphan comments
+[{"datname":"afldb_v2_rem2tests363rd_test","comment":"afldb-v2-isolated-test"}]
+[{"datname":"afldb_v2_pf_20200101000000_4242_0000000a_test","comment":null}]
+[{"datname":"afldb_v2_pf_20200101000000_4242_0000000b_test","comment":"someone-elses-marker"}]
+## sweep dry run
+would drop	afldb_v2_pf_20200101000000_4242_0000000a_test
+kept	afldb_v2_pf_20200101000000_4242_0000000b_test	marker comment differs from the base
+sweep: 1 would be dropped, 1 kept
+## sweep for real
+dropped	afldb_v2_pf_20200101000000_4242_0000000a_test
+kept	afldb_v2_pf_20200101000000_4242_0000000b_test	marker comment differs from the base
+sweep: 1 dropped, 1 kept
+## the differently commented database must still exist; remove it by hand (it is this check's own fixture)
+[{"datname":"afldb_v2_pf_20200101000000_4242_0000000b_test","comment":"someone-elses-marker"}]
+dropped afldb_v2_pf_20200101000000_4242_0000000b_test
+[]
+## done
