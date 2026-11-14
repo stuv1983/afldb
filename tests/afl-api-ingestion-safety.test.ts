@@ -2275,3 +2275,141 @@ describe('AFLDB-ISSUE-332 — settle failure notifier (prepared, not installed)'
     });
   });
 });
+
+// AFLDB-ISSUE-332 (review A-07): the sealed notifier delivers nothing by itself (no network, no transport). Two prepared,
+// not-installed ways to get the signal to a human without weakening it: an optional separate transport unit, and a
+// read-only pull check for a monitor that runs elsewhere.
+describe('AFLDB-ISSUE-332 — failure delivery: optional transport unit and read-only pull check (prepared, not installed)', () => {
+  const strip = (text: string): string => text.split('\r\n').join('\n');
+  const directives = (text: string): string[] => text.split('\n').filter((l) => /^\s*[A-Za-z]+=/.test(l));
+  const transportUnit = strip(readSource('deploy/afldb-settle-failure-transport@.service'));
+  const transportDropIn = strip(readSource('deploy/afldb-settle-failure@.service.d/transport.conf.example'));
+  const notifierUnit = strip(readSource('deploy/afldb-settle-failure@.service'));
+
+  it('the network is opened only by the separate transport unit; the notifier stays sealed and holds no credential', () => {
+    expect(notifierUnit).toMatch(/^PrivateNetwork=true$/m);
+    expect(notifierUnit).toMatch(/^RestrictAddressFamilies=AF_UNIX$/m);
+    expect(notifierUnit).not.toMatch(/^\s*(OnSuccess|LoadCredential|Environment)=/m);
+    expect(directives(transportDropIn)).toEqual(['OnSuccess=afldb-settle-failure-transport@%i.service']);
+    expect(transportUnit).not.toMatch(/^PrivateNetwork=true$/m);
+    expect(transportUnit).toMatch(/^RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6$/m);
+    // no credential, database or checkout secret reaches the network-capable unit; /home is hidden except deploy/, read-only
+    expect(transportUnit).not.toMatch(/^\s*(EnvironmentFile|Environment|PassEnvironment|LoadCredential|SetCredential)=/m);
+    expect(transportUnit).not.toMatch(/DATABASE_URL|SMTP|PASSWORD|SECRET|psql|postgres/i);
+    expect(transportUnit).toMatch(/^ProtectHome=tmpfs$/m);
+    expect(transportUnit).toMatch(/^BindReadOnlyPaths=\/home\/arm\/projects\/afldb\/deploy$/m);
+    expect(transportUnit).toMatch(/^ReadOnlyPaths=\/var\/lib\/afldb-settle-failure$/m);
+    expect(transportUnit).toMatch(/^NoNewPrivileges=true$/m);
+    expect(transportUnit).toMatch(/^ExecStart=\/bin\/sh \/home\/arm\/projects\/afldb\/deploy\/afldb-settle-failure-transport\.sh %i$/m);
+    // prepared, not installed: no installer or sync path references the new files either
+    for (const path of ['deploy/sync-dev.ps1', 'deploy/sync-dev-remote.sh', 'deploy/sync-dev-transport.sh', 'deploy/release.mjs', 'deploy/post-install-check.sh']) {
+      expect(readSource(path), path).not.toMatch(/afldb-settle-failure-(transport|status)|transport\.conf/);
+    }
+  });
+
+  const linux = process.platform === 'linux' && spawnSync('sh', ['-c', 'date -u -d "Sat 2026-11-14 18:14:45 UTC" +%s']).status === 0;
+  describe.skipIf(!linux)('the scripts (POSIX sh, GNU date)', () => {
+    let dir = '';
+    beforeEach(() => {
+      dir = mkdtempSync(join(tmpdir(), 'afldb-332b-'));
+      mkdirSync(join(dir, 'state'));
+      // Stub systemctl: `show <unit> -p <prop> --value` answers from a "unit|prop|value" table.
+      // Like the real systemd 255 (`show` ignores --timestamp=), it prints a zone abbreviation GNU date cannot parse unless TZ=UTC.
+      writeFileSync(join(dir, 'fake-systemctl'), '#!/bin/sh\nv=$(grep -m1 "^$2|$4|" "$AFLDB_STUB_PROPS" | cut -d"|" -f3)\n[ "$TZ" = UTC ] || v=$(printf "%s" "$v" | sed "s/ UTC$/ AEDT/")\nprintf "%s\\n" "$v"\n');
+      chmodSync(join(dir, 'fake-systemctl'), 0o755);
+    });
+    afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
+
+    const NOW = Math.floor(Date.UTC(2026, 10, 15, 6, 0, 0) / 1000);
+    const table = (over: Record<string, string> = {}): string => {
+      const base: Record<string, string> = {
+        'afldb-settle-afl-api.service|LoadState': 'loaded', 'afldb-settle-afl-api.service|Result': 'success',
+        'afldb-settle-afl-api.service|ActiveState': 'inactive', 'afldb-settle-afl-api.service|ExecMainStatus': '0',
+        'afldb-settle-afl-api-brownlow.service|LoadState': 'loaded', 'afldb-settle-afl-api-brownlow.service|Result': 'success',
+        'afldb-settle-afl-api-brownlow.service|ActiveState': 'inactive', 'afldb-settle-afl-api-brownlow.service|ExecMainStatus': '0',
+        'afldb-settle-afl-api.timer|LoadState': 'loaded', 'afldb-settle-afl-api.timer|ActiveState': 'active',
+        'afldb-settle-afl-api.timer|LastTriggerUSec': 'Sat 2026-11-14 18:14:45 UTC', ...over,
+      };
+      const file = join(dir, 'props');
+      writeFileSync(file, `${Object.entries(base).map(([k, v]) => `${k}|${v}`).join('\n')}\n`);
+      return file;
+    };
+    const status = (over: Record<string, string> = {}, now = NOW) => spawnSync('sh', [join(ROOT, 'deploy/afldb-settle-failure-status.sh')], {
+      encoding: 'utf8',
+      env: {
+        PATH: process.env.PATH ?? '', AFLDB_FAILURE_SYSTEMCTL: join(dir, 'fake-systemctl'), AFLDB_STUB_PROPS: table(over),
+        AFLDB_FAILURE_STATE_DIR: join(dir, 'state'), AFLDB_FAILURE_NOW: String(now),
+      } as unknown as NodeJS.ProcessEnv,
+    });
+
+    it('pull check: OK when the latest run succeeded and the timer fired within the limit (works with no notifier installed)', () => {
+      const out = status();
+      expect(out.status, out.stdout).toBe(0);
+      expect(out.stdout.split('\n')[0]).toBe('AFLDB_SETTLE_STATUS OK');
+      expect(out.stdout).toMatch(/timer afldb-settle-afl-api\.timer: active, last fired Sat 2026-11-14 18:14:45 UTC \(11 h ago; limit 36 h\)/);
+    });
+
+    it('pull check: a failed latest run, an inactive timer, or a timer that stopped firing is FAILED (exit 1), never OK', () => {
+      const failed = status({ 'afldb-settle-afl-api.service|Result': 'exit-code', 'afldb-settle-afl-api.service|ExecMainStatus': '1', 'afldb-settle-afl-api.service|ActiveState': 'failed' });
+      expect(failed.status).toBe(1);
+      expect(failed.stdout.split('\n')[0]).toBe('AFLDB_SETTLE_STATUS FAILED');
+      expect(failed.stdout).toMatch(/FAILED: the latest run of afldb-settle-afl-api\.service did not succeed/);
+      const stopped = status({ 'afldb-settle-afl-api.timer|ActiveState': 'inactive' });
+      expect(stopped.status).toBe(1);
+      expect(stopped.stdout).toMatch(/the nightly will not run/);
+      const stale = status({}, NOW + 40 * 3600);
+      expect(stale.status).toBe(1);
+      expect(stale.stdout).toMatch(/has not fired for 51 h/);
+    });
+
+    it('pull check: an unreadable or missing unit is UNKNOWN (exit 2, an alarm), and a FAILED outranks it', () => {
+      const missing = status({ 'afldb-settle-afl-api.timer|LoadState': 'not-found' });
+      expect(missing.status).toBe(2);
+      expect(missing.stdout.split('\n')[0]).toBe('AFLDB_SETTLE_STATUS UNKNOWN');
+      const noTime = status({ 'afldb-settle-afl-api.timer|LastTriggerUSec': 'n/a' });
+      expect(noTime.status).toBe(2);
+      const both = status({ 'afldb-settle-afl-api.timer|LoadState': 'not-found', 'afldb-settle-afl-api-brownlow.service|Result': 'timeout' });
+      expect(both.status).toBe(1);
+    });
+
+    it('pull check reports an installed notifier marker as information only, and writes nothing', () => {
+      writeFileSync(join(dir, 'state', 'afldb-settle-afl-api.failed'), 'time_utc=2026-11-10T19:00:00Z\nunit=afldb-settle-afl-api.service\n');
+      const out = status();
+      expect(out.status).toBe(0);
+      expect(out.stdout).toMatch(/notifier marker present \(information; the unit Result above is authoritative\): time_utc=2026-11-10T19:00:00Z/);
+      expect(readdirSync(join(dir, 'state'))).toEqual(['afldb-settle-afl-api.failed']);
+    });
+
+    const transport = (instance: string, env: Record<string, string> = {}) => spawnSync('sh', [join(ROOT, 'deploy/afldb-settle-failure-transport.sh'), instance], {
+      encoding: 'utf8', env: { PATH: process.env.PATH ?? '', AFLDB_FAILURE_STATE_DIR: join(dir, 'state'), ...env } as unknown as NodeJS.ProcessEnv,
+    });
+
+    it('transport script: sends nothing without a configured transport; refuses a foreign instance; needs the marker and an executable', () => {
+      writeFileSync(join(dir, 'state', 'afldb-settle-afl-api.failed'), 'unit=afldb-settle-afl-api.service\n');
+      const none = transport('afldb-settle-afl-api.service');
+      expect(none.status).toBe(0);
+      expect(none.stdout).toMatch(/no transport configured; nothing sent/);
+      for (const bad of ['', 'afldb.service', '../x.service', 'afldb-settle-afl-api.service; id']) expect(transport(bad).status, JSON.stringify(bad)).toBe(2);
+      writeFileSync(join(dir, 'plain'), 'not executable\n');
+      expect(transport('afldb-settle-afl-api.service', { AFLDB_FAILURE_TRANSPORT: join(dir, 'plain') }).status).toBe(4);
+      expect(transport('afldb-settle-afl-api-brownlow.service', { AFLDB_FAILURE_TRANSPORT: join(dir, 'plain') }).status).toBe(3);
+    });
+
+    it('transport script: calls the transport with the marker path only; a failing transport fails the unit and the marker stays', () => {
+      const marker = join(dir, 'state', 'afldb-settle-afl-api.failed');
+      writeFileSync(marker, 'unit=afldb-settle-afl-api.service\n');
+      writeFileSync(join(dir, 'ok-transport'), `#!/bin/sh\necho "$#:$1" > "${join(dir, 'transport.out')}"\nexit 0\n`);
+      writeFileSync(join(dir, 'bad-transport'), '#!/bin/sh\nexit 9\n');
+      chmodSync(join(dir, 'ok-transport'), 0o755);
+      chmodSync(join(dir, 'bad-transport'), 0o755);
+      const ok = transport('afldb-settle-afl-api.service', { AFLDB_FAILURE_TRANSPORT: join(dir, 'ok-transport') });
+      expect(ok.status).toBe(0);
+      expect(ok.stdout).toMatch(/AFLDB_SETTLE_FAILURE_DELIVERED unit=afldb-settle-afl-api\.service/);
+      expect(readFileSync(join(dir, 'transport.out'), 'utf8').trim()).toBe(`1:${marker}`);
+      const bad = transport('afldb-settle-afl-api.service', { AFLDB_FAILURE_TRANSPORT: join(dir, 'bad-transport') });
+      expect(bad.status).toBe(1);
+      expect(bad.stderr).toMatch(/the transport exited non-zero; the marker is still the record/);
+      expect(readFileSync(marker, 'utf8')).toMatch(/^unit=afldb-settle-afl-api\.service$/m);
+    });
+  });
+});

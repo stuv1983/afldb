@@ -17,8 +17,9 @@ StateDirectory=afldb-settle-failure
 StateDirectoryMode=0750
 
 # One short shell script, no database, no network, no credential: it validates the instance name, writes a marker and
-# appends a line. No EnvironmentFile= on purpose (the settle .env holds the import DSN); the optional transport hook is
-# set, if ever, by a separate owner-installed drop-in, never here.
+# appends a line. No EnvironmentFile= on purpose (the settle .env holds the import DSN). This unit is sealed and stays so:
+# with no network it DELIVERS NOTHING by itself (marker and journal only; review A-07). A network channel is the separate,
+# optional afldb-settle-failure-transport@.service, or a pull check (deploy/afldb-settle-failure-status.sh).
 ExecStart=/bin/sh /home/arm/projects/afldb/deploy/afldb-settle-failure-notify.sh %i
 TimeoutStartSec=60
 Nice=10

@@ -12,10 +12,13 @@
 #                                              invocation id, the line to run to read the failure
 #   3. appends one line to $STATE_DIR/failures.log (an append-only history; the marker is the "latest" view);
 #   4. only if AFLDB_FAILURE_TRANSPORT names an executable file: runs it with the marker path as its one argument.
-#      The unit configures no transport. The transport is how the owner wires a channel LATER (a mail relay command,
-#      a webhook wrapper); the application mailer is deliberately NOT reused here, because the settle units drop every
-#      SMTP credential by design (AFLDB-ISSUE-232) and a notifier that read them would add a credential surface to the
-#      nightly path. A transport failure is logged and never changes this script's exit status: the marker is the record.
+#      The unit configures no transport. Inside this sealed unit (PrivateNetwork=true, AF_UNIX only) a transport can only use
+#      LOCAL channels; it CANNOT reach the network, so a mail relay or webhook set here would log "transport exited non-zero"
+#      and deliver nothing (review A-07). A network channel belongs to the separate, optional
+#      afldb-settle-failure-transport@.service (started by the owner drop-in transport.conf.example after this unit succeeds),
+#      or to the pull check deploy/afldb-settle-failure-status.sh. The application mailer is deliberately NOT reused, because
+#      the settle units drop every SMTP credential by design (AFLDB-ISSUE-232). A transport failure is logged and never
+#      changes this script's exit status: the marker is the record.
 #
 # A marker is "stale" once a later run of the unit succeeded; the check below compares the two. See
 # docs/v2/evidence/remediation-20261114/rollover/README.md (operator runbook) for the exact check and the safe re-run.

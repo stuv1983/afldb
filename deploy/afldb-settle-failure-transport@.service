@@ -1,0 +1,45 @@
+[Unit]
+Description=AFLDB — deliver the failure marker of %i over the network (optional transport; never a retry)
+Documentation=https://github.com/afldb
+# AFLDB-ISSUE-332 (review A-07). PREPARED, NOT INSTALLED, and OPTIONAL: nothing starts this unit until the owner installs the
+# drop-in deploy/afldb-settle-failure@.service.d/transport.conf.example (as transport.conf) on the notifier template.
+# Procedure and options: docs/v2/evidence/remediation-20261114/run2/ops/procedures/04-failure-notifier.md.
+#
+# The notifier template (afldb-settle-failure@.service) is sealed: PrivateNetwork=true, AF_UNIX only. This is the separate
+# unprivileged unit that may open a connection. It never writes the marker, holds no database or application credential,
+# and cannot see the checkout's .env, backups or SSH keys (ProtectHome=tmpfs; only the deploy directory is bound, read-only).
+
+[Service]
+Type=oneshot
+User=arm
+Group=arm
+ExecStart=/bin/sh /home/arm/projects/afldb/deploy/afldb-settle-failure-transport.sh %i
+TimeoutStartSec=60
+Nice=10
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=afldb-settle-failure-transport
+
+# Read the marker, nothing else of the host's state.
+ReadOnlyPaths=/var/lib/afldb-settle-failure
+ProtectHome=tmpfs
+BindReadOnlyPaths=/home/arm/projects/afldb/deploy
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+# The one deliberate difference from the notifier: a network family. No other privilege is added.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM

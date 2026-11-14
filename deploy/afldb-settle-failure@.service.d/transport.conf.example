@@ -1,0 +1,18 @@
+# AFLDB-ISSUE-332 (review A-07) — OPTIONAL owner-installed drop-in: start the network transport after the notifier succeeds.
+# systemd loads only files ending in .conf, so this .example file does nothing where it is. PREPARED, NOT INSTALLED.
+#
+#   1. install the transport template and the owner's transport executable (root-owned, mode 0755; it receives the marker
+#      path as $1 and reads any secret from $CREDENTIALS_DIRECTORY, for example a health-check ping URL):
+#        sudo install -m 644 -o root -g root deploy/afldb-settle-failure-transport@.service /etc/systemd/system/
+#        sudo install -m 755 -o root -g root <your transport> /usr/local/sbin/afldb-failure-transport
+#   2. name the transport and, if it needs a secret, hand it over as a credential (root-owned 0600 file, never in the repo):
+#        sudo install -d -m 755 /etc/systemd/system/afldb-settle-failure-transport@.service.d
+#        printf '%s\n' '[Service]' 'Environment=AFLDB_FAILURE_TRANSPORT=/usr/local/sbin/afldb-failure-transport' \
+#          'LoadCredential=ping-url:/etc/afldb/failure-ping-url' | sudo tee /etc/systemd/system/afldb-settle-failure-transport@.service.d/transport.conf
+#   3. install THIS drop-in on the notifier template, then reload:
+#        sudo install -d -m 755 /etc/systemd/system/afldb-settle-failure@.service.d
+#        sudo install -m 644 deploy/afldb-settle-failure@.service.d/transport.conf.example /etc/systemd/system/afldb-settle-failure@.service.d/transport.conf
+#        sudo systemctl daemon-reload
+# Removal: delete the drop-in files and daemon-reload. The notifier and the marker are unchanged by any of this.
+[Unit]
+OnSuccess=afldb-settle-failure-transport@%i.service

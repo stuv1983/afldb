@@ -4313,4 +4313,14 @@ describe('AFLDB-ISSUE-350 season opening: the production tool controls', () => {
     expect((tool.match(/TimeZone: 'Etc\/UTC'/g) ?? []).length).toBe(2);
     expect(repoText('tools/v2/season-opening-check.ts')).toMatch(/TimeZone: 'Etc\/UTC'/);
   });
+
+  // Review A-08: the identity query reads afldb_meta.schema_migrations, which the application role cannot. The default role is
+  // the read-only backup role, and that role holds pg_read_all_data (USAGE on every schema, SELECT on every table).
+  it('the gate check defaults to the read-only backup role, which holds pg_read_all_data (afldb_meta is readable by it)', () => {
+    const check = repoText('tools/v2/season-opening-check.ts');
+    expect(check).toMatch(/dsnEnv: values\.get\('dsn-env'\) \?\? 'AFLDB_BACKUP_DATABASE_URL'/);
+    expect(check).not.toMatch(/\?\? 'DATABASE_URL'/);
+    expect(check).toMatch(/schema_migrations/);
+    expect(repoText('tools/maintenance/privileges.sql')).toMatch(/GRANT pg_read_all_data TO afldb_backup/);
+  });
 });
