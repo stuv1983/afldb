@@ -1,5 +1,12 @@
 # AFLDB Waiting and Blocker Register
 
+> **2026-11-14 remediation run (this register's counts are NOT recomputed).** Records: `docs/v2/evidence/remediation-20261114/` (`HANDOFF.md`, `QUALIFICATION.md`, `APPROVAL-PACKET.md`). Everything is **local on `claude/remediation-20261114`, qualified, not published, not deployed**; nothing was installed or written on production or DEV.
+> - **Resolved locally (publication pending):** ISSUE-353, 354, 355, 356, 358, 359, 360, 361.
+> - **Blocked on owner approval (publication):** the whole candidate (push / merge to `main`).
+> - **Blocked on owner production operations after publication and release:** ISSUE-350 I350 season opening (D-350-1, before 2027-03-17); ISSUE-351 host policy install, weekly window and the separate attended reboot (D-HO-1/4/6); ISSUE-352 backup units and off-host destination (D-HO-2/3/5/7); ISSUE-362 Caddyfile install and pre-fix log deletion (O-3/O-1); ISSUE-332 settle failure notifier (D-332-1).
+> - **Blocked on owner decisions:** ISSUE-348 reconciliation at the acquisition and three REPLACE_CLUB rulings; ISSUE-357 O-1 residual policy; ISSUE-363 per-file disposable DB; ISSUE-364 O-2 lint gate wiring.
+> - Open issues: 9 (332, 348, 350, 351, 352, 357, 362, 363, 364).
+
 > **2026-11-14 full review (this register's counts are NOT recomputed).** Record: `issues/reviews/AFLDB-FULL-REVIEW-2026-11-14.md` §6.
 > - **Owner decisions needed:** ISSUE-350 (High), the 2027 `seasons` row and club identities on production, before 2027-03-17; ISSUE-351, host patching and restart policy; ISSUE-352, backup schedule or an accepted data-loss window; ISSUE-348, the DraftGuru import guard before the Nov–Dec acquisition; ISSUE-358, confirm the McGovern sibling row in the canonical rebuild.
 > - **Actionable after authorisation:** ISSUE-353 to ISSUE-364 (review remediation batches 3–6).

@@ -15,6 +15,22 @@ commit.
 
 ## [Unreleased]
 
+### Remediation of the 2026-11-14 full review (local, qualified, not published, not deployed)
+
+Branch `claude/remediation-20261114`. Nothing was pushed, deployed, installed or written on production or DEV. Results: `docs/v2/evidence/remediation-20261114/QUALIFICATION.md`; approvals: `APPROVAL-PACKET.md`.
+
+- **2027 season opening (ISSUE-350):** an audited, idempotent I350 season-opening operation (one `seasons` row from the tracked contract, `last_season` 2027 on the 18 open club identities and their organisations, one audit `import_batches` row, a count-bounded owner reversal), a read-only `tools/v2/season-opening-check.ts`, and a settle `season_row_missing` HALT instead of a foreign-key failure. No competition dates are invented; historical club identities are not edited.
+- **Release safety (ISSUE-351):** `deploy/release.mjs promote`/`rollback` require `--attended` (**breaking CLI change**); new `host-gate`; `status --expect` records the activation and fails a restart that coincides with an apt run; rollback checks the schema ledger. Host policy files (needrestart hold, PostgreSQL apt blacklist) prepared, not installed.
+- **Backups (ISSUE-352):** scheduled backup and weekly restore-verification wrapper, systemd units, an off-host pull script and a rewritten V2 `docs/backup-restore.md` (prepared, not installed).
+- **DraftGuru (ISSUE-348):** a full import refuses to delete or rewrite the 35 audited picks and 31 persons without a reviewed, hash-pinned reconciliation.
+- **Admin (ISSUE-353, 354):** the Match Sheet refuses removal or club change of a player with Brownlow votes, vote-entry slots or curated special records; retired coach/draft/data-editor overrides are no longer revived by the next edit.
+- **Search and answers (ISSUE-355, 356, 360):** the Grid Solver ignores unrecorded seasons for club leads; NL "least", marquee settings and period words are parsed as asked (`PARSER_VERSION` 68); tied record holders are shown, the NL tie headline counts true ties, the head-to-head link opens games between the two clubs (`club_match=both`), and redirecting Brownlow URLs leave the sitemap.
+- **Public routes (ISSUE-357, 359):** strict canonical ids and seasons (non-canonical spellings and out-of-range ids are 404s), safe AFLW key decoding, validated and capped (500-row) qualifying-matches drill-down.
+- **Performance (ISSUE-361):** the deep players index pages before the club-name lookup; `/clubs/compare` pair loads go through a per-process gate (`AFLDB_COMPARE_MAX_CONCURRENT`, default 2).
+- **Security hygiene (ISSUE-362):** Caddy access and error logs redact query strings, invite tokens, `Referer` and cookies (config prepared, not installed); admin claims are held to the beta epoch.
+- **Tests and tooling (ISSUE-358, 363, 364):** reviewed input pins (McGovern sibling supplement), regenerated stage map, Python contracts invoked and interpreter resolution, new beta/consent action tests, leaked-fixture guard; `next dev` starts (sitemap index behind a rewrite); serving-checkout `node_modules` check; `npm run lint:gate` ratchet (baseline 338).
+- **ISSUE-332:** a settle failure notifier (`OnFailure` template and drop-in) prepared, not installed.
+
 ### Full review of `origin/main` `de640826` (2026-11-14; records only)
 
 - A review-only full review (application, data integrity, auth, admin, search and Grid Solver, frontend, performance, ingestion, deployment, backup and recovery, tests) opened ISSUE-350 to ISSUE-364 and raised ISSUE-348 to Medium. Nothing was implemented, deployed or written to production or DEV. Report: `issues/reviews/AFLDB-FULL-REVIEW-2026-11-14.md`.

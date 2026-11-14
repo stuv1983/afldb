@@ -125,3 +125,10 @@ ISSUE-332 stays **open** until every row below has occurred and its evidence is 
 | G7 | About October 2027, before the 2027 rollover | C9 delivered and reviewed; `rollover-season.ts` and the D-233-3 census pass for 2027 | Owner approves; implementation by a later session | The delivery and review record, and the census result |
 
 Until then, the nightly empty batches (row 10) need no action. Section 8 still applies in full.
+
+**Proposed additions (2026-11-14 remediation run; PROPOSED, not adopted).** The 2026-11-08 statement "nothing further can be prepared" was wrong: the full review found that production has no 2027 `seasons` row (ISSUE-350). These rows take effect only when the owner adopts them after the remediation candidate is published; until then G1–G7 above are the register. Background: `docs/v2/evidence/remediation-20261114/rollover/README.md` sections 8 and 9.
+
+| # | Date / trigger | Gate | Who acts | Evidence that closes the row |
+|---|---|---|---|---|
+| G0 | **By 2027-03-10**, before Opening Round | The 2027 season is open in the production database (ISSUE-350, decision D-350-1) | **Owner** approves and runs the I350 ceremony | `node --import tsx tools/v2/season-opening-check.ts --dsn-env AFLDB_BACKUP_DATABASE_URL --expect-database afldb_prod --expect-oid 66668 --expect-sysid 7674454702926115004 --json` exits 0 (`OPEN`), or the accepted I350 outcome. Exit 10 (`NOT_OPEN`) on or after 2027-03-10 blocks G1/G2; exit 11 (`REFUSED`) is a stop. |
+| G0b | Before Opening Round | A failed nightly is visible to the operator (decision D-332-1) | **Owner** | The notifier template and drop-in installed with a transport configured, or a written owner record that the per-round manual check (section 3) stands in for it. |
