@@ -76,6 +76,13 @@
  * commit and teardown, other sessions on `afldb_test` can observe the recomputed rows; the lock
  * above only excludes other runs OF THIS FILE.
  *
+ * TWO FIXTURE ROUNDS (ISSUE-363 run 4, item 2). The four cases run twice with the same bodies: on an ordinary
+ * home-and-away round of the REAL season 2026 (run 3; this keeps the real-season shared-state restoration under test),
+ * and on a PRELIMINARY FINAL (`PF`, `preliminary_final`, `is_final`) in the SUITE-OWNED season 2069 (the finals
+ * coverage run 3 lost). The second set can never collide with a real match: season 2069 is proved empty at startup,
+ * created and removed by this file, and its writer-side declarations (round vocabulary, provider season id,
+ * in-progress) are in-memory copies. See FINALS_SEASON.
+ *
  * @see issues/open/AFLDB-ISSUE-276.md
  * @see issues/open/AFLDB-ISSUE-276-RESIDUE.sql (read-only residue classification for exactly this scope)
  */
@@ -99,7 +106,7 @@ import {
 } from '@/lib/acquisition/settle-afl-api';
 import { renderMatchKey } from '@/lib/acquisition/settle-core';
 import {
-  getSourceFamily, parseSourceFamilyRegistry, type SourceFamilyRegistry,
+  getSourceFamily, parseSourceFamilyRegistry, type RoundVocabulary, type SourceFamilyRegistry,
 } from '@/lib/acquisition/source-families';
 
 const PROJECT_ROOT = join(__dirname, '..', '..');
@@ -125,7 +132,15 @@ const CASE_IDS = {
   lifecycle: `${NS}C`,
   corroborated: `${NS}D`,
 } as const;
-const ALL_IDS: string[] = Object.values(CASE_IDS);
+/** The same four cases on a PRELIMINARY FINAL in a suite-owned season (see FINALS_SEASON below). */
+const FINALS_CASE_IDS = {
+  fresh: `${NS}FINA`,
+  existing: `${NS}FINB`,
+  lifecycle: `${NS}FINC`,
+  corroborated: `${NS}FIND`,
+} as const;
+/** Every provider match id this file may write: the four home-and-away cases and the four preliminary-final cases. */
+const ALL_IDS: string[] = [...Object.values(CASE_IDS), ...Object.values(FINALS_CASE_IDS)];
 
 /**
  * One dedicated date per case (the date, not the provider id, is what makes a case its own
@@ -153,6 +168,86 @@ const CASE_DATES: Readonly<Record<string, string>> = {
  */
 const API_ROUND_NUMBER = 5;
 const ROUND_CODE = '6';
+
+/**
+ * AFLDB-ISSUE-363 (run 4, item 2) FINALS COVERAGE, RESTORED. Moving the cases to a home-and-away round (above) removed
+ * the suite's only finals-round fixtures: a Preliminary Final (`PF`, `preliminary_final`, `is_final` true) written by
+ * the settle and then driven through the same period-score behaviours. They cannot return to the real 2026 season, whose
+ * real preliminary final (Hawthorn v Brisbane Lions, 2026-09-19) is the same oriented fixture. So the SAME four cases
+ * run a second time against a SUITE-OWNED SEASON, 2069, in which no real match can exist (the season is outside the
+ * database's history and the table's CHECK is year <= 2100):
+ *   - startup proves 2069 is unused (no `seasons` row, no row in any table that references `seasons`); anything found
+ *     stops the run and is never deleted automatically;
+ *   - the season row is created by this file and removed by it, after every owned fixture, with a proof that nothing
+ *     else cites it; the only derived rows the writer's own recompute leaves behind (`club_seasons` for 2069) are
+ *     removed by exact season, which is safe because the season held nothing before this run;
+ *   - the writer needs a season provider id, a round vocabulary and an in-progress declaration for 2069: all three are
+ *     IN-MEMORY copies for this file (`registry`, `identities`, `inProgressSeasons`); no reference file is edited;
+ *   - the cases carry the fixture file's own Preliminary Final unchanged (API round 28 `PF`, label "First Preliminary
+ *     Final"); the match ids stay in this file's own namespace (`NS`), because every ownership proof below keys on it.
+ * The synthetic season provider id carries the run-4 scope prefix `CD_I4040`.
+ */
+const FINALS_SEASON = 2069;
+const FINALS_SEASON_PROVIDER_ID = 'CD_I4040S2069';
+const FINALS_COMP_SEASON_ID = 4040;
+const REAL_2026_SEASON_PROVIDER_ID = 'CD_S2026014';
+/** September Saturday..Tuesday of the suite-owned season, AEST (daylight saving starts in October). */
+const FINALS_DATES: Readonly<Record<string, string>> = {
+  [FINALS_CASE_IDS.fresh]: '2069-09-20',
+  [FINALS_CASE_IDS.existing]: '2069-09-21',
+  [FINALS_CASE_IDS.lifecycle]: '2069-09-22',
+  [FINALS_CASE_IDS.corroborated]: '2069-09-23',
+};
+const KEEPALIVE_FINALS_MATCH_KEY = `${NS}-keepalive-${FINALS_SEASON}`;
+
+/** What a case's written match row must look like, as LITERALS (nothing here is computed by the writer). */
+type RoundExpectation = {
+  season: number;
+  roundCode: string;
+  roundNumber: number | null;
+  roundType: 'home_and_away' | 'preliminary_final';
+  isFinal: boolean;
+  /** `club_seasons.finals_played` of each side straight after the case's first settle; null = not asserted. */
+  finalsPlayed: number | null;
+};
+const HOME_AND_AWAY_ROUND: RoundExpectation = {
+  season: SEASON, roundCode: ROUND_CODE, roundNumber: Number(ROUND_CODE), roundType: 'home_and_away',
+  isFinal: false, finalsPlayed: null,
+};
+const PRELIMINARY_FINAL_ROUND: RoundExpectation = {
+  season: FINALS_SEASON, roundCode: 'PF', roundNumber: null, roundType: 'preliminary_final',
+  isFinal: true, finalsPlayed: 1,
+};
+
+function isFinalsCase(providerMatchId: string): boolean {
+  return (Object.values(FINALS_CASE_IDS) as string[]).includes(providerMatchId);
+}
+function roundExpectationOf(providerMatchId: string): RoundExpectation {
+  return isFinalsCase(providerMatchId) ? PRELIMINARY_FINAL_ROUND : HOME_AND_AWAY_ROUND;
+}
+
+/**
+ * IN-MEMORY copy of the registry that also declares the 2069 round vocabulary, as a copy of the real 2026 one (same
+ * rounds, abbreviations, names and finals label rules). The parsed registry and the reference file are not changed;
+ * a REAL 2069 vocabulary would make this a refusal, never a silent override.
+ */
+function withFinalsSeasonVocabulary(parsed: SourceFamilyRegistry): SourceFamilyRegistry {
+  const key = `afl_api_${FINALS_SEASON}`;
+  const real = parsed.roundVocabularies.get(`afl_api_${SEASON}`);
+  if (!real || real.shape !== 'declared') throw new Error(`The registry holds no declared round vocabulary afl_api_${SEASON} to copy.`);
+  if (parsed.roundVocabularies.has(key)) throw new Error(`The registry already declares '${key}'; season ${FINALS_SEASON} is not suite-owned.`);
+  const vocabularies = new Map<string, RoundVocabulary>(parsed.roundVocabularies);
+  vocabularies.set(key, { ...real, key, season: FINALS_SEASON });
+  return { ...parsed, roundVocabularies: vocabularies };
+}
+
+/** IN-MEMORY copy of the AFL API identities that also declares the synthetic 2069 provider season (CD_I4040 prefix). */
+function withFinalsSeasonIdentity(parsed: AflApiIdentities): AflApiIdentities {
+  if (parsed.seasons.has(FINALS_SEASON)) throw new Error(`The identities already declare season ${FINALS_SEASON}; it is not suite-owned.`);
+  const seasons = new Map(parsed.seasons);
+  seasons.set(FINALS_SEASON, { compSeasonId: FINALS_COMP_SEASON_ID, providerId: FINALS_SEASON_PROVIDER_ID });
+  return { ...parsed, seasons };
+}
 
 const PERIOD_TYPE = 'afl_api_period_scores_contradiction';
 const PERIOD_REASON = 'period_scores_contradict_final_score';
@@ -196,7 +291,7 @@ type RosterRaw = {
 type RawUnit = { fixture: unknown; roster: unknown; stats: unknown };
 
 function matchDateFor(providerMatchId: string): string {
-  const date = CASE_DATES[providerMatchId];
+  const date = CASE_DATES[providerMatchId] ?? FINALS_DATES[providerMatchId];
   if (!date) throw new Error(`No CASE_DATES entry for provider match id '${providerMatchId}'.`);
   return date;
 }
@@ -210,12 +305,26 @@ function unitSourceFor(providerMatchId: string, mutate?: (raw: RawUnit) => void)
 
   fixture.providerId = providerMatchId;
   fixture.utcStartTime = `${matchDate}T07:15:00.000+0000`;
-  // The fixture file's Preliminary Final -> an ordinary home-and-away round (see ROUND_CODE above).
-  const fixtureRound = (fixture as unknown as { round: Record<string, unknown> }).round;
-  (fixture as unknown as { round: Record<string, unknown> }).round = {
-    ...fixtureRound, roundNumber: API_ROUND_NUMBER, abbreviation: `Rd ${API_ROUND_NUMBER}`, name: `Round ${API_ROUND_NUMBER}`,
-  };
-  (roster.matchRoster as unknown as { roundNumber: number }).roundNumber = API_ROUND_NUMBER;
+  if (isFinalsCase(providerMatchId)) {
+    // The fixture file's own Preliminary Final is kept as it is (round 28 `PF`, the finals label); only the SEASON
+    // moves to the suite-owned one, in both families that name it (`compSeason.providerId`, `roster.competitionId`).
+    const seasonId = (fixture as unknown as { compSeason: Record<string, unknown> }).compSeason;
+    (fixture as unknown as { compSeason: Record<string, unknown> }).compSeason = {
+      ...seasonId, id: FINALS_COMP_SEASON_ID, providerId: FINALS_SEASON_PROVIDER_ID,
+    };
+    const competition = roster.matchRoster as unknown as { competitionId: string };
+    if (competition.competitionId !== REAL_2026_SEASON_PROVIDER_ID) {
+      throw new Error(`The roster fixture's matchRoster.competitionId is '${competition.competitionId}', expected the 2026 provider season id.`);
+    }
+    competition.competitionId = FINALS_SEASON_PROVIDER_ID;
+  } else {
+    // The fixture file's Preliminary Final -> an ordinary home-and-away round (see ROUND_CODE above).
+    const fixtureRound = (fixture as unknown as { round: Record<string, unknown> }).round;
+    (fixture as unknown as { round: Record<string, unknown> }).round = {
+      ...fixtureRound, roundNumber: API_ROUND_NUMBER, abbreviation: `Rd ${API_ROUND_NUMBER}`, name: `Round ${API_ROUND_NUMBER}`,
+    };
+    (roster.matchRoster as unknown as { roundNumber: number }).roundNumber = API_ROUND_NUMBER;
+  }
   roster.match.matchId = providerMatchId;
   roster.match.venueLocalStartTime = `${matchDate}T17:15:00`;
   roster.matchRoster.matchId = providerMatchId;
@@ -232,9 +341,9 @@ function unitSourceFor(providerMatchId: string, mutate?: (raw: RawUnit) => void)
  * persist carries an exact namespace marker in its payload (the stored-payload ownership evidence
  * the teardown relies on). Fails the case instead of letting an unprovable payload be stored.
  */
-function buildBundle(sources: readonly AflApiSettleUnitSource[]): AflApiSettleBundle {
+function buildBundle(season: number, sources: readonly AflApiSettleUnitSource[]): AflApiSettleBundle {
   const bundle = buildAflApiSettleBundle({
-    season: SEASON, snapshotLabel: SNAPSHOT_LABEL, sources, registry, identities,
+    season, snapshotLabel: SNAPSHOT_LABEL, sources, registry, identities,
   });
   expect(bundle.buildFailures).toEqual([]);
   for (const unit of bundle.units) {
@@ -327,14 +436,18 @@ const ledger = {
   batchIds: new Set<string>(),
   /** `matches.id` values returned by this run's own `INSERT ... RETURNING id`. */
   seededMatchIds: new Set<number>(),
-  keepaliveMatchId: null as number | null,
+  /** The keep-alive rows this run seeded (one per season that needed one), by returned id. */
+  keepaliveMatchIds: new Set<number>(),
+  /** True once this run inserted the suite-owned finals `seasons` row (and so must remove it). */
+  finalsSeasonCreated: false,
   /** Exact payload identities, retained from versions proven owned, before those versions go. */
   payloads: new Map<string, PayloadKey>(),
 };
 
 function matchKeyFor(providerMatchId: string): string {
   if (!homeClubName || !awayClubName) throw new Error('matchKeyFor() was called before beforeAll() read the club names.');
-  return renderMatchKey(SEASON, ROUND_CODE, matchDateFor(providerMatchId), homeClubName, awayClubName);
+  const round = roundExpectationOf(providerMatchId);
+  return renderMatchKey(round.season, round.roundCode, matchDateFor(providerMatchId), homeClubName, awayClubName);
 }
 
 function caseMatchKeys(): string[] {
@@ -589,7 +702,7 @@ async function inspectNamespace(includeKeepalive: boolean): Promise<NamespaceSta
   const unproven: string[] = [];
   const sharedPayloads: PayloadKey[] = [];
   const caseKeys = caseMatchKeys();
-  const allKeys = [...caseKeys, KEEPALIVE_MATCH_KEY];
+  const allKeys = [...caseKeys, KEEPALIVE_MATCH_KEY, KEEPALIVE_FINALS_MATCH_KEY];
   const adopted = (batchId: string | null): boolean => batchId !== null && ledger.batchIds.has(batchId);
 
   // matches ----------------------------------------------------------------------------------
@@ -604,7 +717,7 @@ async function inspectNamespace(includeKeepalive: boolean): Promise<NamespaceSta
         OR starts_with(match_key, ${NS})
         OR starts_with(coalesce(source_record_id, ''), ${NS})
      ORDER BY id
-  `).filter((row) => includeKeepalive || row.id !== ledger.keepaliveMatchId);
+  `).filter((row) => includeKeepalive || !ledger.keepaliveMatchIds.has(row.id));
   for (const row of matchRows) {
     const seeded = ledger.seededMatchIds.has(row.id) && (row.notes ?? '').includes(SEED_NOTE);
     const written = row.sourceId === aflApiSourceId && (row.sourceRecordId ?? '').startsWith(NS) && adopted(row.batchId);
@@ -889,30 +1002,112 @@ async function removeOwnedFixtures(includeKeepalive: boolean): Promise<void> {
     );
   }
   if (includeKeepalive) {
-    ledger.keepaliveMatchId = null;
+    ledger.keepaliveMatchIds.clear();
     ledger.seededMatchIds.clear();
   }
 }
 
-/** Seeds the keep-alive only when the writer's own recompute would otherwise have nothing to rank. */
-async function seedKeepaliveIfNeeded(): Promise<void> {
+/**
+ * Seeds the keep-alive only when the writer's own recompute would otherwise have nothing to rank (the recompute
+ * throws for a season with no home-and-away match). The suite-owned finals season is always empty, so it always
+ * needs one; the real season 2026 only on a database that holds no home-and-away match for it.
+ */
+async function seedKeepaliveIfNeeded(season: number = SEASON): Promise<void> {
   const [{ n }] = await sql<{ n: number }[]>`
-    SELECT count(*)::int AS n FROM matches WHERE season = ${SEASON} AND NOT is_final
+    SELECT count(*)::int AS n FROM matches WHERE season = ${season} AND NOT is_final
   `;
   if (n > 0) return;
+  const key = season === FINALS_SEASON ? KEEPALIVE_FINALS_MATCH_KEY : KEEPALIVE_MATCH_KEY;
   const [row] = await sql<{ id: number }[]>`
     INSERT INTO matches (
       match_key, season, round_code, round_type, round_number, is_final, match_date,
       venue_raw, home_club_id, away_club_id, home_score, away_score, result,
       winner_club_id, margin, attendance_status, notes
     ) VALUES (
-      ${KEEPALIVE_MATCH_KEY}, ${SEASON}::smallint, '9276', 'home_and_away', 9276, false,
-      ${`${SEASON}-01-02`}::date, 'ISSUE-276 test fixture', ${homeClubId}, ${awayClubId}, 100, 80,
+      ${key}, ${season}::smallint, '9276', 'home_and_away', 9276, false,
+      ${`${season}-01-02`}::date, 'ISSUE-276 test fixture', ${homeClubId}, ${awayClubId}, 100, 80,
       'home_win', ${homeClubId}, 20, 'not_collected', ${SEED_NOTE}
     ) RETURNING id
   `;
-  ledger.keepaliveMatchId = row.id;
+  ledger.keepaliveMatchIds.add(row.id);
   ledger.seededMatchIds.add(row.id);
+}
+
+/* ------------------------------------------------------------------ *
+ * The suite-owned finals season (2069): proof of absence, creation, proven removal
+ * ------------------------------------------------------------------ */
+
+/** Every (table, column) that holds a foreign key to `seasons(year)`, from the catalogue, never from a list. */
+async function seasonReferences(): Promise<{ table: string; column: string }[]> {
+  return sql<{ table: string; column: string }[]>`
+    SELECT c.conrelid::regclass::text AS "table", a.attname AS "column"
+      FROM pg_constraint c
+      JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY (c.conkey)
+     WHERE c.contype = 'f' AND c.confrelid = 'seasons'::regclass
+     ORDER BY 1, 2
+  `;
+}
+
+/** Rows citing the finals season, per referencing table (zero-count tables omitted), plus the `seasons` row itself. */
+async function finalsSeasonFootprint(): Promise<string[]> {
+  const found: string[] = [];
+  const [own] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM seasons WHERE year = ${FINALS_SEASON}`;
+  if (own.n > 0) found.push(`seasons: ${own.n}`);
+  for (const ref of await seasonReferences()) {
+    const [row] = await sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM ${sql(ref.table)} WHERE ${sql(ref.column)} = ${FINALS_SEASON}
+    `;
+    if (row.n > 0) found.push(`${ref.table}.${ref.column}: ${row.n}`);
+  }
+  return found;
+}
+
+/** Read-only. The finals season must be completely unused before this run creates it; otherwise nothing is written. */
+async function assertFinalsSeasonUnused(): Promise<void> {
+  const found = await finalsSeasonFootprint();
+  if (found.length > 0) {
+    throw new Error(
+      `ISSUE-276 finals cases cannot run: season ${FINALS_SEASON} is reserved for this file's own fixtures and must be `
+      + `empty, but these rows already cite it: ${found.join('; ')}. NOTHING was deleted or written. An interrupted `
+      + 'earlier run of this file leaves them; drop the database copy or clear them deliberately.',
+    );
+  }
+}
+
+/** Creates the suite-owned season row. Called only after `assertFinalsSeasonUnused()` proved the season empty. */
+async function createFinalsSeason(): Promise<void> {
+  await sql`
+    INSERT INTO seasons (year, league, status, notes)
+    VALUES (${FINALS_SEASON}::smallint, 'AFL', 'in_progress'::season_status, ${SEED_NOTE})
+  `;
+  ledger.finalsSeasonCreated = true;
+}
+
+/**
+ * Removes the suite-owned season after every owned fixture is gone. The writer's own recompute leaves exactly one
+ * kind of derived row behind (`club_seasons` for the season); it is removed by exact season, which is safe because
+ * the season held nothing at all before this run. Anything ELSE still citing the season is unexplained: it is
+ * reported, the season row is left, and the run fails. Nothing is touched unless this run created the season.
+ */
+async function removeFinalsSeason(): Promise<void> {
+  if (!ledger.finalsSeasonCreated) return;
+  const remaining = await finalsSeasonFootprint();
+  const unexplained = remaining.filter((line) => !line.startsWith('seasons: ') && !line.startsWith('club_seasons.season: '));
+  if (unexplained.length > 0) {
+    throw new Error(
+      `ISSUE-276 teardown refused to remove season ${FINALS_SEASON}: rows this file did not account for still cite it: `
+      + `${unexplained.join('; ')}. Nothing was deleted.`,
+    );
+  }
+  await sql.begin(async (tx) => {
+    await tx`DELETE FROM club_seasons WHERE season = ${FINALS_SEASON}`;
+    expectRemoved('seasons', await tx`DELETE FROM seasons WHERE year = ${FINALS_SEASON}`, 1);
+  });
+  const after = await finalsSeasonFootprint();
+  if (after.length > 0) {
+    throw new Error(`ISSUE-276 teardown left rows citing season ${FINALS_SEASON}: ${after.join('; ')}`);
+  }
+  ledger.finalsSeasonCreated = false;
 }
 
 /**
@@ -924,8 +1119,9 @@ async function seedKeepaliveIfNeeded(): Promise<void> {
 async function assertNoForeignFixtureConflicts(): Promise<void> {
   const conflicts: string[] = [];
   for (const id of ALL_IDS) {
+    const round = roundExpectationOf(id);
     const rows = await findPlausibleCanonicalFixtures(sql, {
-      season: SEASON, matchKey: matchKeyFor(id), roundCode: ROUND_CODE, matchDate: matchDateFor(id),
+      season: round.season, matchKey: matchKeyFor(id), roundCode: round.roundCode, matchDate: matchDateFor(id),
       homeClubId, awayClubId,
     });
     conflicts.push(...rows.map((row) => `${row.matchKey} (matches.id ${row.id})`));
@@ -949,12 +1145,12 @@ async function adoptBatch(batchId: string): Promise<void> {
 
 beforeAll(async () => {
   await assertTestDatabase();
-  registry = parseSourceFamilyRegistry(
+  registry = withFinalsSeasonVocabulary(parseSourceFamilyRegistry(
     JSON.parse(readFileSync(join(PROJECT_ROOT, 'data', 'reference', 'source-families.json'), 'utf8')),
-  );
-  identities = parseAflApiIdentities(
+  ));
+  identities = withFinalsSeasonIdentity(parseAflApiIdentities(
     JSON.parse(readFileSync(join(PROJECT_ROOT, 'data', 'reference', 'afl-api-identities.json'), 'utf8')),
-  );
+  ));
   getSourceFamily(registry, 'afl_api', 'match'); // fails loudly if the registry is somehow not this repo's
 
   const [afl] = await sql<{ id: number }[]>`SELECT id FROM sources WHERE key = 'afl_api'`;
@@ -988,6 +1184,7 @@ beforeAll(async () => {
     );
   }
   await assertNoForeignFixtureConflicts();
+  await assertFinalsSeasonUnused(); // read-only: the suite-owned season must be empty before anything is written
   sharedBaseline = await captureSharedState();
 
   ledger.writesAllowed = true; // from here on teardown may remove and restore what this run creates
@@ -1013,6 +1210,7 @@ afterAll(async () => {
     if (ledger.writesAllowed) {
       // Independent steps: each runs even if an earlier one failed, so one failure cannot hide another.
       await attempt('removing this run\'s fixtures and keep-alive', () => removeOwnedFixtures(true));
+      await attempt(`removing the suite-owned season ${FINALS_SEASON}`, removeFinalsSeason);
       await attempt('restoring the shared season-2026 derived rows', restoreSharedBaseline);
     }
   } finally {
@@ -1107,9 +1305,10 @@ async function canonicalSnapshot(matchKey: string, providerId: string) {
 
 /** Runs one settle and adopts the batch id it RETURNS: the only way a batch (and so its rows) becomes owned. */
 async function settleCase(providerId: string, mutate?: (raw: RawUnit) => void, autoApply = true) {
+  const season = roundExpectationOf(providerId).season;
   const result = await runSettleAflApi(sql, {
-    bundle: buildBundle([unitSourceFor(providerId, mutate)]),
-    registry, apply: true, autoApply, inProgressSeasons: [SEASON],
+    bundle: buildBundle(season, [unitSourceFor(providerId, mutate)]),
+    registry, apply: true, autoApply, inProgressSeasons: [season],
   });
   if (result.batchId !== null) await adoptBatch(result.batchId);
   return result;
@@ -1119,9 +1318,18 @@ async function settleCase(providerId: string, mutate?: (raw: RawUnit) => void, a
  * The cases
  * ------------------------------------------------------------------ */
 
-describe('AFLDB-ISSUE-276 — a roster whose period scores contradict the final score is refused, made durable and self-healing', () => {
+/**
+ * The four ISSUE-276 cases, registered once per fixture round with the SAME bodies: the home-and-away cases on the real
+ * season 2026 (run 3) and the preliminary-final cases on the suite-owned season 2069 (run 4, finals coverage restored;
+ * see FINALS_SEASON). Only the case ids, and so the season, round, dates and match keys, differ. Each case also pins
+ * the round facts the writer stored, as literals, so a finals-path defect that leaves the period-score behaviour
+ * intact is still caught.
+ */
+function registerCases(ids: typeof CASE_IDS | typeof FINALS_CASE_IDS): void {
+  const expectedRound = roundExpectationOf(ids.fresh);
+
   it('a contradictory roster for a FRESH match writes the match but no period rows, and opens one finding; a repeat refreshes it in place; a corrected roster resolves it and writes the periods', async () => {
-    const providerId = CASE_IDS.fresh;
+    const providerId = ids.fresh;
     const matchKey = matchKeyFor(providerId);
 
     const first = await settleCase(providerId, threePeriodsOnly(providerId));
@@ -1132,13 +1340,35 @@ describe('AFLDB-ISSUE-276 — a roster whose period scores contradict the final 
     // Only the roster family is refused: the match family still inserts the fixture.
     expect(first.counters.canonicalRowsInserted).toBeGreaterThan(0);
 
-    const [match] = await sql<{ id: number; sourceId: number; homeScore: number; awayScore: number }[]>`
-      SELECT id, source_id AS "sourceId", home_score AS "homeScore", away_score AS "awayScore"
+    const [match] = await sql<{
+      id: number; sourceId: number; homeScore: number; awayScore: number; season: number;
+      roundCode: string; roundNumber: number | null; roundType: string; isFinal: boolean; isFinalsSeries: boolean;
+    }[]>`
+      SELECT id, source_id AS "sourceId", home_score AS "homeScore", away_score AS "awayScore",
+             season::int AS season, round_code AS "roundCode", round_number::int AS "roundNumber",
+             round_type::text AS "roundType", is_final AS "isFinal", is_finals_series AS "isFinalsSeries"
         FROM matches WHERE match_key = ${matchKey}
     `;
     expect(match).toBeDefined();
     expect(match.sourceId).toBe(aflApiSourceId);
     expect([match.homeScore, match.awayScore]).toEqual([122, 131]);
+    // The round facts the writer stored, against literals (a Preliminary Final is a finals-series match).
+    expect({
+      season: match.season, roundCode: match.roundCode, roundNumber: match.roundNumber,
+      roundType: match.roundType, isFinal: match.isFinal, isFinalsSeries: match.isFinalsSeries,
+    }).toEqual({
+      season: expectedRound.season, roundCode: expectedRound.roundCode, roundNumber: expectedRound.roundNumber,
+      roundType: expectedRound.roundType, isFinal: expectedRound.isFinal, isFinalsSeries: expectedRound.isFinal,
+    });
+    if (expectedRound.finalsPlayed !== null) {
+      // The writer's own recompute of the suite-owned season counts the finals appearance of each side.
+      const clubSeasons = await sql<{ clubId: number; finalsPlayed: number | null }[]>`
+        SELECT club_id AS "clubId", finals_played::int AS "finalsPlayed"
+          FROM club_seasons WHERE season = ${expectedRound.season} ORDER BY club_id
+      `;
+      expect(clubSeasons.map((row) => row.clubId)).toEqual([homeClubId, awayClubId].sort((a, b) => a - b));
+      expect(clubSeasons.map((row) => row.finalsPlayed)).toEqual([expectedRound.finalsPlayed, expectedRound.finalsPlayed]);
+    }
 
     // No canonical period row, no ledger row and no review candidate targets match_period_scores.
     expect(await periodRowsOf(matchKey)).toEqual([]);
@@ -1204,7 +1434,7 @@ describe('AFLDB-ISSUE-276 — a roster whose period scores contradict the final 
   }, 120_000);
 
   it('a contradictory roster leaves EXISTING canonical period rows byte-identical: nothing is rewritten, deleted or ledgered', async () => {
-    const providerId = CASE_IDS.existing;
+    const providerId = ids.existing;
     const matchKey = matchKeyFor(providerId);
 
     const first = await settleCase(providerId);
@@ -1238,7 +1468,7 @@ describe('AFLDB-ISSUE-276 — a roster whose period scores contradict the final 
   }, 120_000);
 
   it('an open finding is resolved only by positive evidence: missing score evidence, a deferred roster and a blocked match each leave it open', async () => {
-    const providerId = CASE_IDS.lifecycle;
+    const providerId = ids.lifecycle;
     const matchKey = matchKeyFor(providerId);
 
     // 1. The contradiction opens the finding.
@@ -1299,7 +1529,7 @@ describe('AFLDB-ISSUE-276 — a roster whose period scores contradict the final 
    * writes period scores.
    */
   it('a finding opened before another source created the match is closed on the corroborated path by positive roster evidence, and only by it', async () => {
-    const providerId = CASE_IDS.corroborated;
+    const providerId = ids.corroborated;
     const matchKey = matchKeyFor(providerId);
 
     // 1. Review-first, contradictory roster: the finding opens, the match is NOT written.
@@ -1324,7 +1554,8 @@ describe('AFLDB-ISSUE-276 — a roster whose period scores contradict the final 
         attendance, attendance_status, attendance_source_id,
         source_id, source_record_id, notes
       ) VALUES (
-        ${matchKey}, ${SEASON}, ${ROUND_CODE}, ${Number(ROUND_CODE)}, 'home_and_away', false,
+        ${matchKey}, ${expectedRound.season}, ${expectedRound.roundCode}, ${expectedRound.roundNumber},
+        ${expectedRound.roundType}::round_type, ${expectedRound.isFinal},
         ${matchDateFor(providerId)}, ${venueId}, 'MCG', ${homeClubId}, ${awayClubId},
         19, 8, 122, 20, 11, 131,
         'away_win', ${awayClubId}, 9,
@@ -1370,4 +1601,20 @@ describe('AFLDB-ISSUE-276 — a roster whose period scores contradict the final 
     expect(after).toEqual({ id: owned.id, sourceId: afltablesSourceId }); // never re-owned
     expect((await canonicalSnapshot(matchKey, providerId)).match).toEqual(ownedBefore);
   }, 150_000);
+}
+
+describe('AFLDB-ISSUE-276 — a roster whose period scores contradict the final score is refused, made durable and self-healing', () => {
+  registerCases(CASE_IDS);
+});
+
+describe('AFLDB-ISSUE-276 — the same cases on a PRELIMINARY FINAL in the suite-owned season 2069 (finals coverage, collision-free)', () => {
+  beforeAll(async () => {
+    // Defence in depth: the module-level startup already proved the season unused (read-only); this re-proves it
+    // immediately before the one write that makes the season exist, then gives the writer's recompute something to rank.
+    await assertFinalsSeasonUnused();
+    await createFinalsSeason();
+    await seedKeepaliveIfNeeded(FINALS_SEASON);
+  }, 120_000);
+
+  registerCases(FINALS_CASE_IDS);
 });

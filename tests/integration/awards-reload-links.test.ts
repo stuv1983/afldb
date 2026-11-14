@@ -3907,8 +3907,12 @@ async function readColemanWinners(): Promise<ColemanWinnerRow[]> {
   `;
 }
 
-/** The row-identity fingerprint the G8 reload-stability claim is measured on. */
-async function colemanFingerprint(): Promise<string> {
+/**
+ * The row-identity fingerprint the G8 reload-stability claim is measured on. `maxSeason` (ISSUE-363 decision
+ * 363-C) bounds it to seasons <= maxSeason: the legacy-transition block measures the legacy scope
+ * (first_season..2025) on its own, so a winner derived for a season completed later cannot move it.
+ */
+async function colemanFingerprint(maxSeason: number | null = null): Promise<string> {
   const [row] = await sql<{ fp: string | null }[]>`
     SELECT md5(string_agg(
              w.id::text || '|' || coalesce(w.source_record_id, '(null)'),
@@ -3916,6 +3920,7 @@ async function colemanFingerprint(): Promise<string> {
       FROM award_winners w
       JOIN awards a ON a.id = w.award_id
      WHERE a.slug = 'coleman'
+       AND (${maxSeason}::int IS NULL OR w.season <= ${maxSeason}::int)
   `;
   return row.fp ?? '';
 }
@@ -4915,6 +4920,22 @@ describe.skipIf(!canRunFixtureImporter)(
  * the derived key each row must come back to is exactly the key it started
  * with, so a correct rekey restores the baseline fingerprint byte for byte.
  *
+ * TWO QUANTITIES, NOT ONE (ISSUE-363 owner decision 363-C; PLAN-REVIEW-4 F-001).
+ * The contract's `legacy_transition.expected_rows` (46) is a ONE-TIME legacy
+ * quantity: the number of draftguru-owned rows that existed for the seasons
+ * first_season..2025 when the transition was measured (2026-08-30). It is the
+ * guard of `import_awards.py --rekey-coleman` and it does not move when a later
+ * season completes. The derived family is a LIVING quantity: the contract's
+ * `completed_seasons_only` rule gives every completed season a winner, so the
+ * family is 47 once 2026 has completed and grows by a season each year. The
+ * block therefore (a) checks the CURRENT family against an independent SQL
+ * oracle (independentColemanFamily) instead of against 46, (b) manufactures the
+ * legacy state for the legacy scope ONLY (seasons <= LEGACY_LAST_SEASON; later
+ * winners are captured whole, removed for the transition and restored by id),
+ * and (c) proves that a later-season row left in the legacy state makes the
+ * rekey refuse, which is what the frozen guard is for. The contract file and
+ * tests/coleman-derivation.test.ts are not touched.
+ *
  * Every state transition happens in beforeAll, in one ordered choreography, so
  * each `it` is a pure assertion over a captured snapshot and a failing
  * assertion cannot strand the database midway. afterAll restores by id rather
@@ -4922,6 +4943,65 @@ describe.skipIf(!canRunFixtureImporter)(
  * testing, and then proves the restoration.
  */
 const TRANSITION = coleman.legacy_transition;
+
+/**
+ * Last season of the legacy-transition scope. Provenance (a literal, not a derived value): the contract's
+ * `first_season_basis` records "awards.last_season = 2025, 46 legacy winner rows, exactly one per season from 1980
+ * to 2025". The assertion below ties it to the frozen contract so the two cannot drift apart silently.
+ */
+const LEGACY_LAST_SEASON = 2025;
+if (LEGACY_LAST_SEASON - coleman.first_season + 1 !== TRANSITION.expected_rows) {
+  throw new Error(
+    `LEGACY_LAST_SEASON ${LEGACY_LAST_SEASON} and the contract's first_season ${coleman.first_season} span `
+    + `${LEGACY_LAST_SEASON - coleman.first_season + 1} seasons but legacy_transition.expected_rows is `
+    + `${TRANSITION.expected_rows}; the legacy scope is one row per season.`,
+  );
+}
+
+/**
+ * INDEPENDENT ORACLE for the current Coleman family (ISSUE-363 decision 363-C): `season:player_id` for every winner
+ * the contract's `derivation_method` yields, in this database right now, sorted. Written from the contract's TEXT
+ * ("player_match_stats JOIN matches, home-and-away matches only, sum(goals) grouped by (season, player); the per-season
+ * maximum qualifying total wins", ties included, only a season with seasons.status = 'complete', first_season on,
+ * minimum_goals goals) and deliberately shaped differently from the loader's own SQL (home-and-away is selected by
+ * `round_type`, not `NOT is_final`; the maximum is "no higher total in the season", not a window function). It
+ * neither calls nor copies the loader (`COLEMAN_DERIVATION_SQL`), so a loader that drifts from the contract is
+ * caught rather than echoed. Provenance (docs/v2/evidence/remediation-20261114/run4/coleman276/README.md, measured
+ * 2026-11-15 by read-only SQL on fresh copies): the oracle yields 47 rows (1980-2026, 46 of them <= 2025) on BOTH the
+ * accepted rebuild and the 4 Nov snapshot, 2026 being `complete` on each; the rebuild already stores those 47, the
+ * snapshot stores 46 until this file's first derived load adds the 2026 winner.
+ */
+async function independentColemanFamily(): Promise<string[]> {
+  const rows = await sql<{ season: number; playerId: number }[]>`
+    WITH totals AS (
+      SELECT m.season::int AS season, s.player_id::int AS player_id, sum(s.goals)::int AS goals
+        FROM player_match_stats s
+        JOIN matches m ON m.id = s.match_id
+        JOIN seasons y ON y.year = m.season
+       WHERE m.round_type = 'home_and_away'
+         AND y.status = 'complete'
+         AND m.season >= ${coleman.first_season}
+       GROUP BY m.season, s.player_id
+    )
+    SELECT t.season, t.player_id AS "playerId"
+      FROM totals t
+     WHERE t.goals >= ${coleman.minimum_goals}
+       AND NOT EXISTS (SELECT 1 FROM totals o WHERE o.season = t.season AND o.goals > t.goals)
+     ORDER BY t.season, t.player_id
+  `;
+  return rows.map((r) => `${r.season}:${r.playerId}`);
+}
+
+/** Every award_winners column of the given rows, as text, so a removed row can be restored by id. */
+async function captureAwardWinners(ids: number[]): Promise<{ id: number; doc: string }[]> {
+  if (ids.length === 0) return [];
+  return sql<{ id: number; doc: string }[]>`
+    SELECT w.id::int AS id, to_jsonb(w)::text AS doc
+      FROM award_winners w
+     WHERE w.id = ANY(${ids}::int[])
+     ORDER BY w.id
+  `;
+}
 
 /** One `--rekey-coleman` run. AFLDB_LEGACY_SQLITE is dropped: it reads none. */
 type RekeyRun = { status: number | null; output: string };
@@ -5023,6 +5103,15 @@ async function readIsolation(): Promise<IsolationSnapshot> {
 describe.skipIf(!canRunFixtureImporter)(
   `Coleman legacy to derived ownership transition (AFLDB-ISSUE-111)${roleParitySuffix}`,
   () => {
+    /** The whole current family at entry (oracle-checked), including winners of seasons after the legacy scope. */
+    let family: OwnershipRow[] = [];
+    let familyFingerprint = '';
+    /** The independent oracle's `season:player_id` list for the current family. */
+    let oracle: string[] = [];
+    /** Winners of seasons after LEGACY_LAST_SEASON, captured whole so they can be restored by id. */
+    let laterRows: OwnershipRow[] = [];
+    let laterCaptured: { id: number; doc: string }[] = [];
+    /** The LEGACY SCOPE only: seasons first_season..LEGACY_LAST_SEASON. */
     let baseline: OwnershipRow[] = [];
     let baselineFingerprint = '';
     let unlinkedRowId = 0;
@@ -5037,6 +5126,12 @@ describe.skipIf(!canRunFixtureImporter)(
     let mixedBefore: OwnershipRow[] = [];
     let mixedRun!: RekeyRun;
     let afterMixed: OwnershipRow[] = [];
+
+    /** A legacy family that also carries the later-season rows: null when the family has none. */
+    let overrunBefore: OwnershipRow[] = [];
+    let overrunRun: RekeyRun | null = null;
+    let afterOverrun: OwnershipRow[] = [];
+    let afterLaterRemoved: OwnershipRow[] = [];
 
     let unbridgeableBefore: OwnershipRow[] = [];
     let unbridgeableRun!: RekeyRun;
@@ -5072,8 +5167,9 @@ describe.skipIf(!canRunFixtureImporter)(
      */
     async function writeLegacyState(
       seasonOverrides: Map<number, number> = new Map(),
+      rows: OwnershipRow[] = baseline,
     ): Promise<void> {
-      for (const row of baseline) {
+      for (const row of rows) {
         const season = seasonOverrides.get(row.id) ?? row.season;
         const unlinked = row.id === unlinkedRowId;
         await sql`
@@ -5103,8 +5199,8 @@ describe.skipIf(!canRunFixtureImporter)(
      * Restores the derived family by id. Deliberately not a reload: restoration
      * must not depend on the loader this block is testing.
      */
-    async function restoreBaseline(): Promise<void> {
-      for (const row of baseline) {
+    async function restoreBaseline(rows: OwnershipRow[] = baseline): Promise<void> {
+      for (const row of rows) {
         await sql`
           UPDATE award_winners
              SET source_id         = ${afltablesId},
@@ -5114,6 +5210,44 @@ describe.skipIf(!canRunFixtureImporter)(
                  link_status_value = ${row.status}::link_status,
                  player_name_raw   = ${row.playerNameRaw}
            WHERE id = ${row.id}
+        `;
+      }
+    }
+
+    /**
+     * Removes the winners of seasons after the legacy scope for the transition (they are captured whole first), so
+     * the legacy state is manufactured for the legacy scope only. Deletes by captured id, nothing else.
+     */
+    async function removeLaterRows(): Promise<void> {
+      if (laterRows.length === 0) return;
+      const removed = await sql`
+        DELETE FROM award_winners WHERE id = ANY(${laterRows.map((r) => r.id)}::int[])
+      `;
+      if (removed.count !== laterRows.length) {
+        throw new Error(`removed ${removed.count} later-season Coleman row(s); expected ${laterRows.length}`);
+      }
+    }
+
+    /**
+     * Puts the later-season winners back exactly as captured, by their ORIGINAL ids (award_winners.id is GENERATED
+     * ALWAYS, hence OVERRIDING SYSTEM VALUE). First removes what the derived load created for those seasons during
+     * this block: Coleman rows of a later season whose id is not one of the captured family's. Not a reload.
+     */
+    async function restoreLaterRows(): Promise<void> {
+      if (laterCaptured.length === 0) return;
+      await sql`
+        DELETE FROM award_winners w
+         USING awards a
+         WHERE a.id = w.award_id AND a.slug = 'coleman'
+           AND w.season > ${LEGACY_LAST_SEASON}
+           AND w.id <> ALL(${family.map((r) => r.id)}::int[])
+      `;
+      for (const row of laterCaptured) {
+        await sql`
+          INSERT INTO award_winners OVERRIDING SYSTEM VALUE
+          SELECT r.*
+            FROM jsonb_populate_record(NULL::award_winners, ${row.doc}::text::jsonb) AS r
+           WHERE NOT EXISTS (SELECT 1 FROM award_winners x WHERE x.id = ${row.id})
         `;
       }
     }
@@ -5138,10 +5272,10 @@ describe.skipIf(!canRunFixtureImporter)(
       afltablesId = derivedSource.id;
       draftguruId = legacySource.id;
 
-      baseline = await readOwnership();
-      baselineFingerprint = await colemanFingerprint();
+      family = await readOwnership();
+      familyFingerprint = await colemanFingerprint();
 
-      const foreign = baseline.filter((r) => r.sourceKey !== coleman.source_key);
+      const foreign = family.filter((r) => r.sourceKey !== coleman.source_key);
       if (foreign.length > 0) {
         throw new Error(
           `${foreign.length} Coleman award_winners row(s) in afldb_test are not owned by `
@@ -5150,15 +5284,34 @@ describe.skipIf(!canRunFixtureImporter)(
           + 'it did not start from.',
         );
       }
-      if (baseline.length !== TRANSITION.expected_rows) {
+      // The CURRENT family is a living quantity: it must equal what the contract's derivation_method yields in
+      // this database now (independent SQL oracle), whatever its size. It is NOT compared with the contract's 46.
+      oracle = await independentColemanFamily();
+      const familyKeys = family.map((r) => `${r.season}:${r.playerId}`).sort();
+      if (JSON.stringify(familyKeys) !== JSON.stringify(oracle)) {
         throw new Error(
-          `afldb_test holds ${baseline.length} Coleman winner row(s); the tracked contract `
-          + `declares exactly ${TRANSITION.expected_rows} and the transition's preflight `
-          + 'refuses any other count. The legacy state is manufactured from this family, so '
-          + 'the 1:1 rekey cannot be tested against a family of a different size — rebuild '
-          + 'afldb_test or reconcile data/reference/coleman-derivation.json.',
+          `afldb_test holds ${family.length} Coleman winner row(s) that are not the ${oracle.length} `
+          + "the contract's derivation_method yields in this database (independent oracle, season:player_id). "
+          + 'The legacy state is manufactured from the derived family, so the family must first be the derived '
+          + 'one: run the derived loader, or rebuild afldb_test.',
         );
       }
+      // The LEGACY SCOPE is a one-time quantity: the contract's expected_rows, one row per season
+      // first_season..LEGACY_LAST_SEASON. Later-season winners are not part of it.
+      baseline = family.filter((r) => r.season <= LEGACY_LAST_SEASON);
+      laterRows = family.filter((r) => r.season > LEGACY_LAST_SEASON);
+      baselineFingerprint = await colemanFingerprint(LEGACY_LAST_SEASON);
+      if (baseline.length !== TRANSITION.expected_rows
+          || new Set(baseline.map((r) => r.season)).size !== TRANSITION.expected_rows
+          || Math.min(...baseline.map((r) => r.season)) !== coleman.first_season) {
+        throw new Error(
+          `afldb_test holds ${baseline.length} Coleman winner row(s) for seasons ${coleman.first_season}-`
+          + `${LEGACY_LAST_SEASON}; the tracked contract declares exactly ${TRANSITION.expected_rows}, one per `
+          + "season, and the transition's preflight refuses any other count. The 1:1 rekey cannot be tested "
+          + 'against a legacy scope of a different size.',
+        );
+      }
+      laterCaptured = await captureAwardWinners(laterRows.map((r) => r.id));
       const decisionsBefore = await colemanLinkDecisions();
       if (decisionsBefore !== 0) {
         throw new Error(
@@ -5215,6 +5368,21 @@ describe.skipIf(!canRunFixtureImporter)(
       afterMixed = await readOwnership();
       await restoreBaseline();
 
+      // 2b. The legacy scope is bounded (363-C): an all-legacy family that ALSO carries a later-season winner is
+      // not the 46-row legacy state, and the guard refuses it. Only meaningful when such a winner exists.
+      if (laterRows.length > 0) {
+        await writeLegacyState(new Map(), family);
+        overrunBefore = await readOwnership();
+        overrunRun = runRekey();
+        afterOverrun = await readOwnership();
+        await restoreBaseline(family);
+      }
+
+      // From here the legacy state is manufactured for the legacy scope ONLY: the later-season winners were
+      // captured whole at entry and are removed now (restored by id in afterAll).
+      await removeLaterRows();
+      afterLaterRemoved = await readOwnership();
+
       // 3. A season that cannot bridge 1:1 aborts the whole transaction.
       await writeLegacyState(new Map([[unlinkedRowId, duplicatedSeason]]));
       unbridgeableBefore = await readOwnership();
@@ -5226,13 +5394,13 @@ describe.skipIf(!canRunFixtureImporter)(
       legacyBefore = await readOwnership();
       rekeyRun = runRekey();
       afterRekey = await readOwnership();
-      fingerprintAfterRekey = await colemanFingerprint();
+      fingerprintAfterRekey = await colemanFingerprint(LEGACY_LAST_SEASON);
       isolationAfterRekey = await readIsolation();
 
       // 5. The first derived load over the transitioned rows.
       firstLoad = runColeman();
       afterFirstLoad = await readOwnership();
-      fingerprintAfterLoad = await colemanFingerprint();
+      fingerprintAfterLoad = await colemanFingerprint(LEGACY_LAST_SEASON);
       decisionsAfterLoad = await colemanLinkDecisions();
       isolationAfterLoad = await readIsolation();
     }, 1_800_000);
@@ -5241,16 +5409,17 @@ describe.skipIf(!canRunFixtureImporter)(
       // Unconditional, and by id: restoration must not depend on the loader.
       if (baseline.length > 0) {
         await restoreBaseline();
+        await restoreLaterRows();
         const restored = ownershipOf(await readOwnership());
         const fingerprint = await colemanFingerprint();
         await removeFixtureCorpus();
-        if (fingerprint !== baselineFingerprint) {
+        if (fingerprint !== familyFingerprint) {
           throw new Error(
             'the derived Coleman family was not restored after the transition fixtures: '
-            + `fingerprint ${fingerprint} != ${baselineFingerprint}`,
+            + `fingerprint ${fingerprint} != ${familyFingerprint}`,
           );
         }
-        if (restored.join('\n') !== ownershipOf(baseline).join('\n')) {
+        if (restored.join('\n') !== ownershipOf(family).join('\n')) {
           throw new Error(
             'the derived Coleman family came back with different ownership or facts after '
             + 'the transition fixtures; afldb_test still holds manufactured legacy state.',
@@ -5266,14 +5435,15 @@ describe.skipIf(!canRunFixtureImporter)(
       // run twice, and the second run must recognise its own work.
       expect(noopRun.status, noopRun.output).toBe(0);
       expect(noopRun.output).toContain('Already rekeyed');
+      // The whole current family (legacy scope and any later seasons) is already derived.
       expect(noopRun.output).toMatch(
-        new RegExp(`owned by ${coleman.source_key}\\s+${baseline.length}\\b`),
+        new RegExp(`owned by ${coleman.source_key}\\s+${family.length}\\b`),
       );
       expect(
         noopRun.output,
         'a no-op must not report a mutation it did not perform',
       ).not.toContain('Coleman row(s) in place');
-      expect(ownershipOf(afterNoop)).toEqual(ownershipOf(baseline));
+      expect(ownershipOf(afterNoop)).toEqual(ownershipOf(family));
     });
 
     it('refuses a mixed ownership state and writes nothing', () => {
@@ -5289,6 +5459,43 @@ describe.skipIf(!canRunFixtureImporter)(
         ownershipOf(afterMixed),
         'a refused transition leaves every row exactly as it found it',
       ).toEqual(ownershipOf(mixedBefore));
+    });
+
+    it('refuses an all-legacy family that also carries a later-season row: the legacy scope is bounded', () => {
+      // 363-C mutation proof, kept as a permanent regression: a winner for a season after LEGACY_LAST_SEASON left in
+      // the legacy state makes the family 46 + n legacy rows, and the frozen guard (expected_rows) refuses it.
+      if (overrunRun === null) {
+        // No later-season winner exists in this database (a base whose newest completed season is 2025), so the
+        // overrun state does not exist; the scope split below is then trivially the whole family.
+        expect(laterRows, 'overrun is only skipped when there is nothing beyond the legacy scope').toEqual([]);
+        expect(family.length).toBe(TRANSITION.expected_rows);
+        return;
+      }
+      expect(laterRows.length).toBeGreaterThan(0);
+      expect(
+        overrunBefore.filter((r) => r.sourceKey !== TRANSITION.legacy_source_key),
+        'the fixture really did put the whole family, later seasons included, into the legacy state',
+      ).toEqual([]);
+      expect(overrunRun.status, overrunRun.output).not.toBe(0);
+      expect(overrunRun.output).toContain(
+        `expected exactly ${TRANSITION.expected_rows} legacy row(s) in scope, found ${family.length}`,
+      );
+      expect(overrunRun.output).toContain('The mapping is not exactly 1:1; nothing was written.');
+      expect(
+        ownershipOf(afterOverrun),
+        'a refused transition leaves every row exactly as it found it',
+      ).toEqual(ownershipOf(overrunBefore));
+    });
+
+    it('is manufactured for the legacy scope only: later-season winners are set aside, not rekeyed', () => {
+      expect(baseline.length).toBe(TRANSITION.expected_rows);
+      expect(baseline.map((r) => r.season).sort((a, b) => a - b))
+        .toEqual(Array.from({ length: TRANSITION.expected_rows }, (_, i) => coleman.first_season + i));
+      expect(
+        afterLaterRemoved.filter((r) => r.season > LEGACY_LAST_SEASON),
+        'no later-season winner takes part in the legacy transition',
+      ).toEqual([]);
+      expect(afterLaterRemoved.map((r) => r.id)).toEqual(baseline.map((r) => r.id));
     });
 
     it('refuses when a season cannot bridge 1:1, aborting the whole transaction', () => {
@@ -5369,19 +5576,31 @@ describe.skipIf(!canRunFixtureImporter)(
         .toBe(legacyKeyFor(coleman.first_season, 0));
     });
 
-    it('reports 46 updated / 0 inserted / 0 deleted on the first derived load', () => {
+    it('reports 46 updated / 0 inserted / 0 deleted for the legacy scope on the first derived load', () => {
       expect(firstLoad.status, firstLoad.stdout + firstLoad.stderr).toBe(0);
       // The acceptance signal from the runbook, read from the contract rather
-      // than written as a literal. An insert or a delete here means the bridge
-      // was wrong and the duplication the transition exists to prevent happened
+      // than written as a literal. It is the signal for the LEGACY SCOPE: an
+      // insert or a delete among the transitioned rows means the bridge was
+      // wrong and the duplication the transition exists to prevent happened
       // anyway.
       expect(TRANSITION.first_load_expectation)
         .toBe(`${TRANSITION.expected_rows} updated, 0 inserted, 0 deleted`);
       expect(firstLoad.updated).toBe(TRANSITION.expected_rows);
-      expect(firstLoad.inserted, 'a transitioned row is matched, never inserted beside').toBe(0);
       expect(firstLoad.deleted, 'and never deleted and rewritten').toBe(0);
 
-      expect(afterFirstLoad.map((r) => r.id)).toEqual(baseline.map((r) => r.id));
+      const inScope = afterFirstLoad.filter((r) => r.season <= LEGACY_LAST_SEASON);
+      expect(inScope.map((r) => r.id), 'a transitioned row is matched, never inserted beside')
+        .toEqual(baseline.map((r) => r.id));
+      // Seasons completed AFTER the legacy scope were set aside for the transition, so the loader
+      // (correctly) derives them as new rows: exactly one insert per later winner the independent
+      // oracle names, and nothing else. On a base with no later season this is 0, the contract's text.
+      const oracleLater = oracle.filter((key) => Number(key.split(':')[0]) > LEGACY_LAST_SEASON);
+      expect(firstLoad.inserted).toBe(oracleLater.length);
+      expect(firstLoad.winners, 'the loader derived exactly the family the oracle yields')
+        .toBe(oracle.length);
+      expect(
+        afterFirstLoad.filter((r) => r.season > LEGACY_LAST_SEASON).map((r) => `${r.season}:${r.playerId}`).sort(),
+      ).toEqual(oracleLater);
       expect(fingerprintAfterLoad).toBe(baselineFingerprint);
 
       // The 1982-Blight case: a legacy row the name matcher could not link is
@@ -5444,6 +5663,8 @@ describe.skipIf(!canRunFixtureImporter)(
 
     let baseline: OwnershipRow[] = [];
     let baselineFingerprint = '';
+    /** The independent oracle's `season:player_id` list: the family the reload must report (363-C). */
+    let familyOracle: string[] = [];
 
     let linkedRowId = 0;
     let linkedSourcePlayer = 0;
@@ -5530,11 +5751,17 @@ describe.skipIf(!canRunFixtureImporter)(
           + 'restores them by id, so it refuses a family it did not start from.',
         );
       }
-      if (baseline.length !== TRANSITION.expected_rows) {
+      // 363-C: the reload signal asserted below is the CURRENT family size, a living quantity (47 once 2026 has
+      // completed), not the contract's one-time legacy-transition 46. Its expected value comes from the
+      // independent oracle, and the family must equal that oracle before anything is measured against it.
+      familyOracle = await independentColemanFamily();
+      const familyKeys = baseline.map((r) => `${r.season}:${r.playerId}`).sort();
+      if (JSON.stringify(familyKeys) !== JSON.stringify(familyOracle)) {
         throw new Error(
-          `afldb_test holds ${baseline.length} Coleman winner row(s); the tracked contract `
-          + `declares exactly ${TRANSITION.expected_rows}. The reload signal asserted below `
-          + 'is that count, so it cannot be measured against a family of a different size.',
+          `afldb_test holds ${baseline.length} Coleman winner row(s) that are not the ${familyOracle.length} `
+          + "the contract's derivation_method yields in this database (independent oracle, season:player_id). "
+          + 'The reload signal asserted below is that family size, so it cannot be measured against a '
+          + 'family that is not the derived one.',
         );
       }
       const decisionsBefore = await colemanLinkDecisions();
@@ -5697,7 +5924,8 @@ describe.skipIf(!canRunFixtureImporter)(
 
       // Reconciled in place: nothing was inserted beside the decided rows and
       // nothing deleted, so no surrogate id — and no decision target — moved.
-      expect(preservingRun.updated).toBe(TRANSITION.expected_rows);
+      expect(preservingRun.updated).toBe(familyOracle.length);
+      expect(preservingRun.winners).toBe(familyOracle.length);
       expect(preservingRun.inserted).toBe(0);
       expect(preservingRun.deleted).toBe(0);
       expect(fingerprintAfterPreserving).toBe(baselineFingerprint);
@@ -5756,7 +5984,7 @@ describe.skipIf(!canRunFixtureImporter)(
 
     it('loads again once the name agrees, with both decisions still standing', () => {
       expect(healRun.status, healRun.stdout + healRun.stderr).toBe(0);
-      expect(healRun.updated).toBe(TRANSITION.expected_rows);
+      expect(healRun.updated).toBe(familyOracle.length);
       expect(healRun.inserted).toBe(0);
       expect(healRun.deleted).toBe(0);
 
