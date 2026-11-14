@@ -1,0 +1,2 @@
+tests/integration/admin-season-lists.test.ts	<file-level>	update or delete on table "auth_users" violates foreign key constraint "data_overrides_admin_user_id_fkey" on table "data_overrides"
+tests/integration/admin-season-lists.test.ts	add (§12.1) refuses every season below FIRST_LIST_SEASON, and writes nothing (D-2, I-4)	AssertionError: 2027: expected true to be false // Object.is equality

@@ -1,0 +1,11 @@
+tests/integration/nl-answers-relationships.test.ts	C2 — has_brother answers a pinned player as one row or none, never a leaderboard	AssertionError: expected +0 to be 1 // Object.is equality
+tests/integration/nl-answers-relationships.test.ts	C3 — parent and child, typed by role excludes a player whose father is UNLINKED (fails closed)	AssertionError: expected +0 to be 1 // Object.is equality
+tests/integration/nl-answers-relationships.test.ts	C3 — parent and child, typed by role the father direction returns the SONS of a father who played	AssertionError: expected [ Array(96) ] to include 3048
+tests/integration/nl-answers-relationships.test.ts	C3 — parent and child, typed by role the two directions are different populations, and both sit inside the symmetric one	AssertionError: expected false to be true // Object.is equality
+tests/integration/nl-answers-relationships.test.ts	C4 — the relatives of one named player an unlinked relative is a name, and returns nobody	AssertionError: expected +0 to be 1 // Object.is equality
+tests/integration/nl-answers-relationships.test.ts	C4 — the relatives of one named player brother_of_player answers with the brother, not the subject	AssertionError: expected [] to deeply equal [ 11789 ]
+tests/integration/nl-answers-relationships.test.ts	C4 — the relatives of one named player keeps two same-named relatives apart by id	AssertionError: expected 'Garry Fenton' to be 'Garry Foulds' // Object.is equality
+tests/integration/nl-answers-relationships.test.ts	C4 — the relatives of one named player son_of_player and father_of_player are inverses of one another	AssertionError: expected [ 12661 ] to deeply equal [ 3048 ]
+tests/integration/nl-answers-relationships.test.ts	FS4 — father_son_father ranks by career games without losing the relationship	AssertionError: expected 2172 to be 2164 // Object.is equality
+tests/integration/nl-answers-relationships.test.ts	X3 — selected under the rule AND actually coached is exactly Rhyce Shaw	AssertionError: expected [ 11043 ] to deeply equal [ 10974 ]
+tests/integration/nl-answers-relationships.test.ts	the family grain (AFLDB-ISSUE-153 Stage 6, D6) disambiguates the Ablett family by id: 4700 and 4701 both display "Gary Ablett"	Error: fixture assumption failed: the Ablett family was not found via getFamilyRecords

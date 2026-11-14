@@ -1,0 +1,18 @@
+isolated-pg: afldb_v2_rem4rbfail_g_pf_rb_sl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55690); running node
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-rbfail-20261115/cand[39m
+
+ [32m✓[39m tests/integration/admin-season-lists.test.ts [2m([22m[2m42 tests[22m[2m)[22m[33m 4835[2mms[22m[39m
+     [33m[2m✓[22m[39m re-creates every membership a rebuild removed, with the same keys [33m 337[2mms[22m[39m
+     [33m[2m✓[22m[39m is idempotent: a second replay changes nothing [33m 333[2mms[22m[39m
+     [33m[2m✓[22m[39m will not resurrect a tombstoned membership, whoever planted the row [33m 340[2mms[22m[39m
+     [33m[2m✓[22m[39m fails the WHOLE batch closed on an unresolvable record, writing nothing [33m 325[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses an unresolvable TOMBSTONE just as hard as a membership [33m 323[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m42 passed[39m[22m[90m (42)[39m
+[2m   Start at [22m 09:28:17
+[2m   Duration [22m 7.40s[2m (transform 395ms, setup 1.49s, import 687ms, tests 4.84s, environment 0ms)[22m
+
+JSON report written to /mnt/ssd/afldb-rem4-rbfail-20261115/evidence/g_pf_rb_sl.json
+g_pf_rb_sl rc=0

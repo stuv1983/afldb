@@ -1,0 +1,41 @@
+######## RED pf rb nl-answers-relationships
+refused: afldb_v2_rem4rbfail_red_pf_nl-answers-relationships_test is not an afldb_v2_*_test name
+red_pf_nl-answers-relationships rc=2
+refused: afldb_v2_rem4rbfail_red_pf_nl-answers-relationships_test is not an afldb_v2_*_test name
+######## RED pf rb nl-answers-cross-domain
+refused: afldb_v2_rem4rbfail_red_pf_nl-answers-cross-domain_test is not an afldb_v2_*_test name
+red_pf_nl-answers-cross-domain rc=2
+refused: afldb_v2_rem4rbfail_red_pf_nl-answers-cross-domain_test is not an afldb_v2_*_test name
+######## RED pf rb nl-answers-first-kick-goal
+refused: afldb_v2_rem4rbfail_red_pf_nl-answers-first-kick-goal_test is not an afldb_v2_*_test name
+red_pf_nl-answers-first-kick-goal rc=2
+refused: afldb_v2_rem4rbfail_red_pf_nl-answers-first-kick-goal_test is not an afldb_v2_*_test name
+######## RED pf rb nl-answers-coaching
+refused: afldb_v2_rem4rbfail_red_pf_nl-answers-coaching_test is not an afldb_v2_*_test name
+red_pf_nl-answers-coaching rc=2
+refused: afldb_v2_rem4rbfail_red_pf_nl-answers-coaching_test is not an afldb_v2_*_test name
+######## RED pf rb admin-season-lists
+refused: afldb_v2_rem4rbfail_red_pf_admin-season-lists_test is not an afldb_v2_*_test name
+red_pf_admin-season-lists rc=2
+refused: afldb_v2_rem4rbfail_red_pf_admin-season-lists_test is not an afldb_v2_*_test name
+######## RED pf rb special-records-public-suppression
+refused: afldb_v2_rem4rbfail_red_pf_special-records-public-suppression_test is not an afldb_v2_*_test name
+red_pf_special-records-public-suppression rc=2
+refused: afldb_v2_rem4rbfail_red_pf_special-records-public-suppression_test is not an afldb_v2_*_test name
+######## RED pf rb special-records-lifecycle
+refused: afldb_v2_rem4rbfail_red_pf_special-records-lifecycle_test is not an afldb_v2_*_test name
+red_pf_special-records-lifecycle rc=2
+refused: afldb_v2_rem4rbfail_red_pf_special-records-lifecycle_test is not an afldb_v2_*_test name
+######## RED sh rb v2-coleman-publication (table counts)
+create-db: afldb_v2_rem4rbfail_red_sh_coleman_test created from afldb_v2_rem4rbfail_rbb_tmpl_test and marked
+red_sh_coleman rc=1
+ Test Files  1 failed (1)
+      Tests  28 skipped (28)
+   Duration  2.27s (transform 641ms, setup 157ms, import 1.02s, tests 737ms, environment 0ms)
+tests/integration/v2-coleman-publication.test.ts	<file-level>	refusing to run: 1 Coleman 2001 row(s) already exist that this suite did not create
+table-count rows changed: 1
+12c12
+< award_winners	3713
+---
+> award_winners	3712
+drop-db: afldb_v2_rem4rbfail_red_sh_coleman_test dropped

@@ -1,0 +1,263 @@
+isolated-pg: afldb_v2_rem4rbfail_red_pf_nl_answers_relationships_test verified (cluster afldb_v2_isolated, 127.0.0.1:55690); running node
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-rbfail-20261115/cand-red[39m
+
+ [31m❯[39m tests/integration/nl-answers-relationships.test.ts [2m([22m[2m49 tests[22m[2m | [22m[31m11 failed[39m[2m)[22m[33m 2336[2mms[22m[39m
+     [32m✓[39m matches the populations measured on 2026-09-09[32m 25[2mms[22m[39m
+     [32m✓[39m holds no parent_child row whose roles are anything but father -> son[32m 1[2mms[22m[39m
+     [32m✓[39m holds sibling rows that are NOT brothers[32m 2[2mms[22m[39m
+     [32m✓[39m returns exactly the hand-written label-backed set[32m 48[2mms[22m[39m
+     [32m✓[39m is never larger than the unsexed sibling set it must not be confused with[32m 38[2mms[22m[39m
+[31m     [31m×[31m answers a pinned player as one row or none, never a leaderboard[39m[32m 22[2mms[22m[39m
+     [32m✓[39m the symmetric builder returns exactly the hand-written set[32m 20[2mms[22m[39m
+[31m     [31m×[31m the father direction returns the SONS of a father who played[39m[32m 13[2mms[22m[39m
+     [32m✓[39m the son direction returns the FATHERS of a son who played[32m 10[2mms[22m[39m
+[31m     [31m×[31m the two directions are different populations, and both sit inside the symmetric one[39m[32m 25[2mms[22m[39m
+[31m     [31m×[31m excludes a player whose father is UNLINKED (fails closed)[39m[32m 8[2mms[22m[39m
+[31m     [31m×[31m brother_of_player answers with the brother, not the subject[39m[32m 6[2mms[22m[39m
+[31m     [31m×[31m son_of_player and father_of_player are inverses of one another[39m[32m 4[2mms[22m[39m
+     [32m✓[39m matches hand-written SQL for every father of a father-son selection[32m 3[2mms[22m[39m
+[31m     [31m×[31m keeps two same-named relatives apart by id[39m[32m 4[2mms[22m[39m
+[31m     [31m×[31m an unlinked relative is a name, and returns nobody[39m[32m 4[2mms[22m[39m
+     [32m✓[39m returns exactly the hand-written linked-father set[32m 11[2mms[22m[39m
+     [32m✓[39m coincides with the role-typed parent_child fathers, today[32m 12[2mms[22m[39m
+[31m     [31m×[31m ranks by career games without losing the relationship[39m[32m 9[2mms[22m[39m
+     [32m✓[39m counts the whole qualifying set even when the rows are capped[32m 16[2mms[22m[39m
+     [32m✓[39m is 99 players, and the builder agrees with a hand-written query[32m 7[2mms[22m[39m
+     [32m✓[39m differs from has_afl_father by exactly the three unmatched-father witnesses[32m 11[2mms[22m[39m
+     [32m✓[39m needs no games filter — every selected player has played[32m 1[2mms[22m[39m
+     [32m✓[39m the father side is unchanged at 107 — the binding is symmetric, not a swap[32m 7[2mms[22m[39m
+     [32m✓[39m folds a RENAME through organization lineage: the Bulldogs are one club[32m 14[2mms[22m[39m
+     [32m✓[39m does NOT fold a merger: Fitzroy is not Brisbane[32m 3[2mms[22m[39m
+     [32m✓[39m draft_year and the debut season are disjoint — 0 of 99 debut in their draft year[32m 2[2mms[22m[39m
+     [32m✓[39m scopes to a draft year, and to that year alone[32m 4[2mms[22m[39m
+     [32m✓[39m the denominator is 127 selection events, never the 99 linked players[32m 37[2mms[22m[39m
+     [32m✓[39m groups by organization, one row per lineage[32m 3[2mms[22m[39m
+     [32m✓[39m Carlton counts its selections, not its linked players[32m 4[2mms[22m[39m
+     [32m✓[39m groups by DRAFT year, chronologically, and links no year to a season page[32m 2[2mms[22m[39m
+     [32m✓[39m discloses the linked-player coverage without letting it become the denominator[32m 1[2mms[22m[39m
+[31m     [31m×[31m is exactly Rhyce Shaw[39m[32m 9[2mms[22m[39m
+     [32m✓[39m the father side is 11 players, and they all actually coached[32m 28[2mms[22m[39m
+     [32m✓[39m a linked coach identity is not enough — the coaching must have happened[32m 2[2mms[22m[39m
+     [32m✓[39m same provenance: one source, one import batch[32m 3[2mms[22m[39m
+     [32m✓[39m sons: neither side holds a player the other does not[32m 2[2mms[22m[39m
+     [32m✓[39m fathers: neither side holds a player the other does not[32m 2[2mms[22m[39m
+     [32m✓[39m pairs: neither side holds a (father, son) pair the other does not[32m 3[2mms[22m[39m
+     [32m✓[39m one projection row per selection, and no more[32m 2[2mms[22m[39m
+     [32m✓[39m no parent_child row carries a family_key, so the sibling board is unaffected[32m 2[2mms[22m[39m
+     [32m✓[39m C1 "biggest football family" agrees with the existing /records/family board[32m 49[2mms[22m[39m
+     [32m✓[39m C1 "most AFL players" ranks a DIFFERENT metric than "biggest" -- never the same phrasing[32m 64[2mms[22m[39m
+     [32m✓[39m excludes every size-1 family, fail-closed (§4.6: 46 of them today)[32m 46[2mms[22m[39m
+     [32m✓[39m C5 "families with three AFL players" matches an independently-filtered count[32m 40[2mms[22m[39m
+[31m     [31m×[31m disambiguates the Ablett family by id: 4700 and 4701 both display "Gary Ablett"[39m[32m 25[2mms[22m[39m
+     [32m✓[39m every linked member is counted once, matching the independent oracle's own summary[32m 25[2mms[22m[39m
+     [32m✓[39m validatePlan refuses a family plan carrying a club, season or player (no regression)[32m 1[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 11 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m tests/integration/nl-answers-relationships.test.ts[2m > [22mC2 — has_brother[2m > [22manswers a pinned player as one row or none, never a leaderboard
+[31m[1mAssertionError[22m: expected +0 to be 1 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 1[39m
+[31m+ 0[39m
+
+[36m [2m❯[22m tests/integration/nl-answers-relationships.test.ts:[2m240:19[22m[39m
+    [90m238|[39m       player[33m:[39m [34mref[39m([33mBRENT_HARVEY[39m)[33m,[39m
+    [90m239|[39m     }))[33m;[39m
+    [90m240|[39m     [34mexpect[39m(total)[33m.[39m[34mtoBe[39m([34m1[39m)[33m;[39m
+    [90m   |[39m                   [31m^[39m
+    [90m241|[39m     [34mexpect[39m(rows[[34m0[39m][33m.[39mplayerId)[33m.[39m[34mtoBe[39m([33mBRENT_HARVEY[39m)[33m;[39m
+    [90m242|[39m   })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/11]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/integration/nl-answers-relationships.test.ts[2m > [22mC3 — parent and child, typed by role[2m > [22mthe father direction returns the SONS of a father who played
+[31m[1mAssertionError[22m: expected [ Array(96) ] to include 3048[39m
+[36m [2m❯[22m tests/integration/nl-answers-relationships.test.ts:[2m281:22[22m[39m
+    [90m279|[39m     `[39m[33m;[39m
+    [90m280|[39m     [34mexpect[39m(answered)[33m.[39m[34mtoEqual[39m(handWritten[33m.[39m[34mmap[39m((r) [33m=>[39m r[33m.[39mid))[33m;[39m
+    [90m281|[39m     [34mexpect[39m(answered)[33m.[39m[34mtoContain[39m([33mCOOPER_HARVEY[39m)[33m;[39m
+    [90m   |[39m                      [31m^[39m
+    [90m282|[39m     [34mexpect[39m(answered)[33m.[39mnot[33m.[39m[34mtoContain[39m([33mBRENT_HARVEY[39m)[33m;[39m
+    [90m283|[39m   })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/11]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/integration/nl-answers-relationships.test.ts[2m > [22mC3 — parent and child, typed by role[2m > [22mthe two directions are different populations, and both sit inside the symmetric one
+[31m[1mAssertionError[22m: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m tests/integration/nl-answers-relationships.test.ts:[2m310:39[22m[39m
+    [90m308|[39m     // Gary Ablett Snr is in one and Jnr in the other -- the direction…
+    [90m309|[39m     [90m// real, not a relabelling of the same set.[39m
+    [90m310|[39m     [34mexpect[39m(sons[33m.[39m[34mhas[39m([33mGARY_ABLETT_SNR[39m))[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m   |[39m                                       [31m^[39m
+    [90m311|[39m     [34mexpect[39m(fathers[33m.[39m[34mhas[39m([33mGARY_ABLETT_JNR[39m))[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m312|[39m   })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/11]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/integration/nl-answers-relationships.test.ts[2m > [22mC3 — parent and child, typed by role[2m > [22mexcludes a player whose father is UNLINKED (fails closed)
+[31m[1mAssertionError[22m: expected +0 to be 1 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 1[39m
+[31m+ 0[39m
+
+[36m [2m❯[22m tests/integration/nl-answers-relationships.test.ts:[2m323:26[22m[39m
+    [90m321|[39m          AND person_b_player_id = ${SHANE_MORRISON} AND person_a_playe…
+    [90m322|[39m     `[39m)[33m;[39m
+    [90m323|[39m     [34mexpect[39m(unlinkedSide)[33m.[39m[34mtoBe[39m([34m1[39m)[33m;[39m
+    [90m   |[39m                          [31m^[39m
+    [90m324|[39m   })[33m;[39m
+    [90m325|[39m })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/11]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/integration/nl-answers-relationships.test.ts[2m > [22mC4 — the relatives of one named player[2m > [22mbrother_of_player answers with the brother, not the subject
+[31m[1mAssertionError[22m: expected [] to deeply equal [ 11789 ][39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- [[39m
+[32m-   11789,[39m
+[32m- ][39m
+[31m+ [][39m
+
+[36m [2m❯[22m tests/integration/nl-answers-relationships.test.ts:[2m332:22[22m[39m
+    [90m330|[39m   it('brother_of_player answers with the brother, not the subject', as…
+    [90m331|[39m     const answered = await ids(ofPlayer('brother_of_player', ref(BRENT…
+    [90m332|[39m     [34mexpect[39m(answered)[33m.[39m[34mtoEqual[39m([[33mSHANE_HARVEY[39m])[33m;[39m
+    [90m   |[39m                      [31m^[39m
+    [90m333|[39m     [34mexpect[39m(answered)[33m.[39mnot[33m.[39m[34mtoContain[39m([33mBRENT_HARVEY[39m)[33m;[39m
+    [90m334|[39m   })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/11]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/integration/nl-answers-relationships.test.ts[2m > [22mC4 — the relatives of one named player[2m > [22mson_of_player and father_of_player are inverses of one another
+[31m[1mAssertionError[22m: expected [ 12661 ] to deeply equal [ 3048 ][39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  [[22m
+[32m-   3048,[39m
+[31m+   12661,[39m
+[2m  ][22m
+
+[36m [2m❯[22m tests/integration/nl-answers-relationships.test.ts:[2m337:69[22m[39m
+    [90m335|[39m
+    [90m336|[39m   it('son_of_player and father_of_player are inverses of one another',…
+    [90m337|[39m     expect(await ids(ofPlayer('son_of_player', ref(BRENT_HARVEY)))).to…
+    [90m   |[39m                                                                     [31m^[39m
+    [90m338|[39m     expect(await ids(ofPlayer('father_of_player', ref(COOPER_HARVEY)))…
+    [90m339|[39m     [90m// And never the wrong way round: Cooper has no recorded son.[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/11]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/integration/nl-answers-relationships.test.ts[2m > [22mC4 — the relatives of one named player[2m > [22mkeeps two same-named relatives apart by id
+[31m[1mAssertionError[22m: expected 'Garry Fenton' to be 'Garry Foulds' // Object.is equality[39m
+
+Expected: [32m"Garry F[7moulds[27m"[39m
+Received: [31m"Garry F[7menton[27m"[39m
+
+[36m [2m❯[22m tests/integration/nl-answers-relationships.test.ts:[2m368:30[22m[39m
+    [90m366|[39m       SELECT display_name FROM players WHERE id = [39m[36m${[39m[33mGARY_ABLETT_JNR[39m[36m}[39m[32m
+    [90m367|[39m     `[39m[33m;[39m
+    [90m368|[39m     [34mexpect[39m(snr[33m.[39mdisplay_name)[33m.[39m[34mtoBe[39m(jnr[33m.[39mdisplay_name)[33m;[39m
+    [90m   |[39m                              [31m^[39m
+    [90m369|[39m
+    [90m370|[39m     [90m// Gary Ablett Snr has more than one recorded son, so this is not a[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/11]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/integration/nl-answers-relationships.test.ts[2m > [22mC4 — the relatives of one named player[2m > [22man unlinked relative is a name, and returns nobody
+[31m[1mAssertionError[22m: expected +0 to be 1 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 1[39m
+[31m+ 0[39m
+
+[36m [2m❯[22m tests/integration/nl-answers-relationships.test.ts:[2m389:26[22m[39m
+    [90m387|[39m          AND person_a_player_id = ${ROBERT_WALLS} AND person_b_player_…
+    [90m388|[39m     `[39m)[33m;[39m
+    [90m389|[39m     [34mexpect[39m(unlinkedSide)[33m.[39m[34mtoBe[39m([34m1[39m)[33m;[39m
+    [90m   |[39m                          [31m^[39m
+    [90m390|[39m   })[33m;[39m
+    [90m391|[39m })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/11]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/integration/nl-answers-relationships.test.ts[2m > [22mFS4 — father_son_father[2m > [22mranks by career games without losing the relationship
+[31m[1mAssertionError[22m: expected 2172 to be 2164 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 2164[39m
+[31m+ 2172[39m
+
+[36m [2m❯[22m tests/integration/nl-answers-relationships.test.ts:[2m431:35[22m[39m
+    [90m429|[39m       agg[33m:[39m { kind[33m:[39m [32m'max'[39m }[33m,[39m
+    [90m430|[39m     }))[33m;[39m
+    [90m431|[39m     [34mexpect[39m(ranked[33m.[39mlead[33m?.[39mplayerId)[33m.[39m[34mtoBe[39m([33mBRENT_HARVEY[39m)[33m;[39m
+    [90m   |[39m                                   [31m^[39m
+    [90m432|[39m     [34mexpect[39m(ranked[33m.[39mlead[33m?.[39mvalue)[33m.[39m[34mtoBe[39m([34m432[39m)[33m;[39m
+    [90m433|[39m   })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/11]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/integration/nl-answers-relationships.test.ts[2m > [22mX3 — selected under the rule AND actually coached[2m > [22mis exactly Rhyce Shaw
+[31m[1mAssertionError[22m: expected [ 11043 ] to deeply equal [ 10974 ][39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  [[22m
+[32m-   10974,[39m
+[31m+   11043,[39m
+[2m  ][22m
+
+[36m [2m❯[22m tests/integration/nl-answers-relationships.test.ts:[2m704:41[22m[39m
+    [90m702|[39m     }))[33m;[39m
+    [90m703|[39m     [34mexpect[39m(total)[33m.[39m[34mtoBe[39m([33mM_153[39m[33m.[39mselectedAndCoached)[33m;[39m
+    [90m704|[39m     [34mexpect[39m(rows[33m.[39m[34mmap[39m((r) [33m=>[39m r[33m.[39mplayerId))[33m.[39m[34mtoEqual[39m([[33mRHYCE_SHAW[39m])[33m;[39m
+    [90m   |[39m                                         [31m^[39m
+    [90m705|[39m   })[33m;[39m
+    [90m706|[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/11]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/integration/nl-answers-relationships.test.ts[2m > [22mthe family grain (AFLDB-ISSUE-153 Stage 6, D6)[2m > [22mdisambiguates the Ablett family by id: 4700 and 4701 both display "Gary Ablett"
+[31m[1mError[22m: fixture assumption failed: the Ablett family was not found via getFamilyRecords[39m
+[36m [2m❯[22m tests/integration/nl-answers-relationships.test.ts:[2m983:24[22m[39m
+    [90m981|[39m     const ablett = board.find((r) => r.members.some((m) => m.playerId …
+    [90m982|[39m       [33m&&[39m r[33m.[39mmembers[33m.[39m[34msome[39m((m) [33m=>[39m m[33m.[39mplayerId [33m===[39m [33mGARY_ABLETT_JNR[39m))[33m;[39m
+    [90m983|[39m     if (!ablett) throw new Error('fixture assumption failed: the Ablet…
+    [90m   |[39m                        [31m^[39m
+    [90m984|[39m
+    [90m985|[39m     [35mconst[39m answer [33m=[39m [35mawait[39m [34mfamily[39m([34mfamilyPlan[39m()[33m,[39m [34m1000[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/11]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m11 failed[39m[22m[2m | [22m[1m[32m38 passed[39m[22m[90m (49)[39m
+[2m   Start at [22m 09:17:33
+[2m   Duration [22m 4.70s[2m (transform 479ms, setup 1.47s, import 532ms, tests 2.34s, environment 0ms)[22m
+
+JSON report written to /mnt/ssd/afldb-rem4-rbfail-20261115/evidence/red_pf_nl_answers_relationships.json
+red_pf_nl_answers_relationships rc=1

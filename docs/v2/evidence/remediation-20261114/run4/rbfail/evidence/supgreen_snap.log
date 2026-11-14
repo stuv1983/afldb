@@ -1,0 +1,15 @@
+isolated-pg: afldb_v2_rem4rbfail_supgreen_snap_test verified (cluster afldb_v2_isolated, 127.0.0.1:55690); running node
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-rbfail-20261115/cand[39m
+
+ [32m✓[39m tests/integration/special-records-public-suppression.test.ts [2m([22m[2m23 tests[22m[2m)[22m[33m 2379[2mms[22m[39m
+ [32m✓[39m tests/integration/nl-answers-first-kick-goal.test.ts [2m([22m[2m20 tests[22m[2m)[22m[33m 1492[2mms[22m[39m
+     [33m[2m✓[22m[39m W13 no unlinked row reaches an NL answer [33m 315[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+[2m      Tests [22m [1m[32m43 passed[39m[22m[90m (43)[39m
+[2m   Start at [22m 08:59:21
+[2m   Duration [22m 9.21s[2m (transform 764ms, setup 3.75s, import 981ms, tests 3.87s, environment 1ms)[22m
+
+JSON report written to /mnt/ssd/afldb-rem4-rbfail-20261115/evidence/supgreen_snap.json
+supgreen_snap rc=0

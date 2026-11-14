@@ -1,0 +1,17 @@
+isolated-pg: afldb_v2_rem4rbfail_rbb_tmpl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55690); running /home/arm/i250/afldb/.venv/bin/python
+AFLDB DraftGuru import (Stage B2-4/5)
+  snapshot   : annual-html-20260826 (42 year pages, sha256 verified)
+  persons    : 5057
+  picks      : 6810
+  ledger     : 6 explicit decisions
+  bridge     : 3562 entries
+  target: afldb_import@127.0.0.1:55690/afldb_v2_rem4rbfail_rbb_tmpl_test
+    reload guard                           clear  0 pick deletion(s) (0 audited); 0 person deletion(s) (0 audited); 0 audited pick rewrite(s); 0 audited person rewrite(s); 0 original_club_raw change(s) {}
+    reload guard effect digest         87645eef29bf34763ca25daa3a9f3a64e8789236a694b22b78bc015fbfd0a986
+    persons                                5,057
+    picks                                  6,810
+    authority: ledger                          6
+    authority: live_override                   0
+    authority: bridge                      3,559
+    authority: unmatched                   1,493
+    authority: seeded                          0

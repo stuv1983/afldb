@@ -1,0 +1,29 @@
+create-db: afldb_v2_rem4rbfail_pair_test created from afldb_v2_rem4rbfail_rbb_tmpl_test and marked
+pair step 1 (match-admin-delete) rc=0
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+-- committed leftovers after step 1
+club_seasons2027|2
+matches2027|0
+seasons2027|1
+pair step 2 (afl-api-c7-observation) rc=1
+ Test Files  1 failed (1)
+      Tests  3 failed | 3 passed (6)
+tests/integration/afl-api-c7-observation.test.ts	season opening (AFLDB-ISSUE-350) against PostgreSQL (rolled back) a count mismatch between the plan and the live rows throws, so the transaction cannot commit a wrong write	PostgresError: update or delete on table "seasons" violates foreign key constraint "club_seasons_season_fkey
+tests/integration/afl-api-c7-observation.test.ts	season opening (AFLDB-ISSUE-350) against PostgreSQL (rolled back) production-like state classifies NOT_OPEN, the write opens it, the proof holds, a second write is a no-op and a divergent row is refused	PostgresError: update or delete on table "seasons" violates foreign key constr
+tests/integration/afl-api-c7-observation.test.ts	season opening (AFLDB-ISSUE-350) against PostgreSQL (rolled back) the settle HALT precondition is the same row the operation creates: season absent before, present after	PostgresError: update or delete on table "seasons" violates foreign key constraint "club_seasons_season_fkey" o
+-- committed leftovers after step 2
+club_seasons2027|2
+matches2027|0
+seasons2027|1
+pair step 3 (afl-api-c7-observation) rc=1
+ Test Files  1 failed (1)
+      Tests  3 failed | 3 passed (6)
+tests/integration/afl-api-c7-observation.test.ts	season opening (AFLDB-ISSUE-350) against PostgreSQL (rolled back) a count mismatch between the plan and the live rows throws, so the transaction cannot commit a wrong write	PostgresError: update or delete on table "seasons" violates foreign key constraint "club_seasons_season_fkey
+tests/integration/afl-api-c7-observation.test.ts	season opening (AFLDB-ISSUE-350) against PostgreSQL (rolled back) production-like state classifies NOT_OPEN, the write opens it, the proof holds, a second write is a no-op and a divergent row is refused	PostgresError: update or delete on table "seasons" violates foreign key constr
+tests/integration/afl-api-c7-observation.test.ts	season opening (AFLDB-ISSUE-350) against PostgreSQL (rolled back) the settle HALT precondition is the same row the operation creates: season absent before, present after	PostgresError: update or delete on table "seasons" violates foreign key constraint "club_seasons_season_fkey" o
+-- committed leftovers after step 3
+club_seasons2027|2
+matches2027|0
+seasons2027|1
+drop-db: afldb_v2_rem4rbfail_pair_test dropped

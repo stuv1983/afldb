@@ -1,0 +1,8 @@
+create-db: afldb_v2_rem4rbfail_colgreen1_test created from afldb_v2_rem4rbfail_snap_tmpl_test and marked
+colgreen1 rc=1
+ Test Files  1 failed (1)
+      Tests  28 skipped (28)
+   Duration  2.00s (transform 689ms, setup 165ms, import 1.08s, tests 379ms, environment 0ms)
+tests/integration/v2-coleman-publication.test.ts	<file-level>	refusing to run: 1 Coleman 2001 row(s) already exist that this suite did not create
+table-count rows changed: 0
+drop-db: afldb_v2_rem4rbfail_colgreen1_test dropped

@@ -1,0 +1,13 @@
+isolated-pg: afldb_v2_rem4rbfail_g_pf_rb_sup_test verified (cluster afldb_v2_isolated, 127.0.0.1:55690); running node
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-rbfail-20261115/cand[39m
+
+ [32m✓[39m tests/integration/special-records-public-suppression.test.ts [2m([22m[2m23 tests[22m[2m)[22m[33m 2479[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m23 passed[39m[22m[90m (23)[39m
+[2m   Start at [22m 09:28:28
+[2m   Duration [22m 5.20s[2m (transform 764ms, setup 1.48s, import 867ms, tests 2.48s, environment 0ms)[22m
+
+JSON report written to /mnt/ssd/afldb-rem4-rbfail-20261115/evidence/g_pf_rb_sup.json
+g_pf_rb_sup rc=0

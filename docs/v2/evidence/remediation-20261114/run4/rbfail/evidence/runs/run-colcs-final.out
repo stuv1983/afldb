@@ -1,0 +1,16 @@
+create-db: afldb_v2_rem4rbfail_colcs_final_test created and marked
+  applying 118_fixtures_unconfirmed_participants.sql ... ok (4 ms)
+
+Applied 118 migration(s).
+psql:tools/maintenance/privileges.sql:899: NOTICE:  afldb_backup: pg_read_all_data needs a superuser; unchanged
+DO
+colcs_final rc=0
+ ✓ tests/integration/v2-coleman-publication.test.ts (28 tests) 3217ms
+     ✓ the offline guard rejects invalid launcher ports and non-loopback targets before database reads  352ms
+     ✓ the offline guard holds canonical season locks across import-batch commits and releases them on close  381ms
+     ✓ after a canonical publication the offline loader refuses and preserves every tuple  450ms
+     ✓ a loader-written season is what the projection retains (no row of either writer is rewritten by the other)  452ms
+ Test Files  1 passed (1)
+      Tests  28 passed (28)
+   Duration  4.78s (transform 644ms, setup 167ms, import 1.02s, tests 3.22s, environment 0ms)
+drop-db: afldb_v2_rem4rbfail_colcs_final_test dropped

@@ -1,0 +1,1 @@
+tests/integration/special-records-lifecycle.test.ts	migration 102 allowlist widenings actually accepts an override and an audit row for both tables	Error: expected [Function] to throw error including 'rollback' but got 'null value in column "admin_user_id" …'

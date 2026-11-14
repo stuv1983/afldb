@@ -1,0 +1,99 @@
+isolated-pg: afldb_v2_rem4rbfail_red_pf_admin_season_lists_test verified (cluster afldb_v2_isolated, 127.0.0.1:55690); running node
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-rbfail-20261115/cand-red[39m
+
+ [31m❯[39m tests/integration/admin-season-lists.test.ts [2m([22m[2m42 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 3323[2mms[22m[39m
+     [32m✓[39m has no matches, no club_seasons row and no fixture for the list season[32m 5[2mms[22m[39m
+     [32m✓[39m still offers every current club, because eligibility never reads a fixture[32m 3[2mms[22m[39m
+     [32m✓[39m resolves a HISTORICAL season through the era identities instead[32m 3[2mms[22m[39m
+     [32m✓[39m administers the bound as FIRST_LIST_SEASON .. max(year) + 1[32m 2[2mms[22m[39m
+     [32m✓[39m writes the canonical row, the durable override and the audit row together[32m 89[2mms[22m[39m
+     [32m✓[39m lists a player who has played no games and holds no statistics at all[32m 9[2mms[22m[39m
+     [32m✓[39m refuses a second club for the same player in the same season (I-1)[32m 33[2mms[22m[39m
+     [32m✓[39m refuses re-adding the same player to the same club[32m 32[2mms[22m[39m
+[31m     [31m×[31m refuses every season below FIRST_LIST_SEASON, and writes nothing (D-2, I-4)[39m[32m 56[2mms[22m[39m
+     [32m✓[39m refuses a club that is not eligible in the season[32m 28[2mms[22m[39m
+     [32m✓[39m keys a manual player by their token and an AFL Tables player by their path[32m 38[2mms[22m[39m
+     [32m✓[39m gives two people with the SAME display name two different keys[32m 37[2mms[22m[39m
+     [32m✓[39m refuses a player holding two AFL Tables identities rather than choosing one[32m 28[2mms[22m[39m
+     [32m✓[39m refuses an identity-less player and never mints an identity for them[32m 30[2mms[22m[39m
+     [32m✓[39m deletes the row, tombstones the record, and changes nothing about the player[32m 63[2mms[22m[39m
+     [32m✓[39m refuses a stale compare-and-swap and leaves the row in place[32m 28[2mms[22m[39m
+     [32m✓[39m refuses a membership that no longer exists[32m 19[2mms[22m[39m
+     [32m✓[39m lifts the tombstone when the player is added again — same record, not a second one[32m 53[2mms[22m[39m
+     [32m✓[39m moves the membership atomically, keeping I-1 and pairing the two audits[32m 121[2mms[22m[39m
+     [32m✓[39m refuses a transfer to the club the player is already at[32m 29[2mms[22m[39m
+     [32m✓[39m leaves the original membership intact when the transfer fails mid-flight[32m 41[2mms[22m[39m
+     [32m✓[39m rolls the whole add back when the audit INSERT fails[32m 42[2mms[22m[39m
+     [32m✓[39m rolls the whole add back when the override write fails[32m 43[2mms[22m[39m
+     [32m✓[39m rolls a multi-select add back entirely when one player of it refuses[32m 38[2mms[22m[39m
+     [32m✓[39m offers who PLAYED last season, and writes absolutely nothing by itself[32m 5[2mms[22m[39m
+     [32m✓[39m excludes anyone already listed in the target season[32m 2[2mms[22m[39m
+     [32m✓[39m records candidate_source as evidence when a human explicitly picks one[32m 86[2mms[22m[39m
+     [32m✓[39m refuses to copy into the first authoritative season, and says what to do instead[32m 19[2mms[22m[39m
+     [32m✓[39m previews without writing, then copies with copied_list provenance[32m 86[2mms[22m[39m
+     [32m✓[39m refuses when a target club already holds rows, naming it, before any write[32m 30[2mms[22m[39m
+     [32m✓[39m refuses a requested club that is not eligible in the target season[32m 26[2mms[22m[39m
+     [32m✓[39m keeps I-1 across the copy: nobody gained two list places[32m 2[2mms[22m[39m
+     [32m✓[39m reads the current list season from the data, never from a clock[32m 1[2mms[22m[39m
+     [32m✓[39m reports per-club completeness so "no membership" is never read as "retired"[32m 3[2mms[22m[39m
+     [32m✓[39m reports no played-not-listed diagnostics for a season with no matches[32m 2[2mms[22m[39m
+     [33m[2m✓[22m[39m re-creates every membership a rebuild removed, with the same keys [33m 357[2mms[22m[39m
+     [33m[2m✓[22m[39m is idempotent: a second replay changes nothing [33m 321[2mms[22m[39m
+     [33m[2m✓[22m[39m will not resurrect a tombstoned membership, whoever planted the row [33m 331[2mms[22m[39m
+     [33m[2m✓[22m[39m fails the WHOLE batch closed on an unresolvable record, writing nothing [33m 315[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses an unresolvable TOMBSTONE just as hard as a membership [33m 313[2mms[22m[39m
+     [32m✓[39m refuses a sealed-season add that carries only a long entry note, and writes nothing[32m 183[2mms[22m[39m
+     [32m✓[39m accepts a sealed-season add with a valid correction note and keeps the two notes apart[32m 122[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Suites 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m tests/integration/admin-season-lists.test.ts[2m [ tests/integration/admin-season-lists.test.ts ][22m
+[31m[1mPostgresError[22m: update or delete on table "auth_users" violates foreign key constraint "data_overrides_admin_user_id_fkey" on table "data_overrides"[39m
+[90m [2m❯[22m ErrorResponse ../cand/node_modules/postgres/src/connection.js:[2m815:30[22m[39m
+[90m [2m❯[22m handle ../cand/node_modules/postgres/src/connection.js:[2m489:6[22m[39m
+[90m [2m❯[22m Socket.data ../cand/node_modules/postgres/src/connection.js:[2m324:9[22m[39m
+[90m [2m❯[22m cachedError ../cand/node_modules/postgres/src/query.js:[2m170:23[22m[39m
+[90m [2m❯[22m new Query ../cand/node_modules/postgres/src/query.js:[2m36:24[22m[39m
+[90m [2m❯[22m sql ../cand/node_modules/postgres/src/index.js:[2m112:11[22m[39m
+[36m [2m❯[22m tests/integration/admin-season-lists.test.ts:[2m332:41[22m[39m
+    [90m330|[39m   await admin`DELETE FROM player_club_season_stats WHERE player_id = A…
+    [90m331|[39m   [35mawait[39m admin[32m`DELETE FROM players WHERE id = ANY([39m[36m${[39mids[36m}[39m[32m::int[])`[39m[33m;[39m
+    [90m332|[39m   if (createdThrowawayAdmin) await admin`DELETE FROM auth_users WHERE …
+    [90m   |[39m                                         [31m^[39m
+    [90m333|[39m
+    [90m334|[39m   [35mdelete[39m process[33m.[39menv[33m.[39m[33mAFLDB_SEASON_LIST_TEST_MAX_SEASON[39m[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m tests/integration/admin-season-lists.test.ts[2m > [22madd (§12.1)[2m > [22mrefuses every season below FIRST_LIST_SEASON, and writes nothing (D-2, I-4)
+[31m[1mAssertionError[22m: 2027: expected true to be false // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- false[39m
+[31m+ true[39m
+
+[36m [2m❯[22m tests/integration/admin-season-lists.test.ts:[2m453:41[22m[39m
+    [90m451|[39m         season, clubSlug: clubA.slug, playerId: manualPlayerId, adminU…
+    [90m452|[39m       })[33m;[39m
+    [90m453|[39m       [34mexpect[39m(result[33m.[39mok[33m,[39m [33mString[39m(season))[33m.[39m[34mtoBe[39m([35mfalse[39m)[33m;[39m
+    [90m   |[39m                                         [31m^[39m
+    [90m454|[39m       [35mif[39m ([33m![39mresult[33m.[39mok) [34mexpect[39m(result[33m.[39mreason)[33m.[39m[34mtoBe[39m([32m'validation'[39m)[33m;[39m
+    [90m455|[39m       [35mconst[39m [row] [33m=[39m [35mawait[39m sql[33m<[39m{ n[33m:[39m number }[][33m>[39m[32m`
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m41 passed[39m[22m[90m (42)[39m
+[2m   Start at [22m 09:18:07
+[2m   Duration [22m 6.09s[2m (transform 447ms, setup 1.65s, import 729ms, tests 3.32s, environment 0ms)[22m
+
+JSON report written to /mnt/ssd/afldb-rem4-rbfail-20261115/evidence/red_pf_admin_season_lists.json
+per-file databases: reaped afldb_v2_pf_20261114221807_3366575_e2d5bac4_test (its file did not run its teardown)
+red_pf_admin_season_lists rc=1

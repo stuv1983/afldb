@@ -1,0 +1,74 @@
+######## GREEN sh snap nl-answers-relationships
+create-db: afldb_v2_rem4rbfail_g_sh_snap_rel_test created from afldb_v2_rem4rbfail_snap_tmpl_test and marked
+g_sh_snap_rel rc=0
+ Test Files  1 passed (1)
+      Tests  49 passed (49)
+   Duration  1.92s (transform 459ms, setup 171ms, import 515ms, tests 860ms, environment 0ms)
+table-count rows changed: 0
+drop-db: afldb_v2_rem4rbfail_g_sh_snap_rel_test dropped
+######## GREEN sh snap nl-answers-cross-domain
+create-db: afldb_v2_rem4rbfail_g_sh_snap_xd_test created from afldb_v2_rem4rbfail_snap_tmpl_test and marked
+g_sh_snap_xd rc=0
+ Test Files  1 passed (1)
+      Tests  22 passed (22)
+   Duration  1.63s (transform 456ms, setup 168ms, import 501ms, tests 587ms, environment 0ms)
+table-count rows changed: 0
+drop-db: afldb_v2_rem4rbfail_g_sh_snap_xd_test dropped
+######## GREEN sh snap nl-answers-first-kick-goal
+create-db: afldb_v2_rem4rbfail_g_sh_snap_fkg_test created from afldb_v2_rem4rbfail_snap_tmpl_test and marked
+g_sh_snap_fkg rc=0
+ Test Files  1 passed (1)
+      Tests  20 passed (20)
+   Duration  1.56s (transform 439ms, setup 161ms, import 468ms, tests 562ms, environment 0ms)
+table-count rows changed: 0
+drop-db: afldb_v2_rem4rbfail_g_sh_snap_fkg_test dropped
+######## GREEN sh snap nl-answers-coaching
+create-db: afldb_v2_rem4rbfail_g_sh_snap_coach_test created from afldb_v2_rem4rbfail_snap_tmpl_test and marked
+g_sh_snap_coach rc=0
+ Test Files  1 passed (1)
+      Tests  23 passed (23)
+   Duration  3.93s (transform 899ms, setup 176ms, import 1.12s, tests 2.27s, environment 0ms)
+table-count rows changed: 0
+drop-db: afldb_v2_rem4rbfail_g_sh_snap_coach_test dropped
+######## GREEN sh snap admin-season-lists
+create-db: afldb_v2_rem4rbfail_g_sh_snap_sl_test created from afldb_v2_rem4rbfail_snap_tmpl_test and marked
+g_sh_snap_sl rc=0
+ Test Files  1 passed (1)
+      Tests  42 passed (42)
+   Duration  4.40s (transform 377ms, setup 164ms, import 679ms, tests 3.20s, environment 0ms)
+table-count rows changed: 0
+drop-db: afldb_v2_rem4rbfail_g_sh_snap_sl_test dropped
+######## GREEN sh snap special-records-public-suppression
+create-db: afldb_v2_rem4rbfail_g_sh_snap_sup_test created from afldb_v2_rem4rbfail_snap_tmpl_test and marked
+g_sh_snap_sup rc=0
+ Test Files  1 passed (1)
+      Tests  23 passed (23)
+   Duration  2.11s (transform 752ms, setup 178ms, import 857ms, tests 698ms, environment 0ms)
+table-count rows changed: 0
+drop-db: afldb_v2_rem4rbfail_g_sh_snap_sup_test dropped
+######## GREEN sh snap special-records-lifecycle
+create-db: afldb_v2_rem4rbfail_g_sh_snap_life_test created from afldb_v2_rem4rbfail_snap_tmpl_test and marked
+g_sh_snap_life rc=0
+ Test Files  1 passed (1)
+      Tests  15 passed | 1 skipped (16)
+   Duration  1.29s (transform 283ms, setup 195ms, import 252ms, tests 480ms, environment 0ms)
+table-count rows changed: 0
+drop-db: afldb_v2_rem4rbfail_g_sh_snap_life_test dropped
+######## GREEN sh snap v2-coleman-publication
+create-db: afldb_v2_rem4rbfail_g_sh_snap_col_test created from afldb_v2_rem4rbfail_snap_tmpl_test and marked
+g_sh_snap_col rc=1
+ Test Files  1 failed (1)
+      Tests  28 skipped (28)
+   Duration  1.99s (transform 641ms, setup 167ms, import 1.03s, tests 435ms, environment 0ms)
+tests/integration/v2-coleman-publication.test.ts	<file-level>	refusing to run: 1 Coleman 2001 row(s) already exist that this suite did not create
+table-count rows changed: 0
+drop-db: afldb_v2_rem4rbfail_g_sh_snap_col_test dropped
+######## GREEN sh snap afl-api-c7-observation
+create-db: afldb_v2_rem4rbfail_g_sh_snap_c7_test created from afldb_v2_rem4rbfail_snap_tmpl_test and marked
+g_sh_snap_c7 rc=0
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+   Duration  1.89s (transform 709ms, setup 173ms, import 787ms, tests 557ms, environment 0ms)
+table-count rows changed: 0
+drop-db: afldb_v2_rem4rbfail_g_sh_snap_c7_test dropped
+######## done

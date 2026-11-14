@@ -1,0 +1,74 @@
+######## GREEN sh rb nl-answers-relationships
+create-db: afldb_v2_rem4rbfail_g_sh_rb_rel_test created from afldb_v2_rem4rbfail_rbb_tmpl_test and marked
+g_sh_rb_rel rc=0
+ Test Files  1 passed (1)
+      Tests  49 passed (49)
+   Duration  1.86s (transform 480ms, setup 159ms, import 540ms, tests 800ms, environment 0ms)
+table-count rows changed: 0
+drop-db: afldb_v2_rem4rbfail_g_sh_rb_rel_test dropped
+######## GREEN sh rb nl-answers-cross-domain
+create-db: afldb_v2_rem4rbfail_g_sh_rb_xd_test created from afldb_v2_rem4rbfail_rbb_tmpl_test and marked
+g_sh_rb_xd rc=0
+ Test Files  1 passed (1)
+      Tests  22 passed (22)
+   Duration  1.69s (transform 454ms, setup 167ms, import 482ms, tests 673ms, environment 0ms)
+table-count rows changed: 0
+drop-db: afldb_v2_rem4rbfail_g_sh_rb_xd_test dropped
+######## GREEN sh rb nl-answers-first-kick-goal
+create-db: afldb_v2_rem4rbfail_g_sh_rb_fkg_test created from afldb_v2_rem4rbfail_rbb_tmpl_test and marked
+g_sh_rb_fkg rc=0
+ Test Files  1 passed (1)
+      Tests  20 passed (20)
+   Duration  1.50s (transform 417ms, setup 159ms, import 449ms, tests 535ms, environment 0ms)
+table-count rows changed: 0
+drop-db: afldb_v2_rem4rbfail_g_sh_rb_fkg_test dropped
+######## GREEN sh rb nl-answers-coaching
+create-db: afldb_v2_rem4rbfail_g_sh_rb_coach_test created from afldb_v2_rem4rbfail_rbb_tmpl_test and marked
+g_sh_rb_coach rc=0
+ Test Files  1 passed (1)
+      Tests  23 passed (23)
+   Duration  4.01s (transform 915ms, setup 160ms, import 1.17s, tests 2.31s, environment 0ms)
+table-count rows changed: 0
+drop-db: afldb_v2_rem4rbfail_g_sh_rb_coach_test dropped
+######## GREEN sh rb admin-season-lists
+create-db: afldb_v2_rem4rbfail_g_sh_rb_sl_test created from afldb_v2_rem4rbfail_rbb_tmpl_test and marked
+g_sh_rb_sl rc=0
+ Test Files  1 passed (1)
+      Tests  42 passed (42)
+   Duration  4.46s (transform 412ms, setup 167ms, import 712ms, tests 3.19s, environment 0ms)
+table-count rows changed: 0
+drop-db: afldb_v2_rem4rbfail_g_sh_rb_sl_test dropped
+######## GREEN sh rb special-records-public-suppression
+create-db: afldb_v2_rem4rbfail_g_sh_rb_sup_test created from afldb_v2_rem4rbfail_rbb_tmpl_test and marked
+g_sh_rb_sup rc=0
+ Test Files  1 passed (1)
+      Tests  23 passed (23)
+   Duration  2.22s (transform 706ms, setup 159ms, import 816ms, tests 880ms, environment 0ms)
+table-count rows changed: 0
+drop-db: afldb_v2_rem4rbfail_g_sh_rb_sup_test dropped
+######## GREEN sh rb special-records-lifecycle
+create-db: afldb_v2_rem4rbfail_g_sh_rb_life_test created from afldb_v2_rem4rbfail_rbb_tmpl_test and marked
+g_sh_rb_life rc=0
+ Test Files  1 passed (1)
+      Tests  15 passed | 1 skipped (16)
+   Duration  1.22s (transform 232ms, setup 170ms, import 221ms, tests 464ms, environment 0ms)
+table-count rows changed: 0
+drop-db: afldb_v2_rem4rbfail_g_sh_rb_life_test dropped
+######## GREEN sh rb v2-coleman-publication
+create-db: afldb_v2_rem4rbfail_g_sh_rb_col_test created from afldb_v2_rem4rbfail_rbb_tmpl_test and marked
+g_sh_rb_col rc=1
+ Test Files  1 failed (1)
+      Tests  28 skipped (28)
+   Duration  2.00s (transform 666ms, setup 165ms, import 1.05s, tests 401ms, environment 0ms)
+tests/integration/v2-coleman-publication.test.ts	<file-level>	refusing to run: 1 Coleman 2001 row(s) already exist that this suite did not create
+table-count rows changed: 0
+drop-db: afldb_v2_rem4rbfail_g_sh_rb_col_test dropped
+######## GREEN sh rb afl-api-c7-observation
+create-db: afldb_v2_rem4rbfail_g_sh_rb_c7_test created from afldb_v2_rem4rbfail_rbb_tmpl_test and marked
+g_sh_rb_c7 rc=0
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+   Duration  2.05s (transform 739ms, setup 162ms, import 861ms, tests 664ms, environment 0ms)
+table-count rows changed: 0
+drop-db: afldb_v2_rem4rbfail_g_sh_rb_c7_test dropped
+######## done

@@ -1,0 +1,12 @@
+create-db: afldb_v2_rem4rbfail_colred1_test created from afldb_v2_rem4rbfail_snap_tmpl_test and marked
+colred1 rc=1
+ Test Files  1 failed (1)
+      Tests  28 skipped (28)
+   Duration  2.65s (transform 744ms, setup 191ms, import 1.11s, tests 941ms, environment 0ms)
+tests/integration/v2-coleman-publication.test.ts	<file-level>	refusing to run: 1 Coleman 2001 row(s) already exist that this suite did not create
+table-count rows changed: 1
+12c12
+< award_winners	3712
+---
+> award_winners	3711
+drop-db: afldb_v2_rem4rbfail_colred1_test dropped

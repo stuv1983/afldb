@@ -1,0 +1,41 @@
+isolated-pg: afldb_v2_rem4rbfail_pair_test verified (cluster afldb_v2_isolated, 127.0.0.1:55690); running node
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-rbfail-20261115/cand[39m
+
+ [31m❯[39m tests/integration/afl-api-c7-observation.test.ts [2m([22m[2m6 tests[22m[2m | [22m[31m3 failed[39m[2m)[22m[32m 182[2mms[22m[39m
+     [32m✓[39m counts only afl_api matches, period rows and both-club statistics, and reads batches[32m 78[2mms[22m[39m
+     [32m✓[39m the CLI's read-only transaction refuses a write[32m 32[2mms[22m[39m
+     [32m✓[39m the round filter narrows the canonical counts[32m 11[2mms[22m[39m
+[31m     [31m×[31m production-like state classifies NOT_OPEN, the write opens it, the proof holds, a second write is a no-op and a divergent row is refused[39m[32m 28[2mms[22m[39m
+[31m     [31m×[31m a count mismatch between the plan and the live rows throws, so the transaction cannot commit a wrong write[39m[32m 12[2mms[22m[39m
+[31m     [31m×[31m the settle HALT precondition is the same row the operation creates: season absent before, present after[39m[32m 11[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 3 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m tests/integration/afl-api-c7-observation.test.ts[2m > [22mseason opening (AFLDB-ISSUE-350) against PostgreSQL (rolled back)[2m > [22mproduction-like state classifies NOT_OPEN, the write opens it, the proof holds, a second write is a no-op and a divergent row is refused
+[41m[1m FAIL [22m[49m tests/integration/afl-api-c7-observation.test.ts[2m > [22mseason opening (AFLDB-ISSUE-350) against PostgreSQL (rolled back)[2m > [22ma count mismatch between the plan and the live rows throws, so the transaction cannot commit a wrong write
+[41m[1m FAIL [22m[49m tests/integration/afl-api-c7-observation.test.ts[2m > [22mseason opening (AFLDB-ISSUE-350) against PostgreSQL (rolled back)[2m > [22mthe settle HALT precondition is the same row the operation creates: season absent before, present after
+[31m[1mPostgresError[22m: update or delete on table "seasons" violates foreign key constraint "club_seasons_season_fkey" on table "club_seasons"[39m
+[90m [2m❯[22m ErrorResponse node_modules/postgres/src/connection.js:[2m815:30[22m[39m
+[90m [2m❯[22m handle node_modules/postgres/src/connection.js:[2m489:6[22m[39m
+[90m [2m❯[22m Socket.data node_modules/postgres/src/connection.js:[2m324:9[22m[39m
+[90m [2m❯[22m cachedError node_modules/postgres/src/query.js:[2m170:23[22m[39m
+[90m [2m❯[22m new Query node_modules/postgres/src/query.js:[2m36:24[22m[39m
+[90m [2m❯[22m sql node_modules/postgres/src/index.js:[2m112:11[22m[39m
+[36m [2m❯[22m productionLike tests/integration/afl-api-c7-observation.test.ts:[2m218:15[22m[39m
+    [90m216|[39m       await tx`UPDATE club_organizations SET last_season = ${exp.previ…
+    [90m217|[39m       [90m// fails loudly if anything already depends on the season row[39m
+    [90m218|[39m       [35mawait[39m tx[32m`DELETE FROM seasons WHERE year = [39m[36m${[39mexp[33m.[39myear[36m}[39m[32m::smallint`[39m[33m;[39m
+    [90m   |[39m               [31m^[39m
+    [90m219|[39m     }
+    [90m220|[39m   }
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m3 failed[39m[22m[2m | [22m[1m[32m3 passed[39m[22m[90m (6)[39m
+[2m   Start at [22m 09:46:57
+[2m   Duration [22m 1.52s[2m (transform 718ms, setup 158ms, import 810ms, tests 182ms, environment 0ms)[22m
+
+JSON report written to /mnt/ssd/afldb-rem4-rbfail-20261115/evidence/pair-2.json

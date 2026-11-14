@@ -1,0 +1,6 @@
+create-db: afldb_v2_rem4rbfail_slgreen_snap_test created from afldb_v2_rem4rbfail_snap_tmpl_test and marked
+slgreen_snap rc=0
+ Test Files  2 passed (2)
+      Tests  57 passed | 1 skipped (58)
+   Duration  12.01s (transform 471ms, setup 4.11s, import 876ms, tests 6.43s, environment 1ms)
+drop-db: afldb_v2_rem4rbfail_slgreen_snap_test dropped

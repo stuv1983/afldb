@@ -1,0 +1,2 @@
+{"file":"tests/integration/nl-answers-first-kick-goal.test.ts","database":"afldb_v2_pf_20261114215753_3307008_ce1e0604_test","createMs":1808,"sizeBytes":407149591,"perFileDatabasesInCluster":1,"residue":[],"touchedOnly":["public.player_achievements","public.sources"]}
+{"file":"tests/integration/nl-answers-coaching.test.ts","database":"afldb_v2_pf_20261114215758_3307192_ddbf2c5b_test","createMs":1665,"sizeBytes":407149591,"perFileDatabasesInCluster":1,"residue":[],"touchedOnly":[]}

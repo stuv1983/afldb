@@ -1,0 +1,3 @@
+SELECT p.id, p.display_name, (SELECT string_agg(e.external_id, ';') FROM external_identities e JOIN sources s ON s.id=e.source_id WHERE e.player_id=p.id AND s.key='afltables') AS afltables FROM players p WHERE p.id IN (2164, 2172, 12661, 11043, 4700, 4701);
+SELECT e.player_id AS id, p.display_name, e.external_id FROM external_identities e JOIN sources s ON s.id=e.source_id JOIN players p ON p.id=e.player_id
+ WHERE s.key='afltables' AND e.external_id IN ('players/B/Brent_Harvey.html','players/G/Gary_Ablett0.html','players/G/Gary_Ablett1.html','players/R/Rhyce_Shaw.html','players/S/Shane_Harvey.html','players/C/Cooper_Harvey.html') ORDER BY e.external_id;

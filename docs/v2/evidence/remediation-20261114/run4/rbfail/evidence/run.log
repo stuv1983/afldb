@@ -1,0 +1,6 @@
+2026-11-14T22:15:37Z rebuilt table counts: IDENTICAL to afldb_v2_rb_rem3-6d5388ea.table-counts.tsv (83 tables)
+2026-11-14T22:15:40Z stage A: verify and copy the 42 raw year pages from /mnt/ssd/afldb-rem3-qual-20261114/cand/data/sources/draftguru/annual-html-20260826
+2026-11-14T22:15:40Z stage A: 42/42 raw files match the manifest at source; copied
+2026-11-14T22:16:21Z bridge import rc=0
+2026-11-14T22:16:23Z bridge: ANALYZE after import (planner statistics only)
+2026-11-14T22:16:24Z stage A removed from the checkout (draftguru-import stays skipped in every cell)

@@ -1,0 +1,13 @@
+isolated-pg: afldb_v2_rem4rbfail_g_sh_snap_c7_test verified (cluster afldb_v2_isolated, 127.0.0.1:55690); running node
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-rbfail-20261115/cand[39m
+
+ [32m✓[39m tests/integration/afl-api-c7-observation.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 557[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m6 passed[39m[22m[90m (6)[39m
+[2m   Start at [22m 09:33:47
+[2m   Duration [22m 1.89s[2m (transform 709ms, setup 173ms, import 787ms, tests 557ms, environment 0ms)[22m
+
+JSON report written to /mnt/ssd/afldb-rem4-rbfail-20261115/evidence/g_sh_snap_c7.json
+g_sh_snap_c7 rc=0

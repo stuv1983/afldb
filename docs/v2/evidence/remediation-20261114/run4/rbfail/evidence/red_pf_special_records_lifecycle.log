@@ -1,0 +1,48 @@
+isolated-pg: afldb_v2_rem4rbfail_red_pf_special_records_lifecycle_test verified (cluster afldb_v2_isolated, 127.0.0.1:55690); running node
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-rbfail-20261115/cand-red[39m
+
+ [31m❯[39m tests/integration/special-records-lifecycle.test.ts [2m([22m[2m16 tests[22m[2m | [22m[31m1 failed[39m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 7196[2mms[22m[39m
+     [32m✓[39m adds status, status_reason and updated_at to both tables, and no created_at[32m 35[2mms[22m[39m
+     [32m✓[39m defaults every pre-existing row to active, so no public projection changes yet[32m 5[2mms[22m[39m
+     [32m✓[39m names both CHECKs and gives them the two-state vocabulary[32m 6[2mms[22m[39m
+     [33m[2m✓[22m[39m REFUSES a void with no reason, and refuses an unknown state [33m 480[2mms[22m[39m
+     [32m✓[39m leaves the source-uniqueness keys exactly as 053 and 089 wrote them[32m 4[2mms[22m[39m
+     [32m✓[39m adds no index, speculative or otherwise[32m 10[2mms[22m[39m
+     [32m✓[39m does not touch after_siren_kicks.cited, which is evidence and not lifecycle[32m 7[2mms[22m[39m
+     [32m✓[39m admits both tables as data_overrides entity types, and no settle target[32m 2[2mms[22m[39m
+     [32m✓[39m admits both tables as data_edits table names, retaining every existing literal[32m 2[2mms[22m[39m
+[31m     [31m×[31m actually accepts an override and an audit row for both tables[39m[32m 14[2mms[22m[39m
+     [32m✓[39m gives afldb_app SELECT on both tables, including the new columns[32m 2[2mms[22m[39m
+     [32m✓[39m gives afldb_app no write, so the public role still cannot void a record[32m 1[2mms[22m[39m
+     [32m✓[39m leaves afldb_auth without either table, which is the decision and not an oversight[32m 2[2mms[22m[39m
+     [32m✓[39m keeps afldb_import write on both tables, new columns included[32m 2[2mms[22m[39m
+     [32m✓[39m lets the REAL afldb_import connection read and write the lifecycle columns[32m 56[2mms[22m[39m
+     [2m[90m↓[39m[22m reports the restricted importer validation was skipped
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m tests/integration/special-records-lifecycle.test.ts[2m > [22mmigration 102 allowlist widenings[2m > [22mactually accepts an override and an audit row for both tables
+[31m[1mAssertionError[22m: expected [Function] to throw error including 'rollback' but got 'null value in column "admin_user_id" …'[39m
+
+Expected: [32m"rollback"[39m
+Received: [31m"null value in column "admin_user_id" of relation "data_overrides" violates not-null constraint"[39m
+
+[36m [2m❯[22m tests/integration/special-records-lifecycle.test.ts:[2m317:8[22m[39m
+    [90m315|[39m       }
+    [90m316|[39m       [35mthrow[39m [35mnew[39m [33mError[39m([32m'rollback'[39m)[33m;[39m
+    [90m317|[39m     }))[33m.[39mrejects[33m.[39m[34mtoThrow[39m([32m'rollback'[39m)[33m;[39m
+    [90m   |[39m        [31m^[39m
+    [90m318|[39m   })[33m;[39m
+    [90m319|[39m })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m14 passed[39m[22m[2m | [22m[33m1 skipped[39m[90m (16)[39m
+[2m   Start at [22m 09:18:32
+[2m   Duration [22m 17.93s[2m (transform 321ms, setup 10.01s, import 345ms, tests 7.20s, environment 0ms)[22m
+
+JSON report written to /mnt/ssd/afldb-rem4-rbfail-20261115/evidence/red_pf_special_records_lifecycle.json
+red_pf_special_records_lifecycle rc=1

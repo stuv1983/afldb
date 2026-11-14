@@ -1,0 +1,131 @@
+isolated-pg: afldb_v2_rem4rbfail_red_pf_nl_answers_cross_domain_test verified (cluster afldb_v2_isolated, 127.0.0.1:55690); running node
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-rbfail-20261115/cand-red[39m
+
+ [31m❯[39m tests/integration/nl-answers-cross-domain.test.ts [2m([22m[2m22 tests[22m[2m | [22m[31m6 failed[39m[2m)[22m[33m 2222[2mms[22m[39m
+     [32m✓[39m matches the seam counts measured on 2026-09-09[32m 32[2mms[22m[39m
+     [32m✓[39m records no zero-game club membership, so player_clubs and games agree[32m 2[2mms[22m[39m
+     [32m✓[39m Richmond is one organization with one club identity[32m 3[2mms[22m[39m
+     [32m✓[39m T1: answers the through-2025 365 plus 2026-only coaches, and agrees with hand-written coaches ⋈ match_coaches SQL[32m 160[2mms[22m[39m
+     [32m✓[39m T8: is not the 368 identity-only seam, and the difference is exactly the matchless identities[32m 32[2mms[22m[39m
+     [32m✓[39m T10/T11: players who never coached are absent, and a shared display name is two identities[32m 28[2mms[22m[39m
+     [32m✓[39m T12: the capped list states its own cap -- 100 of the X1 total, never silently[32m 131[2mms[22m[39m
+     [32m✓[39m T2: answers 27, and agrees with hand-written player_clubs ∩ match_coaches SQL[32m 30[2mms[22m[39m
+     [32m✓[39m T14: the coaching half alone is 41, so 27 is provably an intersection[32m 13[2mms[22m[39m
+[31m     [31m×[31m T5: every measured Richmond positive is present[39m[32m 27[2mms[22m[39m
+[31m     [31m×[31m T6: both directions of the conjunction exclude the right people[39m[32m 26[2mms[22m[39m
+[31m     [31m×[31m Denis Pagan satisfies coached_club for every organization coached, and no other[39m[32m 3[2mms[22m[39m
+[31m     [31m×[31m Terry Wallace satisfies coached_club for every organization coached, and no other[39m[32m 2[2mms[22m[39m
+[31m     [31m×[31m Dani Laidley satisfies coached_club for every organization coached, and no other[39m[32m 2[2mms[22m[39m
+[31m     [31m×[31m the raw club identities really do outnumber the organizations[39m[32m 4[2mms[22m[39m
+     [32m✓[39m V1: a club in match scope is refused[32m 1[2mms[22m[39m
+     [32m✓[39m V5: both coaching predicates at once is refused[32m 0[2mms[22m[39m
+     [32m✓[39m V6: a father–son selection ranked is refused[32m 0[2mms[22m[39m
+     [32m✓[39m V9: the composition at coach grain is refused[32m 0[2mms[22m[39m
+     [32m✓[39m V10: the composition at season grain is refused[32m 0[2mms[22m[39m
+     [32m✓[39m V7 is RETIRED: a father–son selection alone is a plan, not a refusal[32m 1[2mms[22m[39m
+     [32m✓[39m V6 is NARROWED, not retired: the ranking is refused only with coaching[32m 0[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 6 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m tests/integration/nl-answers-cross-domain.test.ts[2m > [22mX2 -- played for a club and also coached a club[2m > [22mT5: every measured Richmond positive is present
+[31m[1mAssertionError[22m: Tom Hafey (12550) must be in X2: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m tests/integration/nl-answers-cross-domain.test.ts:[2m326:63[22m[39m
+    [90m324|[39m     [35mconst[39m members [33m=[39m [35mawait[39m [34midsOf[39m([34mx2Plan[39m([33mRICHMOND[39m[33m,[39m [33mRICHMOND[39m))[33m;[39m
+    [90m325|[39m     [35mfor[39m ([35mconst[39m [who[33m,[39m id] [35mof[39m [33mObject[39m[33m.[39m[34mentries[39m([33mX2_POSITIVES[39m)) {
+    [90m326|[39m       expect(members.has(id), `${who} (${id}) must be in X2`).toBe(tru…
+    [90m   |[39m                                                               [31m^[39m
+    [90m327|[39m     }
+    [90m328|[39m   })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/integration/nl-answers-cross-domain.test.ts[2m > [22mX2 -- played for a club and also coached a club[2m > [22mT6: both directions of the conjunction exclude the right people
+[31m[1mAssertionError[22m: Allan Jeans (481) must satisfy the coaching half: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m tests/integration/nl-answers-cross-domain.test.ts:[2m342:84[22m[39m
+    [90m340|[39m     const coachedOnly = await idsOf(coachedClubOnly(RICHMOND.organizat…
+    [90m341|[39m     [35mfor[39m ([35mconst[39m [who[33m,[39m id] [35mof[39m [33mObject[39m[33m.[39m[34mentries[39m([33mCOACHED_RICHMOND_ONLY[39m)) {
+    [90m342|[39m       expect(coachedOnly.has(id), `${who} (${id}) must satisfy the coa…
+    [90m   |[39m                                                                                    [31m^[39m
+    [90m343|[39m     }
+    [90m344|[39m   })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/integration/nl-answers-cross-domain.test.ts[2m > [22mT7: coached clubs fold through organization lineage, never raw club ids[2m > [22mDenis Pagan satisfies coached_club for every organization coached, and no other
+[31m[1mAssertionError[22m: Denis Pagan must have coached at least one organization: expected 0 to be greater than 0[39m
+[36m [2m❯[22m tests/integration/nl-answers-cross-domain.test.ts:[2m364:86[22m[39m
+    [90m362|[39m        WHERE c.player_id = ${playerId} AND c.link_status_value = 'uniq…
+    [90m363|[39m     `[39m)[33m.[39m[34mmap[39m((r) [33m=>[39m [33mNumber[39m(r[33m.[39morganization_id))[33m;[39m
+    [90m364|[39m     expect(coachedOrgs.length, `${who} must have coached at least one …
+    [90m   |[39m                                                                                      [31m^[39m
+    [90m365|[39m
+    [90m366|[39m     [35mfor[39m ([35mconst[39m orgId [35mof[39m coachedOrgs) {
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/integration/nl-answers-cross-domain.test.ts[2m > [22mT7: coached clubs fold through organization lineage, never raw club ids[2m > [22mTerry Wallace satisfies coached_club for every organization coached, and no other
+[31m[1mAssertionError[22m: Terry Wallace must have coached at least one organization: expected 0 to be greater than 0[39m
+[36m [2m❯[22m tests/integration/nl-answers-cross-domain.test.ts:[2m364:86[22m[39m
+    [90m362|[39m        WHERE c.player_id = ${playerId} AND c.link_status_value = 'uniq…
+    [90m363|[39m     `[39m)[33m.[39m[34mmap[39m((r) [33m=>[39m [33mNumber[39m(r[33m.[39morganization_id))[33m;[39m
+    [90m364|[39m     expect(coachedOrgs.length, `${who} must have coached at least one …
+    [90m   |[39m                                                                                      [31m^[39m
+    [90m365|[39m
+    [90m366|[39m     [35mfor[39m ([35mconst[39m orgId [35mof[39m coachedOrgs) {
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/integration/nl-answers-cross-domain.test.ts[2m > [22mT7: coached clubs fold through organization lineage, never raw club ids[2m > [22mDani Laidley satisfies coached_club for every organization coached, and no other
+[31m[1mAssertionError[22m: Dani Laidley must have coached at least one organization: expected 0 to be greater than 0[39m
+[36m [2m❯[22m tests/integration/nl-answers-cross-domain.test.ts:[2m364:86[22m[39m
+    [90m362|[39m        WHERE c.player_id = ${playerId} AND c.link_status_value = 'uniq…
+    [90m363|[39m     `[39m)[33m.[39m[34mmap[39m((r) [33m=>[39m [33mNumber[39m(r[33m.[39morganization_id))[33m;[39m
+    [90m364|[39m     expect(coachedOrgs.length, `${who} must have coached at least one …
+    [90m   |[39m                                                                                      [31m^[39m
+    [90m365|[39m
+    [90m366|[39m     [35mfor[39m ([35mconst[39m orgId [35mof[39m coachedOrgs) {
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/integration/nl-answers-cross-domain.test.ts[2m > [22mT7: coached clubs fold through organization lineage, never raw club ids[2m > [22mthe raw club identities really do outnumber the organizations
+[31m[1mAssertionError[22m: expected [] to have a length of 3 but got +0[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 3[39m
+[31m+ 0[39m
+
+[36m [2m❯[22m tests/integration/nl-answers-cross-domain.test.ts:[2m396:18[22m[39m
+    [90m394|[39m        GROUP BY c.player_id
+    [90m395|[39m     `[39m[33m;[39m
+    [90m396|[39m     [34mexpect[39m(rows)[33m.[39m[34mtoHaveLength[39m([33mObject[39m[33m.[39m[34mkeys[39m([33mLINEAGE_TRAPS[39m)[33m.[39mlength)[33m;[39m
+    [90m   |[39m                  [31m^[39m
+    [90m397|[39m     [35mfor[39m ([35mconst[39m row [35mof[39m rows) {
+    [90m398|[39m       expect(Number(row.raw_clubs), `player ${row.player_id}`).toBeGre…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m6 failed[39m[22m[2m | [22m[1m[32m16 passed[39m[22m[90m (22)[39m
+[2m   Start at [22m 09:17:41
+[2m   Duration [22m 4.66s[2m (transform 444ms, setup 1.58s, import 470ms, tests 2.22s, environment 0ms)[22m
+
+JSON report written to /mnt/ssd/afldb-rem4-rbfail-20261115/evidence/red_pf_nl_answers_cross_domain.json
+red_pf_nl_answers_cross_domain rc=1

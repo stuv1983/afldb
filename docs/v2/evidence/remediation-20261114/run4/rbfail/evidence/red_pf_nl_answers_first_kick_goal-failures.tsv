@@ -1,0 +1,4 @@
+tests/integration/nl-answers-first-kick-goal.test.ts	E8 — the first-kick goal was their only career goal W12 the NL totals are the board summary minus its unlinked rows	AssertionError: expected +0 to be 4 // Object.is equality
+tests/integration/nl-answers-first-kick-goal.test.ts	composition and the link boundary W13 no unlinked row reaches an NL answer	AssertionError: expected [] to have a length of 4 but got +0
+tests/integration/nl-answers-first-kick-goal.test.ts	the already-supported subfamilies, now proven against data W1 "players who kicked a goal with their first kick" == the linked population	AssertionError: expected 334 to be 330 // Object.is equality
+tests/integration/nl-answers-first-kick-goal.test.ts	the loaded curated extract (D11 / M-E1) matches the measurement the corpus thresholds were finalised from	AssertionError: expected 334 to be 330 // Object.is equality
