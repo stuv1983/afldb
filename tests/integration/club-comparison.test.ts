@@ -74,6 +74,7 @@ import type {
   H2HPeriodRecordKind,
   H2HTurnaroundSegment,
 } from '@/db/queries/club-comparison';
+import { BROWNLOW_DECLARED_NO_MEDAL_SEASONS } from '@/db/queries/player-derived';
 
 afterAll(async () => {
   await sql.end();
@@ -1842,7 +1843,31 @@ describe('club comparison: club Brownlow history', () => {
     expect(pending.coverage).toBe(coverageOf.get(2026));
     expect(complete.coverage).toBe('complete');
     expect(notApplicable.coverage).toBe('not_applicable');
-    expect(pending.coverage).toBe('pending');
+    // ISSUE-363 (F-CC-1): 2026 is `pending` only while no 2026 Brownlow results are loaded, so the expectation is
+    // derived from RAW tables, never from the function under test. Provenance: the documented D-365-1 season_total
+    // rule (player-derived.ts, recomputeBrownlowCoverage), first match wins: medal loaded (brownlow_season_votes rows)
+    // -> complete; season in progress -> pending; this workflow holds final/void decisions -> partial; DECLARED
+    // no-medal season (BROWNLOW_DECLARED_NO_MEDAL_SEASONS, the authority constant) -> not_applicable; else pending.
+    const [raw2026] = await sql<{ votes: number; status: string | null; decided: number }[]>`
+      SELECT (SELECT count(*) FROM brownlow_season_votes WHERE season = 2026)::int AS votes,
+             (SELECT status::text FROM seasons WHERE year = 2026) AS status,
+             (SELECT count(*) FROM brownlow_vote_entry_state es
+                JOIN matches mt ON mt.id = es.match_id
+               WHERE es.season = 2026 AND es.status IN ('final', 'void')
+                 AND mt.round_type = 'home_and_away')::int AS decided
+    `;
+    const declaredNoMedal2026 = BROWNLOW_DECLARED_NO_MEDAL_SEASONS.some(
+      (range) => range.firstSeason <= 2026 && 2026 <= range.lastSeason,
+    );
+    const expected2026 = raw2026.votes > 0 ? 'complete'
+      : raw2026.status === 'in_progress' ? 'pending'
+        : raw2026.decided > 0 ? 'partial'
+          : declaredNoMedal2026 ? 'not_applicable' : 'pending';
+    expect(pending.coverage).toBe(expected2026);
+    // Non-vacuous literal: with no 2026 results loaded and no decision of any kind (today's bases) it is `pending`.
+    if (raw2026.votes === 0 && raw2026.decided === 0 && !declaredNoMedal2026) {
+      expect(pending.coverage).toBe('pending');
+    }
     expect(missing.coverage).toBe('missing');
 
     expect(complete.isAuthoritative).toBe(true);
