@@ -1,0 +1,32 @@
+{
+ "ledger": {
+  "head": "118_fixtures_unconfirmed_participants.sql",
+  "applied": 118
+ },
+ "db": {
+  "db": "afldb_v2_rb_rem3_test",
+  "size": "345 MB",
+  "bytes": "361511959",
+  "comment": "afldb-v2-isolated-test"
+ },
+ "draft": {
+  "picks": 6810,
+  "persons": 5057,
+  "min_pick_id": 1,
+  "max_pick_id": 6810,
+  "picks_6819_6853": 0
+ },
+ "core": {
+  "players": 13365,
+  "matches": 17056,
+  "clubs": 24,
+  "seasons": 131,
+  "max_season": 2027
+ },
+ "fixtures": {
+  "fixtures": 0
+ },
+ "tables": {
+  "public_tables": 83
+ }
+}

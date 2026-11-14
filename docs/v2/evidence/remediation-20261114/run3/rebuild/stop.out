@@ -1,0 +1,15 @@
+HEAD=6d5388ea5305e73b0420fbccfa7b0cea4fe75927 porcelain=0 env_file=0
+afldb_v2_rb_rem3_restore_test	marked	295877655
+afldb_v2_rb_rem3_test	marked	361585687
+postgres	unmarked	7683095
+waiting for server to shut down.... done
+server stopped
+pg_ctl: no server running
+--- listener on 55672:
+none
+--- processes of mine under /mnt/ssd/afldb-rem3-rebuild-20261114 / /mnt/ssd/afldb-rem3-rebuild-20261114-pg:
+2204279 timeout 120 bash /mnt/ssd/afldb-rem3-rebuild-20261114/stop.sh
+2204280 bash /mnt/ssd/afldb-rem3-rebuild-20261114/stop.sh
+none (pg root)
+1.7G	/mnt/ssd/afldb-rem3-rebuild-20261114
+1.5G	/mnt/ssd/afldb-rem3-rebuild-20261114-pg

@@ -1,0 +1,1668 @@
+;
+; Archive created at 2026-11-14 21:26:54 AEDT
+;     dbname: afldb_v2_rb_rem3_test
+;     TOC Entries: 1658
+;     Compression: gzip
+;     Dump Version: 1.15-0
+;     Format: CUSTOM
+;     Integer: 4 bytes
+;     Offset: 8 bytes
+;     Dumped from database version: 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+;     Dumped by pg_dump version: 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+;
+;
+; Selected TOC Entries:
+;
+7; 2615 16483 SCHEMA - afldb_meta afldb_owner
+11; 2615 18023 SCHEMA - aflw afldb_owner
+5638; 0 0 ACL - SCHEMA aflw afldb_owner
+8; 2615 2200 SCHEMA - public afldb_owner
+5639; 0 0 ACL - SCHEMA public afldb_owner
+9; 2615 16492 SCHEMA - staging afldb_owner
+5640; 0 0 COMMENT - SCHEMA staging afldb_owner
+5641; 0 0 ACL - SCHEMA staging afldb_owner
+10; 2615 17897 SCHEMA - staging_aflw afldb_owner
+5642; 0 0 ACL - SCHEMA staging_aflw afldb_owner
+2; 3079 16391 EXTENSION - pg_trgm 
+5643; 0 0 COMMENT - EXTENSION pg_trgm 
+3; 3079 16472 EXTENSION - unaccent 
+5644; 0 0 COMMENT - EXTENSION unaccent 
+1429; 1247 19154 TYPE public after_siren_effect afldb_owner
+1432; 1247 19162 TYPE public after_siren_result afldb_owner
+1426; 1247 19146 TYPE public after_siren_score afldb_owner
+1435; 1247 19170 TYPE public after_siren_siren afldb_owner
+1114; 1247 16605 TYPE public club_succession afldb_owner
+1210; 1247 17518 TYPE public coverage_status afldb_owner
+5645; 0 0 COMMENT public TYPE coverage_status afldb_owner
+1090; 1247 16506 TYPE public import_status afldb_owner
+1093; 1247 16516 TYPE public issue_severity afldb_owner
+1087; 1247 16494 TYPE public link_status afldb_owner
+5646; 0 0 COMMENT public TYPE link_status afldb_owner
+1147; 1247 16836 TYPE public match_result afldb_owner
+1225; 1247 17608 TYPE public organization_relation afldb_owner
+1354; 1247 18303 TYPE public player_achievement_type afldb_owner
+1189; 1247 17288 TYPE public relationship_type afldb_owner
+1144; 1247 16822 TYPE public round_type afldb_owner
+1213; 1247 17530 TYPE public season_status afldb_owner
+1255; 1247 17827 TYPE public submission_status afldb_owner
+1096; 1247 16524 TYPE public value_confidence afldb_owner
+446; 1255 18151 FUNCTION afldb_meta grant_app_read(text) afldb_owner
+5647; 0 0 COMMENT afldb_meta FUNCTION grant_app_read(table_name text) afldb_owner
+459; 1255 18200 FUNCTION afldb_meta grant_import_write(text) afldb_owner
+5648; 0 0 COMMENT afldb_meta FUNCTION grant_import_write(table_name text) afldb_owner
+447; 1255 18191 FUNCTION afldb_meta owned_sequences(text) afldb_owner
+5649; 0 0 COMMENT afldb_meta FUNCTION owned_sequences(p_table text) afldb_owner
+460; 1255 18201 FUNCTION afldb_meta revoke_app_read(text) afldb_owner
+5650; 0 0 COMMENT afldb_meta FUNCTION revoke_app_read(table_name text) afldb_owner
+461; 1255 18202 FUNCTION afldb_meta revoke_import_write(text) afldb_owner
+5651; 0 0 COMMENT afldb_meta FUNCTION revoke_import_write(table_name text) afldb_owner
+445; 1255 18085 FUNCTION aflw venue_slug(text) afldb_owner
+443; 1255 16592 FUNCTION public add_provenance_columns(regclass) afldb_owner
+5652; 0 0 COMMENT public FUNCTION add_provenance_columns(target regclass) afldb_owner
+444; 1255 17639 FUNCTION public afldb_identity_for_season(integer, smallint) afldb_owner
+5653; 0 0 COMMENT public FUNCTION afldb_identity_for_season(p_organization_id integer, p_season smallint) afldb_owner
+464; 1255 17478 FUNCTION public afldb_normalise_name(text) afldb_owner
+5654; 0 0 COMMENT public FUNCTION afldb_normalise_name(input text) afldb_owner
+234; 1259 16616 TABLE public clubs afldb_owner
+5655; 0 0 COMMENT public TABLE clubs afldb_owner
+5656; 0 0 COMMENT public COLUMN clubs.current_identity_id afldb_owner
+5657; 0 0 COMMENT public COLUMN clubs.legacy_club_hist afldb_owner
+5658; 0 0 COMMENT public COLUMN clubs.organization_id afldb_owner
+5659; 0 0 COMMENT public CONSTRAINT clubs_org_span_ck ON clubs afldb_owner
+5660; 0 0 ACL public TABLE clubs afldb_owner
+463; 1255 19381 FUNCTION public afldb_season_list_clubs(smallint) afldb_owner
+5661; 0 0 COMMENT public FUNCTION afldb_season_list_clubs(p_season smallint) afldb_owner
+466; 1255 19712 FUNCTION public assert_viable_super_admin_actor(integer) afldb_owner
+5662; 0 0 COMMENT public FUNCTION assert_viable_super_admin_actor(p_actor_id integer) afldb_owner
+5663; 0 0 ACL public FUNCTION assert_viable_super_admin_actor(p_actor_id integer) afldb_owner
+462; 1255 19139 FUNCTION public match_coaches_club_in_match() afldb_owner
+465; 1255 18956 FUNCTION public nl_search_telemetry_clear() afldb_owner
+5664; 0 0 COMMENT public FUNCTION nl_search_telemetry_clear() afldb_owner
+5665; 0 0 ACL public FUNCTION nl_search_telemetry_clear() afldb_owner
+467; 1255 19913 FUNCTION public refuse_brownlow_receipt_mutation() afldb_owner
+334; 1259 18143 TABLE afldb_meta app_readable_tables afldb_owner
+5666; 0 0 COMMENT afldb_meta TABLE app_readable_tables afldb_owner
+335; 1259 18192 TABLE afldb_meta import_writable_tables afldb_owner
+5667; 0 0 COMMENT afldb_meta TABLE import_writable_tables afldb_owner
+223; 1259 16484 TABLE afldb_meta schema_migrations afldb_owner
+310; 1259 17908 TABLE staging_aflw ladders afldb_owner
+5668; 0 0 COMMENT staging_aflw COLUMN ladders.conference afldb_owner
+5669; 0 0 ACL staging_aflw TABLE ladders afldb_owner
+309; 1259 17899 TABLE staging_aflw seasons afldb_owner
+5670; 0 0 COMMENT staging_aflw TABLE seasons afldb_owner
+5671; 0 0 COMMENT staging_aflw COLUMN seasons.has_grand_final afldb_owner
+5672; 0 0 ACL staging_aflw TABLE seasons afldb_owner
+319; 1259 18029 VIEW aflw clubs afldb_owner
+5673; 0 0 COMMENT aflw VIEW clubs afldb_owner
+5674; 0 0 ACL aflw TABLE clubs afldb_owner
+312; 1259 17939 TABLE staging_aflw matches afldb_owner
+5675; 0 0 COMMENT staging_aflw TABLE matches afldb_owner
+5676; 0 0 ACL staging_aflw TABLE matches afldb_owner
+321; 1259 18039 VIEW aflw matches afldb_owner
+5677; 0 0 COMMENT aflw VIEW matches afldb_owner
+5678; 0 0 ACL aflw TABLE matches afldb_owner
+328; 1259 18074 VIEW aflw club_totals afldb_owner
+5679; 0 0 ACL aflw TABLE club_totals afldb_owner
+311; 1259 17921 TABLE staging_aflw fixtures afldb_owner
+5680; 0 0 COMMENT staging_aflw COLUMN fixtures.fixture_status afldb_owner
+5681; 0 0 ACL staging_aflw TABLE fixtures afldb_owner
+322; 1259 18044 VIEW aflw fixtures afldb_owner
+5682; 0 0 ACL aflw TABLE fixtures afldb_owner
+323; 1259 18049 VIEW aflw ladders afldb_owner
+5683; 0 0 ACL aflw TABLE ladders afldb_owner
+313; 1259 17959 TABLE staging_aflw player_match_stats afldb_owner
+5684; 0 0 COMMENT staging_aflw COLUMN player_match_stats.jumper_number afldb_owner
+5685; 0 0 COMMENT staging_aflw COLUMN player_match_stats.metres_gained afldb_owner
+5686; 0 0 ACL staging_aflw TABLE player_match_stats afldb_owner
+324; 1259 18054 VIEW aflw player_match_stats afldb_owner
+5687; 0 0 ACL aflw TABLE player_match_stats afldb_owner
+327; 1259 18069 VIEW aflw player_careers afldb_owner
+5688; 0 0 ACL aflw TABLE player_careers afldb_owner
+326; 1259 18064 VIEW aflw player_seasons afldb_owner
+5689; 0 0 ACL aflw TABLE player_seasons afldb_owner
+325; 1259 18059 VIEW aflw players afldb_owner
+5690; 0 0 ACL aflw TABLE players afldb_owner
+314; 1259 17980 TABLE staging_aflw scoring_events afldb_owner
+5691; 0 0 COMMENT staging_aflw TABLE scoring_events afldb_owner
+5692; 0 0 ACL staging_aflw TABLE scoring_events afldb_owner
+329; 1259 18079 VIEW aflw scoring_events afldb_owner
+5693; 0 0 ACL aflw TABLE scoring_events afldb_owner
+315; 1259 18003 TABLE staging_aflw player_seasons afldb_owner
+5694; 0 0 COMMENT staging_aflw TABLE player_seasons afldb_owner
+5695; 0 0 ACL staging_aflw TABLE player_seasons afldb_owner
+318; 1259 18024 VIEW aflw seasons afldb_owner
+5696; 0 0 COMMENT aflw VIEW seasons afldb_owner
+5697; 0 0 ACL aflw TABLE seasons afldb_owner
+320; 1259 18034 VIEW aflw venues afldb_owner
+5698; 0 0 ACL aflw TABLE venues afldb_owner
+331; 1259 18093 TABLE public admin_invites afldb_owner
+5699; 0 0 COMMENT public TABLE admin_invites afldb_owner
+5700; 0 0 COMMENT public COLUMN admin_invites.can_manage_admins afldb_owner
+5701; 0 0 ACL public TABLE admin_invites afldb_owner
+330; 1259 18092 SEQUENCE public admin_invites_id_seq afldb_owner
+5702; 0 0 ACL public SEQUENCE admin_invites_id_seq afldb_owner
+396; 1259 19679 TABLE public afl_api_identity_adjudications afldb_owner
+5703; 0 0 COMMENT public TABLE afl_api_identity_adjudications afldb_owner
+5704; 0 0 COMMENT public COLUMN afl_api_identity_adjudications.player_identity afldb_owner
+5705; 0 0 COMMENT public COLUMN afl_api_identity_adjudications.supersedes_id afldb_owner
+5706; 0 0 COMMENT public COLUMN afl_api_identity_adjudications.previous_player_identity afldb_owner
+5707; 0 0 ACL public TABLE afl_api_identity_adjudications afldb_owner
+395; 1259 19678 SEQUENCE public afl_api_identity_adjudications_id_seq afldb_owner
+5708; 0 0 ACL public SEQUENCE afl_api_identity_adjudications_id_seq afldb_owner
+383; 1259 19178 TABLE public after_siren_kicks afldb_owner
+5709; 0 0 COMMENT public TABLE after_siren_kicks afldb_owner
+5710; 0 0 COMMENT public COLUMN after_siren_kicks.competition afldb_owner
+5711; 0 0 COMMENT public COLUMN after_siren_kicks.match_id afldb_owner
+5712; 0 0 COMMENT public COLUMN after_siren_kicks.kick_scored afldb_owner
+5713; 0 0 COMMENT public COLUMN after_siren_kicks.kick_effect afldb_owner
+5714; 0 0 COMMENT public COLUMN after_siren_kicks.kicker_result afldb_owner
+5715; 0 0 COMMENT public COLUMN after_siren_kicks.siren afldb_owner
+5716; 0 0 COMMENT public COLUMN after_siren_kicks.cited afldb_owner
+5717; 0 0 COMMENT public COLUMN after_siren_kicks.status afldb_owner
+5718; 0 0 COMMENT public COLUMN after_siren_kicks.status_reason afldb_owner
+5719; 0 0 COMMENT public COLUMN after_siren_kicks.updated_at afldb_owner
+5720; 0 0 ACL public TABLE after_siren_kicks afldb_owner
+382; 1259 19177 SEQUENCE public after_siren_kicks_id_seq afldb_owner
+5721; 0 0 ACL public SEQUENCE after_siren_kicks_id_seq afldb_owner
+343; 1259 18281 TABLE public app_health_events afldb_owner
+5722; 0 0 COMMENT public TABLE app_health_events afldb_owner
+5723; 0 0 ACL public TABLE app_health_events afldb_owner
+342; 1259 18280 SEQUENCE public app_health_events_id_seq afldb_owner
+5724; 0 0 ACL public SEQUENCE app_health_events_id_seq afldb_owner
+303; 1259 17812 TABLE public auth_audit_log afldb_owner
+5725; 0 0 ACL public TABLE auth_audit_log afldb_owner
+302; 1259 17811 SEQUENCE public auth_audit_log_id_seq afldb_owner
+5726; 0 0 ACL public SEQUENCE auth_audit_log_id_seq afldb_owner
+295; 1259 17748 TABLE public auth_sessions afldb_owner
+5727; 0 0 ACL public TABLE auth_sessions afldb_owner
+294; 1259 17747 SEQUENCE public auth_sessions_id_seq afldb_owner
+5728; 0 0 ACL public SEQUENCE auth_sessions_id_seq afldb_owner
+293; 1259 17736 TABLE public auth_users afldb_owner
+5729; 0 0 COMMENT public TABLE auth_users afldb_owner
+5730; 0 0 COMMENT public COLUMN auth_users.role afldb_owner
+5731; 0 0 COMMENT public COLUMN auth_users.totp_last_step afldb_owner
+5732; 0 0 COMMENT public COLUMN auth_users.can_manage_admins afldb_owner
+5733; 0 0 COMMENT public COLUMN auth_users.must_change_password afldb_owner
+5734; 0 0 COMMENT public COLUMN auth_users.password_changed_at afldb_owner
+5735; 0 0 ACL public TABLE auth_users afldb_owner
+292; 1259 17735 SEQUENCE public auth_users_id_seq afldb_owner
+5736; 0 0 ACL public SEQUENCE auth_users_id_seq afldb_owner
+263; 1259 17086 TABLE public award_nominations afldb_owner
+5737; 0 0 ACL public TABLE award_nominations afldb_owner
+262; 1259 17085 SEQUENCE public award_nominations_id_seq afldb_owner
+5738; 0 0 ACL public SEQUENCE award_nominations_id_seq afldb_owner
+400; 1259 19773 TABLE public award_proposal_decisions afldb_owner
+5739; 0 0 COMMENT public TABLE award_proposal_decisions afldb_owner
+5740; 0 0 ACL public TABLE award_proposal_decisions afldb_owner
+399; 1259 19772 SEQUENCE public award_proposal_decisions_id_seq afldb_owner
+5741; 0 0 ACL public SEQUENCE award_proposal_decisions_id_seq afldb_owner
+398; 1259 19723 TABLE public award_proposals afldb_owner
+5742; 0 0 COMMENT public TABLE award_proposals afldb_owner
+5743; 0 0 COMMENT public COLUMN award_proposals.player_identity afldb_owner
+5744; 0 0 COMMENT public COLUMN award_proposals.source_kind afldb_owner
+5745; 0 0 COMMENT public COLUMN award_proposals.approved_entity_key afldb_owner
+5746; 0 0 ACL public TABLE award_proposals afldb_owner
+5747; 0 0 ACL public COLUMN award_proposals.status afldb_owner
+5748; 0 0 ACL public COLUMN award_proposals.validation_result afldb_owner
+5749; 0 0 ACL public COLUMN award_proposals.validated_at afldb_owner
+5750; 0 0 ACL public COLUMN award_proposals.approved_entity_key afldb_owner
+5751; 0 0 ACL public COLUMN award_proposals.approved_at afldb_owner
+5752; 0 0 ACL public COLUMN award_proposals.updated_at afldb_owner
+397; 1259 19722 SEQUENCE public award_proposals_id_seq afldb_owner
+5753; 0 0 ACL public SEQUENCE award_proposals_id_seq afldb_owner
+261; 1259 17042 TABLE public award_winners afldb_owner
+5754; 0 0 COMMENT public COLUMN award_winners.player_id afldb_owner
+5755; 0 0 COMMENT public COLUMN award_winners.sort_order afldb_owner
+5756; 0 0 COMMENT public COLUMN award_winners.status afldb_owner
+5757; 0 0 COMMENT public COLUMN award_winners.status_reason afldb_owner
+5758; 0 0 COMMENT public COLUMN award_winners.updated_at afldb_owner
+5759; 0 0 ACL public TABLE award_winners afldb_owner
+260; 1259 17041 SEQUENCE public award_winners_id_seq afldb_owner
+5760; 0 0 ACL public SEQUENCE award_winners_id_seq afldb_owner
+259; 1259 17016 TABLE public awards afldb_owner
+5761; 0 0 COMMENT public TABLE awards afldb_owner
+5762; 0 0 ACL public TABLE awards afldb_owner
+258; 1259 17015 SEQUENCE public awards_id_seq afldb_owner
+5763; 0 0 ACL public SEQUENCE awards_id_seq afldb_owner
+297; 1259 17765 TABLE public beta_access_codes afldb_owner
+5764; 0 0 COMMENT public COLUMN beta_access_codes.label afldb_owner
+5765; 0 0 COMMENT public COLUMN beta_access_codes.max_uses afldb_owner
+5766; 0 0 ACL public TABLE beta_access_codes afldb_owner
+296; 1259 17764 SEQUENCE public beta_access_codes_id_seq afldb_owner
+5767; 0 0 ACL public SEQUENCE beta_access_codes_id_seq afldb_owner
+299; 1259 17784 TABLE public beta_allowed_emails afldb_owner
+5768; 0 0 ACL public TABLE beta_allowed_emails afldb_owner
+298; 1259 17783 SEQUENCE public beta_allowed_emails_id_seq afldb_owner
+5769; 0 0 ACL public SEQUENCE beta_allowed_emails_id_seq afldb_owner
+308; 1259 17880 TABLE public beta_join_requests afldb_owner
+5770; 0 0 COMMENT public TABLE beta_join_requests afldb_owner
+5771; 0 0 COMMENT public COLUMN beta_join_requests.answers afldb_owner
+5772; 0 0 ACL public TABLE beta_join_requests afldb_owner
+307; 1259 17879 SEQUENCE public beta_join_requests_id_seq afldb_owner
+5773; 0 0 ACL public SEQUENCE beta_join_requests_id_seq afldb_owner
+301; 1259 17800 TABLE public beta_login_tokens afldb_owner
+5774; 0 0 ACL public TABLE beta_login_tokens afldb_owner
+300; 1259 17799 SEQUENCE public beta_login_tokens_id_seq afldb_owner
+5775; 0 0 ACL public SEQUENCE beta_login_tokens_id_seq afldb_owner
+407; 1259 19901 TABLE public brownlow_correction_receipts afldb_owner
+5776; 0 0 COMMENT public TABLE brownlow_correction_receipts afldb_owner
+404; 1259 19835 TABLE public brownlow_eligibility_decisions afldb_owner
+5777; 0 0 COMMENT public TABLE brownlow_eligibility_decisions afldb_owner
+5778; 0 0 COMMENT public COLUMN brownlow_eligibility_decisions.player_identity afldb_owner
+5779; 0 0 COMMENT public COLUMN brownlow_eligibility_decisions.player_id_at_decision afldb_owner
+5780; 0 0 COMMENT public COLUMN brownlow_eligibility_decisions.basis afldb_owner
+5781; 0 0 COMMENT public COLUMN brownlow_eligibility_decisions.correction afldb_owner
+5782; 0 0 COMMENT public COLUMN brownlow_eligibility_decisions.supersedes_id afldb_owner
+5783; 0 0 ACL public TABLE brownlow_eligibility_decisions afldb_owner
+403; 1259 19834 SEQUENCE public brownlow_eligibility_decisions_id_seq afldb_owner
+5784; 0 0 ACL public SEQUENCE brownlow_eligibility_decisions_id_seq afldb_owner
+257; 1259 16996 TABLE public brownlow_round_votes afldb_owner
+5785; 0 0 COMMENT public TABLE brownlow_round_votes afldb_owner
+5786; 0 0 COMMENT public COLUMN brownlow_round_votes.import_batch_id afldb_owner
+5787; 0 0 COMMENT public COLUMN brownlow_round_votes.match_id afldb_owner
+5788; 0 0 ACL public TABLE brownlow_round_votes afldb_owner
+256; 1259 16995 SEQUENCE public brownlow_round_votes_id_seq afldb_owner
+5789; 0 0 ACL public SEQUENCE brownlow_round_votes_id_seq afldb_owner
+385; 1259 19310 TABLE public brownlow_season_authority afldb_owner
+5790; 0 0 COMMENT public TABLE brownlow_season_authority afldb_owner
+5791; 0 0 ACL public TABLE brownlow_season_authority afldb_owner
+255; 1259 16954 TABLE public brownlow_season_votes afldb_owner
+5792; 0 0 COMMENT public TABLE brownlow_season_votes afldb_owner
+5793; 0 0 ACL public TABLE brownlow_season_votes afldb_owner
+254; 1259 16953 SEQUENCE public brownlow_season_votes_id_seq afldb_owner
+5794; 0 0 ACL public SEQUENCE brownlow_season_votes_id_seq afldb_owner
+384; 1259 19247 TABLE public brownlow_vote_entry_state afldb_owner
+5795; 0 0 COMMENT public TABLE brownlow_vote_entry_state afldb_owner
+5796; 0 0 COMMENT public COLUMN brownlow_vote_entry_state.revision afldb_owner
+5797; 0 0 ACL public TABLE brownlow_vote_entry_state afldb_owner
+376; 1259 18988 TABLE public canonical_applications afldb_owner
+5798; 0 0 COMMENT public TABLE canonical_applications afldb_owner
+5799; 0 0 COMMENT public COLUMN canonical_applications.family afldb_owner
+5800; 0 0 COMMENT public COLUMN canonical_applications.target_key afldb_owner
+5801; 0 0 COMMENT public COLUMN canonical_applications.previous_values afldb_owner
+5802; 0 0 COMMENT public COLUMN canonical_applications.new_values afldb_owner
+5803; 0 0 ACL public TABLE canonical_applications afldb_owner
+375; 1259 18987 SEQUENCE public canonical_applications_id_seq afldb_owner
+5804; 0 0 ACL public SEQUENCE canonical_applications_id_seq afldb_owner
+269; 1259 17186 TABLE public captaincies afldb_owner
+5805; 0 0 ACL public TABLE captaincies afldb_owner
+268; 1259 17185 SEQUENCE public captaincies_id_seq afldb_owner
+5806; 0 0 ACL public SEQUENCE captaincies_id_seq afldb_owner
+236; 1259 16654 TABLE public club_aliases afldb_owner
+5807; 0 0 ACL public TABLE club_aliases afldb_owner
+235; 1259 16653 SEQUENCE public club_aliases_id_seq afldb_owner
+5808; 0 0 ACL public SEQUENCE club_aliases_id_seq afldb_owner
+391; 1259 19440 TABLE public club_leadership afldb_owner
+5809; 0 0 COMMENT public TABLE club_leadership afldb_owner
+5810; 0 0 COMMENT public COLUMN club_leadership.appointment_key afldb_owner
+5811; 0 0 COMMENT public COLUMN club_leadership.season afldb_owner
+5812; 0 0 COMMENT public COLUMN club_leadership.club_id afldb_owner
+5813; 0 0 COMMENT public COLUMN club_leadership.role afldb_owner
+5814; 0 0 COMMENT public COLUMN club_leadership.status afldb_owner
+5815; 0 0 COMMENT public COLUMN club_leadership.started_on afldb_owner
+5816; 0 0 COMMENT public COLUMN club_leadership.ended_on afldb_owner
+5817; 0 0 COMMENT public COLUMN club_leadership.import_batch_id afldb_owner
+5818; 0 0 ACL public TABLE club_leadership afldb_owner
+390; 1259 19439 SEQUENCE public club_leadership_id_seq afldb_owner
+5819; 0 0 ACL public SEQUENCE club_leadership_id_seq afldb_owner
+287; 1259 17615 TABLE public club_organization_relations afldb_owner
+5820; 0 0 COMMENT public TABLE club_organization_relations afldb_owner
+5821; 0 0 ACL public TABLE club_organization_relations afldb_owner
+286; 1259 17578 TABLE public club_organizations afldb_owner
+5822; 0 0 COMMENT public TABLE club_organizations afldb_owner
+5823; 0 0 COMMENT public COLUMN club_organizations.first_season afldb_owner
+5824; 0 0 ACL public TABLE club_organizations afldb_owner
+285; 1259 17577 SEQUENCE public club_organizations_id_seq afldb_owner
+5825; 0 0 ACL public SEQUENCE club_organizations_id_seq afldb_owner
+273; 1259 17255 TABLE public club_seasons afldb_owner
+5826; 0 0 ACL public TABLE club_seasons afldb_owner
+272; 1259 17254 SEQUENCE public club_seasons_id_seq afldb_owner
+5827; 0 0 ACL public SEQUENCE club_seasons_id_seq afldb_owner
+233; 1259 16615 SEQUENCE public clubs_id_seq afldb_owner
+5828; 0 0 ACL public SEQUENCE clubs_id_seq afldb_owner
+380; 1259 19076 TABLE public coaches afldb_owner
+5829; 0 0 COMMENT public TABLE coaches afldb_owner
+5830; 0 0 COMMENT public COLUMN coaches.afltables_coach_path afldb_owner
+5831; 0 0 COMMENT public COLUMN coaches.name_key afldb_owner
+5832; 0 0 COMMENT public COLUMN coaches.source_games_coached afldb_owner
+5833; 0 0 COMMENT public CONSTRAINT coaches_manual_identity_ck ON coaches afldb_owner
+5834; 0 0 COMMENT public CONSTRAINT coaches_path_namespace_ck ON coaches afldb_owner
+5835; 0 0 ACL public TABLE coaches afldb_owner
+379; 1259 19075 SEQUENCE public coaches_id_seq afldb_owner
+5836; 0 0 ACL public SEQUENCE coaches_id_seq afldb_owner
+351; 1259 18408 TABLE public data_edits afldb_owner
+5837; 0 0 COMMENT public TABLE data_edits afldb_owner
+5838; 0 0 COMMENT public CONSTRAINT data_edits_table_name_check ON data_edits afldb_owner
+5839; 0 0 ACL public TABLE data_edits afldb_owner
+350; 1259 18407 SEQUENCE public data_edits_id_seq afldb_owner
+5840; 0 0 ACL public SEQUENCE data_edits_id_seq afldb_owner
+231; 1259 16582 TABLE public data_issues afldb_owner
+5841; 0 0 COMMENT public TABLE data_issues afldb_owner
+5842; 0 0 COMMENT public COLUMN data_issues.issue_key afldb_owner
+5843; 0 0 ACL public TABLE data_issues afldb_owner
+230; 1259 16581 SEQUENCE public data_issues_id_seq afldb_owner
+5844; 0 0 ACL public SEQUENCE data_issues_id_seq afldb_owner
+358; 1259 18565 TABLE public data_overrides afldb_owner
+5845; 0 0 COMMENT public TABLE data_overrides afldb_owner
+5846; 0 0 COMMENT public CONSTRAINT data_overrides_entity_type_check ON data_overrides afldb_owner
+5847; 0 0 ACL public TABLE data_overrides afldb_owner
+5848; 0 0 ACL public COLUMN data_overrides.entity_type afldb_owner
+5849; 0 0 ACL public COLUMN data_overrides.entity_key afldb_owner
+5850; 0 0 ACL public COLUMN data_overrides.field_group afldb_owner
+5851; 0 0 ACL public COLUMN data_overrides.override_values afldb_owner
+5852; 0 0 ACL public COLUMN data_overrides.is_active afldb_owner
+5853; 0 0 ACL public COLUMN data_overrides.admin_user_id afldb_owner
+5854; 0 0 ACL public COLUMN data_overrides.updated_at afldb_owner
+357; 1259 18564 SEQUENCE public data_overrides_id_seq afldb_owner
+5855; 0 0 ACL public SEQUENCE data_overrides_id_seq afldb_owner
+306; 1259 17865 TABLE public data_submission_rows afldb_owner
+5856; 0 0 COMMENT public COLUMN data_submission_rows.verdict afldb_owner
+5857; 0 0 ACL public TABLE data_submission_rows afldb_owner
+305; 1259 17840 TABLE public data_submissions afldb_owner
+5858; 0 0 COMMENT public COLUMN data_submissions.content afldb_owner
+5859; 0 0 ACL public TABLE data_submissions afldb_owner
+5860; 0 0 ACL public COLUMN data_submissions.status afldb_owner
+5861; 0 0 ACL public COLUMN data_submissions.promoted_at afldb_owner
+5862; 0 0 ACL public COLUMN data_submissions.import_batch_id afldb_owner
+5863; 0 0 ACL public COLUMN data_submissions.error afldb_owner
+304; 1259 17839 SEQUENCE public data_submissions_id_seq afldb_owner
+5864; 0 0 ACL public SEQUENCE data_submissions_id_seq afldb_owner
+406; 1259 19869 TABLE public derived_award_projections afldb_owner
+5865; 0 0 COMMENT public TABLE derived_award_projections afldb_owner
+5866; 0 0 COMMENT public COLUMN derived_award_projections.actions afldb_owner
+5867; 0 0 COMMENT public COLUMN derived_award_projections.correction afldb_owner
+5868; 0 0 ACL public TABLE derived_award_projections afldb_owner
+405; 1259 19868 SEQUENCE public derived_award_projections_id_seq afldb_owner
+5869; 0 0 ACL public SEQUENCE derived_award_projections_id_seq afldb_owner
+402; 1259 19799 TABLE public derived_award_results afldb_owner
+5870; 0 0 COMMENT public TABLE derived_award_results afldb_owner
+5871; 0 0 COMMENT public COLUMN derived_award_results.result afldb_owner
+5872; 0 0 COMMENT public COLUMN derived_award_results.correction afldb_owner
+5873; 0 0 COMMENT public COLUMN derived_award_results.supersedes_id afldb_owner
+5874; 0 0 ACL public TABLE derived_award_results afldb_owner
+401; 1259 19798 SEQUENCE public derived_award_results_id_seq afldb_owner
+5875; 0 0 ACL public SEQUENCE derived_award_results_id_seq afldb_owner
+282; 1259 17469 TABLE public derived_rebuilds afldb_owner
+5876; 0 0 COMMENT public TABLE derived_rebuilds afldb_owner
+5877; 0 0 ACL public TABLE derived_rebuilds afldb_owner
+281; 1259 17468 SEQUENCE public derived_rebuilds_id_seq afldb_owner
+5878; 0 0 ACL public SEQUENCE derived_rebuilds_id_seq afldb_owner
+291; 1259 17679 TABLE public draft_persons afldb_owner
+5879; 0 0 COMMENT public TABLE draft_persons afldb_owner
+5880; 0 0 COMMENT public COLUMN draft_persons.reported_games afldb_owner
+5881; 0 0 COMMENT public COLUMN draft_persons.is_matching_backlog afldb_owner
+5882; 0 0 ACL public TABLE draft_persons afldb_owner
+290; 1259 17678 SEQUENCE public draft_persons_id_seq afldb_owner
+5883; 0 0 ACL public SEQUENCE draft_persons_id_seq afldb_owner
+271; 1259 17222 TABLE public draft_picks afldb_owner
+5884; 0 0 COMMENT public TABLE draft_picks afldb_owner
+5885; 0 0 COMMENT public COLUMN draft_picks.player_name_raw afldb_owner
+5886; 0 0 COMMENT public COLUMN draft_picks.link_status_value afldb_owner
+5887; 0 0 COMMENT public COLUMN draft_picks.draft_person_id afldb_owner
+5888; 0 0 COMMENT public COLUMN draft_picks.signing_detail afldb_owner
+5889; 0 0 ACL public TABLE draft_picks afldb_owner
+270; 1259 17221 SEQUENCE public draft_picks_id_seq afldb_owner
+5890; 0 0 ACL public SEQUENCE draft_picks_id_seq afldb_owner
+374; 1259 18936 TABLE public external_grid_axes afldb_owner
+5891; 0 0 COMMENT public TABLE external_grid_axes afldb_owner
+5892; 0 0 COMMENT public COLUMN external_grid_axes.orientation afldb_owner
+5893; 0 0 COMMENT public COLUMN external_grid_axes.criterion_key afldb_owner
+5894; 0 0 COMMENT public COLUMN external_grid_axes.raw_label afldb_owner
+5895; 0 0 ACL public TABLE external_grid_axes afldb_owner
+373; 1259 18935 SEQUENCE public external_grid_axes_id_seq afldb_owner
+5896; 0 0 ACL public SEQUENCE external_grid_axes_id_seq afldb_owner
+370; 1259 18884 TABLE public external_grid_sources afldb_owner
+5897; 0 0 COMMENT public TABLE external_grid_sources afldb_owner
+5898; 0 0 COMMENT public COLUMN external_grid_sources.ingest_source_id afldb_owner
+5899; 0 0 ACL public TABLE external_grid_sources afldb_owner
+369; 1259 18883 SEQUENCE public external_grid_sources_id_seq afldb_owner
+372; 1259 18903 TABLE public external_grids afldb_owner
+5900; 0 0 COMMENT public TABLE external_grids afldb_owner
+5901; 0 0 COMMENT public COLUMN external_grids.provenance afldb_owner
+5902; 0 0 COMMENT public COLUMN external_grids.revision afldb_owner
+5903; 0 0 COMMENT public COLUMN external_grids.payload_sha256 afldb_owner
+5904; 0 0 COMMENT public COLUMN external_grids.raw_payload afldb_owner
+5905; 0 0 COMMENT public COLUMN external_grids.fetched_at afldb_owner
+5906; 0 0 ACL public TABLE external_grids afldb_owner
+5907; 0 0 ACL public COLUMN external_grids.is_current afldb_owner
+371; 1259 18902 SEQUENCE public external_grids_id_seq afldb_owner
+5908; 0 0 ACL public SEQUENCE external_grids_id_seq afldb_owner
+246; 1259 16772 TABLE public external_identities afldb_owner
+5909; 0 0 COMMENT public TABLE external_identities afldb_owner
+5910; 0 0 ACL public TABLE external_identities afldb_owner
+245; 1259 16771 SEQUENCE public external_identities_id_seq afldb_owner
+5911; 0 0 ACL public SEQUENCE external_identities_id_seq afldb_owner
+277; 1259 17340 TABLE public father_son_selections afldb_owner
+5912; 0 0 COMMENT public COLUMN father_son_selections.competition afldb_owner
+5913; 0 0 COMMENT public COLUMN father_son_selections.selection_note afldb_owner
+5914; 0 0 COMMENT public CONSTRAINT father_son_selections_drafted_link_ck ON father_son_selections afldb_owner
+5915; 0 0 COMMENT public CONSTRAINT father_son_selections_father_link_ck ON father_son_selections afldb_owner
+5916; 0 0 ACL public TABLE father_son_selections afldb_owner
+276; 1259 17339 SEQUENCE public father_son_selections_id_seq afldb_owner
+5917; 0 0 ACL public SEQUENCE father_son_selections_id_seq afldb_owner
+389; 1259 19384 TABLE public fixtures afldb_owner
+5918; 0 0 COMMENT public TABLE fixtures afldb_owner
+5919; 0 0 COMMENT public COLUMN fixtures.fixture_key afldb_owner
+5920; 0 0 COMMENT public COLUMN fixtures.season afldb_owner
+5921; 0 0 COMMENT public COLUMN fixtures.round_code afldb_owner
+5922; 0 0 COMMENT public COLUMN fixtures.match_date afldb_owner
+5923; 0 0 COMMENT public COLUMN fixtures.match_time afldb_owner
+5924; 0 0 COMMENT public COLUMN fixtures.venue_raw afldb_owner
+5925; 0 0 COMMENT public COLUMN fixtures.status afldb_owner
+5926; 0 0 COMMENT public COLUMN fixtures.import_batch_id afldb_owner
+5927; 0 0 COMMENT public COLUMN fixtures.confirmation afldb_owner
+5928; 0 0 COMMENT public COLUMN fixtures.home_placeholder afldb_owner
+5929; 0 0 COMMENT public COLUMN fixtures.away_placeholder afldb_owner
+5930; 0 0 ACL public TABLE fixtures afldb_owner
+388; 1259 19383 SEQUENCE public fixtures_id_seq afldb_owner
+5931; 0 0 ACL public SEQUENCE fixtures_id_seq afldb_owner
+265; 1259 17133 TABLE public hall_of_fame afldb_owner
+5932; 0 0 COMMENT public COLUMN hall_of_fame.status afldb_owner
+5933; 0 0 COMMENT public COLUMN hall_of_fame.status_reason afldb_owner
+5934; 0 0 COMMENT public COLUMN hall_of_fame.updated_at afldb_owner
+5935; 0 0 ACL public TABLE hall_of_fame afldb_owner
+264; 1259 17132 SEQUENCE public hall_of_fame_id_seq afldb_owner
+5936; 0 0 ACL public SEQUENCE hall_of_fame_id_seq afldb_owner
+267; 1259 17159 TABLE public honour_team_members afldb_owner
+5937; 0 0 COMMENT public COLUMN honour_team_members.status afldb_owner
+5938; 0 0 COMMENT public COLUMN honour_team_members.status_reason afldb_owner
+5939; 0 0 COMMENT public COLUMN honour_team_members.updated_at afldb_owner
+5940; 0 0 ACL public TABLE honour_team_members afldb_owner
+266; 1259 17158 SEQUENCE public honour_team_members_id_seq afldb_owner
+5941; 0 0 ACL public SEQUENCE honour_team_members_id_seq afldb_owner
+227; 1259 16546 TABLE public import_batches afldb_owner
+5942; 0 0 COMMENT public TABLE import_batches afldb_owner
+5943; 0 0 ACL public TABLE import_batches afldb_owner
+226; 1259 16545 SEQUENCE public import_batches_id_seq afldb_owner
+5944; 0 0 ACL public SEQUENCE import_batches_id_seq afldb_owner
+229; 1259 16567 TABLE public import_rejections afldb_owner
+5945; 0 0 ACL public TABLE import_rejections afldb_owner
+228; 1259 16566 SEQUENCE public import_rejections_id_seq afldb_owner
+5946; 0 0 ACL public SEQUENCE import_rejections_id_seq afldb_owner
+381; 1259 19106 TABLE public match_coaches afldb_owner
+5947; 0 0 COMMENT public TABLE match_coaches afldb_owner
+5948; 0 0 ACL public TABLE match_coaches afldb_owner
+251; 1259 16893 TABLE public match_period_scores afldb_owner
+5949; 0 0 COMMENT public TABLE match_period_scores afldb_owner
+5950; 0 0 COMMENT public COLUMN match_period_scores.import_batch_id afldb_owner
+5951; 0 0 ACL public TABLE match_period_scores afldb_owner
+250; 1259 16844 TABLE public matches afldb_owner
+5952; 0 0 COMMENT public COLUMN matches.round_type afldb_owner
+5953; 0 0 COMMENT public COLUMN matches.is_final afldb_owner
+5954; 0 0 COMMENT public COLUMN matches.venue_id afldb_owner
+5955; 0 0 COMMENT public COLUMN matches.attendance afldb_owner
+5956; 0 0 COMMENT public COLUMN matches.attendance_status afldb_owner
+5957; 0 0 COMMENT public COLUMN matches.attendance_source_id afldb_owner
+5958; 0 0 COMMENT public COLUMN matches.source_id afldb_owner
+5959; 0 0 COMMENT public COLUMN matches.source_record_id afldb_owner
+5960; 0 0 COMMENT public COLUMN matches.is_finals_series afldb_owner
+5961; 0 0 COMMENT public CONSTRAINT matches_result_scores_ck ON matches afldb_owner
+5962; 0 0 COMMENT public CONSTRAINT matches_score_components_ck ON matches afldb_owner
+5963; 0 0 ACL public TABLE matches afldb_owner
+249; 1259 16843 SEQUENCE public matches_id_seq afldb_owner
+5964; 0 0 ACL public SEQUENCE matches_id_seq afldb_owner
+341; 1259 18263 TABLE public nl_search_feedback afldb_owner
+5965; 0 0 COMMENT public TABLE nl_search_feedback afldb_owner
+5966; 0 0 COMMENT public COLUMN nl_search_feedback.client_ref afldb_owner
+5967; 0 0 ACL public TABLE nl_search_feedback afldb_owner
+340; 1259 18262 SEQUENCE public nl_search_feedback_id_seq afldb_owner
+5968; 0 0 ACL public SEQUENCE nl_search_feedback_id_seq afldb_owner
+337; 1259 18205 TABLE public nl_search_log afldb_owner
+5969; 0 0 COMMENT public TABLE nl_search_log afldb_owner
+5970; 0 0 COMMENT public COLUMN nl_search_log.failure_reason afldb_owner
+5971; 0 0 COMMENT public COLUMN nl_search_log.plan_hash afldb_owner
+5972; 0 0 COMMENT public COLUMN nl_search_log.session_id afldb_owner
+5973; 0 0 COMMENT public COLUMN nl_search_log.parent_search_id afldb_owner
+5974; 0 0 COMMENT public COLUMN nl_search_log.client_ref afldb_owner
+5975; 0 0 COMMENT public COLUMN nl_search_log.run_tag afldb_owner
+5976; 0 0 ACL public TABLE nl_search_log afldb_owner
+336; 1259 18204 SEQUENCE public nl_search_log_id_seq afldb_owner
+5977; 0 0 ACL public SEQUENCE nl_search_log_id_seq afldb_owner
+339; 1259 18234 TABLE public nl_search_review afldb_owner
+5978; 0 0 COMMENT public TABLE nl_search_review afldb_owner
+5979; 0 0 ACL public TABLE nl_search_review afldb_owner
+338; 1259 18233 SEQUENCE public nl_search_review_id_seq afldb_owner
+5980; 0 0 ACL public SEQUENCE nl_search_review_id_seq afldb_owner
+345; 1259 18306 TABLE public player_achievements afldb_owner
+5981; 0 0 COMMENT public TABLE player_achievements afldb_owner
+5982; 0 0 COMMENT public COLUMN player_achievements.source_annotation afldb_owner
+5983; 0 0 COMMENT public COLUMN player_achievements.round_raw afldb_owner
+5984; 0 0 COMMENT public COLUMN player_achievements.consecutive_goal_kicks afldb_owner
+5985; 0 0 COMMENT public COLUMN player_achievements.no_further_career_goals afldb_owner
+5986; 0 0 COMMENT public COLUMN player_achievements.no_further_career_kicks afldb_owner
+5987; 0 0 COMMENT public COLUMN player_achievements.kickless_matches_before_first_kick afldb_owner
+5988; 0 0 COMMENT public COLUMN player_achievements.match_id afldb_owner
+5989; 0 0 COMMENT public COLUMN player_achievements.status afldb_owner
+5990; 0 0 COMMENT public COLUMN player_achievements.status_reason afldb_owner
+5991; 0 0 COMMENT public COLUMN player_achievements.updated_at afldb_owner
+5992; 0 0 ACL public TABLE player_achievements afldb_owner
+344; 1259 18305 SEQUENCE public player_achievements_id_seq afldb_owner
+5993; 0 0 ACL public SEQUENCE player_achievements_id_seq afldb_owner
+289; 1259 17641 TABLE public player_birth_evidence afldb_owner
+5994; 0 0 COMMENT public TABLE player_birth_evidence afldb_owner
+5995; 0 0 COMMENT public COLUMN player_birth_evidence.external_id afldb_owner
+5996; 0 0 COMMENT public COLUMN player_birth_evidence.occurrences afldb_owner
+5997; 0 0 ACL public TABLE player_birth_evidence afldb_owner
+288; 1259 17640 SEQUENCE public player_birth_evidence_id_seq afldb_owner
+5998; 0 0 ACL public SEQUENCE player_birth_evidence_id_seq afldb_owner
+279; 1259 17407 TABLE public player_career_stats afldb_owner
+5999; 0 0 COMMENT public TABLE player_career_stats afldb_owner
+6000; 0 0 COMMENT public COLUMN player_career_stats.disposals afldb_owner
+6001; 0 0 COMMENT public COLUMN player_career_stats.brownlow_votes afldb_owner
+6002; 0 0 ACL public TABLE player_career_stats afldb_owner
+278; 1259 17376 TABLE public player_club_season_stats afldb_owner
+6003; 0 0 COMMENT public TABLE player_club_season_stats afldb_owner
+6004; 0 0 ACL public TABLE player_club_season_stats afldb_owner
+280; 1259 17441 TABLE public player_clubs afldb_owner
+6005; 0 0 COMMENT public TABLE player_clubs afldb_owner
+6006; 0 0 ACL public TABLE player_clubs afldb_owner
+378; 1259 19041 TABLE public player_height_evidence afldb_owner
+6007; 0 0 COMMENT public TABLE player_height_evidence afldb_owner
+6008; 0 0 COMMENT public COLUMN player_height_evidence.external_id afldb_owner
+6009; 0 0 COMMENT public COLUMN player_height_evidence.occurrences afldb_owner
+6010; 0 0 ACL public TABLE player_height_evidence afldb_owner
+377; 1259 19040 SEQUENCE public player_height_evidence_id_seq afldb_owner
+6011; 0 0 ACL public SEQUENCE player_height_evidence_id_seq afldb_owner
+356; 1259 18519 TABLE public player_link_match_candidates afldb_owner
+6012; 0 0 COMMENT public TABLE player_link_match_candidates afldb_owner
+6013; 0 0 COMMENT public COLUMN player_link_match_candidates.gap afldb_owner
+6014; 0 0 COMMENT public COLUMN player_link_match_candidates.bulk_eligible afldb_owner
+6015; 0 0 ACL public TABLE player_link_match_candidates afldb_owner
+355; 1259 18518 SEQUENCE public player_link_match_candidates_id_seq afldb_owner
+6016; 0 0 ACL public SEQUENCE player_link_match_candidates_id_seq afldb_owner
+349; 1259 18383 TABLE public player_link_resolutions afldb_owner
+6017; 0 0 COMMENT public TABLE player_link_resolutions afldb_owner
+6018; 0 0 COMMENT public COLUMN player_link_resolutions.action afldb_owner
+6019; 0 0 COMMENT public COLUMN player_link_resolutions.match_score afldb_owner
+6020; 0 0 ACL public TABLE player_link_resolutions afldb_owner
+348; 1259 18382 SEQUENCE public player_link_resolutions_id_seq afldb_owner
+6021; 0 0 ACL public SEQUENCE player_link_resolutions_id_seq afldb_owner
+347; 1259 18361 TABLE public player_link_suggestions afldb_owner
+6022; 0 0 COMMENT public TABLE player_link_suggestions afldb_owner
+6023; 0 0 COMMENT public COLUMN player_link_suggestions.target_id afldb_owner
+6024; 0 0 ACL public TABLE player_link_suggestions afldb_owner
+6025; 0 0 ACL public COLUMN player_link_suggestions.status afldb_owner
+6026; 0 0 ACL public COLUMN player_link_suggestions.resolved_by afldb_owner
+6027; 0 0 ACL public COLUMN player_link_suggestions.resolved_at afldb_owner
+346; 1259 18360 SEQUENCE public player_link_suggestions_id_seq afldb_owner
+6028; 0 0 ACL public SEQUENCE player_link_suggestions_id_seq afldb_owner
+353; 1259 18430 TABLE public player_match_period_stats afldb_owner
+6029; 0 0 COMMENT public TABLE player_match_period_stats afldb_owner
+6030; 0 0 ACL public TABLE player_match_period_stats afldb_owner
+352; 1259 18429 SEQUENCE public player_match_period_stats_id_seq afldb_owner
+253; 1259 16910 TABLE public player_match_stats afldb_owner
+6031; 0 0 COMMENT public TABLE player_match_stats afldb_owner
+6032; 0 0 COMMENT public COLUMN player_match_stats.club_id afldb_owner
+6033; 0 0 COMMENT public COLUMN player_match_stats.brownlow_votes afldb_owner
+6034; 0 0 COMMENT public COLUMN player_match_stats.import_batch_id afldb_owner
+6035; 0 0 COMMENT public COLUMN player_match_stats.source_record_id afldb_owner
+6036; 0 0 ACL public TABLE player_match_stats afldb_owner
+252; 1259 16909 SEQUENCE public player_match_stats_id_seq afldb_owner
+6037; 0 0 ACL public SEQUENCE player_match_stats_id_seq afldb_owner
+244; 1259 16750 TABLE public player_name_aliases afldb_owner
+6038; 0 0 ACL public TABLE player_name_aliases afldb_owner
+243; 1259 16749 SEQUENCE public player_name_aliases_id_seq afldb_owner
+6039; 0 0 ACL public SEQUENCE player_name_aliases_id_seq afldb_owner
+275; 1259 17306 TABLE public player_relationships afldb_owner
+6040; 0 0 COMMENT public TABLE player_relationships afldb_owner
+6041; 0 0 ACL public TABLE player_relationships afldb_owner
+274; 1259 17305 SEQUENCE public player_relationships_id_seq afldb_owner
+6042; 0 0 ACL public SEQUENCE player_relationships_id_seq afldb_owner
+284; 1259 17543 TABLE public player_season_stats afldb_owner
+6043; 0 0 COMMENT public TABLE player_season_stats afldb_owner
+6044; 0 0 COMMENT public COLUMN player_season_stats.primary_club_id afldb_owner
+6045; 0 0 COMMENT public COLUMN player_season_stats.brownlow_votes afldb_owner
+6046; 0 0 ACL public TABLE player_season_stats afldb_owner
+242; 1259 16723 TABLE public players afldb_owner
+6047; 0 0 COMMENT public TABLE players afldb_owner
+6048; 0 0 COMMENT public COLUMN players.search_name afldb_owner
+6049; 0 0 COMMENT public COLUMN players.dob afldb_owner
+6050; 0 0 COMMENT public COLUMN players.search_rank afldb_owner
+6051; 0 0 COMMENT public COLUMN players.dob_evidence_id afldb_owner
+6052; 0 0 COMMENT public COLUMN players.dob_disputed afldb_owner
+6053; 0 0 COMMENT public COLUMN players.height_evidence_id afldb_owner
+6054; 0 0 ACL public TABLE players afldb_owner
+241; 1259 16722 SEQUENCE public players_id_seq afldb_owner
+6055; 0 0 ACL public SEQUENCE players_id_seq afldb_owner
+363; 1259 18648 TABLE public promotion_candidates afldb_owner
+6056; 0 0 COMMENT public TABLE promotion_candidates afldb_owner
+6057; 0 0 COMMENT public COLUMN promotion_candidates.source_version_seq afldb_owner
+6058; 0 0 COMMENT public COLUMN promotion_candidates.baseline_canonical_hash afldb_owner
+6059; 0 0 ACL public TABLE promotion_candidates afldb_owner
+6060; 0 0 ACL public COLUMN promotion_candidates.status afldb_owner
+6061; 0 0 ACL public COLUMN promotion_candidates.resolved_at afldb_owner
+6062; 0 0 ACL public COLUMN promotion_candidates.resolved_decision_id afldb_owner
+362; 1259 18647 SEQUENCE public promotion_candidates_id_seq afldb_owner
+6063; 0 0 ACL public SEQUENCE promotion_candidates_id_seq afldb_owner
+365; 1259 18692 TABLE public promotion_decisions afldb_owner
+6064; 0 0 COMMENT public TABLE promotion_decisions afldb_owner
+6065; 0 0 ACL public TABLE promotion_decisions afldb_owner
+364; 1259 18691 SEQUENCE public promotion_decisions_id_seq afldb_owner
+6066; 0 0 ACL public SEQUENCE promotion_decisions_id_seq afldb_owner
+387; 1259 19342 TABLE public season_list_members afldb_owner
+6067; 0 0 COMMENT public TABLE season_list_members afldb_owner
+6068; 0 0 COMMENT public COLUMN season_list_members.season afldb_owner
+6069; 0 0 COMMENT public COLUMN season_list_members.club_id afldb_owner
+6070; 0 0 COMMENT public COLUMN season_list_members.origin afldb_owner
+6071; 0 0 COMMENT public COLUMN season_list_members.import_batch_id afldb_owner
+6072; 0 0 ACL public TABLE season_list_members afldb_owner
+386; 1259 19341 SEQUENCE public season_list_members_id_seq afldb_owner
+6073; 0 0 ACL public SEQUENCE season_list_members_id_seq afldb_owner
+232; 1259 16593 TABLE public seasons afldb_owner
+6074; 0 0 COMMENT public COLUMN seasons.status afldb_owner
+6075; 0 0 COMMENT public COLUMN seasons.data_through_date afldb_owner
+6076; 0 0 COMMENT public COLUMN seasons.source_built_at afldb_owner
+6077; 0 0 COMMENT public COLUMN seasons.last_loaded_round afldb_owner
+6078; 0 0 COMMENT public COLUMN seasons.completed_at afldb_owner
+6079; 0 0 COMMENT public COLUMN seasons.is_complete afldb_owner
+6080; 0 0 ACL public TABLE seasons afldb_owner
+333; 1259 18126 TABLE public site_media afldb_owner
+6081; 0 0 COMMENT public TABLE site_media afldb_owner
+6082; 0 0 COMMENT public COLUMN site_media.name afldb_owner
+6083; 0 0 COMMENT public COLUMN site_media.mime afldb_owner
+6084; 0 0 COMMENT public COLUMN site_media.byte_size afldb_owner
+6085; 0 0 COMMENT public COLUMN site_media.width afldb_owner
+6086; 0 0 COMMENT public COLUMN site_media.alt afldb_owner
+6087; 0 0 ACL public TABLE site_media afldb_owner
+332; 1259 18113 TABLE public site_settings afldb_owner
+6088; 0 0 COMMENT public TABLE site_settings afldb_owner
+6089; 0 0 COMMENT public COLUMN site_settings.key afldb_owner
+6090; 0 0 COMMENT public COLUMN site_settings.value afldb_owner
+6091; 0 0 ACL public TABLE site_settings afldb_owner
+225; 1259 16534 TABLE public sources afldb_owner
+6092; 0 0 COMMENT public TABLE sources afldb_owner
+6093; 0 0 ACL public TABLE sources afldb_owner
+224; 1259 16533 SEQUENCE public sources_id_seq afldb_owner
+6094; 0 0 ACL public SEQUENCE sources_id_seq afldb_owner
+248; 1259 16803 TABLE public stat_availability afldb_owner
+6095; 0 0 COMMENT public TABLE stat_availability afldb_owner
+6096; 0 0 COMMENT public COLUMN stat_availability.coverage afldb_owner
+6097; 0 0 ACL public TABLE stat_availability afldb_owner
+247; 1259 16793 TABLE public stat_definitions afldb_owner
+6098; 0 0 ACL public TABLE stat_definitions afldb_owner
+240; 1259 16702 TABLE public venue_aliases afldb_owner
+6099; 0 0 ACL public TABLE venue_aliases afldb_owner
+239; 1259 16701 SEQUENCE public venue_aliases_id_seq afldb_owner
+6100; 0 0 ACL public SEQUENCE venue_aliases_id_seq afldb_owner
+238; 1259 16677 TABLE public venues afldb_owner
+6101; 0 0 COMMENT public TABLE venues afldb_owner
+6102; 0 0 ACL public TABLE venues afldb_owner
+237; 1259 16676 SEQUENCE public venues_id_seq afldb_owner
+6103; 0 0 ACL public SEQUENCE venues_id_seq afldb_owner
+394; 1259 19630 TABLE staging afl_api_brownlow_vote afldb_owner
+6104; 0 0 COMMENT staging TABLE afl_api_brownlow_vote afldb_owner
+6105; 0 0 COMMENT staging COLUMN afl_api_brownlow_vote.canonical_round_number afldb_owner
+6106; 0 0 COMMENT staging COLUMN afl_api_brownlow_vote.eligible afldb_owner
+6107; 0 0 COMMENT staging COLUMN afl_api_brownlow_vote.match_id afldb_owner
+6108; 0 0 ACL staging TABLE afl_api_brownlow_vote afldb_owner
+368; 1259 18831 TABLE staging afl_api_lineup afldb_owner
+6109; 0 0 COMMENT staging TABLE afl_api_lineup afldb_owner
+6110; 0 0 COMMENT staging COLUMN afl_api_lineup.external_record_id afldb_owner
+6111; 0 0 COMMENT staging COLUMN afl_api_lineup.status afldb_owner
+6112; 0 0 COMMENT staging COLUMN afl_api_lineup.jumper_number afldb_owner
+6113; 0 0 COMMENT staging COLUMN afl_api_lineup.team_name_raw afldb_owner
+6114; 0 0 COMMENT staging COLUMN afl_api_lineup.match_id afldb_owner
+6115; 0 0 COMMENT staging COLUMN afl_api_lineup.club_id afldb_owner
+6116; 0 0 COMMENT staging COLUMN afl_api_lineup.player_id afldb_owner
+6117; 0 0 ACL staging TABLE afl_api_lineup afldb_owner
+392; 1259 19518 TABLE staging afl_api_match afldb_owner
+6118; 0 0 COMMENT staging TABLE afl_api_match afldb_owner
+6119; 0 0 COMMENT staging COLUMN afl_api_match.provider_status afldb_owner
+6120; 0 0 COMMENT staging COLUMN afl_api_match.venue_id afldb_owner
+6121; 0 0 COMMENT staging COLUMN afl_api_match.attendance_status afldb_owner
+6122; 0 0 ACL staging TABLE afl_api_match afldb_owner
+393; 1259 19584 TABLE staging afl_api_player_match afldb_owner
+6123; 0 0 COMMENT staging TABLE afl_api_player_match afldb_owner
+6124; 0 0 COMMENT staging COLUMN afl_api_player_match.match_key afldb_owner
+6125; 0 0 COMMENT staging COLUMN afl_api_player_match.career_game_no afldb_owner
+6126; 0 0 ACL staging TABLE afl_api_player_match afldb_owner
+366; 1259 18723 TABLE staging afltables_match afldb_owner
+6127; 0 0 COMMENT staging TABLE afltables_match afldb_owner
+6128; 0 0 COMMENT staging COLUMN afltables_match.version_seq afldb_owner
+6129; 0 0 COMMENT staging COLUMN afltables_match.venue_id afldb_owner
+6130; 0 0 COMMENT staging COLUMN afltables_match.attendance afldb_owner
+6131; 0 0 ACL staging TABLE afltables_match afldb_owner
+367; 1259 18787 TABLE staging afltables_player_match afldb_owner
+6132; 0 0 COMMENT staging TABLE afltables_player_match afldb_owner
+6133; 0 0 COMMENT staging COLUMN afltables_player_match.afltables_id afldb_owner
+6134; 0 0 COMMENT staging COLUMN afltables_player_match.brownlow_votes afldb_owner
+6135; 0 0 COMMENT staging COLUMN afltables_player_match.brownlow_round_number afldb_owner
+6136; 0 0 ACL staging TABLE afltables_player_match afldb_owner
+354; 1259 18465 TABLE staging external_current_matches afldb_owner
+6137; 0 0 COMMENT staging TABLE external_current_matches afldb_owner
+6138; 0 0 COMMENT staging COLUMN external_current_matches.local_match_id afldb_owner
+6139; 0 0 ACL staging TABLE external_current_matches afldb_owner
+359; 1259 18584 TABLE staging source_payloads afldb_owner
+6140; 0 0 COMMENT staging TABLE source_payloads afldb_owner
+6141; 0 0 COMMENT staging COLUMN source_payloads.hash_recipe afldb_owner
+6142; 0 0 ACL staging TABLE source_payloads afldb_owner
+360; 1259 18599 TABLE staging source_record_versions afldb_owner
+6143; 0 0 COMMENT staging TABLE source_record_versions afldb_owner
+6144; 0 0 COMMENT staging COLUMN source_record_versions.source_updated_at afldb_owner
+6145; 0 0 ACL staging TABLE source_record_versions afldb_owner
+361; 1259 18626 TABLE staging source_records afldb_owner
+6146; 0 0 COMMENT staging TABLE source_records afldb_owner
+6147; 0 0 COMMENT staging COLUMN source_records.scope_key afldb_owner
+6148; 0 0 COMMENT staging COLUMN source_records.absent_since afldb_owner
+6149; 0 0 ACL staging TABLE source_records afldb_owner
+283; 1259 17499 TABLE staging team_seasons afldb_owner
+6150; 0 0 COMMENT staging TABLE team_seasons afldb_owner
+6151; 0 0 COMMENT staging COLUMN team_seasons.club_id afldb_owner
+6152; 0 0 ACL staging TABLE team_seasons afldb_owner
+317; 1259 18016 TABLE staging_aflw issues afldb_owner
+6153; 0 0 COMMENT staging_aflw TABLE issues afldb_owner
+6154; 0 0 ACL staging_aflw TABLE issues afldb_owner
+316; 1259 18015 SEQUENCE staging_aflw issues_id_seq afldb_owner
+6155; 0 0 ACL staging_aflw SEQUENCE issues_id_seq afldb_owner
+5557; 0 18143 TABLE DATA afldb_meta app_readable_tables afldb_owner
+5558; 0 18192 TABLE DATA afldb_meta import_writable_tables afldb_owner
+5458; 0 16484 TABLE DATA afldb_meta schema_migrations afldb_owner
+5554; 0 18093 TABLE DATA public admin_invites afldb_owner
+5619; 0 19679 TABLE DATA public afl_api_identity_adjudications afldb_owner
+5606; 0 19178 TABLE DATA public after_siren_kicks afldb_owner
+5566; 0 18281 TABLE DATA public app_health_events afldb_owner
+5538; 0 17812 TABLE DATA public auth_audit_log afldb_owner
+5530; 0 17748 TABLE DATA public auth_sessions afldb_owner
+5528; 0 17736 TABLE DATA public auth_users afldb_owner
+5498; 0 17086 TABLE DATA public award_nominations afldb_owner
+5623; 0 19773 TABLE DATA public award_proposal_decisions afldb_owner
+5621; 0 19723 TABLE DATA public award_proposals afldb_owner
+5496; 0 17042 TABLE DATA public award_winners afldb_owner
+5494; 0 17016 TABLE DATA public awards afldb_owner
+5532; 0 17765 TABLE DATA public beta_access_codes afldb_owner
+5534; 0 17784 TABLE DATA public beta_allowed_emails afldb_owner
+5543; 0 17880 TABLE DATA public beta_join_requests afldb_owner
+5536; 0 17800 TABLE DATA public beta_login_tokens afldb_owner
+5630; 0 19901 TABLE DATA public brownlow_correction_receipts afldb_owner
+5627; 0 19835 TABLE DATA public brownlow_eligibility_decisions afldb_owner
+5492; 0 16996 TABLE DATA public brownlow_round_votes afldb_owner
+5608; 0 19310 TABLE DATA public brownlow_season_authority afldb_owner
+5490; 0 16954 TABLE DATA public brownlow_season_votes afldb_owner
+5607; 0 19247 TABLE DATA public brownlow_vote_entry_state afldb_owner
+5599; 0 18988 TABLE DATA public canonical_applications afldb_owner
+5504; 0 17186 TABLE DATA public captaincies afldb_owner
+5471; 0 16654 TABLE DATA public club_aliases afldb_owner
+5614; 0 19440 TABLE DATA public club_leadership afldb_owner
+5522; 0 17615 TABLE DATA public club_organization_relations afldb_owner
+5521; 0 17578 TABLE DATA public club_organizations afldb_owner
+5508; 0 17255 TABLE DATA public club_seasons afldb_owner
+5469; 0 16616 TABLE DATA public clubs afldb_owner
+5603; 0 19076 TABLE DATA public coaches afldb_owner
+5574; 0 18408 TABLE DATA public data_edits afldb_owner
+5466; 0 16582 TABLE DATA public data_issues afldb_owner
+5581; 0 18565 TABLE DATA public data_overrides afldb_owner
+5541; 0 17865 TABLE DATA public data_submission_rows afldb_owner
+5540; 0 17840 TABLE DATA public data_submissions afldb_owner
+5629; 0 19869 TABLE DATA public derived_award_projections afldb_owner
+5625; 0 19799 TABLE DATA public derived_award_results afldb_owner
+5517; 0 17469 TABLE DATA public derived_rebuilds afldb_owner
+5526; 0 17679 TABLE DATA public draft_persons afldb_owner
+5506; 0 17222 TABLE DATA public draft_picks afldb_owner
+5597; 0 18936 TABLE DATA public external_grid_axes afldb_owner
+5593; 0 18884 TABLE DATA public external_grid_sources afldb_owner
+5595; 0 18903 TABLE DATA public external_grids afldb_owner
+5481; 0 16772 TABLE DATA public external_identities afldb_owner
+5512; 0 17340 TABLE DATA public father_son_selections afldb_owner
+5612; 0 19384 TABLE DATA public fixtures afldb_owner
+5500; 0 17133 TABLE DATA public hall_of_fame afldb_owner
+5502; 0 17159 TABLE DATA public honour_team_members afldb_owner
+5462; 0 16546 TABLE DATA public import_batches afldb_owner
+5464; 0 16567 TABLE DATA public import_rejections afldb_owner
+5604; 0 19106 TABLE DATA public match_coaches afldb_owner
+5486; 0 16893 TABLE DATA public match_period_scores afldb_owner
+5485; 0 16844 TABLE DATA public matches afldb_owner
+5564; 0 18263 TABLE DATA public nl_search_feedback afldb_owner
+5560; 0 18205 TABLE DATA public nl_search_log afldb_owner
+5562; 0 18234 TABLE DATA public nl_search_review afldb_owner
+5568; 0 18306 TABLE DATA public player_achievements afldb_owner
+5524; 0 17641 TABLE DATA public player_birth_evidence afldb_owner
+5514; 0 17407 TABLE DATA public player_career_stats afldb_owner
+5513; 0 17376 TABLE DATA public player_club_season_stats afldb_owner
+5515; 0 17441 TABLE DATA public player_clubs afldb_owner
+5601; 0 19041 TABLE DATA public player_height_evidence afldb_owner
+5579; 0 18519 TABLE DATA public player_link_match_candidates afldb_owner
+5572; 0 18383 TABLE DATA public player_link_resolutions afldb_owner
+5570; 0 18361 TABLE DATA public player_link_suggestions afldb_owner
+5576; 0 18430 TABLE DATA public player_match_period_stats afldb_owner
+5488; 0 16910 TABLE DATA public player_match_stats afldb_owner
+5479; 0 16750 TABLE DATA public player_name_aliases afldb_owner
+5510; 0 17306 TABLE DATA public player_relationships afldb_owner
+5519; 0 17543 TABLE DATA public player_season_stats afldb_owner
+5477; 0 16723 TABLE DATA public players afldb_owner
+5586; 0 18648 TABLE DATA public promotion_candidates afldb_owner
+5588; 0 18692 TABLE DATA public promotion_decisions afldb_owner
+5610; 0 19342 TABLE DATA public season_list_members afldb_owner
+5467; 0 16593 TABLE DATA public seasons afldb_owner
+5556; 0 18126 TABLE DATA public site_media afldb_owner
+5555; 0 18113 TABLE DATA public site_settings afldb_owner
+5460; 0 16534 TABLE DATA public sources afldb_owner
+5483; 0 16803 TABLE DATA public stat_availability afldb_owner
+5482; 0 16793 TABLE DATA public stat_definitions afldb_owner
+5475; 0 16702 TABLE DATA public venue_aliases afldb_owner
+5473; 0 16677 TABLE DATA public venues afldb_owner
+5617; 0 19630 TABLE DATA staging afl_api_brownlow_vote afldb_owner
+5591; 0 18831 TABLE DATA staging afl_api_lineup afldb_owner
+5615; 0 19518 TABLE DATA staging afl_api_match afldb_owner
+5616; 0 19584 TABLE DATA staging afl_api_player_match afldb_owner
+5589; 0 18723 TABLE DATA staging afltables_match afldb_owner
+5590; 0 18787 TABLE DATA staging afltables_player_match afldb_owner
+5577; 0 18465 TABLE DATA staging external_current_matches afldb_owner
+5582; 0 18584 TABLE DATA staging source_payloads afldb_owner
+5583; 0 18599 TABLE DATA staging source_record_versions afldb_owner
+5584; 0 18626 TABLE DATA staging source_records afldb_owner
+5518; 0 17499 TABLE DATA staging team_seasons afldb_owner
+5546; 0 17921 TABLE DATA staging_aflw fixtures afldb_owner
+5552; 0 18016 TABLE DATA staging_aflw issues afldb_owner
+5545; 0 17908 TABLE DATA staging_aflw ladders afldb_owner
+5547; 0 17939 TABLE DATA staging_aflw matches afldb_owner
+5548; 0 17959 TABLE DATA staging_aflw player_match_stats afldb_owner
+5550; 0 18003 TABLE DATA staging_aflw player_seasons afldb_owner
+5549; 0 17980 TABLE DATA staging_aflw scoring_events afldb_owner
+5544; 0 17899 TABLE DATA staging_aflw seasons afldb_owner
+6156; 0 0 SEQUENCE SET public admin_invites_id_seq afldb_owner
+6157; 0 0 SEQUENCE SET public afl_api_identity_adjudications_id_seq afldb_owner
+6158; 0 0 SEQUENCE SET public after_siren_kicks_id_seq afldb_owner
+6159; 0 0 SEQUENCE SET public app_health_events_id_seq afldb_owner
+6160; 0 0 SEQUENCE SET public auth_audit_log_id_seq afldb_owner
+6161; 0 0 SEQUENCE SET public auth_sessions_id_seq afldb_owner
+6162; 0 0 SEQUENCE SET public auth_users_id_seq afldb_owner
+6163; 0 0 SEQUENCE SET public award_nominations_id_seq afldb_owner
+6164; 0 0 SEQUENCE SET public award_proposal_decisions_id_seq afldb_owner
+6165; 0 0 SEQUENCE SET public award_proposals_id_seq afldb_owner
+6166; 0 0 SEQUENCE SET public award_winners_id_seq afldb_owner
+6167; 0 0 SEQUENCE SET public awards_id_seq afldb_owner
+6168; 0 0 SEQUENCE SET public beta_access_codes_id_seq afldb_owner
+6169; 0 0 SEQUENCE SET public beta_allowed_emails_id_seq afldb_owner
+6170; 0 0 SEQUENCE SET public beta_join_requests_id_seq afldb_owner
+6171; 0 0 SEQUENCE SET public beta_login_tokens_id_seq afldb_owner
+6172; 0 0 SEQUENCE SET public brownlow_eligibility_decisions_id_seq afldb_owner
+6173; 0 0 SEQUENCE SET public brownlow_round_votes_id_seq afldb_owner
+6174; 0 0 SEQUENCE SET public brownlow_season_votes_id_seq afldb_owner
+6175; 0 0 SEQUENCE SET public canonical_applications_id_seq afldb_owner
+6176; 0 0 SEQUENCE SET public captaincies_id_seq afldb_owner
+6177; 0 0 SEQUENCE SET public club_aliases_id_seq afldb_owner
+6178; 0 0 SEQUENCE SET public club_leadership_id_seq afldb_owner
+6179; 0 0 SEQUENCE SET public club_organizations_id_seq afldb_owner
+6180; 0 0 SEQUENCE SET public club_seasons_id_seq afldb_owner
+6181; 0 0 SEQUENCE SET public clubs_id_seq afldb_owner
+6182; 0 0 SEQUENCE SET public coaches_id_seq afldb_owner
+6183; 0 0 SEQUENCE SET public data_edits_id_seq afldb_owner
+6184; 0 0 SEQUENCE SET public data_issues_id_seq afldb_owner
+6185; 0 0 SEQUENCE SET public data_overrides_id_seq afldb_owner
+6186; 0 0 SEQUENCE SET public data_submissions_id_seq afldb_owner
+6187; 0 0 SEQUENCE SET public derived_award_projections_id_seq afldb_owner
+6188; 0 0 SEQUENCE SET public derived_award_results_id_seq afldb_owner
+6189; 0 0 SEQUENCE SET public derived_rebuilds_id_seq afldb_owner
+6190; 0 0 SEQUENCE SET public draft_persons_id_seq afldb_owner
+6191; 0 0 SEQUENCE SET public draft_picks_id_seq afldb_owner
+6192; 0 0 SEQUENCE SET public external_grid_axes_id_seq afldb_owner
+6193; 0 0 SEQUENCE SET public external_grid_sources_id_seq afldb_owner
+6194; 0 0 SEQUENCE SET public external_grids_id_seq afldb_owner
+6195; 0 0 SEQUENCE SET public external_identities_id_seq afldb_owner
+6196; 0 0 SEQUENCE SET public father_son_selections_id_seq afldb_owner
+6197; 0 0 SEQUENCE SET public fixtures_id_seq afldb_owner
+6198; 0 0 SEQUENCE SET public hall_of_fame_id_seq afldb_owner
+6199; 0 0 SEQUENCE SET public honour_team_members_id_seq afldb_owner
+6200; 0 0 SEQUENCE SET public import_batches_id_seq afldb_owner
+6201; 0 0 SEQUENCE SET public import_rejections_id_seq afldb_owner
+6202; 0 0 SEQUENCE SET public matches_id_seq afldb_owner
+6203; 0 0 SEQUENCE SET public nl_search_feedback_id_seq afldb_owner
+6204; 0 0 SEQUENCE SET public nl_search_log_id_seq afldb_owner
+6205; 0 0 SEQUENCE SET public nl_search_review_id_seq afldb_owner
+6206; 0 0 SEQUENCE SET public player_achievements_id_seq afldb_owner
+6207; 0 0 SEQUENCE SET public player_birth_evidence_id_seq afldb_owner
+6208; 0 0 SEQUENCE SET public player_height_evidence_id_seq afldb_owner
+6209; 0 0 SEQUENCE SET public player_link_match_candidates_id_seq afldb_owner
+6210; 0 0 SEQUENCE SET public player_link_resolutions_id_seq afldb_owner
+6211; 0 0 SEQUENCE SET public player_link_suggestions_id_seq afldb_owner
+6212; 0 0 SEQUENCE SET public player_match_period_stats_id_seq afldb_owner
+6213; 0 0 SEQUENCE SET public player_match_stats_id_seq afldb_owner
+6214; 0 0 SEQUENCE SET public player_name_aliases_id_seq afldb_owner
+6215; 0 0 SEQUENCE SET public player_relationships_id_seq afldb_owner
+6216; 0 0 SEQUENCE SET public players_id_seq afldb_owner
+6217; 0 0 SEQUENCE SET public promotion_candidates_id_seq afldb_owner
+6218; 0 0 SEQUENCE SET public promotion_decisions_id_seq afldb_owner
+6219; 0 0 SEQUENCE SET public season_list_members_id_seq afldb_owner
+6220; 0 0 SEQUENCE SET public sources_id_seq afldb_owner
+6221; 0 0 SEQUENCE SET public venue_aliases_id_seq afldb_owner
+6222; 0 0 SEQUENCE SET public venues_id_seq afldb_owner
+6223; 0 0 SEQUENCE SET staging_aflw issues_id_seq afldb_owner
+4739; 2606 18150 CONSTRAINT afldb_meta app_readable_tables app_readable_tables_pkey afldb_owner
+4741; 2606 18199 CONSTRAINT afldb_meta import_writable_tables import_writable_tables_pkey afldb_owner
+4417; 2606 16491 CONSTRAINT afldb_meta schema_migrations schema_migrations_pkey afldb_owner
+4727; 2606 18102 CONSTRAINT public admin_invites admin_invites_pkey afldb_owner
+4729; 2606 18104 CONSTRAINT public admin_invites admin_invites_token_hash_key afldb_owner
+4983; 2606 19692 CONSTRAINT public afl_api_identity_adjudications afl_api_identity_adjudications_pkey afldb_owner
+4905; 2606 19193 CONSTRAINT public after_siren_kicks after_siren_kicks_pkey afldb_owner
+4907; 2606 19231 CONSTRAINT public after_siren_kicks after_siren_kicks_source_uq afldb_owner
+4765; 2606 18293 CONSTRAINT public app_health_events app_health_events_pkey afldb_owner
+4687; 2606 17819 CONSTRAINT public auth_audit_log auth_audit_log_pkey afldb_owner
+4666; 2606 17755 CONSTRAINT public auth_sessions auth_sessions_pkey afldb_owner
+4668; 2606 17757 CONSTRAINT public auth_sessions auth_sessions_token_hash_key afldb_owner
+4661; 2606 17746 CONSTRAINT public auth_users auth_users_email_key afldb_owner
+4663; 2606 17744 CONSTRAINT public auth_users auth_users_pkey afldb_owner
+4555; 2606 17094 CONSTRAINT public award_nominations award_nominations_pkey afldb_owner
+4557; 2606 18170 CONSTRAINT public award_nominations award_nominations_source_uq afldb_owner
+4998; 2606 19785 CONSTRAINT public award_proposal_decisions award_proposal_decisions_pkey afldb_owner
+4989; 2606 19754 CONSTRAINT public award_proposals award_proposals_pkey afldb_owner
+4991; 2606 19756 CONSTRAINT public award_proposals award_proposals_proposal_revision_uq afldb_owner
+4546; 2606 17051 CONSTRAINT public award_winners award_winners_pkey afldb_owner
+4548; 2606 18168 CONSTRAINT public award_winners award_winners_source_uq afldb_owner
+4542; 2606 17023 CONSTRAINT public awards awards_pkey afldb_owner
+4544; 2606 17025 CONSTRAINT public awards awards_slug_key afldb_owner
+4671; 2606 17777 CONSTRAINT public beta_access_codes beta_access_codes_code_hash_key afldb_owner
+4673; 2606 17775 CONSTRAINT public beta_access_codes beta_access_codes_pkey afldb_owner
+4676; 2606 17793 CONSTRAINT public beta_allowed_emails beta_allowed_emails_email_key afldb_owner
+4678; 2606 17791 CONSTRAINT public beta_allowed_emails beta_allowed_emails_pkey afldb_owner
+4699; 2606 17889 CONSTRAINT public beta_join_requests beta_join_requests_pkey afldb_owner
+4682; 2606 17807 CONSTRAINT public beta_login_tokens beta_login_tokens_pkey afldb_owner
+4684; 2606 17809 CONSTRAINT public beta_login_tokens beta_login_tokens_token_hash_key afldb_owner
+5023; 2606 19912 CONSTRAINT public brownlow_correction_receipts brownlow_correction_receipts_pkey afldb_owner
+5010; 2606 19851 CONSTRAINT public brownlow_eligibility_decisions brownlow_eligibility_decisions_pkey afldb_owner
+5012; 2606 19853 CONSTRAINT public brownlow_eligibility_decisions brownlow_eligibility_decisions_target_uq afldb_owner
+4535; 2606 17003 CONSTRAINT public brownlow_round_votes brownlow_round_uq afldb_owner
+4537; 2606 17001 CONSTRAINT public brownlow_round_votes brownlow_round_votes_pkey afldb_owner
+4923; 2606 19318 CONSTRAINT public brownlow_season_authority brownlow_season_authority_pkey afldb_owner
+4528; 2606 16966 CONSTRAINT public brownlow_season_votes brownlow_season_uq afldb_owner
+4530; 2606 16964 CONSTRAINT public brownlow_season_votes brownlow_season_votes_pkey afldb_owner
+4914; 2606 19262 CONSTRAINT public brownlow_vote_entry_state brownlow_vote_entry_state_pkey afldb_owner
+4885; 2606 19001 CONSTRAINT public canonical_applications canonical_applications_pkey afldb_owner
+4575; 2606 18174 CONSTRAINT public captaincies captaincies_natural_uq afldb_owner
+4577; 2606 17193 CONSTRAINT public captaincies captaincies_pkey afldb_owner
+4579; 2606 18172 CONSTRAINT public captaincies captaincies_source_uq afldb_owner
+4449; 2606 16662 CONSTRAINT public club_aliases club_aliases_pkey afldb_owner
+4451; 2606 16664 CONSTRAINT public club_aliases club_aliases_uq afldb_owner
+4948; 2606 19457 CONSTRAINT public club_leadership club_leadership_appointment_key_key afldb_owner
+4950; 2606 19455 CONSTRAINT public club_leadership club_leadership_pkey afldb_owner
+4952; 2606 19459 CONSTRAINT public club_leadership club_leadership_source_record_uq afldb_owner
+4646; 2606 17623 CONSTRAINT public club_organization_relations club_organization_relations_pkey afldb_owner
+4640; 2606 17587 CONSTRAINT public club_organizations club_organizations_name_key afldb_owner
+4642; 2606 17585 CONSTRAINT public club_organizations club_organizations_pkey afldb_owner
+4644; 2606 17589 CONSTRAINT public club_organizations club_organizations_slug_key afldb_owner
+4591; 2606 17262 CONSTRAINT public club_seasons club_seasons_pkey afldb_owner
+4593; 2606 17264 CONSTRAINT public club_seasons club_seasons_uq afldb_owner
+4437; 2606 16630 CONSTRAINT public clubs clubs_legacy_club_hist_key afldb_owner
+4439; 2606 16628 CONSTRAINT public clubs clubs_name_key afldb_owner
+4441; 2606 16624 CONSTRAINT public clubs clubs_pkey afldb_owner
+4443; 2606 16626 CONSTRAINT public clubs clubs_slug_key afldb_owner
+4895; 2606 19087 CONSTRAINT public coaches coaches_afltables_coach_path_key afldb_owner
+4897; 2606 19089 CONSTRAINT public coaches coaches_name_key_key afldb_owner
+4899; 2606 19085 CONSTRAINT public coaches coaches_pkey afldb_owner
+4789; 2606 18418 CONSTRAINT public data_edits data_edits_pkey afldb_owner
+4430; 2606 16590 CONSTRAINT public data_issues data_issues_pkey afldb_owner
+4812; 2606 18575 CONSTRAINT public data_overrides data_overrides_pkey afldb_owner
+4814; 2606 18577 CONSTRAINT public data_overrides data_overrides_uq afldb_owner
+4697; 2606 17871 CONSTRAINT public data_submission_rows data_submission_rows_pkey afldb_owner
+4691; 2606 17848 CONSTRAINT public data_submissions data_submissions_pkey afldb_owner
+5018; 2606 19883 CONSTRAINT public derived_award_projections derived_award_projections_pkey afldb_owner
+5002; 2606 19817 CONSTRAINT public derived_award_results derived_award_results_pkey afldb_owner
+5004; 2606 19819 CONSTRAINT public derived_award_results derived_award_results_target_uq afldb_owner
+4631; 2606 17477 CONSTRAINT public derived_rebuilds derived_rebuilds_pkey afldb_owner
+4653; 2606 17689 CONSTRAINT public draft_persons draft_persons_pkey afldb_owner
+4655; 2606 18557 CONSTRAINT public draft_persons draft_persons_source_id_dg_person_id_key afldb_owner
+4583; 2606 17229 CONSTRAINT public draft_picks draft_picks_pkey afldb_owner
+4879; 2606 18948 CONSTRAINT public external_grid_axes external_grid_axes_grid_id_orientation_position_key afldb_owner
+4881; 2606 18946 CONSTRAINT public external_grid_axes external_grid_axes_pkey afldb_owner
+4864; 2606 18894 CONSTRAINT public external_grid_sources external_grid_sources_code_key afldb_owner
+4866; 2606 18896 CONSTRAINT public external_grid_sources external_grid_sources_ingest_source_id_key afldb_owner
+4868; 2606 18892 CONSTRAINT public external_grid_sources external_grid_sources_pkey afldb_owner
+4870; 2606 18917 CONSTRAINT public external_grids external_grids_pkey afldb_owner
+4872; 2606 18919 CONSTRAINT public external_grids external_grids_source_id_provenance_board_number_revision_key afldb_owner
+4488; 2606 16779 CONSTRAINT public external_identities external_identities_pkey afldb_owner
+4490; 2606 16781 CONSTRAINT public external_identities external_identities_uq afldb_owner
+4605; 2606 19144 CONSTRAINT public father_son_selections father_son_selections_pair_uq afldb_owner
+4607; 2606 17346 CONSTRAINT public father_son_selections father_son_selections_pkey afldb_owner
+4609; 2606 18181 CONSTRAINT public father_son_selections father_son_selections_source_uq afldb_owner
+6224; 0 0 COMMENT public CONSTRAINT father_son_selections_source_uq ON father_son_selections afldb_owner
+4936; 2606 19403 CONSTRAINT public fixtures fixtures_fixture_key_key afldb_owner
+4938; 2606 19401 CONSTRAINT public fixtures fixtures_pkey afldb_owner
+4940; 2606 19405 CONSTRAINT public fixtures fixtures_source_record_uq afldb_owner
+4565; 2606 17140 CONSTRAINT public hall_of_fame hall_of_fame_pkey afldb_owner
+4570; 2606 17166 CONSTRAINT public honour_team_members honour_team_members_pkey afldb_owner
+4423; 2606 16558 CONSTRAINT public import_batches import_batches_pkey afldb_owner
+4427; 2606 16574 CONSTRAINT public import_rejections import_rejections_pkey afldb_owner
+4903; 2606 19112 CONSTRAINT public match_coaches match_coaches_pkey afldb_owner
+4514; 2606 16898 CONSTRAINT public match_period_scores match_period_scores_pkey afldb_owner
+4508; 2606 16858 CONSTRAINT public matches matches_legacy_match_id_key afldb_owner
+4510; 2606 16860 CONSTRAINT public matches matches_match_key_key afldb_owner
+4512; 2606 16856 CONSTRAINT public matches matches_pkey afldb_owner
+4761; 2606 18275 CONSTRAINT public nl_search_feedback nl_search_feedback_client_ref_key afldb_owner
+4763; 2606 18273 CONSTRAINT public nl_search_feedback nl_search_feedback_pkey afldb_owner
+4750; 2606 18218 CONSTRAINT public nl_search_log nl_search_log_pkey afldb_owner
+4755; 2606 18244 CONSTRAINT public nl_search_review nl_search_review_pkey afldb_owner
+4757; 2606 18246 CONSTRAINT public nl_search_review nl_search_review_search_log_id_key afldb_owner
+4775; 2606 18320 CONSTRAINT public player_achievements player_achievements_pkey afldb_owner
+4777; 2606 18353 CONSTRAINT public player_achievements player_achievements_source_uq afldb_owner
+4649; 2606 17651 CONSTRAINT public player_birth_evidence player_birth_evidence_pkey afldb_owner
+4651; 2606 17653 CONSTRAINT public player_birth_evidence player_birth_evidence_uq afldb_owner
+4626; 2606 17427 CONSTRAINT public player_career_stats player_career_stats_pkey afldb_owner
+4629; 2606 17446 CONSTRAINT public player_clubs player_clubs_pkey afldb_owner
+4891; 2606 19051 CONSTRAINT public player_height_evidence player_height_evidence_pkey afldb_owner
+4893; 2606 19053 CONSTRAINT public player_height_evidence player_height_evidence_uq afldb_owner
+4808; 2606 18540 CONSTRAINT public player_link_match_candidates player_link_match_candidates_pkey afldb_owner
+4787; 2606 18395 CONSTRAINT public player_link_resolutions player_link_resolutions_pkey afldb_owner
+4782; 2606 18374 CONSTRAINT public player_link_suggestions player_link_suggestions_pkey afldb_owner
+4796; 2606 18434 CONSTRAINT public player_match_period_stats player_match_period_stats_pkey afldb_owner
+4524; 2606 16917 CONSTRAINT public player_match_stats player_match_stats_pkey afldb_owner
+4484; 2606 16757 CONSTRAINT public player_name_aliases player_name_aliases_pkey afldb_owner
+4486; 2606 16759 CONSTRAINT public player_name_aliases player_name_aliases_uq afldb_owner
+4601; 2606 17312 CONSTRAINT public player_relationships player_relationships_pkey afldb_owner
+4603; 2606 18179 CONSTRAINT public player_relationships player_relationships_source_uq afldb_owner
+6225; 0 0 COMMENT public CONSTRAINT player_relationships_source_uq ON player_relationships afldb_owner
+4616; 2606 17388 CONSTRAINT public player_club_season_stats player_season_stats_pkey afldb_owner
+4638; 2606 17558 CONSTRAINT public player_season_stats player_season_stats_pkey1 afldb_owner
+4478; 2606 16734 CONSTRAINT public players players_legacy_player_id_key afldb_owner
+4480; 2606 16732 CONSTRAINT public players players_pkey afldb_owner
+4810; 2606 18542 CONSTRAINT public player_link_match_candidates plmc_entity_rank_uq afldb_owner
+4798; 2606 18436 CONSTRAINT public player_match_period_stats pmps_player_match_period_uq afldb_owner
+4526; 2606 16919 CONSTRAINT public player_match_stats pms_player_match_uq afldb_owner
+4832; 2606 18665 CONSTRAINT public promotion_candidates promotion_candidates_pkey afldb_owner
+4837; 2606 18704 CONSTRAINT public promotion_decisions promotion_decisions_pkey afldb_owner
+4932; 2606 19355 CONSTRAINT public season_list_members season_list_members_one_club_ck afldb_owner
+4934; 2606 19353 CONSTRAINT public season_list_members season_list_members_pkey afldb_owner
+4435; 2606 16603 CONSTRAINT public seasons seasons_pkey afldb_owner
+4737; 2606 18137 CONSTRAINT public site_media site_media_pkey afldb_owner
+4734; 2606 18120 CONSTRAINT public site_settings site_settings_pkey afldb_owner
+4419; 2606 16544 CONSTRAINT public sources sources_key_key afldb_owner
+4421; 2606 16542 CONSTRAINT public sources sources_pkey afldb_owner
+4497; 2606 16809 CONSTRAINT public stat_availability stat_availability_pkey afldb_owner
+4494; 2606 16802 CONSTRAINT public stat_definitions stat_definitions_pkey afldb_owner
+4464; 2606 16708 CONSTRAINT public venue_aliases venue_aliases_pkey afldb_owner
+4466; 2606 16710 CONSTRAINT public venue_aliases venue_aliases_uq afldb_owner
+4455; 2606 16688 CONSTRAINT public venues venues_canonical_name_key afldb_owner
+4457; 2606 16690 CONSTRAINT public venues venues_legacy_name_key afldb_owner
+4459; 2606 16684 CONSTRAINT public venues venues_pkey afldb_owner
+4461; 2606 16686 CONSTRAINT public venues venues_slug_key afldb_owner
+4976; 2606 19642 CONSTRAINT staging afl_api_brownlow_vote afl_api_brownlow_vote_pkey afldb_owner
+4855; 2606 18844 CONSTRAINT staging afl_api_lineup afl_api_lineup_pkey afldb_owner
+4959; 2606 19538 CONSTRAINT staging afl_api_match afl_api_match_pkey afldb_owner
+4966; 2606 19598 CONSTRAINT staging afl_api_player_match afl_api_player_match_grain_uq afldb_owner
+4968; 2606 19596 CONSTRAINT staging afl_api_player_match afl_api_player_match_pkey afldb_owner
+4839; 2606 18741 CONSTRAINT staging afltables_match afltables_match_pkey afldb_owner
+4846; 2606 18799 CONSTRAINT staging afltables_player_match afltables_player_match_grain_uq afldb_owner
+4848; 2606 18797 CONSTRAINT staging afltables_player_match afltables_player_match_pkey afldb_owner
+4800; 2606 18476 CONSTRAINT staging external_current_matches external_current_matches_pkey afldb_owner
+4818; 2606 18593 CONSTRAINT staging source_payloads source_payloads_pkey afldb_owner
+4821; 2606 18608 CONSTRAINT staging source_record_versions source_record_versions_pkey afldb_owner
+4826; 2606 18634 CONSTRAINT staging source_records source_records_pkey afldb_owner
+4633; 2606 17506 CONSTRAINT staging team_seasons team_seasons_pkey afldb_owner
+4711; 2606 17932 CONSTRAINT staging_aflw fixtures fixtures_pkey afldb_owner
+4725; 2606 18022 CONSTRAINT staging_aflw issues issues_pkey afldb_owner
+4709; 2606 17915 CONSTRAINT staging_aflw ladders ladders_pkey afldb_owner
+4714; 2606 17948 CONSTRAINT staging_aflw matches matches_pkey afldb_owner
+4718; 2606 17967 CONSTRAINT staging_aflw player_match_stats player_match_stats_pkey afldb_owner
+4723; 2606 18009 CONSTRAINT staging_aflw player_seasons player_seasons_pkey afldb_owner
+4705; 2606 17907 CONSTRAINT staging_aflw seasons saflw_seasons_ordinal_uq afldb_owner
+4721; 2606 17991 CONSTRAINT staging_aflw scoring_events scoring_events_pkey afldb_owner
+4707; 2606 17905 CONSTRAINT staging_aflw seasons seasons_pkey afldb_owner
+4900; 1259 19105 INDEX public coaches_player_uq afldb_owner
+4656; 1259 18554 INDEX public draft_persons_source_uq afldb_owner
+6226; 0 0 COMMENT public INDEX draft_persons_source_uq afldb_owner
+4584; 1259 18555 INDEX public draft_picks_source_uq afldb_owner
+6227; 0 0 COMMENT public INDEX draft_picks_source_uq afldb_owner
+4563; 1259 19500 INDEX public hall_of_fame_active_name_uq afldb_owner
+6228; 0 0 COMMENT public INDEX hall_of_fame_active_name_uq afldb_owner
+4568; 1259 19505 INDEX public honour_team_linked_player_uq afldb_owner
+6229; 0 0 COMMENT public INDEX honour_team_linked_player_uq afldb_owner
+4571; 1259 19506 INDEX public honour_team_unlinked_name_uq afldb_owner
+6230; 0 0 COMMENT public INDEX honour_team_unlinked_name_uq afldb_owner
+4730; 1259 18110 INDEX public ix_admin_invites_email afldb_owner
+4731; 1259 18162 INDEX public ix_admin_invites_invited_by afldb_owner
+4984; 1259 19710 INDEX public ix_afl_api_identity_adjudications_admin_user_id afldb_owner
+4985; 1259 19708 INDEX public ix_afl_api_identity_adjudications_external_id afldb_owner
+4986; 1259 19709 INDEX public ix_afl_api_identity_adjudications_player_id afldb_owner
+4987; 1259 19900 INDEX public ix_afl_api_identity_adjudications_supersedes_id afldb_owner
+4908; 1259 19233 INDEX public ix_after_siren_kicks_club afldb_owner
+4909; 1259 19236 INDEX public ix_after_siren_kicks_effect afldb_owner
+4910; 1259 19235 INDEX public ix_after_siren_kicks_match afldb_owner
+4911; 1259 19234 INDEX public ix_after_siren_kicks_opponent afldb_owner
+4912; 1259 19232 INDEX public ix_after_siren_kicks_player afldb_owner
+4766; 1259 18299 INDEX public ix_app_health_events_at afldb_owner
+4767; 1259 18301 INDEX public ix_app_health_events_related_search afldb_owner
+4768; 1259 18300 INDEX public ix_app_health_events_type_at afldb_owner
+4688; 1259 18161 INDEX public ix_auth_audit_actor afldb_owner
+4689; 1259 17825 INDEX public ix_auth_audit_at afldb_owner
+4669; 1259 17763 INDEX public ix_auth_sessions_user afldb_owner
+4558; 1259 18155 INDEX public ix_award_nominations_club afldb_owner
+4559; 1259 18156 INDEX public ix_award_nominations_opponent afldb_owner
+4560; 1259 17131 INDEX public ix_award_nominations_player afldb_owner
+4561; 1259 17130 INDEX public ix_award_nominations_season afldb_owner
+4999; 1259 19797 INDEX public ix_award_proposal_decisions_admin_user_id afldb_owner
+5000; 1259 19796 INDEX public ix_award_proposal_decisions_proposal afldb_owner
+4992; 1259 19769 INDEX public ix_award_proposals_created_by afldb_owner
+4993; 1259 19771 INDEX public ix_award_proposals_status afldb_owner
+4994; 1259 19770 INDEX public ix_award_proposals_target afldb_owner
+4549; 1259 17082 INDEX public ix_award_winners_award afldb_owner
+4550; 1259 18154 INDEX public ix_award_winners_club afldb_owner
+4551; 1259 18186 INDEX public ix_award_winners_player afldb_owner
+6231; 0 0 COMMENT public INDEX ix_award_winners_player afldb_owner
+4552; 1259 17084 INDEX public ix_award_winners_unlinked afldb_owner
+4674; 1259 18158 INDEX public ix_beta_access_codes_created_by afldb_owner
+4679; 1259 18159 INDEX public ix_beta_allowed_emails_added_by afldb_owner
+4700; 1259 18160 INDEX public ix_beta_join_requests_reviewed_by afldb_owner
+4701; 1259 17896 INDEX public ix_beta_join_requests_status afldb_owner
+4685; 1259 17810 INDEX public ix_beta_login_tokens_email afldb_owner
+5013; 1259 19867 INDEX public ix_brownlow_eligibility_decisions_decided_by afldb_owner
+5014; 1259 19866 INDEX public ix_brownlow_eligibility_decisions_target afldb_owner
+4531; 1259 16993 INDEX public ix_brownlow_player afldb_owner
+4538; 1259 17014 INDEX public ix_brownlow_round_player afldb_owner
+4532; 1259 16992 INDEX public ix_brownlow_season afldb_owner
+4533; 1259 16994 INDEX public ix_brownlow_winners afldb_owner
+4924; 1259 19335 INDEX public ix_bsa_published_by afldb_owner
+4925; 1259 19334 INDEX public ix_bsa_updated_by afldb_owner
+4915; 1259 19307 INDEX public ix_bves_created_by afldb_owner
+4916; 1259 19309 INDEX public ix_bves_finalised_by afldb_owner
+4917; 1259 19306 INDEX public ix_bves_one afldb_owner
+4918; 1259 19303 INDEX public ix_bves_season_status afldb_owner
+4919; 1259 19304 INDEX public ix_bves_three afldb_owner
+4920; 1259 19305 INDEX public ix_bves_two afldb_owner
+4921; 1259 19308 INDEX public ix_bves_updated_by afldb_owner
+4886; 1259 19019 INDEX public ix_canonical_applications_batch afldb_owner
+4887; 1259 19017 INDEX public ix_canonical_applications_source_version afldb_owner
+4888; 1259 19018 INDEX public ix_canonical_applications_target_applied afldb_owner
+4580; 1259 17219 INDEX public ix_captaincies_club afldb_owner
+4581; 1259 18187 INDEX public ix_captaincies_player afldb_owner
+4452; 1259 17482 INDEX public ix_club_aliases_trgm afldb_owner
+4953; 1259 19484 INDEX public ix_club_leadership_batch afldb_owner
+4954; 1259 19481 INDEX public ix_club_leadership_club_season afldb_owner
+4955; 1259 19482 INDEX public ix_club_leadership_player afldb_owner
+4956; 1259 19483 INDEX public ix_club_leadership_source afldb_owner
+4594; 1259 17285 INDEX public ix_club_seasons_club afldb_owner
+4595; 1259 17286 INDEX public ix_club_seasons_ladder afldb_owner
+4444; 1259 16646 INDEX public ix_clubs_current_identity afldb_owner
+4445; 1259 16647 INDEX public ix_clubs_is_current afldb_owner
+4446; 1259 17481 INDEX public ix_clubs_name_trgm afldb_owner
+4447; 1259 17605 INDEX public ix_clubs_organization afldb_owner
+4790; 1259 18559 INDEX public ix_data_edits_admin_user_id afldb_owner
+4791; 1259 18424 INDEX public ix_data_edits_target afldb_owner
+4431; 1259 16591 INDEX public ix_data_issues_open afldb_owner
+4815; 1259 18722 INDEX public ix_data_overrides_admin_user_id afldb_owner
+4816; 1259 18583 INDEX public ix_data_overrides_entity afldb_owner
+4692; 1259 18177 INDEX public ix_data_submissions_content afldb_owner
+6232; 0 0 COMMENT public INDEX ix_data_submissions_content afldb_owner
+4693; 1259 18164 INDEX public ix_data_submissions_reviewed_by afldb_owner
+4694; 1259 17864 INDEX public ix_data_submissions_status afldb_owner
+4695; 1259 18163 INDEX public ix_data_submissions_uploaded_by afldb_owner
+5019; 1259 19896 INDEX public ix_derived_award_projections_projected_by afldb_owner
+5020; 1259 19894 INDEX public ix_derived_award_projections_result afldb_owner
+5021; 1259 19895 INDEX public ix_derived_award_projections_target afldb_owner
+5005; 1259 19833 INDEX public ix_derived_award_results_published_by afldb_owner
+5006; 1259 19832 INDEX public ix_derived_award_results_target afldb_owner
+4585; 1259 17252 INDEX public ix_draft_club afldb_owner
+4657; 1259 17703 INDEX public ix_draft_persons_backlog afldb_owner
+4658; 1259 17704 INDEX public ix_draft_persons_name afldb_owner
+4659; 1259 17702 INDEX public ix_draft_persons_player afldb_owner
+4586; 1259 17710 INDEX public ix_draft_picks_person afldb_owner
+4587; 1259 18188 INDEX public ix_draft_player afldb_owner
+4588; 1259 17253 INDEX public ix_draft_unlinked afldb_owner
+4589; 1259 17250 INDEX public ix_draft_year afldb_owner
+4882; 1259 18954 INDEX public ix_external_grid_axes_key afldb_owner
+4883; 1259 18955 INDEX public ix_external_grid_axes_label afldb_owner
+4873; 1259 18933 INDEX public ix_external_grids_batch afldb_owner
+4874; 1259 18932 INDEX public ix_external_grids_date afldb_owner
+4875; 1259 18934 INDEX public ix_external_grids_sha afldb_owner
+4491; 1259 18185 INDEX public ix_external_identities_player afldb_owner
+4610; 1259 17374 INDEX public ix_father_son_child afldb_owner
+4611; 1259 17375 INDEX public ix_father_son_father afldb_owner
+4941; 1259 19433 INDEX public ix_fixtures_away afldb_owner
+4942; 1259 19436 INDEX public ix_fixtures_batch afldb_owner
+4943; 1259 19432 INDEX public ix_fixtures_home afldb_owner
+4944; 1259 19431 INDEX public ix_fixtures_season_round afldb_owner
+4945; 1259 19435 INDEX public ix_fixtures_source afldb_owner
+4946; 1259 19434 INDEX public ix_fixtures_venue afldb_owner
+4566; 1259 17157 INDEX public ix_hof_legend afldb_owner
+4567; 1259 17156 INDEX public ix_hof_player afldb_owner
+4572; 1259 17184 INDEX public ix_honour_team afldb_owner
+4573; 1259 18153 INDEX public ix_honour_team_player afldb_owner
+4424; 1259 16564 INDEX public ix_import_batches_source afldb_owner
+4425; 1259 16565 INDEX public ix_import_batches_status afldb_owner
+4428; 1259 16580 INDEX public ix_import_rejections_batch afldb_owner
+4901; 1259 19138 INDEX public ix_match_coaches_coach afldb_owner
+4498; 1259 17719 INDEX public ix_matches_attendance_unknown afldb_owner
+4499; 1259 16889 INDEX public ix_matches_away afldb_owner
+4500; 1259 16887 INDEX public ix_matches_date afldb_owner
+4501; 1259 16891 INDEX public ix_matches_finals afldb_owner
+4502; 1259 19039 INDEX public ix_matches_finals_series afldb_owner
+4503; 1259 16888 INDEX public ix_matches_home afldb_owner
+4504; 1259 16886 INDEX public ix_matches_season_round afldb_owner
+4505; 1259 16890 INDEX public ix_matches_venue afldb_owner
+4506; 1259 16892 INDEX public ix_matches_winner afldb_owner
+4758; 1259 18276 INDEX public ix_nl_search_feedback_created afldb_owner
+4759; 1259 18277 INDEX public ix_nl_search_feedback_verdict afldb_owner
+4742; 1259 18219 INDEX public ix_nl_search_log_at afldb_owner
+4743; 1259 18230 INDEX public ix_nl_search_log_failure_reason afldb_owner
+4744; 1259 18220 INDEX public ix_nl_search_log_outcome afldb_owner
+4745; 1259 18278 INDEX public ix_nl_search_log_parent_search_id afldb_owner
+4746; 1259 18232 INDEX public ix_nl_search_log_parser_version afldb_owner
+4747; 1259 18229 INDEX public ix_nl_search_log_plan_hash afldb_owner
+4748; 1259 18231 INDEX public ix_nl_search_log_session_id afldb_owner
+4752; 1259 18279 INDEX public ix_nl_search_review_reviewed_by afldb_owner
+4753; 1259 18257 INDEX public ix_nl_search_review_status afldb_owner
+4647; 1259 17669 INDEX public ix_pbe_player afldb_owner
+4617; 1259 17436 INDEX public ix_pcs_brownlow afldb_owner
+4618; 1259 17439 INDEX public ix_pcs_clubs afldb_owner
+4619; 1259 17438 INDEX public ix_pcs_debut afldb_owner
+4620; 1259 17435 INDEX public ix_pcs_finals afldb_owner
+4621; 1259 17433 INDEX public ix_pcs_games afldb_owner
+4622; 1259 17440 INDEX public ix_pcs_games_goals afldb_owner
+4623; 1259 17434 INDEX public ix_pcs_goals afldb_owner
+4624; 1259 17437 INDEX public ix_pcs_premierships afldb_owner
+4612; 1259 17405 INDEX public ix_pcss_club_season afldb_owner
+4613; 1259 17406 INDEX public ix_pcss_player afldb_owner
+4614; 1259 17404 INDEX public ix_pcss_season afldb_owner
+4889; 1259 19069 INDEX public ix_phe_player afldb_owner
+4769; 1259 18356 INDEX public ix_player_achievements_club afldb_owner
+4770; 1259 18358 INDEX public ix_player_achievements_match afldb_owner
+4771; 1259 18355 INDEX public ix_player_achievements_player afldb_owner
+4772; 1259 18357 INDEX public ix_player_achievements_season afldb_owner
+4773; 1259 18354 INDEX public ix_player_achievements_type afldb_owner
+4481; 1259 17480 INDEX public ix_player_aliases_trgm afldb_owner
+4627; 1259 17467 INDEX public ix_player_clubs_club afldb_owner
+4482; 1259 16770 INDEX public ix_player_name_aliases_search afldb_owner
+4467; 1259 16748 INDEX public ix_players_debut afldb_owner
+4468; 1259 17676 INDEX public ix_players_dob_disputed afldb_owner
+4469; 1259 18157 INDEX public ix_players_dob_evidence afldb_owner
+4470; 1259 19237 INDEX public ix_players_height_evidence_id afldb_owner
+4471; 1259 16745 INDEX public ix_players_search_name afldb_owner
+4472; 1259 17485 INDEX public ix_players_search_prefix afldb_owner
+4473; 1259 17486 INDEX public ix_players_search_rank afldb_owner
+4474; 1259 17479 INDEX public ix_players_search_trgm afldb_owner
+4475; 1259 16747 INDEX public ix_players_slug afldb_owner
+4476; 1259 16746 INDEX public ix_players_sort_name afldb_owner
+4803; 1259 18549 INDEX public ix_plmc_band afldb_owner
+4804; 1259 18550 INDEX public ix_plmc_bulk afldb_owner
+4805; 1259 18551 INDEX public ix_plmc_player afldb_owner
+4806; 1259 18548 INDEX public ix_plmc_target afldb_owner
+4783; 1259 18560 INDEX public ix_plr_admin_user_id afldb_owner
+4784; 1259 18561 INDEX public ix_plr_player_id afldb_owner
+4785; 1259 18406 INDEX public ix_plr_target afldb_owner
+4778; 1259 18562 INDEX public ix_pls_resolved_by afldb_owner
+4779; 1259 18380 INDEX public ix_pls_status afldb_owner
+4780; 1259 18381 INDEX public ix_pls_target afldb_owner
+4792; 1259 18464 INDEX public ix_pmps_club afldb_owner
+4793; 1259 18463 INDEX public ix_pmps_match afldb_owner
+4794; 1259 18462 INDEX public ix_pmps_player afldb_owner
+4515; 1259 16952 INDEX public ix_pms_brownlow afldb_owner
+4516; 1259 16947 INDEX public ix_pms_club afldb_owner
+4517; 1259 16949 INDEX public ix_pms_club_player afldb_owner
+4518; 1259 16951 INDEX public ix_pms_disposals afldb_owner
+4519; 1259 16950 INDEX public ix_pms_goals afldb_owner
+4520; 1259 16946 INDEX public ix_pms_match afldb_owner
+4521; 1259 16945 INDEX public ix_pms_player afldb_owner
+4522; 1259 16948 INDEX public ix_pms_player_club afldb_owner
+4827; 1259 18690 INDEX public ix_promotion_candidates_decision afldb_owner
+4828; 1259 18689 INDEX public ix_promotion_candidates_evidence afldb_owner
+4829; 1259 18687 INDEX public ix_promotion_candidates_queue afldb_owner
+4830; 1259 18688 INDEX public ix_promotion_candidates_target afldb_owner
+4834; 1259 18716 INDEX public ix_promotion_decisions_admin afldb_owner
+4835; 1259 18715 INDEX public ix_promotion_decisions_candidate afldb_owner
+4634; 1259 17575 INDEX public ix_pss_player afldb_owner
+4635; 1259 17574 INDEX public ix_pss_season afldb_owner
+4636; 1259 17576 INDEX public ix_pss_season_brownlow afldb_owner
+4596; 1259 17335 INDEX public ix_relationships_a afldb_owner
+4597; 1259 17336 INDEX public ix_relationships_b afldb_owner
+4598; 1259 17337 INDEX public ix_relationships_family afldb_owner
+4599; 1259 17338 INDEX public ix_relationships_type afldb_owner
+4735; 1259 18166 INDEX public ix_site_media_uploaded_by afldb_owner
+4732; 1259 18165 INDEX public ix_site_settings_updated_by afldb_owner
+4926; 1259 19380 INDEX public ix_slm_batch afldb_owner
+4927; 1259 19377 INDEX public ix_slm_club afldb_owner
+4928; 1259 19378 INDEX public ix_slm_player afldb_owner
+4929; 1259 19376 INDEX public ix_slm_season_club afldb_owner
+4930; 1259 19379 INDEX public ix_slm_source afldb_owner
+4495; 1259 16820 INDEX public ix_stat_availability_season afldb_owner
+4462; 1259 17484 INDEX public ix_venue_aliases_trgm afldb_owner
+4453; 1259 17483 INDEX public ix_venues_name_trgm afldb_owner
+4664; 1259 18182 INDEX public uq_auth_users_email_lower afldb_owner
+6233; 0 0 COMMENT public INDEX uq_auth_users_email_lower afldb_owner
+4562; 1259 17877 INDEX public uq_award_nominations_source afldb_owner
+6234; 0 0 COMMENT public INDEX uq_award_nominations_source afldb_owner
+4995; 1259 19767 INDEX public uq_award_proposals_live_revision afldb_owner
+4996; 1259 19768 INDEX public uq_award_proposals_revision_of afldb_owner
+4553; 1259 17878 INDEX public uq_award_winners_source afldb_owner
+6235; 0 0 COMMENT public INDEX uq_award_winners_source afldb_owner
+4680; 1259 18183 INDEX public uq_beta_allowed_emails_lower afldb_owner
+4702; 1259 17895 INDEX public uq_beta_join_requests_pending_email afldb_owner
+4703; 1259 18184 INDEX public uq_beta_join_requests_pending_email_lower afldb_owner
+5015; 1259 19864 INDEX public uq_brownlow_eligibility_decisions_root afldb_owner
+5016; 1259 19865 INDEX public uq_brownlow_eligibility_decisions_supersedes afldb_owner
+4432; 1259 18830 INDEX public uq_data_issues_open_by_key afldb_owner
+6236; 0 0 COMMENT public INDEX uq_data_issues_open_by_key afldb_owner
+4433; 1259 18563 INDEX public uq_data_issues_open_dob_per_player afldb_owner
+6237; 0 0 COMMENT public INDEX uq_data_issues_open_dob_per_player afldb_owner
+5007; 1259 19830 INDEX public uq_derived_award_results_root afldb_owner
+5008; 1259 19831 INDEX public uq_derived_award_results_supersedes afldb_owner
+4492; 1259 19711 INDEX public uq_external_identities_afl_api_player afldb_owner
+6238; 0 0 COMMENT public INDEX uq_external_identities_afl_api_player afldb_owner
+4539; 1259 19245 INDEX public ux_brownlow_round_votes_match_player afldb_owner
+4540; 1259 19246 INDEX public ux_brownlow_round_votes_match_value afldb_owner
+4957; 1259 19480 INDEX public ux_club_leadership_active_player afldb_owner
+4876; 1259 18931 INDEX public ux_external_grids_current_date afldb_owner
+4877; 1259 18930 INDEX public ux_external_grids_current_number afldb_owner
+4751; 1259 18261 INDEX public ux_nl_search_log_client_ref afldb_owner
+4833; 1259 18686 INDEX public ux_promotion_candidates_pending afldb_owner
+4977; 1259 19676 INDEX staging ix_afl_api_brownlow_vote_club afldb_owner
+4978; 1259 19674 INDEX staging ix_afl_api_brownlow_vote_match afldb_owner
+4979; 1259 19675 INDEX staging ix_afl_api_brownlow_vote_player afldb_owner
+4980; 1259 19677 INDEX staging ix_afl_api_brownlow_vote_season afldb_owner
+4981; 1259 19673 INDEX staging ix_afl_api_brownlow_vote_version afldb_owner
+4856; 1259 18879 INDEX staging ix_afl_api_lineup_batch afldb_owner
+4857; 1259 18877 INDEX staging ix_afl_api_lineup_club afldb_owner
+4858; 1259 18878 INDEX staging ix_afl_api_lineup_match afldb_owner
+4859; 1259 18876 INDEX staging ix_afl_api_lineup_player afldb_owner
+4860; 1259 18881 INDEX staging ix_afl_api_lineup_provider_match afldb_owner
+4861; 1259 18880 INDEX staging ix_afl_api_lineup_season afldb_owner
+4862; 1259 18875 INDEX staging ix_afl_api_lineup_version afldb_owner
+4960; 1259 19582 INDEX staging ix_afl_api_match_away_club afldb_owner
+4961; 1259 19581 INDEX staging ix_afl_api_match_home_club afldb_owner
+4962; 1259 19580 INDEX staging ix_afl_api_match_season afldb_owner
+4963; 1259 19583 INDEX staging ix_afl_api_match_venue afldb_owner
+4964; 1259 19579 INDEX staging ix_afl_api_match_version afldb_owner
+4969; 1259 19626 INDEX staging ix_afl_api_player_match_club afldb_owner
+4970; 1259 19628 INDEX staging ix_afl_api_player_match_key afldb_owner
+4971; 1259 19625 INDEX staging ix_afl_api_player_match_player afldb_owner
+4972; 1259 19629 INDEX staging ix_afl_api_player_match_provider_match afldb_owner
+4973; 1259 19627 INDEX staging ix_afl_api_player_match_season afldb_owner
+4974; 1259 19624 INDEX staging ix_afl_api_player_match_version afldb_owner
+4840; 1259 18785 INDEX staging ix_afltables_match_away_club afldb_owner
+4841; 1259 18784 INDEX staging ix_afltables_match_home_club afldb_owner
+4842; 1259 18783 INDEX staging ix_afltables_match_season afldb_owner
+4843; 1259 18786 INDEX staging ix_afltables_match_venue afldb_owner
+4844; 1259 18782 INDEX staging ix_afltables_match_version afldb_owner
+4849; 1259 18827 INDEX staging ix_afltables_player_match_club afldb_owner
+4850; 1259 18829 INDEX staging ix_afltables_player_match_key afldb_owner
+4851; 1259 18826 INDEX staging ix_afltables_player_match_player afldb_owner
+4852; 1259 18828 INDEX staging ix_afltables_player_match_season afldb_owner
+4853; 1259 18825 INDEX staging ix_afltables_player_match_version afldb_owner
+4801; 1259 18503 INDEX staging ix_external_current_matches_local afldb_owner
+4802; 1259 18502 INDEX staging ix_external_current_matches_season afldb_owner
+4819; 1259 18625 INDEX staging ix_source_record_versions_payload afldb_owner
+4823; 1259 18646 INDEX staging ix_source_records_absent afldb_owner
+4824; 1259 18645 INDEX staging ix_source_records_sweep afldb_owner
+4822; 1259 18624 INDEX staging ux_source_record_versions_open afldb_owner
+4719; 1259 18002 INDEX staging_aflw ix_saflw_events_match afldb_owner
+4712; 1259 17938 INDEX staging_aflw ix_saflw_fixtures_season afldb_owner
+4715; 1259 17978 INDEX staging_aflw ix_saflw_pms_player afldb_owner
+4716; 1259 17979 INDEX staging_aflw ix_saflw_pms_season afldb_owner
+5302; 2620 19914 TRIGGER public brownlow_correction_receipts brownlow_receipt_immutable afldb_owner
+5301; 2620 19140 TRIGGER public match_coaches match_coaches_club_in_match_trg afldb_owner
+5159; 2606 18105 FK CONSTRAINT public admin_invites admin_invites_invited_by_fkey afldb_owner
+5288; 2606 19703 FK CONSTRAINT public afl_api_identity_adjudications afl_api_identity_adjudications_admin_user_id_fkey afldb_owner
+5289; 2606 19693 FK CONSTRAINT public afl_api_identity_adjudications afl_api_identity_adjudications_player_id_fkey afldb_owner
+5290; 2606 19698 FK CONSTRAINT public afl_api_identity_adjudications afl_api_identity_adjudications_supersedes_id_fkey afldb_owner
+5238; 2606 19199 FK CONSTRAINT public after_siren_kicks after_siren_kicks_club_id_fkey afldb_owner
+5239; 2606 19225 FK CONSTRAINT public after_siren_kicks after_siren_kicks_import_batch_id_fkey afldb_owner
+5240; 2606 19214 FK CONSTRAINT public after_siren_kicks after_siren_kicks_match_id_fkey afldb_owner
+5241; 2606 19204 FK CONSTRAINT public after_siren_kicks after_siren_kicks_opponent_club_id_fkey afldb_owner
+5242; 2606 19194 FK CONSTRAINT public after_siren_kicks after_siren_kicks_player_id_fkey afldb_owner
+5243; 2606 19209 FK CONSTRAINT public after_siren_kicks after_siren_kicks_season_fkey afldb_owner
+5244; 2606 19220 FK CONSTRAINT public after_siren_kicks after_siren_kicks_source_id_fkey afldb_owner
+5165; 2606 18294 FK CONSTRAINT public app_health_events app_health_events_related_search_id_fkey afldb_owner
+5144; 2606 17820 FK CONSTRAINT public auth_audit_log auth_audit_log_actor_user_id_fkey afldb_owner
+5141; 2606 17758 FK CONSTRAINT public auth_sessions auth_sessions_user_id_fkey afldb_owner
+5082; 2606 17095 FK CONSTRAINT public award_nominations award_nominations_award_id_fkey afldb_owner
+5083; 2606 17110 FK CONSTRAINT public award_nominations award_nominations_club_id_fkey afldb_owner
+5084; 2606 17125 FK CONSTRAINT public award_nominations award_nominations_import_batch_id_fkey afldb_owner
+5085; 2606 17115 FK CONSTRAINT public award_nominations award_nominations_opponent_club_id_fkey afldb_owner
+5086; 2606 17105 FK CONSTRAINT public award_nominations award_nominations_player_id_fkey afldb_owner
+5087; 2606 17100 FK CONSTRAINT public award_nominations award_nominations_season_fkey afldb_owner
+5088; 2606 17120 FK CONSTRAINT public award_nominations award_nominations_source_id_fkey afldb_owner
+5293; 2606 19791 FK CONSTRAINT public award_proposal_decisions award_proposal_decisions_admin_user_id_fkey afldb_owner
+5294; 2606 19786 FK CONSTRAINT public award_proposal_decisions award_proposal_decisions_proposal_id_fkey afldb_owner
+5291; 2606 19762 FK CONSTRAINT public award_proposals award_proposals_created_by_fkey afldb_owner
+5292; 2606 19757 FK CONSTRAINT public award_proposals award_proposals_revision_of_id_fkey afldb_owner
+5076; 2606 17052 FK CONSTRAINT public award_winners award_winners_award_id_fkey afldb_owner
+5077; 2606 17067 FK CONSTRAINT public award_winners award_winners_club_id_fkey afldb_owner
+5078; 2606 17077 FK CONSTRAINT public award_winners award_winners_import_batch_id_fkey afldb_owner
+5079; 2606 17062 FK CONSTRAINT public award_winners award_winners_player_id_fkey afldb_owner
+5080; 2606 17057 FK CONSTRAINT public award_winners award_winners_season_fkey afldb_owner
+5081; 2606 17072 FK CONSTRAINT public award_winners award_winners_source_id_fkey afldb_owner
+5073; 2606 17026 FK CONSTRAINT public awards awards_club_id_fkey afldb_owner
+5074; 2606 17031 FK CONSTRAINT public awards awards_first_season_fkey afldb_owner
+5075; 2606 17036 FK CONSTRAINT public awards awards_last_season_fkey afldb_owner
+5142; 2606 17778 FK CONSTRAINT public beta_access_codes beta_access_codes_created_by_fkey afldb_owner
+5143; 2606 17794 FK CONSTRAINT public beta_allowed_emails beta_allowed_emails_added_by_fkey afldb_owner
+5149; 2606 17890 FK CONSTRAINT public beta_join_requests beta_join_requests_reviewed_by_fkey afldb_owner
+5297; 2606 19854 FK CONSTRAINT public brownlow_eligibility_decisions brownlow_eligibility_decisions_decided_by_fkey afldb_owner
+5298; 2606 19859 FK CONSTRAINT public brownlow_eligibility_decisions brownlow_eligibility_decisions_supersedes_fk afldb_owner
+5068; 2606 18980 FK CONSTRAINT public brownlow_round_votes brownlow_round_votes_import_batch_id_fkey afldb_owner
+5069; 2606 19240 FK CONSTRAINT public brownlow_round_votes brownlow_round_votes_match_id_fkey afldb_owner
+5070; 2606 17009 FK CONSTRAINT public brownlow_round_votes brownlow_round_votes_player_id_fkey afldb_owner
+5071; 2606 17004 FK CONSTRAINT public brownlow_round_votes brownlow_round_votes_season_fkey afldb_owner
+5072; 2606 18975 FK CONSTRAINT public brownlow_round_votes brownlow_round_votes_source_id_fkey afldb_owner
+5253; 2606 19324 FK CONSTRAINT public brownlow_season_authority brownlow_season_authority_published_by_fkey afldb_owner
+5254; 2606 19319 FK CONSTRAINT public brownlow_season_authority brownlow_season_authority_season_fkey afldb_owner
+5255; 2606 19329 FK CONSTRAINT public brownlow_season_authority brownlow_season_authority_updated_by_fkey afldb_owner
+5063; 2606 16977 FK CONSTRAINT public brownlow_season_votes brownlow_season_votes_club_id_fkey afldb_owner
+5064; 2606 16987 FK CONSTRAINT public brownlow_season_votes brownlow_season_votes_import_batch_id_fkey afldb_owner
+5065; 2606 16972 FK CONSTRAINT public brownlow_season_votes brownlow_season_votes_player_id_fkey afldb_owner
+5066; 2606 16967 FK CONSTRAINT public brownlow_season_votes brownlow_season_votes_season_fkey afldb_owner
+5067; 2606 16982 FK CONSTRAINT public brownlow_season_votes brownlow_season_votes_source_id_fkey afldb_owner
+5245; 2606 19288 FK CONSTRAINT public brownlow_vote_entry_state brownlow_vote_entry_state_created_by_fkey afldb_owner
+5246; 2606 19298 FK CONSTRAINT public brownlow_vote_entry_state brownlow_vote_entry_state_finalised_by_fkey afldb_owner
+5247; 2606 19263 FK CONSTRAINT public brownlow_vote_entry_state brownlow_vote_entry_state_match_id_fkey afldb_owner
+5248; 2606 19283 FK CONSTRAINT public brownlow_vote_entry_state brownlow_vote_entry_state_one_player_id_fkey afldb_owner
+5249; 2606 19268 FK CONSTRAINT public brownlow_vote_entry_state brownlow_vote_entry_state_season_fkey afldb_owner
+5250; 2606 19273 FK CONSTRAINT public brownlow_vote_entry_state brownlow_vote_entry_state_three_player_id_fkey afldb_owner
+5251; 2606 19278 FK CONSTRAINT public brownlow_vote_entry_state brownlow_vote_entry_state_two_player_id_fkey afldb_owner
+5252; 2606 19293 FK CONSTRAINT public brownlow_vote_entry_state brownlow_vote_entry_state_updated_by_fkey afldb_owner
+5224; 2606 19002 FK CONSTRAINT public canonical_applications canonical_applications_import_batch_id_fkey afldb_owner
+5225; 2606 19012 FK CONSTRAINT public canonical_applications canonical_applications_source_id_family_external_record_id_fkey afldb_owner
+5226; 2606 19007 FK CONSTRAINT public canonical_applications canonical_applications_source_id_fkey afldb_owner
+5095; 2606 17199 FK CONSTRAINT public captaincies captaincies_club_id_fkey afldb_owner
+5096; 2606 17214 FK CONSTRAINT public captaincies captaincies_import_batch_id_fkey afldb_owner
+5097; 2606 17204 FK CONSTRAINT public captaincies captaincies_player_id_fkey afldb_owner
+5098; 2606 17194 FK CONSTRAINT public captaincies captaincies_season_fkey afldb_owner
+5099; 2606 17209 FK CONSTRAINT public captaincies captaincies_source_id_fkey afldb_owner
+5030; 2606 16665 FK CONSTRAINT public club_aliases club_aliases_club_id_fkey afldb_owner
+5031; 2606 16670 FK CONSTRAINT public club_aliases club_aliases_source_id_fkey afldb_owner
+5265; 2606 19460 FK CONSTRAINT public club_leadership club_leadership_club_id_fkey afldb_owner
+5266; 2606 19475 FK CONSTRAINT public club_leadership club_leadership_import_batch_id_fkey afldb_owner
+5267; 2606 19465 FK CONSTRAINT public club_leadership club_leadership_player_id_fkey afldb_owner
+5268; 2606 19470 FK CONSTRAINT public club_leadership club_leadership_source_id_fkey afldb_owner
+5133; 2606 17634 FK CONSTRAINT public club_organization_relations club_organization_relations_effective_season_fkey afldb_owner
+5134; 2606 17720 FK CONSTRAINT public club_organization_relations club_organization_relations_from_organization_id_fkey afldb_owner
+5135; 2606 17725 FK CONSTRAINT public club_organization_relations club_organization_relations_to_organization_id_fkey afldb_owner
+5131; 2606 17590 FK CONSTRAINT public club_organizations club_organizations_first_season_fkey afldb_owner
+5132; 2606 17595 FK CONSTRAINT public club_organizations club_organizations_last_season_fkey afldb_owner
+5105; 2606 17270 FK CONSTRAINT public club_seasons club_seasons_club_id_fkey afldb_owner
+5106; 2606 17280 FK CONSTRAINT public club_seasons club_seasons_import_batch_id_fkey afldb_owner
+5107; 2606 17265 FK CONSTRAINT public club_seasons club_seasons_season_fkey afldb_owner
+5108; 2606 17275 FK CONSTRAINT public club_seasons club_seasons_source_id_fkey afldb_owner
+5026; 2606 17493 FK CONSTRAINT public clubs clubs_current_identity_id_fkey afldb_owner
+5027; 2606 16636 FK CONSTRAINT public clubs clubs_first_season_fkey afldb_owner
+5028; 2606 16641 FK CONSTRAINT public clubs clubs_last_season_fkey afldb_owner
+5029; 2606 17600 FK CONSTRAINT public clubs clubs_organization_id_fkey afldb_owner
+5230; 2606 19100 FK CONSTRAINT public coaches coaches_import_batch_id_fkey afldb_owner
+5231; 2606 19090 FK CONSTRAINT public coaches coaches_player_id_fkey afldb_owner
+5232; 2606 19095 FK CONSTRAINT public coaches coaches_source_id_fkey afldb_owner
+5175; 2606 18419 FK CONSTRAINT public data_edits data_edits_admin_user_id_fkey afldb_owner
+5187; 2606 18578 FK CONSTRAINT public data_overrides data_overrides_admin_user_id_fkey afldb_owner
+5148; 2606 17872 FK CONSTRAINT public data_submission_rows data_submission_rows_submission_id_fkey afldb_owner
+5145; 2606 17859 FK CONSTRAINT public data_submissions data_submissions_import_batch_id_fkey afldb_owner
+5146; 2606 17854 FK CONSTRAINT public data_submissions data_submissions_reviewed_by_fkey afldb_owner
+5147; 2606 17849 FK CONSTRAINT public data_submissions data_submissions_uploaded_by_fkey afldb_owner
+5299; 2606 19884 FK CONSTRAINT public derived_award_projections derived_award_projections_projected_by_fkey afldb_owner
+5300; 2606 19889 FK CONSTRAINT public derived_award_projections derived_award_projections_result_fk afldb_owner
+5295; 2606 19820 FK CONSTRAINT public derived_award_results derived_award_results_published_by_fkey afldb_owner
+5296; 2606 19825 FK CONSTRAINT public derived_award_results derived_award_results_supersedes_fk afldb_owner
+5139; 2606 17697 FK CONSTRAINT public draft_persons draft_persons_player_id_fkey afldb_owner
+5140; 2606 17692 FK CONSTRAINT public draft_persons draft_persons_source_id_fkey afldb_owner
+5100; 2606 17235 FK CONSTRAINT public draft_picks draft_picks_club_id_fkey afldb_owner
+5101; 2606 17705 FK CONSTRAINT public draft_picks draft_picks_draft_person_id_fkey afldb_owner
+5102; 2606 17245 FK CONSTRAINT public draft_picks draft_picks_import_batch_id_fkey afldb_owner
+5103; 2606 17230 FK CONSTRAINT public draft_picks draft_picks_player_id_fkey afldb_owner
+5104; 2606 17240 FK CONSTRAINT public draft_picks draft_picks_source_id_fkey afldb_owner
+5223; 2606 18949 FK CONSTRAINT public external_grid_axes external_grid_axes_grid_id_fkey afldb_owner
+5220; 2606 18897 FK CONSTRAINT public external_grid_sources external_grid_sources_ingest_source_id_fkey afldb_owner
+5221; 2606 18925 FK CONSTRAINT public external_grids external_grids_import_batch_id_fkey afldb_owner
+5222; 2606 18920 FK CONSTRAINT public external_grids external_grids_source_id_fkey afldb_owner
+5042; 2606 16787 FK CONSTRAINT public external_identities external_identities_player_id_fkey afldb_owner
+5043; 2606 16782 FK CONSTRAINT public external_identities external_identities_source_id_fkey afldb_owner
+5113; 2606 17359 FK CONSTRAINT public father_son_selections father_son_selections_club_id_fkey afldb_owner
+5114; 2606 17349 FK CONSTRAINT public father_son_selections father_son_selections_drafted_player_id_fkey afldb_owner
+5115; 2606 17354 FK CONSTRAINT public father_son_selections father_son_selections_father_player_id_fkey afldb_owner
+5116; 2606 17369 FK CONSTRAINT public father_son_selections father_son_selections_import_batch_id_fkey afldb_owner
+5117; 2606 17364 FK CONSTRAINT public father_son_selections father_son_selections_source_id_fkey afldb_owner
+5260; 2606 19416 FK CONSTRAINT public fixtures fixtures_away_club_id_fkey afldb_owner
+5261; 2606 19411 FK CONSTRAINT public fixtures fixtures_home_club_id_fkey afldb_owner
+5262; 2606 19426 FK CONSTRAINT public fixtures fixtures_import_batch_id_fkey afldb_owner
+5263; 2606 19421 FK CONSTRAINT public fixtures fixtures_source_id_fkey afldb_owner
+5264; 2606 19406 FK CONSTRAINT public fixtures fixtures_venue_id_fkey afldb_owner
+5089; 2606 17151 FK CONSTRAINT public hall_of_fame hall_of_fame_import_batch_id_fkey afldb_owner
+5090; 2606 17141 FK CONSTRAINT public hall_of_fame hall_of_fame_player_id_fkey afldb_owner
+5091; 2606 17146 FK CONSTRAINT public hall_of_fame hall_of_fame_source_id_fkey afldb_owner
+5092; 2606 17179 FK CONSTRAINT public honour_team_members honour_team_members_import_batch_id_fkey afldb_owner
+5093; 2606 17169 FK CONSTRAINT public honour_team_members honour_team_members_player_id_fkey afldb_owner
+5094; 2606 17174 FK CONSTRAINT public honour_team_members honour_team_members_source_id_fkey afldb_owner
+5024; 2606 16559 FK CONSTRAINT public import_batches import_batches_source_id_fkey afldb_owner
+5025; 2606 16575 FK CONSTRAINT public import_rejections import_rejections_import_batch_id_fkey afldb_owner
+5233; 2606 19118 FK CONSTRAINT public match_coaches match_coaches_club_id_fkey afldb_owner
+5234; 2606 19123 FK CONSTRAINT public match_coaches match_coaches_coach_id_fkey afldb_owner
+5235; 2606 19133 FK CONSTRAINT public match_coaches match_coaches_import_batch_id_fkey afldb_owner
+5236; 2606 19113 FK CONSTRAINT public match_coaches match_coaches_match_id_fkey afldb_owner
+5237; 2606 19128 FK CONSTRAINT public match_coaches match_coaches_source_id_fkey afldb_owner
+5054; 2606 16904 FK CONSTRAINT public match_period_scores match_period_scores_club_id_fkey afldb_owner
+5055; 2606 18967 FK CONSTRAINT public match_period_scores match_period_scores_import_batch_id_fkey afldb_owner
+5056; 2606 16899 FK CONSTRAINT public match_period_scores match_period_scores_match_id_fkey afldb_owner
+5057; 2606 18962 FK CONSTRAINT public match_period_scores match_period_scores_source_id_fkey afldb_owner
+5046; 2606 17712 FK CONSTRAINT public matches matches_attendance_source_id_fkey afldb_owner
+5047; 2606 16876 FK CONSTRAINT public matches matches_away_club_id_fkey afldb_owner
+5048; 2606 16871 FK CONSTRAINT public matches matches_home_club_id_fkey afldb_owner
+5049; 2606 18510 FK CONSTRAINT public matches matches_import_batch_id_fkey afldb_owner
+5050; 2606 16861 FK CONSTRAINT public matches matches_season_fkey afldb_owner
+5051; 2606 18505 FK CONSTRAINT public matches matches_source_id_fkey afldb_owner
+5052; 2606 16866 FK CONSTRAINT public matches matches_venue_id_fkey afldb_owner
+5053; 2606 16881 FK CONSTRAINT public matches matches_winner_club_id_fkey afldb_owner
+5162; 2606 18222 FK CONSTRAINT public nl_search_log nl_search_log_parent_search_id_fkey afldb_owner
+5163; 2606 18252 FK CONSTRAINT public nl_search_review nl_search_review_reviewed_by_fkey afldb_owner
+5164; 2606 18247 FK CONSTRAINT public nl_search_review nl_search_review_search_log_id_fkey afldb_owner
+5166; 2606 18326 FK CONSTRAINT public player_achievements player_achievements_club_id_fkey afldb_owner
+5167; 2606 18347 FK CONSTRAINT public player_achievements player_achievements_import_batch_id_fkey afldb_owner
+5168; 2606 18336 FK CONSTRAINT public player_achievements player_achievements_match_id_fkey afldb_owner
+5169; 2606 18321 FK CONSTRAINT public player_achievements player_achievements_player_id_fkey afldb_owner
+5170; 2606 18331 FK CONSTRAINT public player_achievements player_achievements_season_fkey afldb_owner
+5171; 2606 18342 FK CONSTRAINT public player_achievements player_achievements_source_id_fkey afldb_owner
+5136; 2606 17664 FK CONSTRAINT public player_birth_evidence player_birth_evidence_batch_id_fkey afldb_owner
+5137; 2606 17654 FK CONSTRAINT public player_birth_evidence player_birth_evidence_player_id_fkey afldb_owner
+5138; 2606 17659 FK CONSTRAINT public player_birth_evidence player_birth_evidence_source_id_fkey afldb_owner
+5121; 2606 17428 FK CONSTRAINT public player_career_stats player_career_stats_player_id_fkey afldb_owner
+5122; 2606 17452 FK CONSTRAINT public player_clubs player_clubs_club_id_fkey afldb_owner
+5123; 2606 17457 FK CONSTRAINT public player_clubs player_clubs_first_match_id_fkey afldb_owner
+5124; 2606 17462 FK CONSTRAINT public player_clubs player_clubs_last_match_id_fkey afldb_owner
+5125; 2606 17447 FK CONSTRAINT public player_clubs player_clubs_player_id_fkey afldb_owner
+5227; 2606 19064 FK CONSTRAINT public player_height_evidence player_height_evidence_batch_id_fkey afldb_owner
+5228; 2606 19054 FK CONSTRAINT public player_height_evidence player_height_evidence_player_id_fkey afldb_owner
+5229; 2606 19059 FK CONSTRAINT public player_height_evidence player_height_evidence_source_id_fkey afldb_owner
+5186; 2606 18543 FK CONSTRAINT public player_link_match_candidates player_link_match_candidates_player_id_fkey afldb_owner
+5173; 2606 18401 FK CONSTRAINT public player_link_resolutions player_link_resolutions_admin_user_id_fkey afldb_owner
+5174; 2606 18396 FK CONSTRAINT public player_link_resolutions player_link_resolutions_player_id_fkey afldb_owner
+5172; 2606 18375 FK CONSTRAINT public player_link_suggestions player_link_suggestions_resolved_by_fkey afldb_owner
+5176; 2606 18447 FK CONSTRAINT public player_match_period_stats player_match_period_stats_club_id_fkey afldb_owner
+5177; 2606 18457 FK CONSTRAINT public player_match_period_stats player_match_period_stats_import_batch_id_fkey afldb_owner
+5178; 2606 18442 FK CONSTRAINT public player_match_period_stats player_match_period_stats_match_id_fkey afldb_owner
+5179; 2606 18437 FK CONSTRAINT public player_match_period_stats player_match_period_stats_player_id_fkey afldb_owner
+5180; 2606 18452 FK CONSTRAINT public player_match_period_stats player_match_period_stats_source_id_fkey afldb_owner
+5058; 2606 16930 FK CONSTRAINT public player_match_stats player_match_stats_club_id_fkey afldb_owner
+5059; 2606 16940 FK CONSTRAINT public player_match_stats player_match_stats_import_batch_id_fkey afldb_owner
+5060; 2606 16925 FK CONSTRAINT public player_match_stats player_match_stats_match_id_fkey afldb_owner
+5061; 2606 16920 FK CONSTRAINT public player_match_stats player_match_stats_player_id_fkey afldb_owner
+5062; 2606 16935 FK CONSTRAINT public player_match_stats player_match_stats_source_id_fkey afldb_owner
+5040; 2606 16760 FK CONSTRAINT public player_name_aliases player_name_aliases_player_id_fkey afldb_owner
+5041; 2606 16765 FK CONSTRAINT public player_name_aliases player_name_aliases_source_id_fkey afldb_owner
+5109; 2606 17330 FK CONSTRAINT public player_relationships player_relationships_import_batch_id_fkey afldb_owner
+5110; 2606 17315 FK CONSTRAINT public player_relationships player_relationships_person_a_player_id_fkey afldb_owner
+5111; 2606 17320 FK CONSTRAINT public player_relationships player_relationships_person_b_player_id_fkey afldb_owner
+5112; 2606 17325 FK CONSTRAINT public player_relationships player_relationships_source_id_fkey afldb_owner
+5118; 2606 17399 FK CONSTRAINT public player_club_season_stats player_season_stats_club_id_fkey afldb_owner
+5119; 2606 17389 FK CONSTRAINT public player_club_season_stats player_season_stats_player_id_fkey afldb_owner
+5128; 2606 17559 FK CONSTRAINT public player_season_stats player_season_stats_player_id_fkey1 afldb_owner
+5129; 2606 17569 FK CONSTRAINT public player_season_stats player_season_stats_primary_club_id_fkey afldb_owner
+5120; 2606 17394 FK CONSTRAINT public player_club_season_stats player_season_stats_season_fkey afldb_owner
+5130; 2606 17564 FK CONSTRAINT public player_season_stats player_season_stats_season_fkey1 afldb_owner
+5036; 2606 16735 FK CONSTRAINT public players players_debut_season_fkey afldb_owner
+5037; 2606 17671 FK CONSTRAINT public players players_dob_evidence_id_fkey afldb_owner
+5038; 2606 16740 FK CONSTRAINT public players players_final_season_fkey afldb_owner
+5039; 2606 19070 FK CONSTRAINT public players players_height_evidence_id_fkey afldb_owner
+5194; 2606 18676 FK CONSTRAINT public promotion_candidates promotion_candidates_created_by_batch_id_fkey afldb_owner
+5195; 2606 18717 FK CONSTRAINT public promotion_candidates promotion_candidates_decision_fk afldb_owner
+5196; 2606 18671 FK CONSTRAINT public promotion_candidates promotion_candidates_season_fkey afldb_owner
+5197; 2606 18681 FK CONSTRAINT public promotion_candidates promotion_candidates_source_id_family_external_record_id_s_fkey afldb_owner
+5198; 2606 18666 FK CONSTRAINT public promotion_candidates promotion_candidates_source_id_fkey afldb_owner
+5199; 2606 18710 FK CONSTRAINT public promotion_decisions promotion_decisions_admin_user_id_fkey afldb_owner
+5200; 2606 18705 FK CONSTRAINT public promotion_decisions promotion_decisions_candidate_id_fkey afldb_owner
+5256; 2606 19356 FK CONSTRAINT public season_list_members season_list_members_club_id_fkey afldb_owner
+5257; 2606 19371 FK CONSTRAINT public season_list_members season_list_members_import_batch_id_fkey afldb_owner
+5258; 2606 19361 FK CONSTRAINT public season_list_members season_list_members_player_id_fkey afldb_owner
+5259; 2606 19366 FK CONSTRAINT public season_list_members season_list_members_source_id_fkey afldb_owner
+5161; 2606 18138 FK CONSTRAINT public site_media site_media_uploaded_by_fkey afldb_owner
+5160; 2606 18121 FK CONSTRAINT public site_settings site_settings_updated_by_fkey afldb_owner
+5044; 2606 16815 FK CONSTRAINT public stat_availability stat_availability_season_fkey afldb_owner
+5045; 2606 16810 FK CONSTRAINT public stat_availability stat_availability_stat_key_fkey afldb_owner
+5034; 2606 16716 FK CONSTRAINT public venue_aliases venue_aliases_source_id_fkey afldb_owner
+5035; 2606 16711 FK CONSTRAINT public venue_aliases venue_aliases_venue_id_fkey afldb_owner
+5032; 2606 16691 FK CONSTRAINT public venues venues_first_season_fkey afldb_owner
+5033; 2606 16696 FK CONSTRAINT public venues venues_last_season_fkey afldb_owner
+5282; 2606 19658 FK CONSTRAINT staging afl_api_brownlow_vote afl_api_brownlow_vote_club_id_fkey afldb_owner
+5283; 2606 19648 FK CONSTRAINT staging afl_api_brownlow_vote afl_api_brownlow_vote_match_id_fkey afldb_owner
+5284; 2606 19653 FK CONSTRAINT staging afl_api_brownlow_vote afl_api_brownlow_vote_player_id_fkey afldb_owner
+5285; 2606 19663 FK CONSTRAINT staging afl_api_brownlow_vote afl_api_brownlow_vote_projected_by_batch_id_fkey afldb_owner
+5286; 2606 19643 FK CONSTRAINT staging afl_api_brownlow_vote afl_api_brownlow_vote_season_fkey afldb_owner
+5287; 2606 19668 FK CONSTRAINT staging afl_api_brownlow_vote afl_api_brownlow_vote_source_id_family_external_record_id__fkey afldb_owner
+5214; 2606 18855 FK CONSTRAINT staging afl_api_lineup afl_api_lineup_club_id_fkey afldb_owner
+5215; 2606 18850 FK CONSTRAINT staging afl_api_lineup afl_api_lineup_match_id_fkey afldb_owner
+5216; 2606 18860 FK CONSTRAINT staging afl_api_lineup afl_api_lineup_player_id_fkey afldb_owner
+5217; 2606 18865 FK CONSTRAINT staging afl_api_lineup afl_api_lineup_projected_by_batch_id_fkey afldb_owner
+5218; 2606 18845 FK CONSTRAINT staging afl_api_lineup afl_api_lineup_season_fkey afldb_owner
+5219; 2606 18870 FK CONSTRAINT staging afl_api_lineup afl_api_lineup_source_id_family_external_record_id_version_fkey afldb_owner
+5269; 2606 19564 FK CONSTRAINT staging afl_api_match afl_api_match_attendance_source_id_fkey afldb_owner
+5270; 2606 19554 FK CONSTRAINT staging afl_api_match afl_api_match_away_club_id_fkey afldb_owner
+5271; 2606 19549 FK CONSTRAINT staging afl_api_match afl_api_match_home_club_id_fkey afldb_owner
+5272; 2606 19569 FK CONSTRAINT staging afl_api_match afl_api_match_projected_by_batch_id_fkey afldb_owner
+5273; 2606 19539 FK CONSTRAINT staging afl_api_match afl_api_match_season_fkey afldb_owner
+5274; 2606 19574 FK CONSTRAINT staging afl_api_match afl_api_match_source_id_family_external_record_id_version__fkey afldb_owner
+5275; 2606 19544 FK CONSTRAINT staging afl_api_match afl_api_match_venue_id_fkey afldb_owner
+5276; 2606 19559 FK CONSTRAINT staging afl_api_match afl_api_match_winner_club_id_fkey afldb_owner
+5277; 2606 19609 FK CONSTRAINT staging afl_api_player_match afl_api_player_match_club_id_fkey afldb_owner
+5278; 2606 19604 FK CONSTRAINT staging afl_api_player_match afl_api_player_match_player_id_fkey afldb_owner
+5279; 2606 19614 FK CONSTRAINT staging afl_api_player_match afl_api_player_match_projected_by_batch_id_fkey afldb_owner
+5280; 2606 19599 FK CONSTRAINT staging afl_api_player_match afl_api_player_match_season_fkey afldb_owner
+5281; 2606 19619 FK CONSTRAINT staging afl_api_player_match afl_api_player_match_source_id_family_external_record_id_v_fkey afldb_owner
+5201; 2606 18767 FK CONSTRAINT staging afltables_match afltables_match_attendance_source_id_fkey afldb_owner
+5202; 2606 18757 FK CONSTRAINT staging afltables_match afltables_match_away_club_id_fkey afldb_owner
+5203; 2606 18752 FK CONSTRAINT staging afltables_match afltables_match_home_club_id_fkey afldb_owner
+5204; 2606 18772 FK CONSTRAINT staging afltables_match afltables_match_projected_by_batch_id_fkey afldb_owner
+5205; 2606 18742 FK CONSTRAINT staging afltables_match afltables_match_season_fkey afldb_owner
+5206; 2606 18777 FK CONSTRAINT staging afltables_match afltables_match_source_id_family_external_record_id_versio_fkey afldb_owner
+5207; 2606 18747 FK CONSTRAINT staging afltables_match afltables_match_venue_id_fkey afldb_owner
+5208; 2606 18762 FK CONSTRAINT staging afltables_match afltables_match_winner_club_id_fkey afldb_owner
+5209; 2606 18810 FK CONSTRAINT staging afltables_player_match afltables_player_match_club_id_fkey afldb_owner
+5210; 2606 18805 FK CONSTRAINT staging afltables_player_match afltables_player_match_player_id_fkey afldb_owner
+5211; 2606 18815 FK CONSTRAINT staging afltables_player_match afltables_player_match_projected_by_batch_id_fkey afldb_owner
+5212; 2606 18800 FK CONSTRAINT staging afltables_player_match afltables_player_match_season_fkey afldb_owner
+5213; 2606 18820 FK CONSTRAINT staging afltables_player_match afltables_player_match_source_id_family_external_record_id_fkey afldb_owner
+5181; 2606 18492 FK CONSTRAINT staging external_current_matches external_current_matches_away_club_id_fkey afldb_owner
+5182; 2606 18487 FK CONSTRAINT staging external_current_matches external_current_matches_home_club_id_fkey afldb_owner
+5183; 2606 18497 FK CONSTRAINT staging external_current_matches external_current_matches_local_match_id_fkey afldb_owner
+5184; 2606 18482 FK CONSTRAINT staging external_current_matches external_current_matches_season_fkey afldb_owner
+5185; 2606 18477 FK CONSTRAINT staging external_current_matches external_current_matches_source_id_fkey afldb_owner
+5188; 2606 18594 FK CONSTRAINT staging source_payloads source_payloads_source_id_fkey afldb_owner
+5189; 2606 18614 FK CONSTRAINT staging source_record_versions source_record_versions_closed_by_batch_id_fkey afldb_owner
+5190; 2606 18609 FK CONSTRAINT staging source_record_versions source_record_versions_opened_by_batch_id_fkey afldb_owner
+5191; 2606 18619 FK CONSTRAINT staging source_record_versions source_record_versions_source_id_family_payload_hash_fkey afldb_owner
+5192; 2606 18635 FK CONSTRAINT staging source_records source_records_last_batch_id_fkey afldb_owner
+5193; 2606 18640 FK CONSTRAINT staging source_records source_records_source_id_family_external_record_id_current_fkey afldb_owner
+5126; 2606 17512 FK CONSTRAINT staging team_seasons team_seasons_club_id_fkey afldb_owner
+5127; 2606 17507 FK CONSTRAINT staging team_seasons team_seasons_season_fkey afldb_owner
+5151; 2606 17933 FK CONSTRAINT staging_aflw fixtures fixtures_season_key_fkey afldb_owner
+5150; 2606 17916 FK CONSTRAINT staging_aflw ladders ladders_season_key_fkey afldb_owner
+5152; 2606 17949 FK CONSTRAINT staging_aflw matches matches_match_key_fkey afldb_owner
+5153; 2606 17954 FK CONSTRAINT staging_aflw matches matches_season_key_fkey afldb_owner
+5154; 2606 17968 FK CONSTRAINT staging_aflw player_match_stats player_match_stats_match_key_fkey afldb_owner
+5155; 2606 17973 FK CONSTRAINT staging_aflw player_match_stats player_match_stats_season_key_fkey afldb_owner
+5158; 2606 18010 FK CONSTRAINT staging_aflw player_seasons player_seasons_season_key_fkey afldb_owner
+5156; 2606 17992 FK CONSTRAINT staging_aflw scoring_events scoring_events_match_key_fkey afldb_owner
+5157; 2606 17997 FK CONSTRAINT staging_aflw scoring_events scoring_events_season_key_fkey afldb_owner
+2698; 826 18084 DEFAULT ACL aflw DEFAULT PRIVILEGES FOR TABLES afldb_owner
+2696; 826 17498 DEFAULT ACL staging DEFAULT PRIVILEGES FOR TABLES afldb_owner
+2697; 826 17898 DEFAULT ACL staging_aflw DEFAULT PRIVILEGES FOR TABLES afldb_owner

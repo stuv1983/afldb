@@ -1,0 +1,12 @@
+isolated-pg: afldb_v2_rb_rem3_test verified (cluster afldb_v2_isolated, 127.0.0.1:55672); running /home/arm/i250/afldb/.venv/bin/python
+{
+  "counts": {
+    "bridges": 3562,
+    "parent_bridges": 3562,
+    "withheld": 1495
+  },
+  "mode": "resolve-against",
+  "out": "/mnt/ssd/afldb-rem3-base/rebuilt/afldb_v2_rb_rem3-draftguru-bridge-child-v3-6d5388ea.json",
+  "sha256": "1200e702a6d3b637a50ab0fc61d8ede6cf0564ad18908a361bb0038b451b6e9d",
+  "target": "isolated"
+}

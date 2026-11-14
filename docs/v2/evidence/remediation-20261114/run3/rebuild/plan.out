@@ -1,0 +1,67 @@
+isolated-pg: afldb_v2_rb_rem3_test verified (cluster afldb_v2_isolated, 127.0.0.1:55672); running node
+AFLDB clean test rebuild (AFLDB-ISSUE-093 §10)
+  target        : afldb_v2_rb_rem3_test (V2 isolated local rebuild (tools/v2/isolated-pg.ts cluster); --target)
+  credentials   : AFLDB_TEST_DATABASE_URL + AFLDB_TEST_IMPORT_DATABASE_URL
+  fitzRoy label : c2-2026-final-core-v1 (ACCEPTED canonical full-history baseline)
+  draftguru     : annual-html-20260826 (no bridge dataset)
+  afl_api owner : census of 1897..2026 excluding in-progress 2027 before the capture; any afl_api-owned completed-season match refuses the rebuild (AFLDB-ISSUE-233 D-233-3)
+  afl_api ids   : captured to /mnt/ssd/afldb-rem3-rebuild-20261114/capture-root/afldb_v2_rb_rem3_test/, reinstated after draftguru
+
+--plan: the stage graph only, nothing executed and nothing destroyed.
+
+  1. [precheck] precheck — PRECHECK — every required input, before anything is destroyed
+  2. [validation] afl-api-ownership-census — AFL API OWNERSHIP CENSUS — refuse if any completed season in 1897..2026 excluding in-progress 2027 holds an afl_api-owned canonical match (read-only, before anything is captured or destroyed)
+  3. [capture] afl-api-adjudications-capture — AFL API ADJUDICATIONS — capture the human identity ledger, the importer-created identities AND the manual player registrations before anything is destroyed
+       npx tsx tools/migration/rebuild_afl_api_adjudications.ts capture
+  4. [destructive] recreate — DATABASE RESET — clear afldb_v2_rb_rem3_test
+  5. [schema] migrations — MIGRATIONS — the complete tracked set
+       npm run db:migrate:test
+  6. [privileges] privileges — PRIVILEGES — reconcile roles from the registries
+       npm run db:privileges:test
+  7. [data] reference — REFERENCE DATA — tracked canonical datasets
+       /home/arm/i250/afldb/.venv/bin/python tools/migration/load_reference_data.py
+  8. [data] fitzroy — FITZROY CORE — c2-2026-final-core-v1
+       /home/arm/i250/afldb/.venv/bin/python tools/migration/import_fitzroy_core.py --label c2-2026-final-core-v1
+  9. [data] heights — HEIGHTS — AFL Tables register (c2-2026-final-core-v1)
+       /home/arm/i250/afldb/.venv/bin/python tools/migration/enrich_heights.py --label c2-2026-final-core-v1
+  10. [data] heights-afl-api — HEIGHTS (AFL API) — corroborating evidence, rosters-20260905
+       /home/arm/i250/afldb/.venv/bin/python tools/migration/enrich_heights_afl_api.py --label rosters-20260905
+  11. [data] heights-wikipedia — HEIGHTS (Wikipedia) — tracked adjudication set, corroborating evidence
+       /home/arm/i250/afldb/.venv/bin/python tools/migration/enrich_heights_wikipedia.py --csv data/players/height-evidence-wikipedia.csv
+  12. [data] birth-dates — BIRTH DATES — AFL Tables club lists, club-lists-20260905
+       /home/arm/i250/afldb/.venv/bin/python tools/migration/enrich_birth_dates_afltables.py --label club-lists-20260905
+  13. [data] coaches — COACHES — AFL Tables coach pages coaches-20260905 + shared height/coach stats (c2-2026-final-core-v1) Coach column + mandatory raw replay
+       /home/arm/i250/afldb/.venv/bin/python tools/migration/import_match_coaches.py --label coaches-20260905 --fitzroy-label c2-2026-final-core-v1 --require-raw-bundle
+  14. [data] father-son — FATHER–SON — tracked Wikipedia list, 127 selections
+       /home/arm/i250/afldb/.venv/bin/python tools/migration/father_son.py load --csv data/players/father-son-selections.csv --provenance data/players/father-son-selections.source.json
+  15. [data] siblings — SIBLINGS — tracked Wikipedia families export, 499 pairs
+       /home/arm/i250/afldb/.venv/bin/python tools/migration/family_siblings.py load --csv data/players/sibling-relationships.csv --provenance data/players/sibling-relationships.source.json
+  16. [data] after-siren — AFTER-SIREN — tracked Wikipedia siren-kick exports, 126 events
+       /home/arm/i250/afldb/.venv/bin/python tools/migration/after_siren.py load --csv data/records/after-siren-events.csv --provenance data/records/after-siren-events.source.json
+  17. [validation] after-siren-reconcile — AFTER-SIREN RECONCILE — loaded table against a fresh re-resolution
+       /home/arm/i250/afldb/.venv/bin/python tools/migration/after_siren.py reconcile --csv data/records/after-siren-events.csv
+  18. [reinstate] manual-registrations-reinstate — MANUAL REGISTRATIONS — reinstate the captured data_overrides creation records and their attribution actors
+       npx tsx tools/migration/rebuild_afl_api_adjudications.ts registrations-reinstate
+  19. [data] manual-registrations-replay — MANUAL REGISTRATIONS — replay_admin_overrides(players), the production replay
+       /home/arm/i250/afldb/.venv/bin/python tools/migration/replay_manual_registrations.py
+  20. [validation] manual-registrations-verify — MANUAL REGISTRATIONS — assert every registered player is back under its stable identity
+       npx tsx tools/migration/rebuild_afl_api_adjudications.ts registrations-verify
+  21. [data] draftguru — DRAFTGURU — annual-html-20260826
+       /home/arm/i250/afldb/.venv/bin/python tools/rebuild/draftguru/import_draftguru.py --label annual-html-20260826
+  22. [reinstate] afl-api-adjudications-reinstate — AFL API ADJUDICATIONS — reinstate the ledger, replay the importer-created identities and replay the human identities (one transaction)
+       npx tsx tools/migration/rebuild_afl_api_adjudications.ts reinstate
+  23. [validation] afl-api-adjudications-bijection — AFL API ADJUDICATIONS — assert the combined importer/human identity invariant (D13; no rebuild marker remains)
+       npx tsx tools/migration/rebuild_afl_api_adjudications.ts bijection
+  24. [data] awards-honours — AWARDS & HONOURS — tracked manifests, no legacy source
+       /home/arm/i250/afldb/.venv/bin/python tools/migration/import_awards.py --groups all_australian under_22 rising_star club_bf named_medals hall_of_fame honour_teams captaincies
+  25. [data] brownlow-season — BROWNLOW SEASON — authoritative season totals from the tracked artefact
+       /home/arm/i250/afldb/.venv/bin/python tools/migration/import_brownlow_season.py
+  26. [data] derived — DERIVED — recomputed summaries
+       /home/arm/i250/afldb/.venv/bin/python tools/migration/rebuild_derived.py
+  27. [data] coleman — COLEMAN — leading home-and-away goalkicker, derived
+       /home/arm/i250/afldb/.venv/bin/python legacy/offline/coleman.py --groups coleman
+  28. [data] first-kick-goal — FIRST-KICK GOAL — pinned curated extract + tracked manifest, 334 records
+       npx tsx --conditions=react-server tools/records/import-first-kick-goal.ts --apply --provenance data/records/first-kick-goal.source.json
+  29. [validation] ladder-witness — LADDER WITNESS — cross-check club_seasons against c2-2026-final-ladder-v1
+       /home/arm/i250/afldb/.venv/bin/python tools/rebuild/fitzroy/validate_ladder_witness.py --label c2-2026-final-ladder-v1 --compare
+  30. [validation] fingerprints — FINAL VALIDATION — per-domain row counts against the accepted contracts

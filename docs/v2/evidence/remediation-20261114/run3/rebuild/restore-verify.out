@@ -1,0 +1,2 @@
+isolated-pg: afldb_v2_rb_rem3_restore_test verified (cluster afldb_v2_isolated, 127.0.0.1:55672); running node
+pg_restore exit=0 seconds=5 stderrLines=0
