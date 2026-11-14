@@ -85,11 +85,20 @@ window as its release id `<rev12>-<BUILD_ID>`. Switch back to it without rebuild
 serving checkout with the unit's pinned Node:
 
 ```bash
-node deploy/release.mjs rollback                # or: rollback --to <PREV release id>
-sudo systemctl restart afldb                     # owner
+# ONE attended sitting (AFLDB-ISSUE-351): `rollback` refuses without --attended; type the restart straight after it
+node deploy/release.mjs rollback --attended [--to <PREV release id>] [--ledger-head <name>]
+sudo systemctl restart afldb                     # owner, NOW: until this runs, any restart activates the target
 node deploy/release.mjs status --expect <PREV release id>
 bash deploy/post-install-check.sh <PREV release id>
 ```
+
+`--attended` is a declaration, not authentication: it stops a bare or copied command from switching `current` and leaves
+`--attended` to the person who types it. It does not stop an unexpected restart (`Restart=always`, needrestart, a
+PostgreSQL package upgrade, a reboot) from activating the switched `current` before your restart; `status --expect`
+afterwards reports a restart that coincides with an apt run, and the host policy of `docs/deployment.md` §3a closes the
+needrestart and PostgreSQL triggers. `rollback` never refuses on host state. Give `--ledger-head` (read-only
+`SELECT max(name) FROM afldb_meta.schema_migrations`) whenever the database is reachable: without it the schema
+compatibility of the target is recorded as `not-checked`.
 
 Never check out, `npm ci` or `npm run build` in the serving checkout to roll back: that deletes the
 live bundle first (AFLDB-ISSUE-329). The frozen 2026-10-30 execution package keeps its in-place text
@@ -274,11 +283,12 @@ paragraphs above call a step unrehearsed, this supersedes them as follows.
 | §6 full restore | The restore procedure is proven into a scratch database (host and isolated); a restore over production has not been run and should not be | Stage 5, Stage 7 |
 
 **Exercised versus available.** No production rollback has run. Production has moved forward only (V2 adoption,
-ISSUE-329 first route build, ISSUE-330), and ISSUE-330's rollback branch D5 was "not used". Current targets:
-`61a95f7397da-JYIBkYn8ynPgYMn1e5nK-` (the `previous` release, one recorded `status-pass`) and
-`9ed9c9dd3e84-QNEHXAtU53TzUjj0Mb7mv`. An optional drill, with the owner's approval for a window, is
-`node deploy/release.mjs rollback`, an owner restart, `status --expect <PREV id>`, `bash deploy/post-install-check.sh <PREV id>`,
-then return with `node deploy/release.mjs rollback --to <current id>` (a mistaken rollback is reversed the same way, INSTALLATION.md) and run the same checks again. Pace the two restarts 30 s apart
+ISSUE-329 first route build, ISSUE-330), and ISSUE-330's rollback branch D5 was "not used". Targets as recorded on 2026-10-31:
+`61a95f7397da-JYIBkYn8ynPgYMn1e5nK-` (then `previous`) and `9ed9c9dd3e84-QNEHXAtU53TzUjj0Mb7mv`; those are history. As recorded
+on 2026-11-14 (read-only `release.mjs status`, no `--expect`): `current` `c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x`, `previous`
+`0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN`; re-read before any use, and use `rollback --to <id>` with an id you have just read. An optional drill, with the owner's approval for a window, is
+`node deploy/release.mjs rollback --attended`, an owner restart, `status --expect <PREV id>`, `bash deploy/post-install-check.sh <PREV id>`,
+then return with `node deploy/release.mjs rollback --attended --to <current id>` (a mistaken rollback is reversed the same way, INSTALLATION.md; the 2026-10-31 text of that document predates `--attended`) and run the same checks again. Pace the two restarts 30 s apart
 (ISSUE-329 O2). It is not a close condition for V2-GAP-026.
 
 The AFL API writer activation (ISSUE-316) has its own rollback and roll-forward rules and is not covered here.

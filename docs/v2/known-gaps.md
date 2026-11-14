@@ -1115,8 +1115,8 @@ award results must be shown reconcilable before production; **no** — not a pro
     drop (lost by design).
 
   **Remaining (optional, owner's call, not a close condition).** A production rollback drill would turn "available"
-  into "exercised": `node deploy/release.mjs rollback`, an owner restart, `status --expect`, `deploy/post-install-check.sh`,
-  then `rollback --to <current id>` to return, with the same checks. It costs two restarts of about 5 s each, paced 30 s apart (ISSUE-329 O1, O2), and needs the
+  into "exercised": `node deploy/release.mjs rollback --attended`, an owner restart, `status --expect`, `deploy/post-install-check.sh`,
+  then `rollback --attended --to <current id>` to return, with the same checks (`--attended` is required since ISSUE-351). It costs two restarts of about 5 s each, paced 30 s apart (ISSUE-329 O1, O2), and needs the
   owner's approval for the window. The commands are the ones in `rollback-runbook.md` §4.1 and its §7 update.
 
   Earlier narrative, retained as history:

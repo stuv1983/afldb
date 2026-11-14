@@ -238,6 +238,20 @@ this block, §11 Rollback, `docs/production-cutover.md` (release step), and any 
 `status` are unchanged callers. `--skip-host-gate "<reason>"` bypasses the host gate only (recorded in `events.log`).
 `rollback` never refuses on host state (the emergency path stays open); it warns.
 
+**What `--attended` protects, and what it cannot** (rehearsed: `docs/v2/evidence/remediation-20261114/run2/ops/README.md` §1).
+It is a plain boolean checked first (`requireAttended`), before the lock, the verification and any link move: a bare or
+copied command from a script, a runbook or a packet written before 2026-11-14 is refused with exit 1 and nothing changes.
+It is a declaration, not authentication: a script that passes the flag is "attended" as far as the tool can tell, so a
+scripted caller must never carry it. It does **not** close the activation window: from the link switch until your
+`sudo systemctl restart afldb`, any restart of the service (`Restart=always` after a crash, a needrestart or PostgreSQL
+package restart, a reboot) starts the release `current` now names, with no gate in between. Detection afterwards is
+`status --expect`: a changed `InvocationID` is always printed, and is a failure only when the restart coincides with a
+`/var/log/apt/history.log` run (a crash restart or a reboot is a note; `NRestarts` counts failures only, so it does not
+move on a needrestart restart). `--skip-host-gate` or `--no-live` records no window, so no audit is possible for that
+promote. Closing it is procedural and by host policy: promote and your restart in one sitting (minutes, not hours), and
+the needrestart and PostgreSQL holds below, which remove the unattended triggers that are the likeliest
+(`docs/v2/evidence/remediation-20261114/run2/ops/procedures/02-host-patching-policy.md`).
+
 - **Rollback and the schema.** `release.json` records the migration head of the revision a release was built from
   (`migrationHead`; releases built before this change have none, or take `--checkout <dir>` to derive it from Git).
   Give `rollback` the database's head, read read-only: `SELECT max(name) FROM afldb_meta.schema_migrations`, as

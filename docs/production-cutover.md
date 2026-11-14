@@ -329,6 +329,11 @@ Keep the development deployment running throughout: it is the fallback reference
 
 ## 6. Post-cutover
 
+> **Status 2026-11-14 (AFLDB-ISSUE-352; nothing below is ticked because none of it runs on production yet).** A reviewed
+> backup, weekly restore-verification and off-host design is prepared and not installed (`docs/backup-restore.md` §3 and
+> §4); the three backup items stay open until the owner installs it. No uptime monitor was found on the host (only
+> DigitalOcean's `do-agent` metrics agent); an external monitor on `/api/health` is **unverified**.
+
 Within 24 hours:
 - [ ] Enable the backup timer against `afldb_prod`
 - [ ] Schedule weekly restore verification
