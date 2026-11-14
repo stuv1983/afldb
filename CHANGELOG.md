@@ -15,6 +15,13 @@ commit.
 
 ## [Unreleased]
 
+### Remediation run 3 of the 2026-11-14 review (local, qualified at `692b1902`, not published, not deployed)
+
+Nothing was pushed, deployed, installed, or written on production or DEV; no application code changed. Records: `docs/v2/evidence/remediation-20261114/run3/`.
+
+- **Test harness (ISSUE-363):** `settle-afl-api-state-b` and `settle-afl-api` no longer delete or depend on the production snapshot's `afl_api` identity row for `CD_I297354`; they use namespace-owned provider player ids and assert the row is unchanged. `settle-afl-api-brownlow` leaves its season's `stat_availability` rows exactly as found (this was the intermittent `database` "war years" failure). `settle-afl-api-issue276` fixtures use an ordinary home-and-away round so they cannot collide with the real 2026 final. Four `database` witnesses re-pinned from the retired baseline to the accepted `c2-2026-final-core-v1` values (685,471 -> 695,499 player-match rows; 114 -> 120, 261 -> 268, 219 -> 223).
+- **Validation:** the standard isolated accepted-baseline rebuild passed (30 stages, 91 checks) and every remaining integration failure was classified on it; ISSUE-365 (Brownlow coverage recompute of a completed season) was opened from that evidence.
+
 ### Remediation run 2 of the 2026-11-14 review (local, qualified at `f10e47ad`, not published, not deployed)
 
 Nothing was pushed, deployed, installed, or written on production or DEV. Records: `docs/v2/evidence/remediation-20261114/run2/`.
