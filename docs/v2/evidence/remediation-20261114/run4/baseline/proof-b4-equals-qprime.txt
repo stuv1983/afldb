@@ -1,0 +1,16 @@
+$ git diff --stat 692b1902 7cfbe186 -- src tests tools packages deploy package.json package-lock.json
+(rc=0 ; 0 bytes of diff)
+
+$ git rev-parse 692b1902 7cfbe186
+692b1902cbcc321cea76a30857a03e15f02db6b7
+7cfbe186e70ca91db67da1aa4e28325ccbc32a86
+
+$ git diff --stat 692b1902 7cfbe186 --name-only (all paths that differ)
+      1 CHANGELOG.md
+      1 IssuesIndex.md
+      1 blockers.md
+      1 docs/v2/evidence/remediation-20261114
+      5 docs/v2/evidence/remediation-20261114/run3
+     36 docs/v2/evidence/remediation-20261114/run3/qualification-3
+      5 docs/v2/evidence/remediation-20261114/run4
+      1 issues.md

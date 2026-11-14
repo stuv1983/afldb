@@ -1,0 +1,12 @@
+isolated-pg: afldb_v2_rem4baseline_rbb_tmpl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55686); running bash
+WARNING:  permission denied to analyze "pg_authid", skipping it
+WARNING:  permission denied to analyze "pg_subscription", skipping it
+WARNING:  permission denied to analyze "pg_database", skipping it
+WARNING:  permission denied to analyze "pg_db_role_setting", skipping it
+WARNING:  permission denied to analyze "pg_tablespace", skipping it
+WARNING:  permission denied to analyze "pg_auth_members", skipping it
+WARNING:  permission denied to analyze "pg_shdepend", skipping it
+WARNING:  permission denied to analyze "pg_shdescription", skipping it
+WARNING:  permission denied to analyze "pg_replication_origin", skipping it
+WARNING:  permission denied to analyze "pg_shseclabel", skipping it
+WARNING:  permission denied to analyze "pg_parameter_acl", skipping it

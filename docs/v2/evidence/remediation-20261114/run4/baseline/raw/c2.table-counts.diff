@@ -1,0 +1,30 @@
+7c7
+< auth_users	0
+---
+> auth_users	4
+12c12
+< award_winners	3713
+---
+> award_winners	3712
+30c30
+< club_seasons	1640
+---
+> club_seasons	1642
+32c32
+< data_edits	0
+---
+> data_edits	6
+34c34
+< data_overrides	0
+---
+> data_overrides	3
+50,51c50,51
+< import_batches	27
+< import_rejections	497
+---
+> import_batches	252
+> import_rejections	500
+79c79
+< sources	14
+---
+> sources	15

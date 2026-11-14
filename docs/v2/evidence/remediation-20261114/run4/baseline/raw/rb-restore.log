@@ -1,0 +1,4 @@
+isolated-pg: afldb_v2_rem4baseline_rb_tmpl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55686); running node
+pg_restore exit=0 seconds=13 stderrLines=0
+ISOLATED TARGET OK: afldb_v2_rem4baseline_rb_tmpl_test
+afldb_v2_rem4baseline_rb_tmpl_test	marked	290454551

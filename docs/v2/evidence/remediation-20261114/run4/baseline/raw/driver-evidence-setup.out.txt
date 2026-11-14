@@ -1,0 +1,124 @@
+##### clone start 2026-11-14T19:10:27Z
+bundle verified sha256 b1e2491b9739703c2ea3484300e9f7db9b051cba5e1d44fb595e4badb13b7a74
+snapshot verified: 30141895 bytes sha256 e77c307d3e0cddcb652e398a946e4c22c2063f13c70edadf96a975c92842826d
+afldb_v2_rb_rem3-6d5388ea.dump: OK
+afldb_v2_rb_rem3-draftguru-bridge-child-v3-6d5388ea.json: OK
+restore-dump.mjs: OK
+afldb_v2_rb_rem3-6d5388ea.table-counts.tsv: OK
+RESTORE.md: OK
+rebuilt dump and bridge child verified
+de640826d13489c58392563e7ae1ff62403ed293 
+The bundle uses this hash algorithm: sha1
+HEAD=7cfbe186e70ca91db67da1aa4e28325ccbc32a86 want=7cfbe186e70ca91db67da1aa4e28325ccbc32a86
+npm warn deprecated eslint@9.39.5: This version is no longer supported. Please see https://eslint.org/version-support for other options.
+
+added 427 packages in 13s
+node v22.23.2 vitest vitest/4.1.10 linux-x64 node-v22.23.2
+porcelain lines: 0
+##### clone end 2026-11-14T19:10:46Z rc=0
+##### cluster start 2026-11-14T19:10:46Z
+The files belonging to this database system will be owned by user "arm".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C".
+The default text search configuration will be set to "english".
+
+Data page checksums are disabled.
+
+creating directory /mnt/ssd/afldb-rem4-baseline-20261115-pg/data ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default max_connections ... 100
+selecting default shared_buffers ... 128MB
+selecting default time zone ... Australia/Melbourne
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+init: cluster initialised
+roles: afldb_owner, afldb_app, afldb_import, afldb_backup, afldb_auth present
+pg_ctl: server is running (PID: 2843423)
+/usr/lib/postgresql/16/bin/postgres "-D" "/mnt/ssd/afldb-rem4-baseline-20261115-pg/data"
+LISTEN 0      600        127.0.0.1:55686      0.0.0.0:*    users:(("postgres",pid=2843423,fd=7))        
+##### cluster end 2026-11-14T19:10:53Z rc=0
+##### tmpl_snap start 2026-11-14T19:10:53Z
+create-db: afldb_v2_rem4baseline_snap_tmpl_test created and marked
+isolated-pg: afldb_v2_rem4baseline_snap_tmpl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55686); running node
+pg_restore exit=0 seconds=7 stderrLines=0
+isolated-pg: afldb_v2_rem4baseline_snap_tmpl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55686); running node
+AFLDB migrations -> test (afldb_owner@127.0.0.1:55686/afldb_v2_rem4baseline_snap_tmpl_test)
+  118 migration file(s), 118 already applied
+
+Nothing to apply — schema is up to date.
+isolated-pg: afldb_v2_rem4baseline_snap_tmpl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55686); running node
+afldb_v2_rem4baseline_snap_tmpl_test {"ledger":"118_fixtures_unconfirmed_participants.sql","matches":17056,"fixtures":218,"receipts":5}
+ISOLATED TARGET OK: afldb_v2_rem4baseline_snap_tmpl_test
+identity of the snapshot template (aggregates only):
+ledger_max=118_fixtures_unconfirmed_participants.sql ledger_count=118
+matches=17056 seasons=1897..2026 players=13365 fixtures=218
+seasons_row_2026=complete
+seasons_in_progress=none
+player_match_stats_authority_rows=1
+draft_picks=6818 draft_persons=5057
+tcounts afldb_v2_rem4baseline_snap_tmpl_test: 83 tables -> /mnt/ssd/afldb-rem4-baseline-20261115/evidence/snap-template.table-counts.tsv
+##### tmpl_snap end 2026-11-14T19:11:07Z rc=0
+##### tmpl_rb start 2026-11-14T19:11:07Z
+create-db: afldb_v2_rem4baseline_rb_tmpl_test created and marked
+isolated-pg: afldb_v2_rem4baseline_rb_tmpl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55686); running node
+pg_restore exit=0 seconds=13 stderrLines=0
+ISOLATED TARGET OK: afldb_v2_rem4baseline_rb_tmpl_test
+afldb_v2_rem4baseline_rb_tmpl_test	marked	290454551
+2026-11-14T19:11:23Z rebuilt table counts: IDENTICAL to afldb_v2_rb_rem3-6d5388ea.table-counts.tsv (83 tables)
+identity of the restored accepted rebuild (aggregates only):
+ledger_max=118_fixtures_unconfirmed_participants.sql ledger_count=118
+matches=17056 seasons=1897..2026 players=13365 fixtures=0
+season2026=complete
+seasons_in_progress=2027
+player_match_stats_authority_rows=0
+draft_picks=6810 draft_persons=5057
+2026-11-14T19:11:26Z stage A: verify and copy the 42 raw year pages from /mnt/ssd/afldb-rem3-qual-20261114/cand/data/sources/draftguru/annual-html-20260826
+MISMATCH raw/years/year_1981.html
+MISMATCH raw/years/year_1982.html
+MISMATCH raw/years/year_1986.html
+MISMATCH raw/years/year_1987.html
+MISMATCH raw/years/year_1988.html
+MISMATCH raw/years/year_1989.html
+MISMATCH raw/years/year_1990.html
+MISMATCH raw/years/year_1991.html
+MISMATCH raw/years/year_1992.html
+MISMATCH raw/years/year_1993.html
+MISMATCH raw/years/year_1994.html
+MISMATCH raw/years/year_1995.html
+MISMATCH raw/years/year_1996.html
+MISMATCH raw/years/year_1997.html
+MISMATCH raw/years/year_1998.html
+MISMATCH raw/years/year_1999.html
+MISMATCH raw/years/year_2000.html
+MISMATCH raw/years/year_2001.html
+MISMATCH raw/years/year_2002.html
+MISMATCH raw/years/year_2003.html
+MISMATCH raw/years/year_2004.html
+MISMATCH raw/years/year_2005.html
+MISMATCH raw/years/year_2006.html
+MISMATCH raw/years/year_2007.html
+MISMATCH raw/years/year_2008.html
+MISMATCH raw/years/year_2009.html
+MISMATCH raw/years/year_2010.html
+MISMATCH raw/years/year_2011.html
+MISMATCH raw/years/year_2012.html
+MISMATCH raw/years/year_2013.html
+MISMATCH raw/years/year_2014.html
+MISMATCH raw/years/year_2015.html
+MISMATCH raw/years/year_2016.html
+MISMATCH raw/years/year_2017.html
+MISMATCH raw/years/year_2018.html
+MISMATCH raw/years/year_2019.html
+MISMATCH raw/years/year_2020.html
+MISMATCH raw/years/year_2021.html
+MISMATCH raw/years/year_2022.html
+MISMATCH raw/years/year_2023.html
+MISMATCH raw/years/year_2024.html
+MISMATCH raw/years/year_2025.html
+Stage A raw pages do not match the committed manifest (42)
+##### tmpl_rb end 2026-11-14T19:11:26Z rc=1
+##### FAILED tmpl_rb

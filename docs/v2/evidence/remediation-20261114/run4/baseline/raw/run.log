@@ -1,0 +1,13 @@
+2026-11-14T19:11:23Z rebuilt table counts: IDENTICAL to afldb_v2_rb_rem3-6d5388ea.table-counts.tsv (83 tables)
+2026-11-14T19:11:26Z stage A: verify and copy the 42 raw year pages from /mnt/ssd/afldb-rem3-qual-20261114/cand/data/sources/draftguru/annual-html-20260826
+2026-11-14T19:12:55Z stage A: verify and copy the 42 raw year pages from /mnt/ssd/afldb-rem3-qual-20261114/cand/data/sources/draftguru/annual-html-20260826
+2026-11-14T19:12:55Z stage A: 42/42 raw files match the manifest at source; copied
+2026-11-14T19:13:41Z bridge import rc=0
+2026-11-14T19:13:44Z bridge: ANALYZE after import (planner statistics only)
+2026-11-14T19:13:44Z stage A removed from the checkout (draftguru-import stays skipped in every cell)
+2026-11-14T19:13:49Z c1 start: per-file (AFLDB_TEST_PER_FILE_DB=all) base=afldb_v2_rem4baseline_c1_base_test template=afldb_v2_rem4baseline_rbb_tmpl_test
+2026-11-14T19:52:41Z c1 end rc=1
+2026-11-14T19:52:47Z c2 start: shared (AFLDB_TEST_PER_FILE_DB unset) db=afldb_v2_rem4baseline_c2_test template=afldb_v2_rem4baseline_rbb_tmpl_test bridge=1
+2026-11-14T20:27:27Z c2 end rc=1
+2026-11-14T20:27:32Z c3 start: shared (AFLDB_TEST_PER_FILE_DB unset) db=afldb_v2_rem4baseline_c3_test template=afldb_v2_rem4baseline_snap_tmpl_test bridge=0
+2026-11-14T21:02:09Z c3 end rc=1

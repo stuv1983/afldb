@@ -1,0 +1,15 @@
+⎯⎯⎯⎯⎯⎯ Failed Tests 68 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  16 failed | 77 passed | 6 skipped (99)
+      Tests  68 failed | 3408 passed | 2 expected fail | 146 skipped (3647)
+   Duration  1474.61s (transform 10.40s, setup 5.72s, import 278.82s, tests 1167.41s, environment 25ms)
+c2 failing ids: 73 (5 file-level)
+files total=99 by status={"passed":83,"failed":16}
+file-level failures (status failed with zero failed assertions)=5
+tests total=3647 passed=3410 failed=68 pending=146 todo=0
+assertion statuses={"passed":3410,"failed":68,"skipped":146,"pending":23}
+wall ms=1474646.0339355469 (24.6 min)
+# order (JSON completion order): n<TAB>file<TAB>status<TAB>file duration ms<TAB>assertions
+c2 files in log order: 169
+c2 table-count rows changed by the run: 8 (see c2.table-counts.diff)
+fixtures rows before: 0
+fixtures rows after:  0
