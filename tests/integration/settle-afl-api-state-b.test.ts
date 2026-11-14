@@ -22,6 +22,11 @@
  * roles `afldb_import`, `afldb_app`, `afldb_auth`, `afldb_backup` exist; the fixture season, namespace,
  * synthetic player and provider identities are all absent (a leftover is an unknown row and is never
  * adopted); `afl_api` and `afltables` sources, the two clubs and the venue exist (read only).
+ * OWNED IDENTITIES ONLY (ISSUE-363 T363-1). The shared fixture names a REAL provider player id (`CD_I297354`,
+ * Karl Amon) that the production snapshot holds an `afl_api` `external_identities` row for. This file renames
+ * it to its own namespace-owned id in an in-memory copy, residue-checks and deletes identity rows only by its own
+ * ids or its own synthetic player, and asserts that the snapshot's real row is unchanged (content, or absence)
+ * after the run, including when `beforeAll` refuses. It never depends on another suite having deleted that row.
  * State A (migration 110 not applied) cannot store the authority: the case is SKIPPED LOUDLY, never
  * passed vacuously.
  *
@@ -72,7 +77,21 @@ const AWAY_HIST = 'Brisbane Lions';
 /** The fixture season's AFL provider season id (resolved to the season year through the identities file). */
 const FIXTURE_COMP_SEASON_PROVIDER_ID = 'CD_S2071014';
 const FIXTURE_COMP_SEASON_ID = 9071;
-const BRIDGED_PROVIDER_PLAYER_ID = 'CD_I297354'; // Karl Amon, home side, in the shared fixture
+/**
+ * The provider player id the SHARED fixture files name for their home-side player (Karl Amon). It is a REAL id:
+ * the production snapshot holds a real `afl_api` `external_identities` row for it. This file never writes, links
+ * or deletes that row; it only renames the id inside its in-memory copy of the fixture (see `unitSource`) and
+ * asserts, before and after, that the row is exactly as it found it (including when it is absent).
+ */
+const FIXTURE_FILE_PROVIDER_PLAYER_ID = 'CD_I297354';
+/** How many times the shared fixture files name it: the roster once, the player stats twice. A change fails loudly. */
+const FIXTURE_FILE_PLAYER_ID_OCCURRENCES = { roster: 1, stats: 2 } as const;
+/**
+ * This file's own provider player id: `CD_I<digits>` (the shape the afl_api adapters validate) built from the
+ * fixture season, the issue and a serial. It is 10 digits where every real `afl_api` provider player id on the
+ * production snapshot has 6 or 7, so no real row can hold it and every row keyed on it is one this file created.
+ */
+const BRIDGED_PROVIDER_PLAYER_ID = `CD_I${FIXTURE_SEASON}275001`;
 const BRIDGED_AFLTABLES_ID = 'players/Z/Issue275-state-b-bridged-test.html';
 const SYNTHETIC_PLAYER_LEGACY_ID = -275000001;
 const REQUIRED_ROLES = ['afldb_owner', 'afldb_import', 'afldb_app', 'afldb_auth', 'afldb_backup'];
@@ -104,13 +123,33 @@ let keepaliveMatchId = 0;
 let matchKey = '';
 let fixtureIds: Record<string, unknown> = {};
 
+/**
+ * Rename the shared fixture's real provider player id to this file's own id in an in-memory copy. The number of
+ * occurrences is asserted, so a fixture that gains or loses one fails here instead of leaving the real id in.
+ */
+function renameFixturePlayer(raw: RawJson, label: string, expected: number): RawJson {
+  const parts = JSON.stringify(raw).split(`"${FIXTURE_FILE_PROVIDER_PLAYER_ID}"`);
+  if (parts.length - 1 !== expected) {
+    throw new Error(
+      `The shared fixture ${label} names ${FIXTURE_FILE_PROVIDER_PLAYER_ID} ${parts.length - 1} time(s), expected ${expected}; `
+      + 'this file cannot rename it onto its own provider player id.',
+    );
+  }
+  return JSON.parse(parts.join(`"${BRIDGED_PROVIDER_PLAYER_ID}"`)) as RawJson;
+}
+
 /** The shared valid fixture, renamed onto this file's provider match id and date (same shape as the original). */
 function unitSource(mutate?: (raw: {
   fixture: RawJson; roster: RawJson; stats: RawJson;
 }) => void): AflApiSettleUnitSource {
   const fixture = clone(readFixture('01-fixture-result.json')) as RawJson;
-  const roster = clone(readFixture('03-match-roster.raw.json')) as RawJson;
-  const stats = clone(readFixture('02-player-stats.raw.json')) as RawJson;
+  // The real snapshot player id never reaches the settle: it is renamed to this file's own id first.
+  const roster = renameFixturePlayer(
+    readFixture('03-match-roster.raw.json') as RawJson, 'roster', FIXTURE_FILE_PLAYER_ID_OCCURRENCES.roster,
+  );
+  const stats = renameFixturePlayer(
+    readFixture('02-player-stats.raw.json') as RawJson, 'player stats', FIXTURE_FILE_PLAYER_ID_OCCURRENCES.stats,
+  );
   fixture.providerId = CASE_PROVIDER_ID;
   // The unit's season is resolved from compSeason.providerId (afl-api-identities.json), never from the bundle parameter.
   fixture.compSeason = {
@@ -186,6 +225,21 @@ async function fingerprint(): Promise<Fingerprint> {
   });
 }
 
+/**
+ * The full content of the snapshot's real `(afl_api, FIXTURE_FILE_PROVIDER_PLAYER_ID)` identity row as one JSON
+ * string, or `null` when no such row exists. `(source_id, external_id)` is unique (migration 002), so there is at
+ * most one. Read only; compared before and after to prove this file neither created, changed nor deleted it.
+ */
+async function snapshotProviderIdentity(): Promise<string | null> {
+  const rows = await sql<{ row: string }[]>`
+    SELECT to_jsonb(e)::text AS row
+      FROM external_identities e
+     WHERE e.source_id = (SELECT id FROM sources WHERE key = 'afl_api')
+       AND e.external_id = ${FIXTURE_FILE_PROVIDER_PLAYER_ID}
+  `;
+  return rows.length === 0 ? null : rows[0].row;
+}
+
 /** Counts of every fixture-namespace row; all must be zero before and after. */
 async function residue(): Promise<Record<string, number>> {
   const [r] = await sql<Record<string, number>[]>`
@@ -197,7 +251,8 @@ async function residue(): Promise<Record<string, number>> {
       (SELECT count(*) FROM players WHERE legacy_player_id = ${SYNTHETIC_PLAYER_LEGACY_ID})::int AS "players",
       (SELECT count(*) FROM external_identities
         WHERE (source_id = ${aflApiSourceId} AND external_id = ${BRIDGED_PROVIDER_PLAYER_ID})
-           OR (source_id = ${afltablesSourceId} AND external_id = ${BRIDGED_AFLTABLES_ID}))::int AS "externalIdentities",
+           OR (source_id = ${afltablesSourceId} AND external_id = ${BRIDGED_AFLTABLES_ID})
+           OR player_id IN (SELECT id FROM players WHERE legacy_player_id = ${SYNTHETIC_PLAYER_LEGACY_ID}))::int AS "externalIdentities",
       (SELECT count(*) FROM data_overrides WHERE entity_type = 'player_match_stats'
          AND starts_with(entity_key, ${`${FIXTURE_SEASON}|`}))::int AS "dataOverrides",
       (SELECT count(*) FROM data_edits WHERE note = ${NOTE})::int AS "dataEdits",
@@ -269,16 +324,23 @@ async function cleanup(): Promise<void> {
     await sql`DELETE FROM ${sql(table)} WHERE player_id IN ${players()}`;
   }
   await sql`DELETE FROM club_seasons WHERE season = ${FIXTURE_SEASON}`;
+  // Identities: only rows this file owns, by its own provider/AFL Tables ids or by its own synthetic player.
+  // The real snapshot id (FIXTURE_FILE_PROVIDER_PLAYER_ID) is never named here, so it can never be deleted.
   await sql`DELETE FROM external_identities WHERE source_id = ${aflApiSourceId} AND external_id = ${BRIDGED_PROVIDER_PLAYER_ID}`;
   await sql`DELETE FROM external_identities WHERE source_id = ${afltablesSourceId} AND external_id = ${BRIDGED_AFLTABLES_ID}`;
+  await sql`DELETE FROM external_identities WHERE player_id IN ${players()}`;
   await sql`DELETE FROM players WHERE legacy_player_id = ${SYNTHETIC_PLAYER_LEGACY_ID}`;
   await sql`DELETE FROM seasons WHERE year = ${FIXTURE_SEASON} AND NOT EXISTS (SELECT 1 FROM matches WHERE season = ${FIXTURE_SEASON})`;
 }
 
 let before: Fingerprint | undefined;
 let setupOk = false;
+/** The snapshot's real identity row for the fixture file's player id, read before anything else (`null` = absent). */
+let snapshotIdentityBefore: { row: string | null } | undefined;
 
 beforeAll(async () => {
+  // ---- the snapshot's own identity row for the fixture file's player id: read first, read only ----
+  snapshotIdentityBefore = { row: await snapshotProviderIdentity() };
   // ---- assert the target and the roles BEFORE any write ----
   const [id] = await sql<{ db: string; user: string }[]>`SELECT current_database() AS db, current_user AS "user"`;
   await requireAflApiBrownlowBacktestDatabase(sql);
@@ -364,6 +426,13 @@ beforeAll(async () => {
 afterAll(async () => {
   try {
     await cleanup();
+    if (snapshotIdentityBefore) {
+      // Also when beforeAll refused: a refused or failed run must leave the snapshot's real row exactly as found.
+      expect(
+        await snapshotProviderIdentity(),
+        `the snapshot's (afl_api, ${FIXTURE_FILE_PROVIDER_PLAYER_ID}) identity row changed`,
+      ).toEqual(snapshotIdentityBefore.row);
+    }
     expect(await residue(), 'no fixture row may remain').toEqual(NO_RESIDUE);
     if (before) {
       // Every pre-existing row is unchanged: counts, content outside the fixture season, and the sample.
@@ -461,6 +530,11 @@ describe('AFLDB-ISSUE-257 §17.8 on a fixture season — Match Sheet authority o
       expect(after.goals).toBe(2); // protected: the correction is kept
       expect(after.contestedMarks).toBe(4); // unrelated: still follows the source
       expect(after.sourceId).toBe(aflApiSourceId); // ownership is never changed by a Match Sheet edit
+
+      // The settle ran on this file's own provider player id: the snapshot's real row was neither read into the
+      // bundle nor touched (full content, or absence, as found in beforeAll).
+      expect(JSON.stringify(unitSource())).not.toContain(FIXTURE_FILE_PROVIDER_PLAYER_ID);
+      expect(await snapshotProviderIdentity()).toEqual(snapshotIdentityBefore?.row);
     } finally {
       await sql`
         DELETE FROM data_overrides
