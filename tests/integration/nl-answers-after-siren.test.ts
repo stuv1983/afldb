@@ -80,6 +80,43 @@ async function scalar(query: Promise<{ n: string }[]>): Promise<number> {
   return Number(row?.n ?? 0);
 }
 
+/**
+ * ISSUE-363 (T363-3 follow-up). Three witnesses below are properties of the 2026 kicks (after-siren rows 122-126),
+ * and the two databases this suite is qualified on hold them in two different, both measured, states:
+ *
+ *   'unresolved-2026'  the 4 Nov production snapshot. The five 2026 kicks were loaded before their matches existed,
+ *                      so they carry no player and no match link: 6 kicks with no trusted kicker (those five and
+ *                      Mark Williams 2011), and the latest MATCH-LINKED kick is the 2025 one.
+ *   'resolved'         the accepted rebuild (and any database the current loader has run on): the loader links all
+ *                      five, so 1 kick has no trusted kicker (Mark Williams 2011), the latest match-linked kick is
+ *                      Tim Membrey 2026-08-28, and Dylan Moore (rows 123 and 125) joins the maximum-kicks tie.
+ *
+ * Provenance: raw-SQL probes of both bases (run-4 `shared` scope, README "after-siren states"), not the code under
+ * test. The state is chosen by one independent fact (how many 2026 kicks have no match link: 5 or 0) and each
+ * state's literals are asserted exactly; a database in neither state fails with its own count, never silently.
+ * Before this, the three literals were the snapshot's, so the suite failed on the rebuild in every mode, and
+ * (ISSUE-363 T363-3) on the snapshot after `after-siren.test.ts` had run the loader over it in shared mode.
+ */
+type SirenState = { noPlayerLink: number; latestLinkedKicker: string; maxKickHolders: string[] };
+const BASE_TIE = [
+  'Barry Hall', 'Brad Johnson', 'David Mundy', 'Gary Rohan', 'Jack Riewoldt',
+  'Malcolm Blight', 'Mitch McGovern', 'Stephen Kernahan', 'Tom Hawkins',
+];
+async function measuredSirenState(): Promise<SirenState> {
+  const unresolved2026 = await scalar(sql<{ n: string }[]>`
+    SELECT count(*) AS n FROM after_siren_kicks WHERE season = 2026 AND match_id IS NULL
+  `);
+  if (unresolved2026 === 5) {
+    return { noPlayerLink: 6, latestLinkedKicker: 'Nasiah Wanganeen-Milera', maxKickHolders: BASE_TIE };
+  }
+  expect(unresolved2026, 'after_siren has neither measured state of the 2026 kicks (5 or 0 without a match link)').toBe(0);
+  return {
+    noPlayerLink: 1,
+    latestLinkedKicker: 'Tim Membrey',
+    maxKickHolders: [...BASE_TIE, 'Dylan Moore'].sort(),
+  };
+}
+
 describe('after_siren — the three dimensions are independent', () => {
   it('a goal after the siren and a goal after the siren TO WIN are different counts', async () => {
     const goal = await count(plan({ agg: { kind: 'count' }, afterSiren: { subject: 'event', kickScored: 'goal' } }));
@@ -175,13 +212,11 @@ describe('after_siren — ranking is always a tie', () => {
     const goals = await players(plan({ agg: { kind: 'max' }, afterSiren: { subject: 'player', kickScored: 'goal' } }));
     expect(kicks.rows.length).toBeGreaterThan(goals.rows.length);
     expect(kicks.rows.every((r) => r.value === kicks.lead!.value)).toBe(true);
-    // Nine measured holders on 2. The wider tie is the point: an absent
-    // kickScored counts every kick, including the misses, so more players
+    // Nine measured holders on 2 on the snapshot, ten on the resolved states (Dylan Moore, see measuredSirenState).
+    // The wider tie is the point: an absent kickScored counts every kick, including the misses, so more players
     // reach the ceiling than reach it on goals alone.
-    expect(kicks.rows.map((r) => r.displayName).sort()).toEqual([
-      'Barry Hall', 'Brad Johnson', 'David Mundy', 'Gary Rohan', 'Jack Riewoldt',
-      'Malcolm Blight', 'Mitch McGovern', 'Stephen Kernahan', 'Tom Hawkins',
-    ]);
+    const state = await measuredSirenState();
+    expect(kicks.rows.map((r) => r.displayName).sort()).toEqual([...state.maxKickHolders].sort());
   });
 
   it('a threshold above the measured ceiling is an honest EMPTY result, not a decline', async () => {
@@ -345,7 +380,7 @@ describe('after_siren — the match-link boundary (D10 §7.1)', () => {
     expect(lead).not.toBeNull();
     expect(lead!.eventId).toBe(expected.id);
     expect(lead!.matchId).not.toBeNull();
-    expect(lead!.playerName).toBe('Nasiah Wanganeen-Milera');
+    expect(lead!.playerName).toBe((await measuredSirenState()).latestLinkedKicker);
 
     // An unlinked row in a LATER season must not have won: it cannot be
     // placed in a chronology at all, and the caveat says so.
@@ -374,9 +409,9 @@ describe('after_siren — the trusted player link', () => {
     expect(excluded.noPlayerLink).toBe(await scalar(sql<{ n: string }[]>`
       SELECT count(*) AS n FROM after_siren_kicks WHERE player_id IS NULL
     `));
-    // Measured: 6 of the 126 recorded kicks have no trusted player link,
-    // and the caveat names that number rather than hiding the exclusion.
-    expect(excluded.noPlayerLink).toBe(6);
+    // Measured: 6 of the 126 recorded kicks have no trusted player link on the snapshot (1 on the resolved
+    // states, see measuredSirenState), and the caveat names that number rather than hiding the exclusion.
+    expect(excluded.noPlayerLink).toBe((await measuredSirenState()).noPlayerLink);
     expect(total).toBeGreaterThan(0);
   });
 

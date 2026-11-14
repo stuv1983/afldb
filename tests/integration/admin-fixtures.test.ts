@@ -97,8 +97,9 @@ const OVERRIDE_FAIL_NOTE = 'AFLDB-ISSUE-162-OVERRIDE-FORCE-FAIL';
 const MARKER_ROUND = 30;
 /**
  * The suite-owned "latest season" (run-4 allocation 2071-2072, ISSUE-363). Committed as a `seasons` row for the
- * length of the suite and removed again; the year after it is the administrable future season. Register both in
- * `tests/integration/leaked-fixtures.ts` (owner: this file). NOTE `settle-afl-api-state-b.test.ts` also uses
+ * length of the suite and removed again; the year after it is the administrable future season and never gets a
+ * `seasons` row (D-3). Only the first needs `tests/integration/leaked-fixtures.ts` (owner: this file; the second
+ * holds `fixtures` rows only, which no guard reads). NOTE `settle-afl-api-state-b.test.ts` also uses
  * 2071 (its own `FIXTURE_SEASON`); the two run serially and each removes its season, and this file never deletes
  * a season that still holds a match.
  */
