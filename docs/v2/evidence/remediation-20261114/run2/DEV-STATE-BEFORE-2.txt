@@ -1,0 +1,10 @@
+﻿# DEV (streamanator) service state — read-only, 2026-11-14T15:50:17+11:00
+afldb.service active MainPID=1732 NRestarts=0 InvocationID=c15b39a7e5554f30a8d1806333c9e880 since=Sat 2026-11-14 03:01:41 AEDT
+postgresql@16-main.service active MainPID=1531 NRestarts=0 InvocationID=f21f38b180c74c3e9baf2a87bad28e21 since=Sat 2026-11-14 03:01:41 AEDT
+caddy.service active MainPID=1683 NRestarts=0 InvocationID=e18d81237bc044ef829f5c17ead441ec since=Sat 2026-11-14 03:01:42 AEDT
+listeners (DEV): 127.0.0.1:2019 127.0.0.1:3000 127.0.0.1:5432 
+listeners (556xx): 
+timer: Sat 2026-11-14 15:55:00 AEDT      4min 41s Sat 2026-11-14 15:50:12 AEDT    5s ago afldb-settle-afl-api-brownlow.timer afldb-settle-afl-api-brownlow.service
+timer: Sun 2026-11-15 05:13:06 AEDT           13h Sat 2026-11-14 05:02:49 AEDT   10h ago afldb-settle-afl-api.timer          afldb-settle-afl-api.service
+DEV checkout HEAD: 8b024098a6771fc5e5be2f8bf006c9c3ca8ab55a
+load 0.75 0.67 0.53; /mnt/ssd free  528G
