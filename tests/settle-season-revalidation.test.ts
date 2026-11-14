@@ -1103,6 +1103,43 @@ describe('AFLDB-ISSUE-134 — the reverse-proxy contract the loopback gate rests
     });
   });
 
+  // AFLDB-ISSUE-357 O-1. Behaviour is proven against a real Caddy (2.11.4 and 2.11.9) in
+  // docs/v2/evidence/remediation-20261114/run2/caddy357/; this keeps the source from regressing.
+  describe('path-shape deny keeps non-canonical ISR paths out of Next (AFLDB-ISSUE-357)', () => {
+    const snippetOf = (source: string): string =>
+      source.match(/\(afldb_path_shape\) \{[\s\S]*?\n\}\n/)?.[0] ?? '';
+
+    it.each(CADDYFILES)('%s defines the four layers on the raw request target', (path) => {
+      const snippet = snippetOf(read(path));
+      expect(snippet).toContain('^[^?]{513,}');
+      expect(snippet).toContain('%2[EeFf]|%5[Cc]');
+      expect(snippet).toContain('^/[^/?]*%');
+      for (const prefix of ['players', 'matches', 'seasons', 'brownlow', 'clubs', 'venues', 'honour-teams', 'sitemap']) {
+        expect(snippet).toContain(`vars_regexp {http.request.uri} ^/${prefix}/[^?]`);
+      }
+      expect(snippet).toMatch(/respond @afldb_bad_player "Not Found" 404/);
+    });
+
+    it.each(CADDYFILES)('%s matches the raw target, never the decoded or cleaned path', (path) => {
+      const snippet = snippetOf(read(path));
+      // `path` / `path_regexp` see %32024 as 2024 and clean // and /../, which hides the alias.
+      expect(snippet).not.toMatch(/^\s*(@\S+\s+)?(not\s+)?path(_regexp)?\s/m);
+      expect(snippet).not.toMatch(/\{http\.request\.uri\.path\}/);
+    });
+
+    it.each(CADDYFILES)('%s imports the snippet before the proxy in the application block', (path) => {
+      const source = read(path);
+      const block = source.match(/^(?:beta\.afldb\.com|:8090) \{\n[\s\S]*?\n\}\n/m)?.[0] ?? '';
+      expect(block).toContain('import afldb_path_shape');
+      expect(block.indexOf('import afldb_path_shape')).toBeLessThan(block.indexOf('reverse_proxy 127.0.0.1:3100'));
+    });
+
+    it('keeps the two Caddyfiles on the same snippet body', () => {
+      const [dev, prod] = CADDYFILES.map((p) => snippetOf(read(p)).replace(/^\s*#.*\n/gm, ''));
+      expect(dev).toBe(prod);
+    });
+  });
+
   it('binds the application to loopback, so the proxy is the only way in', () => {
     expect(read('deploy/afldb.service')).toContain('Environment=HOSTNAME=127.0.0.1');
   });
