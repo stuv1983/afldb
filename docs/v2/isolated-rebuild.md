@@ -125,3 +125,22 @@ Local secret storage was replaced; no secret was displayed or committed. No conn
 55432 or shared-credential/SSH change occurred. Earlier endpoint contact remains supported;
 successful login, SQL execution and remote cluster identity remain unestablished. See
 `evidence/gap-029-acceptance-verification.json`.
+
+## 6. Retained rebuild inputs (RB-1, owner decision 2026-11-15)
+
+The standard rebuild of the **current** accepted baseline needs three inputs that exist in only one retained place on
+`streamanator`: the fitzRoy core `c2-2026-final-core-v1` (132 files, tree sha256 `02bbcf93…9988`), the ladder witness
+`c2-2026-final-ladder-v1` (130 files, `65c29907…7c34`) and the AFL Tables coaches raw bundle
+`coaches-20260905-raw.tar` (`24685690…4a`). They live under
+`/mnt/ssd/afldb/workspaces/afldb-i316-rb-I-20261023T0905Z/package/data/sources/` (also reachable through the symlink
+`/mnt/ssd/afldb-i316-rb-I-20261023T0905Z`, same directory). DEV's `/home/arm/projects/afldb/data/sources` does not hold them.
+
+The owner decided (RB-1, 2026-11-15) to **retain that workspace and its rebuild inputs**: never relocate, delete, clean or
+write it, and exclude it from every agent or housekeeping cleanup. Losing it blocks the accepted-baseline rebuild.
+Remediation run 3 copied the three inputs read-only and hash-verified into its own rebuild workspace
+(`docs/v2/evidence/remediation-20261114/run3/rebuild/inputs.tsv`); run 4 reads those copies and does not touch RB-1.
+
+Sections 3 and 5 above record the 2026-10-19/20 runs (baseline `full-history-20260902`, 89 checks, bridge parent v2). The
+current accepted baseline is `c2-2026-final-core-v1` (`data/reference/fitzroy-accepted-baselines.json`), and the run-3
+isolated rebuild validated **91 checks** with bridge parent v3
+(`docs/v2/evidence/remediation-20261114/run3/rebuild/README.md`).
