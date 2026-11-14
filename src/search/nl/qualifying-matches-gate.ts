@@ -55,6 +55,16 @@ function hasWellFormedShape(plan: unknown): plan is NlQueryPlan {
       || scope.matchup.clubA === undefined || scope.matchup.clubB === undefined) return false;
   }
   if (scope.venue !== undefined && !(isPlainObject(scope.venue) && isInt4(scope.venue.id))) return false;
+  // Review B-04: validatePlan accepts any finite non-negative matchFilter.value and any
+  // integer havingClause.value, but the drill-down binds both against integer expressions
+  // (a margin, a count): 1.5 fails with 22P02 and 3e10 / 1e300 with 22003, a 500. Operators
+  // and metrics stay allowlisted by validatePlan; only the value's range is held here.
+  if (plan.havingClause !== undefined && !(isPlainObject(plan.havingClause) && isInt4(plan.havingClause.value))) {
+    return false;
+  }
+  if (plan.matchFilter !== undefined && !(isPlainObject(plan.matchFilter) && isInt4(plan.matchFilter.value))) {
+    return false;
+  }
   return true;
 }
 
