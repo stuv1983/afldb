@@ -777,7 +777,9 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
 // when the next word is not a preposition, relative, conjunction, article or
 // auxiliary ("round with most goals", "round of most goals", "round that had
 // the most goals" decline; run-2 review MED-1, folded into v69 before release,
-// so no further bump). B-08: the singular rivalry rewrite inserts "game" only behind
+// so no further bump); after an auxiliary the same prepositions, relatives,
+// conjunctions and articles refuse it ("which was round with most goals";
+// review D LOW-3), while "has round had the most goals" still resolves. B-08: the singular rivalry rewrite inserts "game" only behind
 // the single-game lead ("in a showdown"); "in the showdown" / "in showdown
 // history" are left unrewritten and decline naming what was typed.
 export const PARSER_VERSION = 69;

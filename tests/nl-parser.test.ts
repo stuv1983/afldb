@@ -5387,6 +5387,11 @@ describe('Review B-03: a bare "round" resolves as a surname only where the quest
     'round that had the most goals',
     'round had the most goals',
     'round has the most goals',
+    // Run-2 review D LOW-3: an auxiliary before the word does not make it a surname when a
+    // preposition follows ("which was round with most goals" means "which round ...").
+    'which was round with most goals',
+    'was round with the most goals',
+    'is round of most goals',
   ])('"%s" still declines and never consults the player resolver', async (question) => {
     const calls: string[] = [];
     const result = await parseNlQuestion(question, roundCtx(calls));

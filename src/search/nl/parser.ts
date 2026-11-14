@@ -2166,15 +2166,20 @@ function candidatePlayerSpan(text: string): string | null {
  * "Barry Round - 293 goals". A surname-first question continues with a metric or career
  * word ("round most goals", "round career goals", "round brownlow votes"), never with one
  * of these. The auxiliaries are in the set because a leading "round has/had X" reads as the
- * noun. The check applies to the start-of-question cue ONLY: after an auxiliary the word is
- * already read as a subject ("has round kicked", "has round had a good year"), so what
- * follows it there is left alone.
+ * noun.
+ *
+ * Run-2 review D LOW-3: the auxiliary cue needs the same check for the non-verb words.
+ * "which was round with most goals" / "is round of most goals" carry an auxiliary before
+ * the word, but the word is still the period noun and `with`/`of` vanish as stopwords. After
+ * an auxiliary the next word is therefore refused when it is a preposition, relative,
+ * conjunction or article, and NOT when it is another auxiliary or a verb: "has round had
+ * the most goals" and "has round kicked" are still a surname subject.
  */
 const ROUND_AUXILIARIES = 'did|does|do|has|have|had|was|were|is|are|will|would|can|could';
-const ROUND_NEXT_WORD_NOT_A_SURNAME_CONTEXT =
-  `with|of|by|in|for|that|which|where|when|on|at|to|from|during|than|and|or|the|a|an|${ROUND_AUXILIARIES}`;
+const ROUND_NON_VERB_NEXT_WORDS = 'with|of|by|in|for|that|which|where|when|on|at|to|from|during|than|and|or|the|a|an';
 const ROUND_AS_SUBJECT_RE = new RegExp(
-  `(?:^round\\b(?!\\s+(?:${ROUND_NEXT_WORD_NOT_A_SURNAME_CONTEXT})\\b)|\\b(?:${ROUND_AUXILIARIES})\\s+round\\b)`,
+  `(?:^round\\b(?!\\s+(?:${ROUND_NON_VERB_NEXT_WORDS}|${ROUND_AUXILIARIES})\\b)`
+  + `|\\b(?:${ROUND_AUXILIARIES})\\s+round\\b(?!\\s+(?:${ROUND_NON_VERB_NEXT_WORDS})\\b))`,
   'g',
 );
 
