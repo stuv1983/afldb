@@ -1,0 +1,12 @@
+##### static 07:37:59
+tsc rc=0
+eslint rc=0
+
+/mnt/ssd/afldb-rem2-public-20261114/qual/src/search/nl/parser.ts
+  159:10  warning  'consume' is defined but never used  @typescript-eslint/no-unused-vars
+
+✖ 1 problem (0 errors, 1 warning)
+
+eslint rc=0
+tsc rc=0
+##### done 07:38:33

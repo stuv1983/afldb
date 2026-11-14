@@ -1,0 +1,76 @@
+isolated-pg: afldb_v2_rem2public_l3red_test verified (cluster afldb_v2_isolated, 127.0.0.1:55654); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem2-public-20261114/cand
+
+ ❯ tests/integration/nl-semantic-mapping.test.ts (44 tests | 2 failed) 5967ms
+     ✓ returns exact counts and last draw for record 35ms
+     ✓ returns exact counts and last draw for compare_wins 16ms
+     ✓ returns exact counts and last draw for draw_count 15ms
+     ✓ returns exact counts and last draw for last_draw 16ms
+     ✓ ranks games played for the requested organization lineage rather than whole-career games  1604ms
+     ✓ filters organization-lineage appearances with gte rather than whole-career games 88ms
+     ✓ filters organization-lineage appearances with gt rather than whole-career games 83ms
+     ✓ filters organization-lineage appearances with eq rather than whole-career games 83ms
+     ✓ orders and projects a club-scoped list by lineage appearances 80ms
+     ✓ preserves whole-career games projection when no club scope is present 7ms
+     ✓ resolves Jr/Jnr/Junior to the exact junior player and keeps senior distinct 225ms
+     ✓ richmond wins against carlton parses to head_to_head/record and answers with the existing record payload 58ms
+     ✓ richmond losses against carlton parses to head_to_head/record and answers with the existing record payload 49ms
+     ✓ bulldogs, dogs, footscray and western bulldogs are one directory entry 13ms
+     ✓ an ordinary organization-backed answer works through the bare alias  1779ms
+     ✓ a same-organization head-to-head through aliases refuses honestly 16ms
+     ✓ a draw question resolves the alias into the typed matchup 20ms
+     ✓ matches an exact alias, keeps the canonical title, and exposes the alias as matchedName 8ms
+     ✓ returns a player once when the primary name and its primary-name alias both match, preferring the primary form 14ms
+     ✓ keeps exact canonical-name ranking for a player with no aliases 13ms
+     ✓ resolves an alternate alias through the database-backed NL path to the canonical player 31ms
+     ✓ still declines an unrelated leftover token beside a valid alias match 111ms
+     ✓ ranks the complete 6-identity family and picks the true leader; the old 5-row resolver could not have 112ms
+     ✓ more than 12 plausible identities declines as ambiguous through the real resolver boundary 77ms
+     ✓ a 2-identity family (the smallest ambiguous case) resolves through the real resolver boundary 70ms
+     ✓ a 13-identity family with 2 hyphenated-surname members declines as ambiguous through the real resolver boundary 67ms
+     ✓ a 12-identity family with 2 hyphenated-surname members ranks completely, and a hyphenated member is the true leader 85ms
+     ✓ a full-name mention of a hyphenated-surname player resolves to that player, not a same-given-name decoy with more games 16ms
+     ✓ a full-name mention of an apostrophe-surname player resolves to that player, not a same-given-name decoy with more games 18ms
+     ✓ "round most goals" answers for the Round family 93ms
+     ✓ "round's career goals" answers for the Round family 71ms
+     ✓ "most goals in a round" still declines: the period noun is not a player 8ms
+     ✓ "most disposals in a round" still declines: the period noun is not a player 9ms
+     ✓ "most goals in the round" still declines: the period noun is not a player 9ms
+     ✓ "most wins in a round" still declines: the period noun is not a player 6ms
+     ✓ "most goals by round" still declines: the period noun is not a player 6ms
+     ✓ "round with most goals" still declines: the period noun is not a player 6ms
+     ✓ "round with the most goals" still declines: the period noun is not a player 6ms
+     ✓ "round of most goals" still declines: the period noun is not a player 6ms
+     ✓ "round for most goals" still declines: the period noun is not a player 6ms
+     ✓ "round that had the most goals" still declines: the period noun is not a player 6ms
+     × "which was round with most goals" still declines: the period noun is not a player 75ms
+     × "is round of most goals" still declines: the period noun is not a player 63ms
+     ✓ "most goals in round 5" is untouched: a round filter, not a player 7ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/nl-semantic-mapping.test.ts > Review B-03: a bare "round" is a surname only where the question reads it as a person > "which was round with most goals" still declines: the period noun is not a player
+ FAIL  tests/integration/nl-semantic-mapping.test.ts > Review B-03: a bare "round" is a surname only where the question reads it as a person > "is round of most goals" still declines: the period noun is not a player
+AssertionError: {"v":1,"grain":"player_career","metric":"goals","agg":{"kind":"max"},"scope":{"playerIdIn":[1030,8950,3567]},"careerConditions":[],"careerPredicates":[],"clubSeasonConditions":[],"tiePolicy":"all","limit":25}: expected 'plan' to be 'none' // Object.is equality
+
+Expected: "none"
+Received: "plan"
+
+ ❯ tests/integration/nl-semantic-mapping.test.ts:991:88
+    989|     const ctx = await buildNlParseContext();
+    990|     const parsed = await parseNlQuestion(question, ctx);
+    991|     expect(parsed.status, parsed.status === 'plan' ? JSON.stringify(pa…
+       |                                                                                        ^
+    992|     expect(parsed.report.entityResolution).toEqual([]);
+    993|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 42 passed (44)
+   Start at  18:37:20
+   Duration  8.13s (transform 1.32s, setup 227ms, import 1.68s, tests 5.97s, environment 0ms)
+
+rc=1

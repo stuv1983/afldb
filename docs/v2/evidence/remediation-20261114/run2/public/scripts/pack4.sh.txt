@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# review D LOW-3 follow-up: committed-form copies (ANSI stripped, DSN lines removed, LF) of the new raw outputs under $E/pack4/raw
+set -u -o pipefail
+W=/mnt/ssd/afldb-rem2-public-20261114
+E=$W/evidence; P=$E/pack4
+rm -rf $P; mkdir -p $P/raw
+put() { # <src> <dest name>
+  [ -f "$1" ] || { echo "MISSING $1"; return; }
+  case "$1" in
+    *.jsonl|*.json) tr -d '\r' < "$1" | grep -a -v -i 'postgres://' > "$P/raw/$2";;
+    *) sed 's/\x1b\[[0-9;]*m//g' "$1" | tr -d '\r' | grep -a -v -i 'postgres://' > "$P/raw/$2";;
+  esac
+}
+put $W/in/q-low3.txt low3-questions.txt
+put $E/probe-low3-red.jsonl low3-probe-red-bdeacaba.jsonl
+put $E/probe-low3-green.jsonl low3-probe-green-f3acebab.jsonl
+put $E/low3-unit-red.keep low3-unit-red-bdeacaba.txt
+put $E/low3-int-red.keep low3-int-red-bdeacaba.txt
+put $E/low3-unit-green.out low3-unit-green-cand.txt
+put $E/qual4-static-run.out low3-qual4-static-run.txt
+put $E/qual4-run.out low3-qual4-run.txt
+put $E/qual4/static-tsc.txt low3-qual4-static-tsc.txt
+put $E/qual4/static-eslint.txt low3-qual4-static-eslint.txt
+put $E/qual4/static-eslint-files.txt low3-qual4-static-eslint-files.txt
+put $E/qual4/unit-focused.log low3-qual4-unit-focused.txt
+for j in m1 m2 m4 m5 m6 m7 m8; do put $E/qual4/integ-$j.log low3-qual4-integ-$j.txt; done
+put $E/corpus-fix5/run.log low3-corpus-fix5-run.txt
+put $E/corpus-fix5/parse/summary.json low3-corpus-fix5-parse-summary.json
+cp $E/corpus-diff5-vs-base.txt $P/raw/low3-corpus-diff-vs-base.txt
+cp $E/corpus-diff5-vs-base.jsonl $P/raw/low3-corpus-diff-vs-base.jsonl
+cp $E/corpus-diff5-vs-a65.txt $P/raw/low3-corpus-diff-vs-a65ca3b4.txt
+cp $E/corpus-diff5-vs-a65.jsonl $P/raw/low3-corpus-diff-vs-a65ca3b4.jsonl
+cp $E/corpus-hashes5.txt $P/raw/low3-corpus-hashes.txt
+(cd $P/raw && ls -l | awk '{print $5, $9}')

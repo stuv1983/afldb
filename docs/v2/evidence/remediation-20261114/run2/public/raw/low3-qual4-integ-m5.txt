@@ -1,0 +1,16 @@
+isolated-pg: afldb_v2_rem2public_m5_test verified (cluster afldb_v2_isolated, 127.0.0.1:55654); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem2-public-20261114/qual
+
+ ✓ tests/integration/nl-answers-game-season.test.ts (24 tests) 5082ms
+     ✓ "most goals in a game" (unscoped) matches a hand-written MAX over player_match_stats  1209ms
+     ✓ "top 5 goals in a game" includes every hand-written top-5, with ties at the cutoff  1142ms
+     ✓ answers the review's exact opponent-scoped wording without discarding the opponent  378ms
+     ✓ a broad live_only season leaderboard pre-aggregates once instead of timing out  712ms
+
+ Test Files  1 passed (1)
+      Tests  24 passed (24)
+   Start at  18:38:55
+   Duration  6.81s (transform 1.03s, setup 201ms, import 1.28s, tests 5.08s, environment 0ms)
+
+rc=0

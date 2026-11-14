@@ -1,0 +1,14 @@
+isolated-pg: afldb_v2_rem2public_m1_test verified (cluster afldb_v2_isolated, 127.0.0.1:55654); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem2-public-20261114/qual
+
+ ✓ tests/integration/nl-semantic-mapping.test.ts (44 tests) 5420ms
+     ✓ ranks games played for the requested organization lineage rather than whole-career games  1584ms
+     ✓ an ordinary organization-backed answer works through the bare alias  1726ms
+
+ Test Files  1 passed (1)
+      Tests  44 passed (44)
+   Start at  18:38:10
+   Duration  7.01s (transform 938ms, setup 158ms, import 1.17s, tests 5.42s, environment 0ms)
+
+rc=0

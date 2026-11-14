@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# derive qual4.sh (f3acebab, review D LOW-3) from qual3.sh: new evidence dir, DB suffixes, corpus tag; corpus diffs vs base and vs the a65ca3b4 run (fix4)
+W=/mnt/ssd/afldb-rem2-public-20261114
+sed -e 's#evidence/qual3#evidence/qual4#' \
+    -e 's/integ_one k/integ_one m/' \
+    -e 's/corpus-parse.sh fix3 \$Q corpusfix3/corpus-parse.sh fix5 $Q corpusfix5/' \
+    -e 's#corpus-fix3#corpus-fix5#g' \
+    -e 's#corpus-hashes3#corpus-hashes5#g' \
+    -e 's#corpus-diff3-vs-base#corpus-diff5-vs-base#g' \
+    -e 's#corpus-diff3-vs-cb75#corpus-diff5-vs-a65#g' \
+    -e 's#corpus-fix/parse#corpus-fix4/parse#g' \
+    -e 's#sha256sum corpus-base/parse/results.jsonl corpus-fix4/parse/results.jsonl#sha256sum corpus-base/parse/results.jsonl corpus-fix4/parse/results.jsonl#' \
+    -e 's#fix3 (a65ca3b4)#fix5 (f3acebab)#g' \
+    -e 's#vs fix (cb75e3b3 v69)#vs fix4 (a65ca3b4 v69)#' \
+    -e 's#qual3.sh#qual4.sh#g' \
+    $W/in/qual3.sh > $W/in/qual4.sh
+grep -nE 'qual4|fix5|fix4|integ_one m' $W/in/qual4.sh | head -30

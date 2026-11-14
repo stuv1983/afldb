@@ -288,3 +288,53 @@ auxiliary verb". Closed by `1333f04f` + `a65ca3b4`; `PARSER_VERSION` 69; parse-o
 `tests/nl-parser.test.ts`, `tests/integration/nl-semantic-mapping.test.ts`, and under this directory `README.md` (this section),
 `SHA256SUMS`, `raw/med1*`, `scripts/{qual3,mk-qual3,pack3,corpus4,corpus-round}.sh.txt`. Commits end `Co-Authored-By: Claude Sonnet 5.5` (the
 system reminder for this task, which replaces the Opus line the protocol text names).
+
+## 11. Addendum: REVIEW-D LOW-3 (auxiliary cue still reads the period noun as Barry Round)
+
+Sections 1 to 10 are unchanged. Code commit `f3acebabde2487cfaa660e6e56d07f3b3118aa89` (on top of docs tip `bdeacaba`); this section and
+its files are the docs commit after it. New raw files `raw/low3*`; scripts `scripts/{qual4,mk-qual4,pack4}.sh.txt`; `SHA256SUMS`
+extended (116 to 145 entries, earlier entries unchanged, every entry verified against the committed blob).
+
+**Validated by execution (red probe, clean checkout `bdeacaba`, `raw/low3-probe-red-bdeacaba.jsonl`).** `which was round with most goals`,
+`was round with the most goals`, `is round of most goals`, plus the unlisted `what is round with the most goals` and `which is round for
+most goals` each answered **`Barry Round — 293 goals`**. Cause as the review traced it: the auxiliary alternative of
+`ROUND_AS_SUBJECT_RE` carried no next-word check, and `with`/`of`/`for` vanish as stopwords, leaving the bare span `round`.
+
+**Fix** (`src/search/nl/parser.ts`). The auxiliary alternative now has a lookahead that refuses the non-verb set only: prepositions
+`with of by in for on at to from during than`, relatives `that which where when`, conjunctions `and or`, articles `the a an`
+(`ROUND_NON_VERB_NEXT_WORDS`). The auxiliaries are deliberately not in it, so `has round had the most goals` and `has round kicked` keep
+resolving. The start-of-question alternative still refuses that set plus the auxiliaries (unchanged from section 10.2). Accepted
+cost, same as at the start of the question: a surname question that puts one of those words directly after the auxiliary-plus-surname
+("has round in his career kicked …") now declines rather than resolves; the wording is rare and declining is the safe side.
+
+**Tests, red then green.**
+
+- Unit, `tests/nl-parser.test.ts` `Review B-03` declining list gains `which was round with most goals`, `was round with the most goals`,
+  `is round of most goals`. Red on the `bdeacaba` parser (`raw/low3-unit-red-bdeacaba.txt`): `Tests  3 failed | 21 passed | 660 skipped
+  (684)`, each `AssertionError: which was round with most goals: expected 'plan' to be 'none' // Object.is equality` (same text for the
+  other two). All existing positives were among the 21 passing. Green on clean `f3acebab`: `Test Files 9 passed (9)`, `Tests 1173 passed
+  (1173)` (`raw/low3-qual4-unit-focused.txt`).
+- Executing, `tests/integration/nl-semantic-mapping.test.ts` declines gain `which was round with most goals`, `is round of most goals`.
+  Red on the `bdeacaba` parser (`raw/low3-int-red-bdeacaba.txt`): `Tests  2 failed | 42 passed (44)`, `AssertionError:
+  {"v":1,"grain":"player_career","metric":"goals",…"scope":{"playerIdIn":[1030,8950,3567]}…}: expected 'plan' to be 'none'`. Green on
+  clean `f3acebab`, fresh snapshot copy: `Tests 44 passed (44)` (`raw/low3-qual4-integ-m1.txt`).
+- Executing probe on `f3acebab` (`raw/low3-probe-green-f3acebab.jsonl`): the five questions above decline (`none/ambiguous`, unsupported
+  `round`); `has round had the most goals`, `round most goals`, `round's career goals`, `round brownlow votes` still answer for the Round
+  family; `round with most goals` and `most goals in a round` still decline.
+- Method, as in 10.3: the red runs used the iteration checkout `$W/cand` with the committed `bdeacaba` `parser.ts` copied over the working
+  file (new tests in place), then the fixed file copied back; the green results that count are the clean-checkout ones.
+
+**Clean checkout `f3acebab`** (`$W/qual`, porcelain 0): `tsc --noEmit` rc 0; eslint on every `.ts/.tsx` changed vs `e8666c17` 0 errors, the
+same baseline warning `parser.ts:159 'consume' unused`; unit 9 files 1,173 / 1,173; executing integration, one fresh snapshot copy per
+file, all pass (nl-semantic-mapping 44, club-comparison-route 31, nl-answers 33, nl-answers-game-season 24, nl-answers-team-club 36,
+nl-answer-boundary 4, nl-vocab 5 = 177). Parse-only V5 corpus (cheap, 10 s, parserVersion 69, 12,000 pass / 0 fail): **0 of 12,000
+changed vs `e8666c17` and 0 of 12,000 changed vs the `a65ca3b4` run** (`raw/low3-corpus-diff-vs-*.txt`, empty `.jsonl`). The corpus
+contains no row with the word "round" at all (section 10.4), so this proves only that nothing else moved; the tests above are the proof.
+Static and the unit/integration/corpus phases ran as two non-overlapping runners (`low3-qual4-static-run.txt`, `low3-qual4-run.txt`).
+Not re-run: production build and the other items listed in 10.5 (this change touches `parser.ts`, a `plan.ts` comment and two tests).
+
+`PARSER_VERSION` stays 69 (unpublished; REVIEW-D confirmed it is label-only); the `plan.ts` history comment gained one sentence.
+
+Files changed by this follow-up: `src/search/nl/parser.ts`, `src/search/nl/plan.ts` (comment only), `tests/nl-parser.test.ts`,
+`tests/integration/nl-semantic-mapping.test.ts`, and under this directory `README.md` (this section), `SHA256SUMS`, `raw/low3*`,
+`scripts/{qual4,mk-qual4,pack4}.sh.txt`. Commit trailer `Co-Authored-By: Claude Sonnet 5.5` as in section 10.8.

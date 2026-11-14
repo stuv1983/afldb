@@ -1,0 +1,33 @@
+isolated-pg: afldb_v2_rem2public_m2_test verified (cluster afldb_v2_isolated, 127.0.0.1:55654); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem2-public-20261114/qual
+
+stdout | tests/integration/club-comparison-route.test.ts > Stage 7 route budget > loads adelaide vs brisbane-lions inside the route budget
+[ISSUE-144 Stage 7] adelaide/brisbane-lions route state warm min/median/max = 304.9/327.6/449.0 ms
+
+stdout | tests/integration/club-comparison-route.test.ts > Stage 7 route budget > loads carlton vs collingwood inside the route budget
+[ISSUE-144 Stage 7] carlton/collingwood route state warm min/median/max = 323.8/332.9/383.6 ms
+
+ ✓ tests/integration/club-comparison-route.test.ts (31 tests) 16487ms
+     ✓ loads the comparison with dynamic defaults  391ms
+     ✓ keeps requested presentation order while canonicalising alphabetically  587ms
+     ✓ compares related but distinct organisations  1564ms
+     ✓ applies a valid match filter  730ms
+     ✓ falls back to all matches on an invalid filter, with a notice  558ms
+     ✓ normalises an invalid page to 1, with a notice  1887ms
+     ✓ preserves a page beyond the last one and reports honest totals  530ms
+     ✓ does not let the page change the head-to-head population  1599ms
+     ✓ scopes rivalry records and match history to the chosen era, leaving everything else all-time  810ms
+     ✓ falls back to all time on an era outside this rivalry’s recorded history, with a notice  335ms
+     ✓ falls back to all time on an unparsable era, with a notice  332ms
+     ✓ loads adelaide vs brisbane-lions inside the route budget  2491ms
+     ✓ loads carlton vs collingwood inside the route budget  2364ms
+     ✓ loads at most the default number of comparisons at once and returns what a lone load returns  1873ms
+     ✓ answers busy without loading the pair, then recovers once the slots drain  332ms
+
+ Test Files  1 passed (1)
+      Tests  31 passed (31)
+   Start at  18:38:21
+   Duration  17.65s (transform 642ms, setup 157ms, import 762ms, tests 16.49s, environment 0ms)
+
+rc=0

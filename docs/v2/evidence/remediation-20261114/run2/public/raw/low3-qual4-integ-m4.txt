@@ -1,0 +1,16 @@
+isolated-pg: afldb_v2_rem2public_m4_test verified (cluster afldb_v2_isolated, 127.0.0.1:55654); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem2-public-20261114/qual
+
+ ✓ tests/integration/nl-answers.test.ts (33 tests) 6922ms
+     ✓ "most all-australian selections without a premiership" matches a hand-written award_winners count  1706ms
+     ✓ renders club appearances under the Games column, not the whole-career total  1127ms
+     ✓ keeps the club filter in the SQL when a career predicate is present  1318ms
+     ✓ "most clangers" (a live_only stat) matches a hand-written SUM over player_match_stats  2010ms
+
+ Test Files  1 passed (1)
+      Tests  33 passed (33)
+   Start at  18:38:42
+   Duration  7.99s (transform 533ms, setup 175ms, import 641ms, tests 6.92s, environment 0ms)
+
+rc=0
