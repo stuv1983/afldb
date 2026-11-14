@@ -2157,8 +2157,24 @@ function candidatePlayerSpan(text: string): string | null {
  * the possessive is stripped by canonicalise) or an auxiliary verb ("has round kicked")
  * makes it a subject. Positive cues only, so any other position keeps the ISSUE-356
  * decline; EVERY occurrence of the word must read as a subject.
+ *
+ * Run-2 review MED-1: the start of the question is a cue only if the NEXT word is not a
+ * preposition, relative, conjunction, article or auxiliary. "round with most goals",
+ * "round of most goals", "round that had the most goals" and "round had the most goals"
+ * all mean "which round...", and `with`/`of`/`for`/`the` are stopwords that vanish before
+ * the leftover span is read, so the word looked like a bare surname and answered
+ * "Barry Round - 293 goals". A surname-first question continues with a metric or career
+ * word ("round most goals", "round career goals", "round brownlow votes"), never with one
+ * of these. The auxiliaries are in the set because "round has/had X" reads equally as the
+ * noun; a surname with an auxiliary is still read in the other direction ("has round kicked").
  */
-const ROUND_AS_SUBJECT_RE = /(?:^|\b(?:did|does|do|has|have|had|was|were|is|are|will|would|can|could)\s+)round\b/g;
+const ROUND_NEXT_WORD_NOT_A_SURNAME_CONTEXT =
+  'with|of|by|in|for|that|which|where|when|on|at|to|from|during|than|and|or|the|a|an'
+  + '|did|does|do|has|have|had|was|were|is|are|will|would|can|could';
+const ROUND_AS_SUBJECT_RE = new RegExp(
+  `(?:^|\\b(?:did|does|do|has|have|had|was|were|is|are|will|would|can|could)\\s+)round\\b(?!\\s+(?:${ROUND_NEXT_WORD_NOT_A_SURNAME_CONTEXT})\\b)`,
+  'g',
+);
 
 function roundIsSurnameSubject(normalisedQuestion: string): boolean {
   const all = normalisedQuestion.match(/\brounds?\b/g)?.length ?? 0;

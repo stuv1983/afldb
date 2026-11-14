@@ -8,9 +8,10 @@ import type { ClubComparisonRouteState } from './state';
  * for it, and nothing about the pair is claimed. It is not an error page, so it
  * is not a 500, and it is never offered to an index: the `robots` meta below is
  * hoisted into the document head by React, the same way `generateMetadata`'s
- * own tags are, and is the only robots tag (pageMetadata sets one only to
- * refuse indexing). Next cannot set a 503 from a page, so the status is 200
- * on a `force-dynamic` (never cached) route.
+ * own tags are. It is NOT the only robots tag: the measured document carries two,
+ * the root layout's `index, follow` and this `noindex, nofollow`, and the most
+ * restrictive directive applies (run-2 review LOW-4). Next cannot set a 503 from a
+ * page, so the status is 200 on a `force-dynamic` (never cached) route.
  */
 export function ClubCompareBusy({ state }: { state: Extract<ClubComparisonRouteState, { kind: 'busy' }> }) {
   return (

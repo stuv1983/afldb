@@ -773,7 +773,11 @@ import { GRID_BUILDERS, GRID_STATS, isGridStatKey, type GridAxisState, type Grid
 // the question reads it as a person -- at the start of the question or after
 // an auxiliary verb ("round's career goals", "has round kicked"); after a
 // determiner or preposition ("in a round", "by round") it stays a period noun
-// and declines. B-08: the singular rivalry rewrite inserts "game" only behind
+// and declines. A start-of-question or post-auxiliary "round" is a person only
+// when the next word is not a preposition, relative, conjunction, article or
+// auxiliary ("round with most goals", "round of most goals", "round that had
+// the most goals" decline; run-2 review MED-1, folded into v69 before release,
+// so no further bump). B-08: the singular rivalry rewrite inserts "game" only behind
 // the single-game lead ("in a showdown"); "in the showdown" / "in showdown
 // history" are left unrewritten and decline naming what was typed.
 export const PARSER_VERSION = 69;

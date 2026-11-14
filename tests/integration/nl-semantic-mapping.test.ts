@@ -978,6 +978,11 @@ describe('Review B-03: a bare "round" is a surname only where the question reads
     'most goals in the round',
     'most wins in a round',
     'most goals by round',
+    'round with most goals',
+    'round with the most goals',
+    'round of most goals',
+    'round for most goals',
+    'round that had the most goals',
   ])('"%s" still declines: the period noun is not a player', async (question) => {
     const ctx = await buildNlParseContext();
     const parsed = await parseNlQuestion(question, ctx);

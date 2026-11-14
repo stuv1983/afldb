@@ -5374,6 +5374,16 @@ describe('Review B-03: a bare "round" resolves as a surname only where the quest
     'highest score in a round',
     'most goals by round',
     'goals by round',
+    // Run-2 review MED-1: "round" first, followed by a word a surname is never followed by. These
+    // mean "which round ...", and with/of/for/the are stopwords that vanish before the span is read.
+    'round with most goals',
+    'round with the most goals',
+    'round of most goals',
+    'round for most goals',
+    'round by most goals',
+    'round that had the most goals',
+    'round had the most goals',
+    'round has the most goals',
   ])('"%s" still declines and never consults the player resolver', async (question) => {
     const calls: string[] = [];
     const result = await parseNlQuestion(question, roundCtx(calls));
