@@ -4,7 +4,7 @@
 
 **Start from `run3/APPROVAL-PACKET-3.md`** (it supersedes packet 2 and packet 1). Records: `run3/QUALIFICATION-3.md` (Q′ **`692b1902`**),
 `run3/RESIDUALS-3.md` (with `run2/RESIDUALS.md` for unchanged rows), `run3/RUN-PLAN-3.md`, `run3/PLAN-REVIEW-3.md` (PROCEED, 0 CRIT/HIGH),
-`run3/AGENT-BRIEF-COMMON-3.md`, and the scope READMEs `run3/{stateb,rebuild,integ,integb,qualification-3}/README.md`.
+`run3/AGENT-BRIEF-COMMON-3.md`, `run3/CLOSURE-3.md` (independent verification: 0 CRIT/HIGH/MED), and the scope READMEs `run3/{stateb,rebuild,integ,integb,qualification-3}/README.md`.
 
 **Nothing was pushed, merged, deployed, installed, restarted or written on production or DEV; there was no production contact.**
 
@@ -16,11 +16,11 @@
 
 **Run-3 commits** (`git log --reverse 6d5388ea..claude/remediation-20261114`): plan `38b08a2a`; stateb `18cbde7b`, `69168858`, `5270f678`;
 rebuild `a6532ec2`; integ `aae066c4`; integb `a38f98f5`, `6edf4f99`, `532e234d`, `bb81cbc9`, `0c66f3e3`, `ed256295`; qualification `692b1902` (**Q′**,
-last executable change), `9cb06c53`, `6575bc95`; records `b9a43343` (**publication candidate**), then the commit adding packet 3 and this section
-(records only). Scope commits were cherry-picked (`-x`) from `claude/rem3-<scope>-20261114`; the qualification branch was fast-forwarded.
+last executable change), `9cb06c53`, `6575bc95`; records `b9a43343`; packet 3 `3465fd97`; closure record and LOW corrections `5cef810b` (**publication candidate**); then the commit updating packet 3
+and this section (records only). Scope commits were cherry-picked (`-x`) from `claude/rem3-<scope>-20261114`; the qualification branch was fast-forwarded.
 
-**Successor record:** candidate `b9a43343272c8ee982a89d9f50f65fee53466313`; Q′ `692b1902cbcc321cea76a30857a03e15f02db6b7`; `origin/main`
-`de640826` (re-fetched 2026-11-15); `git diff --stat 692b1902 b9a43343` lists only `issues.md`, `IssuesIndex.md`, `blockers.md`, `CHANGELOG.md`
+**Successor record:** candidate `5cef810b88c1cd1e880e6eb5d9fb09322f8db618`; Q′ `692b1902cbcc321cea76a30857a03e15f02db6b7`; `origin/main`
+`de640826` (re-fetched 2026-11-15); `git diff --stat 692b1902 5cef810b` lists only `issues.md`, `IssuesIndex.md`, `blockers.md`, `CHANGELOG.md`
 and `docs/…`. Next actions, in order: owner approval A (publication); B0 read-only production probe; B1; owner decisions §C1 (D-365-1 first, then
 363-W/G/C/B), each implemented and qualified in a new run; B2 before 2027-03-10.
 

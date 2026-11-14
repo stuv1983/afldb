@@ -9,8 +9,8 @@ has been accepted on the owner's behalf.
 | Pin | Value | Source |
 |---|---|---|
 | `origin/main` | `de640826d13489c58392563e7ae1ff62403ed293` (unchanged; `git fetch` 2026-11-15) | read-only fetch |
-| **Publication candidate** | **`b9a43343272c8ee982a89d9f50f65fee53466313`** (`records(run3): ISSUE-363 partially resolved, new ISSUE-365, …`) | `git log` |
-| **Executable revision Q′** | **`692b1902cbcc321cea76a30857a03e15f02db6b7`**, the last commit that changes code, tests or scripts | `QUALIFICATION-3.md` |
+| **Publication candidate** | **`5cef810b88c1cd1e880e6eb5d9fb09322f8db618`** (`records(run3): closure verification record and its LOW corrections`) | `git log` |
+| **Executable revision Q′** | **`692b1902cbcc321cea76a30857a03e15f02db6b7`**, the last commit that changes code, tests or scripts (it adds the qualification scripts under `docs/`; the last commit outside the record paths is `bb81cbc9`) | `QUALIFICATION-3.md` |
 | Run 2's Q (superseded) | `f10e47ad`; since Q only five integration test files and the run-3 qualification scripts changed | §A |
 | Production release, host, Caddyfile, database | **carried from run 2, not re-read** (run 3 had no production access): `current` `c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x`, `previous` `0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN`; kernel 137 running with reboot required; installed Caddyfile sha256 `4f6972ec…d7af036`; `afldb_prod` OID 66668, sysid 7674454702926115004, ledger 118, `AFLDB_BETA_EPOCH` 1, 2027 `NOT_OPEN` | `../run2/PINS-2.txt` |
 | Schema change in the candidate | **none** (no file under `src/db/migrations/` changed since `de640826`) | `git diff` |
@@ -18,14 +18,14 @@ has been accepted on the owner's behalf.
 
 ## A. Publication (Git only; recommended: approve)
 
-**What:** fast-forward `origin/main` from `de640826` to `b9a43343`:
-- **129 commits** (`git rev-list --count de640826..b9a43343`): the full review `5035ed96`, run 1, run 2 and run 3.
-- **1,632 files** changed. Excluding `docs/v2/evidence/` and `issues/`: **190 files, +13,633 / −512**.
+**What:** fast-forward `origin/main` from `de640826` to `5cef810b`:
+- **131 commits** (`git rev-list --count de640826..5cef810b`): the full review `5035ed96`, run 1, run 2 and run 3.
+- **1,634 files** changed. Excluding `docs/v2/evidence/` and `issues/`: **190 files, +13,633 / −512**.
 - **Executable delta since run 2's Q `f10e47ad`:** `tests/integration/{settle-afl-api-state-b,settle-afl-api,settle-afl-api-brownlow,settle-afl-api-issue276,database}.test.ts`
   (+264 / −23) and the qualification scripts `run3/qualification-3/{setup,qual,fixtures}.sh`. **No application code, tool, migration, deploy file,
   package file or reference dataset changed in run 3.** The run-1 and run-2 code delta is unchanged (packet 2 §A).
-- **Proof that Q′ is the executable revision:** `git diff --stat 692b1902 b9a43343` lists only `docs/…`, `issues.md`, `IssuesIndex.md`, `blockers.md`,
-  `CHANGELOG.md` (0 other paths, recorded 2026-11-15). Every script that produced Q′ evidence is committed at or before Q′.
+- **Proof that Q′ is the executable revision:** `git diff --stat 692b1902 5cef810b` lists only `docs/…`, `issues.md`, `IssuesIndex.md`, `blockers.md`,
+  `CHANGELOG.md` (0 other paths, recorded 2026-11-15; independently re-derived by `afldb-closure`, `CLOSURE-3.md`). Every script that produced Q′ evidence is committed at or before Q′.
 - **Lint stays a ratchet:** 338 errors in 43 files remain; the gate fails only when a count rises. This is not clean lint.
 
 **Qualification at Q′** (`QUALIFICATION-3.md`): typecheck rc 0; lint ratchet 338/43; unit **12,295 passed / 0 failed** with every hash-verified fixture
@@ -36,15 +36,15 @@ classified on it (14 pass under intended conditions, 2 defects fixed, 31 stale a
 **Before:** `git fetch origin` and confirm `origin/main` is still `de640826` (if it moved: stop, a rebase needs a new qualification). Expect a later
 merge in `D:\dev\afldb` (branch `claude/issue-339-deploy-preflight`), which holds unrelated uncommitted edits to 12 files this candidate also changes
 (packet 2 §A lists them).
-**Command (owner):** `git push origin b9a43343272c8ee982a89d9f50f65fee53466313:main` (fast-forward; refuse `--force`).
-The branch tip is a records-only commit after `b9a43343` that adds this packet and the run-3 HANDOFF record. Pushing the branch tip instead is covered by
-this approval only if `git diff --name-only b9a43343 claude/remediation-20261114` lists files under `docs/v2/evidence/remediation-20261114/` only.
+**Command (owner):** `git push origin 5cef810b88c1cd1e880e6eb5d9fb09322f8db618:main` (fast-forward; refuse `--force`).
+The branch tip is a records-only commit after `5cef810b` that updates this packet and the run-3 HANDOFF record. Pushing the branch tip instead is covered by
+this approval only if `git diff --name-only 5cef810b claude/remediation-20261114` lists files under `docs/v2/evidence/remediation-20261114/` only.
 **Recovery:** a revert commit; never rewrite `main`.
 **Breaking changes to note (unchanged from packet 2):** `release.mjs promote`/`rollback` require `--attended`; per-file test mode refuses parameterised or
 tunnelled DSNs (opt-in); the Caddy changes, once installed (B7), 404 a trailing slash on protected ISR routes, cap match ids at 99,999 and require
 slugs `[a-z0-9-]`.
 
-> **Approval A:** "I approve publishing `claude/remediation-20261114` at `b9a43343272c8ee982a89d9f50f65fee53466313` to `origin/main` by fast-forward from `de640826d13489c58392563e7ae1ff62403ed293`. Executable revision `692b1902cbcc321cea76a30857a03e15f02db6b7`. Lint is a 338-error ratchet, not clean." — owner, date ________.
+> **Approval A:** "I approve publishing `claude/remediation-20261114` at `5cef810b88c1cd1e880e6eb5d9fb09322f8db618` to `origin/main` by fast-forward from `de640826d13489c58392563e7ae1ff62403ed293`. Executable revision `692b1902cbcc321cea76a30857a03e15f02db6b7`. Lint is a 338-error ratchet, not clean." — owner, date ________.
 
 ## B. Production operations (each separately approved; all need A; B2–B8 need B1)
 
@@ -62,7 +62,7 @@ nothing below is valid with a blank.**
 - **Prerequisite:** B0 done; `node deploy/release.mjs host-gate` (refuses while apt runs or is due within 90 minutes, and outside 05:00–07:15 AEDT).
 - **Commands:** `promote --attended`, then the owner's restart in the same sitting. **Validation:** `release.mjs status --expect <new id>`,
   `deploy/post-install-check.sh <new id>`, a public smoke. **Recovery:** `release.mjs rollback --attended` to `c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x` (re-read in B0).
-> **Approval B1:** "I approve releasing `b9a43343…` (published) to production with `promote --attended` and my attended restart in the window ________ (date, 05:00–07:15 AEDT), rollback target `________` (as re-read in B0)." — owner, date ________.
+> **Approval B1:** "I approve releasing `5cef810b…` (published) to production with `promote --attended` and my attended restart in the window ________ (date, 05:00–07:15 AEDT), rollback target `________` (as re-read in B0)." — owner, date ________.
 
 ### B2. ISSUE-350: open 2027 (D-350-1; recommended (b): after B1, **by 2027-03-10**; every nightly fails from 2027-03-17 otherwise)
 - Procedure 01 (the I350 ceremony); 1 `seasons` row, `last_season` 2027 on 18 club identities and 18 organisations, 1 audit row; typed digest;
@@ -105,7 +105,7 @@ nothing below is valid with a blank.**
 | Decision | Recommended | Consequence of the recommendation | Consequence of the alternative |
 |---|---|---|---|
 | **D-365-1** Brownlow coverage of a completed season with no loaded medal (ISSUE-365, Medium) | (a) keep it `pending` unless a declared no-medal season; fix with a regression | changes a modelling rule and the admin lock semantics; needs a reviewed code change and qualification | (b)/(c): the first Brownlow settle or admin finalisation of such a season marks it "no medal" and locks Brownlow admin for it |
-| **363-W** 27 stale club-comparison / release-gates witnesses (plus 2 surrogate-id lookups) | club-comparison bounded to seasons ≤ 2025 with stable keys; release-gates counts re-pinned to the accepted baseline | the suites pass on the accepted rebuild and stop going stale each season | re-pin to 2026 values: stale again when 2027 loads; accept: 29 ids stay classified failures |
+| **363-W** 27 stale club-comparison / release-gates witnesses (plus 2 surrogate-id lookups); note: 4 `database` witnesses were already re-pinned to the accepted baseline under this run's authorisation (`bb81cbc9`; revert is the owner's option) | club-comparison bounded to seasons ≤ 2025 with stable keys; release-gates counts re-pinned to the accepted baseline | the suites pass on the accepted rebuild and stop going stale each season | re-pin to 2026 values: stale again when 2027 loads; accept: 29 ids stay classified failures |
 | **363-G** three "2026 is provisional" gates | re-point to the current in-progress season | gates keep their meaning as seasons roll | keep: they fail on every accepted-baseline database |
 | **363-C** Coleman contract `expected_rows` 46 | re-pin and derive the legacy-transition expectation | `awards-reload-links` runs on completed-2026 bases | keep: the suite only runs on a base with 2026 in progress, which the register no longer produces |
 | **363-B** birth-date pins (13,255 vs rebuild 13,347) | pins follow the accepted rebuild | 3 release-gates ids pass on the rebuild; then fail on the 4 Nov snapshot until production is re-enriched | follow production: the rebuild path stays red |
@@ -138,7 +138,7 @@ nothing below is valid with a blank.**
 - **Not verified in run 3:** every production pin (carried), DEV `AFLDB_BETA_EPOCH`, Caddy `roll_keep_for`, DigitalOcean console and snapshots; no
   systemd unit, host-policy file or ssh/rrsync path has run on production.
 - **Residual register:** `RESIDUALS-3.md` (with `../run2/RESIDUALS.md` for unchanged rows). Nothing accepted on the owner's behalf.
-- **Incidents disclosed:** none outside authority. Two scope agents ran single-file test groups without the shared heavy lock (not restores, rebuilds,
+- **Incidents disclosed:** none outside authority. Minor, disclosed in the scope records: the rebuild agent briefly placed an untracked probe script in its own host checkout (moved out unexecuted); the integ agent applied migration 118 (the runner has no upper bound) to the two Brownlow clones it built from retained artefacts read-only copied from `/home/arm/afldb-v2-brownlowverify-20261028`; the closure agent's first focused run stopped on a script bug and was relaunched. Two scope agents ran single-file test groups without the shared heavy lock (not restores, rebuilds,
   full suites or builds); one `pkill -f` matched its own ssh shell and killed only its own lock waiter; one kill-and-relaunch command was refused by the
   permission classifier and did not run; directory names were listed (no file read, no write) under `D:\dev\afldbV2\data` and `D:\dev\afldb\data\sources`
   early in the rebuild input search.
