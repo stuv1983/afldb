@@ -1,0 +1,78 @@
+isolated-pg: afldb_v2_remanswershr_test verified (cluster afldb_v2_isolated, 127.0.0.1:55616); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem-answers-20261114/cand
+
+ ❯ tests/integration/home-records.test.ts (7 tests | 3 failed) 711ms
+     ✓ preserves career records and reuses match and season record semantics 110ms
+     ✓ derives coach count and percentage leaders from canonical match assignments  346ms
+     ✓ preserves venue counts and NULL attendance semantics 47ms
+     ✓ uses active linked curated records for after-siren and first-kick leaders 27ms
+     × after-siren-most-attempts never hides a holder tied on the cutoff value 33ms
+     × after-siren-most-goals never hides a holder tied on the cutoff value 22ms
+     × coach-most-premierships never hides a holder tied on the cutoff value 116ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/home-records.test.ts > AFL home record catalogue against afldb_test > after-siren-most-attempts never hides a holder tied on the cutoff value
+AssertionError: expected 5 to be 9 // Object.is equality
+
+- Expected
++ Received
+
+- 9
++ 5
+
+ ❯ tests/integration/home-records.test.ts:101:59
+     99|     const result = await getHomeRecord(value, 5);
+    100|     const shownAtCutoff = result.rows.filter((row) => row.value === cu…
+    101|     expect(shownAtCutoff + (result.moreTied?.count ?? 0)).toBe(holders…
+       |                                                           ^
+    102|     expect(result.rows.every((row) => row.value >= cutoff)).toBe(true);
+    103|     if (result.moreTied) {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  tests/integration/home-records.test.ts > AFL home record catalogue against afldb_test > after-siren-most-goals never hides a holder tied on the cutoff value
+AssertionError: expected 3 to be 64 // Object.is equality
+
+- Expected
++ Received
+
+- 64
++ 3
+
+ ❯ tests/integration/home-records.test.ts:101:59
+     99|     const result = await getHomeRecord(value, 5);
+    100|     const shownAtCutoff = result.rows.filter((row) => row.value === cu…
+    101|     expect(shownAtCutoff + (result.moreTied?.count ?? 0)).toBe(holders…
+       |                                                           ^
+    102|     expect(result.rows.every((row) => row.value >= cutoff)).toBe(true);
+    103|     if (result.moreTied) {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  tests/integration/home-records.test.ts > AFL home record catalogue against afldb_test > coach-most-premierships never hides a holder tied on the cutoff value
+AssertionError: expected 1 to be 8 // Object.is equality
+
+- Expected
++ Received
+
+- 8
++ 1
+
+ ❯ tests/integration/home-records.test.ts:101:59
+     99|     const result = await getHomeRecord(value, 5);
+    100|     const shownAtCutoff = result.rows.filter((row) => row.value === cu…
+    101|     expect(shownAtCutoff + (result.moreTied?.count ?? 0)).toBe(holders…
+       |                                                           ^
+    102|     expect(result.rows.every((row) => row.value >= cutoff)).toBe(true);
+    103|     if (result.moreTied) {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 4 passed (7)
+   Start at  08:51:40
+   Duration  1.47s (transform 341ms, setup 164ms, import 348ms, tests 711ms, environment 0ms)
+

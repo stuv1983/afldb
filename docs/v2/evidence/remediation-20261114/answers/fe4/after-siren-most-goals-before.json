@@ -1,0 +1,25 @@
+{
+ "record": "after-siren-most-goals",
+ "tag": "before",
+ "baseUrl": "http://127.0.0.1:3161",
+ "results": [
+  {
+   "viewport": "desktop",
+   "status": 200,
+   "meterRows": 5,
+   "moreTied": null,
+   "panelHeightPx": 404,
+   "horizontalOverflow": false,
+   "text": "Record of the week ALL → Most After-the-Siren Goals. Most goals kicked after the siren in active, source-backed records. Barry Hall 2 Goals Gary Rohan 2 Goals David Mundy 1 Goals Jack Riewoldt 1 Goals Malcolm Blight 1 Goals This is a curated historical record, not a claim of complete play-by-play coverage."
+  },
+  {
+   "viewport": "mobile",
+   "status": 200,
+   "meterRows": 5,
+   "moreTied": null,
+   "panelHeightPx": 401,
+   "horizontalOverflow": false,
+   "text": "Record of the week ALL → Most After-the-Siren Goals. Most goals kicked after the siren in active, source-backed records. Barry Hall 2 Goals Gary Rohan 2 Goals David Mundy 1 Goals Jack Riewoldt 1 Goals Malcolm Blight 1 Goals This is a curated historical record, not a claim of complete play-by-play coverage."
+  }
+ ]
+}

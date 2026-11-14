@@ -1,0 +1,10 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem-answers-20261114/cand
+
+ ✓ tests/home-records.test.ts (21 tests) 100ms
+
+ Test Files  1 passed (1)
+      Tests  21 passed (21)
+   Start at  08:50:46
+   Duration  708ms (transform 217ms, setup 158ms, import 196ms, tests 100ms, environment 0ms)
+

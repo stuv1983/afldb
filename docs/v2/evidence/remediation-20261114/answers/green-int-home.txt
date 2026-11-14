@@ -1,0 +1,12 @@
+isolated-pg: afldb_v2_remanswershg_test verified (cluster afldb_v2_isolated, 127.0.0.1:55616); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem-answers-20261114/cand
+
+ ✓ tests/integration/home-records.test.ts (7 tests) 742ms
+     ✓ derives coach count and percentage leaders from canonical match assignments  355ms
+
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+   Start at  08:51:47
+   Duration  1.51s (transform 343ms, setup 167ms, import 358ms, tests 742ms, environment 0ms)
+

@@ -1,0 +1,3 @@
+ Test Files  1 failed (1)
+      Tests  1 failed | 1211 passed (1212)
+   Duration  363.58s (transform 526ms, setup 157ms, import 86.20s, tests 276.86s, environment 0ms)

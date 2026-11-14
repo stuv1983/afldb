@@ -1,0 +1,8 @@
+cellStats 10209 10209 differing (ignoring ms): 0
+findings 25422 25422 only-before 0 only-after 0
+criteria 839 839 differing (ignoring ms): 0
+criterion keys id,occurrences,status,axis,players,ms,error
+criteria on club_season_stat_leader* 5 live-only stat among them: 0
+[{"id":"clubLeadingGoalKicker","axis":"club_season_stat_leader({\"stat\":\"goals\"})"},{"id":"clubLeadingGoalKicker2x","axis":"club_season_stat_leader_min_times({\"stat\":\"goals\",\"times\":\"2\"})"},{"id":"clubLeadingGoalKicker3x","axis":"club_season_stat_leader_min_times({\"stat\":\"goals\",\"times\":\"3\"})"},{"id":"marksClubLeader","axis":"club_season_stat_leader({\"stat\":\"marks\"})"},{"id":"disposalsClubLeader","axis":"club_season_stat_leader({\"stat\":\"disposals\"})"}]
+before {"boards":1143,"cells":10287,"solvedCells":10209,"findingsByCategory":{"time of board":23530,"adjudicated key disagreement":54,"unsupported":78,"list membership":1232,"external source disagreement":425,"adjudicated source conflict":63,"criterion disagreement":40},"database":"afldb_v2_remanswersgb_test"}
+after {"boards":1143,"cells":10287,"solvedCells":10209,"findingsByCategory":{"time of board":23530,"adjudicated key disagreement":54,"unsupported":78,"list membership":1232,"external source disagreement":425,"adjudicated source conflict":63,"criterion disagreement":40},"database":"afldb_v2_remanswersga_test"}

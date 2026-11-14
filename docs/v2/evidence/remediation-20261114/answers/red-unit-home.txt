@@ -1,0 +1,196 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem-answers-20261114/cand
+
+ ❯ tests/home-records.test.ts (21 tests | 9 failed) 112ms
+     ✓ executes only most-goals and returns its declared row kind 20ms
+     ✓ executes only most-goals-in-a-game and returns its declared row kind 1ms
+     ✓ executes only most-goals-in-a-season and returns its declared row kind 1ms
+     ✓ executes only coach-most-wins and returns its declared row kind 1ms
+     ✓ executes only venue-most-finals and returns its declared row kind 1ms
+     ✓ executes only after-siren-most-goals and returns its declared row kind 1ms
+     ✓ executes only first-kick-most-consecutive-goals and returns its declared row kind 1ms
+     × falls back before dispatching when the stored value is stale 13ms
+     × lists every holder when nine are tied on the record (5 shown before the fix) 5ms
+     × lists a short tie straddling the cutoff but not the places below it 2ms
+     × discloses the true count of a long tie instead of implying five holders 2ms
+     × says "at least" when the provider window ends inside the tie 1ms
+     ✓ adds nothing when the fifth place is not tied 1ms
+     × never relabels or reorders, and never invents a tie below the cutoff 1ms
+     × returns fewer rows than the limit untouched 1ms
+     × states how many holders are not listed, the shared value, and links the full record 46ms
+     × flags a lower bound and omits the link when the record has no full page 5ms
+     ✓ renders no marker when nothing is hidden 2ms
+     ✓ renders player, coach and venue rows with the correct entity links 4ms
+     ✓ renders match context and visible units 1ms
+     ✓ renders an empty selected provider without crashing 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 9 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/home-records.test.ts > home record provider dispatch > falls back before dispatching when the stored value is stale
+AssertionError: expected "vi.fn()" to be called with arguments: [ 'most-goals', undefined ]
+
+Received:
+
+  1st vi.fn() call:
+
+  [
+    "most-goals",
+-   undefined,
++   5,
+  ]
+
+
+Number of calls: 1
+
+ ❯ tests/home-records.test.ts:108:26
+    106|     // The provider is read through the tie window, not the bare panel…
+    107|     // (AFLDB-ISSUE-360 FE-4), so a tie at the cutoff can be seen.
+    108|     expect(mocks.career).toHaveBeenCalledWith('most-goals', HOME_RECOR…
+       |                          ^
+    109|   });
+    110| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/9]⎯
+
+ FAIL  tests/home-records.test.ts > home record tied holders at the cutoff (AFLDB-ISSUE-360 FE-4) > lists every holder when nine are tied on the record (5 shown before the fix)
+AssertionError: expected [ { …(5) }, { …(5) }, { …(5) }, …(2) ] to have a length of 9 but got 5
+
+- Expected
++ Received
+
+- 9
++ 5
+
+ ❯ tests/home-records.test.ts:133:25
+    131|     const { getHomeRecord } = await import('@/db/queries/home-records'…
+    132|     const result = await getHomeRecord('after-siren-most-attempts', 5);
+    133|     expect(result.rows).toHaveLength(9);
+       |                         ^
+    134|     expect(result.rows.every((row) => row.value === 2)).toBe(true);
+    135|     expect(result.moreTied).toBeUndefined();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/9]⎯
+
+ FAIL  tests/home-records.test.ts > home record tied holders at the cutoff (AFLDB-ISSUE-360 FE-4) > lists a short tie straddling the cutoff but not the places below it
+AssertionError: expected [ 6, 5, 4, 3, 3 ] to deeply equal [ 6, 5, 4, 3, 3, 3, 3 ]
+
+- Expected
++ Received
+
+@@ -2,8 +2,6 @@
+    6,
+    5,
+    4,
+    3,
+    3,
+-   3,
+-   3,
+  ]
+
+ ❯ tests/home-records.test.ts:142:49
+    140|     const { getHomeRecord } = await import('@/db/queries/home-records'…
+    141|     const result = await getHomeRecord('after-siren-most-attempts', 5);
+    142|     expect(result.rows.map((row) => row.value)).toEqual([6, 5, 4, 3, 3…
+       |                                                 ^
+    143|     expect(result.moreTied).toBeUndefined();
+    144|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/9]⎯
+
+ FAIL  tests/home-records.test.ts > home record tied holders at the cutoff (AFLDB-ISSUE-360 FE-4) > discloses the true count of a long tie instead of implying five holders
+AssertionError: expected undefined to deeply equal { count: 61, exact: true, value: 1 }
+
+- Expected:
+{
+  "count": 61,
+  "exact": true,
+  "value": 1,
+}
+
++ Received:
+undefined
+
+ ❯ tests/home-records.test.ts:151:29
+    149|     const result = await getHomeRecord('after-siren-most-goals', 5);
+    150|     expect(result.rows).toHaveLength(5);
+    151|     expect(result.moreTied).toEqual({ count: 61, exact: true, value: 1…
+       |                             ^
+    152|   });
+    153|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/9]⎯
+
+ FAIL  tests/home-records.test.ts > home record tied holders at the cutoff (AFLDB-ISSUE-360 FE-4) > says "at least" when the provider window ends inside the tie
+RangeError: Invalid array length
+ ❯ tests/home-records.test.ts:155:13
+    153|
+    154|   it('says "at least" when the provider window ends inside the tie', a…
+    155|     provide(Array<number>(HOME_RECORD_TIE_WINDOW + 50).fill(1));
+       |             ^
+    156|     const { getHomeRecord } = await import('@/db/queries/home-records'…
+    157|     const result = await getHomeRecord('after-siren-most-goals', 5);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/9]⎯
+
+ FAIL  tests/home-records.test.ts > selectHomeRecordRows > never relabels or reorders, and never invents a tie below the cutoff
+TypeError: selectHomeRecordRows is not a function
+ ❯ tests/home-records.test.ts:176:39
+    174|
+    175|   it('never relabels or reorders, and never invents a tie below the cu…
+    176|     const { rows: shown, moreTied } = selectHomeRecordRows(rows(5, 4, …
+       |                                       ^
+    177|     expect(shown.map((row) => row.value)).toEqual([5, 4, 3, 2, 1, 1]);
+    178|     expect(moreTied).toBeNull();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/9]⎯
+
+ FAIL  tests/home-records.test.ts > selectHomeRecordRows > returns fewer rows than the limit untouched
+TypeError: selectHomeRecordRows is not a function
+ ❯ tests/home-records.test.ts:182:12
+    180|
+    181|   it('returns fewer rows than the limit untouched', () => {
+    182|     expect(selectHomeRecordRows(rows(3, 2), 5)).toEqual({ rows: rows(3…
+       |            ^
+    183|   });
+    184| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/9]⎯
+
+ FAIL  tests/home-records.test.ts > HomeRecordPanel tied-holder marker > states how many holders are not listed, the shared value, and links the full record
+AssertionError: expected '<section aria-label="Record of the we…' to contain 'and 61 more tied on 1 Goals'
+
+Expected: "and 61 more tied on 1 Goals"
+Received: "<section aria-label="Record of the week"><div class="split-head"><h2>Record of the week</h2><a class="more" href="/records/after-the-siren">All →</a></div><p class="lede"><strong>Most After-the-Siren Goals.</strong> Most goals kicked after the siren in active, source-backed records.</p><div class="meter"><div class="meter-head"><span><a href="/players/a-one-1">A One</a></span><span class="meter-value">1 Goals</span></div><div class="meter-track" aria-hidden="true"><div class="meter-fill" style="width:100%"></div></div></div><p class="footnote">This is a curated historical record, not a claim of complete play-by-play coverage.</p></section>"
+
+ ❯ tests/home-records.test.ts:195:18
+    193|       moreTied: { count: 61, exact: true, value: 1 },
+    194|     } }));
+    195|     expect(html).toContain('and 61 more tied on 1 Goals');
+       |                  ^
+    196|     expect(html).toContain('href="/records/after-the-siren">see the fu…
+    197|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/9]⎯
+
+ FAIL  tests/home-records.test.ts > HomeRecordPanel tied-holder marker > flags a lower bound and omits the link when the record has no full page
+AssertionError: expected '<section aria-label="Record of the we…' to contain 'and at least 195 more tied on 1 Grand…'
+
+Expected: "and at least 195 more tied on 1 Grand Finals"
+Received: "<section aria-label="Record of the week"><div class="split-head"><h2>Record of the week</h2></div><p class="lede"><strong>Most Grand Finals Hosted.</strong> Most VFL/AFL Grand Finals played at a venue.</p><div class="meter"><div class="meter-head"><span><a href="/venues/mcg">MCG</a></span><span class="meter-value">1 Grand Finals</span></div><div class="meter-track" aria-hidden="true"><div class="meter-fill" style="width:100%"></div></div></div></section>"
+
+ ❯ tests/home-records.test.ts:205:18
+    203|       moreTied: { count: 195, exact: false, value: 1 },
+    204|     } }));
+    205|     expect(html).toContain('and at least 195 more tied on 1 Grand Fina…
+       |                  ^
+    206|     expect(html).not.toContain('see the full record');
+    207|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/9]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  9 failed | 12 passed (21)
+   Start at  08:50:38
+   Duration  744ms (transform 233ms, setup 175ms, import 191ms, tests 112ms, environment 0ms)
+

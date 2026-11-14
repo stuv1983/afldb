@@ -1,0 +1,17 @@
+isolated-pg: afldb_v2_remanswersgreen_test verified (cluster afldb_v2_isolated, 127.0.0.1:55616); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem-answers-20261114/cand
+
+ ✓ tests/integration/grid-solver.test.ts (222 tests | 216 skipped) 8047ms
+     ✓ club_season_stat_leader(clearances) is exactly the players with a recorded leading season  1598ms
+     ✓ club_season_stat_leader(rebounds) is exactly the players with a recorded leading season  1304ms
+     ✓ club_season_stat_leader(inside_50s) is exactly the players with a recorded leading season  1303ms
+     ✓ club_season_stat_leader(goal_assists) is exactly the players with a recorded leading season  1487ms
+     ✓ club_season_stat_leader_min_times(clearances, 5) counts only recorded leading seasons  1410ms
+     ✓ a player whose every season is unrecorded for the stat never led a club in it  925ms
+
+ Test Files  1 passed (1)
+      Tests  6 passed | 216 skipped (222)
+   Start at  08:51:18
+   Duration  9.00s (transform 460ms, setup 174ms, import 515ms, tests 8.05s, environment 0ms)
+

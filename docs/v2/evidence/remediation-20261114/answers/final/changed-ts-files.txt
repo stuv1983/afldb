@@ -1,0 +1,7 @@
+src/components/HomeRecordPanel.tsx
+src/db/queries/grid-solver.ts
+src/db/queries/home-records.ts
+src/lib/home-records.ts
+tests/home-records.test.ts
+tests/integration/grid-solver.test.ts
+tests/integration/home-records.test.ts

@@ -1,0 +1,39 @@
+isolated-pg: afldb_v2_remanswersg2_test verified (cluster afldb_v2_isolated, 127.0.0.1:55616); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem-answers-20261114/cand
+
+ ✓ tests/integration/grid-solver.test.ts (222 tests) 30357ms
+     ✓ solves a cell using "games_at_one_club_min" without throwing  318ms
+     ✓ solves a cell using "goals_at_multiple_clubs_min" without throwing  310ms
+     ✓ solves a cell using "games_at_multiple_clubs_min" without throwing  357ms
+     ✓ solves a cell using "one_club_player_incl_merged" without throwing  336ms
+     ✓ solves a cell using "clubs_played_min_incl_merged" without throwing  375ms
+     ✓ solves a cell using "games_at_one_club_min_incl_merged" without throwing  383ms
+     ✓ solves a cell using "games_at_multiple_clubs_min_incl_merged" without throwing  394ms
+     ✓ solves a cell using "goals_at_multiple_clubs_min_incl_merged" without throwing  371ms
+     ✓ solves a cell using "career_teammates_min" without throwing  1736ms
+     ✓ solves a cell using "single_game_stat_multi_club_min" without throwing  1664ms
+     ✓ solves a cell using "season_stat_avg_min" without throwing  351ms
+     ✓ solves a cell using "club_season_brownlow_leader" without throwing  594ms
+     ✓ solves a cell using "consecutive_wins_min" without throwing  577ms
+     ✓ solves a cell using "never_won_a_final" without throwing  536ms
+     ✓ solves the mapped ISSUE-076 won-final grid within the four-second safety margin  625ms
+     ✓ career_games_min(200) AND career_games_min(0) matches a hand-written equivalent count  616ms
+     ✓ career_stat_total_min on a live_only stat (clangers) matches a hand-written SUM  1213ms
+     ✓ no won_a_final player is also flagged never_won_a_final  472ms
+     ✓ solves the three ISSUE-103 finals-win cells under one second with an independent oracle  1187ms
+     ✓ games_at_one_club_min counts a whole organization stint across a rename  469ms
+     ✓ club_season_stat_leader(clearances) is exactly the players with a recorded leading season  1440ms
+     ✓ club_season_stat_leader(rebounds) is exactly the players with a recorded leading season  1494ms
+     ✓ club_season_stat_leader(inside_50s) is exactly the players with a recorded leading season  1461ms
+     ✓ club_season_stat_leader(goal_assists) is exactly the players with a recorded leading season  1653ms
+     ✓ club_season_stat_leader_min_times(clearances, 5) counts only recorded leading seasons  1499ms
+     ✓ a player whose every season is unrecorded for the stat never led a club in it  971ms
+ ✓ tests/integration/home-records.test.ts (7 tests) 778ms
+     ✓ derives coach count and percentage leaders from canonical match assignments  367ms
+
+ Test Files  2 passed (2)
+      Tests  229 passed (229)
+   Start at  08:53:03
+   Duration  32.64s (transform 594ms, setup 200ms, import 810ms, tests 31.13s, environment 1ms)
+

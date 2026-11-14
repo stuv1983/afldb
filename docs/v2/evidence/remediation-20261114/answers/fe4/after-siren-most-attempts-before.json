@@ -1,0 +1,25 @@
+{
+ "record": "after-siren-most-attempts",
+ "tag": "before",
+ "baseUrl": "http://127.0.0.1:3161",
+ "results": [
+  {
+   "viewport": "desktop",
+   "status": 200,
+   "meterRows": 5,
+   "moreTied": null,
+   "panelHeightPx": 425,
+   "horizontalOverflow": false,
+   "text": "Record of the week ALL → Most After-the-Siren Attempts. Most active, source-backed after-the-siren kicks by a linked player. Barry Hall 2 Attempts Brad Johnson 2 Attempts David Mundy 2 Attempts Gary Rohan 2 Attempts Jack Riewoldt 2 Attempts This is a curated historical record, not a claim of complete play-by-play coverage."
+  },
+  {
+   "viewport": "mobile",
+   "status": 200,
+   "meterRows": 5,
+   "moreTied": null,
+   "panelHeightPx": 422,
+   "horizontalOverflow": false,
+   "text": "Record of the week ALL → Most After-the-Siren Attempts. Most active, source-backed after-the-siren kicks by a linked player. Barry Hall 2 Attempts Brad Johnson 2 Attempts David Mundy 2 Attempts Gary Rohan 2 Attempts Jack Riewoldt 2 Attempts This is a curated historical record, not a claim of complete play-by-play coverage."
+  }
+ ]
+}

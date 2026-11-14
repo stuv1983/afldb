@@ -1,0 +1,951 @@
+isolated-pg: afldb_v2_remanswersred_test verified (cluster afldb_v2_isolated, 127.0.0.1:55616); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem-answers-20261114/cand
+
+ ❯ tests/integration/grid-solver.test.ts (222 tests | 6 failed | 216 skipped) 9367ms
+     ↓ solves a cell using "played_for_club" without throwing
+     ↓ solves a cell using "debut_club" without throwing
+     ↓ solves a cell using "one_club_player" without throwing
+     ↓ solves a cell using "multi_club_player" without throwing
+     ↓ solves a cell using "games_at_one_club_min" without throwing
+     ↓ solves a cell using "clubs_played_min" without throwing
+     ↓ solves a cell using "goals_at_multiple_clubs_min" without throwing
+     ↓ solves a cell using "games_at_multiple_clubs_min" without throwing
+     ↓ solves a cell using "played_for_club_incl_merged" without throwing
+     ↓ solves a cell using "debut_club_incl_merged" without throwing
+     ↓ solves a cell using "one_club_player_incl_merged" without throwing
+     ↓ solves a cell using "multi_club_player_incl_merged" without throwing
+     ↓ solves a cell using "clubs_played_min_incl_merged" without throwing
+     ↓ solves a cell using "games_at_one_club_min_incl_merged" without throwing
+     ↓ solves a cell using "games_at_multiple_clubs_min_incl_merged" without throwing
+     ↓ solves a cell using "goals_at_multiple_clubs_min_incl_merged" without throwing
+     ↓ solves a cell using "finals_clubs_min_incl_merged" without throwing
+     ↓ solves a cell using "grand_final_clubs_min_incl_merged" without throwing
+     ↓ solves a cell using "career_games_min" without throwing
+     ↓ solves a cell using "career_games_max" without throwing
+     ↓ solves a cell using "career_goals_min" without throwing
+     ↓ solves a cell using "career_goals_max" without throwing
+     ↓ solves a cell using "career_stat_total_min" without throwing
+     ↓ solves a cell using "career_stat_avg_min" without throwing
+     ↓ solves a cell using "career_stat_exceeds" without throwing
+     ↓ solves a cell using "career_teammates_min" without throwing
+     ↓ solves a cell using "single_game_stat_min" without throwing
+     ↓ solves a cell using "single_game_two_stats_min" without throwing
+     ↓ solves a cell using "games_with_stat_min_count" without throwing
+     ↓ solves a cell using "single_game_stat_multi_club_min" without throwing
+     ↓ solves a cell using "after_siren_winner" without throwing
+     ↓ solves a cell using "debuted_between" without throwing
+     ↓ solves a cell using "debuted_in_decade" without throwing
+     ↓ solves a cell using "played_in_decade" without throwing
+     ↓ solves a cell using "played_between_seasons" without throwing
+     ↓ solves a cell using "season_stat_total_min" without throwing
+     ↓ solves a cell using "games_in_season_min" without throwing
+     ↓ solves a cell using "season_stat_avg_min" without throwing
+     ↓ solves a cell using "season_wins_min" without throwing
+     ↓ solves a cell using "season_losses_min" without throwing
+     ↓ solves a cell using "season_draws_min" without throwing
+     ↓ solves a cell using "drawn_matches_min" without throwing
+     ↓ solves a cell using "never_played_in_draw" without throwing
+     ↓ solves a cell using "club_season_stat_leader" without throwing
+     ↓ solves a cell using "club_season_stat_leader_min_times" without throwing
+     ↓ solves a cell using "wooden_spoon_season" without throwing
+     ↓ solves a cell using "minor_premiership_season" without throwing
+     ↓ solves a cell using "never_minor_premier" without throwing
+     ↓ solves a cell using "minor_premierships_min" without throwing
+     ↓ solves a cell using "games_in_named_season_min" without throwing
+     ↓ solves a cell using "named_season_stat_total_min" without throwing
+     ↓ solves a cell using "league_season_stat_rank_top" without throwing
+     ↓ solves a cell using "club_season_brownlow_leader" without throwing
+     ↓ solves a cell using "won_by_margin_min" without throwing
+     ↓ solves a cell using "consecutive_wins_min" without throwing
+     ↓ solves a cell using "played_in_a_final" without throwing
+     ↓ solves a cell using "never_played_finals" without throwing
+     ↓ solves a cell using "finals_games_min" without throwing
+     ↓ solves a cell using "premiership_player" without throwing
+     ↓ solves a cell using "won_a_final" without throwing
+     ↓ solves a cell using "finals_wins_min" without throwing
+     ↓ solves a cell using "never_won_a_final" without throwing
+     ↓ solves a cell using "played_finals_no_wins" without throwing
+     ↓ solves a cell using "finals_clubs_min" without throwing
+     ↓ solves a cell using "final_game_stat_min" without throwing
+     ↓ solves a cell using "grand_final_game_stat_min" without throwing
+     ↓ solves a cell using "finals_stat_total_min" without throwing
+     ↓ solves a cell using "finals_stat_avg_min" without throwing
+     ↓ solves a cell using "played_a_grand_final" without throwing
+     ↓ solves a cell using "never_played_grand_final" without throwing
+     ↓ solves a cell using "grand_finals_played_min" without throwing
+     ↓ solves a cell using "prelim_finals_played_min" without throwing
+     ↓ solves a cell using "grand_final_clubs_min" without throwing
+     ↓ solves a cell using "grand_final_between_seasons" without throwing
+     ↓ solves a cell using "premierships_min" without throwing
+     ↓ solves a cell using "premiership_between_seasons" without throwing
+     ↓ solves a cell using "grand_finals_lost_min" without throwing
+     ↓ solves a cell using "lost_grand_final_against" without throwing
+     ↓ solves a cell using "finals_winning_record" without throwing
+     ↓ solves a cell using "grand_finals_with_stat_min_count" without throwing
+     ↓ solves a cell using "grand_final_won_against_club" without throwing
+     ↓ solves a cell using "premiership_captain" without throwing
+     ↓ solves a cell using "played_at_venue" without throwing
+     ↓ solves a cell using "games_at_venue_min" without throwing
+     ↓ solves a cell using "won_final_at_venue" without throwing
+     ↓ solves a cell using "venue_game_stat_min" without throwing
+     ↓ solves a cell using "venue_stat_total_min" without throwing
+     ↓ solves a cell using "venue_goals_max" without throwing
+     ↓ solves a cell using "match_event_played" without throwing
+     ↓ solves a cell using "match_event_min" without throwing
+     ↓ solves a cell using "matchup_played_min" without throwing
+     ↓ solves a cell using "match_event_won" without throwing
+     ↓ solves a cell using "match_event_played_between" without throwing
+     ↓ solves a cell using "matchup_won_min" without throwing
+     ↓ solves a cell using "matchup_game_stat_min" without throwing
+     ↓ solves a cell using "matchup_winning_record" without throwing
+     ↓ solves a cell using "gather_round_played" without throwing
+     ↓ solves a cell using "gather_round_game_stat_min" without throwing
+     ↓ solves a cell using "teammate_of" without throwing
+     ↓ solves a cell using "played_against" without throwing
+     ↓ solves a cell using "coached_by" without throwing
+     ↓ solves a cell using "premiership_coach" without throwing
+     ↓ solves a cell using "has_coached" without throwing
+     ↓ solves a cell using "coached_club" without throwing
+     ↓ solves a cell using "club_captain" without throwing
+     ↓ solves a cell using "club_captain_any" without throwing
+     ↓ solves a cell using "captain_between_seasons" without throwing
+     ↓ solves a cell using "captain_of_club_between_seasons" without throwing
+     ↓ solves a cell using "hall_of_fame_player" without throwing
+     ↓ solves a cell using "first_kick_goal_player" without throwing
+     ↓ solves a cell using "first_kick_goal_only_career_goal" without throwing
+     ↓ solves a cell using "first_kick_goal_consecutive_min" without throwing
+     ↓ solves a cell using "first_kick_goal_for_club" without throwing
+     ↓ solves a cell using "first_kick_goal_between" without throwing
+     ↓ solves a cell using "brownlow_medallist" without throwing
+     ↓ solves a cell using "brownlow_votes_career_min" without throwing
+     ↓ solves a cell using "award_winner" without throwing
+     ↓ solves a cell using "award_winner_min_times" without throwing
+     ↓ solves a cell using "award_winner_between_seasons" without throwing
+     ↓ solves a cell using "under_22_selection" without throwing
+     ↓ solves a cell using "all_australian_captain" without throwing
+     ↓ solves a cell using "all_australian_position" without throwing
+     ↓ solves a cell using "club_best_and_fairest_min_times" without throwing
+     ↓ solves a cell using "best_and_fairest_multi_club" without throwing
+     ↓ solves a cell using "brownlow_finish_exact" without throwing
+     ↓ solves a cell using "brownlow_top_finish" without throwing
+     ↓ solves a cell using "brownlow_top_finish_min_times" without throwing
+     ↓ solves a cell using "brownlow_winner_votes_min" without throwing
+     ↓ solves a cell using "brownlow_season_votes_min" without throwing
+     ↓ solves a cell using "rising_star_nominee" without throwing
+     ↓ solves a cell using "rising_star_nominee_between_seasons" without throwing
+     ↓ solves a cell using "rising_star_nominee_for_club" without throwing
+     ↓ solves a cell using "rising_star_nominee_for_club_between_seasons" without throwing
+     ↓ solves a cell using "rising_star_nominee_in_season" without throwing
+     ↓ solves a cell using "all_australian_defender" without throwing
+     ↓ solves a cell using "all_australian_forward" without throwing
+     ↓ solves a cell using "all_australian_midfielder" without throwing
+     ↓ solves a cell using "all_australian_team" without throwing
+     ↓ solves a cell using "all_australian_team_min_times" without throwing
+     ↓ solves a cell using "all_australian_team_between_seasons" without throwing
+     ↓ solves a cell using "all_australian_squad_member" without throwing
+     ↓ solves a cell using "all_australian_squad_in_season" without throwing
+     ↓ solves a cell using "best_and_fairest_in_premiership_season" without throwing
+     ↓ solves a cell using "drafted_by_club" without throwing
+     ↓ solves a cell using "draft_pick_between" without throwing
+     ↓ solves a cell using "draft_year_between" without throwing
+     ↓ solves a cell using "draft_type_is" without throwing
+     ↓ solves a cell using "drafted_by_club_never_played" without throwing
+     ↓ solves a cell using "recruited_via" without throwing
+     ↓ solves a cell using "traded_min_times" without throwing
+     ↓ solves a cell using "father_son_selection" without throwing
+     ↓ solves a cell using "father_son_father" without throwing
+     ↓ solves a cell using "father_son_selection_for_club" without throwing
+     ↓ solves a cell using "father_son_selection_between" without throwing
+     ↓ solves a cell using "national_draft_pick_between" without throwing
+     ↓ solves a cell using "given_name_in" without throwing
+     ↓ solves a cell using "surname_hyphenated" without throwing
+     ↓ solves a cell using "jumper_number_worn" without throwing
+     ↓ solves a cell using "height_min" without throwing
+     ↓ solves a cell using "height_max" without throwing
+     ↓ solves a cell using "age_on_debut_min" without throwing
+     ↓ solves a cell using "has_brother" without throwing
+     ↓ solves a cell using "has_afl_father" without throwing
+     ↓ solves a cell using "has_afl_son" without throwing
+     ↓ solves a cell using "has_afl_parent_or_child" without throwing
+     ↓ solves a cell using "brother_of_player" without throwing
+     ↓ solves a cell using "father_of_player" without throwing
+     ↓ solves a cell using "son_of_player" without throwing
+     ↓ the final team is the all-australian award alone, never the squad rows
+     ↓ repeat selections count distinct seasons, so a two-row 1984 selection is one honour
+     ↓ an unknown height never qualifies on either side of the bound
+     ↓ counts completed years on debut day and never qualifies an unknown date
+     ↓ solves the mapped ISSUE-076 won-final grid within the four-second safety margin
+     ↓ 22Under22 selection matches linked rows from the fixed award series
+     ↓ career_games_min(200) AND career_games_min(0) matches a hand-written equivalent count
+     ↓ no premiership player is also flagged as never having played a final
+     ↓ teammate_of includes a player independently known to share a club in a season
+     ↓ coached_by is exactly the players who played a match for a club while that coach was assigned to it (ISSUE-118 Stage E2)
+     ↓ premiership_coach is the linked coaches of Grand Final winners, and coach-only people never appear as players
+     ↓ father_son_father and father_son_selection are the linked ends of father_son_selections, and the Abletts sit on the right ends
+     ↓ has_brother is exactly the linked ends of brothers-labelled sibling rows, and the Abletts sit on the right ends
+     ↓ after_siren_winner is exactly the linked, premiership-season, scoring, match-winning kickers
+     ↓ solveCellRows returns exactly min(eligible, limit) rows for a real cell
+     ↓ rejects an incomplete axis rather than silently matching everything
+     ↓ career_stat_total_min on a live_only stat (clangers) matches a hand-written SUM
+     ↓ no minor_premiership_season player is also flagged never_minor_premier
+     ↓ career_games_max is inclusive (<=) of the threshold
+     ↓ single_game_stat_min correctly returns 0 for a player whose matches predate stat recording (NULL semantics)
+     ↓ no won_a_final player is also flagged never_won_a_final
+     ↓ solves the three ISSUE-103 finals-win cells under one second with an independent oracle
+     ↓ lost_grand_final_against finds a real losing-side player against a real winning-side player
+     ↓ brownlow_top_finish(1) matches a hand-written equivalent count
+     ↓ drafted_by_club_never_played matches a hand-written equivalent for a real club
+     ↓ games_at_multiple_clubs_min never matches a one-organization career
+     ↓ goals_at_multiple_clubs_min never matches a one-organization career
+     ↓ finals_clubs_min(2) never matches a one-organization career
+     ↓ games_at_one_club_min counts a whole organization stint across a rename
+     ↓ season_draws_min(2) matches a hand-written equivalent count
+     ↓ drawn_matches_min(1) matches a hand-written equivalent count
+     ↓ club_season_stat_leader(goals) rows really did lead a club-season in goals
+     × club_season_stat_leader(clearances) is exactly the players with a recorded leading season 1862ms
+     × club_season_stat_leader(rebounds) is exactly the players with a recorded leading season 1541ms
+     × club_season_stat_leader(inside_50s) is exactly the players with a recorded leading season 1535ms
+     × club_season_stat_leader(goal_assists) is exactly the players with a recorded leading season 1691ms
+     × club_season_stat_leader_min_times(clearances, 5) counts only recorded leading seasons 1545ms
+     × a player whose every season is unrecorded for the stat never led a club in it 1169ms
+     ↓ the fixture season is isolated: only the two fixture players are in the cell
+     ↓ a wildcard-only player does not satisfy "played_in_a_final"
+     ↓ a wildcard-only player does not satisfy "won_a_final"
+     ↓ a wildcard-only player does not satisfy "finals_games_min"
+     ↓ a wildcard-only player does not satisfy "final_game_stat_min"
+     ↓ a wildcard-only player does not satisfy "played_a_grand_final"
+     ↓ a wildcard-only player does not satisfy "finals_wins_min"
+     ↓ an elimination-final player still satisfies "played_in_a_final"
+     ↓ an elimination-final player still satisfies "finals_games_min"
+     ↓ an elimination-final player still satisfies "final_game_stat_min"
+     ↓ "never played finals" now includes the wildcard-only player
+     ↓ the grand_final_* criteria are untouched by the new enum value
+     ↓ national_draft_pick_between reads the 1982 "National Draft" spelling as a national pick; draft_pick_between spans every kind
+     ↓ draft_type_is is asked of draft_kind, so both national spellings and a legacy label find the same row
+     ↓ the "drafted" builders exclude the trade and free-agency list moves, which the trade builder counts
+     ↓ solveCellSummary tells an axis nobody matches apart from an empty intersection
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/grid-solver.test.ts > AFLDB-ISSUE-355 club season stat leaders ignore unrecorded (NULL) seasons > club_season_stat_leader(clearances) is exactly the players with a recorded leading season
+AssertionError: expected 10966 to be 178 // Object.is equality
+
+- Expected
++ Received
+
+- 178
++ 10966
+
+ ❯ tests/integration/grid-solver.test.ts:1061:26
+    1059|       const got = [...await axisPlayerIds({ builder: 'club_season_stat…
+    1060|         .sort((a, b) => a - b);
+    1061|       expect(got.length).toBe(expected.length);
+       |                          ^
+    1062|       expect(got).toEqual(expected);
+    1063|     },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+ FAIL  tests/integration/grid-solver.test.ts > AFLDB-ISSUE-355 club season stat leaders ignore unrecorded (NULL) seasons > club_season_stat_leader(rebounds) is exactly the players with a recorded leading season
+AssertionError: expected 11023 to be 259 // Object.is equality
+
+- Expected
++ Received
+
+- 259
++ 11023
+
+ ❯ tests/integration/grid-solver.test.ts:1061:26
+    1059|       const got = [...await axisPlayerIds({ builder: 'club_season_stat…
+    1060|         .sort((a, b) => a - b);
+    1061|       expect(got.length).toBe(expected.length);
+       |                          ^
+    1062|       expect(got).toEqual(expected);
+    1063|     },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯
+
+ FAIL  tests/integration/grid-solver.test.ts > AFLDB-ISSUE-355 club season stat leaders ignore unrecorded (NULL) seasons > club_season_stat_leader(inside_50s) is exactly the players with a recorded leading season
+AssertionError: expected 11008 to be 223 // Object.is equality
+
+- Expected
++ Received
+
+- 223
++ 11008
+
+ ❯ tests/integration/grid-solver.test.ts:1061:26
+    1059|       const got = [...await axisPlayerIds({ builder: 'club_season_stat…
+    1060|         .sort((a, b) => a - b);
+    1061|       expect(got.length).toBe(expected.length);
+       |                          ^
+    1062|       expect(got).toEqual(expected);
+    1063|     },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
+
+ FAIL  tests/integration/grid-solver.test.ts > AFLDB-ISSUE-355 club season stat leaders ignore unrecorded (NULL) seasons > club_season_stat_leader(goal_assists) is exactly the players with a recorded leading season
+AssertionError: expected 11436 to be 273 // Object.is equality
+
+- Expected
++ Received
+
+- 273
++ 11436
+
+ ❯ tests/integration/grid-solver.test.ts:1061:26
+    1059|       const got = [...await axisPlayerIds({ builder: 'club_season_stat…
+    1060|         .sort((a, b) => a - b);
+    1061|       expect(got.length).toBe(expected.length);
+       |                          ^
+    1062|       expect(got).toEqual(expected);
+    1063|     },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
+
+ FAIL  tests/integration/grid-solver.test.ts > AFLDB-ISSUE-355 club season stat leaders ignore unrecorded (NULL) seasons > club_season_stat_leader_min_times(clearances, 5) counts only recorded leading seasons
+AssertionError: expected 3360 to be 31 // Object.is equality
+
+- Expected
++ Received
+
+- 31
++ 3360
+
+ ❯ tests/integration/grid-solver.test.ts:1080:22
+    1078|       builder: 'club_season_stat_leader_min_times', params: { stat: 'c…
+    1079|     });
+    1080|     expect(got.size).toBe(n);
+       |                      ^
+    1081|   });
+    1082|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯
+
+ FAIL  tests/integration/grid-solver.test.ts > AFLDB-ISSUE-355 club season stat leaders ignore unrecorded (NULL) seasons > a player whose every season is unrecorded for the stat never led a club in it
+AssertionError: expected [ { id: 23 }, { id: 24 }, …(198) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "id": 23,
++   },
++   {
++     "id": 24,
++   },
++   {
++     "id": 34,
++   },
++   {
++     "id": 41,
++   },
++   {
++     "id": 43,
++   },
++   {
++     "id": 47,
++   },
++   {
++     "id": 56,
++   },
++   {
++     "id": 60,
++   },
++   {
++     "id": 66,
++   },
++   {
++     "id": 68,
++   },
++   {
++     "id": 69,
++   },
++   {
++     "id": 70,
++   },
++   {
++     "id": 71,
++   },
++   {
++     "id": 72,
++   },
++   {
++     "id": 73,
++   },
++   {
++     "id": 74,
++   },
++   {
++     "id": 77,
++   },
++   {
++     "id": 78,
++   },
++   {
++     "id": 80,
++   },
++   {
++     "id": 81,
++   },
++   {
++     "id": 82,
++   },
++   {
++     "id": 84,
++   },
++   {
++     "id": 85,
++   },
++   {
++     "id": 87,
++   },
++   {
++     "id": 95,
++   },
++   {
++     "id": 96,
++   },
++   {
++     "id": 97,
++   },
++   {
++     "id": 98,
++   },
++   {
++     "id": 99,
++   },
++   {
++     "id": 100,
++   },
++   {
++     "id": 101,
++   },
++   {
++     "id": 102,
++   },
++   {
++     "id": 103,
++   },
++   {
++     "id": 104,
++   },
++   {
++     "id": 105,
++   },
++   {
++     "id": 106,
++   },
++   {
++     "id": 107,
++   },
++   {
++     "id": 108,
++   },
++   {
++     "id": 109,
++   },
++   {
++     "id": 110,
++   },
++   {
++     "id": 111,
++   },
++   {
++     "id": 112,
++   },
++   {
++     "id": 113,
++   },
++   {
++     "id": 114,
++   },
++   {
++     "id": 116,
++   },
++   {
++     "id": 117,
++   },
++   {
++     "id": 118,
++   },
++   {
++     "id": 119,
++   },
++   {
++     "id": 120,
++   },
++   {
++     "id": 121,
++   },
++   {
++     "id": 122,
++   },
++   {
++     "id": 123,
++   },
++   {
++     "id": 124,
++   },
++   {
++     "id": 125,
++   },
++   {
++     "id": 126,
++   },
++   {
++     "id": 127,
++   },
++   {
++     "id": 128,
++   },
++   {
++     "id": 129,
++   },
++   {
++     "id": 130,
++   },
++   {
++     "id": 131,
++   },
++   {
++     "id": 132,
++   },
++   {
++     "id": 133,
++   },
++   {
++     "id": 134,
++   },
++   {
++     "id": 135,
++   },
++   {
++     "id": 136,
++   },
++   {
++     "id": 137,
++   },
++   {
++     "id": 138,
++   },
++   {
++     "id": 139,
++   },
++   {
++     "id": 140,
++   },
++   {
++     "id": 141,
++   },
++   {
++     "id": 142,
++   },
++   {
++     "id": 143,
++   },
++   {
++     "id": 144,
++   },
++   {
++     "id": 145,
++   },
++   {
++     "id": 146,
++   },
++   {
++     "id": 147,
++   },
++   {
++     "id": 148,
++   },
++   {
++     "id": 149,
++   },
++   {
++     "id": 150,
++   },
++   {
++     "id": 151,
++   },
++   {
++     "id": 152,
++   },
++   {
++     "id": 153,
++   },
++   {
++     "id": 154,
++   },
++   {
++     "id": 155,
++   },
++   {
++     "id": 156,
++   },
++   {
++     "id": 157,
++   },
++   {
++     "id": 158,
++   },
++   {
++     "id": 160,
++   },
++   {
++     "id": 161,
++   },
++   {
++     "id": 162,
++   },
++   {
++     "id": 163,
++   },
++   {
++     "id": 164,
++   },
++   {
++     "id": 165,
++   },
++   {
++     "id": 166,
++   },
++   {
++     "id": 167,
++   },
++   {
++     "id": 168,
++   },
++   {
++     "id": 169,
++   },
++   {
++     "id": 170,
++   },
++   {
++     "id": 171,
++   },
++   {
++     "id": 172,
++   },
++   {
++     "id": 173,
++   },
++   {
++     "id": 174,
++   },
++   {
++     "id": 175,
++   },
++   {
++     "id": 176,
++   },
++   {
++     "id": 177,
++   },
++   {
++     "id": 178,
++   },
++   {
++     "id": 179,
++   },
++   {
++     "id": 180,
++   },
++   {
++     "id": 181,
++   },
++   {
++     "id": 182,
++   },
++   {
++     "id": 183,
++   },
++   {
++     "id": 184,
++   },
++   {
++     "id": 185,
++   },
++   {
++     "id": 186,
++   },
++   {
++     "id": 187,
++   },
++   {
++     "id": 188,
++   },
++   {
++     "id": 189,
++   },
++   {
++     "id": 190,
++   },
++   {
++     "id": 191,
++   },
++   {
++     "id": 192,
++   },
++   {
++     "id": 193,
++   },
++   {
++     "id": 194,
++   },
++   {
++     "id": 195,
++   },
++   {
++     "id": 197,
++   },
++   {
++     "id": 198,
++   },
++   {
++     "id": 199,
++   },
++   {
++     "id": 200,
++   },
++   {
++     "id": 201,
++   },
++   {
++     "id": 202,
++   },
++   {
++     "id": 203,
++   },
++   {
++     "id": 204,
++   },
++   {
++     "id": 205,
++   },
++   {
++     "id": 208,
++   },
++   {
++     "id": 209,
++   },
++   {
++     "id": 210,
++   },
++   {
++     "id": 211,
++   },
++   {
++     "id": 212,
++   },
++   {
++     "id": 213,
++   },
++   {
++     "id": 214,
++   },
++   {
++     "id": 215,
++   },
++   {
++     "id": 216,
++   },
++   {
++     "id": 217,
++   },
++   {
++     "id": 218,
++   },
++   {
++     "id": 219,
++   },
++   {
++     "id": 220,
++   },
++   {
++     "id": 221,
++   },
++   {
++     "id": 222,
++   },
++   {
++     "id": 223,
++   },
++   {
++     "id": 224,
++   },
++   {
++     "id": 226,
++   },
++   {
++     "id": 227,
++   },
++   {
++     "id": 228,
++   },
++   {
++     "id": 229,
++   },
++   {
++     "id": 230,
++   },
++   {
++     "id": 231,
++   },
++   {
++     "id": 232,
++   },
++   {
++     "id": 233,
++   },
++   {
++     "id": 234,
++   },
++   {
++     "id": 235,
++   },
++   {
++     "id": 236,
++   },
++   {
++     "id": 237,
++   },
++   {
++     "id": 238,
++   },
++   {
++     "id": 239,
++   },
++   {
++     "id": 240,
++   },
++   {
++     "id": 241,
++   },
++   {
++     "id": 242,
++   },
++   {
++     "id": 243,
++   },
++   {
++     "id": 244,
++   },
++   {
++     "id": 245,
++   },
++   {
++     "id": 246,
++   },
++   {
++     "id": 247,
++   },
++   {
++     "id": 248,
++   },
++   {
++     "id": 249,
++   },
++   {
++     "id": 250,
++   },
++   {
++     "id": 251,
++   },
++   {
++     "id": 252,
++   },
++   {
++     "id": 253,
++   },
++   {
++     "id": 254,
++   },
++   {
++     "id": 255,
++   },
++   {
++     "id": 256,
++   },
++   {
++     "id": 257,
++   },
++   {
++     "id": 258,
++   },
++   {
++     "id": 259,
++   },
++   {
++     "id": 260,
++   },
++   {
++     "id": 261,
++   },
++   {
++     "id": 262,
++   },
++   {
++     "id": 263,
++   },
++   {
++     "id": 264,
++   },
++   {
++     "id": 265,
++   },
++   {
++     "id": 266,
++   },
++   {
++     "id": 267,
++   },
++   {
++     "id": 268,
++   },
++   {
++     "id": 269,
++   },
++   {
++     "id": 270,
++   },
++   {
++     "id": 271,
++   },
++   {
++     "id": 272,
++   },
++   {
++     "id": 273,
++   },
++   {
++     "id": 274,
++   },
++   {
++     "id": 275,
++   },
++   {
++     "id": 276,
++   },
++ ]
+
+ ❯ tests/integration/grid-solver.test.ts:1094:58
+    1092|     expect(preCoverage.length).toBeGreaterThan(0);
+    1093|     const leaders = await axisPlayerIds({ builder: 'club_season_stat_l…
+    1094|     expect(preCoverage.filter((r) => leaders.has(r.id))).toEqual([]);
+       |                                                          ^
+    1095|   });
+    1096| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  6 failed | 216 skipped (222)
+   Start at  08:50:57
+   Duration  10.32s (transform 466ms, setup 174ms, import 510ms, tests 9.37s, environment 0ms)
+

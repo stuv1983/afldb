@@ -1,0 +1,25 @@
+{
+ "record": "coach-most-premierships",
+ "tag": "before",
+ "baseUrl": "http://127.0.0.1:3161",
+ "results": [
+  {
+   "viewport": "desktop",
+   "status": 200,
+   "meterRows": 5,
+   "moreTied": null,
+   "panelHeightPx": 319,
+   "horizontalOverflow": false,
+   "text": "Record of the week ALL → Most Premierships Coached. Most VFL/AFL Grand Finals coached and won. Jock McHale 7 Premierships Norm Smith 6 Premierships Frank Hughes 5 Premierships John Worrall 5 Premierships Alastair Clarkson 4 Premierships"
+  },
+  {
+   "viewport": "mobile",
+   "status": 200,
+   "meterRows": 5,
+   "moreTied": null,
+   "panelHeightPx": 316,
+   "horizontalOverflow": false,
+   "text": "Record of the week ALL → Most Premierships Coached. Most VFL/AFL Grand Finals coached and won. Jock McHale 7 Premierships Norm Smith 6 Premierships Frank Hughes 5 Premierships John Worrall 5 Premierships Alastair Clarkson 4 Premierships"
+  }
+ ]
+}

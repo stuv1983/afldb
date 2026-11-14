@@ -1,0 +1,38 @@
+isolated-pg: afldb_v2_remanswersfin1_test verified (cluster afldb_v2_isolated, 127.0.0.1:55616); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem-answers-20261114/final
+
+ ✓ tests/integration/grid-solver.test.ts (222 tests) 30049ms
+     ✓ solves a cell using "games_at_one_club_min" without throwing  314ms
+     ✓ solves a cell using "goals_at_multiple_clubs_min" without throwing  319ms
+     ✓ solves a cell using "games_at_multiple_clubs_min" without throwing  336ms
+     ✓ solves a cell using "one_club_player_incl_merged" without throwing  334ms
+     ✓ solves a cell using "clubs_played_min_incl_merged" without throwing  359ms
+     ✓ solves a cell using "games_at_one_club_min_incl_merged" without throwing  342ms
+     ✓ solves a cell using "games_at_multiple_clubs_min_incl_merged" without throwing  383ms
+     ✓ solves a cell using "goals_at_multiple_clubs_min_incl_merged" without throwing  359ms
+     ✓ solves a cell using "career_games_max" without throwing  926ms
+     ✓ solves a cell using "career_teammates_min" without throwing  1738ms
+     ✓ solves a cell using "single_game_stat_multi_club_min" without throwing  1533ms
+     ✓ solves a cell using "season_stat_avg_min" without throwing  366ms
+     ✓ solves a cell using "club_season_brownlow_leader" without throwing  602ms
+     ✓ solves a cell using "consecutive_wins_min" without throwing  551ms
+     ✓ solves a cell using "never_won_a_final" without throwing  513ms
+     ✓ solves the mapped ISSUE-076 won-final grid within the four-second safety margin  430ms
+     ✓ career_games_min(200) AND career_games_min(0) matches a hand-written equivalent count  591ms
+     ✓ career_stat_total_min on a live_only stat (clangers) matches a hand-written SUM  1620ms
+     ✓ no won_a_final player is also flagged never_won_a_final  475ms
+     ✓ solves the three ISSUE-103 finals-win cells under one second with an independent oracle  1148ms
+     ✓ games_at_one_club_min counts a whole organization stint across a rename  421ms
+     ✓ club_season_stat_leader(clearances) is exactly the players with a recorded leading season  1434ms
+     ✓ club_season_stat_leader(rebounds) is exactly the players with a recorded leading season  1465ms
+     ✓ club_season_stat_leader(inside_50s) is exactly the players with a recorded leading season  1412ms
+     ✓ club_season_stat_leader(goal_assists) is exactly the players with a recorded leading season  1578ms
+     ✓ club_season_stat_leader_min_times(clearances, 5) counts only recorded leading seasons  1379ms
+     ✓ a player whose every season is unrecorded for the stat never led a club in it  971ms
+
+ Test Files  1 passed (1)
+      Tests  222 passed (222)
+   Start at  09:30:32
+   Duration  30.94s (transform 429ms, setup 161ms, import 474ms, tests 30.05s, environment 0ms)
+

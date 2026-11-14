@@ -1,0 +1,70 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem-answers-20261114/final
+
+ ❯ tests/v2-acquisition-pipeline.test.ts (24 tests | 1 failed) 854ms
+     ✓ src/lib/acquisition/afl-api-client.ts: no postgres, no src/db, no writer module, no SQL mutation in its runtime closure 85ms
+     ✓ src/lib/acquisition/afl-api-season-discovery.ts: no postgres, no src/db, no writer module, no SQL mutation in its runtime closure 22ms
+     ✓ src/lib/acquisition/afl-api-season-enumeration.ts: no postgres, no src/db, no writer module, no SQL mutation in its runtime closure 49ms
+     ✓ src/lib/acquisition/afl-api-acquisition-constants.ts: no postgres, no src/db, no writer module, no SQL mutation in its runtime closure 2ms
+     ✓ the acquire constants leaf imports nothing, and the writer modules re-export it value for value 2ms
+     ✓ tools/current-season/acquire-afl-api.ts reaches no writer module, no src/db module and holds no SQL mutation text 98ms
+     ✓ tools/current-season/acquire-afl-api-brownlow.ts reaches no writer module, no src/db module and holds no SQL mutation text 71ms
+     ✓ the ingestion switch the CLIs reach only SELECTs from site_settings 1ms
+     ✓ flags a fake client importing canonical-apply, even indirectly 2ms
+     ✓ flags a fake client reaching src/db and postgres 1ms
+     ✓ flags SQL mutation text in the closure (each verb) 2ms
+     ✓ does not flag a TYPE-ONLY import of a writer, nor read-only SQL, nor prose such as "truncated" 1ms
+     ✓ the runtime specifier set is always a subset of the parser-wide specifier set 51ms
+     ✓ has the seven stages, once each, in the owner chain order 1ms
+     ✓ only promote writes canonical rows; acquire, identity and reconcile write nothing 0ms
+     ✓ every implementation symbol is exported at its cited path (one table row each) 190ms
+     ✓ cites the V2 Stage 3 fixture contract and the season seal 1ms
+     ✓ refuses a missing file and a symbol that is not exported there 3ms
+     ✓ findExportLine handles declarations, export lists, re-exports, aliases and ignores comments 5ms
+     ✓ finds a re-export list entry in a real module (settle-afl-api.ts: export { areCoSources }) 4ms
+     × equals renderAflApiStageMap output 95ms
+     ✓ spliceStageMap touches only the marked region and preserves the line ending 1ms
+     ✓ imports with DATABASE_URL unset and exposes the facade 10ms
+     ✓ the package index runtime closure reaches no src/db, postgres, server-only or writer module 149ms
+ ✓ tests/site-settings.test.ts (37 tests) 43ms
+ ✓ tests/home-records.test.ts (21 tests) 109ms
+ ✓ tests/grid-solver-spec.test.ts (19 tests) 51ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/v2-acquisition-pipeline.test.ts > (e) docs/v2/architecture.md §9 is the rendered stage map > equals renderAflApiStageMap output
+AssertionError: expected '| Stage | Location | Symbol | Writes …' to be '| Stage | Location | Symbol | Writes …' // Object.is equality
+
+- Expected
++ Received
+
+@@ -52,11 +52,11 @@
+  | reconcile | `src/lib/acquisition/afl-api-settle-plan.ts:520` | `planAflApiMatchUnit` | nothing |
+  | reconcile | `src/lib/acquisition/afl-api-brownlow.ts:1397` | `reconcileAflApiBrownlowSeason` | nothing |
+  | reconcile | `packages/acquisition/src/reconciliation-report.ts:136` | `buildAflApiReconciliationReport` | nothing |
+  | reconcile | `packages/acquisition/src/reconciliation-report.ts:248` | `validateAflApiReconciliationReport` | nothing |
+  | promote | `tools/current-season/settle-afl-api.ts:152` | `loadAflApiSettleBundle` | canonical |
+- | promote | `tools/current-season/settle-afl-api.ts:357` | `runAflApiSettleCli` | canonical |
++ | promote | `tools/current-season/settle-afl-api.ts:356` | `runAflApiSettleCli` | canonical |
+  | promote | `tools/current-season/settle-season-seal.ts:30` | `refuseSealedSeasonForSettle` | canonical |
+  | promote | `packages/domain/src/season-seal.ts:124` | `evaluateSeasonWrite` | canonical |
+  | promote | `packages/domain/src/season-seal.ts:170` | `assertSeasonWritable` | canonical |
+  | promote | `src/lib/acquisition/settle-core.ts:392` | `acquireSettlePromotionGate` | canonical |
+  | promote | `src/lib/acquisition/settle-afl-api.ts:1973` | `runSettleAflApi` | canonical |
+
+ ❯ tests/v2-acquisition-pipeline.test.ts:374:39
+    372|   it('equals renderAflApiStageMap output', () => {
+    373|     const document = diskReader('docs/v2/architecture.md') as string;
+    374|     expect(extractStageMap(document)).toBe(renderAflApiStageMap(diskRe…
+       |                                       ^
+    375|   });
+    376|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 3 passed (4)
+      Tests  1 failed | 100 passed (101)
+   Start at  09:30:18
+   Duration  3.28s (transform 574ms, setup 276ms, import 984ms, tests 1.06s, environment 1ms)
+

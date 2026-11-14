@@ -1,0 +1,17 @@
+HEAD=92377e5e78337998c70fd8dab1b09fa186e058c3
+branch=rem-answers
+porcelain_lines=0
+2026-11-13T22:27:56Z
+== tsc --noEmit (types from this build's next typegen)
+tsc rc=0
+== eslint on the changed files
+eslint rc=0 (log: eslint.log)
+== unit (no DB variables)
+     × equals renderAflApiStageMap output 95ms
+ FAIL  tests/v2-acquisition-pipeline.test.ts > (e) docs/v2/architecture.md §9 is the rendered stage map > equals renderAflApiStageMap output
+ Test Files  1 failed | 3 passed (4)
+      Tests  1 failed | 100 passed (101)
+== int grid-solver on fresh snapshot copy afldb_v2_remanswersfin1_test:  Test Files 1 passed (1) /  Tests 222 passed (222)
+== int home-records on fresh snapshot copy afldb_v2_remanswersfin2_test:  Test Files 1 passed (1) /  Tests 7 passed (7)
+porcelain_after=0
+QUAL-DONE
