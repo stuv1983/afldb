@@ -236,10 +236,11 @@ describe('stat availability dataset', () => {
       { firstSeason: 1897, lastSeason: 1923 },
       { firstSeason: 1942, lastSeason: 1945 },
     ]);
+    type CoverageRange = { stat_key: string; coverage: string; first_season: number; last_season: number };
     for (const key of ['brownlow_season_total', 'brownlow_round_votes', 'brownlow_match_votes']) {
-      const declared = statAvail.coverage_ranges
-        .filter((r: any) => r.stat_key === key && r.coverage === 'not_applicable')
-        .map((r: any) => ({ firstSeason: r.first_season, lastSeason: r.last_season }));
+      const declared = (statAvail.coverage_ranges as CoverageRange[])
+        .filter((r) => r.stat_key === key && r.coverage === 'not_applicable')
+        .map((r) => ({ firstSeason: r.first_season, lastSeason: r.last_season }));
       expect(declared, `${key} not_applicable ranges`).toEqual([...BROWNLOW_DECLARED_NO_MEDAL_SEASONS]);
     }
     // No fixture, in-progress or completed-but-unloaded season may ever be declared.
