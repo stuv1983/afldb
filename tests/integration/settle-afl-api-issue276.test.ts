@@ -140,6 +140,20 @@ const CASE_DATES: Readonly<Record<string, string>> = {
   [CASE_IDS.corroborated]: '2026-06-22',
 };
 
+/**
+ * AFLDB-ISSUE-363 (run 3, integb) FIXTURE ROUND. The cases used the fixture file's own round, a
+ * Preliminary Final (`PF`), with Hawthorn at home to Brisbane Lions: the same oriented pair and round as
+ * the real 2026 preliminary final (2026-09-19) that any database holding the completed 2026 season
+ * carries. That row differs from a case by the date alone, so `findPlausibleCanonicalFixtures` reported it
+ * as a foreign conflict and the suite refused to run (`matches.id 17055 = 2026|PF|2026-09-19|Hawthorn|
+ * Brisbane Lions`), by design, on every such base. Every case now carries an ordinary home-and-away round
+ * instead (`afl_api_2026`: API round 5 -> canonical '6', the choice the sibling Brownlow suite made), so a
+ * case differs from the real final in BOTH round and date and cannot collide with it. Nothing else of any
+ * case, ownership rule or assertion changes: the fixtures' clubs, venue, scores and rosters are the same.
+ */
+const API_ROUND_NUMBER = 5;
+const ROUND_CODE = '6';
+
 const PERIOD_TYPE = 'afl_api_period_scores_contradiction';
 const PERIOD_REASON = 'period_scores_contradict_final_score';
 
@@ -196,6 +210,12 @@ function unitSourceFor(providerMatchId: string, mutate?: (raw: RawUnit) => void)
 
   fixture.providerId = providerMatchId;
   fixture.utcStartTime = `${matchDate}T07:15:00.000+0000`;
+  // The fixture file's Preliminary Final -> an ordinary home-and-away round (see ROUND_CODE above).
+  const fixtureRound = (fixture as unknown as { round: Record<string, unknown> }).round;
+  (fixture as unknown as { round: Record<string, unknown> }).round = {
+    ...fixtureRound, roundNumber: API_ROUND_NUMBER, abbreviation: `Rd ${API_ROUND_NUMBER}`, name: `Round ${API_ROUND_NUMBER}`,
+  };
+  (roster.matchRoster as unknown as { roundNumber: number }).roundNumber = API_ROUND_NUMBER;
   roster.match.matchId = providerMatchId;
   roster.match.venueLocalStartTime = `${matchDate}T17:15:00`;
   roster.matchRoster.matchId = providerMatchId;
@@ -314,7 +334,7 @@ const ledger = {
 
 function matchKeyFor(providerMatchId: string): string {
   if (!homeClubName || !awayClubName) throw new Error('matchKeyFor() was called before beforeAll() read the club names.');
-  return renderMatchKey(SEASON, 'PF', matchDateFor(providerMatchId), homeClubName, awayClubName);
+  return renderMatchKey(SEASON, ROUND_CODE, matchDateFor(providerMatchId), homeClubName, awayClubName);
 }
 
 function caseMatchKeys(): string[] {
@@ -905,7 +925,7 @@ async function assertNoForeignFixtureConflicts(): Promise<void> {
   const conflicts: string[] = [];
   for (const id of ALL_IDS) {
     const rows = await findPlausibleCanonicalFixtures(sql, {
-      season: SEASON, matchKey: matchKeyFor(id), roundCode: 'PF', matchDate: matchDateFor(id),
+      season: SEASON, matchKey: matchKeyFor(id), roundCode: ROUND_CODE, matchDate: matchDateFor(id),
       homeClubId, awayClubId,
     });
     conflicts.push(...rows.map((row) => `${row.matchKey} (matches.id ${row.id})`));
@@ -1304,7 +1324,7 @@ describe('AFLDB-ISSUE-276 — a roster whose period scores contradict the final 
         attendance, attendance_status, attendance_source_id,
         source_id, source_record_id, notes
       ) VALUES (
-        ${matchKey}, ${SEASON}, 'PF', ${null}, 'preliminary_final', true,
+        ${matchKey}, ${SEASON}, ${ROUND_CODE}, ${Number(ROUND_CODE)}, 'home_and_away', false,
         ${matchDateFor(providerId)}, ${venueId}, 'MCG', ${homeClubId}, ${awayClubId},
         19, 8, 122, 20, 11, 131,
         'away_win', ${awayClubId}, 9,
