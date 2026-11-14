@@ -1,0 +1,20 @@
+docs/v2/evidence/remediation-20261114/run2/admin/SHA256SUMS.host ok=6 mismatch=0 not-committed=6
+docs/v2/evidence/remediation-20261114/run2/caddy357/MANIFEST-host-sha256.txt ok=17 mismatch=0 not-committed=85
+docs/v2/evidence/remediation-20261114/run2/caddy357/MANIFEST-r2-host-sha256.txt ok=4 mismatch=0 not-committed=64
+docs/v2/evidence/remediation-20261114/run2/caddy357/low4/SHA256SUMS ok=5 mismatch=0 not-committed=0
+docs/v2/evidence/remediation-20261114/run2/fixtures/fh-expected.sha256 ok=0 mismatch=0 not-committed=131
+docs/v2/evidence/remediation-20261114/run2/lint364/MANIFEST.sha256 ok=5 mismatch=0 not-committed=0
+docs/v2/evidence/remediation-20261114/run2/ops/raw/SHA256SUMS-committed.txt ok=24 mismatch=0 not-committed=0
+  MISMATCH docs/v2/evidence/remediation-20261114/run2/ops/raw/prod-ro-ops-notify-logs.txt
+  MISMATCH docs/v2/evidence/remediation-20261114/run2/ops/raw/prod-ro-ops-procedures.txt
+  MISMATCH docs/v2/evidence/remediation-20261114/run2/ops/raw/prod-ro-ops-logs2.txt
+  MISMATCH docs/v2/evidence/remediation-20261114/run2/ops/raw/prod-caddyfile-installed.txt
+docs/v2/evidence/remediation-20261114/run2/ops/raw/SHA256SUMS-originals.txt ok=10 mismatch=4 not-committed=6
+docs/v2/evidence/remediation-20261114/run2/public/HOST-PACK-SHA256SUMS ok=58 mismatch=0 not-committed=2
+docs/v2/evidence/remediation-20261114/run2/public/SHA256SUMS ok=145 mismatch=0 not-committed=0
+docs/v2/evidence/remediation-20261114/run2/qualification-2/SHA256SUMS ok=21 mismatch=0 not-committed=7
+docs/v2/evidence/remediation-20261114/run2/qualification-2/SHA256SUMS-host.txt ok=12 mismatch=0 not-committed=22
+docs/v2/evidence/remediation-20261114/run2/qualification-2/stagea-src.sha256 ok=0 mismatch=0 not-committed=90
+docs/v2/evidence/remediation-20261114/run2/tests363/MANIFEST.txt ok=49 mismatch=0 not-committed=0
+docs/v2/evidence/remediation-20261114/run2/tests363/SHA256SUMS-host.txt ok=0 mismatch=0 not-committed=25
+docs/v2/evidence/remediation-20261114/run2/tests363/SHA256SUMS-reviewd-host.txt ok=0 mismatch=0 not-committed=3
