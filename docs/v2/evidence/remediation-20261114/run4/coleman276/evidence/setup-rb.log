@@ -1,0 +1,4 @@
+create-db: afldb_v2_rem4coleman276_rbtmpl_test created and marked
+isolated-pg: afldb_v2_rem4coleman276_rbtmpl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55684); running node
+pg_restore exit=0 seconds=5 stderrLines=0
+ISOLATED TARGET OK: afldb_v2_rem4coleman276_rbtmpl_test

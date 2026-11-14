@@ -1,0 +1,42 @@
+### base=rb
+== identity
+                 db                  | ledger 
+-------------------------------------+--------
+ afldb_v2_rem4coleman276_prvbrb_test |    118
+(1 row)
+
+== seasons beyond the real history (expect 2027 only on the rebuild, none on the snapshot)
+ year |   status    
+------+-------------
+ 2027 | in_progress
+(1 row)
+
+== rows citing season 2069 or 2070 in ANY table that references seasons(year) (expect none)
+ table_name | column_name | year | n 
+------------+-------------+------+---
+(0 rows)
+
+ referencing_columns_checked 
+-----------------------------
+                          34
+(1 row)
+
+== matches / external_identities / import_batches under the CD_I4040 prefix or the suite namespace (expect 0)
+ matches_rows | external_identities_rows 
+--------------+--------------------------
+            0 |                        0
+(1 row)
+
+== the real 2026 Preliminary Final(s) the suite avoids (key, round, finals flag)
+  id   |                 match_key                  | round_code |    round_type     | is_final 
+-------+--------------------------------------------+------------+-------------------+----------
+ 17054 | 2026|PF|2026-09-18|Sydney|Fremantle        | PF         | preliminary_final | t
+ 17055 | 2026|PF|2026-09-19|Hawthorn|Brisbane Lions | PF         | preliminary_final | t
+(2 rows)
+
+== real 2026 matches with the oriented pair Hawthorn(home) v Brisbane Lions(away): round_code, date
+ round_code | match_date 
+------------+------------
+ PF         | 2026-09-19
+(1 row)
+

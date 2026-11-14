@@ -1,0 +1,16 @@
+isolated-pg: afldb_v2_rem4coleman276_fin_cole_all_test verified (cluster afldb_v2_isolated, 127.0.0.1:55684); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem4-coleman276-20261115/cand
+
+ ✓ tests/integration/v2-coleman-publication.test.ts (28 tests) 3427ms
+     ✓ the offline guard rejects invalid launcher ports and non-loopback targets before database reads  372ms
+     ✓ the offline guard holds canonical season locks across import-batch commits and releases them on close  379ms
+     ✓ after a canonical publication the offline loader refuses and preserves every tuple  438ms
+     ✓ a loader-written season is what the projection retains (no row of either writer is rewritten by the other)  459ms
+
+ Test Files  1 passed (1)
+      Tests  28 passed (28)
+   Start at  07:26:05
+   Duration  5.23s (transform 671ms, setup 384ms, import 1.05s, tests 3.43s, environment 0ms)
+
+JSON report written to /mnt/ssd/afldb-rem4-coleman276-20261115/ev/fin_cole_all/vitest.json

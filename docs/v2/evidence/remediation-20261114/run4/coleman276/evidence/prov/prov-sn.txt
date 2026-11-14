@@ -1,0 +1,73 @@
+### base=sn
+== identity
+                 db                  | ledger 
+-------------------------------------+--------
+ afldb_v2_rem4coleman276_provsn_test |    118
+(1 row)
+
+== seasons 2025..2027
+ year |  status  | match_count 
+------+----------+-------------
+ 2025 | complete |            
+ 2026 | complete |         218
+(2 rows)
+
+== coleman award definition
+  slug   | first_season | last_season 
+---------+--------------+-------------
+ coleman |         1980 |        2025
+(1 row)
+
+== coleman family (before any loader run): rows, seasons, first, last, per-source
+ rows | seasons | first_season | last_season 
+------+---------+--------------+-------------
+   46 |      46 |         1980 |        2025
+(1 row)
+
+ source_key | rows | first_season | last_season 
+------------+------+--------------+-------------
+ afltables  |   46 |         1980 |        2025
+(1 row)
+
+== rows with season <= 2025 and season > 2025
+ le_2025 | gt_2025 
+---------+---------
+      46 |       0
+(1 row)
+
+== key shape (derived form) counts
+ derived_key_form | legacy_key_form 
+------------------+-----------------
+               46 |               0
+(1 row)
+
+== independent oracle (contract derivation_method; same SQL text as the test): rows, le_2025, gt_2025, max season
+ rows | le_2025 | gt_2025 | first_season | last_season | seasons 
+------+---------+---------+--------------+-------------+---------
+   47 |      46 |       1 |         1980 |        2026 |      47
+(1 row)
+
+== oracle vs stored family (season:player_id), symmetric difference
+ in_oracle_not_stored | in_stored_not_oracle 
+----------------------+----------------------
+                    1 |                    0
+(1 row)
+
+== real 2026 Coleman winner in the oracle (names are public facts)
+ season | goals |  display_name  
+--------+-------+----------------
+   2026 |    69 | Charlie Curnow
+(1 row)
+
+== null goals in home-and-away rows from 1980 (the loader refuses on these)
+ null_goal_rows 
+----------------
+              0
+(1 row)
+
+== data_overrides authority rows, Coleman link decisions
+ data_overrides | coleman_decisions 
+----------------+-------------------
+            165 |                 0
+(1 row)
+

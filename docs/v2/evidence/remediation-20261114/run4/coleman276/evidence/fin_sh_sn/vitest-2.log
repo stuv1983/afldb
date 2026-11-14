@@ -1,0 +1,26 @@
+isolated-pg: afldb_v2_rem4coleman276_fin_sh_sn_test verified (cluster afldb_v2_isolated, 127.0.0.1:55684); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem4-coleman276-20261115/cand
+
+stderr | tests/integration/settle-afl-api-issue276.test.ts
+[ISSUE-276] shared season 2026 derived rows had moved from the setup capture and were restored from it:
+  seasons.match_count: baseline 218 -> now 219
+  club_seasons (excluding id): baseline 18 row(s), now 18; differing club_id(s): 3, 13
+  player_season_stats 2026: baseline 669 row(s), now 669; whole-row md5 DIFFERS; brownlow status/votes differ for 669 player(s)
+
+ ✓ tests/integration/settle-afl-api-issue276.test.ts (8 tests) 23797ms
+     ✓ a contradictory roster for a FRESH match writes the match but no period rows, and opens one finding; a repeat refreshes it in place; a corrected roster resolves it and writes the periods  2222ms
+     ✓ a contradictory roster leaves EXISTING canonical period rows byte-identical: nothing is rewritten, deleted or ledgered  2595ms
+     ✓ an open finding is resolved only by positive evidence: missing score evidence, a deferred roster and a blocked match each leave it open  2245ms
+     ✓ a finding opened before another source created the match is closed on the corroborated path by positive roster evidence, and only by it  2727ms
+     ✓ a contradictory roster for a FRESH match writes the match but no period rows, and opens one finding; a repeat refreshes it in place; a corrected roster resolves it and writes the periods  2756ms
+     ✓ a contradictory roster leaves EXISTING canonical period rows byte-identical: nothing is rewritten, deleted or ledgered  2494ms
+     ✓ an open finding is resolved only by positive evidence: missing score evidence, a deferred roster and a blocked match each leave it open  2165ms
+     ✓ a finding opened before another source created the match is closed on the corroborated path by positive roster evidence, and only by it  2729ms
+
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+   Start at  07:24:48
+   Duration  25.14s (transform 717ms, setup 165ms, import 810ms, tests 23.80s, environment 0ms)
+
+JSON report written to /mnt/ssd/afldb-rem4-coleman276-20261115/ev/fin_sh_sn/vitest-2.json

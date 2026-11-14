@@ -1,0 +1,260 @@
+isolated-pg: afldb_v2_rem4coleman276_m_keep2026_sn_test verified (cluster afldb_v2_isolated, 127.0.0.1:55684); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem4-coleman276-20261115/cand
+
+ ❯ tests/integration/awards-reload-links.test.ts (109 tests | 4 failed | 4 skipped) 170674ms
+     ✓ imports the canonical Under 22 group as afldb_import (AFLDB-ISSUE-083)  61709ms
+     ✓ keeps a resolved Hall of Fame link, and its row id, across a reload  627ms
+     ✓ keeps a confirmed-unlinked decision pointing at the same row  619ms
+     ✓ keeps the admin's link when the source later names someone else, and says so  610ms
+     ✓ aborts rather than lose a decision when a name-keyed source row is renamed  1060ms
+     ✓ aborts on a renamed honour-team member for the same reason  999ms
+     ✓ keeps an award-winner link across the full legacy awards reload  1094ms
+     ✓ reloads the full 113-row manifest as afldb_import with AFLDB_LEGACY_SQLITE unset  577ms
+     ✓ is idempotent across three consecutive reloads with a byte-identical row-id fingerprint  1501ms
+     ✓ keeps the one explicit honour_team_members link decision (Ted Whitten) resolved across a reload  1058ms
+     ✓ leaves every unlinked observation unlinked, and unlinks no resolvable one  499ms
+     ✓ does not touch a manual_admin_edit honour_team_members row  502ms
+     ✓ does not change hall_of_fame, captaincies, award_winners or award_nominations row counts  590ms
+     ✓ reloads the full 343-row manifest as afldb_import with AFLDB_LEGACY_SQLITE unset  554ms
+     ✓ is idempotent across three consecutive reloads with a byte-identical row-id fingerprint  1672ms
+     ✓ keeps all five explicit hall_of_fame link decisions resolved across a reload  3270ms
+     ✓ leaves every name-only observation unlinked  545ms
+     ✓ does not touch a manual_admin_edit hall_of_fame row  546ms
+     ✓ does not change honour_team_members, captaincies, award_winners or award_nominations row counts  547ms
+     ✓ reloads the full current manifest as afldb_import with AFLDB_LEGACY_SQLITE unset  1541ms
+     ✓ re-resolves each era identity from the canonical club name, season-aware  1600ms
+     ✓ is idempotent across three consecutive reloads with a byte-identical row-id fingerprint  5289ms
+     ✓ keeps a resolved captaincy link stable across a reload  3563ms
+     ✓ leaves every wikipedia-owned captaincy linked (none dropped to unlinked)  1757ms
+     ✓ does not touch a manual_admin_edit captaincy row (AFLDB-ISSUE-085)  1857ms
+     ✓ fails closed when an incoming natural key is held by a foreign-owned row (AFLDB-ISSUE-085)  4738ms
+     ✓ does not change hall_of_fame, honour_team_members, award_winners or award_nominations row counts  2685ms
+     ✓ reloads the full 766-row manifest as afldb_import with AFLDB_LEGACY_SQLITE unset  749ms
+     ✓ re-resolves each era identity from the canonical club name, season-aware  737ms
+     ✓ preserves the NULL club and NULL opponent rows exactly  802ms
+     ✓ round-trips a stat_line jsonb object byte-for-byte  826ms
+     ✓ is idempotent across three consecutive reloads with a byte-identical row-id fingerprint  2585ms
+     ✓ keeps a resolved nomination link stable across a reload  1801ms
+     ✓ drops a link only where the player_id cannot be resolved — never otherwise  908ms
+     ✓ does not touch a manual_admin_edit nomination row (AFLDB-ISSUE-080)  925ms
+     ✓ does not change hall_of_fame, honour_team_members, captaincies or award_winners row counts  935ms
+     ✓ reloads the full 1,244-row manifest as afldb_import with AFLDB_LEGACY_SQLITE unset  1073ms
+     ✓ re-resolves each era identity from the source club string, season-aware  1049ms
+     ✓ keeps the 1984 club/state dual selections and the 2016 Josh Kennedy pair as distinct rows  1053ms
+     ✓ preserves the carried link state and any player_link_resolutions decision on this award (G5 shape)  2097ms
+     ✓ is idempotent across three consecutive reloads with a byte-identical row-id fingerprint  3167ms
+     ✓ drops a link only where the player_id cannot be resolved — never otherwise  1071ms
+     ✓ does not touch a manual_admin_edit award_winners row (AFLDB-ISSUE-080)  1064ms
+     ✓ does not change other award families or the other honours tables  1078ms
+     ✓ reloads the full 752-row manifest plus 19 definitions with AFLDB_LEGACY_SQLITE unset  796ms
+     ✓ re-resolves each era identity from the source club string, season-aware  775ms
+     ✓ every winner club_id round-trips from its source club string (0 mismatches)  753ms
+     ✓ keeps a tied season as two distinct winner rows  750ms
+     ✓ preserves carried link state and any player_link_resolutions decision (G5 shape)  1491ms
+     ✓ is idempotent across three consecutive reloads with a byte-identical row-id fingerprint  2248ms
+     ✓ drops a link only where the player_id cannot be resolved — never otherwise  769ms
+     ✓ does not touch a manual_admin_edit award_winners row (AFLDB-ISSUE-080)  775ms
+     ✓ does not change other award families or the other honours tables  690ms
+     ✓ reloads the full 979-row manifest plus 17 definitions with AFLDB_LEGACY_SQLITE unset  1127ms
+     ✓ re-resolves each era identity from the source club string, season-aware  1100ms
+     ✓ resolves a club_id for every row that carries a club string, NULL for the rest (680 / 299)  1098ms
+     ✓ keeps the 2003 Brownlow as three distinct winner rows, each with its votes tally  1135ms
+     ✓ carries the Brownlow votes tally on exactly those rows and nowhere else  1108ms
+     ✓ preserves carried link state and any player_link_resolutions decision (G5 shape)  2213ms
+     ✓ is idempotent across three consecutive reloads with a byte-identical row-id fingerprint  3305ms
+     ✓ drops a link only where the player_id cannot be resolved — never otherwise  1102ms
+     ✓ does not touch a manual_admin_edit award_winners row (AFLDB-ISSUE-080)  1104ms
+     ✓ does not change other award families or the other honours tables  1091ms
+     ✓ keeps admin-created honours rows across a reload, linked, decided or not  712ms
+     ✓ keeps foreign-owned award rows across manifest award reloads  2122ms
+     ✓ refuses the Hall of Fame reload when a foreign row occupies an incoming key  472ms
+     ✓ refuses an honour-team reload over a foreign unlinked row with an incoming unlinked name  451ms
+     ✓ refuses when a foreign unlinked row meets the same name incoming linked  452ms
+     ✓ refuses when a foreign linked row meets the same name incoming unlinked, creating no duplicate  455ms
+     ✓ refuses when a foreign row and the incoming row assert the same linked player  452ms
+     ✓ refuses the same linked player recorded under a different raw name (§4.4)  450ms
+     ✓ createHonourTeamMember refuses the same linked player under a different display name (§4.4 axis 2, real database) 33ms
+     ✓ lets two distinct linked players share a display name in one team (AFLDB-ISSUE-025)  510ms
+     ✓ reloads idempotently: a second identical run changes nothing  1302ms
+       ✓ serialises both writers over one identity and releases on commit and rollback 40ms
+       ✓ createHonourTeamMember fails fast while the reload lock is held, then succeeds 61ms
+       ✓ create-refusal is provenance-independent: a wikipedia-owned entry also refuses 24ms
+       ✓ the real runtime role can take both lock forms and contend across roles (§9.4b) 41ms
+     ✓ derives and loads with AFLDB_LEGACY_SQLITE unset (G9) 1ms
+     ✓ records its own batch against the derived provenance 2ms
+     ✓ owns every row under the derived provenance and the durable key 9ms
+     ✓ is born linked, and records the goal total in note rather than votes 17ms
+     ✓ reproduces the persisted winner set with an independent oracle query (G2)  344ms
+     ✓ honours the declared span and the completed-season rule  319ms
+     ✓ persists the sole home-and-away club, or NULL when there is more than one (G4) 2ms
+     ✓ is stable across three consecutive reloads (G8)  2014ms
+     ✓ creates no player-link decision of its own 2ms
+     ✓ loads the fixture corpus without refusing 1ms
+     ✓ awards every player tied on the season maximum 1ms
+     ✓ persists NULL rather than inventing a club for a two-club winner 1ms
+     ✓ decides nothing in a season still in progress 2ms
+     ✓ never reaches behind the declared first season 5ms
+     ✓ counts home-and-away goals only, never finals (G4 corollary) 1ms
+     ✓ refuses the whole load when a winner holds no durable identity  983ms
+     ✓ refuses rather than choosing when a winner holds two durable identities  984ms
+     ✓ refuses a normalised path containing the key separator, and does not sanitise it  986ms
+     ✓ loads that same winner once the identity contract is satisfied  1026ms
+     ✓ verifies and no-ops when every Coleman row is already derived 1ms
+     ✓ refuses a mixed ownership state and writes nothing 1ms
+     ✓ refuses an all-legacy family that also carries a later-season row: the legacy scope is bounded 2ms
+     × is manufactured for the legacy scope only: later-season winners are set aside, not rekeyed 31ms
+     × refuses when a season cannot bridge 1:1, aborting the whole transaction 7ms
+     × rekeys an all-legacy family exactly 1:1, preserving every surrogate id 2ms
+     ✓ leaves every other award family untouched 1ms
+     × reports 46 updated / 0 inserted / 0 deleted for the legacy scope on the first derived load 1ms
+     ↓ keeps an admin's link across the derived reload, and reports the disagreement
+     ↓ keeps a confirmed-unlinked decision, and reports that disagreement too
+     ↓ refuses the reload when a decided row no longer carries the derived name
+     ↓ loads again once the name agrees, with both decisions still standing
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/awards-reload-links.test.ts > Coleman legacy to derived ownership transition (AFLDB-ISSUE-111)
+PostgresError: duplicate key value violates unique constraint "award_winners_source_uq"
+ ❯ ErrorResponse node_modules/postgres/src/connection.js:815:30
+ ❯ handle node_modules/postgres/src/connection.js:489:6
+ ❯ Socket.data node_modules/postgres/src/connection.js:324:9
+ ❯ cachedError node_modules/postgres/src/query.js:170:23
+ ❯ new Query node_modules/postgres/src/query.js:36:24
+ ❯ Module.sql node_modules/postgres/src/index.js:112:11
+ ❯ restoreBaseline tests/integration/awards-reload-links.test.ts:5204:18
+    5202|     async function restoreBaseline(rows: OwnershipRow[] = baseline): P…
+    5203|       for (const row of rows) {
+    5204|         await sql`
+       |                  ^
+    5205|           UPDATE award_winners
+    5206|              SET source_id         = ${afltablesId},
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+ FAIL  tests/integration/awards-reload-links.test.ts > Coleman derived reload preserves human link decisions (AFLDB-ISSUE-111)
+Error: 46 Coleman award_winners row(s) in afldb_test are not owned by 'afltables'. This block decides rows of the derived family and restores them by id, so it refuses a family it did not start from.
+ ❯ tests/integration/awards-reload-links.test.ts:5748:15
+    5746|       const foreign = baseline.filter((r) => r.sourceKey !== coleman.s…
+    5747|       if (foreign.length > 0) {
+    5748|         throw new Error(
+       |               ^
+    5749|           `${foreign.length} Coleman award_winners row(s) in afldb_tes…
+    5750|           + `'${coleman.source_key}'. This block decides rows of the d…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/awards-reload-links.test.ts > Coleman legacy to derived ownership transition (AFLDB-ISSUE-111) > is manufactured for the legacy scope only: later-season winners are set aside, not rekeyed
+AssertionError: no later-season winner takes part in the legacy transition: expected [ { id: 4048, season: 2026, …(5) } ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "id": 4048,
++     "playerId": 2619,
++     "playerNameRaw": "Charlie Curnow",
++     "recordId": "coleman:2026:players/C/Charlie_Curnow.html",
++     "season": 2026,
++     "sourceKey": "afltables",
++     "status": "resolved",
++   },
++ ]
+
+ ❯ tests/integration/awards-reload-links.test.ts:5497:9
+    5495|         afterLaterRemoved.filter((r) => r.season > LEGACY_LAST_SEASON),
+    5496|         'no later-season winner takes part in the legacy transition',
+    5497|       ).toEqual([]);
+       |         ^
+    5498|       expect(afterLaterRemoved.map((r) => r.id)).toEqual(baseline.map(…
+    5499|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
+
+ FAIL  tests/integration/awards-reload-links.test.ts > Coleman legacy to derived ownership transition (AFLDB-ISSUE-111) > refuses when a season cannot bridge 1:1, aborting the whole transaction
+AssertionError: expected '  target        : afldb_import@127.0.…' to contain 'carry more than one legacy row'
+
+- Expected
++ Received
+
+- carry more than one legacy row
++   target        : afldb_import@127.0.0.1:55684/afldb_v2_pf_20261114195417_2989863_ed3ce788_test
++   coleman rekey preflight:
++       rows in the coleman award               47
++       owned by draftguru                      46
++       owned by afltables                       1
++       owned by neither (left untouched)         0
++     WARNING: Mixed ownership state: 1 row(s) already owned by afltables and 46 still owned by draftguru. This needs manual review; nothing was written.
++
+
+ ❯ tests/integration/awards-reload-links.test.ts:5503:38
+    5501|     it('refuses when a season cannot bridge 1:1, aborting the whole tr…
+    5502|       expect(unbridgeableRun.status, unbridgeableRun.output).not.toBe(…
+    5503|       expect(unbridgeableRun.output).toContain('carry more than one le…
+       |                                      ^
+    5504|       expect(unbridgeableRun.output).toContain(String(duplicatedSeason…
+    5505|       expect(unbridgeableRun.output).toContain(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
+
+ FAIL  tests/integration/awards-reload-links.test.ts > Coleman legacy to derived ownership transition (AFLDB-ISSUE-111) > rekeys an all-legacy family exactly 1:1, preserving every surrogate id
+AssertionError: the fixture really did put the whole family into the legacy state: expected [ { id: 4048, season: 2026, …(5) } ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "id": 4048,
++     "playerId": 2619,
++     "playerNameRaw": "Charlie Curnow",
++     "recordId": "coleman:2026:players/C/Charlie_Curnow.html",
++     "season": 2026,
++     "sourceKey": "afltables",
++     "status": "resolved",
++   },
++ ]
+
+ ❯ tests/integration/awards-reload-links.test.ts:5521:9
+    5519|         legacyBefore.filter((r) => r.sourceKey !== TRANSITION.legacy_s…
+    5520|         'the fixture really did put the whole family into the legacy s…
+    5521|       ).toEqual([]);
+       |         ^
+    5522|       expect(legacyBefore.length).toBe(TRANSITION.expected_rows);
+    5523|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯
+
+ FAIL  tests/integration/awards-reload-links.test.ts > Coleman legacy to derived ownership transition (AFLDB-ISSUE-111) > reports 46 updated / 0 inserted / 0 deleted for the legacy scope on the first derived load
+AssertionError: expected 1 to be 46 // Object.is equality
+
+- Expected
++ Received
+
+- 46
++ 1
+
+ ❯ tests/integration/awards-reload-links.test.ts:5588:33
+    5586|       expect(TRANSITION.first_load_expectation)
+    5587|         .toBe(`${TRANSITION.expected_rows} updated, 0 inserted, 0 dele…
+    5588|       expect(firstLoad.updated).toBe(TRANSITION.expected_rows);
+       |                                 ^
+    5589|       expect(firstLoad.deleted, 'and never deleted and rewritten').toB…
+    5590|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 101 passed | 4 skipped (109)
+   Start at  06:54:16
+   Duration  174.28s (transform 632ms, setup 2.12s, import 1.08s, tests 170.67s, environment 0ms)
+
+JSON report written to /mnt/ssd/afldb-rem4-coleman276-20261115/ev/m_keep2026_sn/vitest.json

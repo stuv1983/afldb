@@ -1,0 +1,47 @@
+label=b4awrb base=rb mode=all db=afldb_v2_rem4coleman276_b4awrb_test CAND=/mnt/ssd/afldb-rem4-coleman276-20261115/cand HEAD=7cfbe186e70ca91db67da1aa4e28325ccbc32a86 porcelain=0
+args: tests/integration/awards-reload-links.test.ts
+2026-11-14T19:11:49Z
+create-db: afldb_v2_rem4coleman276_b4awrb_test created from afldb_v2_rem4coleman276_rbtmpl_test and marked
+vitest rc=1
+     ✓ imports the canonical Under 22 group as afldb_import (AFLDB-ISSUE-083)  60516ms
+     ✓ keeps a resolved Hall of Fame link, and its row id, across a reload  574ms
+     ✓ keeps a confirmed-unlinked decision pointing at the same row  588ms
+     ✓ keeps the admin's link when the source later names someone else, and says so  579ms
+     ✓ aborts rather than lose a decision when a name-keyed source row is renamed  1038ms
+     ✓ aborts on a renamed honour-team member for the same reason  983ms
+     ✓ keeps an award-winner link across the full legacy awards reload  1088ms
+     ✓ reloads the full 113-row manifest as afldb_import with AFLDB_LEGACY_SQLITE unset  540ms
+     ✓ is idempotent across three consecutive reloads with a byte-identical row-id fingerprint  1485ms
+     ✓ keeps the one explicit honour_team_members link decision (Ted Whitten) resolved across a reload  987ms
+     ✓ leaves every unlinked observation unlinked, and unlinks no resolvable one  494ms
+     ✓ does not touch a manual_admin_edit honour_team_members row  494ms
+     ✓ does not change hall_of_fame, captaincies, award_winners or award_nominations row counts  511ms
+     ✓ reloads the full 343-row manifest as afldb_import with AFLDB_LEGACY_SQLITE unset  531ms
+     ✓ is idempotent across three consecutive reloads with a byte-identical row-id fingerprint  1587ms
+     ✓ keeps all five explicit hall_of_fame link decisions resolved across a reload  3225ms
+     ✓ leaves every name-only observation unlinked  541ms
+     ✓ does not touch a manual_admin_edit hall_of_fame row  532ms
+     ✓ does not change honour_team_members, captaincies, award_winners or award_nominations row counts  541ms
+     ✓ reloads the full current manifest as afldb_import with AFLDB_LEGACY_SQLITE unset  1540ms
+     ✓ re-resolves each era identity from the canonical club name, season-aware  1612ms
+     ✓ is idempotent across three consecutive reloads with a byte-identical row-id fingerprint  5236ms
+     ✓ keeps a resolved captaincy link stable across a reload  3576ms
+     ✓ leaves every wikipedia-owned captaincy linked (none dropped to unlinked)  1737ms
+     ✓ does not touch a manual_admin_edit captaincy row (AFLDB-ISSUE-085)  1767ms
+     ✓ fails closed when an incoming natural key is held by a foreign-owned row (AFLDB-ISSUE-085)  4693ms
+     ✓ does not change hall_of_fame, honour_team_members, award_winners or award_nominations row counts  2981ms
+     ✓ reloads the full 766-row manifest as afldb_import with AFLDB_LEGACY_SQLITE unset  2347ms
+     ✓ re-resolves each era identity from the canonical club name, season-aware  1130ms
+     ✓ preserves the NULL club and NULL opponent rows exactly  1195ms
+     ✓ round-trips a stat_line jsonb object byte-for-byte  856ms
+     ✓ is idempotent across three consecutive reloads with a byte-identical row-id fingerprint  2729ms
+     ✓ keeps a resolved nomination link stable across a reload  1875ms
+     ✓ drops a link only where the player_id cannot be resolved — never otherwise  928ms
+     ✓ does not touch a manual_admin_edit nomination row (AFLDB-ISSUE-080)  927ms
+     ✓ does not change hall_of_fame, honour_team_members, captaincies or award_winners row counts  904ms
+     ✓ reloads the full 1,244-row manifest as afldb_import with AFLDB_LEGACY_SQLITE unset  1054ms
+     ✓ re-resolves each era identity from the source club string, season-aware  1082ms
+     ✓ keeps the 1984 club/state dual selections and the 2016 Josh Kennedy pair as distinct rows  1112ms
+     ✓ preserves the carried link state and any player_link_resolutions decision on this award (G5 shape)  2140ms
+2026-11-14T19:15:15Z
+drop-db: afldb_v2_rem4coleman276_b4awrb_test dropped

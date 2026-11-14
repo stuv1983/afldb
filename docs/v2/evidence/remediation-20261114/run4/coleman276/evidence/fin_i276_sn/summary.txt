@@ -1,0 +1,18 @@
+label=fin_i276_sn base=sn mode=all db=afldb_v2_rem4coleman276_fin_i276_sn_test CAND=/mnt/ssd/afldb-rem4-coleman276-20261115/cand HEAD=fef79cbcbf9958f6dc85900da7526fb086416ae7 porcelain=0
+args: tests/integration/settle-afl-api-issue276.test.ts
+2026-11-14T20:18:14Z
+create-db: afldb_v2_rem4coleman276_fin_i276_sn_test created from afldb_v2_rem4coleman276_sntmpl_test and marked
+vitest rc=0
+ ✓ tests/integration/settle-afl-api-issue276.test.ts (8 tests) 30318ms
+     ✓ a contradictory roster for a FRESH match writes the match but no period rows, and opens one finding; a repeat refreshes it in place; a corrected roster resolves it and writes the periods  2408ms
+     ✓ a contradictory roster leaves EXISTING canonical period rows byte-identical: nothing is rewritten, deleted or ledgered  3358ms
+     ✓ an open finding is resolved only by positive evidence: missing score evidence, a deferred roster and a blocked match each leave it open  2874ms
+     ✓ a finding opened before another source created the match is closed on the corroborated path by positive roster evidence, and only by it  3513ms
+     ✓ a contradictory roster for a FRESH match writes the match but no period rows, and opens one finding; a repeat refreshes it in place; a corrected roster resolves it and writes the periods  3467ms
+     ✓ a contradictory roster leaves EXISTING canonical period rows byte-identical: nothing is rewritten, deleted or ledgered  3192ms
+     ✓ an open finding is resolved only by positive evidence: missing score evidence, a deferred roster and a blocked match each leave it open  2732ms
+     ✓ a finding opened before another source created the match is closed on the corroborated path by positive roster evidence, and only by it  3466ms
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+2026-11-14T20:18:51Z
+drop-db: afldb_v2_rem4coleman276_fin_i276_sn_test dropped

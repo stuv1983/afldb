@@ -1,0 +1,146 @@
+isolated-pg: afldb_v2_rem4coleman276_b4awrb_test verified (cluster afldb_v2_isolated, 127.0.0.1:55684); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem4-coleman276-20261115/cand
+
+ ❯ tests/integration/awards-reload-links.test.ts (107 tests | 10 skipped) 181024ms
+     ✓ imports the canonical Under 22 group as afldb_import (AFLDB-ISSUE-083)  60516ms
+     ✓ keeps a resolved Hall of Fame link, and its row id, across a reload  574ms
+     ✓ keeps a confirmed-unlinked decision pointing at the same row  588ms
+     ✓ keeps the admin's link when the source later names someone else, and says so  579ms
+     ✓ aborts rather than lose a decision when a name-keyed source row is renamed  1038ms
+     ✓ aborts on a renamed honour-team member for the same reason  983ms
+     ✓ keeps an award-winner link across the full legacy awards reload  1088ms
+     ✓ reloads the full 113-row manifest as afldb_import with AFLDB_LEGACY_SQLITE unset  540ms
+     ✓ is idempotent across three consecutive reloads with a byte-identical row-id fingerprint  1485ms
+     ✓ keeps the one explicit honour_team_members link decision (Ted Whitten) resolved across a reload  987ms
+     ✓ leaves every unlinked observation unlinked, and unlinks no resolvable one  494ms
+     ✓ does not touch a manual_admin_edit honour_team_members row  494ms
+     ✓ does not change hall_of_fame, captaincies, award_winners or award_nominations row counts  511ms
+     ✓ reloads the full 343-row manifest as afldb_import with AFLDB_LEGACY_SQLITE unset  531ms
+     ✓ is idempotent across three consecutive reloads with a byte-identical row-id fingerprint  1587ms
+     ✓ keeps all five explicit hall_of_fame link decisions resolved across a reload  3225ms
+     ✓ leaves every name-only observation unlinked  541ms
+     ✓ does not touch a manual_admin_edit hall_of_fame row  532ms
+     ✓ does not change honour_team_members, captaincies, award_winners or award_nominations row counts  541ms
+     ✓ reloads the full current manifest as afldb_import with AFLDB_LEGACY_SQLITE unset  1540ms
+     ✓ re-resolves each era identity from the canonical club name, season-aware  1612ms
+     ✓ is idempotent across three consecutive reloads with a byte-identical row-id fingerprint  5236ms
+     ✓ keeps a resolved captaincy link stable across a reload  3576ms
+     ✓ leaves every wikipedia-owned captaincy linked (none dropped to unlinked)  1737ms
+     ✓ does not touch a manual_admin_edit captaincy row (AFLDB-ISSUE-085)  1767ms
+     ✓ fails closed when an incoming natural key is held by a foreign-owned row (AFLDB-ISSUE-085)  4693ms
+     ✓ does not change hall_of_fame, honour_team_members, award_winners or award_nominations row counts  2981ms
+     ✓ reloads the full 766-row manifest as afldb_import with AFLDB_LEGACY_SQLITE unset  2347ms
+     ✓ re-resolves each era identity from the canonical club name, season-aware  1130ms
+     ✓ preserves the NULL club and NULL opponent rows exactly  1195ms
+     ✓ round-trips a stat_line jsonb object byte-for-byte  856ms
+     ✓ is idempotent across three consecutive reloads with a byte-identical row-id fingerprint  2729ms
+     ✓ keeps a resolved nomination link stable across a reload  1875ms
+     ✓ drops a link only where the player_id cannot be resolved — never otherwise  928ms
+     ✓ does not touch a manual_admin_edit nomination row (AFLDB-ISSUE-080)  927ms
+     ✓ does not change hall_of_fame, honour_team_members, captaincies or award_winners row counts  904ms
+     ✓ reloads the full 1,244-row manifest as afldb_import with AFLDB_LEGACY_SQLITE unset  1054ms
+     ✓ re-resolves each era identity from the source club string, season-aware  1082ms
+     ✓ keeps the 1984 club/state dual selections and the 2016 Josh Kennedy pair as distinct rows  1112ms
+     ✓ preserves the carried link state and any player_link_resolutions decision on this award (G5 shape)  2140ms
+     ✓ is idempotent across three consecutive reloads with a byte-identical row-id fingerprint  3247ms
+     ✓ drops a link only where the player_id cannot be resolved — never otherwise  1134ms
+     ✓ does not touch a manual_admin_edit award_winners row (AFLDB-ISSUE-080)  1088ms
+     ✓ does not change other award families or the other honours tables  1123ms
+     ✓ reloads the full 752-row manifest plus 19 definitions with AFLDB_LEGACY_SQLITE unset  771ms
+     ✓ re-resolves each era identity from the source club string, season-aware  757ms
+     ✓ every winner club_id round-trips from its source club string (0 mismatches)  1034ms
+     ✓ keeps a tied season as two distinct winner rows  2066ms
+     ✓ preserves carried link state and any player_link_resolutions decision (G5 shape)  1857ms
+     ✓ is idempotent across three consecutive reloads with a byte-identical row-id fingerprint  2138ms
+     ✓ drops a link only where the player_id cannot be resolved — never otherwise  715ms
+     ✓ does not touch a manual_admin_edit award_winners row (AFLDB-ISSUE-080)  696ms
+     ✓ does not change other award families or the other honours tables  692ms
+     ✓ reloads the full 979-row manifest plus 17 definitions with AFLDB_LEGACY_SQLITE unset  1246ms
+     ✓ re-resolves each era identity from the source club string, season-aware  1118ms
+     ✓ resolves a club_id for every row that carries a club string, NULL for the rest (680 / 299)  1124ms
+     ✓ keeps the 2003 Brownlow as three distinct winner rows, each with its votes tally  1096ms
+     ✓ carries the Brownlow votes tally on exactly those rows and nowhere else  1116ms
+     ✓ preserves carried link state and any player_link_resolutions decision (G5 shape)  2281ms
+     ✓ is idempotent across three consecutive reloads with a byte-identical row-id fingerprint  3356ms
+     ✓ drops a link only where the player_id cannot be resolved — never otherwise  1175ms
+     ✓ does not touch a manual_admin_edit award_winners row (AFLDB-ISSUE-080)  1123ms
+     ✓ does not change other award families or the other honours tables  1112ms
+     ✓ keeps admin-created honours rows across a reload, linked, decided or not  751ms
+     ✓ keeps foreign-owned award rows across manifest award reloads  2292ms
+     ✓ refuses the Hall of Fame reload when a foreign row occupies an incoming key  526ms
+     ✓ refuses an honour-team reload over a foreign unlinked row with an incoming unlinked name  511ms
+     ✓ refuses when a foreign unlinked row meets the same name incoming linked  511ms
+     ✓ refuses when a foreign linked row meets the same name incoming unlinked, creating no duplicate  467ms
+     ✓ refuses when a foreign row and the incoming row assert the same linked player  979ms
+     ✓ refuses the same linked player recorded under a different raw name (§4.4)  1394ms
+     ✓ createHonourTeamMember refuses the same linked player under a different display name (§4.4 axis 2, real database) 77ms
+     ✓ lets two distinct linked players share a display name in one team (AFLDB-ISSUE-025)  1456ms
+     ✓ reloads idempotently: a second identical run changes nothing  3759ms
+       ✓ serialises both writers over one identity and releases on commit and rollback 39ms
+       ✓ createHonourTeamMember fails fast while the reload lock is held, then succeeds 166ms
+       ✓ create-refusal is provenance-independent: a wikipedia-owned entry also refuses 30ms
+       ✓ the real runtime role can take both lock forms and contend across roles (§9.4b) 52ms
+     ✓ derives and loads with AFLDB_LEGACY_SQLITE unset (G9) 1ms
+     ✓ records its own batch against the derived provenance 2ms
+     ✓ owns every row under the derived provenance and the durable key 11ms
+     ✓ is born linked, and records the goal total in note rather than votes 19ms
+     ✓ reproduces the persisted winner set with an independent oracle query (G2)  344ms
+     ✓ honours the declared span and the completed-season rule  346ms
+     ✓ persists the sole home-and-away club, or NULL when there is more than one (G4) 3ms
+     ✓ is stable across three consecutive reloads (G8)  2052ms
+     ✓ creates no player-link decision of its own 2ms
+     ✓ loads the fixture corpus without refusing 1ms
+     ✓ awards every player tied on the season maximum 1ms
+     ✓ persists NULL rather than inventing a club for a two-club winner 1ms
+     ✓ decides nothing in a season still in progress 3ms
+     ✓ never reaches behind the declared first season 5ms
+     ✓ counts home-and-away goals only, never finals (G4 corollary) 1ms
+     ✓ refuses the whole load when a winner holds no durable identity  1209ms
+     ✓ refuses rather than choosing when a winner holds two durable identities  1185ms
+     ✓ refuses a normalised path containing the key separator, and does not sanitise it  1381ms
+     ✓ loads that same winner once the identity contract is satisfied  1582ms
+     ↓ verifies and no-ops when every Coleman row is already derived
+     ↓ refuses a mixed ownership state and writes nothing
+     ↓ refuses when a season cannot bridge 1:1, aborting the whole transaction
+     ↓ rekeys an all-legacy family exactly 1:1, preserving every surrogate id
+     ↓ leaves every other award family untouched
+     ↓ reports 46 updated / 0 inserted / 0 deleted on the first derived load
+     ↓ keeps an admin's link across the derived reload, and reports the disagreement
+     ↓ keeps a confirmed-unlinked decision, and reports that disagreement too
+     ↓ refuses the reload when a decided row no longer carries the derived name
+     ↓ loads again once the name agrees, with both decisions still standing
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/awards-reload-links.test.ts > Coleman legacy to derived ownership transition (AFLDB-ISSUE-111)
+Error: afldb_test holds 47 Coleman winner row(s); the tracked contract declares exactly 46 and the transition's preflight refuses any other count. The legacy state is manufactured from this family, so the 1:1 rekey cannot be tested against a family of a different size — rebuild afldb_test or reconcile data/reference/coleman-derivation.json.
+ ❯ tests/integration/awards-reload-links.test.ts:5154:15
+    5152|       }
+    5153|       if (baseline.length !== TRANSITION.expected_rows) {
+    5154|         throw new Error(
+       |               ^
+    5155|           `afldb_test holds ${baseline.length} Coleman winner row(s); …
+    5156|           + `declares exactly ${TRANSITION.expected_rows} and the tran…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  tests/integration/awards-reload-links.test.ts > Coleman derived reload preserves human link decisions (AFLDB-ISSUE-111)
+Error: afldb_test holds 47 Coleman winner row(s); the tracked contract declares exactly 46. The reload signal asserted below is that count, so it cannot be measured against a family of a different size.
+ ❯ tests/integration/awards-reload-links.test.ts:5534:15
+    5532|       }
+    5533|       if (baseline.length !== TRANSITION.expected_rows) {
+    5534|         throw new Error(
+       |               ^
+    5535|           `afldb_test holds ${baseline.length} Coleman winner row(s); …
+    5536|           + `declares exactly ${TRANSITION.expected_rows}. The reload …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  97 passed | 10 skipped (107)
+   Start at  06:12:00
+   Duration  194.31s (transform 875ms, setup 11.68s, import 1.20s, tests 181.02s, environment 0ms)
+
+JSON report written to /mnt/ssd/afldb-rem4-coleman276-20261115/ev/b4awrb/vitest.json

@@ -1,0 +1,350 @@
+isolated-pg: afldb_v2_rem4coleman276_m_loaderno2026_rb_test verified (cluster afldb_v2_isolated, 127.0.0.1:55684); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem4-coleman276-20261115/cand
+
+ ❯ tests/integration/awards-reload-links.test.ts (109 tests | 10 failed | 12 skipped) 157735ms
+     ✓ imports the canonical Under 22 group as afldb_import (AFLDB-ISSUE-083)  51884ms
+     ✓ keeps a resolved Hall of Fame link, and its row id, across a reload  604ms
+     ✓ keeps a confirmed-unlinked decision pointing at the same row  600ms
+     ✓ keeps the admin's link when the source later names someone else, and says so  581ms
+     ✓ aborts rather than lose a decision when a name-keyed source row is renamed  1047ms
+     ✓ aborts on a renamed honour-team member for the same reason  1003ms
+     ✓ keeps an award-winner link across the full legacy awards reload  1100ms
+     ✓ reloads the full 113-row manifest as afldb_import with AFLDB_LEGACY_SQLITE unset  546ms
+     ✓ is idempotent across three consecutive reloads with a byte-identical row-id fingerprint  1509ms
+     ✓ keeps the one explicit honour_team_members link decision (Ted Whitten) resolved across a reload  1004ms
+     ✓ leaves every unlinked observation unlinked, and unlinks no resolvable one  500ms
+     ✓ does not touch a manual_admin_edit honour_team_members row  507ms
+     ✓ does not change hall_of_fame, captaincies, award_winners or award_nominations row counts  520ms
+     ✓ reloads the full 343-row manifest as afldb_import with AFLDB_LEGACY_SQLITE unset  570ms
+     ✓ is idempotent across three consecutive reloads with a byte-identical row-id fingerprint  1620ms
+     ✓ keeps all five explicit hall_of_fame link decisions resolved across a reload  3267ms
+     ✓ leaves every name-only observation unlinked  553ms
+     ✓ does not touch a manual_admin_edit hall_of_fame row  568ms
+     ✓ does not change honour_team_members, captaincies, award_winners or award_nominations row counts  546ms
+     ✓ reloads the full current manifest as afldb_import with AFLDB_LEGACY_SQLITE unset  1540ms
+     ✓ re-resolves each era identity from the canonical club name, season-aware  1622ms
+     ✓ is idempotent across three consecutive reloads with a byte-identical row-id fingerprint  5392ms
+     ✓ keeps a resolved captaincy link stable across a reload  3494ms
+     ✓ leaves every wikipedia-owned captaincy linked (none dropped to unlinked)  1847ms
+     ✓ does not touch a manual_admin_edit captaincy row (AFLDB-ISSUE-085)  1784ms
+     ✓ fails closed when an incoming natural key is held by a foreign-owned row (AFLDB-ISSUE-085)  4662ms
+     ✓ does not change hall_of_fame, honour_team_members, award_winners or award_nominations row counts  2490ms
+     ✓ reloads the full 766-row manifest as afldb_import with AFLDB_LEGACY_SQLITE unset  753ms
+     ✓ re-resolves each era identity from the canonical club name, season-aware  750ms
+     ✓ preserves the NULL club and NULL opponent rows exactly  802ms
+     ✓ round-trips a stat_line jsonb object byte-for-byte  802ms
+     ✓ is idempotent across three consecutive reloads with a byte-identical row-id fingerprint  2579ms
+     ✓ keeps a resolved nomination link stable across a reload  1831ms
+     ✓ drops a link only where the player_id cannot be resolved — never otherwise  912ms
+     ✓ does not touch a manual_admin_edit nomination row (AFLDB-ISSUE-080)  909ms
+     ✓ does not change hall_of_fame, honour_team_members, captaincies or award_winners row counts  919ms
+     ✓ reloads the full 1,244-row manifest as afldb_import with AFLDB_LEGACY_SQLITE unset  1073ms
+     ✓ re-resolves each era identity from the source club string, season-aware  1065ms
+     ✓ keeps the 1984 club/state dual selections and the 2016 Josh Kennedy pair as distinct rows  1074ms
+     ✓ preserves the carried link state and any player_link_resolutions decision on this award (G5 shape)  2122ms
+     ✓ is idempotent across three consecutive reloads with a byte-identical row-id fingerprint  3264ms
+     ✓ drops a link only where the player_id cannot be resolved — never otherwise  1070ms
+     ✓ does not touch a manual_admin_edit award_winners row (AFLDB-ISSUE-080)  1068ms
+     ✓ does not change other award families or the other honours tables  1063ms
+     ✓ reloads the full 752-row manifest plus 19 definitions with AFLDB_LEGACY_SQLITE unset  770ms
+     ✓ re-resolves each era identity from the source club string, season-aware  752ms
+     ✓ every winner club_id round-trips from its source club string (0 mismatches)  737ms
+     ✓ keeps a tied season as two distinct winner rows  747ms
+     ✓ preserves carried link state and any player_link_resolutions decision (G5 shape)  1480ms
+     ✓ is idempotent across three consecutive reloads with a byte-identical row-id fingerprint  2235ms
+     ✓ drops a link only where the player_id cannot be resolved — never otherwise  737ms
+     ✓ does not touch a manual_admin_edit award_winners row (AFLDB-ISSUE-080)  752ms
+     ✓ does not change other award families or the other honours tables  741ms
+     ✓ reloads the full 979-row manifest plus 17 definitions with AFLDB_LEGACY_SQLITE unset  1277ms
+     ✓ re-resolves each era identity from the source club string, season-aware  1256ms
+     ✓ resolves a club_id for every row that carries a club string, NULL for the rest (680 / 299)  1248ms
+     ✓ keeps the 2003 Brownlow as three distinct winner rows, each with its votes tally  1258ms
+     ✓ carries the Brownlow votes tally on exactly those rows and nowhere else  1099ms
+     ✓ preserves carried link state and any player_link_resolutions decision (G5 shape)  2197ms
+     ✓ is idempotent across three consecutive reloads with a byte-identical row-id fingerprint  3316ms
+     ✓ drops a link only where the player_id cannot be resolved — never otherwise  1119ms
+     ✓ does not touch a manual_admin_edit award_winners row (AFLDB-ISSUE-080)  1108ms
+     ✓ does not change other award families or the other honours tables  1114ms
+     ✓ keeps admin-created honours rows across a reload, linked, decided or not  717ms
+     ✓ keeps foreign-owned award rows across manifest award reloads  2170ms
+     ✓ refuses the Hall of Fame reload when a foreign row occupies an incoming key  473ms
+     ✓ refuses an honour-team reload over a foreign unlinked row with an incoming unlinked name  454ms
+     ✓ refuses when a foreign unlinked row meets the same name incoming linked  461ms
+     ✓ refuses when a foreign linked row meets the same name incoming unlinked, creating no duplicate  461ms
+     ✓ refuses when a foreign row and the incoming row assert the same linked player  457ms
+     ✓ refuses the same linked player recorded under a different raw name (§4.4)  454ms
+     ✓ createHonourTeamMember refuses the same linked player under a different display name (§4.4 axis 2, real database) 32ms
+     ✓ lets two distinct linked players share a display name in one team (AFLDB-ISSUE-025)  519ms
+     ✓ reloads idempotently: a second identical run changes nothing  1317ms
+       ✓ serialises both writers over one identity and releases on commit and rollback 38ms
+       ✓ createHonourTeamMember fails fast while the reload lock is held, then succeeds 61ms
+       ✓ create-refusal is provenance-independent: a wikipedia-owned entry also refuses 26ms
+       ✓ the real runtime role can take both lock forms and contend across roles (§9.4b) 38ms
+     ✓ derives and loads with AFLDB_LEGACY_SQLITE unset (G9) 1ms
+     ✓ records its own batch against the derived provenance 3ms
+     ✓ owns every row under the derived provenance and the durable key 12ms
+     ✓ is born linked, and records the goal total in note rather than votes 16ms
+     × reproduces the persisted winner set with an independent oracle query (G2) 380ms
+     × honours the declared span and the completed-season rule 327ms
+     ✓ persists the sole home-and-away club, or NULL when there is more than one (G4) 4ms
+     ✓ is stable across three consecutive reloads (G8)  1990ms
+     ✓ creates no player-link decision of its own 2ms
+     × loads the fixture corpus without refusing 1ms
+     × awards every player tied on the season maximum 2ms
+     × persists NULL rather than inventing a club for a two-club winner 2ms
+     ✓ decides nothing in a season still in progress 4ms
+     ✓ never reaches behind the declared first season 5ms
+     × counts home-and-away goals only, never finals (G4 corollary) 1ms
+     × refuses the whole load when a winner holds no durable identity 993ms
+     × refuses rather than choosing when a winner holds two durable identities 996ms
+     × refuses a normalised path containing the key separator, and does not sanitise it 994ms
+     × loads that same winner once the identity contract is satisfied 995ms
+     ↓ verifies and no-ops when every Coleman row is already derived
+     ↓ refuses a mixed ownership state and writes nothing
+     ↓ refuses an all-legacy family that also carries a later-season row: the legacy scope is bounded
+     ↓ is manufactured for the legacy scope only: later-season winners are set aside, not rekeyed
+     ↓ refuses when a season cannot bridge 1:1, aborting the whole transaction
+     ↓ rekeys an all-legacy family exactly 1:1, preserving every surrogate id
+     ↓ leaves every other award family untouched
+     ↓ reports 46 updated / 0 inserted / 0 deleted for the legacy scope on the first derived load
+     ↓ keeps an admin's link across the derived reload, and reports the disagreement
+     ↓ keeps a confirmed-unlinked decision, and reports that disagreement too
+     ↓ refuses the reload when a decided row no longer carries the derived name
+     ↓ loads again once the name agrees, with both decisions still standing
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/awards-reload-links.test.ts > Coleman legacy to derived ownership transition (AFLDB-ISSUE-111)
+Error: afldb_test holds 46 Coleman winner row(s) that are not the 47 the contract's derivation_method yields in this database (independent oracle, season:player_id). The legacy state is manufactured from the derived family, so the family must first be the derived one: run the derived loader, or rebuild afldb_test.
+ ❯ tests/integration/awards-reload-links.test.ts:5292:15
+    5290|       const familyKeys = family.map((r) => `${r.season}:${r.playerId}`…
+    5291|       if (JSON.stringify(familyKeys) !== JSON.stringify(oracle)) {
+    5292|         throw new Error(
+       |               ^
+    5293|           `afldb_test holds ${family.length} Coleman winner row(s) tha…
+    5294|           + "the contract's derivation_method yields in this database …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/12]⎯
+
+ FAIL  tests/integration/awards-reload-links.test.ts > Coleman derived reload preserves human link decisions (AFLDB-ISSUE-111)
+Error: afldb_test holds 46 Coleman winner row(s) that are not the 47 the contract's derivation_method yields in this database (independent oracle, season:player_id). The reload signal asserted below is that family size, so it cannot be measured against a family that is not the derived one.
+ ❯ tests/integration/awards-reload-links.test.ts:5760:15
+    5758|       const familyKeys = baseline.map((r) => `${r.season}:${r.playerId…
+    5759|       if (JSON.stringify(familyKeys) !== JSON.stringify(familyOracle))…
+    5760|         throw new Error(
+       |               ^
+    5761|           `afldb_test holds ${baseline.length} Coleman winner row(s) t…
+    5762|           + "the contract's derivation_method yields in this database …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/12]⎯
+
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 10 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/awards-reload-links.test.ts > Coleman Medal derived from canonical match facts (AFLDB-ISSUE-111) > reproduces the persisted winner set with an independent oracle query (G2)
+AssertionError: the loader and an independently shaped query must name the same winners: expected [ '1980:9629', '1981:9629', …(44) ] to deeply equal [ '1980:9629', '1981:9629', …(45) ]
+
+- Expected
++ Received
+
+@@ -43,7 +43,6 @@
+    "2021:5683",
+    "2022:2631",
+    "2023:2631",
+    "2024:6984",
+    "2025:6964",
+-   "2026:2631",
+  ]
+
+ ❯ tests/integration/awards-reload-links.test.ts:4121:9
+    4119|         winners.map((w) => `${w.season}:${w.playerId}`),
+    4120|         'the loader and an independently shaped query must name the sa…
+    4121|       ).toEqual(oracle.map((o) => `${o.season}:${o.playerId}`));
+       |         ^
+    4122|
+    4123|       // The persisted goal total is the same fact, not merely the sam…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/12]⎯
+
+ FAIL  tests/integration/awards-reload-links.test.ts > Coleman Medal derived from canonical match facts (AFLDB-ISSUE-111) > honours the declared span and the completed-season rule
+AssertionError: expected 46 to be 47 // Object.is equality
+
+- Expected
++ Received
+
+- 47
++ 46
+
+ ❯ tests/integration/awards-reload-links.test.ts:4170:37
+    4168|           ) q
+    4169|       `;
+    4170|       expect(new Set(seasons).size).toBe(expected.n);
+       |                                     ^
+    4171|       expect(firstRun.seasons).toBe(expected.n);
+    4172|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/12]⎯
+
+ FAIL  tests/integration/awards-reload-links.test.ts > Coleman derivation rules that history cannot demonstrate (AFLDB-ISSUE-111) > loads the fixture corpus without refusing
+AssertionError: expected 46 to be 50 // Object.is equality
+
+- Expected
++ Received
+
+- 50
++ 46
+
+ ❯ tests/integration/awards-reload-links.test.ts:4524:37
+    4522|       // Four new winners (two tied, one multi-club, one finals season…
+    4523|       // three new seasons: the in-progress and pre-span seasons decid…
+    4524|       expect(fixtureWinners.length).toBe(baselineWinners.length + 4);
+       |                                     ^
+    4525|       expect(new Set(fixtureWinners.map((w) => w.season)).size)
+    4526|         .toBe(new Set(baselineWinners.map((w) => w.season)).size + 3);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/12]⎯
+
+ FAIL  tests/integration/awards-reload-links.test.ts > Coleman derivation rules that history cannot demonstrate (AFLDB-ISSUE-111) > awards every player tied on the season maximum
+AssertionError: both leaders win; there is no tie-break and no silent single-row pick: expected [] to deeply equal [ 1, 2 ]
+
+- Expected
++ Received
+
+- [
+-   1,
+-   2,
+- ]
++ []
+
+ ❯ tests/integration/awards-reload-links.test.ts:4536:9
+    4534|         tied.map((w) => w.playerId).sort((a, b) => (a ?? 0) - (b ?? 0)…
+    4535|         'both leaders win; there is no tie-break and no silent single-…
+    4536|       ).toEqual([playerA, playerB].sort((a, b) => a - b));
+       |         ^
+    4537|       expect(tied.map(goalsIn)).toEqual([5, 5]);
+    4538|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/12]⎯
+
+ FAIL  tests/integration/awards-reload-links.test.ts > Coleman derivation rules that history cannot demonstrate (AFLDB-ISSUE-111) > persists NULL rather than inventing a club for a two-club winner
+AssertionError: exactly one leader that season: expected [] to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ tests/integration/awards-reload-links.test.ts:4554:77
+    4552|     it('persists NULL rather than inventing a club for a two-club winn…
+    4553|       const rows = rowsFor(MULTI_CLUB_SEASON);
+    4554|       expect(rows.map((w) => w.playerId), 'exactly one leader that sea…
+       |                                                                             ^
+    4555|       const [winner] = rows;
+    4556|       expect(winner.playerId).toBe(playerA);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/12]⎯
+
+ FAIL  tests/integration/awards-reload-links.test.ts > Coleman derivation rules that history cannot demonstrate (AFLDB-ISSUE-111) > counts home-and-away goals only, never finals (G4 corollary)
+AssertionError: exactly one leader that season: expected [] to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ tests/integration/awards-reload-links.test.ts:4615:77
+    4613|     it('counts home-and-away goals only, never finals (G4 corollary)',…
+    4614|       const rows = rowsFor(FINALS_SEASON);
+    4615|       expect(rows.map((w) => w.playerId), 'exactly one leader that sea…
+       |                                                                             ^
+    4616|       const [winner] = rows;
+    4617|       // B kicked 14 across the season and 4 across home-and-away; A k…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/12]⎯
+
+ FAIL  tests/integration/awards-reload-links.test.ts > Coleman durable-identity refusals against a real database (AFLDB-ISSUE-111 G5a) > refuses the whole load when a winner holds no durable identity
+AssertionError: the loader must refuse this load, not perform it:
+  groups        : coleman
+  target        : afldb_import@127.0.0.1:55684/afldb_v2_pf_20261114195715_3000197_85462564_test
+  coleman — Coleman Medal, derived from canonical home-and-away facts
+    coleman winners                           46  (46 seasons, 46 updated, 0 inserted, 0 deleted)
+  done in 1 s
+: expected +0 not to be +0 // Object.is equality
+ ❯ expectRefusal tests/integration/awards-reload-links.test.ts:4705:14
+    4703|
+    4704|       expect(run.status, `the loader must refuse this load, not perfor…
+    4705|         .not.toBe(0);
+       |              ^
+    4706|       expect(output).toContain(
+    4707|         'coleman: the derivation cannot produce a durable source_recor…
+ ❯ tests/integration/awards-reload-links.test.ts:4835:28
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/12]⎯
+
+ FAIL  tests/integration/awards-reload-links.test.ts > Coleman durable-identity refusals against a real database (AFLDB-ISSUE-111 G5a) > refuses rather than choosing when a winner holds two durable identities
+AssertionError: the loader must refuse this load, not perform it:
+  groups        : coleman
+  target        : afldb_import@127.0.0.1:55684/afldb_v2_pf_20261114195715_3000197_85462564_test
+  coleman — Coleman Medal, derived from canonical home-and-away facts
+    coleman winners                           46  (46 seasons, 46 updated, 0 inserted, 0 deleted)
+  done in 1 s
+: expected +0 not to be +0 // Object.is equality
+ ❯ expectRefusal tests/integration/awards-reload-links.test.ts:4705:14
+    4703|
+    4704|       expect(run.status, `the loader must refuse this load, not perfor…
+    4705|         .not.toBe(0);
+       |              ^
+    4706|       expect(output).toContain(
+    4707|         'coleman: the derivation cannot produce a durable source_recor…
+ ❯ tests/integration/awards-reload-links.test.ts:4858:28
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/12]⎯
+
+ FAIL  tests/integration/awards-reload-links.test.ts > Coleman durable-identity refusals against a real database (AFLDB-ISSUE-111 G5a) > refuses a normalised path containing the key separator, and does not sanitise it
+AssertionError: the loader must refuse this load, not perform it:
+  groups        : coleman
+  target        : afldb_import@127.0.0.1:55684/afldb_v2_pf_20261114195715_3000197_85462564_test
+  coleman — Coleman Medal, derived from canonical home-and-away facts
+    coleman winners                           46  (46 seasons, 46 updated, 0 inserted, 0 deleted)
+  done in 1 s
+: expected +0 not to be +0 // Object.is equality
+ ❯ expectRefusal tests/integration/awards-reload-links.test.ts:4705:14
+    4703|
+    4704|       expect(run.status, `the loader must refuse this load, not perfor…
+    4705|         .not.toBe(0);
+       |              ^
+    4706|       expect(output).toContain(
+    4707|         'coleman: the derivation cannot produce a durable source_recor…
+ ❯ tests/integration/awards-reload-links.test.ts:4870:28
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/12]⎯
+
+ FAIL  tests/integration/awards-reload-links.test.ts > Coleman durable-identity refusals against a real database (AFLDB-ISSUE-111 G5a) > loads that same winner once the identity contract is satisfied
+AssertionError: exactly the one fixture winner is new: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ tests/integration/awards-reload-links.test.ts:4884:69
+    4882|       const run = runColeman();
+    4883|       expect(run.status, run.stdout + run.stderr).toBe(0);
+    4884|       expect(run.inserted, 'exactly the one fixture winner is new').to…
+       |                                                                     ^
+    4885|       expect(run.deleted, 'no real winner is displaced').toBe(0);
+    4886|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/12]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  10 failed | 87 passed | 12 skipped (109)
+   Start at  06:57:14
+   Duration  160.48s (transform 556ms, setup 1.45s, import 912ms, tests 157.74s, environment 0ms)
+
+JSON report written to /mnt/ssd/afldb-rem4-coleman276-20261115/ev/m_loaderno2026_rb/vitest.json

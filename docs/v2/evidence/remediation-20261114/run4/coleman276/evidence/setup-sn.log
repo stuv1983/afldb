@@ -1,0 +1,9 @@
+create-db: afldb_v2_rem4coleman276_sntmpl_test created and marked
+isolated-pg: afldb_v2_rem4coleman276_sntmpl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55684); running node
+pg_restore exit=0 seconds=6 stderrLines=0
+isolated-pg: afldb_v2_rem4coleman276_sntmpl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55684); running node
+AFLDB migrations -> test (afldb_owner@127.0.0.1:55684/afldb_v2_rem4coleman276_sntmpl_test)
+  118 migration file(s), 118 already applied
+
+Nothing to apply — schema is up to date.
+ISOLATED TARGET OK: afldb_v2_rem4coleman276_sntmpl_test

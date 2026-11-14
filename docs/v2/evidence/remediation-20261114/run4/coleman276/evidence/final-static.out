@@ -1,0 +1,15 @@
+##### static start 20:11:54 HEAD=fef79cbcbf9958f6dc85900da7526fb086416ae7 porcelain=0
+##### typecheck
+typecheck rc=0
+
+Generating route types...
+✓ Types generated successfully
+##### lint:gate
+lint:gate rc=0
+
+> afldb@0.1.0 lint:gate
+> tsx tools/dev/lint-gate.ts
+
+Lint gate (ratchet): 338 error(s) in 43 file(s) now; the ratchet baseline allows 338 in 43 (existing debt, not clean lint).
+Lint gate: PASSED (ratchet; existing debt remains).
+##### static done 21:06:42 HEAD=fef79cbcbf9958f6dc85900da7526fb086416ae7 porcelain=0

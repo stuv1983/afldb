@@ -1,0 +1,82 @@
+##### final start 20:11:54 HEAD=fef79cbcbf9958f6dc85900da7526fb086416ae7 porcelain=0
+frozen diff vs B4 (bytes; 0 = byte-identical): 0
+##### per-file(all) rb: tests/integration/awards-reload-links.test.ts
+label=fin_aw_rb base=rb mode=all db=afldb_v2_rem4coleman276_fin_aw_rb_test CAND=/mnt/ssd/afldb-rem4-coleman276-20261115/cand HEAD=fef79cbcbf9958f6dc85900da7526fb086416ae7 porcelain=0
+vitest rc=0
+##### per-file(all) rb: tests/integration/settle-afl-api-issue276.test.ts
+label=fin_i276_rb base=rb mode=all db=afldb_v2_rem4coleman276_fin_i276_rb_test CAND=/mnt/ssd/afldb-rem4-coleman276-20261115/cand HEAD=fef79cbcbf9958f6dc85900da7526fb086416ae7 porcelain=0
+vitest rc=0
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+##### per-file(all) sn: tests/integration/awards-reload-links.test.ts
+label=fin_aw_sn base=sn mode=all db=afldb_v2_rem4coleman276_fin_aw_sn_test CAND=/mnt/ssd/afldb-rem4-coleman276-20261115/cand HEAD=fef79cbcbf9958f6dc85900da7526fb086416ae7 porcelain=0
+vitest rc=0
+##### per-file(all) sn: tests/integration/settle-afl-api-issue276.test.ts
+label=fin_i276_sn base=sn mode=all db=afldb_v2_rem4coleman276_fin_i276_sn_test CAND=/mnt/ssd/afldb-rem4-coleman276-20261115/cand HEAD=fef79cbcbf9958f6dc85900da7526fb086416ae7 porcelain=0
+vitest rc=0
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+##### shared rb: tests/integration/settle-afl-api-issue276.test.ts then tests/integration/awards-reload-links.test.ts
+label=fin_sh_rb base=rb mode=shared(unset) HEAD=fef79cbcbf9958f6dc85900da7526fb086416ae7 porcelain=0
+per-file env vars set: 0
+create-db: afldb_v2_rem4coleman276_fin_sh_rb_test created from afldb_v2_rem4coleman276_rbtmpl_test and marked
+[1] tests/integration/settle-afl-api-issue276.test.ts rc=0:  Tests 8 passed (8)
+[2] tests/integration/awards-reload-links.test.ts rc=0:  Tests 109 passed (109)
+count diff lines (template vs used db): 4
+50c50
+< public.import_batches=26
+---
+> public.import_batches=148
+drop-db: afldb_v2_rem4coleman276_fin_sh_rb_test dropped
+##### shared sn: tests/integration/awards-reload-links.test.ts then tests/integration/settle-afl-api-issue276.test.ts
+label=fin_sh_sn base=sn mode=shared(unset) HEAD=fef79cbcbf9958f6dc85900da7526fb086416ae7 porcelain=0
+per-file env vars set: 0
+create-db: afldb_v2_rem4coleman276_fin_sh_sn_test created from afldb_v2_rem4coleman276_sntmpl_test and marked
+[1] tests/integration/awards-reload-links.test.ts rc=0:  Tests 109 passed (109)
+[2] tests/integration/settle-afl-api-issue276.test.ts rc=0:  Tests 8 passed (8)
+count diff lines (template vs used db): 8
+11c11
+< public.award_winners=3712
+---
+> public.award_winners=3713
+50c50
+< public.import_batches=75
+---
+> public.import_batches=197
+drop-db: afldb_v2_rem4coleman276_fin_sh_sn_test dropped
+##### shared sn: tests/integration/settle-afl-api-issue276.test.ts alone (cleanup proof for the finals season)
+label=fin_leak_sn base=sn mode=shared(unset) HEAD=fef79cbcbf9958f6dc85900da7526fb086416ae7 porcelain=0
+per-file env vars set: 0
+create-db: afldb_v2_rem4coleman276_fin_leak_sn_test created from afldb_v2_rem4coleman276_sntmpl_test and marked
+[1] tests/integration/settle-afl-api-issue276.test.ts rc=0:  Tests 8 passed (8)
+count diff lines (template vs used db): 0
+drop-db: afldb_v2_rem4coleman276_fin_leak_sn_test dropped
+##### shared rb: tests/integration/settle-afl-api-issue276.test.ts alone (cleanup proof for the finals season)
+label=fin_leak_rb base=rb mode=shared(unset) HEAD=fef79cbcbf9958f6dc85900da7526fb086416ae7 porcelain=0
+per-file env vars set: 0
+create-db: afldb_v2_rem4coleman276_fin_leak_rb_test created from afldb_v2_rem4coleman276_rbtmpl_test and marked
+[1] tests/integration/settle-afl-api-issue276.test.ts rc=0:  Tests 8 passed (8)
+count diff lines (template vs used db): 0
+drop-db: afldb_v2_rem4coleman276_fin_leak_rb_test dropped
+##### v2-coleman-publication on its schema-only base
+label=fin_cole_all mode=all HEAD=fef79cbcbf9958f6dc85900da7526fb086416ae7 porcelain=0
+create-db: afldb_v2_rem4coleman276_fin_cole_all_test created and marked
+
+Applied 118 migration(s).
+psql:tools/maintenance/privileges.sql:899: NOTICE:  afldb_backup: pg_read_all_data needs a superuser; unchanged
+DO
+vitest rc=0
+ Test Files  1 passed (1)
+      Tests  28 passed (28)
+drop-db: afldb_v2_rem4coleman276_fin_cole_all_test dropped
+label=fin_cole_sh mode=shared HEAD=fef79cbcbf9958f6dc85900da7526fb086416ae7 porcelain=0
+create-db: afldb_v2_rem4coleman276_fin_cole_sh_test created and marked
+
+Applied 118 migration(s).
+psql:tools/maintenance/privileges.sql:899: NOTICE:  afldb_backup: pg_read_all_data needs a superuser; unchanged
+DO
+vitest rc=0
+ Test Files  1 passed (1)
+      Tests  28 passed (28)
+drop-db: afldb_v2_rem4coleman276_fin_cole_sh_test dropped
+##### final done 20:26:21 HEAD=fef79cbcbf9958f6dc85900da7526fb086416ae7 porcelain=0

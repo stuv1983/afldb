@@ -1,0 +1,14 @@
+label=m_finplayedold_rb base=rb mode=all db=afldb_v2_rem4coleman276_m_finplayedold_rb_test CAND=/mnt/ssd/afldb-rem4-coleman276-20261115/cand HEAD=7cfbe186e70ca91db67da1aa4e28325ccbc32a86 porcelain=4
+args: tests/integration/zz-b4-settle-afl-api-issue276.test.ts
+2026-11-14T20:00:26Z
+create-db: afldb_v2_rem4coleman276_m_finplayedold_rb_test created from afldb_v2_rem4coleman276_rbtmpl_test and marked
+vitest rc=0
+ ✓ tests/integration/zz-b4-settle-afl-api-issue276.test.ts (4 tests) 5842ms
+     ✓ a contradictory roster for a FRESH match writes the match but no period rows, and opens one finding; a repeat refreshes it in place; a corrected roster resolves it and writes the periods  381ms
+     ✓ a contradictory roster leaves EXISTING canonical period rows byte-identical: nothing is rewritten, deleted or ledgered  1189ms
+     ✓ an open finding is resolved only by positive evidence: missing score evidence, a deferred roster and a blocked match each leave it open  749ms
+     ✓ a finding opened before another source created the match is closed on the corroborated path by positive roster evidence, and only by it  1346ms
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+2026-11-14T20:00:42Z
+drop-db: afldb_v2_rem4coleman276_m_finplayedold_rb_test dropped

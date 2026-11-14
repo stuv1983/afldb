@@ -1,0 +1,20 @@
+label=m_finplayed_sn base=sn mode=all db=afldb_v2_rem4coleman276_m_finplayed_sn_test CAND=/mnt/ssd/afldb-rem4-coleman276-20261115/cand HEAD=7cfbe186e70ca91db67da1aa4e28325ccbc32a86 porcelain=3
+args: tests/integration/settle-afl-api-issue276.test.ts
+2026-11-14T20:00:59Z
+create-db: afldb_v2_rem4coleman276_m_finplayed_sn_test created from afldb_v2_rem4coleman276_sntmpl_test and marked
+vitest rc=1
+     ✓ a contradictory roster for a FRESH match writes the match but no period rows, and opens one finding; a repeat refreshes it in place; a corrected roster resolves it and writes the periods  2356ms
+     ✓ a contradictory roster leaves EXISTING canonical period rows byte-identical: nothing is rewritten, deleted or ledgered  3312ms
+     ✓ an open finding is resolved only by positive evidence: missing score evidence, a deferred roster and a blocked match each leave it open  2786ms
+     ✓ a finding opened before another source created the match is closed on the corroborated path by positive roster evidence, and only by it  3453ms
+     × a contradictory roster for a FRESH match writes the match but no period rows, and opens one finding; a repeat refreshes it in place; a corrected roster resolves it and writes the periods 3363ms
+     ✓ a contradictory roster leaves EXISTING canonical period rows byte-identical: nothing is rewritten, deleted or ledgered  2376ms
+     ✓ an open finding is resolved only by positive evidence: missing score evidence, a deferred roster and a blocked match each leave it open  2709ms
+     ✓ a finding opened before another source created the match is closed on the corroborated path by positive roster evidence, and only by it  3466ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/integration/settle-afl-api-issue276.test.ts > AFLDB-ISSUE-276 — the same cases on a PRELIMINARY FINAL in the suite-owned season 2069 (finals coverage, collision-free) > a contradictory roster for a FRESH match writes the match but no period rows, and opens one finding; a repeat refreshes it in place; a corrected roster resolves it and writes the periods
+AssertionError: expected [ +0, +0 ] to deeply equal [ 1, 1 ]
+ Test Files  1 failed (1)
+      Tests  1 failed | 7 passed (8)
+2026-11-14T20:01:34Z
+drop-db: afldb_v2_rem4coleman276_m_finplayed_sn_test dropped

@@ -1,0 +1,67 @@
+label=awsn1 base=sn mode=all db=afldb_v2_rem4coleman276_awsn1_test CAND=/mnt/ssd/afldb-rem4-coleman276-20261115/cand HEAD=7cfbe186e70ca91db67da1aa4e28325ccbc32a86 porcelain=2
+args: tests/integration/awards-reload-links.test.ts
+2026-11-14T19:28:24Z
+create-db: afldb_v2_rem4coleman276_awsn1_test created from afldb_v2_rem4coleman276_sntmpl_test and marked
+vitest rc=0
+ ✓ tests/integration/awards-reload-links.test.ts (109 tests) 230742ms
+     ✓ imports the canonical Under 22 group as afldb_import (AFLDB-ISSUE-083)  63965ms
+     ✓ keeps a resolved Hall of Fame link, and its row id, across a reload  1201ms
+     ✓ keeps a confirmed-unlinked decision pointing at the same row  1232ms
+     ✓ keeps the admin's link when the source later names someone else, and says so  1166ms
+     ✓ aborts rather than lose a decision when a name-keyed source row is renamed  2818ms
+     ✓ aborts on a renamed honour-team member for the same reason  3554ms
+     ✓ keeps an award-winner link across the full legacy awards reload  2487ms
+     ✓ reloads the full 113-row manifest as afldb_import with AFLDB_LEGACY_SQLITE unset  794ms
+     ✓ is idempotent across three consecutive reloads with a byte-identical row-id fingerprint  2876ms
+     ✓ keeps the one explicit honour_team_members link decision (Ted Whitten) resolved across a reload  1829ms
+     ✓ leaves every unlinked observation unlinked, and unlinks no resolvable one  727ms
+     ✓ does not touch a manual_admin_edit honour_team_members row  1244ms
+     ✓ does not change hall_of_fame, captaincies, award_winners or award_nominations row counts  798ms
+     ✓ reloads the full 343-row manifest as afldb_import with AFLDB_LEGACY_SQLITE unset  1072ms
+     ✓ is idempotent across three consecutive reloads with a byte-identical row-id fingerprint  2843ms
+     ✓ keeps all five explicit hall_of_fame link decisions resolved across a reload  4659ms
+     ✓ leaves every name-only observation unlinked  1555ms
+     ✓ does not touch a manual_admin_edit hall_of_fame row  1989ms
+     ✓ does not change honour_team_members, captaincies, award_winners or award_nominations row counts  1238ms
+     ✓ reloads the full current manifest as afldb_import with AFLDB_LEGACY_SQLITE unset  2262ms
+     ✓ re-resolves each era identity from the canonical club name, season-aware  1810ms
+     ✓ is idempotent across three consecutive reloads with a byte-identical row-id fingerprint  5886ms
+     ✓ keeps a resolved captaincy link stable across a reload  3801ms
+     ✓ leaves every wikipedia-owned captaincy linked (none dropped to unlinked)  1859ms
+     ✓ does not touch a manual_admin_edit captaincy row (AFLDB-ISSUE-085)  1845ms
+     ✓ fails closed when an incoming natural key is held by a foreign-owned row (AFLDB-ISSUE-085)  5010ms
+     ✓ does not change hall_of_fame, honour_team_members, award_winners or award_nominations row counts  2753ms
+     ✓ reloads the full 766-row manifest as afldb_import with AFLDB_LEGACY_SQLITE unset  805ms
+     ✓ re-resolves each era identity from the canonical club name, season-aware  841ms
+     ✓ preserves the NULL club and NULL opponent rows exactly  890ms
+     ✓ round-trips a stat_line jsonb object byte-for-byte  912ms
+     ✓ is idempotent across three consecutive reloads with a byte-identical row-id fingerprint  2458ms
+     ✓ keeps a resolved nomination link stable across a reload  1633ms
+     ✓ drops a link only where the player_id cannot be resolved — never otherwise  836ms
+     ✓ does not touch a manual_admin_edit nomination row (AFLDB-ISSUE-080)  924ms
+     ✓ does not change hall_of_fame, honour_team_members, captaincies or award_winners row counts  874ms
+     ✓ reloads the full 1,244-row manifest as afldb_import with AFLDB_LEGACY_SQLITE unset  2129ms
+     ✓ re-resolves each era identity from the source club string, season-aware  2712ms
+     ✓ keeps the 1984 club/state dual selections and the 2016 Josh Kennedy pair as distinct rows  2021ms
+     ✓ preserves the carried link state and any player_link_resolutions decision on this award (G5 shape)  4211ms
+     ✓ is idempotent across three consecutive reloads with a byte-identical row-id fingerprint  6423ms
+     ✓ drops a link only where the player_id cannot be resolved — never otherwise  2360ms
+     ✓ does not touch a manual_admin_edit award_winners row (AFLDB-ISSUE-080)  1431ms
+     ✓ does not change other award families or the other honours tables  1156ms
+     ✓ reloads the full 752-row manifest plus 19 definitions with AFLDB_LEGACY_SQLITE unset  948ms
+     ✓ re-resolves each era identity from the source club string, season-aware  824ms
+     ✓ every winner club_id round-trips from its source club string (0 mismatches)  943ms
+     ✓ keeps a tied season as two distinct winner rows  926ms
+     ✓ preserves carried link state and any player_link_resolutions decision (G5 shape)  1937ms
+     ✓ is idempotent across three consecutive reloads with a byte-identical row-id fingerprint  2794ms
+     ✓ drops a link only where the player_id cannot be resolved — never otherwise  753ms
+     ✓ does not touch a manual_admin_edit award_winners row (AFLDB-ISSUE-080)  792ms
+     ✓ does not change other award families or the other honours tables  790ms
+     ✓ reloads the full 979-row manifest plus 17 definitions with AFLDB_LEGACY_SQLITE unset  1380ms
+     ✓ re-resolves each era identity from the source club string, season-aware  1324ms
+     ✓ resolves a club_id for every row that carries a club string, NULL for the rest (680 / 299)  1335ms
+     ✓ keeps the 2003 Brownlow as three distinct winner rows, each with its votes tally  1499ms
+     ✓ carries the Brownlow votes tally on exactly those rows and nowhere else  1323ms
+     ✓ preserves carried link state and any player_link_resolutions decision (G5 shape)  2558ms
+2026-11-14T19:33:27Z
+drop-db: afldb_v2_rem4coleman276_awsn1_test dropped

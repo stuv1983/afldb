@@ -1,0 +1,54 @@
+isolated-pg: afldb_v2_rem4coleman276_m_finplayed_rb_test verified (cluster afldb_v2_isolated, 127.0.0.1:55684); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem4-coleman276-20261115/cand
+
+stderr | tests/integration/settle-afl-api-issue276.test.ts
+[ISSUE-276] shared season 2026 derived rows had moved from the setup capture and were restored from it:
+  seasons.club_count: baseline null -> now 18
+  seasons.match_count: baseline null -> now 219
+  seasons.last_match_date: baseline null -> now "2026-09-26"
+  seasons.first_match_date: baseline null -> now "2026-03-05"
+  club_seasons (excluding id): baseline 18 row(s), now 18; differing club_id(s): 1, 3, 4, 9, 10, 13, 21, 24
+
+ ❯ tests/integration/settle-afl-api-issue276.test.ts (8 tests | 1 failed) 9594ms
+     ✓ a contradictory roster for a FRESH match writes the match but no period rows, and opens one finding; a repeat refreshes it in place; a corrected roster resolves it and writes the periods  371ms
+     ✓ a contradictory roster leaves EXISTING canonical period rows byte-identical: nothing is rewritten, deleted or ledgered  1185ms
+     ✓ an open finding is resolved only by positive evidence: missing score evidence, a deferred roster and a blocked match each leave it open  749ms
+     ✓ a finding opened before another source created the match is closed on the corroborated path by positive roster evidence, and only by it  1348ms
+     × a contradictory roster for a FRESH match writes the match but no period rows, and opens one finding; a repeat refreshes it in place; a corrected roster resolves it and writes the periods 1282ms
+     ✓ a contradictory roster leaves EXISTING canonical period rows byte-identical: nothing is rewritten, deleted or ledgered  367ms
+     ✓ an open finding is resolved only by positive evidence: missing score evidence, a deferred roster and a blocked match each leave it open  655ms
+     ✓ a finding opened before another source created the match is closed on the corroborated path by positive roster evidence, and only by it  1336ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/settle-afl-api-issue276.test.ts > AFLDB-ISSUE-276 — the same cases on a PRELIMINARY FINAL in the suite-owned season 2069 (finals coverage, collision-free) > a contradictory roster for a FRESH match writes the match but no period rows, and opens one finding; a repeat refreshes it in place; a corrected roster resolves it and writes the periods
+AssertionError: expected [ +0, +0 ] to deeply equal [ 1, 1 ]
+
+- Expected
++ Received
+
+  [
+-   1,
+-   1,
++   0,
++   0,
+  ]
+
+ ❯ tests/integration/settle-afl-api-issue276.test.ts:1370:58
+    1368|       `;
+    1369|       expect(clubSeasons.map((row) => row.clubId)).toEqual([homeClubId…
+    1370|       expect(clubSeasons.map((row) => row.finalsPlayed)).toEqual([expe…
+       |                                                          ^
+    1371|     }
+    1372|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 7 passed (8)
+   Start at  07:00:46
+   Duration  12.21s (transform 696ms, setup 1.47s, import 774ms, tests 9.59s, environment 0ms)
+
+JSON report written to /mnt/ssd/afldb-rem4-coleman276-20261115/ev/m_finplayed_rb/vitest.json
