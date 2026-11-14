@@ -504,6 +504,22 @@ async function matchSheetDependentsRefusalFor(
   const [round] = await tx<{ roundCode: string }[]>`
     SELECT round_code AS "roundCode" FROM matches WHERE id = ${match.id}
   `;
+  // Review A-05: a positive round vote with NULL `match_id` (migration 094 keeps the column nullable
+  // for an unresolved row) names no match, but its own (season, round_number, player_id) key is the
+  // one migration 094 section 27.5 resolves by: this match's season and home-and-away round, and the
+  // player's own line-up row. Such a vote is the vote this line-up row carries, so removing the row
+  // would orphan it as surely as a match-linked one. Nothing is attributed or written: the row is only
+  // read, to refuse. A NULL `votes` (not recorded) is not a vote and never blocks.
+  const unlinkedVotes = await tx<{ playerId: number; votes: number; roundNumber: number }[]>`
+    SELECT rv.player_id::int AS "playerId", rv.votes::int AS votes, rv.round_number::int AS "roundNumber"
+      FROM brownlow_round_votes rv
+      JOIN matches m ON m.id = ${match.id}
+     WHERE rv.match_id IS NULL
+       AND m.round_type = 'home_and_away'
+       AND rv.season = m.season AND rv.round_number = m.round_number
+       AND rv.player_id = ANY(${ids}::int[]) AND rv.votes > 0
+     ORDER BY rv.player_id
+  `;
   const votes = await tx<{ playerId: number; votes: number }[]>`
     SELECT player_id::int AS "playerId", votes::int AS votes
       FROM brownlow_round_votes
@@ -546,6 +562,9 @@ async function matchSheetDependentsRefusalFor(
     season: match.season,
     roundCode: round?.roundCode ?? '',
     brownlowVotes: votes.map((v) => ({ playerId: Number(v.playerId), votes: Number(v.votes) })),
+    unlinkedBrownlowVotes: unlinkedVotes.map((v) => ({
+      playerId: Number(v.playerId), votes: Number(v.votes), roundNumber: Number(v.roundNumber),
+    })),
     voteEntries,
     specialRecords: records.map((r) => ({
       playerId: Number(r.playerId), family: r.family,

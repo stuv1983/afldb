@@ -25,6 +25,15 @@ export type MatchSheetDependents = {
   roundCode: string;
   /** `brownlow_round_votes` rows of this match with `votes > 0` (a published zero is not a dependent). */
   brownlowVotes: ReadonlyArray<{ playerId: number; votes: number }>;
+  /**
+   * AFLDB-ISSUE-353 review A-05: positive `brownlow_round_votes` rows whose `match_id` is NULL (migration 094
+   * keeps the column nullable for a row no match was resolved for; the production snapshot holds 621 positive
+   * ones, all season 2026) but whose own (season, round, player) key is this match's season and home-and-away
+   * round. The row names no match, yet it is the vote the player's line-up row in this round carries, so
+   * deleting that row would orphan it exactly as deleting a match-linked vote would. Never attributed to a
+   * match by this module (nothing is written); only used to refuse. Optional: absent means none.
+   */
+  unlinkedBrownlowVotes?: ReadonlyArray<{ playerId: number; votes: number; roundNumber: number }>;
   /** The match's `brownlow_vote_entry_state` row (draft or final), per slot a named player holds. */
   voteEntries: ReadonlyArray<{ playerId: number; status: string; slot: 3 | 2 | 1 }>;
   /** `player_achievements` (first-kick-goal) and `after_siren_kicks` rows naming the player in this match. */
@@ -39,7 +48,8 @@ export type MatchSheetDependents = {
 
 /** True when no player has a dependent. */
 function empty(d: MatchSheetDependents): boolean {
-  return d.brownlowVotes.length === 0 && d.voteEntries.length === 0 && d.specialRecords.length === 0;
+  return d.brownlowVotes.length === 0 && (d.unlinkedBrownlowVotes ?? []).length === 0
+    && d.voteEntries.length === 0 && d.specialRecords.length === 0;
 }
 
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
@@ -54,9 +64,11 @@ export function matchSheetDependentsRefusal(
   dependents: MatchSheetDependents,
 ): string | null {
   if (empty(dependents)) return null;
+  const unlinked = dependents.unlinkedBrownlowVotes ?? [];
 
   const playerIds = [...new Set([
     ...dependents.brownlowVotes.map((v) => v.playerId),
+    ...unlinked.map((v) => v.playerId),
     ...dependents.voteEntries.map((e) => e.playerId),
     ...dependents.specialRecords.map((r) => r.playerId),
   ])].sort((a, b) => a - b);
@@ -70,6 +82,11 @@ export function matchSheetDependentsRefusal(
     const parts: string[] = [];
     for (const v of dependents.brownlowVotes.filter((x) => x.playerId === id)) {
       parts.push(`${v.votes} Brownlow ${plural(v.votes, 'vote', 'votes')} in this match`);
+    }
+    for (const v of unlinked.filter((x) => x.playerId === id)) {
+      parts.push(
+        `${v.votes} Brownlow ${plural(v.votes, 'vote', 'votes')} in round ${v.roundNumber} with no match link (unresolved)`,
+      );
     }
     for (const e of dependents.voteEntries.filter((x) => x.playerId === id)) {
       parts.push(
@@ -97,7 +114,7 @@ export function matchSheetDependentsRefusal(
       : 'Deleting the line-up row would leave that record naming a non-participant.';
 
   const where: string[] = [];
-  if (dependents.brownlowVotes.length > 0 || dependents.voteEntries.length > 0) {
+  if (dependents.brownlowVotes.length > 0 || unlinked.length > 0 || dependents.voteEntries.length > 0) {
     where.push(`Brownlow administration (/admin/brownlow/${dependents.season}/${dependents.roundCode})`);
   }
   const families = [...new Set(dependents.specialRecords.map((r) => r.family))].sort();
@@ -105,7 +122,8 @@ export function matchSheetDependentsRefusal(
     where.push(`Special records (${families.map((f) => `/admin/records/${f}`).join(', ')})`);
   }
 
-  const count = dependents.brownlowVotes.length + dependents.voteEntries.length + dependents.specialRecords.length;
+  const count = dependents.brownlowVotes.length + unlinked.length
+    + dependents.voteEntries.length + dependents.specialRecords.length;
   return `${lead}${sentences.join('; ')}. ${consequence} Nothing was saved. `
     + `Resolve ${count === 1 ? 'it' : 'them'} in ${where.join(' and ')} first.`;
 }

@@ -1917,6 +1917,12 @@ describe('AFLDB-ISSUE-353: a line-up row with Brownlow or special-record depende
     INSERT INTO brownlow_round_votes (season, player_id, round_number, played, votes, match_id)
     VALUES (${SEASON_257}, ${playerId}, 1, true, ${votes}, ${fx.matchId})
   `;
+  // Review A-05: a legacy / unresolved round row (migration 094 keeps `match_id` nullable; the production
+  // snapshot holds 9,522, all season 2026, 621 of them positive). Keyed by season + round + player only.
+  const seedUnlinkedVote = (playerId: number, votes: number | null, round = 1) => sql`
+    INSERT INTO brownlow_round_votes (season, player_id, round_number, played, votes, match_id)
+    VALUES (${SEASON_257}, ${playerId}, ${round}, true, ${votes}, NULL)
+  `;
   const seedEntry = (fx: Fx257, threePlayerId: number) => sql`
     INSERT INTO brownlow_vote_entry_state (match_id, season, status, three_player_id, created_by, updated_by)
     VALUES (${fx.matchId}, ${SEASON_257}, 'draft', ${threePlayerId}, ${adminUserId}, ${adminUserId})
@@ -1998,6 +2004,44 @@ describe('AFLDB-ISSUE-353: a line-up row with Brownlow or special-record depende
     const after = await state(fx);
     expect(after.lineup).toEqual([{ p: fx.playerId, c: fx.clubId }]);
     expect(after.votes).toEqual([{ p: fx.playerId, v: 3 }, { p: other.id, v: 0 }]);
+  }, FX_TIMEOUT);
+
+  it('refuses removing or re-clubbing a player whose only vote is a NULL-match_id round row of this season and round (review A-05); zero, unrecorded and other-round rows do not block', async () => {
+    const fx = await seedFixture257('t353-unlinked');
+    const zero = await addPlayer(fx, 't353-unlinked-z');
+    const unrecorded = await addPlayer(fx, 't353-unlinked-n');
+    const otherRound = await addPlayer(fx, 't353-unlinked-r');
+    await seedUnlinkedVote(fx.playerId, 2);
+    await seedUnlinkedVote(zero.id, 0);
+    await seedUnlinkedVote(unrecorded.id, null);
+    await seedUnlinkedVote(otherRound.id, 3, 2); // round 2 is not this match's round
+
+    const text = `Cannot remove a player from the Match Sheet of match #${fx.matchId}: `
+      + `Issue257 t353unlinked (player #${fx.playerId}) carries 2 Brownlow votes in round 1 with no match link (unresolved). `
+      + `${tail} Resolve it in ${brownlowWhere} first.`;
+    await expectRefused(fx, () => removeIt(fx, fx.playerId), text);
+
+    const [m] = await sql<{ away: number }[]>`SELECT away_club_id::int AS away FROM matches WHERE id = ${fx.matchId}`;
+    await expectRefused(fx, async () => saveMatchSheet({
+      matchId: fx.matchId, syncMatchScores: false,
+      players: [{ ...sheetInput257(fx), playerId: fx.playerId, clubId: m.away }], removedPlayerIds: [],
+      adminUserId, note: NOTE, staleToken: await tokenOf(fx.matchId),
+    }),
+    `Cannot change a player's club in the Match Sheet of match #${fx.matchId}: `
+      + `Issue257 t353unlinked (player #${fx.playerId}) carries 2 Brownlow votes in round 1 with no match link (unresolved). `
+      + 'Changing the club would leave that record attributed to a club the player did not play for in this match. '
+      + `Nothing was saved. Resolve it in ${brownlowWhere} first.`);
+
+    // The unlinked row is untouched (never attributed to a match by the guard).
+    expect(await sql`SELECT player_id::int AS p, votes::int AS v, match_id FROM brownlow_round_votes WHERE player_id = ${fx.playerId}`)
+      .toEqual([{ p: fx.playerId, v: 2, match_id: null }]);
+
+    // No over-refusal: a published zero, an unrecorded vote and another round's vote do not block.
+    if (!(await storable353())) return;
+    for (const free of [zero, unrecorded, otherRound]) {
+      expect(await removeIt(fx, free.id)).toMatchObject({ ok: true });
+    }
+    expect((await state(fx)).lineup).toEqual([{ p: fx.playerId, c: fx.clubId }]);
   }, FX_TIMEOUT);
 
   it('refuses removing a player named by the match\'s Brownlow vote entry, but not an unnamed player of that match', async () => {

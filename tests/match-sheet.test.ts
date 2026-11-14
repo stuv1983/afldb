@@ -1133,6 +1133,37 @@ describe('AFLDB-ISSUE-353 line-up row dependents refusal', () => {
     );
   });
 
+  it('refuses a positive round vote that has no match link, in its own words, and keeps a linked vote apart (review A-05)', async () => {
+    const { matchSheetDependentsRefusal } = await import('@/lib/match-sheet-dependents');
+    const text = matchSheetDependentsRefusal('remove', names, {
+      ...base,
+      brownlowVotes: [{ playerId: 11, votes: 1 }],
+      unlinkedBrownlowVotes: [{ playerId: 10, votes: 3, roundNumber: 5 }],
+    });
+    expect(text).toBe(
+      'Cannot remove a player from the Match Sheet of match #77: '
+      + 'Ann Able (player #10) carries 3 Brownlow votes in round 5 with no match link (unresolved); '
+      + 'Bob Baker (player #11) carries 1 Brownlow vote in this match. '
+      + 'Deleting the line-up row would leave that record naming a non-participant. Nothing was saved. '
+      + 'Resolve them in Brownlow administration (/admin/brownlow/2024/5) first.',
+    );
+    // An unlinked vote alone is a dependent for every action; the empty list is not.
+    expect(matchSheetDependentsRefusal('club_change', names, {
+      ...base, unlinkedBrownlowVotes: [{ playerId: 10, votes: 1, roundNumber: 5 }],
+    })).toContain('Ann Able (player #10) carries 1 Brownlow vote in round 5 with no match link (unresolved)');
+    expect(matchSheetDependentsRefusal('remove', names, { ...base, unlinkedBrownlowVotes: [] })).toBeNull();
+  });
+
+  it('reads the unlinked-vote rows by the player\'s own season, home-and-away round and id, only above zero, never writing (review A-05)', () => {
+    const source = fs.readFileSync(path.join(process.cwd(), 'src/db/queries/match-sheet.ts'), 'utf8');
+    const read = source.slice(source.indexOf('const unlinkedVotes'), source.indexOf('const [entry]'));
+    expect(read).toMatch(/WHERE rv\.match_id IS NULL/);
+    expect(read).toMatch(/m\.round_type = 'home_and_away'/);
+    expect(read).toMatch(/rv\.season = m\.season AND rv\.round_number = m\.round_number/);
+    expect(read).toMatch(/rv\.player_id = ANY\(\$\{ids\}::int\[\]\) AND rv\.votes > 0/);
+    expect(read).not.toMatch(/\b(INSERT|UPDATE|DELETE)\b/);
+  });
+
   it('is guarded on both line-up-row delete paths and never reads a Brownlow vote of zero as a dependent', () => {
     const source = fs.readFileSync(path.join(process.cwd(), 'src/db/queries/match-sheet.ts'), 'utf8');
     expect(source).toContain("matchSheetDependentsRefusalFor(tx, match, action, ids)");
