@@ -60,7 +60,12 @@ import {
   clubComparePath,
   isMatchType,
 } from '@/lib/club-comparison-url';
-import { createConcurrencyGate, gateLimitFromEnv } from '@/lib/concurrency-gate';
+import {
+  ConcurrencyGateBusyError,
+  createConcurrencyGate,
+  gateLimitFromEnv,
+  gateWaitMsFromEnv,
+} from '@/lib/concurrency-gate';
 import { firstValue, parsePage, parseSlug } from '@/lib/params';
 
 /**
@@ -73,10 +78,23 @@ import { firstValue, parsePage, parseSlug } from '@/lib/params';
  * FE-6). Excess comparisons wait here, holding no connection, and run in arrival
  * order. Results are unchanged: only when each comparison starts moves.
  * `AFLDB_COMPARE_MAX_CONCURRENT=0` disables the gate.
+ *
+ * Review B-06: the wait is bounded too. At most `AFLDB_COMPARE_MAX_QUEUE`
+ * comparisons may wait (default 24; 0 = nobody waits) and none waits longer
+ * than `AFLDB_COMPARE_MAX_WAIT_MS` (default 10000). A comparison beyond either
+ * bound is not queued or run: the page answers with the "busy" state. A lone
+ * comparison takes 0.2-0.4 s, so 24 waiters on 2 slots is a few seconds; the
+ * wait bound only bites under real overload.
  */
 export const COMPARE_MAX_CONCURRENT_DEFAULT = 2;
+export const COMPARE_MAX_QUEUE_DEFAULT = 24;
+export const COMPARE_MAX_WAIT_MS_DEFAULT = 10_000;
 export const clubComparePairGate = createConcurrencyGate(
   gateLimitFromEnv(process.env.AFLDB_COMPARE_MAX_CONCURRENT, COMPARE_MAX_CONCURRENT_DEFAULT),
+  {
+    maxQueue: gateLimitFromEnv(process.env.AFLDB_COMPARE_MAX_QUEUE, COMPARE_MAX_QUEUE_DEFAULT),
+    maxWaitMs: gateWaitMsFromEnv(process.env.AFLDB_COMPARE_MAX_WAIT_MS, COMPARE_MAX_WAIT_MS_DEFAULT),
+  },
 );
 
 export type RawSearchParams = Record<string, string | string[] | undefined>;
@@ -145,6 +163,11 @@ export type ClubComparisonRouteState =
   | (BaseRouteState & { kind: 'unselected' })
   | (BaseRouteState & { kind: 'invalid-club'; invalidSlugs: string[] })
   | (BaseRouteState & { kind: 'same-organization'; organization: ComparisonOrganization })
+  /**
+   * Review B-06: a valid pair whose load was refused because too many comparisons
+   * were already running or waiting. Nothing was queried for the pair; `noindex`.
+   */
+  | (BaseRouteState & { kind: 'busy' })
   | (BaseRouteState & {
       kind: 'comparison';
       /** Presentation order is the REQUESTED order, not the canonical one. */
@@ -306,7 +329,16 @@ export async function resolveClubComparisonState(
   const b = organizationB.id;
 
   // Hold a slot for the whole pair load, not per query: see clubComparePairGate.
-  const releaseSlot = await clubComparePairGate.acquire();
+  let releaseSlot: () => void;
+  try {
+    releaseSlot = await clubComparePairGate.acquire();
+  } catch (error) {
+    // Queue full or wait timed out: the comparison is not run and holds no slot.
+    if (error instanceof ConcurrencyGateBusyError) {
+      return { ...base, kind: 'busy', canonicalPath: CLUB_COMPARE_PATH, noindex: true };
+    }
+    throw error;
+  }
   try {
     // 4. Everything that does not depend on `era` runs at once, INCLUDING
     //    the decade breakdown -- it is the pair's own era population, and

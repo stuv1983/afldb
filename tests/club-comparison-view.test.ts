@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 
+import { ClubCompareBusy } from '@/app/clubs/compare/busy';
 import { ClubComparisonView } from '@/components/ClubComparisonView';
 import type {
   ClubComparisonData,
@@ -649,5 +650,45 @@ describe('Stage 9 accessibility semantics', () => {
     for (const [, inner] of summaries) {
       expect(inner.replace(/<[^>]+>/g, '').trim().length).toBeGreaterThan(2);
     }
+  });
+});
+
+/**
+ * Review B-06 (remediation run 2) -- the "busy" state: a valid pair whose load the pair gate
+ * refused (queue full or wait timed out). It renders a plain explanation, keeps the selectors, links
+ * back to the same view, claims nothing about the pair, and is never offered to an index.
+ */
+describe('B-06 busy state', () => {
+  const effective = params({});
+  const busy: ClubComparisonRouteState = {
+    kind: 'busy',
+    params: effective,
+    notices: [],
+    options: OPTIONS,
+    canonicalPath: '/clubs/compare',
+    sharePath: clubComparePath(effective),
+    noindex: true,
+  };
+  const html = renderToStaticMarkup(ClubCompareBusy({ state: busy }));
+
+  it('says comparisons are busy and offers the same view again', () => {
+    expect(html).toContain('Comparisons are busy right now');
+    expect(html).toContain(`<a href="${clubComparePath(effective).replace(/&/g, '&amp;')}">Try again</a>`);
+    expect(html).toContain('role="status"');
+  });
+
+  it('is never indexable and claims nothing about the pair', () => {
+    expect(html).toContain('<meta name="robots" content="noindex, nofollow"/>');
+    expect(html).not.toContain('Head-to-head');
+    expect(html).not.toMatch(/Adelaide v Brisbane/);
+    expect(html).not.toContain('<table');
+  });
+
+  it('keeps the selectors, one h1 and no skipped heading level', () => {
+    expect(html).toContain('name="club1"');
+    expect(html).toContain('name="club2"');
+    expect(html.match(/<h1[\s>]/g)?.length ?? 0).toBe(1);
+    const levels = [...html.matchAll(/<h([1-6])[\s>]/g)].map((m) => Number(m[1]));
+    expect(levels).toEqual([1, 2]);
   });
 });

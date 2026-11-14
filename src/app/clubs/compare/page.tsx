@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { ClubComparisonView } from '@/components/ClubComparisonView';
 import { pageMetadata } from '@/lib/seo';
 
+import { ClubCompareBusy } from './busy';
 import { resolveClubComparisonMetadata, resolveClubComparisonState } from './state';
 
 /**
@@ -38,5 +39,6 @@ export default async function ClubComparePage(
   { searchParams }: { searchParams: SearchParams },
 ) {
   const state = await resolveClubComparisonState(await searchParams);
+  if (state.kind === 'busy') return <ClubCompareBusy state={state} />;
   return <ClubComparisonView state={state} />;
 }

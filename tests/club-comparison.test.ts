@@ -6,9 +6,14 @@
  * The state resolution that reads canonical rows is proved separately in
  * tests/integration/club-comparison-route.test.ts.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { createConcurrencyGate, gateLimitFromEnv } from '@/lib/concurrency-gate';
+import {
+  ConcurrencyGateBusyError,
+  createConcurrencyGate,
+  gateLimitFromEnv,
+  gateWaitMsFromEnv,
+} from '@/lib/concurrency-gate';
 
 import {
   CLUB_COMPARE_PATH,
@@ -183,5 +188,136 @@ describe('AFLDB-ISSUE-361 (FE-6): the concurrency gate behind pair comparisons',
     expect(gateLimitFromEnv('1.5', 2)).toBe(2);
     expect(gateLimitFromEnv('0', 2)).toBe(0);
     expect(gateLimitFromEnv('4', 2)).toBe(4);
+  });
+});
+
+// Review B-06 (remediation run 2): the queue behind the gate is bounded in length and in time.
+// A waiter beyond either bound is refused, holds no slot, and never remains queued.
+describe('review B-06: the concurrency gate bounds its queue and its wait', () => {
+  const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
+
+  it('refuses a waiter beyond maxQueue with queue_full, without queueing it', async () => {
+    const gate = createConcurrencyGate(1, { maxQueue: 2 });
+    const holder = await gate.acquire();
+    const w1 = gate.acquire();
+    const w2 = gate.acquire();
+    await expect(gate.acquire()).rejects.toMatchObject({ name: 'ConcurrencyGateBusyError', reason: 'queue_full' });
+    await expect(gate.acquire()).rejects.toBeInstanceOf(ConcurrencyGateBusyError);
+    expect(gate.stats()).toEqual({ active: 1, waiting: 2, peakActive: 1 });
+    expect(gate.refusals()).toEqual({ queueFull: 2, timeout: 0 });
+    // The two queued waiters are unaffected, and still go in arrival order.
+    holder();
+    const r1 = await w1;
+    expect(gate.stats()).toEqual({ active: 1, waiting: 1, peakActive: 1 });
+    r1();
+    (await w2)();
+    await tick();
+    expect(gate.stats()).toEqual({ active: 0, waiting: 0, peakActive: 1 });
+  });
+
+  it('maxQueue 0 lets nobody wait: refused as soon as the slots are full', async () => {
+    const gate = createConcurrencyGate(2, { maxQueue: 0 });
+    const a = await gate.acquire();
+    const b = await gate.acquire();
+    await expect(gate.acquire()).rejects.toMatchObject({ reason: 'queue_full' });
+    expect(gate.stats().waiting).toBe(0);
+    a();
+    const c = await gate.acquire();
+    b();
+    c();
+    expect(gate.stats().active).toBe(0);
+  });
+
+  it('refuses a waiter whose wait runs out with timeout, and the slot it never took is not leaked', async () => {
+    vi.useFakeTimers();
+    try {
+      const gate = createConcurrencyGate(1, { maxWaitMs: 100 });
+      const holder = await gate.acquire();
+      const waiter = gate.acquire();
+      const settled = waiter.then(() => 'granted', (error: unknown) => error);
+      await vi.advanceTimersByTimeAsync(99);
+      expect(gate.stats().waiting).toBe(1);
+      await vi.advanceTimersByTimeAsync(1);
+      const outcome = await settled;
+      expect(outcome).toBeInstanceOf(ConcurrencyGateBusyError);
+      expect((outcome as ConcurrencyGateBusyError).reason).toBe('timeout');
+      expect(gate.stats()).toEqual({ active: 1, waiting: 0, peakActive: 1 });
+      expect(gate.refusals()).toEqual({ queueFull: 0, timeout: 1 });
+      // The holder still owns the one slot; releasing it frees exactly one, and the next caller gets it at once.
+      holder();
+      expect(gate.stats().active).toBe(0);
+      const next = await gate.acquire();
+      expect(gate.stats().active).toBe(1);
+      next();
+      expect(gate.stats().active).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a timed-out waiter leaves the line without disturbing the others, and a granted waiter never times out later', async () => {
+    vi.useFakeTimers();
+    try {
+      const gate = createConcurrencyGate(1, { maxWaitMs: 100 });
+      const holder = await gate.acquire();
+      const early = gate.acquire(); // times out at t=100
+      const earlyOutcome = early.then(() => 'granted', (error: unknown) => (error as ConcurrencyGateBusyError).reason);
+      await vi.advanceTimersByTimeAsync(60);
+      const late = gate.acquire(); // would time out at t=160
+      await vi.advanceTimersByTimeAsync(40); // t=100: early is refused, late still queued
+      expect(await earlyOutcome).toBe('timeout');
+      expect(gate.stats()).toEqual({ active: 1, waiting: 1, peakActive: 1 });
+      holder(); // t=100: late is next in line and is granted
+      const release = await late;
+      expect(gate.stats()).toEqual({ active: 1, waiting: 0, peakActive: 1 });
+      await vi.advanceTimersByTimeAsync(500); // well past late's own deadline: its timer must be gone
+      expect(gate.refusals()).toEqual({ queueFull: 0, timeout: 1 });
+      expect(gate.stats().active).toBe(1);
+      release();
+      expect(gate.stats().active).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('leaves the normal flow unchanged when the bounds are generous', async () => {
+    const gate = createConcurrencyGate(2, { maxQueue: 50, maxWaitMs: 60_000 });
+    const started: number[] = [];
+    const tasks = Array.from({ length: 7 }, (_, i) => gate.run(async () => {
+      started.push(i);
+      for (let n = 0; n < 3; n += 1) await tick();
+      return i;
+    }));
+    expect(await Promise.all(tasks)).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    expect(started).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    expect(gate.stats()).toEqual({ active: 0, waiting: 0, peakActive: 2 });
+    expect(gate.refusals()).toEqual({ queueFull: 0, timeout: 0 });
+  });
+
+  it('run() passes a refusal on and holds nothing', async () => {
+    const gate = createConcurrencyGate(1, { maxQueue: 0 });
+    const holder = await gate.acquire();
+    let ran = false;
+    await expect(gate.run(async () => { ran = true; })).rejects.toMatchObject({ reason: 'queue_full' });
+    expect(ran).toBe(false);
+    holder();
+    expect(gate.stats().active).toBe(0);
+  });
+
+  it('an ungated gate (limit 0) never queues, so the bounds never apply', async () => {
+    const gate = createConcurrencyGate(0, { maxQueue: 0, maxWaitMs: 1 });
+    const releases = await Promise.all(Array.from({ length: 4 }, () => gate.acquire()));
+    expect(gate.stats()).toEqual({ active: 4, waiting: 0, peakActive: 4 });
+    for (const release of releases) release();
+  });
+
+  it('reads the wait bound from the environment: blank, junk, zero and negative fall back', () => {
+    expect(gateWaitMsFromEnv(undefined, 10_000)).toBe(10_000);
+    expect(gateWaitMsFromEnv(' ', 10_000)).toBe(10_000);
+    expect(gateWaitMsFromEnv('abc', 10_000)).toBe(10_000);
+    expect(gateWaitMsFromEnv('0', 10_000)).toBe(10_000);
+    expect(gateWaitMsFromEnv('-5', 10_000)).toBe(10_000);
+    expect(gateWaitMsFromEnv('2.5', 10_000)).toBe(10_000);
+    expect(gateWaitMsFromEnv('2500', 10_000)).toBe(2500);
   });
 });

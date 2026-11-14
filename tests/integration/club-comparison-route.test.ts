@@ -31,6 +31,7 @@ import { generateMetadata } from '@/app/clubs/compare/page';
 import {
   clubComparePairGate,
   COMPARE_MAX_CONCURRENT_DEFAULT,
+  COMPARE_MAX_QUEUE_DEFAULT,
   resolveClubComparisonMetadata,
   resolveClubComparisonState,
 } from '@/app/clubs/compare/state';
@@ -560,6 +561,42 @@ describe('AFLDB-ISSUE-361 pair comparisons are bounded and unchanged', () => {
     }
     expect(loaders.peak).toBeLessThanOrEqual(COMPARE_MAX_CONCURRENT_DEFAULT * LOADERS_PER_COMPARISON);
     expect(loaders.peak).toBeGreaterThanOrEqual(LOADERS_PER_COMPARISON);
+    expect(clubComparePairGate.stats()).toMatchObject({ active: 0, waiting: 0 });
+  }, 120_000);
+});
+
+/**
+ * Review B-06 (remediation run 2) -- a comparison beyond the queue bound is not queued or run: the
+ * route answers with the `busy` state, nothing is loaded for the pair, no slot is held or leaked, and
+ * the very next request resolves normally. The gate is filled with its own default bound: two held
+ * slots plus COMPARE_MAX_QUEUE_DEFAULT pending waiters.
+ */
+describe('review B-06 a comparison beyond the queue bound is refused, not queued', () => {
+  it('answers busy without loading the pair, then recovers once the slots drain', async () => {
+    const held = await Promise.all(Array.from({ length: COMPARE_MAX_CONCURRENT_DEFAULT }, () => clubComparePairGate.acquire()));
+    const waiters = Array.from({ length: COMPARE_MAX_QUEUE_DEFAULT }, () => clubComparePairGate.acquire());
+    expect(clubComparePairGate.stats()).toMatchObject({ active: COMPARE_MAX_CONCURRENT_DEFAULT, waiting: COMPARE_MAX_QUEUE_DEFAULT });
+
+    loaders.current = 0;
+    loaders.peak = 0;
+    const refused = await resolveClubComparisonState({ club1: 'carlton', club2: 'collingwood' });
+    expect(refused.kind).toBe('busy');
+    expect(refused.noindex).toBe(true);
+    expect(refused.canonicalPath).toBe('/clubs/compare');
+    expect(loaders.peak, 'no pair loader may start for a refused comparison').toBe(0);
+    // Refusal did not join the queue and took no slot.
+    expect(clubComparePairGate.stats()).toMatchObject({ active: COMPARE_MAX_CONCURRENT_DEFAULT, waiting: COMPARE_MAX_QUEUE_DEFAULT });
+
+    // A request that never reaches the gate is unaffected by a full queue.
+    expect((await resolveClubComparisonState({})).kind).toBe('unselected');
+
+    // Drain: every held slot is released, each waiter is granted in turn and releases at once.
+    for (const release of held) release();
+    for (const waiter of waiters) (await waiter)();
+    expect(clubComparePairGate.stats()).toMatchObject({ active: 0, waiting: 0 });
+
+    const recovered = await resolveClubComparisonState({ club1: 'carlton', club2: 'collingwood' });
+    expect(recovered.kind).toBe('comparison');
     expect(clubComparePairGate.stats()).toMatchObject({ active: 0, waiting: 0 });
   }, 120_000);
 });
