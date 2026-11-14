@@ -8,7 +8,7 @@ Each approval below is separate: approving one approves nothing else. Silence is
 | Pin | Value | Source |
 |---|---|---|
 | `origin/main` | `de640826d13489c58392563e7ae1ff62403ed293` (unchanged) | `git ls-remote`, `PINS-2.txt` |
-| **Final candidate** | tip of local branch `claude/remediation-20261114`: the commit that adds this packet (`git log -1 --format=%H -- docs/v2/evidence/remediation-20261114/run2/APPROVAL-PACKET-2.md`); later commits, if any, are records-only (§A) | |
+| **Final candidate** | **the tip of local branch `claude/remediation-20261114`**, i.e. the commit that last changed this packet (`git log -1 --format=%H -- docs/v2/evidence/remediation-20261114/run2/APPROVAL-PACKET-2.md`); its SHA is stated in the run's final report and in `HANDOFF.md`'s successor record. Approve only the SHA you read with `git rev-parse claude/remediation-20261114` | |
 | **Executable revision Q** | `f10e47adf9697d9a59a03dd627615e61e8213d30`, the last commit that changes code, tests or scripts; every commit after it touches only `docs/`, `issues.md`, `IssuesIndex.md`, `blockers.md` and `CHANGELOG.md` (§A proof) | `QUALIFICATION-2.md` |
 | Production release | `current` `c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x`; `previous` `0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN`; serving checkout `c1c4b22ee150`, clean | read-only probe, `PINS-2.txt` |
 | Production host | kernel `6.8.0-137` running, `/var/run/reboot-required` present; `afldb` active since 06:35:21 AEDT, NRestarts 0; no needrestart hold, no `52-afldb-unattended` | `PINS-2.txt` |
@@ -20,8 +20,8 @@ Each approval below is separate: approving one approves nothing else. Silence is
 ## A. Publication (Git only; recommended: approve)
 
 **What:** fast-forward `origin/main` from `de640826` to the final candidate. This publishes:
-- 107 commits: the full review `5035ed96`, run 1 and run 2;
-- 1,005 files changed. Excluding evidence and issue records, 186 files: +13,229 / -489 lines.
+- 112 commits (`git rev-list --count de640826..<candidate>`): the full review `5035ed96`, run 1 and run 2;
+- 1,035 files changed. Excluding evidence and issue records, 186 files: +13,229 / -489 lines (unchanged since Q).
 
 No deployment follows.
 
