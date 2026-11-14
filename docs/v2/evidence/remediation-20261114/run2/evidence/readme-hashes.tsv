@@ -1,0 +1,32 @@
+readme	hash	label	locations (C:path-under-remediation-dir ; H:absolute host path)	reason-if-no-location
+# Hashes that the scope READMEs state in prose next to a file name. Curated by hand; verify-manifests.sh re-checks that each hash still occurs in the README.
+perf/README.md	4097d6a3a5041f56f5008dad8a678cc4f726a1d062d4fd5b63a898057386f6a3	session1-20261113T222102Z.txt	C:perf/raw/session1-20261113T222102Z.txt;H:/mnt/ssd/afldb-rem-perf-20261114/evidence/session1-20261113T222102Z.txt	
+perf/README.md	a2d7df1f91e1dcf186af212116a4002b727f49d3915b0ce472faa1f79215d3f7	session2-20261113T224407Z.txt	C:perf/raw/session2-20261113T224407Z.txt;H:/mnt/ssd/afldb-rem-perf-20261114/evidence/session2-20261113T224407Z.txt	
+perf/README.md	77b21333427cc4d114f4886d17cca0f52ae34f61909ce6de70f245ffe6cde0d1	http-session.txt	C:perf/raw/http-session.txt;H:/mnt/ssd/afldb-rem-perf-20261114/evidence/http-session.txt	
+perf/README.md	d13b21c3516e352667fc8818caf73ada91f33714eea3ad191423d1773b377f97	build.txt	C:perf/raw/build.txt;H:/mnt/ssd/afldb-rem-perf-20261114/evidence/build.txt	
+perf/README.md	eae6a0fb5a011073f8cc84e68b02e7c5de587489f09e44000f0641b126fa6e0d	buildid-check.txt	C:perf/raw/buildid-check.txt;H:/mnt/ssd/afldb-rem-perf-20261114/evidence/buildid-check.txt	
+perf/README.md	dcea998e76e1fdd59fa28004e6cd528e80a9310b598098aaf0ac881e5e39ae12	final-qual.txt	C:perf/raw/final-qual.txt;H:/mnt/ssd/afldb-rem-perf-20261114/evidence/final-qual.txt	
+perf/README.md	cf9d9526165fa40db9c9e488e8a37f6e28783753b3ad90ab2828f6a3e44c6020	classify.txt	C:perf/raw/classify.txt;H:/mnt/ssd/afldb-rem-perf-20261114/evidence/classify.txt	
+perf/README.md	b510a73422e0f5283af66d8bf319066701a6702bb86ac6dfc5c6fd440d36ee75	build-next.log (host-only)	H:/mnt/ssd/afldb-rem-perf-20261114/evidence/build-next.log	
+perf/README.md	943e57b0612a7a5954375038fda0b0c0eb053021214698a8ccf737e29f58c8b0	classify-5035ed96.json (host-only)	H:/mnt/ssd/afldb-rem-perf-20261114/evidence/classify-5035ed96.json	
+perf/README.md	7ad93e44891de07195f4c7d416b2c7b8f84a9ba10eef1477083000a3f02603db	classify-b1e1a140.json (host-only)	H:/mnt/ssd/afldb-rem-perf-20261114/evidence/classify-b1e1a140.json	
+pins/README.md	073f1eed1b44caa6c08d3ac12dc04e02d4b896cfdff9507ba23664b9b58a8aa3	final-unit.json	H:/mnt/ssd/afldb-rem-pins-20261114/evidence/final-unit.json	
+pins/README.md	4d79dce9f16d5913ce5625e44144ba0aa2cd732ad65cc6357eeccffa8aa3a175	final-unit-verbose.log	H:/mnt/ssd/afldb-rem-pins-20261114/evidence/final-unit-verbose.log	
+pins/README.md	a060f0b06ccbd1bca6e86fe44443e40cb54a1f7ceb19363c9a07176f8a91cb0c	final-focused.log	H:/mnt/ssd/afldb-rem-pins-20261114/evidence/final-focused.log	
+pins/README.md	531db22a0d3c3c12876b1c1ef5ef6992e81029c0e2f36e27553ec34e6ac18c5a	final-qual.log	H:/mnt/ssd/afldb-rem-pins-20261114/evidence/final-qual.log	
+pins/README.md	1d8da840ae76529f991699174121e20f8015675e4eeee0df591f0fbd428dde60	red-base.log	H:/mnt/ssd/afldb-rem-pins-20261114/evidence/red-base.log	
+pins/README.md	2887013e2fc8d94d120a33693922b18c8893fca4f66b0da6653938e6a6092c74	red-new.log	H:/mnt/ssd/afldb-rem-pins-20261114/evidence/red-new.log	
+pins/README.md	4aa7990f86e299dad3c6022da12721fa718b4233ef0581cd78dd1c9f2cb6cfb8	int-nl.log	H:/mnt/ssd/afldb-rem-pins-20261114/evidence/int-nl.log	
+pins/README.md	8a577a132300af2c0ab355249bc466478a834e6ad264529aa76f6818e3b4e5c7	rebuild-run.log	H:/mnt/ssd/afldb-rem-pins-20261114/evidence/rebuild-run.log	
+pins/README.md	4bca6867546d0c9b68a952f41d12d917de8ce8a9bb40eeb06293dd4d543f0591	pins.bundle		README l.98 says the bundle lived in the workstation scratchpad (scratchpadundles\pins.bundle), not on the host
+auth/README.md	b7105518e3ed1c0761f232e44fc09345535533c9cb0abf0e12809416c7ac64d9	caddy-bin/caddy-2.11.4	H:/mnt/ssd/afldb-rem-auth-20261114/caddy-bin/caddy-2.11.4	
+auth/README.md	a563843e11cbce39c557bd429ebb787d56f49d51d9bbb3292cd9b36b37a60cdf	caddy-bin/caddy-system	H:/mnt/ssd/afldb-rem-auth-20261114/caddy-bin/caddy-system	
+auth/README.md	aed1352aac08797f568d05f43b5c9c4e1d1a883261bdbc774b446662df780179	probes/final-qualification.sh (host copy)	C:auth/probes/final-qualification.sh;H:/mnt/ssd/afldb-rem-auth-20261114/probes/final-qualification.sh	
+auth/README.md	acf5cb5b	evidence-raw/final/00-checkout.txt (prefix)	H:/mnt/ssd/afldb-rem-auth-20261114/evidence-raw/final/00-checkout.txt	
+auth/README.md	fcc2e30d	evidence-raw/final/10-typecheck.txt (prefix)	H:/mnt/ssd/afldb-rem-auth-20261114/evidence-raw/final/10-typecheck.txt	
+auth/README.md	a5834e2c	evidence-raw/final/20-vitest.txt (prefix)	H:/mnt/ssd/afldb-rem-auth-20261114/evidence-raw/final/20-vitest.txt	
+auth/README.md	5d01aae3	evidence-raw/final/30-lint-gate.txt (prefix)	H:/mnt/ssd/afldb-rem-auth-20261114/evidence-raw/final/30-lint-gate.txt	
+auth/README.md	ce8c5c4c	evidence-raw/final/31-lint-gate-red.txt (prefix)	H:/mnt/ssd/afldb-rem-auth-20261114/evidence-raw/final/31-lint-gate-red.txt	
+auth/README.md	93716581	evidence-raw/final/90-checkout-after.txt (prefix)	H:/mnt/ssd/afldb-rem-auth-20261114/evidence-raw/final/90-checkout-after.txt	
+rollover/README.md	9a57e289a08c8af0cf89e8c4546039a9a87fba010dcfa4c1a58ef8947ca5028a	live-checks/prod-facts.bundle.mjs	C:rollover/live-checks/prod-facts.bundle.mjs	
+tests/README.md	e77c307d3e0cddcb652e398a946e4c22c2063f13c70edadf96a975c92842826d	afldb_prod-20261104T021037Z.dump (30141895 bytes)	H:/mnt/ssd/afldb/workspaces/afldb-issue333-o2-20261104/private/afldb_prod-20261104T021037Z.dump	
