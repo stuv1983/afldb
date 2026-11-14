@@ -186,6 +186,69 @@ async function ownedRowDigest(): Promise<Record<string, { n: number; md5: string
 
 let digestBefore: Record<string, { n: number; md5: string }> = {};
 
+/**
+ * Capture and restore, so the suite leaves the shared database exactly as it found it (T363-3).
+ *
+ * The suite needs the REAL loader, and that loader rewrites `after_siren_kicks`, adds an `import_batches` row
+ * per run and re-asserts overrides, none of which a rollback can undo (it is a separate process). The old
+ * `afterAll` "restored" by running the loader once more, which cannot put back a row the loader itself had
+ * changed, a batch it had added, or the administrator the suite inserted. So: capture each table's rows
+ * (as jsonb text, a separate step from the digest above) before the first mutation, and afterwards delete
+ * only the in-scope rows that are not byte-identical to a captured row and re-insert what is missing with
+ * its original id. Rows that were never touched are never deleted. Table names and scope columns are
+ * constants of this file, never input.
+ */
+type Scope = { col: string; val: string } | null;
+const OWNED_TABLES: ReadonlyArray<{ table: string; scope: Scope }> = [
+  { table: 'data_overrides', scope: { col: 'entity_type', val: 'after_siren_kicks' } },
+  { table: 'after_siren_kicks', scope: null },
+  { table: 'import_batches', scope: { col: 'tool', val: 'after_siren.py' } },
+  { table: 'auth_users', scope: { col: 'email', val: FIXTURE_EMAIL } },
+];
+let capturedRows: string[] = [];
+
+async function captureRows(table: string, scope: Scope): Promise<string> {
+  const [row] = await sql<{ j: string }[]>`
+    SELECT coalesce(jsonb_agg(to_jsonb(x) ORDER BY x.id), '[]'::jsonb)::text AS j
+      FROM ${sql(table)} x
+     WHERE ${scope ? sql`x.${sql(scope.col)} = ${scope.val}` : sql`true`}
+  `;
+  return row.j;
+}
+
+async function restoreRows(table: string, scope: Scope, captured: string): Promise<void> {
+  await sql.begin(async (tx) => {
+    await tx`
+      DELETE FROM ${tx(table)} x
+       WHERE ${scope ? tx`x.${tx(scope.col)} = ${scope.val}` : tx`true`}
+         AND NOT EXISTS (
+           SELECT 1 FROM jsonb_populate_recordset(null::${tx(table)}, ${captured}::text::jsonb) c
+            WHERE c.id = x.id AND c::text = x::text)
+    `;
+    // A GENERATED column cannot be inserted even with OVERRIDING SYSTEM VALUE: list the others.
+    const columns = (await tx<{ name: string }[]>`
+      SELECT column_name AS name FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = ${table} AND is_generated = 'NEVER'
+       ORDER BY ordinal_position
+    `).map((c) => c.name);
+    await tx`
+      INSERT INTO ${tx(table)} (${tx(columns)}) OVERRIDING SYSTEM VALUE
+      SELECT ${tx(columns)} FROM jsonb_populate_recordset(null::${tx(table)}, ${captured}::text::jsonb) c
+       WHERE NOT EXISTS (SELECT 1 FROM ${tx(table)} x WHERE x.id = c.id)
+    `;
+  });
+}
+
+async function captureOwnedTables(): Promise<void> {
+  capturedRows = [];
+  for (const { table, scope } of OWNED_TABLES) capturedRows.push(await captureRows(table, scope));
+}
+
+/** Children before parents: overrides (which name the administrator) first, the administrator last. */
+async function restoreOwnedTables(): Promise<void> {
+  for (const [i, { table, scope }] of OWNED_TABLES.entries()) await restoreRows(table, scope, capturedRows[i]);
+}
+
 /** One event key the artefact carries, and the row it loaded to. */
 async function anyLoadedEvent(): Promise<{ id: number; key: string }> {
   const [row] = await sql<{ id: number; key: string }[]>`
@@ -212,6 +275,7 @@ describe.skipIf(!canLoad)(
     beforeAll(async () => {
       await clearFixtures();
       digestBefore = await ownedRowDigest();
+      await captureOwnedTables();
       const [admin] = await sql<{ id: number }[]>`
         INSERT INTO auth_users (email, role)
         VALUES (${FIXTURE_EMAIL}, 'admin')
@@ -222,10 +286,9 @@ describe.skipIf(!canLoad)(
     });
 
     afterAll(async () => {
+      // Safety net for a run that died before the last test: leave every row exactly as it was found.
       await clearFixtures();
-      // Leave the canonical rows exactly as they were found.
-      const restore = runLoad(ARTEFACT);
-      expect(restore.status, loadOutput(restore)).toBe(0);
+      await restoreOwnedTables();
     }, 300_000);
 
     it('proves its target before mutating it', async () => {
@@ -413,8 +476,7 @@ describe.skipIf(!canLoad)(
 
     it('leaves every row it did not create exactly as it found it (ISSUE-363 T363-3)', async () => {
       await clearFixtures();
-      const restore = runLoad(ARTEFACT);
-      expect(restore.status, loadOutput(restore)).toBe(0);
+      await restoreOwnedTables();
       expect(await ownedRowDigest()).toEqual(digestBefore);
     }, 300_000);
   },

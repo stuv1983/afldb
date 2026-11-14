@@ -24,13 +24,22 @@
  *                                        created (D-3) — which is the whole
  *                                        point: a fixture is intent about a
  *                                        season the register has not reached.
- *   seasonNow  = max(seasons.year)       the in-progress season, used ONLY for
- *                                        the played-resolution proofs, because
- *                                        `matches.season REFERENCES seasons(year)`
- *                                        so a played row cannot exist in a
- *                                        season the register does not hold. Work
- *                                        there is confined to round MARKER_ROUND,
- *                                        which no real match uses (asserted).
+ *   seasonNow  = max(seasons.year)       the register's latest season, used ONLY
+ *                                        for the played-resolution proofs,
+ *                                        because `matches.season REFERENCES
+ *                                        seasons(year)` so a played row cannot
+ *                                        exist in a season the register does not
+ *                                        hold. Work there is confined to round
+ *                                        MARKER_ROUND, which no real match uses
+ *                                        (asserted).
+ *
+ * ISSUE-363 (T363-2): the register's latest season is a SUITE-OWNED ONE. `seasonNow` is `SUITE_SEASON_NOW`, a
+ * `seasons` row this suite inserts and removes (so `max(year)` is that year while it runs and `seasonNext` is the
+ * year after), instead of the real latest season. The real one carries data the suite must not touch: the 4 Nov
+ * production snapshot holds 218 provider-owned fixtures in the real `seasonNext` (2027), which the old suite
+ * deleted as its own and which therefore vanished from the shared database for every later file. Everything the
+ * code under test reads is keyed by season or by the id of a row this suite created, so no real row is read or
+ * written; the three tables the suite writes are additionally digested before and after (final test).
  *
  * Every row created here is removed in `afterAll`, including the durable
  * records — a `data_overrides` row OUTLIVES the canonical row it describes, so
@@ -86,6 +95,15 @@ const AUDIT_FAIL_NOTE = 'AFLDB-ISSUE-162-GATE-FORCE-FAIL';
 const OVERRIDE_FAIL_NOTE = 'AFLDB-ISSUE-162-OVERRIDE-FORCE-FAIL';
 /** A home-and-away round no real match uses, so seasonNow work disturbs nothing. */
 const MARKER_ROUND = 30;
+/**
+ * The suite-owned "latest season" (run-4 allocation 2071-2072, ISSUE-363). Committed as a `seasons` row for the
+ * length of the suite and removed again; the year after it is the administrable future season. Register both in
+ * `tests/integration/leaked-fixtures.ts` (owner: this file). NOTE `settle-afl-api-state-b.test.ts` also uses
+ * 2071 (its own `FIXTURE_SEASON`); the two run serially and each removes its season, and this file never deletes
+ * a season that still holds a match.
+ */
+const SUITE_SEASON_NOW = 2071;
+const SUITE_SEASON_NEXT = SUITE_SEASON_NOW + 1;
 
 const venvPython = process.platform === 'win32'
   ? join(root, '.venv', 'Scripts', 'python.exe')
@@ -207,18 +225,90 @@ async function playedFacts() {
   return row;
 }
 
+/**
+ * ISSUE-363 (T363-2): OWNERSHIP BY CAPTURE. The old teardown deleted every `fixtures` row of the two seasons and
+ * every `data_edits` / `data_overrides` row of the entity, on the stated ground that "nothing outside this suite
+ * writes `fixtures`". That is true of a database that starts empty and false of the 4 Nov production snapshot,
+ * which holds 218 provider-owned fixtures: in the default shared mode (one database, files run serially) the
+ * suite committed that deletion and every later file read an empty table. The suite now works in a season of its
+ * own (`SUITE_SEASON_NOW`, see the header), and a row is its to delete only if it did not exist when it started:
+ * `capturedRows` holds the pre-existing rows of the three tables (as jsonb text, in `OWNED_TABLES` order), and
+ * every delete below is "in scope and not in that capture".
+ *
+ * The scope is by id, not by season or by payload, so it still removes the rows a proof deliberately CORRUPTED (a
+ * non-numeric season, an invalid status) -- the reason the old delete was unfiltered -- and an orphaned override
+ * (which OUTLIVES its canonical row, and would be REPLAYED by the next run) is removed with the rest.
+ * (`::text::jsonb`: postgres.js serialises a parameter typed jsonb as a JSON STRING, so the text is cast first.)
+ */
+type Scope = { col: string; val: string } | null;
+const OWNED_TABLES: ReadonlyArray<{ table: string; scope: Scope }> = [
+  { table: 'data_edits', scope: { col: 'table_name', val: 'fixtures' } },
+  { table: 'data_overrides', scope: { col: 'entity_type', val: 'fixtures' } },
+  { table: 'fixtures', scope: null },
+];
+let capturedRows: string[] = [];
+
+async function captureOwnedTables(): Promise<void> {
+  capturedRows = [];
+  for (const { table, scope } of OWNED_TABLES) {
+    const [row] = await admin<{ j: string }[]>`
+      SELECT coalesce(jsonb_agg(to_jsonb(x) ORDER BY x.id), '[]'::jsonb)::text AS j
+        FROM ${admin(table)} x
+       WHERE ${scope ? admin`x.${admin(scope.col)} = ${scope.val}` : admin`true`}`;
+    capturedRows.push(row.j);
+  }
+}
+
+/** Delete the in-scope rows of one table that were not there when the suite started. Table and scope are constants. */
+async function deleteCreated(index: number): Promise<void> {
+  const { table, scope } = OWNED_TABLES[index];
+  await admin`
+    DELETE FROM ${admin(table)} x
+     WHERE ${scope ? admin`x.${admin(scope.col)} = ${scope.val}` : admin`true`}
+       AND NOT EXISTS (
+         SELECT 1 FROM jsonb_populate_recordset(null::${admin(table)}, ${capturedRows[index]}::text::jsonb) c
+          WHERE c.id = x.id)`;
+}
+
+/**
+ * Safety net only: put every captured row back, byte for byte, if anything (the code under test, a failed proof)
+ * changed or removed one. Deletes in-scope rows that are not an exact copy of a captured row, re-inserts what is
+ * missing with its original id. A row that was never touched is never deleted. The final test asserts the digest
+ * BEFORE this runs, so a restore that had work to do shows up as a failure rather than being masked.
+ */
+async function restoreCapturedRows(): Promise<void> {
+  await admin.begin(async (tx) => {
+    for (const [i, { table, scope }] of OWNED_TABLES.entries()) {
+      await tx`
+        DELETE FROM ${tx(table)} x
+         WHERE ${scope ? tx`x.${tx(scope.col)} = ${scope.val}` : tx`true`}
+           AND NOT EXISTS (
+             SELECT 1 FROM jsonb_populate_recordset(null::${tx(table)}, ${capturedRows[i]}::text::jsonb) c
+              WHERE c.id = x.id AND c::text = x::text)`;
+    }
+    for (const [i, { table }] of [...OWNED_TABLES.entries()].reverse()) {
+      // A GENERATED column (fixtures.is_final) cannot be inserted even with OVERRIDING SYSTEM VALUE: list the rest.
+      const columns = (await tx<{ name: string }[]>`
+        SELECT column_name AS name FROM information_schema.columns
+         WHERE table_schema = 'public' AND table_name = ${table} AND is_generated = 'NEVER'
+         ORDER BY ordinal_position`).map((c) => c.name);
+      await tx`
+        INSERT INTO ${tx(table)} (${tx(columns)}) OVERRIDING SYSTEM VALUE
+        SELECT ${tx(columns)} FROM jsonb_populate_recordset(null::${tx(table)}, ${capturedRows[i]}::text::jsonb) c
+         WHERE NOT EXISTS (SELECT 1 FROM ${tx(table)} x WHERE x.id = c.id)`;
+    }
+  });
+}
+
+/** Delete only the fixtures this suite created: the "destructive reload" a replay proof simulates. */
+async function deleteCreatedFixtures(): Promise<void> {
+  await deleteCreated(OWNED_TABLES.findIndex((t) => t.table === 'fixtures'));
+}
+
 async function clearFixtureState(): Promise<void> {
   // The durable record OUTLIVES the canonical row — that is the point of it —
-  // so the teardown clears BOTH. The override and audit deletes are
-  // UNFILTERED within their entity: `fixtures` arrives with migration 097 and
-  // nothing outside this suite writes it, and several proofs deliberately
-  // CORRUPT a payload (a non-numeric season, an invalid status), so a teardown
-  // that filtered on `(override_values->>'season')::int` would fail on the very
-  // rows it exists to remove — and an orphan left behind would be REPLAYED by
-  // the next run.
-  await admin`DELETE FROM data_edits WHERE table_name = 'fixtures'`;
-  await admin`DELETE FROM data_overrides WHERE entity_type = 'fixtures'`;
-  await admin`DELETE FROM fixtures WHERE season IN (${seasonNow}, ${seasonNext})`;
+  // so the teardown clears all three tables, audit and override first.
+  for (let i = 0; i < OWNED_TABLES.length; i++) await deleteCreated(i);
 }
 
 /**
@@ -240,18 +330,64 @@ async function fixtureTablesDigest(): Promise<Record<string, { n: number; md5: s
     SELECT 'data_edits[fixtures]', count(*)::int,
            md5(coalesce(string_agg(x::text, chr(10) ORDER BY x.id), ''))
       FROM data_edits x WHERE x.table_name = 'fixtures'
+    UNION ALL
+    SELECT 'seasons', count(*)::int,
+           md5(coalesce(string_agg(x::text, chr(10) ORDER BY x.year), ''))
+      FROM seasons x
+    UNION ALL
+    SELECT 'matches', count(*)::int,
+           md5(coalesce(string_agg(x::text, chr(10) ORDER BY x.id), ''))
+      FROM matches x
   `;
   return Object.fromEntries(rows.map((r) => [r.t, { n: r.n, md5: r.h }]));
 }
 
 let digestBefore: Record<string, { n: number; md5: string }> = {};
 
+/**
+ * The two seasons this suite owns (`SUITE_SEASON_NOW` and the year after) hold nothing but this suite's own rows,
+ * so debris a crashed earlier run left there is removed before the digest and the capture: its fixtures, the audit
+ * and override rows that name them, its marker `matches`, and the season row itself unless a match still sits on
+ * it (which would be another suite's, and this one never deletes another suite's season).
+ */
+async function cleanSuiteSeasons(): Promise<void> {
+  const owned = await admin<{ id: string; key: string }[]>`
+    SELECT id::text AS id, fixture_key AS key FROM fixtures
+     WHERE season IN (${SUITE_SEASON_NOW}, ${SUITE_SEASON_NEXT})`;
+  const entityKeys = owned.map((f) => fixtureEntityKey(f.key));
+  await admin`DELETE FROM data_edits WHERE table_name = 'fixtures' AND row_id::text = ANY(${owned.map((f) => f.id)}::text[])`;
+  await admin`
+    DELETE FROM data_overrides
+     WHERE entity_type = 'fixtures'
+       AND (entity_key = ANY(${entityKeys}::text[])
+            OR override_values->>'season' IN (${String(SUITE_SEASON_NOW)}, ${String(SUITE_SEASON_NEXT)}))`;
+  await admin`DELETE FROM fixtures WHERE season IN (${SUITE_SEASON_NOW}, ${SUITE_SEASON_NEXT})`;
+  await admin`DELETE FROM matches WHERE match_key LIKE ${`${MARKER}%`}`;
+  await removeSuiteSeason();
+}
+
+/** Remove the suite's `seasons` row, but never while a match still sits on it. */
+async function removeSuiteSeason(): Promise<void> {
+  await admin`
+    DELETE FROM seasons
+     WHERE year = ${SUITE_SEASON_NOW}
+       AND NOT EXISTS (SELECT 1 FROM matches WHERE season = ${SUITE_SEASON_NOW})`;
+}
+
 beforeAll(async () => {
+  await cleanSuiteSeasons();
   digestBefore = await fixtureTablesDigest();
+  await captureOwnedTables();
+  const [real] = await admin<{ maxYear: number }[]>`SELECT max(year)::int AS "maxYear" FROM seasons`;
+  expect(real.maxYear, `the register already holds a season at or beyond ${SUITE_SEASON_NOW}`).toBeLessThan(SUITE_SEASON_NOW);
+  await admin`
+    INSERT INTO seasons (year, league, status)
+    VALUES (${SUITE_SEASON_NOW}::smallint, 'AFL', 'complete'::season_status)`;
   const [bound] = await sql<{ maxYear: number }[]>`SELECT max(year)::int AS "maxYear" FROM seasons`;
   maxYear = bound.maxYear;
   seasonNow = maxYear;
   seasonNext = maxYear + 1;
+  expect(seasonNow, 'the suite-owned season must be the register\'s latest').toBe(SUITE_SEASON_NOW);
 
   const eligible = await eligibleFixtureClubs(seasonNext);
   expect(eligible.length, 'need four eligible clubs').toBeGreaterThan(3);
@@ -273,13 +409,10 @@ beforeAll(async () => {
     createdThrowawayAdmin = true;
   }
 
-  // Debris from a crashed earlier run would be REPLAYED by this one, so the
-  // suite clears its own state before it starts rather than assuming the last
-  // run exited cleanly.
-  await clearFixtureState();
-  await admin`DELETE FROM matches WHERE match_key LIKE ${`${MARKER}%`}`;
+  // (Debris from a crashed earlier run, which would be REPLAYED by this one, was removed by cleanSuiteSeasons()
+  // above, from the two seasons this suite owns and nowhere else.)
 
-  // The marker round of the in-progress season must be empty, or the
+  // The marker round of the suite's latest season must be empty, or the
   // played-resolution proofs would be reading someone else's data.
   const [markerRound] = await sql<{ n: number }[]>`
     SELECT count(*)::int AS n FROM matches
@@ -328,11 +461,15 @@ afterAll(async () => {
   await admin`DROP TRIGGER IF EXISTS issue162_test_force_overrides_failure_trg ON data_overrides`;
   await admin`DROP FUNCTION IF EXISTS issue162_test_force_overrides_failure()`;
 
-  await clearFixtureState();
+  if (capturedRows.length) {
+    await clearFixtureState();
+    await restoreCapturedRows();
+  }
   if (markerMatchIds.length) {
     await admin`DELETE FROM matches WHERE id = ANY(${markerMatchIds}::int[])`;
   }
   await admin`DELETE FROM matches WHERE match_key LIKE ${`${MARKER}%`}`;
+  await removeSuiteSeason();
   if (createdThrowawayAdmin) await admin`DELETE FROM auth_users WHERE id = ${actorId}`;
 
   await admin.end({ timeout: 5 });
@@ -1350,7 +1487,7 @@ describe('the REAL replay (§20)', () => {
     ));
 
     // A destructive reload, or a promotion swap, leaves the table empty.
-    await admin`DELETE FROM fixtures WHERE season IN (${seasonNow}, ${seasonNext})`;
+    await deleteCreatedFixtures();
     expect(await fixtureRow(scheduled)).toBeNull();
 
     const replay = runReplay('fixtures');
@@ -1415,7 +1552,7 @@ describe('the REAL replay (§20)', () => {
          SET override_values = jsonb_set(override_values, '{home_club_slug}',
                                          ${'"not-a-club"'}::jsonb)
        WHERE entity_type = 'fixtures' AND entity_key = ${fixtureEntityKey(bad)}`;
-    await admin`DELETE FROM fixtures WHERE season IN (${seasonNow}, ${seasonNext})`;
+    await deleteCreatedFixtures();
 
     const replay = runReplay('fixtures');
     expect(replay.status).not.toBe(0);
@@ -1442,7 +1579,7 @@ describe('the REAL replay (§20)', () => {
         UPDATE data_overrides
            SET override_values = jsonb_set(override_values, ${path}::text[], ${value}::jsonb)
          WHERE entity_type = 'fixtures' AND entity_key = ${fixtureEntityKey(key)}`;
-      await admin`DELETE FROM fixtures WHERE season IN (${seasonNow}, ${seasonNext})`;
+      await deleteCreatedFixtures();
 
       const replay = runReplay('fixtures');
       expect(replay.status, `${path} should refuse`).not.toBe(0);
@@ -1454,7 +1591,11 @@ describe('the REAL replay (§20)', () => {
 
 describe('the shared database after this suite (ISSUE-363 T363-2)', () => {
   it('leaves every fixtures, data_overrides and data_edits row it did not create exactly as it found it', async () => {
+    // Asserted after the suite's own cleanup and BEFORE the afterAll safety net restores anything, so damage done
+    // to a pre-existing row (by a proof or by the code under test) is a failure here and not silently repaired.
     await clearFixtureState();
+    await admin`DELETE FROM matches WHERE match_key LIKE ${`${MARKER}%`}`;
+    await removeSuiteSeason();
     expect(await fixtureTablesDigest()).toEqual(digestBefore);
   });
 });
