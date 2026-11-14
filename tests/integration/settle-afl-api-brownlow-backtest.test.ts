@@ -48,7 +48,12 @@ import { affectedPlayerIds, renderMatchKey, type DerivedScope } from '@/lib/acqu
 import {
   getSourceFamily, parseSourceFamilyRegistry, type SourceFamilyRegistry,
 } from '@/lib/acquisition/source-families';
-import { recomputePlayerDerivedStats } from '@/db/queries/player-derived';
+import { recomputeBrownlowCoverage, recomputePlayerDerivedStats } from '@/db/queries/player-derived';
+import {
+  FIXTURE_FILE_PLAYER_ID_OCCURRENCES, FIXTURE_FILE_PROVIDER_PLAYER_ID, ownedFixtureProviderPlayerId,
+  readSeasonCoverage, realFixtureIdentityRow, realFixturePlayerStatRowsIn, renameFixturePlayer, restoreSeasonCoverage,
+  type SeasonCoverageRow,
+} from './afl-api-fixture-player';
 
 const PROJECT_ROOT = join(__dirname, '..', '..');
 const FIXTURE_DIR = join(PROJECT_ROOT, 'tests', 'fixtures', 'afl_api', 'match');
@@ -89,10 +94,36 @@ const VOTER_LEGACY_IDS = [-228320001, -228320002, -228320003] as const;
 /** Deliberately never given an `external_identities` row. */
 const UNTRUSTED_VOTER_PROVIDER_ID = 'CD_I228BTUNKNOWN';
 
+/**
+ * ISSUE-363 (run 4, `brownlow` scope): the shared fixture files name a REAL provider player id (`CD_I297354`), which
+ * resolves to a real player on the production snapshot. The in-memory copy is renamed onto this suite's own,
+ * deliberately unbridged id (occurrence counts asserted; the files are never edited), so no real player's rows are
+ * written against this synthetic match. `beforeAll` captures the real identity row; `afterAll` asserts it unchanged.
+ */
+const OWN_FIXTURE_PLAYER_ID = ownedFixtureProviderPlayerId(3);
+let realIdentityBefore: string | null = null;
+
+/**
+ * ISSUE-363 / ISSUE-365 TEST HYGIENE (run 4): this suite applies a Brownlow settle to the real SEASON, which
+ * recomputes SEASON's `stat_availability` rows inside its committed transaction; the cleanup removes the matches
+ * and votes they were computed from but not the rows. `beforeAll` captures them before anything writes and `afterAll`
+ * puts back exactly that content. When `beforeAll` finds this suite's own residue (a crashed earlier run) the
+ * captured rows may already describe its fixtures, so `startedClean` is false and the rows are recomputed from what
+ * genuinely remains instead (crash repair, with the canonical helper).
+ */
+let coverageBefore: SeasonCoverageRow[] = [];
+let startedClean = true;
+
 function unitSourceFor(providerMatchId: string, matchDate: string): AflApiSettleUnitSource {
   const fixture = clone(readFixture('01-fixture-result.json')) as Record<string, any>;
-  const roster = clone(readFixture('03-match-roster.raw.json')) as Record<string, any>;
-  const stats = clone(readFixture('02-player-stats.raw.json')) as Record<string, any>;
+  const roster = renameFixturePlayer(
+    clone(readFixture('03-match-roster.raw.json')) as Record<string, any>,
+    'roster', FIXTURE_FILE_PLAYER_ID_OCCURRENCES.roster, OWN_FIXTURE_PLAYER_ID,
+  );
+  const stats = renameFixturePlayer(
+    clone(readFixture('02-player-stats.raw.json')) as Record<string, any>,
+    'player stats', FIXTURE_FILE_PLAYER_ID_OCCURRENCES.stats, OWN_FIXTURE_PLAYER_ID,
+  );
 
   fixture.providerId = providerMatchId;
   fixture.utcStartTime = `${matchDate}T07:15:00.000+0000`;
@@ -270,6 +301,7 @@ async function cleanup(): Promise<void> {
 }
 
 beforeAll(async () => {
+  realIdentityBefore = await realFixtureIdentityRow(sql); // read only, before anything of this suite writes
   registry = parseSourceFamilyRegistry(
     JSON.parse(readFileSync(join(PROJECT_ROOT, 'data', 'reference', 'source-families.json'), 'utf8')),
   );
@@ -295,6 +327,10 @@ beforeAll(async () => {
     throw new Error('Backtest authority does not match the integration target');
   }
 
+  startedClean = (await sql<{ n: number }[]>`
+    SELECT count(*)::int AS n FROM matches WHERE match_key = ANY(${[matchKey()]}::text[])
+  `)[0].n === 0;
+  coverageBefore = await readSeasonCoverage(sql, SEASON);
   await cleanup();
 
   for (let i = 0; i < VOTER_PROVIDER_IDS.length; i += 1) {
@@ -334,11 +370,29 @@ beforeAll(async () => {
     SELECT count(*)::text AS count FROM matches WHERE match_key = ${matchKey()}
   `;
   if (count !== '1') throw new Error(`Expected exactly one canonical match after settling, found ${count}.`);
+
+  // ISSUE-363: the real provider player id never reached the settle, so no real player holds a stats row in this
+  // synthetic match (on the snapshot the unrenamed fixture resolved it to a real player and wrote one).
+  const realStatRows = await realFixturePlayerStatRowsIn(sql, [matchKey()]);
+  if (realStatRows !== 0) {
+    throw new Error(`${realStatRows} player_match_stats row(s) in this suite's match belong to the real ${FIXTURE_FILE_PROVIDER_PLAYER_ID} player.`);
+  }
 }, 30_000);
 
 afterAll(async () => {
-  await cleanup();
-  await sql.end({ timeout: 5 });
+  let realIdentityAfter: string | null | undefined;
+  try {
+    await cleanup();
+    if (startedClean) await restoreSeasonCoverage(sql, SEASON, coverageBefore);
+    else await sql.begin((tx) => recomputeBrownlowCoverage(tx, SEASON));
+    realIdentityAfter = await realFixtureIdentityRow(sql);
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+  expect(
+    realIdentityAfter,
+    `the snapshot's (afl_api, ${FIXTURE_FILE_PROVIDER_PLAYER_ID}) identity row changed`,
+  ).toEqual(realIdentityBefore);
 }, 30_000);
 
 describe('AFLDB-ISSUE-228 §10 follow-up — the completed-season Brownlow backtest authority against afldb_test', () => {
