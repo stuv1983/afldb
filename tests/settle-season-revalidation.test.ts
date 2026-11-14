@@ -1111,6 +1111,18 @@ describe('AFLDB-ISSUE-134 — the reverse-proxy contract the loopback gate rests
     expect(snippet.indexOf('"invite/REDACTED"')).toBeLessThan(snippet.indexOf('regexp "\\?.*$" ""'));
   });
 
+  // AFLDB-ISSUE-362 / review REVIEW-D LOW-4: a redirect echoes the token in its response headers (Next answers
+  // /admin/invite/<token>/ and /beta/verify/?token= with a 308 whose Location and Refresh hold it), and the access
+  // log records response headers. Measured red/green on Caddy 2.11.4 and 2.11.9 (run2/caddy357/low4/).
+  it.each(CADDYFILES)('%s redacts the token and query in the logged Location and Refresh response headers', (path) => {
+    const snippet = read(path).match(/\(afldb_log_format\) \{[\s\S]*?\n\}\n/)?.[0] ?? '';
+    for (const header of ['Location', 'Refresh']) {
+      const block = snippet.match(new RegExp(`resp_headers>${header} multi_regexp \\{[\\s\\S]*?\\n\\t\\t\\t\\}`))?.[0] ?? '';
+      expect(block, header).toContain('(?:/|%2f|[\\\\]|%5c)+[^?#]*" "invite/REDACTED"');
+      expect(block, header).toContain('regexp "\\?.*$" ""');
+    }
+  });
+
   // AFLDB-ISSUE-357 O-1. Behaviour is proven against a real Caddy (2.11.4 and 2.11.9) in
   // docs/v2/evidence/remediation-20261114/run2/caddy357/; this keeps the source from regressing.
   describe('path-shape deny keeps non-canonical ISR paths out of Next (AFLDB-ISSUE-357)', () => {

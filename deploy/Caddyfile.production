@@ -73,6 +73,17 @@
 				regexp "\?.*$" ""
 			}
 			request>headers>Referer regexp "^(https?://[^/?#]+).*$" "${1}/"
+			# A redirect can echo the token back: Next answers /admin/invite/<token>/ with a 308
+			# whose Location AND Refresh ("0;url=...") headers hold it, and the access log
+			# records response headers (measured on Caddy 2.11.4 and 2.11.9, REVIEW-D LOW-4).
+			resp_headers>Location multi_regexp {
+				regexp "(?i)(?:i|%[46]9)(?:n|%[46]e)(?:v|%[57]6)(?:i|%[46]9)(?:t|%[57]4)(?:e|%[46]5)(?:/|%2f|[\\]|%5c)+[^?#]*" "invite/REDACTED"
+				regexp "\?.*$" ""
+			}
+			resp_headers>Refresh multi_regexp {
+				regexp "(?i)(?:i|%[46]9)(?:n|%[46]e)(?:v|%[57]6)(?:i|%[46]9)(?:t|%[57]4)(?:e|%[46]5)(?:/|%2f|[\\]|%5c)+[^?#]*" "invite/REDACTED"
+				regexp "\?.*$" ""
+			}
 		}
 	}
 }
