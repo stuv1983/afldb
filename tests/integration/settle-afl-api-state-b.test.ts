@@ -30,6 +30,18 @@
  * State A (migration 110 not applied) cannot store the authority: the case is SKIPPED LOUDLY, never
  * passed vacuously.
  *
+ * SUITE-OWNED ACTOR (ISSUE-363, run 4 `fixup`). The Match Sheet save needs an `auth_users` row to attribute its
+ * `data_overrides` / `data_edits` rows to. This file used to borrow the lowest-id existing user and refused to run
+ * when there was none, which is the state of the accepted rebuild (0 `auth_users` rows). It now creates its OWN
+ * actor, `ACTOR_EMAIL` (`CD_I4080-...@example.invalid`: a non-routable synthetic address in the suite's namespace,
+ * no password, no TOTP secret, disabled), AFTER the pre-existing-row fingerprint is taken, and removes it in
+ * `afterAll` together with every `data_overrides` / `data_edits` row that references it. A leftover actor is part of
+ * the residue check, so `beforeAll` refuses it (an unknown row is never adopted); the delete is keyed on the exact
+ * email AND on the actor's credential-less shape, and is never keyed on an id, a role or `ORDER BY id LIMIT 1`, so it
+ * cannot reach a pre-existing user. The fingerprint carries the count and a content hash of every OTHER user, so a
+ * pre-existing user that this file touched would fail `afterAll`. It works on a database with zero users and on one
+ * with many.
+ *
  * ISOLATION AND CLEANUP. Committed fixtures (the settle opens its own transaction), removed by exact key,
  * namespace prefix and fixture season only, before and after. `afterAll` asserts zero residue and that
  * every pre-existing row is unchanged (counts of the touched tables, the content of `seasons` and
@@ -94,6 +106,12 @@ const FIXTURE_FILE_PLAYER_ID_OCCURRENCES = { roster: 1, stats: 2 } as const;
 const BRIDGED_PROVIDER_PLAYER_ID = `CD_I${FIXTURE_SEASON}275001`;
 const BRIDGED_AFLTABLES_ID = 'players/Z/Issue275-state-b-bridged-test.html';
 const SYNTHETIC_PLAYER_LEGACY_ID = -275000001;
+/**
+ * The suite-owned actor (see the header). `.invalid` is reserved (RFC 2606) and never deliverable; the prefix is this
+ * scope's synthetic namespace. `auth_users` is unique on `lower(email)` (migration 044), so every comparison below
+ * lower-cases both sides.
+ */
+const ACTOR_EMAIL = `CD_I4080-stateb-${FIXTURE_SEASON}-actor@example.invalid`;
 const REQUIRED_ROLES = ['afldb_owner', 'afldb_import', 'afldb_app', 'afldb_auth', 'afldb_backup'];
 
 const sql = postgres(process.env.AFLDB_TEST_DATABASE_URL as string, { max: 1, onnotice: () => {} });
@@ -213,6 +231,9 @@ async function fingerprint(): Promise<Fingerprint> {
         (SELECT count(*) FROM staging.source_records)::int AS "sourceRecords",
         (SELECT count(*) FROM staging.source_record_versions)::int AS "sourceRecordVersions",
         (SELECT count(*) FROM staging.source_payloads)::int AS "sourcePayloads",
+        (SELECT count(*) FROM auth_users WHERE lower(email) <> lower(${ACTOR_EMAIL}))::int AS "authUsers",
+        (SELECT coalesce(md5(string_agg(to_jsonb(u)::text, '|' ORDER BY u.id)), '') FROM auth_users u
+          WHERE lower(u.email) <> lower(${ACTOR_EMAIL})) AS "authUsersContent",
         (SELECT coalesce(md5(string_agg(to_jsonb(d)::text, '|' ORDER BY d.id)), '') FROM data_issues d) AS "dataIssuesContent",
         (SELECT coalesce(md5(string_agg(to_jsonb(x)::text, '|' ORDER BY x.year)), '') FROM seasons x
           WHERE x.year <> ${FIXTURE_SEASON}) AS "seasonsContent",
@@ -253,9 +274,12 @@ async function residue(): Promise<Record<string, number>> {
         WHERE (source_id = ${aflApiSourceId} AND external_id = ${BRIDGED_PROVIDER_PLAYER_ID})
            OR (source_id = ${afltablesSourceId} AND external_id = ${BRIDGED_AFLTABLES_ID})
            OR player_id IN (SELECT id FROM players WHERE legacy_player_id = ${SYNTHETIC_PLAYER_LEGACY_ID}))::int AS "externalIdentities",
-      (SELECT count(*) FROM data_overrides WHERE entity_type = 'player_match_stats'
-         AND starts_with(entity_key, ${`${FIXTURE_SEASON}|`}))::int AS "dataOverrides",
-      (SELECT count(*) FROM data_edits WHERE note = ${NOTE})::int AS "dataEdits",
+      (SELECT count(*) FROM data_overrides WHERE (entity_type = 'player_match_stats'
+         AND starts_with(entity_key, ${`${FIXTURE_SEASON}|`}))
+          OR admin_user_id IN (SELECT id FROM auth_users WHERE lower(email) = lower(${ACTOR_EMAIL})))::int AS "dataOverrides",
+      (SELECT count(*) FROM data_edits WHERE note = ${NOTE}
+          OR admin_user_id IN (SELECT id FROM auth_users WHERE lower(email) = lower(${ACTOR_EMAIL})))::int AS "dataEdits",
+      (SELECT count(*) FROM auth_users WHERE lower(email) = lower(${ACTOR_EMAIL}))::int AS "authUsers",
       (SELECT count(*) FROM canonical_applications WHERE external_record_id LIKE ${`${NS}%`})::int AS "canonicalApplications",
       (SELECT count(*) FROM import_batches WHERE notes LIKE ${`%${SNAPSHOT_LABEL}%`})::int AS "importBatches",
       (SELECT count(*) FROM data_issues WHERE issue_key LIKE ${`%${NS}%`} OR issue_key LIKE ${`afl_api|%|${FIXTURE_SEASON}|%`})::int AS "dataIssues",
@@ -270,7 +294,7 @@ async function residue(): Promise<Record<string, number>> {
 }
 const NO_RESIDUE = {
   seasons: 0, matches: 0, clubSeasons: 0, playerMatchStats: 0, players: 0, externalIdentities: 0, dataOverrides: 0,
-  dataEdits: 0, canonicalApplications: 0, importBatches: 0, dataIssues: 0, promotionCandidates: 0,
+  dataEdits: 0, authUsers: 0, canonicalApplications: 0, importBatches: 0, dataIssues: 0, promotionCandidates: 0,
   importRejections: 0, aflApiMatch: 0, aflApiPlayerMatch: 0, sourceRecords: 0, sourceRecordVersions: 0,
 };
 
@@ -282,8 +306,12 @@ async function cleanup(): Promise<void> {
   if (!aflApiSourceId || !afltablesSourceId) return;
   // postgres.js fragments are single-use, so each use builds a fresh one.
   const players = () => sql`(SELECT id FROM players WHERE legacy_player_id = ${SYNTHETIC_PLAYER_LEGACY_ID})`;
+  const actors = () => sql`(SELECT id FROM auth_users WHERE lower(email) = lower(${ACTOR_EMAIL}))`;
   await sql`DELETE FROM data_overrides WHERE entity_type = 'player_match_stats' AND starts_with(entity_key, ${`${FIXTURE_SEASON}|`})`;
+  // Rows that reference this file's own actor (only this file ever writes them), before the actor itself goes.
+  await sql`DELETE FROM data_overrides WHERE admin_user_id IN ${actors()}`;
   await sql`DELETE FROM data_edits WHERE note = ${NOTE}`;
+  await sql`DELETE FROM data_edits WHERE admin_user_id IN ${actors()}`;
   // player_clubs references matches with no ON DELETE: it must go before the matches do.
   await sql`DELETE FROM player_clubs WHERE player_id IN ${players()}`;
   const matchIds = (await sql<{ id: number }[]>`SELECT id FROM matches WHERE season = ${FIXTURE_SEASON}`).map((r) => r.id);
@@ -331,6 +359,13 @@ async function cleanup(): Promise<void> {
   await sql`DELETE FROM external_identities WHERE player_id IN ${players()}`;
   await sql`DELETE FROM players WHERE legacy_player_id = ${SYNTHETIC_PLAYER_LEGACY_ID}`;
   await sql`DELETE FROM seasons WHERE year = ${FIXTURE_SEASON} AND NOT EXISTS (SELECT 1 FROM matches WHERE season = ${FIXTURE_SEASON})`;
+  // The suite-owned actor last (everything that references it is gone). Exact email AND the credential-less shape this
+  // file creates it with: a real account can never match, and a referencing row this file did not remove fails loudly
+  // on the foreign key instead of being deleted around.
+  await sql`
+    DELETE FROM auth_users
+     WHERE lower(email) = lower(${ACTOR_EMAIL}) AND password_hash IS NULL AND totp_secret IS NULL
+  `;
 }
 
 let before: Fingerprint | undefined;
@@ -363,9 +398,6 @@ beforeAll(async () => {
   const [venue] = await sql<{ id: number }[]>`SELECT id FROM venues WHERE legacy_name = 'M.C.G.'`;
   if (!home || !away || !venue) throw new Error('Hawthorn, Brisbane Lions and M.C.G. must exist on afldb_test (read only).');
   homeClubId = home.id; awayClubId = away.id; homeClubName = home.name; awayClubName = away.name;
-  const [actor] = await sql<{ id: number }[]>`SELECT id FROM auth_users ORDER BY id LIMIT 1`;
-  if (!actor) throw new Error('afldb_test has no auth_users row; this file will not create one.');
-  adminUserId = actor.id;
 
   // ---- fail closed: nothing of the fixture namespace may exist (a leftover is an unknown row) ----
   const left = await residue();
@@ -383,6 +415,14 @@ beforeAll(async () => {
   before = await fingerprint();
 
   // ---- fixtures ----
+  // The suite-owned actor: created after the fingerprint, never a borrowed user, never an `ORDER BY id LIMIT 1`.
+  // Credential-less and disabled, so it cannot sign in even if it were left behind.
+  const [actor] = await sql<{ id: number }[]>`
+    INSERT INTO auth_users (email, role, password_hash, totp_secret, disabled_at)
+    VALUES (${ACTOR_EMAIL}, 'admin', NULL, NULL, now())
+    RETURNING id::int AS id
+  `;
+  adminUserId = actor.id;
   await sql`INSERT INTO seasons (year, league, status) VALUES (${FIXTURE_SEASON}, 'AFL', 'in_progress'::season_status)`;
   const [keepalive] = await sql<{ id: number }[]>`
     INSERT INTO matches (
@@ -416,7 +456,7 @@ beforeAll(async () => {
     database: id.db, role: id.user, season: FIXTURE_SEASON, namespace: NS, providerMatchId: CASE_PROVIDER_ID,
     matchKey, keepaliveMatchId, keepaliveMatchKey: KEEPALIVE_MATCH_KEY, bridgedPlayerId,
     syntheticLegacyPlayerId: SYNTHETIC_PLAYER_LEGACY_ID, providerPlayerId: BRIDGED_PROVIDER_PLAYER_ID,
-    afltablesIdentity: BRIDGED_AFLTABLES_ID, adminUserId, note: NOTE, snapshotLabel: SNAPSHOT_LABEL,
+    afltablesIdentity: BRIDGED_AFLTABLES_ID, adminUserId, actorEmail: ACTOR_EMAIL, note: NOTE, snapshotLabel: SNAPSHOT_LABEL,
     aflApiSourceId, afltablesSourceId,
   };
   console.log(`[ISSUE-275 state-b fixture] ${JSON.stringify(fixtureIds)}`);
