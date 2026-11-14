@@ -38,9 +38,6 @@
   "src/components/SearchBox.tsx": {
     "react-hooks/set-state-in-effect": 2
   },
-  "src/db/queries/data-edits.ts": {
-    "@typescript-eslint/no-explicit-any": 2
-  },
   "tests/afl-api-match.test.ts": {
     "@typescript-eslint/no-explicit-any": 3
   },

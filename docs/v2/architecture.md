@@ -167,8 +167,8 @@ a test fails if this table and the code disagree (every cited `path:line` must h
 | promote | `packages/domain/src/season-seal.ts:124` | `evaluateSeasonWrite` | canonical |
 | promote | `packages/domain/src/season-seal.ts:170` | `assertSeasonWritable` | canonical |
 | promote | `src/lib/acquisition/settle-core.ts:392` | `acquireSettlePromotionGate` | canonical |
-| promote | `src/lib/acquisition/settle-afl-api.ts:1973` | `runSettleAflApi` | canonical |
-| promote | `src/lib/acquisition/settle-afl-api.ts:1969` | `normaliseAflApiCountersAfterFullRollback` | canonical |
+| promote | `src/lib/acquisition/settle-afl-api.ts:1976` | `runSettleAflApi` | canonical |
+| promote | `src/lib/acquisition/settle-afl-api.ts:1972` | `normaliseAflApiCountersAfterFullRollback` | canonical |
 | promote | `src/lib/acquisition/afl-api-brownlow.ts:1502` | `runSettleAflApiBrownlow` | canonical |
 | promote | `src/lib/acquisition/canonical-apply.ts:1041` | `applyCanonicalUnit` | canonical |
 | derive | `src/lib/acquisition/settle-core.ts:297` | `runDerivedRecomputeWithDeadlockRetry` | derived |
