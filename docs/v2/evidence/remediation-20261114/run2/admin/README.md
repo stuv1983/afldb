@@ -99,3 +99,15 @@ script scopes the click to the form with the authenticator input. No product def
 ## Files changed (vs `e8666c17`)
 `src/db/queries/match-sheet.ts`, `src/lib/match-sheet-dependents.ts`, `src/lib/auth/session.ts`, `src/app/admin/login/page.tsx`,
 `tests/match-sheet.test.ts`, `tests/integration/data-editor.test.ts`, `tests/auth.test.ts`, and this directory.
+
+## Addendum (REVIEW-C LOW-6): the unlinked-vote refusal now says how to clear it
+Finding validated: a player wrongly listed in two home-and-away matches of one round, holding an unlinked positive vote, is
+refused removal from both; it clears only when a Brownlow entry is saved for the right match (`writeMatchFacts` step 1,
+`src/db/queries/admin-brownlow.ts:813-823`, links the round's NULL-`match_id` rows of that match's own line-up players). The text
+did not say so. Wording only; **which removals are refused is unchanged** (the read, the refusal conditions and the other texts
+are untouched). When the refusal names an unlinked vote it now ends: "A vote with no match link is linked to its match when a
+Brownlow entry is saved for that match in that round: save the entry for the match the player actually played in, then try again."
+(`UNLINKED_HOW_TO_CLEAR`, `src/lib/match-sheet-dependents.ts`; a linked-only refusal is byte-identical to before, asserted).
+Tests: the existing unit case and the existing integration case (remove and club change) assert the new sentence; red
+(`low6-red.txt`: Expected text with the sentence, Received without it, unit and integration) then green (`low6-green.txt`:
+unit 6 passed, integration ISSUE-353 group 7 passed). Final-checkout rerun recorded in the report.
