@@ -432,8 +432,10 @@ once — the kill switch. Admin sessions pass the beta gate, held to the same
 epoch: an admin cookie is minted at the epoch current at sign-in, so a bump
 also retires admin cookies issued before it at the beta gate (AFLDB-ISSUE-362).
 An admin holding a pre-bump cookie keeps `/admin` (the database session is
-what decides there) but is sent to `/beta` on public pages until they sign out
-and in again, or redeem a beta code.
+what decides there) but is sent to `/beta` on public pages until they sign in
+again (`/admin/login` shows the sign-in form, with a notice, to a signed-in admin
+whose cookie is below the current epoch; the sign-in itself is the unchanged
+password, TOTP and new-session path), or redeem a beta code.
 
 Middleware verifies signatures only (edge runtime, no database); admin
 pages re-check their session against the database on every request. The
