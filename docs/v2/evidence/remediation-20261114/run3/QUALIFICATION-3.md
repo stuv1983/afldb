@@ -1,6 +1,7 @@
 # Remediation run 3 — final qualification (supersedes `../run2/QUALIFICATION-2.md` for the candidate)
 
-**Executable revision Q′ = `692b1902cbcc321cea76a30857a03e15f02db6b7`** (branch `claude/remediation-20261114`). Every commit after
+**Executable revision Q′ = `692b1902cbcc321cea76a30857a03e15f02db6b7`** (branch `claude/remediation-20261114`), the commit that adds the
+qualification scripts; the last commit outside the record paths is `bb81cbc9` (the `database` witnesses). Every commit after
 Q′ touches records only (`docs/`, `issues.md`, `IssuesIndex.md`, `blockers.md`, `CHANGELOG.md`); `APPROVAL-PACKET-3.md` §A proves it.
 Since run 2's Q (`f10e47ad`) the only executable change is five integration test files (+264 / −23):
 `tests/integration/{settle-afl-api-state-b,settle-afl-api,settle-afl-api-brownlow,settle-afl-api-issue276,database}.test.ts`, plus the
@@ -67,8 +68,9 @@ each); its own leftover still refused; mutation proofs red. The snapshot row is 
 
 ## 4. Evidence manifests
 
-`run2/evidence/verify-manifests.sh` (unchanged) at `6575bc95`: COMMITTED-OK 763, **COMMITTED-MISMATCH 1**, HOST-OK 142, HOST-MISSING 94 (the same set
-run 2 recorded), HOST-MISMATCH 0, UNRESOLVED 1,302. The one mismatch is a verifier false positive (basename match across run-3 scopes), proved by
+`run2/evidence/verify-manifests.sh` (unchanged) at `9cb06c53` (committed output `qualification-3/manifest-verify-9cb06c53.tsv`): COMMITTED-OK 754,
+**COMMITTED-MISMATCH 1**, HOST-OK 141, HOST-MISSING 94 (the same set run 2 recorded), HOST-MISMATCH 0, UNRESOLVED 1,300. (The scope agent also ran it at
+`6575bc95` and reported 763 / 1 / 142 / 94 / 0 / 1,302; that output is not committed, so only the `9cb06c53` figures are claimed.) The one mismatch is a verifier false positive (basename match across run-3 scopes), proved by
 hashing the real committed file (`RESIDUALS-3.md` §2.5). Every run-3 scope verified its own committed blobs against its `SHA256SUMS` (0 mismatches).
 `.gitattributes` unchanged; the one CR-bearing log is committed gzipped (`qualification-3/build-next.log.gz`).
 

@@ -2,7 +2,7 @@
 
 > **2026-11-15 remediation run 3 (this register's counts are NOT recomputed).** Records: `docs/v2/evidence/remediation-20261114/run3/` (`RESIDUALS-3.md`, `QUALIFICATION-3.md`, `APPROVAL-PACKET-3.md`, which supersedes packet 2). Final executable revision `692b1902`, **local, not published, nothing installed**.
 > - **Fixed locally (publication pending):** ISSUE-363 test defects (state-b order dependence, snapshot-row deletion in `settle-afl-api`, `settle-afl-api-brownlow` coverage contamination, issue276 fixture collision, 4 `database` witnesses). ISSUE-363 is **partially resolved**.
-> - **Awaiting owner decision (new):** ISSUE-363 stale witnesses (28), the three "2026 is provisional" gates, the Coleman contract 46 pin, the birth-date pins; D-365-1 (ISSUE-365 Brownlow coverage rule). Run-2 waits below are unchanged.
+> - **Awaiting owner decision (new):** ISSUE-363 stale witnesses (27), the three "2026 is provisional" gates, the Coleman contract 46 pin, the birth-date pins; D-365-1 (ISSUE-365 Brownlow coverage rule). Run-2 waits below are unchanged.
 > - Open issues: 10 (332, 348, 350, 351, 352, 357, 362, 363, 364, 365).
 
 > **2026-11-14 remediation run 2 (this register's counts are NOT recomputed).** Records: `docs/v2/evidence/remediation-20261114/run2/` (`RESIDUALS.md`, `QUALIFICATION-2.md`, `APPROVAL-PACKET-2.md`). Final executable revision `f10e47ad`, **local, not published, nothing installed**.

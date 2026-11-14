@@ -48,6 +48,15 @@ Q′ = `692b1902`, `QUALIFICATION-3.md`); **awaiting publication / owner decisio
 - The three `settle-afl-api-brownlow*` suites still resolve the real `CD_I297354` through the snapshot (LOW, F-STATEB-001); they pass in every order tested. Recommendation: the same rename helper, test-only.
 - A full test-and-file shuffle of the settle family fails the same 10 within-file-ordered tests at base and at Q′ (INFO).
 
+### 2.4a Test-coverage notes from closure (LOW)
+- `settle-afl-api-issue276` fixtures moved from the preliminary-final round to an ordinary home-and-away round (`532e234d`) so they cannot collide with the
+  real 2026 final; no assertion changed, but the suite no longer exercises a finals-round fixture. Alternative: a non-colliding synthetic finals fixture
+  (own clubs/date). Recommendation: restore finals-round coverage with own fixtures when the suite is next touched.
+- The four `database` count witnesses re-pinned to the accepted baseline (`bb81cbc9`) will go stale again when 2027 completes; the same bounding
+  (seasons ≤ a fixed year) recommended for 363-W would make them durable. The owner may also revert them (packet §C1).
+- `run3/integb/README.md` §6 heads its list "28 ids"; the class table and the ledgers count **27** (club-comparison 24 + release-gates 3) plus 2
+  rebuild-only surrogate-id lookups. The evidence file is left unchanged.
+
 ### 2.5 Evidence verifier false positive (LOW)
 - `run2/evidence/verify-manifests.sh` matches manifest entries by basename within the first path component (`run3`), so `template-identity.txt` in `run3/integ/evidence/brownlow/retained-artefacts.SHA256SUMS` is compared with the unrelated `run3/integb/evidence/c1/template-identity.txt`: **1 COMMITTED-MISMATCH**. The real file is committed as `run3/integ/evidence/brownlow/template-identity.restored.txt` and hashes to the expected `4ec64b7b…ea60` (re-checked by the orchestrator with `git cat-file`). No evidence byte is wrong.
 - **Recommendation:** scope the verifier's basename match to the scope directory in a later records change (it is a script; changing it after Q′ moves Q′).
