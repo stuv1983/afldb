@@ -1,0 +1,121 @@
+create-db: afldb_v2_remint_int_test created from afldb_v2_remint_tmpl_test and marked
+     × raises no contradiction against links AFLDB already confirmed 5003ms
+     × persons partition exactly as the child + ledger predict 57ms
+     × withheld persons stay unlinked by the bridge; the rejected identities are reached by nobody 18ms
+ FAIL  tests/integration/admin-draft.test.ts [ tests/integration/admin-draft.test.ts ]
+ FAIL  tests/integration/admin-season-lists.test.ts [ tests/integration/admin-season-lists.test.ts ]
+ FAIL  tests/integration/awards-reload-links.test.ts > Coleman legacy to derived ownership transition (AFLDB-ISSUE-111)
+ FAIL  tests/integration/awards-reload-links.test.ts > Coleman derived reload preserves human link decisions (AFLDB-ISSUE-111)
+ FAIL  tests/integration/release-gates.test.ts [ tests/integration/release-gates.test.ts ]
+ FAIL  tests/integration/settle-afl-api-issue276.test.ts [ tests/integration/settle-afl-api-issue276.test.ts ]
+ FAIL  tests/integration/settle-afltables.test.ts [ tests/integration/settle-afltables.test.ts ]
+ FAIL  tests/integration/settle-afltables.test.ts > AFLDB-ISSUE-122 §8 — manual authority read from data_overrides
+ FAIL  tests/integration/settle-afltables.test.ts > AFLDB-ISSUE-122 §8 — manual authority read from data_overrides
+ FAIL  tests/integration/settle-afltables.test.ts > AFLDB-ISSUE-122 S5 — the canonical applier
+ FAIL  tests/integration/settle-afltables.test.ts > AFLDB-ISSUE-122 S5 — the canonical applier
+ FAIL  tests/integration/settle-afltables.test.ts > AFLDB-ISSUE-295 — the settle exception report lists only the apply failures of its own source
+ FAIL  tests/integration/v2-brownlow-eligibility-2025-rehearsal.test.ts [ tests/integration/v2-brownlow-eligibility-2025-rehearsal.test.ts ]
+ FAIL  tests/integration/v2-brownlow-production-correction.test.ts [ tests/integration/v2-brownlow-production-correction.test.ts ]
+ FAIL  tests/integration/v2-coleman-publication.test.ts [ tests/integration/v2-coleman-publication.test.ts ]
+⎯⎯⎯⎯⎯⎯ Failed Tests 99 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/integration/admin-brownlow.test.ts > migration 094 objects and backfill > resolved every historical round row to exactly one match (preflight P2)
+ FAIL  tests/integration/afl-api-c7-observation.test.ts > season opening (AFLDB-ISSUE-350) against PostgreSQL (rolled back) > production-like state classifies NOT_OPEN, the write opens it, the proof holds, a second write is a no-op and a divergent row is refused
+ FAIL  tests/integration/afl-api-c7-observation.test.ts > season opening (AFLDB-ISSUE-350) against PostgreSQL (rolled back) > a count mismatch between the plan and the live rows throws, so the transaction cannot commit a wrong write
+ FAIL  tests/integration/afl-api-c7-observation.test.ts > season opening (AFLDB-ISSUE-350) against PostgreSQL (rolled back) > the settle HALT precondition is the same row the operation creates: season absent before, present after
+ FAIL  tests/integration/awards-reload-links.test.ts > awards importer production-role parity (AFLDB-ISSUE-083) > imports the canonical Under 22 group as afldb_import (AFLDB-ISSUE-083)
+ FAIL  tests/integration/club-comparison-route.test.ts > Stage 7 route budget > loads adelaide vs brisbane-lions inside the route budget
+ FAIL  tests/integration/club-comparison-route.test.ts > Stage 7 route budget > loads carlton vs collingwood inside the route budget
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head core > summarises Adelaide vs Brisbane Lions to the canonical witness and to independent SQL
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head core > filters by match type so that home-and-away and finals partition the complete history
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head core > filters by era (Club Rivalry Explorer follow-up, FR-2) so the decades partition the complete history
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head core > paginates the complete meetings list deterministically at 25 rows per page
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head core > groups venue records by canonical venue and agrees with an independent grouping
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head core > reads streaks from chronological order, with a draw breaking a winning streak
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head core > keeps Brisbane Bears and Fitzroy out of Brisbane Lions head-to-head totals
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head core > handles the Carlton vs Collingwood long rivalry, including Grand Finals
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: crossover players > lists everyone who represented both organisations, agreeing with independent SQL
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: crossover players > reports Ben Keays as Brisbane Lions first, then Adelaide, in both argument orders
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: crossover players > summarises the first and most recent players to complete both representations
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head player leaders > ranks H2H games leaders against independent SQL and the measured witnesses
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head player leaders > ranks H2H goals leaders without ever treating an unrecorded goal as nought
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head player leaders > consolidates a player who represented both organisations into one row
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head player leaders > keeps every tied holder of the single-match goals and disposals records
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head Brownlow > counts eligible and covered meetings from home-and-away matches only
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: maximum canonical season > runs the complete selected season path for the maximum canonical season without naming it
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head by decade > reproduces the Adelaide vs Brisbane Lions decade witness and independent SQL
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head by decade > sums every Carlton vs Collingwood decade back to the complete 268-meeting population
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: period-score rivalry records > exposes pair-level period-score coverage for both witness rivalries
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head player averages > reuses the comparison metric registry rather than defining a second one
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head player averages > ranks the disposals average board on recorded games and matches independent SQL
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head player averages > applies the five-recorded-game minimum, per metric and never per rivalry appearance
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head player averages > retains every tie at the rank-ten boundary and reports the recorded-game denominator
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head player averages > splits a crossover player average across both organisations
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: long rivalry performance > keeps every warm H2H query under the query ceiling for both rivalry scales
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: long rivalry performance > keeps each independent parallel query group under the group ceiling
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: long rivalry performance > keeps the route-equivalent composed data load under the route ceiling
+ FAIL  tests/integration/data-editor.test.ts > Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) > (2a) replay re-applies a field correction over a reset source value
+ FAIL  tests/integration/data-editor.test.ts > Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) > (2b) replay recreates a durable addition the reload did not supply
+ FAIL  tests/integration/data-editor.test.ts > Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) > (2c) replay deletes a reinserted row under a durable removal
+ FAIL  tests/integration/data-editor.test.ts > Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) > (3a) an active key whose match_key is absent from matches refuses before any write
+ FAIL  tests/integration/data-editor.test.ts > Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) > (3b) an active key whose identity names no accepted external identity refuses before any write
+ FAIL  tests/integration/database.test.ts > data integrity > has the full player-match dataset
+ FAIL  tests/integration/database.test.ts > Brownlow correctness > separates the war years from merely uncollected seasons
+ FAIL  tests/integration/database.test.ts > advanced search regression cases > 200-249 games with 16 or more finals
+ FAIL  tests/integration/database.test.ts > advanced search regression cases > 50-199 goals and no Brownlow votes
+ FAIL  tests/integration/database.test.ts > advanced search regression cases > 200+ games, 100+ goals and 15+ finals
+ FAIL  tests/integration/draft-linkage.test.ts > DraftGuru bridge on afldb_test — §6.1 reconciliation (read-only) > persons partition exactly as the child + ledger predict
+ FAIL  tests/integration/draft-linkage.test.ts > DraftGuru bridge on afldb_test — §6.4 negative controls (read-only) > withheld persons stay unlinked by the bridge; the rejected identities are reached by nobody
+ FAIL  tests/integration/gridley-corpus.test.ts > Gridley corpus -- criteria > flags every criterion whose full eligible set takes over one second and fails any over four
+ FAIL  tests/integration/gridley-corpus.test.ts > Gridley corpus -- every cell through solveCellSummary > writes the run report and has no failing cells
+ FAIL  tests/integration/gridley-corpus.test.ts > Gridley corpus -- every cell through solveCellSummary > conforms to the bounded approved-deferral policy, independently of diagnostic mode
+ FAIL  tests/integration/player-link-concurrency.test.ts > AFLDB-ISSUE-235 S6 (I8–I10): afl_api adjudication races > I8 — two links for the same provider to different players, released together from the provider lock: one resolved row, one audit row, the other refused as stale
+ FAIL  tests/integration/player-link-concurrency.test.ts > AFLDB-ISSUE-235 S6 (I8–I10): afl_api adjudication races > I9 — two providers linked to the same player, released together from the player lock: one wins, the other is refused as a collision; the index backs it up
+ FAIL  tests/integration/player-link-concurrency.test.ts > AFLDB-ISSUE-235 S6 (I8–I10): afl_api adjudication races > I10 — an admin link racing a raw bridge-style INSERT of the same provider: exactly one row, and the admin side reports stale on 23505; loader-second fails closed on both unique constraints
+ FAIL  tests/integration/player-link-concurrency.test.ts > AFLDB-ISSUE-235 S6 (I8–I10): afl_api adjudication races > I10 (revoke race; the brief's I10) — a revoke racing an in-flight consumer of the link waits for it, sees its committed use, and refuses: one serial order, no lost decision, no orphan ledger row
+ FAIL  tests/integration/settle-afl-api.test.ts > AFLDB-ISSUE-235 S6 (I2–I7, I6b–I6d): human afl_api adjudication against afldb_test > I2 → I6 (revoke before I5) → re-link → I5 (re-settle) → I6 (revoke after I5) → I6c: one provider through the real settle, link, revoke and replay
+ FAIL  tests/integration/settle-afl-api.test.ts > AFLDB-ISSUE-235 S6 (I2–I7, I6b–I6d): human afl_api adjudication against afldb_test > I2 (D8 audit shape) — the linked and revoked audit rows store evidence and previous_state as jsonb OBJECTS, not JSON text
+ FAIL  tests/integration/settle-afl-api.test.ts > AFLDB-ISSUE-235 S6 (I2–I7, I6b–I6d): human afl_api adjudication against afldb_test > I3 — atomicity: an audit INSERT refused by its CHECK after the identity INSERT leaves zero rows on both sides
+ FAIL  tests/integration/settle-afl-api.test.ts > AFLDB-ISSUE-235 S6 (I2–I7, I6b–I6d): human afl_api adjudication against afldb_test > I4/T2 (the brief's I3) — a second link of the same provider to the same player is refused as already linked; no duplicate row or audit
+ FAIL  tests/integration/settle-afl-api.test.ts > AFLDB-ISSUE-235 S6 (I2–I7, I6b–I6d): human afl_api adjudication against afldb_test > I4/T3 (the brief's I4) — a link of an already-linked provider to a DIFFERENT player is refused; no reassignment, no audit
+ FAIL  tests/integration/settle-afl-api.test.ts > AFLDB-ISSUE-235 S6 (I2–I7, I6b–I6d): human afl_api adjudication against afldb_test > I4/T4 — a link to a player who already holds another afl_api provider is refused, naming that provider
+ FAIL  tests/integration/settle-afl-api.test.ts > AFLDB-ISSUE-235 S6 (I2–I7, I6b–I6d): human afl_api adjudication against afldb_test > I4/T6 (the brief's I7) — a stale fingerprint is refused for link and for revoke after a real database change; nothing is written
+ FAIL  tests/integration/settle-afl-api.test.ts > AFLDB-ISSUE-235 S6 (I2–I7, I6b–I6d): human afl_api adjudication against afldb_test > I4/T7 — a link to a player with no stable identity is refused; nothing is written
+ FAIL  tests/integration/settle-afl-api.test.ts > AFLDB-ISSUE-235 S6 (I2–I7, I6b–I6d): human afl_api adjudication against afldb_test > I4/T8 — every action on an anomalous (NULL-player) row is refused; the row is unchanged
+ FAIL  tests/integration/settle-afl-api.test.ts > AFLDB-ISSUE-235 S6 (I2–I7, I6b–I6d): human afl_api adjudication against afldb_test > I4/T9 — a surname disagreement is refused without the acknowledgement, and recorded when acknowledged
+ FAIL  tests/integration/settle-afl-api.test.ts > AFLDB-ISSUE-235 S6 (I2–I7, I6b–I6d): human afl_api adjudication against afldb_test > I6b (Brownlow, OD-2) — a human link used only by a Brownlow settle is refused as used through D10 (a) and (b), with no projection row
+ FAIL  tests/integration/settle-afl-api.test.ts > AFLDB-ISSUE-235 S6 (I2–I7, I6b–I6d): human afl_api adjudication against afldb_test > I6d (lock) — while another session holds a read of external_identities the revoke refuses on lock_timeout and writes nothing
+ FAIL  tests/integration/settle-afl-api.test.ts > AFLDB-ISSUE-235 S6 (I2–I7, I6b–I6d): human afl_api adjudication against afldb_test > I6-LI (LINK_INDEPENDENT; the brief's I6d) — an afl_api player_height_evidence row does not block a revoke and survives it
+ FAIL  tests/integration/settle-afl-api.test.ts > AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreSQL (post-COMMIT, pre-archive recovery) > OD-5 recovery — a committed reinstatement whose capture was never archived is verified, archived and captured afresh; the database is not written
+ FAIL  tests/integration/settle-afl-api.test.ts > AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreSQL (post-COMMIT, pre-archive recovery) > OD-5 reinstate (rolled back, no rebuild) — reinstateAndReplay() puts a captured ledger back byte-for-byte under its original ids, replays it and passes the bijection
+ FAIL  tests/integration/settle-afl-api.test.ts > AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreSQL (post-COMMIT, pre-archive recovery) > OD-5 recovery — a missing human identity is refused as already_reinstated_unverified; the pending capture is left in place
+ FAIL  tests/integration/settle-afl-api.test.ts > AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreSQL (post-COMMIT, pre-archive recovery) > OD-5 recovery — a human identity with no ledger entry is refused; the pending capture is left in place
+ FAIL  tests/integration/settle-afl-api.test.ts > AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreSQL (post-COMMIT, pre-archive recovery) > OD-5 recovery — ledger drift is refused before any observation; the pending capture is left in place
+ FAIL  tests/integration/player-matching.test.ts > source evidence extraction > reads draft picks at draft_person grain, never per pick
+ FAIL  tests/integration/player-matching.test.ts > source evidence extraction > keeps the known player id out of the evidence the scorer sees
+ FAIL  tests/integration/player-matching.test.ts > candidate blocking > recalls the true player for confirmed links
+ FAIL  tests/integration/player-matching.test.ts > club lineage and club text against real clubs > carries the lineage on every source row and candidate club
+ FAIL  tests/integration/player-matching.test.ts > club lineage and club text against real clubs > gates lineage-aware club matching to the authorised sources
+ FAIL  tests/integration/player-matching.test.ts > assessment over real rows > raises no contradiction against links AFLDB already confirmed
+ FAIL  tests/integration/settle-afl-api.test.ts > AFLDB-ISSUE-235 S6 (I2–I7, I6b–I6d): human afl_api adjudication against afldb_test > I7 — link and revoke against the BRIDGED importer (unique) provider are refused; its status, player_id and match_method are unchanged
+ FAIL  tests/integration/settle-afl-api.test.ts > AFLDB-ISSUE-235 S6 (I15, I16): the D15 replay fails closed and is idempotent against afldb_test > I16 (replay idempotence) — over a ledger written by the real link/revoke API, a first replay re-creates exactly the net-linked rows and a second is a pure no-op
+ FAIL  tests/integration/settle-afltables.test.ts > AFLDB-ISSUE-099 settle — the transaction against PostgreSQL > runs the whole write path in --dry-run and retains nothing (§22)
+ FAIL  tests/integration/settle-afltables.test.ts > AFLDB-ISSUE-099 settle — the transaction against PostgreSQL > applies observations, projections and candidates, and refuses to sweep an incomplete scope (I2)
+ FAIL  tests/integration/settle-afltables.test.ts > AFLDB-ISSUE-099 settle — the transaction against PostgreSQL > reruns idempotently: no payload, no version, no candidate, no rejection
+ FAIL  tests/integration/settle-afltables.test.ts > AFLDB-ISSUE-099 settle — the transaction against PostgreSQL > marks a genuine omission absent inside a proven-complete scope, and nowhere else (I3)
+ FAIL  tests/integration/settle-afltables.test.ts > AFLDB-ISSUE-099 settle — the transaction against PostgreSQL > keeps an observed-but-rejected record present and unprojected (I1)
+ FAIL  tests/integration/settle-afltables.test.ts > AFLDB-ISSUE-099 settle — the transaction against PostgreSQL > clears absence on reappearance without appending a version (I4)
+ FAIL  tests/integration/settle-afltables.test.ts > AFLDB-ISSUE-099 settle — the transaction against PostgreSQL > keeps A -> B -> A as three ordered versions over two payloads
+ FAIL  tests/integration/settle-afltables.test.ts > AFLDB-ISSUE-099 settle — the transaction against PostgreSQL > the data_issues disagreement lifecycle > opens exactly one row for a genuine independent score disagreement
+ FAIL  tests/integration/settle-afltables.test.ts > AFLDB-ISSUE-099 settle — the transaction against PostgreSQL > the data_issues disagreement lifecycle > refreshes the SAME row when the disagreement recurs, keeping detected_at
+ FAIL  tests/integration/settle-afltables.test.ts > AFLDB-ISSUE-099 settle — the transaction against PostgreSQL > the data_issues disagreement lifecycle > resolves on positive agreement even though the AFL Tables payload did not move
+ FAIL  tests/integration/settle-afltables.test.ts > AFLDB-ISSUE-099 settle — the transaction against PostgreSQL > the data_issues disagreement lifecycle > does not resolve an already-resolved row a second time
+ FAIL  tests/integration/settle-afltables.test.ts > AFLDB-ISSUE-099 settle — the transaction against PostgreSQL > the data_issues disagreement lifecycle > never resolves an open row another writer owns
+ FAIL  tests/integration/settle-afltables.test.ts > AFLDB-ISSUE-099 settle — the transaction against PostgreSQL > leaves every ISSUE-099-owned relation byte-identical after a --dry-run
+ FAIL  tests/integration/settle-afltables.test.ts > AFLDB-ISSUE-099 settle — the transaction against PostgreSQL > obligation O1 > left both projection sentinels in place across every run
+ FAIL  tests/integration/settle-afltables.test.ts > AFLDB-ISSUE-099 settle — the transaction against PostgreSQL > opens no Brownlow target for an unlinked player with an NA vote (D2)
+ FAIL  tests/integration/settle-afltables.test.ts > AFLDB-ISSUE-099 settle — the transaction against PostgreSQL > wrote no canonical fact row in any settle transaction (§15)
+ FAIL  tests/integration/settle-afltables.test.ts > AFLDB-ISSUE-099 settle — the transaction against PostgreSQL > executes the whole write path under the restricted afldb_import role
+ FAIL  tests/integration/settle-afltables.test.ts > AFLDB-ISSUE-295 — the settle exception report lists only the apply failures of its own source > shows each source only the failures it wrote
+ FAIL  tests/integration/settle-afltables.test.ts > AFLDB-ISSUE-295 — the settle exception report lists only the apply failures of its own source > does not let the failures of the other source fill the cut and hide its own
+ Test Files  20 failed | 73 passed | 6 skipped (99)
+      Tests  99 failed | 3160 passed | 2 expected fail | 345 skipped (3629)

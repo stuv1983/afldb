@@ -1,0 +1,5 @@
+[BABEL] Note: The code generator has deoptimised the styling of /mnt/ssd/afldb-rem-int-20261114/cand/tools/db/afl-api-identity-correction-rehearsal.ts as it exceeds the max of 500KB.
+eslint rc=1
+{"errors":338,"warnings":146,"byTop":{".phaneslight":12,"src":11,"tests":276,"tools":39}}
+Lint gate: 338 error(s) now; baseline allows 338.
+Lint gate: PASSED.

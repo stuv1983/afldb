@@ -1,0 +1,10 @@
+restore-test.test.sh rc=0
+PASS: test_transport_option_still_accepted
+PASS: test_unknown_error_refused
+restore-test harness: 24 passed, 0 failed
+sync-dev-remote.test.sh rc=0
+PASS: e2e 346: running job refused (40), no child
+PASS: e2e 346: missing preparation refused (41), no child
+PASS: e2e 346: parity failure stops with 44, no build or restart
+PASS: e2e 346: exported TEST_URL alone cannot misdirect the child (proceeds, dev only)
+86 passed, 0 failed

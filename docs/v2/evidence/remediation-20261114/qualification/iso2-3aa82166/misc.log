@@ -1,0 +1,610 @@
+isolated-pg: afldb_v2_remint2_misc_test verified (cluster afldb_v2_isolated, 127.0.0.1:55630); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem-int-20261114/cand
+
+ ❯ tests/integration/database.test.ts (69 tests | 4 failed) 16402ms
+     ✓ has pg_trgm and unaccent enabled 31ms
+     ✓ normalises names consistently with the search columns 5ms
+     ✓ accepts every supported NL telemetry grain and rejects an unsupported one 43ms
+     ✓ refuses a match whose margin disagrees with its scores 6ms
+     ✓ refuses a Brownlow vote outside 0-3 in a single game 5ms
+     ✓ refuses a match between a club and itself 5ms
+     ✓ refuses a home_win the away team actually won 5ms
+     ✓ refuses a draw whose scores differ 4ms
+     ✓ refuses a score that disagrees with its goals and behinds 5ms
+     ✓ refuses a negative score 5ms
+     × has the full player-match dataset 42ms
+     ✓ has no orphan player-match rows 135ms
+     ✓ keeps all 24 historical club identities 2ms
+     ✓ preserves NULL rather than defaulting unrecorded statistics 54ms
+     ✓ uses the authoritative season totals for career votes 6ms
+     ✓ does not derive career votes from per-game votes 67ms
+     ✓ credits Bob Skilton with the votes the legacy derivation lost 4ms
+     ✓ marks 1935-1983 as not collected at match grain, not as absent 2ms
+     ✓ keeps the season total complete across the same years 1ms
+     ✓ separates the war years from merely uncollected seasons 2ms
+     ✓ counts a renamed club once in clubs_played 3ms
+     ✓ counts a genuine two-club career as two 2ms
+     ✓ keeps players who share a name distinct 4ms
+     ✓ finds both Gary Abletts and ranks the more prominent first 3ms
+     ✓ matches a hyphenated surname by its second part 2ms
+     ✓ matches an apostrophe surname typed without the apostrophe 3ms
+     ✓ normalises an apostrophe out of the search form 2ms
+     ✓ uses an index for a prefix search rather than scanning 3ms
+     ✓ debuted in the 1960s and played for exactly two clubs 3ms
+     × 200-249 games with 16 or more finals 4ms
+     × 50-199 goals and no Brownlow votes 4ms
+     × 200+ games, 100+ goals and 15+ finals 4ms
+     ✓ answers a career filter without scanning the fact table 2ms
+     ✓ returns a player match log quickly 8ms
+     ✓ sort=games desc: page 1 descends and omits the career-less player 59ms
+     ✓ sort=goals desc: page 1 descends and omits the career-less player 38ms
+     ✓ sort=finals desc: page 1 descends and omits the career-less player 39ms
+     ✓ sort=brownlow_votes desc: page 1 descends and omits the career-less player 40ms
+     ✓ sort=premierships desc: page 1 descends and omits the career-less player 40ms
+     ✓ runs against a database large enough for a skipped-row cost to show 0ms
+     ✓ sort=games asc: pages, totals and club names equal the legacy statement  930ms
+     ✓ sort=games desc: pages, totals and club names equal the legacy statement  870ms
+     ✓ sort=goals asc: pages, totals and club names equal the legacy statement  888ms
+     ✓ sort=goals desc: pages, totals and club names equal the legacy statement  884ms
+     ✓ sort=name asc: pages, totals and club names equal the legacy statement  1075ms
+     ✓ sort=name desc: pages, totals and club names equal the legacy statement  1070ms
+     ✓ sort=debut asc: pages, totals and club names equal the legacy statement  881ms
+     ✓ sort=debut desc: pages, totals and club names equal the legacy statement  881ms
+     ✓ sort=final_game asc: pages, totals and club names equal the legacy statement  889ms
+     ✓ sort=final_game desc: pages, totals and club names equal the legacy statement  881ms
+     ✓ sort=brownlow_votes asc: pages, totals and club names equal the legacy statement  908ms
+     ✓ sort=brownlow_votes desc: pages, totals and club names equal the legacy statement  896ms
+     ✓ sort=finals asc: pages, totals and club names equal the legacy statement  919ms
+     ✓ sort=finals desc: pages, totals and club names equal the legacy statement  915ms
+     ✓ sort=premierships asc: pages, totals and club names equal the legacy statement  986ms
+     ✓ sort=premierships desc: pages, totals and club names equal the legacy statement  957ms
+     ✓ looks up club names for the returned page, not for every skipped row 48ms
+     ✓ T9: a wildcard-only player has games = 1 and finals = 0 2ms
+     ✓ T9: an elimination-final player is still counted as a finals game 1ms
+     ✓ T9: db-health finals parity reports 0 mismatches with the fixture present 144ms
+     ✓ T10: the Wildcard Final contributes nothing to club_seasons 4ms
+     ✓ T10: the Wildcard Final does not appear in the round ladder 9ms
+     ✓ T16: the ladder witness wildcard-season query names the fixture season 5ms
+     ✓ T10: the wildcard match is is_final but not is_finals_series 3ms
+     ✓ T1: getSeasonMatches orders H&A → WF → finals and groups like the season page 7ms
+     ✓ T2: runMatchSearch match types put the WF on the right side of every filter 33ms
+     ✓ T3: searchRounds returns the anchor the season page emits for the WF 14ms
+     ✓ T4: getPlayerMatches shows the WF row, labelled WF, for the wildcard-only player 11ms
+     ✓ T5: searchAdminMatches lists the WF for the season and drops it under a round-number filter 19ms
+stderr | tests/integration/admin-brownlow.test.ts > the main season, administered in order > rolls the facts back when the required audit row cannot be written
+[admin-brownlow] Brownlow finalise on match #17292 failed: PostgresError: issue155 audit probe
+    at ErrorResponse (file:///mnt/ssd/afldb-rem-int-20261114/cand/node_modules/postgres/src/connection.js:815:30)
+    at handle (file:///mnt/ssd/afldb-rem-int-20261114/cand/node_modules/postgres/src/connection.js:489:6)
+    at Socket.data (file:///mnt/ssd/afldb-rem-int-20261114/cand/node_modules/postgres/src/connection.js:324:9)
+    at Socket.emit (node:events:519:28)
+    at addChunk (node:internal/streams/readable:561:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    at Socket.Readable.push (node:internal/streams/readable:392:5)
+    at TCP.onStreamRead (node:internal/stream_base_commons:189:23)
+    at cachedError (file:///mnt/ssd/afldb-rem-int-20261114/cand/node_modules/postgres/src/query.js:170:23)
+    at new Query (file:///mnt/ssd/afldb-rem-int-20261114/cand/node_modules/postgres/src/query.js:36:24)
+    at sql (file:///mnt/ssd/afldb-rem-int-20261114/cand/node_modules/postgres/src/index.js:112:11)
+    at recordDataEdit (/mnt/ssd/afldb-rem-int-20261114/cand/src/db/queries/audit-log.ts:156:42) {
+  severity_local: 'ERROR',
+  severity: 'ERROR',
+  code: 'P0001',
+  where: 'PL/pgSQL function issue155_audit_probe() line 1 at RAISE',
+  file: 'pl_exec.c',
+  line: '3897',
+  routine: 'exec_stmt_raise'
+}
+
+ ❯ tests/integration/admin-brownlow.test.ts (47 tests | 1 failed) 10818ms
+     ✓ gives the round fact a nullable match identity 17ms
+     ✓ carries both partial unique indexes, and only as partial ones 11ms
+     × resolved every historical round row to exactly one match (preflight P2) 58ms
+     ✓ creates the two workflow tables and widens the audit allowlist 5ms
+     ✓ registers both tables for the app read grant 1ms
+     ✓ leaves data_overrides.entity_type exactly as migration 073 wrote it 2ms
+     ✓ attributes exactly one candidate, keeps NULL for none or several, and re-resolves on reload  345ms
+     ✓ refuses a match that is not home-and-away, wildcard final and grand final alike 52ms
+     ✓ refuses a season whose coverage grid says no medal was awarded 23ms
+     ✓ refuses a player who has no line-up row in the match 48ms
+     ✓ refuses the same player twice 29ms
+     ✓ refuses to finalise an incomplete selection, though a draft may hold one 25ms
+     ✓ refuses a match whose line-up is short of the §27.6 threshold, and writes nothing 64ms
+     ✓ creates a draft that reaches no public fact table 42ms
+     ✓ updates the draft and bumps the revision 41ms
+     ✓ refuses a stale revision without writing anything 29ms
+     ✓ finalises: three canonical rows, a dense mirror, one audit row, coverage moved 71ms
+     ✓ leaves a source-published season total completely alone, and reports the disagreement 24ms
+     ✓ refuses a draft on a finalised match 29ms
+     ✓ corrects a finalised match, recording the reason and the full before and after 68ms
+     ✓ refuses a correction with no reason 54ms
+     ✓ refuses a finalisation whose canonical picture moved since the page was rendered 55ms
+     ✓ adopts the imported rows on a fresh finalisation, demoting rather than deleting them 75ms
+     ✓ voids a match: the values are withdrawn, the participation record is not 146ms
+     ✓ refuses a second void of the same match 35ms
+     ✓ refuses a void with no reason, and writes nothing 36ms
+     ✓ rolls the facts back when the required audit row cannot be written 92ms
+     ✓ finalises the last match, completing the season 84ms
+     ✓ lists the round in fixture order with its current holders 7ms
+     ✓ refuses a season that still has an unattached vote row 47ms
+     ✓ refuses a season whose matches are not all accounted for 40ms
+     ✓ refuses an ineligibility flag on a player who polled nothing 46ms
+     ✓ refuses a publication without the administrator note: the generated default never satisfies the season seal (V2-GAP-006 review F-001)  417ms
+     ✓ publishes: manual rows, measured ranks and winners, derived totals in step  420ms
+     ✓ refuses a stale publication 29ms
+     ✓ is idempotent: re-publishing identical inputs produces identical rows 116ms
+     ✓ re-derives a published season inside the correction that changed it 148ms
+     ✓ the artefact loader's own refusal predicate sees the admin-published season 10ms
+     ✓ the fitzRoy loader's own refusal predicate sees the admin-finalised matches 5ms
+     ✓ preserves the Brownlow mirror through a match-sheet save  733ms
+     ✓ refuses to delete a match that carries a Brownlow decision, and changes nothing 41ms
+     ✓ a draft and a finalisation of the same match: the loser is refused stale 91ms
+     ✓ two corrections of the same finalised match: the second is refused stale 160ms
+     ✓ two finalisations of the same match: the second is refused stale 147ms
+     ✓ two publications of the same season: the second is refused stale 159ms
+     ✓ reports each fixture season with the state it is actually in  1682ms
+     ✓ counts a drafted match whose source votes are complete, so the season reads complete  1879ms
+stdout | tests/integration/draft-linkage.test.ts > DraftGuru bridge on afldb_test — §6.1 reconciliation (read-only) > persons partition exactly as the child + ledger predict
+[draft-linkage] persons by status|method: [["resolved|draftguru_explicit_admin_decision",5],["unique|draftguru_person_page_afltables_bridge",3559],["unmatched|draftguru_explicit_admin_decision",1],["unmatched|",1492]]
+
+stdout | tests/integration/draft-linkage.test.ts > DraftGuru bridge on afldb_test — §6.1 reconciliation (read-only) > every pick inherits its person and the pick population is the manifest's
+[draft-linkage] picks 6810, linked 5213 (bridge 5208, human 5), capability 76.55%
+
+stdout | tests/integration/draft-linkage.test.ts > DraftGuru bridge on afldb_test — §6.1 reconciliation (read-only) > §6.1 pick level: bridge/human/unlinked per (year, kind) sums to the cell and is printed
+[draft-linkage] cells: 208; 1981/national 16/24, 1982/national 17/24, 1986/national 28/65, 1986/pre_draft 4/6, 1987/national 28/65, 1988/national 61/112, 1988/pre_draft 5/5, 1988/preseason 33/55, 1988/trade 8/10, 1989/midseason 18/44, 1989/national 58/119, 1989/pre_draft 10/12, 1989/preseason 37/55, 1989/trade 7/8, 1990/midseason 11/38, 1990/national 39/94, 1990/pre_draft 58/65, 1990/preseason 32/52, 1990/trade 25/26, 1991/midseason 24/47, 1991/national 42/85, 1991/pre_draft 1/2, 1991/preseason 34/48, 1991/trade 42/46, 1992/midseason 21/31, 1992/national 65/118, 1992/pre_draft 9/10, 1992/preseason 52/75, 1992/trade 28/28, 1993/national 49/65, 1993/pre_draft 6/6, 1993/preseason 34/38, 1993/trade 22/23, 1994/national 66/89, 1994/pre_draft 56/64, 1994/preseason 32/35, 1994/trade 32/34, 1995/national 58/76, 1995/pre_draft 25/27, 1995/preseason 17/22, 1995/trade 40/41, 1996/national 69/87, 1996/pre_draft 39/44, 1996/preseason 19/20, 1996/rookie 22/42, 1996/trade 38/42, 1997/national 69/83, 1997/preseason 8/9, 1997/rookie 23/51, 1997/trade 37/37, 1998/national 72/83, 1998/preseason 13/14, 1998/rookie 18/42, 1998/trade 26/26, 1999/national 73/87, 1999/preseason 15/15, 1999/rookie 25/55, 1999/trade 27/27, 2000/national 66/72, 2000/preseason 11/11, 2000/rookie 29/54, 2000/trade 33/33, 2001/national 58/68, 2001/preseason 5/5, 2001/rookie 27/54, 2001/trade 29/29, 2002/national 60/67, 2002/preseason 4/4, 2002/rookie 28/50, 2002/trade 24/25, 2003/national 58/68, 2003/preseason 10/11, 2003/rookie 20/46, 2003/trade 24/25, 2004/national 60/69, 2004/post_draft 1/1, 2004/preseason 7/7, 2004/rookie 24/47, 2004/trade 17/17, 2005/national 58/66, 2005/preseason 10/10, 2005/rookie 29/49, 2005/trade 13/13, 2006/national 73/79, 2006/preseason 8/8, 2006/rookie 29/50, 2006/trade 9/9, 2007/national 59/67, 2007/preseason 8/8, 2007/rookie 29/54, 2007/trade 20/20, 2008/national 70/79, 2008/preseason 6/6, 2008/rookie 31/62, 2008/trade 6/6, 2009/national 65/74, 2009/pre_draft 20/25, 2009/preseason 7/7, 2009/rookie 41/64, 2009/trade 23/23, 2010/national 71/79, 2010/pre_draft 30/33, 2010/preseason 6/6, 2010/rookie 30/60, 2010/trade 21/21, 2010/training_squad_selection 1/1, 2011/mini_draft 2/2, 2011/national 65/74, 2011/pre_draft 8/9, 2011/preseason 5/5, 2011/rookie 44/69, 2011/trade 28/28, 2012/free_agency 14/14, 2012/mini_draft 2/2, 2012/national 64/69, 2012/pre_draft 0/2, 2012/preseason 5/5, 2012/rookie 28/39, 2012/trade 29/29, 2013/free_agency 15/15, 2013/national 57/62, 2013/preseason 1/1, 2013/rookie 26/47, 2013/trade 28/28, 2014/free_agency 12/12, 2014/national 64/76, 2014/preseason 1/1, 2014/rookie 32/52, 2014/trade 24/24, 2015/free_agency 8/8, 2015/national 64/70, 2015/post_draft 10/10, 2015/rookie 31/48, 2015/trade 39/40, 2016/free_agency 7/7, 2016/national 69/77, 2016/post_draft 4/9, 2016/pre_draft 7/8, 2016/rookie 29/38, 2016/trade 33/34, 2017/free_agency 8/8, 2017/national 72/78, 2017/post_draft 6/7, 2017/pre_draft 1/5, 2017/preseason 1/1, 2017/rookie 18/26, 2017/trade 24/25, 2018/free_agency 10/10, 2018/midseason 8/13, 2018/national 61/78, 2018/post_draft 18/21, 2018/pre_draft 12/19, 2018/rookie 16/22, 2018/trade 39/39, 2019/free_agency 10/10, 2019/national 60/65, 2019/post_draft 9/17, 2019/pre_draft 0/4, 2019/preseason 2/2, 2019/rookie 8/17, 2019/trade 27/27, 2020/free_agency 9/9, 2020/midseason 16/22, 2020/national 53/59, 2020/post_draft 15/18, 2020/pre_draft 1/4, 2020/preseason 1/1, 2020/rookie 10/15, 2020/trade 26/26, 2021/free_agency 10/10, 2021/midseason 13/17, 2021/national 58/65, 2021/post_draft 12/17, 2021/pre_draft 1/2, 2021/preseason 1/1, 2021/rookie 12/13, 2021/trade 15/15, 2022/free_agency 7/7, 2022/midseason 9/13, 2022/national 46/59, 2022/post_draft 21/30, 2022/pre_draft 2/4, 2022/rookie 7/15, 2022/trade 31/31, 2023/free_agency 11/11, 2023/midseason 15/19, 2023/national 56/64, 2023/post_draft 10/14, 2023/pre_draft 2/5, 2023/preseason 1/1, 2023/rookie 8/11, 2023/trade 27/27, 2024/free_agency 10/10, 2024/midseason 17/18, 2024/national 52/71, 2024/post_draft 18/20, 2024/pre_draft 1/8, 2024/preseason 1/1, 2024/rookie 4/11, 2024/trade 21/21, 2025/free_agency 7/7, 2025/midseason 14/18, 2025/national 36/58, 2025/post_draft 18/24, 2025/pre_draft 0/1, 2025/preseason 1/1, 2025/rookie 4/6, 2025/trade 27/27
+
+stdout | tests/integration/draft-linkage.test.ts > DraftGuru bridge on afldb_test — §6.4 negative controls (read-only) > every admitted child bridge: the exact target is registered once, resolves to the stored player, and the person stores the bridge state (or the agreeing human state)
+[draft-linkage] decided persons inside bridges[]: 3 (ledger 3); players with more than one AFL Tables path: [{"player_id":2604,"paths":["players/C/Charlie_Cameron.html","players/C/Charlie_Cameron3.html"],"urls":["https://www.draftguru.com.au/players/charlie_cameron/4"],"target":"players/C/Charlie_Cameron3.html","explained":true,"rule_ids":["2025-charlie-cameron-renumbered-profile"]},{"player_id":6292,"paths":["players/J/Jack_Graham.html","players/J/Jack_Graham2.html"],"urls":["https://www.draftguru.com.au/players/jack_graham/3"],"target":"players/J/Jack_Graham2.html","explained":true,"rule_ids":["2025-jack-graham-renumbered-profile"]},{"player_id":6519,"paths":["players/J/Jack_Ross.html","players/J/Jack_Ross3.html"],"urls":["https://www.draftguru.com.au/players/jack_ross/3"],"target":"players/J/Jack_Ross3.html","explained":true,"rule_ids":["2025-jack-ross-renumbered-profile"]},{"player_id":6619,"paths":["players/J/Jack_Williams.html","players/J/Jack_Williams3.html"],"urls":["https://www.draftguru.com.au/players/jack_williams/8"],"target":"players/J/Jack_Williams3.html","explained":true,"rule_ids":["2025-jack-williams-renumbered-profile"]}]
+
+stdout | tests/integration/draft-linkage.test.ts > DraftGuru bridge on afldb_test — §6.4 negative controls (read-only) > trade and free-agency rows carry no pick number; Sam Chapman's outcome is printed, never asserted
+[draft-linkage] Sam Chapman (U5/§3.6): [{"url":"https://www.draftguru.com.au/players/sam_chapman/2","status":"unmatched","method":null,"player_id":null}]
+
+stdout | tests/integration/draft-linkage.test.ts > DraftGuru bridge on afldb_test — §6.4 negative controls (read-only) > §6.2: National Draft picks 1–10 coverage by year is stated for every draft
+[draft-linkage] top-10 national coverage: 1981 7/10, 1982 9/10, 1986 6/10, 1987 8/10, 1988 9/10, 1989 9/10, 1990 9/10, 1991 9/10, 1992 9/10, 1993 10/10, 1994 10/10, 1995 9/10, 1996 10/10, 1997 10/10, 1998 9/10, 1999 10/10, 2000 10/10, 2001 9/10, 2002 10/10, 2003 10/10, 2004 10/10, 2005 10/10, 2006 10/10, 2007 10/10, 2008 10/10, 2009 10/10, 2010 10/10, 2011 10/10, 2012 10/10, 2013 10/10, 2014 10/10, 2015 10/10, 2016 10/10, 2017 10/10, 2018 10/10, 2019 10/10, 2020 10/10, 2021 10/10, 2022 10/10, 2023 10/10, 2024 9/10, 2025 10/10
+
+stdout | tests/integration/draft-linkage.test.ts > Grid Solver draft criteria on the real linked population (read-only, production compiler) > the six draft builders each answer a non-empty set with sane bounds
+[draft-linkage] national top-10 399, pick 1 42, any-kind top-10 813, rookie 655, traded>=1 871, father-son 97, drafted 2001 90
+
+stdout | tests/integration/draft-linkage.test.ts > Grid Solver draft criteria on the real linked population (read-only, production compiler) > drafted_by_club answers for the club with the most linked national picks
+[draft-linkage] drafted_by_club(essendon) 260; never played there 21
+
+stdout | tests/integration/draft-linkage.test.ts > Grid Solver draft criteria on the real linked population (read-only, production compiler) > the ISSUE-221 "No data" square is gone: national top-10 × any career is a populated cell
+[draft-linkage] cell national top-10 x career>=0: eligible 399, emptyAxis null, top {"id":3285,"slug":"danny-roach","displayName":"Danny Roach","debutSeason":2001,"finalSeason":2001,"games":1}
+
+ ❯ tests/integration/draft-linkage.test.ts (11 tests | 2 failed) 566ms
+     × persons partition exactly as the child + ledger predict 43ms
+     ✓ every pick inherits its person and the pick population is the manifest's 30ms
+     ✓ §6.1 pick level: bridge/human/unlinked per (year, kind) sums to the cell and is printed 21ms
+     ✓ every admitted child bridge: the exact target is registered once, resolves to the stored player, and the person stores the bridge state (or the agreeing human state) 144ms
+     × withheld persons stay unlinked by the bridge; the rejected identities are reached by nobody 22ms
+     ✓ no two DraftGuru persons share a player; the confirmed-unlinked person stays unmatched 9ms
+     ✓ trade and free-agency rows carry no pick number; Sam Chapman's outcome is printed, never asserted 11ms
+     ✓ §6.2: National Draft picks 1–10 coverage by year is stated for every draft 9ms
+     ✓ the six draft builders each answer a non-empty set with sane bounds 75ms
+     ✓ drafted_by_club answers for the club with the most linked national picks 27ms
+     ✓ the ISSUE-221 "No data" square is gone: national top-10 × any career is a populated cell 171ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/admin-brownlow.test.ts > migration 094 objects and backfill > resolved every historical round row to exactly one match (preflight P2)
+AssertionError: expected 9522 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 9522
+
+ ❯ tests/integration/admin-brownlow.test.ts:391:31
+    389|        WHERE season <= 2026
+    390|     `;
+    391|     expect(counts.unresolved).toBe(0);
+       |                               ^
+    392|     expect(counts.total).toBeGreaterThanOrEqual(320_861);
+    393|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/7]⎯
+
+ FAIL  tests/integration/database.test.ts > data integrity > has the full player-match dataset
+AssertionError: expected 695499 to be 685471 // Object.is equality
+
+- Expected
++ Received
+
+- 685471
++ 695499
+
+ ❯ tests/integration/database.test.ts:216:19
+    214|     // full-history-20260827 (measured.player_match_rows = 685,471). 6…
+    215|     // the retired legacy SQLite import.
+    216|     expect(row.n).toBe(685_471);
+       |                   ^
+    217|   });
+    218|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/7]⎯
+
+ FAIL  tests/integration/database.test.ts > advanced search regression cases > 200-249 games with 16 or more finals
+AssertionError: expected 120 to be 114 // Object.is equality
+
+- Expected
++ Received
+
+- 114
++ 120
+
+ ❯ tests/integration/database.test.ts:477:19
+    475|     // 254 games / 27 finals once his renumbered AFL Tables profile wa…
+    476|     // he has left the 200-249 band.
+    477|     expect(row.n).toBe(114);
+       |                   ^
+    478|   });
+    479|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/7]⎯
+
+ FAIL  tests/integration/database.test.ts > advanced search regression cases > 50-199 goals and no Brownlow votes
+AssertionError: expected 268 to be 261 // Object.is equality
+
+- Expected
++ Received
+
+- 261
++ 268
+
+ ❯ tests/integration/database.test.ts:489:19
+    487|        WHERE goals BETWEEN 50 AND 199 AND brownlow_votes = 0
+    488|     `;
+    489|     expect(row.n).toBe(261);
+       |                   ^
+    490|   });
+    491|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/7]⎯
+
+ FAIL  tests/integration/database.test.ts > advanced search regression cases > 200+ games, 100+ goals and 15+ finals
+AssertionError: expected 223 to be 219 // Object.is equality
+
+- Expected
++ Received
+
+- 219
++ 223
+
+ ❯ tests/integration/database.test.ts:497:19
+    495|        WHERE games >= 200 AND goals >= 100 AND finals >= 15
+    496|     `;
+    497|     expect(row.n).toBe(219);
+       |                   ^
+    498|   });
+    499| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/7]⎯
+
+ FAIL  tests/integration/draft-linkage.test.ts > DraftGuru bridge on afldb_test — §6.1 reconciliation (read-only) > persons partition exactly as the child + ledger predict
+AssertionError: expected 3559 to be 3465 // Object.is equality
+
+- Expected
++ Received
+
+- 3465
++ 3559
+
+ ❯ tests/integration/draft-linkage.test.ts:76:52
+     74|     note(`persons by status|method: ${JSON.stringify([...by])}`);
+     75|     expect(rows.reduce((a, r) => a + r.n, 0)).toBe(manifest.distinct_p…
+     76|     expect(by.get(`unique|${BRIDGE_METHOD}`) ?? 0).toBe(expectedBridge…
+       |                                                    ^
+     77|     expect(by.get(`resolved|${LEDGER_METHOD}`) ?? 0).toBe(expectedLedg…
+     78|     expect(by.get(`unmatched|${LEDGER_METHOD}`) ?? 0).toBe(expectedLed…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/7]⎯
+
+ FAIL  tests/integration/draft-linkage.test.ts > DraftGuru bridge on afldb_test — §6.4 negative controls (read-only) > withheld persons stay unlinked by the bridge; the rejected identities are reached by nobody
+AssertionError: expected [ …(94) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "url": "https://www.draftguru.com.au/players/aidan_schubert/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/alex_van%20wyk/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/angus_anderson/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/archie_ludowyke/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/balyn_o'brien/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/beau_addinsall/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/billy_cootee/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/bodie_ryan/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/caleb_lewis/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/cam_nairn/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/campbell_lake/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/charlie_banfield/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/charlie_edwards/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/chris_scerri/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/cody_curtin/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/cooper_duff-tytler/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/daniel_annable/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/dean_laidley/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/dylan_patterson/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/dyson_sharp/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/flynn_riley/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/harry_dean/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/harry_kyle/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/harry_oliver/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/hugo_hall-kahan/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/hussien_el%20achkar/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/jack_dalton/2",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/jack_ison/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/jack_ough/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/jack_watkins/2",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/jacob_farrow/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/jagga_smith/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/jai_murray/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/jaxon_artemis/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/jay_polkinghorne/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/joel_fitzgerald/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/josh_lai/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/josh_lindsay/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/kye_annand/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/lachie_jaques/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/lachlan_carmichael/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/lachlan_smith/4",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/lachy_dovaston/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/latrelle_pickett/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/liam_puncher/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/louis_emmett/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/lukas_cooke/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/luke_kennedy/2",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/luker_kentfield/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/marcus_herbert/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/matt_hill/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/matthew_capuano/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/max_beattie/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/max_kondogiannis/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/michael_sellwood/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/milan_murdock/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/mitch_edwards/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/mitch_podhajski/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/mitch_zadow/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/noah_howes/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/noah_mraz/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/noah_roberts-thomson/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/oliver_francou/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/oliver_hayes-brown/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/ollie_greeves/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/ollie_hannaford/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/oscar_ryan/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/oscar_steene/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/paddy_cross/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/patrick_retschko/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/phoenix_gothard/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/riley_hamilton/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/sam_cumming/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/sam_grlj/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/sam_swadling/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/sullivan_robey/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/talor_byrne/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/taylor_goad/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/toby_murray/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/tobyn_murray/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/tom_anastasopoulos/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/tom_blamires/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/tom_burton/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/wade_derksen/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/will_edwards/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/will_green/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/will_lewis/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/will_mccabe/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/willem_duursma/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/xavier_bamert/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/xavier_taylor/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/zane_peucker/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/zane_zakostelsky/1",
++   },
++   {
++     "url": "https://www.draftguru.com.au/players/zeke_uwland/1",
++   },
++ ]
+
+ ❯ tests/integration/draft-linkage.test.ts:158:28
+    156|       SELECT dp.player_url AS url FROM draft_persons dp JOIN sources s…
+    157|        WHERE s.key = 'draftguru' AND dp.match_method = ${BRIDGE_METHOD…
+    158|     expect(linkedWithheld).toEqual([]);
+       |                            ^
+    159|     const reached = await sql<{ url: string; path: string }[]>`
+    160|       SELECT dp.player_url AS url, e.external_id AS path
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/7]⎯
+
+
+ Test Files  3 failed (3)
+      Tests  7 failed | 120 passed (127)
+   Start at  13:24:46
+   Duration  32.35s (transform 2.38s, setup 302ms, import 3.52s, tests 27.79s, environment 1ms)
+
+JSON report written to /mnt/ssd/afldb-rem-int-20261114/evidence/iso2-3aa82166/misc.json

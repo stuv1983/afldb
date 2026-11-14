@@ -1,0 +1,100 @@
+REFUSED: missing child: data/reference/does-not-exist.json
+REFUSED: missing child: data/reference/draftguru-person-bridge-20260918-v2.afldb_test.json
+
+1. A clean fixture lineage validates
+  PASS  1.1 zero failures on the clean lineage
+  PASS  1.2 the measured counts are the fixture's
+  PASS  1.3 the transition table names exactly the corrected and the removed person, in URL order
+  PASS  1.4 the corrected transition records the structured field, never notes
+  PASS  1.5 every section 1-7 contributed at least one check
+  PASS  1.6 summary_sha256 is 64 lowercase hex
+  PASS  1.7 the child sha256 is reported
+
+2. Fail-closed refusals
+  PASS  2.1 a wrong expected sha256 fails 1.1
+  PASS  2.1a a missing expected sha256 fails closed (never PASS by default)
+  PASS  2.2 kind != deployment fails 2.2
+  PASS  2.3 target != afldb_test fails 2.3
+  PASS  2.4 a tampered parent_sha256 fails 2.5
+  PASS  2.5 an accepted mapping absent from the parent fails 4.1
+  PASS  2.6 a duplicate AFL Tables identity fails the schema gate 3.1
+  PASS  2.7 a duplicate DraftGuru person fails the schema gate 3.1
+  PASS  2.8 a withheld person outside the parent population fails 4.4
+  PASS  2.9 a counts drift fails 3.3
+  PASS  2.10 a rejected target among accepted identities fails 4.5
+  PASS  2.11 an unrelated person changing state fails 5.11 (and the carry-forward count 5.2)
+  PASS  2.12 a registration count drift fails 6.1
+  PASS  2.13 a malformed measured_at fails 6.2
+  PASS  2.14 a DSN in the child fails 7.1
+  PASS  2.15 CRLF bytes fail 7.2 and the canonical-bytes check 7.3
+  PASS  2.16 a missing pinned input fails 1.2 without raising
+  PASS  2.17 a corrected target that matches operator_notes but not the structured corrected_identity_candidate fails 5.7
+  PASS  2.18 a provenance that is not the parent's verbatim fails 2.7
+  PASS  2.19 an unsorted bridges[] fails 3.6
+  PASS  2.20 an extra top-level key fails 1.4
+  PASS  2.21 a child that is not a JSON object fails 1.3 without raising
+
+3. Read-only and repeatable
+  PASS  3.1 two runs over identical inputs produce an identical summary_sha256
+  PASS  3.1a the repeated runs are the clean lineage (the digest compared is a PASS digest)
+  PASS  3.1b the same lineage in a different temporary root yields the same summary_sha256 (no absolute path enters the digest)
+  PASS  3.1c a FAILING run is equally repeatable (failure details carry no clock, temp path or unordered input either)
+  PASS  3.2 validation writes nothing (fixture tree byte-identical before and after)
+AFLDB-ISSUE-222 deployment-child validation (tools/rebuild/draftguru/validate_person_bridge_child.py 1.0.0) -- read-only
+
+1. Bytes and pinned lineage
+  PASS  3.3 the CLI refuses a missing child with exit status 1
+AFLDB-ISSUE-222 deployment-child validation (tools/rebuild/draftguru/validate_person_bridge_child.py 1.0.0) -- read-only
+
+1. Bytes and pinned lineage
+  PASS  3.4 the CLI exits 1 when the default lineage is validated at a root that lacks it
+
+4. No database / network / import code path
+  PASS  4.1 the validator imports no database, network, subprocess, GUI, importer or exporter module
+  PASS  4.2 the validator reads no environment variable
+  PASS  4.3 the validator exposes no write path
+
+5. Pinned real lineage constants
+  PASS  5.1 the default child is the v2 afldb_test deployment child
+  PASS  5.2 the expected child sha256 is the operator-reported value
+  PASS  5.3 the pinned v2 parent, v1 parent, v1 child and verdict hashes are the recorded ones
+  PASS  5.4 the expected transition is 3,468 accepted / 1,589 withheld over 5,057, 3,461 carry-forward, 7 corrected, 2 removed, 94 remaining target_not_registered, 13,275 registered
+  PASS  5.5 the seven corrected targets are the structured operator corrections
+  PASS  5.6 the two removals are Craig Somerville and David Sullivan with their rejected hrefs
+  PASS  5.7 the validator declares no output path at all
+
+6. Closed target selection (test / dev)
+  PASS  6.1 the default target is 'test' and resolves to the pinned afldb_test child, its pinned hash and the unchanged EXPECT block
+  PASS  6.2 an explicit --target test resolves identically to the legacy invocation
+  PASS  6.3 the legacy CLI still looks for the pinned afldb_test child, and --target test is the same invocation
+  PASS  6.4 --target test still accepts an explicit --child and --expect-sha256 exactly as before (a non-default file is validated, never trusted by name)
+  PASS  6.5 an explicit dev target plus the real DEV child shape validates with zero failures
+  PASS  6.5a the DEV run measures the same lineage counts as the test run
+  PASS  6.5b the DEV run reports the DEV child's own sha256 and a distinct summary_sha256
+  PASS  6.6 the DEV report names the target 'dev' and never calls the pinned v1 afldb_test child a DEV deployment
+  PASS  6.7 no existing test check was renamed, dropped or added (the pinned test check names are exactly the DEV ones with the baseline named and the target substituted)
+  PASS  6.7a the pinned test check names are verbatim what 1.0.0 emitted
+  PASS  6.8 --target dev without --child refuses
+  PASS  6.9 --target dev without --expect-sha256 refuses
+  PASS  6.9a --target dev with a malformed --expect-sha256 refuses
+  PASS  6.10 --target dev refuses the afldb_test child by its pinned path
+  PASS  6.10a --target dev refuses any *.afldb_test.json child (a deny rule, never a trust rule)
+  PASS  6.10b --target dev refuses the afldb_test child's BYTES whatever the file is called
+  PASS  6.10c restoring the pin leaves the module constant untouched
+  PASS  6.11 prod, the DEV database name, an unknown string, an empty string, a case variant and a non-string target are all refused (closed set; no PROD target)
+  PASS  6.11a the CLI refuses --target prod before any lineage is opened
+  PASS  6.12 a child declaring target 'afldb_test' fails 2.3 under the dev target
+  PASS  6.13 the DEV child fails 2.3 under the test target
+  PASS  6.13a a DEV child whose target is the database name, not the exporter's 'dev' label, fails 2.3
+  PASS  6.14 a wrong expected sha256 fails 1.1 under dev
+  PASS  6.14a a counts drift fails 3.3 under dev
+  PASS  6.14b a tampered parent_sha256 fails 2.5 under dev
+  PASS  6.14c an unrelated person changing state fails 5.11 and 5.2 under dev
+  PASS  6.14d a registration drift fails 6.1 under dev (the DEV measurement is pinned evidence, not an assumption that DEV equals test)
+  PASS  6.15 the dev target declares no default child and no default hash
+  PASS  6.15a the real DEV child's sha256 and filename appear nowhere in the validator source
+  PASS  6.15b the test target still declares the pinned child and hash as its defaults
+  PASS  6.16 both target labels are the exporter's own TARGET_DSN_ENV keys, and the exporter has no PROD target either
+  PASS  6.16a the dev expectation differs from the test expectation only in the target label and the baseline wording
+
+All DraftGuru child-validation checks hold.

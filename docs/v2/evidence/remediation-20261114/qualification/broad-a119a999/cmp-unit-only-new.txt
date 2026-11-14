@@ -1,0 +1,2 @@
+tests/draftguru-acquisition.test.ts > DraftGuru bridge import gate (plan / verify, read-only) DSN guard, read-only discipline, hash pins, classification refusals, verify checks and the no-artefact guarantee all hold on the real tool
+tests/special-records-public-filter-contract.test.ts > AFLDB-ISSUE-167 Stage 5 — public special-record reads are filtered classifies every file in src/ that references either table

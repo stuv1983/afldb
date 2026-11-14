@@ -1,0 +1,13 @@
+tests/integration/admin-season-lists.test.ts > add (§12.1) refuses every season below FIRST_LIST_SEASON, and writes nothing (D-2, I-4)
+tests/integration/derived-rebuild-parity.test.ts > AFLDB-ISSUE-254 — rebuild_derived.py equals the targeted recompute produces the same frees aggregates and the same zero-games career row, and invents none
+tests/integration/nl-answers-relationships.test.ts > C2 — has_brother returns exactly the hand-written label-backed set
+tests/integration/nl-answers-relationships.test.ts > the list cap is disclosed, never silently applied counts the whole qualifying set even when the rows are capped
+tests/integration/release-gates.test.ts > gate: 2026 is provisional (snapshot-pinned) awards no premier and no wooden spoon for 2026
+tests/integration/release-gates.test.ts > gate: 2026 is provisional (snapshot-pinned) is the only season still in progress
+tests/integration/release-gates.test.ts > gate: 2026 is provisional (snapshot-pinned) reports 2026 Brownlow as pending, never as zero
+tests/integration/release-gates.test.ts > gate: Advanced Search regression cases 50-199 goals and zero Brownlow votes returns the exact 261 players
+tests/integration/release-gates.test.ts > gate: Brownlow authority agrees with the canonical round votes for every career inside their coverage
+tests/integration/release-gates.test.ts > gate: absence is never zero records why each attendance is missing
+tests/integration/release-gates.test.ts > gate: birth dates leaves the remaining players honestly without a date
+tests/integration/release-gates.test.ts > gate: birth dates matches players on the profile URL rather than the name
+tests/integration/release-gates.test.ts > gate: club organizations and identities attaches every ladder row to the identity trading that season

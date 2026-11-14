@@ -1,0 +1,67 @@
+1. relisting_signature_review signature (zero-per-entry-game listing -> already-ended career)
+  PASS  1a National zero-per-entry-game listing, career ended earlier -> relisting_signature_review
+  PASS  1a' National row retains BIRTH_YEAR_CONSISTENT (age agreement, not guessed away)
+  PASS  1a Pre-Season zero-per-entry-game listing, career ended earlier -> relisting_signature_review
+  PASS  1a' Pre-Season row retains BIRTH_YEAR_CONSISTENT (age agreement, not guessed away)
+  PASS  1a Mid-Season zero-per-entry-game listing, career ended earlier -> relisting_signature_review
+  PASS  1a' Mid-Season row retains BIRTH_YEAR_CONSISTENT (age agreement, not guessed away)
+  PASS  1b trade-only zero-per-entry-game entry, career ended before trade year -> relisting_signature_review
+  PASS  1c trade-only row carries the relisting-signature reason
+  PASS  1d relisting row's disposition is operator_adjudication_required, never an automatic exclusion
+1e. the one-year career-end/recruitment boundary no longer changes classification
+  PASS  1e-1 career ended IN the listing year -> relisting_signature_review
+  PASS  1e-2 career ended ONE YEAR BEFORE the listing year -> the SAME outcome
+  PASS  1e-3 both reach the identical population_reason (no boundary-dependent wording)
+1f. per-entry zero games on one listing is not zero career games overall
+  PASS  1f a later DraftGuru entry recording real games keeps the row population_clean
+1g. a genuine birth-year contradiction is never absorbed into relisting_signature_review
+  PASS  1g a real birth-year conflict on the same shape -> suspected_source_mislink, not relisting
+  PASS  1g' the fired contradiction reason names BIRTH_YEAR_CONFLICT explicitly
+2. genuine later re-draft / veteran is never flagged
+  PASS  2a career continues through and past the recruitment year -> population_clean
+3. trade/re-listing of an established player is never flagged
+  PASS  3a established player later traded -> population_clean
+4. Age="0" sentinel correction is inherited from the reused review tool
+  PASS  4a AGE_ARTIFACT_FLOOR constant is shared (single source of truth)
+  PASS  4b scan module does not define its own AGE_ARTIFACT_FLOOR constant (mentions in prose only)
+5. birth-year tolerance in evaluate_candidate()
+  PASS  5a |delta|==1 is consistent -> candidate accepted
+  PASS  5b |delta|==2 conflicts -> candidate rejected
+  PASS  5c missing DraftGuru birth year -> candidate rejected (never guessed)
+  PASS  5d missing retained birth year -> candidate rejected (never guessed)
+6. same exact name, career already ended -> relisting_signature_review, not clean
+  PASS  6a exact-name match with 0 games vs. an earlier-ended established career still requires review
+7. spelling-variant href -> source_discrepancy_same_person via the alternate probe
+  PASS  7a Steven-href/Stephen-page resolves to the correctly-spelled registered identity
+  PASS  7b corrected_identity names the real registered path
+  PASS  7c disposition is manual_curation, never an auto-applied bridge
+8. numeric-suffix candidates require club overlap; ambiguity is never forced
+  PASS  8a suffix candidate without club overlap -> insufficient_evidence, never forced
+  PASS  8b two equally-strong candidates -> ambiguous, insufficient_evidence (never guessed)
+9. legitimate zero-game / unregistered draftee -> insufficient_evidence, not a mislink
+  PASS  9a no retained evidence anywhere -> insufficient_evidence
+  PASS  9b recommended disposition is withhold (no forced match)
+10. snapshot-cutoff draftee -> insufficient_evidence (TARGET_NOT_REGISTERED_NO_EVIDENCE)
+  PASS  10a not yet registered, zero candidates -> TARGET_NOT_REGISTERED_NO_EVIDENCE
+11. human ledger overlap is surfaced distinctly
+  PASS  11a agreeing ledger decision on an otherwise-clean row -> human_authority_overlap
+  PASS  11b disagreeing ledger decision surfaces as a mislink signal, not silently overlapped
+12. numbered_candidates() / spelling_candidate() pure functions
+  PASS  12a numbered candidates include the real suffix 0
+  PASS  12b numbered candidates never include the original identity
+  PASS  12c spelling candidate substitutes the visible name into the same directory
+  PASS  12d spelling candidate is None without a visible name
+13. deterministic rows_sha256 across two independent constructions
+  PASS  13a identical fixture inputs reproduce an identical rows_sha256
+14. no network, no database module use
+  PASS  14a no psycopg import
+  PASS  14b no *DATABASE_URL* environment read outside the docstring
+  PASS  14c no socket/urllib/requests/http.client import
+15. CLI refusals on bad input
+  PASS  15a well-formed tiny fixture succeeds
+  PASS  15b a deployment parent is refused
+  PASS  15c a non-deployment child is refused
+  PASS  15d a row-count mismatch is refused
+  PASS  15e a parent hash mismatch is refused
+
+All checks passed.

@@ -1,0 +1,20 @@
+     × rebuilds byte-identically from the accepted Stage A snapshot 46ms
+     × is the frozen 120 / 8 / 68 / 30 / 14 contract over the accepted Stage A label 3ms
+     × DSN guard, read-only discipline, hash pins, classification refusals, verify checks and the no-artefact guarantee all hold on the real tool 616ms
+     × leaves exactly the two genuine Round 10 rows 35ms
+     × leaves the younger player's other appearances untouched 2ms
+     × corrects exactly two rows and nothing else in 1909 1ms
+     × covers the four real 2025 players, retaining all 79 rows 2ms
+     × classifies every file in src/ that references either table 19ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/draftguru-acquisition.test.ts > frozen Stage B1 sample (local snapshot) > rebuilds byte-identically from the accepted Stage A snapshot
+ FAIL  tests/draftguru-acquisition.test.ts > frozen Stage B1 sample (local snapshot) > is the frozen 120 / 8 / 68 / 30 / 14 contract over the accepted Stage A label
+ FAIL  tests/draftguru-acquisition.test.ts > DraftGuru bridge import gate (plan / verify, read-only) > DSN guard, read-only discipline, hash pins, classification refusals, verify checks and the no-artefact guarantee all hold on the real tool
+  FAIL  9.6 that run passed every offline guard -- the real DEV child's pinned bytes, the v2 parent_sha256 chain and the Stage A snapshot -- and stopped only where it would open a connection -- ['AFLDB DraftGuru bridge import gate -- plan (read-only, afldb_dev only) [target=dev]', '', 'ERROR: snapshot directory not found: /mnt/ssd/afldb-rem-int-20261114/cand/data/sources/draftguru/annual-html-20260826']
+ FAIL  tests/fitzroy-core-import.test.ts > fitzRoy source row corrections > leaves exactly the two genuine Round 10 rows
+ FAIL  tests/fitzroy-core-import.test.ts > fitzRoy source row corrections > leaves the younger player's other appearances untouched
+ FAIL  tests/fitzroy-core-import.test.ts > fitzRoy source row corrections > corrects exactly two rows and nothing else in 1909
+ FAIL  tests/fitzroy-core-import.test.ts > blank Player fallback > covers the four real 2025 players, retaining all 79 rows
+ FAIL  tests/special-records-public-filter-contract.test.ts > AFLDB-ISSUE-167 Stage 5 — public special-record reads are filtered > classifies every file in src/ that references either table
+ Test Files  3 failed | 212 passed | 1 skipped (216)
+      Tests  8 failed | 12108 passed | 31 skipped (12147)

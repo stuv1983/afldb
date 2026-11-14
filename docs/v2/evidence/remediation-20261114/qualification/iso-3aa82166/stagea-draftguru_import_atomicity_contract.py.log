@@ -1,0 +1,111 @@
+
+1. Success path -- the data commit and the completed status are one commit
+  target: contract@never.invalid:1/never_dialled
+  PASS  1.1 the run completes without an exception
+  PASS  1.2 a data statement was actually sent
+  PASS  1.3 exactly one commit precedes the first data statement (the running batch row)
+  PASS  1.4 exactly one batch-row update carries status 'completed'
+  PASS  1.5 NO commit lies between the first data statement and the 'completed' update
+  PASS  1.6 the 'completed' update is followed by a commit (data + status land together)
+  PASS  1.7 ANALYZE is issued only after that commit
+  PASS  1.8 ANALYZE runs under autocommit, switched on after the commit
+  PASS  1.9 no rollback on the success path
+  PASS  1.10 no data statement is sent after the 'completed' update except ANALYZE
+  PASS  1.11 the importer reports one bridge link and no HALT
+
+2. Server error during external_identities reconciliation -- rollback, then the failed row
+  target: contract@never.invalid:1/never_dialled
+  PASS  2.1 the injected error propagates out of run_import
+  PASS  2.2 exactly one rollback
+  PASS  2.3 the rollback follows data statements (there was something to roll back)
+  PASS  2.4 no commit between the first data statement and the rollback
+  PASS  2.5 the only statement after the rollback is the failed batch-row update
+  PASS  2.6 that update records status 'failed' and names the error
+  PASS  2.7 no ANALYZE after a failure
+  PASS  2.8 exactly one commit after the rollback (the audit row), one before the data (the running row)
+
+3. --dry-run rolls everything back after the full write path
+  target: contract@never.invalid:1/never_dialled
+  PASS  3.1 DryRunComplete propagates (main() turns it into the DRY RUN message)
+  PASS  3.2 exactly one rollback and no ANALYZE
+  PASS  3.3 the whole write path ran before the rollback (reconcile + replay were reached)
+  PASS  3.4 after the rollback only the failed batch row is written, error DryRunComplete
+  PASS  3.5 the dry-run message states that the data writes were rolled back
+  PASS  3.6 the dry-run message states that a failed import_batches audit row is retained
+  PASS  3.7 the retained row's status and error are the ones the message names
+
+4. A bridge that contradicts an explicit human decision is refused before any write
+  target: contract@never.invalid:1/never_dialled
+  PASS  4.1 ImportFailure names the contradiction
+  PASS  4.2 no data statement was sent at all
+  PASS  4.3 one rollback, then only the failed batch row
+
+5. Reload scope
+  PASS  5.1 only the DraftGuru tables, the reload staging table and the batch row are written
+  PASS  5.2 every draft_persons / draft_picks write is DraftGuru-scoped
+  PASS  5.3 replay_admin_overrides(draft_picks) ran inside the same transaction, before the commit
+
+6. Reload guard (AFLDB-ISSUE-348): refusal writes nothing, even under --dry-run
+  target: contract@never.invalid:1/never_dialled
+  PASS  6.1 a clean reload (nothing to delete or rewrite) is not refused
+  PASS  6.2 the guard's reads precede the import_batches row, apply_authority and every write
+  PASS  6.3 the success path still commits once before the data and never rolls back
+  PASS  6.4 the guard states it is clear
+  target: contract@never.invalid:1/never_dialled
+  PASS  6.5 (normal run) deleting an audited pick (pick_number NULL) is refused as ImportFailure
+  PASS  6.6 (normal run) the refusal wrote nothing: SELECTs only, no commit, no import_batches row
+  target: contract@never.invalid:1/never_dialled
+  PASS  6.5 (--dry-run) deleting an audited pick (pick_number NULL) is refused as ImportFailure
+  PASS  6.6 (--dry-run) the refusal wrote nothing: SELECTs only, no commit, no import_batches row
+  target: contract@never.invalid:1/never_dialled
+  PASS  6.7 --acknowledge-population-drop does not satisfy the guard (D-3)
+  target: contract@never.invalid:1/never_dialled
+  PASS  6.8 the report names the audited deletion by id and key, with its reasons
+  target: contract@never.invalid:1/never_dialled
+  PASS  6.9 a reconciliation naming exactly those keys and the digest lets the run proceed
+  target: contract@never.invalid:1/never_dialled
+  PASS  6.10 an audited deletion needs acknowledge_audit_orphans (its data_edits rows are orphaned)
+  target: contract@never.invalid:1/never_dialled
+  PASS  6.11 a reconciliation reviewed against different effects (digest) is refused
+  target: contract@never.invalid:1/never_dialled
+  PASS  6.12 a reconciliation for another Stage A label is refused
+  target: contract@never.invalid:1/never_dialled
+  PASS  6.13 every deleted person must be named too
+  target: contract@never.invalid:1/never_dialled
+  PASS  6.14 a key that is not an effect of this run is refused (exact keys)
+  target: contract@never.invalid:1/never_dialled
+  PASS  6.15 a stored row with a NULL reload-key component is reported, not silently kept
+  target: contract@never.invalid:1/never_dialled
+  PASS  6.16 an audited pick the snapshot DOES carry unchanged (NULL pick_number == NULL) and kept at the same rank is not refused
+  target: contract@never.invalid:1/never_dialled
+  PASS  6.17 a changed dg_person_id on an audited person is refused (dry-run too)
+  target: contract@never.invalid:1/never_dialled
+  PASS  6.18 the rewrite is reported column by column: dg_person_id 5058 -> 4
+  target: contract@never.invalid:1/never_dialled
+  PASS  6.19 naming that person in the reconciliation lets the renumbering through
+  target: contract@never.invalid:1/never_dialled
+  PASS  6.20 original_club_raw changes without a review input are refused (dry-run too)
+  target: contract@never.invalid:1/never_dialled
+  PASS  6.21 the three D-336-3 shapes are classified REPLACE_CLUB / RENAME_EXPAND / INSERT_SCHOOL
+  target: contract@never.invalid:1/never_dialled
+  PASS  6.22 a REPLACE_CLUB row is not adjudicated: it needs an explicit owner ruling
+  target: contract@never.invalid:1/never_dialled
+  PASS  6.23 only 'accept_incoming' with a reference is a ruling the importer can execute
+  target: contract@never.invalid:1/never_dialled
+  PASS  6.24 review entries for all three plus the explicit ruling let the run proceed
+  target: contract@never.invalid:1/never_dialled
+  PASS  6.25 a review entry whose class is not the recomputed class is refused
+  target: contract@never.invalid:1/never_dialled
+  PASS  6.26 an origin change with no review entry is refused
+  target: contract@never.invalid:1/never_dialled
+  PASS  6.27 a column an active override covers is not a reload effect (the replay restores it)
+  target: contract@never.invalid:1/never_dialled
+  PASS  6.28 an uncovered change on a pick with data_edits is a refused audited rewrite
+  PASS  6.30 the committed classifier output (187 rows) is reproduced exactly by the guard's port
+  PASS  6.31 NULL -> value is an insertion, value -> NULL is not auto-accepted
+  PASS  6.32 a reconciliation pinned by its sha256 loads
+  PASS  6.33 a wrong pin, a missing partner flag and unknown keys are all refused
+  PASS  6.34 a reconciliation with an unknown key is refused
+  PASS  6.35 --link-only refuses the guard's flags (its behaviour is otherwise unchanged)
+
+All DraftGuru importer atomicity checks hold.

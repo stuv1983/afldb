@@ -1,0 +1,9 @@
+HEAD=e905915a96ed5fd859a7711612706f700edec8bf porcelain=0
+tsc rc=0 lines=0
+unit rc=1
+     × offhost-pull: binds each sidecar to its dump, refuses future stamps, and a flood cannot evict genuine copies (review A-03) 173ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/deploy-web-unit.test.ts > AFLDB-ISSUE-352 — scheduled backup wrapper and units > offhost-pull: binds each sidecar to its dump, refuses future stamps, and a flood cannot evict genuine copies (review A-03)
+ Test Files  1 failed | 10 passed (11)
+      Tests  1 failed | 1900 passed (1901)
+porcelain-after=0

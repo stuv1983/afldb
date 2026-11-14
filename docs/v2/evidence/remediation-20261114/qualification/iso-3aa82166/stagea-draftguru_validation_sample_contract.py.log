@@ -1,0 +1,54 @@
+
+1. Clean build on the fixture lineage
+  PASS  1.1 the eligible frame is the non-census v2 bridges minus the v1 sample minus the adjudicated pack
+  PASS  1.2 the ranking is sha256(salt|url) ascending, ties by url (independent computation)
+  PASS  1.3 the rows are the first n ranked persons with ordinals 1..n
+  PASS  1.4 every selection_key equals export_person_bridge.salted_key (v1 formula parity)
+  PASS  1.5 the v2 census is derived from Stage A and equals the v1 census
+  PASS  1.6 the frame accounting is exact
+  PASS  1.7 disjointness from the census, the v1 census, the v1 random stratum and the adjudicated pack is proven and recorded as zero overlaps
+  PASS  1.8 generated_utc is frozen to the validated child's generated_utc and the child is hash-linked with its validation summary
+  PASS  1.9 every row carries the parent identity and the child status, and no verdict field
+  PASS  1.10 the zero-failure bound is 1 - 0.05^(1/n), recorded beside n
+  PASS  1.11 rows_sha256 is the sha256 of the canonical rows
+  PASS  1.12 the CSV is LF-only with the declared header and one line per row
+  PASS  1.13 a second build reproduces both outputs byte-for-byte
+  PASS  1.14 a different salt produces different selection keys for every frame person
+  PASS  1.15 no absolute path, DSN or credential appears in the outputs (the fixture root is an absolute temp path and is absent)
+  PASS  1.16 every input and tool hash is recorded repository-relative
+
+2. Frame options and refusals
+  PASS  2.1 --include-adjudicated returns the adjudicated bridged non-census person to the frame
+  PASS  2.2 n larger than the eligible frame is refused
+  PASS  2.3 reusing the prior sample's salt is refused
+  PASS  2.4 a salt containing '|' or a non-positive n is refused
+  PASS  2.5 a v2 census that differs from the v1 census is refused (operator matter)
+  PASS  2.6 a child that fails validation refuses generation (the gate)
+  PASS  2.7 a pinned-input hash mismatch is refused before anything is computed
+  PASS  2.8 the tool exposes no overwrite flag
+
+3. Output lifecycle (validate-only writes nothing; write never overwrites)
+  PASS  3.1 validate-only exits 0 and writes nothing
+  PASS  3.2 validate-only reports both outputs absent with their would-be hashes
+  PASS  3.3 write exits 0 and creates both outputs with the computed bytes
+  PASS  3.4 a second write exits 0 and reports both outputs identical
+  PASS  3.5 validate-only after a write exits 0
+  PASS  3.6 write refuses when an existing output differs and touches neither file
+  PASS  3.7 validate-only exits 1 when an existing output differs
+  PASS  3.8 a refusal inside run() is reported, not raised, with exit 1
+
+4. No database / network / import code path
+  PASS  4.1 the generator imports no database, network, subprocess, GUI, importer or exporter module
+  PASS  4.2 the generator reads no environment variable
+  PASS  4.3 every frozen tool source exists in the repository
+  PASS  4.4 the top-10 census helper module imports no network or database module either
+
+5. Pinned Phase F constants
+  PASS  5.1 the default salt is AFLDB-ISSUE-222/v2 and the default n is 598
+  PASS  5.2 the ordering formula is the v1 formula with the new salt
+  PASS  5.3 the outputs are the v2 validation-sample JSON and CSV under docs/rebuild-manifests
+  PASS  5.4 the pinned inputs include the validated v2 child, the v1 review sample and the Stage A rows with the recorded hashes
+  PASS  5.5 no output path is a pinned input path (nothing pinned can be overwritten)
+  PASS  5.6 the sample never carries a verdict field and declares itself unreviewed
+
+All DraftGuru validation-sample checks hold.

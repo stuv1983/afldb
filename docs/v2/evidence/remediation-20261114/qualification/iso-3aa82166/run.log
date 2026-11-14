@@ -1,0 +1,29 @@
+2026-11-14T01:50:12Z HEAD=3aa821662aa5dcc55cccdcf82dd804370b0a1c12 porcelain=0
+2026-11-14T01:51:24Z suite settle rc=0       Tests  85 passed (85)
+2026-11-14T01:51:30Z suite c7 rc=0       Tests  6 passed (6)
+2026-11-14T01:55:06Z suite awards rc=1       Tests  97 passed | 10 skipped (107)
+ FAIL  tests/integration/awards-reload-links.test.ts > Coleman legacy to derived ownership transition (AFLDB-ISSUE-111)
+ FAIL  tests/integration/awards-reload-links.test.ts > Coleman derived reload preserves human link decisions (AFLDB-ISSUE-111)
+2026-11-14T01:56:12Z suite dataeditor rc=0       Tests  62 passed | 1 skipped (63)
+2026-11-14T01:56:29Z suite admincoaches rc=0       Tests  18 passed (18)
+2026-11-14T02:03:40Z suite gridley rc=1       Tests  1 failed | 1211 passed (1212)
+ FAIL  tests/integration/gridley-corpus.test.ts > Gridley corpus -- every cell through solveCellSummary > writes the run report and has no failing cells
+2026-11-14T02:03:57Z suite gates rc=1       Tests  8 failed | 94 passed | 7 skipped (109)
+ FAIL  tests/integration/release-gates.test.ts > gate: Brownlow authority > agrees with the canonical round votes for every career inside their coverage
+ FAIL  tests/integration/release-gates.test.ts > gate: Advanced Search regression cases > 50-199 goals and zero Brownlow votes returns the exact 261 players
+ FAIL  tests/integration/release-gates.test.ts > gate: club organizations and identities > attaches every ladder row to the identity trading that season
+ FAIL  tests/integration/release-gates.test.ts > gate: absence is never zero > records why each attendance is missing
+ FAIL  tests/integration/release-gates.test.ts > gate: birth dates > leaves the remaining players honestly without a date
+ FAIL  tests/integration/release-gates.test.ts > gate: 2026 is provisional (snapshot-pinned) > reports 2026 Brownlow as pending, never as zero
+ FAIL  tests/integration/release-gates.test.ts > gate: 2026 is provisional (snapshot-pinned) > awards no premier and no wooden spoon for 2026
+ FAIL  tests/integration/release-gates.test.ts > gate: 2026 is provisional (snapshot-pinned) > is the only season still in progress
+2026-11-14T02:11:09Z build rc=0
+2026-11-14T02:11:20Z standalone rc=0 BUILD_ID=GciqAlQ-EN8HR4V6tU-aP
+2026-11-14T02:12:38Z serve/visual rc=1
+2026-11-14T02:12:38Z git porcelain after build: 0
+2026-11-14T02:13:50Z stagea rc=0
+2026-11-14T02:14:02Z corpus parse rc=0
+2026-11-14T02:14:02Z corpus diff lines=1 {"parserVersion":68,"total":12000,"pass":12000,"softFail":0,"fail":0}
+2026-11-14T02:14:05Z cluster stopped; no listener on 55630
+2026-11-14T02:14:05Z porcelain final: 0
+2026-11-14T02:14:05Z DONE

@@ -1,0 +1,22 @@
+BUILD_ID=GciqAlQ-EN8HR4V6tU-aP home=200
+HTTP/1.1 200 OK
+[{"scene":"S1","vp":"desktop","status":200,"build":null,"selectVisible":true,"label":"Two clubs","options":["Games involving either club","Games between the two clubs"],"selected":"any","overflow":false},{"scene":"S2","vp":"desktop","status":200,"build":null,"summary":"231 matches · Clubs (head-to-head): Richmond v Carlton","totals":["231 matches · Clubs (head-to-head): Richmond v Carlton"],"selected":"both","overflow":false},{"scene":"S2b","vp":"desktop","status":200,"build":null,"summary":"4,879 matches · Clubs (either): Richmond or Carlton","totals":["4,879 matches · Clubs (either): Richmond or Carlton"],"selected":"any","overflow":false},{"scene":"S3","vp":"desktop","q":"teams with more than 3 wins","href":"/search/qualifying-matches?plan=eyJ2IjoxLCJncmFpbiI6InRlYW1fbWF0Y2giLCJtZXRyaWMiOm51bGwsImFnZyI6eyJraW5kIjoibGlzdCJ9LCJzY29wZSI6e30sImNhcmVlckNvbmRpdGlvbnMiOltd","status":200,"build":null,"note":"Showing the 500 most recent of 1,641 qualifying games.","rows":500,"capped":true,"overflow":false},{"scene":"S3","vp":"desktop","q":"teams with more than 3 wins against the Lions","href":"/search/qualifying-matches?plan=eyJ2IjoxLCJncmFpbiI6InRlYW1fbWF0Y2giLCJtZXRyaWMiOm51bGwsImFnZyI6eyJraW5kIjoibGlzdCJ9LCJzY29wZSI6eyJjbHViQWdhaW5zdCI6eyJvcmdhbml6","status":200,"build":null,"note":null,"rows":27,"capped":false,"overflow":false},{"scene":"S1","vp":"mobile","status":200,"build":null,"selectVisible":true,"label":"Two clubs","options":["Games involving either club","Games between the two clubs"],"selected":"any","overflow":false},{"scene":"S2","vp":"mobile","status":200,"build":null,"summary":"231 matches · Clubs (head-to-head): Richmond v Carlton","totals":["231 matches · Clubs (head-to-head): Richmond v Carlton"],"selected":"both","overflow":false},{"scene":"S2b","vp":"mobile","status":200,"build":null,"summary":"4,879 matches · Clubs (either): Richmond or Carlton","totals":["4,879 matches · Clubs (either): Richmond or Carlton"],"selected":"any","overflow":false},{"scene":"S3","vp":"mobile","q":"teams with more than 3 wins","href":"/search/qualifying-matches?plan=eyJ2IjoxLCJncmFpbiI6InRlYW1fbWF0Y2giLCJtZXRyaWMiOm51bGwsImFnZyI6eyJraW5kIjoibGlzdCJ9LCJzY29wZSI6e30sImNhcmVlckNvbmRpdGlvbnMiOltd","status":200,"build":null,"note":"Showing the 500 most recent of 1,641 qualifying games.","rows":500,"capped":true,"overflow":false},{"scene":"S3","vp":"mobile","q":"teams with more than 3 wins against the Lions","href":"/search/qualifying-matches?plan=eyJ2IjoxLCJncmFpbiI6InRlYW1fbWF0Y2giLCJtZXRyaWMiOm51bGwsImFnZyI6eyJraW5kIjoibGlzdCJ9LCJzY29wZSI6eyJjbHViQWdhaW5zdCI6eyJvcmdhbml6","status":200,"build":null,"note":null,"rows":27,"capped":false,"overflow":false}]
+shoot rc=0
+/sitemap.xml 404 text/plain e3ebaa16dd9d9b9f
+/sitemap-index.xml 404 text/plain e3ebaa16dd9d9b9f
+/robots.txt 200 text/plain d17b641665bc0d4e
+/sitemap/0.xml 200 application/xml 4d3ac9786f9acff3
+Not found
+sitemap.xml == sitemap-index.xml (bytes)
+segment /sitemap/0.xml urls=606 brownlow-medal=0 brownlow-pages=0
+segment /sitemap/1.xml urls=1797 brownlow-medal=0 brownlow-pages=98
+segment /sitemap/100.xml urls=5000 brownlow-medal=0 brownlow-pages=0
+segment /sitemap/101.xml urls=5000 brownlow-medal=0 brownlow-pages=0
+segment /sitemap/102.xml urls=3365 brownlow-medal=0 brownlow-pages=0
+segment /sitemap/200.xml urls=5000 brownlow-medal=0 brownlow-pages=0
+segment /sitemap/201.xml urls=5000 brownlow-medal=0 brownlow-pages=0
+segment /sitemap/202.xml urls=5000 brownlow-medal=0 brownlow-pages=0
+segment /sitemap/203.xml urls=2056 brownlow-medal=0 brownlow-pages=0
+segment /sitemap/300.xml urls=1705 brownlow-medal=0 brownlow-pages=0
+brownlow-medal URLs across segments: 0
+server stopped

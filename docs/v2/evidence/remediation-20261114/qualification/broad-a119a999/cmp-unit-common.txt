@@ -1,0 +1,6 @@
+tests/draftguru-acquisition.test.ts > frozen Stage B1 sample (local snapshot) is the frozen 120 / 8 / 68 / 30 / 14 contract over the accepted Stage A label
+tests/draftguru-acquisition.test.ts > frozen Stage B1 sample (local snapshot) rebuilds byte-identically from the accepted Stage A snapshot
+tests/fitzroy-core-import.test.ts > blank Player fallback covers the four real 2025 players, retaining all 79 rows
+tests/fitzroy-core-import.test.ts > fitzRoy source row corrections corrects exactly two rows and nothing else in 1909
+tests/fitzroy-core-import.test.ts > fitzRoy source row corrections leaves exactly the two genuine Round 10 rows
+tests/fitzroy-core-import.test.ts > fitzRoy source row corrections leaves the younger player's other appearances untouched

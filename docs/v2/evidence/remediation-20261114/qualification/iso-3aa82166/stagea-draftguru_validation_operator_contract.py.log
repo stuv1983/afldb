@@ -1,0 +1,120 @@
+WARNING: removing existing lock (pid=1171983, host=streamanator, started=2026-11-14T02:13:48Z) because --force-unlock was given
+
+1. Vocabulary, schema and boundaries
+  PASS  1.1 the verdict vocabulary is exactly the reviewer/validator vocabulary
+  PASS  1.2 the final artefact path is exactly the validator's operator_rel
+  PASS  1.3 mandatory prefixes, audit class and UTC rule come from the final validator
+  PASS  1.4 the checkpoint lives in a new data/review Phase F directory, separate from the 83-row lineage
+  PASS  1.5 the source imports no database client, importer, resolver or HTTP client and reads no environment
+  PASS  1.6 no database client module is loaded after importing the tool
+  PASS  1.7 the pinned hashes are the operator-reported 2026-09-18 values
+  PASS  1.8 the eleven queue classes are exactly the v1 builder's class keys, in runbook order
+  PASS  1.9 the plain-English statement says target_not_registered is not an identity contradiction
+  PASS  1.10 every verdict label carries its stored value beneath it in the help and explains all three meanings
+  PASS  1.11 the next command after finalisation is the final validator
+
+2. Inputs and the deduplicated queue (fixture)
+  PASS  2.1 8 rows -> 8 unique queue entries = 4 mandatory + 4 audit; a person in two classes appears once
+  PASS  2.2 the two-class person lists both memberships, in class order
+  PASS  2.3 queue order is mandatory rows in sample order, then the audit in sample order; positions 1..n
+  PASS  2.4 target_not_registered stays a deployment status with identity_evaluable false and no retained target
+  PASS  2.5 expected-count mismatch is refused (mandatory 5)
+  PASS  2.6 a pinned-hash mismatch is refused before anything is read further
+  PASS  2.7 a verdicts artefact that no longer hash-links to the recheck queue is refused
+  PASS  2.8 a stray operator verdict inside the machine rows is refused
+
+3. Row presentation (pure helpers)
+  PASS  3.1 identity summary shows the DraftGuru person and the proposed AFL Tables identity
+  PASS  3.2 comparison shows names, birth year, career span, games, clubs and identity; the withheld row shows 'no retained target facts' on the retained side
+  PASS  3.3 review reasons name every class membership with its plain-English label plus the flags
+  PASS  3.4 reason codes are explained and contradiction codes are identified
+  PASS  3.5 verdict guidance distinguishes audit, mandatory, contradiction-override and withheld rows
+  PASS  3.6 no citation is invented: none on the fixture rows; a genuinely present one is surfaced
+
+4. Evidence links
+  PASS  4.1 both links build from the row: DraftGuru URL as captured, AFL Tables from the canonical identity
+  PASS  4.2 the AFL Tables builder refuses traversal, query strings, absolute URLs and foreign shapes
+  PASS  4.3 scheme/host allow-list: javascript:, file:, an unexpected host and a look-alike host are refused
+  PASS  4.4 a valid URL calls the (mocked) opener exactly once; a refused URL never reaches it
+  PASS  4.5 a DraftGuru URL with an apostrophe or %20 is accepted as captured (never re-encoded)
+
+5. Session: no preselection, navigation, unsaved state
+  PASS  5.1 a fresh session has no verdict selected, reports NO VERDICT, and opening a link changes nothing
+  PASS  5.2 position text and bounds: 'Row 1 of 8', Previous disabled only at the first row
+  PASS  5.3 Next disabled only at the last row; Previous enabled there
+  PASS  5.4 Next at the last row is a no-op (never strands or wraps)
+  PASS  5.5 selecting a verdict is UNSAVED until committed and is never reported as saved
+  PASS  5.6 navigation, filtering and jumping are all blocked while an edit is unsaved (Save or Discard first)
+  PASS  5.7 committing saves the verdict, stamps reviewed_utc, and the status reads SAVED with the stored value
+  PASS  5.8 editing notes after a save is UNSAVED again (notes/evidence changed) and Discard restores the saved state
+  PASS  5.9 a stashed draft survives restart as a DRAFT (still UNSAVED, not counted, not a verdict)
+  PASS  5.10 discarding the draft clears it from the checkpoint
+
+6. Verdict, notes and evidence contract
+  PASS  6.1 on a machine-contradiction row, 'agree' (the override) requires notes AND evidence
+  PASS  6.2 'contradict' without notes and evidence is rejected with both problems named; nothing is saved
+  PASS  6.3 'undetermined' with notes but no evidence is rejected; with both it is recorded (and will block acceptance)
+  PASS  6.4 an empty or unknown verdict is rejected
+  PASS  6.5 'agree' on an ordinary row needs no notes; the saved decision records classes, classification and the unedited machine outcome
+  PASS  6.6 a target_not_registered row takes an ordinary 'agree' (continued withholding) without touching its outcome or deployment status
+  PASS  6.7 clearing a saved verdict makes the row incomplete again (explicit action, nothing else changes)
+  PASS  6.8 no bulk-positive action exists in the tool
+
+7. Filters preserve deterministic queue order
+  PASS  7.1 classification=mandatory shows the 4 mandatory rows in queue order and keeps the current row
+  PASS  7.2 classification=audit shows the 4 audit rows in queue order; current falls to the first shown
+  PASS  7.3 completion=incomplete hides the saved rows and preserves order
+  PASS  7.4 completion=complete shows exactly the saved rows in order
+  PASS  7.5 machine-outcome and deployment-status filters are separate controls that each isolate the withheld row
+  PASS  7.6 deployment=bridged shows the other 7 in order
+  PASS  7.7 an empty filter result reports no rows without crashing; navigation is inert
+  PASS  7.8 an unknown filter value is refused
+  PASS  7.9 the filter vocabulary is the six machine outcomes and the two deployment statuses
+
+8. Checkpoint: resume, hash-linking, refusals, atomicity, lock
+  PASS  8.1 every saved decision is preserved across restart and the checkpoint is hash-linked to all artefacts
+  PASS  8.2 a checkpoint recorded against different artefacts is refused (no resume)
+  PASS  8.3 a decision for a person outside the queue is refused
+  PASS  8.4 a decision whose recorded machine outcome differs from the artefact is refused
+  PASS  8.5 an unknown schema version and the earlier 83-row checkpoint shape are both refused; nothing migrates
+  PASS  8.6 atomic write: a failed replace leaves the previous checkpoint byte-identical and no temp file behind
+  PASS  8.7 lock: a second session is refused; --force-unlock replaces it; release removes it
+  PASS  8.8 releasing an absent lock is harmless
+
+9. Finalisation gating and deterministic rendering
+  PASS  9.1 finalisation is disabled until every required row has a valid verdict
+  PASS  9.2 with all 8 rows saved, finalisation is enabled and the preview expects no blocker
+  PASS  9.3 rendering is deterministic (identical bytes), canonical ASCII LF, sorted keys
+  PASS  9.4 the artefact satisfies the validator's section 6 contract: hash-linked to the recheck queue, verdicts and sample; same classes and row order; verdict values; UTC stamps; no machine outcome edited
+  PASS  9.5 a person in two classes carries the identical operator block in both (never conflicting)
+  PASS  9.6 the withheld row keeps outcome target_unregistered beside its 'agree'; the override carries notes+evidence
+  PASS  9.7 every required row's verdict is filled; the summary counts reconcile
+  PASS  9.8 finalise writes exactly the operator artefact path, records it in the checkpoint, and names the next command
+  PASS  9.9 finalising again with identical content is idempotent
+  PASS  9.10 a differing existing artefact is never overwritten
+  PASS  9.11 output hygiene: notes carrying a DSN are refused at render time
+  PASS  9.12 a 'contradict' on an audit row is rendered honestly and previewed as blocking (not auto-agreed)
+  PASS  9.13 finalisation touches nothing else: no import/link/database/deploy symbols in the tool source
+
+10. Network and database isolation across a full lifecycle
+  PASS  10.1 load -> adjudicate -> finalise opens no socket
+
+11. GUI construction guarantees (source-level; tkinter never imported here)
+  PASS  11.1 the GUI is only built when Tcl/Tk is present and never at import time
+  PASS  11.2 fixed footer with Previous/Next packed before the expanding body; Alt+Left/Right bound globally and inside the notes/evidence fields; scroll-to-top on every row change
+  PASS  11.3 Previous/Next are disabled only at the ends, from the session's can_go_prev/can_go_next
+  PASS  11.4 nothing preselected: the verdict variable starts empty and radios carry stored values beneath
+  PASS  11.5 unsaved edits prompt Save / Discard / Stay before leaving a row, filtering, finalising or closing
+  PASS  11.6 focus loss on notes/evidence stashes a draft (never a verdict); Ctrl+S commits
+  PASS  11.7 Open/Copy buttons exist for both links, validated through the allow-list, and touch no state
+  PASS  11.8 labels re-wrap on resize (wraplength follows the canvas width); minimum window size set
+  PASS  11.9 the Finalise button is enabled only when the session can finalise and the dialog names the next command
+
+12. The real Phase F artefacts (read-only; skipped when absent)
+  PASS  12.1 the real queue is exactly 69 unique rows = 39 mandatory + 30 audit, pinned hashes matching
+  PASS  12.2 the 16 target_not_registered rows are class 3 with identity_evaluable false; zero machine contradictions
+  PASS  12.3 the 4 offline_limited rows are mandatory; audit rows are all offline_strong and disjoint from the mandatory set
+  PASS  12.4 every real row builds both evidence links from its own captured URL and canonical identity
+  PASS  12.5 the audit salt is the recorded AFLDB-ISSUE-222/audit-v2
+
+All DraftGuru Phase F operator-adjudication checks hold.

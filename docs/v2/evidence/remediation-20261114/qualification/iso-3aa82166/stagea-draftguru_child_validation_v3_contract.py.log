@@ -1,0 +1,77 @@
+REFUSED: missing child: data/reference/does-not-exist.json
+REFUSED: missing child: data/reference/draftguru-person-bridge-20260918-v3.afldb_test.json
+
+1. A clean fixture lineage validates
+  PASS  1.1 zero failures on the clean lineage
+  PASS  1.2 the measured counts are the fixture's
+  PASS  1.3 the transition table names exactly the two corrected persons, in URL order
+  PASS  1.4 every section 1-7 contributed at least one check
+  PASS  1.5 summary_sha256 is 64 lowercase hex
+  PASS  1.6 the child sha256 is reported
+
+2. Fail-closed refusals
+  PASS  2.1 a wrong expected sha256 fails 1.1
+  PASS  2.1a a missing expected sha256 fails closed (never PASS by default)
+  PASS  2.2 kind != deployment fails 2.2
+  PASS  2.3 target != afldb_test fails 2.3
+  PASS  2.4 a tampered parent_sha256 fails 2.5
+  PASS  2.5 an accepted mapping absent from the v3 parent fails 4.1
+  PASS  2.6 a duplicate AFL Tables identity fails the schema gate 3.1
+  PASS  2.7 a duplicate DraftGuru person fails the schema gate 3.1
+  PASS  2.8 a withheld person outside the v3 parent population fails 4.4
+  PASS  2.9 a counts drift fails 3.3
+  PASS  2.10 a wrong-href-rejected person (fixture Craig-Somerville analogue) re-entering as accepted fails 4.1 (absent from the v3 parent's bridges) and 5.11
+  PASS  2.11 one of the two parent-evidence transitions missing fails 5.4 and 5.9
+  PASS  2.12 an unexpected third newly-accepted person (also: one of the deferred-rollover rows unexpectedly accepted) fails 5.4 and 5.9
+  PASS  2.13 a corrected identity changed back to its captured/wrong path fails 4.1 and 5.8
+  PASS  2.14 a DSN in the child fails 7.1
+  PASS  2.15 CRLF bytes fail 7.2 and the canonical-bytes check 7.3
+  PASS  2.16 a missing pinned input (the classification artefact) fails 1.2 without raising
+  PASS  2.17 a reconciliation manifest whose diff_report.sha256 drifts from the real diff CSV fails 5.13
+  PASS  2.18 a provenance that is not the v3 parent's verbatim fails 2.8
+  PASS  2.19 an unsorted bridges[] fails 3.6
+  PASS  2.20 an extra top-level key fails 1.4
+  PASS  2.21 a child that is not a JSON object fails 1.3 without raising
+  PASS  2.22 a registration count drift fails 6.1
+  PASS  2.23 a malformed measured_at fails 6.2
+  PASS  2.24 a v3 parent whose withheld[] no longer matches the v2 parent's fails 4.6
+  PASS  2.25 a duplicate player_url in the classification artefact fails 5.6
+  PASS  2.26 a duplicate player_url in the operator-decision artefact fails 5.7
+  PASS  2.27 a stale/wrong source_adjudication_pack.sha256 fails 5.7 even though rows_sha256 and every semantic row are untouched and still correct (whole-file sha256 and rows_sha256 are complementary invariants, never alternatives)
+
+3. Read-only and repeatable
+  PASS  3.1 two runs over identical inputs produce an identical summary_sha256
+  PASS  3.1a the repeated runs are the clean lineage (the digest compared is a PASS digest)
+  PASS  3.1b the same lineage in a different temporary root yields the same summary_sha256 (no absolute path enters the digest)
+  PASS  3.1c a FAILING run is equally repeatable (failure details carry no clock, temp path or unordered input either)
+  PASS  3.2 validation writes nothing (fixture tree byte-identical before and after)
+AFLDB-ISSUE-227 v3 deployment-child validation (tools/rebuild/draftguru/validate_person_bridge_child_v3.py 1.0.0) -- read-only
+
+1. Bytes and pinned lineage
+  PASS  3.3 the CLI refuses a missing child with exit status 1
+AFLDB-ISSUE-227 v3 deployment-child validation (tools/rebuild/draftguru/validate_person_bridge_child_v3.py 1.0.0) -- read-only
+
+1. Bytes and pinned lineage
+  PASS  3.4 the CLI exits 1 when the default lineage is validated at a root that lacks it
+
+4. No database / network / import code path
+  PASS  4.1 the validator imports no database, network, subprocess, GUI, importer or exporter module
+  PASS  4.2 the validator reads no environment variable
+  PASS  4.3 the validator exposes no write path
+  PASS  4.4 the validator is a wholly separate module from the frozen v1 -> v2 validator (no import of it, and its own TOOL_VERSION/pinned lineage are its own)
+
+5. Pinned v3 lineage constants
+  PASS  5.1 the default child is the v3 afldb_test deployment child
+  PASS  5.2 the expected child sha256 is the independently-computed value
+  PASS  5.3 the pinned v2 parent, v2 child, classification, decisions, v3 parent, reconciliation and diff hashes are the independently-computed ones
+  PASS  5.4 the expected v3 transition is 3,470 accepted / 1,587 withheld over 5,057, 3,468 carry-forward, 2 corrected, 0 removed, 92 remaining target_not_registered, 13,275 registered
+  PASS  5.5 the two corrections are Dean Laidley and Matthew Capuano with their AFL Tables identities and evidence IDs
+  PASS  5.6 the two preserved wrong-href removals are Craig Somerville and David Sullivan
+  PASS  5.7 the validator declares no output path at all
+
+6. Real repository lineage
+  PASS  6.1 the real committed v2 -> v3 lineage validates with zero failures
+  PASS  6.2 the real lineage's summary_sha256 is the independently-established digest
+  PASS  6.3 the CLI exits 0 on the real committed lineage
+
+All ISSUE-224 v3 child-validation contract checks hold.

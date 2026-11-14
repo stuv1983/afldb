@@ -1,0 +1,86 @@
+
+1. Clean machine review on the fixture lineage
+  PASS  1.1 exactly n rows, in sample order, ordinals 1..n, stratum 'validation'
+  PASS  1.2 every row carries the sample's person, parent identity, child status and selection key
+  PASS  1.3 bridged rows reach offline_strong; the unregistered row is target_unregistered with deployment_status target_not_registered, identity_evaluable False and no retained facts
+  PASS  1.4 totals reconcile: 3 strong, 1 unregistered, completed 4, identity_evaluable 3, deployment {3, 1}, 0 contradictions, 0 not-terminal
+  PASS  1.5 rows_sha256 is the sha256 of the canonical rows and is recorded
+  PASS  1.6 generated_utc is frozen to the sample's (the child's) in all three JSON outputs
+  PASS  1.7 the header is hash-linked to the sample JSON/CSV, its rows_sha256, the child and the child validation summary reproduced independently
+  PASS  1.8 every frozen tool source is recorded with its current hash, including the v1 review tool
+  PASS  1.9 the CSV carries the v1 columns byte-for-byte as review_person_bridge_offline.write_csv renders them, plus deployment_status, identity_evaluable and selection_key; LF only
+  PASS  1.10 the recheck queue lists the unregistered row in class 3, the clean strong rows as the audit under salt AFLDB-ISSUE-222/audit-v2 (independent ordering), is hash-linked to the verdicts artefact and records 1 mandatory row
+  PASS  1.11 the residual report carries the unregistered row and no contradiction, hash-linked
+  PASS  1.12 no absolute path, DSN or credential appears in any output
+  PASS  1.13 a second review reproduces all four outputs byte-for-byte
+  PASS  1.14 operator_verdict is null in every machine row; verdict storage is the separate artefact
+  PASS  1.15 the acceptance rule block states the failure definition, the target_not_registered treatment and the bound statement
+
+2. Observed failures are surfaced
+  PASS  2.1 a birth-year conflict yields offline_contradict, counted, queued in class 1 and listed in the residual report
+  PASS  2.2 a registered identity without retained rows yields offline_unavailable, counted as not-terminal and queued in class 4
+  PASS  2.3 an unexpected href shape yields tooling_or_schema_error and is queued in class 5
+
+3. Fail-closed refusals
+  PASS  3.1 a wrong sample hash is refused before anything is computed
+  PASS  3.2 sample rows that no longer reproduce rows_sha256 are refused
+  PASS  3.3 a salt other than the expected one is refused
+  PASS  3.4 a row count other than the expected n is refused
+  PASS  3.5 a sample identity that disagrees with the v2 parent is refused (lineage)
+  PASS  3.6 a recorded non-zero overlap is refused
+  PASS  3.7 a child that fails validation refuses the review (the gate)
+  PASS  3.8 an audit salt containing '|' is refused
+  PASS  3.9 a tool hash that no longer matches the sample's frozen hash is refused
+  PASS  3.10 a child validation summary_sha256 other than the pinned one is refused
+
+4. Output lifecycle (validate-only writes nothing; write never overwrites)
+  PASS  4.1 validate-only exits 0, writes nothing and reports all four outputs absent
+  PASS  4.2 write exits 0 and creates all four outputs with the computed bytes
+  PASS  4.3 a second write exits 0 and reports every output identical
+  PASS  4.4 write refuses when an existing output differs and touches nothing
+  PASS  4.5 validate-only exits 1 when an existing output differs
+
+5. No database / network / import code path; reuse of the v1 rules
+  PASS  5.1 the review tool imports no database, network, subprocess, GUI, importer or exporter module
+  PASS  5.2 the review tool reads no environment variable
+  PASS  5.1 the final validator imports no database, network, subprocess, GUI, importer or exporter module
+  PASS  5.2 the final validator reads no environment variable
+  PASS  5.3 the review tool defines none of the v1 rules itself (evaluate_row, build_fitzroy_index, build_recheck_queue, build_residual_report are imported from review_person_bridge_offline)
+  PASS  5.4 the review tool freezes the v1 review tool's hash and never writes it
+  PASS  5.5 the final validator exposes no write path
+  PASS  5.6 the review outputs live under bridge-validation-* names, never the v1 bridge-review-* names
+
+6. Final validator and acceptance
+  PASS  6.1 with no operator artefact every structural check passes, acceptance is NOT granted, the decision is 'pending' and the exit status is 2
+  PASS  6.2 the structural sections all contributed checks (1-7)
+  PASS  6.3 with every mandatory and audit row 'agree', acceptance is ACCEPTED with exit 0, 0 failures, and the bound stated at n and at the identity-evaluable count
+  PASS  6.4 the acceptance statement uses the O-4 revision 2 wording and names the comparison target
+  PASS  6.5 an audit row adjudicated 'contradict' (with notes and evidence) blocks acceptance as a genuine contradiction and an unconfirmed audit row
+  PASS  6.6 an 'undetermined' verdict blocks acceptance (not a pass; escalated, never redrawn)
+  PASS  6.7 a 'contradict' without notes and evidence fails check 6.4
+  PASS  6.8 a required row left without a verdict is pending, not accepted, exit 2
+  PASS  6.9 a row added to the operator artefact fails 6.3 (and 6.4 for a person outside the sample)
+  PASS  6.10 an operator artefact not hash-linked to this recheck queue fails 6.2
+  PASS  6.11 an edited machine outcome inside the operator artefact fails 6.4
+  PASS  6.12 reordered rows fail the order check 3.2 and the rows_sha256 check 3.7
+  PASS  6.13 a removed row fails 3.1
+  PASS  6.14 tampered totals fail 4.1
+  PASS  6.15 a recorded tool hash that no longer matches its source fails 2.5 (a drift voids the review)
+  PASS  6.16 an operator verdict inside the machine artefact fails 3.6
+  PASS  6.17 a header not hash-linked to the pinned sample fails 2.2
+  PASS  6.18 a wrong pinned sample hash fails 1.1 and stops
+  PASS  6.19 a machine contradiction is surfaced (7.1) and, without an operator verdict, acceptance is pending with the contradiction listed in the recheck queue
+  PASS  6.20 a machine offline_contradict the operator resolves to 'agree' with evidence is not genuine: ACCEPTED
+  PASS  6.21 a machine offline_contradict the operator confirms is genuine: NOT ACCEPTED
+  PASS  6.22 an offline_unavailable row blocks acceptance even when every operator verdict is 'agree' (rerun required, never excluded)
+  PASS  6.23 --require-per-row-operator-verdicts counts every sample row as required
+  PASS  6.24 validation writes nothing and two runs produce an identical summary_sha256
+
+7. Pinned real Phase F constants
+  PASS  7.1 the review pins the operator-reported sample JSON/CSV hashes and rows_sha256
+  PASS  7.2 the review pins the validated child and its summary_sha256
+  PASS  7.3 the expected sample is n = 598, salt AFLDB-ISSUE-222/v2, 582 bridged + 16 target_not_registered
+  PASS  7.4 the retained-evidence inputs are pinned to the hashes the v1 review recorded
+  PASS  7.5 no output path is a pinned input path
+
+All DraftGuru Phase F review checks hold.

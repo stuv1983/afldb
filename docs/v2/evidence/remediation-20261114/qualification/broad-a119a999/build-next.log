@@ -1,0 +1,27 @@
+isolated-pg: afldb_v2_remint_build_test verified (cluster afldb_v2_isolated, 127.0.0.1:55630); running env
+▲ Next.js 16.3.1 (webpack)
+✓ Running next.config.ts took 176ms
+
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead.
+
+  To migrate automatically, run:
+  npx @next/codemod@canary middleware-to-proxy .
+
+  Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+  Creating an optimized production build ...
+Failed to compile.
+
+src/app/layout.tsx
+An error occurred in `next/font`.
+
+TypeError: Cannot read properties of null (reading '1')
+    at /mnt/ssd/afldb-rem-int-20261114/cand/node_modules/next/dist/compiled/@next/font/dist/google/loader.js:122:78
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async Promise.all (index 2)
+    at async nextFontGoogleFontLoader (/mnt/ssd/afldb-rem-int-20261114/cand/node_modules/next/dist/compiled/@next/font/dist/google/loader.js:104:33)
+    at async Span.traceAsyncFn (/mnt/ssd/afldb-rem-int-20261114/cand/node_modules/next/dist/trace/trace.js:164:20)
+    at async /mnt/ssd/afldb-rem-int-20261114/cand/node_modules/next/dist/build/webpack/loaders/next-font-loader/index.js:90:87
+    at async Span.traceAsyncFn (/mnt/ssd/afldb-rem-int-20261114/cand/node_modules/next/dist/trace/trace.js:164:20)
+
+
+> Build failed because of webpack errors

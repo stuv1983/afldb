@@ -1,0 +1,22 @@
+isolated-pg: afldb_v2_remint2_admindraft_test verified (cluster afldb_v2_isolated, 127.0.0.1:55630); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem-int-20261114/cand
+
+ ✓ tests/integration/admin-draft.test.ts (53 tests) 6852ms
+     ✓ re-creates the manual player and selection with the same tokens, and no twin  908ms
+     ✓ replays a corrected year and club onto the manual row  479ms
+     ✓ binds the token onto the path-player instead of creating a twin, after a debut  487ms
+     ✓ refuses to commit a replay whose durable record cannot be resolved  321ms
+     ✓ finds a manual player awaiting identity with the REAL candidate query, and refuses  722ms
+     ✓ draft_pick_key names a source row and a manual row, and skips a NULL-source one  571ms
+ ✓ tests/integration/admin-special-records.test.ts (43 tests) 4467ms
+     ✓ createFirstKickGoal does not complete while the line-up row is locked FOR UPDATE, then succeeds  1571ms
+ ✓ tests/integration/match-admin-delete.test.ts (7 tests) 2332ms
+     ✓ AFLDB-ISSUE-181: refuses deletion, names the AFL API lineup dependency, and changes nothing  408ms
+
+ Test Files  3 passed (3)
+      Tests  103 passed (103)
+   Start at  13:24:25
+   Duration  16.80s (transform 1.71s, setup 304ms, import 2.13s, tests 13.65s, environment 1ms)
+
+JSON report written to /mnt/ssd/afldb-rem-int-20261114/evidence/iso2-3aa82166/admindraft.json

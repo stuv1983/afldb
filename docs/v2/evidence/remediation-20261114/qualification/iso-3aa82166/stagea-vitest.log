@@ -1,0 +1,219 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem-int-20261114/cand
+
+ ❯ tests/draftguru-acquisition.test.ts (167 tests | 2 failed | 1 skipped) 26150ms
+     ✓ pins the canonical player_url form settled by U1 (absolute https, no trailing slash, ordinal preserved) 5ms
+     ✓ constructs annual URLs from the single base constant 1ms
+     ✓ pins exactly the 42 expected years 4ms
+     ✓ records 1983-1985 as intentional coverage gaps, not failures 2ms
+     ✓ pins the three CSV schema variants and the live Trade-column rule 2ms
+     ✓ declares the frozen CSV artifact as a non-importable parity oracle 1ms
+     ✓ pins the parity baseline and respectful HTTP policy 1ms
+     ✓ have zero legacy-database and zero application-database dependency 2ms
+     ✓ performs no destructive filesystem or data operation anywhere 2ms
+     ✓ implements the §4 respectful-HTTP contract 1ms
+     ✓ writes the manifest LAST, refuses partials, and treats labels as immutable 1ms
+     ✓ extracts verbatim hrefs and canonicalises to the U1 stored form 104ms
+     ✓ preserves the ordinal exactly (gary_ablett/2 never collapses to /1 or slug-only) 101ms
+     ✓ keeps the two Brad Millers distinct (the canonical identity regression) 98ms
+     ✓ canonicalisation is idempotent and rejects trailing slashes and foreign hosts  431ms
+     ✓ accepts the 14-column variant A shape (1981: no Draft, no Trade) 100ms
+     ✓ fails closed on an unknown header (schema drift) 94ms
+     ✓ treats blank as absence: null selection numbers, parity-only career figures, absent Trade 96ms
+     ✓ separates text nodes across <br> in Pick and Signing cells (live 2001 structure) 89ms
+     ✓ never modifies raw/ bytes and counts encoding artefacts instead of repairing them 96ms
+     ✓ --validate-only writes nothing 93ms
+     ✓ --require-complete refuses a partial snapshot 88ms
+     ✓ refuses the frozen browser-export CSV label outright 86ms
+     ✓ reconciles the 2001 fixture against its browser-export shape 95ms
+     ✓ fails on an unexplained population difference 97ms
+     ✓ reconciles the four damaged CSV names without altering the live values 101ms
+     ✓ still fails when a CSV name differs by more than the known damage 93ms
+     ✓ still fails on an unrelated name difference among the damaged rows 94ms
+     ✓ aborts on an existing manifest label before touching anything 129ms
+     ✓ rejects labels outside the pinned pattern (the frozen CSV path is unreachable) 121ms
+     ✓ never requests the intentional 1983-1985 coverage gaps 121ms
+     ✓ keeps raw snapshots gitignored while manifests stay tracked 1ms
+     ✓ the retrospective CSV manifest refuses identity/import without opening a file 1ms
+     ↓ the frozen CSV corpus itself is intact (42 files, expected years)
+     ✓ is additive — every Stage A key it depends on is unchanged 0ms
+     ✓ pins the Stage B1 snapshot label shape and refuses Stage A labels outright 1ms
+     ✓ declares a profiling-only manifest: identity_complete and import_capable are false 0ms
+     ✓ pins the frozen 120-person sample shape 1ms
+     ✓ recognises the AFL Tables vocabulary and keeps the www host a FINDING 1ms
+     ✓ inherits the settled Stage A HTTP policy unchanged 1ms
+     ✓ pins terminal-classification and resume semantics 0ms
+     ✓ acquisition and profiler carry zero legacy-store and zero application-database dependency 2ms
+     ✓ no Stage B1 tool imports a database driver or a legacy embedded store 1ms
+     ✓ the sample freezer and the profiler import no network module at all 1ms
+     ✓ performs no destructive filesystem or data operation anywhere 2ms
+     ✓ mirrors normalise_profile_url() exactly — a www host does not reduce 1ms
+     ✓ the adapter writes the manifest LAST, after profiling and the terminal-count gate 1ms
+     ✓ pins resume semantics: terminal states are reused, never silently retried 1ms
+     ✓ keeps a filename from ever becoming identity 1ms
+     ✓ freezes exactly 120 persons as 8 / 68 / 30 / 14, one primary cohort each 127ms
+     ✓ carries all eight convergence persons and both ordinals of every pair 104ms
+     ✓ is deterministic: a rebuild is byte-identical and --validate-only proves it  311ms
+     ✓ records the residual input evidence verbatim (lines, bytes, sha256) 103ms
+     ✓ tolerates CRLF from the query output and nothing else 193ms
+     ✓ refuses a residual input that is short, blank-padded, duplicated or foreign  361ms
+     ✓ fails closed when the residual input hash or size drifts 186ms
+     ✓ round-trips percent-encoded identities without ever decoding them 106ms
+     ✓ refuses a Stage A label and writes nothing 87ms
+     ✓ aborts on an existing manifest label before touching anything 237ms
+     ✓ refuses a Stage A label 130ms
+     ✓ plans acquisition deterministically by slug then ordinal, with storage-only names 231ms
+     ✓ refuses a probe target that is not in the frozen sample 233ms
+     ✓ extracts an AFL Tables identity from the href alone and reduces it canonically 221ms
+     ✓ treats a www host that does not reduce as a FINDING, never a silent repair 216ms
+     ✓ classifies a page with no AFL Tables link, and never infers identity from a name 214ms
+     ✓ refuses to choose between multiple AFL Tables candidates on one page 212ms
+     ✓ reports a two-persons-one-profile collision as a finding, never a merge 216ms
+     ✓ answers the convergence-pair question per pair 218ms
+     ✓ keeps a terminal failure profiled as a missing page, not as an absent link 211ms
+     ✓ declares itself profiling-only in the aggregate output 209ms
+     ✓ refuses to profile an incomplete experiment as complete 297ms
+     ✓ captures a single person-page Wikipedia href verbatim, additively to the general vocabulary stream 209ms
+     ✓ records absence honestly -- no Wikipedia href on the page means null, never invented 219ms
+     ✓ refuses to choose between multiple distinct Wikipedia candidates on one page 209ms
+     ✓ captures an unrelated Wikipedia link verbatim -- relevance is never judged or fetched 212ms
+     ✓ deduplicates the identical href linked twice -- not ambiguous 211ms
+     ✓ reports Wikipedia coverage in the aggregate, separately from AFL Tables coverage 206ms
+     ✓ completes with fetched + failed = 120 (failed > 0) and writes the manifest LAST  399ms
+     ✓ writes NO manifest when fetched + failed < 120 293ms
+     ✓ reuses terminal successes and terminal failures byte-for-byte on resume  399ms
+     ✓ probe mode acquires nothing beyond its targets and writes no manifest  307ms
+     ✓ maps every stored filename back to its exact player_url  422ms
+     × rebuilds byte-identically from the accepted Stage A snapshot 42ms
+     × is the frozen 120 / 8 / 68 / 30 / 14 contract over the accepted Stage A label 2ms
+     ✓ can never publish an importable Stage B1 manifest 1ms
+     ✓ are labelled real-source, carry provenance, and stay distinct from synthetic ones 1ms
+     ✓ pin the observed structure exactly: h2 heading, no h1, one href on /1 and none on /2 2ms
+     ✓ extracts the one real AFL Tables identity from the href, not from the name 209ms
+     ✓ reads the real display name from <h2> with no <h1>, as evidence only 212ms
+     ✓ classifies the real /2 page as no_afltables_link despite its statistics tables 208ms
+     ✓ records Footywire and Wikipedia as vocabulary only, never as identity 211ms
+     ✓ answers the real convergence pair honestly: one bridge, one absence, no collision 211ms
+     ✓ are faithful excerpts of the acquired bytes (local snapshot only) 1ms
+     ✓ reconciles to the accepted Stage A population exactly 1ms
+     ✓ classifies every observed Stage A label, with nothing left over 79ms
+     ✓ treats the missing Draft column as null, never as a sentinel string 59ms
+     ✓ maps the absent Draft column to National Draft/national 0ms
+     ✓ keeps the label byte-exact: no trimming, folding or case collapse 61ms
+     ✓ fails closed on an unseen label rather than deriving a kind for it 0ms
+     ✓ cannot be replaced by a mechanical draft_type -> draft_kind rule 1ms
+     ✓ collapses National and National Draft onto one kind, and only those two 1ms
+     ✓ keeps the mapping's draft_type vocabulary set-equal to GRID_DRAFT_TYPES/LEGACY_DRAFT_TYPE_LABELS 4ms
+     ✓ keeps the signing head vocabulary set-equal to GRID_SIGNING_KINDS 2ms
+     ✓ reproduces every derivable signing_kind from Stage A by the frozen head rule 61ms
+     ✓ does not pretend signing_detail is settled 1ms
+     ✓ resolves by exact slug equality and needs no new mapping table 1ms
+     ✓ reconciles to the accepted Stage A population exactly 1ms
+     ✓ declares exactly one deliberate NULL, and it is brisbane 1ms
+     ✓ cannot resolve brisbane through any other clubs.json field either 1ms
+     ✓ forbids every fallback mechanism by name 1ms
+     ✓ keeps the modernised labels mapped as-is, never era-rewritten 2ms
+     ✓ fails closed on an unknown slug, as a bare machine token 0ms
+     ✓ matches the real Stage A club population 67ms
+     ✓ exporter issues no write statement of any kind 2ms
+     ✓ exporter keeps the mandatory safety envelope 1ms
+     ✓ exporter pins the expected population and distribution as hard gates 0ms
+     ✓ exporter treats the Stage B1 oracle as opt-in, never a default source 0ms
+     ✓ exporter proves the B1 evidence is the accepted snapshot, not a local file 1ms
+     ✓ exporter admits a B1 bridge only under the full §14 contract 0ms
+     ✓ exporter caps the reviewed promotion at exactly one decision 0ms
+     ✓ has the frozen schema shape 1ms
+     ✓ carries exactly six decisions on six distinct persons 1ms
+     ✓ is 5 linked + 1 confirmed_unlinked, distributed 3 afltables / 2 draftguru / 1 null 1ms
+     ✓ uses only the settled decision and source vocabulary 1ms
+     ✓ keeps each target identity in its canonical form 1ms
+     ✓ carries no surrogate id and no private or seed metadata 4ms
+     ✓ is deterministically ordered by the durable key 1ms
+     ✓ records provenance only where an identity did not come from external_identities 0ms
+     ✓ declares the whole-population rule and reuses the Stage B1 label pattern 1ms
+     ✓ pins the crawl-failure ceiling and concentration triggers (runbook §2.6) 0ms
+     ✓ restates the profiler's admissibility flags by name, exhaustively 0ms
+     ✓ declares the bridge dataset schema as additive to load_bridge()'s schema_version 1 0ms
+     ✓ never declares identity_complete/import_capable true for the raw snapshot itself 0ms
+     ✓ carries zero legacy-store, zero application-database and zero network dependency 1ms
+     ✓ performs no destructive filesystem or data operation anywhere 1ms
+     ✓ the exporter self-validates every dataset it writes against the load_bridge() schema 0ms
+     ✓ the exporter opens no database connection outside --resolve-against 1ms
+     ✓ selects the WHOLE Stage A population as one 'population' cohort 98ms
+     ✓ refuses to write under the accepted Stage B1 label 79ms
+     ✓ is deterministic: a rebuild is byte-identical and --validate-only proves it 273ms
+     ✓ tags reported-zero-games persons descriptively, never as a selection criterion 101ms
+     ✓ aggregates a fully-fetched population snapshot without crashing (KeyError regression)  424ms
+     ✓ records Stage B3's own provenance in sample_basis, never Stage B1's residual_input  420ms
+     ✓ computes the O-3 crawl_failure_ceiling and failure_concentration fields for a real B3 run  424ms
+     ✓ profile_person_pages.py run standalone against a B3 sample also stages itself correctly  316ms
+     ✓ classifies every admissibility outcome by name, matching the contract 88ms
+     ✓ refuses an unacknowledged collision and writes nothing 89ms
+     ✓ withholds BOTH sides of an acknowledged collision -- never a merge 88ms
+     ✓ refuses when the profiling output does not match the tracked manifest sha256 86ms
+     ✓ every output round-trips through the local load_bridge()-shape self-check 87ms
+     ✓ puts every bridged national top-10 person in the census stratum, exhaustively 175ms
+     ✓ the random stratum is deterministic for one salt and n truncates it 267ms
+     ✓ orders the random stratum by the pinned sha256(salt + "|" + player_url) digest 300ms
+     ✓ --review-sample rejects a deployment child (kind: "deployment") as input 179ms
+     ✓ REGISTRATION_SQL filters on the importer's own match_method, not just the source 1ms
+     ✓ admissibility_reason withholds a record whose identity count is not exactly 1, even when afltables_identity is non-null (contract canonical_required, both conjuncts) 86ms
+     ✓ admits a record carrying every real person_profile.jsonl key, not just the minimal fixture shape 86ms
+     ✓ duplicate-row registration, target_ambiguous/target_not_registered and agreeing human-decision bridge exclusion all hold on the real functions 281ms
+     ✓ every outcome, name-variant table, club-overlap gating, games/birth-year rules, deterministic audit selection, refusals and the no-network/no-database guarantee all hold on the real tool  549ms
+     ✓ pack validation, checkpoint/lock/finalisation, the event-club appearance relationship derivation, its acknowledgement gate, identity-verdict independence and checkpoint schema migration all hold on the real tool  1547ms
+     ✓ lineage hash chain, schema/partition, parent containment, the exact v1 -> v2 transition, fail-closed refusals and the read-only/no-database guarantee all hold on the real tool  422ms
+     ✓ frame derivation, salted ordering, disjointness, the child-validation gate, refusals and the output lifecycle all hold on the real tool  320ms
+     ✓ sample-order review, identity/deployment separation, failure surfacing, refusals, the output lifecycle, the operator-verdict link and the acceptance rule all hold on the real tools  1390ms
+     ✓ queue deduplication, navigation, filters, checkpoint/resume, verdict contract, evidence links, finalisation gating and deterministic rendering all hold on the real tool  410ms
+     ✓ DSN guard, read-only discipline, hash pins, classification refusals, verify checks and the no-artefact guarantee all hold on the real tool  6191ms
+     ✓ reads only AFLDB_TEST_DATABASE_URL, forces read-only, refuses non-SELECT, never prints a DSN 2ms
+     ✓ models the link-only write set without weakening 6.4 / 6.6 / 6.7 or the target guards 2ms
+ ✓ tests/draftguru-import.test.ts (51 tests) 27277ms
+     ✓ rolls back on failure and commits data + status once (scripted connection)  794ms
+     ✓ write set, no-Stage-A, child partition, preconditions, authority, CLI, atomicity and the gate's link-only plan/verify all hold on the real tools  648ms
+     ✓ validates the whole input set without a database  5223ms
+     ✓ accepts a well-formed synthetic bridge dataset  5132ms
+     ✓ refuses a bridge that binds one AFL Tables identity to two persons  5065ms
+     ✓ refuses a bridge whose identity is not the canonical profile form  5169ms
+     ✓ refuses a bridge keyed on a non-canonical player_url  4974ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/draftguru-acquisition.test.ts > frozen Stage B1 sample (local snapshot) > rebuilds byte-identically from the accepted Stage A snapshot
+AssertionError: Required frozen sample is missing: /mnt/ssd/afldb-rem-int-20261114/cand/data/sources/draftguru/person-html-20260826/sample.json: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ tests/draftguru-acquisition.test.ts:1757:92
+    1755|   itFrozen("rebuilds byte-identically from the accepted Stage A snapsh…
+    1756|     expect(canSpawn, 'Required frozen-sample verification needs AFLDB_…
+    1757|     expect(existsSync(frozenSample), `Required frozen sample is missin…
+       |                                                                                            ^
+    1758|     const run = runSampleTool(["--label", "person-html-20260826", "--v…
+    1759|     expect(run.status).toBe(0);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  tests/draftguru-acquisition.test.ts > frozen Stage B1 sample (local snapshot) > is the frozen 120 / 8 / 68 / 30 / 14 contract over the accepted Stage A label
+Error: ENOENT: no such file or directory, open '/mnt/ssd/afldb-rem-int-20261114/cand/data/sources/draftguru/person-html-20260826/sample.json'
+ ❯ tests/draftguru-acquisition.test.ts:1764:31
+    1762|
+    1763|   itFrozen("is the frozen 120 / 8 / 68 / 30 / 14 contract over the acc…
+    1764|     const sample = JSON.parse(readFileSync(frozenSample, "utf8"));
+       |                               ^
+    1765|     expect(sample.counts.total).toBe(120);
+    1766|     expect(sample.counts.by_primary_cohort).toEqual({
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  2 failed | 215 passed | 1 skipped (218)
+   Start at  13:12:39
+   Duration  55.71s (transform 365ms, setup 237ms, import 1.27s, tests 53.43s, environment 1ms)
+

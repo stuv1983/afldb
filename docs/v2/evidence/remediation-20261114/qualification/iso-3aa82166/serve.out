@@ -1,0 +1,23 @@
+BUILD_ID=GciqAlQ-EN8HR4V6tU-aP home=200
+HTTP/1.1 200 OK
+node:internal/modules/run_main:123
+    triggerUncaughtException(
+    ^
+
+page.goto: Timeout 30000ms exceeded.
+Call log:
+  - navigating to "http://127.0.0.1:3170/search?q=which%20club%20has%20the%20most%20wins", waiting until "networkidle"
+
+    at /mnt/ssd/afldb-rem-int-20261114/cand/.orch-shoot.mjs:54:23 {
+  log: [
+    '  - navigating to "http://127.0.0.1:3170/search?q=which%20club%20has%20the%20most%20wins", waiting until "networkidle"'
+  ],
+  name: 'TimeoutError'
+}
+
+Node.js v22.23.2
+shoot rc=1
+/sitemap.xml 404 text/plain e3ebaa16dd9d9b9f
+/sitemap-index.xml 404 text/plain e3ebaa16dd9d9b9f
+/robots.txt 200 text/plain d17b641665bc0d4e
+server stopped

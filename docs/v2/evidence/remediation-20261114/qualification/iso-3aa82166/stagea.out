@@ -1,0 +1,34 @@
+snapshot path is gitignored
+copy identical: 90 files, manifest ceea2d344aa5eb88
+vitest rc=1
+     ↓ the frozen CSV corpus itself is intact (42 files, expected years)
+     ✓ is additive — every Stage A key it depends on is unchanged 0ms
+     ✓ pins the Stage B1 snapshot label shape and refuses Stage A labels outright 1ms
+     ✓ inherits the settled Stage A HTTP policy unchanged 1ms
+     ✓ refuses a Stage A label and writes nothing 87ms
+     ✓ refuses a Stage A label 130ms
+     × rebuilds byte-identically from the accepted Stage A snapshot 42ms
+     × is the frozen 120 / 8 / 68 / 30 / 14 contract over the accepted Stage A label 2ms
+     ✓ reconciles to the accepted Stage A population exactly 1ms
+     ✓ classifies every observed Stage A label, with nothing left over 79ms
+     ✓ reproduces every derivable signing_kind from Stage A by the frozen head rule 61ms
+     ✓ reconciles to the accepted Stage A population exactly 1ms
+     ✓ matches the real Stage A club population 67ms
+     ✓ selects the WHOLE Stage A population as one 'population' cohort 98ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  1 failed | 1 passed (2)
+      Tests  2 failed | 215 passed | 1 skipped (218)
+draftguru_bridge_operator_review_contract.py rc=0 0 pass-lines 0 fail-lines
+draftguru_bridge_resolution_contract.py rc=0 0 pass-lines 0 fail-lines
+draftguru_bridge_v2_contract.py rc=0 0 pass-lines 0 fail-lines
+draftguru_child_validation_contract.py rc=0 0 pass-lines 1 fail-lines
+draftguru_child_validation_v3_contract.py rc=0 0 pass-lines 1 fail-lines
+draftguru_import_atomicity_contract.py rc=0 0 pass-lines 0 fail-lines
+draftguru_import_gate_contract.py rc=0 0 pass-lines 0 fail-lines
+draftguru_link_only_contract.py rc=0 0 pass-lines 0 fail-lines
+draftguru_offline_review_contract.py rc=0 0 pass-lines 0 fail-lines
+draftguru_population_scan_contract.py rc=0 0 pass-lines 0 fail-lines
+draftguru_validation_operator_contract.py rc=0 0 pass-lines 0 fail-lines
+draftguru_validation_review_contract.py rc=0 0 pass-lines 0 fail-lines
+draftguru_validation_sample_contract.py rc=0 0 pass-lines 0 fail-lines
+porcelain=0

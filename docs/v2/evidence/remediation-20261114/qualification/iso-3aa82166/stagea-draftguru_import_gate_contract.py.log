@@ -1,0 +1,160 @@
+
+1. Clean plan on the pre-import state
+  PASS  1.1 the plan holds (no failures)
+  PASS  1.2 newly linked is exactly the one non-decided bridge person
+  PASS  1.3 the ledger person in the bridge is already-agreeing human-linked
+  PASS  1.4 the three withheld persons are already-agreeing unlinked
+  PASS  1.5 authority: bridge 1, ledger 1, seeded 0
+  PASS  1.6 pick link changes belong to the newly linked person only
+  PASS  1.7 identity link changes are the newly linked person only
+  PASS  1.8 totals_after: 2 linked persons, 2 linked picks, vocabulary keys
+  PASS  1.9 only SELECT statements reached the connection
+  PASS  1.10 the transaction was rolled back once and the connection closed
+  PASS  1.11 the gate never toggles autocommit
+  PASS  1.12 import_batches_expected_after = before + 1 in the summary
+  PASS  1.12a the plan PRINTS import_batches_before and import_batches_expected_after
+  PASS  1.12b the printed values equal the summary's (same read-only snapshot)
+  PASS  1.12c both counters are inside the hashed summary payload
+  PASS  1.13 a second plan over the same state reproduces every hash and the summary_sha256
+  PASS  1.13a the second plan prints the same two batch counters
+  PASS  1.14 changes_sha256 covers exactly the one changing person
+
+2. Guards
+  PASS  2.1 legacy/default resolve_dsn() (no --target) for None: refused
+  PASS  2.2 the refusal never echoes the DSN or a password
+  PASS  2.2 the refusal never echoes the DSN or a password
+  PASS  2.2 the refusal never echoes the DSN or a password
+  PASS  2.1 legacy/default resolve_dsn() (no --target) for 'mysql://u:pw@h/afldb_test': refused
+  PASS  2.2 the refusal never echoes the DSN or a password
+
+2b. --target generalisation: explicit test, explicit dev, DSN separation, PROD refusal
+  PASS  2b.0 the default target is test, and dev is a separate, closed second entry
+  PASS  2b.0aa the target specification carries the physical database and the child's own deployment-target LABEL as SEPARATE fields, and they differ for dev
+  PASS  2b.0a test and dev read different environment variables (never the importer's write DSN)
+  PASS  2b.1 explicit --target test DSN guard for None: refused
+  PASS  2b.2 the refusal never echoes the DSN or a password
+  PASS  2b.2 the refusal never echoes the DSN or a password
+  PASS  2b.1 explicit --target dev DSN guard for None: refused
+  PASS  2b.2 the refusal never echoes the DSN or a password
+  PASS  2b.2 the refusal never echoes the DSN or a password
+  PASS  2b.2 the refusal never echoes the DSN or a password
+  PASS  2b.3 target 'prod' is refused before any DSN is read -- no PROD target exists
+  PASS  2b.3 target 'PROD' is refused before any DSN is read -- no PROD target exists
+  PASS  2b.3 target 'afldb_prod' is refused before any DSN is read -- no PROD target exists
+  PASS  2b.3 target '' is refused before any DSN is read -- no PROD target exists
+  PASS  2.3 a server that reports transaction_read_only=off is refused before any read
+  PASS  2.4 a server whose current_database() is not afldb_test is refused
+  PASS  2.5 the SELECT-only cursor refuses a write before it is sent
+  PASS  2.6 a commented, lower-case SELECT is still a SELECT
+  PASS  2.7 rollback and close happen even when the read-only assertion refuses
+  PASS  2.8 a child whose sha256 is not the pinned value is refused
+  PASS  2.9 the pinned child loads with its counts
+  PASS  2.10 a count that differs from the pinned expectation is refused
+  PASS  2.11 a parent the child's parent_sha256 does not name is refused
+  PASS  2.12 the parent map carries the withheld person's identity
+  PASS  2.13 a source-evidence parent passed as --bridge is refused
+
+3. Registration and authority refusals
+  PASS  3.1 an unregistered bridge target fails 4.1 and stops before the replay
+  PASS  3.2 a bridge target registered twice (ambiguous) fails 4.1
+  PASS  3.3 a target_not_registered identity that became registered fails 4.2 (stale child)
+  PASS  3.4 a bridge contradicting a human decision fails 5.1 with the importer's HALT message
+  PASS  3.5 a ledger decision that would mint a player shell fails 5.1 as seed_required
+  PASS  3.6 a live confirmed_unlinked decision on a bridged person HALTs the replay (5.1)
+  PASS  3.7 a live decision on a non-bridged person (clean, uniquely registered, non-rejected target) is honoured, warned, and not a refusal
+  PASS  3.9 a non-bridged live decision targeting a rejected identity's player is refused by 4.3 (the invariant holds even against human authority)
+  PASS  3.8 contradictory live decisions across one person's picks fail 2.4 (read_live_decisions HALT)
+
+4. Classification refusals
+  PASS  4.1 a person already linked to a different player is 'relinked' and fails 6.3
+  PASS  4.2 a stored link the import would drop is 'link_dropped' and fails 6.3
+  PASS  4.3 a snapshot person absent from the target is 'missing' and fails 6.1 and 3.1
+  PASS  4.4 a stored person the snapshot no longer carries is 'extra' and fails 6.1
+  PASS  4.5 a non-link person column that would change fails 6.4
+  PASS  4.6 a dg_person_id permutation fails 6.5
+  PASS  4.7 external_identities notes carrying another Stage A label fail 6.7 (unexpected state)
+  PASS  4.8 a non-link pick column that would change fails 6.6
+  PASS  4.9 the same change explained by an active source-owned override is expected (6.6 holds)
+  PASS  4.10 an active manual selection with no stored row (would be re-created) fails 6.10
+  PASS  4.11 two stored persons on one canonical player surface as dropped links (never silently kept)
+  PASS  4.12 a stored person reaching a rejected identity fails 4.3
+
+5. Verify
+  PASS  5.1 the post-import state verifies against the plan's four hashes and the PRINTED batch count
+  PASS  5.1a verify prints import_batches_before (now = printed plan value + 1) and no expected_after
+  PASS  5.2 verify reports 0 changes and the bridge-linked set equals the plan's
+  PASS  5.3 verify is read-only too: SELECT only, one rollback, closed
+  PASS  5.4 a rejected person that re-entered fails 4.3, 8.7 and the state hash
+  PASS  5.5 a withheld person linked by the bridge fails 8.5, 8.6 and 8.1
+  PASS  5.6 a bridge link stored as 'resolved' is outside the vocabulary (8.9) and provenance (8.4)
+  PASS  5.7 a changed unrelated-table digest fails 8.14 baseline_sha256 only
+  PASS  5.8 a running draftguru batch fails 8.10, 8.11, 8.12 and 8.13
+  PASS  5.9 a failed newest batch fails 8.10
+  PASS  5.10 a canonical player claimed by two persons fails 8.8
+  PASS  5.11 verify on the PRE-import state refuses (8.1, 8.4, 8.5, 8.12, 8.13)
+
+6. No artefact; CLI guards
+  PASS  6.1 neither mode writes a file to the working directory
+  PASS  6.2 missing DSN exits 2 with an ERROR line
+  PASS  6.3 a DSN for another database exits 2 and never prints the DSN
+
+7. --target dev: plan/verify parity with test, on the same frame
+  PASS  7.1 a DEV-target plan over the equivalent frame holds and reproduces the test-target hashes
+  PASS  7.2 the DEV plan's hashed summary records target_database=afldb_dev
+  PASS  7.3 the DEV plan is read-only too: SELECT only, one rollback, closed, no autocommit toggle
+  PASS  7.4 a second DEV plan over the same state reproduces the summary_sha256 deterministically
+  PASS  7.5 the DEV verify holds against the DEV plan's four hashes and batch count
+  PASS  7.6 the DEV verify's hashed summary also records target_database=afldb_dev
+  PASS  7.7 a server reporting afldb_test when required_database is afldb_dev is refused before any read
+  PASS  7.8 a server whose current_database() is the LABEL 'dev' is refused -- the DEV physical database guard remains exactly afldb_dev
+  PASS  7.9 the DEV target's current_database guard is the database name, not the child label
+
+8. Refusal of cross-target child artefacts (target LABEL, never the database name)
+  PASS  8.1 an afldb_test-labelled child is refused under the dev target label
+  PASS  8.2 the real DEV child shape (target='dev') loads cleanly under the dev target label
+  PASS  8.3 the reverse is also refused: a target='dev' child under the test target label
+  PASS  8.4 a child labelled with the PHYSICAL database name ('afldb_dev') is refused under the dev target -- the label is never the database name
+  PASS  8.5 the pinned afldb_test child is refused under --target dev by its BYTES even under a neutral filename
+  PASS  8.6 a .afldb_test.json name is refused under --target dev (DENY rule, file need not exist)
+  PASS  8.7 the same guard never fires on --target test (the default path is unchanged)
+
+8b. The real committed DEV child carries the exporter's real label
+  PASS  8b.1 the real DEV deployment child exists, hashes to the operator-reported sha256, and declares target='dev'
+  PASS  8b.2 load_child accepts the real DEV child under the dev target label
+  PASS  8b.3 the real DEV child is refused under the test target label
+  PASS  8b.4 the real afldb_test child still loads under the test target label with its pinned hash and counts, and declares target='afldb_test'
+  PASS  8b.5 every target's child_target is one of the exporter's own TARGET_DSN_ENV labels, and each label's exporter database equals this target's physical database
+
+9. CLI --target dev: mandatory --bridge, no silent afldb_test reuse, no PROD choice
+  PASS  9.1 --target dev with no --bridge and no AFLDB_DEV_DATABASE_URL exits ERROR before any DSN is read (never reaches open_read_only)
+  PASS  9.2 --target dev with AFLDB_DEV_DATABASE_URL set but still no --bridge still exits ERROR
+  PASS  9.3 --target dev with --bridge pointed at the afldb_test child is refused (must not silently reuse the afldb_test child)
+  PASS  9.4 --target prod does not exist as a choice
+  PASS  9.5 --target dev with the REAL committed DEV child is no longer refused on its target label (the exact fail-closed bug the DEV pre-import attempt hit)
+  PASS  9.6 that run passed every offline guard -- the real DEV child's pinned bytes, the v2 parent_sha256 chain and the Stage A snapshot -- and stopped only where it would open a connection
+
+10. --lineage: v2/v3 artefact-pair selection (AFLDB-ISSUE-227)
+  PASS  10.1 omitted --lineage (DEFAULT_LINEAGE) resolves identically to explicit --lineage v2 for both test and dev targets, including the resolved parent path/hash
+  PASS  10.2 --lineage v2 yields exactly the pre-existing historical child and parent values
+  PASS  10.3 --lineage v3 yields the v3 parent AND the v3 child together (asserted in one check so they cannot drift apart)
+  PASS  10.3b --lineage v3 under --target dev still leaves the three child fields None (a DEV deployment child is a live measurement, never a pinned artefact, in every lineage)
+  PASS  10.4 an unsupported lineage is refused both by effective_config (GateError, fail closed) and by argparse's own --lineage choices (exit 2)
+  PASS  10.5 resolving --lineage v3 does not mutate TARGETS -- the v2 test child hash is still pinned and DEV's three child fields are still None (F-101 regression guard against in-process leakage across repeated main() calls)
+  PASS  10.6 the target set is unchanged by lineages -- exactly {'dev', 'test'}, no PROD, and the literal string 'test-v3' appears in neither tool's source
+  PASS  10.7 no lineage value can reach a PROD target through effective_config
+  PASS  10.8 the pre-existing v2 afldb_test child BYTES DENY rule still fires under --target dev after lineages were added (adds alongside 8.5, does not weaken it)
+  PASS  10.9 the v3 afldb_test child is likewise refused under --target dev by its BYTES under a neutral filename (mirrors 8.5 for the new lineage)
+  PASS  10.10 the real committed v3 parent exists and hashes to the pinned v3 parent sha256
+  PASS  10.11 the real committed v3 test child exists, hashes to the pinned v3 child sha256, declares target='afldb_test', and names the pinned v3 parent by parent_sha256
+  PASS  10.12 load_child() accepts the real committed v3 test child under its pinned sha256 AND the full pinned v3 count set (3470 bridges, 1587 withheld, 1493 U-no-href, 92 target_not_registered, 2 different_person_wrong_href)
+  PASS  10.13 a v3 child count drift (bridges off by one from the pinned expectation) fails closed
+  PASS  10.14 the real v3 test child paired with the real v2 parent fails the parent_sha256 chain (the v3 child names the v3 parent, never the v2 one)
+
+10b. --lineage v3: main() CLI resolution proofs (AFLDB-ISSUE-227)
+  PASS  10.15 main() CLI: --target test --lineage v3 with no overrides resolves the committed v3 child path/sha and v3 parent path/sha (via the real load_child/load_parent_map calls), stopping only at the connection stub
+  PASS  10.16 main() CLI: an explicit --parent/--expect-parent-sha256 pointed at the v2 parent overrides the --lineage v3 default rather than being replaced after argument parsing -- proven by the cross-lineage parent_sha256 refusal this produces, which the v3 default parent would not have produced
+  PASS  10.17 main() CLI: an explicit --bridge/--expect-child-sha256 pointed at the v2 test child overrides the --lineage v3 default rather than being replaced after argument parsing -- proven by the resulting v3-expected-count mismatch against the v2 child's real counts, which loading the v3 child itself would not have produced
+  PASS  10.18 main() CLI: --target dev --lineage v3 with no --bridge still exits ERROR before any DSN or file is read -- a DEV deployment child is never a pinned artefact in any lineage
+  PASS  10.19 main() CLI: --target dev --lineage v3 resolves the v3 parent by default (not v2) -- a synthetic DEV-shaped child naming the v3 parent's sha256 passes load_parent_map and the run stops only at the connection stub, printing the v3 parent path
+
+All DraftGuru import-gate checks hold.

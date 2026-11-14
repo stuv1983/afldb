@@ -1,0 +1,64 @@
+isolated-pg: afldb_v2_remint_dataeditor_test verified (cluster afldb_v2_isolated, 127.0.0.1:55630); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem-int-20261114/cand
+
+stderr | tests/integration/data-editor.test.ts > Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) > (5) D-257-9: a save records the folded continuing_url identity and the replay resolves it back
+[ISSUE-257 F-S9-03 / D-257-9] SKIPPED: no tracked profile_url_continuity rule is collision-free in afldb_test (every rule has a path already held by an external_identities row), so a synthetic player cannot hold a rule's two paths without ambiguity. No real row is used or mutated.
+
+ ✓ tests/integration/data-editor.test.ts (63 tests | 1 skipped) 59058ms
+     ✓ propagates kicks correctly  571ms
+     ✓ persists the match-sheet mutation and its data_edits audit together  642ms
+     ✓ rolls the statistical mutation back when the required audit cannot be written  451ms
+     ✓ commits the production match-sheet and migration-066 audit path as afldb_import  503ms
+     ✓ inserts and updates a durable override atomically as afldb_import  301ms
+     ✓ writes dob, birth year, height, weight and notes into the record, audits each, and the replay re-creates them  786ms
+     ✓ a cleared value is an explicit null in the record, and the replay clears it  761ms
+     ✓ the guard does not turn a record that was already unreplayable into a block on every edit  717ms
+     ✓ the guard agrees with the real replay about which records it refuses  1708ms
+     ✓ refuses a stale sheet whole, before any write (a settle must never become authority)  403ms
+     ✓ refuses a save whose token is missing  367ms
+     ✓ rolls the row change back when the player has no durable identity  427ms
+     ✓ commits the row change and its authority together, reusing an existing identity key  451ms
+     ✓ deleteMatch refuses while active Match Sheet authority exists, and deletes nothing  409ms
+     ✓ returns ordinary field authority to source: record withdrawn, row untouched  417ms
+     ✓ a manual addition still unowned is withdrawn and its row deleted  475ms
+     ✓ a manual addition a settling source has since owned is withdrawn and the row kept  404ms
+     ✓ F-S7-01: a manual addition now owned by fitzroy_afldata is withdrawn and the row kept  442ms
+     ✓ F-S7-01: a manual addition owned by an unsupported source refuses, writing nothing  431ms
+     ✓ a manual removal is withdrawn with no canonical write; the next settle restores the row  401ms
+     ✓ refuses removing a player who holds Brownlow votes; an unvoted player of the same match (published zero) is removable  540ms
+     ✓ refuses removing a player named by the match's Brownlow vote entry, but not an unnamed player of that match  1246ms
+     ✓ refuses removing the player of a first-kick-goal record (a suppressed one too), naming where to clear it  914ms
+     ✓ refuses removing the kicker of an after-the-siren record  471ms
+     ✓ refuses a club change of a player carrying a vote, allows it for a free player, and allows a stat-only edit of the voted player  607ms
+     ✓ Return to source refuses the row deletion of a manual addition that a Brownlow vote names, changing nothing  442ms
+     ✓ does not revive a retired override, keeps its values in the audit trail, and audits carried keys of an active one  481ms
+     ✓ an assignment made through the real coach mutation blocks deletion; match, assignment, override and audit unchanged  492ms
+     ✓ an override retired through the real clear mutation does not block; the inactive record is kept  591ms
+     ✓ a source-only assignment (no override) keeps the existing behaviour: deleted, cascading the assignment  631ms
+     ✓ overrides naming another match do not block, including keys a prefix pattern would catch  561ms
+     ✓ (1) rolls the row change AND the authority back when the authority write fails (post-110)  507ms
+     ✓ (2a) replay re-applies a field correction over a reset source value  1021ms
+     ✓ (2b) replay recreates a durable addition the reload did not supply  1425ms
+     ✓ (2c) replay deletes a reinserted row under a durable removal  766ms
+     ✓ (3a) an active key whose match_key is absent from matches refuses before any write  1079ms
+     ✓ (3b) an active key whose identity names no accepted external identity refuses before any write  1108ms
+       ✓ BASIC LOCK TIMEOUT (no deadlock): refused at its 5 s bound, rolled back whole, every lock released  5607ms
+       ✓ SETTLE/ADMIN DEADLOCK (settle stood in for by a test transaction, settle is the victim): the writer is refused at its bound and the settle recovers on a retry  7139ms
+       ✓ BASIC LOCK TIMEOUT (no deadlock): refused at its 5 s bound, rolled back whole, every lock released  5647ms
+       ✓ SETTLE/ADMIN DEADLOCK (settle stood in for by a test transaction, settle is the victim): the writer is refused at its bound and the settle recovers on a retry  7211ms
+       ✓ first attempt raises 40P01, a later attempt succeeds: the outer transaction commits and the failed attempt's writes are gone  376ms
+       ✓ 40P01 on every attempt: four attempts, the error propagates, and the whole outer transaction rolls back  334ms
+     ✓ ISSUE-267: a one-field score edit keeps every unchanged component, and both final-period rows equal the corrected totals  755ms
+     ✓ ISSUE-269: an attendance edit and a partial score edit on one match both survive, with derived totals and final periods  809ms
+     ✓ equal-authority overrides that disagree are refused before any write  618ms
+     ✓ identical overlapping values merge; an inactive override contributes nothing  660ms
+     ✓ a score component neither the source nor the override records is refused, never written as zero  626ms
+     ✓ a component the source lacks but another active group supplies is derived from the merge: the replay succeeds and census section 4 agrees  673ms
+
+ Test Files  1 passed (1)
+      Tests  62 passed | 1 skipped (63)
+   Start at  12:55:11
+   Duration  61.44s (transform 852ms, setup 191ms, import 1.91s, tests 59.06s, environment 0ms)
+
+JSON report written to /mnt/ssd/afldb-rem-int-20261114/evidence/iso-3aa82166/dataeditor.json

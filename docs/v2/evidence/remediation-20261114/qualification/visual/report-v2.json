@@ -1,0 +1,163 @@
+{
+ "baseUrl": "http://127.0.0.1:3170",
+ "results": [
+  {
+   "scene": "S1",
+   "vp": "desktop",
+   "status": 200,
+   "build": null,
+   "selectVisible": true,
+   "label": "Two clubs",
+   "options": [
+    "Games involving either club",
+    "Games between the two clubs"
+   ],
+   "selected": "any",
+   "overflow": false
+  },
+  {
+   "scene": "S2",
+   "vp": "desktop",
+   "status": 200,
+   "build": null,
+   "summary": "231 matches · Clubs (head-to-head): Richmond v Carlton",
+   "totals": [
+    "231 matches · Clubs (head-to-head): Richmond v Carlton"
+   ],
+   "selected": "both",
+   "overflow": false
+  },
+  {
+   "scene": "S2b",
+   "vp": "desktop",
+   "status": 200,
+   "build": null,
+   "summary": "4,879 matches · Clubs (either): Richmond or Carlton",
+   "totals": [
+    "4,879 matches · Clubs (either): Richmond or Carlton"
+   ],
+   "selected": "any",
+   "overflow": false
+  },
+  {
+   "scene": "S3-probe",
+   "vp": "desktop",
+   "q": "which club has the most wins",
+   "status": 200,
+   "drilldown": false
+  },
+  {
+   "scene": "S3-probe",
+   "vp": "desktop",
+   "q": "most wins by a club",
+   "status": 200,
+   "drilldown": false
+  },
+  {
+   "scene": "S3-probe",
+   "vp": "desktop",
+   "q": "which club has the most wins against Carlton",
+   "status": 200,
+   "drilldown": false
+  },
+  {
+   "scene": "S3-probe",
+   "vp": "desktop",
+   "q": "which club has won the most games at the MCG",
+   "status": 200,
+   "drilldown": false
+  },
+  {
+   "scene": "S3-probe",
+   "vp": "desktop",
+   "q": "most draws by a club",
+   "status": 200,
+   "drilldown": false
+  },
+  {
+   "scene": "S3",
+   "vp": "desktop",
+   "capped": false,
+   "note": "no capped drill-down found among the probe questions"
+  },
+  {
+   "scene": "S1",
+   "vp": "mobile",
+   "status": 200,
+   "build": null,
+   "selectVisible": true,
+   "label": "Two clubs",
+   "options": [
+    "Games involving either club",
+    "Games between the two clubs"
+   ],
+   "selected": "any",
+   "overflow": false
+  },
+  {
+   "scene": "S2",
+   "vp": "mobile",
+   "status": 200,
+   "build": null,
+   "summary": "231 matches · Clubs (head-to-head): Richmond v Carlton",
+   "totals": [
+    "231 matches · Clubs (head-to-head): Richmond v Carlton"
+   ],
+   "selected": "both",
+   "overflow": false
+  },
+  {
+   "scene": "S2b",
+   "vp": "mobile",
+   "status": 200,
+   "build": null,
+   "summary": "4,879 matches · Clubs (either): Richmond or Carlton",
+   "totals": [
+    "4,879 matches · Clubs (either): Richmond or Carlton"
+   ],
+   "selected": "any",
+   "overflow": false
+  },
+  {
+   "scene": "S3-probe",
+   "vp": "mobile",
+   "q": "which club has the most wins",
+   "status": 200,
+   "drilldown": false
+  },
+  {
+   "scene": "S3-probe",
+   "vp": "mobile",
+   "q": "most wins by a club",
+   "status": 200,
+   "drilldown": false
+  },
+  {
+   "scene": "S3-probe",
+   "vp": "mobile",
+   "q": "which club has the most wins against Carlton",
+   "status": 200,
+   "drilldown": false
+  },
+  {
+   "scene": "S3-probe",
+   "vp": "mobile",
+   "q": "which club has won the most games at the MCG",
+   "status": 200,
+   "drilldown": false
+  },
+  {
+   "scene": "S3-probe",
+   "vp": "mobile",
+   "q": "most draws by a club",
+   "status": 200,
+   "drilldown": false
+  },
+  {
+   "scene": "S3",
+   "vp": "mobile",
+   "capped": false,
+   "note": "no capped drill-down found among the probe questions"
+  }
+ ]
+}

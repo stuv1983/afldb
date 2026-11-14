@@ -1,0 +1,11 @@
+setup rc=0
+regen rc=0
+sync_rev rc=0
+tsc rc=0
+lint rc=0
+unit rc=1
+shell rc=0
+cluster rc=0
+integ rc=1
+build rc=1
+stop rc=0

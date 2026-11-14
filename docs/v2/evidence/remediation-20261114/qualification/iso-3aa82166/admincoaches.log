@@ -1,0 +1,23 @@
+isolated-pg: afldb_v2_remint_admincoaches_test verified (cluster afldb_v2_isolated, 127.0.0.1:55630); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem-int-20261114/cand
+
+stdout | tests/integration/admin-coaches.test.ts
+{
+  severity_local: 'NOTICE',
+  severity: 'NOTICE',
+  code: '00000',
+  message: 'trigger "issue159_test_force_data_edits_failure_trg" for relation "data_edits" does not exist, skipping',
+  file: 'dropcmds.c',
+  line: '528',
+  routine: 'does_not_exist_skipping'
+}
+
+ ✓ tests/integration/admin-coaches.test.ts (18 tests) 1510ms
+
+ Test Files  1 passed (1)
+      Tests  18 passed (18)
+   Start at  12:56:26
+   Duration  2.47s (transform 493ms, setup 282ms, import 413ms, tests 1.51s, environment 0ms)
+
+JSON report written to /mnt/ssd/afldb-rem-int-20261114/evidence/iso-3aa82166/admincoaches.json

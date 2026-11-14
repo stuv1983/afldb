@@ -1,0 +1,70 @@
+isolated-pg: afldb_v2_remint_build2_test verified (cluster afldb_v2_isolated, 127.0.0.1:55630); running sh
+Corpus: 12000 rows from /mnt/ssd/afldb-rem-nl-20261114/in/nl-stress-corpus-v5.csv
+Running: 12000
+Database: afldb_v2_remint_build2_test  concurrency: 6  parse only
+
+Every club, venue and player the corpus names resolves to a database identity.
+
+  200/12000  568.2/s  ~0m 21s left
+  400/12000  657.9/s  ~0m 18s left
+  600/12000  717.7/s  ~0m 16s left
+  800/12000  767.0/s  ~0m 15s left
+  1000/12000  803.2/s  ~0m 14s left
+  1200/12000  835.7/s  ~0m 13s left
+  1400/12000  858.9/s  ~0m 12s left
+  1600/12000  873.8/s  ~0m 12s left
+  1800/12000  914.2/s  ~0m 11s left
+  2000/12000  942.5/s  ~0m 11s left
+  2200/12000  966.2/s  ~0m 10s left
+  2400/12000  987.7/s  ~0m 10s left
+  2600/12000  1005.8/s  ~0m 9s left
+  2800/12000  1025.6/s  ~0m 9s left
+  3000/12000  1041.7/s  ~0m 9s left
+  3200/12000  1047.1/s  ~0m 8s left
+  3400/12000  1062.2/s  ~0m 8s left
+  3600/12000  1074.6/s  ~0m 8s left
+  3800/12000  1089.4/s  ~0m 8s left
+  4000/12000  1105.9/s  ~0m 7s left
+  4200/12000  1122.4/s  ~0m 7s left
+  4400/12000  1138.7/s  ~0m 7s left
+  4600/12000  1150.9/s  ~0m 6s left
+  4800/12000  1157.5/s  ~0m 6s left
+  5000/12000  1172.1/s  ~0m 6s left
+  5200/12000  1186.1/s  ~0m 6s left
+  5400/12000  1198.4/s  ~0m 6s left
+  5600/12000  1210.8/s  ~0m 5s left
+  5800/12000  1228.3/s  ~0m 5s left
+  6000/12000  1243.5/s  ~0m 5s left
+  6200/12000  1258.9/s  ~0m 5s left
+  6400/12000  1274.6/s  ~0m 4s left
+  6600/12000  1288.1/s  ~0m 4s left
+  6800/12000  1302.4/s  ~0m 4s left
+  7000/12000  1315.8/s  ~0m 4s left
+  7200/12000  1326.7/s  ~0m 4s left
+  7400/12000  1339.6/s  ~0m 3s left
+  7600/12000  1352.1/s  ~0m 3s left
+  7800/12000  1359.1/s  ~0m 3s left
+  8000/12000  1366.6/s  ~0m 3s left
+  8200/12000  1374.0/s  ~0m 3s left
+  8400/12000  1381.1/s  ~0m 3s left
+  8600/12000  1390.7/s  ~0m 2s left
+  8800/12000  1400.4/s  ~0m 2s left
+  9000/12000  1406.5/s  ~0m 2s left
+  9200/12000  1413.2/s  ~0m 2s left
+  9400/12000  1419.7/s  ~0m 2s left
+  9600/12000  1425.6/s  ~0m 2s left
+  9800/12000  1432.5/s  ~0m 2s left
+  10000/12000  1439.3/s  ~0m 1s left
+  10200/12000  1445.2/s  ~0m 1s left
+  10400/12000  1451.3/s  ~0m 1s left
+  10600/12000  1454.6/s  ~0m 1s left
+  10800/12000  1453.8/s  ~0m 1s left
+  11000/12000  1456.4/s  ~0m 1s left
+  11200/12000  1458.3/s  ~0m 1s left
+  11400/12000  1462.9/s  ~0m 0s left
+  11600/12000  1468.5/s  ~0m 0s left
+  11800/12000  1362.0/s  ~0m 0s left
+  12000/12000  1373.8/s  ~0m 0s left
+
+12000 scored (0 audit-required unscored): 12000 clean (100.0%), 0 soft, 0 failed (0.0%).
+Report: /mnt/ssd/afldb-rem-int-20261114/evidence/iso-3aa82166/parse/report.md

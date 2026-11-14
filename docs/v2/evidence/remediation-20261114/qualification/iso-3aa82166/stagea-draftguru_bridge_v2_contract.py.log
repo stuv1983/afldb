@@ -1,0 +1,168 @@
+
+1. Baseline generation, lineage and reconciliation
+  PASS  1.1 all pinned inputs validate and the build completes
+  PASS  1.2 v2 accepted count is v1 minus the rejected rows
+  PASS  1.3 v2 withheld count is v1 plus the rejected rows
+  PASS  1.4 bridges + withheld partition the population exactly
+  PASS  1.5 action totals: 3 untouched, 4 confirmed, 1 corrected, 0 added, 1 withheld
+  PASS  1.6 reconciliation reports content-unchanged = untouched + confirmed
+  PASS  1.7 reconciliation decision totals balance
+  PASS  1.8 reconciliation totals balance exactly (no unaccounted row)
+  PASS  1.9 every changed row is listed in the machine-readable manifest
+  PASS  1.10 child_status is explicit and no child artefact is produced
+  PASS  1.11 child planning figures are carry-forward + pending only
+  PASS  1.12 no final v2 child accepted/withheld count is published
+  PASS  1.13 manifest records that no database/import/DEV/PROD action occurred
+  PASS  1.14 every positive verdict is represented exactly once
+  PASS  1.15 audit-agree row does not duplicate its mapping
+  PASS  1.16 tokenisation row uses the structured retained target
+  PASS  1.17 manual-curation row uses the structured corrected target
+  PASS  1.18 operator notes are never parsed as target authority
+  PASS  1.19 unaffected v1 rows are preserved unchanged, content and order
+  PASS  1.20 unaffected v1 withheld rows are preserved unchanged
+  PASS  1.21 the rejected person is absent from v2 accepted rows
+  PASS  1.22 the rejected person is present in withheld with the operator's reason
+  PASS  1.23 the rejected AFL Tables target survives in no accepted row
+  PASS  1.24 withheld manifest preserves immutable row identity, source URL, rejected target and operator reason
+  PASS  1.25 withheld manifest records the v1 child status as lineage evidence
+  PASS  1.26 event-club relationship is preserved as review provenance
+  PASS  1.27 event-club provenance does not change identity or add a statistic
+  PASS  1.28 per-row provenance records confirmed/corrected/added/withheld
+
+2. Event reconciliation (no event-level bridge file exists)
+  PASS  2.1 relisting rows collapse to one parent with multiple events
+  PASS  2.2 a same-club re-draft remains valid and is preserved
+  PASS  2.3 no orphan event person and no duplicate event identity
+  PASS  2.4 events belonging to the withheld person resolve to no accepted link
+  PASS  2.5 referential integrity result recorded
+  PASS  2.6 duplicate immutable event identity is refused
+  PASS  2.7 an orphan event person is refused
+
+3. Fail-closed refusals
+  PASS  3.1 incomplete operator output is refused
+  PASS  3.2 a missing accepted decision is refused
+  PASS  3.3 a wrong verdict/group combination is refused
+  PASS  3.4 an unexpected uncertain verdict is refused
+  PASS  3.5 an unexpected extra affected row is refused
+  PASS  3.6 a manual-curation row with no structured corrected target is refused
+  PASS  3.7 a manual-curation row with more than one corrected target is refused
+  PASS  3.8 a manual-curation row that does not change the target is refused
+  PASS  3.9 a conflicting parent target is refused
+  PASS  3.10 a duplicate parent key is refused
+  PASS  3.11 a rejected href cannot re-enter through a v1 carry-forward path
+  PASS  3.12 a verdict decided against a different captured target is refused
+  PASS  3.13 a row with no structured captured href is refused
+  PASS  3.14 a row with two structured captured-href fields is refused
+  PASS  3.15 a duplicate adjudicated row identity is refused
+  PASS  3.16 an adjudicated row naming a person the v1 parent does not bridge is refused
+  PASS  3.17 a pinned-input hash mismatch is refused before anything is computed
+  PASS  3.18 a missing pinned input is refused
+
+4. Determinism, ordering, atomicity, idempotency
+  PASS  4.1 repeat generation is byte-identical
+  PASS  4.2 no wall-clock value is written; the timestamp is frozen to the verdict artefact
+  PASS  4.3 deterministic ordering: both sections ascend by player_url
+  PASS  4.4 the reconciliation's changed-row list is deterministically ordered
+  PASS  4.5 a content-addressed rows_sha256 accompanies the parent
+  PASS  4.6 CSV view is LF-only and covers the whole population
+  PASS  4.7 Markdown summary states the deferred child status
+  PASS  4.8 v1 bridges, adjudication pack and operator outputs remain byte-identical
+  PASS  4.9 first write writes every artefact
+  PASS  4.10 written bytes equal the computed payloads
+  PASS  4.11 atomic write leaves no temporary file behind
+  PASS  4.12 an identical rerun is idempotent and safe
+  PASS  4.13 an existing non-identical artefact refuses overwrite
+  PASS  4.14 a refused write leaves every existing artefact untouched
+
+5. Output screening
+  PASS  5.1 no absolute local path appears in any output
+  PASS  5.2 no credential or DSN appears in any output
+  PASS  5.3 outputs use repository-relative paths only
+  PASS  5.4 screen refuses an absolute Windows path
+  PASS  5.4 screen refuses a PostgreSQL DSN
+  PASS  5.4 screen refuses a database environment variable name
+  PASS  5.5 screen refuses a backslash drive path (raw view)
+  PASS  5.5 screen refuses a backslash drive path (JSON-escaped view)
+  PASS  5.5 screen refuses a second backslash drive path (raw view)
+  PASS  5.5 screen refuses a second backslash drive path (JSON-escaped view)
+  PASS  5.5 screen refuses a forward-slash drive path (raw view)
+  PASS  5.5 screen refuses a forward-slash drive path (JSON-escaped view)
+  PASS  5.5 screen refuses a second forward-slash drive path (raw view)
+  PASS  5.5 screen refuses a second forward-slash drive path (JSON-escaped view)
+  PASS  5.5 screen refuses a UNC network path (raw view)
+  PASS  5.5 screen refuses a UNC network path (JSON-escaped view)
+  PASS  5.5 screen refuses a drive path embedded in prose (raw view)
+  PASS  5.5 screen refuses a drive path embedded in prose (JSON-escaped view)
+  PASS  5.5 screen refuses a drive path beside a valid evidence URL (raw view)
+  PASS  5.5 screen refuses a drive path beside a valid evidence URL (JSON-escaped view)
+  PASS  5.6 screen allows a canonical DraftGuru URL (raw view)
+  PASS  5.6 screen allows a canonical DraftGuru URL (JSON-escaped view)
+  PASS  5.6 screen allows a Wikipedia evidence URL (raw view)
+  PASS  5.6 screen allows a Wikipedia evidence URL (JSON-escaped view)
+  PASS  5.6 screen allows an AFL Tables evidence URL (raw view)
+  PASS  5.6 screen allows an AFL Tables evidence URL (JSON-escaped view)
+  PASS  5.6 screen allows several evidence URLs in one note (raw view)
+  PASS  5.6 screen allows several evidence URLs in one note (JSON-escaped view)
+  PASS  5.6 screen allows a repository-relative path (raw view)
+  PASS  5.6 screen allows a repository-relative path (JSON-escaped view)
+  PASS  5.6 screen allows a non-breaking space in an award string (raw view)
+  PASS  5.6 screen allows a non-breaking space in an award string (JSON-escaped view)
+  PASS  5.6 screen allows a written-out \u00a0 escape in an award string
+  PASS  5.7 every output renderer's bytes pass through the screen
+  PASS  5.8 the screened bytes are exactly the bytes that would be written
+  PASS  5.9 data/reference/draftguru-person-bridge-20260918-v2.json refuses an injected Windows path (raw view)
+  PASS  5.9 data/reference/draftguru-person-bridge-20260918-v2.json refuses an injected Windows path (JSON-escaped view)
+  PASS  5.9 data/reference/draftguru-person-bridge-20260918-v2.json refuses an injected Windows path (UNC view)
+  PASS  5.9 docs/rebuild-manifests/draftguru/bridge-v2-parent-20260918-v1.csv refuses an injected Windows path (raw view)
+  PASS  5.9 docs/rebuild-manifests/draftguru/bridge-v2-parent-20260918-v1.csv refuses an injected Windows path (JSON-escaped view)
+  PASS  5.9 docs/rebuild-manifests/draftguru/bridge-v2-parent-20260918-v1.csv refuses an injected Windows path (UNC view)
+  PASS  5.9 docs/rebuild-manifests/draftguru/bridge-v2-withheld-20260918-v1.json refuses an injected Windows path (raw view)
+  PASS  5.9 docs/rebuild-manifests/draftguru/bridge-v2-withheld-20260918-v1.json refuses an injected Windows path (JSON-escaped view)
+  PASS  5.9 docs/rebuild-manifests/draftguru/bridge-v2-withheld-20260918-v1.json refuses an injected Windows path (UNC view)
+  PASS  5.9 docs/rebuild-manifests/draftguru/bridge-v2-withheld-20260918-v1.csv refuses an injected Windows path (raw view)
+  PASS  5.9 docs/rebuild-manifests/draftguru/bridge-v2-withheld-20260918-v1.csv refuses an injected Windows path (JSON-escaped view)
+  PASS  5.9 docs/rebuild-manifests/draftguru/bridge-v2-withheld-20260918-v1.csv refuses an injected Windows path (UNC view)
+  PASS  5.9 docs/rebuild-manifests/draftguru/bridge-v2-reconciliation-20260918-v1.json refuses an injected Windows path (raw view)
+  PASS  5.9 docs/rebuild-manifests/draftguru/bridge-v2-reconciliation-20260918-v1.json refuses an injected Windows path (JSON-escaped view)
+  PASS  5.9 docs/rebuild-manifests/draftguru/bridge-v2-reconciliation-20260918-v1.json refuses an injected Windows path (UNC view)
+  PASS  5.9 docs/rebuild-manifests/draftguru/bridge-v2-summary-20260918-v1.md refuses an injected Windows path (raw view)
+  PASS  5.9 docs/rebuild-manifests/draftguru/bridge-v2-summary-20260918-v1.md refuses an injected Windows path (JSON-escaped view)
+  PASS  5.9 docs/rebuild-manifests/draftguru/bridge-v2-summary-20260918-v1.md refuses an injected Windows path (UNC view)
+  PASS  5.10 the build fails closed when an operator note carries a backslash drive path
+  PASS  5.11 the refused build wrote no artefact (a backslash drive path)
+  PASS  5.10 the build fails closed when an operator note carries a forward-slash drive path
+  PASS  5.11 the refused build wrote no artefact (a forward-slash drive path)
+  PASS  5.10 the build fails closed when an operator note carries a UNC network path
+  PASS  5.11 the refused build wrote no artefact (a UNC network path)
+
+6. No database / network / import code path
+  PASS  6.1 build_person_bridge_v2.py imports no database, network, subprocess or GUI module
+  PASS  6.1 review_person_bridge_offline.py imports no database, network, subprocess or GUI module
+  PASS  6.2 the generator reads no environment variable at all
+  PASS  6.2a the shared offline base module reads no environment variable either
+  PASS  6.2b the environment check ignores filesystem os calls and the word 'environment'
+  PASS  6.2c the environment check still catches a real environment read
+  PASS  6.2d the environment check reports the offending node with its position
+  PASS  6.3 the generator declares and produces no afldb_test child artefact
+  PASS  6.4 the generator never writes to a v1 artefact path
+
+7. Pinned real-adjudication constants
+  PASS  7.1 decision total is pinned at 83
+  PASS  7.2 eligible/positive total is pinned at 81
+  PASS  7.3 withheld total is pinned at 2
+  PASS  7.4 uncertain total is pinned at 0
+  PASS  7.5 the verdict breakdown is pinned 42/2/7/30 + 2
+  PASS  7.6 the group breakdown is pinned 44/2/7/30
+  PASS  7.7 positive + withheld = the decision total
+  PASS  7.8 Craig Somerville's wrong href is pinned as withheld
+  PASS  7.9 David Sullivan's wrong href is pinned as withheld
+  PASS  7.10 exactly two withheld identities are pinned
+  PASS  7.11 neither withheld person is also a corrected-target person
+  PASS  7.12 exactly seven structured corrected targets are pinned, all canonical and distinct
+  PASS  7.13 the pinned corrected targets are exactly the seven adjudicated basenames
+  PASS  7.14 the pinned v1 -> v2 arithmetic is 3564/1493 -> 3562/1495 over 5,057 persons
+  PASS  7.15 the accepted delta is -2, not +81
+  PASS  7.16 every pinned input hash is 64-char lowercase hex
+  PASS  7.17 the pinned operator-verdict artefacts are the canonical JSON, CSV and Markdown
+
+All DraftGuru bridge-v2 generation checks hold.

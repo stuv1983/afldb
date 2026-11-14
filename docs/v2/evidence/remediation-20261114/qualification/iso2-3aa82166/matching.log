@@ -1,0 +1,23 @@
+isolated-pg: afldb_v2_remint2_matching_test verified (cluster afldb_v2_isolated, 127.0.0.1:55630); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem-int-20261114/cand
+
+ ✓ tests/integration/player-matching.test.ts (23 tests) 2822ms
+     ✓ recalls the true player for confirmed links  550ms
+     ✓ carries the lineage on every source row and candidate club  326ms
+     ✓ raises no contradiction from a club-text source, resolved or not  500ms
+     ✓ raises no contradiction against links AFLDB already confirmed  478ms
+ ✓ tests/integration/player-link-concurrency.test.ts (8 tests) 4501ms
+     ✓ Interleaving A (resolve lock first): confirmation waits and rejects  300ms
+     ✓ I8 — two links for the same provider to different players, released together from the provider lock: one resolved row, one audit row, the other refused as stale  784ms
+     ✓ I9 — two providers linked to the same player, released together from the player lock: one wins, the other is refused as a collision; the index backs it up  846ms
+     ✓ I10 — an admin link racing a raw bridge-style INSERT of the same provider: exactly one row, and the admin side reports stale on 23505; loader-second fails closed on both unique constraints  889ms
+     ✓ I10 (revoke race; the brief's I10) — a revoke racing an in-flight consumer of the link waits for it, sees its committed use, and refuses: one serial order, no lost decision, no orphan ledger row  638ms
+     ✓ I8–I10 fixture-leftover gate — the races leave zero ISSUE-235 fixture rows  342ms
+
+ Test Files  2 passed (2)
+      Tests  31 passed (31)
+   Start at  13:24:11
+   Duration  10.19s (transform 1.67s, setup 244ms, import 2.14s, tests 7.32s, environment 1ms)
+
+JSON report written to /mnt/ssd/afldb-rem-int-20261114/evidence/iso2-3aa82166/matching.json

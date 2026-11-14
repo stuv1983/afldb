@@ -1,0 +1,12 @@
+isolated-pg: afldb_v2_remint_c7_test verified (cluster afldb_v2_isolated, 127.0.0.1:55630); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem-int-20261114/cand
+
+ ✓ tests/integration/afl-api-c7-observation.test.ts (6 tests) 584ms
+
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+   Start at  12:51:28
+   Duration  1.90s (transform 770ms, setup 177ms, import 852ms, tests 584ms, environment 0ms)
+
+JSON report written to /mnt/ssd/afldb-rem-int-20261114/evidence/iso-3aa82166/c7.json

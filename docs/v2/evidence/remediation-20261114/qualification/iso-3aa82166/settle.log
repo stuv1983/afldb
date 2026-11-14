@@ -1,0 +1,50 @@
+isolated-pg: afldb_v2_remint_settle_test verified (cluster afldb_v2_isolated, 127.0.0.1:55630); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem-int-20261114/cand
+
+ ✓ tests/integration/settle-afltables.test.ts (85 tests) 59848ms
+     ✓ runs the whole write path in --dry-run and retains nothing (§22)  426ms
+     ✓ applies observations, projections and candidates, and refuses to sweep an incomplete scope (I2)  426ms
+     ✓ reruns idempotently: no payload, no version, no candidate, no rejection  340ms
+     ✓ marks a genuine omission absent inside a proven-complete scope, and nowhere else (I3)  341ms
+     ✓ clears absence on reappearance without appending a version (I4)  344ms
+     ✓ keeps A -> B -> A as three ordered versions over two payloads  725ms
+       ✓ opens exactly one row for a genuine independent score disagreement  413ms
+       ✓ refreshes the SAME row when the disagreement recurs, keeping detected_at  358ms
+       ✓ resolves on positive agreement even though the AFL Tables payload did not move  362ms
+       ✓ does not resolve an already-resolved row a second time  353ms
+       ✓ never resolves an open row another writer owns  345ms
+     ✓ leaves every ISSUE-099-owned relation byte-identical after a --dry-run  500ms
+     ✓ opens no Brownlow target for an unlinked player with an NA vote (D2)  652ms
+     ✓ executes the whole write path under the restricted afldb_import role  311ms
+     ✓ runs the whole automatic path in --dry-run and leaves no canonical row  326ms
+     ✓ applies an AFL-Tables-owned correction as exactly one update ledger row  333ms
+       ✓ --dry-run --auto-apply executes the automatic path, the recompute included, and leaves canonical, ledger and derived state unchanged  512ms
+       ✓ --apply --auto-apply lands the valid data unattended and recomputes the derived tables once, scoped to the players it wrote  401ms
+       ✓ a second identical --apply --auto-apply is a total no-op: 0 canonical writes, 0 ledger rows, no new version, candidate or finding, no recompute  443ms
+       ✓ lands the debutant on the identical bundle once its identity is resolved, recomputes only that player, and the report moves its candidate to MOOT  500ms
+       ✓ rekeys the existing canonical match when only round_code moves, instead of inserting a duplicate  536ms
+       ✓ rekeys in place when a numbered round is reclassified wildcard_final, rather than duplicating the fixture  551ms
+       ✓ withholds the whole fixture family when the matches target refuses rekey_would_merge  528ms
+       ✓ inserts no period row onto the stale match when rekey_override_conflict refuses the rekey  535ms
+       ✓ names the numerically latest settle batch in the exception report, not the lexicographically latest  682ms
+       ✓ plans, applies and then finds nothing left to do  491ms
+       ✓ refuses rather than guessing when two retired rows could be the fixture  328ms
+       ✓ a corrected field survives the settle, on a retry and when the source moves  852ms
+       ✓ an unchanged re-settle neither churns nor reverts the corrected value  1077ms
+       ✓ an unprotected field on the same row still updates from the source  649ms
+       ✓ a durable removal stops the settle reinserting the row  841ms
+       ✓ a manual addition survives the settle, row and authority  676ms
+       ✓ after Return to source the next settle restores the source value  841ms
+       ✓ F-PR-03: a settle that now carries a manual addition neither adopts nor drops it  882ms
+       ✓ F-PR-03: an addition the source does not carry is withdrawn and its row deleted  410ms
+       ✓ a settle rekey carries the Match Sheet authority to the new match key  841ms
+       ✓ repair-match-rekeys carries the Match Sheet authority to the live match key  844ms
+       ✓ R-01: a Match Sheet save cannot commit inside the settle rekey unit authority window  6058ms
+
+ Test Files  1 passed (1)
+      Tests  85 passed (85)
+   Start at  12:50:21
+   Duration  62.57s (transform 1.20s, setup 174ms, import 2.26s, tests 59.85s, environment 0ms)
+
+JSON report written to /mnt/ssd/afldb-rem-int-20261114/evidence/iso-3aa82166/settle.json

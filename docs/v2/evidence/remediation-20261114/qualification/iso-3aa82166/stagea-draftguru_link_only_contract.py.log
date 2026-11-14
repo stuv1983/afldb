@@ -1,0 +1,150 @@
+
+0. The real population constants, before the fixture swaps them
+  PASS  0.1 EXPECTED_PERSONS is 5,057 and EXPECTED_ROWS is 6,810
+
+1. The committed write set is exactly the link columns
+  PASS  1.1 draft_persons SET clause is exactly the person link columns
+  PASS  1.2 draft_picks SET clause is exactly the pick link columns
+  PASS  1.3 external_identities SET clause is exactly (player_id, status, match_method)
+  PASS  1.4 every write set is disjoint from the gate's non-link vocabulary
+  PASS  1.5 no source-owned or key column is named in any SET clause
+  PASS  1.6 every link-only statement is an UPDATE -- no INSERT, DELETE, COPY, TRUNCATE or DDL
+  PASS  1.7 every link-only statement is scoped to the DraftGuru source_id
+  PASS  1.8 every link-only statement is keyed on the stored row's own natural key
+  PASS  1.9 every link-only statement skips rows whose link state already agrees (IS DISTINCT FROM guard, so a re-run is a genuine no-op)
+  PASS  1.10 draft_persons writes is_matching_backlog, which migration 019's draft_persons_backlog_ck makes impossible to omit alongside player_id
+  PASS  1.11 RED proof: a smuggled non-link SET column is visible to link_only_write_set()
+  PASS  1.12 the statement was restored byte-for-byte after the RED proof
+
+2. No Stage A page, manifest or parsed artefact is opened
+  PASS  2.1 no link-only function calls a Stage A snapshot function (AST over the real module)
+  PASS  2.2 every link-only function named above exists in the module
+  PASS  2.3 the FULL path still calls them (the absence above is link-only's, not a regression)
+  PASS  2.4 runtime proof: validate_link_only completes with every Stage A entry point booby-trapped, against a real child file on disk
+  PASS  2.5 it returned the child's partition and its pinned parent lineage
+
+3. Deployment-child partition and pinned parent lineage
+  PASS  3.1 a source-evidence parent (kind != deployment) is refused
+  PASS  3.2 an unsupported schema_version is refused
+  PASS  3.3 a child with no parent_sha256 is refused
+  PASS  3.4 a malformed parent_sha256 is refused
+  PASS  3.5 a person that is both accepted and withheld is refused (not a partition)
+  PASS  3.6 a repeated person is refused
+  PASS  3.7 a withheld row with no reason is refused
+  PASS  3.8 a child that does not cover the whole population is refused
+  PASS  3.9 the unmutated child is accepted
+
+4. Stored-population preconditions (checked before a single row is written)
+  PASS  4.1 the coherent stored population passes
+  PASS  4.2 a duplicate stored player_url refuses
+  PASS  4.3 a duplicate stored pick key refuses
+  PASS  4.4 a duplicate stored identity row refuses
+  PASS  4.5 a person short of the expected population refuses
+  PASS  4.6 a pick short of the expected population refuses
+  PASS  4.7 a stored person the child does not carry (and a child person the target does not carry) refuses
+  PASS  4.8 a pick naming a player_url with no person row refuses
+  PASS  4.9 an identity row count that is not one per person refuses
+  PASS  4.10 a NULL identity notes value refuses
+  PASS  4.11 a WRONG identity notes label refuses
+  PASS  4.12 a MIXED identity notes label refuses (one row disagreeing is enough)
+  PASS  4.13 that refusal names BOTH directions -- in the child but not stored, and stored but not in the child -- so a same-size population with the wrong members cannot slip through
+  PASS  4.14 a stored person with no pick refuses
+  PASS  4.15 the notes refusal names the expected label, the observed one and the counts, and refuses to be made to pass by choosing a label
+
+5. Authority precedence, ambiguity and the fail-closed HALTs
+  PASS  5.1 the non-decided bridge person is linked by the bridge, with bridge provenance
+  PASS  5.2 the ledger person keeps HUMAN authority and is not counted as a bridge link
+  PASS  5.3 every withheld person -- including both rejected identities -- stays unlinked
+  PASS  5.4 nothing is seeded
+  PASS  5.5 a bridge contradicting a human decision HALTs
+  PASS  5.6 a live admin decision outranks the bridge and is applied with ledger provenance
+  PASS  5.7 a bridge target with no registered identity HALTs
+  PASS  5.8 an ambiguous bridge target HALTs
+  PASS  5.9 a decision that would need a seeded player HALTs under seeds_allowed=False
+  PASS  5.10 two DraftGuru persons claiming one canonical player HALTs
+  PASS  5.11 any seeded player HALTs
+  PASS  5.12 a link state outside the allowed vocabulary HALTs
+  PASS  5.13 a withheld person computing to a bridge link HALTs
+  PASS  5.14 the coherent decided state passes
+  PASS  5.15 is_matching_backlog is cleared on the newly linked person and set only on an unlinked person who played (migration 019's draft_persons_backlog_ck)
+  PASS  5.16 an unlinked identity row's status is 'unmatched', never the person's link_status
+  PASS  5.17 is_matching_backlog comes from the STORED reported_games, not from a snapshot
+
+6. CLI contract
+  PASS  6.1 the complete, correct invocation is accepted
+  PASS  6.2 --link-only without --bridge refuses
+  PASS  6.3 --link-only without --no-seed refuses
+  PASS  6.4 --link-only without an EXPLICIT --label refuses
+  PASS  6.5 --link-only with --acknowledge-population-drop refuses
+  PASS  6.6 --link-only with --snapshot-root refuses
+  PASS  6.7 without --link-only the function is inert (the full path is never gated by it)
+  PASS  6.8 main() exits 1 and prints REFUSED when --label is left at its default
+  PASS  6.9 main() exits 1 when the child file is absent, before any database work
+
+7. Atomicity: linkage and the completed audit row commit together
+  target: contract@never.invalid:1/never_dialled
+  PASS  7.1 the link-only run completes without an exception
+  PASS  7.2 exactly one commit precedes the first linkage statement (the running batch row)
+  PASS  7.3 exactly one batch-row update carries status 'completed'
+  PASS  7.4 NO commit lies between the first linkage statement and the 'completed' update
+  PASS  7.5 the 'completed' update is followed by a commit (linkage + status land together)
+  PASS  7.6 ANALYZE runs only after that commit, under autocommit
+  PASS  7.7 no rollback on the success path
+  PASS  7.8 exactly three linkage statements are sent, one per table, all UPDATEs
+  PASS  7.9 they write exactly draft_persons, draft_picks and external_identities -- no players, no data_overrides, no temp table, no other table
+  PASS  7.10 the SET clause actually sent names only the permitted columns
+  PASS  7.11 no statement anywhere in the run mentions replay_admin_overrides' override tables or the full reload's staging table
+  PASS  7.12 the audit row's notes declare mode=link_only, the asserted label and the child hash
+  PASS  7.13 the audit row's target_table is draft_persons and records_read is the pick count
+  PASS  7.14 the reporter states the mode and the asserted label, as STRING values and not as counts
+  target: contract@never.invalid:1/never_dialled
+  PASS  7.15 an error mid-write rolls the linkage back and records a failed batch row
+  PASS  7.16 the only statement after that rollback is the failed batch-row update
+  target: contract@never.invalid:1/never_dialled
+  PASS  7.17 --dry-run runs the whole write path, then rolls it back
+  PASS  7.18 --dry-run retains only the documented failed / DryRunComplete audit row
+  PASS  7.19 the link-only dry-run message states the rollback and the retained failed row, and never claims nothing was written
+  target: contract@never.invalid:1/never_dialled
+  PASS  7.20 a label the target does not hold refuses BEFORE any linkage statement is sent
+  PASS  7.21 that refusal still rolls back and records the failed batch row
+  target: contract@never.invalid:1/never_dialled
+  PASS  7.22 re-running over an already-linked target succeeds and is a no-op by construction (the IS DISTINCT FROM guard means the server updates nothing)
+  PASS  7.23 the whole link-only write path runs against the REAL common.Reporter without an exception (RED before the fix: ValueError: Cannot specify ',' with 's')
+  PASS  7.24 the real reporter actually rendered the mode, the asserted label and a count
+  PASS  7.25 the fix adds value() without weakening result(): a string is still REFUSED by the count column, which keeps its thousands separator, and value() adds none
+
+8. Gate --link-only: plan, verify, determinism, and the preservation digests
+  PASS  8.1 the link-only plan holds on the pre-import state
+  PASS  8.2 it is read-only: SELECT only, rolled back once, closed, no autocommit toggle
+  PASS  8.3 the hashed summary records the mode and the importer's write set
+  PASS  8.4 the plan captures import_batches_before and expects exactly one more
+  PASS  8.5 newly linked is exactly the one non-decided bridge person
+  PASS  8.6 the plan applies no source-owned override patch (link-only never replays them)
+  PASS  8.7 the four non-link preservation digests were read
+  PASS  8.8 6.4 / 6.6 / 6.7 ran as write-set proofs and the notes-label proof ran too
+  PASS  8.9 the identity-notes label is recorded in the hashed summary
+  PASS  8.10 two independent plans over the same state reproduce every hash and the summary_sha256
+  PASS  8.11 the link-only verify holds against the plan's four hashes and batch count
+  PASS  8.12 verify is read-only too
+  PASS  8.13 two independent verify runs reproduce the same summary_sha256
+  PASS  8.14 verify required exactly one new completed link-only batch and ran 8.15
+  PASS  8.15 a plan whose stored notes name a different label REFUSES on 6.7a
+  PASS  8.16 a verify whose picks were re-stamped with the new batch id REFUSES on 8.12
+  PASS  8.17 RED proof: a moved external_identities non-link digest REFUSES on 8.14/8.15 -- the 6.7 preservation proof is falsifiable, not assumed
+  PASS  8.18 RED proof: a moved draft_picks non-link digest REFUSES too (6.6 after the fact)
+  PASS  8.19 a verify whose newest batch does not declare mode=link_only REFUSES on 8.10/8.10a
+
+9. Target guards unchanged; the full reload and the gate's full mode untouched
+  PASS  9.1 the DEV target still guards the physical database name and the child LABEL separately
+  PASS  9.2 the DSN environment variables are unchanged and separate
+  PASS  9.3 the afldb_test child is still refused under a non-test target, by name and by bytes
+  PASS  9.4 a server reporting the wrong database is still refused before any read, in link-only mode too
+  PASS  9.5 the gate's default baseline set is unchanged; the two link-only digests are additive
+  PASS  9.6 the gate's FULL mode holds over the same population and adds none of link-only's summary keys or baseline digests
+  PASS  9.7 the full mode still runs its own 6.4 / 6.6 / 6.7, not link-only's
+  PASS  9.8 run_import and validate -- the full reload -- contain no link-only branch at all
+  PASS  9.9 the full path's default label is unchanged and link-only did not repoint it
+  PASS  9.10 --link-only is documented in the CLI help alongside the unchanged full-mode flags
+  PASS  9.11 the real population constants were restored after the fixture
+
+All DraftGuru link-only checks hold.

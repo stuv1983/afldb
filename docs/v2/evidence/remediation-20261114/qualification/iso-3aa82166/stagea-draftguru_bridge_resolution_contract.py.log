@@ -1,0 +1,62 @@
+1. resolve_afltables_players() does not de-duplicate rows (handoff sec C.1)
+  PASS  1a two rows for one identity produce a 2-element candidate list, not a distinct-count of 1
+  PASS  1b the query is filtered to the pinned match_method
+
+2. apply_authority() HALTs on that 2-element candidate list (mirrors the real bridge and ledger branches -- proves the importer's own fail-closed behaviour on this input)
+  PASS  2a a bridge naming the duplicated identity HALTs with ImportFailure
+
+3. export_person_bridge.build_deployment_dataset() agrees: the SAME duplicated-row count (2) is withheld target_ambiguous, never silently accepted as registered (handoff sec C.1, C.2)
+  PASS  3a the duplicated-registration identity is withheld target_ambiguous, not accepted
+  PASS  3b an identity absent from the registration dict is withheld target_not_registered
+  PASS  3c an identity registered exactly once is accepted into the deployment bridge
+  PASS  3d withheld count matches (dup + unregistered), accepted count matches (clean only)
+
+4. apply_authority(): an admissible bridge that AGREES with an existing human decision is excluded from stats['bridge'] but counted in stats['ledger'], with no HALT (handoff sec C.7, sec 3's three agreeing rows: matt_rendell/1, nathan_fyfe/1, ryan_o'keefe/1)
+  PASS  4a stats['ledger'] counts the one explicit human decision
+  PASS  4b stats['bridge'] counts ONLY the non-agreeing bridge, excluding the agreeing one
+  PASS  4c the agreeing person keeps the human decision's player_id, not a re-application
+  PASS  4d the other bridge person is linked via the bridge, not the ledger
+  PASS  4e no HALT: apply_authority() returned normally for an agreeing bridge
+
+5. apply_authority(): a bridge that DISAGREES with an existing human decision HALTs (sanity check that 'agrees' in item 4 is doing real work, not vacuously passing)
+  PASS  5a a disagreeing bridge HALTs with ImportFailure
+
+6. --resolve-against takes the SOURCE-EVIDENCE parent, never a per-target deployment child (the resolve-side twin of the --review-sample guard; the v2 parent and the v1 afldb_test child now differ by one filename suffix)
+  PASS  6a a kind='deployment' child is refused as a resolve input
+  PASS  6b the source-evidence parent is accepted
+  PASS  6c a minimal parent carrying no 'kind' is still accepted (integration-test shape)
+
+7. --resolve-against never silently replaces an existing file: atomic_write_bytes() would overwrite the pinned v1 child or the parent itself without warning
+  PASS  7a a --out that does not yet exist is allowed
+  PASS  7b --out equal to --parent is refused
+  PASS  7c --out equal to --parent is refused even with --allow-overwrite
+  PASS  7d an existing --out is refused without --allow-overwrite
+  PASS  7e an existing --out is permitted with an explicit --allow-overwrite
+  PASS  7f the guards wrote nothing and left both files byte-identical
+
+8. the resolve path is provably read-only: every SQL statement this module can execute is a SELECT, resolved through the module's own constants (AST, not grep)
+  PASS  8a every execute() call resolves to a known SQL string
+  PASS  8b the module executes exactly three SELECTs: live isolated identity, read-only proof and registration
+  PASS  8c every executed statement is a SELECT
+  PASS  8d no executed statement carries a write, DDL or transaction-control verb
+  PASS  8e the module never calls commit()
+  PASS  8f the module always rolls the read transaction back
+  PASS  8g the module closes the connection
+  PASS  8h the module never touches autocommit
+  PASS  8i every connect() forces default_transaction_read_only=on at the server
+  PASS  8j the tool imports no importer module (no write surface, even transitively) -- a comment naming import_draftguru is prose, not an import
+9. isolated target DSN refuses redirection and requires the dedicated runner
+  PASS  9a guarded isolated target admitted
+  PASS  9b refuses remote
+  PASS  9b refuses wrong port
+  PASS  9b refuses non-test
+  PASS  9b refuses redirect
+  PASS  9c refuses absent runner
+  PASS  9d the runner-declared port is admitted
+  PASS  9e refuses a DSN port other than the runner's
+  PASS  9f refuses runner port '5432'
+  PASS  9f refuses runner port '80'
+  PASS  9f refuses runner port 'not-a-port'
+  PASS  9f refuses runner port ''
+
+All DraftGuru bridge-resolution alignment checks hold.

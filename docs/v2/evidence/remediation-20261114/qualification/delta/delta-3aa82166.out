@@ -1,0 +1,6 @@
+HEAD=3aa821662aa5dcc55cccdcf82dd804370b0a1c12 porcelain=0
+tsc rc=0 lines=0
+unit rc=0
+ Test Files  2 passed (2)
+      Tests  50 passed (50)
+porcelain-after=0

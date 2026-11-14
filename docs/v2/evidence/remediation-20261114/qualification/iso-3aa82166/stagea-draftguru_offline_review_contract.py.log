@@ -1,0 +1,96 @@
+1. one fixture row per outcome
+  PASS  1a clean corroborated row -> offline_strong
+  PASS  1b no birth-year evidence, name-only otherwise -> offline_limited
+  PASS  1c birth-year delta >= 2 -> offline_contradict
+  PASS  1d child target_not_registered -> target_unregistered
+  PASS  1e missing DraftGuru profile -> offline_unavailable
+  PASS  1f registered but no retained snapshot rows -> offline_unavailable
+  PASS  1g distinct_afltables_identity_count != 1 -> tooling_or_schema_error
+
+2. name-only equality yields offline_limited (no birth year, no debut/span/games signal)
+  PASS  2a
+
+3. a club difference alone never contradicts
+  PASS  3a different club, everything else consistent -> still offline_strong
+  PASS  3b CLUB_HISTORY_OVERLAPS absent, no contradiction code from it
+
+4. DEBUT_BEFORE_EARLIEST_RECRUITMENT is informational; CAREER_ENDED_BEFORE_EARLIEST_RECRUITMENT contradicts
+  PASS  4a debut before recruitment year, span still contains it -> offline_strong
+  PASS  4b DEBUT_BEFORE_EARLIEST_RECRUITMENT recorded, not blocking
+  PASS  4c career ended before recruitment year -> offline_contradict
+  PASS  4d CAREER_ENDED_BEFORE_EARLIEST_RECRUITMENT recorded
+
+5. earliest-original-recruitment selection
+  PASS  5a skips Trade, picks the National row
+  PASS  5b a null event_type_raw (1981/1982/1987 absent-column years) counts as recruitment
+  PASS  5c trade-only person -> no earliest_original_recruitment
+  PASS  5d trade-only person -> earliest_trade_row picks the earliest by year
+  PASS  5e trade-only row reaches offline_strong via SPAN_CONTAINS using the trade year
+  PASS  5f trade_only flag set
+
+6. name-variant table, including Stephen/Steven, and the unlisted-variant path
+  PASS  6a Dan/Daniel is a listed variant -> offline_strong with NAME_VARIANT
+  PASS  6a-flag flags.name_variant is set
+  PASS  6b Stephen/Steven is a listed variant -> offline_strong with NAME_VARIANT
+  PASS  6c Jimmy/James is NOT a listed variant -> NAME_VARIANT_UNLISTED, offline_limited
+  PASS  6d multi-word surname ('de Goey') suffix-matches, not a false SURNAME_DIFFERENT
+
+6e known_exception_class actually flags a real slug against the module's own NUMBERING_SLUGS/SPELLING_SLUGS/SCHWERDT_SLUGS constants (regression: _matches_slug() was defined but never called from evaluate_row(), so every known_exception_class flag silently stayed None on the real 997-row run until this was wired in)
+  PASS  6e-1 _matches_slug matches a full URL against a bare slug
+  PASS  6e-2 _matches_slug does not match an unrelated URL
+  PASS  6e-3 a real numbering-class url is flagged known_exception_class == 'numbering'
+  PASS  6e-4 stephen_schwerdt/1 is flagged known_exception_class == 'schwerdt'
+
+7. numeric-suffix and continuity-path rows require club overlap for offline_strong
+  PASS  7a numeric-suffix identity, no club overlap -> withheld from offline_strong
+  PASS  7b numeric_suffix flag set
+  PASS  7c numeric-suffix identity WITH club overlap -> offline_strong
+  PASS  7d continuity-rule path, no club overlap -> withheld from offline_strong
+  PASS  7e continuity_rule_url flag set
+
+8. birth-year tolerance; DOB preferred over Age-implied year
+  PASS  8a |delta|==1 is consistent (tolerance)
+  PASS  8b tolerance reason code recorded
+  PASS  8c |delta|==3 conflicts
+  PASS  8d DOB absent, falls back to Age-implied birth year (delta 1, tolerated)
+
+9. the games consistency rule
+  PASS  9a equal games, last_season<=2024 -> GAMES_CONSISTENT
+  PASS  9b retained < draftguru but last_season<=2024 requires equality -> GAMES_INCONSISTENT
+  PASS  9c retained <= draftguru, last_season 2025 -> GAMES_CONSISTENT (no equality required)
+  PASS  9d retained > draftguru -> GAMES_INCONSISTENT
+  PASS  9e games leading-integer parse: '76 (31)' -> 76
+
+10. deterministic audit selection, pinned digest, excludes classes 1-10
+  PASS  10a salted_key matches an independently computed sha256(salt+"|"+url)
+  PASS  10b weak_evidence row excluded from the audit pool (already in class 10)
+  PASS  10c contradict row excluded from the audit pool (already in class 1)
+  PASS  10d the clean strong row IS eligible for the audit pool
+  PASS  10e class 1 carries the contradict row
+  PASS  10f class 10 carries the weak row
+
+11. deterministic rows_sha256 across two independent runs (tiny fixture, no CSV scan)
+  PASS  11a both fixture runs exit 0
+  PASS  11b identical rows_sha256 across two independent process runs
+
+12. refusal on input-hash mismatch, row-count mismatch, deployment-as-parent
+  PASS  12a wrong --expect-sample-sha256 refuses (exit 1)
+  PASS  12b refusal message names the mismatch
+  PASS  12c wrong row count refuses (exit 1)
+  PASS  12d a deployment child passed as --parent refuses (exit 1)
+  PASS  12e refusal names the deployment kind
+
+13. no socket opened, no database module imported
+  PASS  13a no top-level or nested psycopg import
+  PASS  13b no *DATABASE_URL* environment read
+  PASS  13c no socket module import
+  PASS  13d no urllib/requests/http.client network import
+  PASS  13e evaluate_row runs with socket.socket poisoned to raise -- no socket opened
+
+14. build_fitzroy_index() skips a literal Age="0" sentinel row when implying a birth year (AFLDB-ISSUE-222 recheck finding: Darren_Mead.html / Tim_Walsh.html)
+  PASS  14a earliest row (Age="0") is skipped; implied_birth_year comes from the next valid row
+  PASS  14b debut_date/debut_season still reflect the TRUE earliest row, not the valid-age row
+  PASS  14c a person whose every dated row is Age="0" gets implied_birth_year=None, never a guess
+  PASS  14d that person's debut_date is still recorded (the row exists; only the age is untrusted)
+
+All DraftGuru offline-review checks hold.
