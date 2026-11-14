@@ -1,0 +1,12 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2957844, import 2957849)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 31: Human-origin ORIGINAL (the real admin link H, net LINKED(P); a newer decoy linked row) -> one corrected row, supersedes_id = H
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  fixture: P=13366 (players/Z/Zz238_031_P.html), P'=13367 (players/Z/Zz238_031_Pprime.html), Q=13368 (players/Z/Zz238_031_Q.html), provider CD_I999238000311 (observed at CD_M999238000311|CD_T992238H|CD_I999238000311, candidate #1), decoy provider CD_I999238000312 (candidate #2), actor 1
+  PASS  pre: CD_I has no identity row and no ledger row (U1: observed, unresolved, candidate retained)
+  ABORTED: AFLDB_AUTH_DATABASE_URL is not set. Run tools/maintenance/02_add_auth_role.sh on the server.
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 31: 4/4 checks PASS (run ABORTED) -> FAIL
+CTDB-RC=1 label=c31 base=rb args=run --case 31 --acknowledge code_test_db

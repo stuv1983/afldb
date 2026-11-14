@@ -1,0 +1,61 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2994437, import 2994438)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 32: Real admin revoke of a CORRECTED provider (page-loader fingerprint) -> refused T21 before the non-use proof; no write; Q2 still ALREADY_SATISFIED
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  fixture: P=13366 (players/Z/Zz238_032_P.html), P'=13367 (players/Z/Zz238_032_Pprime.html), provider CD_I999238000321, match M=17057, closure row player_match_stats#695500, settle batch 27, actor 1
+  PASS  pre: closure row at (P, M), afl_api-owned, stamped <CD_M>|<team>|CD_I with the settle batch; contract = the insert application — {"player_id":13366,"source_record_id":"CD_M999238000321|CD_T992238H|CD_I999238000321"}
+  PASS  pre: no P′ counterpart at M; P holds exactly the one row; M holds only it — {"counterpart":0,"pRows":1,"atM":1}
+  PASS  pre: CD_I is an importer row at P (unique, afl_api_stat_vector_bootstrap)
+  PASS  pre: the combined identity invariant holds with the fixture in place
+  validate-only: exit 0, {"kind":"PLANNED","fingerprint":"334a73e29982d7b94c6b23cde5304adb3bc539110dc1937050750938d1ac7105","rowsPlanned":1}
+  PASS  validate-only: PLAN OK, exit 0, 1 row(s) planned — {"kind":"PLANNED","fingerprint":"334a73e29982d7b94c6b23cde5304adb3bc539110dc1937050750938d1ac7105","rowsPlanned":1}
+  PASS  validate-only wrote nothing (fixture census unchanged)
+  apply: exit 0, {"kind":"COMMITTED","fingerprint":"334a73e29982d7b94c6b23cde5304adb3bc539110dc1937050750938d1ac7105","adjudicationId":1,"batchId":28,"moved":1,"deleted":0,"reportIncomplete":false}
+  PASS  apply: COMMITTED, exit 0, the validate-only fingerprint, moved 1, deleted 0, report complete — {"kind":"COMMITTED","fingerprint":"334a73e29982d7b94c6b23cde5304adb3bc539110dc1937050750938d1ac7105","adjudicationId":1,"batchId":28,"moved":1,"deleted":0,"reportIncomplete":false}
+  PASS  corrected base: the SAME row id at (P′, M), contract byte-identical, provenance kept (D3)
+  PASS  corrected base: (P, M) is free after the MOVE — {"pRows":0,"pPrimeRows":1,"pAtM":0,"pPrimeAtM":1,"atM":1}
+  PASS  post: one new `corrected` ledger row after 0 prior row(s): P′ at its identity, previous identity P, supersedes NULL (importer origin), surname ack false, actor, evidence hash, previous_state unique at P — [{"id":1,"action":"corrected","playerId":13367,"playerIdentity":"players/Z/Zz238_032_Pprime.html","previousPlayerIdentity":"players/Z/Zz238_032_P.html","supersedesId":null,"adminUserId":1,"evidenceSha256":"a6b6c0bbfe66446b25fe118eda19365e7c6e1c1a1f7b9ea07e96b32106b86e24","previousState":{"id":18427,"status":"unique","playerId":13366},"surnameAck":false}]
+  PASS  post: CD_I updated in place to P′ (same id, resolved, candidate_count 0, afl_api_admin_adjudication) — {"id":18427,"playerId":13367,"status":"resolved","candidateCount":0,"matchMethod":"afl_api_admin_adjudication","externalName":null}
+  PASS  corrected base: c = the correction application's applied_at exists
+  PASS  corrected base: no data_edits audit for M yet — []
+  corrected base: adjudication 1, batch K 28, c = 2026-11-14T19:55:37.012931Z
+  PASS  corrected base: CD_I's identity row names P′ (the correction re-pointed it) — {"id":18427,"notes":"AFLDB-ISSUE-238 admin correction; see afl_api_identity_adjudications","status":"resolved","player_id":13367,"source_id":6,"external_id":"CD_I999238000321","external_url":null,"match_method":"afl_api_admin_adjudication","external_name":null,"candidate_count":0}
+  c = 2026-11-14T19:55:37.012931Z; CD_I ledger: [{"id":1,"action":"corrected","createdAt":"2026-11-14T19:55:37.012931Z","afterCutoff":true}]
+  PASS  corrected base: CD_I's ledger is exactly the one `corrected` row, the correction's adjudication (net action corrected) — [{"id":1,"action":"corrected","createdAt":"2026-11-14T19:55:37.012931Z","afterCutoff":true}]
+  page loader: {"state":"L-H","existing":{"id":18427,"status":"resolved","playerId":13367,"matchMethod":"afl_api_admin_adjudication"},"pendingCandidates":[],"latestAdjudicationId":"1"}
+  PASS  page loader (real readAflApiProviderEvidence): CD_I is L-H at P′, no pending candidate, latest adjudication = the corrected row — latestAdjudicationId string 1
+  PASS  pre-revoke: the link is USED (P′ holds the corrected row stamped through CD_I), so a non-use proof that ran could only refuse (T19) — {"n":1}
+  writer revokeAflApiLink (after the correction; db clock 2026-11-14T19:55:37.309610Z, after c: true): {"ok":false,"error":"This provider's link was corrected by a recorded human correction (AFLDB-ISSUE-238). A correction cannot be revoked from this surface; undoing a correction is a separate operation that does not exist yet.","code":"T21_revoke_corrected"}
+  PASS  writer: the real revokeAflApiLink REFUSED with T21_revoke_corrected and its exact message (not T6: the page fingerprint matched; not T8/T20/T19: the state rules and the non-use proof never ran) — {"ok":false,"error":"This provider's link was corrected by a recorded human correction (AFLDB-ISSUE-238). A correction cannot be revoked from this surface; undoing a correction is a separate operation that does not exist yet.","code":"T21_revoke_corrected"}
+  PASS  no write: CD_I's identity row byte-identical (still at P′)
+  PASS  no write: CD_I's ledger is still exactly the one `corrected` row (no `revoked` row)
+  PASS  no write: the correction footprint (ledger, correction batches, applications, identity, projections) is byte-identical
+  PASS  no write: the corrected row is byte-identical
+  PASS  no write: no data_edits row by the fixture actor — {"before":0,"after":0}
+  PASS  post-revoke: the combined identity invariant holds
+  Q2 re-run (validate-only): exit 0, {"kind":"ALREADY_SATISFIED"}
+    | ALREADY_SATISFIED: this provider is already corrected and the correction remains satisfied
+    | NOOP already_corrected_moved: player_match_stats {"match_id":17057,"player_id":13367}
+    | CORRECTION SATISFACTION: SAT-1..SAT-5 PASS
+  PASS  Q2 re-run (validate-only) wrote nothing (fixture census unchanged)
+  PASS  Q2 (validate-only): ALREADY_SATISFIED (exit 0), "NOOP already_corrected_moved: player_match_stats {"match_id":17057,"player_id":13367}", CORRECTION SATISFACTION: SAT-1..SAT-5 PASS — {"kind":"ALREADY_SATISFIED"}
+  PASS  Q2 (validate-only): no other STOP / post-correction classification line
+  PASS  Q2 (validate-only): the correction footprint (ledger, correction batches, applications, identity, projections) is byte-identical: no second correction
+  PASS  Q2 (validate-only): the corrected row byte-identical
+  Q2 re-run (apply): exit 0, {"kind":"ALREADY_SATISFIED"}
+    | ALREADY_SATISFIED: this provider is already corrected and the correction remains satisfied
+    | NOOP already_corrected_moved: player_match_stats {"match_id":17057,"player_id":13367}
+    | CORRECTION SATISFACTION: SAT-1..SAT-5 PASS
+  PASS  Q2 re-run (apply) wrote nothing (fixture census unchanged)
+  PASS  Q2 (apply): ALREADY_SATISFIED (exit 0), "NOOP already_corrected_moved: player_match_stats {"match_id":17057,"player_id":13367}", CORRECTION SATISFACTION: SAT-1..SAT-5 PASS — {"kind":"ALREADY_SATISFIED"}
+  PASS  Q2 (apply): no other STOP / post-correction classification line
+  PASS  Q2 (apply): the correction footprint (ledger, correction batches, applications, identity, projections) is byte-identical: no second correction
+  PASS  Q2 (apply): the corrected row byte-identical
+  PASS  post: CD_I's ledger is exactly one `corrected` row
+  PASS  post: the combined identity invariant (SAT-1 basis) holds
+  PASS  no non-fixture row changed across fixture setup and the correction (foreign fingerprint equal)
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 32: 40/40 checks PASS -> PASS
+CTDB-RC=0 label=c32 base=rb args=run --case 32 --acknowledge code_test_db

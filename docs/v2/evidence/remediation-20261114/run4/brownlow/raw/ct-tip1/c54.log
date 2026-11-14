@@ -1,0 +1,33 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2905604, import 2905605)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 54: The admin resolve step set match_id on an AFL API-owned round row -> STOP out_of_ledger_edit (match_id) (B5)
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  fixture: P=13366 (players/Z/Zz238_054_P.html), P'=13367 (players/Z/Zz238_054_Pprime.html), provider CD_I999238000541, match M=17057 (CD_M999238000541, round 1), closure row brownlow_round_votes#320862 {"match_id":17057,"played":true,"votes":3}, companions V2 CD_I999238000542->player 13368 #320863 (2), V3 CD_I999238000543->player 13369 #320864 (1), settle batch 27, actor 1
+  PASS  pre: closure row brownlow_round_votes#320862 at (2092, P, 1): afl_api-owned, stamped CD_M, import batch 27; {played, votes, match_id} = {"match_id":17057,"played":true,"votes":3} — {"id":320862,"votes":3,"played":true,"season":2092,"match_id":17057,"player_id":13366,"source_id":6,"imported_at":"2026-11-14T19:31:45.311948+00:00","round_number":1,"import_batch_id":27,"source_record_id":"CD_M999238000541"}
+  PASS  pre: CD_I is an importer row at P (unique, afl_api_stat_vector_bootstrap)
+  PASS  pre: the combined identity invariant holds with the fixture in place
+  PASS  pre: the admin resolve step resolved exactly one row, the closure row (the companions have no line-up row at M) — [320862]
+  PASS  pre: the history at {2092, P, 1} is exactly [insert v1 {played, votes 3} (pre-F007: no match_id)] (no later application) — [{"id":1,"batchId":27,"versionSeq":1,"verb":"insert","previous":null,"next":{"votes":3,"played":true}}]
+  PASS  pre: reconstruction from the history gives match_id NULL; the row now holds M; played and votes equal their reconstruction (only match_id differs) — {"played":true,"votes":3,"match_id":null}
+  PASS  pre: B3-I holds (payload names CD_I once with 3); CD_I's projection names P
+  PASS  pre: P's line-up row at M is afltables-owned (C11 foreign, not a closure row); P′ participates in M
+  stat_availability 2092 baseline (3 row(s), sha256 347ad2b20f8135d84da9004287adab12cef62bdcd6de3cb76d759fdd0568aaa2)
+  PASS  baseline: the settled 2092 coverage is a fixed point of the real recomputeBrownlowCoverage (rolled-back re-run byte-identical) — 347ad2b20f8135d84da9004287adab12cef62bdcd6de3cb76d759fdd0568aaa2 -> 347ad2b20f8135d84da9004287adab12cef62bdcd6de3cb76d759fdd0568aaa2
+  validate-only: exit 1, {"kind":"STOP","stops":[{"table":"brownlow_round_votes","rowId":320862,"step":"B5","code":"out_of_ledger_edit","detail":"field(s) differ from reconstruction: match_id"}],"referenceFingerprint":"caa5cabaafd224ce68c915094034297f65917c3100f32ff0009b495f4cd39c40"}
+    | STOP: 1 stop(s); nothing written
+    | brownlow_round_votes#320862 [B5] out_of_ledger_edit: field(s) differ from reconstruction: match_id
+  PASS  validate-only: STOP (exit 1) with exactly one stop, brownlow_round_votes#320862 [B5] out_of_ledger_edit — {"kind":"STOP","stops":[{"table":"brownlow_round_votes","rowId":320862,"step":"B5","code":"out_of_ledger_edit","detail":"field(s) differ from reconstruction: match_id"}],"referenceFingerprint":"caa5cabaafd224ce68c915094034297f65917c3100f32ff0009b495f4cd39c40"}
+  PASS  validate-only: the STOP names its evidence exactly, "field(s) differ from reconstruction: match_id" (§5.7; §12.1) — printed: brownlow_round_votes#320862 [B5] out_of_ledger_edit: field(s) differ from reconstruction: match_id; "field(s) differ from reconstruction: match_id" appears nowhere in the CLI output
+  apply (--expect-fingerprint = the STOP's reference fingerprint): exit 1, {"kind":"STOP","stops":[{"table":"brownlow_round_votes","rowId":320862,"step":"B5","code":"out_of_ledger_edit","detail":"field(s) differ from reconstruction: match_id"}],"referenceFingerprint":"caa5cabaafd224ce68c915094034297f65917c3100f32ff0009b495f4cd39c40"}
+  PASS  apply (the locking re-plan): STOP (exit 1) with the identical stop set -- the STOP holds under §8.2's locks — {"kind":"STOP","stops":[{"table":"brownlow_round_votes","rowId":320862,"step":"B5","code":"out_of_ledger_edit","detail":"field(s) differ from reconstruction: match_id"}],"referenceFingerprint":"caa5cabaafd224ce68c915094034297f65917c3100f32ff0009b495f4cd39c40"}
+  PASS  nothing written by either run: fixture census, CD_I's identity row and every protected row byte-identical
+  PASS  no ledger row and no correction batch for CD_I — {"ledger":0,"batches":0}
+  PASS  post: the combined identity invariant holds
+  PASS  post: stat_availability for 2092 byte-identical to the settled baseline (a STOP writes nothing) — 347ad2b20f8135d84da9004287adab12cef62bdcd6de3cb76d759fdd0568aaa2 -> 347ad2b20f8135d84da9004287adab12cef62bdcd6de3cb76d759fdd0568aaa2
+  PASS  post: CD_M's projection rows byte-identical
+  PASS  no non-fixture row changed across fixture setup and the correction (foreign fingerprint equal)
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 54: 21/21 checks PASS -> PASS
+CTDB-RC=0 label=c54 base=rb args=run --case 54 --acknowledge code_test_db

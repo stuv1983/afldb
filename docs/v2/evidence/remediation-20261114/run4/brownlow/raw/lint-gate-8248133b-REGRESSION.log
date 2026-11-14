@@ -1,0 +1,8 @@
+
+> afldb@0.1.0 lint:gate
+> tsx tools/dev/lint-gate.ts
+
+Lint gate (ratchet): 1 regression(s); 340 error(s) in 43 file(s) now; the ratchet baseline allows 338 in 43 (existing debt, not clean lint).
+  REGRESSION: tests/reference-data.test.ts: @typescript-eslint/no-explicit-any 31 -> 33
+Lint gate: FAILED (1).
+lint-gate-rc=0

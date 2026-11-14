@@ -1,0 +1,25 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2868972, import 2868974)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 2, variant votes-0: As 1, but the closure row's brownlow_votes is 0 (and separately 3) -> STOP brownlow_state_present (P6/BG1), nothing written
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  fixture: P=13366 (players/Z/Zz238_002_P.html), P'=13367 (players/Z/Zz238_002_Pprime.html), provider CD_I999238000021, match M=17057, closure row player_match_stats#695500, settle batch 27, actor 1
+  PASS  pre: the closure row is at (P, M), afl_api-owned, stamped <CD_M>|<team>|CD_I with its settle batch — {"player_id":13366,"source_record_id":"CD_M999238000021|CD_T992238H|CD_I999238000021","import_batch_id":27}
+  PASS  pre: CD_I is an importer row at P (unique, afl_api_stat_vector_bootstrap)
+  PASS  pre: the combined identity invariant holds with the fixture in place
+  PASS  pre: the closure row carries player_match_stats.brownlow_votes = 0 (Brownlow state the AFL API never writes); every other contract field is the insert application's — {"brownlow_votes":0}
+  PASS  pre: no P′ counterpart at M; P holds exactly the closure row — {"pRows":1,"pPrimeRows":0,"pAtM":1,"pPrimeAtM":0,"atM":1}
+  validate-only: exit 1, {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":695500,"step":"P6","code":"brownlow_state_present","detail":"brownlow_votes is not NULL"}],"referenceFingerprint":"5f1863e2bcf7577176a41d42d3598f37a96fef019b5047d9cbf06f2cfbb8ccca"}
+    | STOP: 1 stop(s); nothing written
+    | player_match_stats#695500 [P6] brownlow_state_present: brownlow_votes is not NULL
+  PASS  validate-only: STOP (exit 1) with exactly one stop, player_match_stats#695500 [P6] brownlow_state_present — {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":695500,"step":"P6","code":"brownlow_state_present","detail":"brownlow_votes is not NULL"}],"referenceFingerprint":"5f1863e2bcf7577176a41d42d3598f37a96fef019b5047d9cbf06f2cfbb8ccca"}
+  apply (--expect-fingerprint = the STOP's reference fingerprint): exit 1, {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":695500,"step":"P6","code":"brownlow_state_present","detail":"brownlow_votes is not NULL"}],"referenceFingerprint":"5f1863e2bcf7577176a41d42d3598f37a96fef019b5047d9cbf06f2cfbb8ccca"}
+  PASS  apply (the locking re-plan): STOP (exit 1) with the identical stop set -- the STOP holds under §8.2's locks — {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":695500,"step":"P6","code":"brownlow_state_present","detail":"brownlow_votes is not NULL"}],"referenceFingerprint":"5f1863e2bcf7577176a41d42d3598f37a96fef019b5047d9cbf06f2cfbb8ccca"}
+  PASS  nothing written by either run: fixture census, CD_I's identity row and every protected row byte-identical
+  PASS  no ledger row and no correction batch for CD_I — {"ledger":0,"batches":0}
+  PASS  post: the combined identity invariant holds
+  PASS  no non-fixture row changed across fixture setup and the correction (foreign fingerprint equal)
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 2 (votes-0): 14/14 checks PASS -> PASS
+CTDB-RC=0 label=c2-votes-0 base=rb args=run --case 2 --variant votes-0 --acknowledge code_test_db

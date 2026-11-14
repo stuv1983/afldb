@@ -1,0 +1,21 @@
+afldb_v2_rb_brownlow2025_test.dump: OK
+acquisition-014218.tar: OK
+fixture-root.tar: OK
+template-identity.txt: OK
+2026-11-14T19:53:59Z fixture acquisition == retained acquisition (byte-identical)
+2026-11-14T19:53:59Z fetch: done (fixture files 258)
+afldb_v2_rb_brownlow2025_test.dump: OK
+acquisition-014218.tar: OK
+fixture-root.tar: OK
+template-identity.txt: OK
+2026-11-14T19:54:00Z toc entries 1640; excluded 4
+pg_restore exit 0
+analyze exit 0
+identity query exit 0
+2026-11-14T20:27:48Z restored template identity == exported template identity
+2026-11-14T20:27:54Z clone afldb_v2_brownlow_tristate_twelve_test ready (migrations via the normal runner, then privileges)
+2026-11-14T20:27:54Z run b2-eligibility-2025 db=afldb_v2_brownlow_tristate_twelve_test file=tests/integration/v2-brownlow-eligibility-2025-rehearsal.test.ts
+2026-11-14T21:04:44Z run b2-eligibility-2025 rc=0:  Test Files  1 passed (1)       Tests  3 passed (3) 
+2026-11-14T21:04:49Z clone afldb_v2_brownlow_policy_final_test ready (migrations via the normal runner, then privileges)
+2026-11-14T21:04:49Z run b1-production-correction db=afldb_v2_brownlow_policy_final_test file=tests/integration/v2-brownlow-production-correction.test.ts
+2026-11-14T21:48:04Z run b1-production-correction rc=0:  Test Files  1 passed (1)       Tests  8 passed (8) 

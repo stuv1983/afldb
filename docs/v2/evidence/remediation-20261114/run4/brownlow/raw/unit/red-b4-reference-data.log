@@ -1,0 +1,123 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem4-brownlow-20261115/cand-b4
+
+ ❯ tests/reference-data.test.ts (70 tests | 2 failed) 5683ms
+     ✓ keeps the predecessor out-of-range exclusion and active pending season unchanged 6ms
+     ✓ included all 2026 football only in explicit synthetic completed metadata before the rollover 1ms
+     ✓ includes all 2026 football in the tracked successor state, with 2027 the excluded in-progress season (D-316-1) 2ms
+     ✓ refuses either in-range incomplete declaration (true/true) 3ms
+     ✓ refuses either in-range incomplete declaration (true/false) 1ms
+     ✓ refuses either in-range incomplete declaration (false/true) 1ms
+     ✓ refuses missing reference coverage and preserves historical no-GF metadata rules 2ms
+     ✓ carries the seven registry rows with unique keys and valid kinds 1ms
+     ✓ starts at 1897 and tiles the league eras contiguously 2ms
+     ✓ keeps in-progress seasons inside the range 1ms
+     ✓ holds all 24 historical identities with unique stable identifiers 2ms
+     ✓ preserves the succession model exactly 2ms
+     ✓ keeps the three organization relations, targeting organizations only 1ms
+     ✓ keeps identity spans inside the season range 4ms
+     ✓ carries the 21 per-match keys plus the three Brownlow grains, never the generic key 2ms
+     ✓ is either pending extraction or a valid coverage grid 158ms
+     × D-365-1: the declared no-medal season constant is exactly 1897-1923 and 1942-1945 and equals the reference grid 18ms
+     × D-365-1: the recompute reads neither the registry status nor the season's existing coverage row 3ms
+     ✓ carries the three unambiguous expansions unchanged 0ms
+     ✓ declares all 18 current AFL clubs with a unique CD_T id and a hist that resolves 1ms
+     ✓ declares one compSeason id/providerId per captured season, 2022-2027 1ms
+     ✓ never guesses a venue mapping: every declared venue also has raw_name evidence 3ms
+     ✓ declares provider LABELS apart from clubs and venues: placeholder teams and the To Be Confirmed venue (ISSUE-229 B2) 2ms
+       ✓ never probes a dependent with an unguarded count 0ms
+       ✓ classifies dependents through the catalogue, not by reading them 1ms
+       ✓ counts rows only in dependents it has proven readable 0ms
+       ✓ refuses, rather than assuming, when a dependent cannot be read 0ms
+       ✓ keeps the populated-dependent refusal it always had 0ms
+       ✓ takes the cascade closure from the POPULATED roots, not the union (§H13) 0ms
+       ✓ will not let the guard and the truncate disagree about the roots (§H13) 0ms
+       ✓ skips a TRUNCATE whose targets are already empty 1ms
+       ✓ needs no new grant: privileges.sql is untouched by this repair 1ms
+       ✓ finds the tables created after 045 that never registered import write 0ms
+       ✓ confirms the two that sit in the reference loader cascade closure 2ms
+     ✓ has zero dependency on the legacy SQLite path 1ms
+     ✓ --print-plan validates the datasets and is deterministic  647ms
+     ✓ cascade guard behaves correctly (tests/python/reference_cascade_contract.py)  305ms
+     ✓ declares the four 2026 acquisition sources by stable key only 3ms
+     ✓ counts Squiggle and Kali as TWO match witnesses now that P1 has run 9ms
+     ✓ keeps the Kali player grain fail-closed after P2 1ms
+     ✓ promotes the AFL Tables and afl_api match-family families, and lineups never at all 7ms
+     ✓ declares advisory corroboration for the two AFL Tables families only (§10) 9ms
+       ✓ declares both families with a proven shape and key 1ms
+       ✓ declares exactly the columns the emitter produces 3ms
+       ✓ keys the player grain on the profile URL, with ID enrichment-only (P5) 1ms
+       ✓ composes the match key from the columns the resolver reads 1ms
+       ✓ keeps NULL distinct from zero and the payload hash whole 5ms
+     ✓ keeps AFL API zero-as-missing and the fetch date out of the change oracle 3ms
+     ✓ treats Squiggle `updated` as the one genuine upstream mutation timestamp 0ms
+     ✓ refuses to project a family whose shape was never proven 1ms
+     ✓ accepts both proven lineup shapes and refuses drift in either direction 3ms
+     ✓ fails closed on lineup identity and source state, not on optional fields 4ms
+     ✓ treats the lineup family as staging-only with no captain signal 1ms
+     ✓ keeps round integers inside their own vocabulary 3ms
+       ✓ declares one table per captured season, each a contiguous 1..N home-and-away run 3ms
+       ✓ gives 2024-2026 an Opening Round (offset +1) and 2022/2023 none (offset 0) 1ms
+       ✓ gives 2026 alone a standalone Wildcard round and a labelled QE split 1ms
+       ✓ fails closed on a declared table with drift (§19.7g) 10ms
+       ✓ declares afltables and afl_api as one co-source group 1ms
+       ✓ is optional and empty when omitted, and fails closed on drift 7ms
+     ✓ fails closed on registry drift 15ms
+     ✓ brownlow_afl_api_season_rehearsal_contract.py exits 0 and prints its closing line  442ms
+     ✓ draftguru_bridge_v2_contract.py exits 0 and prints its closing line  1439ms
+     ✓ draftguru_child_validation_v3_contract.py exits 0 and prints its closing line  856ms
+     ✓ draftguru_population_scan_contract.py exits 0 and prints its closing line  522ms
+     ✓ fitzroy_profile_continuity_contract.py exits 0 and prints its closing line 101ms
+     ✓ issue333_o2_contract.py exits 0 and prints its closing line  603ms
+     ✓ settle_emit_contract.py exits 0 and prints its closing line 182ms
+     ✓ every tests/python/*_contract.py is run by a suite (this table or another test file) 258ms
+     ✓ AFLDB_PYTHON wins, PYTHON is the legacy fallback, then the in-tree venv, then the system interpreter 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/reference-data.test.ts > stat availability dataset > D-365-1: the declared no-medal season constant is exactly 1897-1923 and 1942-1945 and equals the reference grid
+AssertionError: expected undefined to deeply equal [ { firstSeason: 1897, …(1) }, …(1) ]
+
+- Expected:
+[
+  {
+    "firstSeason": 1897,
+    "lastSeason": 1923,
+  },
+  {
+    "firstSeason": 1942,
+    "lastSeason": 1945,
+  },
+]
+
++ Received:
+undefined
+
+ ❯ tests/reference-data.test.ts:235:48
+    233|   // `coverage-registry` status (registry `unsupported` also covers 20…
+    234|   it('D-365-1: the declared no-medal season constant is exactly 1897-1…
+    235|     expect(BROWNLOW_DECLARED_NO_MEDAL_SEASONS).toEqual([
+       |                                                ^
+    236|       { firstSeason: 1897, lastSeason: 1923 },
+    237|       { firstSeason: 1942, lastSeason: 1945 },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  tests/reference-data.test.ts > stat availability dataset > D-365-1: the recompute reads neither the registry status nor the season's existing coverage row
+AssertionError: Target cannot be null or undefined.
+ ❯ tests/reference-data.test.ts:262:95
+    260|     expect(body).not.toMatch(/FROM\s+stat_availability/i);
+    261|     // Every grain's final branch is the declared-or-pending pair, and…
+    262|     expect(body.match(/WHEN c\.declared_no_medal\s+THEN 'not_applicabl…
+       |                                                                                               ^
+    263|     expect(body).not.toMatch(/ELSE 'not_applicable'/);
+    264|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 68 passed (70)
+   Start at  06:56:04
+   Duration  6.75s (transform 250ms, setup 167ms, import 513ms, tests 5.68s, environment 0ms)
+

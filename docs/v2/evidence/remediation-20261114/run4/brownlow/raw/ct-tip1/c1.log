@@ -1,0 +1,33 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2865105, import 2865110)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 1: Basic P -> P′: player_match_stats row proven through CD_I (P1-P7), no P′ counterpart -> MOVE (C1)
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  fixture: P=13366 (players/Z/Zz238_001_P.html), P'=13367 (players/Z/Zz238_001_Pprime.html), provider CD_I999238000011, match M=17057, closure row player_match_stats#695500, settle batch 27, actor 1
+  PASS  pre: closure row exists at (P, M), afl_api-owned, stamped <CD_M>|<team>|CD_I with the settle batch, brownlow_votes NULL — {"player_id":13366,"source_record_id":"CD_M999238000011|CD_T992238H|CD_I999238000011"}
+  PASS  pre: its contract equals the insert application (P7 reconstruction)
+  PASS  pre: no P′ counterpart at M; P holds exactly the one row; the projection names P — {"counterpart":0,"pRows":1,"projection":13366}
+  PASS  pre: CD_I is an importer row at P (unique, afl_api_stat_vector_bootstrap)
+  PASS  pre: the combined identity invariant holds with the fixture in place
+  validate-only: exit 0, {"kind":"PLANNED","fingerprint":"00ea99bb691bf30acfd339985fb1d6253f11b178ba02060f1fb227d9b61dde8a","rowsPlanned":1}
+  PASS  validate-only: PLAN OK, exit 0, 1 row(s) planned — {"kind":"PLANNED","fingerprint":"00ea99bb691bf30acfd339985fb1d6253f11b178ba02060f1fb227d9b61dde8a","rowsPlanned":1}
+  PASS  validate-only wrote nothing (fixture census unchanged)
+  apply: exit 0, {"kind":"COMMITTED","fingerprint":"00ea99bb691bf30acfd339985fb1d6253f11b178ba02060f1fb227d9b61dde8a","adjudicationId":1,"batchId":28,"moved":1,"deleted":0,"reportIncomplete":false}
+  PASS  apply: COMMITTED, exit 0, the validate-only fingerprint, moved 1, deleted 0, report complete — {"kind":"COMMITTED","fingerprint":"00ea99bb691bf30acfd339985fb1d6253f11b178ba02060f1fb227d9b61dde8a","adjudicationId":1,"batchId":28,"moved":1,"deleted":0,"reportIncomplete":false}
+  PASS  post: the SAME row id now sits at (P′, M)
+  PASS  post: its contract is byte-identical (MOVE changes player_id only)
+  PASS  post: provenance kept (D3: source_id, source_record_id, import_batch_id unchanged)
+  PASS  post: P holds no row; P′ holds exactly the moved one — {"pLeft":0,"pPrimeRows":1}
+  PASS  post: exactly one correction application, bound to batch K, citing the insert's version, update {player_id: P} -> {player_id: P′} at (P′, M) — [{"id":2,"importBatchId":28,"family":"player_match_stats","externalRecordId":"CD_M999238000011|CD_T992238H|CD_I999238000011","versionSeq":1,"targetKey":{"match_id":17057,"player_id":13367},"verb":"update","previousValues":{"player_id":13366},"newValues":{"player_id":13367}}]
+  PASS  post: one new `corrected` ledger row after 0 prior row(s): P′ at its identity, previous identity P, supersedes NULL (importer origin), surname ack false, actor, evidence hash, previous_state unique at P — [{"id":1,"action":"corrected","playerId":13367,"playerIdentity":"players/Z/Zz238_001_Pprime.html","previousPlayerIdentity":"players/Z/Zz238_001_P.html","supersedesId":null,"adminUserId":1,"evidenceSha256":"067a03bed79f102f43079a5990e1c4b53c4ec0e79ffb0e713d8d897c95f88bc8","previousState":{"id":18427,"status":"unique","playerId":13366},"surnameAck":false}]
+  PASS  post: CD_I updated in place to P′ (same id, resolved, candidate_count 0, afl_api_admin_adjudication) — {"id":18427,"playerId":13367,"status":"resolved","candidateCount":0,"matchMethod":"afl_api_admin_adjudication","externalName":null}
+  PASS  post: batch K completed and bound: adjudication id, closure fingerprint, one update rowProof with the pre-correction contract hash — {"moved":{"player_match_stats":1,"brownlow_round_votes":0},"deleted":{"player_match_stats":0,"brownlow_round_votes":0},"projectionsMoved":1}
+  PASS  post: batch counts: moved player_match_stats 1, deleted 0, projections moved 1
+  PASS  post: the typed projection of CD_I names P′ (SAT-5)
+  PASS  post: targeted recompute: P has no 2092 season row and 0 career games; P′ has 1 game in 2092 and in career — [{"playerId":13366,"season":null,"games":0,"career":0},{"playerId":13367,"season":2092,"games":1,"career":1}]
+  PASS  post: the combined identity invariant (SAT-1 basis) holds
+  PASS  no non-fixture row changed across fixture setup and the correction (foreign fingerprint equal)
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 1: 24/24 checks PASS -> PASS
+CTDB-RC=0 label=c1 base=rb args=run --case 1 --acknowledge code_test_db

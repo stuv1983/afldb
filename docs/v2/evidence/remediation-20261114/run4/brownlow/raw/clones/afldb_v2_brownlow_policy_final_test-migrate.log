@@ -1,0 +1,9 @@
+isolated-pg: afldb_v2_brownlow_policy_final_test verified (cluster afldb_v2_isolated, 127.0.0.1:55681); running node
+AFLDB migrations -> test (afldb_owner@127.0.0.1:55681/afldb_v2_brownlow_policy_final_test)
+  118 migration file(s), 115 already applied
+
+  applying 116_brownlow_correction_receipts.sql ... ok (20 ms)
+  applying 117_brownlow_provider_eligibility_unknown.sql ... ok (4 ms)
+  applying 118_fixtures_unconfirmed_participants.sql ... ok (6 ms)
+
+Applied 3 migration(s).

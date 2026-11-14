@@ -1,0 +1,36 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem4-brownlow-20261115/final
+
+stdout | tests/correct-afl-api-identity-cli.test.ts > AFLDB-ISSUE-238 stage-aware PRE-SWAP SAT-1 / CRV: exactly the declared pending-D15 providers may lack a resolved row (production contract correction found by the DEV rehearsal) > CRV (gateAflApiCorrectedReplayVerification) applies the shared contract, not a second rule > 21. resolved set == C_promotion while the exact linked set is pending D15 -> PASS
+
+[PASS] afl_api corrected identities — replay verification (CRV, §7.5)
+       1 C_promotion provider(s) verified on the candidate
+       CD_I (adjudication 2): identity resolved, replay batch as predicted, correction satisfied
+
+stdout | tests/correct-afl-api-identity-cli.test.ts > AFLDB-ISSUE-238 stage-aware PRE-SWAP SAT-1 / CRV: exactly the declared pending-D15 providers may lack a resolved row (production contract correction found by the DEV rehearsal) > CRV (gateAflApiCorrectedReplayVerification) applies the shared contract, not a second rule > the same world with nothing declared -> FAIL (24: undeclared missing linked provider)
+
+[FAIL] afl_api corrected identities — replay verification (CRV, §7.5)
+       1 C_promotion provider(s) verified on the candidate
+       STOP CD_I: Q2 STOP [SAT-1] identity_contradicts: extended bijection: {"kind":"bijection_mismatch","mismatch":{"kind":"ledger_without_row","externalId":"CD_J"}}
+
+stdout | tests/correct-afl-api-identity-cli.test.ts > AFLDB-ISSUE-238 stage-aware PRE-SWAP SAT-1 / CRV: exactly the declared pending-D15 providers may lack a resolved row (production contract correction found by the DEV rehearsal) > CRV (gateAflApiCorrectedReplayVerification) applies the shared contract, not a second rule > 22. a pending provider already resolved pre-swap -> FAIL
+
+[FAIL] afl_api corrected identities — replay verification (CRV, §7.5)
+       1 C_promotion provider(s) verified on the candidate
+       STOP CD_I: Q2 STOP [SAT-1] identity_contradicts: extended bijection: {"kind":"pending_d15_materialised_early","externalId":"CD_J"}
+
+stdout | tests/correct-afl-api-identity-cli.test.ts > AFLDB-ISSUE-238 stage-aware PRE-SWAP SAT-1 / CRV: exactly the declared pending-D15 providers may lack a resolved row (production contract correction found by the DEV rehearsal) > CRV (gateAflApiCorrectedReplayVerification) applies the shared contract, not a second rule > 23. the corrected provider absent -> FAIL, whatever is declared
+
+[FAIL] afl_api corrected identities — replay verification (CRV, §7.5)
+       1 C_promotion provider(s) verified on the candidate
+       STOP CD_I: no afl_api identity row exists after the replay
+       STOP CD_I: Q2 STOP [SAT-1] identity_contradicts: extended bijection: {"kind":"bijection_mismatch","mismatch":{"kind":"ledger_without_row","externalId":"CD_I"}}
+       STOP CD_I: Q2 STOP [SAT-1] identity_contradicts: the external identity or ledger chain is not resolved to P' with a valid chain
+
+ ✓ tests/correct-afl-api-identity-cli.test.ts (276 tests) 434ms
+
+ Test Files  1 passed (1)
+      Tests  276 passed (276)
+   Start at  06:56:24
+   Duration  3.33s (transform 2.05s, setup 171ms, import 2.34s, tests 434ms, environment 0ms)
+

@@ -1,0 +1,19 @@
+isolated-pg: afldb_v2_rem4brownlow_rb_pb1a1_test verified (cluster afldb_v2_isolated, 127.0.0.1:55681); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem4-brownlow-20261115/cand
+
+ ✓ tests/integration/settle-afl-api-brownlow.test.ts (21 tests) 28380ms
+     ✓ resolves and plans vote sets for TWO distinct matches once the match family has staged them (the operator's unknown_match -> voteSetsPlanned/voteSetsWouldAutoApply target), and creates no duplicate canonical match  310ms
+       ✓ a later correction can reverse the swap (D -> 0, C -> 1): the retained zero row is reused, never recreated  315ms
+       ✓ never touches another match's row in the SAME season and round, nor a foreign-owned row that merely reuses this match's source_record_id — the correction is bounded by (source_id, source_record_id), not by round  327ms
+       ✓ rolls the WHOLE vote set back when one part of a swap cannot apply — C is never zeroed while D is missing — and the identical call succeeds once the failure is removed  326ms
+       ✓ heals a vote set a pre-F002 run left stale (A3 B2 C1 + D1 all positive) on its next replay, and (AFLDB-ISSUE-244 I244-F007) heals D's NULL match_id in the SAME replay with no extra vote change, recomputing coverage once as part of the same committed transaction  308ms
+       ✓ AFLDB-ISSUE-244 I244-F007: a two-way permutation (A3 B2 C1 -> A2 B3 C1) succeeds without violating UNIQUE (match_id, votes): A and B are released to 0 first, then claim their final values — and neither temporary release is counted as a stale demotion  317ms
+     ✓ cleanup() self-heals a stale player_clubs pointer left by a crashed prior teardown (one that deleted player_match_stats but never reached the recompute/DELETE FROM matches that follows it — the exact partial state a reported failed run left behind). Runs last: it deletes matches p and q outright, which every test above this one depends on existing.  13449ms
+
+ Test Files  1 passed (1)
+      Tests  21 passed (21)
+   Start at  06:31:43
+   Duration  31.27s (transform 810ms, setup 1.57s, import 932ms, tests 28.38s, environment 0ms)
+
+JSON report written to /mnt/ssd/afldb-rem4-brownlow-20261115/evidence/rb-pb1a1/vitest.json

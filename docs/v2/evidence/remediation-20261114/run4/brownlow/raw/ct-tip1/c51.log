@@ -1,0 +1,35 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2873761, import 2873762)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 51: Foreign-owned row at P (another match), no Brownlow event dependency -> NOOP foreign (C11); the closure row still MOVEs
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  fixture: P=13366 (players/Z/Zz238_051_P.html), P'=13367 (players/Z/Zz238_051_Pprime.html), provider CD_I999238000511, match M=17057, closure row player_match_stats#695500, settle batch 27, actor 1
+  foreign row at P: player_match_stats#695501 at match M2=17058 (round 2)
+  PASS  pre: the closure row is at (P, M), afl_api-owned, stamped <CD_M>|<team>|CD_I with its settle batch — {"player_id":13366,"source_record_id":"CD_M999238000511|CD_T992238H|CD_I999238000511","import_batch_id":27}
+  PASS  pre: CD_I is an importer row at P (unique, afl_api_stat_vector_bootstrap)
+  PASS  pre: the combined identity invariant holds with the fixture in place
+  PASS  pre: the closure row's contract is the settled one
+  PASS  pre: the foreign row is at (P, M2), AFL Tables-owned, with no stamp, batch or application at its key; P has no Brownlow row (no event dependency) — {"ownerKey":"afltables","apps":0,"brv":0}
+  PASS  pre: P holds two rows (closure + foreign); no P′ counterpart at M — {"pRows":2,"pPrimeRows":0,"pAtM":1,"pPrimeAtM":0,"atM":1}
+  validate-only: exit 0, {"kind":"PLANNED","fingerprint":"2e2c373f0da7c897e0e7ec0d1a3ea386fa1b88ff001178fdd2fb0364dca684a0","rowsPlanned":1}
+  PASS  validate-only: PLAN OK, exit 0, 1 row(s) planned — {"kind":"PLANNED","fingerprint":"2e2c373f0da7c897e0e7ec0d1a3ea386fa1b88ff001178fdd2fb0364dca684a0","rowsPlanned":1}
+  PASS  validate-only wrote nothing (fixture census unchanged)
+  apply: exit 0, {"kind":"COMMITTED","fingerprint":"2e2c373f0da7c897e0e7ec0d1a3ea386fa1b88ff001178fdd2fb0364dca684a0","adjudicationId":1,"batchId":28,"moved":1,"deleted":0,"reportIncomplete":false}
+  PASS  apply: COMMITTED, exit 0, the validate-only fingerprint, moved 1, deleted 0, report complete — {"kind":"COMMITTED","fingerprint":"2e2c373f0da7c897e0e7ec0d1a3ea386fa1b88ff001178fdd2fb0364dca684a0","adjudicationId":1,"batchId":28,"moved":1,"deleted":0,"reportIncomplete":false}
+  PASS  validate-only: the foreign row is classified NOOP foreign (C11) and reported; only the closure row is planned — NOOP foreign (C11): player_match_stats#695501 (player 13366, match 17058) is not afl_api-owned and carries no CD_I999238000511 lineage; preserved untouched
+  PASS  post: the closure row (same id) is at (P′, M), contract byte-identical, provenance kept
+  PASS  post: the foreign row is byte-identical apart from recompute-owned career_game_no, and still at (P, M2): never moved, deleted or rewritten — [{"career_game_no":[2,1]}]
+  PASS  post: its career_game_no is re-sequenced 2 -> 1 by the targeted recompute (M2 is now P's only, first, game) — 2 -> 1
+  PASS  post: P holds exactly the foreign row; P′ holds exactly the moved row — {"pRows":1,"pPrimeRows":1,"pAtM":0,"pPrimeAtM":1,"atM":1}
+  PASS  post: no application was written at the foreign row's key (or at P′ for M2)
+  PASS  post: batch K completed and bound (adjudication, fingerprint, evidence hash); exactly one player_match_stats update rowProof with the pre-correction contract hash — [{"verb":"update","table":"player_match_stats","newKey":{"match_id":17057,"player_id":13367},"oldKey":{"match_id":17057,"player_id":13366},"preCorrectionContractSha256":"1ca9b726dbf7d9b377f7e45361e8e5bad6df006b9eecd6135b7ed71d8bd04fbc"}]
+  PASS  post: batch counts moved {"brownlow_round_votes":0,"player_match_stats":1}, deleted {"brownlow_round_votes":0,"player_match_stats":0} — {"moved":{"player_match_stats":1,"brownlow_round_votes":0},"deleted":{"player_match_stats":0,"brownlow_round_votes":0},"projectionsMoved":1}
+  PASS  post: one new `corrected` ledger row after 0 prior row(s): P′ at its identity, previous identity P, supersedes NULL (importer origin), surname ack false, actor, evidence hash, previous_state unique at P — [{"id":1,"action":"corrected","playerId":13367,"playerIdentity":"players/Z/Zz238_051_Pprime.html","previousPlayerIdentity":"players/Z/Zz238_051_P.html","supersedesId":null,"adminUserId":1,"evidenceSha256":"39c135fd6808754723e48aa864d47a8bc64de5704c321011e7a2684f9a08687f","previousState":{"id":18427,"status":"unique","playerId":13366},"surnameAck":false}]
+  PASS  post: CD_I updated in place to P′ (same id, resolved, candidate_count 0, afl_api_admin_adjudication) — {"id":18427,"playerId":13367,"status":"resolved","candidateCount":0,"matchMethod":"afl_api_admin_adjudication","externalName":null}
+  PASS  post: targeted recompute: P keeps 1 game in 2092 (the foreign M2 row) and 1 career game; P′ has 1 and 1 — {"p":{"playerId":13366,"season":1,"career":1},"pPrime":{"playerId":13367,"season":1,"career":1}}
+  PASS  post: the combined identity invariant (SAT-1 basis) holds
+  PASS  no non-fixture row changed across fixture setup and the correction (foreign fingerprint equal)
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 51: 25/25 checks PASS -> PASS
+CTDB-RC=0 label=c51 base=rb args=run --case 51 --acknowledge code_test_db

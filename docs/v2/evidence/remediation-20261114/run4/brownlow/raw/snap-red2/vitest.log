@@ -1,0 +1,117 @@
+isolated-pg: afldb_v2_rem4brownlow_snap_red2_test verified (cluster afldb_v2_isolated, 127.0.0.1:55681); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem4-brownlow-20261115/cand
+
+ ❯ tests/integration/brownlow-pending-coverage.test.ts (8 tests | 4 failed) 1988ms
+     ✓ precondition: the fixture season is completed, holds no medal rows, no decisions and no coverage row 10ms
+     × a recompute of the completed season writes pending at all three grains (no coverage row to begin with) 29ms
+     × heals a season already (wrongly) marked not_applicable: the rule never reads the existing row 20ms
+     × a pending completed season admits a finalisation, which then reads partial; a not_applicable one is refused 63ms
+     ✓ recomputing 1900 inside a rolled-back transaction keeps all three grains not_applicable 9ms
+     ✓ recomputing 1943 inside a rolled-back transaction keeps all three grains not_applicable 8ms
+     ✓ a declared no-medal season still refuses a Brownlow finalisation (season_not_polled) and writes nothing 27ms
+     × no season is ever recomputed to not_applicable unless declared; season totals match the committed reference grid 1149ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/brownlow-pending-coverage.test.ts > D-365-1: a completed season with no loaded medal is pending, never not_applicable > a recompute of the completed season writes pending at all three grains (no coverage row to begin with)
+AssertionError: expected { …(5) } to deeply equal { …(5) }
+
+- Expected
++ Received
+
+  {
+-   "coverage": "pending",
++   "coverage": "not_applicable",
+    "isRecorded": false,
+    "populatedRows": null,
+    "statKey": "brownlow_season_total",
+    "totalRows": null,
+  }
+
+ ❯ tests/integration/brownlow-pending-coverage.test.ts:167:51
+    165|     // Expected values are literals from the owner's rule. The match g…
+    166|     // (0 of the fixture's 2 home-and-away matches carry a full 6-vote…
+    167|     expect(rowFor(rows, 'brownlow_season_total')).toEqual({
+       |                                                   ^
+    168|       statKey: 'brownlow_season_total', isRecorded: false, coverage: '…
+    169|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  tests/integration/brownlow-pending-coverage.test.ts > D-365-1: a completed season with no loaded medal is pending, never not_applicable > heals a season already (wrongly) marked not_applicable: the rule never reads the existing row
+AssertionError: expected [ …(3) ] to deeply equal [ …(3) ]
+
+- Expected
++ Received
+
+  [
+    [
+      "brownlow_match_votes",
+-     "pending",
++     "not_applicable",
+    ],
+    [
+      "brownlow_round_votes",
+-     "pending",
++     "not_applicable",
+    ],
+    [
+      "brownlow_season_total",
+-     "pending",
++     "not_applicable",
+    ],
+  ]
+
+ ❯ tests/integration/brownlow-pending-coverage.test.ts:188:54
+    186|     await recomputeCommitted(fixture.season);
+    187|     const rows = await readRows(owner, fixture.season);
+    188|     expect(rows.map((r) => [r.statKey, r.coverage])).toEqual([
+       |                                                      ^
+    189|       ['brownlow_match_votes', 'pending'], ['brownlow_round_votes', 'p…
+    190|     ]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  tests/integration/brownlow-pending-coverage.test.ts > D-365-1: a completed season with no loaded medal is pending, never not_applicable > a pending completed season admits a finalisation, which then reads partial; a not_applicable one is refused
+Error: finalisation refused (season_total was 'not_applicable'): season_not_polled No Brownlow Medal was awarded for that season, so it has no votes to record. No Brownlow Medal was awarded in 2063.
+ ❯ tests/integration/brownlow-pending-coverage.test.ts:216:13
+    214|     const admitted = await finaliseBrownlowMatch({ matchId: match.matc…
+    215|     if (!admitted.ok) {
+    216|       throw new Error(`finalisation refused (season_total was '${state…
+       |             ^
+    217|     }
+    218|     expect(stateBefore).toBe('pending');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  tests/integration/brownlow-pending-coverage.test.ts > D-365-1: the all-season sweep (every recompute rolled back) > no season is ever recomputed to not_applicable unless declared; season totals match the committed reference grid
+AssertionError: expected [ …(3) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "2026 brownlow_season_total: not_applicable (declared=false)",
++   "2026 brownlow_match_votes: not_applicable (declared=false)",
++   "2026 brownlow_season_total: not_applicable != pending",
++ ]
+
+ ❯ tests/integration/brownlow-pending-coverage.test.ts:303:24
+    301|       }
+    302|     }
+    303|     expect(violations).toEqual([]);
+       |                        ^
+    304|   }, 120_000);
+    305| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 4 passed (8)
+   Start at  06:15:46
+   Duration  3.13s (transform 553ms, setup 161ms, import 616ms, tests 1.99s, environment 0ms)
+
+JSON report written to /mnt/ssd/afldb-rem4-brownlow-20261115/evidence/snap-red2/vitest.json

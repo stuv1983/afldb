@@ -1,0 +1,33 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2916506, import 2916507)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 4, variant draft: brownlow_vote_entry_state for M names P (draft by the real writer; final) -> STOP brownlow_entry_names_player (BG3) at the pms row
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  fixture: P=13366 (players/Z/Zz238_004_P.html), P'=13367 (players/Z/Zz238_004_Pprime.html), provider CD_I999238000041, match M=17057, closure row player_match_stats#695500, settle batch 27, actor 1
+  writer saveDraftBrownlowMatch: {"ok":true,"value":{"matchId":17057,"status":"draft","revision":1,"selection":{"three":13366,"two":13368,"one":13369},"republishedSeason":null}}
+  PASS  writer: the real saveDraftBrownlowMatch saved a draft for M (revision 1) — {"ok":true,"value":{"matchId":17057,"status":"draft","revision":1,"selection":{"three":13366,"two":13368,"one":13369},"republishedSeason":null}}
+  PASS  pre: the closure row is at (P, M), afl_api-owned, stamped <CD_M>|<team>|CD_I with its settle batch — {"player_id":13366,"source_record_id":"CD_M999238000041|CD_T992238H|CD_I999238000041","import_batch_id":27}
+  PASS  pre: CD_I is an importer row at P (unique, afl_api_stat_vector_bootstrap)
+  PASS  pre: the combined identity invariant holds with the fixture in place
+  PASS  pre: M's entry state is draft, revision 1, and names P in the three-vote slot (A, B in two/one), not finalised — {"season":2092,"status":"draft","match_id":17057,"revision":1,"created_at":"2026-11-14T19:34:13.978931+00:00","created_by":1,"updated_at":"2026-11-14T19:34:13.978931+00:00","updated_by":1,"last_reason":null,"finalised_at":null,"finalised_by":null,"one_player_id":13369,"two_player_id":13368,"three_player_id":13366,"finalised_revision":null}
+  PASS  pre: the writer's production audit exists: exactly one data_edits brownlow_vote_entry_state/draft row for M — [{"fieldGroup":"draft"}]
+  PASS  pre: BG1 absent (the closure row's brownlow_votes is NULL; a draft or reproduced entry writes no mirror) and BG2 absent (P has no round row) — {"votes":null,"pRounds":0,"entries":1}
+  PASS  pre: no P′ counterpart at M; P holds exactly the closure row — {"pRows":1,"pPrimeRows":0,"pAtM":1,"pPrimeAtM":0,"atM":3}
+  stat_availability 2092 baseline (3 row(s), sha256 64b2052c06a7e3a7adee024b7771a5698846b5a273d7d57997afd5abed141f92)
+  PASS  baseline: the settled 2092 coverage is a fixed point of the real recomputeBrownlowCoverage (rolled-back re-run byte-identical) — 64b2052c06a7e3a7adee024b7771a5698846b5a273d7d57997afd5abed141f92 -> 64b2052c06a7e3a7adee024b7771a5698846b5a273d7d57997afd5abed141f92
+  validate-only: exit 1, {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":695500,"step":"BG3","code":"brownlow_entry_names_player","detail":"the match entry-state names this player in a vote slot"}],"referenceFingerprint":"b3d141b0a6e0070fa1681cbdbf53a67e0af3a0474dfc2184612fb8d89f484297"}
+    | STOP: 1 stop(s); nothing written
+    | player_match_stats#695500 [BG3] brownlow_entry_names_player: the match entry-state names this player in a vote slot
+  PASS  validate-only: STOP (exit 1) with exactly one stop, player_match_stats#695500 [BG3] brownlow_entry_names_player — {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":695500,"step":"BG3","code":"brownlow_entry_names_player","detail":"the match entry-state names this player in a vote slot"}],"referenceFingerprint":"b3d141b0a6e0070fa1681cbdbf53a67e0af3a0474dfc2184612fb8d89f484297"}
+  PASS  validate-only: the STOP names its evidence exactly, "the match entry-state names this player in a vote slot" (§5.7; §12.1) — printed: player_match_stats#695500 [BG3] brownlow_entry_names_player: the match entry-state names this player in a vote slot; "the match entry-state names this player in a vote slot" appears nowhere in the CLI output
+  apply (--expect-fingerprint = the STOP's reference fingerprint): exit 1, {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":695500,"step":"BG3","code":"brownlow_entry_names_player","detail":"the match entry-state names this player in a vote slot"}],"referenceFingerprint":"b3d141b0a6e0070fa1681cbdbf53a67e0af3a0474dfc2184612fb8d89f484297"}
+  PASS  apply (the locking re-plan): STOP (exit 1) with the identical stop set -- the STOP holds under §8.2's locks — {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":695500,"step":"BG3","code":"brownlow_entry_names_player","detail":"the match entry-state names this player in a vote slot"}],"referenceFingerprint":"b3d141b0a6e0070fa1681cbdbf53a67e0af3a0474dfc2184612fb8d89f484297"}
+  PASS  nothing written by either run: fixture census, CD_I's identity row and every protected row byte-identical
+  PASS  no ledger row and no correction batch for CD_I — {"ledger":0,"batches":0}
+  PASS  post: the combined identity invariant holds
+  PASS  post: every guard/dependent row (entry state, season authority and totals, after_siren_kicks, player_achievements), every 2092 round row, 2092 stat_availability and P/P′ derived rows byte-identical (9 row(s)): the STOP wrote nothing — b6b0a72fcac3d79e3cd59ad8114dcd3a4580d2862293a88a399c8c820eb1113f -> b6b0a72fcac3d79e3cd59ad8114dcd3a4580d2862293a88a399c8c820eb1113f
+  PASS  no non-fixture row changed across fixture setup and the correction (foreign fingerprint equal)
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 4 (draft): 20/20 checks PASS -> PASS
+CTDB-RC=0 label=c4-draft base=rb args=run --case 4 --variant draft --acknowledge code_test_db

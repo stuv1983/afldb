@@ -1,0 +1,33 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2925329, import 2925330)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 19, variant debut-change: A first_kick_goal row for (P, M) -> STOP (DP-2); a P′ debut-match change -> reported (DP-5), COMMITTED
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  fixture: P=13366 (players/Z/Zz238_019_P.html), P'=13367 (players/Z/Zz238_019_Pprime.html), provider CD_I999238000191, match M=17057, closure row player_match_stats#695500, settle batch 27, actor 1
+  PASS  pre: the closure row is at (P, M), afl_api-owned, stamped <CD_M>|<team>|CD_I with its settle batch — {"player_id":13366,"source_record_id":"CD_M999238000191|CD_T992238H|CD_I999238000191","import_batch_id":27}
+  PASS  pre: CD_I is an importer row at P (unique, afl_api_stat_vector_bootstrap)
+  PASS  pre: the combined identity invariant holds with the fixture in place
+  PASS  pre: no Brownlow state for P and no entry state at M — {"votes":null,"pRounds":0,"entries":0}
+  PASS  pre: P′'s career is only M2=17058 (career_game_no 1, a later date than M); player_achievements#335 is P′'s first_kick_goal AT M2 (its debut) — [{"matchId":17058,"careerGameNo":1}]
+  PASS  pre: no dependent at (P, M) or at M, none match-less for P (DP-1..DP-4 all absent); P has no first_kick_goal row — {"sirenAtPM":0,"achievementAtPM":0,"unresolvedAtM":0,"matchLessForP":0}
+  PASS  pre: no P′ counterpart at M; P holds exactly the closure row — {"pRows":1,"pPrimeRows":1,"pAtM":1,"pPrimeAtM":0,"atM":1}
+  validate-only: exit 0, {"kind":"PLANNED","fingerprint":"4fdc3a8603c325bdf29045e8174cc9c9fcb9d33dffe5595dff56ad5be9fecbf8","rowsPlanned":1}
+  PASS  validate-only: PLAN OK, exit 0, 1 row(s) planned — {"kind":"PLANNED","fingerprint":"4fdc3a8603c325bdf29045e8174cc9c9fcb9d33dffe5595dff56ad5be9fecbf8","rowsPlanned":1}
+  PASS  validate-only wrote nothing (fixture census unchanged)
+  apply: exit 0, {"kind":"COMMITTED","fingerprint":"4fdc3a8603c325bdf29045e8174cc9c9fcb9d33dffe5595dff56ad5be9fecbf8","adjudicationId":1,"batchId":28,"moved":1,"deleted":0,"reportIncomplete":false}
+  PASS  apply: COMMITTED, exit 0, the validate-only fingerprint, moved 1, deleted 0, report complete — {"kind":"COMMITTED","fingerprint":"4fdc3a8603c325bdf29045e8174cc9c9fcb9d33dffe5595dff56ad5be9fecbf8","adjudicationId":1,"batchId":28,"moved":1,"deleted":0,"reportIncomplete":false}
+  PASS  validate-only: the report carries the DP-5 debut-change report (prospective): "DP-5 REPORT: first_kick_goal player_achievements#335 for P′ (player 13367): debut match 17058 -> 17057; the importer's tie-break evidence changes (import-first-kick-goal.ts:446-457)"
+  PASS  apply: the report carries the DP-5 debut-change report (committed): "DP-5 REPORT: first_kick_goal player_achievements#335 for P′ (player 13367): debut match 17058 -> 17057; the importer's tie-break evidence changes (import-first-kick-goal.ts:446-457)"
+  PASS  post: the closure row (same id) is at (P′, M), contract byte-identical, provenance kept
+  PASS  post: batch K completed and bound (adjudication, fingerprint, evidence hash); exactly one player_match_stats update rowProof with the pre-correction contract hash — [{"verb":"update","table":"player_match_stats","newKey":{"match_id":17057,"player_id":13367},"oldKey":{"match_id":17057,"player_id":13366},"preCorrectionContractSha256":"1ca9b726dbf7d9b377f7e45361e8e5bad6df006b9eecd6135b7ed71d8bd04fbc"}]
+  PASS  post: batch counts moved {"brownlow_round_votes":0,"player_match_stats":1}, deleted {"brownlow_round_votes":0,"player_match_stats":0} — {"moved":{"player_match_stats":1,"brownlow_round_votes":0},"deleted":{"player_match_stats":0,"brownlow_round_votes":0},"projectionsMoved":1}
+  PASS  post: one new `corrected` ledger row after 0 prior row(s): P′ at its identity, previous identity P, supersedes NULL (importer origin), surname ack false, actor, evidence hash, previous_state unique at P — [{"id":1,"action":"corrected","playerId":13367,"playerIdentity":"players/Z/Zz238_019_Pprime.html","previousPlayerIdentity":"players/Z/Zz238_019_P.html","supersedesId":null,"adminUserId":1,"evidenceSha256":"b15286e89037c8e949c4866cee54a98b7b26375e933e253c50013597ce99aeee","previousState":{"id":18427,"status":"unique","playerId":13366},"surnameAck":false}]
+  PASS  post: CD_I updated in place to P′ (same id, resolved, candidate_count 0, afl_api_admin_adjudication) — {"id":18427,"playerId":13367,"status":"resolved","candidateCount":0,"matchMethod":"afl_api_admin_adjudication","externalName":null}
+  PASS  post: the combined identity invariant (SAT-1 basis) holds
+  PASS  post: the first_kick_goal row is byte-identical (report only: still P′ at M2, never re-pointed)
+  PASS  post: the change the report names is real: P′'s debut (career_game_no 1) is now M=17057 (the moved row), M2 re-sequenced to 2 — [{"matchId":17057,"careerGameNo":1},{"matchId":17058,"careerGameNo":2}]
+  PASS  no non-fixture row changed across fixture setup and the correction (foreign fingerprint equal)
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 19 (debut-change): 24/24 checks PASS -> PASS
+CTDB-RC=0 label=c19-debut-change base=rb args=run --case 19 --variant debut-change --acknowledge code_test_db

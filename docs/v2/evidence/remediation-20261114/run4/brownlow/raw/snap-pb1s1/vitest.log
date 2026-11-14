@@ -1,0 +1,26 @@
+isolated-pg: afldb_v2_rem4brownlow_snap_pb1s1_test verified (cluster afldb_v2_isolated, 127.0.0.1:55681); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem4-brownlow-20261115/cand
+
+ ✓ tests/integration/settle-afl-api-brownlow.test.ts (21 tests) 23089ms
+     ✓ resolves and plans vote sets for TWO distinct matches once the match family has staged them (the operator's unknown_match -> voteSetsPlanned/voteSetsWouldAutoApply target), and creates no duplicate canonical match  720ms
+     ✓ auto-applies a complete 3/2/1 vote set to brownlow_round_votes atomically, and a replay is a no-op (the canonical write path itself — every prior case in this suite ran `observe-only`/`apply: false` and never reached applyAflApiBrownlowVoteSet at all)  436ms
+       ✓ a corrected recipient swap (A3 B2 C1 -> A3 B2 D1) demotes C to 0 through the ledger, writes D, and leaves exactly three positive recipients summing to 6 — the pre-F002 code left C = 1 beside D = 1  453ms
+       ✓ an identical replay of the corrected version is a no-op: no write, no counter, no repeated demotion, no provenance churn  371ms
+       ✓ a later correction can reverse the swap (D -> 0, C -> 1): the retained zero row is reused, never recreated  402ms
+       ✓ never touches another match's row in the SAME season and round, nor a foreign-owned row that merely reuses this match's source_record_id — the correction is bounded by (source_id, source_record_id), not by round  360ms
+       ✓ heals a vote set a pre-F002 run left stale (A3 B2 C1 + D1 all positive) on its next replay, and (AFLDB-ISSUE-244 I244-F007) heals D's NULL match_id in the SAME replay with no extra vote change, recomputing coverage once as part of the same committed transaction  465ms
+       ✓ AFLDB-ISSUE-244 I244-F007: a two-way permutation (A3 B2 C1 -> A2 B3 C1) succeeds without violating UNIQUE (match_id, votes): A and B are released to 0 first, then claim their final values — and neither temporary release is counted as a stale demotion  588ms
+       ✓ AFLDB-ISSUE-244 I244-F007: a three-way permutation (A3 B2 C1 -> C3 A2 B1) succeeds — no single-row write order can — by releasing all three recipients before claiming any final value; none is a stale demotion  669ms
+       ✓ AFLDB-ISSUE-244 I244-F007: refuses the WHOLE vote set (match_identity_conflict) before any write when a 'CURRENT recipient (A stays in A3 B2 D…' row already carries a different non-null match_id — nothing demoted, claimed, healed or logged  510ms
+       ✓ AFLDB-ISSUE-244 I244-F007: refuses the WHOLE vote set (match_identity_conflict) before any write when a 'STALE recipient (C is the one A3 B2 D…' row already carries a different non-null match_id — nothing demoted, claimed, healed or logged  533ms
+       ✓ AFLDB-ISSUE-244 I244-F007: a foreign-owned row that borrows this provider match's source_record_id and a contradicting match_id is not "this set's" stale row — it neither blocks the set nor is touched by it  421ms
+       ✓ a committed apply with one refused set leaves a terminal batch: records_rejected = the persisted import_rejections rows, validation_result = the run counters; an identical replay is a terminal zero-change batch  320ms
+     ✓ cleanup() self-heals a stale player_clubs pointer left by a crashed prior teardown (one that deleted player_match_stats but never reached the recompute/DELETE FROM matches that follows it — the exact partial state a reported failed run left behind). Runs last: it deletes matches p and q outright, which every test above this one depends on existing.  13732ms
+
+ Test Files  1 passed (1)
+      Tests  21 passed (21)
+   Start at  06:24:38
+   Duration  25.73s (transform 1.21s, setup 344ms, import 1.25s, tests 23.09s, environment 0ms)
+
+JSON report written to /mnt/ssd/afldb-rem4-brownlow-20261115/evidence/snap-pb1s1/vitest.json

@@ -1,0 +1,10 @@
+rc=1
+green reference-data rc=0   Tests 70 passed (70)
+green admin-match-mutations rc=0   Tests 17 passed (17)
+green afl-api-ingestion-safety rc=0   Tests 198 passed (198)
+green correct-afl-api-identity-cli rc=0   Tests 276 passed (276)
+green current-season-import rc=0   Tests 360 passed (360)
+green data-overrides-source-contract rc=0   Tests 78 passed (78)
+green finals-semantics-contract rc=0   Tests 10 passed (10)
+green match-sheet rc=0   Tests 97 passed (97)
+green v2-season-seal rc=0   Tests 62 passed (62)

@@ -1,0 +1,31 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2915476, import 2915477)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 3, variant claim: A manual-owned (admin demote / claim) round row for P at M beside a pms closure row -> STOP foreign_brownlow_dependency (BG2)
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  fixture: P=13366 (players/Z/Zz238_003_P.html), P'=13367 (players/Z/Zz238_003_Pprime.html), provider CD_I999238000031, match M=17057, closure row player_match_stats#695500, settle batch 27, actor 1
+  PASS  pre: the closure row is at (P, M), afl_api-owned, stamped <CD_M>|<team>|CD_I with its settle batch — {"player_id":13366,"source_record_id":"CD_M999238000031|CD_T992238H|CD_I999238000031","import_batch_id":27}
+  PASS  pre: CD_I is an importer row at P (unique, afl_api_stat_vector_bootstrap)
+  PASS  pre: the combined identity invariant holds with the fixture in place
+  PASS  pre: brownlow_round_votes#320862 for P at M is manual_admin_edit-owned exactly as the admin claim leaves it ({"match_id":17057,"played":true,"votes":3}, entry:17057:r1, import batch NULL) — {"id":320862,"votes":3,"played":true,"season":2092,"match_id":17057,"player_id":13366,"source_id":2,"imported_at":"2026-11-14T19:34:01.496992+00:00","round_number":1,"import_batch_id":null,"source_record_id":"entry:17057:r1"}
+  PASS  pre: the manual row has no canonical_applications history (never an AFL API closure row) — []
+  PASS  pre: BG1 absent (the closure row's brownlow_votes is NULL) and BG3 absent (no entry state at M); P's only round row is the manual one — {"votes":null,"pRounds":1,"entries":0}
+  PASS  pre: no P′ counterpart at M; P holds exactly the closure row — {"pRows":1,"pPrimeRows":0,"pAtM":1,"pPrimeAtM":0,"atM":1}
+  stat_availability 2092 baseline (3 row(s), sha256 347ad2b20f8135d84da9004287adab12cef62bdcd6de3cb76d759fdd0568aaa2)
+  PASS  baseline: the settled 2092 coverage is a fixed point of the real recomputeBrownlowCoverage (rolled-back re-run byte-identical) — 347ad2b20f8135d84da9004287adab12cef62bdcd6de3cb76d759fdd0568aaa2 -> 347ad2b20f8135d84da9004287adab12cef62bdcd6de3cb76d759fdd0568aaa2
+  validate-only: exit 1, {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":695500,"step":"BG2","code":"foreign_brownlow_dependency","detail":"a foreign brownlow_round_votes row exists for this player at this event"}],"referenceFingerprint":"63495d393ab2e3f85a28af51e88a149faa3375efdeef7fe8d7abfd0c94a792b1"}
+    | STOP: 1 stop(s); nothing written
+    | player_match_stats#695500 [BG2] foreign_brownlow_dependency: a foreign brownlow_round_votes row exists for this player at this event
+  PASS  validate-only: STOP (exit 1) with exactly one stop, player_match_stats#695500 [BG2] foreign_brownlow_dependency — {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":695500,"step":"BG2","code":"foreign_brownlow_dependency","detail":"a foreign brownlow_round_votes row exists for this player at this event"}],"referenceFingerprint":"63495d393ab2e3f85a28af51e88a149faa3375efdeef7fe8d7abfd0c94a792b1"}
+  PASS  validate-only: the STOP names its evidence exactly, "a foreign brownlow_round_votes row exists for this player at this event" (§5.7; §12.1) — printed: player_match_stats#695500 [BG2] foreign_brownlow_dependency: a foreign brownlow_round_votes row exists for this player at this event; "a foreign brownlow_round_votes row exists for this player at this event" appears nowhere in the CLI output
+  apply (--expect-fingerprint = the STOP's reference fingerprint): exit 1, {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":695500,"step":"BG2","code":"foreign_brownlow_dependency","detail":"a foreign brownlow_round_votes row exists for this player at this event"}],"referenceFingerprint":"63495d393ab2e3f85a28af51e88a149faa3375efdeef7fe8d7abfd0c94a792b1"}
+  PASS  apply (the locking re-plan): STOP (exit 1) with the identical stop set -- the STOP holds under §8.2's locks — {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":695500,"step":"BG2","code":"foreign_brownlow_dependency","detail":"a foreign brownlow_round_votes row exists for this player at this event"}],"referenceFingerprint":"63495d393ab2e3f85a28af51e88a149faa3375efdeef7fe8d7abfd0c94a792b1"}
+  PASS  nothing written by either run: fixture census, CD_I's identity row and every protected row byte-identical
+  PASS  no ledger row and no correction batch for CD_I — {"ledger":0,"batches":0}
+  PASS  post: the combined identity invariant holds
+  PASS  post: every guard/dependent row (entry state, season authority and totals, after_siren_kicks, player_achievements), every 2092 round row, 2092 stat_availability and P/P′ derived rows byte-identical (9 row(s)): the STOP wrote nothing — 0ea219d98fefb7d14cf6c7c7dfa044789690ebc39f4c38924f7e1aa4af33c61d -> 0ea219d98fefb7d14cf6c7c7dfa044789690ebc39f4c38924f7e1aa4af33c61d
+  PASS  no non-fixture row changed across fixture setup and the correction (foreign fingerprint equal)
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 3 (claim): 19/19 checks PASS -> PASS
+CTDB-RC=0 label=c3-claim base=rb args=run --case 3 --variant claim --acknowledge code_test_db

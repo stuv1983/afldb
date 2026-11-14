@@ -1,0 +1,20 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2954765, import 2954767)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 24, variant admin-linked: D8: P′ already holds another AFL API provider CD_K (importer bootstrap / the real admin link) -> STOP p_prime_holds_another_provider; nothing written
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  fixture: P=13366 (players/Z/Zz238_024_P.html), P'=13367 (players/Z/Zz238_024_Pprime.html), provider CD_I999238000241, match M=17057, closure row player_match_stats#695500, settle batch 27, actor 1
+  CD_K CD_I999238000242: unresolved observation CD_M999238000242|CD_T992238H|CD_I999238000242 (match #17058), retained candidate #1
+  PASS  pre: the closure row is at (P, M), afl_api-owned, stamped <CD_M>|<team>|CD_I with its settle batch — {"player_id":13366,"source_record_id":"CD_M999238000241|CD_T992238H|CD_I999238000241","import_batch_id":27}
+  PASS  pre: CD_I is an importer row at P (unique, afl_api_stat_vector_bootstrap)
+  PASS  pre: the combined identity invariant holds with the fixture in place
+  PASS  pre: P′ holds no AFL API provider; CD_K has no identity row (its observation is evidence, not authority)
+  validate-only: exit 0, {"kind":"PLANNED","fingerprint":"f63b7d33c6aa75ae3989d0207d1ae6b2299e2a22275571671795c036b1b7155d","rowsPlanned":1}
+  PASS  validate-only: PLAN OK, exit 0, 1 row(s) planned — {"kind":"PLANNED","fingerprint":"f63b7d33c6aa75ae3989d0207d1ae6b2299e2a22275571671795c036b1b7155d","rowsPlanned":1}
+  PASS  validate-only wrote nothing (fixture census unchanged)
+  PASS  base: without the conflicting authority the correction plans (PLAN OK, 1 row) — f63b7d33c6aa75ae3989d0207d1ae6b2299e2a22275571671795c036b1b7155d
+  ABORTED: AFLDB_AUTH_DATABASE_URL is not set. Run tools/maintenance/02_add_auth_role.sh on the server.
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 24 (admin-linked): 10/10 checks PASS (run ABORTED) -> FAIL
+CTDB-RC=1 label=c24-admin-linked base=rb args=run --case 24 --variant admin-linked --acknowledge code_test_db

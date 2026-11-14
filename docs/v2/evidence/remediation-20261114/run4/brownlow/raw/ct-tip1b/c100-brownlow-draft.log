@@ -1,0 +1,40 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2993504, import 2993506)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 100, variant brownlow-draft: Entry-state insertion race: a real match-sheet insert at (P, M) / a real Brownlow draft for M waits on the correction's matches FOR UPDATE
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  variant brownlow-draft; fixture: P=13366, P'=13367, provider CD_I999238001001, match M=17057, closure row player_match_stats#695500, settle batch 27, actor 1
+  PASS  pre: closure row at (P, M), afl_api-owned, stamped <CD_M>|<team>|CD_I with the settle batch; contract = the insert application — {"player_id":13366,"source_record_id":"CD_M999238001001|CD_T992238H|CD_I999238001001"}
+  PASS  pre: no P′ counterpart at M; P holds exactly the one row; M holds only it — {"counterpart":0,"pRows":1,"atM":1}
+  PASS  pre: CD_I is an importer row at P (unique, afl_api_stat_vector_bootstrap)
+  PASS  pre: the combined identity invariant holds with the fixture in place
+  validate-only: exit 0, {"kind":"PLANNED","fingerprint":"c7e02a9ee22a74628c40ec39b98ff62ccc007598da1208409c2486c7d33ca3d3","rowsPlanned":1}
+  PASS  validate-only: PLAN OK, exit 0, 1 row(s) planned — {"kind":"PLANNED","fingerprint":"c7e02a9ee22a74628c40ec39b98ff62ccc007598da1208409c2486c7d33ca3d3","rowsPlanned":1}
+  PASS  validate-only wrote nothing (fixture census unchanged)
+  PASS  pre: M is a home-and-away match of a POLLED season (brownlow_season_total coverage pending): the draft's lockMatch precondition holds — {"coverage":"pending"}
+  gate G: pid 2993663 ('afldb-issue238-case100-gate', afldb_owner), holds players#13367 (P′) FOR UPDATE, xid 28432
+  PASS  gate: G holds players P′ FOR UPDATE in an open transaction with an assigned xid
+  correction: pid 2993689 (afldb_import), backend_xid 28433, wait Lock/transactionid, pg_blocking_pids = {2993663}, waiting 6 ms, query 'INSERT INTO afl_api_identity_adjudications (source_key, external_id, action, player_id, player_identity, previous_state, previous_player_identity, evidence, evidence_sha256, surname_disagreement_acknowledged, admin_user_id, note, supersedes_id) VALUES ($1, $2, 'corrected', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id::int AS id'; ungranted [{"locktype":"transactionid","relation":null,"mode":"ShareLock","granted":false,"page":null,"tuple":null,"transactionId":"28432"}]; xmax matches#17057 (ctid (426,4)) = 28433, player_match_stats#695500 = 28433
+  PASS  correction: blocked by the gate: pg_blocking_pids(correction) = {G}, waiting on G's transaction id — [{"locktype":"transactionid","relation":null,"mode":"ShareLock","granted":false,"page":null,"tuple":null,"transactionId":"28432"}]
+  PASS  correction: it ALREADY holds the closure locks: matches M and the closure row both carry its transaction id as xmax — xid 28433: {"match":"28433","row":"28433","matchCtid":"(426,4)"}
+  writer: pid 2993690 ('afldb-issue238-case100-writer-brownlow-draft', afldb_import), wait Lock/transactionid, pg_blocking_pids = {2993689}, query 'SELECT id, season, round_number AS "roundNumber", round_type::text AS "roundType", home_club_id AS "homeClubId", away_club_id AS "awayClubId" FROM matches WHERE id = $1 FOR UPDATE'; locks [{"locktype":"transactionid","relation":null,"mode":"ShareLock","granted":false,"page":null,"tuple":null,"transactionId":"28433"},{"locktype":"relation","relation":"matches","mode":"RowShareLock","granted":true,"page":null,"tuple":null,"transactionId":null},{"locktype":"tuple","relation":"matches","mode":"AccessExclusiveLock","granted":true,"page":426,"tuple":4,"transactionId":null}]
+  PASS  writer: its own afldb_import backend, issued its first statement (matches … FOR UPDATE) and is WAITING on a lock — SELECT id, season, round_number AS "roundNumber", round_type::text AS "roundType", home_club_id AS "homeClubId", away_club_id AS "awayClubId" FROM matches WHERE id = $1 FOR UPDATE
+  PASS  writer: pg_blocking_pids(writer) = {correction} exactly -- NOT the gate — {2993689}; correction 2993689, gate 2993663
+  PASS  writer: waiting on the correction's transaction id while holding the tuple lock on EXACTLY M's row (matches ctid) — M ctid (426,4): [{"locktype":"transactionid","relation":null,"mode":"ShareLock","granted":false,"page":null,"tuple":null,"transactionId":"28433"},{"locktype":"relation","relation":"matches","mode":"RowShareLock","granted":true,"page":null,"tuple":null,"transactionId":null},{"locktype":"tuple","relation":"matches","mode":"AccessExclusiveLock","granted":true,"page":426,"tuple":4,"transactionId":null...
+  PASS  timing: the correction is still waiting on G, well inside its 5 s lock_timeout (< 4 s), when G is released — waited 43 ms
+  gate G released after the correction had waited ~43 ms
+  apply: exit 0, {"kind":"COMMITTED","fingerprint":"c7e02a9ee22a74628c40ec39b98ff62ccc007598da1208409c2486c7d33ca3d3","adjudicationId":1,"batchId":28,"moved":1,"deleted":0,"reportIncomplete":false}
+  PASS  apply: COMMITTED (exit 0) with the validate-only fingerprint, moved 1, deleted 0, report complete -- the gate did not cost it its lock_timeout — {"kind":"COMMITTED","fingerprint":"c7e02a9ee22a74628c40ec39b98ff62ccc007598da1208409c2486c7d33ca3d3","adjudicationId":1,"batchId":28,"moved":1,"deleted":0,"reportIncomplete":false}
+  PASS  apply: exactly one correction application, bound to batch K
+  writer: {"ok":false,"code":"not_participant","message":"Every selected player must have a line-up row in this match. The three-vote player did not play in this match."}
+  PASS  writer: saveDraftBrownlowMatch resumed after the commit, re-read M's participants, and refused not_participant (P no longer plays M) — {"ok":false,"code":"not_participant","message":"Every selected player must have a line-up row in this match. The three-vote player did not play in this match."}
+  PASS  post: NO brownlow_vote_entry_state for M and no entry-state audit (no entry state naming P was interleaved) — {"entry":0,"audits":0,"pAtM":0,"movedAt":13367}
+  PASS  post: the closure row is at (P′, M); P holds nothing at M — {"entry":0,"audits":0,"pAtM":0,"movedAt":13367}
+  PASS  post: one new `corrected` ledger row after 0 prior row(s): P′ at its identity, previous identity P, supersedes NULL (importer origin), surname ack false, actor, evidence hash, previous_state unique at P — [{"id":1,"action":"corrected","playerId":13367,"playerIdentity":"players/Z/Zz238_100_Pprime.html","previousPlayerIdentity":"players/Z/Zz238_100_P.html","supersedesId":null,"adminUserId":1,"evidenceSha256":"d17ddfba9da2fa2659d00e0a48331f8c39b6e1d3c1f5ba7c7b71ae97e9f42856","previousState":{"id":18427,"status":"unique","playerId":13366},"surnameAck":false}]
+  PASS  post: CD_I updated in place to P′ (same id, resolved, candidate_count 0, afl_api_admin_adjudication) — {"id":18427,"playerId":13367,"status":"resolved","candidateCount":0,"matchMethod":"afl_api_admin_adjudication","externalName":null}
+  PASS  post: the combined identity invariant (SAT-1 basis) holds
+  PASS  no non-fixture row changed across fixture setup and the correction (foreign fingerprint equal)
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 100 (brownlow-draft): 26/26 checks PASS -> PASS
+CTDB-RC=0 label=c100-brownlow-draft base=rb args=run --case 100 --variant brownlow-draft --acknowledge code_test_db

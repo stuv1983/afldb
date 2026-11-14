@@ -1,0 +1,33 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2959125, import 2959128)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 58, variant disagreement-ack: Surname disagreement: no flag -> STOP M1; flag -> COMMITTED, stored true; flag with an agreeing / no observation -> REFUSED
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  fixture: P=13366 (players/Z/Zz238_058_P.html), P'=13367 (players/Z/Zz238_058_Pprime.html), provider CD_I999238000581, match M=17057, closure row player_match_stats#695500, settle batch 27, actor 1
+  CD_I's observation publishes surname 'Zz238-058-P'; retained candidate: #1
+  PASS  pre: the closure row is at (P, M), afl_api-owned, stamped <CD_M>|<team>|CD_I with its settle batch — {"player_id":13366,"source_record_id":"CD_M999238000581|CD_T992238H|CD_I999238000581","import_batch_id":27}
+  PASS  pre: CD_I is an importer row at P (unique, afl_api_stat_vector_bootstrap)
+  PASS  pre: the combined identity invariant holds with the fixture in place
+  surname gate inputs (CLI query + production normaliseSurname): {"observed":"Zz238-058-P","observedNormalised":"ZZP","pSurname":"Zz238-058-P","pNormalised":"ZZP","pPrimeSurname":"Zz238-058-Pprime","pPrimeNormalised":"ZZPPRIME","disagrees":true}
+  PASS  surname gate: the observed surname is P's; it and P′'s normalise to different non-empty values -> DISAGREES (only the surname differs) — {"observed":"Zz238-058-P","observedNormalised":"ZZP","pSurname":"Zz238-058-P","pNormalised":"ZZP","pPrimeSurname":"Zz238-058-Pprime","pPrimeNormalised":"ZZPPRIME","disagrees":true}
+  validate-only: exit 0, {"kind":"PLANNED","fingerprint":"bb76563c584e501595e1807a30301e58a6068bcf5a98478759f7f69ab37e6646","rowsPlanned":1}
+  PASS  validate-only: PLAN OK, exit 0, 1 row(s) planned — {"kind":"PLANNED","fingerprint":"bb76563c584e501595e1807a30301e58a6068bcf5a98478759f7f69ab37e6646","rowsPlanned":1}
+  PASS  validate-only wrote nothing (fixture census unchanged)
+  apply: exit 0, {"kind":"COMMITTED","fingerprint":"bb76563c584e501595e1807a30301e58a6068bcf5a98478759f7f69ab37e6646","adjudicationId":1,"batchId":29,"moved":1,"deleted":0,"reportIncomplete":false}
+  PASS  apply: COMMITTED, exit 0, the validate-only fingerprint, moved 1, deleted 0, report complete — {"kind":"COMMITTED","fingerprint":"bb76563c584e501595e1807a30301e58a6068bcf5a98478759f7f69ab37e6646","adjudicationId":1,"batchId":29,"moved":1,"deleted":0,"reportIncomplete":false}
+  PASS  the validate-only and apply invocations both carried --acknowledge-surname-disagreement
+  PASS  post: one new `corrected` ledger row after 0 prior row(s): P′ at its identity, previous identity P, supersedes NULL (importer origin), surname ack true, actor, evidence hash, previous_state unique at P — [{"id":1,"action":"corrected","playerId":13367,"playerIdentity":"players/Z/Zz238_058_Pprime.html","previousPlayerIdentity":"players/Z/Zz238_058_P.html","supersedesId":null,"adminUserId":1,"evidenceSha256":"0eea8b1c891dfa034294b2516a7faf23b97f07d642299517c695b23863b6d08c","previousState":{"id":18427,"status":"unique","playerId":13366},"surnameAck":true}]
+  PASS  post: CD_I updated in place to P′ (same id, resolved, candidate_count 0, afl_api_admin_adjudication) — {"id":18427,"playerId":13367,"status":"resolved","candidateCount":0,"matchMethod":"afl_api_admin_adjudication","externalName":null}
+  PASS  post: the stored acknowledgement is boolean `true` in the real schema, written by the CLI's own INSERT — {"ack":"true","type":"boolean","evidenceFingerprint":"bb76563c584e501595e1807a30301e58a6068bcf5a98478759f7f69ab37e6646"}
+  PASS  post: the fingerprint is the ordinary plan fingerprint: validate-only = apply = batch K = the ledger evidence's closureFingerprint — {"stored":{"ack":"true","type":"boolean","evidenceFingerprint":"bb76563c584e501595e1807a30301e58a6068bcf5a98478759f7f69ab37e6646"},"fingerprint":"bb76563c584e501595e1807a30301e58a6068bcf5a98478759f7f69ab37e6646"}
+  PASS  post: CD_I resolved P -> P′ exactly once: one `corrected` row, one correction batch (K), one correction application in K, identity and the row at P′ — {"corrected":1,"batches":1,"applications":1,"identityAtPPrime":1,"rowAtPPrime":1}
+  PASS  post: batch K completed and bound (adjudication, fingerprint, evidence hash); exactly one player_match_stats update rowProof with the pre-correction contract hash — [{"verb":"update","table":"player_match_stats","newKey":{"match_id":17057,"player_id":13367},"oldKey":{"match_id":17057,"player_id":13366},"preCorrectionContractSha256":"1ca9b726dbf7d9b377f7e45361e8e5bad6df006b9eecd6135b7ed71d8bd04fbc"}]
+  PASS  post: batch counts moved {"brownlow_round_votes":0,"player_match_stats":1}, deleted {"brownlow_round_votes":0,"player_match_stats":0} — {"moved":{"player_match_stats":1,"brownlow_round_votes":0},"deleted":{"player_match_stats":0,"brownlow_round_votes":0},"projectionsMoved":1}
+  PASS  post: CD_I's typed projection names P′
+  PASS  post: the combined identity invariant (SAT-1 basis) holds
+  PASS  post: the apply report lists the retained candidate under "pending promotion candidates" (reported, never resolved) — promotion_candidates#1 player_match_stats CD_M999238000581|CD_T992238H|CD_I999238000581 -> player_match_stats (unresolved_identity, season 2092;
+  PASS  no non-fixture row changed across fixture setup and the correction (foreign fingerprint equal)
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 58 (disagreement-ack): 22/22 checks PASS -> PASS
+CTDB-RC=0 label=c58-disagreement-ack base=rb args=run --case 58 --variant disagreement-ack --acknowledge code_test_db

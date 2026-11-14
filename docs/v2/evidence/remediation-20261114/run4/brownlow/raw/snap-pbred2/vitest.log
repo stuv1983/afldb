@@ -1,0 +1,30 @@
+isolated-pg: afldb_v2_rem4brownlow_snap_pbred2_test verified (cluster afldb_v2_isolated, 127.0.0.1:55681); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem4-brownlow-20261115/cand
+
+ ❯ tests/integration/zz-red-brownlow-reschedule.test.ts (3 tests | 3 skipped) 4878ms
+     ↓ stages an ordinary match (Round 5 -> canonical 6) and a "rescheduled" one (staged as Opening Round -> canonical 1) as two distinct canonical matches carrying their OWN, different round_number
+     ↓ writes brownlow_round_votes.round_number from the RESOLVED CANONICAL MATCH's own round, never from translateAflApiBrownlowRound()'s translated provider round, for BOTH matches — even though both Brownlow votes below are reported under the SAME provider round (api_round_number 5, translated 6)
+     ↓ the same player voting under the SAME provider round in the two DIFFERENT matches above lands as TWO DISTINCT canonical rows, never one overwriting the other
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/zz-red-brownlow-reschedule.test.ts [ tests/integration/zz-red-brownlow-reschedule.test.ts ]
+Error: 2 player_match_stats row(s) in this suite's matches belong to the real CD_I297354 player.
+ ❯ tests/integration/zz-red-brownlow-reschedule.test.ts:375:11
+    373|   const realStatRows = await realFixturePlayerStatRowsIn(sql, allMatch…
+    374|   if (realStatRows !== 0) {
+    375|     throw new Error(`${realStatRows} player_match_stats row(s) in this…
+       |           ^
+    376|   }
+    377| }, 30_000);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 skipped (3)
+   Start at  06:33:49
+   Duration  6.33s (transform 771ms, setup 196ms, import 860ms, tests 4.88s, environment 0ms)
+
+JSON report written to /mnt/ssd/afldb-rem4-brownlow-20261115/evidence/snap-pbred2/vitest.json

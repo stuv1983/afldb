@@ -1,0 +1,8 @@
+c91	rc=0	14s	rsc=1	case 91: 30/30 checks PASS -> PASS
+c100-match-sheet	rc=0	12s	rsc=1	case 100 (match-sheet): 28/28 checks PASS -> PASS
+c100-brownlow-draft	rc=0	10s	rsc=1	case 100 (brownlow-draft): 26/26 checks PASS -> PASS
+c16	rc=0	10s	rsc=1	case 16: 21/21 checks PASS -> PASS
+c32	rc=0	12s	rsc=1	case 32: 40/40 checks PASS -> PASS
+c24-admin-linked	rc=0	11s	rsc=1	case 24 (admin-linked): 24/24 checks PASS -> PASS
+c31	rc=0	11s	rsc=1	case 31: 33/33 checks PASS -> PASS
+CT-ALL-DONE 2026-11-14T19:56:05Z

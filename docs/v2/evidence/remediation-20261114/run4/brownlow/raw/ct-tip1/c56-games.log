@@ -1,0 +1,35 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2926694, import 2926699)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 56, variant games: Admin-published season (the real publish), a closure MOVE of a positive round vote / of P's games -> STOP season_total_depends_on_correction (SV-1)
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  fixture: P=13366 (players/Z/Zz238_056_P.html), P'=13367 (players/Z/Zz238_056_Pprime.html), provider CD_I999238000561, match M=17057, closure row player_match_stats#695500, settle batch 27, actor 1
+  PASS  pre: the closure row is at (P, M), afl_api-owned, stamped <CD_M>|<team>|CD_I with its settle batch — {"player_id":13366,"source_record_id":"CD_M999238000561|CD_T992238H|CD_I999238000561","import_batch_id":27}
+  PASS  pre: CD_I is an importer row at P (unique, afl_api_stat_vector_bootstrap)
+  PASS  pre: the combined identity invariant holds with the fixture in place
+  writer publishBrownlowSeason: {"ok":true,"value":{"season":2092,"revision":2,"rowCount":4,"votesTotal":12,"winners":[13368]}}
+  PASS  writer: the real publishBrownlowSeason published 2092 (the first publication: revision 2; 4 season rows) — {"ok":true,"value":{"season":2092,"revision":2,"rowCount":4,"votesTotal":12,"winners":[13368]}}
+  PASS  pre: 2092 is ADMIN-PUBLISHED (SV-1's class, bound to the CURRENT revision): published_revision 2, and every season row manual_admin_edit stamped publish:2092:r2 — {"authority":{"publishedRevision":2},"rows":[{"playerId":13366,"votes":3,"sourceKey":"manual_admin_edit","sourceRecordId":"publish:2092:r2"},{"playerId":13368,"votes":5,"sourceKey":"manual_admin_edit","sourceRecordId":"publish:2092:r2"},{"playerId":13369,"votes":3,"sourceKey":"manual_admin_edit","sourceRecordId":"publish:2092:r2"},{"playerId":13370,"votes":1,"sourceKey":"manual_admin_edit","source...
+  PASS  pre: P is in the published totals (3 votes, polled at M2=17058); P′ is not; no afl_api round row in 2092 (no Brownlow closure row: the positive-vote disjunct cannot hold); no entry state — {"rows":[[13366,3],[13368,5],[13369,3],[13370,1]],"cdIRounds":0,"entries":0}
+  PASS  pre: P's only round row (#320865) is foreign at M2, round 2 -- not the closure row's event (M, round 1): no BG2 at M — {"id":320865,"votes":3,"played":true,"season":2092,"match_id":17058,"player_id":13366,"source_id":10,"imported_at":"2026-11-14T19:36:23.558807+00:00","round_number":2,"import_batch_id":null,"source_record_id":null}
+  PASS  pre: no P′ counterpart at M; P holds the closure row and the foreign M2 row — {"pRows":2,"pPrimeRows":0,"pAtM":1,"pPrimeAtM":0,"atM":4}
+  stat_availability 2092 baseline (3 row(s), sha256 f9b90d991fcdf35c5cf3383cc449b66f414dbf949b4e049befd4c065d427f8ce)
+  PASS  baseline: the settled 2092 coverage is a fixed point of the real recomputeBrownlowCoverage (rolled-back re-run byte-identical) — f9b90d991fcdf35c5cf3383cc449b66f414dbf949b4e049befd4c065d427f8ce -> f9b90d991fcdf35c5cf3383cc449b66f414dbf949b4e049befd4c065d427f8ce
+  validate-only: exit 1, {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":null,"step":"SV-1","code":"season_total_depends_on_correction","detail":null}],"referenceFingerprint":"d2fa451b1d04f91df10c1ae5aef729fb60904127791ff47752cecf890baaa66f"}
+    | STOP: 1 stop(s); nothing written
+    | player_match_stats [SV-1] season_total_depends_on_correction
+  PASS  validate-only: STOP (exit 1) with exactly one stop, player_match_stats [SV-1] season_total_depends_on_correction — {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":null,"step":"SV-1","code":"season_total_depends_on_correction","detail":null}],"referenceFingerprint":"d2fa451b1d04f91df10c1ae5aef729fb60904127791ff47752cecf890baaa66f"}
+  PASS  validate-only: the STOP's report context carries the SV-1 season verdict: "season 2092: STOP SV-1 (admin_published) [SV-1] season_total_depends_on_correction: not proven independent: the admin-published season depends on the corrected facts"
+  PASS  validate-only: the STOP's report context carries the P-in-totals SV-1 check (the disjunct under test): "failed: SV-1: P or P′ has a brownlow_season_votes row in this season (its games input changes)"
+  PASS  validate-only: the STOP's report context does NOT carry the positive-round-vote SV-1 check — failed: SV-1: the closure moves or deletes a Brownlow round row with votes > 0 in this season
+  apply (--expect-fingerprint = the STOP's reference fingerprint): exit 1, {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":null,"step":"SV-1","code":"season_total_depends_on_correction","detail":null}],"referenceFingerprint":"d2fa451b1d04f91df10c1ae5aef729fb60904127791ff47752cecf890baaa66f"}
+  PASS  apply (the locking re-plan): STOP (exit 1) with the identical stop set -- the STOP holds under §8.2's locks — {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":null,"step":"SV-1","code":"season_total_depends_on_correction","detail":null}],"referenceFingerprint":"d2fa451b1d04f91df10c1ae5aef729fb60904127791ff47752cecf890baaa66f"}
+  PASS  nothing written by either run: fixture census, CD_I's identity row and every protected row byte-identical
+  PASS  no ledger row and no correction batch for CD_I — {"ledger":0,"batches":0}
+  PASS  post: the combined identity invariant holds
+  PASS  post: every guard/dependent row (entry state, season authority and totals, after_siren_kicks, player_achievements), every 2092 round row, 2092 stat_availability and P/P′ derived rows byte-identical (19 row(s)): the STOP wrote nothing — 23286856e003846ca610675bc29940ccceff24608b49fd41618ea08a52231e2a -> 23286856e003846ca610675bc29940ccceff24608b49fd41618ea08a52231e2a
+  PASS  no non-fixture row changed across fixture setup and the correction (foreign fingerprint equal)
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 56 (games): 22/22 checks PASS -> PASS
+CTDB-RC=0 label=c56-games base=rb args=run --case 56 --variant games --acknowledge code_test_db

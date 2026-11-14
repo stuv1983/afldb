@@ -1,0 +1,65 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2948641, import 2948642)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 14: Moved row later removed by the real match deletion, with its match_deletion audit after c -> NOOP correction_target_absent; ALREADY_SATISFIED; not recreated
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  fixture: P=13366 (players/Z/Zz238_014_P.html), P'=13367 (players/Z/Zz238_014_Pprime.html), provider CD_I999238000141, match M=17057, closure row player_match_stats#695500, settle batch 27, actor 1
+  PASS  pre: closure row at (P, M), afl_api-owned, stamped <CD_M>|<team>|CD_I with the settle batch; contract = the insert application — {"player_id":13366,"source_record_id":"CD_M999238000141|CD_T992238H|CD_I999238000141"}
+  PASS  pre: no P′ counterpart at M; P holds exactly the one row; M holds only it — {"counterpart":0,"pRows":1,"atM":1}
+  PASS  pre: CD_I is an importer row at P (unique, afl_api_stat_vector_bootstrap)
+  PASS  pre: the combined identity invariant holds with the fixture in place
+  validate-only: exit 0, {"kind":"PLANNED","fingerprint":"04155575043a4caa770e5a38bf7c071e75dfbf7e9ce0ecb7eca2d9f3f4e2c3ce","rowsPlanned":1}
+  PASS  validate-only: PLAN OK, exit 0, 1 row(s) planned — {"kind":"PLANNED","fingerprint":"04155575043a4caa770e5a38bf7c071e75dfbf7e9ce0ecb7eca2d9f3f4e2c3ce","rowsPlanned":1}
+  PASS  validate-only wrote nothing (fixture census unchanged)
+  apply: exit 0, {"kind":"COMMITTED","fingerprint":"04155575043a4caa770e5a38bf7c071e75dfbf7e9ce0ecb7eca2d9f3f4e2c3ce","adjudicationId":1,"batchId":28,"moved":1,"deleted":0,"reportIncomplete":false}
+  PASS  apply: COMMITTED, exit 0, the validate-only fingerprint, moved 1, deleted 0, report complete — {"kind":"COMMITTED","fingerprint":"04155575043a4caa770e5a38bf7c071e75dfbf7e9ce0ecb7eca2d9f3f4e2c3ce","adjudicationId":1,"batchId":28,"moved":1,"deleted":0,"reportIncomplete":false}
+  PASS  corrected base: the SAME row id at (P′, M), contract byte-identical, provenance kept (D3)
+  PASS  corrected base: (P, M) is free after the MOVE — {"pRows":0,"pPrimeRows":1,"pAtM":0,"pPrimeAtM":1,"atM":1}
+  PASS  post: one new `corrected` ledger row after 0 prior row(s): P′ at its identity, previous identity P, supersedes NULL (importer origin), surname ack false, actor, evidence hash, previous_state unique at P — [{"id":1,"action":"corrected","playerId":13367,"playerIdentity":"players/Z/Zz238_014_Pprime.html","previousPlayerIdentity":"players/Z/Zz238_014_P.html","supersedesId":null,"adminUserId":1,"evidenceSha256":"4d6349069d60a76785eaa49509bc8a86b4e3f69f2a2259ac9039fdb9b14e82b9","previousState":{"id":18427,"status":"unique","playerId":13366},"surnameAck":false}]
+  PASS  post: CD_I updated in place to P′ (same id, resolved, candidate_count 0, afl_api_admin_adjudication) — {"id":18427,"playerId":13367,"status":"resolved","candidateCount":0,"matchMethod":"afl_api_admin_adjudication","externalName":null}
+  PASS  corrected base: c = the correction application's applied_at exists
+  PASS  corrected base: no data_edits audit for M yet — []
+  corrected base: adjudication 1, batch K 28, c = 2026-11-14T19:41:26.587929Z
+  PASS  absence base: M and the empty sibling 2092 match (round 2) both exist; the sibling holds no row — {"match":1,"sibling":1,"atSibling":0}
+  PASS  absence base: exactly one correction application in batch K for the closure row — [{"id":2}]
+  correction: adjudication 1, batch K 28, application 2, c = 2026-11-14T19:41:26.587929Z; sibling match 17058
+  pre-writer: foreign keys naming M: [{"column":"player_clubs.first_match_id","n":1},{"column":"player_clubs.last_match_id","n":1},{"column":"player_match_stats.match_id","n":1}]
+  PASS  pre-writer: the corrected row is at (P′, M) and no data_edits row names M at all
+  writer deleteMatch (after the correction): {"ok":true,"deletedId":17057,"affectedPlayers":1}
+  PASS  writer: the real deleteMatch deleted M — {"ok":true,"deletedId":17057,"affectedPlayers":1}
+  PASS  post-writer: the moved row is GONE (its id, (P′, M), (P, M), anything at M); M no longer exists — {"atM":0,"match":0,"pAtM":0,"pPrimeAtM":0,"rowById":null}
+  PASS  post-writer: the sibling 2092 match survives (the season is not emptied)
+  c = 2026-11-14T19:41:26.587929Z; writer audit(s) [{"id":1,"fieldGroup":"match_deletion","createdAt":"2026-11-14T19:41:26.843441Z","afterCutoff":true}]
+  PASS  the writer's durable audit: exactly one data_edits row names M -- matches/match_deletion, created at or after c — [{"id":1,"tableName":"matches","createdAt":"2026-11-14T19:41:26.843441Z","fieldGroup":"match_deletion","afterCutoff":true,"newValues":{}}]
+  PASS  post-writer: no foreign-key column referencing matches(id) holds M — []
+  Q2 re-run (validate-only): exit 0, {"kind":"ALREADY_SATISFIED"}
+    | ALREADY_SATISFIED: this provider is already corrected and the correction remains satisfied
+    | NOOP correction_target_absent: player_match_stats {"match_id":17057,"player_id":13367} (match 17057 deleted after the correction, audited); lineage L1-L7 retained, never recreated
+    | CORRECTION SATISFACTION: SAT-1..SAT-5 PASS
+  PASS  Q2 re-run (validate-only) wrote nothing (fixture census unchanged)
+  PASS  Q2 (validate-only): ALREADY_SATISFIED (exit 0), CORRECTION SATISFACTION: SAT-1..SAT-5 PASS — {"kind":"ALREADY_SATISFIED"}
+  PASS  Q2 (validate-only): carries the target-absent NOOP: "NOOP correction_target_absent: player_match_stats {"match_id":17057,"player_id":13367} (match 17057 deleted after the correction, audited); lineage L1-L7 retained, never recreated"
+  PASS  Q2 (validate-only): carries its satisfaction entry citing the writer's audit: "correction_target_absent (satisfied): player_match_stats {"match_id":17057,"player_id":13367}, match 17057 deleted after the correction (audit 1)"
+  PASS  Q2 (validate-only): no other STOP / post-correction / target-absence line
+  PASS  Q2 (validate-only): no "NOOP already_corrected_moved" (the target is absent, never read as moved and present)
+  PASS  Q2 (validate-only): the correction footprint (ledger, correction batches, applications, identity, projections) is byte-identical: no second correction
+  PASS  Q2 (validate-only): nothing recreated: no row with the corrected id, nothing at (P′, M) or (P, M), M's existence unchanged — {"atM":0,"match":0,"pAtM":0,"pPrimeAtM":0,"rowById":null}
+  Q2 re-run (apply): exit 0, {"kind":"ALREADY_SATISFIED"}
+    | ALREADY_SATISFIED: this provider is already corrected and the correction remains satisfied
+    | NOOP correction_target_absent: player_match_stats {"match_id":17057,"player_id":13367} (match 17057 deleted after the correction, audited); lineage L1-L7 retained, never recreated
+    | CORRECTION SATISFACTION: SAT-1..SAT-5 PASS
+  PASS  Q2 re-run (apply) wrote nothing (fixture census unchanged)
+  PASS  Q2 (apply): ALREADY_SATISFIED (exit 0), CORRECTION SATISFACTION: SAT-1..SAT-5 PASS — {"kind":"ALREADY_SATISFIED"}
+  PASS  Q2 (apply): carries the target-absent NOOP: "NOOP correction_target_absent: player_match_stats {"match_id":17057,"player_id":13367} (match 17057 deleted after the correction, audited); lineage L1-L7 retained, never recreated"
+  PASS  Q2 (apply): carries its satisfaction entry citing the writer's audit: "correction_target_absent (satisfied): player_match_stats {"match_id":17057,"player_id":13367}, match 17057 deleted after the correction (audit 1)"
+  PASS  Q2 (apply): no other STOP / post-correction / target-absence line
+  PASS  Q2 (apply): no "NOOP already_corrected_moved" (the target is absent, never read as moved and present)
+  PASS  Q2 (apply): the correction footprint (ledger, correction batches, applications, identity, projections) is byte-identical: no second correction
+  PASS  Q2 (apply): nothing recreated: no row with the corrected id, nothing at (P′, M) or (P, M), M's existence unchanged — {"atM":0,"match":0,"pAtM":0,"pPrimeAtM":0,"rowById":null}
+  PASS  post: CD_I's ledger is exactly one `corrected` row
+  PASS  post: the combined identity invariant (SAT-1 basis) holds
+  PASS  no non-fixture row changed across fixture setup and the correction (foreign fingerprint equal)
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 14: 43/43 checks PASS -> PASS
+CTDB-RC=0 label=c14 base=rb args=run --case 14 --acknowledge code_test_db

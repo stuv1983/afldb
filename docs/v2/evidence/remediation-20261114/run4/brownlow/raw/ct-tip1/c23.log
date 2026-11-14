@@ -1,0 +1,30 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2871888, import 2871890)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 23: Mixed-provider application history at the old key (inserted through CD_J, updated through CD_I) -> STOP P3
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  fixture: P=13366 (players/Z/Zz238_023_P.html), P'=13367 (players/Z/Zz238_023_Pprime.html), provider CD_I999238000231, match M=17057, closure row player_match_stats#695500, settle batch 27, actor 1
+  other provider CD_J CD_I999238000232 (record CD_M999238000231|CD_T992238H|CD_I999238000232), insert application 1; CD_I update application 2, later batch B2 28
+  PASS  pre: the closure row is at (P, M), afl_api-owned, stamped <CD_M>|<team>|CD_I with its settle batch — {"player_id":13366,"source_record_id":"CD_M999238000231|CD_T992238H|CD_I999238000231","import_batch_id":28}
+  PASS  pre: CD_I is an importer row at P (unique, afl_api_stat_vector_bootstrap)
+  PASS  pre: the combined identity invariant holds with the fixture in place
+  PASS  pre: the row's contract = CD_J's insert with CD_I's update applied (goals 3): P7 would pass
+  history at {P, M}: [{"id":1,"verb":"insert","source":"afl_api","record":"CD_M999238000231|CD_T992238H|CD_I999238000232","batch":27},{"id":2,"verb":"update","source":"afl_api","record":"CD_M999238000231|CD_T992238H|CD_I999238000231","batch":28}]
+  PASS  pre: the history at {P, M} is exactly [CD_J insert (settle batch), CD_I update goals 2 -> 3 (B2)], all afl_api-sourced: P1, P2, P4 hold — [{"id":1,"importBatchId":27,"sourceKey":"afl_api","family":"player_match_stats","externalRecordId":"CD_M999238000231|CD_T992238H|CD_I999238000232","versionSeq":1,"targetKey":{"match_id":17057,"player_id":13366},"verb":"insert","previousValues":null,"newValues":{"goals":2,"kicks":14,"marks":5,"behinds":1,"bounces":1,"club_id":1,"hitouts":0,"tackles":4,"clangers":2,"rebounds":2,"contested":9,"dispos...
+  PASS  pre: CD_J is genuinely OUTSIDE CD_I's lineage: its record ends |CD_J (not |CD_I); it holds no identity, ledger or projection row — {"identities":0,"ledger":0,"projections":0,"projection":13366}
+  PASS  pre: CD_I's projection names P (P5 holds)
+  PASS  pre: no P′ counterpart at M (not a collision case); P holds exactly this row — {"pRows":1,"pPrimeRows":0,"pAtM":1,"pPrimeAtM":0,"atM":1}
+  validate-only: exit 1, {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":695500,"step":"P3","code":"mixed_provider_application_history","detail":null}],"referenceFingerprint":"800a98057c58deb368a7df9f9baf6241ee705a1f8c9416e3fba261164d5147ec"}
+    | STOP: 1 stop(s); nothing written
+    | player_match_stats#695500 [P3] mixed_provider_application_history
+  PASS  validate-only: STOP (exit 1) with exactly one stop, player_match_stats#695500 [P3] mixed_provider_application_history — {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":695500,"step":"P3","code":"mixed_provider_application_history","detail":null}],"referenceFingerprint":"800a98057c58deb368a7df9f9baf6241ee705a1f8c9416e3fba261164d5147ec"}
+  apply (--expect-fingerprint = the STOP's reference fingerprint): exit 1, {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":695500,"step":"P3","code":"mixed_provider_application_history","detail":null}],"referenceFingerprint":"800a98057c58deb368a7df9f9baf6241ee705a1f8c9416e3fba261164d5147ec"}
+  PASS  apply (the locking re-plan): STOP (exit 1) with the identical stop set -- the STOP holds under §8.2's locks — {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":695500,"step":"P3","code":"mixed_provider_application_history","detail":null}],"referenceFingerprint":"800a98057c58deb368a7df9f9baf6241ee705a1f8c9416e3fba261164d5147ec"}
+  PASS  nothing written by either run: fixture census, CD_I's identity row and every protected row byte-identical
+  PASS  no ledger row and no correction batch for CD_I — {"ledger":0,"batches":0}
+  PASS  post: the combined identity invariant holds
+  PASS  no non-fixture row changed across fixture setup and the correction (foreign fingerprint equal)
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 23: 17/17 checks PASS -> PASS
+CTDB-RC=0 label=c23 base=rb args=run --case 23 --acknowledge code_test_db

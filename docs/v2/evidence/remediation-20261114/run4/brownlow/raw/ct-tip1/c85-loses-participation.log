@@ -1,0 +1,29 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2928851, import 2928852)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 85, variant loses-participation: DP-4: a match-less after_siren_kicks row for P losing its last justifying participation -> STOP; with participation remaining -> reported, COMMITTED
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  fixture: P=13366 (players/Z/Zz238_085_P.html), P'=13367 (players/Z/Zz238_085_Pprime.html), provider CD_I999238000851, match M=17057, closure row player_match_stats#695500, settle batch 27, actor 1
+  PASS  pre: the closure row is at (P, M), afl_api-owned, stamped <CD_M>|<team>|CD_I with its settle batch — {"player_id":13366,"source_record_id":"CD_M999238000851|CD_T992238H|CD_I999238000851","import_batch_id":27}
+  PASS  pre: CD_I is an importer row at P (unique, afl_api_stat_vector_bootstrap)
+  PASS  pre: the combined identity invariant holds with the fixture in place
+  PASS  pre: after_siren_kicks#127 is match-less (NAB Cup, premiership false), P's, season 2092, for the home club (organization 1) — {"match_id":null,"club_id":1}
+  PASS  pre: DP-1/DP-2/DP-3 absent at (P, M) and M; no Brownlow or entry state: only DP-4 is under test — {"sirenAtPM":0,"achievementAtPM":0,"unresolvedAtM":0,"matchLessForP":1,"votes":null,"pRounds":0,"entries":0}
+  PASS  pre: P's ONLY 2092 participation is the closure row #695500 at M (home club): the MOVE removes the dependent's last justification — [{"rowId":695500,"matchId":17057,"clubId":1}]
+  validate-only: exit 1, {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":null,"step":"DP-4","code":"dependent_record_would_be_stale","detail":null}],"referenceFingerprint":"6c15d26b7fe11648f0513b281ee810dfe8aa796559a12bf79696938a5f999115"}
+    | STOP: 1 stop(s); nothing written
+    | player_match_stats [DP-4] dependent_record_would_be_stale
+  PASS  validate-only: STOP (exit 1) with exactly one stop, player_match_stats [DP-4] dependent_record_would_be_stale — {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":null,"step":"DP-4","code":"dependent_record_would_be_stale","detail":null}],"referenceFingerprint":"6c15d26b7fe11648f0513b281ee810dfe8aa796559a12bf79696938a5f999115"}
+  PASS  validate-only: the STOP's report context carries the DP-4 STOP naming the dependent: "DP-4 STOP: match-less after_siren_kicks#127 (player 13366, season 2092) loses its justifying club-season participation"
+  PASS  validate-only: the STOP's report context does NOT carry a DP-4 "keeps its justifying participation" report (D14 fail-open) — DP-4 REPORT: match-less after_siren_kicks#127 (player 13366, season 2092) keeps its justifying participation; affected, still valid
+  apply (--expect-fingerprint = the STOP's reference fingerprint): exit 1, {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":null,"step":"DP-4","code":"dependent_record_would_be_stale","detail":null}],"referenceFingerprint":"6c15d26b7fe11648f0513b281ee810dfe8aa796559a12bf79696938a5f999115"}
+  PASS  apply (the locking re-plan): STOP (exit 1) with the identical stop set -- the STOP holds under §8.2's locks — {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":null,"step":"DP-4","code":"dependent_record_would_be_stale","detail":null}],"referenceFingerprint":"6c15d26b7fe11648f0513b281ee810dfe8aa796559a12bf79696938a5f999115"}
+  PASS  nothing written by either run: fixture census, CD_I's identity row and every protected row byte-identical
+  PASS  no ledger row and no correction batch for CD_I — {"ledger":0,"batches":0}
+  PASS  post: the combined identity invariant holds
+  PASS  post: every guard/dependent row (entry state, season authority and totals, after_siren_kicks, player_achievements), every 2092 round row, 2092 stat_availability and P/P′ derived rows byte-identical (6 row(s)): the STOP wrote nothing — 6adef3cf1ae9cf939fe81df7fd97eeb9d3e5c23cd8e18904cc92091531c1a188 -> 6adef3cf1ae9cf939fe81df7fd97eeb9d3e5c23cd8e18904cc92091531c1a188
+  PASS  no non-fixture row changed across fixture setup and the correction (foreign fingerprint equal)
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 85 (loses-participation): 18/18 checks PASS -> PASS
+CTDB-RC=0 label=c85-loses-participation base=rb args=run --case 85 --variant loses-participation --acknowledge code_test_db

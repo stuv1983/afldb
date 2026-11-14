@@ -1,0 +1,12 @@
+isolated-pg: afldb_v2_rem4brownlow_rb_pb1a3_test verified (cluster afldb_v2_isolated, 127.0.0.1:55681); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem4-brownlow-20261115/cand
+
+ ✓ tests/integration/settle-afl-api-brownlow-backtest.test.ts (6 tests) 8403ms
+
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+   Start at  06:32:32
+   Duration  11.20s (transform 734ms, setup 1.58s, import 826ms, tests 8.40s, environment 0ms)
+
+JSON report written to /mnt/ssd/afldb-rem4-brownlow-20261115/evidence/rb-pb1a3/vitest.json

@@ -1,0 +1,28 @@
+isolated-pg: afldb_v2_rem4brownlow_rb_b4stateb_test verified (cluster afldb_v2_isolated, 127.0.0.1:55681); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem4-brownlow-20261115/cand-b4
+
+ ❯ tests/integration/settle-afl-api-state-b.test.ts (1 test | 1 skipped) 97ms
+     ↓ keeps the corrected field, lets an unrelated field follow the source, and never changes ownership
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/settle-afl-api-state-b.test.ts [ tests/integration/settle-afl-api-state-b.test.ts ]
+Error: afldb_test has no auth_users row; this file will not create one.
+ ❯ tests/integration/settle-afl-api-state-b.test.ts:367:21
+    365|   homeClubId = home.id; awayClubId = away.id; homeClubName = home.name…
+    366|   const [actor] = await sql<{ id: number }[]>`SELECT id FROM auth_user…
+    367|   if (!actor) throw new Error('afldb_test has no auth_users row; this …
+       |                     ^
+    368|   adminUserId = actor.id;
+    369|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 skipped (1)
+   Start at  06:54:54
+   Duration  1.55s (transform 820ms, setup 162ms, import 922ms, tests 97ms, environment 0ms)
+
+JSON report written to /mnt/ssd/afldb-rem4-brownlow-20261115/evidence/rb-b4stateb/vitest.json

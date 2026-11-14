@@ -1,0 +1,32 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2959673, import 2959677)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 58, variant ack-no-disagreement: Surname disagreement: no flag -> STOP M1; flag -> COMMITTED, stored true; flag with an agreeing / no observation -> REFUSED
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  fixture: P=13366 (players/Z/Zz238_058_P.html), P'=13367 (players/Z/Zz238_058_Pprime.html), provider CD_I999238000581, match M=17057, closure row player_match_stats#695500, settle batch 27, actor 1
+  CD_I's observation publishes surname 'Zz238-058-Pprime'; retained candidate: #1
+  PASS  pre: the closure row is at (P, M), afl_api-owned, stamped <CD_M>|<team>|CD_I with its settle batch — {"player_id":13366,"source_record_id":"CD_M999238000581|CD_T992238H|CD_I999238000581","import_batch_id":27}
+  PASS  pre: CD_I is an importer row at P (unique, afl_api_stat_vector_bootstrap)
+  PASS  pre: the combined identity invariant holds with the fixture in place
+  surname gate inputs (CLI query + production normaliseSurname): {"observed":"Zz238-058-Pprime","observedNormalised":"ZZPPRIME","pSurname":"Zz238-058-P","pNormalised":"ZZP","pPrimeSurname":"Zz238-058-Pprime","pPrimeNormalised":"ZZPPRIME","disagrees":false}
+  PASS  surname gate: the observed surname is exactly P′'s -> normalised equal -> NO disagreement — {"observed":"Zz238-058-Pprime","observedNormalised":"ZZPPRIME","pSurname":"Zz238-058-P","pNormalised":"ZZP","pPrimeSurname":"Zz238-058-Pprime","pPrimeNormalised":"ZZPPRIME","disagrees":false}
+  validate-only: exit 0, {"kind":"PLANNED","fingerprint":"bb76563c584e501595e1807a30301e58a6068bcf5a98478759f7f69ab37e6646","rowsPlanned":1}
+  PASS  validate-only: PLAN OK, exit 0, 1 row(s) planned — {"kind":"PLANNED","fingerprint":"bb76563c584e501595e1807a30301e58a6068bcf5a98478759f7f69ab37e6646","rowsPlanned":1}
+  PASS  validate-only wrote nothing (fixture census unchanged)
+  PASS  base: without the flag the correction plans (PLAN OK, 1 row): nothing but the flag is wrong — bb76563c584e501595e1807a30301e58a6068bcf5a98478759f7f69ab37e6646
+  pre-refusal sequences: {"afl_api_identity_adjudications":null,"canonical_applications":1,"import_batches":28}
+  validate-only --acknowledge-surname-disagreement: exit 1, {"kind":"REFUSED","message":"REFUSED: --acknowledge-surname-disagreement was given but the observed surname does not disagree"}
+  PASS  validate-only --acknowledge-surname-disagreement: REFUSED (exit 1), exactly "REFUSED: --acknowledge-surname-disagreement was given but the observed surname does not disagree", and "nothing was written" — {"kind":"REFUSED","message":"REFUSED: --acknowledge-surname-disagreement was given but the observed surname does not disagree"} REFUSED: REFUSED: --acknowledge-surname-disagreement was given but the observed surname does not disagree
+  nothing was written (the transaction rolled back or was never opened)
+  PASS  validate-only --acknowledge-surname-disagreement: nothing written -- identities (CD_K's too), ledger, correction batches, applications, closure row, projections, candidates, findings, derived rows, fixture census and id sequences byte-identical
+  apply --acknowledge-surname-disagreement --expect-fingerprint <base fingerprint>: exit 1, {"kind":"REFUSED","message":"REFUSED: --acknowledge-surname-disagreement was given but the observed surname does not disagree"}
+  PASS  apply --acknowledge-surname-disagreement --expect-fingerprint <base fingerprint>: REFUSED (exit 1), exactly "REFUSED: --acknowledge-surname-disagreement was given but the observed surname does not disagree", and "nothing was written" — {"kind":"REFUSED","message":"REFUSED: --acknowledge-surname-disagreement was given but the observed surname does not disagree"} REFUSED: REFUSED: --acknowledge-surname-disagreement was given but the observed surname does not disagree
+  nothing was written (the transaction rolled back or was never opened)
+  PASS  apply --acknowledge-surname-disagreement --expect-fingerprint <base fingerprint>: nothing written -- identities (CD_K's too), ledger, correction batches, applications, closure row, projections, candidates, findings, derived rows, fixture census and id sequences byte-identical
+  PASS  no `corrected` ledger row and no correction batch for CD_I; the closure row is still at P — {"ledger":0,"batches":0,"atP":1}
+  PASS  post: the combined identity invariant holds
+  PASS  no non-fixture row changed across fixture setup and the correction (foreign fingerprint equal)
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 58 (ack-no-disagreement): 17/17 checks PASS -> PASS
+CTDB-RC=0 label=c58-ack-no-disagreement base=rb args=run --case 58 --variant ack-no-disagreement --acknowledge code_test_db

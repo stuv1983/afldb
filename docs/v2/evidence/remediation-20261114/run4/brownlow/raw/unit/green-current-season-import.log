@@ -1,0 +1,10 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem4-brownlow-20261115/final
+
+ ✓ tests/current-season-import.test.ts (360 tests) 1035ms
+
+ Test Files  1 passed (1)
+      Tests  360 passed (360)
+   Start at  06:56:28
+   Duration  2.83s (transform 829ms, setup 160ms, import 1.26s, tests 1.03s, environment 0ms)
+

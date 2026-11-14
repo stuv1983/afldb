@@ -1,0 +1,10 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem4-brownlow-20261115/final
+
+ ✓ tests/match-sheet.test.ts (97 tests) 107ms
+
+ Test Files  1 passed (1)
+      Tests  97 passed (97)
+   Start at  06:56:34
+   Duration  948ms (transform 359ms, setup 161ms, import 318ms, tests 107ms, environment 0ms)
+

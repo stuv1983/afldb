@@ -1,0 +1,13 @@
+isolated-pg: afldb_v2_rem4brownlow_rb_fin1a1_test verified (cluster afldb_v2_isolated, 127.0.0.1:55681); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem4-brownlow-20261115/final
+
+ ✓ tests/integration/settle-afl-api-brownlow.test.ts (21 tests) 12874ms
+     ✓ cleanup() self-heals a stale player_clubs pointer left by a crashed prior teardown (one that deleted player_match_stats but never reached the recompute/DELETE FROM matches that follows it — the exact partial state a reported failed run left behind). Runs last: it deletes matches p and q outright, which every test above this one depends on existing.  9438ms
+
+ Test Files  1 passed (1)
+      Tests  21 passed (21)
+   Start at  06:41:09
+   Duration  16.37s (transform 887ms, setup 2.09s, import 987ms, tests 12.87s, environment 0ms)
+
+JSON report written to /mnt/ssd/afldb-rem4-brownlow-20261115/evidence/rb-fin1a1/vitest.json

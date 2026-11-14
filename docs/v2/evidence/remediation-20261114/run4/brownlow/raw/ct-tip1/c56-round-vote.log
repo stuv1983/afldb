@@ -1,0 +1,35 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2925956, import 2925957)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 56, variant round-vote: Admin-published season (the real publish), a closure MOVE of a positive round vote / of P's games -> STOP season_total_depends_on_correction (SV-1)
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  fixture: P=13366 (players/Z/Zz238_056_P.html), P'=13367 (players/Z/Zz238_056_Pprime.html), provider CD_I999238000561, match M=17057 (CD_M999238000561, round 1), closure row brownlow_round_votes#320862 {"match_id":17057,"played":true,"votes":3}, companions V2 CD_I999238000562->player 13368 #320863 (2), V3 CD_I999238000563->player 13369 #320864 (1), settle batch 27, actor 1
+  PASS  pre: closure row brownlow_round_votes#320862 at (2092, P, 1): afl_api-owned, stamped CD_M, import batch 27; {played, votes, match_id} = {"match_id":17057,"played":true,"votes":3} — {"id":320862,"votes":3,"played":true,"season":2092,"match_id":17057,"player_id":13366,"source_id":6,"imported_at":"2026-11-14T19:36:13.41084+00:00","round_number":1,"import_batch_id":27,"source_record_id":"CD_M999238000561"}
+  PASS  pre: CD_I is an importer row at P (unique, afl_api_stat_vector_bootstrap)
+  PASS  pre: the combined identity invariant holds with the fixture in place
+  PASS  pre: B1-B5 hold (payload names CD_I once with 3; CD_I's projection names P); P′ plays M (C1c); no P′ round row (C1 MOVE)
+  writer publishBrownlowSeason: {"ok":true,"value":{"season":2092,"revision":2,"rowCount":3,"votesTotal":6,"winners":[13366]}}
+  PASS  writer: the real publishBrownlowSeason published 2092 (the first publication: revision 2; 3 season rows) — {"ok":true,"value":{"season":2092,"revision":2,"rowCount":3,"votesTotal":6,"winners":[13366]}}
+  PASS  pre: 2092 is ADMIN-PUBLISHED (SV-1's class, bound to the CURRENT revision): published_revision 2, and every season row manual_admin_edit stamped publish:2092:r2 — {"authority":{"publishedRevision":2},"rows":[{"playerId":13366,"votes":3,"sourceKey":"manual_admin_edit","sourceRecordId":"publish:2092:r2"},{"playerId":13368,"votes":2,"sourceKey":"manual_admin_edit","sourceRecordId":"publish:2092:r2"},{"playerId":13369,"votes":1,"sourceKey":"manual_admin_edit","sourceRecordId":"publish:2092:r2"}]}
+  PASS  pre: the season rows are the vote set (P 3, V2 2, V3 1); P's only round row is the closure row (no BG2); no entry state (no BG3) — {"pRounds":1,"entries":0}
+  stat_availability 2092 baseline (3 row(s), sha256 42a6583db5bd08663828e6197595ad0864250d95a951b0cd378dd1cccaeb1fa9)
+  PASS  baseline: the settled 2092 coverage is a fixed point of the real recomputeBrownlowCoverage (rolled-back re-run byte-identical) — 42a6583db5bd08663828e6197595ad0864250d95a951b0cd378dd1cccaeb1fa9 -> 42a6583db5bd08663828e6197595ad0864250d95a951b0cd378dd1cccaeb1fa9
+  validate-only: exit 1, {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":null,"step":"SV-1","code":"season_total_depends_on_correction","detail":null}],"referenceFingerprint":"209dd876a6c2920fd490d2d897d6def9f3ab4c31c495bc1e6005acda52fe4459"}
+    | STOP: 1 stop(s); nothing written
+    | player_match_stats [SV-1] season_total_depends_on_correction
+  PASS  validate-only: STOP (exit 1) with exactly one stop, player_match_stats [SV-1] season_total_depends_on_correction — {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":null,"step":"SV-1","code":"season_total_depends_on_correction","detail":null}],"referenceFingerprint":"209dd876a6c2920fd490d2d897d6def9f3ab4c31c495bc1e6005acda52fe4459"}
+  PASS  validate-only: the STOP's report context carries the SV-1 season verdict: "season 2092: STOP SV-1 (admin_published) [SV-1] season_total_depends_on_correction: not proven independent: the admin-published season depends on the corrected facts"
+  PASS  validate-only: the STOP's report context carries the positive-round-vote SV-1 check (the disjunct under test): "failed: SV-1: the closure moves or deletes a Brownlow round row with votes > 0 in this season"
+  PASS  validate-only: the STOP's report context carries the P-in-totals SV-1 check (P polled): "failed: SV-1: P or P′ has a brownlow_season_votes row in this season (its games input changes)"
+  apply (--expect-fingerprint = the STOP's reference fingerprint): exit 1, {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":null,"step":"SV-1","code":"season_total_depends_on_correction","detail":null}],"referenceFingerprint":"209dd876a6c2920fd490d2d897d6def9f3ab4c31c495bc1e6005acda52fe4459"}
+  PASS  apply (the locking re-plan): STOP (exit 1) with the identical stop set -- the STOP holds under §8.2's locks — {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":null,"step":"SV-1","code":"season_total_depends_on_correction","detail":null}],"referenceFingerprint":"209dd876a6c2920fd490d2d897d6def9f3ab4c31c495bc1e6005acda52fe4459"}
+  PASS  nothing written by either run: fixture census, CD_I's identity row and every protected row byte-identical
+  PASS  no ledger row and no correction batch for CD_I — {"ledger":0,"batches":0}
+  PASS  post: the combined identity invariant holds
+  PASS  post: every guard/dependent row (entry state, season authority and totals, after_siren_kicks, player_achievements), every 2092 round row, 2092 stat_availability and P/P′ derived rows byte-identical (18 row(s)): the STOP wrote nothing — 243747da0c8198fefe945beabbcdd984742c8fa0f4181d16907af8efd0f3ecef -> 243747da0c8198fefe945beabbcdd984742c8fa0f4181d16907af8efd0f3ecef
+  PASS  post: CD_M's projection rows byte-identical
+  PASS  no non-fixture row changed across fixture setup and the correction (foreign fingerprint equal)
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 56 (round-vote): 22/22 checks PASS -> PASS
+CTDB-RC=0 label=c56-round-vote base=rb args=run --case 56 --variant round-vote --acknowledge code_test_db

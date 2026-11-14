@@ -1,0 +1,30 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2902926, import 2902974)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 53, variant source-positive: Brownlow collision with a positive vote on either side (foreign P′ counterpart) -> STOP C5
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  fixture: P=13366 (players/Z/Zz238_053_P.html), P'=13367 (players/Z/Zz238_053_Pprime.html), provider CD_I999238000531, match M=17057 (CD_M999238000531, round 1), closure row brownlow_round_votes#320862 {"match_id":17057,"played":true,"votes":3}, companions V2 CD_I999238000532->player 13368 #320863 (2), V3 CD_I999238000533->player 13369 #320864 (1), settle batch 27, actor 1
+  PASS  pre: closure row brownlow_round_votes#320862 at (2092, P, 1): afl_api-owned, stamped CD_M, import batch 27; {played, votes, match_id} = {"match_id":17057,"played":true,"votes":3} — {"id":320862,"votes":3,"played":true,"season":2092,"match_id":17057,"player_id":13366,"source_id":6,"imported_at":"2026-11-14T19:31:23.185004+00:00","round_number":1,"import_batch_id":27,"source_record_id":"CD_M999238000531"}
+  PASS  pre: CD_I is an importer row at P (unique, afl_api_stat_vector_bootstrap)
+  PASS  pre: the combined identity invariant holds with the fixture in place
+  PASS  pre: the POSITIVE side is the closure row (votes 3); P′'s counterpart at (2092, P′, 1) is afltables-owned, no stamps, votes 0, played, match_id M — {"closure":{"played":true,"votes":3,"match_id":17057},"counterpart":{"id":320865,"votes":0,"played":true,"season":2092,"match_id":17057,"player_id":13367,"source_id":10,"imported_at":"2026-11-14T19:31:23.185004+00:00","round_number":1,"import_batch_id":null,"source_record_id":null}}
+  PASS  pre: exactly one side is positive (C5's trigger), and P′ participates in M (C1c passes)
+  stat_availability 2092 baseline (3 row(s), sha256 c4b9802d625ddbc6f241526f0a292f9cf7588c3ecc4652ed6eb6241c315a325c)
+  PASS  baseline: the settled 2092 coverage is a fixed point of the real recomputeBrownlowCoverage (rolled-back re-run byte-identical) — c4b9802d625ddbc6f241526f0a292f9cf7588c3ecc4652ed6eb6241c315a325c -> c4b9802d625ddbc6f241526f0a292f9cf7588c3ecc4652ed6eb6241c315a325c
+  validate-only: exit 1, {"kind":"STOP","stops":[{"table":"brownlow_round_votes","rowId":320862,"step":"C5","code":"collision_values_disagree","detail":"a positive-vote or NULL-vote destructive collision is refused"}],"referenceFingerprint":"7a8f645f2face9eee8aa2a1af2e9dc2e6ca5e50cd0de4521e75ca1b8c0d4f329"}
+    | STOP: 1 stop(s); nothing written
+    | brownlow_round_votes#320862 [C5] collision_values_disagree: a positive-vote or NULL-vote destructive collision is refused
+  PASS  validate-only: STOP (exit 1) with exactly one stop, brownlow_round_votes#320862 [C5] collision_values_disagree — {"kind":"STOP","stops":[{"table":"brownlow_round_votes","rowId":320862,"step":"C5","code":"collision_values_disagree","detail":"a positive-vote or NULL-vote destructive collision is refused"}],"referenceFingerprint":"7a8f645f2face9eee8aa2a1af2e9dc2e6ca5e50cd0de4521e75ca1b8c0d4f329"}
+  PASS  validate-only: the STOP names its evidence exactly, "a positive-vote or NULL-vote destructive collision is refused" (§5.7; §12.1) — printed: brownlow_round_votes#320862 [C5] collision_values_disagree: a positive-vote or NULL-vote destructive collision is refused; "a positive-vote or NULL-vote destructive collision is refused" appears nowhere in the CLI output
+  apply (--expect-fingerprint = the STOP's reference fingerprint): exit 1, {"kind":"STOP","stops":[{"table":"brownlow_round_votes","rowId":320862,"step":"C5","code":"collision_values_disagree","detail":"a positive-vote or NULL-vote destructive collision is refused"}],"referenceFingerprint":"7a8f645f2face9eee8aa2a1af2e9dc2e6ca5e50cd0de4521e75ca1b8c0d4f329"}
+  PASS  apply (the locking re-plan): STOP (exit 1) with the identical stop set -- the STOP holds under §8.2's locks — {"kind":"STOP","stops":[{"table":"brownlow_round_votes","rowId":320862,"step":"C5","code":"collision_values_disagree","detail":"a positive-vote or NULL-vote destructive collision is refused"}],"referenceFingerprint":"7a8f645f2face9eee8aa2a1af2e9dc2e6ca5e50cd0de4521e75ca1b8c0d4f329"}
+  PASS  nothing written by either run: fixture census, CD_I's identity row and every protected row byte-identical
+  PASS  no ledger row and no correction batch for CD_I — {"ledger":0,"batches":0}
+  PASS  post: the combined identity invariant holds
+  PASS  post: stat_availability for 2092 byte-identical to the settled baseline (a STOP writes nothing) — c4b9802d625ddbc6f241526f0a292f9cf7588c3ecc4652ed6eb6241c315a325c -> c4b9802d625ddbc6f241526f0a292f9cf7588c3ecc4652ed6eb6241c315a325c
+  PASS  post: CD_M's projection rows byte-identical
+  PASS  no non-fixture row changed across fixture setup and the correction (foreign fingerprint equal)
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 53 (source-positive): 18/18 checks PASS -> PASS
+CTDB-RC=0 label=c53-source-positive base=rb args=run --case 53 --variant source-positive --acknowledge code_test_db

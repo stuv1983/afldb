@@ -1,0 +1,48 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2995724, import 2995725)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 31: Human-origin ORIGINAL (the real admin link H, net LINKED(P); a newer decoy linked row) -> one corrected row, supersedes_id = H
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  fixture: P=13366 (players/Z/Zz238_031_P.html), P'=13367 (players/Z/Zz238_031_Pprime.html), Q=13368 (players/Z/Zz238_031_Q.html), provider CD_I999238000311 (observed at CD_M999238000311|CD_T992238H|CD_I999238000311, candidate #1), decoy provider CD_I999238000312 (candidate #2), actor 1
+  PASS  pre: CD_I has no identity row and no ledger row (U1: observed, unresolved, candidate retained)
+  page loader (CD_I999238000311): {"state":"U1","existing":null,"pendingCandidates":[{"id":"1","sourceVersionSeq":1}],"latestAdjudicationId":null,"observedSurname":"Zz238-031-Twin"}
+  PASS  admin links CD_I to P (the wrong twin): the real page loader classifies CD_I999238000311 U1 (no identity row, the retained candidate #1 pending, no ledger row)
+  writer linkAflApiProvider(CD_I999238000311 -> player 13366): {"ok":true}
+  PASS  admin links CD_I to P (the wrong twin): the real linkAflApiProvider returns ok (page fingerprint matched; no surname acknowledgement needed) — {"ok":true}
+  PASS  admin links CD_I to P (the wrong twin): exactly one `linked` ledger row (supersedes NULL, surname ack false, the fixture actor) and a `resolved` admin identity row at player 13366 — {"rows":[{"id":1,"action":"linked","playerId":13366,"playerIdentity":"players/Z/Zz238_031_P.html","supersedesId":null,"previousPlayerIdentity":null,"evidenceSha256":"763ee8c78fda73374355a8ea3c07b4fc523f6df098523ffa5f8b236443cb169b"}],"identity":{"playerId":13366,"status":"resolved","matchMethod":"afl_api_admin_adjudication"}}
+  PASS  H: the `linked` row names P at P's stable identity — {"id":1,"action":"linked","playerId":13366,"playerIdentity":"players/Z/Zz238_031_P.html","supersedesId":null,"previousPlayerIdentity":null,"evidenceSha256":"763ee8c78fda73374355a8ea3c07b4fc523f6df098523ffa5f8b236443cb169b"}
+  fixture: P=13366 (players/Z/Zz238_031_P.html), P'=13367 (players/Z/Zz238_031_Pprime.html), provider CD_I999238000311, match M=17057, closure row player_match_stats#695500, settle batch 27, actor 1
+  PASS  pre: the closure row is at (P, M), afl_api-owned, stamped <CD_M>|<team>|CD_I with its settle batch
+  PASS  pre: CD_I is the admin row at P (resolved, afl_api_admin_adjudication): net ledger state LINKED(P) = H — {"id":18428,"notes":"AFLDB-ISSUE-235 admin adjudication; see afl_api_identity_adjudications","status":"resolved","player_id":13366,"source_id":6,"external_id":"CD_I999238000311","external_url":null,"match_method":"afl_api_admin_adjudication","external_name":"Zz238-031-Twin","candidate_count":0}
+  page loader (CD_I999238000312): {"state":"U1","existing":null,"pendingCandidates":[{"id":"2","sourceVersionSeq":1}],"latestAdjudicationId":null,"observedSurname":"Zz238-031-Q"}
+  PASS  admin links the unrelated CD_K to Q (the decoy: the newest linked row in the ledger): the real page loader classifies CD_I999238000312 U1 (no identity row, the retained candidate #2 pending, no ledger row)
+  writer linkAflApiProvider(CD_I999238000312 -> player 13368): {"ok":true}
+  PASS  admin links the unrelated CD_K to Q (the decoy: the newest linked row in the ledger): the real linkAflApiProvider returns ok (page fingerprint matched; no surname acknowledgement needed) — {"ok":true}
+  PASS  admin links the unrelated CD_K to Q (the decoy: the newest linked row in the ledger): exactly one `linked` ledger row (supersedes NULL, surname ack false, the fixture actor) and a `resolved` admin identity row at player 13368 — {"rows":[{"id":2,"action":"linked","playerId":13368,"playerIdentity":"players/Z/Zz238_031_Q.html","supersedesId":null,"previousPlayerIdentity":null,"evidenceSha256":"5a4d507db162c0706da0aaab0a0e7c3816df7e4f1c61d3e38adf8809ea949502"}],"identity":{"playerId":13368,"status":"resolved","matchMethod":"afl_api_admin_adjudication"}}
+  PASS  decoy: its `linked` row is newer than H and names neither P nor P′
+  PASS  pre: the combined identity invariant holds
+  surname gate inputs (CLI query + production normaliseSurname): {"observed":"Zz238-031-Twin","observedNormalised":"ZZTWIN","pSurname":"Zz238-031-Twin","pNormalised":"ZZTWIN","pPrimeSurname":"Zz238-031-Twin","pPrimeNormalised":"ZZTWIN","disagrees":false}
+  PASS  surname gate: the retained candidate publishes the shared surname; P and P′ carry it; normalised equal -> no disagreement, no flag — {"observed":"Zz238-031-Twin","observedNormalised":"ZZTWIN","pSurname":"Zz238-031-Twin","pNormalised":"ZZTWIN","pPrimeSurname":"Zz238-031-Twin","pPrimeNormalised":"ZZTWIN","disagrees":false}
+  validate-only: exit 0, {"kind":"PLANNED","fingerprint":"143e97756283b47650887c45b4de7ea216dd6969235c8ec04ccc386ef3b13a16","rowsPlanned":1}
+  PASS  validate-only: PLAN OK, exit 0, 1 row(s) planned — {"kind":"PLANNED","fingerprint":"143e97756283b47650887c45b4de7ea216dd6969235c8ec04ccc386ef3b13a16","rowsPlanned":1}
+  PASS  validate-only wrote nothing (fixture census unchanged)
+  apply: exit 0, {"kind":"COMMITTED","fingerprint":"143e97756283b47650887c45b4de7ea216dd6969235c8ec04ccc386ef3b13a16","adjudicationId":3,"batchId":30,"moved":1,"deleted":0,"reportIncomplete":false}
+  PASS  apply: COMMITTED, exit 0, the validate-only fingerprint, moved 1, deleted 0, report complete — {"kind":"COMMITTED","fingerprint":"143e97756283b47650887c45b4de7ea216dd6969235c8ec04ccc386ef3b13a16","adjudicationId":3,"batchId":30,"moved":1,"deleted":0,"reportIncomplete":false}
+  PASS  post: one new `corrected` ledger row after 1 prior row(s): P′ at its identity, previous identity P, supersedes #1, surname ack false, actor, evidence hash, previous_state resolved at P — [{"id":1,"action":"linked","playerId":13366,"playerIdentity":"players/Z/Zz238_031_P.html","previousPlayerIdentity":null,"supersedesId":null,"adminUserId":1,"evidenceSha256":"763ee8c78fda73374355a8ea3c07b4fc523f6df098523ffa5f8b236443cb169b","previousState":null,"surnameAck":false},{"id":3,"action":"corrected","playerId":13367,"playerIdentity":"players/Z/Zz238_031_Pprime.html","previousPlayerIdentit...
+  PASS  post: CD_I updated in place to P′ (same id, resolved, candidate_count 0, afl_api_admin_adjudication) — {"id":18428,"playerId":13367,"status":"resolved","candidateCount":0,"matchMethod":"afl_api_admin_adjudication","externalName":null}
+  PASS  post: CD_I's ledger is exactly [H linked, C corrected] — [{"id":1,"action":"linked","playerId":13366,"playerIdentity":"players/Z/Zz238_031_P.html","supersedesId":null,"previousPlayerIdentity":null,"evidenceSha256":"763ee8c78fda73374355a8ea3c07b4fc523f6df098523ffa5f8b236443cb169b"},{"id":3,"action":"corrected","playerId":13367,"playerIdentity":"players/Z/Zz238_031_Pprime.html","supersedesId":1,"previousPlayerIdentity":"players/Z/Zz238_031_P.html","eviden...
+  PASS  chain: the net ledger row before the correction is #1 linked; supersedes_id = 1; the CLI's correctionLedgerChainValid accepts it — [{"id":1,"action":"linked","playerId":13366,"playerIdentity":"players/Z/Zz238_031_P.html","supersedesId":null,"previousPlayerIdentity":null,"evidenceSha256":"763ee8c78fda73374355a8ea3c07b4fc523f6df098523ffa5f8b236443cb169b"},{"id":3,"action":"corrected","playerId":13367,"playerIdentity":"players/Z/Zz238_031_Pprime.html","supersedesId":1,"previousPlayerIdentity":"players/Z/Zz238_031_P.html","eviden...
+  PASS  post: C does not supersede the decoy #2 (the newest linked row overall)
+  PASS  post: H is byte-identical (an append-only predecessor is never rewritten)
+  PASS  post: the decoy row is byte-identical, and the decoy provider is still at Q
+  PASS  post: CD_I resolved P -> P′ exactly once: one `corrected` row, one correction batch (K), one correction application in K, identity and the row at P′ — {"corrected":1,"batches":1,"applications":1,"identityAtPPrime":1,"rowAtPPrime":1}
+  PASS  post: batch K completed and bound (adjudication, fingerprint, evidence hash); exactly one player_match_stats update rowProof with the pre-correction contract hash — [{"verb":"update","table":"player_match_stats","newKey":{"match_id":17057,"player_id":13367},"oldKey":{"match_id":17057,"player_id":13366},"preCorrectionContractSha256":"1ca9b726dbf7d9b377f7e45361e8e5bad6df006b9eecd6135b7ed71d8bd04fbc"}]
+  PASS  post: batch counts moved {"brownlow_round_votes":0,"player_match_stats":1}, deleted {"brownlow_round_votes":0,"player_match_stats":0} — {"moved":{"player_match_stats":1,"brownlow_round_votes":0},"deleted":{"player_match_stats":0,"brownlow_round_votes":0},"projectionsMoved":1}
+  PASS  post: CD_I's typed projection names P′
+  PASS  post: the combined identity invariant (SAT-1 basis) holds
+  PASS  post: the apply report lists the retained candidate under "pending promotion candidates" (reported, never resolved) — promotion_candidates#1 player_match_stats CD_M999238000311|CD_T992238H|CD_I999238000311 -> player_match_stats (unresolved_identity, season 2092;
+  PASS  no non-fixture row changed across fixture setup and the correction (foreign fingerprint equal)
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 31: 33/33 checks PASS -> PASS
+CTDB-RC=0 label=c31 base=rb args=run --case 31 --acknowledge code_test_db

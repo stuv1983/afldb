@@ -1,0 +1,21 @@
+label=warred1 base=rb db=afldb_v2_rem4brownlow_rb_warred1_test CAND=/mnt/ssd/afldb-rem4-brownlow-20261115/cand-b4 HEAD=7cfbe186e70ca91db67da1aa4e28325ccbc32a86 porcelain=2
+2026-11-14T19:25:12Z
+create-db: afldb_v2_rem4brownlow_rb_warred1_test created from afldb_v2_rem4brownlow_rbtpl_test and marked
+BEFORE afldb_v2_rem4brownlow_rb_warred1_test {"realRows":0,"realRowMd5":null,"realPlayerId":null,"identitiesTotal":18424,"aflApiIdentities":0,"ownIdRows":0,"fixtureSeasonsLeft":0,"matches":17056,"players":13365,"brownlowCoverageMd5":"70209edc0e475b3ae07d130e1514c997"}
+== tests/integration/zz-old-brownlow-scratch.test.ts rc=0
+ Test Files  1 passed (1)
+      Tests  21 passed (21)
+AFTER-zz-old-brownlow-scratch.test.ts afldb_v2_rem4brownlow_rb_warred1_test {"realRows":0,"realRowMd5":null,"realPlayerId":null,"identitiesTotal":18424,"aflApiIdentities":0,"ownIdRows":0,"fixtureSeasonsLeft":0,"matches":17056,"players":13365,"brownlowCoverageMd5":"cd58785e842364b86e35cbfbf8cf0fde"}
+== tests/integration/database.test.ts rc=1
+     ✓ 200+ games, 100+ goals and 15+ finals 1ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/integration/database.test.ts > Brownlow correctness > separates the war years from merely uncollected seasons
+AssertionError: expected [ 1942, 1943, 1944, 1945, 2026 ] to deeply equal [ 1942, 1943, 1944, 1945 ]
+- Expected
++ Received
++   2026,
+ Test Files  1 failed (1)
+      Tests  1 failed | 68 passed (69)
+AFTER-database.test.ts afldb_v2_rem4brownlow_rb_warred1_test {"realRows":0,"realRowMd5":null,"realPlayerId":null,"identitiesTotal":18424,"aflApiIdentities":0,"ownIdRows":0,"fixtureSeasonsLeft":0,"matches":17056,"players":13365,"brownlowCoverageMd5":"cd58785e842364b86e35cbfbf8cf0fde"}
+2026-11-14T19:26:40Z
+drop-db: afldb_v2_rem4brownlow_rb_warred1_test dropped

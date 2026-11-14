@@ -1,0 +1,10 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem4-brownlow-20261115/final
+
+ ✓ tests/afl-api-ingestion-safety.test.ts (198 tests) 1210ms
+
+ Test Files  1 passed (1)
+      Tests  198 passed (198)
+   Start at  06:56:20
+   Duration  2.95s (transform 1.03s, setup 165ms, import 1.19s, tests 1.21s, environment 0ms)
+

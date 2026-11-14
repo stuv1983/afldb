@@ -1,0 +1,29 @@
+=== afldb_v2_rem4brownlow_rbtpl_test
+## SELECT 'status2026-distinct', brownlow_status::text, count(*) FROM player_season_stats WHERE season  (1 rows)
+status2026-distinct	pending	669
+## SELECT 'na-ge1924', stat_key, count(*) FROM stat_availability WHERE stat_key LIKE 'brownlow%' AND co (3 rows)
+na-ge1924	brownlow_match_votes	4
+na-ge1924	brownlow_round_votes	4
+na-ge1924	brownlow_season_total	4
+## SELECT 'na-1942-45', stat_key, count(*) FROM stat_availability WHERE stat_key LIKE 'brownlow%' AND c (3 rows)
+na-1942-45	brownlow_match_votes	4
+na-1942-45	brownlow_round_votes	4
+na-1942-45	brownlow_season_total	4
+## SELECT 'seasons', year, status::text FROM seasons WHERE year >= 2025 ORDER BY year (3 rows)
+seasons	2025	complete
+seasons	2026	complete
+seasons	2027	in_progress
+=== afldb_v2_rem4brownlow_snaptpl_test
+## SELECT 'status2026-distinct', brownlow_status::text, count(*) FROM player_season_stats WHERE season  (1 rows)
+status2026-distinct	not_applicable	669
+## SELECT 'na-ge1924', stat_key, count(*) FROM stat_availability WHERE stat_key LIKE 'brownlow%' AND co (3 rows)
+na-ge1924	brownlow_match_votes	4
+na-ge1924	brownlow_round_votes	4
+na-ge1924	brownlow_season_total	4
+## SELECT 'na-1942-45', stat_key, count(*) FROM stat_availability WHERE stat_key LIKE 'brownlow%' AND c (3 rows)
+na-1942-45	brownlow_match_votes	4
+na-1942-45	brownlow_round_votes	4
+na-1942-45	brownlow_season_total	4
+## SELECT 'seasons', year, status::text FROM seasons WHERE year >= 2025 ORDER BY year (2 rows)
+seasons	2025	complete
+seasons	2026	complete

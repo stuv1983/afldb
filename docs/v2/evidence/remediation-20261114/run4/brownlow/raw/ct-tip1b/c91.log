@@ -1,0 +1,48 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2992065, import 2992066)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 91: R half: a real match-sheet writer on the closure row waits on the correction's row lock; its edit is post-correction state (L8-d or STOP, observed)
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  fixture: P=13366, P'=13367, provider CD_I999238000911, match M=17057, closure row player_match_stats#695500, settle batch 27, actor 1
+  PASS  pre: closure row at (P, M), afl_api-owned, stamped <CD_M>|<team>|CD_I with the settle batch; contract = the insert application — {"player_id":13366,"source_record_id":"CD_M999238000911|CD_T992238H|CD_I999238000911"}
+  PASS  pre: no P′ counterpart at M; P holds exactly the one row; M holds only it — {"counterpart":0,"pRows":1,"atM":1}
+  PASS  pre: CD_I is an importer row at P (unique, afl_api_stat_vector_bootstrap)
+  PASS  pre: the combined identity invariant holds with the fixture in place
+  validate-only: exit 0, {"kind":"PLANNED","fingerprint":"4102e639e91010b648ac42a71009834f663e6435eecafe43b9c46a8790cafc40","rowsPlanned":1}
+  PASS  validate-only: PLAN OK, exit 0, 1 row(s) planned — {"kind":"PLANNED","fingerprint":"4102e639e91010b648ac42a71009834f663e6435eecafe43b9c46a8790cafc40","rowsPlanned":1}
+  PASS  validate-only wrote nothing (fixture census unchanged)
+  gate G: pid 2992344 ('afldb-issue238-case091-gate', afldb_owner), holds players#13367 (P′) FOR UPDATE, xid 27574
+  PASS  gate: G holds players P′ FOR UPDATE in an open transaction with an assigned xid
+  correction: pid 2992427 (afldb_import), backend_xid 27575, wait Lock/transactionid, pg_blocking_pids = {2992344}, waiting 8 ms, query 'INSERT INTO afl_api_identity_adjudications (source_key, external_id, action, player_id, player_identity, previous_state, previous_player_identity, evidence, evidence_sha256, surname_disagreement_acknowledged, admin_user_id, note, supersedes_id) VALUES ($1, $2, 'corrected', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id::int AS id'; ungranted [{"locktype":"transactionid","relation":null,"mode":"ShareLock","granted":false,"page":null,"tuple":null,"transactionId":"27574"}]; xmax matches#17057 (ctid (426,4)) = 27575, player_match_stats#695500 = 27575
+  PASS  correction: blocked by the gate: pg_blocking_pids(correction) = {G}, waiting on G's transaction id — [{"locktype":"transactionid","relation":null,"mode":"ShareLock","granted":false,"page":null,"tuple":null,"transactionId":"27574"}]
+  PASS  correction: it ALREADY holds the closure locks: matches M and the closure row both carry its transaction id as xmax — xid 27575: {"match":"27575","row":"27575","matchCtid":"(426,4)"}
+  writer: pid 2992477 ('afldb-issue238-case091-writer-match-sheet', afldb_import), wait Lock/transactionid, pg_blocking_pids = {2992427}, query 'SELECT id, season, match_key AS "matchKey", home_club_id AS "homeClubId", away_club_id AS "awayClubId" FROM matches WHERE id = $1 FOR UPDATE'; locks [{"locktype":"transactionid","relation":null,"mode":"ShareLock","granted":false,"page":null,"tuple":null,"transactionId":"27575"},{"locktype":"relation","relation":"matches","mode":"RowShareLock","granted":true,"page":null,"tuple":null,"transactionId":null},{"locktype":"tuple","relation":"matches","mode":"AccessExclusiveLock","granted":true,"page":426,"tuple":4,"transactionId":null}]
+  PASS  writer: its own afldb_import backend, issued its first statement (matches … FOR UPDATE) and is WAITING on a lock — SELECT id, season, match_key AS "matchKey", home_club_id AS "homeClubId", away_club_id AS "awayClubId" FROM matches WHERE id = $1 FOR UPDATE
+  PASS  writer: pg_blocking_pids(writer) = {correction} exactly -- NOT the gate — {2992427}; correction 2992427, gate 2992344
+  PASS  writer: waiting on the correction's transaction id while holding the tuple lock on EXACTLY M's row (matches ctid) — M ctid (426,4): [{"locktype":"transactionid","relation":null,"mode":"ShareLock","granted":false,"page":null,"tuple":null,"transactionId":"27575"},{"locktype":"relation","relation":"matches","mode":"RowShareLock","granted":true,"page":null,"tuple":null,"transactionId":null},{"locktype":"tuple","relation":"matches","mode":"AccessExclusiveLock","granted":true,"page":426,"tuple":4,"transactionId":null...
+  PASS  timing: the correction is still waiting on G, well inside its 5 s lock_timeout (< 4 s), when G is released — waited 42 ms
+  gate G released after the correction had waited ~42 ms
+  apply: exit 0, {"kind":"COMMITTED","fingerprint":"4102e639e91010b648ac42a71009834f663e6435eecafe43b9c46a8790cafc40","adjudicationId":1,"batchId":28,"moved":1,"deleted":0,"reportIncomplete":false}
+  PASS  apply: COMMITTED (exit 0) with the validate-only fingerprint, moved 1, deleted 0, report complete -- the gate did not cost it its lock_timeout — {"kind":"COMMITTED","fingerprint":"4102e639e91010b648ac42a71009834f663e6435eecafe43b9c46a8790cafc40","adjudicationId":1,"batchId":28,"moved":1,"deleted":0,"reportIncomplete":false}
+  PASS  apply: exactly one correction application, bound to batch K
+  writer: {"ok":false,"error":"This match sheet has changed since it was loaded (for example by a source update). Nothing was saved. Reload the sheet and re-apply your edits."}
+  PASS  writer: saveMatchSheet refused as a stale save once the correction released M (the MOVE changed the sheet the token was taken from) — {"ok":false,"error":"This match sheet has changed since it was loaded (for example by a source update). Nothing was saved. Reload the sheet and re-apply your edits."}
+  PASS  post: the SAME row id is at (P′, M) with its settled contract byte-identical (goals still 2): the stale save wrote nothing — {"club_id":1,"jumper_number":"23","kicks":14,"marks":5,"handballs":9,"disposals":23,"goals":2,"behinds":1,"hitouts":0,"tackles":4,"rebounds":2,"inside_50s":5,"clearances":3,"clangers":2,"frees_for":1,"frees_against":1,"contested":9,"uncontested":14,"contested_marks":1,"marks_inside_50":2,"one_percenters":3,"bounces":1,"goal_assists":1,"brownlow_votes":null}
+  PASS  post: provenance kept (source_id, source_record_id, import_batch_id)
+  PASS  post: M holds exactly the one (moved) row; P holds none — {"n":1,"pRows":0}
+  PASS  post: one new `corrected` ledger row after 0 prior row(s): P′ at its identity, previous identity P, supersedes NULL (importer origin), surname ack false, actor, evidence hash, previous_state unique at P — [{"id":1,"action":"corrected","playerId":13367,"playerIdentity":"players/Z/Zz238_091_Pprime.html","previousPlayerIdentity":"players/Z/Zz238_091_P.html","supersedesId":null,"adminUserId":1,"evidenceSha256":"7ebfd1983f521cabbaf34ce279ba87588931f49d86ee1bc1985db2b700b227f1","previousState":{"id":18427,"status":"unique","playerId":13366},"surnameAck":false}]
+  PASS  post: CD_I updated in place to P′ (same id, resolved, candidate_count 0, afl_api_admin_adjudication) — {"id":18427,"playerId":13367,"status":"resolved","candidateCount":0,"matchMethod":"afl_api_admin_adjudication","externalName":null}
+  PASS  post: NO writer audit for M (the refusal precedes every write) — []
+  PASS  post: no player_match_stats data_overrides row for M (the refusal precedes the authority writes) — []
+  c (correction application applied_at) = 2026-11-14T19:54:54.058766Z
+  Q2 re-run: exit 0, {"kind":"ALREADY_SATISFIED"}
+    | ALREADY_SATISFIED: this provider is already corrected and the correction remains satisfied
+    | NOOP already_corrected_moved: player_match_stats {"match_id":17057,"player_id":13367}
+  PASS  Q2: ALREADY_SATISFIED with no post_correction_edit divergence (the refused writer left the corrected row as settled) — {"kind":"ALREADY_SATISFIED"}
+  PASS  Q2 re-run wrote nothing (fixture census unchanged)
+  PASS  post: the combined identity invariant (SAT-1 basis) holds
+  PASS  no non-fixture row changed across fixture setup and the correction (foreign fingerprint equal)
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 91: 30/30 checks PASS -> PASS
+CTDB-RC=0 label=c91 base=rb args=run --case 91 --acknowledge code_test_db

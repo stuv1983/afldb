@@ -1,0 +1,10 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2868414, import 2868419)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 100, variant brownlow-draft: Entry-state insertion race: a real match-sheet insert at (P, M) / a real Brownlow draft for M waits on the correction's matches FOR UPDATE
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  ABORTED: the real writers are server-only modules: run this harness as `npx tsx --conditions=react-server ...` (DATABASE_URL is not set)
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 100 (brownlow-draft): 3/3 checks PASS (run ABORTED) -> FAIL
+CTDB-RC=1 label=c100-brownlow-draft base=rb args=run --case 100 --variant brownlow-draft --acknowledge code_test_db

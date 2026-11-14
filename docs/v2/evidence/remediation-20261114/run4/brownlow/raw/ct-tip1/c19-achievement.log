@@ -1,0 +1,27 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2924570, import 2924571)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 19, variant achievement: A first_kick_goal row for (P, M) -> STOP (DP-2); a P′ debut-match change -> reported (DP-5), COMMITTED
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  fixture: P=13366 (players/Z/Zz238_019_P.html), P'=13367 (players/Z/Zz238_019_Pprime.html), provider CD_I999238000191, match M=17057, closure row player_match_stats#695500, settle batch 27, actor 1
+  PASS  pre: the closure row is at (P, M), afl_api-owned, stamped <CD_M>|<team>|CD_I with its settle batch — {"player_id":13366,"source_record_id":"CD_M999238000191|CD_T992238H|CD_I999238000191","import_batch_id":27}
+  PASS  pre: CD_I is an importer row at P (unique, afl_api_stat_vector_bootstrap)
+  PASS  pre: the combined identity invariant holds with the fixture in place
+  PASS  pre: no Brownlow state for P and no entry state at M — {"votes":null,"pRounds":0,"entries":0}
+  PASS  pre: player_achievements#335 is P's linked first_kick_goal at M; the ONLY dependent (DP-1 0, DP-2 1, DP-3 0, match-less 0) — {"sirenAtPM":0,"achievementAtPM":1,"unresolvedAtM":0,"matchLessForP":0}
+  validate-only: exit 1, {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":695500,"step":"DP-2","code":"dependent_record_would_be_stale","detail":"a player_achievements row depends on this participation"}],"referenceFingerprint":"ad859ef0bec3d05f420d5699d0ba80c9438ce014c4260c26ff611bfc70ecd68d"}
+    | STOP: 1 stop(s); nothing written
+    | player_match_stats#695500 [DP-2] dependent_record_would_be_stale: a player_achievements row depends on this participation
+  PASS  validate-only: STOP (exit 1) with exactly one stop, player_match_stats#695500 [DP-2] dependent_record_would_be_stale — {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":695500,"step":"DP-2","code":"dependent_record_would_be_stale","detail":"a player_achievements row depends on this participation"}],"referenceFingerprint":"ad859ef0bec3d05f420d5699d0ba80c9438ce014c4260c26ff611bfc70ecd68d"}
+  PASS  validate-only: the STOP names its evidence exactly, "a player_achievements row depends on this participation" (§5.7; §12.1) — printed: player_match_stats#695500 [DP-2] dependent_record_would_be_stale: a player_achievements row depends on this participation; "a player_achievements row depends on this participation" appears nowhere in the CLI output
+  apply (--expect-fingerprint = the STOP's reference fingerprint): exit 1, {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":695500,"step":"DP-2","code":"dependent_record_would_be_stale","detail":"a player_achievements row depends on this participation"}],"referenceFingerprint":"ad859ef0bec3d05f420d5699d0ba80c9438ce014c4260c26ff611bfc70ecd68d"}
+  PASS  apply (the locking re-plan): STOP (exit 1) with the identical stop set -- the STOP holds under §8.2's locks — {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":695500,"step":"DP-2","code":"dependent_record_would_be_stale","detail":"a player_achievements row depends on this participation"}],"referenceFingerprint":"ad859ef0bec3d05f420d5699d0ba80c9438ce014c4260c26ff611bfc70ecd68d"}
+  PASS  nothing written by either run: fixture census, CD_I's identity row and every protected row byte-identical
+  PASS  no ledger row and no correction batch for CD_I — {"ledger":0,"batches":0}
+  PASS  post: the combined identity invariant holds
+  PASS  post: every guard/dependent row (entry state, season authority and totals, after_siren_kicks, player_achievements), every 2092 round row, 2092 stat_availability and P/P′ derived rows byte-identical (6 row(s)): the STOP wrote nothing — 2b9c0d0d7d00d6a4d0ecc2127c4520d254472f029bcafa56d80be153d488d6fa -> 2b9c0d0d7d00d6a4d0ecc2127c4520d254472f029bcafa56d80be153d488d6fa
+  PASS  no non-fixture row changed across fixture setup and the correction (foreign fingerprint equal)
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 19 (achievement): 16/16 checks PASS -> PASS
+CTDB-RC=0 label=c19-achievement base=rb args=run --case 19 --variant achievement --acknowledge code_test_db

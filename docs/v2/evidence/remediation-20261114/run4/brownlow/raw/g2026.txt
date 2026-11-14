@@ -1,0 +1,61 @@
+create-db: afldb_v2_rem4brownlow_rb_gcandb4_test created from afldb_v2_rem4brownlow_rbtpl_test and marked
+G2026 base=rb checkout=cand-b4 HEAD=7cfbe186 rule=OLD-B4 season=2026 status=complete
+  BEFORE md5=467b502bcc1bb8791c8cceffcdb526f5
+    brownlow_match_votes recorded=false coverage=pending populated=NULL total=NULL
+    brownlow_round_votes recorded=false coverage=pending populated=NULL total=NULL
+    brownlow_season_total recorded=false coverage=pending populated=NULL total=NULL
+  INSIDE-RECOMPUTE md5=ea2cac860092df706bfe8b6798b9feae
+    brownlow_match_votes recorded=false coverage=not_applicable populated=0 total=207
+    brownlow_round_votes recorded=false coverage=not_applicable populated=NULL total=NULL
+    brownlow_season_total recorded=false coverage=not_applicable populated=NULL total=NULL
+  AFTER-ROLLBACK md5=467b502bcc1bb8791c8cceffcdb526f5
+    brownlow_match_votes recorded=false coverage=pending populated=NULL total=NULL
+    brownlow_round_votes recorded=false coverage=pending populated=NULL total=NULL
+    brownlow_season_total recorded=false coverage=pending populated=NULL total=NULL
+drop-db: afldb_v2_rem4brownlow_rb_gcandb4_test dropped
+create-db: afldb_v2_rem4brownlow_rb_gfinal_test created from afldb_v2_rem4brownlow_rbtpl_test and marked
+G2026 base=rb checkout=final HEAD=8248133b rule=NEW-D-365-1 season=2026 status=complete
+  BEFORE md5=467b502bcc1bb8791c8cceffcdb526f5
+    brownlow_match_votes recorded=false coverage=pending populated=NULL total=NULL
+    brownlow_round_votes recorded=false coverage=pending populated=NULL total=NULL
+    brownlow_season_total recorded=false coverage=pending populated=NULL total=NULL
+  INSIDE-RECOMPUTE md5=4529ac667c765e089df9473cf839b507
+    brownlow_match_votes recorded=false coverage=pending populated=0 total=207
+    brownlow_round_votes recorded=false coverage=pending populated=NULL total=NULL
+    brownlow_season_total recorded=false coverage=pending populated=NULL total=NULL
+  AFTER-ROLLBACK md5=467b502bcc1bb8791c8cceffcdb526f5
+    brownlow_match_votes recorded=false coverage=pending populated=NULL total=NULL
+    brownlow_round_votes recorded=false coverage=pending populated=NULL total=NULL
+    brownlow_season_total recorded=false coverage=pending populated=NULL total=NULL
+drop-db: afldb_v2_rem4brownlow_rb_gfinal_test dropped
+create-db: afldb_v2_rem4brownlow_snap_gcandb4_test created from afldb_v2_rem4brownlow_snaptpl_test and marked
+G2026 base=snap checkout=cand-b4 HEAD=7cfbe186 rule=OLD-B4 season=2026 status=complete
+  BEFORE md5=467b502bcc1bb8791c8cceffcdb526f5
+    brownlow_match_votes recorded=false coverage=pending populated=NULL total=NULL
+    brownlow_round_votes recorded=false coverage=pending populated=NULL total=NULL
+    brownlow_season_total recorded=false coverage=pending populated=NULL total=NULL
+  INSIDE-RECOMPUTE md5=7ed6625495182e09c4ff30d89a0a2bca
+    brownlow_match_votes recorded=false coverage=not_applicable populated=0 total=207
+    brownlow_round_votes recorded=false coverage=partial populated=NULL total=NULL
+    brownlow_season_total recorded=false coverage=not_applicable populated=NULL total=NULL
+  AFTER-ROLLBACK md5=467b502bcc1bb8791c8cceffcdb526f5
+    brownlow_match_votes recorded=false coverage=pending populated=NULL total=NULL
+    brownlow_round_votes recorded=false coverage=pending populated=NULL total=NULL
+    brownlow_season_total recorded=false coverage=pending populated=NULL total=NULL
+drop-db: afldb_v2_rem4brownlow_snap_gcandb4_test dropped
+create-db: afldb_v2_rem4brownlow_snap_gfinal_test created from afldb_v2_rem4brownlow_snaptpl_test and marked
+G2026 base=snap checkout=final HEAD=8248133b rule=NEW-D-365-1 season=2026 status=complete
+  BEFORE md5=467b502bcc1bb8791c8cceffcdb526f5
+    brownlow_match_votes recorded=false coverage=pending populated=NULL total=NULL
+    brownlow_round_votes recorded=false coverage=pending populated=NULL total=NULL
+    brownlow_season_total recorded=false coverage=pending populated=NULL total=NULL
+  INSIDE-RECOMPUTE md5=5db37abb79170d811051bbccfbdfa460
+    brownlow_match_votes recorded=false coverage=pending populated=0 total=207
+    brownlow_round_votes recorded=false coverage=partial populated=NULL total=NULL
+    brownlow_season_total recorded=false coverage=pending populated=NULL total=NULL
+  AFTER-ROLLBACK md5=467b502bcc1bb8791c8cceffcdb526f5
+    brownlow_match_votes recorded=false coverage=pending populated=NULL total=NULL
+    brownlow_round_votes recorded=false coverage=pending populated=NULL total=NULL
+    brownlow_season_total recorded=false coverage=pending populated=NULL total=NULL
+drop-db: afldb_v2_rem4brownlow_snap_gfinal_test dropped
+G-DONE

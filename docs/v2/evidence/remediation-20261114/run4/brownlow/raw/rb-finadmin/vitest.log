@@ -1,0 +1,41 @@
+isolated-pg: afldb_v2_rem4brownlow_rb_finadmin_test verified (cluster afldb_v2_isolated, 127.0.0.1:55681); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem4-brownlow-20261115/final
+
+stderr | tests/integration/admin-brownlow.test.ts > the main season, administered in order > rolls the facts back when the required audit row cannot be written
+[admin-brownlow] Brownlow finalise on match #17060 failed: PostgresError: issue155 audit probe
+    at ErrorResponse (file:///mnt/ssd/afldb-rem4-brownlow-20261115/cand/node_modules/postgres/src/connection.js:815:30)
+    at handle (file:///mnt/ssd/afldb-rem4-brownlow-20261115/cand/node_modules/postgres/src/connection.js:489:6)
+    at Socket.data (file:///mnt/ssd/afldb-rem4-brownlow-20261115/cand/node_modules/postgres/src/connection.js:324:9)
+    at Socket.emit (node:events:519:28)
+    at addChunk (node:internal/streams/readable:561:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    at Socket.Readable.push (node:internal/streams/readable:392:5)
+    at TCP.onStreamRead (node:internal/stream_base_commons:189:23)
+    at cachedError (file:///mnt/ssd/afldb-rem4-brownlow-20261115/cand/node_modules/postgres/src/query.js:170:23)
+    at new Query (file:///mnt/ssd/afldb-rem4-brownlow-20261115/cand/node_modules/postgres/src/query.js:36:24)
+    at sql (file:///mnt/ssd/afldb-rem4-brownlow-20261115/cand/node_modules/postgres/src/index.js:112:11)
+    at recordDataEdit (/mnt/ssd/afldb-rem4-brownlow-20261115/final/src/db/queries/audit-log.ts:156:42) {
+  severity_local: 'ERROR',
+  severity: 'ERROR',
+  code: 'P0001',
+  where: 'PL/pgSQL function issue155_audit_probe() line 1 at RAISE',
+  file: 'pl_exec.c',
+  line: '3897',
+  routine: 'exec_stmt_raise'
+}
+
+ ✓ tests/integration/admin-brownlow.test.ts (47 tests) 10292ms
+     ✓ attributes exactly one candidate, keeps NULL for none or several, and re-resolves on reload  365ms
+     ✓ refuses a publication without the administrator note: the generated default never satisfies the season seal (V2-GAP-006 review F-001)  313ms
+     ✓ publishes: manual rows, measured ranks and winners, derived totals in step  411ms
+     ✓ preserves the Brownlow mirror through a match-sheet save  559ms
+     ✓ reports each fixture season with the state it is actually in  1634ms
+     ✓ counts a drafted match whose source votes are complete, so the season reads complete  1804ms
+
+ Test Files  1 passed (1)
+      Tests  47 passed (47)
+   Start at  06:55:00
+   Duration  12.24s (transform 980ms, setup 165ms, import 1.42s, tests 10.29s, environment 0ms)
+
+JSON report written to /mnt/ssd/afldb-rem4-brownlow-20261115/evidence/rb-finadmin/vitest.json

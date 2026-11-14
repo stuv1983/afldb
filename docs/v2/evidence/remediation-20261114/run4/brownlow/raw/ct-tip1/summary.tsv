@@ -1,0 +1,85 @@
+c1	rc=0	12s	rsc=0	case 1: 24/24 checks PASS -> PASS
+c29	rc=0	10s	rsc=0	case 29: 33/33 checks PASS -> PASS
+c87	rc=0	18s	rsc=0	case 87: 23/23 checks PASS -> PASS
+c91	rc=1	7s	rsc=1	case 91: 3/3 checks PASS (run ABORTED) -> FAIL
+c100-match-sheet	rc=1	10s	rsc=1	case 100 (match-sheet): 3/3 checks PASS (run ABORTED) -> FAIL
+c100-brownlow-draft	rc=1	10s	rsc=1	case 100 (brownlow-draft): 3/3 checks PASS (run ABORTED) -> FAIL
+c2-votes-0	rc=0	15s	rsc=0	case 2 (votes-0): 14/14 checks PASS -> PASS
+c2-votes-3	rc=0	17s	rsc=0	case 2 (votes-3): 14/14 checks PASS -> PASS
+c16	rc=1	23s	rsc=1	case 16: 3/3 checks PASS (run ABORTED) -> FAIL
+c23	rc=0	15s	rsc=0	case 23: 17/17 checks PASS -> PASS
+c48	rc=0	19s	rsc=0	case 48: 15/15 checks PASS -> PASS
+c51	rc=0	10s	rsc=0	case 51: 25/25 checks PASS -> PASS
+c9-pms-foreign-identical	rc=0	26s	rsc=0	case 9 (pms-foreign-identical): 26/26 checks PASS -> PASS
+c9-brownlow-foreign-zero	rc=0	25s	rsc=0	case 9 (brownlow-foreign-zero): 26/26 checks PASS -> PASS
+c10-kicks	rc=0	14s	rsc=0	case 10 (kicks): 16/16 checks PASS -> PASS
+c10-null-vs-zero	rc=0	10s	rsc=0	case 10 (null-vs-zero): 16/16 checks PASS -> PASS
+c10-jumper-whitespace	rc=0	10s	rsc=0	case 10 (jumper-whitespace): 16/16 checks PASS -> PASS
+c11	rc=0	10s	rsc=0	case 11: 15/15 checks PASS -> PASS
+c12-pms	rc=0	10s	rsc=0	case 12 (pms): 33/33 checks PASS -> PASS
+c12-brownlow	rc=0	15s	rsc=0	case 12 (brownlow): 33/33 checks PASS -> PASS
+c52-pms-identical	rc=0	40s	rsc=0	case 52 (pms-identical): 26/26 checks PASS -> PASS
+c52-pms-differing	rc=0	42s	rsc=0	case 52 (pms-differing): 16/16 checks PASS -> PASS
+c52-brownlow-zero	rc=0	25s	rsc=0	case 52 (brownlow-zero): 26/26 checks PASS -> PASS
+c5	rc=0	30s	rsc=0	case 5: 33/33 checks PASS -> PASS
+c6	rc=0	101s	rsc=0	case 6: 29/29 checks PASS -> PASS
+c7	rc=0	103s	rsc=0	case 7: 28/28 checks PASS -> PASS
+c8-malformed-entry	rc=0	13s	rsc=0	case 8 (malformed-entry): 21/21 checks PASS -> PASS
+c8-other-record	rc=0	13s	rsc=0	case 8 (other-record): 21/21 checks PASS -> PASS
+c53-source-positive	rc=0	50s	rsc=0	case 53 (source-positive): 18/18 checks PASS -> PASS
+c53-counterpart-positive	rc=0	11s	rsc=0	case 53 (counterpart-positive): 18/18 checks PASS -> PASS
+c54	rc=0	11s	rsc=0	case 54: 21/21 checks PASS -> PASS
+c76	rc=0	24s	rsc=0	case 76: 32/32 checks PASS -> PASS
+c78	rc=0	12s	rsc=0	case 78: 29/29 checks PASS -> PASS
+c79	rc=0	12s	rsc=0	case 79: 28/28 checks PASS -> PASS
+c83-no-participation	rc=0	27s	rsc=0	case 83 (no-participation): 18/18 checks PASS -> PASS
+c83-null-match-zero	rc=0	13s	rsc=0	case 83 (null-match-zero): 18/18 checks PASS -> PASS
+c83-null-match-two	rc=0	10s	rsc=0	case 83 (null-match-two): 18/18 checks PASS -> PASS
+c83-paired-pms-move	rc=0	11s	rsc=0	case 83 (paired-pms-move): 28/28 checks PASS -> PASS
+c3-demote	rc=0	8s	rsc=0	case 3 (demote): 19/19 checks PASS -> PASS
+c3-claim	rc=0	19s	rsc=0	case 3 (claim): 19/19 checks PASS -> PASS
+c4-draft	rc=0	13s	rsc=1	case 4 (draft): 20/20 checks PASS -> PASS
+c4-final	rc=0	10s	rsc=0	case 4 (final): 18/18 checks PASS -> PASS
+c17-votes-written	rc=0	26s	rsc=1	case 17 (votes-written): 22/22 checks PASS -> PASS
+c17-round-reowned	rc=0	10s	rsc=1	case 17 (round-reowned): 24/24 checks PASS -> PASS
+c18-after-siren	rc=0	9s	rsc=0	case 18 (after-siren): 17/17 checks PASS -> PASS
+c18-unresolved	rc=0	11s	rsc=0	case 18 (unresolved): 24/24 checks PASS -> PASS
+c19-achievement	rc=0	30s	rsc=0	case 19 (achievement): 16/16 checks PASS -> PASS
+c19-debut-change	rc=0	12s	rsc=0	case 19 (debut-change): 24/24 checks PASS -> PASS
+c56-round-vote	rc=0	11s	rsc=1	case 56 (round-vote): 22/22 checks PASS -> PASS
+c56-games	rc=0	10s	rsc=1	case 56 (games): 22/22 checks PASS -> PASS
+c84-draft	rc=0	10s	rsc=0	case 84 (draft): 20/20 checks PASS -> PASS
+c84-final	rc=0	11s	rsc=0	case 84 (final): 20/20 checks PASS -> PASS
+c85-loses-participation	rc=0	10s	rsc=0	case 85 (loses-participation): 18/18 checks PASS -> PASS
+c85-keeps-participation	rc=0	12s	rsc=0	case 85 (keeps-participation): 25/25 checks PASS -> PASS
+c70	rc=0	25s	rsc=1	case 70: 28/28 checks PASS -> PASS
+c88	rc=0	13s	rsc=1	case 88: 28/28 checks PASS -> PASS
+c101	rc=0	13s	rsc=1	case 101: 29/29 checks PASS -> PASS
+c20	rc=0	24s	rsc=0	case 20: 31/31 checks PASS -> PASS
+c21	rc=0	16s	rsc=0	case 21: 35/35 checks PASS -> PASS
+c27-same-target	rc=0	25s	rsc=0	case 27 (same-target): 30/30 checks PASS -> PASS
+c27-other-target	rc=0	13s	rsc=0	case 27 (other-target): 25/25 checks PASS -> PASS
+c69	rc=0	12s	rsc=1	case 69: 42/42 checks PASS -> PASS
+c72	rc=0	14s	rsc=1	case 72: 51/51 checks PASS -> PASS
+c73	rc=0	24s	rsc=0	case 73: 41/41 checks PASS -> PASS
+c94-audited	rc=0	13s	rsc=1	case 94 (audited): 46/46 checks PASS -> PASS
+c94-no-audit	rc=0	13s	rsc=1	case 94 (no-audit): 41/41 checks PASS -> PASS
+c98	rc=0	13s	rsc=1	case 98: 42/42 checks PASS -> PASS
+c99	rc=0	27s	rsc=1	case 99: 47/47 checks PASS -> PASS
+c14	rc=0	18s	rsc=1	case 14: 43/43 checks PASS -> PASS
+c15-match-exists	rc=0	26s	rsc=0	case 15 (match-exists): 38/38 checks PASS -> PASS
+c15-match-gone	rc=0	13s	rsc=0	case 15 (match-gone): 38/38 checks PASS -> PASS
+c32	rc=1	26s	rsc=1	case 32: 18/18 checks PASS (run ABORTED) -> FAIL
+c24-importer-unique	rc=0	13s	rsc=0	case 24 (importer-unique): 21/21 checks PASS -> PASS
+c24-admin-linked	rc=1	14s	rsc=1	case 24 (admin-linked): 10/10 checks PASS (run ABORTED) -> FAIL
+c28	rc=0	14s	rsc=0	case 28: 23/23 checks PASS -> PASS
+c30	rc=0	13s	rsc=0	case 30: 21/21 checks PASS -> PASS
+c31	rc=1	27s	rsc=1	case 31: 4/4 checks PASS (run ABORTED) -> FAIL
+c58-disagreement-no-ack	rc=0	22s	rsc=0	case 58 (disagreement-no-ack): 17/17 checks PASS -> PASS
+c58-disagreement-ack	rc=0	10s	rsc=0	case 58 (disagreement-ack): 22/22 checks PASS -> PASS
+c58-ack-no-disagreement	rc=0	11s	rsc=0	case 58 (ack-no-disagreement): 17/17 checks PASS -> PASS
+c58-ack-no-observation	rc=0	11s	rsc=0	case 58 (ack-no-observation): 17/17 checks PASS -> PASS
+c82-independent	rc=0	30s	rsc=0	case 82 (independent): 28/28 checks PASS -> PASS
+c82-extra-row	rc=0	24s	rsc=0	case 82 (extra-row): 28/28 checks PASS -> PASS
+c47	rc=1	19s	rsc=0	case 47: 11/11 checks PASS (run ABORTED) -> FAIL
+CT-ALL-DONE 2026-11-14T19:46:09Z

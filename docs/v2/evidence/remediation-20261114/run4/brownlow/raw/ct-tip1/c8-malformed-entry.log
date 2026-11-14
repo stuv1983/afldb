@@ -1,0 +1,33 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2898709, import 2898715)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 8, variant malformed-entry: No projection and the insert's cited payload unparseable -> STOP brownlow_insert_unproven (B3-I)
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  fixture: P=13366 (players/Z/Zz238_008_P.html), P'=13367 (players/Z/Zz238_008_Pprime.html), provider CD_I999238000081, match M=17057 (CD_M999238000081, round 1), closure row brownlow_round_votes#320862 {"match_id":17057,"played":true,"votes":3}, companions V2 CD_I999238000082->player 13368 #320863 (2), V3 CD_I999238000083->player 13369 #320864 (1), settle batch 27, actor 1
+  PASS  pre: closure row brownlow_round_votes#320862 at (2092, P, 1): afl_api-owned, stamped CD_M, import batch 27; {played, votes, match_id} = {"match_id":17057,"played":true,"votes":3} — {"id":320862,"votes":3,"played":true,"season":2092,"match_id":17057,"player_id":13366,"source_id":6,"imported_at":"2026-11-14T19:30:20.325609+00:00","round_number":1,"import_batch_id":27,"source_record_id":"CD_M999238000081"}
+  PASS  pre: CD_I is an importer row at P (unique, afl_api_stat_vector_bootstrap)
+  PASS  pre: the combined identity invariant holds with the fixture in place
+  PASS  pre: the history at {2092, P, 1} is exactly [insert v1 {played, votes 3, match_id M}] (no later application) — [{"id":1,"batchId":27,"versionSeq":1,"verb":"insert","previous":null,"next":{"votes":3,"played":true,"match_id":17057}}]
+  PASS  pre: CD_I has NO typed projection (as case 7); both companions' projections are present — [{"providerPlayerId":"CD_I999238000082","playerId":13368,"votes":2,"matchId":17057,"versionSeq":1},{"providerPlayerId":"CD_I999238000083","playerId":13369,"votes":1,"matchId":17057,"versionSeq":1}]
+  PASS  pre: the version the insert cites (v1) EXISTS and its payload row EXISTS, now the malformed-entry payload (the only change from case 7) — {"payloadHash":"6cf6402e51b9b70ebf737519b21d808f152695f547a18a056e54866fe28591d7","payloadRows":1}
+  PASS  pre: the real extractor finds that payload UNPARSEABLE (count -1: never "no CD_I entry") — {"count":-1,"vote":null}
+  PASS  pre: P′ participates in M (C1c would pass: the STOP is B3-I's alone)
+  stat_availability 2092 baseline (3 row(s), sha256 c4b9802d625ddbc6f241526f0a292f9cf7588c3ecc4652ed6eb6241c315a325c)
+  PASS  baseline: the settled 2092 coverage is a fixed point of the real recomputeBrownlowCoverage (rolled-back re-run byte-identical) — c4b9802d625ddbc6f241526f0a292f9cf7588c3ecc4652ed6eb6241c315a325c -> c4b9802d625ddbc6f241526f0a292f9cf7588c3ecc4652ed6eb6241c315a325c
+  validate-only: exit 1, {"kind":"STOP","stops":[{"table":"brownlow_round_votes","rowId":320862,"step":"B3-I","code":"brownlow_insert_unproven","detail":"no projection and no parseable insert payload evidence"}],"referenceFingerprint":"8417b0401d7dcf09e9a13201cff2421b164d79f56f6726cb6996cd988c21684e"}
+    | STOP: 1 stop(s); nothing written
+    | brownlow_round_votes#320862 [B3-I] brownlow_insert_unproven: no projection and no parseable insert payload evidence
+  PASS  validate-only: STOP (exit 1) with exactly one stop, brownlow_round_votes#320862 [B3-I] brownlow_insert_unproven — {"kind":"STOP","stops":[{"table":"brownlow_round_votes","rowId":320862,"step":"B3-I","code":"brownlow_insert_unproven","detail":"no projection and no parseable insert payload evidence"}],"referenceFingerprint":"8417b0401d7dcf09e9a13201cff2421b164d79f56f6726cb6996cd988c21684e"}
+  PASS  validate-only: the STOP names its evidence exactly, "no projection and no parseable insert payload evidence" (§5.7; §12.1) — printed: brownlow_round_votes#320862 [B3-I] brownlow_insert_unproven: no projection and no parseable insert payload evidence; "no projection and no parseable insert payload evidence" appears nowhere in the CLI output
+  apply (--expect-fingerprint = the STOP's reference fingerprint): exit 1, {"kind":"STOP","stops":[{"table":"brownlow_round_votes","rowId":320862,"step":"B3-I","code":"brownlow_insert_unproven","detail":"no projection and no parseable insert payload evidence"}],"referenceFingerprint":"8417b0401d7dcf09e9a13201cff2421b164d79f56f6726cb6996cd988c21684e"}
+  PASS  apply (the locking re-plan): STOP (exit 1) with the identical stop set -- the STOP holds under §8.2's locks — {"kind":"STOP","stops":[{"table":"brownlow_round_votes","rowId":320862,"step":"B3-I","code":"brownlow_insert_unproven","detail":"no projection and no parseable insert payload evidence"}],"referenceFingerprint":"8417b0401d7dcf09e9a13201cff2421b164d79f56f6726cb6996cd988c21684e"}
+  PASS  nothing written by either run: fixture census, CD_I's identity row and every protected row byte-identical
+  PASS  no ledger row and no correction batch for CD_I — {"ledger":0,"batches":0}
+  PASS  post: the combined identity invariant holds
+  PASS  post: stat_availability for 2092 byte-identical to the settled baseline (a STOP writes nothing) — c4b9802d625ddbc6f241526f0a292f9cf7588c3ecc4652ed6eb6241c315a325c -> c4b9802d625ddbc6f241526f0a292f9cf7588c3ecc4652ed6eb6241c315a325c
+  PASS  post: CD_M's projection rows byte-identical
+  PASS  no non-fixture row changed across fixture setup and the correction (foreign fingerprint equal)
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 8 (malformed-entry): 21/21 checks PASS -> PASS
+CTDB-RC=0 label=c8-malformed-entry base=rb args=run --case 8 --variant malformed-entry --acknowledge code_test_db

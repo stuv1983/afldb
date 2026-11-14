@@ -1,0 +1,16 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem4-brownlow-20261115/final
+
+ ✓ tests/reference-data.test.ts (70 tests) 5585ms
+     ✓ --print-plan validates the datasets and is deterministic  655ms
+     ✓ brownlow_afl_api_season_rehearsal_contract.py exits 0 and prints its closing line  435ms
+     ✓ draftguru_bridge_v2_contract.py exits 0 and prints its closing line  1492ms
+     ✓ draftguru_child_validation_v3_contract.py exits 0 and prints its closing line  835ms
+     ✓ draftguru_population_scan_contract.py exits 0 and prints its closing line  507ms
+     ✓ issue333_o2_contract.py exits 0 and prints its closing line  595ms
+
+ Test Files  1 passed (1)
+      Tests  70 passed (70)
+   Start at  06:56:11
+   Duration  6.65s (transform 256ms, setup 168ms, import 516ms, tests 5.59s, environment 0ms)
+

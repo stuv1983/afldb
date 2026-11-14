@@ -1,0 +1,30 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2912777, import 2912778)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 83, variant null-match-two: Brownlow MOVE without P′ participation (match M; match_id NULL with zero / two candidates) -> STOP C1c; with a paired pms MOVE -> allowed
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  fixture: P=13366 (players/Z/Zz238_083_P.html), P'=13367 (players/Z/Zz238_083_Pprime.html), provider CD_I999238000831, match M=17057 (CD_M999238000831, round 1), closure row brownlow_round_votes#320862 {"match_id":null,"played":true,"votes":3}, companions V2 CD_I999238000832->player 13368 #320863 (2), V3 CD_I999238000833->player 13369 #320864 (1), settle batch 27, actor 1
+  PASS  pre: closure row brownlow_round_votes#320862 at (2092, P, 1): afl_api-owned, stamped CD_M, import batch 27; {played, votes, match_id} = {"match_id":null,"played":true,"votes":3} — {"id":320862,"votes":3,"played":true,"season":2092,"match_id":null,"player_id":13366,"source_id":6,"imported_at":"2026-11-14T19:33:23.53536+00:00","round_number":1,"import_batch_id":27,"source_record_id":"CD_M999238000831"}
+  PASS  pre: CD_I is an importer row at P (unique, afl_api_stat_vector_bootstrap)
+  PASS  pre: the combined identity invariant holds with the fixture in place
+  PASS  pre: B1-B5 hold on the row itself (payload names CD_I once with 3; CD_I's projection names P): only participation is under test
+  stat_availability 2092 baseline (3 row(s), sha256 507aa963d4842c97a1256196258d644bfa5472ee455d528d0b36843e90a4fa85)
+  PASS  baseline: the settled 2092 coverage is a fixed point of the real recomputeBrownlowCoverage (rolled-back re-run byte-identical) — 507aa963d4842c97a1256196258d644bfa5472ee455d528d0b36843e90a4fa85 -> 507aa963d4842c97a1256196258d644bfa5472ee455d528d0b36843e90a4fa85
+  PASS  pre: match_id NULL; round (2092, 1) = {M, M2}; P′ plays BOTH (two candidates) — {"roundMatches":[17057,17058],"pPrimeInRound":[17057,17058]}
+  validate-only: exit 1, {"kind":"STOP","stops":[{"table":"brownlow_round_votes","rowId":320862,"step":"C1c","code":"brownlow_move_without_participation","detail":"P' has no canonical participation in this match under the plan"}],"referenceFingerprint":"983b987e2080ff02bf6d7383f655b34a539759a229fe6f7ac86d99ca7f931918"}
+    | STOP: 1 stop(s); nothing written
+    | brownlow_round_votes#320862 [C1c] brownlow_move_without_participation: P' has no canonical participation in this match under the plan
+  PASS  validate-only: STOP (exit 1) with exactly one stop, brownlow_round_votes#320862 [C1c] brownlow_move_without_participation — {"kind":"STOP","stops":[{"table":"brownlow_round_votes","rowId":320862,"step":"C1c","code":"brownlow_move_without_participation","detail":"P' has no canonical participation in this match under the plan"}],"referenceFingerprint":"983b987e2080ff02bf6d7383f655b34a539759a229fe6f7ac86d99ca7f931918"}
+  PASS  validate-only: the STOP names its evidence exactly, "P' has no canonical participation in this match under the plan" (§5.7; §12.1) — printed: brownlow_round_votes#320862 [C1c] brownlow_move_without_participation: P' has no canonical participation in this match under the plan; "P' has no canonical participation in this match under the plan" appears nowhere in the CLI output
+  apply (--expect-fingerprint = the STOP's reference fingerprint): exit 1, {"kind":"STOP","stops":[{"table":"brownlow_round_votes","rowId":320862,"step":"C1c","code":"brownlow_move_without_participation","detail":"P' has no canonical participation in this match under the plan"}],"referenceFingerprint":"983b987e2080ff02bf6d7383f655b34a539759a229fe6f7ac86d99ca7f931918"}
+  PASS  apply (the locking re-plan): STOP (exit 1) with the identical stop set -- the STOP holds under §8.2's locks — {"kind":"STOP","stops":[{"table":"brownlow_round_votes","rowId":320862,"step":"C1c","code":"brownlow_move_without_participation","detail":"P' has no canonical participation in this match under the plan"}],"referenceFingerprint":"983b987e2080ff02bf6d7383f655b34a539759a229fe6f7ac86d99ca7f931918"}
+  PASS  nothing written by either run: fixture census, CD_I's identity row and every protected row byte-identical
+  PASS  no ledger row and no correction batch for CD_I — {"ledger":0,"batches":0}
+  PASS  post: the combined identity invariant holds
+  PASS  post: stat_availability for 2092 byte-identical to the settled baseline (a STOP writes nothing) — 507aa963d4842c97a1256196258d644bfa5472ee455d528d0b36843e90a4fa85 -> 507aa963d4842c97a1256196258d644bfa5472ee455d528d0b36843e90a4fa85
+  PASS  post: CD_M's projection rows byte-identical
+  PASS  no non-fixture row changed across fixture setup and the correction (foreign fingerprint equal)
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 83 (null-match-two): 18/18 checks PASS -> PASS
+CTDB-RC=0 label=c83-null-match-two base=rb args=run --case 83 --variant null-match-two --acknowledge code_test_db

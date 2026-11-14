@@ -1,0 +1,10 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem4-brownlow-20261115/final
+
+ ✓ tests/data-overrides-source-contract.test.ts (78 tests) 513ms
+
+ Test Files  1 passed (1)
+      Tests  78 passed (78)
+   Start at  06:56:31
+   Duration  1.31s (transform 310ms, setup 159ms, import 280ms, tests 513ms, environment 0ms)
+

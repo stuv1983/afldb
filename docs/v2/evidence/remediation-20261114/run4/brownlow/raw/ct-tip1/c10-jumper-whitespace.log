@@ -1,0 +1,29 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2878519, import 2878520)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 10, variant jumper-whitespace: Collision where one substantive value differs (a value; NULL vs 0; jumper_number whitespace) -> STOP collision_values_disagree naming the field (C3)
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  fixture: P=13366 (players/Z/Zz238_010_P.html), P'=13367 (players/Z/Zz238_010_Pprime.html), provider CD_I999238000101, match M=17057, closure row player_match_stats#695500, settle batch 27, actor 1
+  counterpart: player_match_stats#695501 at (P′, M), owner foreign
+  PASS  pre: the closure row is at (P, M), afl_api-owned, stamped <CD_M>|<team>|CD_I with its settle batch — {"player_id":13366,"source_record_id":"CD_M999238000101|CD_T992238H|CD_I999238000101","import_batch_id":27}
+  PASS  pre: CD_I is an importer row at P (unique, afl_api_stat_vector_bootstrap)
+  PASS  pre: the combined identity invariant holds with the fixture in place
+  PASS  pre: the closure row's brownlow_votes is null; every other contract field is the insert application's
+  PASS  pre: P′'s counterpart at M is AFL Tables-owned (foreign), with no stamp or batch (no CD_I lineage) — {"ownerKey":"afltables"}
+  §5.5 substantive fields differing between the closure row and the counterpart: [jumper_number] (jumper_number: "23" vs "23 ")
+  PASS  pre: exactly ONE §5.5 field differs, jumper_number: closure "23" vs counterpart "23 " — jumper_number
+  validate-only: exit 1, {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":695500,"step":"C3","code":"collision_values_disagree","detail":"field(s) differ: jumper_number"}],"referenceFingerprint":"8c3c940c23b521f26830920b39d4039c283560330eb621aee8a304bf7ce3aece"}
+    | STOP: 1 stop(s); nothing written
+    | player_match_stats#695500 [C3] collision_values_disagree: field(s) differ: jumper_number
+  PASS  validate-only: STOP (exit 1) with exactly one stop, player_match_stats#695500 [C3] collision_values_disagree — {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":695500,"step":"C3","code":"collision_values_disagree","detail":"field(s) differ: jumper_number"}],"referenceFingerprint":"8c3c940c23b521f26830920b39d4039c283560330eb621aee8a304bf7ce3aece"}
+  PASS  validate-only: the STOP names its evidence exactly, "field(s) differ: jumper_number" (§5.7; §12.1) — printed: player_match_stats#695500 [C3] collision_values_disagree: field(s) differ: jumper_number; "field(s) differ: jumper_number" appears nowhere in the CLI output
+  apply (--expect-fingerprint = the STOP's reference fingerprint): exit 1, {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":695500,"step":"C3","code":"collision_values_disagree","detail":"field(s) differ: jumper_number"}],"referenceFingerprint":"8c3c940c23b521f26830920b39d4039c283560330eb621aee8a304bf7ce3aece"}
+  PASS  apply (the locking re-plan): STOP (exit 1) with the identical stop set -- the STOP holds under §8.2's locks — {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":695500,"step":"C3","code":"collision_values_disagree","detail":"field(s) differ: jumper_number"}],"referenceFingerprint":"8c3c940c23b521f26830920b39d4039c283560330eb621aee8a304bf7ce3aece"}
+  PASS  nothing written by either run: fixture census, CD_I's identity row and every protected row byte-identical
+  PASS  no ledger row and no correction batch for CD_I — {"ledger":0,"batches":0}
+  PASS  post: the combined identity invariant holds
+  PASS  no non-fixture row changed across fixture setup and the correction (foreign fingerprint equal)
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 10 (jumper-whitespace): 16/16 checks PASS -> PASS
+CTDB-RC=0 label=c10-jumper-whitespace base=rb args=run --case 10 --variant jumper-whitespace --acknowledge code_test_db

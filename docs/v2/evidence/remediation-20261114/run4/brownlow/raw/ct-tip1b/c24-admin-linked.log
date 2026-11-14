@@ -1,0 +1,43 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2995111, import 2995112)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 24, variant admin-linked: D8: P′ already holds another AFL API provider CD_K (importer bootstrap / the real admin link) -> STOP p_prime_holds_another_provider; nothing written
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  fixture: P=13366 (players/Z/Zz238_024_P.html), P'=13367 (players/Z/Zz238_024_Pprime.html), provider CD_I999238000241, match M=17057, closure row player_match_stats#695500, settle batch 27, actor 1
+  CD_K CD_I999238000242: unresolved observation CD_M999238000242|CD_T992238H|CD_I999238000242 (match #17058), retained candidate #1
+  PASS  pre: the closure row is at (P, M), afl_api-owned, stamped <CD_M>|<team>|CD_I with its settle batch — {"player_id":13366,"source_record_id":"CD_M999238000241|CD_T992238H|CD_I999238000241","import_batch_id":27}
+  PASS  pre: CD_I is an importer row at P (unique, afl_api_stat_vector_bootstrap)
+  PASS  pre: the combined identity invariant holds with the fixture in place
+  PASS  pre: P′ holds no AFL API provider; CD_K has no identity row (its observation is evidence, not authority)
+  validate-only: exit 0, {"kind":"PLANNED","fingerprint":"f63b7d33c6aa75ae3989d0207d1ae6b2299e2a22275571671795c036b1b7155d","rowsPlanned":1}
+  PASS  validate-only: PLAN OK, exit 0, 1 row(s) planned — {"kind":"PLANNED","fingerprint":"f63b7d33c6aa75ae3989d0207d1ae6b2299e2a22275571671795c036b1b7155d","rowsPlanned":1}
+  PASS  validate-only wrote nothing (fixture census unchanged)
+  PASS  base: without the conflicting authority the correction plans (PLAN OK, 1 row) — f63b7d33c6aa75ae3989d0207d1ae6b2299e2a22275571671795c036b1b7155d
+  page loader (CD_I999238000242): {"state":"U1","existing":null,"pendingCandidates":[{"id":"1","sourceVersionSeq":1}],"latestAdjudicationId":null,"observedSurname":"Zz238-024-Pprime"}
+  PASS  admin links CD_K to P′ (the conflicting authority): the real page loader classifies CD_I999238000242 U1 (no identity row, the retained candidate #1 pending, no ledger row)
+  writer linkAflApiProvider(CD_I999238000242 -> player 13367): {"ok":true}
+  PASS  admin links CD_K to P′ (the conflicting authority): the real linkAflApiProvider returns ok (page fingerprint matched; no surname acknowledgement needed) — {"ok":true}
+  PASS  admin links CD_K to P′ (the conflicting authority): exactly one `linked` ledger row (supersedes NULL, surname ack false, the fixture actor) and a `resolved` admin identity row at player 13367 — {"rows":[{"id":1,"action":"linked","playerId":13367,"playerIdentity":"players/Z/Zz238_024_Pprime.html","supersedesId":null,"previousPlayerIdentity":null,"evidenceSha256":"0c0226d71e7e6fc6a20eaae20d24047a5242522a45047a45c785a7dc9f7ce428"}],"identity":{"playerId":13367,"status":"resolved","matchMethod":"afl_api_admin_adjudication"}}
+  AFL API providers held at P′ (the CLI's D8 query, CD_I excluded): [{"externalId":"CD_I999238000242","status":"resolved","matchMethod":"afl_api_admin_adjudication"}]
+  PASS  conflict: exactly one other live AFL API provider at P′, CD_K (CD_I999238000242 ≠ CD_I999238000241), resolved — [{"externalId":"CD_I999238000242","status":"resolved","matchMethod":"afl_api_admin_adjudication"}]
+  PASS  conflict: CD_K's ledger is exactly its `linked` row at P′ — [{"id":1,"action":"linked","playerId":13367,"playerIdentity":"players/Z/Zz238_024_Pprime.html","supersedesId":null,"previousPlayerIdentity":null,"evidenceSha256":"0c0226d71e7e6fc6a20eaae20d24047a5242522a45047a45c785a7dc9f7ce428"}]
+  PASS  conflict: CD_I is still the importer row at P (the correction's own authority is unchanged)
+  PASS  conflict: the combined identity invariant holds (CD_K at P′ is a legal state)
+  pre-refusal sequences: {"afl_api_identity_adjudications":1,"canonical_applications":1,"import_batches":28}
+  validate-only: exit 1, {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":null,"step":"D8","code":"p_prime_holds_another_provider","detail":null}],"referenceFingerprint":null}
+    | STOP: 1 stop(s); nothing written
+    | player_match_stats [D8] p_prime_holds_another_provider
+  PASS  validate-only: STOP (exit 1) with exactly one stop, "player_match_stats [D8] p_prime_holds_another_provider", and no reference fingerprint (whole-plan STOP) — {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":null,"step":"D8","code":"p_prime_holds_another_provider","detail":null}],"referenceFingerprint":null}
+  PASS  validate-only: nothing written -- identities (CD_K's too), ledger, correction batches, applications, closure row, projections, candidates, findings, derived rows, fixture census and id sequences byte-identical
+  apply --expect-fingerprint <base fingerprint>: exit 1, {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":null,"step":"D8","code":"p_prime_holds_another_provider","detail":null}],"referenceFingerprint":null}
+    | STOP: 1 stop(s); nothing written
+    | player_match_stats [D8] p_prime_holds_another_provider
+  PASS  apply --expect-fingerprint <base fingerprint>: STOP (exit 1) with exactly one stop, "player_match_stats [D8] p_prime_holds_another_provider", and no reference fingerprint (whole-plan STOP) — {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":null,"step":"D8","code":"p_prime_holds_another_provider","detail":null}],"referenceFingerprint":null}
+  PASS  apply --expect-fingerprint <base fingerprint>: nothing written -- identities (CD_K's too), ledger, correction batches, applications, closure row, projections, candidates, findings, derived rows, fixture census and id sequences byte-identical
+  PASS  no `corrected` ledger row and no correction batch for CD_I; the closure row is still at P — {"ledger":0,"batches":0,"atP":1}
+  PASS  post: the combined identity invariant holds
+  PASS  no non-fixture row changed across fixture setup and the correction (foreign fingerprint equal)
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 24 (admin-linked): 24/24 checks PASS -> PASS
+CTDB-RC=0 label=c24-admin-linked base=rb args=run --case 24 --variant admin-linked --acknowledge code_test_db

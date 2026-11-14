@@ -1,0 +1,36 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2876249, import 2876250)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 9, variant brownlow-foreign-zero: Safe identical collision against a foreign P′ row: player_match_stats C2 / Brownlow votes 0 C4 -> DELETE_AS_FOREIGN_COLLISION
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  fixture: P=13366, P'=13367, provider CD_I999238000091, match M=17057 (CD_M999238000091), closure row brownlow_round_votes#320862 (demoted by batch B2 28, application 4), voters now V4 CD_I999238000094 (3), V2 CD_I999238000092 (2), V3 CD_I999238000093 (1); P' participation player_match_stats#695500; counterpart brownlow_round_votes#320866 (foreign)
+  PASS  pre: closure row at (2092, P, 1): afl_api-owned, stamped CD_M, restamped with the demoting batch B2; played true, votes 0, match_id M — {"id":320862,"votes":0,"played":true,"season":2092,"match_id":17057,"player_id":13366,"source_id":6,"imported_at":"2026-11-14T19:23:16.545868+00:00","round_number":1,"import_batch_id":28,"source_record_id":"CD_M999238000091"}
+  PASS  pre: its chain is [insert (v1, votes 3, settle batch), update {votes: 3} -> {votes: 0} (v2, B2)] — [{"id":1,"verb":"insert","v":1},{"id":4,"verb":"update","v":2}]
+  PASS  pre: version 1 names CD_I once with 3 (B3-I); version 2 (real extractor) is a 3/2/1 set WITHOUT CD_I (B3-C case 2, I244-F002) — {"v1":{"count":1,"vote":3},"v2":{"count":0,"vote":null},"v2Voters":[{"playerId":"CD_I999238000094","votes":3},{"playerId":"CD_I999238000092","votes":2},{"playerId":"CD_I999238000093","votes":1}]}
+  PASS  pre: P′'s round row at (2092, P′, 1) is AFL Tables-owned, no stamps; votes 0, played true, match_id M: equal under §5.5 (C4) — {"id":320866,"votes":0,"played":true,"season":2092,"match_id":17057,"player_id":13367,"source_id":10,"imported_at":"2026-11-14T19:23:16.545868+00:00","round_number":1,"import_batch_id":null,"source_record_id":null}
+  PASS  pre: P holds no match row; P′ participates in M through its foreign row (C1c) — {"pPms":0,"pPrimeAtM":1}
+  PASS  pre: CD_I is an importer row at P (unique, afl_api_stat_vector_bootstrap)
+  stat_availability 2092 baseline (3 row(s), sha256 c4b9802d625ddbc6f241526f0a292f9cf7588c3ecc4652ed6eb6241c315a325c)
+  PASS  baseline: the settled 2092 coverage is a fixed point of the real recomputeBrownlowCoverage (rolled-back re-run byte-identical)
+  PASS  pre: the combined identity invariant holds with the fixture in place
+  validate-only: exit 0, {"kind":"PLANNED","fingerprint":"aae40bf0de41ddff1f651fa255eac1c5d471c698d7b5caa447a617144a1453db","rowsPlanned":1}
+  PASS  validate-only: PLAN OK, exit 0, 1 row(s) planned — {"kind":"PLANNED","fingerprint":"aae40bf0de41ddff1f651fa255eac1c5d471c698d7b5caa447a617144a1453db","rowsPlanned":1}
+  PASS  validate-only wrote nothing (fixture census unchanged)
+  apply: exit 0, {"kind":"COMMITTED","fingerprint":"aae40bf0de41ddff1f651fa255eac1c5d471c698d7b5caa447a617144a1453db","adjudicationId":1,"batchId":29,"moved":0,"deleted":1,"reportIncomplete":false}
+  PASS  apply: COMMITTED, exit 0, the validate-only fingerprint, moved 0, deleted 1, report complete — {"kind":"COMMITTED","fingerprint":"aae40bf0de41ddff1f651fa255eac1c5d471c698d7b5caa447a617144a1453db","adjudicationId":1,"batchId":29,"moved":0,"deleted":1,"reportIncomplete":false}
+  PASS  post: the closure round row is DELETED (DELETE_AS_FOREIGN_COLLISION, C4)
+  PASS  post: P′'s counterpart and the three current voters' rows (V4, V2, V3) are byte-identical
+  PASS  post: P′'s participation row is byte-identical
+  PASS  post: exactly one correction application at the OLD key {2092, P, 1}: `delete`, batch K, citing the latest (version 2) application, previous_values = the full pre-delete row (its id, votes 0), new_values {} — [{"id":6,"importBatchId":29,"sourceKey":"afl_api","family":"brownlow_match_votes","externalRecordId":"CD_M999238000091","versionSeq":2,"targetKey":{"season":2092,"player_id":13366,"round_number":1},"verb":"delete","previousValues":{"id":320862,"votes":0,"played":true,"season":2092,"match_id":17057,"player_id":13366,"source_id":6,"imported_at":"2026-11-14T19:23:16.545868+00:00","round_number":1,"im...
+  PASS  post: batch K completed and bound (adjudication, fingerprint, evidence hash); exactly one brownlow_round_votes delete rowProof with the pre-correction contract hash — [{"verb":"delete","table":"brownlow_round_votes","newKey":null,"oldKey":{"season":2092,"player_id":13366,"round_number":1},"preCorrectionContractSha256":"eff7b5fae4ae28719cd81d6f95f45ff4b2bde08d3af9df85ac5a1660b10060aa"}]
+  PASS  post: batch counts moved {"brownlow_round_votes":0,"player_match_stats":0}, deleted {"brownlow_round_votes":1,"player_match_stats":0} — {"moved":{"player_match_stats":0,"brownlow_round_votes":0},"deleted":{"player_match_stats":0,"brownlow_round_votes":1},"projectionsMoved":1}
+  PASS  post: CD_I's (stale, version 1) Brownlow projection names P′, not P (SAT-5; projections moved 1)
+  PASS  post: stat_availability for 2092 is byte-identical to the settled baseline — c4b9802d625ddbc6f241526f0a292f9cf7588c3ecc4652ed6eb6241c315a325c -> c4b9802d625ddbc6f241526f0a292f9cf7588c3ecc4652ed6eb6241c315a325c
+  PASS  post: one new `corrected` ledger row after 0 prior row(s): P′ at its identity, previous identity P, supersedes NULL (importer origin), surname ack false, actor, evidence hash, previous_state unique at P — [{"id":1,"action":"corrected","playerId":13367,"playerIdentity":"players/Z/Zz238_009_Pprime.html","previousPlayerIdentity":"players/Z/Zz238_009_P.html","supersedesId":null,"adminUserId":1,"evidenceSha256":"0c3826905920fbf69de6bf2b26d81a92d49598937395218d1b64bfdd188f8975","previousState":{"id":18427,"status":"unique","playerId":13366},"surnameAck":false}]
+  PASS  post: CD_I updated in place to P′ (same id, resolved, candidate_count 0, afl_api_admin_adjudication) — {"id":18427,"playerId":13367,"status":"resolved","candidateCount":0,"matchMethod":"afl_api_admin_adjudication","externalName":null}
+  PASS  post: the combined identity invariant (SAT-1 basis) holds
+  PASS  no non-fixture row changed across fixture setup and the correction (foreign fingerprint equal)
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 9 (brownlow-foreign-zero): 26/26 checks PASS -> PASS
+CTDB-RC=0 label=c9-brownlow-foreign-zero base=rb args=run --case 9 --variant brownlow-foreign-zero --acknowledge code_test_db

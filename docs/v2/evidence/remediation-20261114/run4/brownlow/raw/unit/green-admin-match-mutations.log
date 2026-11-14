@@ -1,0 +1,10 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem4-brownlow-20261115/final
+
+ ✓ tests/admin-match-mutations.test.ts (17 tests) 175ms
+
+ Test Files  1 passed (1)
+      Tests  17 passed (17)
+   Start at  06:56:19
+   Duration  732ms (transform 113ms, setup 160ms, import 26ms, tests 175ms, environment 0ms)
+

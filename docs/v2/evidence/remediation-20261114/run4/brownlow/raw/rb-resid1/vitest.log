@@ -1,0 +1,13 @@
+isolated-pg: afldb_v2_rem4brownlow_rb_resid1_test verified (cluster afldb_v2_isolated, 127.0.0.1:55681); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem4-brownlow-20261115/cand
+
+ ✓ tests/integration/settle-afl-api-brownlow-reschedule.test.ts (3 tests) 9119ms
+     ✓ writes brownlow_round_votes.round_number from the RESOLVED CANONICAL MATCH's own round, never from translateAflApiBrownlowRound()'s translated provider round, for BOTH matches — even though both Brownlow votes below are reported under the SAME provider round (api_round_number 5, translated 6)  656ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  06:35:40
+   Duration  10.57s (transform 780ms, setup 163ms, import 903ms, tests 9.12s, environment 0ms)
+
+JSON report written to /mnt/ssd/afldb-rem4-brownlow-20261115/evidence/rb-resid1/vitest.json

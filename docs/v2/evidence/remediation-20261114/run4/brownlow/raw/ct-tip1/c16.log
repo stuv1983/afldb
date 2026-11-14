@@ -1,0 +1,10 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2871276, import 2871277)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 16: A real match-sheet edit changed a statistic on the AFL API-owned closure row before correction -> STOP out_of_ledger_edit naming the field
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  ABORTED: the real writers are server-only modules: run this harness as `npx tsx --conditions=react-server ...` (DATABASE_URL is not set)
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 16: 3/3 checks PASS (run ABORTED) -> FAIL
+CTDB-RC=1 label=c16 base=rb args=run --case 16 --acknowledge code_test_db

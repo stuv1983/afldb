@@ -1,0 +1,10 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem4-brownlow-20261115/final
+
+ ✓ tests/v2-season-seal.test.ts (62 tests) 358ms
+
+ Test Files  1 passed (1)
+      Tests  62 passed (62)
+   Start at  06:56:36
+   Duration  1.52s (transform 465ms, setup 166ms, import 618ms, tests 358ms, environment 0ms)
+

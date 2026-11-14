@@ -1,0 +1,58 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2950622, import 2950624)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 15, variant match-exists: Moved row absent with no match-deletion audit (out of band; M still exists / M gone) -> STOP correction_target_absent_unexplained
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  fixture: P=13366 (players/Z/Zz238_015_P.html), P'=13367 (players/Z/Zz238_015_Pprime.html), provider CD_I999238000151, match M=17057, closure row player_match_stats#695500, settle batch 27, actor 1
+  PASS  pre: closure row at (P, M), afl_api-owned, stamped <CD_M>|<team>|CD_I with the settle batch; contract = the insert application — {"player_id":13366,"source_record_id":"CD_M999238000151|CD_T992238H|CD_I999238000151"}
+  PASS  pre: no P′ counterpart at M; P holds exactly the one row; M holds only it — {"counterpart":0,"pRows":1,"atM":1}
+  PASS  pre: CD_I is an importer row at P (unique, afl_api_stat_vector_bootstrap)
+  PASS  pre: the combined identity invariant holds with the fixture in place
+  validate-only: exit 0, {"kind":"PLANNED","fingerprint":"d549c5055313b39f57d9accbf27c08309f9e5f7f8a7eeb638c5fc36ed6ea8ae0","rowsPlanned":1}
+  PASS  validate-only: PLAN OK, exit 0, 1 row(s) planned — {"kind":"PLANNED","fingerprint":"d549c5055313b39f57d9accbf27c08309f9e5f7f8a7eeb638c5fc36ed6ea8ae0","rowsPlanned":1}
+  PASS  validate-only wrote nothing (fixture census unchanged)
+  apply: exit 0, {"kind":"COMMITTED","fingerprint":"d549c5055313b39f57d9accbf27c08309f9e5f7f8a7eeb638c5fc36ed6ea8ae0","adjudicationId":1,"batchId":28,"moved":1,"deleted":0,"reportIncomplete":false}
+  PASS  apply: COMMITTED, exit 0, the validate-only fingerprint, moved 1, deleted 0, report complete — {"kind":"COMMITTED","fingerprint":"d549c5055313b39f57d9accbf27c08309f9e5f7f8a7eeb638c5fc36ed6ea8ae0","adjudicationId":1,"batchId":28,"moved":1,"deleted":0,"reportIncomplete":false}
+  PASS  corrected base: the SAME row id at (P′, M), contract byte-identical, provenance kept (D3)
+  PASS  corrected base: (P, M) is free after the MOVE — {"pRows":0,"pPrimeRows":1,"pAtM":0,"pPrimeAtM":1,"atM":1}
+  PASS  post: one new `corrected` ledger row after 0 prior row(s): P′ at its identity, previous identity P, supersedes NULL (importer origin), surname ack false, actor, evidence hash, previous_state unique at P — [{"id":1,"action":"corrected","playerId":13367,"playerIdentity":"players/Z/Zz238_015_Pprime.html","previousPlayerIdentity":"players/Z/Zz238_015_P.html","supersedesId":null,"adminUserId":1,"evidenceSha256":"8eca2ddbdd2c92a626295724c23106773a55c5e2b29abcbddbc04b4244f30752","previousState":{"id":18427,"status":"unique","playerId":13366},"surnameAck":false}]
+  PASS  post: CD_I updated in place to P′ (same id, resolved, candidate_count 0, afl_api_admin_adjudication) — {"id":18427,"playerId":13367,"status":"resolved","candidateCount":0,"matchMethod":"afl_api_admin_adjudication","externalName":null}
+  PASS  corrected base: c = the correction application's applied_at exists
+  PASS  corrected base: no data_edits audit for M yet — []
+  corrected base: adjudication 1, batch K 28, c = 2026-11-14T19:41:56.030770Z
+  PASS  absence base: M and the empty sibling 2092 match (round 2) both exist; the sibling holds no row — {"match":1,"sibling":1,"atSibling":0}
+  PASS  absence base: exactly one correction application in batch K for the closure row — [{"id":2}]
+  correction: adjudication 1, batch K 28, application 2, c = 2026-11-14T19:41:56.030770Z; sibling match 17058
+  pre-mutation: foreign keys naming M: [{"column":"player_clubs.first_match_id","n":1},{"column":"player_clubs.last_match_id","n":1},{"column":"player_match_stats.match_id","n":1}]
+  PASS  pre-mutation: M is named only by the moved row and P′'s derived player_clubs first/last match (the correction's own derived recompute; so the out-of-band removal below is complete and minimal) — {"refsBefore":[{"column":"player_clubs.first_match_id","n":1},{"column":"player_clubs.last_match_id","n":1},{"column":"player_match_stats.match_id","n":1}],"clubRefs":[{"playerId":13367}]}
+  out-of-band mutation (owner SQL, after c): {"rows":1,"playerClubs":0,"matches":0,"playerClubPlayers":[]}
+  PASS  mutation: exactly the moved row deleted; nothing else — {"rows":1,"playerClubs":0,"matches":0,"playerClubPlayers":[]}
+  PASS  post-mutation: the moved row is GONE (its id, (P′, M), (P, M)); M STILL exists — {"atM":0,"match":1,"pAtM":0,"pPrimeAtM":0,"rowById":null}
+  PASS  post-mutation: the sibling 2092 match is untouched
+  c = 2026-11-14T19:41:56.030770Z; data_edits naming M: []; by the fixture actor: 0; after c naming M / the row / the actor: 0
+  PASS  no recognised provenance: no data_edits row names M (no match_deletion, no match_sheet), none by the fixture actor, none after c naming M or the moved row — {"audits":[],"edits":{"byActor":0,"afterC":0}}
+  Q2 re-run (validate-only): exit 1, {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":null,"step":"C14","code":"correction_target_absent_unexplained","detail":"no durable match_deletion audit explains the absence"}],"referenceFingerprint":null}
+    | STOP: 1 stop(s); nothing written
+    | player_match_stats [C14] correction_target_absent_unexplained: no durable match_deletion audit explains the absence
+  PASS  Q2 re-run (validate-only) wrote nothing (fixture census unchanged)
+  PASS  Q2 (validate-only): STOP (exit 1) with exactly one stop, player_match_stats [C14] correction_target_absent_unexplained: no durable match_deletion audit explains the absence — {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":null,"step":"C14","code":"correction_target_absent_unexplained","detail":"no durable match_deletion audit explains the absence"}],"referenceFingerprint":null}
+  PASS  Q2 (validate-only): nothing reported as satisfied or explained
+  PASS  Q2 (validate-only): no "NOOP already_corrected_moved" (the target is absent, never read as moved and present)
+  PASS  Q2 (validate-only): the correction footprint (ledger, correction batches, applications, identity, projections) is byte-identical: no second correction
+  PASS  Q2 (validate-only): nothing recreated: no row with the corrected id, nothing at (P′, M) or (P, M), M's existence unchanged — {"atM":0,"match":1,"pAtM":0,"pPrimeAtM":0,"rowById":null}
+  Q2 re-run (apply): exit 1, {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":null,"step":"C14","code":"correction_target_absent_unexplained","detail":"no durable match_deletion audit explains the absence"}],"referenceFingerprint":null}
+    | STOP: 1 stop(s); nothing written
+    | player_match_stats [C14] correction_target_absent_unexplained: no durable match_deletion audit explains the absence
+  PASS  Q2 re-run (apply) wrote nothing (fixture census unchanged)
+  PASS  Q2 (apply): STOP (exit 1) with exactly one stop, player_match_stats [C14] correction_target_absent_unexplained: no durable match_deletion audit explains the absence — {"kind":"STOP","stops":[{"table":"player_match_stats","rowId":null,"step":"C14","code":"correction_target_absent_unexplained","detail":"no durable match_deletion audit explains the absence"}],"referenceFingerprint":null}
+  PASS  Q2 (apply): nothing reported as satisfied or explained
+  PASS  Q2 (apply): no "NOOP already_corrected_moved" (the target is absent, never read as moved and present)
+  PASS  Q2 (apply): the correction footprint (ledger, correction batches, applications, identity, projections) is byte-identical: no second correction
+  PASS  Q2 (apply): nothing recreated: no row with the corrected id, nothing at (P′, M) or (P, M), M's existence unchanged — {"atM":0,"match":1,"pAtM":0,"pPrimeAtM":0,"rowById":null}
+  PASS  post: CD_I's ledger is exactly one `corrected` row
+  PASS  post: the combined identity invariant (SAT-1 basis) holds
+  PASS  no non-fixture row changed across fixture setup and the correction (foreign fingerprint equal)
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 15 (match-exists): 38/38 checks PASS -> PASS
+CTDB-RC=0 label=c15-match-exists base=rb args=run --case 15 --variant match-exists --acknowledge code_test_db

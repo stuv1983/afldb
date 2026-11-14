@@ -1,0 +1,14 @@
+isolated-pg: afldb_v2_rem4brownlow_snap_fin1a1_test verified (cluster afldb_v2_isolated, 127.0.0.1:55681); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem4-brownlow-20261115/final
+
+ ✓ tests/integration/settle-afl-api-brownlow.test.ts (21 tests) 12996ms
+     ✓ resolves and plans vote sets for TWO distinct matches once the match family has staged them (the operator's unknown_match -> voteSetsPlanned/voteSetsWouldAutoApply target), and creates no duplicate canonical match  382ms
+     ✓ cleanup() self-heals a stale player_clubs pointer left by a crashed prior teardown (one that deleted player_match_stats but never reached the recompute/DELETE FROM matches that follows it — the exact partial state a reported failed run left behind). Runs last: it deletes matches p and q outright, which every test above this one depends on existing.  8746ms
+
+ Test Files  1 passed (1)
+      Tests  21 passed (21)
+   Start at  06:48:23
+   Duration  21.72s (transform 857ms, setup 7.31s, import 1.00s, tests 13.00s, environment 0ms)
+
+JSON report written to /mnt/ssd/afldb-rem4-brownlow-20261115/evidence/snap-fin1a1/vitest.json

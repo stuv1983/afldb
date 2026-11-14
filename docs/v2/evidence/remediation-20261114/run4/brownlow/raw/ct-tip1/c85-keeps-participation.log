@@ -1,0 +1,34 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2929709, import 2929711)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 85, variant keeps-participation: DP-4: a match-less after_siren_kicks row for P losing its last justifying participation -> STOP; with participation remaining -> reported, COMMITTED
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  fixture: P=13366 (players/Z/Zz238_085_P.html), P'=13367 (players/Z/Zz238_085_Pprime.html), provider CD_I999238000851, match M=17057, closure row player_match_stats#695500, settle batch 27, actor 1
+  PASS  pre: the closure row is at (P, M), afl_api-owned, stamped <CD_M>|<team>|CD_I with its settle batch — {"player_id":13366,"source_record_id":"CD_M999238000851|CD_T992238H|CD_I999238000851","import_batch_id":27}
+  PASS  pre: CD_I is an importer row at P (unique, afl_api_stat_vector_bootstrap)
+  PASS  pre: the combined identity invariant holds with the fixture in place
+  PASS  pre: after_siren_kicks#127 is match-less (NAB Cup, premiership false), P's, season 2092, for the home club (organization 1) — {"match_id":null,"club_id":1}
+  PASS  pre: DP-1/DP-2/DP-3 absent at (P, M) and M; no Brownlow or entry state: only DP-4 is under test — {"sirenAtPM":0,"achievementAtPM":0,"unresolvedAtM":0,"matchLessForP":1,"votes":null,"pRounds":0,"entries":0}
+  PASS  pre: P also plays M2=17058 (2092, home club) through foreign row #695501, distinct from closure row #695500, so P keeps a justifying participation after the MOVE — [{"rowId":695500,"matchId":17057,"clubId":1},{"rowId":695501,"matchId":17058,"clubId":1}]
+  validate-only: exit 0, {"kind":"PLANNED","fingerprint":"4fe9d6d435e67234fa55e0be2a1e691c435d115fcb16ed5a9c0fc19f31022eca","rowsPlanned":1}
+  PASS  validate-only: PLAN OK, exit 0, 1 row(s) planned — {"kind":"PLANNED","fingerprint":"4fe9d6d435e67234fa55e0be2a1e691c435d115fcb16ed5a9c0fc19f31022eca","rowsPlanned":1}
+  PASS  validate-only wrote nothing (fixture census unchanged)
+  apply: exit 0, {"kind":"COMMITTED","fingerprint":"4fe9d6d435e67234fa55e0be2a1e691c435d115fcb16ed5a9c0fc19f31022eca","adjudicationId":1,"batchId":28,"moved":1,"deleted":0,"reportIncomplete":false}
+  PASS  apply: COMMITTED, exit 0, the validate-only fingerprint, moved 1, deleted 0, report complete — {"kind":"COMMITTED","fingerprint":"4fe9d6d435e67234fa55e0be2a1e691c435d115fcb16ed5a9c0fc19f31022eca","adjudicationId":1,"batchId":28,"moved":1,"deleted":0,"reportIncomplete":false}
+  PASS  validate-only: the report carries the DP-4 affected-dependent report: "DP-4 REPORT: match-less after_siren_kicks#127 (player 13366, season 2092) keeps its justifying participation; affected, still valid"
+  PASS  apply: the report carries the DP-4 affected-dependent report: "DP-4 REPORT: match-less after_siren_kicks#127 (player 13366, season 2092) keeps its justifying participation; affected, still valid"
+  PASS  validate-only: the report carries the plan report DP-4 line: "DP-4 affected dependent (reported): after_siren_kicks#127 (player 13366, season 2092)"
+  PASS  apply: the report carries the plan report DP-4 line: "DP-4 affected dependent (reported): after_siren_kicks#127 (player 13366, season 2092)"
+  PASS  post: the closure row (same id) is at (P′, M), contract byte-identical, provenance kept
+  PASS  post: batch K completed and bound (adjudication, fingerprint, evidence hash); exactly one player_match_stats update rowProof with the pre-correction contract hash — [{"verb":"update","table":"player_match_stats","newKey":{"match_id":17057,"player_id":13367},"oldKey":{"match_id":17057,"player_id":13366},"preCorrectionContractSha256":"1ca9b726dbf7d9b377f7e45361e8e5bad6df006b9eecd6135b7ed71d8bd04fbc"}]
+  PASS  post: batch counts moved {"brownlow_round_votes":0,"player_match_stats":1}, deleted {"brownlow_round_votes":0,"player_match_stats":0} — {"moved":{"player_match_stats":1,"brownlow_round_votes":0},"deleted":{"player_match_stats":0,"brownlow_round_votes":0},"projectionsMoved":1}
+  PASS  post: one new `corrected` ledger row after 0 prior row(s): P′ at its identity, previous identity P, supersedes NULL (importer origin), surname ack false, actor, evidence hash, previous_state unique at P — [{"id":1,"action":"corrected","playerId":13367,"playerIdentity":"players/Z/Zz238_085_Pprime.html","previousPlayerIdentity":"players/Z/Zz238_085_P.html","supersedesId":null,"adminUserId":1,"evidenceSha256":"494a8863aa82c657c6bd5834820b3cca7c156c4d9d8f06212f320bcb1a057ec3","previousState":{"id":18427,"status":"unique","playerId":13366},"surnameAck":false}]
+  PASS  post: CD_I updated in place to P′ (same id, resolved, candidate_count 0, afl_api_admin_adjudication) — {"id":18427,"playerId":13367,"status":"resolved","candidateCount":0,"matchMethod":"afl_api_admin_adjudication","externalName":null}
+  PASS  post: the combined identity invariant (SAT-1 basis) holds
+  PASS  post: the match-less after_siren_kicks row is byte-identical (report only: still P's, match-less, never rewritten)
+  PASS  post: the justification the report relies on is real: P still holds the M2 row, home club, season 2092 — {"playerId":13366,"clubId":1,"season":2092}
+  PASS  no non-fixture row changed across fixture setup and the correction (foreign fingerprint equal)
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 85 (keeps-participation): 25/25 checks PASS -> PASS
+CTDB-RC=0 label=c85-keeps-participation base=rb args=run --case 85 --variant keeps-participation --acknowledge code_test_db

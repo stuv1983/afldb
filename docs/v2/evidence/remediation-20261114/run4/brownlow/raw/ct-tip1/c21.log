@@ -1,0 +1,55 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2936366, import 2936367)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 21: L7: a later settle through CD_I at P′ (the production applyCanonicalUnit) -> NOOP; L7 passes
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  fixture: P=13366 (players/Z/Zz238_021_P.html), P'=13367 (players/Z/Zz238_021_Pprime.html), provider CD_I999238000211, match M=17057, closure row player_match_stats#695500, settle batch 27, actor 1
+  PASS  pre: closure row at (P, M), afl_api-owned, stamped <CD_M>|<team>|CD_I with the settle batch; contract = the insert application — {"player_id":13366,"source_record_id":"CD_M999238000211|CD_T992238H|CD_I999238000211"}
+  PASS  pre: no P′ counterpart at M; P holds exactly the one row; M holds only it — {"counterpart":0,"pRows":1,"atM":1}
+  PASS  pre: CD_I is an importer row at P (unique, afl_api_stat_vector_bootstrap)
+  PASS  pre: the combined identity invariant holds with the fixture in place
+  validate-only: exit 0, {"kind":"PLANNED","fingerprint":"96ac4bf96d6f3e149e6e94abb5c583d79aab741cd49a957b74c948edca586770","rowsPlanned":1}
+  PASS  validate-only: PLAN OK, exit 0, 1 row(s) planned — {"kind":"PLANNED","fingerprint":"96ac4bf96d6f3e149e6e94abb5c583d79aab741cd49a957b74c948edca586770","rowsPlanned":1}
+  PASS  validate-only wrote nothing (fixture census unchanged)
+  apply: exit 0, {"kind":"COMMITTED","fingerprint":"96ac4bf96d6f3e149e6e94abb5c583d79aab741cd49a957b74c948edca586770","adjudicationId":1,"batchId":28,"moved":1,"deleted":0,"reportIncomplete":false}
+  PASS  apply: COMMITTED, exit 0, the validate-only fingerprint, moved 1, deleted 0, report complete — {"kind":"COMMITTED","fingerprint":"96ac4bf96d6f3e149e6e94abb5c583d79aab741cd49a957b74c948edca586770","adjudicationId":1,"batchId":28,"moved":1,"deleted":0,"reportIncomplete":false}
+  PASS  corrected base: the SAME row id at (P′, M), contract byte-identical, provenance kept (D3)
+  PASS  corrected base: (P, M) is free after the MOVE — {"pRows":0,"pPrimeRows":1,"pAtM":0,"pPrimeAtM":1,"atM":1}
+  PASS  post: one new `corrected` ledger row after 0 prior row(s): P′ at its identity, previous identity P, supersedes NULL (importer origin), surname ack false, actor, evidence hash, previous_state unique at P — [{"id":1,"action":"corrected","playerId":13367,"playerIdentity":"players/Z/Zz238_021_Pprime.html","previousPlayerIdentity":"players/Z/Zz238_021_P.html","supersedesId":null,"adminUserId":1,"evidenceSha256":"ad5dc3a73de20cba881fe9a8c8a9d4704c744e1c8e05efb7330aabd5afc318b1","previousState":{"id":18427,"status":"unique","playerId":13366},"surnameAck":false}]
+  PASS  post: CD_I updated in place to P′ (same id, resolved, candidate_count 0, afl_api_admin_adjudication) — {"id":18427,"playerId":13367,"status":"resolved","candidateCount":0,"matchMethod":"afl_api_admin_adjudication","externalName":null}
+  PASS  corrected base: c = the correction application's applied_at exists
+  PASS  corrected base: no data_edits audit for M yet — []
+  corrected base: adjudication 1, batch K 28, c = 2026-11-14T19:38:34.864319Z
+  later settle B2 29: rendered fields ["goals"]; applyCanonicalUnit {"results":[{"targetTable":"player_match_stats","applied":true,"verb":"update","rowsInserted":0,"rowsUpdated":1,"refusal":null}],"failure":null,"insertedMatchId":null,"rekeyedMatch":null,"fixtureBlocked":null,"overridesCarried":0}
+  PASS  later settle: the settle resolver resolved CD_I to P′ (the corrected link); the automatic proposal differs in goals only
+  PASS  later settle: the production applyCanonicalUnit applied the one player_match_stats target (no failure, no refusal) — [{"targetTable":"player_match_stats","applied":true,"verb":"update","rowsInserted":0,"rowsUpdated":1,"refusal":null}]
+  PASS  post-settle: the corrected row (same id, (P′, M)) has goals 3, every other contract field as corrected; afl_api-owned, stamp <CD_M>|<team>|CD_I, restamped with B2 — {"goals":3,"import_batch_id":29}
+  c = 2026-11-14T19:38:34.864319Z; L7 application 3 applied_at 2026-11-14T19:38:35.080735Z
+  PASS  post-settle: k′ holds [c (batch K), the L7 application (B2, afl_api, through CD_I, version 2, update {goals: 2} -> {goals: 3})], the L7 one applied at or after c — [{"id":2,"batchId":28,"versionSeq":1,"verb":"update","previous":{"player_id":13366},"next":{"player_id":13367}},{"id":3,"batchId":29,"versionSeq":2,"verb":"update","previous":{"goals":2},"next":{"goals":3}}]
+  PASS  post-settle: the old key's history is still only the settle's insert
+  PASS  post-settle: CD_I's projection names P′ at version 2 (goals 3) — {"playerId":13367,"versionSeq":2,"goals":3}
+  Q2 re-run (validate-only): exit 0, {"kind":"ALREADY_SATISFIED"}
+    | ALREADY_SATISFIED: this provider is already corrected and the correction remains satisfied
+    | NOOP already_corrected_moved: player_match_stats {"match_id":17057,"player_id":13367}
+    | CORRECTION SATISFACTION: SAT-1..SAT-5 PASS
+  PASS  Q2 re-run (validate-only) wrote nothing (fixture census unchanged)
+  PASS  Q2 (validate-only): ALREADY_SATISFIED (exit 0), "NOOP already_corrected_moved: player_match_stats {"match_id":17057,"player_id":13367}", CORRECTION SATISFACTION: SAT-1..SAT-5 PASS — {"kind":"ALREADY_SATISFIED"}
+  PASS  Q2 (validate-only): no other STOP / post-correction classification line
+  PASS  Q2 (validate-only): the correction footprint (ledger, correction batches, applications, identity, projections) is byte-identical: no second correction
+  PASS  Q2 (validate-only): the settled corrected row byte-identical
+  Q2 re-run (apply): exit 0, {"kind":"ALREADY_SATISFIED"}
+    | ALREADY_SATISFIED: this provider is already corrected and the correction remains satisfied
+    | NOOP already_corrected_moved: player_match_stats {"match_id":17057,"player_id":13367}
+    | CORRECTION SATISFACTION: SAT-1..SAT-5 PASS
+  PASS  Q2 re-run (apply) wrote nothing (fixture census unchanged)
+  PASS  Q2 (apply): ALREADY_SATISFIED (exit 0), "NOOP already_corrected_moved: player_match_stats {"match_id":17057,"player_id":13367}", CORRECTION SATISFACTION: SAT-1..SAT-5 PASS — {"kind":"ALREADY_SATISFIED"}
+  PASS  Q2 (apply): no other STOP / post-correction classification line
+  PASS  Q2 (apply): the correction footprint (ledger, correction batches, applications, identity, projections) is byte-identical: no second correction
+  PASS  Q2 (apply): the settled corrected row byte-identical
+  PASS  post: CD_I's ledger is exactly one `corrected` row
+  PASS  post: the combined identity invariant (SAT-1 basis) holds
+  PASS  no non-fixture row changed across fixture setup and the correction (foreign fingerprint equal)
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 21: 35/35 checks PASS -> PASS
+CTDB-RC=0 label=c21 base=rb args=run --case 21 --acknowledge code_test_db

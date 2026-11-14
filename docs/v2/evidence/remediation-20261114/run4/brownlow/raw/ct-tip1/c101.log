@@ -1,0 +1,55 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2933708, import 2933745)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 101: Post-correction reappearance: a real match-sheet line inserts a fresh NULL-owned row at (P, M) -> Q2 PASS post_correction_reappearance
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  fixture: P=13366 (players/Z/Zz238_101_P.html), P'=13367 (players/Z/Zz238_101_Pprime.html), provider CD_I999238001011, match M=17057, closure row player_match_stats#695500, settle batch 27, actor 1
+  PASS  pre: closure row at (P, M), afl_api-owned, stamped <CD_M>|<team>|CD_I with the settle batch; contract = the insert application — {"player_id":13366,"source_record_id":"CD_M999238001011|CD_T992238H|CD_I999238001011"}
+  PASS  pre: no P′ counterpart at M; P holds exactly the one row; M holds only it — {"counterpart":0,"pRows":1,"atM":1}
+  PASS  pre: CD_I is an importer row at P (unique, afl_api_stat_vector_bootstrap)
+  PASS  pre: the combined identity invariant holds with the fixture in place
+  validate-only: exit 0, {"kind":"PLANNED","fingerprint":"523b0f065636249bd023a40a333681cecea7866e25962f7e0731df1a53705c84","rowsPlanned":1}
+  PASS  validate-only: PLAN OK, exit 0, 1 row(s) planned — {"kind":"PLANNED","fingerprint":"523b0f065636249bd023a40a333681cecea7866e25962f7e0731df1a53705c84","rowsPlanned":1}
+  PASS  validate-only wrote nothing (fixture census unchanged)
+  apply: exit 0, {"kind":"COMMITTED","fingerprint":"523b0f065636249bd023a40a333681cecea7866e25962f7e0731df1a53705c84","adjudicationId":1,"batchId":28,"moved":1,"deleted":0,"reportIncomplete":false}
+  PASS  apply: COMMITTED, exit 0, the validate-only fingerprint, moved 1, deleted 0, report complete — {"kind":"COMMITTED","fingerprint":"523b0f065636249bd023a40a333681cecea7866e25962f7e0731df1a53705c84","adjudicationId":1,"batchId":28,"moved":1,"deleted":0,"reportIncomplete":false}
+  PASS  corrected base: the SAME row id at (P′, M), contract byte-identical, provenance kept (D3)
+  PASS  corrected base: (P, M) is free after the MOVE — {"pRows":0,"pPrimeRows":1,"pAtM":0,"pPrimeAtM":1,"atM":1}
+  PASS  post: one new `corrected` ledger row after 0 prior row(s): P′ at its identity, previous identity P, supersedes NULL (importer origin), surname ack false, actor, evidence hash, previous_state unique at P — [{"id":1,"action":"corrected","playerId":13367,"playerIdentity":"players/Z/Zz238_101_Pprime.html","previousPlayerIdentity":"players/Z/Zz238_101_P.html","supersedesId":null,"adminUserId":1,"evidenceSha256":"962a2be85e525e954cd4591a8c1c745c830662f160e5e71f4873bc30f8a1be82","previousState":{"id":18427,"status":"unique","playerId":13366},"surnameAck":false}]
+  PASS  post: CD_I updated in place to P′ (same id, resolved, candidate_count 0, afl_api_admin_adjudication) — {"id":18427,"playerId":13367,"status":"resolved","candidateCount":0,"matchMethod":"afl_api_admin_adjudication","externalName":null}
+  PASS  corrected base: c = the correction application's applied_at exists
+  PASS  corrected base: no data_edits audit for M yet — []
+  corrected base: adjudication 1, batch K 28, c = 2026-11-14T19:37:57.618256Z
+  schema state: B (migration 110 applied: authority is storable)
+  writer saveMatchSheet (a line for P at M): {"ok":true,"playerCount":1,"scoreUpdated":false}
+  PASS  State B: the real saveMatchSheet line for P at M saved ({ok: true, playerCount 1}) — {"ok":true,"playerCount":1,"scoreUpdated":false}
+  PASS  State B: durable authority written: an active player_match_stats data_overrides 'match_sheet' row exists for M's changed player — [{"entityKey":"2092|issue238-rehearsal:101:1|afltables:players/Z/Zz238_101_P.html","fieldGroup":"lineup","isActive":true},{"entityKey":"2092|issue238-rehearsal:101:1|afltables:players/Z/Zz238_101_P.html","fieldGroup":"match_sheet","isActive":true}]
+  rows at M: [{"id":695500,"player_id":13367,"source_id":6},{"id":695501,"player_id":13366,"source_id":null}]
+  PASS  post-writer: the corrected row (same id) is byte-identical at (P′, M)
+  PASS  post-writer: a NEW row reappeared at (P, M): the writer's line, NULL-owned (source_id / source_record_id / import_batch_id NULL)
+  c = 2026-11-14T19:37:57.618256Z; writer audit(s) [{"id":1,"fieldGroup":"match_sheet","createdAt":"2026-11-14T19:37:57.899845Z","afterCutoff":true}]
+  PASS  the writer's production audit: exactly one data_edits matches/match_sheet row for M, created at or after c — [{"id":1,"createdAt":"2026-11-14T19:37:57.899845Z","fieldGroup":"match_sheet","afterCutoff":true,"newValues":{"players":{"13366":{"kind":"add","values":{"goals":1,"kicks":10,"marks":4,"behinds":0,"hitouts":0,"tackles":3,"club_slug":"adelaide","disposals":15,"frees_for":0,"handballs":5,"frees_against":2,"jumper_number":"7"}}},"playersCount":1,"scoreUpdated":false,"authorityKeys":[{"action":"mint","...
+  Q2 re-run (validate-only): exit 0, {"kind":"ALREADY_SATISFIED"}
+    | ALREADY_SATISFIED: this provider is already corrected and the correction remains satisfied
+    | post_correction_reappearance: a new row not attributed through CD_I999238001011 occupies the vacated player_match_stats key {"match_id":17057,"player_id":13366}; not touched
+    | NOOP already_corrected_moved: player_match_stats {"match_id":17057,"player_id":13367}
+    | CORRECTION SATISFACTION: SAT-1..SAT-5 PASS
+    | post_correction_reappearance: player_match_stats {"match_id":17057,"player_id":13366} (a new row not attributed through the provider; not touched)
+  PASS  Q2 re-run (validate-only) wrote nothing (fixture census unchanged)
+  PASS  Q2 (validate-only): ALREADY_SATISFIED, the reappearance reported distinctly as post_correction_reappearance; the MOVE still already_corrected_moved; SAT-1..SAT-5 PASS (SAT-5 did not fire) — post_correction_reappearance: a new row not attributed through CD_I999238001011 occupies the vacated player_match_stats key {"match_id":17057,"player_id":13366}; not touched
+  PASS  Q2 (validate-only): both rows byte-identical afterwards -- the reappeared row is never deleted, merged or reattributed; the corrected row unchanged
+  Q2 re-run (apply): exit 0, {"kind":"ALREADY_SATISFIED"}
+    | ALREADY_SATISFIED: this provider is already corrected and the correction remains satisfied
+    | post_correction_reappearance: a new row not attributed through CD_I999238001011 occupies the vacated player_match_stats key {"match_id":17057,"player_id":13366}; not touched
+    | NOOP already_corrected_moved: player_match_stats {"match_id":17057,"player_id":13367}
+    | CORRECTION SATISFACTION: SAT-1..SAT-5 PASS
+    | post_correction_reappearance: player_match_stats {"match_id":17057,"player_id":13366} (a new row not attributed through the provider; not touched)
+  PASS  Q2 re-run (apply) wrote nothing (fixture census unchanged)
+  PASS  Q2 (apply): ALREADY_SATISFIED, the reappearance reported distinctly as post_correction_reappearance; the MOVE still already_corrected_moved; SAT-1..SAT-5 PASS (SAT-5 did not fire) — post_correction_reappearance: a new row not attributed through CD_I999238001011 occupies the vacated player_match_stats key {"match_id":17057,"player_id":13366}; not touched
+  PASS  Q2 (apply): both rows byte-identical afterwards -- the reappeared row is never deleted, merged or reattributed; the corrected row unchanged
+  PASS  post: the combined identity invariant (SAT-1 basis) holds
+  PASS  no non-fixture row changed across fixture setup and the correction (foreign fingerprint equal)
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 101: 29/29 checks PASS -> PASS
+CTDB-RC=0 label=c101 base=rb args=run --case 101 --acknowledge code_test_db

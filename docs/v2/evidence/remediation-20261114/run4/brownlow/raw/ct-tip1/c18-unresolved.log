@@ -1,0 +1,33 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2922919, import 2922935)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 18, variant unresolved: An after_siren_kicks row for (P, M) -> STOP dependent_record_would_be_stale (DP-1); an unresolved row at M -> reported (DP-3), COMMITTED
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  fixture: P=13366 (players/Z/Zz238_018_P.html), P'=13367 (players/Z/Zz238_018_Pprime.html), provider CD_I999238000181, match M=17057, closure row player_match_stats#695500, settle batch 27, actor 1
+  PASS  pre: the closure row is at (P, M), afl_api-owned, stamped <CD_M>|<team>|CD_I with its settle batch — {"player_id":13366,"source_record_id":"CD_M999238000181|CD_T992238H|CD_I999238000181","import_batch_id":27}
+  PASS  pre: CD_I is an importer row at P (unique, afl_api_stat_vector_bootstrap)
+  PASS  pre: the combined identity invariant holds with the fixture in place
+  PASS  pre: no Brownlow state for P and no entry state at M (nothing ahead of the dependents can stop the row) — {"votes":null,"pRounds":0,"entries":0}
+  PASS  pre: no P′ counterpart at M; P holds exactly the closure row — {"pRows":1,"pPrimeRows":0,"pAtM":1,"pPrimeAtM":0,"atM":1}
+  PASS  pre: after_siren_kicks#127 at M is UNRESOLVED (player NULL, ambiguous, 2 candidates); it is the only dependent (DP-1 0, DP-2 0, DP-3 1) — {"sirenAtPM":0,"achievementAtPM":0,"unresolvedAtM":1,"matchLessForP":0}
+  validate-only: exit 0, {"kind":"PLANNED","fingerprint":"4a7c9c451fb3f277b220276ac03a2c72d35dc74c69358f73565576ba5c12ad34","rowsPlanned":1}
+  PASS  validate-only: PLAN OK, exit 0, 1 row(s) planned — {"kind":"PLANNED","fingerprint":"4a7c9c451fb3f277b220276ac03a2c72d35dc74c69358f73565576ba5c12ad34","rowsPlanned":1}
+  PASS  validate-only wrote nothing (fixture census unchanged)
+  apply: exit 0, {"kind":"COMMITTED","fingerprint":"4a7c9c451fb3f277b220276ac03a2c72d35dc74c69358f73565576ba5c12ad34","adjudicationId":1,"batchId":28,"moved":1,"deleted":0,"reportIncomplete":false}
+  PASS  apply: COMMITTED, exit 0, the validate-only fingerprint, moved 1, deleted 0, report complete — {"kind":"COMMITTED","fingerprint":"4a7c9c451fb3f277b220276ac03a2c72d35dc74c69358f73565576ba5c12ad34","adjudicationId":1,"batchId":28,"moved":1,"deleted":0,"reportIncomplete":false}
+  PASS  validate-only: the report carries the DP-3 report naming the unresolved row: "DP-3 REPORT: unresolved after_siren_kicks#127 at match 17057 (closure row player_match_stats#695500): its resolution evidence changes"
+  PASS  apply: the report carries the DP-3 report naming the unresolved row: "DP-3 REPORT: unresolved after_siren_kicks#127 at match 17057 (closure row player_match_stats#695500): its resolution evidence changes"
+  PASS  validate-only: the report carries the plan report DP-3 line: "player_match_stats#695500: DP-3: an unresolved dependent row exists at this match"
+  PASS  apply: the report carries the plan report DP-3 line: "player_match_stats#695500: DP-3: an unresolved dependent row exists at this match"
+  PASS  post: the closure row (same id) is at (P′, M), contract byte-identical, provenance kept
+  PASS  post: batch K completed and bound (adjudication, fingerprint, evidence hash); exactly one player_match_stats update rowProof with the pre-correction contract hash — [{"verb":"update","table":"player_match_stats","newKey":{"match_id":17057,"player_id":13367},"oldKey":{"match_id":17057,"player_id":13366},"preCorrectionContractSha256":"1ca9b726dbf7d9b377f7e45361e8e5bad6df006b9eecd6135b7ed71d8bd04fbc"}]
+  PASS  post: batch counts moved {"brownlow_round_votes":0,"player_match_stats":1}, deleted {"brownlow_round_votes":0,"player_match_stats":0} — {"moved":{"player_match_stats":1,"brownlow_round_votes":0},"deleted":{"player_match_stats":0,"brownlow_round_votes":0},"projectionsMoved":1}
+  PASS  post: one new `corrected` ledger row after 0 prior row(s): P′ at its identity, previous identity P, supersedes NULL (importer origin), surname ack false, actor, evidence hash, previous_state unique at P — [{"id":1,"action":"corrected","playerId":13367,"playerIdentity":"players/Z/Zz238_018_Pprime.html","previousPlayerIdentity":"players/Z/Zz238_018_P.html","supersedesId":null,"adminUserId":1,"evidenceSha256":"a7b10c71733dc52a083707894a15f8a0ecfa769280777841ca68dceedee080b0","previousState":{"id":18427,"status":"unique","playerId":13366},"surnameAck":false}]
+  PASS  post: CD_I updated in place to P′ (same id, resolved, candidate_count 0, afl_api_admin_adjudication) — {"id":18427,"playerId":13367,"status":"resolved","candidateCount":0,"matchMethod":"afl_api_admin_adjudication","externalName":null}
+  PASS  post: the combined identity invariant (SAT-1 basis) holds
+  PASS  post: the unresolved after_siren_kicks row is byte-identical (report only: still player NULL at M, never resolved or rewritten) — {"player_id":null,"match_id":17057}
+  PASS  no non-fixture row changed across fixture setup and the correction (foreign fingerprint equal)
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 18 (unresolved): 24/24 checks PASS -> PASS
+CTDB-RC=0 label=c18-unresolved base=rb args=run --case 18 --variant unresolved --acknowledge code_test_db

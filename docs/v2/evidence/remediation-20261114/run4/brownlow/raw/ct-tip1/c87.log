@@ -1,0 +1,35 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2866359, import 2866360)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 87: ORIGINAL lock timeout against an in-flight settle (settle resolver ACCESS SHARE on external_identities) -> STOP, nothing written
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  fixture: P=13366, P'=13367, provider CD_I999238000871, match M=17057, closure row player_match_stats#695500, settle batch 27, actor 1
+  PASS  pre: closure row at (P, M), afl_api-owned, stamped <CD_M>|<team>|CD_I with the settle batch; contract = the insert application — {"player_id":13366,"source_record_id":"CD_M999238000871|CD_T992238H|CD_I999238000871"}
+  PASS  pre: no P′ counterpart at M; P holds exactly the one row; M holds only it — {"counterpart":0,"pRows":1,"atM":1}
+  PASS  pre: CD_I is an importer row at P (unique, afl_api_stat_vector_bootstrap)
+  PASS  pre: the combined identity invariant holds with the fixture in place
+  validate-only: exit 0, {"kind":"PLANNED","fingerprint":"249829476a79401950eed03fd0fe60595ea933e4ee8ce766418e4748737264a6","rowsPlanned":1}
+  PASS  validate-only: PLAN OK, exit 0, 1 row(s) planned — {"kind":"PLANNED","fingerprint":"249829476a79401950eed03fd0fe60595ea933e4ee8ce766418e4748737264a6","rowsPlanned":1}
+  PASS  validate-only wrote nothing (fixture census unchanged)
+  blocker H: pid 2866635 ('afldb-issue238-case087-settle-holder', afldb_import), transaction open after the real settle resolver (resolveAflApiPlayer(CD_I999238000871) -> player 13366); its external_identities locks [{"locktype":"relation","relation":"external_identities","mode":"AccessShareLock","granted":true,"page":null,"tuple":null,"transactionId":null}]
+  PASS  blocker: H (afldb_import, open transaction) holds the settle resolver's lock on external_identities: AccessShareLock, granted — [{"locktype":"relation","relation":"external_identities","mode":"AccessShareLock","granted":true,"page":null,"tuple":null,"transactionId":null}]
+  correction: pid 2866666 (afldb_import), wait Lock/relation, pg_blocking_pids = {2866635}, waiting 6 ms so far, backend_xid 6639, query 'LOCK TABLE external_identities IN ACCESS EXCLUSIVE MODE'; ungranted [{"locktype":"relation","relation":"external_identities","mode":"AccessExclusiveLock","granted":false,"page":null,"tuple":null,"transactionId":null}]
+  PASS  correction: its backend (afldb_import, afldb-correct-afl-api-identity-apply) is waiting on a heavyweight RELATION lock — {"pid":2866666,"applicationName":"afldb-correct-afl-api-identity-apply","role":"afldb_import","state":"active","waitEventType":"Lock","waitEvent":"relation","query":"LOCK TABLE external_identities IN ACCESS EXCLUSIVE MODE","blockingPids":[2866635],"backendXid":"6639","waitedMs":6}
+  PASS  correction: pg_blocking_pids(correction) = {H} exactly — {2866635} vs H 2866635
+  PASS  correction: its one ungranted lock is AccessExclusiveLock on external_identities, issued by §8.2 step 1's LOCK TABLE — [{"locktype":"relation","relation":"external_identities","mode":"AccessExclusiveLock","granted":false,"page":null,"tuple":null,"transactionId":null}]
+  correction backend_xid 6639 (assigned by the ACCESS EXCLUSIVE request itself)
+  PASS  blocker: H was still open when the correction gave up (the timeout was against a live holder)
+  apply: exit 1, {"kind":"REFUSED","message":"REFUSED: lock_timeout waiting for external_identities (an in-flight settle holds it)"}; stderr "REFUSED: REFUSED: lock_timeout waiting for external_identities (an in-flight settle holds it)\n  nothing was written (the transaction rolled back or was never opened)"; waited ~5044 ms from its LOCK TABLE to exit (lock_timeout 5s)
+  PASS  apply: REFUSED, exit 1, with the lock_timeout refusal for external_identities and "nothing was written" (§8.2 step 1 STOP) — {"kind":"REFUSED","message":"REFUSED: lock_timeout waiting for external_identities (an in-flight settle holds it)"}
+  PASS  apply: it gave up after the configured lock_timeout (>= 5 s of waiting, and bounded: < 15 s) — 5044 ms
+  PASS  cleanup: H rolled back and closed
+  PASS  post: fixture census byte-identical to the pre-apply census (no batch, ledger row, application or row change) — {"canonical_applications":1,"staging.afl_api_player_match":1,"staging.source_record_versions":1,"staging.source_payloads":1,"player_match_stats":1,"player_clubs":1,"player_club_season_stats":1,"player_season_stats":1,"player_career_stats":2,"matches":1,"external_identities":3,"players":2,"seasons":1,"import_batches":1,"auth_users":1}
+  PASS  post: the closure row is byte-identical (still at P)
+  PASS  post: CD_I's identity row is byte-identical (still unique at P)
+  PASS  post: no ledger row, no correction batch, only the settle's insert application — {"ledger":0,"batches":0,"apps":1}
+  PASS  post: the combined identity invariant holds
+  PASS  no non-fixture row changed across fixture setup and the correction (foreign fingerprint equal)
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 87: 23/23 checks PASS -> PASS
+CTDB-RC=0 label=c87 base=rb args=run --case 87 --acknowledge code_test_db

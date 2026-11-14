@@ -1,0 +1,13 @@
+isolated-pg: afldb_v2_rb_rem4brownlowio5snap_test verified (cluster afldb_v2_isolated, 127.0.0.1:55681); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem4-brownlow-20261115/final
+
+ ✓ tests/integration/settle-afl-api.test.ts (74 tests | 73 skipped) 1971ms
+     ✓ OD-5 reinstate (rolled back, no rebuild) — reinstateAndReplay() puts a captured ledger back byte-for-byte under its original ids, replays it and passes the bijection  1379ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 73 skipped (74)
+   Start at  06:54:27
+   Duration  4.61s (transform 1.79s, setup 161ms, import 2.11s, tests 1.97s, environment 0ms)
+
+JSON report written to /mnt/ssd/afldb-rem4-brownlow-20261115/evidence/snap-od5snap/vitest.json

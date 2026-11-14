@@ -1,0 +1,104 @@
+isolated-pg: afldb_v2_rem4brownlow_snap_b4admin_test verified (cluster afldb_v2_isolated, 127.0.0.1:55681); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem4-brownlow-20261115/cand-b4
+
+stderr | tests/integration/admin-brownlow.test.ts > the main season, administered in order > rolls the facts back when the required audit row cannot be written
+[admin-brownlow] Brownlow finalise on match #17278 failed: PostgresError: issue155 audit probe
+    at ErrorResponse (file:///mnt/ssd/afldb-rem4-brownlow-20261115/cand/node_modules/postgres/src/connection.js:815:30)
+    at handle (file:///mnt/ssd/afldb-rem4-brownlow-20261115/cand/node_modules/postgres/src/connection.js:489:6)
+    at Socket.data (file:///mnt/ssd/afldb-rem4-brownlow-20261115/cand/node_modules/postgres/src/connection.js:324:9)
+    at Socket.emit (node:events:519:28)
+    at addChunk (node:internal/streams/readable:561:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    at Socket.Readable.push (node:internal/streams/readable:392:5)
+    at TCP.onStreamRead (node:internal/stream_base_commons:189:23)
+    at cachedError (file:///mnt/ssd/afldb-rem4-brownlow-20261115/cand/node_modules/postgres/src/query.js:170:23)
+    at new Query (file:///mnt/ssd/afldb-rem4-brownlow-20261115/cand/node_modules/postgres/src/query.js:36:24)
+    at sql (file:///mnt/ssd/afldb-rem4-brownlow-20261115/cand/node_modules/postgres/src/index.js:112:11)
+    at recordDataEdit (/mnt/ssd/afldb-rem4-brownlow-20261115/cand-b4/src/db/queries/audit-log.ts:156:42) {
+  severity_local: 'ERROR',
+  severity: 'ERROR',
+  code: 'P0001',
+  where: 'PL/pgSQL function issue155_audit_probe() line 1 at RAISE',
+  file: 'pl_exec.c',
+  line: '3897',
+  routine: 'exec_stmt_raise'
+}
+
+ ❯ tests/integration/admin-brownlow.test.ts (47 tests | 1 failed) 10123ms
+     ✓ gives the round fact a nullable match identity 13ms
+     ✓ carries both partial unique indexes, and only as partial ones 6ms
+     × resolved every historical round row to exactly one match (preflight P2) 54ms
+     ✓ creates the two workflow tables and widens the audit allowlist 6ms
+     ✓ registers both tables for the app read grant 1ms
+     ✓ leaves data_overrides.entity_type exactly as migration 073 wrote it 2ms
+     ✓ attributes exactly one candidate, keeps NULL for none or several, and re-resolves on reload  406ms
+     ✓ refuses a match that is not home-and-away, wildcard final and grand final alike 51ms
+     ✓ refuses a season whose coverage grid says no medal was awarded 28ms
+     ✓ refuses a player who has no line-up row in the match 46ms
+     ✓ refuses the same player twice 30ms
+     ✓ refuses to finalise an incomplete selection, though a draft may hold one 27ms
+     ✓ refuses a match whose line-up is short of the §27.6 threshold, and writes nothing 68ms
+     ✓ creates a draft that reaches no public fact table 43ms
+     ✓ updates the draft and bumps the revision 43ms
+     ✓ refuses a stale revision without writing anything 29ms
+     ✓ finalises: three canonical rows, a dense mirror, one audit row, coverage moved 72ms
+     ✓ leaves a source-published season total completely alone, and reports the disagreement 23ms
+     ✓ refuses a draft on a finalised match 30ms
+     ✓ corrects a finalised match, recording the reason and the full before and after 67ms
+     ✓ refuses a correction with no reason 33ms
+     ✓ refuses a finalisation whose canonical picture moved since the page was rendered 41ms
+     ✓ adopts the imported rows on a fresh finalisation, demoting rather than deleting them 62ms
+     ✓ voids a match: the values are withdrawn, the participation record is not 120ms
+     ✓ refuses a second void of the same match 26ms
+     ✓ refuses a void with no reason, and writes nothing 25ms
+     ✓ rolls the facts back when the required audit row cannot be written 70ms
+     ✓ finalises the last match, completing the season 65ms
+     ✓ lists the round in fixture order with its current holders 5ms
+     ✓ refuses a season that still has an unattached vote row 37ms
+     ✓ refuses a season whose matches are not all accounted for 36ms
+     ✓ refuses an ineligibility flag on a player who polled nothing 32ms
+     ✓ refuses a publication without the administrator note: the generated default never satisfies the season seal (V2-GAP-006 review F-001)  306ms
+     ✓ publishes: manual rows, measured ranks and winners, derived totals in step  387ms
+     ✓ refuses a stale publication 23ms
+     ✓ is idempotent: re-publishing identical inputs produces identical rows 103ms
+     ✓ re-derives a published season inside the correction that changed it 111ms
+     ✓ the artefact loader's own refusal predicate sees the admin-published season 5ms
+     ✓ the fitzRoy loader's own refusal predicate sees the admin-finalised matches 2ms
+     ✓ preserves the Brownlow mirror through a match-sheet save  540ms
+     ✓ refuses to delete a match that carries a Brownlow decision, and changes nothing 31ms
+     ✓ a draft and a finalisation of the same match: the loser is refused stale 96ms
+     ✓ two corrections of the same finalised match: the second is refused stale 137ms
+     ✓ two finalisations of the same match: the second is refused stale 128ms
+     ✓ two publications of the same season: the second is refused stale 116ms
+     ✓ reports each fixture season with the state it is actually in  1735ms
+     ✓ counts a drafted match whose source votes are complete, so the season reads complete  2051ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/admin-brownlow.test.ts > migration 094 objects and backfill > resolved every historical round row to exactly one match (preflight P2)
+AssertionError: expected 9522 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 9522
+
+ ❯ tests/integration/admin-brownlow.test.ts:391:31
+    389|        WHERE season <= 2026
+    390|     `;
+    391|     expect(counts.unresolved).toBe(0);
+       |                               ^
+    392|     expect(counts.total).toBeGreaterThanOrEqual(320_861);
+    393|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 46 passed (47)
+   Start at  06:54:36
+   Duration  12.08s (transform 995ms, setup 165ms, import 1.41s, tests 10.12s, environment 0ms)
+
+JSON report written to /mnt/ssd/afldb-rem4-brownlow-20261115/evidence/snap-b4admin/vitest.json

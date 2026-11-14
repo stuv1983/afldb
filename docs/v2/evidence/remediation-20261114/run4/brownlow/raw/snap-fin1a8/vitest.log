@@ -1,0 +1,28 @@
+isolated-pg: afldb_v2_rem4brownlow_snap_fin1a8_test verified (cluster afldb_v2_isolated, 127.0.0.1:55681); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem4-brownlow-20261115/final
+
+ ✓ tests/integration/database.test.ts (69 tests) 23041ms
+     ✓ sort=games asc: pages, totals and club names equal the legacy statement  1031ms
+     ✓ sort=games desc: pages, totals and club names equal the legacy statement  990ms
+     ✓ sort=goals asc: pages, totals and club names equal the legacy statement  1017ms
+     ✓ sort=goals desc: pages, totals and club names equal the legacy statement  1074ms
+     ✓ sort=name asc: pages, totals and club names equal the legacy statement  1252ms
+     ✓ sort=name desc: pages, totals and club names equal the legacy statement  1106ms
+     ✓ sort=debut asc: pages, totals and club names equal the legacy statement  954ms
+     ✓ sort=debut desc: pages, totals and club names equal the legacy statement  937ms
+     ✓ sort=final_game asc: pages, totals and club names equal the legacy statement  979ms
+     ✓ sort=final_game desc: pages, totals and club names equal the legacy statement  1022ms
+     ✓ sort=brownlow_votes asc: pages, totals and club names equal the legacy statement  985ms
+     ✓ sort=brownlow_votes desc: pages, totals and club names equal the legacy statement  960ms
+     ✓ sort=finals asc: pages, totals and club names equal the legacy statement  963ms
+     ✓ sort=finals desc: pages, totals and club names equal the legacy statement  1050ms
+     ✓ sort=premierships asc: pages, totals and club names equal the legacy statement  1016ms
+     ✓ sort=premierships desc: pages, totals and club names equal the legacy statement  1023ms
+
+ Test Files  1 passed (1)
+      Tests  69 passed (69)
+   Start at  06:53:18
+   Duration  32.83s (transform 1.27s, setup 7.86s, import 1.56s, tests 23.04s, environment 0ms)
+
+JSON report written to /mnt/ssd/afldb-rem4-brownlow-20261115/evidence/snap-fin1a8/vitest.json

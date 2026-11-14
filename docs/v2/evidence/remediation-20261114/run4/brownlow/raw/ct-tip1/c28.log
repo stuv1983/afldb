@@ -1,0 +1,37 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2955331, import 2955334)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 28: --apply with a wrong (well-formed) --expect-fingerprint -> REFUSED before batch K; nothing written or attempted; F unchanged; control apply with F commits
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  fixture: P=13366 (players/Z/Zz238_028_P.html), P'=13367 (players/Z/Zz238_028_Pprime.html), provider CD_I999238000281, match M=17057, closure row player_match_stats#695500, settle batch 27, actor 1
+  PASS  pre: the closure row is at (P, M), afl_api-owned, stamped <CD_M>|<team>|CD_I with its settle batch — {"player_id":13366,"source_record_id":"CD_M999238000281|CD_T992238H|CD_I999238000281","import_batch_id":27}
+  PASS  pre: CD_I is an importer row at P (unique, afl_api_stat_vector_bootstrap)
+  PASS  pre: the combined identity invariant holds with the fixture in place
+  validate-only: exit 0, {"kind":"PLANNED","fingerprint":"da6609dc6cf445ea154bea210b7e07c6e982242454a22908f47856d4104a62b8","rowsPlanned":1}
+  PASS  validate-only: PLAN OK, exit 0, 1 row(s) planned — {"kind":"PLANNED","fingerprint":"da6609dc6cf445ea154bea210b7e07c6e982242454a22908f47856d4104a62b8","rowsPlanned":1}
+  PASS  validate-only wrote nothing (fixture census unchanged)
+  real fingerprint F       da6609dc6cf445ea154bea210b7e07c6e982242454a22908f47856d4104a62b8
+  --expect-fingerprint F'  da6609dc6cf445ea154bea210b7e07c6e982242454a22908f47856d4104a62b0
+  PASS  F' is well-formed (64 lowercase hex) and differs from F in exactly its last digit
+  pre-apply sequences: {"afl_api_identity_adjudications":null,"canonical_applications":1,"import_batches":27}
+  apply --expect-fingerprint F': exit 1, {"kind":"REFUSED","message":"REFUSED: recomputed fingerprint da6609dc6cf445ea154bea210b7e07c6e982242454a22908f47856d4104a62b8 does not match --expect-fingerprint da6609dc6cf445ea154bea210b7e07c6e982242454a22908f47856d4104a62b0"}
+  PASS  apply --expect-fingerprint F': REFUSED (exit 1), exactly "REFUSED: recomputed fingerprint da6609dc6cf445ea154bea210b7e07c6e982242454a22908f47856d4104a62b8 does not match --expect-fingerprint da6609dc6cf445ea154bea210b7e07c6e982242454a22908f47856d4104a62b0", and "nothing was written" — {"kind":"REFUSED","message":"REFUSED: recomputed fingerprint da6609dc6cf445ea154bea210b7e07c6e982242454a22908f47856d4104a62b8 does not match --expect-fingerprint da6609dc6cf445ea154bea210b7e07c6e982242454a22908f47856d4104a62b0"} REFUSED: REFUSED: recomputed fingerprint da6609dc6cf445ea154bea210b7e07c6e982242454a22908f47856d4104a62b8 does not match --expect-fingerprint da6609dc6cf445ea154bea210b7e0...
+  PASS  nothing written, and nothing even attempted: identities, ledger, correction batches, applications, closure row, projections, findings, derived rows, census AND the batch / ledger / application id sequences byte-identical (a rolled-back INSERT would still have advanced one)
+  PASS  no ledger row, no correction batch, only the settle's insert application; CD_I still unique at P; the projection still names P — {"ledger":0,"batches":0,"applications":1,"identityAtP":1,"projection":13366}
+  PASS  the closure row is byte-identical at (P, M)
+  validate-only again: exit 0, {"kind":"PLANNED","fingerprint":"da6609dc6cf445ea154bea210b7e07c6e982242454a22908f47856d4104a62b8","rowsPlanned":1}
+  PASS  validate-only again: PLAN OK with the SAME fingerprint F (the refusal changed nothing) — {"kind":"PLANNED","fingerprint":"da6609dc6cf445ea154bea210b7e07c6e982242454a22908f47856d4104a62b8","rowsPlanned":1}
+  control apply --expect-fingerprint F: exit 0, {"kind":"COMMITTED","fingerprint":"da6609dc6cf445ea154bea210b7e07c6e982242454a22908f47856d4104a62b8","adjudicationId":1,"batchId":28,"moved":1,"deleted":0,"reportIncomplete":false}
+  PASS  control: apply --expect-fingerprint F COMMITS (fingerprint F, moved 1, deleted 0, report complete) — {"kind":"COMMITTED","fingerprint":"da6609dc6cf445ea154bea210b7e07c6e982242454a22908f47856d4104a62b8","adjudicationId":1,"batchId":28,"moved":1,"deleted":0,"reportIncomplete":false}
+  PASS  post: one new `corrected` ledger row after 0 prior row(s): P′ at its identity, previous identity P, supersedes NULL (importer origin), surname ack false, actor, evidence hash, previous_state unique at P — [{"id":1,"action":"corrected","playerId":13367,"playerIdentity":"players/Z/Zz238_028_Pprime.html","previousPlayerIdentity":"players/Z/Zz238_028_P.html","supersedesId":null,"adminUserId":1,"evidenceSha256":"51940711ab1e37f72b42dcce9cf1b1196e15da381b66caa649a1da0426afe44a","previousState":{"id":18427,"status":"unique","playerId":13366},"surnameAck":false}]
+  PASS  post: CD_I updated in place to P′ (same id, resolved, candidate_count 0, afl_api_admin_adjudication) — {"id":18427,"playerId":13367,"status":"resolved","candidateCount":0,"matchMethod":"afl_api_admin_adjudication","externalName":null}
+  PASS  post: CD_I resolved P -> P′ exactly once: one `corrected` row, one correction batch (K), one correction application in K, identity and the row at P′ — {"corrected":1,"batches":1,"applications":1,"identityAtPPrime":1,"rowAtPPrime":1}
+  PASS  post: batch K completed and bound (adjudication, fingerprint, evidence hash); exactly one player_match_stats update rowProof with the pre-correction contract hash — [{"verb":"update","table":"player_match_stats","newKey":{"match_id":17057,"player_id":13367},"oldKey":{"match_id":17057,"player_id":13366},"preCorrectionContractSha256":"1ca9b726dbf7d9b377f7e45361e8e5bad6df006b9eecd6135b7ed71d8bd04fbc"}]
+  PASS  post: batch counts moved {"brownlow_round_votes":0,"player_match_stats":1}, deleted {"brownlow_round_votes":0,"player_match_stats":0} — {"moved":{"player_match_stats":1,"brownlow_round_votes":0},"deleted":{"player_match_stats":0,"brownlow_round_votes":0},"projectionsMoved":1}
+  PASS  post: CD_I's typed projection names P′
+  PASS  post: the combined identity invariant (SAT-1 basis) holds
+  PASS  no non-fixture row changed across fixture setup and the correction (foreign fingerprint equal)
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 28: 23/23 checks PASS -> PASS
+CTDB-RC=0 label=c28 base=rb args=run --case 28 --acknowledge code_test_db

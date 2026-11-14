@@ -1,0 +1,71 @@
+target: owner afldb_owner@127.0.0.1:55681/code_test_db; import afldb_import@127.0.0.1:55681/code_test_db (current_database() and current_user verified; harness pids owner 2941202, import 2941203)
+AFLDB-ISSUE-238 Slice 10 rehearsal, case 69: Post-correction real Brownlow finalise of M naming P′ -> Q2 PASS post_correction_edit brownlow_admin; re-run ALREADY_SATISFIED; §5 census PASS; D15 ALREADY_SATISFIED
+  preconditions: fixture residue 0; identity invariant holds; foreign fingerprint taken
+  fixture: P=13366 (players/Z/Zz238_069_P.html), P'=13367 (players/Z/Zz238_069_Pprime.html), provider CD_I999238000691, match M=17057, closure row player_match_stats#695500, settle batch 27, actor 1
+  PASS  pre: closure row at (P, M), afl_api-owned, stamped <CD_M>|<team>|CD_I with the settle batch; contract = the insert application — {"player_id":13366,"source_record_id":"CD_M999238000691|CD_T992238H|CD_I999238000691"}
+  PASS  pre: no P′ counterpart at M; P holds exactly the one row; M holds only it and 35 foreign line-up row(s) of other fixture players — {"counterpart":0,"pRows":1,"atM":36}
+  PASS  pre: CD_I is an importer row at P (unique, afl_api_stat_vector_bootstrap)
+  PASS  pre: the combined identity invariant holds with the fixture in place
+  validate-only: exit 0, {"kind":"PLANNED","fingerprint":"4d126fb1acb839fc25ff1736595225c1620c4c636a61c11e7b11e30525d95aa0","rowsPlanned":1}
+  PASS  validate-only: PLAN OK, exit 0, 1 row(s) planned — {"kind":"PLANNED","fingerprint":"4d126fb1acb839fc25ff1736595225c1620c4c636a61c11e7b11e30525d95aa0","rowsPlanned":1}
+  PASS  validate-only wrote nothing (fixture census unchanged)
+  apply: exit 0, {"kind":"COMMITTED","fingerprint":"4d126fb1acb839fc25ff1736595225c1620c4c636a61c11e7b11e30525d95aa0","adjudicationId":1,"batchId":28,"moved":1,"deleted":0,"reportIncomplete":false}
+  PASS  apply: COMMITTED, exit 0, the validate-only fingerprint, moved 1, deleted 0, report complete — {"kind":"COMMITTED","fingerprint":"4d126fb1acb839fc25ff1736595225c1620c4c636a61c11e7b11e30525d95aa0","adjudicationId":1,"batchId":28,"moved":1,"deleted":0,"reportIncomplete":false}
+  PASS  corrected base: the SAME row id at (P′, M), contract byte-identical, provenance kept (D3)
+  PASS  corrected base: (P, M) is free after the MOVE (M also holds its 35 untouched line-up rows) — {"pRows":0,"pPrimeRows":1,"pAtM":0,"pPrimeAtM":1,"atM":36}
+  PASS  post: one new `corrected` ledger row after 0 prior row(s): P′ at its identity, previous identity P, supersedes NULL (importer origin), surname ack false, actor, evidence hash, previous_state unique at P — [{"id":1,"action":"corrected","playerId":13367,"playerIdentity":"players/Z/Zz238_069_Pprime.html","previousPlayerIdentity":"players/Z/Zz238_069_P.html","supersedesId":null,"adminUserId":1,"evidenceSha256":"7dc0766689ebe59750d3edc442de928e709921612255fa68a2d78d29d0aff454","previousState":{"id":18427,"status":"unique","playerId":13366},"surnameAck":false}]
+  PASS  post: CD_I updated in place to P′ (same id, resolved, candidate_count 0, afl_api_admin_adjudication) — {"id":18427,"playerId":13367,"status":"resolved","candidateCount":0,"matchMethod":"afl_api_admin_adjudication","externalName":null}
+  PASS  corrected base: c = the correction application's applied_at exists
+  PASS  corrected base: no data_edits audit for M yet — []
+  corrected base: adjudication 1, batch K 28, c = 2026-11-14T19:39:28.294961Z
+  PASS  corrected base: the corrected row's brownlow_votes is NULL (the §5.12 pre-state)
+  writer finaliseBrownlowMatch (after the correction, P′ three votes): {"ok":true,"value":{"matchId":17057,"status":"final","revision":1,"selection":{"three":13367,"two":13368,"one":13385},"republishedSeason":null}}
+  PASS  writer: the real finaliseBrownlowMatch finalised M (revision 1), P′ in the three-vote slot — {"ok":true,"value":{"matchId":17057,"status":"final","revision":1,"selection":{"three":13367,"two":13368,"one":13385},"republishedSeason":null}}
+  PASS  post-writer: the corrected row (same id, still (P′, M)) now carries brownlow_votes = 3 (the real mirror); every other contract field and its ownership/stamps unchanged — {"brownlow_votes":3}
+  c = 2026-11-14T19:39:28.294961Z; writer audit(s) [{"id":1,"fieldGroup":"finalise","createdAt":"2026-11-14T19:39:28.504763Z","afterCutoff":true}]
+  PASS  the writer's production audit: exactly one data_edits brownlow_vote_entry_state/finalise row for M, revision 1, created at or after c — [{"id":1,"createdAt":"2026-11-14T19:39:28.504763Z","fieldGroup":"finalise","afterCutoff":true,"newValues":{"one":13385,"two":13368,"three":13367,"status":"final","revision":1,"canonicalRows":[{"votes":3,"playerId":13367,"sourceId":2},{"votes":2,"playerId":13368,"sourceId":2},{"votes":1,"playerId":13385,"sourceId":2}]}}]
+  PASS  post-writer: M's entry state is final and names P′ in the three-vote slot — {"status":"final","three":13367}
+  Q2 re-run (validate-only): exit 0, {"kind":"ALREADY_SATISFIED"}
+    | ALREADY_SATISFIED: this provider is already corrected and the correction remains satisfied
+    | post_correction_edit brownlow_admin: player_match_stats {"match_id":17057,"player_id":13367} brownlow_votes null -> 3 (audit 1)
+    | NOOP already_corrected_moved: player_match_stats {"match_id":17057,"player_id":13367}
+    | CORRECTION SATISFACTION: SAT-1..SAT-5 PASS
+    | post_correction_edit brownlow_admin (PASS): player_match_stats {"match_id":17057,"player_id":13367} brownlow_votes null -> 3 (audit 1)
+  PASS  Q2 re-run (validate-only) wrote nothing (fixture census unchanged)
+  PASS  Q2 (validate-only): ALREADY_SATISFIED (exit 0), "NOOP already_corrected_moved: player_match_stats {"match_id":17057,"player_id":13367}", CORRECTION SATISFACTION: SAT-1..SAT-5 PASS — {"kind":"ALREADY_SATISFIED"}
+  PASS  Q2 (validate-only): carries the explained divergence: "post_correction_edit brownlow_admin: player_match_stats {"match_id":17057,"player_id":13367} brownlow_votes null -> 3 (audit 1)"
+  PASS  Q2 (validate-only): carries its satisfaction entry: "post_correction_edit brownlow_admin (PASS): player_match_stats {"match_id":17057,"player_id":13367} brownlow_votes null -> 3 (audit 1)"
+  PASS  Q2 (validate-only): no other STOP / post-correction classification line
+  PASS  Q2 (validate-only): the correction footprint (ledger, correction batches, applications, identity, projections) is byte-identical: no second correction
+  PASS  Q2 (validate-only): the Brownlow state (entry state, 2092 round rows, season authority/totals, stat_availability, P/P′ derived) and the edited row byte-identical
+  Q2 re-run (apply): exit 0, {"kind":"ALREADY_SATISFIED"}
+    | ALREADY_SATISFIED: this provider is already corrected and the correction remains satisfied
+    | post_correction_edit brownlow_admin: player_match_stats {"match_id":17057,"player_id":13367} brownlow_votes null -> 3 (audit 1)
+    | NOOP already_corrected_moved: player_match_stats {"match_id":17057,"player_id":13367}
+    | CORRECTION SATISFACTION: SAT-1..SAT-5 PASS
+    | post_correction_edit brownlow_admin (PASS): player_match_stats {"match_id":17057,"player_id":13367} brownlow_votes null -> 3 (audit 1)
+  PASS  Q2 re-run (apply) wrote nothing (fixture census unchanged)
+  PASS  Q2 (apply): ALREADY_SATISFIED (exit 0), "NOOP already_corrected_moved: player_match_stats {"match_id":17057,"player_id":13367}", CORRECTION SATISFACTION: SAT-1..SAT-5 PASS — {"kind":"ALREADY_SATISFIED"}
+  PASS  Q2 (apply): carries the explained divergence: "post_correction_edit brownlow_admin: player_match_stats {"match_id":17057,"player_id":13367} brownlow_votes null -> 3 (audit 1)"
+  PASS  Q2 (apply): carries its satisfaction entry: "post_correction_edit brownlow_admin (PASS): player_match_stats {"match_id":17057,"player_id":13367} brownlow_votes null -> 3 (audit 1)"
+  PASS  Q2 (apply): no other STOP / post-correction classification line
+  PASS  Q2 (apply): the correction footprint (ledger, correction batches, applications, identity, projections) is byte-identical: no second correction
+  PASS  Q2 (apply): the Brownlow state (entry state, 2092 round rows, season authority/totals, stat_availability, P/P′ derived) and the edited row byte-identical
+  PASS  post: CD_I's ledger is exactly one `corrected` row
+  PASS  post: the combined identity invariant (SAT-1 basis) holds
+  PASS  §5 census input: the database's net-corrected set is exactly CD_I's one ledger row — {"corrected":1,"adjudicationId":1}
+
+[PASS] afl_api corrected identities — pre-cutover satisfaction census (Q2)
+       net-corrected providers on the live target: 1; correction satisfied: 1; not satisfied: 0
+       CD_I999238000691: recognised, not a failure — post_correction_edit brownlow_admin: player_match_stats {"match_id":17057,"player_id":13367} brownlow_votes null -> 3 (audit 1)
+  PASS  §5 census (gateAflApiCorrectedCensus): PASS, 1 net-corrected provider, 1 satisfied, 0 not satisfied; the brownlow_admin edit shown as recognised — {"gate":"afl_api corrected identities — pre-cutover satisfaction census (Q2)","verdict":"PASS","lines":["net-corrected providers on the live target: 1; correction satisfied: 1; not satisfied: 0","CD_I999238000691: recognised, not a failure — post_correction_edit brownlow_admin: player_match_stats {\"match_id\":17057,\"player_id\":13367} brownlow_votes null -> 3 (audit 1)"]}
+  D15 replay (read only): {"inserted":0,"noops":1,"alreadySatisfied":1,"stops":[],"supersedes":[]}
+  PASS  D15 (replayAflApiAdjudications, expectedAlreadySatisfied = {CD_I}, read only): ALREADY_SATISFIED 1, inserted 0, no supersede, no stop — {"inserted":0,"noops":1,"alreadySatisfied":1,"stops":[],"supersedes":[]}
+  PASS  post: the Brownlow state and the edited row byte-identical after the census and D15
+  PASS  no non-fixture row changed across fixture setup and the correction (foreign fingerprint equal)
+  PASS  cleanup: no harness or correction backend remains (no open transaction, no lock holder) — []
+  PASS  teardown: zero ISSUE-238 fixture residue — {}
+  PASS  teardown: no non-fixture row changed (foreign fingerprint equal to the pre-run one)
+
+AFLDB-ISSUE-238 Slice 10 case 69: 42/42 checks PASS -> PASS
+CTDB-RC=0 label=c69 base=rb args=run --case 69 --acknowledge code_test_db

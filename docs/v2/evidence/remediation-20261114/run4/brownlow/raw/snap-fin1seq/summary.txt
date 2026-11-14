@@ -1,0 +1,26 @@
+label=fin1seq base=snap mode=shared-sequence db=afldb_v2_rem4brownlow_snap_fin1seq_test CAND=/mnt/ssd/afldb-rem4-brownlow-20261115/final HEAD=8248133b7f35c89fedf232656d7a4b3c1bac3dfb porcelain=0
+2026-11-14T19:46:04Z
+create-db: afldb_v2_rem4brownlow_snap_fin1seq_test created from afldb_v2_rem4brownlow_snaptpl_test and marked
+BEFORE afldb_v2_rem4brownlow_snap_fin1seq_test {"realRows":1,"realRowMd5":"cf04e8f54805716e81742d4dbe3d5af4","realPlayerId":7974,"identitiesTotal":19319,"aflApiIdentities":803,"ownIdRows":0,"fixtureSeasonsLeft":0,"matches":17056,"players":13365,"brownlowCoverageMd5":"70209edc0e475b3ae07d130e1514c997"}
+== [1] tests/integration/settle-afl-api-brownlow.test.ts vitest rc=0   Tests 21 passed (21)
+AFTER[1] afldb_v2_rem4brownlow_snap_fin1seq_test {"realRows":1,"realRowMd5":"cf04e8f54805716e81742d4dbe3d5af4","realPlayerId":7974,"identitiesTotal":19319,"aflApiIdentities":803,"ownIdRows":0,"fixtureSeasonsLeft":0,"matches":17056,"players":13365,"brownlowCoverageMd5":"70209edc0e475b3ae07d130e1514c997"}
+== [2] tests/integration/settle-afl-api-brownlow-reschedule.test.ts vitest rc=0   Tests 3 passed (3)
+AFTER[2] afldb_v2_rem4brownlow_snap_fin1seq_test {"realRows":1,"realRowMd5":"cf04e8f54805716e81742d4dbe3d5af4","realPlayerId":7974,"identitiesTotal":19319,"aflApiIdentities":803,"ownIdRows":0,"fixtureSeasonsLeft":0,"matches":17056,"players":13365,"brownlowCoverageMd5":"70209edc0e475b3ae07d130e1514c997"}
+== [3] tests/integration/settle-afl-api-brownlow-backtest.test.ts vitest rc=0   Tests 6 passed (6)
+AFTER[3] afldb_v2_rem4brownlow_snap_fin1seq_test {"realRows":1,"realRowMd5":"cf04e8f54805716e81742d4dbe3d5af4","realPlayerId":7974,"identitiesTotal":19319,"aflApiIdentities":803,"ownIdRows":0,"fixtureSeasonsLeft":0,"matches":17056,"players":13365,"brownlowCoverageMd5":"70209edc0e475b3ae07d130e1514c997"}
+== [4] tests/integration/brownlow-pending-coverage.test.ts vitest rc=0   Tests 8 passed (8)
+AFTER[4] afldb_v2_rem4brownlow_snap_fin1seq_test {"realRows":1,"realRowMd5":"cf04e8f54805716e81742d4dbe3d5af4","realPlayerId":7974,"identitiesTotal":19319,"aflApiIdentities":803,"ownIdRows":0,"fixtureSeasonsLeft":0,"matches":17056,"players":13365,"brownlowCoverageMd5":"70209edc0e475b3ae07d130e1514c997"}
+== [5] tests/integration/admin-brownlow.test.ts vitest rc=1   Tests 1 failed | 46 passed (47)
+AssertionError: expected 9522 to be +0 // Object.is equality
+ FAIL  tests/integration/admin-brownlow.test.ts > migration 094 objects and backfill > resolved every historical round row to exactly one match (preflight P2)
+AFTER[5] afldb_v2_rem4brownlow_snap_fin1seq_test {"realRows":1,"realRowMd5":"cf04e8f54805716e81742d4dbe3d5af4","realPlayerId":7974,"identitiesTotal":19319,"aflApiIdentities":803,"ownIdRows":0,"fixtureSeasonsLeft":0,"matches":17056,"players":13365,"brownlowCoverageMd5":"70209edc0e475b3ae07d130e1514c997"}
+== [6] tests/integration/settle-afl-api-state-b.test.ts vitest rc=0   Tests 1 passed (1)
+AFTER[6] afldb_v2_rem4brownlow_snap_fin1seq_test {"realRows":1,"realRowMd5":"cf04e8f54805716e81742d4dbe3d5af4","realPlayerId":7974,"identitiesTotal":19319,"aflApiIdentities":803,"ownIdRows":0,"fixtureSeasonsLeft":0,"matches":17056,"players":13365,"brownlowCoverageMd5":"70209edc0e475b3ae07d130e1514c997"}
+== [7] tests/integration/settle-afl-api.test.ts vitest rc=1   Tests 1 failed | 73 passed (74)
+Error: Refusing to rebuild 'afldb_v2_rem4brownlow_snap_fin1seq_test': the only explicit rebuild targets are 'afldb_test' (normal test/integration rebuild), 'code_test_db' (disposable full-rebuild rehearsal). A target is never inferred from a DSN.
+ FAIL  tests/integration/settle-afl-api.test.ts > AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreSQL (post-COMMIT, pre-archive recovery) > OD-5 reinstate (rolled back, no rebuild) — reinstateAndReplay() puts a captured ledger back byte-
+AFTER[7] afldb_v2_rem4brownlow_snap_fin1seq_test {"realRows":1,"realRowMd5":"cf04e8f54805716e81742d4dbe3d5af4","realPlayerId":7974,"identitiesTotal":19319,"aflApiIdentities":803,"ownIdRows":0,"fixtureSeasonsLeft":0,"matches":17056,"players":13365,"brownlowCoverageMd5":"70209edc0e475b3ae07d130e1514c997"}
+== [8] tests/integration/database.test.ts vitest rc=0   Tests 69 passed (69)
+AFTER[8] afldb_v2_rem4brownlow_snap_fin1seq_test {"realRows":1,"realRowMd5":"cf04e8f54805716e81742d4dbe3d5af4","realPlayerId":7974,"identitiesTotal":19319,"aflApiIdentities":803,"ownIdRows":0,"fixtureSeasonsLeft":0,"matches":17056,"players":13365,"brownlowCoverageMd5":"70209edc0e475b3ae07d130e1514c997"}
+2026-11-14T19:48:18Z
+drop-db: afldb_v2_rem4brownlow_snap_fin1seq_test dropped

@@ -1,0 +1,33 @@
+isolated-pg: afldb_v2_rem4brownlow_snap_pbred3_test verified (cluster afldb_v2_isolated, 127.0.0.1:55681); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem4-brownlow-20261115/cand
+
+ ❯ tests/integration/zz-red-brownlow-backtest.test.ts (6 tests | 6 skipped) 979ms
+     ↓ #1 refuses season_not_in_progress without the backtest authority, exactly as default behaviour requires
+     ↓ #2/#3/#4 authorised afldb_test override writes exactly one atomic 3/2/1 set, with its canonical_applications ledger
+     ↓ #5 an identical replay (still authorised, still a completed season) is a no-op
+     ↓ #6 the override does not permit an invalid vote set (duplicate canonical player identity)
+     ↓ #7 the override does not permit an unresolved/untrusted identity
+     ↓ #8 finals remain excluded even with the override active
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/zz-red-brownlow-backtest.test.ts [ tests/integration/zz-red-brownlow-backtest.test.ts ]
+Error: 1 player_match_stats row(s) in this suite's match belong to the real CD_I297354 player.
+ ❯ tests/integration/zz-red-brownlow-backtest.test.ts:362:11
+    360|   const realStatRows = await realFixturePlayerStatRowsIn(sql, [matchKe…
+    361|   if (realStatRows !== 0) {
+    362|     throw new Error(`${realStatRows} player_match_stats row(s) in this…
+       |           ^
+    363|   }
+    364| }, 30_000);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  6 skipped (6)
+   Start at  06:34:05
+   Duration  2.45s (transform 779ms, setup 176ms, import 873ms, tests 979ms, environment 0ms)
+
+JSON report written to /mnt/ssd/afldb-rem4-brownlow-20261115/evidence/snap-pbred3/vitest.json

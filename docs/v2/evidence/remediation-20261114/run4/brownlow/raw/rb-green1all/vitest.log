@@ -1,0 +1,13 @@
+isolated-pg: afldb_v2_rem4brownlow_rb_green1all_test verified (cluster afldb_v2_isolated, 127.0.0.1:55681); running node
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem4-brownlow-20261115/cand
+
+ ✓ tests/integration/brownlow-pending-coverage.test.ts (8 tests) 6508ms
+     ✓ no season is ever recomputed to not_applicable unless declared; season totals match the committed reference grid  1158ms
+
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+   Start at  06:16:24
+   Duration  11.99s (transform 579ms, setup 4.45s, import 636ms, tests 6.51s, environment 0ms)
+
+JSON report written to /mnt/ssd/afldb-rem4-brownlow-20261115/evidence/rb-green1all/vitest.json
