@@ -1,0 +1,12 @@
+ src/db/queries/player-derived.ts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+diff --git a/src/db/queries/player-derived.ts b/src/db/queries/player-derived.ts
+index 1e6b38ad..9c0f31fe 100644
+--- a/src/db/queries/player-derived.ts
++++ b/src/db/queries/player-derived.ts
+@@ -547 +547 @@ export async function recomputeSeasonMetadata(tx: Tx, season: number): Promise<v
+-              THEN 'in_progress'::season_status
++              THEN 'complete'::season_status
+@@ -555 +555 @@ export async function recomputeSeasonMetadata(tx: Tx, season: number): Promise<v
+-              THEN 'in_progress'::season_status
++              THEN 'complete'::season_status

@@ -1,0 +1,15 @@
+ src/db/queries/player-derived.ts | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+diff --git a/src/db/queries/player-derived.ts b/src/db/queries/player-derived.ts
+index 1e6b38ad..e4915160 100644
+--- a/src/db/queries/player-derived.ts
++++ b/src/db/queries/player-derived.ts
+@@ -737 +737 @@ export async function recomputeBrownlowCoverage(tx: Tx, season: number): Promise
+-               WHEN c.season_status = 'in_progress' THEN 'pending'
++               WHEN c.season_status = 'in_progress' THEN 'not_applicable'
+@@ -748 +748 @@ export async function recomputeBrownlowCoverage(tx: Tx, season: number): Promise
+-               WHEN c.season_status = 'in_progress' THEN 'pending'
++               WHEN c.season_status = 'in_progress' THEN 'not_applicable'
+@@ -758 +758 @@ export async function recomputeBrownlowCoverage(tx: Tx, season: number): Promise
+-               WHEN c.season_status = 'in_progress' THEN 'pending'
++               WHEN c.season_status = 'in_progress' THEN 'not_applicable'

@@ -1,0 +1,19 @@
+create-db: afldb_v2_rb_rem4gates_seqrb_test created from afldb_v2_rb_rem4gates_tmpl_test and marked
+file 1 tests/integration/brownlow-pending-projection.test.ts rc=0
+total 8 passed 8 failed 0 skipped 0
+file 2 tests/integration/release-gates.test.ts rc=0
+total 75 passed 68 failed 0 skipped 7
+year|status
+(0 rows)
+create-db: afldb_v2_rem4gates_seqsn_test created from afldb_v2_rem4gates_snap_tmpl_test and marked
+file 1 tests/integration/brownlow-pending-projection.test.ts rc=0
+total 8 passed 8 failed 0 skipped 0
+file 2 tests/integration/release-gates.test.ts rc=1
+total 75 passed 63 failed 5 skipped 7
+FAIL gate: Brownlow authority agrees with the canonical round votes for every career inside their coverage :: AssertionError: expected 183 to be +0 // Object.is equality
+FAIL gate: birth dates populates the canonical dates with no conflicts (13,255 historical, 13,347 on the accepted rebuild) :: AssertionError: expected 13255 to be 13347 // Object.is equality
+FAIL gate: birth dates keeps the evidence behind every recovered date (14,110 historical, 14,294 on the accepted rebuild) :: AssertionError: expected 14110 to be 14294 // Object.is equality
+FAIL gate: birth dates matches players on the profile URL rather than the name (13,275 historical, 13,367 on the accepted rebuild) :: AssertionError: expected 13275 to be 13367 // Object.is equality
+FAIL gate: birth dates leaves the remaining players honestly without a date :: AssertionError: expected 110 to be 18 // Object.is equality
+year|status
+(0 rows)

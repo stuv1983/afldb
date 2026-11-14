@@ -1,0 +1,57 @@
+--- seasons (latest, in_progress, 2065/2066 usage)
+year|status|match_count
+2025|complete|
+2026|complete|
+2027|in_progress|
+(3 rows)
+--- matches/external_identities/players slug use of CD_I4020 and seasons 2065/2066
+matches_2065_6|ext_ids|players_slug|cs|sa
+0|0|0|0|0
+(1 row)
+--- cohort 50-199 goals, zero career brownlow: independent oracle (all seasons / through 2025)
+all_seasons_bsv|thru25_bsv
+268|261
+(1 row)
+--- career-table based (what run3 facts3 used) through 2025
+t25_career_bv
+261
+(1 row)
+--- attendance by status, all and thru 2025
+attendance_status|thru25|n|null_att
+complete|f|218|0
+complete|t|15187|0
+not_collected|t|1651|1651
+(3 rows)
+--- ladder ranges all and through 2025
+slug|n|first|last|n25|last25
+footscray|72|1925|1996|72|1996
+kangaroos|9|1999|2007|9|2007
+north-melbourne|93|1925|2026|92|2025
+south-melbourne|84|1897|1981|84|1981
+sydney|45|1982|2026|44|2025
+western-bulldogs|30|1997|2026|29|2025
+(6 rows)
+--- birth dates
+players|dated|undated|undated_unknown|dated_linked|evidence|profile_uniq|profile_players
+13365|13347|18|18|13347|14294|13367|13363
+(1 row)
+dob_confidence|dob_null|count
+sourced|f|13347
+unknown|t|18
+(2 rows)
+evidence_type|src|rows|players
+afltables_club_list|afltables|13347|13347
+fitzroy_player_stats|fitzroy_afldata|947|947
+(2 rows)
+dob_confidence|evidence_type|count
+sourced|afltables_club_list|12400
+sourced|fitzroy_player_stats|947
+(2 rows)
+--- first-appearance season of the undated and of dated-not-in-fitzroy-evidence
+undated_2026_debut
+0
+(1 row)
+--- 2026 debutants (no pms row through 2025)
+debut2026|dated
+92|92
+(1 row)

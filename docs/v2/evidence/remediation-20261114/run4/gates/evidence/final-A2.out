@@ -1,0 +1,143 @@
+orphan muts rb finished 19:36:03
+CHECKOUT HEAD aade0feb6af5be57014898bff492cbaa19e7c92e porcelain 0
+######## fa rb shared
+HEAD aade0feb6af5be57014898bff492cbaa19e7c92e porcelain 0 mode=shared db=afldb_v2_rb_rem4gates_fa_rb_shared_test
+create-db: afldb_v2_rb_rem4gates_fa_rb_shared_test created from afldb_v2_rb_rem4gates_tmpl_test and marked
+rc=0
+total 75 passed 68 failed 0 skipped 7
+######## fa rb all
+HEAD aade0feb6af5be57014898bff492cbaa19e7c92e porcelain 0 mode=all db=afldb_v2_rb_rem4gates_fa_rb_all_test
+create-db: afldb_v2_rb_rem4gates_fa_rb_all_test created from afldb_v2_rb_rem4gates_tmpl_test and marked
+rc=0
+total 75 passed 68 failed 0 skipped 7
+######## fa snap shared
+HEAD aade0feb6af5be57014898bff492cbaa19e7c92e porcelain 0 mode=shared db=afldb_v2_rem4gates_fa_snap_shared_test
+create-db: afldb_v2_rem4gates_fa_snap_shared_test created from afldb_v2_rem4gates_snap_tmpl_test and marked
+rc=1
+total 75 passed 63 failed 5 skipped 7
+FAIL gate: Brownlow authority agrees with the canonical round votes for every career inside their coverage :: AssertionError: expected 183 to be +0 // Object.is equality
+FAIL gate: birth dates populates the canonical dates with no conflicts (13,255 historical, 13,347 on the accepted rebuild) :: AssertionError: expected 13255 to be 13347 // Object.is equality
+FAIL gate: birth dates keeps the evidence behind every recovered date (14,110 historical, 14,294 on the accepted rebuild) :: AssertionError: expected 14110 to be 14294 // Object.is equality
+FAIL gate: birth dates matches players on the profile URL rather than the name (13,275 historical, 13,367 on the accepted rebuild) :: AssertionError: expected 13275 to be 13367 // Object.is equality
+FAIL gate: birth dates leaves the remaining players honestly without a date :: AssertionError: expected 110 to be 18 // Object.is equality
+######## fa snap all
+HEAD aade0feb6af5be57014898bff492cbaa19e7c92e porcelain 0 mode=all db=afldb_v2_rem4gates_fa_snap_all_test
+create-db: afldb_v2_rem4gates_fa_snap_all_test created from afldb_v2_rem4gates_snap_tmpl_test and marked
+rc=1
+total 75 passed 63 failed 5 skipped 7
+FAIL gate: Brownlow authority agrees with the canonical round votes for every career inside their coverage :: AssertionError: expected 183 to be +0 // Object.is equality
+FAIL gate: birth dates populates the canonical dates with no conflicts (13,255 historical, 13,347 on the accepted rebuild) :: AssertionError: expected 13255 to be 13347 // Object.is equality
+FAIL gate: birth dates keeps the evidence behind every recovered date (14,110 historical, 14,294 on the accepted rebuild) :: AssertionError: expected 14110 to be 14294 // Object.is equality
+FAIL gate: birth dates matches players on the profile URL rather than the name (13,275 historical, 13,367 on the accepted rebuild) :: AssertionError: expected 13275 to be 13367 // Object.is equality
+FAIL gate: birth dates leaves the remaining players honestly without a date :: AssertionError: expected 110 to be 18 // Object.is equality
+######## FINAL DONE fa it; HEAD aade0feb6af5be57014898bff492cbaa19e7c92e porcelain 0
+CHECKOUT HEAD aade0feb6af5be57014898bff492cbaa19e7c92e porcelain 0
+######## snap struct1  (a historical season left in progress)
+create-db: afldb_v2_rem4gates_mut_struct1_snap_test created from afldb_v2_rem4gates_snap_tmpl_test and marked
+UPDATE 1
+RED has at most one season in progress, and it is the latest :: AssertionError: expected 'season 2025 is in progress but is not…' to be '' // Object.is equality |     at /mnt/ssd/afldb-rem4-gates-20261115/cand/tests/integration/release-gates.test.ts:1770:68 |     at processTicksAndRejections (node:internal/process/task_queues:103:5) |     at file:///mnt/ssd/afldb-rem4-gates-20261115/cand/node_modules/@vitest/runner
+passed 0 failed 1
+######## snap c261a  (Brownlow row the career table does not know)
+create-db: afldb_v2_rem4gates_mut_c261a_snap_test created from afldb_v2_rem4gates_snap_tmpl_test and marked
+INSERT 0 1
+RED 50-199 goals and zero Brownlow votes returns the cohort an independent oracle derives (261 through 2025) :: AssertionError: expected [ …(268) ] to deeply equal [ Array(267) ] |     at /mnt/ssd/afldb-rem4-gates-20261115/cand/tests/integration/release-gates.test.ts:412:20 |     at processTicksAndRejections (node:internal/process/task_queues:103:5) |     at file:///mnt/ssd/afldb-rem4-gates-20261115/cand/node_modul
+passed 0 failed 1
+######## snap c261b  (cohort player moved out consistently)
+create-db: afldb_v2_rem4gates_mut_c261b_snap_test created from afldb_v2_rem4gates_snap_tmpl_test and marked
+UPDATE 1
+RED 50-199 goals and zero Brownlow votes returns the cohort an independent oracle derives (261 through 2025) :: AssertionError: expected 260 to be 261 // Object.is equality |     at /mnt/ssd/afldb-rem4-gates-20261115/cand/tests/integration/release-gates.test.ts:416:31 |     at processTicksAndRejections (node:internal/process/task_queues:103:5) |     at file:///mnt/ssd/afldb-rem4-gates-20261115/cand/node_modules/@vite
+passed 0 failed 1
+######## snap c261c  (cohort player loses profile identity)
+create-db: afldb_v2_rem4gates_mut_c261c_snap_test created from afldb_v2_rem4gates_snap_tmpl_test and marked
+DELETE 1
+RED 50-199 goals and zero Brownlow votes returns the cohort an independent oracle derives (261 through 2025) :: AssertionError: expected 267 to be 268 // Object.is equality |     at /mnt/ssd/afldb-rem4-gates-20261115/cand/tests/integration/release-gates.test.ts:407:27 |     at processTicksAndRejections (node:internal/process/task_queues:103:5) |     at file:///mnt/ssd/afldb-rem4-gates-20261115/cand/node_modules/@vite
+passed 0 failed 1
+######## snap att1  (historical missing crowd becomes recorded)
+create-db: afldb_v2_rem4gates_mut_att1_snap_test created from afldb_v2_rem4gates_snap_tmpl_test and marked
+UPDATE 1
+RED records why each attendance is missing :: AssertionError: expected [ …(2) ] to deeply equal [ …(2) ] |     at /mnt/ssd/afldb-rem4-gates-20261115/cand/tests/integration/release-gates.test.ts:865:18 |     at processTicksAndRejections (node:internal/process/task_queues:103:5) |     at file:///mnt/ssd/afldb-rem4-gates-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+passed 0 failed 1
+######## snap att2  (pairing constraint dropped, crowd mislabelled)
+create-db: afldb_v2_rem4gates_mut_att2_snap_test created from afldb_v2_rem4gates_snap_tmpl_test and marked
+ALTER TABLE
+UPDATE 1
+RED records why each attendance is missing :: AssertionError: expected [ { status: 'complete', …(1) }, …(2) ] to deeply equal [ { status: 'complete', …(1) }, …(1) ] |     at /mnt/ssd/afldb-rem4-gates-20261115/cand/tests/integration/release-gates.test.ts:847:21 |     at processTicksAndRejections (node:internal/process/task_queues:103:5) |     at file:///mnt/ssd/afldb-rem4-gates-20261115/cand/node_modules/@vite
+passed 0 failed 1
+######## snap lad1  (Footscray 1950 filed under Sydney)
+create-db: afldb_v2_rem4gates_mut_lad1_snap_test created from afldb_v2_rem4gates_snap_tmpl_test and marked
+UPDATE 1
+RED attaches every ladder row to the identity trading that season :: AssertionError: expected { slug: 'sydney', n: 45, …(2) } to match object { from: 1982, to: 2025 } | (2 matching properties omitted from actual) |     at Proxy.<anonymous> (file:///mnt/ssd/afldb-rem4-gates-20261115/cand/node_modules/@vitest/expect/dist/index.js:1283:10) |     at Proxy.<anonymous> (file:///mnt/ssd/afldb-rem4-gates-20261115/cand/node
+passed 0 failed 1
+######## snap lad2  (Sydney 1990 row lost)
+create-db: afldb_v2_rem4gates_mut_lad2_snap_test created from afldb_v2_rem4gates_snap_tmpl_test and marked
+DELETE 1
+RED attaches every ladder row to the identity trading that season :: AssertionError: expected 127 to be 128 // Object.is equality |     at /mnt/ssd/afldb-rem4-gates-20261115/cand/tests/integration/release-gates.test.ts:607:54 |     at processTicksAndRejections (node:internal/process/task_queues:103:5) |     at file:///mnt/ssd/afldb-rem4-gates-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+passed 0 failed 1
+######## snap dob1  (historical player loses date)
+create-db: afldb_v2_rem4gates_mut_dob1_snap_test created from afldb_v2_rem4gates_snap_tmpl_test and marked
+UPDATE 1
+RED populates the canonical dates with no conflicts (13,255 historical, 13,347 on the accepted rebuild) :: AssertionError: expected 13254 to be 13255 // Object.is equality |     at /mnt/ssd/afldb-rem4-gates-20261115/cand/tests/integration/release-gates.test.ts:986:35 |     at processTicksAndRejections (node:internal/process/task_queues:103:5) |     at file:///mnt/ssd/afldb-rem4-gates-20261115/cand/node_modules/@vites
+passed 0 failed 1
+######## snap dob2  (club-list evidence row dropped and unlinked)
+create-db: afldb_v2_rem4gates_mut_dob2_snap_test created from afldb_v2_rem4gates_snap_tmpl_test and marked
+DELETE 1
+RED keeps the evidence behind every recovered date (14,110 historical, 14,294 on the accepted rebuild) :: AssertionError: expected 14109 to be 14110 // Object.is equality |     at /mnt/ssd/afldb-rem4-gates-20261115/cand/tests/integration/release-gates.test.ts:1045:36 |     at processTicksAndRejections (node:internal/process/task_queues:103:5) |     at file:///mnt/ssd/afldb-rem4-gates-20261115/cand/node_modules/@vites
+passed 0 failed 1
+######## snap DONE
+######## FINAL DONE fa dbmuts-snap; HEAD aade0feb6af5be57014898bff492cbaa19e7c92e porcelain 0
+CHECKOUT HEAD aade0feb6af5be57014898bff492cbaa19e7c92e porcelain 0
+######## src-mutation g1 rb
+ src/db/queries/player-derived.ts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+create-db: afldb_v2_rb_rem4gates_smut_g1_rb_test created from afldb_v2_rb_rem4gates_tmpl_test and marked
+restored src/db/queries/player-derived.ts byte-identical
+porcelain: 
+RED awards no premier and no wooden spoon :: AssertionError: expected '1 club_seasons rows hold the wooden s…' to be '' // Object.is equality |     at /mnt/ssd/afldb-rem4-gates-20261115/cand/tests/integration/release-gates.test.ts:1634:31 |     at processTicksAndRejections (node:internal/process/task_queues:103:5) |     at file:///mnt/ssd/afldb-rem4-gates-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifac
+passed 7 failed 1
+######## src-mutation g2 rb
+ src/db/queries/player-derived.ts | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+create-db: afldb_v2_rb_rem4gates_smut_g2_rb_test created from afldb_v2_rb_rem4gates_tmpl_test and marked
+restored src/db/queries/player-derived.ts byte-identical
+porcelain: 
+RED reports Brownlow as pending, never as zero :: AssertionError: expected 'brownlow_season_total: coverage not_a…' to be '' // Object.is equality |     at /mnt/ssd/afldb-rem4-gates-20261115/cand/tests/integration/release-gates.test.ts:1629:31 |     at processTicksAndRejections (node:internal/process/task_queues:103:5) |     at file:///mnt/ssd/afldb-rem4-gates-20261115/cand/node_modules/@vitest/runner/dist/chunk-ar
+passed 7 failed 1
+######## src-mutation g3 rb
+ src/db/queries/player-derived.ts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+create-db: afldb_v2_rb_rem4gates_smut_g3_rb_test created from afldb_v2_rb_rem4gates_tmpl_test and marked
+restored src/db/queries/player-derived.ts byte-identical
+porcelain: 
+RED is a genuine in-progress season with something for each contract to protect :: AssertionError: expected 'status is complete, not in_progress |…' to be '' // Object.is equality |     at /mnt/ssd/afldb-rem4-gates-20261115/cand/tests/integration/release-gates.test.ts:1620:38 |     at processTicksAndRejections (node:internal/process/task_queues:103:5) |     at file:///mnt/ssd/afldb-rem4-gates-20261115/cand/node_mod
+RED reports Brownlow as pending, never as zero :: AssertionError: expected 'brownlow_season_total: coverage not_a…' to be '' // Object.is equality |     at /mnt/ssd/afldb-rem4-gates-20261115/cand/tests/integration/release-gates.test.ts:1629:31 |     at processTicksAndRejections (node:internal/process/task_queues:103:5) |     at file:///mnt/ssd/afldb-rem4-gates-20261115/cand/node_modules/@vitest/runner/dist/chunk-ar
+RED awards no premier and no wooden spoon :: AssertionError: expected '1 club_seasons rows hold the wooden s…' to be '' // Object.is equality |     at /mnt/ssd/afldb-rem4-gates-20261115/cand/tests/integration/release-gates.test.ts:1634:31 |     at processTicksAndRejections (node:internal/process/task_queues:103:5) |     at file:///mnt/ssd/afldb-rem4-gates-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifac
+RED carries an explicit as-at date and is not completed :: AssertionError: expected 'status is complete, not in_progress |…' to be '' // Object.is equality |     at /mnt/ssd/afldb-rem4-gates-20261115/cand/tests/integration/release-gates.test.ts:1642:31 |     at processTicksAndRejections (node:internal/process/task_queues:103:5) |     at file:///mnt/ssd/afldb-rem4-gates-20261115/cand/node_modules/@vitest/runner/dist
+passed 4 failed 4
+######## src-mutation g1 snap
+ src/db/queries/player-derived.ts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+create-db: afldb_v2_rem4gates_smut_g1_snap_test created from afldb_v2_rem4gates_snap_tmpl_test and marked
+restored src/db/queries/player-derived.ts byte-identical
+porcelain: 
+RED awards no premier and no wooden spoon :: AssertionError: expected '1 club_seasons rows hold the wooden s…' to be '' // Object.is equality |     at /mnt/ssd/afldb-rem4-gates-20261115/cand/tests/integration/release-gates.test.ts:1634:31 |     at processTicksAndRejections (node:internal/process/task_queues:103:5) |     at file:///mnt/ssd/afldb-rem4-gates-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifac
+passed 7 failed 1
+######## src-mutation g2 snap
+ src/db/queries/player-derived.ts | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+create-db: afldb_v2_rem4gates_smut_g2_snap_test created from afldb_v2_rem4gates_snap_tmpl_test and marked
+restored src/db/queries/player-derived.ts byte-identical
+porcelain: 
+RED reports Brownlow as pending, never as zero :: AssertionError: expected 'brownlow_season_total: coverage not_a…' to be '' // Object.is equality |     at /mnt/ssd/afldb-rem4-gates-20261115/cand/tests/integration/release-gates.test.ts:1629:31 |     at processTicksAndRejections (node:internal/process/task_queues:103:5) |     at file:///mnt/ssd/afldb-rem4-gates-20261115/cand/node_modules/@vitest/runner/dist/chunk-ar
+passed 7 failed 1
+######## src-mutation g3 snap
+ src/db/queries/player-derived.ts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+create-db: afldb_v2_rem4gates_smut_g3_snap_test created from afldb_v2_rem4gates_snap_tmpl_test and marked
+restored src/db/queries/player-derived.ts byte-identical
+porcelain: 
+RED is a genuine in-progress season with something for each contract to protect :: AssertionError: expected 'status is complete, not in_progress |…' to be '' // Object.is equality |     at /mnt/ssd/afldb-rem4-gates-20261115/cand/tests/integration/release-gates.test.ts:1620:38 |     at processTicksAndRejections (node:internal/process/task_queues:103:5) |     at file:///mnt/ssd/afldb-rem4-gates-20261115/cand/node_mod
+RED reports Brownlow as pending, never as zero :: AssertionError: expected 'brownlow_season_total: coverage not_a…' to be '' // Object.is equality |     at /mnt/ssd/afldb-rem4-gates-20261115/cand/tests/integration/release-gates.test.ts:1629:31 |     at processTicksAndRejections (node:internal/process/task_queues:103:5) |     at file:///mnt/ssd/afldb-rem4-gates-20261115/cand/node_modules/@vitest/runner/dist/chunk-ar
+RED awards no premier and no wooden spoon :: AssertionError: expected '1 club_seasons rows hold the wooden s…' to be '' // Object.is equality |     at /mnt/ssd/afldb-rem4-gates-20261115/cand/tests/integration/release-gates.test.ts:1634:31 |     at processTicksAndRejections (node:internal/process/task_queues:103:5) |     at file:///mnt/ssd/afldb-rem4-gates-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifac
+RED carries an explicit as-at date and is not completed :: AssertionError: expected 'status is complete, not in_progress |…' to be '' // Object.is equality |     at /mnt/ssd/afldb-rem4-gates-20261115/cand/tests/integration/release-gates.test.ts:1642:31 |     at processTicksAndRejections (node:internal/process/task_queues:103:5) |     at file:///mnt/ssd/afldb-rem4-gates-20261115/cand/node_modules/@vitest/runner/dist
+passed 4 failed 4
+######## FINAL DONE fa srcmuts; HEAD aade0feb6af5be57014898bff492cbaa19e7c92e porcelain 0

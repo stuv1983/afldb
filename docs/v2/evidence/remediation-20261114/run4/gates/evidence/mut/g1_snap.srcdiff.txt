@@ -1,0 +1,9 @@
+ src/db/queries/player-derived.ts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+diff --git a/src/db/queries/player-derived.ts b/src/db/queries/player-derived.ts
+index 1e6b38ad..425a4ded 100644
+--- a/src/db/queries/player-derived.ts
++++ b/src/db/queries/player-derived.ts
+@@ -497 +497 @@ export async function recomputeClubSeasons(tx: Tx, season: number): Promise<void
+-        k.tied = 1 AND k.pos = k.clubs_in_season AND se.status = 'complete',
++        k.tied = 1 AND k.pos = k.clubs_in_season,

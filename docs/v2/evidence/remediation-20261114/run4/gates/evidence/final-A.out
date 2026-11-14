@@ -1,0 +1,113 @@
+CHECKOUT HEAD aade0feb6af5be57014898bff492cbaa19e7c92e porcelain 0
+######## A rb shared
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1040:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1045:22)
+    at Function._load (node:internal/modules/cjs/loader:1216:25)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:254:19)
+    at Module.require (node:internal/modules/cjs/loader:1527:12)
+    at require (node:internal/modules/helpers:147:16)
+    at [eval]:1:9
+    at runScriptInThisContext (node:internal/vm:209:10)
+    at node:internal/process/execution:446:12 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ '/mnt/ssd/afldb-rem4-gates-20261115/cand/[eval]' ]
+}
+
+Node.js v22.23.2
+######## A rb all
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1040:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1045:22)
+    at Function._load (node:internal/modules/cjs/loader:1216:25)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:254:19)
+    at Module.require (node:internal/modules/cjs/loader:1527:12)
+    at require (node:internal/modules/helpers:147:16)
+    at [eval]:1:9
+    at runScriptInThisContext (node:internal/vm:209:10)
+    at node:internal/process/execution:446:12 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ '/mnt/ssd/afldb-rem4-gates-20261115/cand/[eval]' ]
+}
+
+Node.js v22.23.2
+######## A snap shared
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1040:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1045:22)
+    at Function._load (node:internal/modules/cjs/loader:1216:25)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:254:19)
+    at Module.require (node:internal/modules/cjs/loader:1527:12)
+    at require (node:internal/modules/helpers:147:16)
+    at [eval]:1:9
+    at runScriptInThisContext (node:internal/vm:209:10)
+    at node:internal/process/execution:446:12 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ '/mnt/ssd/afldb-rem4-gates-20261115/cand/[eval]' ]
+}
+
+Node.js v22.23.2
+######## A snap all
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1040:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1045:22)
+    at Function._load (node:internal/modules/cjs/loader:1216:25)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:254:19)
+    at Module.require (node:internal/modules/cjs/loader:1527:12)
+    at require (node:internal/modules/helpers:147:16)
+    at [eval]:1:9
+    at runScriptInThisContext (node:internal/vm:209:10)
+    at node:internal/process/execution:446:12 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ '/mnt/ssd/afldb-rem4-gates-20261115/cand/[eval]' ]
+}
+
+Node.js v22.23.2
+######## rb struct1  (a historical season left in progress)
+create-db: afldb_v2_rb_rem4gates_mut_struct1_rb_test created from afldb_v2_rb_rem4gates_tmpl_test and marked
+UPDATE 1
+RED has at most one season in progress, and it is the latest :: AssertionError: expected '2 seasons in progress: 2025, 2027 | s…' to be '' // Object.is equality |     at /mnt/ssd/afldb-rem4-gates-20261115/cand/tests/integration/release-gates.test.ts:1770:68 |     at processTicksAndRejections (node:internal/process/task_queues:103:5) |     at file:///mnt/ssd/afldb-rem4-gates-20261115/cand/node_modules/@vitest/runner
+passed 0 failed 1
+######## rb c261a  (Brownlow row the career table does not know)
+create-db: afldb_v2_rb_rem4gates_mut_c261a_rb_test created from afldb_v2_rb_rem4gates_tmpl_test and marked
+INSERT 0 1
+RED 50-199 goals and zero Brownlow votes returns the cohort an independent oracle derives (261 through 2025) :: AssertionError: expected [ …(268) ] to deeply equal [ Array(267) ] |     at /mnt/ssd/afldb-rem4-gates-20261115/cand/tests/integration/release-gates.test.ts:412:20 |     at processTicksAndRejections (node:internal/process/task_queues:103:5) |     at file:///mnt/ssd/afldb-rem4-gates-20261115/cand/node_modul
+passed 0 failed 1
+######## rb c261b  (cohort player moved out consistently)
+create-db: afldb_v2_rb_rem4gates_mut_c261b_rb_test created from afldb_v2_rb_rem4gates_tmpl_test and marked
+UPDATE 1
+RED 50-199 goals and zero Brownlow votes returns the cohort an independent oracle derives (261 through 2025) :: AssertionError: expected 260 to be 261 // Object.is equality |     at /mnt/ssd/afldb-rem4-gates-20261115/cand/tests/integration/release-gates.test.ts:416:31 |     at processTicksAndRejections (node:internal/process/task_queues:103:5) |     at file:///mnt/ssd/afldb-rem4-gates-20261115/cand/node_modules/@vite
+passed 0 failed 1
+######## rb c261c  (cohort player loses profile identity)
+create-db: afldb_v2_rb_rem4gates_mut_c261c_rb_test created from afldb_v2_rb_rem4gates_tmpl_test and marked
+DELETE 1
+RED 50-199 goals and zero Brownlow votes returns the cohort an independent oracle derives (261 through 2025) :: AssertionError: expected 267 to be 268 // Object.is equality |     at /mnt/ssd/afldb-rem4-gates-20261115/cand/tests/integration/release-gates.test.ts:407:27 |     at processTicksAndRejections (node:internal/process/task_queues:103:5) |     at file:///mnt/ssd/afldb-rem4-gates-20261115/cand/node_modules/@vite
+passed 0 failed 1
+######## rb att1  (historical missing crowd becomes recorded)
+create-db: afldb_v2_rb_rem4gates_mut_att1_rb_test created from afldb_v2_rb_rem4gates_tmpl_test and marked
+UPDATE 1
+RED records why each attendance is missing :: AssertionError: expected [ …(2) ] to deeply equal [ …(2) ] |     at /mnt/ssd/afldb-rem4-gates-20261115/cand/tests/integration/release-gates.test.ts:865:18 |     at processTicksAndRejections (node:internal/process/task_queues:103:5) |     at file:///mnt/ssd/afldb-rem4-gates-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+passed 0 failed 1
+######## rb att2  (pairing constraint dropped, crowd mislabelled)
+create-db: afldb_v2_rb_rem4gates_mut_att2_rb_test created from afldb_v2_rb_rem4gates_tmpl_test and marked
+ALTER TABLE
+UPDATE 1
+RED records why each attendance is missing :: AssertionError: expected [ { status: 'complete', …(1) }, …(2) ] to deeply equal [ { status: 'complete', …(1) }, …(1) ] |     at /mnt/ssd/afldb-rem4-gates-20261115/cand/tests/integration/release-gates.test.ts:847:21 |     at processTicksAndRejections (node:internal/process/task_queues:103:5) |     at file:///mnt/ssd/afldb-rem4-gates-20261115/cand/node_modules/@vite
+passed 0 failed 1
+######## rb lad1  (Footscray 1950 filed under Sydney)
+create-db: afldb_v2_rb_rem4gates_mut_lad1_rb_test created from afldb_v2_rb_rem4gates_tmpl_test and marked
+UPDATE 1
+RED attaches every ladder row to the identity trading that season :: AssertionError: expected { slug: 'sydney', n: 45, …(2) } to match object { from: 1982, to: 2025 } | (2 matching properties omitted from actual) |     at Proxy.<anonymous> (file:///mnt/ssd/afldb-rem4-gates-20261115/cand/node_modules/@vitest/expect/dist/index.js:1283:10) |     at Proxy.<anonymous> (file:///mnt/ssd/afldb-rem4-gates-20261115/cand/node
+passed 0 failed 1
+######## rb lad2  (Sydney 1990 row lost)
+create-db: afldb_v2_rb_rem4gates_mut_lad2_rb_test created from afldb_v2_rb_rem4gates_tmpl_test and marked
+DELETE 1
+RED attaches every ladder row to the identity trading that season :: AssertionError: expected 127 to be 128 // Object.is equality |     at /mnt/ssd/afldb-rem4-gates-20261115/cand/tests/integration/release-gates.test.ts:607:54 |     at processTicksAndRejections (node:internal/process/task_queues:103:5) |     at file:///mnt/ssd/afldb-rem4-gates-20261115/cand/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+passed 0 failed 1
+######## rb dob1  (historical player loses date)
+create-db: afldb_v2_rb_rem4gates_mut_dob1_rb_test created from afldb_v2_rb_rem4gates_tmpl_test and marked
+UPDATE 1
+RED populates the canonical dates with no conflicts (13,255 historical, 13,347 on the accepted rebuild) :: AssertionError: expected 13254 to be 13255 // Object.is equality |     at /mnt/ssd/afldb-rem4-gates-20261115/cand/tests/integration/release-gates.test.ts:986:35 |     at processTicksAndRejections (node:internal/process/task_queues:103:5) |     at file:///mnt/ssd/afldb-rem4-gates-20261115/cand/node_modules/@vites
+passed 0 failed 1
+######## rb dob2  (club-list evidence row dropped and unlinked)
+create-db: afldb_v2_rb_rem4gates_mut_dob2_rb_test created from afldb_v2_rb_rem4gates_tmpl_test and marked
+DELETE 1
+RED keeps the evidence behind every recovered date (14,110 historical, 14,294 on the accepted rebuild) :: AssertionError: expected 14109 to be 14110 // Object.is equality |     at /mnt/ssd/afldb-rem4-gates-20261115/cand/tests/integration/release-gates.test.ts:1045:36 |     at processTicksAndRejections (node:internal/process/task_queues:103:5) |     at file:///mnt/ssd/afldb-rem4-gates-20261115/cand/node_modules/@vites
+passed 0 failed 1
+######## rb DONE

@@ -1,0 +1,16 @@
+hist_players|hist_dated|hist_undated_unknown|hist_linked|hist_evidence|hist_profile_ids|non_hist_players|dobnull_conf_other
+13271|13255|16|13255|14110|13275|94|0
+(1 row)
+players_no_pms
+2
+(1 row)
+players_no_unique_profile
+2
+(1 row)
+status|match_method|count
+unique|afltables_profile_url|13367
+(1 row)
+debut_null|count
+f|13363
+t|2
+(2 rows)
