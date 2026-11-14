@@ -2018,7 +2018,9 @@ describe('AFLDB-ISSUE-353: a line-up row with Brownlow or special-record depende
 
     const text = `Cannot remove a player from the Match Sheet of match #${fx.matchId}: `
       + `Issue257 t353unlinked (player #${fx.playerId}) carries 2 Brownlow votes in round 1 with no match link (unresolved). `
-      + `${tail} Resolve it in ${brownlowWhere} first.`;
+      + `${tail} Resolve it in ${brownlowWhere} first. `
+      + 'A vote with no match link is linked to its match when a Brownlow entry is saved for that match in that round: '
+      + 'save the entry for the match the player actually played in, then try again.';
     await expectRefused(fx, () => removeIt(fx, fx.playerId), text);
 
     const [m] = await sql<{ away: number }[]>`SELECT away_club_id::int AS away FROM matches WHERE id = ${fx.matchId}`;
@@ -2030,7 +2032,9 @@ describe('AFLDB-ISSUE-353: a line-up row with Brownlow or special-record depende
     `Cannot change a player's club in the Match Sheet of match #${fx.matchId}: `
       + `Issue257 t353unlinked (player #${fx.playerId}) carries 2 Brownlow votes in round 1 with no match link (unresolved). `
       + 'Changing the club would leave that record attributed to a club the player did not play for in this match. '
-      + `Nothing was saved. Resolve it in ${brownlowWhere} first.`);
+      + `Nothing was saved. Resolve it in ${brownlowWhere} first. `
+      + 'A vote with no match link is linked to its match when a Brownlow entry is saved for that match in that round: '
+      + 'save the entry for the match the player actually played in, then try again.');
 
     // The unlinked row is untouched (never attributed to a match by the guard).
     expect(await sql`SELECT player_id::int AS p, votes::int AS v, match_id FROM brownlow_round_votes WHERE player_id = ${fx.playerId}`)

@@ -1145,13 +1145,17 @@ describe('AFLDB-ISSUE-353 line-up row dependents refusal', () => {
       + 'Ann Able (player #10) carries 3 Brownlow votes in round 5 with no match link (unresolved); '
       + 'Bob Baker (player #11) carries 1 Brownlow vote in this match. '
       + 'Deleting the line-up row would leave that record naming a non-participant. Nothing was saved. '
-      + 'Resolve them in Brownlow administration (/admin/brownlow/2024/5) first.',
+      + 'Resolve them in Brownlow administration (/admin/brownlow/2024/5) first. '
+      + 'A vote with no match link is linked to its match when a Brownlow entry is saved for that match in that round: save the entry for the match the player actually played in, then try again.',
     );
     // An unlinked vote alone is a dependent for every action; the empty list is not.
     expect(matchSheetDependentsRefusal('club_change', names, {
       ...base, unlinkedBrownlowVotes: [{ playerId: 10, votes: 1, roundNumber: 5 }],
     })).toContain('Ann Able (player #10) carries 1 Brownlow vote in round 5 with no match link (unresolved)');
     expect(matchSheetDependentsRefusal('remove', names, { ...base, unlinkedBrownlowVotes: [] })).toBeNull();
+    // The how-to-clear sentence belongs to the unlinked case only: a linked vote's text is unchanged.
+    expect(matchSheetDependentsRefusal('remove', names, { ...base, brownlowVotes: [{ playerId: 11, votes: 1 }] }))
+      .not.toContain('no match link');
   });
 
   it('reads the unlinked-vote rows by the player\'s own season, home-and-away round and id, only above zero, never writing (review A-05)', () => {

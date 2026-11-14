@@ -55,6 +55,16 @@ function empty(d: MatchSheetDependents): boolean {
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
 /**
+ * Review LOW-6: how an unlinked round vote is cleared. Saving a Brownlow entry for a match links
+ * the round's NULL-`match_id` rows of that match's own line-up players to that match
+ * (`writeMatchFacts` step 1 in `src/db/queries/admin-brownlow.ts`); only then does the vote
+ * stop being "unresolved". Wording only: which removals are refused is unchanged.
+ */
+const UNLINKED_HOW_TO_CLEAR =
+  ' A vote with no match link is linked to its match when a Brownlow entry is saved for that match in that round: '
+  + 'save the entry for the match the player actually played in, then try again.';
+
+/**
  * The refusal for `action`, or `null` when none of the dependents hangs off a player. `names` maps
  * player id to display name (an id with no name is shown as the id alone).
  */
@@ -125,5 +135,5 @@ export function matchSheetDependentsRefusal(
   const count = dependents.brownlowVotes.length + unlinked.length
     + dependents.voteEntries.length + dependents.specialRecords.length;
   return `${lead}${sentences.join('; ')}. ${consequence} Nothing was saved. `
-    + `Resolve ${count === 1 ? 'it' : 'them'} in ${where.join(' and ')} first.`;
+    + `Resolve ${count === 1 ? 'it' : 'them'} in ${where.join(' and ')} first.${unlinked.length > 0 ? UNLINKED_HOW_TO_CLEAR : ''}`;
 }
