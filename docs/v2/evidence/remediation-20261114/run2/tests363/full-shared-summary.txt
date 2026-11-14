@@ -1,0 +1,8 @@
+create-db: afldb_v2_rem2tests363fsh_test created from afldb_v2_rem2tests363_tmpl_test and marked
+2026-11-14T06:28:24Z [shared] checkout HEAD ad073a72a2b67e5c3be22839b8d57f50b62e3ad4 porcelain lines 0; base afldb_v2_rem2tests363fsh_test; mode off
+2026-11-14T06:28:24Z [shared] waiting for heavy lock
+2026-11-14T06:29:01Z [shared] lock acquired; df before:  410G  481G
+2026-11-14T06:54:49Z [shared] vitest rc=1 seconds=1548
+2026-11-14T06:54:49Z [shared] summary:  Test Files  14 failed | 79 passed | 6 skipped (99)       Tests  49 failed | 3429 passed | 2 expected fail | 127 skipped (3630)    Duration  1545.62s (transform 12.30s, setup 5.73s, import 287.66s, tests 1228.77s, environment 25ms) 
+2026-11-14T06:54:49Z [shared] pf databases left: 8; peak simultaneous pf databases sampled: 8
+2026-11-14T06:54:49Z [shared] max cluster MB sampled: 9130; df after:  413G  478G

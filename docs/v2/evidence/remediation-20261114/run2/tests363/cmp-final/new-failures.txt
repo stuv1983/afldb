@@ -1,0 +1,10 @@
+integration/awards-reload-links.test.ts::FILE-LEVEL
+integration/release-gates.test.ts::gate: 2026 is provisional (snapshot-pinned) awards no premier and no wooden spoon for 2026
+integration/release-gates.test.ts::gate: 2026 is provisional (snapshot-pinned) is the only season still in progress
+integration/release-gates.test.ts::gate: 2026 is provisional (snapshot-pinned) reports 2026 Brownlow as pending, never as zero
+integration/release-gates.test.ts::gate: Advanced Search regression cases 50-199 goals and zero Brownlow votes returns the exact 261 players
+integration/release-gates.test.ts::gate: Brownlow authority agrees with the canonical round votes for every career inside their coverage
+integration/release-gates.test.ts::gate: absence is never zero records why each attendance is missing
+integration/release-gates.test.ts::gate: birth dates leaves the remaining players honestly without a date
+integration/release-gates.test.ts::gate: club organizations and identities attaches every ladder row to the identity trading that season
+integration/settle-afl-api-state-b.test.ts::FILE-LEVEL

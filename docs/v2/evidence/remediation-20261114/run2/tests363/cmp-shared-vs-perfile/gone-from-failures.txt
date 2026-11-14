@@ -1,0 +1,3 @@
+integration/nl-answers-after-siren.test.ts::after_siren — ranking is always a tie most kicks after the siren is a wider tie than most goals  [now passes]
+integration/nl-answers-after-siren.test.ts::after_siren — the match-link boundary (D10 §7.1) the most recent kick is match-linked and is NEVER an unlinked later row  [now passes]
+integration/nl-answers-after-siren.test.ts::after_siren — the trusted player link a player-subject answer counts only trusted-linked kickers, and says how many it left out  [now passes]

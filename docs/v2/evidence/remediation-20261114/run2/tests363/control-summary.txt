@@ -1,0 +1,5 @@
+== [control] HEAD ad073a72a2b67e5c3be22839b8d57f50b62e3ad4, shared mode (AFLDB_TEST_PER_FILE_DB unset), clean fresh base
+create-db: afldb_v2_rem2tests363c1_test created from afldb_v2_rem2tests363_tmpl_test and marked
+== [control] release-gates:       Tests  8 failed | 52 passed | 7 skipped (67)
+== [control] admin-season-lists:       Tests  42 passed (42)
+== [control] afl-api-c7-observation:       Tests  6 passed (6)

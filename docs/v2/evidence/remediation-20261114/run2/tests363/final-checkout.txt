@@ -1,0 +1,5 @@
+host streamanator, workspace /mnt/ssd/afldb-rem2-tests363-20261114, checkout cand
+HEAD=ad073a72a2b67e5c3be22839b8d57f50b62e3ad4 ("ISSUE-363: per-file disposable integration databases (opt-in) and awards season move")
+git status --porcelain lines: 0 before every run of this scope's qualification and again after the last one (2026-11-14T07:23Z, SHA256SUMS-host.txt)
+typecheck: next typegen + tsc --noEmit rc 0; eslint on the changed files rc 0
+unit: tests/dsn-policy.test.ts 58 passed (20 at base e8666c17), tests/v2-module-boundaries.test.ts 53 passed, tests/v2-isolated-test-target.test.ts 27 passed

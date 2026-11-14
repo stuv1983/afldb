@@ -1,0 +1,40 @@
+# 2026-11-14T06:55:34Z sweep demo, base afldb_v2_rem2tests363fsh_test, HEAD ad073a72a2b67e5c3be22839b8d57f50b62e3ad4
+## a bound below the minimum is refused
+isolated-pg: afldb_v2_rem2tests363fsh_test verified (cluster afldb_v2_isolated, 127.0.0.1:55651); running node
+Sweep age bound 300000 ms refused: the minimum is 3600000 ms so a live run's database is never reaped.
+## dry run, 60 minute bound
+isolated-pg: afldb_v2_rem2tests363fsh_test verified (cluster afldb_v2_isolated, 127.0.0.1:55651); running node
+would drop	afldb_v2_pf_20261114055401_1704281_1c01e48a_test
+would drop	afldb_v2_pf_20261114055502_1708620_e483f063_test
+would drop	afldb_v2_pf_20261114052207_1488443_dd22e3fe_test
+would drop	afldb_v2_pf_20261114053901_1546169_18b807c9_test
+would drop	afldb_v2_pf_20261114053939_1547466_cfe7bdfd_test
+would drop	afldb_v2_pf_20261114053946_1547641_a8641818_test
+would drop	afldb_v2_pf_20261114053507_1536385_2ad2f2e9_test
+would drop	afldb_v2_pf_20261114053730_1541716_8ea3e3ed_test
+sweep: 8 would be dropped, 0 kept
+## real run, 60 minute bound
+isolated-pg: afldb_v2_rem2tests363fsh_test verified (cluster afldb_v2_isolated, 127.0.0.1:55651); running node
+dropped	afldb_v2_pf_20261114055401_1704281_1c01e48a_test
+dropped	afldb_v2_pf_20261114055502_1708620_e483f063_test
+dropped	afldb_v2_pf_20261114052207_1488443_dd22e3fe_test
+dropped	afldb_v2_pf_20261114053901_1546169_18b807c9_test
+dropped	afldb_v2_pf_20261114053939_1547466_cfe7bdfd_test
+dropped	afldb_v2_pf_20261114053946_1547641_a8641818_test
+dropped	afldb_v2_pf_20261114053507_1536385_2ad2f2e9_test
+dropped	afldb_v2_pf_20261114053730_1541716_8ea3e3ed_test
+sweep: 8 dropped, 0 kept
+## databases after
+afldb_v2_rem2tests363_tmpl_test
+afldb_v2_rem2tests363c1_test
+afldb_v2_rem2tests363fa_test
+afldb_v2_rem2tests363fin_test
+afldb_v2_rem2tests363fr_test
+afldb_v2_rem2tests363fsh_test
+afldb_v2_rem2tests363l1_test
+afldb_v2_rem2tests363l2_test
+afldb_v2_rem2tests363l3_test
+afldb_v2_rem2tests363s1_test
+afldb_v2_rem2tests363sk_test
+afldb_v2_rem2tests363st_test
+postgres

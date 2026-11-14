@@ -1,0 +1,13 @@
+   1 integration/admin-brownlow.test.ts
+   1 integration/awards-reload-links.test.ts
+   1 integration/gridley-corpus.test.ts
+   1 integration/settle-afl-api-issue276.test.ts
+   1 integration/settle-afl-api.test.ts
+   1 integration/v2-brownlow-eligibility-2025-rehearsal.test.ts
+   1 integration/v2-brownlow-production-correction.test.ts
+   1 integration/v2-coleman-publication.test.ts
+   2 integration/draft-linkage.test.ts
+   4 integration/database.test.ts
+   5 integration/data-editor.test.ts
+   8 integration/release-gates.test.ts
+  24 integration/club-comparison.test.ts

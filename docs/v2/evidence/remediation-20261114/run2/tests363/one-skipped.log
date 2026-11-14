@@ -1,0 +1,23 @@
+isolated-pg: afldb_v2_rem2tests363sk_test verified (cluster afldb_v2_isolated, 127.0.0.1:55651); running node
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem2-tests363-20261114/cand[39m
+
+ [2m[90m↓[39m[22m tests/integration/brownlow-pending-populated.test.ts [2m([22m[2m4 tests[22m[2m | [22m[33m4 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/integration/db-promotion-receipts.test.ts [2m([22m[2m7 tests[22m[2m | [22m[33m7 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/integration/first-kick-goal-reload-links.test.ts [2m([22m[2m22 tests[22m[2m | [22m[33m22 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/integration/import-role-match-lock.test.ts [2m([22m[2m1 test[22m[2m | [22m[33m1 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/integration/isolated-populated-lifecycle.test.ts [2m([22m[2m17 tests[22m[2m | [22m[33m17 skipped[39m[2m)[22m
+ [2m[90m↓[39m[22m tests/integration/settle-promotion-deadlock.test.ts [2m([22m[2m11 tests[22m[2m | [22m[33m11 skipped[39m[2m)[22m
+
+[2m Test Files [22m [33m6 skipped[39m[90m (6)[39m
+[2m      Tests [22m [33m62 skipped[39m[90m (62)[39m
+[2m   Start at [22m 18:23:32
+[2m   Duration [22m 23.88s[2m (transform 3.31s, setup 17.89s, import 4.44s, tests 0ms, environment 2ms)[22m
+
+JSON report written to /mnt/ssd/afldb-rem2-tests363-20261114/evidence/one-skipped.json
+per-file databases: reaped afldb_v2_pf_20261114072333_1919710_2fd992d0_test (its file did not run its teardown)
+per-file databases: reaped afldb_v2_pf_20261114072336_1919789_61a150c4_test (its file did not run its teardown)
+per-file databases: reaped afldb_v2_pf_20261114072340_1919853_111e3f73_test (its file did not run its teardown)
+per-file databases: reaped afldb_v2_pf_20261114072344_1919932_fc6d8a0a_test (its file did not run its teardown)
+per-file databases: reaped afldb_v2_pf_20261114072347_1920063_6ed92a21_test (its file did not run its teardown)
+per-file databases: reaped afldb_v2_pf_20261114072352_1920374_3dfa73aa_test (its file did not run its teardown)

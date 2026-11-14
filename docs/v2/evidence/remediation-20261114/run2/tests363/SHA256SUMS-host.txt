@@ -1,0 +1,32 @@
+# host: streamanator; workspace /mnt/ssd/afldb-rem2-tests363-20261114; 2026-11-14T07:25:34Z
+# sha256  bytes  path (relative to /mnt/ssd/afldb-rem2-tests363-20261114/evidence)
+8784655635b5a311b4d3bb2dde16f2f783c7d07f32815b1fc184c9eccd464242  1337135  full-final.json
+55d72b52b906152da4b74586dd8ac5c5403cb76dc5749c648963bca5ade93769  299040  full-final.log
+a4aaf3510f57b8d7fcccdc155ea37b5f838af6f8939013d6a2ffd80846447e28  1337778  full-shared.json
+689ffa161fa4ac7ee50402dc0b0e1b59155afe6e84788a5bb1d0bdeaeef0d1fa  305194  full-shared.log
+0c7150c76323db5edc9197095d3ddf19d182b45f003c617542132ea22e52c943  1336979  full-reg.json
+edc5c1ced9364acb37513c748fe44e427cc264f05b2a9d813f8d4cefba32f611  298542  full-reg.log
+c873082867ee9843c10e9fb864e2fd94ebae6cb7b6924609deef4194ba7e8d16  1337217  full-all.json
+ec3fc4192e60389b06f15eaa677dcd56a04f126a4b602cac0ca907d270b7c65a  295833  full-all.log
+b8160dc4ec6c63fa4e9e9db1a3a797300965fdbe504e9598d0e627b899bbb03b  34391  full-all-audit.jsonl
+d29ce61392b822b0b04630a7ad941f8b3bc0741466a928429ce4a59113016b30  218  leak-shared-settle.log
+cf44f4a9a107ba7612badeb11093625cc16708272a6d21d4c8f68515f5508a23  7302  leak-shared-release-gates.log
+340c2d168c3c9f4dcbeeac03896cebcd1cde2ba49cb796acef0dc87118ae88e4  6072  leak-shared-admin-season-lists.log
+e5141d586759df74524715a71930ad3d4cbff93c3a8f6ea7ce09564a9d7a0b02  6329  leak-shared-afl-api-c7-observation.log
+29dcf6579e4ec8f7cc91341bfc550f5bab3f3607dcbdcd4c74126c50027dd9ac  15577  leak-perfile-1-release-gates.log
+6e0f3ebf062e4b08af2018be6bf6abf3f14e28b270ddae6307d7983449b26ea6  1203  leak-perfile-1-admin-season-lists.log
+2dc66408dcb08ad2aa9911da72289c1b5b152fcfd2d86fadaff727dfa4858032  617  leak-perfile-1-afl-api-c7-observation.log
+9a5975dc590f8cb41a9daf3f8825be2fac2784775708cc90ab2b4c6f67459808  15570  leak-perfile-all-release-gates.log
+f3cda2181334ee0654df0dc6c9658a3d016d21434d46a0a1b08c6d691211ccd0  1205  leak-perfile-all-admin-season-lists.log
+4edf60d0ed7edc8418b873cf6f16191f312c494e9f45ad884f7968e1698c54ad  810  leak-perfile-all-afl-api-c7-observation.log
+4a3256eeb1cd81943c080d32817d59942405b5b7ae60330769fd1acfcdc8abc8  7304  leakguard-release-gates.log
+13fa9f652ede80c8d6087053b7b6de9cd3947a0c841d56fc6a20811fd993be39  6074  leakguard-admin-season-lists.log
+209b948f6c42a28f48102c2ea851f15b895d401bac5e5914ee5577737a6489ef  15564  control-release-gates.log
+6b112391e28f0cd8f77c9f21d83f2f21ec882fb7d80d02f401e3f2db19222f90  1203  control-admin-season-lists.log
+d921b0618b67e906fef05729f9f866e210440a96962101120ddab415e7d85301  617  control-afl-api-c7-observation.log
+6ac8e718adfa5815709f5ccd8b1f288919c5e8d35ce5b908ac357a1bd8dee9eb  131  tmpl-probe.txt
+# checkout after all runs
+HEAD=ad073a72a2b67e5c3be22839b8d57f50b62e3ad4
+status porcelain lines: 0
+# processes of this workspace (cluster postmaster only expected): 4
+# per-file databases left: 0

@@ -1,0 +1,7 @@
+create-db: afldb_v2_rem2tests363fa_test created from afldb_v2_rem2tests363_tmpl_test and marked
+2026-11-14T05:13:14Z [all] waiting for heavy lock
+2026-11-14T05:15:25Z [all] lock acquired; df before:  388G  503G
+2026-11-14T05:46:26Z [all] vitest rc=0 seconds=1861
+2026-11-14T05:46:26Z [all] summary:  Test Files  14 failed | 79 passed | 6 skipped (99)       Tests  46 failed | 3431 passed | 2 expected fail | 128 skipped (3630)    Duration  1859.08s (transform 10.57s, setup 250.89s, import 287.93s, tests 1296.95s, environment 26ms) 
+2026-11-14T05:46:26Z [all] databases after: afldb_v2_pf_20261114050905_1419721_8e4dbabb_test afldb_v2_pf_20261114052207_1488443_dd22e3fe_test afldb_v2_pf_20261114053507_1536385_2ad2f2e9_test afldb_v2_pf_20261114053730_1541716_8ea3e3ed_test afldb_v2_pf_20261114053901_1546169_18b807c9_test afldb_v2_pf_20261114053939_1547466_cfe7bdfd_test afldb_v2_pf_20261114053946_1547641_a8641818_test afldb_v2_rem2tests363_tmpl_test afldb_v2_rem2tests363c1_test afldb_v2_rem2tests363fa_test afldb_v2_rem2tests363l1_test afldb_v2_rem2tests363l2_test afldb_v2_rem2tests363s1_test postgres 
+2026-11-14T05:46:26Z [all] df after:  399G  492G

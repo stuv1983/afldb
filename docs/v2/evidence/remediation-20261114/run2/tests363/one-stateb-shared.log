@@ -1,0 +1,46 @@
+isolated-pg: afldb_v2_rem2tests363st_test verified (cluster afldb_v2_isolated, 127.0.0.1:55651); running node
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem2-tests363-20261114/cand[39m
+
+ [31m❯[39m tests/integration/settle-afl-api-state-b.test.ts [2m([22m[2m1 test[22m[2m | [22m[33m1 skipped[39m[2m)[22m[32m 162[2mms[22m[39m
+     [2m[90m↓[39m[22m keeps the corrected field, lets an unrelated field follow the source, and never changes ownership
+
+[31m⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Suites 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m tests/integration/settle-afl-api-state-b.test.ts[2m [ tests/integration/settle-afl-api-state-b.test.ts ][22m
+[31m[1mAssertionError[22m: a leftover fixture row exists; remove it deliberately, this file will not adopt it: expected { seasons: +0, matches: +0, …(15) } to deeply equal { seasons: +0, matches: +0, …(15) }[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[33m@@ -4,11 +4,11 @@[39m
+[2m    "canonicalApplications": 0,[22m
+[2m    "clubSeasons": 0,[22m
+[2m    "dataEdits": 0,[22m
+[2m    "dataIssues": 0,[22m
+[2m    "dataOverrides": 0,[22m
+[32m-   "externalIdentities": 0,[39m
+[31m+   "externalIdentities": 1,[39m
+[2m    "importBatches": 0,[22m
+[2m    "importRejections": 0,[22m
+[2m    "matches": 0,[22m
+[2m    "playerMatchStats": 0,[22m
+[2m    "players": 0,[22m
+
+[36m [2m❯[22m tests/integration/settle-afl-api-state-b.test.ts:[2m310:102[22m[39m
+    [90m308|[39m   // ---- fail closed: nothing of the fixture namespace may exist (a l…
+    [90m309|[39m   [35mconst[39m left [33m=[39m [35mawait[39m [34mresidue[39m()[33m;[39m
+    [90m310|[39m   expect(left, 'a leftover fixture row exists; remove it deliberately,…
+    [90m   |[39m                                                                                                      [31m^[39m
+    [90m311|[39m   [35mconst[39m clash [33m=[39m [35mawait[39m sql[33m<[39m{ n[33m:[39m number }[][33m>[39m[32m`
+    [90m312|[39m     SELECT count(*)::int AS n FROM matches WHERE match_key = ${KEEPALI…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [33m1 skipped[39m[90m (1)[39m
+[2m   Start at [22m 18:24:25
+[2m   Duration [22m 1.74s[2m (transform 900ms, setup 230ms, import 980ms, tests 162ms, environment 0ms)[22m
+
+JSON report written to /mnt/ssd/afldb-rem2-tests363-20261114/evidence/one-stateb-shared.json

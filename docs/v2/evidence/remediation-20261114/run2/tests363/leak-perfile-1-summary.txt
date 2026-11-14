@@ -1,0 +1,12 @@
+create-db: afldb_v2_rem2tests363l2_test created from afldb_v2_rem2tests363_tmpl_test and marked
+== [perfile-1] mode=1 base=afldb_v2_rem2tests363l2_test; before: {"afldb_v2_rem2tests363l2_test":[]}
+== [perfile-1] season 2076 seen committed before kill: 1 (after 4s)
+== [perfile-1] killing process group 1703992: 1703992 1703995 1704014 1704281 
+== [perfile-1] after SIGKILL: {"afldb_v2_pf_20261114055401_1704281_1c01e48a_test":["2076:in_progress"],"afldb_v2_rem2tests363l2_test":[]}; processes left in group: 
+== [perfile-1] release-gates:       Tests  8 failed | 52 passed | 7 skipped (67)
+AssertionError: expected 183 to be +0 // Object.is equality
+AssertionError: expected 268 to be 261 // Object.is equality
+AssertionError: expected [ …(2) ] to deeply equal [ …(2) ]
+== [perfile-1] admin-season-lists:       Tests  42 passed (42)
+== [perfile-1] afl-api-c7-observation:       Tests  6 passed (6)
+== [perfile-1] after victims: {"afldb_v2_pf_20261114055401_1704281_1c01e48a_test":["2076:in_progress"],"afldb_v2_rem2tests363l2_test":[]}

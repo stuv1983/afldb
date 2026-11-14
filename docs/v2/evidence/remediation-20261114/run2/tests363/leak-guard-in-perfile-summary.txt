@@ -1,0 +1,5 @@
+base l1 seasons >= 2060: {"afldb_v2_rem2tests363l1_test":["2076:in_progress"]}
+== [per-file all, contaminated base] release-gates:       Tests  67 skipped (67)
+Error: Committed fixture season(s) left in the test database by an interrupted earlier run: 2076 (in_progress; reserved by tests/integration/settle-afltables.test.ts). This suite reads the whole seasons table and cannot pass with 
+== [per-file all, contaminated base] admin-season-lists:       Tests  42 skipped (42)
+Error: Committed fixture season(s) left in the test database by an interrupted earlier run: 2076 (in_progress; reserved by tests/integration/settle-afltables.test.ts). This suite reads the whole seasons table and cannot pass with 
