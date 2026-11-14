@@ -1,0 +1,38 @@
+## ok (all groups + brownlow) | expected rc=0 | got rc=0 | OK
+workspace=/mnt/ssd/afldb-rem3-integ-20261114 checkout=6d5388ea5305e73b0420fbccfa7b0cea4fe75927 port=55673 evidence=/mnt/ssd/afldb-rem3-integ-20261114/evidence/b-20261114T111530Z
+groups: restore oracle6 data-editor awards war-years coleman issue276 od5 brownlow
+dry-run: dump sha256 matches
+dry-run: arguments and prerequisites accepted; nothing changed
+## ok (subset) | expected rc=0 | got rc=0 | OK
+workspace=/mnt/ssd/afldb-rem3-integ-20261114 checkout=6d5388ea5305e73b0420fbccfa7b0cea4fe75927 port=55673 evidence=/mnt/ssd/afldb-rem3-integ-20261114/evidence/b-t1
+groups: restore od5
+dry-run: dump sha256 matches
+dry-run: arguments and prerequisites accepted; nothing changed
+## sha not the SHA256SUMS entry | expected rc=2 | got rc=2 | OK
+run-rebuilt: --sha256 is not the SHA256SUMS entry for afldb_v2_rb_rem3-6d5388ea.dump
+## sha malformed | expected rc=2 | got rc=2 | OK
+run-rebuilt: --sha256 must be 64 lowercase hex characters
+## missing dump | expected rc=2 | got rc=2 | OK
+run-rebuilt: --dump not found: /mnt/ssd/afldb-rem3-base/rebuilt/none.dump
+## missing bridge | expected rc=2 | got rc=2 | OK
+run-rebuilt: --bridge not found: /mnt/ssd/afldb-rem3-base/rebuilt/none.json
+## port 5432 | expected rc=2 | got rc=2 | OK
+run-rebuilt: --port 5432 is forbidden (shared/DEV/sibling port)
+## port 55651 (sibling) | expected rc=2 | got rc=2 | OK
+run-rebuilt: --port 55651 is forbidden (shared/DEV/sibling port)
+## port 55660 | expected rc=2 | got rc=2 | OK
+run-rebuilt: --port 55660 is forbidden (shared/DEV/sibling port)
+## port 80 | expected rc=2 | got rc=2 | OK
+run-rebuilt: --port out of range
+## per-file prefix env set | expected rc=2 | got rc=2 | OK
+run-rebuilt: AFLDB_TEST_PER_FILE_DB_PREFIX is set ('afldb_v2_rb_'): refused (F-005; afldb_v2_rb_ would un-skip isolated-populated-lifecycle)
+## ambient test DSN env set | expected rc=2 | got rc=2 | OK
+run-rebuilt: an ambient AFLDB_TEST_DATABASE_URL is set: refused (every database command must go through isolated-pg run)
+## foreign workspace | expected rc=2 | got rc=2 | OK
+run-rebuilt: --workspace must be this scope's /mnt/ssd/afldb-rem3-integ-* directory
+## unknown group | expected rc=2 | got rc=2 | OK
+run-rebuilt: unknown group 'bogus'
+## unknown argument | expected rc=2 | got rc=2 | OK
+run-rebuilt: unknown argument: --frob
+## bad tag | expected rc=2 | got rc=2 | OK
+run-rebuilt: --tag may only contain [A-Za-z0-9._-]

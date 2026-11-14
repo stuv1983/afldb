@@ -1,0 +1,5 @@
+--- m2 after settle-afl-api then settle-afl-api-brownlow
+season2026 complete
+brownlow_match_votes 2026 not_applicable
+brownlow_round_votes 2026 partial
+brownlow_season_total 2026 not_applicable

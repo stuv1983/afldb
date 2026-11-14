@@ -1,0 +1,6 @@
+coleman rows=46 seasons=46 minseason=1980 maxseason=2025
+coleman season 2025 rows=1
+coleman by source afltables 46
+awards coleman first/last=1980/2025
+season2026 complete
+coleman rows after run=47
