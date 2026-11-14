@@ -1,0 +1,6 @@
+2026-11-14 (host UTC date 2026-11-14T00:2x) after the final qualification and all servers
+host checkout /mnt/ssd/afldb-rem-perf-20261114/cand: HEAD=b1e1a14063837020a29e82076dbefa7d47e3901a, git status --porcelain: 0 lines
+isolated-pg stop: waiting for server to shut down.... done / server stopped
+ss -ltn for :55621 :3341 :3342 -> no listener
+processes mentioning the workspace path: 0
+du -sh /mnt/ssd/afldb-rem-perf-20261114 -> 5.8G

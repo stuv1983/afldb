@@ -1,0 +1,30 @@
+== http session start 2026-11-14T00:00:58Z BUILD_ID=oUUVh6OSk_l_w_EbKJ1M9 HEAD=b1e1a14063837020a29e82076dbefa7d47e3901a loadavg 1.91 1.54 1.69 1/2101 951136
+-- gate=0 server up (wrapper pid 951140) loadavg 1.91 1.54 1.69 2/2121 951316
+{"label":"compare gate=0 conc=8","port":"3341","conc":8,"dur":20,"heavy":"/clubs/compare?club1=carlton&club2=collingwood","probe":"/clubs","loadBefore":"1.91 1.54 1.69 1/2127 951323","loadAfter":"3.74 1.98 1.83 1/2124 951940","builds":["none"],"baselineProbeP50":36,"heavyAloneP50":669,"heavyN":85,"heavyP50":1741,"heavyP95":2568,"probeN":26,"probeP50":317,"probeP95":1450,"probeMax":1639,"errors":0,"statuses":{"200":124}}
+{"gate":"0","name":"players p1","status":200,"medianMs":107,"minMs":67,"maxMs":186}
+{"gate":"0","name":"players p267","status":200,"medianMs":110,"minMs":67,"maxMs":129}
+{"gate":"0","name":"players p268","status":200,"medianMs":107,"minMs":85,"maxMs":119}
+{"gate":"0","name":"players past end p400","status":307,"medianMs":83,"minMs":79,"maxMs":104}
+listener pid 951158
+-- gate=2 server up (wrapper pid 952233) loadavg 3.24 1.93 1.82 2/2104 952340
+{"label":"compare gate=2 conc=8","port":"3341","conc":8,"dur":20,"heavy":"/clubs/compare?club1=carlton&club2=collingwood","probe":"/clubs","loadBefore":"3.24 1.93 1.82 1/2110 952347","loadAfter":"4.97 2.41 1.98 1/2123 953232","builds":["none"],"baselineProbeP50":35,"heavyAloneP50":605,"heavyN":83,"heavyP50":1660,"heavyP95":2668,"probeN":57,"probeP50":60,"probeP95":394,"probeMax":521,"errors":0,"statuses":{"200":153}}
+{"gate":"2","name":"players p1","status":200,"medianMs":95,"minMs":57,"maxMs":144}
+{"gate":"2","name":"players p267","status":200,"medianMs":128,"minMs":113,"maxMs":139}
+{"gate":"2","name":"players p268","status":200,"medianMs":113,"minMs":61,"maxMs":123}
+{"gate":"2","name":"players past end p400","status":307,"medianMs":83,"minMs":74,"maxMs":114}
+listener pid 952318
+-- gate=0 server up (wrapper pid 953404) loadavg 4.60 2.41 1.98 4/2099 953560
+{"label":"compare gate=0 conc=8","port":"3341","conc":8,"dur":20,"heavy":"/clubs/compare?club1=carlton&club2=collingwood","probe":"/clubs","loadBefore":"4.60 2.41 1.98 2/2100 953572","loadAfter":"6.22 2.92 2.16 1/2114 954209","builds":["none"],"baselineProbeP50":36,"heavyAloneP50":607,"heavyN":84,"heavyP50":1627,"heavyP95":2725,"probeN":32,"probeP50":315,"probeP95":1005,"probeMax":1018,"errors":0,"statuses":{"200":129}}
+{"gate":"0","name":"players p1","status":200,"medianMs":116,"minMs":79,"maxMs":170}
+{"gate":"0","name":"players p267","status":200,"medianMs":118,"minMs":74,"maxMs":134}
+{"gate":"0","name":"players p268","status":200,"medianMs":111,"minMs":93,"maxMs":115}
+{"gate":"0","name":"players past end p400","status":307,"medianMs":79,"minMs":64,"maxMs":94}
+listener pid 953471
+-- gate=2 server up (wrapper pid 954462) loadavg 5.41 2.86 2.15 3/2096 954601
+{"label":"compare gate=2 conc=8","port":"3341","conc":8,"dur":20,"heavy":"/clubs/compare?club1=carlton&club2=collingwood","probe":"/clubs","loadBefore":"5.41 2.86 2.15 2/2102 954608","loadAfter":"6.62 3.29 2.31 1/2114 955293","builds":["none"],"baselineProbeP50":34,"heavyAloneP50":684,"heavyN":80,"heavyP50":1755,"heavyP95":2695,"probeN":53,"probeP50":113,"probeP95":387,"probeMax":411,"errors":0,"statuses":{"200":146}}
+{"gate":"2","name":"players p1","status":200,"medianMs":102,"minMs":74,"maxMs":152}
+{"gate":"2","name":"players p267","status":200,"medianMs":126,"minMs":111,"maxMs":138}
+{"gate":"2","name":"players p268","status":200,"medianMs":101,"minMs":67,"maxMs":116}
+{"gate":"2","name":"players past end p400","status":307,"medianMs":85,"minMs":80,"maxMs":102}
+listener pid 954481
+== http session end 2026-11-14T00:02:55Z loadavg 6.17 3.25 2.30 1/2072 955523

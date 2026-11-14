@@ -1,0 +1,9 @@
+import { createRequire } from 'node:module';
+const require = createRequire('/mnt/ssd/afldb-rem-perf-20261114/cand/package.json');
+const postgres = require('postgres');
+const sql = postgres(process.env.AFLDB_OWNER_DATABASE_URL, { max: 1 });
+const [{ db }] = await sql`SELECT current_database() db`;
+const q = () => sql`SELECT count(*) FILTER (WHERE last_analyze IS NOT NULL OR last_autoanalyze IS NOT NULL)::int AS analysed, count(*)::int AS tables FROM pg_stat_user_tables`;
+console.log(db, 'before', JSON.stringify((await q())[0]));
+if (process.argv[2] === 'analyze') { const t = performance.now(); await sql.unsafe('ANALYZE'); console.log('ANALYZE ms', Math.round(performance.now() - t)); console.log(db, 'after', JSON.stringify((await q())[0])); }
+await sql.end();

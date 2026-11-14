@@ -1,0 +1,20 @@
+import { createRequire } from 'node:module';
+const require = createRequire('/mnt/ssd/afldb-rem-perf-20261114/cand/package.json');
+const postgres = require('postgres');
+const sql = postgres(process.env.DATABASE_URL, { max: 2 });
+const CASES = { 'name desc': 'p.sort_name DESC', 'debut asc': 'c.debut_season ASC NULLS LAST, p.sort_name ASC', 'finals asc': 'c.finals ASC NULLS LAST, p.sort_name ASC', 'brownlow asc': 'c.brownlow_votes ASC NULLS LAST, p.sort_name ASC' };
+const COLS = `p.id, p.sort_name, c.debut_season, c.finals, c.brownlow_votes`;
+for (const [name, ord] of Object.entries(CASES)) {
+  for (const o of [0, 100, 13325, 13465]) {
+    const A = await sql.unsafe(`SELECT ${COLS} FROM players p LEFT JOIN player_career_stats c ON c.player_id=p.id ORDER BY ${ord} LIMIT 25 OFFSET ${o}`);
+    const C = await sql.unsafe(`WITH page AS (SELECT ${COLS}, row_number() OVER (ORDER BY ${ord}) rn FROM players p LEFT JOIN player_career_stats c ON c.player_id=p.id ORDER BY ${ord} LIMIT 25 OFFSET ${o}) SELECT * FROM page ORDER BY rn`);
+    const a = A.map(r => r.id).join(','), c = C.map(r => r.id).join(',');
+    if (a !== c) {
+      const i = A.findIndex((r, k) => r.id !== C[k].id);
+      console.log(name, 'offset', o, 'DIFF first at idx', i, JSON.stringify(A[i]), JSON.stringify(C[i]));
+    } else console.log(name, 'offset', o, 'same');
+  }
+}
+// duplicate sort_name count
+console.log((await sql`SELECT count(*)::int dup FROM (SELECT sort_name FROM players GROUP BY sort_name HAVING count(*)>1) x`)[0]);
+await sql.end();

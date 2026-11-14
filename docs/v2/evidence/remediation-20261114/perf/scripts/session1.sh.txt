@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# One measurement session (hold the host lock around the whole script): FE-5 EXPLAIN/timings legacy vs new, FE-6 function-level load gate off/on, interleaved.
+W=/mnt/ssd/afldb-rem-perf-20261114
+EV=$W/evidence; mkdir -p $EV
+OUT=$EV/session1-$(date -u +%Y%m%dT%H%M%SZ).txt
+{
+echo "== session1 start $(date -u +%FT%TZ) loadavg $(cat /proc/loadavg)"
+echo "== FE-5 legacy (A) vs fixed (C) statements, offsets 0/6650/13300/14000, 8 reps each; loadavg $(cat /proc/loadavg)"
+bash $W/run.sh afldb_v2_remperf_a_test node $W/exp1.mjs "" plan 2>&1 | grep -v "^isolated-pg"
+echo "loadavg after $(cat /proc/loadavg)"
+for g in 0 2 0 2; do
+  echo "== FE-6 function-level 8 clients 15 s, AFLDB_COMPARE_MAX_CONCURRENT=$g ; loadavg $(cat /proc/loadavg)"
+  AFLDB_COMPARE_MAX_CONCURRENT=$g bash $W/run.sh afldb_v2_remperf_a_test node --conditions react-server --import tsx $W/loadfn.ts 8 15 2>&1 | grep -v "^isolated-pg"
+done
+echo "== session1 end $(date -u +%FT%TZ) loadavg $(cat /proc/loadavg)"
+} > $OUT 2>&1
+echo $OUT

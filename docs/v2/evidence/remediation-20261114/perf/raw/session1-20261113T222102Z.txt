@@ -1,0 +1,88 @@
+== session1 start 2026-11-13T22:21:02Z loadavg 6.51 8.19 6.29 4/2401 488815
+== FE-5 legacy (A) vs fixed (C) statements, offsets 0/6650/13300/14000, 8 reps each; loadavg 6.51 8.19 6.29 5/2403 488819
+A offset 0 median ms 31.2 min 30.4 max 65.9
+A offset 6650 median ms 728.5 min 718.9 max 827.0
+A offset 13300 median ms 789.1 min 783.8 max 810.4
+A offset 14000 median ms 804.7 min 781.3 max 809.4
+B offset 0 median ms 29.0 min 28.5 max 30.1
+B offset 6650 median ms 54.5 min 53.4 max 56.0
+B offset 13300 median ms 55.3 min 54.4 max 57.3
+B offset 14000 median ms 53.8 min 52.9 max 55.0
+C offset 0 median ms 36.8 min 36.2 max 37.4
+C offset 6650 median ms 38.9 min 38.5 max 39.5
+C offset 13300 median ms 39.9 min 39.3 max 40.5
+C offset 14000 median ms 39.6 min 39.0 max 40.1
+-- B
+Subquery Scan on page (actual rows=50 loops=1)
+  ->  Limit (actual rows=50 loops=1)
+        ->  Sort (actual rows=13350 loops=1)
+              Sort Key: c.games DESC NULLS LAST, p.sort_name
+              Sort Method: quicksort  Memory: 2163kB
+              ->  WindowAgg (actual rows=13365 loops=1)
+                    ->  Hash Left Join (actual rows=13365 loops=1)
+                          Hash Cond: (p.id = c.player_id)
+                          ->  Seq Scan on players p (actual rows=13365 loops=1)
+                          ->  Hash (actual rows=13363 loops=1)
+                                Buckets: 16384  Batches: 1  Memory Usage: 964kB
+                                ->  Seq Scan on player_career_stats c (actual rows=13363 loops=1)
+  SubPlan 1
+    ->  Aggregate (actual rows=1 loops=50)
+          ->  Sort (actual rows=1 loops=50)
+                Sort Key: cl.short_name
+                Sort Method: quicksort  Memory: 25kB
+                ->  Hash Join (actual rows=1 loops=50)
+                      Hash Cond: (pc.club_id = cl.id)
+                      ->  Bitmap Heap Scan on player_clubs pc (actual rows=1 loops=50)
+                            Recheck Cond: (player_id = page.id)
+                            Heap Blocks: exact=50
+                            ->  Bitmap Index Scan on player_clubs_pkey (actual rows=1 loops=50)
+                                  Index Cond: (player_id = page.id)
+                      ->  Hash (actual rows=24 loops=1)
+                            Buckets: 1024  Batches: 1  Memory Usage: 10kB
+                            ->  Seq Scan on clubs cl (actual rows=24 loops=1)
+Planning Time: 0.517 ms
+Execution Time: 54.400 ms
+-- C
+Sort (actual rows=50 loops=1)
+  Sort Key: page.rn
+  Sort Method: quicksort  Memory: 30kB
+  ->  Subquery Scan on page (actual rows=50 loops=1)
+        ->  Limit (actual rows=50 loops=1)
+              ->  WindowAgg (actual rows=13350 loops=1)
+                    ->  WindowAgg (actual rows=13365 loops=1)
+                          ->  Sort (actual rows=13365 loops=1)
+                                Sort Key: c.games DESC NULLS LAST, p.sort_name, p.id
+                                Sort Method: quicksort  Memory: 1680kB
+                                ->  Hash Left Join (actual rows=13365 loops=1)
+                                      Hash Cond: (p.id = c.player_id)
+                                      ->  Seq Scan on players p (actual rows=13365 loops=1)
+                                      ->  Hash (actual rows=13363 loops=1)
+                                            Buckets: 16384  Batches: 1  Memory Usage: 964kB
+                                            ->  Seq Scan on player_career_stats c (actual rows=13363 loops=1)
+        SubPlan 1
+          ->  Aggregate (actual rows=1 loops=50)
+                ->  Sort (actual rows=1 loops=50)
+                      Sort Key: cl.short_name
+                      Sort Method: quicksort  Memory: 25kB
+                      ->  Hash Join (actual rows=1 loops=50)
+                            Hash Cond: (pc.club_id = cl.id)
+                            ->  Bitmap Heap Scan on player_clubs pc (actual rows=1 loops=50)
+                                  Recheck Cond: (player_id = page.id)
+                                  Heap Blocks: exact=50
+                                  ->  Bitmap Index Scan on player_clubs_pkey (actual rows=1 loops=50)
+                                        Index Cond: (player_id = page.id)
+                            ->  Hash (actual rows=24 loops=1)
+                                  Buckets: 1024  Batches: 1  Memory Usage: 10kB
+                                  ->  Seq Scan on clubs cl (actual rows=24 loops=1)
+Planning Time: 0.552 ms
+Execution Time: 40.808 ms
+loadavg after 6.87 8.17 6.33 4/2340 490537
+== FE-6 function-level 8 clients 15 s, AFLDB_COMPARE_MAX_CONCURRENT=0 ; loadavg 6.87 8.17 6.33 3/2340 490538
+{"gateLimit":0,"conc":8,"dur":15,"singleAloneMs":4014,"baselineProbeP50":1,"heavyN":8,"heavyP50":5225,"heavyP95":8144,"probeN":2,"probeP50":4000,"probeP95":4000,"probeMax":4000,"errors":0,"load":"7.04 8.11 6.35 5/2436 492375"}
+== FE-6 function-level 8 clients 15 s, AFLDB_COMPARE_MAX_CONCURRENT=2 ; loadavg 7.04 8.11 6.35 6/2405 492394
+{"gateLimit":2,"conc":8,"dur":15,"singleAloneMs":3525,"baselineProbeP50":1,"heavyN":10,"heavyP50":11057,"heavyP95":14512,"probeN":23,"probeP50":1,"probeP95":141,"probeMax":158,"errors":0,"load":"7.34 8.07 6.39 5/2486 495151"}
+== FE-6 function-level 8 clients 15 s, AFLDB_COMPARE_MAX_CONCURRENT=0 ; loadavg 7.34 8.07 6.39 5/2454 495153
+{"gateLimit":0,"conc":8,"dur":15,"singleAloneMs":3234,"baselineProbeP50":1,"heavyN":12,"heavyP50":5972,"heavyP95":13482,"probeN":5,"probeP50":3,"probeP95":3428,"probeMax":3428,"errors":0,"load":"8.21 8.21 6.48 3/2367 497541"}
+== FE-6 function-level 8 clients 15 s, AFLDB_COMPARE_MAX_CONCURRENT=2 ; loadavg 8.21 8.21 6.48 3/2335 497547
+{"gateLimit":2,"conc":8,"dur":15,"singleAloneMs":3308,"baselineProbeP50":1,"heavyN":10,"heavyP50":10389,"heavyP95":15335,"probeN":24,"probeP50":1,"probeP95":82,"probeMax":181,"errors":0,"load":"7.31 7.98 6.46 8/2296 500746"}
+== session1 end 2026-11-13T22:23:08Z loadavg 7.31 7.98 6.46 2/2264 500749

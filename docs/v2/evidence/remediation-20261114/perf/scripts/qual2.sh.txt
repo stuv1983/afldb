@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# scope=perf: classify the snapshot-pinned failures by running the same two files on the unmodified base and on the final commit; hold the host lock
+W=/mnt/ssd/afldb-rem-perf-20261114
+export PATH="$HOME/.nvm/versions/node/v22.23.2/bin:$PATH"
+FINAL=${FINAL:?}; BASE=5035ed96d04261cc4733d8d8de7b8395a5866d20
+cd $W/cand || exit 1
+EV=$W/evidence; OUT=$EV/classify.txt
+strip() { sed 's/\x1b\[[0-9;]*m//g'; }
+INT() { bash $W/run.sh afldb_v2_remperf_int_test node node_modules/vitest/vitest.mjs run "$@" --reporter=json --outputFile.json="$1.$2.json" 2>&1 | strip | grep -E "Tests |Test Files"; }
+{
+echo "== start $(date -u +%FT%TZ) loadavg $(cat /proc/loadavg)"
+for rev in $BASE $FINAL; do
+  git checkout -q -f $rev; echo "== HEAD=$(git rev-parse HEAD) status=[$(git status --porcelain | tr '\n' ' ')]"
+  bash $W/run.sh afldb_v2_remperf_int_test node node_modules/vitest/vitest.mjs run tests/integration/database.test.ts tests/integration/club-comparison.test.ts --reporter=json --outputFile.json=$EV/classify-${rev:0:8}.json 2>&1 | strip | grep -E "Tests |Test Files"
+  node -e '
+    const r=require(process.argv[1]); const out=[];
+    for (const f of r.testResults) for (const t of f.assertionResults) if (t.status==="failed") out.push(f.name.replace(/.*tests\//,"tests/")+" :: "+t.fullName+" :: "+(t.failureMessages[0]||"").split("\n")[0].slice(0,160));
+    out.sort(); console.log("failed="+out.length); for (const l of out) console.log(l);' $EV/classify-${rev:0:8}.json
+done
+git checkout -q -f $FINAL; echo "== final: HEAD=$(git rev-parse HEAD) status=[$(git status --porcelain | tr '\n' ' ')]"
+sha256sum $EV/classify-*.json
+echo "== end $(date -u +%FT%TZ)"
+} > $OUT 2>&1
+echo done

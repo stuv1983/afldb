@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# iteration run (under the host lock): typecheck + focused tests on the cand tree as it is
+W=/mnt/ssd/afldb-rem-perf-20261114
+export PATH="$HOME/.nvm/versions/node/v22.23.2/bin:$PATH"
+cd $W/cand
+OUT=$W/evidence/iter-$(date -u +%H%M%S).txt
+{
+echo "start $(date -u +%FT%TZ) loadavg $(cat /proc/loadavg)"
+node node_modules/next/dist/bin/next typegen >/dev/null 2>&1; node node_modules/typescript/bin/tsc --noEmit -p . ; echo "tsc rc=$?"
+env -u DATABASE_URL -u AFLDB_TEST_DATABASE_URL node node_modules/vitest/vitest.mjs run tests/club-comparison.test.ts 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -E "Test Files|Tests |FAIL|×"
+bash $W/run.sh afldb_v2_remperf_int_test node node_modules/vitest/vitest.mjs run tests/integration/database.test.ts -t "ISSUE-361" 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -E "Test Files|Tests |FAIL|×|Error"
+bash $W/run.sh afldb_v2_remperf_int_test node node_modules/vitest/vitest.mjs run tests/integration/club-comparison-route.test.ts 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -E "Test Files|Tests |FAIL|×|Error|route state warm"
+echo "end $(date -u +%FT%TZ) loadavg $(cat /proc/loadavg)"
+} > $OUT 2>&1

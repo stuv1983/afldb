@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# scope=perf (remediation run 2026-11-14) final qualification; hold the host lock around the whole script
+W=/mnt/ssd/afldb-rem-perf-20261114
+export PATH="$HOME/.nvm/versions/node/v22.23.2/bin:$PATH"
+export PYTHON=/home/arm/i250/afldb/.venv/bin/python AFLDB_PYTHON=/home/arm/i250/afldb/.venv/bin/python
+FINAL=${FINAL:?}
+cd $W/cand || exit 1
+EV=$W/evidence; OUT=$EV/final-qual.txt
+strip() { sed 's/\x1b\[[0-9;]*m//g'; }
+VT() { node node_modules/vitest/vitest.mjs run "$@" 2>&1 | strip; }
+INT() { bash $W/run.sh afldb_v2_remperf_int_test node node_modules/vitest/vitest.mjs run "$@" 2>&1 | strip; }
+{
+echo "== final qualification start $(date -u +%FT%TZ) loadavg $(cat /proc/loadavg)"
+echo "== RED 1: FE-5 plan check on 00d5a9db (extraction + tests, SQL unchanged)"
+git checkout -q 00d5a9db && echo "HEAD=$(git rev-parse HEAD) status=[$(git status --porcelain | tr '\n' ' ')]"
+INT tests/integration/database.test.ts -t "ISSUE-361" | grep -E "×|FAIL|AssertionError|Tests |Test Files"
+echo "== RED 2: FE-6 unit tests against a tree without the gate (tests from the final commit on a6170337)"
+git checkout -q a6170337 && git checkout -q $FINAL -- tests/club-comparison.test.ts && echo "HEAD=$(git rev-parse HEAD) (test file from $FINAL)"
+env -u DATABASE_URL -u AFLDB_TEST_DATABASE_URL node node_modules/vitest/vitest.mjs run tests/club-comparison.test.ts 2>&1 | strip | grep -E "FAIL|Error|Failed to resolve|Tests |Test Files" | head -8
+git checkout -q -f $FINAL && git status --porcelain | head -3
+echo "== GREEN on final commit"
+echo "HEAD=$(git rev-parse HEAD) status=[$(git status --porcelain | tr '\n' ' ')]"
+node node_modules/next/dist/bin/next typegen >/dev/null 2>&1; node node_modules/typescript/bin/tsc --noEmit -p . ; echo "tsc rc=$?"
+git status --porcelain | head -3
+echo "-- unit"
+env -u DATABASE_URL -u AFLDB_TEST_DATABASE_URL node node_modules/vitest/vitest.mjs run tests/club-comparison.test.ts tests/club-comparison-view.test.ts 2>&1 | strip | grep -E "×|FAIL|Tests |Test Files"
+echo "-- integration: database.test.ts (whole file)"
+INT tests/integration/database.test.ts | grep -E "×|FAIL|Tests |Test Files"
+echo "-- integration: club comparison suites"
+INT tests/integration/club-comparison-route.test.ts tests/integration/club-comparison.test.ts tests/integration/club-comparison-view.test.ts | grep -E "×|FAIL|Tests |Test Files|route state warm"
+echo "== RED 3: FE-6 integration test with the gate disabled (AFLDB_COMPARE_MAX_CONCURRENT=0 reproduces the ungated behaviour)"
+AFLDB_COMPARE_MAX_CONCURRENT=0 INT tests/integration/club-comparison-route.test.ts -t "ISSUE-361" | grep -E "×|FAIL|AssertionError|Tests |Test Files"
+echo "== final: HEAD=$(git rev-parse HEAD) status=[$(git status --porcelain | tr '\n' ' ')]"
+echo "== end $(date -u +%FT%TZ) loadavg $(cat /proc/loadavg)"
+} > $OUT 2>&1
+echo done

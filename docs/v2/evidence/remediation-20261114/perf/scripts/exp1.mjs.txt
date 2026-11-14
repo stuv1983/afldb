@@ -1,0 +1,26 @@
+import { createRequire } from 'node:module';
+const require = createRequire('/mnt/ssd/afldb-rem-perf-20261114/cand/package.json');
+const postgres = require('postgres');
+const sql = postgres(process.env.DATABASE_URL, { max: 2 });
+const ord = 'c.games DESC NULLS LAST, p.sort_name ASC';
+const CLUBS = `(SELECT string_agg(DISTINCT cl.short_name, ', ' ORDER BY cl.short_name) FROM player_clubs pc JOIN clubs cl ON cl.id = pc.club_id WHERE pc.player_id = p.id)`;
+const COLS = `p.id, p.slug, p.display_name AS "displayName", c.debut_season AS "debutSeason", c.final_season AS "finalSeason", COALESCE(c.games,0) AS games, COALESCE(c.goals,0) AS goals, COALESCE(c.finals,0) AS finals, COALESCE(c.premierships,0) AS premierships, COALESCE(c.brownlow_votes,0) AS "brownlowVotes", COALESCE(c.clubs_played,0) AS "clubsPlayed"`;
+const V = {
+  A: (o) => `SELECT ${COLS}, ${CLUBS} AS "clubNames", count(*) OVER () AS total FROM players p LEFT JOIN player_career_stats c ON c.player_id = p.id ORDER BY ${ord} LIMIT 50 OFFSET ${o}`,
+  B: (o) => `WITH page AS (SELECT ${COLS}, count(*) OVER () AS total FROM players p LEFT JOIN player_career_stats c ON c.player_id = p.id ORDER BY ${ord} LIMIT 50 OFFSET ${o}) SELECT page.*, (SELECT string_agg(DISTINCT cl.short_name, ', ' ORDER BY cl.short_name) FROM player_clubs pc JOIN clubs cl ON cl.id = pc.club_id WHERE pc.player_id = page.id) AS "clubNames" FROM page`,
+  C: (o) => `WITH page AS (SELECT ${COLS}, count(*) OVER () AS total, row_number() OVER (ORDER BY ${ord}, p.id ASC) AS rn FROM players p LEFT JOIN player_career_stats c ON c.player_id = p.id ORDER BY ${ord}, p.id ASC LIMIT 50 OFFSET ${o}) SELECT page.id, page.slug, page."displayName", page."debutSeason", page."finalSeason", page.games, page.goals, page.finals, page.premierships, page."brownlowVotes", page."clubsPlayed", (SELECT string_agg(DISTINCT cl.short_name, ', ' ORDER BY cl.short_name) FROM player_clubs pc JOIN clubs cl ON cl.id = pc.club_id WHERE pc.player_id = page.id) AS "clubNames", page.total FROM page ORDER BY page.rn`,
+};
+const which = process.argv[2];
+for (const k of Object.keys(V)) {
+  if (which && which !== k) continue;
+  for (const o of [0, 6650, 13300, 14000]) {
+    const times = [];
+    for (let i = 0; i < 8; i++) { const t = performance.now(); await sql.unsafe(V[k](o)); times.push(performance.now() - t); }
+    times.sort((a, b) => a - b);
+    console.log(k, 'offset', o, 'median ms', times[4].toFixed(1), 'min', times[0].toFixed(1), 'max', times[7].toFixed(1));
+  }
+}
+if (process.argv[3] === 'plan') {
+  for (const k of ['B','C']) { const r = await sql.unsafe('EXPLAIN (ANALYZE, COSTS OFF, TIMING OFF) ' + V[k](13300)); console.log('--', k); console.log(r.map(x => x['QUERY PLAN']).join('\n')); }
+}
+await sql.end();

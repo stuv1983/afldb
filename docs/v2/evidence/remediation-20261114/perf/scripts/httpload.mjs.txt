@@ -1,0 +1,27 @@
+// usage: node httpload.mjs <port> <conc> <durSec> <heavyPath> <probePath> <label>
+// 8-client style load: <conc> workers loop the heavy path; one prober fetches the probe path every 200 ms.
+// Every probe hit records the Next build id found in the response HTML (must equal .next/BUILD_ID).
+import fs from 'node:fs';
+const [port, conc, dur, heavy, probe, label] = [process.argv[2], Number(process.argv[3]), Number(process.argv[4]), process.argv[5], process.argv[6], process.argv[7] ?? ''];
+const base = `http://127.0.0.1:${port}`;
+if (Number(port) < 3300 || Number(port) > 3399) throw new Error('port outside 3300-3399');
+const until = Date.now() + dur * 1000;
+const heavyT = [], probeT = []; let errors = 0; const statuses = {}; const builds = new Set();
+async function hit(path, arr, isProbe) {
+  const t0 = performance.now();
+  try {
+    const r = await fetch(base + path, { redirect: 'manual' });
+    const body = await r.text();
+    statuses[r.status] = (statuses[r.status] ?? 0) + 1;
+    if (isProbe) { const m = body.match(/_next\/static\/([A-Za-z0-9_-]+)\/_buildManifest/); builds.add(m ? m[1] : 'none'); }
+  } catch { errors++; }
+  arr.push(performance.now() - t0);
+}
+const load0 = fs.readFileSync('/proc/loadavg', 'utf8').trim();
+const base0 = []; for (let i = 0; i < 10; i++) await hit(probe, base0, true);
+const alone = []; for (let i = 0; i < 3; i++) await hit(heavy, alone, false);
+async function worker() { while (Date.now() < until) await hit(heavy, heavyT, false); }
+async function prober() { while (Date.now() < until) { await hit(probe, probeT, true); await new Promise(r => setTimeout(r, 200)); } }
+await Promise.all([...Array(conc)].map(worker).concat([prober()]));
+const pct = (a, p) => { const s = [...a].sort((x, y) => x - y); return s.length ? Math.round(s[Math.min(s.length - 1, Math.floor(p * s.length))]) : -1; };
+console.log(JSON.stringify({ label, port, conc, dur, heavy, probe, loadBefore: load0, loadAfter: fs.readFileSync('/proc/loadavg', 'utf8').trim(), builds: [...builds], baselineProbeP50: pct(base0, .5), heavyAloneP50: pct(alone, .5), heavyN: heavyT.length, heavyP50: pct(heavyT, .5), heavyP95: pct(heavyT, .95), probeN: probeT.length, probeP50: pct(probeT, .5), probeP95: pct(probeT, .95), probeMax: pct(probeT, 1), errors, statuses }));

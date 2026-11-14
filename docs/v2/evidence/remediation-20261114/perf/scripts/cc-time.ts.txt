@@ -1,0 +1,40 @@
+// times each club-comparison query for carlton v collingwood, sequentially, 3 runs
+import * as cc from '@/db/queries/club-comparison';
+import { sql } from '@/db/client';
+
+async function main() {
+  const a = await cc.getOrganizationBySlug('carlton');
+  const b = await cc.getOrganizationBySlug('collingwood');
+  if (!a || !b) throw new Error('orgs');
+  const fns: [string, () => Promise<unknown>][] = [
+    ['getHeadToHeadSummary', () => cc.getHeadToHeadSummary(a.id, b.id)],
+    ['getHeadToHeadVenueRecords', () => cc.getHeadToHeadVenueRecords(a.id, b.id)],
+    ['getHeadToHeadStreaks', () => cc.getHeadToHeadStreaks(a.id, b.id)],
+    ['getCrossoverSummary', () => cc.getCrossoverSummary(a.id, b.id)],
+    ['getCrossoverPlayers', () => cc.getCrossoverPlayers(a.id, b.id)],
+    ['getHeadToHeadPlayerLeaders', () => cc.getHeadToHeadPlayerLeaders(a.id, b.id)],
+    ['getHeadToHeadBrownlow', () => cc.getHeadToHeadBrownlow(a.id, b.id)],
+    ['getClubBrownlowHistory(a)', () => cc.getClubBrownlowHistory(a.id)],
+    ['getClubBrownlowHistory(b)', () => cc.getClubBrownlowHistory(b.id)],
+    ['getHeadToHeadByDecade', () => cc.getHeadToHeadByDecade(a.id, b.id)],
+    ['getHeadToHeadPeriodRecords', () => cc.getHeadToHeadPeriodRecords(a.id, b.id)],
+    ['getHeadToHeadPlayerAverages', () => cc.getHeadToHeadPlayerAverages(a.id, b.id)],
+  ];
+  for (let run = 0; run < 3; run++) {
+    const line: string[] = [];
+    for (const [name, fn] of fns) {
+      const t0 = performance.now();
+      await fn();
+      line.push(`${name}=${Math.round(performance.now() - t0)}ms`);
+    }
+    console.log(`run ${run}: ` + line.join(' '));
+  }
+  // concurrency: all 12 at once like the page
+  for (let run = 0; run < 3; run++) {
+    const t0 = performance.now();
+    await Promise.all(fns.map(([, fn]) => fn()));
+    console.log(`parallel run ${run}: ${Math.round(performance.now() - t0)}ms`);
+  }
+  await sql.end();
+}
+main().catch((e) => { console.error(e); process.exit(1); });

@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# The one production build (hold the host lock around the whole script). Must run on a checkout equal to the final commit.
+W=/mnt/ssd/afldb-rem-perf-20261114
+export PATH="$HOME/.nvm/versions/node/v22.23.2/bin:$PATH"
+export AFLDB_V2_PG_ROOT="$W/pg-root" AFLDB_V2_PG_BIN=/usr/lib/postgresql/16/bin AFLDB_V2_PG_PORT=55621
+cd $W/cand || exit 1
+echo "build start $(date -u +%FT%TZ) HEAD=$(git rev-parse HEAD) status=[$(git status --porcelain | tr '\n' ' ')] loadavg $(cat /proc/loadavg)"
+node --import tsx tools/v2/isolated-pg.ts run afldb_v2_remperf_build_test -- env NODE_ENV=production node node_modules/next/dist/bin/next build --webpack > $W/evidence/build-next.log 2>&1; echo "next build rc=$?"
+node --import tsx tools/v2/isolated-pg.ts run afldb_v2_remperf_build_test -- node tools/build/prepare-standalone.mjs > $W/evidence/build-standalone.log 2>&1; echo "prepare-standalone rc=$?"
+echo "BUILD_ID=$(cat .next/BUILD_ID)"; test -f .next/standalone/server.js && echo "standalone server present"
+git status --porcelain | head
+echo "build end $(date -u +%FT%TZ) loadavg $(cat /proc/loadavg)"

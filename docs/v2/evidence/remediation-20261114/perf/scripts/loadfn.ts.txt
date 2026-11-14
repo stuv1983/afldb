@@ -1,0 +1,21 @@
+import fs from 'node:fs';
+// function-level 8-client load: N workers resolve the pair state in a loop; a prober runs one light query every 200ms.
+import { resolveClubComparisonState, clubComparePairGate } from '@/app/clubs/compare/state';
+import { getOrganizationBySlug } from '@/db/queries/club-comparison';
+import { sql } from '@/db/client';
+async function main() {
+const conc = Number(process.argv[2] ?? 8), dur = Number(process.argv[3] ?? 15);
+const until = Date.now() + dur * 1000;
+const heavy: number[] = [], probe: number[] = []; let errors = 0;
+const pct = (a: number[], p: number) => { const s = [...a].sort((x, y) => x - y); return s.length ? Math.round(s[Math.min(s.length - 1, Math.floor(p * s.length))]) : -1; };
+const base: number[] = [];
+for (let i = 0; i < 10; i++) { const t = performance.now(); await getOrganizationBySlug('carlton'); base.push(performance.now() - t); }
+for (let w = 0; w < 2; w++) await resolveClubComparisonState({ club1: "carlton", club2: "collingwood" });
+const t0 = performance.now(); await resolveClubComparisonState({ club1: 'carlton', club2: 'collingwood' }); const single = Math.round(performance.now() - t0);
+async function worker() { while (Date.now() < until) { const t = performance.now(); try { await resolveClubComparisonState({ club1: 'carlton', club2: 'collingwood' }); } catch { errors++; } heavy.push(performance.now() - t); } }
+async function prober() { while (Date.now() < until) { const t = performance.now(); await getOrganizationBySlug('carlton'); probe.push(performance.now() - t); await new Promise(r => setTimeout(r, 200)); } }
+await Promise.all([...Array(conc)].map(worker).concat([prober()]));
+console.log(JSON.stringify({ gateLimit: clubComparePairGate.limit, conc, dur, singleAloneMs: single, baselineProbeP50: pct(base, .5), heavyN: heavy.length, heavyP50: pct(heavy, .5), heavyP95: pct(heavy, .95), probeN: probe.length, probeP50: pct(probe, .5), probeP95: pct(probe, .95), probeMax: pct(probe, 1), errors, load: fs.readFileSync('/proc/loadavg', 'utf8').trim() }));
+await sql.end();
+}
+main().catch((e) => { console.error(e); process.exit(1); });

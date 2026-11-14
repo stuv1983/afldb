@@ -1,0 +1,96 @@
+== final qualification start 2026-11-14T00:06:11Z loadavg 4.24 3.02 2.34 1/2027 968597
+== RED 1: FE-5 plan check on 00d5a9db (extraction + tests, SQL unchanged)
+HEAD=00d5a9db0f47b002dbc325909ca04248cbfa02c6 status=[]
+     × looks up club names for the returned page, not for every skipped row 392ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/integration/database.test.ts > AFLDB-ISSUE-361 player index looks up club names for the returned page only > looks up club names for the returned page, not for every skipped row
+AssertionError: expected 13365 to be less than or equal to 5
+ Test Files  1 failed (1)
+      Tests  1 failed | 17 passed | 51 skipped (69)
+== RED 2: FE-6 unit tests against a tree without the gate (tests from the final commit on a6170337)
+HEAD=a617033795b446f06b77c48d72d3280f7dbe6c79 (test file from b1e1a14063837020a29e82076dbefa7d47e3901a)
+ FAIL  tests/club-comparison.test.ts [ tests/club-comparison.test.ts ]
+Error: Cannot find package '@/lib/concurrency-gate' imported from /mnt/ssd/afldb-rem-perf-20261114/cand/tests/club-comparison.test.ts
+ Test Files  1 failed (1)
+      Tests  no tests
+== GREEN on final commit
+HEAD=b1e1a14063837020a29e82076dbefa7d47e3901a status=[]
+tsc rc=0
+-- unit
+ Test Files  2 passed (2)
+      Tests  52 passed (52)
+-- integration: database.test.ts (whole file)
+     × has the full player-match dataset 229ms
+     × 200-249 games with 16 or more finals 2ms
+     × 50-199 goals and no Brownlow votes 4ms
+     × 200+ games, 100+ goals and 15+ finals 3ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/integration/database.test.ts > data integrity > has the full player-match dataset
+ FAIL  tests/integration/database.test.ts > advanced search regression cases > 200-249 games with 16 or more finals
+ FAIL  tests/integration/database.test.ts > advanced search regression cases > 50-199 goals and no Brownlow votes
+ FAIL  tests/integration/database.test.ts > advanced search regression cases > 200+ games, 100+ goals and 15+ finals
+ Test Files  1 failed (1)
+      Tests  4 failed | 65 passed (69)
+-- integration: club comparison suites
+     × summarises Adelaide vs Brisbane Lions to the canonical witness and to independent SQL 51ms
+     × filters by match type so that home-and-away and finals partition the complete history 40ms
+     × filters by era (Club Rivalry Explorer follow-up, FR-2) so the decades partition the complete history 41ms
+     × paginates the complete meetings list deterministically at 25 rows per page 30ms
+     × groups venue records by canonical venue and agrees with an independent grouping 20ms
+     × reads streaks from chronological order, with a draw breaking a winning streak 22ms
+     × keeps Brisbane Bears and Fitzroy out of Brisbane Lions head-to-head totals 21ms
+     × handles the Carlton vs Collingwood long rivalry, including Grand Finals 35ms
+     × lists everyone who represented both organisations, agreeing with independent SQL 52ms
+     × reports Ben Keays as Brisbane Lions first, then Adelaide, in both argument orders 17ms
+     × summarises the first and most recent players to complete both representations 52ms
+     × ranks H2H games leaders against independent SQL and the measured witnesses 46ms
+     × ranks H2H goals leaders without ever treating an unrecorded goal as nought 22ms
+     × consolidates a player who represented both organisations into one row 31ms
+     × keeps every tied holder of the single-match goals and disposals records 34ms
+     × counts eligible and covered meetings from home-and-away matches only 35ms
+     × reproduces the Adelaide vs Brisbane Lions decade witness and independent SQL 17ms
+     × sums every Carlton vs Collingwood decade back to the complete 268-meeting population 16ms
+     × exposes pair-level period-score coverage for both witness rivalries 27ms
+     × reuses the comparison metric registry rather than defining a second one 69ms
+     × ranks the disposals average board on recorded games and matches independent SQL 65ms
+     × applies the five-recorded-game minimum, per metric and never per rivalry appearance 72ms
+     × retains every tie at the rank-ten boundary and reports the recorded-game denominator 49ms
+     × splits a crossover player average across both organisations 69ms
+[ISSUE-144 Stage 7] adelaide/brisbane-lions route state warm min/median/max = 317.9/357.8/360.5 ms
+[ISSUE-144 Stage 7] carlton/collingwood route state warm min/median/max = 314.2/336.1/370.6 ms
+⎯⎯⎯⎯⎯⎯ Failed Tests 24 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head core > summarises Adelaide vs Brisbane Lions to the canonical witness and to independent SQL
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head core > filters by match type so that home-and-away and finals partition the complete history
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head core > filters by era (Club Rivalry Explorer follow-up, FR-2) so the decades partition the complete history
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head core > paginates the complete meetings list deterministically at 25 rows per page
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head core > groups venue records by canonical venue and agrees with an independent grouping
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head core > reads streaks from chronological order, with a draw breaking a winning streak
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head core > keeps Brisbane Bears and Fitzroy out of Brisbane Lions head-to-head totals
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head core > handles the Carlton vs Collingwood long rivalry, including Grand Finals
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: crossover players > lists everyone who represented both organisations, agreeing with independent SQL
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: crossover players > reports Ben Keays as Brisbane Lions first, then Adelaide, in both argument orders
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: crossover players > summarises the first and most recent players to complete both representations
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head player leaders > ranks H2H games leaders against independent SQL and the measured witnesses
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head player leaders > ranks H2H goals leaders without ever treating an unrecorded goal as nought
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head player leaders > consolidates a player who represented both organisations into one row
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head player leaders > keeps every tied holder of the single-match goals and disposals records
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head Brownlow > counts eligible and covered meetings from home-and-away matches only
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head by decade > reproduces the Adelaide vs Brisbane Lions decade witness and independent SQL
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head by decade > sums every Carlton vs Collingwood decade back to the complete 268-meeting population
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: period-score rivalry records > exposes pair-level period-score coverage for both witness rivalries
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head player averages > reuses the comparison metric registry rather than defining a second one
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head player averages > ranks the disposals average board on recorded games and matches independent SQL
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head player averages > applies the five-recorded-game minimum, per metric and never per rivalry appearance
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head player averages > retains every tie at the rank-ten boundary and reports the recorded-game denominator
+ FAIL  tests/integration/club-comparison.test.ts > club comparison: head-to-head player averages > splits a crossover player average across both organisations
+ Test Files  1 failed | 2 passed (3)
+      Tests  24 failed | 82 passed (106)
+== RED 3: FE-6 integration test with the gate disabled (AFLDB_COMPARE_MAX_CONCURRENT=0 reproduces the ungated behaviour)
+     × loads at most the default number of comparisons at once and returns what a lone load returns 1987ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/integration/club-comparison-route.test.ts > AFLDB-ISSUE-361 pair comparisons are bounded and unchanged > loads at most the default number of comparisons at once and returns what a lone load returns
+AssertionError: expected 72 to be less than or equal to 24
+ Test Files  1 failed (1)
+      Tests  1 failed | 29 skipped (30)
+== final: HEAD=b1e1a14063837020a29e82076dbefa7d47e3901a status=[]
+== end 2026-11-14T00:08:06Z loadavg 3.99 3.10 2.44 1/2027 973772

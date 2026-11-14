@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# HTTP measurement session (hold the host lock around the whole script). Loopback ports 3300-3399 only; never :3000.
+# usage: http-session.sh "<gate list e.g. 0 2 0 2>" <conc> <dur>
+W=/mnt/ssd/afldb-rem-perf-20261114
+export PATH="$HOME/.nvm/versions/node/v22.23.2/bin:$PATH"
+export AFLDB_V2_PG_ROOT="$W/pg-root" AFLDB_V2_PG_BIN=/usr/lib/postgresql/16/bin AFLDB_V2_PG_PORT=55621
+PORT=3341
+cd $W/cand || exit 1
+BID=$(cat .next/BUILD_ID)
+echo "== http session start $(date -u +%FT%TZ) BUILD_ID=$BID HEAD=$(git rev-parse HEAD) loadavg $(cat /proc/loadavg)"
+for g in $1; do
+  ss -ltn | awk '{print $4}' | grep -E ":$PORT$" && { echo "port $PORT busy"; exit 1; }
+  (cd $W/cand && exec node --import tsx tools/v2/isolated-pg.ts run afldb_v2_remperf_a_test -- env PORT=$PORT HOSTNAME=127.0.0.1 NODE_ENV=production AFLDB_COMPARE_MAX_CONCURRENT=$g node .next/standalone/server.js > $W/evidence/server-g$g.log 2>&1) &
+  SP=$!
+  for i in $(seq 1 60); do curl -s -o /dev/null http://127.0.0.1:$PORT/ && break; sleep 1; done
+  echo "-- gate=$g server up (wrapper pid $SP) loadavg $(cat /proc/loadavg)"
+  for p in "/clubs/compare?club1=carlton&club2=collingwood" ; do :; done
+  node $W/httpload.mjs $PORT $2 $3 "/clubs/compare?club1=carlton&club2=collingwood" "/clubs" "compare gate=$g conc=$2"
+  # FE-5 end to end: deep /players page, 10 sequential hits, then the past-the-end redirect
+  node -e '
+    const b="http://127.0.0.1:'$PORT'";
+    (async()=>{ for (const [name,path] of [["players p1","/players"],["players p267","/players?page=267"],["players p268","/players?page=268"],["players past end p400","/players?page=400"]]) {
+      const t=[]; let st; for(let i=0;i<10;i++){ const t0=performance.now(); const r=await fetch(b+path,{redirect:"manual"}); await r.text(); st=r.status; t.push(performance.now()-t0);} t.sort((x,y)=>x-y);
+      console.log(JSON.stringify({gate:"'$g'",name,status:st,medianMs:Math.round(t[5]),minMs:Math.round(t[0]),maxMs:Math.round(t[9])})); } })();'
+  LP=$(ss -ltnp 2>/dev/null | grep ":$PORT " | grep -o "pid=[0-9]*" | head -1 | cut -d= -f2); echo "listener pid $LP"; [ -n "$LP" ] && kill -TERM $LP; sleep 2; kill -TERM $SP 2>/dev/null
+  for i in $(seq 1 15); do ss -ltn | awk '{print $4}' | grep -qE ":$PORT$" || break; sleep 1; done
+  ss -ltn | awk '{print $4}' | grep -E ":$PORT$" && echo "WARNING: port $PORT still listening"
+done
+echo "== http session end $(date -u +%FT%TZ) loadavg $(cat /proc/loadavg)"

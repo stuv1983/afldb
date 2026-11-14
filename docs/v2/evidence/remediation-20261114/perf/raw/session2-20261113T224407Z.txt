@@ -1,0 +1,90 @@
+== session2 start 2026-11-13T22:44:07Z loadavg 2.02 3.57 4.75 4/2186 604363
+== FE-5 legacy (A) vs fixed (C) statements, offsets 0/6650/13300/14000, 8 reps each; loadavg 2.02 3.57 4.75 3/2188 604366
+A offset 0 median ms 31.4 min 30.1 max 64.7
+A offset 6650 median ms 163.6 min 162.9 max 164.2
+A offset 13300 median ms 313.3 min 306.0 max 328.2
+A offset 14000 median ms 309.1 min 303.0 max 317.1
+B offset 0 median ms 30.5 min 30.2 max 31.6
+B offset 6650 median ms 53.6 min 53.1 max 55.7
+B offset 13300 median ms 53.4 min 53.2 max 54.0
+B offset 14000 median ms 53.1 min 52.5 max 53.6
+C offset 0 median ms 35.9 min 35.4 max 38.2
+C offset 6650 median ms 37.1 min 36.8 max 39.3
+C offset 13300 median ms 39.9 min 38.9 max 62.2
+C offset 14000 median ms 37.9 min 37.7 max 38.3
+-- B
+Subquery Scan on page (actual rows=50 loops=1)
+  ->  Limit (actual rows=50 loops=1)
+        ->  Sort (actual rows=13350 loops=1)
+              Sort Key: c.games DESC NULLS LAST, p.sort_name
+              Sort Method: quicksort  Memory: 2163kB
+              ->  WindowAgg (actual rows=13365 loops=1)
+                    ->  Hash Left Join (actual rows=13365 loops=1)
+                          Hash Cond: (p.id = c.player_id)
+                          ->  Seq Scan on players p (actual rows=13365 loops=1)
+                          ->  Hash (actual rows=13363 loops=1)
+                                Buckets: 16384  Batches: 1  Memory Usage: 964kB
+                                ->  Seq Scan on player_career_stats c (actual rows=13363 loops=1)
+  SubPlan 1
+    ->  Aggregate (actual rows=1 loops=50)
+          ->  Sort (actual rows=1 loops=50)
+                Sort Key: cl.short_name
+                Sort Method: quicksort  Memory: 25kB
+                ->  Hash Join (actual rows=1 loops=50)
+                      Hash Cond: (cl.id = pc.club_id)
+                      ->  Seq Scan on clubs cl (actual rows=24 loops=50)
+                      ->  Hash (actual rows=1 loops=50)
+                            Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                            ->  Index Only Scan using player_clubs_pkey on player_clubs pc (actual rows=1 loops=50)
+                                  Index Cond: (player_id = page.id)
+                                  Heap Fetches: 50
+Planning Time: 0.544 ms
+Execution Time: 52.498 ms
+-- C
+Sort (actual rows=50 loops=1)
+  Sort Key: page.rn
+  Sort Method: quicksort  Memory: 30kB
+  ->  Subquery Scan on page (actual rows=50 loops=1)
+        ->  Limit (actual rows=50 loops=1)
+              ->  WindowAgg (actual rows=13350 loops=1)
+                    ->  WindowAgg (actual rows=13365 loops=1)
+                          ->  Sort (actual rows=13365 loops=1)
+                                Sort Key: c.games DESC NULLS LAST, p.sort_name, p.id
+                                Sort Method: quicksort  Memory: 1680kB
+                                ->  Hash Left Join (actual rows=13365 loops=1)
+                                      Hash Cond: (p.id = c.player_id)
+                                      ->  Seq Scan on players p (actual rows=13365 loops=1)
+                                      ->  Hash (actual rows=13363 loops=1)
+                                            Buckets: 16384  Batches: 1  Memory Usage: 964kB
+                                            ->  Seq Scan on player_career_stats c (actual rows=13363 loops=1)
+        SubPlan 1
+          ->  Aggregate (actual rows=1 loops=50)
+                ->  Sort (actual rows=1 loops=50)
+                      Sort Key: cl.short_name
+                      Sort Method: quicksort  Memory: 25kB
+                      ->  Hash Join (actual rows=1 loops=50)
+                            Hash Cond: (cl.id = pc.club_id)
+                            ->  Seq Scan on clubs cl (actual rows=24 loops=50)
+                            ->  Hash (actual rows=1 loops=50)
+                                  Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                                  ->  Index Only Scan using player_clubs_pkey on player_clubs pc (actual rows=1 loops=50)
+                                        Index Cond: (player_id = page.id)
+                                        Heap Fetches: 50
+Planning Time: 0.539 ms
+Execution Time: 40.049 ms
+loadavg after 2.01 3.52 4.72 1/2188 604968
+== FE-6 function-level 8 clients 15 s, AFLDB_COMPARE_MAX_CONCURRENT=0 ; loadavg 2.01 3.52 4.72 1/2188 604969
+{"gateLimit":0,"conc":8,"dur":15,"singleAloneMs":383,"baselineProbeP50":1,"heavyN":73,"heavyP50":1211,"heavyP95":4383,"probeN":34,"probeP50":1,"probeP95":1007,"probeMax":3363,"errors":0,"load":"3.31 3.72 4.76 1/2221 605999"}
+== FE-6 function-level 8 clients 15 s, AFLDB_COMPARE_MAX_CONCURRENT=1 ; loadavg 3.31 3.72 4.76 1/2189 606001
+{"gateLimit":1,"conc":8,"dur":15,"singleAloneMs":380,"baselineProbeP50":1,"heavyN":46,"heavyP50":2562,"heavyP95":4006,"probeN":69,"probeP50":1,"probeP95":1,"probeMax":171,"errors":0,"load":"3.17 3.67 4.73 2/2230 606936"}
+== FE-6 function-level 8 clients 15 s, AFLDB_COMPARE_MAX_CONCURRENT=2 ; loadavg 3.17 3.67 4.73 2/2198 606937
+{"gateLimit":2,"conc":8,"dur":15,"singleAloneMs":385,"baselineProbeP50":1,"heavyN":72,"heavyP50":1485,"heavyP95":2762,"probeN":60,"probeP50":1,"probeP95":340,"probeMax":343,"errors":0,"load":"4.56 3.94 4.79 1/2228 607753"}
+== FE-6 function-level 8 clients 15 s, AFLDB_COMPARE_MAX_CONCURRENT=3 ; loadavg 4.56 3.94 4.79 1/2196 607754
+{"gateLimit":3,"conc":8,"dur":15,"singleAloneMs":318,"baselineProbeP50":1,"heavyN":86,"heavyP50":1329,"heavyP95":2066,"probeN":51,"probeP50":1,"probeP95":359,"probeMax":723,"errors":0,"load":"5.12 4.09 4.83 1/2222 608604"}
+== FE-6 function-level 8 clients 15 s, AFLDB_COMPARE_MAX_CONCURRENT=4 ; loadavg 5.12 4.09 4.83 1/2190 608605
+{"gateLimit":4,"conc":8,"dur":15,"singleAloneMs":296,"baselineProbeP50":1,"heavyN":83,"heavyP50":1303,"heavyP95":2856,"probeN":46,"probeP50":1,"probeP95":372,"probeMax":1044,"errors":0,"load":"6.27 4.40 4.92 1/2222 609431"}
+== FE-6 function-level 8 clients 15 s, AFLDB_COMPARE_MAX_CONCURRENT=0 ; loadavg 6.27 4.40 4.92 1/2190 609432
+{"gateLimit":0,"conc":8,"dur":15,"singleAloneMs":215,"baselineProbeP50":1,"heavyN":93,"heavyP50":1148,"heavyP95":2073,"probeN":32,"probeP50":227,"probeP95":687,"probeMax":1792,"errors":0,"load":"6.62 4.59 4.97 1/2227 610428"}
+== FE-6 function-level 8 clients 15 s, AFLDB_COMPARE_MAX_CONCURRENT=2 ; loadavg 6.62 4.59 4.97 1/2195 610429
+{"gateLimit":2,"conc":8,"dur":15,"singleAloneMs":397,"baselineProbeP50":1,"heavyN":75,"heavyP50":1448,"heavyP95":2623,"probeN":55,"probeP50":0,"probeP95":341,"probeMax":453,"errors":0,"load":"6.73 4.71 5.00 1/2226 611137"}
+== session2 end 2026-11-13T22:46:14Z loadavg 6.73 4.71 5.00 1/2194 611139

@@ -1,0 +1,11 @@
+start 2026-11-13T22:39:14Z loadavg 7.26 6.16 5.77 5/2311 584952
+tsc rc=0
+ Test Files  1 passed (1)
+      Tests  20 passed (20)
+ Test Files  1 passed (1)
+      Tests  18 passed | 51 skipped (69)
+[ISSUE-144 Stage 7] adelaide/brisbane-lions route state warm min/median/max = 301.1/369.9/398.2 ms
+[ISSUE-144 Stage 7] carlton/collingwood route state warm min/median/max = 318.3/368.0/386.0 ms
+ Test Files  1 passed (1)
+      Tests  30 passed (30)
+end 2026-11-13T22:42:00Z loadavg 2.44 4.38 5.14 6/2237 597228

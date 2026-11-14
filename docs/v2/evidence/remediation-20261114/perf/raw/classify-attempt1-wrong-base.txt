@@ -1,0 +1,66 @@
+== start 2026-11-14T00:14:26Z loadavg 1.34 2.00 2.17 2/1988 987589
+fatal: reference is not a tree: 5035ed9639a0f4a9b62d14a8cff6b5b4efeddc1b
+== HEAD=b1e1a14063837020a29e82076dbefa7d47e3901a status=[]
+failed=28
+tests/integration/club-comparison.test.ts :: club comparison: crossover players lists everyone who represented both organisations, agreeing with independent SQL :: AssertionError: expected [ { playerId: 2604, …(13) }, …(11) ] to have a length of 11 but got 12
+tests/integration/club-comparison.test.ts :: club comparison: crossover players reports Ben Keays as Brisbane Lions first, then Adelaide, in both argument orders :: AssertionError: expected 156 to be 131 // Object.is equality
+tests/integration/club-comparison.test.ts :: club comparison: crossover players summarises the first and most recent players to complete both representations :: AssertionError: expected 12 to be 11 // Object.is equality
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head Brownlow counts eligible and covered meetings from home-and-away matches only :: AssertionError: expected [ { matchId: 11178, …(4) }, …(39) ] to have a length of 39 but got 40
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head by decade reproduces the Adelaide vs Brisbane Lions decade witness and independent SQL :: AssertionError: expected [ [ 1990, 5, 2, 3, +0 ], …(3) ] to deeply equal [ [ 1990, 5, 2, 3, +0 ], …(3) ]
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head by decade sums every Carlton vs Collingwood decade back to the complete 268-meeting population :: AssertionError: expected 270 to be 268 // Object.is equality
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head core filters by era (Club Rivalry Explorer follow-up, FR-2) so the decades partition the complete history :: AssertionError: expected 10 to be 8 // Object.is equality
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head core filters by match type so that home-and-away and finals partition the complete history :: AssertionError: expected 43 to be 41 // Object.is equality
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head core groups venue records by canonical venue and agrees with an independent grouping :: AssertionError: expected 43 to be 41 // Object.is equality
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head core handles the Carlton vs Collingwood long rivalry, including Grand Finals :: AssertionError: expected 270 to be 268 // Object.is equality
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head core keeps Brisbane Bears and Fitzroy out of Brisbane Lions head-to-head totals :: AssertionError: expected [ …(43) ] to have a length of 41 but got 43
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head core paginates the complete meetings list deterministically at 25 rows per page :: AssertionError: expected [ { matchId: 13184, …(22) }, …(17) ] to have a length of 16 but got 18
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head core reads streaks from chronological order, with a draw breaking a winning streak :: AssertionError: expected 'b-win' to be 'a-win' // Object.is equality
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head core summarises Adelaide vs Brisbane Lions to the canonical witness and to independent SQL :: AssertionError: expected 43 to be 41 // Object.is equality
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head player averages applies the five-recorded-game minimum, per metric and never per rivalry appearance :: AssertionError: expected 7 to be 5 // Object.is equality
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head player averages ranks the disposals average board on recorded games and matches independent SQL :: AssertionError: expected [ [ 'Matt Crouch', 7, 30.71 ], …(2) ] to deeply equal [ [ 'Matt Crouch', 7, 30.71 ], …(2) ]
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head player averages retains every tie at the rank-ten boundary and reports the recorded-game denominator :: AssertionError: expected 1 to be 2 // Object.is equality
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head player averages reuses the comparison metric registry rather than defining a second one :: AssertionError: expected 43 to be 41 // Object.is equality
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head player averages splits a crossover player average across both organisations :: AssertionError: expected 16 to be 14 // Object.is equality
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head player leaders consolidates a player who represented both organisations into one row :: AssertionError: expected 16 to be 14 // Object.is equality
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head player leaders keeps every tied holder of the single-match goals and disposals records :: AssertionError: expected 42 to be 40 // Object.is equality
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head player leaders ranks H2H games leaders against independent SQL and the measured witnesses :: AssertionError: expected 22 to be 20 // Object.is equality
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head player leaders ranks H2H goals leaders without ever treating an unrecorded goal as nought :: AssertionError: expected 57 to be 54 // Object.is equality
+tests/integration/club-comparison.test.ts :: club comparison: period-score rivalry records exposes pair-level period-score coverage for both witness rivalries :: AssertionError: expected 43 to be 41 // Object.is equality
+tests/integration/database.test.ts :: advanced search regression cases 200+ games, 100+ goals and 15+ finals :: AssertionError: expected 223 to be 219 // Object.is equality
+tests/integration/database.test.ts :: advanced search regression cases 200-249 games with 16 or more finals :: AssertionError: expected 120 to be 114 // Object.is equality
+tests/integration/database.test.ts :: advanced search regression cases 50-199 goals and no Brownlow votes :: AssertionError: expected 268 to be 261 // Object.is equality
+tests/integration/database.test.ts :: data integrity has the full player-match dataset :: AssertionError: expected 695499 to be 685471 // Object.is equality
+== HEAD=b1e1a14063837020a29e82076dbefa7d47e3901a status=[]
+failed=28
+tests/integration/club-comparison.test.ts :: club comparison: crossover players lists everyone who represented both organisations, agreeing with independent SQL :: AssertionError: expected [ { playerId: 2604, …(13) }, …(11) ] to have a length of 11 but got 12
+tests/integration/club-comparison.test.ts :: club comparison: crossover players reports Ben Keays as Brisbane Lions first, then Adelaide, in both argument orders :: AssertionError: expected 156 to be 131 // Object.is equality
+tests/integration/club-comparison.test.ts :: club comparison: crossover players summarises the first and most recent players to complete both representations :: AssertionError: expected 12 to be 11 // Object.is equality
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head Brownlow counts eligible and covered meetings from home-and-away matches only :: AssertionError: expected [ { matchId: 11178, …(4) }, …(39) ] to have a length of 39 but got 40
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head by decade reproduces the Adelaide vs Brisbane Lions decade witness and independent SQL :: AssertionError: expected [ [ 1990, 5, 2, 3, +0 ], …(3) ] to deeply equal [ [ 1990, 5, 2, 3, +0 ], …(3) ]
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head by decade sums every Carlton vs Collingwood decade back to the complete 268-meeting population :: AssertionError: expected 270 to be 268 // Object.is equality
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head core filters by era (Club Rivalry Explorer follow-up, FR-2) so the decades partition the complete history :: AssertionError: expected 10 to be 8 // Object.is equality
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head core filters by match type so that home-and-away and finals partition the complete history :: AssertionError: expected 43 to be 41 // Object.is equality
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head core groups venue records by canonical venue and agrees with an independent grouping :: AssertionError: expected 43 to be 41 // Object.is equality
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head core handles the Carlton vs Collingwood long rivalry, including Grand Finals :: AssertionError: expected 270 to be 268 // Object.is equality
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head core keeps Brisbane Bears and Fitzroy out of Brisbane Lions head-to-head totals :: AssertionError: expected [ …(43) ] to have a length of 41 but got 43
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head core paginates the complete meetings list deterministically at 25 rows per page :: AssertionError: expected [ { matchId: 13184, …(22) }, …(17) ] to have a length of 16 but got 18
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head core reads streaks from chronological order, with a draw breaking a winning streak :: AssertionError: expected 'b-win' to be 'a-win' // Object.is equality
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head core summarises Adelaide vs Brisbane Lions to the canonical witness and to independent SQL :: AssertionError: expected 43 to be 41 // Object.is equality
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head player averages applies the five-recorded-game minimum, per metric and never per rivalry appearance :: AssertionError: expected 7 to be 5 // Object.is equality
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head player averages ranks the disposals average board on recorded games and matches independent SQL :: AssertionError: expected [ [ 'Matt Crouch', 7, 30.71 ], …(2) ] to deeply equal [ [ 'Matt Crouch', 7, 30.71 ], …(2) ]
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head player averages retains every tie at the rank-ten boundary and reports the recorded-game denominator :: AssertionError: expected 1 to be 2 // Object.is equality
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head player averages reuses the comparison metric registry rather than defining a second one :: AssertionError: expected 43 to be 41 // Object.is equality
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head player averages splits a crossover player average across both organisations :: AssertionError: expected 16 to be 14 // Object.is equality
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head player leaders consolidates a player who represented both organisations into one row :: AssertionError: expected 16 to be 14 // Object.is equality
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head player leaders keeps every tied holder of the single-match goals and disposals records :: AssertionError: expected 42 to be 40 // Object.is equality
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head player leaders ranks H2H games leaders against independent SQL and the measured witnesses :: AssertionError: expected 22 to be 20 // Object.is equality
+tests/integration/club-comparison.test.ts :: club comparison: head-to-head player leaders ranks H2H goals leaders without ever treating an unrecorded goal as nought :: AssertionError: expected 57 to be 54 // Object.is equality
+tests/integration/club-comparison.test.ts :: club comparison: period-score rivalry records exposes pair-level period-score coverage for both witness rivalries :: AssertionError: expected 43 to be 41 // Object.is equality
+tests/integration/database.test.ts :: advanced search regression cases 200+ games, 100+ goals and 15+ finals :: AssertionError: expected 223 to be 219 // Object.is equality
+tests/integration/database.test.ts :: advanced search regression cases 200-249 games with 16 or more finals :: AssertionError: expected 120 to be 114 // Object.is equality
+tests/integration/database.test.ts :: advanced search regression cases 50-199 goals and no Brownlow votes :: AssertionError: expected 268 to be 261 // Object.is equality
+tests/integration/database.test.ts :: data integrity has the full player-match dataset :: AssertionError: expected 695499 to be 685471 // Object.is equality
+== final: HEAD=b1e1a14063837020a29e82076dbefa7d47e3901a status=[]
+bafc0c45884fd2f6a111f500db4d2733af19e8d9cff4bbd4197efbf3994f5281  /mnt/ssd/afldb-rem-perf-20261114/evidence/classify-5035ed96.json
+d32b1105716f81c8295d026c50e2997776a4baf57dcd156c34d4ff0e2674cd29  /mnt/ssd/afldb-rem-perf-20261114/evidence/classify-b1e1a140.json
+== end 2026-11-14T00:15:48Z
