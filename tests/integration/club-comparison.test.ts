@@ -15,6 +15,19 @@
  * The named witnesses (Adelaide/Brisbane Lions 41-19-21-1, matches
  * 16486/12275/12463, Carlton/Collingwood 268) come from the measured
  * ISSUE-144 test-database evidence pack and the approved runbook.
+ *
+ * ISSUE-363 (owner decision 363-W, run 4): every HISTORICAL witness is a
+ * statement about seasons through HISTORY_THROUGH (2025), pinned on the
+ * independent oracle BOUNDED to that season, never on a result that moves
+ * when a later season completes. The application is separately held to the
+ * UNBOUNDED oracle, so a completed 2026 (or any later season) cannot make a
+ * historical literal stale, and a wrong application still fails. Players
+ * named by a witness are resolved by their AFL Tables profile identity
+ * (`external_identities`, source `afltables`), never by a surrogate
+ * `players.id`, which differs between the production snapshot and a rebuild.
+ * Provenance of every pinned literal: the measured ISSUE-144 witnesses
+ * through 2025, re-measured on the accepted rebuild AND the 4 Nov snapshot
+ * with the bounded oracle (run 4 `clubcmp` README).
  */
 import './guard';
 
@@ -80,8 +93,21 @@ type OracleSummary = {
   latestDate: Date | null;
 };
 
-/** Plain aggregate over the two-way organisation join. No CTE, no reuse. */
-async function oracleSummary(orgA: number, orgB: number): Promise<OracleSummary> {
+/**
+ * Owner decision 363-W: the explicit historical scope of every pinned
+ * head-to-head and aggregate literal in this file. Complete seasons only.
+ */
+const HISTORY_THROUGH = 2025;
+
+/**
+ * Plain aggregate over the two-way organisation join. No CTE, no reuse.
+ * `through` bounds the population to seasons <= through (null: all seasons).
+ */
+async function oracleSummary(
+  orgA: number,
+  orgB: number,
+  through: number | null = null,
+): Promise<OracleSummary> {
   const [row] = await sql<OracleSummary[]>`
     SELECT count(*)::int AS meetings,
            count(*) FILTER (WHERE wc.organization_id = ${orgA})::int AS "aWins",
@@ -96,8 +122,9 @@ async function oracleSummary(orgA: number, orgB: number): Promise<OracleSummary>
       JOIN clubs hc ON hc.id = m.home_club_id
       JOIN clubs ac ON ac.id = m.away_club_id
       LEFT JOIN clubs wc ON wc.id = m.winner_club_id
-     WHERE (hc.organization_id = ${orgA} AND ac.organization_id = ${orgB})
-        OR (hc.organization_id = ${orgB} AND ac.organization_id = ${orgA})
+     WHERE ((hc.organization_id = ${orgA} AND ac.organization_id = ${orgB})
+         OR (hc.organization_id = ${orgB} AND ac.organization_id = ${orgA}))
+       AND (${through}::int IS NULL OR m.season <= ${through}::int)
   `;
   return row;
 }
@@ -120,8 +147,15 @@ type OracleMeeting = {
   awayScore: number | null;
 };
 
-/** Every meeting, unaggregated and unordered by the implementation's rules. */
-async function oracleMeetings(orgA: number, orgB: number): Promise<OracleMeeting[]> {
+/**
+ * Every meeting, unaggregated and unordered by the implementation's rules.
+ * `through` bounds the population to seasons <= through (null: all seasons).
+ */
+async function oracleMeetings(
+  orgA: number,
+  orgB: number,
+  through: number | null = null,
+): Promise<OracleMeeting[]> {
   const rows = await sql<OracleMeeting[]>`
     SELECT m.id, m.season, m.match_date AS "matchDate", m.round_type::text AS "roundType",
            m.is_finals_series AS "isFinalsSeries",
@@ -135,10 +169,58 @@ async function oracleMeetings(orgA: number, orgB: number): Promise<OracleMeeting
       JOIN clubs ac ON ac.id = m.away_club_id
       LEFT JOIN clubs wc ON wc.id = m.winner_club_id
       LEFT JOIN venues v ON v.id = m.venue_id
-     WHERE (hc.organization_id = ${orgA} AND ac.organization_id = ${orgB})
-        OR (hc.organization_id = ${orgB} AND ac.organization_id = ${orgA})
+     WHERE ((hc.organization_id = ${orgA} AND ac.organization_id = ${orgB})
+         OR (hc.organization_id = ${orgB} AND ac.organization_id = ${orgA}))
+       AND (${through}::int IS NULL OR m.season <= ${through}::int)
   `;
   return [...rows];
+}
+
+/** Rows of a bounded oracle population in chronological order (date, season, id). */
+function chronological(rows: OracleMeeting[]): OracleMeeting[] {
+  return [...rows].sort(
+    (x, y) => (x.matchDate?.getTime() ?? 0) - (y.matchDate?.getTime() ?? 0)
+      || x.season - y.season
+      || x.id - y.id,
+  );
+}
+
+/** Wins, draws and meetings of an oracle population, from the winner column only. */
+function tally(rows: OracleMeeting[], orgA: number, orgB: number) {
+  return {
+    meetings: rows.length,
+    aWins: rows.filter((r) => r.winnerOrgId === orgA).length,
+    bWins: rows.filter((r) => r.winnerOrgId === orgB).length,
+    draws: rows.filter((r) => r.winnerOrgId === null).length,
+  };
+}
+
+/**
+ * Runs of identical results in chronological order, written from the
+ * documented contract (a draw is its own result and breaks a winning run):
+ * returns the run list, from which longest / current are read.
+ */
+function oracleRuns(rows: OracleMeeting[], orgA: number, orgB: number) {
+  type Run = { outcome: 'a-win' | 'b-win' | 'draw'; length: number; fromId: number; toId: number; fromSeason: number; toSeason: number };
+  const runs: Run[] = [];
+  for (const row of chronological(rows)) {
+    const outcome = row.winnerOrgId === orgA ? 'a-win' : row.winnerOrgId === orgB ? 'b-win' : 'draw';
+    const open = runs[runs.length - 1];
+    if (open && open.outcome === outcome) {
+      open.length += 1;
+      open.toId = row.id;
+      open.toSeason = row.season;
+    } else {
+      runs.push({ outcome, length: 1, fromId: row.id, toId: row.id, fromSeason: row.season, toSeason: row.season });
+    }
+  }
+  const longest = (outcome: 'a-win' | 'b-win') => {
+    const mine = runs.filter((r) => r.outcome === outcome);
+    const best = Math.max(0, ...mine.map((r) => r.length));
+    // The earlier of two tied runs, the documented tie-break.
+    return mine.find((r) => r.length === best) ?? null;
+  };
+  return { longestA: longest('a-win'), longestB: longest('b-win'), current: runs[runs.length - 1] ?? null };
 }
 
 /** Organisation A's score in an oracle row, without touching the implementation. */
@@ -160,6 +242,26 @@ async function orgIdBySlug(slug: string): Promise<number> {
   return (org as { id: number }).id;
 }
 
+/**
+ * Resolves a witness player by the AFL Tables profile identity
+ * (`external_identities.external_id` of source `afltables`, the path
+ * `players/<initial>/<Name>.html`). That identity is the same person on
+ * the production snapshot and on a rebuild; `players.id` is not.
+ */
+async function playerIdByProfile(profile: string): Promise<number> {
+  const rows = await sql<{ id: number }[]>`
+    SELECT ei.player_id::int AS id
+      FROM external_identities ei
+      JOIN sources s ON s.id = ei.source_id
+     WHERE s.key = 'afltables'
+       AND ei.external_id = ${profile}
+       AND ei.status IN ('unique', 'resolved')
+       AND ei.player_id IS NOT NULL
+  `;
+  expect(rows, `player identity '${profile}' must resolve to exactly one player`).toHaveLength(1);
+  return rows[0].id;
+}
+
 // --- Tests ---
 
 describe('club comparison: head-to-head core', () => {
@@ -178,20 +280,25 @@ describe('club comparison: head-to-head core', () => {
   });
 
   it('summarises Adelaide vs Brisbane Lions to the canonical witness and to independent SQL', async () => {
-    const [summary, oracle] = await Promise.all([
+    const [summary, oracle, history, allMeetings, historyMeetings] = await Promise.all([
       getHeadToHeadSummary(adelaide, lions),
       oracleSummary(adelaide, lions),
+      oracleSummary(adelaide, lions, HISTORY_THROUGH),
+      oracleMeetings(adelaide, lions),
+      oracleMeetings(adelaide, lions, HISTORY_THROUGH),
     ]);
 
-    // The measured canonical witness.
-    expect(summary.meetings).toBe(41);
-    expect(summary.aWins).toBe(19);
-    expect(summary.bWins).toBe(21);
-    expect(summary.draws).toBe(1);
-    expect(summary.finalsSeriesMeetings).toBe(2);
-    expect(summary.grandFinalMeetings).toBe(0);
+    // The measured canonical witness: the rivalry through 2025 (363-W),
+    // pinned on the oracle bounded to that scope.
+    expect(history.meetings).toBe(41);
+    expect(history.aWins).toBe(19);
+    expect(history.bWins).toBe(21);
+    expect(history.drawsByWinnerNull).toBe(1);
+    expect(history.finalsSeries).toBe(2);
+    expect(history.grandFinals).toBe(0);
 
-    // ...and the same numbers reached by structurally simpler SQL.
+    // ...and the application, with every season, equals the same numbers
+    // reached by structurally simpler SQL over every season.
     expect(summary.meetings).toBe(oracle.meetings);
     expect(summary.aWins).toBe(oracle.aWins);
     expect(summary.bWins).toBe(oracle.bWins);
@@ -200,43 +307,61 @@ describe('club comparison: head-to-head core', () => {
     expect(summary.finalsSeriesMeetings).toBe(oracle.finalsSeries);
     expect(summary.grandFinalMeetings).toBe(oracle.grandFinals);
     expect(summary.aWins + summary.bWins + summary.draws).toBe(summary.meetings);
+    // No season after the historical scope can remove a meeting.
+    expect(oracle.meetings).toBeGreaterThanOrEqual(history.meetings);
 
-    // Half-draw win percentages.
-    expect(summary.aWinPercentage).toBeCloseTo((100 * (19 + 0.5)) / 41, 10);
-    expect(summary.bWinPercentage).toBeCloseTo((100 * (21 + 0.5)) / 41, 10);
+    // Half-draw win percentages (the formula, over the oracle's counts).
+    expect(summary.aWinPercentage).toBeCloseTo((100 * (oracle.aWins + 0.5 * oracle.drawsByWinnerNull)) / oracle.meetings, 10);
+    expect(summary.bWinPercentage).toBeCloseTo((100 * (oracle.bWins + 0.5 * oracle.drawsByWinnerNull)) / oracle.meetings, 10);
     expect((summary.aWinPercentage as number) + (summary.bWinPercentage as number)).toBeCloseTo(100, 10);
 
     // First and latest meeting, by chronology rather than by id alone.
     expect(summary.firstMeeting?.matchId).toBe(11178);
     expect(summary.firstMeeting?.season).toBe(1997);
     expect(summary.firstMeeting?.matchDate?.getTime()).toBe(oracle.firstDate?.getTime());
-    expect(summary.latestMeeting?.matchId).toBe(16729);
-    expect(summary.latestMeeting?.season).toBe(2025);
+    const latest = chronological(allMeetings).at(-1);
+    expect(summary.latestMeeting?.matchId).toBe(latest?.id);
+    expect(summary.latestMeeting?.season).toBe(latest?.season);
     expect(summary.latestMeeting?.matchDate?.getTime()).toBe(oracle.latestDate?.getTime());
+    // The latest meeting THROUGH 2025 is the 2025 round that Adelaide won.
+    const latestHistory = chronological(historyMeetings).at(-1);
+    expect(latestHistory?.id).toBe(16729);
+    expect(latestHistory?.season).toBe(2025);
   });
 
   it('filters by match type so that home-and-away and finals partition the complete history', async () => {
-    const [all, homeAndAway, finals, oracle] = await Promise.all([
+    const [all, homeAndAway, finals, oracle, history] = await Promise.all([
       getHeadToHeadMeetings(adelaide, lions, { matchType: 'all' }),
       getHeadToHeadMeetings(adelaide, lions, { matchType: 'home-and-away' }),
       getHeadToHeadMeetings(adelaide, lions, { matchType: 'finals' }),
       oracleMeetings(adelaide, lions),
+      oracleMeetings(adelaide, lions, HISTORY_THROUGH),
     ]);
 
-    expect(all.totalMeetings).toBe(41);
-    expect(finals.totalMeetings).toBe(2);
-    expect(homeAndAway.totalMeetings).toBe(39);
-    expect(homeAndAway.totalMeetings + finals.totalMeetings).toBe(all.totalMeetings);
+    // The measured witness through 2025 (363-W), on the bounded oracle.
+    const historyFinals = history.filter((m) => m.isFinalsSeries === true);
+    expect(history).toHaveLength(41);
+    expect(historyFinals).toHaveLength(2);
+    expect(history.filter((m) => m.isFinalsSeries !== true)).toHaveLength(39);
+    expect(historyFinals.map((m) => m.id).sort((x, y) => x - y)).toEqual([12275, 12463]);
+    expect(historyFinals.map((m) => m.roundType).sort()).toEqual(['qualifying_final', 'semi_final']);
+    expect(historyFinals.some((m) => m.roundType === 'grand_final')).toBe(false);
 
+    // The application, over every season, equals the unbounded oracle.
+    expect(homeAndAway.totalMeetings + finals.totalMeetings).toBe(all.totalMeetings);
     expect(all.totalMeetings).toBe(oracle.length);
     expect(finals.totalMeetings).toBe(oracle.filter((m) => m.isFinalsSeries === true).length);
     expect(homeAndAway.totalMeetings).toBe(oracle.filter((m) => m.isFinalsSeries !== true).length);
 
-    // The two finals witnesses, and finals derived from is_finals_series only.
-    expect(finals.meetings.map((m) => m.matchId).sort((x, y) => x - y)).toEqual([12275, 12463]);
+    // Finals derived from is_finals_series only, identified by match id.
+    const oracleFinals = oracle.filter((m) => m.isFinalsSeries === true);
+    expect(finals.meetings.map((m) => m.matchId).sort((x, y) => x - y))
+      .toEqual(oracleFinals.map((m) => m.id).sort((x, y) => x - y));
     expect(finals.meetings.every((m) => m.isFinalsSeries)).toBe(true);
-    expect(finals.meetings.map((m) => m.roundType).sort()).toEqual(['qualifying_final', 'semi_final']);
-    expect(finals.meetings.some((m) => m.isGrandFinal)).toBe(false);
+    expect(finals.meetings.map((m) => m.roundType).sort())
+      .toEqual(oracleFinals.map((m) => m.roundType).sort());
+    expect(finals.meetings.some((m) => m.isGrandFinal))
+      .toBe(oracleFinals.some((m) => m.roundType === 'grand_final'));
 
     // The 2024 draw witness, carried on the complete list.
     const draw = all.meetings.find((m) => m.matchId === 16486);
@@ -248,22 +373,35 @@ describe('club comparison: head-to-head core', () => {
   });
 
   it('filters by era (Club Rivalry Explorer follow-up, FR-2) so the decades partition the complete history', async () => {
-    const [all, s1990s, s2000s, s2010s, s2020s] = await Promise.all([
+    const [all, s1990s, s2000s, s2010s, s2020s, oracle, history] = await Promise.all([
       getHeadToHeadMeetings(adelaide, lions),
       getHeadToHeadMeetings(adelaide, lions, { era: 1990 }),
       getHeadToHeadMeetings(adelaide, lions, { era: 2000 }),
       getHeadToHeadMeetings(adelaide, lions, { era: 2010 }),
       getHeadToHeadMeetings(adelaide, lions, { era: 2020 }),
+      oracleMeetings(adelaide, lions),
+      oracleMeetings(adelaide, lions, HISTORY_THROUGH),
     ]);
 
-    // Runbook witness (V1.7 decade H2H): Adelaide vs Brisbane Lions.
-    expect(s1990s.totalMeetings).toBe(5);
-    expect(s2000s.totalMeetings).toBe(15);
-    expect(s2010s.totalMeetings).toBe(13);
-    expect(s2020s.totalMeetings).toBe(8);
+    // Runbook witness (V1.7 decade H2H): Adelaide vs Brisbane Lions,
+    // through 2025 (363-W), on the bounded oracle.
+    const inDecade = (rows: OracleMeeting[], decade: number) =>
+      rows.filter((m) => m.season >= decade && m.season < decade + 10).length;
+    expect(inDecade(history, 1990)).toBe(5);
+    expect(inDecade(history, 2000)).toBe(15);
+    expect(inDecade(history, 2010)).toBe(13);
+    expect(inDecade(history, 2020)).toBe(8);
+
+    // The application, over every season, equals the unbounded oracle.
+    expect(s1990s.totalMeetings).toBe(inDecade(oracle, 1990));
+    expect(s2000s.totalMeetings).toBe(inDecade(oracle, 2000));
+    expect(s2010s.totalMeetings).toBe(inDecade(oracle, 2010));
+    expect(s2020s.totalMeetings).toBe(inDecade(oracle, 2020));
+    // The four decades partition the history (a later decade would be
+    // counted separately by the oracle, not folded into the 2020s).
     expect(
       s1990s.totalMeetings + s2000s.totalMeetings + s2010s.totalMeetings + s2020s.totalMeetings,
-    ).toBe(all.totalMeetings);
+    ).toBe(all.totalMeetings - oracle.filter((m) => m.season >= 2030).length);
 
     expect(s1990s.era).toBe(1990);
     expect(s1990s.meetings.every((m) => m.season >= 1990 && m.season < 2000)).toBe(true);
@@ -278,27 +416,45 @@ describe('club comparison: head-to-head core', () => {
   it('paginates the complete meetings list deterministically at 25 rows per page', async () => {
     expect(MEETINGS_PAGE_SIZE).toBe(25);
 
-    const [page1, page2, page3] = await Promise.all([
-      getHeadToHeadMeetings(adelaide, lions, { page: 1 }),
-      getHeadToHeadMeetings(adelaide, lions, { page: 2 }),
-      getHeadToHeadMeetings(adelaide, lions, { page: 3 }),
+    // The rivalry through 2025 is 41 meetings (363-W): 25 on the first
+    // page and 16 on the second. That is a statement about the bounded
+    // oracle; the application's pages are held to the unbounded one.
+    const [oracle, history] = await Promise.all([
+      oracleMeetings(adelaide, lions),
+      oracleMeetings(adelaide, lions, HISTORY_THROUGH),
     ]);
+    expect(history).toHaveLength(41);
+    expect(history.length - MEETINGS_PAGE_SIZE).toBe(16);
 
-    expect(page1.meetings).toHaveLength(25);
-    expect(page2.meetings).toHaveLength(16);
-    expect(page3.meetings).toHaveLength(0);
-    expect(page1.totalPages).toBe(2);
-    expect(page1.hasPreviousPage).toBe(false);
-    expect(page1.hasNextPage).toBe(true);
-    expect(page2.hasPreviousPage).toBe(true);
-    expect(page2.hasNextPage).toBe(false);
-    expect(page3.totalMeetings).toBe(41);
+    const total = oracle.length;
+    const pageCount = Math.ceil(total / MEETINGS_PAGE_SIZE);
+    expect(pageCount).toBeGreaterThanOrEqual(2);
+    const pages = await Promise.all(
+      Array.from({ length: pageCount + 1 }, (_, i) =>
+        getHeadToHeadMeetings(adelaide, lions, { page: i + 1 })),
+    );
+    const beyond = pages[pageCount];
+    const real = pages.slice(0, pageCount);
+    const page1 = real[0];
+    const page2 = real[1];
 
-    const ids = [...page1.meetings, ...page2.meetings].map((m) => m.matchId);
-    expect(new Set(ids).size).toBe(41);
+    real.forEach((page, i) => {
+      expect(page.meetings, `page ${i + 1}`)
+        .toHaveLength(Math.min(MEETINGS_PAGE_SIZE, total - i * MEETINGS_PAGE_SIZE));
+      expect(page.totalMeetings).toBe(total);
+      expect(page.hasPreviousPage).toBe(i > 0);
+      expect(page.hasNextPage).toBe(i < pageCount - 1);
+    });
+    expect(beyond.meetings).toHaveLength(0);
+    expect(page1.totalPages).toBe(pageCount);
+    expect(beyond.totalMeetings).toBe(total);
+
+    const ids = real.flatMap((p) => p.meetings).map((m) => m.matchId);
+    expect(new Set(ids).size).toBe(total);
+    expect([...ids].sort((x, y) => x - y)).toEqual(oracle.map((m) => m.id).sort((x, y) => x - y));
 
     // match_date DESC, season DESC, id DESC.
-    const keys = [...page1.meetings, ...page2.meetings].map(
+    const keys = real.flatMap((p) => p.meetings).map(
       (m) => [m.matchDate?.getTime() ?? 0, m.season, m.matchId] as [number, number, number],
     );
     for (let i = 1; i < keys.length; i += 1) {
@@ -310,14 +466,22 @@ describe('club comparison: head-to-head core', () => {
           : prev[2] > next[2];
       expect(descending, `rows ${i - 1} and ${i} are out of order`).toBe(true);
     }
-    expect(page1.meetings[0].matchId).toBe(16729);
-    expect(page2.meetings[page2.meetings.length - 1].matchId).toBe(11178);
+    // The newest meeting leads page 1 and the oldest closes the last page.
+    const newestFirst = chronological(oracle).reverse();
+    expect(page1.meetings[0].matchId).toBe(newestFirst[0].id);
+    expect(real[pageCount - 1].meetings.at(-1)?.matchId).toBe(newestFirst.at(-1)?.id);
+    // Through 2025 (363-W) the newest is 16729 and the oldest 11178.
+    const historyNewestFirst = chronological(history).reverse();
+    expect(historyNewestFirst[0].id).toBe(16729);
+    expect(historyNewestFirst.at(-1)?.id).toBe(11178);
+    expect(page2.hasPreviousPage).toBe(true);
   });
 
   it('groups venue records by canonical venue and agrees with an independent grouping', async () => {
-    const [venues, oracle] = await Promise.all([
+    const [venues, oracle, history] = await Promise.all([
       getHeadToHeadVenueRecords(adelaide, lions),
       oracleMeetings(adelaide, lions),
+      oracleMeetings(adelaide, lions, HISTORY_THROUGH),
     ]);
 
     const expected = new Map<string, { meetings: number; aWins: number; bWins: number; draws: number }>();
@@ -332,7 +496,7 @@ describe('club comparison: head-to-head core', () => {
     }
 
     expect(venues).toHaveLength(expected.size);
-    expect(venues.reduce((n, v) => n + v.meetings, 0)).toBe(41);
+    expect(venues.reduce((n, v) => n + v.meetings, 0)).toBe(oracle.length);
     for (const venue of venues) {
       const key = venue.venueId === null ? `raw:${venue.venueName ?? ''}` : `id:${venue.venueId}`;
       const want = expected.get(key);
@@ -344,39 +508,52 @@ describe('club comparison: head-to-head core', () => {
       expect(venue.aWins + venue.bWins + venue.draws).toBe(venue.meetings);
     }
 
-    // Measured witness: the Gabba is the most-used ground of this rivalry.
-    const gabba = venues.find((v) => v.venueName === 'Gabba');
-    expect(gabba?.meetings).toBe(25);
-    expect(gabba?.aWins).toBe(11);
-    expect(gabba?.bWins).toBe(14);
-    expect(gabba?.draws).toBe(0);
-    const adelaideOval = venues.find((v) => v.venueName === 'Adelaide Oval');
-    expect(adelaideOval?.meetings).toBe(7);
-    expect(adelaideOval?.draws).toBe(1);
+    // Measured witness through 2025 (363-W), on the bounded oracle: the
+    // Gabba is the most-used ground of this rivalry.
+    const atVenue = (rows: OracleMeeting[], name: string) =>
+      tally(rows.filter((m) => m.venueName === name), adelaide, lions);
+    expect(venues.reduce((n, v) => n + v.meetings, 0)).toBeGreaterThanOrEqual(history.length);
+    expect(history).toHaveLength(41);
+    expect(atVenue(history, 'Gabba')).toEqual({ meetings: 25, aWins: 11, bWins: 14, draws: 0 });
+    expect(atVenue(history, 'Adelaide Oval').meetings).toBe(7);
+    expect(atVenue(history, 'Adelaide Oval').draws).toBe(1);
+    // ...and the application reports every season's meetings at those grounds.
+    for (const name of ['Gabba', 'Adelaide Oval']) {
+      const venue = venues.find((v) => v.venueName === name);
+      const want = atVenue(oracle, name);
+      expect(venue?.meetings, name).toBe(want.meetings);
+      expect(venue?.aWins, name).toBe(want.aWins);
+      expect(venue?.bWins, name).toBe(want.bWins);
+      expect(venue?.draws, name).toBe(want.draws);
+    }
   });
 
   it('derives every head-to-head record from independent extremes and keeps ties', async () => {
-    const [records, oracle] = await Promise.all([
+    const [records, oracle, history] = await Promise.all([
       getHeadToHeadRecords(adelaide, lions),
       oracleMeetings(adelaide, lions),
+      oracleMeetings(adelaide, lions, HISTORY_THROUGH),
     ]);
 
-    const scored = oracle
+    type Scored = { id: number; aScore: number; bScore: number };
+    const scoredOf = (rows: OracleMeeting[]) => rows
       .map((row) => ({ id: row.id, ...perspective(row, adelaide) }))
-      .filter((row): row is { id: number; aScore: number; bScore: number } =>
-        row.aScore !== null && row.bScore !== null);
+      .filter((row): row is Scored => row.aScore !== null && row.bScore !== null);
+    const extremesOf = (scored: Scored[]) => ({
+      biggestA: Math.max(...scored.filter((r) => r.aScore > r.bScore).map((r) => r.aScore - r.bScore)),
+      biggestB: Math.max(...scored.filter((r) => r.bScore > r.aScore).map((r) => r.bScore - r.aScore)),
+      closest: Math.min(...scored.filter((r) => r.aScore !== r.bScore).map((r) => Math.abs(r.aScore - r.bScore))),
+      highestA: Math.max(...scored.map((r) => r.aScore)),
+      highestB: Math.max(...scored.map((r) => r.bScore)),
+      lowestA: Math.min(...scored.map((r) => r.aScore)),
+      lowestB: Math.min(...scored.map((r) => r.bScore)),
+      combined: Math.max(...scored.map((r) => r.aScore + r.bScore)),
+    });
 
+    // The application is held to the extremes of every season...
+    const scored = scoredOf(oracle);
     const idsOf = (kind: keyof typeof records) => records[kind].map((r) => r.matchId).sort((x, y) => x - y);
-    const pick = (values: number[], want: number) => values.filter((v) => v === want).length;
-
-    const biggestA = Math.max(...scored.filter((r) => r.aScore > r.bScore).map((r) => r.aScore - r.bScore));
-    const biggestB = Math.max(...scored.filter((r) => r.bScore > r.aScore).map((r) => r.bScore - r.aScore));
-    const closest = Math.min(...scored.filter((r) => r.aScore !== r.bScore).map((r) => Math.abs(r.aScore - r.bScore)));
-    const highestA = Math.max(...scored.map((r) => r.aScore));
-    const highestB = Math.max(...scored.map((r) => r.bScore));
-    const lowestA = Math.min(...scored.map((r) => r.aScore));
-    const lowestB = Math.min(...scored.map((r) => r.bScore));
-    const combined = Math.max(...scored.map((r) => r.aScore + r.bScore));
+    const { biggestA, biggestB, closest, highestA, highestB, lowestA, lowestB, combined } = extremesOf(scored);
 
     expect(records['biggest-win-a'].every((r) => r.value === biggestA)).toBe(true);
     expect(records['biggest-win-b'].every((r) => r.value === biggestB)).toBe(true);
@@ -395,24 +572,34 @@ describe('club comparison: head-to-head core', () => {
     expect(idsOf('highest-combined-score')).toEqual(
       scored.filter((r) => r.aScore + r.bScore === combined).map((r) => r.id).sort((x, y) => x - y));
 
-    // Measured witnesses.
-    expect(biggestA).toBe(138);
-    expect(idsOf('biggest-win-a')).toEqual([14950]);
-    expect(biggestB).toBe(141);
-    expect(idsOf('biggest-win-b')).toEqual([12597]);
-    expect(closest).toBe(1);
-    expect(idsOf('closest-game')).toEqual([15481]);
-    expect(highestA).toBe(177);
-    expect(highestB).toBe(189);
-    expect(lowestB).toBe(39);
-    expect(combined).toBe(249);
-    expect(idsOf('highest-combined-score')).toEqual([11978]);
+    // ...and the measured witnesses are the extremes THROUGH 2025 (363-W),
+    // on the bounded oracle.
+    const past = scoredOf(history);
+    const hist = extremesOf(past);
+    const historyIdsWhere = (hit: (r: Scored) => boolean) =>
+      past.filter(hit).map((r) => r.id).sort((x, y) => x - y);
+    expect(hist.biggestA).toBe(138);
+    expect(historyIdsWhere((r) => r.aScore - r.bScore === 138)).toEqual([14950]);
+    expect(hist.biggestB).toBe(141);
+    expect(historyIdsWhere((r) => r.bScore - r.aScore === 141)).toEqual([12597]);
+    expect(hist.closest).toBe(1);
+    expect(historyIdsWhere((r) => Math.abs(r.aScore - r.bScore) === 1)).toEqual([15481]);
+    expect(hist.highestA).toBe(177);
+    expect(hist.highestB).toBe(189);
+    expect(hist.lowestB).toBe(39);
+    expect(hist.combined).toBe(249);
+    expect(historyIdsWhere((r) => r.aScore + r.bScore === 249)).toEqual([11978]);
 
     // Adelaide's lowest score against Brisbane Lions is a genuine two-way
     // tie: collapsing it would silently drop the 2002 qualifying final.
-    expect(lowestA).toBe(44);
-    expect(pick(scored.map((r) => r.aScore), 44)).toBe(2);
-    expect(idsOf('lowest-score-a')).toEqual([11692, 12275]);
+    expect(hist.lowestA).toBe(44);
+    expect(historyIdsWhere((r) => r.aScore === 44)).toEqual([11692, 12275]);
+
+    // A later season can only equal or move a record, never lose a witness
+    // the application already returns for every season.
+    expect(biggestA).toBeGreaterThanOrEqual(hist.biggestA);
+    expect(biggestB).toBeGreaterThanOrEqual(hist.biggestB);
+    expect(closest).toBeLessThanOrEqual(hist.closest);
 
     // The draw is never the closest game, and never a record win.
     expect(records['closest-game'].some((r) => r.matchId === 16486)).toBe(false);
@@ -439,29 +626,52 @@ describe('club comparison: head-to-head core', () => {
   });
 
   it('reads streaks from chronological order, with a draw breaking a winning streak', async () => {
-    const streaks = await getHeadToHeadStreaks(adelaide, lions);
+    const [streaks, oracle, history] = await Promise.all([
+      getHeadToHeadStreaks(adelaide, lions),
+      oracleMeetings(adelaide, lions),
+      oracleMeetings(adelaide, lions, HISTORY_THROUGH),
+    ]);
+
+    // The application reads the runs of every season, in chronological
+    // order, exactly as the documented contract reads them from the oracle.
+    const all = oracleRuns(oracle, adelaide, lions);
+    expect(streaks.longestA?.length).toBe(all.longestA?.length);
+    expect(streaks.longestA?.fromMatchId).toBe(all.longestA?.fromId);
+    expect(streaks.longestA?.toMatchId).toBe(all.longestA?.toId);
+    expect(streaks.longestB?.length).toBe(all.longestB?.length);
+    expect(streaks.longestB?.fromMatchId).toBe(all.longestB?.fromId);
+    expect(streaks.longestB?.toMatchId).toBe(all.longestB?.toId);
+    expect(streaks.current?.outcome).toBe(all.current?.outcome);
+    expect(streaks.current?.length).toBe(all.current?.length);
+    expect(streaks.current?.fromMatchId).toBe(all.current?.fromId);
+    expect(streaks.current?.toMatchId).toBe(all.current?.toId);
+
+    // The historical witnesses are the runs THROUGH 2025 (363-W), pinned
+    // on the oracle bounded to that scope.
+    const past = oracleRuns(history, adelaide, lions);
 
     // Adelaide 2013 round 2 through 2018 round 18: seven straight.
-    expect(streaks.longestA?.outcome).toBe('a-win');
-    expect(streaks.longestA?.length).toBe(7);
-    expect(streaks.longestA?.fromMatchId).toBe(14177);
-    expect(streaks.longestA?.toMatchId).toBe(15346);
-    expect(streaks.longestA?.fromSeason).toBe(2013);
-    expect(streaks.longestA?.toSeason).toBe(2018);
+    expect(past.longestA?.outcome).toBe('a-win');
+    expect(past.longestA?.length).toBe(7);
+    expect(past.longestA?.fromId).toBe(14177);
+    expect(past.longestA?.toId).toBe(15346);
+    expect(past.longestA?.fromSeason).toBe(2013);
+    expect(past.longestA?.toSeason).toBe(2018);
 
     // Brisbane Lions 2002 qualifying final through 2005: six straight,
     // finals included -- the streak population is every meeting.
-    expect(streaks.longestB?.outcome).toBe('b-win');
-    expect(streaks.longestB?.length).toBe(6);
-    expect(streaks.longestB?.fromMatchId).toBe(12275);
-    expect(streaks.longestB?.toMatchId).toBe(12710);
+    expect(past.longestB?.outcome).toBe('b-win');
+    expect(past.longestB?.length).toBe(6);
+    expect(past.longestB?.fromId).toBe(12275);
+    expect(past.longestB?.toId).toBe(12710);
 
-    // The 2024 draw broke Brisbane Lions' run, so the current streak is
-    // Adelaide's single 2025 win rather than anything longer.
-    expect(streaks.current?.outcome).toBe('a-win');
-    expect(streaks.current?.length).toBe(1);
-    expect(streaks.current?.fromMatchId).toBe(16729);
-    expect(streaks.current?.toMatchId).toBe(16729);
+    // The 2024 draw broke Brisbane Lions' run, so the streak standing at
+    // the end of 2025 is Adelaide's single 2025 win rather than anything
+    // longer. (Which streak stands today moves with every season.)
+    expect(past.current?.outcome).toBe('a-win');
+    expect(past.current?.length).toBe(1);
+    expect(past.current?.fromId).toBe(16729);
+    expect(past.current?.toId).toBe(16729);
   });
 
   it('includes Footscray and South Melbourne meetings through organization_id', async () => {
@@ -516,7 +726,8 @@ describe('club comparison: head-to-head core', () => {
     const lionsOrgs = new Set(lionsMeetings.flatMap((m) => [m.homeOrgId, m.awayOrgId]));
     expect(lionsOrgs.has(bears)).toBe(false);
     expect(lionsOrgs.has(fitzroy)).toBe(false);
-    expect(lionsMeetings).toHaveLength(41);
+    // Through 2025 (363-W) the Brisbane Lions total is exactly 41.
+    expect(lionsMeetings.filter((m) => m.season <= HISTORY_THROUGH)).toHaveLength(41);
 
     const [bearsMeetings, fitzroyMeetings] = await Promise.all([
       oracleMeetings(adelaide, bears),
@@ -528,14 +739,18 @@ describe('club comparison: head-to-head core', () => {
   });
 
   it('handles the Carlton vs Collingwood long rivalry, including Grand Finals', async () => {
-    const [summary, oracle, all, finals] = await Promise.all([
+    const [summary, oracle, history, all, finals] = await Promise.all([
       getHeadToHeadSummary(carlton, collingwood),
       oracleSummary(carlton, collingwood),
+      oracleSummary(carlton, collingwood, HISTORY_THROUGH),
       getHeadToHeadMeetings(carlton, collingwood, { matchType: 'all' }),
       getHeadToHeadMeetings(carlton, collingwood, { matchType: 'finals' }),
     ]);
 
-    expect(summary.meetings).toBe(268);
+    // 268 meetings through 2025 (363-W), on the bounded oracle; the
+    // application, over every season, equals the unbounded oracle.
+    expect(history.meetings).toBe(268);
+    expect(history.finalsSeries).toBe(22);
     expect(summary.meetings).toBe(oracle.meetings);
     expect(summary.aWins).toBe(oracle.aWins);
     expect(summary.bWins).toBe(oracle.bWins);
@@ -615,6 +830,44 @@ async function oracleCrossover(orgA: number, orgB: number): Promise<OracleRepres
   return [...rows];
 }
 
+/**
+ * The same crossover population, bounded to seasons <= `through` (363-W),
+ * counted from the per-match fact table instead of from `player_clubs`
+ * (whose games, goals and last match are cumulative over every season and
+ * cannot be cut at a season). A player is a crossover player through
+ * `through` only if both organisations have an appearance in that scope.
+ */
+async function oracleCrossoverThrough(
+  orgA: number,
+  orgB: number,
+  through: number,
+): Promise<OracleRepresentation[]> {
+  const rows = await sql<OracleRepresentation[]>`
+    WITH per_org AS (
+      SELECT pms.player_id,
+             c.organization_id AS org_id,
+             count(*)::int AS games,
+             sum(pms.goals)::int AS goals,
+             min(m.match_date) AS first_date,
+             max(m.match_date) AS last_date
+        FROM player_match_stats pms
+        JOIN matches m ON m.id = pms.match_id
+        JOIN clubs c ON c.id = pms.club_id
+       WHERE m.season <= ${through}
+       GROUP BY pms.player_id, c.organization_id
+    )
+    SELECT x.player_id AS "playerId",
+           x.games AS "aGames", x.goals AS "aGoals",
+           x.first_date AS "aFirst", x.last_date AS "aLast",
+           y.games AS "bGames", y.goals AS "bGoals",
+           y.first_date AS "bFirst", y.last_date AS "bLast"
+      FROM per_org x
+      JOIN per_org y ON y.player_id = x.player_id AND y.org_id = ${orgB}
+     WHERE x.org_id = ${orgA}
+  `;
+  return [...rows];
+}
+
 /** Third organisations first represented strictly between the two target debuts. */
 async function oracleIntervening(playerId: number, orgA: number, orgB: number): Promise<string[]> {
   const rows = await sql<{ slug: string }[]>`
@@ -667,14 +920,22 @@ describe('club comparison: crossover players', () => {
   });
 
   it('lists everyone who represented both organisations, agreeing with independent SQL', async () => {
-    const [players, oracle] = await Promise.all([
+    const [players, oracle, history, lyonsId, cameronId] = await Promise.all([
       getCrossoverPlayers(adelaide, lions),
       oracleCrossover(adelaide, lions),
+      oracleCrossoverThrough(adelaide, lions, HISTORY_THROUGH),
+      playerIdByProfile('players/J/Jarryd_Lyons.html'),
+      playerIdByProfile('players/C/Charlie_Cameron.html'),
     ]);
 
-    // The measured witness for this pair.
-    expect(players).toHaveLength(11);
+    // The measured witness for this pair: 11 players through 2025 (363-W),
+    // on the bounded oracle; every one of them is still a crossover player.
+    expect(history).toHaveLength(11);
+    expect(oracle.length).toBeGreaterThanOrEqual(history.length);
     expect(players).toHaveLength(oracle.length);
+    for (const h of history) {
+      expect(players.some((p) => p.playerId === h.playerId), `player ${h.playerId}`).toBe(true);
+    }
     expect(new Set(players.map((p) => p.playerId)))
       .toEqual(new Set(oracle.map((o) => o.playerId)));
 
@@ -704,7 +965,8 @@ describe('club comparison: crossover players', () => {
       expect(p.careerGames, p.displayName).not.toBeNull();
       expect(p.careerGames as number, p.displayName).toBeGreaterThanOrEqual(p.combinedGames);
     }
-    const lyons = players.find((p) => p.displayName === 'Jarryd Lyons');
+    const lyons = players.find((p) => p.playerId === lyonsId);
+    expect(lyons?.displayName).toBe('Jarryd Lyons');
     expect(lyons?.careerGames).toBe(194);
     expect(lyons?.careerGoals).toBe(86);
     expect(lyons?.careerGames).toBeGreaterThan(lyons?.combinedGames as number);
@@ -719,27 +981,40 @@ describe('club comparison: crossover players', () => {
           : prev.playerId < next.playerId;
       expect(ordered, `rows ${i - 1} and ${i} are out of order`).toBe(true);
     }
-    expect(players[0].displayName).toBe('Charlie Cameron');
-    expect(players[0].combinedGames).toBe(254);
+    // The top row carries the largest combined games of every season...
+    expect(players[0].combinedGames).toBe(Math.max(...oracle.map((o) => o.aGames + o.bGames)));
+    // ...and through 2025 (363-W) that player is Charlie Cameron on 254.
+    const pastTop = [...history].sort((x, y) => (y.aGames + y.bGames) - (x.aGames + x.bGames))[0];
+    expect(pastTop.playerId).toBe(cameronId);
+    expect(pastTop.aGames + pastTop.bGames).toBe(254);
+    expect(players.find((p) => p.playerId === cameronId)?.displayName).toBe('Charlie Cameron');
   });
 
   it('reports Ben Keays as Brisbane Lions first, then Adelaide, in both argument orders', async () => {
-    const [fromAdelaide, fromLions] = await Promise.all([
+    const [fromAdelaide, fromLions, keaysId, oracle, history] = await Promise.all([
       getCrossoverPlayers(adelaide, lions),
       getCrossoverPlayers(lions, adelaide),
+      playerIdByProfile('players/B/Ben_Keays.html'),
+      oracleCrossover(adelaide, lions),
+      oracleCrossoverThrough(adelaide, lions, HISTORY_THROUGH),
     ]);
 
-    const a = fromAdelaide.find((p) => p.displayName === 'Ben Keays');
-    const b = fromLions.find((p) => p.displayName === 'Ben Keays');
+    const a = fromAdelaide.find((p) => p.playerId === keaysId);
+    const b = fromLions.find((p) => p.playerId === keaysId);
     expect(a).toBeDefined();
     expect(b).toBeDefined();
+    expect(a?.displayName).toBe('Ben Keays');
 
     // A = Adelaide, B = Brisbane Lions: the Lions came first, so B -> A.
     expect(a?.direction).toBe('b-to-a');
     expect(day(a?.b.firstMatchDate ?? null)).toBe('2016-05-01');
     expect(day(a?.a.firstMatchDate ?? null)).toBe('2020-06-13');
     expect(a?.b.games).toBe(30);
-    expect(a?.a.games).toBe(131);
+    // His Adelaide games through 2025 (363-W) are 131 on the bounded
+    // oracle; the application counts every season.
+    expect(history.find((h) => h.playerId === keaysId)?.aGames).toBe(131);
+    expect(history.find((h) => h.playerId === keaysId)?.bGames).toBe(30);
+    expect(a?.a.games).toBe(oracle.find((o) => o.playerId === keaysId)?.aGames);
 
     // Swapping the arguments swaps the label and nothing else.
     expect(b?.direction).toBe('a-to-b');
@@ -755,15 +1030,18 @@ describe('club comparison: crossover players', () => {
   });
 
   it('reports Jarryd Lyons as Adelaide first, then Brisbane Lions, with Gold Coast in between', async () => {
+    // Jarryd Lyons by his AFL Tables profile identity: `players.id` is 6818
+    // on the production snapshot and 6850 on a rebuild.
+    const lyonsId = await playerIdByProfile('players/J/Jarryd_Lyons.html');
     const [fromAdelaide, fromLions, oracleSlugs] = await Promise.all([
       getCrossoverPlayers(adelaide, lions),
       getCrossoverPlayers(lions, adelaide),
-      oracleIntervening(6818, adelaide, lions),
+      oracleIntervening(lyonsId, adelaide, lions),
     ]);
 
-    const a = fromAdelaide.find((p) => p.displayName === 'Jarryd Lyons');
-    const b = fromLions.find((p) => p.displayName === 'Jarryd Lyons');
-    expect(a?.playerId).toBe(6818);
+    const a = fromAdelaide.find((p) => p.playerId === lyonsId);
+    const b = fromLions.find((p) => p.playerId === lyonsId);
+    expect(a?.displayName).toBe('Jarryd Lyons');
 
     expect(a?.direction).toBe('a-to-b');
     expect(b?.direction).toBe('b-to-a');
@@ -798,17 +1076,26 @@ describe('club comparison: crossover players', () => {
   });
 
   it('treats Footscray and Western Bulldogs as one continuing organisation', async () => {
-    const [players, oracle] = await Promise.all([
+    // James Cook and Brad Johnson by AFL Tables profile identity:
+    // `players.id` for Cook is 6711 on the production snapshot and 6743 on
+    // a rebuild, and Johnson 2068 against 2076.
+    const [players, oracle, history, cookId, johnsonId] = await Promise.all([
       getCrossoverPlayers(carlton, bulldogs),
       oracleCrossover(carlton, bulldogs),
+      oracleCrossoverThrough(carlton, bulldogs, HISTORY_THROUGH),
+      playerIdByProfile('players/J/James_Cook.html'),
+      playerIdByProfile('players/B/Brad_Johnson.html'),
     ]);
 
-    expect(players).toHaveLength(40);
+    // 40 crossover players through 2025 (363-W), on the bounded oracle;
+    // the application, over every season, equals the unbounded oracle.
+    expect(history).toHaveLength(40);
+    expect(oracle.length).toBeGreaterThanOrEqual(history.length);
     expect(players).toHaveLength(oracle.length);
 
     // James Cook played 5 games as Footscray and 44 as Western Bulldogs.
     // That is ONE representation of 49, not two clubs.
-    const cook = players.find((p) => p.playerId === 6711);
+    const cook = players.find((p) => p.playerId === cookId);
     expect(cook?.displayName).toBe('James Cook');
     expect(cook?.b.games).toBe(49);
     expect(cook?.b.goals).toBe(96);
@@ -819,25 +1106,25 @@ describe('club comparison: crossover players', () => {
     expect(day(cook?.completionDate ?? null)).toBe('1996-04-06');
     // Melbourne came AFTER the second debut, so it is not intervening.
     expect(cook?.interveningOrganizations).toEqual([]);
-    expect(await oracleIntervening(6711, carlton, bulldogs)).toEqual([]);
+    expect(await oracleIntervening(cookId, carlton, bulldogs)).toEqual([]);
     // He appears exactly once, not once per identity.
-    expect(players.filter((p) => p.playerId === 6711)).toHaveLength(1);
+    expect(players.filter((p) => p.playerId === cookId)).toHaveLength(1);
 
     // Brad Johnson played 52 games as Footscray and 312 as Western
     // Bulldogs and nothing else. Two identities, one organisation, so he
     // is not a crossover player with anyone.
-    expect(players.some((p) => p.playerId === 2068)).toBe(false);
+    expect(players.some((p) => p.playerId === johnsonId)).toBe(false);
     const [johnsonIdentities] = await sql<{ identities: number; games: number }[]>`
       SELECT count(*)::int AS identities, sum(pc.games)::int AS games
         FROM player_clubs pc JOIN clubs c ON c.id = pc.club_id
-       WHERE pc.player_id = 2068 AND c.organization_id = ${bulldogs}
+       WHERE pc.player_id = ${johnsonId} AND c.organization_id = ${bulldogs}
     `;
     expect(johnsonIdentities.identities).toBe(2);
     expect(johnsonIdentities.games).toBe(364);
     const [johnsonOrgs] = await sql<{ orgs: number }[]>`
       SELECT count(DISTINCT c.organization_id)::int AS orgs
         FROM player_clubs pc JOIN clubs c ON c.id = pc.club_id
-       WHERE pc.player_id = 2068
+       WHERE pc.player_id = ${johnsonId}
     `;
     expect(johnsonOrgs.orgs).toBe(1);
 
@@ -889,13 +1176,18 @@ describe('club comparison: crossover players', () => {
   });
 
   it('summarises the first and most recent players to complete both representations', async () => {
-    const [summary, players, oracle] = await Promise.all([
+    const [summary, players, oracle, history, mckinnonId, doedeeId] = await Promise.all([
       getCrossoverSummary(adelaide, lions),
       getCrossoverPlayers(adelaide, lions),
       oracleCrossover(adelaide, lions),
+      oracleCrossoverThrough(adelaide, lions, HISTORY_THROUGH),
+      playerIdByProfile('players/M/Martin_McKinnon.html'),
+      playerIdByProfile('players/T/Tom_Doedee.html'),
     ]);
 
-    expect(summary.players).toBe(11);
+    // 11 players through 2025 (363-W), on the bounded oracle; the summary
+    // counts every season.
+    expect(history).toHaveLength(11);
     expect(summary.players).toBe(players.length);
     expect(summary.players).toBe(oracle.length);
 
@@ -912,11 +1204,22 @@ describe('club comparison: crossover players', () => {
     expect(summary.mostRecentToRepresentBoth.map((p) => p.playerId).sort((x, y) => x - y))
       .toEqual(completions.filter((c) => c.completion === latest).map((c) => c.playerId).sort((x, y) => x - y));
 
-    // The measured witnesses.
+    // The measured witnesses: the first to complete the pair is Martin
+    // McKinnon (1999-05-01, immune to later seasons), and THROUGH 2025
+    // (363-W) the most recent to complete it is Tom Doedee on 2025-08-09,
+    // read from the bounded oracle. The application's most recent is the
+    // unbounded oracle's (asserted above), which moves with every season.
+    expect(summary.firstToRepresentBoth.map((p) => p.playerId)).toEqual([mckinnonId]);
     expect(summary.firstToRepresentBoth.map((p) => p.displayName)).toEqual(['Martin McKinnon']);
     expect(day(summary.firstToRepresentBoth[0].completionDate)).toBe('1999-05-01');
-    expect(summary.mostRecentToRepresentBoth.map((p) => p.displayName)).toEqual(['Tom Doedee']);
-    expect(day(summary.mostRecentToRepresentBoth[0].completionDate)).toBe('2025-08-09');
+    const pastCompletions = history.map((o) => ({
+      playerId: o.playerId,
+      completion: Math.max((o.aFirst as Date).getTime(), (o.bFirst as Date).getTime()),
+    }));
+    const pastLatest = Math.max(...pastCompletions.map((c) => c.completion));
+    expect(pastCompletions.filter((c) => c.completion === pastLatest).map((c) => c.playerId))
+      .toEqual([doedeeId]);
+    expect(day(new Date(pastLatest))).toBe('2025-08-09');
 
     // Completion is NOT the career debut or the first stint start:
     // McKinnon first played for Adelaide in 1994 and only completed the
@@ -952,10 +1255,19 @@ type OracleH2HPlayer = {
   goalRows: number;
   aGames: number;
   bGames: number;
+  aGoals: number | null;
+  bGoals: number | null;
 };
 
-/** Every player appearance in the pair, aggregated with one GROUP BY. */
-async function oracleH2HPlayers(orgA: number, orgB: number): Promise<OracleH2HPlayer[]> {
+/**
+ * Every player appearance in the pair, aggregated with one GROUP BY.
+ * `through` bounds the population to seasons <= through (null: all).
+ */
+async function oracleH2HPlayers(
+  orgA: number,
+  orgB: number,
+  through: number | null = null,
+): Promise<OracleH2HPlayer[]> {
   return sql<OracleH2HPlayer[]>`
     SELECT pms.player_id AS "playerId",
            p.display_name AS "displayName",
@@ -963,7 +1275,9 @@ async function oracleH2HPlayers(orgA: number, orgB: number): Promise<OracleH2HPl
            sum(pms.goals)::int AS goals,
            count(pms.goals)::int AS "goalRows",
            count(*) FILTER (WHERE c.organization_id = ${orgA})::int AS "aGames",
-           count(*) FILTER (WHERE c.organization_id = ${orgB})::int AS "bGames"
+           count(*) FILTER (WHERE c.organization_id = ${orgB})::int AS "bGames",
+           sum(pms.goals) FILTER (WHERE c.organization_id = ${orgA})::int AS "aGoals",
+           sum(pms.goals) FILTER (WHERE c.organization_id = ${orgB})::int AS "bGoals"
       FROM player_match_stats pms
       JOIN matches m ON m.id = pms.match_id
       JOIN clubs hc ON hc.id = m.home_club_id
@@ -972,6 +1286,7 @@ async function oracleH2HPlayers(orgA: number, orgB: number): Promise<OracleH2HPl
       JOIN players p ON p.id = pms.player_id
      WHERE ((hc.organization_id = ${orgA} AND ac.organization_id = ${orgB})
          OR (hc.organization_id = ${orgB} AND ac.organization_id = ${orgA}))
+       AND (${through}::int IS NULL OR m.season <= ${through}::int)
      GROUP BY pms.player_id, p.display_name
   `;
 }
@@ -983,6 +1298,7 @@ async function oracleH2HStatRows(
   orgA: number,
   orgB: number,
   stat: 'goals' | 'disposals',
+  through: number | null = null,
 ): Promise<OracleStatRow[]> {
   const column = stat === 'goals' ? sql`pms.goals` : sql`pms.disposals`;
   return sql<OracleStatRow[]>`
@@ -994,6 +1310,7 @@ async function oracleH2HStatRows(
      WHERE ((hc.organization_id = ${orgA} AND ac.organization_id = ${orgB})
          OR (hc.organization_id = ${orgB} AND ac.organization_id = ${orgA}))
        AND ${column} IS NOT NULL
+       AND (${through}::int IS NULL OR m.season <= ${through}::int)
   `;
 }
 
@@ -1041,8 +1358,15 @@ type OracleH2HMatchVotes = {
   coverage: string | null;
 };
 
-/** Every meeting of the pair with its raw recorded vote total. No filtering. */
-async function oracleH2HMatchVotes(orgA: number, orgB: number): Promise<OracleH2HMatchVotes[]> {
+/**
+ * Every meeting of the pair with its raw recorded vote total. No filtering
+ * other than the optional season bound (`through`, null: all seasons).
+ */
+async function oracleH2HMatchVotes(
+  orgA: number,
+  orgB: number,
+  through: number | null = null,
+): Promise<OracleH2HMatchVotes[]> {
   return sql<OracleH2HMatchVotes[]>`
     SELECT m.id AS "matchId", m.season,
            COALESCE(m.is_finals_series, false) AS "isFinal",
@@ -1055,8 +1379,9 @@ async function oracleH2HMatchVotes(orgA: number, orgB: number): Promise<OracleH2
       JOIN clubs ac ON ac.id = m.away_club_id
       LEFT JOIN stat_availability sa
         ON sa.stat_key = 'brownlow_match_votes' AND sa.season = m.season
-     WHERE (hc.organization_id = ${orgA} AND ac.organization_id = ${orgB})
-        OR (hc.organization_id = ${orgB} AND ac.organization_id = ${orgA})
+     WHERE ((hc.organization_id = ${orgA} AND ac.organization_id = ${orgB})
+         OR (hc.organization_id = ${orgB} AND ac.organization_id = ${orgA}))
+       AND (${through}::int IS NULL OR m.season <= ${through}::int)
   `;
 }
 
@@ -1094,21 +1419,31 @@ describe('club comparison: head-to-head player leaders', () => {
   });
 
   it('ranks H2H games leaders against independent SQL and the measured witnesses', async () => {
-    const [leaders, oracle] = await Promise.all([
+    const [leaders, oracle, history, blackId, walkerId, vossId] = await Promise.all([
       getHeadToHeadPlayerLeaders(adelaide, lions),
       oracleH2HPlayers(adelaide, lions),
+      oracleH2HPlayers(adelaide, lions, HISTORY_THROUGH),
+      playerIdByProfile('players/S/Simon_Black.html'),
+      playerIdByProfile('players/T/Taylor_Walker.html'),
+      playerIdByProfile('players/M/Michael_Voss.html'),
     ]);
 
     const byGames = [...oracle].sort((x, y) => y.games - x.games);
     const topGames = byGames[0].games;
-    expect(topGames).toBe(23);
 
-    // Dense rank 1 is exactly the oracle's maximum, ties included.
+    // Dense rank 1 is exactly the oracle's maximum (every season), ties included.
     const rank1 = leaders.games.filter((l) => l.rank === 1).map((l) => l.playerId).sort();
     const oracleRank1 = byGames.filter((r) => r.games === topGames).map((r) => r.playerId).sort();
     expect(rank1).toEqual(oracleRank1);
-    expect(leaders.games[0].displayName).toBe('Simon Black');
-    expect(leaders.games[0].games).toBe(23);
+    expect(leaders.games[0].games).toBe(topGames);
+
+    // The measured witnesses THROUGH 2025 (363-W), on the bounded oracle:
+    // Simon Black leads with 23 games, Taylor Walker has 20, Michael Voss 16.
+    const pastByGames = [...history].sort((x, y) => y.games - x.games);
+    expect(pastByGames[0].games).toBe(23);
+    expect(pastByGames.filter((r) => r.games === 23).map((r) => r.playerId)).toEqual([blackId]);
+    expect(history.find((r) => r.playerId === walkerId)?.games).toBe(20);
+    expect(history.find((r) => r.playerId === vossId)?.games).toBe(16);
 
     // Every returned row agrees with the oracle on games and on the
     // per-organisation split.
@@ -1137,24 +1472,34 @@ describe('club comparison: head-to-head player leaders', () => {
       expect(leader.rank).toBe(distinctGames.indexOf(leader.games) + 1);
     }
 
-    // Measured witnesses from the evidence pack.
-    const named = (name: string) => leaders.games.find((l) => l.displayName === name);
-    expect(named('Taylor Walker')?.games).toBe(20);
-    expect(named('Michael Voss')?.games).toBe(16);
+    // The named players, by stable identity, hold the games the
+    // application reports for every season whenever they are on the board.
+    for (const id of [blackId, walkerId, vossId]) {
+      const row = leaders.games.find((l) => l.playerId === id);
+      if (row) expect(row.games).toBe(index.get(id)?.games);
+    }
   });
 
   it('ranks H2H goals leaders without ever treating an unrecorded goal as nought', async () => {
-    const [leaders, oracle] = await Promise.all([
+    const [leaders, oracle, history, walkerId, lynchId] = await Promise.all([
       getHeadToHeadPlayerLeaders(adelaide, lions),
       oracleH2HPlayers(adelaide, lions),
+      oracleH2HPlayers(adelaide, lions, HISTORY_THROUGH),
+      playerIdByProfile('players/T/Taylor_Walker.html'),
+      playerIdByProfile('players/A/Alastair_Lynch.html'),
     ]);
 
+    // The leader is the oracle's top scorer over every season...
     const scored = oracle.filter((r) => r.goalRows > 0);
     const topGoals = Math.max(...scored.map((r) => r.goals as number));
-    expect(topGoals).toBe(54);
-    expect(leaders.goals[0].displayName).toBe('Taylor Walker');
-    expect(leaders.goals[0].goals).toBe(54);
+    expect(leaders.goals[0].goals).toBe(topGoals);
     expect(leaders.goals[0].rank).toBe(1);
+    // ...and through 2025 (363-W) it is Taylor Walker on 54, on the
+    // bounded oracle.
+    const pastScored = history.filter((r) => r.goalRows > 0);
+    const pastTop = Math.max(...pastScored.map((r) => r.goals as number));
+    expect(pastTop).toBe(54);
+    expect(pastScored.filter((r) => r.goals === pastTop).map((r) => r.playerId)).toEqual([walkerId]);
 
     const index = new Map(oracle.map((r) => [r.playerId, r]));
     for (const leader of leaders.goals) {
@@ -1169,7 +1514,8 @@ describe('club comparison: head-to-head player leaders', () => {
 
     // Alastair Lynch played only for Brisbane Lions in this rivalry:
     // 45 goals on the B side and NULL, not 0, on the A side.
-    const lynch = leaders.goals.find((l) => l.displayName === 'Alastair Lynch');
+    const lynch = leaders.goals.find((l) => l.playerId === lynchId);
+    expect(lynch?.displayName).toBe('Alastair Lynch');
     expect(lynch?.goals).toBe(45);
     expect(lynch?.b.goals).toBe(45);
     expect(lynch?.a.games).toBe(0);
@@ -1178,22 +1524,37 @@ describe('club comparison: head-to-head player leaders', () => {
   });
 
   it('consolidates a player who represented both organisations into one row', async () => {
-    const [leaders, oracle] = await Promise.all([
+    const [leaders, oracle, history, cameronId] = await Promise.all([
       getHeadToHeadPlayerLeaders(adelaide, lions),
       oracleH2HPlayers(adelaide, lions),
+      oracleH2HPlayers(adelaide, lions, HISTORY_THROUGH),
+      playerIdByProfile('players/C/Charlie_Cameron.html'),
     ]);
 
     const dualOrg = oracle.filter((r) => r.aGames > 0 && r.bGames > 0);
     expect(dualOrg.length).toBeGreaterThan(0);
 
-    const cameron = leaders.goals.filter((l) => l.displayName === 'Charlie Cameron');
+    // Charlie Cameron by stable identity (one person; four players share the name).
+    const cameron = leaders.goals.filter((l) => l.playerId === cameronId);
     expect(cameron).toHaveLength(1);
-    expect(cameron[0].games).toBe(14);
-    expect(cameron[0].a.games).toBe(5);
-    expect(cameron[0].b.games).toBe(9);
-    expect(cameron[0].goals).toBe(32);
-    expect(cameron[0].a.goals).toBe(8);
-    expect(cameron[0].b.goals).toBe(24);
+    expect(cameron[0].displayName).toBe('Charlie Cameron');
+    // The measured witness through 2025 (363-W), on the bounded oracle:
+    // 14 games (5 Adelaide, 9 Brisbane Lions) and 32 goals (8 and 24).
+    const past = history.find((r) => r.playerId === cameronId);
+    expect(past?.games).toBe(14);
+    expect(past?.aGames).toBe(5);
+    expect(past?.bGames).toBe(9);
+    expect(past?.goals).toBe(32);
+    expect(past?.aGoals).toBe(8);
+    expect(past?.bGoals).toBe(24);
+    // The application reports every season: one row, the oracle's split.
+    const now = oracle.find((r) => r.playerId === cameronId);
+    expect(cameron[0].games).toBe(now?.games);
+    expect(cameron[0].a.games).toBe(now?.aGames);
+    expect(cameron[0].b.games).toBe(now?.bGames);
+    expect(cameron[0].goals).toBe(now?.goals);
+    expect(cameron[0].a.goals).toBe(now?.aGoals);
+    expect(cameron[0].b.goals).toBe(now?.bGoals);
     expect((cameron[0].a.goals ?? 0) + (cameron[0].b.goals ?? 0)).toBe(cameron[0].goals);
 
     // No player appears twice on either board.
@@ -1204,16 +1565,27 @@ describe('club comparison: head-to-head player leaders', () => {
   });
 
   it('keeps every tied holder of the single-match goals and disposals records', async () => {
-    const [leaders, goalRows, disposalRows] = await Promise.all([
+    const [leaders, goalRows, disposalRows, pastGoalRows, pastDisposalRows] = await Promise.all([
       getHeadToHeadPlayerLeaders(adelaide, lions),
       oracleH2HStatRows(adelaide, lions, 'goals'),
       oracleH2HStatRows(adelaide, lions, 'disposals'),
+      oracleH2HStatRows(adelaide, lions, 'goals', HISTORY_THROUGH),
+      oracleH2HStatRows(adelaide, lions, 'disposals', HISTORY_THROUGH),
     ]);
 
+    // The measured single-match records THROUGH 2025 (363-W), on the
+    // bounded oracle: 7 goals held by five (player, match) pairs and 40
+    // disposals held by four.
+    const pastMaxGoals = Math.max(...pastGoalRows.map((r) => r.value));
+    expect(pastMaxGoals).toBe(7);
+    expect(pastGoalRows.filter((r) => r.value === pastMaxGoals)).toHaveLength(5);
+    const pastMaxDisposals = Math.max(...pastDisposalRows.map((r) => r.value));
+    expect(pastMaxDisposals).toBe(40);
+    expect(pastDisposalRows.filter((r) => r.value === pastMaxDisposals)).toHaveLength(4);
+
+    // The application holds every season's record, ties included.
     const maxGoals = Math.max(...goalRows.map((r) => r.value));
     const tiedGoals = goalRows.filter((r) => r.value === maxGoals);
-    expect(maxGoals).toBe(7);
-    expect(tiedGoals).toHaveLength(5);
     expect(leaders.singleMatchGoals.value).toBe(maxGoals);
     expect(leaders.singleMatchGoals.holders).toHaveLength(tiedGoals.length);
     expect(leaders.singleMatchGoals.recordedRows).toBe(goalRows.length);
@@ -1231,8 +1603,8 @@ describe('club comparison: head-to-head player leaders', () => {
 
     const maxDisposals = Math.max(...disposalRows.map((r) => r.value));
     const tiedDisposals = disposalRows.filter((r) => r.value === maxDisposals);
-    expect(maxDisposals).toBe(40);
-    expect(tiedDisposals).toHaveLength(4);
+    expect(maxDisposals).toBeGreaterThanOrEqual(pastMaxDisposals);
+    expect(leaders.singleMatchDisposals.holders).toHaveLength(tiedDisposals.length);
     expect(leaders.singleMatchDisposals.value).toBe(maxDisposals);
     expect(leaders.singleMatchDisposals.recordedRows).toBe(disposalRows.length);
     expect(
@@ -1523,25 +1895,39 @@ describe('club comparison: head-to-head Brownlow', () => {
     (row.coverage === 'complete' || row.coverage === 'partial') && row.votes === 6;
 
   it('counts eligible and covered meetings from home-and-away matches only', async () => {
-    const [brownlow, matches, summary] = await Promise.all([
+    const [brownlow, matches, past, summary, historySummary] = await Promise.all([
       getHeadToHeadBrownlow(adelaide, lions),
       oracleH2HMatchVotes(adelaide, lions),
+      oracleH2HMatchVotes(adelaide, lions, HISTORY_THROUGH),
       getHeadToHeadSummary(adelaide, lions),
+      oracleSummary(adelaide, lions, HISTORY_THROUGH),
     ]);
 
+    // Through 2025 (363-W), on the bounded oracle: 39 eligible home-and-away
+    // meetings, every one covered by a full 3-2-1 allocation.
+    const pastEligible = past.filter((m) => !m.isFinal);
+    expect(pastEligible).toHaveLength(39);
+    expect(pastEligible.filter(isCovered)).toHaveLength(39);
+    expect(historySummary.meetings).toBe(41);
+    expect(historySummary.finalsSeries).toBe(2);
+
+    // The application, over every season, equals the unbounded oracle. A
+    // completed season whose match votes are not yet loaded is eligible
+    // but not covered, so the coverage state follows from the oracle's
+    // counts rather than being fixed at 'complete'.
     const eligible = matches.filter((m) => !m.isFinal);
     const covered = eligible.filter(isCovered);
-    expect(eligible).toHaveLength(39);
-    expect(covered).toHaveLength(39);
     expect(brownlow.eligibleMeetings).toBe(eligible.length);
     expect(brownlow.coveredMeetings).toBe(covered.length);
-    expect(brownlow.coverage).toBe('complete');
+    expect(brownlow.coverage).toBe(covered.length === eligible.length ? 'complete' : 'partial');
 
     // Eligible meetings are exactly the rivalry minus its finals.
     expect(brownlow.eligibleMeetings).toBe(summary.meetings - summary.finalsSeriesMeetings);
-    expect(summary.meetings).toBe(41);
-    expect(summary.finalsSeriesMeetings).toBe(2);
-    expect(brownlow.partiallyPolledMeetings).toBe(0);
+    // Some votes recorded but not the full allocation: none through 2025.
+    const partiallyPolled = (rows: typeof eligible) =>
+      rows.filter((m) => m.votes > 0 && m.votes !== 6).length;
+    expect(partiallyPolled(pastEligible)).toBe(0);
+    expect(brownlow.partiallyPolledMeetings).toBe(partiallyPolled(eligible));
   });
 
   it('never lets a finals meeting contribute to the H2H Brownlow population', async () => {
@@ -1606,14 +1992,21 @@ describe('club comparison: head-to-head Brownlow', () => {
       expect(player.aVotes + player.bVotes).toBe(player.votes);
     }
 
-    // Measured witnesses from the evidence pack.
-    const named = (name: string) => brownlow.players.find((p) => p.displayName === name);
-    expect(named('Scott Thompson')?.votes).toBe(16);
-    expect(named('Michael Voss')?.votes).toBe(14);
-    expect(named('Simon Black')?.votes).toBe(11);
+    // Measured witnesses from the evidence pack, by stable player identity
+    // (two players are named Scott Thompson). All three are retired, so
+    // their totals cannot move with a later season.
+    const [thompsonId, vossId, blackId] = await Promise.all([
+      playerIdByProfile('players/S/Scott_Thompson0.html'),
+      playerIdByProfile('players/M/Michael_Voss.html'),
+      playerIdByProfile('players/S/Simon_Black.html'),
+    ]);
+    const named = (id: number) => brownlow.players.find((p) => p.playerId === id);
+    expect(named(thompsonId)?.votes).toBe(16);
+    expect(named(vossId)?.votes).toBe(14);
+    expect(named(blackId)?.votes).toBe(11);
     // Voss polled entirely for Brisbane Lions in this rivalry.
-    expect(named('Michael Voss')?.aVotes).toBe(0);
-    expect(named('Michael Voss')?.bVotes).toBe(14);
+    expect(named(vossId)?.aVotes).toBe(0);
+    expect(named(vossId)?.bVotes).toBe(14);
     expect(brownlow.players[0].votes).toBeGreaterThanOrEqual(brownlow.players[1].votes);
   });
 
@@ -2513,7 +2906,11 @@ type OracleDecade = {
  * No CTE, no shared fragment, no perspective column: this is the number
  * `getHeadToHeadByDecade` has to reach independently.
  */
-async function oracleDecades(orgA: number, orgB: number): Promise<OracleDecade[]> {
+async function oracleDecades(
+  orgA: number,
+  orgB: number,
+  through: number | null = null,
+): Promise<OracleDecade[]> {
   const rows = await sql<OracleDecade[]>`
     SELECT ((m.season / 10) * 10)::int AS decade,
            count(*)::int AS meetings,
@@ -2528,8 +2925,9 @@ async function oracleDecades(orgA: number, orgB: number): Promise<OracleDecade[]
       JOIN clubs hc ON hc.id = m.home_club_id
       JOIN clubs ac ON ac.id = m.away_club_id
       LEFT JOIN clubs wc ON wc.id = m.winner_club_id
-     WHERE (hc.organization_id = ${orgA} AND ac.organization_id = ${orgB})
-        OR (hc.organization_id = ${orgB} AND ac.organization_id = ${orgA})
+     WHERE ((hc.organization_id = ${orgA} AND ac.organization_id = ${orgB})
+         OR (hc.organization_id = ${orgB} AND ac.organization_id = ${orgA}))
+       AND (${through}::int IS NULL OR m.season <= ${through}::int)
      GROUP BY 1
      ORDER BY 1
   `;
@@ -2624,6 +3022,7 @@ async function oracleAverages(
   orgB: number,
   column: string,
   minimumRecordedGames: number,
+  through: number | null = null,
 ): Promise<OracleAverage[]> {
   const rows = await sql<OracleAverage[]>`
     SELECT pms.player_id AS "playerId",
@@ -2640,6 +3039,7 @@ async function oracleAverages(
      WHERE ((hc.organization_id = ${orgA} AND ac.organization_id = ${orgB})
          OR (hc.organization_id = ${orgB} AND ac.organization_id = ${orgA}))
        AND c.organization_id IN (${orgA}, ${orgB})
+       AND (${through}::int IS NULL OR m.season <= ${through}::int)
      GROUP BY pms.player_id, p.display_name
     HAVING count(pms.${sql(column)}) >= ${minimumRecordedGames}
      ORDER BY avg(pms.${sql(column)}) DESC
@@ -2653,6 +3053,7 @@ async function oracleRecordedGames(
   orgB: number,
   playerId: number,
   column: string,
+  through: number | null = null,
 ): Promise<number> {
   const [row] = await sql<{ recordedGames: number }[]>`
     SELECT count(pms.${sql(column)})::int AS "recordedGames"
@@ -2665,8 +3066,52 @@ async function oracleRecordedGames(
          OR (hc.organization_id = ${orgB} AND ac.organization_id = ${orgA}))
        AND c.organization_id IN (${orgA}, ${orgB})
        AND pms.player_id = ${playerId}
+       AND (${through}::int IS NULL OR m.season <= ${through}::int)
   `;
   return row.recordedGames;
+}
+
+/**
+ * The dense-ranked board of an oracle population, cut at `limit` with every
+ * tie at the cut retained (the documented board contract, applied here in
+ * TypeScript to the oracle rows).
+ */
+function denseBoard(rows: OracleAverage[], limit: number) {
+  const ordered = [...rows].sort((x, y) => y.average - x.average);
+  const distinct = [...new Set(ordered.map((r) => r.average))];
+  return ordered
+    .map((r) => ({ ...r, rank: distinct.indexOf(r.average) + 1 }))
+    .filter((r) => r.rank <= limit);
+}
+
+/**
+ * One player's recorded games and total of one metric, split by the
+ * organisation represented, plain aggregates with an optional season bound.
+ */
+async function oracleAverageSplit(
+  orgA: number,
+  orgB: number,
+  playerId: number,
+  column: string,
+  through: number | null = null,
+): Promise<{ aGames: number; bGames: number; aTotal: number | null; bTotal: number | null }> {
+  const [row] = await sql<{ aGames: number; bGames: number; aTotal: number | null; bTotal: number | null }[]>`
+    SELECT count(pms.${sql(column)}) FILTER (WHERE c.organization_id = ${orgA})::int AS "aGames",
+           count(pms.${sql(column)}) FILTER (WHERE c.organization_id = ${orgB})::int AS "bGames",
+           sum(pms.${sql(column)}) FILTER (WHERE c.organization_id = ${orgA})::int AS "aTotal",
+           sum(pms.${sql(column)}) FILTER (WHERE c.organization_id = ${orgB})::int AS "bTotal"
+      FROM player_match_stats pms
+      JOIN matches m ON m.id = pms.match_id
+      JOIN clubs hc ON hc.id = m.home_club_id
+      JOIN clubs ac ON ac.id = m.away_club_id
+      JOIN clubs c ON c.id = pms.club_id
+     WHERE ((hc.organization_id = ${orgA} AND ac.organization_id = ${orgB})
+         OR (hc.organization_id = ${orgB} AND ac.organization_id = ${orgA}))
+       AND c.organization_id IN (${orgA}, ${orgB})
+       AND pms.player_id = ${playerId}
+       AND (${through}::int IS NULL OR m.season <= ${through}::int)
+  `;
+  return row;
 }
 
 describe('club comparison: head-to-head by decade', () => {
@@ -2685,21 +3130,26 @@ describe('club comparison: head-to-head by decade', () => {
   });
 
   it('reproduces the Adelaide vs Brisbane Lions decade witness and independent SQL', async () => {
-    const [decades, oracle] = await Promise.all([
+    const [decades, oracle, history] = await Promise.all([
       getHeadToHeadByDecade(adelaide, lions),
       oracleDecades(adelaide, lions),
+      oracleDecades(adelaide, lions, HISTORY_THROUGH),
     ]);
 
-    // The measured V1.7 witness: decade, meetings, A wins, B wins, draws.
-    expect(decades.map((d) => [d.decade, d.meetings, d.aWins, d.bWins, d.draws])).toEqual([
+    // The measured V1.7 witness THROUGH 2025 (363-W), on the bounded
+    // oracle: decade, meetings, A wins, B wins, draws.
+    expect(history.map((d) => [d.decade, d.meetings, d.aWins, d.bWins, d.draws])).toEqual([
       [1990, 5, 2, 3, 0],
       [2000, 15, 5, 10, 0],
       [2010, 13, 10, 3, 0],
       [2020, 8, 2, 5, 1],
     ]);
 
-    // ...and the same table reached by structurally simpler SQL,
-    // points included.
+    // ...and the application, over every season, equals the same table
+    // reached by structurally simpler SQL over every season, points
+    // included. Decades that completed before 2025 cannot change.
+    expect(decades.filter((d) => d.decade < 2020).map((d) => [d.decade, d.meetings, d.aWins, d.bWins, d.draws]))
+      .toEqual(history.filter((d) => d.decade < 2020).map((d) => [d.decade, d.meetings, d.aWins, d.bWins, d.draws]));
     expect(oracle.length).toBe(decades.length);
     decades.forEach((d, i) => {
       expect(d.decade).toBe(oracle[i].decade);
@@ -2720,24 +3170,27 @@ describe('club comparison: head-to-head by decade', () => {
       expect(d.aWins + d.bWins + d.draws).toBe(d.meetings);
     });
 
-    // The measured points witness, stated once explicitly.
-    expect(decades.map((d) => [d.aPointsFor, d.bPointsFor])).toEqual([
+    // The measured points witness through 2025, stated once explicitly.
+    expect(history.map((d) => [d.aPointsFor, d.bPointsFor])).toEqual([
       [415, 462], [1221, 1555], [1432, 1012], [603, 723],
     ]);
   });
 
   it('sums every Carlton vs Collingwood decade back to the complete 268-meeting population', async () => {
-    const [decades, oracle, summary] = await Promise.all([
+    const [decades, oracle, history, summary] = await Promise.all([
       getHeadToHeadByDecade(carlton, collingwood),
       oracleDecades(carlton, collingwood),
+      oracleDecades(carlton, collingwood, HISTORY_THROUGH),
       getHeadToHeadSummary(carlton, collingwood),
     ]);
 
     // Decades are DISCOVERED, not enumerated: the 1890s appear because
     // the pair met then, and no decade without a meeting is invented.
-    expect(decades.map((d) => d.decade)).toEqual([
+    // Through 2025 (363-W) the bounded oracle finds fourteen of them.
+    expect(history.map((d) => d.decade)).toEqual([
       1890, 1900, 1910, 1920, 1930, 1940, 1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020,
     ]);
+    expect(history.reduce((sum, d) => sum + d.meetings, 0)).toBe(268);
     expect(decades.map((d) => d.decade)).toEqual(oracle.map((d) => d.decade));
     expect(decades.every((d) => d.meetings > 0)).toBe(true);
 
@@ -2750,7 +3203,6 @@ describe('club comparison: head-to-head by decade', () => {
     // the check that no historical identity leaked in or out.
     const total = (pick: (d: (typeof decades)[number]) => number) =>
       decades.reduce((sum, d) => sum + pick(d), 0);
-    expect(total((d) => d.meetings)).toBe(268);
     expect(total((d) => d.meetings)).toBe(summary.meetings);
     expect(total((d) => d.aWins)).toBe(summary.aWins);
     expect(total((d) => d.bWins)).toBe(summary.bWins);
@@ -2783,21 +3235,29 @@ describe('club comparison: period-score rivalry records', () => {
   });
 
   it('exposes pair-level period-score coverage for both witness rivalries', async () => {
-    const [short, long] = await Promise.all([
+    const [short, long, shortAll, longAll, shortPast, longPast] = await Promise.all([
       getHeadToHeadPeriodRecords(adelaide, lions),
       getHeadToHeadPeriodRecords(carlton, collingwood),
+      oracleMeetings(adelaide, lions),
+      oracleMeetings(carlton, collingwood),
+      oracleMeetings(adelaide, lions, HISTORY_THROUGH),
+      oracleMeetings(carlton, collingwood, HISTORY_THROUGH),
     ]);
 
     // "Period-score data available for X of Y rivalry meetings" is
     // answerable for both pairs -- which is the contract, whatever the
-    // numbers happen to be today.
-    expect(short.coverage.meetings).toBe(41);
-    expect(short.coverage.usableMeetings).toBe(41);
+    // numbers happen to be today. Through 2025 (363-W) the rivalries are
+    // 41 and 268 meetings on the bounded oracle; the application counts
+    // every season's meetings.
+    expect(shortPast).toHaveLength(41);
+    expect(longPast).toHaveLength(268);
+    expect(short.coverage.meetings).toBe(shortAll.length);
+    expect(short.coverage.usableMeetings).toBe(shortAll.length);
     expect(short.coverage.incompleteMeetings).toBe(0);
     expect(short.coverage.state).toBe('complete');
 
-    expect(long.coverage.meetings).toBe(268);
-    expect(long.coverage.usableMeetings).toBe(268);
+    expect(long.coverage.meetings).toBe(longAll.length);
+    expect(long.coverage.usableMeetings).toBe(longAll.length);
     expect(long.coverage.incompleteMeetings).toBe(0);
     expect(long.coverage.state).toBe('complete');
 
@@ -3061,27 +3521,38 @@ describe('club comparison: head-to-head player averages', () => {
       'contested_marks', 'marks_i50', 'one_percenters', 'bounces', 'goal_assists',
     ]);
 
-    const averages = await getHeadToHeadPlayerAverages(adelaide, lions);
+    const [averages, all, history] = await Promise.all([
+      getHeadToHeadPlayerAverages(adelaide, lions),
+      oracleMeetings(adelaide, lions),
+      oracleMeetings(adelaide, lions, HISTORY_THROUGH),
+    ]);
     expect(averages.boards.map((b) => b.key)).toEqual(H2H_AVERAGE_METRICS.map((m) => m.key));
-    expect(averages.meetings).toBe(41);
+    // 41 meetings through 2025 (363-W) on the bounded oracle; the
+    // application counts every season's.
+    expect(history).toHaveLength(41);
+    expect(averages.meetings).toBe(all.length);
     expect(averages.minimumRecordedGames).toBe(5);
     expect(averages.rankLimit).toBe(H2H_AVERAGE_RANK_LIMIT);
   });
 
   it('ranks the disposals average board on recorded games and matches independent SQL', async () => {
-    const [averages, oracle] = await Promise.all([
+    const [averages, oracle, history, crouchId, nealeId, lairdId] = await Promise.all([
       getHeadToHeadPlayerAverages(adelaide, lions),
       oracleAverages(adelaide, lions, 'disposals', H2H_AVERAGE_MINIMUM_RECORDED_GAMES),
+      oracleAverages(adelaide, lions, 'disposals', H2H_AVERAGE_MINIMUM_RECORDED_GAMES, HISTORY_THROUGH),
+      playerIdByProfile('players/M/Matt_Crouch.html'),
+      playerIdByProfile('players/L/Lachie_Neale.html'),
+      playerIdByProfile('players/R/Rory_Laird.html'),
     ]);
     const board = averages.boards.find((b) => b.key === 'disposals')!;
 
-    // The measured V1.7 witness.
-    expect(board.leaders.slice(0, 3).map((l) => [
-      l.displayName, l.recordedGames, Number(l.average.toFixed(2)),
-    ])).toEqual([
-      ['Matt Crouch', 7, 30.71],
-      ['Lachie Neale', 8, 29.75],
-      ['Rory Laird', 14, 28.86],
+    // The measured V1.7 witness THROUGH 2025 (363-W): the top three of the
+    // bounded oracle, by stable player identity.
+    const pastTop3 = [...history].sort((x, y) => y.average - x.average).slice(0, 3);
+    expect(pastTop3.map((r) => [r.playerId, r.recordedGames, Number(r.average.toFixed(2))])).toEqual([
+      [crouchId, 7, 30.71],
+      [nealeId, 8, 29.75],
+      [lairdId, 14, 28.86],
     ]);
 
     // Dense rank applied to the independent oracle, cut at ten with
@@ -3120,7 +3591,12 @@ describe('club comparison: head-to-head player averages', () => {
   });
 
   it('applies the five-recorded-game minimum, per metric and never per rivalry appearance', async () => {
-    const averages = await getHeadToHeadPlayerAverages(adelaide, lions);
+    const [averages, dunkleyId, rankineId, lynchId] = await Promise.all([
+      getHeadToHeadPlayerAverages(adelaide, lions),
+      playerIdByProfile('players/J/Josh_Dunkley.html'),
+      playerIdByProfile('players/I/Izak_Rankine.html'),
+      playerIdByProfile('players/A/Alastair_Lynch.html'),
+    ]);
     const disposals = averages.boards.find((b) => b.key === 'disposals')!;
     const goalAssists = averages.boards.find((b) => b.key === 'goal_assists')!;
 
@@ -3130,28 +3606,39 @@ describe('club comparison: head-to-head player averages', () => {
       expect(board.leaders.every((l) => l.recordedGames >= 5), board.key).toBe(true);
     }
 
-    // EXACTLY five is eligible: Josh Dunkley's five recorded disposal
-    // games put him on the board.
-    const dunkley = disposals.leaders.find((l) => l.displayName === 'Josh Dunkley');
-    expect(dunkley).toBeDefined();
-    expect(dunkley!.recordedGames).toBe(5);
-    expect(await oracleRecordedGames(adelaide, lions, dunkley!.playerId, 'disposals')).toBe(5);
+    // The boundary is witnessed THROUGH 2025 (363-W), on the bounded
+    // oracle, by stable player identity. EXACTLY five is eligible: Josh
+    // Dunkley's five recorded disposal games put him on the board.
+    const pastBoard = await oracleAverages(
+      adelaide, lions, 'disposals', H2H_AVERAGE_MINIMUM_RECORDED_GAMES, HISTORY_THROUGH);
+    expect(await oracleRecordedGames(adelaide, lions, dunkleyId, 'disposals', HISTORY_THROUGH)).toBe(5);
+    expect(pastBoard.some((r) => r.playerId === dunkleyId)).toBe(true);
 
     // FOUR is not: Izak Rankine averaged 20.25 over four recorded
     // disposal games, which would have placed him inside the top ten.
-    const [rankine] = await sql<{ id: number }[]>`
-      SELECT id FROM players WHERE display_name = 'Izak Rankine'
-    `;
-    expect(await oracleRecordedGames(adelaide, lions, rankine.id, 'disposals')).toBe(4);
-    expect(disposals.leaders.some((l) => l.playerId === rankine.id)).toBe(false);
+    expect(await oracleRecordedGames(adelaide, lions, rankineId, 'disposals', HISTORY_THROUGH)).toBe(4);
+    expect(pastBoard.some((r) => r.playerId === rankineId)).toBe(false);
+
+    // The application, over every season, puts exactly the oracle's
+    // eligible players inside the rank-ten cut on the board, with the
+    // oracle's recorded-game counts.
+    const nowBoard = denseBoard(
+      await oracleAverages(adelaide, lions, 'disposals', H2H_AVERAGE_MINIMUM_RECORDED_GAMES),
+      H2H_AVERAGE_RANK_LIMIT);
+    for (const id of [dunkleyId, rankineId]) {
+      const onBoard = disposals.leaders.find((l) => l.playerId === id);
+      expect(onBoard !== undefined, `player ${id} on the disposals board`)
+        .toBe(nowBoard.some((r) => r.playerId === id));
+      if (onBoard) {
+        expect(onBoard.recordedGames).toBe(await oracleRecordedGames(adelaide, lions, id, 'disposals'));
+      }
+    }
 
     // The threshold is METRIC-SPECIFIC: Alastair Lynch has twelve
     // recorded disposal games in the rivalry but only three recorded
     // goal-assist games, so he is eligible for one board and not the
     // other. Total rivalry appearances decide neither.
-    const [lynch] = await sql<{ id: number }[]>`
-      SELECT id FROM players WHERE display_name = 'Alastair Lynch'
-    `;
+    const lynch = { id: lynchId };
     expect(await oracleRecordedGames(adelaide, lions, lynch.id, 'disposals')).toBe(12);
     expect(await oracleRecordedGames(adelaide, lions, lynch.id, 'goal_assists')).toBe(3);
     expect(goalAssists.leaders.some((l) => l.playerId === lynch.id)).toBe(false);
@@ -3162,19 +3649,33 @@ describe('club comparison: head-to-head player averages', () => {
   });
 
   it('retains every tie at the rank-ten boundary and reports the recorded-game denominator', async () => {
-    const [averages, oracle] = await Promise.all([
+    const [averages, oracle, history, mcleodId, mccluggageId] = await Promise.all([
       getHeadToHeadPlayerAverages(adelaide, lions),
       oracleAverages(adelaide, lions, 'goal_assists', H2H_AVERAGE_MINIMUM_RECORDED_GAMES),
+      oracleAverages(adelaide, lions, 'goal_assists', H2H_AVERAGE_MINIMUM_RECORDED_GAMES, HISTORY_THROUGH),
+      playerIdByProfile('players/A/Andrew_McLeod.html'),
+      playerIdByProfile('players/H/Hugh_McCluggage.html'),
     ]);
     const board = averages.boards.find((b) => b.key === 'goal_assists')!;
 
-    // Two players tie on 9 assists from 11 recorded games, and BOTH are
-    // kept at rank ten -- the board is therefore longer than ten rows.
+    // Through 2025 (363-W), on the bounded oracle: two players tie on 9
+    // assists from 11 recorded games at rank ten, and BOTH are kept.
+    const pastAtCut = denseBoard(history, H2H_AVERAGE_RANK_LIMIT)
+      .filter((r) => r.rank === H2H_AVERAGE_RANK_LIMIT);
+    expect(pastAtCut.map((r) => r.playerId).sort((x, y) => x - y))
+      .toEqual([mcleodId, mccluggageId].sort((x, y) => x - y));
+    expect(pastAtCut.every((r) => r.recordedGames === 11 && r.total === 9)).toBe(true);
+    expect(denseBoard(history, H2H_AVERAGE_RANK_LIMIT).length).toBeGreaterThan(H2H_AVERAGE_RANK_LIMIT);
+
+    // The application, over every season, keeps exactly the oracle's tied
+    // holders at rank ten -- the board is therefore longer than ten rows
+    // whenever the cut ties.
+    const nowAtCut = denseBoard(oracle, H2H_AVERAGE_RANK_LIMIT)
+      .filter((r) => r.rank === H2H_AVERAGE_RANK_LIMIT);
     const atCut = board.leaders.filter((l) => l.rank === H2H_AVERAGE_RANK_LIMIT);
-    expect(atCut.length).toBe(2);
-    expect(atCut.map((l) => l.displayName).sort()).toEqual(['Andrew McLeod', 'Hugh McCluggage']);
-    expect(atCut.every((l) => l.recordedGames === 11 && l.total === 9)).toBe(true);
-    expect(board.leaders.length).toBeGreaterThan(H2H_AVERAGE_RANK_LIMIT);
+    expect(atCut.map((l) => l.playerId).sort((x, y) => x - y))
+      .toEqual(nowAtCut.map((r) => r.playerId).sort((x, y) => x - y));
+    expect(board.leaders.length).toBe(denseBoard(oracle, H2H_AVERAGE_RANK_LIMIT).length);
     expect(Math.max(...board.leaders.map((l) => l.rank))).toBe(H2H_AVERAGE_RANK_LIMIT);
 
     // ...and independent SQL agrees on every retained row.
@@ -3251,23 +3752,40 @@ describe('club comparison: head-to-head player averages', () => {
   });
 
   it('splits a crossover player average across both organisations', async () => {
-    const averages = await getHeadToHeadPlayerAverages(adelaide, lions);
+    const [averages, cameronId] = await Promise.all([
+      getHeadToHeadPlayerAverages(adelaide, lions),
+      playerIdByProfile('players/C/Charlie_Cameron.html'),
+    ]);
     const board = averages.boards.find((b) => b.key === 'goal_assists')!;
 
-    // Charlie Cameron has played this rivalry for BOTH organisations, so
-    // he is one row with two contributions, never two ambiguous rows.
-    const cameron = board.leaders.filter((l) => l.displayName === 'Charlie Cameron');
+    // Charlie Cameron (one person by stable identity; four players share
+    // the name) has played this rivalry for BOTH organisations, so he is
+    // one row with two contributions, never two ambiguous rows.
+    const cameron = board.leaders.filter((l) => l.playerId === cameronId);
     expect(cameron.length).toBe(1);
     const [row] = cameron;
-    expect(row.recordedGames).toBe(14);
-    expect(row.a.recordedGames).toBe(5);
-    expect(row.b.recordedGames).toBe(9);
-    expect(row.a.total).toBe(9);
-    expect(row.b.total).toBe(8);
-    expect(row.total).toBe(17);
-    expect(row.average).toBeCloseTo(17 / 14, 10);
-    expect(row.a.average).toBeCloseTo(9 / 5, 10);
-    expect(row.b.average).toBeCloseTo(8 / 9, 10);
+
+    // The measured witness THROUGH 2025 (363-W), on the bounded oracle:
+    // 14 recorded games (5 Adelaide, 9 Brisbane Lions), 17 assists (9, 8).
+    const past = await oracleAverageSplit(adelaide, lions, cameronId, 'goal_assists', HISTORY_THROUGH);
+    expect(past.aGames + past.bGames).toBe(14);
+    expect(past.aGames).toBe(5);
+    expect(past.bGames).toBe(9);
+    expect(past.aTotal).toBe(9);
+    expect(past.bTotal).toBe(8);
+    expect((past.aTotal ?? 0) + (past.bTotal ?? 0)).toBe(17);
+
+    // The application, over every season, reports the oracle's split.
+    const now = await oracleAverageSplit(adelaide, lions, cameronId, 'goal_assists');
+    expect(row.recordedGames).toBe(now.aGames + now.bGames);
+    expect(row.a.recordedGames).toBe(now.aGames);
+    expect(row.b.recordedGames).toBe(now.bGames);
+    expect(row.a.total).toBe(now.aTotal);
+    expect(row.b.total).toBe(now.bTotal);
+    expect(row.total).toBe((now.aTotal ?? 0) + (now.bTotal ?? 0));
+    expect(row.average).toBeCloseTo(row.total / row.recordedGames, 10);
+    expect(row.a.average).toBeCloseTo((now.aTotal ?? 0) / now.aGames, 10);
+    expect(row.b.average).toBeCloseTo((now.bTotal ?? 0) / now.bGames, 10);
   });
 });
 

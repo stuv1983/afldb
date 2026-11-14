@@ -205,20 +205,97 @@ describe('schema', () => {
   });
 });
 
+/**
+ * AFLDB-ISSUE-363 (run 4, owner decisions 363-W and item 4): the four
+ * "dataset size" witnesses below are statements about the HISTORY through
+ * this season, not about whatever seasons the database happens to hold.
+ * Each is held two ways, so that a later completed season can never make a
+ * correct database fail and a wrong application can never pass:
+ *
+ *   1. the application's result equals an INDEPENDENT oracle over EVERY
+ *      season, written here from the per-match fact table
+ *      (`player_match_stats` joined to `matches`), never from the table
+ *      under test and never from the implementation that builds it;
+ *   2. the same oracle BOUNDED to seasons <= HISTORY_THROUGH equals the
+ *      historical literal, whose provenance is stated next to it.
+ */
+const HISTORY_THROUGH = 2025;
+
+type OracleCohorts = {
+  rows: number;
+  /** 200-249 games and 16 or more finals. */
+  games200To249Finals16: number;
+  /** 50-199 goals and no Brownlow votes. */
+  goals50To199NoBrownlow: number;
+  /** 200+ games, 100+ goals and 15+ finals. */
+  games200Goals100Finals15: number;
+};
+
+/**
+ * Career cohorts re-derived per player from the fact table, bounded to
+ * seasons <= `through` (null: every season). A "final" is a game of the
+ * finals series (`matches.is_finals_series`), exactly as the career table
+ * counts one: a 2026 Wildcard Final has `is_final` true but is not part of
+ * a player's career finals. Brownlow votes come from the authoritative
+ * `brownlow_season_votes`, never from per-match votes, and a goal total
+ * that was never recorded is NULL and joins no band (never coerced to 0).
+ */
+async function oracleCohorts(through: number | null): Promise<OracleCohorts> {
+  const [row] = await sql<OracleCohorts[]>`
+    WITH per_player AS (
+      SELECT s.player_id,
+             count(*)::int AS games,
+             sum(s.goals)::int AS goals,
+             count(*) FILTER (WHERE m.is_finals_series)::int AS finals
+        FROM player_match_stats s
+        JOIN matches m ON m.id = s.match_id
+       WHERE (${through}::int IS NULL OR m.season <= ${through}::int)
+       GROUP BY s.player_id
+    )
+    SELECT (SELECT sum(games) FROM per_player)::int AS rows,
+           count(*) FILTER (WHERE games BETWEEN 200 AND 249 AND finals >= 16)::int
+             AS "games200To249Finals16",
+           count(*) FILTER (
+             WHERE goals BETWEEN 50 AND 199
+               AND NOT EXISTS (
+                 SELECT 1 FROM brownlow_season_votes b
+                  WHERE b.player_id = p.player_id AND b.votes > 0
+                    AND (${through}::int IS NULL OR b.season <= ${through}::int))
+           )::int AS "goals50To199NoBrownlow",
+           count(*) FILTER (WHERE games >= 200 AND goals >= 100 AND finals >= 15)::int
+             AS "games200Goals100Finals15"
+      FROM per_player p
+  `;
+  return row;
+}
+
 describe('data integrity', () => {
   it('has the full player-match dataset', async () => {
     const [row] = await sql<{ n: number }[]>`
       SELECT count(*)::int AS n FROM player_match_stats
     `;
-    // AFLDB-ISSUE-108: re-pinned to the accepted canonical baseline
-    // full-history-20260827 (measured.player_match_rows = 685,471). 694,210 was
-    // the retired legacy SQLite import.
-    // AFLDB-ISSUE-363 (run 3, integb): re-pinned to the accepted baseline c2-2026-final-core-v1
-    // (data/reference/fitzroy-accepted-baselines.json, measured.player_match_rows = 695,499). The
-    // 685,471 witness was measured on the retired full-history-20260827 baseline, which stopped
-    // before 2026 was completed: on the rebuilt c2 database the rows of seasons <= 2025 are still
-    // exactly 685,471 and the 10,028 rows of 2026 are the whole difference.
-    expect(row.n).toBe(695_499);
+    const [career] = await sql<{ games: number }[]>`
+      SELECT sum(games)::int AS games FROM player_career_stats
+    `;
+    const [all, past] = await Promise.all([
+      oracleCohorts(null),
+      oracleCohorts(HISTORY_THROUGH),
+    ]);
+    // The application holds exactly the rows of every season, and its
+    // derived career table agrees (db-health's drift gate, asserted here).
+    expect(row.n).toBe(all.rows);
+    expect(career.games).toBe(all.rows);
+    // AFLDB-ISSUE-108: pinned to the accepted canonical baseline
+    // full-history-20260827 (measured.player_match_rows = 685,471; 694,210
+    // was the retired legacy SQLite import). AFLDB-ISSUE-363 (run 3, integb):
+    // the accepted baseline c2-2026-final-core-v1
+    // (data/reference/fitzroy-accepted-baselines.json) measures 695,499 for
+    // every season; the rows of seasons <= 2025 are still exactly 685,471 and
+    // the 10,028 rows of 2026 are the whole difference (run 3 `facts2`/`facts3`,
+    // reproduced on both bases in run 4 `clubcmp`). 363-W: the historical
+    // literal is the bounded oracle's.
+    expect(past.rows).toBe(685_471);
+    expect(all.rows).toBeGreaterThanOrEqual(past.rows);
   });
 
   it('has no orphan player-match rows', async () => {
@@ -476,13 +553,21 @@ describe('advanced search regression cases', () => {
       SELECT count(*)::int AS n FROM player_career_stats
        WHERE games BETWEEN 200 AND 249 AND finals >= 16
     `;
+    const [all, past] = await Promise.all([
+      oracleCohorts(null),
+      oracleCohorts(HISTORY_THROUGH),
+    ]);
+    // The application's cohort (every season) equals the independent oracle's.
+    expect(row.n).toBe(all.games200To249Finals16);
     // AFLDB-ISSUE-136: 115 → 114 — Charlie Cameron is one canonical player with
     // 254 games / 27 finals once his renumbered AFL Tables profile was folded, so
     // he has left the 200-249 band.
-    // AFLDB-ISSUE-363 (run 3, integb): 114 -> 120 on the accepted c2 baseline. 114 was measured on the
-    // retired full-history-20260902 baseline; derived independently from player_match_stats the cohort
-    // over seasons <= 2025 is still 114 and the 2026 season (complete in c2) adds the rest.
-    expect(row.n).toBe(120);
+    // AFLDB-ISSUE-363 (run 3, integb): measured 114 on the retired
+    // full-history-20260902 baseline (`414f110c`); derived independently from
+    // player_match_stats the cohort over seasons <= 2025 is still 114 on the
+    // accepted c2 baseline, and 120 over every season (2026 completed). 363-W
+    // (run 4): the historical literal is the bounded oracle's.
+    expect(past.games200To249Finals16).toBe(114);
   });
 
   // AFLDB-ISSUE-108: skipped while no canonical career-Brownlow acquisition existed.
@@ -494,10 +579,21 @@ describe('advanced search regression cases', () => {
       SELECT count(*)::int AS n FROM player_career_stats
        WHERE goals BETWEEN 50 AND 199 AND brownlow_votes = 0
     `;
-    // AFLDB-ISSUE-363 (run 3, integb): 261 -> 268 on the accepted c2 baseline (261 was measured on the
-    // retired canonical rebuild before 2026 completed; goals through season 2025 from the fact table,
-    // with career Brownlow votes = 0, still give 261).
-    expect(row.n).toBe(268);
+    const [all, past] = await Promise.all([
+      oracleCohorts(null),
+      oracleCohorts(HISTORY_THROUGH),
+    ]);
+    // The application's cohort (every season) equals the independent oracle's.
+    expect(row.n).toBe(all.goals50To199NoBrownlow);
+    // AFLDB-ISSUE-113 measured 261 on the canonically rebuilt afldb_test before
+    // 2026 completed. AFLDB-ISSUE-363 (run 3, integb): goals through season 2025
+    // from the fact table, with no career Brownlow votes, still give 261 on the
+    // accepted c2 baseline, and 268 over every season. 363-W (run 4): the
+    // historical literal is the bounded oracle's, with Brownlow votes also
+    // counted only through 2025 so that a later season's medal count cannot
+    // move a 2025 fact. This is the same fact as the release-gates "exact 261
+    // players" gate (`gates` adopts this oracle).
+    expect(past.goals50To199NoBrownlow).toBe(261);
   });
 
   it('200+ games, 100+ goals and 15+ finals', async () => {
@@ -505,11 +601,18 @@ describe('advanced search regression cases', () => {
       SELECT count(*)::int AS n FROM player_career_stats
        WHERE games >= 200 AND goals >= 100 AND finals >= 15
     `;
-    // AFLDB-ISSUE-363 (run 3, integb): 219 -> 223 on the accepted c2 baseline. 219 was measured before
-    // 2026 completed: derived independently from player_match_stats the cohort over seasons <= 2025
-    // is still 219, and over all seasons (finals counted as player_career_stats counts them,
-    // is_finals_series) it is 223.
-    expect(row.n).toBe(223);
+    const [all, past] = await Promise.all([
+      oracleCohorts(null),
+      oracleCohorts(HISTORY_THROUGH),
+    ]);
+    // The application's cohort (every season) equals the independent oracle's.
+    expect(row.n).toBe(all.games200Goals100Finals15);
+    // AFLDB-ISSUE-363 (run 3, integb): 219 was measured on `673f0e31` before
+    // 2026 completed; derived independently from player_match_stats the cohort
+    // over seasons <= 2025 is still 219, and over every season (finals counted
+    // as player_career_stats counts them, is_finals_series) it is 223. 363-W
+    // (run 4): the historical literal is the bounded oracle's.
+    expect(past.games200Goals100Finals15).toBe(219);
   });
 });
 
