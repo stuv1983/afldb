@@ -20,8 +20,8 @@ Each approval below is separate: approving one approves nothing else. Silence is
 ## A. Publication (Git only; recommended: approve)
 
 **What:** fast-forward `origin/main` from `de640826` to the final candidate. This publishes:
-- 112 commits (`git rev-list --count de640826..<candidate>`): the full review `5035ed96`, run 1 and run 2;
-- 1,035 files changed. Excluding evidence and issue records, 186 files: +13,229 / -489 lines (unchanged since Q).
+- 113 commits (`git rev-list --count de640826..<candidate>`): the full review `5035ed96`, run 1 and run 2;
+- 1,035 files changed. Excluding `docs/v2/evidence/` and `issues/`, 186 files: +13,326 / -489 lines (the code files are unchanged since Q; the ledgers and changelog grew).
 
 No deployment follows.
 
