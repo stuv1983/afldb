@@ -1,0 +1,26 @@
+--- player_match_stats rows by period
+thru_2025|count
+f|10028
+t|685471
+(2 rows)
+--- career table is an exact aggregate of the fact table (db-health agreement)
+sum_games|pms_rows|sum_finals|pms_final_rows|sum_goals|pms_goals
+695499|695499|29732|29824|413607|413607
+(1 row)
+--- cohorts from the career table (what the tests read)
+c_200_100_15|c_200_249_16|c_50_199_nobv
+223|120|268
+(1 row)
+--- same cohorts re-derived independently from player_match_stats, all seasons
+i_200_100_15|i_200_249_16
+224|121
+(1 row)
+--- same two cohorts re-derived through season 2025 only (the retired baseline stopped before 2026 completed)
+t25_200_100_15|t25_200_249_16
+219|114
+(1 row)
+--- matches by season 2025/2026 and H2H Adelaide v Brisbane Lions meetings in 2026
+season|count
+2025|216
+2026|218
+(2 rows)

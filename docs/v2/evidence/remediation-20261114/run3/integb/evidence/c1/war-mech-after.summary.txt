@@ -1,0 +1,2 @@
+total 69 passed 0 failed 1 skipped 68 files 1
+tests/integration/database.test.ts	Brownlow correctness separates the war years from merely uncollected seasons	AssertionError: expected [ 1942, 1943, 1944, 1945, 2026 ] to deeply equal [ 1942, 1943, 1944, 1945 ]

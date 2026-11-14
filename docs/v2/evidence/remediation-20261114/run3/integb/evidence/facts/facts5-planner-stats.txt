@@ -1,0 +1,3 @@
+afldb_v2_rem3integb_rb_tmpl_test|546|32|105|695499|17056
+afldb_v2_rem3integb_rb_bridged_test|56|3|105|695499|17056
+afldb_v2_rem3integb_snap_tmpl_test|639|52|105|695499|17056

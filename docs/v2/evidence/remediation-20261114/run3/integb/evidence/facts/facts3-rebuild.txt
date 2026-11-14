@@ -1,0 +1,21 @@
+--- 2026 finals matches and their is_final / round_type
+round_code|round_type|is_final|is_finals_series|matches|pms_rows
+EF|elimination_final|t|t|2|92
+GF|grand_final|t|t|1|46
+PF|preliminary_final|t|t|2|92
+QF|qualifying_final|t|t|2|92
+SF|semi_final|t|t|2|92
+WF|wildcard_final|t|f|2|92
+(6 rows)
+--- career finals vs pms finals, split
+career_finals_sum|pms_finals_series_rows|pms_is_final_rows|pms_wf_rows
+29732|29732|29824|92
+(1 row)
+--- cohort 3 re-derived: goals through 2025 from the fact table, career brownlow = 0
+t25_50_199_nobv
+261
+(1 row)
+--- cohorts 1,2 re-derived independently excluding WF rows (as the career table counts finals), all seasons
+fs_200_100_15|fs_200_249_16
+223|120
+(1 row)

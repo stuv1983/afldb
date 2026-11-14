@@ -1,0 +1,32 @@
+HEAD ff0be02581ccc5ec1afdcfe2aa12a5b756a15bec porcelain 0
+create-db: afldb_v2_rem3integb_x_green1_test created from afldb_v2_rem3integb_snap_tmpl_test and marked
+rows start: 24 lines, md5 7ea20d9dd3e1
+step 1 b rc=0
+rows after1b: 24 lines, md5 7ea20d9dd3e1
+step 2 d rc=1
+rows after2d: 24 lines, md5 7ea20d9dd3e1
+HEAD ff0be02581ccc5ec1afdcfe2aa12a5b756a15bec porcelain 0
+create-db: afldb_v2_rem3integb_x_green2_test created from afldb_v2_rem3integb_snap_tmpl_test and marked
+rows start: 24 lines, md5 7ea20d9dd3e1
+step 1 d rc=1
+rows after1d: 24 lines, md5 7ea20d9dd3e1
+step 2 b rc=0
+rows after2b: 24 lines, md5 7ea20d9dd3e1
+HEAD ff0be02581ccc5ec1afdcfe2aa12a5b756a15bec porcelain 0
+create-db: afldb_v2_rem3integb_x_green3_test created from afldb_v2_rem3integb_snap_tmpl_test and marked
+rows start: 24 lines, md5 7ea20d9dd3e1
+step 1 b rc=0
+rows after1b: 24 lines, md5 7ea20d9dd3e1
+step 2 d rc=1
+rows after2d: 24 lines, md5 7ea20d9dd3e1
+step 3 b rc=0
+rows after3b: 24 lines, md5 7ea20d9dd3e1
+step 4 d rc=1
+rows after4d: 24 lines, md5 7ea20d9dd3e1
+HEAD ff0be02581ccc5ec1afdcfe2aa12a5b756a15bec porcelain 0
+create-db: afldb_v2_rem3integb_x_greenreb_test created from afldb_v2_rem3integb_rb_tmpl_test and marked
+rows start: 24 lines, md5 7ea20d9dd3e1
+step 1 b rc=0
+rows after1b: 24 lines, md5 7ea20d9dd3e1
+step 2 d rc=1
+rows after2d: 24 lines, md5 7ea20d9dd3e1

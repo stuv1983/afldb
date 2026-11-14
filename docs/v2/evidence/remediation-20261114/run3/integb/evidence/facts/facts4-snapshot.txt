@@ -1,0 +1,31 @@
+--- H2H meetings by period (independent join on club_organizations, as the test oracle does)
+pair|thru_2025|meetings|finals_series
+adelaide-v-brisbane-lions|f|2|1
+adelaide-v-brisbane-lions|t|41|2
+carlton-v-collingwood|f|2|0
+carlton-v-collingwood|t|268|22
+(4 rows)
+--- attendance status (the release-gates witness 15,187 / 1,651) and the accepted c2 attendance_known 15,405
+attendance_status|count
+complete|15405
+not_collected|1651
+(2 rows)
+thru_2025|complete
+f|218
+t|15187
+(2 rows)
+--- club_seasons ranges (release-gates ladder witness)
+slug|n|first|last
+footscray|72|1925|1996
+kangaroos|9|1999|2007
+north-melbourne|93|1925|2026
+south-melbourne|84|1897|1981
+sydney|45|1982|2026
+western-bulldogs|30|1997|2026
+(6 rows)
+--- player ids named by id witnesses (club-comparison): Jarryd Lyons, James Cook, Ben Keays
+id|display_name
+1103|Ben Keays
+6711|James Cook
+6818|Jarryd Lyons
+(3 rows)

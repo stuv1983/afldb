@@ -1,0 +1,7 @@
+HEAD 641ccd1a0624e6025bc4cdbbb5b5d6bc96b8218f porcelain 0
+create-db: afldb_v2_rem3integb_x_red1_test created from afldb_v2_rem3integb_snap_tmpl_test and marked
+rows start: 24 lines, md5 7ea20d9dd3e1
+step 1 b rc=0
+rows after1b: 24 lines, md5 32f0d069ffc3
+step 2 d rc=1
+rows after2d: 24 lines, md5 32f0d069ffc3

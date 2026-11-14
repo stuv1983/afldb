@@ -1,0 +1,11 @@
+identity of the restored rebuilt base (aggregates only):
+ledger_max=118_fixtures_unconfirmed_participants.sql ledger_count=118
+matches=17056 seasons=1897..2026 players=13365
+season2026=complete
+seasons_in_progress=2027
+player_match_stats_authority_rows=0
+coleman_winner_rows=47 seasons=47 last_season=2026
+coleman_2001_rows=1
+pf_2026_hawthorn_v_brisbane_lions=1
+brownlow_coverage_2026=brownlow_match_votes:pending,brownlow_round_votes:pending,brownlow_season_total:pending
+brownlow_round_votes_null_match_id=0

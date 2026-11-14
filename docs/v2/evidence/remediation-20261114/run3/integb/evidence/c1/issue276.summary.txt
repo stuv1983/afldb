@@ -1,0 +1,2 @@
+total 4 passed 0 failed 0 skipped 4 files 1
+tests/integration/settle-afl-api-issue276.test.ts	<file-level>	ISSUE-276 cases cannot run: these existing canonical rows are not ISSUE-276 fixtures and would make the settle refuse possible_existing_match. They were NOT tou

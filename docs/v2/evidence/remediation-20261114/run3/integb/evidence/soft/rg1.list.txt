@@ -1,0 +1,28 @@
+### gate: Advanced Search regression cases 50-199 goals and zero Brownlow votes returns the exact 261 players
+  L312 | AssertionError: expected 268 to be 261 // Object.is equality
+  L317 | AssertionError: expected 268 to be 261 // Object.is equality
+  L319 | AssertionError: expected 'f7719c70521bee69' to be 'ca65f15239aaf0b5' // Object.is equality
+  L320 | AssertionError: expected '7b65674c50d3d508' to be '79d3e6eea83a4620' // Object.is equality
+### gate: club organizations and identities attaches every ladder row to the identity trading that season
+  L490 | AssertionError: expected { slug: 'western-bulldogs', …(3) } to match object { from: 1997, to: 2025 }
+  L492 | AssertionError: expected { slug: 'sydney', n: 45, …(2) } to match object { from: 1982, to: 2025 }
+  L494 | AssertionError: expected { Object (slug, n, ...) } to match object { from: 1925, to: 2025 }
+  L502 | AssertionError: expected 102 to be 101 // Object.is equality
+  L503 | AssertionError: expected 129 to be 128 // Object.is equality
+  L504 | AssertionError: expected 102 to be 101 // Object.is equality
+### gate: absence is never zero records why each attendance is missing
+  L722 | AssertionError: expected [ …(2) ] to deeply equal [ …(2) ]
+### gate: birth dates populates 13,255 canonical dates with no conflicts
+  L795 | AssertionError: expected 13347 to be 13255 // Object.is equality
+### gate: birth dates keeps the evidence behind every recovered date
+  L831 | AssertionError: expected 14294 to be 14110 // Object.is equality
+  L834 | AssertionError: expected 13347 to be 13255 // Object.is equality
+### gate: birth dates matches players on the profile URL rather than the name
+  L851 | AssertionError: expected 13367 to be 13275 // Object.is equality
+### gate: 2026 is provisional (snapshot-pinned) reports 2026 Brownlow as pending, never as zero
+  L1110 | AssertionError: expected 'complete' to be 'in_progress' // Object.is equality
+### gate: 2026 is provisional (snapshot-pinned) awards no premier and no wooden spoon for 2026
+  L1132 | AssertionError: expected 1 to be +0 // Object.is equality
+  L1135 | AssertionError: expected 1 to be +0 // Object.is equality
+### gate: 2026 is provisional (snapshot-pinned) is the only season still in progress
+  L1152 | AssertionError: expected [ 2027 ] to deeply equal [ 2026 ]

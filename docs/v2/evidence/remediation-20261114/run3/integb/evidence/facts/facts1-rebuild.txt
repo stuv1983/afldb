@@ -1,0 +1,37 @@
+--- 2026 stat_availability brownlow rows
+stat_key|season|is_recorded|coverage|populated_rows|total_rows
+brownlow_match_votes|2026|f|pending||
+brownlow_round_votes|2026|f|pending||
+brownlow_season_total|2026|f|pending||
+(3 rows)
+--- all stat_availability rows count for 2026
+count
+24
+(1 row)
+--- seasons 2026 and 2027
+year|status|first_match_date|last_match_date|match_count
+2026|complete|||
+2027|in_progress|||
+(2 rows)
+--- brownlow_season_votes for 2026 / 2025
+season|count
+2025|188
+(1 row)
+--- Hawthorn v Brisbane Lions 2026 matches
+id|match_key|round_code|round_type|match_date|source_id
+17020|2026|23|2026-08-07|Brisbane Lions|Hawthorn|23|home_and_away|2026-08-07|10
+17055|2026|PF|2026-09-19|Hawthorn|Brisbane Lions|PF|preliminary_final|2026-09-19|10
+(2 rows)
+--- 2026 final matches
+round_code|count
+EF|2
+GF|1
+PF|2
+QF|2
+SF|2
+WF|2
+(6 rows)
+--- brownlow_vote_entry_state 2026
+count
+0
+(1 row)

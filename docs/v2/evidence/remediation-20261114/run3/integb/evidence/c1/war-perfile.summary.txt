@@ -1,0 +1,5 @@
+total 69 passed 65 failed 4 skipped 0 files 1
+tests/integration/database.test.ts	advanced search regression cases 200+ games, 100+ goals and 15+ finals	AssertionError: expected 223 to be 219 // Object.is equality
+tests/integration/database.test.ts	advanced search regression cases 200-249 games with 16 or more finals	AssertionError: expected 120 to be 114 // Object.is equality
+tests/integration/database.test.ts	advanced search regression cases 50-199 goals and no Brownlow votes	AssertionError: expected 268 to be 261 // Object.is equality
+tests/integration/database.test.ts	data integrity has the full player-match dataset	AssertionError: expected 695499 to be 685471 // Object.is equality

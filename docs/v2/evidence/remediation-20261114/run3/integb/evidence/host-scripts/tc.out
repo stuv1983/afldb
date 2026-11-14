@@ -1,0 +1,15 @@
+HEAD 82e0322933cdf9b5c665e38926b3a328bf5d04cf porcelain 0
+tsc rc=0 lines=0
+-- tsc errors total: 0
+
+/mnt/ssd/afldb-rem3-integb-20261114/cand/tests/integration/database.test.ts
+  630:41  warning  '_t' is defined but never used  @typescript-eslint/no-unused-vars
+
+/mnt/ssd/afldb-rem3-integb-20261114/cand/tests/integration/settle-afl-api-brownlow.test.ts
+  180:82  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  181:83  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  182:82  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+✖ 4 problems (3 errors, 1 warning)
+
+eslint rc=1

@@ -1,0 +1,6 @@
+`tools/db/rebuild-test.ts --target isolated` at commit `6d5388ea5305e73b0420fbccfa7b0cea4fe75927`, fitzRoy baseline
+`c2-2026-final-core-v1` (the register's single accepted entry), DraftGuru `annual-html-20260826` **without a bridge**, migration
+ledger head `118_fixtures_unconfirmed_participants.sql` (118 applied), FINAL VALIDATION PASSED: 91 checks. Its DraftGuru
+* `matches` 17,056; `players` 13,365 (FINAL VALIDATION's 13,363 counts players with an afltables profile identity; the 2 more are player ids 13364 and 13365, created by the DraftGuru stage under `draftguru_explicit_admin_decision`, with no match rows and no afltables identity); `clubs` 24; `seasons` 131 (1897-2027).
+## DraftGuru bridge child (needed by the draft-linkage and draftguru-import suites)
+The dump is the pristine rebuild, imported **without** a bridge, so DraftGuru persons are not yet linked to players.

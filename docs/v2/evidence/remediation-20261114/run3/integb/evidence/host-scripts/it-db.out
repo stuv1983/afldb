@@ -1,0 +1,8 @@
+HEAD 82e0322933cdf9b5c665e38926b3a328bf5d04cf porcelain 0
+create-db: afldb_v2_rem3integb_it_dbr_test created from afldb_v2_rem3integb_rb_tmpl_test and marked
+rc=0
+total 69 passed 69 failed 0 skipped 0
+HEAD 82e0322933cdf9b5c665e38926b3a328bf5d04cf porcelain 0
+create-db: afldb_v2_rem3integb_it_dbs_test created from afldb_v2_rem3integb_snap_tmpl_test and marked
+rc=0
+total 69 passed 69 failed 0 skipped 0

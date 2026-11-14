@@ -1,0 +1,52 @@
+ABSENT	tests/integration/v2-brownlow-eligibility-2025-rehearsal.test.ts	<file-level>
+ABSENT	tests/integration/v2-brownlow-production-correction.test.ts	<file-level>
+FAIL@awards.json	tests/integration/awards-reload-links.test.ts	<file-level>
+FAIL@coleman-rebuilt.json,PASS@coleman-schema-only.json	tests/integration/v2-coleman-publication.test.ts	<file-level>
+FAIL@issue276.json	tests/integration/settle-afl-api-issue276.test.ts	<file-level>
+FAIL@oracle6.json,SKIP@war-mech-after.json,FAIL@war-perfile.json,FAIL@war-shared-1.json,FAIL@war-shared-2.json,FAIL@war-shared-3.json	tests/integration/database.test.ts	advanced search regression cases 200-249 games with 16 or more finals
+FAIL@oracle6.json,SKIP@war-mech-after.json,FAIL@war-perfile.json,FAIL@war-shared-1.json,FAIL@war-shared-2.json,FAIL@war-shared-3.json	tests/integration/database.test.ts	advanced search regression cases 200+ games, 100+ goals and 15+ finals
+FAIL@oracle6.json,SKIP@war-mech-after.json,FAIL@war-perfile.json,FAIL@war-shared-1.json,FAIL@war-shared-2.json,FAIL@war-shared-3.json	tests/integration/database.test.ts	advanced search regression cases 50-199 goals and no Brownlow votes
+FAIL@oracle6.json,SKIP@war-mech-after.json,FAIL@war-perfile.json,FAIL@war-shared-1.json,FAIL@war-shared-2.json,FAIL@war-shared-3.json	tests/integration/database.test.ts	data integrity has the full player-match dataset
+FAIL@oracle6.json	tests/integration/club-comparison.test.ts	club comparison: crossover players lists everyone who represented both organisations, agreeing with independent SQL
+FAIL@oracle6.json	tests/integration/club-comparison.test.ts	club comparison: crossover players reports Ben Keays as Brisbane Lions first, then Adelaide, in both argument orders
+FAIL@oracle6.json	tests/integration/club-comparison.test.ts	club comparison: crossover players summarises the first and most recent players to complete both representations
+FAIL@oracle6.json	tests/integration/club-comparison.test.ts	club comparison: head-to-head Brownlow counts eligible and covered meetings from home-and-away matches only
+FAIL@oracle6.json	tests/integration/club-comparison.test.ts	club comparison: head-to-head by decade reproduces the Adelaide vs Brisbane Lions decade witness and independent SQL
+FAIL@oracle6.json	tests/integration/club-comparison.test.ts	club comparison: head-to-head by decade sums every Carlton vs Collingwood decade back to the complete 268-meeting population
+FAIL@oracle6.json	tests/integration/club-comparison.test.ts	club comparison: head-to-head core filters by era (Club Rivalry Explorer follow-up, FR-2) so the decades partition the complete history
+FAIL@oracle6.json	tests/integration/club-comparison.test.ts	club comparison: head-to-head core filters by match type so that home-and-away and finals partition the complete history
+FAIL@oracle6.json	tests/integration/club-comparison.test.ts	club comparison: head-to-head core groups venue records by canonical venue and agrees with an independent grouping
+FAIL@oracle6.json	tests/integration/club-comparison.test.ts	club comparison: head-to-head core handles the Carlton vs Collingwood long rivalry, including Grand Finals
+FAIL@oracle6.json	tests/integration/club-comparison.test.ts	club comparison: head-to-head core keeps Brisbane Bears and Fitzroy out of Brisbane Lions head-to-head totals
+FAIL@oracle6.json	tests/integration/club-comparison.test.ts	club comparison: head-to-head core paginates the complete meetings list deterministically at 25 rows per page
+FAIL@oracle6.json	tests/integration/club-comparison.test.ts	club comparison: head-to-head core reads streaks from chronological order, with a draw breaking a winning streak
+FAIL@oracle6.json	tests/integration/club-comparison.test.ts	club comparison: head-to-head core summarises Adelaide vs Brisbane Lions to the canonical witness and to independent SQL
+FAIL@oracle6.json	tests/integration/club-comparison.test.ts	club comparison: head-to-head player averages applies the five-recorded-game minimum, per metric and never per rivalry appearance
+FAIL@oracle6.json	tests/integration/club-comparison.test.ts	club comparison: head-to-head player averages ranks the disposals average board on recorded games and matches independent SQL
+FAIL@oracle6.json	tests/integration/club-comparison.test.ts	club comparison: head-to-head player averages retains every tie at the rank-ten boundary and reports the recorded-game denominator
+FAIL@oracle6.json	tests/integration/club-comparison.test.ts	club comparison: head-to-head player averages reuses the comparison metric registry rather than defining a second one
+FAIL@oracle6.json	tests/integration/club-comparison.test.ts	club comparison: head-to-head player averages splits a crossover player average across both organisations
+FAIL@oracle6.json	tests/integration/club-comparison.test.ts	club comparison: head-to-head player leaders consolidates a player who represented both organisations into one row
+FAIL@oracle6.json	tests/integration/club-comparison.test.ts	club comparison: head-to-head player leaders keeps every tied holder of the single-match goals and disposals records
+FAIL@oracle6.json	tests/integration/club-comparison.test.ts	club comparison: head-to-head player leaders ranks H2H games leaders against independent SQL and the measured witnesses
+FAIL@oracle6.json	tests/integration/club-comparison.test.ts	club comparison: head-to-head player leaders ranks H2H goals leaders without ever treating an unrecorded goal as nought
+FAIL@oracle6.json	tests/integration/club-comparison.test.ts	club comparison: period-score rivalry records exposes pair-level period-score coverage for both witness rivalries
+FAIL@oracle6.json	tests/integration/gridley-corpus.test.ts	Gridley corpus -- every cell through solveCellSummary writes the run report and has no failing cells
+FAIL@oracle6.json	tests/integration/release-gates.test.ts	gate: 2026 is provisional (snapshot-pinned) awards no premier and no wooden spoon for 2026
+FAIL@oracle6.json	tests/integration/release-gates.test.ts	gate: 2026 is provisional (snapshot-pinned) is the only season still in progress
+FAIL@oracle6.json	tests/integration/release-gates.test.ts	gate: 2026 is provisional (snapshot-pinned) reports 2026 Brownlow as pending, never as zero
+FAIL@oracle6.json	tests/integration/release-gates.test.ts	gate: absence is never zero records why each attendance is missing
+FAIL@oracle6.json	tests/integration/release-gates.test.ts	gate: Advanced Search regression cases 50-199 goals and zero Brownlow votes returns the exact 261 players
+FAIL@oracle6.json	tests/integration/release-gates.test.ts	gate: club organizations and identities attaches every ladder row to the identity trading that season
+PASS@data-editor.json	tests/integration/data-editor.test.ts	Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) (2a) replay re-applies a field correction over a reset source value
+PASS@data-editor.json	tests/integration/data-editor.test.ts	Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) (2b) replay recreates a durable addition the reload did not supply
+PASS@data-editor.json	tests/integration/data-editor.test.ts	Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) (2c) replay deletes a reinserted row under a durable removal
+PASS@data-editor.json	tests/integration/data-editor.test.ts	Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) (3a) an active key whose match_key is absent from matches refuses before 
+PASS@data-editor.json	tests/integration/data-editor.test.ts	Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) (3b) an active key whose identity names no accepted external identity ref
+PASS@od5.json	tests/integration/settle-afl-api.test.ts	AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreSQL (post-COMMIT, pre-archive recovery) OD-5 reinstate (rolled back, no rebuild) — reinsta
+PASS@oracle6.json,FAIL@war-mech-after.json,PASS@war-perfile.json,PASS@war-shared-1.json,PASS@war-shared-2.json,PASS@war-shared-3.json	tests/integration/database.test.ts	Brownlow correctness separates the war years from merely uncollected seasons
+PASS@oracle6.json	tests/integration/admin-brownlow.test.ts	migration 094 objects and backfill resolved every historical round row to exactly one match (preflight P2)
+PASS@oracle6.json	tests/integration/draft-linkage.test.ts	DraftGuru bridge on afldb_test — §6.1 reconciliation (read-only) persons partition exactly as the child + ledger predict
+PASS@oracle6.json	tests/integration/draft-linkage.test.ts	DraftGuru bridge on afldb_test — §6.4 negative controls (read-only) withheld persons stay unlinked by the bridge; the rejected identities are reached by nobody
+PASS@oracle6.json	tests/integration/release-gates.test.ts	gate: birth dates leaves the remaining players honestly without a date
+PASS@oracle6.json	tests/integration/release-gates.test.ts	gate: Brownlow authority agrees with the canonical round votes for every career inside their coverage
