@@ -1,0 +1,4 @@
+AFLDB_SETTLE_STATUS OK
+unit afldb-settle-afl-api.service: ActiveState=inactive Result=success ExecMainStatus=0
+unit afldb-settle-afl-api-brownlow.service: ActiveState=inactive Result=success ExecMainStatus=0
+timer afldb-settle-afl-api.timer: active, last fired Fri 2026-11-13 18:14:45 UTC (10 h ago; limit 36 h)

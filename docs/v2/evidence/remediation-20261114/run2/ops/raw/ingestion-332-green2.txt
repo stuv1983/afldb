@@ -1,0 +1,10 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem2-ops-20261114/cand
+
+ ✓ tests/afl-api-ingestion-safety.test.ts (198 tests | 186 skipped) 371ms
+
+ Test Files  1 passed (1)
+      Tests  12 passed | 186 skipped (198)
+   Start at  16:03:19
+   Duration  2.20s (transform 1.25s, setup 316ms, import 1.21s, tests 371ms, environment 0ms)
+

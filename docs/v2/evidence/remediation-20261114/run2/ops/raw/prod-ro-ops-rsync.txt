@@ -1,0 +1,8 @@
+rsync       /usr/bin/rsync
+rrsync      /usr/bin/rrsync
+pg_dump     /usr/bin/pg_dump
+pg_restore  /usr/bin/pg_restore
+gpg         /usr/bin/gpg
+curl        /usr/bin/curl
+ls: cannot access '/usr/share/doc/rsync/scripts/': No such file or directory
+ii rsync 3.2.7-1ubuntu1.5

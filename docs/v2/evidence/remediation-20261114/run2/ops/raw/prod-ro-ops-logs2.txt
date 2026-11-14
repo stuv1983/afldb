@@ -1,0 +1,55 @@
+== .env key names matching SMTP/MAIL (names only)
+AFLDB_SMTP_FROM
+AFLDB_SMTP_HOST
+AFLDB_SMTP_PASSWORD
+AFLDB_SMTP_PORT
+AFLDB_SMTP_SECURE
+AFLDB_SMTP_USER
+== /etc/rsyslog.d/50-default.conf (non-comment)
+auth,authpriv.*			/var/log/auth.log
+*.*;auth,authpriv.none		-/var/log/syslog
+kern.*				-/var/log/kern.log
+mail.*				-/var/log/mail.log
+mail.err			/var/log/mail.err
+*.emerg				:omusrmsg:*
+== /etc/logrotate.d/rsyslog
+/var/log/syslog
+/var/log/mail.log
+/var/log/kern.log
+/var/log/auth.log
+/var/log/user.log
+/var/log/cron.log
+{
+	rotate 4
+	weekly
+	missingok
+	notifempty
+	compress
+	delaycompress
+	sharedscripts
+	postrotate
+		/usr/lib/rsyslog/rsyslog-rotate
+	endscript
+}
+== /etc/logrotate.d/postgresql-common
+/var/log/postgresql/*.log {
+       weekly
+       rotate 10
+       copytruncate
+       delaycompress
+       compress
+       notifempty
+       missingok
+       su root root
+}
+== syslog file metadata (no content)
+/var/log/syslog|syslog:adm|640|9517224 bytes|2026-11-14 16:09:04.524433259 +1100
+/var/log/syslog.1|syslog:adm|640|10673313 bytes|2026-11-08 00:00:02.652116176 +1100
+/var/log/auth.log|syslog:adm|640|2104619 bytes|2026-11-14 16:09:04.517433223 +1100
+5
+== journal directory metadata (persistent storage present?)
+drwxr-sr-x+ 3 root systemd-journal 4096 Aug 16 11:33 /var/log/journal
+drwxr-sr-x+ 2 root systemd-journal 4096 Nov  8 05:06 /var/log/journal/ba4e110e197f483b88cb4fe3aef250b9
+== journald effective limits are defaults unless set above (no drop-ins found by probe #1)
+== loginctl linger for arm (user timers need it for a pull-side or arm-side unit)
+Linger=no

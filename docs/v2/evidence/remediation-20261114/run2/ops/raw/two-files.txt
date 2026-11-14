@@ -1,0 +1,11 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem2-ops-20261114/cand
+
+ ✓ tests/season-rollover.test.ts (417 tests) 2222ms
+ ✓ tests/afl-api-ingestion-safety.test.ts (198 tests) 1049ms
+
+ Test Files  2 passed (2)
+      Tests  615 passed (615)
+   Start at  16:03:39
+   Duration  6.62s (transform 2.26s, setup 243ms, import 2.65s, tests 3.27s, environment 0ms)
+

@@ -1,0 +1,15 @@
+systemd 255 (255.4-1ubuntu8.18)
+== transport template (as written) ==
+rc=0
+== notifier template + OnSuccess drop-in ==
+rc=0
+== instance (symlink named as systemd names it) ==
+rc=0
+== negative control: misspelled key must warn ==
+/mnt/ssd/afldb-rem2-ops-20261114/out/units/ctl/afldb-settle-failure-transport@.service:43: Unknown key name 'RestrictAddressFamilie' in section 'Service', ignoring.
+rc=0
+== effective properties of the instance: what the sandbox resolves to (cat-config is read-only) ==
+ReadOnlyPaths=/var/lib/afldb-settle-failure
+ProtectHome=tmpfs
+BindReadOnlyPaths=/home/arm/projects/afldb/deploy
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6

@@ -1,0 +1,23 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem2-ops-20261114/cand
+
+ ✓ tests/deploy-release.test.ts (47 tests) 23598ms
+     ✓ check-node-modules exits 1 on drift, 0 on a matching or unrecorded tree; the settle wrapper only warns  322ms
+     ✓ builds outside the checkout, validates, boots the candidate and promotes it  3165ms
+     ✓ a failing build leaves the serving release, its assets and the links untouched  1210ms
+     ✓ a type error fails the build; off-host type-checking needs recorded evidence; nothing changes  1296ms
+     ✓ a build interrupted by SIGTERM is stopped with its whole process group; nothing changes  1285ms
+     ✓ a build interrupted by SIGHUP is stopped with its whole process group; nothing changes  1286ms
+     ✓ a SIGKILLed tool leaves an orphan only in its workspace; the next build reaps it  2508ms
+     ✓ the memory guard kills a build that drives MemAvailable below the floor; nothing changes  2031ms
+     ✓ promotes a second release, then rolls back to the retained one without building, even mid-build  6689ms
+     ✓ ISSUE-351: promote and rollback are attended; the host gate and the ledger check refuse before any link moves  648ms
+     ✓ ISSUE-351: status --expect fails a restart that coincides with an apt run, and names the owner's way past it  717ms
+     ✓ fails a public asset whose bytes are not the release's, and one that is missing  373ms
+
+ Test Files  1 passed (1)
+      Tests  47 passed (47)
+   Start at  15:58:00
+   Duration  24.41s (transform 425ms, setup 178ms, import 373ms, tests 23.60s, environment 0ms)
+
+rc=0

@@ -1,0 +1,31 @@
+HEAD e8666c17e6f99591d68704240d7c029036bcaf81 status=[0]
+root /mnt/ssd/afldb-rem2-ops-20261114/out/attended-root.MPgKbN (empty releases dir; no release exists)
+tree-hash-before dd68811a6f7a9989
+
+== 1. bare promote from a script (no TTY): refused before any lock, link or verification ==
+release: REFUSED: promote switches the release the service starts from, and the service restarts on any unattended package upgrade or PostgreSQL restart (ISSUE-351). Run it only as one attended step with your own restart and status gate, and say so with --attended. Nothing was changed.
+exit=1
+== 2. bare rollback ==
+release: REFUSED: rollback switches the release the service starts from, and the service restarts on any unattended package upgrade or PostgreSQL restart (ISSUE-351). Run it only as one attended step with your own restart and status gate, and say so with --attended. Nothing was changed.
+exit=1
+tree-hash-after-bare dd68811a6f7a9989 (must equal dd68811a6f7a9989)
+
+== 3. the same calls with --attended from the same non-TTY script: the attended check is passed ==
+   (they then stop at the NEXT check, because no such release exists here; the point is that the flag alone satisfies the gate)
+release: REFUSED: not a release id: nosuch-release
+exit=1
+release: REFUSED: no previous release; name one with --to <id>
+exit=1
+tree-hash-after-attended dd68811a6f7a9989
+(a lock directory/file may appear and disappear: compare the listing)
+.
+./releases
+
+== 4. flag value is not checked: --attended=anything, --attended false ==
+release: REFUSED: not a release id: nosuch-release
+exit=1 (parseArgs treats the flag as boolean)
+
+== 5. the refusal text (pinned by tests/deploy-release.test.ts) ==
+1
+
+done

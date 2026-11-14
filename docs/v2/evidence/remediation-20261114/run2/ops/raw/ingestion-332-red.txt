@@ -1,0 +1,249 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-rem2-ops-20261114/cand
+
+ ❯ tests/afl-api-ingestion-safety.test.ts (198 tests | 2 failed | 191 skipped) 339ms
+     ↓ deploy/afldb-settle-afl-api.service retains DATABASE_URL but still treats the writer connection as a distinct supplied secret
+     ↓ deploy/afldb-settle-afl-api-brownlow.service retains DATABASE_URL but still treats the writer connection as a distinct supplied secret
+     ↓ derives a non-trivial name set from .env.example, commented assignments included
+     ↓ classifies every credential suffix, and only by suffix
+       ↓ loads .env and denies through UnsetEnvironment= only
+       ↓ retains exactly DATABASE_URL and AFLDB_IMPORT_DATABASE_URL among the DSNs
+       ↓ denies DSN AFLDB_OWNER_DATABASE_URL
+       ↓ denies DSN AFLDB_TEST_DATABASE_URL
+       ↓ denies DSN AFLDB_TEST_IMPORT_DATABASE_URL
+       ↓ denies DSN AFLDB_TEST_AUTH_DATABASE_URL
+       ↓ denies DSN AFLDB_DEV_DATABASE_URL
+       ↓ denies DSN AFLDB_DEV_IMPORT_DATABASE_URL
+       ↓ denies DSN AFLDB_CODE_TEST_DATABASE_URL
+       ↓ denies DSN AFLDB_CODE_TEST_IMPORT_DATABASE_URL
+       ↓ denies DSN AFLDB_BACKUP_DATABASE_URL
+       ↓ denies DSN AFLDB_PROD_DATABASE_URL
+       ↓ denies DSN AFLDB_PROD_IMPORT_DATABASE_URL
+       ↓ denies DSN AFLDB_PROD_AUTH_DATABASE_URL
+       ↓ denies DSN AFLDB_AUTH_DATABASE_URL
+       ↓ denies credential AFLDB_SESSION_SECRET
+       ↓ denies credential AFLDB_SMTP_USER
+       ↓ denies credential AFLDB_SMTP_PASSWORD
+       ↓ denies credential AFLDB_EMAIL_INTAKE_SECRET
+       ↓ denies credential AFLDB_REVALIDATE_SECRET
+       ↓ denies credential AFLDB_INTAKE_IMAP_USER
+       ↓ denies credential AFLDB_INTAKE_IMAP_PASSWORD
+       ↓ denies every credential-shaped name .env.example defines
+       ↓ keeps the non-secret operational settings the chain reads
+       ↓ loads .env and denies through UnsetEnvironment= only
+       ↓ retains exactly DATABASE_URL and AFLDB_IMPORT_DATABASE_URL among the DSNs
+       ↓ denies DSN AFLDB_OWNER_DATABASE_URL
+       ↓ denies DSN AFLDB_TEST_DATABASE_URL
+       ↓ denies DSN AFLDB_TEST_IMPORT_DATABASE_URL
+       ↓ denies DSN AFLDB_TEST_AUTH_DATABASE_URL
+       ↓ denies DSN AFLDB_DEV_DATABASE_URL
+       ↓ denies DSN AFLDB_DEV_IMPORT_DATABASE_URL
+       ↓ denies DSN AFLDB_CODE_TEST_DATABASE_URL
+       ↓ denies DSN AFLDB_CODE_TEST_IMPORT_DATABASE_URL
+       ↓ denies DSN AFLDB_BACKUP_DATABASE_URL
+       ↓ denies DSN AFLDB_PROD_DATABASE_URL
+       ↓ denies DSN AFLDB_PROD_IMPORT_DATABASE_URL
+       ↓ denies DSN AFLDB_PROD_AUTH_DATABASE_URL
+       ↓ denies DSN AFLDB_AUTH_DATABASE_URL
+       ↓ denies credential AFLDB_SESSION_SECRET
+       ↓ denies credential AFLDB_SMTP_USER
+       ↓ denies credential AFLDB_SMTP_PASSWORD
+       ↓ denies credential AFLDB_EMAIL_INTAKE_SECRET
+       ↓ denies credential AFLDB_REVALIDATE_SECRET
+       ↓ denies credential AFLDB_INTAKE_IMAP_USER
+       ↓ denies credential AFLDB_INTAKE_IMAP_PASSWORD
+       ↓ denies every credential-shaped name .env.example defines
+       ↓ keeps the non-secret operational settings the chain reads
+     ↓ allows distinct roles on the same live database
+     ↓ refuses a different live writer database and names databases without exposing DSNs
+     ↓ tools/current-season/settle-afl-api.ts proves live control/writer identity before invoking its canonical settle
+     ↓ tools/current-season/settle-afl-api-brownlow.ts proves live control/writer identity before invoking its canonical settle
+     ↓ tools/current-season/settle-afl-api-fixtures.ts proves live control/writer identity inside the writer's try/finally, before any write
+     ↓ tools/current-season/settle-afl-api-fixture-schedule.ts proves live control/writer identity inside the writer's try/finally, before any write
+       ↓ --dry-run: control database A enabled, writer database B — refuses with zero writes
+       ↓ --apply: control database A enabled, writer database B — refuses with zero writes
+       ↓ matching identity but a disabled switch refuses with zero writes
+       ↓ matching identity with the switch enabled proceeds to the writer (gate permits progression)
+       ↓ the real preflight fails closed without a control DSN, before the writer is touched
+       ↓ --validate-only opens no connection and runs no preflight
+       ↓ --dry-run: control database A enabled, writer database B — refuses with zero writes
+       ↓ --apply: control database A enabled, writer database B — refuses with zero writes
+       ↓ matching identity but a disabled switch refuses with zero writes
+       ↓ matching identity with the switch enabled proceeds to the writer (gate permits progression)
+       ↓ the real preflight fails closed without a control DSN, before the writer is touched
+       ↓ --validate-only opens no connection and runs no preflight
+     ↓ passes --require-complete-source into the transactional writer before its commit decision
+     ↓ renders completeness refusal separately from dry-run rollback and committed apply
+     ↓ fails closed without echoing a malformed control DSN secret before touching the writer
+     ↓ zeros durable effects while retaining source, input and planning facts
+     ↓ maps a committed run: completed, versions appended -> records_inserted, canonical counters kept in validation_result
+     ↓ counts records_rejected from the persisted import_rejections rows, not from an in-memory counter
+     ↓ maps an idempotent replay to a terminal zero-change batch — no false inserts, updates or rejections
+     ↓ maps a Brownlow-shaped run: refused vote sets stay in validation_result, only persisted rejection rows are counted
+     ↓ refuses to finalise from a negative versions count
+     ↓ refuses to finalise from a fractional versions count
+     ↓ refuses to finalise from a NaN versions count
+     ↓ refuses to finalise from a negative rejection count
+     ↓ counts persisted rejections then closes exactly the running batch row, stamping the terminal columns
+     ↓ fails when the batch row cannot be closed, so the surrounding transaction cannot commit
+     ↓ a committed apply finalises the batch inside the transaction, after the writes and before commit
+     ↓ takes the shared settle/promotion gate first, ahead of every read and write
+     ↓ a dry-run still exercises the real finalising UPDATE, then rolls back and presents no committed batch
+     ↓ a --require-complete-source refusal never finalises the batch and rolls the whole transaction back (F004 preserved)
+     ↓ a finalisation failure fails the run and rolls the transaction back — nothing is committed beside a running batch
+     ↓ HALTs season_row_missing before the batch row, names the remedy and commits nothing
+     ↓ a run with no units never reads the season: the off-season nightly is untouched
+     ↓ a committed observe-only run is a committed batch and is closed like an applying one
+     ↓ the batch validation_result carries the FINAL counters, leaderboard reconciliation included
+     ↓ a dry-run finalises (real UPDATE) then rolls back and presents no committed batch
+     ↓ a finalisation failure fails the run and rolls the transaction back
+     ↓ every committing AFL API writer finalises after its last write/gate and before its dry-run rollback
+     ↓ no AFL API writer closes its batch outside the settle transaction
+     ↓ names the machine refusal code, the target and only the FIELD NAMES — never values, payloads or errors
+     ↓ keeps the applier vocabulary verbatim and grades fail-closed refusals as errors
+     ↓ I244-F030: possible_existing_match has a specific operator explanation and error severity (an INSERT would duplicate a fixture)
+     ↓ A: a refused player target opens exactly one finding carrying the machine reason, and writes nothing else
+     ↓ B: an identical replay refreshes the one open finding in place — no duplicate pending spam
+     ↓ B2: a changed refusal reason refreshes the same finding rather than opening a second
+     ↓ C: a dependent refusal is per target — an applied sibling closes ITS finding and opens nothing
+     ↓ D: a later successful auto-apply closes the pending refusal (self-heal)
+     ↓ D2: a target that no longer differs (nothing_to_write / not offered) closes the refusal as moot, and opens no finding
+     ↓ D3: healing is bounded — the open set is read ONCE per run and an unchanged target costs no statement
+     ↓ E: replay never overwrites a finding a human already resolved — a recurrence opens a fresh row beside the untouched one
+     ↓ E2: another writer's finding on the same type is never closed (owner and source scoped)
+     ↓ F: the season gate is ONE run-level finding, not one per refused target, and closes when the season is in progress
+     ↓ G: findings are written on the run transaction only, so a dry-run / F004 / HALT rollback leaves none
+     ↓ the branch only increments nonParticipantPlayerRows and returns
+     ↓ it returns before the first projectAflApiPlayerMatch( in settlePlayerUnit()
+     ↓ it returns before the first applyCanonicalUnit( in settlePlayerUnit()
+     ↓ it returns before the first applyUnitOutcome( in settlePlayerUnit()
+     ↓ it returns before the first writePromotionCandidate( in settlePlayerUnit()
+     ↓ it returns before the first writeImportRejection( in settlePlayerUnit()
+     ↓ it returns before the first writeMatchIdentityIssue( in settlePlayerUnit()
+     ↓ it returns before the first closeMootApplyFinding( in settlePlayerUnit()
+     ↓ it returns before the first derived.playerIds.add( in settlePlayerUnit()
+     ↓ the spine observes every settle record BEFORE the unit is planned, so the row keeps its observation
+     ↓ completeness never counts a non-participant as a rejection, and a full rollback keeps the classification
+     ↓ the CLI prints the counter in its own informational group
+     ↓ an automatic-apply run with nothing to evaluate issues no apply-finding statement and finalises exactly as before (F008 unchanged)
+     ↓ a refusal finding is never an import_rejection, a candidate or a decision, and no new counter exists
+     ↓ the Brownlow writer and the fixtures-only tool are untouched by F009 (already durable / no canonical promotion)
+     ↓ the identity field set is exactly the columns match_key renders plus the columns CHECK-bound to round_code
+     ↓ A: a non-identity correction (scores, venue, kick-off time) is untouched by F010
+     ↓ B: a change to EACH identity-bearing field is detected and withheld
+     ↓ C: no partial identity update — a mixed correction offers the applier NO identity field, only the rest
+     ↓ C2: race safety — even when identity AGREES, no identity field is offered, so a concurrent move cannot be written back with match_key untouched
+     ↓ rebuilds the matches target without identity fields and re-derives the E5 baseline over what remains
+     ↓ drops the matches target when nothing but identity differs, and keeps the rest of the unit
+     ↓ an INSERT is not split: it defines the identity, so every field including match_key inputs is offered
+     ↓ carries the machine reason, both identities and only the differing identity fields — no payload, secrets or errors
+     ↓ has its own key: it can never collide with, be healed by, or heal the F009 matches refusal finding
+     ↓ refuses to draft a finding that names no differing identity field (no unsupported evidence)
+     ↓ G/first: one open finding; an identical replay refreshes that one row, never a duplicate
+     ↓ a provider that moves to a DIFFERENT identity refreshes the same row with the current evidence
+     ↓ H/self-heal: when source and canonical agree on identity again the finding closes, and an untouched record costs one read
+     ↓ is independent of the F009 matches finding: neither lifecycle closes the other
+     ↓ E: a finding a human resolved is never rewritten — a persisting difference opens one fresh row beside it
+     ↓ another writer's finding under the same key is never closed (owner and source scoped)
+     ↓ is written on the run transaction only: a dry-run / F004 / HALT rollback leaves no finding, and a rolled-back heal leaves it open
+     ↓ writes and reads data_issues only (the stub throws on anything else): no rejection, candidate, decision, ledger or batch write
+     ↓ the AFL API settle neither rekeys nor writes match_key: the applier is never told to, and never offered identity on an UPDATE
+     ↓ the identity finding is written and healed only on the automatic path, in the run transaction
+     ↓ F009 self-heal for matches is judged on what the automatic path may write, so an identity-only difference cannot mask it
+     ↓ the shared applier and the AFL Tables settle are untouched by F010: the AFL API path adds no rekey support
+     ↓ Brownlow stays fail-closed on X -> Y: F010 adds nothing there and match_identity_conflict still refuses the whole set
+     ↓ F010 adds no refusal counter: the identity finding rides canonicalApplyRefusals and the data_issues lifecycle counters
+     ↓ the retired-identity search and the F030 helper share ONE predicate, and the helper adds no authority requirement
+     ↓ the planner asks BEFORE offering new_target, and never resolves a target from the candidates
+     ↓ the applier re-asks inside readFreshTarget() before a matches target is declared insertable, under FOR UPDATE
+     ↓ only the AFL API match writer opts in: AFL Tables, the AFL API player unit and Brownlow never pass matchAmbiguity
+     ↓ a refused match returns before any period, player or typed-projection write, and self-heal follows the refusal return
+     ↓ A — populates a variable the process does not already hold
+     ↓ B — never overwrites a value the process already holds
+     ↓ C — skip mode does not rehydrate a variable that was stripped
+     ↓ D — skip mode leaves an already-set value exactly as it was
+     ↓ E — skip mode needs no .env to exist at all
+     ↓ only "1" skips: any other value loads normally
+     ↓ preserves the parsing the five CLIs relied on before consolidation
+     ↓ a missing .env is a no-op, not an error
+     ↓ decides to skip before it opens the file, and never writes the flag
+     ↓ tools/current-season/settle-afl-api.ts imports the shared loader and keeps no private copy
+     ↓ tools/current-season/settle-afl-api-brownlow.ts imports the shared loader and keeps no private copy
+     ↓ tools/current-season/acquire-afl-api.ts imports the shared loader and keeps no private copy
+     ↓ tools/current-season/acquire-afl-api-brownlow.ts imports the shared loader and keeps no private copy
+     ↓ tools/current-season/settle-afltables.ts imports the shared loader and keeps no private copy
+     ↓ tools/current-season/settle-afl-api-fixtures.ts imports the shared loader and keeps no private copy
+     ↓ deploy/afldb-settle-afl-api.sh exports the flag under systemd, before its first Node invocation
+     ↓ deploy/afldb-settle-afl-api.service keeps stripping the credentials and declares no Environment= of its own
+     ↓ deploy/afldb-settle-afl-api-brownlow.sh exports the flag under systemd, before its first Node invocation
+     ↓ deploy/afldb-settle-afl-api-brownlow.service keeps stripping the credentials and declares no Environment= of its own
+     ↓ runs fixtures-only acquire -> fixtures settle -> Brownlow acquire -> Brownlow settle, in that order
+     ↓ hands each settle the label ITS OWN acquisition printed, never the other one
+     ↓ propagates every failure: set -eu, both acquisitions fail the run, the EXIT trap marks it
+     ↓ keeps D-232-3: no automatic revalidation, and the unit still strips the revalidation secret
+     ↓ orders by the wrapper, not systemd: no After=/Requires=/Wants= on the match unit
+     ↓ its ReadWritePaths= covers both subtrees the run writes (fixtures and brownlow)
+     ↓ the unit still bounds a run below the 5-minute timer period
+     ↓ scans the acquisition library, the current-season tools and the player-link queries
+     ↓ no file in that set contains an INSERT INTO players statement
+     ↓ NEGATIVE CONTROL: the pattern flags every spelling of the forbidden statement on an in-memory string
+     ↓ NEGATIVE CONTROL: the pattern leaves other player tables and ordinary text alone
+     ↓ the drop-in only names the notifier; the notifier unit holds no credential, no database and no network
+     ↓ no installer or sync path copies the drop-in or the notifier (the owner installs them, in order)
+       ↓ records one marker and one history line for a settle unit and sends nothing by itself
+       ↓ refuses any instance that is not a settle unit, so nothing reaches a path or a command
+       ↓ refuses to run with no state directory, and calls a configured transport only with the marker path (stub transport; a failing transport never loses the marker)
+     ✓ the network is opened only by the separate transport unit; the notifier stays sealed and holds no credential 36ms
+       ✓ pull check: OK when the latest run succeeded and the timer fired within the limit (works with no notifier installed) 47ms
+       × pull check: a failed latest run, an inactive timer, or a timer that stopped firing is FAILED (exit 1), never OK 63ms
+       × pull check: an unreadable or missing unit is UNKNOWN (exit 2, an alarm), and a FAILED outranks it 115ms
+       ✓ pull check reports an installed notifier marker as information only, and writes nothing 44ms
+       ✓ transport script: sends nothing without a configured transport; refuses a foreign instance; needs the marker and an executable 20ms
+       ✓ transport script: calls the transport with the marker path only; a failing transport fails the unit and the marker stays 10ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/afl-api-ingestion-safety.test.ts > AFLDB-ISSUE-332 — failure delivery: optional transport unit and read-only pull check (prepared, not installed) > the scripts (POSIX sh, GNU date) > pull check: a failed latest run, an inactive timer, or a timer that stopped firing is FAILED (exit 1), never OK
+AssertionError: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ tests/afl-api-ingestion-safety.test.ts:2353:29
+    2351|     it('pull check: a failed latest run, an inactive timer, or a timer…
+    2352|       const failed = status({ 'afldb-settle-afl-api.service|Result': '…
+    2353|       expect(failed.status).toBe(1);
+       |                             ^
+    2354|       expect(failed.stdout.split('\n')[0]).toBe('AFLDB_SETTLE_STATUS F…
+    2355|       expect(failed.stdout).toMatch(/FAILED: the latest run of afldb-s…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  tests/afl-api-ingestion-safety.test.ts > AFLDB-ISSUE-332 — failure delivery: optional transport unit and read-only pull check (prepared, not installed) > the scripts (POSIX sh, GNU date) > pull check: an unreadable or missing unit is UNKNOWN (exit 2, an alarm), and a FAILED outranks it
+AssertionError: expected 2 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 2
+
+ ❯ tests/afl-api-ingestion-safety.test.ts:2371:27
+    2369|       expect(noTime.status).toBe(2);
+    2370|       const both = status({ 'afldb-settle-afl-api.timer|LoadState': 'n…
+    2371|       expect(both.status).toBe(1);
+       |                           ^
+    2372|     });
+    2373|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 5 passed | 191 skipped (198)
+   Start at  16:02:29
+   Duration  2.73s (transform 1.65s, setup 182ms, import 1.85s, tests 339ms, environment 0ms)
+

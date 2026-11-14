@@ -1,0 +1,281 @@
+
+=== identity ===
+afldb-prod
+uid=1000(arm) gid=1000(arm) groups=1000(arm),27(sudo),100(users)
+2026-11-14T15:55:34+11:00
+
+=== mail transport: binaries on PATH and well-known paths ===
+sendmail   (absent)
+mail       (absent)
+mailx      (absent)
+mutt       (absent)
+msmtp      (absent)
+ssmtp      (absent)
+exim4      (absent)
+postfix    (absent)
+opensmtpd  (absent)
+s-nail     (absent)
+curl       /usr/bin/curl
+wget       /usr/bin/wget
+logger     /usr/bin/logger
+ls: cannot access '/usr/sbin/sendmail': No such file or directory
+ls: cannot access '/usr/lib/sendmail': No such file or directory
+ls: cannot access '/etc/alternatives/mta': No such file or directory
+
+=== dpkg: mail / MTA / monitoring packages ===
+ii do-agent 3.18.16
+ii droplet-agent 1.4.4
+ii droplet-agent-keyring 2.0.0
+ii needrestart 3.6-7ubuntu4.5
+ii rsyslog 8.2312.0-3ubuntu9.4
+ii unattended-upgrades 2.9.1+nmu4ubuntu1
+
+=== mail-related and monitoring services: units (installed and active) ===
+do-agent.service                             enabled         enabled
+droplet-agent-update.service                 static          -
+droplet-agent.service                        enabled         enabled
+lvm2-monitor.service                         enabled         enabled
+mdmonitor-oneshot.service                    static          -
+mdmonitor.service                            static          -
+rsyslog.service                              enabled         enabled
+droplet-agent-update.timer                   enabled         enabled
+mdmonitor-oneshot.timer                      enabled         enabled
+afldb.service
+caddy.service
+cron.service
+dbus.service
+do-agent.service
+droplet-agent.service
+fwupd.service
+getty@tty1.service
+ModemManager.service
+multipathd.service
+polkit.service
+postgresql@16-main.service
+rsyslog.service
+serial-getty@ttyS0.service
+ssh.service
+systemd-journald.service
+systemd-logind.service
+systemd-networkd.service
+systemd-resolved.service
+systemd-timesyncd.service
+systemd-udevd.service
+udisks2.service
+unattended-upgrades.service
+user@1000.service
+
+=== mail spool and aliases (metadata) ===
+ls: cannot access '/var/spool/postfix': No such file or directory
+ls: cannot access '/var/spool/exim4': No such file or directory
+drwxrwsr-x 2 root mail 4096 Jun 15 23:43 /var/mail
+lrwxrwxrwx 1 root root    7 Jun 15 23:43 /var/spool/mail -> ../mail
+total 0
+ls: cannot access '/etc/aliases': No such file or directory
+ls: cannot access '/etc/mailname': No such file or directory
+ls: cannot access '/etc/postfix/main.cf': No such file or directory
+ls: cannot access '/etc/exim4/update-exim4.conf.conf': No such file or directory
+ls: cannot access '/etc/msmtprc': No such file or directory
+ls: cannot access '/etc/ssmtp/ssmtp.conf': No such file or directory
+
+=== /etc/aliases (world-readable config; root forwarding target) ===
+grep: /etc/aliases: No such file or directory
+
+=== cron mail behaviour (MAILTO in world-readable crontabs; no spool read) ===
+(no MAILTO set)
+no crontab for arm
+
+=== journald configuration (forwarding, storage, rate limit) ===
+--- /etc/systemd/journald.conf
+[Journal]
+--- /usr/lib/systemd/journald.conf.d/syslog.conf
+[Journal]
+ForwardToSyslog=yes
+total 4
+drwxr-sr-x+ 2 root systemd-journal 4096 Nov  8 05:06 ba4e110e197f483b88cb4fe3aef250b9
+
+=== journal readability for arm (group membership only; no journal read) ===
+arm sudo users
+adm:x:4:syslog
+systemd-journal:x:999:
+
+=== rsyslog configuration (forward targets: lines with @ / @@ / omfwd) ===
+-rw-r--r-- 1 root root 1213 Mar 22  2024 /etc/rsyslog.conf
+
+/etc/rsyslog.d/:
+total 12
+-rw-r--r-- 1 root root  314 May 16  2023 20-ufw.conf
+-rw-r--r-- 1 root root  255 Mar 31  2026 21-cloudinit.conf
+-rw-r--r-- 1 root root 1124 Mar 22  2024 50-default.conf
+
+=== outbound-alert helpers that exist for the app (names only) ===
+/usr/local/bin:
+total 0
+
+/usr/local/sbin:
+total 0
+
+=== settle units: state, OnFailure wiring (systemctl show/cat; installed state, not the repo) ===
+--- afldb-settle-afl-api.service
+Result=success
+ExecMainStatus=0
+OnFailure=
+LoadState=loaded
+ActiveState=inactive
+SubState=dead
+--- afldb-settle-afl-api-brownlow.service
+Result=success
+ExecMainStatus=0
+OnFailure=
+LoadState=loaded
+ActiveState=inactive
+SubState=dead
+--- afldb-settle-afl-api.timer
+NextElapseUSecRealtime=Sun 2026-11-15 05:13:03 AEDT
+LastTriggerUSec=Sat 2026-11-14 05:14:45 AEDT
+Result=success
+Persistent=yes
+OnFailure=
+LoadState=loaded
+ActiveState=active
+SubState=waiting
+--- afldb-backup.timer
+NextElapseUSecRealtime=
+LastTriggerUSec=
+Result=success
+Persistent=no
+OnFailure=
+LoadState=not-found
+ActiveState=inactive
+SubState=dead
+--- afldb-backup-verify.timer
+NextElapseUSecRealtime=
+LastTriggerUSec=
+Result=success
+Persistent=no
+OnFailure=
+LoadState=not-found
+ActiveState=inactive
+SubState=dead
+--- afldb-settle-failure@afldb-settle-afl-api.service
+Result=success
+ExecMainStatus=0
+OnFailure=
+LoadState=not-found
+ActiveState=inactive
+SubState=dead
+ls: cannot access '/etc/systemd/system/afldb-settle-afl-api.service.d/': No such file or directory
+ls: cannot access '/etc/systemd/system/afldb-settle-failure@.service': No such file or directory
+ls: cannot access '/var/lib/afldb-settle-failure': No such file or directory
+
+=== systemd failed units (all) ===
+
+=== unit hooks that could page: OnFailure of afldb units on this host ===
+Restart=always
+RestartUSec=5s
+NRestarts=0
+Id=afldb.service
+OnFailure=
+
+Restart=no
+RestartUSec=100ms
+NRestarts=0
+Id=afldb-settle-afl-api.service
+OnFailure=
+
+=== network egress capability test: NOT performed (no connection is opened by this probe) ===
+skipped by design
+
+=== caddy: world-readable configuration, and log FILE METADATA ONLY ===
+total 8
+-rw-r--r-- 1 root root 7807 Aug 16 18:46 Caddyfile
+MainPID=7797
+ExecStart={ path=/usr/bin/caddy ; argv[]=/usr/bin/caddy run --environ --config /etc/caddy/Caddyfile ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }
+User=caddy
+Group=caddy
+ActiveState=active
+--- /etc/caddy/Caddyfile: log blocks and output lines only (config text, not log content)
+83:	log {
+84:		output file /var/log/caddy/afldb-access.log {
+85:			roll_size 20MiB
+86:			roll_keep 5
+88:		format json
+196:	log {
+197:		output file /var/log/caddy/afldb-apex.log {
+198:			roll_size 20MiB
+199:			roll_keep 5
+201:		format json
+--- log directory and file metadata (name, owner, mode, size, mtime); content is never opened
+drwxr-xr-x 2 caddy caddy 4096 Nov  2 18:51 /var/log/caddy
+/var/log/caddy/afldb-access-2026-09-04T11-02-31.065-size.log.gz|caddy:caddy|600|1086027 bytes|2026-09-04 21:02:31.325832460 +1000
+/var/log/caddy/afldb-access-2026-09-07T21-28-03.060-size.log.gz|caddy:caddy|600|1130156 bytes|2026-09-08 07:28:03.330830673 +1000
+/var/log/caddy/afldb-access-2026-09-14T12-27-36.536-size.log.gz|caddy:caddy|600|1121927 bytes|2026-09-14 22:27:36.843842916 +1000
+/var/log/caddy/afldb-access-2026-10-15T13-18-15.638-size.log.gz|caddy:caddy|600|1149465 bytes|2026-10-16 00:18:15.904267663 +1100
+/var/log/caddy/afldb-access-2026-11-02T07-51-03.012-size.log.gz|caddy:caddy|600|1113936 bytes|2026-11-02 18:51:03.275520628 +1100
+/var/log/caddy/afldb-access.log|caddy:caddy|600|18039767 bytes|2026-11-14 12:56:56.868264014 +1100
+/var/log/caddy/afldb-apex-2026-09-09T13-26-13.354-size.log.gz|caddy:caddy|600|1413311 bytes|2026-09-09 23:26:13.632594764 +1000
+/var/log/caddy/afldb-apex-2026-09-28T10-33-21.243-size.log.gz|caddy:caddy|600|1288778 bytes|2026-09-28 20:33:21.506756584 +1000
+/var/log/caddy/afldb-apex-2026-10-21T04-04-49.343-size.log.gz|caddy:caddy|600|1463479 bytes|2026-10-21 15:04:49.612304060 +1100
+/var/log/caddy/afldb-apex.log|caddy:caddy|600|15630860 bytes|2026-11-14 15:37:09.684669097 +1100
+
+=== logrotate config for caddy (world-readable) ===
+total 52
+-rw-r--r-- 1 root root 120 Feb  5  2024 alternatives
+-rw-r--r-- 1 root root 126 Apr 22  2022 apport
+-rw-r--r-- 1 root root 173 Mar 22  2024 apt
+-rw-r--r-- 1 root root  91 Jan  5  2024 bootlog
+-rw-r--r-- 1 root root 130 Oct 14  2019 btmp
+-rw-r--r-- 1 root root 144 Mar 31  2026 cloud-init
+-rw-r--r-- 1 root root 112 Feb  5  2024 dpkg
+-rw-r--r-- 1 root root 173 Jul 31  2023 postgresql-common
+-rw-r--r-- 1 root root 248 Mar 22  2024 rsyslog
+-rw-r--r-- 1 root root 270 Apr  3  2024 ubuntu-pro-client
+-rw-r--r-- 1 root root 209 May 16  2023 ufw
+-rw-r--r-- 1 root root 235 Feb 13  2024 unattended-upgrades
+-rw-r--r-- 1 root root 145 Oct 14  2019 wtmp
+--- global logrotate.conf (non-comment)
+weekly
+su root adm
+rotate 4
+create
+include /etc/logrotate.d
+--- logrotate timer
+NextElapseUSecRealtime=Sun 2026-11-15 00:00:00 AEDT
+LastTriggerUSec=Sat 2026-11-14 00:00:01 AEDT
+ActiveState=active
+--- logrotate status file entries for caddy (name + last rotated date only)
+grep: /var/lib/logrotate/status: Permission denied
+
+=== other log classes that may hold tokens or query text: metadata only ===
+stat: cannot statx '/var/log/nginx': No such file or directory
+stat: cannot statx '/var/log/apache2': No such file or directory
+stat: cannot statx '/var/log/afldb*': No such file or directory
+stat: cannot statx '/home/arm/logs': No such file or directory
+stat: cannot statx '/home/arm/afldb-logs': No such file or directory
+drwxrwxr-t 2 root postgres 4096 Nov  8 00:00 /var/log/postgresql
+total 144
+-rw-r----- 1 postgres adm 10655 Nov 14 08:49 postgresql-16-main.log
+-rw-r----- 1 postgres adm 20593 Nov  8 00:00 postgresql-16-main.log.1
+-rw-r----- 1 postgres adm 14949 Sep  6 00:00 postgresql-16-main.log.10.gz
+-rw-r----- 1 postgres adm  2570 Nov  1 00:00 postgresql-16-main.log.2.gz
+-rw-r----- 1 postgres adm  2273 Oct 25 00:00 postgresql-16-main.log.3.gz
+-rw-r----- 1 postgres adm  1524 Oct 18 00:00 postgresql-16-main.log.4.gz
+-rw-r----- 1 postgres adm  1852 Oct 11 00:00 postgresql-16-main.log.5.gz
+-rw-r----- 1 postgres adm  3735 Oct  4 00:00 postgresql-16-main.log.6.gz
+-rw-r----- 1 postgres adm  2178 Sep 27 00:00 postgresql-16-main.log.7.gz
+--- postgresql logging settings (world-readable config, not log content)
+570:log_line_prefix = '%m [%p] %q%u@%d '		# special values:
+grep: /etc/postgresql/16/main/conf.d/*.conf: No such file or directory
+--- app logging: afldb unit output goes to the journal
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=afldb
+LogLevelMax=-1
+
+=== disk free on log and backup volumes (aggregate) ===
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/vda1        77G   33G   45G  42% /
+/dev/vda1        77G   33G   45G  42% /
+
+=== end ===
+2026-11-14T15:55:35+11:00

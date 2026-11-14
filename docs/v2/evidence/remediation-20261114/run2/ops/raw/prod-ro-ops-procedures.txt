@@ -1,0 +1,150 @@
+
+=== identity ===
+afldb-prod
+arm
+2026-11-14T16:07:17+11:00
+6.8.0-137-generic
+2026-08-16 12:14:44
+
+=== serving checkout: HEAD and tracked-file state (no diff content) ===
+c1c4b22ee15007111eab66f6d354e0b9ecbb2ade
+0
+total      
+-rw-rw-r-- arm 8495 Sep 7 23:38 00_install_postgres.sh
+-rw-rw-r-- arm 13471 Aug 17 21:10 00_install_postgres_prod.sh
+-rw-rw-r-- arm 4783 Aug 16 12:37 01_setup_service.sh
+-rw-rw-r-- arm 3726 Aug 16 18:05 02_add_auth_role.sh
+-rw-rw-r-- arm 3997 Aug 16 20:11 03_apex_dir.sh
+-rw-rw-r-- arm 4485 Sep 26 20:39 backup-afldb-test.ps1
+-rw-rw-r-- arm 4510 Aug 16 12:37 backup.sh
+-rw-rw-r-- arm 32704 Sep 26 20:39 issue246-retire-issue109-fixture.ts
+-rw-rw-r-- arm 40759 Sep 26 20:39 issue248-cleanup-dev-auth-fixtures.ts
+-rw-rw-r-- arm 4344 Aug 16 12:37 loadtest.mjs
+-rw-rw-r-- arm 46121 Oct 31 08:22 privileges.sql
+-rw-rw-r-- arm 8255 Sep 26 20:39 restore-test.sh
+-rw-rw-r-- 60201 release.mjs
+
+=== node on PATH and the unit's pinned node ===
+/tmp/afldb-rem2-ops-probe2.sh: line 15: node: command not found
+ExecStart={ path=/home/arm/.nvm/versions/node/v22.23.2/bin/node ; argv[]=/home/arm/.nvm/versions/node/v22.23.2/bin/node deploy/server-cluster.mjs ; ignore_errors=no ; start_time=[Sat 2026-11-14 06:35:21 AEDT] ; stop_time=[n/a] ; pid=3774230 ; code=(null) ; sta
+
+=== .env: KEY NAMES ONLY (values are never read into this output) ===
+-rw------- arm arm 4096
+  AFLDB_AUTH_DATABASE_URL
+  AFLDB_BACKUP_DATABASE_URL
+  AFLDB_BACKUP_DIR
+  AFLDB_BETA_EPOCH
+  AFLDB_ENV
+  AFLDB_IMPORT_DATABASE_URL
+  AFLDB_OWNER_DATABASE_URL
+  AFLDB_PROD_DATABASE_URL
+  DATABASE_URL
+
+=== backup directories: metadata and aggregate size ===
+ls: cannot access '/home/arm/backups/afldb-scheduled': No such file or directory
+drwxrwxr-x  3 arm arm  4096 Aug 18 23:36 /home/arm/backups
+drwx------ 34 arm arm 12288 Nov 12 13:50 /home/arm/backups/afldb
+880M	/home/arm/backups/afldb
+90
+/dev/vda1        77G   33G   45G  42% /
+
+=== ssh: server config (non-comment) and arm authorized_keys metadata (count only) ===
+Include /etc/ssh/sshd_config.d/*.conf
+PermitRootLogin yes
+KbdInteractiveAuthentication no
+UsePAM yes
+X11Forwarding yes
+PrintMotd no
+AcceptEnv LANG LC_*
+Subsystem	sftp	/usr/lib/openssh/sftp-server
+grep: /etc/ssh/sshd_config.d/50-cloud-init.conf: Permission denied
+PasswordAuthentication no
+PermitRootLogin no
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PubkeyAuthentication yes
+AllowUsers arm
+total   
+-rw------- arm 193 authorized_keys
+-rw------- arm 123 config
+-rw------- arm 411 id_deploy
+-rw-r--r-- arm 99 id_deploy.pub
+-rw------- arm 928 known_hosts
+-rw-rw-r-- arm 92 known_hosts.old
+2
+forced-command or restrict options already present on any key (option names only):
+
+=== pending reboot: kernels, reboot-required packages, GRUB defaults (world-readable) ===
+linux-image-6.8.0-138-generic
+linux-base
+linux-image-6.8.0-139-generic
+linux-base
+libc6
+linux-image-6.8.0-142-generic
+linux-base
+linux-image-6.8.0-146-generic
+linux-base
+linux-image-6.8.0-147-generic
+linux-base
+linux-image-6.8.0-149-generic
+linux-base
+libc6
+rc linux-image-6.8.0-124-generic 6.8.0-124.124
+ii linux-image-6.8.0-137-generic 6.8.0-137.137
+rc linux-image-6.8.0-138-generic 6.8.0-138.138
+rc linux-image-6.8.0-139-generic 6.8.0-139.139
+rc linux-image-6.8.0-142-generic 6.8.0-142.142
+rc linux-image-6.8.0-146-generic 6.8.0-146.146
+rc linux-image-6.8.0-147-generic 6.8.0-147.147
+ii linux-image-6.8.0-149-generic 6.8.0-149.149
+lrwxrwxrwx 28 initrd.img
+-rw-r--r-- 31055130 initrd.img-6.8.0-137-generic
+-rw-r--r-- 31057171 initrd.img-6.8.0-149-generic
+lrwxrwxrwx 28 initrd.img.old
+lrwxrwxrwx 25 vmlinuz
+-rw------- 15055240 vmlinuz-6.8.0-137-generic
+-rw------- 15108488 vmlinuz-6.8.0-149-generic
+lrwxrwxrwx 25 vmlinuz.old
+GRUB_DEFAULT=0
+GRUB_TIMEOUT_STYLE=hidden
+GRUB_TIMEOUT=0
+GRUB_DISTRIBUTOR=`( . /etc/os-release; echo ${NAME:-Ubuntu} ) 2>/dev/null || echo Ubuntu`
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"
+GRUB_CMDLINE_LINUX=""
+GRUB_RECORDFAIL_TIMEOUT=0
+GRUB_TIMEOUT=0
+GRUB_CMDLINE_LINUX_DEFAULT="console=tty1 console=ttyS0"
+GRUB_TERMINAL=console
+GRUB_CMDLINE_LINUX_DEFAULT="console=tty1 console=ttyS0 net.ifnames=0 biosdevname=0"
+-rw------- 1 root root 8002 Nov 14 06:35 /boot/grub/grub.cfg
+BOOT_IMAGE=/vmlinuz-6.8.0-137-generic root=UUID=<uuid> ro console=tty1 console=ttyS0 net.ifnames=0 biosdevname=0
+
+=== console access evidence on the host (not the cloud console): serial getty and droplet-agent state ===
+active
+active
+active
+active
+
+=== services restarted by a libc upgrade (config only): needrestart hold files already installed? ===
+ls: cannot access '/etc/apt/apt.conf.d/52-afldb-unattended': No such file or directory
+/etc/needrestart/conf.d/:
+total 4
+-rw-r--r-- 1 root root 241 Dec  5  2024 README.needrestart
+
+=== sudo group membership is a fact of /etc/group (no sudo is run) ===
+sudo:x:27:arm
+
+=== systemd: failed units, timers ===
+NEXT                             LEFT LAST                               PASSED UNIT                           ACTIVATES
+Sat 2026-11-14 16:12:40 AEDT     5min Fri 2026-11-13 21:03:01 AEDT      19h ago apt-daily.timer                apt-daily.service
+Sun 2026-11-15 00:00:00 AEDT       7h Sat 2026-11-14 00:00:01 AEDT      16h ago dpkg-db-backup.timer           dpkg-db-backup.service
+Sun 2026-11-15 00:00:00 AEDT       7h Sat 2026-11-14 00:00:01 AEDT      16h ago logrotate.timer                logrotate.service
+Sun 2026-11-15 03:10:00 AEDT      11h Sun 2026-11-08 03:10:21 AEDT   6 days ago e2scrub_all.timer              e2scrub_all.service
+Sun 2026-11-15 05:13:03 AEDT      13h Sat 2026-11-14 05:14:45 AEDT      10h ago afldb-settle-afl-api.timer     afldb-settle-afl-api.service
+Sun 2026-11-15 06:45:13 AEDT      14h Sat 2026-11-14 06:34:15 AEDT       9h ago apt-daily-upgrade.timer        apt-daily-upgrade.service
+
+=== the 2027 season facts the opening procedure rests on are in the rollover evidence (not re-read here: no database access in this probe) ===
+
+=== end ===
+2026-11-14T16:07:17+11:00
+ls: cannot access '/tmp/afldb-rem2-ops*': No such file or directory
