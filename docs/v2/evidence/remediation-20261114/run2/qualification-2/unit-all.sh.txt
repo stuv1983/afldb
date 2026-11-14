@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -u
+export PATH="$HOME/.nvm/versions/node/v22.23.2/bin:$PATH" PYTHON=/home/arm/i250/afldb/.venv/bin/python AFLDB_PYTHON=/home/arm/i250/afldb/.venv/bin/python
+W=/mnt/ssd/afldb-rem2-int-20261114; E=$W/evidence/q-f10e47ad; cd $W/cand
+flock /mnt/ssd/afldb-rem2-base/heavy.lock nice -n 10 timeout 2400 env -u DATABASE_URL -u AFLDB_TEST_DATABASE_URL node node_modules/vitest/vitest.mjs run --exclude "tests/integration/**" --reporter=default --reporter=json --outputFile.json=$E/unit-allfix.json > $E/unit-allfix.log 2>&1
+echo "unit-allfix rc=$?" >> $E/unit-allfix.log
+echo "porcelain: $(git status --porcelain | wc -l)" >> $E/unit-allfix.log

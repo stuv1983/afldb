@@ -1,0 +1,6 @@
+⎯⎯⎯⎯⎯⎯ Failed Tests 46 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  14 failed | 79 passed | 6 skipped (99)
+      Tests  46 failed | 3448 passed | 2 expected fail | 128 skipped (3647)
+   Start at  19:08:03
+   Duration  1852.15s (transform 13.42s, setup 199.57s, import 296.56s, tests 1332.42s, environment 26ms)
+integ rc=1

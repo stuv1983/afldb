@@ -1,0 +1,10 @@
+# Stage A provenance 2026-11-14T08:43:23Z
+## 1. raw files against the committed manifest docs/rebuild-manifests/draftguru/annual-html-20260826.json (42 entries)
+OK: 42
+rc=0 (all 42 match)
+## 2. every file of the source against the second retained copy (/mnt/ssd/afldb/workspaces/i336-preview2-20261106/checkout/data/sources/draftguru/annual-html-20260826)
+files src=90 alt=90
+IDENTICAL (paths and sha256)
+tree sha256 (sha256 of the sorted list): ceea2d344aa5eb8826edd54c0dae574188738e94cc26ee67a9e7ab8368264de2
+copy re-verified (90 files)
+residual input copied read-only; sha256 = pin (sample.json residual_input.sha256 and tests/draftguru-acquisition.test.ts)

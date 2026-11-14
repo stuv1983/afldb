@@ -1,0 +1,2 @@
+ FAIL  tests/draftguru-acquisition.test.ts > DraftGuru bridge import gate (plan / verify, read-only) > DSN guard, read-only discipline, hash pins, classification refusals, verify checks and the no-artefact guarantee all hold on the real tool
+ FAIL  tests/draftguru-acquisition.test.ts > frozen Stage B1 sample (local snapshot) > rebuilds byte-identically from the accepted Stage A snapshot

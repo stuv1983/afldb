@@ -1,0 +1,99 @@
+##### checkout 07:45:18
+HEAD=f10e47adf9697d9a59a03dd627615e61e8213d30 want=f10e47adf9697d9a59a03dd627615e61e8213d30
+package files unchanged since e8666c17: node_modules from npm ci at e8666c17 kept
+porcelain lines: 0
+##### static 07:45:18
+typecheck rc=0
+lint:gate rc=0
+Lint gate (ratchet): 338 error(s) in 43 file(s) now; the ratchet baseline allows 338 in 43 (existing debt, not clean lint).
+Lint gate: PASSED (ratchet; existing debt remains).
+lint:gate rc=0
+porcelain lines: 0
+##### unit_nofix 07:47:36
+unit-nofix rc=1
+     × corrects exactly two rows and nothing else in 1909 1ms
+     × covers the four real 2025 players, retaining all 79 rows 2ms
+     × DSN guard, read-only discipline, hash pins, classification refusals, verify checks and the no-artefact guarantee all hold on the real tool 593ms
+  FAIL  9.6 that run passed every offline guard -- the real DEV child's pinned bytes, the v2 parent_sha256 chain and the Stage A snapshot -- and stopped only where it would open a connection -- ['AFLDB DraftGuru bridge import gate -- plan (read-only, afldb_dev only) [target=dev]', '', 'ERROR: snapshot directory not found: /mnt/ssd/afldb-rem2-int-20261114/cand/data/sources/draftguru/annual-html-20260826']
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/draftguru-acquisition.test.ts > DraftGuru bridge import gate (plan / verify, read-only) > DSN guard, read-only discipline, hash pins, classification refusals, verify checks and the no-artefact guarantee all hold on the real tool
+ FAIL  tests/draftguru-acquisition.test.ts > frozen Stage B1 sample (local snapshot) > is the frozen 120 / 8 / 68 / 30 / 14 contract over the accepted Stage A label
+ FAIL  tests/draftguru-acquisition.test.ts > frozen Stage B1 sample (local snapshot) > rebuilds byte-identically from the accepted Stage A snapshot
+ FAIL  tests/fitzroy-core-import.test.ts > blank Player fallback > covers the four real 2025 players, retaining all 79 rows
+ FAIL  tests/fitzroy-core-import.test.ts > fitzRoy source row corrections > corrects exactly two rows and nothing else in 1909
+ FAIL  tests/fitzroy-core-import.test.ts > fitzRoy source row corrections > leaves exactly the two genuine Round 10 rows
+ FAIL  tests/fitzroy-core-import.test.ts > fitzRoy source row corrections > leaves the younger player's other appearances untouched
+     × is the frozen 120 / 8 / 68 / 30 / 14 contract over the accepted Stage A label 3ms
+     × leaves exactly the two genuine Round 10 rows 34ms
+     × leaves the younger player's other appearances untouched 2ms
+     × rebuilds byte-identically from the accepted Stage A snapshot 48ms
+ Test Files  2 failed | 213 passed | 1 skipped (216)
+      Tests  7 failed | 12282 passed | 31 skipped (12320)
+##### shell 07:57:40
+tests/restore-test.test.sh rc=0
+restore-test harness: 24 passed, 0 failed
+tests/sync-dev-remote.test.sh rc=0
+42 passed, 0 failed
+porcelain lines: 0
+##### fixtures 07:57:43
+fitzRoy copy: 131 files re-verified
+sample.json copy re-verified
+porcelain lines: 0
+##### unit_fix 07:57:46
+unit-fix rc=1
+     × DSN guard, read-only discipline, hash pins, classification refusals, verify checks and the no-artefact guarantee all hold on the real tool 601ms
+  FAIL  9.6 that run passed every offline guard -- the real DEV child's pinned bytes, the v2 parent_sha256 chain and the Stage A snapshot -- and stopped only where it would open a connection -- ['AFLDB DraftGuru bridge import gate -- plan (read-only, afldb_dev only) [target=dev]', '', 'ERROR: snapshot directory not found: /mnt/ssd/afldb-rem2-int-20261114/cand/data/sources/draftguru/annual-html-20260826']
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/draftguru-acquisition.test.ts > DraftGuru bridge import gate (plan / verify, read-only) > DSN guard, read-only discipline, hash pins, classification refusals, verify checks and the no-artefact guarantee all hold on the real tool
+ FAIL  tests/draftguru-acquisition.test.ts > frozen Stage B1 sample (local snapshot) > rebuilds byte-identically from the accepted Stage A snapshot
+     × rebuilds byte-identically from the accepted Stage A snapshot 131ms
+ Test Files  1 failed | 214 passed | 1 skipped (216)
+      Tests  2 failed | 12287 passed | 31 skipped (12320)
+##### integ 08:07:59
+fresh base afldb_v2_rem2int_base_f10e47ad_test created from afldb_v2_rem2int_tmpl_test
+integ rc=1
+⎯⎯⎯⎯⎯⎯ Failed Tests 46 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  14 failed | 79 passed | 6 skipped (99)
+      Tests  46 failed | 3448 passed | 2 expected fail | 128 skipped (3647)
+   Duration  1852.15s (transform 13.42s, setup 199.57s, import 296.56s, tests 1332.42s, environment 26ms)
+per-file DBs left: 0
+porcelain lines: 0
+##### build 08:38:56
+build rc=0
+└ ƒ /venues/[slug]/matches
+ƒ Proxy (Middleware)
+○  (Static)   prerendered as static content
+●  (SSG)      prerendered as static HTML (uses generateStaticParams)
+ƒ  (Dynamic)  server-rendered on demand
+build rc=0
+standalone rc=0 BUILD_ID=dKd6UdRfV0Fg8LcJU13q1
+porcelain lines: 0
+##### aflw 08:42:34
+app health=200 BUILD_ID=dKd6UdRfV0Fg8LcJU13q1 (beta gate off, indexing on)
+# AFLW %27 metadata on the integrated build Q=f10e47adf9697d9a59a03dd627615e61e8213d30 BUILD_ID=dKd6UdRfV0Fg8LcJU13q1, 2026-11-14T08:42:36Z
+## direct to the app
+url=http://127.0.0.1:55661/aflw/players/Aasta_O%2527Connor host=- status=200
+<title>Aasta O&#x27;Connor — AFLW Stats, Games &amp; Career Record | AFLDB</title>
+<link rel="canonical" href="https://afldb.com/aflw/players/Aasta_O%2527Connor"/>
+<meta name="robots" content="index, follow"/>
+url=http://127.0.0.1:55661/aflw/players/Aasta_O%27Connor host=- status=404
+<title>Page not found | AFLDB</title>
+<meta name="robots" content="noindex"/>
+<meta name="robots" content="noindex, nofollow"/>
+url=http://127.0.0.1:55661/aflw/players/Aasta_O'Connor host=- status=404
+<title>Page not found | AFLDB</title>
+<meta name="robots" content="noindex"/>
+<meta name="robots" content="noindex, nofollow"/>
+## through deploy/Caddyfile.production at Q (Caddy v2.11.4, admin off, local ports)
+url=http://127.0.0.1:55662/aflw/players/Aasta_O%2527Connor host=beta.afldb.com status=200
+<title>Aasta O&#x27;Connor — AFLW Stats, Games &amp; Career Record | AFLDB</title>
+<link rel="canonical" href="https://afldb.com/aflw/players/Aasta_O%2527Connor"/>
+<meta name="robots" content="index, follow"/>
+url=http://127.0.0.1:55662/aflw/players/Aasta_O%27Connor host=beta.afldb.com status=404
+<title>Page not found | AFLDB</title>
+<meta name="robots" content="noindex"/>
+<meta name="robots" content="noindex, nofollow"/>
+url=http://127.0.0.1:55662/aflw/players/Aasta_O%2527Connor host=afldb.com status=404
+url=http://127.0.0.1:55662/aflw/players/Aasta_O%27Connor host=afldb.com status=404
+listeners app/caddy: 0
+##### done 08:42:44

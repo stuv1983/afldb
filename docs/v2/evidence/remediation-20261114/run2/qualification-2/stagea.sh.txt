@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# remediation run 2: copy the DraftGuru Stage A snapshot read-only into the qualification checkout and re-run the
+# DraftGuru unit suite. usage: stagea.sh <Q sha>
+set -u -o pipefail
+export W=/mnt/ssd/afldb-rem2-int-20261114
+export PATH="$HOME/.nvm/versions/node/v22.23.2/bin:$PATH"
+export PYTHON=/home/arm/i250/afldb/.venv/bin/python AFLDB_PYTHON=/home/arm/i250/afldb/.venv/bin/python
+Q=$1; CAND=$W/cand; E=$W/evidence/q-${Q:0:8}
+SRC=/home/arm/projects/afldb/data/sources/draftguru/annual-html-20260826
+ALT=/mnt/ssd/afldb/workspaces/i336-preview2-20261106/checkout/data/sources/draftguru/annual-html-20260826
+DST=$CAND/data/sources/draftguru/annual-html-20260826
+[ "$(git -C "$CAND" rev-parse HEAD)" = "$Q" ] || { echo "HEAD mismatch"; exit 1; }
+{
+echo "# Stage A provenance $(date -u +%FT%TZ)"
+echo "## 1. raw files against the committed manifest docs/rebuild-manifests/draftguru/annual-html-20260826.json (42 entries)"
+(cd "$SRC" && sha256sum -c "$W/in/stagea-expected.sha256" | grep -c ': OK$' | sed 's/^/OK: /'; sha256sum -c --quiet "$W/in/stagea-expected.sha256" && echo "rc=0 (all 42 match)")
+echo "## 2. every file of the source against the second retained copy ($ALT)"
+(cd "$SRC" && find . -type f | sort | xargs sha256sum) > "$E/stagea-src.sha256"
+(cd "$ALT" && find . -type f | sort | xargs sha256sum) > "$E/stagea-alt.sha256"
+echo "files src=$(wc -l < "$E/stagea-src.sha256") alt=$(wc -l < "$E/stagea-alt.sha256")"
+cmp -s "$E/stagea-src.sha256" "$E/stagea-alt.sha256" && echo "IDENTICAL (paths and sha256)" || { echo "DIFFER"; diff "$E/stagea-src.sha256" "$E/stagea-alt.sha256" | head; }
+echo "tree sha256 (sha256 of the sorted list): $(sha256sum < "$E/stagea-src.sha256" | cut -d' ' -f1)"
+} | tee "$E/stagea-provenance.txt"
+grep -q 'rc=0 (all 42 match)' "$E/stagea-provenance.txt" && grep -q IDENTICAL "$E/stagea-provenance.txt" || { echo "provenance check failed: not copied"; exit 1; }
+[ -e "$DST" ] && { echo "destination exists"; exit 1; }
+cp -a "$SRC" "$DST" && chmod -R a-w "$DST"
+(cd "$DST" && find . -type f | sort | xargs sha256sum) | cmp -s - "$E/stagea-src.sha256" && echo "copy re-verified (90 files)" | tee -a "$E/stagea-provenance.txt" || { echo "COPY MISMATCH"; exit 1; }
+cd "$CAND"
+flock /mnt/ssd/afldb-rem2-base/heavy.lock nice -n 10 timeout 1200 env -u DATABASE_URL -u AFLDB_TEST_DATABASE_URL node node_modules/vitest/vitest.mjs run tests/draftguru-acquisition.test.ts \
+  --reporter=default --reporter=json --outputFile.json="$E/unit-stagea.json" > "$E/unit-stagea.log" 2>&1
+echo "unit-stagea rc=$?" | tee -a "$E/unit-stagea.log"
+sed 's/\x1b\[[0-9;]*m//g' "$E/unit-stagea.log" | grep -a -E "^ *(FAIL|×) |Test Files|Tests " | sort -u | head -20
+echo "porcelain lines: $(git status --porcelain | wc -l)"

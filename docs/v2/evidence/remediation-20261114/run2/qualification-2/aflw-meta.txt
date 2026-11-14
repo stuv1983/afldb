@@ -1,0 +1,25 @@
+# AFLW %27 metadata on the integrated build Q=f10e47adf9697d9a59a03dd627615e61e8213d30 BUILD_ID=dKd6UdRfV0Fg8LcJU13q1, 2026-11-14T08:42:36Z
+## direct to the app
+url=http://127.0.0.1:55661/aflw/players/Aasta_O%2527Connor host=- status=200
+<title>Aasta O&#x27;Connor — AFLW Stats, Games &amp; Career Record | AFLDB</title>
+<link rel="canonical" href="https://afldb.com/aflw/players/Aasta_O%2527Connor"/>
+<meta name="robots" content="index, follow"/>
+url=http://127.0.0.1:55661/aflw/players/Aasta_O%27Connor host=- status=404
+<title>Page not found | AFLDB</title>
+<meta name="robots" content="noindex"/>
+<meta name="robots" content="noindex, nofollow"/>
+url=http://127.0.0.1:55661/aflw/players/Aasta_O'Connor host=- status=404
+<title>Page not found | AFLDB</title>
+<meta name="robots" content="noindex"/>
+<meta name="robots" content="noindex, nofollow"/>
+## through deploy/Caddyfile.production at Q (Caddy v2.11.4, admin off, local ports)
+url=http://127.0.0.1:55662/aflw/players/Aasta_O%2527Connor host=beta.afldb.com status=200
+<title>Aasta O&#x27;Connor — AFLW Stats, Games &amp; Career Record | AFLDB</title>
+<link rel="canonical" href="https://afldb.com/aflw/players/Aasta_O%2527Connor"/>
+<meta name="robots" content="index, follow"/>
+url=http://127.0.0.1:55662/aflw/players/Aasta_O%27Connor host=beta.afldb.com status=404
+<title>Page not found | AFLDB</title>
+<meta name="robots" content="noindex"/>
+<meta name="robots" content="noindex, nofollow"/>
+url=http://127.0.0.1:55662/aflw/players/Aasta_O%2527Connor host=afldb.com status=404
+url=http://127.0.0.1:55662/aflw/players/Aasta_O%27Connor host=afldb.com status=404

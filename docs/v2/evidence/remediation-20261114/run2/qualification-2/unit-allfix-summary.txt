@@ -1,0 +1,5 @@
+ Test Files  215 passed | 1 skipped (216)
+      Tests  12295 passed | 25 skipped (12320)
+   Duration  638.32s (transform 21.38s, setup 12.27s, import 127.61s, tests 447.04s, environment 56ms)
+unit-allfix rc=0
+porcelain: 0

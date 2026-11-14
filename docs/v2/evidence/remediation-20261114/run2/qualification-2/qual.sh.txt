@@ -1,0 +1,161 @@
+#!/usr/bin/env bash
+# remediation run 2: final integrated qualification of revision Q in $W/cand.
+# usage: qual.sh <Q sha> <phase...>   phases: checkout static unit_nofix fixtures unit_fix integ shell build aflw stop
+# Ports: PostgreSQL 55660 (cluster already started by setup.sh), app 55661, Caddy 55662. Heavy phases hold the shared lock.
+set -u -o pipefail
+export W=/mnt/ssd/afldb-rem2-int-20261114
+export PATH="$HOME/.nvm/versions/node/v22.23.2/bin:$PATH"
+export PYTHON=/home/arm/i250/afldb/.venv/bin/python AFLDB_PYTHON=/home/arm/i250/afldb/.venv/bin/python
+export AFLDB_V2_PG_ROOT=$W/pg-root AFLDB_V2_PG_BIN=/usr/lib/postgresql/16/bin AFLDB_V2_PG_PORT=55660
+export NEXT_TELEMETRY_DISABLED=1
+Q=$1; shift
+CAND=$W/cand; E=$W/evidence/q-${Q:0:8}; mkdir -p "$E"
+LOCK=/mnt/ssd/afldb-rem2-base/heavy.lock
+TMPL=afldb_v2_rem2int_tmpl_test
+APP_PORT=55661 CADDY_PORT=55662
+CADDY_BIN=$W/caddy-2.11.4
+strip() { sed 's/\x1b\[[0-9;]*m//g' | grep -a -v -i 'postgres://'; }
+IR() { (cd "$CAND" && node --import tsx tools/v2/isolated-pg.ts "$@"); }
+H() { flock "$LOCK" nice -n 10 "$@"; }
+porcelain() { echo "porcelain lines: $(git -C "$CAND" status --porcelain | wc -l)"; git -C "$CAND" status --porcelain | head -5; }
+
+phase_checkout() {
+  cd "$CAND" || return 1
+  git fetch -q "$W/in/q.bundle" claude/remediation-20261114:refs/heads/q-final || return 1
+  git checkout -q --detach "$Q" || return 1
+  echo "HEAD=$(git rev-parse HEAD) want=$Q"
+  [ "$(git rev-parse HEAD)" = "$Q" ] || { echo "HEAD MISMATCH"; return 1; }
+  git diff --quiet e8666c17 "$Q" -- package.json package-lock.json && echo "package files unchanged since e8666c17: node_modules from npm ci at e8666c17 kept" \
+    || { timeout 900 npm ci --no-audit --no-fund 2>&1 | tail -3; }
+  porcelain
+}
+
+phase_static() {
+  cd "$CAND"
+  H timeout 1200 npm run -s typecheck > "$E/typecheck.log" 2>&1; echo "typecheck rc=$?" | tee -a "$E/typecheck.log"
+  strip < "$E/typecheck.log" | grep -a -E "error TS" | head -10
+  H timeout 1200 npm run -s lint:gate > "$E/lint-gate.log" 2>&1; echo "lint:gate rc=$?" | tee -a "$E/lint-gate.log"
+  strip < "$E/lint-gate.log" | tail -8
+  porcelain
+}
+
+unit_run() { # <tag>
+  cd "$CAND"
+  H timeout 2400 env -u DATABASE_URL -u AFLDB_TEST_DATABASE_URL node node_modules/vitest/vitest.mjs run --exclude 'tests/integration/**' \
+    --reporter=default --reporter=json --outputFile.json="$E/unit-$1.json" > "$E/unit-$1.log" 2>&1
+  echo "unit-$1 rc=$?" | tee -a "$E/unit-$1.log"
+  strip < "$E/unit-$1.log" | grep -a -E "^ *(FAIL|×)|Test Files|Tests " | sort -u | head -40
+}
+phase_unit_nofix() {
+  [ -e "$CAND/data/sources/afltables/fitzroy_core/full-history-20260902" ] && { echo "fixtures already present: refusing nofix run"; return 1; }
+  unit_run nofix
+}
+
+phase_fixtures() {
+  local FH_SRC=/home/arm/projects/afldb/data/sources/afltables/fitzroy_core/full-history-20260902
+  local FH_DST=$CAND/data/sources/afltables/fitzroy_core/full-history-20260902
+  local SJ_SRC=/mnt/ssd/afldb/workspaces/i336-preview2-20261106/checkout/data/sources/draftguru/person-html-20260826/sample.json
+  local SJ_DST=$CAND/data/sources/draftguru/person-html-20260826/sample.json
+  local SJ_SHA=d8d743fbcfca39a4c9e708a1198c7e34592270d32628d4fc0003aea88068db28
+  (cd "$FH_SRC" && sha256sum -c --quiet "$W/in/fh-expected.sha256") || { echo "SOURCE fitzRoy hash mismatch"; return 1; }
+  [ "$(ls "$FH_SRC" | wc -l)" = 131 ] || { echo "source file count not 131"; return 1; }
+  [ "$(sha256sum "$SJ_SRC" | cut -d' ' -f1)" = "$SJ_SHA" ] || { echo "SOURCE sample.json hash mismatch"; return 1; }
+  mkdir -p "$(dirname "$FH_DST")" "$(dirname "$SJ_DST")"
+  cp -a "$FH_SRC" "$FH_DST" && cp -p "$SJ_SRC" "$SJ_DST" || return 1
+  chmod -R a-w "$FH_DST" "$SJ_DST"
+  (cd "$FH_DST" && sha256sum -c --quiet "$W/in/fh-expected.sha256") && echo "fitzRoy copy: 131 files re-verified" || { echo "COPY mismatch"; return 1; }
+  [ "$(ls "$FH_DST" | wc -l)" = 131 ] || { echo "copy count not 131"; return 1; }
+  [ "$(sha256sum "$SJ_DST" | cut -d' ' -f1)" = "$SJ_SHA" ] && echo "sample.json copy re-verified" || { echo "COPY sample mismatch"; return 1; }
+  { echo "# fixtures copied read-only $(date -u +%FT%TZ)"; echo "fitzroy src=$FH_SRC files=131 per-file sha256 = run2/fixtures/fh-expected.sha256 (all OK)"; echo "sample.json src=$SJ_SRC sha256=$SJ_SHA"; } > "$E/fixtures-provenance.txt"
+  porcelain
+}
+phase_unit_fix() { [ -e "$CAND/data/sources/draftguru/person-html-20260826/sample.json" ] || { echo "fixtures missing"; return 1; }; unit_run fix; }
+
+phase_integ() {
+  local BASE=afldb_v2_rem2int_base_${Q:0:8}_test
+  IR create-db "$BASE" --template "$TMPL" > "$E/integ-base-mk.log" 2>&1 || { cat "$E/integ-base-mk.log"; return 1; }
+  echo "fresh base $BASE created from $TMPL"
+  H timeout 10800 env CAND="$CAND" BASE="$BASE" MODE=all AUDIT="$E/integ-audit.jsonl" \
+    bash "$CAND/docs/v2/evidence/remediation-20261114/run2/tests363/run-integration-per-file.sh" tests/integration \
+    --reporter=default --reporter=json --outputFile.json="$E/integ.json" > "$E/integ.log" 2>&1
+  echo "integ rc=$?" | tee -a "$E/integ.log"
+  strip < "$E/integ.log" | grep -a -E "Test Files|Tests |Duration" | tail -4
+  echo "per-file DBs left: $(IR list 2>/dev/null | grep -c '_pf_' || true)"
+  porcelain
+}
+
+phase_shell() {
+  cd "$CAND"
+  for t in tests/restore-test.test.sh tests/sync-dev-remote.test.sh; do
+    timeout 600 bash "$t" > "$E/$(basename "$t").log" 2>&1; echo "$t rc=$?" | tee -a "$E/$(basename "$t").log"
+    grep -a -E "^(FAIL|passed|failed)|[0-9]+ passed|[0-9]+ failed" "$E/$(basename "$t").log" | tail -3
+  done
+  porcelain
+}
+
+phase_build() {
+  cd "$CAND"
+  IR create-db afldb_v2_rem2int_app_test --template "$TMPL" > "$E/build-mk.log" 2>&1 || { cat "$E/build-mk.log"; return 1; }
+  H timeout 2400 node --import tsx tools/v2/isolated-pg.ts run afldb_v2_rem2int_app_test -- env NODE_ENV=production node node_modules/next/dist/bin/next build --webpack > "$E/build-next.log" 2>&1
+  local b=$?; echo "build rc=$b" | tee -a "$E/build-next.log"; strip < "$E/build-next.log" | grep -v -E '^\s*$' | tail -6
+  [ $b -eq 0 ] || return 1
+  node --import tsx tools/v2/isolated-pg.ts run afldb_v2_rem2int_app_test -- node tools/build/prepare-standalone.mjs > "$E/build-standalone.log" 2>&1
+  echo "standalone rc=$? BUILD_ID=$(cat .next/BUILD_ID)" | tee -a "$E/build-standalone.log"
+  porcelain
+}
+
+meta() { # <url> <host header or ->
+  local hdr=(); [ "$2" != - ] && hdr=(-H "Host: $2")
+  local f; f=$(mktemp); local code
+  code=$(curl -s "${hdr[@]}" -o "$f" -w '%{http_code}' "$1")
+  printf 'url=%s host=%s status=%s\n' "$1" "$2" "$code"
+  grep -o '<title>[^<]*</title>' "$f" | head -1
+  grep -o '<link rel="canonical"[^>]*>' "$f" | head -1
+  grep -o '<meta name="robots"[^>]*>' "$f" | sort -u
+  rm -f "$f"
+}
+phase_aflw() {
+  cd "$CAND"
+  ss -ltnH | awk '{print $4}' | grep -E ":($APP_PORT|$CADDY_PORT)$" && { echo "port in use"; return 1; }
+  export AFLDB_INDEXING=on AFLDB_BASE_URL=https://afldb.com HOSTNAME=127.0.0.1
+  export AFLDB_SESSION_SECRET="$(head -c 48 /dev/urandom | base64 | tr -d '\n=+/' | head -c 48)"
+  nohup bash -c "cd '$CAND' && node --import tsx tools/v2/isolated-pg.ts run afldb_v2_rem2int_app_test -- bash -c \"cd '$CAND' && exec node node_modules/next/dist/bin/next start -H 127.0.0.1 -p $APP_PORT\"" > "$E/serve.log" 2>&1 &
+  echo $! > "$W/app.pid"
+  local code=; for i in $(seq 1 60); do sleep 1; code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$APP_PORT/api/health" || true); [ "$code" = 200 ] && break; done
+  echo "app health=$code BUILD_ID=$(cat .next/BUILD_ID) (beta gate off, indexing on)"
+  {
+    echo "# AFLW %27 metadata on the integrated build Q=$Q BUILD_ID=$(cat .next/BUILD_ID), $(date -u +%FT%TZ)"
+    echo "## direct to the app"
+    for p in "/aflw/players/Aasta_O%2527Connor" "/aflw/players/Aasta_O%27Connor" "/aflw/players/Aasta_O'Connor"; do meta "http://127.0.0.1:$APP_PORT$p" -; done
+  } > "$E/aflw-meta.txt" 2>&1
+  # through the candidate production Caddyfile (same transform as run2/caddy357/scripts/caddyapp.sh)
+  local R=$W/caddyapp; rm -rf "$R"; mkdir -p "$R/logs" "$R/xdg/data" "$R/xdg/config" "$W/soon"
+  sed -e '0,/^{$/s//{\n\tadmin off\n\tauto_https off\n\tpersist_config off/' \
+    -e "s#^beta\.afldb\.com {#http://beta.afldb.com:$CADDY_PORT {#" -e "s#^www\.afldb\.com {#http://www.afldb.com:$CADDY_PORT {#" \
+    -e "s#^afldb\.com {#http://afldb.com:$CADDY_PORT {#" -e "s#^:8090 {#http://beta.afldb.com:$CADDY_PORT {#" \
+    -e "s#127\.0\.0\.1:3100#127.0.0.1:$APP_PORT#g" -e "s#/var/log/caddy/#$R/logs/#g" -e "s#/var/www/afldb-soon#$W/soon#g" \
+    "$CAND/deploy/Caddyfile.production" > "$R/Caddyfile.test"
+  export XDG_DATA_HOME=$R/xdg/data XDG_CONFIG_HOME=$R/xdg/config
+  "$CADDY_BIN" adapt --config "$R/Caddyfile.test" --adapter caddyfile > "$R/adapted.json" 2>/dev/null
+  if grep -q '"admin":{"disabled":true' "$R/adapted.json"; then
+    nohup "$CADDY_BIN" run --config "$R/Caddyfile.test" --adapter caddyfile > "$R/caddy-stderr.log" 2>&1 &
+    echo $! > "$W/caddy.pid"; sleep 3
+    {
+      echo "## through deploy/Caddyfile.production at Q (Caddy $("$CADDY_BIN" version | cut -d' ' -f1), admin off, local ports)"
+      for h in beta.afldb.com afldb.com; do
+        for p in "/aflw/players/Aasta_O%2527Connor" "/aflw/players/Aasta_O%27Connor"; do meta "http://127.0.0.1:$CADDY_PORT$p" "$h"; done
+      done
+    } >> "$E/aflw-meta.txt" 2>&1
+  else echo "## Caddy admin guard failed: not run" >> "$E/aflw-meta.txt"; fi
+  cat "$E/aflw-meta.txt"
+  phase_stop_servers
+}
+phase_stop_servers() {
+  for f in "$W/caddy.pid" "$W/app.pid"; do [ -f "$f" ] && { pkill -TERM -P "$(cat "$f")" 2>/dev/null; kill "$(cat "$f")" 2>/dev/null; rm -f "$f"; }; done
+  sleep 3; pkill -f "next start -H 127.0.0.1 -p $APP_PORT" 2>/dev/null; sleep 1
+  echo "listeners app/caddy: $(ss -ltnH | awk '{print $4}' | grep -cE ":($APP_PORT|$CADDY_PORT)$")"
+}
+phase_stop() { phase_stop_servers; IR stop; sleep 2; echo "listener 55660: $(ss -ltnH | awk '{print $4}' | grep -c ':55660$')"; }
+
+for ph in "$@"; do echo "##### $ph $(date -u +%T)"; "phase_$ph" || { echo "##### FAILED $ph"; exit 1; }; done
+echo "##### done $(date -u +%T)"

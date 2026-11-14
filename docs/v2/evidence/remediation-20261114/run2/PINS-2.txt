@@ -1,0 +1,10 @@
+# Read-only pin probe (orchestrator, run 2), 2026-11-14T08:47:59Z workstation time
+origin/main (git ls-remote): de640826d13489c58392563e7ae1ff62403ed293
+production (ssh afldb, stdin script, read-only; no file written on the host):
+releases_dir=/home/arm/afldb-releases current=c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x previous=0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN
+serving_checkout_head=c1c4b22ee150 porcelain=0
+kernel_running=6.8.0-137-generic reboot_required=present
+caddyfile_sha256=4f6972ec119f5d33fff4c16cbbce15c50a36b883654dcffcabdb01776d7af036
+needrestart_hold=absent apt52=absent
+afldb_active=active since=Sat 2026-11-14 06:35:21 AEDT NRestarts=0
+Not re-read in this probe (carried from the ops scope's read-only probes of 2026-11-14 and run 1): database OID/system identifier, ledger head 118, AFLDB_BETA_EPOCH=1, 2027 season NOT_OPEN.

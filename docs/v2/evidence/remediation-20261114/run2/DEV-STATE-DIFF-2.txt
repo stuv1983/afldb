@@ -1,0 +1,3 @@
+# DEV state before vs after remediation run 2 (orchestrator)
+Compared DEV-STATE-BEFORE-2.txt (15:50:17 AEDT) with DEV-STATE-AFTER-2.txt (19:56:18 AEDT), excluding the header line, timer next/last times and load.
+Result: identical. afldb.service MainPID 1732, postgresql@16-main 1531, caddy 1683, NRestarts 0 for each, same InvocationIDs; listeners 2019/3000/5432; no 556xx listener; DEV checkout HEAD 8b024098a6771fc5e5be2f8bf006c9c3ca8ab55a.
