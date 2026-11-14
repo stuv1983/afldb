@@ -1,0 +1,57 @@
+run2 ids=52 this run ids=46
+## GONE (in run 2, not in this run) (6)
+tests/integration/database.test.ts  |  advanced search regression cases 200+ games, 100+ goals and 15+ finals
+tests/integration/database.test.ts  |  advanced search regression cases 200-249 games with 16 or more finals
+tests/integration/database.test.ts  |  advanced search regression cases 50-199 goals and no Brownlow votes
+tests/integration/database.test.ts  |  data integrity has the full player-match dataset
+tests/integration/settle-afl-api-issue276.test.ts  |  <file-level>
+tests/integration/settle-afl-api-state-b.test.ts  |  <file-level>
+## COMMON (46)
+tests/integration/admin-brownlow.test.ts  |  migration 094 objects and backfill resolved every historical round row to exactly one match (preflight P2)
+tests/integration/awards-reload-links.test.ts  |  <file-level>
+tests/integration/club-comparison.test.ts  |  club comparison: crossover players lists everyone who represented both organisations, agreeing with independent SQL
+tests/integration/club-comparison.test.ts  |  club comparison: crossover players reports Ben Keays as Brisbane Lions first, then Adelaide, in both argument orders
+tests/integration/club-comparison.test.ts  |  club comparison: crossover players summarises the first and most recent players to complete both representations
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head Brownlow counts eligible and covered meetings from home-and-away matches only
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head by decade reproduces the Adelaide vs Brisbane Lions decade witness and independent SQL
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head by decade sums every Carlton vs Collingwood decade back to the complete 268-meeting population
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head core filters by era (Club Rivalry Explorer follow-up, FR-2) so the decades partition the complete history
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head core filters by match type so that home-and-away and finals partition the complete history
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head core groups venue records by canonical venue and agrees with an independent grouping
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head core handles the Carlton vs Collingwood long rivalry, including Grand Finals
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head core keeps Brisbane Bears and Fitzroy out of Brisbane Lions head-to-head totals
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head core paginates the complete meetings list deterministically at 25 rows per page
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head core reads streaks from chronological order, with a draw breaking a winning streak
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head core summarises Adelaide vs Brisbane Lions to the canonical witness and to independent SQL
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head player averages applies the five-recorded-game minimum, per metric and never per rivalry appearance
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head player averages ranks the disposals average board on recorded games and matches independent SQL
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head player averages retains every tie at the rank-ten boundary and reports the recorded-game denominator
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head player averages reuses the comparison metric registry rather than defining a second one
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head player averages splits a crossover player average across both organisations
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head player leaders consolidates a player who represented both organisations into one row
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head player leaders keeps every tied holder of the single-match goals and disposals records
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head player leaders ranks H2H games leaders against independent SQL and the measured witnesses
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head player leaders ranks H2H goals leaders without ever treating an unrecorded goal as nought
+tests/integration/club-comparison.test.ts  |  club comparison: period-score rivalry records exposes pair-level period-score coverage for both witness rivalries
+tests/integration/data-editor.test.ts  |  Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) (2a) replay re-applies a field correction over a reset source value
+tests/integration/data-editor.test.ts  |  Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) (2b) replay recreates a durable addition the reload did not supply
+tests/integration/data-editor.test.ts  |  Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) (2c) replay deletes a reinserted row under a durable removal
+tests/integration/data-editor.test.ts  |  Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) (3a) an active key whose match_key is absent from matches refuses before any write
+tests/integration/data-editor.test.ts  |  Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) (3b) an active key whose identity names no accepted external identity refuses before any write
+tests/integration/draft-linkage.test.ts  |  DraftGuru bridge on afldb_test — §6.1 reconciliation (read-only) persons partition exactly as the child + ledger predict
+tests/integration/draft-linkage.test.ts  |  DraftGuru bridge on afldb_test — §6.4 negative controls (read-only) withheld persons stay unlinked by the bridge; the rejected identities are reached by nobody
+tests/integration/gridley-corpus.test.ts  |  Gridley corpus -- every cell through solveCellSummary writes the run report and has no failing cells
+tests/integration/release-gates.test.ts  |  gate: 2026 is provisional (snapshot-pinned) awards no premier and no wooden spoon for 2026
+tests/integration/release-gates.test.ts  |  gate: 2026 is provisional (snapshot-pinned) is the only season still in progress
+tests/integration/release-gates.test.ts  |  gate: 2026 is provisional (snapshot-pinned) reports 2026 Brownlow as pending, never as zero
+tests/integration/release-gates.test.ts  |  gate: Advanced Search regression cases 50-199 goals and zero Brownlow votes returns the exact 261 players
+tests/integration/release-gates.test.ts  |  gate: Brownlow authority agrees with the canonical round votes for every career inside their coverage
+tests/integration/release-gates.test.ts  |  gate: absence is never zero records why each attendance is missing
+tests/integration/release-gates.test.ts  |  gate: birth dates leaves the remaining players honestly without a date
+tests/integration/release-gates.test.ts  |  gate: club organizations and identities attaches every ladder row to the identity trading that season
+tests/integration/settle-afl-api.test.ts  |  AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreSQL (post-COMMIT, pre-archive recovery) OD-5 reinstate (rolled back, no rebuild) — reinstateAndReplay() puts a captured ledger back byte-for-byte under its original ids, replays it and passes the bijection
+tests/integration/v2-brownlow-eligibility-2025-rehearsal.test.ts  |  <file-level>
+tests/integration/v2-brownlow-production-correction.test.ts  |  <file-level>
+tests/integration/v2-coleman-publication.test.ts  |  <file-level>
+## NEW (not in run 2) (0)
+

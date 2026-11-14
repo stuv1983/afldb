@@ -1,0 +1,3 @@
+# fixtures (base) copied read-only 2026-11-14T14:31:42Z into /mnt/ssd/afldb-rem3-qual-20261114/cand at HEAD=692b1902cbcc321cea76a30857a03e15f02db6b7
+fitzroy src=/home/arm/projects/afldb/data/sources/afltables/fitzroy_core/full-history-20260902 files=131, per-file sha256 = run2/fixtures/fh-expected.sha256 (131/131 OK at source and at copy)
+sample.json src=/mnt/ssd/afldb/workspaces/i336-preview2-20261106/checkout/data/sources/draftguru/person-html-20260826/sample.json sha256=d8d743fbcfca39a4c9e708a1198c7e34592270d32628d4fc0003aea88068db28 (source and copy)

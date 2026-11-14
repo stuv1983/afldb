@@ -1,0 +1,161 @@
+##### checkout start 2026-11-14T14:17:44Z HEAD=692b1902 porcelain-before=0
+HEAD=692b1902cbcc321cea76a30857a03e15f02db6b7 want=692b1902cbcc321cea76a30857a03e15f02db6b7
+package.json / package-lock.json unchanged since 6d5388ea5305e73b0420fbccfa7b0cea4fe75927 (npm ci ran at Q' in setup.sh)
+node v22.23.2 vitest vitest/4.1.10 linux-x64 node-v22.23.2
+porcelain lines: 0
+##### checkout end 2026-11-14T14:17:44Z rc=0 porcelain-after=0
+##### static start 2026-11-14T14:17:44Z HEAD=692b1902 porcelain-before=0
+typecheck rc=0
+lint:gate rc=0
+Lint gate (ratchet): 338 error(s) in 43 file(s) now; the ratchet baseline allows 338 in 43 (existing debt, not clean lint).
+Lint gate: PASSED (ratchet; existing debt remains).
+lint:gate rc=0
+##### static end 2026-11-14T14:21:37Z rc=0 porcelain-after=0
+##### unit_nofix start 2026-11-14T14:21:37Z HEAD=692b1902 porcelain-before=0
+unit-nofix rc=1
+ Test Files  2 failed | 213 passed | 1 skipped (216)
+      Tests  7 failed | 12282 passed | 31 skipped (12320)
+   Duration  600.95s (transform 22.33s, setup 12.40s, import 127.26s, tests 410.14s, environment 56ms)
+unit-nofix failing ids: 7
+tests/draftguru-acquisition.test.ts	DraftGuru bridge import gate (plan / verify, read-only) DSN guard, read-only discipline, hash pins, classification refusals, verify ch
+tests/draftguru-acquisition.test.ts	frozen Stage B1 sample (local snapshot) is the frozen 120 / 8 / 68 / 30 / 14 contract over the accepted Stage A label
+tests/draftguru-acquisition.test.ts	frozen Stage B1 sample (local snapshot) rebuilds byte-identically from the accepted Stage A snapshot
+tests/fitzroy-core-import.test.ts	blank Player fallback covers the four real 2025 players, retaining all 79 rows
+tests/fitzroy-core-import.test.ts	fitzRoy source row corrections corrects exactly two rows and nothing else in 1909
+tests/fitzroy-core-import.test.ts	fitzRoy source row corrections leaves exactly the two genuine Round 10 rows
+tests/fitzroy-core-import.test.ts	fitzRoy source row corrections leaves the younger player's other appearances untouched
+##### unit_nofix end 2026-11-14T14:31:39Z rc=0 porcelain-after=0
+##### fixtures_base start 2026-11-14T14:31:39Z HEAD=692b1902 porcelain-before=0
+fitzRoy copy: 131 files re-verified against run2/fixtures/fh-expected.sha256
+sample.json copy re-verified
+porcelain lines: 0
+##### fixtures_base end 2026-11-14T14:31:42Z rc=0 porcelain-after=0
+##### unit_fix start 2026-11-14T14:31:42Z HEAD=692b1902 porcelain-before=0
+unit-fix rc=1
+ Test Files  1 failed | 214 passed | 1 skipped (216)
+      Tests  2 failed | 12287 passed | 31 skipped (12320)
+   Duration  609.65s (transform 21.77s, setup 12.29s, import 126.55s, tests 419.55s, environment 56ms)
+unit-fix failing ids: 2
+tests/draftguru-acquisition.test.ts	DraftGuru bridge import gate (plan / verify, read-only) DSN guard, read-only discipline, hash pins, classification refusals, verify ch
+tests/draftguru-acquisition.test.ts	frozen Stage B1 sample (local snapshot) rebuilds byte-identically from the accepted Stage A snapshot
+##### unit_fix end 2026-11-14T14:41:53Z rc=0 porcelain-after=0
+##### integ start 2026-11-14T14:41:53Z HEAD=692b1902 porcelain-before=0
+fresh base afldb_v2_rem3qual_base_692b1902_test created from afldb_v2_rem3qual_tmpl_test
+integ rc=1
+⎯⎯⎯⎯⎯⎯ Failed Tests 42 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  11 failed | 82 passed | 6 skipped (99)
+      Tests  42 failed | 3457 passed | 2 expected fail | 123 skipped (3647)
+   Duration  1855.00s (transform 12.06s, setup 175.51s, import 302.08s, tests 1353.39s, environment 26ms)
+per-file DBs left: 0
+##### integ end 2026-11-14T15:12:53Z rc=0 porcelain-after=0
+##### fixtures_stagea start 2026-11-14T15:12:53Z HEAD=692b1902 porcelain-before=0
+# Stage A and residual-input provenance 2026-11-14T15:12:54Z, HEAD=692b1902cbcc321cea76a30857a03e15f02db6b7
+## 1. raw files against the committed manifest docs/rebuild-manifests/draftguru/annual-html-20260826.json (42 entries)
+OK: 42
+rc=0 (all 42 match)
+## 2. every file of the source against the second retained copy (/mnt/ssd/afldb/workspaces/i336-preview2-20261106/checkout/data/sources/draftguru/annual-html-20260826)
+files src=90 alt=90
+IDENTICAL (paths and sha256)
+tree sha256 (sha256 of the sorted list): ceea2d344aa5eb8826edd54c0dae574188738e94cc26ee67a9e7ab8368264de2
+## 3. residual input: source sha256 df6c9a7559bceb649e8e28e457fbe91d3351d8c1737a9042f233b1f1e3c5e841 ; sample.json residual_input.sha256 df6c9a7559bceb649e8e28e457fbe91d3351d8c1737a9042f233b1f1e3c5e841
+Stage A copy re-verified (90 files, paths and sha256)
+residual input copy re-verified: sha256 df6c9a7559bceb649e8e28e457fbe91d3351d8c1737a9042f233b1f1e3c5e841 = sample.json residual_input.sha256
+porcelain lines: 0
+##### fixtures_stagea end 2026-11-14T15:12:54Z rc=0 porcelain-after=0
+##### unit_all start 2026-11-14T15:12:54Z HEAD=692b1902 porcelain-before=0
+unit-allfix rc=0
+ Test Files  215 passed | 1 skipped (216)
+      Tests  12295 passed | 25 skipped (12320)
+   Duration  669.66s (transform 18.40s, setup 13.26s, import 130.31s, tests 472.45s, environment 57ms)
+unit-allfix failing ids: 0
+##### unit_all end 2026-11-14T15:24:05Z rc=0 porcelain-after=0
+##### shell start 2026-11-14T15:24:05Z HEAD=692b1902 porcelain-before=0
+tests/restore-test.test.sh rc=0
+restore-test harness: 24 passed, 0 failed
+tests/sync-dev-remote.test.sh rc=0
+42 passed, 0 failed
+##### shell end 2026-11-14T15:24:08Z rc=0 porcelain-after=0
+##### build start 2026-11-14T15:24:09Z HEAD=692b1902 porcelain-before=0
+build rc=0
+└ ƒ /venues/[slug]/matches
+ƒ Proxy (Middleware)
+○  (Static)   prerendered as static content
+●  (SSG)      prerendered as static HTML (uses generateStaticParams)
+ƒ  (Dynamic)  server-rendered on demand
+build rc=0
+standalone rc=0 BUILD_ID=cnEy98lTDk5v5UlbJLNFH
+##### build end 2026-11-14T15:28:14Z rc=0 porcelain-after=0
+##### failures start 2026-11-14T15:28:14Z HEAD=692b1902 porcelain-before=0
+integration failing ids: 46 (4 file-level)
+run2 ids=52 this run ids=46
+## GONE (in run 2, not in this run) (6)
+tests/integration/database.test.ts  |  advanced search regression cases 200+ games, 100+ goals and 15+ finals
+tests/integration/database.test.ts  |  advanced search regression cases 200-249 games with 16 or more finals
+tests/integration/database.test.ts  |  advanced search regression cases 50-199 goals and no Brownlow votes
+tests/integration/database.test.ts  |  data integrity has the full player-match dataset
+tests/integration/settle-afl-api-issue276.test.ts  |  <file-level>
+tests/integration/settle-afl-api-state-b.test.ts  |  <file-level>
+## COMMON (46)
+tests/integration/admin-brownlow.test.ts  |  migration 094 objects and backfill resolved every historical round row to exactly one match (preflight P2)
+tests/integration/awards-reload-links.test.ts  |  <file-level>
+tests/integration/club-comparison.test.ts  |  club comparison: crossover players lists everyone who represented both organisations, agreeing with independent SQL
+tests/integration/club-comparison.test.ts  |  club comparison: crossover players reports Ben Keays as Brisbane Lions first, then Adelaide, in both argument orders
+tests/integration/club-comparison.test.ts  |  club comparison: crossover players summarises the first and most recent players to complete both representations
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head Brownlow counts eligible and covered meetings from home-and-away matches only
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head by decade reproduces the Adelaide vs Brisbane Lions decade witness and independent SQL
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head by decade sums every Carlton vs Collingwood decade back to the complete 268-meeting population
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head core filters by era (Club Rivalry Explorer follow-up, FR-2) so the decades partition the complete history
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head core filters by match type so that home-and-away and finals partition the complete history
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head core groups venue records by canonical venue and agrees with an independent grouping
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head core handles the Carlton vs Collingwood long rivalry, including Grand Finals
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head core keeps Brisbane Bears and Fitzroy out of Brisbane Lions head-to-head totals
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head core paginates the complete meetings list deterministically at 25 rows per page
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head core reads streaks from chronological order, with a draw breaking a winning streak
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head core summarises Adelaide vs Brisbane Lions to the canonical witness and to independent SQL
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head player averages applies the five-recorded-game minimum, per metric and never per rivalry appearance
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head player averages ranks the disposals average board on recorded games and matches independent SQL
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head player averages retains every tie at the rank-ten boundary and reports the recorded-game denominator
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head player averages reuses the comparison metric registry rather than defining a second one
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head player averages splits a crossover player average across both organisations
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head player leaders consolidates a player who represented both organisations into one row
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head player leaders keeps every tied holder of the single-match goals and disposals records
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head player leaders ranks H2H games leaders against independent SQL and the measured witnesses
+tests/integration/club-comparison.test.ts  |  club comparison: head-to-head player leaders ranks H2H goals leaders without ever treating an unrecorded goal as nought
+tests/integration/club-comparison.test.ts  |  club comparison: period-score rivalry records exposes pair-level period-score coverage for both witness rivalries
+tests/integration/data-editor.test.ts  |  Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) (2a) replay re-applies a field correction over a reset source value
+tests/integration/data-editor.test.ts  |  Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) (2b) replay recreates a durable addition the reload did not supply
+tests/integration/data-editor.test.ts  |  Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) (2c) replay deletes a reinserted row under a durable removal
+tests/integration/data-editor.test.ts  |  Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) (3a) an active key whose match_key is absent from matches refuses before any write
+tests/integration/data-editor.test.ts  |  Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) (3b) an active key whose identity names no accepted external identity refuses before any write
+tests/integration/draft-linkage.test.ts  |  DraftGuru bridge on afldb_test — §6.1 reconciliation (read-only) persons partition exactly as the child + ledger predict
+tests/integration/draft-linkage.test.ts  |  DraftGuru bridge on afldb_test — §6.4 negative controls (read-only) withheld persons stay unlinked by the bridge; the rejected identities are reached by nobody
+tests/integration/gridley-corpus.test.ts  |  Gridley corpus -- every cell through solveCellSummary writes the run report and has no failing cells
+tests/integration/release-gates.test.ts  |  gate: 2026 is provisional (snapshot-pinned) awards no premier and no wooden spoon for 2026
+tests/integration/release-gates.test.ts  |  gate: 2026 is provisional (snapshot-pinned) is the only season still in progress
+tests/integration/release-gates.test.ts  |  gate: 2026 is provisional (snapshot-pinned) reports 2026 Brownlow as pending, never as zero
+tests/integration/release-gates.test.ts  |  gate: Advanced Search regression cases 50-199 goals and zero Brownlow votes returns the exact 261 players
+tests/integration/release-gates.test.ts  |  gate: Brownlow authority agrees with the canonical round votes for every career inside their coverage
+tests/integration/release-gates.test.ts  |  gate: absence is never zero records why each attendance is missing
+tests/integration/release-gates.test.ts  |  gate: birth dates leaves the remaining players honestly without a date
+tests/integration/release-gates.test.ts  |  gate: club organizations and identities attaches every ladder row to the identity trading that season
+tests/integration/settle-afl-api.test.ts  |  AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreSQL (post-COMMIT, pre-archive recovery) OD-5 reinstate (rolled back, no rebuild) — reinstateAndReplay() puts a captured ledger back byte-for-byte under its original ids, replays it and passes the bijection
+tests/integration/v2-brownlow-eligibility-2025-rehearsal.test.ts  |  <file-level>
+tests/integration/v2-brownlow-production-correction.test.ts  |  <file-level>
+tests/integration/v2-coleman-publication.test.ts  |  <file-level>
+## NEW (not in run 2) (0)
+
+files: failed=11 passed=88 other=0 total=99; tests: failed=42 passed=3459 pending=123 todo=0 total=3647
+##### failures end 2026-11-14T15:28:14Z rc=0 porcelain-after=0
+##### seal start 2026-11-14T15:28:14Z HEAD=692b1902 porcelain-before=0
+28 SHA256SUMS-host.txt
+d6c5dec5e86884938e80c3fffe5316a0276b78e5fb16601d403d4526204ef3a2  /mnt/ssd/afldb-rem3-qual-20261114/cand/docs/v2/evidence/remediation-20261114/run3/qualification-3/setup.sh
+f2e04d4e87443f980f0a220db9628224b1668e23f1f82fa7e6f7629e301152c0  /mnt/ssd/afldb-rem3-qual-20261114/cand/docs/v2/evidence/remediation-20261114/run3/qualification-3/qual.sh
+b062da727e72e99471b5d8dfc634787a1fe130cd4a690df6a39b5c49b0ac6c78  /mnt/ssd/afldb-rem3-qual-20261114/cand/docs/v2/evidence/remediation-20261114/run3/qualification-3/fixtures.sh
+##### seal end 2026-11-14T15:28:14Z rc=0 porcelain-after=0
+##### stop start 2026-11-14T15:28:14Z HEAD=692b1902 porcelain-before=0
+waiting for server to shut down.... done
+server stopped
+listeners on 55674/55676/55677: 0
+processes under /mnt/ssd/afldb-rem3-qual-20261114: 1
+##### stop end 2026-11-14T15:28:18Z rc=0 porcelain-after=0
+##### done 2026-11-14T15:28:18Z

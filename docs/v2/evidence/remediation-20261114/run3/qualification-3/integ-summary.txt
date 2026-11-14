@@ -1,0 +1,6 @@
+⎯⎯⎯⎯⎯⎯ Failed Tests 42 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  11 failed | 82 passed | 6 skipped (99)
+      Tests  42 failed | 3457 passed | 2 expected fail | 123 skipped (3647)
+   Duration  1855.00s (transform 12.06s, setup 175.51s, import 302.08s, tests 1353.39s, environment 26ms)
+per-file DBs left: 0
+files: failed=11 passed=88 other=0 total=99; tests: failed=42 passed=3459 pending=123 todo=0 total=3647
