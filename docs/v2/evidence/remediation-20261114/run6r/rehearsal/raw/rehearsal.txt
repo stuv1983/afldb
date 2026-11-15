@@ -1,0 +1,329 @@
+=== packet 6R B1a rehearsal 2026-11-15T22:05:36Z host=streamanator node=v22.23.2 psql=16.15
+checkout HEAD=f6af6da93551aed9dbd5658319346d7ecdd96ea3 porcelain=0
+--- artifact sha256 (as executed)
+bcc4131171a08500cc3b4b64ee51d254a5f0608f450847f17e95a06f62f8c32c  b1a-repair-2026-r6r.mts
+dc6211d7826d03712ab95a872889a562b86c5a86b72a4fc717431005b5033ec7  b1a-accept-r6r.sql
+e8343ae635288781ff2e5b2957cafa40287f0bfce6dc77f1b87f555c2cd616f3  b1a-reverse-r6r.sql
+--- src imported by the runner, identical to the published candidate?
+42a1f1f484d6ddd4adaef83cea303eba927fb426417a2d82a7253900dfd0dbcc  src/db/queries/brownlow-readiness.ts
+=== static qualification of the runner (repo typecheck and lint exclude docs/**/evidence)
+tsc (strict, repo compilerOptions) rc=0
+eslint (repo config, ignores lifted) rc=0
+=== cluster
+/usr/lib/postgresql/16/bin/postgres "-D" "/mnt/ssd/afldb-rem4-coleman276-20261115-pg/data"
+
+##### case exact 22:05:44
+create-db: afldb_v2_rem6r_exact_test created from afldb_v2_rem4coleman276_sntmpl_test and marked
+copy: db=afldb_v2_rem6r_exact_test oid=70944 sysid=7708106352119813731 role=afldb_import ids2026(pre-drift)=e5ead8dbf3baf9a7b647b0f55b04c496
+accept BEFORE rc=0
+  identity|afldb_v2_rem6r_exact_test|70944|7708106352119813731
+  pss2026|not_applicable|669|0
+  ids2026|669|e5ead8dbf3baf9a7b647b0f55b04c496
+  cov2026|brownlow_match_votes|pending|f|-|-
+  cov2026|brownlow_round_votes|pending|f|-|-
+  cov2026|brownlow_season_total|pending|f|-|-
+  inputs2026|complete/0/9522/draft:1/0
+  fp_pss_other(H1)|097fd0b35e770ad7aac79b678f582f16
+  fp_pss2026_nonstatus(H2)|a18697db41e9c25fd24d00e2095fa9ab
+  fp_stat_availability(H3)|3120|0c3d4ab4bf45dbec07b0ae94e103d532
+  na_cov|0|12
+  na_pss|669|9553
+fp0 xmin2026=4459e0bd3f490671b8eaaf2d4f29a83e row2026=0f557dab6a51e27325ea7a5e02eb48fb pss_all=49660fd9f78df07c11496ac14e0704b1 sa_all=0c3d4ab4bf45dbec07b0ae94e103d532 bsv2026=0 status2026=not_applicable:669
+--- dry run
+LOCKED {"tables":["seasons","stat_availability","brownlow_season_votes","brownlow_season_authority","brownlow_vote_entry_state","brownlow_round_votes","player_season_stats"],"mode":"SHARE ROW EXCLUSIVE","rows2026":669,"waitMs":7}
+BEFORE {"pss2026":"669 rows, not_applicable 669, pending 0, votes 0","ids":"e5ead8dbf3baf9a7b647b0f55b04c496","fp2026NonStatus":"a18697db41e9c25fd24d00e2095fa9ab","fpOtherSeasons":"097fd0b35e770ad7aac79b678f582f16","fpStatAvailability":"0c3d4ab4bf45dbec07b0ae94e103d532","coverage":["brownlow_match_votes=pending/unrecorded/-/-","brownlow_round_votes=pending/unrecorded/-/-","brownlow_season_total=pending/unrecorded/-/-"],"season":"complete","medalRows":0,"publishedAuthority":0,"authorityRows":0,"roundRows":9522,"entryState":"draft:1","derivedStatus":"pending"}
+AFTER(in tx) {"pss2026":"669 rows, not_applicable 0, pending 669, votes 0","ids":"e5ead8dbf3baf9a7b647b0f55b04c496","fp2026NonStatus":"a18697db41e9c25fd24d00e2095fa9ab","fpOtherSeasons":"097fd0b35e770ad7aac79b678f582f16","fpStatAvailability":"0c3d4ab4bf45dbec07b0ae94e103d532","coverage":["brownlow_match_votes=pending/unrecorded/-/-","brownlow_round_votes=pending/unrecorded/-/-","brownlow_season_total=pending/unrecorded/-/-"],"season":"complete","medalRows":0,"publishedAuthority":0,"authorityRows":0,"roundRows":9522,"entryState":"draft:1","derivedStatus":"pending"}
+OUTCOME DRY-RUN-PASS (rolled back)
+exit=0
+PASS dry run rolled back: state byte-identical (xmin, rows, coverage, medal)
+--- commit
+LOCKED {"tables":["seasons","stat_availability","brownlow_season_votes","brownlow_season_authority","brownlow_vote_entry_state","brownlow_round_votes","player_season_stats"],"mode":"SHARE ROW EXCLUSIVE","rows2026":669,"waitMs":7}
+BEFORE {"pss2026":"669 rows, not_applicable 669, pending 0, votes 0","ids":"e5ead8dbf3baf9a7b647b0f55b04c496","fp2026NonStatus":"a18697db41e9c25fd24d00e2095fa9ab","fpOtherSeasons":"097fd0b35e770ad7aac79b678f582f16","fpStatAvailability":"0c3d4ab4bf45dbec07b0ae94e103d532","coverage":["brownlow_match_votes=pending/unrecorded/-/-","brownlow_round_votes=pending/unrecorded/-/-","brownlow_season_total=pending/unrecorded/-/-"],"season":"complete","medalRows":0,"publishedAuthority":0,"authorityRows":0,"roundRows":9522,"entryState":"draft:1","derivedStatus":"pending"}
+AFTER(in tx) {"pss2026":"669 rows, not_applicable 0, pending 669, votes 0","ids":"e5ead8dbf3baf9a7b647b0f55b04c496","fp2026NonStatus":"a18697db41e9c25fd24d00e2095fa9ab","fpOtherSeasons":"097fd0b35e770ad7aac79b678f582f16","fpStatAvailability":"0c3d4ab4bf45dbec07b0ae94e103d532","coverage":["brownlow_match_votes=pending/unrecorded/-/-","brownlow_round_votes=pending/unrecorded/-/-","brownlow_season_total=pending/unrecorded/-/-"],"season":"complete","medalRows":0,"publishedAuthority":0,"authorityRows":0,"roundRows":9522,"entryState":"draft:1","derivedStatus":"pending"}
+OUTCOME COMMITTED
+exit=0
+accept AFTER rc=0
+--- acceptance BEFORE -> AFTER (changed lines only)
+< pss2026|not_applicable|669|0
+> pss2026|pending|669|0
+< na_pss|669|9553
+> na_pss|0|9553
+fp2 xmin2026=48e6150b4fd769d5255c2f4bf0c0f22f row2026=1f4a44adb30b0e81991d5d4edacbcb46 pss_all=2fcce0d53e3a0d9ac283f0f78f001924 sa_all=0c3d4ab4bf45dbec07b0ae94e103d532 bsv2026=0 status2026=pending:669
+PASS commit left stat_availability byte-identical
+only-status check: 0 rows not pending/NULL
+--- repeat --commit
+LOCKED {"tables":["seasons","stat_availability","brownlow_season_votes","brownlow_season_authority","brownlow_vote_entry_state","brownlow_round_votes","player_season_stats"],"mode":"SHARE ROW EXCLUSIVE","rows2026":669,"waitMs":7}
+BEFORE {"pss2026":"669 rows, not_applicable 0, pending 669, votes 0","ids":"e5ead8dbf3baf9a7b647b0f55b04c496","fp2026NonStatus":"a18697db41e9c25fd24d00e2095fa9ab","fpOtherSeasons":"097fd0b35e770ad7aac79b678f582f16","fpStatAvailability":"0c3d4ab4bf45dbec07b0ae94e103d532","coverage":["brownlow_match_votes=pending/unrecorded/-/-","brownlow_round_votes=pending/unrecorded/-/-","brownlow_season_total=pending/unrecorded/-/-"],"season":"complete","medalRows":0,"publishedAuthority":0,"authorityRows":0,"roundRows":9522,"entryState":"draft:1","derivedStatus":"pending"}
+OUTCOME ALREADY-APPLIED (nothing written)
+exit=3
+PASS repeat commit performed no mutation: state byte-identical (xmin, rows, coverage, medal)
+--- repeat dry run
+LOCKED {"tables":["seasons","stat_availability","brownlow_season_votes","brownlow_season_authority","brownlow_vote_entry_state","brownlow_round_votes","player_season_stats"],"mode":"SHARE ROW EXCLUSIVE","rows2026":669,"waitMs":7}
+BEFORE {"pss2026":"669 rows, not_applicable 0, pending 669, votes 0","ids":"e5ead8dbf3baf9a7b647b0f55b04c496","fp2026NonStatus":"a18697db41e9c25fd24d00e2095fa9ab","fpOtherSeasons":"097fd0b35e770ad7aac79b678f582f16","fpStatAvailability":"0c3d4ab4bf45dbec07b0ae94e103d532","coverage":["brownlow_match_votes=pending/unrecorded/-/-","brownlow_round_votes=pending/unrecorded/-/-","brownlow_season_total=pending/unrecorded/-/-"],"season":"complete","medalRows":0,"publishedAuthority":0,"authorityRows":0,"roundRows":9522,"entryState":"draft:1","derivedStatus":"pending"}
+OUTCOME ALREADY-APPLIED (nothing written)
+exit=3
+PASS repeat dry run performed no mutation: state byte-identical (xmin, rows, coverage, medal)
+reversal inputs from BEFORE capture: ids=e5ead8dbf3baf9a7b647b0f55b04c496 inputs=complete/0/9522/draft:1/0 h1=097fd0b35e770ad7aac79b678f582f16 h2=a18697db41e9c25fd24d00e2095fa9ab h3=0c3d4ab4bf45dbec07b0ae94e103d532
+--- reversal without -v commit (must refuse)
+ERROR:  REVERSE REFUSED: -v commit=true|false is required
+CONTEXT:  PL/pgSQL function inline_code_block line 1 at RAISE
+exit=3
+--- reversal, wrong H3 (must refuse)
+ERROR:  REVERSE REFUSED: stat_availability changed (H3)
+CONTEXT:  PL/pgSQL function inline_code_block line 45 at RAISE
+exit=3
+PASS refused reversals wrote nothing: state byte-identical (xmin, rows, coverage, medal)
+--- reversal dry run
+REVERSE DRY-RUN PASS (rolled back)
+exit=0
+PASS reversal dry run rolled back: state byte-identical (xmin, rows, coverage, medal)
+--- reversal commit
+REVERSE COMMITTED: 669 rows back to not_applicable
+exit=0
+fp5 xmin2026=3d934e44ab6c23ac2385af6ea72cd1bf row2026=0f557dab6a51e27325ea7a5e02eb48fb pss_all=49660fd9f78df07c11496ac14e0704b1 sa_all=0c3d4ab4bf45dbec07b0ae94e103d532 bsv2026=0 status2026=not_applicable:669
+PASS reversal restored row2026 exactly (= fp0)
+PASS reversal restored pss_all exactly (= fp0)
+PASS reversal restored sa_all exactly (= fp0)
+PASS reversal restored bsv2026 exactly (= fp0)
+PASS reversal restored status2026 exactly (= fp0)
+--- acceptance BEFORE vs after reversal (changed lines only; none expected)
+  (identical)
+--- reversal repeated (must refuse: rows are not_applicable)
+ERROR:  REVERSE REFUSED pss2026 total=669 pending=0 votes=0 (expected 669/669/0)
+CONTEXT:  PL/pgSQL function inline_code_block line 12 at RAISE
+exit=3
+--- reversal, wrong identity (must refuse)
+ERROR:  REVERSE REFUSED identity: afldb_v2_rem6r_exact_test 70944 7708106352119813731 ro=off
+CONTEXT:  PL/pgSQL function inline_code_block line 6 at RAISE
+exit=3
+PASS refused reversals wrote nothing: state byte-identical (xmin, rows, coverage, medal)
+drop-db: afldb_v2_rem6r_exact_test dropped
+
+##### case identity 22:05:57
+create-db: afldb_v2_rem6r_identity_test created from afldb_v2_rem4coleman276_sntmpl_test and marked
+copy: db=afldb_v2_rem6r_identity_test oid=70945 sysid=7708106352119813731 role=afldb_import ids2026(pre-drift)=e5ead8dbf3baf9a7b647b0f55b04c496
+--- wrong database name, --commit
+OUTCOME REFUSED identity or session mismatch: {"db":"afldb_v2_rem6r_identity_test","oid":"70945","sysid":"7708106352119813731","ro":"off","iso":"read committed"}
+exit=1
+--- wrong OID, --commit
+OUTCOME REFUSED identity or session mismatch: {"db":"afldb_v2_rem6r_identity_test","oid":"70945","sysid":"7708106352119813731","ro":"off","iso":"read committed"}
+exit=1
+--- wrong system identifier, --commit
+OUTCOME REFUSED identity or session mismatch: {"db":"afldb_v2_rem6r_identity_test","oid":"70945","sysid":"7708106352119813731","ro":"off","iso":"read committed"}
+exit=1
+--- wrong 2026 id-set hash, --commit
+LOCKED {"tables":["seasons","stat_availability","brownlow_season_votes","brownlow_season_authority","brownlow_vote_entry_state","brownlow_round_votes","player_season_stats"],"mode":"SHARE ROW EXCLUSIVE","rows2026":669,"waitMs":7}
+BEFORE {"pss2026":"669 rows, not_applicable 669, pending 0, votes 0","ids":"e5ead8dbf3baf9a7b647b0f55b04c496","fp2026NonStatus":"a18697db41e9c25fd24d00e2095fa9ab","fpOtherSeasons":"097fd0b35e770ad7aac79b678f582f16","fpStatAvailability":"0c3d4ab4bf45dbec07b0ae94e103d532","coverage":["brownlow_match_votes=pending/unrecorded/-/-","brownlow_round_votes=pending/unrecorded/-/-","brownlow_season_total=pending/unrecorded/-/-"],"season":"complete","medalRows":0,"publishedAuthority":0,"authorityRows":0,"roundRows":9522,"entryState":"draft:1","derivedStatus":"pending"}
+OUTCOME REFUSED 2026 player_id set hash e5ead8dbf3baf9a7b647b0f55b04c496 differs from --expect-ids-md5
+exit=1
+--- --expect-sysid omitted, --commit
+OUTCOME REFUSED usage: --dsn-env, --expect-db, --expect-oid, --expect-sysid and --expect-ids-md5 are all required
+exit=1
+--- --expect-oid omitted, --commit
+OUTCOME REFUSED usage: --dsn-env, --expect-db, --expect-oid, --expect-sysid and --expect-ids-md5 are all required
+exit=1
+--- --expect-ids-md5 omitted, --commit
+OUTCOME REFUSED usage: --dsn-env, --expect-db, --expect-oid, --expect-sysid and --expect-ids-md5 are all required
+exit=1
+--- unknown flag, --commit
+OUTCOME REFUSED usage: --dsn-env, --expect-db, --expect-oid, --expect-sysid and --expect-ids-md5 are all required; unknown --expect-rows
+exit=1
+PASS identity refusals wrote nothing: state byte-identical (xmin, rows, coverage, medal)
+drop-db: afldb_v2_rem6r_identity_test dropped
+
+##### case mixed 22:06:03
+create-db: afldb_v2_rem6r_mixed_test created from afldb_v2_rem4coleman276_sntmpl_test and marked
+copy: db=afldb_v2_rem6r_mixed_test oid=70946 sysid=7708106352119813731 role=afldb_import ids2026(pre-drift)=e5ead8dbf3baf9a7b647b0f55b04c496
+drift: player 13363 set to pending (668 not_applicable + 1 pending)
+--- mixed: dry run
+LOCKED {"tables":["seasons","stat_availability","brownlow_season_votes","brownlow_season_authority","brownlow_vote_entry_state","brownlow_round_votes","player_season_stats"],"mode":"SHARE ROW EXCLUSIVE","rows2026":669,"waitMs":7}
+BEFORE {"pss2026":"669 rows, not_applicable 668, pending 1, votes 0","ids":"e5ead8dbf3baf9a7b647b0f55b04c496","fp2026NonStatus":"a18697db41e9c25fd24d00e2095fa9ab","fpOtherSeasons":"097fd0b35e770ad7aac79b678f582f16","fpStatAvailability":"0c3d4ab4bf45dbec07b0ae94e103d532","coverage":["brownlow_match_votes=pending/unrecorded/-/-","brownlow_round_votes=pending/unrecorded/-/-","brownlow_season_total=pending/unrecorded/-/-"],"season":"complete","medalRows":0,"publishedAuthority":0,"authorityRows":0,"roundRows":9522,"entryState":"draft:1","derivedStatus":"pending"}
+OUTCOME REFUSED 2026 statuses are mixed or changed: not_applicable 668, pending 1, other 0
+exit=1
+--- mixed: --commit
+LOCKED {"tables":["seasons","stat_availability","brownlow_season_votes","brownlow_season_authority","brownlow_vote_entry_state","brownlow_round_votes","player_season_stats"],"mode":"SHARE ROW EXCLUSIVE","rows2026":669,"waitMs":7}
+BEFORE {"pss2026":"669 rows, not_applicable 668, pending 1, votes 0","ids":"e5ead8dbf3baf9a7b647b0f55b04c496","fp2026NonStatus":"a18697db41e9c25fd24d00e2095fa9ab","fpOtherSeasons":"097fd0b35e770ad7aac79b678f582f16","fpStatAvailability":"0c3d4ab4bf45dbec07b0ae94e103d532","coverage":["brownlow_match_votes=pending/unrecorded/-/-","brownlow_round_votes=pending/unrecorded/-/-","brownlow_season_total=pending/unrecorded/-/-"],"season":"complete","medalRows":0,"publishedAuthority":0,"authorityRows":0,"roundRows":9522,"entryState":"draft:1","derivedStatus":"pending"}
+OUTCOME REFUSED 2026 statuses are mixed or changed: not_applicable 668, pending 1, other 0
+exit=1
+PASS mixed-state refusals wrote nothing: state byte-identical (xmin, rows, coverage, medal)
+drop-db: afldb_v2_rem6r_mixed_test dropped
+
+##### case missing 22:06:09
+create-db: afldb_v2_rem6r_missing_test created from afldb_v2_rem4coleman276_sntmpl_test and marked
+copy: db=afldb_v2_rem6r_missing_test oid=70947 sysid=7708106352119813731 role=afldb_import ids2026(pre-drift)=e5ead8dbf3baf9a7b647b0f55b04c496
+drift: 2026 row of player 13363 deleted (668 rows)
+--- missing: dry run
+LOCKED {"tables":["seasons","stat_availability","brownlow_season_votes","brownlow_season_authority","brownlow_vote_entry_state","brownlow_round_votes","player_season_stats"],"mode":"SHARE ROW EXCLUSIVE","rows2026":668,"waitMs":7}
+BEFORE {"pss2026":"668 rows, not_applicable 668, pending 0, votes 0","ids":"48e6652c6c49abbbbdf0c6be3a16d6d8","fp2026NonStatus":"469054b1c90b4d42d04d5aa16ef8e933","fpOtherSeasons":"097fd0b35e770ad7aac79b678f582f16","fpStatAvailability":"0c3d4ab4bf45dbec07b0ae94e103d532","coverage":["brownlow_match_votes=pending/unrecorded/-/-","brownlow_round_votes=pending/unrecorded/-/-","brownlow_season_total=pending/unrecorded/-/-"],"season":"complete","medalRows":0,"publishedAuthority":0,"authorityRows":0,"roundRows":9522,"entryState":"draft:1","derivedStatus":"pending"}
+OUTCOME REFUSED 2026 player_id set hash 48e6652c6c49abbbbdf0c6be3a16d6d8 differs from --expect-ids-md5; 668 player_season_stats rows for 2026, expected 669
+exit=1
+--- missing: --commit
+LOCKED {"tables":["seasons","stat_availability","brownlow_season_votes","brownlow_season_authority","brownlow_vote_entry_state","brownlow_round_votes","player_season_stats"],"mode":"SHARE ROW EXCLUSIVE","rows2026":668,"waitMs":8}
+BEFORE {"pss2026":"668 rows, not_applicable 668, pending 0, votes 0","ids":"48e6652c6c49abbbbdf0c6be3a16d6d8","fp2026NonStatus":"469054b1c90b4d42d04d5aa16ef8e933","fpOtherSeasons":"097fd0b35e770ad7aac79b678f582f16","fpStatAvailability":"0c3d4ab4bf45dbec07b0ae94e103d532","coverage":["brownlow_match_votes=pending/unrecorded/-/-","brownlow_round_votes=pending/unrecorded/-/-","brownlow_season_total=pending/unrecorded/-/-"],"season":"complete","medalRows":0,"publishedAuthority":0,"authorityRows":0,"roundRows":9522,"entryState":"draft:1","derivedStatus":"pending"}
+OUTCOME REFUSED 2026 player_id set hash 48e6652c6c49abbbbdf0c6be3a16d6d8 differs from --expect-ids-md5; 668 player_season_stats rows for 2026, expected 669
+exit=1
+PASS missing-row refusals wrote nothing: state byte-identical (xmin, rows, coverage, medal)
+drop-db: afldb_v2_rem6r_missing_test dropped
+
+##### case additional 22:06:14
+create-db: afldb_v2_rem6r_additional_test created from afldb_v2_rem4coleman276_sntmpl_test and marked
+copy: db=afldb_v2_rem6r_additional_test oid=70948 sysid=7708106352119813731 role=afldb_import ids2026(pre-drift)=e5ead8dbf3baf9a7b647b0f55b04c496
+drift: 2026 row inserted for player 8 (670 rows, all not_applicable: 670)
+--- additional: dry run
+LOCKED {"tables":["seasons","stat_availability","brownlow_season_votes","brownlow_season_authority","brownlow_vote_entry_state","brownlow_round_votes","player_season_stats"],"mode":"SHARE ROW EXCLUSIVE","rows2026":670,"waitMs":7}
+BEFORE {"pss2026":"670 rows, not_applicable 670, pending 0, votes 0","ids":"0d075fb7c0722cc6068ea2409d5435f5","fp2026NonStatus":"b01e03c46b81c474c2bed8f6b40ebdb5","fpOtherSeasons":"097fd0b35e770ad7aac79b678f582f16","fpStatAvailability":"0c3d4ab4bf45dbec07b0ae94e103d532","coverage":["brownlow_match_votes=pending/unrecorded/-/-","brownlow_round_votes=pending/unrecorded/-/-","brownlow_season_total=pending/unrecorded/-/-"],"season":"complete","medalRows":0,"publishedAuthority":0,"authorityRows":0,"roundRows":9522,"entryState":"draft:1","derivedStatus":"pending"}
+OUTCOME REFUSED 2026 player_id set hash 0d075fb7c0722cc6068ea2409d5435f5 differs from --expect-ids-md5; 670 player_season_stats rows for 2026, expected 669
+exit=1
+--- additional: --commit
+LOCKED {"tables":["seasons","stat_availability","brownlow_season_votes","brownlow_season_authority","brownlow_vote_entry_state","brownlow_round_votes","player_season_stats"],"mode":"SHARE ROW EXCLUSIVE","rows2026":670,"waitMs":8}
+BEFORE {"pss2026":"670 rows, not_applicable 670, pending 0, votes 0","ids":"0d075fb7c0722cc6068ea2409d5435f5","fp2026NonStatus":"b01e03c46b81c474c2bed8f6b40ebdb5","fpOtherSeasons":"097fd0b35e770ad7aac79b678f582f16","fpStatAvailability":"0c3d4ab4bf45dbec07b0ae94e103d532","coverage":["brownlow_match_votes=pending/unrecorded/-/-","brownlow_round_votes=pending/unrecorded/-/-","brownlow_season_total=pending/unrecorded/-/-"],"season":"complete","medalRows":0,"publishedAuthority":0,"authorityRows":0,"roundRows":9522,"entryState":"draft:1","derivedStatus":"pending"}
+OUTCOME REFUSED 2026 player_id set hash 0d075fb7c0722cc6068ea2409d5435f5 differs from --expect-ids-md5; 670 player_season_stats rows for 2026, expected 669
+exit=1
+PASS additional refusals wrote nothing: state byte-identical (xmin, rows, coverage, medal)
+drop-db: afldb_v2_rem6r_additional_test dropped
+
+##### case swap 22:06:19
+create-db: afldb_v2_rem6r_swap_test created from afldb_v2_rem4coleman276_sntmpl_test and marked
+copy: db=afldb_v2_rem6r_swap_test oid=70949 sysid=7708106352119813731 role=afldb_import ids2026(pre-drift)=e5ead8dbf3baf9a7b647b0f55b04c496
+drift: 2026 row of player 13363 deleted
+drift: 2026 row inserted for player 8 (669 rows, all not_applicable: 669)
+--- swap: dry run
+LOCKED {"tables":["seasons","stat_availability","brownlow_season_votes","brownlow_season_authority","brownlow_vote_entry_state","brownlow_round_votes","player_season_stats"],"mode":"SHARE ROW EXCLUSIVE","rows2026":669,"waitMs":8}
+BEFORE {"pss2026":"669 rows, not_applicable 669, pending 0, votes 0","ids":"22712d1f138f91cb1574aa00292b7ddd","fp2026NonStatus":"87ab99d520cdb20005c4085f0f5a0b22","fpOtherSeasons":"097fd0b35e770ad7aac79b678f582f16","fpStatAvailability":"0c3d4ab4bf45dbec07b0ae94e103d532","coverage":["brownlow_match_votes=pending/unrecorded/-/-","brownlow_round_votes=pending/unrecorded/-/-","brownlow_season_total=pending/unrecorded/-/-"],"season":"complete","medalRows":0,"publishedAuthority":0,"authorityRows":0,"roundRows":9522,"entryState":"draft:1","derivedStatus":"pending"}
+OUTCOME REFUSED 2026 player_id set hash 22712d1f138f91cb1574aa00292b7ddd differs from --expect-ids-md5
+exit=1
+--- swap: --commit
+LOCKED {"tables":["seasons","stat_availability","brownlow_season_votes","brownlow_season_authority","brownlow_vote_entry_state","brownlow_round_votes","player_season_stats"],"mode":"SHARE ROW EXCLUSIVE","rows2026":669,"waitMs":8}
+BEFORE {"pss2026":"669 rows, not_applicable 669, pending 0, votes 0","ids":"22712d1f138f91cb1574aa00292b7ddd","fp2026NonStatus":"87ab99d520cdb20005c4085f0f5a0b22","fpOtherSeasons":"097fd0b35e770ad7aac79b678f582f16","fpStatAvailability":"0c3d4ab4bf45dbec07b0ae94e103d532","coverage":["brownlow_match_votes=pending/unrecorded/-/-","brownlow_round_votes=pending/unrecorded/-/-","brownlow_season_total=pending/unrecorded/-/-"],"season":"complete","medalRows":0,"publishedAuthority":0,"authorityRows":0,"roundRows":9522,"entryState":"draft:1","derivedStatus":"pending"}
+OUTCOME REFUSED 2026 player_id set hash 22712d1f138f91cb1574aa00292b7ddd differs from --expect-ids-md5
+exit=1
+PASS swap refusals wrote nothing: state byte-identical (xmin, rows, coverage, medal)
+drop-db: afldb_v2_rem6r_swap_test dropped
+
+##### case cov-partial 22:06:24
+create-db: afldb_v2_rem6r_cov_partial_test created from afldb_v2_rem4coleman276_sntmpl_test and marked
+copy: db=afldb_v2_rem6r_cov_partial_test oid=70950 sysid=7708106352119813731 role=afldb_import ids2026(pre-drift)=e5ead8dbf3baf9a7b647b0f55b04c496
+drift: 2026 brownlow_round_votes coverage -> partial
+--- cov-partial: dry run
+LOCKED {"tables":["seasons","stat_availability","brownlow_season_votes","brownlow_season_authority","brownlow_vote_entry_state","brownlow_round_votes","player_season_stats"],"mode":"SHARE ROW EXCLUSIVE","rows2026":669,"waitMs":7}
+BEFORE {"pss2026":"669 rows, not_applicable 669, pending 0, votes 0","ids":"e5ead8dbf3baf9a7b647b0f55b04c496","fp2026NonStatus":"a18697db41e9c25fd24d00e2095fa9ab","fpOtherSeasons":"097fd0b35e770ad7aac79b678f582f16","fpStatAvailability":"7863289343fe2e576ad869c93fd1ba95","coverage":["brownlow_match_votes=pending/unrecorded/-/-","brownlow_round_votes=partial/unrecorded/-/-","brownlow_season_total=pending/unrecorded/-/-"],"season":"complete","medalRows":0,"publishedAuthority":0,"authorityRows":0,"roundRows":9522,"entryState":"draft:1","derivedStatus":"pending"}
+OUTCOME REFUSED 2026 Brownlow coverage rows are [brownlow_match_votes=pending/false/null/null,brownlow_round_votes=partial/false/null/null,brownlow_season_total=pending/false/null/null], expected [brownlow_match_votes=pending/false/null/null,brownlow_round_votes=pending/false/null/null,brownlow_season_total=pending/false/null/null] (a different coverage state needs a separate reviewed operation)
+exit=1
+--- cov-partial: --commit
+LOCKED {"tables":["seasons","stat_availability","brownlow_season_votes","brownlow_season_authority","brownlow_vote_entry_state","brownlow_round_votes","player_season_stats"],"mode":"SHARE ROW EXCLUSIVE","rows2026":669,"waitMs":7}
+BEFORE {"pss2026":"669 rows, not_applicable 669, pending 0, votes 0","ids":"e5ead8dbf3baf9a7b647b0f55b04c496","fp2026NonStatus":"a18697db41e9c25fd24d00e2095fa9ab","fpOtherSeasons":"097fd0b35e770ad7aac79b678f582f16","fpStatAvailability":"7863289343fe2e576ad869c93fd1ba95","coverage":["brownlow_match_votes=pending/unrecorded/-/-","brownlow_round_votes=partial/unrecorded/-/-","brownlow_season_total=pending/unrecorded/-/-"],"season":"complete","medalRows":0,"publishedAuthority":0,"authorityRows":0,"roundRows":9522,"entryState":"draft:1","derivedStatus":"pending"}
+OUTCOME REFUSED 2026 Brownlow coverage rows are [brownlow_match_votes=pending/false/null/null,brownlow_round_votes=partial/false/null/null,brownlow_season_total=pending/false/null/null], expected [brownlow_match_votes=pending/false/null/null,brownlow_round_votes=pending/false/null/null,brownlow_season_total=pending/false/null/null] (a different coverage state needs a separate reviewed operation)
+exit=1
+PASS cov-partial refusals wrote nothing: state byte-identical (xmin, rows, coverage, medal)
+drop-db: afldb_v2_rem6r_cov_partial_test dropped
+
+##### case cov-na 22:06:29
+create-db: afldb_v2_rem6r_cov_na_test created from afldb_v2_rem4coleman276_sntmpl_test and marked
+copy: db=afldb_v2_rem6r_cov_na_test oid=70951 sysid=7708106352119813731 role=afldb_import ids2026(pre-drift)=e5ead8dbf3baf9a7b647b0f55b04c496
+drift: 2026 brownlow_season_total coverage -> not_applicable
+--- cov-na: dry run
+LOCKED {"tables":["seasons","stat_availability","brownlow_season_votes","brownlow_season_authority","brownlow_vote_entry_state","brownlow_round_votes","player_season_stats"],"mode":"SHARE ROW EXCLUSIVE","rows2026":669,"waitMs":8}
+BEFORE {"pss2026":"669 rows, not_applicable 669, pending 0, votes 0","ids":"e5ead8dbf3baf9a7b647b0f55b04c496","fp2026NonStatus":"a18697db41e9c25fd24d00e2095fa9ab","fpOtherSeasons":"097fd0b35e770ad7aac79b678f582f16","fpStatAvailability":"811d4f9d76d9d2d132f87ad1bf68705d","coverage":["brownlow_match_votes=pending/unrecorded/-/-","brownlow_round_votes=pending/unrecorded/-/-","brownlow_season_total=not_applicable/unrecorded/-/-"],"season":"complete","medalRows":0,"publishedAuthority":0,"authorityRows":0,"roundRows":9522,"entryState":"draft:1","derivedStatus":"not_applicable"}
+OUTCOME REFUSED the shipped derivation gives 'not_applicable' for 2026, not 'pending'; 2026 Brownlow coverage rows are [brownlow_match_votes=pending/false/null/null,brownlow_round_votes=pending/false/null/null,brownlow_season_total=not_applicable/false/null/null], expected [brownlow_match_votes=pending/false/null/null,brownlow_round_votes=pending/false/null/null,brownlow_season_total=pending/false/null/null] (a different coverage state needs a separate reviewed operation)
+exit=1
+--- cov-na: --commit
+LOCKED {"tables":["seasons","stat_availability","brownlow_season_votes","brownlow_season_authority","brownlow_vote_entry_state","brownlow_round_votes","player_season_stats"],"mode":"SHARE ROW EXCLUSIVE","rows2026":669,"waitMs":7}
+BEFORE {"pss2026":"669 rows, not_applicable 669, pending 0, votes 0","ids":"e5ead8dbf3baf9a7b647b0f55b04c496","fp2026NonStatus":"a18697db41e9c25fd24d00e2095fa9ab","fpOtherSeasons":"097fd0b35e770ad7aac79b678f582f16","fpStatAvailability":"811d4f9d76d9d2d132f87ad1bf68705d","coverage":["brownlow_match_votes=pending/unrecorded/-/-","brownlow_round_votes=pending/unrecorded/-/-","brownlow_season_total=not_applicable/unrecorded/-/-"],"season":"complete","medalRows":0,"publishedAuthority":0,"authorityRows":0,"roundRows":9522,"entryState":"draft:1","derivedStatus":"not_applicable"}
+OUTCOME REFUSED the shipped derivation gives 'not_applicable' for 2026, not 'pending'; 2026 Brownlow coverage rows are [brownlow_match_votes=pending/false/null/null,brownlow_round_votes=pending/false/null/null,brownlow_season_total=not_applicable/false/null/null], expected [brownlow_match_votes=pending/false/null/null,brownlow_round_votes=pending/false/null/null,brownlow_season_total=pending/false/null/null] (a different coverage state needs a separate reviewed operation)
+exit=1
+PASS cov-na refusals wrote nothing: state byte-identical (xmin, rows, coverage, medal)
+drop-db: afldb_v2_rem6r_cov_na_test dropped
+
+##### case medal 22:06:34
+create-db: afldb_v2_rem6r_medal_test created from afldb_v2_rem4coleman276_sntmpl_test and marked
+copy: db=afldb_v2_rem6r_medal_test oid=70952 sysid=7708106352119813731 role=afldb_import ids2026(pre-drift)=e5ead8dbf3baf9a7b647b0f55b04c496
+drift: one 2026 brownlow_season_votes row (medal result present)
+--- medal: dry run
+LOCKED {"tables":["seasons","stat_availability","brownlow_season_votes","brownlow_season_authority","brownlow_vote_entry_state","brownlow_round_votes","player_season_stats"],"mode":"SHARE ROW EXCLUSIVE","rows2026":669,"waitMs":8}
+BEFORE {"pss2026":"669 rows, not_applicable 669, pending 0, votes 0","ids":"e5ead8dbf3baf9a7b647b0f55b04c496","fp2026NonStatus":"a18697db41e9c25fd24d00e2095fa9ab","fpOtherSeasons":"097fd0b35e770ad7aac79b678f582f16","fpStatAvailability":"0c3d4ab4bf45dbec07b0ae94e103d532","coverage":["brownlow_match_votes=pending/unrecorded/-/-","brownlow_round_votes=pending/unrecorded/-/-","brownlow_season_total=pending/unrecorded/-/-"],"season":"complete","medalRows":1,"publishedAuthority":0,"authorityRows":0,"roundRows":9522,"entryState":"draft:1","derivedStatus":"pending"}
+OUTCOME REFUSED 1 brownlow_season_votes rows for 2026 (a loaded medal result is out of scope)
+exit=1
+--- medal: --commit
+LOCKED {"tables":["seasons","stat_availability","brownlow_season_votes","brownlow_season_authority","brownlow_vote_entry_state","brownlow_round_votes","player_season_stats"],"mode":"SHARE ROW EXCLUSIVE","rows2026":669,"waitMs":7}
+BEFORE {"pss2026":"669 rows, not_applicable 669, pending 0, votes 0","ids":"e5ead8dbf3baf9a7b647b0f55b04c496","fp2026NonStatus":"a18697db41e9c25fd24d00e2095fa9ab","fpOtherSeasons":"097fd0b35e770ad7aac79b678f582f16","fpStatAvailability":"0c3d4ab4bf45dbec07b0ae94e103d532","coverage":["brownlow_match_votes=pending/unrecorded/-/-","brownlow_round_votes=pending/unrecorded/-/-","brownlow_season_total=pending/unrecorded/-/-"],"season":"complete","medalRows":1,"publishedAuthority":0,"authorityRows":0,"roundRows":9522,"entryState":"draft:1","derivedStatus":"pending"}
+OUTCOME REFUSED 1 brownlow_season_votes rows for 2026 (a loaded medal result is out of scope)
+exit=1
+PASS medal refusals wrote nothing: state byte-identical (xmin, rows, coverage, medal)
+drop-db: afldb_v2_rem6r_medal_test dropped
+
+##### case conc-timeout 22:06:40
+create-db: afldb_v2_rem6r_conc_timeout_test created from afldb_v2_rem4coleman276_sntmpl_test and marked
+copy: db=afldb_v2_rem6r_conc_timeout_test oid=70953 sysid=7708106352119813731 role=afldb_import ids2026(pre-drift)=e5ead8dbf3baf9a7b647b0f55b04c496
+writer: holds ROW EXCLUSIVE on player_season_stats (no-op update of one 2025 row) for 8 s, then commits
+--- runner --commit while the writer is open (t=1 s)
+OUTCOME ERROR canceling statement due to lock timeout
+exit=2
+runner took 5.3 s
+
+writer exit=0
+2026 after: status2026=not_applicable:669  xmin2026 unchanged: yes
+drop-db: afldb_v2_rem6r_conc_timeout_test dropped
+
+##### case conc-mixed 22:06:52
+create-db: afldb_v2_rem6r_conc_mixed_test created from afldb_v2_rem4coleman276_sntmpl_test and marked
+copy: db=afldb_v2_rem6r_conc_mixed_test oid=70954 sysid=7708106352119813731 role=afldb_import ids2026(pre-drift)=e5ead8dbf3baf9a7b647b0f55b04c496
+writer: changes 2026 player 13363 to pending, holds 2 s, commits
+--- runner --commit while the writer is open (t=0.5 s)
+
+writer exit=0
+LOCKED {"tables":["seasons","stat_availability","brownlow_season_votes","brownlow_season_authority","brownlow_vote_entry_state","brownlow_round_votes","player_season_stats"],"mode":"SHARE ROW EXCLUSIVE","rows2026":669,"waitMs":1266}
+BEFORE {"pss2026":"669 rows, not_applicable 668, pending 1, votes 0","ids":"e5ead8dbf3baf9a7b647b0f55b04c496","fp2026NonStatus":"a18697db41e9c25fd24d00e2095fa9ab","fpOtherSeasons":"097fd0b35e770ad7aac79b678f582f16","fpStatAvailability":"0c3d4ab4bf45dbec07b0ae94e103d532","coverage":["brownlow_match_votes=pending/unrecorded/-/-","brownlow_round_votes=pending/unrecorded/-/-","brownlow_season_total=pending/unrecorded/-/-"],"season":"complete","medalRows":0,"publishedAuthority":0,"authorityRows":0,"roundRows":9522,"entryState":"draft:1","derivedStatus":"pending"}
+OUTCOME REFUSED 2026 statuses are mixed or changed: not_applicable 668, pending 1, other 0
+exit=1
+2026 after: status2026=not_applicable:668,pending:1  (writer's change only: the runner wrote nothing)
+drop-db: afldb_v2_rem6r_conc_mixed_test dropped
+
+##### case conc-blocked 22:06:58
+create-db: afldb_v2_rem6r_conc_blocked_test created from afldb_v2_rem4coleman276_sntmpl_test and marked
+copy: db=afldb_v2_rem6r_conc_blocked_test oid=70955 sysid=7708106352119813731 role=afldb_import ids2026(pre-drift)=e5ead8dbf3baf9a7b647b0f55b04c496
+holder: SELECT ... FOR SHARE on 2026 player 3 for 4 s (ROW SHARE: compatible with the runner's table locks; delays its FOR UPDATE)
+--- locks held by the runner at t=1.5 s (granted=t) and its wait
+  brownlow_round_votes ShareRowExclusiveLock granted=true
+  brownlow_season_authority ShareRowExclusiveLock granted=true
+  brownlow_season_votes ShareRowExclusiveLock granted=true
+  brownlow_vote_entry_state ShareRowExclusiveLock granted=true
+  player_season_stats RowShareLock granted=true
+  player_season_stats ShareRowExclusiveLock granted=true
+  seasons ShareRowExclusiveLock granted=true
+  stat_availability ShareRowExclusiveLock granted=true
+  transactionid ShareLock granted=false
+--- four writers and one reader start at t=1.5 s, each with lock_timeout 1 s
+holder exit=0
+  W1 UPDATE 2026 player_season_stats row : rc=1 ERROR:  canceling statement due to lock timeout LINE 1: UPDATE player_season_stats SET brownlow_status = 'pending' W...                ^
+  W2 UPDATE 2026 coverage row           : rc=1 ERROR:  canceling statement due to lock timeout LINE 1: UPDATE stat_availability SET total_rows = 1 WHERE season = 2...                ^
+  W3 INSERT 2026 medal row              : rc=1 ERROR:  canceling statement due to lock timeout LINE 1: INSERT INTO brownlow_season_votes (season, player_id, votes)...                     ^
+  W4 UPDATE seasons 2026                : rc=1 ERROR:  canceling statement due to lock timeout LINE 1: UPDATE seasons SET status = status WHERE year = 2026                ^
+  R1 SELECT count 2026 (reader)         : rc=0 669
+--- runner output
+LOCKED {"tables":["seasons","stat_availability","brownlow_season_votes","brownlow_season_authority","brownlow_vote_entry_state","brownlow_round_votes","player_season_stats"],"mode":"SHARE ROW EXCLUSIVE","rows2026":669,"waitMs":3271}
+BEFORE {"pss2026":"669 rows, not_applicable 669, pending 0, votes 0","ids":"e5ead8dbf3baf9a7b647b0f55b04c496","fp2026NonStatus":"a18697db41e9c25fd24d00e2095fa9ab","fpOtherSeasons":"097fd0b35e770ad7aac79b678f582f16","fpStatAvailability":"0c3d4ab4bf45dbec07b0ae94e103d532","coverage":["brownlow_match_votes=pending/unrecorded/-/-","brownlow_round_votes=pending/unrecorded/-/-","brownlow_season_total=pending/unrecorded/-/-"],"season":"complete","medalRows":0,"publishedAuthority":0,"authorityRows":0,"roundRows":9522,"entryState":"draft:1","derivedStatus":"pending"}
+AFTER(in tx) {"pss2026":"669 rows, not_applicable 0, pending 669, votes 0","ids":"e5ead8dbf3baf9a7b647b0f55b04c496","fp2026NonStatus":"a18697db41e9c25fd24d00e2095fa9ab","fpOtherSeasons":"097fd0b35e770ad7aac79b678f582f16","fpStatAvailability":"0c3d4ab4bf45dbec07b0ae94e103d532","coverage":["brownlow_match_votes=pending/unrecorded/-/-","brownlow_round_votes=pending/unrecorded/-/-","brownlow_season_total=pending/unrecorded/-/-"],"season":"complete","medalRows":0,"publishedAuthority":0,"authorityRows":0,"roundRows":9522,"entryState":"draft:1","derivedStatus":"pending"}
+OUTCOME COMMITTED
+exit=0
+after: status2026=pending:669 bsv2026=0; coverage: brownlow_match_votes=pending/null,brownlow_round_votes=pending/null,brownlow_season_total=pending/null
+drop-db: afldb_v2_rem6r_conc_blocked_test dropped
+
+##### case conc-twin 22:07:06
+create-db: afldb_v2_rem6r_conc_twin_test created from afldb_v2_rem4coleman276_sntmpl_test and marked
+copy: db=afldb_v2_rem6r_conc_twin_test oid=70956 sysid=7708106352119813731 role=afldb_import ids2026(pre-drift)=e5ead8dbf3baf9a7b647b0f55b04c496
+two runners --commit started together
+--- runner a
+LOCKED {"tables":["seasons","stat_availability","brownlow_season_votes","brownlow_season_authority","brownlow_vote_entry_state","brownlow_round_votes","player_season_stats"],"mode":"SHARE ROW EXCLUSIVE","rows2026":669,"waitMs":531}
+OUTCOME ALREADY-APPLIED (nothing written)
+exit=3
+--- runner b
+LOCKED {"tables":["seasons","stat_availability","brownlow_season_votes","brownlow_season_authority","brownlow_vote_entry_state","brownlow_round_votes","player_season_stats"],"mode":"SHARE ROW EXCLUSIVE","rows2026":669,"waitMs":7}
+OUTCOME COMMITTED
+exit=0
+after: status2026=pending:669
+drop-db: afldb_v2_rem6r_conc_twin_test dropped
+
+checkout porcelain after cleanup: 0
+server stopped
+port 55684 closed
+=== DONE 2026-11-15T22:07:11Z

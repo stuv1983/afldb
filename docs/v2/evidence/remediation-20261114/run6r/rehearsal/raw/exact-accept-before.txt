@@ -1,0 +1,12 @@
+identity|afldb_v2_rem6r_exact_test|70944|7708106352119813731
+pss2026|not_applicable|669|0
+ids2026|669|e5ead8dbf3baf9a7b647b0f55b04c496
+cov2026|brownlow_match_votes|pending|f|-|-
+cov2026|brownlow_round_votes|pending|f|-|-
+cov2026|brownlow_season_total|pending|f|-|-
+inputs2026|complete/0/9522/draft:1/0
+fp_pss_other(H1)|097fd0b35e770ad7aac79b678f582f16
+fp_pss2026_nonstatus(H2)|a18697db41e9c25fd24d00e2095fa9ab
+fp_stat_availability(H3)|3120|0c3d4ab4bf45dbec07b0ae94e103d532
+na_cov|0|12
+na_pss|669|9553

@@ -1,0 +1,122 @@
+=== option A rehearsal 2026-11-15T22:11:48Z
+dc6211d7826d03712ab95a872889a562b86c5a86b72a4fc717431005b5033ec7  b1a/b1a-accept-r6r.sql
+bcc4131171a08500cc3b4b64ee51d254a5f0608f450847f17e95a06f62f8c32c  b1a/b1a-repair-2026-r6r.mts
+3ec8fd207117c560af8564e57e70c41381c119df02d3558ab0b58d0cf8c067cf  b1a0/b1a0-dev-restore-verify.sh
+7c2a7be0eca0ed1f7024ccc6197b333818caadb7727f2f3be49ae97eb70fcf5d  b1a0/b1a0-parity.sql
+create-db: afldb_v2_rem6r_optaside_test created from afldb_v2_rem4coleman276_sntmpl_test and marked
+drop-db: afldb_v2_rem6r_optaside_test dropped
+server stopped
+--- production-side inputs (from the template copy)
+  player_match_stats rows|695499
+  players rows|13365
+  matches rows|17056
+  clubs rows|24
+  career games total|695499
+  career goals total|413607
+  Brownlow votes total|79113
+  unrecorded disposals|248996
+  stat_availability rows|3120
+  identity|afldb_v2_rem6r_optaside_test|70958|7708106352119813731
+  pss2026|not_applicable|669|0
+  ids2026|669|e5ead8dbf3baf9a7b647b0f55b04c496
+  cov2026|brownlow_match_votes|pending|f|-|-
+  cov2026|brownlow_round_votes|pending|f|-|-
+  cov2026|brownlow_season_total|pending|f|-|-
+  inputs2026|complete/0/9522/draft:1/0
+  fp_pss_other(H1)|097fd0b35e770ad7aac79b678f582f16
+  fp_pss2026_nonstatus(H2)|a18697db41e9c25fd24d00e2095fa9ab
+  fp_stat_availability(H3)|3120|0c3d4ab4bf45dbec07b0ae94e103d532
+  na_cov|0|12
+  na_pss|669|9553
+
+##### A1: matching production evidence (expect VERDICT PASS)
+=== B1a-0 option A 2026-11-15T22:11:56Z host=streamanator dump=/mnt/ssd/afldb-rem6r-b1a-20261116/opta/rehearsal2-good-afldb_prod-20261104T021037Z.dump
+checkout f6af6da93551aed9dbd5658319346d7ecdd96ea3
+artifacts: 7c2a7be0eca0ed1f7024ccc6197b333818caadb7727f2f3be49ae97eb70fcf5d  b1a0/b1a0-parity.sql dc6211d7826d03712ab95a872889a562b86c5a86b72a4fc717431005b5033ec7  b1a/b1a-accept-r6r.sql bcc4131171a08500cc3b4b64ee51d254a5f0608f450847f17e95a06f62f8c32c  b1a/b1a-repair-2026-r6r.mts 
+--- 1. file identity
+;     dbname: afldb_prod
+PASS size 30141895, sha256 e77c307d3e0cddcb652e398a946e4c22c2063f13c70edadf96a975c92842826d, header dbname afldb_prod
+--- 2. brand-new isolated cluster, restore
+syncing data to disk ... ok
+init: cluster initialised
+roles: afldb_owner, afldb_app, afldb_import, afldb_backup, afldb_auth present
+/usr/lib/postgresql/16/bin/postgres "-D" "/mnt/ssd/afldb-b1a0-verify-rehearsal2-good-afldb-prod-20261104t021037z-pg/data"
+create-db: afldb_v2_b1a0_verify_test created and marked
+pg_restore exit=0
+restore seconds=7
+--- 3-5. parity, acceptance equality, runner dry run (artifacts copied into the checkout untracked, removed after)
+checkout clean again
+  copy  player_match_stats rows|695499
+  copy  players rows|13365
+  copy  matches rows|17056
+  copy  clubs rows|24
+  copy  career games total|695499
+  copy  career goals total|413607
+  copy  Brownlow votes total|79113
+  copy  unrecorded disposals|248996
+  copy  stat_availability rows|3120
+PASS 3. nine parity aggregates equal production's
+PASS 4. acceptance probe equals production's BEFORE capture on every line but identity (11 lines)
+  LOCKED {"tables":["seasons","stat_availability","brownlow_season_votes","brownlow_season_authority","brownlow_vote_entry_state","brownlow_round_votes","player_season_stats"],"mode":"SHARE ROW EXCLUSIVE","rows2026":669,"w
+  OUTCOME DRY-RUN-PASS (rolled back)
+  runner exit=0
+PASS 5. runner dry run on the restored copy
+server stopped
+cluster stopped; root /mnt/ssd/afldb-b1a0-verify-rehearsal2-good-afldb-prod-20261104t021037z-pg and the dump copy retained (0700) for the owner's decision
+VERDICT PASS backup proven by a fresh disposable restore
+script exit=0
+
+##### A2: one parity value and the id-set line altered (expect VERDICT FAIL on 3 and 4)
+=== B1a-0 option A 2026-11-15T22:12:12Z host=streamanator dump=/mnt/ssd/afldb-rem6r-b1a-20261116/opta/rehearsal2-bad-afldb_prod-20261104T021037Z.dump
+checkout f6af6da93551aed9dbd5658319346d7ecdd96ea3
+artifacts: 7c2a7be0eca0ed1f7024ccc6197b333818caadb7727f2f3be49ae97eb70fcf5d  b1a0/b1a0-parity.sql dc6211d7826d03712ab95a872889a562b86c5a86b72a4fc717431005b5033ec7  b1a/b1a-accept-r6r.sql bcc4131171a08500cc3b4b64ee51d254a5f0608f450847f17e95a06f62f8c32c  b1a/b1a-repair-2026-r6r.mts 
+--- 1. file identity
+;     dbname: afldb_prod
+PASS size 30141895, sha256 e77c307d3e0cddcb652e398a946e4c22c2063f13c70edadf96a975c92842826d, header dbname afldb_prod
+--- 2. brand-new isolated cluster, restore
+syncing data to disk ... ok
+init: cluster initialised
+roles: afldb_owner, afldb_app, afldb_import, afldb_backup, afldb_auth present
+/usr/lib/postgresql/16/bin/postgres "-D" "/mnt/ssd/afldb-b1a0-verify-rehearsal2-bad-afldb-prod-20261104t021037z-pg/data"
+create-db: afldb_v2_b1a0_verify_test created and marked
+pg_restore exit=0
+restore seconds=7
+--- 3-5. parity, acceptance equality, runner dry run (artifacts copied into the checkout untracked, removed after)
+checkout clean again
+  copy  player_match_stats rows|695499
+  copy  players rows|13365
+  copy  matches rows|17056
+  copy  clubs rows|24
+  copy  career games total|695499
+  copy  career goals total|413607
+  copy  Brownlow votes total|79113
+  copy  unrecorded disposals|248996
+  copy  stat_availability rows|3120
+FAIL 3. parity differs:
+    2c2
+    < players rows|13365
+    ---
+    > players rows|999999
+FAIL 4. acceptance differs:
+    2c2
+    < ids2026|669|e5ead8dbf3baf9a7b647b0f55b04c496
+    ---
+    > ids2026|669|00000000000000000000000000000000
+  LOCKED {"tables":["seasons","stat_availability","brownlow_season_votes","brownlow_season_authority","brownlow_vote_entry_state","brownlow_round_votes","player_season_stats"],"mode":"SHARE ROW EXCLUSIVE","rows2026":669,"w
+  OUTCOME DRY-RUN-PASS (rolled back)
+  runner exit=0
+PASS 5. runner dry run on the restored copy
+server stopped
+cluster stopped; root /mnt/ssd/afldb-b1a0-verify-rehearsal2-bad-afldb-prod-20261104t021037z-pg and the dump copy retained (0700) for the owner's decision
+VERDICT FAIL
+script exit=1
+
+##### A3: wrong sha256 (expect STOP before any cluster)
+=== B1a-0 option A 2026-11-15T22:12:28Z host=streamanator dump=/mnt/ssd/afldb-rem6r-b1a-20261116/opta/rehearsal2-sha-afldb_prod-20261104T021037Z.dump
+checkout f6af6da93551aed9dbd5658319346d7ecdd96ea3
+artifacts: 7c2a7be0eca0ed1f7024ccc6197b333818caadb7727f2f3be49ae97eb70fcf5d  b1a0/b1a0-parity.sql dc6211d7826d03712ab95a872889a562b86c5a86b72a4fc717431005b5033ec7  b1a/b1a-accept-r6r.sql bcc4131171a08500cc3b4b64ee51d254a5f0608f450847f17e95a06f62f8c32c  b1a/b1a-repair-2026-r6r.mts 
+--- 1. file identity
+STOP sha256 differs
+VERDICT FAIL (stopped before completion)
+script exit=1
+=== DONE 2026-11-15T22:12:28Z
