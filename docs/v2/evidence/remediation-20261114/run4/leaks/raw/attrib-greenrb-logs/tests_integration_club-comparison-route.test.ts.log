@@ -1,0 +1,31 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand[39m
+
+[90mstdout[2m | tests/integration/club-comparison-route.test.ts[2m > [22m[2mStage 7 route budget[2m > [22m[2mloads adelaide vs brisbane-lions inside the route budget
+[22m[39m[ISSUE-144 Stage 7] adelaide/brisbane-lions route state warm min/median/max = 308.7/321.4/435.3 ms
+
+[90mstdout[2m | tests/integration/club-comparison-route.test.ts[2m > [22m[2mStage 7 route budget[2m > [22m[2mloads carlton vs collingwood inside the route budget
+[22m[39m[ISSUE-144 Stage 7] carlton/collingwood route state warm min/median/max = 348.2/378.3/412.3 ms
+
+ [32m✓[39m tests/integration/club-comparison-route.test.ts [2m([22m[2m31 tests[22m[2m)[22m[33m 16789[2mms[22m[39m
+     [33m[2m✓[22m[39m loads the comparison with dynamic defaults [33m 391[2mms[22m[39m
+     [33m[2m✓[22m[39m keeps requested presentation order while canonicalising alphabetically [33m 440[2mms[22m[39m
+     [33m[2m✓[22m[39m compares related but distinct organisations [33m 1490[2mms[22m[39m
+     [33m[2m✓[22m[39m applies a valid match filter [33m 702[2mms[22m[39m
+     [33m[2m✓[22m[39m falls back to all matches on an invalid filter, with a notice [33m 491[2mms[22m[39m
+     [33m[2m✓[22m[39m normalises an invalid page to 1, with a notice [33m 1609[2mms[22m[39m
+     [33m[2m✓[22m[39m preserves a page beyond the last one and reports honest totals [33m 520[2mms[22m[39m
+     [33m[2m✓[22m[39m does not let the page change the head-to-head population [33m 1905[2mms[22m[39m
+     [33m[2m✓[22m[39m scopes rivalry records and match history to the chosen era, leaving everything else all-time [33m 671[2mms[22m[39m
+     [33m[2m✓[22m[39m falls back to all time on an era outside this rivalry’s recorded history, with a notice [33m 413[2mms[22m[39m
+     [33m[2m✓[22m[39m falls back to all time on an unparsable era, with a notice [33m 405[2mms[22m[39m
+     [33m[2m✓[22m[39m loads adelaide vs brisbane-lions inside the route budget [33m 2615[2mms[22m[39m
+     [33m[2m✓[22m[39m loads carlton vs collingwood inside the route budget [33m 2677[2mms[22m[39m
+     [33m[2m✓[22m[39m loads at most the default number of comparisons at once and returns what a lone load returns [33m 2013[2mms[22m[39m
+     [33m[2m✓[22m[39m answers busy without loading the pair, then recovers once the slots drain [33m 332[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m31 passed[39m[22m[90m (31)[39m
+[2m   Start at [22m 12:08:56
+[2m   Duration [22m 18.16s[2m (transform 646ms, setup 224ms, import 775ms, tests 16.79s, environment 0ms)[22m
+

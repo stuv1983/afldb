@@ -1,0 +1,5 @@
+create-db: afldb_v2_rem4leaks_pfgreensnap_test created from afldb_v2_rem4leaks_snap_tmpl_test and marked
+pf greensnap rc=0
+ Test Files  7 passed (7)
+      Tests  136 passed | 2 expected fail | 1 skipped (162)
+per-file DBs left: 0

@@ -1,0 +1,17 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand[39m
+
+[90mstdout[2m | tests/integration/settle-afl-api-state-b.test.ts
+[22m[39m[ISSUE-275 state-b fixture] {"database":"afldb_v2_rem4leaks_chaingreenrb_test","role":"afldb_owner","season":2071,"namespace":"CD_M2071ISSUE275SB","providerMatchId":"CD_M2071ISSUE275SBN","matchKey":"2071|PF|2071-06-03|Hawthorn|Brisbane Lions","keepaliveMatchId":17112,"keepaliveMatchKey":"CD_M2071ISSUE275SB-keepalive","bridgedPlayerId":13440,"syntheticLegacyPlayerId":-275000001,"providerPlayerId":"CD_I2071275001","afltablesIdentity":"players/Z/Issue275-state-b-bridged-test.html","adminUserId":3,"note":"issue-275 state-b afl_api ownership test","snapshotLabel":"issue275-stateb-integration","aflApiSourceId":6,"afltablesSourceId":10}
+
+[90mstdout[2m | tests/integration/settle-afl-api-state-b.test.ts[2m > [22m[2mAFLDB-ISSUE-257 §17.8 on a fixture season — Match Sheet authority over an afl_api-owned row survives a re-settle[2m > [22m[2mkeeps the corrected field, lets an unrelated field follow the source, and never changes ownership
+[22m[39m[ISSUE-275 state-b fixture] {"createdMatchId":17113,"createdMatchKey":"2071|PF|2071-06-03|Hawthorn|Brisbane Lions"}
+
+ [32m✓[39m tests/integration/settle-afl-api-state-b.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 1509[2mms[22m[39m
+     [33m[2m✓[22m[39m keeps the corrected field, lets an unrelated field follow the source, and never changes ownership [33m 382[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m   Start at [22m 10:23:45
+[2m   Duration [22m 2.99s[2m (transform 830ms, setup 166ms, import 938ms, tests 1.51s, environment 0ms)[22m
+

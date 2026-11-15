@@ -1,0 +1,14 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand[39m
+
+ [32m✓[39m tests/integration/admin-club-leadership.test.ts [2m([22m[2m42 tests[22m[2m)[22m[33m 7925[2mms[22m[39m
+     [33m[2m✓[22m[39m re-creates active, ended and void appointments, and is idempotent [33m 839[2mms[22m[39m
+     [33m[2m✓[22m[39m replays without any season-list membership — history outlives the list [33m 576[2mms[22m[39m
+     [33m[2m✓[22m[39m fails the whole batch closed when a payload cannot be resolved [33m 2885[2mms[22m[39m
+     [33m[2m✓[22m[39m is unaffected by a display-name change — the payload carries no name [33m 369[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m42 passed[39m[22m[90m (42)[39m
+[2m   Start at [22m 11:58:04
+[2m   Duration [22m 9.30s[2m (transform 526ms, setup 161ms, import 859ms, tests 7.92s, environment 0ms)[22m
+

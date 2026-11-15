@@ -1,0 +1,104 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand[39m
+
+ [31m❯[39m tests/integration/settle-afl-api.test.ts [2m([22m[2m74 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 44498[2mms[22m[39m
+     [33m[2m✓[22m[39m §19: a new CONCLUDED match auto-applies match, period scores and the bridged player; the unbridged player is refused without blocking it [33m 365[2mms[22m[39m
+     [33m[2m✓[22m[39m §19: an identical rerun is idempotent — no new canonical writes [33m 688[2mms[22m[39m
+     [33m[2m✓[22m[39m §14: a provider-id hit whose season/clubs contradict the incoming record HALTs the whole run [33m 671[2mms[22m[39m
+     [33m[2m✓[22m[39m §19.1: an afltables-owned match observed by afl_api with agreeing scores is corroborated, not written, ownership unchanged [33m 456[2mms[22m[39m
+     [33m[2m✓[22m[39m §19.1 (AFLDB-ISSUE-293): a score disagreement with the owner opens a finding, and agreement restored closes it and is counted [33m 510[2mms[22m[39m
+     [33m[2m✓[22m[39m §19.2: AFL Tables attendance enriches an afl_api-owned match without changing its ownership [33m 700[2mms[22m[39m
+     [33m[2m✓[22m[39m I244-F001: a new afl_api-owned final updates club_seasons.finals_played and seasons metadata, gated on the write [33m 848[2mms[22m[39m
+     [33m[2m✓[22m[39m I244-F001: a score correction to an afl_api-owned final recomputes club_seasons/seasons rather than accumulating them [33m 588[2mms[22m[39m
+     [33m[2m✓[22m[39m I244-F001: a genuinely new afl_api-owned H&A match updates club_seasons W/L/points/percentage/ladder and seasons metadata [33m 632[2mms[22m[39m
+     [33m[2m✓[22m[39m I244-F001: an H&A score correction that flips home_win to away_win replaces club_seasons W/L/points/percentage rather than accumulating them [33m 536[2mms[22m[39m
+     [33m[2m✓[22m[39m I244-F003 §11.2: a provider venue CD_V absent from afl-api-identities.json.venues refuses auto-apply, counts venueProviderUnmapped and opens a data_issues finding [33m 550[2mms[22m[39m
+     [33m[2m✓[22m[39m I244-F003 §11.3: a mapped legacy_name with no matching venues row refuses auto-apply and counts venueUnmapped, distinctly from a provider map miss [33m 302[2mms[22m[39m
+     [33m[2m✓[22m[39m I244-F003 §11.4: correcting a provider venue mapping self-heals a previously-refused afl_api match on re-settle [33m 503[2mms[22m[39m
+     [33m[2m✓[22m[39m I244-F004: require-complete-source refuses an incomplete apply before commit, while explicit partial apply and dry-run keep their contracts [33m 734[2mms[22m[39m
+     [33m[2m✓[22m[39m I244-F008: a committed apply leaves a terminal batch that agrees with the run, its import_rejections and the canonical data; an identical replay is a terminal zero-change batch [33m 632[2mms[22m[39m
+     [33m[2m✓[22m[39m I244-F008: a dry-run leaves no batch row at all, even though it ran the real finalising UPDATE [33m 589[2mms[22m[39m
+     [33m[2m✓[22m[39m V2-GAP-027: the settle CLI writes a valid reconciliation report for a real dry-run and a real apply [33m 415[2mms[22m[39m
+     [33m[2m✓[22m[39m I244-F008: a failure while finalising the batch rolls the whole run back — no batch, no canonical row, no spine row [33m 490[2mms[22m[39m
+     [32m✓[39m the spine keeps the row; nothing canonical, typed, ledger, candidate, rejection or data-issue is written for it; played rows still apply; a replay is idempotent[32m 262[2mms[22m[39m
+     [33m[2m✓[22m[39m a foreign-owned player row is refused with a durable machine-readable finding; a replay refreshes it in place; it self-heals when the row becomes applicable — canonical state and ownership untouched while refused [33m 928[2mms[22m[39m
+     [33m[2m✓[22m[39m a refusal that no longer differs from canonical state is closed as moot; a finding a human resolved is never rewritten, and a persisting refusal opens exactly one fresh row [33m 1190[2mms[22m[39m
+     [33m[2m✓[22m[39m keeps the corrected field, lets an unrelated field follow the source, and never changes ownership [33m 1775[2mms[22m[39m
+     [33m[2m✓[22m[39m a provider date correction is withheld while non-identity corrections still apply; the finding is replay-safe, heals when the sides agree again, and never rewrites a human resolution [33m 1055[2mms[22m[39m
+     [33m[2m✓[22m[39m a correction whose proposed identity is already another match's is refused with both rows untouched; a round correction is withheld as one group; a supervised repair of the canonical row is recognised and heals the finding [33m 2173[2mms[22m[39m
+     [33m[2m✓[22m[39m a DATE disagreement with a foreign-owned fixture refuses the INSERT durably; a replay refreshes the one finding; nothing dependent is written and the foreign row is byte-identical [33m 1347[2mms[22m[39m
+     [33m[2m✓[22m[39m a ROUND disagreement (same date, a different round) refuses in exactly the same way [33m 610[2mms[22m[39m
+     [33m[2m✓[22m[39m SELF-HEAL: once a supervised correction makes the renderings agree the record resolves normally, ownership is unchanged, the open finding closes, and a human resolution is never rewritten [33m 603[2mms[22m[39m
+     [33m[2m✓[22m[39m NEGATIVE CONTROL: a genuine second meeting — round AND date both differ — is not blocked and inserts normally [33m 1279[2mms[22m[39m
+     [33m[2m✓[22m[39m a fixture from a DIFFERENT SEASON never blocks the INSERT, even one that would otherwise be one day from the record [33m 421[2mms[22m[39m
+     [33m[2m✓[22m[39m club ORIENTATION is exact: the same clubs with home and away swapped are a different fixture, not a candidate [33m 359[2mms[22m[39m
+     [33m[2m✓[22m[39m MULTIPLE plausible fixtures (any owner, either component) refuse with every candidate listed and none chosen [33m 399[2mms[22m[39m
+     [33m[2m✓[22m[39m APPLY-TIME RECHECK: a plausible fixture committed AFTER planning is still refused inside the savepoint — no match, period or player row, a durable finding naming the reason [33m 458[2mms[22m[39m
+     [33m[2m✓[22m[39m exists, with predicate source_id = <afl_api id> AND player_id IS NOT NULL [33m 513[2mms[22m[39m
+     [32m✓[39m raises 23505 on a second afl_api row for the same player[32m 75[2mms[22m[39m
+     [32m✓[39m still allows two rows for the same player under another source (the predicate binds on source_id)[32m 45[2mms[22m[39m
+     [32m✓[39m I14 — the replay re-derives the current player_id from player_identity (never trusts a stale stored value), is idempotent, and passes the bijection check[32m 80[2mms[22m[39m
+     [32m✓[39m readAflApiImporterRows — returns the unprefixed identity, and excludes (never silently captures) a two-path player[32m 43[2mms[22m[39m
+     [32m✓[39m renumbering — the replay never trusts the captured playerId, only the re-derived identity[32m 65[2mms[22m[39m
+     [32m✓[39m D9 STOPs against the real UNIQUE constraint and the per-player index[32m 83[2mms[22m[39m
+     [32m✓[39m D15 supersede (OD-2) against the real table — the id is kept, the bijection passes, a second replay is a no-op[32m 71[2mms[22m[39m
+     [32m✓[39m the combined invariant passes on this fixture set, and fails for an injected anomaly[32m 32[2mms[22m[39m
+     [33m[2m✓[22m[39m P-M point 2 (D11d) — the database marker survives RESET_SQL, entirely inside one rolled-back transaction [33m 434[2mms[22m[39m
+     [32m✓[39m whole-table isolation guarding — I237_OWNERSHIP never overlaps ISSUE235_OWNERSHIP (DB-free)[32m 61[2mms[22m[39m
+     [32m✓[39m §10/E13 — the settle resolver (resolveAflApiPlayer) resolves a replayed importer row through the intended identity path, and refuses one it never replayed[32m 36[2mms[22m[39m
+     [32m✓[39m I17 (R1/R2 live pin) — the live afldb_test catalogue matches the D10 manifest exactly[32m 29[2mms[22m[39m
+     [33m[2m✓[22m[39m I2 → I6 (revoke before I5) → re-link → I5 (re-settle) → I6 (revoke after I5) → I6c: one provider through the real settle, link, revoke and replay [33m 875[2mms[22m[39m
+     [33m[2m✓[22m[39m I2 (D8 audit shape) — the linked and revoked audit rows store evidence and previous_state as jsonb OBJECTS, not JSON text [33m 1036[2mms[22m[39m
+     [33m[2m✓[22m[39m I3 — atomicity: an audit INSERT refused by its CHECK after the identity INSERT leaves zero rows on both sides [33m 460[2mms[22m[39m
+     [33m[2m✓[22m[39m I4/T2 (the brief's I3) — a second link of the same provider to the same player is refused as already linked; no duplicate row or audit [33m 528[2mms[22m[39m
+     [33m[2m✓[22m[39m I4/T3 (the brief's I4) — a link of an already-linked provider to a DIFFERENT player is refused; no reassignment, no audit [33m 514[2mms[22m[39m
+     [33m[2m✓[22m[39m I4/T4 — a link to a player who already holds another afl_api provider is refused, naming that provider [33m 415[2mms[22m[39m
+     [32m✓[39m I4/T5 — a link with no pending evidence (U0) is refused; nothing is written[32m 187[2mms[22m[39m
+     [33m[2m✓[22m[39m I4/T6 (the brief's I7) — a stale fingerprint is refused for link and for revoke after a real database change; nothing is written [33m 1416[2mms[22m[39m
+     [33m[2m✓[22m[39m I4/T7 — a link to a player with no stable identity is refused; nothing is written [33m 413[2mms[22m[39m
+     [33m[2m✓[22m[39m I4/T8 — every action on an anomalous (NULL-player) row is refused; the row is unchanged [33m 507[2mms[22m[39m
+     [33m[2m✓[22m[39m I4/T9 — a surname disagreement is refused without the acknowledgement, and recorded when acknowledged [33m 472[2mms[22m[39m
+     [33m[2m✓[22m[39m I6b (Brownlow, OD-2) — a human link used only by a Brownlow settle is refused as used through D10 (a) and (b), with no projection row [33m 830[2mms[22m[39m
+     [33m[2m✓[22m[39m I6d (lock) — while another session holds a read of external_identities the revoke refuses on lock_timeout and writes nothing [33m 2527[2mms[22m[39m
+     [33m[2m✓[22m[39m I6-LI (LINK_INDEPENDENT; the brief's I6d) — an afl_api player_height_evidence row does not block a revoke and survives it [33m 499[2mms[22m[39m
+     [32m✓[39m I7 — link and revoke against the BRIDGED importer (unique) provider are refused; its status, player_id and match_method are unchanged[32m 295[2mms[22m[39m
+     [32m✓[39m I15 — an unresolvable player_identity stops the replay; nothing is written[32m 152[2mms[22m[39m
+     [32m✓[39m I15 — an ambiguous player_identity (an afltables and a manual_admin_edit identity naming two players) stops the replay[32m 151[2mms[22m[39m
+     [32m✓[39m I15 — an importer unique row for the CD_I naming a DIFFERENT player stops the replay; the importer row is untouched[32m 157[2mms[22m[39m
+     [32m✓[39m I15 — an importer unique row for the CD_I and the SAME player still stops the replay (it is not the identical human row)[32m 151[2mms[22m[39m
+     [32m✓[39m I15 — a conflicting HUMAN row for the CD_I (another player) stops the replay[32m 157[2mms[22m[39m
+     [32m✓[39m I15 — a remapped player already holding another afl_api row stops the replay[32m 152[2mms[22m[39m
+     [33m[2m✓[22m[39m I16 (replay idempotence) — over a ledger written by the real link/revoke API, a first replay re-creates exactly the net-linked rows and a second is a pure no-op [33m 1212[2mms[22m[39m
+     [33m[2m✓[22m[39m OD-5 recovery — a committed reinstatement whose capture was never archived is verified, archived and captured afresh; the database is not written [33m 1109[2mms[22m[39m
+[31m     [31m×[31m OD-5 reinstate (rolled back, no rebuild) — reinstateAndReplay() puts a captured ledger back byte-for-byte under its original ids, replays it and passes the bijection[39m[33m 1131[2mms[22m[39m
+     [33m[2m✓[22m[39m OD-5 recovery — a missing human identity is refused as already_reinstated_unverified; the pending capture is left in place [33m 1105[2mms[22m[39m
+     [33m[2m✓[22m[39m OD-5 recovery — a human identity with no ledger entry is refused; the pending capture is left in place [33m 1108[2mms[22m[39m
+     [33m[2m✓[22m[39m OD-5 recovery — ledger drift is refused before any observation; the pending capture is left in place [33m 1075[2mms[22m[39m
+     [32m✓[39m S6 fixture-leftover gate — afldb_test holds zero ISSUE-235 fixture rows[32m 101[2mms[22m[39m
+     [32m✓[39m I237 fixture-leftover gate — afldb_test holds zero I237 fixture rows[32m 94[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m tests/integration/settle-afl-api.test.ts[2m > [22mAFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreSQL (post-COMMIT, pre-archive recovery)[2m > [22mOD-5 reinstate (rolled back, no rebuild) — reinstateAndReplay() puts a captured ledger back byte-for-byte under its original ids, replays it and passes the bijection
+[31m[1mError[22m: Refusing to rebuild 'afldb_v2_rem4leaks_greenrb_test': the only explicit rebuild targets are 'afldb_test' (normal test/integration rebuild), 'code_test_db' (disposable full-rebuild rehearsal). A target is never inferred from a DSN.[39m
+[36m [2m❯[22m assertRebuildTargetName tools/db/rebuild-test.ts:[2m790:11[22m[39m
+    [90m788|[39m   const isolatedName = isIsolatedRebuildName(database) && isolatedRunP…
+    [90m789|[39m   if (!isRebuildTarget(database) && !isolatedName) {
+    [90m790|[39m     throw new RebuildRefused(
+    [90m   |[39m           [31m^[39m
+    [90m791|[39m       `Refusing to rebuild '${database}': the only explicit rebuild ta…
+    [90m792|[39m       + `${describeRebuildTargets()}. A target is never inferred from …
+[90m [2m❯[22m setRebuildMarker tools/migration/rebuild_afl_api_adjudications.ts:[2m1183:3[22m[39m
+[90m [2m❯[22m tests/integration/settle-afl-api.test.ts:[2m5607:15[22m[39m
+[90m [2m❯[22m scope node_modules/postgres/src/index.js:[2m260:18[22m[39m
+[90m [2m❯[22m Function.begin node_modules/postgres/src/index.js:[2m243:14[22m[39m
+[90m [2m❯[22m tests/integration/settle-afl-api.test.ts:[2m5598:7[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m73 passed[39m[22m[90m (74)[39m
+[2m   Start at [22m 11:44:53
+[2m   Duration [22m 47.49s[2m (transform 1.99s, setup 242ms, import 2.38s, tests 44.50s, environment 0ms)[22m
+

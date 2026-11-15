@@ -1,0 +1,48 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand[39m
+
+ [32m✓[39m tests/integration/settle-afltables.test.ts [2m([22m[2m85 tests[22m[2m)[22m[33m 57214[2mms[22m[39m
+     [33m[2m✓[22m[39m runs the whole write path in --dry-run and retains nothing (§22) [33m 430[2mms[22m[39m
+     [33m[2m✓[22m[39m applies observations, projections and candidates, and refuses to sweep an incomplete scope (I2) [33m 358[2mms[22m[39m
+     [33m[2m✓[22m[39m reruns idempotently: no payload, no version, no candidate, no rejection [33m 345[2mms[22m[39m
+     [33m[2m✓[22m[39m marks a genuine omission absent inside a proven-complete scope, and nowhere else (I3) [33m 340[2mms[22m[39m
+     [33m[2m✓[22m[39m clears absence on reappearance without appending a version (I4) [33m 343[2mms[22m[39m
+     [33m[2m✓[22m[39m keeps A -> B -> A as three ordered versions over two payloads [33m 699[2mms[22m[39m
+       [33m[2m✓[22m[39m opens exactly one row for a genuine independent score disagreement [33m 372[2mms[22m[39m
+       [33m[2m✓[22m[39m refreshes the SAME row when the disagreement recurs, keeping detected_at [33m 370[2mms[22m[39m
+       [33m[2m✓[22m[39m resolves on positive agreement even though the AFL Tables payload did not move [33m 402[2mms[22m[39m
+       [33m[2m✓[22m[39m does not resolve an already-resolved row a second time [33m 327[2mms[22m[39m
+       [33m[2m✓[22m[39m never resolves an open row another writer owns [33m 345[2mms[22m[39m
+     [33m[2m✓[22m[39m leaves every ISSUE-099-owned relation byte-identical after a --dry-run [33m 455[2mms[22m[39m
+     [33m[2m✓[22m[39m opens no Brownlow target for an unlinked player with an NA vote (D2) [33m 628[2mms[22m[39m
+     [33m[2m✓[22m[39m executes the whole write path under the restricted afldb_import role [33m 313[2mms[22m[39m
+     [33m[2m✓[22m[39m runs the whole automatic path in --dry-run and leaves no canonical row [33m 330[2mms[22m[39m
+       [33m[2m✓[22m[39m --dry-run --auto-apply executes the automatic path, the recompute included, and leaves canonical, ledger and derived state unchanged [33m 550[2mms[22m[39m
+       [33m[2m✓[22m[39m --apply --auto-apply lands the valid data unattended and recomputes the derived tables once, scoped to the players it wrote [33m 447[2mms[22m[39m
+       [33m[2m✓[22m[39m a second identical --apply --auto-apply is a total no-op: 0 canonical writes, 0 ledger rows, no new version, candidate or finding, no recompute [33m 466[2mms[22m[39m
+       [33m[2m✓[22m[39m lands the debutant on the identical bundle once its identity is resolved, recomputes only that player, and the report moves its candidate to MOOT [33m 459[2mms[22m[39m
+       [33m[2m✓[22m[39m rekeys the existing canonical match when only round_code moves, instead of inserting a duplicate [33m 555[2mms[22m[39m
+       [33m[2m✓[22m[39m rekeys in place when a numbered round is reclassified wildcard_final, rather than duplicating the fixture [33m 482[2mms[22m[39m
+       [33m[2m✓[22m[39m withholds the whole fixture family when the matches target refuses rekey_would_merge [33m 565[2mms[22m[39m
+       [33m[2m✓[22m[39m inserts no period row onto the stale match when rekey_override_conflict refuses the rekey [33m 506[2mms[22m[39m
+       [33m[2m✓[22m[39m names the numerically latest settle batch in the exception report, not the lexicographically latest [33m 553[2mms[22m[39m
+       [33m[2m✓[22m[39m plans, applies and then finds nothing left to do [33m 553[2mms[22m[39m
+       [33m[2m✓[22m[39m refuses rather than guessing when two retired rows could be the fixture [33m 361[2mms[22m[39m
+       [33m[2m✓[22m[39m a corrected field survives the settle, on a retry and when the source moves [33m 801[2mms[22m[39m
+       [33m[2m✓[22m[39m an unchanged re-settle neither churns nor reverts the corrected value [33m 979[2mms[22m[39m
+       [33m[2m✓[22m[39m an unprotected field on the same row still updates from the source [33m 594[2mms[22m[39m
+       [33m[2m✓[22m[39m a durable removal stops the settle reinserting the row [33m 823[2mms[22m[39m
+       [33m[2m✓[22m[39m a manual addition survives the settle, row and authority [33m 599[2mms[22m[39m
+       [33m[2m✓[22m[39m after Return to source the next settle restores the source value [33m 822[2mms[22m[39m
+       [33m[2m✓[22m[39m F-PR-03: a settle that now carries a manual addition neither adopts nor drops it [33m 955[2mms[22m[39m
+       [33m[2m✓[22m[39m F-PR-03: an addition the source does not carry is withdrawn and its row deleted [33m 427[2mms[22m[39m
+       [33m[2m✓[22m[39m a settle rekey carries the Match Sheet authority to the new match key [33m 815[2mms[22m[39m
+       [33m[2m✓[22m[39m repair-match-rekeys carries the Match Sheet authority to the live match key [33m 1018[2mms[22m[39m
+       [33m[2m✓[22m[39m R-01: a Match Sheet save cannot commit inside the settle rekey unit authority window [33m 6044[2mms[22m[39m
+       [33m[2m✓[22m[39m ISSUE-274: a match deleted while a matches-only unit waits for its lock is not counted as updated [33m 327[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m85 passed[39m[22m[90m (85)[39m
+[2m   Start at [22m 10:34:09
+[2m   Duration [22m 59.82s[2m (transform 1.02s, setup 162ms, import 2.04s, tests 57.21s, environment 0ms)[22m
+

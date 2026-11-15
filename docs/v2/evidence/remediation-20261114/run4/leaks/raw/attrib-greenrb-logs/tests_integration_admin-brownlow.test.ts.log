@@ -1,0 +1,39 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand[39m
+
+[90mstderr[2m | tests/integration/admin-brownlow.test.ts[2m > [22m[2mthe main season, administered in order[2m > [22m[2mrolls the facts back when the required audit row cannot be written
+[22m[39m[admin-brownlow] Brownlow finalise on match #17341 failed: PostgresError: issue155 audit probe
+    at ErrorResponse [90m(file:///mnt/ssd/afldb-rem4-leaks-20261115/cand/[39mnode_modules/[4mpostgres[24m/src/connection.js:815:30[90m)[39m
+    at handle [90m(file:///mnt/ssd/afldb-rem4-leaks-20261115/cand/[39mnode_modules/[4mpostgres[24m/src/connection.js:489:6[90m)[39m
+    at Socket.data [90m(file:///mnt/ssd/afldb-rem4-leaks-20261115/cand/[39mnode_modules/[4mpostgres[24m/src/connection.js:324:9[90m)[39m
+[90m    at Socket.emit (node:events:519:28)[39m
+[90m    at addChunk (node:internal/streams/readable:561:12)[39m
+[90m    at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)[39m
+[90m    at Socket.Readable.push (node:internal/streams/readable:392:5)[39m
+[90m    at TCP.onStreamRead (node:internal/stream_base_commons:189:23)[39m
+    at cachedError [90m(file:///mnt/ssd/afldb-rem4-leaks-20261115/cand/[39mnode_modules/[4mpostgres[24m/src/query.js:170:23[90m)[39m
+    at new Query [90m(file:///mnt/ssd/afldb-rem4-leaks-20261115/cand/[39mnode_modules/[4mpostgres[24m/src/query.js:36:24[90m)[39m
+    at sql [90m(file:///mnt/ssd/afldb-rem4-leaks-20261115/cand/[39mnode_modules/[4mpostgres[24m/src/index.js:112:11[90m)[39m
+    at recordDataEdit [90m(/mnt/ssd/afldb-rem4-leaks-20261115/cand/[39msrc/db/queries/audit-log.ts:156:42[90m)[39m {
+  severity_local: [32m'ERROR'[39m,
+  severity: [32m'ERROR'[39m,
+  code: [32m'P0001'[39m,
+  where: [32m'PL/pgSQL function issue155_audit_probe() line 1 at RAISE'[39m,
+  file: [32m'pl_exec.c'[39m,
+  line: [32m'3897'[39m,
+  routine: [32m'exec_stmt_raise'[39m
+}
+
+ [32m✓[39m tests/integration/admin-brownlow.test.ts [2m([22m[2m47 tests[22m[2m)[22m[33m 10683[2mms[22m[39m
+     [33m[2m✓[22m[39m attributes exactly one candidate, keeps NULL for none or several, and re-resolves on reload [33m 352[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses a publication without the administrator note: the generated default never satisfies the season seal (V2-GAP-006 review F-001) [33m 384[2mms[22m[39m
+     [33m[2m✓[22m[39m publishes: manual rows, measured ranks and winners, derived totals in step [33m 418[2mms[22m[39m
+     [33m[2m✓[22m[39m preserves the Brownlow mirror through a match-sheet save [33m 678[2mms[22m[39m
+     [33m[2m✓[22m[39m reports each fixture season with the state it is actually in [33m 1669[2mms[22m[39m
+     [33m[2m✓[22m[39m counts a drafted match whose source votes are complete, so the season reads complete [33m 1824[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m47 passed[39m[22m[90m (47)[39m
+[2m   Start at [22m 11:52:18
+[2m   Duration [22m 12.92s[2m (transform 1.20s, setup 242ms, import 1.64s, tests 10.68s, environment 0ms)[22m
+

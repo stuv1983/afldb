@@ -1,0 +1,12 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand[39m
+
+ [32m✓[39m tests/integration/nl-answer-boundary.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 1391[2mms[22m[39m
+     [33m[2m✓[22m[39m returns an NlAnswer and logs no_results for a valid supported plan with zero rows [33m 645[2mms[22m[39m
+     [33m[2m✓[22m[39m leaves the same semantic family unchanged when rows exist [33m 635[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+[2m   Start at [22m 11:08:07
+[2m   Duration [22m 3.07s[2m (transform 949ms, setup 160ms, import 1.15s, tests 1.39s, environment 0ms)[22m
+

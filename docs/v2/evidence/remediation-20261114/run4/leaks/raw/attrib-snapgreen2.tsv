@@ -1,0 +1,7 @@
+tests/integration/dob-enrichment-issues.test.ts	0	-	0	0	0	0
+tests/integration/sealed-editor-guard.test.ts	0	public.club_seasons	1640	1640	0	32
+tests/integration/sealed-editor-guard.test.ts	0	public.player_season_stats	58845	58845	0	1207
+tests/integration/sealed-editor-guard.test.ts	0	public.seasons	130	130	0	2
+tests/integration/match-admin-delete.test.ts	0	public.club_seasons	1640	1640	0	18
+tests/integration/match-admin-delete.test.ts	0	public.player_season_stats	58845	58845	0	669
+tests/integration/match-admin-delete.test.ts	0	public.seasons	130	130	0	1

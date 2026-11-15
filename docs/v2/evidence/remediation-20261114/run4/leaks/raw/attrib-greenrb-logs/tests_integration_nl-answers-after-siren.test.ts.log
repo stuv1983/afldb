@@ -1,0 +1,96 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand[39m
+
+ [31m❯[39m tests/integration/nl-answers-after-siren.test.ts [2m([22m[2m20 tests[22m[2m | [22m[31m3 failed[39m[2m)[22m[33m 323[2mms[22m[39m
+     [32m✓[39m a goal after the siren and a goal after the siren TO WIN are different counts[32m 38[2mms[22m[39m
+     [32m✓[39m a miss and a miss-and-lost are different counts[32m 9[2mms[22m[39m
+     [32m✓[39m kicker_result is independent of kick_effect: a scoreless kick whose side still won exists[32m 4[2mms[22m[39m
+     [32m✓[39m an absent kickScored means EVERY kick, including the misses[32m 7[2mms[22m[39m
+     [32m✓[39m most goals after the siren returns every joint holder, checked against hand-written SQL[32m 14[2mms[22m[39m
+[31m     [31m×[31m most kicks after the siren is a wider tie than most goals[39m[32m 30[2mms[22m[39m
+     [32m✓[39m a threshold above the measured ceiling is an honest EMPTY result, not a decline[32m 6[2mms[22m[39m
+     [32m✓[39m opponent scope folds the whole organization lineage[32m 16[2mms[22m[39m
+     [32m✓[39m club scope is the KICKER's club and opponent scope is the other side[32m 16[2mms[22m[39m
+     [32m✓[39m a match-unlinked row is COUNTED, listed and attributed[32m 22[2mms[22m[39m
+     [32m✓[39m finals scope reads matches.round_type, never the free-text round_raw[32m 12[2mms[22m[39m
+     [32m✓[39m "after the siren in a Grand Final" is EMPTY, and never the round_raw = GF row[32m 15[2mms[22m[39m
+     [32m✓[39m the first kick after the siren is the earliest MATCH-LINKED event[32m 19[2mms[22m[39m
+[31m     [31m×[31m the most recent kick is match-linked and is NEVER an unlinked later row[39m[32m 24[2mms[22m[39m
+     [32m✓[39m afterSirenRequiresMatchLink agrees with what the compiler actually excluded[32m 10[2mms[22m[39m
+[31m     [31m×[31m a player-subject answer counts only trusted-linked kickers, and says how many it left out[39m[32m 14[2mms[22m[39m
+     [32m✓[39m an unlinked kicker still appears as EVENT evidence, under the source spelling[32m 13[2mms[22m[39m
+     [32m✓[39m per-player kick and goal counts match getAfterSirenRecords for every player[32m 34[2mms[22m[39m
+     [32m✓[39m returns that player's own events and nobody else's[32m 5[2mms[22m[39m
+     [32m✓[39m a player with no after-siren kick is an honest empty result[32m 3[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 3 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m tests/integration/nl-answers-after-siren.test.ts[2m > [22mafter_siren — ranking is always a tie[2m > [22mmost kicks after the siren is a wider tie than most goals
+[31m[1mAssertionError[22m: expected [ 'Barry Hall', 'Brad Johnson', …(8) ] to deeply equal [ 'Barry Hall', 'Brad Johnson', …(7) ][39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[33m@@ -1,9 +1,10 @@[39m
+[2m  [[22m
+[2m    "Barry Hall",[22m
+[2m    "Brad Johnson",[22m
+[2m    "David Mundy",[22m
+[31m+   "Dylan Moore",[39m
+[2m    "Gary Rohan",[22m
+[2m    "Jack Riewoldt",[22m
+[2m    "Malcolm Blight",[22m
+[2m    "Mitch McGovern",[22m
+[2m    "Stephen Kernahan",[22m
+
+[36m [2m❯[22m tests/integration/nl-answers-after-siren.test.ts:[2m181:57[22m[39m
+    [90m179|[39m     // kickScored counts every kick, including the misses, so more pla…
+    [90m180|[39m     [90m// reach the ceiling than reach it on goals alone.[39m
+    [90m181|[39m     [34mexpect[39m(kicks[33m.[39mrows[33m.[39m[34mmap[39m((r) [33m=>[39m r[33m.[39mdisplayName)[33m.[39m[34msort[39m())[33m.[39m[34mtoEqual[39m([
+    [90m   |[39m                                                         [31m^[39m
+    [90m182|[39m       'Barry Hall', 'Brad Johnson', 'David Mundy', 'Gary Rohan', 'Jack…
+    [90m183|[39m       'Malcolm Blight', 'Mitch McGovern', 'Stephen Kernahan', 'Tom Haw…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/integration/nl-answers-after-siren.test.ts[2m > [22mafter_siren — the match-link boundary (D10 §7.1)[2m > [22mthe most recent kick is match-linked and is NEVER an unlinked later row
+[31m[1mAssertionError[22m: expected 'Tim Membrey' to be 'Nasiah Wanganeen-Milera' // Object.is equality[39m
+
+Expected: [32m"Nasiah Wanganeen-Milera"[39m
+Received: [31m"Tim Membrey"[39m
+
+[36m [2m❯[22m tests/integration/nl-answers-after-siren.test.ts:[2m348:30[22m[39m
+    [90m346|[39m     [34mexpect[39m(lead[33m![39m[33m.[39meventId)[33m.[39m[34mtoBe[39m(expected[33m.[39mid)[33m;[39m
+    [90m347|[39m     [34mexpect[39m(lead[33m![39m[33m.[39mmatchId)[33m.[39mnot[33m.[39m[34mtoBeNull[39m()[33m;[39m
+    [90m348|[39m     [34mexpect[39m(lead[33m![39m[33m.[39mplayerName)[33m.[39m[34mtoBe[39m([32m'Nasiah Wanganeen-Milera'[39m)[33m;[39m
+    [90m   |[39m                              [31m^[39m
+    [90m349|[39m
+    [90m350|[39m     // An unlinked row in a LATER season must not have won: it cannot …
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/integration/nl-answers-after-siren.test.ts[2m > [22mafter_siren — the trusted player link[2m > [22ma player-subject answer counts only trusted-linked kickers, and says how many it left out
+[31m[1mAssertionError[22m: expected 1 to be 6 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 6[39m
+[31m+ 1[39m
+
+[36m [2m❯[22m tests/integration/nl-answers-after-siren.test.ts:[2m379:35[22m[39m
+    [90m377|[39m     // Measured: 6 of the 126 recorded kicks have no trusted player li…
+    [90m378|[39m     // and the caveat names that number rather than hiding the exclusi…
+    [90m379|[39m     [34mexpect[39m(excluded[33m.[39mnoPlayerLink)[33m.[39m[34mtoBe[39m([34m6[39m)[33m;[39m
+    [90m   |[39m                                   [31m^[39m
+    [90m380|[39m     [34mexpect[39m(total)[33m.[39m[34mtoBeGreaterThan[39m([34m0[39m)[33m;[39m
+    [90m381|[39m   })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m3 failed[39m[22m[2m | [22m[1m[32m17 passed[39m[22m[90m (20)[39m
+[2m   Start at [22m 12:10:35
+[2m   Duration [22m 1.26s[2m (transform 355ms, setup 160ms, import 406ms, tests 323ms, environment 0ms)[22m
+

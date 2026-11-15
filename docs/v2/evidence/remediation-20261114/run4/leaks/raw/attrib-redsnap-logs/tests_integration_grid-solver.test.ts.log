@@ -1,0 +1,28 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand-red[39m
+
+ [32m✓[39m tests/integration/grid-solver.test.ts [2m([22m[2m222 tests[22m[2m)[22m[33m 24896[2mms[22m[39m
+     [33m[2m✓[22m[39m solves a cell using "games_at_multiple_clubs_min_incl_merged" without throwing [33m 311[2mms[22m[39m
+     [33m[2m✓[22m[39m solves a cell using "career_teammates_min" without throwing [33m 1467[2mms[22m[39m
+     [33m[2m✓[22m[39m solves a cell using "single_game_stat_multi_club_min" without throwing [33m 1265[2mms[22m[39m
+     [33m[2m✓[22m[39m solves a cell using "club_season_brownlow_leader" without throwing [33m 509[2mms[22m[39m
+     [33m[2m✓[22m[39m solves a cell using "consecutive_wins_min" without throwing [33m 479[2mms[22m[39m
+     [33m[2m✓[22m[39m solves a cell using "never_won_a_final" without throwing [33m 416[2mms[22m[39m
+     [33m[2m✓[22m[39m solves the mapped ISSUE-076 won-final grid within the four-second safety margin [33m 512[2mms[22m[39m
+     [33m[2m✓[22m[39m career_games_min(200) AND career_games_min(0) matches a hand-written equivalent count [33m 569[2mms[22m[39m
+     [33m[2m✓[22m[39m career_stat_total_min on a live_only stat (clangers) matches a hand-written SUM [33m 1431[2mms[22m[39m
+     [33m[2m✓[22m[39m no won_a_final player is also flagged never_won_a_final [33m 396[2mms[22m[39m
+     [33m[2m✓[22m[39m solves the three ISSUE-103 finals-win cells under one second with an independent oracle [33m 934[2mms[22m[39m
+     [33m[2m✓[22m[39m games_at_one_club_min counts a whole organization stint across a rename [33m 419[2mms[22m[39m
+     [33m[2m✓[22m[39m club_season_stat_leader(clearances) is exactly the players with a recorded leading season [33m 1204[2mms[22m[39m
+     [33m[2m✓[22m[39m club_season_stat_leader(rebounds) is exactly the players with a recorded leading season [33m 1204[2mms[22m[39m
+     [33m[2m✓[22m[39m club_season_stat_leader(inside_50s) is exactly the players with a recorded leading season [33m 1156[2mms[22m[39m
+     [33m[2m✓[22m[39m club_season_stat_leader(goal_assists) is exactly the players with a recorded leading season [33m 1283[2mms[22m[39m
+     [33m[2m✓[22m[39m club_season_stat_leader_min_times(clearances, 5) counts only recorded leading seasons [33m 1154[2mms[22m[39m
+     [33m[2m✓[22m[39m a player whose every season is unrecorded for the stat never led a club in it [33m 790[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m222 passed[39m[22m[90m (222)[39m
+[2m   Start at [22m 10:04:03
+[2m   Duration [22m 25.71s[2m (transform 322ms, setup 146ms, import 352ms, tests 24.90s, environment 0ms)[22m
+

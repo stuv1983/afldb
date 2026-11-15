@@ -1,0 +1,16 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand[39m
+
+ [32m✓[39m tests/integration/draftguru-import.test.ts [2m([22m[2m30 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 208417[2mms[22m[39m
+     [33m[2m✓[22m[39m an identity reload that carries the audited pick (NULL pick_number) unchanged is not refused [33m 32064[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses an audited pick the snapshot does not carry — normal run and --dry-run — and writes nothing [33m 46539[2mms[22m[39m
+     [33m[2m✓[22m[39m a changed dg_person_id on an audited person is a refused rewrite (D-5) [33m 16602[2mms[22m[39m
+     [33m[2m✓[22m[39m a reviewed reconciliation naming the exact keys and digest is the only way past; REPLACE_CLUB needs an owner ruling [33m 64892[2mms[22m[39m
+     [33m[2m✓[22m[39m a column an active override covers is not an effect: the replay restores it (ISSUE-160) [33m 46930[2mms[22m[39m
+     [33m[2m✓[22m[39m matches a reload key with a NULL component NULL-safely, as reload_keyed does [33m 454[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m6 passed[39m[22m[2m | [22m[33m1 skipped[39m[90m (30)[39m
+[2m   Start at [22m 09:44:27
+[2m   Duration [22m 209.97s[2m (transform 421ms, setup 160ms, import 1.03s, tests 208.42s, environment 0ms)[22m
+

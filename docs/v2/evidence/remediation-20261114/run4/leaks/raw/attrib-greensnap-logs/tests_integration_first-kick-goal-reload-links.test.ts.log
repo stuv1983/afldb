@@ -1,0 +1,10 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand[39m
+
+ [2m[90m↓[39m[22m tests/integration/first-kick-goal-reload-links.test.ts [2m([22m[2m22 tests[22m[2m | [22m[33m22 skipped[39m[2m)[22m
+
+[2m Test Files [22m [33m1 skipped[39m[90m (1)[39m
+[2m      Tests [22m [33m22 skipped[39m[90m (22)[39m
+[2m   Start at [22m 10:54:09
+[2m   Duration [22m 1.23s[2m (transform 582ms, setup 247ms, import 621ms, tests 0ms, environment 0ms)[22m
+

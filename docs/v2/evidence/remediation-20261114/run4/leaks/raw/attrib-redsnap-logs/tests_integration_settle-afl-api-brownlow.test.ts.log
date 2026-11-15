@@ -1,0 +1,14 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand-red[39m
+
+ [32m✓[39m tests/integration/settle-afl-api-brownlow.test.ts [2m([22m[2m21 tests[22m[2m)[22m[33m 14559[2mms[22m[39m
+     [33m[2m✓[22m[39m resolves and plans vote sets for TWO distinct matches once the match family has staged them (the operator's unknown_match -> voteSetsPlanned/voteSetsWouldAutoApply target), and creates no duplicate canonical match [33m 447[2mms[22m[39m
+       [33m[2m✓[22m[39m heals a vote set a pre-F002 run left stale (A3 B2 C1 + D1 all positive) on its next replay, and (AFLDB-ISSUE-244 I244-F007) heals D's NULL match_id in the SAME replay with no extra vote change, recomputing coverage once as part of the same committed transaction [33m 534[2mms[22m[39m
+       [33m[2m✓[22m[39m AFLDB-ISSUE-244 I244-F007: a two-way permutation (A3 B2 C1 -> A2 B3 C1) succeeds without violating UNIQUE (match_id, votes): A and B are released to 0 first, then claim their final values — and neither temporary release is counted as a stale demotion [33m 533[2mms[22m[39m
+     [33m[2m✓[22m[39m cleanup() self-heals a stale player_clubs pointer left by a crashed prior teardown (one that deleted player_match_stats but never reached the recompute/DELETE FROM matches that follows it — the exact partial state a reported failed run left behind). Runs last: it deletes matches p and q outright, which every test above this one depends on existing. [33m 10158[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m21 passed[39m[22m[90m (21)[39m
+[2m   Start at [22m 09:58:36
+[2m   Duration [22m 16.04s[2m (transform 822ms, setup 164ms, import 945ms, tests 14.56s, environment 0ms)[22m
+

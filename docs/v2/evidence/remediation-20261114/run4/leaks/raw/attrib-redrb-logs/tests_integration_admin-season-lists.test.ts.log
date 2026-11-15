@@ -1,0 +1,74 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand-red[39m
+
+ [31m❯[39m tests/integration/admin-season-lists.test.ts [2m([22m[2m42 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 3334[2mms[22m[39m
+     [32m✓[39m has no matches, no club_seasons row and no fixture for the list season[32m 5[2mms[22m[39m
+     [32m✓[39m still offers every current club, because eligibility never reads a fixture[32m 3[2mms[22m[39m
+     [32m✓[39m resolves a HISTORICAL season through the era identities instead[32m 4[2mms[22m[39m
+     [32m✓[39m administers the bound as FIRST_LIST_SEASON .. max(year) + 1[32m 3[2mms[22m[39m
+     [32m✓[39m writes the canonical row, the durable override and the audit row together[32m 81[2mms[22m[39m
+     [32m✓[39m lists a player who has played no games and holds no statistics at all[32m 11[2mms[22m[39m
+     [32m✓[39m refuses a second club for the same player in the same season (I-1)[32m 41[2mms[22m[39m
+     [32m✓[39m refuses re-adding the same player to the same club[32m 37[2mms[22m[39m
+[31m     [31m×[31m refuses every season below FIRST_LIST_SEASON, and writes nothing (D-2, I-4)[39m[32m 73[2mms[22m[39m
+     [32m✓[39m refuses a club that is not eligible in the season[32m 32[2mms[22m[39m
+     [32m✓[39m keys a manual player by their token and an AFL Tables player by their path[32m 42[2mms[22m[39m
+     [32m✓[39m gives two people with the SAME display name two different keys[32m 44[2mms[22m[39m
+     [32m✓[39m refuses a player holding two AFL Tables identities rather than choosing one[32m 27[2mms[22m[39m
+     [32m✓[39m refuses an identity-less player and never mints an identity for them[32m 33[2mms[22m[39m
+     [32m✓[39m deletes the row, tombstones the record, and changes nothing about the player[32m 69[2mms[22m[39m
+     [32m✓[39m refuses a stale compare-and-swap and leaves the row in place[32m 37[2mms[22m[39m
+     [32m✓[39m refuses a membership that no longer exists[32m 23[2mms[22m[39m
+     [32m✓[39m lifts the tombstone when the player is added again — same record, not a second one[32m 40[2mms[22m[39m
+     [32m✓[39m moves the membership atomically, keeping I-1 and pairing the two audits[32m 103[2mms[22m[39m
+     [32m✓[39m refuses a transfer to the club the player is already at[32m 26[2mms[22m[39m
+     [32m✓[39m leaves the original membership intact when the transfer fails mid-flight[32m 42[2mms[22m[39m
+     [32m✓[39m rolls the whole add back when the audit INSERT fails[32m 43[2mms[22m[39m
+     [32m✓[39m rolls the whole add back when the override write fails[32m 44[2mms[22m[39m
+     [32m✓[39m rolls a multi-select add back entirely when one player of it refuses[32m 40[2mms[22m[39m
+     [32m✓[39m offers who PLAYED last season, and writes absolutely nothing by itself[32m 5[2mms[22m[39m
+     [32m✓[39m excludes anyone already listed in the target season[32m 2[2mms[22m[39m
+     [32m✓[39m records candidate_source as evidence when a human explicitly picks one[32m 87[2mms[22m[39m
+     [32m✓[39m refuses to copy into the first authoritative season, and says what to do instead[32m 20[2mms[22m[39m
+     [32m✓[39m previews without writing, then copies with copied_list provenance[32m 89[2mms[22m[39m
+     [32m✓[39m refuses when a target club already holds rows, naming it, before any write[32m 31[2mms[22m[39m
+     [32m✓[39m refuses a requested club that is not eligible in the target season[32m 25[2mms[22m[39m
+     [32m✓[39m keeps I-1 across the copy: nobody gained two list places[32m 2[2mms[22m[39m
+     [32m✓[39m reads the current list season from the data, never from a clock[32m 2[2mms[22m[39m
+     [32m✓[39m reports per-club completeness so "no membership" is never read as "retired"[32m 5[2mms[22m[39m
+     [32m✓[39m reports no played-not-listed diagnostics for a season with no matches[32m 3[2mms[22m[39m
+     [33m[2m✓[22m[39m re-creates every membership a rebuild removed, with the same keys [33m 336[2mms[22m[39m
+     [33m[2m✓[22m[39m is idempotent: a second replay changes nothing [33m 333[2mms[22m[39m
+     [33m[2m✓[22m[39m will not resurrect a tombstoned membership, whoever planted the row [33m 345[2mms[22m[39m
+     [33m[2m✓[22m[39m fails the WHOLE batch closed on an unresolvable record, writing nothing [33m 325[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses an unresolvable TOMBSTONE just as hard as a membership [33m 317[2mms[22m[39m
+     [32m✓[39m refuses a sealed-season add that carries only a long entry note, and writes nothing[32m 174[2mms[22m[39m
+     [32m✓[39m accepts a sealed-season add with a valid correction note and keeps the two notes apart[32m 79[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m tests/integration/admin-season-lists.test.ts[2m > [22madd (§12.1)[2m > [22mrefuses every season below FIRST_LIST_SEASON, and writes nothing (D-2, I-4)
+[31m[1mAssertionError[22m: 2027: expected true to be false // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- false[39m
+[31m+ true[39m
+
+[36m [2m❯[22m tests/integration/admin-season-lists.test.ts:[2m453:41[22m[39m
+    [90m451|[39m         season, clubSlug: clubA.slug, playerId: manualPlayerId, adminU…
+    [90m452|[39m       })[33m;[39m
+    [90m453|[39m       [34mexpect[39m(result[33m.[39mok[33m,[39m [33mString[39m(season))[33m.[39m[34mtoBe[39m([35mfalse[39m)[33m;[39m
+    [90m   |[39m                                         [31m^[39m
+    [90m454|[39m       [35mif[39m ([33m![39mresult[33m.[39mok) [34mexpect[39m(result[33m.[39mreason)[33m.[39m[34mtoBe[39m([32m'validation'[39m)[33m;[39m
+    [90m455|[39m       [35mconst[39m [row] [33m=[39m [35mawait[39m sql[33m<[39m{ n[33m:[39m number }[][33m>[39m[32m`
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m41 passed[39m[22m[90m (42)[39m
+[2m   Start at [22m 11:29:47
+[2m   Duration [22m 4.69s[2m (transform 469ms, setup 243ms, import 735ms, tests 3.33s, environment 0ms)[22m
+

@@ -1,0 +1,3 @@
+tests/integration/dob-enrichment-issues.test.ts rc=0 residue-tables=0
+tests/integration/sealed-editor-guard.test.ts rc=0 residue-tables=3
+tests/integration/match-admin-delete.test.ts rc=0 residue-tables=3

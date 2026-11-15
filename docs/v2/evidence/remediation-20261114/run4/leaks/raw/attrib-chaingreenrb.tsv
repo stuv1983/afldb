@@ -1,0 +1,14 @@
+tests/integration/match-results-promotion.test.ts	0	-	0	0	0	0
+tests/integration/draftguru-import.test.ts	0	public.draft_picks	6810	6810	0	1
+tests/integration/dob-enrichment-issues.test.ts	0	-	0	0	0	0
+tests/integration/admin-season-lists.test.ts	1	public.auth_users	0	1	1	1
+tests/integration/admin-season-lists.test.ts	1	public.data_overrides	0	1	1	1
+tests/integration/submission-promotion.test.ts	0	-	0	0	0	0
+tests/integration/settle-afl-api-state-b.test.ts	0	-	0	0	0	0
+tests/integration/sealed-editor-guard.test.ts	0	public.club_seasons	1640	1640	0	32
+tests/integration/sealed-editor-guard.test.ts	0	public.player_season_stats	58845	58845	0	1207
+tests/integration/sealed-editor-guard.test.ts	0	public.seasons	131	131	0	2
+tests/integration/match-admin-delete.test.ts	0	public.seasons	131	131	0	1
+tests/integration/special-records-lifecycle.test.ts	0	-	0	0	0	0
+tests/integration/afl-api-c7-observation.test.ts	0	-	0	0	0	0
+tests/integration/join-request-approval.test.ts	0	-	0	0	0	0

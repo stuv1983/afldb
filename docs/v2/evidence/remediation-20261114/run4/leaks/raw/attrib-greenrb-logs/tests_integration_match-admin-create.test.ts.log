@@ -1,0 +1,11 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand[39m
+
+ [32m✓[39m tests/integration/match-admin-create.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 1580[2mms[22m[39m
+     [33m[2m✓[22m[39m J. an admin-created match receives manual_admin_edit creation provenance, with a distinct token per match [33m 307[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m10 passed[39m[22m[90m (10)[39m
+[2m   Start at [22m 12:07:48
+[2m   Duration [22m 2.95s[2m (transform 714ms, setup 240ms, import 771ms, tests 1.58s, environment 0ms)[22m
+

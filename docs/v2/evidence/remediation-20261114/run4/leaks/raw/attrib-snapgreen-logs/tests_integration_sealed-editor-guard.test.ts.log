@@ -1,0 +1,42 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand[39m
+
+ [31m❯[39m tests/integration/sealed-editor-guard.test.ts [2m([22m[2m21 tests[22m[2m)[22m[33m 3107[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses a missing, blank, short and excessive note, and leaves no match and no audit row [33m 330[2mms[22m[39m
+     [32m✓[39m accepts a valid correction note and binds actor, trimmed note and the edit to the audit row[32m 87[2mms[22m[39m
+     [32m✓[39m leaves the open season unchanged: no note, a short note, and the unchanged audit note[32m 139[2mms[22m[39m
+     [32m✓[39m refuses missing, short and excessive notes and leaves the canonical row and the audit untouched[32m 177[2mms[22m[39m
+     [32m✓[39m accepts the 20 and 2000 character boundaries and records the trimmed note[32m 65[2mms[22m[39m
+     [32m✓[39m leaves an open-season save unchanged: no note required[32m 31[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses without a reason, leaving the match and the audit; deletes with a reason and audits it [33m 385[2mms[22m[39m
+     [32m✓[39m rolls the earlier canonical write and the audit row back when it refuses[32m 23[2mms[22m[39m
+     [32m✓[39m returns a receipt whose evidence reference is the real data_edits row, with the workflow derived[32m 6[2mms[22m[39m
+     [32m✓[39m guards both the old and the new season when an edit moves a record[32m 80[2mms[22m[39m
+     [32m✓[39m fails closed on an unknown season and on a row that does not exist[32m 6[2mms[22m[39m
+     [32m✓[39m derives brownlow_authority for the Brownlow audit tables, and reads the season from the authority row id[32m 5[2mms[22m[39m
+     [32m✓[39m refuses every season-scoped write, open or sealed, when the season registry cannot be read[32m 12[2mms[22m[39m
+     [32m✓[39m coach assignment (match_coaches / matches)[32m 122[2mms[22m[39m
+     [32m✓[39m award winner (award_winners)[32m 102[2mms[22m[39m
+     [32m✓[39m draft selection (draft_picks)[32m 123[2mms[22m[39m
+     [32m✓[39m has the crafted fixture note at exactly 2001 characters, one over the limit[32m 1[2mms[22m[39m
+     [32m✓[39m coach assignment action on a sealed match: refused, canonical rows, overrides and audit unchanged[32m 50[2mms[22m[39m
+     [32m✓[39m award winner action on a sealed season: refused, nothing written[32m 51[2mms[22m[39m
+     [32m✓[39m draft selection action on a sealed year: refused, nothing written[32m 60[2mms[22m[39m
+     [32m✓[39m leaves an OPEN season unchanged: the same 2001-character note is accepted and stored cut to 2000[32m 147[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Suites 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m tests/integration/sealed-editor-guard.test.ts[2m [ tests/integration/sealed-editor-guard.test.ts ][22m
+[31m[1mPostgresError[22m: cannot call jsonb_populate_recordset on a non-array[39m
+[90m [2m❯[22m ErrorResponse node_modules/postgres/src/connection.js:[2m815:30[22m[39m
+[90m [2m❯[22m handle node_modules/postgres/src/connection.js:[2m489:6[22m[39m
+[90m [2m❯[22m Socket.data node_modules/postgres/src/connection.js:[2m324:9[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m21 passed[39m[22m[90m (21)[39m
+[2m   Start at [22m 09:41:34
+[2m   Duration [22m 5.71s[2m (transform 1.66s, setup 174ms, import 2.04s, tests 3.11s, environment 0ms)[22m
+

@@ -1,0 +1,16 @@
+tests/integration/match-results-promotion.test.ts	0	-	0	0	0	0
+tests/integration/draftguru-import.test.ts	0	public.draft_picks	6818	6818	0	1
+tests/integration/dob-enrichment-issues.test.ts	1	public.import_batches	75	109	34	34
+tests/integration/dob-enrichment-issues.test.ts	1	public.import_rejections	681	684	3	3
+tests/integration/dob-enrichment-issues.test.ts	1	public.sources	14	15	1	1
+tests/integration/submission-promotion.test.ts	0	-	0	0	0	0
+tests/integration/sealed-editor-guard.test.ts	1	public.club_seasons	1640	1640	0	32
+tests/integration/sealed-editor-guard.test.ts	1	public.data_edits	168	192	24	24
+tests/integration/sealed-editor-guard.test.ts	1	public.data_overrides	165	167	2	2
+tests/integration/sealed-editor-guard.test.ts	1	public.player_season_stats	58845	58845	0	1207
+tests/integration/sealed-editor-guard.test.ts	1	public.seasons	130	130	0	2
+tests/integration/match-admin-delete.test.ts	1	public.club_seasons	1640	1640	0	18
+tests/integration/match-admin-delete.test.ts	1	public.data_edits	192	194	2	2
+tests/integration/match-admin-delete.test.ts	1	public.player_season_stats	58845	58845	0	669
+tests/integration/match-admin-delete.test.ts	1	public.seasons	130	130	0	1
+tests/integration/join-request-approval.test.ts	0	-	0	0	0	0

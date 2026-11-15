@@ -1,0 +1,15 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand[39m
+
+ [32m✓[39m tests/integration/after-siren.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 4334[2mms[22m[39m
+     [33m[2m✓[22m[39m leaves the lifecycle columns alone on an ordinary reload (Layer 1) [33m 622[2mms[22m[39m
+     [33m[2m✓[22m[39m re-asserts a lifecycle decision the canonical row lost (Layer 2) [33m 616[2mms[22m[39m
+     [33m[2m✓[22m[39m re-creates a manual record row, and the stale-row DELETE leaves it alone [33m 1247[2mms[22m[39m
+     [33m[2m✓[22m[39m WARNS AND RETAINS a lifecycle override whose row is absent, and proceeds [33m 616[2mms[22m[39m
+     [33m[2m✓[22m[39m REFUSES to delete a stale row carrying an active override, and writes nothing [33m 559[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m10 passed[39m[22m[90m (10)[39m
+[2m   Start at [22m 11:01:08
+[2m   Duration [22m 5.51s[2m (transform 317ms, setup 243ms, import 571ms, tests 4.33s, environment 0ms)[22m
+

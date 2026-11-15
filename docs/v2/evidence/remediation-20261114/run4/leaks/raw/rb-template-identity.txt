@@ -1,0 +1,7 @@
+identity of the restored accepted rebuild (aggregates only):
+ledger_max=118_fixtures_unconfirmed_participants.sql ledger_count=118
+matches=17056 seasons=1897..2026 players=13365 fixtures=0
+season2026=complete
+seasons_in_progress=2027
+player_match_stats_authority_rows=0
+draft_picks=6810 draft_persons=5057

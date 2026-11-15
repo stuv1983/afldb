@@ -1,0 +1,26 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand[39m
+
+ [32m✓[39m tests/integration/match-results-promotion.test.ts [2m([22m[2m46 tests[22m[2m)[22m[33m 44836[2mms[22m[39m
+     [33m[2m✓[22m[39m match_results: a silent column and a blank cell keep goals, behinds and attendance together [33m 376[2mms[22m[39m
+     [33m[2m✓[22m[39m AFLDB-ISSUE-307: the promotion batch counts a new match as inserted and a re-promoted one as updated [33m 391[2mms[22m[39m
+       [33m[2m✓[22m[39m a mixed file (valid rows around a blank one) refuses whole: the valid figures are not applied either [33m 313[2mms[22m[39m
+       [33m[2m✓[22m[39m the existing nonblank spellings still validate and promote to the figure Number() reads [33m 388[2mms[22m[39m
+       [33m[2m✓[22m[39m refuses a differing protected value at validation, and admits identical or silent ones [33m 328[2mms[22m[39m
+         [33m[2m✓[22m[39m characterises the cycle the shared lock order removes: an unordered match_results writer against the stats hook [33m 1050[2mms[22m[39m
+         [33m[2m✓[22m[39m FOR SHARE blocks no reader; another promotion is refused at the gate meanwhile, and a retry succeeds [33m 5154[2mms[22m[39m
+         [33m[2m✓[22m[39m blocks the Match Sheet save and Return to source until the promotion finishes [33m 977[2mms[22m[39m
+         [33m[2m✓[22m[39m blocks any other UPDATE of the match row until the promotion finishes [33m 364[2mms[22m[39m
+         [33m[2m✓[22m[39m blocks a rekey (carry plus key change) until the promotion finishes, then it carries the authority [33m 388[2mms[22m[39m
+         [33m[2m✓[22m[39m blocks deleteMatch until the promotion finishes [33m 472[2mms[22m[39m
+         [33m[2m✓[22m[39m bounds the wait at 5s with the retryable refusal, writes nothing, and a retry succeeds [33m 5269[2mms[22m[39m
+         [33m[2m✓[22m[39m keeps the timeout transaction-local: restored after the hook, absent on the connection afterwards [33m 5056[2mms[22m[39m
+           [33m[2m✓[22m[39m match_results: an ungated deadlock aborts exactly one participant; a refused promotion is atomic and retryable [33m 1142[2mms[22m[39m
+           [33m[2m✓[22m[39m player_match_stats: an ungated deadlock aborts exactly one participant; a refused promotion is atomic and retryable [33m 1164[2mms[22m[39m
+           [33m[2m✓[22m[39m an UNGATED cycle aborts exactly one participant atomically, whichever victim PostgreSQL selects [33m 1221[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m46 passed[39m[22m[90m (46)[39m
+[2m   Start at [22m 11:51:06
+[2m   Duration [22m 46.36s[2m (transform 823ms, setup 245ms, import 912ms, tests 44.84s, environment 0ms)[22m
+

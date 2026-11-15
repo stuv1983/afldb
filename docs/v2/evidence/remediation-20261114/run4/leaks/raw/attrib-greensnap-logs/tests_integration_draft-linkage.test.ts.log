@@ -1,0 +1,372 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand[39m
+
+[90mstdout[2m | tests/integration/draft-linkage.test.ts[2m > [22m[2mDraftGuru bridge on afldb_test — §6.1 reconciliation (read-only)[2m > [22m[2mpersons partition exactly as the child + ledger predict
+[22m[39m[draft-linkage] persons by status|method: [["resolved|draftguru_explicit_admin_decision",5],["unique|draftguru_person_page_afltables_bridge",3559],["unmatched|draftguru_explicit_admin_decision",1],["unmatched|",1492]]
+
+[90mstdout[2m | tests/integration/draft-linkage.test.ts[2m > [22m[2mDraftGuru bridge on afldb_test — §6.1 reconciliation (read-only)[2m > [22m[2mevery pick inherits its person and the pick population is the manifest's
+[22m[39m[draft-linkage] picks 6810, linked 5213 (bridge 5208, human 5), capability 76.55%
+
+[90mstdout[2m | tests/integration/draft-linkage.test.ts[2m > [22m[2mDraftGuru bridge on afldb_test — §6.1 reconciliation (read-only)[2m > [22m[2m§6.1 pick level: bridge/human/unlinked per (year, kind) sums to the cell and is printed
+[22m[39m[draft-linkage] cells: 208; 1981/national 16/24, 1982/national 17/24, 1986/national 28/65, 1986/pre_draft 4/6, 1987/national 28/65, 1988/national 61/112, 1988/pre_draft 5/5, 1988/preseason 33/55, 1988/trade 8/10, 1989/midseason 18/44, 1989/national 58/119, 1989/pre_draft 10/12, 1989/preseason 37/55, 1989/trade 7/8, 1990/midseason 11/38, 1990/national 39/94, 1990/pre_draft 58/65, 1990/preseason 32/52, 1990/trade 25/26, 1991/midseason 24/47, 1991/national 42/85, 1991/pre_draft 1/2, 1991/preseason 34/48, 1991/trade 42/46, 1992/midseason 21/31, 1992/national 65/118, 1992/pre_draft 9/10, 1992/preseason 52/75, 1992/trade 28/28, 1993/national 49/65, 1993/pre_draft 6/6, 1993/preseason 34/38, 1993/trade 22/23, 1994/national 66/89, 1994/pre_draft 56/64, 1994/preseason 32/35, 1994/trade 32/34, 1995/national 58/76, 1995/pre_draft 25/27, 1995/preseason 17/22, 1995/trade 40/41, 1996/national 69/87, 1996/pre_draft 39/44, 1996/preseason 19/20, 1996/rookie 22/42, 1996/trade 38/42, 1997/national 69/83, 1997/preseason 8/9, 1997/rookie 23/51, 1997/trade 37/37, 1998/national 72/83, 1998/preseason 13/14, 1998/rookie 18/42, 1998/trade 26/26, 1999/national 73/87, 1999/preseason 15/15, 1999/rookie 25/55, 1999/trade 27/27, 2000/national 66/72, 2000/preseason 11/11, 2000/rookie 29/54, 2000/trade 33/33, 2001/national 58/68, 2001/preseason 5/5, 2001/rookie 27/54, 2001/trade 29/29, 2002/national 60/67, 2002/preseason 4/4, 2002/rookie 28/50, 2002/trade 24/25, 2003/national 58/68, 2003/preseason 10/11, 2003/rookie 20/46, 2003/trade 24/25, 2004/national 60/69, 2004/post_draft 1/1, 2004/preseason 7/7, 2004/rookie 24/47, 2004/trade 17/17, 2005/national 58/66, 2005/preseason 10/10, 2005/rookie 29/49, 2005/trade 13/13, 2006/national 73/79, 2006/preseason 8/8, 2006/rookie 29/50, 2006/trade 9/9, 2007/national 59/67, 2007/preseason 8/8, 2007/rookie 29/54, 2007/trade 20/20, 2008/national 70/79, 2008/preseason 6/6, 2008/rookie 31/62, 2008/trade 6/6, 2009/national 65/74, 2009/pre_draft 20/25, 2009/preseason 7/7, 2009/rookie 41/64, 2009/trade 23/23, 2010/national 71/79, 2010/pre_draft 30/33, 2010/preseason 6/6, 2010/rookie 30/60, 2010/trade 21/21, 2010/training_squad_selection 1/1, 2011/mini_draft 2/2, 2011/national 65/74, 2011/pre_draft 8/9, 2011/preseason 5/5, 2011/rookie 44/69, 2011/trade 28/28, 2012/free_agency 14/14, 2012/mini_draft 2/2, 2012/national 64/69, 2012/pre_draft 0/2, 2012/preseason 5/5, 2012/rookie 28/39, 2012/trade 29/29, 2013/free_agency 15/15, 2013/national 57/62, 2013/preseason 1/1, 2013/rookie 26/47, 2013/trade 28/28, 2014/free_agency 12/12, 2014/national 64/76, 2014/preseason 1/1, 2014/rookie 32/52, 2014/trade 24/24, 2015/free_agency 8/8, 2015/national 64/70, 2015/post_draft 10/10, 2015/rookie 31/48, 2015/trade 39/40, 2016/free_agency 7/7, 2016/national 69/77, 2016/post_draft 4/9, 2016/pre_draft 7/8, 2016/rookie 29/38, 2016/trade 33/34, 2017/free_agency 8/8, 2017/national 72/78, 2017/post_draft 6/7, 2017/pre_draft 1/5, 2017/preseason 1/1, 2017/rookie 18/26, 2017/trade 24/25, 2018/free_agency 10/10, 2018/midseason 8/13, 2018/national 61/78, 2018/post_draft 18/21, 2018/pre_draft 12/19, 2018/rookie 16/22, 2018/trade 39/39, 2019/free_agency 10/10, 2019/national 60/65, 2019/post_draft 9/17, 2019/pre_draft 0/4, 2019/preseason 2/2, 2019/rookie 8/17, 2019/trade 27/27, 2020/free_agency 9/9, 2020/midseason 16/22, 2020/national 53/59, 2020/post_draft 15/18, 2020/pre_draft 1/4, 2020/preseason 1/1, 2020/rookie 10/15, 2020/trade 26/26, 2021/free_agency 10/10, 2021/midseason 13/17, 2021/national 58/65, 2021/post_draft 12/17, 2021/pre_draft 1/2, 2021/preseason 1/1, 2021/rookie 12/13, 2021/trade 15/15, 2022/free_agency 7/7, 2022/midseason 9/13, 2022/national 46/59, 2022/post_draft 21/30, 2022/pre_draft 2/4, 2022/rookie 7/15, 2022/trade 31/31, 2023/free_agency 11/11, 2023/midseason 15/19, 2023/national 56/64, 2023/post_draft 10/14, 2023/pre_draft 2/5, 2023/preseason 1/1, 2023/rookie 8/11, 2023/trade 27/27, 2024/free_agency 10/10, 2024/midseason 17/18, 2024/national 52/71, 2024/post_draft 18/20, 2024/pre_draft 1/8, 2024/preseason 1/1, 2024/rookie 4/11, 2024/trade 21/21, 2025/free_agency 7/7, 2025/midseason 14/18, 2025/national 36/58, 2025/post_draft 18/24, 2025/pre_draft 0/1, 2025/preseason 1/1, 2025/rookie 4/6, 2025/trade 27/27
+
+[90mstdout[2m | tests/integration/draft-linkage.test.ts[2m > [22m[2mDraftGuru bridge on afldb_test — §6.4 negative controls (read-only)[2m > [22m[2mevery admitted child bridge: the exact target is registered once, resolves to the stored player, and the person stores the bridge state (or the agreeing human state)
+[22m[39m[draft-linkage] decided persons inside bridges[]: 3 (ledger 3); players with more than one AFL Tables path: [{"player_id":2604,"paths":["players/C/Charlie_Cameron.html","players/C/Charlie_Cameron3.html"],"urls":["https://www.draftguru.com.au/players/charlie_cameron/4"],"target":"players/C/Charlie_Cameron3.html","explained":true,"rule_ids":["2025-charlie-cameron-renumbered-profile"]},{"player_id":6292,"paths":["players/J/Jack_Graham.html","players/J/Jack_Graham2.html"],"urls":["https://www.draftguru.com.au/players/jack_graham/3"],"target":"players/J/Jack_Graham2.html","explained":true,"rule_ids":["2025-jack-graham-renumbered-profile"]},{"player_id":6519,"paths":["players/J/Jack_Ross.html","players/J/Jack_Ross3.html"],"urls":["https://www.draftguru.com.au/players/jack_ross/3"],"target":"players/J/Jack_Ross3.html","explained":true,"rule_ids":["2025-jack-ross-renumbered-profile"]},{"player_id":6619,"paths":["players/J/Jack_Williams.html","players/J/Jack_Williams3.html"],"urls":["https://www.draftguru.com.au/players/jack_williams/8"],"target":"players/J/Jack_Williams3.html","explained":true,"rule_ids":["2025-jack-williams-renumbered-profile"]}]
+
+[90mstdout[2m | tests/integration/draft-linkage.test.ts[2m > [22m[2mDraftGuru bridge on afldb_test — §6.4 negative controls (read-only)[2m > [22m[2mtrade and free-agency rows carry no pick number; Sam Chapman's outcome is printed, never asserted
+[22m[39m[draft-linkage] Sam Chapman (U5/§3.6): [{"url":"https://www.draftguru.com.au/players/sam_chapman/2","status":"unmatched","method":null,"player_id":null}]
+
+[90mstdout[2m | tests/integration/draft-linkage.test.ts[2m > [22m[2mDraftGuru bridge on afldb_test — §6.4 negative controls (read-only)[2m > [22m[2m§6.2: National Draft picks 1–10 coverage by year is stated for every draft
+[22m[39m[draft-linkage] top-10 national coverage: 1981 7/10, 1982 9/10, 1986 6/10, 1987 8/10, 1988 9/10, 1989 9/10, 1990 9/10, 1991 9/10, 1992 9/10, 1993 10/10, 1994 10/10, 1995 9/10, 1996 10/10, 1997 10/10, 1998 9/10, 1999 10/10, 2000 10/10, 2001 9/10, 2002 10/10, 2003 10/10, 2004 10/10, 2005 10/10, 2006 10/10, 2007 10/10, 2008 10/10, 2009 10/10, 2010 10/10, 2011 10/10, 2012 10/10, 2013 10/10, 2014 10/10, 2015 10/10, 2016 10/10, 2017 10/10, 2018 10/10, 2019 10/10, 2020 10/10, 2021 10/10, 2022 10/10, 2023 10/10, 2024 9/10, 2025 10/10
+
+[90mstdout[2m | tests/integration/draft-linkage.test.ts[2m > [22m[2mGrid Solver draft criteria on the real linked population (read-only, production compiler)[2m > [22m[2mthe six draft builders each answer a non-empty set with sane bounds
+[22m[39m[draft-linkage] national top-10 399, pick 1 42, any-kind top-10 813, rookie 655, traded>=1 871, father-son 97, drafted 2001 90
+
+[90mstdout[2m | tests/integration/draft-linkage.test.ts[2m > [22m[2mGrid Solver draft criteria on the real linked population (read-only, production compiler)[2m > [22m[2mdrafted_by_club answers for the club with the most linked national picks
+[22m[39m[draft-linkage] drafted_by_club(essendon) 260; never played there 21
+
+[90mstdout[2m | tests/integration/draft-linkage.test.ts[2m > [22m[2mGrid Solver draft criteria on the real linked population (read-only, production compiler)[2m > [22m[2mthe ISSUE-221 "No data" square is gone: national top-10 × any career is a populated cell
+[22m[39m[draft-linkage] cell national top-10 x career>=0: eligible 399, emptyAxis null, top {"id":3285,"slug":"danny-roach","displayName":"Danny Roach","debutSeason":2001,"finalSeason":2001,"games":1}
+
+ [31m❯[39m tests/integration/draft-linkage.test.ts [2m([22m[2m11 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[33m 613[2mms[22m[39m
+[31m     [31m×[31m persons partition exactly as the child + ledger predict[39m[32m 61[2mms[22m[39m
+     [32m✓[39m every pick inherits its person and the pick population is the manifest's[32m 33[2mms[22m[39m
+     [32m✓[39m §6.1 pick level: bridge/human/unlinked per (year, kind) sums to the cell and is printed[32m 23[2mms[22m[39m
+     [32m✓[39m every admitted child bridge: the exact target is registered once, resolves to the stored player, and the person stores the bridge state (or the agreeing human state)[32m 148[2mms[22m[39m
+[31m     [31m×[31m withheld persons stay unlinked by the bridge; the rejected identities are reached by nobody[39m[32m 25[2mms[22m[39m
+     [32m✓[39m no two DraftGuru persons share a player; the confirmed-unlinked person stays unmatched[32m 11[2mms[22m[39m
+     [32m✓[39m trade and free-agency rows carry no pick number; Sam Chapman's outcome is printed, never asserted[32m 11[2mms[22m[39m
+     [32m✓[39m §6.2: National Draft picks 1–10 coverage by year is stated for every draft[32m 9[2mms[22m[39m
+     [32m✓[39m the six draft builders each answer a non-empty set with sane bounds[32m 75[2mms[22m[39m
+     [32m✓[39m drafted_by_club answers for the club with the most linked national picks[32m 28[2mms[22m[39m
+     [32m✓[39m the ISSUE-221 "No data" square is gone: national top-10 × any career is a populated cell[32m 181[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 2 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m tests/integration/draft-linkage.test.ts[2m > [22mDraftGuru bridge on afldb_test — §6.1 reconciliation (read-only)[2m > [22mpersons partition exactly as the child + ledger predict
+[31m[1mAssertionError[22m: expected 3559 to be 3465 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 3465[39m
+[31m+ 3559[39m
+
+[36m [2m❯[22m tests/integration/draft-linkage.test.ts:[2m76:52[22m[39m
+    [90m 74|[39m     [34mnote[39m([32m`persons by status|method: [39m[36m${[39m[33mJSON[39m[33m.[39m[34mstringify[39m([[33m...[39mby])[36m}[39m[32m`[39m)[33m;[39m
+    [90m 75|[39m     expect(rows.reduce((a, r) => a + r.n, 0)).toBe(manifest.distinct_p…
+    [90m 76|[39m     expect(by.get(`unique|${BRIDGE_METHOD}`) ?? 0).toBe(expectedBridge…
+    [90m   |[39m                                                    [31m^[39m
+    [90m 77|[39m     expect(by.get(`resolved|${LEDGER_METHOD}`) ?? 0).toBe(expectedLedg…
+    [90m 78|[39m     expect(by.get(`unmatched|${LEDGER_METHOD}`) ?? 0).toBe(expectedLed…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/integration/draft-linkage.test.ts[2m > [22mDraftGuru bridge on afldb_test — §6.4 negative controls (read-only)[2m > [22mwithheld persons stay unlinked by the bridge; the rejected identities are reached by nobody
+[31m[1mAssertionError[22m: expected [ …(94) ] to deeply equal [][39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- [][39m
+[31m+ [[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/aidan_schubert/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/alex_van%20wyk/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/angus_anderson/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/archie_ludowyke/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/balyn_o'brien/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/beau_addinsall/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/billy_cootee/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/bodie_ryan/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/caleb_lewis/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/cam_nairn/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/campbell_lake/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/charlie_banfield/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/charlie_edwards/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/chris_scerri/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/cody_curtin/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/cooper_duff-tytler/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/daniel_annable/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/dean_laidley/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/dylan_patterson/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/dyson_sharp/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/flynn_riley/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/harry_dean/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/harry_kyle/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/harry_oliver/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/hugo_hall-kahan/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/hussien_el%20achkar/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/jack_dalton/2",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/jack_ison/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/jack_ough/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/jack_watkins/2",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/jacob_farrow/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/jagga_smith/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/jai_murray/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/jaxon_artemis/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/jay_polkinghorne/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/joel_fitzgerald/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/josh_lai/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/josh_lindsay/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/kye_annand/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/lachie_jaques/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/lachlan_carmichael/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/lachlan_smith/4",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/lachy_dovaston/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/latrelle_pickett/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/liam_puncher/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/louis_emmett/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/lukas_cooke/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/luke_kennedy/2",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/luker_kentfield/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/marcus_herbert/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/matt_hill/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/matthew_capuano/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/max_beattie/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/max_kondogiannis/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/michael_sellwood/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/milan_murdock/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/mitch_edwards/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/mitch_podhajski/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/mitch_zadow/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/noah_howes/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/noah_mraz/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/noah_roberts-thomson/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/oliver_francou/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/oliver_hayes-brown/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/ollie_greeves/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/ollie_hannaford/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/oscar_ryan/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/oscar_steene/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/paddy_cross/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/patrick_retschko/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/phoenix_gothard/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/riley_hamilton/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/sam_cumming/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/sam_grlj/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/sam_swadling/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/sullivan_robey/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/talor_byrne/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/taylor_goad/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/toby_murray/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/tobyn_murray/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/tom_anastasopoulos/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/tom_blamires/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/tom_burton/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/wade_derksen/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/will_edwards/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/will_green/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/will_lewis/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/will_mccabe/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/willem_duursma/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/xavier_bamert/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/xavier_taylor/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/zane_peucker/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/zane_zakostelsky/1",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "url": "https://www.draftguru.com.au/players/zeke_uwland/1",[39m
+[31m+   },[39m
+[31m+ ][39m
+
+[36m [2m❯[22m tests/integration/draft-linkage.test.ts:[2m158:28[22m[39m
+    [90m156|[39m       SELECT dp.player_url AS url FROM draft_persons dp JOIN sources s…
+    [90m157|[39m        WHERE s.key = 'draftguru' AND dp.match_method = ${BRIDGE_METHOD…
+    [90m158|[39m     [34mexpect[39m(linkedWithheld)[33m.[39m[34mtoEqual[39m([])[33m;[39m
+    [90m   |[39m                            [31m^[39m
+    [90m159|[39m     [35mconst[39m reached [33m=[39m [35mawait[39m sql[33m<[39m{ url[33m:[39m string[33m;[39m path[33m:[39m string }[][33m>[39m[32m`
+    [90m160|[39m       SELECT dp.player_url AS url, e.external_id AS path
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m9 passed[39m[22m[90m (11)[39m
+[2m   Start at [22m 11:01:01
+[2m   Duration [22m 1.62s[2m (transform 392ms, setup 192ms, import 430ms, tests 613ms, environment 0ms)[22m
+

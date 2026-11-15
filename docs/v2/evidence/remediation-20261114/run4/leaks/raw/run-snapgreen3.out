@@ -1,0 +1,6 @@
+2026-11-14T22:43:44Z attrib snapgreen3: HEAD=7cfbe186e70ca91db67da1aa4e28325ccbc32a86 porcelain=7 template=afldb_v2_rem4leaks_snap_tmpl_test
+create-db: afldb_v2_rem4leaks_snapgreen3_test created from afldb_v2_rem4leaks_snap_tmpl_test and marked
+2026-11-14T22:43:48Z attrib snapgreen3: 105 tables in the count set
+tests/integration/sealed-editor-guard.test.ts rc=0 residue-tables=3
+tests/integration/match-admin-delete.test.ts rc=0 residue-tables=3
+2026-11-14T22:44:08Z attrib snapgreen3: done (6 lines)

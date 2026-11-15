@@ -1,0 +1,14 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand-red[39m
+
+ [32m✓[39m tests/integration/player-matching.test.ts [2m([22m[2m23 tests[22m[2m)[22m[33m 2933[2mms[22m[39m
+     [33m[2m✓[22m[39m recalls the true player for confirmed links [33m 608[2mms[22m[39m
+     [33m[2m✓[22m[39m carries the lineage on every source row and candidate club [33m 339[2mms[22m[39m
+     [33m[2m✓[22m[39m raises no contradiction from a club-text source, resolved or not [33m 560[2mms[22m[39m
+     [33m[2m✓[22m[39m raises no contradiction against links AFLDB already confirmed [33m 528[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m23 passed[39m[22m[90m (23)[39m
+[2m   Start at [22m 10:17:48
+[2m   Duration [22m 3.78s[2m (transform 298ms, setup 179ms, import 298ms, tests 2.93s, environment 0ms)[22m
+

@@ -1,0 +1,18 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand-red[39m
+
+ [32m✓[39m tests/integration/admin-fixtures.test.ts [2m([22m[2m45 tests[22m[2m)[22m[33m 7975[2mms[22m[39m
+     [33m[2m✓[22m[39m reinstates a cancelled fixture whose game was later played, and keeps every other lock (D-289-1) [33m 351[2mms[22m[39m
+     [33m[2m✓[22m[39m locks a played fixture to notes-only edits [33m 305[2mms[22m[39m
+     [33m[2m✓[22m[39m moves no played-match fact and no derived statistic [33m 369[2mms[22m[39m
+     [33m[2m✓[22m[39m re-creates a scheduled, a cancelled and a void fixture identically [33m 886[2mms[22m[39m
+     [33m[2m✓[22m[39m re-applies an edit made while the canonical row was absent [33m 411[2mms[22m[39m
+     [33m[2m✓[22m[39m degrades an unresolvable VENUE and reports it, rather than stopping [33m 380[2mms[22m[39m
+     [33m[2m✓[22m[39m FAILS CLOSED on an unresolvable club, and writes nothing at all [33m 411[2mms[22m[39m
+     [33m[2m✓[22m[39m FAILS CLOSED on an invalid status and on a broken round [33m 1090[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m45 passed[39m[22m[90m (45)[39m
+[2m   Start at [22m 11:22:18
+[2m   Duration [22m 9.32s[2m (transform 452ms, setup 243ms, import 732ms, tests 7.97s, environment 0ms)[22m
+

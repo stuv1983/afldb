@@ -1,0 +1,48 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand-red[39m
+
+ [31m❯[39m tests/integration/special-records-public-suppression.test.ts [2m([22m[2m23 tests[22m[2m | [22m[33m23 skipped[39m[2m)[22m[32m 92[2mms[22m[39m
+     [2m[90m↓[39m[22m drops a voided row from the list, and changes nothing else in it
+     [2m[90m↓[39m[22m drops a voided row from every count in the summary
+     [2m[90m↓[39m[22m moves the earliest highlight off a voided row
+     [2m[90m↓[39m[22m drops a voided row from the club and decade breakdowns
+     [2m[90m↓[39m[22m lists a club as having none once its only row is voided
+     [2m[90m↓[39m[22m reads the provenance instant from active rows only
+     [2m[90m↓[39m[22m drops a voided achievement from getPlayerHonours
+     [2m[90m↓[39m[22m drops a player whose only attempt was voided
+     [2m[90m↓[39m[22m drops a voided event from getPlayerAfterSirenEvents
+     [2m[90m↓[39m[22m stops satisfying a first-kick clue once the row is voided
+     [2m[90m↓[39m[22m stops satisfying the after-siren winner clue once the kick is voided
+     [2m[90m↓[39m[22m empties a club-scoped first-kick cell when that club’s only row is voided
+     [2m[90m↓[39m[22m drops a voided row from the total and from every grouping
+     [2m[90m↓[39m[22m reports a club as never having had one once its only row is voided
+     [2m[90m↓[39m[22m drops a voided kick from the event list and the count
+     [2m[90m↓[39m[22m never counts a voided kick among the ownership exclusions
+     [2m[90m↓[39m[22m drops a voided achievement from the unresolved queue
+     [2m[90m↓[39m[22m drops a voided achievement from the candidate evidence set
+     [2m[90m↓[39m[22m leaves every other target table untouched by the achievement filter
+     [2m[90m↓[39m[22m does not add after_siren_kicks to the link targets (D-2)
+     [2m[90m↓[39m[22m keeps a voided first-kick row in the list and the detail read
+     [2m[90m↓[39m[22m keeps a voided after-siren row in the list and the detail read
+     [2m[90m↓[39m[22m still filters to void on request, which is the point of the admin surface
+
+[31m⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Suites 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m tests/integration/special-records-public-suppression.test.ts[2m [ tests/integration/special-records-public-suppression.test.ts ][22m
+[31m[1mAssertionError[22m: no fixture found for "unlinked" — this database has not been loaded: expected undefined to be defined[39m
+[36m [2m❯[22m tests/integration/special-records-public-suppression.test.ts:[2m175:89[22m[39m
+    [90m173|[39m     soleInSeason, soleForOrg, earliest, unlinked, soleWinner, soleAtte…
+    [90m174|[39m   })) {
+    [90m175|[39m     expect(value, `no fixture found for "${name}" — this database has …
+    [90m   |[39m                                                                                         [31m^[39m
+    [90m176|[39m   }
+    [90m177|[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [33m23 skipped[39m[90m (23)[39m
+[2m   Start at [22m 11:33:50
+[2m   Duration [22m 1.59s[2m (transform 764ms, setup 173ms, import 947ms, tests 92ms, environment 0ms)[22m
+

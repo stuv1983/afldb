@@ -1,0 +1,14 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand-red[39m
+
+ [32m✓[39m tests/integration/nl-answers.test.ts [2m([22m[2m33 tests[22m[2m)[22m[33m 7168[2mms[22m[39m
+     [33m[2m✓[22m[39m "most all-australian selections without a premiership" matches a hand-written award_winners count [33m 1865[2mms[22m[39m
+     [33m[2m✓[22m[39m renders club appearances under the Games column, not the whole-career total [33m 1123[2mms[22m[39m
+     [33m[2m✓[22m[39m keeps the club filter in the SQL when a career predicate is present [33m 1327[2mms[22m[39m
+     [33m[2m✓[22m[39m "most clangers" (a live_only stat) matches a hand-written SUM over player_match_stats [33m 2049[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m33 passed[39m[22m[90m (33)[39m
+[2m   Start at [22m 11:34:28
+[2m   Duration [22m 8.34s[2m (transform 560ms, setup 241ms, import 565ms, tests 7.17s, environment 0ms)[22m
+

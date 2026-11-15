@@ -1,0 +1,2 @@
+tests/integration/sealed-editor-guard.test.ts rc=0 residue-tables=5
+tests/integration/match-admin-delete.test.ts rc=0 residue-tables=4

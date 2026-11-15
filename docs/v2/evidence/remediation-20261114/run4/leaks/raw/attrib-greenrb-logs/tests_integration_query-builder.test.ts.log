@@ -1,0 +1,73 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand[39m
+
+[90mstdout[2m | tests/integration/query-builder.test.ts[2m > [22m[2mquery builder compiler -- cost gate (ISSUE-115 T-C11)[2m > [22m[2mcost: every reachable anchor x relationship pair as a bare related card, EXISTS and NOT EXISTS
+[22m[39m    10.6 ms  total=  13363  players x player.career EXISTS
+     7.8 ms  total=      2  players x player.career NOT EXISTS
+   432.5 ms  total=  13363  players x player.match_stats EXISTS
+    75.6 ms  total=      2  players x player.match_stats NOT EXISTS
+    12.5 ms  total=  13363  players x player.clubs EXISTS
+     9.4 ms  total=      2  players x player.clubs NOT EXISTS
+     2.8 ms  total=      5  players x player.draft_picks EXISTS
+     6.5 ms  total=  13360  players x player.draft_picks NOT EXISTS
+     7.0 ms  total=    240  players x player.hall_of_fame EXISTS
+     7.1 ms  total=  13125  players x player.hall_of_fame NOT EXISTS
+     9.9 ms  total=    591  players x player.captaincies EXISTS
+     8.6 ms  total=  12774  players x player.captaincies NOT EXISTS
+    11.5 ms  total=   1089  players x player.awards EXISTS
+    10.0 ms  total=  12276  players x player.awards NOT EXISTS
+     2.6 ms  total=      0  players x player.link_candidates EXISTS
+     6.0 ms  total=  13365  players x player.link_candidates NOT EXISTS
+   437.8 ms  total=  13363  player_career_stats x player.match_stats EXISTS
+   103.8 ms  total=      0  player_career_stats x player.match_stats NOT EXISTS
+    19.8 ms  total=  13363  player_career_stats x player.clubs EXISTS
+     9.8 ms  total=      0  player_career_stats x player.clubs NOT EXISTS
+     2.6 ms  total=      3  player_career_stats x player.draft_picks EXISTS
+    11.5 ms  total=  13360  player_career_stats x player.draft_picks NOT EXISTS
+     8.2 ms  total=    240  player_career_stats x player.hall_of_fame EXISTS
+    11.9 ms  total=  13123  player_career_stats x player.hall_of_fame NOT EXISTS
+    11.9 ms  total=    591  player_career_stats x player.captaincies EXISTS
+    20.7 ms  total=  12772  player_career_stats x player.captaincies NOT EXISTS
+    11.3 ms  total=   1089  player_career_stats x player.awards EXISTS
+    16.4 ms  total=  12274  player_career_stats x player.awards NOT EXISTS
+     1.8 ms  total=      0  player_career_stats x player.link_candidates EXISTS
+     9.5 ms  total=  13363  player_career_stats x player.link_candidates NOT EXISTS
+     2.3 ms  total=     24  clubs x club.club_seasons EXISTS
+     1.6 ms  total=      0  clubs x club.club_seasons NOT EXISTS
+     4.4 ms  total=     24  clubs x club.matches EXISTS
+     4.1 ms  total=      0  clubs x club.matches NOT EXISTS
+    96.0 ms  total=  17056  matches x match.player_stats EXISTS
+    78.4 ms  total=      0  matches x match.player_stats NOT EXISTS
+    44.4 ms  total=  17056  matches x match.clubs EXISTS
+    34.8 ms  total=      0  matches x match.clubs NOT EXISTS
+
+[90mstdout[2m | tests/integration/query-builder.test.ts[2m > [22m[2mquery builder compiler -- cost gate (ISSUE-115 T-C11)[2m > [22m[2mcost: the player_match_stats-target shapes with a related condition, and the partial-index relationships
+[22m[39m     4.9 ms  total=  13365  players (anchor alone)
+    12.8 ms  total=  17056  matches (anchor alone)
+   176.9 ms  total= 695499  player_match_stats (anchor alone)
+    16.0 ms  total=    318  players x player.match_stats EXISTS goals>=8
+    16.9 ms  total=  13047  players x player.match_stats NOT EXISTS goals>=8
+    16.8 ms  total=    318  player_career_stats x player.match_stats EXISTS goals>=8
+    32.3 ms  total=  13045  player_career_stats x player.match_stats NOT EXISTS goals>=8
+   621.7 ms  total=      0  matches x match.player_stats EXISTS club_is_participant IS FALSE
+   568.1 ms  total=  17056  matches x match.player_stats NOT EXISTS club_is_participant IS FALSE
+    37.8 ms  total=   7437  matches x match.player_stats EXISTS disposals>=30
+    42.6 ms  total=   9619  matches x match.player_stats NOT EXISTS disposals>=30
+     6.0 ms  total=  13365  players x player.draft_picks NOT EXISTS link_status=unique
+    19.5 ms  total=  12797  players x player.captaincies NOT EXISTS link_status=unique
+
+[90mstdout[2m | tests/integration/query-builder.test.ts[2m > [22m[2mquery builder compiler -- cost gate (ISSUE-115 T-C11)[2m > [22m[2mcost: QB_LIMITS.maxRelatedCards concurrent related cards over player_match_stats-target relationships
+[22m[39m   145.0 ms  total=   2462  players x 4 related player.match_stats cards
+   134.2 ms  total=      9  player_career_stats x 2 anchor cards + 4 related player.match_stats cards
+
+ [32m✓[39m tests/integration/query-builder.test.ts [2m([22m[2m27 tests[22m[2m)[22m[33m 6162[2mms[22m[39m
+     [33m[2m✓[22m[39m T-C4: "no such row" compiles as NOT EXISTS and equals an independent absence oracle [33m 548[2mms[22m[39m
+     [33m[2m✓[22m[39m T-C10: the curated club_is_participant predicate under the Matches anchor equals an independent oracle [33m 1656[2mms[22m[39m
+     [33m[2m✓[22m[39m cost: every reachable anchor x relationship pair as a bare related card, EXISTS and NOT EXISTS [33m 1577[2mms[22m[39m
+     [33m[2m✓[22m[39m cost: the player_match_stats-target shapes with a related condition, and the partial-index relationships [33m 1576[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m27 passed[39m[22m[90m (27)[39m
+[2m   Start at [22m 12:06:44
+[2m   Duration [22m 7.17s[2m (transform 397ms, setup 191ms, import 433ms, tests 6.16s, environment 0ms)[22m
+

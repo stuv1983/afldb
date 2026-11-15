@@ -1,0 +1,26 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand-red[39m
+
+ [32m✓[39m tests/integration/database.test.ts [2m([22m[2m69 tests[22m[2m)[22m[33m 16882[2mms[22m[39m
+     [33m[2m✓[22m[39m sort=games asc: pages, totals and club names equal the legacy statement [33m 933[2mms[22m[39m
+     [33m[2m✓[22m[39m sort=games desc: pages, totals and club names equal the legacy statement [33m 909[2mms[22m[39m
+     [33m[2m✓[22m[39m sort=goals asc: pages, totals and club names equal the legacy statement [33m 920[2mms[22m[39m
+     [33m[2m✓[22m[39m sort=goals desc: pages, totals and club names equal the legacy statement [33m 944[2mms[22m[39m
+     [33m[2m✓[22m[39m sort=name asc: pages, totals and club names equal the legacy statement [33m 1180[2mms[22m[39m
+     [33m[2m✓[22m[39m sort=name desc: pages, totals and club names equal the legacy statement [33m 1100[2mms[22m[39m
+     [33m[2m✓[22m[39m sort=debut asc: pages, totals and club names equal the legacy statement [33m 909[2mms[22m[39m
+     [33m[2m✓[22m[39m sort=debut desc: pages, totals and club names equal the legacy statement [33m 909[2mms[22m[39m
+     [33m[2m✓[22m[39m sort=final_game asc: pages, totals and club names equal the legacy statement [33m 918[2mms[22m[39m
+     [33m[2m✓[22m[39m sort=final_game desc: pages, totals and club names equal the legacy statement [33m 923[2mms[22m[39m
+     [33m[2m✓[22m[39m sort=brownlow_votes asc: pages, totals and club names equal the legacy statement [33m 961[2mms[22m[39m
+     [33m[2m✓[22m[39m sort=brownlow_votes desc: pages, totals and club names equal the legacy statement [33m 944[2mms[22m[39m
+     [33m[2m✓[22m[39m sort=finals asc: pages, totals and club names equal the legacy statement [33m 957[2mms[22m[39m
+     [33m[2m✓[22m[39m sort=finals desc: pages, totals and club names equal the legacy statement [33m 942[2mms[22m[39m
+     [33m[2m✓[22m[39m sort=premierships asc: pages, totals and club names equal the legacy statement [33m 1019[2mms[22m[39m
+     [33m[2m✓[22m[39m sort=premierships desc: pages, totals and club names equal the legacy statement [33m 1023[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m69 passed[39m[22m[90m (69)[39m
+[2m   Start at [22m 10:12:20
+[2m   Duration [22m 18.91s[2m (transform 1.21s, setup 160ms, import 1.49s, tests 16.88s, environment 0ms)[22m
+

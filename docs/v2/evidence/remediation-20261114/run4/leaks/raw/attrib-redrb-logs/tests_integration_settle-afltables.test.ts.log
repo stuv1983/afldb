@@ -1,0 +1,25 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand-red[39m
+
+ [32m✓[39m tests/integration/settle-afltables.test.ts [2m([22m[2m85 tests[22m[2m)[22m[33m 42821[2mms[22m[39m
+     [33m[2m✓[22m[39m keeps A -> B -> A as three ordered versions over two payloads [33m 344[2mms[22m[39m
+     [33m[2m✓[22m[39m opens no Brownlow target for an unlinked player with an NA vote (D2) [33m 323[2mms[22m[39m
+       [33m[2m✓[22m[39m names the numerically latest settle batch in the exception report, not the lexicographically latest [33m 513[2mms[22m[39m
+       [33m[2m✓[22m[39m plans, applies and then finds nothing left to do [33m 419[2mms[22m[39m
+       [33m[2m✓[22m[39m refuses rather than guessing when two retired rows could be the fixture [33m 301[2mms[22m[39m
+       [33m[2m✓[22m[39m a corrected field survives the settle, on a retry and when the source moves [33m 328[2mms[22m[39m
+       [33m[2m✓[22m[39m an unchanged re-settle neither churns nor reverts the corrected value [33m 352[2mms[22m[39m
+       [33m[2m✓[22m[39m a durable removal stops the settle reinserting the row [33m 326[2mms[22m[39m
+       [33m[2m✓[22m[39m after Return to source the next settle restores the source value [33m 359[2mms[22m[39m
+       [33m[2m✓[22m[39m F-PR-03: a settle that now carries a manual addition neither adopts nor drops it [33m 412[2mms[22m[39m
+       [33m[2m✓[22m[39m a settle rekey carries the Match Sheet authority to the new match key [33m 381[2mms[22m[39m
+       [33m[2m✓[22m[39m repair-match-rekeys carries the Match Sheet authority to the live match key [33m 461[2mms[22m[39m
+       [33m[2m✓[22m[39m R-01: a Match Sheet save cannot commit inside the settle rekey unit authority window [33m 5550[2mms[22m[39m
+       [33m[2m✓[22m[39m ISSUE-274: a Data Editor score edit committed while a matches-only unit is in flight is not overwritten [33m 312[2mms[22m[39m
+       [33m[2m✓[22m[39m ISSUE-274: a match deleted while a matches-only unit waits for its lock is not counted as updated [33m 325[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m85 passed[39m[22m[90m (85)[39m
+[2m   Start at [22m 11:10:26
+[2m   Duration [22m 45.63s[2m (transform 1.18s, setup 239ms, import 2.20s, tests 42.82s, environment 0ms)[22m
+

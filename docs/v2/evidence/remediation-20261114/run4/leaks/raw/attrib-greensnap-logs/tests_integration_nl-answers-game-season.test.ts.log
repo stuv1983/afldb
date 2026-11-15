@@ -1,0 +1,14 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand[39m
+
+ [32m✓[39m tests/integration/nl-answers-game-season.test.ts [2m([22m[2m24 tests[22m[2m)[22m[33m 4997[2mms[22m[39m
+     [33m[2m✓[22m[39m "most goals in a game" (unscoped) matches a hand-written MAX over player_match_stats [33m 1181[2mms[22m[39m
+     [33m[2m✓[22m[39m "top 5 goals in a game" includes every hand-written top-5, with ties at the cutoff [33m 1142[2mms[22m[39m
+     [33m[2m✓[22m[39m answers the review's exact opponent-scoped wording without discarding the opponent [33m 368[2mms[22m[39m
+     [33m[2m✓[22m[39m a broad live_only season leaderboard pre-aggregates once instead of timing out [33m 701[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m24 passed[39m[22m[90m (24)[39m
+[2m   Start at [22m 10:57:25
+[2m   Duration [22m 6.58s[2m (transform 855ms, setup 158ms, import 1.07s, tests 5.00s, environment 0ms)[22m
+

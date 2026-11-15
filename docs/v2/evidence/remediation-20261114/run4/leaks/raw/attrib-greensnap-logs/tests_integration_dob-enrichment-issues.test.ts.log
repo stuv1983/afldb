@@ -1,0 +1,31 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand[39m
+
+ [32m✓[39m tests/integration/dob-enrichment-issues.test.ts [2m([22m[2m28 tests[22m[2m)[22m[33m 21822[2mms[22m[39m
+       [33m[2m✓[22m[39m tests 1/2: rerunning is idempotent and the issue identity is stable [33m 742[2mms[22m[39m
+       [33m[2m✓[22m[39m test 3: two club files retain distinct assertions for one player [33m 366[2mms[22m[39m
+       [33m[2m✓[22m[39m test 6: an unprocessed file's scope is untouched by a partial run [33m 699[2mms[22m[39m
+       [33m[2m✓[22m[39m test 7: an authoritative agreement removes the assertion [33m 710[2mms[22m[39m
+       [33m[2m✓[22m[39m test 8: a present but unmatchable record is retained, not treated as cessation [33m 749[2mms[22m[39m
+       [33m[2m✓[22m[39m test 9: a record deleted from a processed file is cleaned up [33m 732[2mms[22m[39m
+       [33m[2m✓[22m[39m test 4: an existing register assertion survives a club-list run untouched [33m 352[2mms[22m[39m
+       [33m[2m✓[22m[39m test 5: an existing club-list assertion survives a real register run untouched [33m 409[2mms[22m[39m
+       [33m[2m✓[22m[39m test 24: a fixture-source run cannot touch the real afltables population [33m 441[2mms[22m[39m
+       [33m[2m✓[22m[39m test 25: an empty asserted population is refused unconditionally (§4 check 1) [33m 727[2mms[22m[39m
+       [33m[2m✓[22m[39m test 26: an over-threshold drop is refused, then permitted only with --acknowledge-population-drop (§4 check 2) [33m 776[2mms[22m[39m
+       [33m[2m✓[22m[39m test 27: an equal-or-larger asserted population passes with no false positive (§11.5, recovery direction) [33m 775[2mms[22m[39m
+       [33m[2m✓[22m[39m test 28: an external_identity_conflict is refiled, never duplicated (D4) [33m 1445[2mms[22m[39m
+       [33m[2m✓[22m[39m test 10: an identical legacy-shape (B) resolved assertion is not refiled [33m 356[2mms[22m[39m
+       [33m[2m✓[22m[39m test 11: an identical v2 resolved assertion is not refiled [33m 353[2mms[22m[39m
+       [33m[2m✓[22m[39m test 12: a materially changed assertion (different asserted date) is filed as new [33m 361[2mms[22m[39m
+       [33m[2m✓[22m[39m test 13: a changed baseline (players.dob moved) is filed as new [33m 364[2mms[22m[39m
+       [33m[2m✓[22m[39m test 14: suppression is assertion-specific -- a resolved register conflict does not suppress a new club-list one [33m 365[2mms[22m[39m
+       [33m[2m✓[22m[39m test 19: clears when no unresolved DOB issue remains [33m 698[2mms[22m[39m
+       [33m[2m✓[22m[39m test 20: stays true when another unresolved DOB issue remains [33m 709[2mms[22m[39m
+       [33m[2m✓[22m[39m test 21: becomes true when a new unresolved DOB issue appears [33m 358[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m28 passed[39m[22m[90m (28)[39m
+[2m   Start at [22m 10:53:41
+[2m   Duration [22m 23.01s[2m (transform 326ms, setup 219ms, import 589ms, tests 21.82s, environment 0ms)[22m
+

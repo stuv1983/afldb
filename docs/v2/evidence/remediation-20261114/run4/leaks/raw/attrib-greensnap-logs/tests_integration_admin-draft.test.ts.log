@@ -1,0 +1,16 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand[39m
+
+ [32m✓[39m tests/integration/admin-draft.test.ts [2m([22m[2m53 tests[22m[2m)[22m[33m 6733[2mms[22m[39m
+     [33m[2m✓[22m[39m re-creates the manual player and selection with the same tokens, and no twin [33m 864[2mms[22m[39m
+     [33m[2m✓[22m[39m replays a corrected year and club onto the manual row [33m 455[2mms[22m[39m
+     [33m[2m✓[22m[39m binds the token onto the path-player instead of creating a twin, after a debut [33m 489[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses to commit a replay whose durable record cannot be resolved [33m 311[2mms[22m[39m
+     [33m[2m✓[22m[39m finds a manual player awaiting identity with the REAL candidate query, and refuses [33m 740[2mms[22m[39m
+     [33m[2m✓[22m[39m draft_pick_key names a source row and a manual row, and skips a NULL-source one [33m 561[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m53 passed[39m[22m[90m (53)[39m
+[2m   Start at [22m 10:41:16
+[2m   Duration [22m 8.41s[2m (transform 1.15s, setup 230ms, import 1.08s, tests 6.73s, environment 0ms)[22m
+

@@ -1,0 +1,102 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand-red[39m
+
+[90mstderr[2m | tests/integration/admin-brownlow.test.ts[2m > [22m[2mthe main season, administered in order[2m > [22m[2mrolls the facts back when the required audit row cannot be written
+[22m[39m[admin-brownlow] Brownlow finalise on match #17554 failed: PostgresError: issue155 audit probe
+    at ErrorResponse (file:///mnt/ssd/afldb-rem4-leaks-20261115/cand/node_modules/[4mpostgres[24m/src/connection.js:815:30)
+    at handle (file:///mnt/ssd/afldb-rem4-leaks-20261115/cand/node_modules/[4mpostgres[24m/src/connection.js:489:6)
+    at Socket.data (file:///mnt/ssd/afldb-rem4-leaks-20261115/cand/node_modules/[4mpostgres[24m/src/connection.js:324:9)
+[90m    at Socket.emit (node:events:519:28)[39m
+[90m    at addChunk (node:internal/streams/readable:561:12)[39m
+[90m    at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)[39m
+[90m    at Socket.Readable.push (node:internal/streams/readable:392:5)[39m
+[90m    at TCP.onStreamRead (node:internal/stream_base_commons:189:23)[39m
+    at cachedError (file:///mnt/ssd/afldb-rem4-leaks-20261115/cand/node_modules/[4mpostgres[24m/src/query.js:170:23)
+    at new Query (file:///mnt/ssd/afldb-rem4-leaks-20261115/cand/node_modules/[4mpostgres[24m/src/query.js:36:24)
+    at sql (file:///mnt/ssd/afldb-rem4-leaks-20261115/cand/node_modules/[4mpostgres[24m/src/index.js:112:11)
+    at recordDataEdit [90m(/mnt/ssd/afldb-rem4-leaks-20261115/cand-red/[39msrc/db/queries/audit-log.ts:156:42[90m)[39m {
+  severity_local: [32m'ERROR'[39m,
+  severity: [32m'ERROR'[39m,
+  code: [32m'P0001'[39m,
+  where: [32m'PL/pgSQL function issue155_audit_probe() line 1 at RAISE'[39m,
+  file: [32m'pl_exec.c'[39m,
+  line: [32m'3897'[39m,
+  routine: [32m'exec_stmt_raise'[39m
+}
+
+ [31m❯[39m tests/integration/admin-brownlow.test.ts [2m([22m[2m47 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 9760[2mms[22m[39m
+     [32m✓[39m gives the round fact a nullable match identity[32m 13[2mms[22m[39m
+     [32m✓[39m carries both partial unique indexes, and only as partial ones[32m 6[2mms[22m[39m
+[31m     [31m×[31m resolved every historical round row to exactly one match (preflight P2)[39m[32m 53[2mms[22m[39m
+     [32m✓[39m creates the two workflow tables and widens the audit allowlist[32m 5[2mms[22m[39m
+     [32m✓[39m registers both tables for the app read grant[32m 1[2mms[22m[39m
+     [32m✓[39m leaves data_overrides.entity_type exactly as migration 073 wrote it[32m 2[2mms[22m[39m
+     [33m[2m✓[22m[39m attributes exactly one candidate, keeps NULL for none or several, and re-resolves on reload [33m 414[2mms[22m[39m
+     [32m✓[39m refuses a match that is not home-and-away, wildcard final and grand final alike[32m 50[2mms[22m[39m
+     [32m✓[39m refuses a season whose coverage grid says no medal was awarded[32m 27[2mms[22m[39m
+     [32m✓[39m refuses a player who has no line-up row in the match[32m 56[2mms[22m[39m
+     [32m✓[39m refuses the same player twice[32m 33[2mms[22m[39m
+     [32m✓[39m refuses to finalise an incomplete selection, though a draft may hold one[32m 27[2mms[22m[39m
+     [32m✓[39m refuses a match whose line-up is short of the §27.6 threshold, and writes nothing[32m 70[2mms[22m[39m
+     [32m✓[39m creates a draft that reaches no public fact table[32m 45[2mms[22m[39m
+     [32m✓[39m updates the draft and bumps the revision[32m 44[2mms[22m[39m
+     [32m✓[39m refuses a stale revision without writing anything[32m 31[2mms[22m[39m
+     [32m✓[39m finalises: three canonical rows, a dense mirror, one audit row, coverage moved[32m 74[2mms[22m[39m
+     [32m✓[39m leaves a source-published season total completely alone, and reports the disagreement[32m 27[2mms[22m[39m
+     [32m✓[39m refuses a draft on a finalised match[32m 36[2mms[22m[39m
+     [32m✓[39m corrects a finalised match, recording the reason and the full before and after[32m 72[2mms[22m[39m
+     [32m✓[39m refuses a correction with no reason[32m 33[2mms[22m[39m
+     [32m✓[39m refuses a finalisation whose canonical picture moved since the page was rendered[32m 39[2mms[22m[39m
+     [32m✓[39m adopts the imported rows on a fresh finalisation, demoting rather than deleting them[32m 61[2mms[22m[39m
+     [32m✓[39m voids a match: the values are withdrawn, the participation record is not[32m 118[2mms[22m[39m
+     [32m✓[39m refuses a second void of the same match[32m 26[2mms[22m[39m
+     [32m✓[39m refuses a void with no reason, and writes nothing[32m 26[2mms[22m[39m
+     [32m✓[39m rolls the facts back when the required audit row cannot be written[32m 79[2mms[22m[39m
+     [32m✓[39m finalises the last match, completing the season[32m 67[2mms[22m[39m
+     [32m✓[39m lists the round in fixture order with its current holders[32m 7[2mms[22m[39m
+     [32m✓[39m refuses a season that still has an unattached vote row[32m 38[2mms[22m[39m
+     [32m✓[39m refuses a season whose matches are not all accounted for[32m 38[2mms[22m[39m
+     [32m✓[39m refuses an ineligibility flag on a player who polled nothing[32m 33[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses a publication without the administrator note: the generated default never satisfies the season seal (V2-GAP-006 review F-001) [33m 308[2mms[22m[39m
+     [33m[2m✓[22m[39m publishes: manual rows, measured ranks and winners, derived totals in step [33m 407[2mms[22m[39m
+     [32m✓[39m refuses a stale publication[32m 25[2mms[22m[39m
+     [32m✓[39m is idempotent: re-publishing identical inputs produces identical rows[32m 102[2mms[22m[39m
+     [32m✓[39m re-derives a published season inside the correction that changed it[32m 109[2mms[22m[39m
+     [32m✓[39m the artefact loader's own refusal predicate sees the admin-published season[32m 5[2mms[22m[39m
+     [32m✓[39m the fitzRoy loader's own refusal predicate sees the admin-finalised matches[32m 2[2mms[22m[39m
+     [33m[2m✓[22m[39m preserves the Brownlow mirror through a match-sheet save [33m 566[2mms[22m[39m
+     [32m✓[39m refuses to delete a match that carries a Brownlow decision, and changes nothing[32m 29[2mms[22m[39m
+     [32m✓[39m a draft and a finalisation of the same match: the loser is refused stale[32m 74[2mms[22m[39m
+     [32m✓[39m two corrections of the same finalised match: the second is refused stale[32m 139[2mms[22m[39m
+     [32m✓[39m two finalisations of the same match: the second is refused stale[32m 169[2mms[22m[39m
+     [32m✓[39m two publications of the same season: the second is refused stale[32m 126[2mms[22m[39m
+     [33m[2m✓[22m[39m reports each fixture season with the state it is actually in [33m 1812[2mms[22m[39m
+     [33m[2m✓[22m[39m counts a drafted match whose source votes are complete, so the season reads complete [33m 1781[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m tests/integration/admin-brownlow.test.ts[2m > [22mmigration 094 objects and backfill[2m > [22mresolved every historical round row to exactly one match (preflight P2)
+[31m[1mAssertionError[22m: expected 9522 to be +0 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 9522[39m
+
+[36m [2m❯[22m tests/integration/admin-brownlow.test.ts:[2m391:31[22m[39m
+    [90m389|[39m        WHERE season <= 2026
+    [90m390|[39m     `[39m[33m;[39m
+    [90m391|[39m     [34mexpect[39m(counts[33m.[39munresolved)[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m   |[39m                               [31m^[39m
+    [90m392|[39m     [34mexpect[39m(counts[33m.[39mtotal)[33m.[39m[34mtoBeGreaterThanOrEqual[39m([34m320_861[39m)[33m;[39m
+    [90m393|[39m   })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m46 passed[39m[22m[90m (47)[39m
+[2m   Start at [22m 09:58:58
+[2m   Duration [22m 11.75s[2m (transform 1.03s, setup 162ms, import 1.46s, tests 9.76s, environment 0ms)[22m
+

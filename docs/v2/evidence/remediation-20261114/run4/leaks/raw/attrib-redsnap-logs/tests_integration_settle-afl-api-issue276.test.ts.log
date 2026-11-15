@@ -1,0 +1,20 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand-red[39m
+
+[90mstderr[2m | tests/integration/settle-afl-api-issue276.test.ts
+[22m[39m[ISSUE-276] shared season 2026 derived rows had moved from the setup capture and were restored from it:
+  seasons.match_count: baseline 220 -> now 219
+  club_seasons (excluding id): baseline 18 row(s), now 18; differing club_id(s): 3, 13
+  player_season_stats 2026: baseline 669 row(s), now 669; whole-row md5 DIFFERS; brownlow status/votes differ for 1 player(s)
+
+ [32m✓[39m tests/integration/settle-afl-api-issue276.test.ts [2m([22m[2m4 tests[22m[2m)[22m[33m 22979[2mms[22m[39m
+     [33m[2m✓[22m[39m a contradictory roster for a FRESH match writes the match but no period rows, and opens one finding; a repeat refreshes it in place; a corrected roster resolves it and writes the periods [33m 4251[2mms[22m[39m
+     [33m[2m✓[22m[39m a contradictory roster leaves EXISTING canonical period rows byte-identical: nothing is rewritten, deleted or ledgered [33m 4814[2mms[22m[39m
+     [33m[2m✓[22m[39m an open finding is resolved only by positive evidence: missing score evidence, a deferred roster and a blocked match each leave it open [33m 4048[2mms[22m[39m
+     [33m[2m✓[22m[39m a finding opened before another source created the match is closed on the corroborated path by positive roster evidence, and only by it [33m 4027[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+[2m   Start at [22m 10:03:23
+[2m   Duration [22m 24.35s[2m (transform 726ms, setup 170ms, import 825ms, tests 22.98s, environment 0ms)[22m
+

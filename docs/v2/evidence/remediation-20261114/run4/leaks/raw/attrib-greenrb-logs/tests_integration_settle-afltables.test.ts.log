@@ -1,0 +1,24 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand[39m
+
+ [32m✓[39m tests/integration/settle-afltables.test.ts [2m([22m[2m85 tests[22m[2m)[22m[33m 42943[2mms[22m[39m
+     [33m[2m✓[22m[39m keeps A -> B -> A as three ordered versions over two payloads [33m 354[2mms[22m[39m
+     [33m[2m✓[22m[39m opens no Brownlow target for an unlinked player with an NA vote (D2) [33m 325[2mms[22m[39m
+       [33m[2m✓[22m[39m names the numerically latest settle batch in the exception report, not the lexicographically latest [33m 500[2mms[22m[39m
+       [33m[2m✓[22m[39m plans, applies and then finds nothing left to do [33m 423[2mms[22m[39m
+       [33m[2m✓[22m[39m refuses rather than guessing when two retired rows could be the fixture [33m 393[2mms[22m[39m
+       [33m[2m✓[22m[39m a corrected field survives the settle, on a retry and when the source moves [33m 367[2mms[22m[39m
+       [33m[2m✓[22m[39m an unchanged re-settle neither churns nor reverts the corrected value [33m 304[2mms[22m[39m
+       [33m[2m✓[22m[39m a durable removal stops the settle reinserting the row [33m 322[2mms[22m[39m
+       [33m[2m✓[22m[39m after Return to source the next settle restores the source value [33m 419[2mms[22m[39m
+       [33m[2m✓[22m[39m F-PR-03: a settle that now carries a manual addition neither adopts nor drops it [33m 494[2mms[22m[39m
+       [33m[2m✓[22m[39m F-PR-03: an addition the source does not carry is withdrawn and its row deleted [33m 314[2mms[22m[39m
+       [33m[2m✓[22m[39m a settle rekey carries the Match Sheet authority to the new match key [33m 478[2mms[22m[39m
+       [33m[2m✓[22m[39m repair-match-rekeys carries the Match Sheet authority to the live match key [33m 478[2mms[22m[39m
+       [33m[2m✓[22m[39m R-01: a Match Sheet save cannot commit inside the settle rekey unit authority window [33m 5513[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m85 passed[39m[22m[90m (85)[39m
+[2m   Start at [22m 11:45:45
+[2m   Duration [22m 45.72s[2m (transform 1.17s, setup 225ms, import 2.18s, tests 42.94s, environment 0ms)[22m
+

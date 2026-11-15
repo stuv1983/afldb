@@ -1,0 +1,53 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand-red[39m
+
+ [31m❯[39m tests/integration/v2-coleman-publication.test.ts [2m([22m[2m28 tests[22m[2m | [22m[33m28 skipped[39m[2m)[22m[33m 788[2mms[22m[39m
+     [2m[90m↓[39m[22m inserts the winner in the loader's exact format, with the ledger row, the provenance row and the audit row
+     [2m[90m↓[39m[22m the preview reports the same effect without writing anything
+     [2m[90m↓[39m[22m refuses to run outside the publisher's native transaction (projection_unavailable)
+     [2m[90m↓[39m[22m a rerun leaves every table's row count unchanged and every winner retained, untouched
+     [2m[90m↓[39m[22m joint winners: a four-way tie is four rows, inserted once, retained on every rerun
+     [2m[90m↓[39m[22m the unique key backs it: a second row with the same (source, key) is impossible
+     [2m[90m↓[39m[22m finals goals that would change the leader are ignored
+     [2m[90m↓[39m[22m an unsettled attestation
+     [2m[90m↓[39m[22m an unsealed (in-progress) season
+     [2m[90m↓[39m[22m incomplete rounds (a club with no goal rows in a home-and-away match)
+     [2m[90m↓[39m[22m a NULL goal is "not recorded", never zero
+     [2m[90m↓[39m[22m a foreign manual Coleman row refuses with foreign_winner_rows and writes NOTHING (ledger row absent)
+     [2m[90m↓[39m[22m a port that fails AFTER inserting leaves no ledger, projection, winner or audit row
+     [2m[90m↓[39m[22m a missing award definition refuses with award_definition_missing and writes nothing
+     [2m[90m↓[39m[22m records provenance only: the winner row is untouched, including updated_at
+     [2m[90m↓[39m[22m the same winner with a corrected total: superseded ledger row, the row is UPDATED (note), one audit row
+     [2m[90m↓[39m[22m a different winner: the old winner is VOIDED with a reason, the new winners are INSERTED, all audited; the unique key survives
+     [2m[90m↓[39m[22m a derived key that is stored as a VOID row is refused (derived_row_voided); the others are not touched
+     [2m[90m↓[39m[22m a data_overrides row on a row publication would change -> admin_override_present, nothing written
+     [2m[90m↓[39m[22m an override on a row that would stay as it is is NOT a conflict (retained)
+     [2m[90m↓[39m[22m a human player-link decision on the row counts as an override
+     [2m[90m↓[39m[22m a row an administrator voided (derived_row_voided)
+     [2m[90m↓[39m[22m a legacy (draftguru) Coleman row of the season is foreign and is never adopted or voided
+     [2m[90m↓[39m[22m getAwardSeason / getAwardWinners / getAwardSeasons / listAwards read the projection
+     [2m[90m↓[39m[22m the offline guard rejects invalid launcher ports and non-loopback targets before database reads
+     [2m[90m↓[39m[22m the offline guard holds canonical season locks across import-batch commits and releases them on close
+     [2m[90m↓[39m[22m after a canonical publication the offline loader refuses and preserves every tuple
+     [2m[90m↓[39m[22m a loader-written season is what the projection retains (no row of either writer is rewritten by the other)
+
+[31m⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Suites 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m tests/integration/v2-coleman-publication.test.ts[2m [ tests/integration/v2-coleman-publication.test.ts ][22m
+[31m[1mError[22m: refusing to run: 1 Coleman 2001 row(s) already exist that this suite did not create[39m
+[36m [2m❯[22m tests/integration/v2-coleman-publication.test.ts:[2m307:29[22m[39m
+    [90m305|[39m   [35mawait[39m [34mseed[39m()[33m;[39m
+    [90m306|[39m   const [existing] = await owner<{ n: number }[]>`SELECT count(*)::int…
+    [90m307|[39m   if (existing.n > 0) throw new Error(`refusing to run: ${existing.n} …
+    [90m   |[39m                             [31m^[39m
+    [90m308|[39m }[33m,[39m [34m60_000[39m)[33m;[39m
+    [90m309|[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [33m28 skipped[39m[90m (28)[39m
+[2m   Start at [22m 11:30:17
+[2m   Duration [22m 2.65s[2m (transform 853ms, setup 226ms, import 1.26s, tests 788ms, environment 0ms)[22m
+

@@ -1,0 +1,18 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand[39m
+
+ [32m✓[39m tests/integration/admin-awards.test.ts [2m([22m[2m43 tests[22m[2m)[22m[33m 6406[2mms[22m[39m
+     [33m[2m✓[22m[39m an ORDINARY reload leaves the lifecycle alone and reverts a correction [33m 1032[2mms[22m[39m
+     [33m[2m✓[22m[39m a DESTRUCTIVE rebuild re-creates a manual row from its record override [33m 376[2mms[22m[39m
+     [33m[2m✓[22m[39m D-9: a missing CORRECTION target fails the reload closed [33m 350[2mms[22m[39m
+     [33m[2m✓[22m[39m D-9: a missing LIFECYCLE target warns and RETAINS the override [33m 360[2mms[22m[39m
+     [33m[2m✓[22m[39m re-creates a manual Hall of Fame row and a manual honour-team row [33m 442[2mms[22m[39m
+     [33m[2m✓[22m[39m a VOIDED out-of-scope row no longer refuses the awards import [33m 632[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses a promotion over a row carrying an active lifecycle override [33m 350[2mms[22m[39m
+     [33m[2m✓[22m[39m takes a voided Hall of Fame entry out of every public surface [33m 478[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m43 passed[39m[22m[90m (43)[39m
+[2m   Start at [22m 10:41:30
+[2m   Duration [22m 8.14s[2m (transform 1.07s, setup 156ms, import 1.22s, tests 6.41s, environment 0ms)[22m
+

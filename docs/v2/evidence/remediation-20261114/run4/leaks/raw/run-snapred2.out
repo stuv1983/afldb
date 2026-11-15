@@ -1,0 +1,6 @@
+2026-11-14T22:34:23Z attrib snapred2: HEAD=7cfbe186e70ca91db67da1aa4e28325ccbc32a86 porcelain=0 template=afldb_v2_rem4leaks_snap_tmpl_test
+create-db: afldb_v2_rem4leaks_snapred2_test created from afldb_v2_rem4leaks_snap_tmpl_test and marked
+2026-11-14T22:34:27Z attrib snapred2: 105 tables in the count set
+tests/integration/sealed-editor-guard.test.ts rc=0 residue-tables=5
+tests/integration/match-admin-delete.test.ts rc=0 residue-tables=4
+2026-11-14T22:34:46Z attrib snapred2: done (9 lines)

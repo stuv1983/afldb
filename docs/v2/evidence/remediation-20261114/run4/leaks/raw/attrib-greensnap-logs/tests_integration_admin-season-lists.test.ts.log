@@ -1,0 +1,15 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand[39m
+
+ [32m✓[39m tests/integration/admin-season-lists.test.ts [2m([22m[2m42 tests[22m[2m)[22m[33m 3530[2mms[22m[39m
+     [33m[2m✓[22m[39m re-creates every membership a rebuild removed, with the same keys [33m 334[2mms[22m[39m
+     [33m[2m✓[22m[39m is idempotent: a second replay changes nothing [33m 339[2mms[22m[39m
+     [33m[2m✓[22m[39m will not resurrect a tombstoned membership, whoever planted the row [33m 343[2mms[22m[39m
+     [33m[2m✓[22m[39m fails the WHOLE batch closed on an unresolvable record, writing nothing [33m 324[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses an unresolvable TOMBSTONE just as hard as a membership [33m 316[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m42 passed[39m[22m[90m (42)[39m
+[2m   Start at [22m 10:54:23
+[2m   Duration [22m 4.85s[2m (transform 435ms, setup 204ms, import 752ms, tests 3.53s, environment 0ms)[22m
+

@@ -1,0 +1,250 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand[39m
+
+[90mstdout[2m | tests/integration/grid-solver.test.ts[2m > [22m[2mgrid solver correctness[2m > [22m[2mafter_siren_winner is exactly the linked, premiership-season, scoring, match-winning kickers
+[22m[39m[grid-solver] after_siren_kicks holds no unlinked premiership-season winner on this database; the unlinked exclusion is exercised by the truth set alone
+
+ [31m❯[39m tests/integration/grid-solver.test.ts [2m([22m[2m222 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 31115[2mms[22m[39m
+     [32m✓[39m solves a cell using "played_for_club" without throwing[32m 103[2mms[22m[39m
+     [32m✓[39m solves a cell using "debut_club" without throwing[32m 52[2mms[22m[39m
+     [32m✓[39m solves a cell using "one_club_player" without throwing[32m 74[2mms[22m[39m
+     [32m✓[39m solves a cell using "multi_club_player" without throwing[32m 49[2mms[22m[39m
+     [33m[2m✓[22m[39m solves a cell using "games_at_one_club_min" without throwing [33m 314[2mms[22m[39m
+     [32m✓[39m solves a cell using "clubs_played_min" without throwing[32m 67[2mms[22m[39m
+     [33m[2m✓[22m[39m solves a cell using "goals_at_multiple_clubs_min" without throwing [33m 323[2mms[22m[39m
+     [33m[2m✓[22m[39m solves a cell using "games_at_multiple_clubs_min" without throwing [33m 337[2mms[22m[39m
+     [32m✓[39m solves a cell using "played_for_club_incl_merged" without throwing[32m 36[2mms[22m[39m
+     [32m✓[39m solves a cell using "debut_club_incl_merged" without throwing[32m 59[2mms[22m[39m
+     [33m[2m✓[22m[39m solves a cell using "one_club_player_incl_merged" without throwing [33m 341[2mms[22m[39m
+     [32m✓[39m solves a cell using "multi_club_player_incl_merged" without throwing[32m 284[2mms[22m[39m
+     [33m[2m✓[22m[39m solves a cell using "clubs_played_min_incl_merged" without throwing [33m 397[2mms[22m[39m
+     [33m[2m✓[22m[39m solves a cell using "games_at_one_club_min_incl_merged" without throwing [33m 357[2mms[22m[39m
+     [33m[2m✓[22m[39m solves a cell using "games_at_multiple_clubs_min_incl_merged" without throwing [33m 384[2mms[22m[39m
+     [33m[2m✓[22m[39m solves a cell using "goals_at_multiple_clubs_min_incl_merged" without throwing [33m 361[2mms[22m[39m
+     [32m✓[39m solves a cell using "finals_clubs_min_incl_merged" without throwing[32m 118[2mms[22m[39m
+     [32m✓[39m solves a cell using "grand_final_clubs_min_incl_merged" without throwing[32m 42[2mms[22m[39m
+     [32m✓[39m solves a cell using "career_games_min" without throwing[32m 98[2mms[22m[39m
+     [33m[2m✓[22m[39m solves a cell using "career_games_max" without throwing [33m 926[2mms[22m[39m
+     [32m✓[39m solves a cell using "career_goals_min" without throwing[32m 71[2mms[22m[39m
+     [32m✓[39m solves a cell using "career_goals_max" without throwing[32m 42[2mms[22m[39m
+     [32m✓[39m solves a cell using "career_stat_total_min" without throwing[32m 54[2mms[22m[39m
+     [32m✓[39m solves a cell using "career_stat_avg_min" without throwing[32m 159[2mms[22m[39m
+     [32m✓[39m solves a cell using "career_stat_exceeds" without throwing[32m 24[2mms[22m[39m
+     [33m[2m✓[22m[39m solves a cell using "career_teammates_min" without throwing [33m 1913[2mms[22m[39m
+     [32m✓[39m solves a cell using "single_game_stat_min" without throwing[32m 226[2mms[22m[39m
+     [32m✓[39m solves a cell using "single_game_two_stats_min" without throwing[32m 221[2mms[22m[39m
+     [32m✓[39m solves a cell using "games_with_stat_min_count" without throwing[32m 124[2mms[22m[39m
+     [33m[2m✓[22m[39m solves a cell using "single_game_stat_multi_club_min" without throwing [33m 1463[2mms[22m[39m
+     [32m✓[39m solves a cell using "after_siren_winner" without throwing[32m 20[2mms[22m[39m
+     [32m✓[39m solves a cell using "debuted_between" without throwing[32m 17[2mms[22m[39m
+     [32m✓[39m solves a cell using "debuted_in_decade" without throwing[32m 18[2mms[22m[39m
+     [32m✓[39m solves a cell using "played_in_decade" without throwing[32m 18[2mms[22m[39m
+     [32m✓[39m solves a cell using "played_between_seasons" without throwing[32m 17[2mms[22m[39m
+     [32m✓[39m solves a cell using "season_stat_total_min" without throwing[32m 62[2mms[22m[39m
+     [32m✓[39m solves a cell using "games_in_season_min" without throwing[32m 99[2mms[22m[39m
+     [33m[2m✓[22m[39m solves a cell using "season_stat_avg_min" without throwing [33m 360[2mms[22m[39m
+     [32m✓[39m solves a cell using "season_wins_min" without throwing[32m 94[2mms[22m[39m
+     [32m✓[39m solves a cell using "season_losses_min" without throwing[32m 99[2mms[22m[39m
+     [32m✓[39m solves a cell using "season_draws_min" without throwing[32m 42[2mms[22m[39m
+     [32m✓[39m solves a cell using "drawn_matches_min" without throwing[32m 42[2mms[22m[39m
+     [32m✓[39m solves a cell using "never_played_in_draw" without throwing[32m 77[2mms[22m[39m
+     [32m✓[39m solves a cell using "club_season_stat_leader" without throwing[32m 82[2mms[22m[39m
+     [32m✓[39m solves a cell using "club_season_stat_leader_min_times" without throwing[32m 78[2mms[22m[39m
+     [32m✓[39m solves a cell using "wooden_spoon_season" without throwing[32m 57[2mms[22m[39m
+     [32m✓[39m solves a cell using "minor_premiership_season" without throwing[32m 43[2mms[22m[39m
+     [32m✓[39m solves a cell using "never_minor_premier" without throwing[32m 98[2mms[22m[39m
+     [32m✓[39m solves a cell using "minor_premierships_min" without throwing[32m 42[2mms[22m[39m
+     [32m✓[39m solves a cell using "games_in_named_season_min" without throwing[32m 22[2mms[22m[39m
+     [32m✓[39m solves a cell using "named_season_stat_total_min" without throwing[32m 20[2mms[22m[39m
+     [32m✓[39m solves a cell using "league_season_stat_rank_top" without throwing[32m 47[2mms[22m[39m
+     [33m[2m✓[22m[39m solves a cell using "club_season_brownlow_leader" without throwing [33m 650[2mms[22m[39m
+     [32m✓[39m solves a cell using "won_by_margin_min" without throwing[32m 232[2mms[22m[39m
+     [33m[2m✓[22m[39m solves a cell using "consecutive_wins_min" without throwing [33m 578[2mms[22m[39m
+     [32m✓[39m solves a cell using "played_in_a_final" without throwing[32m 52[2mms[22m[39m
+     [32m✓[39m solves a cell using "never_played_finals" without throwing[32m 77[2mms[22m[39m
+     [32m✓[39m solves a cell using "finals_games_min" without throwing[32m 51[2mms[22m[39m
+     [32m✓[39m solves a cell using "premiership_player" without throwing[32m 26[2mms[22m[39m
+     [32m✓[39m solves a cell using "won_a_final" without throwing[32m 47[2mms[22m[39m
+     [32m✓[39m solves a cell using "finals_wins_min" without throwing[32m 50[2mms[22m[39m
+     [33m[2m✓[22m[39m solves a cell using "never_won_a_final" without throwing [33m 525[2mms[22m[39m
+     [32m✓[39m solves a cell using "played_finals_no_wins" without throwing[32m 28[2mms[22m[39m
+     [32m✓[39m solves a cell using "finals_clubs_min" without throwing[32m 67[2mms[22m[39m
+     [32m✓[39m solves a cell using "final_game_stat_min" without throwing[32m 41[2mms[22m[39m
+     [32m✓[39m solves a cell using "grand_final_game_stat_min" without throwing[32m 36[2mms[22m[39m
+     [32m✓[39m solves a cell using "finals_stat_total_min" without throwing[32m 48[2mms[22m[39m
+     [32m✓[39m solves a cell using "finals_stat_avg_min" without throwing[32m 48[2mms[22m[39m
+     [32m✓[39m solves a cell using "played_a_grand_final" without throwing[32m 39[2mms[22m[39m
+     [32m✓[39m solves a cell using "never_played_grand_final" without throwing[32m 96[2mms[22m[39m
+     [32m✓[39m solves a cell using "grand_finals_played_min" without throwing[32m 35[2mms[22m[39m
+     [32m✓[39m solves a cell using "prelim_finals_played_min" without throwing[32m 41[2mms[22m[39m
+     [32m✓[39m solves a cell using "grand_final_clubs_min" without throwing[32m 30[2mms[22m[39m
+     [32m✓[39m solves a cell using "grand_final_between_seasons" without throwing[32m 17[2mms[22m[39m
+     [32m✓[39m solves a cell using "premierships_min" without throwing[32m 30[2mms[22m[39m
+     [32m✓[39m solves a cell using "premiership_between_seasons" without throwing[32m 17[2mms[22m[39m
+     [32m✓[39m solves a cell using "grand_finals_lost_min" without throwing[32m 27[2mms[22m[39m
+     [32m✓[39m solves a cell using "lost_grand_final_against" without throwing[32m 21[2mms[22m[39m
+     [32m✓[39m solves a cell using "finals_winning_record" without throwing[32m 36[2mms[22m[39m
+     [32m✓[39m solves a cell using "grand_finals_with_stat_min_count" without throwing[32m 24[2mms[22m[39m
+     [32m✓[39m solves a cell using "grand_final_won_against_club" without throwing[32m 17[2mms[22m[39m
+     [32m✓[39m solves a cell using "premiership_captain" without throwing[32m 17[2mms[22m[39m
+     [32m✓[39m solves a cell using "played_at_venue" without throwing[32m 25[2mms[22m[39m
+     [32m✓[39m solves a cell using "games_at_venue_min" without throwing[32m 24[2mms[22m[39m
+     [32m✓[39m solves a cell using "won_final_at_venue" without throwing[32m 18[2mms[22m[39m
+     [32m✓[39m solves a cell using "venue_game_stat_min" without throwing[32m 30[2mms[22m[39m
+     [32m✓[39m solves a cell using "venue_stat_total_min" without throwing[32m 27[2mms[22m[39m
+     [32m✓[39m solves a cell using "venue_goals_max" without throwing[32m 26[2mms[22m[39m
+     [32m✓[39m solves a cell using "match_event_played" without throwing[32m 20[2mms[22m[39m
+     [32m✓[39m solves a cell using "match_event_min" without throwing[32m 16[2mms[22m[39m
+     [32m✓[39m solves a cell using "matchup_played_min" without throwing[32m 16[2mms[22m[39m
+     [32m✓[39m solves a cell using "match_event_won" without throwing[32m 20[2mms[22m[39m
+     [32m✓[39m solves a cell using "match_event_played_between" without throwing[32m 17[2mms[22m[39m
+     [32m✓[39m solves a cell using "matchup_won_min" without throwing[32m 16[2mms[22m[39m
+     [32m✓[39m solves a cell using "matchup_game_stat_min" without throwing[32m 16[2mms[22m[39m
+     [32m✓[39m solves a cell using "matchup_winning_record" without throwing[32m 16[2mms[22m[39m
+     [32m✓[39m solves a cell using "gather_round_played" without throwing[32m 21[2mms[22m[39m
+     [32m✓[39m solves a cell using "gather_round_game_stat_min" without throwing[32m 21[2mms[22m[39m
+     [32m✓[39m solves a cell using "teammate_of" without throwing[32m 17[2mms[22m[39m
+     [32m✓[39m solves a cell using "played_against" without throwing[32m 22[2mms[22m[39m
+     [32m✓[39m solves a cell using "coached_by" without throwing[32m 27[2mms[22m[39m
+     [32m✓[39m solves a cell using "premiership_coach" without throwing[32m 17[2mms[22m[39m
+     [32m✓[39m solves a cell using "has_coached" without throwing[32m 23[2mms[22m[39m
+     [32m✓[39m solves a cell using "coached_club" without throwing[32m 16[2mms[22m[39m
+     [32m✓[39m solves a cell using "club_captain" without throwing[32m 16[2mms[22m[39m
+     [32m✓[39m solves a cell using "club_captain_any" without throwing[32m 21[2mms[22m[39m
+     [32m✓[39m solves a cell using "captain_between_seasons" without throwing[32m 16[2mms[22m[39m
+     [32m✓[39m solves a cell using "captain_of_club_between_seasons" without throwing[32m 16[2mms[22m[39m
+     [32m✓[39m solves a cell using "hall_of_fame_player" without throwing[32m 20[2mms[22m[39m
+     [32m✓[39m solves a cell using "first_kick_goal_player" without throwing[32m 18[2mms[22m[39m
+     [32m✓[39m solves a cell using "first_kick_goal_only_career_goal" without throwing[32m 16[2mms[22m[39m
+     [32m✓[39m solves a cell using "first_kick_goal_consecutive_min" without throwing[32m 21[2mms[22m[39m
+     [32m✓[39m solves a cell using "first_kick_goal_for_club" without throwing[32m 16[2mms[22m[39m
+     [32m✓[39m solves a cell using "first_kick_goal_between" without throwing[32m 16[2mms[22m[39m
+     [32m✓[39m solves a cell using "brownlow_medallist" without throwing[32m 21[2mms[22m[39m
+     [32m✓[39m solves a cell using "brownlow_votes_career_min" without throwing[32m 38[2mms[22m[39m
+     [32m✓[39m solves a cell using "award_winner" without throwing[32m 20[2mms[22m[39m
+     [32m✓[39m solves a cell using "award_winner_min_times" without throwing[32m 25[2mms[22m[39m
+     [32m✓[39m solves a cell using "award_winner_between_seasons" without throwing[32m 18[2mms[22m[39m
+     [32m✓[39m solves a cell using "under_22_selection" without throwing[32m 23[2mms[22m[39m
+     [32m✓[39m solves a cell using "all_australian_captain" without throwing[32m 18[2mms[22m[39m
+     [32m✓[39m solves a cell using "all_australian_position" without throwing[32m 18[2mms[22m[39m
+     [32m✓[39m solves a cell using "club_best_and_fairest_min_times" without throwing[32m 24[2mms[22m[39m
+     [32m✓[39m solves a cell using "best_and_fairest_multi_club" without throwing[32m 22[2mms[22m[39m
+     [32m✓[39m solves a cell using "brownlow_finish_exact" without throwing[32m 19[2mms[22m[39m
+     [32m✓[39m solves a cell using "brownlow_top_finish" without throwing[32m 25[2mms[22m[39m
+     [32m✓[39m solves a cell using "brownlow_top_finish_min_times" without throwing[32m 20[2mms[22m[39m
+     [32m✓[39m solves a cell using "brownlow_winner_votes_min" without throwing[32m 19[2mms[22m[39m
+     [32m✓[39m solves a cell using "brownlow_season_votes_min" without throwing[32m 119[2mms[22m[39m
+     [32m✓[39m solves a cell using "rising_star_nominee" without throwing[32m 31[2mms[22m[39m
+     [32m✓[39m solves a cell using "rising_star_nominee_between_seasons" without throwing[32m 21[2mms[22m[39m
+     [32m✓[39m solves a cell using "rising_star_nominee_for_club" without throwing[32m 28[2mms[22m[39m
+     [32m✓[39m solves a cell using "rising_star_nominee_for_club_between_seasons" without throwing[32m 24[2mms[22m[39m
+     [32m✓[39m solves a cell using "rising_star_nominee_in_season" without throwing[32m 24[2mms[22m[39m
+     [32m✓[39m solves a cell using "all_australian_defender" without throwing[32m 36[2mms[22m[39m
+     [32m✓[39m solves a cell using "all_australian_forward" without throwing[32m 23[2mms[22m[39m
+     [32m✓[39m solves a cell using "all_australian_midfielder" without throwing[32m 22[2mms[22m[39m
+     [32m✓[39m solves a cell using "all_australian_team" without throwing[32m 27[2mms[22m[39m
+     [32m✓[39m solves a cell using "all_australian_team_min_times" without throwing[32m 30[2mms[22m[39m
+     [32m✓[39m solves a cell using "all_australian_team_between_seasons" without throwing[32m 16[2mms[22m[39m
+     [32m✓[39m solves a cell using "all_australian_squad_member" without throwing[32m 20[2mms[22m[39m
+     [32m✓[39m solves a cell using "all_australian_squad_in_season" without throwing[32m 17[2mms[22m[39m
+     [32m✓[39m solves a cell using "best_and_fairest_in_premiership_season" without throwing[32m 18[2mms[22m[39m
+     [32m✓[39m solves a cell using "drafted_by_club" without throwing[32m 17[2mms[22m[39m
+     [32m✓[39m solves a cell using "draft_pick_between" without throwing[32m 16[2mms[22m[39m
+     [32m✓[39m solves a cell using "draft_year_between" without throwing[32m 17[2mms[22m[39m
+     [32m✓[39m solves a cell using "draft_type_is" without throwing[32m 21[2mms[22m[39m
+     [32m✓[39m solves a cell using "drafted_by_club_never_played" without throwing[32m 24[2mms[22m[39m
+     [32m✓[39m solves a cell using "recruited_via" without throwing[32m 17[2mms[22m[39m
+     [32m✓[39m solves a cell using "traded_min_times" without throwing[32m 17[2mms[22m[39m
+     [32m✓[39m solves a cell using "father_son_selection" without throwing[32m 25[2mms[22m[39m
+     [32m✓[39m solves a cell using "father_son_father" without throwing[32m 20[2mms[22m[39m
+     [32m✓[39m solves a cell using "father_son_selection_for_club" without throwing[32m 23[2mms[22m[39m
+     [32m✓[39m solves a cell using "father_son_selection_between" without throwing[32m 19[2mms[22m[39m
+     [32m✓[39m solves a cell using "national_draft_pick_between" without throwing[32m 19[2mms[22m[39m
+     [32m✓[39m solves a cell using "given_name_in" without throwing[32m 19[2mms[22m[39m
+     [32m✓[39m solves a cell using "surname_hyphenated" without throwing[32m 17[2mms[22m[39m
+     [32m✓[39m solves a cell using "jumper_number_worn" without throwing[32m 67[2mms[22m[39m
+     [32m✓[39m solves a cell using "height_min" without throwing[32m 115[2mms[22m[39m
+     [32m✓[39m solves a cell using "height_max" without throwing[32m 22[2mms[22m[39m
+     [32m✓[39m solves a cell using "age_on_debut_min" without throwing[32m 109[2mms[22m[39m
+     [32m✓[39m solves a cell using "has_brother" without throwing[32m 26[2mms[22m[39m
+     [32m✓[39m solves a cell using "has_afl_father" without throwing[32m 27[2mms[22m[39m
+     [32m✓[39m solves a cell using "has_afl_son" without throwing[32m 26[2mms[22m[39m
+     [32m✓[39m solves a cell using "has_afl_parent_or_child" without throwing[32m 22[2mms[22m[39m
+     [32m✓[39m solves a cell using "brother_of_player" without throwing[32m 37[2mms[22m[39m
+     [32m✓[39m solves a cell using "father_of_player" without throwing[32m 20[2mms[22m[39m
+     [32m✓[39m solves a cell using "son_of_player" without throwing[32m 19[2mms[22m[39m
+     [32m✓[39m the final team is the all-australian award alone, never the squad rows[32m 42[2mms[22m[39m
+     [32m✓[39m repeat selections count distinct seasons, so a two-row 1984 selection is one honour[32m 60[2mms[22m[39m
+     [32m✓[39m an unknown height never qualifies on either side of the bound[32m 210[2mms[22m[39m
+     [32m✓[39m counts completed years on debut day and never qualifies an unknown date[32m 127[2mms[22m[39m
+     [33m[2m✓[22m[39m solves the mapped ISSUE-076 won-final grid within the four-second safety margin [33m 415[2mms[22m[39m
+     [32m✓[39m 22Under22 selection matches linked rows from the fixed award series[32m 29[2mms[22m[39m
+     [33m[2m✓[22m[39m career_games_min(200) AND career_games_min(0) matches a hand-written equivalent count [33m 611[2mms[22m[39m
+     [32m✓[39m no premiership player is also flagged as never having played a final[32m 13[2mms[22m[39m
+     [32m✓[39m teammate_of includes a player independently known to share a club in a season[32m 37[2mms[22m[39m
+     [32m✓[39m coached_by is exactly the players who played a match for a club while that coach was assigned to it (ISSUE-118 Stage E2)[32m 113[2mms[22m[39m
+     [32m✓[39m premiership_coach is the linked coaches of Grand Final winners, and coach-only people never appear as players[32m 86[2mms[22m[39m
+     [32m✓[39m father_son_father and father_son_selection are the linked ends of father_son_selections, and the Abletts sit on the right ends[32m 183[2mms[22m[39m
+     [32m✓[39m has_brother is exactly the linked ends of brothers-labelled sibling rows, and the Abletts sit on the right ends[32m 201[2mms[22m[39m
+     [32m✓[39m after_siren_winner is exactly the linked, premiership-season, scoring, match-winning kickers[32m 111[2mms[22m[39m
+     [32m✓[39m solveCellRows returns exactly min(eligible, limit) rows for a real cell[32m 159[2mms[22m[39m
+     [32m✓[39m rejects an incomplete axis rather than silently matching everything[32m 6[2mms[22m[39m
+     [33m[2m✓[22m[39m career_stat_total_min on a live_only stat (clangers) matches a hand-written SUM [33m 1189[2mms[22m[39m
+     [32m✓[39m no minor_premiership_season player is also flagged never_minor_premier[32m 37[2mms[22m[39m
+     [32m✓[39m career_games_max is inclusive (<=) of the threshold[32m 60[2mms[22m[39m
+     [32m✓[39m single_game_stat_min correctly returns 0 for a player whose matches predate stat recording (NULL semantics)[32m 46[2mms[22m[39m
+     [33m[2m✓[22m[39m no won_a_final player is also flagged never_won_a_final [33m 473[2mms[22m[39m
+     [33m[2m✓[22m[39m solves the three ISSUE-103 finals-win cells under one second with an independent oracle [33m 1257[2mms[22m[39m
+     [32m✓[39m lost_grand_final_against finds a real losing-side player against a real winning-side player[32m 31[2mms[22m[39m
+     [32m✓[39m brownlow_top_finish(1) matches a hand-written equivalent count[32m 99[2mms[22m[39m
+[31m     [31m×[31m drafted_by_club_never_played matches a hand-written equivalent for a real club[39m[32m 64[2mms[22m[39m
+     [32m✓[39m games_at_multiple_clubs_min never matches a one-organization career[32m 82[2mms[22m[39m
+     [32m✓[39m goals_at_multiple_clubs_min never matches a one-organization career[32m 87[2mms[22m[39m
+     [32m✓[39m finals_clubs_min(2) never matches a one-organization career[32m 39[2mms[22m[39m
+     [33m[2m✓[22m[39m games_at_one_club_min counts a whole organization stint across a rename [33m 493[2mms[22m[39m
+     [32m✓[39m season_draws_min(2) matches a hand-written equivalent count[32m 31[2mms[22m[39m
+     [32m✓[39m drawn_matches_min(1) matches a hand-written equivalent count[32m 46[2mms[22m[39m
+     [32m✓[39m club_season_stat_leader(goals) rows really did lead a club-season in goals[32m 123[2mms[22m[39m
+     [33m[2m✓[22m[39m club_season_stat_leader(clearances) is exactly the players with a recorded leading season [33m 1465[2mms[22m[39m
+     [33m[2m✓[22m[39m club_season_stat_leader(rebounds) is exactly the players with a recorded leading season [33m 1431[2mms[22m[39m
+     [33m[2m✓[22m[39m club_season_stat_leader(inside_50s) is exactly the players with a recorded leading season [33m 1403[2mms[22m[39m
+     [33m[2m✓[22m[39m club_season_stat_leader(goal_assists) is exactly the players with a recorded leading season [33m 1537[2mms[22m[39m
+     [33m[2m✓[22m[39m club_season_stat_leader_min_times(clearances, 5) counts only recorded leading seasons [33m 1429[2mms[22m[39m
+     [33m[2m✓[22m[39m a player whose every season is unrecorded for the stat never led a club in it [33m 976[2mms[22m[39m
+     [32m✓[39m the fixture season is isolated: only the two fixture players are in the cell[32m 18[2mms[22m[39m
+     [32m✓[39m a wildcard-only player does not satisfy "played_in_a_final"[32m 10[2mms[22m[39m
+     [32m✓[39m a wildcard-only player does not satisfy "won_a_final"[32m 29[2mms[22m[39m
+     [32m✓[39m a wildcard-only player does not satisfy "finals_games_min"[32m 13[2mms[22m[39m
+     [32m✓[39m a wildcard-only player does not satisfy "final_game_stat_min"[32m 25[2mms[22m[39m
+     [32m✓[39m a wildcard-only player does not satisfy "played_a_grand_final"[32m 15[2mms[22m[39m
+     [32m✓[39m a wildcard-only player does not satisfy "finals_wins_min"[32m 31[2mms[22m[39m
+     [32m✓[39m an elimination-final player still satisfies "played_in_a_final"[32m 10[2mms[22m[39m
+     [32m✓[39m an elimination-final player still satisfies "finals_games_min"[32m 9[2mms[22m[39m
+     [32m✓[39m an elimination-final player still satisfies "final_game_stat_min"[32m 25[2mms[22m[39m
+     [32m✓[39m "never played finals" now includes the wildcard-only player[32m 17[2mms[22m[39m
+     [32m✓[39m the grand_final_* criteria are untouched by the new enum value[32m 47[2mms[22m[39m
+     [32m✓[39m national_draft_pick_between reads the 1982 "National Draft" spelling as a national pick; draft_pick_between spans every kind[32m 7[2mms[22m[39m
+     [32m✓[39m draft_type_is is asked of draft_kind, so both national spellings and a legacy label find the same row[32m 9[2mms[22m[39m
+     [32m✓[39m the "drafted" builders exclude the trade and free-agency list moves, which the trade builder counts[32m 19[2mms[22m[39m
+     [32m✓[39m solveCellSummary tells an axis nobody matches apart from an empty intersection[32m 140[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m tests/integration/grid-solver.test.ts[2m > [22mgrid solver correctness[2m > [22mdrafted_by_club_never_played matches a hand-written equivalent for a real club
+[31m[1mAssertionError[22m: linked draft selections are required to exercise the criterion: expected 0 to be greater than 0[39m
+[36m [2m❯[22m tests/integration/grid-solver.test.ts:[2m926:102[22m[39m
+    [90m924|[39m       ) t
+    [90m925|[39m     `[39m[33m;[39m
+    [90m926|[39m     expect(Number(expected.count), 'linked draft selections are requir…
+    [90m   |[39m                                                                                                      [31m^[39m
+    [90m927|[39m     [34mexpect[39m(summary[33m.[39meligible)[33m.[39m[34mtoBe[39m([33mNumber[39m(expected[33m.[39mcount))[33m;[39m
+    [90m928|[39m   })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m221 passed[39m[22m[90m (222)[39m
+[2m   Start at [22m 11:57:13
+[2m   Duration [22m 32.24s[2m (transform 510ms, setup 218ms, import 537ms, tests 31.12s, environment 0ms)[22m
+

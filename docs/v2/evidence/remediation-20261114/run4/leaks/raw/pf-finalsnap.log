@@ -1,0 +1,64 @@
+isolated-pg: afldb_v2_rem4leaks_pffinalsnap_test verified (cluster afldb_v2_isolated, 127.0.0.1:55691); running node
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand[39m
+
+ [32m✓[39m tests/integration/draftguru-import.test.ts [2m([22m[2m30 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 212928[2mms[22m[39m
+     [33m[2m✓[22m[39m an identity reload that carries the audited pick (NULL pick_number) unchanged is not refused [33m 32731[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses an audited pick the snapshot does not carry — normal run and --dry-run — and writes nothing [33m 47360[2mms[22m[39m
+     [33m[2m✓[22m[39m a changed dg_person_id on an audited person is a refused rewrite (D-5) [33m 16561[2mms[22m[39m
+     [33m[2m✓[22m[39m a reviewed reconciliation naming the exact keys and digest is the only way past; REPLACE_CLUB needs an owner ruling [33m 66302[2mms[22m[39m
+     [33m[2m✓[22m[39m a column an active override covers is not an effect: the replay restores it (ISSUE-160) [33m 47215[2mms[22m[39m
+     [33m[2m✓[22m[39m matches a reload key with a NULL component NULL-safely, as reload_keyed does [33m 444[2mms[22m[39m
+ [32m✓[39m tests/integration/match-results-promotion.test.ts [2m([22m[2m46 tests[22m[2m)[22m[33m 47241[2mms[22m[39m
+     [33m[2m✓[22m[39m match_results: a silent column and a blank cell keep goals, behinds and attendance together [33m 421[2mms[22m[39m
+     [33m[2m✓[22m[39m player_match_stats: a partial file changes only the figures it carries [33m 381[2mms[22m[39m
+     [33m[2m✓[22m[39m AFLDB-ISSUE-307: the promotion batch counts a new match as inserted and a re-promoted one as updated [33m 356[2mms[22m[39m
+       [33m[2m✓[22m[39m the existing nonblank spellings still validate and promote to the figure Number() reads [33m 382[2mms[22m[39m
+       [33m[2m✓[22m[39m refuses a differing protected value at validation, and admits identical or silent ones [33m 372[2mms[22m[39m
+         [33m[2m✓[22m[39m characterises the cycle the shared lock order removes: an unordered match_results writer against the stats hook [33m 1050[2mms[22m[39m
+         [33m[2m✓[22m[39m FOR SHARE blocks no reader; another promotion is refused at the gate meanwhile, and a retry succeeds [33m 5180[2mms[22m[39m
+         [33m[2m✓[22m[39m blocks the Match Sheet save and Return to source until the promotion finishes [33m 971[2mms[22m[39m
+         [33m[2m✓[22m[39m blocks any other UPDATE of the match row until the promotion finishes [33m 356[2mms[22m[39m
+         [33m[2m✓[22m[39m blocks a rekey (carry plus key change) until the promotion finishes, then it carries the authority [33m 377[2mms[22m[39m
+         [33m[2m✓[22m[39m blocks deleteMatch until the promotion finishes [33m 422[2mms[22m[39m
+         [33m[2m✓[22m[39m authority recorded while a promotion waits wins: the promotion then refuses and writes nothing [33m 326[2mms[22m[39m
+         [33m[2m✓[22m[39m bounds the wait at 5s with the retryable refusal, writes nothing, and a retry succeeds [33m 5271[2mms[22m[39m
+         [33m[2m✓[22m[39m keeps the timeout transaction-local: restored after the hook, absent on the connection afterwards [33m 5072[2mms[22m[39m
+           [33m[2m✓[22m[39m match_results: an ungated deadlock aborts exactly one participant; a refused promotion is atomic and retryable [33m 1159[2mms[22m[39m
+           [33m[2m✓[22m[39m player_match_stats: an ungated deadlock aborts exactly one participant; a refused promotion is atomic and retryable [33m 1136[2mms[22m[39m
+           [33m[2m✓[22m[39m an UNGATED cycle aborts exactly one participant atomically, whichever victim PostgreSQL selects [33m 1222[2mms[22m[39m
+ [32m✓[39m tests/integration/dob-enrichment-issues.test.ts [2m([22m[2m28 tests[22m[2m)[22m[33m 22958[2mms[22m[39m
+       [33m[2m✓[22m[39m tests 1/2: rerunning is idempotent and the issue identity is stable [33m 767[2mms[22m[39m
+       [33m[2m✓[22m[39m test 3: two club files retain distinct assertions for one player [33m 376[2mms[22m[39m
+       [33m[2m✓[22m[39m test 6: an unprocessed file's scope is untouched by a partial run [33m 724[2mms[22m[39m
+       [33m[2m✓[22m[39m test 7: an authoritative agreement removes the assertion [33m 705[2mms[22m[39m
+       [33m[2m✓[22m[39m test 8: a present but unmatchable record is retained, not treated as cessation [33m 724[2mms[22m[39m
+       [33m[2m✓[22m[39m test 9: a record deleted from a processed file is cleaned up [33m 711[2mms[22m[39m
+       [33m[2m✓[22m[39m test 4: an existing register assertion survives a club-list run untouched [33m 358[2mms[22m[39m
+       [33m[2m✓[22m[39m test 5: an existing club-list assertion survives a real register run untouched [33m 496[2mms[22m[39m
+       [33m[2m✓[22m[39m test 24: a fixture-source run cannot touch the real afltables population [33m 447[2mms[22m[39m
+       [33m[2m✓[22m[39m test 25: an empty asserted population is refused unconditionally (§4 check 1) [33m 752[2mms[22m[39m
+       [33m[2m✓[22m[39m test 26: an over-threshold drop is refused, then permitted only with --acknowledge-population-drop (§4 check 2) [33m 794[2mms[22m[39m
+       [33m[2m✓[22m[39m test 27: an equal-or-larger asserted population passes with no false positive (§11.5, recovery direction) [33m 767[2mms[22m[39m
+       [33m[2m✓[22m[39m test 28: an external_identity_conflict is refiled, never duplicated (D4) [33m 1492[2mms[22m[39m
+       [33m[2m✓[22m[39m test 10: an identical legacy-shape (B) resolved assertion is not refiled [33m 365[2mms[22m[39m
+       [33m[2m✓[22m[39m test 11: an identical v2 resolved assertion is not refiled [33m 354[2mms[22m[39m
+       [33m[2m✓[22m[39m test 12: a materially changed assertion (different asserted date) is filed as new [33m 376[2mms[22m[39m
+       [33m[2m✓[22m[39m test 13: a changed baseline (players.dob moved) is filed as new [33m 368[2mms[22m[39m
+       [33m[2m✓[22m[39m test 14: suppression is assertion-specific -- a resolved register conflict does not suppress a new club-list one [33m 377[2mms[22m[39m
+       [33m[2m✓[22m[39m test 19: clears when no unresolved DOB issue remains [33m 707[2mms[22m[39m
+       [33m[2m✓[22m[39m test 20: stays true when another unresolved DOB issue remains [33m 706[2mms[22m[39m
+       [33m[2m✓[22m[39m test 21: becomes true when a new unresolved DOB issue appears [33m 366[2mms[22m[39m
+ [32m✓[39m tests/integration/sealed-editor-guard.test.ts [2m([22m[2m21 tests[22m[2m)[22m[33m 4827[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses a missing, blank, short and excessive note, and leaves no match and no audit row [33m 359[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses without a reason, leaving the match and the audit; deletes with a reason and audits it [33m 422[2mms[22m[39m
+ [32m✓[39m tests/integration/submission-promotion.test.ts [2m([22m[2m21 tests[22m[2m)[22m[33m 3778[2mms[22m[39m
+ [32m✓[39m tests/integration/match-admin-delete.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 3598[2mms[22m[39m
+     [33m[2m✓[22m[39m AFLDB-ISSUE-181: refuses deletion, names the AFL API lineup dependency, and changes nothing [33m 420[2mms[22m[39m
+ [32m✓[39m tests/integration/join-request-approval.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 1357[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m7 passed[39m[22m[90m (7)[39m
+[2m      Tests [22m [1m[32m136 passed[39m[22m[2m | [22m[36m2 expected fail[39m[2m | [22m[33m1 skipped[39m[90m (162)[39m
+[2m   Start at [22m 12:21:31
+[2m   Duration [22m 318.96s[2m (transform 2.75s, setup 15.25s, import 5.23s, tests 296.69s, environment 2ms)[22m
+

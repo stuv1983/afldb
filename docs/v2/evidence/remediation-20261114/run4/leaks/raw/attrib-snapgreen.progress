@@ -1,0 +1,7 @@
+tests/integration/match-results-promotion.test.ts rc=0 residue-tables=0
+tests/integration/draftguru-import.test.ts rc=0 residue-tables=1
+tests/integration/dob-enrichment-issues.test.ts rc=1 residue-tables=3
+tests/integration/submission-promotion.test.ts rc=0 residue-tables=0
+tests/integration/sealed-editor-guard.test.ts rc=1 residue-tables=5
+tests/integration/match-admin-delete.test.ts rc=1 residue-tables=4
+tests/integration/join-request-approval.test.ts rc=0 residue-tables=0

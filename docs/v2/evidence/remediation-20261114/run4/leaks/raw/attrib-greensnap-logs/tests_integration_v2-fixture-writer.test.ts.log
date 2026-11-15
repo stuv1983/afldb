@@ -1,0 +1,19 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand[39m
+
+ [32m✓[39m tests/integration/v2-fixture-writer.test.ts [2m([22m[2m29 tests[22m[2m)[22m[33m 8897[2mms[22m[39m
+     [33m[2m✓[22m[39m is idempotent: replaying the same snapshot changes nothing and opens no batch [33m 335[2mms[22m[39m
+     [33m[2m✓[22m[39m dry-run executes the writes and keeps none of them [33m 533[2mms[22m[39m
+     [33m[2m✓[22m[39m cancelled (acknowledged), then reinstated by a later SCHEDULED observation [33m 556[2mms[22m[39m
+     [33m[2m✓[22m[39m abandoned (acknowledged) records a cancelled fixture whose reason says abandoned [33m 784[2mms[22m[39m
+     [33m[2m✓[22m[39m completed: a CONCLUDED observation of an owned fixture retains it untouched [33m 531[2mms[22m[39m
+     [33m[2m✓[22m[39m is idempotent for unconfirmed rows, including label rows [33m 322[2mms[22m[39m
+     [33m[2m✓[22m[39m resolves label participants to clubs and a venue in place when the provider confirms them [33m 530[2mms[22m[39m
+     [33m[2m✓[22m[39m never regresses: a confirmed fixture observed again as PLACEHOLDER is refused and nothing changes [33m 520[2mms[22m[39m
+     [33m[2m✓[22m[39m dry-run of a label row writes nothing [33m 305[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m29 passed[39m[22m[90m (29)[39m
+[2m   Start at [22m 10:57:09
+[2m   Duration [22m 9.96s[2m (transform 563ms, setup 155ms, import 546ms, tests 8.90s, environment 0ms)[22m
+

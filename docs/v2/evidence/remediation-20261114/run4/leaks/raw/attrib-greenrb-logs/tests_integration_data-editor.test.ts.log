@@ -1,0 +1,62 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand[39m
+
+[90mstderr[2m | tests/integration/data-editor.test.ts[2m > [22m[2mDurable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03)[2m > [22m[2m(5) D-257-9: a save records the folded continuing_url identity and the replay resolves it back
+[22m[39m[ISSUE-257 F-S9-03 / D-257-9] SKIPPED: no tracked profile_url_continuity rule is collision-free in afldb_test (every rule has a path already held by an external_identities row), so a synthetic player cannot hold a rule's two paths without ambiguity. No real row is used or mutated.
+
+ [32m✓[39m tests/integration/data-editor.test.ts [2m([22m[2m64 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 54975[2mms[22m[39m
+     [33m[2m✓[22m[39m propagates kicks correctly [33m 583[2mms[22m[39m
+     [33m[2m✓[22m[39m persists the match-sheet mutation and its data_edits audit together [33m 590[2mms[22m[39m
+     [33m[2m✓[22m[39m rolls the statistical mutation back when the required audit cannot be written [33m 446[2mms[22m[39m
+     [33m[2m✓[22m[39m commits the production match-sheet and migration-066 audit path as afldb_import [33m 462[2mms[22m[39m
+     [33m[2m✓[22m[39m writes dob, birth year, height, weight and notes into the record, audits each, and the replay re-creates them [33m 801[2mms[22m[39m
+     [33m[2m✓[22m[39m a cleared value is an explicit null in the record, and the replay clears it [33m 747[2mms[22m[39m
+     [33m[2m✓[22m[39m the guard does not turn a record that was already unreplayable into a block on every edit [33m 642[2mms[22m[39m
+     [33m[2m✓[22m[39m the guard agrees with the real replay about which records it refuses [33m 1478[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses a stale sheet whole, before any write (a settle must never become authority) [33m 387[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses a save whose token is missing [33m 333[2mms[22m[39m
+     [33m[2m✓[22m[39m rolls the row change back when the player has no durable identity [33m 390[2mms[22m[39m
+     [33m[2m✓[22m[39m commits the row change and its authority together, reusing an existing identity key [33m 457[2mms[22m[39m
+     [33m[2m✓[22m[39m deleteMatch refuses while active Match Sheet authority exists, and deletes nothing [33m 423[2mms[22m[39m
+     [33m[2m✓[22m[39m returns ordinary field authority to source: record withdrawn, row untouched [33m 382[2mms[22m[39m
+     [33m[2m✓[22m[39m a manual addition still unowned is withdrawn and its row deleted [33m 452[2mms[22m[39m
+     [33m[2m✓[22m[39m a manual addition a settling source has since owned is withdrawn and the row kept [33m 378[2mms[22m[39m
+     [33m[2m✓[22m[39m F-S7-01: a manual addition now owned by fitzroy_afldata is withdrawn and the row kept [33m 387[2mms[22m[39m
+     [33m[2m✓[22m[39m F-S7-01: a manual addition owned by an unsupported source refuses, writing nothing [33m 382[2mms[22m[39m
+     [33m[2m✓[22m[39m a manual removal is withdrawn with no canonical write; the next settle restores the row [33m 400[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses removing a player who holds Brownlow votes; an unvoted player of the same match (published zero) is removable [33m 550[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses removing or re-clubbing a player whose only vote is a NULL-match_id round row of this season and round (review A-05); zero, unrecorded and other-round rows do not block [33m 862[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses removing a player named by the match's Brownlow vote entry, but not an unnamed player of that match [33m 527[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses removing the player of a first-kick-goal record (a suppressed one too), naming where to clear it [33m 468[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses removing the kicker of an after-the-siren record [33m 391[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses a club change of a player carrying a vote, allows it for a free player, and allows a stat-only edit of the voted player [33m 621[2mms[22m[39m
+     [33m[2m✓[22m[39m Return to source refuses the row deletion of a manual addition that a Brownlow vote names, changing nothing [33m 405[2mms[22m[39m
+     [33m[2m✓[22m[39m does not revive a retired override, keeps its values in the audit trail, and audits carried keys of an active one [33m 428[2mms[22m[39m
+     [33m[2m✓[22m[39m an assignment made through the real coach mutation blocks deletion; match, assignment, override and audit unchanged [33m 447[2mms[22m[39m
+     [33m[2m✓[22m[39m an override retired through the real clear mutation does not block; the inactive record is kept [33m 562[2mms[22m[39m
+     [33m[2m✓[22m[39m a source-only assignment (no override) keeps the existing behaviour: deleted, cascading the assignment [33m 488[2mms[22m[39m
+     [33m[2m✓[22m[39m overrides naming another match do not block, including keys a prefix pattern would catch [33m 554[2mms[22m[39m
+     [33m[2m✓[22m[39m (1) rolls the row change AND the authority back when the authority write fails (post-110) [33m 470[2mms[22m[39m
+     [33m[2m✓[22m[39m (2a) replay re-applies a field correction over a reset source value [33m 718[2mms[22m[39m
+     [33m[2m✓[22m[39m (2b) replay recreates a durable addition the reload did not supply [33m 717[2mms[22m[39m
+     [33m[2m✓[22m[39m (2c) replay deletes a reinserted row under a durable removal [33m 674[2mms[22m[39m
+     [33m[2m✓[22m[39m (3a) an active key whose match_key is absent from matches refuses before any write [33m 997[2mms[22m[39m
+     [33m[2m✓[22m[39m (3b) an active key whose identity names no accepted external identity refuses before any write [33m 1023[2mms[22m[39m
+       [33m[2m✓[22m[39m BASIC LOCK TIMEOUT (no deadlock): refused at its 5 s bound, rolled back whole, every lock released [33m 5538[2mms[22m[39m
+       [33m[2m✓[22m[39m SETTLE/ADMIN DEADLOCK (settle stood in for by a test transaction, settle is the victim): the writer is refused at its bound and the settle recovers on a retry [33m 7050[2mms[22m[39m
+       [33m[2m✓[22m[39m BASIC LOCK TIMEOUT (no deadlock): refused at its 5 s bound, rolled back whole, every lock released [33m 5535[2mms[22m[39m
+       [33m[2m✓[22m[39m SETTLE/ADMIN DEADLOCK (settle stood in for by a test transaction, settle is the victim): the writer is refused at its bound and the settle recovers on a retry [33m 7086[2mms[22m[39m
+       [33m[2m✓[22m[39m first attempt raises 40P01, a later attempt succeeds: the outer transaction commits and the failed attempt's writes are gone [33m 350[2mms[22m[39m
+       [33m[2m✓[22m[39m 40P01 on every attempt: four attempts, the error propagates, and the whole outer transaction rolls back [33m 314[2mms[22m[39m
+     [33m[2m✓[22m[39m ISSUE-267: a one-field score edit keeps every unchanged component, and both final-period rows equal the corrected totals [33m 635[2mms[22m[39m
+     [33m[2m✓[22m[39m ISSUE-269: an attendance edit and a partial score edit on one match both survive, with derived totals and final periods [33m 650[2mms[22m[39m
+     [33m[2m✓[22m[39m equal-authority overrides that disagree are refused before any write [33m 508[2mms[22m[39m
+     [33m[2m✓[22m[39m identical overlapping values merge; an inactive override contributes nothing [33m 574[2mms[22m[39m
+     [33m[2m✓[22m[39m a score component neither the source nor the override records is refused, never written as zero [33m 516[2mms[22m[39m
+     [33m[2m✓[22m[39m a component the source lacks but another active group supplies is derived from the merge: the replay succeeds and census section 4 agrees [33m 571[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m63 passed[39m[22m[2m | [22m[33m1 skipped[39m[90m (64)[39m
+[2m   Start at [22m 11:49:31
+[2m   Duration [22m 57.53s[2m (transform 963ms, setup 233ms, import 1.95s, tests 54.98s, environment 0ms)[22m
+

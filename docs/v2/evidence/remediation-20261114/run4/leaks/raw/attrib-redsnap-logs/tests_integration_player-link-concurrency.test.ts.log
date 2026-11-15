@@ -1,0 +1,15 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand-red[39m
+
+ [32m✓[39m tests/integration/player-link-concurrency.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 3858[2mms[22m[39m
+     [33m[2m✓[22m[39m I8 — two links for the same provider to different players, released together from the provider lock: one resolved row, one audit row, the other refused as stale [33m 632[2mms[22m[39m
+     [33m[2m✓[22m[39m I9 — two providers linked to the same player, released together from the player lock: one wins, the other is refused as a collision; the index backs it up [33m 773[2mms[22m[39m
+     [33m[2m✓[22m[39m I10 — an admin link racing a raw bridge-style INSERT of the same provider: exactly one row, and the admin side reports stale on 23505; loader-second fails closed on both unique constraints [33m 804[2mms[22m[39m
+     [33m[2m✓[22m[39m I10 (revoke race; the brief's I10) — a revoke racing an in-flight consumer of the link waits for it, sees its committed use, and refuses: one serial order, no lost decision, no orphan ledger row [33m 576[2mms[22m[39m
+     [33m[2m✓[22m[39m I8–I10 fixture-leftover gate — the races leave zero ISSUE-235 fixture rows [33m 349[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m8 passed[39m[22m[90m (8)[39m
+[2m   Start at [22m 10:14:52
+[2m   Duration [22m 5.90s[2m (transform 1.35s, setup 163ms, import 1.51s, tests 3.86s, environment 0ms)[22m
+

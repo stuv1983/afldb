@@ -1,0 +1,24 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand-red[39m
+
+ [32m✓[39m tests/integration/match-results-promotion.test.ts [2m([22m[2m46 tests[22m[2m)[22m[33m 29433[2mms[22m[39m
+     [33m[2m✓[22m[39m match_results: a silent column and a blank cell keep goals, behinds and attendance together [33m 306[2mms[22m[39m
+     [33m[2m✓[22m[39m AFLDB-ISSUE-307: the promotion batch counts a new match as inserted and a re-promoted one as updated [33m 318[2mms[22m[39m
+       [33m[2m✓[22m[39m the existing nonblank spellings still validate and promote to the figure Number() reads [33m 345[2mms[22m[39m
+         [33m[2m✓[22m[39m characterises the cycle the shared lock order removes: an unordered match_results writer against the stats hook [33m 1037[2mms[22m[39m
+         [33m[2m✓[22m[39m FOR SHARE blocks no reader; another promotion is refused at the gate meanwhile, and a retry succeeds [33m 5130[2mms[22m[39m
+         [33m[2m✓[22m[39m blocks the Match Sheet save and Return to source until the promotion finishes [33m 869[2mms[22m[39m
+         [33m[2m✓[22m[39m blocks any other UPDATE of the match row until the promotion finishes [33m 357[2mms[22m[39m
+         [33m[2m✓[22m[39m blocks a rekey (carry plus key change) until the promotion finishes, then it carries the authority [33m 370[2mms[22m[39m
+         [33m[2m✓[22m[39m blocks deleteMatch until the promotion finishes [33m 410[2mms[22m[39m
+         [33m[2m✓[22m[39m bounds the wait at 5s with the retryable refusal, writes nothing, and a retry succeeds [33m 5218[2mms[22m[39m
+         [33m[2m✓[22m[39m keeps the timeout transaction-local: restored after the hook, absent on the connection afterwards [33m 5059[2mms[22m[39m
+           [33m[2m✓[22m[39m match_results: an ungated deadlock aborts exactly one participant; a refused promotion is atomic and retryable [33m 1134[2mms[22m[39m
+           [33m[2m✓[22m[39m player_match_stats: an ungated deadlock aborts exactly one participant; a refused promotion is atomic and retryable [33m 1140[2mms[22m[39m
+           [33m[2m✓[22m[39m an UNGATED cycle aborts exactly one participant atomically, whichever victim PostgreSQL selects [33m 1175[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m46 passed[39m[22m[90m (46)[39m
+[2m   Start at [22m 09:58:00
+[2m   Duration [22m 30.82s[2m (transform 735ms, setup 162ms, import 859ms, tests 29.43s, environment 0ms)[22m
+

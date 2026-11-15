@@ -1,0 +1,33 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand-red[39m
+
+ [31m❯[39m tests/integration/v2-brownlow-production-correction.test.ts [2m([22m[2m8 tests[22m[2m | [22m[33m8 skipped[39m[2m)[22m[32m 38[2mms[22m[39m
+     [2m[90m↓[39m[22m plans read-only, refuses a wrong live target and pre-apply row drift
+     [2m[90m↓[39m[22m rolls a failed backfill back, then applies/replays/reverses preserving all vote values and provenance
+     [2m[90m↓[39m[22m adopts exactly 621 positives, preserves 8901 zero rows, replays and reverses; refuses subsequent-write reversal
+     [2m[90m↓[39m[22m refuses premature issue resolution and unapproved or ambiguous eligibility
+     [2m[90m↓[39m[22m records and replays an authentic observe-only snapshot in the outer transaction
+     [2m[90m↓[39m[22m rolls all eligibility decisions/publication back on partial failure, then records an approved subset through the audited service
+     [2m[90m↓[39m[22m resolves only a genuinely healed ownership issue, atomically with its receipt and with replay
+     [2m[90m↓[39m[22m requires a fresh restored baseline and re-proves live identity before a historical-only correction
+
+[31m⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Suites 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m tests/integration/v2-brownlow-production-correction.test.ts[2m [ tests/integration/v2-brownlow-production-correction.test.ts ][22m
+[31m[1mError[22m: Dedicated Brownlow package clone required[39m
+[36m [2m❯[22m tests/integration/v2-brownlow-production-correction.test.ts:[2m51:34[22m[39m
+    [90m 49|[39m     d.oid::text AS "databaseOid", current_setting('cluster_name') AS "…
+    [90m 50|[39m     FROM pg_control_system() c CROSS JOIN pg_database d WHERE d.datnam…
+    [90m 51|[39m   if (row.database !== DB) throw new Error('Dedicated Brownlow package…
+    [90m   |[39m                                  [31m^[39m
+    [90m 52|[39m   [35mconst[39m url [33m=[39m [35mnew[39m [33mURL[39m(process[33m.[39menv[33m.[39m[33mAFLDB_TEST_DATABASE_URL[39m[33m![39m)[33m;[39m
+    [90m 53|[39m   target = { host: url.hostname, port: Number(url.port), ...row } as C…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [33m8 skipped[39m[90m (8)[39m
+[2m   Start at [22m 10:17:57
+[2m   Duration [22m 1.72s[2m (transform 998ms, setup 166ms, import 1.16s, tests 38ms, environment 0ms)[22m
+

@@ -1,0 +1,55 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-leaks-20261115/cand-red[39m
+
+ [31m❯[39m tests/integration/nl-answers-coaching.test.ts [2m([22m[2m23 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 2280[2mms[22m[39m
+     [32m✓[39m every Richmond coach, same rows in the same order[32m 99[2mms[22m[39m
+     [32m✓[39m Damien Hardwick's Richmond record is the measured 307/170/6/131, not his whole career[32m 27[2mms[22m[39m
+     [32m✓[39m a season witness returns exactly one Richmond coach for 2017[32m 12[2mms[22m[39m
+     [32m✓[39m counts a club's coaches rather than listing them when asked how many[32m 19[2mms[22m[39m
+     [32m✓[39m Richmond coaches with games >= 200[32m 35[2mms[22m[39m
+     [32m✓[39m Richmond coaches with games >= 100[32m 28[2mms[22m[39m
+[31m     [31m×[31m Richmond coaches with games >= 50[39m[32m 40[2mms[22m[39m
+     [32m✓[39m Richmond coaches with wins >= 100[32m 32[2mms[22m[39m
+     [32m✓[39m Richmond coaches with wins >= 50[32m 30[2mms[22m[39m
+     [32m✓[39m Richmond coaches with wins >= 25[32m 29[2mms[22m[39m
+     [32m✓[39m George Angus computes 70.00, which a plain W/G control does NOT match[32m 7[2mms[22m[39m
+     [32m✓[39m the 50-game board is led by Cliff Rankin, and dropping the qualifier changes the answer[32m 218[2mms[22m[39m
+     [32m✓[39m a reader-stated minimum is applied instead of the default[32m 90[2mms[22m[39m
+     [32m✓[39m a Western Bulldogs query returns Footscray-era coaching rows[32m 24[2mms[22m[39m
+     [32m✓[39m a Brisbane Lions query returns no Fitzroy coaching rows[32m 28[2mms[22m[39m
+     [32m✓[39m coachOnly agrees with coaches.player_id IS NULL on every returned row[32m 103[2mms[22m[39m
+     [32m✓[39m the table splits 368 player-linked / 18 coach-only[32m 2[2mms[22m[39m
+     [32m✓[39m an unknown coach returns no record at all[32m 4[2mms[22m[39m
+     [32m✓[39m a season with no coaching records returns an empty result, not a zero-row record[32m 5[2mms[22m[39m
+     [32m✓[39m the earliest recorded coaching season really is 1902[32m 16[2mms[22m[39m
+     [33m[2m✓[22m[39m every plan row parses to a coaching plan that validates [33m 320[2mms[22m[39m
+     [33m[2m✓[22m[39m every decline row declines, or refuses honestly at validation [33m 1078[2mms[22m[39m
+     [32m✓[39m the real coach directory keeps a colliding surname out of the alias set[32m 15[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m tests/integration/nl-answers-coaching.test.ts[2m > [22mcoaching thresholds match a hand-written HAVING[2m > [22mRichmond coaches with games >= 50
+[31m[1mAssertionError[22m: expected 15 to be 14 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 14[39m
+[31m+ 15[39m
+
+[36m [2m❯[22m tests/integration/nl-answers-coaching.test.ts:[2m185:36[22m[39m
+    [90m183|[39m       ) q
+    [90m184|[39m     `[39m[33m;[39m
+    [90m185|[39m     [34mexpect[39m([33mNumber[39m(expected[33m.[39mcount))[33m.[39m[34mtoBe[39m(expectedCount)[33m;[39m
+    [90m   |[39m                                    [31m^[39m
+    [90m186|[39m     [34mexpect[39m(total)[33m.[39m[34mtoBe[39m(expectedCount)[33m;[39m
+    [90m187|[39m   })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m22 passed[39m[22m[90m (23)[39m
+[2m   Start at [22m 11:35:38
+[2m   Duration [22m 4.22s[2m (transform 1.10s, setup 235ms, import 1.33s, tests 2.28s, environment 0ms)[22m
+
