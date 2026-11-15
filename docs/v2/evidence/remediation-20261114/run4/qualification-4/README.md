@@ -173,3 +173,9 @@ Supplementary, my own addition (`clones_c.sh`, phase `mreal`, `clones/mreal*`): 
 
 `scripts/` holds every host script as run (LF): `common.sh setup.sh closure.sh closure.mjs rebuild.sh digest.mjs qual.sh clones.sh clones_b.sh clones_c.sh post.sh compare.mjs collect_p1.sh collect_cells.sh va.sh probe.sh final_state.sh aw.sh aw2.sh final_stop.sh`
 (`clones.sh` is the first pass; `clones_b.sh` = the corrected ISSUE-238 rerun, phase `ct_rsc`; `clones_c.sh` adds phase `mreal`). Cluster stopped; no listener on :55687; host `cand` and `rb` HEAD = Q'', porcelain empty (`misc/final-stop.txt`). The workspace is left in place (`du`: workspace 5.4 GB, cluster 5.0 GB).
+
+## 10. Committed hash lists
+
+Four payload hash lists are committed as `*.hashlist.txt`, not `*.sha256`: `p1/inputs-files-q.hashlist.txt` (752 rebuild-input files), `clones/fixture-root.hashlist.txt` (258 retained fixture files), `fixtures/stagea-src.hashlist.txt` (90) and
+`fixtures/stagea-expected.hashlist.txt` (42). They list files that live only on the host (the run-3 copies); the run-4 manifest checker treats any `*sha256*` basename as a manifest and, with no host root declared for them in its map, reported their 1,142 entries
+`UNRESOLVED`. Content is unchanged by the rename (listed with its hash in `SHA256SUMS`); the first commit of this directory (`656b2c62`) carried them under the old names.
