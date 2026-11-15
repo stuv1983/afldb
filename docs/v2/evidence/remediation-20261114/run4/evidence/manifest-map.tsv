@@ -98,3 +98,6 @@ hroot	run3/qualification-3/stagea-src.sha256	/mnt/ssd/afldb-rem3-qual-20261114/c
 croot	run3/rebuild/inputs-files.sha256	-	-	gitignored source inputs, copied read-only into the rebuild checkout (run3/rebuild/README.md:35-39)
 hroot	run3/rebuild/inputs-files.sha256	/mnt/ssd/afldb-rem3-rebuild-20261114/cand/data	-	run3/rebuild/README.md:38-39 (copied into $W/cand/data/, re-verified in place, per-file inputs-files.sha256, 752 lines)
 hroot	tests/host-log-sha256.txt	/mnt/ssd/afldb-rem-tests-20261114/evidence	-	tests/README.md:4,81 ("Raw logs on the host under evidence/final/; sha256 in host-log-sha256.txt"; entries are final/<log>)
+hroot	run4/baseline/raw/SHA256SUMS-host.txt	/mnt/ssd/afldb-rem4-baseline-20261115/evidence	-	run4/baseline/README.md:196-197 (host seal output; scripts and full c{1,2,3} JSON/logs stay in the host evidence dir; committed copies are scripts/ and gzipped raw/)
+hroot	run4/baseline/raw/host-raw-sha256.txt	/mnt/ssd/afldb-rem4-baseline-20261115/evidence	-	run4/baseline/README.md:195-197 (full uncompressed c{1,2,3}.json/.log under the host evidence dir; committed copies gzipped)
+hroot	run4/clubcmp/evidence/c1_test-sha256.txt	/mnt/ssd/afldb-rem4-clubcmp-20261115/cand	-	run4/clubcmp/README.md:188-191 (repository-relative test files hashed in the clubcmp host checkout at its code commit; blobs in evidence/c1_test-blobs.txt)

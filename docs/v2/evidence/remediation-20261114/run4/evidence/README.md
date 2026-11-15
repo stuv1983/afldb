@@ -191,3 +191,15 @@ hashes in a separately named file, e.g. `HOST-SHA256SUMS`, with absolute host pa
 Edits: only `run4/evidence/**` and the one new `run2/evidence/ERRATA.md`. Host use, all read-only hashing and listing of paths named in committed records, plus my own scratch: `/mnt/ssd/afldb-rem4-evidence-20261115` (a clone of the base bundle at B4, the tool copies,
 `new-at-B4-host.tsv`, `new-at-B4-host.err`) and two helper scripts in the host `/tmp` (`rem4ev-hprobe.sh`, `rem4ev-hfind.sh`; removed at the end of the run) that I used to derive the host roots (read-only `sha256sum` / `find`). While deriving the roots I hashed, never wrote, files under the
 run-1/2/3 workspaces `/mnt/ssd/afldb-rem*-2026111*`, the retained `/mnt/ssd/afldb-rem3-qual-20261114/cand/data/...` copies and `/mnt/ssd/afldb-rem3-base/rebuilt/`. Nothing under RB-1, production, DEV application paths or the shared `afldb_test` was touched; nothing was pushed.
+
+## 8. Amendment (orchestrator, 2026-11-15, after the Q″ qualification)
+
+The final-candidate gate (`REQUIRE_NO_UNRESOLVED=1`) at the integration tip after Q″ reported **UNRESOLVED 11**, all in manifests committed
+after B4 by other run-4 scopes whose host-only entries had no declared host root: `run4/baseline/raw/SHA256SUMS-host.txt` (3: `classify.js`,
+`post.sh`, `q-coleman.sh`), `run4/baseline/raw/host-raw-sha256.txt` (6: `c{1,2,3}.{json,log}`) and `run4/clubcmp/evidence/c1_test-sha256.txt`
+(2: the two repository-relative test files of the clubcmp code commit `f368d275`). Three `hroot` rows were appended to `manifest-map.tsv`
+(the baseline host evidence directory and the clubcmp host checkout, each citing the README lines that name it); no existing row changed and the
+checker script is unchanged. The orchestrator first confirmed read-only on the host that each of the 11 paths exists and hashes to the recorded
+value. `SHA256SUMS` lines for `README.md` and `manifest-map.tsv` were updated in the same commit; their B4-sealed values were
+`052b9a64dcd0f503a328e33667e6dd75f2cc5974320d67d438f967aeda9db391` (README) and `8efe7e00b15b27f064782733db9db9660fa7ee09330b9bb3c08ef86ed5e049d4` (map), recoverable with `git show d184d63e:docs/v2/evidence/remediation-20261114/run4/evidence/<file>`
+(the evidence scope commit as integrated; scope branch `4c452d88`). Under RUN-PLAN-4 §3a F-008 a map change is an executable change: this commit is part of the fix-loop revision Q‴.
