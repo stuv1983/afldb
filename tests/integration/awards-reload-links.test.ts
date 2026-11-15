@@ -3270,6 +3270,23 @@ describe.skipIf(!canRunFixtureImporter)(
         const [{ year }] = await sql<{ year: number }[]>`
           SELECT max(year)::int AS year FROM seasons
         `;
+        // ISSUE-363 (run 4, leaks F-L02): the reloads below recompute each award's span from its active winners,
+        // so a fixture winner in the latest season (2027 on the accepted rebuild) moves awards.last_season there
+        // and, left behind, blocks deleting that season (afl-api-c7-observation, awards_last_season_fkey).
+        // Capture the three spans now and put them back after the fixture rows are gone.
+        const spansBefore = await sql<{ id: number; first: number | null; last: number | null }[]>`
+          SELECT id, first_season AS first, last_season AS last
+            FROM awards WHERE id IN (${namedMedalAward.id}, ${aaAward.id}, ${rsAward.id})
+           ORDER BY id
+        `;
+        // Pushed first, so the reversed unwind runs it AFTER the fixture rows below are deleted.
+        cleanup.push(async () => {
+          for (const span of spansBefore) {
+            await sql`
+              UPDATE awards SET first_season = ${span.first}, last_season = ${span.last} WHERE id = ${span.id}
+            `;
+          }
+        });
 
         // A manual admin winner inside the legacy domain scope, an ingest-
         // promoted All-Australian row and an ingest-promoted Rising Star
