@@ -1,0 +1,107 @@
+# DEV (streamanator) service state — read-only, 2026-11-15T17:38:47+11:00
+afldb.service 1732 0 active c15b39a7e5554f30a8d1806333c9e880  since=Sat 2026-11-14 03:01:41 AEDT
+postgresql@16-main.service 1531 0 active f21f38b180c74c3e9baf2a87bad28e21  since=Sat 2026-11-14 03:01:41 AEDT
+caddy.service 1683 0 active e18d81237bc044ef829f5c17ead441ec  since=Sat 2026-11-14 03:01:42 AEDT
+listeners (DEV): 127.0.0.1:2019 127.0.0.1:3000 127.0.0.1:5432 
+listeners (556xx/557xx): 
+timer: Sun 2026-11-15 17:40:00 AEDT       1min 12s Sun 2026-11-15 17:35:15 AEDT  3min 32s ago afldb-settle-afl-api-brownlow.timer afldb-settle-afl-api-brownlow.service
+timer: Mon 2026-11-16 05:11:56 AEDT            11h Sun 2026-11-15 05:13:14 AEDT       12h ago afldb-settle-afl-api.timer          afldb-settle-afl-api.service
+DEV checkout HEAD: 8b024098a6771fc5e5be2f8bf006c9c3ca8ab55a
+load 0.53 1.08 1.48; /mnt/ssd free  392G
+mem: total 31Gi used 4.6Gi avail 26Gi
+rem3 workspaces: /mnt/ssd/afldb-rem3-base /mnt/ssd/afldb-rem3-closure-20261114 /mnt/ssd/afldb-rem3-closure-20261114-pg /mnt/ssd/afldb-rem3-integ-20261114 /mnt/ssd/afldb-rem3-integ-20261114-pg /mnt/ssd/afldb-rem3-integb-20261114 /mnt/ssd/afldb-rem3-integb-20261114-pg /mnt/ssd/afldb-rem3-qual-20261114 /mnt/ssd/afldb-rem3-qual-20261114-pg /mnt/ssd/afldb-rem3-rebuild-20261114 /mnt/ssd/afldb-rem3-rebuild-20261114-pg /mnt/ssd/afldb-rem3-stateb-20261114 /mnt/ssd/afldb-rem3-stateb-20261114-pg 
+rem4 workspaces: /mnt/ssd/afldb-rem4-base /mnt/ssd/afldb-rem4-baseline-20261115 /mnt/ssd/afldb-rem4-baseline-20261115-pg /mnt/ssd/afldb-rem4-brownlow-20261115 /mnt/ssd/afldb-rem4-brownlow-20261115-pg /mnt/ssd/afldb-rem4-clubcmp-20261115 /mnt/ssd/afldb-rem4-clubcmp-20261115-pg /mnt/ssd/afldb-rem4-coleman276-20261115 /mnt/ssd/afldb-rem4-coleman276-20261115-pg /mnt/ssd/afldb-rem4-evidence-20261115 /mnt/ssd/afldb-rem4-fixloop-20261115 /mnt/ssd/afldb-rem4-fixloop-20261115-pg /mnt/ssd/afldb-rem4-fixup-20261115 /mnt/ssd/afldb-rem4-fixup-20261115-pg /mnt/ssd/afldb-rem4-gates-20261115 /mnt/ssd/afldb-rem4-gates-20261115-pg /mnt/ssd/afldb-rem4-leaks-20261115 /mnt/ssd/afldb-rem4-leaks-20261115-pg /mnt/ssd/afldb-rem4-qual-20261115 /mnt/ssd/afldb-rem4-qual-20261115-pg /mnt/ssd/afldb-rem4-rbfail-20261115 /mnt/ssd/afldb-rem4-rbfail-20261115-pg /mnt/ssd/afldb-rem4-shared-20261115 /mnt/ssd/afldb-rem4-shared-20261115-pg 
+postgres processes (any user, cmd): /usr/lib/postgresql/16/bin/postgres -D /var/lib/postgresql/16/main -c config_file=/etc/postgresql/16/main/postgresql.conf;
+## RB-1 paths (read-only ls)
+EXISTS /mnt/ssd/afldb-i316-rb-I-20261023T0905Z
+lrwxrwxrwx 1 arm arm 56 Nov  5 18:36 /mnt/ssd/afldb-i316-rb-I-20261023T0905Z -> /mnt/ssd/afldb/workspaces/afldb-i316-rb-I-20261023T0905Z
+total 6224
+drwx------ 18 arm arm    4096 Oct 23 19:44 .
+drwx------  9 arm arm    4096 Oct 23 19:44 ..
+drwx------  3 arm arm    4096 Oct 23 19:44 .agents
+-rw-------  1 arm arm   18352 Oct 23 19:44 AGENTS.md
+-rw-------  1 arm arm  142109 Oct 23 19:44 blockers.md
+-rw-------  1 arm arm  951887 Oct 23 19:44 CHANGELOG.md
+drwx------  5 arm arm    4096 Oct 23 19:44 .claude
+-rw-------  1 arm arm   32571 Oct 23 19:44 CLAUDE.md
+drwx------  8 arm arm    4096 Oct 23 19:44 data
+drwx------  3 arm arm    4096 Oct 23 19:44 deploy
+drwx------  7 arm arm    4096 Oct 23 19:44 docs
+drwx------  7 arm arm    4096 Oct 23 19:44 documentation
+-rw-------  1 arm arm   20708 Oct 23 19:44 .env.example
+-rw-------  1 arm arm    3161 Oct 23 19:44 eslint.config.mjs
+drwx------  8 arm arm    4096 Oct 23 19:44 .git
+-rw-------  1 arm arm    5175 Oct 23 19:44 .gitattributes
+-rw-------  1 arm arm    8879 Oct 23 19:44 .gitignore
+drwx------  4 arm arm    4096 Oct 23 19:44 issues
+-rw-------  1 arm arm  229942 Oct 23 19:44 IssuesIndex.md
+-rw-------  1 arm arm 4468560 Oct 23 19:44 issues.md
+drwx------  3 arm arm    4096 Oct 23 19:44 legacy
+-rw-------  1 arm arm    3883 Oct 23 19:44 next.config.ts
+lrwxrwxrwx  1 arm arm      87 Oct 23 19:44 node_modules -> /home/arm/afldb-c2-CLEANINSTALL-20261022T195338Z/repolock-scripts-reviewed/node_modules
+-rw-------  1 arm arm    5642 Oct 23 19:44 package.json
+-rw-------  1 arm arm  293071 Oct 23 19:44 package-lock.json
+drwx------  8 arm arm    4096 Oct 23 19:44 packages
+drwx------  3 arm arm    4096 Oct 23 19:44 .phaneslight
+drwx------  2 arm arm    4096 Oct 23 19:44 playbooks
+-rw-------  1 arm arm    1555 Oct 23 19:44 playwright.admin-nav.config.ts
+EXISTS /mnt/ssd/afldb/workspaces/afldb-i316-rb-I-20261023T0905Z
+total 36
+drwx------  9 arm arm 4096 Oct 23 19:44 .
+drwx------ 37 arm arm 4096 Nov  7 09:17 ..
+drwx------  3 arm arm 4096 Oct 23 19:47 bin
+drwx------  2 arm arm 4096 Oct 23 19:44 capture
+drwx------  4 arm arm 4096 Nov  7 20:43 cluster
+drwx------  2 arm arm 4096 Oct 23 19:54 logs
+drwx------ 18 arm arm 4096 Oct 23 19:44 package
+drwx------  3 arm arm 4096 Oct 23 19:53 tmp
+drwx------  2 arm arm 4096 Oct 23 19:53 work
+total 6224
+drwx------ 18 arm arm    4096 Oct 23 19:44 .
+drwx------  9 arm arm    4096 Oct 23 19:44 ..
+drwx------  3 arm arm    4096 Oct 23 19:44 .agents
+-rw-------  1 arm arm   18352 Oct 23 19:44 AGENTS.md
+-rw-------  1 arm arm  142109 Oct 23 19:44 blockers.md
+-rw-------  1 arm arm  951887 Oct 23 19:44 CHANGELOG.md
+drwx------  5 arm arm    4096 Oct 23 19:44 .claude
+-rw-------  1 arm arm   32571 Oct 23 19:44 CLAUDE.md
+drwx------  8 arm arm    4096 Oct 23 19:44 data
+drwx------  3 arm arm    4096 Oct 23 19:44 deploy
+drwx------  7 arm arm    4096 Oct 23 19:44 docs
+drwx------  7 arm arm    4096 Oct 23 19:44 documentation
+-rw-------  1 arm arm   20708 Oct 23 19:44 .env.example
+-rw-------  1 arm arm    3161 Oct 23 19:44 eslint.config.mjs
+drwx------  8 arm arm    4096 Oct 23 19:44 .git
+-rw-------  1 arm arm    5175 Oct 23 19:44 .gitattributes
+-rw-------  1 arm arm    8879 Oct 23 19:44 .gitignore
+drwx------  4 arm arm    4096 Oct 23 19:44 issues
+-rw-------  1 arm arm  229942 Oct 23 19:44 IssuesIndex.md
+-rw-------  1 arm arm 4468560 Oct 23 19:44 issues.md
+drwx------  3 arm arm    4096 Oct 23 19:44 legacy
+-rw-------  1 arm arm    3883 Oct 23 19:44 next.config.ts
+lrwxrwxrwx  1 arm arm      87 Oct 23 19:44 node_modules -> /home/arm/afldb-c2-CLEANINSTALL-20261022T195338Z/repolock-scripts-reviewed/node_modules
+-rw-------  1 arm arm    5642 Oct 23 19:44 package.json
+-rw-------  1 arm arm  293071 Oct 23 19:44 package-lock.json
+drwx------  8 arm arm    4096 Oct 23 19:44 packages
+drwx------  3 arm arm    4096 Oct 23 19:44 .phaneslight
+drwx------  2 arm arm    4096 Oct 23 19:44 playbooks
+-rw-------  1 arm arm    1555 Oct 23 19:44 playwright.admin-nav.config.ts
+## rebuilt dump
+/mnt/ssd/afldb-rem3-base/:
+total 9124
+drwxrwxr-x  3 arm arm    4096 Nov 14 21:26 .
+drwxr-xr-x 99 arm arm  131072 Nov 15 16:58 ..
+-rw-r--r--  1 arm arm 9203056 Nov 14 21:10 base-6d5388ea.bundle
+-rw-rw-r--  1 arm arm       0 Nov 14 21:16 heavy.lock
+drwxrwxr-x  2 arm arm    4096 Nov 14 21:29 rebuilt
+
+/mnt/ssd/afldb-rem3-base/rebuilt/:
+total 20904
+drwxrwxr-x 2 arm arm     4096 Nov 14 21:29 .
+drwxrwxr-x 3 arm arm     4096 Nov 14 21:26 ..
+-r--r--r-- 1 arm arm 20662515 Nov 14 21:27 afldb_v2_rb_rem3-6d5388ea.dump
+-r--r--r-- 1 arm arm     1749 Nov 14 21:29 afldb_v2_rb_rem3-6d5388ea.table-counts.tsv
+-r--r--r-- 1 arm arm   710882 Nov 14 21:27 afldb_v2_rb_rem3-draftguru-bridge-child-v3-6d5388ea.json
+-r--r--r-- 1 arm arm     2056 Nov 14 21:27 restore-dump.mjs
+-r--r--r-- 1 arm arm     6229 Nov 14 21:29 RESTORE.md
+-r--r--r-- 1 arm arm      489 Nov 14 21:29 SHA256SUMS

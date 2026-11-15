@@ -15,6 +15,19 @@ commit.
 
 ## [Unreleased]
 
+### Remediation run 4 of the 2026-11-14 review (local, final executable revision `16027092`, not published, not deployed)
+
+Nothing was pushed, deployed, installed, or written on production or DEV. Records: `docs/v2/evidence/remediation-20261114/run4/`.
+
+#### Changed
+- **Brownlow coverage (ISSUE-365, owner decision D-365-1):** `recomputeBrownlowCoverage` no longer infers "no medal awarded" from missing results. A completed season without loaded Brownlow results stays `pending`; only the declared seasons 1897-1923 and 1942-1945 (`BROWNLOW_DECLARED_NO_MEDAL_SEASONS`, from `data/reference/stat-availability.json`) are `not_applicable`. Applies to future recomputes; no existing row is repaired. `docs/data-dictionary.md` §3.2a and `docs/architecture.md` §4.6 updated.
+
+#### Fixed (tests and evidence tooling, ISSUE-363)
+- Stale integration witnesses re-expressed against independent oracles with stable keys and an explicit season bound (club-comparison, `database`, release-gates; owner decisions 363-W, 363-G, 363-B); the Coleman legacy transition scoped to its measured 46 rows (363-C); issue276 finals coverage restored on a suite-owned season; the Brownlow settle suites use owned provider ids.
+- The default shared integration mode no longer leaks rows between files: `admin-fixtures` and `after-siren` leave pre-existing rows untouched (T363-2, T363-3); seven suites remove or restore what they write; awards-reload-links restores the award spans its fixture moves; state-b creates its own actor. Shared mode now fails exactly the ids per-file mode fails.
+- 40 integration failures seen only on the accepted rebuild (surrogate ids, an empty `auth_users`, a teardown that deleted a real Coleman row) fixed.
+- A replacement evidence-manifest checker with exact resolution (`run4/evidence/verify-manifests.sh`); the run-2 script is kept byte-identical with an erratum.
+
 ### Remediation run 3 of the 2026-11-14 review (local, qualified at `692b1902`, not published, not deployed)
 
 Nothing was pushed, deployed, installed, or written on production or DEV; no application code changed. Records: `docs/v2/evidence/remediation-20261114/run3/`.

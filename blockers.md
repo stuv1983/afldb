@@ -1,5 +1,11 @@
 # AFLDB Waiting and Blocker Register
 
+> **2026-11-15 remediation run 4 (this register's counts are NOT recomputed).** Records: `docs/v2/evidence/remediation-20261114/run4/` (`RESIDUALS-4.md`, `QUALIFICATION-4.md`, `FAILURE-LEDGER-4.md`, `APPROVAL-PACKET-4.md`, which supersedes packet 3). Final executable revision `16027092`, **local, not published, not deployed**; the final candidate is the local tag named in the packet.
+> - **Fixed locally (publication pending):** ISSUE-365 rule (D-365-1, future recomputes only); ISSUE-363 owner decisions 363-W/G/C/B/3, shared-mode T363-2/T363-3 and leaks, rebuild-only failures, evidence checker.
+> - **Awaiting owner decision:** ISSUE-365 B0 read-only production probe and the conditional repair (669 2026 `player_season_stats` rows read `not_applicable` on the 4 Nov snapshot); the public wording of a `pending` Brownlow season; Gridley / the rebuild's 0 `data_overrides` (ISSUE-363, class 5). Run-2/3 waits below are unchanged.
+> - **RB-1 (retain; excluded from every cleanup):** `/mnt/ssd/afldb-i316-rb-I-20261023T0905Z` is a symlink to `/mnt/ssd/afldb/workspaces/afldb-i316-rb-I-20261023T0905Z` (one directory, two names); it holds the only retained copy outside run-owned workspaces of the standard rebuild's accepted inputs. Never write, move, delete or clean it (`docs/v2/isolated-rebuild.md` §6).
+> - Open issues: 10 (332, 348, 350, 351, 352, 357, 362, 363, 364, 365).
+
 > **2026-11-15 remediation run 3 (this register's counts are NOT recomputed).** Records: `docs/v2/evidence/remediation-20261114/run3/` (`RESIDUALS-3.md`, `QUALIFICATION-3.md`, `APPROVAL-PACKET-3.md`, which supersedes packet 2). Final executable revision `692b1902`, **local, not published, nothing installed**.
 > - **Fixed locally (publication pending):** ISSUE-363 test defects (state-b order dependence, snapshot-row deletion in `settle-afl-api`, `settle-afl-api-brownlow` coverage contamination, issue276 fixture collision, 4 `database` witnesses). ISSUE-363 is **partially resolved**.
 > - **Awaiting owner decision (new):** ISSUE-363 stale witnesses (27), the three "2026 is provisional" gates, the Coleman contract 46 pin, the birth-date pins; D-365-1 (ISSUE-365 Brownlow coverage rule). Run-2 waits below are unchanged.

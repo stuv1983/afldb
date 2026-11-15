@@ -1,6 +1,40 @@
-# Remediation run 2026-11-14 — handoff (runs 1, 2 and 3 complete; candidate local, not published)
+# Remediation run 2026-11-14 — handoff (runs 1 to 4 complete; candidate local, not published)
 
-## Run 3 (2026-11-14/15, read this first)
+## Run 4 (2026-11-15, read this first)
+
+**Start from `run4/APPROVAL-PACKET-4.md`** (it supersedes packets 3, 2 and 1). The final candidate is the commit the local annotated tag
+**`remediation-final-20261115`** points at (also the local branch `claude/remediation-final-20261115` and the tip of `claude/remediation-20261114`);
+print it with `git rev-list -n 1 remediation-final-20261115`. A commit cannot name its own SHA: the tag annotation and the closure phase-B record
+(written outside the candidate) carry it. Records: `run4/QUALIFICATION-4.md` (Q″ `1f7b0d71`, final executable revision **Q‴ `16027092`**),
+`run4/FAILURE-LEDGER-4.{md,tsv}`, `run4/RESIDUALS-4.md`, `run4/RUN-PLAN-4.md`, `run4/PLAN-REVIEW-4.md` (PROCEED WITH MITIGATIONS, 0 CRIT/HIGH),
+`run4/AGENT-BRIEF-COMMON-4.md`, `run4/CLOSURE-4.md`, and the scope READMEs `run4/{gates,baseline,coleman276,evidence,brownlow,clubcmp,rbfail,shared,fixup,leaks,qualification-4,fixloop}/README.md`.
+
+**Nothing was pushed, merged, deployed, installed, restarted or written on production or DEV; there was no production contact.** DEV `8b024098`
+unchanged (`run4/DEV-STATE-BEFORE-4.txt` vs `run4/DEV-STATE-AFTER-4.txt`).
+
+| Issue | State after run 4 |
+|---|---|
+| 363 | open, **fixed locally except owner-decision items**: 363-W/G/C/B/3, T363-2/T363-3, shared-mode leaks, 40 rebuild-only failures, issue276 finals, Brownlow suites' owned ids, evidence checker; remaining: Gridley (class 5) owner decision |
+| 365 | open: **rule fixed locally (D-365-1), future recomputes only**; B0 probe and conditional repair await the owner (669 2026 `player_season_stats` rows `not_applicable` on the 4 Nov snapshot) |
+| all others | unchanged from run 3 |
+
+**RB-1:** `/mnt/ssd/afldb-i316-rb-I-20261023T0905Z` (symlink) = `/mnt/ssd/afldb/workspaces/afldb-i316-rb-I-20261023T0905Z`: one directory, two
+names; retain; excluded from every cleanup (`docs/v2/isolated-rebuild.md` §6, `run4/RB1-PATHS.txt`). Run 4 did not read it.
+
+**Run-4 commits** (`git log --reverse c8ea9ef8..remediation-final-20261115`): plan `f358ed29`, B4 `7cfbe186`, RB-1 doc `ca806a7f`; scope commits cherry-picked
+(`-x`) from `claude/rem4-<scope>-20261115`; orchestrator fixes `65fe171d`, `581a898b`, `1f7b0d71` (**Q″**); qual records; fix-loop `6eb90a3e`, `16027092`
+(**Q‴**, last executable change); then records only, ending with the closure record (the candidate).
+
+**Next actions, in order:** owner approval A (publication of the tagged candidate); B0 read-only production probe (pins and the ISSUE-365 2026 rows);
+B1; the ISSUE-365 conditional repair only if B0 shows stale rows; owner decisions in packet 4 §C; B2 before 2027-03-10.
+
+**Housekeeping (run 4):** host workspaces `/mnt/ssd/afldb-rem4-*-20261115` (+ `-pg` clusters, all stopped) and `/mnt/ssd/afldb-rem4-base` are left in
+place (`RESIDUALS-4.md` §4). Worktrees `D:\dev\afldb-rem4-*` and scratch `D:\tmp\afldb-rem4-*` are left for the owner. Agent returns are persisted
+(gitignored) under `.phaneslight/returns/rem4-20261115/` of the integration worktree.
+
+---
+
+## Run 3 (2026-11-14/15)
 
 **Start from `run3/APPROVAL-PACKET-3.md`** (it supersedes packet 2 and packet 1). Records: `run3/QUALIFICATION-3.md` (Q′ **`692b1902`**),
 `run3/RESIDUALS-3.md` (with `run2/RESIDUALS.md` for unchanged rows), `run3/RUN-PLAN-3.md`, `run3/PLAN-REVIEW-3.md` (PROCEED, 0 CRIT/HIGH),
