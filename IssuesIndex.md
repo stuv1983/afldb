@@ -9,7 +9,9 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Current state — 2026-11-16 (published):** **10 open issues (unchanged).** Owner Approval A executed: `origin/main` fast-forwarded `de640826..a2e6ea99` (172 commits; executable revision `f6af6da9`). **Nothing deployed**: production still serves `c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x` and ISSUE-365's 669 rows are unrepaired. Release-and-repair packet: `docs/v2/evidence/remediation-20261114/run6/RELEASE-AND-REPAIR-PACKET-6.md`.
+**Current state — 2026-11-16 (packet 6R, local):** **10 open issues (unchanged).** Bounded safety correction of the ISSUE-365 B1a operation: corrected runner, acceptance and reversal (`run6r/b1a/`, commit `15aa89cb`, unpushed), rehearsed on disposable copies only; backup verification now an explicit owner choice (option A fresh restore on streamanator, or option B destructive `afldb_restore_test` replacement). No production contact; `origin/main` still `a2e6ea99`; production still serves `c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x`. Replacement packet: `docs/v2/evidence/remediation-20261114/run6r/RELEASE-AND-REPAIR-PACKET-6R.md`.
+
+**Earlier state — 2026-11-16 (published):** **10 open issues (unchanged).** Owner Approval A executed: `origin/main` fast-forwarded `de640826..a2e6ea99` (172 commits; executable revision `f6af6da9`). **Nothing deployed**: production still serves `c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x` and ISSUE-365's 669 rows are unrepaired. Release-and-repair packet: `docs/v2/evidence/remediation-20261114/run6/RELEASE-AND-REPAIR-PACKET-6.md`.
 
 **Earlier state — 2026-11-15 (finalisation run 5, local):** **10 open issues (unchanged).** B0 read-only production probe done (20:19 AEDT): production unchanged since run 2 (`c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x`, ledger 118, no 2027 row) and **ISSUE-365 present** (669 2026 player-season rows `not_applicable`). T-2 corrected locally (test-only, executable revision `f6af6da9`). Candidate: local tag `remediation-final-20261115-r5`; packet `docs/v2/evidence/remediation-20261114/run5/APPROVAL-PACKET-5.md` (supersedes packet 4; corrects the B1 window to daytime). Not published, not deployed.
 
@@ -157,7 +159,8 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 - **Run 4 (2026-11-15, local, `16027092`):** D-365-1 implemented and qualified (`BROWNLOW_DECLARED_NO_MEDAL_SEASONS`, 1897-1923 and 1942-1945); future recomputes only. The 4 Nov snapshot already holds 669 2026 `player_season_stats` rows at `not_applicable`.
 - **Run 5 B0 (2026-11-15):** present on production: 669/669 2026 `player_season_stats` rows `not_applicable`; coverage `pending`; admin not locked (`run5/B0-FINDINGS.md`).
 - **Published 2026-11-16** (`origin/main` = `a2e6ea99`); not deployed.
-- **Next action:** owner approvals B1, B1a-0 (fresh backup + restore verification), B1a (669 rows) and D-365-W per `run6/RELEASE-AND-REPAIR-PACKET-6.md`.
+- **Packet 6R (2026-11-16, local):** B1a runner corrected and rehearsed (exact 669 rows by id-set hash, locks before checks, no coverage write); run-5 runner withdrawn.
+- **Next action:** owner approvals B1, B1a-0 (option A or B) and B1a per `run6r/RELEASE-AND-REPAIR-PACKET-6R.md` §9, and D-365-W.
 
 **Resolved locally 2026-11-14 (qualified, not published, not deployed):** ISSUE-353 (Match Sheet dependent refusals), 354 (active-only override merge), 355 (Grid Solver NULL guard), 356 (NL least/marquee/period words, `PARSER_VERSION` 68), 358 (pins, stage map, restore-order test), 359 (parameter hardening, drill-down cap), 360 (tied holders, head-to-head link, sitemap), 361 (players index CTE, compare gate). Removed from the open list; full records in `issues.md`.
 
