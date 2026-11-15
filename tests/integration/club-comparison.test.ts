@@ -1877,10 +1877,13 @@ describe('club comparison: club Brownlow history', () => {
     // The fallback attribution path is what put these players here.
     expect(complete.leaders.every((l) => l.attributionSource === 'primary')).toBe(true);
 
-    // ISSUE-363 (F-FX-1): once 2026 Brownlow results load, the 2026 summary is authoritative like 2002's.
+    // ISSUE-363 (F-FX-1): once 2026 Brownlow results load, the 2026 summary is authoritative like 2002's: its total is a
+    // recorded number. Zero is allowed (a club can poll no votes in a loaded season; NULL means "not recorded", not zero),
+    // so the check is "recorded", never "> 0" (run-4 qual F-002: a loaded season whose only vote row has no club).
     if (expected2026 === 'complete') {
       expect(pending.isAuthoritative).toBe(true);
-      expect(pending.totalVotes).toBeGreaterThan(0);
+      expect(pending.totalVotes).not.toBeNull();
+      expect(typeof pending.totalVotes).toBe('number');
     }
     for (const summary of [notApplicable, missing, ...(expected2026 === 'complete' ? [] : [pending])]) {
       expect(summary.isAuthoritative).toBe(false);

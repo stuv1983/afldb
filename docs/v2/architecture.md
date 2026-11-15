@@ -176,7 +176,7 @@ a test fails if this table and the code disagree (every cited `path:line` must h
 | derive | `src/db/queries/player-derived.ts:425` | `recomputeClubSeasons` | derived |
 | derive | `src/db/queries/player-derived.ts:527` | `recomputeSeasonMetadata` | derived |
 | derive | `src/db/queries/player-derived.ts:379` | `recomputeSeasonBrownlowStatus` | derived |
-| derive | `src/db/queries/player-derived.ts:670` | `recomputeBrownlowCoverage` | derived |
+| derive | `src/db/queries/player-derived.ts:730` | `recomputeBrownlowCoverage` | derived |
 <!-- stage-map:end -->
 
 ## 10. Admin operations centre (Stage 5)
