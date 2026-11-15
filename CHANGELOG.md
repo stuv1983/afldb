@@ -15,12 +15,16 @@ commit.
 
 ## [Unreleased]
 
+### Publication of the 2026-11-14 remediation (2026-11-16)
+
+`origin/main` fast-forwarded `de640826..a2e6ea99` (172 commits; executable revision `f6af6da9`, everything after it records-only) under owner Approval A. Nothing deployed: production still serves `c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x`. Release and repair preparation (B1, B1a): `docs/v2/evidence/remediation-20261114/run6/RELEASE-AND-REPAIR-PACKET-6.md`.
+
 ### Finalisation (run 5) of the 2026-11-14 review (local, executable revision `f6af6da9`, not published, not deployed)
 
 Owner-approved read-only production probe B0 only; nothing pushed, deployed, installed or repaired. Records: `docs/v2/evidence/remediation-20261114/run5/`.
 
 #### Fixed (tests)
-- `awards-reload-links` no longer leaves a real-data side effect in a shared test database: on a base whose stored award rows lag the loaders it left the derived 2026 Coleman winner and 22 relinked "22 Under 22" rows behind, and it re-stamped every reloaded row's `import_batch_id`; it now captures every pre-existing `award_winners` row and award span before any block and restores them at file teardown, failing if anything still differs (ISSUE-363 T-2).
+- `awards-reload-links` now restores the `award_winners` rows and award spans it changes in a shared test database: on a base whose stored award rows lag the loaders it left the derived 2026 Coleman winner and 22 relinked "22 Under 22" rows behind, and it re-stamped every reloaded row's `import_batch_id`; it now captures every pre-existing `award_winners` row and award span before any block and restores them at file teardown, failing if any of those still differs (ISSUE-363 T-2). **The file as a whole does not leave a shared database unchanged:** after a shared run the content of `award_nominations`, `hall_of_fame`, `honour_team_members` and `captaincies` still differs (row counts equal) and `import_batches` grows; this is recorded as a test-isolation follow-up under ISSUE-363 (corrected 2026-11-16).
 
 ### Remediation run 4 of the 2026-11-14 review (local, final executable revision `16027092`, not published, not deployed)
 
