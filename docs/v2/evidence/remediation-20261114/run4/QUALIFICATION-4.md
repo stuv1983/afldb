@@ -53,3 +53,12 @@ no class 2, 3, 4 or 6.
 ## Manifest verification
 
 Fresh clone of `ba77ae3b` (the fix-loop record on top of Q‴; scope `fixloop` F6), `REQUIRE_NO_UNRESOLVED=1`: **rc 0**: 70 manifests, 5,718 entries: COMMITTED-OK 3,752, COMMITTED-OK-ALIAS 15, COMMITTED-MISMATCH 0, AMBIGUOUS 0, HOST-OK 1,855, HOST-MISMATCH 0, HOST-MISSING 0, DECLARED-NOT-RETAINED 96, **UNRESOLVED 0**. At Q″ + qual record the same gate reported UNRESOLVED 11 (three run-4 host-only manifests without a declared host root); the map rows added at Q‴ resolve them (`run4/evidence/README.md` §8). The pre-final tip and the tagged candidate are re-verified by `afldb-closure` (`CLOSURE-4.md`, phase A; phase B outside the candidate). The original run-2 script still reports its known false positive (`run2/evidence/ERRATA.md`).
+
+## Scopes added during the run (closure C-006)
+
+RUN-PLAN-4's step table and the brief's §3a allocation name the seven planned scopes. Five more were dispatched by the orchestrator in response to
+measured findings, each with its own brief, worktree, port and record: `rbfail` (baseline F-002: 40 rebuild-only failures; port 55690),
+`leaks` (baseline F-003: shared-mode row leaks; 55691), `fixup` (state-b's borrowed `auth_users` row and the club-comparison 2026 literal; 55692),
+`qual` (plan step 8; 55687) and `fixloop` (plan step 9; 55689). Their file edits are listed in their READMEs (`run4/<scope>/README.md`);
+closure A8 mapped all 36 commits `7cfbe186..a4b471c1` to a scope README or record. The verbatim agent returns are persisted (gitignored) under
+`.phaneslight/returns/rem4-20261115/` of the integration worktree.

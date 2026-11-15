@@ -68,6 +68,12 @@ Status words: **fixed locally** (committed on `claude/remediation-20261114`, unp
 - Three long-rivalry performance tests have ~250 ms Brownlow ceilings with little headroom under load (`clubcmp` F-CC-2, INFO).
 - The Q″ rebuild assigns `venue_aliases` surrogate ids non-deterministically (set-equal, counts identical; qual F-004, INFO).
 - `tests/rate-limit.test.ts:55` (1 ms window) failed once in one full unit run at Q‴ and passed 10/10 alone and in a second full run: a timing flake, pre-existing, not in the diff (`fixloop` F-002, LOW).
+- Closure phase A LOW/INFO (`CLOSURE-4.md`), no code change after Q‴: `club-comparison`'s 2026 oracle imports the implementation's
+  `BROWNLOW_DECLARED_NO_MEDAL_SEASONS` (C-001; `tests/reference-data.test.ts` pins it to literals and to `stat-availability.json`);
+  `brownlow-pending-coverage`'s all-season sweep pins 2026/2027 as `pending` and goes stale when either Brownlow loads (C-002); in shared mode on
+  the snapshot the restored Coleman span (1980–2025) no longer covers the 2026 winner row the real reload adds (C-010, the same row as above);
+  `leaked-fixtures.ts` does not register 2064 (`venue-records`) or 2073 (`match-results-promotion`) (C-004). Recommendation: fix with the next
+  test change in those files.
 - F-FX-1 acceptance: a club-less 2026 vote row for a player without a 2026 season row (`mnew`) correctly trips the unchanged multi-club invariant at
   `club-comparison.test.ts:1800`; the acceptance mutation is the club-attributed `mreal` (70/70 on both bases). Orchestrator decision, recorded (`fixloop` F-001).
 - `run2/qualification-2/SHA256SUMS:28` pins the hash of a never-committed stripped copy of `unit-stagea2.log`; the run-4 checker verifies it through a

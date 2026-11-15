@@ -147,7 +147,7 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 
 ### AFLDB-ISSUE-365 (Medium, new 2026-11-15)
 
-- **Brownlow coverage recompute** (`src/db/queries/player-derived.ts` ~:736) marks a completed season with no loaded medal `not_applicable` and `lockMatch` then refuses Brownlow admin for it; callers `afl-api-brownlow.ts:1722`, `admin-brownlow.ts:1192`/`:1392`. Reproduced on isolated databases (2026 `pending` -> `not_applicable`); production not read.
+- **Brownlow coverage recompute** (`src/db/queries/player-derived.ts` `recomputeBrownlowCoverage`, :730 at Q‴) marks a completed season with no loaded medal `not_applicable` and `lockMatch` then refuses Brownlow admin for it; callers `afl-api-brownlow.ts:1722`, `admin-brownlow.ts:1192`/`:1392`. Reproduced on isolated databases (2026 `pending` -> `not_applicable`); production not read.
 - **Run 4 (2026-11-15, local, `16027092`):** D-365-1 implemented and qualified (`BROWNLOW_DECLARED_NO_MEDAL_SEASONS`, 1897-1923 and 1942-1945); future recomputes only. The 4 Nov snapshot already holds 669 2026 `player_season_stats` rows at `not_applicable`.
 - **Next action:** publish; B0 read-only production probe of the 2026 coverage and `player_season_stats` rows; conditional repair only if stale (`run4/brownlow/README.md` §6.3), separately approved; owner decision on the public `pending` wording.
 
