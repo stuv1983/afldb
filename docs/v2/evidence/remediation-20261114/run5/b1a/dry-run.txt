@@ -1,0 +1,49 @@
+# B1a runner rehearsal, DEV host, run-owned workspace /mnt/ssd/afldb-rem5-t2-20261115, 2026-11-15 10:06:59-10:07:14Z
+# checkout f6af6da9 (Q''''); runner sha256 8453572e796f16fbe5f7900404e021bff62f13d764ac35197f1ceedb5fd7a27c (= b1a-repair-2026.mts)
+# fresh --template copies of sn (4 Nov snapshot) and rb (accepted rebuild), role AFLDB_TEST_IMPORT_DATABASE_URL, each copy dropped after
+# first attempt 09:50Z with a .ts file failed to load (tsx compiled it as CommonJS: top-level await); nothing reached a database; renamed to .mts
+=== b1a 10:06:59
+HEAD=f6af6da93551aed9dbd5658319346d7ecdd96ea3 runner sha256=8453572e796f16fbe5f7900404e021bff62f13d764ac35197f1ceedb5fd7a27c uploaded=8453572e796f16fbe5f7900404e021bff62f13d764ac35197f1ceedb5fd7a27c
+--- sn: dry run
+BEFORE {"coverage":["brownlow_match_votes=pending","brownlow_round_votes=pending","brownlow_season_total=pending"],"pss":["not_applicable:669/votes:0"],"season":"complete","medalRows":0,"roundRows":9522,"naOutside":0,"naWar":12}
+AFTER(in tx) {"coverage":["brownlow_match_votes=pending","brownlow_round_votes=pending","brownlow_season_total=pending"],"pss":["pending:669/votes:0"],"season":"complete","medalRows":0,"roundRows":9522,"naOutside":0,"naWar":12}
+OUTCOME DRY-RUN-PASS (rolled back)
+exit=0
+--- sn: wrong expected row count (must roll back, exit 1)
+BEFORE {"coverage":["brownlow_match_votes=pending","brownlow_round_votes=pending","brownlow_season_total=pending"],"pss":["not_applicable:669/votes:0"],"season":"complete","medalRows":0,"roundRows":9522,"naOutside":0,"naWar":12}
+OUTCOME ROLLED-BACK 669 player_season_stats rows for 2026, expected 668
+exit=1
+--- sn: wrong database name (must refuse, exit 1)
+OUTCOME ROLLED-BACK identity mismatch or read-only session: {"db":"afldb_v2_rem5t2_b1a_sn_test","oid":"70942","ro":"off"}
+exit=1
+--- sn: --commit on the disposable copy
+BEFORE {"coverage":["brownlow_match_votes=pending","brownlow_round_votes=pending","brownlow_season_total=pending"],"pss":["not_applicable:669/votes:0"],"season":"complete","medalRows":0,"roundRows":9522,"naOutside":0,"naWar":12}
+AFTER(in tx) {"coverage":["brownlow_match_votes=pending","brownlow_round_votes=pending","brownlow_season_total=pending"],"pss":["pending:669/votes:0"],"season":"complete","medalRows":0,"roundRows":9522,"naOutside":0,"naWar":12}
+OUTCOME COMMITTED
+exit=0
+--- sn: re-run after commit (expect NOTHING-TO-REPAIR)
+BEFORE {"coverage":["brownlow_match_votes=pending","brownlow_round_votes=pending","brownlow_season_total=pending"],"pss":["pending:669/votes:0"],"season":"complete","medalRows":0,"roundRows":9522,"naOutside":0,"naWar":12}
+OUTCOME NOTHING-TO-REPAIR
+exit=0
+--- rb: dry run
+BEFORE {"coverage":["brownlow_match_votes=pending","brownlow_round_votes=pending","brownlow_season_total=pending"],"pss":["pending:669/votes:0"],"season":"complete","medalRows":0,"roundRows":0,"naOutside":0,"naWar":12}
+OUTCOME NOTHING-TO-REPAIR
+exit=0
+--- rb: wrong expected row count (must roll back, exit 1)
+BEFORE {"coverage":["brownlow_match_votes=pending","brownlow_round_votes=pending","brownlow_season_total=pending"],"pss":["pending:669/votes:0"],"season":"complete","medalRows":0,"roundRows":0,"naOutside":0,"naWar":12}
+OUTCOME ROLLED-BACK 669 player_season_stats rows for 2026, expected 668
+exit=1
+--- rb: wrong database name (must refuse, exit 1)
+OUTCOME ROLLED-BACK identity mismatch or read-only session: {"db":"afldb_v2_rem5t2_b1a_rb_test","oid":"70943","ro":"off"}
+exit=1
+--- rb: --commit on the disposable copy
+BEFORE {"coverage":["brownlow_match_votes=pending","brownlow_round_votes=pending","brownlow_season_total=pending"],"pss":["pending:669/votes:0"],"season":"complete","medalRows":0,"roundRows":0,"naOutside":0,"naWar":12}
+OUTCOME NOTHING-TO-REPAIR
+exit=0
+--- rb: re-run after commit (expect NOTHING-TO-REPAIR)
+BEFORE {"coverage":["brownlow_match_votes=pending","brownlow_round_votes=pending","brownlow_season_total=pending"],"pss":["pending:669/votes:0"],"season":"complete","medalRows":0,"roundRows":0,"naOutside":0,"naWar":12}
+OUTCOME NOTHING-TO-REPAIR
+exit=0
+port 55684 closed
+port 55684 closed (final)
+=== HOST2-DONE 10:07:14

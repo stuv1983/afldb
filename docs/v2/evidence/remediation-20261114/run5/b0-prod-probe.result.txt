@@ -1,0 +1,216 @@
+== probe_at_utc 2026-11-15T09:19:12Z host_local 2026-11-15 20:19:12 AEDT
+== host afldb-prod kernel_running 6.8.0-137-generic uptime_since 2026-08-16 12:14:44
+reboot_required=present
+  pkg: linux-image-6.8.0-138-generic
+  pkg: linux-base
+  pkg: linux-image-6.8.0-139-generic
+  pkg: linux-base
+  pkg: libc6
+  pkg: linux-image-6.8.0-142-generic
+  pkg: linux-base
+  pkg: linux-image-6.8.0-146-generic
+  pkg: linux-base
+  pkg: linux-image-6.8.0-147-generic
+  pkg: linux-base
+  pkg: linux-image-6.8.0-149-generic
+  pkg: linux-base
+  pkg: libc6
+caddyfile_sha256=4f6972ec119f5d33fff4c16cbbce15c50a36b883654dcffcabdb01776d7af036
+absent /etc/needrestart/conf.d/50-afldb-hold.conf
+absent /etc/apt/apt.conf.d/52-afldb-unattended
+== releases
+current=c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x previous=0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN
+  release: 0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN
+  release: 61a95f7397da-JYIBkYn8ynPgYMn1e5nK-
+  release: 9ed9c9dd3e84-QNEHXAtU53TzUjj0Mb7mv
+  release: a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+  release: ad245d602f6f-m0M8pf121326vNSo2B759
+  release: c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x
+  release: ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+  release: fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy
+events_log_lines_before=33
+  ev: {"ts":"2026-11-02T21:41:21.672Z","op":"promote","id":"a0b1080f5b98-B8kdpO6PO1tUCHus0j1za","previous":"ea98a35f2061--vY0EFS0DdR-TiPkxTZz6"}
+  ev: {"ts":"2026-11-02T21:48:16.046Z","op":"status-pass","id":"a0b1080f5b98-B8kdpO6PO1tUCHus0j1za"}
+  ev: {"ts":"2026-11-05T01:11:57.884Z","op":"build-start","revision":"0f251c2daa8d7c6c38eacd559376dde41e010fd9","afldbEnv":"production",}
+  ev: {"ts":"2026-11-05T01:16:48.479Z","op":"build-pass","id":"0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN","revision":"0f251c2daa8d7c6c38eacd559376dde41e010fd9","buildId":"3t0xWKI76Jgna2tB8a9oN",}
+  ev: {"ts":"2026-11-05T04:11:49.252Z","op":"promote","id":"0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN","previous":"a0b1080f5b98-B8kdpO6PO1tUCHus0j1za"}
+  ev: {"ts":"2026-11-05T04:17:55.025Z","op":"status-pass","id":"0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN"}
+  ev: {"ts":"2026-11-11T05:10:33.882Z","op":"build-start","revision":"c1c4b22ee15007111eab66f6d354e0b9ecbb2ade","afldbEnv":"production",}
+  ev: {"ts":"2026-11-11T05:15:00.771Z","op":"build-pass","id":"c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x","revision":"c1c4b22ee15007111eab66f6d354e0b9ecbb2ade","buildId":"bTVyci1eHVcKvSKDVZl_x",}
+  ev: {"ts":"2026-11-11T05:41:42.699Z","op":"promote","id":"c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x","previous":"0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN"}
+  ev: {"ts":"2026-11-11T06:09:28.861Z","op":"status-pass","id":"c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x"}
+  ev: {"ts":"2026-11-12T00:27:17.669Z","op":"status-pass","id":"c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x"}
+  ev: {"ts":"2026-11-12T19:11:45.521Z","op":"status-pass","id":"c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x"}
+current_release_json {"revision":"c1c4b22ee15007111eab66f6d354e0b9ecbb2ade","buildId":"bTVyci1eHVcKvSKDVZl_x","afldbEnv":"production","builtAt":"2026-11-11T05:15:00.748Z"}
+== serving checkout
+checkout_head=c1c4b22ee15007111eab66f6d354e0b9ecbb2ade branch=main porcelain_lines=0
+beta_epoch_line=1 AFLDB_BETA_EPOCH=1
+== release.mjs status (no --expect; read-only)
+release: current  c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x revision c1c4b22ee15007111eab66f6d354e0b9ecbb2ade BUILD_ID bTVyci1eHVcKvSKDVZl_x production
+release: previous 0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN revision 0f251c2daa8d7c6c38eacd559376dde41e010fd9 BUILD_ID 3t0xWKI76Jgna2tB8a9oN
+release: memory   afldb MemoryCurrent 252 MB
+release: process  3774230 runs in /home/arm/afldb-releases/releases/c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x
+release: health   200 status=ok database=ok
+release: build    /_next/static/bTVyci1eHVcKvSKDVZl_x/_buildManifest.js 200
+release: build    /_next/static/3t0xWKI76Jgna2tB8a9oN/_buildManifest.js 404 (previous; expect 404)
+release: STATUS PASS c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x
+events_log_lines_after=33
+== service identity
+afldb.service MainPID=3774230 NRestarts=0 ActiveState=active SubState=running ActiveEnterTimestamp=Sat 2026-11-14 06:35:21 AEDT InvocationID=a2584da119f84c5bb47e2c5a58f85755 
+postgresql@16-main.service MainPID=3774184 NRestarts=0 ActiveState=active SubState=running ActiveEnterTimestamp=Sat 2026-11-14 06:35:19 AEDT InvocationID=b8a69e7dae9d4faf8c2a735108621507 
+caddy.service MainPID=7797 NRestarts=0 ActiveState=active SubState=running ActiveEnterTimestamp=Sun 2026-08-16 13:18:12 AEST InvocationID=c39a55bf404e4809b9307a56f1e99ee3 
+health_local port=3100 code=200 body={"status":"ok","database":"ok","latencyMs":1}
+== timers (all)
+  NEXT                             LEFT LAST                               PASSED UNIT                           ACTIVATES
+  Sun 2026-11-15 20:20:00 AEDT      46s Sun 2026-11-15 20:10:01 AEDT     9min ago sysstat-collect.timer          sysstat-collect.service
+  Sun 2026-11-15 20:30:16 AEDT    11min Sun 2026-11-15 19:55:15 AEDT    23min ago fwupd-refresh.timer            fwupd-refresh.service
+  Sun 2026-11-15 21:01:11 AEDT    41min Sun 2026-11-15 20:14:45 AEDT 4min 27s ago droplet-agent-update.timer     droplet-agent-update.service
+  Mon 2026-11-16 00:00:00 AEDT 3h 40min Sun 2026-11-15 00:00:01 AEDT      20h ago dpkg-db-backup.timer           dpkg-db-backup.service
+  Mon 2026-11-16 00:00:00 AEDT 3h 40min Sun 2026-11-15 00:00:01 AEDT      20h ago logrotate.timer                logrotate.service
+  Mon 2026-11-16 00:07:00 AEDT 3h 47min Sun 2026-11-15 00:07:01 AEDT      20h ago sysstat-summary.timer          sysstat-summary.service
+  Mon 2026-11-16 00:50:55 AEDT 4h 31min Mon 2026-11-09 00:09:45 AEDT   6 days ago fstrim.timer                   fstrim.service
+  Mon 2026-11-16 05:08:15 AEDT       8h Sun 2026-11-15 05:13:35 AEDT      15h ago afldb-settle-afl-api.timer     afldb-settle-afl-api.service
+  Mon 2026-11-16 05:22:01 AEDT       9h Sun 2026-11-15 07:30:25 AEDT      12h ago man-db.timer                   man-db.service
+  Mon 2026-11-16 06:41:40 AEDT      10h Sun 2026-11-15 06:45:35 AEDT      13h ago apt-daily-upgrade.timer        apt-daily-upgrade.service
+  Mon 2026-11-16 06:50:20 AEDT      10h Sun 2026-11-15 18:05:18 AEDT 2h 13min ago apt-daily.timer                apt-daily.service
+  Mon 2026-11-16 08:34:51 AEDT      12h Sun 2026-11-15 14:29:45 AEDT 5h 49min ago motd-news.timer                motd-news.service
+  Mon 2026-11-16 13:39:45 AEDT      17h Sun 2026-11-15 13:39:45 AEDT       6h ago update-notifier-download.timer update-notifier-download.service
+  Mon 2026-11-16 13:50:16 AEDT      17h Sun 2026-11-15 13:50:16 AEDT       6h ago systemd-tmpfiles-clean.timer   systemd-tmpfiles-clean.service
+  Wed 2026-11-18 04:11:36 AEDT   2 days Thu 2026-11-12 10:08:55 AEDT   3 days ago update-notifier-motd.timer     update-notifier-motd.service
+  Sun 2026-11-22 03:10:06 AEDT   6 days Sun 2026-11-15 03:10:01 AEDT      17h ago e2scrub_all.timer              e2scrub_all.service
+  -                                   - -                                       - apport-autoreport.timer        apport-autoreport.service
+  -                                   - -                                       - snapd.snap-repair.timer        snapd.snap-repair.service
+  -                                   - -                                       - ua-timer.timer                 ua-timer.service
+  
+  19 timers listed.
+== afldb timer units
+afldb-settle-afl-api-brownlow.service ActiveState=inactive UnitFileState=static 
+afldb-settle-afl-api.service ActiveState=inactive UnitFileState=static 
+afldb-settle-afltables.service ActiveState=inactive UnitFileState=static 
+afldb.service ActiveState=active UnitFileState=enabled 
+afldb-settle-afl-api-brownlow.timer NextElapseUSecRealtime= LastTriggerUSec= ActiveState=inactive UnitFileState=disabled 
+afldb-settle-afl-api.timer NextElapseUSecRealtime=Mon 2026-11-16 05:08:15 AEDT LastTriggerUSec=Sun 2026-11-15 05:13:35 AEDT ActiveState=active UnitFileState=enabled 
+afldb-settle-afltables.timer NextElapseUSecRealtime= LastTriggerUSec= ActiveState=inactive UnitFileState=disabled 
+-- cat afldb-settle-afl-api.timer
+   # /etc/systemd/system/afldb-settle-afl-api.timer
+   OnCalendar=*-*-* 05:00
+   RandomizedDelaySec=15min
+   AccuracySec=1min
+   Persistent=true
+-- cat afldb-settle-afltables.timer
+   # /etc/systemd/system/afldb-settle-afltables.timer
+   OnCalendar=*-*-* 04:30
+   RandomizedDelaySec=15min
+   AccuracySec=1min
+   Persistent=true
+-- cat afldb-settle-afl-api-brownlow.timer
+   # /etc/systemd/system/afldb-settle-afl-api-brownlow.timer
+   OnCalendar=*:0/5
+   AccuracySec=30sec
+-- cat afldb-backup.timer
+-- cat afldb-backup-verify.timer
+-- cat afldb-email-intake.timer
+-- cat apt-daily-upgrade.timer
+   # /usr/lib/systemd/system/apt-daily-upgrade.timer
+   OnCalendar=*-*-* 6:00
+   RandomizedDelaySec=60m
+   Persistent=true
+-- cat apt-daily.timer
+   # /usr/lib/systemd/system/apt-daily.timer
+   OnCalendar=*-*-* 6,18:00
+   RandomizedDelaySec=12h
+   Persistent=true
+== recent settle runs (unit timestamps)
+afldb-settle-afl-api.service Result=success ExecMainStartTimestamp=Sun 2026-11-15 05:13:35 AEDT ExecMainExitTimestamp=Sun 2026-11-15 05:13:37 AEDT ExecMainStatus=0 InactiveExitTimestamp=Sun 2026-11-15 05:13:35 AEDT InactiveEnterTimestamp=Sun 2026-11-15 05:13:37 AEDT 
+afldb-settle-afltables.service Result=success ExecMainStartTimestamp= ExecMainExitTimestamp= ExecMainStatus=0 InactiveExitTimestamp= InactiveEnterTimestamp= 
+afldb-settle-afl-api-brownlow.service Result=success ExecMainStartTimestamp= ExecMainExitTimestamp= ExecMainStatus=0 InactiveExitTimestamp= InactiveEnterTimestamp= 
+== arm crontab
+  no crontab for arm
+== seasons.json in-progress entries
+[]
+
+== database
+{
+ "identity": {
+  "db": "afldb_prod",
+  "oid": "66668",
+  "sysid": "7674454702926115004",
+  "ro": "on",
+  "role": "afldb_backup",
+  "at": "2026-11-15 09:19:13.665658+00",
+  "version": "PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1) on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0, 64-bit"
+ },
+ "ledger": {
+  "head": "118_fixtures_unconfirmed_participants.sql",
+  "applied": 118
+ },
+ "ledger_last3": [
+  "118_fixtures_unconfirmed_participants.sql",
+  "117_brownlow_provider_eligibility_unknown.sql",
+  "116_brownlow_correction_receipts.sql"
+ ],
+ "seasons": [
+  {
+   "year": 2025,
+   "status": "complete"
+  },
+  {
+   "year": 2026,
+   "status": "complete"
+  }
+ ],
+ "site_settings": [],
+ "cov2026": [
+  {
+   "stat_key": "brownlow_match_votes",
+   "coverage": "pending",
+   "is_recorded": false,
+   "populated_rows": null,
+   "total_rows": null
+  },
+  {
+   "stat_key": "brownlow_round_votes",
+   "coverage": "pending",
+   "is_recorded": false,
+   "populated_rows": null,
+   "total_rows": null
+  },
+  {
+   "stat_key": "brownlow_season_total",
+   "coverage": "pending",
+   "is_recorded": false,
+   "populated_rows": null,
+   "total_rows": null
+  }
+ ],
+ "pss2026": [
+  {
+   "brownlow_status": "not_applicable",
+   "n": 669,
+   "votes_non_null": 0
+  }
+ ],
+ "pss2025": [
+  {
+   "brownlow_status": "complete",
+   "n": 668
+  }
+ ],
+ "brownlow_rows_2026": {
+  "season_votes": 0,
+  "round_votes": 9522,
+  "entry_state": 1,
+  "pms_votes_non_null": 0,
+  "ha_matches": 207
+ },
+ "na_cov_outside_declared": [],
+ "na_cov_war": 12,
+ "na_pss_outside_declared": [
+  {
+   "season": 2026,
+   "n": 669
+  }
+ ],
+ "na_pss_declared": 9553
+}
+== end 2026-11-15T09:19:13Z

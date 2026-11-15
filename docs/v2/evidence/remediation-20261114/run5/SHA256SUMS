@@ -1,0 +1,15 @@
+631e0134211760d867cabebe9f943e1329b22be60d7c157b37bb0b8983eb8cd8 *./APPROVAL-PACKET-5.md
+cf42de1b2c2db0621141d3ec2b0d4545a8c66569e2355989296ad46acf5c0a57 *./B0-FINDINGS.md
+edd084507b4256bfd30030cdf38914ae61cdee238f2f72c173025b0492d220cd *./G1-REBUILD-TIERS.md
+cd61c2e86b5a2cbafa0602c4035b28fe59ad06c4ff575e148f8deff0d7fc1728 *./T2-QUALIFICATION.md
+44debe4c4043705cfeeb0eb252233af67ccade020ccbf22bfdffc8a5b20e5561 *./b0-prod-probe.result.txt
+eff2369391de7cc4f9c5bec530c5637133baf8277f28f64b6751ef075da2480a *./b0-prod-probe.sh
+46cf96f5dec1be2ea2d4641cf2affd5edf71b44c9a30d6b9e06dd64e3f12cb7e *./b1a/README.md
+8453572e796f16fbe5f7900404e021bff62f13d764ac35197f1ceedb5fd7a27c *./b1a/b1a-repair-2026.mts
+483c72b39f90f76d75858b6e3fce5c3ac34c460a6d3d5b22a909ffe309724b50 *./b1a/dry-run.txt
+22f23692a9891aec939f131b90cf9a9fa47854559c15b52c766461e7d0009640 *./host-evidence/t2-host-evidence.tgz
+eb66fc02e47a12e72ff66c118f50ef9572e5bb42aececbb5404ff13a04b304ee *./host-scripts/aw-diag.sh
+9954a665aafd01a3c6710086e9c76a2d749ba27d56345c6d4d5c0e81f44c513b *./host-scripts/b1a-rehearsal.sh
+acdbadb079a036718f3584050a9eaa0a924b5b75c7d8e408d8b38bc57a217c6d *./host-scripts/run5-host.sh
+7554fb11d5a537284abc10150a1586a2537af4d6eed0fc29cd841420f3908538 *./host-scripts/run5-host2.sh
+853239f475529b01428b7ba92fb66c67cba6c75c1eef14c87c39cf82e0232649 *./host-scripts/t2-qual.sh

@@ -15,6 +15,13 @@ commit.
 
 ## [Unreleased]
 
+### Finalisation (run 5) of the 2026-11-14 review (local, executable revision `f6af6da9`, not published, not deployed)
+
+Owner-approved read-only production probe B0 only; nothing pushed, deployed, installed or repaired. Records: `docs/v2/evidence/remediation-20261114/run5/`.
+
+#### Fixed (tests)
+- `awards-reload-links` no longer leaves a real-data side effect in a shared test database: on a base whose stored award rows lag the loaders it left the derived 2026 Coleman winner and 22 relinked "22 Under 22" rows behind, and it re-stamped every reloaded row's `import_batch_id`; it now captures every pre-existing `award_winners` row and award span before any block and restores them at file teardown, failing if anything still differs (ISSUE-363 T-2).
+
 ### Remediation run 4 of the 2026-11-14 review (local, final executable revision `16027092`, not published, not deployed)
 
 Nothing was pushed, deployed, installed, or written on production or DEV. Records: `docs/v2/evidence/remediation-20261114/run4/`.

@@ -1,5 +1,7 @@
 # AFLDB Waiting and Blocker Register
 
+> **2026-11-15 finalisation (run 5; counts NOT recomputed).** Packet `docs/v2/evidence/remediation-20261114/run5/APPROVAL-PACKET-5.md` supersedes packet 4. B0 done (read-only): production unchanged since run 2; **ISSUE-365 present** (669 2026 player-season rows `not_applicable`). Waiting on the owner: A (publish), B1 (daytime window, 08:00-14:00 AEDT start; the packets 2-4 window was wrong), B1a (669-row repair, separately approved), D-365-W, G-1, and the unchanged B2-B8 decisions. T-2 corrected locally (executable revision `f6af6da9`).
+>
 > **2026-11-15 remediation run 4 (this register's counts are NOT recomputed).** Records: `docs/v2/evidence/remediation-20261114/run4/` (`RESIDUALS-4.md`, `QUALIFICATION-4.md`, `FAILURE-LEDGER-4.md`, `APPROVAL-PACKET-4.md`, which supersedes packet 3). Final executable revision `16027092`, **local, not published, not deployed**; the final candidate is the local tag named in the packet.
 > - **Fixed locally (publication pending):** ISSUE-365 rule (D-365-1, future recomputes only); ISSUE-363 owner decisions 363-W/G/C/B/3, shared-mode T363-2/T363-3 and leaks, rebuild-only failures, evidence checker.
 > - **Awaiting owner decision:** ISSUE-365 B0 read-only production probe and the conditional repair (669 2026 `player_season_stats` rows read `not_applicable` on the 4 Nov snapshot); the public wording of a `pending` Brownlow season; Gridley / the rebuild's 0 `data_overrides` (ISSUE-363, class 5). Run-2/3 waits below are unchanged.
