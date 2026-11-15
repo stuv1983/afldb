@@ -9,7 +9,9 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Current state — 2026-11-16 (packet 6R, local):** **10 open issues (unchanged).** Bounded safety correction of the ISSUE-365 B1a operation: corrected runner, acceptance and reversal (`run6r/b1a/`, commit `15aa89cb`, unpushed), rehearsed on disposable copies only; backup verification now an explicit owner choice (option A fresh restore on streamanator, or option B destructive `afldb_restore_test` replacement). No production contact; `origin/main` still `a2e6ea99`; production still serves `c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x`. Replacement packet: `docs/v2/evidence/remediation-20261114/run6r/RELEASE-AND-REPAIR-PACKET-6R.md`.
+**Current state — 2026-11-16 (sitting approved):** **10 open issues (unchanged).** Owner approved B1, B1a-0 **option A** and B1a for **Wednesday 18 November 2026, 10:00–12:30 AEDT** under packet 6R; preparation commits published (`origin/main` = `c34ae24d`, records only beyond `a2e6ea99`). Sitting procedure and blocks: `docs/v2/evidence/remediation-20261114/run6r/sitting/SITTING.md`. Nothing executed on production yet; production still serves `c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x`.
+
+**Earlier state — 2026-11-16 (packet 6R, local):** **10 open issues (unchanged).** Bounded safety correction of the ISSUE-365 B1a operation: corrected runner, acceptance and reversal (`run6r/b1a/`, commit `15aa89cb`, unpushed), rehearsed on disposable copies only; backup verification now an explicit owner choice (option A fresh restore on streamanator, or option B destructive `afldb_restore_test` replacement). No production contact; `origin/main` still `a2e6ea99`; production still serves `c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x`. Replacement packet: `docs/v2/evidence/remediation-20261114/run6r/RELEASE-AND-REPAIR-PACKET-6R.md`.
 
 **Earlier state — 2026-11-16 (published):** **10 open issues (unchanged).** Owner Approval A executed: `origin/main` fast-forwarded `de640826..a2e6ea99` (172 commits; executable revision `f6af6da9`). **Nothing deployed**: production still serves `c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x` and ISSUE-365's 669 rows are unrepaired. Release-and-repair packet: `docs/v2/evidence/remediation-20261114/run6/RELEASE-AND-REPAIR-PACKET-6.md`.
 
@@ -160,7 +162,8 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 - **Run 5 B0 (2026-11-15):** present on production: 669/669 2026 `player_season_stats` rows `not_applicable`; coverage `pending`; admin not locked (`run5/B0-FINDINGS.md`).
 - **Published 2026-11-16** (`origin/main` = `a2e6ea99`); not deployed.
 - **Packet 6R (2026-11-16, local):** B1a runner corrected and rehearsed (exact 669 rows by id-set hash, locks before checks, no coverage write); run-5 runner withdrawn.
-- **Next action:** owner approvals B1, B1a-0 (option A or B) and B1a per `run6r/RELEASE-AND-REPAIR-PACKET-6R.md` §9, and D-365-W.
+- **Approved 2026-11-16:** B1, B1a-0 option A, B1a for Wed 18 Nov 2026 10:00–12:30 AEDT; preparation published (`c34ae24d`); procedure `run6r/sitting/SITTING.md`.
+- **Next action:** execute the sitting per `run6r/sitting/SITTING.md`; resolve after B1a is committed and re-read on production. D-365-W separately gated.
 
 **Resolved locally 2026-11-14 (qualified, not published, not deployed):** ISSUE-353 (Match Sheet dependent refusals), 354 (active-only override merge), 355 (Grid Solver NULL guard), 356 (NL least/marquee/period words, `PARSER_VERSION` 68), 358 (pins, stage map, restore-order test), 359 (parameter hardening, drill-down cap), 360 (tied holders, head-to-head link, sitemap), 361 (players index CTE, compare gate). Removed from the open list; full records in `issues.md`.
 
