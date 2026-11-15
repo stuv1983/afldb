@@ -1,0 +1,15 @@
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  5 failed | 89 passed | 6 skipped (100)
+      Tests  4 failed | 3529 passed | 2 expected fail | 113 skipped (3671)
+   Duration  1557.95s (transform 12.36s, setup 5.85s, import 283.63s, tests 1244.80s, environment 26ms)
+r_sh failing ids: 7 (3 file-level)
+files total=100 by status={"passed":95,"failed":5}
+file-level failures (status failed with zero failed assertions)=3
+tests total=3671 passed=3531 failed=4 pending=113 todo=0
+assertion statuses={"passed":3531,"skipped":113,"pending":23,"failed":4}
+wall ms=1557978.9482421875 (26.0 min)
+# order (JSON completion order): n<TAB>file<TAB>status<TAB>file duration ms<TAB>assertions
+r_sh files in execution order: 100
+r_sh table-count rows changed by the run: 1 (see r_sh.table-counts.diff)
+fixtures rows before: 0
+fixtures rows after:  0

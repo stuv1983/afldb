@@ -1,0 +1,39 @@
+##### mreal start 2026-11-15T05:30:47Z HEAD=1f7b0d71 porcelain-before=0
+create-db: afldb_v2_rem4qual_mrealrb_test created from afldb_v2_rem4qual_rb_tmpl_test and marked
+INSERT 0 18
+UPDATE 1
+mrealrb 2026 brownlow_season_votes=18 season_total=complete
+2026-11-15T05:30:53Z mrealrb rc=0:  Test Files  1 passed (1)       Tests  1 passed | 69 skipped (70) 
+mrealrb failing ids: 0
+SUMMARY-TEST passed  club comparison: club Brownlow history exposes selected-season Brownlow coverage without presenting a partial total
+mrealrb: table counts changed (1 rows)
+drop-db: afldb_v2_rem4qual_mrealrb_test dropped
+create-db: afldb_v2_rem4qual_mrealsnap_test created from afldb_v2_rem4qual_snap_tmpl_test and marked
+INSERT 0 18
+UPDATE 1
+mrealsnap 2026 brownlow_season_votes=18 season_total=complete
+2026-11-15T05:31:02Z mrealsnap rc=0:  Test Files  1 passed (1)       Tests  1 passed | 69 skipped (70) 
+mrealsnap failing ids: 0
+SUMMARY-TEST passed  club comparison: club Brownlow history exposes selected-season Brownlow coverage without presenting a partial total
+mrealsnap: table counts changed (1 rows)
+drop-db: afldb_v2_rem4qual_mrealsnap_test dropped
+create-db: afldb_v2_rem4qual_mrealfile_test created from afldb_v2_rem4qual_rb_tmpl_test and marked
+INSERT 0 18
+UPDATE 1
+mrealfile 2026 brownlow_season_votes=18 season_total=complete
+2026-11-15T05:31:33Z mrealfile rc=0:  Test Files  1 passed (1)       Tests  70 passed (70) 
+mrealfile failing ids: 0
+SUMMARY-TEST passed  club comparison: club Brownlow history exposes selected-season Brownlow coverage without presenting a partial total
+mrealfile: table counts changed (1 rows)
+drop-db: afldb_v2_rem4qual_mrealfile_test dropped
+create-db: afldb_v2_rem4qual_mrealfilesnap_test created from afldb_v2_rem4qual_snap_tmpl_test and marked
+INSERT 0 18
+UPDATE 1
+mrealfilesnap 2026 brownlow_season_votes=18 season_total=complete
+2026-11-15T05:32:06Z mrealfilesnap rc=0:  Test Files  1 passed (1)       Tests  70 passed (70) 
+mrealfilesnap failing ids: 0
+SUMMARY-TEST passed  club comparison: club Brownlow history exposes selected-season Brownlow coverage without presenting a partial total
+mrealfilesnap: table counts changed (1 rows)
+drop-db: afldb_v2_rem4qual_mrealfilesnap_test dropped
+##### mreal end 2026-11-15T05:32:07Z rc=0 porcelain-after=0
+##### done 2026-11-15T05:32:07Z

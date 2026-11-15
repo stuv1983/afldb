@@ -1,0 +1,97 @@
+isolated-pg: afldb_v2_rem4qual_mnewsnap_test verified (cluster afldb_v2_isolated, 127.0.0.1:55687); running node
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-qual-20261115/cand[39m
+
+ [31m❯[39m tests/integration/club-comparison.test.ts [2m([22m[2m70 tests[22m[2m | [22m[31m1 failed[39m[2m | [22m[33m69 skipped[39m[2m)[22m[32m 152[2mms[22m[39m
+     [2m[90m↓[39m[22m summarises Adelaide vs Brisbane Lions to the canonical witness and to independent SQL
+     [2m[90m↓[39m[22m filters by match type so that home-and-away and finals partition the complete history
+     [2m[90m↓[39m[22m filters by era (Club Rivalry Explorer follow-up, FR-2) so the decades partition the complete history
+     [2m[90m↓[39m[22m paginates the complete meetings list deterministically at 25 rows per page
+     [2m[90m↓[39m[22m groups venue records by canonical venue and agrees with an independent grouping
+     [2m[90m↓[39m[22m derives every head-to-head record from independent extremes and keeps ties
+     [2m[90m↓[39m[22m scopes records to one decade of the rivalry when an era is given (Club Rivalry Explorer follow-up, FR-2)
+     [2m[90m↓[39m[22m reads streaks from chronological order, with a draw breaking a winning streak
+     [2m[90m↓[39m[22m includes Footscray and South Melbourne meetings through organization_id
+     [2m[90m↓[39m[22m keeps Brisbane Bears and Fitzroy out of Brisbane Lions head-to-head totals
+     [2m[90m↓[39m[22m handles the Carlton vs Collingwood long rivalry, including Grand Finals
+     [2m[90m↓[39m[22m refuses to compare an organisation with itself
+     [2m[90m↓[39m[22m lists everyone who represented both organisations, agreeing with independent SQL
+     [2m[90m↓[39m[22m reports Ben Keays as Brisbane Lions first, then Adelaide, in both argument orders
+     [2m[90m↓[39m[22m reports Jarryd Lyons as Adelaide first, then Brisbane Lions, with Gold Coast in between
+     [2m[90m↓[39m[22m treats Footscray and Western Bulldogs as one continuing organisation
+     [2m[90m↓[39m[22m keeps Brisbane Bears, Fitzroy and Brisbane Lions as three distinct organisations
+     [2m[90m↓[39m[22m summarises the first and most recent players to complete both representations
+     [2m[90m↓[39m[22m refuses to look for crossover players inside one organisation
+     [2m[90m↓[39m[22m ranks H2H games leaders against independent SQL and the measured witnesses
+     [2m[90m↓[39m[22m ranks H2H goals leaders without ever treating an unrecorded goal as nought
+     [2m[90m↓[39m[22m consolidates a player who represented both organisations into one row
+     [2m[90m↓[39m[22m keeps every tied holder of the single-match goals and disposals records
+     [2m[90m↓[39m[22m reports an unrecorded single-match statistic as unavailable rather than nought
+     [2m[90m↓[39m[22m refuses to build leaders for an organisation against itself
+     [2m[90m↓[39m[22m attributes season Brownlow votes through the nullable club_id contract
+     [2m[90m↓[39m[22m takes winners only from is_winner, never from vote rank or maximum votes
+     [2m[90m↓[39m[22m includes only complete-coverage seasons and ranks all-time vote leaders
+     [2m[90m↓[39m[22m excludes ambiguous multi-club seasons and discloses them instead of forcing them
+[31m     [31m×[31m exposes selected-season Brownlow coverage without presenting a partial total[39m[32m 96[2mms[22m[39m
+     [2m[90m↓[39m[22m agrees with the all-time history when a season is read on its own
+     [2m[90m↓[39m[22m counts eligible and covered meetings from home-and-away matches only
+     [2m[90m↓[39m[22m never lets a finals meeting contribute to the H2H Brownlow population
+     [2m[90m↓[39m[22m totals H2H votes per player against independent SQL over covered meetings
+     [2m[90m↓[39m[22m reports partial coverage for a rivalry that predates match-vote recording
+     [2m[90m↓[39m[22m refuses to build H2H Brownlow for an organisation against itself
+     [2m[90m↓[39m[22m discovers canonical seasons and defaults to the maximum one
+     [2m[90m↓[39m[22m resolves the selected season identity through the canonical lineage function
+     [2m[90m↓[39m[22m returns an explicit no-participation state rather than borrowing a season or identity
+     [2m[90m↓[39m[22m computes the selected season home-and-away record against independent SQL
+     [2m[90m↓[39m[22m reports the selected season completed state from canonical metadata
+     [2m[90m↓[39m[22m ranks selected season player leaders densely and keeps every tie at the cut
+     [2m[90m↓[39m[22m reads the selected season Brownlow through the Stage 3 attribution primitive
+     [2m[90m↓[39m[22m aggregates team metrics match by match, never by averaging player rows
+     [2m[90m↓[39m[22m covers every approved metric family and maps marks inside 50 to its canonical column
+     [2m[90m↓[39m[22m keeps a pre-1965 uncollected metric unavailable instead of reporting zero
+     [2m[90m↓[39m[22m reports a mixed-coverage historical season as partial with an honest denominator
+     [2m[90m↓[39m[22m fails safely to unavailable when a selected season has no coverage metadata at all
+     [2m[90m↓[39m[22m contains no hard-coded season year in the selected season code path
+     [2m[90m↓[39m[22m runs the complete selected season path for the maximum canonical season without naming it
+     [2m[90m↓[39m[22m reproduces the Adelaide vs Brisbane Lions decade witness and independent SQL
+     [2m[90m↓[39m[22m sums every Carlton vs Collingwood decade back to the complete 268-meeting population
+     [2m[90m↓[39m[22m exposes pair-level period-score coverage for both witness rivalries
+     [2m[90m↓[39m[22m drops a meeting whose period structure is incomplete rather than reading a gap as nought
+     [2m[90m↓[39m[22m matches independent SQL on the biggest lead at every named break
+     [2m[90m↓[39m[22m defines a comeback as trailing at the break and winning on the canonical result
+     [2m[90m↓[39m[22m computes the largest consecutive-break turnaround from the canonical full-time score, never period 4
+     [2m[90m↓[39m[22m reuses the comparison metric registry rather than defining a second one
+     [2m[90m↓[39m[22m ranks the disposals average board on recorded games and matches independent SQL
+     [2m[90m↓[39m[22m applies the five-recorded-game minimum, per metric and never per rivalry appearance
+     [2m[90m↓[39m[22m retains every tie at the rank-ten boundary and reports the recorded-game denominator
+     [2m[90m↓[39m[22m reads average availability from runtime stat_availability over the rivalry seasons
+     [2m[90m↓[39m[22m splits a crossover player average across both organisations
+     [2m[90m↓[39m[22m keeps every warm H2H query under the query ceiling for both rivalry scales
+     [2m[90m↓[39m[22m keeps every warm selected-season query under the query ceiling
+     [2m[90m↓[39m[22m keeps the maximum canonical season path under the query ceiling
+     [2m[90m↓[39m[22m keeps every warm Stage 6 extended-rivalry query under the query ceiling
+     [2m[90m↓[39m[22m keeps the parallel Stage 6 extended-rivalry group under the group ceiling
+     [2m[90m↓[39m[22m keeps each independent parallel query group under the group ceiling
+     [2m[90m↓[39m[22m keeps the route-equivalent composed data load under the route ceiling
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m tests/integration/club-comparison.test.ts[2m > [22mclub comparison: club Brownlow history[2m > [22mexposes selected-season Brownlow coverage without presenting a partial total
+[31m[1mAssertionError[22m: expected 0 to be greater than 0[39m
+[36m [2m❯[22m tests/integration/club-comparison.test.ts:[2m1883:34[22m[39m
+    [90m1881|[39m     if (expected2026 === 'complete') {
+    [90m1882|[39m       expect(pending.isAuthoritative).toBe(true);
+    [90m1883|[39m       expect(pending.totalVotes).toBeGreaterThan(0);
+    [90m   |[39m                                  [31m^[39m
+    [90m1884|[39m     }
+    [90m1885|[39m     for (const summary of [notApplicable, missing, ...(expected2026 ==…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[33m69 skipped[39m[90m (70)[39m
+[2m   Start at [22m 16:21:44
+[2m   Duration [22m 1.35s[2m (transform 542ms, setup 234ms, import 579ms, tests 152ms, environment 0ms)[22m
+
+JSON report written to /mnt/ssd/afldb-rem4-qual-20261115/evidence/clones/mnewsnap.json

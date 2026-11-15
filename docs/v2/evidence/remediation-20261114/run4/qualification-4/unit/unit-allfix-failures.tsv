@@ -1,0 +1,1 @@
+tests/v2-acquisition-pipeline.test.ts	(e) docs/v2/architecture.md §9 is the rendered stage map equals renderAflApiStageMap output	AssertionError: docs/v2/architecture.md §9 is stale: run `npx tsx tools/v2/acquisition-stage-map.ts --write`: expected '| Stage | Location | Symbol | Writes …' to be '| Stage | Location | Symbol | Wri

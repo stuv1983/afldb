@@ -1,0 +1,227 @@
+##### bl_fetch start 2026-11-15T04:20:31Z HEAD=1f7b0d71 porcelain-before=0
+afldb_v2_rb_brownlow2025_test.dump: OK
+acquisition-014218.tar: OK
+fixture-root.tar: OK
+template-identity.txt: OK
+fixture acquisition == retained acquisition (byte-identical)
+fetch: done (fixture files 258)
+##### bl_fetch end 2026-11-15T04:20:31Z rc=0 porcelain-after=0
+##### bl_tmpl start 2026-11-15T04:20:31Z HEAD=1f7b0d71 porcelain-before=0
+create-db: afldb_v2_rem4qual_bl2025_tmpl_test created and marked
+toc entries 1640; excluded 4
+pg_restore exit 0
+analyze exit 0
+identity query exit 0
+2026-11-15T04:20:55Z restored template identity == exported template identity
+ISOLATED TARGET OK: afldb_v2_rem4qual_bl2025_tmpl_test
+##### bl_tmpl end 2026-11-15T04:20:56Z rc=0 porcelain-after=0
+##### bl_b2 start 2026-11-15T04:20:56Z HEAD=1f7b0d71 porcelain-before=0
+create-db: afldb_v2_brownlow_tristate_twelve_test created from afldb_v2_rem4qual_bl2025_tmpl_test and marked
+  PENDING  117_brownlow_provider_eligibility_unknown.sql
+  PENDING  118_fixtures_unconfirmed_participants.sql
+
+3 pending.
+  118 migration file(s), 115 already applied
+  applying 116_brownlow_correction_receipts.sql ... ok (19 ms)
+  applying 117_brownlow_provider_eligibility_unknown.sql ... ok (3 ms)
+  applying 118_fixtures_unconfirmed_participants.sql ... ok (6 ms)
+2026-11-15T04:21:02Z clone afldb_v2_brownlow_tristate_twelve_test ready (migrations via the normal runner, then privileges)
+2026-11-15T04:21:02Z run b2-eligibility-2025 db=afldb_v2_brownlow_tristate_twelve_test file=tests/integration/v2-brownlow-eligibility-2025-rehearsal.test.ts
+2026-11-15T04:23:37Z run b2-eligibility-2025 rc=0:  Test Files  1 passed (1)       Tests  3 passed (3) 
+b2-eligibility-2025 failing ids: 0
+##### bl_b2 end 2026-11-15T04:23:37Z rc=0 porcelain-after=0
+##### bl_b1 start 2026-11-15T04:23:37Z HEAD=1f7b0d71 porcelain-before=0
+create-db: afldb_v2_brownlow_policy_final_test created from afldb_v2_rem4qual_bl2025_tmpl_test and marked
+  PENDING  117_brownlow_provider_eligibility_unknown.sql
+  PENDING  118_fixtures_unconfirmed_participants.sql
+
+3 pending.
+  118 migration file(s), 115 already applied
+  applying 116_brownlow_correction_receipts.sql ... ok (23 ms)
+  applying 117_brownlow_provider_eligibility_unknown.sql ... ok (3 ms)
+  applying 118_fixtures_unconfirmed_participants.sql ... ok (8 ms)
+2026-11-15T04:23:43Z clone afldb_v2_brownlow_policy_final_test ready (migrations via the normal runner, then privileges)
+2026-11-15T04:23:43Z run b1-production-correction db=afldb_v2_brownlow_policy_final_test file=tests/integration/v2-brownlow-production-correction.test.ts
+2026-11-15T05:04:58Z run b1-production-correction rc=0:  Test Files  1 passed (1)       Tests  8 passed (8) 
+b1-production-correction failing ids: 0
+##### bl_b1 end 2026-11-15T05:04:58Z rc=0 porcelain-after=0
+##### od5 start 2026-11-15T05:04:58Z HEAD=1f7b0d71 porcelain-before=0
+create-db: afldb_v2_rb_rem4qod5rb_test created from afldb_v2_rem4qual_rbb_tmpl_test and marked
+2026-11-15T05:05:51Z od5 rb db=afldb_v2_rb_rem4qod5rb_test rc=0:  Test Files  1 passed (1)       Tests  74 passed (74) 
+od5-rb failing ids: 0
+passed  AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreSQL (post-COMMIT, pre-archive recovery) OD-5 recovery — a committed reinstatement whose capture was never archived is verified, archived and captured afresh; the database is not written
+passed  AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreSQL (post-COMMIT, pre-archive recovery) OD-5 reinstate (rolled back, no rebuild) — reinstateAndReplay() puts a captured ledger back byte-for-byte under its original ids, replays it and passes the bijection
+passed  AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreSQL (post-COMMIT, pre-archive recovery) OD-5 recovery — a missing human identity is refused as already_reinstated_unverified; the pending capture is left in place
+passed  AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreSQL (post-COMMIT, pre-archive recovery) OD-5 recovery — a human identity with no ledger entry is refused; the pending capture is left in place
+passed  AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreSQL (post-COMMIT, pre-archive recovery) OD-5 recovery — ledger drift is refused before any observation; the pending capture is left in place
+od5-rb: table counts unchanged
+drop-db: afldb_v2_rb_rem4qod5rb_test dropped
+create-db: afldb_v2_rb_rem4qod5snap_test created from afldb_v2_rem4qual_snap_tmpl_test and marked
+2026-11-15T05:06:53Z od5 snap db=afldb_v2_rb_rem4qod5snap_test rc=0:  Test Files  1 passed (1)       Tests  74 passed (74) 
+od5-snap failing ids: 0
+passed  AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreSQL (post-COMMIT, pre-archive recovery) OD-5 recovery — a committed reinstatement whose capture was never archived is verified, archived and captured afresh; the database is not written
+passed  AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreSQL (post-COMMIT, pre-archive recovery) OD-5 reinstate (rolled back, no rebuild) — reinstateAndReplay() puts a captured ledger back byte-for-byte under its original ids, replays it and passes the bijection
+passed  AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreSQL (post-COMMIT, pre-archive recovery) OD-5 recovery — a missing human identity is refused as already_reinstated_unverified; the pending capture is left in place
+passed  AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreSQL (post-COMMIT, pre-archive recovery) OD-5 recovery — a human identity with no ledger entry is refused; the pending capture is left in place
+passed  AFLDB-ISSUE-235 OD-5: observeLiveReinstatement() against real PostgreSQL (post-COMMIT, pre-archive recovery) OD-5 recovery — ledger drift is refused before any observation; the pending capture is left in place
+od5-snap: table counts unchanged
+drop-db: afldb_v2_rb_rem4qod5snap_test dropped
+##### od5 end 2026-11-15T05:06:54Z rc=0 porcelain-after=0
+##### cole start 2026-11-15T05:06:55Z HEAD=1f7b0d71 porcelain-before=0
+create-db: afldb_v2_rem4qual_cs_test created and marked
+  applying 118_fixtures_unconfirmed_participants.sql ... ok (8 ms)
+
+Applied 118 migration(s).
+2026-11-15T05:07:06Z coleman schema-only rc=0:  Test Files  1 passed (1)       Tests  28 passed (28) 
+coleman failing ids: 0
+drop-db: afldb_v2_rem4qual_cs_test dropped
+##### cole end 2026-11-15T05:07:07Z rc=0 porcelain-after=0
+##### ct start 2026-11-15T05:07:07Z HEAD=1f7b0d71 porcelain-before=0
+create-db: afldb_v2_rem4qual_ctenv_test created and marked
+c1	rc=0	10s	rsc=0	case 1: 24/24 checks PASS -> PASS -> PASS
+c29	rc=0	9s	rsc=0	case 29: 33/33 checks PASS -> PASS -> PASS
+c87	rc=0	14s	rsc=0	case 87: 23/23 checks PASS -> PASS -> PASS
+c91	rc=1	5s	rsc=1	case 91: 3/3 checks PASS (run ABORTED) -> FAIL -> FAIL
+c100-match-sheet	rc=1	5s	rsc=1	case 100 (match-sheet): 3/3 checks PASS (run ABORTED) -> FAIL -> FAIL
+c100-brownlow-draft	rc=1	5s	rsc=1	case 100 (brownlow-draft): 3/3 checks PASS (run ABORTED) -> FAIL -> FAIL
+c2-votes-0	rc=0	9s	rsc=0	case 2 (votes-0): 14/14 checks PASS -> PASS -> PASS
+c2-votes-3	rc=0	9s	rsc=0	case 2 (votes-3): 14/14 checks PASS -> PASS -> PASS
+c16	rc=1	4s	rsc=1	case 16: 3/3 checks PASS (run ABORTED) -> FAIL -> FAIL
+c23	rc=0	9s	rsc=0	case 23: 17/17 checks PASS -> PASS -> PASS
+c48	rc=0	9s	rsc=0	case 48: 15/15 checks PASS -> PASS -> PASS
+c51	rc=0	9s	rsc=0	case 51: 25/25 checks PASS -> PASS -> PASS
+c9-pms-foreign-identical	rc=0	9s	rsc=0	case 9 (pms-foreign-identical): 26/26 checks PASS -> PASS -> PASS
+c9-brownlow-foreign-zero	rc=0	10s	rsc=0	case 9 (brownlow-foreign-zero): 26/26 checks PASS -> PASS -> PASS
+c10-kicks	rc=0	8s	rsc=0	case 10 (kicks): 16/16 checks PASS -> PASS -> PASS
+c10-null-vs-zero	rc=0	9s	rsc=0	case 10 (null-vs-zero): 16/16 checks PASS -> PASS -> PASS
+c10-jumper-whitespace	rc=0	9s	rsc=0	case 10 (jumper-whitespace): 16/16 checks PASS -> PASS -> PASS
+c11	rc=0	9s	rsc=0	case 11: 15/15 checks PASS -> PASS -> PASS
+c12-pms	rc=0	11s	rsc=0	case 12 (pms): 33/33 checks PASS -> PASS -> PASS
+c12-brownlow	rc=0	11s	rsc=0	case 12 (brownlow): 33/33 checks PASS -> PASS -> PASS
+c52-pms-identical	rc=0	10s	rsc=0	case 52 (pms-identical): 26/26 checks PASS -> PASS -> PASS
+c52-pms-differing	rc=0	9s	rsc=0	case 52 (pms-differing): 16/16 checks PASS -> PASS -> PASS
+c52-brownlow-zero	rc=0	10s	rsc=0	case 52 (brownlow-zero): 26/26 checks PASS -> PASS -> PASS
+c5	rc=0	10s	rsc=0	case 5: 33/33 checks PASS -> PASS -> PASS
+c6	rc=0	10s	rsc=0	case 6: 29/29 checks PASS -> PASS -> PASS
+c7	rc=0	9s	rsc=0	case 7: 28/28 checks PASS -> PASS -> PASS
+c8-malformed-entry	rc=0	8s	rsc=0	case 8 (malformed-entry): 21/21 checks PASS -> PASS -> PASS
+c8-other-record	rc=0	9s	rsc=0	case 8 (other-record): 21/21 checks PASS -> PASS -> PASS
+c53-source-positive	rc=0	9s	rsc=0	case 53 (source-positive): 18/18 checks PASS -> PASS -> PASS
+c53-counterpart-positive	rc=0	10s	rsc=0	case 53 (counterpart-positive): 18/18 checks PASS -> PASS -> PASS
+c54	rc=0	9s	rsc=0	case 54: 21/21 checks PASS -> PASS -> PASS
+c76	rc=0	10s	rsc=0	case 76: 32/32 checks PASS -> PASS -> PASS
+c78	rc=0	9s	rsc=0	case 78: 29/29 checks PASS -> PASS -> PASS
+c79	rc=0	10s	rsc=0	case 79: 28/28 checks PASS -> PASS -> PASS
+c83-no-participation	rc=0	9s	rsc=0	case 83 (no-participation): 18/18 checks PASS -> PASS -> PASS
+c83-null-match-zero	rc=0	9s	rsc=0	case 83 (null-match-zero): 18/18 checks PASS -> PASS -> PASS
+c83-null-match-two	rc=0	9s	rsc=0	case 83 (null-match-two): 18/18 checks PASS -> PASS -> PASS
+c83-paired-pms-move	rc=0	10s	rsc=0	case 83 (paired-pms-move): 28/28 checks PASS -> PASS -> PASS
+c3-demote	rc=0	9s	rsc=0	case 3 (demote): 19/19 checks PASS -> PASS -> PASS
+c3-claim	rc=0	9s	rsc=0	case 3 (claim): 19/19 checks PASS -> PASS -> PASS
+c4-draft	rc=1	5s	rsc=1	case 4 (draft): 3/3 checks PASS (run ABORTED) -> FAIL -> FAIL
+c4-final	rc=0	9s	rsc=0	case 4 (final): 18/18 checks PASS -> PASS -> PASS
+c17-votes-written	rc=1	5s	rsc=1	case 17 (votes-written): 3/3 checks PASS (run ABORTED) -> FAIL -> FAIL
+c17-round-reowned	rc=1	5s	rsc=1	case 17 (round-reowned): 3/3 checks PASS (run ABORTED) -> FAIL -> FAIL
+c18-after-siren	rc=0	9s	rsc=0	case 18 (after-siren): 17/17 checks PASS -> PASS -> PASS
+c18-unresolved	rc=0	10s	rsc=0	case 18 (unresolved): 24/24 checks PASS -> PASS -> PASS
+c19-achievement	rc=0	9s	rsc=0	case 19 (achievement): 16/16 checks PASS -> PASS -> PASS
+c19-debut-change	rc=0	10s	rsc=0	case 19 (debut-change): 24/24 checks PASS -> PASS -> PASS
+c56-round-vote	rc=1	5s	rsc=1	case 56 (round-vote): 3/3 checks PASS (run ABORTED) -> FAIL -> FAIL
+c56-games	rc=1	5s	rsc=1	case 56 (games): 3/3 checks PASS (run ABORTED) -> FAIL -> FAIL
+c84-draft	rc=0	9s	rsc=0	case 84 (draft): 20/20 checks PASS -> PASS -> PASS
+c84-final	rc=0	9s	rsc=0	case 84 (final): 20/20 checks PASS -> PASS -> PASS
+c85-loses-participation	rc=0	8s	rsc=0	case 85 (loses-participation): 18/18 checks PASS -> PASS -> PASS
+c85-keeps-participation	rc=0	9s	rsc=0	case 85 (keeps-participation): 25/25 checks PASS -> PASS -> PASS
+c70	rc=1	5s	rsc=1	case 70: 3/3 checks PASS (run ABORTED) -> FAIL -> FAIL
+c88	rc=1	5s	rsc=1	case 88: 3/3 checks PASS (run ABORTED) -> FAIL -> FAIL
+c101	rc=1	5s	rsc=1	case 101: 3/3 checks PASS (run ABORTED) -> FAIL -> FAIL
+c20	rc=0	11s	rsc=0	case 20: 31/31 checks PASS -> PASS -> PASS
+c21	rc=0	12s	rsc=0	case 21: 35/35 checks PASS -> PASS -> PASS
+c27-same-target	rc=0	11s	rsc=0	case 27 (same-target): 30/30 checks PASS -> PASS -> PASS
+c27-other-target	rc=0	11s	rsc=0	case 27 (other-target): 25/25 checks PASS -> PASS -> PASS
+c69	rc=1	5s	rsc=1	case 69: 3/3 checks PASS (run ABORTED) -> FAIL -> FAIL
+c72	rc=1	5s	rsc=1	case 72: 3/3 checks PASS (run ABORTED) -> FAIL -> FAIL
+c73	rc=0	12s	rsc=0	case 73: 41/41 checks PASS -> PASS -> PASS
+c94-audited	rc=1	4s	rsc=1	case 94 (audited): 3/3 checks PASS (run ABORTED) -> FAIL -> FAIL
+c94-no-audit	rc=0	11s	rsc=1	case 94 (no-audit): 41/41 checks PASS -> PASS -> PASS
+c98	rc=1	5s	rsc=1	case 98: 3/3 checks PASS (run ABORTED) -> FAIL -> FAIL
+c99	rc=1	5s	rsc=1	case 99: 3/3 checks PASS (run ABORTED) -> FAIL -> FAIL
+c14	rc=1	5s	rsc=1	case 14: 3/3 checks PASS (run ABORTED) -> FAIL -> FAIL
+c15-match-exists	rc=0	11s	rsc=0	case 15 (match-exists): 38/38 checks PASS -> PASS -> PASS
+c15-match-gone	rc=0	12s	rsc=0	case 15 (match-gone): 38/38 checks PASS -> PASS -> PASS
+c32	rc=1	5s	rsc=1	case 32: 3/3 checks PASS (run ABORTED) -> FAIL -> FAIL
+c24-importer-unique	rc=0	10s	rsc=0	case 24 (importer-unique): 21/21 checks PASS -> PASS -> PASS
+c24-admin-linked	rc=1	5s	rsc=1	case 24 (admin-linked): 3/3 checks PASS (run ABORTED) -> FAIL -> FAIL
+c28	rc=0	11s	rsc=0	case 28: 23/23 checks PASS -> PASS -> PASS
+c30	rc=0	9s	rsc=0	case 30: 21/21 checks PASS -> PASS -> PASS
+c31	rc=1	5s	rsc=1	case 31: 3/3 checks PASS (run ABORTED) -> FAIL -> FAIL
+c58-disagreement-no-ack	rc=0	10s	rsc=0	case 58 (disagreement-no-ack): 17/17 checks PASS -> PASS -> PASS
+c58-disagreement-ack	rc=0	9s	rsc=0	case 58 (disagreement-ack): 22/22 checks PASS -> PASS -> PASS
+c58-ack-no-disagreement	rc=0	10s	rsc=0	case 58 (ack-no-disagreement): 17/17 checks PASS -> PASS -> PASS
+c58-ack-no-observation	rc=0	10s	rsc=0	case 58 (ack-no-observation): 17/17 checks PASS -> PASS -> PASS
+c82-independent	rc=0	11s	rsc=0	case 82 (independent): 28/28 checks PASS -> PASS -> PASS
+c82-extra-row	rc=0	11s	rsc=0	case 82 (extra-row): 28/28 checks PASS -> PASS -> PASS
+c47	rc=1	17s	rsc=0	case 47: 11/11 checks PASS (run ABORTED) -> FAIL -> FAIL
+cases attempted: 84
+summary: PASS=62 FAIL=22
+drop-db: afldb_v2_rem4qual_ctenv_test dropped
+##### ct end 2026-11-15T05:21:15Z rc=0 porcelain-after=0
+##### mnew start 2026-11-15T05:21:15Z HEAD=1f7b0d71 porcelain-before=0
+create-db: afldb_v2_rem4qual_mctlrb_test created from afldb_v2_rem4qual_rb_tmpl_test and marked
+mctlrb 2026 brownlow_season_votes=0 season_total=pending
+2026-11-15T05:21:21Z mctlrb rc=0:  Test Files  1 passed (1)       Tests  1 passed | 69 skipped (70) 
+mctlrb failing ids: 0
+SUMMARY-TEST passed  club comparison: club Brownlow history exposes selected-season Brownlow coverage without presenting a partial total
+mctlrb: table counts unchanged by the run
+drop-db: afldb_v2_rem4qual_mctlrb_test dropped
+create-db: afldb_v2_rem4qual_mctlsnap_test created from afldb_v2_rem4qual_snap_tmpl_test and marked
+mctlsnap 2026 brownlow_season_votes=0 season_total=pending
+2026-11-15T05:21:29Z mctlsnap rc=0:  Test Files  1 passed (1)       Tests  1 passed | 69 skipped (70) 
+mctlsnap failing ids: 0
+SUMMARY-TEST passed  club comparison: club Brownlow history exposes selected-season Brownlow coverage without presenting a partial total
+mctlsnap: table counts unchanged by the run
+drop-db: afldb_v2_rem4qual_mctlsnap_test dropped
+create-db: afldb_v2_rem4qual_mnew_test created from afldb_v2_rem4qual_rb_tmpl_test and marked
+INSERT 0 1
+UPDATE 1
+mnew 2026 brownlow_season_votes=1 season_total=complete
+2026-11-15T05:21:37Z mnew rc=1: ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯  Test Files  1 failed (1)       Tests  1 failed | 69 skipped (70) 
+mnew failing ids: 1
+tests/integration/club-comparison.test.ts	club comparison: club Brownlow history exposes selected-season Brownlow coverage without presenting a partial total	AssertionError: expected 0 to be greater than 0
+SUMMARY-TEST failed  club comparison: club Brownlow history exposes selected-season Brownlow coverage without presenting a partial total
+mnew: table counts changed (1 rows)
+drop-db: afldb_v2_rem4qual_mnew_test dropped
+create-db: afldb_v2_rem4qual_mnewsnap_test created from afldb_v2_rem4qual_snap_tmpl_test and marked
+INSERT 0 1
+UPDATE 1
+mnewsnap 2026 brownlow_season_votes=1 season_total=complete
+2026-11-15T05:21:45Z mnewsnap rc=1: ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯  Test Files  1 failed (1)       Tests  1 failed | 69 skipped (70) 
+mnewsnap failing ids: 1
+tests/integration/club-comparison.test.ts	club comparison: club Brownlow history exposes selected-season Brownlow coverage without presenting a partial total	AssertionError: expected 0 to be greater than 0
+SUMMARY-TEST failed  club comparison: club Brownlow history exposes selected-season Brownlow coverage without presenting a partial total
+mnewsnap: table counts changed (1 rows)
+drop-db: afldb_v2_rem4qual_mnewsnap_test dropped
+create-db: afldb_v2_rem4qual_mnewfile_test created from afldb_v2_rem4qual_rb_tmpl_test and marked
+INSERT 0 1
+UPDATE 1
+mnewfile 2026 brownlow_season_votes=1 season_total=complete
+2026-11-15T05:22:17Z mnewfile rc=1: ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯  Test Files  1 failed (1)       Tests  2 failed | 68 passed (70) 
+mnewfile failing ids: 2
+tests/integration/club-comparison.test.ts	club comparison: club Brownlow history excludes ambiguous multi-club seasons and discloses them instead of forcing them	AssertionError: expected false to be true // Object.is equality
+tests/integration/club-comparison.test.ts	club comparison: club Brownlow history exposes selected-season Brownlow coverage without presenting a partial total	AssertionError: expected 0 to be greater than 0
+SUMMARY-TEST failed  club comparison: club Brownlow history exposes selected-season Brownlow coverage without presenting a partial total
+mnewfile: table counts changed (1 rows)
+drop-db: afldb_v2_rem4qual_mnewfile_test dropped
+create-db: afldb_v2_rem4qual_mnewfilesnap_test created from afldb_v2_rem4qual_snap_tmpl_test and marked
+INSERT 0 1
+UPDATE 1
+mnewfilesnap 2026 brownlow_season_votes=1 season_total=complete
+2026-11-15T05:22:49Z mnewfilesnap rc=1: ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯  Test Files  1 failed (1)       Tests  2 failed | 68 passed (70) 
+mnewfilesnap failing ids: 2
+tests/integration/club-comparison.test.ts	club comparison: club Brownlow history excludes ambiguous multi-club seasons and discloses them instead of forcing them	AssertionError: expected false to be true // Object.is equality
+tests/integration/club-comparison.test.ts	club comparison: club Brownlow history exposes selected-season Brownlow coverage without presenting a partial total	AssertionError: expected 0 to be greater than 0
+SUMMARY-TEST failed  club comparison: club Brownlow history exposes selected-season Brownlow coverage without presenting a partial total
+mnewfilesnap: table counts changed (1 rows)
+drop-db: afldb_v2_rem4qual_mnewfilesnap_test dropped
+##### mnew end 2026-11-15T05:22:51Z rc=0 porcelain-after=0
+##### done 2026-11-15T05:22:51Z

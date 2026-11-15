@@ -1,0 +1,1307 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-qual-20261115/cand[39m
+
+ [32m✓[39m tests/db-test-rebuild.test.ts [2m([22m[2m1157 tests[22m[2m)[22m[33m 33756[2mms[22m[39m
+         [33m[2m✓[22m[39m loads a real bound dependency through mjs and the actual tsx preload [33m 487[2mms[22m[39m
+         [33m[2m✓[22m[39m loads a real bound dependency through cjs and the actual tsx preload [33m 500[2mms[22m[39m
+         [33m[2m✓[22m[39m loads a real bound dependency through ts and the actual tsx preload [33m 550[2mms[22m[39m
+         [33m[2m✓[22m[39m loads the runner-style CommonJS TypeScript path with real type transformation [33m 592[2mms[22m[39m
+         [33m[2m✓[22m[39m refuses ancestor imports on the runner-style CommonJS TypeScript path [33m 550[2mms[22m[39m
+         [33m[2m✓[22m[39m refuses resolvable ancestor dependency before sentinel execution via mjs [33m 546[2mms[22m[39m
+         [33m[2m✓[22m[39m refuses resolvable ancestor dependency before sentinel execution via cjs [33m 469[2mms[22m[39m
+         [33m[2m✓[22m[39m refuses resolvable ancestor dependency before sentinel execution via ts [33m 597[2mms[22m[39m
+         [33m[2m✓[22m[39m rejects changed bound dependency bytes at module load via mjs [33m 508[2mms[22m[39m
+         [33m[2m✓[22m[39m rejects changed bound dependency bytes at module load via cjs [33m 437[2mms[22m[39m
+         [33m[2m✓[22m[39m rejects changed bound dependency bytes at module load via ts [33m 514[2mms[22m[39m
+         [33m[2m✓[22m[39m uses the real TS loader for an inventoried workspace alias and transitive import [33m 600[2mms[22m[39m
+         [33m[2m✓[22m[39m refuses an unbound workspace alias target before its code executes [33m 583[2mms[22m[39m
+         [33m[2m✓[22m[39m loads a real hard-linked module only when the policy declares that exact link count [33m 3246[2mms[22m[39m
+       [33m[2m✓[22m[39m resolves the isolated candidate to 1640 with all 2026 included and preserves full stage order [33m 404[2mms[22m[39m
+         [33m[2m✓[22m[39m the ordinary and final checks still reject a pending marker, and the capture recheck still needs the resting one [33m 359[2mms[22m[39m
+       [33m[2m✓[22m[39m the real checkout (its WHOLE node_modules tree is walked) agrees with a direct lstat of its own node_modules chain (a linked install refuses by design) [33m 622[2mms[22m[39m
+         [33m[2m✓[22m[39m db:privileges (direct run): runs its work, refusing rather than skipping [33m 1287[2mms[22m[39m
+         [33m[2m✓[22m[39m the ownership census CLI refuses before reading its evidence or launching psql [33m 456[2mms[22m[39m
+         [33m[2m✓[22m[39m the reset proof CLI refuses before opening a session or launching psql [33m 1240[2mms[22m[39m
+         [33m[2m✓[22m[39m the convergence rehearsal refuses before connecting or seeding anything [33m 1555[2mms[22m[39m
+     [33m[2m✓[22m[39m the provider/match namespace is absent from every tracked AFL API data file [33m 559[2mms[22m[39m
+       [33m[2m✓[22m[39m owns a provider namespace, a profile path and a notes marker no tracked source carries [33m 1114[2mms[22m[39m
+[90mstdout[2m | tests/db-promotion-check.test.ts[2m > [22m[2mAFLDB-ISSUE-257 A4.4 — the player_match_stats authority replay predicted before the swap (DB-free)[2m > [22m[2mthe gate with no player_match_stats record PASSes with zero counts and reads nothing new
+[22m[39m
+[PASS] data_overrides players replay predicted on the candidate (AFLDB-ISSUE-237 A4.2)
+       target data_overrides read from o; identities and CHECK columns from c
+       creation records replayable: 0 (present 0, bind 0, create 0); source-keyed corrections resolving: 0
+       players the merge UPDATE writes: 0 (candidate rows read by id: 0)
+       candidate manual identities no target creation record names: 0 (each a STOP)
+
+[90mstdout[2m | tests/db-promotion-check.test.ts[2m > [22m[2mAFLDB-ISSUE-257 A4.4 — the player_match_stats authority replay predicted before the swap (DB-free)[2m > [22m[2mthe gate with no player_match_stats record PASSes with zero counts and reads nothing new
+[22m[39m
+[PASS] data_overrides match-keyed replay targets exist in the candidate (AFLDB-ISSUE-237 A4.3)
+       target data_overrides read from o; matches from c (max season 2025)
+       active matches / match_coaches overrides resolving to a candidate match: 0
+
+[PASS] data_overrides player_match_stats replay predicted on the candidate (AFLDB-ISSUE-257 A4.4)
+       target data_overrides read from o; matches, identities, clubs and rows from c
+       active player_match_stats records: 0 over 0 key(s); resolving with authority: 0 (durable additions 0, durable removals 0)
+
+[90mstdout[2m | tests/db-promotion-check.test.ts[2m > [22m[2mAFLDB-ISSUE-257 A4.4 — the player_match_stats authority replay predicted before the swap (DB-free)[2m > [22m[2mthe gate reads the candidate narrowly and PASSes a resolving record; a failure is a FAIL naming the key
+[22m[39m
+[PASS] data_overrides players replay predicted on the candidate (AFLDB-ISSUE-237 A4.2)
+       target data_overrides read from o; identities and CHECK columns from c
+       creation records replayable: 0 (present 0, bind 0, create 0); source-keyed corrections resolving: 0
+       players the merge UPDATE writes: 0 (candidate rows read by id: 0)
+       candidate manual identities no target creation record names: 0 (each a STOP)
+
+[90mstdout[2m | tests/db-promotion-check.test.ts[2m > [22m[2mAFLDB-ISSUE-257 A4.4 — the player_match_stats authority replay predicted before the swap (DB-free)[2m > [22m[2mthe gate reads the candidate narrowly and PASSes a resolving record; a failure is a FAIL naming the key
+[22m[39m
+[PASS] data_overrides match-keyed replay targets exist in the candidate (AFLDB-ISSUE-237 A4.3)
+       target data_overrides read from o; matches from c (max season 2025)
+       active matches / match_coaches overrides resolving to a candidate match: 0
+
+[90mstdout[2m | tests/db-promotion-check.test.ts[2m > [22m[2mAFLDB-ISSUE-257 A4.4 — the player_match_stats authority replay predicted before the swap (DB-free)[2m > [22m[2mthe gate reads the candidate narrowly and PASSes a resolving record; a failure is a FAIL naming the key
+[22m[39m
+[PASS] data_overrides player_match_stats replay predicted on the candidate (AFLDB-ISSUE-257 A4.4)
+       target data_overrides read from o; matches, identities, clubs and rows from c
+       active player_match_stats records: 1 over 1 key(s); resolving with authority: 1 (durable additions 0, durable removals 0)
+
+[90mstdout[2m | tests/db-promotion-check.test.ts[2m > [22m[2mAFLDB-ISSUE-257 A4.4 — the player_match_stats authority replay predicted before the swap (DB-free)[2m > [22m[2mthe gate reads the candidate narrowly and PASSes a resolving record; a failure is a FAIL naming the key
+[22m[39m
+[PASS] data_overrides players replay predicted on the candidate (AFLDB-ISSUE-237 A4.2)
+       target data_overrides read from o; identities and CHECK columns from c
+       creation records replayable: 0 (present 0, bind 0, create 0); source-keyed corrections resolving: 0
+       players the merge UPDATE writes: 0 (candidate rows read by id: 0)
+       candidate manual identities no target creation record names: 0 (each a STOP)
+
+[90mstdout[2m | tests/db-promotion-check.test.ts[2m > [22m[2mAFLDB-ISSUE-257 A4.4 — the player_match_stats authority replay predicted before the swap (DB-free)[2m > [22m[2mthe gate reads the candidate narrowly and PASSes a resolving record; a failure is a FAIL naming the key
+[22m[39m
+[PASS] data_overrides match-keyed replay targets exist in the candidate (AFLDB-ISSUE-237 A4.3)
+       target data_overrides read from o; matches from c (max season 2025)
+       active matches / match_coaches overrides resolving to a candidate match: 0
+
+[90mstdout[2m | tests/db-promotion-check.test.ts[2m > [22m[2mAFLDB-ISSUE-257 A4.4 — the player_match_stats authority replay predicted before the swap (DB-free)[2m > [22m[2mthe gate reads the candidate narrowly and PASSes a resolving record; a failure is a FAIL naming the key
+[22m[39m
+[FAIL] data_overrides player_match_stats replay predicted on the candidate (AFLDB-ISSUE-257 A4.4)
+       target data_overrides read from o; matches, identities, clubs and rows from c
+       active player_match_stats records: 1 over 1 key(s); resolving with authority: 0 (durable additions 0, durable removals 0)
+       STOP player_match_stats override 2025|1|2025-03-13|Richmond|Carlton|afltables:players/P/P_Player.html: field record has no player_match_stats row on the candidate and no durable addition behind it
+       A4.4: the post-swap player_match_stats replay would refuse (replay_admin_overrides raises, nothing commits). STOP before the swap; return the named records to source or repair them, never by name or players.id.
+
+[90mstdout[2m | tests/db-promotion-check.test.ts[2m > [22m[2mAFLDB-ISSUE-233 D-233-3 — completed-season afl_api ownership on the live promotion target (DB-free)[2m > [22m[2mlive target with zero afl_api-owned matches: PASS
+[22m[39m
+[PASS] afl_api completed-season ownership on the live target (AFLDB-ISSUE-233 D-233-3)
+       target afldb_prod: completed-season scope 1897..2025 excluding in-progress 2026
+       in scope      : none
+       outside scope : none (in progress or later; reported, never blocked here)
+
+[90mstdout[2m | tests/db-promotion-check.test.ts[2m > [22m[2mAFLDB-ISSUE-233 D-233-3 — completed-season afl_api ownership on the live promotion target (DB-free)[2m > [22m[2mone afl_api-owned match in a completed season: FAIL, naming the season and its count
+[22m[39m
+[FAIL] afl_api completed-season ownership on the live target (AFLDB-ISSUE-233 D-233-3)
+       target afldb_prod: completed-season scope 1897..2025 excluding in-progress 2026
+       in scope      : 2025 (1)
+       outside scope : none (in progress or later; reported, never blocked here)
+       STOP AFLDB-AFL-API-OWNERSHIP-CENSUS REFUSED on afldb_prod: completed season(s) in promotion scope 1897..2025 excluding in-progress 2026 hold canonical matches owned by source afl_api: 2025 (1). A promotion replaces these seasons with a rebuilt candidate's AFL Tables rows, which no ownership replay carries over, and would silently re-own them (AFLDB-ISSUE-233 D-233-3). There is no override: the refusal lifts only with an ownership-replay design.
+
+[90mstdout[2m | tests/db-promotion-check.test.ts[2m > [22m[2mAFLDB-ISSUE-233 D-233-3 — completed-season afl_api ownership on the live promotion target (DB-free)[2m > [22m[2mseveral completed seasons: every one named with its exact count; the in-progress season never
+[22m[39m
+[FAIL] afl_api completed-season ownership on the live target (AFLDB-ISSUE-233 D-233-3)
+       target afldb_prod: completed-season scope 1897..2025 excluding in-progress 2026
+       in scope      : 1990 (2), 2019 (5), 2025 (1)
+       outside scope : 2026 (40) (in progress or later; reported, never blocked here)
+       STOP AFLDB-AFL-API-OWNERSHIP-CENSUS REFUSED on afldb_prod: completed season(s) in promotion scope 1897..2025 excluding in-progress 2026 hold canonical matches owned by source afl_api: 1990 (2), 2019 (5), 2025 (1). A promotion replaces these seasons with a rebuilt candidate's AFL Tables rows, which no ownership replay carries over, and would silently re-own them (AFLDB-ISSUE-233 D-233-3). There is no override: the refusal lifts only with an ownership-replay design.
+
+[90mstdout[2m | tests/db-promotion-check.test.ts[2m > [22m[2mAFLDB-ISSUE-233 D-233-3 — completed-season afl_api ownership on the live promotion target (DB-free)[2m > [22m[2min-progress-only ownership is not blocked by this completed-season rule
+[22m[39m
+[PASS] afl_api completed-season ownership on the live target (AFLDB-ISSUE-233 D-233-3)
+       target afldb_prod: completed-season scope 1897..2025 excluding in-progress 2026
+       in scope      : none
+       outside scope : 2026 (207) (in progress or later; reported, never blocked here)
+
+[90mstdout[2m | tests/db-promotion-check.test.ts[2m > [22m[2mAFLDB-ISSUE-233 D-233-3 — completed-season afl_api ownership on the live promotion target (DB-free)[2m > [22m[2ma census that cannot be taken never passes: no matches table, a damaged schema, the wrong database
+[22m[39m
+[FAIL] afl_api completed-season ownership on the live target (AFLDB-ISSUE-233 D-233-3)
+       target afldb_prod: completed-season scope 1897..2025 excluding in-progress 2026
+       in scope      : none
+       outside scope : none (in progress or later; reported, never blocked here)
+       STOP target afldb_prod has no public.matches. A promotion target is an existing AFLDB database: an absent table is not evidence that nothing is owned, so the census cannot pass.
+
+[90mstdout[2m | tests/db-promotion-check.test.ts[2m > [22m[2mAFLDB-ISSUE-233 D-233-3 — completed-season afl_api ownership on the live promotion target (DB-free)[2m > [22m[2ma census that cannot be taken never passes: no matches table, a damaged schema, the wrong database
+[22m[39m
+[FAIL] afl_api completed-season ownership on the live target (AFLDB-ISSUE-233 D-233-3)
+       target afldb_prod: AFLDB-AFL-API-OWNERSHIP-CENSUS REFUSED on afldb_prod: public.matches exists but public.sources or matches.source_id does not, so the owner of its rows cannot be determined. A damaged schema never satisfies this census (AFLDB-ISSUE-233 D-233-3). Nothing has been changed.
+       STOP: the census could not be taken; this promotion does not proceed.
+
+[90mstdout[2m | tests/db-promotion-check.test.ts[2m > [22m[2mAFLDB-ISSUE-233 D-233-3 — completed-season afl_api ownership on the live promotion target (DB-free)[2m > [22m[2ma census that cannot be taken never passes: no matches table, a damaged schema, the wrong database
+[22m[39m
+[FAIL] afl_api completed-season ownership on the live target (AFLDB-ISSUE-233 D-233-3)
+       target afldb_prod: AFLDB-AFL-API-OWNERSHIP-CENSUS REFUSED on afldb_prod: public.matches exists but public.sources or matches.source_id does not, so the owner of its rows cannot be determined. A damaged schema never satisfies this census (AFLDB-ISSUE-233 D-233-3). Nothing has been changed.
+       STOP: the census could not be taken; this promotion does not proceed.
+
+[90mstdout[2m | tests/db-promotion-check.test.ts[2m > [22m[2mAFLDB-ISSUE-233 D-233-3 — completed-season afl_api ownership on the live promotion target (DB-free)[2m > [22m[2ma census that cannot be taken never passes: no matches table, a damaged schema, the wrong database
+[22m[39m
+[FAIL] afl_api completed-season ownership on the live target (AFLDB-ISSUE-233 D-233-3)
+       target afldb_prod: the census read database 'afldb_test', not 'afldb_prod'.
+       STOP: the census could not be taken; this promotion does not proceed.
+
+[90mstdout[2m | tests/db-promotion-check.test.ts[2m > [22m[2mAFLDB-ISSUE-233 D-233-3 — completed-season afl_api ownership on the live promotion target (DB-free)[2m > [22m[2ma source or candidate with zero cannot mask the live target: the gate reads only the target connection
+[22m[39m
+[PASS] afl_api completed-season ownership on the live target (AFLDB-ISSUE-233 D-233-3)
+       candidate: completed-season scope 1897..2025 excluding in-progress 2026
+       in scope      : none
+       outside scope : none (in progress or later; reported, never blocked here)
+
+[90mstdout[2m | tests/db-promotion-check.test.ts[2m > [22m[2mAFLDB-ISSUE-233 D-233-3 — completed-season afl_api ownership on the live promotion target (DB-free)[2m > [22m[2ma source or candidate with zero cannot mask the live target: the gate reads only the target connection
+[22m[39m
+[FAIL] afl_api completed-season ownership on the live target (AFLDB-ISSUE-233 D-233-3)
+       target afldb_prod: completed-season scope 1897..2025 excluding in-progress 2026
+       in scope      : 2024 (3)
+       outside scope : none (in progress or later; reported, never blocked here)
+       STOP AFLDB-AFL-API-OWNERSHIP-CENSUS REFUSED on afldb_prod: completed season(s) in promotion scope 1897..2025 excluding in-progress 2026 hold canonical matches owned by source afl_api: 2024 (3). A promotion replaces these seasons with a rebuilt candidate's AFL Tables rows, which no ownership replay carries over, and would silently re-own them (AFLDB-ISSUE-233 D-233-3). There is no override: the refusal lifts only with an ownership-replay design.
+
+[90mstdout[2m | tests/db-promotion-check.test.ts[2m > [22m[2mAFLDB-ISSUE-233 D-233-3 — completed-season afl_api ownership on the live promotion target (DB-free)[2m > [22m[2mlate ownership appearing after an earlier phase is caught by the frozen pre-cutover, candidate and kept-database reads
+[22m[39m
+[PASS] afl_api completed-season ownership on the live target (AFLDB-ISSUE-233 D-233-3)
+       target afldb_prod: completed-season scope 1897..2025 excluding in-progress 2026
+       in scope      : none
+       outside scope : 2026 (12) (in progress or later; reported, never blocked here)
+
+[90mstdout[2m | tests/db-promotion-check.test.ts[2m > [22m[2mAFLDB-ISSUE-233 D-233-3 — completed-season afl_api ownership on the live promotion target (DB-free)[2m > [22m[2mlate ownership appearing after an earlier phase is caught by the frozen pre-cutover, candidate and kept-database reads
+[22m[39m
+[FAIL] afl_api completed-season ownership on the live target (AFLDB-ISSUE-233 D-233-3)
+       target afldb_prod: completed-season scope 1897..2025 excluding in-progress 2026
+       in scope      : 2025 (1)
+       outside scope : 2026 (12) (in progress or later; reported, never blocked here)
+       STOP AFLDB-AFL-API-OWNERSHIP-CENSUS REFUSED on afldb_prod: completed season(s) in promotion scope 1897..2025 excluding in-progress 2026 hold canonical matches owned by source afl_api: 2025 (1). A promotion replaces these seasons with a rebuilt candidate's AFL Tables rows, which no ownership replay carries over, and would silently re-own them (AFLDB-ISSUE-233 D-233-3). There is no override: the refusal lifts only with an ownership-replay design.
+
+[90mstdout[2m | tests/db-promotion-check.test.ts[2m > [22m[2mAFLDB-ISSUE-233 D-233-3 — completed-season afl_api ownership on the live promotion target (DB-free)[2m > [22m[2mlate ownership appearing after an earlier phase is caught by the frozen pre-cutover, candidate and kept-database reads
+[22m[39m
+[FAIL] afl_api completed-season ownership on the live target (AFLDB-ISSUE-233 D-233-3)
+       live target afldb_prod: completed-season scope 1897..2025 excluding in-progress 2026
+       in scope      : 2025 (1)
+       outside scope : 2026 (12) (in progress or later; reported, never blocked here)
+       STOP AFLDB-AFL-API-OWNERSHIP-CENSUS REFUSED on afldb_prod: completed season(s) in promotion scope 1897..2025 excluding in-progress 2026 hold canonical matches owned by source afl_api: 2025 (1). A promotion replaces these seasons with a rebuilt candidate's AFL Tables rows, which no ownership replay carries over, and would silently re-own them (AFLDB-ISSUE-233 D-233-3). There is no override: the refusal lifts only with an ownership-replay design.
+
+[90mstdout[2m | tests/db-promotion-check.test.ts[2m > [22m[2mAFLDB-ISSUE-233 D-233-3 — completed-season afl_api ownership on the live promotion target (DB-free)[2m > [22m[2mlate ownership appearing after an earlier phase is caught by the frozen pre-cutover, candidate and kept-database reads
+[22m[39m
+[FAIL] afl_api completed-season ownership on the live target (AFLDB-ISSUE-233 D-233-3)
+       kept afldb_prod_pre_rebuild_20261001: completed-season scope 1897..2025 excluding in-progress 2026
+       in scope      : 2025 (1)
+       outside scope : 2026 (12) (in progress or later; reported, never blocked here)
+       STOP AFLDB-AFL-API-OWNERSHIP-CENSUS REFUSED on afldb_prod_pre_rebuild_20261001: completed season(s) in promotion scope 1897..2025 excluding in-progress 2026 hold canonical matches owned by source afl_api: 2025 (1). A promotion replaces these seasons with a rebuilt candidate's AFL Tables rows, which no ownership replay carries over, and would silently re-own them (AFLDB-ISSUE-233 D-233-3). There is no override: the refusal lifts only with an ownership-replay design.
+
+ [32m✓[39m tests/db-promotion-check.test.ts [2m([22m[2m480 tests[22m[2m)[22m[33m 1469[2mms[22m[39m
+ [32m✓[39m tests/current-season-import.test.ts [2m([22m[2m360 tests[22m[2m)[22m[33m 1065[2mms[22m[39m
+ [32m✓[39m tests/nl-parser.test.ts [2m([22m[2m684 tests[22m[2m)[22m[33m 793[2mms[22m[39m
+ [32m✓[39m tests/season-rollover.test.ts [2m([22m[2m417 tests[22m[2m)[22m[33m 2606[2mms[22m[39m
+ [32m✓[39m tests/player-link-mutations.test.ts [2m([22m[2m175 tests[22m[2m)[22m[33m 474[2mms[22m[39m
+ [32m✓[39m tests/afl-api-cutover.test.ts [2m([22m[2m477 tests[22m[2m)[22m[33m 46780[2mms[22m[39m
+     [33m[2m✓[22m[39m retired: refuses before fitzRoy is loaded [33m 937[2mms[22m[39m
+     [33m[2m✓[22m[39m missing: refuses before fitzRoy is loaded [33m 773[2mms[22m[39m
+     [33m[2m✓[22m[39m garbage: refuses before fitzRoy is loaded [33m 772[2mms[22m[39m
+     [33m[2m✓[22m[39m unbounded: refuses before fitzRoy is loaded [33m 769[2mms[22m[39m
+     [33m[2m✓[22m[39m beyond: an active switch behind the register refuses as out of bounds [33m 764[2mms[22m[39m
+     [33m[2m✓[22m[39m active: passes the gate (then stops on the missing contract or package, offline) [33m 770[2mms[22m[39m
+     [33m[2m✓[22m[39m active: passes the gate [33m 530[2mms[22m[39m
+       [33m[2m✓[22m[39m acquire_core.R: 'integer 2026 bounds [2026]' -> 'active' [33m 778[2mms[22m[39m
+       [33m[2m✓[22m[39m acquire_core.R: '2026.0 bounds [2026]' -> 'active' [33m 787[2mms[22m[39m
+       [33m[2m✓[22m[39m acquire_core.R: '2.026e3 (an exponent form of 2026) bo…' -> 'active' [33m 785[2mms[22m[39m
+       [33m[2m✓[22m[39m acquire_core.R: '2026.0 bounds [2026.0]' -> 'active' [33m 783[2mms[22m[39m
+       [33m[2m✓[22m[39m acquire_core.R: '2027.0 bounds [2026]' -> 'active' [33m 797[2mms[22m[39m
+       [33m[2m✓[22m[39m acquire_core.R: '2026.0 bounds an empty register' -> 'active' [33m 781[2mms[22m[39m
+       [33m[2m✓[22m[39m acquire_core.R: '2026.0 with [2027] is out of bounds' -> 'out_of_bounds' [33m 762[2mms[22m[39m
+       [33m[2m✓[22m[39m acquire_core.R: '2026.0 with [2027.0] is out of bounds' -> 'out_of_bounds' [33m 792[2mms[22m[39m
+       [33m[2m✓[22m[39m acquire_core.R: '2026.0 with [2026, 2027.0] is out of …' -> 'out_of_bounds' [33m 770[2mms[22m[39m
+       [33m[2m✓[22m[39m acquire_core.R: 'a fractional season in the register' -> 'out_of_bounds' [33m 781[2mms[22m[39m
+       [33m[2m✓[22m[39m acquire_core.R: 'a boolean season in the register' -> 'out_of_bounds' [33m 776[2mms[22m[39m
+       [33m[2m✓[22m[39m acquire_core.R: 'a string season in the register' -> 'out_of_bounds' [33m 759[2mms[22m[39m
+       [33m[2m✓[22m[39m acquire_core.R: 'a null season in the register' -> 'out_of_bounds' [33m 786[2mms[22m[39m
+       [33m[2m✓[22m[39m acquire_core.R: 'a non-finite season in the register (…' -> 'out_of_bounds' [33m 788[2mms[22m[39m
+       [33m[2m✓[22m[39m acquire_core.R: 'a fractional last_season' -> 'retired' [33m 788[2mms[22m[39m
+       [33m[2m✓[22m[39m acquire_core.R: 'a boolean last_season' -> 'retired' [33m 774[2mms[22m[39m
+       [33m[2m✓[22m[39m acquire_core.R: 'a string last_season' -> 'retired' [33m 776[2mms[22m[39m
+       [33m[2m✓[22m[39m acquire_core.R: 'a null last_season' -> 'retired' [33m 773[2mms[22m[39m
+       [33m[2m✓[22m[39m acquire_core.R: 'a non-finite last_season (1e999)' -> 'retired' [33m 767[2mms[22m[39m
+       [33m[2m✓[22m[39m acquire_core.R: 'a NaN last_season (not valid JSON)' -> 'retired' [33m 768[2mms[22m[39m
+       [33m[2m✓[22m[39m acquire_core.R: 'an Infinity last_season (not valid JS…' -> 'retired' [33m 814[2mms[22m[39m
+       [33m[2m✓[22m[39m acquire_core.R: 'a retired switch with 2026.0' -> 'retired' [33m 771[2mms[22m[39m
+       [33m[2m✓[22m[39m acquire_core.R: 'a retired switch with 2026.0 and [202…' -> 'retired' [33m 773[2mms[22m[39m
+       [33m[2m✓[22m[39m acquire_club_lists.R: 'integer 2026 bounds [2026]' -> 'active' [33m 507[2mms[22m[39m
+       [33m[2m✓[22m[39m acquire_club_lists.R: '2026.0 bounds [2026]' -> 'active' [33m 510[2mms[22m[39m
+       [33m[2m✓[22m[39m acquire_club_lists.R: '2.026e3 (an exponent form of 2026) bo…' -> 'active' [33m 512[2mms[22m[39m
+       [33m[2m✓[22m[39m acquire_club_lists.R: '2026.0 bounds [2026.0]' -> 'active' [33m 517[2mms[22m[39m
+       [33m[2m✓[22m[39m acquire_club_lists.R: '2027.0 bounds [2026]' -> 'active' [33m 515[2mms[22m[39m
+       [33m[2m✓[22m[39m acquire_club_lists.R: '2026.0 bounds an empty register' -> 'active' [33m 512[2mms[22m[39m
+         [33m[2m✓[22m[39m a fixture that ignores its token fails the teardown with its PID, run token and evidence directory, and nothing is deleted [33m 313[2mms[22m[39m
+         [33m[2m✓[22m[39m several unresponsive processes share one bounded deadline, after every token has been written [33m 420[2mms[22m[39m
+         [33m[2m✓[22m[39m a still-running owned handle that outlives the deadline is ended through the handle, never by PID [33m 309[2mms[22m[39m
+       [33m[2m✓[22m[39m a watchdog that never publishes times out, is stopped, and leaves a stand-down marker [33m 1631[2mms[22m[39m
+       [33m[2m✓[22m[39m the watchdog command runs through the tsx loader with no wrapper, so the spawned PID is the watchdog's own [33m 309[2mms[22m[39m
+       [33m[2m✓[22m[39m over a real process: an abort ends it, confirmed by its exit, and the process is gone [33m 408[2mms[22m[39m
+         [33m[2m✓[22m[39m over a real process: the tsx loader runs the script in the spawned PID itself, where the tsx CLI does not [33m 606[2mms[22m[39m
+         [33m[2m✓[22m[39m over a real process: a descendant that keeps the inherited pipes open does not keep the parent alive once the result is produced [33m 1003[2mms[22m[39m
+         [33m[2m✓[22m[39m over a real process that ignores SIGTERM (POSIX): SIGKILL ends it after the grace [33m 353[2mms[22m[39m
+           [33m[2m✓[22m[39m a real acquire process stopped by the deadline: HALT, the process gone, restored before the result, no settle [33m 317[2mms[22m[39m
+[90mstdout[2m | tests/correct-afl-api-identity-cli.test.ts[2m > [22m[2mAFLDB-ISSUE-238 stage-aware PRE-SWAP SAT-1 / CRV: exactly the declared pending-D15 providers may lack a resolved row (production contract correction found by the DEV rehearsal)[2m > [22m[2mCRV (gateAflApiCorrectedReplayVerification) applies the shared contract, not a second rule[2m > [22m[2m21. resolved set == C_promotion while the exact linked set is pending D15 -> PASS
+[22m[39m
+[PASS] afl_api corrected identities — replay verification (CRV, §7.5)
+       1 C_promotion provider(s) verified on the candidate
+       CD_I (adjudication 2): identity resolved, replay batch as predicted, correction satisfied
+
+[90mstdout[2m | tests/correct-afl-api-identity-cli.test.ts[2m > [22m[2mAFLDB-ISSUE-238 stage-aware PRE-SWAP SAT-1 / CRV: exactly the declared pending-D15 providers may lack a resolved row (production contract correction found by the DEV rehearsal)[2m > [22m[2mCRV (gateAflApiCorrectedReplayVerification) applies the shared contract, not a second rule[2m > [22m[2mthe same world with nothing declared -> FAIL (24: undeclared missing linked provider)
+[22m[39m
+[FAIL] afl_api corrected identities — replay verification (CRV, §7.5)
+       1 C_promotion provider(s) verified on the candidate
+       STOP CD_I: Q2 STOP [SAT-1] identity_contradicts: extended bijection: {"kind":"bijection_mismatch","mismatch":{"kind":"ledger_without_row","externalId":"CD_J"}}
+
+[90mstdout[2m | tests/correct-afl-api-identity-cli.test.ts[2m > [22m[2mAFLDB-ISSUE-238 stage-aware PRE-SWAP SAT-1 / CRV: exactly the declared pending-D15 providers may lack a resolved row (production contract correction found by the DEV rehearsal)[2m > [22m[2mCRV (gateAflApiCorrectedReplayVerification) applies the shared contract, not a second rule[2m > [22m[2m22. a pending provider already resolved pre-swap -> FAIL
+[22m[39m
+[FAIL] afl_api corrected identities — replay verification (CRV, §7.5)
+       1 C_promotion provider(s) verified on the candidate
+       STOP CD_I: Q2 STOP [SAT-1] identity_contradicts: extended bijection: {"kind":"pending_d15_materialised_early","externalId":"CD_J"}
+
+[90mstdout[2m | tests/correct-afl-api-identity-cli.test.ts[2m > [22m[2mAFLDB-ISSUE-238 stage-aware PRE-SWAP SAT-1 / CRV: exactly the declared pending-D15 providers may lack a resolved row (production contract correction found by the DEV rehearsal)[2m > [22m[2mCRV (gateAflApiCorrectedReplayVerification) applies the shared contract, not a second rule[2m > [22m[2m23. the corrected provider absent -> FAIL, whatever is declared
+[22m[39m
+[FAIL] afl_api corrected identities — replay verification (CRV, §7.5)
+       1 C_promotion provider(s) verified on the candidate
+       STOP CD_I: no afl_api identity row exists after the replay
+       STOP CD_I: Q2 STOP [SAT-1] identity_contradicts: extended bijection: {"kind":"bijection_mismatch","mismatch":{"kind":"ledger_without_row","externalId":"CD_I"}}
+       STOP CD_I: Q2 STOP [SAT-1] identity_contradicts: the external identity or ledger chain is not resolved to P' with a valid chain
+
+ [32m✓[39m tests/correct-afl-api-identity-cli.test.ts [2m([22m[2m276 tests[22m[2m)[22m[33m 413[2mms[22m[39m
+AFLDB-ISSUE-228 acquire — season 2026 (compSeasonId 85), label afl-api-2026-2026-09-19-143000
+  season feed: 2 match(es); selected: 1
+  CD_M1: player-stats + match-roster acquired
+  manifest: /tmp/afldb-issue-228-acquire-s9IY3a/data/sources/afl_api/matches/afl-api-2026-2026-09-19-143000/manifest.json
+AFLDB-ISSUE-228 acquire — season 2026 (compSeasonId 85), label afl-api-2026-2026-09-19-143000
+AFLDB-ISSUE-228 acquire — season 2026 (compSeasonId 85), label afl-api-2026-2026-09-19-143000
+AFLDB-ISSUE-228 acquire — season 2026 (compSeasonId 85), label afl-api-2026-2026-09-19-143000
+AFLDB-ISSUE-228 acquire — season 2026 (compSeasonId 85), label afl-api-2026-2026-09-19-143000
+  season feed: 2 match(es); selected: 1
+AFLDB-ISSUE-228 acquire — season 2026 (compSeasonId 85), label afl-api-2026-2026-09-19-143000
+  season feed: 2 match(es); selected: 1
+  CD_M1: player-stats + match-roster acquired
+  manifest: /tmp/afldb-issue-228-acquire-son2rx/data/sources/afl_api/matches/afl-api-2026-2026-09-19-143000/manifest.json
+AFLDB-ISSUE-228 acquire — season 2026 (compSeasonId 85), label afl-api-2026-2026-09-19-143000
+  season feed: 2 match(es); selected: 1
+  CD_M1: player-stats + match-roster acquired
+  manifest: /tmp/afldb-issue-228-acquire-4OPX9N/data/sources/afl_api/matches/afl-api-2026-2026-09-19-143000/manifest.json
+AFLDB-ISSUE-228 acquire — season 2026 (compSeasonId 85), label afl-api-2026-2026-09-19-143000
+  season feed: 2 match(es); selected: 1
+  CD_M2: player-stats + match-roster acquired
+  manifest: /tmp/afldb-issue-228-acquire-FpKeFR/data/sources/afl_api/matches/afl-api-2026-2026-09-19-143000/manifest.json
+AFLDB-ISSUE-228 acquire — season 2026 (compSeasonId 85), label afl-api-2026-2026-09-19-143000
+  season feed: 2 match(es); selected: 1
+AFLDB-ISSUE-228 acquire — season 2026 (compSeasonId 85), label afl-api-2026-2026-09-19-143000
+  season feed: 2 match(es); selected: 1
+  CD_M1: player-stats + match-roster acquired
+  manifest: /tmp/afldb-issue-228-acquire-CdklQL/data/sources/afl_api/matches/afl-api-2026-2026-09-19-143000/manifest.json
+AFLDB-ISSUE-228 acquire — season 2026 (compSeasonId 85), label afl-api-2026-2026-09-19-143000
+  season feed: 2 match(es); selected: 1
+  CD_M1: player-stats + match-roster acquired
+  manifest: /tmp/afldb-issue-228-acquire-pRYoAV/data/sources/afl_api/matches/afl-api-2026-2026-09-19-143000/manifest.json
+AFLDB-ISSUE-228 acquire — season 2026 (compSeasonId 85), label afl-api-2026-2026-09-19-143000-2
+  season feed: 2 match(es); selected: 1
+  CD_M1: player-stats + match-roster acquired
+  manifest: /tmp/afldb-issue-228-acquire-pRYoAV/data/sources/afl_api/matches/afl-api-2026-2026-09-19-143000-2/manifest.json
+AFLDB-ISSUE-228 acquire — season 2026 (compSeasonId 85), label afl-api-2026-2026-09-19-143000-2
+  season feed: 2 match(es); selected: 1
+  CD_M1: player-stats + match-roster acquired
+  manifest: /tmp/afldb-issue-228-acquire-hSfHUN/data/sources/afl_api/matches/afl-api-2026-2026-09-19-143000-2/manifest.json
+AFLDB-ISSUE-228 acquire — season 2026 (compSeasonId 85), label afl-api-2026-2026-09-19-143000 [--fixtures-only: season fixture feed only, no CFS/token, no playerStats/matchRoster]
+  season feed: 2 match(es); selected: 1
+  CD_M1: fixture acquired (--fixtures-only — no playerStats/matchRoster requested)
+  manifest: /tmp/afldb-issue-228-acquire-ThpFqN/data/sources/afl_api/fixtures/afl-api-2026-2026-09-19-143000/manifest.json
+AFLDB-ISSUE-228 acquire — season 2026 (compSeasonId 85), label afl-api-2026-2026-09-19-143000-2 [--fixtures-only: season fixture feed only, no CFS/token, no playerStats/matchRoster]
+  season feed: 2 match(es); selected: 1
+  CD_M1: fixture acquired (--fixtures-only — no playerStats/matchRoster requested)
+  manifest: /tmp/afldb-issue-228-acquire-ThpFqN/data/sources/afl_api/fixtures/afl-api-2026-2026-09-19-143000-2/manifest.json
+AFLDB-ISSUE-228 acquire — season 2026 (compSeasonId 85), label afl-api-2026-2026-09-19-143000 [--fixtures-only: season fixture feed only, no CFS/token, no playerStats/matchRoster]
+  season feed: 2 match(es); selected: 1
+  CD_M1: fixture acquired (--fixtures-only — no playerStats/matchRoster requested)
+  manifest: /tmp/afldb-issue-228-acquire-Io3kf3/data/sources/afl_api/fixtures/afl-api-2026-2026-09-19-143000/manifest.json
+AFLDB-ISSUE-228 acquire — season 2026 (compSeasonId 85), label afl-api-2026-2026-09-19-143000 [--fixtures-only: season fixture feed only, no CFS/token, no playerStats/matchRoster]
+  season feed: 2 match(es); selected: 1
+  CD_M2: fixture acquired (--fixtures-only — no playerStats/matchRoster requested)
+  manifest: /tmp/afldb-issue-228-acquire-RXLmmQ/data/sources/afl_api/fixtures/afl-api-2026-2026-09-19-143000/manifest.json
+ [32m✓[39m tests/afl-api-match.test.ts [2m([22m[2m247 tests[22m[2m)[22m[33m 804[2mms[22m[39m
+ [32m✓[39m tests/draftguru-acquisition.test.ts [2m([22m[2m167 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 24459[2mms[22m[39m
+     [33m[2m✓[22m[39m canonicalisation is idempotent and rejects trailing slashes and foreign hosts [33m 391[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses a residual input that is short, blank-padded, duplicated or foreign [33m 343[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses to profile an incomplete experiment as complete [33m 302[2mms[22m[39m
+     [33m[2m✓[22m[39m completes with fetched + failed = 120 (failed > 0) and writes the manifest LAST [33m 388[2mms[22m[39m
+     [33m[2m✓[22m[39m reuses terminal successes and terminal failures byte-for-byte on resume [33m 353[2mms[22m[39m
+     [33m[2m✓[22m[39m maps every stored filename back to its exact player_url [33m 366[2mms[22m[39m
+     [33m[2m✓[22m[39m rebuilds byte-identically from the accepted Stage A snapshot [33m 353[2mms[22m[39m
+     [33m[2m✓[22m[39m aggregates a fully-fetched population snapshot without crashing (KeyError regression) [33m 398[2mms[22m[39m
+     [33m[2m✓[22m[39m records Stage B3's own provenance in sample_basis, never Stage B1's residual_input [33m 397[2mms[22m[39m
+     [33m[2m✓[22m[39m computes the O-3 crawl_failure_ceiling and failure_concentration fields for a real B3 run [33m 385[2mms[22m[39m
+     [33m[2m✓[22m[39m profile_person_pages.py run standalone against a B3 sample also stages itself correctly [33m 303[2mms[22m[39m
+     [33m[2m✓[22m[39m duplicate-row registration, target_ambiguous/target_not_registered and agreeing human-decision bridge exclusion all hold on the real functions [33m 341[2mms[22m[39m
+     [33m[2m✓[22m[39m every outcome, name-variant table, club-overlap gating, games/birth-year rules, deterministic audit selection, refusals and the no-network/no-database guarantee all hold on the real tool [33m 535[2mms[22m[39m
+     [33m[2m✓[22m[39m pack validation, checkpoint/lock/finalisation, the event-club appearance relationship derivation, its acknowledgement gate, identity-verdict independence and checkpoint schema migration all hold on the real tool [33m 1555[2mms[22m[39m
+     [33m[2m✓[22m[39m lineage hash chain, schema/partition, parent containment, the exact v1 -> v2 transition, fail-closed refusals and the read-only/no-database guarantee all hold on the real tool [33m 420[2mms[22m[39m
+     [33m[2m✓[22m[39m frame derivation, salted ordering, disjointness, the child-validation gate, refusals and the output lifecycle all hold on the real tool [33m 311[2mms[22m[39m
+     [33m[2m✓[22m[39m sample-order review, identity/deployment separation, failure surfacing, refusals, the output lifecycle, the operator-verdict link and the acceptance rule all hold on the real tools [33m 1336[2mms[22m[39m
+     [33m[2m✓[22m[39m queue deduplication, navigation, filters, checkpoint/resume, verdict contract, evidence links, finalisation gating and deterministic rendering all hold on the real tool [33m 451[2mms[22m[39m
+     [33m[2m✓[22m[39m DSN guard, read-only discipline, hash pins, classification refusals, verify checks and the no-artefact guarantee all hold on the real tool [33m 5274[2mms[22m[39m
+ [32m✓[39m tests/v2-admin-operations.test.ts [2m([22m[2m95 tests[22m[2m)[22m[33m 10840[2mms[22m[39m
+ [32m✓[39m tests/afl-api-ingestion-safety.test.ts [2m([22m[2m198 tests[22m[2m)[22m[33m 1226[2mms[22m[39m
+[90mstderr[2m | tests/auth.test.ts[2m > [22m[2mthe beta gate holds admin claims to the beta epoch (AFLDB-ISSUE-362 SEC-2)[2m > [22m[2mstill sets the admin cookie when AFLDB_BETA_EPOCH is malformed, below every valid epoch (review B-01)
+[22m[39m[auth] AFLDB_BETA_EPOCH must be an integer; got "epoch-2". Refusing to run rather than silently disable the beta kill switch. Admin claim minted below every valid epoch.
+
+ [32m✓[39m tests/auth.test.ts [2m([22m[2m223 tests[22m[2m)[22m[33m 998[2mms[22m[39m
+     [33m[2m✓[22m[39m round-trips and rejects a wrong password [33m 426[2mms[22m[39m
+ [32m✓[39m tests/fitzroy-core-import.test.ts [2m([22m[2m117 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 20864[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses a malformed rule before any row is read [33m 411[2mms[22m[39m
+     [33m[2m✓[22m[39m covers the four real 2025 players, retaining all 79 rows [33m 7580[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses malformed, surrogate-keyed, and duplicate entries [33m 647[2mms[22m[39m
+[90mstdout[2m | tests/v2-shadow-parity.test.ts[2m > [22m[2mowner migration separation: synthetic preservation policy[2m > [22m[2moffline release CLI writes incomplete evidence explicitly and refuses overwrites
+[22m[39m{
+  "policy": "v2.migration-separation.1",
+  "backendFunctional": "INCOMPLETE",
+  "migrationCompatibility": "INCOMPLETE",
+  "migrationCompatibilityBasis": "NOT_ESTABLISHED",
+  "stagedBrownlowComparator": "INCOMPLETE",
+  "brownlowAlternative": {
+    "decision": "D-V2-BROWNLOW-ALT-1",
+    "status": "NOT_APPLIED",
+    "reasons": [
+      "No Brownlow alternative attestation supplied"
+    ],
+    "scope": {
+      "archiveSha256": "a583fc7d8d4376aa816253adf299a1325da7e65c994576b6b56bfa136ed11b04",
+      "migrationScope": {
+        "from": 110,
+        "to": 115
+      },
+      "seasons": 98
+    },
+    "notEstablished": "authentic AFL API vote, identity or leaderboard reconciliation"
+  },
+  "brownlowOperationalReconciliation": "OUTSTANDING: authentic provenance/checksum-verified completed-season API vote, identity and leaderboard reconciliation is still required before Brownlow operational/publication readiness",
+  "gridleyEvidence": "Retained 2026-10-20 at 12abe77f; not rerun by this offline report",
+  "strictGridley": {
+    "result": "FAIL",
+    "findings": 149
+  },
+  "adjudicationConformance": {
+    "result": "FAIL",
+    "approved": 99,
+    "unapproved": 50
+  },
+  "productionOperational": "INCOMPLETE",
+  "backendAcceptance": "INCOMPLETE",
+  "productionDecision": "NO-GO",
+  "preservation": {
+    "result": "INCOMPLETE",
+    "findings": [
+      "Required complete preservation snapshots missing or invalid"
+    ]
+  }
+}
+{
+  "policy": "v2.migration-separation.1",
+  "backendFunctional": "INCOMPLETE",
+  "migrationCompatibility": "INCOMPLETE",
+  "migrationCompatibilityBasis": "NOT_ESTABLISHED",
+  "stagedBrownlowComparator": "INCOMPLETE",
+  "brownlowAlternative": {
+    "decision": "D-V2-BROWNLOW-ALT-1",
+    "status": "NOT_APPLIED",
+    "reasons": [
+      "No Brownlow alternative attestation supplied"
+    ],
+    "scope": {
+      "archiveSha256": "a583fc7d8d4376aa816253adf299a1325da7e65c994576b6b56bfa136ed11b04",
+      "migrationScope": {
+        "from": 110,
+        "to": 115
+      },
+      "seasons": 98
+    },
+    "notEstablished": "authentic AFL API vote, identity or leaderboard reconciliation"
+  },
+  "brownlowOperationalReconciliation": "OUTSTANDING: authentic provenance/checksum-verified completed-season API vote, identity and leaderboard reconciliation is still required before Brownlow operational/publication readiness",
+  "gridleyEvidence": "Retained 2026-10-20 at 12abe77f; not rerun by this offline report",
+  "strictGridley": {
+    "result": "FAIL",
+    "findings": 149
+  },
+  "adjudicationConformance": {
+    "result": "FAIL",
+    "approved": 99,
+    "unapproved": 50
+  },
+  "productionOperational": "INCOMPLETE",
+  "backendAcceptance": "INCOMPLETE",
+  "productionDecision": "NO-GO",
+  "preservation": {
+    "result": "INCOMPLETE",
+    "findings": [
+      "Required complete preservation snapshots missing or invalid"
+    ]
+  }
+}
+
+[90mstdout[2m | tests/v2-shadow-parity.test.ts[2m > [22m[2mowner migration separation: synthetic preservation policy[2m > [22m[2mD-V2-BROWNLOW-ALT-1: scoped alternative to the unavailable staged Brownlow comparator[2m > [22m[2mreaches PASS from the committed attestation through the offline CLI, and only with readable evidence
+[22m[39m{
+  "policy": "v2.migration-separation.1",
+  "backendFunctional": "PASS",
+  "migrationCompatibility": "PASS",
+  "migrationCompatibilityBasis": "APPROVED_BROWNLOW_ALTERNATIVE",
+  "stagedBrownlowComparator": "INCOMPLETE",
+  "brownlowAlternative": {
+    "decision": "D-V2-BROWNLOW-ALT-1",
+    "status": "APPLIED",
+    "reasons": [],
+    "scope": {
+      "archiveSha256": "a583fc7d8d4376aa816253adf299a1325da7e65c994576b6b56bfa136ed11b04",
+      "migrationScope": {
+        "from": 110,
+        "to": 115
+      },
+      "seasons": 98
+    },
+    "notEstablished": "authentic AFL API vote, identity or leaderboard reconciliation"
+  },
+  "brownlowOperationalReconciliation": "OUTSTANDING: authentic provenance/checksum-verified completed-season API vote, identity and leaderboard reconciliation is still required before Brownlow operational/publication readiness",
+  "gridleyEvidence": "Retained 2026-10-20 at 12abe77f; not rerun by this offline report",
+  "strictGridley": {
+    "result": "FAIL",
+    "findings": 149
+  },
+  "adjudicationConformance": {
+    "result": "FAIL",
+    "approved": 99,
+    "unapproved": 50
+  },
+  "productionOperational": "INCOMPLETE",
+  "backendAcceptance": "PASS",
+  "productionDecision": "NO-GO",
+  "preservation": {
+    "result": "PASS",
+    "findings": []
+  }
+}
+{
+  "policy": "v2.migration-separation.1",
+  "backendFunctional": "PASS",
+  "migrationCompatibility": "INCOMPLETE",
+  "migrationCompatibilityBasis": "NOT_ESTABLISHED",
+  "stagedBrownlowComparator": "INCOMPLETE",
+  "brownlowAlternative": {
+    "decision": "D-V2-BROWNLOW-ALT-1",
+    "status": "NOT_APPLIED",
+    "reasons": [
+      "rawVoteAuditPreservation: INCOMPLETE",
+      "storedReports: INCOMPLETE",
+      "integration: INCOMPLETE",
+      "unitReport: INCOMPLETE"
+    ],
+    "scope": {
+      "archiveSha256": "a583fc7d8d4376aa816253adf299a1325da7e65c994576b6b56bfa136ed11b04",
+      "migrationScope": {
+        "from": 110,
+        "to": 115
+      },
+      "seasons": 98
+    },
+    "notEstablished": "authentic AFL API vote, identity or leaderboard reconciliation"
+  },
+  "brownlowOperationalReconciliation": "OUTSTANDING: authentic provenance/checksum-verified completed-season API vote, identity and leaderboard reconciliation is still required before Brownlow operational/publication readiness",
+  "gridleyEvidence": "Retained 2026-10-20 at 12abe77f; not rerun by this offline report",
+  "strictGridley": {
+    "result": "FAIL",
+    "findings": 149
+  },
+  "adjudicationConformance": {
+    "result": "FAIL",
+    "approved": 99,
+    "unapproved": 50
+  },
+  "productionOperational": "INCOMPLETE",
+  "backendAcceptance": "INCOMPLETE",
+  "productionDecision": "NO-GO",
+  "preservation": {
+    "result": "PASS",
+    "findings": []
+  }
+}
+
+ [32m✓[39m tests/v2-shadow-parity.test.ts [2m([22m[2m201 tests[22m[2m)[22m[33m 4090[2mms[22m[39m
+     [33m[2m✓[22m[39m the real process: exit codes through `tsx`, and a coverage export that feeds a PASS compare [33m 2849[2mms[22m[39m
+ [32m✓[39m tests/data-overrides-source-contract.test.ts [2m([22m[2m78 tests[22m[2m)[22m[33m 516[2mms[22m[39m
+ [32m✓[39m tests/ingest-datasets.test.ts [2m([22m[2m305 tests[22m[2m)[22m[32m 208[2mms[22m[39m
+ [32m✓[39m tests/afl-api-identity-correction.test.ts [2m([22m[2m141 tests[22m[2m)[22m[32m 119[2mms[22m[39m
+ [32m✓[39m tests/v2-admin-operations-ui.test.ts [2m([22m[2m101 tests[22m[2m)[22m[33m 733[2mms[22m[39m
+ [32m✓[39m tests/v2-curated-awards.test.ts [2m([22m[2m124 tests[22m[2m)[22m[33m 437[2mms[22m[39m
+ [32m✓[39m tests/reference-data.test.ts [2m([22m[2m70 tests[22m[2m)[22m[33m 5693[2mms[22m[39m
+     [33m[2m✓[22m[39m --print-plan validates the datasets and is deterministic [33m 600[2mms[22m[39m
+     [33m[2m✓[22m[39m brownlow_afl_api_season_rehearsal_contract.py exits 0 and prints its closing line [33m 735[2mms[22m[39m
+     [33m[2m✓[22m[39m draftguru_bridge_v2_contract.py exits 0 and prints its closing line [33m 1512[2mms[22m[39m
+     [33m[2m✓[22m[39m draftguru_child_validation_v3_contract.py exits 0 and prints its closing line [33m 821[2mms[22m[39m
+     [33m[2m✓[22m[39m draftguru_population_scan_contract.py exits 0 and prints its closing line [33m 511[2mms[22m[39m
+     [33m[2m✓[22m[39m issue333_o2_contract.py exits 0 and prints its closing line [33m 526[2mms[22m[39m
+ [32m✓[39m tests/nl-plan.test.ts [2m([22m[2m224 tests[22m[2m)[22m[32m 118[2mms[22m[39m
+ [32m✓[39m tests/gridley-compat.test.ts [2m([22m[2m61 tests[22m[2m)[22m[33m 35558[2mms[22m[39m
+     [33m[2m✓[22m[39m carries a non-empty answer key for every one of the 10,287 cells [33m 34739[2mms[22m[39m
+     [33m[2m✓[22m[39m maps every mapped occurrence to a complete axis on a real builder [33m 345[2mms[22m[39m
+ [32m✓[39m tests/deploy-release.test.ts [2m([22m[2m54 tests[22m[2m)[22m[33m 23643[2mms[22m[39m
+     [33m[2m✓[22m[39m check-node-modules exits 1 on drift, 0 on a matching or unrecorded tree; the settle wrapper only warns [33m 305[2mms[22m[39m
+     [33m[2m✓[22m[39m builds outside the checkout, validates, boots the candidate and promotes it [33m 3122[2mms[22m[39m
+     [33m[2m✓[22m[39m a failing build leaves the serving release, its assets and the links untouched [33m 1194[2mms[22m[39m
+     [33m[2m✓[22m[39m a type error fails the build; off-host type-checking needs recorded evidence; nothing changes [33m 1285[2mms[22m[39m
+     [33m[2m✓[22m[39m a build interrupted by SIGTERM is stopped with its whole process group; nothing changes [33m 1298[2mms[22m[39m
+     [33m[2m✓[22m[39m a build interrupted by SIGHUP is stopped with its whole process group; nothing changes [33m 1185[2mms[22m[39m
+     [33m[2m✓[22m[39m a SIGKILLed tool leaves an orphan only in its workspace; the next build reaps it [33m 2366[2mms[22m[39m
+     [33m[2m✓[22m[39m the memory guard kills a build that drives MemAvailable below the floor; nothing changes [33m 1940[2mms[22m[39m
+     [33m[2m✓[22m[39m promotes a second release, then rolls back to the retained one without building, even mid-build [33m 6597[2mms[22m[39m
+     [33m[2m✓[22m[39m ISSUE-351: promote and rollback are attended; the host gate and the ledger check refuse before any link moves [33m 603[2mms[22m[39m
+     [33m[2m✓[22m[39m ISSUE-351: status --expect fails a restart that coincides with an apt run, and names the owner's way past it [33m 721[2mms[22m[39m
+     [33m[2m✓[22m[39m fails a public asset whose bytes are not the release's, and one that is missing [33m 371[2mms[22m[39m
+ [32m✓[39m tests/v2-curated-awards-pglite.test.ts [2m([22m[2m35 tests[22m[2m)[22m[33m 6119[2mms[22m[39m
+     [33m[2m✓[22m[39m the ledger CHECK admits exactly the transitions the TypeScript state machine allows [33m 1351[2mms[22m[39m
+ [32m✓[39m tests/register-issue224-s9-dev-write-gate.test.ts [2m([22m[2m154 tests[22m[2m)[22m[33m 496[2mms[22m[39m
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mrunAflApiSettleCli — AFLDB-ISSUE-228 follow-up settle-CLI gate coverage[2m > [22m[2m--dry-run refuses before the settle DB path opens when disabled
+[22m[39mBundle v2 'gate-test-snapshot' (season 2026): 0 match unit(s) built, 0 build failure(s).
+Season feed CD_S2026014: 0 match(es), INCOMPLETE (season_feed_not_in_snapshot); statuses observed: none.
+  SEASON FEED season_feed_not_in_snapshot: The snapshot's manifest does not list 00-season-matches.json.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mrunAflApiSettleCli — AFLDB-ISSUE-228 follow-up settle-CLI gate coverage[2m > [22m[2m--apply refuses before the settle DB path opens when disabled
+[22m[39mBundle v2 'gate-test-snapshot' (season 2026): 0 match unit(s) built, 0 build failure(s).
+Season feed CD_S2026014: 0 match(es), INCOMPLETE (season_feed_not_in_snapshot); statuses observed: none.
+  SEASON FEED season_feed_not_in_snapshot: The snapshot's manifest does not list 00-season-matches.json.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mrunAflApiSettleCli — AFLDB-ISSUE-228 follow-up settle-CLI gate coverage[2m > [22m[2m--validate-only remains allowed while disabled and never opens the settle DB path
+[22m[39mBundle v2 'gate-test-snapshot' (season 2026): 0 match unit(s) built, 0 build failure(s).
+Season feed CD_S2026014: 0 match(es), INCOMPLETE (season_feed_not_in_snapshot); statuses observed: none.
+  SEASON FEED season_feed_not_in_snapshot: The snapshot's manifest does not list 00-season-matches.json.
+
+--validate-only: manifest, registry and bundle contract verified. No connection opened.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mrunAflApiSettleCli — AFLDB-ISSUE-228 follow-up settle-CLI gate coverage[2m > [22m[2m--report remains allowed while disabled (read-only diagnostics, §F)
+[22m[39mBundle v2 'gate-test-snapshot' (season 2026): 0 match unit(s) built, 0 build failure(s).
+Season feed CD_S2026014: 0 match(es), INCOMPLETE (season_feed_not_in_snapshot); statuses observed: none.
+  SEASON FEED season_feed_not_in_snapshot: The snapshot's manifest does not list 00-season-matches.json.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mrunAflApiSettleCli — AFLDB-ISSUE-228 follow-up settle-CLI gate coverage[2m > [22m[2m--dry-run reaches the settle DB path once enabled (gate permits progression)
+[22m[39mBundle v2 'gate-test-snapshot' (season 2026): 0 match unit(s) built, 0 build failure(s).
+Season feed CD_S2026014: 0 match(es), INCOMPLETE (season_feed_not_in_snapshot); statuses observed: none.
+  SEASON FEED season_feed_not_in_snapshot: The snapshot's manifest does not list 00-season-matches.json.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mrunAflApiSettleCli — AFLDB-ISSUE-228 follow-up settle-CLI gate coverage[2m > [22m[2m--apply reaches the settle DB path once enabled (gate permits progression)
+[22m[39mBundle v2 'gate-test-snapshot' (season 2026): 0 match unit(s) built, 0 build failure(s).
+Season feed CD_S2026014: 0 match(es), INCOMPLETE (season_feed_not_in_snapshot); statuses observed: none.
+  SEASON FEED season_feed_not_in_snapshot: The snapshot's manifest does not list 00-season-matches.json.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mrunAflApiSettleCli — AFLDB-ISSUE-228 follow-up settle-CLI gate coverage[2m > [22m[2mfail-closed: the real disabled-by-unreadable-settings result still refuses --dry-run
+[22m[39mBundle v2 'gate-test-snapshot' (season 2026): 0 match unit(s) built, 0 build failure(s).
+Season feed CD_S2026014: 0 match(es), INCOMPLETE (season_feed_not_in_snapshot); statuses observed: none.
+  SEASON FEED season_feed_not_in_snapshot: The snapshot's manifest does not list 00-season-matches.json.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mrunAflApiSettleCli — AFLDB-ISSUE-228 follow-up settle-CLI gate coverage[2m > [22m[2mfails real control preflight before the normal settle can touch its writer
+[22m[39mBundle v2 'gate-test-snapshot' (season 2026): 0 match unit(s) built, 0 build failure(s).
+Season feed CD_S2026014: 0 match(es), INCOMPLETE (season_feed_not_in_snapshot); statuses observed: none.
+  SEASON FEED season_feed_not_in_snapshot: The snapshot's manifest does not list 00-season-matches.json.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mrunAflApiFixturesSettleCli — AFLDB-ISSUE-228 follow-up settle-CLI gate coverage[2m > [22m[2m--dry-run refuses before DB mutation when disabled
+[22m[39mFixtures-only snapshot 'gate-test-fixtures-snapshot' (season 2026): 0 fixture(s) built, 0 build failure(s).
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mrunAflApiFixturesSettleCli — AFLDB-ISSUE-228 follow-up settle-CLI gate coverage[2m > [22m[2m--apply refuses before DB mutation when disabled
+[22m[39mFixtures-only snapshot 'gate-test-fixtures-snapshot' (season 2026): 0 fixture(s) built, 0 build failure(s).
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mrunAflApiFixturesSettleCli — AFLDB-ISSUE-228 follow-up settle-CLI gate coverage[2m > [22m[2mAFLDB-ISSUE-300: an unreadable control database is reported as a read failure, not a disabled switch
+[22m[39mFixtures-only snapshot 'gate-test-fixtures-snapshot' (season 2026): 0 fixture(s) built, 0 build failure(s).
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mrunAflApiFixturesSettleCli — AFLDB-ISSUE-228 follow-up settle-CLI gate coverage[2m > [22m[2m--validate-only remains allowed while disabled and never opens the settle DB path
+[22m[39mFixtures-only snapshot 'gate-test-fixtures-snapshot' (season 2026): 0 fixture(s) built, 0 build failure(s).
+
+--validate-only: manifest, registry and fixture contract verified. No connection opened.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mrunAflApiFixturesSettleCli — AFLDB-ISSUE-228 follow-up settle-CLI gate coverage[2m > [22m[2m--dry-run reaches the settle DB path once enabled (gate permits progression)
+[22m[39mFixtures-only snapshot 'gate-test-fixtures-snapshot' (season 2026): 0 fixture(s) built, 0 build failure(s).
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mrunAflApiFixturesSettleCli — AFLDB-ISSUE-228 follow-up settle-CLI gate coverage[2m > [22m[2m--apply reaches the settle DB path once enabled (gate permits progression)
+[22m[39mFixtures-only snapshot 'gate-test-fixtures-snapshot' (season 2026): 0 fixture(s) built, 0 build failure(s).
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mrunAflApiBrownlowSettleCli — AFLDB-ISSUE-228 follow-up two-key settle-CLI gate coverage[2m > [22m[2m--dry-run refuses before DB mutation when deployment=false, admin=false
+[22m[39mBrownlow snapshot 'gate-test-brownlow-snapshot' (season 2026): 0 match vote-set(s), 0 leaderboard entr(y/ies), leaderboard status = IN_PROGRESS.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mrunAflApiBrownlowSettleCli — AFLDB-ISSUE-228 follow-up two-key settle-CLI gate coverage[2m > [22m[2m--dry-run refuses before DB mutation when deployment=true, admin=false
+[22m[39mBrownlow snapshot 'gate-test-brownlow-snapshot' (season 2026): 0 match vote-set(s), 0 leaderboard entr(y/ies), leaderboard status = IN_PROGRESS.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mrunAflApiBrownlowSettleCli — AFLDB-ISSUE-228 follow-up two-key settle-CLI gate coverage[2m > [22m[2m--dry-run refuses before DB mutation when deployment=false, admin=true
+[22m[39mBrownlow snapshot 'gate-test-brownlow-snapshot' (season 2026): 0 match vote-set(s), 0 leaderboard entr(y/ies), leaderboard status = IN_PROGRESS.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mrunAflApiBrownlowSettleCli — AFLDB-ISSUE-228 follow-up two-key settle-CLI gate coverage[2m > [22m[2m--apply refuses before DB mutation when both gates are off
+[22m[39mBrownlow snapshot 'gate-test-brownlow-snapshot' (season 2026): 0 match vote-set(s), 0 leaderboard entr(y/ies), leaderboard status = IN_PROGRESS.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mrunAflApiBrownlowSettleCli — AFLDB-ISSUE-228 follow-up two-key settle-CLI gate coverage[2m > [22m[2m--observe-only refuses before it can persist spine observations when both gates are off
+[22m[39mBrownlow snapshot 'gate-test-brownlow-snapshot' (season 2026): 0 match vote-set(s), 0 leaderboard entr(y/ies), leaderboard status = IN_PROGRESS.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mrunAflApiBrownlowSettleCli — AFLDB-ISSUE-228 follow-up two-key settle-CLI gate coverage[2m > [22m[2m--validate-only remains allowed regardless of gate state
+[22m[39mBrownlow snapshot 'gate-test-brownlow-snapshot' (season 2026): 0 match vote-set(s), 0 leaderboard entr(y/ies), leaderboard status = IN_PROGRESS.
+
+--validate-only: manifest, registry and record parse verified. No connection opened.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mrunAflApiBrownlowSettleCli — AFLDB-ISSUE-228 follow-up two-key settle-CLI gate coverage[2m > [22m[2m--dry-run reaches the settle DB path once BOTH gates are on (gate permits progression)
+[22m[39mBrownlow snapshot 'gate-test-brownlow-snapshot' (season 2026): 0 match vote-set(s), 0 leaderboard entr(y/ies), leaderboard status = IN_PROGRESS.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mrunAflApiBrownlowSettleCli — AFLDB-ISSUE-228 follow-up two-key settle-CLI gate coverage[2m > [22m[2m--apply reaches the settle DB path once BOTH gates are on (gate permits progression)
+[22m[39mBrownlow snapshot 'gate-test-brownlow-snapshot' (season 2026): 0 match vote-set(s), 0 leaderboard entr(y/ies), leaderboard status = IN_PROGRESS.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mrunAflApiBrownlowSettleCli — AFLDB-ISSUE-228 follow-up two-key settle-CLI gate coverage[2m > [22m[2m--observe-only reaches the settle DB path once BOTH gates are on (gate permits progression)
+[22m[39mBrownlow snapshot 'gate-test-brownlow-snapshot' (season 2026): 0 match vote-set(s), 0 leaderboard entr(y/ies), leaderboard status = IN_PROGRESS.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mrunAflApiBrownlowSettleCli — AFLDB-ISSUE-228 follow-up two-key settle-CLI gate coverage[2m > [22m[2mfails real control preflight before the Brownlow settle can touch its writer
+[22m[39mBrownlow snapshot 'gate-test-brownlow-snapshot' (season 2026): 0 match vote-set(s), 0 leaderboard entr(y/ies), leaderboard status = IN_PROGRESS.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mrunAflApiBrownlowSettleCli — AFLDB-ISSUE-244 I244-F006 fixture-identity contract[2m > [22m[2mrefuses before any write (apply) when a vote set is resolvable only via fixture identity and the flag is absent: [--apply --auto-apply]
+[22m[39mBrownlow snapshot 'f006-brownlow-snapshot' (season 2026): 3 match vote-set(s), 0 leaderboard entr(y/ies), leaderboard status = IN_PROGRESS.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mrunAflApiBrownlowSettleCli — AFLDB-ISSUE-244 I244-F006 fixture-identity contract[2m > [22m[2mrefuses before any write (apply) when a vote set is resolvable only via fixture identity and the flag is absent: [--apply]
+[22m[39mBrownlow snapshot 'f006-brownlow-snapshot' (season 2026): 3 match vote-set(s), 0 leaderboard entr(y/ies), leaderboard status = IN_PROGRESS.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mrunAflApiBrownlowSettleCli — AFLDB-ISSUE-244 I244-F006 fixture-identity contract[2m > [22m[2mrefuses before any write (dry-run) when a vote set is resolvable only via fixture identity and the flag is absent: [--dry-run --auto-apply]
+[22m[39mBrownlow snapshot 'f006-brownlow-snapshot' (season 2026): 3 match vote-set(s), 0 leaderboard entr(y/ies), leaderboard status = IN_PROGRESS.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mrunAflApiBrownlowSettleCli — AFLDB-ISSUE-244 I244-F006 fixture-identity contract[2m > [22m[2mrefuses before any write (dry-run) when a vote set is resolvable only via fixture identity and the flag is absent: [--dry-run]
+[22m[39mBrownlow snapshot 'f006-brownlow-snapshot' (season 2026): 3 match vote-set(s), 0 leaderboard entr(y/ies), leaderboard status = IN_PROGRESS.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mrunAflApiBrownlowSettleCli — AFLDB-ISSUE-244 I244-F006 fixture-identity contract[2m > [22m[2mrefuses before any write (dry-run) when a vote set is resolvable only via fixture identity and the flag is absent: [no mode flag]
+[22m[39mBrownlow snapshot 'f006-brownlow-snapshot' (season 2026): 3 match vote-set(s), 0 leaderboard entr(y/ies), leaderboard status = IN_PROGRESS.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mrunAflApiBrownlowSettleCli — AFLDB-ISSUE-244 I244-F006 fixture-identity contract[2m > [22m[2man ordinary staged snapshot still starts without the flag: no unnecessary refusal, and the fallback is never consulted
+[22m[39mBrownlow snapshot 'f006-brownlow-snapshot' (season 2026): 2 match vote-set(s), 0 leaderboard entr(y/ies), leaderboard status = IN_PROGRESS.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mrunAflApiBrownlowSettleCli — AFLDB-ISSUE-244 I244-F006 fixture-identity contract[2m > [22m[2mvote sets that even the fixture path cannot resolve keep their ordinary per-set refusal: no flag-required refusal
+[22m[39mBrownlow snapshot 'f006-brownlow-snapshot' (season 2026): 1 match vote-set(s), 0 leaderboard entr(y/ies), leaderboard status = IN_PROGRESS.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mrunAflApiBrownlowSettleCli — AFLDB-ISSUE-244 I244-F006 fixture-identity contract[2m > [22m[2m--validate-only opens no connection and does not assess fixture identity
+[22m[39mBrownlow snapshot 'f006-brownlow-snapshot' (season 2026): 1 match vote-set(s), 0 leaderboard entr(y/ies), leaderboard status = IN_PROGRESS.
+
+--validate-only: manifest, registry and record parse verified. No connection opened.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mrunAflApiBrownlowSettleCli — AFLDB-ISSUE-244 I244-F006 fixture-identity contract[2m > [22m[2mdoes not weaken the completed-season backtest proof: a non-afldb_test database is refused for THAT reason, before fixture identity is assessed
+[22m[39mBrownlow snapshot 'f006-brownlow-snapshot' (season 2026): 1 match vote-set(s), 0 leaderboard entr(y/ies), leaderboard status = IN_PROGRESS.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mrunAflApiBrownlowSettleCli — AFLDB-ISSUE-244 I244-F006 fixture-identity contract[2m > [22m[2mthe backtest authority does not bypass the identity requirement on afldb_test
+[22m[39mBrownlow snapshot 'f006-brownlow-snapshot' (season 2026): 1 match vote-set(s), 0 leaderboard entr(y/ies), leaderboard status = IN_PROGRESS.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mrunAflApiBrownlowSettleCli — AFLDB-ISSUE-244 I244-F006 fixture-identity contract[2m > [22m[2mthe backtest authority does not bypass the identity requirement on afldb_test
+[22m[39m
+COMPLETED-SEASON BROWNLOW BACKTEST
+database: afldb_v2_cli_test
+season-in-progress gate bypass authorised for this Brownlow run only
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mV2-GAP-006 — the seal on historical seasons at the three AFL API settle CLIs[2m > [22m[2msettle-afl-api --dry-run refuses a sealed season before the DB path opens, with the ingestion gate ENABLED
+[22m[39mBundle v2 'seal-match-snapshot' (season 2025): 0 match unit(s) built, 0 build failure(s).
+Season feed CD_S2025014: 0 match(es), INCOMPLETE (season_feed_not_in_snapshot); statuses observed: none.
+  SEASON FEED season_feed_not_in_snapshot: The snapshot's manifest does not list 00-season-matches.json.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mV2-GAP-006 — the seal on historical seasons at the three AFL API settle CLIs[2m > [22m[2msettle-afl-api --apply refuses a sealed season before the DB path opens, with the ingestion gate ENABLED
+[22m[39mBundle v2 'seal-match-snapshot' (season 2025): 0 match unit(s) built, 0 build failure(s).
+Season feed CD_S2025014: 0 match(es), INCOMPLETE (season_feed_not_in_snapshot); statuses observed: none.
+  SEASON FEED season_feed_not_in_snapshot: The snapshot's manifest does not list 00-season-matches.json.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mV2-GAP-006 — the seal on historical seasons at the three AFL API settle CLIs[2m > [22m[2msettle-afl-api --apply --auto-apply refuses a sealed season before the DB path opens, with the ingestion gate ENABLED
+[22m[39mBundle v2 'seal-match-snapshot' (season 2025): 0 match unit(s) built, 0 build failure(s).
+Season feed CD_S2025014: 0 match(es), INCOMPLETE (season_feed_not_in_snapshot); statuses observed: none.
+  SEASON FEED season_feed_not_in_snapshot: The snapshot's manifest does not list 00-season-matches.json.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mV2-GAP-006 — the seal on historical seasons at the three AFL API settle CLIs[2m > [22m[2msettle-afl-api without the test-only controls refuses a sealed season before the real control preflight
+[22m[39mBundle v2 'seal-match-snapshot' (season 2025): 0 match unit(s) built, 0 build failure(s).
+Season feed CD_S2025014: 0 match(es), INCOMPLETE (season_feed_not_in_snapshot); statuses observed: none.
+  SEASON FEED season_feed_not_in_snapshot: The snapshot's manifest does not list 00-season-matches.json.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mV2-GAP-006 — the seal on historical seasons at the three AFL API settle CLIs[2m > [22m[2msettle-afl-api --validate-only on a sealed season still succeeds offline
+[22m[39mBundle v2 'seal-match-snapshot' (season 2025): 0 match unit(s) built, 0 build failure(s).
+Season feed CD_S2025014: 0 match(es), INCOMPLETE (season_feed_not_in_snapshot); statuses observed: none.
+  SEASON FEED season_feed_not_in_snapshot: The snapshot's manifest does not list 00-season-matches.json.
+
+--validate-only: manifest, registry and bundle contract verified. No connection opened.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mV2-GAP-006 — the seal on historical seasons at the three AFL API settle CLIs[2m > [22m[2msettle-afl-api --report stays allowed for a sealed season (read-only diagnostics reach the DB path)
+[22m[39mBundle v2 'seal-match-snapshot' (season 2025): 0 match unit(s) built, 0 build failure(s).
+Season feed CD_S2025014: 0 match(es), INCOMPLETE (season_feed_not_in_snapshot); statuses observed: none.
+  SEASON FEED season_feed_not_in_snapshot: The snapshot's manifest does not list 00-season-matches.json.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mV2-GAP-006 — the seal on historical seasons at the three AFL API settle CLIs[2m > [22m[2msettle-afl-api does not seal a season outside first..last (SYNTHETIC 2071): the existing path continues
+[22m[39mBundle v2 'seal-match-snapshot' (season 2071): 0 match unit(s) built, 0 build failure(s).
+Season feed undeclared: 0 match(es), INCOMPLETE (season_feed_not_in_snapshot); statuses observed: none.
+  SEASON FEED season_feed_not_in_snapshot: The snapshot's manifest does not list 00-season-matches.json.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mV2-GAP-006 — the seal on historical seasons at the three AFL API settle CLIs[2m > [22m[2msettle-afl-api-fixtures --dry-run refuses a sealed season before the DB path opens, with the ingestion gate ENABLED
+[22m[39mFixtures-only snapshot 'seal-fixtures-snapshot' (season 2025): 0 fixture(s) built, 0 build failure(s).
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mV2-GAP-006 — the seal on historical seasons at the three AFL API settle CLIs[2m > [22m[2msettle-afl-api-fixtures --apply refuses a sealed season before the DB path opens, with the ingestion gate ENABLED
+[22m[39mFixtures-only snapshot 'seal-fixtures-snapshot' (season 2025): 0 fixture(s) built, 0 build failure(s).
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mV2-GAP-006 — the seal on historical seasons at the three AFL API settle CLIs[2m > [22m[2msettle-afl-api-fixtures --validate-only on a sealed season still succeeds offline
+[22m[39mFixtures-only snapshot 'seal-fixtures-snapshot' (season 2025): 0 fixture(s) built, 0 build failure(s).
+
+--validate-only: manifest, registry and fixture contract verified. No connection opened.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mV2-GAP-006 — the seal on historical seasons at the three AFL API settle CLIs[2m > [22m[2msettle-afl-api-fixtures does not seal a season outside first..last (SYNTHETIC 2071)
+[22m[39mFixtures-only snapshot 'seal-fixtures-snapshot' (season 2071): 0 fixture(s) built, 0 build failure(s).
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mV2-GAP-006 — the seal on historical seasons at the three AFL API settle CLIs[2m > [22m[2msettle-afl-api-brownlow --dry-run refuses a sealed season before the DB path opens, with BOTH gates ENABLED
+[22m[39mBrownlow snapshot 'seal-brownlow-snapshot' (season 2025): 0 match vote-set(s), 0 leaderboard entr(y/ies), leaderboard status = COMPLETE.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mV2-GAP-006 — the seal on historical seasons at the three AFL API settle CLIs[2m > [22m[2msettle-afl-api-brownlow --apply refuses a sealed season before the DB path opens, with BOTH gates ENABLED
+[22m[39mBrownlow snapshot 'seal-brownlow-snapshot' (season 2025): 0 match vote-set(s), 0 leaderboard entr(y/ies), leaderboard status = COMPLETE.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mV2-GAP-006 — the seal on historical seasons at the three AFL API settle CLIs[2m > [22m[2msettle-afl-api-brownlow --observe-only refuses a sealed season before the DB path opens, with BOTH gates ENABLED
+[22m[39mBrownlow snapshot 'seal-brownlow-snapshot' (season 2025): 0 match vote-set(s), 0 leaderboard entr(y/ies), leaderboard status = COMPLETE.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mV2-GAP-006 — the seal on historical seasons at the three AFL API settle CLIs[2m > [22m[2msettle-afl-api-brownlow --validate-only on a sealed season still succeeds offline
+[22m[39mBrownlow snapshot 'seal-brownlow-snapshot' (season 2025): 0 match vote-set(s), 0 leaderboard entr(y/ies), leaderboard status = COMPLETE.
+
+--validate-only: manifest, registry and record parse verified. No connection opened.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mV2-GAP-006 — the seal on historical seasons at the three AFL API settle CLIs[2m > [22m[2msettle-afl-api-brownlow does not seal a season outside first..last (SYNTHETIC 2071)
+[22m[39mBrownlow snapshot 'seal-brownlow-snapshot' (season 2071): 0 match vote-set(s), 0 leaderboard entr(y/ies), leaderboard status = COMPLETE.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mV2-GAP-006 — the seal on historical seasons at the three AFL API settle CLIs[2m > [22m[2msettle-afl-api-brownlow --allow-completed-season-backtest keeps the afldb_test refusal reason for a sealed season
+[22m[39mBrownlow snapshot 'seal-brownlow-snapshot' (season 2025): 0 match vote-set(s), 0 leaderboard entr(y/ies), leaderboard status = COMPLETE.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mV2-GAP-027 — settle-afl-api --report-out[2m > [22m[2mrefuses an existing file (never overwritten) before any connection opens or the settle runs
+[22m[39mBundle v2 'gap027-snapshot' (season 2026): 1 match unit(s) built, 0 build failure(s).
+Season feed CD_S2026014: 0 match(es), INCOMPLETE (season_feed_not_in_snapshot); statuses observed: none.
+  SEASON FEED season_feed_not_in_snapshot: The snapshot's manifest does not list 00-season-matches.json.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mV2-GAP-027 — settle-afl-api --report-out[2m > [22m[2mrefuses a missing parent directory before any connection opens or the settle runs
+[22m[39mBundle v2 'gap027-snapshot' (season 2026): 1 match unit(s) built, 0 build failure(s).
+Season feed CD_S2026014: 0 match(es), INCOMPLETE (season_feed_not_in_snapshot); statuses observed: none.
+  SEASON FEED season_feed_not_in_snapshot: The snapshot's manifest does not list 00-season-matches.json.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mV2-GAP-027 — settle-afl-api --report-out[2m > [22m[2mrefuses a path inside the acquired snapshots before any connection opens or the settle runs
+[22m[39mBundle v2 'gap027-snapshot' (season 2026): 1 match unit(s) built, 0 build failure(s).
+Season feed CD_S2026014: 0 match(es), INCOMPLETE (season_feed_not_in_snapshot); statuses observed: none.
+  SEASON FEED season_feed_not_in_snapshot: The snapshot's manifest does not list 00-season-matches.json.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mV2-GAP-027 — settle-afl-api --report-out[2m > [22m[2ma sealed-season refusal still comes first and leaves no report file behind
+[22m[39mBundle v2 'gap027-snapshot' (season 2025): 0 match unit(s) built, 0 build failure(s).
+Season feed CD_S2025014: 0 match(es), INCOMPLETE (season_feed_not_in_snapshot); statuses observed: none.
+  SEASON FEED season_feed_not_in_snapshot: The snapshot's manifest does not list 00-season-matches.json.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mAFLDB-ISSUE-316 — the tracked registry seals 2026 at all three AFL API settle CLIs after the rollover[2m > [22m[2msettle-afl-api --dry-run refuses 2026 before the DB path opens, with ingestion ENABLED
+[22m[39mBundle v2 'sealed-matches-snapshot' (season 2026): 0 match unit(s) built, 0 build failure(s).
+Season feed CD_S2026014: 0 match(es), INCOMPLETE (season_feed_not_in_snapshot); statuses observed: none.
+  SEASON FEED season_feed_not_in_snapshot: The snapshot's manifest does not list 00-season-matches.json.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mAFLDB-ISSUE-316 — the tracked registry seals 2026 at all three AFL API settle CLIs after the rollover[2m > [22m[2msettle-afl-api --apply refuses 2026 before the DB path opens, with ingestion ENABLED
+[22m[39mBundle v2 'sealed-matches-snapshot' (season 2026): 0 match unit(s) built, 0 build failure(s).
+Season feed CD_S2026014: 0 match(es), INCOMPLETE (season_feed_not_in_snapshot); statuses observed: none.
+  SEASON FEED season_feed_not_in_snapshot: The snapshot's manifest does not list 00-season-matches.json.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mAFLDB-ISSUE-316 — the tracked registry seals 2026 at all three AFL API settle CLIs after the rollover[2m > [22m[2msettle-afl-api-fixtures --dry-run refuses 2026 before the DB path opens, with ingestion ENABLED
+[22m[39mFixtures-only snapshot 'sealed-fixtures-snapshot' (season 2026): 0 fixture(s) built, 0 build failure(s).
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mAFLDB-ISSUE-316 — the tracked registry seals 2026 at all three AFL API settle CLIs after the rollover[2m > [22m[2msettle-afl-api-fixtures --apply refuses 2026 before the DB path opens, with ingestion ENABLED
+[22m[39mFixtures-only snapshot 'sealed-fixtures-snapshot' (season 2026): 0 fixture(s) built, 0 build failure(s).
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mAFLDB-ISSUE-316 — the tracked registry seals 2026 at all three AFL API settle CLIs after the rollover[2m > [22m[2msettle-afl-api-brownlow --dry-run refuses 2026 before the DB path opens, with BOTH Brownlow gates on
+[22m[39mBrownlow snapshot 'sealed-brownlow-snapshot' (season 2026): 0 match vote-set(s), 0 leaderboard entr(y/ies), leaderboard status = IN_PROGRESS.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mAFLDB-ISSUE-316 — the tracked registry seals 2026 at all three AFL API settle CLIs after the rollover[2m > [22m[2msettle-afl-api-brownlow --apply refuses 2026 before the DB path opens, with BOTH Brownlow gates on
+[22m[39mBrownlow snapshot 'sealed-brownlow-snapshot' (season 2026): 0 match vote-set(s), 0 leaderboard entr(y/ies), leaderboard status = IN_PROGRESS.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mAFLDB-ISSUE-316 — the tracked registry seals 2026 at all three AFL API settle CLIs after the rollover[2m > [22m[2msettle-afl-api-brownlow --observe-only refuses 2026 before the DB path opens, with BOTH Brownlow gates on
+[22m[39mBrownlow snapshot 'sealed-brownlow-snapshot' (season 2026): 0 match vote-set(s), 0 leaderboard entr(y/ies), leaderboard status = IN_PROGRESS.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mAFLDB-ISSUE-316 — the tracked registry seals 2026 at all three AFL API settle CLIs after the rollover[2m > [22m[2msettle-afl-api --validate-only on sealed 2026 still succeeds offline
+[22m[39mBundle v2 'sealed-matches-snapshot' (season 2026): 0 match unit(s) built, 0 build failure(s).
+Season feed CD_S2026014: 0 match(es), INCOMPLETE (season_feed_not_in_snapshot); statuses observed: none.
+  SEASON FEED season_feed_not_in_snapshot: The snapshot's manifest does not list 00-season-matches.json.
+
+--validate-only: manifest, registry and bundle contract verified. No connection opened.
+
+[90mstdout[2m | tests/afl-api-settle-cli-gate.test.ts[2m > [22m[2mAFLDB-ISSUE-316 — the tracked registry seals 2026 at all three AFL API settle CLIs after the rollover[2m > [22m[2m2027, the season in progress, is not sealed: settle-afl-api continues to its DB path
+[22m[39mBundle v2 'sealed-matches-snapshot' (season 2027): 0 match unit(s) built, 0 build failure(s).
+Season feed CD_S2027014: 0 match(es), INCOMPLETE (season_feed_not_in_snapshot); statuses observed: none.
+  SEASON FEED season_feed_not_in_snapshot: The snapshot's manifest does not list 00-season-matches.json.
+
+ [32m✓[39m tests/afl-api-settle-cli-gate.test.ts [2m([22m[2m81 tests[22m[2m)[22m[33m 597[2mms[22m[39m
+ [32m✓[39m tests/admin-fixture-actions.test.ts [2m([22m[2m89 tests[22m[2m)[22m[32m 213[2mms[22m[39m
+ [32m✓[39m tests/match-sheet.test.ts [2m([22m[2m97 tests[22m[2m)[22m[32m 99[2mms[22m[39m
+ [32m✓[39m tests/nl-regression-corpus.test.ts [2m([22m[2m163 tests[22m[2m)[22m[32m 245[2mms[22m[39m
+ [32m✓[39m tests/nl-describe.test.ts [2m([22m[2m94 tests[22m[2m)[22m[32m 89[2mms[22m[39m
+ [32m✓[39m tests/nl-semantic-mapping.test.ts [2m([22m[2m178 tests[22m[2m)[22m[32m 292[2mms[22m[39m
+ [32m✓[39m tests/v2-brownlow-reconciliation.test.ts [2m([22m[2m59 tests[22m[2m)[22m[33m 1654[2mms[22m[39m
+     [33m[2m✓[22m[39m the stored totals end at 2025, so no committed API season overlaps them (V2-GAP-010) [33m 1335[2mms[22m[39m
+ [32m✓[39m tests/v2-brownlow-eligibility.test.ts [2m([22m[2m65 tests[22m[2m)[22m[32m 225[2mms[22m[39m
+ [32m✓[39m tests/player-matching.test.ts [2m([22m[2m100 tests[22m[2m)[22m[32m 75[2mms[22m[39m
+ [32m✓[39m tests/v2-module-boundaries.test.ts [2m([22m[2m53 tests[22m[2m)[22m[33m 9611[2mms[22m[39m
+     [33m[2m✓[22m[39m src, tools, packages and deploy contain no boundary violation [33m 1115[2mms[22m[39m
+     [33m[2m✓[22m[39m fires on forbidden imports [33m 2720[2mms[22m[39m
+     [33m[2m✓[22m[39m the quarantined tool exists and the whole tree has no violation [33m 671[2mms[22m[39m
+     [33m[2m✓[22m[39m every real edge is known and every known edge is real (tests/** excluded) [33m 1162[2mms[22m[39m
+     [33m[2m✓[22m[39m the transitive closure of every public src/app and src/components file is clean [33m 338[2mms[22m[39m
+     [33m[2m✓[22m[39m no file under src/ or packages/*/src/ imports tools/{migration,rebuild,records,aflw,email_intake}/ or legacy/ [33m 372[2mms[22m[39m
+     [33m[2m✓[22m[39m the CLI exits 1 with the refusal for a retired entry and for an unknown name [33m 1329[2mms[22m[39m
+     [33m[2m✓[22m[39m no file under src/app/admin or src/app/api/admin imports the pipeline, datasets, the Squiggle/Kali libraries or startSettleRun [33m 474[2mms[22m[39m
+     [33m[2m✓[22m[39m the AFL Tables settle CLI, run directly, refuses before .env or a connection (exit 1) [33m 838[2mms[22m[39m
+ [32m✓[39m tests/gridley-acquisition.test.ts [2m([22m[2m45 tests[22m[2m)[22m[33m 29680[2mms[22m[39m
+     [33m[2m✓[22m[39m does not re-request a date it already holds [33m 358[2mms[22m[39m
+     [33m[2m✓[22m[39m completes a capture a killed run left without its request record [33m 529[2mms[22m[39m
+     [33m[2m✓[22m[39m keeps both captures when upstream content changes, and overwrites neither [33m 540[2mms[22m[39m
+     [33m[2m✓[22m[39m reports a clean 404 as unavailable, and as a failure under --require-complete [33m 353[2mms[22m[39m
+     [33m[2m✓[22m[39m retries a 5xx with backoff and succeeds when the source recovers [33m 6199[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses a well-formed response that is not the board it asked for [33m 355[2mms[22m[39m
+     [33m[2m✓[22m[39m reports a transport failure as network_error without writing anything [33m 14178[2mms[22m[39m
+     [33m[2m✓[22m[39m paces its requests [33m 1393[2mms[22m[39m
+     [33m[2m✓[22m[39m validates a whole snapshot without a database and reports what it holds [33m 331[2mms[22m[39m
+     [33m[2m✓[22m[39m preserves the criterion id, the title/subtitle split, the description and the type [33m 330[2mms[22m[39m
+     [33m[2m✓[22m[39m reproduces the lossy legacy label exactly, because it is the only shared field [33m 319[2mms[22m[39m
+     [33m[2m✓[22m[39m keeps the answer key and everything else the columns do not model [33m 322[2mms[22m[39m
+     [33m[2m✓[22m[39m hashes the envelope by a recipe another language can reproduce [33m 325[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses a capture whose bytes no longer match its name [33m 329[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses a capture with no request record rather than inventing a fetch time [33m 327[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses a request record with no fetched_at [33m 329[2mms[22m[39m
+     [33m[2m✓[22m[39m is a complete no-op on a re-run, and reports a revert instead of guessing [33m 494[2mms[22m[39m
+     [33m[2m✓[22m[39m makes a changed capture a new revision and chains it inside one run [33m 492[2mms[22m[39m
+ [32m✓[39m tests/afl-api-settle-plan.test.ts [2m([22m[2m55 tests[22m[2m)[22m[32m 186[2mms[22m[39m
+ [32m✓[39m tests/afl-api-player-evidence.test.ts [2m([22m[2m58 tests[22m[2m)[22m[32m 125[2mms[22m[39m
+ [32m✓[39m tests/workflow-preflight.test.ts [2m([22m[2m61 tests[22m[2m)[22m[33m 6684[2mms[22m[39m
+     [33m[2m✓[22m[39m blocks a branch behind current clean origin/main and reports both counts [33m 301[2mms[22m[39m
+       [33m[2m✓[22m[39m refuses, with a named reason, when ESLint is not installed or prints no JSON [33m 438[2mms[22m[39m
+[90mstdout[2m | tests/settle-season-revalidation.test.ts[2m > [22m[2mPOST /api/internal/revalidate-season[2m > [22m[2minvalidates exactly the season page it was given
+[22m[39m[revalidate-season] /seasons/2026 invalidated on worker single (pid 4087318)
+
+[90mstdout[2m | tests/settle-season-revalidation.test.ts[2m > [22m[2mPOST /api/internal/revalidate-season[2m > [22m[2mreports the worker identity the caller needs to prove coverage
+[22m[39m[revalidate-season] /seasons/2026 invalidated on worker 3 (pid 4087318)
+
+[90mstdout[2m | tests/settle-season-revalidation.test.ts[2m > [22m[2mPOST /api/internal/revalidate-season[2m > [22m[2mreports a single-process server truthfully rather than guessing
+[22m[39m[revalidate-season] /seasons/2026 invalidated on worker single (pid 4087318)
+
+[90mstdout[2m | tests/settle-season-revalidation.test.ts[2m > [22m[2mPOST /api/internal/revalidate-season[2m > [22m[2mtakes the worker identity from process state, never from the request
+[22m[39m[revalidate-season] /seasons/2026 invalidated on worker 2 (pid 4087318)
+
+[90mstdout[2m | tests/settle-season-revalidation.test.ts[2m > [22m[2mPOST /api/internal/revalidate-season[2m > [22m[2mrefuses to believe a nonsensical worker count rather than reporting it
+[22m[39m[revalidate-season] /seasons/2026 invalidated on worker single (pid 4087318)
+
+[90mstdout[2m | tests/settle-season-revalidation.test.ts[2m > [22m[2mPOST /api/internal/revalidate-season[2m > [22m[2mrefuses to believe a nonsensical worker count rather than reporting it
+[22m[39m[revalidate-season] /seasons/2026 invalidated on worker single (pid 4087318)
+
+[90mstdout[2m | tests/settle-season-revalidation.test.ts[2m > [22m[2mPOST /api/internal/revalidate-season[2m > [22m[2mrefuses to believe a nonsensical worker count rather than reporting it
+[22m[39m[revalidate-season] /seasons/2026 invalidated on worker single (pid 4087318)
+
+[90mstdout[2m | tests/settle-season-revalidation.test.ts[2m > [22m[2mPOST /api/internal/revalidate-season[2m > [22m[2mrefuses to believe a nonsensical worker count rather than reporting it
+[22m[39m[revalidate-season] /seasons/2026 invalidated on worker single (pid 4087318)
+
+[90mstdout[2m | tests/settle-season-revalidation.test.ts[2m > [22m[2mPOST /api/internal/revalidate-season[2m > [22m[2mrefuses to believe a nonsensical worker count rather than reporting it
+[22m[39m[revalidate-season] /seasons/2026 invalidated on worker single (pid 4087318)
+
+[90mstdout[2m | tests/settle-season-revalidation.test.ts[2m > [22m[2mPOST /api/internal/revalidate-season[2m > [22m[2mserves a loopback caller carrying the forwarding headers Next synthesises
+[22m[39m[revalidate-season] /seasons/2026 invalidated on worker single (pid 4087318)
+
+[90mstdout[2m | tests/settle-season-revalidation.test.ts[2m > [22m[2mPOST /api/internal/revalidate-season[2m > [22m[2mserves every loopback form the deployment can emit
+[22m[39m[revalidate-season] /seasons/2026 invalidated on worker single (pid 4087318)
+
+[90mstdout[2m | tests/settle-season-revalidation.test.ts[2m > [22m[2mPOST /api/internal/revalidate-season[2m > [22m[2mserves every loopback form the deployment can emit
+[22m[39m[revalidate-season] /seasons/2026 invalidated on worker single (pid 4087318)
+
+[90mstdout[2m | tests/settle-season-revalidation.test.ts[2m > [22m[2mPOST /api/internal/revalidate-season[2m > [22m[2mserves every loopback form the deployment can emit
+[22m[39m[revalidate-season] /seasons/2026 invalidated on worker single (pid 4087318)
+
+[90mstdout[2m | tests/settle-season-revalidation.test.ts[2m > [22m[2mPOST /api/internal/revalidate-season[2m > [22m[2mserves every loopback form the deployment can emit
+[22m[39m[revalidate-season] /seasons/2026 invalidated on worker single (pid 4087318)
+
+[90mstdout[2m | tests/settle-season-revalidation.test.ts[2m > [22m[2mPOST /api/internal/revalidate-season[2m > [22m[2mserves every loopback form the deployment can emit
+[22m[39m[revalidate-season] /seasons/2026 invalidated on worker single (pid 4087318)
+
+[90mstdout[2m | tests/settle-season-revalidation.test.ts[2m > [22m[2mPOST /api/internal/revalidate-season[2m > [22m[2mignores x-forwarded-host, which is client input on every path
+[22m[39m[revalidate-season] /seasons/2026 invalidated on worker single (pid 4087318)
+
+[90mstdout[2m | tests/settle-season-revalidation.test.ts[2m > [22m[2mPOST /api/internal/revalidate-season[2m > [22m[2mserves a request with no forwarding identity at all
+[22m[39m[revalidate-season] /seasons/2026 invalidated on worker single (pid 4087318)
+
+[90mstdout[2m | tests/settle-season-revalidation.test.ts[2m > [22m[2mPOST /api/internal/revalidate-season[2m > [22m[2mcharges only failed secret checks against the limiter
+[22m[39m[revalidate-season] /seasons/2026 invalidated on worker single (pid 4087318)
+
+ [32m✓[39m tests/settle-season-revalidation.test.ts [2m([22m[2m86 tests[22m[2m)[22m[32m 176[2mms[22m[39m
+ [32m✓[39m tests/v2-season-seal.test.ts [2m([22m[2m62 tests[22m[2m)[22m[33m 341[2mms[22m[39m
+ [32m✓[39m tests/admin-current-season-settle.test.ts [2m([22m[2m58 tests[22m[2m)[22m[32m 107[2mms[22m[39m
+ [32m✓[39m tests/nl-ui-corpus.test.ts [2m([22m[2m51 tests[22m[2m)[22m[33m 544[2mms[22m[39m
+ [32m✓[39m tests/afl-api-adjudication-recovery.test.ts [2m([22m[2m26 tests[22m[2m)[22m[32m 176[2mms[22m[39m
+ [32m✓[39m tests/issue248-cleanup-dev-auth-fixtures.test.ts [2m([22m[2m138 tests[22m[2m)[22m[32m 132[2mms[22m[39m
+[90mstderr[2m | tests/v2-shadow-award-reports.test.ts[2m > [22m[2mBrownlow capture[2m > [22m[2mequals the operations-centre report for the same data and clock
+[22m[39mOperations centre: provider team identities unavailable Error: not attempted by the capture tool
+    at Object.loadProviderTeamIdentities [90m(/mnt/ssd/afldb-rem4-qual-20261115/cand/[39mtests/v2-shadow-award-reports.test.ts:437:49[90m)[39m
+    at readProviderTeamIdentities [90m(/mnt/ssd/afldb-rem4-qual-20261115/cand/[39msrc/lib/admin/operations-centre.ts:1043:28[90m)[39m
+    at [90m/mnt/ssd/afldb-rem4-qual-20261115/cand/[39msrc/lib/admin/operations-centre.ts:987:24
+    at runRead [90m(/mnt/ssd/afldb-rem4-qual-20261115/cand/[39msrc/lib/admin/operations-centre.ts:347:34[90m)[39m
+    at Module.reconcileBrownlowSeasonForAdmin [90m(/mnt/ssd/afldb-rem4-qual-20261115/cand/[39msrc/lib/admin/operations-centre.ts:976:10[90m)[39m
+    at [90m/mnt/ssd/afldb-rem4-qual-20261115/cand/[39mtests/v2-shadow-award-reports.test.ts:439:26
+    at [90mfile:///mnt/ssd/afldb-rem4-qual-20261115/cand/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1903:20
+
+ [32m✓[39m tests/v2-shadow-award-reports.test.ts [2m([22m[2m59 tests[22m[2m)[22m[33m 6328[2mms[22m[39m
+ [32m✓[39m tests/gap029-ops.test.ts [2m([22m[2m97 tests[22m[2m)[22m[32m 207[2mms[22m[39m
+ [32m✓[39m tests/dsn-policy.test.ts [2m([22m[2m73 tests[22m[2m)[22m[32m 108[2mms[22m[39m
+ [32m✓[39m tests/after-siren-normalisation.test.ts [2m([22m[2m31 tests[22m[2m)[22m[33m 18020[2mms[22m[39m
+     [33m[2m✓[22m[39m classifies each file by its name and derives scored / effect / result per table [33m 339[2mms[22m[39m
+     [33m[2m✓[22m[39m keeps other-competition rows with their competition, supergoal notation and no premiership flag [33m 1214[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses a score that does not add up, a separator that disagrees with the margin, and a category that disagrees with the scores [33m 3928[2mms[22m[39m
+     [33m[2m✓[22m[39m Shuey 2017: the [a] footnote is refused without an adjudication and is a goal to win after the extra-time siren with one [33m 1215[2mms[22m[39m
+     [33m[2m✓[22m[39m King 1994: a miss in a 23-point win is refused until the end_of_regulation adjudication types it as a miss with no effect [33m 908[2mms[22m[39m
+     [33m[2m✓[22m[39m an uncited row needs a citation adjudication, and a score that does not add up needs a score_arithmetic one; both are recorded, neither may be stale [33m 2133[2mms[22m[39m
+     [33m[2m✓[22m[39m strips the repeat marker from the name, refuses the same event in two files, and orders deterministically [33m 607[2mms[22m[39m
+     [33m[2m✓[22m[39m keys on season, round and both club organisations, and takes the clubs from the match [33m 303[2mms[22m[39m
+     [33m[2m✓[22m[39m reads the kicker first whichever side of the fixture the club was on [33m 305[2mms[22m[39m
+     [33m[2m✓[22m[39m separates a drawn final from its replay on the source's own points [33m 306[2mms[22m[39m
+     [33m[2m✓[22m[39m retries one round higher only in a season shaped by an Opening Round [33m 605[2mms[22m[39m
+     [33m[2m✓[22m[39m leaves match_id NULL for a season this database does not carry, and says so [33m 307[2mms[22m[39m
+     [33m[2m✓[22m[39m leaves match_id NULL for another competition without ever looking for one [33m 306[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses a season it carries whose fixture it cannot find [33m 305[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses a fixture whose score disagrees with the source's [33m 307[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses a club name that is not exactly one organisation [33m 306[2mms[22m[39m
+     [33m[2m✓[22m[39m links the one player of that name in the match for the kicker club [33m 314[2mms[22m[39m
+     [33m[2m✓[22m[39m never reaches across to the opponent, and leaves the source spelling when nobody matches [33m 306[2mms[22m[39m
+     [33m[2m✓[22m[39m leaves same-name team-mates ambiguous rather than picking one [33m 305[2mms[22m[39m
+     [33m[2m✓[22m[39m separates same-name candidates by a generational suffix, and records that it did [33m 603[2mms[22m[39m
+     [33m[2m✓[22m[39m confirms a goal against the kicker's own scoring line [32m 300[2mms[22m[39m
+     [33m[2m✓[22m[39m treats an unrecorded statistic as unknown, never as zero [33m 306[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses a recorded zero, which contradicts the source [33m 305[2mms[22m[39m
+     [33m[2m✓[22m[39m checks nothing for a kick that scored nothing [33m 304[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses a header that is not the tracked shape [33m 303[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses an unknown enum value [33m 305[2mms[22m[39m
+     [33m[2m✓[22m[39m accepts the tracked artefact through load --validate-only, and its provenance agrees [33m 330[2mms[22m[39m
+     [33m[2m✓[22m[39m writes only columns migration 089 declares [33m 303[2mms[22m[39m
+ [32m✓[39m tests/afl-api-player-bridge-import.test.ts [2m([22m[2m36 tests[22m[2m)[22m[32m 161[2mms[22m[39m
+ [32m✓[39m tests/brownlow-season-artefact.test.ts [2m([22m[2m44 tests[22m[2m)[22m[33m 25454[2mms[22m[39m
+     [33m[2m✓[22m[39m is unique and deterministically ordered on (season, profile path) [33m 405[2mms[22m[39m
+     [33m[2m✓[22m[39m passes the loader's own offline validation through its CLI [33m 1436[2mms[22m[39m
+     [33m[2m✓[22m[39m passes the AFL API Brownlow season artefact contract (builder + D-233-2 loader) [33m 17483[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses a tampered artefact (hash mismatch) through the same CLI [33m 1447[2mms[22m[39m
+     [33m[2m✓[22m[39m applies all five adjudications when the row names the exact recovery path [33m 338[2mms[22m[39m
+     [33m[2m✓[22m[39m carries an unadjudicated mismatched recovery path through unchanged (no correction) [33m 325[2mms[22m[39m
+     [33m[2m✓[22m[39m fails hard when an override names a recovery path the export does not carry [33m 306[2mms[22m[39m
+     [33m[2m✓[22m[39m fails hard when an override names a legacy player the export lacks [33m 305[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses a gap-fill row (no recovery path) for a player the export already bridges [33m 308[2mms[22m[39m
+     [33m[2m✓[22m[39m agrees on the real tracked contract, and folds Jack Ross to players/J/Jack_Ross.html [33m 414[2mms[22m[39m
+     [33m[2m✓[22m[39m agrees on a synthetic contract where continuing_url sorts after renumbered_url [33m 322[2mms[22m[39m
+     [33m[2m✓[22m[39m both sides refuse a contract with a duplicated renumbered_url [33m 318[2mms[22m[39m
+     [33m[2m✓[22m[39m both sides refuse a contract with a chain [33m 317[2mms[22m[39m
+     [33m[2m✓[22m[39m both sides refuse a contract with a broken career-game continuity [33m 315[2mms[22m[39m
+     [33m[2m✓[22m[39m both sides refuse a contract with a non-normalised path [33m 312[2mms[22m[39m
+ [32m✓[39m tests/coach-reconciliation.test.ts [2m([22m[2m39 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 5257[2mms[22m[39m
+     [33m[2m✓[22m[39m links a player/coach ONLY through the page profile path, and leaves a coach-only person unlinked with no player [33m 328[2mms[22m[39m
+     [33m[2m✓[22m[39m never binds an ambiguous name: the page profile decides which Ron Barassi, and a same-name player is no substitute for a profile [33m 953[2mms[22m[39m
+     [33m[2m✓[22m[39m folds a renumbered profile through the contract continuity rule, and refuses two pages on one player [33m 615[2mms[22m[39m
+     [33m[2m✓[22m[39m applies a tracked profile-link correction by exact page and href, exactly once, and refuses a rule that no longer matches [33m 1247[2mms[22m[39m
+     [33m[2m✓[22m[39m keeps an unparseable or absent birth date as null without affecting identity [33m 310[2mms[22m[39m
+     [33m[2m✓[22m[39m yields one string per (match, club), keys the match exactly as the fitzRoy import does, and keeps a blank cell as a gap [33m 309[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses two coach strings for one (match, club), and a club that is not in the match [33m 626[2mms[22m[39m
+     [33m[2m✓[22m[39m maps every string to a coach page by exact index name, and refuses any other string [33m 627[2mms[22m[39m
+ [32m✓[39m tests/v2-coleman.test.ts [2m([22m[2m45 tests[22m[2m)[22m[32m 86[2mms[22m[39m
+ [32m✓[39m tests/brownlow-entry.test.ts [2m([22m[2m95 tests[22m[2m)[22m[32m 60[2mms[22m[39m
+ [32m✓[39m tests/v2-fixture-contract.test.ts [2m([22m[2m80 tests[22m[2m)[22m[33m 664[2mms[22m[39m
+ [32m✓[39m tests/awards-admin.test.ts [2m([22m[2m41 tests[22m[2m)[22m[32m 81[2mms[22m[39m
+ [32m✓[39m tests/afl-api-brownlow.test.ts [2m([22m[2m58 tests[22m[2m)[22m[32m 61[2mms[22m[39m
+ [32m✓[39m tests/admin-draft-actions.test.ts [2m([22m[2m60 tests[22m[2m)[22m[32m 91[2mms[22m[39m
+ [32m✓[39m tests/sibling-reconciliation.test.ts [2m([22m[2m12 tests[22m[2m)[22m[33m 10861[2mms[22m[39m
+     [33m[2m✓[22m[39m splits listed clubs on the export's separators, maps organisation spellings, and reads the title birth year [33m 345[2mms[22m[39m
+     [33m[2m✓[22m[39m labels what the source evidences: brothers, twin brothers, sisters, else the export's label [33m 303[2mms[22m[39m
+     [33m[2m✓[22m[39m resolves by name, suffix and listed club; orders each pair deterministically with roles travelling [33m 304[2mms[22m[39m
+     [33m[2m✓[22m[39m a same-name pair narrows by the listed club, then by the title birth year only when every candidate is dated [33m 900[2mms[22m[39m
+     [33m[2m✓[22m[39m listed clubs all outside the VFL/AFL are unlinked whatever the name matches; no candidate is unmatched [33m 598[2mms[22m[39m
+     [33m[2m✓[22m[39m an adjudication decides an ambiguous member, must be needed, and an explicit unlinked one is honoured [33m 1217[2mms[22m[39m
+     [33m[2m✓[22m[39m a supplement adds an explicitly evidenced pair the export lacks; a stale or non-identity supplement refuses [33m 913[2mms[22m[39m
+     [33m[2m✓[22m[39m two people who both resolve to canonical players are brothers whatever the export called them; the men's competition decides [33m 910[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses a self-pair, merges a family listed twice into one pair, and refuses two unlinked namesake pairs [33m 913[2mms[22m[39m
+     [33m[2m✓[22m[39m accepts a well-formed artefact and measures it [33m 311[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses a status that disagrees with its profile, a duplicate or unordered pair, a self-pair, a repeated key and an unevidenced brothers label [33m 3636[2mms[22m[39m
+     [33m[2m✓[22m[39m the tracked artefact validates offline, its adjudications are exactly the eight recorded, its supplements are the fourteen evidenced pairs, and its reconciliation counts hold [33m 503[2mms[22m[39m
+ [32m✓[39m tests/behind-holder.test.ts [2m([22m[2m34 tests[22m[2m)[22m[33m 1847[2mms[22m[39m
+ [32m✓[39m tests/afl-api-lineup.test.ts [2m([22m[2m46 tests[22m[2m)[22m[33m 1676[2mms[22m[39m
+     [33m[2m✓[22m[39m 'acquire_lineups.R': a non-empty existing --out-dir is refused and left exactly as it was [33m 803[2mms[22m[39m
+     [33m[2m✓[22m[39m 'acquire_rosters.R': a non-empty existing --out-dir is refused and left exactly as it was [33m 806[2mms[22m[39m
+[90mstderr[2m | tests/external-grids-import.test.ts
+[22m[39m[AFLDB-ISSUE-118] legacy archive not present at D:/dev/sports_data_lab/data/afl/afl.db; the 1,123-board validation was skipped. Set AFLDB_LEGACY_SQLITE to run it.
+
+ [32m✓[39m tests/external-grids-import.test.ts [2m([22m[2m47 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 3718[2mms[22m[39m
+ [32m✓[39m tests/draftguru-import.test.ts [2m([22m[2m51 tests[22m[2m)[22m[33m 24287[2mms[22m[39m
+     [33m[2m✓[22m[39m rolls back on failure and commits data + status once (scripted connection) [33m 396[2mms[22m[39m
+     [33m[2m✓[22m[39m write set, no-Stage-A, child partition, preconditions, authority, CLI, atomicity and the gate's link-only plan/verify all hold on the real tools [33m 517[2mms[22m[39m
+     [33m[2m✓[22m[39m validates the whole input set without a database [33m 4688[2mms[22m[39m
+     [33m[2m✓[22m[39m accepts a well-formed synthetic bridge dataset [33m 4687[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses a bridge that binds one AFL Tables identity to two persons [33m 4626[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses a bridge whose identity is not the canonical profile form [33m 4592[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses a bridge keyed on a non-canonical player_url [33m 4681[2mms[22m[39m
+ [32m✓[39m tests/deploy-web-unit.test.ts [2m([22m[2m40 tests[22m[2m)[22m[33m 2248[2mms[22m[39m
+     [33m[2m✓[22m[39m offhost-pull: binds each sidecar to its dump, refuses future stamps, and a flood cannot evict genuine copies (review A-03) [33m 1182[2mms[22m[39m
+ [32m✓[39m tests/v2-coleman-publication-pglite.test.ts [2m([22m[2m23 tests[22m[2m)[22m[33m 3007[2mms[22m[39m
+ [32m✓[39m tests/nl-stress-corpus.test.ts [2m([22m[2m65 tests[22m[2m)[22m[32m 56[2mms[22m[39m
+ [32m✓[39m tests/nl-stress-v2.test.ts [2m([22m[2m58 tests[22m[2m)[22m[32m 79[2mms[22m[39m
+ [32m✓[39m tests/special-records-admin.test.ts [2m([22m[2m43 tests[22m[2m)[22m[32m 72[2mms[22m[39m
+ [32m✓[39m tests/issue246-retire-issue109-fixture.test.ts [2m([22m[2m88 tests[22m[2m)[22m[32m 80[2mms[22m[39m
+ [32m✓[39m tests/v2-coleman-projection.test.ts [2m([22m[2m36 tests[22m[2m)[22m[32m 74[2mms[22m[39m
+ [32m✓[39m tests/v2-shadow-capture.test.ts [2m([22m[2m82 tests[22m[2m)[22m[32m 96[2mms[22m[39m
+ [32m✓[39m tests/beta-verify.test.ts [2m([22m[2m40 tests[22m[2m)[22m[32m 119[2mms[22m[39m
+ [32m✓[39m tests/afl-api-player-bridge-cli.test.ts [2m([22m[2m28 tests[22m[2m)[22m[32m 134[2mms[22m[39m
+ [32m✓[39m tests/v2-historical-manifest.test.ts [2m([22m[2m38 tests[22m[2m)[22m[32m 75[2mms[22m[39m
+ [32m✓[39m tests/submission-review-actions.test.ts [2m([22m[2m42 tests[22m[2m)[22m[32m 71[2mms[22m[39m
+ [32m✓[39m tests/nl-issue-204-corpus-fix.test.ts [2m([22m[2m34 tests[22m[2m)[22m[33m 3333[2mms[22m[39m
+     [33m[2m✓[22m[39m changes exactly the derived 180 rows to the established coverage_unavailable decline shape [33m 355[2mms[22m[39m
+     [33m[2m✓[22m[39m leaves every non-target row byte-identical at the parsed field level [33m 639[2mms[22m[39m
+ [32m✓[39m tests/club-comparison-view.test.ts [2m([22m[2m35 tests[22m[2m)[22m[33m 318[2mms[22m[39m
+ [32m✓[39m tests/seo.test.ts [2m([22m[2m30 tests[22m[2m)[22m[33m 1469[2mms[22m[39m
+     [33m[2m✓[22m[39m answers an id that does not fit int4 with not-found, on every id route [33m 737[2mms[22m[39m
+ [32m✓[39m tests/player-matching-describe.test.ts [2m([22m[2m38 tests[22m[2m)[22m[32m 43[2mms[22m[39m
+ [32m✓[39m tests/named-medals-source.test.ts [2m([22m[2m44 tests[22m[2m)[22m[33m 3832[2mms[22m[39m
+ [32m✓[39m tests/nl-audit-acceptance.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 204[2mms[22m[39m
+ [32m✓[39m tests/awards-replace-panel.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 69[2mms[22m[39m
+ [32m✓[39m tests/admin-upload-route.test.ts [2m([22m[2m36 tests[22m[2m)[22m[32m 137[2mms[22m[39m
+ [31m❯[39m tests/v2-acquisition-pipeline.test.ts [2m([22m[2m24 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 848[2mms[22m[39m
+     [32m✓[39m src/lib/acquisition/afl-api-client.ts: no postgres, no src/db, no writer module, no SQL mutation in its runtime closure[32m 85[2mms[22m[39m
+     [32m✓[39m src/lib/acquisition/afl-api-season-discovery.ts: no postgres, no src/db, no writer module, no SQL mutation in its runtime closure[32m 21[2mms[22m[39m
+     [32m✓[39m src/lib/acquisition/afl-api-season-enumeration.ts: no postgres, no src/db, no writer module, no SQL mutation in its runtime closure[32m 48[2mms[22m[39m
+     [32m✓[39m src/lib/acquisition/afl-api-acquisition-constants.ts: no postgres, no src/db, no writer module, no SQL mutation in its runtime closure[32m 2[2mms[22m[39m
+     [32m✓[39m the acquire constants leaf imports nothing, and the writer modules re-export it value for value[32m 2[2mms[22m[39m
+     [32m✓[39m tools/current-season/acquire-afl-api.ts reaches no writer module, no src/db module and holds no SQL mutation text[32m 98[2mms[22m[39m
+     [32m✓[39m tools/current-season/acquire-afl-api-brownlow.ts reaches no writer module, no src/db module and holds no SQL mutation text[32m 74[2mms[22m[39m
+     [32m✓[39m the ingestion switch the CLIs reach only SELECTs from site_settings[32m 1[2mms[22m[39m
+     [32m✓[39m flags a fake client importing canonical-apply, even indirectly[32m 2[2mms[22m[39m
+     [32m✓[39m flags a fake client reaching src/db and postgres[32m 1[2mms[22m[39m
+     [32m✓[39m flags SQL mutation text in the closure (each verb)[32m 2[2mms[22m[39m
+     [32m✓[39m does not flag a TYPE-ONLY import of a writer, nor read-only SQL, nor prose such as "truncated"[32m 1[2mms[22m[39m
+     [32m✓[39m the runtime specifier set is always a subset of the parser-wide specifier set[32m 48[2mms[22m[39m
+     [32m✓[39m has the seven stages, once each, in the owner chain order[32m 1[2mms[22m[39m
+     [32m✓[39m only promote writes canonical rows; acquire, identity and reconcile write nothing[32m 0[2mms[22m[39m
+     [32m✓[39m every implementation symbol is exported at its cited path (one table row each)[32m 189[2mms[22m[39m
+     [32m✓[39m cites the V2 Stage 3 fixture contract and the season seal[32m 1[2mms[22m[39m
+     [32m✓[39m refuses a missing file and a symbol that is not exported there[32m 3[2mms[22m[39m
+     [32m✓[39m findExportLine handles declarations, export lists, re-exports, aliases and ignores comments[32m 5[2mms[22m[39m
+     [32m✓[39m finds a re-export list entry in a real module (settle-afl-api.ts: export { areCoSources })[32m 5[2mms[22m[39m
+[31m     [31m×[31m equals renderAflApiStageMap output[39m[32m 92[2mms[22m[39m
+     [32m✓[39m spliceStageMap touches only the marked region and preserves the line ending[32m 1[2mms[22m[39m
+     [32m✓[39m imports with DATABASE_URL unset and exposes the facade[32m 10[2mms[22m[39m
+     [32m✓[39m the package index runtime closure reaches no src/db, postgres, server-only or writer module[32m 147[2mms[22m[39m
+ [32m✓[39m tests/admin-audit-viewer.test.ts [2m([22m[2m33 tests[22m[2m)[22m[32m 65[2mms[22m[39m
+ [32m✓[39m tests/all-australian-source.test.ts [2m([22m[2m40 tests[22m[2m)[22m[33m 2921[2mms[22m[39m
+ [32m✓[39m tests/match-backtest-compare.test.ts [2m([22m[2m32 tests[22m[2m)[22m[32m 42[2mms[22m[39m
+ [32m✓[39m tests/v2-brownlow-legacy-ownership-adoption.test.ts [2m([22m[2m21 tests[22m[2m)[22m[33m 4200[2mms[22m[39m
+ [32m✓[39m tests/admin-lifecycle-actions.test.ts [2m([22m[2m35 tests[22m[2m)[22m[32m 89[2mms[22m[39m
+ [32m✓[39m tests/coleman-derivation.test.ts [2m([22m[2m42 tests[22m[2m)[22m[33m 1098[2mms[22m[39m
+ [32m✓[39m tests/first-kick-goal-source.test.ts [2m([22m[2m20 tests[22m[2m)[22m[33m 615[2mms[22m[39m
+     [33m[2m✓[22m[39m needs an explicit --acknowledge code_test_db and an evidence directory [33m 368[2mms[22m[39m
+ [32m✓[39m tests/v2-coleman-publication.test.ts [2m([22m[2m32 tests[22m[2m)[22m[32m 64[2mms[22m[39m
+ [32m✓[39m tests/admin-season-list-actions.test.ts [2m([22m[2m28 tests[22m[2m)[22m[32m 40[2mms[22m[39m
+ [32m✓[39m tests/site-content.test.ts [2m([22m[2m48 tests[22m[2m)[22m[32m 77[2mms[22m[39m
+ [32m✓[39m tests/club-best-and-fairest-source.test.ts [2m([22m[2m37 tests[22m[2m)[22m[33m 2963[2mms[22m[39m
+ [32m✓[39m tests/catalogue-lookups.test.ts [2m([22m[2m24 tests[22m[2m)[22m[32m 45[2mms[22m[39m
+ [32m✓[39m tests/coach-profile-route.test.ts [2m([22m[2m18 tests[22m[2m)[22m[33m 425[2mms[22m[39m
+ [32m✓[39m tests/query-builder-spec.test.ts [2m([22m[2m24 tests[22m[2m)[22m[32m 69[2mms[22m[39m
+ [32m✓[39m tests/v2-reconciliation-report.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 215[2mms[22m[39m
+ [32m✓[39m tests/site-settings.test.ts [2m([22m[2m37 tests[22m[2m)[22m[32m 40[2mms[22m[39m
+ [2m[90m↓[39m[22m tests/special-records-replay-parity.test.ts [2m([22m[2m19 tests[22m[2m | [22m[33m19 skipped[39m[2m)[22m
+AFLDB-ISSUE-228 S7 Brownlow acquire — season 2025 (CD_S2025014), label afl-api-brownlow-2025-2026-09-20-100800
+  manifest: /tmp/afldb-issue-228-brownlow-acquire-90tstj/data/sources/afl_api/brownlow/afl-api-brownlow-2025-2026-09-20-100800/manifest.json
+AFLDB-ISSUE-228 S7 Brownlow acquire — season 2025 (CD_S2025014), label afl-api-brownlow-2025-2026-09-20-100800-2
+  manifest: /tmp/afldb-issue-228-brownlow-acquire-90tstj/data/sources/afl_api/brownlow/afl-api-brownlow-2025-2026-09-20-100800-2/manifest.json
+AFLDB-ISSUE-228 S7 Brownlow acquire — season 2025 (CD_S2025014), label afl-api-brownlow-2025-2026-09-20-100800-2
+  manifest: /tmp/afldb-issue-228-brownlow-acquire-z89ZlX/data/sources/afl_api/brownlow/afl-api-brownlow-2025-2026-09-20-100800-2/manifest.json
+AFLDB-ISSUE-228 S7 Brownlow acquire — season 2025 (CD_S2025014), label afl-api-brownlow-2025-2026-09-20-100800
+  manifest: /tmp/afldb-issue-228-brownlow-acquire-BZvUdG/data/sources/afl_api/brownlow/afl-api-brownlow-2025-2026-09-20-100800/manifest.json
+AFLDB-ISSUE-228 S7 Brownlow acquire — season 2025 (CD_S2025014), label afl-api-brownlow-2025-2026-09-20-100800
+  manifest: /tmp/afldb-issue-228-brownlow-acquire-uOq0t4/data/sources/afl_api/brownlow/afl-api-brownlow-2025-2026-09-20-100800/manifest.json
+AFLDB-ISSUE-228 S7 Brownlow acquire — season 2025 (CD_S2025014), label afl-api-brownlow-2025-2026-09-20-100800-2
+AFLDB-ISSUE-228 S7 Brownlow acquire — season 2025 (CD_S2025014), label afl-api-brownlow-2025-2026-09-20-100800
+  manifest: /tmp/afldb-issue-228-brownlow-acquire-LrSR3v/data/sources/afl_api/brownlow/afl-api-brownlow-2025-2026-09-20-100800/manifest.json
+AFLDB-ISSUE-228 S7 Brownlow acquire — season 2025 (CD_S2025014), label afl-api-brownlow-2025-2026-09-20-100800
+AFLDB-ISSUE-228 S7 Brownlow acquire — season 2025 (CD_S2025014), label afl-api-brownlow-2025-2026-09-20-100800
+ [32m✓[39m tests/afl-api-brownlow-acquire.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 97[2mms[22m[39m
+ [32m✓[39m tests/v2-brownlow-round-vote-match-backfill.test.ts [2m([22m[2m16 tests[22m[2m)[22m[33m 2999[2mms[22m[39m
+ [32m✓[39m tests/v2-coverage-registry.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 99[2mms[22m[39m
+ [32m✓[39m tests/father-son-reconciliation.test.ts [2m([22m[2m11 tests[22m[2m)[22m[33m 7956[2mms[22m[39m
+     [33m[2m✓[22m[39m a son with 0 listed games and no candidate is a non-player; one with games needs an adjudication [33m 581[2mms[22m[39m
+     [33m[2m✓[22m[39m a father with a state-league or administrator annotation and no candidate is unlinked; a plain games figure needs an adjudication [33m 875[2mms[22m[39m
+     [33m[2m✓[22m[39m a father who matches by name and era but never played for the club's lineage refuses without an adjudication, and an explicit unlinked adjudication is honoured [33m 883[2mms[22m[39m
+     [33m[2m✓[22m[39m the Brisbane Lions lineage admits Fitzroy and Bears games; no other organisation borrows [33m 593[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses an ambiguous son, a stale adjudication, an unused adjudication and a repeated pair [33m 1174[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses a status that disagrees with its profile, a duplicate key, a repeated pair, a pre-draft pick and a bad competition [33m 2345[2mms[22m[39m
+     [33m[2m✓[22m[39m the tracked artefact validates offline through the loader, and its adjudications are exactly the seven recorded [33m 320[2mms[22m[39m
+ [32m✓[39m tests/nl-issue-199-corpus-fix.test.ts [2m([22m[2m28 tests[22m[2m)[22m[33m 2456[2mms[22m[39m
+     [33m[2m✓[22m[39m leaves every non-target row byte-identical at the parsed field level [33m 647[2mms[22m[39m
+ [32m✓[39m tests/fitzroy-acquisition.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 35[2mms[22m[39m
+ [32m✓[39m tests/nl-issue-205-corpus-fix.test.ts [2m([22m[2m15 tests[22m[2m)[22m[33m 2422[2mms[22m[39m
+     [33m[2m✓[22m[39m leaves every non-target row (filler and unrelated decline siblings) byte-identical [33m 663[2mms[22m[39m
+ [32m✓[39m tests/gap029-rookie-selections.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 46[2mms[22m[39m
+ [32m✓[39m tests/query-intent.test.ts [2m([22m[2m47 tests[22m[2m)[22m[32m 46[2mms[22m[39m
+ [32m✓[39m tests/gap029-assembly.test.ts [2m([22m[2m35 tests[22m[2m)[22m[32m 127[2mms[22m[39m
+ [32m✓[39m tests/admin-match-mutations.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 107[2mms[22m[39m
+ [32m✓[39m tests/v2-shadow-target.test.ts [2m([22m[2m72 tests[22m[2m)[22m[32m 54[2mms[22m[39m
+ [32m✓[39m tests/rising-star-source.test.ts [2m([22m[2m33 tests[22m[2m)[22m[33m 3030[2mms[22m[39m
+     [33m[2m✓[22m[39m every stat_line in the canonical file is an integer-valued object keyed within STAT_KEYS [33m 439[2mms[22m[39m
+ [32m✓[39m tests/nl-issue-200-audit-cluster.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 245[2mms[22m[39m
+ [32m✓[39m tests/nl-issue-200-audit-extract.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 89[2mms[22m[39m
+ [32m✓[39m tests/import-role-lock-fixture.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32m✓[39m tests/format.test.ts [2m([22m[2m49 tests[22m[2m)[22m[32m 61[2mms[22m[39m
+ [32m✓[39m tests/captaincies-source.test.ts [2m([22m[2m23 tests[22m[2m)[22m[33m 1750[2mms[22m[39m
+ [32m✓[39m tests/afl-api-lineup-migration.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 37[2mms[22m[39m
+ [32m✓[39m tests/afl-api-match-migration.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 50[2mms[22m[39m
+ [32m✓[39m tests/coach-career-record.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 201[2mms[22m[39m
+ [32m✓[39m tests/v2-isolated-test-target.test.ts [2m([22m[2m27 tests[22m[2m)[22m[32m 51[2mms[22m[39m
+ [32m✓[39m tests/club-comparison.test.ts [2m([22m[2m28 tests[22m[2m)[22m[32m 42[2mms[22m[39m
+ [32m✓[39m tests/admin-brownlow-actions.test.ts [2m([22m[2m32 tests[22m[2m)[22m[32m 77[2mms[22m[39m
+ [32m✓[39m tests/afl-api-lineup-store.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+ [32m✓[39m tests/home-records.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 111[2mms[22m[39m
+ [32m✓[39m tests/brownlow-vote-form-data.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 49[2mms[22m[39m
+ [32m✓[39m tests/brownlow-focus-restore.test.ts [2m([22m[2m29 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32m✓[39m tests/coach-head-to-head-view.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 246[2mms[22m[39m
+ [32m✓[39m tests/afl-api-rounds.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 40[2mms[22m[39m
+ [32m✓[39m tests/gap029-outcome.test.ts [2m([22m[2m20 tests[22m[2m)[22m[33m 379[2mms[22m[39m
+     [33m[2m✓[22m[39m tests/python/gap029_common_contract.py passes (writer exit codes are never trusted; the probe decides; committed states are never called rolled back) [33m 346[2mms[22m[39m
+ [32m✓[39m tests/under-22-importer.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 714[2mms[22m[39m
+     [33m[2m✓[22m[39m makes every destructive awards reload restore the independent team data [33m 692[2mms[22m[39m
+ [32m✓[39m tests/hall-of-fame-source.test.ts [2m([22m[2m24 tests[22m[2m)[22m[33m 1992[2mms[22m[39m
+ [32m✓[39m tests/player-links-page.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 167[2mms[22m[39m
+ [32m✓[39m tests/honours-lifecycle-public-contract.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+ [32m✓[39m tests/v2-acquisition-replay.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 139[2mms[22m[39m
+ [32m✓[39m tests/admin-access-actions.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 60[2mms[22m[39m
+ [32m✓[39m tests/honour-teams-source.test.ts [2m([22m[2m22 tests[22m[2m)[22m[33m 1786[2mms[22m[39m
+ [32m✓[39m tests/admin-awards-hall-of-fame-years.test.ts [2m([22m[2m42 tests[22m[2m)[22m[32m 57[2mms[22m[39m
+ [32m✓[39m tests/special-records-public-filter-contract.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 47[2mms[22m[39m
+ [32m✓[39m tests/height-reconciliation.test.ts [2m([22m[2m14 tests[22m[2m)[22m[33m 3685[2mms[22m[39m
+     [33m[2m✓[22m[39m maps on club + games + goals + exact season set + the source name [33m 309[2mms[22m[39m
+     [33m[2m✓[22m[39m folds the renamed clubs into the register club, and refuses an unknown one [33m 620[2mms[22m[39m
+     [33m[2m✓[22m[39m fails closed when the facts fit but the name is spelled differently [33m 330[2mms[22m[39m
+     [33m[2m✓[22m[39m separates two same-name players at one club by their facts, and refuses when it cannot [33m 611[2mms[22m[39m
+     [33m[2m✓[22m[39m is unmatched when a game count differs (a current player without the in-season rows) [33m 301[2mms[22m[39m
+     [33m[2m✓[22m[39m rejects differing goals with otherwise identical facts/name, including literal blank register Goals [33m 304[2mms[22m[39m
+ [32m✓[39m tests/player-identity-source.test.ts [2m([22m[2m20 tests[22m[2m)[22m[33m 1233[2mms[22m[39m
+ [32m✓[39m tests/coach-comparison-career.test.ts [2m([22m[2m17 tests[22m[2m)[22m[33m 337[2mms[22m[39m
+ [32m✓[39m tests/rising-star-winners-source.test.ts [2m([22m[2m27 tests[22m[2m)[22m[33m 3175[2mms[22m[39m
+ [32m✓[39m tests/player-family-card.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 49[2mms[22m[39m
+ [32m✓[39m tests/v2-brownlow-production-correction.test.ts [2m([22m[2m23 tests[22m[2m | [22m[33m2 skipped[39m[2m)[22m[32m 125[2mms[22m[39m
+ [32m✓[39m tests/nl-finals-without-premiership-corpus-fix.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 1783[2mms[22m[39m
+     [33m[2m✓[22m[39m leaves every non-target row byte-identical [33m 657[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses a target whose before-state is not the audited answer/value/tie [33m 302[2mms[22m[39m
+ [32m✓[39m tests/admin-club-leadership-actions.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32m✓[39m tests/award-definitions-source.test.ts [2m([22m[2m24 tests[22m[2m)[22m[33m 1644[2mms[22m[39m
+ [32m✓[39m tests/nl-issue-201-corpus-fix.test.ts [2m([22m[2m17 tests[22m[2m)[22m[33m 1713[2mms[22m[39m
+     [33m[2m✓[22m[39m leaves every non-target row byte-identical at the parsed field level [33m 637[2mms[22m[39m
+ [32m✓[39m tests/club-records-sections.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 108[2mms[22m[39m
+ [32m✓[39m tests/nl-feedback.test.ts [2m([22m[2m42 tests[22m[2m)[22m[32m 62[2mms[22m[39m
+ [32m✓[39m tests/admin-coach-actions.test.ts [2m([22m[2m25 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32m✓[39m tests/nl-search-log.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 36[2mms[22m[39m
+ [32m✓[39m tests/grid-solver-spec.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 54[2mms[22m[39m
+ [32m✓[39m tests/venue-records-sections.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 111[2mms[22m[39m
+ [32m✓[39m tests/email-intake-route.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 34[2mms[22m[39m
+ [32m✓[39m tests/afl-api-c7-observation.test.ts [2m([22m[2m38 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+ [32m✓[39m tests/finals-semantics-contract.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 30[2mms[22m[39m
+ [32m✓[39m tests/unit/qualifying-matches-gate.test.ts [2m([22m[2m28 tests[22m[2m)[22m[32m 33[2mms[22m[39m
+ [32m✓[39m tests/grid-solver-timeout.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+ [32m✓[39m tests/admin-nl-search-actions.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 52[2mms[22m[39m
+ [32m✓[39m tests/executable-statements.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 131[2mms[22m[39m
+ [32m✓[39m tests/special-records-identity.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 111[2mms[22m[39m
+ [32m✓[39m tests/match-spec.test.ts [2m([22m[2m24 tests[22m[2m)[22m[32m 28[2mms[22m[39m
+ [32m✓[39m tests/player-coaching-career.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 124[2mms[22m[39m
+ [32m✓[39m tests/coaches.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 155[2mms[22m[39m
+ [32m✓[39m tests/family-records-surfaces.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 215[2mms[22m[39m
+ [32m✓[39m tests/table-filters.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+ [32m✓[39m tests/club-list-sources.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 1206[2mms[22m[39m
+ [32m✓[39m tests/under-22-source.test.ts [2m([22m[2m12 tests[22m[2m)[22m[33m 1033[2mms[22m[39m
+ [32m✓[39m tests/early-access-questions.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+ [32m✓[39m tests/brownlow-provider-team-club-map.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 38[2mms[22m[39m
+ [32m✓[39m tests/draft-linkage-invariants.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m tests/issue333-coach-row-selector.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 80[2mms[22m[39m
+ [32m✓[39m tests/edit-spec.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 27[2mms[22m[39m
+ [32m✓[39m tests/audit-link-fk-indexes.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m tests/club-premierships.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 109[2mms[22m[39m
+ [32m✓[39m tests/afl-api-ingestion-control.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 32[2mms[22m[39m
+ [32m✓[39m tests/club-coach-records.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 94[2mms[22m[39m
+ [32m✓[39m tests/gap029-captaincy-additions.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32m✓[39m tests/like.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m tests/migration-checksum.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m tests/audit-afl-api-brownlow-canonical-equality.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m tests/nl-player-career-metric-guard.test.ts [2m([22m[2m31 tests[22m[2m)[22m[32m 36[2mms[22m[39m
+ [32m✓[39m tests/match-lineup-editor.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m tests/csv.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m tests/admin-settings-actions.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 42[2mms[22m[39m
+ [32m✓[39m tests/player-after-siren-events.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 44[2mms[22m[39m
+[90mstderr[2m | tests/search-rate-limit.test.ts[2m > [22m[2mrunNlSearchWithRateLimit[2m > [22m[2mfails open if IP resolution or the limiter throws
+[22m[39m[search] rate limiter unavailable; failing open Error: headers unavailable
+    at [90m/mnt/ssd/afldb-rem4-qual-20261115/cand/[39mtests/search-rate-limit.test.ts:76:39
+    at [90mfile:///mnt/ssd/afldb-rem4-qual-20261115/cand/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:302:11
+    at [90mfile:///mnt/ssd/afldb-rem4-qual-20261115/cand/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:1903:26
+    at [90mfile:///mnt/ssd/afldb-rem4-qual-20261115/cand/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel [90m(file:///mnt/ssd/afldb-rem4-qual-20261115/cand/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2323:10[90m)[39m
+    at [90mfile:///mnt/ssd/afldb-rem4-qual-20261115/cand/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///mnt/ssd/afldb-rem4-qual-20261115/cand/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2272:10[90m)[39m
+    at [90mfile:///mnt/ssd/afldb-rem4-qual-20261115/cand/[39mnode_modules/[4m@vitest/runner[24m/dist/chunk-artifact.js:2955:64
+
+[90mstderr[2m | tests/search-rate-limit.test.ts[2m > [22m[2mrunNlSearchWithRateLimit[2m > [22m[2mfails open if the limiter check itself throws
+[22m[39m[search] rate limiter unavailable; failing open Error: limiter unavailable
+    at Object.<anonymous> [90m(/mnt/ssd/afldb-rem4-qual-20261115/cand/[39mtests/search-rate-limit.test.ts:90:13[90m)[39m
+    at Object.Mock [as check] [90m(file:///mnt/ssd/afldb-rem4-qual-20261115/cand/[39mnode_modules/[4m@vitest/spy[24m/dist/index.js:332:34[90m)[39m
+    at RateLimiter.check [90m(/mnt/ssd/afldb-rem4-qual-20261115/cand/[39mtests/search-rate-limit.test.ts:18:20[90m)[39m
+    at Module.runNlSearchWithRateLimit [90m(/mnt/ssd/afldb-rem4-qual-20261115/cand/[39msrc/app/search/rate-limit.ts:17:25[90m)[39m
+[90m    at processTicksAndRejections (node:internal/process/task_queues:103:5)[39m
+    at [90m/mnt/ssd/afldb-rem4-qual-20261115/cand/[39mtests/search-rate-limit.test.ts:94:20
+
+ [32m✓[39m tests/search-rate-limit.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 32[2mms[22m[39m
+ [32m✓[39m tests/advanced-spec.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m tests/player-compare.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m tests/health-event-route.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32m✓[39m tests/playwright-timeout-policy.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32m✓[39m tests/expandable-table-frame.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32m✓[39m tests/indexing.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m tests/afl-api-adjudication-actions-contract.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m tests/v2-gap029-label-checks.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m tests/unit/NlAnswerSection.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 61[2mms[22m[39m
+ [32m✓[39m tests/rate-limit.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 27[2mms[22m[39m
+ [32m✓[39m tests/afl-api-page-table-wrap-contract.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m tests/after-siren-format.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m tests/award-stat-line.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m tests/nl-head-to-head-describe.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 36[2mms[22m[39m
+ [32m✓[39m tests/nl-answer-feedback-boundary.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 40[2mms[22m[39m
+ [32m✓[39m tests/unit/sorting.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m tests/import-role-parity.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m tests/coach-comparison-url.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+[90mstderr[2m | tests/census-afl-api-brownlow-identities.test.ts
+[22m[39mENOENT: no such file or directory, open '/mnt/ssd/afldb-rem4-qual-20261115/cand/data/sources/AFLWebsite/BrownlowSamples/brownlow-samples/2025/01-brownlow-season.raw.json'
+
+ [32m✓[39m tests/census-afl-api-brownlow-identities.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m tests/aflw-match-outcome-guard.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m tests/coach-slug.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m tests/grid-solver-under22.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m tests/nl-expanded-ui-corpus-generator.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32m✓[39m tests/admin-match-input.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m tests/v2-acquisition-pipeline.test.ts[2m > [22m(e) docs/v2/architecture.md §9 is the rendered stage map[2m > [22mequals renderAflApiStageMap output
+[31m[1mAssertionError[22m: docs/v2/architecture.md §9 is stale: run `npx tsx tools/v2/acquisition-stage-map.ts --write`: expected '| Stage | Location | Symbol | Writes …' to be '| Stage | Location | Symbol | Writes …' // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[33m@@ -66,6 +66,6 @@[39m
+[2m  | derive | `src/lib/acquisition/settle-core.ts:297` | `runDerivedRecomputeWithDeadlockRetry` | derived |[22m
+[2m  | derive | `src/db/queries/player-derived.ts:47` | `recomputePlayerDerivedStats` | derived |[22m
+[2m  | derive | `src/db/queries/player-derived.ts:425` | `recomputeClubSeasons` | derived |[22m
+[2m  | derive | `src/db/queries/player-derived.ts:527` | `recomputeSeasonMetadata` | derived |[22m
+[2m  | derive | `src/db/queries/player-derived.ts:379` | `recomputeSeasonBrownlowStatus` | derived |[22m
+[32m- | derive | `src/db/queries/player-derived.ts:7[7m3[27m0` | `recomputeBrownlowCoverage` | derived |[39m
+[31m+ | derive | `src/db/queries/player-derived.ts:[7m6[27m70` | `recomputeBrownlowCoverage` | derived |[39m
+
+[36m [2m❯[22m tests/v2-acquisition-pipeline.test.ts:[2m380:7[22m[39m
+    [90m378|[39m       [34mextractStageMap[39m(document)[33m,[39m
+    [90m379|[39m       'docs/v2/architecture.md §9 is stale: run `npx tsx tools/v2/acqu…
+    [90m380|[39m     )[33m.[39m[34mtoBe[39m([34mrenderAflApiStageMap[39m(diskReader))[33m;[39m
+    [90m   |[39m       [31m^[39m
+    [90m381|[39m   })[33m;[39m
+    [90m382|[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m214 passed[39m[22m[2m | [22m[33m1 skipped[39m[90m (216)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m12296 passed[39m[22m[2m | [22m[33m25 skipped[39m[90m (12322)[39m
+[2m   Start at [22m 15:05:55
+[2m   Duration [22m 642.93s[2m (transform 21.48s, setup 12.46s, import 128.72s, tests 450.32s, environment 56ms)[22m
+
+JSON report written to /mnt/ssd/afldb-rem4-qual-20261115/evidence/unit-allfix.json
+unit-allfix rc=1

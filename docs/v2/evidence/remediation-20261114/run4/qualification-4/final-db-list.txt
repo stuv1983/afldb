@@ -1,0 +1,17 @@
+== databases in the cluster (name, size)
+afldb_v2_brownlow_policy_final_test	marked	403201047
+afldb_v2_brownlow_tristate_twelve_test	marked	400923671
+afldb_v2_rb_rem4q_test	marked	361618455
+afldb_v2_rem4qual_app_test	marked	407141399
+afldb_v2_rem4qual_bl2025_tmpl_test	marked	395541527
+afldb_v2_rem4qual_r_pf_base_test	marked	296442903
+afldb_v2_rem4qual_r_sh_test	marked	325745687
+afldb_v2_rem4qual_rb3ref_test	marked	288218135
+afldb_v2_rem4qual_rb_tmpl_test	marked	288218135
+afldb_v2_rem4qual_rbb_tmpl_test	marked	296442903
+afldb_v2_rem4qual_s_pf_base_test	marked	407141399
+afldb_v2_rem4qual_s_sh_test	marked	436558871
+afldb_v2_rem4qual_snap_tmpl_test	marked	407141399
+postgres	unmarked	7691287
+== per-file databases remaining (afldb_v2_pf_*): 0
+== code_test_db present: 0

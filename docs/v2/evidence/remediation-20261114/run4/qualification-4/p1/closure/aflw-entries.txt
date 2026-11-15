@@ -1,0 +1,13 @@
+next.config.ts
+src/app/aflw/clubs/[code]/page.tsx
+src/app/aflw/clubs/page.tsx
+src/app/aflw/matches/[key]/page.tsx
+src/app/aflw/match-search/page.tsx
+src/app/aflw/page.tsx
+src/app/aflw/players/page.tsx
+src/app/aflw/players/[slug]/page.tsx
+src/app/aflw/seasons/[key]/page.tsx
+src/app/aflw/seasons/page.tsx
+src/app/aflw/venues/page.tsx
+src/app/layout.tsx
+src/middleware.ts

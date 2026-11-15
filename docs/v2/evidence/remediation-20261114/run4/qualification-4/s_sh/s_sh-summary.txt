@@ -1,0 +1,15 @@
+⎯⎯⎯⎯⎯⎯ Failed Tests 15 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  9 failed | 85 passed | 6 skipped (100)
+      Tests  15 failed | 3518 passed | 2 expected fail | 113 skipped (3671)
+   Duration  1580.35s (transform 12.19s, setup 5.94s, import 266.67s, tests 1284.00s, environment 26ms)
+s_sh failing ids: 18 (3 file-level)
+files total=100 by status={"passed":91,"failed":9}
+file-level failures (status failed with zero failed assertions)=3
+tests total=3671 passed=3520 failed=15 pending=113 todo=0
+assertion statuses={"passed":3520,"failed":15,"skipped":113,"pending":23}
+wall ms=1580387.4240722656 (26.3 min)
+# order (JSON completion order): n<TAB>file<TAB>status<TAB>file duration ms<TAB>assertions
+s_sh files in execution order: 100
+s_sh table-count rows changed by the run: 2 (see s_sh.table-counts.diff)
+fixtures rows before: 218
+fixtures rows after:  218

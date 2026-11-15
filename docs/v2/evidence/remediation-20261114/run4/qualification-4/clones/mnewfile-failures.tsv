@@ -1,0 +1,2 @@
+tests/integration/club-comparison.test.ts	club comparison: club Brownlow history excludes ambiguous multi-club seasons and discloses them instead of forcing them	AssertionError: expected false to be true // Object.is equality
+tests/integration/club-comparison.test.ts	club comparison: club Brownlow history exposes selected-season Brownlow coverage without presenting a partial total	AssertionError: expected 0 to be greater than 0

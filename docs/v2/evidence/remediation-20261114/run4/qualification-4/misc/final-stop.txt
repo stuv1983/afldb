@@ -1,0 +1,10 @@
+date 2026-11-15T05:33:50Z
+cand HEAD=1f7b0d717b37e98432716d6b9170fbd45142ab63 porcelain=0
+rb   HEAD=1f7b0d717b37e98432716d6b9170fbd45142ab63 porcelain=0
+waiting for server to shut down.... done
+server stopped
+listeners on 55687 (ss -ltn): 0
+no listener on :55687
+arm processes whose command line names /mnt/ssd/afldb-rem4-qual-20261115 (excluding this check): 1
+33491 tee /mnt/ssd/afldb-rem4-qual-20261115/evidence/final-stop.txt
+du: 5.4G	/mnt/ssd/afldb-rem4-qual-20261115 5.0G	/mnt/ssd/afldb-rem4-qual-20261115-pg 

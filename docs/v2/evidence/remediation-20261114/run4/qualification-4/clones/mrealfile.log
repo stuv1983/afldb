@@ -1,0 +1,82 @@
+isolated-pg: afldb_v2_rem4qual_mrealfile_test verified (cluster afldb_v2_isolated, 127.0.0.1:55687); running node
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-qual-20261115/cand[39m
+
+[90mstdout[2m | tests/integration/club-comparison.test.ts[2m > [22m[2mclub comparison: long rivalry performance
+[22m[39m┌─────────┬────────────────────────────────────┬──────────────────────────────────────┬──────┬────────┬───────────┬────────┐
+│ (index) │ group                              │ label                                │ runs │ min_ms │ median_ms │ max_ms │
+├─────────┼────────────────────────────────────┼──────────────────────────────────────┼──────┼────────┼───────────┼────────┤
+│ 0       │ [32m'adelaide/brisbane-lions'[39m          │ [32m'getHeadToHeadSummary'[39m               │ [33m5[39m    │ [33m6[39m      │ [33m6.3[39m       │ [33m6.9[39m    │
+│ 1       │ [32m'adelaide/brisbane-lions'[39m          │ [32m'getHeadToHeadMeetings (page 1)'[39m     │ [33m5[39m    │ [33m11.1[39m   │ [33m11.7[39m      │ [33m12.7[39m   │
+│ 2       │ [32m'adelaide/brisbane-lions'[39m          │ [32m'getHeadToHeadMeetings (finals)'[39m     │ [33m5[39m    │ [33m14.3[39m   │ [33m27.5[39m      │ [33m29.1[39m   │
+│ 3       │ [32m'adelaide/brisbane-lions'[39m          │ [32m'getHeadToHeadVenueRecords'[39m          │ [33m5[39m    │ [33m5.7[39m    │ [33m6.5[39m       │ [33m6.9[39m    │
+│ 4       │ [32m'adelaide/brisbane-lions'[39m          │ [32m'getHeadToHeadRecords'[39m               │ [33m5[39m    │ [33m7.9[39m    │ [33m9[39m         │ [33m14.1[39m   │
+│ 5       │ [32m'adelaide/brisbane-lions'[39m          │ [32m'getHeadToHeadStreaks'[39m               │ [33m5[39m    │ [33m5.8[39m    │ [33m5.9[39m       │ [33m6.7[39m    │
+│ 6       │ [32m'adelaide/brisbane-lions'[39m          │ [32m'getCrossoverPlayers'[39m                │ [33m5[39m    │ [33m8.6[39m    │ [33m11.6[39m      │ [33m16.1[39m   │
+│ 7       │ [32m'adelaide/brisbane-lions'[39m          │ [32m'getCrossoverSummary'[39m                │ [33m5[39m    │ [33m12.9[39m   │ [33m16.2[39m      │ [33m19.3[39m   │
+│ 8       │ [32m'adelaide/brisbane-lions'[39m          │ [32m'getHeadToHeadPlayerLeaders'[39m         │ [33m5[39m    │ [33m18.1[39m   │ [33m28.5[39m      │ [33m40.1[39m   │
+│ 9       │ [32m'adelaide/brisbane-lions'[39m          │ [32m'getHeadToHeadBrownlow'[39m              │ [33m5[39m    │ [33m35.8[39m   │ [33m51.7[39m      │ [33m63.8[39m   │
+│ 10      │ [32m'adelaide/brisbane-lions'[39m          │ [32m'getClubBrownlowHistory (A)'[39m         │ [33m5[39m    │ [33m231.4[39m  │ [33m232.5[39m     │ [33m236.6[39m  │
+│ 11      │ [32m'adelaide/brisbane-lions'[39m          │ [32m'getClubBrownlowHistory (B)'[39m         │ [33m5[39m    │ [33m202.2[39m  │ [33m203.5[39m     │ [33m207.8[39m  │
+│ 12      │ [32m'carlton/collingwood'[39m              │ [32m'getHeadToHeadSummary'[39m               │ [33m5[39m    │ [33m8.2[39m    │ [33m8.9[39m       │ [33m16.6[39m   │
+│ 13      │ [32m'carlton/collingwood'[39m              │ [32m'getHeadToHeadMeetings (page 1)'[39m     │ [33m5[39m    │ [33m13.6[39m   │ [33m16.4[39m      │ [33m18.2[39m   │
+│ 14      │ [32m'carlton/collingwood'[39m              │ [32m'getHeadToHeadMeetings (finals)'[39m     │ [33m5[39m    │ [33m17.4[39m   │ [33m26[39m        │ [33m28.4[39m   │
+│ 15      │ [32m'carlton/collingwood'[39m              │ [32m'getHeadToHeadVenueRecords'[39m          │ [33m5[39m    │ [33m7.9[39m    │ [33m13.5[39m      │ [33m13.9[39m   │
+│ 16      │ [32m'carlton/collingwood'[39m              │ [32m'getHeadToHeadRecords'[39m               │ [33m5[39m    │ [33m18.4[39m   │ [33m20.2[39m      │ [33m22.5[39m   │
+│ 17      │ [32m'carlton/collingwood'[39m              │ [32m'getHeadToHeadStreaks'[39m               │ [33m5[39m    │ [33m13.8[39m   │ [33m13.9[39m      │ [33m15[39m     │
+│ 18      │ [32m'carlton/collingwood'[39m              │ [32m'getCrossoverPlayers'[39m                │ [33m5[39m    │ [33m19.4[39m   │ [33m21.9[39m      │ [33m22.4[39m   │
+│ 19      │ [32m'carlton/collingwood'[39m              │ [32m'getCrossoverSummary'[39m                │ [33m5[39m    │ [33m21.9[39m   │ [33m24[39m        │ [33m30.6[39m   │
+│ 20      │ [32m'carlton/collingwood'[39m              │ [32m'getHeadToHeadPlayerLeaders'[39m         │ [33m5[39m    │ [33m24.9[39m   │ [33m30.1[39m      │ [33m58.4[39m   │
+│ 21      │ [32m'carlton/collingwood'[39m              │ [32m'getHeadToHeadBrownlow'[39m              │ [33m5[39m    │ [33m63[39m     │ [33m72[39m        │ [33m86.4[39m   │
+│ 22      │ [32m'carlton/collingwood'[39m              │ [32m'getClubBrownlowHistory (A)'[39m         │ [33m5[39m    │ [33m236.3[39m  │ [33m238[39m       │ [33m239.8[39m  │
+│ 23      │ [32m'carlton/collingwood'[39m              │ [32m'getClubBrownlowHistory (B)'[39m         │ [33m5[39m    │ [33m204.9[39m  │ [33m205.8[39m     │ [33m239.5[39m  │
+│ 24      │ [32m'adelaide 2026'[39m                    │ [32m'getSeasonIdentity'[39m                  │ [33m5[39m    │ [33m2[39m      │ [33m2.4[39m       │ [33m3.7[39m    │
+│ 25      │ [32m'adelaide 2026'[39m                    │ [32m'getClubSeasonRecord'[39m                │ [33m5[39m    │ [33m0.9[39m    │ [33m0.9[39m       │ [33m1.4[39m    │
+│ 26      │ [32m'adelaide 2026'[39m                    │ [32m'getClubSeasonTeamMetrics'[39m           │ [33m5[39m    │ [33m4.2[39m    │ [33m6.7[39m       │ [33m10.4[39m   │
+│ 27      │ [32m'adelaide 2026'[39m                    │ [32m'getClubSeasonPlayerLeaders'[39m         │ [33m5[39m    │ [33m4.2[39m    │ [33m5.2[39m       │ [33m6[39m      │
+│ 28      │ [32m'adelaide 2026'[39m                    │ [32m'getClubSeasonBrownlowSummary'[39m       │ [33m5[39m    │ [33m6.6[39m    │ [33m6.6[39m       │ [33m6.7[39m    │
+│ 29      │ [32m'adelaide 2026'[39m                    │ [32m'getClubSeasonComparison (composed)'[39m │ [33m5[39m    │ [33m8.7[39m    │ [33m12[39m        │ [33m17.1[39m   │
+│ 30      │ [32m'brisbane-lions 2026'[39m              │ [32m'getSeasonIdentity'[39m                  │ [33m5[39m    │ [33m1.9[39m    │ [33m3.6[39m       │ [33m3.7[39m    │
+│ 31      │ [32m'brisbane-lions 2026'[39m              │ [32m'getClubSeasonRecord'[39m                │ [33m5[39m    │ [33m0.7[39m    │ [33m0.7[39m       │ [33m0.9[39m    │
+│ 32      │ [32m'brisbane-lions 2026'[39m              │ [32m'getClubSeasonTeamMetrics'[39m           │ [33m5[39m    │ [33m3.8[39m    │ [33m3.8[39m       │ [33m4.2[39m    │
+│ 33      │ [32m'brisbane-lions 2026'[39m              │ [32m'getClubSeasonPlayerLeaders'[39m         │ [33m5[39m    │ [33m2.2[39m    │ [33m2.3[39m       │ [33m2.6[39m    │
+│ 34      │ [32m'brisbane-lions 2026'[39m              │ [32m'getClubSeasonBrownlowSummary'[39m       │ [33m5[39m    │ [33m3.2[39m    │ [33m4.8[39m       │ [33m7.9[39m    │
+│ 35      │ [32m'brisbane-lions 2026'[39m              │ [32m'getClubSeasonComparison (composed)'[39m │ [33m5[39m    │ [33m7.2[39m    │ [33m7.5[39m       │ [33m15.4[39m   │
+│ 36      │ [32m'max season 2027 (0 participants)'[39m │ [32m'getMaximumComparisonSeason'[39m         │ [33m5[39m    │ [33m0.9[39m    │ [33m1.3[39m       │ [33m1.7[39m    │
+│ 37      │ [32m'max season 2027 (0 participants)'[39m │ [32m'getComparisonSeasons'[39m               │ [33m5[39m    │ [33m2.3[39m    │ [33m2.7[39m       │ [33m6.5[39m    │
+│ 38      │ [32m'max season 2027 (0 participants)'[39m │ [32m'getSeasonParticipants'[39m              │ [33m5[39m    │ [33m2.2[39m    │ [33m3.5[39m       │ [33m3.6[39m    │
+│ 39      │ [32m'max season 2027 (0 participants)'[39m │ [32m'getClubSeasonComparison (composed)'[39m │ [33m5[39m    │ [33m6.8[39m    │ [33m8.6[39m       │ [33m11.3[39m   │
+│ 40      │ [32m'adelaide/brisbane-lions'[39m          │ [32m'getHeadToHeadByDecade'[39m              │ [33m5[39m    │ [33m12.3[39m   │ [33m12.3[39m      │ [33m12.4[39m   │
+│ 41      │ [32m'adelaide/brisbane-lions'[39m          │ [32m'getHeadToHeadPeriodRecords'[39m         │ [33m5[39m    │ [33m9.8[39m    │ [33m11.2[39m      │ [33m12.8[39m   │
+│ 42      │ [32m'adelaide/brisbane-lions'[39m          │ [32m'getHeadToHeadPlayerAverages'[39m        │ [33m5[39m    │ [33m54.3[39m   │ [33m60.9[39m      │ [33m71[39m     │
+│ 43      │ [32m'carlton/collingwood'[39m              │ [32m'getHeadToHeadByDecade'[39m              │ [33m5[39m    │ [33m8.8[39m    │ [33m12.1[39m      │ [33m12.9[39m   │
+│ 44      │ [32m'carlton/collingwood'[39m              │ [32m'getHeadToHeadPeriodRecords'[39m         │ [33m5[39m    │ [33m29.1[39m   │ [33m31.6[39m      │ [33m39.6[39m   │
+│ 45      │ [32m'carlton/collingwood'[39m              │ [32m'getHeadToHeadPlayerAverages'[39m        │ [33m5[39m    │ [33m84.1[39m   │ [33m106.5[39m     │ [33m118[39m    │
+│ 46      │ [32m'adelaide/brisbane-lions'[39m          │ [32m'extended-rivalry parallel group'[39m    │ [33m5[39m    │ [33m31.6[39m   │ [33m32.5[39m      │ [33m37.6[39m   │
+│ 47      │ [32m'carlton/collingwood'[39m              │ [32m'extended-rivalry parallel group'[39m    │ [33m5[39m    │ [33m91.3[39m   │ [33m93.6[39m      │ [33m100.5[39m  │
+│ 48      │ [32m'adelaide/brisbane-lions'[39m          │ [32m'H2H parallel group'[39m                 │ [33m5[39m    │ [33m36.6[39m   │ [33m37.3[39m      │ [33m42.5[39m   │
+│ 49      │ [32m'adelaide/brisbane-lions'[39m          │ [32m'selected-season parallel group'[39m     │ [33m5[39m    │ [33m8.2[39m    │ [33m8.9[39m       │ [33m11.1[39m   │
+│ 50      │ [32m'carlton/collingwood'[39m              │ [32m'H2H parallel group'[39m                 │ [33m5[39m    │ [33m72.8[39m   │ [33m83.4[39m      │ [33m97[39m     │
+│ 51      │ [32m'carlton/collingwood'[39m              │ [32m'selected-season parallel group'[39m     │ [33m5[39m    │ [33m10.9[39m   │ [33m11.9[39m      │ [33m15.7[39m   │
+│ 52      │ [32m'adelaide/brisbane-lions'[39m          │ [32m'route-equivalent composed load'[39m     │ [33m5[39m    │ [33m294.5[39m  │ [33m298.7[39m     │ [33m326.2[39m  │
+│ 53      │ [32m'carlton/collingwood'[39m              │ [32m'route-equivalent composed load'[39m     │ [33m5[39m    │ [33m322.9[39m  │ [33m325.8[39m     │ [33m334.5[39m  │
+└─────────┴────────────────────────────────────┴──────────────────────────────────────┴──────┴────────┴───────────┴────────┘
+
+ [32m✓[39m tests/integration/club-comparison.test.ts [2m([22m[2m70 tests[22m[2m)[22m[33m 23758[2mms[22m[39m
+     [33m[2m✓[22m[39m lists everyone who represented both organisations, agreeing with independent SQL [33m 657[2mms[22m[39m
+     [33m[2m✓[22m[39m reports Ben Keays as Brisbane Lions first, then Adelaide, in both argument orders [33m 608[2mms[22m[39m
+     [33m[2m✓[22m[39m treats Footscray and Western Bulldogs as one continuing organisation [33m 620[2mms[22m[39m
+     [33m[2m✓[22m[39m summarises the first and most recent players to complete both representations [33m 594[2mms[22m[39m
+     [33m[2m✓[22m[39m keeps every warm H2H query under the query ceiling for both rivalry scales [33m 9321[2mms[22m[39m
+     [33m[2m✓[22m[39m keeps every warm selected-season query under the query ceiling [33m 399[2mms[22m[39m
+     [33m[2m✓[22m[39m keeps every warm Stage 6 extended-rivalry query under the query ceiling [33m 1662[2mms[22m[39m
+     [33m[2m✓[22m[39m keeps the parallel Stage 6 extended-rivalry group under the group ceiling [33m 911[2mms[22m[39m
+     [33m[2m✓[22m[39m keeps each independent parallel query group under the group ceiling [33m 1028[2mms[22m[39m
+     [33m[2m✓[22m[39m keeps the route-equivalent composed data load under the route ceiling [33m 4424[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m70 passed[39m[22m[90m (70)[39m
+[2m   Start at [22m 16:31:08
+[2m   Duration [22m 24.88s[2m (transform 492ms, setup 175ms, import 579ms, tests 23.76s, environment 0ms)[22m
+
+JSON report written to /mnt/ssd/afldb-rem4-qual-20261115/evidence/clones/mrealfile.json

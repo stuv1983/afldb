@@ -1,0 +1,156 @@
+##### bridge start 2026-11-15T02:02:19Z HEAD=1f7b0d71 porcelain-before=0
+create-db: afldb_v2_rem4qual_rbb_tmpl_test created from afldb_v2_rem4qual_rb_tmpl_test and marked
+2026-11-15T02:03:01Z bridge import rc=0
+2026-11-15T02:03:04Z bridge: ANALYZE after import (planner statistics only)
+draft_picks=6810 draft_persons=5057 bridge_identities=3559
+tcounts afldb_v2_rem4qual_rbb_tmpl_test: 83 tables -> /mnt/ssd/afldb-rem4-qual-20261115/evidence/rb-bridged-template.table-counts.tsv
+bridged vs pristine restored counts (expect only import_batches +1):
+50c50
+< import_batches	26
+---
+> import_batches	27
+Stage A absent from /mnt/ssd/afldb-rem4-qual-20261115/cand
+##### bridge end 2026-11-15T02:03:05Z rc=0 porcelain-after=0
+##### static start 2026-11-15T02:03:05Z HEAD=1f7b0d71 porcelain-before=0
+typecheck rc=0
+lint:gate rc=0
+Lint gate (ratchet): 338 error(s) in 43 file(s) now; the ratchet baseline allows 338 in 43 (existing debt, not clean lint).
+Lint gate: PASSED (ratchet; existing debt remains).
+lint:gate rc=0
+##### static end 2026-11-15T02:07:02Z rc=0 porcelain-after=0
+##### s_pf start 2026-11-15T02:07:02Z HEAD=1f7b0d71 porcelain-before=0
+create-db: afldb_v2_rem4qual_s_pf_base_test created from afldb_v2_rem4qual_snap_tmpl_test and marked
+tcounts afldb_v2_rem4qual_s_pf_base_test: 83 tables -> /mnt/ssd/afldb-rem4-qual-20261115/evidence/s_pf-base-before.table-counts.tsv
+2026-11-15T02:07:05Z s_pf start: per-file (AFLDB_TEST_PER_FILE_DB=all) base=afldb_v2_rem4qual_s_pf_base_test template=afldb_v2_rem4qual_snap_tmpl_test bridge=0
+s_pf rc=1
+2026-11-15T02:39:02Z s_pf end rc=1
+⎯⎯⎯⎯⎯⎯ Failed Tests 15 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  9 failed | 85 passed | 6 skipped (100)
+      Tests  15 failed | 3518 passed | 2 expected fail | 113 skipped (3671)
+   Duration  1914.99s (transform 12.69s, setup 206.74s, import 294.42s, tests 1390.03s, environment 26ms)
+s_pf failing ids: 18 (3 file-level)
+files total=100 by status={"passed":91,"failed":9}
+file-level failures (status failed with zero failed assertions)=3
+tests total=3671 passed=3520 failed=15 pending=113 todo=0
+assertion statuses={"passed":3520,"failed":15,"skipped":113,"pending":23}
+wall ms=1914013.6840820312 (31.9 min)
+# order (JSON completion order): n<TAB>file<TAB>status<TAB>file duration ms<TAB>assertions
+s_pf files in execution order: 100
+per-file DBs left: 1
+tcounts afldb_v2_rem4qual_s_pf_base_test: 83 tables -> /mnt/ssd/afldb-rem4-qual-20261115/evidence/s_pf-base-after.table-counts.tsv
+base table counts unchanged by the run
+##### s_pf end 2026-11-15T02:39:04Z rc=0 porcelain-after=0
+##### r_pf start 2026-11-15T02:39:04Z HEAD=1f7b0d71 porcelain-before=0
+create-db: afldb_v2_rem4qual_r_pf_base_test created from afldb_v2_rem4qual_rbb_tmpl_test and marked
+tcounts afldb_v2_rem4qual_r_pf_base_test: 83 tables -> /mnt/ssd/afldb-rem4-qual-20261115/evidence/r_pf-base-before.table-counts.tsv
+2026-11-15T02:39:07Z r_pf start: per-file (AFLDB_TEST_PER_FILE_DB=all) base=afldb_v2_rem4qual_r_pf_base_test template=afldb_v2_rem4qual_rbb_tmpl_test bridge=1
+r_pf rc=1
+2026-11-15T03:09:22Z r_pf end rc=1
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  5 failed | 89 passed | 6 skipped (100)
+      Tests  4 failed | 3529 passed | 2 expected fail | 113 skipped (3671)
+   Duration  1813.04s (transform 12.85s, setup 150.77s, import 303.08s, tests 1335.39s, environment 26ms)
+r_pf failing ids: 7 (3 file-level)
+files total=100 by status={"passed":95,"failed":5}
+file-level failures (status failed with zero failed assertions)=3
+tests total=3671 passed=3531 failed=4 pending=113 todo=0
+assertion statuses={"passed":3531,"skipped":113,"pending":23,"failed":4}
+wall ms=1812162.0393066406 (30.2 min)
+# order (JSON completion order): n<TAB>file<TAB>status<TAB>file duration ms<TAB>assertions
+r_pf files in execution order: 100
+per-file DBs left: 2
+tcounts afldb_v2_rem4qual_r_pf_base_test: 83 tables -> /mnt/ssd/afldb-rem4-qual-20261115/evidence/r_pf-base-after.table-counts.tsv
+base table counts unchanged by the run
+##### r_pf end 2026-11-15T03:09:24Z rc=0 porcelain-after=0
+##### r_sh start 2026-11-15T03:09:24Z HEAD=1f7b0d71 porcelain-before=0
+create-db: afldb_v2_rem4qual_r_sh_test created from afldb_v2_rem4qual_rbb_tmpl_test and marked
+tcounts afldb_v2_rem4qual_r_sh_test: 83 tables -> /mnt/ssd/afldb-rem4-qual-20261115/evidence/r_sh-before.table-counts.tsv
+2026-11-15T03:09:27Z r_sh start: shared (AFLDB_TEST_PER_FILE_DB unset) db=afldb_v2_rem4qual_r_sh_test template=afldb_v2_rem4qual_rbb_tmpl_test bridge=1
+r_sh rc=1
+2026-11-15T03:35:26Z r_sh end rc=1
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  5 failed | 89 passed | 6 skipped (100)
+      Tests  4 failed | 3529 passed | 2 expected fail | 113 skipped (3671)
+   Duration  1557.95s (transform 12.36s, setup 5.85s, import 283.63s, tests 1244.80s, environment 26ms)
+r_sh failing ids: 7 (3 file-level)
+files total=100 by status={"passed":95,"failed":5}
+file-level failures (status failed with zero failed assertions)=3
+tests total=3671 passed=3531 failed=4 pending=113 todo=0
+assertion statuses={"passed":3531,"skipped":113,"pending":23,"failed":4}
+wall ms=1557978.9482421875 (26.0 min)
+# order (JSON completion order): n<TAB>file<TAB>status<TAB>file duration ms<TAB>assertions
+r_sh files in execution order: 100
+tcounts afldb_v2_rem4qual_r_sh_test: 83 tables -> /mnt/ssd/afldb-rem4-qual-20261115/evidence/r_sh-after.table-counts.tsv
+r_sh table-count rows changed by the run: 1 (see r_sh.table-counts.diff)
+fixtures rows before: 0
+fixtures rows after:  0
+##### r_sh end 2026-11-15T03:35:28Z rc=0 porcelain-after=0
+##### s_sh start 2026-11-15T03:35:28Z HEAD=1f7b0d71 porcelain-before=0
+create-db: afldb_v2_rem4qual_s_sh_test created from afldb_v2_rem4qual_snap_tmpl_test and marked
+tcounts afldb_v2_rem4qual_s_sh_test: 83 tables -> /mnt/ssd/afldb-rem4-qual-20261115/evidence/s_sh-before.table-counts.tsv
+2026-11-15T03:35:32Z s_sh start: shared (AFLDB_TEST_PER_FILE_DB unset) db=afldb_v2_rem4qual_s_sh_test template=afldb_v2_rem4qual_snap_tmpl_test bridge=0
+s_sh rc=1
+2026-11-15T04:01:54Z s_sh end rc=1
+⎯⎯⎯⎯⎯⎯ Failed Tests 15 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  9 failed | 85 passed | 6 skipped (100)
+      Tests  15 failed | 3518 passed | 2 expected fail | 113 skipped (3671)
+   Duration  1580.35s (transform 12.19s, setup 5.94s, import 266.67s, tests 1284.00s, environment 26ms)
+s_sh failing ids: 18 (3 file-level)
+files total=100 by status={"passed":91,"failed":9}
+file-level failures (status failed with zero failed assertions)=3
+tests total=3671 passed=3520 failed=15 pending=113 todo=0
+assertion statuses={"passed":3520,"failed":15,"skipped":113,"pending":23}
+wall ms=1580387.4240722656 (26.3 min)
+# order (JSON completion order): n<TAB>file<TAB>status<TAB>file duration ms<TAB>assertions
+s_sh files in execution order: 100
+tcounts afldb_v2_rem4qual_s_sh_test: 83 tables -> /mnt/ssd/afldb-rem4-qual-20261115/evidence/s_sh-after.table-counts.tsv
+s_sh table-count rows changed by the run: 2 (see s_sh.table-counts.diff)
+fixtures rows before: 218
+fixtures rows after:  218
+##### s_sh end 2026-11-15T04:01:55Z rc=0 porcelain-after=0
+##### shell start 2026-11-15T04:01:55Z HEAD=1f7b0d71 porcelain-before=0
+tests/restore-test.test.sh rc=0
+restore-test harness: 24 passed, 0 failed
+tests/sync-dev-remote.test.sh rc=0
+NOT RUN: e2e generated-payload cases (set SYNC_DEV_GENERATED_DIR; see tests/sync-dev-static.test.ps1 -ExportDir)
+42 passed, 0 failed
+##### shell end 2026-11-15T04:01:59Z rc=0 porcelain-after=0
+##### build start 2026-11-15T04:01:59Z HEAD=1f7b0d71 porcelain-before=0
+build rc=0
+└ ƒ /venues/[slug]/matches
+ƒ Proxy (Middleware)
+○  (Static)   prerendered as static content
+●  (SSG)      prerendered as static HTML (uses generateStaticParams)
+ƒ  (Dynamic)  server-rendered on demand
+build rc=0
+standalone rc=0 BUILD_ID=6dRxZQwoAUGMbjI5f11G3
+##### build end 2026-11-15T04:05:51Z rc=0 porcelain-after=0
+##### fixtures_base start 2026-11-15T04:05:51Z HEAD=1f7b0d71 porcelain-before=0
+fitzRoy copy: 131 files re-verified against run2/fixtures/fh-expected.sha256
+sample.json copy re-verified
+##### fixtures_base end 2026-11-15T04:05:54Z rc=0 porcelain-after=0
+##### fixtures_stagea start 2026-11-15T04:05:54Z HEAD=1f7b0d71 porcelain-before=0
+# Stage A and residual-input provenance 2026-11-15T04:05:54Z, HEAD=1f7b0d717b37e98432716d6b9170fbd45142ab63; sources are the RUN-3 qual workspace copies (read-only), never DEV
+## 1. raw files against the committed manifest docs/rebuild-manifests/draftguru/annual-html-20260826.json (42 entries)
+OK: 42
+rc=0 (all 42 match)
+## 2. every file of the source against run 3's committed 90-file list run3/qualification-3/stagea-src.sha256
+files src=90
+IDENTICAL (paths and sha256) to run3/qualification-3/stagea-src.sha256
+tree sha256 (sha256 of the sorted list): ceea2d344aa5eb8826edd54c0dae574188738e94cc26ee67a9e7ab8368264de2
+## 3. residual input: source sha256 df6c9a7559bceb649e8e28e457fbe91d3351d8c1737a9042f233b1f1e3c5e841 ; sample.json residual_input.sha256 df6c9a7559bceb649e8e28e457fbe91d3351d8c1737a9042f233b1f1e3c5e841
+Stage A copy re-verified (90 files, paths and sha256)
+residual input copy re-verified: sha256 df6c9a7559bceb649e8e28e457fbe91d3351d8c1737a9042f233b1f1e3c5e841 = sample.json residual_input.sha256
+##### fixtures_stagea end 2026-11-15T04:05:55Z rc=0 porcelain-after=0
+##### unit_allfix start 2026-11-15T04:05:55Z HEAD=1f7b0d71 porcelain-before=0
+unit-allfix rc=1
+ Test Files  1 failed | 214 passed | 1 skipped (216)
+      Tests  1 failed | 12296 passed | 25 skipped (12322)
+   Duration  642.93s (transform 21.48s, setup 12.46s, import 128.72s, tests 450.32s, environment 56ms)
+unit-allfix failing ids: 1
+tests/v2-acquisition-pipeline.test.ts	(e) docs/v2/architecture.md §9 is the rendered stage map equals renderAflApiStageMap output
+##### unit_allfix end 2026-11-15T04:16:39Z rc=0 porcelain-after=0
+##### seal start 2026-11-15T04:16:39Z HEAD=1f7b0d71 porcelain-before=0
+sealed
+##### seal end 2026-11-15T04:16:39Z rc=0 porcelain-after=0
+##### done 2026-11-15T04:16:39Z

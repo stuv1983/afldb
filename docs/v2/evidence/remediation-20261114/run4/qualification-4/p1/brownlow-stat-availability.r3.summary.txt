@@ -1,0 +1,3 @@
+brownlow_match_votes rows=130 seasons=1897..2026 coverage=complete,not_applicable,not_collected,partial,pending
+brownlow_round_votes rows=130 seasons=1897..2026 coverage=complete,not_applicable,not_collected,pending
+brownlow_season_total rows=130 seasons=1897..2026 coverage=complete,not_applicable,pending

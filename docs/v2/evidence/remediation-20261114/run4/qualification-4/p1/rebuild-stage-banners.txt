@@ -1,0 +1,30 @@
+==> PRECHECK — every required input, before anything is destroyed
+==> AFL API OWNERSHIP CENSUS — refuse if any completed season in 1897..2026 excluding in-progress 2027 holds an afl_api-owned canonical match (read-only, before anything is captured or destroyed)
+==> AFL API ADJUDICATIONS — capture the human identity ledger, the importer-created identities AND the manual player registrations before anything is destroyed
+==> DATABASE RESET — clear afldb_v2_rb_rem4q_test
+==> MIGRATIONS — the complete tracked set
+==> PRIVILEGES — reconcile roles from the registries
+==> REFERENCE DATA — tracked canonical datasets
+==> FITZROY CORE — c2-2026-final-core-v1
+==> HEIGHTS — AFL Tables register (c2-2026-final-core-v1)
+==> HEIGHTS (AFL API) — corroborating evidence, rosters-20260905
+==> HEIGHTS (Wikipedia) — tracked adjudication set, corroborating evidence
+==> BIRTH DATES — AFL Tables club lists, club-lists-20260905
+==> COACHES — AFL Tables coach pages coaches-20260905 + shared height/coach stats (c2-2026-final-core-v1) Coach column + mandatory raw replay
+==> FATHER–SON — tracked Wikipedia list, 127 selections
+==> SIBLINGS — tracked Wikipedia families export, 499 pairs
+==> AFTER-SIREN — tracked Wikipedia siren-kick exports, 126 events
+==> AFTER-SIREN RECONCILE — loaded table against a fresh re-resolution
+==> MANUAL REGISTRATIONS — reinstate the captured data_overrides creation records and their attribution actors
+==> MANUAL REGISTRATIONS — replay_admin_overrides(players), the production replay
+==> MANUAL REGISTRATIONS — assert every registered player is back under its stable identity
+==> DRAFTGURU — annual-html-20260826
+==> AFL API ADJUDICATIONS — reinstate the ledger, replay the importer-created identities and replay the human identities (one transaction)
+==> AFL API ADJUDICATIONS — assert the combined importer/human identity invariant (D13; no rebuild marker remains)
+==> AWARDS & HONOURS — tracked manifests, no legacy source
+==> BROWNLOW SEASON — authoritative season totals from the tracked artefact
+==> DERIVED — recomputed summaries
+==> COLEMAN — leading home-and-away goalkicker, derived
+==> FIRST-KICK GOAL — pinned curated extract + tracked manifest, 334 records
+==> LADDER WITNESS — cross-check club_seasons against c2-2026-final-ladder-v1
+==> FINAL VALIDATION — per-domain row counts against the accepted contracts

@@ -1,0 +1,14 @@
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  5 failed | 89 passed | 6 skipped (100)
+      Tests  4 failed | 3529 passed | 2 expected fail | 113 skipped (3671)
+   Duration  1813.04s (transform 12.85s, setup 150.77s, import 303.08s, tests 1335.39s, environment 26ms)
+r_pf failing ids: 7 (3 file-level)
+files total=100 by status={"passed":95,"failed":5}
+file-level failures (status failed with zero failed assertions)=3
+tests total=3671 passed=3531 failed=4 pending=113 todo=0
+assertion statuses={"passed":3531,"skipped":113,"pending":23,"failed":4}
+wall ms=1812162.0393066406 (30.2 min)
+# order (JSON completion order): n<TAB>file<TAB>status<TAB>file duration ms<TAB>assertions
+r_pf files in execution order: 100
+per-file DBs left: 2
+base table counts unchanged by the run

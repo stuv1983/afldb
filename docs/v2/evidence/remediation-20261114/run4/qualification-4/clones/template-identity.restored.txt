@@ -1,0 +1,6 @@
+ledger_count=115 ledger_max=115_adjudication_supersession_fk_index.sql
+brownlow_round_votes=330383 md5=097a9f86c734c530e055a826f93e66b9
+brownlow_season_votes=16120 md5=252aa832d28633e77420e19e4368c51e
+staging_afl_api_brownlow_vote=621 seasons=2025 md5=48fc8ff083bd7b827efe599c8705e635
+players=13365
+matches=17056 seasons=1897..2026

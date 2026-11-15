@@ -1,0 +1,20 @@
+isolated-pg: afldb_v2_brownlow_policy_final_test verified (cluster afldb_v2_isolated, 127.0.0.1:55687); running /usr/bin/env
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-qual-20261115/cand[39m
+
+ [32m✓[39m tests/integration/v2-brownlow-production-correction.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 2472532[2mms[22m[39m
+     [33m[2m✓[22m[39m plans read-only, refuses a wrong live target and pre-apply row drift [33m 167985[2mms[22m[39m
+     [33m[2m✓[22m[39m rolls a failed backfill back, then applies/replays/reverses preserving all vote values and provenance [33m 344145[2mms[22m[39m
+     [33m[2m✓[22m[39m adopts exactly 621 positives, preserves 8901 zero rows, replays and reverses; refuses subsequent-write reversal [33m 480033[2mms[22m[39m
+     [33m[2m✓[22m[39m refuses premature issue resolution and unapproved or ambiguous eligibility [33m 114762[2mms[22m[39m
+     [33m[2m✓[22m[39m records and replays an authentic observe-only snapshot in the outer transaction [33m 224871[2mms[22m[39m
+     [33m[2m✓[22m[39m rolls all eligibility decisions/publication back on partial failure, then records an approved subset through the audited service [33m 214786[2mms[22m[39m
+     [33m[2m✓[22m[39m resolves only a genuinely healed ownership issue, atomically with its receipt and with replay [33m 497675[2mms[22m[39m
+     [33m[2m✓[22m[39m requires a fresh restored baseline and re-proves live identity before a historical-only correction [33m 428206[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m8 passed[39m[22m[90m (8)[39m
+[2m   Start at [22m 15:23:44
+[2m   Duration [22m 2474.71s[2m (transform 1.32s, setup 249ms, import 1.56s, tests 2472.53s, environment 0ms)[22m
+
+JSON report written to /mnt/ssd/afldb-rem4-qual-20261115/evidence/clones/b1-production-correction.json

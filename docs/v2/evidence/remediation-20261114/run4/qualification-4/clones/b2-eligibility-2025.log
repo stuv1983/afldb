@@ -1,0 +1,15 @@
+isolated-pg: afldb_v2_brownlow_tristate_twelve_test verified (cluster afldb_v2_isolated, 127.0.0.1:55687); running /usr/bin/env
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/mnt/ssd/afldb-rem4-qual-20261115/cand[39m
+
+ [32m✓[39m tests/integration/v2-brownlow-eligibility-2025-rehearsal.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 152128[2mms[22m[39m
+     [33m[2m✓[22m[39m before any ruling: explicit provider flags are read with provenance; the twelve provider-ineligible players disagree with their unevaluated stored rows and stay unresolved [33m 1089[2mms[22m[39m
+     [33m[2m✓[22m[39m applies the twelve approved rulings through the guarded runner (all or nothing, replayable) without touching a raw vote [33m 150084[2mms[22m[39m
+     [33m[2m✓[22m[39m after the rulings: audited decisions take precedence, every rank is determinate, the winner is unchanged and the published flags agree [33m 887[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m3 passed[39m[22m[90m (3)[39m
+[2m   Start at [22m 15:21:03
+[2m   Duration [22m 153.80s[2m (transform 909ms, setup 175ms, import 1.13s, tests 152.13s, environment 0ms)[22m
+
+JSON report written to /mnt/ssd/afldb-rem4-qual-20261115/evidence/clones/b2-eligibility-2025.json

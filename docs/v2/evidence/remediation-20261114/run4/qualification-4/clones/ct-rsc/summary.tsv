@@ -1,0 +1,22 @@
+c91	rc=0	11s	rsc=1	case 91: 30/30 checks PASS -> PASS
+c100-match-sheet	rc=0	11s	rsc=1	case 100 (match-sheet): 28/28 checks PASS -> PASS
+c100-brownlow-draft	rc=0	9s	rsc=1	case 100 (brownlow-draft): 26/26 checks PASS -> PASS
+c16	rc=0	9s	rsc=1	case 16: 21/21 checks PASS -> PASS
+c4-draft	rc=0	9s	rsc=1	case 4 (draft): 20/20 checks PASS -> PASS
+c17-votes-written	rc=0	9s	rsc=1	case 17 (votes-written): 22/22 checks PASS -> PASS
+c17-round-reowned	rc=0	9s	rsc=1	case 17 (round-reowned): 24/24 checks PASS -> PASS
+c56-round-vote	rc=0	9s	rsc=1	case 56 (round-vote): 22/22 checks PASS -> PASS
+c56-games	rc=0	9s	rsc=1	case 56 (games): 22/22 checks PASS -> PASS
+c70	rc=0	12s	rsc=1	case 70: 28/28 checks PASS -> PASS
+c88	rc=0	12s	rsc=1	case 88: 28/28 checks PASS -> PASS
+c101	rc=0	12s	rsc=1	case 101: 29/29 checks PASS -> PASS
+c69	rc=0	12s	rsc=1	case 69: 42/42 checks PASS -> PASS
+c72	rc=0	11s	rsc=1	case 72: 51/51 checks PASS -> PASS
+c94-audited	rc=0	12s	rsc=1	case 94 (audited): 46/46 checks PASS -> PASS
+c94-no-audit	rc=0	12s	rsc=1	case 94 (no-audit): 41/41 checks PASS -> PASS
+c98	rc=0	13s	rsc=1	case 98: 42/42 checks PASS -> PASS
+c99	rc=0	12s	rsc=1	case 99: 47/47 checks PASS -> PASS
+c14	rc=0	12s	rsc=1	case 14: 43/43 checks PASS -> PASS
+c32	rc=0	12s	rsc=1	case 32: 40/40 checks PASS -> PASS
+c24-admin-linked	rc=0	11s	rsc=1	case 24 (admin-linked): 24/24 checks PASS -> PASS
+c31	rc=0	10s	rsc=1	case 31: 33/33 checks PASS -> PASS

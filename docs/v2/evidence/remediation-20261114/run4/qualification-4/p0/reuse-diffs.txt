@@ -1,0 +1,19 @@
+$ git diff --stat f10e47ad Q'' -- src tools packages deploy package.json package-lock.json next.config.ts   (run 2 qualified revision Q = f10e47ad)
+ src/db/queries/player-derived.ts                  | 126 +++++++++++++++++-----
+ tools/db/afl-api-identity-correction-rehearsal.ts |  22 +++-
+ 2 files changed, 117 insertions(+), 31 deletions(-)
+
+$ git diff --stat 692b1902 Q'' -- src tools packages deploy package.json package-lock.json next.config.ts   (run 3 Qprime = 692b1902)
+ src/db/queries/player-derived.ts                  | 126 +++++++++++++++++-----
+ tools/db/afl-api-identity-correction-rehearsal.ts |  22 +++-
+ 2 files changed, 117 insertions(+), 31 deletions(-)
+
+$ git diff --stat 692b1902 Q'' -- deploy next.config.ts package.json package-lock.json packages  (must be empty)
+(empty above = identical)
+
+$ git diff --stat f10e47ad Q'' -- deploy next.config.ts package.json package-lock.json packages src/app src/middleware.ts
+(empty above = identical)
+
+$ git diff --stat 6d5388ea Q'' -- tools/db tools/migration tools/rebuild tools/records src/db/migrations data/reference packages legacy
+ tools/db/afl-api-identity-correction-rehearsal.ts | 22 ++++++++++++++++++----
+ 1 file changed, 18 insertions(+), 4 deletions(-)

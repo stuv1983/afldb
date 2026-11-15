@@ -1,0 +1,10 @@
+# fitzroy-core c2-2026-final-core-v1: manifest-derived artefact_set_sha256=817d594e5c0529b6524c8b211a209b9ef25a500c5c463daad8e3bb7b1eee7b7e register=817d594e5c0529b6524c8b211a209b9ef25a500c5c463daad8e3bb7b1eee7b7e files=132 register_files=132
+fitzroy-core	VERIFIED	/mnt/ssd/afldb-rem3-rebuild-20261114/cand/data/sources/afltables/fitzroy_core/c2-2026-final-core-v1	files=132 present=132 bad=0	manifest_lf=02bbcf932ef7(register.manifest_sha256)
+ladder-witness	VERIFIED	/mnt/ssd/afldb-rem3-rebuild-20261114/cand/data/sources/afltables/fitzroy_core/c2-2026-final-ladder-v1	files=130 present=130 bad=0	manifest_lf=65c299072afb(fitzroy-contract.accepted_witness)
+afl-api-rosters	VERIFIED	/mnt/ssd/afldb-rem3-rebuild-20261114/cand/data/sources/afl_api/rosters/rosters-20260905	files=15 present=15 bad=0	manifest_lf=61aff99a8b14(afl-api-contract.roster)
+club-lists	VERIFIED	/mnt/ssd/afldb-rem3-rebuild-20261114/cand/data/sources/afltables/club_lists/club-lists-20260905	files=42 present=42 bad=0	manifest_lf=e6d5ae2632d6(afltables-contract.club_player_lists)
+coaches	VERIFIED	/mnt/ssd/afldb-rem3-rebuild-20261114/cand/data/sources/afltables/coaches/coaches-20260905	files=389 present=389 bad=0	manifest_lf=3e78f47354ac(afltables-contract.coaches)
+coaches-raw-bundle	VERIFIED	/mnt/ssd/afldb-rem3-rebuild-20261114/cand/data/sources/afltables/coaches/coaches-20260905/coaches-20260905-raw.tar	bytes=24023040/24023040	sha=2468569067209ec3810b5bbcc45cb8d75c616f69517bac8531fbffa47c661e4a/2468569067209ec3810b5bbcc45cb8d75c616f69517bac8531fbffa47c661e4a
+draftguru-stage-a	VERIFIED	/mnt/ssd/afldb-rem3-rebuild-20261114/cand/data/sources/draftguru/annual-html-20260826	files=42 present=42 bad=0	manifest_lf=d06bf6be3586
+first-kick-goal	VERIFIED	/mnt/ssd/afldb-rem3-rebuild-20261114/cand/data/records/first-kick-goal.csv	lf_sha=8f234f3b76ce78c18e6d0bc7f30ef8f64ec125b4b646f4cd15577a32f0e5a036	pin=8f234f3b76ce78c18e6d0bc7f30ef8f64ec125b4b646f4cd15577a32f0e5a036	data_rows=334/334
+# summary: 8 inputs checked, 0 failed

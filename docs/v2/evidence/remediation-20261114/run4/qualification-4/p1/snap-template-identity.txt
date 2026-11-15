@@ -1,0 +1,7 @@
+identity of the snapshot template (aggregates only):
+ledger_max=118_fixtures_unconfirmed_participants.sql ledger_count=118
+matches=17056 seasons=1897..2026 players=13365 fixtures=218
+seasons_row_2026=complete
+seasons_in_progress=none
+player_match_stats_authority_rows=1
+draft_picks=6818 draft_persons=5057

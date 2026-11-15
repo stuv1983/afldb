@@ -1,0 +1,26 @@
+##### post_dump start 2026-11-15T02:00:21Z HEAD=1f7b0d71 porcelain-before=0
+ISOLATED TARGET OK: afldb_v2_rb_rem4q_test
+rebuilt tables: 83
+isolated-pg: afldb_v2_rb_rem4q_test verified (cluster afldb_v2_isolated, 127.0.0.1:55687); running node
+pg_dump exit=0 seconds=7 stderrLines=0
+db=afldb_v2_rb_rem4q_test bytes=20662027 sha256=f3c7dca967ba9a0c7b3f8907af9cf00648aba879e25acc6da9770067a7715e5b
+-rw-rw-r-- 1 arm arm 20662027 Nov 15 13:00 /mnt/ssd/afldb-rem4-qual-20261115/rebuilt/afldb_v2_rb_rem4q-1f7b0d71.dump
+f3c7dca967ba9a0c7b3f8907af9cf00648aba879e25acc6da9770067a7715e5b  /mnt/ssd/afldb-rem4-qual-20261115/rebuilt/afldb_v2_rb_rem4q-1f7b0d71.dump
+1668
+##### post_dump end 2026-11-15T02:00:30Z rc=0 porcelain-after=0
+##### post_restore start 2026-11-15T02:00:30Z HEAD=1f7b0d71 porcelain-before=0
+create-db: afldb_v2_rem4qual_rb_tmpl_test created and marked
+isolated-pg: afldb_v2_rem4qual_rb_tmpl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55687); running node
+pg_restore exit=0 seconds=5 stderrLines=0
+ISOLATED TARGET OK: afldb_v2_rem4qual_rb_tmpl_test
+afldb_v2_rem4qual_rb_tmpl_test	marked	289537047
+2026-11-15T02:00:38Z Q'' rebuild (restored from its own dump): 83-table exact counts IDENTICAL to the published run-3 table-counts.tsv (83 tables)
+2026-11-15T02:00:38Z counts of the rebuilt DB == counts of the DB restored from its dump
+##### post_restore end 2026-11-15T02:00:38Z rc=0 porcelain-after=0
+##### post_ref start 2026-11-15T02:00:38Z HEAD=1f7b0d71 porcelain-before=0
+create-db: afldb_v2_rem4qual_rb3ref_test created and marked
+isolated-pg: afldb_v2_rem4qual_rb3ref_test verified (cluster afldb_v2_isolated, 127.0.0.1:55687); running node
+pg_restore exit=0 seconds=5 stderrLines=0
+ISOLATED TARGET OK: afldb_v2_rem4qual_rb3ref_test
+##### post_ref end 2026-11-15T02:00:45Z rc=0 porcelain-after=0
+##### done 2026-11-15T02:00:45Z

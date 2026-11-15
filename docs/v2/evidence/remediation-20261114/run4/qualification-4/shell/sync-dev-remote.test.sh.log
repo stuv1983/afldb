@@ -1,0 +1,52 @@
+PASS: clean tree continues
+PASS: tracked modification blocks
+PASS: staged and renamed changes block
+PASS: known operational artifacts warn and continue
+PASS: unknown untracked file blocks
+PASS: known plus unknown mixture blocks
+PASS: AllowDirtyServer bypass is explicit
+PASS: operational allowlist is narrow
+PASS: immediate healthy readiness succeeds
+PASS: transient connection refusal then healthy succeeds
+PASS: failed service stops readiness early
+PASS: readiness timeout fails with diagnostics
+PASS: unhealthy HTTP 200 payload is refused
+PASS: expected build identity remains enforced
+PASS: curl connection reset is a retryable probe failure
+PASS: curl probe validates healthy JSON and build header
+PASS: failure diagnostics are bounded and actionable
+PASS: classification performs no repository cleanup
+warning: remote HEAD refers to nonexistent ref, unable to checkout
+PASS: pin fast-forwards to exactly the pin, not the upstream tip
+warning: remote HEAD refers to nonexistent ref, unable to checkout
+PASS: pin already current is a no-op
+warning: remote HEAD refers to nonexistent ref, unable to checkout
+PASS: pin refuses a short or malformed id
+warning: remote HEAD refers to nonexistent ref, unable to checkout
+PASS: pin refuses a detached HEAD
+warning: remote HEAD refers to nonexistent ref, unable to checkout
+PASS: pin refuses an unpublished commit
+warning: remote HEAD refers to nonexistent ref, unable to checkout
+PASS: pin refuses a diverged branch without rewriting it
+warning: remote HEAD refers to nonexistent ref, unable to checkout
+PASS: pin refuses a branch without an upstream
+PASS: pin helper never resets, cleans, checks out or pulls
+PASS: R339-D: userinfo password leaves argv for PGPASSWORD (percent-decoded); routing env removed
+PASS: R339-D: query password (encoded keyword) leaves argv
+PASS: R339-D: dual/ssl/key-value/malformed passwords are refused before psql
+PASS: R339-D: password-free DSN is passed unchanged
+PASS: R339-B: expected state permits only the target-main move
+PASS: R339-C: complete payload runs and its status propagates
+PASS: R339-C: invalid base64 refuses (47) with nothing run
+PASS: R339-C: corrupt gzip refuses (47) with nothing run
+PASS: R339-C: truncated payload refuses (47) without running partial input
+PASS: R339-C: missing decoder refuses (47) with nothing run
+PASS: R339-C: transport template has no double quote and no bash -s
+PASS: gate: branch namespace collision dev vs dev/v2-main
+PASS: gate: ledger accepts CRLF checksum, refuses drift and reordering
+PASS: gate: .env presence by name never prints values
+PASS: gate: approval window missing/expired/too long/future/open
+PASS: gate 346: migration-set check is not evaluated under -SkipMigrate
+NOT RUN: e2e generated-payload cases (set SYNC_DEV_GENERATED_DIR; see tests/sync-dev-static.test.ps1 -ExportDir)
+42 passed, 0 failed
+tests/sync-dev-remote.test.sh rc=0

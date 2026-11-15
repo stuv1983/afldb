@@ -1,0 +1,55 @@
+{"id": 1, "alias": "Adelaide Oval", "venue_id": 1, "source_id": null}
+{"id": 10, "alias": "Carrara", "venue_id": 10, "source_id": null}
+{"id": 11, "alias": "Cazaly's Stadium", "venue_id": 11, "source_id": null}
+{"id": 12, "alias": "Coburg Oval", "venue_id": 12, "source_id": null}
+{"id": 13, "alias": "Corio Oval", "venue_id": 13, "source_id": null}
+{"id": 14, "alias": "Docklands", "venue_id": 14, "source_id": null}
+{"id": 15, "alias": "East Melbourne", "venue_id": 15, "source_id": null}
+{"id": 16, "alias": "Eureka Stadium", "venue_id": 16, "source_id": null}
+{"id": 17, "alias": "Euroa", "venue_id": 17, "source_id": null}
+{"id": 18, "alias": "Football Park", "venue_id": 18, "source_id": null}
+{"id": 19, "alias": "Gabba", "venue_id": 19, "source_id": null}
+{"id": 2, "alias": "Albury", "venue_id": 2, "source_id": null}
+{"id": 20, "alias": "Glenferrie Oval", "venue_id": 20, "source_id": null}
+{"id": 21, "alias": "Hands Oval", "venue_id": 21, "source_id": null}
+{"id": 22, "alias": "Jiangwan Stadium", "venue_id": 22, "source_id": null}
+{"id": 23, "alias": "Junction Oval", "venue_id": 23, "source_id": null}
+{"id": 24, "alias": "Kardinia Park", "venue_id": 24, "source_id": null}
+{"id": 25, "alias": "Lake Oval", "venue_id": 25, "source_id": null}
+{"id": 26, "alias": "Melbourne Cricket Ground", "venue_id": 26, "source_id": null}
+{"id": 27, "alias": "M.C.G.", "venue_id": 26, "source_id": null}
+{"id": 28, "alias": "Manuka Oval", "venue_id": 27, "source_id": null}
+{"id": 29, "alias": "Marrara Oval", "venue_id": 28, "source_id": null}
+{"id": 3, "alias": "Arden St", "venue_id": 3, "source_id": null}
+{"id": 30, "alias": "Moorabbin Oval", "venue_id": 29, "source_id": null}
+{"id": 31, "alias": "North Hobart", "venue_id": 30, "source_id": null}
+{"id": 32, "alias": "Norwood Oval", "venue_id": 31, "source_id": null}
+{"id": 33, "alias": "Olympic Park", "venue_id": 32, "source_id": null}
+{"id": 34, "alias": "Perth Stadium", "venue_id": 33, "source_id": null}
+{"id": 35, "alias": "Princes Park", "venue_id": 34, "source_id": null}
+{"id": 36, "alias": "Punt Rd", "venue_id": 35, "source_id": null}
+{"id": 37, "alias": "Riverway Stadium", "venue_id": 36, "source_id": null}
+{"id": 38, "alias": "S.C.G.", "venue_id": 37, "source_id": null}
+{"id": 39, "alias": "Sydney Cricket Ground", "venue_id": 37, "source_id": null}
+{"id": 4, "alias": "Barossa Park", "venue_id": 4, "source_id": null}
+{"id": 40, "alias": "Stadium Australia", "venue_id": 38, "source_id": null}
+{"id": 41, "alias": "Subiaco", "venue_id": 39, "source_id": null}
+{"id": 42, "alias": "Summit Sports Park", "venue_id": 40, "source_id": null}
+{"id": 43, "alias": "Sydney Showground", "venue_id": 41, "source_id": null}
+{"id": 44, "alias": "Toorak Park", "venue_id": 42, "source_id": null}
+{"id": 45, "alias": "Traeger Park", "venue_id": 43, "source_id": null}
+{"id": 46, "alias": "Victoria Park", "venue_id": 44, "source_id": null}
+{"id": 47, "alias": "W.A.C.A.", "venue_id": 45, "source_id": null}
+{"id": 48, "alias": "WACA Ground", "venue_id": 45, "source_id": null}
+{"id": 49, "alias": "Waverley Park", "venue_id": 46, "source_id": null}
+{"id": 5, "alias": "Bellerive Oval", "venue_id": 5, "source_id": null}
+{"id": 50, "alias": "Wellington", "venue_id": 47, "source_id": null}
+{"id": 51, "alias": "Western Oval", "venue_id": 48, "source_id": null}
+{"id": 52, "alias": "Windy Hill", "venue_id": 49, "source_id": null}
+{"id": 53, "alias": "Yallourn", "venue_id": 50, "source_id": null}
+{"id": 54, "alias": "Yarraville Oval", "venue_id": 51, "source_id": null}
+{"id": 55, "alias": "York Park", "venue_id": 52, "source_id": null}
+{"id": 6, "alias": "Blacktown", "venue_id": 6, "source_id": null}
+{"id": 7, "alias": "Brisbane Exhibition", "venue_id": 7, "source_id": null}
+{"id": 8, "alias": "Bruce Stadium", "venue_id": 8, "source_id": null}
+{"id": 9, "alias": "Brunswick St", "venue_id": 9, "source_id": null}

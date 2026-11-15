@@ -1,0 +1,78 @@
+HEAD=1f7b0d717b37e98432716d6b9170fbd45142ab63 want=1f7b0d717b37e98432716d6b9170fbd45142ab63 porcelain=0
+git diff --name-only 692b1902 1f7b0d717b37e98432716d6b9170fbd45142ab63: 2232 files
+git diff --name-only 6d5388ea 1f7b0d717b37e98432716d6b9170fbd45142ab63: 2787 files
+git diff --name-only 7cfbe186 1f7b0d717b37e98432716d6b9170fbd45142ab63: 2181 files
+== TypeScript stage entries (tools/db/rebuild-test.ts ordinaryTsxArgv + the two npm scripts + the driver and harness) ==
+esbuild 0.28.2
+tools/db/rebuild-test.ts: 38 inputs
+tools/db/migrate.ts: 3 inputs
+tools/db/privileges.ts: 2 inputs
+tools/migration/rebuild_afl_api_adjudications.ts: 38 inputs
+tools/records/import-first-kick-goal.ts: 34 inputs
+tools/v2/isolated-pg.ts: 13 inputs
+entries=6 failed=0 union=57 intersection-with-diff=1
+  HIT src/db/queries/player-derived.ts
+== Python/SQL/data stage paths and path prefixes (RUN-PLAN-4 section 3) intersected with git diff --name-only 6d5388ea 1f7b0d717b37e98432716d6b9170fbd45142ab63 ==
+docs/v2/evidence/remediation-20261114/run3/integb/evidence/host-scripts/facts1.sql
+docs/v2/evidence/remediation-20261114/run3/integb/evidence/host-scripts/facts2.sql
+docs/v2/evidence/remediation-20261114/run3/integb/evidence/host-scripts/facts3.sql
+docs/v2/evidence/remediation-20261114/run3/integb/evidence/host-scripts/facts4.sql
+docs/v2/evidence/remediation-20261114/run3/integb/evidence/host-scripts/facts5.sql
+docs/v2/evidence/remediation-20261114/run3/integb/evidence/host-scripts/rows2026.sql
+docs/v2/evidence/remediation-20261114/run4/clubcmp/evidence/cohorts.sql
+docs/v2/evidence/remediation-20261114/run4/clubcmp/evidence/scripts/synth2067.sql
+docs/v2/evidence/remediation-20261114/run4/coleman276/evidence/host-scripts/counts.sql
+docs/v2/evidence/remediation-20261114/run4/coleman276/evidence/host-scripts/prov.sql
+docs/v2/evidence/remediation-20261114/run4/coleman276/evidence/host-scripts/prov2.sql
+docs/v2/evidence/remediation-20261114/run4/gates/scripts/facts1.sql
+docs/v2/evidence/remediation-20261114/run4/gates/scripts/facts2.sql
+docs/v2/evidence/remediation-20261114/run4/gates/scripts/facts3.sql
+docs/v2/evidence/remediation-20261114/run4/gates/scripts/m_att1.sql
+docs/v2/evidence/remediation-20261114/run4/gates/scripts/m_att2.sql
+docs/v2/evidence/remediation-20261114/run4/gates/scripts/m_c261a.sql
+docs/v2/evidence/remediation-20261114/run4/gates/scripts/m_c261b.sql
+docs/v2/evidence/remediation-20261114/run4/gates/scripts/m_c261c.sql
+docs/v2/evidence/remediation-20261114/run4/gates/scripts/m_dob1.sql
+docs/v2/evidence/remediation-20261114/run4/gates/scripts/m_dob2.sql
+docs/v2/evidence/remediation-20261114/run4/gates/scripts/m_lad1.sql
+docs/v2/evidence/remediation-20261114/run4/gates/scripts/m_lad2.sql
+docs/v2/evidence/remediation-20261114/run4/gates/scripts/m_struct1.sql
+docs/v2/evidence/remediation-20261114/run4/leaks/raw/counts-chaingreenrb.sql
+docs/v2/evidence/remediation-20261114/run4/leaks/raw/counts-chainredrb.sql
+docs/v2/evidence/remediation-20261114/run4/leaks/raw/counts-greenrb.sql
+docs/v2/evidence/remediation-20261114/run4/leaks/raw/counts-greensnap.sql
+docs/v2/evidence/remediation-20261114/run4/leaks/raw/counts-redrb.sql
+docs/v2/evidence/remediation-20261114/run4/leaks/raw/counts-redsnap.sql
+docs/v2/evidence/remediation-20261114/run4/leaks/raw/counts-snapdg.sql
+docs/v2/evidence/remediation-20261114/run4/leaks/raw/counts-snapgreen.sql
+docs/v2/evidence/remediation-20261114/run4/leaks/raw/counts-snapgreen2.sql
+docs/v2/evidence/remediation-20261114/run4/leaks/raw/counts-snapgreen3.sql
+docs/v2/evidence/remediation-20261114/run4/leaks/raw/counts-snapred.sql
+docs/v2/evidence/remediation-20261114/run4/leaks/raw/counts-snapred2.sql
+docs/v2/evidence/remediation-20261114/run4/rbfail/scripts/p1-snap-ids.sql
+docs/v2/evidence/remediation-20261114/run4/rbfail/scripts/p2-data.sql
+docs/v2/evidence/remediation-20261114/run4/rbfail/scripts/p3-fkg2026.sql
+docs/v2/evidence/remediation-20261114/run4/rbfail/scripts/p4.sql
+tools/db/afl-api-identity-correction-rehearsal.ts
+prefix hits: 41
+== diff list outside docs/v2/evidence, issues, tracking files (every code/test/doc path since 6d5388ea) ==
+38
+== AFLW %27 metadata route closure (page/layout files of src/app/aflw, root layout, middleware, next.config) ==
+13
+esbuild 0.28.2
+next.config.ts: 1 inputs
+src/app/aflw/clubs/[code]/page.tsx: 25 inputs
+src/app/aflw/clubs/page.tsx: 21 inputs
+src/app/aflw/matches/[key]/page.tsx: 23 inputs
+src/app/aflw/match-search/page.tsx: 23 inputs
+src/app/aflw/page.tsx: 20 inputs
+src/app/aflw/players/page.tsx: 23 inputs
+src/app/aflw/players/[slug]/page.tsx: 26 inputs
+src/app/aflw/seasons/[key]/page.tsx: 25 inputs
+src/app/aflw/seasons/page.tsx: 21 inputs
+src/app/aflw/venues/page.tsx: 21 inputs
+src/app/layout.tsx: 23 inputs
+src/middleware.ts: 6 inputs
+entries=13 failed=0 union=58 intersection-with-diff=0
+porcelain=0
+porcelain-after=0

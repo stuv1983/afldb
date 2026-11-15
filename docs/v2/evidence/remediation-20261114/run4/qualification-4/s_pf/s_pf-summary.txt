@@ -1,0 +1,14 @@
+⎯⎯⎯⎯⎯⎯ Failed Tests 15 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  9 failed | 85 passed | 6 skipped (100)
+      Tests  15 failed | 3518 passed | 2 expected fail | 113 skipped (3671)
+   Duration  1914.99s (transform 12.69s, setup 206.74s, import 294.42s, tests 1390.03s, environment 26ms)
+s_pf failing ids: 18 (3 file-level)
+files total=100 by status={"passed":91,"failed":9}
+file-level failures (status failed with zero failed assertions)=3
+tests total=3671 passed=3520 failed=15 pending=113 todo=0
+assertion statuses={"passed":3520,"failed":15,"skipped":113,"pending":23}
+wall ms=1914013.6840820312 (31.9 min)
+# order (JSON completion order): n<TAB>file<TAB>status<TAB>file duration ms<TAB>assertions
+s_pf files in execution order: 100
+per-file DBs left: 1
+base table counts unchanged by the run
