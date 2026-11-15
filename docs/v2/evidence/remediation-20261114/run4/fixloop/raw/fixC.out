@@ -1,0 +1,25 @@
+##### unit_rl start 2026-11-15T06:21:46Z HEAD=9346605b porcelain-before=0
+rate-limit alone run 1 rc=0:  Tests 6 passed (6)
+rate-limit alone run 2 rc=0:  Tests 6 passed (6)
+rate-limit alone run 3 rc=0:  Tests 6 passed (6)
+rate-limit alone run 4 rc=0:  Tests 6 passed (6)
+rate-limit alone run 5 rc=0:  Tests 6 passed (6)
+rate-limit alone run 6 rc=0:  Tests 6 passed (6)
+rate-limit alone run 7 rc=0:  Tests 6 passed (6)
+rate-limit alone run 8 rc=0:  Tests 6 passed (6)
+rate-limit alone run 9 rc=0:  Tests 6 passed (6)
+rate-limit alone run 10 rc=0:  Tests 6 passed (6)
+##### unit_rl end 2026-11-15T06:21:59Z rc=0 porcelain-after=0
+##### unit_all2 start 2026-11-15T06:21:59Z HEAD=9346605b porcelain-before=0
+unit-all2 rc=0
+ Test Files  215 passed | 1 skipped (216)
+      Tests  12297 passed | 25 skipped (12322)
+   Duration  639.47s (transform 21.26s, setup 12.38s, import 126.73s, tests 448.68s, environment 56ms)
+unit-all2 failing ids: 0
+TEST passed  (e) docs/v2/architecture.md §9 is the rendered stage map equals renderAflApiStageMap output
+TEST passed  (e) docs/v2/architecture.md §9 is the rendered stage map spliceStageMap touches only the marked region and preserves the line ending
+##### unit_all2 end 2026-11-15T06:32:40Z rc=0 porcelain-after=0
+##### seal start 2026-11-15T06:32:40Z HEAD=9346605b porcelain-before=0
+sealed
+##### seal end 2026-11-15T06:32:41Z rc=0 porcelain-after=0
+##### done 2026-11-15T06:32:41Z

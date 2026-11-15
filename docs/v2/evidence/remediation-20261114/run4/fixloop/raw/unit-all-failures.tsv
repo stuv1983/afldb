@@ -1,0 +1,1 @@
+tests/rate-limit.test.ts	RateLimiter.peek is false again once the window has passed	AssertionError: expected false to be true // Object.is equality

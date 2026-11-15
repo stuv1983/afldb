@@ -1,0 +1,5 @@
+docs/v2/architecture.md
+docs/v2/evidence/remediation-20261114/run4/evidence/README.md
+docs/v2/evidence/remediation-20261114/run4/evidence/SHA256SUMS
+docs/v2/evidence/remediation-20261114/run4/evidence/manifest-map.tsv
+tests/integration/club-comparison.test.ts

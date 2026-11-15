@@ -1,0 +1,2 @@
+TEST passed  (e) docs/v2/architecture.md §9 is the rendered stage map equals renderAflApiStageMap output
+TEST passed  (e) docs/v2/architecture.md §9 is the rendered stage map spliceStageMap touches only the marked region and preserves the line ending

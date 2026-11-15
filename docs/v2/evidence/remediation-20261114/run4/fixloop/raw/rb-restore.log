@@ -1,0 +1,3 @@
+isolated-pg: afldb_v2_rem4fixloop_rb_tmpl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55689); running node
+pg_restore exit=0 seconds=28 stderrLines=0
+ISOLATED TARGET OK: afldb_v2_rem4fixloop_rb_tmpl_test

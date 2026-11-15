@@ -1,0 +1,31 @@
+2026-11-15T05:58:31Z snapshot template 83-table counts IDENTICAL to qual's
+2026-11-15T05:59:02Z Q'' rebuild restore: 83-table exact counts IDENTICAL to qual's committed restored counts (83 tables)
+2026-11-15T05:59:05Z rebuild template: ANALYZE (planner statistics only)
+2026-11-15T06:04:46Z f3_rb_pf start: pf template=afldb_v2_rem4fixloop_rb_tmpl_test preseed=none pattern=-
+2026-11-15T06:05:14Z f3_rb_pf end rc=0
+2026-11-15T06:05:20Z f3_rb_sh start: sh template=afldb_v2_rem4fixloop_rb_tmpl_test preseed=none pattern=-
+2026-11-15T06:05:45Z f3_rb_sh end rc=0
+2026-11-15T06:05:52Z f3_snap_pf start: pf template=afldb_v2_rem4fixloop_snap_tmpl_test preseed=none pattern=-
+2026-11-15T06:06:21Z f3_snap_pf end rc=0
+2026-11-15T06:06:28Z f3_snap_sh start: sh template=afldb_v2_rem4fixloop_snap_tmpl_test preseed=none pattern=-
+2026-11-15T06:06:53Z f3_snap_sh end rc=0
+2026-11-15T06:06:59Z mctlrb start: sh template=afldb_v2_rem4fixloop_rb_tmpl_test preseed=none pattern=exposes selected-season Brownlow coverage
+2026-11-15T06:07:01Z mctlrb end rc=0
+2026-11-15T06:07:07Z mctlsnap start: sh template=afldb_v2_rem4fixloop_snap_tmpl_test preseed=none pattern=exposes selected-season Brownlow coverage
+2026-11-15T06:07:10Z mctlsnap end rc=0
+2026-11-15T06:07:16Z mnew start: sh template=afldb_v2_rem4fixloop_rb_tmpl_test preseed=yes pattern=exposes selected-season Brownlow coverage
+2026-11-15T06:07:18Z mnew end rc=0
+2026-11-15T06:07:24Z mnewsnap start: sh template=afldb_v2_rem4fixloop_snap_tmpl_test preseed=yes pattern=exposes selected-season Brownlow coverage
+2026-11-15T06:07:27Z mnewsnap end rc=0
+2026-11-15T06:07:33Z mnewfile start: sh template=afldb_v2_rem4fixloop_rb_tmpl_test preseed=yes pattern=-
+2026-11-15T06:07:57Z mnewfile end rc=1
+2026-11-15T06:08:04Z mnewfilesnap start: sh template=afldb_v2_rem4fixloop_snap_tmpl_test preseed=yes pattern=-
+2026-11-15T06:08:29Z mnewfilesnap end rc=1
+2026-11-15T06:08:36Z mrealrb start: sh template=afldb_v2_rem4fixloop_rb_tmpl_test preseed=yes pattern=exposes selected-season Brownlow coverage
+2026-11-15T06:08:38Z mrealrb end rc=0
+2026-11-15T06:08:44Z mrealsnap start: sh template=afldb_v2_rem4fixloop_snap_tmpl_test preseed=yes pattern=exposes selected-season Brownlow coverage
+2026-11-15T06:08:47Z mrealsnap end rc=0
+2026-11-15T06:08:53Z mrealfile start: sh template=afldb_v2_rem4fixloop_rb_tmpl_test preseed=yes pattern=-
+2026-11-15T06:09:18Z mrealfile end rc=0
+2026-11-15T06:09:25Z mrealfilesnap start: sh template=afldb_v2_rem4fixloop_snap_tmpl_test preseed=yes pattern=-
+2026-11-15T06:09:51Z mrealfilesnap end rc=0

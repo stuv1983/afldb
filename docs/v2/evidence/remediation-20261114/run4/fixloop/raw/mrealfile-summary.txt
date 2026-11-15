@@ -1,0 +1,11 @@
+ Test Files  1 passed (1)
+      Tests  70 passed (70)
+   Duration  24.28s (transform 535ms, setup 238ms, import 544ms, tests 23.13s, environment 0ms)
+mrealfile failing ids: 0
+files total=1 by status={"passed":1}
+file-level failures (status failed with zero failed assertions)=0
+tests total=70 passed=70 failed=0 pending=0 todo=0
+assertion statuses={"passed":70}
+wall ms=24262.741455078125 (0.4 min)
+# order (JSON completion order): n<TAB>file<TAB>status<TAB>file duration ms<TAB>assertions
+SUMMARY-TEST passed  club comparison: club Brownlow history exposes selected-season Brownlow coverage without presenting a partial total

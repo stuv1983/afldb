@@ -1,0 +1,11 @@
+# Stage A and residual-input provenance 2026-11-15T06:10:39Z, HEAD=9346605bd4cbd00465fd6a69d47ff3bf2ea064ed; sources are the QUAL workspace copies (read-only), never DEV
+## 1. raw files against the committed manifest docs/rebuild-manifests/draftguru/annual-html-20260826.json (42 entries)
+OK: 42
+rc=0 (all 42 match)
+## 2. every file of the source against run 3's committed 90-file list run3/qualification-3/stagea-src.sha256
+files src=90
+IDENTICAL (paths and sha256) to run3/qualification-3/stagea-src.sha256
+tree sha256 (sha256 of the sorted list): ceea2d344aa5eb8826edd54c0dae574188738e94cc26ee67a9e7ab8368264de2
+## 3. residual input: source sha256 df6c9a7559bceb649e8e28e457fbe91d3351d8c1737a9042f233b1f1e3c5e841 ; sample.json residual_input.sha256 df6c9a7559bceb649e8e28e457fbe91d3351d8c1737a9042f233b1f1e3c5e841
+Stage A copy re-verified (90 files, paths and sha256)
+residual input copy re-verified: sha256 df6c9a7559bceb649e8e28e457fbe91d3351d8c1737a9042f233b1f1e3c5e841 = sample.json residual_input.sha256

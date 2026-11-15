@@ -1,0 +1,296 @@
+##### static start 2026-11-15T06:00:55Z HEAD=9346605b porcelain-before=0
+typecheck rc=0
+lint:gate rc=0
+Lint gate (ratchet): 338 error(s) in 43 file(s) now; the ratchet baseline allows 338 in 43 (existing debt, not clean lint).
+Lint gate: PASSED (ratchet; existing debt remains).
+lint:gate rc=0
+##### static end 2026-11-15T06:04:43Z rc=0 porcelain-after=0
+##### f3 start 2026-11-15T06:04:43Z HEAD=9346605b porcelain-before=0
+create-db: afldb_v2_rem4fixloop_f3_rb_pf_test created from afldb_v2_rem4fixloop_rb_tmpl_test and marked
+f3_rb_pf 2026 brownlow_season_votes=0 season_total=pending
+2026-11-15T06:04:46Z f3_rb_pf start: pf template=afldb_v2_rem4fixloop_rb_tmpl_test preseed=none pattern=-
+f3_rb_pf rc=0
+2026-11-15T06:05:14Z f3_rb_pf end rc=0
+ Test Files  1 passed (1)
+      Tests  70 passed (70)
+   Duration  27.09s (transform 458ms, setup 1.74s, import 481ms, tests 24.49s, environment 0ms)
+f3_rb_pf failing ids: 0
+files total=1 by status={"passed":1}
+file-level failures (status failed with zero failed assertions)=0
+tests total=70 passed=70 failed=0 pending=0 todo=0
+assertion statuses={"passed":70}
+wall ms=25373.3203125 (0.4 min)
+# order (JSON completion order): n<TAB>file<TAB>status<TAB>file duration ms<TAB>assertions
+SUMMARY-TEST passed  club comparison: club Brownlow history exposes selected-season Brownlow coverage without presenting a partial total
+f3_rb_pf: table counts unchanged by the run
+f3_rb_pf per-file DBs (afldb_v2_pf_*) left: 0
+drop-db: afldb_v2_rem4fixloop_f3_rb_pf_test dropped
+create-db: afldb_v2_rem4fixloop_f3_rb_sh_test created from afldb_v2_rem4fixloop_rb_tmpl_test and marked
+f3_rb_sh 2026 brownlow_season_votes=0 season_total=pending
+2026-11-15T06:05:20Z f3_rb_sh start: sh template=afldb_v2_rem4fixloop_rb_tmpl_test preseed=none pattern=-
+f3_rb_sh rc=0
+2026-11-15T06:05:45Z f3_rb_sh end rc=0
+ Test Files  1 passed (1)
+      Tests  70 passed (70)
+   Duration  24.41s (transform 467ms, setup 206ms, import 512ms, tests 23.32s, environment 0ms)
+f3_rb_sh failing ids: 0
+files total=1 by status={"passed":1}
+file-level failures (status failed with zero failed assertions)=0
+tests total=70 passed=70 failed=0 pending=0 todo=0
+assertion statuses={"passed":70}
+wall ms=24382.820068359375 (0.4 min)
+# order (JSON completion order): n<TAB>file<TAB>status<TAB>file duration ms<TAB>assertions
+SUMMARY-TEST passed  club comparison: club Brownlow history exposes selected-season Brownlow coverage without presenting a partial total
+f3_rb_sh: table counts unchanged by the run
+f3_rb_sh per-file DBs (afldb_v2_pf_*) left: 0
+drop-db: afldb_v2_rem4fixloop_f3_rb_sh_test dropped
+create-db: afldb_v2_rem4fixloop_f3_snap_pf_test created from afldb_v2_rem4fixloop_snap_tmpl_test and marked
+f3_snap_pf 2026 brownlow_season_votes=0 season_total=pending
+2026-11-15T06:05:52Z f3_snap_pf start: pf template=afldb_v2_rem4fixloop_snap_tmpl_test preseed=none pattern=-
+f3_snap_pf rc=0
+2026-11-15T06:06:21Z f3_snap_pf end rc=0
+ Test Files  1 passed (1)
+      Tests  70 passed (70)
+   Duration  28.68s (transform 550ms, setup 3.01s, import 543ms, tests 24.74s, environment 0ms)
+f3_snap_pf failing ids: 0
+files total=1 by status={"passed":1}
+file-level failures (status failed with zero failed assertions)=0
+tests total=70 passed=70 failed=0 pending=0 todo=0
+assertion statuses={"passed":70}
+wall ms=27305.314208984375 (0.5 min)
+# order (JSON completion order): n<TAB>file<TAB>status<TAB>file duration ms<TAB>assertions
+SUMMARY-TEST passed  club comparison: club Brownlow history exposes selected-season Brownlow coverage without presenting a partial total
+f3_snap_pf: table counts unchanged by the run
+f3_snap_pf per-file DBs (afldb_v2_pf_*) left: 0
+drop-db: afldb_v2_rem4fixloop_f3_snap_pf_test dropped
+create-db: afldb_v2_rem4fixloop_f3_snap_sh_test created from afldb_v2_rem4fixloop_snap_tmpl_test and marked
+f3_snap_sh 2026 brownlow_season_votes=0 season_total=pending
+2026-11-15T06:06:28Z f3_snap_sh start: sh template=afldb_v2_rem4fixloop_snap_tmpl_test preseed=none pattern=-
+f3_snap_sh rc=0
+2026-11-15T06:06:53Z f3_snap_sh end rc=0
+ Test Files  1 passed (1)
+      Tests  70 passed (70)
+   Duration  24.39s (transform 478ms, setup 178ms, import 579ms, tests 23.26s, environment 0ms)
+f3_snap_sh failing ids: 0
+files total=1 by status={"passed":1}
+file-level failures (status failed with zero failed assertions)=0
+tests total=70 passed=70 failed=0 pending=0 todo=0
+assertion statuses={"passed":70}
+wall ms=24363.75927734375 (0.4 min)
+# order (JSON completion order): n<TAB>file<TAB>status<TAB>file duration ms<TAB>assertions
+SUMMARY-TEST passed  club comparison: club Brownlow history exposes selected-season Brownlow coverage without presenting a partial total
+f3_snap_sh: table counts unchanged by the run
+f3_snap_sh per-file DBs (afldb_v2_pf_*) left: 0
+drop-db: afldb_v2_rem4fixloop_f3_snap_sh_test dropped
+##### f3 end 2026-11-15T06:06:55Z rc=0 porcelain-after=0
+##### f4 start 2026-11-15T06:06:55Z HEAD=9346605b porcelain-before=0
+create-db: afldb_v2_rem4fixloop_mctlrb_test created from afldb_v2_rem4fixloop_rb_tmpl_test and marked
+mctlrb 2026 brownlow_season_votes=0 season_total=pending
+2026-11-15T06:06:59Z mctlrb start: sh template=afldb_v2_rem4fixloop_rb_tmpl_test preseed=none pattern=exposes selected-season Brownlow coverage
+mctlrb rc=0
+2026-11-15T06:07:01Z mctlrb end rc=0
+ Test Files  1 passed (1)
+      Tests  1 passed | 69 skipped (70)
+   Duration  1.26s (transform 508ms, setup 195ms, import 566ms, tests 121ms, environment 0ms)
+mctlrb failing ids: 0
+files total=1 by status={"passed":1}
+file-level failures (status failed with zero failed assertions)=0
+tests total=70 passed=1 failed=0 pending=69 todo=0
+assertion statuses={"skipped":69,"passed":1}
+wall ms=1267.460205078125 (0.0 min)
+# order (JSON completion order): n<TAB>file<TAB>status<TAB>file duration ms<TAB>assertions
+SUMMARY-TEST passed  club comparison: club Brownlow history exposes selected-season Brownlow coverage without presenting a partial total
+mctlrb: table counts unchanged by the run
+mctlrb per-file DBs (afldb_v2_pf_*) left: 0
+drop-db: afldb_v2_rem4fixloop_mctlrb_test dropped
+create-db: afldb_v2_rem4fixloop_mctlsnap_test created from afldb_v2_rem4fixloop_snap_tmpl_test and marked
+mctlsnap 2026 brownlow_season_votes=0 season_total=pending
+2026-11-15T06:07:07Z mctlsnap start: sh template=afldb_v2_rem4fixloop_snap_tmpl_test preseed=none pattern=exposes selected-season Brownlow coverage
+mctlsnap rc=0
+2026-11-15T06:07:10Z mctlsnap end rc=0
+ Test Files  1 passed (1)
+      Tests  1 passed | 69 skipped (70)
+   Duration  1.31s (transform 561ms, setup 234ms, import 582ms, tests 130ms, environment 0ms)
+mctlsnap failing ids: 0
+files total=1 by status={"passed":1}
+file-level failures (status failed with zero failed assertions)=0
+tests total=70 passed=1 failed=0 pending=69 todo=0
+assertion statuses={"skipped":69,"passed":1}
+wall ms=1318.065185546875 (0.0 min)
+# order (JSON completion order): n<TAB>file<TAB>status<TAB>file duration ms<TAB>assertions
+SUMMARY-TEST passed  club comparison: club Brownlow history exposes selected-season Brownlow coverage without presenting a partial total
+mctlsnap: table counts unchanged by the run
+mctlsnap per-file DBs (afldb_v2_pf_*) left: 0
+drop-db: afldb_v2_rem4fixloop_mctlsnap_test dropped
+create-db: afldb_v2_rem4fixloop_mnew_test created from afldb_v2_rem4fixloop_rb_tmpl_test and marked
+INSERT 0 1
+UPDATE 1
+mnew 2026 brownlow_season_votes=1 season_total=complete
+2026-11-15T06:07:16Z mnew start: sh template=afldb_v2_rem4fixloop_rb_tmpl_test preseed=yes pattern=exposes selected-season Brownlow coverage
+mnew rc=0
+2026-11-15T06:07:18Z mnew end rc=0
+ Test Files  1 passed (1)
+      Tests  1 passed | 69 skipped (70)
+   Duration  1.19s (transform 491ms, setup 244ms, import 466ms, tests 114ms, environment 0ms)
+mnew failing ids: 0
+files total=1 by status={"passed":1}
+file-level failures (status failed with zero failed assertions)=0
+tests total=70 passed=1 failed=0 pending=69 todo=0
+assertion statuses={"skipped":69,"passed":1}
+wall ms=1201.0166015625 (0.0 min)
+# order (JSON completion order): n<TAB>file<TAB>status<TAB>file duration ms<TAB>assertions
+SUMMARY-TEST passed  club comparison: club Brownlow history exposes selected-season Brownlow coverage without presenting a partial total
+mnew: table counts changed (1 rows; see mnew.table-counts.diff)
+mnew per-file DBs (afldb_v2_pf_*) left: 0
+drop-db: afldb_v2_rem4fixloop_mnew_test dropped
+create-db: afldb_v2_rem4fixloop_mnewsnap_test created from afldb_v2_rem4fixloop_snap_tmpl_test and marked
+INSERT 0 1
+UPDATE 1
+mnewsnap 2026 brownlow_season_votes=1 season_total=complete
+2026-11-15T06:07:24Z mnewsnap start: sh template=afldb_v2_rem4fixloop_snap_tmpl_test preseed=yes pattern=exposes selected-season Brownlow coverage
+mnewsnap rc=0
+2026-11-15T06:07:27Z mnewsnap end rc=0
+ Test Files  1 passed (1)
+      Tests  1 passed | 69 skipped (70)
+   Duration  1.29s (transform 498ms, setup 175ms, import 606ms, tests 137ms, environment 0ms)
+mnewsnap failing ids: 0
+files total=1 by status={"passed":1}
+file-level failures (status failed with zero failed assertions)=0
+tests total=70 passed=1 failed=0 pending=69 todo=0
+assertion statuses={"skipped":69,"passed":1}
+wall ms=1297.441650390625 (0.0 min)
+# order (JSON completion order): n<TAB>file<TAB>status<TAB>file duration ms<TAB>assertions
+SUMMARY-TEST passed  club comparison: club Brownlow history exposes selected-season Brownlow coverage without presenting a partial total
+mnewsnap: table counts changed (1 rows; see mnewsnap.table-counts.diff)
+mnewsnap per-file DBs (afldb_v2_pf_*) left: 0
+drop-db: afldb_v2_rem4fixloop_mnewsnap_test dropped
+create-db: afldb_v2_rem4fixloop_mnewfile_test created from afldb_v2_rem4fixloop_rb_tmpl_test and marked
+INSERT 0 1
+UPDATE 1
+mnewfile 2026 brownlow_season_votes=1 season_total=complete
+2026-11-15T06:07:33Z mnewfile start: sh template=afldb_v2_rem4fixloop_rb_tmpl_test preseed=yes pattern=-
+mnewfile rc=1
+2026-11-15T06:07:57Z mnewfile end rc=1
+ Test Files  1 failed (1)
+      Tests  1 failed | 69 passed (70)
+   Duration  23.41s (transform 541ms, setup 239ms, import 590ms, tests 22.19s, environment 0ms)
+mnewfile failing ids: 1
+tests/integration/club-comparison.test.ts	club comparison: club Brownlow history excludes ambiguous multi-club seasons and discloses them instead of forcing them	AssertionError: expected false to be true // Object.is equality
+files total=1 by status={"failed":1}
+file-level failures (status failed with zero failed assertions)=0
+tests total=70 passed=69 failed=1 pending=0 todo=0
+assertion statuses={"passed":69,"failed":1}
+wall ms=23396.598876953125 (0.4 min)
+# order (JSON completion order): n<TAB>file<TAB>status<TAB>file duration ms<TAB>assertions
+SUMMARY-TEST passed  club comparison: club Brownlow history exposes selected-season Brownlow coverage without presenting a partial total
+mnewfile: table counts changed (1 rows; see mnewfile.table-counts.diff)
+mnewfile per-file DBs (afldb_v2_pf_*) left: 0
+drop-db: afldb_v2_rem4fixloop_mnewfile_test dropped
+create-db: afldb_v2_rem4fixloop_mnewfilesnap_test created from afldb_v2_rem4fixloop_snap_tmpl_test and marked
+INSERT 0 1
+UPDATE 1
+mnewfilesnap 2026 brownlow_season_votes=1 season_total=complete
+2026-11-15T06:08:04Z mnewfilesnap start: sh template=afldb_v2_rem4fixloop_snap_tmpl_test preseed=yes pattern=-
+mnewfilesnap rc=1
+2026-11-15T06:08:29Z mnewfilesnap end rc=1
+ Test Files  1 failed (1)
+      Tests  1 failed | 69 passed (70)
+   Duration  24.40s (transform 535ms, setup 224ms, import 593ms, tests 23.20s, environment 0ms)
+mnewfilesnap failing ids: 1
+tests/integration/club-comparison.test.ts	club comparison: club Brownlow history excludes ambiguous multi-club seasons and discloses them instead of forcing them	AssertionError: expected false to be true // Object.is equality
+files total=1 by status={"failed":1}
+file-level failures (status failed with zero failed assertions)=0
+tests total=70 passed=69 failed=1 pending=0 todo=0
+assertion statuses={"passed":69,"failed":1}
+wall ms=24385.05126953125 (0.4 min)
+# order (JSON completion order): n<TAB>file<TAB>status<TAB>file duration ms<TAB>assertions
+SUMMARY-TEST passed  club comparison: club Brownlow history exposes selected-season Brownlow coverage without presenting a partial total
+mnewfilesnap: table counts changed (1 rows; see mnewfilesnap.table-counts.diff)
+mnewfilesnap per-file DBs (afldb_v2_pf_*) left: 0
+drop-db: afldb_v2_rem4fixloop_mnewfilesnap_test dropped
+create-db: afldb_v2_rem4fixloop_mrealrb_test created from afldb_v2_rem4fixloop_rb_tmpl_test and marked
+INSERT 0 18
+UPDATE 1
+mrealrb 2026 brownlow_season_votes=18 season_total=complete
+2026-11-15T06:08:36Z mrealrb start: sh template=afldb_v2_rem4fixloop_rb_tmpl_test preseed=yes pattern=exposes selected-season Brownlow coverage
+mrealrb rc=0
+2026-11-15T06:08:38Z mrealrb end rc=0
+ Test Files  1 passed (1)
+      Tests  1 passed | 69 skipped (70)
+   Duration  1.21s (transform 529ms, setup 245ms, import 493ms, tests 110ms, environment 0ms)
+mrealrb failing ids: 0
+files total=1 by status={"passed":1}
+file-level failures (status failed with zero failed assertions)=0
+tests total=70 passed=1 failed=0 pending=69 todo=0
+assertion statuses={"skipped":69,"passed":1}
+wall ms=1222.946533203125 (0.0 min)
+# order (JSON completion order): n<TAB>file<TAB>status<TAB>file duration ms<TAB>assertions
+SUMMARY-TEST passed  club comparison: club Brownlow history exposes selected-season Brownlow coverage without presenting a partial total
+mrealrb: table counts changed (1 rows; see mrealrb.table-counts.diff)
+mrealrb per-file DBs (afldb_v2_pf_*) left: 0
+drop-db: afldb_v2_rem4fixloop_mrealrb_test dropped
+create-db: afldb_v2_rem4fixloop_mrealsnap_test created from afldb_v2_rem4fixloop_snap_tmpl_test and marked
+INSERT 0 18
+UPDATE 1
+mrealsnap 2026 brownlow_season_votes=18 season_total=complete
+2026-11-15T06:08:44Z mrealsnap start: sh template=afldb_v2_rem4fixloop_snap_tmpl_test preseed=yes pattern=exposes selected-season Brownlow coverage
+mrealsnap rc=0
+2026-11-15T06:08:47Z mrealsnap end rc=0
+ Test Files  1 passed (1)
+      Tests  1 passed | 69 skipped (70)
+   Duration  1.36s (transform 565ms, setup 233ms, import 627ms, tests 133ms, environment 0ms)
+mrealsnap failing ids: 0
+files total=1 by status={"passed":1}
+file-level failures (status failed with zero failed assertions)=0
+tests total=70 passed=1 failed=0 pending=69 todo=0
+assertion statuses={"skipped":69,"passed":1}
+wall ms=1367.400634765625 (0.0 min)
+# order (JSON completion order): n<TAB>file<TAB>status<TAB>file duration ms<TAB>assertions
+SUMMARY-TEST passed  club comparison: club Brownlow history exposes selected-season Brownlow coverage without presenting a partial total
+mrealsnap: table counts changed (1 rows; see mrealsnap.table-counts.diff)
+mrealsnap per-file DBs (afldb_v2_pf_*) left: 0
+drop-db: afldb_v2_rem4fixloop_mrealsnap_test dropped
+create-db: afldb_v2_rem4fixloop_mrealfile_test created from afldb_v2_rem4fixloop_rb_tmpl_test and marked
+INSERT 0 18
+UPDATE 1
+mrealfile 2026 brownlow_season_votes=18 season_total=complete
+2026-11-15T06:08:53Z mrealfile start: sh template=afldb_v2_rem4fixloop_rb_tmpl_test preseed=yes pattern=-
+mrealfile rc=0
+2026-11-15T06:09:18Z mrealfile end rc=0
+ Test Files  1 passed (1)
+      Tests  70 passed (70)
+   Duration  24.28s (transform 535ms, setup 238ms, import 544ms, tests 23.13s, environment 0ms)
+mrealfile failing ids: 0
+files total=1 by status={"passed":1}
+file-level failures (status failed with zero failed assertions)=0
+tests total=70 passed=70 failed=0 pending=0 todo=0
+assertion statuses={"passed":70}
+wall ms=24262.741455078125 (0.4 min)
+# order (JSON completion order): n<TAB>file<TAB>status<TAB>file duration ms<TAB>assertions
+SUMMARY-TEST passed  club comparison: club Brownlow history exposes selected-season Brownlow coverage without presenting a partial total
+mrealfile: table counts changed (1 rows; see mrealfile.table-counts.diff)
+mrealfile per-file DBs (afldb_v2_pf_*) left: 0
+drop-db: afldb_v2_rem4fixloop_mrealfile_test dropped
+create-db: afldb_v2_rem4fixloop_mrealfilesnap_test created from afldb_v2_rem4fixloop_snap_tmpl_test and marked
+INSERT 0 18
+UPDATE 1
+mrealfilesnap 2026 brownlow_season_votes=18 season_total=complete
+2026-11-15T06:09:25Z mrealfilesnap start: sh template=afldb_v2_rem4fixloop_snap_tmpl_test preseed=yes pattern=-
+mrealfilesnap rc=0
+2026-11-15T06:09:51Z mrealfilesnap end rc=0
+ Test Files  1 passed (1)
+      Tests  70 passed (70)
+   Duration  25.28s (transform 568ms, setup 241ms, import 619ms, tests 24.04s, environment 0ms)
+mrealfilesnap failing ids: 0
+files total=1 by status={"passed":1}
+file-level failures (status failed with zero failed assertions)=0
+tests total=70 passed=70 failed=0 pending=0 todo=0
+assertion statuses={"passed":70}
+wall ms=25257.395263671875 (0.4 min)
+# order (JSON completion order): n<TAB>file<TAB>status<TAB>file duration ms<TAB>assertions
+SUMMARY-TEST passed  club comparison: club Brownlow history exposes selected-season Brownlow coverage without presenting a partial total
+mrealfilesnap: table counts changed (1 rows; see mrealfilesnap.table-counts.diff)
+mrealfilesnap per-file DBs (afldb_v2_pf_*) left: 0
+drop-db: afldb_v2_rem4fixloop_mrealfilesnap_test dropped
+##### f4 end 2026-11-15T06:09:54Z rc=0 porcelain-after=0
+##### done 2026-11-15T06:09:54Z

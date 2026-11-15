@@ -1,0 +1,11 @@
+ Test Files  1 passed (1)
+      Tests  1 passed | 69 skipped (70)
+   Duration  1.29s (transform 498ms, setup 175ms, import 606ms, tests 137ms, environment 0ms)
+mnewsnap failing ids: 0
+files total=1 by status={"passed":1}
+file-level failures (status failed with zero failed assertions)=0
+tests total=70 passed=1 failed=0 pending=69 todo=0
+assertion statuses={"skipped":69,"passed":1}
+wall ms=1297.441650390625 (0.0 min)
+# order (JSON completion order): n<TAB>file<TAB>status<TAB>file duration ms<TAB>assertions
+SUMMARY-TEST passed  club comparison: club Brownlow history exposes selected-season Brownlow coverage without presenting a partial total

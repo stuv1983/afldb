@@ -1,0 +1,42 @@
+fatal: cannot change to '/mnt/ssd/afldb-rem4-fixloop-20261115/cand': No such file or directory
+##### clone start 2026-11-15T05:57:30Z HEAD= porcelain-before=0
+fatal: cannot change to '/mnt/ssd/afldb-rem4-fixloop-20261115/cand': No such file or directory
+bundle verified: sha256 692120bbae25c11189abdcf8929a5a8eaf82f1a37a73816d65fa98b40e426c45 (and listed in /mnt/ssd/afldb-rem4-base/SHA256SUMS)
+snapshot verified: 30141895 bytes sha256 e77c307d3e0cddcb652e398a946e4c22c2063f13c70edadf96a975c92842826d
+Q'' rebuild dump verified: 20662027 bytes sha256 f3c7dca967ba9a0c7b3f8907af9cf00648aba879e25acc6da9770067a7715e5b
+The bundle records a complete history.
+The bundle uses this hash algorithm: sha1
+HEAD=9346605bd4cbd00465fd6a69d47ff3bf2ea064ed want=9346605bd4cbd00465fd6a69d47ff3bf2ea064ed
+Q''' 16027092e075d9064df8a3749c4b17805c2eaaeb is an ancestor of HEAD
+npm warn deprecated eslint@9.39.5: This version is no longer supported. Please see https://eslint.org/version-support for other options.
+
+added 427 packages in 14s
+node v22.23.2 vitest vitest/4.1.10 linux-x64 node-v22.23.2
+porcelain lines: 0
+##### clone end 2026-11-15T05:58:03Z rc=0 porcelain-after=0
+##### cluster start 2026-11-15T05:58:03Z HEAD=9346605b porcelain-before=0
+The files belonging to this database system will be owned by user "arm".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C".
+The default text search configuration will be set to "english".
+
+Data page checksums are disabled.
+
+creating directory /mnt/ssd/afldb-rem4-fixloop-20261115-pg/data ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default max_connections ... 100
+selecting default shared_buffers ... 128MB
+selecting default time zone ... Australia/Melbourne
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+init: cluster initialised
+roles: afldb_owner, afldb_app, afldb_import, afldb_backup, afldb_auth present
+pg_ctl: server is running (PID: 82028)
+/usr/lib/postgresql/16/bin/postgres "-D" "/mnt/ssd/afldb-rem4-fixloop-20261115-pg/data"
+LISTEN 0      600        127.0.0.1:55689      0.0.0.0:*    users:(("postgres",pid=82028,fd=7))          
+##### cluster end 2026-11-15T05:58:09Z rc=0 porcelain-after=0
+##### done 2026-11-15T05:58:09Z

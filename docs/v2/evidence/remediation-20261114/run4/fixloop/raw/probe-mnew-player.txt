@@ -1,0 +1,8 @@
+== rb (afldb_v2_rem4fixloop_rb_tmpl_test)
+min_player_id_is_set=true ps_2026_rows=0 ps_2026_club_count=none pms_2026_matches=0
+club_id_null_vote_rows_all_seasons=16120 of_which_season_2026=0
+players_with_2026_club_count_gt1=0
+== snap (afldb_v2_rem4fixloop_snap_tmpl_test)
+min_player_id_is_set=true ps_2026_rows=0 ps_2026_club_count=none pms_2026_matches=0
+club_id_null_vote_rows_all_seasons=16120 of_which_season_2026=0
+players_with_2026_club_count_gt1=0

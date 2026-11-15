@@ -1,0 +1,7 @@
+files total=1 by status={"failed":1}
+file-level failures (status failed with zero failed assertions)=0
+tests total=70 passed=69 failed=1 pending=0 todo=0
+assertion statuses={"passed":69,"failed":1}
+wall ms=23396.598876953125 (0.4 min)
+# order (JSON completion order): n<TAB>file<TAB>status<TAB>file duration ms<TAB>assertions
+1	tests/integration/club-comparison.test.ts	failed	22116	70

@@ -1,0 +1,9 @@
+date 2026-11-15T06:33:15Z
+cand HEAD=9346605bd4cbd00465fd6a69d47ff3bf2ea064ed porcelain=0
+waiting for server to shut down.... done
+server stopped
+listeners on 55689 (ss -ltn): 0
+no listener on :55689
+arm processes whose command line names /mnt/ssd/afldb-rem4-fixloop-20261115 (excluding this check): 1
+165629 tee /mnt/ssd/afldb-rem4-fixloop-20261115/evidence/final-stop.txt
+du: 1.9G	/mnt/ssd/afldb-rem4-fixloop-20261115 1.4G	/mnt/ssd/afldb-rem4-fixloop-20261115-pg 

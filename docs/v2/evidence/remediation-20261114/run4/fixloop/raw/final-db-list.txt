@@ -1,0 +1,6 @@
+date 2026-11-15T06:33:05Z
+cand HEAD=9346605bd4cbd00465fd6a69d47ff3bf2ea064ed porcelain=0
+databases on the cluster (port 55689):
+afldb_v2_rem4fixloop_rb_tmpl_test	marked	288300055
+afldb_v2_rem4fixloop_snap_tmpl_test	marked	407157783
+postgres	unmarked	7683095

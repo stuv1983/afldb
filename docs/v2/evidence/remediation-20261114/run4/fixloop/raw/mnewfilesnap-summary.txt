@@ -1,0 +1,11 @@
+ Test Files  1 failed (1)
+      Tests  1 failed | 69 passed (70)
+   Duration  24.40s (transform 535ms, setup 224ms, import 593ms, tests 23.20s, environment 0ms)
+mnewfilesnap failing ids: 1
+files total=1 by status={"failed":1}
+file-level failures (status failed with zero failed assertions)=0
+tests total=70 passed=69 failed=1 pending=0 todo=0
+assertion statuses={"passed":69,"failed":1}
+wall ms=24385.05126953125 (0.4 min)
+# order (JSON completion order): n<TAB>file<TAB>status<TAB>file duration ms<TAB>assertions
+SUMMARY-TEST passed  club comparison: club Brownlow history exposes selected-season Brownlow coverage without presenting a partial total

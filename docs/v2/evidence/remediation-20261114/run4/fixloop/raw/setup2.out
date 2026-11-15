@@ -1,0 +1,34 @@
+##### tmpl_snap start 2026-11-15T05:58:19Z HEAD=9346605b porcelain-before=0
+create-db: afldb_v2_rem4fixloop_snap_tmpl_test created and marked
+isolated-pg: afldb_v2_rem4fixloop_snap_tmpl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55689); running node
+pg_restore exit=0 seconds=6 stderrLines=0
+isolated-pg: afldb_v2_rem4fixloop_snap_tmpl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55689); running node
+AFLDB migrations -> test (afldb_owner@127.0.0.1:55689/afldb_v2_rem4fixloop_snap_tmpl_test)
+  118 migration file(s), 118 already applied
+
+Nothing to apply — schema is up to date.
+isolated-pg: afldb_v2_rem4fixloop_snap_tmpl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55689); running node
+afldb_v2_rem4fixloop_snap_tmpl_test {"ledger":"118_fixtures_unconfirmed_participants.sql","matches":17056,"fixtures":218,"receipts":5}
+ISOLATED TARGET OK: afldb_v2_rem4fixloop_snap_tmpl_test
+identity of the snapshot template (aggregates only):
+ledger_max=118_fixtures_unconfirmed_participants.sql ledger_count=118
+matches=17056 seasons=1897..2026 players=13365 fixtures=218
+seasons_row_2026=complete
+seasons_in_progress=none
+tcounts afldb_v2_rem4fixloop_snap_tmpl_test: 83 tables -> /mnt/ssd/afldb-rem4-fixloop-20261115/evidence/snap-template.table-counts.tsv
+2026-11-15T05:58:31Z snapshot template 83-table counts IDENTICAL to qual's
+##### tmpl_snap end 2026-11-15T05:58:31Z rc=0 porcelain-after=0
+##### tmpl_rb start 2026-11-15T05:58:31Z HEAD=9346605b porcelain-before=0
+create-db: afldb_v2_rem4fixloop_rb_tmpl_test created and marked
+isolated-pg: afldb_v2_rem4fixloop_rb_tmpl_test verified (cluster afldb_v2_isolated, 127.0.0.1:55689); running node
+pg_restore exit=0 seconds=28 stderrLines=0
+ISOLATED TARGET OK: afldb_v2_rem4fixloop_rb_tmpl_test
+2026-11-15T05:59:02Z Q'' rebuild restore: 83-table exact counts IDENTICAL to qual's committed restored counts (83 tables)
+2026-11-15T05:59:05Z rebuild template: ANALYZE (planner statistics only)
+identity of the Q'' rebuild template (aggregates only):
+ledger_max=118_fixtures_unconfirmed_participants.sql ledger_count=118
+matches=17056 seasons=1897..2026 players=13365 fixtures=0
+seasons_row_2026=complete
+seasons_in_progress=2027
+##### tmpl_rb end 2026-11-15T05:59:07Z rc=0 porcelain-after=0
+##### done 2026-11-15T05:59:07Z
