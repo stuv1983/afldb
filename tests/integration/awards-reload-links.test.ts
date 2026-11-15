@@ -146,10 +146,93 @@ beforeAll(async () => {
   }
 });
 beforeAll(() => lockHonoursTables(integrationDsn), 300_000);
-afterAll(async () => {
-  await unlockHonoursTables();
-  await sql.end();
+
+/**
+ * ISSUE-363 T-2: the file's real Coleman loads run against whatever the test database holds, and on a base whose
+ * stored Coleman family lags its derivation (the 4 Nov snapshot stores 46 winners, the derivation yields 47 with
+ * 2026) the first load inserts the missing winner and nothing put it back, so a shared database left this file with
+ * one more `award_winners` row than it started with and a Coleman span (1980-2025) that no longer covered it. The
+ * pre-existing Coleman family and span are captured here, once, before any block runs, and restored by id at file
+ * teardown: rows the file created are deleted, captured rows that went missing or changed are put back whole
+ * (award_winners.id is GENERATED ALWAYS, hence OVERRIDING SYSTEM VALUE; nothing references award_winners by foreign
+ * key), and the restore is verified, failing the file if the family or span still differs. `import_batches` rows the
+ * loads append are not touched: winner rows reference them, tests read the table only relatively, and the growth is
+ * the recorded shared-mode residue.
+ */
+type ColemanStart = { awardId: number; first: number | null; last: number | null; rows: { id: number; doc: string }[] };
+let colemanAtStart: ColemanStart | null = null;
+
+async function colemanFamilyDocs(awardId: number): Promise<{ id: number; doc: string }[]> {
+  return sql<{ id: number; doc: string }[]>`
+    SELECT w.id::int AS id, to_jsonb(w)::text AS doc
+      FROM award_winners w
+     WHERE w.award_id = ${awardId}
+     ORDER BY w.id
+  `;
+}
+
+beforeAll(async () => {
+  const [award] = await sql<{ id: number; first: number | null; last: number | null }[]>`
+    SELECT id, first_season AS first, last_season AS last FROM awards WHERE slug = 'coleman'
+  `;
+  // No Coleman definition yet (a schema-only base): there is no pre-existing family to protect.
+  if (!award) return;
+  colemanAtStart = { awardId: award.id, first: award.first, last: award.last, rows: await colemanFamilyDocs(award.id) };
 });
+
+async function restoreColemanAtStart(): Promise<void> {
+  const start = colemanAtStart;
+  if (!start) return;
+  await sql.begin(async (tx) => {
+    await tx`
+      DELETE FROM award_winners
+       WHERE award_id = ${start.awardId}
+         AND id <> ALL(${start.rows.map((r) => r.id)}::int[])
+    `;
+    const now = new Map(
+      (await tx<{ id: number; doc: string }[]>`
+        SELECT w.id::int AS id, to_jsonb(w)::text AS doc FROM award_winners w WHERE w.award_id = ${start.awardId}
+      `).map((r) => [r.id, r.doc]),
+    );
+    for (const row of start.rows) {
+      const current = now.get(row.id);
+      if (current !== undefined && JSON.stringify(JSON.parse(current)) === JSON.stringify(JSON.parse(row.doc))) continue;
+      if (current !== undefined) await tx`DELETE FROM award_winners WHERE id = ${row.id}`;
+      await tx`
+        INSERT INTO award_winners OVERRIDING SYSTEM VALUE
+        SELECT r.* FROM jsonb_populate_record(NULL::award_winners, ${row.doc}::text::jsonb) AS r
+      `;
+    }
+    await tx`
+      UPDATE awards SET first_season = ${start.first}, last_season = ${start.last}
+       WHERE id = ${start.awardId}
+         AND (first_season IS DISTINCT FROM ${start.first} OR last_season IS DISTINCT FROM ${start.last})
+    `;
+  });
+  const after = await colemanFamilyDocs(start.awardId);
+  const [span] = await sql<{ first: number | null; last: number | null }[]>`
+    SELECT first_season AS first, last_season AS last FROM awards WHERE id = ${start.awardId}
+  `;
+  const same = after.length === start.rows.length
+    && after.every((r, i) => r.id === start.rows[i].id
+      && JSON.stringify(JSON.parse(r.doc)) === JSON.stringify(JSON.parse(start.rows[i].doc)))
+    && span?.first === start.first && span?.last === start.last;
+  if (!same) {
+    throw new Error(
+      `awards-reload-links did not restore the pre-existing Coleman family: ${start.rows.length} row(s) and span `
+      + `${start.first}-${start.last} at start, ${after.length} row(s) and span ${span?.first}-${span?.last} after restore`,
+    );
+  }
+}
+
+afterAll(async () => {
+  try {
+    await restoreColemanAtStart();
+  } finally {
+    await unlockHonoursTables();
+    await sql.end();
+  }
+}, 120_000);
 
 function runImporter(
   groups: string[],
