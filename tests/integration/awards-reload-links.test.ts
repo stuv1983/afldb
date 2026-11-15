@@ -148,86 +148,78 @@ beforeAll(async () => {
 beforeAll(() => lockHonoursTables(integrationDsn), 300_000);
 
 /**
- * ISSUE-363 T-2: the file's real Coleman loads run against whatever the test database holds, and on a base whose
- * stored Coleman family lags its derivation (the 4 Nov snapshot stores 46 winners, the derivation yields 47 with
- * 2026) the first load inserts the missing winner and nothing put it back, so a shared database left this file with
- * one more `award_winners` row than it started with and a Coleman span (1980-2025) that no longer covered it. The
- * pre-existing Coleman family and span are captured here, once, before any block runs, and restored by id at file
- * teardown: rows the file created are deleted, captured rows that went missing or changed are put back whole
- * (award_winners.id is GENERATED ALWAYS, hence OVERRIDING SYSTEM VALUE; nothing references award_winners by foreign
- * key), and the restore is verified, failing the file if the family or span still differs. `import_batches` rows the
- * loads append are not touched: winner rows reference them, tests read the table only relatively, and the growth is
- * the recorded shared-mode residue.
+ * ISSUE-363 T-2: the file's real loaders (Coleman, 22 Under 22, All-Australian, club and named medals, ...) run against
+ * whatever the test database holds, and nothing put their effect on pre-existing rows back. On a base whose stored
+ * rows lag the loaders (the 4 Nov snapshot) a shared database left this file with the derived 2026 Coleman winner
+ * added (award_winners +1, Coleman span 1980-2025 no longer covering it) and 22 "22 Under 22" rows relinked
+ * (`implausible`/NULL -> `unique`/player); on every base every reloaded row was re-stamped to the newest
+ * `import_batch_id`. Every `award_winners` row (whole, by id) and every award span are captured here, once, before any
+ * block runs, and restored set-based at file teardown: rows the file created are deleted, captured rows that went
+ * missing or changed are put back whole (award_winners.id is GENERATED ALWAYS, hence OVERRIDING SYSTEM VALUE; nothing
+ * references award_winners by foreign key; the captured `import_batch_id`s still exist because `import_batches` rows
+ * are never deleted), and the restore is verified, failing the file if any row or span still differs.
+ * `import_batches` growth itself is left: tests read that table only relatively, and it is the recorded residue.
  */
-type ColemanStart = { awardId: number; first: number | null; last: number | null; rows: { id: number; doc: string }[] };
-let colemanAtStart: ColemanStart | null = null;
+type AwardsAtStart = { docs: string; ids: number[]; fp: string; spans: string };
+let awardsAtStart: AwardsAtStart | null = null;
 
-async function colemanFamilyDocs(awardId: number): Promise<{ id: number; doc: string }[]> {
-  return sql<{ id: number; doc: string }[]>`
-    SELECT w.id::int AS id, to_jsonb(w)::text AS doc
-      FROM award_winners w
-     WHERE w.award_id = ${awardId}
-     ORDER BY w.id
+async function awardsState(): Promise<{ fp: string; spans: string; n: number }> {
+  const [w] = await sql<{ fp: string; n: number }[]>`
+    SELECT md5(coalesce(string_agg(to_jsonb(w)::text, '|' ORDER BY w.id), '')) AS fp, count(*)::int AS n FROM award_winners w
   `;
+  const [a] = await sql<{ spans: string }[]>`
+    SELECT coalesce(jsonb_agg(jsonb_build_array(id, first_season, last_season) ORDER BY id), '[]'::jsonb)::text AS spans FROM awards
+  `;
+  return { fp: w.fp, spans: a.spans, n: w.n };
 }
 
 beforeAll(async () => {
-  const [award] = await sql<{ id: number; first: number | null; last: number | null }[]>`
-    SELECT id, first_season AS first, last_season AS last FROM awards WHERE slug = 'coleman'
+  const [w] = await sql<{ docs: string; ids: number[] }[]>`
+    SELECT coalesce(jsonb_agg(to_jsonb(w) ORDER BY w.id), '[]'::jsonb)::text AS docs,
+           coalesce(array_agg(w.id::int ORDER BY w.id), '{}'::int[]) AS ids
+      FROM award_winners w
   `;
-  // No Coleman definition yet (a schema-only base): there is no pre-existing family to protect.
-  if (!award) return;
-  colemanAtStart = { awardId: award.id, first: award.first, last: award.last, rows: await colemanFamilyDocs(award.id) };
-});
+  const state = await awardsState();
+  awardsAtStart = { docs: w.docs, ids: w.ids, fp: state.fp, spans: state.spans };
+}, 120_000);
 
-async function restoreColemanAtStart(): Promise<void> {
-  const start = colemanAtStart;
+async function restoreAwardsAtStart(): Promise<void> {
+  const start = awardsAtStart;
   if (!start) return;
   await sql.begin(async (tx) => {
+    await tx`DELETE FROM award_winners WHERE id <> ALL(${start.ids}::int[])`;
     await tx`
-      DELETE FROM award_winners
-       WHERE award_id = ${start.awardId}
-         AND id <> ALL(${start.rows.map((r) => r.id)}::int[])
+      DELETE FROM award_winners w
+       USING jsonb_array_elements(${start.docs}::text::jsonb) AS d(doc)
+       WHERE w.id = (d.doc->>'id')::int AND to_jsonb(w) <> d.doc
     `;
-    const now = new Map(
-      (await tx<{ id: number; doc: string }[]>`
-        SELECT w.id::int AS id, to_jsonb(w)::text AS doc FROM award_winners w WHERE w.award_id = ${start.awardId}
-      `).map((r) => [r.id, r.doc]),
-    );
-    for (const row of start.rows) {
-      const current = now.get(row.id);
-      if (current !== undefined && JSON.stringify(JSON.parse(current)) === JSON.stringify(JSON.parse(row.doc))) continue;
-      if (current !== undefined) await tx`DELETE FROM award_winners WHERE id = ${row.id}`;
-      await tx`
-        INSERT INTO award_winners OVERRIDING SYSTEM VALUE
-        SELECT r.* FROM jsonb_populate_record(NULL::award_winners, ${row.doc}::text::jsonb) AS r
-      `;
-    }
     await tx`
-      UPDATE awards SET first_season = ${start.first}, last_season = ${start.last}
-       WHERE id = ${start.awardId}
-         AND (first_season IS DISTINCT FROM ${start.first} OR last_season IS DISTINCT FROM ${start.last})
+      INSERT INTO award_winners OVERRIDING SYSTEM VALUE
+      SELECT r.*
+        FROM jsonb_array_elements(${start.docs}::text::jsonb) AS d(doc)
+       CROSS JOIN LATERAL jsonb_populate_record(NULL::award_winners, d.doc) AS r
+       WHERE NOT EXISTS (SELECT 1 FROM award_winners x WHERE x.id = r.id)
+    `;
+    await tx`
+      UPDATE awards a
+         SET first_season = (s.span->>1)::int, last_season = (s.span->>2)::int
+        FROM jsonb_array_elements(${start.spans}::text::jsonb) AS s(span)
+       WHERE a.id = (s.span->>0)::int
+         AND (a.first_season IS DISTINCT FROM (s.span->>1)::int OR a.last_season IS DISTINCT FROM (s.span->>2)::int)
     `;
   });
-  const after = await colemanFamilyDocs(start.awardId);
-  const [span] = await sql<{ first: number | null; last: number | null }[]>`
-    SELECT first_season AS first, last_season AS last FROM awards WHERE id = ${start.awardId}
-  `;
-  const same = after.length === start.rows.length
-    && after.every((r, i) => r.id === start.rows[i].id
-      && JSON.stringify(JSON.parse(r.doc)) === JSON.stringify(JSON.parse(start.rows[i].doc)))
-    && span?.first === start.first && span?.last === start.last;
-  if (!same) {
+  const after = await awardsState();
+  if (after.fp !== start.fp || after.spans !== start.spans) {
     throw new Error(
-      `awards-reload-links did not restore the pre-existing Coleman family: ${start.rows.length} row(s) and span `
-      + `${start.first}-${start.last} at start, ${after.length} row(s) and span ${span?.first}-${span?.last} after restore`,
+      `awards-reload-links did not restore the pre-existing award rows: ${start.ids.length} award_winners row(s) at start, `
+      + `${after.n} after restore; rows ${after.fp === start.fp ? 'equal' : 'DIFFER'}, spans ${after.spans === start.spans ? 'equal' : 'DIFFER'}`,
     );
   }
 }
 
 afterAll(async () => {
   try {
-    await restoreColemanAtStart();
+    await restoreAwardsAtStart();
   } finally {
     await unlockHonoursTables();
     await sql.end();
