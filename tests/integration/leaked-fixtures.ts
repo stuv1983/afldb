@@ -18,6 +18,10 @@
  * SEASON OWNERSHIP (kept here so the claim is checkable). One suite per season, except where noted:
  *   2061  awards-reload-links.test.ts (multi-club season)    -- moved from 2091 (ISSUE-363 decision 2)
  *   2062  awards-reload-links.test.ts (finals season)        -- moved from 2093 (ISSUE-363 decision 2)
+ *   2063  brownlow-pending-coverage.test.ts (D-365-1 completed-but-unloaded season) -- run 4
+ *   2066  brownlow-pending-projection.test.ts               -- release-gates.test.ts also uses 2066 (LATER_SEASON), rolled back
+ *   2069  settle-afl-api-issue276.test.ts (finals season)    -- run 4
+ *   2071  admin-fixtures.test.ts (SUITE_SEASON_NOW, run 4); settle-afl-api-state-b.test.ts (FIXTURE_SEASON, run 3) -- known overlap
  *   2076  settle-afltables.test.ts (ISSUE-099 block)         -- moved from 2094 by TST-9
  *   2090  awards-reload-links.test.ts (tie season)
  *   2091  admin-coaches.test.ts; v2-curated-awards.test.ts (sealed season) -- known overlap, neither is awards
@@ -41,6 +45,10 @@ import type postgres from 'postgres';
 export const COMMITTED_FIXTURE_SEASONS: Readonly<Record<number, string>> = {
   2061: 'tests/integration/awards-reload-links.test.ts',
   2062: 'tests/integration/awards-reload-links.test.ts',
+  2063: 'tests/integration/brownlow-pending-coverage.test.ts',
+  2066: 'tests/integration/brownlow-pending-projection.test.ts',
+  2069: 'tests/integration/settle-afl-api-issue276.test.ts',
+  2071: 'tests/integration/admin-fixtures.test.ts (or settle-afl-api-state-b.test.ts)',
   2076: 'tests/integration/settle-afltables.test.ts',
   2090: 'tests/integration/awards-reload-links.test.ts',
   2091: 'tests/integration/admin-coaches.test.ts (or v2-curated-awards.test.ts)',
@@ -74,6 +82,7 @@ export const COMMITTING_SUITES: readonly string[] = [
   'tests/integration/afl-api-ownership-census.test.ts',
   'tests/integration/after-siren.test.ts',
   'tests/integration/awards-reload-links.test.ts',
+  'tests/integration/brownlow-pending-coverage.test.ts',
   'tests/integration/brownlow-pending-projection.test.ts',
   'tests/integration/data-editor.test.ts',
   'tests/integration/database.test.ts',
@@ -93,6 +102,7 @@ export const COMMITTING_SUITES: readonly string[] = [
   'tests/integration/settle-afl-api-brownlow-backtest.test.ts',
   'tests/integration/settle-afl-api-brownlow-reschedule.test.ts',
   'tests/integration/settle-afl-api-brownlow.test.ts',
+  'tests/integration/settle-afl-api-issue276.test.ts',
   'tests/integration/settle-afl-api-state-b.test.ts',
   'tests/integration/settle-afl-api.test.ts',
   'tests/integration/settle-afltables.test.ts',
