@@ -1,0 +1,118 @@
+harness set=a1 host=streamanator bash=5.2.21(1)-release git=git version 2.43.0 2026-11-15T23:58:29Z
+block p10-s9b-pages.sh 2eba46e0af201ee46c8568d60a82cf4fc7bfda0d76adf0ccc2eba9082951005e
+block p11-s10-observe.sh 34926869832801899ae2ee2a18cfa36d66e4e01f2ea5a3ec3c3b1fb328472390
+block p1-s1-precheck.sh 47134e23ff05ede64a999224660c9c75c24e2030b511fe31536bff125b2d245a
+block p2-s2-ff.sh 7ffda1b00c7b8a5abdeb93ebf67e35091b4190c060f0525f2cb2a08d07a6f9f4
+block p3-b1a0-dump.sh 57c17feafbfa8fe1a1c6b2b44c1f3b3ff4e8f090c4f9d2cc75a804d8260bce80
+block p4-dev-verify.sh 0145c2cae63fd5523f52f17689ab1e877a2cb9f1bb399598c76fa91eee961de9
+block p5-b1a-dryrun.sh 6b5e428ab4667859bc9cbf769575c373db771c2527cba93ef0ec6b9dce1afd4b
+block p6-b1a-commit.sh 963b2bbf5a4eb4922826e1a0213c5c46125c3d37ecdd9b16097654f6daa577d3
+block p7b-s3-build-check.sh 71af227f35c59edf57814b69dd841d9b164898d1159da076e85091b97b376c42
+block p7-s3-build.sh 14119a9a06daed14eb60868851491c3e1c2978921837b73d7f902ed5adf45744
+block p8-s4s5-gate-promote.sh b634225e26bb481b6f787caee8414df8efb23d09fcb941578d149991bc78d26a
+block p9-s7s8-checks.sh fa98beec4c3c08716e16760ecd4b742b00b685834a73ca0b00929927788c4dd8
+block r1-state.sh c0b471475bf2ca0cda38c603f3d1b9e4bf0d97e01da6f248854d519b4b948760
+block r2-rollback.sh 81af77e771967759e925196dccc45fc080c0a6174299758baa9e1885e80ae968
+block r3-remove-artifacts.sh 5bb697df7cf76d41a45dd76bacfadb972a973db5fbb3d58868299a57b9dbcb1c
+PASS  p1-ok: precheck PASS at H0, origin=PREP
+PASS  p1-origin-future: remote drift stops P1
+PASS  p1-no-tsx: missing tsx stops
+PASS  p1-settle-active: active settle stops
+PASS  p1-writer-proc: writer process stops
+PASS  p1-wrong-head: HEAD not c1c4b22e stops
+PASS  p2-pin-ok: origin=PREP: PASS, HEAD=CP
+PASS  p2-origin-at-CP: origin=a2e6ea99 refused (drift)
+PASS  p2-origin-at-c34ae24d: origin=c34ae24d refused
+PASS  p2-origin-future-docs: future docs-only origin refused
+PASS  p2-start-dirty: dirty checkout stops before fetch
+PASS  p2-start-wrong-head: start HEAD not H0/CP stops
+PASS  p2-status-fails-then-rerun: status failure stops P2
+PASS  p2-status-fails-then-rerun: re-run after post-ff failure passes
+PASS  p2-A-exists-nonempty: non-empty pre-existing A stops
+PASS  p2-bad-stamp: malformed STAMP stops before any git write
+PASS  p3-ok: normal: BEFORE-CHECK PASS
+PASS  p3-ok: verdict persisted
+PASS  p3-ok: password not in psql argv
+PASS  p3-ok: backup --dir new --keep 1000
+PASS  p3-wrong-head: wrong HEAD stops before install/dump
+PASS  p3-dirty: dirty checkout stops before dump
+PASS  p3-artifact-hash-bad: tampered artifact stops
+PASS  p3-before-diff: drifted BEFORE capture: FAIL
+PASS  p3-dump-pending: dump 2026 rows != 669: FAIL
+PASS  p3-wrong-db-dump: dump header dbname not afldb_prod stops
+PASS  p3-backup-fails: backup failure stops
+PASS  p4-pass: verify rc0 + VERDICT PASS
+PASS  p4-pass: PORT 61432 passed
+PASS  p4-rc1-with-pass-line: verify rc1 is NOT PASS even with the line
+PASS  p4-fail-line: VERDICT FAIL is NOT PASS
+PASS  p4-sha-mismatch: wrong sha stops before verify
+PASS  p4-bytes-mismatch: wrong size stops
+PASS  p4-art-tamper: tampered verify script stops
+PASS  p5-pass: dry run pass
+PASS  p5-fp-drift: fingerprint drift: NOT PASS
+PASS  p5-H-missing: missing H labels: NOT PASS
+PASS  p5-runner-refused: runner REFUSED exit 1: NOT PASS
+PASS  p5-before-check-fail: P3 FAIL on record: refused before runner
+PASS  p5-wrong-verified-sha: P4-verified sha != prod dump sha: refused before runner
+PASS  p5-no-verdict-arg: missing VERDICT-PASS arg: refused
+PASS  p5-rerun-refused: existing dryrun.txt: refused
+PASS  p6-committed: checkout porcelain empty afterwards
+PASS  p6-committed: COMMITTED + exact
+PASS  p6-committed: verdict COMMITTED EXACT exit 0
+PASS  p6-committed: runner got --commit with the import DSN env
+PASS  p6-unknown: checkout porcelain empty afterwards
+PASS  p6-unknown: exit 3 ATTENTION -> R1 probe
+PASS  p6-unknown-notcommitted: checkout porcelain empty afterwards
+PASS  p6-unknown-notcommitted: exit 3 ATTENTION -> R1 probe
+PASS  p6-already: checkout porcelain empty afterwards
+PASS  p6-already: exit 3 ATTENTION -> R1 probe
+PASS  p6-refused: checkout porcelain empty afterwards
+PASS  p6-refused: exit 3 ATTENTION -> R1 probe
+PASS  p6-error: checkout porcelain empty afterwards
+PASS  p6-error: exit 3 ATTENTION -> R1 probe
+PASS  p6-no-outcome: checkout porcelain empty afterwards
+PASS  p6-no-outcome: exit 3 ATTENTION -> R1 probe
+PASS  p6-accept-psql-fails: acceptance query failure is NOT EXACT
+FAIL  p6-p5-notpass: porcelain not empty
+PASS  p6-p5-notpass: P5 NOT PASS on record: commit refused
+PASS  p6-p5-notpass: after refused P6, R3 removes the artifacts (SITTING: R3 then R1)
+PASS  p6-rerun-refused: existing commit.txt: never re-run
+PASS  p7-build-ok: build finished in wait
+PASS  p7-build-ok: evidence string reached release.mjs as ONE argument intact
+PASS  p7-build-ok: P7b parses READY id
+PASS  p7b-build-failed: BUILD_EXIT=1 stops
+PASS  p7b-bad-log-path: log path outside pattern refused
+PASS  p7-tmux-exists: existing tmux session refused
+PASS  p8-ok: gate + promote PASS
+PASS  p8-gate-refuses: gate refusal stops before promote
+PASS  p8-half-switch: current moved but previous not: STOP (no PROMOTED)
+PASS  p8-rerun-after-promote: second P8 refused (links already moved)
+PASS  p8-bad-id: non-a2e6ea99 id refused
+PASS  p9-plain: plain path
+PASS  p9-plain: status --expect without confirm
+PASS  p9-confirm: confirm path
+PASS  p9-confirm: confirm flag passed to S7
+PASS  p9-s8-fails: S8 failure stops
+PASS  r1-probe: probe prints pending|669|0
+PASS  r1-probe: R1 shows the lost session's OUTCOME
+PASS  r1-probe-no-A: probe without A reports non-zero, no crash
+PASS  r2-links-after-promote: rollback links to c1c4b22e
+PASS  r2-links-after-promote: second rollback refused (previous is now NEW)
+PASS  r2-links-after-promote: verify after rollback
+PASS  r2-half-promote: half-switched promote: R2 refuses (owner needs --to)
+PASS  r3-present: removes artifacts, porcelain empty
+PASS  r3-present: idempotent second run
+PASS  r3-other-untracked: unrelated untracked file: STOP, not deleted
+PASS  r3-other-untracked: unrelated file left in place
+== totals: 89 PASS, 1 FAIL, 0 DEFECT-lines
+PASS  p10-after-pass: after: new text on all samples
+PASS  p10-after-pass: selection order Pendlebury first + debutant last
+FAIL  p10-after-pass: cookie never printed
+PASS  p10-after-stale: after with old text: 64 not as expected
+PASS  p10-baseline-pass: baseline: old text
+PASS  p10-few-eligible: fewer than 4 eligible: STOP before any request
+PASS  p10-http-500: HTTP 500 counted
+PASS  p11-ok: 4 ticks OK
+PASS  p11-health-bad: bad health: 4 ticks not OK
+PASS  p11-bad-player: malformed player path refused
+== p10/p11 totals: 9 PASS, 1 FAIL

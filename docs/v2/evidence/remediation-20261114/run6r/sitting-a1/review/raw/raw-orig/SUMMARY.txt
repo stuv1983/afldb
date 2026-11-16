@@ -1,0 +1,113 @@
+harness set=orig host=streamanator bash=5.2.21(1)-release git=git version 2.43.0 2026-11-15T23:57:44Z
+block p10-s9b-pages.sh 2eba46e0af201ee46c8568d60a82cf4fc7bfda0d76adf0ccc2eba9082951005e
+block p11-s10-observe.sh 34926869832801899ae2ee2a18cfa36d66e4e01f2ea5a3ec3c3b1fb328472390
+block p1-s1-precheck.sh e940f48784849316669578394056480f1fe1bc91f9d31bdccc295bb1bca25271
+block p2-s2-ff.sh 11cb1b5d9bcb920e20efa4fb2c76bebe24a087c8f3b25146aef02ec2203d9c28
+block p3-b1a0-dump.sh b89a13ceb63809db949d4b65b0fc668b97ef806f0973e260d1edae8f0cb0bd7d
+block p4-dev-verify.sh 0145c2cae63fd5523f52f17689ab1e877a2cb9f1bb399598c76fa91eee961de9
+block p5-b1a-dryrun.sh f94a8fe8a9290d183e275ca1a45d407fea43fe8af27e76f196a163a982ac8861
+block p6-b1a-commit.sh ac8579105213ed16a52401a4111e76527e9b174969ad76a6a41537a843f5a520
+block p7b-s3-build-check.sh 71af227f35c59edf57814b69dd841d9b164898d1159da076e85091b97b376c42
+block p7-s3-build.sh 14119a9a06daed14eb60868851491c3e1c2978921837b73d7f902ed5adf45744
+block p8-s4s5-gate-promote.sh b634225e26bb481b6f787caee8414df8efb23d09fcb941578d149991bc78d26a
+block p9-s7s8-checks.sh fa98beec4c3c08716e16760ecd4b742b00b685834a73ca0b00929927788c4dd8
+block r1-state.sh f14a62bb97bf4e96f09c822db85c21655718943a6a12dce07dbe07b373e6f436
+block r2-rollback.sh 81af77e771967759e925196dccc45fc080c0a6174299758baa9e1885e80ae968
+block r3-remove-artifacts.sh 5bb697df7cf76d41a45dd76bacfadb972a973db5fbb3d58868299a57b9dbcb1c
+PASS  p1-ok: precheck PASS at H0, origin=PREP
+PASS  p1-origin-future: original P1 has no remote check
+PASS  p1-no-tsx: DEFECT reproduced: missing tsx passes
+PASS  p1-settle-active: active settle stops
+PASS  p1-writer-proc: writer process stops
+PASS  p1-wrong-head: HEAD not c1c4b22e stops
+PASS  p2-pin-ok: origin=PREP: PASS, HEAD=CP
+PASS  p2-origin-at-CP: origin=a2e6ea99 accepted by original
+PASS  p2-origin-at-c34ae24d: origin=c34ae24d accepted by original
+PASS  p2-origin-future-docs: DEFECT reproduced: future docs-only origin accepted by original
+PASS  p2-start-dirty: dirty checkout stops before fetch
+PASS  p2-start-wrong-head: start HEAD not H0/CP stops
+PASS  p2-status-fails-then-rerun: status failure stops P2
+PASS  p2-status-fails-then-rerun: DEFECT reproduced: re-run refused after post-ff failure
+PASS  p2-A-exists-nonempty: non-empty pre-existing A stops
+PASS  p2-bad-stamp: malformed STAMP stops before any git write
+PASS  p3-ok: normal: BEFORE-CHECK PASS
+PASS  p3-ok: password not in psql argv
+PASS  p3-ok: backup --dir new --keep 1000
+PASS  p3-wrong-head: DEFECT reproduced: wrong HEAD not stopped, dump taken
+PASS  p3-dirty: DEFECT reproduced: dirty checkout not stopped
+PASS  p3-artifact-hash-bad: tampered artifact stops
+PASS  p3-before-diff: drifted BEFORE capture: FAIL
+PASS  p3-dump-pending: original does not assert dump proof (prints only)
+PASS  p3-wrong-db-dump: dump header dbname not afldb_prod stops
+PASS  p3-backup-fails: backup failure stops
+PASS  p4-pass: verify rc0 + VERDICT PASS
+PASS  p4-pass: PORT 61432 passed
+PASS  p4-rc1-with-pass-line: verify rc1 is NOT PASS even with the line
+PASS  p4-fail-line: VERDICT FAIL is NOT PASS
+PASS  p4-sha-mismatch: wrong sha stops before verify
+PASS  p4-bytes-mismatch: wrong size stops
+PASS  p4-art-tamper: tampered verify script stops
+PASS  p5-pass: dry run pass
+PASS  p5-fp-drift: fingerprint drift: NOT PASS
+PASS  p5-H-missing: DEFECT reproduced: missing H labels pass vacuously
+PASS  p5-runner-refused: runner REFUSED exit 1: NOT PASS
+PASS  p5-before-check-fail: DEFECT reproduced: original runs dry run despite BEFORE-CHECK FAIL
+PASS  p5-rerun-refused: existing dryrun.txt: refused
+PASS  p6-committed: checkout porcelain empty afterwards
+PASS  p6-committed: COMMITTED + exact
+PASS  p6-committed: runner got --commit with the import DSN env
+PASS  p6-unknown: checkout porcelain empty afterwards
+DEFECT reproduced  p6-unknown: original exits 0 with free-text result (runner exit 4)
+PASS  p6-unknown-notcommitted: checkout porcelain empty afterwards
+DEFECT reproduced  p6-unknown-notcommitted: original exits 0 with free-text result (runner exit 4)
+PASS  p6-already: checkout porcelain empty afterwards
+DEFECT reproduced  p6-already: original exits 0 with free-text result (runner exit 3)
+PASS  p6-refused: checkout porcelain empty afterwards
+DEFECT reproduced  p6-refused: original exits 0 with free-text result (runner exit 1)
+PASS  p6-error: checkout porcelain empty afterwards
+DEFECT reproduced  p6-error: original exits 0 with free-text result (runner exit 2)
+PASS  p6-no-outcome: checkout porcelain empty afterwards
+DEFECT reproduced  p6-no-outcome: original exits 0 with free-text result (runner exit 1)
+PASS  p6-accept-psql-fails: acceptance query failure is NOT EXACT
+PASS  p6-p5-notpass: checkout porcelain empty afterwards
+PASS  p6-p5-notpass: DEFECT reproduced: original commits despite P5 NOT PASS
+PASS  p6-rerun-refused: existing commit.txt: never re-run
+PASS  p7-build-ok: build finished in wait
+PASS  p7-build-ok: evidence string reached release.mjs as ONE argument intact
+PASS  p7-build-ok: P7b parses READY id
+PASS  p7b-build-failed: BUILD_EXIT=1 stops
+PASS  p7b-bad-log-path: log path outside pattern refused
+PASS  p7-tmux-exists: existing tmux session refused
+PASS  p8-ok: gate + promote PASS
+PASS  p8-gate-refuses: gate refusal stops before promote
+PASS  p8-half-switch: current moved but previous not: STOP (no PROMOTED)
+PASS  p8-rerun-after-promote: second P8 refused (links already moved)
+PASS  p8-bad-id: non-a2e6ea99 id refused
+PASS  p9-plain: plain path
+PASS  p9-plain: status --expect without confirm
+PASS  p9-confirm: confirm path
+PASS  p9-confirm: confirm flag passed to S7
+PASS  p9-s8-fails: S8 failure stops
+PASS  r1-probe: probe prints pending|669|0
+PASS  r1-probe: DEFECT reproduced: original R1 does not show commit.txt
+PASS  r1-probe-no-A: probe without A reports non-zero, no crash
+PASS  r2-links-after-promote: rollback links to c1c4b22e
+PASS  r2-links-after-promote: second rollback refused (previous is now NEW)
+PASS  r2-links-after-promote: verify after rollback
+PASS  r2-half-promote: half-switched promote: R2 refuses (owner needs --to)
+PASS  r3-present: removes artifacts, porcelain empty
+PASS  r3-present: idempotent second run
+PASS  r3-other-untracked: unrelated untracked file: STOP, not deleted
+PASS  r3-other-untracked: unrelated file left in place
+== totals: 79 PASS, 0 FAIL, 6 DEFECT-lines
+PASS  p10-after-pass: after: new text on all samples
+PASS  p10-after-pass: selection order Pendlebury first + debutant last
+FAIL  p10-after-pass: cookie never printed
+PASS  p10-after-stale: after with old text: 64 not as expected
+PASS  p10-baseline-pass: baseline: old text
+PASS  p10-few-eligible: fewer than 4 eligible: STOP before any request
+PASS  p10-http-500: HTTP 500 counted
+PASS  p11-ok: 4 ticks OK
+PASS  p11-health-bad: bad health: 4 ticks not OK
+PASS  p11-bad-player: malformed player path refused
+== p10/p11 totals: 9 PASS, 1 FAIL

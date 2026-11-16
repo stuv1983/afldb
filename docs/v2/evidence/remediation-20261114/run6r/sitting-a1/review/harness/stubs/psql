@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Harness stub for psql: logs argv (DSN password must not appear) and PGOPTIONS; serves fixture output by -f file.
+echo "psql PGOPTIONS=[${PGOPTIONS:-}] PGPASSWORD_set=$([ -n "${PGPASSWORD:-}" ] && echo yes || echo no) argv=$*" >> "$HT/calls.log"
+f=
+while [ $# -gt 0 ]; do [ "$1" = -f ] && f=$2; shift; done
+[ -n "${STUB_PSQL_RC:-}" ] && [ "$STUB_PSQL_RC" != 0 ] && { echo "psql: stub failure" >&2; exit "$STUB_PSQL_RC"; }
+case "$(basename "$f")" in
+  b1a0-parity.sql) echo "parity|stub|ok";;
+  b1a-accept-r6r.sql) cat "$STUB_ACCEPT";;
+  *) echo "stub psql: unexpected -f $f" >&2; exit 97;;
+esac

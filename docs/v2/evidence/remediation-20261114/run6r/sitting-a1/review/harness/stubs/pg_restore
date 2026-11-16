@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Harness stub for pg_restore: --list prints a custom-format TOC header; --data-only --table=player_season_stats prints a COPY block.
+echo "pg_restore $*" >> "$HT/calls.log"
+if [ "$1" = --list ]; then
+  printf ';\n; Archive created at 2026-11-18 00:20:00 UTC\n;     dbname: %s\n;     TOC Entries: 4\n;\n' "${STUB_DUMP_DB:-afldb_prod}"
+  echo '1; 0 0 TABLE DATA public player_season_stats afldb'
+  echo '2; 0 0 TABLE DATA public stat_availability afldb'
+  echo '3; 0 0 TABLE DATA public brownlow_season_votes afldb'
+  echo '4; 0 0 TABLE DATA public auth_users afldb'
+  exit 0
+fi
+printf 'COPY public.player_season_stats (id, player_id, season, brownlow_status, brownlow_votes) FROM stdin;\n'
+for i in $(seq 1 "${STUB_DUMP_ROWS:-669}"); do printf '%s\t%s\t2026\tnot_applicable\t\\N\n' "$i" "$i"; done
+printf '9001\t1\t2025\trecorded\t3\n'
+printf '\\.\n'

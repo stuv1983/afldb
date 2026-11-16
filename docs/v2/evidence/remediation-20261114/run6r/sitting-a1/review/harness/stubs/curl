@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Harness stub for curl (loopback page checks): -o FILE gets the body, -w prints the http code (and an empty redirect_url).
+echo "curl $*" >> "$HT/calls.log"
+o=; w=; url=
+while [ $# -gt 0 ]; do case "$1" in -o) o=$2; shift 2;; -w) w=$2; shift 2;; -m|-H) shift 2;; -s) shift;; *) url=$1; shift;; esac; done
+case "$url" in
+  */api/health) body=${STUB_HEALTH:-'{"status":"ok","database":"ok"}'};;
+  */players/*) body=$(cat "${STUB_PAGE_BODY:-/dev/null}");;
+  *) body=ok;;
+esac
+if [ -n "$o" ]; then printf '%s' "$body" > "$o"; else printf '%s' "$body"; fi
+[ -n "$w" ] && { [[ $w == *redirect_url* ]] && printf '%s ' "${STUB_CODE:-200}" || printf '%s' "${STUB_CODE:-200}"; }
+exit 0

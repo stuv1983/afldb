@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Harness stub for node. Logs argv; emulates release.mjs subcommands and the B1a runner from fixtures.
+echo "node $*" >> "$HT/calls.log"; { printf "nodeargv"; printf " [%s]" "$@"; echo; } >> "$HT/calls.log"
+if [ "${1:-}" = --version ]; then echo v22.23.2; exit 0; fi
+if [ "${1:-}" = deploy/release.mjs ]; then
+  cmd=${2:-}; shift 2
+  case "$cmd" in
+    status|verify|check-node-modules|host-gate)
+      v="STUB_REL_${cmd//-/_}_RC"; echo "release: stub $cmd $*"; exit "${!v:-0}";;
+    build)
+      echo "release: stub build $*"
+      [ -n "${STUB_BUILD_OUT:-}" ] && cat "$STUB_BUILD_OUT"; exit "${STUB_BUILD_RC:-0}";;
+    promote)
+      id=$1; echo "release: stub promote $*"
+      [ "${STUB_PROMOTE_RC:-0}" = 0 ] || exit "$STUB_PROMOTE_RC"
+      cur=$(readlink "$HT/rel/current"); ln -sfn "releases/$id" "$HT/rel/current"
+      [ "${STUB_PROMOTE_HALF:-0}" = 1 ] || ln -sfn "$cur" "$HT/rel/previous"
+      echo '{"op":"promote","id":"'"$id"'"}' >> "$HT/rel/events.log"; exit 0;;
+    rollback)
+      echo "release: stub rollback $*"
+      [ "${STUB_ROLLBACK_RC:-0}" = 0 ] || exit "$STUB_ROLLBACK_RC"
+      cur=$(readlink "$HT/rel/current"); prev=$(readlink "$HT/rel/previous")
+      ln -sfn "$prev" "$HT/rel/current"; ln -sfn "$cur" "$HT/rel/previous"
+      echo '{"op":"rollback"}' >> "$HT/rel/events.log"; exit 0;;
+    *) echo "stub: unknown release command $cmd" >&2; exit 99;;
+  esac
+fi
+if [ "${1:-}" = --import ] && [ "${2:-}" = tsx ]; then
+  # B1a runner: record whether the DSN env var is present (never its value), print the fixture, exit with the fixture code.
+  for a in "$@"; do [ "$a" = --commit ] && mode=commit; done
+  echo "runner mode=${mode:-dryrun} import_dsn_set=$([ -n "${AFLDB_IMPORT_DATABASE_URL:-}" ] && echo yes || echo no)" >> "$HT/calls.log"
+  if [ "${mode:-dryrun}" = commit ]; then cat "$STUB_COMMIT_OUT"; exit "${STUB_COMMIT_RC:-0}"; fi
+  cat "$STUB_DRY_OUT"; exit "${STUB_DRY_RC:-0}"
+fi
+echo "stub node: unexpected argv $*" >&2; exit 98
