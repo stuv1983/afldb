@@ -28,8 +28,10 @@ export function formatNumber(value: number | null | undefined): string {
  *
  * An absent vote count has three quite different meanings and they must
  * never collapse into "0". A player in 1943 did not fail to poll — there
- * was no medal. A 2026 player has not polled zero — the count is not yet
- * published. Only `complete` makes 0 a fact about the player.
+ * was no medal. A `pending` season has not polled zero — AFLDB has not
+ * loaded its results, whether the season is still being played or is
+ * complete with the medal awarded but not yet loaded (D-365-W). Only
+ * `complete` makes 0 a fact about the player.
  */
 export function formatBrownlow(
   votes: number | null | undefined,
@@ -39,7 +41,7 @@ export function formatBrownlow(
     case 'complete':
       return votes === null || votes === undefined ? NOT_RECORDED : votes.toLocaleString('en-AU');
     case 'pending':
-      return 'Not yet awarded';
+      return 'Results not loaded';
     case 'not_applicable':
       return 'No medal';
     case 'not_collected':
@@ -53,7 +55,7 @@ export function formatBrownlow(
 export function brownlowStatusNote(status: string): string | null {
   switch (status) {
     case 'pending':
-      return 'The season is still in progress; the Brownlow Medal has not been awarded.';
+      return 'Brownlow Medal results for this season have not been loaded yet.';
     case 'not_applicable':
       return 'No Brownlow Medal was awarded for this season.';
     case 'not_collected':

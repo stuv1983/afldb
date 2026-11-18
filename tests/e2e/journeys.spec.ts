@@ -126,13 +126,14 @@ test('an unfinished season is visibly provisional', async ({ page }) => {
   await expect(page.locator('.subtitle')).not.toContainText('Premiers:');
 });
 
-test('a pending Brownlow reads as not yet awarded, never as zero', async ({ page }) => {
-  // Max Gawn is still playing; the 2026 medal has not been awarded.
+test('a pending Brownlow reads as results not loaded, never as zero', async ({ page }) => {
+  // Max Gawn's 2026 Brownlow results are not loaded (D-365-W wording). Pending says nothing about
+  // whether the season is still being played: a completed season can have pending results too.
   await page.goto('/players/max-gawn-11966');
   const seasonTable = page.getByRole('table', { name: /not recorded in that era/ });
   const row2026 = seasonTable.locator('tr').filter({ hasText: '2026' }).first();
-  await expect(row2026).toContainText('Not yet awarded');
-  await expect(row2026).toContainText('In progress');
+  const bv = row2026.locator('td[title="Brownlow Medal results for this season have not been loaded yet."]');
+  await expect(bv).toHaveText('Results not loaded');
 });
 
 test('a club page names each era by the identity of the time', async ({ page }) => {

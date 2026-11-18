@@ -3,6 +3,11 @@
 # one read-only DB query (backup role) to choose the player paths, then loopback requests with a 15-minute beta claim minted from
 # .env (cookie file 600, removed at the end; never sent over the public route).
 #   MODE=baseline (before the B1a commit: the OLD text) or after (S9b: the NEW text) on all 16 samples of each of 4 players.
+#   The NEW text is the D-365-W `pending` wording ("Results not loaded" / "Brownlow Medal results for this season have not been
+#   loaded yet."), so `after` needs a serving release that contains D-365-W; a release with the interim ISSUE-365 wording
+#   ("Not yet awarded") fails every sample (STOP, not a pass). A sample is bad when its page carries any wording of the other
+#   state, even alongside the expected text: `after` rejects "No medal" and the interim label/tooltip; `baseline` rejects both
+#   pending wordings (D-365-W and interim).
 # Unlike packet 6R P10, the three controls are part of the verdict, each recorded separately:
 #   anonymous /players/<A>    307 with Location <origin>/beta?from=%2Fplayers%2F<A>
 #   /seasons/2026 (admitted)  200 and the no-votes text
@@ -49,10 +54,13 @@ cnt() { grep -o "$1" "$T" | wc -l || true; }
 for s in $SEL; do for i in $(seq 1 12); do hit "/players/$s" >/dev/null; done; done   # warm-up pass
 bad=0; n=0
 for s in $SEL; do for i in $(seq 1 16); do c=$(hit "/players/$s"); n=$((n+1))
-  ny=$(cnt 'Not yet awarded'); pn=$(cnt 'still in progress; the Brownlow Medal has not been awarded'); nm=$(cnt 'No medal'); na=$(cnt 'No Brownlow Medal was awarded for this season')
-  echo "/players/$s $c notyet=$ny pendnote=$pn nomedal=$nm nanote=$na"
-  if [ "$MODE" = after ]; then { [ "$c" = 200 ] && [ "$ny" -ge 1 ] && [ "$pn" -ge 1 ] && [ "$nm" = 0 ] && [ "$na" = 0 ]; } || bad=$((bad+1))
-  else { [ "$c" = 200 ] && [ "$nm" -ge 1 ] && [ "$na" -ge 1 ] && [ "$ny" = 0 ]; } || bad=$((bad+1)); fi
+  ny=$(cnt 'Results not loaded'); pn=$(cnt 'Brownlow Medal results for this season have not been loaded yet'); nm=$(cnt 'No medal'); na=$(cnt 'No Brownlow Medal was awarded for this season')
+  iy=$(cnt 'Not yet awarded'); ip=$(cnt 'still in progress; the Brownlow Medal has not been awarded')
+  echo "/players/$s $c notloaded=$ny pendnote=$pn nomedal=$nm nanote=$na interim=$iy interimnote=$ip"
+  # after: the D-365-W label and tooltip, and neither the no-medal nor the interim wording anywhere on the page.
+  # baseline: the no-medal label and tooltip, and neither pending wording (D-365-W or interim) anywhere on the page.
+  if [ "$MODE" = after ]; then { [ "$c" = 200 ] && [ "$ny" -ge 1 ] && [ "$pn" -ge 1 ] && [ "$nm" = 0 ] && [ "$na" = 0 ] && [ "$iy" = 0 ] && [ "$ip" = 0 ]; } || bad=$((bad+1))
+  else { [ "$c" = 200 ] && [ "$nm" -ge 1 ] && [ "$na" -ge 1 ] && [ "$ny" = 0 ] && [ "$pn" = 0 ] && [ "$iy" = 0 ] && [ "$ip" = 0 ]; } || bad=$((bad+1)); fi
 done; done
 A1=$(echo "$SEL" | head -n 1)
 # Control 1: anonymous (no cookie) player page -> 307 to the beta gate with the encoded return path.

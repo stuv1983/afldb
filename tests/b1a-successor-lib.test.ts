@@ -189,11 +189,21 @@ describe.runIf(blocksBash)('ISSUE-366 — the successor sitting blocks (stub pro
     stub(`${chk}/deploy/post-install-check.sh`, 'echo "post-install-check $*" >> "$CALLS"; echo "post-install-check stub"; exit "${STUB_PIC_RC:-0}"');
     writeFileSync(`${chk}/.env`, ['AFLDB_BACKUP_DATABASE_URL=postgres://afldb_backup:p%40ss@127.0.0.1:5432/afldb_prod', 'AFLDB_SESSION_SECRET=x',
       'AFLDB_BETA_EPOCH=1', 'PORT=3000', ''].join('\n'));
-    // The historical tests-p10p11.sh fixtures: four eligible players (Pendlebury first, one debutant), and the two page texts.
+    // The historical tests-p10p11.sh fixtures: four eligible players (Pendlebury first, one debutant), and the page texts.
     writeFileSync(`${dir}/rows4.txt`, ['cand|scott-pendlebury-11724|pending|0', 'cand|a-b-9235|pending|0', 'cand|c-d-9910|pending|0', 'cand|e-f-10130|pending|0', 'debut|g-h-13001|pending|0', ''].join('\n'));
     writeFileSync(`${dir}/rows-few.txt`, ['cand|scott-pendlebury-11724|pending|0', 'cand|a-b-9235|pending|3', 'cand|c-d-9910|pending|1', 'debut|g-h-13001|pending|0', ''].join('\n'));
-    writeFileSync(`${dir}/page-new.html`, '<td>Not yet awarded</td><span>The season is still in progress; the Brownlow Medal has not been awarded</span>');
+    // D-365-W: the `pending` cell as the player page renders it (label as text, note as the title attribute).
+    writeFileSync(`${dir}/page-new.html`, '<td class="num" title="Brownlow Medal results for this season have not been loaded yet.">Results not loaded</td>');
+    // The interim ISSUE-365 wording, served by a release without D-365-W.
+    writeFileSync(`${dir}/page-interim.html`, '<td class="num" title="The season is still in progress; the Brownlow Medal has not been awarded.">Not yet awarded</td>');
     writeFileSync(`${dir}/page-old.html`, '<td>No medal</td><span>No Brownlow Medal was awarded for this season</span>');
+    // Mixed pages: the expected text of the mode plus a pending wording that must not be there.
+    const NEW_CELL = '<td class="num" title="Brownlow Medal results for this season have not been loaded yet.">Results not loaded</td>';
+    const INTERIM_CELL = '<td class="num" title="The season is still in progress; the Brownlow Medal has not been awarded.">Not yet awarded</td>';
+    const OLD_CELL = '<td class="num" title="No Brownlow Medal was awarded for this season.">No medal</td>';
+    writeFileSync(`${dir}/page-old-plus-interim.html`, `${OLD_CELL}${INTERIM_CELL}`);
+    writeFileSync(`${dir}/page-old-plus-new.html`, `${OLD_CELL}${NEW_CELL}`);
+    writeFileSync(`${dir}/page-new-plus-interim.html`, `${NEW_CELL}${INTERIM_CELL}`);
   });
   afterAll(() => { rmSync(dir, { recursive: true, force: true }); });
 
@@ -254,7 +264,7 @@ describe.runIf(blocksBash)('ISSUE-366 — the successor sitting blocks (stub pro
       expect(r.code).toBe(1);
     });
 
-    it('the historical scenarios: stale text after, HTTP 500, baseline with the old text, too few eligible players', () => {
+    it('the historical scenarios: stale or interim text after, HTTP 500, baseline with the old text, new text at baseline, too few eligible players', () => {
       const stale = p10({ STUB_PAGE_BODY: `${dir}/page-old.html` });
       expect(stale.out).toContain('P10 CHECK players     FAIL samples=64 bad=64');
       expect(stale.code).toBe(1);
@@ -264,12 +274,35 @@ describe.runIf(blocksBash)('ISSUE-366 — the successor sitting blocks (stub pro
       const baseline = p10({ STUB_PAGE_BODY: `${dir}/page-old.html` }, 'baseline');
       expect(baseline.out).toContain('P10 RESULT baseline PASS (64 samples, 3 controls)');
       expect(baseline.code).toBe(0);
+      const interim = p10({ STUB_PAGE_BODY: `${dir}/page-interim.html` });
+      expect(interim.out).toContain('notloaded=0 pendnote=0 nomedal=0 nanote=0');
+      expect(interim.out).toContain('P10 CHECK players     FAIL samples=64 bad=64');
+      expect(interim.code).toBe(1);
+      const newTextAtBaseline = p10({ STUB_PAGE_BODY: `${dir}/page-new.html` }, 'baseline');
+      expect(newTextAtBaseline.out).toContain('P10 CHECK players     FAIL samples=64 bad=64');
+      expect(newTextAtBaseline.code).toBe(1);
       const few = p10({ STUB_P10_ROWS: `${dir}/rows-few.txt` });
       expect(few.out).toMatch(/STOP line/);
       expect(few.out).not.toContain('P10 RESULT');
       expect(few.calls).not.toContain('curl');
       expect(few.code).not.toBe(0);
     });
+
+    // D-365-W review: a page carrying the mode's expected text AND a pending wording it must not carry.
+    for (const [name, mode, page] of [
+      ['baseline: "No medal" with the interim pending label', 'baseline', 'page-old-plus-interim.html'],
+      ['baseline: "No medal" with the D-365-W pending label', 'baseline', 'page-old-plus-new.html'],
+      ['after: the D-365-W label and tooltip with the interim wording', 'after', 'page-new-plus-interim.html'],
+    ] as const) {
+      it(`mixed page, ${name}: every sample bad, FAIL, exit 1`, () => {
+        const r = p10({ STUB_PAGE_BODY: `${dir}/${page}` }, mode);
+        expect(r.out).toContain('P10 CHECK players     FAIL samples=64 bad=64');
+        expect(verdict(r.out)).toMatchObject({ mode, players: { result: 'FAIL', samples: 64, bad: 64 },
+          anon: { result: 'PASS' }, season2026: { result: 'PASS' }, brownlow2026: { result: 'PASS' }, manualBrowser: 'not-recorded', pass: false });
+        expect(r.out).not.toContain(`${mode} PASS`);
+        expect(r.code).toBe(1);
+      });
+    }
   });
 
   describe('P9 and R2 verify: an owner-attested restart reaches S7 and S8 alike', () => {

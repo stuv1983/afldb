@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   awardPath,
   awardSeasonPath,
+  brownlowStatusNote,
+  formatBrownlow,
   NOT_RECORDED,
   coachProfilePath,
   formatHallOfFameClub,
@@ -45,6 +47,45 @@ describe('formatStat', () => {
 
   it('groups thousands', () => {
     expect(formatStat(1234)).toBe('1,234');
+  });
+});
+
+describe('formatBrownlow and brownlowStatusNote (D-365-W)', () => {
+  // The player season-by-season BV cell renders formatBrownlow as its text and
+  // brownlowStatusNote as its title. The four absent-vote meanings must stay
+  // distinct from each other and from a recorded zero.
+  it('a pending season reads as results not loaded, never as zero or no medal', () => {
+    expect(formatBrownlow(null, 'pending')).toBe('Results not loaded');
+    expect(brownlowStatusNote('pending')).toBe('Brownlow Medal results for this season have not been loaded yet.');
+    // The interim (ISSUE-365) wording claimed the season was still in progress.
+    expect(brownlowStatusNote('pending')).not.toMatch(/in progress|not been awarded/);
+    expect(formatBrownlow(null, 'pending')).not.toBe('Not yet awarded');
+  });
+
+  it('a declared no-medal season keeps "No medal"', () => {
+    expect(formatBrownlow(null, 'not_applicable')).toBe('No medal');
+    expect(brownlowStatusNote('not_applicable')).toBe('No Brownlow Medal was awarded for this season.');
+  });
+
+  it('a completed result renders a recorded zero as 0, with no note', () => {
+    expect(formatBrownlow(0, 'complete')).toBe('0');
+    expect(formatBrownlow(1234, 'complete')).toBe('1,234');
+    expect(brownlowStatusNote('complete')).toBeNull();
+  });
+
+  it('unrecorded results keep their existing treatment', () => {
+    expect(formatBrownlow(null, 'not_collected')).toBe('Not recorded');
+    expect(brownlowStatusNote('not_collected')).toBe('Votes for this season were not recorded in the source data.');
+    // A complete status without a count, or an unknown status, is "not recorded", never 0.
+    expect(formatBrownlow(null, 'complete')).toBe(NOT_RECORDED);
+    expect(formatBrownlow(undefined, 'complete')).toBe(NOT_RECORDED);
+    expect(formatBrownlow(null, 'unexpected')).toBe(NOT_RECORDED);
+    expect(brownlowStatusNote('unexpected')).toBeNull();
+  });
+
+  it('the status, not a stray vote count, decides a non-complete cell', () => {
+    expect(formatBrownlow(0, 'pending')).toBe('Results not loaded');
+    expect(formatBrownlow(0, 'not_applicable')).toBe('No medal');
   });
 });
 

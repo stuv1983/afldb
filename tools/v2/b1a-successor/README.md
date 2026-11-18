@@ -48,7 +48,12 @@ JSON in bytewise order, `0|-` for none. A packet 6R capture is refused by every 
    the BEFORE capture exactly. Commit mode also needs `--approval-ref`.
 4. **P10 verification.** `p10-pages.sh` keeps the four-player, 16-sample loop and adds the three controls to the
    verdict, each on its own `P10 CHECK` line and in the `P10 VERDICT` JSON line. Any failure: `P10 RESULT … FAIL`, exit 1.
-   The signed-in browser check stays a separate manual result (`manual-browser NOT-RECORDED`).
+   The signed-in browser check stays a separate manual result (`manual-browser NOT-RECORDED`). The `after` text is the
+   D-365-W `pending` wording ("Results not loaded" with the title "Brownlow Medal results for this season have not been
+   loaded yet."), not the interim ISSUE-365 "Not yet awarded": `after` therefore needs a serving release that contains
+   D-365-W, and every sample fails against one that does not. Each sample also rejects wording of the other state even
+   when the expected text is present: `after` fails on "No medal" or its tooltip and on the interim label or tooltip;
+   `baseline` requires "No medal" and its tooltip and fails on either pending label or tooltip (D-365-W or interim).
 5. **S7/S8 restart confirmation (with AFLDB-ISSUE-351).** `release.mjs status --confirm-restart-invocation <InvocationID>`
    accepts the owner's confirmation for that invocation only, and `post-install-check.sh` passes the same option to its
    own `status --expect`. `p9-s7s8-checks.sh <NEW_ID> [<InvocationID>]` and `r2-rollback.sh verify <OLD_ID>

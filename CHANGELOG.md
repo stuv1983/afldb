@@ -15,9 +15,17 @@ commit.
 
 ## [Unreleased]
 
-### Successor B1a repair procedure and release-check confirmation (ISSUE-366, 2026-11-19, local)
+### Brownlow `pending` wording on player pages (D-365-W, ISSUE-365 follow-up, 2026-11-19, awaiting release)
 
-Qualified on streamanator against disposable PostgreSQL 16 (unit 88/88, integration 14/14, typecheck clean). Local commit only: not published or deployed; nothing ran against production. The historical packet 6R artifacts are unchanged. Record: the ISSUE-366 entry in `issues.md`.
+Implemented and verified; local commit on top of `b9c045fe`, not published or released. Production keeps the interim "Not yet awarded" wording until a release that contains this change. No data change.
+
+#### Changed
+- **Player season-by-season BV cell:** a `pending` Brownlow season now reads "Results not loaded", with the tooltip "Brownlow Medal results for this season have not been loaded yet.", replacing "Not yet awarded" / "The season is still in progress; the Brownlow Medal has not been awarded." (untrue for a completed season such as 2026). "No medal" for declared no-medal seasons, `0` for a completed zero-vote result and "Not recorded" / `—` for unrecorded results are unchanged. Verified by `tests/format.test.ts` and `tests/b1a-successor-lib.test.ts` (86 passed in the review run) and, earlier, by a rendered player page on an isolated, seeded database.
+- **Successor P10 check (`tools/v2/b1a-successor/sitting/p10-pages.sh`):** `after` now requires the D-365-W label and tooltip and rejects "No medal" and the interim wording anywhere on the page; `baseline` requires "No medal" and rejects either pending wording. This closes two mixed-page false passes. The 64 samples, the three controls and the manual-browser result are unchanged.
+
+### Successor B1a repair procedure and release-check confirmation (ISSUE-366, 2026-11-19, published)
+
+Qualified on streamanator against disposable PostgreSQL 16 (unit 88/88, integration 14/14, typecheck clean). Published to `origin/main` at `b9c045fe`; not deployed (awaiting deployment); nothing ran against production. The historical packet 6R artifacts are unchanged. Record: the ISSUE-366 entry in `issues.md`.
 
 #### Added
 - **`tools/v2/b1a-successor/`:** a successor to the packet 6R B1a tooling for future sittings (capture, repair, recovery, reversal and the sitting blocks). Recovery (R1) decides only after the attempt's runner, launching block, database backend and advisory lock are all shown to be gone before and after its snapshot, and the block exits with the verdict (0 committed, 10 not committed, otherwise stop). The commit (P6) is bound to the recorded BEFORE capture and its sha256 and refuses any drift before its first write. The reversal compares row content, not counts, and needs an approval reference to commit. The P10 page check counts the anonymous redirect, season-page and Brownlow-page controls in its verdict and exits nonzero on any failure. Using the procedure still needs its own owner approval.
