@@ -21,7 +21,9 @@
  *   node deploy/release.mjs verify   <id>
  *   node deploy/release.mjs promote  <id> --attended [--skip-host-gate "<reason>"] [--window-min 90] [--strict]
  *   node deploy/release.mjs rollback [--to <id>] --attended [--ledger-head <name> [--accept-schema-ahead <name>]]
- *   node deploy/release.mjs status   [--expect <id>] [--url http://127.0.0.1:3100] [--confirm-attended-restart] [--checkout <dir>]
+ *   node deploy/release.mjs status   [--expect <id>] [--url http://127.0.0.1:3100] [--checkout <dir>]
+ *                                    [--confirm-restart-invocation <InvocationID>]   owner-attested restart, that invocation only
+ *                                    [--confirm-attended-restart]                    legacy unbound form, kept for compatibility
  *   node deploy/release.mjs host-gate [--mode promote|rollback] [--strict] [--window-min 90]     read-only packet gate
  *   node deploy/release.mjs check-node-modules --checkout <dir>                                  installed tree vs lock
  *   node deploy/release.mjs adopt    --checkout <dir> --revision <sha> --afldb-env production
@@ -1397,23 +1399,39 @@ function readEvents(root) {
 /**
  * Was the restart that made `id` live an unattended one? Compares the service identity recorded at promote time with now,
  * and whether the (re)start coincides with an apt run (the unattended-upgrade + needrestart signature). Read-only.
+ * `confirmInvocation` (ISSUE-366 §5): the systemd InvocationID the owner attested; it accepts only that one restart.
+ * @param {{ events: any[], id: string, now: any, aptEntries: any[], confirmed: boolean, confirmInvocation?: string | null, nowMs: number }} input
  * @returns {{ problems: string[], notes: string[] }}
  */
-export function auditActivation({ events, id, now, aptEntries, confirmed, nowMs }) {
+export function auditActivation({ events, id, now, aptEntries, confirmed, confirmInvocation = null, nowMs }) {
   const out = { problems: [], notes: [] };
   const opened = [...events].reverse().find((e) => (e.op === 'promote' || e.op === 'rollback') && e.id === id);
+  // AFLDB-ISSUE-366 §5: an owner confirmation bound to one restart (InvocationID). It covers that invocation only: a new
+  // invocation needs its own attestation, and nothing (promote --attended, an earlier status PASS) stands in for one.
+  if (confirmInvocation) {
+    if (!now?.invocationId) {
+      out.problems.push(`--confirm-restart-invocation ${confirmInvocation} given, but the service InvocationID cannot be read: the confirmation cannot be matched`);
+      return out;
+    }
+    if (now.invocationId !== confirmInvocation) {
+      out.problems.push(`--confirm-restart-invocation names InvocationID ${confirmInvocation}, but the service is now InvocationID ${now.invocationId}: `
+        + 'a confirmation covers only the restart it names; this invocation needs its own attestation');
+    }
+  }
   if (!now) return out;
+  const attested = confirmInvocation ? now.invocationId === confirmInvocation : Boolean(confirmed);
   out.notes.push(`service InvocationID ${now.invocationId ?? '?'} NRestarts ${now.nRestarts ?? '?'} ActiveEnter ${now.activeEnterMs ? new Date(now.activeEnterMs).toISOString() : '?'}`);
+  if (confirmInvocation && attested) out.notes.push(`owner-attested restart: InvocationID ${confirmInvocation} (this invocation only)`);
   if (!opened?.window?.afldb) { out.notes.push(`no recorded activation window for ${id} (promoted before ISSUE-351 or with the gate skipped)`); return out; }
   const before = opened.window.afldb;
   const openedMs = Date.parse(opened.window.at);
   if (before.invocationId && now.invocationId && before.invocationId !== now.invocationId) {
     out.notes.push(`restarted since ${opened.op} (InvocationID ${before.invocationId} -> ${now.invocationId})`);
     const hit = restartCoincidesWithApt(aptEntries ?? [], now.activeEnterMs);
-    if (hit && !confirmed) {
+    if (hit && !attested) {
       out.problems.push(`the service (re)started at ${new Date(now.activeEnterMs).toISOString()}, during/after an apt run `
         + `(${new Date(hit.startMs).toISOString()} ${hit.command}): that is the unattended-upgrade signature, so this may not be your attended restart. `
-        + 'If it was yours, rerun with --confirm-attended-restart');
+        + `If it was yours, rerun with --confirm-restart-invocation ${now.invocationId ?? '<InvocationID>'}`);
     }
   }
   const runs = aptRunsBetween(aptEntries ?? [], openedMs, nowMs);
@@ -1429,6 +1447,11 @@ export function auditActivation({ events, id, now, aptEntries, confirmed, nowMs 
 async function cmdStatus(opts) {
   const root = resolve(opts.root);
   const problems = [];
+  const confirmInvocation = opts['confirm-restart-invocation'];
+  if (confirmInvocation !== undefined) {
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(confirmInvocation)) throw new Refusal('--confirm-restart-invocation needs the InvocationID of the restart the owner attests');
+    if (!opts.expect || opts['no-live']) throw new Refusal('--confirm-restart-invocation applies only to a live status --expect <id>');
+  }
   const current = readReleaseLink(root, 'current');
   const previous = readReleaseLink(root, 'previous');
   const describe = (id) => {
@@ -1490,7 +1513,10 @@ async function cmdStatus(opts) {
     const hostState = { nowMs };
     let aptEntries = [];
     try { aptEntries = parseAptHistory(readFileSync(opts['apt-history'] ?? '/var/log/apt/history.log', 'utf8')); } catch { log('apt history unreadable: activation audit limited to service identity'); }
-    const audit = auditActivation({ events: readEvents(root), id: cur.id, now: serviceNow, aptEntries, confirmed: Boolean(opts['confirm-attended-restart']), nowMs: hostState.nowMs });
+    const audit = auditActivation({
+      events: readEvents(root), id: cur.id, now: serviceNow, aptEntries, confirmed: Boolean(opts['confirm-attended-restart']),
+      confirmInvocation: opts['confirm-restart-invocation'] ?? null, nowMs: hostState.nowMs,
+    });
     for (const note of audit.notes) log(`activation ${note}`);
     if (opts.expect) problems.push(...audit.problems);
     const lastPass = [...readEvents(root)].reverse().find((e) => e.op === 'status-pass' && e.id === cur.id);
@@ -1511,7 +1537,11 @@ async function cmdStatus(opts) {
   }
   // A live, expected PASS is what makes a release a known-good rollback target.
   if (opts.expect && !opts['no-live']) {
-    event(root, 'status-pass', { id: cur.id, invocationId: serviceNow?.invocationId ?? null, nRestarts: serviceNow?.nRestarts ?? null });
+    event(root, 'status-pass', {
+      id: cur.id, invocationId: serviceNow?.invocationId ?? null, nRestarts: serviceNow?.nRestarts ?? null,
+      // Recorded for audit only: a later status run never reads it as a confirmation (ISSUE-366 §5).
+      restartConfirmation: confirmInvocation ? { invocationId: confirmInvocation } : opts['confirm-attended-restart'] ? 'unbound-flag' : null,
+    });
   }
   log(`STATUS PASS ${cur.id}`);
   return 0;

@@ -82,6 +82,7 @@ export const COMMITTING_SUITES: readonly string[] = [
   'tests/integration/afl-api-ownership-census.test.ts',
   'tests/integration/after-siren.test.ts',
   'tests/integration/awards-reload-links.test.ts',
+  'tests/integration/b1a-successor.test.ts',
   'tests/integration/brownlow-pending-coverage.test.ts',
   'tests/integration/brownlow-pending-projection.test.ts',
   'tests/integration/data-editor.test.ts',

@@ -342,7 +342,12 @@ procedure in `docs/v2/evidence/remediation-20261114/hostops/README.md`):
    never runs apt, needrestart or unattended-upgrade.
 5. `status --expect` records the service `InvocationID`, `NRestarts` and `ActiveEnterTimestamp` and compares them with the
    window recorded at `promote`/`rollback`. A (re)start inside or just after an apt run is flagged as not yours;
-   `--confirm-attended-restart` is your explicit way past it.
+   `--confirm-restart-invocation <InvocationID>` is your explicit way past it, for that one restart only (AFLDB-ISSUE-366):
+   status fails if the service is now a different invocation, and a later restart needs its own confirmation. Nothing
+   else (`promote --attended`, an earlier status PASS) counts as one. `bash deploy/post-install-check.sh
+   [--confirm-restart-invocation <InvocationID>] <release-id> [<previous-BUILD_ID>]` passes it to its own
+   `status --expect`, so S7 and S8 judge the same attested restart. The unbound `--confirm-attended-restart` flag of
+   `status` still works but is not carried by the post-install check.
 
 A **pending reboot** (kernel packages; `/var/run/reboot-required`) is a separate owner operation, never an unattended one:
 there is no `Automatic-Reboot`. Procedure and recovery: the README above.

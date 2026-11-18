@@ -9,7 +9,11 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Current state — 2026-11-18 (packet 6R sitting executed, replacement window 13:00–15:30 AEDT):** **9 open issues: 332, 348, 350, 351, 352, 357, 362, 363, 364.** **ISSUE-365 resolved.** Production serves `a2e6ea9995a4-aKAYwf0qC4go6JJWiHhv5` (revision `a2e6ea99`; rollback target `c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x`); B1a committed exactly (669 rows `pending`, re-read); P11 observation PASS. D-365-W open, separately gated. The other open issues' "publish and release" prerequisites are now met by this release, but their states were not re-evaluated here. Record: `docs/v2/evidence/remediation-20261114/run6r/sitting-a1-exec-20261118/README.md`.
+**Current state — 2026-11-19 (ISSUE-366 resolved locally).** **9 open issues** (332, 348, 350, 351, 352, 357, 362, 363, 364). AFLDB-ISSUE-366 resolved locally (qualified; local commit, not published); see below. AFLDB-ISSUE-351 stays open for host policy. D-365-W remains the separately gated wording change.
+
+**Earlier state — 2026-11-18 (Packet 6R follow-up review).** **10 open issues** (332, 348, 350, 351, 352, 357, 362, 363, 364, 366). AFLDB-ISSUE-366 tracks future repair and verification safeguards. AFLDB-ISSUE-351 covers attended activation. AFLDB-ISSUE-365 remains resolved. D-365-W remains the separately gated wording change. See the [implementation playbook](issues/closed/AFLDB-ISSUE-366.md).
+
+**Earlier state — 2026-11-18 (packet 6R sitting executed, replacement window 13:00–15:30 AEDT):** **9 open issues: 332, 348, 350, 351, 352, 357, 362, 363, 364.** **ISSUE-365 resolved.** Production serves `a2e6ea9995a4-aKAYwf0qC4go6JJWiHhv5` (revision `a2e6ea99`; rollback target `c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x`); B1a committed exactly (669 rows `pending`, re-read); P11 observation PASS. D-365-W open, separately gated. The other open issues' "publish and release" prerequisites are now met by this release, but their states were not re-evaluated here. Record: `docs/v2/evidence/remediation-20261114/run6r/sitting-a1-exec-20261118/README.md`.
 
 **Earlier state — 2026-11-16 (sitting approved):** **10 open issues (unchanged).** Owner approved B1, B1a-0 **option A** and B1a for **Wednesday 18 November 2026, 10:00–12:30 AEDT** under packet 6R; preparation commits published (`origin/main` = `c34ae24d`, records only beyond `a2e6ea99`). Sitting procedure and blocks: `docs/v2/evidence/remediation-20261114/run6r/sitting/SITTING.md`. Nothing executed on production yet; production still serves `c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x`.
 
@@ -125,6 +129,8 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 - **Update 2026-11-14 (run 2):** `--attended` is a declaration only (documented). Procedures 02 (weekly owned window; the owner holds PostgreSQL updates) and 03 (reboot; GRUB is hidden, so the console fallback is unverified).
 
 
+- **Packet 6R follow-up (2026-11-18).** Carry explicit owner confirmation for the same restart through S7 and S8. See item 5 of the [AFLDB-ISSUE-366 playbook](issues/closed/AFLDB-ISSUE-366.md). The recorded sitting passed both checks. **2026-11-19:** implemented locally under ISSUE-366 (`--confirm-restart-invocation`, bound to one InvocationID, reaches S7 and S8); host policy D-HO-1/4/6 unchanged.
+
 ### AFLDB-ISSUE-352 — No scheduled production backup, restore verification or off-host copy
 
 - **Severity / area:** Medium; backup and recovery.
@@ -156,6 +162,8 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 - **Published 2026-11-16 (`origin/main` = `a2e6ea99`):**
   - **363:** **Next:** owner decision G-1; test-isolation follow-up for T-2's residue (`awards-reload-links` restores only `award_winners` rows and award spans; `award_nominations`, `hall_of_fame`, `honour_team_members`, `captaincies` content and `import_batches` growth still differ after a shared run).
 - Details: their `issues.md` entries.
+
+**AFLDB-ISSUE-366 resolved locally 2026-11-19** (qualified on streamanator; local commit, not published or deployed). Successor B1a procedure in `tools/v2/b1a-successor/`: R1 decides only when the attempt and its transaction are terminal and exits with its verdict; P6 is bound to the P3c BEFORE capture and refuses drift before the UPDATE; the reversal requires the exact repaired image (content fingerprints) and `--approval-ref`; P10's three controls are in its verdict. `release.mjs status` and `post-install-check.sh` take `--confirm-restart-invocation <InvocationID>`, passed to S7 and S8. Unit 88/88, integration 14/14 on disposable PostgreSQL 16, typecheck clean. Synthetic only; the successor procedure needs its own owner approval before use. Removed from this index and the Open Issues table. Record: its `issues.md` entry; runbook `issues/closed/AFLDB-ISSUE-366.md`.
 
 **AFLDB-ISSUE-365 resolved 2026-11-18** (packet 6R Amendment A1, owner-approved replacement window 13:00–15:30 AEDT after the morning sitting stopped at P1 with no production change; STAMP `20261118T021817Z`). B1 released D-365-1 (`a2e6ea9995a4-aKAYwf0qC4go6JJWiHhv5`); B1a, after a fresh dump (sha256 `7e85e8a2…758a`) restore-verified on DEV, returned `P6 RESULT COMMITTED EXACT`; its separate read-only acceptance read `pss2026|pending|669|0` with `ACCEPTANCE-DIFF EXACT`. P9 (S7+S8), S9 and P10 (64 samples) PASS (terminal transcript excerpts); P11 `OBSERVATION PASS (4 ticks)` to 14:38:20 AEDT (workstation log). Browser spot-check unconfirmed. No rollback, reversal or restore. **Still open: D-365-W** (public wording for a `pending` season; separately gated; interim wording accepted). Removed from this index and the Open Issues table. Record: its `issues.md` entry; `docs/v2/evidence/remediation-20261114/run6r/sitting-a1-exec-20261118/README.md`.
 

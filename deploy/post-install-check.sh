@@ -3,7 +3,12 @@
 # §3a). Read-only apart from two things: one POST, to the retired email-intake route, which must answer
 # 410; and the `status-pass` line that `release.mjs status --expect` appends to <root>/events.log.
 #
-#   bash deploy/post-install-check.sh <release-id> [<previous-BUILD_ID>]
+#   bash deploy/post-install-check.sh [--confirm-restart-invocation <InvocationID>] <release-id> [<previous-BUILD_ID>]
+#
+# --confirm-restart-invocation (AFLDB-ISSUE-366 §5): the owner's explicit confirmation that the restart with that systemd
+# InvocationID was their attended restart. It is passed to `status --expect`, which accepts it for that invocation only.
+# Give it only when the owner attested this restart for this invocation; it is never inferred. The option may come before
+# or after the positional arguments; the two legacy forms (with and without the previous BUILD_ID) are unchanged.
 #
 # Run as arm from the serving checkout after every restart (promote or rollback). The previous
 # BUILD_ID defaults to the retained `previous` release's. It runs `release.mjs status --expect`, then:
@@ -19,7 +24,20 @@
 # installation package's checker (issues/closed/AFLDB-ISSUE-329-installation-20261031/), which stays
 # as approved. Environment overrides exist only so it can be rehearsed off-host.
 set -u
-ID=${1:-}
+USAGE="usage: bash deploy/post-install-check.sh [--confirm-restart-invocation <InvocationID>] <release-id> [<previous-BUILD_ID>]"
+CONFIRM_INVOCATION=; POS=()
+while [ $# -gt 0 ]; do
+  case $1 in
+    --confirm-restart-invocation)
+      [ $# -ge 2 ] && [[ $2 =~ ^[A-Za-z0-9_-]{1,64}$ ]] || { echo "$USAGE"; exit 2; }
+      CONFIRM_INVOCATION=$2; shift 2;;
+    # Anything else is positional, exactly as before: a BUILD_ID may itself begin with '-'.
+    *) POS+=("$1"); shift;;
+  esac
+done
+[ ${#POS[@]} -le 2 ] || { echo "$USAGE"; exit 2; }
+ID=${POS[0]:-}
+CONFIRM=(); [ -n "$CONFIRM_INVOCATION" ] && CONFIRM=(--confirm-restart-invocation "$CONFIRM_INVOCATION")
 CHECKOUT=${CHECKOUT:-/home/arm/projects/afldb}
 ROOT=${ROOT:-/home/arm/afldb-releases}
 UNIT=${UNIT:-afldb}
@@ -27,8 +45,8 @@ NODE=${NODE:-/home/arm/.nvm/versions/node/v22.23.2/bin/node}
 LOCAL=${LOCAL:-http://127.0.0.1:3100}
 PUBLIC=${PUBLIC:-https://beta.afldb.com}
 PAGES=${PAGES:-/ /beta /players /matches /seasons /clubs /records /search /admin/operations}
-[ -n "$ID" ] || { echo "usage: bash deploy/post-install-check.sh <release-id> [<previous-BUILD_ID>]"; exit 2; }
-PREV_BUILD=${2:-$(cat "$ROOT/previous/.next/standalone/.next/BUILD_ID" 2>/dev/null)}
+[ -n "$ID" ] || { echo "$USAGE"; exit 2; }
+PREV_BUILD=${POS[1]:-$(cat "$ROOT/previous/.next/standalone/.next/BUILD_ID" 2>/dev/null)}
 fails=0; cache_hits=0
 ok()    { echo "  ok    $*"; }
 fail()  { echo "  FAIL  $*"; fails=$((fails + 1)); }
@@ -37,6 +55,7 @@ T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 REL=$ROOT/releases/$ID
 BUILD=$(cat "$REL/.next/standalone/.next/BUILD_ID" 2>/dev/null)
 echo "AFLDB post-install check $(date -u +%FT%TZ): expect $ID (BUILD_ID ${BUILD:-?}, previous ${PREV_BUILD:-none})"
+[ -n "$CONFIRM_INVOCATION" ] && echo "owner-attested restart: InvocationID $CONFIRM_INVOCATION (passed to status --expect; this invocation only)"
 [ -n "$BUILD" ] || { echo "  FAIL  no release $REL"; echo "POST-INSTALL CHECK FAIL"; exit 1; }
 
 # <code> <cf-cache-status or -> for one GET, headers kept apart from the body.
@@ -58,7 +77,7 @@ if [ "$state" != active ]; then
   echo "POST-INSTALL CHECK FAIL"; exit 1
 fi
 echo "release route status"
-(cd "$CHECKOUT" && "$NODE" deploy/release.mjs status --expect "$ID" --root "$ROOT" --unit "$UNIT" --url "$LOCAL") 2>&1 | sed 's/^/        /'
+(cd "$CHECKOUT" && "$NODE" deploy/release.mjs status --expect "$ID" ${CONFIRM[@]+"${CONFIRM[@]}"} --root "$ROOT" --unit "$UNIT" --url "$LOCAL") 2>&1 | sed 's/^/        /'
 [ "${PIPESTATUS[0]}" = 0 ] && ok "status --expect $ID PASS" || fail "status --expect $ID"
 
 echo "current build and health through loopback and the public endpoint"

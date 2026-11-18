@@ -15,6 +15,16 @@ commit.
 
 ## [Unreleased]
 
+### Successor B1a repair procedure and release-check confirmation (ISSUE-366, 2026-11-19, local)
+
+Qualified on streamanator against disposable PostgreSQL 16 (unit 88/88, integration 14/14, typecheck clean). Local commit only: not published or deployed; nothing ran against production. The historical packet 6R artifacts are unchanged. Record: the ISSUE-366 entry in `issues.md`.
+
+#### Added
+- **`tools/v2/b1a-successor/`:** a successor to the packet 6R B1a tooling for future sittings (capture, repair, recovery, reversal and the sitting blocks). Recovery (R1) decides only after the attempt's runner, launching block, database backend and advisory lock are all shown to be gone before and after its snapshot, and the block exits with the verdict (0 committed, 10 not committed, otherwise stop). The commit (P6) is bound to the recorded BEFORE capture and its sha256 and refuses any drift before its first write. The reversal compares row content, not counts, and needs an approval reference to commit. The P10 page check counts the anonymous redirect, season-page and Brownlow-page controls in its verdict and exits nonzero on any failure. Using the procedure still needs its own owner approval.
+
+#### Changed
+- **Release checks (ISSUE-351 path):** `deploy/release.mjs status --expect <id> --confirm-restart-invocation <InvocationID>` accepts an apt-coincident owner restart only for that one systemd invocation. `deploy/post-install-check.sh` accepts the same option and passes it to its nested status check, so S7 and S8 now agree. Calls without the option behave as before.
+
 ### Production release `a2e6ea99` and ISSUE-365 repair (2026-11-18)
 
 Packet 6R Amendment A1, executed in the owner-approved replacement window (13:00–15:30 AEDT). Record: `docs/v2/evidence/remediation-20261114/run6r/sitting-a1-exec-20261118/README.md`.

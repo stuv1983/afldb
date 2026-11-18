@@ -337,6 +337,37 @@ describe('AFLDB-ISSUE-351 — the attended gate and the activation audit (pure)'
     expect(auditActivation({ ...base, events: [], confirmed: false }).notes.join()).toMatch(/no recorded activation window/);
   });
 
+  it('ISSUE-366 §5: a restart confirmation is bound to one InvocationID and covers that invocation only', () => {
+    const entries = parseAptHistory(HISTORY);
+    const restartedAt = local(2026, 11, 14, 6, 35, 21);
+    const opened = { op: 'promote', id: 'X', window: { at: new Date(local(2026, 11, 14, 6, 30, 0)).toISOString(), afldb: { invocationId: 'OLD' } } };
+    const now = { invocationId: 'NEW', nRestarts: 0, activeEnterMs: restartedAt };
+    const base = { events: [opened], id: 'X', now, aptEntries: entries, nowMs: local(2026, 11, 14, 7, 0, 0), confirmed: false };
+    // The apt-coincidence hit names the exact option to rerun with.
+    expect(auditActivation(base).problems[0]).toMatch(/rerun with --confirm-restart-invocation NEW/);
+    // The owner attests THIS invocation: the apt hit is accepted and the attestation is noted.
+    const bound = auditActivation({ ...base, confirmInvocation: 'NEW' });
+    expect(bound.problems).toEqual([]);
+    expect(bound.notes.join(' | ')).toMatch(/owner-attested restart: InvocationID NEW \(this invocation only\)/);
+    // A confirmation naming another invocation (an earlier restart) does not carry over, and fails outright even where
+    // there is no apt signature to excuse.
+    const stale = auditActivation({ ...base, confirmInvocation: 'OLD' });
+    expect(stale.problems.join()).toMatch(/names InvocationID OLD, but the service is now InvocationID NEW: .*needs its own attestation/);
+    const staleCalm = auditActivation({ ...base, now: { ...now, activeEnterMs: local(2026, 11, 14, 6, 50, 0) }, confirmInvocation: 'OLD' });
+    expect(staleCalm.problems).toHaveLength(1);
+    // The unbound flag does not rescue a mismatched binding: the mismatch AND the unexcused apt hit both fail.
+    const both = auditActivation({ ...base, confirmed: true, confirmInvocation: 'OLD' }).problems.join(' | ');
+    expect(both).toMatch(/needs its own attestation/);
+    expect(both).toMatch(/unattended-upgrade signature/);
+    // The service identity cannot be read: nothing can be matched, so the confirmation fails rather than passes.
+    for (const unread of [null, { ...now, invocationId: null }]) {
+      expect(auditActivation({ ...base, now: unread, confirmInvocation: 'NEW' }).problems.join()).toMatch(/InvocationID cannot be read/);
+    }
+    // An earlier status-pass recorded with a confirmation is never read as one.
+    const passed = { op: 'status-pass', id: 'X', invocationId: 'NEW', restartConfirmation: { invocationId: 'NEW' } };
+    expect(auditActivation({ ...base, events: [opened, passed] }).problems[0]).toMatch(/unattended-upgrade signature/);
+  });
+
   it('refuses rollback only on a PROVEN schema mismatch, and never because the database is unreachable', () => {
     expect(migrationHeadOf(['src/db/migrations/009_a.sql', 'src/db/migrations/118_b.sql', 'src/db/migrations/README.md'])).toBe('118_b.sql');
     expect(migrationHeadOf([])).toBeNull();
@@ -490,6 +521,10 @@ describe('AFLDB-ISSUE-351 — the attended gate and the activation audit (pure)'
     expect(opts['host-state']).toBe('/f.json');
     expect(parseArgs(['status']).opts.attended).toBeUndefined();
     expect(parseArgs(['status']).opts['pg-unit']).toBe('postgresql@16-main.service');
+    // ISSUE-366 §5: the bound confirmation is a value option, not a flag.
+    expect(parseArgs(['status', '--expect', 'x', '--confirm-restart-invocation', 'abc123']).opts['confirm-restart-invocation']).toBe('abc123');
+    expect(() => parseArgs(['status', '--confirm-restart-invocation'])).toThrow(/needs a value/);
+    expect(parseArgs(['status']).opts['confirm-restart-invocation']).toBeUndefined();
   });
 });
 
@@ -967,6 +1002,26 @@ describe.runIf(linux)('AFLDB-ISSUE-329 — route on Linux: failed builds never t
     const confirmed = await audit('--confirm-attended-restart');
     expect(confirmed.out).toMatch(/activation restarted since rollback/);
     expect(confirmed.out).not.toMatch(/unattended-upgrade signature/);
+    // ISSUE-366 §5: the confirmation bound to this restart's InvocationID passes exactly as the unbound flag does ...
+    const bound = await audit('--confirm-restart-invocation', 'BBBB');
+    expect(bound.out).toMatch(/owner-attested restart: InvocationID BBBB/);
+    expect(bound.out).not.toMatch(/unattended-upgrade signature/);
+    expect(bound.code, bound.out).toBe(confirmed.code);
+    if (bound.code === 0) {
+      const passes = readFileSync(join(root, 'events.log'), 'utf8').split('\n').filter((l) => l.includes('"op":"status-pass"'));
+      expect(JSON.parse(passes[passes.length - 1])).toMatchObject({ invocationId: 'BBBB', restartConfirmation: { invocationId: 'BBBB' } });
+    }
+    // ... one naming any other restart fails, even after that PASS ...
+    const other = await audit('--confirm-restart-invocation', 'AAAA');
+    expect(other.code).toBe(1);
+    expect(other.out).toMatch(/names InvocationID AAAA, but the service is now InvocationID BBBB/);
+    // ... and it is accepted only on a live status --expect, with a well-formed InvocationID.
+    const noExpect = await tool('status', '--host-state', join(base, 'host-state-after.json'), '--confirm-restart-invocation', 'BBBB', ...live());
+    expect(noExpect.code).not.toBe(0);
+    expect(noExpect.out).toMatch(/REFUSED: --confirm-restart-invocation applies only to a live status --expect/);
+    const malformed = await audit('--confirm-restart-invocation', 'BB;BB');
+    expect(malformed.code).not.toBe(0);
+    expect(malformed.out).toMatch(/REFUSED: --confirm-restart-invocation needs the InvocationID/);
     // Restore the previous order (current ids[0], previous ids[1]) for the tests that follow.
     const restored = await tool('rollback', '--to', ids[0], ...att());
     expect(restored.code, restored.out).toBe(0);
@@ -1109,7 +1164,7 @@ describe.runIf(checkerBash)('AFLDB-ISSUE-330 — post-install check: origin abse
     ].join('\n'));
     stub('systemctl', 'case $4 in ActiveState) echo active;; Result) echo success;; ActiveEnterTimestamp) echo "Sat 2026-10-31 18:02:55 AEDT";; MemoryCurrent) echo 154140672;; NRestarts) echo 0;; esac');
     stub('journalctl', 'cat "$STUB_JOURNAL"');
-    stub('node', 'echo "release: STATUS stub"; exit "${STUB_STATUS_EXIT:-0}"');
+    stub('node', 'echo "release: STATUS stub"; [ -n "${STUB_LOG_ARGV:-}" ] && echo "release: STATUS stub argv=$*"; exit "${STUB_STATUS_EXIT:-0}"');
 
     rel = `${dir}/root/releases/${ID}/.next/standalone/.next`;
     mkdirSync(`${rel}/static/chunks`, { recursive: true });
@@ -1144,11 +1199,11 @@ describe.runIf(checkerBash)('AFLDB-ISSUE-330 — post-install check: origin abse
     [`POST ${PUBLIC}/api/admin/email-intake`]: '410 application/json DYNAMIC -',
   });
 
-  const check = (over: Record<string, string> = {}, env: Record<string, string> = {}) => {
+  const check = (over: Record<string, string> = {}, env: Record<string, string> = {}, argv: string[] = [ID]) => {
     const routes = { ...baseRoutes(), ...over };
     const file = `${dir}/routes-${Math.random().toString(36).slice(2)}`;
     writeFileSync(file, Object.entries(routes).map(([k, v]) => `${k} ${v}\n`).join(''));
-    const r = spawnSync('bash', [fwd(join(REPO, 'deploy', 'post-install-check.sh')), ID], {
+    const r = spawnSync('bash', [fwd(join(REPO, 'deploy', 'post-install-check.sh')), ...argv], {
       encoding: 'utf8',
       env: {
         ...process.env, PATH: `${stubs}${process.platform === 'win32' ? ';' : ':'}${process.env.PATH}`,
@@ -1222,5 +1277,41 @@ describe.runIf(checkerBash)('AFLDB-ISSUE-330 — post-install check: origin abse
     const missing = check({ [`GET ${PUBLIC}/_next/static/css/site.css`]: '404 text/html - -' });
     expect(missing.out).toContain('FAIL  2 assets, 1 bad');
     expect(missing.status).toBe(1);
+  });
+
+  describe('ISSUE-366 §5 — the owner-attested restart reaches the nested status --expect', () => {
+    const argvOf = (out: string) => /^\s*release: STATUS stub argv=(.*)$/m.exec(out)?.[1];
+    const logged = { STUB_LOG_ARGV: '1' };
+    it('forwards --confirm-restart-invocation, before or after the positionals, and says so', () => {
+      for (const argv of [['--confirm-restart-invocation', 'BBBB', ID], [ID, '--confirm-restart-invocation', 'BBBB'], [ID, 'OLDBUILD', '--confirm-restart-invocation', 'BBBB']]) {
+        const { status, out } = check({}, logged, argv);
+        expect(out).toContain('owner-attested restart: InvocationID BBBB (passed to status --expect; this invocation only)');
+        expect(argvOf(out)).toMatch(new RegExp(`^deploy/release\\.mjs status --expect ${ID} --confirm-restart-invocation BBBB --root `));
+        expect(out).toContain(`POST-INSTALL CHECK PASS ${ID}\n`);
+        expect(status).toBe(0);
+      }
+    });
+    it('without it, status --expect gets no confirmation (legacy forms, with and without the previous BUILD_ID)', () => {
+      for (const argv of [[ID], [ID, 'OLDBUILD']]) {
+        const { status, out } = check({}, logged, argv);
+        expect(argvOf(out)).toMatch(new RegExp(`^deploy/release\\.mjs status --expect ${ID} --root `));
+        expect(out).not.toContain('confirm');
+        expect(out).toContain('previous OLDBUILD');
+        expect(status).toBe(0);
+      }
+    });
+    it('a failing nested status fails the check even with a confirmation', () => {
+      const { status, out } = check({}, { ...logged, STUB_STATUS_EXIT: '1' }, ['--confirm-restart-invocation', 'BBBB', ID]);
+      expect(out).toContain(`FAIL  status --expect ${ID}`);
+      expect(status).toBe(1);
+    });
+    it('refuses a malformed or missing InvocationID and a third positional with the usage line, exit 2', () => {
+      for (const argv of [['--confirm-restart-invocation', 'BB;BB', ID], [ID, '--confirm-restart-invocation'], [ID, 'OLDBUILD', 'extra'], []]) {
+        const { status, out } = check({}, logged, argv);
+        expect(out).toMatch(/^usage: bash deploy\/post-install-check\.sh \[--confirm-restart-invocation <InvocationID>\]/m);
+        expect(out).not.toContain('STATUS stub');
+        expect(status).toBe(2);
+      }
+    });
   });
 });
