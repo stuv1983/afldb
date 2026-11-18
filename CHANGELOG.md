@@ -15,6 +15,16 @@ commit.
 
 ## [Unreleased]
 
+### Production release `a2e6ea99` and ISSUE-365 repair (2026-11-18)
+
+Packet 6R Amendment A1, executed in the owner-approved replacement window (13:00–15:30 AEDT). Record: `docs/v2/evidence/remediation-20261114/run6r/sitting-a1-exec-20261118/README.md`.
+
+#### Changed
+- **Production release:** production now serves `a2e6ea9995a4-aKAYwf0qC4go6JJWiHhv5` (revision `a2e6ea99`, the published 2026-11-14 remediation), replacing `c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x`, which is retained as the rollback target. Promoted attended after the host gate; the four-tick post-release observation passed.
+
+#### Fixed (data)
+- **Brownlow 2026 player-season status (ISSUE-365):** the 669 2026 `player_season_stats` rows that read `not_applicable` ("No medal") now read `pending`, with votes still unset and the coverage rows unchanged (post-commit acceptance diff exact); one guarded transaction after a fresh, restore-verified backup. Player pages show the interim "Not yet awarded" wording until D-365-W.
+
 ### Publication of the 2026-11-14 remediation (2026-11-16)
 
 `origin/main` fast-forwarded `de640826..a2e6ea99` (172 commits; executable revision `f6af6da9`, everything after it records-only) under owner Approval A. Nothing deployed: production still serves `c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x`. Release and repair preparation (B1, B1a): `docs/v2/evidence/remediation-20261114/run6/RELEASE-AND-REPAIR-PACKET-6.md`.
