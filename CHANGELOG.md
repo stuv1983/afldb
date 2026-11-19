@@ -17,7 +17,7 @@ commit.
 
 ### Brownlow `pending` wording on player pages (D-365-W, ISSUE-365 follow-up, 2026-11-19, awaiting release)
 
-Implemented and verified; local commit on top of `b9c045fe`, not published or released. Production keeps the interim "Not yet awarded" wording until a release that contains this change. No data change.
+Implemented and verified. D-365-W was published to origin/main at b51f963c on top of ISSUE-366 (b9c045fe). Both await a separately approved production release. Production keeps the interim "Not yet awarded" wording until a release that contains this change. No data change.
 
 #### Changed
 - **Player season-by-season BV cell:** a `pending` Brownlow season now reads "Results not loaded", with the tooltip "Brownlow Medal results for this season have not been loaded yet.", replacing "Not yet awarded" / "The season is still in progress; the Brownlow Medal has not been awarded." (untrue for a completed season such as 2026). "No medal" for declared no-medal seasons, `0` for a completed zero-vote result and "Not recorded" / `—` for unrecorded results are unchanged. Verified by `tests/format.test.ts` and `tests/b1a-successor-lib.test.ts` (86 passed in the review run) and, earlier, by a rendered player page on an isolated, seeded database.
