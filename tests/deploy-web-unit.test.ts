@@ -462,8 +462,42 @@ describe.runIf(process.platform === 'linux')('AFLDB-ISSUE-352 — scheduled back
     for (let d = 10; d < 41; d += 1) put(`afldb_prod-202610${String(d - 9).padStart(2, '0')}-0${String(d % 10)}0000.dump`);
     const flood = pull();
     expect(flood.status).toBe(1);
-    expect(flood.stdout).toMatch(/ALERT: 31 new dumps verified in one run \(limit 3\); retention skipped/);
+    expect(flood.stdout).toMatch(/ALERT: 31 new dumps verified in one run \(limit 3\); retention hold set, nothing deleted/);
     for (const g of genuine) expect(held()).toContain(g);
+    const hold = join(dest, '.retention-hold');
+    expect(readFileSync(hold, 'utf8')).toContain('afldb_prod-20261001-000000.dump');
+
+    // AFLDB-ISSUE-352 closeout: the hold outlives the alerting run. Unchanged pulls verify nothing new, yet must still
+    // delete nothing (before the fix the second pull pruned every genuine copy) and keep failing until an operator acts.
+    const keptFiles = () => readdirSync(dest).filter((f) => !f.startsWith('.rsync')).sort();
+    const afterFlood = keptFiles();
+    for (const g of genuine) {
+      expect(afterFlood).toEqual(expect.arrayContaining([g, `${g}.sha256`, `.verified-${g}`]));
+    }
+    for (let retry = 0; retry < 2; retry += 1) {
+      const again = pull();
+      expect(again.status, `${again.stdout}${again.stderr}`).toBe(1);
+      expect(again.stdout).toMatch(/0 newly verified/);
+      expect(again.stdout).toMatch(/retention hold in force/);
+      expect(again.stdout).not.toMatch(/retention: removed/);
+      expect(keptFiles()).toEqual(afterFlood);
+    }
+
+    // The operator's disposition: quarantine the batch they reject and lift the hold. Normal retention then applies
+    // (KEEP newest by verification time), and a later healthy pull within the limit prunes as documented.
+    for (const f of readdirSync(src)) if (f.startsWith('afldb_prod-202610')) rmSync(join(src, f));
+    for (const f of readdirSync(dest)) if (f.includes('afldb_prod-202610')) rmSync(join(dest, f));
+    rmSync(hold);
+    const released = pull();
+    expect(released.status, `${released.stdout}${released.stderr}`).toBe(0);
+    expect(held()).toEqual(genuine);
+    put('afldb_prod-20261104-022000.dump');
+    const daily = pull();
+    expect(daily.status, `${daily.stdout}${daily.stderr}`).toBe(0);
+    expect(daily.stdout).toMatch(/retention: removed afldb_prod-20261101-022000\.dump/);
+    expect(held()).toEqual([...genuine.slice(1), 'afldb_prod-20261104-022000.dump']);
+    expect(existsSync(join(dest, `${genuine[0]}.sha256`))).toBe(false);
+    expect(existsSync(join(dest, `.verified-${genuine[0]}`))).toBe(false);
   });
 
   it('off-host: copies, re-hashes and prunes at the destination; a missing destination keeps the local dump and fails the run', () => {

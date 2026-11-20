@@ -10,7 +10,7 @@
 # Why a pull: the production host never holds a credential that can delete or alter these copies, so a compromised or
 # destroyed production host cannot take its own backups with it. Copies are only ever ADDED (--ignore-existing); the one
 # deletion is this script's own retention (the N most recently verified dumps by this machine's clock, default 30, and
-# none in a run that verified an implausible number of new dumps). Every new dump is proven against its sha256
+# none while a retention hold is in force). Every new dump is proven against its sha256
 # sidecar and read with pg_restore --list; a dump that fails either is moved to <dest-dir>/quarantine, never kept
 # as a good copy, and the run exits 1. A dump whose sidecar has not arrived yet is left for the next run.
 #
@@ -74,9 +74,23 @@ done
 # than a healthy source produces (one a day; AFLDB_OFFHOST_MAX_NEW, default 3) prunes nothing and fails, so a flood of
 # valid-looking dumps from a compromised source cannot evict the genuine copies in one pull. Residual: a source that
 # adds one dump a day for KEEP days is indistinguishable from normal operation; the off-host alert covers that.
+#
+# The alert is DURABLE (AFLDB-ISSUE-352 closeout): the flood's markers are written before the count is known, so a
+# skip that lasted one run let the next, unchanged pull count zero new dumps and prune the very copies the alert had
+# protected. The alert therefore writes <dest-dir>/.retention-hold, and while that file exists every run deletes
+# nothing and exits 1. Only an operator ends it, after deciding what the batch listed in the file is (quarantine the
+# unwanted dumps by hand, then `rm <dest-dir>/.retention-hold`); the next run then applies normal retention.
 MAX_NEW="${AFLDB_OFFHOST_MAX_NEW:-3}"
+HOLD="$DEST/.retention-hold"
 if (( prior > 0 && checked > MAX_NEW )); then  # the first (seeding) pull may verify many
-  log "ALERT: $checked new dumps verified in one run (limit $MAX_NEW); retention skipped, nothing deleted"
+  { printf 'retention hold set %s: %s new dumps verified in one run (limit %s)\n' "$(date -u +%FT%TZ)" "$checked" "$MAX_NEW"
+    printf 'remove this file only after deciding what the batch below is; until then no copy is deleted\n'
+    find "$DEST" -maxdepth 1 -name '.verified-*.dump' -newermt "@$now" -printf '%f\n' | sed 's/^\.verified-//' | sort
+  } >> "$HOLD" || log "ALERT: could not write $HOLD; a later run could prune"
+  log "ALERT: $checked new dumps verified in one run (limit $MAX_NEW); retention hold set, nothing deleted"
+  bad=$((bad + 1))
+elif [[ -e "$HOLD" ]]; then
+  log "ALERT: retention hold in force ($HOLD); nothing deleted until an operator reviews and removes it"
   bad=$((bad + 1))
 else
   ls -1t "$DEST"/.verified-*.dump 2> /dev/null | tail -n +$((KEEP + 1)) | while read -r marker; do
