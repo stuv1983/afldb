@@ -63,7 +63,8 @@ export default async function DataEditorPage(
   // Token FIRST: if a settle lands between the two reads the token is the older
   // one, so the save is refused as stale rather than blessing rows never shown.
   const matchSheetToken = matchForSheet ? await loadMatchSheetStaleToken(sql, id) : '';
-  const matchSheetPlayers = matchForSheet ? await getMatchPlayers(id) : [];
+  // Raw stored votes: the sheet shows evidence to an admin and never writes them (AFLDB-ISSUE-367).
+  const matchSheetPlayers = matchForSheet ? await getMatchPlayers(id, { brownlow: 'raw' }) : [];
   // ISSUE-257 D-257-6: the match's active durable decisions (import-role read; fails
   // closed to "unavailable", never to "none").
   const authoritySummary = matchForSheet ? await loadMatchSheetAuthoritySummary(id) : null;

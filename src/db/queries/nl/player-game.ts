@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { sql } from '@/db/client';
+import { brownlowAcceptedSql } from '@/db/queries/brownlow-readiness';
 import { NL_METRICS, type NlAggregation, type NlCompareOp, type NlMatchScope, type NlMatchType, type NlQueryPlan } from '@/search/nl/plan';
 import type { NlAnswerPayload, NlPlayerGameRow } from '@/search/nl/answer-types';
 
@@ -16,6 +17,18 @@ function metricColumn(metric: string): string {
   const def = NL_METRICS.player_game[metric];
   if (def.kind !== 'column') throw new Error(`player_game metric "${metric}" has no column.`);
   return def.column;
+}
+
+/**
+ * Per-match Brownlow votes count only in a season whose Brownlow is accepted
+ * (`brownlowAcceptedSql`, AFLDB-ISSUE-367), the gate every public Brownlow
+ * figure applies. Other seasons' rows are excluded exactly as a NULL
+ * ("not recorded") statistic is. Every other metric is unaffected.
+ */
+function metricGate(metric: string): SqlFragment {
+  return metric === 'brownlow_votes'
+    ? sql`${sql.unsafe(brownlowAcceptedSql('m.season'))}`
+    : sql`TRUE`;
 }
 
 /**
@@ -106,7 +119,11 @@ async function answerSingle(plan: NlQueryPlan, limit: number): Promise<NlAnswerP
   const value = sql`${sql.unsafe(`s.${metricColumn(plan.metric!)}`)}`;
   const direction = plan.agg.kind === 'min' ? sql.unsafe('ASC') : sql.unsafe('DESC');
   const n = rankDepth(plan);
-  const clauses: SqlFragment[] = [...scopeClauses(plan.scope, plan.player?.id, plan.debutGame), sql`${value} IS NOT NULL`];
+  const clauses: SqlFragment[] = [
+    ...scopeClauses(plan.scope, plan.player?.id, plan.debutGame),
+    sql`${value} IS NOT NULL`,
+    metricGate(plan.metric!),
+  ];
   // Mode 'single': the threshold qualifies each individual performance.
   // Applied inside the ranked CTE, before any ranking work, alongside the
   // IS NOT NULL above -- a NULL statistic is "not recorded" and never
@@ -160,7 +177,10 @@ async function answerSum(plan: NlQueryPlan, limit: number): Promise<NlAnswerPayl
   const statColumn = sql.unsafe(metricColumn(plan.metric!));
   const direction = plan.agg.kind === 'min' ? sql.unsafe('ASC') : sql.unsafe('DESC');
   const n = rankDepth(plan);
-  const where = foldAnd(scopeClauses(plan.scope, plan.player?.id, plan.debutGame));
+  const where = foldAnd([
+    ...scopeClauses(plan.scope, plan.player?.id, plan.debutGame),
+    metricGate(plan.metric!),
+  ]);
   // Mode 'sum': the threshold qualifies the player's aggregate across the
   // fully scoped match set, so it is a HAVING predicate AFTER aggregation.
   // A player with no non-NULL row in scope forms no group and can never

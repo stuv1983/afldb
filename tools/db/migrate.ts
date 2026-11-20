@@ -235,28 +235,59 @@ function checkMigrationSafety(): void {
 
 checkMigrationSafety();
 
+/** The ledger bootstrap. Apply mode only: `--status` never runs DDL (AFLDB-ISSUE-369). */
+const LEDGER_BOOTSTRAP_SQL = `
+  CREATE SCHEMA IF NOT EXISTS afldb_meta;
+  CREATE TABLE IF NOT EXISTS afldb_meta.schema_migrations (
+    name        text        PRIMARY KEY,
+    checksum    text        NOT NULL,
+    applied_at  timestamptz NOT NULL DEFAULT now(),
+    duration_ms integer     NOT NULL
+  );
+`;
+
+type Ledger = { present: boolean; applied: { name: string; checksum: string }[] };
+
+/**
+ * Read the ledger without assuming it exists. Existence comes from the catalog, which every role can read, so an
+ * empty target reports every file as pending instead of being initialised by an inspection.
+ */
+async function readLedger(q: postgres.Sql | postgres.TransactionSql): Promise<Ledger> {
+  const [{ present }] = await q<{ present: boolean }[]>`
+    SELECT EXISTS (
+      SELECT 1 FROM pg_catalog.pg_class c
+      JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'afldb_meta' AND c.relname = 'schema_migrations'
+    ) AS present
+  `;
+  if (!present) return { present, applied: [] };
+  const applied = await q<{ name: string; checksum: string }[]>`
+    SELECT name, checksum FROM afldb_meta.schema_migrations
+  `;
+  return { present, applied: [...applied] };
+}
+
 async function main() {
   const sql = postgres(connectionString!, { max: 1, onnotice: () => {} });
 
   try {
-    await sql.unsafe(`
-      CREATE SCHEMA IF NOT EXISTS afldb_meta;
-      CREATE TABLE IF NOT EXISTS afldb_meta.schema_migrations (
-        name        text        PRIMARY KEY,
-        checksum    text        NOT NULL,
-        applied_at  timestamptz NOT NULL DEFAULT now(),
-        duration_ms integer     NOT NULL
-      );
-    `);
-
-    const applied = await sql<{ name: string; checksum: string }[]>`
-      SELECT name, checksum FROM afldb_meta.schema_migrations
-    `;
+    // --status inspects inside a READ ONLY transaction, so even an owner connection cannot change the target, and a
+    // server-enforced read-only connection is enough to report. Only apply mode creates the ledger.
+    if (!statusOnly) await sql.unsafe(LEDGER_BOOTSTRAP_SQL);
+    const ledger = statusOnly
+      ? await sql.begin('read only', (tx) => readLedger(tx))
+      : await readLedger(sql);
+    const { applied } = ledger;
     const appliedByName = new Map(applied.map((r) => [r.name, r.checksum]));
     const migrations = loadMigrations();
 
     console.log(`AFLDB migrations -> ${target} (${safeTarget(connectionString!)})`);
     console.log(`  ${migrations.length} migration file(s), ${applied.length} already applied\n`);
+    if (!ledger.present) {
+      // Reachable only under --status: apply mode created the ledger above.
+      console.log('  No migration ledger (afldb_meta.schema_migrations): every file is pending.');
+      console.log('  --status does not create it; db:migrate does.\n');
+    }
 
     // Refuse to run if an already-applied migration has been edited.
     const drifted = migrations.filter(

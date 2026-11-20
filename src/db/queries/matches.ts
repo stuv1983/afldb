@@ -3,6 +3,7 @@ import 'server-only';
 import { cache } from 'react';
 
 import { sql } from '@/db/client';
+import { brownlowAcceptedSql } from '@/db/queries/brownlow-readiness';
 
 export type MatchListRow = {
   id: number;
@@ -125,16 +126,31 @@ export type MatchPlayerRow = {
   brownlowVotes: number | null;
 };
 
-export async function getMatchPlayers(matchId: number): Promise<MatchPlayerRow[]> {
+/**
+ * A match's line-up with per-player statistics.
+ *
+ * `brownlowVotes` is public only once the match season's Brownlow is accepted
+ * (`brownlowAcceptedSql`, AFLDB-ISSUE-367); before that it is NULL, exactly
+ * like an unrecorded value. `brownlow: 'raw'` is for the admin match sheet,
+ * which shows the stored evidence and never writes it.
+ */
+export async function getMatchPlayers(
+  matchId: number,
+  options: { brownlow?: 'accepted' | 'raw' } = {},
+): Promise<MatchPlayerRow[]> {
+  const votes = options.brownlow === 'raw'
+    ? sql`s.brownlow_votes`
+    : sql`CASE WHEN ${sql.unsafe(brownlowAcceptedSql('m.season'))} THEN s.brownlow_votes END`;
   return sql<MatchPlayerRow[]>`
     SELECT s.player_id AS "playerId", p.slug, p.display_name AS "displayName",
            s.club_id AS "clubId", s.jumper_number AS "jumperNumber",
            s.goals, s.behinds, s.kicks, s.handballs, s.disposals,
            s.marks, s.tackles, s.hitouts,
            s.frees_for AS "freesFor", s.frees_against AS "freesAgainst",
-           s.brownlow_votes AS "brownlowVotes"
+           ${votes} AS "brownlowVotes"
       FROM player_match_stats s
       JOIN players p ON p.id = s.player_id
+      JOIN matches m ON m.id = s.match_id
      WHERE s.match_id = ${matchId}
      ORDER BY s.club_id,
               COALESCE(s.disposals, -1) DESC,

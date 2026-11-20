@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { sql } from '@/db/client';
+import { brownlowAcceptedSql } from '@/db/queries/brownlow-readiness';
 
 /**
  * Queries backing /players/compare: career comparison reuses getPlayer()
@@ -139,6 +140,9 @@ export async function getHeadToHeadMatches(
     : relationship === 'opponents'
       ? sql`pms1.club_id <> pms2.club_id`
       : sql`TRUE`;
+  // Per-match votes are NULL until the match season's Brownlow is accepted (AFLDB-ISSUE-367).
+  const accepted = brownlowAcceptedSql('m.season');
+  const votes = (alias: 'pms1' | 'pms2') => sql.unsafe(`CASE WHEN ${accepted} THEN ${alias}.brownlow_votes END`);
 
   return sql<HeadToHeadMatch[]>`
     SELECT m.id AS "matchId", m.season, m.round_type AS "roundType",
@@ -150,10 +154,10 @@ export async function getHeadToHeadMatches(
            m.home_club_id AS "homeClubId", m.home_score AS "homeScore", m.away_score AS "awayScore",
            pms1.goals AS "aGoals", pms1.kicks AS "aKicks", pms1.marks AS "aMarks",
            pms1.disposals AS "aDisposals", pms1.tackles AS "aTackles",
-           pms1.brownlow_votes AS "aBrownlowVotes",
+           ${votes('pms1')} AS "aBrownlowVotes",
            pms2.goals AS "bGoals", pms2.kicks AS "bKicks", pms2.marks AS "bMarks",
            pms2.disposals AS "bDisposals", pms2.tackles AS "bTackles",
-           pms2.brownlow_votes AS "bBrownlowVotes"
+           ${votes('pms2')} AS "bBrownlowVotes"
       FROM player_match_stats pms1
       JOIN player_match_stats pms2 ON pms2.match_id = pms1.match_id
       JOIN matches m ON m.id = pms1.match_id

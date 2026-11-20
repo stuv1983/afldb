@@ -1,4 +1,4 @@
-import { acceptedBrownlowRowsSql } from './brownlow-readiness';
+import { acceptedBrownlowRowsSql, brownlowAcceptedSql } from './brownlow-readiness';
 import { randomUUID } from 'node:crypto';
 
 import 'server-only';
@@ -677,6 +677,10 @@ export type PlayerMatchRow = {
   careerGameNo: number | null;
 };
 
+/** A match-log row's Brownlow votes, NULL until the match season's Brownlow is accepted (AFLDB-ISSUE-367). */
+export const PUBLIC_MATCH_BROWNLOW_SQL =
+  `CASE WHEN ${brownlowAcceptedSql('m.season')} THEN s.brownlow_votes END`;
+
 export const PLAYER_MATCH_SORTS: Record<string, string> = {
   no: 's.career_game_no',
   date: 'm.match_date',
@@ -692,7 +696,8 @@ export const PLAYER_MATCH_SORTS: Record<string, string> = {
   m: 's.marks',
   t: 's.tackles',
   ho: 's.hitouts',
-  bv: 's.brownlow_votes',
+  // Sorts by the PUBLISHED value only, so a pending season's votes cannot leak through row order (AFLDB-ISSUE-367).
+  bv: PUBLIC_MATCH_BROWNLOW_SQL,
 };
 
 export function isPlayerMatchSort(s: string | undefined): s is keyof typeof PLAYER_MATCH_SORTS {
@@ -728,7 +733,7 @@ export async function getPlayerMatches(
            CASE WHEN m.home_club_id = s.club_id THEN m.away_score ELSE m.home_score END AS "pointsAgainst",
            s.goals, s.behinds, s.kicks, s.handballs, s.disposals,
            s.marks, s.tackles, s.hitouts,
-           s.brownlow_votes AS "brownlowVotes",
+           ${sql.unsafe(PUBLIC_MATCH_BROWNLOW_SQL)} AS "brownlowVotes",
            s.career_game_no AS "careerGameNo",
            count(*) OVER () AS total
       FROM player_match_stats s

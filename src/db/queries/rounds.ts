@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { sql } from '@/db/client';
+import { brownlowAcceptedSql } from '@/db/queries/brownlow-readiness';
 
 /**
  * Round-grain views derived live from `matches` and `brownlow_round_votes`.
@@ -128,6 +129,11 @@ export type RoundVoteRow = {
  * independently sourced tables) renders with a null club — this is a data
  * gap, not a player-identity ambiguity, since `brownlow_round_votes.player_id`
  * is a hard foreign key with no name-matching involved.
+ *
+ * Votes are public only once the season's Brownlow is accepted, the same
+ * gate the season totals and every career figure apply
+ * (`brownlowAcceptedSql`, AFLDB-ISSUE-367): before the count is published,
+ * round votes can already exist in this table and must not reach the page.
  */
 export async function getSeasonRoundVotes(year: number): Promise<RoundVoteRow[]> {
   return sql<RoundVoteRow[]>`
@@ -147,6 +153,7 @@ export async function getSeasonRoundVotes(year: number): Promise<RoundVoteRow[]>
       ) pc ON true
       LEFT JOIN clubs cl ON cl.id = pc.club_id
      WHERE rv.season = ${year} AND rv.votes > 0
+       AND ${sql.unsafe(brownlowAcceptedSql('rv.season'))}
      ORDER BY rv.round_number, rv.votes DESC, p.sort_name
   `;
 }

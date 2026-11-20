@@ -177,7 +177,9 @@ function lastOrderBy(): string {
 }
 
 vi.doMock('@/db/client', () => ({ sql: fakeSql }));
-const { PLAYER_MATCH_SORTS, getPlayerMatches, isPlayerMatchSort, isPlayerMatchSortDir } = await import(
+const {
+  PLAYER_MATCH_SORTS, PUBLIC_MATCH_BROWNLOW_SQL, getPlayerMatches, isPlayerMatchSort, isPlayerMatchSortDir,
+} = await import(
   '@/db/queries/players'
 );
 const {
@@ -220,6 +222,16 @@ describe('match-log and draft ORDER BY', () => {
     expect(lastOrderBy()).toBe(`s.goals ASC NULLS LAST, ${PLAYER_DEFAULT}`);
     await listDraftPicks({ ...draftFilters, sort: 'player', dir: 'desc' });
     expect(lastOrderBy()).toBe(`COALESCE(p.sort_name, dp.player_name_raw) DESC NULLS LAST, ${DRAFT_DEFAULT}`);
+  });
+
+  it('AFLDB-ISSUE-367: the match log projects and sorts only accepted Brownlow votes', async () => {
+    await getPlayerMatches(1, { limit: 10, offset: 0, sort: 'bv', dir: 'desc' });
+    const gated = PUBLIC_MATCH_BROWNLOW_SQL.replace(/\s+/g, ' ');
+    expect(gated).toMatch(/^CASE WHEN \(.*av\.season = m\.season.*\) THEN s\.brownlow_votes END$/);
+    expect(lastOrderBy()).toBe(`${gated} DESC NULLS LAST, ${PLAYER_DEFAULT}`);
+    const text = render(recordedQueries.at(-1)).replace(/\s+/g, ' ');
+    expect(text).toContain(`${gated} AS "brownlowVotes"`);
+    expect(text).not.toContain('s.brownlow_votes AS');
   });
 
   it('AFLDB-ISSUE-336: a pick sort stays inside each category and a type sort is category order', async () => {

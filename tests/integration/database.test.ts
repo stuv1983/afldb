@@ -8,20 +8,24 @@
  */
 import './guard';
 
+import { spawnSync } from 'node:child_process';
+
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { sql } from '@/db/client';
 import { reconcileCareerTotals } from '@/db/queries/db-health';
 import { searchAdminMatches } from '@/db/queries/match-admin';
 import { runMatchSearch } from '@/db/queries/match-search';
-import { getSeasonMatches } from '@/db/queries/matches';
+import { getMatchPlayers, getSeasonMatches } from '@/db/queries/matches';
+import { answerPlayerGame } from '@/db/queries/nl/player-game';
+import { getHeadToHeadMatches } from '@/db/queries/player-compare';
 import { getPlayerMatches, listPlayers, PLAYER_SORTS, playerListQueries } from '@/db/queries/players';
-import { getSeasonRoundLadder } from '@/db/queries/rounds';
+import { getSeasonRoundLadder, getSeasonRoundVotes } from '@/db/queries/rounds';
 import { searchRounds } from '@/db/queries/search';
 import { formatRound, formatRoundShort } from '@/lib/format';
 import { seedWildcardFinalSeason, type WildcardFixture } from './wildcard-final-fixture';
 import type { MatchType } from '@/search/match-spec';
-import type { NlGrain } from '@/search/nl/plan';
+import { validatePlan, type NlGrain, type NlQueryPlan } from '@/search/nl/plan';
 
 const SUPPORTED_NL_GRAINS = {
   player_career: true,
@@ -1072,5 +1076,205 @@ describe('AFLDB-ISSUE-132 wildcard final visibility (public and admin query surf
     expect(roundOne.total).toBe(2);
     expect(roundOne.rows.every((row) => row.roundNumber === 1)).toBe(true);
     expect(roundOne.rows.map((row) => row.id)).not.toContain(fixture.wildcardMatchId);
+  });
+});
+
+/*
+ * AFLDB-ISSUE-367. Round and match vote mirrors must follow the season acceptance rule
+ * (`brownlowAcceptedSql`) that the season totals and career figures already apply. One
+ * synthetic season keeps its positive rows throughout while its Brownlow coverage switches
+ * between complete (accepted) and pending (not accepted).
+ */
+describe('AFLDB-ISSUE-367 Brownlow acceptance on round, match, player and NL views', () => {
+  const season = 2083;
+  const prefix = `issue367-${season}-`;
+  const ids = { m1: 0, m2: 0, p1: 0, p2: 0 };
+  const seededPlayers: number[] = [];
+
+  async function cleanup(): Promise<void> {
+    await sql`DELETE FROM brownlow_round_votes WHERE season = ${season}`;
+    await sql`DELETE FROM stat_availability WHERE season = ${season}`;
+    if (seededPlayers.length > 0) {
+      await sql`DELETE FROM player_match_stats WHERE player_id = ANY(${seededPlayers})`;
+      await sql`DELETE FROM players WHERE id = ANY(${seededPlayers})`;
+    }
+    await sql`DELETE FROM matches WHERE match_key LIKE ${`${prefix}%`}`;
+    await sql`DELETE FROM seasons WHERE year = ${season}`;
+  }
+
+  async function setCoverage(coverage: 'complete' | 'pending'): Promise<void> {
+    await sql`
+      UPDATE stat_availability
+         SET coverage = ${coverage}::coverage_status, is_recorded = ${coverage === 'complete'}
+       WHERE stat_key = 'brownlow_season_total' AND season = ${season}
+    `;
+  }
+
+  function nlPlan(): NlQueryPlan {
+    const validated = validatePlan({
+      v: 1, grain: 'player_game', metric: 'brownlow_votes', mode: 'single', agg: { kind: 'max' },
+      scope: { seasonMin: season, seasonMax: season }, careerConditions: [], careerPredicates: [],
+      clubSeasonConditions: [], tiePolicy: 'all', limit: 25,
+    } as NlQueryPlan);
+    if ('error' in validated) throw new Error(`plan failed validation: ${validated.error}`);
+    return validated;
+  }
+
+  beforeAll(async () => {
+    const [existing] = await sql`SELECT 1 FROM seasons WHERE year = ${season}`;
+    if (existing) throw new Error(`Refusing to run: seasons(${season}) already exists.`);
+    try {
+      const clubs = await sql<{ id: number }[]>`
+        SELECT DISTINCT ON (organization_id) id::int AS id
+          FROM clubs WHERE organization_id IS NOT NULL
+         ORDER BY organization_id, id LIMIT 2
+      `;
+      const [a, b] = clubs.map((row) => row.id);
+      const [{ id: sourceId }] = await sql<{ id: number }[]>`SELECT id::int AS id FROM sources WHERE key = 'afltables'`;
+      await sql`INSERT INTO seasons (year, league, status) VALUES (${season}, 'AFL', 'complete'::season_status)`;
+      const match = async (key: string, round: number, date: string): Promise<number> => {
+        const [row] = await sql<{ id: number }[]>`
+          INSERT INTO matches (
+            match_key, season, round_code, round_number, round_type, is_final,
+            match_date, venue_raw, home_club_id, away_club_id,
+            home_score, away_score, result, winner_club_id, margin,
+            attendance, attendance_status, source_id
+          ) VALUES (
+            ${`${prefix}${key}`}, ${season}, ${String(round)}, ${round}, 'home_and_away'::round_type, false,
+            ${date}, 'Issue 367 Oval', ${a}, ${b}, 90, 60, 'home_win'::match_result, ${a}, 30,
+            NULL, 'not_collected'::coverage_status, ${sourceId}
+          ) RETURNING id::int AS id
+        `;
+        return row.id;
+      };
+      ids.m1 = await match('m1', 1, `${season}-03-05`);
+      ids.m2 = await match('m2', 2, `${season}-03-12`);
+      const player = async (slug: string): Promise<number> => {
+        const name = `Issue Three Six Seven ${slug}`;
+        const [row] = await sql<{ id: number }[]>`
+          INSERT INTO players (display_name, sort_name, search_name, slug)
+          VALUES (${name}, ${name}, ${name.toLowerCase()}, ${`${prefix}${slug}`})
+          RETURNING id::int AS id
+        `;
+        seededPlayers.push(row.id);
+        return row.id;
+      };
+      ids.p1 = await player('one');
+      ids.p2 = await player('two');
+      const line = async (playerId: number, matchId: number, clubId: number, votes: number) => {
+        await sql`
+          INSERT INTO player_match_stats (player_id, match_id, club_id, goals, brownlow_votes, source_id)
+          VALUES (${playerId}, ${matchId}, ${clubId}, 1, ${votes}, ${sourceId})
+        `;
+      };
+      await line(ids.p1, ids.m1, a, 3);
+      await line(ids.p2, ids.m1, b, 1);
+      await line(ids.p1, ids.m2, a, 0);
+      await line(ids.p2, ids.m2, b, 2);
+      const vote = async (playerId: number, round: number, matchId: number, votes: number) => {
+        await sql`
+          INSERT INTO brownlow_round_votes (season, player_id, round_number, match_id, played, votes)
+          VALUES (${season}, ${playerId}, ${round}, ${matchId}, true, ${votes})
+        `;
+      };
+      await vote(ids.p1, 1, ids.m1, 3);
+      await vote(ids.p2, 1, ids.m1, 1);
+      await vote(ids.p1, 2, ids.m2, 0);
+      await vote(ids.p2, 2, ids.m2, 2);
+      await sql`
+        INSERT INTO stat_availability (stat_key, season, is_recorded, coverage)
+        VALUES ('brownlow_season_total', ${season}, true, 'complete'::coverage_status)
+      `;
+    } catch (error) {
+      await cleanup();
+      throw error;
+    }
+  });
+
+  afterAll(async () => {
+    await cleanup();
+  });
+
+  it('shows every view of an accepted season', async () => {
+    await setCoverage('complete');
+    const rounds = await getSeasonRoundVotes(season);
+    expect(rounds.map((r) => [r.roundNumber, r.id, r.votes])).toEqual([[1, ids.p1, 3], [1, ids.p2, 1], [2, ids.p2, 2]]);
+
+    const sheet = await getMatchPlayers(ids.m1);
+    expect(new Map(sheet.map((r) => [r.playerId, r.brownlowVotes]))).toEqual(new Map([[ids.p1, 3], [ids.p2, 1]]));
+
+    const log = await getPlayerMatches(ids.p1, { limit: 10, offset: 0, season, sort: 'bv', dir: 'desc' });
+    expect(log.rows.map((r) => [r.matchId, r.brownlowVotes])).toEqual([[ids.m1, 3], [ids.m2, 0]]);
+
+    const h2h = await getHeadToHeadMatches(ids.p1, ids.p2, 'opponents');
+    expect(h2h.map((r) => [r.matchId, r.aBrownlowVotes, r.bBrownlowVotes])).toEqual([[ids.m2, 0, 2], [ids.m1, 3, 1]]);
+
+    const nl = await answerPlayerGame(nlPlan(), 25);
+    expect(nl.kind === 'player_game' && nl.lead).toMatchObject({ playerId: ids.p1, matchId: ids.m1, value: 3 });
+  });
+
+  it('withholds every public view while the season is pending, as unavailable rather than zero', async () => {
+    await setCoverage('pending');
+    try {
+      expect(await getSeasonRoundVotes(season)).toEqual([]);
+
+      const sheet = await getMatchPlayers(ids.m1);
+      expect(sheet).toHaveLength(2);
+      expect(sheet.every((r) => r.brownlowVotes === null)).toBe(true);
+      // The admin match sheet still sees the stored evidence.
+      const raw = await getMatchPlayers(ids.m1, { brownlow: 'raw' });
+      expect(new Map(raw.map((r) => [r.playerId, r.brownlowVotes]))).toEqual(new Map([[ids.p1, 3], [ids.p2, 1]]));
+
+      // Sorting by votes cannot reveal them: every value is NULL, so the date order decides.
+      const log = await getPlayerMatches(ids.p1, { limit: 10, offset: 0, season, sort: 'bv', dir: 'desc' });
+      expect(log.total).toBe(2);
+      expect(log.rows.map((r) => [r.matchId, r.brownlowVotes])).toEqual([[ids.m2, null], [ids.m1, null]]);
+
+      const h2h = await getHeadToHeadMatches(ids.p1, ids.p2, 'opponents');
+      expect(h2h).toHaveLength(2);
+      expect(h2h.every((r) => r.aBrownlowVotes === null && r.bBrownlowVotes === null)).toBe(true);
+
+      const nl = await answerPlayerGame(nlPlan(), 25);
+      expect(nl.kind === 'player_game' && nl.total).toBe(0);
+    } finally {
+      await setCoverage('complete');
+    }
+    expect(await getSeasonRoundVotes(season)).toHaveLength(3);
+  });
+});
+
+/*
+ * AFLDB-ISSUE-369. `db:status` must inspect, never initialise or alter. Against the populated test
+ * target on a session the SERVER holds read-only (default_transaction_read_only as a startup
+ * parameter), the report must succeed and leave the catalog exactly as it was. Before the fix the
+ * runner issued CREATE SCHEMA/TABLE IF NOT EXISTS first, which a read-only session rejects.
+ * The empty-target half of the acceptance runs against a fresh isolated database (issue record).
+ */
+describe('AFLDB-ISSUE-369 migration status is read-only', () => {
+  const catalog = async () => {
+    const [row] = await sql<{ fingerprint: string; ledger: number }[]>`
+      SELECT md5(string_agg(n.nspname || '.' || c.relname || ':' || c.relkind, ',' ORDER BY n.nspname, c.relname))
+               AS fingerprint,
+             (SELECT count(*)::int FROM afldb_meta.schema_migrations) AS ledger
+        FROM pg_catalog.pg_class c
+        JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+       WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') AND n.nspname NOT LIKE 'pg_toast%'
+    `;
+    return row;
+  };
+
+  it('reports on a server-enforced read-only session and changes nothing', async () => {
+    const url = new URL(process.env.AFLDB_TEST_DATABASE_URL!);
+    url.searchParams.set('default_transaction_read_only', 'on');
+    const env: NodeJS.ProcessEnv = { ...process.env, AFLDB_TEST_DATABASE_URL: url.toString() };
+    delete env.AFLDB_MIGRATE_TARGET;
+    const before = await catalog();
+    const run = spawnSync(process.execPath, ['--import', 'tsx', 'tools/db/migrate.ts', '--status', '--target', 'test'], {
+      env, encoding: 'utf8', timeout: 60_000,
+    });
+    expect(run.status, `${run.stdout}\n${run.stderr}`).toBe(0);
+    expect(run.stdout).toMatch(/^\d+ pending\.$/m);
+    expect(run.stdout).toMatch(new RegExp(`\\b${before.ledger} already applied`));
+    expect(await catalog()).toEqual(before);
   });
 });
