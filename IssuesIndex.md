@@ -1,5 +1,14 @@
 # AFLDB Current Issues Index
 
+**Current state, 21 November 2026.** Twelve open issues: 332, 348, 350, 351, 352, 357, 362, 363, 364, 367, 368 and 369. Live `origin/main` matched the remediation tip `b82a6b04`. The local `main` ref was 223 commits behind at the review. The new source findings and the ISSUE-352 retention retry defect block closeout. Primary ISSUE-366 remains resolved. The untracked Release 7 sitting record contains approval for an expired window and no execution result. [Closeout review](issues/reviews/AFLDB-FULL-REVIEW-2026-11-21.md) · [Worktree inventory](issues/reviews/AFLDB-CLOSEOUT-WORKTREES-2026-11-21.md).
+
+| Issue | Severity | Next action |
+|---|---|---|
+| 352 · backup retention | Medium | Prove protected copies survive the second pull after a retention alert. |
+| 367 · Brownlow publication | Low | Qualify the season gate on the integration base. Gate the two mirror readers in the separate follow-up. |
+| 368 · AFLW import and public views | High | Require a complete immutable input set and prove refusal before replacing a populated disposable dataset. |
+| 369 · Database upgrade tooling | Medium | Move bootstrap to apply mode and verify status on empty and populated read-only targets. |
+
 > Lightweight session index of open issues only.
 >
 > `issues.md` is the authoritative detailed ledger.
@@ -9,7 +18,7 @@
 > `-HANDOFF.md` companions and evidence artefacts. Historical entries below name a runbook by
 > filename only; resolved ones are in `issues/closed/`.
 
-**Current state — 2026-11-19 (ISSUE-366 and D-365-W published, both awaiting release).** **9 open issues** (332, 348, 350, 351, 352, 357, 362, 363, 364). AFLDB-ISSUE-366 resolved and published at `b9c045fe`, not deployed: awaiting deployment. AFLDB-ISSUE-351 stays open for host policy. **D-365-W implemented and verified, awaiting release.** D-365-W was published to origin/main at b51f963c on top of ISSUE-366 (b9c045fe). Both await a separately approved production release. `pending` Brownlow cell "Results not loaded" / "Brownlow Medal results for this season have not been loaded yet."; production still shows the interim "Not yet awarded". Tracked under resolved ISSUE-365 (no new ID). Next: owner Approval R7 for the attended release of `0a308e2a` prepared in `docs/v2/evidence/remediation-20261114/run7/RELEASE-PACKET-7.md` (2026-11-19; DEV-qualified; no production contact yet).
+**Earlier state — 2026-11-19 (ISSUE-366 and D-365-W published, both awaiting release).** **9 open issues** (332, 348, 350, 351, 352, 357, 362, 363, 364). AFLDB-ISSUE-366 resolved and published at `b9c045fe`, not deployed: awaiting deployment. AFLDB-ISSUE-351 stays open for host policy. **D-365-W implemented and verified, awaiting release.** D-365-W was published to origin/main at b51f963c on top of ISSUE-366 (b9c045fe). Both await a separately approved production release. `pending` Brownlow cell "Results not loaded" / "Brownlow Medal results for this season have not been loaded yet."; production still shows the interim "Not yet awarded". Tracked under resolved ISSUE-365 (no new ID). Next: owner Approval R7 for the attended release of `0a308e2a` prepared in `docs/v2/evidence/remediation-20261114/run7/RELEASE-PACKET-7.md` (2026-11-19; DEV-qualified; no production contact yet).
 
 **Earlier state — 2026-11-18 (Packet 6R follow-up review).** **10 open issues** (332, 348, 350, 351, 352, 357, 362, 363, 364, 366). AFLDB-ISSUE-366 tracks future repair and verification safeguards. AFLDB-ISSUE-351 covers attended activation. AFLDB-ISSUE-365 remains resolved. D-365-W remains the separately gated wording change. See the [implementation playbook](issues/closed/AFLDB-ISSUE-366.md).
 
