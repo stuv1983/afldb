@@ -912,9 +912,9 @@ travel. `data/` is gitignored, so they are never committed.
 
 ```bash
 # workstation
-python tools/aflw/parse_aflw.py            # scrape -> data/aflw/parsed/*.csv
+python tools/aflw/parse_aflw.py            # scrape -> data/aflw/parsed/*.csv + manifest.json
 python tools/aflw/load_staging.py --check  # no database needed
-scp data/aflw/parsed/*.csv arm@10.0.40.100:~/projects/afldb/data/aflw/parsed/
+scp data/aflw/parsed/*.csv data/aflw/parsed/manifest.json arm@10.0.40.100:~/projects/afldb/data/aflw/parsed/
 
 # server
 cd ~/projects/afldb
@@ -923,6 +923,12 @@ cd ~/projects/afldb
 
 `--load` re-runs `--check` first and loads inside one transaction, so a bad
 parse is a readable report and a failure leaves the previous load intact.
+Both refuse anything but one complete parser generation (AFLDB-ISSUE-368):
+the manifest must be present and match every file, every table except the
+issue list must have rows, and seasons, fixtures, matches and player
+statistics must agree. A refusal happens before the database is contacted,
+and `--load` copies exactly the rows it verified. A parse written before the
+manifest existed is sealed once with `load_staging.py --seal`.
 See [tools/aflw/README.md](../tools/aflw/README.md) for what the source is
 and where it lies.
 

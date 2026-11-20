@@ -17,6 +17,15 @@ other migration. `load_staging.py` only ever loads rows; it never creates a
 table or issues a grant. `--load` always runs `--check` first, so a bad parse
 is reported as a readable list rather than a `COPY` failure halfway through.
 
+The parser writes every table (header-only when empty) and then
+`manifest.json` with each file's SHA-256 and row count. The loader accepts
+only that complete generation: a missing manifest, a changed or stale file,
+or a replacement with an empty core table or inconsistent seasons, fixtures,
+matches and player statistics is refused before any database contact, and
+`--load` copies the exact rows it verified (AFLDB-ISSUE-368). For a parse
+written before the manifest existed, `load_staging.py --seal` runs the same
+checks and writes the manifest only if they pass.
+
 Nothing here resolves an entity. Team codes, player slugs and venue strings
 are staged exactly as published, with the resolution columns left NULL for a
 later pass. `data/` is gitignored, so the parsed files are rebuildable

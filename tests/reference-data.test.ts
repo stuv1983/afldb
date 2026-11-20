@@ -1321,6 +1321,7 @@ describe('standalone Python contracts (ISSUE-363 TST-5)', () => {
   const contractRoot = join(__dirname, '..');
   const python = resolveTestPython(contractRoot);
   const CONTRACTS: ReadonlyArray<readonly [file: string, closing: RegExp]> = [
+    ['aflw_staging_contract.py', /^All \d+ AFLW staging generation checks hold\.$/m],
     ['brownlow_afl_api_season_rehearsal_contract.py', /All Brownlow AFL API season rehearsal contract checks passed\./],
     ['draftguru_bridge_v2_contract.py', /All DraftGuru bridge-v2 generation checks hold\./],
     ['draftguru_child_validation_v3_contract.py', /All ISSUE-224 v3 child-validation contract checks hold\./],

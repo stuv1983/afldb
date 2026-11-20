@@ -27,13 +27,17 @@ issues.csv with enough context to find it again.
 from __future__ import annotations
 
 import argparse
-import csv
 import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from bs4 import BeautifulSoup
+
+# The loader owns the generation format (AFLDB-ISSUE-368). This script runs
+# from tools/aflw, so the sibling module is importable as-is.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from load_staging import write_generation  # noqa: E402
 
 DEFAULT_RAW = Path("D:/dev/aflw/raw/raw")
 DEFAULT_OUT = Path(__file__).resolve().parents[2] / "data" / "aflw" / "parsed"
@@ -89,14 +93,10 @@ class Output:
                  {"source_page": source, "kind": kind, "detail": detail})
 
     def write(self) -> None:
-        self.out_dir.mkdir(parents=True, exist_ok=True)
-        for table, rows in sorted(self.tables.items()):
-            path = self.out_dir / f"{table}.csv"
-            with path.open("w", newline="", encoding="utf-8") as fh:
-                writer = csv.DictWriter(fh, fieldnames=self.headers[table])
-                writer.writeheader()
-                writer.writerows(rows)
-            print(f"  {path.name:28s} {len(rows):>7,} rows")
+        # One complete generation: every staging table, header-only when
+        # empty, then manifest.json, so no file of an earlier run survives
+        # and the loader can bind its COPY to these exact bytes.
+        write_generation(self.out_dir, self.tables, self.headers)
 
 
 # ---------------------------------------------------------------------------
