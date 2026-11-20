@@ -1,0 +1,128 @@
+== closeout qualification 2026-11-20T21:38:22Z host=streamanator node v22.23.2 candidate 295c55c4 base b82a6b04
+TREES cand files=10124 base files=10121 overlaid=4 tests
+STEP npm-ci rc=0 (15s)
+RED 368 review command (header-only) rc=0 (pre-fix accepts: expect 0) | All constraints satisfied. 0 rows across 8 tables are safe to load.
+STEP red-unit-352-367 rc=1 (4s)
+  red-unit-352-367:  ❯ tests/deploy-web-unit.test.ts (40 tests | 1 failed | 39 skipped) 1226ms
+  red-unit-352-367:  ❯ tests/catalogue-lookups.test.ts (25 tests | 1 failed | 24 skipped) 27ms
+  red-unit-352-367:  FAIL  tests/catalogue-lookups.test.ts > match-log and draft ORDER BY > AFLDB-ISSUE-367: the match log projects and sorts only accepted Brownlow votes
+  red-unit-352-367:  ❯ tests/catalogue-lookups.test.ts:229:45
+  red-unit-352-367:  FAIL  tests/deploy-web-unit.test.ts > AFLDB-ISSUE-352 — scheduled backup wrapper and units > offhost-pull: binds each sidecar to its dump, refuses future stamps, and a flood cannot evict genuine copies (review A-03)
+  red-unit-352-367:  ❯ tests/deploy-web-unit.test.ts:465:26
+  red-unit-352-367:  Test Files  2 failed (2)
+  red-unit-352-367:       Tests  2 failed | 63 skipped (65)
+GREEN 368 review command (header-only) rc=1 (expect 1) | 1 input check(s) failed. Not safe to load; nothing was loaded.
+STEP aflw-contract rc=0 (1s)
+  All 34 AFLW staging generation checks hold.
+STEP typecheck rc=0 (127s)
+STEP lint-gate rc=0 (109s)
+  lint-gate: > tsx tools/dev/lint-gate.ts
+  lint-gate: 
+  lint-gate: Lint gate (ratchet): 338 error(s) in 43 file(s) now; the ratchet baseline allows 338 in 43 (existing debt, not clean lint).
+  lint-gate: Lint gate: PASSED (ratchet; existing debt remains).
+STEP eslint-changed rc=1 (4s)
+  eslint-changed:   1257:36  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  eslint-changed:   1264:36  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  eslint-changed: 
+  eslint-changed: ✖ 38 problems (31 errors, 7 warnings)
+  eslint-changed: 
+bash -n offhost-pull.sh ok
+STEP green-unit-focused rc=0 (14s)
+  green-unit-focused:  ✓ tests/reference-data.test.ts (71 tests) 6809ms
+  green-unit-focused:  ✓ tests/deploy-web-unit.test.ts (40 tests) 2672ms
+  green-unit-focused:  ✓ tests/catalogue-lookups.test.ts (25 tests) 65ms
+  green-unit-focused:  Test Files  3 passed (3)
+  green-unit-focused:       Tests  136 passed (136)
+STEP unit rc=1 (642s)
+  unit:  ✓ tests/db-test-rebuild.test.ts (1157 tests) 32368ms
+  unit: stdout | tests/db-promotion-check.test.ts > AFLDB-ISSUE-257 A4.4 — the player_match_stats authority replay predicted before the swap (DB-free) > the gate reads the candidate narrowly and PASSes a resolving record; a failure is a FAIL naming the key
+  unit: stdout | tests/db-promotion-check.test.ts > AFLDB-ISSUE-257 A4.4 — the player_match_stats authority replay predicted before the swap (DB-free) > the gate reads the candidate narrowly and PASSes a resolving record; a failure is a FAIL naming the key
+  unit: stdout | tests/db-promotion-check.test.ts > AFLDB-ISSUE-257 A4.4 — the player_match_stats authority replay predicted before the swap (DB-free) > the gate reads the candidate narrowly and PASSes a resolving record; a failure is a FAIL naming the key
+  unit: stdout | tests/db-promotion-check.test.ts > AFLDB-ISSUE-257 A4.4 — the player_match_stats authority replay predicted before the swap (DB-free) > the gate reads the candidate narrowly and PASSes a resolving record; a failure is a FAIL naming the key
+  unit: stdout | tests/db-promotion-check.test.ts > AFLDB-ISSUE-257 A4.4 — the player_match_stats authority replay predicted before the swap (DB-free) > the gate reads the candidate narrowly and PASSes a resolving record; a failure is a FAIL naming the key
+  unit: stdout | tests/db-promotion-check.test.ts > AFLDB-ISSUE-257 A4.4 — the player_match_stats authority replay predicted before the swap (DB-free) > the gate reads the candidate narrowly and PASSes a resolving record; a failure is a FAIL naming the key
+  unit:  ✓ tests/db-promotion-check.test.ts (480 tests) 1515ms
+  unit:  ✓ tests/current-season-import.test.ts (360 tests) 1043ms
+  unit:  ✓ tests/nl-parser.test.ts (684 tests) 798ms
+  unit:  ✓ tests/season-rollover.test.ts (417 tests) 2604ms
+  unit:  ✓ tests/player-link-mutations.test.ts (175 tests) 483ms
+  unit:  ✓ tests/afl-api-cutover.test.ts (477 tests) 45013ms
+  unit: stdout | tests/correct-afl-api-identity-cli.test.ts > AFLDB-ISSUE-238 stage-aware PRE-SWAP SAT-1 / CRV: exactly the declared pending-D15 providers may lack a resolved row (production contract correction found by the DEV rehearsal) > CRV (gateAflApiCorrectedReplayVerification) applies the shared contract, not a second rule > the same world with nothing declared -> FAIL (24: undeclared missing linked provider)
+  unit:  ✓ tests/correct-afl-api-identity-cli.test.ts (276 tests) 421ms
+  unit:  ✓ tests/afl-api-match.test.ts (247 tests) 786ms
+  unit:  ❯ tests/draftguru-acquisition.test.ts (167 tests | 3 failed | 1 skipped) 19161ms
+  unit:  ✓ tests/v2-admin-operations.test.ts (95 tests) 10594ms
+  unit:  ✓ tests/afl-api-ingestion-safety.test.ts (198 tests) 1217ms
+  unit:  ✓ tests/auth.test.ts (223 tests) 1019ms
+  unit:  ❯ tests/fitzroy-core-import.test.ts (117 tests | 4 failed | 1 skipped) 12571ms
+  unit:  ✓ tests/v2-shadow-parity.test.ts (201 tests) 4828ms
+  unit:  ✓ tests/data-overrides-source-contract.test.ts (78 tests) 508ms
+  unit:  ✓ tests/ingest-datasets.test.ts (305 tests) 205ms
+  unit:  ✓ tests/afl-api-identity-correction.test.ts (141 tests) 117ms
+  unit:  ✓ tests/v2-admin-operations-ui.test.ts (101 tests) 906ms
+  unit:  ✓ tests/v2-curated-awards.test.ts (124 tests) 423ms
+  unit:  ✓ tests/deploy-release.test.ts (59 tests) 25291ms
+  unit:  ✓ tests/reference-data.test.ts (71 tests) 6337ms
+  unit:  ✓ tests/nl-plan.test.ts (224 tests) 108ms
+  unit:  ✓ tests/gridley-compat.test.ts (61 tests) 35581ms
+  unit:  ✓ tests/v2-curated-awards-pglite.test.ts (35 tests) 5990ms
+  unit:  ✓ tests/register-issue224-s9-dev-write-gate.test.ts (154 tests) 519ms
+  unit:  ✓ tests/afl-api-settle-cli-gate.test.ts (81 tests) 567ms
+  unit:  ✓ tests/admin-fixture-actions.test.ts (89 tests) 212ms
+  unit:  ✓ tests/match-sheet.test.ts (97 tests) 103ms
+  unit:  ✓ tests/nl-regression-corpus.test.ts (163 tests) 280ms
+  unit:  ✓ tests/nl-describe.test.ts (94 tests) 94ms
+  unit:  ✓ tests/nl-semantic-mapping.test.ts (178 tests) 285ms
+  unit:  ✓ tests/v2-brownlow-reconciliation.test.ts (59 tests) 1643ms
+STEP pg-init rc=0 (4s)
+STEP green-369-empty rc=0 (2s)
+369 green EMPTY: before []
+369 green EMPTY: owner status rc=0 after [] unchanged=yes |   No migration ledger (afldb_meta.schema_migrations): every file is pending. 118 pending. 
+369 green EMPTY: read-only status rc=0 after [] |   No migration ledger (afldb_meta.schema_migrations): every file is pending. 118 pending. 
+STEP green-369-apply rc=0 (3s)
+  apply-from-empty: Applied 118 migration(s).
+STEP green-369-after-apply rc=0 (1s)
+  after-apply: 0 pending.
+STEP pg-red-db rc=0 (0s)
+STEP red-369-empty rc=0 (2s)
+369 red EMPTY: before []
+369 red EMPTY: owner status rc=0 after [] unchanged=yes | 118 pending. 
+369 red EMPTY: read-only status rc=1 after [] | cannot execute CREATE SCHEMA in a read-only transaction 
+STEP migrate-integ rc=0 (3s)
+STEP privileges-integ rc=0 (1s)
+STEP seed-integ rc=0 (0s)
+SEED clubs=2 afltables=1
+STEP red-integ rc=1 (5s)
+  red-integ:  ❯ tests/integration/database.test.ts (72 tests | 2 failed | 69 skipped) 277ms
+  red-integ:  FAIL  tests/integration/database.test.ts > AFLDB-ISSUE-367 Brownlow acceptance on round, match, player and NL views > withholds every public view while the season is pending, as unavailable rather than zero
+  red-integ:  ❯ tests/integration/database.test.ts:1219:49
+  red-integ:  FAIL  tests/integration/database.test.ts > AFLDB-ISSUE-369 migration status is read-only > reports on a server-enforced read-only session and changes nothing
+  red-integ:  Test Files  1 failed (1)
+  red-integ:       Tests  2 failed | 1 passed | 69 skipped (72)
+STEP green-integ rc=1 (3s)
+  green-integ:  ❯ tests/integration/database.test.ts (72 tests | 1 failed | 69 skipped) 204ms
+  green-integ:  FAIL  tests/integration/database.test.ts > AFLDB-ISSUE-369 migration status is read-only > reports on a server-enforced read-only session and changes nothing
+  green-integ:  Test Files  1 failed (1)
+  green-integ:       Tests  1 failed | 2 passed | 69 skipped (72)
+STEP migrate-aflw rc=0 (3s)
+STEP privileges-aflw rc=0 (1s)
+AFLW real extract copied: 8 files, sha256 of concatenation b61d584f92e2beb2
+STEP green-368-db rc=1 (33s)
+  START staging_rows=0 views=9 view_rows=0
+  SCENARIO PASS seal the real extract: Sealed /mnt/ssd/afldb-close-20261121/aflw-scratch/g1/manifest.json.
+  SCENARIO PASS load the real generation: rc=0 staging_rows=51018 views=9 view_rows=48084
+  SCENARIO PASS all-header generation with manifest refused, data preserved: rc=1 preserved=True FAIL  every table except issues has rows  (7)
+  SCENARIO PASS all-header files without manifest refused, data preserved: rc=1 preserved=True FAIL  /mnt/ssd/afldb-close-20261121/aflw-scratch/legacy-header-only/manifest.json not found: the directory is 
+  SCENARIO PASS omitted core table refused, data preserved: rc=1 preserved=True FAIL  /mnt/ssd/afldb-close-20261121/aflw-scratch/omit-matches/matches.csv not found
+  SCENARIO PASS stale optional file refused, data preserved: rc=1 preserved=True FAIL  issues.csv does not match its manifest checksum (changed, stale or from another generation)
+  SCENARIO FAIL input changed between validation and COPY: the verified rows load: loaded==verified False; re-run on changed dir rc=1
+  SCENARIO PASS valid generation with zero parser issues loads: rc=0 issues=0 other_staging_unchanged=True
+  SCENARIO FAIL repeated delivery is idempotent: rc=0,0 first==A False second==A False
+  SCENARIO FAIL failed COPY rolls back: rc=1 passed-preflight=True preserved=False CONTEXT:  COPY ladders, line 144, column played: "not-a-number"
+  RED base loader on header-only files: rc=0 emptied=True staging_rows=0 views=9 view_rows=0
+  SCENARIO FAIL restore after the red run: rc=0
+  SCENARIO PASS red reproduced (pre-fix loader empties staging and views): 
+  AFLW-DB-PROOF FAIL 8/12
+STEP pg-stop rc=0 (0s)
+== done 2026-11-20T21:54:47Z
+CLOSE-QUAL-COMPLETE

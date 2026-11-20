@@ -15,6 +15,16 @@ commit.
 
 ## [Unreleased]
 
+### Closeout fixes: AFLW replacement, Brownlow publication gate, read-only migration status, off-host retention (ISSUE-368, 367, 369, 352; 2026-11-21, local)
+
+Qualified red/green on streamanator against disposable PostgreSQL 16 ([record](docs/v2/evidence/closeout-20261121/QUALIFICATION.md)). Not published, not deployed; nothing ran against DEV or production.
+
+#### Fixed
+- **AFLW staging replacement (ISSUE-368):** the parser writes every table plus a `manifest.json` (SHA-256 and row count per file); `load_staging.py` refuses a missing manifest, a changed, stale or missing file, an empty core table or inconsistent seasons, fixtures, matches and player statistics before connecting, and loads exactly the rows it verified. A header-only extract can no longer empty the public AFLW views. New `--seal` adopts one pre-manifest parse.
+- **Brownlow votes on public views (ISSUE-367):** the season round-vote block, match page, player match log (value and `bv` sort), player head-to-head and the NL per-game Brownlow metric show votes only once the season's Brownlow is accepted; otherwise they are withheld or unavailable, never zero. The admin match sheet still shows stored values.
+- **`npm run db:status` (ISSUE-369):** inspects inside a read-only transaction and no longer creates `afldb_meta.schema_migrations` on an empty target; it works on a read-only connection. `db:migrate` still creates the ledger.
+- **Off-host backup pull (ISSUE-352):** a flood alert now leaves a durable `.retention-hold`; later unchanged pulls delete nothing and fail until an operator removes it, instead of pruning the protected copies on the next run.
+
 ### Brownlow `pending` wording on player pages (D-365-W, ISSUE-365 follow-up, 2026-11-19, awaiting release)
 
 Implemented and verified. D-365-W was published to origin/main at b51f963c on top of ISSUE-366 (b9c045fe). Both await a separately approved production release. Production keeps the interim "Not yet awarded" wording until a release that contains this change. No data change.

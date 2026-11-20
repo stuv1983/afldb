@@ -1,0 +1,105 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-close-20261121/base
+
+ ❯ tests/deploy-web-unit-red352.test.ts (40 tests | 1 failed | 39 skipped) 1379ms
+     ↓ .env.example defines DSNs beyond the three the web process keeps
+     ↓ loads .env, then keeps exactly app, auth and import
+     ↓ has at least one DSN left to deny
+     ↓ unsets AFLDB_OWNER_DATABASE_URL
+     ↓ unsets AFLDB_TEST_DATABASE_URL
+     ↓ unsets AFLDB_TEST_IMPORT_DATABASE_URL
+     ↓ unsets AFLDB_TEST_AUTH_DATABASE_URL
+     ↓ unsets AFLDB_DEV_DATABASE_URL
+     ↓ unsets AFLDB_DEV_IMPORT_DATABASE_URL
+     ↓ unsets AFLDB_CODE_TEST_DATABASE_URL
+     ↓ unsets AFLDB_CODE_TEST_IMPORT_DATABASE_URL
+     ↓ unsets AFLDB_BACKUP_DATABASE_URL
+     ↓ unsets AFLDB_PROD_DATABASE_URL
+     ↓ unsets AFLDB_PROD_IMPORT_DATABASE_URL
+     ↓ unsets AFLDB_PROD_AUTH_DATABASE_URL
+     ↓ removes .env files copied into the standalone tree and leaves everything else
+     ↓ prepare-standalone.mjs refuses to ship if a .env file survives removal
+     ↓ detects a nested credential file that top-level cleanup leaves, and deletes nothing nested
+     ↓ reports sorted relative POSIX paths, deterministically
+     ↓ never follows a symlinked directory
+     ↓ works from names only: the helper never opens a file
+     ↓ prepare-standalone.mjs refuses to ship if a .env-named file survives anywhere in the tree
+     ↓ src/lib/rollover/ is imported by no other src/ module, so its repository paths never run in the server
+     ↓ lists every data/ and tools/ JSON file a src/ loader reads, and the Coleman contract among them
+     ↓ every listed file exists in the repository
+     ↓ copies the files into a standalone-shaped tree, where the Coleman and season loaders read them
+     ↓ reports a bundle file that differs from the repository copy
+     ↓ names a file missing from the repository instead of failing the copy
+     ↓ prepare-standalone.mjs copies, then refuses to ship unless every file checks out
+     ↓ documents the current three-DSN web process boundary, not the pre-066 one
+     ↓ lists every DSN name .env.example defines
+     ↓ refuses to guess its target: no AFLDB_BACKUP_DIR, or a relative one, is a configuration error and writes nothing
+     ↓ backup: writes a verifiable sha256 sidecar and state, logs the resolved target first, drops orphaned sidecars
+     ↓ a failing backup exits 1 and leaves a FAILED marker naming the step; the next success clears it
+     ↓ verify: restores the FRESH dump itself, retries a failed parity check once, and fails loudly after the second
+     ↓ a backup success does not erase a failed verification; only a verify success does (review A-02)
+     × offhost-pull: binds each sidecar to its dump, refuses future stamps, and a flood cannot evict genuine copies (review A-03) 1376ms
+     ↓ off-host: copies, re-hashes and prunes at the destination; a missing destination keeps the local dump and fails the run
+     ↓ status is the monitor probe: ok after a recent backup and verification, failing on staleness or a never-verified restore
+     ↓ the prepared units sit outside the settle and apt windows, carry no credentials, and use a dedicated directory
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/deploy-web-unit-red352.test.ts > AFLDB-ISSUE-352 — scheduled backup wrapper and units > offhost-pull: binds each sidecar to its dump, refuses future stamps, and a flood cannot evict genuine copies (review A-03)
+AssertionError: 2026-11-20T21:41:58Z offhost-pull: pull /tmp/afldb-352-NRxXBz/pull-src/ -> /tmp/afldb-352-NRxXBz/pull-dest keep=3
+2026-11-20T21:41:58Z offhost-pull: retention: removed afldb_prod-20261028-070000.dump
+2026-11-20T21:41:58Z offhost-pull: retention: removed afldb_prod-20261027-060000.dump
+2026-11-20T21:41:58Z offhost-pull: retention: removed afldb_prod-20261026-050000.dump
+2026-11-20T21:41:58Z offhost-pull: retention: removed afldb_prod-20261025-040000.dump
+2026-11-20T21:41:58Z offhost-pull: retention: removed afldb_prod-20261024-030000.dump
+2026-11-20T21:41:58Z offhost-pull: retention: removed afldb_prod-20261023-020000.dump
+2026-11-20T21:41:58Z offhost-pull: retention: removed afldb_prod-20261022-010000.dump
+2026-11-20T21:41:58Z offhost-pull: retention: removed afldb_prod-20261021-000000.dump
+2026-11-20T21:41:58Z offhost-pull: retention: removed afldb_prod-20261020-090000.dump
+2026-11-20T21:41:58Z offhost-pull: retention: removed afldb_prod-20261019-080000.dump
+2026-11-20T21:41:58Z offhost-pull: retention: removed afldb_prod-20261018-070000.dump
+2026-11-20T21:41:58Z offhost-pull: retention: removed afldb_prod-20261017-060000.dump
+2026-11-20T21:41:58Z offhost-pull: retention: removed afldb_prod-20261016-050000.dump
+2026-11-20T21:41:58Z offhost-pull: retention: removed afldb_prod-20261015-040000.dump
+2026-11-20T21:41:58Z offhost-pull: retention: removed afldb_prod-20261014-030000.dump
+2026-11-20T21:41:58Z offhost-pull: retention: removed afldb_prod-20261013-020000.dump
+2026-11-20T21:41:58Z offhost-pull: retention: removed afldb_prod-20261012-010000.dump
+2026-11-20T21:41:58Z offhost-pull: retention: removed afldb_prod-20261011-000000.dump
+2026-11-20T21:41:58Z offhost-pull: retention: removed afldb_prod-20261010-090000.dump
+2026-11-20T21:41:58Z offhost-pull: retention: removed afldb_prod-20261009-080000.dump
+2026-11-20T21:41:58Z offhost-pull: retention: removed afldb_prod-20261008-070000.dump
+2026-11-20T21:41:58Z offhost-pull: retention: removed afldb_prod-20261007-060000.dump
+2026-11-20T21:41:58Z offhost-pull: retention: removed afldb_prod-20261006-050000.dump
+2026-11-20T21:41:58Z offhost-pull: retention: removed afldb_prod-20261005-040000.dump
+2026-11-20T21:41:58Z offhost-pull: retention: removed afldb_prod-20261004-030000.dump
+2026-11-20T21:41:58Z offhost-pull: retention: removed afldb_prod-20261003-020000.dump
+2026-11-20T21:41:58Z offhost-pull: retention: removed afldb_prod-20261002-010000.dump
+2026-11-20T21:41:58Z offhost-pull: retention: removed afldb_prod-20261001-000000.dump
+2026-11-20T21:41:58Z offhost-pull: retention: removed afldb_prod-20261103-022000.dump
+2026-11-20T21:41:58Z offhost-pull: retention: removed afldb_prod-20261102-022000.dump
+2026-11-20T21:41:58Z offhost-pull: retention: removed afldb_prod-20261101-022000.dump
+2026-11-20T21:41:58Z offhost-pull: done: 0 newly verified, 0 pending, 0 failed; 3 dump(s) held
+: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ tests/deploy-web-unit-red352.test.ts:478:62
+    476|     for (let retry = 0; retry < 2; retry += 1) {
+    477|       const again = pull();
+    478|       expect(again.status, `${again.stdout}${again.stderr}`).toBe(1);
+       |                                                              ^
+    479|       expect(again.stdout).toMatch(/0 newly verified/);
+    480|       expect(again.stdout).not.toMatch(/retention: removed/);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 39 skipped (40)
+   Start at  08:41:56
+   Duration  2.31s (transform 415ms, setup 160ms, import 394ms, tests 1.38s, environment 0ms)
+

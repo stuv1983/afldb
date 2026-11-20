@@ -1,0 +1,68 @@
+== rerun 2026-11-20T21:55:42Z cand test file sha256 1a032e70a64f
+STEP pg-start rc=0
+STEP pg-dbs rc=0
+STEP green-369-empty rc=0
+369 green EMPTY: before [CATALOG rels=0 fp=d41d8cd98f00b204e9800998ecf8427e afldb_meta=0]
+369 green EMPTY: owner status rc=0 after [CATALOG rels=0 fp=d41d8cd98f00b204e9800998ecf8427e afldb_meta=0] unchanged=yes |   No migration ledger (afldb_meta.schema_migrations): every file is pending. 118 pending. 
+369 green EMPTY: read-only status rc=0 after [CATALOG rels=0 fp=d41d8cd98f00b204e9800998ecf8427e afldb_meta=0] |   No migration ledger (afldb_meta.schema_migrations): every file is pending. 118 pending. 
+STEP green-369-apply rc=0
+  apply-from-empty: Applied 118 migration(s).
+STEP green-369-after-apply rc=0
+  after-apply: CATALOG rels=627 fp=45c6d399233bd2755e97adfe93c01ccc afldb_meta=1
+  after-apply: 0 pending.
+STEP red-369-empty rc=0
+369 red EMPTY: before [CATALOG rels=0 fp=d41d8cd98f00b204e9800998ecf8427e afldb_meta=0]
+369 red EMPTY: owner status rc=0 after [CATALOG rels=2 fp=615204e787ebf2f9fb3c72274c592b5b afldb_meta=1] unchanged=NO | 118 pending. 
+369 red EMPTY: read-only status rc=1 after [CATALOG rels=2 fp=615204e787ebf2f9fb3c72274c592b5b afldb_meta=1] | cannot execute CREATE SCHEMA in a read-only transaction 
+STEP red-integ rc=1
+  red-integ:      ✓ shows every view of an accepted season 31ms
+  red-integ:      × withholds every public view while the season is pending, as unavailable rather than zero 28ms
+  red-integ:      × reports on a server-enforced read-only session and changes nothing 351ms
+  red-integ:  FAIL  tests/integration/database.test.ts > AFLDB-ISSUE-367 Brownlow acceptance on round, match, player and NL views > withholds every public view while the season is pending, as unavailable rather than zero
+  red-integ:  FAIL  tests/integration/database.test.ts > AFLDB-ISSUE-369 migration status is read-only > reports on a server-enforced read-only session and changes nothing
+  red-integ:  Test Files  1 failed (1)
+  red-integ:       Tests  2 failed | 1 passed | 69 skipped (72)
+STEP green-integ rc=0
+  green-integ:  ✓ tests/integration/database.test.ts (72 tests | 69 skipped) 665ms
+  green-integ:      ✓ reports on a server-enforced read-only session and changes nothing  395ms
+  green-integ:  Test Files  1 passed (1)
+  green-integ:       Tests  3 passed | 69 skipped (72)
+STEP green-368-db rc=0
+  START staging_rows=51018 views=9 view_rows=48084
+  SCENARIO PASS seal the real extract: Sealed /mnt/ssd/afldb-close-20261121/aflw-scratch/g1/manifest.json.
+  SCENARIO PASS load the real generation: rc=0 staging_rows=51018 views=9 view_rows=48084
+  SCENARIO PASS all-header generation with manifest refused, data preserved: rc=1 preserved=True FAIL  every table except issues has rows  (7)
+  SCENARIO PASS all-header files without manifest refused, data preserved: rc=1 preserved=True FAIL  /mnt/ssd/afldb-close-20261121/aflw-scratch/legacy-header-only/manifest.json not found: the directory is 
+  SCENARIO PASS omitted core table refused, data preserved: rc=1 preserved=True FAIL  /mnt/ssd/afldb-close-20261121/aflw-scratch/omit-matches/matches.csv not found
+  SCENARIO PASS stale optional file refused, data preserved: rc=1 preserved=True FAIL  issues.csv does not match its manifest checksum (changed, stale or from another generation)
+  SCENARIO PASS input changed between validation and COPY: the verified rows load: loaded==verified True; re-run on changed dir rc=1
+  SCENARIO PASS valid generation with zero parser issues loads: rc=0 issues=0 other_staging_unchanged=True
+  SCENARIO PASS repeated delivery is idempotent: rc=0,0 first==A True second==A True
+  SCENARIO PASS failed COPY rolls back: rc=1 passed-preflight=True preserved=True CONTEXT:  COPY ladders, line 144, column played: "not-a-number"
+  RED base loader on header-only files: rc=0 emptied=True staging_rows=0 views=9 view_rows=0
+  SCENARIO PASS restore after the red run: rc=0
+  SCENARIO PASS red reproduced (pre-fix loader empties staging and views): 
+  AFLW-DB-PROOF PASS 12/12
+STEP base-unit-known rc=1
+  base-unit-known:      ✓ pins the canonical player_url form settled by U1 (absolute https, no trailing slash, ordinal preserved) 5ms
+  base-unit-known:      ✓ constructs annual URLs from the single base constant 1ms
+  base-unit-known:      ✓ pins exactly the 42 expected years 3ms
+  base-unit-known:      ✓ records 1983-1985 as intentional coverage gaps, not failures 1ms
+  base-unit-known:      ✓ pins the three CSV schema variants and the live Trade-column rule 2ms
+  base-unit-known:      ✓ declares the frozen CSV artifact as a non-importable parity oracle 1ms
+  base-unit-known:      ✓ pins the parity baseline and respectful HTTP policy 1ms
+  base-unit-known:      ✓ have zero legacy-database and zero application-database dependency 2ms
+  base-unit-known:      ✓ performs no destructive filesystem or data operation anywhere 2ms
+  base-unit-known:      ✓ implements the §4 respectful-HTTP contract 1ms
+  base-unit-known:      ✓ writes the manifest LAST, refuses partials, and treats labels as immutable 1ms
+  base-unit-known:      ✓ extracts verbatim hrefs and canonicalises to the U1 stored form 86ms
+  base-unit-known:      ✓ preserves the ordinal exactly (gary_ablett/2 never collapses to /1 or slug-only) 87ms
+  base-unit-known:      ✓ keeps the two Brad Millers distinct (the canonical identity regression) 89ms
+  base-unit-known:      ✓ canonicalisation is idempotent and rejects trailing slashes and foreign hosts  394ms
+  base-unit-known:      ✓ accepts the 14-column variant A shape (1981: no Draft, no Trade) 86ms
+  base-unit-known:      ✓ fails closed on an unknown header (schema drift) 85ms
+  base-unit-known:      ✓ treats blank as absence: null selection numbers, parity-only career figures, absent Trade 88ms
+  base-unit-known:      ✓ separates text nodes across <br> in Pick and Signing cells (live 2001 structure) 86ms
+  base-unit-known:      ✓ never modifies raw/ bytes and counts encoding artefacts instead of repairing them 90ms
+STEP pg-stop rc=0
+CLOSE-RERUN-COMPLETE

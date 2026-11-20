@@ -1,13 +1,12 @@
 # AFLDB Current Issues Index
 
-**Current state, 21 November 2026.** Twelve open issues: 332, 348, 350, 351, 352, 357, 362, 363, 364, 367, 368 and 369. Live `origin/main` matched the remediation tip `b82a6b04`. The local `main` ref was 223 commits behind at the review. The new source findings and the ISSUE-352 retention retry defect block closeout. Primary ISSUE-366 remains resolved. The untracked Release 7 sitting record contains approval for an expired window and no execution result. [Closeout review](issues/reviews/AFLDB-FULL-REVIEW-2026-11-21.md) · [Worktree inventory](issues/reviews/AFLDB-CLOSEOUT-WORKTREES-2026-11-21.md).
+**Current state, 21 November 2026 (closeout pass).** Nine open issues: 332, 348, 350, 351, 352, 357, 362, 363 and 364. AFLDB-ISSUE-367, 368 and 369 are **resolved locally** on branch `claude/closeout-20261121` (executable tree `467cd243`, qualified red/green on streamanator, [QUALIFICATION.md](docs/v2/evidence/closeout-20261121/QUALIFICATION.md)); not published, not deployed. The ISSUE-352 retention-retry defect is fixed the same way; 352 stays open for owner decisions D-HO-2/3/5/7. Release 7 was not executed: its approval expired 2026-11-20T01:00Z with no production contact recorded. Every other open issue is blocked on an owner decision or operational input (see the table).
+
+**Review state, 21 November 2026.** Twelve open issues: 332, 348, 350, 351, 352, 357, 362, 363, 364, 367, 368 and 369. Live `origin/main` matched the remediation tip `b82a6b04`. The local `main` ref was 223 commits behind at the review. The new source findings and the ISSUE-352 retention retry defect block closeout. Primary ISSUE-366 remains resolved. The untracked Release 7 sitting record contains approval for an expired window and no execution result. [Closeout review](issues/reviews/AFLDB-FULL-REVIEW-2026-11-21.md) · [Worktree inventory](issues/reviews/AFLDB-CLOSEOUT-WORKTREES-2026-11-21.md).
 
 | Issue | Severity | Next action |
 |---|---|---|
-| 352 · backup retention | Medium | Prove protected copies survive the second pull after a retention alert. |
-| 367 · Brownlow publication | Low | Qualify the season gate on the integration base. Gate the two mirror readers in the separate follow-up. |
-| 368 · AFLW import and public views | High | Require a complete immutable input set and prove refusal before replacing a populated disposable dataset. |
-| 369 · Database upgrade tooling | Medium | Move bootstrap to apply mode and verify status on empty and populated read-only targets. |
+| 352 · backup retention | Medium | Retry defect fixed locally (durable `.retention-hold`, red/green). Owner D-HO-2/3/5/7 before off-host activation. |
 
 > Lightweight session index of open issues only.
 >
