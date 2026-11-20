@@ -1253,7 +1253,7 @@ describe('AFLDB-ISSUE-367 Brownlow acceptance on round, match, player and NL vie
 describe('AFLDB-ISSUE-369 migration status is read-only', () => {
   const catalog = async () => {
     const [row] = await sql<{ fingerprint: string; ledger: number }[]>`
-      SELECT md5(string_agg(n.nspname || '.' || c.relname || ':' || c.relkind, ',' ORDER BY n.nspname, c.relname))
+      SELECT md5(string_agg(n.nspname || '.' || c.relname || ':' || c.relkind::text, ',' ORDER BY n.nspname, c.relname))
                AS fingerprint,
              (SELECT count(*)::int FROM afldb_meta.schema_migrations) AS ledger
         FROM pg_catalog.pg_class c
