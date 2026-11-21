@@ -1,0 +1,11 @@
+== p1 build afldb_v2_rb_p1_overlay_test from afldb_v2_rb_s_test HEAD=7d92042fd11010eaa20966e2f49ae7a93e286568 2026-11-21T17:26:12Z
+create-db: afldb_v2_rb_p1_overlay_test created from afldb_v2_rb_s_test and marked
+tier P plan: labels=64 (ids changed from production: 3); rookie selections=8 (every player resolves exactly once)
+labels: 64 written and verified by the audited applier
+rookie selections: 8 written in one transaction
+tier P built on afldb_v2_rb_p1_overlay_test: report /mnt/ssd/afldb-backlog-20261122b-363/ev/p1/out/tier-p-report.json; content fingerprint 6f988a679c2218840bc20f4c6e8045fa5943d2ded8195a6cbd6470ba05624256
+tier P rc=0 seconds=6
+raw fingerprint (fp.sql, no exclusions) sha256=83270ee7b462de8039464444e14a1ff6a50a30e68ae5d67216b602ca9818111c
+d1e75ddb3b8f906c47fe1450d8da984a633558fbac4419ef26066d24c32ccd63  ev/p1/out/evidence-rekeyed.json
+e427081cbe03b1e6a5102cfb9ee6f221f7f6a05cb5f0a5dd96fe562a3536fefd  ev/p1/out/applier-report.json
+58c58b4b0fba50209a543750bce18e10f7c3170d5fda00863f67ab59bd1adf45  ev/p1/out/tier-p-report.json

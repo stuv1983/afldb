@@ -1,0 +1,12 @@
+## control wrong-database-name: target afldb_v2_rb_nc1_test (copy of afldb_v2_rb_s_test), --template-name afldb_v2_rb_s_test
+tier P refused: not an acceptable tier P target: database name afldb_v2_rb_nc1_test is not afldb_v2_rb_*_overlay_test
+rc=1 (expected non-zero); out dir exists: no
+## control preexisting-accounts: target afldb_v2_rb_nc2_overlay_test (copy of afldb_v2_rb_p1_overlay_test), --template-name afldb_v2_rb_s_test
+tier P refused: not an acceptable tier P target: the target already holds 2 auth_users row(s): tier P needs a fresh copy of a source-only rebuild (zero accounts)
+rc=1 (expected non-zero); out dir exists: no
+## control target-equals-template: target afldb_v2_rb_nc3_overlay_test (copy of afldb_v2_rb_s_test), --template-name afldb_v2_rb_nc3_overlay_test
+tier P refused: not an acceptable tier P target: the target IS the template: tier P is applied to a fresh copy, never the template
+rc=1 (expected non-zero); out dir exists: no
+## control template-does-not-exist: target afldb_v2_rb_nc4_overlay_test (copy of afldb_v2_rb_s_test), --template-name afldb_v2_rb_missing_test
+tier P refused: not an acceptable tier P target: template afldb_v2_rb_missing_test does not exist or does not carry the isolated-test marker
+rc=1 (expected non-zero); out dir exists: no

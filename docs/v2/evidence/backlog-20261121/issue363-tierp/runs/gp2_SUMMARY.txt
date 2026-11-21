@@ -1,0 +1,32 @@
+== gp2 gridley base=afldb_v2_rb_p2_overlay_test HEAD=7d92042fd11010eaa20966e2f49ae7a93e286568 2026-11-21T17:41:44Z
+-- gridley-corpus on a fresh copy of afldb_v2_rb_p2_overlay_test (afldb_v2_rb_gp2_g1_test) 17:41:44
+create-db: afldb_v2_rb_gp2_g1_test created from afldb_v2_rb_p2_overlay_test and marked
+vitest rc=1 [gridley-corpus]  Test Files 1 failed (1); Tests 1 failed | 1211 passed (1212);
+     × tests/integration/gridley-corpus.test.ts > Gridley corpus -- every cell through solveCellSummary > writes the run report and has no failing cells 110ms
+     FAIL  tests/integration/gridley-corpus.test.ts > Gridley corpus -- every cell through solveCellSummary > writes the run report and has no failing cells
+    ID: ✓ tests/integration/gridley-corpus.test.ts > Gridley corpus -- criteria > has no probed dataset gap, unless run in diagnostic mode
+    ID: ✓ tests/integration/gridley-corpus.test.ts > Gridley corpus -- every cell through solveCellSummary > conforms to the bounded approved-deferral policy, independently of diagnostic mode
+    ID: × tests/integration/gridley-corpus.test.ts > Gridley corpus -- every cell through solveCellSummary > writes the run report and has no failing cells
+    [gridley-corpus] dataset gaps on this database: {"maxSeason":2026,"registerSeason":2026,"draftLinks":true,"matchEvents":true,"heights":true,"dobs":true,"coaches":true,"fatherSon":true,"siblings":true,"afterSiren":true}; gapped criteria: none
+    [gridley-corpus] cells solved 10209/10287; findings {"time of board":23571,"adjudicated key disagreement":54,"unsupported":78,"list membership":1232,"external source disagreement":425,"adjudicated source conflict":63,"criterion disagreement":40}; cells over 1 s: 19
+drop-db: afldb_v2_rb_gp2_g1_test dropped
+-- gridley-aa-oracle on a fresh copy of afldb_v2_rb_p2_overlay_test (afldb_v2_rb_gp2_g2_test) 17:47:26
+create-db: afldb_v2_rb_gp2_g2_test created from afldb_v2_rb_p2_overlay_test and marked
+vitest rc=0 [gridley-aa-oracle]  Test Files 1 passed (1); Tests 61 passed | 1 skipped (62);
+drop-db: afldb_v2_rb_gp2_g2_test dropped
+-- gridley-height-oracle on a fresh copy of afldb_v2_rb_p2_overlay_test (afldb_v2_rb_gp2_g3_test) 17:49:34
+create-db: afldb_v2_rb_gp2_g3_test created from afldb_v2_rb_p2_overlay_test and marked
+vitest rc=0 [gridley-height-oracle]  Test Files 1 passed (1); Tests 61 passed | 1 skipped (62);
+drop-db: afldb_v2_rb_gp2_g3_test dropped
+-- grid-solver on a fresh copy of afldb_v2_rb_p2_overlay_test (afldb_v2_rb_gp2_g4_test) 17:51:42
+create-db: afldb_v2_rb_gp2_g4_test created from afldb_v2_rb_p2_overlay_test and marked
+vitest rc=0 [grid-solver]  Test Files 1 passed (1); Tests 222 passed (222);
+drop-db: afldb_v2_rb_gp2_g4_test dropped
+-- grid-solver-investigation on a fresh copy of afldb_v2_rb_p2_overlay_test (afldb_v2_rb_gp2_g5_test) 17:52:17
+create-db: afldb_v2_rb_gp2_g5_test created from afldb_v2_rb_p2_overlay_test and marked
+vitest rc=0 [grid-solver-investigation]  Test Files 1 passed (1); Tests 1 passed (1);
+drop-db: afldb_v2_rb_gp2_g5_test dropped
+-- release-gates on a fresh copy of afldb_v2_rb_p2_overlay_test (afldb_v2_rb_gp2_g6_test) 17:52:21
+create-db: afldb_v2_rb_gp2_g6_test created from afldb_v2_rb_p2_overlay_test and marked
+vitest rc=0 [release-gates]  Test Files 1 passed (1); Tests 68 passed | 7 skipped (75);
+drop-db: afldb_v2_rb_gp2_g6_test dropped

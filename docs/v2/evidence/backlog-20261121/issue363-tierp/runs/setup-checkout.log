@@ -1,0 +1,4 @@
+HEAD=7d92042fd11010eaa20966e2f49ae7a93e286568
+npm ci rc=0
+3.12.3 psycopg 3.3.4
+porcelain=0

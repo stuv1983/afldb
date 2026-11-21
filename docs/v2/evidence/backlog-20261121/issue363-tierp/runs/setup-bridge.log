@@ -1,0 +1,17 @@
+stage A: 42 raw pages match the manifest; copied
+create-db: afldb_v2_rb_s_test created from afldb_v2_rb_s0_test and marked
+bridge import rc=0
+WARNING:  permission denied to analyze "pg_authid", skipping it
+WARNING:  permission denied to analyze "pg_subscription", skipping it
+WARNING:  permission denied to analyze "pg_database", skipping it
+WARNING:  permission denied to analyze "pg_db_role_setting", skipping it
+WARNING:  permission denied to analyze "pg_tablespace", skipping it
+WARNING:  permission denied to analyze "pg_auth_members", skipping it
+WARNING:  permission denied to analyze "pg_shdepend", skipping it
+WARNING:  permission denied to analyze "pg_shdescription", skipping it
+WARNING:  permission denied to analyze "pg_replication_origin", skipping it
+WARNING:  permission denied to analyze "pg_shseclabel", skipping it
+WARNING:  permission denied to analyze "pg_parameter_acl", skipping it
+draft_picks=6810 draft_persons=5057 bridge_identities=3559 import_batches=27 ledger=118 data_overrides=0 auth_users=0
+stage A removed from the checkout
+porcelain=3

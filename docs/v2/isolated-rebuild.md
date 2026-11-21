@@ -144,3 +144,44 @@ Sections 3 and 5 above record the 2026-10-19/20 runs (baseline `full-history-202
 current accepted baseline is `c2-2026-final-core-v1` (`data/reference/fitzroy-accepted-baselines.json`), and the run-3
 isolated rebuild validated **91 checks** with bridge parent v3
 (`docs/v2/evidence/remediation-20261114/run3/rebuild/README.md`).
+
+## 7. Tier P (opt-in, ISSUE-363 S + P-full)
+
+Owner decision Q9 (22 Nov 2026): the source-only rebuild above is **tier S** and stays the default, unchanged
+(`tools/db/rebuild-test.ts`: 30 stages, 91 checks, accepted digest). **Tier P** is a separate, opt-in overlay built only from
+tracked, reviewed GAP-029 curation evidence, on a **fresh `--template` copy** of tier S (the template is never written).
+
+**Declared tier S dependency:** G-a and G-b require tier P (curated GAP-029 labels + 8 reviewed Rookie selections).
+On tier S alone the Gridley ids G-a ("has no probed dataset gap") and G-b ("conforms to the bounded approved-deferral policy") are
+recorded as declared dependencies, not re-triaged each run; a NEW Gridley failure on tier S is still red, and no test is skipped
+or weakened. G-c ("writes the run report and has no failing cells") fails on every base, production-shaped data included
+(78 deferred `unsupported` plus 40 sibling `criterion disagreement` cells, ISSUE-118) and is not a tier question.
+
+`tools/v2/rebuild-tier-p.ts` applies, and nothing else:
+
+1. **64 match-event labels.** `docs/v2/evidence/gap-029-match-event-correction-2026-11-01-r2.json` names production match ids. They are
+   rekeyed to the target by natural key (season, date, round, home club, away club, both scores). An entry is kept only on exactly one
+   match; any entry with 0 or more than 1 refuses the whole run. The rekeyed file is written to `--out`, then the existing audited
+   applier `tools/v2/apply-gap029-match-events.ts --apply` runs on it unchanged.
+2. **8 Rookie selections** from `data/players/rookie-relisting-outcomes.csv` (`buildEntries`). Each player is resolved on the target by
+   AFL Tables profile (exactly one, else refuse). One clone-local Super Admin (placeholder credentials, non-reserved domain, created
+   only inside the target) is the actor; all 8 are written by `createManualPickInTransaction` in one `afldb_import` transaction after
+   `assert_viable_super_admin_actor`. Any refusal rolls the transaction back.
+
+It refuses unless the DSNs are loopback on the isolated port, the database is named `afldb_v2_rb_*_overlay_test`, the live server proves
+the isolated cluster and marker, the target is not a template and not the `--template-name` it was copied from, and the target holds
+zero `auth_users` rows. The 92 player-identity and 1 line-up live overrides are not applied. The report (`tier-p-report.json` under
+`--out`) records the tool revision, target and template names, the rekeyed-evidence and applier-report digests, counts, and a content
+fingerprint over every base table that excludes a declared list of volatile columns and normalises the editor's random UUID tokens
+(both lists are in the report). Two builds from one template must give the same digest.
+
+```bash
+# the tier S template (restored dump + DraftGuru bridge import) is never written; copy it first
+npx tsx tools/v2/isolated-pg.ts create-db afldb_v2_rb_p1_overlay_test --template <tier-S-template>
+npx tsx tools/v2/isolated-pg.ts run afldb_v2_rb_p1_overlay_test -- node --conditions=react-server --import tsx \
+  tools/v2/rebuild-tier-p.ts --template-name <tier-S-template> --out <empty-dir> --apply
+```
+
+Without `--apply` it runs every refusal and the read-only plan only. A failure after the first write leaves a partial overlay: drop the
+copy and rebuild it from the template. Run the Gridley suites on a further fresh copy of the tier P database. Measurements and the
+determinism comparison: `docs/v2/evidence/backlog-20261121/issue363-tierp/README.md`.

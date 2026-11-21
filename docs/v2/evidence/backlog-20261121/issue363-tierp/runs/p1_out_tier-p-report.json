@@ -1,0 +1,193 @@
+{
+  "format": "afldb.v2.tier-p-report.1",
+  "decision": "ISSUE-363 Q9 S + P-full",
+  "tool": {
+    "gitHead": "7d92042fd11010eaa20966e2f49ae7a93e286568",
+    "fileSha256": {
+      "tools/v2/rebuild-tier-p.ts": "9fc96a1233d0d4a39a5204e51b3a952572aa39a662a26960486c669ee7741dc0",
+      "tools/v2/apply-gap029-match-events.ts": "0873e98dbb2d83fa29ed01a3dcb6f5acfa9a572abd383ca3f6b16a70d2349b7c",
+      "src/db/queries/admin-draft.ts": "44d8507420797020fe1a62511ceb8209268b7b8fb5abd128c872fb04730a801d",
+      "docs/v2/evidence/gap-029-match-event-correction-2026-11-01-r2.json": "e3848807931cf255175c1642d9ded63590b2c7e2633b33a5e9f0fa5b96a4430f",
+      "data/players/rookie-relisting-outcomes.csv": "c24ea37cce6eb4852ec7d04ab30f82c3be354a942ba3957e4994c2137a5a4b65"
+    }
+  },
+  "target": {
+    "database": "afldb_v2_rb_p1_overlay_test",
+    "templateName": "afldb_v2_rb_s_test"
+  },
+  "rekeyedEvidenceSha256": "d1e75ddb3b8f906c47fe1450d8da984a633558fbac4419ef26066d24c32ccd63",
+  "applierReportSha256": "e427081cbe03b1e6a5102cfb9ee6f221f7f6a05cb5f0a5dd96fe562a3536fefd",
+  "counts": {
+    "labels": 64,
+    "labelIdsChangedFromProduction": 3,
+    "labelAuditRows": 64,
+    "labelActiveOverrides": 64,
+    "rookieSelections": 8,
+    "rookiePlayerIdsDifferingFromProduction": 7,
+    "draftPicksBefore": 6810,
+    "draftPicksAfter": 6818,
+    "activeOverridesByGroup": {
+      "draft_picks/selection": 8,
+      "matches/match_event": 64
+    },
+    "dataEdits": 72,
+    "authUsers": 2
+  },
+  "fingerprint": {
+    "algorithm": "per base table in public/staging/afldb_meta: <rows>:<sum of hashtextextended(row text, 0)>; sha256 over the sorted \"<schema.table>=<value>\" lines",
+    "volatileColumns": {
+      "public.auth_users": [
+        "created_at"
+      ],
+      "public.data_edits": [
+        "created_at"
+      ],
+      "public.data_overrides": [
+        "created_at",
+        "updated_at"
+      ],
+      "public.draft_picks": [
+        "created_at",
+        "updated_at"
+      ]
+    },
+    "normalisedColumns": {
+      "public.data_edits": [
+        {
+          "column": "new_values",
+          "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+          "replacement": "<token>"
+        },
+        {
+          "column": "old_values",
+          "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+          "replacement": "<token>"
+        },
+        {
+          "column": "note",
+          "pattern": "see [^ ]*evidence-rekeyed[.]json",
+          "replacement": "see <rekeyed-evidence>"
+        }
+      ],
+      "public.data_overrides": [
+        {
+          "column": "entity_key",
+          "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+          "replacement": "<token>"
+        }
+      ],
+      "public.draft_picks": [
+        {
+          "column": "source_record_id",
+          "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+          "replacement": "<token>"
+        },
+        {
+          "column": "player_url",
+          "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+          "replacement": "<token>"
+        }
+      ]
+    },
+    "digest": "6f988a679c2218840bc20f4c6e8045fa5943d2ded8195a6cbd6470ba05624256",
+    "tables": {
+      "afldb_meta.app_readable_tables": "55:-36052791530744640991",
+      "afldb_meta.import_writable_tables": "47:14939055232795603463",
+      "afldb_meta.schema_migrations": "118:-66537864554982363457",
+      "public.admin_invites": "0:0",
+      "public.afl_api_identity_adjudications": "0:0",
+      "public.after_siren_kicks": "126:-98026879451193085974",
+      "public.app_health_events": "0:0",
+      "public.auth_audit_log": "0:0",
+      "public.auth_sessions": "0:0",
+      "public.auth_users": "2:-9656067061768913417",
+      "public.award_nominations": "766:-108899765529588143333",
+      "public.award_proposal_decisions": "0:0",
+      "public.award_proposals": "0:0",
+      "public.award_winners": "3713:-363467733304798369048",
+      "public.awards": "47:3452181425287256988",
+      "public.beta_access_codes": "0:0",
+      "public.beta_allowed_emails": "0:0",
+      "public.beta_join_requests": "0:0",
+      "public.beta_login_tokens": "0:0",
+      "public.brownlow_correction_receipts": "0:0",
+      "public.brownlow_eligibility_decisions": "0:0",
+      "public.brownlow_round_votes": "320861:1400537463882281735360",
+      "public.brownlow_season_authority": "0:0",
+      "public.brownlow_season_votes": "16120:-333764140990038735703",
+      "public.brownlow_vote_entry_state": "0:0",
+      "public.canonical_applications": "0:0",
+      "public.captaincies": "1781:235427254958527082428",
+      "public.club_aliases": "48:9058054424163662745",
+      "public.club_leadership": "0:0",
+      "public.club_organization_relations": "3:18718439790816949401",
+      "public.club_organizations": "21:285126970475050321",
+      "public.club_seasons": "1640:-33877078551134231807",
+      "public.clubs": "24:-6534867939318154056",
+      "public.coaches": "386:29038517430422501571",
+      "public.data_edits": "72:-56018167988142720267",
+      "public.data_issues": "5:7993383904608095410",
+      "public.data_overrides": "72:-51777978469925233181",
+      "public.data_submission_rows": "0:0",
+      "public.data_submissions": "0:0",
+      "public.derived_award_projections": "0:0",
+      "public.derived_award_results": "0:0",
+      "public.derived_rebuilds": "7:-41257219782475512156",
+      "public.draft_persons": "5057:143247606126672262052",
+      "public.draft_picks": "6818:-370947699763029356315",
+      "public.external_grid_axes": "0:0",
+      "public.external_grid_sources": "1:7105944140332503271",
+      "public.external_grids": "0:0",
+      "public.external_identities": "18424:-225005375853402527260",
+      "public.father_son_selections": "127:-41876645243123525863",
+      "public.fixtures": "0:0",
+      "public.hall_of_fame": "343:-107116381466882678454",
+      "public.honour_team_members": "113:-3601182842862172791",
+      "public.import_batches": "27:-31294305134694778336",
+      "public.import_rejections": "497:-129463836624503603994",
+      "public.match_coaches": "32470:-456251547664912463741",
+      "public.match_period_scores": "136448:-1162073985383183834936",
+      "public.matches": "17056:-202071792374433031130",
+      "public.nl_search_feedback": "0:0",
+      "public.nl_search_log": "0:0",
+      "public.nl_search_review": "0:0",
+      "public.player_achievements": "334:59443349140151608552",
+      "public.player_birth_evidence": "14294:-280615914905709951424",
+      "public.player_career_stats": "13363:-104117425059345358964",
+      "public.player_club_season_stats": "59094:-101274116050372140382",
+      "public.player_clubs": "16842:-206041962701435504465",
+      "public.player_height_evidence": "14579:-350582523158212847163",
+      "public.player_link_match_candidates": "0:0",
+      "public.player_link_resolutions": "0:0",
+      "public.player_link_suggestions": "0:0",
+      "public.player_match_period_stats": "0:0",
+      "public.player_match_stats": "695499:4155745677521298225781",
+      "public.player_name_aliases": "13365:-217724090974607384351",
+      "public.player_relationships": "626:51056626504336740116",
+      "public.player_season_stats": "58845:-283138641727419014053",
+      "public.players": "13365:-400934866919974407053",
+      "public.promotion_candidates": "0:0",
+      "public.promotion_decisions": "0:0",
+      "public.season_list_members": "0:0",
+      "public.seasons": "131:-37954015700830781870",
+      "public.site_media": "0:0",
+      "public.site_settings": "0:0",
+      "public.sources": "14:6506074854159855076",
+      "public.stat_availability": "3120:-29613134538733968875",
+      "public.stat_definitions": "24:-16929568679505961986",
+      "public.venue_aliases": "55:83211482170541813417",
+      "public.venues": "52:15799216533356353918",
+      "staging.afl_api_brownlow_vote": "0:0",
+      "staging.afl_api_lineup": "0:0",
+      "staging.afl_api_match": "0:0",
+      "staging.afl_api_player_match": "0:0",
+      "staging.afltables_match": "0:0",
+      "staging.afltables_player_match": "0:0",
+      "staging.external_current_matches": "0:0",
+      "staging.source_payloads": "0:0",
+      "staging.source_record_versions": "0:0",
+      "staging.source_records": "0:0",
+      "staging.team_seasons": "0:0"
+    }
+  }
+}

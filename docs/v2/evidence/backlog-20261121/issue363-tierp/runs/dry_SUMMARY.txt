@@ -1,0 +1,3 @@
+== dry dry afldb_v2_rb_dry_overlay_test tool=b9973e353f275b1b 2026-11-21T17:24:35Z
+tier P plan: labels=64 (ids changed from production: 3); rookie selections=8 (every player resolves exactly once)
+dry run: nothing written (add --apply to build tier P on this copy)

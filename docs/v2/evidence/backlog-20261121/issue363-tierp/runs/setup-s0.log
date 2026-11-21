@@ -1,0 +1,5 @@
+rb dump bytes=20662515 sha256=d8397aab92e3ce0cf2a640bb5daeac6594fb0e2c723dc410d82d8e718f165c63
+create-db: afldb_v2_rb_s0_test created and marked
+isolated-pg: afldb_v2_rb_s0_test verified (cluster afldb_v2_isolated, 127.0.0.1:61530); running node
+pg_restore exit=0 seconds=5 stderrLines=0
+ISOLATED TARGET OK: afldb_v2_rb_s0_test
