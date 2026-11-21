@@ -1,5 +1,13 @@
 # AFLDB Waiting and Blocker Register
 
+> **2026-11-22 backlog run b (owner decisions 3-7; counts NOT recomputed).** Record: `docs/v2/evidence/backlog-20261121/RUN-20261122b.md`. Local on `claude/backlog-20261122`, unpublished; no production contact.
+> - **Resolved:** ISSUE-363 (S + P-full, tier P `1fd51dae`). **New:** ISSUE-373 (Low, Gridley G-c 118).
+> - **Awaiting publication:** `7b52c46c`, `552e5e96` (348), `1fd51dae` (363), the run b docs commit.
+> - **Awaiting owner approval:** the ISSUE-348 sealed load (`issue348-acquisition/SEALED-PLAN.md`); the consolidated attended draft (`ATTENDED-DRAFT-20261122b.md`): slot and opening date are proposals only.
+> - **Awaiting owner input:** ISSUE-332 alarm destination (delivery unverified until the owner confirms the test alarm); ISSUE-362 O-1 (R5 option); ISSUE-348 R-2 (rebuild label).
+> - **Owner housekeeping:** re-stage the `-T` settle-check wrapper into `/home/arm/afldb-ops`; streamanator workspace disposal (table in the run record).
+> - Open issues: 9 (332, 348, 350, 351, 352, 357, 362, 372, 373).
+
 > **2026-11-22 backlog run (owner decisions of 22 Nov; counts NOT recomputed).** Record: `docs/v2/evidence/backlog-20261121/RUN-20261122.md`. Local on `claude/backlog-20261121`, unpublished; nothing installed on production.
 > - **Resolved:** ISSUE-364 (Q8).
 > - **Awaiting publication and release:** ISSUE-372 option B (`b40c13ff`, `cf158d60`) with ISSUE-371, per `RC-371-372.md`; **production precondition:** the owner adds `AFLDB_REVALIDATE_URL`/`SECRET` and restarts (absent at R0).

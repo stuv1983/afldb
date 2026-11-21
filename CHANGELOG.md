@@ -15,6 +15,25 @@ commit.
 
 ## [Unreleased]
 
+### Opt-in rebuild tier P for the Gridley acceptance gates (ISSUE-363 S + P-full; local, not released)
+
+- New `tools/v2/rebuild-tier-p.ts`: on a fresh `afldb_v2_rb_*_overlay_test` copy of a source-only rebuild (tier S, still the
+  default contract) it applies the 64 tracked GAP-029 labels (rekeyed by natural key, through the unchanged audited applier)
+  and the 8 reviewed Rookie selections, and reports a content fingerprint. It refuses non-loopback or non-overlay targets,
+  targets with accounts and the template itself. Gridley G-a and G-b pass on tier P; G-c (118 cells) moves to ISSUE-373.
+  Documented in `docs/v2/isolated-rebuild.md` §7.
+
+### DraftGuru importer accepts an owner-reviewed acquisition pinned by digest (ISSUE-348 F-348-1; local, not released)
+
+- `draftguru-contract.json` gains `reviewed_acquisitions`: a label pinned there (today only `annual-html-20261122`, the
+  2026-11-22 export: 42 page sha256, parsed-rows sha256, 6,845 rows / 5,088 persons) is verified against its pin instead of
+  the frozen 2026-08-26 CSV oracle. `acquire_draft.py --seal-reviewed` seals its Stage A manifest offline; the importer
+  takes the pin's counts for that label and refuses a manifest not sealed against the pin. Every other label keeps CSV
+  parity, `parity_baseline` and 6,810 / 5,057 unchanged, so the 2026-08-26 verification is preserved.
+- New contract `tests/python/draftguru_reviewed_pin_contract.py` (pass, refusal of altered pages/rows/counts/manifests,
+  unchanged legacy labels). The production load is a separate, sealed, owner-approved step
+  (`docs/v2/evidence/backlog-20261121/issue348-acquisition/SEALED-PLAN.md`); nothing was written to production.
+
 ### An award publication refreshes its season page on every worker (ISSUE-372 option B; local, not released)
 
 - `/admin/awards/revalidate` (the follow-up of every awards and Coleman mutation) now also posts the cross-worker season

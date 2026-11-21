@@ -12,7 +12,7 @@ PROD="${AFLDB_PROD_SSH:-arm@209.38.87.252}"
 KEY="${AFLDB_SETTLE_KEY:-$HOME/.ssh/afldb_settle_status}"
 mkdir -p "$STATE" && chmod 700 "$STATE"
 stamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-out=$(timeout 60 ssh -o BatchMode=yes -o ConnectTimeout=20 -o IdentitiesOnly=yes -i "$KEY" "$PROD" 2>&1); rc=$?
+out=$(timeout 60 ssh -T -o BatchMode=yes -o ConnectTimeout=20 -o IdentitiesOnly=yes -i "$KEY" "$PROD" 2>&1); rc=$?
 printf '%s rc=%s %s\n' "$stamp" "$rc" "$(printf '%s' "$out" | head -n 1)" >> "$STATE/settle-check.log"
 [ "$rc" -eq 0 ] && exit 0
 msg=$(printf '%s\n' "AFLDB settle check failed rc=$rc at $stamp (from $(hostname))" "$out")

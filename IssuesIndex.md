@@ -1,5 +1,14 @@
 # AFLDB Current Issues Index
 
+**Current state, 22 November 2026 (backlog run b, owner decisions 3-7 of 22 Nov; local branch `claude/backlog-20261122`, unpublished; no production contact).**
+Run record: [RUN-20261122b.md](docs/v2/evidence/backlog-20261121/RUN-20261122b.md). **AFLDB-ISSUE-363 resolved** (S + P-full: opt-in
+tier P `1fd51dae`, G-a/G-b pass on two deterministic builds, tier S unchanged); its G-c re-homed as new **AFLDB-ISSUE-373** (Low).
+**348:** F-348-1 executed locally (`7b52c46c`, `552e5e96`): reviewed acquisition pinned by digest, guarded dry run and load
+rehearsals on R0 restores, [sealed plan](docs/v2/evidence/backlog-20261121/issue348-acquisition/SEALED-PLAN.md) awaiting approval.
+**350/351:** opening Tue 23 Feb 2027 and weekly slot Tue 10:00-10:30 Melbourne recorded as proposed;
+[consolidated attended draft](docs/v2/evidence/backlog-20261121/ATTENDED-DRAFT-20261122b.md). **332:** destination pending,
+wrapper dry-tested (delivery not verified). Nine open issues: 332, 348, 350, 351, 352, 357, 362, 372 and 373.
+
 **Current state, 22 November 2026 (backlog run, owner decisions of 22 Nov; local branch `claude/backlog-20261121`, unpublished).**
 Run record: [RUN-20261122.md](docs/v2/evidence/backlog-20261121/RUN-20261122.md). **AFLDB-ISSUE-364 resolved** (owner Q8:
 merge-time lint ratchet accepted as O-2; criteria verified). **AFLDB-ISSUE-372** option B implemented and qualified locally
@@ -151,6 +160,7 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 - **Update 2026-11-14 (remediation, local, not published):** ISSUE-350 season opening and gate check prepared; settle failure notifier (`OnFailure` template + drop-in) PREPARED, NOT INSTALLED; gates G0/G0b proposed; owner D-332-1 (install the notifier, choose a transport).
 - **Update 2026-11-14 (run 2):** production delivers **no** failure notification (no MTA or monitor; the sealed notifier cannot deliver). A read-only pull check is prepared and returned OK against production. Proposed amendment to D-332-1 (option A, pull from an owner host) and a G0b/G0c split; neither is adopted. **Next:** owner D-332-1.
 - **2026-11-22 (owner Q1):** D-332-1 amended to option A and adopted (hourly read-only pull check from streamanator, notifier marker); G0/G0b/G0c adopted. Alarm destination blank (owner). R2 kit prepared (streamanator key and wrapper staged; production key NOT installed). **Next:** owner names the alarm destination; attended R2 install.
+- **2026-11-22 (run b, decision 6):** destination still pending; wrapper gains `ssh -T` (sha `c6467ff4…`; staged copy untouched, re-stage before the first run); 8/8 dry tests against a `.invalid` host with stub/real ssh. **Delivery NOT verified** (needs the owner's confirmation of the test alarm). **Next:** owner names the destination; attended R2.
 
 
 ### AFLDB-ISSUE-348 — The next DraftGuru re-acquisition must carry forward the D-336-3 origin revisions and adjudicate three club replacements
@@ -161,6 +171,7 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 - **Next action:** publish; at the Nov–Dec acquisition run `--guard-report`, review the reconciliation, adjudicate 5961/6784/6626; owner decides the 6,845 contract re-baseline.
 
 - **2026-11-22 (owner Q2):** guard enforced; re-baseline to the fresh acquisition. Fresh acquisition 6,845 rows / 5,088 persons; 5961, 6784, 6626 byte-equal to the 2026-11-05 CSV (accepted); provisional guard report 0 deletions, 35 rewrites. The genuine dry-run refuses on the missing Stage A manifest and the CSV-parity gate (frozen 2026-08-26 oracle) blocks a real load: **owner question F-348-1**. Evidence `docs/v2/evidence/backlog-20261121/issue348-acquisition/README.md`.
+- **2026-11-22 (run b, F-348-1):** reviewed acquisition pinned by digest (additive `reviewed_acquisitions`; 2026-08-26 verification and 6,810/5,057 kept for other labels), `--seal-reviewed` manifest `26ca190b…`, contract tests 35/35. Guarded dry run on R0 restore: effect `ff8ef1b8…`, reconciliation `cf49f6a5…` (rulings 5961/6784/6626 byte-checked against the owner CSV); three real-load rehearsals identical, link state unchanged. **Next:** publish `7b52c46c`+`552e5e96`; owner approves `issue348-acquisition/SEALED-PLAN.md` and a window. R-2 (rebuild label) open.
 ### AFLDB-ISSUE-350 — Production has no 2027 `seasons` row and the AFL API settle never creates one
 
 - **Severity / area:** **High**; AFL API ingestion, 2027 operations.
@@ -169,6 +180,7 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 - **Next action:** publish and release (stage I350 must be in the production checkout); owner D-350-1 (recommended: open at least a week before 2027-03-17); the approved I350 ceremony on production; gate G0 in ISSUE-332.
 - **Update 2026-11-14 (run 2):** procedure `docs/v2/evidence/remediation-20261114/run2/ops/procedures/01-season-opening.md`; A-06 verified.
 - **2026-11-22 (owner Q3, D-350-1 (b)):** attended opening between 2027-02-15 and 2027-03-03, exact date blank (owner). R8 kit; procedure 01 gains the ISSUE-372 season-opening refresh step (no restart fallback).
+- **2026-11-22 (run b, decision 5):** date PROPOSED Tuesday 23 February 2027, after the weekly slot (11:00 AEDT proposed); `ATTENDED-DRAFT-20261122b.md`.
 
 
 ### AFLDB-ISSUE-351 — Unattended upgrades restart production app and PostgreSQL; promote/rollback activation window
@@ -179,6 +191,7 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 - **Next action:** publish; owner D-HO-1 (install policy + weekly owned window), D-HO-4 (`--attended`), D-HO-6 (attended reboot).
 - **Update 2026-11-14 (run 2):** `--attended` is a declaration only (documented). Procedures 02 (weekly owned window; the owner holds PostgreSQL updates) and 03 (reboot; GRUB is hidden, so the console fallback is unverified).
 - **2026-11-22 (owner Q4):** D-HO-1 install (R1), D-HO-4 recorded, reboot per procedure 03 (F-02, F-06). Proposed weekly slot Tuesday 10:00–10:30 AEDT (alternate Thursday); reboot prerequisites with status in `kits/KITS-20261122.md` §R1/R6. Nothing installed.
+- **2026-11-22 (run b, decision 5):** weekly slot PROPOSED Tuesday 10:00–10:30 Melbourne time (AEDT to 2027-04-04, then AEST); R6 remains its own sitting; consolidated draft `ATTENDED-DRAFT-20261122b.md`.
 
 
 - **Packet 6R follow-up (2026-11-18).** Carry explicit owner confirmation for the same restart through S7 and S8. See item 5 of the [AFLDB-ISSUE-366 playbook](issues/closed/AFLDB-ISSUE-366.md). The recorded sitting passed both checks. **2026-11-19:** implemented locally under ISSUE-366 (`--confirm-restart-invocation`, bound to one InvocationID, reaches S7 and S8); host policy D-HO-1/4/6 unchanged.
@@ -199,7 +212,13 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 - **2026-11-22 (owner Q6):** beta gate stays on; R4 deny via the combined Caddy change; cache bound and disk alert recorded as pre-launch requirements; F-09 a follow-up.
 
 
-### AFLDB-ISSUE-362, AFLDB-ISSUE-363 (Low; 364 resolved 2026-11-22)
+### AFLDB-ISSUE-373 — Gridley corpus acceptance G-c fails on every base (118 failing cells)
+
+- **Severity / area:** Low; Grid Solver / Gridley corpus (N7 in `tests/integration/gridley-corpus.test.ts`).
+- **State:** Open, opened 2026-11-22 (G-c re-homed from ISSUE-363 by owner decision 3; cross-reference ISSUE-118). 118 = 78 unsupported + 40 criterion disagreement, identical on tier P and the production-shaped snapshot.
+- **Next action:** classify the 118 cells from the run report; decide approved deferrals vs solver work.
+
+### AFLDB-ISSUE-362, AFLDB-ISSUE-363 (Low; 363 resolved 2026-11-22 run b; 364 resolved 2026-11-22)
 
 - **362** Caddy log filter and epoch-held admin claims implemented locally; **next:** owner O-3 install the Caddyfile, O-1 delete pre-fix logs.
 - **363** TST-4..9 implemented locally; the integrated run still shows `settle-afltables` timing out under full parallel load and leaking its season; **next:** owner decisions (per-file disposable DB recommended).
@@ -220,6 +239,8 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
   - **362 (owner Q7):** O-3 install as the single combined Caddy change (R4). O-1 not decided: log paths, retention and the live-invite check (0 live invites at R0) presented in `kits/KITS-20261122.md` §R4/R5; nothing deleted.
   - **363 (Q9):** G-1 and G-c quoted and recommended (S + P-full; G-c as a new Low Gridley-corpus issue); **no decision recorded**.
   - **364 RESOLVED** (owner Q8): merge-time ratchet accepted as O-2; criteria verified (`c79d7d06` in `origin/main`; preflight/merge:ready wiring; `lint:gate` 338/43 at `b40c13ff`).
+- **2026-11-22 (backlog run b):**
+  - **363 RESOLVED** (owner decision 3, S + P-full): opt-in `tools/v2/rebuild-tier-p.ts` (`1fd51dae`); G-a and G-b pass on two builds, deterministic (content fingerprint `6f988a67…` equal), tier S template byte-identical before/after; G-c to ISSUE-373.
 - Details: their `issues.md` entries.
 
 **AFLDB-ISSUE-366 resolved locally 2026-11-19** (qualified on streamanator; local commit, not published or deployed). Successor B1a procedure in `tools/v2/b1a-successor/`: R1 decides only when the attempt and its transaction are terminal and exits with its verdict; P6 is bound to the P3c BEFORE capture and refuses drift before the UPDATE; the reversal requires the exact repaired image (content fingerprints) and `--approval-ref`; P10's three controls are in its verdict. `release.mjs status` and `post-install-check.sh` take `--confirm-restart-invocation <InvocationID>`, passed to S7 and S8. Unit 88/88, integration 14/14 on disposable PostgreSQL 16, typecheck clean. Synthetic only; the successor procedure needs its own owner approval before use. Removed from this index and the Open Issues table. Record: its `issues.md` entry; runbook `issues/closed/AFLDB-ISSUE-366.md`.

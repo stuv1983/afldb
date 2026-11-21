@@ -29,7 +29,11 @@ byte for byte, reference = the CSV hash in `SHA256SUMS.owner-csv` (Q2(c)); prese
 
 ## 2. Effect (rehearsed on the R0 state; identical across three fresh restores)
 
-Declared before the rehearsal (reviewer R-5) and observed exactly:
+The write set declared before the rehearsal (reviewer R-5) was observed, **plus changes the declaration did not list**:
+`name_key` on 31 audited persons (guard-visible, acknowledged in the reconciliation) and the source re-baseline of unprotected
+rows in the "Source re-baseline" bullet below (`source_record_id`, career games/goals, `draft_age`, `height_cm`). They follow from
+loading the newer source (owner Q2(b) "re-baseline to the fresh acquisition") but were not declared in advance, so the owner
+should read them as part of this approval:
 
 - **No deletions.** 0 picks, 0 persons. `draft_picks` 6,845 → 6,845, `draft_persons` 5,088 → 5,088.
 - **Link state unchanged in both directions.** `link_persons` and `link_picks` digests are byte-equal before and after;
