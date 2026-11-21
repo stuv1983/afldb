@@ -1,5 +1,13 @@
 # AFLDB Current Issues Index
 
+**Current state, 21 November 2026 (backlog run, local branch `claude/backlog-20261121` from `40fb1c68`).** **AFLDB-ISSUE-371
+resolved locally** (`36510bd9`, cherry-picked from `f05172a8`; not published, not deployed): Brownlow publication's
+`revalidatePath(path, 'page')` expired a tag no page carries under Next 16; red/green on a DEV 2-worker production build with a
+real admin publish ([evidence](docs/v2/evidence/issue371-20261121/README.md)). Its generic residual is new **AFLDB-ISSUE-372**
+(Low). Production-operations decisions and approval requests for 332/348/350/351/352/357/362/364 and the retained-artefact
+inventory: [OWNER-PACKET.md](docs/v2/evidence/backlog-20261121/OWNER-PACKET.md) (`35a690ea`). Ten open issues: 332, 348, 350,
+351, 352, 357, 362, 363, 364 and **372**.
+
 **Current state, 21 November 2026 (Release 7R3 executed; ISSUE-370 RESOLVED; ISSUE-371 opened).** Under approval R7R3
 (Sat 21 Nov 17:00–20:30 AEDT) `origin/main` moved to PREP `4f5fc9c9` and production now serves
 `c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC` (promoted 06:05:44Z, owner restart 06:17:12Z). 2026 was attached (one D4 commit, audit 205) and
@@ -25,8 +33,8 @@ open issues: 332, 348, 350, 351, 352, 357, 362, 363, 364 and **370**.
 
 | Issue | Severity | Next action |
 |---|---|---|
-| 352 · backup retention | Medium | Retry defect fixed locally (durable `.retention-hold`, red/green). Owner D-HO-2/3/5/7 before off-host activation. |
-| 371 · new `/brownlow/<season>` keeps its 404 head after publication | Low | Reproduce on DEV (404 a season page, publish, compare head and body per worker); decide before 2027 publication whether publication must refresh metadata on every worker. See `issues.md`. |
+| 352 · backup retention | Medium | Retry defect fixed (`35bbc67f`, durable `.retention-hold`, red/green), published and in the serving tree `c8d4202a`; nothing installed. Owner D-HO-2/3/5/7, then attended installation. |
+| 372 · a cached 404 that becomes a page can keep the not-found head on an uninvalidated worker | Low | Opened 2026-11-21 from the ISSUE-371 reproduction (Next 16.3.1 stale-404 background regeneration). Inventory ISR routes that can go 404 → 200 and the invalidations that reach every worker; decide extend fan-out / tag invalidation / accept one window. See `issues.md`. |
 
 > Lightweight session index of open issues only.
 >

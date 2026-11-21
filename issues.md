@@ -2,6 +2,8 @@
 
 ## Open Issues
 
+**Current state, 21 November 2026 (Release 7R3 executed; ISSUE-370 resolved).** Production serves `c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC` (promoted 06:05:44Z, owner restart 06:17:12Z; rollback target `a2e6ea99`); `origin/main` = `40fb1c68`. The 2026 Brownlow is published as revision 3 (audit 207). Every remediation and closeout fix through `a3c8c67c`, including the ISSUE-352 retention-hold fix `35bbc67f`, is in the serving tree, so the "publish" prerequisite of the open issues is met; production installations, writes and owner decisions remain. Backlog run started 2026-11-21 on worktree branch `claude/backlog-20261121` from `40fb1c68`: **ISSUE-371 resolved locally** (`36510bd9`; not published, not deployed) and **ISSUE-372 opened** (Low). Owner decisions and approval requests: `docs/v2/evidence/backlog-20261121/OWNER-PACKET.md`. Ten open issues: 332, 348, 350, 351, 352, 357, 362, 363, 364 and 372.
+
 **Current state, 21 November 2026 (closeout pass).** **Published 2026-11-21:** `origin/main` fast-forwarded `b82a6b04` → `a3c8c67c` (owner-approved; executable tree equal to the qualified `467cd243`). **Not deployed.** Release 7 re-derived as packet 7R2 for candidate `a3c8c67c` ([RELEASE-PACKET-7R2.md](docs/v2/evidence/remediation-20261114/run7r2/RELEASE-PACKET-7R2.md); DEV qualification PASS on streamanator, including a rendered ISSUE-367 check); production release and acceptance await a new owner approval and window. Nine open issues: 332, 348, 350, 351, 352, 357, 362, 363 and 364. AFLDB-ISSUE-367, 368 and 369 are **resolved locally** on branch `claude/closeout-20261121` (executable tree `467cd243`, qualified red/green on streamanator, [QUALIFICATION.md](docs/v2/evidence/closeout-20261121/QUALIFICATION.md)); not published, not deployed. The ISSUE-352 retention-retry defect is fixed the same way; 352 stays open for owner decisions D-HO-2/3/5/7. Release 7 was not executed: its approval expired 2026-11-20T01:00Z with no production contact recorded. Every other open issue is blocked on an owner decision or operational input (see the table).
 
 **Review state, 21 November 2026.** Twelve open issues: 332, 348, 350, 351, 352, 357, 362, 363, 364, 367, 368 and 369. Live `origin/main` matched the remediation tip `b82a6b04`. The local `main` ref was 223 commits behind at the review. The new source findings and the ISSUE-352 retention retry defect block closeout. Primary ISSUE-366 remains resolved. The untracked Release 7 sitting record contains approval for an expired window and no execution result. [Closeout review](issues/reviews/AFLDB-FULL-REVIEW-2026-11-21.md) · [Worktree inventory](issues/reviews/AFLDB-CLOSEOUT-WORKTREES-2026-11-21.md).
@@ -68,12 +70,12 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-348 | The next DraftGuru re-acquisition must carry forward the D-336-3 origin revisions and adjudicate three club replacements | Medium (raised 2026-11-14) | Draft data / DraftGuru acquisition | Open. **2026-11-14:** fail-closed reload guard implemented locally (qualified, not published): a full import refuses to delete or rewrite the 35 audited picks / 31 persons without a reviewed, hash-pinned reconciliation; REPLACE_CLUB needs owner rulings. | Publish; at the Nov–Dec acquisition run `--guard-report`, review the reconciliation, adjudicate 5961/6784/6626; decide the 6,845 re-baseline. |
 | AFLDB-ISSUE-350 | Production has no 2027 `seasons` row and the AFL API settle never creates one | High | AFL API ingestion / 2027 operations | Open. **2026-11-14:** audited I350 season-opening operation, read-only gate check and settle `season_row_missing` HALT implemented and rehearsed on snapshot copies (local, not published). Production still NOT_OPEN (read-only). **Run 2:** season-opening procedure 01 written; A-06 verified. | Publish and release; owner D-350-1 (recommended: open ≥1 week before 2027-03-17); approved I350 ceremony on production; gate G0 in ISSUE-332. |
 | AFLDB-ISSUE-351 | Unattended upgrades restart the production app and PostgreSQL; promote/rollback unattended-activation window | Medium | Production operations | Open. **2026-11-14:** `release.mjs` attended promote/rollback, host gate and activation audit implemented; needrestart hold and PostgreSQL apt blacklist PREPARED, NOT INSTALLED (local, not published). Reboot pending on production. **Run 2:** `--attended` documented as a declaration; procedures 02 (weekly owned window) and 03 (reboot; GRUB hidden, fallback unverified). | Publish; owner D-HO-1 (install policy + weekly window), D-HO-4 (`--attended`), D-HO-6 (separate attended reboot). |
-| AFLDB-ISSUE-352 | Scheduled backup, restore verification and off-host recovery | Medium | Backup and recovery | Open. Wrapper and units published. The closeout retry defect (an unchanged pull after a flood alert pruned the protected copies) is fixed locally on `claude/closeout-20261121`: the alert writes a durable `.retention-hold`; red/green on streamanator. | Publish the fix; owner decisions D-HO-2/3/5/7 before off-host activation. |
+| AFLDB-ISSUE-352 | Scheduled backup, restore verification and off-host recovery | Medium | Backup and recovery | Open. Wrapper and units published. The closeout retry defect (an unchanged pull after a flood alert pruned the protected copies) is fixed (`35bbc67f`: the alert writes a durable `.retention-hold`; red/green on streamanator), published at `a3c8c67c` and present in the serving tree `c8d4202a`; nothing installed. | Owner decisions D-HO-2/3/5/7, then the attended installation per `docs/backup-restore.md` §3. |
 | AFLDB-ISSUE-357 | ISR persists a page per non-canonical id spelling and per 404 path, unbounded | Medium | Public frontend | Open, narrowed 2026-11-14: strict canonical id/season parsing implemented locally (non-canonical spellings 404; 10–70× less disk per path); every distinct 404 path still persists ~50 KB. **Run 2:** O-1 (A) Caddy path-shape deny implemented and matrix-tested (0 mismatches); residual MED: unknown well-formed slugs still persist about 76 KiB each, protected only by the beta gate. | Publish; owner installs the combined Caddy file (packet B7) and keeps the beta gate on until a prune job or allow-lists and a disk alert exist; operational acceptance is the owner's. |
 | AFLDB-ISSUE-362 | Caddy logs magic-link/invite tokens; revoked admin cookie passes the beta gate | Low | Security hygiene | Open. **2026-11-14:** Caddy log filter (proven on Caddy 2.11.4/2.11.9) and epoch-held admin claims implemented locally (not published; live Caddy unchanged). **Run 2:** B-05 re-authentication; token redaction in any spelling and in `Location`/`Refresh` (red/green on Caddy 2.11.4/2.11.9). | Publish; owner: combined Caddy install (B7), then O-1 pre-fix logs. |
 | AFLDB-ISSUE-363 | Test reliability (vacuous passes, uninvoked Python contracts, `AFLDB_PYTHON`, untested beta actions, `/beta` predicates, leaking fixtures) | Low | Tests | Open. Runs 1-3: TST-4..9, per-file DBs, state-b/settle fixes (see entry). **Run 4 (2026-11-15, local, final executable revision `16027092`, `run4/QUALIFICATION-4.md`):** 363-W/G/C/B and 363-3 implemented; T363-2/T363-3 and all shared-mode leaks fixed (shared mode now fails exactly the per-file ids); 40 rebuild-only failures fixed; integration at Q″: snapshot 18 ids, rebuild 7, every id class 1 or class 5 (Gridley); unit 12,296/1 (stage map, fixed at Q‴). Remaining: Gridley owner decision; publication. **Run 5 (2026-11-15, local, executable `f6af6da9`):** T-2 corrected (`awards-reload-links` restores every pre-existing `award_winners` row and award span at file teardown; affected scope requalified, `run5/T2-QUALIFICATION.md`). **Published 2026-11-16** (`a2e6ea99`). T-2 residue open as a test-isolation follow-up: the file still changes `award_nominations`, `hall_of_fame`, `honour_team_members`, `captaincies` content and grows `import_batches` in shared mode. | Owner decision G-1 (`run5/G1-REBUILD-TIERS.md`); extend `awards-reload-links` restore to the four honours tables. |
 | AFLDB-ISSUE-364 | Tooling drift (`next dev` sitemap conflict, serving-checkout `node_modules`, lint ungated) | Low | Tooling | Open. **2026-11-14:** `next dev` fixed (sitemap index behind a rewrite), `node_modules` check (warn-only), lint ratchet `npm run lint:gate` (338 baseline) implemented locally (not published). **Run 2:** lint gate wired into preflight/merge:ready as a ratchet (338 errors allowed; not clean lint); B-07 refusals; A-09 split. | Publish; owner accepts the merge-time ratchet as O-2 (release/CI not wired). |
-| AFLDB-ISSUE-371 | A newly published `/brownlow/<season>` serves its earlier 404 head until the hourly regeneration | Low | Public frontend / ISR metadata | Open. **2026-11-21 (Release 7R3):** after the owner published 2026, `/brownlow/2026` returned 200 with the correct body ("Won by Nick Daicos with 47 votes", standings, 14 ineligible rows) but `<title>Page not found \| AFLDB</title>` and the site-default description: all 8 P10c samples at 07:27:31Z and one browser navigation at 08:31:56Z; every request after 08:32Z correct. Root cause not established. | Reproduce on DEV (404 a season page, publish, compare head and body per worker); decide whether publication must refresh metadata on every worker before 2027 is published. |
+| AFLDB-ISSUE-372 | A cached 404 that later becomes a page can be regenerated with the not-found head on a worker that was not invalidated | Low | Public frontend / ISR metadata | Open (2026-11-21, from the ISSUE-371 reproduction). Next 16.3.1 background regeneration of a stale 404 persists the not-found title and `noindex` over a correct 200 body for one ISR window. ISSUE-371 covers Brownlow publication and `/seasons/<year>` only. | Inventory ISR routes that can go 404 → 200 and the invalidations reaching every worker; decide: extend the fan-out, tag invalidation on every worker, or accept one window. |
 
 **AFLDB-ISSUE-323 and AFLDB-ISSUE-324 resolved 2026-10-24** (fixes `481511d2`; `82603dc7`, `14abea5e`, `876dadbf`; local, not pushed). The owner ruled on 2026-10-24 that the ISSUE-316 revision J2 disposable rebuild is the J2 proof, and that its 5 sampler anomalies (F-J06) are an evidence-monitor defect, registered as ISSUE-325. That rebuild was the ordinary successor path at pinned `876dadbf`, under the reviewed native closure (policy `a8e586e0…`) with no provenance, against `afldb_v2_rb_i316_revision_j2_test`. It passed the successor preflight and the real execution boundary, and executed the constrained tsx/npm path under enforcement: runner exit 0, 30 stages, 91 checks PASSED, all 1,640 club-seasons equal, `AFLDB-POST PASSED`, 0 native REFUSED lines and 0 provenance mentions. A focused read-only evidence review of the retained artefacts preceded the closure; it is recorded in the ISSUE-316 entry. No push, deployment, apply, activation or census. Removed from `IssuesIndex.md` and the Open Issues table. Full record: the entries in this file.
 
@@ -55380,7 +55382,8 @@ Acceptance: Every non-public audience refuses data access until must_change_pass
 ## AFLDB-ISSUE-371 — A newly published `/brownlow/<season>` serves its earlier 404 head until the hourly regeneration
 
 - **Severity / area** Low, public frontend (ISR page metadata). No data effect; the body is correct.
-- **Status** **OPEN** (found 2026-11-21 during Release 7R3, ISSUE-370).
+- **Status** **RESOLVED LOCALLY 2026-11-21** (found 2026-11-21 during Release 7R3, ISSUE-370); not published, not deployed.
+  See Resolution below.
 - **Evidence (production, `c8d4202a`, `AFLDB_WORKERS=2`, `revalidate = 3600`)**
   - Before publication `/brownlow/2026` was 404 (expected, P10a/P10b).
   - After the owner's publication (audit 206 at 07:06:27Z, audit 207 at 07:26:25Z), P10c at 07:27:31Z: all 8 samples 200 with the
@@ -55396,3 +55399,56 @@ Acceptance: Every non-public audience refuses data access until must_change_pass
 - **Next action** Reproduce on DEV: render `/brownlow/<season>` as 404, publish the season, then compare head and body per worker
   before and after the revalidation window. Decide whether publication must refresh metadata on every worker before 2027 is
   published (ISSUE-332). Related: ISSUE-357 (ISR keeps per-404-path entries).
+- **Resolution (2026-11-21, resolved locally; not published, not deployed).** Fix `f05172a8` on `claude/issue-371-20261121`,
+  carried as `36510bd9` on `claude/backlog-20261121` (parent chain to `40fb1c68`).
+  - **Root cause (established on DEV).** `publishSeasonAction` called `revalidatePath('/brownlow/<season>', 'page')`
+    (`src/app/admin/brownlow/actions.ts:290` at `40fb1c68`). Next 16.3.1 appends the type to a concrete path
+    (`next/dist/server/web/spec-extension/revalidate.js`), so the call expired `_N_T_/brownlow/2026/page`. That tag is carried
+    by no page; the cached entry's tags were `_N_T_/layout`, `_N_T_/brownlow/layout`, `_N_T_/brownlow/[year]/layout`,
+    `_N_T_/brownlow/[year]/page` and `_N_T_/brownlow/2026` (captured `.meta`). Publication invalidated nothing on any worker.
+    The same malformed form also made the action's other concrete-path calls (`:119`, `:120`, `:128`, `:129`, `:134`, `:286`,
+    `:288`) no-ops.
+  - **Where head and body diverge (Next behaviour, reached because nothing was expired).** A worker that did not write the
+    entry treats an on-demand path as stale after 1 s, serves the stale 404 and regenerates in the background. Serving the
+    stale entry set the shared response status to 404 (`app-page-runtime.js:1212`), so the background render resolved
+    metadata as not-found (`app-render.js:1174-1181`, plus `noindex`) while the body rendered normally. It persisted a 200
+    page with the not-found head for one ISR window, matching production's recovery about an hour later.
+  - **Fix.** Concrete paths are revalidated with no type argument; patterns and static routes keep `'page'`. The ISSUE-134
+    cross-worker fan-out `/api/internal/revalidate-season` (already called by publication) now also invalidates
+    `/brownlow/<year>` and returns `paths`; its input is still only an integer year (scope note in `docs/deployment.md` §7c
+    and `.env.example`).
+  - **Validation (streamanator; production build served by `deploy/server-cluster.mjs`, `AFLDB_WORKERS=2`, private port 3120;
+    disposable copy of the accepted rebuild with a disposable 2026 season; publication through the real admin login with
+    password and TOTP and the real publish form).** Red at `40fb1c68` (`red3`): 8 × 200 with the correct body and
+    `<title>Page not found | AFLDB</title>` plus `noindex`, 16 × 404 from the other worker; client navigation correct title
+    1/4. Green (`green1`): 24/24 raw requests 200 with the correct title, description and body; client navigation 4/4.
+    Without the fan-out configured (`green_nofanout`) only the acting worker refreshes (12/24), which is why the fan-out
+    matters. Genuinely missing seasons (`/brownlow/1897`, `/brownlow/1923`) and the ISSUE-357 non-canonical spellings
+    (`/02026`, `/2026.0`, `/+2026`, `/2026abc`, `/%202026`) return 404 with the 404 title before and after, also on a cached
+    second pass. Focused unit (`tests/admin-brownlow-actions.test.ts`, `tests/settle-season-revalidation.test.ts`) 8 failed /
+    116 passed at `40fb1c68`, 124/124 with the fix; typecheck rc 0; eslint on the changed files rc 0; `lint:gate` at baseline.
+    Visual evidence at 1280×800 (`screenshots/red3-full-load-1.png`, `green1-client-nav.png`) inspected: identical standings,
+    title wrong in red and correct in green. Evidence: `docs/v2/evidence/issue371-20261121/README.md`.
+  - **Release precondition and acceptance.** Cross-worker coverage needs `AFLDB_REVALIDATE_URL` and `AFLDB_REVALIDATE_SECRET`
+    in the production `.env` (presence unverified; check presence only). Acceptance after release: 8 fresh-connection samples
+    of `/brownlow/2026` all 200 with "2026 Brownlow Medal — Winner, Votes & Leaderboard | AFLDB" and no `noindex`; one §7c
+    loopback POST `{"season":2026}` per worker listing `paths` `["/seasons/2026","/brownlow/2026"]`.
+  - **Residuals.** LOW: match finalise/correct/void invalidations now take effect on the acting worker (correct direction);
+    each canonical-data settle re-renders `/brownlow/<year>` once; `/admin/operations/brownlow/revalidate` still refreshes the
+    acting worker only (pre-existing). The generic Next stale-404 regeneration fault is tracked as AFLDB-ISSUE-372.
+
+## AFLDB-ISSUE-372 — A cached 404 that later becomes a page can be regenerated with the not-found head on a worker that was not invalidated
+
+- **Status:** Open (opened 2026-11-21 from the ISSUE-371 reproduction).
+- **Severity / area:** Low; public frontend (ISR metadata, multi-worker). No data effect; the body is correct; the head
+  (title, description, `noindex`) is wrong for up to one ISR window.
+- **Mechanism (Next 16.3.1, observed on DEV for `/brownlow/<year>` before the ISSUE-371 fix):** when a path's cached entry is a
+  404 and the underlying data later makes it a 200, a worker that was not explicitly invalidated serves the stale 404 and
+  regenerates it in the background on a response whose status is already 404 (`app-page-runtime.js:1212`); the render
+  resolves metadata as not-found (`app-render.js:1174-1181`) and persists a 200 body with the not-found head.
+- **Exposure:** any ISR route whose 404 can turn into a page without an invalidation that reaches every worker: for example a
+  debut player's page, or `/matches/<id>` (not in the season fan-out). ISSUE-371 closes it for Brownlow publication and
+  `/seasons/<year>` only.
+- **Next action:** inventory the ISR routes that can go 404 → 200 and the invalidations that reach them (nightly settle,
+  admin create actions, fan-out route); decide between extending the fan-out, invalidating by tag on every worker, or
+  accepting one window of wrong head. Related: ISSUE-357, ISSUE-371. Evidence: `docs/v2/evidence/issue371-20261121/README.md`.

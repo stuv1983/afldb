@@ -15,6 +15,13 @@ commit.
 
 ## [Unreleased]
 
+### A newly published Brownlow season no longer keeps the "Page not found" title (ISSUE-371; local, not released)
+
+- Brownlow admin actions now revalidate concrete paths without a type argument. Under Next 16 the old
+  `revalidatePath('/brownlow/<year>', 'page')` form expired a tag no page carries, so publication invalidated nothing.
+- The cross-worker season fan-out (`/api/internal/revalidate-season`) also invalidates `/brownlow/<year>`, so every worker
+  serves the published season with its own title, description and standings. Missing seasons still return 404.
+
 ### A completed season's unpublished Brownlow no longer reads as unawarded; 2026 Brownlow attached and published (ISSUE-370; Release 7R3, 2026-11-21, in production)
 
 - **Player-page BV wording is season-aware.** A `pending` Brownlow in a completed season reads **"Awaiting verification"**,
