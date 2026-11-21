@@ -1,0 +1,49 @@
+== R7 P1/S1 2026-11-21T02:00:32Z host=afldb-prod user=arm
+PASS current -> a2e6ea9995a4-aKAYwf0qC4go6JJWiHhv5
+PASS previous -> c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x
+PASS checkout HEAD = a2e6ea99
+PASS branch main
+PASS porcelain empty
+PASS origin/main = PREP 4484a6d09ffa3d38c6dfd992ff41a7163fe458c6 (ls-remote)
+PASS no release locks
+release: current  a2e6ea9995a4-aKAYwf0qC4go6JJWiHhv5 revision a2e6ea9995a44b6d5b7de7e820d17bb2e14986b5 BUILD_ID aKAYwf0qC4go6JJWiHhv5 production
+release: previous c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x revision c1c4b22ee15007111eab66f6d354e0b9ecbb2ade BUILD_ID bTVyci1eHVcKvSKDVZl_x
+release: memory   afldb MemoryCurrent 573 MB
+release: process  3943317 runs in /home/arm/afldb-releases/releases/a2e6ea9995a4-aKAYwf0qC4go6JJWiHhv5
+release: health   200 status=ok database=ok
+release: build    /_next/static/aKAYwf0qC4go6JJWiHhv5/_buildManifest.js 200
+release: build    /_next/static/bTVyci1eHVcKvSKDVZl_x/_buildManifest.js 404 (previous; expect 404)
+release: activation service InvocationID fabd985ff6c14959afcafd163b007c37 NRestarts 0 ActiveEnter 2026-11-18T03:02:50.000Z
+release: activation restarted since promote (InvocationID a2584da119f84c5bb47e2c5a58f85755 -> fabd985ff6c14959afcafd163b007c37)
+release: activation 2 apt run(s) since the promote: 2026-11-19T19:09:40.000Z, 2026-11-20T19:11:08.000Z
+release: STATUS PASS a2e6ea9995a4-aKAYwf0qC4go6JJWiHhv5
+release: a2e6ea9995a4-aKAYwf0qC4go6JJWiHhv5: 369 server-output file(s) differ (ISR; allowed)
+release: VERIFY PASS a2e6ea9995a4-aKAYwf0qC4go6JJWiHhv5 (revision a2e6ea9995a44b6d5b7de7e820d17bb2e14986b5, BUILD_ID aKAYwf0qC4go6JJWiHhv5, 13002 files)
+PASS settle inactive
+settle next: Sun 2026-11-22 05:03:38 AEDT
+PASS apt services inactive
+PASS no apt/dpkg process
+NEXT                            LEFT LAST                               PASSED UNIT                       ACTIVATES
+Sat 2026-11-21 18:09:58 AEDT 5h 9min Sat 2026-11-21 11:50:24 AEDT 1h 10min ago apt-daily.timer            apt-daily.service
+Sun 2026-11-22 05:03:38 AEDT     16h Sat 2026-11-21 05:08:36 AEDT       7h ago afldb-settle-afl-api.timer afldb-settle-afl-api.service
+Sun 2026-11-22 06:32:22 AEDT     17h Sat 2026-11-21 06:11:01 AEDT       6h ago apt-daily-upgrade.timer    apt-daily-upgrade.service
+
+3 timers listed.
+PASS no writer or B1a processes
+MemAvailable 2823 MB
+PASS disk >= 6G (44G)
+PASS port 3199 free
+PASS beta gate line
+PASS beta epoch 1
+workers/port: PORT=3100 AFLDB_WORKERS=2 
+PASS deps tsx+postgres
+PASS node v22.23.2
+pss2026|pending|669|0
+season2026|complete
+PASS 2026 rows all pending, votes NULL (669 rows)
+NRestarts=0
+ActiveState=active
+SubState=running
+ActiveEnterTimestamp=Wed 2026-11-18 14:02:50 AEDT
+InvocationID=fabd985ff6c14959afcafd163b007c37
+P1 RESULT PASS

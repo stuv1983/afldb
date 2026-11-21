@@ -1,0 +1,1 @@
+STOP line 11: [[ $LOG =~ ^/home/arm/r7-build-[0-9]{8}T[0-9]{6}Z\.log$ ]]

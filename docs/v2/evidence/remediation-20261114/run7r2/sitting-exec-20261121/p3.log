@@ -1,0 +1,9 @@
+== R7 P3/S3 2026-11-21T02:00:57Z
+PASS checkout CAND, porcelain empty
+LOG /home/arm/r7-build-20261121T020057Z.log
+release: candidate a3c8c67cc98f-JFf9-hXYa6xoigu5Tw4Hg passed V1-V5; boot smoke on 127.0.0.1:3199
+release: smoke: health ok, _buildManifest.js 200, /_next/static/css/b99cbb581759dab0.css 200, pages {"/":"200 HIT","/players":"200","/clubs":"200","/seasons":"200","/draft":"200"} (beta claim)
+release: RELEASE READY a3c8c67cc98f-JFf9-hXYa6xoigu5Tw4Hg (13002 files, manifest ef8209311702…) at /home/arm/afldb-releases/releases/a3c8c67cc98f-JFf9-hXYa6xoigu5Tw4Hg
+release: next: node deploy/release.mjs promote a3c8c67cc98f-JFf9-hXYa6xoigu5Tw4Hg --attended
+BUILD_EXIT=0
+P3 build finished 2026-11-21T02:05:32Z: run r7-p3b-build-check.sh /home/arm/r7-build-20261121T020057Z.log

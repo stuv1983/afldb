@@ -1,0 +1,10 @@
+== P0 2026-11-21T02:00:23Z
+pre-publish origin/main=a3c8c67cc98fc35e963795e331e7217a24ccf1e0
+PASS local HEAD = PREP, parent = CAND
+PASS no diff in blocks/manifest
+manifest non-OK lines=0
+SHA256SUMS=78b655fdaf25a38dff386103264ef92abcb12bd0f84ef2346f78dd22b342a90b
+PASS manifest = approved
+   a3c8c67c..4484a6d0  4484a6d09ffa3d38c6dfd992ff41a7163fe458c6 -> main
+post-publish origin/main=4484a6d09ffa3d38c6dfd992ff41a7163fe458c6
+P0 RESULT PASS (PREP published)

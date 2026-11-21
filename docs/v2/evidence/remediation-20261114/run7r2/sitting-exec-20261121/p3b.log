@@ -1,0 +1,18 @@
+release: candidate a3c8c67cc98f-JFf9-hXYa6xoigu5Tw4Hg passed V1-V5; boot smoke on 127.0.0.1:3199
+release: smoke: health ok, _buildManifest.js 200, /_next/static/css/b99cbb581759dab0.css 200, pages {"/":"200 HIT","/players":"200","/clubs":"200","/seasons":"200","/draft":"200"} (beta claim)
+release: RELEASE READY a3c8c67cc98f-JFf9-hXYa6xoigu5Tw4Hg (13002 files, manifest ef8209311702…) at /home/arm/afldb-releases/releases/a3c8c67cc98f-JFf9-hXYa6xoigu5Tw4Hg
+release: next: node deploy/release.mjs promote a3c8c67cc98f-JFf9-hXYa6xoigu5Tw4Hg --attended
+BUILD_EXIT=0
+== R7 P3b/S3 checks 2026-11-21T02:05:45Z
+NEW_ID a3c8c67cc98f-JFf9-hXYa6xoigu5Tw4Hg
+PASS BUILD_EXIT=0 and READY id
+{"ts":"2026-11-21T02:05:29.422Z","op":"build-pass","id":"a3c8c67cc98f-JFf9-hXYa6xoigu5Tw4Hg","revision":"a3c8c67cc98fc35e963795e331e7217a24ccf1e0","buildId":"JFf9-hXYa6xoigu5Tw4Hg","manifest":"ef82093117020697fc71f2e0289bf44acaa40410ba54688f4491ed2d83dfc22f","workspace":"/home/arm/afldb-releases/builds/20261121T020057Z-a3c8c67cc98f-a4efa8"}
+release: VERIFY PASS a3c8c67cc98f-JFf9-hXYa6xoigu5Tw4Hg (revision a3c8c67cc98fc35e963795e331e7217a24ccf1e0, BUILD_ID JFf9-hXYa6xoigu5Tw4Hg, 13002 files)
+BUILD_ID JFf9-hXYa6xoigu5Tw4Hg
+PASS links untouched
+release: admission: MemAvailable 2810 MB of 3915 MB, swap 0 MB, free disk 43.3 GB
+release: npm ci: 17 s, min MemAvailable 1954 MB, peak RSS 948 MB
+release: build: 230 s, min MemAvailable 1276 MB, peak RSS 1716 MB
+release: smoke: health ok, _buildManifest.js 200, /_next/static/css/b99cbb581759dab0.css 200, pages {"/":"200 HIT","/players":"200","/clubs":"200","/seasons":"200","/draft":"200"} (beta claim)
+PASS checkout porcelain empty
+P3b RESULT BUILD PASS a3c8c67cc98f-JFf9-hXYa6xoigu5Tw4Hg
