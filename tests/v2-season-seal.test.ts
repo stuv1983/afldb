@@ -492,7 +492,7 @@ describe('every audited editor mutation declares its seasons (V2-GAP-006 E1 inve
         expect(block, `${file}: ${block.slice(0, 80)}`).toMatch(/\bseal:\s*(\{ kind: '|(input|entity)\.table)/);
       }
     }
-    expect(total).toBe(55); // the inventory at 2026-10-31; a new call site must be declared AND raise this
+    expect(total).toBe(57); // the inventory at 2026-10-31 (55) + ISSUE-370's attachment apply and reverse (2); a new call site must be declared AND raise this
   });
 
   it("never passes { kind: 'reference' } for a table the manifest treats as season-bearing", () => {
@@ -686,6 +686,9 @@ describe('the season-bearing writer inventory (V2-GAP-006, application level onl
     'tools/current-season/repair-match-rekeys.ts': 'repair',
     'src/db/queries/brownlow-legacy-ownership-adoption.ts': 'governed',
     'src/db/queries/brownlow-round-vote-match-backfill.ts': 'governed',
+    // AFLDB-ISSUE-370: digest-bound reviewed plan, target-identity proof, owner approval and fresh backup (release 7R3 D1/D1v); apply and
+    // reverse each write one sealed recordDataEdit row (seal: the season itself), so a sealed season needs an audited-correction note.
+    'src/db/queries/brownlow-season-attachment.ts': 'governed',
     'tools/v2/gap029-captaincy-additions-production.ts': 'governed',
     // AFLDB-ISSUE-336 (D-336-1, D-336-2): digest-bound plan and approval, fresh assembled backup (stage I336), and every insert audited through recordDataEdit under the seal.
     'tools/v2/issue336-predraft-insert-production.ts': 'governed',
