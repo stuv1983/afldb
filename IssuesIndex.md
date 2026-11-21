@@ -6,8 +6,8 @@ tier P `1fd51dae`, G-a/G-b pass on two deterministic builds, tier S unchanged); 
 **348:** F-348-1 executed locally (`7b52c46c`, `552e5e96`): reviewed acquisition pinned by digest, guarded dry run and load
 rehearsals on R0 restores, [sealed plan](docs/v2/evidence/backlog-20261121/issue348-acquisition/SEALED-PLAN.md) awaiting approval.
 **350/351:** opening Tue 23 Feb 2027 and weekly slot Tue 10:00-10:30 Melbourne recorded as proposed;
-[consolidated attended draft](docs/v2/evidence/backlog-20261121/ATTENDED-DRAFT-20261122b.md). **332:** destination pending,
-wrapper dry-tested (delivery not verified). Nine open issues: 332, 348, 350, 351, 352, 357, 362, 372 and 373.
+[consolidated attended draft](docs/v2/evidence/backlog-20261121/ATTENDED-DRAFT-20261122b.md). **332:** destination the owner's email (SMTP relay),
+wrapper dry-tested; delivery not verified until the owner confirms receipt. Nine open issues: 332, 348, 350, 351, 352, 357, 362, 372 and 373.
 
 **Current state, 22 November 2026 (backlog run, owner decisions of 22 Nov; local branch `claude/backlog-20261121`, unpublished).**
 Run record: [RUN-20261122.md](docs/v2/evidence/backlog-20261121/RUN-20261122.md). **AFLDB-ISSUE-364 resolved** (owner Q8:
@@ -160,7 +160,7 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 - **Update 2026-11-14 (remediation, local, not published):** ISSUE-350 season opening and gate check prepared; settle failure notifier (`OnFailure` template + drop-in) PREPARED, NOT INSTALLED; gates G0/G0b proposed; owner D-332-1 (install the notifier, choose a transport).
 - **Update 2026-11-14 (run 2):** production delivers **no** failure notification (no MTA or monitor; the sealed notifier cannot deliver). A read-only pull check is prepared and returned OK against production. Proposed amendment to D-332-1 (option A, pull from an owner host) and a G0b/G0c split; neither is adopted. **Next:** owner D-332-1.
 - **2026-11-22 (owner Q1):** D-332-1 amended to option A and adopted (hourly read-only pull check from streamanator, notifier marker); G0/G0b/G0c adopted. Alarm destination blank (owner). R2 kit prepared (streamanator key and wrapper staged; production key NOT installed). **Next:** owner names the alarm destination; attended R2 install.
-- **2026-11-22 (run b, decision 6):** destination still pending; wrapper gains `ssh -T` (sha `c6467ff4…`; staged copy untouched, re-stage before the first run); 8/8 dry tests against a `.invalid` host with stub/real ssh. **Delivery NOT verified** (needs the owner's confirmation of the test alarm). **Next:** owner names the destination; attended R2.
+- **2026-11-22 (run b, decision 6):** destination still pending; wrapper gains `ssh -T` (sha `c6467ff4…`; staged copy untouched, re-stage before the first run); 8/8 dry tests against a `.invalid` host with stub/real ssh. **Delivery NOT verified.** Later the same day: destination = **the owner's email via an SMTP relay** (owner, 22 Nov: "send the test alarm to my email"), sender `/home/arm/afldb-ops/alarm-email.sh` used as `AFLDB_ALARM_CMD`, credentials in `/home/arm/afldb-ops/alarm-smtp.env` (0600, filled by the owner); both files belong to the main session and were not modified by this run. Test method: the settle-check wrapper pointed at an `.invalid` host (no production contact). Delivery is NOT verified until the owner confirms receipt. **Next:** owner confirms receipt of the test alarm; attended R2.
 
 
 ### AFLDB-ISSUE-348 — The next DraftGuru re-acquisition must carry forward the D-336-3 origin revisions and adjudicate three club replacements

@@ -4,7 +4,7 @@
 > - **Resolved:** ISSUE-363 (S + P-full, tier P `1fd51dae`). **New:** ISSUE-373 (Low, Gridley G-c 118).
 > - **Awaiting publication:** `7b52c46c`, `552e5e96` (348), `1fd51dae` (363), the run b docs commit.
 > - **Awaiting owner approval:** the ISSUE-348 sealed load (`issue348-acquisition/SEALED-PLAN.md`); the consolidated attended draft (`ATTENDED-DRAFT-20261122b.md`): slot and opening date are proposals only.
-> - **Awaiting owner input:** ISSUE-332 alarm destination (delivery unverified until the owner confirms the test alarm); ISSUE-362 O-1 (R5 option); ISSUE-348 R-2 (rebuild label).
+> - **Awaiting owner input:** ISSUE-332 delivery (destination now the owner's email via SMTP relay, sender owned by the main session; unverified until the owner confirms receipt of the test alarm); ISSUE-362 O-1 (R5 option); ISSUE-348 R-2 (rebuild label).
 > - **Owner housekeeping:** re-stage the `-T` settle-check wrapper into `/home/arm/afldb-ops`; streamanator workspace disposal (table in the run record).
 > - Open issues: 9 (332, 348, 350, 351, 352, 357, 362, 372, 373).
 
