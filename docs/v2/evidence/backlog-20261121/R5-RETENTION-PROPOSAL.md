@@ -117,7 +117,7 @@ Not present by design: `afldb-access-2026-09-04T11-02-31.065-size.log.gz` (ALREA
 `<S>`, any fourth apex name, every size and the `SHA256SUMS` line count; that record is then the reference for the review.
 
 **Helper for the 7 Jan 2027 review:** `r5-20270107/r5-retained-paths.sh`, sha256 of the LF form
-**`c722a9647a40a35be03ba5a20004dd0582cf88aba5319e718eefd947d22471a4`**. Read-only (lists, hashes, `sha256sum -c`, prints a
+**`ba5ccc178387849a846063040952dbccf922aeddae3b435b23218949da7398ed`**. Read-only (lists, hashes, `sha256sum -c`, prints a
 deletion-approval list; deletes nothing); run by the owner as root; no argument; the directory is hard-coded. Transport (reviewer
 F-009): it is never copied into the production checkout; it is piped as `arm` to `/home/arm/ops/r5-retained-paths.sh` (a named
 production write outside the checkout), the owner compares `sha256sum` with the value above, runs `sudo bash` on it and removes the

@@ -36,7 +36,7 @@ Runbook §4.5a runs in A2 and now adds the owner's re-verify (`sudo sh -c 'cd '"
 inventory report (names, sizes, owner/mode, file count, `SHA256SUMS` line count); the Caddy size-growth check stays. The 4 Sep access
 file is recorded as **ALREADY ROTATED OUT**. **Thu 7 Jan 2027 is the EARLIEST DISPOSAL REVIEW DATE, not a disposal date; disposal
 needs a separate approval.** `R5-RETENTION-PROPOSAL.md` gains the decision, the expected exact retained-paths template (§7) and the
-review helper `r5-20270107/r5-retained-paths.sh` (sha256 LF `c722a964…71a4`; read-only; transport defined; dry-run on a scratch
+review helper `r5-20270107/r5-retained-paths.sh` (sha256 LF `ba5ccc17…98ed`; read-only; transport defined; dry-run on a scratch
 directory). §4.5's drop rule and §4.5a's start condition now agree (after R4's probes pass, or on its own at 11:35 if R4 is not
 started). The R6 snapshot, if taken, is a provider copy of these files: disposal review also 7 Jan 2027 (OPEN-ITEMS §2).
 
@@ -82,3 +82,7 @@ beneath; the fresh-session prompt in commit B).
 - **Known deviations:** files created with Write, not the PhanesLight `new-file` CLI, and `documentation/plans/_index.md` not
   regenerated (both need Node; the workstation has none), as in runs b-d.
 - **Agents:** reviewer plan review (no CRIT/HIGH; MED amendments applied); closure on commit A; a mechanical check of B.
+- **Closure on commit A (PASS WITH FINDINGS):** MED F-001/F-002 (`basename` in `r6-pre-verify.sh` and `cut` in
+  `r5-retained-paths.sh` were used but missing from their header command inventories) fixed by a header-only content commit
+  (no behaviour change); pins re-stated in `ATTENDED-PLAN-R6-20261125.md` §0 and `R5-RETENTION-PROPOSAL.md` §7. The dry-run log
+  predates that header edit. LOW/INFO F-003..F-007 recorded, no work.

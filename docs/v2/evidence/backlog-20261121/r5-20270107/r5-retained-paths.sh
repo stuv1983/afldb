@@ -12,7 +12,7 @@
 # (same checks, literal commands) is used instead: no file transfer on Tuesday.
 # READ-ONLY: lists metadata, hashes files and runs `sha256sum -c` against the directory's own SHA256SUMS. It never prints file
 # CONTENT, never writes, moves or deletes anything. Output is safe to paste into a record (names, sizes, hashes, counts).
-# Command inventory: id stat find sort sha256sum wc grep date hostname printf echo (cd into the directory in a subshell).
+# Command inventory: id stat find sort sha256sum cut wc grep date hostname printf echo (cd into the directory in a subshell).
 # Override for a rehearsal on a scratch directory (never on production): R5_DIR=<dir> R5_ALLOW_NONROOT=1 bash r5-retained-paths.sh
 set -uo pipefail; export LC_ALL=C
 [ -n "${R5_DIR:-}" ] && [ "$(hostname)" = afldb-prod ] && { echo "STOP the R5_DIR override is refused on afldb-prod"; exit 2; }

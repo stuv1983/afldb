@@ -19,7 +19,7 @@ parse, run to their end, refuse the wrong host and write nothing; they prove not
 
 | Script (all in `r6-20261125/` unless noted) | Where, as whom | sha256 of the LF form (`tr -d '\r' < f \| sha256sum`) |
 |---|---|---|
-| `r6-pre-verify.sh <accepted\|stopped\|rolledback> <CURRENT_ID> <r3:yes\|no> <r4:yes\|no> [10:00\|14:00]` | production, arm, one connection, read-only | `b6578ee05ca4a662823dd95c5c0e2a96f9cec3e78005e2fa2676d145db034399` |
+| `r6-pre-verify.sh <accepted\|stopped\|rolledback> <CURRENT_ID> <r3:yes\|no> <r4:yes\|no> [10:00\|14:00]` | production, arm, one connection, read-only | `f142f9fc1f51d08e1b6d6e5d5545b0f2569ec1ced80e3efcea2d846713c7ba36` |
 | `r6-offhost-verify.sh <DUMP_NAME> <DUMP_SHA256>` | streamanator, arm, read-only | `787ec230ea33eb42cfb18d65771390d42e749d92bfa64c8547ca81a84e387b8f` |
 | `r6-post-verify.sh full <KERNEL> <CURRENT_ID> <PRE_BOOT_ID> <PRE_INVOCATION_ID> <RESTORE_SHA\|none> <r4:yes\|no> <GRUB_BASELINE>` / `grub <GRUB_BASELINE>` | production, arm, one connection per run, read-only | `818aa00978d1bb2f897d879e4ffd8c6cab000c60a56fe2343608e1eff4b63ba8` |
 | `r6-public-smoke.sh` | workstation, public GETs only | `de84f1205b4ab4cfec182b1fb7b0770ca916c8570f10a14539daa9a4e450bd9e` |
