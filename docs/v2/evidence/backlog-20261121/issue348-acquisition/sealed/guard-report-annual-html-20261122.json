@@ -1,0 +1,3412 @@
+{
+ "format": "afldb-draftguru-reload-guard-report/1",
+ "stage_a_label": "annual-html-20261122",
+ "effect_digest": "ff8ef1b8ef900d9ab5b17c89b2f0f85d5b3091e9493456a45b2a5f67cf766452",
+ "summary": "0 pick deletion(s) (0 audited); 0 person deletion(s) (0 audited); 35 audited pick rewrite(s); 35 audited person rewrite(s); 191 original_club_raw change(s) {'INSERT_CLUB': 11, 'INSERT_SCHOOL': 174, 'RENAME_EXPAND': 3, 'REPLACE_CLUB': 3}",
+ "effects": {
+  "deleted_picks": [],
+  "deleted_persons": [],
+  "origin_changes": [
+   {
+    "id": 233,
+    "key": [
+     "https://www.draftguru.com.au/players/daryn_cresswell/1",
+     1988,
+     "national"
+    ],
+    "year": 1988,
+    "before": "North Hobart",
+    "after": "Glenorchy/​North Hobart",
+    "class": "INSERT_CLUB"
+   },
+   {
+    "id": 378,
+    "key": [
+     "https://www.draftguru.com.au/players/shane_fell/1",
+     1989,
+     "pre_draft"
+    ],
+    "year": 1989,
+    "before": null,
+    "after": "Glenorchy",
+    "class": "INSERT_CLUB"
+   },
+   {
+    "id": 635,
+    "key": [
+     "https://www.draftguru.com.au/players/danny_noonan/1",
+     1990,
+     "pre_draft"
+    ],
+    "year": 1990,
+    "before": null,
+    "after": "Clarence",
+    "class": "INSERT_CLUB"
+   },
+   {
+    "id": 859,
+    "key": [
+     "https://www.draftguru.com.au/players/shane_fell/1",
+     1990,
+     "midseason"
+    ],
+    "year": 1990,
+    "before": null,
+    "after": "Glenorchy",
+    "class": "INSERT_CLUB"
+   },
+   {
+    "id": 1097,
+    "key": [
+     "https://www.draftguru.com.au/players/daryn_cresswell/1",
+     1991,
+     "midseason"
+    ],
+    "year": 1991,
+    "before": "North Hobart",
+    "after": "Glenorchy/​North Hobart",
+    "class": "INSERT_CLUB"
+   },
+   {
+    "id": 1388,
+    "key": [
+     "https://www.draftguru.com.au/players/bradley_plain/1",
+     1993,
+     "trade"
+    ],
+    "year": 1993,
+    "before": "Clarence",
+    "after": "North Hobart/​Clarence",
+    "class": "INSERT_CLUB"
+   },
+   {
+    "id": 1753,
+    "key": [
+     "https://www.draftguru.com.au/players/bradley_plain/1",
+     1995,
+     "trade"
+    ],
+    "year": 1995,
+    "before": "Clarence",
+    "after": "North Hobart/​Clarence",
+    "class": "INSERT_CLUB"
+   },
+   {
+    "id": 3795,
+    "key": [
+     "https://www.draftguru.com.au/players/tom_bellchambers/1",
+     2007,
+     "preseason"
+    ],
+    "year": 2007,
+    "before": "North Launceston/​Tasmania U18",
+    "after": "Launceston/​North Launceston/​Tasmania U18",
+    "class": "INSERT_CLUB"
+   },
+   {
+    "id": 3912,
+    "key": [
+     "https://www.draftguru.com.au/players/aaron_cornelius/1",
+     2008,
+     "national"
+    ],
+    "year": 2008,
+    "before": "Tasmania U18/​Tasmania (VFL)",
+    "after": "Glenorchy/​Tasmania U18/​Tasmania (VFL)",
+    "class": "INSERT_CLUB"
+   },
+   {
+    "id": 4163,
+    "key": [
+     "https://www.draftguru.com.au/players/daniel_archer/1",
+     2009,
+     "rookie"
+    ],
+    "year": 2009,
+    "before": "Clarence/​Tasmania U18",
+    "after": "Kingborough/​Clarence/​Tasmania U18",
+    "class": "INSERT_CLUB"
+   },
+   {
+    "id": 5961,
+    "key": [
+     "https://www.draftguru.com.au/players/finlay_macrae/1",
+     2020,
+     "national"
+    ],
+    "year": 2020,
+    "before": "Surrey Park/​Xavier College/​Oakleigh U18",
+    "after": "Kew Rovers/​Xavier College/​Oakleigh U18",
+    "class": "REPLACE_CLUB"
+   },
+   {
+    "id": 5965,
+    "key": [
+     "https://www.draftguru.com.au/players/reef_mcinnes/1",
+     2020,
+     "national"
+    ],
+    "year": 2020,
+    "before": "Scotch College/​Oakleigh U18",
+    "after": "Canterbury JFC/​Surrey Park/​Boroondara Hawks JFC/​Scotch College/​Oakleigh U18",
+    "class": "INSERT_CLUB"
+   },
+   {
+    "id": 6085,
+    "key": [
+     "https://www.draftguru.com.au/players/jason_horne-francis/1",
+     2021,
+     "national"
+    ],
+    "year": 2021,
+    "before": "Christies Beach/​South Adelaide",
+    "after": "Christies Beach/​Wirreanda SS/​South Adelaide",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6092,
+    "key": [
+     "https://www.draftguru.com.au/players/jye_amiss/1",
+     2021,
+     "national"
+    ],
+    "year": 2021,
+    "before": "Busselton/​East Perth",
+    "after": "Busselton/​Cape Naturaliste College/​East Perth",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6096,
+    "key": [
+     "https://www.draftguru.com.au/players/josh_sinn/1",
+     2021,
+     "national"
+    ],
+    "year": 2021,
+    "before": "East Brighton/​Old Xavs/​Sandringham U18",
+    "after": "East Brighton/​Old Xavs/​Xavier College/​Sandringham U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6113,
+    "key": [
+     "https://www.draftguru.com.au/players/sam_banks/1",
+     2021,
+     "national"
+    ],
+    "year": 2021,
+    "before": "Clarence/​Tasmania U18",
+    "after": "Clarence/​Guilford Young College/​Tasmania U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6119,
+    "key": [
+     "https://www.draftguru.com.au/players/paul_curtis/1",
+     2021,
+     "national"
+    ],
+    "year": 2021,
+    "before": "Melton South/​Keilor/​Western U18",
+    "after": "Melton South/​Keilor/​Maribyrnong College/​Western U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6126,
+    "key": [
+     "https://www.draftguru.com.au/players/josh_fahey/1",
+     2021,
+     "national"
+    ],
+    "year": 2021,
+    "before": "Queanbeyan/​Greater Western Sydney (NEAFL)",
+    "after": "Queanbeyan/​Erindale College/​Greater Western Sydney (NEAFL)",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6127,
+    "key": [
+     "https://www.draftguru.com.au/players/arthur_jones/2",
+     2021,
+     "national"
+    ],
+    "year": 2021,
+    "before": "Mt Barker (WA)/​Claremont",
+    "after": "Mt Barker (WA)/​Wesley College (WA)/​Claremont",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6135,
+    "key": [
+     "https://www.draftguru.com.au/players/oscar_adams/1",
+     2021,
+     "national"
+    ],
+    "year": 2021,
+    "before": "South Gambier/​Glenelg",
+    "after": "South Gambier/​Tenison Woods College/​Glenelg",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6139,
+    "key": [
+     "https://www.draftguru.com.au/players/hugh_jackson/1",
+     2021,
+     "national"
+    ],
+    "year": 2021,
+    "before": "Crystal Brook/​North Adelaide",
+    "after": "Crystal Brook/​Rostrevor College/​North Adelaide",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6141,
+    "key": [
+     "https://www.draftguru.com.au/players/jack_williams/8",
+     2021,
+     "national"
+    ],
+    "year": 2021,
+    "before": "Rossmoyne JFC/​East Fremantle",
+    "after": "Rossmoyne JFC/​Willetton SHS/​East Fremantle",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6143,
+    "key": [
+     "https://www.draftguru.com.au/players/jackson_archer/1",
+     2021,
+     "national"
+    ],
+    "year": 2021,
+    "before": "Park Orchards/​Northern U18",
+    "after": "Park Orchards/​Whitefriars College/​Northern U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6144,
+    "key": [
+     "https://www.draftguru.com.au/players/jase_burgoyne/1",
+     2021,
+     "national"
+    ],
+    "year": 2021,
+    "before": "Woodville-West Torrens",
+    "after": "Henley HS/​Woodville-West Torrens",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6145,
+    "key": [
+     "https://www.draftguru.com.au/players/luke_cleary/1",
+     2021,
+     "national"
+    ],
+    "year": 2021,
+    "before": "Beaumaris/​Sandringham U18",
+    "after": "Beaumaris/​Haileybury College/​Sandringham U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6149,
+    "key": [
+     "https://www.draftguru.com.au/players/taj_woewodin/1",
+     2021,
+     "national"
+    ],
+    "year": 2021,
+    "before": "Coorparoo JAFC/​Booragoon/​East Fremantle",
+    "after": "Coorparoo JAFC/​Booragoon/​Aquinas College (WA)/​East Fremantle",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6154,
+    "key": [
+     "https://www.draftguru.com.au/players/karl_worner/1",
+     2021,
+     "rookie"
+    ],
+    "year": 2021,
+    "before": "Ashburton/​East Burwood/​Oakleigh U18",
+    "after": "Ashburton/​East Burwood/​Carey Grammar/​Oakleigh U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6160,
+    "key": [
+     "https://www.draftguru.com.au/players/judd_mcvee/1",
+     2021,
+     "rookie"
+    ],
+    "year": 2021,
+    "before": "Swanbourne JFC/​Mullewa/​East Fremantle",
+    "after": "Swanbourne JFC/​Mullewa/​Geraldton SHS/​East Fremantle",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6163,
+    "key": [
+     "https://www.draftguru.com.au/players/bodhi_uwland/1",
+     2021,
+     "rookie"
+    ],
+    "year": 2021,
+    "before": "Broadbeach/​Gold Coast (NEAFL)",
+    "after": "Broadbeach/​All Saints Anglican/​Gold Coast (NEAFL)",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6171,
+    "key": [
+     "https://www.draftguru.com.au/players/jack_hayes/2",
+     2021,
+     "post_draft"
+    ],
+    "year": 2021,
+    "before": "Woodville-West Torrens",
+    "after": "Sacred Heart College/​Woodville-West Torrens",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6175,
+    "key": [
+     "https://www.draftguru.com.au/players/nic_martin/1",
+     2021,
+     "post_draft"
+    ],
+    "year": 2021,
+    "before": "Noranda JFC/​Subiaco",
+    "after": "Noranda JFC/​Trinity College (WA)/​Subiaco",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6182,
+    "key": [
+     "https://www.draftguru.com.au/players/kallan_dawson/1",
+     2021,
+     "midseason"
+    ],
+    "year": 2021,
+    "before": "Williamstown Juniors/​Williamstown",
+    "after": "Williamstown Juniors/​Williamstown HS/​Williamstown",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6183,
+    "key": [
+     "https://www.draftguru.com.au/players/massimo_d'ambrosio/1",
+     2021,
+     "midseason"
+    ],
+    "year": 2021,
+    "before": "Point Cook/​Western U18/​Richmond (VFL)",
+    "after": "Point Cook/​Maribyrnong College/​Western U18/​Richmond (VFL)",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6219,
+    "key": [
+     "https://www.draftguru.com.au/players/jason_horne-francis/1",
+     2022,
+     "trade"
+    ],
+    "year": 2022,
+    "before": "Christies Beach/​South Adelaide",
+    "after": "Christies Beach/​Wirreanda SS/​South Adelaide",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6236,
+    "key": [
+     "https://www.draftguru.com.au/players/darryl_mcdowell-white/1",
+     2022,
+     "pre_draft"
+    ],
+    "year": 2022,
+    "before": "Basketball",
+    "after": "Anglican Church Grammar/​Basketball",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6240,
+    "key": [
+     "https://www.draftguru.com.au/players/aaron_cadman/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "Darley/​North Ballarat U18",
+    "after": "Darley/​St Patrick's College/​North Ballarat U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6241,
+    "key": [
+     "https://www.draftguru.com.au/players/will_ashcroft/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "Southport/​Sandringham U18",
+    "after": "Southport/​Brighton Grammar/​Sandringham U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6242,
+    "key": [
+     "https://www.draftguru.com.au/players/harry_sheezel/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "Ajax/​Sandringham U18",
+    "after": "Ajax/​Mount Scopus/​Sandringham U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6243,
+    "key": [
+     "https://www.draftguru.com.au/players/george_wardlaw/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "St Peters/​Oakleigh U18",
+    "after": "St Peters/​St Kevin's College/​Oakleigh U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6244,
+    "key": [
+     "https://www.draftguru.com.au/players/elijah_tsatas/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "Surrey Park/​Oakleigh U18",
+    "after": "Surrey Park/​Wesley College/​Oakleigh U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6245,
+    "key": [
+     "https://www.draftguru.com.au/players/bailey_humphrey/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "Moe/​Gippsland U18",
+    "after": "Moe/​Lowanna College/​Gippsland U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6246,
+    "key": [
+     "https://www.draftguru.com.au/players/cam_mackenzie/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "Beaumaris/​Sandringham U18",
+    "after": "Beaumaris/​Brighton Grammar/​Sandringham U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6248,
+    "key": [
+     "https://www.draftguru.com.au/players/reuben_ginbey/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "Dunsborough/​East Perth",
+    "after": "Dunsborough/​Wesley College (WA)/​East Perth",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6249,
+    "key": [
+     "https://www.draftguru.com.au/players/mattaes_phillipou/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "PHOS Camden/​Woodville-West Torrens",
+    "after": "PHOS Camden/​Henley HS/​Woodville-West Torrens",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6250,
+    "key": [
+     "https://www.draftguru.com.au/players/oliver_hollands/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "Wodonga FC/​Murray U18",
+    "after": "Wodonga FC/​Geelong Grammar/​Murray U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6251,
+    "key": [
+     "https://www.draftguru.com.au/players/jaspa_fletcher/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "Coorparoo/​Brisbane (NEAFL)",
+    "after": "Coorparoo/​Brisbane SHS/​Brisbane (NEAFL)",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6253,
+    "key": [
+     "https://www.draftguru.com.au/players/elijah_hewett/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "Caversham JFC/​Swan Districts",
+    "after": "Caversham JFC/​Guildford Grammar/​Scotch College (WA)/​Swan Districts",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6254,
+    "key": [
+     "https://www.draftguru.com.au/players/matthew_jefferson/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "Ashburton/​Oakleigh U18",
+    "after": "Ashburton/​Wesley College/​Oakleigh U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6255,
+    "key": [
+     "https://www.draftguru.com.au/players/harry_rowston/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "Griffith",
+    "after": "Griffith/​Assumption College",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6256,
+    "key": [
+     "https://www.draftguru.com.au/players/max_michalanney/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "Glenunga/​Norwood",
+    "after": "Glenunga/​Rostrevor College/​Norwood",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6257,
+    "key": [
+     "https://www.draftguru.com.au/players/josh_weddle/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "Templestowe/​Oakleigh U18",
+    "after": "Templestowe/​Carey Grammar/​Oakleigh U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6258,
+    "key": [
+     "https://www.draftguru.com.au/players/ed_allan/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "Mosman Park JFC/​Claremont",
+    "after": "Mosman Park JFC/​Scotch College (WA)/​Claremont",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6261,
+    "key": [
+     "https://www.draftguru.com.au/players/max_gruzewski/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "Surrey Park/​Oakleigh U18",
+    "after": "Surrey Park/​Caulfield Grammar/​Oakleigh U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6262,
+    "key": [
+     "https://www.draftguru.com.au/players/harry_barnett/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "Goodwood/​West Adelaide",
+    "after": "Goodwood/​Mercedes College/​West Adelaide",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6264,
+    "key": [
+     "https://www.draftguru.com.au/players/lewis_hayes/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "Lysterfield JFC/​Eastern U18",
+    "after": "Lysterfield JFC/​Rowville SC/​Eastern U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6267,
+    "key": [
+     "https://www.draftguru.com.au/players/jakob_ryan/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "Brighton Districts & Old Scholars/​Glenelg",
+    "after": "Brighton Districts & Old Scholars/​Sacred Heart College/​Glenelg",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6268,
+    "key": [
+     "https://www.draftguru.com.au/players/coby_burgiel/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "Gippsland U18",
+    "after": "Wesley College/​Gippsland U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6269,
+    "key": [
+     "https://www.draftguru.com.au/players/lachie_cowan/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "Devonport/​Tasmania U18",
+    "after": "Devonport/​St Brendan-Shaw College/​Tasmania U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6270,
+    "key": [
+     "https://www.draftguru.com.au/players/james_van%20es/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "North Ballarat/​North Ballarat U18",
+    "after": "North Ballarat/​St Patrick's College/​North Ballarat U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6271,
+    "key": [
+     "https://www.draftguru.com.au/players/jaxon_binns/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "Berwick/​Dandenong U18",
+    "after": "Berwick/​Caulfield Grammar/​Dandenong U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6272,
+    "key": [
+     "https://www.draftguru.com.au/players/hugh_davies/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "Claremont",
+    "after": "Christ Church Grammar/​Claremont",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6274,
+    "key": [
+     "https://www.draftguru.com.au/players/olli_hotton/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "Hampton Rovers/​Sandringham U18",
+    "after": "Hampton Rovers/​Haileybury College/​Sandringham U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6275,
+    "key": [
+     "https://www.draftguru.com.au/players/tom_mccallum/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "Clarence/​Tasmania U18",
+    "after": "Clarence/​Guilford Young College/​Tasmania U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6280,
+    "key": [
+     "https://www.draftguru.com.au/players/tom_emmett/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "Payneham Norwood Union/​Sturt",
+    "after": "Payneham Norwood Union/​Pembroke School/​Sturt",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6282,
+    "key": [
+     "https://www.draftguru.com.au/players/billy_dowling/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "Walkerville/​North Adelaide",
+    "after": "Walkerville/​St Peter's College (SA)/​North Adelaide",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6284,
+    "key": [
+     "https://www.draftguru.com.au/players/alwyn_davey/2",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "Palmerston/​Oakleigh U18",
+    "after": "Palmerston/​Xavier College/​Oakleigh U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6285,
+    "key": [
+     "https://www.draftguru.com.au/players/jack_o'sullivan/4",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "Kyneton/​Oakleigh U18",
+    "after": "Kyneton/​Xavier College/​Oakleigh U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6288,
+    "key": [
+     "https://www.draftguru.com.au/players/kaleb_smith/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "Melville JFC/​East Fremantle",
+    "after": "Melville JFC/​Wesley College (WA)/​East Fremantle",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6289,
+    "key": [
+     "https://www.draftguru.com.au/players/hugh_bond/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "North Ballarat/​North Ballarat U18",
+    "after": "North Ballarat/​Ballarat Grammar/​North Ballarat U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6290,
+    "key": [
+     "https://www.draftguru.com.au/players/bailey_macdonald/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "Surrey Park/​Oakleigh U18",
+    "after": "Surrey Park/​Wesley College/​Oakleigh U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6293,
+    "key": [
+     "https://www.draftguru.com.au/players/jayden_davey/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "Palmerston/​Oakleigh U18",
+    "after": "Palmerston/​Xavier College/​Oakleigh U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6295,
+    "key": [
+     "https://www.draftguru.com.au/players/cooper_harvey/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "Yarrambat/​Northern U18",
+    "after": "Yarrambat/​Assumption College/​Northern U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6297,
+    "key": [
+     "https://www.draftguru.com.au/players/noah_long/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "Echuca/​Bendigo U18",
+    "after": "Echuca/​Geelong Grammar/​Bendigo U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6298,
+    "key": [
+     "https://www.draftguru.com.au/players/kyle_marshall/1",
+     2022,
+     "national"
+    ],
+    "year": 2022,
+    "before": "McLaren/​South Adelaide",
+    "after": "McLaren/​Cardijn College/​South Adelaide",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6303,
+    "key": [
+     "https://www.draftguru.com.au/players/liam_reidy/1",
+     2022,
+     "rookie"
+    ],
+    "year": 2022,
+    "before": "East Brighton/​Frankston",
+    "after": "East Brighton/​Brighton SC/​Frankston",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6311,
+    "key": [
+     "https://www.draftguru.com.au/players/jaiden_magor/1",
+     2022,
+     "rookie"
+    ],
+    "year": 2022,
+    "before": "Myponga-Sellicks/​South Adelaide",
+    "after": "Myponga-Sellicks/​Sacred Heart College/​South Adelaide",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6330,
+    "key": [
+     "https://www.draftguru.com.au/players/kaelan_bradtke/1",
+     2022,
+     "post_draft"
+    ],
+    "year": 2022,
+    "before": "Corowa-Rutherglen/​Sydney (NEAFL)",
+    "after": "Corowa-Rutherglen/​Xavier HS (Albury)/​Sydney (NEAFL)",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6333,
+    "key": [
+     "https://www.draftguru.com.au/players/alex_cincotta/1",
+     2022,
+     "post_draft"
+    ],
+    "year": 2022,
+    "before": "Newtown & Chilwell/​Geelong (VFL)/​Carlton (VFL)",
+    "after": "Newtown & Chilwell/​Geelong College/​Geelong (VFL)/​Carlton (VFL)",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6339,
+    "key": [
+     "https://www.draftguru.com.au/players/hudson_o'keeffe/1",
+     2022,
+     "post_draft"
+    ],
+    "year": 2022,
+    "before": "Camberwell/​Oakleigh U18",
+    "after": "Camberwell/​Camberwell HS/​Oakleigh U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6343,
+    "key": [
+     "https://www.draftguru.com.au/players/kye_turner/1",
+     2022,
+     "post_draft"
+    ],
+    "year": 2022,
+    "before": "Beaumaris/​Sandringham U18/​Old Haileybury/​Frankston",
+    "after": "Beaumaris/​Haileybury College/​Sandringham U18/​Old Haileybury/​Frankston",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6345,
+    "key": [
+     "https://www.draftguru.com.au/players/robert_hansen/2",
+     2022,
+     "midseason"
+    ],
+    "year": 2022,
+    "before": "Subiaco",
+    "after": "Trinity College (WA)/​Subiaco",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6350,
+    "key": [
+     "https://www.draftguru.com.au/players/ethan_stanley/1",
+     2022,
+     "midseason"
+    ],
+    "year": 2022,
+    "before": "Box Hill",
+    "after": "Mornington SC/​Box Hill",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6351,
+    "key": [
+     "https://www.draftguru.com.au/players/jaiden_hunter/1",
+     2022,
+     "midseason"
+    ],
+    "year": 2022,
+    "before": "Perth",
+    "after": "Aquinas College (WA)/​Perth",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6355,
+    "key": [
+     "https://www.draftguru.com.au/players/james_trezise/1",
+     2022,
+     "midseason"
+    ],
+    "year": 2022,
+    "before": "Tooradin-Dalmore/​Richmond (VFL)",
+    "after": "Tooradin-Dalmore/​St Francis Xavier College (Beaconsfield)/​Richmond (VFL)",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6356,
+    "key": [
+     "https://www.draftguru.com.au/players/jack_buller/1",
+     2022,
+     "midseason"
+    ],
+    "year": 2022,
+    "before": "Cottesloe JFC/​Claremont",
+    "after": "Cottesloe JFC/​Scotch College (WA)/​Claremont",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6374,
+    "key": [
+     "https://www.draftguru.com.au/players/massimo_d'ambrosio/1",
+     2023,
+     "trade"
+    ],
+    "year": 2023,
+    "before": "Point Cook/​Western U18/​Richmond (VFL)",
+    "after": "Point Cook/​Maribyrnong College/​Western U18/​Richmond (VFL)",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6399,
+    "key": [
+     "https://www.draftguru.com.au/players/oliver_hayes-brown/1",
+     2023,
+     "pre_draft"
+    ],
+    "year": 2023,
+    "before": "Basketball",
+    "after": "Peninsula Grammar/​Basketball",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6445,
+    "key": [
+     "https://www.draftguru.com.au/players/bodie_ryan/1",
+     2023,
+     "national"
+    ],
+    "year": 2023,
+    "before": "Brighton/​Sacred Heart College/​Glenelg",
+    "after": "Brighton Districts & Old Scholars/​Sacred Heart College/​Glenelg",
+    "class": "RENAME_EXPAND"
+   },
+   {
+    "id": 6454,
+    "key": [
+     "https://www.draftguru.com.au/players/aiden_o'driscoll/1",
+     2023,
+     "national"
+    ],
+    "year": 2023,
+    "before": "Northam Saints JFC/​Perth",
+    "after": "Northam Saints JFC/​Wesley College (WA)/​Perth",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6460,
+    "key": [
+     "https://www.draftguru.com.au/players/oli_wiltshire/1",
+     2023,
+     "national"
+    ],
+    "year": 2023,
+    "before": "Barwon Heads/​Geelong U18",
+    "after": "Barwon Heads/​St Joseph's College/​Geelong U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6466,
+    "key": [
+     "https://www.draftguru.com.au/players/finnbar_maley/1",
+     2023,
+     "rookie"
+    ],
+    "year": 2023,
+    "before": "Research/​Eltham/​Northern U18/​Northern Bullants",
+    "after": "Research/​Eltham/​Eltham HS/​Northern U18/​Northern Bullants",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6471,
+    "key": [
+     "https://www.draftguru.com.au/players/xavier_walsh/1",
+     2023,
+     "rookie"
+    ],
+    "year": 2023,
+    "before": "Mt Lawley Inglewood JFC/​East Perth",
+    "after": "Mt Lawley Inglewood JFC/​Trinity College (WA)/​East Perth",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6473,
+    "key": [
+     "https://www.draftguru.com.au/players/will_rowlands/1",
+     2023,
+     "rookie"
+    ],
+    "year": 2023,
+    "before": "Southern Districts/​Norwood",
+    "after": "Southern Districts/​Rostrevor College/​Norwood",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6479,
+    "key": [
+     "https://www.draftguru.com.au/players/coen_livingstone/1",
+     2023,
+     "post_draft"
+    ],
+    "year": 2023,
+    "before": "Perth",
+    "after": "Scotch College (WA)/​Perth",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6486,
+    "key": [
+     "https://www.draftguru.com.au/players/tyler_sellers/1",
+     2023,
+     "post_draft"
+    ],
+    "year": 2023,
+    "before": "Old Scotch/​North Melbourne (VFL)",
+    "after": "Old Scotch/​Scotch College/​North Melbourne (VFL)",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6488,
+    "key": [
+     "https://www.draftguru.com.au/players/lachie_sullivan/1",
+     2023,
+     "post_draft"
+    ],
+    "year": 2023,
+    "before": "Footscray (VFL)",
+    "after": "St Kevin's College/​Footscray (VFL)",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6491,
+    "key": [
+     "https://www.draftguru.com.au/players/jacob_blight/1",
+     2023,
+     "midseason"
+    ],
+    "year": 2023,
+    "before": "Peel",
+    "after": "Wesley College (WA)/​Peel",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6495,
+    "key": [
+     "https://www.draftguru.com.au/players/will_mclachlan/1",
+     2023,
+     "midseason"
+    ],
+    "year": 2023,
+    "before": "Geelong U18",
+    "after": "Trinity College (Colac)/​Geelong U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6497,
+    "key": [
+     "https://www.draftguru.com.au/players/kelsey_rypstra/1",
+     2023,
+     "midseason"
+    ],
+    "year": 2023,
+    "before": "North Adelaide",
+    "after": "Blackfriars/​North Adelaide",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6498,
+    "key": [
+     "https://www.draftguru.com.au/players/cooper_lord/1",
+     2023,
+     "midseason"
+    ],
+    "year": 2023,
+    "before": "North Melbourne (VFL)",
+    "after": "Scotch College/​North Melbourne (VFL)",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6503,
+    "key": [
+     "https://www.draftguru.com.au/players/tom_hanily/1",
+     2023,
+     "midseason"
+    ],
+    "year": 2023,
+    "before": "Gippsland U18",
+    "after": "Xavier College/​Gippsland U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6505,
+    "key": [
+     "https://www.draftguru.com.au/players/campbell_gray/1",
+     2023,
+     "midseason"
+    ],
+    "year": 2023,
+    "before": "Essendon (VFL)",
+    "after": "Overnewton College/​Essendon (VFL)",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6545,
+    "key": [
+     "https://www.draftguru.com.au/players/matt_hill/1",
+     2024,
+     "pre_draft"
+    ],
+    "year": 2024,
+    "before": "Rugby League",
+    "after": "St Brendan's College (Yeppoon)/​Rugby League",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6590,
+    "key": [
+     "https://www.draftguru.com.au/players/ben_camporeale/1",
+     2024,
+     "national"
+    ],
+    "year": 2024,
+    "before": "Brighton/​Sacred Heart College/​Glenelg",
+    "after": "Brighton Districts & Old Scholars/​Sacred Heart College/​Glenelg",
+    "class": "RENAME_EXPAND"
+   },
+   {
+    "id": 6601,
+    "key": [
+     "https://www.draftguru.com.au/players/lucas_camporeale/1",
+     2024,
+     "national"
+    ],
+    "year": 2024,
+    "before": "Brighton/​Sacred Heart College/​Glenelg",
+    "after": "Brighton Districts & Old Scholars/​Sacred Heart College/​Glenelg",
+    "class": "RENAME_EXPAND"
+   },
+   {
+    "id": 6626,
+    "key": [
+     "https://www.draftguru.com.au/players/blake_leidler/1",
+     2024,
+     "rookie"
+    ],
+    "year": 2024,
+    "before": "Collegians/​Wesley College/​Oakleigh U18",
+    "after": "Surrey Park/​Wesley College/​Oakleigh U18",
+    "class": "REPLACE_CLUB"
+   },
+   {
+    "id": 6631,
+    "key": [
+     "https://www.draftguru.com.au/players/josaia_delana/1",
+     2024,
+     "post_draft"
+    ],
+    "year": 2024,
+    "before": "Kellyville-Rouse Hill",
+    "after": "Kellyville-Rouse Hill/​Oakhill College",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6632,
+    "key": [
+     "https://www.draftguru.com.au/players/lachlan_gulbin/1",
+     2024,
+     "post_draft"
+    ],
+    "year": 2024,
+    "before": "Burleigh",
+    "after": "All Saints Anglican/​Burleigh",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6633,
+    "key": [
+     "https://www.draftguru.com.au/players/jayden_nguyen/1",
+     2024,
+     "post_draft"
+    ],
+    "year": 2024,
+    "before": "Avondale Heights/​Aberfeldie/​Calder U18",
+    "after": "Avondale Heights/​Aberfeldie/​Maribyrnong College/​Calder U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6634,
+    "key": [
+     "https://www.draftguru.com.au/players/ricky_mentha/1",
+     2024,
+     "post_draft"
+    ],
+    "year": 2024,
+    "before": "Palmerston/​Morwell/​Gippsland U18",
+    "after": "Palmerston/​Morwell/​Lowanna College/​Gippsland U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6641,
+    "key": [
+     "https://www.draftguru.com.au/players/isaiah_dudley/1",
+     2024,
+     "post_draft"
+    ],
+    "year": 2024,
+    "before": "Central District",
+    "after": "Prince Alfred College/​Central District",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6644,
+    "key": [
+     "https://www.draftguru.com.au/players/jack_henderson/1",
+     2024,
+     "post_draft"
+    ],
+    "year": 2024,
+    "before": "Werribee",
+    "after": "Geelong College/​Werribee",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6646,
+    "key": [
+     "https://www.draftguru.com.au/players/josh_lai/1",
+     2024,
+     "post_draft"
+    ],
+    "year": 2024,
+    "before": "Cheltenham",
+    "after": "Cheltenham/​Mentone Grammar",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6650,
+    "key": [
+     "https://www.draftguru.com.au/players/will_white/1",
+     2024,
+     "post_draft"
+    ],
+    "year": 2024,
+    "before": "North Ballarat U18/​Carlton (VFL)",
+    "after": "Emmanuel College (Warrnambool)/​North Ballarat U18/​Carlton (VFL)",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6653,
+    "key": [
+     "https://www.draftguru.com.au/players/harrison_ramm/1",
+     2024,
+     "midseason"
+    ],
+    "year": 2024,
+    "before": "Glenelg",
+    "after": "Sacred Heart College/​Glenelg",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6655,
+    "key": [
+     "https://www.draftguru.com.au/players/michael_sellwood/1",
+     2024,
+     "midseason"
+    ],
+    "year": 2024,
+    "before": "Peel",
+    "after": "Aquinas College (WA)/​Peel",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6656,
+    "key": [
+     "https://www.draftguru.com.au/players/archie_may/1",
+     2024,
+     "midseason"
+    ],
+    "year": 2024,
+    "before": "Richmond (VFL)/​Subiaco",
+    "after": "Brighton Grammar/​Richmond (VFL)/​Subiaco",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6657,
+    "key": [
+     "https://www.draftguru.com.au/players/oscar_adams/1",
+     2024,
+     "midseason"
+    ],
+    "year": 2024,
+    "before": "South Gambier/​Glenelg",
+    "after": "South Gambier/​Tenison Woods College/​Glenelg",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6659,
+    "key": [
+     "https://www.draftguru.com.au/players/jacob_newton/1",
+     2024,
+     "midseason"
+    ],
+    "year": 2024,
+    "before": "Norwood",
+    "after": "Rostrevor College/​Norwood",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6660,
+    "key": [
+     "https://www.draftguru.com.au/players/cooper_trembath/1",
+     2024,
+     "midseason"
+    ],
+    "year": 2024,
+    "before": "Eastern U18/​North Melbourne (VFL)",
+    "after": "Whitefriars College/​Eastern U18/​North Melbourne (VFL)",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6661,
+    "key": [
+     "https://www.draftguru.com.au/players/ewan_mackinlay/1",
+     2024,
+     "midseason"
+    ],
+    "year": 2024,
+    "before": "North Adelaide",
+    "after": "Billabong HS/​North Adelaide",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6664,
+    "key": [
+     "https://www.draftguru.com.au/players/caleb_lewis/1",
+     2024,
+     "midseason"
+    ],
+    "year": 2024,
+    "before": "Sandringham U18/​St Bedes Mentone (VAFA)/​Footscray (VFL)/​Dingley/​Casey",
+    "after": "Brighton Grammar/​Sandringham U18/​St Bedes Mentone (VAFA)/​Footscray (VFL)/​Dingley/​Casey",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6667,
+    "key": [
+     "https://www.draftguru.com.au/players/oskar_smartt/1",
+     2024,
+     "midseason"
+    ],
+    "year": 2024,
+    "before": "Essendon (VFL)",
+    "after": "St Joseph's College (Echuca)/​Essendon (VFL)",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6679,
+    "key": [
+     "https://www.draftguru.com.au/players/jack_buller/1",
+     2025,
+     "trade"
+    ],
+    "year": 2025,
+    "before": "Cottesloe JFC/​Claremont",
+    "after": "Cottesloe JFC/​Scotch College (WA)/​Claremont",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6689,
+    "key": [
+     "https://www.draftguru.com.au/players/finnbar_maley/1",
+     2025,
+     "trade"
+    ],
+    "year": 2025,
+    "before": "Research/​Eltham/​Northern U18/​Northern Bullants",
+    "after": "Research/​Eltham/​Eltham HS/​Northern U18/​Northern Bullants",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6690,
+    "key": [
+     "https://www.draftguru.com.au/players/judd_mcvee/1",
+     2025,
+     "trade"
+    ],
+    "year": 2025,
+    "before": "Swanbourne JFC/​Mullewa/​East Fremantle",
+    "after": "Swanbourne JFC/​Mullewa/​Geraldton SHS/​East Fremantle",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6694,
+    "key": [
+     "https://www.draftguru.com.au/players/liam_reidy/1",
+     2025,
+     "trade"
+    ],
+    "year": 2025,
+    "before": "East Brighton/​Frankston",
+    "after": "East Brighton/​Brighton SC/​Frankston",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6703,
+    "key": [
+     "https://www.draftguru.com.au/players/kalani_white/1",
+     2025,
+     "pre_draft"
+    ],
+    "year": 2025,
+    "before": "Surfers Paradise/​Broadbeach",
+    "after": "Surfers Paradise/​All Saints Anglican/​Broadbeach",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6704,
+    "key": [
+     "https://www.draftguru.com.au/players/willem_duursma/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Foster/​Gippsland U18",
+    "after": "Foster/​Foster SC/​Gippsland U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6705,
+    "key": [
+     "https://www.draftguru.com.au/players/zeke_uwland/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Burleigh",
+    "after": "All Saints Anglican/​Burleigh",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6706,
+    "key": [
+     "https://www.draftguru.com.au/players/harry_dean/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Lavington/​Murray U18",
+    "after": "Lavington/​Scots School (Albury)/​Murray U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6708,
+    "key": [
+     "https://www.draftguru.com.au/players/dylan_patterson/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Palm Beach Currumbin",
+    "after": "Palm Beach Currumbin SHS/​Palm Beach Currumbin",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6709,
+    "key": [
+     "https://www.draftguru.com.au/players/daniel_annable/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Redland-Victoria Point",
+    "after": "Cleveland SHS/​Redland-Victoria Point",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6710,
+    "key": [
+     "https://www.draftguru.com.au/players/sam_cumming/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Wentworth/​North Adelaide",
+    "after": "Wentworth/​Prince Alfred College/​North Adelaide",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6711,
+    "key": [
+     "https://www.draftguru.com.au/players/sam_grlj/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Canterbury/​Oakleigh U18",
+    "after": "Canterbury/​Camberwell Grammar/​Oakleigh U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6712,
+    "key": [
+     "https://www.draftguru.com.au/players/sullivan_robey/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Rowville/​Eastern U18",
+    "after": "Rowville/​Mazenod College/​Eastern U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6713,
+    "key": [
+     "https://www.draftguru.com.au/players/jacob_farrow/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Joondalup Kinross JFC/​West Perth",
+    "after": "Joondalup Kinross JFC/​Mater Dei College/​West Perth",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6714,
+    "key": [
+     "https://www.draftguru.com.au/players/xavier_taylor/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "East Ringwood/​Eastern U18",
+    "after": "East Ringwood/​Rowville SC/​Eastern U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6716,
+    "key": [
+     "https://www.draftguru.com.au/players/dyson_sharp/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Barossa/​Central District",
+    "after": "Barossa/​Xavier College (SA)/​Central District",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6717,
+    "key": [
+     "https://www.draftguru.com.au/players/harry_kyle/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "UNSW-Eastern Suburbs",
+    "after": "Scots College/​UNSW-Eastern Suburbs",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6718,
+    "key": [
+     "https://www.draftguru.com.au/players/oskar_taylor/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Upwey-Tecoma/​Eastern U18",
+    "after": "Upwey-Tecoma/​St Joseph's College (Ferntree Gully)/​Eastern U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6719,
+    "key": [
+     "https://www.draftguru.com.au/players/lachy_dovaston/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Blackburn/​Eastern U18",
+    "after": "Blackburn/​Rowville SC/​Eastern U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6720,
+    "key": [
+     "https://www.draftguru.com.au/players/jai_murray/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Burleigh",
+    "after": "Palm Beach Currumbin SHS/​Burleigh",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6721,
+    "key": [
+     "https://www.draftguru.com.au/players/beau_addinsall/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Burleigh",
+    "after": "All Saints Anglican/​Burleigh",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6722,
+    "key": [
+     "https://www.draftguru.com.au/players/josh_lindsay/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Newtown & Chilwell/​Geelong U18",
+    "after": "Newtown & Chilwell/​Geelong Grammar/​Geelong U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6723,
+    "key": [
+     "https://www.draftguru.com.au/players/cam_nairn/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Willaston/​Central District",
+    "after": "Willaston/​Kapunda HS/​Central District",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6724,
+    "key": [
+     "https://www.draftguru.com.au/players/lachlan_carmichael/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "North Shore (NSW)",
+    "after": "North Shore (NSW)/​Scots College",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6726,
+    "key": [
+     "https://www.draftguru.com.au/players/aidan_schubert/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Gawler Central/​Central District",
+    "after": "Gawler Central/​Trinity College (SA)/​Central District",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6728,
+    "key": [
+     "https://www.draftguru.com.au/players/adam_sweid/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Pascoe Vale/​Calder U18",
+    "after": "Pascoe Vale/​Islamic College of Sport/​Calder U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6730,
+    "key": [
+     "https://www.draftguru.com.au/players/louis_emmett/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Glen Iris/​Oakleigh U18",
+    "after": "Glen Iris/​Scotch College/​Oakleigh U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6732,
+    "key": [
+     "https://www.draftguru.com.au/players/sam_allen/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Glen Iris/​Oakleigh U18",
+    "after": "Glen Iris/​Scotch College/​Oakleigh U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6733,
+    "key": [
+     "https://www.draftguru.com.au/players/thomas_matthews/2",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Moe/​Gippsland U18",
+    "after": "Moe/​Lowanna College/​Gippsland U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6734,
+    "key": [
+     "https://www.draftguru.com.au/players/zane_peucker/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Port District/​Woodville-West Torrens",
+    "after": "Port District/​St Michael's College (SA)/​Woodville-West Torrens",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6735,
+    "key": [
+     "https://www.draftguru.com.au/players/tyan_prindable/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Coorparoo",
+    "after": "St Laurence's College (Qld)/​Coorparoo",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6736,
+    "key": [
+     "https://www.draftguru.com.au/players/hunter_holmes/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Prahran/​Oakleigh U18",
+    "after": "Prahran/​Melbourne Grammar/​Oakleigh U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6737,
+    "key": [
+     "https://www.draftguru.com.au/players/jack_dalton/2",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "East Malvern/​Sandringham U18",
+    "after": "East Malvern/​Xavier College/​Sandringham U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6739,
+    "key": [
+     "https://www.draftguru.com.au/players/max_kondogiannis/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Kew Rovers/​Oakleigh U18",
+    "after": "Kew Rovers/​Carey Grammar/​Oakleigh U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6740,
+    "key": [
+     "https://www.draftguru.com.au/players/sam_swadling/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Whitford/​West Perth",
+    "after": "Whitford/​Sacred Heart College (WA)/​West Perth",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6741,
+    "key": [
+     "https://www.draftguru.com.au/players/koby_evans/2",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Kenwick/​Perth",
+    "after": "Kenwick/​Darling Range Sports College/​Perth",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6742,
+    "key": [
+     "https://www.draftguru.com.au/players/tylah_williams/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Redcliffe JFC/​Swan Districts",
+    "after": "Redcliffe JFC/​Darling Range Sports College/​Swan Districts",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6744,
+    "key": [
+     "https://www.draftguru.com.au/players/charlie_banfield/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Swanbourne JFC/​Claremont",
+    "after": "Swanbourne JFC/​Scotch College (WA)/​Claremont",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6745,
+    "key": [
+     "https://www.draftguru.com.au/players/billy_cootee/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Doutta Stars/​Norwood",
+    "after": "Doutta Stars/​Maribyrnong College/​Norwood",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6746,
+    "key": [
+     "https://www.draftguru.com.au/players/cody_curtin/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "West Coast JFC/​Claremont",
+    "after": "West Coast JFC/​Scotch College (WA)/​Claremont",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6748,
+    "key": [
+     "https://www.draftguru.com.au/players/talor_byrne/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Koroit/​North Ballarat U18",
+    "after": "Koroit/​Emmanuel College (Warrnambool)/​North Ballarat U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6749,
+    "key": [
+     "https://www.draftguru.com.au/players/koby_coulson/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Broadbeach",
+    "after": "All Saints Anglican/​Broadbeach",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6750,
+    "key": [
+     "https://www.draftguru.com.au/players/jack_ison/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Parkside/​Oakleigh U18",
+    "after": "Parkside/​Scotch College/​Oakleigh U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6752,
+    "key": [
+     "https://www.draftguru.com.au/players/max_king/3",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Cardiff",
+    "after": "Warners Bay HS/​Cardiff",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6753,
+    "key": [
+     "https://www.draftguru.com.au/players/archie_ludowyke/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "East Sandringham/​Sandringham U18",
+    "after": "East Sandringham/​Brighton Grammar/​Sandringham U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6755,
+    "key": [
+     "https://www.draftguru.com.au/players/kye_fincher/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "East Brighton/​Sandringham U18",
+    "after": "East Brighton/​Brighton Grammar/​Sandringham U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6757,
+    "key": [
+     "https://www.draftguru.com.au/players/noah_roberts-thomson/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Unley/​Sturt",
+    "after": "Unley/​Pembroke School/​Sturt",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6758,
+    "key": [
+     "https://www.draftguru.com.au/players/zac_mccarthy/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Kew Comets/​Oakleigh U18",
+    "after": "Kew Comets/​Carey Grammar/​Oakleigh U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6759,
+    "key": [
+     "https://www.draftguru.com.au/players/matthew_leray/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Golden Grove/​Central District",
+    "after": "Golden Grove/​Prince Alfred College/​Central District",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6761,
+    "key": [
+     "https://www.draftguru.com.au/players/will_darcy/1",
+     2025,
+     "national"
+    ],
+    "year": 2025,
+    "before": "Glen Iris/​Oakleigh U18",
+    "after": "Glen Iris/​Scotch College/​Oakleigh U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6764,
+    "key": [
+     "https://www.draftguru.com.au/players/riley_onley/1",
+     2025,
+     "rookie"
+    ],
+    "year": 2025,
+    "before": "Shepparton United/​Murray U18",
+    "after": "Shepparton United/​Scotch College/​Murray U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6766,
+    "key": [
+     "https://www.draftguru.com.au/players/leon_kickett/1",
+     2025,
+     "rookie"
+    ],
+    "year": 2025,
+    "before": "South Bunbury/​Swan Districts",
+    "after": "South Bunbury/​Newton Moore SHS/​Swan Districts",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6767,
+    "key": [
+     "https://www.draftguru.com.au/players/ollie_greeves/1",
+     2025,
+     "rookie"
+    ],
+    "year": 2025,
+    "before": "Vermont/​Eastern U18",
+    "after": "Vermont/​Caulfield Grammar/​Eastern U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6768,
+    "key": [
+     "https://www.draftguru.com.au/players/nick_driscoll/1",
+     2025,
+     "rookie"
+    ],
+    "year": 2025,
+    "before": "Eltham/​Northern U18",
+    "after": "Eltham/​Eltham College/​Northern U18",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6770,
+    "key": [
+     "https://www.draftguru.com.au/players/noah_chamberlain/1",
+     2025,
+     "post_draft"
+    ],
+    "year": 2025,
+    "before": "East Sydney",
+    "after": "East Sydney/​Endeavour Sports HS",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6784,
+    "key": [
+     "https://www.draftguru.com.au/players/finlay_macrae/1",
+     2025,
+     "post_draft"
+    ],
+    "year": 2025,
+    "before": "Surrey Park/​Xavier College/​Oakleigh U18",
+    "after": "Kew Rovers/​Xavier College/​Oakleigh U18",
+    "class": "REPLACE_CLUB"
+   },
+   {
+    "id": 6786,
+    "key": [
+     "https://www.draftguru.com.au/players/balyn_o'brien/1",
+     2025,
+     "post_draft"
+    ],
+    "year": 2025,
+    "before": "Central Eyre United/​Norwood",
+    "after": "Central Eyre United/​Rostrevor College/​Norwood",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6789,
+    "key": [
+     "https://www.draftguru.com.au/players/chris_scerri/1",
+     2025,
+     "post_draft"
+    ],
+    "year": 2025,
+    "before": "Strathmore/​Northern Bullants",
+    "after": "Strathmore/​St Bernard's College/​Northern Bullants",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6793,
+    "key": [
+     "https://www.draftguru.com.au/players/jaxon_artemis/1",
+     2025,
+     "midseason"
+    ],
+    "year": 2025,
+    "before": "Jandakot JFC/​South Fremantle/​Tasmania (VFL)",
+    "after": "Jandakot JFC/​Trinity College (WA)/​South Fremantle/​Tasmania (VFL)",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6794,
+    "key": [
+     "https://www.draftguru.com.au/players/kye_annand/1",
+     2025,
+     "midseason"
+    ],
+    "year": 2025,
+    "before": "South Barwon/​Ocean Grove/​Geelong West/​Queenscliff/​Geelong (VFL)",
+    "after": "South Barwon/​Ocean Grove/​Geelong West/​Queenscliff/​St Ignatius (Geelong)/​Geelong (VFL)",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6795,
+    "key": [
+     "https://www.draftguru.com.au/players/oliver_francou/1",
+     2025,
+     "midseason"
+    ],
+    "year": 2025,
+    "before": "Walkerville/​North Adelaide",
+    "after": "Walkerville/​St Peter's College (SA)/​North Adelaide",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6796,
+    "key": [
+     "https://www.draftguru.com.au/players/flynn_riley/1",
+     2025,
+     "midseason"
+    ],
+    "year": 2025,
+    "before": "South Morang/​Montmorency/​Northern U18/​Aberfeldie/​Carlton (VFL)",
+    "after": "South Morang/​Montmorency/​Parade College/​Northern U18/​Aberfeldie/​Carlton (VFL)",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6797,
+    "key": [
+     "https://www.draftguru.com.au/players/xavier_bamert/1",
+     2025,
+     "midseason"
+    ],
+    "year": 2025,
+    "before": "East Malvern/​Sandringham U18/​North Melbourne (VFL)",
+    "after": "East Malvern/​Wesley College/​Sandringham U18/​North Melbourne (VFL)",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6799,
+    "key": [
+     "https://www.draftguru.com.au/players/campbell_lake/1",
+     2025,
+     "midseason"
+    ],
+    "year": 2025,
+    "before": "Labrador/​Southport",
+    "after": "Labrador/​Ormeau Woods SHS/​Southport",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6803,
+    "key": [
+     "https://www.draftguru.com.au/players/lukas_cooke/1",
+     2025,
+     "midseason"
+    ],
+    "year": 2025,
+    "before": "Lockleys/​Woodville-West Torrens",
+    "after": "Lockleys/​Westminster School/​Woodville-West Torrens",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6805,
+    "key": [
+     "https://www.draftguru.com.au/players/marcus_herbert/1",
+     2025,
+     "midseason"
+    ],
+    "year": 2025,
+    "before": "South Warrnambool/​Leopold/​Heidelberg/​Geelong (VFL)",
+    "after": "South Warrnambool/​Emmanuel College (Warrnambool)/​Leopold/​Heidelberg/​Geelong (VFL)",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6809,
+    "key": [
+     "https://www.draftguru.com.au/players/mitch_podhajski/1",
+     2025,
+     "midseason"
+    ],
+    "year": 2025,
+    "before": "Greenvale/​Calder U18/​Coburg",
+    "after": "Greenvale/​St Bernard's College/​Calder U18/​Coburg",
+    "class": "INSERT_SCHOOL"
+   },
+   {
+    "id": 6810,
+    "key": [
+     "https://www.draftguru.com.au/players/max_mapley/1",
+     2025,
+     "midseason"
+    ],
+    "year": 2025,
+    "before": "Jindalee/​Tasmania (VFL)",
+    "after": "Jindalee/​Indooroopilly SHS/​Tasmania (VFL)",
+    "class": "INSERT_SCHOOL"
+   }
+  ],
+  "protected_rewrites": [
+   {
+    "id": 6819,
+    "key": [
+     "https://www.draftguru.com.au/players/solomoni_loki/1",
+     2008,
+     "pre_draft"
+    ],
+    "reasons": [
+     "data_edits",
+     "audited_insert"
+    ],
+    "columns": {
+     "competition": [
+      null,
+      "AFL"
+     ]
+    }
+   },
+   {
+    "id": 6820,
+    "key": [
+     "https://www.draftguru.com.au/players/amua_pirika/1",
+     2008,
+     "pre_draft"
+    ],
+    "reasons": [
+     "data_edits",
+     "audited_insert"
+    ],
+    "columns": {
+     "competition": [
+      null,
+      "AFL"
+     ]
+    }
+   },
+   {
+    "id": 6821,
+    "key": [
+     "https://www.draftguru.com.au/players/inoke_ratu/1",
+     2008,
+     "pre_draft"
+    ],
+    "reasons": [
+     "data_edits",
+     "audited_insert"
+    ],
+    "columns": {
+     "competition": [
+      null,
+      "AFL"
+     ]
+    }
+   },
+   {
+    "id": 6822,
+    "key": [
+     "https://www.draftguru.com.au/players/stanis_susuve/1",
+     2008,
+     "pre_draft"
+    ],
+    "reasons": [
+     "data_edits",
+     "audited_insert"
+    ],
+    "columns": {
+     "competition": [
+      null,
+      "AFL"
+     ]
+    }
+   },
+   {
+    "id": 6823,
+    "key": [
+     "https://www.draftguru.com.au/players/donald_barry/1",
+     2009,
+     "pre_draft"
+    ],
+    "reasons": [
+     "data_edits",
+     "audited_insert"
+    ],
+    "columns": {
+     "competition": [
+      null,
+      "AFL"
+     ]
+    }
+   },
+   {
+    "id": 6824,
+    "key": [
+     "https://www.draftguru.com.au/players/brendan_beno/1",
+     2009,
+     "pre_draft"
+    ],
+    "reasons": [
+     "data_edits",
+     "audited_insert"
+    ],
+    "columns": {
+     "competition": [
+      null,
+      "AFL"
+     ]
+    }
+   },
+   {
+    "id": 6825,
+    "key": [
+     "https://www.draftguru.com.au/players/kurt_heatherley/1",
+     2009,
+     "pre_draft"
+    ],
+    "reasons": [
+     "data_edits",
+     "audited_insert"
+    ],
+    "columns": {
+     "competition": [
+      null,
+      "AFL"
+     ]
+    }
+   },
+   {
+    "id": 6826,
+    "key": [
+     "https://www.draftguru.com.au/players/ezra_kautu/1",
+     2009,
+     "pre_draft"
+    ],
+    "reasons": [
+     "data_edits",
+     "audited_insert"
+    ],
+    "columns": {
+     "competition": [
+      null,
+      "AFL"
+     ]
+    }
+   },
+   {
+    "id": 6827,
+    "key": [
+     "https://www.draftguru.com.au/players/peter_labi/1",
+     2009,
+     "pre_draft"
+    ],
+    "reasons": [
+     "data_edits",
+     "audited_insert"
+    ],
+    "columns": {
+     "competition": [
+      null,
+      "AFL"
+     ]
+    }
+   },
+   {
+    "id": 6828,
+    "key": [
+     "https://www.draftguru.com.au/players/max_lavai/1",
+     2009,
+     "pre_draft"
+    ],
+    "reasons": [
+     "data_edits",
+     "audited_insert"
+    ],
+    "columns": {
+     "competition": [
+      null,
+      "AFL"
+     ]
+    }
+   },
+   {
+    "id": 6829,
+    "key": [
+     "https://www.draftguru.com.au/players/nathan_malbak/1",
+     2009,
+     "pre_draft"
+    ],
+    "reasons": [
+     "data_edits",
+     "audited_insert"
+    ],
+    "columns": {
+     "competition": [
+      null,
+      "AFL"
+     ]
+    }
+   },
+   {
+    "id": 6830,
+    "key": [
+     "https://www.draftguru.com.au/players/david_meli/1",
+     2009,
+     "pre_draft"
+    ],
+    "reasons": [
+     "data_edits",
+     "audited_insert"
+    ],
+    "columns": {
+     "competition": [
+      null,
+      "AFL"
+     ]
+    }
+   },
+   {
+    "id": 6831,
+    "key": [
+     "https://www.draftguru.com.au/players/victor_rame/1",
+     2009,
+     "pre_draft"
+    ],
+    "reasons": [
+     "data_edits",
+     "audited_insert"
+    ],
+    "columns": {
+     "competition": [
+      null,
+      "AFL"
+     ]
+    }
+   },
+   {
+    "id": 6832,
+    "key": [
+     "https://www.draftguru.com.au/players/gideon_simon/1",
+     2009,
+     "pre_draft"
+    ],
+    "reasons": [
+     "data_edits",
+     "audited_insert"
+    ],
+    "columns": {
+     "competition": [
+      null,
+      "AFL"
+     ]
+    }
+   },
+   {
+    "id": 6833,
+    "key": [
+     "https://www.draftguru.com.au/players/bayanda_sobetwa/1",
+     2009,
+     "pre_draft"
+    ],
+    "reasons": [
+     "data_edits",
+     "audited_insert"
+    ],
+    "columns": {
+     "competition": [
+      null,
+      "AFL"
+     ]
+    }
+   },
+   {
+    "id": 6834,
+    "key": [
+     "https://www.draftguru.com.au/players/rhys_panui-leth/1",
+     2010,
+     "pre_draft"
+    ],
+    "reasons": [
+     "data_edits",
+     "audited_insert"
+    ],
+    "columns": {
+     "competition": [
+      null,
+      "AFL"
+     ]
+    }
+   },
+   {
+    "id": 6835,
+    "key": [
+     "https://www.draftguru.com.au/players/shem_tatupu/1",
+     2010,
+     "pre_draft"
+    ],
+    "reasons": [
+     "data_edits",
+     "audited_insert"
+    ],
+    "columns": {
+     "competition": [
+      null,
+      "AFL"
+     ]
+    }
+   },
+   {
+    "id": 6836,
+    "key": [
+     "https://www.draftguru.com.au/players/charlton_brown/1",
+     2011,
+     "pre_draft"
+    ],
+    "reasons": [
+     "data_edits",
+     "audited_insert"
+    ],
+    "columns": {
+     "competition": [
+      null,
+      "AFL"
+     ]
+    }
+   },
+   {
+    "id": 6837,
+    "key": [
+     "https://www.draftguru.com.au/players/theo_gavuri/1",
+     2011,
+     "pre_draft"
+    ],
+    "reasons": [
+     "data_edits",
+     "audited_insert"
+    ],
+    "columns": {
+     "competition": [
+      null,
+      "AFL"
+     ]
+    }
+   },
+   {
+    "id": 6838,
+    "key": [
+     "https://www.draftguru.com.au/players/yoshi_harris/1",
+     2011,
+     "pre_draft"
+    ],
+    "reasons": [
+     "data_edits",
+     "audited_insert"
+    ],
+    "columns": {
+     "competition": [
+      null,
+      "AFL"
+     ]
+    }
+   },
+   {
+    "id": 6839,
+    "key": [
+     "https://www.draftguru.com.au/players/peni_mahina/1",
+     2011,
+     "pre_draft"
+    ],
+    "reasons": [
+     "data_edits",
+     "audited_insert"
+    ],
+    "columns": {
+     "competition": [
+      null,
+      "AFL"
+     ]
+    }
+   },
+   {
+    "id": 6840,
+    "key": [
+     "https://www.draftguru.com.au/players/ben_miller/4",
+     2011,
+     "pre_draft"
+    ],
+    "reasons": [
+     "data_edits",
+     "audited_insert"
+    ],
+    "columns": {
+     "competition": [
+      null,
+      "AFL"
+     ]
+    }
+   },
+   {
+    "id": 6841,
+    "key": [
+     "https://www.draftguru.com.au/players/joe_baker-thomas/1",
+     2012,
+     "pre_draft"
+    ],
+    "reasons": [
+     "data_edits",
+     "audited_insert"
+    ],
+    "columns": {
+     "competition": [
+      null,
+      "AFL"
+     ]
+    }
+   },
+   {
+    "id": 6842,
+    "key": [
+     "https://www.draftguru.com.au/players/aksel_bang/1",
+     2012,
+     "pre_draft"
+    ],
+    "reasons": [
+     "data_edits",
+     "audited_insert"
+    ],
+    "columns": {
+     "competition": [
+      null,
+      "AFL"
+     ]
+    }
+   },
+   {
+    "id": 6843,
+    "key": [
+     "https://www.draftguru.com.au/players/siope_ngata/1",
+     2012,
+     "pre_draft"
+    ],
+    "reasons": [
+     "data_edits",
+     "audited_insert"
+    ],
+    "columns": {
+     "competition": [
+      null,
+      "AFL"
+     ]
+    }
+   },
+   {
+    "id": 6844,
+    "key": [
+     "https://www.draftguru.com.au/players/maia_westrupp/1",
+     2012,
+     "pre_draft"
+    ],
+    "reasons": [
+     "data_edits",
+     "audited_insert"
+    ],
+    "columns": {
+     "competition": [
+      null,
+      "AFL"
+     ]
+    }
+   },
+   {
+    "id": 6845,
+    "key": [
+     "https://www.draftguru.com.au/players/giovanni_mountain-silbery/1",
+     2013,
+     "pre_draft"
+    ],
+    "reasons": [
+     "data_edits",
+     "audited_insert"
+    ],
+    "columns": {
+     "competition": [
+      null,
+      "AFL"
+     ]
+    }
+   },
+   {
+    "id": 6846,
+    "key": [
+     "https://www.draftguru.com.au/players/barclay_miller/1",
+     2014,
+     "pre_draft"
+    ],
+    "reasons": [
+     "data_edits",
+     "audited_insert"
+    ],
+    "columns": {
+     "competition": [
+      null,
+      "AFL"
+     ]
+    }
+   },
+   {
+    "id": 6847,
+    "key": [
+     "https://www.draftguru.com.au/players/shaoliang_chen/1",
+     2015,
+     "pre_draft"
+    ],
+    "reasons": [
+     "data_edits",
+     "audited_insert"
+    ],
+    "columns": {
+     "competition": [
+      null,
+      "AFL"
+     ]
+    }
+   },
+   {
+    "id": 6848,
+    "key": [
+     "https://www.draftguru.com.au/players/brandon_kaufman/1",
+     2015,
+     "pre_draft"
+    ],
+    "reasons": [
+     "data_edits",
+     "audited_insert"
+    ],
+    "columns": {
+     "competition": [
+      null,
+      "AFL"
+     ]
+    }
+   },
+   {
+    "id": 6849,
+    "key": [
+     "https://www.draftguru.com.au/players/hewago%20paul_oea/1",
+     2017,
+     "pre_draft"
+    ],
+    "reasons": [
+     "data_edits",
+     "audited_insert"
+    ],
+    "columns": {
+     "competition": [
+      null,
+      "AFL"
+     ]
+    }
+   },
+   {
+    "id": 6850,
+    "key": [
+     "https://www.draftguru.com.au/players/bassirou_faye/1",
+     2021,
+     "pre_draft"
+    ],
+    "reasons": [
+     "data_edits",
+     "audited_insert"
+    ],
+    "columns": {
+     "competition": [
+      null,
+      "AFL"
+     ]
+    }
+   },
+   {
+    "id": 6851,
+    "key": [
+     "https://www.draftguru.com.au/players/cillian_bourke/1",
+     2025,
+     "pre_draft"
+    ],
+    "reasons": [
+     "data_edits",
+     "audited_insert"
+    ],
+    "columns": {
+     "competition": [
+      null,
+      "AFL"
+     ]
+    }
+   },
+   {
+    "id": 6852,
+    "key": [
+     "https://www.draftguru.com.au/players/kobe_mcdonald/1",
+     2025,
+     "pre_draft"
+    ],
+    "reasons": [
+     "data_edits",
+     "audited_insert"
+    ],
+    "columns": {
+     "competition": [
+      null,
+      "AFL"
+     ]
+    }
+   },
+   {
+    "id": 6853,
+    "key": [
+     "https://www.draftguru.com.au/players/jake_miles-wrency/1",
+     2025,
+     "pre_draft"
+    ],
+    "reasons": [
+     "data_edits",
+     "audited_insert"
+    ],
+    "columns": {
+     "competition": [
+      null,
+      "AFL"
+     ]
+    }
+   }
+  ],
+  "protected_person_rewrites": [
+   {
+    "id": 1717,
+    "player_url": "https://www.draftguru.com.au/players/gideon_simon/1",
+    "columns": {
+     "dg_person_id": [
+      1717,
+      1730
+     ]
+    }
+   },
+   {
+    "id": 1875,
+    "player_url": "https://www.draftguru.com.au/players/hewago%20paul_oea/1",
+    "columns": {
+     "dg_person_id": [
+      1875,
+      1889
+     ]
+    }
+   },
+   {
+    "id": 2753,
+    "player_url": "https://www.draftguru.com.au/players/kurt_heatherley/1",
+    "columns": {
+     "dg_person_id": [
+      2753,
+      2771
+     ]
+    }
+   },
+   {
+    "id": 4410,
+    "player_url": "https://www.draftguru.com.au/players/shem_tatupu/1",
+    "columns": {
+     "dg_person_id": [
+      4410,
+      4435
+     ]
+    }
+   },
+   {
+    "id": 5058,
+    "player_url": "https://www.draftguru.com.au/players/solomoni_loki/1",
+    "columns": {
+     "dg_person_id": [
+      5058,
+      4479
+     ],
+     "name_key": [
+      "solomoniloki",
+      "solomoni loki"
+     ]
+    }
+   },
+   {
+    "id": 5059,
+    "player_url": "https://www.draftguru.com.au/players/amua_pirika/1",
+    "columns": {
+     "dg_person_id": [
+      5059,
+      186
+     ],
+     "name_key": [
+      "amuapirika",
+      "amua pirika"
+     ]
+    }
+   },
+   {
+    "id": 5060,
+    "player_url": "https://www.draftguru.com.au/players/inoke_ratu/1",
+    "columns": {
+     "dg_person_id": [
+      5060,
+      1924
+     ],
+     "name_key": [
+      "inokeratu",
+      "inoke ratu"
+     ]
+    }
+   },
+   {
+    "id": 5061,
+    "player_url": "https://www.draftguru.com.au/players/stanis_susuve/1",
+    "columns": {
+     "dg_person_id": [
+      5061,
+      4482
+     ],
+     "name_key": [
+      "stanissusuve",
+      "stanis susuve"
+     ]
+    }
+   },
+   {
+    "id": 5062,
+    "player_url": "https://www.draftguru.com.au/players/donald_barry/1",
+    "columns": {
+     "dg_person_id": [
+      5062,
+      1550
+     ],
+     "name_key": [
+      "donaldbarry",
+      "donald barry"
+     ]
+    }
+   },
+   {
+    "id": 5063,
+    "player_url": "https://www.draftguru.com.au/players/brendan_beno/1",
+    "columns": {
+     "dg_person_id": [
+      5063,
+      657
+     ],
+     "name_key": [
+      "brendanbeno",
+      "brendan beno"
+     ]
+    }
+   },
+   {
+    "id": 5064,
+    "player_url": "https://www.draftguru.com.au/players/ezra_kautu/1",
+    "columns": {
+     "dg_person_id": [
+      5064,
+      1641
+     ],
+     "name_key": [
+      "ezrakautu",
+      "ezra kautu"
+     ]
+    }
+   },
+   {
+    "id": 5065,
+    "player_url": "https://www.draftguru.com.au/players/peter_labi/1",
+    "columns": {
+     "dg_person_id": [
+      5065,
+      3888
+     ],
+     "name_key": [
+      "peterlabi",
+      "peter labi"
+     ]
+    }
+   },
+   {
+    "id": 5066,
+    "player_url": "https://www.draftguru.com.au/players/max_lavai/1",
+    "columns": {
+     "dg_person_id": [
+      5066,
+      3378
+     ],
+     "name_key": [
+      "maxlavai",
+      "max lavai"
+     ]
+    }
+   },
+   {
+    "id": 5067,
+    "player_url": "https://www.draftguru.com.au/players/nathan_malbak/1",
+    "columns": {
+     "dg_person_id": [
+      5067,
+      3580
+     ],
+     "name_key": [
+      "nathanmalbak",
+      "nathan malbak"
+     ]
+    }
+   },
+   {
+    "id": 5068,
+    "player_url": "https://www.draftguru.com.au/players/david_meli/1",
+    "columns": {
+     "dg_person_id": [
+      5068,
+      1425
+     ],
+     "name_key": [
+      "davidmeli",
+      "david meli"
+     ]
+    }
+   },
+   {
+    "id": 5069,
+    "player_url": "https://www.draftguru.com.au/players/victor_rame/1",
+    "columns": {
+     "dg_person_id": [
+      5069,
+      4955
+     ],
+     "name_key": [
+      "victorrame",
+      "victor rame"
+     ]
+    }
+   },
+   {
+    "id": 5070,
+    "player_url": "https://www.draftguru.com.au/players/bayanda_sobetwa/1",
+    "columns": {
+     "dg_person_id": [
+      5070,
+      409
+     ],
+     "name_key": [
+      "bayandasobetwa",
+      "bayanda sobetwa"
+     ]
+    }
+   },
+   {
+    "id": 5071,
+    "player_url": "https://www.draftguru.com.au/players/rhys_panui-leth/1",
+    "columns": {
+     "dg_person_id": [
+      5071,
+      3973
+     ],
+     "name_key": [
+      "rhyspanuileth",
+      "rhys panui-leth"
+     ]
+    }
+   },
+   {
+    "id": 5072,
+    "player_url": "https://www.draftguru.com.au/players/charlton_brown/1",
+    "columns": {
+     "dg_person_id": [
+      5072,
+      928
+     ],
+     "name_key": [
+      "charltonbrown",
+      "charlton brown"
+     ]
+    }
+   },
+   {
+    "id": 5073,
+    "player_url": "https://www.draftguru.com.au/players/theo_gavuri/1",
+    "columns": {
+     "dg_person_id": [
+      5073,
+      4623
+     ],
+     "name_key": [
+      "theogavuri",
+      "theo gavuri"
+     ]
+    }
+   },
+   {
+    "id": 5074,
+    "player_url": "https://www.draftguru.com.au/players/yoshi_harris/1",
+    "columns": {
+     "dg_person_id": [
+      5074,
+      5054
+     ],
+     "name_key": [
+      "yoshiharris",
+      "yoshi harris"
+     ]
+    }
+   },
+   {
+    "id": 5075,
+    "player_url": "https://www.draftguru.com.au/players/peni_mahina/1",
+    "columns": {
+     "dg_person_id": [
+      5075,
+      3863
+     ],
+     "name_key": [
+      "penimahina",
+      "peni mahina"
+     ]
+    }
+   },
+   {
+    "id": 5076,
+    "player_url": "https://www.draftguru.com.au/players/ben_miller/4",
+    "columns": {
+     "dg_person_id": [
+      5076,
+      489
+     ],
+     "name_key": [
+      "benmiller",
+      "ben miller"
+     ]
+    }
+   },
+   {
+    "id": 5077,
+    "player_url": "https://www.draftguru.com.au/players/joe_baker-thomas/1",
+    "columns": {
+     "dg_person_id": [
+      5077,
+      2403
+     ],
+     "name_key": [
+      "joebakerthomas",
+      "joe baker-thomas"
+     ]
+    }
+   },
+   {
+    "id": 5078,
+    "player_url": "https://www.draftguru.com.au/players/aksel_bang/1",
+    "columns": {
+     "dg_person_id": [
+      5078,
+      122
+     ],
+     "name_key": [
+      "akselbang",
+      "aksel bang"
+     ]
+    }
+   },
+   {
+    "id": 5079,
+    "player_url": "https://www.draftguru.com.au/players/siope_ngata/1",
+    "columns": {
+     "dg_person_id": [
+      5079,
+      4478
+     ],
+     "name_key": [
+      "siopengata",
+      "siope ngata"
+     ]
+    }
+   },
+   {
+    "id": 5080,
+    "player_url": "https://www.draftguru.com.au/players/maia_westrupp/1",
+    "columns": {
+     "dg_person_id": [
+      5080,
+      3058
+     ],
+     "name_key": [
+      "maiawestrupp",
+      "maia westrupp"
+     ]
+    }
+   },
+   {
+    "id": 5081,
+    "player_url": "https://www.draftguru.com.au/players/giovanni_mountain-silbery/1",
+    "columns": {
+     "dg_person_id": [
+      5081,
+      1732
+     ],
+     "name_key": [
+      "giovannimountainsilbery",
+      "giovanni mountain-silbery"
+     ]
+    }
+   },
+   {
+    "id": 5082,
+    "player_url": "https://www.draftguru.com.au/players/barclay_miller/1",
+    "columns": {
+     "dg_person_id": [
+      5082,
+      398
+     ],
+     "name_key": [
+      "barclaymiller",
+      "barclay miller"
+     ]
+    }
+   },
+   {
+    "id": 5083,
+    "player_url": "https://www.draftguru.com.au/players/shaoliang_chen/1",
+    "columns": {
+     "dg_person_id": [
+      5083,
+      4407
+     ],
+     "name_key": [
+      "shaoliangchen",
+      "shaoliang chen"
+     ]
+    }
+   },
+   {
+    "id": 5084,
+    "player_url": "https://www.draftguru.com.au/players/brandon_kaufman/1",
+    "columns": {
+     "dg_person_id": [
+      5084,
+      636
+     ],
+     "name_key": [
+      "brandonkaufman",
+      "brandon kaufman"
+     ]
+    }
+   },
+   {
+    "id": 5085,
+    "player_url": "https://www.draftguru.com.au/players/bassirou_faye/1",
+    "columns": {
+     "dg_person_id": [
+      5085,
+      408
+     ],
+     "name_key": [
+      "bassiroufaye",
+      "bassirou faye"
+     ]
+    }
+   },
+   {
+    "id": 5086,
+    "player_url": "https://www.draftguru.com.au/players/cillian_bourke/1",
+    "columns": {
+     "dg_person_id": [
+      5086,
+      1015
+     ],
+     "name_key": [
+      "cillianbourke",
+      "cillian bourke"
+     ]
+    }
+   },
+   {
+    "id": 5087,
+    "player_url": "https://www.draftguru.com.au/players/kobe_mcdonald/1",
+    "columns": {
+     "dg_person_id": [
+      5087,
+      2754
+     ],
+     "name_key": [
+      "kobemcdonald",
+      "kobe mcdonald"
+     ]
+    }
+   },
+   {
+    "id": 5088,
+    "player_url": "https://www.draftguru.com.au/players/jake_miles-wrency/1",
+    "columns": {
+     "dg_person_id": [
+      5088,
+      2086
+     ],
+     "name_key": [
+      "jakemileswrency",
+      "jake miles-wrency"
+     ]
+    }
+   }
+  ]
+ }
+}

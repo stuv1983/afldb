@@ -1,0 +1,7214 @@
+{
+ "acknowledged_deletions": [],
+ "acknowledged_person_deletions": [],
+ "acknowledged_protected_person_rewrites": [
+  {
+   "acknowledged_because": "dg_person_id is a per-load rank (import_draftguru.build_persons); never durable identity",
+   "columns": {
+    "dg_person_id": [
+     1717,
+     1730
+    ]
+   },
+   "id": 1717,
+   "player_url": "https://www.draftguru.com.au/players/gideon_simon/1"
+  },
+  {
+   "acknowledged_because": "dg_person_id is a per-load rank (import_draftguru.build_persons); never durable identity",
+   "columns": {
+    "dg_person_id": [
+     1875,
+     1889
+    ]
+   },
+   "id": 1875,
+   "player_url": "https://www.draftguru.com.au/players/hewago%20paul_oea/1"
+  },
+  {
+   "acknowledged_because": "dg_person_id is a per-load rank (import_draftguru.build_persons); never durable identity",
+   "columns": {
+    "dg_person_id": [
+     2753,
+     2771
+    ]
+   },
+   "id": 2753,
+   "player_url": "https://www.draftguru.com.au/players/kurt_heatherley/1"
+  },
+  {
+   "acknowledged_because": "dg_person_id is a per-load rank (import_draftguru.build_persons); never durable identity",
+   "columns": {
+    "dg_person_id": [
+     4410,
+     4435
+    ]
+   },
+   "id": 4410,
+   "player_url": "https://www.draftguru.com.au/players/shem_tatupu/1"
+  },
+  {
+   "acknowledged_because": "dg_person_id is a per-load rank (import_draftguru.build_persons); never durable identity; name_key moves from the D-336-2 insert's alphanumeric-only form to the importer's frozen G6 rule carried by every other DraftGuru person (search key, never identity)",
+   "columns": {
+    "dg_person_id": [
+     5058,
+     4479
+    ],
+    "name_key": [
+     "solomoniloki",
+     "solomoni loki"
+    ]
+   },
+   "id": 5058,
+   "player_url": "https://www.draftguru.com.au/players/solomoni_loki/1"
+  },
+  {
+   "acknowledged_because": "dg_person_id is a per-load rank (import_draftguru.build_persons); never durable identity; name_key moves from the D-336-2 insert's alphanumeric-only form to the importer's frozen G6 rule carried by every other DraftGuru person (search key, never identity)",
+   "columns": {
+    "dg_person_id": [
+     5059,
+     186
+    ],
+    "name_key": [
+     "amuapirika",
+     "amua pirika"
+    ]
+   },
+   "id": 5059,
+   "player_url": "https://www.draftguru.com.au/players/amua_pirika/1"
+  },
+  {
+   "acknowledged_because": "dg_person_id is a per-load rank (import_draftguru.build_persons); never durable identity; name_key moves from the D-336-2 insert's alphanumeric-only form to the importer's frozen G6 rule carried by every other DraftGuru person (search key, never identity)",
+   "columns": {
+    "dg_person_id": [
+     5060,
+     1924
+    ],
+    "name_key": [
+     "inokeratu",
+     "inoke ratu"
+    ]
+   },
+   "id": 5060,
+   "player_url": "https://www.draftguru.com.au/players/inoke_ratu/1"
+  },
+  {
+   "acknowledged_because": "dg_person_id is a per-load rank (import_draftguru.build_persons); never durable identity; name_key moves from the D-336-2 insert's alphanumeric-only form to the importer's frozen G6 rule carried by every other DraftGuru person (search key, never identity)",
+   "columns": {
+    "dg_person_id": [
+     5061,
+     4482
+    ],
+    "name_key": [
+     "stanissusuve",
+     "stanis susuve"
+    ]
+   },
+   "id": 5061,
+   "player_url": "https://www.draftguru.com.au/players/stanis_susuve/1"
+  },
+  {
+   "acknowledged_because": "dg_person_id is a per-load rank (import_draftguru.build_persons); never durable identity; name_key moves from the D-336-2 insert's alphanumeric-only form to the importer's frozen G6 rule carried by every other DraftGuru person (search key, never identity)",
+   "columns": {
+    "dg_person_id": [
+     5062,
+     1550
+    ],
+    "name_key": [
+     "donaldbarry",
+     "donald barry"
+    ]
+   },
+   "id": 5062,
+   "player_url": "https://www.draftguru.com.au/players/donald_barry/1"
+  },
+  {
+   "acknowledged_because": "dg_person_id is a per-load rank (import_draftguru.build_persons); never durable identity; name_key moves from the D-336-2 insert's alphanumeric-only form to the importer's frozen G6 rule carried by every other DraftGuru person (search key, never identity)",
+   "columns": {
+    "dg_person_id": [
+     5063,
+     657
+    ],
+    "name_key": [
+     "brendanbeno",
+     "brendan beno"
+    ]
+   },
+   "id": 5063,
+   "player_url": "https://www.draftguru.com.au/players/brendan_beno/1"
+  },
+  {
+   "acknowledged_because": "dg_person_id is a per-load rank (import_draftguru.build_persons); never durable identity; name_key moves from the D-336-2 insert's alphanumeric-only form to the importer's frozen G6 rule carried by every other DraftGuru person (search key, never identity)",
+   "columns": {
+    "dg_person_id": [
+     5064,
+     1641
+    ],
+    "name_key": [
+     "ezrakautu",
+     "ezra kautu"
+    ]
+   },
+   "id": 5064,
+   "player_url": "https://www.draftguru.com.au/players/ezra_kautu/1"
+  },
+  {
+   "acknowledged_because": "dg_person_id is a per-load rank (import_draftguru.build_persons); never durable identity; name_key moves from the D-336-2 insert's alphanumeric-only form to the importer's frozen G6 rule carried by every other DraftGuru person (search key, never identity)",
+   "columns": {
+    "dg_person_id": [
+     5065,
+     3888
+    ],
+    "name_key": [
+     "peterlabi",
+     "peter labi"
+    ]
+   },
+   "id": 5065,
+   "player_url": "https://www.draftguru.com.au/players/peter_labi/1"
+  },
+  {
+   "acknowledged_because": "dg_person_id is a per-load rank (import_draftguru.build_persons); never durable identity; name_key moves from the D-336-2 insert's alphanumeric-only form to the importer's frozen G6 rule carried by every other DraftGuru person (search key, never identity)",
+   "columns": {
+    "dg_person_id": [
+     5066,
+     3378
+    ],
+    "name_key": [
+     "maxlavai",
+     "max lavai"
+    ]
+   },
+   "id": 5066,
+   "player_url": "https://www.draftguru.com.au/players/max_lavai/1"
+  },
+  {
+   "acknowledged_because": "dg_person_id is a per-load rank (import_draftguru.build_persons); never durable identity; name_key moves from the D-336-2 insert's alphanumeric-only form to the importer's frozen G6 rule carried by every other DraftGuru person (search key, never identity)",
+   "columns": {
+    "dg_person_id": [
+     5067,
+     3580
+    ],
+    "name_key": [
+     "nathanmalbak",
+     "nathan malbak"
+    ]
+   },
+   "id": 5067,
+   "player_url": "https://www.draftguru.com.au/players/nathan_malbak/1"
+  },
+  {
+   "acknowledged_because": "dg_person_id is a per-load rank (import_draftguru.build_persons); never durable identity; name_key moves from the D-336-2 insert's alphanumeric-only form to the importer's frozen G6 rule carried by every other DraftGuru person (search key, never identity)",
+   "columns": {
+    "dg_person_id": [
+     5068,
+     1425
+    ],
+    "name_key": [
+     "davidmeli",
+     "david meli"
+    ]
+   },
+   "id": 5068,
+   "player_url": "https://www.draftguru.com.au/players/david_meli/1"
+  },
+  {
+   "acknowledged_because": "dg_person_id is a per-load rank (import_draftguru.build_persons); never durable identity; name_key moves from the D-336-2 insert's alphanumeric-only form to the importer's frozen G6 rule carried by every other DraftGuru person (search key, never identity)",
+   "columns": {
+    "dg_person_id": [
+     5069,
+     4955
+    ],
+    "name_key": [
+     "victorrame",
+     "victor rame"
+    ]
+   },
+   "id": 5069,
+   "player_url": "https://www.draftguru.com.au/players/victor_rame/1"
+  },
+  {
+   "acknowledged_because": "dg_person_id is a per-load rank (import_draftguru.build_persons); never durable identity; name_key moves from the D-336-2 insert's alphanumeric-only form to the importer's frozen G6 rule carried by every other DraftGuru person (search key, never identity)",
+   "columns": {
+    "dg_person_id": [
+     5070,
+     409
+    ],
+    "name_key": [
+     "bayandasobetwa",
+     "bayanda sobetwa"
+    ]
+   },
+   "id": 5070,
+   "player_url": "https://www.draftguru.com.au/players/bayanda_sobetwa/1"
+  },
+  {
+   "acknowledged_because": "dg_person_id is a per-load rank (import_draftguru.build_persons); never durable identity; name_key moves from the D-336-2 insert's alphanumeric-only form to the importer's frozen G6 rule carried by every other DraftGuru person (search key, never identity)",
+   "columns": {
+    "dg_person_id": [
+     5071,
+     3973
+    ],
+    "name_key": [
+     "rhyspanuileth",
+     "rhys panui-leth"
+    ]
+   },
+   "id": 5071,
+   "player_url": "https://www.draftguru.com.au/players/rhys_panui-leth/1"
+  },
+  {
+   "acknowledged_because": "dg_person_id is a per-load rank (import_draftguru.build_persons); never durable identity; name_key moves from the D-336-2 insert's alphanumeric-only form to the importer's frozen G6 rule carried by every other DraftGuru person (search key, never identity)",
+   "columns": {
+    "dg_person_id": [
+     5072,
+     928
+    ],
+    "name_key": [
+     "charltonbrown",
+     "charlton brown"
+    ]
+   },
+   "id": 5072,
+   "player_url": "https://www.draftguru.com.au/players/charlton_brown/1"
+  },
+  {
+   "acknowledged_because": "dg_person_id is a per-load rank (import_draftguru.build_persons); never durable identity; name_key moves from the D-336-2 insert's alphanumeric-only form to the importer's frozen G6 rule carried by every other DraftGuru person (search key, never identity)",
+   "columns": {
+    "dg_person_id": [
+     5073,
+     4623
+    ],
+    "name_key": [
+     "theogavuri",
+     "theo gavuri"
+    ]
+   },
+   "id": 5073,
+   "player_url": "https://www.draftguru.com.au/players/theo_gavuri/1"
+  },
+  {
+   "acknowledged_because": "dg_person_id is a per-load rank (import_draftguru.build_persons); never durable identity; name_key moves from the D-336-2 insert's alphanumeric-only form to the importer's frozen G6 rule carried by every other DraftGuru person (search key, never identity)",
+   "columns": {
+    "dg_person_id": [
+     5074,
+     5054
+    ],
+    "name_key": [
+     "yoshiharris",
+     "yoshi harris"
+    ]
+   },
+   "id": 5074,
+   "player_url": "https://www.draftguru.com.au/players/yoshi_harris/1"
+  },
+  {
+   "acknowledged_because": "dg_person_id is a per-load rank (import_draftguru.build_persons); never durable identity; name_key moves from the D-336-2 insert's alphanumeric-only form to the importer's frozen G6 rule carried by every other DraftGuru person (search key, never identity)",
+   "columns": {
+    "dg_person_id": [
+     5075,
+     3863
+    ],
+    "name_key": [
+     "penimahina",
+     "peni mahina"
+    ]
+   },
+   "id": 5075,
+   "player_url": "https://www.draftguru.com.au/players/peni_mahina/1"
+  },
+  {
+   "acknowledged_because": "dg_person_id is a per-load rank (import_draftguru.build_persons); never durable identity; name_key moves from the D-336-2 insert's alphanumeric-only form to the importer's frozen G6 rule carried by every other DraftGuru person (search key, never identity)",
+   "columns": {
+    "dg_person_id": [
+     5076,
+     489
+    ],
+    "name_key": [
+     "benmiller",
+     "ben miller"
+    ]
+   },
+   "id": 5076,
+   "player_url": "https://www.draftguru.com.au/players/ben_miller/4"
+  },
+  {
+   "acknowledged_because": "dg_person_id is a per-load rank (import_draftguru.build_persons); never durable identity; name_key moves from the D-336-2 insert's alphanumeric-only form to the importer's frozen G6 rule carried by every other DraftGuru person (search key, never identity)",
+   "columns": {
+    "dg_person_id": [
+     5077,
+     2403
+    ],
+    "name_key": [
+     "joebakerthomas",
+     "joe baker-thomas"
+    ]
+   },
+   "id": 5077,
+   "player_url": "https://www.draftguru.com.au/players/joe_baker-thomas/1"
+  },
+  {
+   "acknowledged_because": "dg_person_id is a per-load rank (import_draftguru.build_persons); never durable identity; name_key moves from the D-336-2 insert's alphanumeric-only form to the importer's frozen G6 rule carried by every other DraftGuru person (search key, never identity)",
+   "columns": {
+    "dg_person_id": [
+     5078,
+     122
+    ],
+    "name_key": [
+     "akselbang",
+     "aksel bang"
+    ]
+   },
+   "id": 5078,
+   "player_url": "https://www.draftguru.com.au/players/aksel_bang/1"
+  },
+  {
+   "acknowledged_because": "dg_person_id is a per-load rank (import_draftguru.build_persons); never durable identity; name_key moves from the D-336-2 insert's alphanumeric-only form to the importer's frozen G6 rule carried by every other DraftGuru person (search key, never identity)",
+   "columns": {
+    "dg_person_id": [
+     5079,
+     4478
+    ],
+    "name_key": [
+     "siopengata",
+     "siope ngata"
+    ]
+   },
+   "id": 5079,
+   "player_url": "https://www.draftguru.com.au/players/siope_ngata/1"
+  },
+  {
+   "acknowledged_because": "dg_person_id is a per-load rank (import_draftguru.build_persons); never durable identity; name_key moves from the D-336-2 insert's alphanumeric-only form to the importer's frozen G6 rule carried by every other DraftGuru person (search key, never identity)",
+   "columns": {
+    "dg_person_id": [
+     5080,
+     3058
+    ],
+    "name_key": [
+     "maiawestrupp",
+     "maia westrupp"
+    ]
+   },
+   "id": 5080,
+   "player_url": "https://www.draftguru.com.au/players/maia_westrupp/1"
+  },
+  {
+   "acknowledged_because": "dg_person_id is a per-load rank (import_draftguru.build_persons); never durable identity; name_key moves from the D-336-2 insert's alphanumeric-only form to the importer's frozen G6 rule carried by every other DraftGuru person (search key, never identity)",
+   "columns": {
+    "dg_person_id": [
+     5081,
+     1732
+    ],
+    "name_key": [
+     "giovannimountainsilbery",
+     "giovanni mountain-silbery"
+    ]
+   },
+   "id": 5081,
+   "player_url": "https://www.draftguru.com.au/players/giovanni_mountain-silbery/1"
+  },
+  {
+   "acknowledged_because": "dg_person_id is a per-load rank (import_draftguru.build_persons); never durable identity; name_key moves from the D-336-2 insert's alphanumeric-only form to the importer's frozen G6 rule carried by every other DraftGuru person (search key, never identity)",
+   "columns": {
+    "dg_person_id": [
+     5082,
+     398
+    ],
+    "name_key": [
+     "barclaymiller",
+     "barclay miller"
+    ]
+   },
+   "id": 5082,
+   "player_url": "https://www.draftguru.com.au/players/barclay_miller/1"
+  },
+  {
+   "acknowledged_because": "dg_person_id is a per-load rank (import_draftguru.build_persons); never durable identity; name_key moves from the D-336-2 insert's alphanumeric-only form to the importer's frozen G6 rule carried by every other DraftGuru person (search key, never identity)",
+   "columns": {
+    "dg_person_id": [
+     5083,
+     4407
+    ],
+    "name_key": [
+     "shaoliangchen",
+     "shaoliang chen"
+    ]
+   },
+   "id": 5083,
+   "player_url": "https://www.draftguru.com.au/players/shaoliang_chen/1"
+  },
+  {
+   "acknowledged_because": "dg_person_id is a per-load rank (import_draftguru.build_persons); never durable identity; name_key moves from the D-336-2 insert's alphanumeric-only form to the importer's frozen G6 rule carried by every other DraftGuru person (search key, never identity)",
+   "columns": {
+    "dg_person_id": [
+     5084,
+     636
+    ],
+    "name_key": [
+     "brandonkaufman",
+     "brandon kaufman"
+    ]
+   },
+   "id": 5084,
+   "player_url": "https://www.draftguru.com.au/players/brandon_kaufman/1"
+  },
+  {
+   "acknowledged_because": "dg_person_id is a per-load rank (import_draftguru.build_persons); never durable identity; name_key moves from the D-336-2 insert's alphanumeric-only form to the importer's frozen G6 rule carried by every other DraftGuru person (search key, never identity)",
+   "columns": {
+    "dg_person_id": [
+     5085,
+     408
+    ],
+    "name_key": [
+     "bassiroufaye",
+     "bassirou faye"
+    ]
+   },
+   "id": 5085,
+   "player_url": "https://www.draftguru.com.au/players/bassirou_faye/1"
+  },
+  {
+   "acknowledged_because": "dg_person_id is a per-load rank (import_draftguru.build_persons); never durable identity; name_key moves from the D-336-2 insert's alphanumeric-only form to the importer's frozen G6 rule carried by every other DraftGuru person (search key, never identity)",
+   "columns": {
+    "dg_person_id": [
+     5086,
+     1015
+    ],
+    "name_key": [
+     "cillianbourke",
+     "cillian bourke"
+    ]
+   },
+   "id": 5086,
+   "player_url": "https://www.draftguru.com.au/players/cillian_bourke/1"
+  },
+  {
+   "acknowledged_because": "dg_person_id is a per-load rank (import_draftguru.build_persons); never durable identity; name_key moves from the D-336-2 insert's alphanumeric-only form to the importer's frozen G6 rule carried by every other DraftGuru person (search key, never identity)",
+   "columns": {
+    "dg_person_id": [
+     5087,
+     2754
+    ],
+    "name_key": [
+     "kobemcdonald",
+     "kobe mcdonald"
+    ]
+   },
+   "id": 5087,
+   "player_url": "https://www.draftguru.com.au/players/kobe_mcdonald/1"
+  },
+  {
+   "acknowledged_because": "dg_person_id is a per-load rank (import_draftguru.build_persons); never durable identity; name_key moves from the D-336-2 insert's alphanumeric-only form to the importer's frozen G6 rule carried by every other DraftGuru person (search key, never identity)",
+   "columns": {
+    "dg_person_id": [
+     5088,
+     2086
+    ],
+    "name_key": [
+     "jakemileswrency",
+     "jake miles-wrency"
+    ]
+   },
+   "id": 5088,
+   "player_url": "https://www.draftguru.com.au/players/jake_miles-wrency/1"
+  }
+ ],
+ "acknowledged_protected_rewrites": [
+  {
+   "acknowledged_because": "Owner Q2(b) 2026-11-22: re-baseline to the reviewed acquisition. The D-336-2 audited insert stored competition NULL; the importer derives 'AFL' from data/reference/seasons.json league eras for every DraftGuru pick.",
+   "columns": {
+    "competition": [
+     null,
+     "AFL"
+    ]
+   },
+   "id": 6819,
+   "key": [
+    "https://www.draftguru.com.au/players/solomoni_loki/1",
+    2008,
+    "pre_draft"
+   ],
+   "reasons": [
+    "data_edits",
+    "audited_insert"
+   ]
+  },
+  {
+   "acknowledged_because": "Owner Q2(b) 2026-11-22: re-baseline to the reviewed acquisition. The D-336-2 audited insert stored competition NULL; the importer derives 'AFL' from data/reference/seasons.json league eras for every DraftGuru pick.",
+   "columns": {
+    "competition": [
+     null,
+     "AFL"
+    ]
+   },
+   "id": 6820,
+   "key": [
+    "https://www.draftguru.com.au/players/amua_pirika/1",
+    2008,
+    "pre_draft"
+   ],
+   "reasons": [
+    "data_edits",
+    "audited_insert"
+   ]
+  },
+  {
+   "acknowledged_because": "Owner Q2(b) 2026-11-22: re-baseline to the reviewed acquisition. The D-336-2 audited insert stored competition NULL; the importer derives 'AFL' from data/reference/seasons.json league eras for every DraftGuru pick.",
+   "columns": {
+    "competition": [
+     null,
+     "AFL"
+    ]
+   },
+   "id": 6821,
+   "key": [
+    "https://www.draftguru.com.au/players/inoke_ratu/1",
+    2008,
+    "pre_draft"
+   ],
+   "reasons": [
+    "data_edits",
+    "audited_insert"
+   ]
+  },
+  {
+   "acknowledged_because": "Owner Q2(b) 2026-11-22: re-baseline to the reviewed acquisition. The D-336-2 audited insert stored competition NULL; the importer derives 'AFL' from data/reference/seasons.json league eras for every DraftGuru pick.",
+   "columns": {
+    "competition": [
+     null,
+     "AFL"
+    ]
+   },
+   "id": 6822,
+   "key": [
+    "https://www.draftguru.com.au/players/stanis_susuve/1",
+    2008,
+    "pre_draft"
+   ],
+   "reasons": [
+    "data_edits",
+    "audited_insert"
+   ]
+  },
+  {
+   "acknowledged_because": "Owner Q2(b) 2026-11-22: re-baseline to the reviewed acquisition. The D-336-2 audited insert stored competition NULL; the importer derives 'AFL' from data/reference/seasons.json league eras for every DraftGuru pick.",
+   "columns": {
+    "competition": [
+     null,
+     "AFL"
+    ]
+   },
+   "id": 6823,
+   "key": [
+    "https://www.draftguru.com.au/players/donald_barry/1",
+    2009,
+    "pre_draft"
+   ],
+   "reasons": [
+    "data_edits",
+    "audited_insert"
+   ]
+  },
+  {
+   "acknowledged_because": "Owner Q2(b) 2026-11-22: re-baseline to the reviewed acquisition. The D-336-2 audited insert stored competition NULL; the importer derives 'AFL' from data/reference/seasons.json league eras for every DraftGuru pick.",
+   "columns": {
+    "competition": [
+     null,
+     "AFL"
+    ]
+   },
+   "id": 6824,
+   "key": [
+    "https://www.draftguru.com.au/players/brendan_beno/1",
+    2009,
+    "pre_draft"
+   ],
+   "reasons": [
+    "data_edits",
+    "audited_insert"
+   ]
+  },
+  {
+   "acknowledged_because": "Owner Q2(b) 2026-11-22: re-baseline to the reviewed acquisition. The D-336-2 audited insert stored competition NULL; the importer derives 'AFL' from data/reference/seasons.json league eras for every DraftGuru pick.",
+   "columns": {
+    "competition": [
+     null,
+     "AFL"
+    ]
+   },
+   "id": 6825,
+   "key": [
+    "https://www.draftguru.com.au/players/kurt_heatherley/1",
+    2009,
+    "pre_draft"
+   ],
+   "reasons": [
+    "data_edits",
+    "audited_insert"
+   ]
+  },
+  {
+   "acknowledged_because": "Owner Q2(b) 2026-11-22: re-baseline to the reviewed acquisition. The D-336-2 audited insert stored competition NULL; the importer derives 'AFL' from data/reference/seasons.json league eras for every DraftGuru pick.",
+   "columns": {
+    "competition": [
+     null,
+     "AFL"
+    ]
+   },
+   "id": 6826,
+   "key": [
+    "https://www.draftguru.com.au/players/ezra_kautu/1",
+    2009,
+    "pre_draft"
+   ],
+   "reasons": [
+    "data_edits",
+    "audited_insert"
+   ]
+  },
+  {
+   "acknowledged_because": "Owner Q2(b) 2026-11-22: re-baseline to the reviewed acquisition. The D-336-2 audited insert stored competition NULL; the importer derives 'AFL' from data/reference/seasons.json league eras for every DraftGuru pick.",
+   "columns": {
+    "competition": [
+     null,
+     "AFL"
+    ]
+   },
+   "id": 6827,
+   "key": [
+    "https://www.draftguru.com.au/players/peter_labi/1",
+    2009,
+    "pre_draft"
+   ],
+   "reasons": [
+    "data_edits",
+    "audited_insert"
+   ]
+  },
+  {
+   "acknowledged_because": "Owner Q2(b) 2026-11-22: re-baseline to the reviewed acquisition. The D-336-2 audited insert stored competition NULL; the importer derives 'AFL' from data/reference/seasons.json league eras for every DraftGuru pick.",
+   "columns": {
+    "competition": [
+     null,
+     "AFL"
+    ]
+   },
+   "id": 6828,
+   "key": [
+    "https://www.draftguru.com.au/players/max_lavai/1",
+    2009,
+    "pre_draft"
+   ],
+   "reasons": [
+    "data_edits",
+    "audited_insert"
+   ]
+  },
+  {
+   "acknowledged_because": "Owner Q2(b) 2026-11-22: re-baseline to the reviewed acquisition. The D-336-2 audited insert stored competition NULL; the importer derives 'AFL' from data/reference/seasons.json league eras for every DraftGuru pick.",
+   "columns": {
+    "competition": [
+     null,
+     "AFL"
+    ]
+   },
+   "id": 6829,
+   "key": [
+    "https://www.draftguru.com.au/players/nathan_malbak/1",
+    2009,
+    "pre_draft"
+   ],
+   "reasons": [
+    "data_edits",
+    "audited_insert"
+   ]
+  },
+  {
+   "acknowledged_because": "Owner Q2(b) 2026-11-22: re-baseline to the reviewed acquisition. The D-336-2 audited insert stored competition NULL; the importer derives 'AFL' from data/reference/seasons.json league eras for every DraftGuru pick.",
+   "columns": {
+    "competition": [
+     null,
+     "AFL"
+    ]
+   },
+   "id": 6830,
+   "key": [
+    "https://www.draftguru.com.au/players/david_meli/1",
+    2009,
+    "pre_draft"
+   ],
+   "reasons": [
+    "data_edits",
+    "audited_insert"
+   ]
+  },
+  {
+   "acknowledged_because": "Owner Q2(b) 2026-11-22: re-baseline to the reviewed acquisition. The D-336-2 audited insert stored competition NULL; the importer derives 'AFL' from data/reference/seasons.json league eras for every DraftGuru pick.",
+   "columns": {
+    "competition": [
+     null,
+     "AFL"
+    ]
+   },
+   "id": 6831,
+   "key": [
+    "https://www.draftguru.com.au/players/victor_rame/1",
+    2009,
+    "pre_draft"
+   ],
+   "reasons": [
+    "data_edits",
+    "audited_insert"
+   ]
+  },
+  {
+   "acknowledged_because": "Owner Q2(b) 2026-11-22: re-baseline to the reviewed acquisition. The D-336-2 audited insert stored competition NULL; the importer derives 'AFL' from data/reference/seasons.json league eras for every DraftGuru pick.",
+   "columns": {
+    "competition": [
+     null,
+     "AFL"
+    ]
+   },
+   "id": 6832,
+   "key": [
+    "https://www.draftguru.com.au/players/gideon_simon/1",
+    2009,
+    "pre_draft"
+   ],
+   "reasons": [
+    "data_edits",
+    "audited_insert"
+   ]
+  },
+  {
+   "acknowledged_because": "Owner Q2(b) 2026-11-22: re-baseline to the reviewed acquisition. The D-336-2 audited insert stored competition NULL; the importer derives 'AFL' from data/reference/seasons.json league eras for every DraftGuru pick.",
+   "columns": {
+    "competition": [
+     null,
+     "AFL"
+    ]
+   },
+   "id": 6833,
+   "key": [
+    "https://www.draftguru.com.au/players/bayanda_sobetwa/1",
+    2009,
+    "pre_draft"
+   ],
+   "reasons": [
+    "data_edits",
+    "audited_insert"
+   ]
+  },
+  {
+   "acknowledged_because": "Owner Q2(b) 2026-11-22: re-baseline to the reviewed acquisition. The D-336-2 audited insert stored competition NULL; the importer derives 'AFL' from data/reference/seasons.json league eras for every DraftGuru pick.",
+   "columns": {
+    "competition": [
+     null,
+     "AFL"
+    ]
+   },
+   "id": 6834,
+   "key": [
+    "https://www.draftguru.com.au/players/rhys_panui-leth/1",
+    2010,
+    "pre_draft"
+   ],
+   "reasons": [
+    "data_edits",
+    "audited_insert"
+   ]
+  },
+  {
+   "acknowledged_because": "Owner Q2(b) 2026-11-22: re-baseline to the reviewed acquisition. The D-336-2 audited insert stored competition NULL; the importer derives 'AFL' from data/reference/seasons.json league eras for every DraftGuru pick.",
+   "columns": {
+    "competition": [
+     null,
+     "AFL"
+    ]
+   },
+   "id": 6835,
+   "key": [
+    "https://www.draftguru.com.au/players/shem_tatupu/1",
+    2010,
+    "pre_draft"
+   ],
+   "reasons": [
+    "data_edits",
+    "audited_insert"
+   ]
+  },
+  {
+   "acknowledged_because": "Owner Q2(b) 2026-11-22: re-baseline to the reviewed acquisition. The D-336-2 audited insert stored competition NULL; the importer derives 'AFL' from data/reference/seasons.json league eras for every DraftGuru pick.",
+   "columns": {
+    "competition": [
+     null,
+     "AFL"
+    ]
+   },
+   "id": 6836,
+   "key": [
+    "https://www.draftguru.com.au/players/charlton_brown/1",
+    2011,
+    "pre_draft"
+   ],
+   "reasons": [
+    "data_edits",
+    "audited_insert"
+   ]
+  },
+  {
+   "acknowledged_because": "Owner Q2(b) 2026-11-22: re-baseline to the reviewed acquisition. The D-336-2 audited insert stored competition NULL; the importer derives 'AFL' from data/reference/seasons.json league eras for every DraftGuru pick.",
+   "columns": {
+    "competition": [
+     null,
+     "AFL"
+    ]
+   },
+   "id": 6837,
+   "key": [
+    "https://www.draftguru.com.au/players/theo_gavuri/1",
+    2011,
+    "pre_draft"
+   ],
+   "reasons": [
+    "data_edits",
+    "audited_insert"
+   ]
+  },
+  {
+   "acknowledged_because": "Owner Q2(b) 2026-11-22: re-baseline to the reviewed acquisition. The D-336-2 audited insert stored competition NULL; the importer derives 'AFL' from data/reference/seasons.json league eras for every DraftGuru pick.",
+   "columns": {
+    "competition": [
+     null,
+     "AFL"
+    ]
+   },
+   "id": 6838,
+   "key": [
+    "https://www.draftguru.com.au/players/yoshi_harris/1",
+    2011,
+    "pre_draft"
+   ],
+   "reasons": [
+    "data_edits",
+    "audited_insert"
+   ]
+  },
+  {
+   "acknowledged_because": "Owner Q2(b) 2026-11-22: re-baseline to the reviewed acquisition. The D-336-2 audited insert stored competition NULL; the importer derives 'AFL' from data/reference/seasons.json league eras for every DraftGuru pick.",
+   "columns": {
+    "competition": [
+     null,
+     "AFL"
+    ]
+   },
+   "id": 6839,
+   "key": [
+    "https://www.draftguru.com.au/players/peni_mahina/1",
+    2011,
+    "pre_draft"
+   ],
+   "reasons": [
+    "data_edits",
+    "audited_insert"
+   ]
+  },
+  {
+   "acknowledged_because": "Owner Q2(b) 2026-11-22: re-baseline to the reviewed acquisition. The D-336-2 audited insert stored competition NULL; the importer derives 'AFL' from data/reference/seasons.json league eras for every DraftGuru pick.",
+   "columns": {
+    "competition": [
+     null,
+     "AFL"
+    ]
+   },
+   "id": 6840,
+   "key": [
+    "https://www.draftguru.com.au/players/ben_miller/4",
+    2011,
+    "pre_draft"
+   ],
+   "reasons": [
+    "data_edits",
+    "audited_insert"
+   ]
+  },
+  {
+   "acknowledged_because": "Owner Q2(b) 2026-11-22: re-baseline to the reviewed acquisition. The D-336-2 audited insert stored competition NULL; the importer derives 'AFL' from data/reference/seasons.json league eras for every DraftGuru pick.",
+   "columns": {
+    "competition": [
+     null,
+     "AFL"
+    ]
+   },
+   "id": 6841,
+   "key": [
+    "https://www.draftguru.com.au/players/joe_baker-thomas/1",
+    2012,
+    "pre_draft"
+   ],
+   "reasons": [
+    "data_edits",
+    "audited_insert"
+   ]
+  },
+  {
+   "acknowledged_because": "Owner Q2(b) 2026-11-22: re-baseline to the reviewed acquisition. The D-336-2 audited insert stored competition NULL; the importer derives 'AFL' from data/reference/seasons.json league eras for every DraftGuru pick.",
+   "columns": {
+    "competition": [
+     null,
+     "AFL"
+    ]
+   },
+   "id": 6842,
+   "key": [
+    "https://www.draftguru.com.au/players/aksel_bang/1",
+    2012,
+    "pre_draft"
+   ],
+   "reasons": [
+    "data_edits",
+    "audited_insert"
+   ]
+  },
+  {
+   "acknowledged_because": "Owner Q2(b) 2026-11-22: re-baseline to the reviewed acquisition. The D-336-2 audited insert stored competition NULL; the importer derives 'AFL' from data/reference/seasons.json league eras for every DraftGuru pick.",
+   "columns": {
+    "competition": [
+     null,
+     "AFL"
+    ]
+   },
+   "id": 6843,
+   "key": [
+    "https://www.draftguru.com.au/players/siope_ngata/1",
+    2012,
+    "pre_draft"
+   ],
+   "reasons": [
+    "data_edits",
+    "audited_insert"
+   ]
+  },
+  {
+   "acknowledged_because": "Owner Q2(b) 2026-11-22: re-baseline to the reviewed acquisition. The D-336-2 audited insert stored competition NULL; the importer derives 'AFL' from data/reference/seasons.json league eras for every DraftGuru pick.",
+   "columns": {
+    "competition": [
+     null,
+     "AFL"
+    ]
+   },
+   "id": 6844,
+   "key": [
+    "https://www.draftguru.com.au/players/maia_westrupp/1",
+    2012,
+    "pre_draft"
+   ],
+   "reasons": [
+    "data_edits",
+    "audited_insert"
+   ]
+  },
+  {
+   "acknowledged_because": "Owner Q2(b) 2026-11-22: re-baseline to the reviewed acquisition. The D-336-2 audited insert stored competition NULL; the importer derives 'AFL' from data/reference/seasons.json league eras for every DraftGuru pick.",
+   "columns": {
+    "competition": [
+     null,
+     "AFL"
+    ]
+   },
+   "id": 6845,
+   "key": [
+    "https://www.draftguru.com.au/players/giovanni_mountain-silbery/1",
+    2013,
+    "pre_draft"
+   ],
+   "reasons": [
+    "data_edits",
+    "audited_insert"
+   ]
+  },
+  {
+   "acknowledged_because": "Owner Q2(b) 2026-11-22: re-baseline to the reviewed acquisition. The D-336-2 audited insert stored competition NULL; the importer derives 'AFL' from data/reference/seasons.json league eras for every DraftGuru pick.",
+   "columns": {
+    "competition": [
+     null,
+     "AFL"
+    ]
+   },
+   "id": 6846,
+   "key": [
+    "https://www.draftguru.com.au/players/barclay_miller/1",
+    2014,
+    "pre_draft"
+   ],
+   "reasons": [
+    "data_edits",
+    "audited_insert"
+   ]
+  },
+  {
+   "acknowledged_because": "Owner Q2(b) 2026-11-22: re-baseline to the reviewed acquisition. The D-336-2 audited insert stored competition NULL; the importer derives 'AFL' from data/reference/seasons.json league eras for every DraftGuru pick.",
+   "columns": {
+    "competition": [
+     null,
+     "AFL"
+    ]
+   },
+   "id": 6847,
+   "key": [
+    "https://www.draftguru.com.au/players/shaoliang_chen/1",
+    2015,
+    "pre_draft"
+   ],
+   "reasons": [
+    "data_edits",
+    "audited_insert"
+   ]
+  },
+  {
+   "acknowledged_because": "Owner Q2(b) 2026-11-22: re-baseline to the reviewed acquisition. The D-336-2 audited insert stored competition NULL; the importer derives 'AFL' from data/reference/seasons.json league eras for every DraftGuru pick.",
+   "columns": {
+    "competition": [
+     null,
+     "AFL"
+    ]
+   },
+   "id": 6848,
+   "key": [
+    "https://www.draftguru.com.au/players/brandon_kaufman/1",
+    2015,
+    "pre_draft"
+   ],
+   "reasons": [
+    "data_edits",
+    "audited_insert"
+   ]
+  },
+  {
+   "acknowledged_because": "Owner Q2(b) 2026-11-22: re-baseline to the reviewed acquisition. The D-336-2 audited insert stored competition NULL; the importer derives 'AFL' from data/reference/seasons.json league eras for every DraftGuru pick.",
+   "columns": {
+    "competition": [
+     null,
+     "AFL"
+    ]
+   },
+   "id": 6849,
+   "key": [
+    "https://www.draftguru.com.au/players/hewago%20paul_oea/1",
+    2017,
+    "pre_draft"
+   ],
+   "reasons": [
+    "data_edits",
+    "audited_insert"
+   ]
+  },
+  {
+   "acknowledged_because": "Owner Q2(b) 2026-11-22: re-baseline to the reviewed acquisition. The D-336-2 audited insert stored competition NULL; the importer derives 'AFL' from data/reference/seasons.json league eras for every DraftGuru pick.",
+   "columns": {
+    "competition": [
+     null,
+     "AFL"
+    ]
+   },
+   "id": 6850,
+   "key": [
+    "https://www.draftguru.com.au/players/bassirou_faye/1",
+    2021,
+    "pre_draft"
+   ],
+   "reasons": [
+    "data_edits",
+    "audited_insert"
+   ]
+  },
+  {
+   "acknowledged_because": "Owner Q2(b) 2026-11-22: re-baseline to the reviewed acquisition. The D-336-2 audited insert stored competition NULL; the importer derives 'AFL' from data/reference/seasons.json league eras for every DraftGuru pick.",
+   "columns": {
+    "competition": [
+     null,
+     "AFL"
+    ]
+   },
+   "id": 6851,
+   "key": [
+    "https://www.draftguru.com.au/players/cillian_bourke/1",
+    2025,
+    "pre_draft"
+   ],
+   "reasons": [
+    "data_edits",
+    "audited_insert"
+   ]
+  },
+  {
+   "acknowledged_because": "Owner Q2(b) 2026-11-22: re-baseline to the reviewed acquisition. The D-336-2 audited insert stored competition NULL; the importer derives 'AFL' from data/reference/seasons.json league eras for every DraftGuru pick.",
+   "columns": {
+    "competition": [
+     null,
+     "AFL"
+    ]
+   },
+   "id": 6852,
+   "key": [
+    "https://www.draftguru.com.au/players/kobe_mcdonald/1",
+    2025,
+    "pre_draft"
+   ],
+   "reasons": [
+    "data_edits",
+    "audited_insert"
+   ]
+  },
+  {
+   "acknowledged_because": "Owner Q2(b) 2026-11-22: re-baseline to the reviewed acquisition. The D-336-2 audited insert stored competition NULL; the importer derives 'AFL' from data/reference/seasons.json league eras for every DraftGuru pick.",
+   "columns": {
+    "competition": [
+     null,
+     "AFL"
+    ]
+   },
+   "id": 6853,
+   "key": [
+    "https://www.draftguru.com.au/players/jake_miles-wrency/1",
+    2025,
+    "pre_draft"
+   ],
+   "reasons": [
+    "data_edits",
+    "audited_insert"
+   ]
+  }
+ ],
+ "effect_digest": "ff8ef1b8ef900d9ab5b17c89b2f0f85d5b3091e9493456a45b2a5f67cf766452",
+ "format": "afldb-draftguru-reconciliation/1",
+ "origin_review": [
+  {
+   "class": "INSERT_CLUB",
+   "csv": "Glenorchy/​North Hobart",
+   "db": "North Hobart",
+   "id": 233,
+   "key": [
+    "https://www.draftguru.com.au/players/daryn_cresswell/1",
+    1988,
+    "national"
+   ],
+   "reviewed_as": "outside the D-336-3 classifier range (1991-2025); auto-accepted class per D-336-3/Q2; listed in issue348-acquisition/README.md section 3",
+   "year": 1988
+  },
+  {
+   "class": "INSERT_CLUB",
+   "csv": "Glenorchy",
+   "db": null,
+   "id": 378,
+   "key": [
+    "https://www.draftguru.com.au/players/shane_fell/1",
+    1989,
+    "pre_draft"
+   ],
+   "reviewed_as": "outside the D-336-3 classifier range (1991-2025); auto-accepted class per D-336-3/Q2; listed in issue348-acquisition/README.md section 3",
+   "year": 1989
+  },
+  {
+   "class": "INSERT_CLUB",
+   "csv": "Clarence",
+   "db": null,
+   "id": 635,
+   "key": [
+    "https://www.draftguru.com.au/players/danny_noonan/1",
+    1990,
+    "pre_draft"
+   ],
+   "reviewed_as": "outside the D-336-3 classifier range (1991-2025); auto-accepted class per D-336-3/Q2; listed in issue348-acquisition/README.md section 3",
+   "year": 1990
+  },
+  {
+   "class": "INSERT_CLUB",
+   "csv": "Glenorchy",
+   "db": null,
+   "id": 859,
+   "key": [
+    "https://www.draftguru.com.au/players/shane_fell/1",
+    1990,
+    "midseason"
+   ],
+   "reviewed_as": "outside the D-336-3 classifier range (1991-2025); auto-accepted class per D-336-3/Q2; listed in issue348-acquisition/README.md section 3",
+   "year": 1990
+  },
+  {
+   "cat": "Mid-Season",
+   "class": "INSERT_CLUB",
+   "club": "Sydney",
+   "csv": "Glenorchy/North Hobart",
+   "db": "North Hobart",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Glenorchy": 28
+    },
+    "added_seen_in_stored_vocab": {
+     "Glenorchy": 37
+    },
+    "added_segments": [
+     "Glenorchy"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [
+     {
+      "id": 233,
+      "origin": "North Hobart",
+      "type": "National",
+      "year": 1988
+     }
+    ],
+    "stored_segments_all_retained": true
+   },
+   "id": 1097,
+   "in_original_46": true,
+   "pick": 39,
+   "player": "Daryn Cresswell",
+   "player_id": 3400,
+   "year": 1991
+  },
+  {
+   "cat": "Trade",
+   "class": "INSERT_CLUB",
+   "club": "Collingwood",
+   "csv": "North Hobart/Clarence",
+   "db": "Clarence",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "North Hobart": 35
+    },
+    "added_seen_in_stored_vocab": {
+     "North Hobart": 49
+    },
+    "added_segments": [
+     "North Hobart"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [
+     {
+      "id": 1753,
+      "origin": "Clarence",
+      "type": "Trade",
+      "year": 1995
+     }
+    ],
+    "stored_segments_all_retained": true
+   },
+   "id": 1388,
+   "in_original_46": true,
+   "pick": null,
+   "player": "Bradley Plain",
+   "player_id": 2099,
+   "year": 1993
+  },
+  {
+   "cat": "Trade",
+   "class": "INSERT_CLUB",
+   "club": "North Melbourne",
+   "csv": "North Hobart/Clarence",
+   "db": "Clarence",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "North Hobart": 35
+    },
+    "added_seen_in_stored_vocab": {
+     "North Hobart": 49
+    },
+    "added_segments": [
+     "North Hobart"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [
+     {
+      "id": 1388,
+      "origin": "Clarence",
+      "type": "Trade",
+      "year": 1993
+     }
+    ],
+    "stored_segments_all_retained": true
+   },
+   "id": 1753,
+   "in_original_46": true,
+   "pick": null,
+   "player": "Bradley Plain",
+   "player_id": 2099,
+   "year": 1995
+  },
+  {
+   "cat": "Pre-Season",
+   "class": "INSERT_CLUB",
+   "club": "Essendon",
+   "csv": "Launceston/North Launceston/Tasmania U18",
+   "db": "North Launceston/Tasmania U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Launceston": 18
+    },
+    "added_seen_in_stored_vocab": {
+     "Launceston": 19
+    },
+    "added_segments": [
+     "Launceston"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 3795,
+   "in_original_46": true,
+   "pick": 8,
+   "player": "Tom Bellchambers",
+   "player_id": 12477,
+   "year": 2007
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_CLUB",
+   "club": "Brisbane",
+   "csv": "Glenorchy/Tasmania U18/Tasmania (VFL)",
+   "db": "Tasmania U18/Tasmania (VFL)",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Glenorchy": 28
+    },
+    "added_seen_in_stored_vocab": {
+     "Glenorchy": 37
+    },
+    "added_segments": [
+     "Glenorchy"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 3912,
+   "in_original_46": true,
+   "pick": 57,
+   "player": "Aaron Cornelius",
+   "player_id": 4,
+   "year": 2008
+  },
+  {
+   "cat": "Rookie",
+   "class": "INSERT_CLUB",
+   "club": "St Kilda",
+   "csv": "Kingborough/Clarence/Tasmania U18",
+   "db": "Clarence/Tasmania U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Kingborough": 5
+    },
+    "added_seen_in_stored_vocab": {
+     "Kingborough": 4
+    },
+    "added_segments": [
+     "Kingborough"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 4163,
+   "in_original_46": true,
+   "pick": 36,
+   "player": "Daniel Archer",
+   "player_id": 3209,
+   "year": 2009
+  },
+  {
+   "cat": "National",
+   "class": "REPLACE_CLUB",
+   "club": "Collingwood",
+   "csv": "Kew Rovers/Xavier College/Oakleigh U18",
+   "db": "Surrey Park/Xavier College/Oakleigh U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Kew Rovers": 14
+    },
+    "added_seen_in_stored_vocab": {
+     "Kew Rovers": 12
+    },
+    "added_segments": [
+     "Kew Rovers"
+    ],
+    "positions": [],
+    "removed_seen_in_csv_vocab": {
+     "Surrey Park": 7
+    },
+    "removed_segments": [
+     "Surrey Park"
+    ],
+    "same_player_other_stored_events": [
+     {
+      "id": 6784,
+      "origin": "Surrey Park/Xavier College/Oakleigh U18",
+      "type": "Post-Draft",
+      "year": 2025
+     }
+    ],
+    "stored_segments_all_retained": false
+   },
+   "id": 5961,
+   "in_original_46": false,
+   "pick": 19,
+   "player": "Finlay Macrae",
+   "player_id": 4274,
+   "year": 2020
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_CLUB",
+   "club": "Collingwood",
+   "csv": "Canterbury JFC/Surrey Park/Boroondara Hawks JFC/Scotch College/Oakleigh U18",
+   "db": "Scotch College/Oakleigh U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Boroondara Hawks JFC": 6,
+     "Canterbury JFC": 1,
+     "Surrey Park": 7
+    },
+    "added_seen_in_stored_vocab": {
+     "Boroondara Hawks JFC": 5,
+     "Canterbury JFC": 0,
+     "Surrey Park": 7
+    },
+    "added_segments": [
+     "Canterbury JFC",
+     "Surrey Park",
+     "Boroondara Hawks JFC"
+    ],
+    "positions": [
+     "interior",
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 5965,
+   "in_original_46": true,
+   "pick": 23,
+   "player": "Reef McInnes",
+   "player_id": 10879,
+   "year": 2020
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "North Melbourne",
+   "csv": "Christies Beach/Wirreanda SS/South Adelaide",
+   "db": "Christies Beach/South Adelaide",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Wirreanda SS": 2
+    },
+    "added_seen_in_stored_vocab": {
+     "Wirreanda SS": 0
+    },
+    "added_segments": [
+     "Wirreanda SS"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [
+     {
+      "id": 6219,
+      "origin": "Christies Beach/South Adelaide",
+      "type": "Trade",
+      "year": 2022
+     }
+    ],
+    "stored_segments_all_retained": true
+   },
+   "id": 6085,
+   "in_original_46": false,
+   "pick": 1,
+   "player": "Jason Horne-Francis",
+   "player_id": 6841,
+   "year": 2021
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Fremantle",
+   "csv": "Busselton/Cape Naturaliste College/East Perth",
+   "db": "Busselton/East Perth",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Cape Naturaliste College": 1
+    },
+    "added_seen_in_stored_vocab": {
+     "Cape Naturaliste College": 0
+    },
+    "added_segments": [
+     "Cape Naturaliste College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6092,
+   "in_original_46": false,
+   "pick": 8,
+   "player": "Jye Amiss",
+   "player_id": 7949,
+   "year": 2021
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Port Adelaide",
+   "csv": "East Brighton/Old Xavs/Xavier College/Sandringham U18",
+   "db": "East Brighton/Old Xavs/Sandringham U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Xavier College": 81
+    },
+    "added_seen_in_stored_vocab": {
+     "Xavier College": 77
+    },
+    "added_segments": [
+     "Xavier College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6096,
+   "in_original_46": false,
+   "pick": 12,
+   "player": "Josh Sinn",
+   "player_id": 7893,
+   "year": 2021
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Richmond",
+   "csv": "Clarence/Guilford Young College/Tasmania U18",
+   "db": "Clarence/Tasmania U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Guilford Young College": 2
+    },
+    "added_seen_in_stored_vocab": {
+     "Guilford Young College": 0
+    },
+    "added_segments": [
+     "Guilford Young College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6113,
+   "in_original_46": false,
+   "pick": 29,
+   "player": "Sam Banks",
+   "player_id": 11601,
+   "year": 2021
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "North Melbourne",
+   "csv": "Melton South/Keilor/Maribyrnong College/Western U18",
+   "db": "Melton South/Keilor/Western U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Maribyrnong College": 15
+    },
+    "added_seen_in_stored_vocab": {
+     "Maribyrnong College": 10
+    },
+    "added_segments": [
+     "Maribyrnong College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6119,
+   "in_original_46": false,
+   "pick": 35,
+   "player": "Paul Curtis",
+   "player_id": 10282,
+   "year": 2021
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "GWS",
+   "csv": "Queanbeyan/Erindale College/Greater Western Sydney (NEAFL)",
+   "db": "Queanbeyan/Greater Western Sydney (NEAFL)",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Erindale College": 2
+    },
+    "added_seen_in_stored_vocab": {
+     "Erindale College": 1
+    },
+    "added_segments": [
+     "Erindale College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6126,
+   "in_original_46": false,
+   "pick": 42,
+   "player": "Josh Fahey",
+   "player_id": 7866,
+   "year": 2021
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Western Bulldogs",
+   "csv": "Mt Barker (WA)/Wesley College (WA)/Claremont",
+   "db": "Mt Barker (WA)/Claremont",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Wesley College (WA)": 35
+    },
+    "added_seen_in_stored_vocab": {
+     "Wesley College (WA)": 30
+    },
+    "added_segments": [
+     "Wesley College (WA)"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6127,
+   "in_original_46": false,
+   "pick": 43,
+   "player": "Arthur Jones",
+   "player_id": 812,
+   "year": 2021
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "St Kilda",
+   "csv": "South Gambier/Tenison Woods College/Glenelg",
+   "db": "South Gambier/Glenelg",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Tenison Woods College": 3
+    },
+    "added_seen_in_stored_vocab": {
+     "Tenison Woods College": 1
+    },
+    "added_segments": [
+     "Tenison Woods College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [
+     {
+      "id": 6657,
+      "origin": "South Gambier/Glenelg",
+      "type": "Mid-Season",
+      "year": 2024
+     }
+    ],
+    "stored_segments_all_retained": true
+   },
+   "id": 6135,
+   "in_original_46": false,
+   "pick": 51,
+   "player": "Oscar Adams",
+   "player_id": 10137,
+   "year": 2021
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Port Adelaide",
+   "csv": "Crystal Brook/Rostrevor College/North Adelaide",
+   "db": "Crystal Brook/North Adelaide",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Rostrevor College": 37
+    },
+    "added_seen_in_stored_vocab": {
+     "Rostrevor College": 36
+    },
+    "added_segments": [
+     "Rostrevor College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6139,
+   "in_original_46": false,
+   "pick": 55,
+   "player": "Hugh Jackson",
+   "player_id": 5929,
+   "year": 2021
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "West Coast",
+   "csv": "Rossmoyne JFC/Willetton SHS/East Fremantle",
+   "db": "Rossmoyne JFC/East Fremantle",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Willetton SHS": 1
+    },
+    "added_seen_in_stored_vocab": {
+     "Willetton SHS": 0
+    },
+    "added_segments": [
+     "Willetton SHS"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6141,
+   "in_original_46": false,
+   "pick": 57,
+   "player": "Jack Williams",
+   "player_id": 6619,
+   "year": 2021
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "North Melbourne",
+   "csv": "Park Orchards/Whitefriars College/Northern U18",
+   "db": "Park Orchards/Northern U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Whitefriars College": 21
+    },
+    "added_seen_in_stored_vocab": {
+     "Whitefriars College": 19
+    },
+    "added_segments": [
+     "Whitefriars College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6143,
+   "in_original_46": false,
+   "pick": 59,
+   "player": "Jackson Archer",
+   "player_id": 6635,
+   "year": 2021
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Port Adelaide",
+   "csv": "Henley HS/Woodville-West Torrens",
+   "db": "Woodville-West Torrens",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Henley HS": 8
+    },
+    "added_seen_in_stored_vocab": {
+     "Henley HS": 10
+    },
+    "added_segments": [
+     "Henley HS"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6144,
+   "in_original_46": true,
+   "pick": 60,
+   "player": "Jase Burgoyne",
+   "player_id": 6823,
+   "year": 2021
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Western Bulldogs",
+   "csv": "Beaumaris/Haileybury College/Sandringham U18",
+   "db": "Beaumaris/Sandringham U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Haileybury College": 75
+    },
+    "added_seen_in_stored_vocab": {
+     "Haileybury College": 72
+    },
+    "added_segments": [
+     "Haileybury College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6145,
+   "in_original_46": false,
+   "pick": 61,
+   "player": "Luke Cleary",
+   "player_id": 8917,
+   "year": 2021
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Melbourne",
+   "csv": "Coorparoo JAFC/Booragoon/Aquinas College (WA)/East Fremantle",
+   "db": "Coorparoo JAFC/Booragoon/East Fremantle",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Aquinas College (WA)": 38
+    },
+    "added_seen_in_stored_vocab": {
+     "Aquinas College (WA)": 36
+    },
+    "added_segments": [
+     "Aquinas College (WA)"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6149,
+   "in_original_46": false,
+   "pick": 65,
+   "player": "Taj Woewodin",
+   "player_id": 12189,
+   "year": 2021
+  },
+  {
+   "cat": "Rookie",
+   "class": "INSERT_SCHOOL",
+   "club": "Fremantle",
+   "csv": "Ashburton/East Burwood/Carey Grammar/Oakleigh U18",
+   "db": "Ashburton/East Burwood/Oakleigh U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Carey Grammar": 46
+    },
+    "added_seen_in_stored_vocab": {
+     "Carey Grammar": 42
+    },
+    "added_segments": [
+     "Carey Grammar"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6154,
+   "in_original_46": false,
+   "pick": 8,
+   "player": "Karl Worner",
+   "player_id": 7978,
+   "year": 2021
+  },
+  {
+   "cat": "Rookie",
+   "class": "INSERT_SCHOOL",
+   "club": "Melbourne",
+   "csv": "Swanbourne JFC/Mullewa/Geraldton SHS/East Fremantle",
+   "db": "Swanbourne JFC/Mullewa/East Fremantle",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Geraldton SHS": 2
+    },
+    "added_seen_in_stored_vocab": {
+     "Geraldton SHS": 0
+    },
+    "added_segments": [
+     "Geraldton SHS"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [
+     {
+      "id": 6690,
+      "origin": "Swanbourne JFC/Mullewa/East Fremantle",
+      "type": "Trade",
+      "year": 2025
+     }
+    ],
+    "stored_segments_all_retained": true
+   },
+   "id": 6160,
+   "in_original_46": false,
+   "pick": 16,
+   "player": "Judd McVee",
+   "player_id": 7913,
+   "year": 2021
+  },
+  {
+   "cat": "Rookie",
+   "class": "INSERT_SCHOOL",
+   "club": "Gold Coast",
+   "csv": "Broadbeach/All Saints Anglican/Gold Coast (NEAFL)",
+   "db": "Broadbeach/Gold Coast (NEAFL)",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "All Saints Anglican": 6
+    },
+    "added_seen_in_stored_vocab": {
+     "All Saints Anglican": 0
+    },
+    "added_segments": [
+     "All Saints Anglican"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6163,
+   "in_original_46": false,
+   "pick": 26,
+   "player": "Bodhi Uwland",
+   "player_id": 2044,
+   "year": 2021
+  },
+  {
+   "cat": "Post-Draft",
+   "class": "INSERT_SCHOOL",
+   "club": "St Kilda",
+   "csv": "Sacred Heart College/Woodville-West Torrens",
+   "db": "Woodville-West Torrens",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Sacred Heart College": 55
+    },
+    "added_seen_in_stored_vocab": {
+     "Sacred Heart College": 59
+    },
+    "added_segments": [
+     "Sacred Heart College"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6171,
+   "in_original_46": true,
+   "pick": null,
+   "player": "Jack Hayes",
+   "player_id": 6330,
+   "year": 2021
+  },
+  {
+   "cat": "Post-Draft",
+   "class": "INSERT_SCHOOL",
+   "club": "Essendon",
+   "csv": "Noranda JFC/Trinity College (WA)/Subiaco",
+   "db": "Noranda JFC/Subiaco",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Trinity College (WA)": 37
+    },
+    "added_seen_in_stored_vocab": {
+     "Trinity College (WA)": 37
+    },
+    "added_segments": [
+     "Trinity College (WA)"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6175,
+   "in_original_46": false,
+   "pick": null,
+   "player": "Nic Martin",
+   "player_id": 9896,
+   "year": 2021
+  },
+  {
+   "cat": "Mid-Season",
+   "class": "INSERT_SCHOOL",
+   "club": "North Melbourne",
+   "csv": "Williamstown Juniors/Williamstown HS/Williamstown",
+   "db": "Williamstown Juniors/Williamstown",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Williamstown HS": 1
+    },
+    "added_seen_in_stored_vocab": {
+     "Williamstown HS": 0
+    },
+    "added_segments": [
+     "Williamstown HS"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6182,
+   "in_original_46": false,
+   "pick": 2,
+   "player": "Kallan Dawson",
+   "player_id": 7962,
+   "year": 2021
+  },
+  {
+   "cat": "Mid-Season",
+   "class": "INSERT_SCHOOL",
+   "club": "Essendon",
+   "csv": "Point Cook/Maribyrnong College/Western U18/Richmond (VFL)",
+   "db": "Point Cook/Western U18/Richmond (VFL)",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Maribyrnong College": 15
+    },
+    "added_seen_in_stored_vocab": {
+     "Maribyrnong College": 10
+    },
+    "added_segments": [
+     "Maribyrnong College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [
+     {
+      "id": 6374,
+      "origin": "Point Cook/Western U18/Richmond (VFL)",
+      "type": "Trade",
+      "year": 2023
+     }
+    ],
+    "stored_segments_all_retained": true
+   },
+   "id": 6183,
+   "in_original_46": false,
+   "pick": 3,
+   "player": "Massimo D'Ambrosio",
+   "player_id": 9197,
+   "year": 2021
+  },
+  {
+   "cat": "Trade",
+   "class": "INSERT_SCHOOL",
+   "club": "Port Adelaide",
+   "csv": "Christies Beach/Wirreanda SS/South Adelaide",
+   "db": "Christies Beach/South Adelaide",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Wirreanda SS": 2
+    },
+    "added_seen_in_stored_vocab": {
+     "Wirreanda SS": 0
+    },
+    "added_segments": [
+     "Wirreanda SS"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [
+     {
+      "id": 6085,
+      "origin": "Christies Beach/South Adelaide",
+      "type": "National",
+      "year": 2021
+     }
+    ],
+    "stored_segments_all_retained": true
+   },
+   "id": 6219,
+   "in_original_46": false,
+   "pick": null,
+   "player": "Jason Horne-Francis",
+   "player_id": 6841,
+   "year": 2022
+  },
+  {
+   "cat": "Pre-Draft",
+   "class": "INSERT_SCHOOL",
+   "club": "Brisbane",
+   "csv": "Anglican Church Grammar/Basketball",
+   "db": "Basketball",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Anglican Church Grammar": 1
+    },
+    "added_seen_in_stored_vocab": {
+     "Anglican Church Grammar": 0
+    },
+    "added_segments": [
+     "Anglican Church Grammar"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6236,
+   "in_original_46": true,
+   "pick": null,
+   "player": "Darryl McDowell-White",
+   "player_id": null,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "GWS",
+   "csv": "Darley/St Patrick's College/North Ballarat U18",
+   "db": "Darley/North Ballarat U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "St Patrick's College": 69
+    },
+    "added_seen_in_stored_vocab": {
+     "St Patrick's College": 74
+    },
+    "added_segments": [
+     "St Patrick's College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6240,
+   "in_original_46": false,
+   "pick": 1,
+   "player": "Aaron Cadman",
+   "player_id": 3,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Brisbane",
+   "csv": "Southport/Brighton Grammar/Sandringham U18",
+   "db": "Southport/Sandringham U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Brighton Grammar": 39
+    },
+    "added_seen_in_stored_vocab": {
+     "Brighton Grammar": 36
+    },
+    "added_segments": [
+     "Brighton Grammar"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6241,
+   "in_original_46": false,
+   "pick": 2,
+   "player": "Will Ashcroft",
+   "player_id": 13180,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "North Melbourne",
+   "csv": "Ajax/Mount Scopus/Sandringham U18",
+   "db": "Ajax/Sandringham U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Mount Scopus": 1
+    },
+    "added_seen_in_stored_vocab": {
+     "Mount Scopus": 0
+    },
+    "added_segments": [
+     "Mount Scopus"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6242,
+   "in_original_46": false,
+   "pick": 3,
+   "player": "Harry Sheezel",
+   "player_id": 5700,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "North Melbourne",
+   "csv": "St Peters/St Kevin's College/Oakleigh U18",
+   "db": "St Peters/Oakleigh U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "St Kevin's College": 49
+    },
+    "added_seen_in_stored_vocab": {
+     "St Kevin's College": 47
+    },
+    "added_segments": [
+     "St Kevin's College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6243,
+   "in_original_46": false,
+   "pick": 4,
+   "player": "George Wardlaw",
+   "player_id": 5071,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Essendon",
+   "csv": "Surrey Park/Wesley College/Oakleigh U18",
+   "db": "Surrey Park/Oakleigh U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Wesley College": 34
+    },
+    "added_seen_in_stored_vocab": {
+     "Wesley College": 31
+    },
+    "added_segments": [
+     "Wesley College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6244,
+   "in_original_46": false,
+   "pick": 5,
+   "player": "Elijah Tsatas",
+   "player_id": 4095,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Gold Coast",
+   "csv": "Moe/Lowanna College/Gippsland U18",
+   "db": "Moe/Gippsland U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Lowanna College": 11
+    },
+    "added_seen_in_stored_vocab": {
+     "Lowanna College": 8
+    },
+    "added_segments": [
+     "Lowanna College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6245,
+   "in_original_46": false,
+   "pick": 6,
+   "player": "Bailey Humphrey",
+   "player_id": 940,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Hawthorn",
+   "csv": "Beaumaris/Brighton Grammar/Sandringham U18",
+   "db": "Beaumaris/Sandringham U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Brighton Grammar": 39
+    },
+    "added_seen_in_stored_vocab": {
+     "Brighton Grammar": 36
+    },
+    "added_segments": [
+     "Brighton Grammar"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6246,
+   "in_original_46": false,
+   "pick": 7,
+   "player": "Cam Mackenzie",
+   "player_id": 2484,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "West Coast",
+   "csv": "Dunsborough/Wesley College (WA)/East Perth",
+   "db": "Dunsborough/East Perth",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Wesley College (WA)": 35
+    },
+    "added_seen_in_stored_vocab": {
+     "Wesley College (WA)": 30
+    },
+    "added_segments": [
+     "Wesley College (WA)"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6248,
+   "in_original_46": false,
+   "pick": 9,
+   "player": "Reuben Ginbey",
+   "player_id": 10954,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "St Kilda",
+   "csv": "PHOS Camden/Henley HS/Woodville-West Torrens",
+   "db": "PHOS Camden/Woodville-West Torrens",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Henley HS": 8
+    },
+    "added_seen_in_stored_vocab": {
+     "Henley HS": 10
+    },
+    "added_segments": [
+     "Henley HS"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6249,
+   "in_original_46": false,
+   "pick": 10,
+   "player": "Mattaes Phillipou",
+   "player_id": 9245,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Carlton",
+   "csv": "Wodonga FC/Geelong Grammar/Murray U18",
+   "db": "Wodonga FC/Murray U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Geelong Grammar": 30
+    },
+    "added_seen_in_stored_vocab": {
+     "Geelong Grammar": 27
+    },
+    "added_segments": [
+     "Geelong Grammar"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6250,
+   "in_original_46": false,
+   "pick": 11,
+   "player": "Oliver Hollands",
+   "player_id": 10125,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Brisbane",
+   "csv": "Coorparoo/Brisbane SHS/Brisbane (NEAFL)",
+   "db": "Coorparoo/Brisbane (NEAFL)",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Brisbane SHS": 1
+    },
+    "added_seen_in_stored_vocab": {
+     "Brisbane SHS": 0
+    },
+    "added_segments": [
+     "Brisbane SHS"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6251,
+   "in_original_46": false,
+   "pick": 12,
+   "player": "Jaspa Fletcher",
+   "player_id": 6864,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "West Coast",
+   "csv": "Caversham JFC/Guildford Grammar/Scotch College (WA)/Swan Districts",
+   "db": "Caversham JFC/Swan Districts",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Guildford Grammar": 20,
+     "Scotch College (WA)": 22
+    },
+    "added_seen_in_stored_vocab": {
+     "Guildford Grammar": 21,
+     "Scotch College (WA)": 16
+    },
+    "added_segments": [
+     "Guildford Grammar",
+     "Scotch College (WA)"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6253,
+   "in_original_46": false,
+   "pick": 14,
+   "player": "Elijah Hewett",
+   "player_id": 4092,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Melbourne",
+   "csv": "Ashburton/Wesley College/Oakleigh U18",
+   "db": "Ashburton/Oakleigh U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Wesley College": 34
+    },
+    "added_seen_in_stored_vocab": {
+     "Wesley College": 31
+    },
+    "added_segments": [
+     "Wesley College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6254,
+   "in_original_46": false,
+   "pick": 15,
+   "player": "Matthew Jefferson",
+   "player_id": 9281,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "GWS",
+   "csv": "Griffith/Assumption College",
+   "db": "Griffith",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Assumption College": 53
+    },
+    "added_seen_in_stored_vocab": {
+     "Assumption College": 59
+    },
+    "added_segments": [
+     "Assumption College"
+    ],
+    "positions": [
+     "suffix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6255,
+   "in_original_46": false,
+   "pick": 16,
+   "player": "Harry Rowston",
+   "player_id": 5693,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Adelaide",
+   "csv": "Glenunga/Rostrevor College/Norwood",
+   "db": "Glenunga/Norwood",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Rostrevor College": 37
+    },
+    "added_seen_in_stored_vocab": {
+     "Rostrevor College": 36
+    },
+    "added_segments": [
+     "Rostrevor College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6256,
+   "in_original_46": false,
+   "pick": 17,
+   "player": "Max Michalanney",
+   "player_id": 9409,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Hawthorn",
+   "csv": "Templestowe/Carey Grammar/Oakleigh U18",
+   "db": "Templestowe/Oakleigh U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Carey Grammar": 46
+    },
+    "added_seen_in_stored_vocab": {
+     "Carey Grammar": 42
+    },
+    "added_segments": [
+     "Carey Grammar"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6257,
+   "in_original_46": false,
+   "pick": 18,
+   "player": "Josh Weddle",
+   "player_id": 7905,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Collingwood",
+   "csv": "Mosman Park JFC/Scotch College (WA)/Claremont",
+   "db": "Mosman Park JFC/Claremont",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Scotch College (WA)": 22
+    },
+    "added_seen_in_stored_vocab": {
+     "Scotch College (WA)": 16
+    },
+    "added_segments": [
+     "Scotch College (WA)"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6258,
+   "in_original_46": false,
+   "pick": 19,
+   "player": "Ed Allan",
+   "player_id": 4081,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "GWS",
+   "csv": "Surrey Park/Caulfield Grammar/Oakleigh U18",
+   "db": "Surrey Park/Oakleigh U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Caulfield Grammar": 79
+    },
+    "added_seen_in_stored_vocab": {
+     "Caulfield Grammar": 77
+    },
+    "added_segments": [
+     "Caulfield Grammar"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6261,
+   "in_original_46": false,
+   "pick": 22,
+   "player": "Max Gruzewski",
+   "player_id": 9384,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "West Coast",
+   "csv": "Goodwood/Mercedes College/West Adelaide",
+   "db": "Goodwood/West Adelaide",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Mercedes College": 2
+    },
+    "added_seen_in_stored_vocab": {
+     "Mercedes College": 1
+    },
+    "added_segments": [
+     "Mercedes College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6262,
+   "in_original_46": false,
+   "pick": 23,
+   "player": "Harry Barnett",
+   "player_id": 5550,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Essendon",
+   "csv": "Lysterfield JFC/Rowville SC/Eastern U18",
+   "db": "Lysterfield JFC/Eastern U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Rowville SC": 10
+    },
+    "added_seen_in_stored_vocab": {
+     "Rowville SC": 7
+    },
+    "added_segments": [
+     "Rowville SC"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6264,
+   "in_original_46": false,
+   "pick": 25,
+   "player": "Lewis Hayes",
+   "player_id": 8784,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Collingwood",
+   "csv": "Brighton Districts & Old Scholars/Sacred Heart College/Glenelg",
+   "db": "Brighton Districts & Old Scholars/Glenelg",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Sacred Heart College": 55
+    },
+    "added_seen_in_stored_vocab": {
+     "Sacred Heart College": 59
+    },
+    "added_segments": [
+     "Sacred Heart College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6267,
+   "in_original_46": false,
+   "pick": 28,
+   "player": "Jakob Ryan",
+   "player_id": 6698,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "West Coast",
+   "csv": "Wesley College/Gippsland U18",
+   "db": "Gippsland U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Wesley College": 34
+    },
+    "added_seen_in_stored_vocab": {
+     "Wesley College": 31
+    },
+    "added_segments": [
+     "Wesley College"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6268,
+   "in_original_46": true,
+   "pick": 29,
+   "player": "Coby Burgiel",
+   "player_id": null,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Carlton",
+   "csv": "Devonport/St Brendan-Shaw College/Tasmania U18",
+   "db": "Devonport/Tasmania U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "St Brendan-Shaw College": 1
+    },
+    "added_seen_in_stored_vocab": {
+     "St Brendan-Shaw College": 0
+    },
+    "added_segments": [
+     "St Brendan-Shaw College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6269,
+   "in_original_46": false,
+   "pick": 30,
+   "player": "Lachie Cowan",
+   "player_id": 8363,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "St Kilda",
+   "csv": "North Ballarat/St Patrick's College/North Ballarat U18",
+   "db": "North Ballarat/North Ballarat U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "St Patrick's College": 69
+    },
+    "added_seen_in_stored_vocab": {
+     "St Patrick's College": 74
+    },
+    "added_segments": [
+     "St Patrick's College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6270,
+   "in_original_46": false,
+   "pick": 31,
+   "player": "James Van Es",
+   "player_id": null,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Carlton",
+   "csv": "Berwick/Caulfield Grammar/Dandenong U18",
+   "db": "Berwick/Dandenong U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Caulfield Grammar": 79
+    },
+    "added_seen_in_stored_vocab": {
+     "Caulfield Grammar": 77
+    },
+    "added_segments": [
+     "Caulfield Grammar"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6271,
+   "in_original_46": false,
+   "pick": 32,
+   "player": "Jaxon Binns",
+   "player_id": 6867,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Fremantle",
+   "csv": "Christ Church Grammar/Claremont",
+   "db": "Claremont",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Christ Church Grammar": 14
+    },
+    "added_seen_in_stored_vocab": {
+     "Christ Church Grammar": 15
+    },
+    "added_segments": [
+     "Christ Church Grammar"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6272,
+   "in_original_46": true,
+   "pick": 33,
+   "player": "Hugh Davies",
+   "player_id": 5919,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "St Kilda",
+   "csv": "Hampton Rovers/Haileybury College/Sandringham U18",
+   "db": "Hampton Rovers/Sandringham U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Haileybury College": 75
+    },
+    "added_seen_in_stored_vocab": {
+     "Haileybury College": 72
+    },
+    "added_segments": [
+     "Haileybury College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6274,
+   "in_original_46": false,
+   "pick": 35,
+   "player": "Olli Hotton",
+   "player_id": null,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Port Adelaide",
+   "csv": "Clarence/Guilford Young College/Tasmania U18",
+   "db": "Clarence/Tasmania U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Guilford Young College": 2
+    },
+    "added_seen_in_stored_vocab": {
+     "Guilford Young College": 0
+    },
+    "added_segments": [
+     "Guilford Young College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6275,
+   "in_original_46": false,
+   "pick": 36,
+   "player": "Tom McCallum",
+   "player_id": null,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Fremantle",
+   "csv": "Payneham Norwood Union/Pembroke School/Sturt",
+   "db": "Payneham Norwood Union/Sturt",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Pembroke School": 15
+    },
+    "added_seen_in_stored_vocab": {
+     "Pembroke School": 15
+    },
+    "added_segments": [
+     "Pembroke School"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6280,
+   "in_original_46": false,
+   "pick": 41,
+   "player": "Tom Emmett",
+   "player_id": 12529,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Adelaide",
+   "csv": "Walkerville/St Peter's College (SA)/North Adelaide",
+   "db": "Walkerville/North Adelaide",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "St Peter's College (SA)": 23
+    },
+    "added_seen_in_stored_vocab": {
+     "St Peter's College (SA)": 22
+    },
+    "added_segments": [
+     "St Peter's College (SA)"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6282,
+   "in_original_46": false,
+   "pick": 43,
+   "player": "Billy Dowling",
+   "player_id": 1726,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Essendon",
+   "csv": "Palmerston/Xavier College/Oakleigh U18",
+   "db": "Palmerston/Oakleigh U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Xavier College": 81
+    },
+    "added_seen_in_stored_vocab": {
+     "Xavier College": 77
+    },
+    "added_segments": [
+     "Xavier College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6284,
+   "in_original_46": false,
+   "pick": 45,
+   "player": "Alwyn Davey",
+   "player_id": 536,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Hawthorn",
+   "csv": "Kyneton/Xavier College/Oakleigh U18",
+   "db": "Kyneton/Oakleigh U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Xavier College": 81
+    },
+    "added_seen_in_stored_vocab": {
+     "Xavier College": 77
+    },
+    "added_segments": [
+     "Xavier College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6285,
+   "in_original_46": false,
+   "pick": 46,
+   "player": "Jack O'Sullivan",
+   "player_id": null,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Richmond",
+   "csv": "Melville JFC/Wesley College (WA)/East Fremantle",
+   "db": "Melville JFC/East Fremantle",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Wesley College (WA)": 35
+    },
+    "added_seen_in_stored_vocab": {
+     "Wesley College (WA)": 30
+    },
+    "added_segments": [
+     "Wesley College (WA)"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6288,
+   "in_original_46": false,
+   "pick": 49,
+   "player": "Kaleb Smith",
+   "player_id": 7960,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Adelaide",
+   "csv": "North Ballarat/Ballarat Grammar/North Ballarat U18",
+   "db": "North Ballarat/North Ballarat U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Ballarat Grammar": 7
+    },
+    "added_seen_in_stored_vocab": {
+     "Ballarat Grammar": 6
+    },
+    "added_segments": [
+     "Ballarat Grammar"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6289,
+   "in_original_46": false,
+   "pick": 50,
+   "player": "Hugh Bond",
+   "player_id": 5911,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Hawthorn",
+   "csv": "Surrey Park/Wesley College/Oakleigh U18",
+   "db": "Surrey Park/Oakleigh U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Wesley College": 34
+    },
+    "added_seen_in_stored_vocab": {
+     "Wesley College": 31
+    },
+    "added_segments": [
+     "Wesley College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6290,
+   "in_original_46": false,
+   "pick": 51,
+   "player": "Bailey Macdonald",
+   "player_id": 942,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Essendon",
+   "csv": "Palmerston/Xavier College/Oakleigh U18",
+   "db": "Palmerston/Oakleigh U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Xavier College": 81
+    },
+    "added_seen_in_stored_vocab": {
+     "Xavier College": 77
+    },
+    "added_segments": [
+     "Xavier College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6293,
+   "in_original_46": false,
+   "pick": 54,
+   "player": "Jayden Davey",
+   "player_id": null,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "North Melbourne",
+   "csv": "Yarrambat/Assumption College/Northern U18",
+   "db": "Yarrambat/Northern U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Assumption College": 53
+    },
+    "added_seen_in_stored_vocab": {
+     "Assumption College": 59
+    },
+    "added_segments": [
+     "Assumption College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6295,
+   "in_original_46": false,
+   "pick": 56,
+   "player": "Cooper Harvey",
+   "player_id": 3048,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "West Coast",
+   "csv": "Echuca/Geelong Grammar/Bendigo U18",
+   "db": "Echuca/Bendigo U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Geelong Grammar": 30
+    },
+    "added_seen_in_stored_vocab": {
+     "Geelong Grammar": 27
+    },
+    "added_segments": [
+     "Geelong Grammar"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6297,
+   "in_original_46": false,
+   "pick": 58,
+   "player": "Noah Long",
+   "player_id": 9966,
+   "year": 2022
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Port Adelaide",
+   "csv": "McLaren/Cardijn College/South Adelaide",
+   "db": "McLaren/South Adelaide",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Cardijn College": 2
+    },
+    "added_seen_in_stored_vocab": {
+     "Cardijn College": 1
+    },
+    "added_segments": [
+     "Cardijn College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6298,
+   "in_original_46": false,
+   "pick": 59,
+   "player": "Kyle Marshall",
+   "player_id": null,
+   "year": 2022
+  },
+  {
+   "cat": "Rookie",
+   "class": "INSERT_SCHOOL",
+   "club": "Fremantle",
+   "csv": "East Brighton/Brighton SC/Frankston",
+   "db": "East Brighton/Frankston",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Brighton SC": 2
+    },
+    "added_seen_in_stored_vocab": {
+     "Brighton SC": 0
+    },
+    "added_segments": [
+     "Brighton SC"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [
+     {
+      "id": 6694,
+      "origin": "East Brighton/Frankston",
+      "type": "Trade",
+      "year": 2025
+     }
+    ],
+    "stored_segments_all_retained": true
+   },
+   "id": 6303,
+   "in_original_46": false,
+   "pick": 13,
+   "player": "Liam Reidy",
+   "player_id": 8811,
+   "year": 2022
+  },
+  {
+   "cat": "Rookie",
+   "class": "INSERT_SCHOOL",
+   "club": "Sydney",
+   "csv": "Myponga-Sellicks/Sacred Heart College/South Adelaide",
+   "db": "Myponga-Sellicks/South Adelaide",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Sacred Heart College": 55
+    },
+    "added_seen_in_stored_vocab": {
+     "Sacred Heart College": 59
+    },
+    "added_segments": [
+     "Sacred Heart College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6311,
+   "in_original_46": false,
+   "pick": 31,
+   "player": "Jaiden Magor",
+   "player_id": null,
+   "year": 2022
+  },
+  {
+   "cat": "Post-Draft",
+   "class": "INSERT_SCHOOL",
+   "club": "Richmond",
+   "csv": "Corowa-Rutherglen/Xavier HS (Albury)/Sydney (NEAFL)",
+   "db": "Corowa-Rutherglen/Sydney (NEAFL)",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Xavier HS (Albury)": 3
+    },
+    "added_seen_in_stored_vocab": {
+     "Xavier HS (Albury)": 2
+    },
+    "added_segments": [
+     "Xavier HS (Albury)"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6330,
+   "in_original_46": false,
+   "pick": null,
+   "player": "Kaelan Bradtke",
+   "player_id": null,
+   "year": 2022
+  },
+  {
+   "cat": "Post-Draft",
+   "class": "INSERT_SCHOOL",
+   "club": "Carlton",
+   "csv": "Newtown & Chilwell/Geelong College/Geelong (VFL)/Carlton (VFL)",
+   "db": "Newtown & Chilwell/Geelong (VFL)/Carlton (VFL)",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Geelong College": 32
+    },
+    "added_seen_in_stored_vocab": {
+     "Geelong College": 30
+    },
+    "added_segments": [
+     "Geelong College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6333,
+   "in_original_46": false,
+   "pick": null,
+   "player": "Alex Cincotta",
+   "player_id": 303,
+   "year": 2022
+  },
+  {
+   "cat": "Post-Draft",
+   "class": "INSERT_SCHOOL",
+   "club": "Carlton",
+   "csv": "Camberwell/Camberwell HS/Oakleigh U18",
+   "db": "Camberwell/Oakleigh U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Camberwell HS": 1
+    },
+    "added_seen_in_stored_vocab": {
+     "Camberwell HS": 0
+    },
+    "added_segments": [
+     "Camberwell HS"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6339,
+   "in_original_46": false,
+   "pick": null,
+   "player": "Hudson O'Keeffe",
+   "player_id": 5909,
+   "year": 2022
+  },
+  {
+   "cat": "Post-Draft",
+   "class": "INSERT_SCHOOL",
+   "club": "Melbourne",
+   "csv": "Beaumaris/Haileybury College/Sandringham U18/Old Haileybury/Frankston",
+   "db": "Beaumaris/Sandringham U18/Old Haileybury/Frankston",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Haileybury College": 75
+    },
+    "added_seen_in_stored_vocab": {
+     "Haileybury College": 72
+    },
+    "added_segments": [
+     "Haileybury College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6343,
+   "in_original_46": false,
+   "pick": null,
+   "player": "Kye Turner",
+   "player_id": null,
+   "year": 2022
+  },
+  {
+   "cat": "Mid-Season",
+   "class": "INSERT_SCHOOL",
+   "club": "North Melbourne",
+   "csv": "Trinity College (WA)/Subiaco",
+   "db": "Subiaco",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Trinity College (WA)": 37
+    },
+    "added_seen_in_stored_vocab": {
+     "Trinity College (WA)": 37
+    },
+    "added_segments": [
+     "Trinity College (WA)"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6345,
+   "in_original_46": true,
+   "pick": 2,
+   "player": "Robert Hansen",
+   "player_id": 11095,
+   "year": 2022
+  },
+  {
+   "cat": "Mid-Season",
+   "class": "INSERT_SCHOOL",
+   "club": "Fremantle",
+   "csv": "Mornington SC/Box Hill",
+   "db": "Box Hill",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Mornington SC": 5
+    },
+    "added_seen_in_stored_vocab": {
+     "Mornington SC": 4
+    },
+    "added_segments": [
+     "Mornington SC"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6350,
+   "in_original_46": true,
+   "pick": 8,
+   "player": "Ethan Stanley",
+   "player_id": 4259,
+   "year": 2022
+  },
+  {
+   "cat": "Mid-Season",
+   "class": "INSERT_SCHOOL",
+   "club": "Essendon",
+   "csv": "Aquinas College (WA)/Perth",
+   "db": "Perth",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Aquinas College (WA)": 38
+    },
+    "added_seen_in_stored_vocab": {
+     "Aquinas College (WA)": 36
+    },
+    "added_segments": [
+     "Aquinas College (WA)"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6351,
+   "in_original_46": true,
+   "pick": 9,
+   "player": "Jaiden Hunter",
+   "player_id": null,
+   "year": 2022
+  },
+  {
+   "cat": "Mid-Season",
+   "class": "INSERT_SCHOOL",
+   "club": "Richmond",
+   "csv": "Tooradin-Dalmore/St Francis Xavier College (Beaconsfield)/Richmond (VFL)",
+   "db": "Tooradin-Dalmore/Richmond (VFL)",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "St Francis Xavier College (Beaconsfield)": 1
+    },
+    "added_seen_in_stored_vocab": {
+     "St Francis Xavier College (Beaconsfield)": 0
+    },
+    "added_segments": [
+     "St Francis Xavier College (Beaconsfield)"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6355,
+   "in_original_46": false,
+   "pick": 13,
+   "player": "James Trezise",
+   "player_id": 6750,
+   "year": 2022
+  },
+  {
+   "cat": "Mid-Season",
+   "class": "INSERT_SCHOOL",
+   "club": "Sydney",
+   "csv": "Cottesloe JFC/Scotch College (WA)/Claremont",
+   "db": "Cottesloe JFC/Claremont",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Scotch College (WA)": 22
+    },
+    "added_seen_in_stored_vocab": {
+     "Scotch College (WA)": 16
+    },
+    "added_segments": [
+     "Scotch College (WA)"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [
+     {
+      "id": 6679,
+      "origin": "Cottesloe JFC/Claremont",
+      "type": "Trade",
+      "year": 2025
+     }
+    ],
+    "stored_segments_all_retained": true
+   },
+   "id": 6356,
+   "in_original_46": false,
+   "pick": 15,
+   "player": "Jack Buller",
+   "player_id": 6165,
+   "year": 2022
+  },
+  {
+   "cat": "Trade",
+   "class": "INSERT_SCHOOL",
+   "club": "Hawthorn",
+   "csv": "Point Cook/Maribyrnong College/Western U18/Richmond (VFL)",
+   "db": "Point Cook/Western U18/Richmond (VFL)",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Maribyrnong College": 15
+    },
+    "added_seen_in_stored_vocab": {
+     "Maribyrnong College": 10
+    },
+    "added_segments": [
+     "Maribyrnong College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [
+     {
+      "id": 6183,
+      "origin": "Point Cook/Western U18/Richmond (VFL)",
+      "type": "Mid-Season",
+      "year": 2021
+     }
+    ],
+    "stored_segments_all_retained": true
+   },
+   "id": 6374,
+   "in_original_46": false,
+   "pick": null,
+   "player": "Massimo D'Ambrosio",
+   "player_id": 9197,
+   "year": 2023
+  },
+  {
+   "cat": "Pre-Draft",
+   "class": "INSERT_SCHOOL",
+   "club": "Richmond",
+   "csv": "Peninsula Grammar/Basketball",
+   "db": "Basketball",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Peninsula Grammar": 10
+    },
+    "added_seen_in_stored_vocab": {
+     "Peninsula Grammar": 9
+    },
+    "added_segments": [
+     "Peninsula Grammar"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6399,
+   "in_original_46": true,
+   "pick": null,
+   "player": "Oliver Hayes-Brown",
+   "player_id": 13351,
+   "year": 2023
+  },
+  {
+   "cat": "National",
+   "class": "RENAME_EXPAND",
+   "club": "Hawthorn",
+   "csv": "Brighton Districts & Old Scholars/Sacred Heart College/Glenelg",
+   "db": "Brighton/Sacred Heart College/Glenelg",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Brighton Districts & Old Scholars": 12
+    },
+    "added_seen_in_stored_vocab": {
+     "Brighton Districts & Old Scholars": 9
+    },
+    "added_segments": [
+     "Brighton Districts & Old Scholars"
+    ],
+    "positions": [],
+    "removed_seen_in_csv_vocab": {
+     "Brighton": 1
+    },
+    "removed_segments": [
+     "Brighton"
+    ],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": false
+   },
+   "id": 6445,
+   "in_original_46": false,
+   "pick": 46,
+   "player": "Bodie Ryan",
+   "player_id": 13340,
+   "year": 2023
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Western Bulldogs",
+   "csv": "Northam Saints JFC/Wesley College (WA)/Perth",
+   "db": "Northam Saints JFC/Perth",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Wesley College (WA)": 35
+    },
+    "added_seen_in_stored_vocab": {
+     "Wesley College (WA)": 30
+    },
+    "added_segments": [
+     "Wesley College (WA)"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6454,
+   "in_original_46": false,
+   "pick": 55,
+   "player": "Aiden O'Driscoll",
+   "player_id": null,
+   "year": 2023
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Geelong",
+   "csv": "Barwon Heads/St Joseph's College/Geelong U18",
+   "db": "Barwon Heads/Geelong U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "St Joseph's College": 30
+    },
+    "added_seen_in_stored_vocab": {
+     "St Joseph's College": 29
+    },
+    "added_segments": [
+     "St Joseph's College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6460,
+   "in_original_46": false,
+   "pick": 61,
+   "player": "Oli Wiltshire",
+   "player_id": 10126,
+   "year": 2023
+  },
+  {
+   "cat": "Rookie",
+   "class": "INSERT_SCHOOL",
+   "club": "North Melbourne",
+   "csv": "Research/Eltham/Eltham HS/Northern U18/Northern Bullants",
+   "db": "Research/Eltham/Northern U18/Northern Bullants",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Eltham HS": 2
+    },
+    "added_seen_in_stored_vocab": {
+     "Eltham HS": 0
+    },
+    "added_segments": [
+     "Eltham HS"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [
+     {
+      "id": 6689,
+      "origin": "Research/Eltham/Northern U18/Northern Bullants",
+      "type": "Trade",
+      "year": 2025
+     }
+    ],
+    "stored_segments_all_retained": true
+   },
+   "id": 6466,
+   "in_original_46": false,
+   "pick": 2,
+   "player": "Finnbar Maley",
+   "player_id": 4278,
+   "year": 2023
+  },
+  {
+   "cat": "Rookie",
+   "class": "INSERT_SCHOOL",
+   "club": "Port Adelaide",
+   "csv": "Mt Lawley Inglewood JFC/Trinity College (WA)/East Perth",
+   "db": "Mt Lawley Inglewood JFC/East Perth",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Trinity College (WA)": 37
+    },
+    "added_seen_in_stored_vocab": {
+     "Trinity College (WA)": 37
+    },
+    "added_segments": [
+     "Trinity College (WA)"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6471,
+   "in_original_46": false,
+   "pick": 13,
+   "player": "Xavier Walsh",
+   "player_id": null,
+   "year": 2023
+  },
+  {
+   "cat": "Rookie",
+   "class": "INSERT_SCHOOL",
+   "club": "Gold Coast",
+   "csv": "Southern Districts/Rostrevor College/Norwood",
+   "db": "Southern Districts/Norwood",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Rostrevor College": 37
+    },
+    "added_seen_in_stored_vocab": {
+     "Rostrevor College": 36
+    },
+    "added_segments": [
+     "Rostrevor College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6473,
+   "in_original_46": false,
+   "pick": 18,
+   "player": "Will Rowlands",
+   "player_id": null,
+   "year": 2023
+  },
+  {
+   "cat": "Post-Draft",
+   "class": "INSERT_SCHOOL",
+   "club": "West Coast",
+   "csv": "Scotch College (WA)/Perth",
+   "db": "Perth",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Scotch College (WA)": 22
+    },
+    "added_seen_in_stored_vocab": {
+     "Scotch College (WA)": 16
+    },
+    "added_segments": [
+     "Scotch College (WA)"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6479,
+   "in_original_46": true,
+   "pick": null,
+   "player": "Coen Livingstone",
+   "player_id": null,
+   "year": 2023
+  },
+  {
+   "cat": "Post-Draft",
+   "class": "INSERT_SCHOOL",
+   "club": "North Melbourne",
+   "csv": "Old Scotch/Scotch College/North Melbourne (VFL)",
+   "db": "Old Scotch/North Melbourne (VFL)",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Scotch College": 55
+    },
+    "added_seen_in_stored_vocab": {
+     "Scotch College": 49
+    },
+    "added_segments": [
+     "Scotch College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6486,
+   "in_original_46": false,
+   "pick": null,
+   "player": "Tyler Sellers",
+   "player_id": 12899,
+   "year": 2023
+  },
+  {
+   "cat": "Post-Draft",
+   "class": "INSERT_SCHOOL",
+   "club": "Collingwood",
+   "csv": "St Kevin's College/Footscray (VFL)",
+   "db": "Footscray (VFL)",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "St Kevin's College": 49
+    },
+    "added_seen_in_stored_vocab": {
+     "St Kevin's College": 47
+    },
+    "added_segments": [
+     "St Kevin's College"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6488,
+   "in_original_46": true,
+   "pick": null,
+   "player": "Lachie Sullivan",
+   "player_id": 8375,
+   "year": 2023
+  },
+  {
+   "cat": "Mid-Season",
+   "class": "INSERT_SCHOOL",
+   "club": "Richmond",
+   "csv": "Wesley College (WA)/Peel",
+   "db": "Peel",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Wesley College (WA)": 35
+    },
+    "added_seen_in_stored_vocab": {
+     "Wesley College (WA)": 30
+    },
+    "added_segments": [
+     "Wesley College (WA)"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6491,
+   "in_original_46": true,
+   "pick": 2,
+   "player": "Jacob Blight",
+   "player_id": 6653,
+   "year": 2023
+  },
+  {
+   "cat": "Mid-Season",
+   "class": "INSERT_SCHOOL",
+   "club": "Brisbane",
+   "csv": "Trinity College (Colac)/Geelong U18",
+   "db": "Geelong U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Trinity College (Colac)": 1
+    },
+    "added_seen_in_stored_vocab": {
+     "Trinity College (Colac)": 0
+    },
+    "added_segments": [
+     "Trinity College (Colac)"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6495,
+   "in_original_46": true,
+   "pick": 6,
+   "player": "Will McLachlan",
+   "player_id": 13199,
+   "year": 2023
+  },
+  {
+   "cat": "Mid-Season",
+   "class": "INSERT_SCHOOL",
+   "club": "Western Bulldogs",
+   "csv": "Blackfriars/North Adelaide",
+   "db": "North Adelaide",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Blackfriars": 8
+    },
+    "added_seen_in_stored_vocab": {
+     "Blackfriars": 8
+    },
+    "added_segments": [
+     "Blackfriars"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6497,
+   "in_original_46": true,
+   "pick": 8,
+   "player": "Kelsey Rypstra",
+   "player_id": null,
+   "year": 2023
+  },
+  {
+   "cat": "Mid-Season",
+   "class": "INSERT_SCHOOL",
+   "club": "Carlton",
+   "csv": "Scotch College/North Melbourne (VFL)",
+   "db": "North Melbourne (VFL)",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Scotch College": 55
+    },
+    "added_seen_in_stored_vocab": {
+     "Scotch College": 49
+    },
+    "added_segments": [
+     "Scotch College"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6498,
+   "in_original_46": true,
+   "pick": 9,
+   "player": "Cooper Lord",
+   "player_id": 3050,
+   "year": 2023
+  },
+  {
+   "cat": "Mid-Season",
+   "class": "INSERT_SCHOOL",
+   "club": "Sydney",
+   "csv": "Xavier College/Gippsland U18",
+   "db": "Gippsland U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Xavier College": 81
+    },
+    "added_seen_in_stored_vocab": {
+     "Xavier College": 77
+    },
+    "added_segments": [
+     "Xavier College"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6503,
+   "in_original_46": true,
+   "pick": 14,
+   "player": "Tom Hanily",
+   "player_id": 12555,
+   "year": 2023
+  },
+  {
+   "cat": "Mid-Season",
+   "class": "INSERT_SCHOOL",
+   "club": "Richmond",
+   "csv": "Overnewton College/Essendon (VFL)",
+   "db": "Essendon (VFL)",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Overnewton College": 1
+    },
+    "added_seen_in_stored_vocab": {
+     "Overnewton College": 0
+    },
+    "added_segments": [
+     "Overnewton College"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6505,
+   "in_original_46": true,
+   "pick": 16,
+   "player": "Campbell Gray",
+   "player_id": 2520,
+   "year": 2023
+  },
+  {
+   "cat": "Pre-Draft",
+   "class": "INSERT_SCHOOL",
+   "club": "Hawthorn",
+   "csv": "St Brendan's College (Yeppoon)/Rugby League",
+   "db": "Rugby League",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "St Brendan's College (Yeppoon)": 1
+    },
+    "added_seen_in_stored_vocab": {
+     "St Brendan's College (Yeppoon)": 0
+    },
+    "added_segments": [
+     "St Brendan's College (Yeppoon)"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6545,
+   "in_original_46": true,
+   "pick": null,
+   "player": "Matt Hill",
+   "player_id": 13358,
+   "year": 2024
+  },
+  {
+   "cat": "National",
+   "class": "RENAME_EXPAND",
+   "club": "Carlton",
+   "csv": "Brighton Districts & Old Scholars/Sacred Heart College/Glenelg",
+   "db": "Brighton/Sacred Heart College/Glenelg",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Brighton Districts & Old Scholars": 12
+    },
+    "added_seen_in_stored_vocab": {
+     "Brighton Districts & Old Scholars": 9
+    },
+    "added_segments": [
+     "Brighton Districts & Old Scholars"
+    ],
+    "positions": [],
+    "removed_seen_in_csv_vocab": {
+     "Brighton": 1
+    },
+    "removed_segments": [
+     "Brighton"
+    ],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": false
+   },
+   "id": 6590,
+   "in_original_46": false,
+   "pick": 43,
+   "player": "Ben Camporeale",
+   "player_id": null,
+   "year": 2024
+  },
+  {
+   "cat": "National",
+   "class": "RENAME_EXPAND",
+   "club": "Carlton",
+   "csv": "Brighton Districts & Old Scholars/Sacred Heart College/Glenelg",
+   "db": "Brighton/Sacred Heart College/Glenelg",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Brighton Districts & Old Scholars": 12
+    },
+    "added_seen_in_stored_vocab": {
+     "Brighton Districts & Old Scholars": 9
+    },
+    "added_segments": [
+     "Brighton Districts & Old Scholars"
+    ],
+    "positions": [],
+    "removed_seen_in_csv_vocab": {
+     "Brighton": 1
+    },
+    "removed_segments": [
+     "Brighton"
+    ],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": false
+   },
+   "id": 6601,
+   "in_original_46": false,
+   "pick": 54,
+   "player": "Lucas Camporeale",
+   "player_id": 8903,
+   "year": 2024
+  },
+  {
+   "cat": "Rookie",
+   "class": "REPLACE_CLUB",
+   "club": "Sydney",
+   "csv": "Surrey Park/Wesley College/Oakleigh U18",
+   "db": "Collegians/Wesley College/Oakleigh U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Surrey Park": 7
+    },
+    "added_seen_in_stored_vocab": {
+     "Surrey Park": 7
+    },
+    "added_segments": [
+     "Surrey Park"
+    ],
+    "positions": [],
+    "removed_seen_in_csv_vocab": {
+     "Collegians": 8
+    },
+    "removed_segments": [
+     "Collegians"
+    ],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": false
+   },
+   "id": 6626,
+   "in_original_46": false,
+   "pick": 14,
+   "player": "Blake Leidler",
+   "player_id": null,
+   "year": 2024
+  },
+  {
+   "cat": "Post-Draft",
+   "class": "INSERT_SCHOOL",
+   "club": "GWS",
+   "csv": "Kellyville-Rouse Hill/Oakhill College",
+   "db": "Kellyville-Rouse Hill",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Oakhill College": 3
+    },
+    "added_seen_in_stored_vocab": {
+     "Oakhill College": 2
+    },
+    "added_segments": [
+     "Oakhill College"
+    ],
+    "positions": [
+     "suffix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6631,
+   "in_original_46": false,
+   "pick": null,
+   "player": "Josaia Delana",
+   "player_id": 7845,
+   "year": 2024
+  },
+  {
+   "cat": "Post-Draft",
+   "class": "INSERT_SCHOOL",
+   "club": "Gold Coast",
+   "csv": "All Saints Anglican/Burleigh",
+   "db": "Burleigh",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "All Saints Anglican": 6
+    },
+    "added_seen_in_stored_vocab": {
+     "All Saints Anglican": 0
+    },
+    "added_segments": [
+     "All Saints Anglican"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6632,
+   "in_original_46": true,
+   "pick": null,
+   "player": "Lachlan Gulbin",
+   "player_id": 8365,
+   "year": 2024
+  },
+  {
+   "cat": "Post-Draft",
+   "class": "INSERT_SCHOOL",
+   "club": "Essendon",
+   "csv": "Avondale Heights/Aberfeldie/Maribyrnong College/Calder U18",
+   "db": "Avondale Heights/Aberfeldie/Calder U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Maribyrnong College": 15
+    },
+    "added_seen_in_stored_vocab": {
+     "Maribyrnong College": 10
+    },
+    "added_segments": [
+     "Maribyrnong College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6633,
+   "in_original_46": false,
+   "pick": null,
+   "player": "Jayden Nguyen",
+   "player_id": 6883,
+   "year": 2024
+  },
+  {
+   "cat": "Post-Draft",
+   "class": "INSERT_SCHOOL",
+   "club": "Melbourne",
+   "csv": "Palmerston/Morwell/Lowanna College/Gippsland U18",
+   "db": "Palmerston/Morwell/Gippsland U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Lowanna College": 11
+    },
+    "added_seen_in_stored_vocab": {
+     "Lowanna College": 8
+    },
+    "added_segments": [
+     "Lowanna College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6634,
+   "in_original_46": false,
+   "pick": null,
+   "player": "Ricky Mentha",
+   "player_id": null,
+   "year": 2024
+  },
+  {
+   "cat": "Post-Draft",
+   "class": "INSERT_SCHOOL",
+   "club": "Fremantle",
+   "csv": "Prince Alfred College/Central District",
+   "db": "Central District",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Prince Alfred College": 34
+    },
+    "added_seen_in_stored_vocab": {
+     "Prince Alfred College": 40
+    },
+    "added_segments": [
+     "Prince Alfred College"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6641,
+   "in_original_46": true,
+   "pick": null,
+   "player": "Isaiah Dudley",
+   "player_id": 6085,
+   "year": 2024
+  },
+  {
+   "cat": "Post-Draft",
+   "class": "INSERT_SCHOOL",
+   "club": "Melbourne",
+   "csv": "Geelong College/Werribee",
+   "db": "Werribee",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Geelong College": 32
+    },
+    "added_seen_in_stored_vocab": {
+     "Geelong College": 30
+    },
+    "added_segments": [
+     "Geelong College"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6644,
+   "in_original_46": true,
+   "pick": null,
+   "player": "Jack Henderson",
+   "player_id": 6333,
+   "year": 2024
+  },
+  {
+   "cat": "Post-Draft",
+   "class": "INSERT_SCHOOL",
+   "club": "Port Adelaide",
+   "csv": "Cheltenham/Mentone Grammar",
+   "db": "Cheltenham",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Mentone Grammar": 12
+    },
+    "added_seen_in_stored_vocab": {
+     "Mentone Grammar": 13
+    },
+    "added_segments": [
+     "Mentone Grammar"
+    ],
+    "positions": [
+     "suffix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6646,
+   "in_original_46": false,
+   "pick": null,
+   "player": "Josh Lai",
+   "player_id": 13332,
+   "year": 2024
+  },
+  {
+   "cat": "Post-Draft",
+   "class": "INSERT_SCHOOL",
+   "club": "Carlton",
+   "csv": "Emmanuel College (Warrnambool)/North Ballarat U18/Carlton (VFL)",
+   "db": "North Ballarat U18/Carlton (VFL)",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Emmanuel College (Warrnambool)": 10
+    },
+    "added_seen_in_stored_vocab": {
+     "Emmanuel College (Warrnambool)": 7
+    },
+    "added_segments": [
+     "Emmanuel College (Warrnambool)"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6650,
+   "in_original_46": true,
+   "pick": null,
+   "player": "Will White",
+   "player_id": 13212,
+   "year": 2024
+  },
+  {
+   "cat": "Mid-Season",
+   "class": "INSERT_SCHOOL",
+   "club": "Port Adelaide",
+   "csv": "Sacred Heart College/Glenelg",
+   "db": "Glenelg",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Sacred Heart College": 55
+    },
+    "added_seen_in_stored_vocab": {
+     "Sacred Heart College": 59
+    },
+    "added_segments": [
+     "Sacred Heart College"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6653,
+   "in_original_46": true,
+   "pick": 3,
+   "player": "Harrison Ramm",
+   "player_id": 5542,
+   "year": 2024
+  },
+  {
+   "cat": "Mid-Season",
+   "class": "INSERT_SCHOOL",
+   "club": "Western Bulldogs",
+   "csv": "Aquinas College (WA)/Peel",
+   "db": "Peel",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Aquinas College (WA)": 38
+    },
+    "added_seen_in_stored_vocab": {
+     "Aquinas College (WA)": 36
+    },
+    "added_segments": [
+     "Aquinas College (WA)"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6655,
+   "in_original_46": true,
+   "pick": 5,
+   "player": "Michael Sellwood",
+   "player_id": 13354,
+   "year": 2024
+  },
+  {
+   "cat": "Mid-Season",
+   "class": "INSERT_SCHOOL",
+   "club": "Essendon",
+   "csv": "Brighton Grammar/Richmond (VFL)/Subiaco",
+   "db": "Richmond (VFL)/Subiaco",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Brighton Grammar": 39
+    },
+    "added_seen_in_stored_vocab": {
+     "Brighton Grammar": 36
+    },
+    "added_segments": [
+     "Brighton Grammar"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6656,
+   "in_original_46": true,
+   "pick": 6,
+   "player": "Archie May",
+   "player_id": 729,
+   "year": 2024
+  },
+  {
+   "cat": "Mid-Season",
+   "class": "INSERT_SCHOOL",
+   "club": "Gold Coast",
+   "csv": "South Gambier/Tenison Woods College/Glenelg",
+   "db": "South Gambier/Glenelg",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Tenison Woods College": 3
+    },
+    "added_seen_in_stored_vocab": {
+     "Tenison Woods College": 1
+    },
+    "added_segments": [
+     "Tenison Woods College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [
+     {
+      "id": 6135,
+      "origin": "South Gambier/Glenelg",
+      "type": "National",
+      "year": 2021
+     }
+    ],
+    "stored_segments_all_retained": true
+   },
+   "id": 6657,
+   "in_original_46": false,
+   "pick": 7,
+   "player": "Oscar Adams",
+   "player_id": 10137,
+   "year": 2024
+  },
+  {
+   "cat": "Mid-Season",
+   "class": "INSERT_SCHOOL",
+   "club": "West Coast",
+   "csv": "Rostrevor College/Norwood",
+   "db": "Norwood",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Rostrevor College": 37
+    },
+    "added_seen_in_stored_vocab": {
+     "Rostrevor College": 36
+    },
+    "added_segments": [
+     "Rostrevor College"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6659,
+   "in_original_46": true,
+   "pick": 9,
+   "player": "Jacob Newton",
+   "player_id": 6661,
+   "year": 2024
+  },
+  {
+   "cat": "Mid-Season",
+   "class": "INSERT_SCHOOL",
+   "club": "North Melbourne",
+   "csv": "Whitefriars College/Eastern U18/North Melbourne (VFL)",
+   "db": "Eastern U18/North Melbourne (VFL)",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Whitefriars College": 21
+    },
+    "added_seen_in_stored_vocab": {
+     "Whitefriars College": 19
+    },
+    "added_segments": [
+     "Whitefriars College"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6660,
+   "in_original_46": true,
+   "pick": 10,
+   "player": "Cooper Trembath",
+   "player_id": 3054,
+   "year": 2024
+  },
+  {
+   "cat": "Mid-Season",
+   "class": "INSERT_SCHOOL",
+   "club": "Port Adelaide",
+   "csv": "Billabong HS/North Adelaide",
+   "db": "North Adelaide",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Billabong HS": 1
+    },
+    "added_seen_in_stored_vocab": {
+     "Billabong HS": 0
+    },
+    "added_segments": [
+     "Billabong HS"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6661,
+   "in_original_46": true,
+   "pick": 11,
+   "player": "Ewan Mackinlay",
+   "player_id": 4263,
+   "year": 2024
+  },
+  {
+   "cat": "Mid-Season",
+   "class": "INSERT_SCHOOL",
+   "club": "Gold Coast",
+   "csv": "Brighton Grammar/Sandringham U18/St Bedes Mentone (VAFA)/Footscray (VFL)/Dingley/Casey",
+   "db": "Sandringham U18/St Bedes Mentone (VAFA)/Footscray (VFL)/Dingley/Casey",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Brighton Grammar": 39
+    },
+    "added_seen_in_stored_vocab": {
+     "Brighton Grammar": 36
+    },
+    "added_segments": [
+     "Brighton Grammar"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6664,
+   "in_original_46": true,
+   "pick": 14,
+   "player": "Caleb Lewis",
+   "player_id": 13320,
+   "year": 2024
+  },
+  {
+   "cat": "Mid-Season",
+   "class": "INSERT_SCHOOL",
+   "club": "Essendon",
+   "csv": "St Joseph's College (Echuca)/Essendon (VFL)",
+   "db": "Essendon (VFL)",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "St Joseph's College (Echuca)": 3
+    },
+    "added_seen_in_stored_vocab": {
+     "St Joseph's College (Echuca)": 2
+    },
+    "added_segments": [
+     "St Joseph's College (Echuca)"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6667,
+   "in_original_46": true,
+   "pick": 17,
+   "player": "Oskar Smartt",
+   "player_id": 10146,
+   "year": 2024
+  },
+  {
+   "cat": "Trade",
+   "class": "INSERT_SCHOOL",
+   "club": "Collingwood",
+   "csv": "Cottesloe JFC/Scotch College (WA)/Claremont",
+   "db": "Cottesloe JFC/Claremont",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Scotch College (WA)": 22
+    },
+    "added_seen_in_stored_vocab": {
+     "Scotch College (WA)": 16
+    },
+    "added_segments": [
+     "Scotch College (WA)"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [
+     {
+      "id": 6356,
+      "origin": "Cottesloe JFC/Claremont",
+      "type": "Mid-Season",
+      "year": 2022
+     }
+    ],
+    "stored_segments_all_retained": true
+   },
+   "id": 6679,
+   "in_original_46": false,
+   "pick": null,
+   "player": "Jack Buller",
+   "player_id": 6165,
+   "year": 2025
+  },
+  {
+   "cat": "Trade",
+   "class": "INSERT_SCHOOL",
+   "club": "Adelaide",
+   "csv": "Research/Eltham/Eltham HS/Northern U18/Northern Bullants",
+   "db": "Research/Eltham/Northern U18/Northern Bullants",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Eltham HS": 2
+    },
+    "added_seen_in_stored_vocab": {
+     "Eltham HS": 0
+    },
+    "added_segments": [
+     "Eltham HS"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [
+     {
+      "id": 6466,
+      "origin": "Research/Eltham/Northern U18/Northern Bullants",
+      "type": "Rookie",
+      "year": 2023
+     }
+    ],
+    "stored_segments_all_retained": true
+   },
+   "id": 6689,
+   "in_original_46": false,
+   "pick": null,
+   "player": "Finnbar Maley",
+   "player_id": 4278,
+   "year": 2025
+  },
+  {
+   "cat": "Trade",
+   "class": "INSERT_SCHOOL",
+   "club": "Fremantle",
+   "csv": "Swanbourne JFC/Mullewa/Geraldton SHS/East Fremantle",
+   "db": "Swanbourne JFC/Mullewa/East Fremantle",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Geraldton SHS": 2
+    },
+    "added_seen_in_stored_vocab": {
+     "Geraldton SHS": 0
+    },
+    "added_segments": [
+     "Geraldton SHS"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [
+     {
+      "id": 6160,
+      "origin": "Swanbourne JFC/Mullewa/East Fremantle",
+      "type": "Rookie",
+      "year": 2021
+     }
+    ],
+    "stored_segments_all_retained": true
+   },
+   "id": 6690,
+   "in_original_46": false,
+   "pick": null,
+   "player": "Judd McVee",
+   "player_id": 7913,
+   "year": 2025
+  },
+  {
+   "cat": "Trade",
+   "class": "INSERT_SCHOOL",
+   "club": "Carlton",
+   "csv": "East Brighton/Brighton SC/Frankston",
+   "db": "East Brighton/Frankston",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Brighton SC": 2
+    },
+    "added_seen_in_stored_vocab": {
+     "Brighton SC": 0
+    },
+    "added_segments": [
+     "Brighton SC"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [
+     {
+      "id": 6303,
+      "origin": "East Brighton/Frankston",
+      "type": "Rookie",
+      "year": 2022
+     }
+    ],
+    "stored_segments_all_retained": true
+   },
+   "id": 6694,
+   "in_original_46": false,
+   "pick": null,
+   "player": "Liam Reidy",
+   "player_id": 8811,
+   "year": 2025
+  },
+  {
+   "cat": "Pre-Draft",
+   "class": "INSERT_SCHOOL",
+   "club": "Melbourne",
+   "csv": "Surfers Paradise/All Saints Anglican/Broadbeach",
+   "db": "Surfers Paradise/Broadbeach",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "All Saints Anglican": 6
+    },
+    "added_seen_in_stored_vocab": {
+     "All Saints Anglican": 0
+    },
+    "added_segments": [
+     "All Saints Anglican"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6703,
+   "in_original_46": false,
+   "pick": null,
+   "player": "Kalani White",
+   "player_id": null,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "West Coast",
+   "csv": "Foster/Foster SC/Gippsland U18",
+   "db": "Foster/Gippsland U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Foster SC": 4
+    },
+    "added_seen_in_stored_vocab": {
+     "Foster SC": 3
+    },
+    "added_segments": [
+     "Foster SC"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6704,
+   "in_original_46": false,
+   "pick": 1,
+   "player": "Willem Duursma",
+   "player_id": 13362,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Gold Coast",
+   "csv": "All Saints Anglican/Burleigh",
+   "db": "Burleigh",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "All Saints Anglican": 6
+    },
+    "added_seen_in_stored_vocab": {
+     "All Saints Anglican": 0
+    },
+    "added_segments": [
+     "All Saints Anglican"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6705,
+   "in_original_46": true,
+   "pick": 2,
+   "player": "Zeke Uwland",
+   "player_id": 13296,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Carlton",
+   "csv": "Lavington/Scots School (Albury)/Murray U18",
+   "db": "Lavington/Murray U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Scots School (Albury)": 1
+    },
+    "added_seen_in_stored_vocab": {
+     "Scots School (Albury)": 0
+    },
+    "added_segments": [
+     "Scots School (Albury)"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6706,
+   "in_original_46": false,
+   "pick": 3,
+   "player": "Harry Dean",
+   "player_id": 13341,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Gold Coast",
+   "csv": "Palm Beach Currumbin SHS/Palm Beach Currumbin",
+   "db": "Palm Beach Currumbin",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Palm Beach Currumbin SHS": 4
+    },
+    "added_seen_in_stored_vocab": {
+     "Palm Beach Currumbin SHS": 2
+    },
+    "added_segments": [
+     "Palm Beach Currumbin SHS"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6708,
+   "in_original_46": true,
+   "pick": 5,
+   "player": "Dylan Patterson",
+   "player_id": 13345,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Brisbane",
+   "csv": "Cleveland SHS/Redland-Victoria Point",
+   "db": "Redland-Victoria Point",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Cleveland SHS": 1
+    },
+    "added_seen_in_stored_vocab": {
+     "Cleveland SHS": 0
+    },
+    "added_segments": [
+     "Cleveland SHS"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6709,
+   "in_original_46": true,
+   "pick": 6,
+   "player": "Daniel Annable",
+   "player_id": 13325,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Richmond",
+   "csv": "Wentworth/Prince Alfred College/North Adelaide",
+   "db": "Wentworth/North Adelaide",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Prince Alfred College": 34
+    },
+    "added_seen_in_stored_vocab": {
+     "Prince Alfred College": 40
+    },
+    "added_segments": [
+     "Prince Alfred College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6710,
+   "in_original_46": false,
+   "pick": 7,
+   "player": "Sam Cumming",
+   "player_id": 13298,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Richmond",
+   "csv": "Canterbury/Camberwell Grammar/Oakleigh U18",
+   "db": "Canterbury/Oakleigh U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Camberwell Grammar": 15
+    },
+    "added_seen_in_stored_vocab": {
+     "Camberwell Grammar": 15
+    },
+    "added_segments": [
+     "Camberwell Grammar"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6711,
+   "in_original_46": false,
+   "pick": 8,
+   "player": "Sam Grlj",
+   "player_id": 13295,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Essendon",
+   "csv": "Rowville/Mazenod College/Eastern U18",
+   "db": "Rowville/Eastern U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Mazenod College": 12
+    },
+    "added_seen_in_stored_vocab": {
+     "Mazenod College": 11
+    },
+    "added_segments": [
+     "Mazenod College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6712,
+   "in_original_46": false,
+   "pick": 9,
+   "player": "Sullivan Robey",
+   "player_id": 13294,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Essendon",
+   "csv": "Joondalup Kinross JFC/Mater Dei College/West Perth",
+   "db": "Joondalup Kinross JFC/West Perth",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Mater Dei College": 1
+    },
+    "added_seen_in_stored_vocab": {
+     "Mater Dei College": 0
+    },
+    "added_segments": [
+     "Mater Dei College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6713,
+   "in_original_46": false,
+   "pick": 10,
+   "player": "Jacob Farrow",
+   "player_id": 13347,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Melbourne",
+   "csv": "East Ringwood/Rowville SC/Eastern U18",
+   "db": "East Ringwood/Eastern U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Rowville SC": 10
+    },
+    "added_seen_in_stored_vocab": {
+     "Rowville SC": 7
+    },
+    "added_segments": [
+     "Rowville SC"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6714,
+   "in_original_46": false,
+   "pick": 11,
+   "player": "Xavier Taylor",
+   "player_id": 13300,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Essendon",
+   "csv": "Barossa/Xavier College (SA)/Central District",
+   "db": "Barossa/Central District",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Xavier College (SA)": 1
+    },
+    "added_seen_in_stored_vocab": {
+     "Xavier College (SA)": 0
+    },
+    "added_segments": [
+     "Xavier College (SA)"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6716,
+   "in_original_46": false,
+   "pick": 13,
+   "player": "Dyson Sharp",
+   "player_id": 13329,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Sydney",
+   "csv": "Scots College/UNSW-Eastern Suburbs",
+   "db": "UNSW-Eastern Suburbs",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Scots College": 4
+    },
+    "added_seen_in_stored_vocab": {
+     "Scots College": 2
+    },
+    "added_segments": [
+     "Scots College"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6717,
+   "in_original_46": true,
+   "pick": 14,
+   "player": "Harry Kyle",
+   "player_id": 13327,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "GWS",
+   "csv": "Upwey-Tecoma/St Joseph's College (Ferntree Gully)/Eastern U18",
+   "db": "Upwey-Tecoma/Eastern U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "St Joseph's College (Ferntree Gully)": 10
+    },
+    "added_seen_in_stored_vocab": {
+     "St Joseph's College (Ferntree Gully)": 9
+    },
+    "added_segments": [
+     "St Joseph's College (Ferntree Gully)"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6718,
+   "in_original_46": false,
+   "pick": 15,
+   "player": "Oskar Taylor",
+   "player_id": null,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "North Melbourne",
+   "csv": "Blackburn/Rowville SC/Eastern U18",
+   "db": "Blackburn/Eastern U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Rowville SC": 10
+    },
+    "added_seen_in_stored_vocab": {
+     "Rowville SC": 7
+    },
+    "added_segments": [
+     "Rowville SC"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6719,
+   "in_original_46": false,
+   "pick": 16,
+   "player": "Lachy Dovaston",
+   "player_id": 13304,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Gold Coast",
+   "csv": "Palm Beach Currumbin SHS/Burleigh",
+   "db": "Burleigh",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Palm Beach Currumbin SHS": 4
+    },
+    "added_seen_in_stored_vocab": {
+     "Palm Beach Currumbin SHS": 2
+    },
+    "added_segments": [
+     "Palm Beach Currumbin SHS"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6720,
+   "in_original_46": true,
+   "pick": 17,
+   "player": "Jai Murray",
+   "player_id": 13314,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Gold Coast",
+   "csv": "All Saints Anglican/Burleigh",
+   "db": "Burleigh",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "All Saints Anglican": 6
+    },
+    "added_seen_in_stored_vocab": {
+     "All Saints Anglican": 0
+    },
+    "added_segments": [
+     "All Saints Anglican"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6721,
+   "in_original_46": true,
+   "pick": 18,
+   "player": "Beau Addinsall",
+   "player_id": 13308,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "West Coast",
+   "csv": "Newtown & Chilwell/Geelong Grammar/Geelong U18",
+   "db": "Newtown & Chilwell/Geelong U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Geelong Grammar": 30
+    },
+    "added_seen_in_stored_vocab": {
+     "Geelong Grammar": 27
+    },
+    "added_segments": [
+     "Geelong Grammar"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6722,
+   "in_original_46": false,
+   "pick": 19,
+   "player": "Josh Lindsay",
+   "player_id": 13360,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Hawthorn",
+   "csv": "Willaston/Kapunda HS/Central District",
+   "db": "Willaston/Central District",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Kapunda HS": 1
+    },
+    "added_seen_in_stored_vocab": {
+     "Kapunda HS": 0
+    },
+    "added_segments": [
+     "Kapunda HS"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6723,
+   "in_original_46": false,
+   "pick": 20,
+   "player": "Cam Nairn",
+   "player_id": 13318,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Western Bulldogs",
+   "csv": "North Shore (NSW)/Scots College",
+   "db": "North Shore (NSW)",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Scots College": 4
+    },
+    "added_seen_in_stored_vocab": {
+     "Scots College": 2
+    },
+    "added_segments": [
+     "Scots College"
+    ],
+    "positions": [
+     "suffix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6724,
+   "in_original_46": false,
+   "pick": 21,
+   "player": "Lachlan Carmichael",
+   "player_id": 13310,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Hawthorn",
+   "csv": "Gawler Central/Trinity College (SA)/Central District",
+   "db": "Gawler Central/Central District",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Trinity College (SA)": 4
+    },
+    "added_seen_in_stored_vocab": {
+     "Trinity College (SA)": 3
+    },
+    "added_segments": [
+     "Trinity College (SA)"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6726,
+   "in_original_46": false,
+   "pick": 23,
+   "player": "Aidan Schubert",
+   "player_id": 13284,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Fremantle",
+   "csv": "Pascoe Vale/Islamic College of Sport/Calder U18",
+   "db": "Pascoe Vale/Calder U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Islamic College of Sport": 1
+    },
+    "added_seen_in_stored_vocab": {
+     "Islamic College of Sport": 0
+    },
+    "added_segments": [
+     "Islamic College of Sport"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6728,
+   "in_original_46": false,
+   "pick": 25,
+   "player": "Adam Sweid",
+   "player_id": null,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Western Bulldogs",
+   "csv": "Glen Iris/Scotch College/Oakleigh U18",
+   "db": "Glen Iris/Oakleigh U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Scotch College": 55
+    },
+    "added_seen_in_stored_vocab": {
+     "Scotch College": 49
+    },
+    "added_segments": [
+     "Scotch College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6730,
+   "in_original_46": false,
+   "pick": 27,
+   "player": "Louis Emmett",
+   "player_id": 13342,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "West Coast",
+   "csv": "Glen Iris/Scotch College/Oakleigh U18",
+   "db": "Glen Iris/Oakleigh U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Scotch College": 55
+    },
+    "added_seen_in_stored_vocab": {
+     "Scotch College": 49
+    },
+    "added_segments": [
+     "Scotch College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6732,
+   "in_original_46": false,
+   "pick": 29,
+   "player": "Sam Allen",
+   "player_id": null,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Melbourne",
+   "csv": "Moe/Lowanna College/Gippsland U18",
+   "db": "Moe/Gippsland U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Lowanna College": 11
+    },
+    "added_seen_in_stored_vocab": {
+     "Lowanna College": 8
+    },
+    "added_segments": [
+     "Lowanna College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6733,
+   "in_original_46": false,
+   "pick": 30,
+   "player": "Thomas Matthews",
+   "player_id": null,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Richmond",
+   "csv": "Port District/St Michael's College (SA)/Woodville-West Torrens",
+   "db": "Port District/Woodville-West Torrens",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "St Michael's College (SA)": 15
+    },
+    "added_seen_in_stored_vocab": {
+     "St Michael's College (SA)": 18
+    },
+    "added_segments": [
+     "St Michael's College (SA)"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6734,
+   "in_original_46": false,
+   "pick": 31,
+   "player": "Zane Peucker",
+   "player_id": 13299,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Collingwood",
+   "csv": "St Laurence's College (Qld)/Coorparoo",
+   "db": "Coorparoo",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "St Laurence's College (Qld)": 2
+    },
+    "added_seen_in_stored_vocab": {
+     "St Laurence's College (Qld)": 1
+    },
+    "added_segments": [
+     "St Laurence's College (Qld)"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6735,
+   "in_original_46": true,
+   "pick": 32,
+   "player": "Tyan Prindable",
+   "player_id": null,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Geelong",
+   "csv": "Prahran/Melbourne Grammar/Oakleigh U18",
+   "db": "Prahran/Oakleigh U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Melbourne Grammar": 63
+    },
+    "added_seen_in_stored_vocab": {
+     "Melbourne Grammar": 64
+    },
+    "added_segments": [
+     "Melbourne Grammar"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6736,
+   "in_original_46": false,
+   "pick": 33,
+   "player": "Hunter Holmes",
+   "player_id": null,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Hawthorn",
+   "csv": "East Malvern/Xavier College/Sandringham U18",
+   "db": "East Malvern/Sandringham U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Xavier College": 81
+    },
+    "added_seen_in_stored_vocab": {
+     "Xavier College": 77
+    },
+    "added_segments": [
+     "Xavier College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6737,
+   "in_original_46": false,
+   "pick": 34,
+   "player": "Jack Dalton",
+   "player_id": 13317,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Essendon",
+   "csv": "Kew Rovers/Carey Grammar/Oakleigh U18",
+   "db": "Kew Rovers/Oakleigh U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Carey Grammar": 46
+    },
+    "added_seen_in_stored_vocab": {
+     "Carey Grammar": 42
+    },
+    "added_segments": [
+     "Carey Grammar"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6739,
+   "in_original_46": false,
+   "pick": 36,
+   "player": "Max Kondogiannis",
+   "player_id": 13285,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Collingwood",
+   "csv": "Whitford/Sacred Heart College (WA)/West Perth",
+   "db": "Whitford/West Perth",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Sacred Heart College (WA)": 8
+    },
+    "added_seen_in_stored_vocab": {
+     "Sacred Heart College (WA)": 7
+    },
+    "added_segments": [
+     "Sacred Heart College (WA)"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6740,
+   "in_original_46": false,
+   "pick": 37,
+   "player": "Sam Swadling",
+   "player_id": 13331,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Brisbane",
+   "csv": "Kenwick/Darling Range Sports College/Perth",
+   "db": "Kenwick/Perth",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Darling Range Sports College": 3
+    },
+    "added_seen_in_stored_vocab": {
+     "Darling Range Sports College": 1
+    },
+    "added_segments": [
+     "Darling Range Sports College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6741,
+   "in_original_46": false,
+   "pick": 38,
+   "player": "Koby Evans",
+   "player_id": null,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "West Coast",
+   "csv": "Redcliffe JFC/Darling Range Sports College/Swan Districts",
+   "db": "Redcliffe JFC/Swan Districts",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Darling Range Sports College": 3
+    },
+    "added_seen_in_stored_vocab": {
+     "Darling Range Sports College": 1
+    },
+    "added_segments": [
+     "Darling Range Sports College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6742,
+   "in_original_46": false,
+   "pick": 39,
+   "player": "Tylah Williams",
+   "player_id": null,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "St Kilda",
+   "csv": "Swanbourne JFC/Scotch College (WA)/Claremont",
+   "db": "Swanbourne JFC/Claremont",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Scotch College (WA)": 22
+    },
+    "added_seen_in_stored_vocab": {
+     "Scotch College (WA)": 16
+    },
+    "added_segments": [
+     "Scotch College (WA)"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6744,
+   "in_original_46": false,
+   "pick": 41,
+   "player": "Charlie Banfield",
+   "player_id": 13321,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Sydney",
+   "csv": "Doutta Stars/Maribyrnong College/Norwood",
+   "db": "Doutta Stars/Norwood",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Maribyrnong College": 15
+    },
+    "added_seen_in_stored_vocab": {
+     "Maribyrnong College": 10
+    },
+    "added_segments": [
+     "Maribyrnong College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6745,
+   "in_original_46": false,
+   "pick": 42,
+   "player": "Billy Cootee",
+   "player_id": 13283,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Brisbane",
+   "csv": "West Coast JFC/Scotch College (WA)/Claremont",
+   "db": "West Coast JFC/Claremont",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Scotch College (WA)": 22
+    },
+    "added_seen_in_stored_vocab": {
+     "Scotch College (WA)": 16
+    },
+    "added_segments": [
+     "Scotch College (WA)"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6746,
+   "in_original_46": false,
+   "pick": 43,
+   "player": "Cody Curtin",
+   "player_id": 13301,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Carlton",
+   "csv": "Koroit/Emmanuel College (Warrnambool)/North Ballarat U18",
+   "db": "Koroit/North Ballarat U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Emmanuel College (Warrnambool)": 10
+    },
+    "added_seen_in_stored_vocab": {
+     "Emmanuel College (Warrnambool)": 7
+    },
+    "added_segments": [
+     "Emmanuel College (Warrnambool)"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6748,
+   "in_original_46": false,
+   "pick": 45,
+   "player": "Talor Byrne",
+   "player_id": 13335,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Gold Coast",
+   "csv": "All Saints Anglican/Broadbeach",
+   "db": "Broadbeach",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "All Saints Anglican": 6
+    },
+    "added_seen_in_stored_vocab": {
+     "All Saints Anglican": 0
+    },
+    "added_segments": [
+     "All Saints Anglican"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6749,
+   "in_original_46": true,
+   "pick": 46,
+   "player": "Koby Coulson",
+   "player_id": null,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Carlton",
+   "csv": "Parkside/Scotch College/Oakleigh U18",
+   "db": "Parkside/Oakleigh U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Scotch College": 55
+    },
+    "added_seen_in_stored_vocab": {
+     "Scotch College": 49
+    },
+    "added_segments": [
+     "Scotch College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6750,
+   "in_original_46": false,
+   "pick": 47,
+   "player": "Jack Ison",
+   "player_id": 13288,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Sydney",
+   "csv": "Warners Bay HS/Cardiff",
+   "db": "Cardiff",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Warners Bay HS": 1
+    },
+    "added_seen_in_stored_vocab": {
+     "Warners Bay HS": 0
+    },
+    "added_segments": [
+     "Warners Bay HS"
+    ],
+    "positions": [
+     "prefix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6752,
+   "in_original_46": true,
+   "pick": 49,
+   "player": "Max King",
+   "player_id": null,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Adelaide",
+   "csv": "East Sandringham/Brighton Grammar/Sandringham U18",
+   "db": "East Sandringham/Sandringham U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Brighton Grammar": 39
+    },
+    "added_seen_in_stored_vocab": {
+     "Brighton Grammar": 36
+    },
+    "added_segments": [
+     "Brighton Grammar"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6753,
+   "in_original_46": false,
+   "pick": 50,
+   "player": "Archie Ludowyke",
+   "player_id": 13292,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "St Kilda",
+   "csv": "East Brighton/Brighton Grammar/Sandringham U18",
+   "db": "East Brighton/Sandringham U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Brighton Grammar": 39
+    },
+    "added_seen_in_stored_vocab": {
+     "Brighton Grammar": 36
+    },
+    "added_segments": [
+     "Brighton Grammar"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6755,
+   "in_original_46": false,
+   "pick": 52,
+   "player": "Kye Fincher",
+   "player_id": null,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Richmond",
+   "csv": "Unley/Pembroke School/Sturt",
+   "db": "Unley/Sturt",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Pembroke School": 15
+    },
+    "added_seen_in_stored_vocab": {
+     "Pembroke School": 15
+    },
+    "added_segments": [
+     "Pembroke School"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6757,
+   "in_original_46": false,
+   "pick": 54,
+   "player": "Noah Roberts-Thomson",
+   "player_id": 13277,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Collingwood",
+   "csv": "Kew Comets/Carey Grammar/Oakleigh U18",
+   "db": "Kew Comets/Oakleigh U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Carey Grammar": 46
+    },
+    "added_seen_in_stored_vocab": {
+     "Carey Grammar": 42
+    },
+    "added_segments": [
+     "Carey Grammar"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6758,
+   "in_original_46": false,
+   "pick": 55,
+   "player": "Zac McCarthy",
+   "player_id": null,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Hawthorn",
+   "csv": "Golden Grove/Prince Alfred College/Central District",
+   "db": "Golden Grove/Central District",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Prince Alfred College": 34
+    },
+    "added_seen_in_stored_vocab": {
+     "Prince Alfred College": 40
+    },
+    "added_segments": [
+     "Prince Alfred College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6759,
+   "in_original_46": false,
+   "pick": 56,
+   "player": "Matthew LeRay",
+   "player_id": null,
+   "year": 2025
+  },
+  {
+   "cat": "National",
+   "class": "INSERT_SCHOOL",
+   "club": "Western Bulldogs",
+   "csv": "Glen Iris/Scotch College/Oakleigh U18",
+   "db": "Glen Iris/Oakleigh U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Scotch College": 55
+    },
+    "added_seen_in_stored_vocab": {
+     "Scotch College": 49
+    },
+    "added_segments": [
+     "Scotch College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6761,
+   "in_original_46": false,
+   "pick": 60,
+   "player": "Will Darcy",
+   "player_id": null,
+   "year": 2025
+  },
+  {
+   "cat": "Rookie",
+   "class": "INSERT_SCHOOL",
+   "club": "Melbourne",
+   "csv": "Shepparton United/Scotch College/Murray U18",
+   "db": "Shepparton United/Murray U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Scotch College": 55
+    },
+    "added_seen_in_stored_vocab": {
+     "Scotch College": 49
+    },
+    "added_segments": [
+     "Scotch College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6764,
+   "in_original_46": false,
+   "pick": 3,
+   "player": "Riley Onley",
+   "player_id": 13365,
+   "year": 2025
+  },
+  {
+   "cat": "Rookie",
+   "class": "INSERT_SCHOOL",
+   "club": "Fremantle",
+   "csv": "South Bunbury/Newton Moore SHS/Swan Districts",
+   "db": "South Bunbury/Swan Districts",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Newton Moore SHS": 1
+    },
+    "added_seen_in_stored_vocab": {
+     "Newton Moore SHS": 0
+    },
+    "added_segments": [
+     "Newton Moore SHS"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6766,
+   "in_original_46": false,
+   "pick": 8,
+   "player": "Leon Kickett",
+   "player_id": null,
+   "year": 2025
+  },
+  {
+   "cat": "Rookie",
+   "class": "INSERT_SCHOOL",
+   "club": "Hawthorn",
+   "csv": "Vermont/Caulfield Grammar/Eastern U18",
+   "db": "Vermont/Eastern U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Caulfield Grammar": 79
+    },
+    "added_seen_in_stored_vocab": {
+     "Caulfield Grammar": 77
+    },
+    "added_segments": [
+     "Caulfield Grammar"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6767,
+   "in_original_46": false,
+   "pick": 12,
+   "player": "Ollie Greeves",
+   "player_id": 13307,
+   "year": 2025
+  },
+  {
+   "cat": "Rookie",
+   "class": "INSERT_SCHOOL",
+   "club": "Geelong",
+   "csv": "Eltham/Eltham College/Northern U18",
+   "db": "Eltham/Northern U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Eltham College": 1
+    },
+    "added_seen_in_stored_vocab": {
+     "Eltham College": 0
+    },
+    "added_segments": [
+     "Eltham College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6768,
+   "in_original_46": false,
+   "pick": 28,
+   "player": "Nick Driscoll",
+   "player_id": null,
+   "year": 2025
+  },
+  {
+   "cat": "Post-Draft",
+   "class": "INSERT_SCHOOL",
+   "club": "Sydney",
+   "csv": "East Sydney/Endeavour Sports HS",
+   "db": "East Sydney",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Endeavour Sports HS": 1
+    },
+    "added_seen_in_stored_vocab": {
+     "Endeavour Sports HS": 0
+    },
+    "added_segments": [
+     "Endeavour Sports HS"
+    ],
+    "positions": [
+     "suffix"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6770,
+   "in_original_46": false,
+   "pick": null,
+   "player": "Noah Chamberlain",
+   "player_id": null,
+   "year": 2025
+  },
+  {
+   "cat": "Post-Draft",
+   "class": "REPLACE_CLUB",
+   "club": "West Coast",
+   "csv": "Kew Rovers/Xavier College/Oakleigh U18",
+   "db": "Surrey Park/Xavier College/Oakleigh U18",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Kew Rovers": 14
+    },
+    "added_seen_in_stored_vocab": {
+     "Kew Rovers": 12
+    },
+    "added_segments": [
+     "Kew Rovers"
+    ],
+    "positions": [],
+    "removed_seen_in_csv_vocab": {
+     "Surrey Park": 7
+    },
+    "removed_segments": [
+     "Surrey Park"
+    ],
+    "same_player_other_stored_events": [
+     {
+      "id": 5961,
+      "origin": "Surrey Park/Xavier College/Oakleigh U18",
+      "type": "National",
+      "year": 2020
+     }
+    ],
+    "stored_segments_all_retained": false
+   },
+   "id": 6784,
+   "in_original_46": false,
+   "pick": null,
+   "player": "Finlay Macrae",
+   "player_id": 4274,
+   "year": 2025
+  },
+  {
+   "cat": "Post-Draft",
+   "class": "INSERT_SCHOOL",
+   "club": "Port Adelaide",
+   "csv": "Central Eyre United/Rostrevor College/Norwood",
+   "db": "Central Eyre United/Norwood",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Rostrevor College": 37
+    },
+    "added_seen_in_stored_vocab": {
+     "Rostrevor College": 36
+    },
+    "added_segments": [
+     "Rostrevor College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6786,
+   "in_original_46": false,
+   "pick": null,
+   "player": "Balyn O'Brien",
+   "player_id": 13303,
+   "year": 2025
+  },
+  {
+   "cat": "Post-Draft",
+   "class": "INSERT_SCHOOL",
+   "club": "Fremantle",
+   "csv": "Strathmore/St Bernard's College/Northern Bullants",
+   "db": "Strathmore/Northern Bullants",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "St Bernard's College": 23
+    },
+    "added_seen_in_stored_vocab": {
+     "St Bernard's College": 22
+    },
+    "added_segments": [
+     "St Bernard's College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6789,
+   "in_original_46": false,
+   "pick": null,
+   "player": "Chris Scerri",
+   "player_id": 13343,
+   "year": 2025
+  },
+  {
+   "cat": "Mid-Season",
+   "class": "INSERT_SCHOOL",
+   "club": "Essendon",
+   "csv": "Jandakot JFC/Trinity College (WA)/South Fremantle/Tasmania (VFL)",
+   "db": "Jandakot JFC/South Fremantle/Tasmania (VFL)",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Trinity College (WA)": 37
+    },
+    "added_seen_in_stored_vocab": {
+     "Trinity College (WA)": 37
+    },
+    "added_segments": [
+     "Trinity College (WA)"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6793,
+   "in_original_46": false,
+   "pick": 1,
+   "player": "Jaxon Artemis",
+   "player_id": 13348,
+   "year": 2025
+  },
+  {
+   "cat": "Mid-Season",
+   "class": "INSERT_SCHOOL",
+   "club": "Richmond",
+   "csv": "South Barwon/Ocean Grove/Geelong West/Queenscliff/St Ignatius (Geelong)/Geelong (VFL)",
+   "db": "South Barwon/Ocean Grove/Geelong West/Queenscliff/Geelong (VFL)",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "St Ignatius (Geelong)": 1
+    },
+    "added_seen_in_stored_vocab": {
+     "St Ignatius (Geelong)": 0
+    },
+    "added_segments": [
+     "St Ignatius (Geelong)"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6794,
+   "in_original_46": false,
+   "pick": 2,
+   "player": "Kye Annand",
+   "player_id": 13311,
+   "year": 2025
+  },
+  {
+   "cat": "Mid-Season",
+   "class": "INSERT_SCHOOL",
+   "club": "West Coast",
+   "csv": "Walkerville/St Peter's College (SA)/North Adelaide",
+   "db": "Walkerville/North Adelaide",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "St Peter's College (SA)": 23
+    },
+    "added_seen_in_stored_vocab": {
+     "St Peter's College (SA)": 22
+    },
+    "added_segments": [
+     "St Peter's College (SA)"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6795,
+   "in_original_46": false,
+   "pick": 3,
+   "player": "Oliver Francou",
+   "player_id": 13346,
+   "year": 2025
+  },
+  {
+   "cat": "Mid-Season",
+   "class": "INSERT_SCHOOL",
+   "club": "Carlton",
+   "csv": "South Morang/Montmorency/Parade College/Northern U18/Aberfeldie/Carlton (VFL)",
+   "db": "South Morang/Montmorency/Northern U18/Aberfeldie/Carlton (VFL)",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Parade College": 31
+    },
+    "added_seen_in_stored_vocab": {
+     "Parade College": 30
+    },
+    "added_segments": [
+     "Parade College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6796,
+   "in_original_46": false,
+   "pick": 4,
+   "player": "Flynn Riley",
+   "player_id": 13363,
+   "year": 2025
+  },
+  {
+   "cat": "Mid-Season",
+   "class": "INSERT_SCHOOL",
+   "club": "Port Adelaide",
+   "csv": "East Malvern/Wesley College/Sandringham U18/North Melbourne (VFL)",
+   "db": "East Malvern/Sandringham U18/North Melbourne (VFL)",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Wesley College": 34
+    },
+    "added_seen_in_stored_vocab": {
+     "Wesley College": 31
+    },
+    "added_segments": [
+     "Wesley College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6797,
+   "in_original_46": false,
+   "pick": 5,
+   "player": "Xavier Bamert",
+   "player_id": 13286,
+   "year": 2025
+  },
+  {
+   "cat": "Mid-Season",
+   "class": "INSERT_SCHOOL",
+   "club": "St Kilda",
+   "csv": "Labrador/Ormeau Woods SHS/Southport",
+   "db": "Labrador/Southport",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Ormeau Woods SHS": 1
+    },
+    "added_seen_in_stored_vocab": {
+     "Ormeau Woods SHS": 0
+    },
+    "added_segments": [
+     "Ormeau Woods SHS"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6799,
+   "in_original_46": false,
+   "pick": 7,
+   "player": "Campbell Lake",
+   "player_id": 13306,
+   "year": 2025
+  },
+  {
+   "cat": "Mid-Season",
+   "class": "INSERT_SCHOOL",
+   "club": "Melbourne",
+   "csv": "Lockleys/Westminster School/Woodville-West Torrens",
+   "db": "Lockleys/Woodville-West Torrens",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Westminster School": 4
+    },
+    "added_seen_in_stored_vocab": {
+     "Westminster School": 3
+    },
+    "added_segments": [
+     "Westminster School"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6803,
+   "in_original_46": false,
+   "pick": 11,
+   "player": "Lukas Cooke",
+   "player_id": 13355,
+   "year": 2025
+  },
+  {
+   "cat": "Mid-Season",
+   "class": "INSERT_SCHOOL",
+   "club": "West Coast",
+   "csv": "South Warrnambool/Emmanuel College (Warrnambool)/Leopold/Heidelberg/Geelong (VFL)",
+   "db": "South Warrnambool/Leopold/Heidelberg/Geelong (VFL)",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Emmanuel College (Warrnambool)": 10
+    },
+    "added_seen_in_stored_vocab": {
+     "Emmanuel College (Warrnambool)": 7
+    },
+    "added_segments": [
+     "Emmanuel College (Warrnambool)"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6805,
+   "in_original_46": false,
+   "pick": 13,
+   "player": "Marcus Herbert",
+   "player_id": 13309,
+   "year": 2025
+  },
+  {
+   "cat": "Mid-Season",
+   "class": "INSERT_SCHOOL",
+   "club": "Collingwood",
+   "csv": "Greenvale/St Bernard's College/Calder U18/Coburg",
+   "db": "Greenvale/Calder U18/Coburg",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "St Bernard's College": 23
+    },
+    "added_seen_in_stored_vocab": {
+     "St Bernard's College": 22
+    },
+    "added_segments": [
+     "St Bernard's College"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6809,
+   "in_original_46": false,
+   "pick": 18,
+   "player": "Mitch Podhajski",
+   "player_id": 13315,
+   "year": 2025
+  },
+  {
+   "cat": "Mid-Season",
+   "class": "INSERT_SCHOOL",
+   "club": "Melbourne",
+   "csv": "Jindalee/Indooroopilly SHS/Tasmania (VFL)",
+   "db": "Jindalee/Tasmania (VFL)",
+   "evidence": {
+    "added_seen_in_csv_vocab": {
+     "Indooroopilly SHS": 1
+    },
+    "added_seen_in_stored_vocab": {
+     "Indooroopilly SHS": 0
+    },
+    "added_segments": [
+     "Indooroopilly SHS"
+    ],
+    "positions": [
+     "interior"
+    ],
+    "removed_seen_in_csv_vocab": {},
+    "removed_segments": [],
+    "same_player_other_stored_events": [],
+    "stored_segments_all_retained": true
+   },
+   "id": 6810,
+   "in_original_46": false,
+   "pick": 19,
+   "player": "Max Mapley",
+   "player_id": null,
+   "year": 2025
+  }
+ ],
+ "owner_rulings": [
+  {
+   "decision": "accept_incoming",
+   "id": 5961,
+   "incoming_utf8_hex": "4b657720526f766572732fe2808b58617669657220436f6c6c6567652fe2808b4f616b6c6569676820553138",
+   "reference": "Owner Q2(c) 2026-11-22: accept_incoming only where incoming equals the reviewed 2026-11-05 owner CSV byte for byte; 2020_AFL_Draft_and_Trade_Period_Table_1.csv sha256 ed699aa2ae27d1744c8cf3f0e55d0f691dc3654a93bf202771dfd421dfaaa961, listed in SHA256SUMS.owner-csv (sha256 c495599b4bcbdfe7fedf4fdd41b241c7e24cba54996833ab6887a9875f09a7c0)",
+   "stored_utf8_hex": "537572726579205061726b2fe2808b58617669657220436f6c6c6567652fe2808b4f616b6c6569676820553138"
+  },
+  {
+   "decision": "accept_incoming",
+   "id": 6626,
+   "incoming_utf8_hex": "537572726579205061726b2fe2808b5765736c657920436f6c6c6567652fe2808b4f616b6c6569676820553138",
+   "reference": "Owner Q2(c) 2026-11-22: accept_incoming only where incoming equals the reviewed 2026-11-05 owner CSV byte for byte; 2024_AFL_Draft_and_Trade_Period_Table_1.csv sha256 da08c4466e2e0cc8768ff416fbcd855451923c1b8c65c6aef5300dd05d234a3d, listed in SHA256SUMS.owner-csv (sha256 c495599b4bcbdfe7fedf4fdd41b241c7e24cba54996833ab6887a9875f09a7c0)",
+   "stored_utf8_hex": "436f6c6c656769616e732fe2808b5765736c657920436f6c6c6567652fe2808b4f616b6c6569676820553138"
+  },
+  {
+   "decision": "accept_incoming",
+   "id": 6784,
+   "incoming_utf8_hex": "4b657720526f766572732fe2808b58617669657220436f6c6c6567652fe2808b4f616b6c6569676820553138",
+   "reference": "Owner Q2(c) 2026-11-22: accept_incoming only where incoming equals the reviewed 2026-11-05 owner CSV byte for byte; 2025_AFL_Draft_and_Trade_Period_Table_1.csv sha256 1b9767a18ad30d5094c561a73597b387c6248ba588dc8e7511a33b395a2bb50e, listed in SHA256SUMS.owner-csv (sha256 c495599b4bcbdfe7fedf4fdd41b241c7e24cba54996833ab6887a9875f09a7c0)",
+   "stored_utf8_hex": "537572726579205061726b2fe2808b58617669657220436f6c6c6567652fe2808b4f616b6c6569676820553138"
+  }
+ ],
+ "stage_a_label": "annual-html-20261122"
+}
