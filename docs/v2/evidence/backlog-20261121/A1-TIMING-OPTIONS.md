@@ -1,4 +1,6 @@
-# A1 timing on Tuesday 24 November 2026: option T-1 or T-2 (for the owner to choose; prepared 22 Nov, run d)
+# A1 timing on Tuesday 24 November 2026: T-1 APPROVED (prepared 22 Nov, run d; decided by the owner the same day)
+
+> **Decision.** **T-1 APPROVED** (owner decision of 2026-11-22, written, relayed by the main session): start **09:20 AEDT on Tue 24 Nov 2026**. The window change is approved: 09:20-09:30 read-only P1 + raw-head baseline; 09:30-09:55 P2 fast-forward of the production checkout to `7d92042f` exactly, P3 build, P3b; 10:00 promote, env, owner restart; A2 starts 10:30, R4 after P6 ends (about 10:45); the latest-restart rule stays 10:45. T-2 below is kept only as the record of the alternative; it is not an option on the day.
 
 **What is decided already.** You approved A1 for **10:00-10:30** and A2 for **10:30-12:00** (Melbourne time, AEDT). You do the one
 production restart. Nothing below changes that approval by itself: **any work before 10:00, even read-only checks, is a change to
@@ -55,7 +57,7 @@ The site keeps serving the current release (`c8d4202a`) until the moment of your
 | A2 | Full 90 minutes; R4 about 11:00, well before 11:35 | Starts about 10:45; R4 squeezed against 11:35; R3 overruns to about 12:15 |
 | If something goes wrong | Rollback inside the morning with time to verify | Rollback and A2 compete for the same time |
 
-## Recommendation
+## Recommendation (accepted: T-1)
 
 **T-1.** It is the only option that gives the checks enough time: the restart lands inside your 10:00-10:30 slot with a 37-minute
 margin to the 10:45 limit, an early build failure can still be retried, every acceptance check and the 30-minute observation finish before R4 needs them,
@@ -64,4 +66,4 @@ build happen between 09:20 and 10:00, before the window you approved; the site s
 at about 10:08. If you prefer not to extend the window, T-2 works only when the build is quick (under about 20 minutes) and accepts a
 restart after 10:30 and a short A2 overrun.
 
-**Your answer, in the first message on Tuesday or earlier:** "T-1, including the 09:20-10:00 pre-window work" or "T-2".
+**Answered 22 Nov: T-1, start 09:20.** The session does not ask again; the pre-window work 09:20-10:00 is approved.

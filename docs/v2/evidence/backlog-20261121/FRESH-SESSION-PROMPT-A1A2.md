@@ -12,7 +12,7 @@ scope; §12: no Git writes beyond the records commit at the end, no push unless 
 1. `docs/v2/evidence/backlog-20261121/ATTENDED-PLAN-A1-A2-20261124.md` (the runbook; it is the contract)
 2. `docs/v2/evidence/backlog-20261121/DECISIONS-20261122c.md` §2-§3 and `DECISIONS-20261122d.md` (the approvals, round 2 and round 3)
 3. `docs/v2/evidence/backlog-20261121/RC-371-372.md` (the release candidate, with its 22 Nov revision note)
-4. `docs/v2/evidence/backlog-20261121/A1-TIMING-OPTIONS.md` (the owner's T-1/T-2 choice)
+4. `docs/v2/evidence/backlog-20261121/A1-TIMING-OPTIONS.md` (T-1 APPROVED: the schedule)
 5. The script headers in `docs/v2/evidence/backlog-20261121/a1a2-20261124/` as you reach each step.
 
 **Pins (verify each before acting; any mismatch is a STOP):**
@@ -38,9 +38,10 @@ the **approved daily cron job**, §4.3 step 13). Both cron jobs are owner-approv
 `a2-cron-install.sh` after their preconditions. **Out of scope:** R5 disposal (logs retained), R6, R7, R8, the ISSUE-348 load,
 the R2 notifier marker.
 
-**Before anything runs:** ask the owner which time option (`A1-TIMING-OPTIONS.md`, T-1 or T-2) applies, in writing. Do not
-assume. Any step before 10:00 (T-1's 09:20-10:00 checks, checkout move and build, or T-2's 09:20-09:30 read-only checks) runs only
-with the owner's explicit yes, because the approved window starts at 10:00.
+**Timing: T-1 is APPROVED (owner, 22 Nov); do not ask again.** Start at **09:20 AEDT**: 09:20-09:30 read-only P1 + raw-head
+baseline; 09:30-09:55 P2 (fast-forward the production checkout to `7d92042f` exactly), P3 build, P3b; 10:00 P4 promote, the
+owner's env lines and restart; P5/S9; P6 to about 10:45; A2 from 10:30 with R4 after P6. **Latest restart 10:45**; later than that,
+stop before promotion and reschedule A1 (runbook §1).
 
 **Owner `sudo` steps: present ONE block at a time,** wait for the owner's output, check it against the runbook's expected value,
 then present the next. Never batch them. Never print, echo or record a secret; only counts of `.env`/`/proc/*/environ` lines.

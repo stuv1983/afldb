@@ -10,8 +10,7 @@ R6 (reboot), R7 (databases retained), R8, the ISSUE-348 load or the R2 notifier 
 **Revision 2026-11-22 (run d, owner decisions round 3, `DECISIONS-20261122d.md`).** (1) PREP is no longer a fixed commit: it is the
 `origin/main` tip the owner confirms at the start of the session (§0). (2) The two streamanator cron jobs are APPROVED and installed in
 A2 after their preconditions (§4.2 step 3, §4.3 step 13, §4.6). (3) R5: the pre-fix Caddy logs are retained with restricted access
-(§4.5a, after R4). (4) The A1 time option is the owner's choice from `A1-TIMING-OPTIONS.md`; any work before 10:00 needs the owner's
-explicit yes. (5) The R4 owner log check is count-only (§4.4 step 10).
+(§4.5a, after R4). (4) A1 timing: **T-1 APPROVED** by the owner on 22 Nov (start 09:20; §1, `A1-TIMING-OPTIONS.md`); the pre-window work is approved. (5) The R4 owner log check is count-only (§4.4 step 10).
 
 **Prepared without production contact.** Production facts come from `R0-SITTING-20261122.md` (read-only probe 2026-11-22 02:52
 AEDT), `OWNER-PACKET.md` §3, `kits/KITS-20261122.md` and `RC-371-372.md` (revised 22 Nov, run c). The pre-window probe re-reads
@@ -43,12 +42,11 @@ The owner runs his `sudo` blocks in his own interactive session. **streamanator:
 verification Wed 25 Nov 03:30); 04:50-05:45 (AFL API settle); 05:45-07:15 (`apt-daily-upgrade` plus random delay; `host-gate`
 enforces its margin). The window is clear of all of these.
 
-**Time budget: an owner choice, to be given in writing before the day (reviewer F-004).** `release.mjs build` takes about
-15-25 minutes, so build, promote, env, restart and acceptance do not fit 10:00-10:30. **Run d:** the full comparison, the owner's
-restart time and what happens to A2 under each option are in `A1-TIMING-OPTIONS.md`; T-1's work before 10:00 (and even T-2's
-09:20-09:30 read-only checks) lies outside the approved 10:00-10:30 window and needs the owner's explicit yes before it runs.
+**Time budget: T-1 APPROVED (reviewer F-004).** **T-1 APPROVED** (owner decision of 2026-11-22, written, relayed by the main session): start **09:20 AEDT on Tue 24 Nov 2026**. The window change is approved: 09:20-09:30 read-only P1 + raw-head baseline; 09:30-09:55 P2 fast-forward of the production checkout to `7d92042f` exactly, P3 build, P3b; 10:00 promote, env, owner restart; A2 starts 10:30, R4 after P6 ends (about 10:45); the latest-restart rule stays 10:45. `release.mjs build` takes about 15-25 minutes, so build, promote,
+env, restart and acceptance do not fit 10:00-10:30; the comparison is kept in `A1-TIMING-OPTIONS.md`. The T-2 column below is the
+record of the rejected alternative only.
 
-| | **Option T-1 (recommended)**: P2/P3 from 09:30 | **Option T-2**: everything from 10:00 |
+| | **Option T-1 (APPROVED 22 Nov; start 09:20)**: P2/P3 from 09:30 | Option T-2 (not chosen; record only) |
 |---|---|---|
 | 09:20-09:30 | P1 + raw-head baseline (read-only) | P1 + raw-head baseline (read-only) |
 | 09:30-09:55 | P2 checkout ff (changes the checkout only), P3 build (loads the host, serves nothing new), P3b | — |
