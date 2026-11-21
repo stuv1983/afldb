@@ -1,4 +1,4 @@
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -1175,5 +1175,103 @@ describe('AFLDB-ISSUE-134 — the reverse-proxy contract the loopback gate rests
   it('relies on Next filling x-forwarded-for only when the proxy did not', () => {
     const source = read('node_modules/next/dist/server/base-server.js');
     expect(source).toMatch(/req\.headers\['x-forwarded-for'\]\s*\?\?=/);
+  });
+});
+
+/**
+ * AFLDB-ISSUE-372 inventory guard for the AFLDB-ISSUE-371 bug class, over every
+ * `revalidatePath(` call in `src/`.
+ *
+ * Next tags a cached page with `_N_T_/layout`, a `<segment>/layout` tag per path
+ * prefix of its ROUTE FILE, the route file's own `<route>/page` tag, and its
+ * concrete pathname (`server/lib/implicit-tags.js`). `revalidatePath(path, type)`
+ * expires `_N_T_<path>/<type>`; without a type it expires `_N_T_<path>`
+ * (`server/web/spec-extension/revalidate.js`). So:
+ *   - a type is only meaningful with a route pattern (`/players/[slug]`) or a
+ *     static route that exists, and with a concrete dynamic path
+ *     (`/brownlow/${season}`, 'page') it expires nothing (ISSUE-371);
+ *   - a pattern without a type expires nothing either (Next warns at runtime).
+ */
+describe('AFLDB-ISSUE-371/372 — every revalidatePath call names a tag a page carries', () => {
+  type Call = { file: string; arg: string; type: 'page' | 'layout' | null };
+
+  const stripComments = (source: string): string => source
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n').filter((line) => !line.trim().startsWith('//')).join('\n');
+
+  const sourceFiles = (): string[] => (readdirSync('src', { recursive: true }) as string[])
+    .filter((p) => /\.tsx?$/.test(p))
+    .map((p) => join('src', p).replace(/\\/g, '/'));
+
+  const calls = (): Call[] => {
+    const out: Call[] = [];
+    for (const file of sourceFiles()) {
+      const source = stripComments(readFileSync(file, 'utf8'));
+      for (const m of source.matchAll(/revalidatePath\(\s*([^,()]+?)\s*(?:,\s*'([a-z]+)'\s*)?\)/g)) {
+        out.push({ file, arg: m[1], type: (m[2] ?? null) as Call['type'] });
+      }
+    }
+    return out;
+  };
+
+  /** Every app route directory that holds a page file. */
+  const pageRoutes = (): string[] => (readdirSync('src/app', { recursive: true }) as string[])
+    .map((p) => p.replace(/\\/g, '/'))
+    .filter((p) => /(^|\/)page\.tsx?$/.test(p))
+    .map((p) => `/${p.replace(/\/?page\.tsx?$/, '')}`.replace(/\/$/, '') || '/');
+
+  /** The literal paths a typed call may resolve to, or the reason it cannot be checked. */
+  const literalPaths = (call: Call, source: string): string[] | string => {
+    const quoted = call.arg.match(/^'([^']*)'$/);
+    if (quoted) return [quoted[1]];
+    if (call.arg.startsWith('`')) return call.arg.includes('${') ? 'a template literal with an interpolation' : [call.arg.slice(1, -1)];
+    if (/^[A-Za-z_$][\w$]*$/.test(call.arg)) {
+      const loop = source.match(new RegExp(`for \\(const ${call.arg} of \\[([\\s\\S]*?)\\]\\)`));
+      if (!loop) return `identifier "${call.arg}" not bound by a literal for-of array`;
+      const items = [...loop[1].matchAll(/'([^']*)'/g)].map((x) => x[1]);
+      return items.length > 0 ? items : `identifier "${call.arg}" iterates no literal`;
+    }
+    return `unrecognised argument ${call.arg}`;
+  };
+
+  it('finds the calls it is guarding (the scan is not vacuous, and parses every call)', () => {
+    const found = calls();
+    const raw = sourceFiles()
+      .reduce((n, file) => n + (stripComments(readFileSync(file, 'utf8')).match(/revalidatePath\(/g)?.length ?? 0), 0);
+    expect(found.length).toBe(raw);
+    expect(found.length).toBeGreaterThan(40);
+    expect(found.some((c) => c.type === 'page' && c.arg.includes('['))).toBe(true);
+    expect(found.some((c) => c.file.endsWith('src/app/api/internal/revalidate-season/route.ts'))).toBe(true);
+  });
+
+  it('pairs a type only with a route pattern or an existing static route, never a concrete dynamic path', () => {
+    const routes = pageRoutes();
+    const bad: string[] = [];
+    for (const call of calls().filter((c) => c.type !== null)) {
+      const resolved = literalPaths(call, stripComments(readFileSync(call.file, 'utf8')));
+      if (typeof resolved === 'string') {
+        bad.push(`${call.file}: revalidatePath(${call.arg}, '${call.type}') — ${resolved}`);
+        continue;
+      }
+      for (const path of resolved) {
+        const ok = call.type === 'page'
+          ? routes.includes(path)
+          : routes.some((r) => path === '/' || r === path || r.startsWith(`${path}/`));
+        if (!ok) bad.push(`${call.file}: revalidatePath('${path}', '${call.type}') names no route file`);
+      }
+    }
+    expect(bad).toEqual([]);
+  });
+
+  it('never passes a route pattern without a type', () => {
+    const bad = calls()
+      .filter((c) => c.type === null && /^['`][^'`]*\[/.test(c.arg))
+      .map((c) => `${c.file}: revalidatePath(${c.arg})`);
+    expect(bad).toEqual([]);
+  });
+
+  it('relies on Next appending the type to the path, read off the installed package', () => {
+    const source = readFileSync('node_modules/next/dist/server/web/spec-extension/revalidate.js', 'utf8');
+    expect(source).toMatch(/if \(type\) \{\s*normalizedPath \+= `\$\{normalizedPath\.endsWith\('\/'\) \? '' : '\/'\}\$\{type\}`;/);
   });
 });
