@@ -273,8 +273,7 @@ sudo sh -c 'mv -n -- /var/log/caddy/afldb-access-2*.log.gz /var/log/caddy/afldb-
 S=$(date -u +%Y%m%dT%H%M%SZ)
 sudo cp -p /var/log/caddy/afldb-access.log "$R/afldb-access.log.copy-at-r5-$S"   # copies of the LIVE files (pre-fix lines up to R4's reload)
 sudo cp -p /var/log/caddy/afldb-apex.log   "$R/afldb-apex.log.copy-at-r5-$S"
-sudo chown root:root "$R"/*; sudo chmod 0600 "$R"/*
-sudo sh -c 'cd '"$R"' && sha256sum -- * > SHA256SUMS && chmod 0600 SHA256SUMS'
+sudo sh -c 'cd '"$R"' && chown root:root afldb-* && chmod 0600 afldb-* && sha256sum -- afldb-* > SHA256SUMS && chown root:root SHA256SUMS && chmod 0600 SHA256SUMS'   # globs expand as root inside sh -c (the directory is 0700 root: the owner's shell cannot list it); afldb-* excludes SHA256SUMS itself
 sudo ls -la "$R"; ls -la /var/log/caddy
 ```
 **Check:** `$R` is `root:root 0700` and holds the eight (or nine) rolled files, the two copies and `SHA256SUMS`, all `root:root 0600`;
@@ -286,7 +285,7 @@ are hidden from other local users, and Caddy can no longer prune them. **Residua
 `caddy:caddy 0600` as today, until Caddy rolls and later prunes them; the copies preserve those lines. `mv`/`rm` are not secure
 erasure; any DigitalOcean backup or snapshot of the droplet (unverified) is outside this step.
 **Rollback (owner):** `sudo sh -c 'mv -n -- '"$R"'/afldb-*-2*.log.gz /var/log/caddy/' && sudo chown caddy:caddy /var/log/caddy/afldb-*-2*.log.gz && sudo chmod 0600 /var/log/caddy/afldb-*-2*.log.gz`,
-then `sudo rm -- "$R"/*.copy-at-r5-* "$R/SHA256SUMS" && sudo rmdir "$R"` (removes only what this block created). After a rollback Caddy
+then `sudo sh -c 'cd '"$R"' && rm -- afldb-*.copy-at-r5-* SHA256SUMS' && sudo rmdir "$R"` (removes only what this block created; the glob is expanded as root). After a rollback Caddy
 prunes the rolled files again by its own rules. Disposal is NOT part of A2: it is the owner's later decision (`R5-RETENTION-PROPOSAL.md`).
 
 ### 4.6 The two streamanator cron jobs: APPROVED (owner decision 3, round 3, 2026-11-22)
