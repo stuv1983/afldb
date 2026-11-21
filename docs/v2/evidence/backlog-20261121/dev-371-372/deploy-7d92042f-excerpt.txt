@@ -1,0 +1,8 @@
+317:[deploy] built BUILD_ID: QLj8i5VnhcmZ7ZGCbLHMx
+318:[deploy] >>> revalidate before restart
+320:[preflight] PASS pre-restart revalidation -- no running job or due writer timer; approval window open
+321:[deploy] >>> restart systemd service
+322:[deploy] passwordless sudo unavailable; restarting through the unit Restart= policy
+340:Nov 22 04:09:53 streamanator systemd[1]: afldb.service: Scheduled restart job, restart counter is at 5.
+346:[deploy] health ready after 3s and 2 probe(s): {"status":"ok","database":"ok","latencyMs":32}
+349:[preflight] evidence: /mnt/ssd/afldb/records/deploy-preflight/20261121T170719Z-streamanator-5199eb4f8859-execute-2127621.txt (exit 0)

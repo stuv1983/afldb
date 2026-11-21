@@ -1,0 +1,10 @@
+{
+  "host": "127.0.0.1",
+  "port": 5432,
+  "database": "afldb_dev",
+  "user": "afldb_import",
+  "systemIdentifier": "7673872117032104869",
+  "databaseOid": "202860",
+  "clusterName": "16/main",
+  "databaseComment": null
+}

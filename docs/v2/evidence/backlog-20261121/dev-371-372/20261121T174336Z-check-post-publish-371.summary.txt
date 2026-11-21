@@ -1,0 +1,14 @@
+check post-publish-371  build=QLj8i5VnhcmZ7ZGCbLHMx  file=/mnt/ssd/afldb-backlog-20261122-dev/dev371372/out/20261121T174336Z-check-post-publish-371.jsonl
+seasons  worker 1 pid=2136733 n=4 status=200 award=4/4 cache=MISS,HIT,HIT,HIT title=["2026 AFL Season — Ladder, Results &amp; Finals | AFLDB"] robots=["noindex, nofollow"] PASS
+seasons  worker 2 pid=2136734 n=4 status=200 award=4/4 cache=MISS,HIT,HIT,HIT title=["2026 AFL Season — Ladder, Results &amp; Finals | AFLDB"] robots=["noindex, nofollow"] PASS
+seasons  worker 3 pid=2136735 n=4 status=200 award=4/4 cache=MISS,HIT,HIT,HIT title=["2026 AFL Season — Ladder, Results &amp; Finals | AFLDB"] robots=["noindex, nofollow"] PASS
+seasons  worker 4 pid=2136738 n=4 status=200 award=4/4 cache=MISS,HIT,HIT,HIT title=["2026 AFL Season — Ladder, Results &amp; Finals | AFLDB"] robots=["noindex, nofollow"] PASS
+brownlow worker 1 pid=2136733 n=4 status=200 200=4/4 notFoundHead=0 cache=MISS,HIT,HIT,HIT title=["2026 Brownlow Medal — Winner, Votes &amp; Leaderboard | AFLDB"] robots=["noindex, nofollow"] PASS
+brownlow worker 2 pid=2136734 n=4 status=200 200=4/4 notFoundHead=0 cache=MISS,HIT,HIT,HIT title=["2026 Brownlow Medal — Winner, Votes &amp; Leaderboard | AFLDB"] robots=["noindex, nofollow"] PASS
+brownlow worker 3 pid=2136735 n=4 status=200 200=4/4 notFoundHead=0 cache=MISS,HIT,HIT,HIT title=["2026 Brownlow Medal — Winner, Votes &amp; Leaderboard | AFLDB"] robots=["noindex, nofollow"] PASS
+brownlow worker 4 pid=2136738 n=4 status=200 200=4/4 notFoundHead=0 cache=MISS,HIT,HIT,HIT title=["2026 Brownlow Medal — Winner, Votes &amp; Leaderboard | AFLDB"] robots=["noindex, nofollow"] PASS
+award    worker 1 pid=2136733 n=4 status=200 200=4/4 notFoundHead=0 cache=-,-,-,- title=["2026 Charles Sutton Medal — Winner and Full Result | AFLDB"] robots=["noindex, nofollow"] PASS
+award    worker 2 pid=2136734 n=4 status=200 200=4/4 notFoundHead=0 cache=-,-,-,- title=["2026 Charles Sutton Medal — Winner and Full Result | AFLDB"] robots=["noindex, nofollow"] PASS
+award    worker 3 pid=2136735 n=4 status=200 200=4/4 notFoundHead=0 cache=-,-,-,- title=["2026 Charles Sutton Medal — Winner and Full Result | AFLDB"] robots=["noindex, nofollow"] PASS
+award    worker 4 pid=2136738 n=4 status=200 200=4/4 notFoundHead=0 cache=-,-,-,- title=["2026 Charles Sutton Medal — Winner and Full Result | AFLDB"] robots=["noindex, nofollow"] PASS
+VERDICT (seasons + award control): PASS; brownlow line shows PASS only once 2026 is published

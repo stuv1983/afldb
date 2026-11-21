@@ -1,0 +1,37 @@
+{
+  "mode": "apply",
+  "database": "afldb_dev",
+  "season": 2026,
+  "digest": "100c112f400a492906cbc2a5c3886243c15d412eb62f84d50f17c63ae1f76aa7",
+  "committed": false,
+  "attached": 9522,
+  "mirrored": 9522,
+  "auditId": null,
+  "after": {
+    "season": 2026,
+    "seasonStatus": "complete",
+    "coverage": "pending",
+    "publishedRevision": null,
+    "seasonTotalRows": 0,
+    "roundRows": 9522,
+    "unattachedRows": 0,
+    "positiveRows": 621,
+    "votesTotal": 1242,
+    "homeAndAwayMatches": 207,
+    "participantCells": 9522,
+    "participantCellsWithoutRow": 0,
+    "mirrorRecorded": 9522,
+    "positiveOutsideHomeAndAway": 0
+  },
+  "target": {
+    "host": "127.0.0.1",
+    "port": 5432,
+    "database": "afldb_dev",
+    "user": "afldb_import",
+    "systemIdentifier": "7673872117032104869",
+    "databaseOid": "202860",
+    "clusterName": "16/main",
+    "databaseComment": null
+  },
+  "ranAt": "2026-11-21T17:35:40.661Z"
+}

@@ -1,0 +1,13 @@
+prime dryrun-prime  build=QLj8i5VnhcmZ7ZGCbLHMx  file=/mnt/ssd/afldb-backlog-20261122-dev/dev371372/out/20261121T171248Z-prime-dryrun-prime.jsonl
+seasons  worker 1 pid=2136733 n=2 status=200 award=0/2 cache=HIT,HIT title=["2026 AFL Season — Ladder, Results &amp; Finals | AFLDB"] robots=["noindex, nofollow"]
+seasons  worker 2 pid=2136734 n=2 status=200 award=0/2 cache=HIT,HIT title=["2026 AFL Season — Ladder, Results &amp; Finals | AFLDB"] robots=["noindex, nofollow"]
+seasons  worker 3 pid=2136735 n=2 status=200 award=0/2 cache=HIT,HIT title=["2026 AFL Season — Ladder, Results &amp; Finals | AFLDB"] robots=["noindex, nofollow"]
+seasons  worker 4 pid=2136738 n=2 status=200 award=0/2 cache=HIT,HIT title=["2026 AFL Season — Ladder, Results &amp; Finals | AFLDB"] robots=["noindex, nofollow"]
+brownlow worker 1 pid=2136733 n=2 status=404 200=0/2 notFoundHead=2 cache=HIT,HIT title=["Page not found | AFLDB"] robots=["noindex"]
+brownlow worker 2 pid=2136734 n=2 status=404 200=0/2 notFoundHead=2 cache=MISS,HIT title=["Page not found | AFLDB"] robots=["noindex"]
+brownlow worker 3 pid=2136735 n=2 status=404 200=0/2 notFoundHead=2 cache=HIT,HIT title=["Page not found | AFLDB"] robots=["noindex"]
+brownlow worker 4 pid=2136738 n=2 status=404 200=0/2 notFoundHead=2 cache=HIT,HIT title=["Page not found | AFLDB"] robots=["noindex"]
+award    worker 1 pid=2136733 n=2 status=404 200=0/2 notFoundHead=2 cache=-,- title=["Page not found | AFLDB"] robots=["noindex"]
+award    worker 2 pid=2136734 n=2 status=404 200=0/2 notFoundHead=2 cache=-,- title=["Page not found | AFLDB"] robots=["noindex"]
+award    worker 3 pid=2136735 n=2 status=404 200=0/2 notFoundHead=2 cache=-,- title=["Page not found | AFLDB"] robots=["noindex"]
+award    worker 4 pid=2136738 n=2 status=404 200=0/2 notFoundHead=2 cache=-,- title=["Page not found | AFLDB"] robots=["noindex"]
