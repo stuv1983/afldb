@@ -1,0 +1,57 @@
+real crontab sha256 before: 043d2510065bd2af43965799c5858e57743ae9a5694281b8c4f8196af003e22e
+PASS T01-check-r2-no-run (rc 0)
+PASS T01-check-r2-no-run says: PRECONDITIONS FAIL
+PASS T01-check-r2-no-run says: NOT INSTALLED
+PASS T02-install-r2-no-run (rc 3)
+PASS T02 crontab unchanged after refused install
+PASS T03-install-r2-stale-ok (rc 3)
+PASS T03-install-r2-stale-ok says: not a successful run within 6 h
+PASS T04-install-r2-last-fail (rc 3)
+PASS T05-dry-run (rc 0)
+PASS T05-dry-run says: DRY RUN OK
+PASS T05 dry run wrote nothing
+PASS T06-install-r2 (rc 0)
+PASS T06-install-r2 says: CRON INSTALL r2 PASS: next due
+PASS T06 crontab = baseline + marker + job (exact bytes)
+PASS T06 0600 pre-image backup kept
+PASS T07-reinstall-r2 (rc 0)
+PASS T07-reinstall-r2 says: ALREADY INSTALLED
+PASS T07 idempotent: unchanged
+PASS T08-check-r2-installed (rc 0)
+PASS T08-check-r2-installed says: CRON CHECK r2 INSTALLED (next due
+PASS T09-marker-other-line (rc 3)
+PASS T09-marker-other-line says: partial, duplicate or different
+PASS T10-remove-mismatch (rc 3)
+PASS T11-remove-r2 (rc 0)
+PASS T11 remove restores the baseline exactly
+PASS T12-remove-again (rc 0)
+PASS T12-remove-again says: NOT INSTALLED
+PASS T13-no-final-newline (rc 0)
+PASS T13-no-final-newline says: added the missing final newline
+PASS T13 lines not joined
+PASS T14-short-crontab (rc 3)
+PASS T14-short-crontab says: fewer than the recorded baseline
+PASS T15-list-fails (rc 3)
+PASS T15-list-fails says: crontab -l failed
+PASS T15 unchanged
+PASS T16-corrupting-write (rc 4)
+PASS T16-corrupting-write says: restored: crontab equals the pre-image
+PASS T16 pre-image restored after a corrupt write
+PASS T17-wrapper-pin (rc 3)
+PASS T17-wrapper-pin says: differs from its pin
+PASS T18-install-r3-nothing (rc 3)
+PASS T18-install-r3-nothing says: no verified newest dump
+PASS T19-install-r3-no-restore-log (rc 3)
+PASS T19-install-r3-no-restore-log says: does not record a PASS restore
+PASS T20-install-r3-bad-sidecar (rc 3)
+PASS T21-install-r3 (rc 0)
+PASS T21-install-r3 says: CRON INSTALL r3 PASS: next due
+PASS T22-install-r2-after-r3 (rc 0)
+PASS T22 both jobs, 28 lines
+PASS T23-observe (rc 0)
+PASS T23-observe says: OBSERVE DONE
+PASS T24 cron-env alarm path: wrapper rc 1, sink received the alarm
+PASS stub crontab received 37 calls
+real crontab sha256 after:  043d2510065bd2af43965799c5858e57743ae9a5694281b8c4f8196af003e22e
+PASS real crontab unchanged
+T-CRON RESULT pass=54 fail=0
