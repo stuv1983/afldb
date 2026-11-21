@@ -1,0 +1,17 @@
+# databases left in the isolated cluster (name, marker, bytes) at 2026-11-21T10:12:52Z
+afldb_v2_i363_rbbov_test	marked	296655895
+afldb_v2_i363_rbbovr_test	marked	296680471
+afldb_v2_i363_rbbtpl_test	marked	296467479
+afldb_v2_i363_rbov_test	marked	288390167
+afldb_v2_i363_rbtpl_test	marked	288209943
+afldb_v2_i363_sntpl_test	marked	407165975
+postgres	unmarked	7691287
+# sizes
+4.0G	/mnt/ssd/afldb-i363-20261121
+2.5G	/mnt/ssd/afldb-i363-20261121/pg/data
+# checkout
+ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a
+porcelain=0
+# stop
+server stopped
+port 61490 closed

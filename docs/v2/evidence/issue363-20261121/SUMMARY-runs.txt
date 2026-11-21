@@ -1,0 +1,526 @@
+######## red_rb
+== red_rb sh base=rb tmpl=afldb_v2_i363_rbtpl_test HEAD=40fb1c689e72ea5114ad3bce69d7339d4b31c34c porcelain=0 2026-11-21T09:25:31Z
+create-db: afldb_v2_i363_red_rb_test created from afldb_v2_i363_rbtpl_test and marked
+shared run 1 rc=0 [tests/integration/awards-reload-links.test.ts]  Test Files 1 passed (1); Tests 109 passed (109);
+whole-db tables differing: 6
+    import_batches.max_id rows 26 -> 148
+    public.award_nominations rows 766 -> 766 content differs
+    public.captaincies rows 1781 -> 1781 content differs
+    public.hall_of_fame rows 343 -> 343 content differs
+    public.honour_team_members rows 113 -> 113 content differs
+    public.import_batches rows 26 -> 148 content differs
+    column award_nominations import_batch_id changed_rows=766
+    column captaincies import_batch_id changed_rows=1781
+    column hall_of_fame import_batch_id changed_rows=343
+    column honour_team_members import_batch_id changed_rows=112
+    table award_nominations: only_template=0 only_after=0 changed=766 changed_only_import_batch_id=766
+    table award_winners: only_template=0 only_after=0 changed=0 changed_only_import_batch_id=0
+    table awards: only_template=0 only_after=0 changed=0 changed_only_import_batch_id=0
+    table captaincies: only_template=0 only_after=0 changed=1781 changed_only_import_batch_id=1781
+    table hall_of_fame: only_template=0 only_after=0 changed=343 changed_only_import_batch_id=343
+    table honour_team_members: only_template=1 only_after=1 changed=112 changed_only_import_batch_id=112
+    import_batches.new=122 target_tables=all_australian,captaincies,club_bf,coleman,hall_of_fame,honour_teams,named_medals,rising_star,under_22
+    psql:/mnt/ssd/afldb-i363-20261121/scripts/refs.sql:14: ERROR:  operator is not unique: text || "char"
+    LINE 1: ... c.conrelid::regclass || '.' || a.attname || ' (' || c.confd...
+                                                                 ^
+    HINT:  Could not choose a best candidate operator. You might need to add explicit type casts.
+drop-db: afldb_v2_i363_red_rb_test dropped
+######## red_sn
+== red_sn sh base=sn tmpl=afldb_v2_i363_sntpl_test HEAD=40fb1c689e72ea5114ad3bce69d7339d4b31c34c porcelain=0 2026-11-21T09:25:31Z
+create-db: afldb_v2_i363_red_sn_test created from afldb_v2_i363_sntpl_test and marked
+shared run 1 rc=0 [tests/integration/awards-reload-links.test.ts]  Test Files 1 passed (1); Tests 109 passed (109);
+whole-db tables differing: 6
+    import_batches.max_id rows 82 -> 204
+    public.award_nominations rows 766 -> 766 content differs
+    public.captaincies rows 1781 -> 1781 content differs
+    public.hall_of_fame rows 343 -> 343 content differs
+    public.honour_team_members rows 113 -> 113 content differs
+    public.import_batches rows 75 -> 197 content differs
+    column award_nominations import_batch_id changed_rows=766
+    column captaincies import_batch_id changed_rows=1781
+    column hall_of_fame import_batch_id changed_rows=343
+    column honour_team_members import_batch_id changed_rows=112
+    table award_nominations: only_template=0 only_after=0 changed=766 changed_only_import_batch_id=766
+    table award_winners: only_template=0 only_after=0 changed=0 changed_only_import_batch_id=0
+    table awards: only_template=0 only_after=0 changed=0 changed_only_import_batch_id=0
+    table captaincies: only_template=0 only_after=0 changed=1781 changed_only_import_batch_id=1781
+    table hall_of_fame: only_template=0 only_after=0 changed=343 changed_only_import_batch_id=343
+    table honour_team_members: only_template=1 only_after=1 changed=112 changed_only_import_batch_id=112
+    import_batches.new=122 target_tables=all_australian,captaincies,club_bf,coleman,hall_of_fame,honour_teams,named_medals,rising_star,under_22
+    psql:/mnt/ssd/afldb-i363-20261121/scripts/refs.sql:14: ERROR:  operator is not unique: text || "char"
+    LINE 1: ... c.conrelid::regclass || '.' || a.attname || ' (' || c.confd...
+                                                                 ^
+    HINT:  Could not choose a best candidate operator. You might need to add explicit type casts.
+drop-db: afldb_v2_i363_red_sn_test dropped
+######## green_sh_rb
+== green_sh_rb shn base=rb tmpl=afldb_v2_i363_rbtpl_test HEAD=234254b85a8e8b5862035df5f7df6f659ce581d3 porcelain=0 2026-11-21T09:30:26Z
+create-db: afldb_v2_i363_green_sh_rb_test created from afldb_v2_i363_rbtpl_test and marked
+shared run 1 rc=1 [tests/integration/awards-reload-links.test.ts]  Test Files 1 failed (1); Tests 109 passed (109);
+     FAIL  tests/integration/awards-reload-links.test.ts [ tests/integration/awards-reload-links.test.ts ]
+shared run 2 (neighbours, same copy) rc=0 [tests/integration/admin-awards.test.ts tests/integration/admin-club-leadership.test.ts tests/integration/player-matching.test.ts tests/integration/query-builder.test.ts tests/integration/special-records-lifecycle.test.ts tests/integration/special-records-public-suppression.test.ts tests/integration/fk-indexes.test.ts tests/integration/privileges.test.ts tests/integration/admin-brownlow.test.ts]  Test Files 9 passed (9); Tests 266 passed | 1 skipped (267);
+whole-db tables differing: 8
+    import_batches.max_id rows 26 -> 148
+    public.award_nominations rows 766 -> 766 content differs
+    public.award_winners rows 3713 -> 3713 content differs
+    public.captaincies rows 1781 -> 1781 content differs
+    public.hall_of_fame rows 343 -> 343 content differs
+    public.honour_team_members rows 113 -> 113 content differs
+    public.import_batches rows 26 -> 148 content differs
+    public.player_achievements rows 334 -> 334 content differs
+    column award_nominations import_batch_id changed_rows=766
+    column award_winners import_batch_id changed_rows=3713
+    column captaincies import_batch_id changed_rows=1781
+    column hall_of_fame import_batch_id changed_rows=343
+    column honour_team_members import_batch_id changed_rows=112
+    table award_nominations: only_template=0 only_after=0 changed=766 changed_only_import_batch_id=766
+    table award_winners: only_template=0 only_after=0 changed=3713 changed_only_import_batch_id=3713
+    table awards: only_template=0 only_after=0 changed=0 changed_only_import_batch_id=0
+    table captaincies: only_template=0 only_after=0 changed=1781 changed_only_import_batch_id=1781
+    table hall_of_fame: only_template=0 only_after=0 changed=343 changed_only_import_batch_id=343
+    table honour_team_members: only_template=1 only_after=1 changed=112 changed_only_import_batch_id=112
+    import_batches.new=122 target_tables=all_australian,captaincies,club_bf,coleman,hall_of_fame,honour_teams,named_medals,rising_star,under_22
+    ref award_nominations.import_batch_id (a)=766
+    ref award_winners.import_batch_id (a)=3713
+    ref captaincies.import_batch_id (a)=1781
+    ref hall_of_fame.import_batch_id (a)=343
+    ref honour_team_members.import_batch_id (a)=113
+drop-db: afldb_v2_i363_green_sh_rb_test dropped
+######## green_sh_sn
+== green_sh_sn shn base=sn tmpl=afldb_v2_i363_sntpl_test HEAD=234254b85a8e8b5862035df5f7df6f659ce581d3 porcelain=0 2026-11-21T09:30:26Z
+create-db: afldb_v2_i363_green_sh_sn_test created from afldb_v2_i363_sntpl_test and marked
+shared run 1 rc=1 [tests/integration/awards-reload-links.test.ts]  Test Files 1 failed (1); Tests 109 passed (109);
+     FAIL  tests/integration/awards-reload-links.test.ts [ tests/integration/awards-reload-links.test.ts ]
+shared run 2 (neighbours, same copy) rc=1 [tests/integration/admin-awards.test.ts tests/integration/admin-club-leadership.test.ts tests/integration/player-matching.test.ts tests/integration/query-builder.test.ts tests/integration/special-records-lifecycle.test.ts tests/integration/special-records-public-suppression.test.ts tests/integration/fk-indexes.test.ts tests/integration/privileges.test.ts tests/integration/admin-brownlow.test.ts]  Test Files 1 failed | 8 passed (9); Tests 1 failed | 265 passed | 1 skipped (267);
+         × resolved every historical round row to exactly one match (preflight P2) 56ms
+     FAIL  tests/integration/admin-brownlow.test.ts > migration 094 objects and backfill > resolved every historical round row to exactly one match (preflight P2)
+whole-db tables differing: 8
+    import_batches.max_id rows 82 -> 204
+    public.award_nominations rows 766 -> 766 content differs
+    public.award_winners rows 3712 -> 3713 content differs
+    public.captaincies rows 1781 -> 1781 content differs
+    public.hall_of_fame rows 343 -> 343 content differs
+    public.honour_team_members rows 113 -> 113 content differs
+    public.import_batches rows 75 -> 197 content differs
+    public.player_achievements rows 334 -> 334 content differs
+    column award_nominations import_batch_id changed_rows=766
+    column award_winners import_batch_id changed_rows=3712
+    column award_winners link_status_value changed_rows=22
+    column award_winners player_id changed_rows=22
+    column captaincies import_batch_id changed_rows=1781
+    column hall_of_fame import_batch_id changed_rows=343
+    column honour_team_members import_batch_id changed_rows=112
+    table award_nominations: only_template=0 only_after=0 changed=766 changed_only_import_batch_id=766
+    table award_winners: only_template=0 only_after=1 changed=3712 changed_only_import_batch_id=3690
+    table awards: only_template=0 only_after=0 changed=0 changed_only_import_batch_id=0
+    table captaincies: only_template=0 only_after=0 changed=1781 changed_only_import_batch_id=1781
+    table hall_of_fame: only_template=0 only_after=0 changed=343 changed_only_import_batch_id=343
+    table honour_team_members: only_template=1 only_after=1 changed=112 changed_only_import_batch_id=112
+    transition award_winners link_status "implausible"->"resolved" rows=1
+    transition award_winners link_status "implausible"->"unique" rows=21
+    transition award_winners player_id null->id rows=22
+    import_batches.new=122 target_tables=all_australian,captaincies,club_bf,coleman,hall_of_fame,honour_teams,named_medals,rising_star,under_22
+    ref award_nominations.import_batch_id (a)=766
+    ref award_winners.import_batch_id (a)=3713
+    ref captaincies.import_batch_id (a)=1781
+    ref hall_of_fame.import_batch_id (a)=343
+    ref honour_team_members.import_batch_id (a)=113
+drop-db: afldb_v2_i363_green_sh_sn_test dropped
+######## ctl_rb
+== ctl_rb sh base=rb tmpl=afldb_v2_i363_rbtpl_test HEAD=234254b85a8e8b5862035df5f7df6f659ce581d3 porcelain=0 2026-11-21T09:35:06Z
+create-db: afldb_v2_i363_ctl_rb_test created from afldb_v2_i363_rbtpl_test and marked
+shared run 1 rc=1 [tests/integration/admin-awards.test.ts tests/integration/admin-club-leadership.test.ts tests/integration/player-matching.test.ts tests/integration/query-builder.test.ts tests/integration/special-records-lifecycle.test.ts tests/integration/special-records-public-suppression.test.ts tests/integration/fk-indexes.test.ts tests/integration/privileges.test.ts tests/integration/admin-brownlow.test.ts]  Test Files 1 failed | 8 passed (9); Tests 219 passed | 48 skipped (267);
+     FAIL  tests/integration/admin-brownlow.test.ts [ tests/integration/admin-brownlow.test.ts ]
+whole-db tables differing: 1
+    public.player_achievements rows 334 -> 334 content differs
+    table award_nominations: only_template=0 only_after=0 changed=0 changed_only_import_batch_id=0
+    table award_winners: only_template=0 only_after=0 changed=0 changed_only_import_batch_id=0
+    table awards: only_template=0 only_after=0 changed=0 changed_only_import_batch_id=0
+    table captaincies: only_template=0 only_after=0 changed=0 changed_only_import_batch_id=0
+    table hall_of_fame: only_template=0 only_after=0 changed=0 changed_only_import_batch_id=0
+    table honour_team_members: only_template=0 only_after=0 changed=0 changed_only_import_batch_id=0
+    import_batches.new=0 target_tables=
+drop-db: afldb_v2_i363_ctl_rb_test dropped
+######## ctl_sn
+== ctl_sn sh base=sn tmpl=afldb_v2_i363_sntpl_test HEAD=234254b85a8e8b5862035df5f7df6f659ce581d3 porcelain=0 2026-11-21T09:35:06Z
+create-db: afldb_v2_i363_ctl_sn_test created from afldb_v2_i363_sntpl_test and marked
+shared run 1 rc=1 [tests/integration/admin-awards.test.ts tests/integration/admin-club-leadership.test.ts tests/integration/player-matching.test.ts tests/integration/query-builder.test.ts tests/integration/special-records-lifecycle.test.ts tests/integration/special-records-public-suppression.test.ts tests/integration/fk-indexes.test.ts tests/integration/privileges.test.ts tests/integration/admin-brownlow.test.ts]  Test Files 1 failed | 8 passed (9); Tests 219 passed | 48 skipped (267);
+     FAIL  tests/integration/admin-brownlow.test.ts [ tests/integration/admin-brownlow.test.ts ]
+whole-db tables differing: 3
+    public.player_achievements rows 334 -> 334 content differs
+    public.players rows 13365 -> 13434 content differs
+    public.seasons rows 130 -> 131 content differs
+    table award_nominations: only_template=0 only_after=0 changed=0 changed_only_import_batch_id=0
+    table award_winners: only_template=0 only_after=0 changed=0 changed_only_import_batch_id=0
+    table awards: only_template=0 only_after=0 changed=0 changed_only_import_batch_id=0
+    table captaincies: only_template=0 only_after=0 changed=0 changed_only_import_batch_id=0
+    table hall_of_fame: only_template=0 only_after=0 changed=0 changed_only_import_batch_id=0
+    table honour_team_members: only_template=0 only_after=0 changed=0 changed_only_import_batch_id=0
+    import_batches.new=0 target_tables=
+drop-db: afldb_v2_i363_ctl_sn_test dropped
+######## green_pf_rb
+== green_pf_rb pf base=rb tmpl=afldb_v2_i363_rbtpl_test HEAD=234254b85a8e8b5862035df5f7df6f659ce581d3 2026-11-21T09:35:06Z
+create-db: afldb_v2_i363_green_pf_rb_test created from afldb_v2_i363_rbtpl_test and marked
+per-file rc=1 [tests/integration/awards-reload-links.test.ts]  Test Files 1 failed (1); Tests 109 passed (109);
+     FAIL  tests/integration/awards-reload-links.test.ts [ tests/integration/awards-reload-links.test.ts ]
+databases left after per-file run: 5
+drop-db: afldb_v2_i363_green_pf_rb_test dropped
+######## green_pf_sn
+== green_pf_sn pf base=sn tmpl=afldb_v2_i363_sntpl_test HEAD=234254b85a8e8b5862035df5f7df6f659ce581d3 2026-11-21T09:35:06Z
+create-db: afldb_v2_i363_green_pf_sn_test created from afldb_v2_i363_sntpl_test and marked
+per-file rc=1 [tests/integration/awards-reload-links.test.ts]  Test Files 1 failed (1); Tests 109 passed (109);
+     FAIL  tests/integration/awards-reload-links.test.ts [ tests/integration/awards-reload-links.test.ts ]
+databases left after per-file run: 3
+drop-db: afldb_v2_i363_green_pf_sn_test dropped
+######## g2_sh_rb
+== g2_sh_rb shn base=rb tmpl=afldb_v2_i363_rbtpl_test HEAD=ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a porcelain=0 2026-11-21T09:41:15Z
+create-db: afldb_v2_i363_g2_sh_rb_test created from afldb_v2_i363_rbtpl_test and marked
+shared run 1 rc=0 [tests/integration/awards-reload-links.test.ts]  Test Files 1 passed (1); Tests 109 passed (109);
+-- compare1 vs untouched template
+whole-db tables differing: 0
+    import_batches.new=0 target_tables=
+shared run 2 (neighbours, same copy) rc=0 [tests/integration/admin-awards.test.ts tests/integration/admin-club-leadership.test.ts tests/integration/player-matching.test.ts tests/integration/query-builder.test.ts tests/integration/special-records-lifecycle.test.ts tests/integration/special-records-public-suppression.test.ts tests/integration/fk-indexes.test.ts tests/integration/privileges.test.ts tests/integration/admin-brownlow.test.ts]  Test Files 9 passed (9); Tests 266 passed | 1 skipped (267);
+-- compare2 vs untouched template
+whole-db tables differing: 1
+    public.player_achievements rows 334 -> 334 content differs
+    import_batches.new=0 target_tables=
+drop-db: afldb_v2_i363_g2_sh_rb_test dropped
+######## g2_sh_sn
+== g2_sh_sn shn base=sn tmpl=afldb_v2_i363_sntpl_test HEAD=ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a porcelain=0 2026-11-21T09:41:15Z
+create-db: afldb_v2_i363_g2_sh_sn_test created from afldb_v2_i363_sntpl_test and marked
+shared run 1 rc=0 [tests/integration/awards-reload-links.test.ts]  Test Files 1 passed (1); Tests 109 passed (109);
+-- compare1 vs untouched template
+whole-db tables differing: 0
+    import_batches.new=0 target_tables=
+shared run 2 (neighbours, same copy) rc=1 [tests/integration/admin-awards.test.ts tests/integration/admin-club-leadership.test.ts tests/integration/player-matching.test.ts tests/integration/query-builder.test.ts tests/integration/special-records-lifecycle.test.ts tests/integration/special-records-public-suppression.test.ts tests/integration/fk-indexes.test.ts tests/integration/privileges.test.ts tests/integration/admin-brownlow.test.ts]  Test Files 1 failed | 8 passed (9); Tests 1 failed | 265 passed | 1 skipped (267);
+         × resolved every historical round row to exactly one match (preflight P2) 58ms
+     FAIL  tests/integration/admin-brownlow.test.ts > migration 094 objects and backfill > resolved every historical round row to exactly one match (preflight P2)
+-- compare2 vs untouched template
+whole-db tables differing: 1
+    public.player_achievements rows 334 -> 334 content differs
+    import_batches.new=0 target_tables=
+drop-db: afldb_v2_i363_g2_sh_sn_test dropped
+######## g2_pf_rb
+== g2_pf_rb pf base=rb tmpl=afldb_v2_i363_rbtpl_test HEAD=ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a 2026-11-21T09:47:22Z
+create-db: afldb_v2_i363_g2_pf_rb_test created from afldb_v2_i363_rbtpl_test and marked
+per-file rc=0 [tests/integration/awards-reload-links.test.ts]  Test Files 1 passed (1); Tests 109 passed (109);
+per-file databases (afldb_v2_pf_*) left in the cluster after the run: 0
+drop-db: afldb_v2_i363_g2_pf_rb_test dropped
+######## g2_pf_sn
+== g2_pf_sn pf base=sn tmpl=afldb_v2_i363_sntpl_test HEAD=ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a 2026-11-21T09:50:32Z
+create-db: afldb_v2_i363_g2_pf_sn_test created from afldb_v2_i363_sntpl_test and marked
+per-file rc=0 [tests/integration/awards-reload-links.test.ts]  Test Files 1 passed (1); Tests 109 passed (109);
+per-file databases (afldb_v2_pf_*) left in the cluster after the run: 0
+drop-db: afldb_v2_i363_g2_pf_sn_test dropped
+######## g2_ctl_rb
+== g2_ctl_rb sh base=rb tmpl=afldb_v2_i363_rbtpl_test HEAD=ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a porcelain=0 2026-11-21T09:54:22Z
+create-db: afldb_v2_i363_g2_ctl_rb_test created from afldb_v2_i363_rbtpl_test and marked
+shared run 1 rc=0 [tests/integration/admin-awards.test.ts tests/integration/admin-club-leadership.test.ts tests/integration/player-matching.test.ts tests/integration/query-builder.test.ts tests/integration/special-records-lifecycle.test.ts tests/integration/special-records-public-suppression.test.ts tests/integration/fk-indexes.test.ts tests/integration/privileges.test.ts tests/integration/admin-brownlow.test.ts]  Test Files 9 passed (9); Tests 266 passed | 1 skipped (267);
+-- compare1 vs untouched template
+whole-db tables differing: 1
+    public.player_achievements rows 334 -> 334 content differs
+    import_batches.new=0 target_tables=
+drop-db: afldb_v2_i363_g2_ctl_rb_test dropped
+######## g2_ctl_sn
+== g2_ctl_sn sh base=sn tmpl=afldb_v2_i363_sntpl_test HEAD=ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a porcelain=0 2026-11-21T09:54:22Z
+create-db: afldb_v2_i363_g2_ctl_sn_test created from afldb_v2_i363_sntpl_test and marked
+shared run 1 rc=1 [tests/integration/admin-awards.test.ts tests/integration/admin-club-leadership.test.ts tests/integration/player-matching.test.ts tests/integration/query-builder.test.ts tests/integration/special-records-lifecycle.test.ts tests/integration/special-records-public-suppression.test.ts tests/integration/fk-indexes.test.ts tests/integration/privileges.test.ts tests/integration/admin-brownlow.test.ts]  Test Files 1 failed | 8 passed (9); Tests 1 failed | 265 passed | 1 skipped (267);
+         × resolved every historical round row to exactly one match (preflight P2) 58ms
+     FAIL  tests/integration/admin-brownlow.test.ts > migration 094 objects and backfill > resolved every historical round row to exactly one match (preflight P2)
+-- compare1 vs untouched template
+whole-db tables differing: 1
+    public.player_achievements rows 334 -> 334 content differs
+    import_batches.new=0 target_tables=
+drop-db: afldb_v2_i363_g2_ctl_sn_test dropped
+######## mut_rb
+== mut_rb sh base=rb tmpl=afldb_v2_i363_rbtpl_test HEAD=ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a porcelain=1 2026-11-21T10:01:33Z
+create-db: afldb_v2_i363_mut_rb_test created from afldb_v2_i363_rbtpl_test and marked
+shared run 1 rc=1 [tests/integration/awards-reload-links-i363mut.test.ts]  Test Files 1 failed (1); Tests 109 passed (109);
+     FAIL  tests/integration/awards-reload-links-i363mut.test.ts [ tests/integration/awards-reload-links-i363mut.test.ts ]
+-- compare1 vs untouched template
+whole-db tables differing: 1
+    public.import_batches rows 26 -> 148 content differs
+    import_batches.new=122 target_tables=all_australian,captaincies,club_bf,coleman,hall_of_fame,honour_teams,named_medals,rising_star,under_22
+drop-db: afldb_v2_i363_mut_rb_test dropped
+######## ov_rb
+== ov_rb overlay base=rb -> afldb_v2_i363_rbov_test HEAD=234254b85a8e8b5862035df5f7df6f659ce581d3 2026-11-21T09:30:36Z
+create-db: afldb_v2_i363_rbov_test created from afldb_v2_i363_rbtpl_test and marked
+rekey: source entries=64 kept=64 id_changed=3 dropped=0 []
+{"database":"afldb_v2_i363_rbov_test","apply":true,"planned":64,"counts":{"Anzac Day":31,"Dreamtime at the 'G":22,"King's Birthday":11},"verified":true,"auditRows":64,"activeOverrides":64,"labelledAfter":[{"match_event":"Anzac Day","n":31},{"match_event":"Dreamtime at the 'G","n":22},{"match_event":"King's Birthday","n":11}],"evidenceSha256":"d21a3eba05553e2a58933ab9ce7f941ab1bc2e9c56a7974e2d770e9ea053f819","resultCount":64}
+ERROR:  aggregate functions are not allowed in GROUP BY
+LINE 1: ... ' || entity_type || '/' || field_group || '=' || count(*) F...
+                                                             ^
+match_event Anzac Day=31
+match_event Dreamtime at the 'G=22
+match_event King's Birthday=11
+data_edits=64
+######## ov_rbb
+== ov_rbb overlay base=rbb -> afldb_v2_i363_rbbov_test HEAD=234254b85a8e8b5862035df5f7df6f659ce581d3 2026-11-21T09:40:42Z
+create-db: afldb_v2_i363_rbbov_test created from afldb_v2_i363_rbbtpl_test and marked
+rekey: source entries=64 kept=64 id_changed=3 dropped=0 []
+{"database":"afldb_v2_i363_rbbov_test","apply":true,"planned":64,"counts":{"Anzac Day":31,"Dreamtime at the 'G":22,"King's Birthday":11},"verified":true,"auditRows":64,"activeOverrides":64,"labelledAfter":[{"match_event":"Anzac Day","n":31},{"match_event":"Dreamtime at the 'G","n":22},{"match_event":"King's Birthday","n":11}],"evidenceSha256":"d21a3eba05553e2a58933ab9ce7f941ab1bc2e9c56a7974e2d770e9ea053f819","resultCount":64}
+data_overrides matches/match_event=64
+match_event Anzac Day=31
+match_event Dreamtime at the 'G=22
+match_event King's Birthday=11
+data_edits=64
+######## g0_rb
+== g0_rb vt base=rb tmpl=afldb_v2_i363_rbtpl_test env=[AFLDB_GRIDLEY_REPORT=/mnt/ssd/afldb-i363-20261121/ev/g0_rb/report-gridley-corpus.json] HEAD=40fb1c689e72ea5114ad3bce69d7339d4b31c34c 2026-11-21T09:25:31Z
+create-db: afldb_v2_i363_g0rb_gridley_corpus_test created from afldb_v2_i363_rbtpl_test and marked
+vitest rc=1 [tests/integration/gridley-corpus.test.ts]  Test Files 1 failed (1); Tests 3 failed | 1209 passed (1212);
+         × has no probed dataset gap, unless run in diagnostic mode 19ms
+         × writes the run report and has no failing cells 123ms
+         × conforms to the bounded approved-deferral policy, independently of diagnostic mode 59ms
+     FAIL  tests/integration/gridley-corpus.test.ts > Gridley corpus -- criteria > has no probed dataset gap, unless run in diagnostic mode
+     FAIL  tests/integration/gridley-corpus.test.ts > Gridley corpus -- every cell through solveCellSummary > writes the run report and has no failing cells
+     FAIL  tests/integration/gridley-corpus.test.ts > Gridley corpus -- every cell through solveCellSummary > conforms to the bounded approved-deferral policy, independently of diagnostic mode
+    [gridley-corpus] known-answer adjudications (AFLDB-ISSUE-225):
+    [gridley-corpus] dataset gaps on this database: {"maxSeason":2026,"registerSeason":2026,"draftLinks":false,"matchEvents":false,"heights":true,"dobs":true,"coaches":true,"fatherSon":true,"siblings":true,"afterSiren":true}; gapped criteria: anzac-playedin-1, anzac-won-1, bigfreeze-playedin-1, dreamtime-playedin-1, freeagent1, pick1, pickrookie, picktop10, picktop5, traded1
+    [gridley-corpus] unsupported valid criteria: 7
+    [gridley-corpus] criteria over 1 s: 3
+    [gridley-corpus] cells solved 9887/10287; findings {"time of board":22827,"adjudicated key disagreement":54,"dataset gap":322,"unsupported":78,"list membership":1219,"external source disagreement":383,"adjudicated source conflict":63,"criterion disagreement":40}; cells over 1 s: 22
+    [gridley-corpus]   time of board (22827): Gridley's answer key is frozen at the board's date and the player was still playing then; AFLDB answers for today
+    [gridley-corpus]   list membership (1219): Gridley's club, decade, teammate, club-count, wooden-spoon, minor-premiership and coached-by criteria include players merely listed by a club that season (a trade-period move, the suspended 2016 Essendon players, a listed player who did not play a caretaker coach's one match); AFLDB models games played
+    [gridley-corpus]   external source disagreement (383): a height cell where every independent source AFLDB holds (AFL API roster, Wikipedia infobox) sits on AFLDB's side of the bound and none on Gridley's (ISSUE-118 §23.19); or a premiership-captain cell where AFLDB's canonical captaincies record the player as one of several captains of the premier club that season who all played and won the Grand Final, and Gridley's key names one premiership captain per flag (ISSUE-118 §23.23); or a National Draft pick-range cell where Gridley lists a linked player whose only trusted-linked pick inside the range is a non-national selection, named in the finding (AFLDB-ISSUE-222 §11.19.12 D1). AFLDB's answer is source-backed; the definitions differ
+    [gridley-corpus]   adjudicated source conflict (63): a height source conflict the operator has reviewed against every source AFLDB holds and decided in a tracked record (data/players/height-adjudications.csv, ISSUE-118 §23.26): AFL Tables is retained under the §23.19 precedence policy and the competing values are named; the record applies only while the canonical height and the competing evidence are exactly those it was decided on
+    [gridley-corpus]   adjudicated key disagreement (54): an operator-adjudicated difference from Gridley's answer key (AFLDB-ISSUE-225 §19, D4-D6), one of two mechanisms named in each finding: (a) the teammates semantic contract -- Gridley lists, AFLDB omits, career_teammates_min is the only lacking axis and the career reaches 2001: Gridley counts list co-members after 2000, AFLDB counts players who played for the same club in the same season, and AFLDB's played-teammate count is in the detail; or (b) a tracked known-answer adjudication (data/players/gridley-known-answer-adjudications.csv) keyed by AFL Tables profile, applying only on its criterion and direction, only while the AFLDB fact it was decided on is exactly what the database holds (otherwise the cell stays `incorrect known answer`, marked STALE), and for a self-inconsistent key only where AFLDB satisfies the other criterion and Gridley's own frozen key lists the player under that criterion elsewhere in the corpus (D10)
+    [gridley-corpus]   unsupported (78): the criterion needs data AFLDB does not hold (src/search/gridley-compat.ts names it) -- acquisition required [FAILS: acceptance is zero]
+    [gridley-corpus]   dataset gap (322): this database lacks a dataset the criterion reads (draft links, marquee tags, a later season, player heights, dates of birth, coaches, after-the-siren events) [FAILS: acceptance is zero]
+drop-db: afldb_v2_i363_g0rb_gridley_corpus_test dropped
+== g0_rb vt base=rb tmpl=afldb_v2_i363_rbtpl_test env=[AFLDB_GRIDLEY_REPORT=/mnt/ssd/afldb-i363-20261121/ev/g0_rb/report-gridley-aa-oracle.json] HEAD=234254b85a8e8b5862035df5f7df6f659ce581d3 2026-11-21T09:32:16Z
+create-db: afldb_v2_i363_g0rb_gridley_aa_oracle_test created from afldb_v2_i363_rbtpl_test and marked
+vitest rc=0 [tests/integration/gridley-aa-oracle.test.ts]  Test Files 1 passed (1); Tests 61 passed | 1 skipped (62);
+drop-db: afldb_v2_i363_g0rb_gridley_aa_oracle_test dropped
+== g0_rb vt base=rb tmpl=afldb_v2_i363_rbtpl_test env=[AFLDB_GRIDLEY_REPORT=/mnt/ssd/afldb-i363-20261121/ev/g0_rb/report-gridley-height-oracle.json] HEAD=234254b85a8e8b5862035df5f7df6f659ce581d3 2026-11-21T09:34:28Z
+create-db: afldb_v2_i363_g0rb_gridley_height_oracle_test created from afldb_v2_i363_rbtpl_test and marked
+vitest rc=0 [tests/integration/gridley-height-oracle.test.ts]  Test Files 1 passed (1); Tests 61 passed | 1 skipped (62);
+drop-db: afldb_v2_i363_g0rb_gridley_height_oracle_test dropped
+== g0_rb vt base=rb tmpl=afldb_v2_i363_rbtpl_test env=[AFLDB_GRIDLEY_REPORT=/mnt/ssd/afldb-i363-20261121/ev/g0_rb/report-grid-solver.json] HEAD=234254b85a8e8b5862035df5f7df6f659ce581d3 2026-11-21T09:37:03Z
+create-db: afldb_v2_i363_g0rb_grid_solver_test created from afldb_v2_i363_rbtpl_test and marked
+vitest rc=1 [tests/integration/grid-solver.test.ts]  Test Files 1 failed (1); Tests 1 failed | 221 passed (222);
+         × drafted_by_club_never_played matches a hand-written equivalent for a real club 31ms
+     FAIL  tests/integration/grid-solver.test.ts > grid solver correctness > drafted_by_club_never_played matches a hand-written equivalent for a real club
+drop-db: afldb_v2_i363_g0rb_grid_solver_test dropped
+== g0_rb vt base=rb tmpl=afldb_v2_i363_rbtpl_test env=[AFLDB_GRIDLEY_REPORT=/mnt/ssd/afldb-i363-20261121/ev/g0_rb/report-grid-solver-investigation.json] HEAD=234254b85a8e8b5862035df5f7df6f659ce581d3 2026-11-21T09:37:44Z
+create-db: afldb_v2_i363_g0rb_grid_solver_investigation_test created from afldb_v2_i363_rbtpl_test and marked
+vitest rc=0 [tests/integration/grid-solver-investigation.test.ts]  Test Files 1 passed (1); Tests 1 passed (1);
+drop-db: afldb_v2_i363_g0rb_grid_solver_investigation_test dropped
+== g0_rb vt base=rb tmpl=afldb_v2_i363_rbtpl_test env=[AFLDB_GRIDLEY_REPORT=/mnt/ssd/afldb-i363-20261121/ev/g0_rb/report-release-gates.json] HEAD=234254b85a8e8b5862035df5f7df6f659ce581d3 2026-11-21T09:37:56Z
+create-db: afldb_v2_i363_g0rb_release_gates_test created from afldb_v2_i363_rbtpl_test and marked
+vitest rc=0 [tests/integration/release-gates.test.ts]  Test Files 1 passed (1); Tests 68 passed | 7 skipped (75);
+drop-db: afldb_v2_i363_g0rb_release_gates_test dropped
+######## g0_sn
+== g0_sn vt base=sn tmpl=afldb_v2_i363_sntpl_test env=[AFLDB_GRIDLEY_REPORT=/mnt/ssd/afldb-i363-20261121/ev/g0_sn/report-gridley_corpus.json] HEAD=234254b85a8e8b5862035df5f7df6f659ce581d3 2026-11-21T09:38:17Z
+create-db: afldb_v2_i363_g0_sn_gridley_corpus_test created from afldb_v2_i363_sntpl_test and marked
+vitest rc=1 [tests/integration/gridley-corpus.test.ts]  Test Files 1 failed (1); Tests 1 failed | 1211 passed (1212);
+         × writes the run report and has no failing cells 171ms
+     FAIL  tests/integration/gridley-corpus.test.ts > Gridley corpus -- every cell through solveCellSummary > writes the run report and has no failing cells
+    [gridley-corpus] known-answer adjudications (AFLDB-ISSUE-225):
+    [gridley-corpus] dataset gaps on this database: {"maxSeason":2026,"registerSeason":2026,"draftLinks":true,"matchEvents":true,"heights":true,"dobs":true,"coaches":true,"fatherSon":true,"siblings":true,"afterSiren":true}; gapped criteria: none
+    [gridley-corpus] unsupported valid criteria: 7
+    [gridley-corpus] criteria over 1 s: 3
+    [gridley-corpus] cells solved 10209/10287; findings {"time of board":23530,"adjudicated key disagreement":54,"unsupported":78,"list membership":1232,"external source disagreement":425,"adjudicated source conflict":63,"criterion disagreement":40}; cells over 1 s: 44
+    [gridley-corpus]   time of board (23530): Gridley's answer key is frozen at the board's date and the player was still playing then; AFLDB answers for today
+    [gridley-corpus]   list membership (1232): Gridley's club, decade, teammate, club-count, wooden-spoon, minor-premiership and coached-by criteria include players merely listed by a club that season (a trade-period move, the suspended 2016 Essendon players, a listed player who did not play a caretaker coach's one match); AFLDB models games played
+    [gridley-corpus]   external source disagreement (425): a height cell where every independent source AFLDB holds (AFL API roster, Wikipedia infobox) sits on AFLDB's side of the bound and none on Gridley's (ISSUE-118 §23.19); or a premiership-captain cell where AFLDB's canonical captaincies record the player as one of several captains of the premier club that season who all played and won the Grand Final, and Gridley's key names one premiership captain per flag (ISSUE-118 §23.23); or a National Draft pick-range cell where Gridley lists a linked player whose only trusted-linked pick inside the range is a non-national selection, named in the finding (AFLDB-ISSUE-222 §11.19.12 D1). AFLDB's answer is source-backed; the definitions differ
+    [gridley-corpus]   adjudicated source conflict (63): a height source conflict the operator has reviewed against every source AFLDB holds and decided in a tracked record (data/players/height-adjudications.csv, ISSUE-118 §23.26): AFL Tables is retained under the §23.19 precedence policy and the competing values are named; the record applies only while the canonical height and the competing evidence are exactly those it was decided on
+    [gridley-corpus]   adjudicated key disagreement (54): an operator-adjudicated difference from Gridley's answer key (AFLDB-ISSUE-225 §19, D4-D6), one of two mechanisms named in each finding: (a) the teammates semantic contract -- Gridley lists, AFLDB omits, career_teammates_min is the only lacking axis and the career reaches 2001: Gridley counts list co-members after 2000, AFLDB counts players who played for the same club in the same season, and AFLDB's played-teammate count is in the detail; or (b) a tracked known-answer adjudication (data/players/gridley-known-answer-adjudications.csv) keyed by AFL Tables profile, applying only on its criterion and direction, only while the AFLDB fact it was decided on is exactly what the database holds (otherwise the cell stays `incorrect known answer`, marked STALE), and for a self-inconsistent key only where AFLDB satisfies the other criterion and Gridley's own frozen key lists the player under that criterion elsewhere in the corpus (D10)
+    [gridley-corpus]   unsupported (78): the criterion needs data AFLDB does not hold (src/search/gridley-compat.ts names it) -- acquisition required [FAILS: acceptance is zero]
+drop-db: afldb_v2_i363_g0_sn_gridley_corpus_test dropped
+== g0_sn vt base=sn tmpl=afldb_v2_i363_sntpl_test env=[AFLDB_GRIDLEY_REPORT=/mnt/ssd/afldb-i363-20261121/ev/g0_sn/report-gridley_aa_oracle.json] HEAD=ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a 2026-11-21T09:45:47Z
+create-db: afldb_v2_i363_g0_sn_gridley_aa_oracle_test created from afldb_v2_i363_sntpl_test and marked
+vitest rc=0 [tests/integration/gridley-aa-oracle.test.ts]  Test Files 1 passed (1); Tests 61 passed | 1 skipped (62);
+drop-db: afldb_v2_i363_g0_sn_gridley_aa_oracle_test dropped
+== g0_sn vt base=sn tmpl=afldb_v2_i363_sntpl_test env=[AFLDB_GRIDLEY_REPORT=/mnt/ssd/afldb-i363-20261121/ev/g0_sn/report-gridley_height_oracle.json] HEAD=ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a 2026-11-21T09:47:55Z
+create-db: afldb_v2_i363_g0_sn_gridley_height_oracle_test created from afldb_v2_i363_sntpl_test and marked
+vitest rc=0 [tests/integration/gridley-height-oracle.test.ts]  Test Files 1 passed (1); Tests 61 passed | 1 skipped (62);
+drop-db: afldb_v2_i363_g0_sn_gridley_height_oracle_test dropped
+== g0_sn vt base=sn tmpl=afldb_v2_i363_sntpl_test env=[AFLDB_GRIDLEY_REPORT=/mnt/ssd/afldb-i363-20261121/ev/g0_sn/report-grid_solver.json] HEAD=ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a 2026-11-21T09:49:45Z
+create-db: afldb_v2_i363_g0_sn_grid_solver_test created from afldb_v2_i363_sntpl_test and marked
+vitest rc=0 [tests/integration/grid-solver.test.ts]  Test Files 1 passed (1); Tests 222 passed (222);
+drop-db: afldb_v2_i363_g0_sn_grid_solver_test dropped
+== g0_sn vt base=sn tmpl=afldb_v2_i363_sntpl_test env=[AFLDB_GRIDLEY_REPORT=/mnt/ssd/afldb-i363-20261121/ev/g0_sn/report-grid_solver_investigation.json] HEAD=ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a 2026-11-21T09:50:16Z
+create-db: afldb_v2_i363_g0_sn_grid_solver_investigation_test created from afldb_v2_i363_sntpl_test and marked
+vitest rc=0 [tests/integration/grid-solver-investigation.test.ts]  Test Files 1 passed (1); Tests 1 passed (1);
+drop-db: afldb_v2_i363_g0_sn_grid_solver_investigation_test dropped
+== g0_sn vt base=sn tmpl=afldb_v2_i363_sntpl_test env=[AFLDB_GRIDLEY_REPORT=/mnt/ssd/afldb-i363-20261121/ev/g0_sn/report-release_gates.json] HEAD=ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a 2026-11-21T09:50:20Z
+create-db: afldb_v2_i363_g0_sn_release_gates_test created from afldb_v2_i363_sntpl_test and marked
+vitest rc=1 [tests/integration/release-gates.test.ts]  Test Files 1 failed (1); Tests 5 failed | 63 passed | 7 skipped (75);
+         × agrees with the canonical round votes for every career inside their coverage 89ms
+         × populates the canonical dates with no conflicts (13,255 historical, 13,347 on the accepted rebuild) 312ms
+         × keeps the evidence behind every recovered date (14,110 historical, 14,294 on the accepted rebuild) 150ms
+         × matches players on the profile URL rather than the name (13,275 historical, 13,367 on the accepted rebuild) 265ms
+         × leaves the remaining players honestly without a date 261ms
+     FAIL  tests/integration/release-gates.test.ts > gate: Brownlow authority > agrees with the canonical round votes for every career inside their coverage
+     FAIL  tests/integration/release-gates.test.ts > gate: birth dates > populates the canonical dates with no conflicts (13,255 historical, 13,347 on the accepted rebuild)
+     FAIL  tests/integration/release-gates.test.ts > gate: birth dates > keeps the evidence behind every recovered date (14,110 historical, 14,294 on the accepted rebuild)
+     FAIL  tests/integration/release-gates.test.ts > gate: birth dates > matches players on the profile URL rather than the name (13,275 historical, 13,367 on the accepted rebuild)
+     FAIL  tests/integration/release-gates.test.ts > gate: birth dates > leaves the remaining players honestly without a date
+drop-db: afldb_v2_i363_g0_sn_release_gates_test dropped
+######## g0_rbov
+== g0_rbov vt base=rbov tmpl=afldb_v2_i363_rbov_test env=[AFLDB_GRIDLEY_REPORT=/mnt/ssd/afldb-i363-20261121/ev/g0_rbov/report-gridley_corpus.json] HEAD=234254b85a8e8b5862035df5f7df6f659ce581d3 2026-11-21T09:38:17Z
+create-db: afldb_v2_i363_g0_rbov_gridley_corpus_test created from afldb_v2_i363_rbov_test and marked
+vitest rc=1 [tests/integration/gridley-corpus.test.ts]  Test Files 1 failed (1); Tests 3 failed | 1209 passed (1212);
+         × has no probed dataset gap, unless run in diagnostic mode 22ms
+         × writes the run report and has no failing cells 138ms
+         × conforms to the bounded approved-deferral policy, independently of diagnostic mode 46ms
+     FAIL  tests/integration/gridley-corpus.test.ts > Gridley corpus -- criteria > has no probed dataset gap, unless run in diagnostic mode
+     FAIL  tests/integration/gridley-corpus.test.ts > Gridley corpus -- every cell through solveCellSummary > writes the run report and has no failing cells
+     FAIL  tests/integration/gridley-corpus.test.ts > Gridley corpus -- every cell through solveCellSummary > conforms to the bounded approved-deferral policy, independently of diagnostic mode
+    [gridley-corpus] known-answer adjudications (AFLDB-ISSUE-225):
+    [gridley-corpus] dataset gaps on this database: {"maxSeason":2026,"registerSeason":2026,"draftLinks":false,"matchEvents":true,"heights":true,"dobs":true,"coaches":true,"fatherSon":true,"siblings":true,"afterSiren":true}; gapped criteria: freeagent1, pick1, pickrookie, picktop10, picktop5, traded1
+    [gridley-corpus] unsupported valid criteria: 7
+    [gridley-corpus] criteria over 1 s: 3
+    [gridley-corpus] cells solved 9928/10287; findings {"time of board":22856,"adjudicated key disagreement":54,"dataset gap":281,"unsupported":78,"list membership":1223,"external source disagreement":386,"adjudicated source conflict":63,"criterion disagreement":40}; cells over 1 s: 47
+    [gridley-corpus]   time of board (22856): Gridley's answer key is frozen at the board's date and the player was still playing then; AFLDB answers for today
+    [gridley-corpus]   list membership (1223): Gridley's club, decade, teammate, club-count, wooden-spoon, minor-premiership and coached-by criteria include players merely listed by a club that season (a trade-period move, the suspended 2016 Essendon players, a listed player who did not play a caretaker coach's one match); AFLDB models games played
+    [gridley-corpus]   external source disagreement (386): a height cell where every independent source AFLDB holds (AFL API roster, Wikipedia infobox) sits on AFLDB's side of the bound and none on Gridley's (ISSUE-118 §23.19); or a premiership-captain cell where AFLDB's canonical captaincies record the player as one of several captains of the premier club that season who all played and won the Grand Final, and Gridley's key names one premiership captain per flag (ISSUE-118 §23.23); or a National Draft pick-range cell where Gridley lists a linked player whose only trusted-linked pick inside the range is a non-national selection, named in the finding (AFLDB-ISSUE-222 §11.19.12 D1). AFLDB's answer is source-backed; the definitions differ
+    [gridley-corpus]   adjudicated source conflict (63): a height source conflict the operator has reviewed against every source AFLDB holds and decided in a tracked record (data/players/height-adjudications.csv, ISSUE-118 §23.26): AFL Tables is retained under the §23.19 precedence policy and the competing values are named; the record applies only while the canonical height and the competing evidence are exactly those it was decided on
+    [gridley-corpus]   adjudicated key disagreement (54): an operator-adjudicated difference from Gridley's answer key (AFLDB-ISSUE-225 §19, D4-D6), one of two mechanisms named in each finding: (a) the teammates semantic contract -- Gridley lists, AFLDB omits, career_teammates_min is the only lacking axis and the career reaches 2001: Gridley counts list co-members after 2000, AFLDB counts players who played for the same club in the same season, and AFLDB's played-teammate count is in the detail; or (b) a tracked known-answer adjudication (data/players/gridley-known-answer-adjudications.csv) keyed by AFL Tables profile, applying only on its criterion and direction, only while the AFLDB fact it was decided on is exactly what the database holds (otherwise the cell stays `incorrect known answer`, marked STALE), and for a self-inconsistent key only where AFLDB satisfies the other criterion and Gridley's own frozen key lists the player under that criterion elsewhere in the corpus (D10)
+    [gridley-corpus]   unsupported (78): the criterion needs data AFLDB does not hold (src/search/gridley-compat.ts names it) -- acquisition required [FAILS: acceptance is zero]
+    [gridley-corpus]   dataset gap (281): this database lacks a dataset the criterion reads (draft links, marquee tags, a later season, player heights, dates of birth, coaches, after-the-siren events) [FAILS: acceptance is zero]
+drop-db: afldb_v2_i363_g0_rbov_gridley_corpus_test dropped
+== g0_rbov vt base=rbov tmpl=afldb_v2_i363_rbov_test env=[AFLDB_GRIDLEY_REPORT=/mnt/ssd/afldb-i363-20261121/ev/g0_rbov/report-gridley_aa_oracle.json] HEAD=ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a 2026-11-21T09:45:47Z
+create-db: afldb_v2_i363_g0_rbov_gridley_aa_oracle_test created from afldb_v2_i363_rbov_test and marked
+vitest rc=0 [tests/integration/gridley-aa-oracle.test.ts]  Test Files 1 passed (1); Tests 61 passed | 1 skipped (62);
+drop-db: afldb_v2_i363_g0_rbov_gridley_aa_oracle_test dropped
+== g0_rbov vt base=rbov tmpl=afldb_v2_i363_rbov_test env=[AFLDB_GRIDLEY_REPORT=/mnt/ssd/afldb-i363-20261121/ev/g0_rbov/report-gridley_height_oracle.json] HEAD=ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a 2026-11-21T09:48:10Z
+create-db: afldb_v2_i363_g0_rbov_gridley_height_oracle_test created from afldb_v2_i363_rbov_test and marked
+vitest rc=0 [tests/integration/gridley-height-oracle.test.ts]  Test Files 1 passed (1); Tests 61 passed | 1 skipped (62);
+drop-db: afldb_v2_i363_g0_rbov_gridley_height_oracle_test dropped
+== g0_rbov vt base=rbov tmpl=afldb_v2_i363_rbov_test env=[AFLDB_GRIDLEY_REPORT=/mnt/ssd/afldb-i363-20261121/ev/g0_rbov/report-grid_solver.json] HEAD=ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a 2026-11-21T09:49:59Z
+create-db: afldb_v2_i363_g0_rbov_grid_solver_test created from afldb_v2_i363_rbov_test and marked
+vitest rc=1 [tests/integration/grid-solver.test.ts]  Test Files 1 failed (1); Tests 1 failed | 221 passed (222);
+         × drafted_by_club_never_played matches a hand-written equivalent for a real club 27ms
+     FAIL  tests/integration/grid-solver.test.ts > grid solver correctness > drafted_by_club_never_played matches a hand-written equivalent for a real club
+drop-db: afldb_v2_i363_g0_rbov_grid_solver_test dropped
+== g0_rbov vt base=rbov tmpl=afldb_v2_i363_rbov_test env=[AFLDB_GRIDLEY_REPORT=/mnt/ssd/afldb-i363-20261121/ev/g0_rbov/report-grid_solver_investigation.json] HEAD=ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a 2026-11-21T09:50:34Z
+create-db: afldb_v2_i363_g0_rbov_grid_solver_investigation_test created from afldb_v2_i363_rbov_test and marked
+vitest rc=0 [tests/integration/grid-solver-investigation.test.ts]  Test Files 1 passed (1); Tests 1 passed (1);
+drop-db: afldb_v2_i363_g0_rbov_grid_solver_investigation_test dropped
+== g0_rbov vt base=rbov tmpl=afldb_v2_i363_rbov_test env=[AFLDB_GRIDLEY_REPORT=/mnt/ssd/afldb-i363-20261121/ev/g0_rbov/report-release_gates.json] HEAD=ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a 2026-11-21T09:50:53Z
+create-db: afldb_v2_i363_g0_rbov_release_gates_test created from afldb_v2_i363_rbov_test and marked
+vitest rc=0 [tests/integration/release-gates.test.ts]  Test Files 1 passed (1); Tests 68 passed | 7 skipped (75);
+drop-db: afldb_v2_i363_g0_rbov_release_gates_test dropped
+######## g0_rbb
+== g0_rbb vt base=rbb tmpl=afldb_v2_i363_rbbtpl_test env=[AFLDB_GRIDLEY_REPORT=/mnt/ssd/afldb-i363-20261121/ev/g0_rbb/report-gridley_corpus.json] HEAD=ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a 2026-11-21T09:41:00Z
+create-db: afldb_v2_i363_g0_rbb_gridley_corpus_test created from afldb_v2_i363_rbbtpl_test and marked
+vitest rc=1 [tests/integration/gridley-corpus.test.ts]  Test Files 1 failed (1); Tests 3 failed | 1209 passed (1212);
+         × has no probed dataset gap, unless run in diagnostic mode 19ms
+         × writes the run report and has no failing cells 101ms
+         × conforms to the bounded approved-deferral policy, independently of diagnostic mode 15ms
+     FAIL  tests/integration/gridley-corpus.test.ts > Gridley corpus -- criteria > has no probed dataset gap, unless run in diagnostic mode
+     FAIL  tests/integration/gridley-corpus.test.ts > Gridley corpus -- every cell through solveCellSummary > writes the run report and has no failing cells
+     FAIL  tests/integration/gridley-corpus.test.ts > Gridley corpus -- every cell through solveCellSummary > conforms to the bounded approved-deferral policy, independently of diagnostic mode
+    [gridley-corpus] known-answer adjudications (AFLDB-ISSUE-225):
+    [gridley-corpus] dataset gaps on this database: {"maxSeason":2026,"registerSeason":2026,"draftLinks":true,"matchEvents":false,"heights":true,"dobs":true,"coaches":true,"fatherSon":true,"siblings":true,"afterSiren":true}; gapped criteria: anzac-playedin-1, anzac-won-1, bigfreeze-playedin-1, dreamtime-playedin-1
+    [gridley-corpus] unsupported valid criteria: 7
+    [gridley-corpus] criteria over 1 s: 3
+    [gridley-corpus] cells solved 10167/10287; findings {"time of board":23542,"adjudicated key disagreement":54,"unsupported":78,"list membership":1228,"external source disagreement":422,"source coverage gap":23,"adjudicated source conflict":63,"dataset gap":42,"criterion disagreement":40}; cells over 1 s: 23
+    [gridley-corpus]   time of board (23542): Gridley's answer key is frozen at the board's date and the player was still playing then; AFLDB answers for today
+    [gridley-corpus]   list membership (1228): Gridley's club, decade, teammate, club-count, wooden-spoon, minor-premiership and coached-by criteria include players merely listed by a club that season (a trade-period move, the suspended 2016 Essendon players, a listed player who did not play a caretaker coach's one match); AFLDB models games played
+    [gridley-corpus]   external source disagreement (422): a height cell where every independent source AFLDB holds (AFL API roster, Wikipedia infobox) sits on AFLDB's side of the bound and none on Gridley's (ISSUE-118 §23.19); or a premiership-captain cell where AFLDB's canonical captaincies record the player as one of several captains of the premier club that season who all played and won the Grand Final, and Gridley's key names one premiership captain per flag (ISSUE-118 §23.23); or a National Draft pick-range cell where Gridley lists a linked player whose only trusted-linked pick inside the range is a non-national selection, named in the finding (AFLDB-ISSUE-222 §11.19.12 D1). AFLDB's answer is source-backed; the definitions differ
+    [gridley-corpus]   adjudicated source conflict (63): a height source conflict the operator has reviewed against every source AFLDB holds and decided in a tracked record (data/players/height-adjudications.csv, ISSUE-118 §23.26): AFL Tables is retained under the §23.19 precedence policy and the competing values are named; the record applies only while the canonical height and the competing evidence are exactly those it was decided on
+    [gridley-corpus]   adjudicated key disagreement (54): an operator-adjudicated difference from Gridley's answer key (AFLDB-ISSUE-225 §19, D4-D6), one of two mechanisms named in each finding: (a) the teammates semantic contract -- Gridley lists, AFLDB omits, career_teammates_min is the only lacking axis and the career reaches 2001: Gridley counts list co-members after 2000, AFLDB counts players who played for the same club in the same season, and AFLDB's played-teammate count is in the detail; or (b) a tracked known-answer adjudication (data/players/gridley-known-answer-adjudications.csv) keyed by AFL Tables profile, applying only on its criterion and direction, only while the AFLDB fact it was decided on is exactly what the database holds (otherwise the cell stays `incorrect known answer`, marked STALE), and for a self-inconsistent key only where AFLDB satisfies the other criterion and Gridley's own frozen key lists the player under that criterion elsewhere in the corpus (D10)
+    [gridley-corpus]   unsupported (78): the criterion needs data AFLDB does not hold (src/search/gridley-compat.ts names it) -- acquisition required [FAILS: acceptance is zero]
+    [gridley-corpus]   dataset gap (42): this database lacks a dataset the criterion reads (draft links, marquee tags, a later season, player heights, dates of birth, coaches, after-the-siren events) [FAILS: acceptance is zero]
+    [gridley-corpus]   source coverage gap (23): a has_brother cell where Gridley lists a player and AFLDB's canonical sibling sources (the tracked Wikipedia football-families export and its evidenced supplements, ISSUE-118 §23.31) carry no brothers row linking him to a VFL/AFL player -- the absence of a row is UNKNOWN coverage, never 'no brother', open until an explicitly evidenced pair is admitted through data/players/sibling-supplements.csv; or a pickrookie cell where Gridley lists a linked player whose DraftGuru page carries no Rookie event, and an independent source AFLDB has reviewed confirms the selection anyway (data/players/rookie-relisting-outcomes.csv, AFLDB-ISSUE-222 §11.19.12/§11.19.13 D2) -- a DraftGuru source-coverage gap, not a linkage or builder defect, open until DraftGuru's rows are supplemented [FAILS: acceptance is zero]
+drop-db: afldb_v2_i363_g0_rbb_gridley_corpus_test dropped
+== g0_rbb vt base=rbb tmpl=afldb_v2_i363_rbbtpl_test env=[AFLDB_GRIDLEY_REPORT=/mnt/ssd/afldb-i363-20261121/ev/g0_rbb/report-gridley_aa_oracle.json] HEAD=ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a 2026-11-21T09:47:55Z
+create-db: afldb_v2_i363_g0_rbb_gridley_aa_oracle_test created from afldb_v2_i363_rbbtpl_test and marked
+vitest rc=0 [tests/integration/gridley-aa-oracle.test.ts]  Test Files 1 passed (1); Tests 61 passed | 1 skipped (62);
+drop-db: afldb_v2_i363_g0_rbb_gridley_aa_oracle_test dropped
+== g0_rbb vt base=rbb tmpl=afldb_v2_i363_rbbtpl_test env=[AFLDB_GRIDLEY_REPORT=/mnt/ssd/afldb-i363-20261121/ev/g0_rbb/report-gridley_height_oracle.json] HEAD=ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a 2026-11-21T09:49:45Z
+create-db: afldb_v2_i363_g0_rbb_gridley_height_oracle_test created from afldb_v2_i363_rbbtpl_test and marked
+vitest rc=0 [tests/integration/gridley-height-oracle.test.ts]  Test Files 1 passed (1); Tests 61 passed | 1 skipped (62);
+drop-db: afldb_v2_i363_g0_rbb_gridley_height_oracle_test dropped
+== g0_rbb vt base=rbb tmpl=afldb_v2_i363_rbbtpl_test env=[AFLDB_GRIDLEY_REPORT=/mnt/ssd/afldb-i363-20261121/ev/g0_rbb/report-grid_solver.json] HEAD=ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a 2026-11-21T09:51:44Z
+create-db: afldb_v2_i363_g0_rbb_grid_solver_test created from afldb_v2_i363_rbbtpl_test and marked
+vitest rc=0 [tests/integration/grid-solver.test.ts]  Test Files 1 passed (1); Tests 222 passed (222);
+drop-db: afldb_v2_i363_g0_rbb_grid_solver_test dropped
+== g0_rbb vt base=rbb tmpl=afldb_v2_i363_rbbtpl_test env=[AFLDB_GRIDLEY_REPORT=/mnt/ssd/afldb-i363-20261121/ev/g0_rbb/report-grid_solver_investigation.json] HEAD=ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a 2026-11-21T09:52:17Z
+create-db: afldb_v2_i363_g0_rbb_grid_solver_investigation_test created from afldb_v2_i363_rbbtpl_test and marked
+vitest rc=0 [tests/integration/grid-solver-investigation.test.ts]  Test Files 1 passed (1); Tests 1 passed (1);
+drop-db: afldb_v2_i363_g0_rbb_grid_solver_investigation_test dropped
+== g0_rbb vt base=rbb tmpl=afldb_v2_i363_rbbtpl_test env=[AFLDB_GRIDLEY_REPORT=/mnt/ssd/afldb-i363-20261121/ev/g0_rbb/report-release_gates.json] HEAD=ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a 2026-11-21T09:52:22Z
+create-db: afldb_v2_i363_g0_rbb_release_gates_test created from afldb_v2_i363_rbbtpl_test and marked
+vitest rc=0 [tests/integration/release-gates.test.ts]  Test Files 1 passed (1); Tests 68 passed | 7 skipped (75);
+drop-db: afldb_v2_i363_g0_rbb_release_gates_test dropped
+######## g0_rbbov
+== g0_rbbov vt base=rbbov tmpl=afldb_v2_i363_rbbov_test env=[AFLDB_GRIDLEY_REPORT=/mnt/ssd/afldb-i363-20261121/ev/g0_rbbov/report-gridley_corpus.json] HEAD=ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a 2026-11-21T09:52:30Z
+create-db: afldb_v2_i363_g0_rbbov_gridley_corpus_test created from afldb_v2_i363_rbbov_test and marked
+vitest rc=1 [tests/integration/gridley-corpus.test.ts]  Test Files 1 failed (1); Tests 2 failed | 1210 passed (1212);
+         × writes the run report and has no failing cells 132ms
+         × conforms to the bounded approved-deferral policy, independently of diagnostic mode 11ms
+     FAIL  tests/integration/gridley-corpus.test.ts > Gridley corpus -- every cell through solveCellSummary > writes the run report and has no failing cells
+     FAIL  tests/integration/gridley-corpus.test.ts > Gridley corpus -- every cell through solveCellSummary > conforms to the bounded approved-deferral policy, independently of diagnostic mode
+    [gridley-corpus] known-answer adjudications (AFLDB-ISSUE-225):
+    [gridley-corpus] dataset gaps on this database: {"maxSeason":2026,"registerSeason":2026,"draftLinks":true,"matchEvents":true,"heights":true,"dobs":true,"coaches":true,"fatherSon":true,"siblings":true,"afterSiren":true}; gapped criteria: none
+    [gridley-corpus] unsupported valid criteria: 7
+    [gridley-corpus] criteria over 1 s: 3
+    [gridley-corpus] cells solved 10209/10287; findings {"time of board":23571,"adjudicated key disagreement":54,"unsupported":78,"list membership":1232,"external source disagreement":425,"source coverage gap":23,"adjudicated source conflict":63,"criterion disagreement":40}; cells over 1 s: 20
+    [gridley-corpus]   time of board (23571): Gridley's answer key is frozen at the board's date and the player was still playing then; AFLDB answers for today
+    [gridley-corpus]   list membership (1232): Gridley's club, decade, teammate, club-count, wooden-spoon, minor-premiership and coached-by criteria include players merely listed by a club that season (a trade-period move, the suspended 2016 Essendon players, a listed player who did not play a caretaker coach's one match); AFLDB models games played
+    [gridley-corpus]   external source disagreement (425): a height cell where every independent source AFLDB holds (AFL API roster, Wikipedia infobox) sits on AFLDB's side of the bound and none on Gridley's (ISSUE-118 §23.19); or a premiership-captain cell where AFLDB's canonical captaincies record the player as one of several captains of the premier club that season who all played and won the Grand Final, and Gridley's key names one premiership captain per flag (ISSUE-118 §23.23); or a National Draft pick-range cell where Gridley lists a linked player whose only trusted-linked pick inside the range is a non-national selection, named in the finding (AFLDB-ISSUE-222 §11.19.12 D1). AFLDB's answer is source-backed; the definitions differ
+    [gridley-corpus]   adjudicated source conflict (63): a height source conflict the operator has reviewed against every source AFLDB holds and decided in a tracked record (data/players/height-adjudications.csv, ISSUE-118 §23.26): AFL Tables is retained under the §23.19 precedence policy and the competing values are named; the record applies only while the canonical height and the competing evidence are exactly those it was decided on
+    [gridley-corpus]   adjudicated key disagreement (54): an operator-adjudicated difference from Gridley's answer key (AFLDB-ISSUE-225 §19, D4-D6), one of two mechanisms named in each finding: (a) the teammates semantic contract -- Gridley lists, AFLDB omits, career_teammates_min is the only lacking axis and the career reaches 2001: Gridley counts list co-members after 2000, AFLDB counts players who played for the same club in the same season, and AFLDB's played-teammate count is in the detail; or (b) a tracked known-answer adjudication (data/players/gridley-known-answer-adjudications.csv) keyed by AFL Tables profile, applying only on its criterion and direction, only while the AFLDB fact it was decided on is exactly what the database holds (otherwise the cell stays `incorrect known answer`, marked STALE), and for a self-inconsistent key only where AFLDB satisfies the other criterion and Gridley's own frozen key lists the player under that criterion elsewhere in the corpus (D10)
+    [gridley-corpus]   unsupported (78): the criterion needs data AFLDB does not hold (src/search/gridley-compat.ts names it) -- acquisition required [FAILS: acceptance is zero]
+    [gridley-corpus]   source coverage gap (23): a has_brother cell where Gridley lists a player and AFLDB's canonical sibling sources (the tracked Wikipedia football-families export and its evidenced supplements, ISSUE-118 §23.31) carry no brothers row linking him to a VFL/AFL player -- the absence of a row is UNKNOWN coverage, never 'no brother', open until an explicitly evidenced pair is admitted through data/players/sibling-supplements.csv; or a pickrookie cell where Gridley lists a linked player whose DraftGuru page carries no Rookie event, and an independent source AFLDB has reviewed confirms the selection anyway (data/players/rookie-relisting-outcomes.csv, AFLDB-ISSUE-222 §11.19.12/§11.19.13 D2) -- a DraftGuru source-coverage gap, not a linkage or builder defect, open until DraftGuru's rows are supplemented [FAILS: acceptance is zero]
+drop-db: afldb_v2_i363_g0_rbbov_gridley_corpus_test dropped
+== g0_rbbov vt base=rbbov tmpl=afldb_v2_i363_rbbov_test env=[AFLDB_GRIDLEY_REPORT=/mnt/ssd/afldb-i363-20261121/ev/g0_rbbov/report-gridley_aa_oracle.json] HEAD=ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a 2026-11-21T09:58:31Z
+create-db: afldb_v2_i363_g0_rbbov_gridley_aa_oracle_test created from afldb_v2_i363_rbbov_test and marked
+vitest rc=0 [tests/integration/gridley-aa-oracle.test.ts]  Test Files 1 passed (1); Tests 61 passed | 1 skipped (62);
+drop-db: afldb_v2_i363_g0_rbbov_gridley_aa_oracle_test dropped
+== g0_rbbov vt base=rbbov tmpl=afldb_v2_i363_rbbov_test env=[AFLDB_GRIDLEY_REPORT=/mnt/ssd/afldb-i363-20261121/ev/g0_rbbov/report-gridley_height_oracle.json] HEAD=ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a 2026-11-21T10:00:33Z
+create-db: afldb_v2_i363_g0_rbbov_gridley_height_oracle_test created from afldb_v2_i363_rbbov_test and marked
+vitest rc=0 [tests/integration/gridley-height-oracle.test.ts]  Test Files 1 passed (1); Tests 61 passed | 1 skipped (62);
+drop-db: afldb_v2_i363_g0_rbbov_gridley_height_oracle_test dropped
+== g0_rbbov vt base=rbbov tmpl=afldb_v2_i363_rbbov_test env=[AFLDB_GRIDLEY_REPORT=/mnt/ssd/afldb-i363-20261121/ev/g0_rbbov/report-grid_solver.json] HEAD=ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a 2026-11-21T10:02:38Z
+create-db: afldb_v2_i363_g0_rbbov_grid_solver_test created from afldb_v2_i363_rbbov_test and marked
+vitest rc=0 [tests/integration/grid-solver.test.ts]  Test Files 1 passed (1); Tests 222 passed (222);
+drop-db: afldb_v2_i363_g0_rbbov_grid_solver_test dropped
+== g0_rbbov vt base=rbbov tmpl=afldb_v2_i363_rbbov_test env=[AFLDB_GRIDLEY_REPORT=/mnt/ssd/afldb-i363-20261121/ev/g0_rbbov/report-grid_solver_investigation.json] HEAD=ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a 2026-11-21T10:03:13Z
+create-db: afldb_v2_i363_g0_rbbov_grid_solver_investigation_test created from afldb_v2_i363_rbbov_test and marked
+vitest rc=0 [tests/integration/grid-solver-investigation.test.ts]  Test Files 1 passed (1); Tests 1 passed (1);
+drop-db: afldb_v2_i363_g0_rbbov_grid_solver_investigation_test dropped
+== g0_rbbov vt base=rbbov tmpl=afldb_v2_i363_rbbov_test env=[AFLDB_GRIDLEY_REPORT=/mnt/ssd/afldb-i363-20261121/ev/g0_rbbov/report-release_gates.json] HEAD=ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a 2026-11-21T10:03:18Z
+create-db: afldb_v2_i363_g0_rbbov_release_gates_test created from afldb_v2_i363_rbbov_test and marked
+vitest rc=0 [tests/integration/release-gates.test.ts]  Test Files 1 passed (1); Tests 68 passed | 7 skipped (75);
+drop-db: afldb_v2_i363_g0_rbbov_release_gates_test dropped
+######## g0_rbbovr
+== g0_rbbovr vt base=rbbovr tmpl=afldb_v2_i363_rbbovr_test env=[AFLDB_GRIDLEY_REPORT=/mnt/ssd/afldb-i363-20261121/ev/g0_rbbovr/report-gridley_corpus.json] HEAD=ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a 2026-11-21T10:01:33Z
+create-db: afldb_v2_i363_g0_rbbovr_gridley_corpus_test created from afldb_v2_i363_rbbovr_test and marked
+vitest rc=1 [tests/integration/gridley-corpus.test.ts]  Test Files 1 failed (1); Tests 1 failed | 1211 passed (1212);
+         × writes the run report and has no failing cells 149ms
+     FAIL  tests/integration/gridley-corpus.test.ts > Gridley corpus -- every cell through solveCellSummary > writes the run report and has no failing cells
+    [gridley-corpus] known-answer adjudications (AFLDB-ISSUE-225):
+    [gridley-corpus] dataset gaps on this database: {"maxSeason":2026,"registerSeason":2026,"draftLinks":true,"matchEvents":true,"heights":true,"dobs":true,"coaches":true,"fatherSon":true,"siblings":true,"afterSiren":true}; gapped criteria: none
+    [gridley-corpus] unsupported valid criteria: 7
+    [gridley-corpus] criteria over 1 s: 3
+    [gridley-corpus] cells solved 10209/10287; findings {"time of board":23571,"adjudicated key disagreement":54,"unsupported":78,"list membership":1232,"external source disagreement":425,"adjudicated source conflict":63,"criterion disagreement":40}; cells over 1 s: 19
+    [gridley-corpus]   time of board (23571): Gridley's answer key is frozen at the board's date and the player was still playing then; AFLDB answers for today
+    [gridley-corpus]   list membership (1232): Gridley's club, decade, teammate, club-count, wooden-spoon, minor-premiership and coached-by criteria include players merely listed by a club that season (a trade-period move, the suspended 2016 Essendon players, a listed player who did not play a caretaker coach's one match); AFLDB models games played
+    [gridley-corpus]   external source disagreement (425): a height cell where every independent source AFLDB holds (AFL API roster, Wikipedia infobox) sits on AFLDB's side of the bound and none on Gridley's (ISSUE-118 §23.19); or a premiership-captain cell where AFLDB's canonical captaincies record the player as one of several captains of the premier club that season who all played and won the Grand Final, and Gridley's key names one premiership captain per flag (ISSUE-118 §23.23); or a National Draft pick-range cell where Gridley lists a linked player whose only trusted-linked pick inside the range is a non-national selection, named in the finding (AFLDB-ISSUE-222 §11.19.12 D1). AFLDB's answer is source-backed; the definitions differ
+    [gridley-corpus]   adjudicated source conflict (63): a height source conflict the operator has reviewed against every source AFLDB holds and decided in a tracked record (data/players/height-adjudications.csv, ISSUE-118 §23.26): AFL Tables is retained under the §23.19 precedence policy and the competing values are named; the record applies only while the canonical height and the competing evidence are exactly those it was decided on
+    [gridley-corpus]   adjudicated key disagreement (54): an operator-adjudicated difference from Gridley's answer key (AFLDB-ISSUE-225 §19, D4-D6), one of two mechanisms named in each finding: (a) the teammates semantic contract -- Gridley lists, AFLDB omits, career_teammates_min is the only lacking axis and the career reaches 2001: Gridley counts list co-members after 2000, AFLDB counts players who played for the same club in the same season, and AFLDB's played-teammate count is in the detail; or (b) a tracked known-answer adjudication (data/players/gridley-known-answer-adjudications.csv) keyed by AFL Tables profile, applying only on its criterion and direction, only while the AFLDB fact it was decided on is exactly what the database holds (otherwise the cell stays `incorrect known answer`, marked STALE), and for a self-inconsistent key only where AFLDB satisfies the other criterion and Gridley's own frozen key lists the player under that criterion elsewhere in the corpus (D10)
+    [gridley-corpus]   unsupported (78): the criterion needs data AFLDB does not hold (src/search/gridley-compat.ts names it) -- acquisition required [FAILS: acceptance is zero]
+drop-db: afldb_v2_i363_g0_rbbovr_gridley_corpus_test dropped
+== g0_rbbovr vt base=rbbovr tmpl=afldb_v2_i363_rbbovr_test env=[AFLDB_GRIDLEY_REPORT=/mnt/ssd/afldb-i363-20261121/ev/g0_rbbovr/report-gridley_aa_oracle.json] HEAD=ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a 2026-11-21T10:07:22Z
+create-db: afldb_v2_i363_g0_rbbovr_gridley_aa_oracle_test created from afldb_v2_i363_rbbovr_test and marked
+vitest rc=0 [tests/integration/gridley-aa-oracle.test.ts]  Test Files 1 passed (1); Tests 61 passed | 1 skipped (62);
+drop-db: afldb_v2_i363_g0_rbbovr_gridley_aa_oracle_test dropped
+== g0_rbbovr vt base=rbbovr tmpl=afldb_v2_i363_rbbovr_test env=[AFLDB_GRIDLEY_REPORT=/mnt/ssd/afldb-i363-20261121/ev/g0_rbbovr/report-gridley_height_oracle.json] HEAD=ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a 2026-11-21T10:09:26Z
+create-db: afldb_v2_i363_g0_rbbovr_gridley_height_oracle_test created from afldb_v2_i363_rbbovr_test and marked
+vitest rc=0 [tests/integration/gridley-height-oracle.test.ts]  Test Files 1 passed (1); Tests 61 passed | 1 skipped (62);
+drop-db: afldb_v2_i363_g0_rbbovr_gridley_height_oracle_test dropped
+== g0_rbbovr vt base=rbbovr tmpl=afldb_v2_i363_rbbovr_test env=[AFLDB_GRIDLEY_REPORT=/mnt/ssd/afldb-i363-20261121/ev/g0_rbbovr/report-grid_solver.json] HEAD=ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a 2026-11-21T10:11:30Z
+create-db: afldb_v2_i363_g0_rbbovr_grid_solver_test created from afldb_v2_i363_rbbovr_test and marked
+vitest rc=0 [tests/integration/grid-solver.test.ts]  Test Files 1 passed (1); Tests 222 passed (222);
+drop-db: afldb_v2_i363_g0_rbbovr_grid_solver_test dropped
+== g0_rbbovr vt base=rbbovr tmpl=afldb_v2_i363_rbbovr_test env=[AFLDB_GRIDLEY_REPORT=/mnt/ssd/afldb-i363-20261121/ev/g0_rbbovr/report-grid_solver_investigation.json] HEAD=ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a 2026-11-21T10:12:06Z
+create-db: afldb_v2_i363_g0_rbbovr_grid_solver_investigation_test created from afldb_v2_i363_rbbovr_test and marked
+vitest rc=0 [tests/integration/grid-solver-investigation.test.ts]  Test Files 1 passed (1); Tests 1 passed (1);
+drop-db: afldb_v2_i363_g0_rbbovr_grid_solver_investigation_test dropped
+== g0_rbbovr vt base=rbbovr tmpl=afldb_v2_i363_rbbovr_test env=[AFLDB_GRIDLEY_REPORT=/mnt/ssd/afldb-i363-20261121/ev/g0_rbbovr/report-release_gates.json] HEAD=ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a 2026-11-21T10:12:11Z
+create-db: afldb_v2_i363_g0_rbbovr_release_gates_test created from afldb_v2_i363_rbbovr_test and marked
+vitest rc=0 [tests/integration/release-gates.test.ts]  Test Files 1 passed (1); Tests 68 passed | 7 skipped (75);
+drop-db: afldb_v2_i363_g0_rbbovr_release_gates_test dropped

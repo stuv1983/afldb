@@ -1,0 +1,13 @@
+1
+mutant lines removed: 1
+== mut_rb sh base=rb tmpl=afldb_v2_i363_rbtpl_test HEAD=ddbc5174bafcdd15ba2b8eae51cf7411db3aa40a porcelain=1 2026-11-21T10:01:33Z
+create-db: afldb_v2_i363_mut_rb_test created from afldb_v2_i363_rbtpl_test and marked
+shared run 1 rc=1 [tests/integration/awards-reload-links-i363mut.test.ts]  Test Files 1 failed (1); Tests 109 passed (109);
+     FAIL  tests/integration/awards-reload-links-i363mut.test.ts [ tests/integration/awards-reload-links-i363mut.test.ts ]
+-- compare1 vs untouched template
+whole-db tables differing: 1
+    public.import_batches rows 26 -> 148 content differs
+    import_batches.new=122 target_tables=all_australian,captaincies,club_bf,coleman,hall_of_fame,honour_teams,named_medals,rising_star,under_22
+drop-db: afldb_v2_i363_mut_rb_test dropped
+Error: awards-reload-links did not restore the pre-existing honours state; still different: import_batches (122 row(s) above the captured maximum)
+porcelain=0

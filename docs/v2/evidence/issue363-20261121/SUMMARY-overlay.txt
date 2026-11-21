@@ -1,0 +1,26 @@
+## overlay applier + rookie prototype
+ev/ov_rb/SUMMARY.txt:== ov_rb overlay base=rb -> afldb_v2_i363_rbov_test HEAD=234254b85a8e8b5862035df5f7df6f659ce581d3 2026-11-21T09:30:36Z
+ev/ov_rb/SUMMARY.txt:rekey: source entries=64 kept=64 id_changed=3 dropped=0 []
+ev/ov_rb/SUMMARY.txt:{"database":"afldb_v2_i363_rbov_test","apply":true,"planned":64,"counts":{"Anzac Day":31,"Dreamtime at the 'G":22,"King's Birthday":11},"verified":true,"auditRows":64,"activeOverrides":64,"labelledAfter":[{"match_event":"Anzac Day","n":31},{"match_event":"Dreamtime at the 'G","n":22},{"match_event":"King's Birthday","n":11}],"evidenceSha256":"d21a3eba05553e2a58933ab9ce7f941ab1bc2e9c56a7974e2d770e9ea053f819","resultCount":64}
+ev/ov_rb/SUMMARY.txt:ERROR:  aggregate functions are not allowed in GROUP BY
+ev/ov_rb/SUMMARY.txt:LINE 1: ... ' || entity_type || '/' || field_group || '=' || count(*) F...
+ev/ov_rb/SUMMARY.txt:                                                             ^
+ev/ov_rb/SUMMARY.txt:match_event Anzac Day=31
+ev/ov_rb/SUMMARY.txt:match_event Dreamtime at the 'G=22
+ev/ov_rb/SUMMARY.txt:match_event King's Birthday=11
+ev/ov_rb/SUMMARY.txt:data_edits=64
+ev/ov_rbb/SUMMARY.txt:== ov_rbb overlay base=rbb -> afldb_v2_i363_rbbov_test HEAD=234254b85a8e8b5862035df5f7df6f659ce581d3 2026-11-21T09:40:42Z
+ev/ov_rbb/SUMMARY.txt:rekey: source entries=64 kept=64 id_changed=3 dropped=0 []
+ev/ov_rbb/SUMMARY.txt:{"database":"afldb_v2_i363_rbbov_test","apply":true,"planned":64,"counts":{"Anzac Day":31,"Dreamtime at the 'G":22,"King's Birthday":11},"verified":true,"auditRows":64,"activeOverrides":64,"labelledAfter":[{"match_event":"Anzac Day","n":31},{"match_event":"Dreamtime at the 'G","n":22},{"match_event":"King's Birthday","n":11}],"evidenceSha256":"d21a3eba05553e2a58933ab9ce7f941ab1bc2e9c56a7974e2d770e9ea053f819","resultCount":64}
+ev/ov_rbb/SUMMARY.txt:data_overrides matches/match_event=64
+ev/ov_rbb/SUMMARY.txt:match_event Anzac Day=31
+ev/ov_rbb/SUMMARY.txt:match_event Dreamtime at the 'G=22
+ev/ov_rbb/SUMMARY.txt:match_event King's Birthday=11
+ev/ov_rbb/SUMMARY.txt:data_edits=64
+da9dc361de580e0f30bad6123e3df3f25195118d3383892832014f044ccbf45e  ev/ov_rb/applier-report.json
+d21a3eba05553e2a58933ab9ce7f941ab1bc2e9c56a7974e2d770e9ea053f819  ev/ov_rb/evidence-rekeyed.json
+14423c9085ca118d36bf84a6a86aa5abb9f0e8a36488f3bf31f153f01ac85bab  ev/ov_rbb/applier-report.json
+d21a3eba05553e2a58933ab9ce7f941ab1bc2e9c56a7974e2d770e9ea053f819  ev/ov_rbb/evidence-rekeyed.json
+00c449f2368cafdc6727552a7c6f508b477090a11d4a93b9fd1fda891003aa2f  ev/ov_rb/fp-overlay.txt
+b88aa46555def667987e48744611a30e2e2966999fecc9e303529feaf166b08e  ev/ov_rbb/fp-overlay.txt
+0ece9e8f020d845b802c1107254b5b8182451dcca3d74639e30a7d471bc66493  ev/ov_rookie/fp-rbbovr.txt
