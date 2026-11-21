@@ -1,4 +1,5 @@
 import { isAllowedRevalidatePath } from '@/app/admin/awards/revalidate-paths';
+import { fanOutAwardSeasons, revalidatedPathsOf } from '@/lib/admin/award-season-fanout';
 import { applyRevalidateRequest } from '@/lib/admin/revalidate-route';
 import { requireCapability } from '@/lib/auth/session';
 
@@ -10,10 +11,18 @@ import { requireCapability } from '@/lib/auth/session';
  * posts here only as a follow-up once a mutation has already committed;
  * paths are allowlisted by shape, never taken as arbitrary strings.
  *
+ * AFLDB-ISSUE-372 option B: when an admitted path is an award season
+ * (`/awards/<slug>/<yyyy>`), the season fan-out then reaches EVERY worker
+ * (`src/lib/admin/award-season-fanout.ts`), so a first-published award season
+ * cannot keep a cached 404's not-found head on a worker this request did not
+ * reach. Best-effort and bounded; inert where `AFLDB_REVALIDATE_*` is unset.
+ *
  * Guarded by `data.awards.edit`, not `.read`: this endpoint exists only to
  * finish a mutation, and only a Super Admin can have made one.
  */
 export async function POST(request: Request): Promise<Response> {
   await requireCapability('data.awards.edit');
-  return applyRevalidateRequest(request, isAllowedRevalidatePath);
+  const response = await applyRevalidateRequest(request, isAllowedRevalidatePath);
+  await fanOutAwardSeasons(await revalidatedPathsOf(response));
+  return response;
 }

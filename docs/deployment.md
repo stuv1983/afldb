@@ -1384,21 +1384,42 @@ echo "AFLDB_REVALIDATE_SECRET=$(openssl rand -hex 32)" >> .env
 sudo systemctl restart afldb
 ```
 
-Verify without waiting for 04:30 — this is the exact request the settle makes,
-and it should answer `{"ok":true,...}` naming the worker that handled it:
+Verify without waiting for 04:30, and without putting the secret on a command
+line: the attended CLI posts on fresh connections until every worker has
+answered and exits 0 only then (1 incomplete cluster; 2 unconfigured,
+half-configured or refused; it refuses to run under systemd, D-232-3):
+
+```bash
+npx tsx tools/maintenance/revalidate-season.ts --season 2026
+```
+
+The same CLI is the season-opening refresh step of procedure 01 (ISSUE-350,
+ISSUE-372): run it for 2027 right after the 2027 `seasons` row is created.
+
+A single loopback request, which reaches one worker, answers `{"ok":true,...}`
+naming the worker that handled it (this form puts the secret in the process
+list; prefer the CLI):
 
 ```bash
 curl -s -X POST http://127.0.0.1:3100/api/internal/revalidate-season   -H "x-afldb-revalidate-secret: $(grep '^AFLDB_REVALIDATE_SECRET=' .env | cut -d= -f2-)"   -H 'content-type: application/json' -d '{"season":2026}'
 ```
 
 **What the secret authorises.** One thing: asking the site to re-render a
-season's two pages, `/seasons/<year>` and `/brownlow/<year>`. The body carries
-an integer year and nothing else — the paths are composed server-side — so
-there is no arbitrary path, pattern, layout or tag to purge. Unconfigured, it
-answers 503. The Super Admin Brownlow publish action posts the same route, so
-a publication reaches every worker's copy of `/brownlow/<year>`
-(`AFLDB-ISSUE-371`); without this configuration only the worker that served
-the action is invalidated.
+season's two pages, `/seasons/<year>` and `/brownlow/<year>`, plus every
+award-season page (`/awards/<slug>/<season>`, the one constant route pattern
+`/awards/[slug]/[season]`, AFLDB-ISSUE-372 option B). The body carries an
+integer year and nothing else — the paths and the pattern are fixed
+server-side — so there is no arbitrary path, pattern, layout or tag to purge.
+Unconfigured, it answers 503. The Super Admin Brownlow publish action posts the
+same route, so a publication reaches every worker's copy of `/brownlow/<year>`
+(`AFLDB-ISSUE-371`); `/admin/awards/revalidate` (the follow-up of every awards
+and Coleman publication) posts it for each award season it revalidated (at most
+three years per request), so a first-published award season reaches every
+worker (`AFLDB-ISSUE-372`). Without this configuration only the worker that
+served the action or follow-up is invalidated, and a cached 404 on another
+worker can regenerate as a 200 page with the "Page not found" title and
+`noindex` for up to one ISR window (1 h seasons and Brownlow, 24 h award
+seasons). The nightly AFL API settle still posts nothing (D-232-3).
 
 **Why the internet cannot reach it.** The route serves a request only when its
 forwarded client address resolves to loopback, and that value is trustworthy

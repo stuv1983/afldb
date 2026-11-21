@@ -82,6 +82,25 @@ cd "$OPS_ROOT/<R:0:8>/cand"
 echo "exit=$?"
 ```
 
+**Season-opening refresh (ISSUE-372, owner decision 2026-11-22, option B keeps it).** Immediately after `accept` (and the
+G0 check), as `arm`, from the **serving checkout** (it must be a revision carrying `tools/maintenance/revalidate-season.ts`,
+i.e. the ISSUE-371/372 release; the production `.env` must hold `AFLDB_REVALIDATE_URL` and `AFLDB_REVALIDATE_SECRET`, absent
+on 2026-11-22 per `docs/v2/evidence/backlog-20261121/R0-SITTING-20261122.md`, with the web service restarted after adding
+them):
+
+```
+cd /home/arm/projects/afldb && export PATH=/home/arm/.nvm/versions/node/v22.23.2/bin:$PATH
+npx tsx tools/maintenance/revalidate-season.ts --season 2027; echo "exit=$?"   # expect "REVALIDATED season 2027: 2/2 worker(s)"
+```
+
+Exit 0 every worker reached; 1 incomplete (re-run once; if still incomplete, record it); 2 not configured or refused (the
+refresh did not happen; record it). Do **not** restart `afldb` as a fallback: a restarted worker does not know the route's
+cache-control, so it takes exactly the stale-404 regeneration path this step avoids (ISSUE-371 README §6). The accepted
+fallback is the residual itself: the wrong head lasts at most about one ISR window per worker, then the page regenerates
+normally. Why:
+a `/seasons/2027` 404 cached by any worker before the row existed would otherwise regenerate as a 200 page with the "Page not
+found" title and `noindex` for up to one hour (ISSUE-371 README §3). The secret never appears on a command line.
+
 Exit 0 `OPEN`, 10 `NOT_OPEN`, 11 `REFUSED`, 2 usage or helper error. The default `--dsn-env` is already
 `AFLDB_BACKUP_DATABASE_URL` (review A-08, verified: `ops/README.md` §2.2); the application role is **not** an accepted
 alternative, because it cannot read `afldb_meta.schema_migrations`.

@@ -68,6 +68,7 @@ vi.mock('@/lib/auth/rate-limit', () => ({
   },
 }));
 
+import { main as revalidateSeasonCli, revalidateEnvFromDotEnv } from '../tools/maintenance/revalidate-season';
 import {
   buildRevalidateRequest,
   classifyForwardedClient,
@@ -670,15 +671,21 @@ describe('POST /api/internal/revalidate-season', () => {
     delete process.env.AFLDB_WORKER_COUNT;
   });
 
-  it('invalidates exactly the season page and its Brownlow page, as concrete paths', async () => {
+  it('invalidates exactly the season page and its Brownlow page as concrete paths, plus the award-season pattern', async () => {
     const response = await POST(post({ season: 2026 }));
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
       ok: true, path: '/seasons/2026', paths: ['/seasons/2026', '/brownlow/2026'],
+      patterns: ['/awards/[slug]/[season]'],
     });
     // AFLDB-ISSUE-371: a concrete path takes no type argument; with 'page' it
     // would name a '/brownlow/2026/page' tag no page carries.
-    expect(mocks.revalidatePath.mock.calls).toEqual([['/seasons/2026'], ['/brownlow/2026']]);
+    // AFLDB-ISSUE-372 option B: the award-season ROUTE PATTERN takes 'page'
+    // (tag `_N_T_/awards/[slug]/[season]/page`, carried by every entry of that
+    // route file, a cached 404 included). Constant: the request selects nothing.
+    expect(mocks.revalidatePath.mock.calls).toEqual([
+      ['/seasons/2026'], ['/brownlow/2026'], ['/awards/[slug]/[season]', 'page'],
+    ]);
   });
 
   it('reports the worker identity the caller needs to prove coverage', async () => {
@@ -754,7 +761,7 @@ describe('POST /api/internal/revalidate-season', () => {
       mocks.revalidatePath.mockClear();
       const response = await POST(post({ season: 2026 }, { 'x-forwarded-for': address }));
       expect(response.status, address).toBe(200);
-      expect(mocks.revalidatePath, address).toHaveBeenCalledTimes(2);
+      expect(mocks.revalidatePath, address).toHaveBeenCalledTimes(3);
     }
   });
 
@@ -1273,5 +1280,80 @@ describe('AFLDB-ISSUE-371/372 — every revalidatePath call names a tag a page c
   it('relies on Next appending the type to the path, read off the installed package', () => {
     const source = readFileSync('node_modules/next/dist/server/web/spec-extension/revalidate.js', 'utf8');
     expect(source).toMatch(/if \(type\) \{\s*normalizedPath \+= `\$\{normalizedPath\.endsWith\('\/'\) \? '' : '\/'\}\$\{type\}`;/);
+  });
+});
+
+describe('AFLDB-ISSUE-372 — the attended season refresh CLI (tools/maintenance/revalidate-season.ts)', () => {
+  const ENV = { AFLDB_REVALIDATE_URL: 'http://127.0.0.1:3100', AFLDB_REVALIDATE_SECRET: 'synthetic-secret' };
+  const outcome = (ok: boolean) => ({
+    ok, season: 2027, path: '/seasons/2027', workersReached: ok ? ['1', '2'] : ['1'], workerCount: 2,
+    attempts: ok ? 2 : 16, failures: ok ? [] : ['worker 2 never answered'],
+  });
+
+  async function run(args: string[], deps: Parameters<typeof revalidateSeasonCli>[1]) {
+    const lines: string[] = [];
+    const code = await revalidateSeasonCli(args, { readDotEnv: () => null, ...deps, log: (l) => lines.push(l) });
+    return { code, lines };
+  }
+
+  it('exits 0 only when every worker answered, and says how many', async () => {
+    const seen: number[] = [];
+    const { code, lines } = await run(['--season', '2027'], {
+      env: ENV, revalidate: async (_c, season) => { seen.push(season); return outcome(true); },
+    });
+    expect(code).toBe(0);
+    expect(seen).toEqual([2027]);
+    expect(lines.join('\n')).toContain('2/2 worker(s) reached');
+  });
+
+  it('exits 1 on an incomplete cluster', async () => {
+    const { code, lines } = await run(['--season', '2027'], { env: ENV, revalidate: async () => outcome(false) });
+    expect(code).toBe(1);
+    expect(lines.join('\n')).toContain('INCOMPLETE season 2027: 1/2');
+  });
+
+  it('exits 2, posting nothing, when unconfigured or half-configured', async () => {
+    let posted = 0;
+    const revalidate = async () => { posted += 1; return outcome(true); };
+    expect((await run(['--season', '2027'], { env: {}, revalidate })).code).toBe(2);
+    expect((await run(['--season', '2027'], { env: { AFLDB_REVALIDATE_URL: ENV.AFLDB_REVALIDATE_URL }, revalidate })).code).toBe(2);
+    expect((await run(['--season', '2027'], { env: { ...ENV, AFLDB_REVALIDATE_URL: 'http://10.0.0.5:3100' }, revalidate })).code).toBe(2);
+    expect(posted).toBe(0);
+  });
+
+  it('takes only the two revalidation names from .env, and never overrides the environment', async () => {
+    const dotEnv = 'AFLDB_SESSION_SECRET=nope\n# c\nAFLDB_REVALIDATE_URL=http://127.0.0.1:3100\nAFLDB_REVALIDATE_SECRET=from-file\n';
+    expect(revalidateEnvFromDotEnv(dotEnv)).toEqual({
+      AFLDB_REVALIDATE_URL: 'http://127.0.0.1:3100', AFLDB_REVALIDATE_SECRET: 'from-file',
+    });
+    let secret = '';
+    const { code } = await run(['--season', '2027'], {
+      env: { AFLDB_REVALIDATE_SECRET: 'from-env' }, readDotEnv: () => dotEnv,
+      revalidate: async (config) => { secret = config.secret; return outcome(true); },
+    });
+    expect(code).toBe(0);
+    expect(secret).toBe('from-env');
+  });
+
+  it('refuses bad usage and refuses to run under systemd (D-232-3)', async () => {
+    const revalidate = async () => outcome(true);
+    for (const args of [[], ['--season'], ['--season', '27'], ['--season', '2027.0'], ['--season', '1800']]) {
+      expect((await run(args, { env: ENV, revalidate })).code, args.join(' ')).toBe(2);
+    }
+    const { code, lines } = await run(['--season', '2027'], { env: { ...ENV, INVOCATION_ID: 'abc' }, revalidate });
+    expect(code).toBe(2);
+    expect(lines.join('\n')).toContain('does not run under systemd');
+  });
+
+  it('D-232-3 stays: no deploy file runs the CLI, and both AFL API units still unset the secret', () => {
+    for (const name of readdirSync('deploy')) {
+      if (!/\.(sh|service|timer|mjs|ps1|rules)$/.test(name)) continue;
+      expect(readFileSync(join('deploy', name), 'utf8'), name).not.toMatch(/revalidate-season\.ts|maintenance\/revalidate-season/);
+    }
+    for (const unit of ['deploy/afldb-settle-afl-api.service', 'deploy/afldb-settle-afl-api-brownlow.service']) {
+      const unset = readFileSync(unit, 'utf8').split('\n').find((line) => line.startsWith('UnsetEnvironment='));
+      expect(unset, unit).toBeDefined();
+      expect(unset!.split(/[=\s]+/), unit).toContain('AFLDB_REVALIDATE_SECRET');
+    }
   });
 });

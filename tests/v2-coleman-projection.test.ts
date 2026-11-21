@@ -34,6 +34,12 @@ import {
 } from '@afldb/derived';
 
 import { isAllowedRevalidatePath } from '@/app/admin/awards/revalidate-paths';
+import {
+  awardSeasonsToFanOut,
+  fanOutAwardSeasons,
+  MAX_AWARD_FANOUT_SEASONS,
+  revalidatedPathsOf,
+} from '@/lib/admin/award-season-fanout';
 import { awardPath, awardSeasonPath, clubPath, playerPath, seasonPath } from '@/lib/format';
 
 import {
@@ -525,6 +531,84 @@ describe('/admin/awards/revalidate admits every path a Coleman row can return (S
   it('still refuses anything outside the allowlist (the route is not widened)', () => {
     for (const path of ['/admin/awards', '//evil.example/awards', '/awards/coleman/2001?x=1', '/awards/Coleman', 'https://example.com/awards']) {
       expect(isAllowedRevalidatePath(path), path).toBe(false);
+    }
+  });
+});
+
+describe('AFLDB-ISSUE-372 option B: the award-season fan-out after /admin/awards/revalidate (SYNTHETIC)', () => {
+  const CONFIG_ENV = { AFLDB_REVALIDATE_URL: 'http://127.0.0.1:3100', AFLDB_REVALIDATE_SECRET: 'synthetic-secret' };
+  const okOutcome = (season: number) => ({
+    ok: true, season, path: `/seasons/${season}`, workersReached: ['1', '2'], workerCount: 2, attempts: 2, failures: [],
+  });
+
+  it('takes only plausible award-season years, deduplicated, in order, capped', () => {
+    expect(awardSeasonsToFanOut([
+      '/awards', awardPath('coleman'), seasonPath(2001), awardSeasonPath('coleman', 2001),
+      awardSeasonPath('rising-star', 2001), awardSeasonPath('coleman', 0), '/awards/coleman/9999', 42, null,
+      awardSeasonPath('coleman', 1999),
+    ])).toEqual([2001, 1999]);
+    const many = [2001, 2002, 2003, 2004, 2005].map((y) => awardSeasonPath('coleman', y));
+    expect(awardSeasonsToFanOut(many)).toEqual([2001, 2002, 2003]);
+    expect(MAX_AWARD_FANOUT_SEASONS).toBe(3);
+  });
+
+  it('fans out each named season through the existing season fan-out when configured', async () => {
+    const calls: Array<[string, number]> = [];
+    const seasons = await fanOutAwardSeasons([awardSeasonPath('coleman', 2027), seasonPath(2027), '/awards'], {
+      env: CONFIG_ENV,
+      revalidate: async (config, season) => { calls.push([config.origin, season]); return okOutcome(season); },
+      logError: () => { throw new Error('no error expected'); },
+    });
+    expect(seasons).toEqual([2027]);
+    expect(calls).toEqual([['http://127.0.0.1:3100', 2027]]);
+  });
+
+  it('does nothing for paths that name no award season, and nothing on an unconfigured host', async () => {
+    let called = 0;
+    const revalidate = async (_c: unknown, season: number) => { called += 1; return okOutcome(season); };
+    expect(await fanOutAwardSeasons(['/awards', awardPath('coleman'), seasonPath(2001)], { env: CONFIG_ENV, revalidate })).toEqual([]);
+    expect(await fanOutAwardSeasons([awardSeasonPath('coleman', 2001)], { env: {}, revalidate })).toEqual([]);
+    expect(called).toBe(0);
+  });
+
+  it('never throws: half-configuration, a rejected post and an incomplete cluster are logged only', async () => {
+    const logged: string[] = [];
+    const logError = (message: string) => { logged.push(message); };
+    expect(await fanOutAwardSeasons([awardSeasonPath('coleman', 2001)], {
+      env: { AFLDB_REVALIDATE_URL: 'http://127.0.0.1:3100' }, logError,
+    })).toEqual([]);
+    await fanOutAwardSeasons([awardSeasonPath('coleman', 2001), awardSeasonPath('coleman', 2002)], {
+      env: CONFIG_ENV,
+      logError,
+      revalidate: async (_c, season) => {
+        if (season === 2001) throw new Error('transport');
+        return { ...okOutcome(season), ok: false, failures: ['worker 2 unreachable'] };
+      },
+    });
+    expect(logged).toEqual([
+      '[admin-awards] award-season fan-out misconfigured',
+      '[admin-awards] award-season fan-out failed',
+      '[admin-awards] award-season fan-out incomplete',
+    ]);
+  });
+
+  it('reads the revalidated list without consuming the response', async () => {
+    const response = new Response(JSON.stringify({ ok: true, revalidated: [awardSeasonPath('coleman', 2001)] }));
+    expect(await revalidatedPathsOf(response)).toEqual([awardSeasonPath('coleman', 2001)]);
+    expect(await response.json()).toEqual({ ok: true, revalidated: [awardSeasonPath('coleman', 2001)] });
+    expect(await revalidatedPathsOf(new Response('not json'))).toEqual([]);
+  });
+
+  it('the route keeps the capability check first, then local revalidation, then the fan-out', () => {
+    const route = codeOf('src/app/admin/awards/revalidate/route.ts');
+    const body = route.slice(route.indexOf('export async function POST'));
+    const order = ['await requireCapability(\'data.awards.edit\')', 'applyRevalidateRequest(', 'fanOutAwardSeasons('];
+    const positions = order.map((needle) => body.indexOf(needle));
+    for (const [i, position] of positions.entries()) expect(position, order[i]).toBeGreaterThan(-1);
+    expect([...positions].sort((a, b) => a - b)).toEqual(positions);
+    // R-7: no Server Action gains a revalidation or a fan-out.
+    for (const file of ['src/app/admin/awards/actions.ts', 'src/app/admin/operations/coleman/actions.ts']) {
+      expect(codeOf(file), file).not.toMatch(/\b(revalidatePath|fanOutAwardSeasons|revalidateSeason)\s*\(/);
     }
   });
 });
