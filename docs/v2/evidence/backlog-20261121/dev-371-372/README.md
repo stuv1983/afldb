@@ -235,3 +235,14 @@ normal way, with real admin actions by the owner.
 **DEV now differs from its pre-check state as follows.** The 2026 Brownlow is attached and published (as on production),
 and there is one 2026 Charles Sutton Medal test record (id 3714; void it when no longer needed). The pre-deploy backup
 `backup-20261121T170610Z` remains the full revert.
+
+## 10. Post-check: DEV test award voided (2026-11-21 18:05:31Z)
+
+At the owner's request ("void the DEV test award 3714") the main session voided `award_winners.id 3714` (Charles Sutton
+Medal 2026, Marcus Bontempelli, Western Bulldogs) through the normal admin action **Void this record…**, with reason "DEV test
+record for ISSUE-372 verification; not a real award" and a correction note citing this README. The audit entry is
+`award_winner_voided` at 18:05:31Z under the owner's admin account. The check run `post-void` straight afterwards
+(`out/*-check-post-void.*` on streamanator) showed, on all four workers (pids unchanged), `/seasons/2026` re-rendered (MISS,
+then HIT) with the award absent 0/2, and `/awards/bf-western-bulldogs/2026` back to 404. The script prints FAIL on those lines
+because it tests for the award's presence; absence is the expected post-void state. The void exercised the same cross-worker
+season refresh, again without a restart. The DEV 2026 attach (audit 8) and publication (audit 9) remain, matching production.
