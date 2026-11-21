@@ -10,7 +10,8 @@ dded9312167cd2f6dbfca30cfe083f93d9af3a221d33731992b3859298eb551c *docs/v2/eviden
 cd31cecc8de78d9f3bfa9f1ae283befb022cf81a863453a8401446f5b7fb1132 *docs/v2/evidence/remediation-20261114/run7r3/sitting/r7r3-p4-gate-promote.sh
 2f654f41bf0957216c7e96beef027dd8cd9c4fa4c9d4d4a884bc6d7942848e23 *docs/v2/evidence/remediation-20261114/run7r3/sitting/r7r3-p8-observe.sh
 1f6746b8446b06219f3f7e000e89c5e97bac4e71c9c836d97e59a88123478748 *docs/v2/evidence/remediation-20261114/run7r3/sitting/r7r3-s9-public-smoke.sh
-97420e8062d0da34135cf2648e3ff1f13094a68f52c53bcb93116acd56d8bcb9 *docs/v2/evidence/remediation-20261114/run7r3/dev/r7r3-blocks-selftest.sh
+5c1f17d1605a4ba5147ae9bee51027073f1545e4aeb7af00e8bc21ea8c66277b *docs/v2/evidence/remediation-20261114/run7r3/dev/r7r3-blocks-selftest.sh
 eb4bf7ec519ee86abe5847d4d6f65233607d1e285e1fee9029a7cea86a505e9f *docs/v2/evidence/remediation-20261114/run7r3/dev/r7r3-dv-restore-verify.sh
+f0ce9feb52287601d7667b78afabe1a4ec0a78359908291f89feb2ddd87394aa *docs/v2/evidence/remediation-20261114/run7r3/dev/r7r3-qual.sh
 7113e3081bfe4e4b16cec41101b8b37a7e5218b87201f27f9d39da5352750a5a *tools/v2/b1a-successor/sitting/p9-s7s8-checks.sh
 2c8dc17e96be60851c0f4ad0db4d2e92eed423051c394ff6033d3ad07741898e *tools/v2/b1a-successor/sitting/r2-rollback.sh

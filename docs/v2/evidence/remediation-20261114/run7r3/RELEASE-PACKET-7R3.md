@@ -87,7 +87,7 @@ worker. The binding published checks therefore run **at least 65 minutes after p
   **Result: QUALIFIED.** The changed journey passed 2/2 on each season state. All 14 Brownlow integration suites passed except the
   two that need dedicated archive clones, which fail identically on BASE `a3c8c67c`. The 7 unit failures and the 18 full-journeys-file
   failures also fail on BASE (byte-verified tree, same database), so `CAND` introduces 0 new failures. Note 3 there records a DEV-only
-  incident: the harness restarted DEV's `afldb.service` three times. That harness has been corrected.
+  incident: the harness restarted DEV's `afldb.service` (streamanator) three times; for about 16 s DEV's LAN proxy reached the test server. The public beta (production droplet, Cloudflare) was not affected. The harness is repaired and proven (private port, own process group).
 - **`dev/BLOCKS-SELFTEST.md`**: every 7R3 data and page block, run unchanged on a disposable copy of the 18 Nov production dump in
   production's current state, in production order. It also covers the D1v backup proof and the reversal boundary.
 - The rehearsal and rendered before/after already recorded in `issues/open/AFLDB-ISSUE-370.md` §7 carry over. Their code is
@@ -323,17 +323,17 @@ Never re-run D4 without the owner.
 
 `run7r3/SHA256SUMS` covers:
 - the twelve `run7r3/sitting/` files;
-- the two `run7r3/dev/` scripts;
+- the three `run7r3/dev/` scripts: the block self-test, the D1v restore proof and the qualification harness (`r7r3-qual.sh`, repaired after the DEV incident; private port, own process group);
 - the two successor blocks reused unchanged: `tools/v2/b1a-successor/sitting/p9-s7s8-checks.sh` and `r2-rollback.sh`.
 
-Paths are repository-root-relative, with LF bytes; check with `sha256sum -c` from the repository root. **Manifest sha256: `f74540053b3811653d34f871f461bd804e2352ca1db55be8e3a26e5716bb4abe`.** Never send a block from `run7/`,
+Paths are repository-root-relative, with LF bytes; check with `sha256sum -c` from the repository root. **Manifest sha256: `e0cb9b9c6f2e33f0cab734263ff6fb50faca5fb729135475b1498bcc8ff59951`.** Never send a block from `run7/`,
 `run7r2/`, `run6/` or `run6r/`. The successor `p10-pages.sh` is **not** used in 7R3.
 
 ## 11. Approval statement (proposed)
 
 > **Approval R7R3:** "I approve publishing `PREP` (the records-only commit adding release packet 7R3) to `origin/main` by
 > fast-forward, and the attended production release and data change of release packet 7R3
-> (`docs/v2/evidence/remediation-20261114/run7r3/RELEASE-PACKET-7R3.md`, `SHA256SUMS` sha256 `f74540053b3811653d34f871f461bd804e2352ca1db55be8e3a26e5716bb4abe`, `origin/main` pin
+> (`docs/v2/evidence/remediation-20261114/run7r3/RELEASE-PACKET-7R3.md`, `SHA256SUMS` sha256 `e0cb9b9c6f2e33f0cab734263ff6fb50faca5fb729135475b1498bcc8ff59951`, `origin/main` pin
 > `PREP` = `<full SHA>`) on **`<day, date>`, `<start>`–`<end>` AEDT** (3½ hours).
 >
 > Part A: Claude releases `c8d4202a4cb3cf0ccdd1cad01e1227a1610c2d76` with the 7R3 blocks, one SSH connection per step (P0–P4, the
@@ -344,7 +344,7 @@ Paths are repository-root-relative, with LF bytes; check with `sha256sum -c` fro
 > the attachment (D4). One commit only; no re-run without me. The reversal (R1) is authorised only before publication and only on a
 > §8.2 trigger.
 >
-> Part C: I publish 2026 at `/admin/brownlow/2026` myself, with the D-370-1 list `<ids>`. Claude runs A1, the binding P10 at least
+> Part C: I publish 2026 at `/admin/brownlow/2026` myself, with the D-370-1 list of 14 ids `6841, 5480, 13246, 6667, 11041, 3295, 12205, 6746, 12869, 4004, 10282, 940, 1108, 3292` (verified in `D-370-1-eligibility-2026.md` §3a). Claude runs A1, the binding P10 at least
 > 65 minutes later, and the A3 Playwright checks in my signed-in browser. I report my own observation.
 >
 > On a §8.1 trigger, roll back the application to `a2e6ea9995a4-aKAYwf0qC4go6JJWiHhv5` with my restart. No restore, no unpublish,
@@ -355,8 +355,9 @@ Paths are repository-root-relative, with LF bytes; check with `sha256sum -c` fro
 
 ## 12. Open before approval
 
-1. **D-370-1**, the 2026 ineligible list: the owner's decision (evidence and the smallest decision in
-   `docs/v2/evidence/remediation-20261114/run7r3/D-370-1-eligibility-2026.md`).
+1. **D-370-1**, the 2026 ineligible list. The owner stated on 21 November an intention to use the full 14. The nine not named in
+   count coverage were then re-verified from primary sources (`D-370-1-eligibility-2026.md` §3a): no change to the list. Signing §11
+   records the decision. The `PREP` SHA in §11 is supplied in the covering approval request, because a commit cannot name itself.
 2. **The window** (3½ hours, owner present throughout Part A's restart, the digest review and the publication).
 3. **Publication of `PREP`** to `origin/main`, which carries `4484a6d0`, `f2741235`, `9626bce1` and `c8d4202a`: part of the approval above.
    Nothing is pushed before it.

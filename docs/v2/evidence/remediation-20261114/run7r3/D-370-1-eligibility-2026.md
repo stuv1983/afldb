@@ -1,6 +1,6 @@
 # D-370-1: players who polled 2026 Brownlow votes while ineligible to win (evidence, 21 November 2026)
 
-**Status: PROPOSED, awaiting the owner's decision.** Nothing here has been written to any database except the DEV self-test copy.
+**Status: PROPOSED.** On 21 November the owner stated an intention to use the full 14-player list, subject to the §3a source check (done; no change). It becomes D-370-1 when the owner signs approval R7R3. Nothing here has been written to any database except the DEV self-test copy.
 The placeholder used in the 21 November rehearsal (an empty list) is withdrawn.
 
 ## 1. Votes polled versus eligibility to win
@@ -89,10 +89,52 @@ The other 16 listed players polled no votes:
 **Confidence.**
 - **High (5 players): Horne-Francis, Bailey, Thilthorpe, Fogarty and Walker.** Each is named ineligible by the AFL's or his club's
   count coverage and has a sourced home-and-away suspension.
-- **Secondary (2 players): Reid and van Rooyen.** Each is named ineligible by a secondary source, with a sourced suspension.
-- **Good (7 players): Sicily, Xerri, Moore, Curtis, Humphrey, Long and Byrne-Jones.** Each has a sourced home-and-away suspension and
-  is on the count-eve ineligible list. No count-night source names them, because the coverage only mentions ineligible players who
-  polled prominently.
+- **Primary-verified (9 players): Reid, van Rooyen, Sicily, Moore, Xerri, Curtis, Humphrey, Long and Byrne-Jones.** §3a re-read each
+  final ruling, including appeals, from AFL.com.au and club sources and applied the 2025 rule. No count-night source names them,
+  because the coverage only mentions ineligible players who polled prominently.
+  - Earlier tiers: Reid and van Rooyen were "secondary", the other seven "good".
+
+## 3a. Primary-source verification of the nine not named in count coverage (21 November 2026, at the owner's request)
+
+**Rule applied.** It is the same rule as the owner-approved 2025 ruling (BP-2025-ELIGIBILITY-v1,
+`docs/v2/brownlow-eligibility-ruling-2026-10-20.md`), AFL Regulation 21.2(c): a guilty finding for a reportable offence in a
+home-and-away match carrying Brownlow votes makes the player ineligible **in that season**. The offence season, not the serving
+season, controls. Financial-only, finals, pre-season, club-imposed and conduct-unbecoming sanctions do not qualify. The 2025
+precedent is identical to Reid's case: Liam Baker (8798) was ruled ineligible for 2025 for a round-24 offence whose ban was served in
+2026.
+
+For the converse, Wikipedia's "Brownlow Medal" ineligibility section (edited 17 Nov 2026) says a player remains eligible "if he
+serves a suspension in the current season which was earned for an offence committed in the previous season". This covers Baker,
+Wines and Rankine in 2026. The Zero Hanger list of 30 includes Baker for 2026, so it over-includes carry-overs. That changes nothing
+here: he polled 0 and cannot be entered. But it is why the list is **not** used as authority for anyone below.
+
+Each page below was opened and read directly (AFL.com.au, club sites, and Zero Hanger for club decisions). Where a page had no
+visible date, the round and year come from its match photo caption.
+
+| Player | AFLDB id | 2026 offence (H&A) | Final ruling | Primary source(s) |
+|---|---|---|---|---|
+| Harley Reid | 5480 | R24 v Hawthorn, rough conduct (sling tackle on Jai Newcombe). Careless, high impact, high contact | **2 matches. Tribunal upheld** (pleaded guilty, failed to have the impact graded medium). No Appeals Board. **Served in rounds 1–2 of 2027** | afl.com.au/news/1594976 (MRO), afl.com.au/news/1595502 (Tribunal), westcoasteagles.com.au/news/2113424 |
+| Jacob van Rooyen | 6667 | R23 v Port Adelaide, striking Aliir Aliir. Careless, severe impact | **3 matches. Tribunal upheld; Appeals Board dismissed** ("did not make any error of law") | afl.com.au/news/1589382 (Tribunal), afl.com.au/news/1589772 (Appeals Board), melbournefc.com.au/news/2105756 |
+| James Sicily | 6746 | R6 v Port Adelaide, striking Logan Evans | **1 match, accepted** ("The Club has accepted both these suspensions") | afl.com.au/news/1501392, zerohanger.com …-175780 |
+| Dylan Moore | 4004 | R6 v Port Adelaide, striking Logan Evans | **1 match, accepted** | afl.com.au/news/1501392, zerohanger.com …-175780 |
+| Tristan Xerri | 12869 | R3 v Essendon (28 Mar 2026), serious misconduct, charged before the Tribunal | **3 matches. Pleaded guilty at the Tribunal.** No appeal reported | afl.com.au/news/1487717 |
+| Paul Curtis | 10282 | R14 v West Coast (13 Jun 2026), rough conduct. Careless, severe impact, high contact | **3 matches. Tribunal upheld.** No appeal reported | afl.com.au/news/1542286 |
+| Bailey Humphrey | 940 | R2 v Richmond, rough conduct (sling tackle on Maurice Rioli). High impact | **2 matches. Tribunal upheld** (pleaded not guilty). No appeal reported | afl.com.au/news/1484114 |
+| Ben Long | 1108 | R17 v Collingwood (4 Jul 2026), rough conduct on Brayden Maynard | **1 match. Tribunal reduced 2 → 1** (high → medium impact). Still a suspension. No appeal reported | afl.com.au/news/1555984 |
+| Darcy Byrne-Jones | 3292 | R22 v Sydney, rough conduct (bump on Errol Gulden). Careless, medium impact, high contact | **1 match, accepted** ("Port Adelaide has decided to accept the one-match ban") | afl.com.au/news/1579625, zerohanger.com …-181069 |
+
+**Discrepancies.** None of these changes the list.
+- **All nine stand:** each has a guilty finding or accepted sanction for a 2026 home-and-away offence, ending in a suspension of at
+  least one match.
+- **Byrne-Jones's charge wording:** the AFL page grades the bump careless / medium / high without the words "rough conduct"; a bump
+  is charged as rough conduct. That does not affect eligibility.
+- **Long's reduced ban** remains a suspension.
+- **Exclusion re-checked (John Noble, 7664, 7 votes):** the same R6 AFL article lists his one-match ban. Gold Coast then "successfully
+  overturned his one-match suspension at Tuesday's Tribunal hearing" (AAP via search). Noble therefore **stays eligible** and
+  off the list. The overturn rests on syndicated AAP text found by search, not on an AFL.com.au article read directly. The R6 page
+  itself does not report the hearing.
+- **Reid:** no AFL publication found names him as Brownlow-ineligible. His inclusion rests on the rule, the 2025 Baker precedent
+  and the Tribunal record above.
 
 ## 4. How the publisher uses the list, and what a wrong entry would change publicly
 

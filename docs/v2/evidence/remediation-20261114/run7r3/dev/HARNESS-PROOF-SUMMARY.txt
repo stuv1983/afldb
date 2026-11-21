@@ -1,0 +1,77 @@
+== harness proof 2026-11-21T05:28:46Z host=streamanator
+files: f0ce9feb52287601 6f2f8c241c5ada1e 
+no port-kill commands: /mnt/ssd/afldb-r7r3-20261121/run7r3/dev/r7r3-qual.sh:0 /mnt/ssd/afldb-r7r3-20261121/run7r3/dev/r7r3-blocks-selftest.sh:0 
+before: DEV afldb.service MainPID=1167221 NRestarts=3 3100-owner-pid=1167221 health=200
+--- 1. qual harness, negative: port 3110 pre-occupied by a process the harness did not launch
+  3 STOP port 3110 is held by a process this harness did not launch; nothing killed
+PASS dummy listener 1202399 survived (not killed by the harness)
+--- 2. qual harness, positive: e2e phase on private port 3110
+  e2e complete-pending: CAND server, own process group 1202689, 127.0.0.1:3110 health 200
+  e2e complete-pending: server group 1202689 stopped
+  e2e complete-pending rc=0  2 passed (5.3s);
+  e2e unfinished-synthetic: CAND server, own process group 1203277, 127.0.0.1:3110 health 200
+  e2e unfinished-synthetic: server group 1203277 stopped
+  e2e unfinished-synthetic rc=0  2 passed (5.2s);
+  e2e full-journeys-file: CAND server, own process group 1203762, 127.0.0.1:3110 health 200
+  e2e full-journeys-file: server group 1203762 stopped
+  e2e full-journeys-file rc=1  18 failed; 3 skipped; 67 passed (32.3s);
+after qual: DEV afldb.service MainPID=1167221 NRestarts=3 3100-owner-pid=1167221 health=200
+--- 3. self-test, negative: port 3371 pre-occupied
+  STOP port 3371 is held by a process this self-test did not launch; nothing killed
+PASS dummy listener 1209092 survived (not killed by the self-test)
+--- 4. self-test, positive: full run on private port 3371
+  STOP line 66: ( set -a && . "$ENVF" && set +a; re='^(postgres(ql)?://)([^:/@]+):([^@]*)@(.*)$'; d=${!DSNVAR}; [[ $d =~ $re ]] || { echo "bad DSN shape" 1>&2; ex
+  server pending1: own process group 1209411 on 127.0.0.1:3371
+  STOP line 29: P=$(sed -n 's/^PORT=//p' "$ENVF" | tail -1 | tr -d '"')
+  STOP line 48: ( set -a && . "$ENVF" && set +a; export R7R3_DSN=${!DSNVAR}; node --input-type=module -e '
+  STOP line 62: [ -s "$A/target.json" ]
+  STOP line 66: ( set -a && . "$ENVF" && set +a; re='^(postgres(ql)?://)([^:/@]+):([^@]*)@(.*)$'; d=${!DSNVAR}; [[ $d =~ $re ]] || { echo "bad DSN shape" 1>&2; ex
+  server group 1209411 stopped
+  server pending2: own process group 1211890 on 127.0.0.1:3371
+  STOP line 29: P=$(sed -n 's/^PORT=//p' "$ENVF" | tail -1 | tr -d '"')
+  STOP line 66: ( set -a && . "$ENVF" && set +a; re='^(postgres(ql)?://)([^:/@]+):([^@]*)@(.*)$'; d=${!DSNVAR}; [[ $d =~ $re ]] || { echo "bad DSN shape" 1>&2; ex
+  STOP line 66: ( set -a && . "$ENVF" && set +a; re='^(postgres(ql)?://)([^:/@]+):([^@]*)@(.*)$'; d=${!DSNVAR}; [[ $d =~ $re ]] || { echo "bad DSN shape" 1>&2; ex
+  server group 1211890 stopped
+  server published: own process group 1214448 on 127.0.0.1:3371
+  STOP line 29: P=$(sed -n 's/^PORT=//p' "$ENVF" | tail -1 | tr -d '"')
+  server group 1214448 stopped
+after: DEV afldb.service MainPID=1167221 NRestarts=3 3100-owner-pid=1167221 health=200
+PASS DEV afldb.service untouched (same MainPID, same NRestarts)
+== done 2026-11-21T05:36:04Z
+--- 4b. self-test, positive, rerun 2026-11-21T05:37:10Z with the pg-rst cluster running (4 failed its precondition: cluster stopped; nothing was written)
+before: DEV afldb.service MainPID=1167221 NRestarts=3 health=200
+  A1 RESULT before PASS
+  server pending1: own process group 1218664 on 127.0.0.1:3371
+  P10 RESULT pending PASS (11 pages x 8 samples, anon control)
+    copy A1 RESULT before PASS
+    plan D RESULT plan PASS digest=100c112f400a492906cbc2a5c3886243c15d412eb62f84d50f17c63ae1f76aa7
+    dry D RESULT dry PASS
+  VERDICT PASS backup proven by a fresh disposable restore
+  D RESULT target PASS
+  D RESULT plan PASS digest=100c112f400a492906cbc2a5c3886243c15d412eb62f84d50f17c63ae1f76aa7
+  D RESULT dry PASS
+  STOP line 74: [ "$(node -e 'console.log(require(process.argv[1]).digest)' "$A/plan-2026.json")" = "$DIG" ]
+  D RESULT commit PASS
+  A1 RESULT attached PASS
+  server group 1218664 stopped
+  server pending2: own process group 1220825 on 127.0.0.1:3371
+  P10 RESULT pending PASS (11 pages x 8 samples, anon control)
+  A3 RESULT pending PASS
+  D RESULT reverse-dry PASS
+  D RESULT reverse-commit PASS
+  A1 RESULT reversed PASS
+  D RESULT commit PASS
+  PUBLISH {"ok":true,"value":{"season":2026,"revision":2,"rowCount":183,"votesTotal":1242,"winners":[9910]}}
+  A1 RESULT published PASS
+  server group 1220825 stopped
+  server published: own process group 1221926 on 127.0.0.1:3371
+  P10 RESULT published PASS (11 pages x 8 samples, anon control)
+  A3 RESULT published PASS
+  REFUSED AttachmentRefusal already_published: Season 2026 has been published since the attachment; reverse the publication first.
+  D RESULT reverse-dry FAIL (exit 1): run r7r3-a1-facts.sh to establish the state before anything else
+  server group 1221926 stopped
+  server log error|unhandled: /mnt/ssd/afldb-r7r3-20261121/evidence/blocks/server-pending1.log:0
+  server log error|unhandled: /mnt/ssd/afldb-r7r3-20261121/evidence/blocks/server-pending2.log:0
+  server log error|unhandled: /mnt/ssd/afldb-r7r3-20261121/evidence/blocks/server-published.log:0
+after: DEV afldb.service MainPID=1167221 NRestarts=3 health=200
+== done 2026-11-21T05:38:59Z

@@ -27,6 +27,7 @@ R bash -c 'printf "PORT=%s\nAFLDB_SESSION_SECRET=%s\nAFLDB_BETA_GATE=on\nAFLDB_B
 chmod 600 "$DATA/blk.env"
 IDC=$(R bash -c '"$AFLDB_V2_PG_BIN/psql" "$AFLDB_TEST_DATABASE_URL" -XAtq -c "SELECT current_database(), d.oid, c.system_identifier FROM pg_database d, pg_control_system() c WHERE d.datname = current_database()"' 2>/dev/null | grep -v '^isolated-pg')
 ACT=$(R bash -c '"$AFLDB_V2_PG_BIN/psql" "$AFLDB_TEST_DATABASE_URL" -XAtq -c "SELECT min(id) FROM auth_users WHERE role = '"'"'super_admin'"'"' AND disabled_at IS NULL"' 2>/dev/null | grep -v '^isolated-pg')
+[ -n "$IDC" ] && [ -n "$ACT" ] && [ -s "$DATA/blk.env" ] || { rec "STOP the copy $T is unreachable or the block env file was not written (is the isolated cluster at $AFLDB_V2_PG_ROOT running?)"; exit 1; }
 rec "copy identity $IDC; actor <first active super-admin id of the copy>"
 cat > "$DATA/a3.mjs" <<'JS'
 import { readFileSync } from 'node:fs'; import { createHmac } from 'node:crypto';
@@ -55,9 +56,19 @@ clear_isr() { find .next/standalone/.next/server/app -type f -not -path '*/admin
   \( -path '*/seasons/202[56]*' -o -path '*/brownlow*' -o -path '*/matches/*' -o -path '*/players/*' \) -delete
   [ -f '.next/standalone/.next/server/app/players/[slug]/page.js' ] || { rec "STOP route module missing"; exit 1; }; }
 SP=
-serve() { stop; clear_isr; R env NODE_ENV=production HOSTNAME=127.0.0.1 PORT=$PORT node .next/standalone/server.js > "$E/server-$1.log" 2>&1 &
-  SP=$!; for i in $(seq 1 60); do curl -s -o /dev/null -m 5 "http://127.0.0.1:$PORT/api/health" && break; sleep 2; done; }
-stop() { [ -n "$SP" ] && { pkill -P "$SP" 2>/dev/null; kill "$SP" 2>/dev/null; wait "$SP" 2>/dev/null; }; fuser -k $PORT/tcp > /dev/null 2>&1; SP=; }
+# The server runs on a private loopback port in its OWN process group (setsid). The self-test refuses a port it did not take and
+# stops only that group: never `fuser -k`, never a kill by port (on streamanator 3100 is DEV's afldb.service).
+serve() { stop; clear_isr
+  ss -ltnH "sport = :$PORT" | grep -q . && { rec "STOP port $PORT is held by a process this self-test did not launch; nothing killed"; exit 1; }
+  setsid node --import tsx tools/v2/isolated-pg.ts run "$T" -- env NODE_ENV=production HOSTNAME=127.0.0.1 PORT=$PORT node .next/standalone/server.js \
+    > "$E/server-$1.log" 2>&1 < /dev/null &
+  SP=$!; [ "$(ps -o pgid= -p "$SP" | tr -d ' ')" = "$SP" ] || { kill "$SP"; rec "STOP server is not its own process group"; exit 1; }
+  for i in $(seq 1 60); do curl -s -o /dev/null -m 5 "http://127.0.0.1:$PORT/api/health" && break; sleep 2; done
+  rec "server $1: own process group $SP on 127.0.0.1:$PORT"; }
+stop() { [ -n "$SP" ] || return 0
+  kill -TERM -- "-$SP" 2>/dev/null; for i in $(seq 1 20); do kill -0 -- "-$SP" 2>/dev/null || break; sleep 0.5; done
+  kill -KILL -- "-$SP" 2>/dev/null; wait "$SP" 2>/dev/null
+  ss -ltnH "sport = :$PORT" | grep -q . && rec "WARN port $PORT still held after stopping group $SP; left untouched" || rec "server group $SP stopped"; SP=; }
 show() { tee -a "$E/$1.log" | grep -E "$2" | cut -c1-260 | tee -a "$S"; }
 
 rec "== A1 before";             blk r7r3-a1-facts.sh "$STAMP" before | show a1-before '^(PASS|FAIL|A1 RESULT|STOP)'

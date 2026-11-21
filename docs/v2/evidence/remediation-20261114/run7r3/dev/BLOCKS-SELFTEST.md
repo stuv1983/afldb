@@ -23,7 +23,31 @@ two exceptions, both changed after that run:
 
 `SHA256SUMS` pins the full values.
 
-## Result (third run, 2026-11-21T04:19Z, final blocks)
+## Final run (2026-11-21T05:37Z, the bytes pinned in `SHA256SUMS`)
+
+**Why it was rerun.** The incident reconciliation (`../DEV-QUALIFICATION.md` note 3) replaced the self-test's `fuser -k $PORT` with
+an own-process-group launch and stop, and added an early STOP when the copy is unreachable. The rerun uses exactly the pinned bytes:
+every one of the 15 script hashes in its header equals `SHA256SUMS`, including the later `r7r3-d1-backup.sh` and `r7r3-p2-ff.sh`
+fixes below.
+
+**Result.** Every step in the table below passed again, in the same order:
+- A1, P10 and A3 in every phase;
+- D1v (`VERDICT PASS`), plan digest `100c112f…76aa7`, dry run, commit;
+- reverse-commit, A1 `reversed` and re-commit;
+- publication `{"ok":true,…,"rowCount":183,"votesTotal":1242,"winners":[9910]}`;
+- the post-publication reversal refused with `already_published`;
+- 0 server-log errors.
+
+**Isolation.** Each of the three servers ran and stopped in its own process group on 127.0.0.1:3371. DEV's `afldb.service` was
+untouched: MainPID 1167221 and `NRestarts=3` before and after. Record: `HARNESS-PROOF-SUMMARY.txt` §4b.
+
+**A failed precondition.** An attempt just before it (§4 there) failed: the isolated `pg-rst` cluster had been stopped during
+cleanup. `isolated-pg` refused to send credentials, so the env file was never written and every block STOPped without touching data.
+The self-test now stops at once in that case.
+
+**Cleanup.** The copy and data directories were deleted afterwards, and the cluster was stopped.
+
+## Result (third run, 2026-11-21T04:19Z)
 
 | Step (production order) | Result |
 |---|---|

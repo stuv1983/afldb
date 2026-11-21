@@ -244,7 +244,7 @@ that packet, not here.
     the new attachment writer was unclassified, and the sealed `recordDataEdit` count is 57, not 55. Fixed by classifying
     `brownlow-season-attachment.ts` as `governed`.
   - The delta from `a3c8c67c` is 44 paths, 10 of them code/test. It adds no migration, package or deploy change.
-- **Qualification: QUALIFIED** (`docs/v2/evidence/remediation-20261114/run7r3/DEV-QUALIFICATION.md`). `CAND` adds 0 new failures; every remaining failure is identical on the byte-verified `a3c8c67c` tree against the same database. DEV-only incident: the e2e harness killed DEV's `afldb.service` (port 3100) three times, and systemd restarted it each time. It is healthy, with no code or data change, and the harness is fixed.
+- **Qualification: QUALIFIED** (`docs/v2/evidence/remediation-20261114/run7r3/DEV-QUALIFICATION.md`). `CAND` adds 0 new failures; every remaining failure is identical on the byte-verified `a3c8c67c` tree against the same database. DEV-only incident: the e2e harness killed streamanator's `afldb.service` (port 3100) three times (16:05:38–16:06:01 AEDT), and systemd restarted it each time; for about 16 s DEV's LAN proxy (:8090) reached the test server. The public beta, served by the production droplet behind Cloudflare, was not affected. The harness was repaired (private port, own process group, stops only what it launched) and re-proven, and the full block self-test was re-run on the pinned bytes. See `DEV-QUALIFICATION.md` note 3.
 - **Block self-test:** `…/run7r3/dev/BLOCKS-SELFTEST.md`. Every data and page block ran unchanged on a disposable copy of the
   production dump in production's current state: attach, exact reverse, re-attach, publish with the proposed list, and the
   post-publication reversal refusal.
@@ -253,6 +253,6 @@ that packet, not here.
   - 14 players polled 2026 votes while suspended (85 votes). They are mapped to production ids, with sources.
   - None of them can change the winner: the highest is Horne-Francis 22, against Nick Daicos 47, who is eligible.
   - 16 more suspended players polled nothing and cannot be entered.
-  - The owner decides the list.
+  - The owner stated an intention to use all 14. The nine not named in count coverage were re-verified from primary AFL, Tribunal and club sources, including appeals (evidence file §3a). Reid's R24 offence with its ban served in 2027 follows the 2025 Baker precedent under regulation 21.2(c). No change to the list; the decision is recorded when R7R3 is signed.
 - **7R2 stays held at P3.** Its built release `a3c8c67cc98f-JFf9-hXYa6xoigu5Tw4Hg` is never promoted. 7R3 builds its own release
   from `c8d4202a`.
