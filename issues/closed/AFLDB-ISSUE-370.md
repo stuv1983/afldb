@@ -2,7 +2,7 @@
 
 Opened 2026-11-21 from the owner's browser observation during the Release 7R2 sitting. Worktree
 `D:\dev\afldb-bv2026`, branch `claude/brownlow-2026-publication-20261121`, based on 7R2 PREP `4484a6d0`
-(executable tree = `a3c8c67c`). Nothing in this runbook has touched production.
+(executable tree = `a3c8c67c`). **RESOLVED 2026-11-21** by Release 7R3 (§12): released, attached, published by the owner and accepted on the live site.
 
 ## 1. Owner observation and hold (verbatim, 2026-11-21)
 
@@ -256,3 +256,25 @@ that packet, not here.
   - The owner stated an intention to use all 14. The nine not named in count coverage were re-verified from primary AFL, Tribunal and club sources, including appeals (evidence file §3a). Reid's R24 offence with its ban served in 2027 follows the 2025 Baker precedent under regulation 21.2(c). No change to the list; the decision is recorded when R7R3 is signed.
 - **7R2 stays held at P3.** Its built release `a3c8c67cc98f-JFf9-hXYa6xoigu5Tw4Hg` is never promoted. 7R3 builds its own release
   from `c8d4202a`.
+
+## 12. Production outcome: Release 7R3 (Saturday 21 November 2026, 17:00–20:30 AEDT) — RESOLVED
+
+Approval R7R3 and every owner statement are verbatim in the sitting record
+`docs/v2/evidence/remediation-20261114/run7r3/sitting-exec-20261121/README.md`, with each block's result line.
+
+- **Release.** `PREP` `4f5fc9c9` fast-forwarded to `origin/main`. P0–P3b PASS; P4 `PROMOTED` at 06:05:44Z
+  (`c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC`); owner restart 06:17:12Z; P9, S9, P10a, A3a and the 30-minute P8 observation PASS.
+- **Data.** D1 backup (sha256 `ec907085…b287`) proven by the D1v disposable restore; D2 plan `9522/621/1242/207/207`, digest
+  `100c112f…76aa7`, confirmed by the owner with actor id 1; D3 dry run PASS; **one D4 commit, audit 205**; A1b and P10b PASS.
+- **Publication.** The owner's first publication (revision 2, audit 206, 07:06:27Z) saved **no** ineligible ids (the form submitted an empty
+  list) and A1c failed on that count alone. Under packet §8.3 item 1 the owner re-published: **revision 3, audit 207,
+  2026-11-21T07:26:25.496Z**, ineligible exactly D-370-1's 14 ids (`940,1108,3292,3295,4004,5480,6667,6746,6841,10282,11041,12205,12869,13246`).
+  183 season rows, 1,242 votes, winner Nick Daicos 47. No vote changed.
+- **Acceptance (packet §7.3).** A1c re-run PASS; binding P10d (08:31:41Z, ≥ 65 min after audit 207) PASS 88/88; A3b in the owner's
+  browser PASS 11/11; the owner's §6.5 observation after P10d: Pendlebury 2026 BV 5 with no tooltip, and `/brownlow/2026` titled
+  "2026 Brownlow Medal - Winner, Votes & Leaderboard | AFLDB", "Won by Nick Daicos with 47 votes", with the full vote count.
+- **New finding → AFLDB-ISSUE-371.** After publication `/brownlow/2026` served the correct body under its earlier 404 head
+  ("Page not found | AFLDB") until the hourly regeneration.
+- **Follow-ups that stay open elsewhere.** §10's two items (rebuild artefact ends at 2025; ISSUE-332's 2027 plan). The owner disposes of the
+  retained backup, data directories, the D1v and pg-rst prod-data copies on streamanator, and the never-promoted 7R2 release (sitting record,
+  Outcome). P4 warned of a pending reboot and a missing needrestart hold (ISSUE-351).

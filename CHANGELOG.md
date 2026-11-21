@@ -15,7 +15,7 @@ commit.
 
 ## [Unreleased]
 
-### A completed season's unpublished Brownlow no longer reads as unawarded; guarded 2026 attachment (ISSUE-370; 2026-11-21, local)
+### A completed season's unpublished Brownlow no longer reads as unawarded; 2026 Brownlow attached and published (ISSUE-370; Release 7R3, 2026-11-21, in production)
 
 - **Player-page BV wording is season-aware.** A `pending` Brownlow in a completed season reads **"Awaiting verification"**,
   with the tooltip "AFLDB has not yet verified and published the Brownlow results for this season." In an unfinished
@@ -29,8 +29,12 @@ commit.
     a sealed audit row;
   - dry run by default; exact reversal until publication.
 
-  It changes no vote. Publication remains the Super Admin action. Not run on production.
-- Release 7R2 held at P3 (built, not promoted) pending a revised packet.
+  It changes no vote. Publication remains the Super Admin action.
+- **Released and run in production (Release 7R3, 2026-11-21).** Production serves `c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC`. The 2026
+  round votes were attached by one audited commit (audit 205: 9,522 rows, 207/207 matches) and the owner published 2026 as
+  revision 3 (audit 207) with the 14 D-370-1 ineligible players: 183 polling players, 1,242 votes, Nick Daicos 47. `/brownlow`
+  lists 2026, `/brownlow/2026` is live, and player, game-log, match and season pages show the 2026 votes (Pendlebury 5). Verified
+  by A1c, the binding P10d, A3b and the owner's own observation. Release 7R2 was held at P3 and never promoted.
 
 ### Closeout fixes: AFLW replacement, Brownlow publication gate, read-only migration status, off-host retention (ISSUE-368, 367, 369, 352; 2026-11-21)
 

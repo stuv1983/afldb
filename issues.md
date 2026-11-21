@@ -73,7 +73,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-362 | Caddy logs magic-link/invite tokens; revoked admin cookie passes the beta gate | Low | Security hygiene | Open. **2026-11-14:** Caddy log filter (proven on Caddy 2.11.4/2.11.9) and epoch-held admin claims implemented locally (not published; live Caddy unchanged). **Run 2:** B-05 re-authentication; token redaction in any spelling and in `Location`/`Refresh` (red/green on Caddy 2.11.4/2.11.9). | Publish; owner: combined Caddy install (B7), then O-1 pre-fix logs. |
 | AFLDB-ISSUE-363 | Test reliability (vacuous passes, uninvoked Python contracts, `AFLDB_PYTHON`, untested beta actions, `/beta` predicates, leaking fixtures) | Low | Tests | Open. Runs 1-3: TST-4..9, per-file DBs, state-b/settle fixes (see entry). **Run 4 (2026-11-15, local, final executable revision `16027092`, `run4/QUALIFICATION-4.md`):** 363-W/G/C/B and 363-3 implemented; T363-2/T363-3 and all shared-mode leaks fixed (shared mode now fails exactly the per-file ids); 40 rebuild-only failures fixed; integration at Q″: snapshot 18 ids, rebuild 7, every id class 1 or class 5 (Gridley); unit 12,296/1 (stage map, fixed at Q‴). Remaining: Gridley owner decision; publication. **Run 5 (2026-11-15, local, executable `f6af6da9`):** T-2 corrected (`awards-reload-links` restores every pre-existing `award_winners` row and award span at file teardown; affected scope requalified, `run5/T2-QUALIFICATION.md`). **Published 2026-11-16** (`a2e6ea99`). T-2 residue open as a test-isolation follow-up: the file still changes `award_nominations`, `hall_of_fame`, `honour_team_members`, `captaincies` content and grows `import_batches` in shared mode. | Owner decision G-1 (`run5/G1-REBUILD-TIERS.md`); extend `awards-reload-links` restore to the four honours tables. |
 | AFLDB-ISSUE-364 | Tooling drift (`next dev` sitemap conflict, serving-checkout `node_modules`, lint ungated) | Low | Tooling | Open. **2026-11-14:** `next dev` fixed (sitemap index behind a rewrite), `node_modules` check (warn-only), lint ratchet `npm run lint:gate` (338 baseline) implemented locally (not published). **Run 2:** lint gate wired into preflight/merge:ready as a ratchet (338 errors allowed; not clean lint); B-07 refusals; A-09 split. | Publish; owner accepts the merge-time ratchet as O-2 (release/CI not wired). |
-| AFLDB-ISSUE-370 | The awarded 2026 Brownlow is unpublishable and reads as "Not yet awarded" | High | Brownlow publication / player-page wording | Open. **2026-11-21:** owner dispute; Release 7R2 **held at P3** (built, not promoted). The complete official count (1,242 votes, Daicos 47) is stored only at the legacy round grain, so publication refuses. Season-aware wording and a guarded attachment runner are implemented and verified locally, with a rehearsal and rendered before/after on a production-dump copy (`claude/brownlow-2026-publication-20261121`, committed locally, not published). | Wording D-370-W approved 2026-11-21. Tested commit `c8d4202a`; release packet 7R3 prepared. Owner: D-370-1 (2026 ineligible list), the 7R3 attended window (promote, attach), then publish at `/admin/brownlow/2026`. Runbook `issues/open/AFLDB-ISSUE-370.md`. |
+| AFLDB-ISSUE-371 | A newly published `/brownlow/<season>` serves its earlier 404 head until the hourly regeneration | Low | Public frontend / ISR metadata | Open. **2026-11-21 (Release 7R3):** after the owner published 2026, `/brownlow/2026` returned 200 with the correct body ("Won by Nick Daicos with 47 votes", standings, 14 ineligible rows) but `<title>Page not found \| AFLDB</title>` and the site-default description: all 8 P10c samples at 07:27:31Z and one browser navigation at 08:31:56Z; every request after 08:32Z correct. Root cause not established. | Reproduce on DEV (404 a season page, publish, compare head and body per worker); decide whether publication must refresh metadata on every worker before 2027 is published. |
 
 **AFLDB-ISSUE-323 and AFLDB-ISSUE-324 resolved 2026-10-24** (fixes `481511d2`; `82603dc7`, `14abea5e`, `876dadbf`; local, not pushed). The owner ruled on 2026-10-24 that the ISSUE-316 revision J2 disposable rebuild is the J2 proof, and that its 5 sampler anomalies (F-J06) are an evidence-monitor defect, registered as ISSUE-325. That rebuild was the ordinary successor path at pinned `876dadbf`, under the reviewed native closure (policy `a8e586e0…`) with no provenance, against `afldb_v2_rb_i316_revision_j2_test`. It passed the successor preflight and the real execution boundary, and executed the constrained tsx/npm path under enforcement: runner exit 0, 30 stages, 91 checks PASSED, all 1,640 club-seasons equal, `AFLDB-POST PASSED`, 0 native REFUSED lines and 0 provenance mentions. A focused read-only evidence review of the retained artefacts preceded the closure; it is recorded in the ISSUE-316 entry. No push, deployment, apply, activation or census. Removed from `IssuesIndex.md` and the Open Issues table. Full record: the entries in this file.
 
@@ -55284,10 +55284,19 @@ Acceptance: Every non-public audience refuses data access until must_change_pass
 
 - **Severity / area** High, Brownlow publication and the player-page BV wording. A completed, officially counted season is
   presented as unawarded and is missing from `/brownlow`.
-- **Status** **OPEN.** Fix implemented and verified locally on `claude/brownlow-2026-publication-20261121` (base `4484a6d0`),
-  **committed locally** (not published; tested commit `c8d4202a`, release packet 7R3 in `docs/v2/evidence/remediation-20261114/run7r3/`, see runbook §11). Nothing written to production. **Release 7R2 held at P3** by the owner on 2026-11-21: P0–P2 PASS, P3/P3b
-  built release `a3c8c67cc98f-JFf9-hXYa6xoigu5Tw4Hg`, **P4 not run**, production still serves `a2e6ea99`. Runbook:
-  [AFLDB-ISSUE-370.md](issues/open/AFLDB-ISSUE-370.md).
+- **Status** **RESOLVED 2026-11-21** by Release 7R3 (approval R7R3; window Sat 21 Nov 17:00–20:30 AEDT). Runbook:
+  [AFLDB-ISSUE-370.md](issues/closed/AFLDB-ISSUE-370.md) §12; sitting record
+  `docs/v2/evidence/remediation-20261114/run7r3/sitting-exec-20261121/README.md`.
+  - Production serves `c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC` (promoted 06:05:44Z, owner restart 06:17:12Z).
+  - 2026 attached by one D4 commit (audit 205, digest `100c112f…76aa7`, 9,522 rows, 207/207 matches).
+  - The owner published 2026. Revision 2 (audit 206) saved no ineligible ids because the form submitted an empty list; the owner
+    re-published under packet §8.3 item 1 as **revision 3 (audit 207, 2026-11-21T07:26:25.496Z)** with exactly D-370-1's 14 ids.
+    183 season rows, 1,242 votes, winner Nick Daicos 47. No vote changed.
+  - Acceptance (packet §7.3): A1c re-run PASS; binding P10d PASS 88/88 (08:31:41Z); A3b PASS 11/11; the owner's §6.5 observation
+    after P10d: Pendlebury 2026 BV 5 with no tooltip; `/brownlow/2026` "Won by Nick Daicos with 47 votes" with the full count.
+  - New finding: AFLDB-ISSUE-371 (the published season page briefly served its earlier 404 head).
+  - Earlier history: Release 7R2 was held at P3 by the owner on 2026-11-21; its built release
+    `a3c8c67cc98f-JFf9-hXYa6xoigu5Tw4Hg` was never promoted.
 - **Owner observation (2026-11-21, verbatim extract)** "on Scott Pendlebury's player page, the 2026 BV cell displayed "Not yet
   awarded". That confirms the displayed text, but I dispute its correctness. The 2026 season finished in September and the
   Brownlow was awarded on Monday 21 September 2026. I can see 2026 votes on the season page, but the 2026 results appear to be
@@ -55367,3 +55376,23 @@ Acceptance: Every non-public audience refuses data access until must_change_pass
   Production acceptance stays open until the corrected behaviour is observed on the live site (runbook §9.5).
 - **Follow-up** The rebuild artefact ends at 2025. Any future rebuild-and-promote must carry the 2026 publication forward.
   ISSUE-332's 2027 plan must include attachment and publication.
+
+## AFLDB-ISSUE-371 — A newly published `/brownlow/<season>` serves its earlier 404 head until the hourly regeneration
+
+- **Severity / area** Low, public frontend (ISR page metadata). No data effect; the body is correct.
+- **Status** **OPEN** (found 2026-11-21 during Release 7R3, ISSUE-370).
+- **Evidence (production, `c8d4202a`, `AFLDB_WORKERS=2`, `revalidate = 3600`)**
+  - Before publication `/brownlow/2026` was 404 (expected, P10a/P10b).
+  - After the owner's publication (audit 206 at 07:06:27Z, audit 207 at 07:26:25Z), P10c at 07:27:31Z: all 8 samples 200 with the
+    correct body (winner sentence, standings, the 14 "Recorded ineligible" rows) but `<title>Page not found | AFLDB</title>` and the
+    site-default description. `/brownlow/2025` and every other checked page had the right head.
+  - Binding P10d at 08:31:41Z PASS on all 8 samples. One browser navigation at 08:31:56Z (network, 200) still had the 404 head;
+    6/6 fetches, 3/3 navigations and 24/24 fetches immediately afterwards carried "2026 Brownlow Medal — Winner, Votes &
+    Leaderboard | AFLDB" and the winner description. The owner later saw the correct title.
+  - Publication calls `revalidatePath('/brownlow/<season>', 'page')` (`src/app/admin/brownlow/actions.ts`) on the worker that served
+    the action; the head is produced by `generateMetadata` in `src/app/brownlow/[year]/page.tsx`.
+- **Root cause** Not established. The body refreshed while the head kept the 404-era metadata, so the metadata and the page body
+  appear to be cached or regenerated separately; the per-worker cache explains the one late stale request.
+- **Next action** Reproduce on DEV: render `/brownlow/<season>` as 404, publish the season, then compare head and body per worker
+  before and after the revalidation window. Decide whether publication must refresh metadata on every worker before 2027 is
+  published (ISSUE-332). Related: ISSUE-357 (ISR keeps per-404-path entries).

@@ -1,6 +1,15 @@
 # AFLDB Current Issues Index
 
-**Current state, 21 November 2026 (Release 7R2 held at P3; ISSUE-370 opened).** The owner held Release 7R2 at P3:
+**Current state, 21 November 2026 (Release 7R3 executed; ISSUE-370 RESOLVED; ISSUE-371 opened).** Under approval R7R3
+(Sat 21 Nov 17:00–20:30 AEDT) `origin/main` moved to PREP `4f5fc9c9` and production now serves
+`c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC` (promoted 06:05:44Z, owner restart 06:17:12Z). 2026 was attached (one D4 commit, audit 205) and
+published by the owner as revision 3 (audit 207) with D-370-1's 14 ineligible ids, after a revision 2 that saved none. A1c,
+binding P10d, A3b and the owner's live observation all passed, so **AFLDB-ISSUE-370 is resolved**
+([runbook](issues/closed/AFLDB-ISSUE-370.md) §12). New **AFLDB-ISSUE-371** (Low): the newly published `/brownlow/2026` briefly kept
+its earlier 404 head. Ten open issues: 332, 348, 350, 351, 352, 357, 362, 363, 364 and **371**. The owner disposes of the retained
+backup, data directories and streamanator prod-data copies (sitting record, Outcome).
+
+**Earlier state, 21 November 2026 (Release 7R2 held at P3; ISSUE-370 opened).** The owner held Release 7R2 at P3:
 - P0–P2 PASS; P3/P3b built `a3c8c67cc98f-JFf9-hXYa6xoigu5Tw4Hg`;
 - **not promoted, no restart**; production still serves `a2e6ea99`;
 - its checkout sits at `a3c8c67c`.
@@ -16,8 +25,8 @@ open issues: 332, 348, 350, 351, 352, 357, 362, 363, 364 and **370**.
 
 | Issue | Severity | Next action |
 |---|---|---|
-| 370 · 2026 Brownlow unpublishable, "Not yet awarded" | High | Wording D-370-W approved 2026-11-21. Tested commit `c8d4202a` (local); release packet 7R3 prepared (`docs/v2/evidence/remediation-20261114/run7r3/`). Owner: D-370-1 2026 ineligible list, approval of the 7R3 attended window (promote, attach), then publish `/admin/brownlow/2026`. [Runbook](issues/open/AFLDB-ISSUE-370.md) |
 | 352 · backup retention | Medium | Retry defect fixed locally (durable `.retention-hold`, red/green). Owner D-HO-2/3/5/7 before off-host activation. |
+| 371 · new `/brownlow/<season>` keeps its 404 head after publication | Low | Reproduce on DEV (404 a season page, publish, compare head and body per worker); decide before 2027 publication whether publication must refresh metadata on every worker. See `issues.md`. |
 
 > Lightweight session index of open issues only.
 >
