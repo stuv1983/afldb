@@ -6,7 +6,7 @@
 - its checkout sits at `a3c8c67c`.
 
 The owner disputes the 2026 BV cell "Not yet awarded" and the absence of 2026 from `/brownlow`. **AFLDB-ISSUE-370** is open, with
-the fix committed locally (not published) on `claude/brownlow-2026-publication-20261121`. R7R2's acceptance criteria (P10 `after`
+the fix committed locally (not published) on `claude/brownlow-2026-publication-20261121`, tested commit `c8d4202a`; release packet 7R3 awaits the owner's D-370-1 decision and a fresh attended window. R7R2's acceptance criteria (P10 `after`
 text, `/brownlow/2026` 404 control, owner "no 2026 votes" observation) certify the disputed state and must be re-derived. Ten
 open issues: 332, 348, 350, 351, 352, 357, 362, 363, 364 and **370**.
 
@@ -16,7 +16,7 @@ open issues: 332, 348, 350, 351, 352, 357, 362, 363, 364 and **370**.
 
 | Issue | Severity | Next action |
 |---|---|---|
-| 370 · 2026 Brownlow unpublishable, "Not yet awarded" | High | Wording D-370-W approved 2026-11-21. Fix committed locally; 7R3 packet in preparation. Owner: D-370-1 2026 ineligible list, approval of the 7R3 attended window (promote, attach), then publish `/admin/brownlow/2026`. [Runbook](issues/open/AFLDB-ISSUE-370.md) |
+| 370 · 2026 Brownlow unpublishable, "Not yet awarded" | High | Wording D-370-W approved 2026-11-21. Tested commit `c8d4202a` (local); release packet 7R3 prepared (`docs/v2/evidence/remediation-20261114/run7r3/`). Owner: D-370-1 2026 ineligible list, approval of the 7R3 attended window (promote, attach), then publish `/admin/brownlow/2026`. [Runbook](issues/open/AFLDB-ISSUE-370.md) |
 | 352 · backup retention | Medium | Retry defect fixed locally (durable `.retention-hold`, red/green). Owner D-HO-2/3/5/7 before off-host activation. |
 
 > Lightweight session index of open issues only.

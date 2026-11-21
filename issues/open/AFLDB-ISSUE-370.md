@@ -156,7 +156,7 @@ after attach and publish. Server logs show 0 errors. Full transcripts:
 
 | Surface | Live today (`a2e6ea99`) | Candidate, before | Candidate, after |
 |---|---|---|---|
-| Pendlebury 2026 BV cell | Not yet awarded | **Awaiting verification** (awarded/unverified tooltip) | **5** |
+| Pendlebury 2026 BV cell | Not yet awarded | **Awaiting verification** (D-370-W tooltip) | **5** |
 | Daicos 2026 BV cell (2026 winner) | n/r | Awaiting verification | **47** |
 | Pendlebury game log 2026 | 17 × "—" | 17 rows, no positive cell (withheld) | R8 **3**, R21 **2**, sum **5** |
 | Daicos game log 2026 | n/r | no positive cell | 18 polled matches, sum **47** |
@@ -229,3 +229,30 @@ that packet, not here.
   rebuild-and-promote of production, confirm that 2026's publication is carried over and not dropped.
 - 2027 onward belongs to the AFL API successor (ISSUE-332), whose plan must include this attachment-and-publication step for
   any season stored at the legacy grain.
+
+## 11. Tested commit, 7R3 packet and D-370-1 (2026-11-21)
+
+- **Approved wording D-370-W (owner, 2026-11-21):**
+  - "Awaiting verification" for a completed season with pending results;
+  - "Not yet available" for an unfinished season;
+  - tooltip "AFLDB has not yet verified and published the Brownlow results for this season.";
+  - claim an award only on evidence independent of season completion.
+- **Tested commit `CAND` = `c8d4202a4cb3cf0ccdd1cad01e1227a1610c2d76`** (local, unpublished):
+  - `f2741235`: code, tests and records;
+  - `9626bce1`: the 7R2 P0–P3b sitting transcripts, force-added;
+  - `c8d4202a`: test-only. The exact-checkout qualification of `9626bce1` showed `tests/v2-season-seal.test.ts` failing 2 tests:
+    the new attachment writer was unclassified, and the sealed `recordDataEdit` count is 57, not 55. Fixed by classifying
+    `brownlow-season-attachment.ts` as `governed`.
+  - The delta from `a3c8c67c` is 44 paths, 10 of them code/test. It adds no migration, package or deploy change.
+- **Qualification: QUALIFIED** (`docs/v2/evidence/remediation-20261114/run7r3/DEV-QUALIFICATION.md`). `CAND` adds 0 new failures; every remaining failure is identical on the byte-verified `a3c8c67c` tree against the same database. DEV-only incident: the e2e harness killed DEV's `afldb.service` (port 3100) three times, and systemd restarted it each time. It is healthy, with no code or data change, and the harness is fixed.
+- **Block self-test:** `…/run7r3/dev/BLOCKS-SELFTEST.md`. Every data and page block ran unchanged on a disposable copy of the
+  production dump in production's current state: attach, exact reverse, re-attach, publish with the proposed list, and the
+  post-publication reversal refusal.
+- **Packet:** `docs/v2/evidence/remediation-20261114/run7r3/RELEASE-PACKET-7R3.md`; block manifest `run7r3/SHA256SUMS`.
+- **D-370-1 evidence:** `docs/v2/evidence/remediation-20261114/run7r3/D-370-1-eligibility-2026.md`.
+  - 14 players polled 2026 votes while suspended (85 votes). They are mapped to production ids, with sources.
+  - None of them can change the winner: the highest is Horne-Francis 22, against Nick Daicos 47, who is eligible.
+  - 16 more suspended players polled nothing and cannot be entered.
+  - The owner decides the list.
+- **7R2 stays held at P3.** Its built release `a3c8c67cc98f-JFf9-hXYa6xoigu5Tw4Hg` is never promoted. 7R3 builds its own release
+  from `c8d4202a`.

@@ -1,0 +1,200 @@
+== 7R3 block self-test 20261121T041948Z host=streamanator blk=c8d4202a4cb3cf0ccdd1cad01e1227a1610c2d76 blocks: 23c3f4f53c49 c76753e28243 e766a6928abc b05b6ea3ccd6 374cdcc107d4 bb9a0fb93118 dded9312167c 2f63540e541d cd31cecc8de7 2f654f41bf09 1f6746b8446b 7e70a043e425 97420e8062d0 eb4bf7ec519e 
+create-db: afldb_v2_r7r3blk_test created from afldb_v2_bv2026_before_test and marked
+copy identity afldb_v2_r7r3blk_test|35885|7710454842039004484; actor <first active super-admin id of the copy>
+== A1 before
+PASS identity = afldb_v2_r7r3blk_test|35885|7710454842039004484
+PASS brv2026 = 9522|621|1242|0|0
+PASS pms2026 = 0|0|0
+PASS bsv2026 = 0|0|0|0
+PASS pss2026 = pending|669|0|0
+PASS pub2026 = 0
+PASS season2026 = complete
+PASS pendlebury2026 = -
+PASS daicos2026 = 47
+A1 RESULT before PASS
+== P10 pending (unattached)
+P10 CHECK player-pendlebury        PASS (/players/scott-pendlebury-11724)
+P10 CHECK player-daicos            PASS (/players/nick-daicos-9910)
+P10 CHECK gamelog-pendlebury-2026  PASS (/players/scott-pendlebury-11724/matches?season=2026)
+P10 CHECK gamelog-daicos-2026      PASS (/players/nick-daicos-9910/matches?season=2026)
+P10 CHECK match-17247-r8           PASS (/matches/17247)
+P10 CHECK match-17151-r21          PASS (/matches/17151)
+P10 CHECK season-2026              PASS (/seasons/2026)
+P10 CHECK brownlow-index           PASS (/brownlow)
+P10 CHECK brownlow-2026            PASS (/brownlow/2026)
+P10 CHECK brownlow-2025            PASS (/brownlow/2025)
+P10 CHECK match-16677-2025         PASS (/matches/16677)
+P10 CHECK anon                     PASS code=307 location=/beta?from=%2Fplayers%2Fscott-pendlebury-11724 (expected 307 to <origin>/beta?from=%2Fplayers%2Fscott-pendlebury-11724)
+P10 RESULT pending PASS (11 pages x 8 samples, anon control)
+P10 CHECK manual-browser NOT-RECORDED (the owner's browser check A3 is a separate result)
+== D1 stand-in: pg_dump of the copy + parity + facts-before -> D1v on a brand-new cluster
+PASS size 29822852, sha256 3ffeca84f6625ac1d45816301eba5e6edda53f5e67dc96db9d9f452433bcec05, header dbname afldb_prod
+PASS 3. nine parity aggregates equal production's
+  copy PASS identity = afldb_v2_r7r3_d1v_test|16390|7710474813294230830
+  copy PASS brv2026 = 9522|621|1242|0|0
+  copy PASS pms2026 = 0|0|0
+  copy PASS bsv2026 = 0|0|0|0
+  copy PASS pss2026 = pending|669|0|0
+  copy PASS pub2026 = 0
+  copy PASS season2026 = complete
+  copy PASS pendlebury2026 = -
+  copy PASS daicos2026 = 47
+  copy A1 RESULT before PASS
+PASS 4. facts on the copy equal production's facts-before on every line but identity (24 lines)
+  plan PLAN season=2026 rows=9522 positive=621 votes=1242 matches=207/207 attach=9522 mirror=9522 digest=100c112f400a492906cbc2a5c3886243c15d412eb62f84d50f17c63ae1f76aa7
+  plan PASS digest equals the 18 Nov production-dump rehearsal digest
+  plan D RESULT plan PASS digest=100c112f400a492906cbc2a5c3886243c15d412eb62f84d50f17c63ae1f76aa7
+  dry APPLY DRY-RUN (rolled back) season=2026 attached=9522 mirrored=9522 unattached_after=0 mirror_after=9522 audit=- digest=100c112f400a492906cbc2a5c3886243c15d412eb62f84d50f17c63ae1f76aa7
+  dry D RESULT dry PASS
+PASS 5a. plan on the copy has production's digest 100c112f400a492906cbc2a5c3886243c15d412eb62f84d50f17c63ae1f76aa7
+PASS 5b. dry run on the copy
+VERDICT PASS backup proven by a fresh disposable restore
+== D2 target / plan
+target: 127.0.0.1:61468 afldb_v2_r7r3blk_test afldb_import afldb_v2_isolated 35885 7710454842039004484
+target.json sha256 85e2a55bbad04f6f6176e82b159f44e9b51c86668970966a7ecaf6dda9b7029a
+D RESULT target PASS
+PLAN season=2026 rows=9522 positive=621 votes=1242 matches=207/207 attach=9522 mirror=9522 digest=100c112f400a492906cbc2a5c3886243c15d412eb62f84d50f17c63ae1f76aa7
+plan file sha256 099c2c78f753027cd7bbe8a66f83bcdf157fcca131aa5e5791693b673bb0f923
+PASS digest equals the 18 Nov production-dump rehearsal digest
+D RESULT plan PASS digest=100c112f400a492906cbc2a5c3886243c15d412eb62f84d50f17c63ae1f76aa7
+== D3 dry
+APPLY DRY-RUN (rolled back) season=2026 attached=9522 mirrored=9522 unattached_after=0 mirror_after=9522 audit=- digest=100c112f400a492906cbc2a5c3886243c15d412eb62f84d50f17c63ae1f76aa7
+exit=0
+D RESULT dry PASS
+== D3 wrong digest (the block must refuse before connecting)
+STOP line 74: [ "$(node -e 'console.log(require(process.argv[1]).digest)' "$A/plan-2026.json")" = "$DIG" ]
+== D4 commit
+APPLY COMMITTED season=2026 attached=9522 mirrored=9522 unattached_after=0 mirror_after=9522 audit=205 digest=100c112f400a492906cbc2a5c3886243c15d412eb62f84d50f17c63ae1f76aa7
+exit=0
+D RESULT commit PASS
+== A1 attached
+PASS identity = afldb_v2_r7r3blk_test|35885|7710454842039004484
+PASS brv2026 = 9522|621|1242|9522|207
+PASS brv2026_match_sets = 207|207
+PASS pms2026 = 9522|621|1242
+PASS recon_round_vs_match_player_diffs = 0
+PASS recon_round_vs_match_cell_diffs = 0
+PASS season2026 = complete
+PASS pendlebury2026 = 17151:2,17247:3
+PASS daicos2026 = 47
+PASS identity unchanged since before
+PASS other_brv unchanged since before
+PASS other_pms unchanged since before
+PASS other_bsv unchanged since before
+PASS other_pss unchanged since before
+PASS other_cov unchanged since before
+PASS other_pub unchanged since before
+PASS bsv2026 = 0|0|0|0
+PASS pss2026 = pending|669|0|0
+PASS pub2026 = 0
+A1 RESULT attached PASS
+== P10 pending (attached, unpublished; fresh render)
+P10 CHECK player-pendlebury        PASS (/players/scott-pendlebury-11724)
+P10 CHECK player-daicos            PASS (/players/nick-daicos-9910)
+P10 CHECK gamelog-pendlebury-2026  PASS (/players/scott-pendlebury-11724/matches?season=2026)
+P10 CHECK gamelog-daicos-2026      PASS (/players/nick-daicos-9910/matches?season=2026)
+P10 CHECK match-17247-r8           PASS (/matches/17247)
+P10 CHECK match-17151-r21          PASS (/matches/17151)
+P10 CHECK season-2026              PASS (/seasons/2026)
+P10 CHECK brownlow-index           PASS (/brownlow)
+P10 CHECK brownlow-2026            PASS (/brownlow/2026)
+P10 CHECK brownlow-2025            PASS (/brownlow/2025)
+P10 CHECK match-16677-2025         PASS (/matches/16677)
+P10 CHECK anon                     PASS code=307 location=/beta?from=%2Fplayers%2Fscott-pendlebury-11724 (expected 307 to <origin>/beta?from=%2Fplayers%2Fscott-pendlebury-11724)
+P10 RESULT pending PASS (11 pages x 8 samples, anon control)
+P10 CHECK manual-browser NOT-RECORDED (the owner's browser check A3 is a separate result)
+== A3 browser function, pending
+A3 CHECK player-pendlebury PASS
+A3 CHECK gamelog-pendlebury-2026 PASS
+A3 CHECK player-daicos PASS
+A3 CHECK gamelog-daicos-2026 PASS
+A3 CHECK match-17247 PASS
+A3 CHECK match-17151 PASS
+A3 CHECK season-2026 PASS
+A3 CHECK brownlow-index PASS
+A3 CHECK brownlow-2026 PASS
+A3 CHECK brownlow-2025 PASS
+A3 CHECK match-16677-2025 PASS
+A3 RESULT pending PASS
+== R1 reverse-dry before publication
+REVERSE DRY-RUN (rolled back) season=2026 attached=-9522 mirrored=-9522 unattached_after=9522 mirror_after=0 audit=- digest=100c112f400a492906cbc2a5c3886243c15d412eb62f84d50f17c63ae1f76aa7
+exit=0
+D RESULT reverse-dry PASS
+== R1 reverse-commit, A1 reversed, then D4 again (a later window re-attaching from the same reviewed plan)
+REVERSE COMMITTED season=2026 attached=-9522 mirrored=-9522 unattached_after=9522 mirror_after=0 audit=207 digest=100c112f400a492906cbc2a5c3886243c15d412eb62f84d50f17c63ae1f76aa7
+exit=0
+D RESULT reverse-commit PASS
+A1 RESULT reversed PASS
+APPLY COMMITTED season=2026 attached=9522 mirrored=9522 unattached_after=0 mirror_after=9522 audit=208 digest=100c112f400a492906cbc2a5c3886243c15d412eb62f84d50f17c63ae1f76aa7
+exit=0
+D RESULT commit PASS
+== owner publication stand-in: the real publishBrownlowSeason with the proposed D-370-1 list (14 ids)
+OVERVIEW expected=207 accounted=207 unresolved=0 revision=0 complete=true
+PUBLISH {"ok":true,"value":{"season":2026,"revision":2,"rowCount":183,"votesTotal":1242,"winners":[9910]}}
+== A1 published
+bsv2026_ineligible|940:1,1108:1,3292:1,3295:4,4004:2,5480:15,6667:10,6746:3,6841:22,10282:2,11041:5,12205:3,12869:3,13246:13
+PASS identity = afldb_v2_r7r3blk_test|35885|7710454842039004484
+PASS brv2026 = 9522|621|1242|9522|207
+PASS brv2026_match_sets = 207|207
+PASS pms2026 = 9522|621|1242
+PASS recon_round_vs_match_player_diffs = 0
+PASS recon_round_vs_match_cell_diffs = 0
+PASS season2026 = complete
+PASS pendlebury2026 = 17151:2,17247:3
+PASS daicos2026 = 47
+PASS identity unchanged since before
+PASS other_brv unchanged since before
+PASS other_pms unchanged since before
+PASS other_bsv unchanged since before
+PASS other_pss unchanged since before
+PASS other_cov unchanged since before
+PASS other_pub unchanged since before
+PASS bsv2026 = 183|1242|1|14
+PASS bsv2026_winner = Nick Daicos:47
+PASS recon_round_vs_season_diffs = 0
+PASS recon_pss_vs_season_diffs = 0
+PASS pss2026 = complete|669|669|1242
+PASS pub2026 = 1
+PASS cov2026 = brownlow_match_votes|complete;brownlow_round_votes|complete;brownlow_season_total|complete
+A1 RESULT published PASS
+== P10 published (fresh render)
+P10 CHECK player-pendlebury        PASS (/players/scott-pendlebury-11724)
+P10 CHECK player-daicos            PASS (/players/nick-daicos-9910)
+P10 CHECK gamelog-pendlebury-2026  PASS (/players/scott-pendlebury-11724/matches?season=2026)
+P10 CHECK gamelog-daicos-2026      PASS (/players/nick-daicos-9910/matches?season=2026)
+P10 CHECK match-17247-r8           PASS (/matches/17247)
+P10 CHECK match-17151-r21          PASS (/matches/17151)
+P10 CHECK season-2026              PASS (/seasons/2026)
+P10 CHECK brownlow-index           PASS (/brownlow)
+P10 CHECK brownlow-2026            PASS (/brownlow/2026)
+P10 CHECK brownlow-2025            PASS (/brownlow/2025)
+P10 CHECK match-16677-2025         PASS (/matches/16677)
+P10 CHECK anon                     PASS code=307 location=/beta?from=%2Fplayers%2Fscott-pendlebury-11724 (expected 307 to <origin>/beta?from=%2Fplayers%2Fscott-pendlebury-11724)
+P10 RESULT published PASS (11 pages x 8 samples, anon control)
+P10 CHECK manual-browser NOT-RECORDED (the owner's browser check A3 is a separate result)
+== A3 browser function, published (headless Chromium, admitted by a minted beta cookie)
+A3 CHECK player-pendlebury PASS
+A3 CHECK gamelog-pendlebury-2026 PASS
+A3 CHECK player-daicos PASS
+A3 CHECK gamelog-daicos-2026 PASS
+A3 CHECK match-17247 PASS
+A3 CHECK match-17151 PASS
+A3 CHECK season-2026 PASS
+A3 CHECK brownlow-index PASS
+A3 CHECK brownlow-2026 PASS
+A3 CHECK brownlow-2025 PASS
+A3 CHECK match-16677-2025 PASS
+A3 RESULT published PASS
+== R1 reverse-dry AFTER publication (must refuse already_published)
+REFUSED AttachmentRefusal already_published: Season 2026 has been published since the attachment; reverse the publication first.
+exit=1
+D RESULT reverse-dry FAIL (exit 1): run r7r3-a1-facts.sh to establish the state before anything else
+server log error|unhandled: /mnt/ssd/afldb-r7r3-20261121/evidence/blocks/server-pending1.log:0
+server log error|unhandled: /mnt/ssd/afldb-r7r3-20261121/evidence/blocks/server-pending2.log:0
+server log error|unhandled: /mnt/ssd/afldb-r7r3-20261121/evidence/blocks/server-published.log:0
+SELFTEST-COMPLETE (data dir /mnt/ssd/afldb-r7r3-20261121/blk-data-20261121T041948Z and /mnt/ssd/afldb-r7r3-20261121/blk-d1v-20261121T041948Z hold production-derived data: 0700, removed after the record is written)
+== addendum 2026-11-21: D1's DB-free dump proof (lines P26= .. "PASS the dump holds", extracted verbatim from r7r3-d1-backup.sh)
+first run exposed a block bug: the "exactly one 2026 status" count also matched the votes_non_null line (2 != 1); fixed (block sha256 fbf7fc2a...)
+pre-attachment self-test dump:   pss2026 pending 669 / votes_non_null 0 / brv2026 rows 9522 votes 1242 attached 0 -> PASS the dump holds the pre-attachment 2026 state, rc=0
+published-state dump (negative): pss2026 complete 669 / votes_non_null 669 / brv2026 rows 9522 votes 1242 attached 9522 -> rc=1 (refused, as required)
+not exercised off production: backup.sh itself (the established B1a-0 tool) and the parity psql (same nine SELECTs as restore-test.sh / b1a0-parity.sql)

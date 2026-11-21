@@ -1,0 +1,133 @@
+== pins 2026-11-21T04:14:26Z HEAD=c8d4202a4cb3cf0ccdd1cad01e1227a1610c2d76 porcelain=0 entries=10163
+parent chain: c8d4202a 9626bce1 f2741235 4484a6d0 
+changed vs a3c8c67c: src/app/players/[slug]/page.tsx src/db/queries/brownlow-season-attachment.ts src/lib/format.ts tests/e2e/journeys.spec.ts tests/format.test.ts tests/integration/brownlow-fixture.ts tests/integration/brownlow-season-attachment.test.ts tests/integration/leaked-fixtures.ts tests/v2-season-seal.test.ts tools/v2/brownlow-season-attach.ts 
+template: 1 listed; python 3.12.3 psycopg 3.3.4
+npm ci rc=0
+typecheck rc=0
+lint:gate rc=0 Lint gate (ratchet): 338 error(s) in 43 file(s) now; the ratchet baseline allows 338 in 43 (existing debt, not clean lint). Lint gate: PASSED (ratchet; existing debt remains). 
+eslint (10 changed code/test files) rc=0
+unit (full, venv python) rc=1  Test Files 2 failed | 214 passed | 1 skipped (217); Tests 7 failed | 12329 passed | 31 skipped (12367);
+  unit-fail:  ❯ tests/draftguru-acquisition.test.ts (167 tests | 3 failed | 1 skipped) 18644ms
+  unit-fail:  ❯ tests/fitzroy-core-import.test.ts (117 tests | 4 failed | 1 skipped) 12841ms
+  unit-fail:  ❯ tests/draftguru-acquisition.test.ts:1757:92
+  unit-fail:  ❯ tests/draftguru-acquisition.test.ts:1764:31
+  unit-fail:  ❯ tests/draftguru-acquisition.test.ts:3441:65
+  unit-fail:  ❯ tests/fitzroy-core-import.test.ts:1854:17
+  unit-fail:  ❯ tests/fitzroy-core-import.test.ts:1878:18
+  unit-fail:  ❯ tests/fitzroy-core-import.test.ts:1886:20
+  unit-fail:  ❯ tests/fitzroy-core-import.test.ts:2089:18
+unit focused rc=0  Test Files 7 passed (7); Tests 317 passed (317);
+bash -n done
+integ cand rc=0 [tests/integration/brownlow-season-attachment.test.ts] db=afldb_v2_rb_r7r3_attach_test  Test Files 1 passed (1); Tests 5 passed (5);
+integ cand rc=2 [tests/integration/admin-brownlow.test.ts] db=afldb_v2_rb_r7r3_admin_test 
+integ cand rc=0 [tests/integration/brownlow-pending-coverage.test.ts] db=afldb_v2_rb_r7r3_pcov_test  Test Files 1 passed (1); Tests 8 passed (8);
+integ cand rc=0 [tests/integration/brownlow-pending-projection.test.ts] db=afldb_v2_rb_r7r3_pproj_test  Test Files 1 passed (1); Tests 8 passed (8);
+integ cand rc=0 [tests/integration/brownlow-pending-populated.test.ts] db=afldb_v2_rb_r7r3_ppop_test  Test Files 1 passed (1); Tests 4 passed (4);
+integ cand rc=0 [tests/integration/b1a-successor.test.ts] db=afldb_v2_rb_r7r3_b1a_test  Test Files 1 passed (1); Tests 14 passed (14);
+integ cand rc=0 [tests/integration/v2-brownlow-eligibility.test.ts] db=afldb_v2_rb_r7r3_elig_test  Test Files 1 passed (1); Tests 47 passed (47);
+integ cand rc=1 [tests/integration/v2-brownlow-eligibility-2025-rehearsal.test.ts] db=afldb_v2_brownlow_tristate_twelve_test  Test Files 1 failed (1); Tests 3 failed (3);
+         × before any ruling: explicit provider flags are read with provenance; the twelve provider-ineligible players disagree with their unevaluated stored rows and stay unresolved 925ms
+         × applies the twelve approved rulings through the guarded runner (all or nothing, replayable) without touching a raw vote 52778ms
+         × after the rulings: audited decisions take precedence, every rank is determinate, the winner is unchanged and the published flags agree 149ms
+integ cand rc=1 [tests/integration/v2-brownlow-production-correction.test.ts] db=afldb_v2_brownlow_policy_final_test  Test Files 1 failed (1); Tests 5 failed | 3 passed (8);
+         × rolls a failed backfill back, then applies/replays/reverses preserving all vote values and provenance 3714ms
+         × adopts exactly 621 positives, preserves 8901 zero rows, replays and reverses; refuses subsequent-write reversal 52838ms
+         × records and replays an authentic observe-only snapshot in the outer transaction 2ms
+         × rolls all eligibility decisions/publication back on partial failure, then records an approved subset through the audited service 52322ms
+         × resolves only a genuinely healed ownership issue, atomically with its receipt and with replay 133769ms
+integ cand rc=0 [tests/integration/settle-afl-api-brownlow.test.ts] db=afldb_v2_rb_r7r3_settle_test  Test Files 1 passed (1); Tests 21 passed (21);
+integ cand rc=0 [tests/integration/settle-afl-api-brownlow-backtest.test.ts] db=afldb_v2_rb_r7r3_sbt_test  Test Files 1 passed (1); Tests 6 passed (6);
+integ cand rc=0 [tests/integration/settle-afl-api-brownlow-reschedule.test.ts] db=afldb_v2_rb_r7r3_srs_test  Test Files 1 passed (1); Tests 3 passed (3);
+integ cand rc=0 [tests/integration/database.test.ts -t Brownlow] db=afldb_v2_rb_r7r3_dbb_test  Test Files 1 passed (1); Tests 10 passed | 62 skipped (72);
+integ cand rc=0 [tests/integration/database.test.ts -t AFLDB-ISSUE-36[79]] db=afldb_v2_rb_r7r3_db367_test  Test Files 1 passed (1); Tests 3 passed | 69 skipped (72);
+integ BASE a3c8c67c rc=2 [tests/integration/admin-brownlow.test.ts] 
+integ BASE a3c8c67c rc=1 [tests/integration/v2-brownlow-eligibility-2025-rehearsal.test.ts]  Test Files 1 failed (1); Tests 3 failed (3);
+         × before any ruling: explicit provider flags are read with provenance; the twelve provider-ineligible players disagree with their unevaluated stored rows and stay unresolved 940ms
+         × applies the twelve approved rulings through the guarded runner (all or nothing, replayable) without touching a raw vote 53086ms
+         × after the rulings: audited decisions take precedence, every rank is determinate, the winner is unchanged and the published flags agree 162ms
+integ BASE a3c8c67c rc=1 [tests/integration/v2-brownlow-production-correction.test.ts]  Test Files 1 failed (1); Tests 5 failed | 3 passed (8);
+         × rolls a failed backfill back, then applies/replays/reverses preserving all vote values and provenance 3729ms
+         × adopts exactly 621 positives, preserves 8901 zero rows, replays and reverses; refuses subsequent-write reversal 52863ms
+         × records and replays an authentic observe-only snapshot in the outer transaction 2ms
+         × rolls all eligibility decisions/publication back on partial failure, then records an approved subset through the audited service 52394ms
+         × resolves only a genuinely healed ownership issue, atomically with its receipt and with replay 167642ms
+build rc=0 BUILD_ID 9C76o6Cvg6uZ7Zmz02SBM
+  complete-copy: state|2026|complete
+  complete-copy: state|2027|in_progress
+  complete-copy: gawn2026|max-gawn-9431|pending
+ISR cleared 3514 file(s) before e2e complete-pending
+e2e complete-pending rc=0  2 passed (7.0s);
+      ✓  1 [desktop] › tests/e2e/journeys.spec.ts:129:5 › a pending Brownlow reads by season state, never as zero or as an award claim (3.9s)
+      ✓  2 [mobile] › tests/e2e/journeys.spec.ts:129:5 › a pending Brownlow reads by season state, never as zero or as an award claim (4.1s)
+  unfinished-copy: state|2026|in_progress
+  unfinished-copy: state|2027|in_progress
+  unfinished-copy: gawn2026|max-gawn-9431|pending
+ISR cleared 49 file(s) before e2e unfinished-synthetic
+e2e unfinished-synthetic rc=0  2 passed (6.6s);
+      ✓  2 [mobile] › tests/e2e/journeys.spec.ts:129:5 › a pending Brownlow reads by season state, never as zero or as an award claim (4.0s)
+      ✓  1 [desktop] › tests/e2e/journeys.spec.ts:129:5 › a pending Brownlow reads by season state, never as zero or as an award claim (4.1s)
+ISR cleared 49 file(s) before e2e full-journeys-file
+e2e full-journeys-file rc=1 
+PHASES-DONE pins static integ build e2e
+== reruns 2026-11-21T05:08:06Z (port 3100 belongs to DEV's afldb.service and is never touched here)
+integ cand (rerun, fresh marked db) rc=0 [tests/integration/admin-brownlow.test.ts] db=afldb_v2_rb_r7r3_admin2_test  Test Files 1 passed (1); Tests 47 passed (47);
+ISR cleared 0 file(s); CAND server on 127.0.0.1:3110 health 200
+e2e full journeys file (rerun, port 3110) rc=1  18 failed; 3 skipped; 67 passed (33.1s);
+      ✘   7 [desktop] › tests/e2e/journeys.spec.ts:84:5 › records → category (2.1s)
+      ✘  17 [desktop] › tests/e2e/journeys.spec.ts:187:5 › robots.txt matches the deployment it is serving (329ms)
+      ✘   4 [desktop] › tests/e2e/journeys.spec.ts:71:5 › player search state is shareable via URL (7.3s)
+      ✘   8 [desktop] › tests/e2e/journeys.spec.ts:78:5 › the old advanced-search URL still resolves, filters intact (7.4s)
+      -  30 [desktop] › tests/e2e/journeys.spec.ts:417:5 › statistical tables stay usable on mobile
+      ✘  10 [desktop] › tests/e2e/journeys.spec.ts:98:5 › stale slug redirects to the canonical URL (8.0s)
+      ✘  11 [desktop] › tests/e2e/journeys.spec.ts:119:5 › an unfinished season is visibly provisional (8.1s)
+      ✘   3 [desktop] › tests/e2e/journeys.spec.ts:7:5 › home → search → player (8.4s)
+      ✘   6 [desktop] › tests/e2e/journeys.spec.ts:110:5 › a mid-century career shows authoritative Brownlow votes (8.6s)
+      -  37 [desktop] › tests/e2e/journeys.spec.ts:693:5 › the comparison stays inside the viewport on mobile
+      ✘  28 [desktop] › tests/e2e/journeys.spec.ts:366:5 › a merged club is discoverable by outcome and names its successor (6.4s)
+      ✘  51 [mobile] › tests/e2e/journeys.spec.ts:84:5 › records → category (2.0s)
+      ✘  45 [mobile] › tests/e2e/journeys.spec.ts:7:5 › home → search → player (7.4s)
+      ✘  58 [mobile] › tests/e2e/journeys.spec.ts:187:5 › robots.txt matches the deployment it is serving (114ms)
+      ✘  49 [mobile] › tests/e2e/journeys.spec.ts:71:5 › player search state is shareable via URL (7.4s)
+      ✘  50 [mobile] › tests/e2e/journeys.spec.ts:78:5 › the old advanced-search URL still resolves, filters intact (7.6s)
+      ✘  53 [mobile] › tests/e2e/journeys.spec.ts:98:5 › stale slug redirects to the canonical URL (6.2s)
+      ✘  56 [mobile] › tests/e2e/journeys.spec.ts:110:5 › a mid-century career shows authoritative Brownlow votes (6.0s)
+      -  85 [mobile] › tests/e2e/journeys.spec.ts:725:5 › the comparison controls are labelled and keyboard-operable
+      ✘  57 [mobile] › tests/e2e/journeys.spec.ts:119:5 › an unfinished season is visibly provisional (6.6s)
+      ✘  71 [mobile] › tests/e2e/journeys.spec.ts:366:5 › a merged club is discoverable by outcome and names its successor (6.3s)
+      1) [desktop] › tests/e2e/journeys.spec.ts:7:5 › home → search → player ───────────────────────────
+          - Expect "toHaveURL" with timeout 5000ms
+              - unexpected value "http://127.0.0.1:3110/"
+              - unexpected value "http://127.0.0.1:3110/players/scott-pendlebury-11797"
+      2) [desktop] › tests/e2e/journeys.spec.ts:71:5 › player search state is shareable via URL ────────
+          - Expect "toContainText" with timeout 5000ms
+          - waiting for locator('.subtitle')
+               - unexpected value "120 players · Games 200–249 · Finals ≥ 16"
+      3) [desktop] › tests/e2e/journeys.spec.ts:78:5 › the old advanced-search URL still resolves, filters intact 
+          - Expect "toContainText" with timeout 5000ms
+          - waiting for locator('.subtitle')
+               - unexpected value "120 players · Games 200–249 · Finals ≥ 16"
+      4) [desktop] › tests/e2e/journeys.spec.ts:84:5 › records → category ──────────────────────────────
+            1) <a class="card" href="/records/most-games">…</a> aka getByRole('link', { name: 'Most Games Total VFL/AFL' })
+            2) <a class="card" href="/records/family">…</a> aka getByRole('link', { name: 'Most Games by Family Combined' })
+            3) <a class="card" href="/records/coaches">…</a> aka getByRole('link', { name: 'Coach Records Most games' })
+          - waiting for getByRole('link', { name: 'Most Games' })
+      5) [desktop] › tests/e2e/journeys.spec.ts:98:5 › stale slug redirects to the canonical URL ───────
+          - Expect "toHaveURL" with timeout 5000ms
+CAND server on 3110 stopped
+server log error|unhandled: 8
+unit BASE a3c8c67c rc=1 [draftguru-acquisition, fitzroy-core-import]  Test Files 2 failed (2); Tests 7 failed | 275 passed | 2 skipped (284);
+  base-fail:  ❯ tests/draftguru-acquisition.test.ts:1757:92
+  base-fail:  ❯ tests/draftguru-acquisition.test.ts:1764:31
+  base-fail:  ❯ tests/draftguru-acquisition.test.ts:3441:65
+  base-fail:  ❯ tests/fitzroy-core-import.test.ts:1854:17
+  base-fail:  ❯ tests/fitzroy-core-import.test.ts:1878:18
+  base-fail:  ❯ tests/fitzroy-core-import.test.ts:1886:20
+  base-fail:  ❯ tests/fitzroy-core-import.test.ts:2089:18
+== reruns done 2026-11-21T05:09:35Z; DEV afldb.service NRestarts=3 health 200
+BASE server (q9RjUGEMc7ecXfA7ryW0l) on 3111 health 200
+e2e BASE a3c8c67c full journeys file rc=1  21 failed; 3 skipped; 64 passed (37.7s);
+failing titles: cand 18, base 21; cand-only: [desktop] › tests/e2e/journeys.spec.ts:187:5 › robots.txt matches the deployment it is serving;[desktop] › tests/e2e/journeys.spec.ts:366:5 › a merged club is discoverable by outcome and names its successor;[mobile] › tests/e2e/journeys.spec.ts:187:5 › robots.txt matches the deployment it is serving;[mobile] › tests/e2e/journeys.spec.ts:366:5 › a merged club is discoverable by outcome and names its successor;; base-only: [desktop] › tests/e2e/journeys.spec.ts:129:5 › a pending Brownlow reads as results not loaded, never as zero;[desktop] › tests/e2e/journeys.spec.ts:173:5 › robots.txt matches the deployment it is serving;[desktop] › tests/e2e/journeys.spec.ts:352:5 › a merged club is discoverable by outcome and names its successor;[desktop] › tests/e2e/journeys.spec.ts:764:5 › coaches → a coach who also played → coach profile, then his playing career;[mobile] › tests/e2e/journeys.spec.ts:129:5 › a pending Brownlow reads as results not loaded, never as zero;[mobile] › tests/e2e/journeys.spec.ts:173:5 › robots.txt matches the deployment it is serving;[mobile] › tests/e2e/journeys.spec.ts:352:5 › a merged club is discoverable by outcome and names its successor;
+BASE server stopped; DEV afldb.service NRestarts=3
+by title (line numbers differ: CAND journeys.spec.ts is +14 lines): cand 18, base 21, common 18
+cand-only: 
+base-only: [desktop] › tests/e2e/journeys.spec.ts › a pending Brownlow reads as results not loaded, never as zero;[desktop] › tests/e2e/journeys.spec.ts › coaches → a coach who also played → coach profile, then his playing career;[mobile] › tests/e2e/journeys.spec.ts › a pending Brownlow reads as results not loaded, never as zero;
