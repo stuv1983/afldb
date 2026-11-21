@@ -22,7 +22,7 @@ raw-head probe's JavaScript (`node --check`) were exercised on streamanator on 2
 | Tested application revision | `cf158d602242a3e7bbf899b951e8423c0d3521e6`; executable tree (ls-tree minus `docs/`, `documentation/`, `issues/`, root `*.md`) sha256 `a18ccac4…e789` = CAND's |
 | Serving now / rollback target | `c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC` (checkout `c8d4202a…`); previous BUILD_ID `aATnIlFOIQjq2z5oDdoHC` |
 | `previous` link now | `a2e6ea9995a4-aKAYwf0qC4go6JJWiHhv5` |
-| Reviewed delta `c8d4202a..CAND` | 153 paths, raw sha256 `b93a294a…91e3`; 13 non-records paths, sha256 `fe9285f6…7dee` (list in `a1-p2-ff.sh`); no migration, dependency, Next config, unit or supervisor change |
+| Reviewed delta `c8d4202a..CAND` | 153 paths of `git diff --raw --no-abbrev --no-renames` (not `--name-only`, which detects renames: 144), sha256 `b93a294a…91e3`; 13 non-records paths, sha256 `fe9285f6…7dee` (list in `a1-p2-ff.sh`); no migration, dependency, Next config, unit or supervisor change |
 | Ledger head | `118_fixtures_unconfirmed_participants.sql` (118 rows) |
 | A2 file pins (equal at `c8d4202a` and CAND) | settle-status `d80838cb…`, host policy `183691d9…`/`4a277b8b…`, `Caddyfile.production` `f00859d5…086d`, installed Caddyfile now `4f6972ec…7af036`; full list in `a2-p0-entry.sh` |
 
