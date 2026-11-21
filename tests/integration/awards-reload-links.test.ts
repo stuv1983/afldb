@@ -156,50 +156,76 @@ beforeAll(() => lockHonoursTables(integrationDsn), 300_000);
  * `import_batch_id`. Every `award_winners` row (whole, by id) and every award span are captured here, once, before any
  * block runs, and restored set-based at file teardown: rows the file created are deleted, captured rows that went
  * missing or changed are put back whole (award_winners.id is GENERATED ALWAYS, hence OVERRIDING SYSTEM VALUE; nothing
- * references award_winners by foreign key; the captured `import_batch_id`s still exist because `import_batches` rows
- * are never deleted), and the restore is verified, failing the file if any row or span still differs.
- * `import_batches` growth itself is left: tests read that table only relatively, and it is the recorded residue.
+ * references award_winners by foreign key; the captured `import_batch_id`s still exist because only batches newer than
+ * the capture are deleted, below), and the restore is verified, failing the file if any row or span still differs.
+ *
+ * T-2 residue (2026-11-21): the same reloads also re-stamp and relink rows of the other four reloaded honours tables
+ * (`award_nominations`, `hall_of_fame`, `honour_team_members`, `captaincies`; characterised in
+ * docs/v2/evidence/issue363-20261121/README.md), and every importer run adds an `import_batches` row. Those four tables
+ * are captured and restored exactly like `award_winners` (no foreign key references any of the five, none has a
+ * trigger, and restoring the captured set restores every unique key it satisfied), and once the restored rows no longer
+ * point at them, the batches this file created (id above the captured maximum) are deleted; the only foreign key that
+ * cascades from them, `import_rejections`, holds only those batches' own rejections. The verification compares all
+ * five tables, the spans and the batch count, and fails the file on any remaining difference.
  */
-type AwardsAtStart = { docs: string; ids: number[]; fp: string; spans: string };
-let awardsAtStart: AwardsAtStart | null = null;
+const RESTORED_TABLES = ['award_winners', 'award_nominations', 'hall_of_fame', 'honour_team_members', 'captaincies'] as const;
+type RestoredTable = (typeof RESTORED_TABLES)[number];
+type TableAtStart = { docs: string; ids: number[]; fp: string; n: number };
+type HonoursAtStart = { tables: Map<RestoredTable, TableAtStart>; spans: string; maxBatchId: string };
+let honoursAtStart: HonoursAtStart | null = null;
 
-async function awardsState(): Promise<{ fp: string; spans: string; n: number }> {
-  const [w] = await sql<{ fp: string; n: number }[]>`
-    SELECT md5(coalesce(string_agg(to_jsonb(w)::text, '|' ORDER BY w.id), '')) AS fp, count(*)::int AS n FROM award_winners w
+async function tableState(table: RestoredTable): Promise<{ fp: string; n: number }> {
+  const [t] = await sql<{ fp: string; n: number }[]>`
+    SELECT md5(coalesce(string_agg(to_jsonb(t)::text, '|' ORDER BY t.id), '')) AS fp, count(*)::int AS n FROM ${sql(table)} t
   `;
+  return t;
+}
+
+async function spansState(): Promise<string> {
   const [a] = await sql<{ spans: string }[]>`
     SELECT coalesce(jsonb_agg(jsonb_build_array(id, first_season, last_season) ORDER BY id), '[]'::jsonb)::text AS spans FROM awards
   `;
-  return { fp: w.fp, spans: a.spans, n: w.n };
+  return a.spans;
+}
+
+async function batchesAfter(maxBatchId: string): Promise<number> {
+  const [b] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM import_batches WHERE id > ${maxBatchId}::bigint`;
+  return b.n;
 }
 
 beforeAll(async () => {
-  const [w] = await sql<{ docs: string; ids: number[] }[]>`
-    SELECT coalesce(jsonb_agg(to_jsonb(w) ORDER BY w.id), '[]'::jsonb)::text AS docs,
-           coalesce(array_agg(w.id::int ORDER BY w.id), '{}'::int[]) AS ids
-      FROM award_winners w
-  `;
-  const state = await awardsState();
-  awardsAtStart = { docs: w.docs, ids: w.ids, fp: state.fp, spans: state.spans };
+  const tables = new Map<RestoredTable, TableAtStart>();
+  for (const table of RESTORED_TABLES) {
+    const [t] = await sql<{ docs: string; ids: number[] }[]>`
+      SELECT coalesce(jsonb_agg(to_jsonb(t) ORDER BY t.id), '[]'::jsonb)::text AS docs,
+             coalesce(array_agg(t.id::int ORDER BY t.id), '{}'::int[]) AS ids
+        FROM ${sql(table)} t
+    `;
+    tables.set(table, { docs: t.docs, ids: t.ids, ...(await tableState(table)) });
+  }
+  const [b] = await sql<{ id: string }[]>`SELECT coalesce(max(id), 0)::text AS id FROM import_batches`;
+  honoursAtStart = { tables, spans: await spansState(), maxBatchId: b.id };
 }, 120_000);
 
-async function restoreAwardsAtStart(): Promise<void> {
-  const start = awardsAtStart;
+async function restoreHonoursAtStart(): Promise<void> {
+  const start = honoursAtStart;
   if (!start) return;
   await sql.begin(async (tx) => {
-    await tx`DELETE FROM award_winners WHERE id <> ALL(${start.ids}::int[])`;
-    await tx`
-      DELETE FROM award_winners w
-       USING jsonb_array_elements(${start.docs}::text::jsonb) AS d(doc)
-       WHERE w.id = (d.doc->>'id')::int AND to_jsonb(w) <> d.doc
-    `;
-    await tx`
-      INSERT INTO award_winners OVERRIDING SYSTEM VALUE
-      SELECT r.*
-        FROM jsonb_array_elements(${start.docs}::text::jsonb) AS d(doc)
-       CROSS JOIN LATERAL jsonb_populate_record(NULL::award_winners, d.doc) AS r
-       WHERE NOT EXISTS (SELECT 1 FROM award_winners x WHERE x.id = r.id)
-    `;
+    for (const [table, s] of start.tables) {
+      await tx`DELETE FROM ${tx(table)} WHERE id <> ALL(${s.ids}::int[])`;
+      await tx`
+        DELETE FROM ${tx(table)} t
+         USING jsonb_array_elements(${s.docs}::text::jsonb) AS d(doc)
+         WHERE t.id = (d.doc->>'id')::int AND to_jsonb(t) <> d.doc
+      `;
+      await tx`
+        INSERT INTO ${tx(table)} OVERRIDING SYSTEM VALUE
+        SELECT r.*
+          FROM jsonb_array_elements(${s.docs}::text::jsonb) AS d(doc)
+         CROSS JOIN LATERAL jsonb_populate_record(NULL::${tx(table)}, d.doc) AS r
+         WHERE NOT EXISTS (SELECT 1 FROM ${tx(table)} x WHERE x.id = r.id)
+      `;
+    }
     await tx`
       UPDATE awards a
          SET first_season = (s.span->>1)::int, last_season = (s.span->>2)::int
@@ -207,19 +233,26 @@ async function restoreAwardsAtStart(): Promise<void> {
        WHERE a.id = (s.span->>0)::int
          AND (a.first_season IS DISTINCT FROM (s.span->>1)::int OR a.last_season IS DISTINCT FROM (s.span->>2)::int)
     `;
+    // Any other table still pointing at one of this file's batches makes this DELETE fail (no cascade except
+    // import_rejections), which fails the file: that is a new residue to characterise, not something to absorb.
+    await tx`DELETE FROM import_batches WHERE id > ${start.maxBatchId}::bigint`;
   });
-  const after = await awardsState();
-  if (after.fp !== start.fp || after.spans !== start.spans) {
-    throw new Error(
-      `awards-reload-links did not restore the pre-existing award rows: ${start.ids.length} award_winners row(s) at start, `
-      + `${after.n} after restore; rows ${after.fp === start.fp ? 'equal' : 'DIFFER'}, spans ${after.spans === start.spans ? 'equal' : 'DIFFER'}`,
-    );
+  const differ: string[] = [];
+  for (const [table, s] of start.tables) {
+    const after = await tableState(table);
+    if (after.fp !== s.fp) differ.push(`${table} (${s.n} row(s) at start, ${after.n} after restore)`);
+  }
+  if ((await spansState()) !== start.spans) differ.push('award spans');
+  const batches = await batchesAfter(start.maxBatchId);
+  if (batches !== 0) differ.push(`import_batches (${batches} row(s) above the captured maximum)`);
+  if (differ.length) {
+    throw new Error(`awards-reload-links did not restore the pre-existing honours state; still different: ${differ.join('; ')}`);
   }
 }
 
 afterAll(async () => {
   try {
-    await restoreAwardsAtStart();
+    await restoreHonoursAtStart();
   } finally {
     await unlockHonoursTables();
     await sql.end();
