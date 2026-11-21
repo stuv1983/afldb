@@ -1,0 +1,84 @@
+# i348-privcheck.sh rehearsal on a throwaway PostgreSQL 16.15 cluster on streamanator (run e, 2026-11-21T21:10-21:12Z)
+# workspace /mnt/ssd/afldb-backlog-20261122e-orch (cluster initdb'd there, 127.0.0.1:61592 + socket, trust; stopped and deleted after the test)
+# Part 1 (first SQL variant, boolean cast bug found; server statement log shows what the afldb_backup session sent):
+##### positive
+afldb_backupLOG:  statement: BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
+afldb_backupLOG:  statement: DO $chk$ BEGIN IF current_user <> 'afldb_backup' OR current_database() <> 'afldb_prod' OR current_setting('transaction_read_only') <> 'on' THEN RAISE EXCEPTION 'i348 privcheck: unexpected session identity'; END IF; END $chk$;
+afldb_backupLOG:  statement: SELECT 'session', current_user, current_database(), current_setting('transaction_read_only'), current_setting('server_version');
+afldb_backupLOG:  statement: SELECT 'member_pg_read_all_data', pg_has_role(current_user, 'pg_read_all_data', 'MEMBER');
+afldb_backupLOG:  statement: SELECT 'schema_usage_public', has_schema_privilege(current_user, 'public', 'USAGE');
+afldb_backupLOG:  statement: SELECT 'table', t.name, coalesce(has_table_privilege(current_user, c.oid, 'SELECT')::text, 'missing'),
+	       c.relrowsecurity, c.relforcerowsecurity,
+	       (SELECT count(*) FROM pg_catalog.pg_attribute a WHERE a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped),
+	       (SELECT count(*) FROM pg_catalog.pg_attribute a WHERE a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped
+	                                                       AND NOT has_column_privilege(current_user, c.oid, a.attnum, 'SELECT')),
+	       (has_table_privilege(current_user, c.oid, 'INSERT') OR has_table_privilege(current_user, c.oid, 'UPDATE')
+	         OR has_table_privilege(current_user, c.oid, 'DELETE') OR has_table_privilege(current_user, c.oid, 'TRUNCATE'))
+	  FROM unnest(ARRAY['data_edits','data_overrides','draft_persons','draft_picks','external_identities','import_batches',
+	                    'player_link_resolutions','players','sources']) AS t(name)
+	  LEFT JOIN pg_catalog.pg_class c ON c.oid = to_regclass('public.' || t.name)
+	 ORDER BY t.name;
+afldb_backupLOG:  statement: ROLLBACK;
+session|afldb_backup|afldb_prod|on|16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+member_pg_read_all_data|t
+schema_usage_public|t
+table|data_edits|true|f|f|2|0|f
+table|data_overrides|true|f|f|1|0|f
+table|draft_persons|true|f|f|2|0|f
+table|draft_picks|true|f|f|3|0|f
+table|external_identities|true|f|f|1|0|f
+table|import_batches|true|f|f|1|0|f
+table|player_link_resolutions|true|f|f|1|0|f
+table|players|true|f|f|1|0|f
+table|sources|true|f|f|2|0|f
+PRIVCHECK RESULT FAIL
+##### session statements logged for afldb_backup:
+##### negative 1: RLS on players
+afldb_backupLOG:  statement: BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
+afldb_backupLOG:  statement: DO $chk$ BEGIN IF current_user <> 'afldb_backup' OR current_database() <> 'afldb_prod' OR current_setting('transaction_read_only') <> 'on' THEN RAISE EXCEPTION 'i348 privcheck: unexpected session identity'; END IF; END $chk$;
+afldb_backupLOG:  statement: SELECT 'session', current_user, current_database(), current_setting('transaction_read_only'), current_setting('server_version');
+afldb_backupLOG:  statement: SELECT 'member_pg_read_all_data', pg_has_role(current_user, 'pg_read_all_data', 'MEMBER');
+afldb_backupLOG:  statement: SELECT 'schema_usage_public', has_schema_privilege(current_user, 'public', 'USAGE');
+afldb_backupLOG:  statement: SELECT 'table', t.name, coalesce(has_table_privilege(current_user, c.oid, 'SELECT')::text, 'missing'),
+	       c.relrowsecurity, c.relforcerowsecurity,
+
+# Part 2 (corrected script, sha256 77e677f6d98990af05584df7c93674558214b0643958996aedb6c9ce637b73c1 = the file run on production):
+bash -n OK 77e677f6d98990af05584df7c93674558214b0643958996aedb6c9ce637b73c1
+start rc=1
+##### positive
+== i348 privcheck 2026-11-21T21:12:09Z host=streamanator user=arm
+session|afldb_backup|afldb_prod|on|16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+member_pg_read_all_data|t
+schema_usage_public|t
+table|data_edits|t|f|f|2|0|f
+table|data_overrides|t|f|f|1|0|f
+table|draft_persons|t|f|f|2|0|f
+table|draft_picks|t|f|f|3|0|f
+table|external_identities|t|f|f|1|0|f
+table|import_batches|t|f|f|1|0|f
+table|player_link_resolutions|t|f|f|1|0|f
+table|players|t|f|f|1|0|f
+table|sources|t|f|f|2|0|f
+psql exit 0
+INFO afldb_backup is a member of pg_read_all_data
+PRIVCHECK RESULT PASS (afldb_backup: SELECT on all 9 relations and every column, USAGE on public, no RLS, no write privilege)
+rc=0
+##### statements the afldb_backup session sent (from the server log):
+0
+##### user relations named after FROM/JOIN in those statements:
+##### negative 1: RLS
+FAIL table|players|t|t|f|1|0|f
+PRIVCHECK RESULT FAIL
+##### negative 2: no membership + one column grant
+FAIL table|data_edits|f|f|f|2|2|f
+FAIL table|data_overrides|f|f|f|1|1|f
+FAIL table|draft_persons|f|f|f|2|2|f
+FAIL table|draft_picks|f|f|f|3|2|f
+##### negative 3: missing table + write privilege
+FAIL table|players|t|f|f|1|0|t
+FAIL table|sources|missing|||0|0|
+PRIVCHECK RESULT FAIL
+stop rc=0
+marker
+r5dir
+s

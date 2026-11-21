@@ -1,0 +1,321 @@
+# Attended runbook: R6, the production reboot into kernel 149, Wednesday 25 November 2026 (APPROVED; prepared 22 Nov, run e; NOT EXECUTED)
+
+**Authority.** Owner decision 2 of 2026-11-22, round 4 (`DECISIONS-20261122e.md` §2): R6 APPROVED for **Wed 25 Nov 2026 10:00-11:00
+AEDT, fallback 14:00-15:00 the same day**, on run d's verdict (`r6-kernel-check-20261122/README.md` §4) and with the owner's rule:
+**"IF BOOT RECOVERY IS STILL UNCERTAIN, PAUSE BEFORE REBOOTING."** This runbook is therefore **NO-GO by default**: it turns GO only
+when every named item of §7 holds on the day. Every `sudo` step is the owner's, one block at a time, in his own SSH session; Claude
+runs the read-only scripts of `r6-20261125/` and records. The ISSUE-348 load, R5 disposal, R7 and anything else are NOT in scope.
+
+**Prepared without production contact** (run e's only production session was the ISSUE-348 privilege check). Production facts come
+from run d's read-only check (`r6-kernel-check-20261122/raw-output.txt`, 22 Nov 07:15 AEDT), `R0-SITTING-20261122.md`, procedure 03
+(`../remediation-20261114/run2/ops/procedures/03-pending-reboot.md`) and `OWNER-PACKET.md` R6. The advisories behind the decision were
+re-verified from public sources in run e: `r6-20261125/ADVISORY-VERIFICATION.md` (all sources agree with run d; no correction).
+
+**Not rehearsed on a like host (reviewer F-017).** No GRUB option, Recovery Console login, power cycle or snapshot restore has been
+exercised on this or any DigitalOcean droplet. The streamanator dry runs (`r6-20261125/dry-run-20261122e.log`) prove that the scripts
+parse, run to their end, refuse the wrong host and write nothing; they prove nothing about production's boot path.
+
+## 0. Scripts and pins
+
+| Script (all in `r6-20261125/` unless noted) | Where, as whom | sha256 of the LF form (`tr -d '\r' < f \| sha256sum`) |
+|---|---|---|
+| `r6-pre-verify.sh <accepted\|stopped\|rolledback> <CURRENT_ID> <r3:yes\|no> <r4:yes\|no> [10:00\|14:00]` | production, arm, one connection, read-only | `b6578ee05ca4a662823dd95c5c0e2a96f9cec3e78005e2fa2676d145db034399` |
+| `r6-offhost-verify.sh <DUMP_NAME> <DUMP_SHA256>` | streamanator, arm, read-only | `787ec230ea33eb42cfb18d65771390d42e749d92bfa64c8547ca81a84e387b8f` |
+| `r6-post-verify.sh full <KERNEL> <CURRENT_ID> <PRE_BOOT_ID> <PRE_INVOCATION_ID> <RESTORE_SHA\|none> <r4:yes\|no> <GRUB_BASELINE>` / `grub <GRUB_BASELINE>` | production, arm, one connection per run, read-only | `818aa00978d1bb2f897d879e4ffd8c6cab000c60a56fe2343608e1eff4b63ba8` |
+| `r6-public-smoke.sh` | workstation, public GETs only | `de84f1205b4ab4cfec182b1fb7b0770ca916c8570f10a14539daa9a4e450bd9e` |
+| `../a1a2-20261124/a1-s9-public-smoke.sh <BUILD_ID>`, `../a1a2-20261124/a1-rawhead.sh check` | as in the A1 runbook | unchanged since run d |
+
+Each script's header carries its complete command inventory (reviewer F-008); `R6_DRYRUN=1` is refused on host `afldb-prod`.
+**Transport** (as A1/A2): `tr -d '\r' < <script> | C:/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes afldb bash -s -- <args>`; one
+connection per step; never at minute :16-:18 (streamanator's hourly r2 check connects then); never a retry loop (the home IPS blocks
+bursts of SSH and then the host only *looks* dead). streamanator: `ssh -o BatchMode=yes -i ~/.ssh/afldb_dev arm@10.0.40.100`.
+**Writes in this runbook, all named:** the owner's GRUB drop-in and `grubenv` changes (§3, undone in F5), the copy
+`/root/grub.cfg.pre-r6-20261125`, the timer stops (§4), the reboot itself, and acceptance step A3 (one `status-pass` line in
+`/home/arm/afldb-releases/events.log` and one POST to the retired email-intake route, which answers 410; `deploy/post-install-check.sh`
+header). The snapshot lives in the owner's DigitalOcean account (§2).
+
+## 1. Fill-in table (from the Tue 24 Nov sitting record; reviewer F-004) and outcome matrix
+
+| Field | Source in the Tuesday record | Value on the day |
+|---|---|---|
+| A1 outcome | `accepted` / `stopped` (before promotion) / `rolledback` (with rollback verify PASS) | ________ |
+| CURRENT_ID | accepted: `7d92042fd110-<BUILD_ID>`; otherwise `c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC` | ________ |
+| BUILD_ID (accepted only) | P3b | ________ |
+| r3 | `yes` = R3 steps 1-11 done and both `afldb-backup*.timer` enabled (§4.3 step 9) | ________ |
+| r4 | `yes` = R4 accepted (installed Caddyfile `f00859d5…`) | ________ |
+| R1 installed | §4.1 accepted | ________ |
+| cron r2 / r3 installed (Melbourne time) | `a2-cron-install.sh` output | ________ / ________ |
+| R5 block run | §4.5a | ________ |
+
+| Tuesday outcome | Effect on R6 |
+|---|---|
+| A1 accepted, stopped, or rolled back **with** the rollback verify PASS | R6 may proceed (pass the matching arguments) |
+| A1 rolled back without a PASS verify, or state unknown | **NO-GO** (NG-PRE): the release state must be known before a reboot |
+| R1 not installed | **NO-GO** (NG-PRE fails it; run d prerequisite 4); owner may re-plan |
+| `r3:no` (R3 moved to another slot) | no scheduled backup exists: NG-DATA can only be met by a **completed snapshot**; the latest verified off-host dump is then R0's of 22 Nov |
+| `r3:yes` but the 02:20 backup, 03:30 verify or 03:10 off-host pull is not PASS | **NO-GO** (NG-PRE / NG-OFFHOST); the owner may decide to proceed on a completed snapshot alone, recorded as his decision |
+| `r4:no` | no effect on R6 (the scripts then expect Caddyfile `4f6972ec…`) |
+
+## 2. (a) Pre-reboot verification (read-only), and (b) DigitalOcean console and snapshot
+
+### 2.1 (a) What is verified before the reboot, with STOP lines
+
+| # | Step | Expected (PASS) | STOP if |
+|---|---|---|---|
+| A-1 | streamanator: `bash a2-cron-observe.sh all` (read-only, run c/d) | r2: first `:17` line after the install `rc=0 … OK`; r3: Wed 03:10 `rc=0` | any `rc` other than 0 |
+| A-2 | production: `r6-pre-verify.sh <outcome> <CURRENT_ID> <r3> <r4> 10:00` | `R6 PRE RESULT PASS`. Section 1: running 137, **installed images exactly {137, 149}** (a third kernel from the Mon-Wed 06:30 unattended run = STOP, owner decision), 137/149 boot files and modules present, `reboot-required` present. Section 3: `apt-daily*` services inactive, no apt/dpkg process, no writer timer (`afldb*`, `apt-daily*`) running or due in [window − 15 min, window + 90 min]. Section 4: `postgresql@16-main`, `afldb`, `caddy` active; 2 workers; `current` = CURRENT_ID; env counts 1/1 if accepted; Caddyfile per r4; R1 files equal the repo. Section 5 (r3:yes): `afldb-backup.service` started today 02:20-02:31, `success`/0; `afldb-backup-verify.service` 03:30-03:41, `success`/0; the 02:2x dump re-hashes to its sidecar; `last-verify.json` from today; no `FAILED-*` marker; `scheduled-backup.sh status` rc 0; ledger 118; `afldb_restore_test` comment `afldb.restore_test.v1 sha256=<last-verify sha>`, `numbackends` 0. Section 6: ≥ 6,144 MB free | any FAIL line (= `R6 PRE RESULT STOP`) |
+| A-3 | record the lines it prints: `BOOT_ID`, `INVOCATION_ID`, `GRUB-BASELINE`, `OFFHOST-COMPARE`, `RESTORE-SHA`; and the firmware (BIOS/UEFI), `/` and `/boot` file-system kind, `kernel.panic`, the `GRUB_*` lines, the grubenv variables | recorded | — |
+| A-4 | streamanator (r3:yes): `r6-offhost-verify.sh <DUMP> <SHA>` with the `OFFHOST-COMPARE` values | `R6 OFFHOST RESULT PASS`; its `OFFHOST-COMPARE` line **identical** to production's | any FAIL, or the two lines differ |
+| A-5 | `deploy/afldb-settle-failure-status.sh` output | printed inside A-2 (packet R6 prerequisite 5: recorded before a reboot erases `Result`) | — |
+
+### 2.2 (b) DigitalOcean: what the console and the snapshot are (sources fetched 2026-11-21 21:03Z; raw pages kept outside the repository)
+
+| Page | URL | HTTP | sha256 of the body |
+|---|---|---|---|
+| Connect with the Droplet/Recovery Console | https://docs.digitalocean.com/products/droplets/how-to/connect-with-console/ | 200 | `503be77be0d8ba25a0896b529b4d47e4c027690d19bc9e7afeea613000c7d1ac` |
+| Recovery ISO | https://docs.digitalocean.com/products/droplets/how-to/recovery/recovery-iso/ | 200 | `d6f63dd6bbfde72f97223097949bbaf9a375c89b3e736df78f7cba79b2f54b77` |
+| Snapshot a Droplet | https://docs.digitalocean.com/products/snapshots/how-to/snapshot-droplets/ | 200 | `6b0c620e098efe6f35ebddaf9fa8f89fac02be21f991ccfcb51821162ae5d0ca` |
+| Restore from a snapshot | https://docs.digitalocean.com/products/snapshots/how-to/restore-snapshot/ | **404** | `80768b6f8508bf5f865df7f07cd72652539b091a102544c7f99d2a3d9990d89c` (error page) |
+| Power cycle (doctl reference) | https://docs.digitalocean.com/products/droplets/how-to/power-cycle/ | 200 | `0341d427abb088b1a30e58b82b07e726997b31a54f95d701b37aaca713e25b6f` |
+
+**What the documentation says (quoted), and what it means here:**
+- Two different consoles. The **Droplet Console** "connects to Droplets using" the in-guest agent and needs the booted system and its
+  network; **it is not a recovery path**. The **Recovery Console** "is an older, browser-based connection option based on VNC. Using
+  it is like plugging a keyboard and monitor directly into the Droplet. The Recovery Console is available even if a Droplet has lost
+  network access or the sshd process has failed", and "it requires password authentication on the Droplet and doesn't fully support
+  features like copying and pasting". So **NG-CONSOLE** means: the owner opened the **Recovery Console**, logged in as `arm` by typing
+  the password (not pasting), ran `uname -r` and saw `6.8.0-137-generic`, then `exit`. A login prompt alone proves nothing (reviewer
+  F-003). Limits stated honestly: the kernel command line ends `console=ttyS0`, so systemd's emergency-mode output goes to the serial
+  line, not to the VNC screen (tty1 shows kernel messages and the login prompt); root is locked on the cloud image, so emergency mode
+  offers no shell. **A 149 that reaches emergency mode is recoverable only by the GRUB fallback of §3, a snapshot restore or the
+  recovery ISO.**
+- **Power cycle** "is similar to pushing the reset button on a physical machine" (doctl reference). It is the action §3's option B
+  relies on; the panel label was not verified by Claude (the owner finds it under the droplet's power controls during B-1).
+- **Recovery ISO:** "First, power off the Droplet …", boot from the recovery ISO, connect "with the Recovery Console, not the Droplet
+  Console", then mount the disk, `fsck` or `chroot`. The page itself recommends "taking a snapshot of your Droplet first". Last resort.
+- **Snapshot:** "you may want to power off the Droplet before taking a snapshot … many databases don't guarantee data consistency on
+  disk unless the database service is stopped or the entire Droplet is powered off first"; a live snapshot is taken "without
+  powering off"; "A progress bar shows the progress of snapshot creation. Once complete, the snapshot is listed along with any other
+  previous snapshots." **Restore** steps could not be fetched (404): the owner locates the restore action for the new snapshot in the
+  panel during B-2 **without executing it**. Cost: not verified in run e (pricing page not fetched); the panel states it.
+
+| # | Owner step (panel) | Pass |
+|---|---|---|
+| B-1 | Before 09:55: open the **Recovery Console**; log in as `arm` (typed password); `uname -r` → `6.8.0-137-generic`; `exit`. Note where the panel's power-cycle and power-off actions are (do not use them) | NG-CONSOLE met; record time |
+| B-2 | **From 08:30** (after the 03:30 verification; a live snapshot runs while the site serves): Backups & Snapshots → Take Live Snapshot, name `afldb-prod-pre-r6-20261125`. Wait for the progress bar to finish and the snapshot to be **listed**. Locate (do not run) its restore action | snapshot listed as complete before 10:00; record name, time, size shown |
+
+**What the snapshot is (reviewer F-013).** A full copy of the droplet disk: `.env` with every production secret, the database files,
+SSH host keys and `authorized_keys`, `~/env-before-revalidate-*.bak` if still present, and the R5 retained pre-fix logs (which may
+carry tokens live until about 1 Dec, `R5-RETENTION-PROPOSAL.md`). It is **crash-consistent only** (live snapshot): PostgreSQL recovers
+from it as from a power loss, which is why the 02:20 dump verified off-host stays the data fallback of record. Duration depends on the
+disk's used size and is unmeasured here, hence the 08:30 start. **Restoring it returns the whole disk to snapshot time:** every write
+after it (settle runs, admin edits, backups, logs) is lost. It persists in the owner's account until deleted: **disposal REVIEW date
+Thu 7 Jan 2027** (with R5's), in `OPEN-ITEMS-AFTER-SITTINGS.md`. Alternative the owner may choose instead: a power-off snapshot (the
+documented recommendation) taken as part of the outage (power off, snapshot, power on = the reboot); consistent, but the outage then
+lasts as long as the snapshot, which is unknown. Not recommended for this window.
+
+## 3. (c) GRUB: owner read steps, choosing the kernel behind the hidden menu, recovery path
+
+**Facts.** `GRUB_DEFAULT=0`, `GRUB_TIMEOUT_STYLE=hidden`, `GRUB_TIMEOUT=0`; `50-cloudimg-settings.cfg` sets `GRUB_TIMEOUT=0` and
+`GRUB_RECORDFAIL_TIMEOUT=0` (`raw-output.txt:60-69`). An unattended boot goes straight to entry 0 = the newest kernel (149) with no
+menu. `grub.cfg` is root-only and unread. Ubuntu puts older kernels in the **`Advanced options for Ubuntu` submenu**: a bare title such
+as `"Ubuntu, with Linux 6.8.0-137-generic"` matches no top-level entry and **GRUB falls back to entry 0 (149)** (reviewer F-001). Every
+entry below is therefore named by its **submenu path with `>`, using the ids copied from the owner's own C-1 output**, never typed
+from memory. Firmware (BIOS or UEFI, printed by A-2) does not change any command here: Ubuntu reads `/boot/grub/grub.cfg` and
+`/boot/grub/grubenv` in both cases; on UEFI `/boot/efi` must be mounted for `update-grub` (A-2 prints the mounts).
+
+### 3.1 C-1 owner read steps (sudo, read-only apart from the saved copy), 09:40-09:55
+
+```bash
+S=20261125; sudo cp -p /boot/grub/grub.cfg /root/grub.cfg.pre-r6-$S && sudo sha256sum /boot/grub/grub.cfg /root/grub.cfg.pre-r6-$S   # record (the two equal)
+sudo grep -n -A7 'if \[ "\${next_entry}" \]' /boot/grub/grub.cfg
+sudo grub-editenv /boot/grub/grubenv list; ls -l /boot/grub/grubenv
+sudo grep -nE '^submenu|^[[:space:]]*menuentry' /boot/grub/grub.cfg | cut -c1-230   # the owner sees the real ids; records write <uuid>
+sudo grep -c 'set default="0"' /boot/grub/grub.cfg
+grep -hE '^GRUB_(TERMINAL|SAVEDEFAULT|DISABLE_SUBMENU|DEFAULT)' /etc/default/grub /etc/default/grub.d/*.cfg
+findmnt -no SOURCE,FSTYPE /boot || findmnt -no SOURCE,FSTYPE /
+```
+
+**Expected shapes (NG-GRUBREAD):**
+1. The `next_entry` block reads `set default="${next_entry}"`, `set next_entry=`, **`save_env next_entry`**, `set boot_once=true`, `else`,
+   `set default="0"`. Absent, or without `save_env next_entry`: option B is unavailable → **NO-GO**.
+2. `grubenv list` prints nothing (or only `recordfail`/`initrdfail` lines the owner records; no `next_entry`, no `saved_entry`).
+3. A `submenu 'Advanced options for Ubuntu' … 'gnulinux-advanced-<UUID>'` line, and inside it `menuentry 'Ubuntu, with Linux
+   6.8.0-149-generic' … 'gnulinux-6.8.0-149-generic-advanced-<UUID>'` and the same for `137`. The owner writes down the two **paths**:
+   `P149 = gnulinux-advanced-<UUID>>gnulinux-6.8.0-149-generic-advanced-<UUID>` and
+   `P137 = gnulinux-advanced-<UUID>>gnulinux-6.8.0-137-generic-advanced-<UUID>` (the UUID is the root file system's; it is not a
+   secret, but records keep `<uuid>`).
+4. `set default="0"` count **1**.
+5. `GRUB_TERMINAL` unset or `console` (a `serial`-only terminal would make any menu invisible on the VNC console; it does not affect
+   option B, which needs no menu). `GRUB_DISABLE_SUBMENU` unset (if `y`, the 137 entry is top-level: use its id without the `>` prefix).
+6. `/boot` (or `/`) is a **plain partition** (for example `/dev/vda1 ext4`), not LVM, MD-RAID or LUKS: GRUB cannot write `grubenv` on
+   those, `next_entry` would then never be cleared and option B would boot 149 on every power cycle → **NO-GO** for option B.
+
+### 3.2 The options (one chosen; the others are record only)
+
+| Option | What it recovers from | Files it changes | Default afterwards | Restore + its verification |
+|---|---|---|---|---|
+| **B (CHOSEN): saved default 137 + one-shot 149.** Drop-in `99-afldb-r6.cfg` with `GRUB_DEFAULT=saved`; `update-grub`; `grub-set-default P137`; `grub-reboot P149` | **149 does not boot** (panic, hang, emergency mode): the owner power-cycles in the panel and GRUB boots `saved_entry` = 137, **no keystroke at the console**. **149 boots but misbehaves**: a plain `sudo systemctl reboot` boots 137 | `/etc/default/grub.d/99-afldb-r6.cfg`, `/boot/grub/grub.cfg` (regenerated), `/boot/grub/grubenv` (`saved_entry`, `next_entry`) | **137** until F5 restores it: if F5 is skipped or half-done, the next unplanned reboot regresses to 137 silently, with `reboot-required` absent | F5 below; verified by `r6-post-verify.sh grub` PASS (GRUB inputs = `GRUB-BASELINE`, no `next_entry`/`saved_entry`) **and** the owner's `sha256sum /boot/grub/grub.cfg` = the C-1 value and `set default="0"` count 1 |
+| A: visible menu for one boot. Drop-in `99-afldb-r6.cfg`: `GRUB_TIMEOUT_STYLE=menu`, `GRUB_TIMEOUT=10`, `GRUB_RECORDFAIL_TIMEOUT=10` (10-30, **never -1**, the name must sort after `50-`), `update-grub` | 149 does not boot, **only if** the owner watches the Recovery Console at boot and selects `Advanced options` → 137 within 10 s with a browser VNC keyboard | drop-in, `grub.cfg` | 149 (menu visible for 10 s on every boot until restored) | remove the drop-in, `update-grub`, same checks |
+| C: no change; `grub-reboot P137` only for a rollback after 149 boots | 149 boots but misbehaves; **not** a 149 that does not boot (then snapshot or recovery ISO only) | `grubenv` (`next_entry`) at rollback | 149 | — |
+| D: Shift/Esc at power-on | **not relied on** (0-second hidden menu through a browser VNC console; procedure 03 §1) | — | — | — |
+
+**Why B.** It is the only option that turns "149 does not boot" into a panel power cycle that lands on the running, known-good kernel,
+without depending on reaching a 10-second menu through a browser keyboard; a "149 misbehaves" rollback is a plain reboot. Its cost is
+the temporary change of the persistent default, which F5 undoes and two independent checks (arm script + owner sha) verify; a rollback
+deliberately keeps it (§6). Its residual uncertainty: it has **never been exercised on this droplet** (F-017). The owner may reduce
+that before the day by restoring the B-2 snapshot (or any recent one) to a **temporary droplet** and rehearsing C-2 there (cost and
+time are his; not required by this runbook).
+
+### 3.3 C-2 owner: apply option B (10:00-10:15; one block; only if NG-GRUBREAD holds)
+
+```bash
+printf '%s\n' '# AFLDB R6 2026-11-25: temporary; removed in step F5 of ATTENDED-PLAN-R6-20261125.md' 'GRUB_DEFAULT=saved' \
+  | sudo tee /etc/default/grub.d/99-afldb-r6.cfg >/dev/null && sudo chmod 0644 /etc/default/grub.d/99-afldb-r6.cfg
+sudo update-grub 2>&1 | grep -E 'Found linux image|done'      # exit 0; BOTH "Found linux image: /boot/vmlinuz-6.8.0-149-generic" and "…-137-generic"
+sudo grub-script-check /boot/grub/grub.cfg && echo script-ok
+sudo grep -n 'set default=' /boot/grub/grub.cfg                  # now: set default="${next_entry}" and set default="${saved_entry}"
+sudo grub-set-default 'P137'                                      # the exact path from C-1, quoted
+sudo grub-reboot 'P149'
+sudo grub-editenv /boot/grub/grubenv list                         # exactly: saved_entry=P137 and next_entry=P149
+sudo grep -c "gnulinux-6.8.0-137-generic-advanced-" /boot/grub/grub.cfg; sudo grep -c "gnulinux-6.8.0-149-generic-advanced-" /boot/grub/grub.cfg   # each >= 1
+```
+**Pass (NG-FALLBACK, boot part):** every line as commented. **Any difference:** undo now (`sudo rm /etc/default/grub.d/99-afldb-r6.cfg
+&& sudo update-grub && sudo grub-editenv /boot/grub/grubenv unset saved_entry next_entry`, then `sudo sha256sum /boot/grub/grub.cfg`
+= the C-1 value; if not, `sudo cp -p /root/grub.cfg.pre-r6-20261125 /boot/grub/grub.cfg`) and **NO-GO**.
+
+## 4. (d) Writer timers: stopped (settle first) before, active again after
+
+Production's enabled afldb timer on 22 Nov is `afldb-settle-afl-api.timer` only (run d `raw-output.txt:118-125`, R0 `:72-78`); after
+A2 also `afldb-backup.timer` and `afldb-backup-verify.timer`. A-2 lists **every** timer live (`list-timers --all`, `list-unit-files
+'afldb*'`); the rule covers whatever it shows.
+
+| # | Owner, at or after **10:18** (after the 10:17 r2 check; 14:18 in the fallback) | Pass |
+|---|---|---|
+| D-1 | `sudo systemctl stop afldb-settle-afl-api.timer` **first**, then every other `afldb*` timer A-2 showed `active` (settle-afltables, settle-afl-api-brownlow, email-intake if present) **except** `afldb-backup.timer` and `afldb-backup-verify.timer` | — |
+| D-2 | `systemctl is-active afldb-settle-afl-api.service afldb-settle-afltables.service afldb-settle-afl-api-brownlow.service afldb-email-intake.service afldb-backup.service afldb-backup-verify.service` | all `inactive` (a unit not installed also prints `inactive`); a running one: wait for it, never kill it |
+| D-3 | apt gate, **immediately before E-1**: the block below | `inactive` twice, and the three other commands print nothing (NG-APT) |
+
+```bash
+systemctl is-active apt-daily.service apt-daily-upgrade.service
+sudo fuser -v /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock
+pgrep -a -x 'dpkg|apt|apt-get'
+pgrep -af '^/usr/bin/python3 /usr/bin/unattended-upgrade( |$)'
+```
+(`unattended-upgrades.service` itself is normally active: it only waits for shutdown; the `pgrep` line looks for an actual run.)
+
+**Why the backup timers stay:** they are not due (next Thu 02:20 and Wed 2 Dec 03:30), and `Persistent=true` fires at boot only for
+a run missed while down, which A-2 proved did not happen. **After the boot:** enabled timers re-arm by themselves at boot; D-4 (in F6)
+checks each timer stopped in D-1 is `active` with a next elapse, and starts any that is not (`sudo systemctl start <timer>`). They
+must all be active **before 11:17** (15:17), when the r2 check next reads `afldb-settle-failure-status.sh` (a stopped settle timer is
+FAILED there). If that cannot be met, **expect exactly one R2 alarm email per hour until it is**, and say so in the record.
+
+## 5. (e) The reboot, and (f) post-reboot verification
+
+| # | Step | Who | Pass / next |
+|---|---|---|---|
+| E-1 | GO (§7) confirmed aloud; the owner keeps the Recovery Console open; `sudo systemctl reboot` **no later than 10:25** (14:25). Record T0 | Owner | — |
+| E-2 | Workstation: `bash r6-public-smoke.sh` from T0+2 min, at most once a minute (HTTPS, not SSH) | Claude | `R6 PUBLIC RESULT PASS`; a Cloudflare error page while down is expected |
+| E-3 | SSH only after E-2 passes, or on the fixed schedule **T0+3, T0+6, T0+10** (one attempt each; the first SSH is F-2 itself), never a loop. HTTPS answering while SSH times out = the home IPS, not the host: wait for the next slot | Claude | — |
+| E-4 | No HTTPS and no SSH at T0+10: the owner reads the Recovery Console (kernel messages, login prompt; logs in as `arm`, `uname -r`, `systemctl --failed`) → §6 | Owner | — |
+| F-1 | `bash r6-public-smoke.sh`; if A1 was accepted also `bash ../a1a2-20261124/a1-s9-public-smoke.sh <BUILD_ID>` | Claude | both PASS |
+| F-2 | `r6-post-verify.sh full 6.8.0-149-generic <CURRENT_ID> <BOOT_ID> <INVOCATION_ID> <RESTORE-SHA\|none> <r4> <GRUB-BASELINE>` | Claude | `R6 POST RESULT PASS (6.8.0-149-generic)` with one `NOTE GRUB inputs … differ` (option B still applied): new boot_id, uptime < 2 h, `reboot-required` absent, units active, `pg_isready`, new InvocationID, NRestarts 0, 2 workers, equal revalidation-name counts, `current` unchanged, Caddyfile unchanged, loopback health 200, timers sane, no failed unit, ledger 118, `afldb_restore_test` unchanged |
+| F-3 | Owner: block F-3 below (counts and unit names only) | Owner | nothing from `postgresql`, `afldb` or `caddy`; anything else is recorded and judged |
+| F-4 | **Acceptance step A3 (writes, named in §0):** the owner attests that InvocationID `<from F-2>` is the R6 boot's; then `node deploy/release.mjs status --expect <CURRENT_ID> --confirm-restart-invocation <INV>` and `bash deploy/post-install-check.sh --confirm-restart-invocation <INV> <CURRENT_ID>`; if the A1 raw-head baseline exists, `a1-rawhead.sh check` | Claude (one connection) | `status` PASS, `POST-INSTALL CHECK PASS`, `RAWHEAD RESULT check PASS` |
+| F-5 | **GRUB restore (owner, only after F-1..F-4 PASS):** block F-5 below; then Claude: `r6-post-verify.sh grub <GRUB-BASELINE>` | Owner, Claude | as commented; `R6 GRUB RESULT PASS` |
+| F-6 | D-4 timers; `systemctl list-timers --all 'afldb*' --no-pager` | Owner | every timer of D-1 active with a next elapse, before 11:17 |
+| F-7 | Record (§9). `/root/grub.cfg.pre-r6-20261125` may stay (root-only) until 7 Jan | Claude | — |
+
+**F-3 (owner):**
+```bash
+sudo journalctl -b -p err --no-pager | wc -l
+sudo journalctl -b -p err --no-pager -o cat --output-fields=SYSLOG_IDENTIFIER | sort | uniq -c | sort -rn | head -n 15   # count per source, no message text
+```
+**F-5 (owner, one block):**
+```bash
+sudo rm /etc/default/grub.d/99-afldb-r6.cfg
+sudo update-grub 2>&1 | grep -E 'Found linux image|done'        # both images listed
+sudo grub-editenv /boot/grub/grubenv unset saved_entry next_entry
+sudo grub-editenv /boot/grub/grubenv list                        # as at C-1 (normally nothing)
+sudo sha256sum /boot/grub/grub.cfg                               # = the C-1 value
+sudo grep -c 'set default="0"' /boot/grub/grub.cfg               # 1
+```
+If the `grub.cfg` hash differs: `sudo diff /root/grub.cfg.pre-r6-20261125 /boot/grub/grub.cfg`, explain every line; if any line is
+unexplained, `sudo cp -p /root/grub.cfg.pre-r6-20261125 /boot/grub/grub.cfg` and re-check the hash.
+
+**Deferred acceptance (reviewer F-016).** Packet R6's "the next 05:00 settle succeeds; R2 reads OK the next morning" falls on Thu 26 Nov,
+inside the owner's leave. The observer is the R2 hourly check: **silence means OK**, an email means it is not. The record is completed
+on the owner's return (7 Jan 2027) from `a2-cron-observe.sh r2` and the settle evidence.
+
+## 6. (g) Rollback to 137, and its acceptance
+
+**Kernel rollback, not application rollback.** Use it when F-2 fails in sections 1-2 (boot, PostgreSQL, the application or Caddy
+not healthy), F-3 shows kernel or driver errors, or the host does not come up (E-4). While option B is still applied this is cheap and
+reversible, so it is preferred to diagnosis inside the window. A release-only fault on a healthy 149 (wrong `current`, a page error
+with all units healthy) is the A1 application rollback (`A1-A2` runbook §3.2), not this.
+
+| Case | Owner action | Then |
+|---|---|---|
+| G-1: 149 is up but fails F-2/F-3 | D-1..D-3 again, then `sudo systemctl reboot` (no GRUB command: `next_entry` was consumed by the 149 boot, so GRUB boots `saved_entry` = 137) | E-2..E-4, then the acceptance below |
+| G-2: 149 never comes up (E-4: panic, hang, emergency mode, no login) | panel **power cycle**, Recovery Console open | GRUB boots 137 (`saved_entry`); acceptance below |
+| G-3: 137 does not come up either | Recovery Console → recovery ISO (§2.2), or **restore the B-2 snapshot** (all writes since 08:30 lost; the 02:20 dump off-host is the data complement); host loss: `docs/backup-restore.md` §6 procedure B | owner decisions, recorded; nothing else is attempted in the window |
+
+**Rollback acceptance (137):** `r6-post-verify.sh full 6.8.0-137-generic …` PASS (`reboot-required` present is expected; GRUB
+`NOTE` expected), `r6-public-smoke.sh` PASS, F-3, F-4 (A3) and D-4. **GRUB after a rollback: keep option B in place for the leave**
+(`99-afldb-r6.cfg` stays; `saved_entry=P137`, no `next_entry`, verified by the owner's `sudo grub-editenv /boot/grub/grubenv list`):
+an unplanned reboot during the leave then boots the known-good 137, not the 149 that just failed. An unattended kernel install runs
+`update-grub` but keeps `GRUB_DEFAULT=saved`, so 137 stays the default while its id exists (137 cannot be autoremoved while it
+runs). Record it in `OPEN-ITEMS-AFTER-SITTINGS.md` as a known deviation from the GRUB baseline; ISSUE-351 stays open; **no second 149
+attempt on Wed 25 Nov** unless the owner decides otherwise.
+
+## 7. GO/NO-GO checklist (all must read GO; default NO-GO)
+
+| Item | GO when | Evidence |
+|---|---|---|
+| **NG-OWNER** | owner present with `sudo` from 09:40 to the end of the window, Recovery Console and panel open | owner |
+| **NG-PRE** | A-2 `R6 PRE RESULT PASS` with the §1 arguments | A-2 output |
+| **NG-OFFHOST** | (r3:yes) A-4 PASS and the two `OFFHOST-COMPARE` lines identical; A-1 r3 `rc=0` | A-1, A-4 |
+| **NG-CONSOLE** | B-1 done today: Recovery Console, `arm` login by typed password, `uname -r` = `6.8.0-137-generic` | owner statement + time |
+| **NG-DATA** | B-2 snapshot **listed complete**, or (r3:yes) NG-PRE section 5 and NG-OFFHOST PASS; both preferred | panel, A-2 |
+| **NG-GRUBREAD** | C-1 shapes 1-6 as expected | owner output (UUIDs redacted) |
+| **NG-FALLBACK** | C-2 applied and every check as commented | owner output |
+| **NG-TIMERS** | D-1, D-2 done at or after 10:18 | owner output |
+| **NG-APT** | D-3 idle, run immediately before E-1 | owner output |
+| **NG-TIME** | E-1 can be issued by **10:25** (14:25) | clock |
+
+**If any item is NO-GO at 10:25:** do not reboot. Undo C-2 if it was applied (§3.3 "any difference"), restart the D-1 timers, and
+go to §8's fallback rule. **The owner's rule applies literally:** if any item about boot recovery (NG-CONSOLE, NG-GRUBREAD,
+NG-FALLBACK, NG-DATA) is uncertain, pause; nothing in this runbook overrides that.
+
+## 8. (h) Timing and the fallback-window rule
+
+| AEDT | Step | Notes |
+|---|---|---|
+| 08:30 | B-2 live snapshot starts | after the 03:30 verify; must be listed complete before 10:00 |
+| 09:30 | A-1, A-4 (streamanator) | no production contact |
+| 09:35 | A-2 (production, one connection) | not at :16-:18 |
+| 09:40-09:55 | B-1 (Recovery Console), C-1 (GRUB read) | owner |
+| 10:00 | GO/NO-GO, all items except NG-TIMERS/NG-APT | — |
+| 10:00-10:15 | C-2 option B | owner |
+| 10:18-10:22 | D-1, D-2, D-3; final GO | after the 10:17 r2 check |
+| **≤ 10:25** | **E-1 reboot (latest)** | leaves room for a G-1/G-2 second boot and its acceptance inside the window |
+| 10:27-10:40 | E-2..F-4 | outage expected 1-3 min plus boot (unmeasured here) |
+| 10:40-10:55 | F-5, F-6, F-7 | timers active well before 11:17 |
+| 11:00 | window ends | a rollback started by about 10:40 still completes by about 11:00 |
+
+**Fallback 14:00-15:00, same offsets** (A-2 re-run at 13:35 with argument `14:00`; C-1 at 13:40; C-2 14:00; D-1 at or after 14:18;
+latest reboot 14:25; timers active before 15:17). **Rule:** the fallback window is used only when the 10:00 window was NO-GO for a
+reason resolved with evidence by 13:55 (snapshot not yet complete, a Recovery Console login problem fixed, a timer or apt job that
+was due, the owner delayed). It is **not** used after: an A-2/A-4 STOP on the backup chain or the kernel set, an unexpected C-1
+shape, or a rollback to 137 in the morning; those go to the owner as a decision (run d §4.2 lists what an alternate operator would
+need during the leave). The morning snapshot stays valid for the fallback (a restore would then lose writes since 08:30).
+
+## 9. (i) What to report (sitting record, excerpts only, never a secret)
+
+The fill-in table of §1; A-1/A-2/A-4 result lines and the printed `BOOT_ID`, `INVOCATION_ID`, `GRUB-BASELINE`, `OFFHOST-COMPARE`,
+`RESTORE-SHA`; B-1 time and result; B-2 snapshot name, completion time and size shown; C-1 outputs with `<uuid>` (shapes 1-6) and the
+pre-R6 `grub.cfg` sha256; C-2 outputs; D-1..D-3; T0 and the time HTTPS and SSH returned (the measured outage); F-1..F-7 result lines,
+the new InvocationID and the owner's attestation; the F-3 counts; F-5 hashes; whether any rollback happened and why; whether any R2
+alarm email was expected or received; the statement that **nothing in this procedure was rehearsed on a DigitalOcean droplet** and
+which steps were therefore first exercised on production; tracker updates (ISSUE-351 in `issues.md`, `IssuesIndex.md`,
+`OPEN-ITEMS-AFTER-SITTINGS.md`: kernel, the snapshot and its disposal review date, GRUB state, deferred Thu 26 Nov acceptance).

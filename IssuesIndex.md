@@ -1,6 +1,15 @@
 # AFLDB Current Issues Index
 
-**Current state, 22 November 2026 (backlog run d, owner decisions round 3 of 22 Nov; local branch `claude/backlog-20261122`, unpublished: `origin/main` = `da4cc0c4`).**
+**Current state, 22 November 2026 (backlog run e, owner decisions round 4 of 22 Nov; local branch `claude/backlog-20261122`, unpublished: `origin/main` = `da4cc0c4`; the push is the main session's).**
+Record: [DECISIONS-20261122e.md](docs/v2/evidence/backlog-20261121/DECISIONS-20261122e.md). **R6 APPROVED** for Wed 25 Nov 10:00-11:00 AEDT (fallback
+14:00-15:00): [runbook](docs/v2/evidence/backlog-20261121/ATTENDED-PLAN-R6-20261125.md), NO-GO by default, GRUB option B, scripts in `r6-20261125/`;
+[advisories re-verified](docs/v2/evidence/backlog-20261121/r6-20261125/ADVISORY-VERIFICATION.md) (run d correct). **R5 APPROVED** (retention; owner re-verify +
+inventory in A2; 7 Jan 2027 = earliest disposal REVIEW). **348:** the owner's eight columns = groups (a)-(e); (f)-(k) to confirm; per-group
+detection before/after COMMIT; `afldb_backup` read access **verified on production** (one read-only session, PASS); refresh procedure;
+Tue 12 Jan 2027 11:00 **PROPOSED**. **R2:** hourly kept, one email/hour accepted; first scheduled run verified in A2. T-1 kept; R4 under
+T-1 = 11:00-11:20 after P6 (ends about 10:45-10:48). Eight open issues: 332, 348, 350, 351, 352, 357, 362 and 372.
+
+**Earlier state, 22 November 2026 (backlog run d, owner decisions round 3 of 22 Nov; local branch `claude/backlog-20261122`, unpublished: `origin/main` = `da4cc0c4`).**
 Record: [DECISIONS-20261122d.md](docs/v2/evidence/backlog-20261121/DECISIONS-20261122d.md). **A1 timing T-1 APPROVED** (start 09:20 AEDT Tue 24 Nov; PREP = the
 owner-confirmed `origin/main` tip, `da4cc0c4` today). **Cron jobs APPROVED** (r2 hourly after its manual run, r3 daily after the first
 verified off-host copy; `a2-cron-install.sh`, dry test 54/54). **R5:** pre-fix Caddy logs retained with restricted access in A2;
@@ -187,6 +196,7 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 - **2026-11-22 (owner confirmed receipt): alarm delivery VERIFIED.** The staged wrapper was re-staged to the `ssh -T` version (sha256 `c6467ff4…`; the previous copy is kept as `state/afldb-settle-check.sh.pre-T`). One deliberate test alarm at 2026-11-21T18:19:05Z: the wrapper ran on streamanator with `AFLDB_PROD_SSH=arm@afldb-alarm-test.invalid` (no production contact), ssh rc 255, wrapper rc 1, and `alarm-email.sh` sent it through the Brevo SMTP relay to the owner's email. The owner then reported "received the test alarm email". Delivery through the chosen channel is proven (the G0b delivery criterion is met for the channel). Still to do in sitting A2 (R2): the forced-command `authorized_keys` line on production, the first real manual run (expect `AFLDB_SETTLE_STATUS OK`), and the hourly cron line on streamanator.
 - **2026-11-22 (run c):** A2 R2 approved as key line + first manual run only; hourly cron a separate unapproved step; alarm command corrected to the executable path `/home/arm/afldb-ops/alarm-email.sh`. **Next:** A2 (Tue 24 Nov 10:30); cron question.
 - **2026-11-22 (run d):** hourly settle-check cron **APPROVED**: A2 §4.2 steps 3-4 (`a2-cron-install.sh install r2` after the manual run; cron-environment alarm test). **Next:** A2; observe the first scheduled runs (`OPEN-ITEMS-AFTER-SITTINGS.md` §4).
+- **2026-11-22 (run e, round 4):** hourly check kept; one email per hour while production is unreachable **accepted** (F-013 resolved); the first scheduled `:17` run after the install is verified in A2 (`a2-cron-observe.sh r2`, runbook §4.2 step 3). **Next:** A2 (Tue 24 Nov).
 
 
 ### AFLDB-ISSUE-348 — The next DraftGuru re-acquisition must carry forward the D-336-3 origin revisions and adjudicate three club replacements
@@ -200,6 +210,7 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 - **2026-11-22 (run b, F-348-1):** reviewed acquisition pinned by digest (additive `reviewed_acquisitions`; 2026-08-26 verification and 6,810/5,057 kept for other labels), `--seal-reviewed` manifest `26ca190b…`, contract tests 35/35. Guarded dry run on R0 restore: effect `ff8ef1b8…`, reconciliation `cf49f6a5…` (rulings 5961/6784/6626 byte-checked against the owner CSV); three real-load rehearsals identical, link state unchanged. **Next:** publish `7b52c46c`+`552e5e96`; owner approves `issue348-acquisition/SEALED-PLAN.md` and a window. R-2 (rebuild label) open.
 - **2026-11-22 (run c):** F-1 accepted (per-label pin kept; August rebuild 6,810/5,057 preserved). F-2 [decision-ready review](docs/v2/evidence/backlog-20261121/issue348-acquisition/F2-DECISION-REVIEW.md): no identity-linkage change; full write set; plan digests unchanged. **Next:** owner approves F-2 + digests and a separate load sitting (not A2).
 - **2026-11-22 (run d):** F-1/F-2 accepted; [LOAD-WINDOW-PROPOSAL.md](docs/v2/evidence/backlog-20261121/issue348-acquisition/LOAD-WINDOW-PROPOSAL.md) (digests recomputed, coverage, read-only post-load check 146/146). **Next:** owner confirms "eight" vs (a)-(k) and the window (recommended from Thu 7 Jan 2027; probable re-rehearsal).
+- **2026-11-22 (run e, round 4):** the owner's eight columns = groups (a)-(e); mapping, generators, detection before/after COMMIT per group (no pre-COMMIT detection for (b)-(e), (g), (j), most of (f), (k), `import_batches`, `player_link_resolutions`; post-load check required); effect digest corrected to "refuses before any write"; `afldb_backup` read access **PASS** on production (one read-only session 21:12Z); refresh procedure (§3a). Tue 12 Jan 2027 11:00 **PROPOSED**. No load, no re-seal. **Next:** owner confirms (f)-(k) and the window after the refresh packet.
 ### AFLDB-ISSUE-350 — Production has no 2027 `seasons` row and the AFL API settle never creates one
 
 - **Severity / area:** **High**; AFL API ingestion, 2027 operations.
@@ -211,6 +222,7 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 - **2026-11-22 (run b, decision 5):** date PROPOSED Tuesday 23 February 2027, after the weekly slot (11:00 AEDT proposed); `ATTENDED-DRAFT-20261122b.md`.
 - **2026-11-22 (run c):** [R8 draft plan](docs/v2/evidence/backlog-20261121/R8-OPENING-PLAN-2027-DRAFT.md) for Tue 23 Feb 2027 11:00 AEDT. **Next:** owner approval of the plan and a capture/plan date.
 - **2026-11-22 (run d):** R8 draft **APPROVED**; capture and plan Fri 19 Feb 2027; revision `7d92042f` unless a later release. **Next:** 19 Feb capture.
+- **2026-11-22 (run e):** no change (round 4 did not touch R8). **Next:** 19 Feb 2027 capture.
 
 
 ### AFLDB-ISSUE-351 — Unattended upgrades restart production app and PostgreSQL; promote/rollback activation window
@@ -227,6 +239,7 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 - **Packet 6R follow-up (2026-11-18).** Carry explicit owner confirmation for the same restart through S7 and S8. See item 5 of the [AFLDB-ISSUE-366 playbook](issues/closed/AFLDB-ISSUE-366.md). The recorded sitting passed both checks. **2026-11-19:** implemented locally under ISSUE-366 (`--confirm-restart-invocation`, bound to one InvocationID, reaches S7 and S8); host policy D-HO-1/4/6 unchanged.
 - **2026-11-22 (run c):** R1 approved for A2 (Tue 24 Nov). R6/R7 after the owner's return (date unknown); deferral consequence in `DECISIONS-20261122c.md` §5.1. **Next:** A2 R1; return date or alternate operator for R6.
 - **2026-11-22 (run d):** [R6 kernel check](docs/v2/evidence/backlog-20261121/r6-kernel-check-20261122/README.md): two CISA-KEV kernel CVEs fixed in installed 149, running 137, no Livepatch; **reboot before the leave warranted**, proposed Wed 25 Nov 10:00 AEDT (owner decides). R7 on/after Thu 7 Jan 2027. **Next:** A2 R1; the owner's R6 decision.
+- **2026-11-22 (run e, round 4):** **R6 APPROVED** Wed 25 Nov 10:00-11:00 AEDT, fallback 14:00-15:00; [runbook](docs/v2/evidence/backlog-20261121/ATTENDED-PLAN-R6-20261125.md) NO-GO by default (named items), GRUB option B (saved default 137 + one-shot 149, restored after acceptance), Recovery Console login check, snapshot (disposal review 7 Jan 2027), timers, rollback, timing; advisories independently re-verified (agree with run d). Not rehearsed on a droplet. **Next:** A2 R1 (Tue); R6 (Wed).
 
 ### AFLDB-ISSUE-352 — No scheduled production backup, restore verification or off-host copy
 
@@ -236,6 +249,7 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 - **Update 2026-11-14 (run 2):** procedure 05; A-04 verified. The serving checkout's bare `backup.sh` prunes dumps, so always use `--dir`.
 - **2026-11-22 (run c):** R3 approved for A2 (units, attended runs, restore target pre-check, pull key, first pull, first-copy restore); daily pull cron unapproved; five databases retained. **Next:** A2 R3; cron question; 25 h and Wednesday evidence.
 - **2026-11-22 (run d):** daily off-host pull cron **APPROVED** (A2 §4.3 step 13 after the first-copy restore PASS; first run Wed 25 Nov 03:10). **Next:** A2 R3; observe 25 Nov.
+- **2026-11-22 (run e, round 4):** R3 cron approval applies after the first-copy restore PASS (unchanged); the first scheduled backup (02:20), verification (03:30) and off-host pull (03:10) of Wed 25 Nov are verified read-only as R6 steps A-1/A-2/A-4 before the reboot. **Next:** A2 R3; Wed 25 Nov evidence.
 
 
 ### AFLDB-ISSUE-357 — ISR persists a page per non-canonical id spelling and per 404 path
@@ -251,6 +265,7 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 
 - **362** Caddy log filter and epoch-held admin claims implemented locally; **next:** owner O-3 install the Caddyfile (A2 R4, Tue 24 Nov); O-1 superseded 22 Nov run c: pre-fix logs RETAINED (R5) pending a retention decision.
 - **362 (run d, 2026-11-22):** R5 = retain with **restricted access** (A2 §4.5a after R4); [expiry options](docs/v2/evidence/backlog-20261121/R5-RETENTION-PROPOSAL.md) for the owner; R4 probes extended (magic link, Referer).
+- **362 (run e, 2026-11-22, round 4):** R5 **APPROVED** as retention: §4.5a + owner re-verify + inventory in A2; the 4 Sep file recorded ALREADY ROTATED OUT; **Thu 7 Jan 2027 = earliest disposal REVIEW date** (disposal a separate approval); retained-paths template and review helper. **Next:** A2 R4/R5 (Tue); review on or after 7 Jan 2027.
 - **363 RESOLVED 2026-11-22 (run b)** (S + P-full; history below; G-c re-homed as ISSUE-373, which was resolved 2026-11-22 run d as an accepted residual). Originally: TST-4..9 implemented locally; `settle-afltables` timing out under full parallel load.
 - **364** `next dev` fixed, `node_modules` check (warn-only), lint ratchet `npm run lint:gate`; **next:** owner O-2 wire the lint gate.
 - **Run 2 (2026-11-14):**

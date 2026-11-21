@@ -1,0 +1,363 @@
+# R6/R5 script dry runs on streamanator (run e, 2026-11-21T21:08-21:10Z = Sun 22 Nov 08:08-08:10 AEDT), workspace /mnt/ssd/afldb-backlog-20261122e-orch
+# streamanator is NOT production: it runs a DEV copy (kernel 151, UEFI, LVM, other timers), so production-only expectations FAIL by design.
+# The DEV checkout's release status, settle status and DEV database (read-only transaction) were read by the pre/post dry runs.
+# Nothing here touched production. r6-public-smoke.sh was NOT run (no production HTTP in run e).
+
+## Run 1: r6-pre-verify.sh first version (timer next-elapse helper broken: every 'next=none'; fixed by nxt() before run 2) + refusal paths
+##### pre-verify dry run
+== R6 PRE 2026-11-21T21:08:13Z local Sun 2026-11-22 08:08:13 AEDT host=streamanator user=arm outcome=accepted current=7d92042fd110-TESTBUILD r3:yes r4:yes window=2026-11-22 10:00
+INFO DRY RUN (not production)
+FAIL today is not Wednesday: the first-scheduled-run expectations do not apply; re-plan
+BOOT_ID c3524e47-59ab-4e0f-8050-875471b56b12
+-- 1. kernels and reboot state
+FAIL running 6.8.0-151-generic (expected 6.8.0-137-generic)
+INFO up since 2026-11-21 03:01:19
+     linux-image-6.8.0-149-generic|6.8.0-149.149
+     linux-image-6.8.0-151-generic|6.8.0-151.151
+     linux-image-generic|6.8.0-151.151
+FAIL installed kernel images are 'linux-image-6.8.0-149-generic linux-image-6.8.0-151-generic ' (expected exactly 137 and 149): another kernel would change what boots; STOP, owner decision
+PASS present /boot/vmlinuz-6.8.0-149-generic (15108488 B, 2026-10-23 23:13:08.00000000)
+PASS present /boot/initrd.img-6.8.0-149-generic (76620245 B, 2026-11-13 07:02:14.51459916)
+FAIL missing /boot/vmlinuz-6.8.0-137-generic
+FAIL missing /boot/initrd.img-6.8.0-137-generic
+PASS modules 149 and 137 present
+INFO reboot-required absent
+-- 2. boot facts for the GRUB decision (arm-readable part; grub.cfg itself is root-only: owner step C1)
+INFO firmware UEFI (/sys/firmware/efi present)
+     ii  grub-common 2.12-1ubuntu7.3
+     ii  grub-efi-amd64 2.12-1ubuntu7.3
+     ii  grub-efi-amd64-bin 2.12-1ubuntu7.3
+     ii  grub-efi-amd64-signed 1.202.5+2.12-1ubuntu7.3
+INFO root fs type ext4; /boot: ext4; root source kind LVM-or-MD
+     -rw-r--r-- 1 root root 1024 Nov 21 03:01 /boot/grub/grubenv
+     -rw-r--r-- 1 root root 1538 Sep  1  2025 /etc/default/grub
+     
+     /etc/default/grub.d/:
+     total 0
+     GRUB_DEFAULT=0
+     GRUB_TIMEOUT_STYLE=hidden
+     GRUB_TIMEOUT=0
+     GRUB_DISTRIBUTOR=`( . /etc/os-release; echo ${NAME:-Ubuntu} ) 2>/dev/null || echo Ubuntu`
+     GRUB_CMDLINE_LINUX_DEFAULT=""
+     GRUB_CMDLINE_LINUX=""
+INFO grubenv variables (non-padding lines): ''
+     3bfb893728053e0a /etc/default/grub
+GRUB-BASELINE 96c818dd458f0ade604b0e7432311a9af21c3df4c38c2cf4da34d2a3236d240f
+INFO kernel.panic=0 kernel.panic_on_oops=0
+     Unattended-Upgrade::Automatic-Reboot "true";
+     Unattended-Upgrade::Automatic-Reboot-Time "03:00";
+-- 3. apt/dpkg idle and every timer (the owner re-runs the apt gate immediately before the reboot)
+PASS apt-daily.service inactive
+PASS apt-daily-upgrade.service inactive
+PASS no apt/dpkg/unattended-upgrade process
+     unit-file: afldb-settle-afl-api-brownlow.service static  -
+     unit-file: afldb-settle-afl-api.service          static  -
+     unit-file: afldb-settle-afltables.service        static  -
+     unit-file: afldb.service                         enabled enabled
+     unit-file: afldb-settle-afl-api-brownlow.timer   enabled enabled
+     unit-file: afldb-settle-afl-api.timer            enabled enabled
+PASS afldb-settle-afl-api-brownlow.timer active=active enabled=enabled triggers=afldb-settle-afl-api-brownlow.service (inactive) next=none
+PASS afldb-settle-afl-api.timer active=active enabled=enabled triggers=afldb-settle-afl-api.service (inactive) next=none
+PASS apport-autoreport.timer active=inactive enabled=enabled triggers=apport-autoreport.service (inactive) next=none
+PASS apt-auto-reboot-if-required.timer active=active enabled=enabled triggers=apt-auto-reboot-if-required.service (inactive) next=none
+PASS apt-auto-upgrade.timer active=active enabled=enabled triggers=apt-auto-upgrade.service (inactive) next=none
+PASS apt-daily-upgrade.timer active=active enabled=enabled triggers=apt-daily-upgrade.service (inactive) next=none
+PASS apt-daily.timer active=active enabled=enabled triggers=apt-daily.service (inactive) next=none
+PASS backup-nightly.timer active=active enabled=enabled triggers=backup-nightly.service (failed) next=none
+PASS backup_min.timer active=active enabled=enabled triggers=backup_min.service (inactive) next=none
+PASS custom-update.timer active=inactive enabled=not-found triggers= () next=none
+PASS dpkg-db-backup.timer active=active enabled=enabled triggers=dpkg-db-backup.service (inactive) next=none
+PASS e2scrub_all.timer active=active enabled=enabled triggers=e2scrub_all.service (inactive) next=none
+PASS fstrim.timer active=active enabled=enabled triggers=fstrim.service (inactive) next=none
+PASS fwupd-refresh.timer active=active enabled=enabled triggers=fwupd-refresh.service (inactive) next=none
+PASS logrotate.timer active=active enabled=enabled triggers=logrotate.service (inactive) next=none
+PASS man-db.timer active=active enabled=enabled triggers=man-db.service (inactive) next=none
+PASS mdcheck_continue.timer active=active enabled=enabled triggers=mdcheck_continue.service (inactive) next=none
+PASS mdcheck_start.timer active=active enabled=enabled triggers=mdcheck_start.service (inactive) next=none
+PASS mdmonitor-oneshot.timer active=active enabled=enabled triggers=mdmonitor-oneshot.service (inactive) next=none
+PASS motd-news.timer active=active enabled=enabled triggers=motd-news.service (inactive) next=none
+PASS snapd.snap-repair.timer active=inactive enabled=enabled triggers=snapd.snap-repair.service (inactive) next=none
+PASS sysstat-collect.timer active=active enabled=enabled triggers=sysstat-collect.service (inactive) next=none
+PASS sysstat-summary.timer active=active enabled=enabled triggers=sysstat-summary.service (inactive) next=none
+PASS systemd-tmpfiles-clean.timer active=active enabled=static triggers=systemd-tmpfiles-clean.service (inactive) next=none
+PASS ua-timer.timer active=inactive enabled=enabled triggers=ua-timer.service (inactive) next=none
+PASS update-notifier-download.timer active=active enabled=enabled triggers=update-notifier-download.service (inactive) next=none
+PASS update-notifier-motd.timer active=active enabled=enabled triggers=update-notifier-motd.service (inactive) next=none
+-- 4. services and the release (outcome accepted)
+PASS postgresql@16-main active
+PASS afldb active
+PASS caddy active
+INVOCATION_ID 4fc4359f330848d09b684aa8ebe0b7dc
+     MainPID=2136687
+     NRestarts=5
+     ActiveEnterTimestamp=Sun 2026-11-22 04:09:53 AEDT
+FAIL worker processes 0 (expected 2)
+FAIL current =  (expected 7d92042fd110-TESTBUILD)
+INFO previous = ; checkout HEAD 7d92042fd11010eaa20966e2f49ae7a93e286568
+     release: current  (none)
+     release: previous (none)
+     release: FAIL no current release
+     release: STATUS FAIL
+INFO release.mjs status exit 1
+PASS env counts 1/1
+     AFLDB_SETTLE_STATUS OK
+     unit afldb-settle-afl-api.service: ActiveState=inactive Result=success ExecMainStatus=0
+     unit afldb-settle-afl-api-brownlow.service: ActiveState=inactive Result=success ExecMainStatus=0
+     timer afldb-settle-afl-api.timer: active, last fired Sat 2026-11-21 18:01:19 UTC (3 h ago; limit 36 h)
+INFO settle-failure-status rc 0 (packet R6 prerequisite 5: recorded before the reboot)
+FAIL Caddyfile bff32c85854903372a5b12ea3e1e708503f7ac0e4e851e8dd999cabaf5c9e702 (r4:yes expects f00859d5)
+FAIL R1 host policy not installed (packet R6 prerequisite 4)
+INFO no A1 raw-head baseline: the post-reboot raw-head check is skipped
+INFO R5 directory absent
+-- 5. first scheduled backup (Wed 02:20 unit) and restore check (Wed 03:30 unit)
+FAIL afldb-backup.service last start never Result=success status=0 (expected today 02:20-02:31, success, 0)
+FAIL afldb-backup-verify.service last start never Result=success status=0 (expected today 03:30-03:41, success, 0)
+INFO last-verify.json: file= sha256= attempts=
+INFO last-backup.json: 
+FAIL no afldb_prod-20261122-02[23]*.dump in /home/arm/backups/afldb-scheduled
+FAIL last-verify.json not from today's 03:30 run
+INFO verify attempts= (2 = one benign retry; record it)
+PASS no FAILED marker
+     2026-11-21T21:08:15Z scheduled-backup: STATUS FAIL backup: never recorded (/home/arm/backups/afldb-scheduled/.state/last-backup.json absent)
+     2026-11-21T21:08:15Z scheduled-backup: STATUS FAIL restore verification: never recorded (/home/arm/backups/afldb-scheduled/.state/last-verify.json absent)
+FAIL scheduled-backup.sh status not 0
+INFO dumps held: 0
+     ledger|118|118_fixtures_unconfirmed_participants.sql
+     rt|afldb_restore_test|afldb.restore_test.v1 sha256=e3326b050d4998eda366d84d95d2f258ec78c156167acaa63dfc44c9e027d5bf|0
+PASS ledger 118
+FAIL afldb_restore_test comment or numbackends not as expected
+RESTORE-SHA none
+-- 6. capacity
+     Filesystem                         Size  Used Avail Use% Mounted on
+     /dev/mapper/ubuntu--vg-ubuntu--lv  232G  141G   81G  64% /
+     /dev/sdd2                          2.0G  202M  1.6G  12% /boot
+                    total        used        free      shared  buff/cache   available
+     Mem:           32018        5354        5406         655       22410       26663
+     Swap:           8191        1135        7056
+PASS root fs free 82242 MB >= 6144
+
+R6 PRE RESULT STOP (15 FAIL line(s)): do not reboot; take them to the owner
+rc=1
+##### pre-verify usage refusal
+STOP usage: <accepted|stopped|rolledback> <CURRENT_ID> <r3:yes|no> <r4:yes|no> [10:00|14:00]
+rc=2
+##### pre-verify outcome/id mismatch
+STOP CURRENT_ID does not fit outcome stopped
+rc=2
+##### pre-verify host guard (no dry-run)
+== R6 PRE 2026-11-21T21:08:15Z local Sun 2026-11-22 08:08:15 AEDT host=streamanator user=arm outcome=accepted current=7d92042fd110-X r3:yes r4:yes window=2026-11-22 10:00
+STOP not arm@afldb-prod
+rc=2
+
+## Run 2: final r6-pre-verify.sh (timer lines) and r6-post-verify.sh full/grub, refusal paths
+bash -n OK r6-pre-verify.sh
+bash -n OK r6-post-verify.sh
+##### pre-verify dry run 2 (timers only shown)
+BOOT_ID c3524e47-59ab-4e0f-8050-875471b56b12
+GRUB-BASELINE 96c818dd458f0ade604b0e7432311a9af21c3df4c38c2cf4da34d2a3236d240f
+-- 3. apt/dpkg idle and every timer (the owner re-runs the apt gate immediately before the reboot)
+     unit-file: afldb-settle-afl-api-brownlow.timer   enabled enabled
+     unit-file: afldb-settle-afl-api.timer            enabled enabled
+PASS afldb-settle-afl-api-brownlow.timer active=active enabled=enabled triggers=afldb-settle-afl-api-brownlow.service (inactive) next=Sun 2026-11-22 08:10:00 AEDT
+PASS afldb-settle-afl-api.timer active=active enabled=enabled triggers=afldb-settle-afl-api.service (inactive) next=Mon 2026-11-23 05:00:45 AEDT
+PASS apport-autoreport.timer active=inactive enabled=enabled triggers=apport-autoreport.service (inactive) next=none
+PASS apt-auto-reboot-if-required.timer active=active enabled=enabled triggers=apt-auto-reboot-if-required.service (inactive) next=Mon 2026-11-23 03:00:00 AEDT
+PASS apt-auto-upgrade.timer active=active enabled=enabled triggers=apt-auto-upgrade.service (inactive) next=Mon 2026-11-23 03:16:22 AEDT
+PASS apt-daily-upgrade.timer active=active enabled=enabled triggers=apt-daily-upgrade.service (inactive) next=Mon 2026-11-23 06:57:55 AEDT
+PASS apt-daily.timer active=active enabled=enabled triggers=apt-daily.service (inactive) next=Sun 2026-11-22 14:06:26 AEDT
+##### post-verify full dry run
+== R6 POST full 2026-11-21T21:09:01Z local Sun 2026-11-22 08:09:01 AEDT host=streamanator user=arm expect kernel=6.8.0-149-generic
+INFO DRY RUN (not production)
+-- 1. kernel and boot
+FAIL running 6.8.0-151-generic (expected 6.8.0-149-generic)
+PASS new boot_id c3524e47-59ab-4e0f-8050-875471b56b12
+INFO up since 2026-11-21 03:01:19 (1747 min)
+FAIL uptime 104862s >= 2 h
+PASS reboot-required absent
+INFO kernel cmdline: BOOT_IMAGE=/vmlinuz-6.8.0-151-generic root=/dev/mapper/ubuntu--vg-ubuntu--lv ro
+INFO taint 12289
+-- 2. PostgreSQL, the application and Caddy
+PASS postgresql@16-main active
+PASS afldb active
+PASS caddy active
+PASS pg_isready
+PASS afldb InvocationID new: 4fc4359f330848d09b684aa8ebe0b7dc (the owner attests it as the R6 boot for acceptance step A3)
+INVOCATION_ID 4fc4359f330848d09b684aa8ebe0b7dc
+FAIL afldb NRestarts 5 (restart loop after boot?)
+INFO afldb active since Sun 2026-11-22 04:09:53 AEDT
+FAIL worker processes 0 (expected 2)
+     pid 2136687: URL count 1, SECRET count 1
+PASS revalidation names: equal counts per process (counts only; 1/1 when A1 was accepted)
+FAIL current = 
+     release: current  (none)
+     release: previous (none)
+     release: FAIL no current release
+     release: STATUS FAIL
+INFO release.mjs status exit 1 (a restart note is expected after a reboot)
+FAIL Caddyfile bff32c85854903372a5b12ea3e1e708503f7ac0e4e851e8dd999cabaf5c9e702
+PASS loopback /api/health 200
+     AFLDB_SETTLE_STATUS OK
+     unit afldb-settle-afl-api.service: ActiveState=inactive Result=success ExecMainStatus=0
+     unit afldb-settle-afl-api-brownlow.service: ActiveState=inactive Result=success ExecMainStatus=0
+     timer afldb-settle-afl-api.timer: active, last fired Sat 2026-11-21 18:01:19 UTC (3 h ago; limit 36 h)
+INFO settle-failure-status rc 0 (compare with the pre-reboot record; the timer must be active again)
+-- 3. timers (active, enabled, next due sane)
+PASS afldb-settle-afl-api.timer active, enabled, next Mon 2026-11-23 05:00:45 AEDT
+PASS apt-daily.timer active, enabled, next Sun 2026-11-22 14:06:26 AEDT
+PASS apt-daily-upgrade.timer active, enabled, next Mon 2026-11-23 06:57:55 AEDT
+     NEXT                                   LEFT LAST                               PASSED UNIT                                ACTIVATES
+     Sun 2026-11-22 08:10:00 AEDT            58s Sun 2026-11-22 08:05:00 AEDT  4min 1s ago afldb-settle-afl-api-brownlow.timer afldb-settle-afl-api-brownlow.service
+     Sun 2026-11-22 08:10:00 AEDT            58s Sun 2026-11-22 08:00:14 AEDT     8min ago sysstat-collect.timer               sysstat-collect.service
+     Sun 2026-11-22 08:16:42 AEDT           7min Sun 2026-11-22 07:54:19 AEDT    14min ago fwupd-refresh.timer                 fwupd-refresh.service
+     Sun 2026-11-22 10:07:57 AEDT       1h 58min Sat 2026-11-21 02:31:53 AEDT            - mdmonitor-oneshot.timer             mdmonitor-oneshot.service
+     Sun 2026-11-22 10:43:23 AEDT       2h 34min Sat 2026-11-21 12:32:24 AEDT      19h ago motd-news.timer                     motd-news.service
+     Sun 2026-11-22 14:06:26 AEDT       5h 57min Sat 2026-11-21 20:50:17 AEDT      11h ago apt-daily.timer                     apt-daily.service
+     Mon 2026-11-23 00:00:00 AEDT            15h Sun 2026-11-22 00:00:03 AEDT       8h ago dpkg-db-backup.timer                dpkg-db-backup.service
+     Mon 2026-11-23 00:00:00 AEDT            15h Sun 2026-11-22 00:00:03 AEDT       8h ago logrotate.timer                     logrotate.service
+     Mon 2026-11-23 00:07:00 AEDT            15h Sun 2026-11-22 00:07:00 AEDT       8h ago sysstat-summary.timer               sysstat-summary.service
+     Mon 2026-11-23 00:17:44 AEDT            16h Sun 2026-11-22 05:57:15 AEDT 2h 11min ago mdcheck_continue.timer              mdcheck_continue.service
+     Mon 2026-11-23 01:37:28 AEDT            17h Mon 2026-11-16 01:28:07 AEDT            - fstrim.timer                        fstrim.service
+     Mon 2026-11-23 02:00:00 AEDT            17h Sun 2026-11-22 02:00:14 AEDT       6h ago backup-nightly.timer                backup-nightly.service
+     Mon 2026-11-23 02:02:35 AEDT            17h Sun 2026-11-22 02:02:20 AEDT       6h ago backup_min.timer                    backup_min.service
+     Mon 2026-11-23 03:00:00 AEDT            18h Sun 2026-11-22 03:00:00 AEDT  5h 9min ago apt-auto-reboot-if-required.timer   apt-auto-reboot-if-required.service
+     Mon 2026-11-23 03:06:49 AEDT            18h Sun 2026-11-22 03:06:49 AEDT  5h 2min ago update-notifier-download.timer      update-notifier-download.service
+     Mon 2026-11-23 03:16:22 AEDT            19h Sat 2026-11-21 03:16:22 AEDT 1 day 4h ago apt-auto-upgrade.timer              apt-auto-upgrade.service
+     Mon 2026-11-23 03:16:23 AEDT            19h Sun 2026-11-22 03:16:23 AEDT 4h 52min ago systemd-tmpfiles-clean.timer        systemd-tmpfiles-clean.service
+     Mon 2026-11-23 05:00:45 AEDT            20h Sun 2026-11-22 05:01:19 AEDT  3h 7min ago afldb-settle-afl-api.timer          afldb-settle-afl-api.service
+     Mon 2026-11-23 06:57:55 AEDT            22h Sun 2026-11-22 06:12:48 AEDT 1h 56min ago apt-daily-upgrade.timer             apt-daily-upgrade.service
+     Mon 2026-11-23 11:39:24 AEDT       1 day 3h Sun 2026-11-22 01:13:48 AEDT       6h ago man-db.timer                        man-db.service
+     Tue 2026-11-24 13:48:12 AEDT         2 days Wed 2026-11-18 03:17:06 AEDT            - update-notifier-motd.timer          update-notifier-motd.service
+     Sun 2026-11-29 03:10:01 AEDT         6 days Sun 2026-11-22 03:10:15 AEDT 4h 58min ago e2scrub_all.timer                   e2scrub_all.service
+     Sun 2026-12-06 14:36:11 AEDT 2 weeks 0 days Sun 2026-11-01 18:20:46 AEDT            - mdcheck_start.timer                 mdcheck_start.service
+     -                                         - -                                       - apport-autoreport.timer             apport-autoreport.service
+     -                                         - -                                       - custom-update.timer                 -
+     -                                         - -                                       - snapd.snap-repair.timer             snapd.snap-repair.service
+     -                                         - -                                       - ua-timer.timer                      ua-timer.service
+     
+     27 timers listed.
+FAIL failed units: backup-nightly.service loaded failed failed Nightly backup of Docker configs, /etc, /home/arm, and system snapshots
+-- 4. journal since boot (arm may not read the system journal; the owner's sudo count of step F3 then decides)
+INFO journal err lines since boot (arm view): 5
+-- 5. database, restore target, GRUB, disk
+     ledger|118|118_fixtures_unconfirmed_participants.sql
+     rt|afldb_restore_test|afldb.restore_test.v1 sha256=e3326b050d4998eda366d84d95d2f258ec78c156167acaa63dfc44c9e027d5bf|0
+     pgstart|2026-11-20T16:17:00Z
+PASS ledger 118
+PASS afldb_restore_test present
+     3bfb893728053e0a /etc/default/grub
+INFO grubenv variables (non-padding lines): ''
+PASS GRUB inputs equal the pre-R6 baseline (96c818dd458f0ade604b0e7432311a9af21c3df4c38c2cf4da34d2a3236d240f)
+     Filesystem                         Size  Used Avail Use% Mounted on
+     /dev/mapper/ubuntu--vg-ubuntu--lv  232G  141G   81G  64% /
+PASS root fs free 82242 MB
+
+R6 POST RESULT FAIL (7): see the FAIL lines; runbook section 8 decides (application rollback vs kernel rollback)
+rc=1
+##### post-verify grub dry run
+== R6 POST grub 2026-11-21T21:09:02Z host=streamanator running 6.8.0-151-generic
+INFO DRY RUN (not production)
+     3bfb893728053e0a /etc/default/grub
+INFO grubenv variables (non-padding lines): ''
+PASS GRUB inputs equal the pre-R6 baseline (96c818dd458f0ade604b0e7432311a9af21c3df4c38c2cf4da34d2a3236d240f)
+PASS grubenv has no next_entry/saved_entry (arm view)
+
+R6 GRUB RESULT PASS (arm-readable GRUB state = pre-R6 baseline; the owner's sudo grub.cfg checks of F5 complete it)
+rc=0
+##### post-verify grub mismatch
+== R6 POST grub 2026-11-21T21:09:02Z host=streamanator running 6.8.0-151-generic
+INFO DRY RUN (not production)
+     3bfb893728053e0a /etc/default/grub
+INFO grubenv variables (non-padding lines): ''
+FAIL GRUB inputs 96c818dd458f0ade604b0e7432311a9af21c3df4c38c2cf4da34d2a3236d240f differ from the pre-R6 baseline 0000000000000000000000000000000000000000000000000000000000000000 (a drop-in is still present or a file changed)
+PASS grubenv has no next_entry/saved_entry (arm view)
+
+R6 GRUB RESULT FAIL (1)
+rc=1
+##### post-verify usage
+STOP usage: full <KERNEL> <CURRENT_ID> <PRE_BOOT_ID> <PRE_INVOCATION_ID> <RESTORE_SHA|none> <r4:yes|no> <GRUB_BASELINE>
+rc=2
+##### post-verify host guard
+== R6 POST grub 2026-11-21T21:09:02Z host=streamanator running 6.8.0-151-generic
+STOP not arm@afldb-prod
+rc=2
+
+## Run 3: r6-offhost-verify.sh (A2 not yet run: STOP expected) and r5-retained-paths.sh on a scratch directory (arm-owned: owner/mode FAIL lines expected; sha256sum -c positive and tamper negative)
+##### offhost verify (A2 not yet run: expected FAIL)
+== R6 OFFHOST 2026-11-21T21:09:14Z (Sun 2026-11-22 08:09 AEDT) host=streamanator user=arm dump=afldb_prod-20261125-022001.dump
+FAIL cron r3 line not found
+FAIL no offhost-pull.log rc line stamped today 03:10-03:45 Melbourne
+FAIL scheduled pull result ''
+FAIL log has no 'verified afldb_prod-20261125-022001.dump'
+FAIL dump /mnt/ssd/afldb-offhost-prod/afldb_prod-20261125-022001.dump missing
+FAIL .verified-afldb_prod-20261125-022001.dump missing
+FAIL sidecar /mnt/ssd/afldb-offhost-prod/afldb_prod-20261125-022001.dump.sha256 missing
+PASS no retention hold
+INFO verified dumps held: 0; quarantine entries: 0
+INFO alarms.log entries: 1; newest: AFLDB settle check failed rc=255 at 2026-11-21T18:19:05Z (from streamanator)
+
+R6 OFFHOST RESULT STOP (7)
+rc=1
+##### offhost bad args
+STOP bad arguments
+rc=2
+##### r5 helper on a scratch directory (positive)
+== R5 retained paths 2026-11-21T21:09:14Z host=streamanator dir=<R>
+directory: arm:arm 700  (expected root:root 700)
+-- exact paths (name | bytes | owner:group mode | mtime UTC | sha256)
+<R>/SHA256SUMS | 1134 | arm:arm 600 | 2026-11-21 21:09:14 | f08e6a4d0a6d49b300a03ba86c96cbc6b891a3e22be3aa5f77e5df2a519031ec
+  FAIL owner/mode of <R>/SHA256SUMS
+<R>/afldb-access-2026-09-07T21-28-03.060-size.log.gz | 100 | arm:arm 600 | 2026-11-21 21:09:14 | dd51bafa419aa127fbf7a39da51083723804554ffb6fd88e963bb04422b44e40
+  FAIL owner/mode of <R>/afldb-access-2026-09-07T21-28-03.060-size.log.gz
+<R>/afldb-access-2026-09-14T12-27-36.536-size.log.gz | 100 | arm:arm 600 | 2026-11-21 21:09:14 | e7765b30b79e2291f32b43b39f7a54ade2360fe83031b377827733ae4ea9bcb1
+  FAIL owner/mode of <R>/afldb-access-2026-09-14T12-27-36.536-size.log.gz
+<R>/afldb-access-2026-10-15T13-18-15.638-size.log.gz | 100 | arm:arm 600 | 2026-11-21 21:09:14 | 60daeca9c4ee40c49d6b2b95d222e05b0a6250227ba58898435588e2a94b9bf9
+  FAIL owner/mode of <R>/afldb-access-2026-10-15T13-18-15.638-size.log.gz
+<R>/afldb-access-2026-11-02T07-51-03.012-size.log.gz | 100 | arm:arm 600 | 2026-11-21 21:09:14 | 2e42ee9ebf5855ae16a45c35839a0aedf4ac8287a5f6bda1a5e9fcbd9a78643b
+  FAIL owner/mode of <R>/afldb-access-2026-11-02T07-51-03.012-size.log.gz
+<R>/afldb-access-2026-11-16T05-48-24.848-size.log.gz | 100 | arm:arm 600 | 2026-11-21 21:09:14 | 61778cb39ed5ecb1ea4b7148575c354396d3b978a601973311e4d9320a5cd885
+  FAIL owner/mode of <R>/afldb-access-2026-11-16T05-48-24.848-size.log.gz
+<R>/afldb-access.log.copy-at-r5-20261124T002000Z | 100 | arm:arm 600 | 2026-11-21 21:09:14 | 9014810687e04daef102efdd07de02236d07f0c1f3fe8d80109f3396e842f301
+  FAIL owner/mode of <R>/afldb-access.log.copy-at-r5-20261124T002000Z
+<R>/afldb-apex-2026-09-09T13-26-13.354-size.log.gz | 100 | arm:arm 600 | 2026-11-21 21:09:14 | 279e2bdabdc3035f79066309938ee746fc8b32bbc9259b8cb87e82f948ced305
+  FAIL owner/mode of <R>/afldb-apex-2026-09-09T13-26-13.354-size.log.gz
+<R>/afldb-apex-2026-09-28T10-33-21.243-size.log.gz | 100 | arm:arm 600 | 2026-11-21 21:09:14 | 8483b92989e85a6fbfb751d820c7cb1ad30960a9abad642e51c17034b380332f
+  FAIL owner/mode of <R>/afldb-apex-2026-09-28T10-33-21.243-size.log.gz
+<R>/afldb-apex-2026-10-21T04-04-49.343-size.log.gz | 100 | arm:arm 600 | 2026-11-21 21:09:14 | 6cc7ddaac18646a9432e3762a7e783abec1dfce0de212bb93df2aa103d8179f8
+  FAIL owner/mode of <R>/afldb-apex-2026-10-21T04-04-49.343-size.log.gz
+<R>/afldb-apex.log.copy-at-r5-20261124T002000Z | 100 | arm:arm 600 | 2026-11-21 21:09:14 | 02f38aaa1221672cf87ce6dc0189ec60107ed292f7e5080b843a02e5505bf225
+  FAIL owner/mode of <R>/afldb-apex.log.copy-at-r5-20261124T002000Z
+files: 11; total bytes: 2134
+-- classification
+rolled access files: 5 (expected 5; 4 if Caddy pruned 2026-09-07 before A2)
+rolled apex files:   3 (expected 3, or 4 if the apex log rolled before A2)
+live-file copies:    2 (expected 2)
+not here by design:  /var/log/caddy/afldb-access-2026-09-04T11-02-31.065-size.log.gz (rotated out by Caddy between 14 and 22 Nov 2026; not recoverable from this host)
+SHA256SUMS lines: 10 (expected = files - 1 = 10)
+PASS sha256sum -c SHA256SUMS
+-- deletion-approval list (exact paths; for the owner's decision only; this script deletes nothing)
+<R>/SHA256SUMS
+<R>/afldb-access-2026-09-07T21-28-03.060-size.log.gz
+<R>/afldb-access-2026-09-14T12-27-36.536-size.log.gz
+<R>/afldb-access-2026-10-15T13-18-15.638-size.log.gz
+<R>/afldb-access-2026-11-02T07-51-03.012-size.log.gz
+<R>/afldb-access-2026-11-16T05-48-24.848-size.log.gz
+<R>/afldb-access.log.copy-at-r5-20261124T002000Z
+<R>/afldb-apex-2026-09-09T13-26-13.354-size.log.gz
+<R>/afldb-apex-2026-09-28T10-33-21.243-size.log.gz
+<R>/afldb-apex-2026-10-21T04-04-49.343-size.log.gz
+<R>/afldb-apex.log.copy-at-r5-20261124T002000Z
+<R>/  (the directory, after its files)
+
+R5 RETAINED RESULT FAIL (11)
+rc=0
+##### r5 helper negative (owner/mode check reports arm:arm; altered file)
+sha256sum: WARNING: 1 computed checksum did NOT match
+  FAIL owner/mode of <R>/SHA256SUMS
+  FAIL owner/mode of <R>/afldb-access-2026-09-07T21-28-03.060-size.log.gz
+  FAIL owner/mode of <R>/afldb-access-2026-09-14T12-27-36.536-size.log.gz
+  FAIL owner/mode of <R>/afldb-access-2026-10-15T13-18-15.638-size.log.gz
+  FAIL owner/mode of <R>/afldb-access-2026-11-02T07-51-03.012-size.log.gz
+rc=0
+##### r5 helper not root
+STOP run as root (sudo bash r5-retained-paths.sh)
+rc=2

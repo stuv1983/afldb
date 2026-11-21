@@ -29,6 +29,11 @@ rule and risks. Recommendation: T-1.
 
 **Owner decision (2026-11-22, written, relayed by the main session after the options were written): T-1 APPROVED**, start **09:20 AEDT on Tue 24 Nov 2026**. The window change is approved: 09:20-09:30 read-only P1 + raw-head baseline; 09:30-09:55 P2 fast-forward of the production checkout to `7d92042f` exactly, P3 build, P3b; 10:00 promote, env, owner restart; A2 starts 10:30, R4 after P6 ends (about 10:45); the latest-restart rule stays 10:45.
 
+**Note (2026-11-22, run e, owner decision 6 of round 4; closure LOW C-F-001).** The text above is the owner's decision, kept
+verbatim. Its "R4 after P6 ends (about 10:45)" is stated consistently as: P6 ends about 10:45-10:48; R4 is scheduled
+11:00-11:20 (runbook §4.5 table), gated on P6 PASS, never started after 11:35. T-1 and the 10:45 latest-restart rule are unchanged
+(10:45 is the restart rule, not the P6 estimate).
+
 ## 3. Crons (decision 3): APPROVED with preconditions
 
 - **r2** hourly `17 * * * *` settle check: installed in A2 only after its first manual run succeeds (§4.2 step 3), then a

@@ -1,0 +1,16 @@
+== i348 privcheck 2026-11-21T21:12:25Z host=afldb-prod user=arm
+session|afldb_backup|afldb_prod|on|16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)
+member_pg_read_all_data|t
+schema_usage_public|t
+table|data_edits|t|f|f|9|0|f
+table|data_overrides|t|f|f|9|0|f
+table|draft_persons|t|f|f|14|0|f
+table|draft_picks|t|f|f|32|0|f
+table|external_identities|t|f|f|10|0|f
+table|import_batches|t|f|f|14|0|f
+table|player_link_resolutions|t|f|f|12|0|f
+table|players|t|f|f|23|0|f
+table|sources|t|f|f|7|0|f
+psql exit 0
+INFO afldb_backup is a member of pg_read_all_data
+PRIVCHECK RESULT PASS (afldb_backup: SELECT on all 9 relations and every column, USAGE on public, no RLS, no write privilege)
