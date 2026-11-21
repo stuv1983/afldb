@@ -6,7 +6,9 @@ resolved locally** (`36510bd9`, cherry-picked from `f05172a8`; not published, no
 real admin publish ([evidence](docs/v2/evidence/issue371-20261121/README.md)). Its generic residual is new **AFLDB-ISSUE-372**
 (Low). Production-operations decisions and approval requests for 332/348/350/351/352/357/362/364 and the retained-artefact
 inventory: [OWNER-PACKET.md](docs/v2/evidence/backlog-20261121/OWNER-PACKET.md) (`35a690ea`). Ten open issues: 332, 348, 350,
-351, 352, 357, 362, 363, 364 and **372**.
+351, 352, 357, 362, 363, 364 and **372**. Combined tip `2efb81dc` independently verified (typecheck, `lint:gate`, unit and
+Brownlow/awards integration equal to the 7R3 baseline, build): [TIP-VERIFICATION.md](docs/v2/evidence/backlog-20261121/TIP-VERIFICATION.md).
+Follow-up `7f73f8f9`/`3b79af70` fixed the two LOW 363 residues; `38e154f6` added the ISSUE-372 guard and inventory.
 
 **Current state, 21 November 2026 (Release 7R3 executed; ISSUE-370 RESOLVED; ISSUE-371 opened).** Under approval R7R3
 (Sat 21 Nov 17:00–20:30 AEDT) `origin/main` moved to PREP `4f5fc9c9` and production now serves
@@ -34,7 +36,7 @@ open issues: 332, 348, 350, 351, 352, 357, 362, 363, 364 and **370**.
 | Issue | Severity | Next action |
 |---|---|---|
 | 352 · backup retention | Medium | Retry defect fixed (`35bbc67f`, durable `.retention-hold`, red/green), published and in the serving tree `c8d4202a`; nothing installed. Owner D-HO-2/3/5/7, then attended installation. |
-| 372 · a cached 404 that becomes a page can keep the not-found head on an uninvalidated worker | Low | Opened 2026-11-21 from the ISSUE-371 reproduction (Next 16.3.1 stale-404 background regeneration). Inventory ISR routes that can go 404 → 200 and the invalidations that reach every worker; decide extend fan-out / tag invalidation / accept one window. See `issues.md`. |
+| 372 · a cached 404 that becomes a page can keep the not-found head on an uninvalidated worker | Low | Opened 2026-11-21 from the ISSUE-371 reproduction (Next 16.3.1 stale-404 background regeneration). Inventory done (local `38e154f6`): no ISSUE-371-form call remains, a guard test fails on it; nine routes can go 404 → 200; the nightly invalidates nothing (D-232-3); only seasons/brownlow fan out, if production sets `AFLDB_REVALIDATE_*`. **Owner:** option A (recommended: accept one window + ISSUE-350 runbook fan-out step + read-only production env check), B or C (`docs/v2/evidence/issue372-20261121/README.md`). |
 
 > Lightweight session index of open issues only.
 >
@@ -198,7 +200,7 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 - **Published 2026-11-16 (`origin/main` = `a2e6ea99`):**
   - **363:** **Next:** owner decision G-1; test-isolation follow-up for T-2's residue (`awards-reload-links` restores only `award_winners` rows and award spans; `award_nominations`, `hall_of_fame`, `honour_team_members`, `captaincies` content and `import_batches` growth still differ after a shared run).
 - **2026-11-21 (backlog run, local, unpublished):**
-  - **363:** T-2 residue **fixed** (`df25d0d0`): the file restores all five honours tables and its import batches; whole database equal to its base after a shared run on the accepted rebuild and the 4 Nov snapshot; per-file 109/109. G-1 measured (full tracked GAP-029 layer passes G-a/G-b, equal to the snapshot; G-c fails on every base). **Next:** owner G-1 + G-c disposition (`docs/v2/evidence/issue363-20261121/README.md` §5); publish; two LOW shared-mode residues.
+  - **363:** T-2 residue **fixed** (`df25d0d0`): the file restores all five honours tables and its import batches; whole database equal to its base after a shared run on the accepted rebuild and the 4 Nov snapshot; per-file 109/109. G-1 measured (full tracked GAP-029 layer passes G-a/G-b, equal to the snapshot; G-c fails on every base). Both LOW shared-mode residues fixed red/green (`7f73f8f9` special-records `imported_at` truncation; `3b79af70` Brownlow fixture late seed after sweep), closure-verified. **Next:** owner G-1 + G-c disposition (`docs/v2/evidence/issue363-20261121/README.md` §5); publish.
 - Details: their `issues.md` entries.
 
 **AFLDB-ISSUE-366 resolved locally 2026-11-19** (qualified on streamanator; local commit, not published or deployed). Successor B1a procedure in `tools/v2/b1a-successor/`: R1 decides only when the attempt and its transaction are terminal and exits with its verdict; P6 is bound to the P3c BEFORE capture and refuses drift before the UPDATE; the reversal requires the exact repaired image (content fingerprints) and `--approval-ref`; P10's three controls are in its verdict. `release.mjs status` and `post-install-check.sh` take `--confirm-restart-invocation <InvocationID>`, passed to S7 and S8. Unit 88/88, integration 14/14 on disposable PostgreSQL 16, typecheck clean. Synthetic only; the successor procedure needs its own owner approval before use. Removed from this index and the Open Issues table. Record: its `issues.md` entry; runbook `issues/closed/AFLDB-ISSUE-366.md`.
