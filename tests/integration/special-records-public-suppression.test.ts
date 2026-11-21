@@ -70,6 +70,66 @@ afterAll(async () => {
 });
 
 /**
+ * ISSUE-363 follow-up (2026-11-21): shared-mode residue. On both the accepted rebuild and the 4 Nov snapshot this file
+ * left exactly one `player_achievements` row changed, in one column: `imported_at` of the provenance witness, cut from
+ * microseconds to milliseconds (`…25.727528+00` -> `…25.727+00`). The restore passed the saved text as `$1::timestamptz`,
+ * so postgres.js typed the parameter timestamptz and serialised it through a JS `Date`. The restore now casts from text
+ * on the server. And, following awards-reload-links.test.ts, every row of the two special-record tables is captured
+ * before any block runs: the columns this file writes (`status`, `status_reason`, `imported_at`) are put back
+ * set-based at teardown, in SQL, with no client-side value conversion. The whole-table fingerprints of both tables and
+ * of `sources` are then compared, and the file fails on any remaining difference.
+ */
+const RESTORED_TABLES = ['player_achievements', 'after_siren_kicks'] as const;
+const VERIFIED_TABLES = [...RESTORED_TABLES, 'sources'] as const;
+type SpecialRecordsAtStart = { docs: Map<string, string>; fp: Map<string, { fp: string; n: number }> };
+let atStart: SpecialRecordsAtStart | null = null;
+
+async function tableState(table: (typeof VERIFIED_TABLES)[number]): Promise<{ fp: string; n: number }> {
+  const [t] = await sql<{ fp: string; n: number }[]>`
+    SELECT md5(coalesce(string_agg(to_jsonb(t)::text, '|' ORDER BY t.id), '')) AS fp, count(*)::int AS n FROM ${sql(table)} t`;
+  return t;
+}
+
+beforeAll(async () => {
+  const docs = new Map<string, string>();
+  for (const table of RESTORED_TABLES) {
+    const [d] = await sql<{ docs: string }[]>`
+      SELECT coalesce(jsonb_agg(jsonb_build_object('id', t.id, 'status', t.status, 'status_reason', t.status_reason,
+                                                   'imported_at', t.imported_at) ORDER BY t.id), '[]'::jsonb)::text AS docs
+        FROM ${sql(table)} t`;
+    docs.set(table, d.docs);
+  }
+  const fp = new Map<string, { fp: string; n: number }>();
+  for (const table of VERIFIED_TABLES) fp.set(table, await tableState(table));
+  atStart = { docs, fp };
+}, 120_000);
+
+async function restoreSpecialRecordsAtStart(): Promise<void> {
+  const start = atStart;
+  if (!start) return;
+  await sql.begin(async (tx) => {
+    for (const table of RESTORED_TABLES) {
+      await tx`
+        UPDATE ${tx(table)} t
+           SET status = r.status, status_reason = r.status_reason, imported_at = r.imported_at
+          FROM jsonb_to_recordset(${start.docs.get(table)!}::text::jsonb)
+               AS r(id bigint, status text, status_reason text, imported_at timestamptz)
+         WHERE t.id = r.id
+           AND (t.status, t.status_reason, t.imported_at) IS DISTINCT FROM (r.status, r.status_reason, r.imported_at)`;
+    }
+  });
+  const differ: string[] = [];
+  for (const table of VERIFIED_TABLES) {
+    const s = start.fp.get(table)!;
+    const after = await tableState(table);
+    if (after.fp !== s.fp) differ.push(`${table} (${s.n} row(s) at start, ${after.n} after restore)`);
+  }
+  if (differ.length) {
+    throw new Error(`special-records-public-suppression did not restore the pre-existing state; still different: ${differ.join('; ')}`);
+  }
+}
+
+/**
  * Void one row for the duration of `fn`, then restore it unconditionally.
  *
  * The restore is `status = 'active', status_reason = NULL` rather than a
@@ -214,9 +274,13 @@ afterAll(async () => {
     expect(await voidCounts(), 'this suite must leave no void row behind')
       .toEqual({ achievements: 0, kicks: 0 });
   } finally {
-    await removeUnlinkedFixture();
+    try {
+      await removeUnlinkedFixture();
+    } finally {
+      await restoreSpecialRecordsAtStart();
+    }
   }
-});
+}, 120_000);
 
 function achievementPlan(kind: 'by_club' | 'by_season' | 'clubs_without' | 'earliest'): NlQueryPlan {
   const validated = validatePlan({
@@ -343,7 +407,8 @@ describe('/records/first-kick-goal — the public records board', () => {
       const after = await withVoid('player_achievements', id, () => getFirstKickGoalProvenance());
       expect(after!.importedAt!.getTime()).toBeLessThan(before!.importedAt!.getTime());
     } finally {
-      await sql`UPDATE player_achievements SET imported_at = ${saved.importedAt}::timestamptz WHERE id = ${id}`;
+      // `::text` first: as `$1::timestamptz` postgres.js serialises the parameter through a JS Date (milliseconds).
+      await sql`UPDATE player_achievements SET imported_at = ${saved.importedAt}::text::timestamptz WHERE id = ${id}`;
     }
   });
 });
