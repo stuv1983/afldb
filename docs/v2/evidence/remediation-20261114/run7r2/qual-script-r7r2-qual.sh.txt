@@ -1,0 +1,140 @@
+#!/usr/bin/env bash
+# Release 7 revision 2 (D-365-W, ISSUE-366, closeout 367/368/369/352) DEV qualification of candidate a3c8c67c in a disposable workspace on streamanator.
+# No DEV service, DEV database, DEV checkout or production contact: own tree, own node_modules, own isolated PostgreSQL cluster.
+set -uo pipefail; export LC_ALL=C
+CAND=a3c8c67cc98fc35e963795e331e7217a24ccf1e0
+W=/mnt/ssd/afldb-rel7r2-20261121; E=$W/evidence; C=$W/cand
+export PATH=/home/arm/.nvm/versions/node/v22.23.2/bin:$PATH
+export AFLDB_V2_PG_ROOT=$W/pg-root AFLDB_V2_PG_BIN=/usr/lib/postgresql/16/bin AFLDB_V2_PG_PORT=55670
+mkdir -p "$C" "$E"; S=$E/SUMMARY.txt; : > "$S"
+rec() { echo "$*" | tee -a "$S"; }
+run() { local name=$1; shift; local t0=$(date +%s); "$@" > "$E/$name.log" 2>&1; local rc=$?; rec "STEP $name rc=$rc ($(( $(date +%s) - t0 ))s)"; return $rc; }
+rec "== release-7R2 DEV qualification $(date -u +%FT%TZ) host=$(hostname) node $(node --version) candidate $CAND"
+cd "$C"
+# 1. exact tree: every blob of the candidate equals the extracted file (git hash-object), no extra files.
+tar -xzf "$W/r7r2-cand.tgz"
+awk '{print $4}' "$W/r7r2-tree.txt" > "$E/tree-paths.txt"
+git hash-object --stdin-paths < "$E/tree-paths.txt" > "$E/tree-hashes.txt"
+paste -d' ' <(awk '{print $3}' "$W/r7r2-tree.txt") "$E/tree-hashes.txt" | awk '$1!=$2{n++} END{print n+0}' > "$E/tree-mismatch.txt"
+extra=$(comm -13 <(sort "$E/tree-paths.txt") <(find . -type f | sed 's|^\./||' | sort) | wc -l)
+rec "TREE entries=$(wc -l < "$E/tree-paths.txt") blob-mismatches=$(cat "$E/tree-mismatch.txt") extra-files=$extra"
+rec "TREE key files: $(sha256sum src/lib/format.ts deploy/release.mjs deploy/post-install-check.sh src/db/queries/rounds.ts tools/aflw/load_staging.py tools/db/migrate.ts | awk '{printf "%s=%s ", $2, substr($1,1,12)}')"
+# 2-5. install, typecheck, lint gate, unit suite (integration excluded: it needs its own database below).
+run npm-ci npm ci --no-audit --no-fund
+run typecheck npm run typecheck
+run lint-gate npm run lint:gate; tail -n 5 "$E/lint-gate.log" | sed 's/^/  lint-gate: /' | tee -a "$S"
+run unit node node_modules/vitest/vitest.mjs run --exclude 'tests/integration/**'
+sed 's/\x1b\[[0-9;]*m//g' "$E/unit.log" | grep -E '^ +(Test Files|Tests) ' | sed 's/^/  unit: /' | tee -a "$S"
+run unit-focused node node_modules/vitest/vitest.mjs run tests/format.test.ts tests/b1a-successor-lib.test.ts tests/deploy-release.test.ts tests/catalogue-lookups.test.ts tests/deploy-web-unit.test.ts tests/reference-data.test.ts
+sed 's/\x1b\[[0-9;]*m//g' "$E/unit-focused.log" | grep -E '^ +(Test Files|Tests) |^ (✓|×|❯) tests/' | sed 's/^/  focused: /' | tee -a "$S"
+bash -n tools/v2/b1a-successor/sitting/*.sh deploy/post-install-check.sh && rec "STEP bash-n rc=0 (successor blocks + post-install-check.sh)"
+for f in tools/v2/b1a-successor/sitting/*.sh deploy/post-install-check.sh; do bash -n "$f" || rec "bash -n FAIL $f"; done
+# 6. isolated cluster: integration suites for the shipped tooling and the Brownlow rule.
+ISO="node --import tsx tools/v2/isolated-pg.ts"
+run pg-init bash -c "$ISO init && $ISO start && $ISO roles && $ISO create-db afldb_v2_r7r2_test && $ISO create-db afldb_v2_r7r2app_test"
+run migrate-integ $ISO run afldb_v2_r7r2_test -- node --import tsx tools/db/migrate.ts --target test
+run integ $ISO run afldb_v2_r7r2_test -- node node_modules/vitest/vitest.mjs run tests/integration/b1a-successor.test.ts tests/integration/brownlow-pending-coverage.test.ts
+cat > "$C/r7r2-seed-integ.mjs" <<'JS'
+import postgres from 'postgres';
+const sql = postgres(process.env.AFLDB_TEST_DATABASE_URL, { max: 1, onnotice: () => {} });
+await sql.begin(async (tx) => {
+  await tx`INSERT INTO sources (key, name, kind) VALUES ('afltables', 'AFL Tables', 'scrape') ON CONFLICT (key) DO NOTHING`;
+  const [{ n }] = await tx`SELECT count(DISTINCT organization_id)::int AS n FROM clubs`;
+  for (let i = n; i < 2; i += 1) {
+    await tx`SET CONSTRAINTS clubs_current_identity_id_fkey DEFERRED`;
+    const [org] = await tx`INSERT INTO club_organizations (name, slug) VALUES (${`R7R2 Org ${i}`}, ${`r7r2-org-${i}`}) RETURNING id`;
+    const [club] = await tx`INSERT INTO clubs (slug, name, short_name, abbreviation, current_identity_id, legacy_club_hist, organization_id)
+      VALUES (${`r7r2-club-${i}`}, ${`R7R2 Club ${i}`}, ${`R7R2 ${i}`}, ${`RR${i}`}, -1, ${`r7r2-club-${i}`}, ${org.id}) RETURNING id`;
+    await tx`UPDATE clubs SET current_identity_id = ${club.id} WHERE id = ${club.id}`;
+  }
+});
+await sql.end(); console.log('SEED-INTEG ok');
+JS
+run privileges-integ $ISO run afldb_v2_r7r2_test -- node --import tsx tools/db/privileges.ts --target test
+run seed-integ $ISO run afldb_v2_r7r2_test -- node r7r2-seed-integ.mjs; rm -f r7r2-seed-integ.mjs
+run integ-closeout $ISO run afldb_v2_r7r2_test -- node node_modules/vitest/vitest.mjs run tests/integration/database.test.ts -t 'AFLDB-ISSUE-36[79]'
+sed 's/\x1b\[[0-9;]*m//g' "$E/integ-closeout.log" | grep -E '^ +(Test Files|Tests) |^ +(✓|×) ' | sed 's/^/  integ-closeout: /' | tee -a "$S"
+sed 's/\x1b\[[0-9;]*m//g' "$E/integ.log" | grep -E '^ +(Test Files|Tests) |^ (✓|×|❯) tests/' | sed 's/^/  integ: /' | tee -a "$S"
+# 7. production build against a migrated, seeded database (synthetic players only).
+run migrate-app $ISO run afldb_v2_r7r2app_test -- node --import tsx tools/db/migrate.ts --target test
+cat > "$W/seed.mjs" <<'JS'
+import postgres from 'postgres';
+const sql = postgres(process.env.AFLDB_TEST_DATABASE_URL);
+await sql.begin(async (tx) => {
+  await tx`INSERT INTO seasons (year, league, status) VALUES (1943,'VFL','complete'),(2024,'AFL','complete'),(2025,'AFL','complete'),(2026,'AFL','complete')`;
+  await tx`INSERT INTO players (id, display_name, sort_name, search_name, slug) VALUES
+    (990365,'Dee Wording','Wording, Dee','dee wording','dee-wording'), (990366,'Pat Pending','Pending, Pat','pat pending','pat-pending')`;
+  await tx`INSERT INTO player_season_stats (player_id, season, games, brownlow_status, brownlow_votes) VALUES
+    (990365,1943,10,'not_applicable',NULL),(990365,2024,11,'not_collected',NULL),(990365,2025,12,'complete',0),(990365,2026,13,'pending',NULL),
+    (990366,2025,20,'complete',0),(990366,2026,21,'pending',NULL)`;
+  await tx`INSERT INTO players (id, display_name, sort_name, search_name, slug) VALUES (990367,'Rory Roundvote','Roundvote, Rory','rory roundvote','rory-roundvote')`;
+  await tx`INSERT INTO brownlow_round_votes (season, player_id, round_number, played, votes) VALUES (2025,990367,1,true,3),(2026,990367,1,true,2)`;
+  await tx`INSERT INTO stat_availability (stat_key, season, is_recorded, coverage) VALUES ('brownlow_season_total',2025,true,'complete'),('brownlow_season_total',2026,false,'pending')`;
+});
+for (const r of await sql`SELECT s.player_id, s.season, se.status, s.brownlow_status, s.brownlow_votes FROM player_season_stats s JOIN seasons se ON se.year=s.season ORDER BY 1,2`)
+  console.log(`seed ${r.player_id} ${r.season} season=${r.status} brownlow=${r.brownlow_status} votes=${r.brownlow_votes}`);
+await sql.end();
+JS
+cp "$W/seed.mjs" ./rel7-seed.mjs; run seed $ISO run afldb_v2_r7r2app_test -- node rel7-seed.mjs; rm -f rel7-seed.mjs; cat "$E/seed.log" | grep '^seed' | tee -a "$S"
+export AFLDB_SESSION_SECRET=$(head -c 32 /dev/urandom | base64 | tr -d '\n') AFLDB_BETA_GATE=on AFLDB_BETA_EPOCH=1 NEXT_TELEMETRY_DISABLED=1
+export AFLDB_ENV=production AFLDB_BASE_URL=http://127.0.0.1:3368
+run build $ISO run afldb_v2_r7r2app_test -- npm run build
+grep -E 'Compiled|Linting|type|Generating static|error' "$E/build.log" | head -8 | sed 's/^/  build: /' | tee -a "$S"
+rec "BUILD_ID $(cat .next/BUILD_ID 2>/dev/null) standalone $(cat .next/standalone/.next/BUILD_ID 2>/dev/null)"
+# 8. production server (standalone, beta gate on): rendered BV cells, P10-shaped samples, the anonymous redirect.
+cat > "$W/observe.mjs" <<'JS'
+import { chromium } from '@playwright/test';
+const cookie = process.argv[2]; const [name, value] = [cookie.slice(0, cookie.indexOf('=')), cookie.slice(cookie.indexOf('=') + 1)];
+const b = await chromium.launch({ headless: true });
+for (const vp of [{ width: 1280, height: 900, tag: 'desktop' }, { width: 412, height: 915, tag: 'mobile' }]) {
+  const ctx = await b.newContext({ viewport: { width: vp.width, height: vp.height } });
+  await ctx.addCookies([{ name, value, url: 'http://127.0.0.1:3368' }]);
+  const p = await ctx.newPage();
+  const r = await p.goto('http://127.0.0.1:3368/players/dee-wording-990365', { waitUntil: 'networkidle', timeout: 120000 });
+  console.log(`playwright ${vp.tag} status ${r.status()} url ${p.url()}`);
+  const table = p.getByRole('table', { name: /not recorded in that era/ });
+  for (const row of await table.locator('tbody tr').all()) {
+    const cells = row.locator('td'); const n = await cells.count(); const bv = cells.nth(n - 1);
+    console.log(`ROW ${vp.tag} season=${(await cells.nth(0).innerText()).trim().split(/\s+/)[0]} bvText=${JSON.stringify((await bv.innerText()).trim())} bvTitle=${JSON.stringify(await bv.getAttribute('title'))} visible=${await bv.isVisible()}`);
+  }
+  await p.screenshot({ path: `${process.argv[3]}/player-990365-${vp.tag}.png`, fullPage: true });
+  await ctx.close();
+}
+await b.close();
+JS
+cp "$W/observe.mjs" ./rel7-observe.mjs
+cat > "$W/serve.sh" <<'SH'
+set -u; E=$1
+NODE_ENV=production HOSTNAME=127.0.0.1 PORT=3368 node .next/standalone/server.js > "$E/server.log" 2>&1 &
+SP=$!
+for i in $(seq 1 60); do curl -s -o /dev/null -m 5 http://127.0.0.1:3368/api/health && break; sleep 2; done
+echo "health $(curl -s -m 10 http://127.0.0.1:3368/api/health)"
+CK=$(node -e 'const{createHmac}=require("crypto");const e=process.env;
+const p=Buffer.from(JSON.stringify({v:1,kind:"beta",sub:"r7r2-dev",exp:Math.floor(Date.now()/1000)+900,epoch:Number(e.AFLDB_BETA_EPOCH??1)}));
+process.stdout.write("afldb_beta="+p.toString("base64url")+"."+createHmac("sha256",e.AFLDB_SESSION_SECRET).update(p).digest().toString("base64url"))')
+T=$(mktemp)
+hit() { curl -s -m 120 -H "Cookie: $CK" -o "$T" -w '%{http_code}' "http://127.0.0.1:3368$1" || true; }
+cnt() { grep -o "$1" "$T" | wc -l || true; }
+for y in 2025 2026; do c=$(hit /seasons/$y); echo "367 /seasons/$y code=$c roundvote_player=$(cnt 'Rory Roundvote') novotes=$(cnt 'No votes recorded for')"; done
+echo "anon /players/pat-pending-990366: $(curl -s -m 60 -o /dev/null -w '%{http_code} %{redirect_url}' http://127.0.0.1:3368/players/pat-pending-990366)"
+c=$(hit /players/dee-wording-990365); cp "$T" "$E/player-990365.html"
+echo "html 990365 code=$c"; grep -o '<td[^>]*title="[^"]*"[^>]*>[^<]*</td>' "$T" | sed 's/^/  cell /'
+bad=0; n=0
+for i in $(seq 1 16); do c=$(hit /players/pat-pending-990366); n=$((n+1))
+  ny=$(cnt 'Results not loaded'); pn=$(cnt 'Brownlow Medal results for this season have not been loaded yet'); nm=$(cnt 'No medal'); na=$(cnt 'No Brownlow Medal was awarded for this season')
+  iy=$(cnt 'Not yet awarded'); ip=$(cnt 'still in progress; the Brownlow Medal has not been awarded')
+  [ $i = 1 ] && echo "sample /players/pat-pending-990366 $c notloaded=$ny pendnote=$pn nomedal=$nm nanote=$na interim=$iy interimnote=$ip"
+  { [ "$c" = 200 ] && [ "$ny" -ge 1 ] && [ "$pn" -ge 1 ] && [ "$nm" = 0 ] && [ "$na" = 0 ] && [ "$iy" = 0 ] && [ "$ip" = 0 ]; } || bad=$((bad+1))
+done
+echo "P10-SHAPED after-mode samples=$n bad=$bad (player 990366, the successor P10 per-sample rule)"
+echo "/brownlow/2026 $(hit /brownlow/2026)  /seasons/2026 $(hit /seasons/2026) novotes=$(cnt 'No votes recorded for')"
+node rel7-observe.mjs "$CK" "$E" || echo "observe rc=$?"
+rm -f "$T"; kill $SP; wait $SP 2>/dev/null || true
+SH
+run serve $ISO run afldb_v2_r7r2app_test -- bash "$W/serve.sh" "$E"
+grep -vE '^isolated-pg: ' "$E/serve.log" | tee -a "$S"
+rm -f rel7-observe.mjs
+grep -ciE 'error|unhandled' "$E/server.log" | sed 's/^/server.log error|unhandled lines: /' | tee -a "$S"
+run pg-stop $ISO stop
+rec "== done $(date -u +%FT%TZ)"
+echo R7R2-QUAL-COMPLETE >> "$S"

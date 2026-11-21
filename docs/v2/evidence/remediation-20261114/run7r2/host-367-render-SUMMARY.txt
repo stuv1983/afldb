@@ -1,0 +1,37 @@
+== R7R2 367 render 2026-11-21T01:38:53Z BUILD_ID q9RjUGEMc7ecXfA7ryW0l
+MATCH 2025 1
+MATCH 2026 2
+AVAIL 2025 complete
+AVAIL 2026 pending
+STEP seed rc=0
+ISR cleared .next/standalone/.next/server/app/seasons/2025.html
+ISR cleared .next/standalone/.next/server/app/seasons/2025.meta
+ISR cleared .next/standalone/.next/server/app/seasons/2025.rsc
+ISR cleared .next/standalone/.next/server/app/seasons/2025.segments
+ISR cleared .next/standalone/.next/server/app/seasons/2025.segments/_full.segment.rsc
+ISR cleared .next/standalone/.next/server/app/seasons/2025.segments/_index.segment.rsc
+ISR cleared .next/standalone/.next/server/app/seasons/2025.segments/_tree.segment.rsc
+ISR cleared .next/standalone/.next/server/app/seasons/2025.segments/seasons
+ISR cleared .next/standalone/.next/server/app/seasons/2025.segments/seasons/$d$year
+ISR cleared .next/standalone/.next/server/app/seasons/2025.segments/seasons/$d$year/__PAGE__.segment.rsc
+ISR cleared .next/standalone/.next/server/app/seasons/2026.html
+ISR cleared .next/standalone/.next/server/app/seasons/2026.meta
+ISR cleared .next/standalone/.next/server/app/seasons/2026.rsc
+ISR cleared .next/standalone/.next/server/app/seasons/2026.segments
+ISR cleared .next/standalone/.next/server/app/seasons/2026.segments/_full.segment.rsc
+ISR cleared .next/standalone/.next/server/app/seasons/2026.segments/_index.segment.rsc
+ISR cleared .next/standalone/.next/server/app/seasons/2026.segments/_tree.segment.rsc
+ISR cleared .next/standalone/.next/server/app/seasons/2026.segments/seasons
+ISR cleared .next/standalone/.next/server/app/seasons/2026.segments/seasons/$d$year
+ISR cleared .next/standalone/.next/server/app/seasons/2026.segments/seasons/$d$year/__PAGE__.segment.rsc
+health {"status":"ok","database":"ok","latencyMs":1}
+SEASON 2025 code=200 roundvote_player=2 round1_heading=5
+SEASON 2026 code=200 roundvote_player=0 round1_heading=5
+MATCH 2025 /matches/1 code=200 player=3 bv_header=1
+MATCH 2026 /matches/2 code=200 player=3 bv_header=0
+GAMELOG code=200 bv_header=1
+GAMELOG ROW season=2026 bvIndex=15 bv="—"
+GAMELOG ROW season=2025 bvIndex=15 bv="3"
+server.log error|unhandled lines: 0
+STEP pg-stop rc=0
+R367-RENDER-COMPLETE

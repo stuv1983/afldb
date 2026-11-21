@@ -15,9 +15,9 @@ commit.
 
 ## [Unreleased]
 
-### Closeout fixes: AFLW replacement, Brownlow publication gate, read-only migration status, off-host retention (ISSUE-368, 367, 369, 352; 2026-11-21, local)
+### Closeout fixes: AFLW replacement, Brownlow publication gate, read-only migration status, off-host retention (ISSUE-368, 367, 369, 352; 2026-11-21)
 
-Qualified red/green on streamanator against disposable PostgreSQL 16 ([record](docs/v2/evidence/closeout-20261121/QUALIFICATION.md)). Not published, not deployed; nothing ran against DEV or production.
+Qualified red/green on streamanator against disposable PostgreSQL 16 ([record](docs/v2/evidence/closeout-20261121/QUALIFICATION.md)). Published to `origin/main` at `a3c8c67c` on 2026-11-21; not deployed (release packet 7R2 prepared, awaiting approval). Nothing ran against DEV or production.
 
 #### Fixed
 - **AFLW staging replacement (ISSUE-368):** the parser writes every table plus a `manifest.json` (SHA-256 and row count per file); `load_staging.py` refuses a missing manifest, a changed, stale or missing file, an empty core table or inconsistent seasons, fixtures, matches and player statistics before connecting, and loads exactly the rows it verified. A header-only extract can no longer empty the public AFLW views. New `--seal` adopts one pre-manifest parse.

@@ -1,0 +1,84 @@
+== release-7R2 DEV qualification 2026-11-21T01:17:23Z host=streamanator node v22.23.2 candidate a3c8c67cc98fc35e963795e331e7217a24ccf1e0
+TREE entries=10129 blob-mismatches=0 extra-files=0
+TREE key files: src/lib/format.ts=27680919d7d0 deploy/release.mjs=a6b9ecca4df7 deploy/post-install-check.sh=3d0bb2a995bb src/db/queries/rounds.ts=cd76e7ca866c tools/aflw/load_staging.py=881e7e8e4735 tools/db/migrate.ts=fcc31fed4fcd 
+STEP npm-ci rc=0 (13s)
+STEP typecheck rc=0 (128s)
+STEP lint-gate rc=0 (110s)
+  lint-gate: > afldb@0.1.0 lint:gate
+  lint-gate: > tsx tools/dev/lint-gate.ts
+  lint-gate: 
+  lint-gate: Lint gate (ratchet): 338 error(s) in 43 file(s) now; the ratchet baseline allows 338 in 43 (existing debt, not clean lint).
+  lint-gate: Lint gate: PASSED (ratchet; existing debt remains).
+STEP unit rc=1 (589s)
+  unit:  Test Files  9 failed | 207 passed | 1 skipped (217)
+  unit:       Tests  86 failed | 12200 passed | 41 skipped (12327)
+STEP unit-focused rc=1 (74s)
+  focused:  ❯ tests/reference-data.test.ts (71 tests | 2 failed | 2 skipped) 5308ms
+  focused:  ✓ tests/b1a-successor-lib.test.ts (32 tests) 35457ms
+  focused:  ✓ tests/deploy-release.test.ts (59 tests) 25396ms
+  focused:  ✓ tests/deploy-web-unit.test.ts (40 tests) 2682ms
+  focused:  ✓ tests/format.test.ts (54 tests) 61ms
+  focused:  ✓ tests/catalogue-lookups.test.ts (25 tests) 66ms
+  focused:  ❯ tests/reference-data.test.ts:1338:56
+  focused:  ❯ tests/reference-data.test.ts:1338:56
+  focused:  Test Files  1 failed | 5 passed (6)
+  focused:       Tests  2 failed | 277 passed | 2 skipped (281)
+STEP bash-n rc=0 (successor blocks + post-install-check.sh)
+STEP pg-init rc=0 (4s)
+STEP migrate-integ rc=0 (3s)
+STEP integ rc=1 (31s)
+STEP privileges-integ rc=0 (1s)
+STEP seed-integ rc=0 (1s)
+STEP integ-closeout rc=0 (4s)
+  integ-closeout:  ✓ tests/integration/database.test.ts (72 tests | 69 skipped) 568ms
+  integ-closeout:      ✓ reports on a server-enforced read-only session and changes nothing  387ms
+  integ-closeout:  Test Files  1 passed (1)
+  integ-closeout:       Tests  3 passed | 69 skipped (72)
+  integ:  ✓ tests/integration/b1a-successor.test.ts (14 tests) 27810ms
+  integ:  ❯ tests/integration/brownlow-pending-coverage.test.ts (8 tests | 8 skipped) 131ms
+  integ:  ❯ tests/integration/brownlow-pending-coverage.test.ts:78:13
+  integ:  Test Files  1 failed | 1 passed (2)
+  integ:       Tests  14 passed | 8 skipped (22)
+STEP migrate-app rc=0 (3s)
+STEP seed rc=0 (0s)
+seed 990365 1943 season=complete brownlow=not_applicable votes=null
+seed 990365 2024 season=complete brownlow=not_collected votes=null
+seed 990365 2025 season=complete brownlow=complete votes=0
+seed 990365 2026 season=complete brownlow=pending votes=null
+seed 990366 2025 season=complete brownlow=complete votes=0
+seed 990366 2026 season=complete brownlow=pending votes=null
+STEP build rc=0 (227s)
+  build: ⚠ Compiled with warnings in 2.4s
+  build: ✓ Compiled successfully in 43s
+  build:   Generating static pages using 23 workers (0/38) ...
+  build:   Generating static pages using 23 workers (9/38) 
+  build:   Generating static pages using 23 workers (18/38) 
+  build:   Generating static pages using 23 workers (28/38) 
+  build: ✓ Generating static pages using 23 workers (38/38) in 2.3s
+BUILD_ID q9RjUGEMc7ecXfA7ryW0l standalone q9RjUGEMc7ecXfA7ryW0l
+STEP serve rc=0 (8s)
+health {"status":"ok","database":"ok","latencyMs":1}
+367 /seasons/2025 code=200 roundvote_player=0 novotes=2
+367 /seasons/2026 code=200 roundvote_player=0 novotes=2
+anon /players/pat-pending-990366: 307 http://127.0.0.1:3368/beta?from=%2Fplayers%2Fpat-pending-990366
+html 990365 code=200
+  cell <td class="num" title="Brownlow Medal results for this season have not been loaded yet.">Results not loaded</td>
+  cell <td class="num" title="Votes for this season were not recorded in the source data.">Not recorded</td>
+  cell <td class="num" title="No Brownlow Medal was awarded for this season.">No medal</td>
+sample /players/pat-pending-990366 200 notloaded=2 pendnote=2 nomedal=0 nanote=0 interim=0 interimnote=0
+P10-SHAPED after-mode samples=16 bad=0 (player 990366, the successor P10 per-sample rule)
+/brownlow/2026 404  /seasons/2026 200 novotes=2
+playwright desktop status 200 url http://127.0.0.1:3368/players/dee-wording-990365
+ROW desktop season=2026 bvText="Results not loaded" bvTitle="Brownlow Medal results for this season have not been loaded yet." visible=true
+ROW desktop season=2025 bvText="0" bvTitle=null visible=true
+ROW desktop season=2024 bvText="Not recorded" bvTitle="Votes for this season were not recorded in the source data." visible=true
+ROW desktop season=1943 bvText="No medal" bvTitle="No Brownlow Medal was awarded for this season." visible=true
+playwright mobile status 200 url http://127.0.0.1:3368/players/dee-wording-990365
+ROW mobile season=2026 bvText="Results not loaded" bvTitle="Brownlow Medal results for this season have not been loaded yet." visible=true
+ROW mobile season=2025 bvText="0" bvTitle=null visible=true
+ROW mobile season=2024 bvText="Not recorded" bvTitle="Votes for this season were not recorded in the source data." visible=true
+ROW mobile season=1943 bvText="No medal" bvTitle="No Brownlow Medal was awarded for this season." visible=true
+server.log error|unhandled lines: 0
+STEP pg-stop rc=0 (1s)
+== done 2026-11-21T01:37:25Z
+R7R2-QUAL-COMPLETE

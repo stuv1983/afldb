@@ -1,0 +1,26 @@
+ ❯ tests/draftguru-acquisition.test.ts (167 tests | 3 failed | 1 skipped) 19133ms
+ ❯ tests/fitzroy-core-import.test.ts (117 tests | 4 failed | 1 skipped) 12870ms
+ ✓ tests/after-siren-normalisation.test.ts (31 tests) 18055ms
+ ✓ tests/reference-data.test.ts (71 tests) 6561ms
+ ✓ tests/brownlow-season-artefact.test.ts (44 tests) 25560ms
+ ✓ tests/sibling-reconciliation.test.ts (12 tests) 10893ms
+ ✓ tests/father-son-reconciliation.test.ts (11 tests) 8017ms
+ ✓ tests/height-reconciliation.test.ts (14 tests) 3708ms
+ ✓ tests/coach-reconciliation.test.ts (39 tests | 1 skipped) 5229ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/draftguru-acquisition.test.ts > frozen Stage B1 sample (local snapshot) > rebuilds byte-identically from the accepted Stage A snapshot
+ ❯ tests/draftguru-acquisition.test.ts:1757:92
+ FAIL  tests/draftguru-acquisition.test.ts > frozen Stage B1 sample (local snapshot) > is the frozen 120 / 8 / 68 / 30 / 14 contract over the accepted Stage A label
+ ❯ tests/draftguru-acquisition.test.ts:1764:31
+ FAIL  tests/draftguru-acquisition.test.ts > DraftGuru bridge import gate (plan / verify, read-only) > DSN guard, read-only discipline, hash pins, classification refusals, verify checks and the no-artefact guarantee all hold on the real tool
+ ❯ tests/draftguru-acquisition.test.ts:3441:65
+ FAIL  tests/fitzroy-core-import.test.ts > fitzRoy source row corrections > leaves exactly the two genuine Round 10 rows
+ ❯ tests/fitzroy-core-import.test.ts:1854:17
+ FAIL  tests/fitzroy-core-import.test.ts > fitzRoy source row corrections > leaves the younger player's other appearances untouched
+ ❯ tests/fitzroy-core-import.test.ts:1878:18
+ FAIL  tests/fitzroy-core-import.test.ts > fitzRoy source row corrections > corrects exactly two rows and nothing else in 1909
+ ❯ tests/fitzroy-core-import.test.ts:1886:20
+ FAIL  tests/fitzroy-core-import.test.ts > blank Player fallback > covers the four real 2025 players, retaining all 79 rows
+ ❯ tests/fitzroy-core-import.test.ts:2089:18
+ Test Files  2 failed | 7 passed (9)
+      Tests  7 failed | 496 passed | 3 skipped (506)

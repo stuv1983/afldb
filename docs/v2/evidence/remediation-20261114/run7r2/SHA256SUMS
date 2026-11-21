@@ -1,0 +1,10 @@
+60a5ea6f76c0d5cd13af563c5239c25333b37c65b79ec0a755761f35c3ef3e0d  docs/v2/evidence/remediation-20261114/run7r2/sitting/r7-p1-precheck.sh
+331a9d3ca0fc13928a9a97b597069fe5d71e84d6f49a1bfce356d78b5feaa990  docs/v2/evidence/remediation-20261114/run7r2/sitting/r7-p2-ff.sh
+76d30608e2d877fb42e0b929f85d72ca6823e3eb086adaa66ce733bb056734a3  docs/v2/evidence/remediation-20261114/run7r2/sitting/r7-p3-build.sh
+65d54ba2a6b5a7358cabfcaf8aecef9e2feb5701612054b65ec50a744d2ba1e8  docs/v2/evidence/remediation-20261114/run7r2/sitting/r7-p3b-build-check.sh
+fa6546c2eae0491c71da3c751c73ed3509b5366f6ee373c2bec01fac02b9e632  docs/v2/evidence/remediation-20261114/run7r2/sitting/r7-p4-gate-promote.sh
+5df4f2cc464b115b557e8bdd3a2c8053eb88acc39e66ab95c2b2680ef616ecad  docs/v2/evidence/remediation-20261114/run7r2/sitting/r7-p8-observe.sh
+2396540b186c3f157d0c7892ec3bcaf96c9f84661f73fa909825b030917e8135  docs/v2/evidence/remediation-20261114/run7r2/sitting/r7-s9-public-smoke.sh
+7113e3081bfe4e4b16cec41101b8b37a7e5218b87201f27f9d39da5352750a5a  tools/v2/b1a-successor/sitting/p9-s7s8-checks.sh
+f6173ecd1d53c4a5ca385c1d412600a8f904d0f2eed6b7de647835855e6715e6  tools/v2/b1a-successor/sitting/p10-pages.sh
+2c8dc17e96be60851c0f4ad0db4d2e92eed423051c394ff6033d3ad07741898e  tools/v2/b1a-successor/sitting/r2-rollback.sh

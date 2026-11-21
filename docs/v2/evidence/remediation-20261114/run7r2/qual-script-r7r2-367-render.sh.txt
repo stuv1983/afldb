@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# R7R2 supplementary: ISSUE-367 rendered check on the qualified standalone build (accepted 2025 vs pending 2026).
+# The first probe was vacuous: round votes render inside each round's match listing, and the seed had no matches.
+set -uo pipefail; export LC_ALL=C
+W=/mnt/ssd/afldb-rel7r2-20261121; E=$W/evidence/r367; C=$W/cand
+export PATH=/home/arm/.nvm/versions/node/v22.23.2/bin:$PATH
+export AFLDB_V2_PG_ROOT=$W/pg-root AFLDB_V2_PG_BIN=/usr/lib/postgresql/16/bin AFLDB_V2_PG_PORT=55670
+mkdir -p "$E"; S=$E/SUMMARY.txt; : > "$S"
+rec() { echo "$*" | tee -a "$S"; }
+cd "$C"; ISO="node --import tsx tools/v2/isolated-pg.ts"
+rec "== R7R2 367 render $(date -u +%FT%TZ) BUILD_ID $(cat .next/standalone/.next/BUILD_ID)"
+$ISO start > "$E/pg-start.log" 2>&1 || { rec "STOP pg start"; exit 1; }
+cat > r367-seed.mjs <<'JS'
+import postgres from 'postgres';
+const sql = postgres(process.env.AFLDB_TEST_DATABASE_URL, { max: 1, onnotice: () => {} });
+await sql.begin(async (tx) => {
+  await tx`INSERT INTO sources (key, name, kind) VALUES ('afltables', 'AFL Tables', 'scrape') ON CONFLICT (key) DO NOTHING`;
+  const [{ n }] = await tx`SELECT count(DISTINCT organization_id)::int AS n FROM clubs`;
+  for (let i = n; i < 2; i += 1) {
+    await tx`SET CONSTRAINTS clubs_current_identity_id_fkey DEFERRED`;
+    const [org] = await tx`INSERT INTO club_organizations (name, slug) VALUES (${`R367 Org ${i}`}, ${`r367-org-${i}`}) RETURNING id`;
+    const [club] = await tx`INSERT INTO clubs (slug, name, short_name, abbreviation, current_identity_id, legacy_club_hist, organization_id)
+      VALUES (${`r367-club-${i}`}, ${`R367 Club ${i}`}, ${`R367 ${i}`}, ${`RS${i}`}, -1, ${`r367-club-${i}`}, ${org.id}) RETURNING id`;
+    await tx`UPDATE clubs SET current_identity_id = ${club.id} WHERE id = ${club.id}`;
+  }
+  const [a, b] = (await tx`SELECT DISTINCT ON (organization_id) id::int AS id FROM clubs WHERE organization_id IS NOT NULL ORDER BY organization_id, id LIMIT 2`).map((r) => r.id);
+  const [{ id: src }] = await tx`SELECT id::int AS id FROM sources WHERE key = 'afltables'`;
+  for (const [season, votes] of [[2025, 3], [2026, 2]]) {
+    const [m] = await tx`INSERT INTO matches (match_key, season, round_code, round_number, round_type, is_final, match_date, venue_raw,
+        home_club_id, away_club_id, home_score, away_score, result, winner_club_id, margin, attendance, attendance_status, source_id)
+      VALUES (${`r367-${season}-m1`}, ${season}, '1', 1, 'home_and_away'::round_type, false, ${`${season}-03-05`}, 'R367 Oval',
+        ${a}, ${b}, 90, 60, 'home_win'::match_result, ${a}, 30, NULL, 'not_collected'::coverage_status, ${src}) RETURNING id::int AS id`;
+    await tx`INSERT INTO player_match_stats (player_id, match_id, club_id, goals, brownlow_votes, source_id) VALUES (990367, ${m.id}, ${a}, 1, ${votes}, ${src})`;
+    await tx`UPDATE brownlow_round_votes SET match_id = ${m.id} WHERE season = ${season} AND player_id = 990367`;
+    console.log(`MATCH ${season} ${m.id}`);
+  }
+});
+for (const r of await sql`SELECT season, coverage FROM stat_availability WHERE stat_key='brownlow_season_total' ORDER BY 1`) console.log(`AVAIL ${r.season} ${r.coverage}`);
+await sql.end();
+JS
+$ISO run afldb_v2_r7r2app_test -- node r367-seed.mjs > "$E/seed.log" 2>&1; rc=$?; rm -f r367-seed.mjs
+grep -E '^(MATCH|AVAIL)' "$E/seed.log" | tee -a "$S"; rec "STEP seed rc=$rc"; [ $rc = 0 ] || { $ISO stop >/dev/null 2>&1; exit 1; }
+M25=$(awk '/^MATCH 2025/{print $3}' "$E/seed.log"); M26=$(awk '/^MATCH 2026/{print $3}' "$E/seed.log")
+# Drop ISR entries the first serve wrote for these paths, so this run renders against the seeded data.
+for f in $(find .next/standalone/.next/server/app -path '*seasons/202[56]*' -o -path "*matches/$M25*" -o -path "*matches/$M26*" | sort); do rec "ISR cleared $f"; rm -f "$f"; done
+cat > "$W/r367-serve.sh" <<'SH'
+set -u; E=$1; M25=$2; M26=$3
+NODE_ENV=production HOSTNAME=127.0.0.1 PORT=3368 node .next/standalone/server.js > "$E/server.log" 2>&1 &
+SP=$!
+for i in $(seq 1 60); do curl -s -o /dev/null -m 5 http://127.0.0.1:3368/api/health && break; sleep 2; done
+echo "health $(curl -s -m 10 http://127.0.0.1:3368/api/health)"
+CK=$(node -e 'const{createHmac}=require("crypto");const e=process.env;
+const p=Buffer.from(JSON.stringify({v:1,kind:"beta",sub:"r7r2-367",exp:Math.floor(Date.now()/1000)+900,epoch:Number(e.AFLDB_BETA_EPOCH??1)}));
+process.stdout.write("afldb_beta="+p.toString("base64url")+"."+createHmac("sha256",e.AFLDB_SESSION_SECRET).update(p).digest().toString("base64url"))')
+T=$(mktemp)
+hit() { curl -s -m 120 -H "Cookie: $CK" -o "$T" -w '%{http_code}' "http://127.0.0.1:3368$1" || true; }
+cnt() { grep -o "$1" "$T" | wc -l || true; }
+for y in 2025 2026; do c=$(hit /seasons/$y); cp "$T" "$E/season-$y.html"; echo "SEASON $y code=$c roundvote_player=$(cnt 'Rory Roundvote') round1_heading=$(cnt 'Round 1')"; done
+for pair in 2025:$M25 2026:$M26; do y=${pair%%:*}; m=${pair#*:}; c=$(hit /matches/$m); cp "$T" "$E/match-$y.html"
+  echo "MATCH $y /matches/$m code=$c player=$(cnt 'Rory Roundvote') bv_header=$(cnt '>BV<')"; done
+c=$(hit /players/rory-roundvote-990367/matches); cp "$T" "$E/gamelog.html"; echo "GAMELOG code=$c bv_header=$(cnt '>BV<')"
+node -e '
+const h=require("fs").readFileSync(process.argv[1],"utf8");
+const heads=[...h.matchAll(/<th[^>]*>(?:<[^>]+>)*([^<]*)/g)].map(m=>m[1].trim());
+const bvi=heads.indexOf("BV");
+for (const tr of h.match(/<tr[\s\S]*?<\/tr>/g)||[]) { if(!/<td/.test(tr)) continue;
+  const tds=[...tr.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map(m=>m[1].replace(/<[^>]+>/g,"").trim());
+  const yr=(tds.join(" ").match(/\b(2025|2026)\b/)||[])[1]||"?";
+  console.log(`GAMELOG ROW season=${yr} bvIndex=${bvi} bv=${JSON.stringify(bvi>=0?tds[bvi]:"(no BV column)")}`); }' "$E/gamelog.html"
+rm -f "$T"; kill $SP; wait $SP 2>/dev/null || true
+SH
+$ISO run afldb_v2_r7r2app_test -- env AFLDB_SESSION_SECRET="$(head -c 32 /dev/urandom | base64 | tr -d '\n')" AFLDB_BETA_GATE=on AFLDB_BETA_EPOCH=1 \
+  NEXT_TELEMETRY_DISABLED=1 AFLDB_ENV=production AFLDB_BASE_URL=http://127.0.0.1:3368 bash "$W/r367-serve.sh" "$E" "$M25" "$M26" > "$E/serve.log" 2>&1
+grep -vE '^isolated-pg: ' "$E/serve.log" | tee -a "$S"
+grep -ciE 'error|unhandled' "$E/server.log" | sed 's/^/server.log error|unhandled lines: /' | tee -a "$S"
+$ISO stop > "$E/pg-stop.log" 2>&1; rec "STEP pg-stop rc=$?"
+rec "R367-RENDER-COMPLETE"
