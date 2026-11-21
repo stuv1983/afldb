@@ -235,6 +235,10 @@ async function restoreHonoursAtStart(): Promise<void> {
     `;
     // Any other table still pointing at one of this file's batches makes this DELETE fail (no cascade except
     // import_rejections), which fails the file: that is a new residue to characterise, not something to absorb.
+    // It is slow, not unsafe: 38 foreign keys reference import_batches, most unindexed (player_match_stats among them),
+    // so every deleted batch costs a scan of each (measured 29 s for the file's 122 batches on the accepted rebuild,
+    // docs/v2/evidence/issue363-20261121/README.md). Hence a local timeout above the 5 s client default.
+    await tx`SET LOCAL statement_timeout = '240s'`;
     await tx`DELETE FROM import_batches WHERE id > ${start.maxBatchId}::bigint`;
   });
   const differ: string[] = [];
@@ -257,7 +261,7 @@ afterAll(async () => {
     await unlockHonoursTables();
     await sql.end();
   }
-}, 120_000);
+}, 300_000);
 
 function runImporter(
   groups: string[],
