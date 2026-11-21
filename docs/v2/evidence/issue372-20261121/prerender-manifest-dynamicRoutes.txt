@@ -1,0 +1,3 @@
+prerender-manifest.json dynamicRoutes (ISR-cached dynamic routes), identical for the base and the candidate production builds:
+/brownlow/[year] /clubs/[slug] /honour-teams/[slug] /matches/[id] /players/[slug] /seasons/[year] /sitemap/[__metadata_id__] /venues/[slug]
+NOT present: /awards/[slug]/[season] (route table: 'f' dynamic, server-rendered on demand; cache-control: private, no-cache, no-store)

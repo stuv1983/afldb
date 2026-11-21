@@ -1,0 +1,7 @@
+✓ Compiled successfully in 47s
+✓ Generating static pages using 23 workers (1528/1528) in 33.4s
+├ ○ /awards                                                 1d      1y
+├ ƒ /awards/[slug]
+├ ƒ /awards/[slug]/[season]
+├   /brownlow/[year]
+├   /seasons/[year]

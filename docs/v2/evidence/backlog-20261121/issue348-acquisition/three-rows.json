@@ -1,0 +1,81 @@
+{
+ "id": 5961,
+ "year": 2020,
+ "type": "National",
+ "player_url": "https://www.draftguru.com.au/players/finlay_macrae/1",
+ "player_id": 4274,
+ "stored_raw": "Surrey Park/​Xavier College/​Oakleigh U18",
+ "stored_hex": "537572726579205061726b2fe2808b58617669657220436f6c6c6567652fe2808b4f616b6c6569676820553138",
+ "fresh_matches": 1,
+ "fresh_raw": [
+  "Kew Rovers/​Xavier College/​Oakleigh U18"
+ ],
+ "fresh_hex": [
+  "4b657720526f766572732fe2808b58617669657220436f6c6c6567652fe2808b4f616b6c6569676820553138"
+ ],
+ "owner_matches": 1,
+ "owner_raw": [
+  "Kew Rovers/​Xavier College/​Oakleigh U18"
+ ],
+ "owner_hex": [
+  "4b657720526f766572732fe2808b58617669657220436f6c6c6567652fe2808b4f616b6c6569676820553138"
+ ],
+ "fresh_eq_owner_bytes": true,
+ "fresh_eq_owner_normalised": true,
+ "fresh_eq_stored_bytes": false,
+ "owner_eq_stored_bytes": false
+}
+{
+ "id": 6784,
+ "year": 2025,
+ "type": "Post-Draft",
+ "player_url": "https://www.draftguru.com.au/players/finlay_macrae/1",
+ "player_id": 4274,
+ "stored_raw": "Surrey Park/​Xavier College/​Oakleigh U18",
+ "stored_hex": "537572726579205061726b2fe2808b58617669657220436f6c6c6567652fe2808b4f616b6c6569676820553138",
+ "fresh_matches": 1,
+ "fresh_raw": [
+  "Kew Rovers/​Xavier College/​Oakleigh U18"
+ ],
+ "fresh_hex": [
+  "4b657720526f766572732fe2808b58617669657220436f6c6c6567652fe2808b4f616b6c6569676820553138"
+ ],
+ "owner_matches": 1,
+ "owner_raw": [
+  "Kew Rovers/​Xavier College/​Oakleigh U18"
+ ],
+ "owner_hex": [
+  "4b657720526f766572732fe2808b58617669657220436f6c6c6567652fe2808b4f616b6c6569676820553138"
+ ],
+ "fresh_eq_owner_bytes": true,
+ "fresh_eq_owner_normalised": true,
+ "fresh_eq_stored_bytes": false,
+ "owner_eq_stored_bytes": false
+}
+{
+ "id": 6626,
+ "year": 2024,
+ "type": "Rookie",
+ "player_url": "https://www.draftguru.com.au/players/blake_leidler/1",
+ "player_id": null,
+ "stored_raw": "Collegians/​Wesley College/​Oakleigh U18",
+ "stored_hex": "436f6c6c656769616e732fe2808b5765736c657920436f6c6c6567652fe2808b4f616b6c6569676820553138",
+ "fresh_matches": 1,
+ "fresh_raw": [
+  "Surrey Park/​Wesley College/​Oakleigh U18"
+ ],
+ "fresh_hex": [
+  "537572726579205061726b2fe2808b5765736c657920436f6c6c6567652fe2808b4f616b6c6569676820553138"
+ ],
+ "owner_matches": 1,
+ "owner_raw": [
+  "Surrey Park/​Wesley College/​Oakleigh U18"
+ ],
+ "owner_hex": [
+  "537572726579205061726b2fe2808b5765736c657920436f6c6c6567652fe2808b4f616b6c6569676820553138"
+ ],
+ "fresh_eq_owner_bytes": true,
+ "fresh_eq_owner_normalised": true,
+ "fresh_eq_stored_bytes": false,
+ "owner_eq_stored_bytes": false
+}

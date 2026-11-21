@@ -1,0 +1,3 @@
+AFLDB DraftGuru import (Stage B2-4/5)
+
+REFUSED: missing Stage A manifest: /mnt/ssd/afldb-backlog-20261122-dg/src/docs/rebuild-manifests/draftguru/annual-html-20261122.json

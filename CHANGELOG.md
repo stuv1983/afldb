@@ -15,6 +15,25 @@ commit.
 
 ## [Unreleased]
 
+### An award publication refreshes its season page on every worker (ISSUE-372 option B; local, not released)
+
+- `/admin/awards/revalidate` (the follow-up of every awards and Coleman mutation) now also posts the cross-worker season
+  fan-out (`/api/internal/revalidate-season`) for each season its admitted paths name (`/seasons/<yyyy>`,
+  `/awards/<slug>/<yyyy>`; plausible years, at most three, best-effort, never fails the request). Before, only the worker
+  that answered refreshed `/seasons/<year>`; the others kept the page without the new award for up to an hour.
+  Award-season pages themselves are dynamic and were never cached, so they needed nothing; a test now fails if that route
+  gains `generateStaticParams`.
+- New attended CLI `tools/maintenance/revalidate-season.ts --season <y>` refreshes `/seasons/<y>` and `/brownlow/<y>` on
+  every worker (refuses under systemd; exit 0 all workers, 1 incomplete, 2 unusable). The season-opening procedure uses it
+  right after the 2027 row is created. The nightly AFL API settle still invalidates nothing (D-232-3, now contract-tested).
+- Inert on any host without `AFLDB_REVALIDATE_URL`/`AFLDB_REVALIDATE_SECRET`; production has neither yet (release
+  precondition in `docs/v2/evidence/backlog-20261121/RC-371-372.md`).
+
+### Lint ratchet accepted as the merge-time gate (ISSUE-364 resolved)
+
+- The owner accepted `npm run lint:gate` in `preflight` (implementation, merge) and `merge:ready` as the O-2 gate: a
+  ratchet at 338 errors in 43 files, not clean lint; release, `sync-dev` and CI do not run it.
+
 ### A newly published Brownlow season no longer keeps the "Page not found" title (ISSUE-371; local, not released)
 
 - Brownlow admin actions now revalidate concrete paths without a type argument. Under Next 16 the old

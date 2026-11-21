@@ -1,0 +1,23 @@
+total 187 {'INSERT_CLUB': 7, 'REPLACE_CLUB': 3, 'INSERT_SCHOOL': 174, 'RENAME_EXPAND': 3}
+by (in original 46, class) [((False, 'INSERT_SCHOOL'), 135), ((False, 'RENAME_EXPAND'), 3), ((False, 'REPLACE_CLUB'), 3), ((True, 'INSERT_CLUB'), 7), ((True, 'INSERT_SCHOOL'), 39)]
+years [(1991, 1), (1993, 1), (1995, 1), (2007, 1), (2008, 1), (2009, 1), (2020, 2), (2021, 21), (2022, 52), (2023, 17), (2024, 21), (2025, 68)]
+years of the 141 [(2020, 1), (2021, 19), (2022, 46), (2023, 8), (2024, 8), (2025, 59)]
+positions (insertions) Counter({('interior',): 130, ('prefix',): 45, ('suffix',): 5, ('interior', 'prefix'): 1})
+added segment count per row Counter({1: 185, 3: 1, 2: 1})
+non-school inserted terms ['Boroondara Hawks JFC', 'Canterbury JFC', 'Glenorchy', 'Kingborough', 'Launceston', 'North Hobart', 'Surrey Park']
+school-matched inserted distinct 89
+inserted terms absent from stored vocab ['All Saints Anglican', 'Anglican Church Grammar', 'Billabong HS', 'Brighton SC', 'Brisbane SHS', 'Camberwell HS', 'Canterbury JFC', 'Cape Naturaliste College', 'Cleveland SHS', 'Eltham College', 'Eltham HS', 'Endeavour Sports HS', 'Geraldton SHS', 'Guilford Young College', 'Indooroopilly SHS', 'Islamic College of Sport', 'Kapunda HS', 'Mater Dei College', 'Mount Scopus', 'Newton Moore SHS', 'Ormeau Woods SHS', 'Overnewton College', 'Scots School (Albury)', "St Brendan's College (Yeppoon)", 'St Brendan-Shaw College', 'St Francis Xavier College (Beaconsfield)', 'St Ignatius (Geelong)', 'Trinity College (Colac)', 'Warners Bay HS', 'Willetton SHS', 'Williamstown HS', 'Wirreanda SS', 'Xavier College (SA)']
+  INSERT_CLUB 1097 1991 Mid-Season Daryn Cresswell 3400 | North Hobart => Glenorchy/North Hobart | siblings [{'id': 233, 'year': 1988, 'type': 'National', 'origin': 'North Hobart'}] | removed in csv vocab {}
+  INSERT_CLUB 1388 1993 Trade Bradley Plain 2099 | Clarence => North Hobart/Clarence | siblings [{'id': 1753, 'year': 1995, 'type': 'Trade', 'origin': 'Clarence'}] | removed in csv vocab {}
+  INSERT_CLUB 1753 1995 Trade Bradley Plain 2099 | Clarence => North Hobart/Clarence | siblings [{'id': 1388, 'year': 1993, 'type': 'Trade', 'origin': 'Clarence'}] | removed in csv vocab {}
+  INSERT_CLUB 3795 2007 Pre-Season Tom Bellchambers 12477 | North Launceston/Tasmania U18 => Launceston/North Launceston/Tasmania U18 | siblings [] | removed in csv vocab {}
+  INSERT_CLUB 3912 2008 National Aaron Cornelius 4 | Tasmania U18/Tasmania (VFL) => Glenorchy/Tasmania U18/Tasmania (VFL) | siblings [] | removed in csv vocab {}
+  INSERT_CLUB 4163 2009 Rookie Daniel Archer 3209 | Clarence/Tasmania U18 => Kingborough/Clarence/Tasmania U18 | siblings [] | removed in csv vocab {}
+  REPLACE_CLUB 5961 2020 National Finlay Macrae 4274 | Surrey Park/Xavier College/Oakleigh U18 => Kew Rovers/Xavier College/Oakleigh U18 | siblings [{'id': 6784, 'year': 2025, 'type': 'Post-Draft', 'origin': 'Surrey Park/Xavier College/Oakleigh U18'}] | removed in csv vocab {'Surrey Park': 7}
+  INSERT_CLUB 5965 2020 National Reef McInnes 10879 | Scotch College/Oakleigh U18 => Canterbury JFC/Surrey Park/Boroondara Hawks JFC/Scotch College/Oakleigh U18 | siblings [] | removed in csv vocab {}
+  RENAME_EXPAND 6445 2023 National Bodie Ryan 13340 | Brighton/Sacred Heart College/Glenelg => Brighton Districts & Old Scholars/Sacred Heart College/Glenelg | siblings [] | removed in csv vocab {'Brighton': 1}
+  RENAME_EXPAND 6590 2024 National Ben Camporeale None | Brighton/Sacred Heart College/Glenelg => Brighton Districts & Old Scholars/Sacred Heart College/Glenelg | siblings [] | removed in csv vocab {'Brighton': 1}
+  RENAME_EXPAND 6601 2024 National Lucas Camporeale 8903 | Brighton/Sacred Heart College/Glenelg => Brighton Districts & Old Scholars/Sacred Heart College/Glenelg | siblings [] | removed in csv vocab {'Brighton': 1}
+  REPLACE_CLUB 6626 2024 Rookie Blake Leidler None | Collegians/Wesley College/Oakleigh U18 => Surrey Park/Wesley College/Oakleigh U18 | siblings [] | removed in csv vocab {'Collegians': 8}
+  REPLACE_CLUB 6784 2025 Post-Draft Finlay Macrae 4274 | Surrey Park/Xavier College/Oakleigh U18 => Kew Rovers/Xavier College/Oakleigh U18 | siblings [{'id': 5961, 'year': 2020, 'type': 'National', 'origin': 'Surrey Park/Xavier College/Oakleigh U18'}] | removed in csv vocab {'Surrey Park': 7}
+rows whose player has another stored event with a different stored origin 0

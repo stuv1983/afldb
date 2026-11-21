@@ -1,0 +1,13 @@
+✓ Compiled successfully in 48s
+✓ Generating static pages using 23 workers (1528/1528) in 33.1s
+Route (app)                                         Revalidate  Expire
+├ ○ /awards                                                 1d      1y
+├ ƒ /awards/[slug]
+├ ƒ /awards/[slug]/[season]
+├   /brownlow/[year]
+├   /seasons/[year]
+ƒ Proxy (Middleware)
+○  (Static)   prerendered as static content
+●  (SSG)      prerendered as static HTML (uses generateStaticParams)
+ƒ  (Dynamic)  server-rendered on demand
+prepare-standalone: created .next/cache for ISR

@@ -1,5 +1,13 @@
 # AFLDB Waiting and Blocker Register
 
+> **2026-11-22 backlog run (owner decisions of 22 Nov; counts NOT recomputed).** Record: `docs/v2/evidence/backlog-20261121/RUN-20261122.md`. Local on `claude/backlog-20261121`, unpublished; nothing installed on production.
+> - **Resolved:** ISSUE-364 (Q8).
+> - **Awaiting publication and release:** ISSUE-372 option B (`b40c13ff`, `cf158d60`) with ISSUE-371, per `RC-371-372.md`; **production precondition:** the owner adds `AFLDB_REVALIDATE_URL`/`SECRET` and restarts (absent at R0).
+> - **Awaiting owner input:** ISSUE-332 alarm destination; ISSUE-350 opening date (2027-02-15..03-03); ISSUE-351 weekly slot (proposed Tue 10:00–10:30 AEDT) and reboot prerequisites; ISSUE-362 O-1; ISSUE-363 Q9 (G-1, G-c); ISSUE-348 F-348-1 (CSV-parity gate vs frozen oracle).
+> - **Awaiting attended installation:** R1 host policy, R2 pull check, R3 backup units and daily pull, R4 combined Caddy (kits `docs/v2/evidence/backlog-20261121/kits/KITS-20261122.md`).
+> - **Blocked:** DEV red/green for 372 (needs publication, DEV `AFLDB_REVALIDATE_*`, a DEV admin credential).
+> - Open issues: 9 (332, 348, 350, 351, 352, 357, 362, 363, 372).
+
 > **2026-11-15 finalisation (run 5; counts NOT recomputed).** Packet `docs/v2/evidence/remediation-20261114/run5/APPROVAL-PACKET-5.md` supersedes packet 4. B0 done (read-only): production unchanged since run 2; **ISSUE-365 present** (669 2026 player-season rows `not_applicable`). Waiting on the owner: A (publish), B1 (daytime window, 08:00-14:00 AEDT start; the packets 2-4 window was wrong), B1a (669-row repair, separately approved), D-365-W, G-1, and the unchanged B2-B8 decisions. T-2 corrected locally (executable revision `f6af6da9`).
 >
 > **2026-11-15 remediation run 4 (this register's counts are NOT recomputed).** Records: `docs/v2/evidence/remediation-20261114/run4/` (`RESIDUALS-4.md`, `QUALIFICATION-4.md`, `FAILURE-LEDGER-4.md`, `APPROVAL-PACKET-4.md`, which supersedes packet 3). Final executable revision `16027092`, **local, not published, not deployed**; the final candidate is the local tag named in the packet.

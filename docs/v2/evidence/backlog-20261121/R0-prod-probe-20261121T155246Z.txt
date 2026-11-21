@@ -1,0 +1,233 @@
+== PROBE 2026-11-21T15:52:46Z host=afldb-prod user=arm node=v22.23.2
+-- checkout
+c8d4202a4cb3cf0ccdd1cad01e1227a1610c2d76
+0
+-- release status
+release: current  c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC revision c8d4202a4cb3cf0ccdd1cad01e1227a1610c2d76 BUILD_ID aATnIlFOIQjq2z5oDdoHC production
+release: previous a2e6ea9995a4-aKAYwf0qC4go6JJWiHhv5 revision a2e6ea9995a44b6d5b7de7e820d17bb2e14986b5 BUILD_ID aKAYwf0qC4go6JJWiHhv5
+release: memory   afldb MemoryCurrent 657 MB
+release: process  4066149 runs in /home/arm/afldb-releases/releases/c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC
+release: health   200 status=ok database=ok
+release: build    /_next/static/aATnIlFOIQjq2z5oDdoHC/_buildManifest.js 200
+release: build    /_next/static/aKAYwf0qC4go6JJWiHhv5/_buildManifest.js 404 (previous; expect 404)
+release: activation service InvocationID 0f8ca9f3c9104a1b98547c2b7a56398f NRestarts 0 ActiveEnter 2026-11-21T06:17:12.000Z
+release: activation restarted since promote (InvocationID fabd985ff6c14959afcafd163b007c37 -> 0f8ca9f3c9104a1b98547c2b7a56398f)
+release: STATUS PASS c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC
+release_status_rc=0
+-- host-gate
+release: host gate (host, promote) at 2026-11-21T15:52:47.330Z
+release:   next apt-daily-upgrade in 220 min
+release:   afldb active MainPID=4066149 InvocationID=0f8ca9f3c9104a1b98547c2b7a56398f NRestarts=0 ActiveEnter=2026-11-21T06:17:12.000Z
+release:   postgresql@16-main.service active MainPID=3774184 InvocationID=b8a69e7dae9d4faf8c2a735108621507 NRestarts=0 ActiveEnter=2026-11-13T19:35:19.000Z
+release:   WARNING reboot pending (6 kernel package(s)); a reboot is a separate owner operation (docs/deployment.md §3a)
+release:   WARNING needrestart hold missing for afldb and postgresql: an unattended upgrade restarts it
+release: HOST GATE PASS
+host_gate_rc=0
+-- kernel
+6.8.0-137-generic
+2026-08-16 12:14:44
+-rw-r--r-- 1 root root  32 Nov 14 06:35 /var/run/reboot-required
+-rw-r--r-- 1 root root 258 Nov 14 06:35 /var/run/reboot-required.pkgs
+linux-image-6.8.0-138-generic
+linux-base
+linux-image-6.8.0-139-generic
+linux-base
+libc6
+linux-image-6.8.0-142-generic
+linux-base
+linux-image-6.8.0-146-generic
+linux-base
+linux-image-6.8.0-147-generic
+linux-base
+linux-image-6.8.0-149-generic
+linux-base
+libc6
+rc linux-image-6.8.0-124-generic
+ii linux-image-6.8.0-137-generic
+rc linux-image-6.8.0-138-generic
+rc linux-image-6.8.0-139-generic
+rc linux-image-6.8.0-142-generic
+rc linux-image-6.8.0-146-generic
+rc linux-image-6.8.0-147-generic
+ii linux-image-6.8.0-149-generic
+ii linux-image-virtual
+initrd.img
+initrd.img-6.8.0-137-generic
+initrd.img-6.8.0-149-generic
+initrd.img.old
+vmlinuz
+vmlinuz-6.8.0-137-generic
+vmlinuz-6.8.0-149-generic
+vmlinuz.old
+GRUB_DEFAULT=0
+GRUB_TIMEOUT_STYLE=hidden
+GRUB_TIMEOUT=0
+GRUB_RECORDFAIL_TIMEOUT=0
+GRUB_TIMEOUT=0
+-- host policy
+ls: cannot access '/etc/apt/apt.conf.d/52-afldb-unattended': No such file or directory
+/etc/needrestart/conf.d/:
+total 4
+-rw-r--r-- 1 root root 241 Dec  5  2024 README.needrestart
+-- timers
+NEXT                             LEFT LAST                          PASSED UNIT                       ACTIVATES
+Sun 2026-11-22 05:03:38 AEDT 2h 10min Sat 2026-11-21 05:08:36 AEDT 21h ago afldb-settle-afl-api.timer afldb-settle-afl-api.service
+Sun 2026-11-22 06:32:22 AEDT 3h 39min Sat 2026-11-21 06:11:01 AEDT 20h ago apt-daily-upgrade.timer    apt-daily-upgrade.service
+Sun 2026-11-22 09:35:58 AEDT       6h Sat 2026-11-21 18:10:01 AEDT  8h ago apt-daily.timer            apt-daily.service
+
+3 timers listed.
+-- units
+active
+active
+active
+MainPID=4066149
+NRestarts=0
+ActiveEnterTimestamp=Sat 2026-11-21 17:17:12 AEDT
+InvocationID=0f8ca9f3c9104a1b98547c2b7a56398f
+-- settle status
+AFLDB_SETTLE_STATUS OK
+unit afldb-settle-afl-api.service: ActiveState=inactive Result=success ExecMainStatus=0
+unit afldb-settle-afl-api-brownlow.service: ActiveState=inactive Result=success ExecMainStatus=0
+timer afldb-settle-afl-api.timer: active, last fired Fri 2026-11-20 18:08:36 UTC (21 h ago; limit 36 h)
+settle_status_rc=0
+-- disk/releases
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/vda1        77G   35G   42G  46% /
+/home/arm/afldb-releases/builds/:
+total 52
+drwxrwxr-x 13 arm arm 4096 Nov 21 17:00 .
+drwxrwxr-x  4 arm arm 4096 Nov 21 17:05 ..
+drwxrwxr-x  2 arm arm 4096 Oct 31 15:57 20261031T045725Z-adopt-9ed9c9dd3e84-7e6303
+drwxrwxr-x  2 arm arm 4096 Oct 31 17:52 20261031T064734Z-61a95f7397da-f4bf55
+drwxrwxr-x  2 arm arm 4096 Oct 31 19:05 20261031T080059Z-ad245d602f6f-d2fffb
+drwxrwxr-x  2 arm arm 4096 Nov  1 10:34 20261031T233005Z-fd48ace0c2cb-85430f
+drwxrwxr-x  2 arm arm 4096 Nov  2 12:55 20261102T015046Z-ea98a35f2061-8292a3
+drwx------  2 arm arm 4096 Nov  3 08:40 20261102T213609Z-a0b1080f5b98-c269b2
+drwx------  2 arm arm 4096 Nov  5 12:16 20261105T011157Z-0f251c2daa8d-79bbe9
+drwx------  2 arm arm 4096 Nov 11 16:15 20261111T051033Z-c1c4b22ee150-750ab4
+drwxrwxr-x  2 arm arm 4096 Nov 18 13:52 20261118T024753Z-a2e6ea9995a4-40e1c2
+drwxrwxr-x  2 arm arm 4096 Nov 21 13:05 20261121T020057Z-a3c8c67cc98f-a4efa8
+drwxrwxr-x  2 arm arm 4096 Nov 21 17:05 20261121T060055Z-c8d4202a4cb3-978316
+
+/home/arm/afldb-releases/releases/:
+total 52
+drwxrwxr-x 13 arm arm 4096 Nov 21 17:05 .
+drwxrwxr-x  4 arm arm 4096 Nov 21 17:05 ..
+drwx------  4 arm arm 4096 Nov  5 12:16 0f251c2daa8d-3t0xWKI76Jgna2tB8a9oN
+drwxrwxr-x  4 arm arm 4096 Oct 31 17:52 61a95f7397da-JYIBkYn8ynPgYMn1e5nK-
+drwxrwxr-x  4 arm arm 4096 Oct 31 15:57 9ed9c9dd3e84-QNEHXAtU53TzUjj0Mb7mv
+drwx------  4 arm arm 4096 Nov  3 08:40 a0b1080f5b98-B8kdpO6PO1tUCHus0j1za
+drwxrwxr-x  4 arm arm 4096 Nov 18 13:52 a2e6ea9995a4-aKAYwf0qC4go6JJWiHhv5
+drwxrwxr-x  4 arm arm 4096 Nov 21 13:05 a3c8c67cc98f-JFf9-hXYa6xoigu5Tw4Hg
+drwxrwxr-x  4 arm arm 4096 Oct 31 19:05 ad245d602f6f-m0M8pf121326vNSo2B759
+drwx------  4 arm arm 4096 Nov 11 16:15 c1c4b22ee150-bTVyci1eHVcKvSKDVZl_x
+drwxrwxr-x  4 arm arm 4096 Nov 21 17:05 c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC
+drwxrwxr-x  4 arm arm 4096 Nov  2 12:55 ea98a35f2061--vY0EFS0DdR-TiPkxTZz6
+drwxrwxr-x  4 arm arm 4096 Nov  1 10:34 fd48ace0c2cb-pqAQwRIJWLjSYzR8LiTuy
+releases/c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC
+releases/a2e6ea9995a4-aKAYwf0qC4go6JJWiHhv5
+-- backups
+total 36
+drwxrwxr-x  5 arm arm  4096 Nov 21 17:18 .
+drwxr-x--- 46 arm arm 12288 Nov 21 18:27 ..
+drwx------ 34 arm arm 12288 Nov 12 13:50 afldb
+drwx------  2 arm arm  4096 Nov 18 13:46 afldb-b1a-20261118T021817Z
+drwx------  2 arm arm  4096 Nov 21 17:18 afldb-r7r3-20261121T060018Z
+880M	/home/arm/backups/afldb
+29M	/home/arm/backups/afldb-b1a-20261118T021817Z
+29M	/home/arm/backups/afldb-r7r3-20261121T060018Z
+90
+-- caddy
+4f6972ec119f5d33fff4c16cbbce15c50a36b883654dcffcabdb01776d7af036  /etc/caddy/Caddyfile
+v2.11.4 h1:XKxkMTgNSizEvKG6QHue6cAsFOteU2qA61w2tKkCWi0=
+total 36360
+drwxr-xr-x  2 caddy caddy      4096 Nov 16 16:48 .
+drwxr-xr-x 11 root  syslog     4096 Nov 22 00:00 ..
+-rw-------  1 caddy caddy   1130156 Sep  8 07:28 afldb-access-2026-09-07T21-28-03.060-size.log.gz
+-rw-------  1 caddy caddy   1121927 Sep 14 22:27 afldb-access-2026-09-14T12-27-36.536-size.log.gz
+-rw-------  1 caddy caddy   1149465 Oct 16 00:18 afldb-access-2026-10-15T13-18-15.638-size.log.gz
+-rw-------  1 caddy caddy   1113936 Nov  2 18:51 afldb-access-2026-11-02T07-51-03.012-size.log.gz
+-rw-------  1 caddy caddy   1078750 Nov 16 16:48 afldb-access-2026-11-16T05-48-24.848-size.log.gz
+-rw-------  1 caddy caddy   8094530 Nov 21 21:55 afldb-access.log
+-rw-------  1 caddy caddy   1413311 Sep  9 23:26 afldb-apex-2026-09-09T13-26-13.354-size.log.gz
+-rw-------  1 caddy caddy   1288778 Sep 28 20:33 afldb-apex-2026-09-28T10-33-21.243-size.log.gz
+-rw-------  1 caddy caddy   1463479 Oct 21 15:04 afldb-apex-2026-10-21T04-04-49.343-size.log.gz
+-rw-------  1 caddy caddy  19348347 Nov 22 02:39 afldb-apex.log
+36M	/var/log/caddy
+== ENV PRESENCE (names only; values never printed)
+AFLDB_REVALIDATE_URL .env: NOT present
+AFLDB_REVALIDATE_SECRET .env: NOT present
+pid 4066149: AFLDB_REVALIDATE_URL absent
+pid 4066149: AFLDB_REVALIDATE_SECRET absent
+pid 4066157: AFLDB_REVALIDATE_URL absent
+pid 4066157: AFLDB_REVALIDATE_SECRET absent
+pid 4066158: AFLDB_REVALIDATE_URL absent
+pid 4066158: AFLDB_REVALIDATE_SECRET absent
+== DB READ-ONLY CHECKS (afldb_backup, default_transaction_read_only)
+ transaction_read_only 
+-----------------------
+ on
+
+     db     |     usr      |  oid  
+------------+--------------+-------
+ afldb_prod | afldb_backup | 66668
+
+ max_season 
+------------
+       2026
+
+ max_match_id 
+--------------
+        17274
+
+ live_invites 
+--------------
+            0
+
+                datname                 | numbackends 
+----------------------------------------+-------------
+ afldb_prod                             |           3
+ afldb_prod_auth_recovery               |           0
+ afldb_prod_candidate_20260926-213225   |           0
+ afldb_prod_candidate_20260927-142540   |           0
+ afldb_prod_pre_rebuild_20260907-234124 |           0
+ afldb_prod_pre_rebuild_20260928-101642 |           0
+ afldb_restore_test                     |           0
+
+                datname                 |   bytes   |  size  
+----------------------------------------+-----------+--------
+ afldb_prod                             | 523516951 | 499 MB
+ afldb_prod_auth_recovery               | 256842775 | 245 MB
+ afldb_prod_candidate_20260926-213225   | 274963479 | 262 MB
+ afldb_prod_candidate_20260927-142540   | 274979863 | 262 MB
+ afldb_prod_pre_rebuild_20260907-234124 | 381631511 | 364 MB
+ afldb_prod_pre_rebuild_20260928-101642 | 412564503 | 393 MB
+ afldb_restore_test                     | 397622295 | 379 MB
+
+ season | revision | published_revision |         published_at          
+--------+----------+--------------------+-------------------------------
+   2026 |        3 |                  3 | 2026-11-21 18:26:25.496507+11
+
+ bsv_rows | votes | winners | ineligible |                              ineligible_ids                               
+----------+-------+---------+------------+---------------------------------------------------------------------------
+      183 |  1242 |       1 |         14 | 940,1108,3292,3295,4004,5480,6667,6746,6841,10282,11041,12205,12869,13246
+
+db_checks_rc=0
+== R0 BACKUP
+R0_DIR=/home/arm/backups/afldb-post7r3-20261121T155248Z
+==> Backing up afldb_prod to /home/arm/backups/afldb-post7r3-20261121T155248Z/afldb_prod-20261122-025248.dump
+    wrote 29M in 9s
+    archive readable, 1651 objects
+    a dump is not proven until restored: tools/maintenance/restore-test.sh
+==> Pruning backups older than the newest 1000
+==> Done. 1 backup(s) of afldb_prod retained in /home/arm/backups/afldb-post7r3-20261121T155248Z
+backup_rc=0
+total 29336
+drwx------ 2 arm arm     4096 Nov 22 02:52 .
+drwxrwxr-x 6 arm arm     4096 Nov 22 02:52 ..
+-rw------- 1 arm arm 30023963 Nov 22 02:52 afldb_prod-20261122-025248.dump
+-rw-rw-r-- 1 arm arm       98 Nov 22 02:52 afldb_prod-20261122-025248.dump.sha256
+/home/arm/backups/afldb-post7r3-20261121T155248Z/afldb_prod-20261122-025248.dump 30023963 600
+/home/arm/backups/afldb-post7r3-20261121T155248Z/afldb_prod-20261122-025248.dump.sha256 98 664
+26db476126b8a2e5474a452d5bfdb9b790031a11e797481065e37041c1761d8b  afldb_prod-20261122-025248.dump
+== DONE 2026-11-21T15:52:57Z

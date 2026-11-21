@@ -1,0 +1,12 @@
+*** PROVISIONAL DRY-RUN: in-memory manifest + baseline overrides; no file edited, nothing written ***
+AFLDB DraftGuru import (Stage B2-4/5)
+  snapshot   : annual-html-20261122 (42 year pages, sha256 verified)
+  persons    : 5088
+  picks      : 6845
+  ledger     : 6 explicit decisions
+  bridge     : 0 entries (no bridge dataset supplied)
+  target: dgsuper@127.0.0.1:61522/afldb_prod_r0
+    reload guard                          REVIEW  0 pick deletion(s) (0 audited); 0 person deletion(s) (0 audited); 35 audited pick rewrite(s); 35 audited person rewrite(s); 191 original_club_raw change(s) {'INSERT_CLUB': 11, 'INSERT_SCHOOL': 174, 'RENAME_EXPAND': 3, 'REPLACE_CLUB': 3}
+    reload guard effect digest         ff8ef1b8ef900d9ab5b17c89b2f0f85d5b3091e9493456a45b2a5f67cf766452
+
+REFUSED: reload guard (AFLDB-ISSUE-348): this full reload would 0 pick deletion(s) (0 audited); 0 person deletion(s) (0 audited); 35 audited pick rewrite(s); 35 audited person rewrite(s); 191 original_club_raw change(s) {'INSERT_CLUB': 11, 'INSERT_SCHOOL': 174, 'RENAME_EXPAND': 3, 'REPLACE_CLUB': 3}. None is acknowledged: a reviewed reconciliation (--reconciliation FILE --reconciliation-sha256 HEX) naming these exact keys and effect digest is the only way past; --acknowledge-population-drop does not apply to this guard [effect digest ff8ef1b8ef900d9ab5b17c89b2f0f85d5b3091e9493456a45b2a5f67cf766452]
