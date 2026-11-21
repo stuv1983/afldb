@@ -35,7 +35,7 @@ segment, `dynamicParams` left at its default (none sets it), and a `notFound()` 
 | `/seasons/[year]` | 1 h | `page.tsx:89,92` (no `seasons` row) | **2027 `seasons` row created (ISSUE-350)** | **Yes**: `/seasons/2027` is guessable and linked by habit |
 | `/brownlow/[year]` | 1 h | `page.tsx:78,81` (no season votes) | First publication of a season | **Yes**. Closed by ISSUE-371 |
 | `/awards/[slug]/[season]` | **24 h** | `page.tsx:75,79,89` (no winners or nominations) | A season's award first recorded (Coleman publication, awards admin) | **Yes**, e.g. `/awards/coleman-medal/2027` |
-| `/players/[slug]` | 1 h | `page.tsx:162,165` | New player row: AFL API settle player bridge (debutant), admin create-and-link | Low: the id is minted at insert, so nothing links it before it exists |
+| `/players/[slug]` | 1 h | `page.tsx:162,165` | New player row: a debutant entering through the AFL API current-season chain (player bridge / settle), admin create-and-link | Low: the id is minted at insert, so nothing links it before it exists |
 | `/matches/[id]` | 1 h | `page.tsx:83,86` | New match row: AFL API settle, admin match create | Low: internal sequential id |
 | `/venues/[slug]` | 24 h | `page.tsx:115,118` | New venue | Low: slug plus id |
 | `/clubs/[slug]` | 24 h | `page.tsx:100,103` | New club identity (for example a future licence) | Medium: guessable slug; rare, owner-run event |
