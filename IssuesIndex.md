@@ -221,7 +221,7 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 ### AFLDB-ISSUE-362, AFLDB-ISSUE-363 (Low; 363 resolved 2026-11-22 run b; 364 resolved 2026-11-22)
 
 - **362** Caddy log filter and epoch-held admin claims implemented locally; **next:** owner O-3 install the Caddyfile, O-1 delete pre-fix logs.
-- **363** TST-4..9 implemented locally; the integrated run still shows `settle-afltables` timing out under full parallel load and leaking its season; **next:** owner decisions (per-file disposable DB recommended).
+- **363 RESOLVED 2026-11-22 (run b)** (S + P-full; history below; G-c open as ISSUE-373). Originally: TST-4..9 implemented locally; `settle-afltables` timing out under full parallel load.
 - **364** `next dev` fixed, `node_modules` check (warn-only), lint ratchet `npm run lint:gate`; **next:** owner O-2 wire the lint gate.
 - **Run 2 (2026-11-14):**
   - **362:** B-05 re-authentication; redaction in any spelling and in the `Location`/`Refresh` headers. **Next:** combined Caddy install (B7), then O-1 logs.
