@@ -16,6 +16,7 @@
  * block). So the recovery is to re-run the owning suite alone, and this check says so.
  *
  * SEASON OWNERSHIP (kept here so the claim is checkable). One suite per season, except where noted:
+ *   2059  brownlow-season-attachment.test.ts (completed season, votes stored but unattached) -- 2026-11-21
  *   2061  awards-reload-links.test.ts (multi-club season)    -- moved from 2091 (ISSUE-363 decision 2)
  *   2062  awards-reload-links.test.ts (finals season)        -- moved from 2093 (ISSUE-363 decision 2)
  *   2063  brownlow-pending-coverage.test.ts (D-365-1 completed-but-unloaded season) -- run 4
@@ -43,6 +44,7 @@
 import type postgres from 'postgres';
 
 export const COMMITTED_FIXTURE_SEASONS: Readonly<Record<number, string>> = {
+  2059: 'tests/integration/brownlow-season-attachment.test.ts',
   2061: 'tests/integration/awards-reload-links.test.ts',
   2062: 'tests/integration/awards-reload-links.test.ts',
   2063: 'tests/integration/brownlow-pending-coverage.test.ts',
@@ -85,6 +87,7 @@ export const COMMITTING_SUITES: readonly string[] = [
   'tests/integration/b1a-successor.test.ts',
   'tests/integration/brownlow-pending-coverage.test.ts',
   'tests/integration/brownlow-pending-projection.test.ts',
+  'tests/integration/brownlow-season-attachment.test.ts',
   'tests/integration/data-editor.test.ts',
   'tests/integration/database.test.ts',
   'tests/integration/derived-rebuild-parity.test.ts',

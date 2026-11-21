@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Supplementary rendered capture (the first pass used a player URL without the id suffix).
+# before = fresh copy of the 18 Nov production dump + B1a-equivalent (production's current Brownlow state)
+# after  = the rehearsal copy after attach + publish. Same build, ISR cleared before each serve.
+set -uo pipefail; export LC_ALL=C
+export PATH=/home/arm/.nvm/versions/node/v22.23.2/bin:$PATH
+W=/mnt/ssd/afldb-bv2026-20261121; C=$W/cand; E=$W/evidence/rehearsal2; P=$W/private; mkdir -p "$E"
+export AFLDB_V2_PG_ROOT=$W/pg-rst AFLDB_V2_PG_PORT=61468 AFLDB_V2_PG_BIN=/usr/lib/postgresql/16/bin
+S=$E/SUMMARY.txt; : > "$S"; rec() { echo "$*" | tee -a "$S"; }
+cd "$C"; ISO="node --import tsx tools/v2/isolated-pg.ts"
+BEFORE=afldb_v2_bv2026_before_test; AFTER=afldb_v2_bv2026_rehearse_test
+rec "== capture2 $(date -u +%FT%TZ) BUILD_ID $(cat .next/standalone/.next/BUILD_ID)"
+$ISO list 2>&1 | grep -q "$BEFORE" && $ISO drop-db "$BEFORE" --acknowledge-destroy "$BEFORE" 2>&1 | tail -1 | tee -a "$S"
+$ISO create-db "$BEFORE" --template afldb_v2_bv2026_rst_test 2>&1 | tail -1 | tee -a "$S"
+$ISO run "$BEFORE" -- node "$P/r0.mjs" 2>&1 | grep -E '^(B1A|PSS)' | tee -a "$S"
+export AFLDB_SESSION_SECRET=$(head -c 32 /dev/urandom | base64 | tr -d '\n') AFLDB_BETA_GATE=on AFLDB_BETA_EPOCH=1 NEXT_TELEMETRY_DISABLED=1
+export AFLDB_ENV=production AFLDB_BASE_URL=http://127.0.0.1:3369
+rec "== rebuild (the first pass's clearing removed compiled route modules)"; rm -rf .next
+$ISO run "$BEFORE" -- npm run build > "$E/build.log" 2>&1; rec "build rc=$? BUILD_ID $(cat .next/standalone/.next/BUILD_ID 2>/dev/null)"
+[ -f .next/standalone/server.js ] || { rec "STOP no standalone"; exit 1; }
+cp -r public .next/standalone/ 2>/dev/null; cp -r .next/static .next/standalone/.next/ 2>/dev/null
+cp "$W/capture.mjs" "$C/capture.mjs"
+M25=$(awk '/^M2025/{print $2}' "$W/evidence/rehearsal/r0.log")
+for pair in before:$BEFORE after:$AFTER; do
+  L=${pair%%:*}; DB=${pair#*:}
+  # Rendered output only (never compiled route modules): .html/.rsc/.meta/.body and segment files, outside admin.
+  n=$(find .next/standalone/.next/server/app -type f -not -path '*/admin/*' \( -name '*.html' -o -name '*.rsc' -o -name '*.meta' -o -name '*.body' -o -path '*.segments/*' \) \
+    \( -path '*/seasons/202[56]*' -o -path '*/brownlow.*' -o -path '*/brownlow/20*' -o -path '*/matches/17247*' -o -path '*/matches/17151*' -o -path "*/matches/$M25*" -o -path '*/players/scott-pendlebury*' -o -path '*/players/nick-daicos*' \) -print -delete | wc -l)
+  [ -f .next/standalone/.next/server/app/brownlow/page.js ] || { rec "STOP route module missing"; exit 1; }
+  rm -rf .next/standalone/.next/cache/fetch-cache .next/standalone/.next/cache/images 2>/dev/null
+  rec "ISR cleared $n file(s) before $L"
+  rec "== $L render ($DB)"
+  $ISO run "$DB" -- bash "$P/serve-capture.sh" "$L" "$E" "$M25" > "$E/$L.log" 2>&1
+  grep -v '^isolated-pg:' "$E/$L.log" | tee -a "$S"
+done
+grep -ciE 'error|unhandled' "$E"/server-*.log | sed 's/^/server log error|unhandled: /' | tee -a "$S"
+rm -f "$C/capture.mjs"
+rec "CAPTURE2-COMPLETE"

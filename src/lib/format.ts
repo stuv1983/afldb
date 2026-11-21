@@ -28,20 +28,29 @@ export function formatNumber(value: number | null | undefined): string {
  *
  * An absent vote count has three quite different meanings and they must
  * never collapse into "0". A player in 1943 did not fail to poll — there
- * was no medal. A `pending` season has not polled zero — AFLDB has not
- * loaded its results, whether the season is still being played or is
- * complete with the medal awarded but not yet loaded (D-365-W). Only
- * `complete` makes 0 a fact about the player.
+ * was no medal. A `pending` season has not polled zero — AFLDB has not yet
+ * accepted (verified and published) its results. Only `complete` makes 0 a
+ * fact about the player.
+ *
+ * `pending` makes no claim about the medal itself (owner decision, ISSUE-370,
+ * 2026-11-21): the only fact AFLDB holds is that it has not yet verified and
+ * published the season's results. A season whose `seasons.status` is
+ * `complete` reads "Awaiting verification"; any other season status (in
+ * progress, or unknown to the caller) reads "Not yet available". Neither text
+ * says the medal was or was not awarded: AFLDB records no evidence of the
+ * award independent of season completion. Declared no-medal seasons are
+ * `not_applicable`, never `pending`.
  */
 export function formatBrownlow(
   votes: number | null | undefined,
   status: string,
+  seasonStatus?: string | null,
 ): string {
   switch (status) {
     case 'complete':
       return votes === null || votes === undefined ? NOT_RECORDED : votes.toLocaleString('en-AU');
     case 'pending':
-      return 'Results not loaded';
+      return seasonStatus === 'complete' ? 'Awaiting verification' : 'Not yet available';
     case 'not_applicable':
       return 'No medal';
     case 'not_collected':
@@ -52,10 +61,12 @@ export function formatBrownlow(
 }
 
 /** Long-form explanation for a tooltip or footnote. */
-export function brownlowStatusNote(status: string): string | null {
+export function brownlowStatusNote(status: string, seasonStatus?: string | null): string | null {
   switch (status) {
     case 'pending':
-      return 'Brownlow Medal results for this season have not been loaded yet.';
+      return seasonStatus === 'complete'
+        ? 'AFLDB has not yet verified and published the Brownlow results for this season.'
+        : 'Brownlow votes for this season are published once the count has been verified.';
     case 'not_applicable':
       return 'No Brownlow Medal was awarded for this season.';
     case 'not_collected':

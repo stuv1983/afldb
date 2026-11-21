@@ -73,6 +73,7 @@ This table indexes currently open issues. Detailed historical entries below rema
 | AFLDB-ISSUE-362 | Caddy logs magic-link/invite tokens; revoked admin cookie passes the beta gate | Low | Security hygiene | Open. **2026-11-14:** Caddy log filter (proven on Caddy 2.11.4/2.11.9) and epoch-held admin claims implemented locally (not published; live Caddy unchanged). **Run 2:** B-05 re-authentication; token redaction in any spelling and in `Location`/`Refresh` (red/green on Caddy 2.11.4/2.11.9). | Publish; owner: combined Caddy install (B7), then O-1 pre-fix logs. |
 | AFLDB-ISSUE-363 | Test reliability (vacuous passes, uninvoked Python contracts, `AFLDB_PYTHON`, untested beta actions, `/beta` predicates, leaking fixtures) | Low | Tests | Open. Runs 1-3: TST-4..9, per-file DBs, state-b/settle fixes (see entry). **Run 4 (2026-11-15, local, final executable revision `16027092`, `run4/QUALIFICATION-4.md`):** 363-W/G/C/B and 363-3 implemented; T363-2/T363-3 and all shared-mode leaks fixed (shared mode now fails exactly the per-file ids); 40 rebuild-only failures fixed; integration at Q″: snapshot 18 ids, rebuild 7, every id class 1 or class 5 (Gridley); unit 12,296/1 (stage map, fixed at Q‴). Remaining: Gridley owner decision; publication. **Run 5 (2026-11-15, local, executable `f6af6da9`):** T-2 corrected (`awards-reload-links` restores every pre-existing `award_winners` row and award span at file teardown; affected scope requalified, `run5/T2-QUALIFICATION.md`). **Published 2026-11-16** (`a2e6ea99`). T-2 residue open as a test-isolation follow-up: the file still changes `award_nominations`, `hall_of_fame`, `honour_team_members`, `captaincies` content and grows `import_batches` in shared mode. | Owner decision G-1 (`run5/G1-REBUILD-TIERS.md`); extend `awards-reload-links` restore to the four honours tables. |
 | AFLDB-ISSUE-364 | Tooling drift (`next dev` sitemap conflict, serving-checkout `node_modules`, lint ungated) | Low | Tooling | Open. **2026-11-14:** `next dev` fixed (sitemap index behind a rewrite), `node_modules` check (warn-only), lint ratchet `npm run lint:gate` (338 baseline) implemented locally (not published). **Run 2:** lint gate wired into preflight/merge:ready as a ratchet (338 errors allowed; not clean lint); B-07 refusals; A-09 split. | Publish; owner accepts the merge-time ratchet as O-2 (release/CI not wired). |
+| AFLDB-ISSUE-370 | The awarded 2026 Brownlow is unpublishable and reads as "Not yet awarded" | High | Brownlow publication / player-page wording | Open. **2026-11-21:** owner dispute; Release 7R2 **held at P3** (built, not promoted). The complete official count (1,242 votes, Daicos 47) is stored only at the legacy round grain, so publication refuses. Season-aware wording and a guarded attachment runner are implemented and verified locally, with a rehearsal and rendered before/after on a production-dump copy (`claude/brownlow-2026-publication-20261121`, committed locally, not published). | Wording D-370-W approved 2026-11-21. Owner: D-370-1 (2026 ineligible list), the 7R3 attended window (promote, attach), then publish at `/admin/brownlow/2026`. Runbook `issues/open/AFLDB-ISSUE-370.md`. |
 
 **AFLDB-ISSUE-323 and AFLDB-ISSUE-324 resolved 2026-10-24** (fixes `481511d2`; `82603dc7`, `14abea5e`, `876dadbf`; local, not pushed). The owner ruled on 2026-10-24 that the ISSUE-316 revision J2 disposable rebuild is the J2 proof, and that its 5 sampler anomalies (F-J06) are an evidence-monitor defect, registered as ISSUE-325. That rebuild was the ordinary successor path at pinned `876dadbf`, under the reviewed native closure (policy `a8e586e0…`) with no provenance, against `afldb_v2_rb_i316_revision_j2_test`. It passed the successor preflight and the real execution boundary, and executed the constrained tsx/npm path under enforcement: runner exit 0, 30 stages, 91 checks PASSED, all 1,640 club-seasons equal, `AFLDB-POST PASSED`, 0 native REFUSED lines and 0 provenance mentions. A focused read-only evidence review of the retained artefacts preceded the closure; it is recorded in the ISSUE-316 entry. No push, deployment, apply, activation or census. Removed from `IssuesIndex.md` and the Open Issues table. Full record: the entries in this file.
 
@@ -55278,3 +55279,91 @@ Acceptance: Every non-public audience refuses data access until must_change_pass
 - **Impact and fix** A status check with owner credentials can initialise an empty target. A genuinely read-only connection can reject the command before reporting status. Inspect ledger existence through a read-only catalog query, report local files as pending when it is absent and confine bootstrap DDL to apply mode.
 - **Verification pending** On streamanator use an empty disposable `_test` target with server-enforced read-only access. Run `npm run db:status -- --target test` and compare the catalog before and after. Require a pending report, no created objects and a valid report on a populated read-only target.
 - **Resolution, 2026-11-21 (`295c55c4`, test fix `467cd243`).** Root cause confirmed: RED at `b82a6b04` — `--status` on an empty target created `afldb_meta` (2 relations) and failed on a read-only session with `cannot execute CREATE SCHEMA in a read-only transaction`. Fix: ledger existence comes from `pg_catalog`; `--status` reads inside a `READ ONLY` transaction and reports every file pending when the ledger is absent; the bootstrap DDL runs only in apply mode. Validation (isolated cluster): empty target, owner and server-enforced read-only sessions, rc 0, catalog unchanged, 118 pending; apply from empty applies 118 then 0 pending; populated read-only session (integration test) passes with an identical catalog. Evidence: [QUALIFICATION.md](docs/v2/evidence/closeout-20261121/QUALIFICATION.md). Published at `a3c8c67c` on 2026-11-21; not deployed (production acceptance under packet 7R2).
+
+## AFLDB-ISSUE-370 — The awarded 2026 Brownlow is unpublishable and reads as "Not yet awarded"
+
+- **Severity / area** High, Brownlow publication and the player-page BV wording. A completed, officially counted season is
+  presented as unawarded and is missing from `/brownlow`.
+- **Status** **OPEN.** Fix implemented and verified locally on `claude/brownlow-2026-publication-20261121` (base `4484a6d0`),
+  **committed locally** (not published). Nothing written to production. **Release 7R2 held at P3** by the owner on 2026-11-21: P0–P2 PASS, P3/P3b
+  built release `a3c8c67cc98f-JFf9-hXYa6xoigu5Tw4Hg`, **P4 not run**, production still serves `a2e6ea99`. Runbook:
+  [AFLDB-ISSUE-370.md](issues/open/AFLDB-ISSUE-370.md).
+- **Owner observation (2026-11-21, verbatim extract)** "on Scott Pendlebury's player page, the 2026 BV cell displayed "Not yet
+  awarded". That confirms the displayed text, but I dispute its correctness. The 2026 season finished in September and the
+  Brownlow was awarded on Monday 21 September 2026. I can see 2026 votes on the season page, but the 2026 results appear to be
+  missing from https://beta.afldb.com/brownlow."
+- **Live reproduction (`a2e6ea99`, signed-in Playwright MCP, ~03:30Z)**
+  - `/players/scott-pendlebury-11724`: 2026 BV "Not yet awarded" with the tooltip "The season is still in progress"; 2025
+    shows 2.
+  - Game log 2026: 17 × "—".
+  - `/seasons/2026`: 25 round vote blocks shown (R8 Pendlebury 3), but "No votes recorded for 2026" in the season total.
+  - Matches 17247/17151: no BV column.
+  - `/brownlow`: latest 2025, no 2026, no season selector. `/brownlow/2026`: 404.
+- **Data (18 Nov production dump copy)** `brownlow_round_votes` 2026 holds 9,522 rows from AFL Tables (batch 34, 28 Sep), all
+  `match_id` NULL. Of those, 621 are positive, totalling 1,242 votes. All rows resolve to exactly one match by the
+  migration-094 §27.5 rule, and 207/207 H&A matches have one 3/2/1 set. The pms mirror is NULL; there are no bsv rows;
+  authority is unpublished; coverage is `pending`; pss has 669 rows `pending` (B1a). The stored data matches the official
+  result: Daicos 47 (record), Smith 36, Bontempelli 34, and the Zero Hanger top ten row for row.
+- **Root cause / first divergence** The award (21 Sep) and the count's storage (28 Sep) happened, but at the legacy round grain.
+  Nothing owned attaching and publishing 2026:
+  - the Block B attachment is policy-limited to 1984–2025 (`brownlow-production-correction.ts:129`);
+  - AFL Tables acquisition retired on 2 Nov;
+  - the AFL API successor is deferred to 2027 (ISSUE-332).
+
+  `publishBrownlowSeason` requires attached 3/2/1 sets, so 2026 cannot be published and stays `pending`, correctly under
+  D-365-1/B1a. The bsv-backed views (`/brownlow`, season total) are therefore empty. ISSUE-367 (in `a3c8c67c`) would also
+  withhold the round blocks the owner currently sees. The cell wording asserts the award has not happened (ISSUE-365 interim
+  "Not yet awarded"; D-365-W "Results not loaded"), when the only fact is that AFLDB has not verified it.
+- **Fix (local)**
+  1. Season-aware `pending` wording (`src/lib/format.ts`, `src/app/players/[slug]/page.tsx`), with no year exception:
+     - a completed season reads "Awaiting verification" ("AFLDB has not yet verified and published the Brownlow results
+       for this season.");
+     - an unfinished season reads "Not yet available" ("Brownlow votes for this season are published once the count has
+       been verified.").
+
+     Zero, `not_applicable` and `not_collected` are unchanged. **D-370-W, owner-approved 2026-11-21, supersedes D-365-W.**
+     No text claims the medal was awarded: the application holds no evidence of the award independent of season completion.
+  2. Guarded attachment (`src/db/queries/brownlow-season-attachment.ts`, CLI `tools/v2/brownlow-season-attach.ts`):
+     - plan is read-only and produces a digest;
+     - apply needs the digest, target identity proof, actor and note;
+     - it runs as one locked transaction, reuses the reviewed `applyRoundVoteMatchBackfill`, fills the mirror (fill-only),
+       checks proofs, and writes a sealed audit row;
+     - dry run is the default; exact reversal is available until publication.
+
+     No vote changes.
+  3. Publication stays the owner's existing Super Admin action, unmodified.
+- **Validation (streamanator, isolated cluster)**
+  - Typecheck rc 0; unit 87/87.
+  - `tests/integration/brownlow-season-attachment.test.ts`: 4/4 on the dump copy and 4/4 on a synthetic database.
+  - Adjacent suites: failures are identical on the unchanged `a3c8c67c` tree against the same databases, so they are
+    environment-bound.
+  - Rehearsal on the dump copy plus B1a:
+    - `PLAN rows=9522 positive=621 votes=1242 matches=207/207`;
+    - dry run, then wrong digest REFUSED, then COMMITTED (attached 9,522, mirrored 9,522, unattached 0);
+    - publish produced 183 rows, 1,242 votes, winner Nick Daicos 47;
+    - 0 differences between bsv and round grain, and between pss and bsv;
+    - all three coverages `complete`;
+    - other seasons unchanged (16,120 rows, 79,113 votes).
+  - Rendered before/after on the standalone build:
+    - before: 2026 cells "Awaiting verification";
+    - after: Pendlebury 5 (game log R8 3, R21 2; matches 17247 = 3, 17151 = 2), Daicos 47, `/brownlow` lists 2026 Daicos 47,
+      `/brownlow/2026` 200, `/seasons/2026` shows 25 round blocks;
+    - accepted 2025 unchanged; server logs 0 errors.
+  - `tests/e2e/journeys.spec.ts` reassessed: it required "Results not loaded" and now requires the neutral wording, never
+    "Not yet awarded" or "Results not loaded".
+- **Why 7R2 acceptance needs review** P10 `after` requires "Results not loaded". Its controls require `/brownlow/2026` = 404
+  and the season page's no-votes text. The owner observation expected no 2026 vote numbers. Those criteria certify the
+  disputed state as success. R7R2 also pins `a3c8c67c` exactly. A revised packet (7R3) must re-derive P10 for "Awaiting
+  verification" before publication, and for numbers and a 200 response after it.
+- **Production action (each needs fresh owner approval)**
+  1. Wording: **approved 2026-11-21 as D-370-W**.
+  2. D-370-1: the 2026 ineligible list. No source records one; the rehearsal used an empty placeholder.
+  3. Revised release packet 7R3 for the new candidate, including disposition of the built release and the checkout at
+     `a3c8c67c`.
+  4. After a verified backup, run the production attach: plan (expect exactly 9,522/621/1,242/207), owner reviews the digest,
+     dry run, commit.
+  5. Owner publishes at `/admin/brownlow/2026`.
+
+  Production acceptance stays open until the corrected behaviour is observed on the live site (runbook §9.5).
+- **Follow-up** The rebuild artefact ends at 2025. Any future rebuild-and-promote must carry the 2026 publication forward.
+  ISSUE-332's 2027 plan must include attachment and publication.

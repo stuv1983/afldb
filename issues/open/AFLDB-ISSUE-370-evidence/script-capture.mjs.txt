@@ -1,0 +1,76 @@
+// Rendered capture of the Brownlow journey (headless Chromium, loopback only).
+// usage: node capture.mjs <baseUrl> <cookieHeaderValue|-> <outDir> <label> <matchR8> <matchR21> <match2025>
+import { chromium } from '@playwright/test';
+import { mkdirSync, writeFileSync } from 'node:fs';
+
+const [base, cookie, out, label, mR8, mR21, m25] = process.argv.slice(2);
+mkdirSync(out, { recursive: true });
+const browser = await chromium.launch();
+const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+if (cookie && cookie !== '-') {
+  const [name, ...rest] = cookie.split('=');
+  await ctx.addCookies([{ name, value: rest.join('='), url: base }]);
+}
+const page = await ctx.newPage();
+const result = { label, base: base.replace(/\/\/[^@]*@/, '//'), at: new Date().toISOString(), pages: {} };
+
+/** Cell text of the BV column for table rows whose text matches `rowRe`. */
+const bvCells = (rowRe) => page.evaluate((src) => {
+  const re = new RegExp(src);
+  const outRows = [];
+  for (const table of document.querySelectorAll('table')) {
+    const heads = [...table.querySelectorAll('thead tr:last-child th')].map((th) => th.innerText.replace(/[^A-Za-z]/g, ''));
+    const bv = heads.indexOf('BV');
+    if (bv < 0) continue;
+    for (const tr of table.querySelectorAll('tbody tr')) {
+      const tds = [...tr.querySelectorAll('td,th')];
+      const text = tds.map((td) => td.innerText.trim()).join(' | ');
+      if (re.test(text)) outRows.push({ row: text.slice(0, 160), bv: tds[bv]?.innerText.trim() ?? null, title: tds[bv]?.getAttribute('title') ?? null });
+    }
+  }
+  return outRows;
+}, rowRe);
+
+async function visit(key, path, extract) {
+  const resp = await page.goto(base + path, { waitUntil: 'networkidle', timeout: 120000 });
+  const status = resp?.status() ?? 0;
+  const text = await page.evaluate(() => document.body.innerText);
+  writeFileSync(`${out}/${label}-${key}.txt`, text);
+  await page.screenshot({ path: `${out}/${label}-${key}.png`, fullPage: false });
+  const extracted = status === 200 && extract ? await extract(text) : null;
+  result.pages[key] = { path, status, url: page.url().replace(base, ''), h1: await page.locator('h1').first().innerText().catch(() => null), extracted };
+}
+
+const lines = (text, re, n = 12) => text.split('\n').filter((l) => re.test(l)).slice(0, n);
+
+await visit('brownlow', '/brownlow', async (text) => ({
+  mentions2026: lines(text, /2026/),
+  links2026: await page.locator('a[href*="/brownlow/2026"]').count(),
+  selectOptions: await page.locator('select option').allInnerTexts().then((o) => o.filter((t) => /20(2[4-7])/.test(t))),
+  winnerRows: lines(text, /^(2025|2026)\b/),
+}));
+await visit('brownlow-2026', '/brownlow/2026', (text) => ({ top: lines(text, /Daicos|Smith|Bontempelli|Pendlebury/, 6) }));
+await visit('brownlow-2025', '/brownlow/2025', (text) => ({ top: lines(text, /Neale|Pendlebury|Daicos|Bontempelli/, 6) }));
+await visit('season-2026', '/seasons/2026', async (text) => ({
+  noVotes: lines(text, /No votes recorded/i, 4),
+  pendlebury: lines(text, /Pendlebury/, 6),
+  daicos: lines(text, /Daicos/, 4),
+}));
+await visit('season-2025', '/seasons/2025', async (text) => ({ noVotes: lines(text, /No votes recorded/i, 4), daicos: lines(text, /Daicos/, 3) }));
+await visit('match-r8', `/matches/${mR8}`, async () => ({ pendlebury: await bvCells('Pendlebury'), polled: await bvCells('^') .then((r) => r.filter((x) => /^[123]$/.test(x.bv)).map((x) => `${x.row.split(' | ').slice(0, 2).join(' ')}=${x.bv}`)) }));
+await visit('match-r21', `/matches/${mR21}`, async () => ({ pendlebury: await bvCells('Pendlebury') }));
+await visit('match-2025', `/matches/${m25}`, async () => ({ polled: await bvCells('^').then((r) => r.filter((x) => /^[123]$/.test(x.bv)).length) }));
+for (const slug of (process.env.CAPTURE_PLAYERS ?? 'scott-pendlebury-11724,nick-daicos-9910').split(',')) {
+  const who = slug.replace(/-\d+$/, '');
+  await visit(`player-${who}`, `/players/${slug}`, async () => ({ seasons: (await bvCells('^(2026|2025|2024)\\b')).map((r) => ({ season: r.row.slice(0, 4), bv: r.bv, title: r.title })) }));
+  for (const y of [2026, 2025]) {
+    await visit(`gamelog-${who}-${y}`, `/players/${slug}/matches?season=${y}`, async () => {
+      const rows = await bvCells('^');
+      return { tableRows: await page.locator('tbody tr').count(), bvRows: rows.length, bvColumn: rows.length > 0, polled: rows.filter((x) => /^[123]$/.test(x.bv)).map((x) => `${x.row.split(' | ').slice(0, 3).join(' ')}=${x.bv}`), sum: rows.reduce((s, x) => s + (/^\d+$/.test(x.bv) ? Number(x.bv) : 0), 0) };
+    });
+  }
+}
+
+writeFileSync(`${out}/${label}.json`, JSON.stringify(result, null, 2));
+for (const [k, v] of Object.entries(result.pages)) console.log(`${label} ${k} ${v.status} ${v.url} ${JSON.stringify(v.extracted)}`);
+await browser.close();

@@ -609,8 +609,8 @@ export default async function PlayerPage({
                   <td className="num">{formatStat(s.marks)}</td>
                   <td className="num">{formatStat(s.tackles)}</td>
                   <td className="num">{formatStat(s.hitouts)}</td>
-                  <td className="num" title={brownlowStatusNote(s.brownlowStatus) ?? undefined}>
-                    {formatBrownlow(s.brownlowVotes, s.brownlowStatus)}
+                  <td className="num" title={brownlowStatusNote(s.brownlowStatus, s.seasonStatus) ?? undefined}>
+                    {formatBrownlow(s.brownlowVotes, s.brownlowStatus, s.seasonStatus)}
                   </td>
                 </tr>
               ),

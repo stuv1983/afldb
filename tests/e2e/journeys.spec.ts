@@ -126,14 +126,28 @@ test('an unfinished season is visibly provisional', async ({ page }) => {
   await expect(page.locator('.subtitle')).not.toContainText('Premiers:');
 });
 
-test('a pending Brownlow reads as results not loaded, never as zero', async ({ page }) => {
-  // Max Gawn's 2026 Brownlow results are not loaded (D-365-W wording). Pending says nothing about
-  // whether the season is still being played: a completed season can have pending results too.
-  await page.goto('/players/max-gawn-11966');
+test('a pending Brownlow reads by season state, never as zero or as an award claim', async ({ page }) => {
+  // ISSUE-370 owner decision (2026-11-21). Max Gawn's 2026 Brownlow is pending on every supported base.
+  // The expected wording follows the season's own state as the season page shows it, not a hard-coded
+  // assumption about the base: a completed season reads "Awaiting verification", an unfinished one
+  // "Not yet available". Neither may claim the medal was (or was not) awarded or that results are unloaded.
+  await page.goto('/seasons/2026');
+  const unfinished = await page.locator('.notice').filter({ hasText: 'Season in progress' }).count() > 0;
+  const [label, note] = unfinished
+    ? ['Not yet available', 'Brownlow votes for this season are published once the count has been verified.']
+    : ['Awaiting verification', 'AFLDB has not yet verified and published the Brownlow results for this season.'];
+
+  // Reach the player through search, so the journey does not depend on one base's player ids.
+  await page.goto('/');
+  await page.getByRole('combobox').fill('max gawn');
+  const option = page.getByRole('option').filter({ hasText: 'Max Gawn' }).first();
+  await expect(option).toBeVisible({ timeout: 10_000 });
+  await option.click();
+  await expect(page).toHaveURL(/\/players\/max-gawn-\d+$/);
   const seasonTable = page.getByRole('table', { name: /not recorded in that era/ });
   const row2026 = seasonTable.locator('tr').filter({ hasText: '2026' }).first();
-  const bv = row2026.locator('td[title="Brownlow Medal results for this season have not been loaded yet."]');
-  await expect(bv).toHaveText('Results not loaded');
+  await expect(row2026.locator(`td[title="${note}"]`)).toHaveText(label);
+  await expect(row2026).not.toContainText(/Not yet awarded|Results not loaded|been awarded/);
 });
 
 test('a club page names each era by the identity of the time', async ({ page }) => {

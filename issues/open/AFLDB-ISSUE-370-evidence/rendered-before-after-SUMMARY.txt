@@ -1,0 +1,50 @@
+== capture2 2026-11-21T03:28:11Z BUILD_ID u2OgozmHr54i_67C4jk1I
+create-db: afldb_v2_bv2026_before_test created from afldb_v2_bv2026_rst_test and marked
+B1A-EQUIV rows=669
+PSS 2025 complete 668 votes=668
+PSS 2026 pending 669 votes=0
+== rebuild (the first pass's clearing removed compiled route modules)
+build rc=0 BUILD_ID 5qHVSeBrHIqiHsTAl2K-f
+ISR cleared 224 file(s) before before
+== before render (afldb_v2_bv2026_before_test)
+health {"status":"ok","database":"ok","latencyMs":1}
+before brownlow 200 /brownlow {"mentions2026":[],"links2026":0,"selectOptions":[],"winnerRows":["2025\tMatt Rowell\tGold Coast\t39"]}
+before brownlow-2026 404 /brownlow/2026 null
+before brownlow-2025 200 /brownlow/2025 {"top":["2\tNick Daicos\t32\t23\t","6\tMarcus Bontempelli\t25\t18\t","23\tLachie Neale\t16\t20\t","31\tJosh Daicos\t12\t23\t","122\tShannon Neale\t2\t22\tRECORDED INELIGIBLE","122\tScott Pendlebury\t2\t20\t"]}
+before season-2026 200 /seasons/2026 {"noVotes":["No votes recorded for 2026"],"pendlebury":[],"daicos":[]}
+before season-2025 200 /seasons/2025 {"noVotes":[],"daicos":[]}
+before match-r8 200 /matches/17247 {"pendlebury":[],"polled":[]}
+before match-r21 200 /matches/17151 {"pendlebury":[]}
+before match-2025 200 /matches/16677 {"polled":3}
+before player-scott-pendlebury 200 /players/scott-pendlebury-11724 {"seasons":[{"season":"2026","bv":"Awaiting verification","title":"The Brownlow Medal for this season has been awarded; AFLDB has not yet verified and published the results."},{"season":"2025","bv":"2","title":null},{"season":"2024","bv":"2","title":null}]}
+before gamelog-scott-pendlebury-2026 200 /players/scott-pendlebury-11724/matches?season=2026 {"tableRows":17,"bvRows":17,"bvColumn":true,"polled":[],"sum":0}
+before gamelog-scott-pendlebury-2025 200 /players/scott-pendlebury-11724/matches?season=2025 {"tableRows":22,"bvRows":22,"bvColumn":true,"polled":["410 25 Apr 2025 2025 R8=2"],"sum":2}
+before player-nick-daicos 200 /players/nick-daicos-9910 {"seasons":[{"season":"2026","bv":"Awaiting verification","title":"The Brownlow Medal for this season has been awarded; AFLDB has not yet verified and published the results."},{"season":"2025","bv":"32","title":null},{"season":"2024","bv":"38","title":null}]}
+before gamelog-nick-daicos-2026 200 /players/nick-daicos-9910/matches?season=2026 {"tableRows":23,"bvRows":23,"bvColumn":true,"polled":[],"sum":0}
+before gamelog-nick-daicos-2025 200 /players/nick-daicos-9910/matches?season=2025 {"tableRows":25,"bvRows":25,"bvColumn":true,"polled":["92 16 Aug 2025 2025 R24=3","89 27 July 2025 2025 R21=3","88 20 July 2025 2025 R20=1","86 4 July 2025 2025 R18=3","85 28 June 2025 2025 R17=3","84 21 June 2025 2025 R16=3","82 30 May 2025 2025 R13=1","81 24 May 2025 2025 R12=2","77 25 Apr 2025 2025 R8=1","76 17 Apr 2025 2025 R7=3","75 11 Apr 2025 2025 R6=3","74 3 Apr 2025 2025 R5=2","73 21 Mar 2025 2025 R3=3","72 15 Mar 2025 2025 R2=1"],"sum":32}
+anon /brownlow 307 http://127.0.0.1:3369/beta?from=%2Fbrownlow
+ISR cleared 63 file(s) before after
+== after render (afldb_v2_bv2026_rehearse_test)
+health {"status":"ok","database":"ok","latencyMs":1}
+after brownlow 200 /brownlow {"mentions2026":["2026\tNick Daicos\tCollingwood\t47"],"links2026":1,"selectOptions":[],"winnerRows":["2026\tNick Daicos\tCollingwood\t47","2025\tMatt Rowell\tGold Coast\t39"]}
+after brownlow-2026 200 /brownlow/2026 {"top":["Won by Nick Daicos with 47 votes · 2026 season","1\tNick Daicos\t47\t23\tWinner","2\tBailey Smith\t36\t22\t","3\tMarcus Bontempelli\t34\t23\t","32\tJagga Smith\t12\t24\t","68\tScott Pendlebury\t5\t17\t"]}
+after brownlow-2025 200 /brownlow/2025 {"top":["2\tNick Daicos\t32\t23\t","6\tMarcus Bontempelli\t25\t18\t","23\tLachie Neale\t16\t20\t","31\tJosh Daicos\t12\t23\t","122\tShannon Neale\t2\t22\tRECORDED INELIGIBLE","122\tScott Pendlebury\t2\t20\t"]}
+after season-2026 200 /seasons/2026 {"noVotes":[],"pendlebury":[],"daicos":[]}
+after season-2025 200 /seasons/2025 {"noVotes":[],"daicos":[]}
+after match-r8 200 /matches/17247 {"pendlebury":[{"row":"Scott Pendlebury | 2 | 0 | 18 | 25 | 43 | 10 | 1 | 0 | 3","bv":"3","title":null}],"polled":["Scott Pendlebury 2=3","Nick Daicos 0=2","Jack Crisp 1=1"]}
+after match-r21 200 /matches/17151 {"pendlebury":[{"row":"Scott Pendlebury | 1 | 0 | 17 | 12 | 29 | 8 | 2 | 0 | 2","bv":"2","title":null}]}
+after match-2025 200 /matches/16677 {"polled":3}
+after player-scott-pendlebury 200 /players/scott-pendlebury-11724 {"seasons":[{"season":"2026","bv":"5","title":null},{"season":"2025","bv":"2","title":null},{"season":"2024","bv":"2","title":null}]}
+after gamelog-scott-pendlebury-2026 200 /players/scott-pendlebury-11724/matches?season=2026 {"tableRows":17,"bvRows":17,"bvColumn":true,"polled":["439 23 July 2026 2026 R21=2","431 25 Apr 2026 2026 R8=3"],"sum":5}
+after gamelog-scott-pendlebury-2025 200 /players/scott-pendlebury-11724/matches?season=2025 {"tableRows":22,"bvRows":22,"bvColumn":true,"polled":["410 25 Apr 2025 2025 R8=2"],"sum":2}
+after player-nick-daicos 200 /players/nick-daicos-9910 {"seasons":[{"season":"2026","bv":"47","title":null},{"season":"2025","bv":"32","title":null},{"season":"2024","bv":"38","title":null}]}
+after gamelog-nick-daicos-2026 200 /players/nick-daicos-9910/matches?season=2026 {"tableRows":23,"bvRows":23,"bvColumn":true,"polled":["116 15 Aug 2026 2026 R24=3","115 9 Aug 2026 2026 R23=3","113 23 July 2026 2026 R21=3","112 18 July 2026 2026 R20=3","111 10 July 2026 2026 R19=3","110 4 July 2026 2026 R18=3","109 27 June 2026 2026 R17=3","108 20 June 2026 2026 R16=3","107 8 June 2026 2026 R14=2","106 30 May 2026 2026 R13=2","105 23 May 2026 2026 R12=3","102 30 Apr 2026 2026 R9=1","101 25 Apr 2026 2026 R8=2","100 16 Apr 2026 2026 R7=3","99 10 Apr 2026 2026 R6=1","98 27 Mar 2026 2026 R4=3","97 14 Mar 2026 2026 R2=3","96 8 Mar 2026 2026 R1=3"],"sum":47}
+after gamelog-nick-daicos-2025 200 /players/nick-daicos-9910/matches?season=2025 {"tableRows":25,"bvRows":25,"bvColumn":true,"polled":["92 16 Aug 2025 2025 R24=3","89 27 July 2025 2025 R21=3","88 20 July 2025 2025 R20=1","86 4 July 2025 2025 R18=3","85 28 June 2025 2025 R17=3","84 21 June 2025 2025 R16=3","82 30 May 2025 2025 R13=1","81 24 May 2025 2025 R12=2","77 25 Apr 2025 2025 R8=1","76 17 Apr 2025 2025 R7=3","75 11 Apr 2025 2025 R6=3","74 3 Apr 2025 2025 R5=2","73 21 Mar 2025 2025 R3=3","72 15 Mar 2025 2025 R2=1"],"sum":32}
+anon /brownlow 307 http://127.0.0.1:3369/beta?from=%2Fbrownlow
+server log error|unhandled: /mnt/ssd/afldb-bv2026-20261121/evidence/rehearsal2/server-after.log:0
+server log error|unhandled: /mnt/ssd/afldb-bv2026-20261121/evidence/rehearsal2/server-before.log:0
+CAPTURE2-COMPLETE
+before SEASON 2026 code=200 roundVoteBlocks=0 pendleburyRoundVotes=[] noVotesText=0 daicosTotal47=false
+before SEASON 2025 code=200 roundVoteBlocks=25 pendleburyRoundVotes=[2] noVotesText=0 daicosTotal47=false
+after SEASON 2026 code=200 roundVoteBlocks=25 pendleburyRoundVotes=[3,2] noVotesText=0 daicosTotal47=true
+after SEASON 2025 code=200 roundVoteBlocks=25 pendleburyRoundVotes=[2] noVotesText=0 daicosTotal47=false

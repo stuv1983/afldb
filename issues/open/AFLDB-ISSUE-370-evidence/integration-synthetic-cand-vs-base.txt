@@ -1,0 +1,40 @@
+== cand tree=/mnt/ssd/afldb-bv2026-20261121/cand rev= migrate=0 privileges=0 seed=0
+cand integ rc=1
+ ❯ tests/integration/brownlow-pending-coverage.test.ts (8 tests | 4 failed) 653ms
+ ❯ tests/integration/admin-brownlow.test.ts (47 tests | 1 failed | 1 skipped) 4299ms
+ ✓ tests/integration/brownlow-pending-projection.test.ts (8 tests) 421ms
+ ✓ tests/integration/brownlow-season-attachment.test.ts (4 tests) 1435ms
+ ✓ tests/integration/b1a-successor.test.ts (14 tests) 26071ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/integration/admin-brownlow.test.ts > migration 094 objects and backfill > resolved every historical round row to exactly one match (preflight P2)
+ ❯ tests/integration/admin-brownlow.test.ts:392:26
+ FAIL  tests/integration/brownlow-pending-coverage.test.ts > D-365-1: declared no-medal seasons stay not_applicable > recomputing 1900 inside a rolled-back transaction keeps all three grains not_applicable
+ FAIL  tests/integration/brownlow-pending-coverage.test.ts > D-365-1: declared no-medal seasons stay not_applicable > recomputing 1943 inside a rolled-back transaction keeps all three grains not_applicable
+ ❯ tests/integration/brownlow-pending-coverage.test.ts:232:72
+ FAIL  tests/integration/brownlow-pending-coverage.test.ts > D-365-1: declared no-medal seasons stay not_applicable > a declared no-medal season still refuses a Brownlow finalisation (season_not_polled) and writes nothing
+ ❯ tests/integration/brownlow-pending-coverage.test.ts:258:19
+ FAIL  tests/integration/brownlow-pending-coverage.test.ts > D-365-1: the all-season sweep (every recompute rolled back) > no season is ever recomputed to not_applicable unless declared; season totals match the committed reference grid
+ ❯ tests/integration/brownlow-pending-coverage.test.ts:285:28
+ Test Files  2 failed | 3 passed (5)
+      Tests  5 failed | 75 passed | 1 skipped (81)
+== base tree=/mnt/ssd/afldb-rel7r2-20261121/cand rev= migrate=0 privileges=0 seed=0
+base integ rc=1
+ ❯ tests/integration/admin-brownlow.test.ts (47 tests | 1 failed | 1 skipped) 4285ms
+ ❯ tests/integration/brownlow-pending-coverage.test.ts (8 tests | 4 failed) 701ms
+ ✓ tests/integration/b1a-successor.test.ts (14 tests) 25950ms
+ ✓ tests/integration/brownlow-pending-projection.test.ts (8 tests) 427ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/integration/admin-brownlow.test.ts > migration 094 objects and backfill > resolved every historical round row to exactly one match (preflight P2)
+ ❯ tests/integration/admin-brownlow.test.ts:392:26
+ FAIL  tests/integration/brownlow-pending-coverage.test.ts > D-365-1: declared no-medal seasons stay not_applicable > recomputing 1900 inside a rolled-back transaction keeps all three grains not_applicable
+ FAIL  tests/integration/brownlow-pending-coverage.test.ts > D-365-1: declared no-medal seasons stay not_applicable > recomputing 1943 inside a rolled-back transaction keeps all three grains not_applicable
+ ❯ tests/integration/brownlow-pending-coverage.test.ts:232:72
+ FAIL  tests/integration/brownlow-pending-coverage.test.ts > D-365-1: declared no-medal seasons stay not_applicable > a declared no-medal season still refuses a Brownlow finalisation (season_not_polled) and writes nothing
+ ❯ tests/integration/brownlow-pending-coverage.test.ts:258:19
+ FAIL  tests/integration/brownlow-pending-coverage.test.ts > D-365-1: the all-season sweep (every recompute rolled back) > no season is ever recomputed to not_applicable unless declared; season totals match the committed reference grid
+ ❯ tests/integration/brownlow-pending-coverage.test.ts:285:28
+ Test Files  2 failed | 2 passed (4)
+      Tests  5 failed | 71 passed | 1 skipped (77)
+SYNTH-COMPLETE
+
+[exited with code 0]

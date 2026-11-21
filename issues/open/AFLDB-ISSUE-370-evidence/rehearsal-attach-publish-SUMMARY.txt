@@ -1,0 +1,63 @@
+== rehearsal 2026-11-21T03:21:19Z host=streamanator
+drop-db: afldb_v2_bv2026_rehearse_test dropped
+create-db: afldb_v2_bv2026_rehearse_test created from afldb_v2_bv2026_rst_test and marked
+B1A-EQUIV rows=669
+ACTOR <redacted: the dump's first active super-admin id, used only as the rehearsal actor>
+M2025 16677
+PSS 2025 complete 668 votes=668
+PSS 2026 pending 669 votes=0
+== build
+build rc=0 BUILD_ID u2OgozmHr54i_67C4jk1I
+== BEFORE render
+health {"status":"ok","database":"ok","latencyMs":1}
+before brownlow 200 /brownlow {"mentions2026":[],"links2026":0,"selectOptions":[],"winnerRows":["2025\tMatt Rowell\tGold Coast\t39"]}
+before brownlow-2026 404 /brownlow/2026 null
+before brownlow-2025 200 /brownlow/2025 {"top":["2\tNick Daicos\t32\t23\t","6\tMarcus Bontempelli\t25\t18\t","23\tLachie Neale\t16\t20\t","31\tJosh Daicos\t12\t23\t","122\tShannon Neale\t2\t22\tRECORDED INELIGIBLE","122\tScott Pendlebury\t2\t20\t"]}
+before season-2026 200 /seasons/2026 {"noVotes":["No votes recorded for 2026"],"pendlebury":[],"daicos":[]}
+before season-2025 200 /seasons/2025 {"noVotes":[],"daicos":[]}
+before match-r8 200 /matches/17247 {"pendlebury":[],"polled":[]}
+before match-r21 200 /matches/17151 {"pendlebury":[]}
+before match-2025 200 /matches/16677 {"polled":0}
+before player 404 /players/scott-pendlebury null
+before gamelog-2026 404 /players/scott-pendlebury/matches?season=2026 null
+before gamelog-2025 404 /players/scott-pendlebury/matches?season=2025 null
+anon /brownlow 307 http://127.0.0.1:3369/beta?from=%2Fbrownlow
+== attach (CLI)
+target afldb_v2_bv2026_rehearse_test afldb_import afldb_v2_isolated 7710454842039004484 20442
+PLAN season=2026 rows=9522 positive=621 votes=1242 matches=207/207 attach=9522 mirror=9522 digest=100c112f400a492906cbc2a5c3886243c15d412eb62f84d50f17c63ae1f76aa7
+APPLY DRY-RUN (rolled back) season=2026 attached=9522 mirrored=9522 unattached_after=0 mirror_after=9522 audit=- digest=100c112f400a492906cbc2a5c3886243c15d412eb62f84d50f17c63ae1f76aa7
+REFUSED AttachmentRefusal export_digest_mismatch: The export digest is not the reviewed digest. Nothing was written.
+APPLY COMMITTED season=2026 attached=9522 mirrored=9522 unattached_after=0 mirror_after=9522 audit=205 digest=100c112f400a492906cbc2a5c3886243c15d412eb62f84d50f17c63ae1f76aa7
+plan file sha256 32fbbafc7d4204b29e620d422db51391299f487ae1e32544405853a8e89f0fc8
+== publish (the real Super Admin writer, ineligible list EMPTY pending the owner's 2026 eligibility decision)
+publish rc=0
+OVERVIEW expected=207 accounted=207 unresolved=0 revision=0 complete=true
+PUBLISH {"ok":true,"value":{"season":2026,"revision":2,"rowCount":183,"votesTotal":1242,"winners":[9910]}}
+bsv2026|183|1242|1|0
+winner|Nick Daicos|47|1
+top|Nick Daicos|47
+top|Bailey Smith|36
+top|Marcus Bontempelli|34
+top|Max Gawn|28
+top|Will Ashcroft|27
+top|Patrick Cripps|27
+top|Harry Sheezel|27
+top|Zak Butters|26
+top|Isaac Heeney|26
+top|Izak Rankine|25
+recon bsv-vs-brv diffs|0
+recon pss-vs-bsv diffs|0
+pss2026|complete|669|669|1242
+coverage|brownlow_match_votes|complete
+coverage|brownlow_round_votes|complete
+coverage|brownlow_season_total|complete
+authority|2026|2|t
+pendlebury|2024|complete|2
+pendlebury|2025|complete|2
+pendlebury|2026|complete|5
+provenance2026|afltables|9522|621
+audit|brownlow_season_authority|attach_round_votes|1
+audit|brownlow_season_authority|publish|1
+other seasons bsv unchanged|16120|79113
+== AFTER render (ISR entries for these paths cleared first)
+ISR cleared 749 file(s)

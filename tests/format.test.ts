@@ -50,16 +50,32 @@ describe('formatStat', () => {
   });
 });
 
-describe('formatBrownlow and brownlowStatusNote (D-365-W)', () => {
+describe('formatBrownlow and brownlowStatusNote (D-365-W, season-aware 2026-11-21)', () => {
   // The player season-by-season BV cell renders formatBrownlow as its text and
   // brownlowStatusNote as its title. The four absent-vote meanings must stay
   // distinct from each other and from a recorded zero.
-  it('a pending season reads as results not loaded, never as zero or no medal', () => {
-    expect(formatBrownlow(null, 'pending')).toBe('Results not loaded');
-    expect(brownlowStatusNote('pending')).toBe('Brownlow Medal results for this season have not been loaded yet.');
-    // The interim (ISSUE-365) wording claimed the season was still in progress.
-    expect(brownlowStatusNote('pending')).not.toMatch(/in progress|not been awarded/);
-    expect(formatBrownlow(null, 'pending')).not.toBe('Not yet awarded');
+  const VERIFY_NOTE = 'AFLDB has not yet verified and published the Brownlow results for this season.';
+  const OPEN_NOTE = 'Brownlow votes for this season are published once the count has been verified.';
+  // ISSUE-370 owner decision (2026-11-21): pending text states only AFLDB's own verification state. It
+  // never says the medal was awarded or not awarded, that the season is in progress, or that results
+  // were not loaded (they can be stored and unverified).
+  const AWARD_CLAIM = /award|in progress|not loaded|not been loaded/i;
+
+  it('a pending COMPLETED season reads "Awaiting verification" with a factual, award-neutral note', () => {
+    expect(formatBrownlow(null, 'pending', 'complete')).toBe('Awaiting verification');
+    expect(brownlowStatusNote('pending', 'complete')).toBe(VERIFY_NOTE);
+    for (const text of [formatBrownlow(null, 'pending', 'complete'), brownlowStatusNote('pending', 'complete')]) {
+      expect(text).not.toMatch(AWARD_CLAIM);
+    }
+  });
+
+  it('a pending season that is not complete (or whose status is unknown) reads "Not yet available"', () => {
+    for (const seasonStatus of ['in_progress', undefined, null]) {
+      expect(formatBrownlow(null, 'pending', seasonStatus)).toBe('Not yet available');
+      expect(brownlowStatusNote('pending', seasonStatus)).toBe(OPEN_NOTE);
+      expect(formatBrownlow(null, 'pending', seasonStatus)).not.toMatch(AWARD_CLAIM);
+      expect(brownlowStatusNote('pending', seasonStatus)).not.toMatch(AWARD_CLAIM);
+    }
   });
 
   it('a declared no-medal season keeps "No medal"', () => {
@@ -71,6 +87,7 @@ describe('formatBrownlow and brownlowStatusNote (D-365-W)', () => {
     expect(formatBrownlow(0, 'complete')).toBe('0');
     expect(formatBrownlow(1234, 'complete')).toBe('1,234');
     expect(brownlowStatusNote('complete')).toBeNull();
+    expect(brownlowStatusNote('complete', 'complete')).toBeNull();
   });
 
   it('unrecorded results keep their existing treatment', () => {
@@ -84,7 +101,8 @@ describe('formatBrownlow and brownlowStatusNote (D-365-W)', () => {
   });
 
   it('the status, not a stray vote count, decides a non-complete cell', () => {
-    expect(formatBrownlow(0, 'pending')).toBe('Results not loaded');
+    expect(formatBrownlow(0, 'pending', 'complete')).toBe('Awaiting verification');
+    expect(formatBrownlow(0, 'pending')).toBe('Not yet available');
     expect(formatBrownlow(0, 'not_applicable')).toBe('No medal');
   });
 });

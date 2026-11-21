@@ -64,6 +64,13 @@ export const BROWNLOW_ACCOUNTING_SEASON = 2075;
  */
 export const BROWNLOW_PENDING_SEASON = 2063;
 
+/**
+ * Owner dispute 2026-11-21 (Brownlow season attachment). A COMPLETED season with no coverage row whose test seeds
+ * complete official votes in the legacy round grain (`match_id` NULL, per-match mirror NULL): the state 2026 is in.
+ * Owned by brownlow-season-attachment.test.ts.
+ */
+export const BROWNLOW_UNATTACHED_SEASON = 2059;
+
 /** §27.6: fewer than this on either side and a match cannot be finalised. */
 const FULL_SIDE = 18;
 /** Deliberately below it, for the participant-incomplete case. */
@@ -270,6 +277,17 @@ const SHAPES: Record<number, FixtureShape> = {
     finals: false,
     sourcePublishedPlayers: 0,
     coverage: 'complete',
+  },
+  [BROWNLOW_UNATTACHED_SEASON]: {
+    homeAndAway: [
+      { home: 0, away: 1, round: 1, homeSide: FULL_SIDE, awaySide: FULL_SIDE },
+      { home: 2, away: 3, round: 1, homeSide: FULL_SIDE, awaySide: FULL_SIDE },
+      { home: 0, away: 2, round: 2, homeSide: FULL_SIDE, awaySide: FULL_SIDE },
+      { home: 1, away: 3, round: 2, homeSide: FULL_SIDE, awaySide: FULL_SIDE },
+    ],
+    finals: false,
+    sourcePublishedPlayers: 0,
+    coverage: 'absent',
   },
   [BROWNLOW_PENDING_SEASON]: {
     homeAndAway: [

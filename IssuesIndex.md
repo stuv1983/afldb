@@ -1,11 +1,22 @@
 # AFLDB Current Issues Index
 
-**Current state, 21 November 2026 (closeout pass).** **Published 2026-11-21:** `origin/main` fast-forwarded `b82a6b04` → `a3c8c67c` (owner-approved; executable tree equal to the qualified `467cd243`). **Not deployed.** Release 7 re-derived as packet 7R2 for candidate `a3c8c67c` ([RELEASE-PACKET-7R2.md](docs/v2/evidence/remediation-20261114/run7r2/RELEASE-PACKET-7R2.md); DEV qualification PASS on streamanator, including a rendered ISSUE-367 check); production release and acceptance await a new owner approval and window. Nine open issues: 332, 348, 350, 351, 352, 357, 362, 363 and 364. AFLDB-ISSUE-367, 368 and 369 are **resolved locally** on branch `claude/closeout-20261121` (executable tree `467cd243`, qualified red/green on streamanator, [QUALIFICATION.md](docs/v2/evidence/closeout-20261121/QUALIFICATION.md)); not published, not deployed. The ISSUE-352 retention-retry defect is fixed the same way; 352 stays open for owner decisions D-HO-2/3/5/7. Release 7 was not executed: its approval expired 2026-11-20T01:00Z with no production contact recorded. Every other open issue is blocked on an owner decision or operational input (see the table).
+**Current state, 21 November 2026 (Release 7R2 held at P3; ISSUE-370 opened).** The owner held Release 7R2 at P3:
+- P0–P2 PASS; P3/P3b built `a3c8c67cc98f-JFf9-hXYa6xoigu5Tw4Hg`;
+- **not promoted, no restart**; production still serves `a2e6ea99`;
+- its checkout sits at `a3c8c67c`.
+
+The owner disputes the 2026 BV cell "Not yet awarded" and the absence of 2026 from `/brownlow`. **AFLDB-ISSUE-370** is open, with
+the fix committed locally (not published) on `claude/brownlow-2026-publication-20261121`. R7R2's acceptance criteria (P10 `after`
+text, `/brownlow/2026` 404 control, owner "no 2026 votes" observation) certify the disputed state and must be re-derived. Ten
+open issues: 332, 348, 350, 351, 352, 357, 362, 363, 364 and **370**.
+
+**Earlier state, 21 November 2026 (closeout pass).** **Published 2026-11-21:** `origin/main` fast-forwarded `b82a6b04` → `a3c8c67c` (owner-approved; executable tree equal to the qualified `467cd243`). **Not deployed.** Release 7 re-derived as packet 7R2 for candidate `a3c8c67c` ([RELEASE-PACKET-7R2.md](docs/v2/evidence/remediation-20261114/run7r2/RELEASE-PACKET-7R2.md); DEV qualification PASS on streamanator, including a rendered ISSUE-367 check); production release and acceptance await a new owner approval and window. Nine open issues: 332, 348, 350, 351, 352, 357, 362, 363 and 364. AFLDB-ISSUE-367, 368 and 369 are **resolved locally** on branch `claude/closeout-20261121` (executable tree `467cd243`, qualified red/green on streamanator, [QUALIFICATION.md](docs/v2/evidence/closeout-20261121/QUALIFICATION.md)); not published, not deployed. The ISSUE-352 retention-retry defect is fixed the same way; 352 stays open for owner decisions D-HO-2/3/5/7. Release 7 was not executed: its approval expired 2026-11-20T01:00Z with no production contact recorded. Every other open issue is blocked on an owner decision or operational input (see the table).
 
 **Review state, 21 November 2026.** Twelve open issues: 332, 348, 350, 351, 352, 357, 362, 363, 364, 367, 368 and 369. Live `origin/main` matched the remediation tip `b82a6b04`. The local `main` ref was 223 commits behind at the review. The new source findings and the ISSUE-352 retention retry defect block closeout. Primary ISSUE-366 remains resolved. The untracked Release 7 sitting record contains approval for an expired window and no execution result. [Closeout review](issues/reviews/AFLDB-FULL-REVIEW-2026-11-21.md) · [Worktree inventory](issues/reviews/AFLDB-CLOSEOUT-WORKTREES-2026-11-21.md).
 
 | Issue | Severity | Next action |
 |---|---|---|
+| 370 · 2026 Brownlow unpublishable, "Not yet awarded" | High | Wording D-370-W approved 2026-11-21. Fix committed locally; 7R3 packet in preparation. Owner: D-370-1 2026 ineligible list, approval of the 7R3 attended window (promote, attach), then publish `/admin/brownlow/2026`. [Runbook](issues/open/AFLDB-ISSUE-370.md) |
 | 352 · backup retention | Medium | Retry defect fixed locally (durable `.retention-hold`, red/green). Owner D-HO-2/3/5/7 before off-host activation. |
 
 > Lightweight session index of open issues only.

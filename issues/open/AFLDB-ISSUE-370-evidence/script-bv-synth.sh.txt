@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Brownlow integration suites on a fresh migrated + minimally seeded database (synthetic data only),
+# for the candidate and for the unchanged 7R2 base, so any difference is attributable to this change.
+set -uo pipefail; export LC_ALL=C
+export PATH=/home/arm/.nvm/versions/node/v22.23.2/bin:$PATH
+W=/mnt/ssd/afldb-bv2026-20261121; E=$W/evidence/synth; P=$W/private; mkdir -p "$E"
+export AFLDB_V2_PG_ROOT=$W/pg-rst AFLDB_V2_PG_PORT=61468 AFLDB_V2_PG_BIN=/usr/lib/postgresql/16/bin
+cat > "$P/seed-synth.mjs" <<'JS'
+import { createRequire } from 'node:module'; const postgres = createRequire('/mnt/ssd/afldb-bv2026-20261121/cand/package.json')('postgres');
+const sql = postgres(process.env.AFLDB_TEST_DATABASE_URL, { max: 1, onnotice: () => {} });
+await sql.begin(async (tx) => {
+  await tx`INSERT INTO sources (key, name, kind) VALUES ('afltables', 'AFL Tables', 'scrape') ON CONFLICT (key) DO NOTHING`;
+  const [{ n }] = await tx`SELECT count(DISTINCT organization_id)::int AS n FROM clubs`;
+  for (let i = n; i < 4; i += 1) {
+    await tx`SET CONSTRAINTS clubs_current_identity_id_fkey DEFERRED`;
+    const [org] = await tx`INSERT INTO club_organizations (name, slug) VALUES (${`BV Org ${i}`}, ${`bv-org-${i}`}) RETURNING id`;
+    const [club] = await tx`INSERT INTO clubs (slug, name, short_name, abbreviation, current_identity_id, legacy_club_hist, organization_id)
+      VALUES (${`bv-club-${i}`}, ${`BV Club ${i}`}, ${`BV ${i}`}, ${`BV${i}`}, -1, ${`bv-club-${i}`}, ${org.id}) RETURNING id`;
+    await tx`UPDATE clubs SET current_identity_id = ${club.id} WHERE id = ${club.id}`;
+  }
+});
+console.log('SEED ok'); await sql.end();
+JS
+SUITES="tests/integration/admin-brownlow.test.ts tests/integration/brownlow-pending-coverage.test.ts tests/integration/brownlow-pending-projection.test.ts tests/integration/b1a-successor.test.ts"
+for pair in cand:$W/cand:"$SUITES tests/integration/brownlow-season-attachment.test.ts" base:/mnt/ssd/afldb-rel7r2-20261121/cand:"$SUITES"; do
+  L=${pair%%:*}; rest=${pair#*:}; TREE=${rest%%:*}; RUN=${rest#*:}
+  cd "$W/cand"; ISO="node --import tsx tools/v2/isolated-pg.ts"; DB=afldb_v2_bv2026_syn${L}_test
+  $ISO list 2>&1 | grep -q "$DB" && $ISO drop-db "$DB" --acknowledge-destroy "$DB" > /dev/null 2>&1
+  $ISO create-db "$DB" > /dev/null 2>&1
+  $ISO run "$DB" -- bash -c "cd $TREE && node --import tsx tools/db/migrate.ts --target test" > "$E/$L-migrate.log" 2>&1; m=$?
+  $ISO run "$DB" -- bash -c "cd $TREE && node --import tsx tools/db/privileges.ts --target test" > "$E/$L-priv.log" 2>&1; p=$?
+  $ISO run "$DB" -- node "$P/seed-synth.mjs" > "$E/$L-seed.log" 2>&1; s=$?
+  echo "== $L tree=$TREE rev=$(git -C $TREE log -1 --format=%h 2>/dev/null) migrate=$m privileges=$p seed=$s"
+  $ISO run "$DB" -- bash -c "cd $TREE && node node_modules/vitest/vitest.mjs run $RUN" > "$E/$L-integ.log" 2>&1; echo "$L integ rc=$?"
+  sed -e 's/\x1b\[[0-9;]*m//g' -e 's#postgres\(ql\)\?://[^ ]*#<dsn>#g' "$E/$L-integ.log" | grep -E '^ FAIL |Test Files|Tests |^ (✓|×|❯) tests/' | head -20
+done
+echo SYNTH-COMPLETE

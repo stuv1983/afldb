@@ -15,6 +15,23 @@ commit.
 
 ## [Unreleased]
 
+### A completed season's unpublished Brownlow no longer reads as unawarded; guarded 2026 attachment (ISSUE-370; 2026-11-21, local)
+
+- **Player-page BV wording is season-aware.** A `pending` Brownlow in a completed season reads **"Awaiting verification"**,
+  with the tooltip "AFLDB has not yet verified and published the Brownlow results for this season." In an unfinished
+  season it reads **"Not yet available"**. Neither wording makes any claim about the award or says results were not
+  loaded. Owner decision D-370-W (2026-11-21) supersedes the D-365-W wording. Genuine zeros,
+  `No medal` and `Not recorded` are unchanged; no season is special-cased.
+- **New guarded runner `tools/v2/brownlow-season-attach.ts`.** It makes a completed season's stored legacy-grain round
+  votes publishable by attaching each row to its match and filling the per-match mirror:
+  - read-only plan with a digest;
+  - apply that requires the digest, target identity proof, an actor and a note, in one locked transaction with proofs and
+    a sealed audit row;
+  - dry run by default; exact reversal until publication.
+
+  It changes no vote. Publication remains the Super Admin action. Not run on production.
+- Release 7R2 held at P3 (built, not promoted) pending a revised packet.
+
 ### Closeout fixes: AFLW replacement, Brownlow publication gate, read-only migration status, off-host retention (ISSUE-368, 367, 369, 352; 2026-11-21)
 
 Qualified red/green on streamanator against disposable PostgreSQL 16 ([record](docs/v2/evidence/closeout-20261121/QUALIFICATION.md)). Published to `origin/main` at `a3c8c67c` on 2026-11-21; not deployed (release packet 7R2 prepared, awaiting approval). Nothing ran against DEV or production.

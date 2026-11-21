@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+# Rendered rehearsal on a disposable copy of the 18 Nov production dump, brought to production's current
+# state (B1a: 669 rows pending). Stage: before render -> attach (CLI dry run, commit) -> Super Admin publish
+# (the real writer) -> after render. Loopback only; nothing leaves this host.
+set -uo pipefail; export LC_ALL=C
+export PATH=/home/arm/.nvm/versions/node/v22.23.2/bin:$PATH
+W=/mnt/ssd/afldb-bv2026-20261121; C=$W/cand; E=$W/evidence/rehearsal; P=$W/private; mkdir -p "$E"; mkdir -m 700 -p "$P"
+export AFLDB_V2_PG_ROOT=$W/pg-rst AFLDB_V2_PG_PORT=61468 AFLDB_V2_PG_BIN=/usr/lib/postgresql/16/bin
+DB=afldb_v2_bv2026_rehearse_test; S=$E/SUMMARY.txt; : > "$S"
+rec() { echo "$*" | tee -a "$S"; }
+cd "$C"; ISO="node --import tsx tools/v2/isolated-pg.ts"
+R() { $ISO run "$DB" -- "$@"; }
+rec "== rehearsal $(date -u +%FT%TZ) host=$(hostname)"
+$ISO list 2>&1 | grep -q "$DB" && $ISO drop-db "$DB" --acknowledge-destroy "$DB" 2>&1 | tail -1 | tee -a "$S"
+$ISO create-db "$DB" --template afldb_v2_bv2026_rst_test 2>&1 | tail -1 | tee -a "$S"
+
+cat > "$P/r0.mjs" <<'JS'
+import { createRequire } from 'node:module'; const postgres = createRequire('/mnt/ssd/afldb-bv2026-20261121/cand/package.json')('postgres');
+const sql = postgres(process.env.AFLDB_TEST_DATABASE_URL, { max: 1, onnotice: () => {} });
+const n = await sql`UPDATE player_season_stats SET brownlow_status = 'pending' WHERE season = 2026 AND brownlow_status = 'not_applicable' AND brownlow_votes IS NULL RETURNING 1`;
+console.log(`B1A-EQUIV rows=${n.length}`);
+const [a] = await sql`SELECT min(id)::int AS id FROM auth_users WHERE role = 'super_admin' AND disabled_at IS NULL`;
+console.log(`ACTOR ${a.id}`);
+const [m] = await sql`SELECT m.id::int AS id FROM matches m JOIN player_match_stats p ON p.match_id = m.id JOIN players pl ON pl.id = p.player_id
+  WHERE m.season = 2025 AND pl.slug = 'scott-pendlebury' AND p.brownlow_votes > 0 ORDER BY m.match_date LIMIT 1`;
+console.log(`M2025 ${m?.id ?? 'none'}`);
+for (const r of await sql`SELECT season, brownlow_status, count(*)::int n, count(brownlow_votes)::int v FROM player_season_stats WHERE season IN (2025, 2026) GROUP BY 1, 2 ORDER BY 1, 2`) console.log(`PSS ${r.season} ${r.brownlow_status} ${r.n} votes=${r.v}`);
+await sql.end();
+JS
+R node "$P/r0.mjs" > "$E/r0.log" 2>&1; grep -E '^(B1A|ACTOR|M2025|PSS)' "$E/r0.log" | tee -a "$S"
+ACTOR=$(awk '/^ACTOR/{print $2}' "$E/r0.log"); M25=$(awk '/^M2025/{print $2}' "$E/r0.log")
+[ -n "$ACTOR" ] || { rec "STOP no actor"; exit 1; }
+
+export AFLDB_SESSION_SECRET=$(head -c 32 /dev/urandom | base64 | tr -d '\n') AFLDB_BETA_GATE=on AFLDB_BETA_EPOCH=1 NEXT_TELEMETRY_DISABLED=1
+export AFLDB_ENV=production AFLDB_BASE_URL=http://127.0.0.1:3369
+rec "== build"; R npm run build > "$E/build.log" 2>&1; rec "build rc=$? BUILD_ID $(cat .next/standalone/.next/BUILD_ID 2>/dev/null)"
+[ -f .next/standalone/server.js ] || { rec "STOP no standalone"; exit 1; }
+
+cat > "$P/serve-capture.sh" <<'SH'
+set -u; LABEL=$1; OUT=$2; M25=$3
+NODE_ENV=production HOSTNAME=127.0.0.1 PORT=3369 node .next/standalone/server.js > "$OUT/server-$LABEL.log" 2>&1 &
+SP=$!
+for i in $(seq 1 60); do curl -s -o /dev/null -m 5 http://127.0.0.1:3369/api/health && break; sleep 2; done
+echo "health $(curl -s -m 10 http://127.0.0.1:3369/api/health)"
+CK=$(node -e 'const{createHmac}=require("crypto");const e=process.env;
+const p=Buffer.from(JSON.stringify({v:1,kind:"beta",sub:"bv2026-rehearsal",exp:Math.floor(Date.now()/1000)+1800,epoch:Number(e.AFLDB_BETA_EPOCH??1)}));
+process.stdout.write("afldb_beta="+p.toString("base64url")+"."+createHmac("sha256",e.AFLDB_SESSION_SECRET).update(p).digest().toString("base64url"))')
+node capture.mjs http://127.0.0.1:3369 "$CK" "$OUT" "$LABEL" 17247 17151 "$M25"
+echo "anon /brownlow $(curl -s -m 60 -o /dev/null -w '%{http_code} %{redirect_url}' http://127.0.0.1:3369/brownlow)"
+kill $SP; wait $SP 2>/dev/null || true
+SH
+cp "$W/capture.mjs" "$C/capture.mjs"
+rec "== BEFORE render"; R bash "$P/serve-capture.sh" before "$E" "$M25" > "$E/before.log" 2>&1; grep -v '^isolated-pg:' "$E/before.log" | tee -a "$S"
+
+rec "== attach (CLI)"
+cat > "$P/target.mjs" <<'JS'
+import { createRequire } from 'node:module'; const postgres = createRequire('/mnt/ssd/afldb-bv2026-20261121/cand/package.json')('postgres');
+const u = new URL(process.env.AFLDB_TEST_IMPORT_DATABASE_URL);
+const sql = postgres(u.toString(), { max: 1, onnotice: () => {} });
+const [r] = await sql.unsafe(`SELECT current_database() AS database, c.system_identifier::text AS "systemIdentifier", d.oid::text AS "databaseOid",
+  current_setting('cluster_name') AS "clusterName", shobj_description(d.oid, 'pg_database') AS "databaseComment"
+  FROM pg_control_system() c CROSS JOIN pg_database d WHERE d.datname = current_database()`);
+console.log(JSON.stringify({ host: u.hostname, port: Number(u.port), database: r.database, user: decodeURIComponent(u.username),
+  systemIdentifier: r.systemIdentifier, databaseOid: r.databaseOid, clusterName: r.clusterName, databaseComment: r.databaseComment }));
+await sql.end();
+JS
+R node "$P/target.mjs" 2>/dev/null | grep '^{' > "$P/target.json"; rec "target $(node -e 'const t=require(process.argv[1]);console.log(t.database,t.user,t.clusterName,t.systemIdentifier,t.databaseOid)' "$P/target.json")"
+ATT() { R bash -c 'AFLDB_BROWNLOW_ATTACH_DSN=$AFLDB_TEST_IMPORT_DATABASE_URL node --import tsx --conditions=react-server tools/v2/brownlow-season-attach.ts "$@"' _ "$@"; }
+ATT plan --target "$P/target.json" --season 2026 --out "$P/plan-2026.json" 2>&1 | grep -v '^isolated-pg:' | tee -a "$S"
+DIG=$(node -e 'console.log(require(process.argv[1]).digest)' "$P/plan-2026.json")
+NOTE="Rehearsal on a disposable copy of the 18 Nov production dump: owner dispute 2026-11-21"
+ATT apply --target "$P/target.json" --export "$P/plan-2026.json" --digest "$DIG" --actor "$ACTOR" --note "$NOTE" --out "$P/dry-2026.json" 2>&1 | grep -v '^isolated-pg:' | tee -a "$S"
+ATT apply --target "$P/target.json" --export "$P/plan-2026.json" --digest "0000000000000000000000000000000000000000000000000000000000000000" --actor "$ACTOR" --note "$NOTE" --out "$P/wrong-2026.json" 2>&1 | grep -v '^isolated-pg:' | tee -a "$S"
+ATT apply --target "$P/target.json" --export "$P/plan-2026.json" --digest "$DIG" --actor "$ACTOR" --note "$NOTE" --out "$P/apply-2026.json" --commit 2>&1 | grep -v '^isolated-pg:' | tee -a "$S"
+sha256sum "$P/plan-2026.json" | cut -c1-64 | sed 's/^/plan file sha256 /' | tee -a "$S"
+
+rec "== publish (the real Super Admin writer, ineligible list EMPTY pending the owner's 2026 eligibility decision)"
+cat > "$P/publish.mts" <<'JS'
+const { getBrownlowSeasonOverview, publishBrownlowSeason } = await import('/mnt/ssd/afldb-bv2026-20261121/cand/src/db/queries/admin-brownlow.ts');
+const o = await getBrownlowSeasonOverview(2026);
+console.log(`OVERVIEW expected=${o.expected} accounted=${o.accounted} unresolved=${o.unresolved} revision=${o.revision} complete=${o.complete}`);
+const r = await publishBrownlowSeason({ season: 2026, ineligiblePlayerIds: [], expectedRevision: o.revision, actorId: Number(process.argv[2]),
+  note: 'Rehearsal publication of 2026 on a disposable copy (owner dispute 2026-11-21)' });
+console.log(`PUBLISH ${JSON.stringify(r)}`);
+process.exit(r.ok ? 0 : 1);
+JS
+R bash -c 'DATABASE_URL=$AFLDB_TEST_DATABASE_URL node --import tsx --conditions=react-server "$0" "$1"' "$P/publish.mts" "$ACTOR" > "$E/publish.log" 2>&1; rec "publish rc=$?"; grep -E '^(OVERVIEW|PUBLISH)' "$E/publish.log" | tee -a "$S"
+
+cat > "$P/post.sql" <<'SQL'
+SELECT 'bsv2026', count(*), sum(votes), count(*) FILTER (WHERE is_winner), count(*) FILTER (WHERE is_ineligible) FROM brownlow_season_votes WHERE season = 2026;
+SELECT 'winner', p.display_name, b.votes, b.vote_rank FROM brownlow_season_votes b JOIN players p ON p.id = b.player_id WHERE b.season = 2026 AND b.is_winner;
+SELECT 'top', p.display_name, b.votes FROM brownlow_season_votes b JOIN players p ON p.id = b.player_id WHERE b.season = 2026 ORDER BY b.votes DESC, p.sort_name LIMIT 10;
+SELECT 'recon bsv-vs-brv diffs', count(*) FROM (SELECT player_id, sum(votes) v FROM brownlow_round_votes WHERE season = 2026 GROUP BY 1 HAVING sum(votes) > 0) r
+  FULL JOIN (SELECT player_id, votes FROM brownlow_season_votes WHERE season = 2026) b USING (player_id) WHERE r.v IS DISTINCT FROM b.votes;
+SELECT 'recon pss-vs-bsv diffs', count(*) FROM player_season_stats s LEFT JOIN brownlow_season_votes b ON b.season = s.season AND b.player_id = s.player_id
+  WHERE s.season = 2026 AND s.brownlow_votes IS DISTINCT FROM COALESCE(b.votes, 0);
+SELECT 'pss2026', brownlow_status, count(*), count(brownlow_votes), sum(brownlow_votes) FROM player_season_stats WHERE season = 2026 GROUP BY 2;
+SELECT 'coverage', stat_key, coverage FROM stat_availability WHERE season = 2026 AND stat_key LIKE 'brownlow%' ORDER BY 2;
+SELECT 'authority', season, revision, published_revision IS NOT NULL FROM brownlow_season_authority WHERE season = 2026;
+SELECT 'pendlebury', s.season, s.brownlow_status, s.brownlow_votes FROM player_season_stats s JOIN players p ON p.id = s.player_id WHERE p.slug = 'scott-pendlebury' AND s.season IN (2024, 2025, 2026) ORDER BY 2;
+SELECT 'provenance2026', s.key, count(*), count(*) FILTER (WHERE b.votes > 0) FROM brownlow_round_votes b JOIN sources s ON s.id = b.source_id WHERE b.season = 2026 GROUP BY 2;
+SELECT 'audit', table_name, field_group, count(*) FROM data_edits WHERE table_name = 'brownlow_season_authority' AND row_id = 2026 GROUP BY 2, 3 ORDER BY 3;
+SELECT 'other seasons bsv unchanged', count(*), sum(votes) FROM brownlow_season_votes WHERE season <> 2026;
+SQL
+R bash -c '"$AFLDB_V2_PG_BIN/psql" "$AFLDB_TEST_DATABASE_URL" -X -q -A -F "|" -t -f "$0"' "$P/post.sql" 2>&1 | grep -v '^isolated-pg:' | tee -a "$S"
+
+rec "== AFTER render (ISR entries for these paths cleared first)"
+for f in $(find .next/standalone/.next/server/app \( -path '*seasons/2026*' -o -path '*brownlow*' -o -path '*matches/17247*' -o -path '*matches/17151*' -o -path '*players/scott-pendlebury*' \) -type f | sort); do rm -f "$f"; echo "ISR cleared $f" >> "$E/isr-cleared.txt"; done
+rec "ISR cleared $(wc -l < "$E/isr-cleared.txt" 2>/dev/null || echo 0) file(s)"
+R bash "$P/serve-capture.sh" after "$E" "$M25" > "$E/after.log" 2>&1; grep -v '^isolated-pg:' "$E/after.log" | tee -a "$S"
+grep -ciE 'error|unhandled' "$E"/server-*.log | sed 's/^/server log error|unhandled: /' | tee -a "$S"
+rm -f "$C/capture.mjs"
+rec "REHEARSAL-COMPLETE"

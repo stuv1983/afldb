@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Season-page round blocks live in closed <details>; count them in the served HTML for before and after.
+set -uo pipefail; export LC_ALL=C
+export PATH=/home/arm/.nvm/versions/node/v22.23.2/bin:$PATH
+W=/mnt/ssd/afldb-bv2026-20261121; C=$W/cand; E=$W/evidence/rehearsal2; P=$W/private
+export AFLDB_V2_PG_ROOT=$W/pg-rst AFLDB_V2_PG_PORT=61468 AFLDB_V2_PG_BIN=/usr/lib/postgresql/16/bin
+cd "$C"; ISO="node --import tsx tools/v2/isolated-pg.ts"
+export AFLDB_SESSION_SECRET=$(head -c 32 /dev/urandom | base64 | tr -d '\n') AFLDB_BETA_GATE=on AFLDB_BETA_EPOCH=1 NEXT_TELEMETRY_DISABLED=1
+export AFLDB_ENV=production AFLDB_BASE_URL=http://127.0.0.1:3369
+cat > "$P/season-html.sh" <<'SH'
+set -u; L=$1; E=$2
+NODE_ENV=production HOSTNAME=127.0.0.1 PORT=3369 node .next/standalone/server.js > "$E/server-season-$L.log" 2>&1 &
+SP=$!
+for i in $(seq 1 60); do curl -s -o /dev/null -m 5 http://127.0.0.1:3369/api/health && break; sleep 2; done
+CK=$(node -e 'const{createHmac}=require("crypto");const e=process.env;
+const p=Buffer.from(JSON.stringify({v:1,kind:"beta",sub:"bv2026-season",exp:Math.floor(Date.now()/1000)+900,epoch:Number(e.AFLDB_BETA_EPOCH??1)}));
+process.stdout.write("afldb_beta="+p.toString("base64url")+"."+createHmac("sha256",e.AFLDB_SESSION_SECRET).update(p).digest().toString("base64url"))')
+for y in 2026 2025; do
+  c=$(curl -s -m 120 -H "Cookie: $CK" -o "$E/$L-season-$y.html" -w '%{http_code}' "http://127.0.0.1:3369/seasons/$y")
+  node -e '
+const h = require("fs").readFileSync(process.argv[1], "utf8");
+const blocks = [...h.matchAll(/<details[\s\S]*?<\/details>/g)].map((m) => m[0]).filter((d) => /Brownlow votes/.test(d));
+const strip = (s) => s.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+const pend = blocks.map(strip).map((t) => (t.match(/Scott Pendlebury Collingwood (\d)/) || [])[1]).filter(Boolean);
+console.log(`${process.argv[2]} SEASON ${process.argv[3]} code=${process.argv[4]} roundVoteBlocks=${blocks.length} pendleburyRoundVotes=[${pend}] noVotesText=${(h.match(/No votes recorded for \d{4}/g) || []).length} daicosTotal47=${/Nick Daicos[\s\S]{0,400}?>47</.test(h)}`);
+' "$E/$L-season-$y.html" "$L" "$y" "$c"
+done
+kill $SP; wait $SP 2>/dev/null || true
+SH
+for pair in before:afldb_v2_bv2026_before_test after:afldb_v2_bv2026_rehearse_test; do
+  L=${pair%%:*}; DB=${pair#*:}
+  find .next/standalone/.next/server/app -type f -not -path '*/admin/*' \( -name '*.html' -o -name '*.rsc' -o -name '*.meta' -o -name '*.body' -o -path '*.segments/*' \) -path '*/seasons/202[56]*' -delete
+  $ISO run "$DB" -- bash "$P/season-html.sh" "$L" "$E" 2>&1 | grep -v '^isolated-pg:' | tee -a "$E/SUMMARY.txt"
+done
+echo SEASON-HTML-COMPLETE
