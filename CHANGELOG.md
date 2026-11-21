@@ -15,6 +15,14 @@ commit.
 
 ## [Unreleased]
 
+### Gridley G-c recorded as an accepted residual (ISSUE-373 resolved; validation state only, no code or test change)
+
+- The Gridley strict-parity acceptance G-c (N7) keeps its raw result, 118 findings over 113 distinct cells, and the owner accepted
+  them on 2026-11-22: 78 are the approved deferrals (ISSUE-118) and 40 the approved brother differences (D-GAP029-21, D3, D4W). G-a
+  and G-b pass. Every accepted finding is listed in
+  `docs/v2/evidence/backlog-20261121/issue373-gc-investigation/ACCEPTED-RESIDUAL-118.md`; any other G-c finding needs its own
+  explanation. N7 and the compatibility pins are unchanged.
+
 ### Opt-in rebuild tier P for the Gridley acceptance gates (ISSUE-363 S + P-full; local, not released)
 
 - New `tools/v2/rebuild-tier-p.ts`: on a fresh `afldb_v2_rb_*_overlay_test` copy of a source-only rebuild (tier S, still the

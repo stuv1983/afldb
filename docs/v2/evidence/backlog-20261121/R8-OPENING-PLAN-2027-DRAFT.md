@@ -1,7 +1,8 @@
-# R8 DRAFT: open the 2027 season on production, Tuesday 23 February 2027 11:00 AEDT (ISSUE-350; FOR APPROVAL, NOT EXECUTED)
+# R8 plan: open the 2027 season on production, Tuesday 23 February 2027 11:00 AEDT (ISSUE-350; DRAFT APPROVED 22 Nov 2026, NOT EXECUTED)
 
-**Status.** Draft production plan, prepared 2026-11-22 (backlog run c) on the owner's planning date (decision 6). Nothing has run.
-It needs its own owner approval, and the `approve` phase needs the owner's typed digest on the day. Sources: procedure 01
+**Status.** Production plan, prepared 2026-11-22 (backlog run c) on the owner's planning date (decision 6). **The owner approved this
+draft on 2026-11-22 (round 3, decision 8; §6).** Nothing has run. Execution still needs the owner's approval of the final plan digest,
+the writes, the revision and the window (§2a), typed in the `approve` phase. Sources: procedure 01
 (`docs/v2/evidence/remediation-20261114/run2/ops/procedures/01-season-opening.md`, §3-§8), packet R8, `kits/KITS-20261122.md` R8,
 `tools/v2/gap029-ops/prod-stage.sh` header, `profile.production.env`. Re-derive every pin below in the week before; any difference
 is a STOP.
@@ -11,9 +12,12 @@ is a STOP.
 - **Tue 23 Feb 2027, 11:00 AEDT (= Tue 00:00Z)**: after the weekly 10:00-10:30 slot (never inside it; the opening is its own
   operation). Inside the owner's window 2027-02-15..03-03; gate G0 by 2027-03-10; Opening Round 2027-03-17.
 - Avoid 02:10-02:40 (scheduled backup, once R3 is installed), Wednesday 03:20-03:45, 04:50-05:45 (settle), 05:45-07:15 (apt).
-- `prep`, `preflight` and `capture` plus the isolated restore and `plan` may run a few days earlier (proposed Thu 18 Feb 2027
-  10:30 AEDT); the plan digest re-baselines at plan time and the approval binds that digest. If anything writes `import_batches`
-  between `plan` and `apply` (every nightly does), the `apply` gate decides; re-plan rather than force.
+- **Capture and read-only planning: Friday 19 February 2027** (proposed by the owner 22 Nov; verified: 19 Feb 2027 is a Friday, four
+  days before Tue 23 Feb; no other record claims that date, searched `docs/v2/evidence/backlog-20261121/`, `issues.md`, `IssuesIndex.md`
+  in run d), from 10:30 AEDT, attended, outside the avoided times: `prep`, `preflight`, `capture`, the isolated restore and assembly
+  on streamanator, and `plan` (read-only). The plan digest re-baselines at plan time and the approval binds that digest. Every nightly
+  writes `import_batches`, so four nightlies fall between 19 and 23 Feb: if the `apply` gate refuses the 19 Feb plan as drifted, run
+  `plan` again on 23 Feb (read-only, minutes) and the owner approves **that** digest; re-plan rather than force.
 
 ## 2. Revision R and pins (to re-derive)
 
@@ -24,6 +28,33 @@ is a STOP.
 | Node | v22.23.2 at `/home/arm/.nvm/versions/node/v22.23.2/bin/node` | profile |
 | OPS root | `/home/arm/ops/gap029-stages/<R:0:8>/cand` | profile |
 | Comparison digest | the 2026-11-14 `de1f574b…` is for comparison only; approve the digest `plan` prints | — |
+
+## 2a. What can be pinned now, and what only exists after the capture (run d, owner decision 8)
+
+**Execution revision rule.** R = the revision production serves when the capture starts on 19 Feb (`release.mjs status`, the
+`current` id's 12-hex prefix expanded to the full commit). **After an accepted A1 that is `7d92042fd11010eaa20966e2f49ae7a93e286568`.**
+It changes only if (a) A1 does not release (then R = `c8d4202a4cb3cf0ccdd1cad01e1227a1610c2d76` and step 9 is skipped: no revalidation
+env), or (b) another release is promoted before 19 Feb (none is planned; the owner is away 26 Nov-6 Jan): then every pin below is
+re-derived for the new R and the plan says so. R8 builds nothing: `prep` extracts an uploaded **checkout tarball of R** (`cand.tar.gz`,
+a git checkout at R) into `<OPS>/<R:0:8>/cand`, and every stage tool runs from there.
+
+| Pin | Value now (2026-11-22, at R = `7d92042f`) | Final when |
+|---|---|---|
+| `tools/v2/gap029-ops/prod-stage.sh` | blob `00964bd7…`, sha256 `f8ff92fe8601983c3055b804f2e75589b486661df167e2ddf3d5dc45747fcde8` | re-checked at `prep` |
+| `tools/v2/gap029-ops/profile.production.env` | sha256 `9bee98b5b071694100a867d14008b9316652f93894568a5db01fd0833baa8170` (`prep` prints `profile_sha256`) | re-checked at `prep` |
+| `tools/v2/season-opening-check.ts` (G0) | sha256 `5ebd2ef85fd61634c70fd317ffabb69f2ff48ae4323dcd397919400e14452bc8` | — |
+| `tools/maintenance/revalidate-season.ts` (step 9) | sha256 `796864852885d9fd0e58c2d160e407276b771a739487f1f2296280fb68e6ca08` | — |
+| `c8d4202a..7d92042f` in `tools/v2/` and `data/reference/seasons.json` | no change (`git diff --name-only`, run d): stage I350 is identical in both candidates | — |
+| Ledger head | `118_fixtures_unconfirmed_participants.sql`, 118 rows (no migration is planned before 23 Feb) | `preflight` |
+| Expected writes | **1** `seasons` row (2027); `last_season` = 2027 on **18** clubs and **18** organisations; **1** audit `import_batches` row; nothing else (procedure 01 §5) | the `plan` summary must say exactly this |
+| Rehearsed surface digests (comparison only) | before the opening `de1f574beadbd52ce6a1c02f37adc9754a126c859dfd335728c06447c5464a1c`, after `803bd836…` (2026-11-14 rehearsal on the 4 Nov production snapshot, `remediation-20261114/rollover/README.md` rows 3, 5, 10) | the live digest at `plan` may differ (nightly data); it is not the approval value |
+| `cand.tar.gz` sha256 | **does not exist yet**: the tarball is made at upload time (a gzip of a git checkout is not reproducible byte for byte) | at upload, before `prep` |
+| **Plan digest** | **does not exist yet: it exists only after the 19 Feb capture and `plan`** (or a re-plan on 23 Feb) | printed by `plan` |
+
+**What the owner approves for execution** (in the `approve` phase, typed, with a statement file): (1) the **plan digest** that `plan`
+printed (64 hex); (2) the **writes** in the plan summary, which must equal the "Expected writes" row; (3) the **revision R** (40 hex);
+(4) the **window**: Tue 23 Feb 2027 from 11:00 AEDT, with an `EXPIRES` the same day (and `NOT_BEFORE` 11:00 if wanted). Any difference
+in (2) or (3) from this page is a STOP and a new review.
 
 ## 3. Preconditions (each a STOP)
 
@@ -66,7 +97,12 @@ npx tsx tools/maintenance/revalidate-season.ts --season 2027; echo "exit=$?"   #
 - **Recovery:** `reverse-opening.sql` as `afldb_owner`, only while nothing depends on 2027; re-check its id lists against the plan's
   `changes.clubIds`/`changes.orgIds` (procedure 01 §8). Failure handling: procedure 01 §7 (no retry, no improvisation).
 
-## 6. Approval text (blank; separate from A1/A2)
+## 6. Approval of this draft (recorded) and the execution approval text (blank)
+
+**Draft approval, recorded 2026-11-22 (owner decision 8, round 3, relayed by the main session):** "the owner APPROVES the draft plan
+(R8-OPENING-PLAN-2027-DRAFT.md) for Tue 23 Feb 2027 11:00 AEDT". This approves the plan and the date; it is not the execution approval,
+which binds the digest that only exists after the capture (below).
 
 > I approve opening season 2027 on production per procedure 01 with execution revision ________, plan digest ________, on
-> Tuesday 23 February 2027 from 11:00 AEDT (D-350-1); capture and plan may run from ________.
+> Tuesday 23 February 2027 from 11:00 AEDT (D-350-1); capture and plan ran on Friday 19 February 2027 (re-plan on the day if the apply
+> gate requires it, approving the new digest).
