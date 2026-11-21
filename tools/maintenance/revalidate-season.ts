@@ -5,8 +5,8 @@
  *   npx tsx tools/maintenance/revalidate-season.ts --season 2027
  *
  * Posts the existing fan-out (`/api/internal/revalidate-season`, AFLDB-ISSUE-134)
- * until every worker of the running site has answered, so `/seasons/<y>`,
- * `/brownlow/<y>` and every award-season page are expired on ALL workers. Its
+ * until every worker of the running site has answered, so `/seasons/<y>` and
+ * `/brownlow/<y>` are expired on ALL workers. Its
  * use: right after the I350 opening creates the 2027 `seasons` row, so no worker
  * keeps a cached `/seasons/2027` 404 whose background regeneration would persist
  * the not-found head over the new page (ISSUE-371 README §3).

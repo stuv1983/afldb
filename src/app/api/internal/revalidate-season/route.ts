@@ -33,20 +33,18 @@ export const dynamic = 'force-dynamic';
  * connections until every ordinal has answered. See
  * `src/lib/acquisition/season-revalidation.ts` for the framework evidence.
  *
- * WHAT A CALLER MAY ASK FOR. A season year, and nothing else. What is
- * invalidated is fixed here: `/seasons/<year>` by `seasonPath()` and, since
+ * WHAT A CALLER MAY ASK FOR. A season year, and nothing else. The paths are
+ * built here from it — `/seasons/<year>` by `seasonPath()` and, since
  * AFLDB-ISSUE-371 (the Brownlow publication action posts here too),
- * `/brownlow/<year>`, both concrete paths built from the integer; and, since
- * AFLDB-ISSUE-372 option B (award publication posts here too), the one
- * constant route pattern `/awards/[slug]/[season]`. No input — not a path,
- * not a pattern, not a tag, not a layout flag — selects anything else, so the
- * route cannot be turned into a general-purpose cache purge. The blast radius
- * of the shared secret leaking is "someone can make a season's two pages and
- * the award-season pages re-render once", which is the smallest it can be
- * made without giving up the feature. The pattern is deliberately broader
- * than the year: every award-season page (every season) re-renders once on
- * its next request per worker after any fan-out. That cost buys award-season
- * coverage with no database read in this secret-gated route.
+ * `/brownlow/<year>` — so there is no input — not a path, not a
+ * pattern, not a tag, not a layout flag — by which this route can be turned
+ * into a general-purpose cache purge. The blast radius of the shared secret
+ * leaking is "someone can make a season's two pages re-render", which is the
+ * smallest it can be made without giving up the feature. Since
+ * AFLDB-ISSUE-372 the awards revalidation follow-up posts here too, for the
+ * seasons an award publication changes; the award-season pages themselves
+ * need nothing (`/awards/[slug]/[season]` has no `generateStaticParams`, so
+ * it renders dynamically and is never cached).
  *
  * WHY IT IS NOT REACHABLE FROM THE INTERNET. Two independent gates, both of
  * which must pass:
@@ -103,16 +101,6 @@ function workerIdentity(): { workerId: string | null; workerCount: number } {
 function seasonRevalidationPaths(season: number): string[] {
   return [seasonPath(season), `/brownlow/${season}`];
 }
-
-/**
- * AFLDB-ISSUE-372 option B: the award-season route, as a PATTERN. A route
- * pattern needs the `'page'` type (it names the tag
- * `_N_T_/awards/[slug]/[season]/page`, which every entry of that route file
- * carries, a cached 404 included). Constant: nothing from the request reaches
- * it. Expired on every worker the caller reaches, so a first-published award
- * season cannot keep a cached 404's not-found head on another worker.
- */
-const AWARD_SEASON_ROUTE_PATTERN = '/awards/[slug]/[season]';
 
 function timingSafeStringEqual(a: string, b: string): boolean {
   const bufA = Buffer.from(a);
@@ -198,17 +186,15 @@ export async function POST(request: Request) {
   const path = seasonPath(body.season);
   const paths = seasonRevalidationPaths(body.season);
   for (const one of paths) revalidatePath(one);
-  revalidatePath('/awards/[slug]/[season]', 'page');
-  const patterns = [AWARD_SEASON_ROUTE_PATTERN];
 
   const { workerId, workerCount } = workerIdentity();
   console.log(
-    `[revalidate-season] ${[...paths, ...patterns].join(' ')} invalidated on worker `
-    + `${workerId ?? 'single'} (pid ${process.pid})`,
+    `[revalidate-season] ${paths.join(' ')} invalidated on worker ${workerId ?? 'single'} `
+    + `(pid ${process.pid})`,
   );
 
   return NextResponse.json(
-    { ok: true, path, paths, patterns, workerId, workerCount },
+    { ok: true, path, paths, workerId, workerCount },
     { headers: { 'Cache-Control': 'no-store' } },
   );
 }

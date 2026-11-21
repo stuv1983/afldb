@@ -535,18 +535,18 @@ describe('/admin/awards/revalidate admits every path a Coleman row can return (S
   });
 });
 
-describe('AFLDB-ISSUE-372 option B: the award-season fan-out after /admin/awards/revalidate (SYNTHETIC)', () => {
+describe('AFLDB-ISSUE-372 option B: the season fan-out after /admin/awards/revalidate (SYNTHETIC)', () => {
   const CONFIG_ENV = { AFLDB_REVALIDATE_URL: 'http://127.0.0.1:3100', AFLDB_REVALIDATE_SECRET: 'synthetic-secret' };
   const okOutcome = (season: number) => ({
     ok: true, season, path: `/seasons/${season}`, workersReached: ['1', '2'], workerCount: 2, attempts: 2, failures: [],
   });
 
-  it('takes only plausible award-season years, deduplicated, in order, capped', () => {
+  it('takes only plausible years named by season or award-season paths, deduplicated, in order, capped', () => {
     expect(awardSeasonsToFanOut([
-      '/awards', awardPath('coleman'), seasonPath(2001), awardSeasonPath('coleman', 2001),
-      awardSeasonPath('rising-star', 2001), awardSeasonPath('coleman', 0), '/awards/coleman/9999', 42, null,
-      awardSeasonPath('coleman', 1999),
-    ])).toEqual([2001, 1999]);
+      '/awards', awardPath('coleman'), awardSeasonPath('coleman', 2001), seasonPath(2001),
+      awardSeasonPath('rising-star', 2001), awardSeasonPath('coleman', 0), '/awards/coleman/9999', '/seasons/1800', 42, null,
+      seasonPath(1998), awardSeasonPath('coleman', 1999), '/hall-of-fame', '/honour-teams/team-of-the-century',
+    ])).toEqual([2001, 1998, 1999]);
     const many = [2001, 2002, 2003, 2004, 2005].map((y) => awardSeasonPath('coleman', y));
     expect(awardSeasonsToFanOut(many)).toEqual([2001, 2002, 2003]);
     expect(MAX_AWARD_FANOUT_SEASONS).toBe(3);
@@ -563,10 +563,10 @@ describe('AFLDB-ISSUE-372 option B: the award-season fan-out after /admin/awards
     expect(calls).toEqual([['http://127.0.0.1:3100', 2027]]);
   });
 
-  it('does nothing for paths that name no award season, and nothing on an unconfigured host', async () => {
+  it('does nothing for paths that name no season, and nothing on an unconfigured host', async () => {
     let called = 0;
     const revalidate = async (_c: unknown, season: number) => { called += 1; return okOutcome(season); };
-    expect(await fanOutAwardSeasons(['/awards', awardPath('coleman'), seasonPath(2001)], { env: CONFIG_ENV, revalidate })).toEqual([]);
+    expect(await fanOutAwardSeasons(['/awards', awardPath('coleman'), '/hall-of-fame', '/sitemap-index.xml'], { env: CONFIG_ENV, revalidate })).toEqual([]);
     expect(await fanOutAwardSeasons([awardSeasonPath('coleman', 2001)], { env: {}, revalidate })).toEqual([]);
     expect(called).toBe(0);
   });

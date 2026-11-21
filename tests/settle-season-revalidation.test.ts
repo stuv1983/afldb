@@ -671,21 +671,24 @@ describe('POST /api/internal/revalidate-season', () => {
     delete process.env.AFLDB_WORKER_COUNT;
   });
 
-  it('invalidates exactly the season page and its Brownlow page as concrete paths, plus the award-season pattern', async () => {
+  it('invalidates exactly the season page and its Brownlow page, as concrete paths', async () => {
     const response = await POST(post({ season: 2026 }));
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
       ok: true, path: '/seasons/2026', paths: ['/seasons/2026', '/brownlow/2026'],
-      patterns: ['/awards/[slug]/[season]'],
     });
     // AFLDB-ISSUE-371: a concrete path takes no type argument; with 'page' it
-    // would name a '/brownlow/2026/page' tag no page carries.
-    // AFLDB-ISSUE-372 option B: the award-season ROUTE PATTERN takes 'page'
-    // (tag `_N_T_/awards/[slug]/[season]/page`, carried by every entry of that
-    // route file, a cached 404 included). Constant: the request selects nothing.
-    expect(mocks.revalidatePath.mock.calls).toEqual([
-      ['/seasons/2026'], ['/brownlow/2026'], ['/awards/[slug]/[season]', 'page'],
-    ]);
+    // would name a '/brownlow/2026/page' tag no page carries. AFLDB-ISSUE-372:
+    // no award-season pattern either: `/awards/[slug]/[season]` is dynamic
+    // (no generateStaticParams), so it is never cached and needs nothing.
+    expect(mocks.revalidatePath.mock.calls).toEqual([['/seasons/2026'], ['/brownlow/2026']]);
+  });
+
+  it('AFLDB-ISSUE-372: the award-season route stays uncached, so the fan-out need not name it', () => {
+    const page = readFileSync('src/app/awards/[slug]/[season]/page.tsx', 'utf8');
+    // If this route ever gains generateStaticParams it becomes ISR, can cache a
+    // 404, and then needs the cross-worker invalidation ISSUE-372 describes.
+    expect(page).not.toMatch(/export\s+(async\s+)?function\s+generateStaticParams/);
   });
 
   it('reports the worker identity the caller needs to prove coverage', async () => {
@@ -761,7 +764,7 @@ describe('POST /api/internal/revalidate-season', () => {
       mocks.revalidatePath.mockClear();
       const response = await POST(post({ season: 2026 }, { 'x-forwarded-for': address }));
       expect(response.status, address).toBe(200);
-      expect(mocks.revalidatePath, address).toHaveBeenCalledTimes(3);
+      expect(mocks.revalidatePath, address).toHaveBeenCalledTimes(2);
     }
   });
 

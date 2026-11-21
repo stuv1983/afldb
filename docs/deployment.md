@@ -1405,21 +1405,22 @@ curl -s -X POST http://127.0.0.1:3100/api/internal/revalidate-season   -H "x-afl
 ```
 
 **What the secret authorises.** One thing: asking the site to re-render a
-season's two pages, `/seasons/<year>` and `/brownlow/<year>`, plus every
-award-season page (`/awards/<slug>/<season>`, the one constant route pattern
-`/awards/[slug]/[season]`, AFLDB-ISSUE-372 option B). The body carries an
-integer year and nothing else — the paths and the pattern are fixed
-server-side — so there is no arbitrary path, pattern, layout or tag to purge.
-Unconfigured, it answers 503. The Super Admin Brownlow publish action posts the
-same route, so a publication reaches every worker's copy of `/brownlow/<year>`
+season's two pages, `/seasons/<year>` and `/brownlow/<year>`. The body carries
+an integer year and nothing else — the paths are composed server-side — so
+there is no arbitrary path, pattern, layout or tag to purge. Unconfigured, it
+answers 503. The Super Admin Brownlow publish action posts the same route, so
+a publication reaches every worker's copy of `/brownlow/<year>`
 (`AFLDB-ISSUE-371`); `/admin/awards/revalidate` (the follow-up of every awards
-and Coleman publication) posts it for each award season it revalidated (at most
-three years per request), so a first-published award season reaches every
-worker (`AFLDB-ISSUE-372`). Without this configuration only the worker that
-served the action or follow-up is invalidated, and a cached 404 on another
-worker can regenerate as a 200 page with the "Page not found" title and
-`noindex` for up to one ISR window (1 h seasons and Brownlow, 24 h award
-seasons). The nightly AFL API settle still posts nothing (D-232-3).
+and Coleman publication) posts it for each season its paths name (at most
+three per request), so the season page shows a new award on every worker
+(`AFLDB-ISSUE-372`). Award-season pages (`/awards/<slug>/<season>`) have no
+`generateStaticParams`, render dynamically and are never cached, so they need
+no invalidation. Without this configuration only the worker that served the
+action or follow-up is invalidated: other workers keep the old season page,
+and a cached `/seasons/<year>` or `/brownlow/<year>` 404 on another worker can
+regenerate as a 200 page with the "Page not found" title and `noindex` for up
+to one ISR window (1 h). The nightly AFL API settle still posts nothing
+(D-232-3).
 
 **Why the internet cannot reach it.** The route serves a request only when its
 forwarded client address resolves to loopback, and that value is trustworthy

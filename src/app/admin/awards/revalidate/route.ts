@@ -11,11 +11,12 @@ import { requireCapability } from '@/lib/auth/session';
  * posts here only as a follow-up once a mutation has already committed;
  * paths are allowlisted by shape, never taken as arbitrary strings.
  *
- * AFLDB-ISSUE-372 option B: when an admitted path is an award season
- * (`/awards/<slug>/<yyyy>`), the season fan-out then reaches EVERY worker
- * (`src/lib/admin/award-season-fanout.ts`), so a first-published award season
- * cannot keep a cached 404's not-found head on a worker this request did not
- * reach. Best-effort and bounded; inert where `AFLDB_REVALIDATE_*` is unset.
+ * AFLDB-ISSUE-372 option B: for each season an admitted path names
+ * (`/seasons/<yyyy>`, `/awards/<slug>/<yyyy>`), the season fan-out then
+ * refreshes that season's page on EVERY worker
+ * (`src/lib/admin/award-season-fanout.ts`), not only the one that answered
+ * this request. Best-effort and bounded; inert where `AFLDB_REVALIDATE_*` is
+ * unset.
  *
  * Guarded by `data.awards.edit`, not `.read`: this endpoint exists only to
  * finish a mutation, and only a Super Admin can have made one.
