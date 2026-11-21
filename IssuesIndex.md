@@ -9,6 +9,8 @@ detection before/after COMMIT; `afldb_backup` read access **verified on producti
 Tue 12 Jan 2027 11:00 **PROPOSED**. **R2:** hourly kept, one email/hour accepted; first scheduled run verified in A2. T-1 kept; R4 under
 T-1 = 11:00-11:20 after P6 (ends about 10:45-10:48). Eight open issues: 332, 348, 350, 351, 352, 357, 362 and 372.
 
+Round 5 (22 Nov): origin/main = `ae51cd8d913a7523dd89fb638279e7f910054b79` (verified; Tuesday PREP). **348:** groups (f)-(k) in the January rehearsal; Tue 12 Jan 2027 11:00 AEDT reserved for the attended load after a refreshed, re-sealed rehearsal; stays open until the load and post-load checks pass ([DECISIONS-20261122f.md](docs/v2/evidence/backlog-20261121/DECISIONS-20261122f.md)).
+
 **Earlier state, 22 November 2026 (backlog run d, owner decisions round 3 of 22 Nov; local branch `claude/backlog-20261122`, unpublished: `origin/main` = `da4cc0c4`).**
 Record: [DECISIONS-20261122d.md](docs/v2/evidence/backlog-20261121/DECISIONS-20261122d.md). **A1 timing T-1 APPROVED** (start 09:20 AEDT Tue 24 Nov; PREP = the
 owner-confirmed `origin/main` tip, `da4cc0c4` today). **Cron jobs APPROVED** (r2 hourly after its manual run, r3 daily after the first

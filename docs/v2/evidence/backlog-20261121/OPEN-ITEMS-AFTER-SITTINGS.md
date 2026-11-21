@@ -50,7 +50,7 @@ inclusive. Sources: `ATTENDED-PLAN-A1-A2-20261124.md`, `ATTENDED-PLAN-R6-2026112
    `ATTENDED-PLAN-R6-20261125.md`; the owner may rehearse option B on a temporary droplet beforehand (optional, his cost).
 3. R5: ~~retention~~ **approved 22 Nov (round 4)**; the disposal decision (option 1 or 2, `R5-RETENTION-PROPOSAL.md` §5) is due at the
    earliest REVIEW date, Thu 7 Jan 2027, as a separate approval.
-4. ISSUE-348: the eight named columns are groups (a)-(e) (round 4); **confirm or not groups (f)-(k)** (`LOAD-WINDOW-PROPOSAL.md` §2a);
+4. ISSUE-348: the eight named columns are groups (a)-(e) (round 4); **groups (f)-(k) CONFIRMED into the January rehearsal (round 5, DECISIONS-20261122f.md §3)** (`LOAD-WINDOW-PROPOSAL.md` §2a);
    approve or move the PROPOSED window Tue 12 Jan 2027 11:00 after the §3a refresh packet.
 5. R7: the separate disposal decision for the five databases, on or after Thu 7 Jan 2027.
 6. ~~Alarm de-duplication~~ **answered 22 Nov (round 4): keep the hourly check; one email per hour while production is unreachable
