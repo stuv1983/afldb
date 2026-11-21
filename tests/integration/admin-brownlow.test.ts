@@ -154,7 +154,9 @@ afterAll(async () => {
 
   // Fail closed: a suite that could not clean up must not report green.
   if (teardownError !== undefined) throw teardownError;
-});
+  // ISSUE-363 follow-up: the sweep quiesces each in-flight seed (up to 2 x SEED_GRACE_MS) before deleting it, so under
+  // host load it must not inherit the 30 s default hook timeout that the `beforeAll` it is cleaning up after just hit.
+}, 300_000);
 
 /* ------------------------------------------------------------------ *
  * Helpers

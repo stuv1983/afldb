@@ -135,6 +135,27 @@ type SeedRegistration = {
 const seededSeasons = new Map<number, SeedRegistration>();
 
 /**
+ * AFLDB-ISSUE-363 (backlog follow-up, 2026-11-21) — the registry CLOSES when the sweep starts.
+ *
+ * The registry made cleanup independent of `seedBrownlowSeason` returning, but only for seeds that had already
+ * registered when the sweep took its snapshot. A timed-out `beforeAll` keeps running: if it was between two seeds, or
+ * still inside the next seed's guard queries, it registers and seeds AFTER the sweep, while the rest of `afterAll`
+ * runs, until the file's worker is torn down. That left a `seasons` row and 69 players behind in a shared copy
+ * (`ctl_sn`, ISSUE-363 §6). Once a sweep has begun, a seed refuses before it writes anything. Vitest isolates modules
+ * per file, so this closes the registry for the one file whose `afterAll` swept it.
+ */
+let sweepStarted = false;
+
+function refuseAfterSweep(season: number): void {
+  if (sweepStarted) {
+    throw new Error(
+      `seedBrownlowSeason(${season}) refused: this file's fixture cleanup has already begun, so a seed started now `
+      + 'belongs to an abandoned (timed-out) hook and would outlive its own cleanup.',
+    );
+  }
+}
+
+/**
  * Second protection only, against a seed that is genuinely hung. It is NOT the
  * cancellation mechanism: a Vitest `beforeAll` timeout at its 30s default fires
  * long before this, and correctness must not depend on either that timeout or
@@ -211,6 +232,9 @@ async function settleWithin(settled: Promise<void>, ms: number): Promise<void> {
  * `afldb_test`.
  */
 export async function cleanupSeededBrownlowSeasons(): Promise<void> {
+  // Close and snapshot in one synchronous step: every seed either registered before this line (and is swept below)
+  // or reaches its registration check after it (and refuses without writing).
+  sweepStarted = true;
   const entries = [...seededSeasons.entries()].sort(([a], [b]) => b - a);
   const failures: string[] = [];
   for (const [season, entry] of entries) {
@@ -311,6 +335,7 @@ const SHAPES: Record<number, FixtureShape> = {
 export async function seedBrownlowSeason(season: number): Promise<BrownlowFixture> {
   const shape = SHAPES[season];
   if (!shape) throw new Error(`No ISSUE-155 fixture shape is defined for season ${season}.`);
+  refuseAfterSweep(season);
 
   const prefix = `issue155-${season}-`;
 
@@ -348,6 +373,13 @@ export async function seedBrownlowSeason(season: number): Promise<BrownlowFixtur
 
   const seededPlayerIds: number[] = [];
   const removeSeeded = async (): Promise<void> => {
+    // ISSUE-363 follow-up: the players are found by their OWNED slug prefix as well as by the ids the seed saw returned,
+    // so a player whose INSERT committed but whose RETURNING never reached the seed (connection destroyed mid-statement)
+    // is still removed. `issue155-<season>-` is this fixture's namespace and no real slug starts with it.
+    const ownedPlayers = await sql<IdRow[]>`
+      SELECT id::int AS id FROM players WHERE slug LIKE ${`${prefix}%`}
+    `;
+    for (const { id } of ownedPlayers) if (!seededPlayerIds.includes(id)) seededPlayerIds.push(id);
     // Order is FK order. brownlow_vote_entry_state RESTRICTs the match delete
     // (§27.15), which is the whole point of that key, so it goes first.
     const matchIds = await sql<IdRow[]>`
@@ -415,6 +447,14 @@ export async function seedBrownlowSeason(season: number): Promise<BrownlowFixtur
     settled: Promise.resolve(),
     remove: removeOnce,
   };
+  // Checked again here, synchronously with the registration: the guard queries above are awaited, and a sweep that
+  // began during them must win. Nothing has been written yet, so refusing here leaves nothing behind.
+  try {
+    refuseAfterSweep(season);
+  } catch (error) {
+    await stopSeedConnection();
+    throw error;
+  }
   seededSeasons.set(season, entry);
 
   /**
