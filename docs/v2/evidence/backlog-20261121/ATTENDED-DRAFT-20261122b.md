@@ -1,5 +1,9 @@
 # Consolidated DRAFT: attended production scope and windows (R1–R8, the 371/372 release, the 348 load) — NOT APPROVED
 
+> **SUPERSEDED for A1 and A2 (2026-11-22, run c)** by `ATTENDED-PLAN-A1-A2-20261124.md` after the owner approved A1 and A2 for Tue 24 Nov
+> (decisions 2-3, `DECISIONS-20261122c.md`). The rows for R5-R8 and the 348 load remain proposals; their current state is in
+> `DECISIONS-20261122c.md` and `OPEN-ITEMS-AFTER-SITTINGS.md`. This draft is kept as the record of the proposal.
+
 **Status.** Planning only (owner decision 5, 2026-11-22). Nothing here has run; no agent contacted production. Every item
 still needs its own owner approval at the sitting. Sources: `OWNER-PACKET.md` §3 (R1–R9, common rules, avoided times, read-only
 pre-checks), `kits/KITS-20261122.md`, `RC-371-372.md`, `issue348-acquisition/SEALED-PLAN.md`, `R0-SITTING-20261122.md`.
