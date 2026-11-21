@@ -3,11 +3,13 @@
 # through the backup role; nothing written). Expected state = R0 (2026-11-22 02:52 AEDT) plus nothing since:
 #   current -> c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC, previous -> a2e6ea9995a4-aKAYwf0qC4go6JJWiHhv5;
 #   checkout on main, clean, HEAD c8d4202a (or 7d92042f if a stopped A1 attempt already fast-forwarded it);
-#   origin/main (ls-remote) = PREP = 731a502540ab3a9d8795e185fbad89e02534b2b7; 7d92042f an ancestor of PREP;
+#   origin/main (ls-remote) = PREP, the origin/main tip the owner confirms at the start of the Tuesday session (da4cc0c4 on
+#   2026-11-22; the owner names the final tip in the first message if anything is pushed before A1); PREP must descend from
+#   7d92042f (W0 on the workstation and P2 check it). A1 builds the pinned CAND 7d92042f, never PREP;
 #   .env holds NEITHER AFLDB_REVALIDATE_URL nor AFLDB_REVALIDATE_SECRET (counts only; values never read);
 #   ledger head 118_fixtures_unconfirmed_participants.sql (118 rows); 2026 Brownlow published revision 3.
 # Run (workstation, one connection):
-#   tr -d '\r' < a1-p1-precheck.sh | C:/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes afldb bash -s -- 731a502540ab3a9d8795e185fbad89e02534b2b7
+#   tr -d '\r' < a1-p1-precheck.sh | C:/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes afldb bash -s -- <PREP, 40 hex>
 main() {
 set -euo pipefail; export LC_ALL=C
 trap 'echo "STOP line $LINENO: $BASH_COMMAND"' ERR

@@ -1,16 +1,19 @@
 #!/usr/bin/env bash
-# Sitting A1, block P2: fast-forward the serving checkout to the candidate CAND = 7d92042f EXACTLY (never to origin/main, which
-# is 731a5025 and carries DraftGuru/tier-P tool changes that are not part of this release). PRODUCTION, as arm.
+# Sitting A1, block P2: fast-forward the serving checkout to the candidate CAND = 7d92042f EXACTLY (never to origin/main = PREP,
+# which carries later records and DraftGuru/tier-P tool changes that are not part of this release). PRODUCTION, as arm.
+# PREP = the origin/main tip the owner confirms at the start of the Tuesday session (da4cc0c4 on 2026-11-22; the owner names the
+# final tip in the first message if anything is pushed before A1). PREP must descend from CAND (checked below). Whatever
+# 7d92042f..PREP changes is irrelevant to A1: the checkout stops at CAND and `release.mjs build` archives CAND by `git archive`.
 # Writes: the checkout only (ff). Does not touch the running site, the release links or the database.
 # Why the fast-forward is needed although `release.mjs build` extracts by `git archive <revision>` and needs neither HEAD nor a
 # clean tree (deploy/release.mjs:960-964, :984-1003, :1005-1074): acceptance runs tools/maintenance/revalidate-season.ts and
 # deploy/post-install-check.sh FROM THE CHECKOUT, and revalidate-season.ts changed in c8d4202a..7d92042f.
 # STOP conditions (all before any change):
-#   origin/main != PREP (731a5025); CAND not an ancestor of PREP; start HEAD not c8d4202a (or CAND on a re-run); not clean;
+#   origin/main != PREP (the argument); CAND not an ancestor of PREP; start HEAD not c8d4202a (or CAND on a re-run); not clean;
 #   the c8d4202a..CAND raw delta (153 paths, every blob) != the reviewed sha256; the non-records part (13 paths) != reviewed;
 #   any migration, dependency, Next config, unit or supervisor change; cf158d60..CAND touches a non-records path; the
 #   executable tree of CAND (ls-tree minus docs/, documentation/, issues/, root *.md) != that of cf158d60 (the tested tree).
-# Run: tr -d '\r' < a1-p2-ff.sh | C:/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes afldb bash -s -- 731a502540ab3a9d8795e185fbad89e02534b2b7
+# Run: tr -d '\r' < a1-p2-ff.sh | C:/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes afldb bash -s -- <PREP, 40 hex>
 main() {
 set -euo pipefail; export LC_ALL=C
 trap 'echo "STOP line $LINENO: $BASH_COMMAND"' ERR

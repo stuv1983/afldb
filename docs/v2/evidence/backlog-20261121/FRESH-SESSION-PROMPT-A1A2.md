@@ -10,12 +10,17 @@ scope; §12: no Git writes beyond the records commit at the end, no push unless 
 
 **Read first, in this order, and nothing else unless a step needs it:**
 1. `docs/v2/evidence/backlog-20261121/ATTENDED-PLAN-A1-A2-20261124.md` (the runbook; it is the contract)
-2. `docs/v2/evidence/backlog-20261121/DECISIONS-20261122c.md` §2-§3 (the approvals, verbatim in substance)
+2. `docs/v2/evidence/backlog-20261121/DECISIONS-20261122c.md` §2-§3 and `DECISIONS-20261122d.md` (the approvals, round 2 and round 3)
 3. `docs/v2/evidence/backlog-20261121/RC-371-372.md` (the release candidate, with its 22 Nov revision note)
-4. The script headers in `docs/v2/evidence/backlog-20261121/a1a2-20261124/` as you reach each step.
+4. `docs/v2/evidence/backlog-20261121/A1-TIMING-OPTIONS.md` (the owner's T-1/T-2 choice)
+5. The script headers in `docs/v2/evidence/backlog-20261121/a1a2-20261124/` as you reach each step.
 
 **Pins (verify each before acting; any mismatch is a STOP):**
-- `origin/main` = `731a502540ab3a9d8795e185fbad89e02534b2b7` (`git ls-remote origin refs/heads/main`)
+- `origin/main` = **PREP: the tip the owner confirms in the first message of the session** (`da4cc0c459f469d3b1a798302f8fe394962a395f`
+  on 2026-11-22; if anything was pushed before A1 the owner names the final tip). Verify with `git ls-remote origin refs/heads/main` (= PREP)
+  and `git merge-base --is-ancestor 7d92042fd11010eaa20966e2f49ae7a93e286568 <PREP>` (exit 0) on the workstation; record
+  `git diff --name-only 7d92042f <PREP>` for the report. PREP is the argument of `a1-p1-precheck.sh` and `a1-p2-ff.sh`; A1 still
+  builds the pinned candidate below, never PREP
 - candidate = `7d92042fd11010eaa20966e2f49ae7a93e286568`; release id must start `7d92042fd110-`; `release.json` revision = that full sha
 - tested revision `cf158d602242a3e7bbf899b951e8423c0d3521e6` (executable tree equal to the candidate)
 - serving now / rollback target = `c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC`; previous BUILD_ID = `aATnIlFOIQjq2z5oDdoHC`
@@ -25,13 +30,17 @@ scope; §12: no Git writes beyond the records commit at the end, no push unless 
 **Scope.** A1: release the candidate (P1-P6 of the runbook), the owner adds the two revalidation variables with the gated blocks
 E1-E3 and performs the restart; acceptance (status, post-install-check, environment counts, `revalidate-season.ts --season 2026`
 2/2, raw-head checks, public smoke, observation); documented application rollback if a trigger is met. A2 (only after A1
-passes, or per the runbook's §3.3 entry table): R1, R2 (forced-command key line + the **first manual run only**), R3 (units,
-attended first runs, pull key, first off-host pull, first-copy restore on streamanator), R4 (combined Caddy install, **last**,
-after the A1 observation ends). **Out of scope:** R5 (logs retained), R6, R7, R8, the ISSUE-348 load, the R2 notifier marker,
-and both cron lines (runbook §4.6: ask the owner the one question; install nothing without a yes).
+passes, or per the runbook's §3.3 entry table; order and drop order per runbook §4.5): R1; R2 (forced-command key line, the
+first manual run, then the **approved hourly cron job** and the cron-environment alarm test, §4.2 steps 3-4); R4 (combined Caddy
+install, only after the A1 observation ends, never started after 11:35); the **R5 access restriction** of the pre-fix logs (§4.5a,
+one owner block after R4); R3 (units, attended first runs, pull key, first off-host pull, first-copy restore on streamanator, then
+the **approved daily cron job**, §4.3 step 13). Both cron jobs are owner-approved (22 Nov, round 3) and install only through
+`a2-cron-install.sh` after their preconditions. **Out of scope:** R5 disposal (logs retained), R6, R7, R8, the ISSUE-348 load,
+the R2 notifier marker.
 
-**Before 10:00:** ask the owner which time option (runbook §1, T-1 or T-2) applies, in writing. Do not assume. Run the
-pre-window read-only steps W0-W2.
+**Before anything runs:** ask the owner which time option (`A1-TIMING-OPTIONS.md`, T-1 or T-2) applies, in writing. Do not
+assume. Any step before 10:00 (T-1's 09:20-10:00 checks, checkout move and build, or T-2's 09:20-09:30 read-only checks) runs only
+with the owner's explicit yes, because the approved window starts at 10:00.
 
 **Owner `sudo` steps: present ONE block at a time,** wait for the owner's output, check it against the runbook's expected value,
 then present the next. Never batch them. Never print, echo or record a secret; only counts of `.env`/`/proc/*/environ` lines.
@@ -49,5 +58,7 @@ Never `--skip-host-gate`; never restart to "fix" a revalidation exit 1/2; never 
 **Records.** Write the sitting record (excerpts only, no secrets) under `docs/v2/evidence/backlog-20261121/` (for example
 `SITTING-A1-A2-20261124.md`), update the trackers per `OPEN-ITEMS-AFTER-SITTINGS.md` (issues.md, IssuesIndex.md, CHANGELOG.md for
 the release), and commit locally on the backlog branch. Report: new release id and BUILD_ID, the restart InvocationID, every
-acceptance result, the installed Caddy sha, the first off-host dump name and sha, what remains open, and the owner's answer to
-the cron question.
+acceptance result, the installed Caddy sha, the first off-host dump name and sha, the R5 retained-directory listing (names, sizes,
+SHA256SUMS line count), each cron job's install result and next due time (Melbourne), the cron-environment alarm test result, and
+what remains open. Afterwards, observe the first scheduled runs with `a2-cron-observe.sh all` and record them in
+`OPEN-ITEMS-AFTER-SITTINGS.md` §4.

@@ -4,8 +4,14 @@
 decisions 2 and 3 of 2026-11-22 (`DECISIONS-20261122c.md` §2-§3): A1 10:00-10:30 AEDT, release of the exact DEV-verified
 candidate `7d92042f`, the owner performs the production restart; A2 10:30-12:00 AEDT after A1 passes: R1, R2 (forced-command key
 and the FIRST MANUAL RUN ONLY), R3 (scheduled backups and the off-host pull), R4 (combined Caddy install). Every `sudo` step is the
-owner's, **one block at a time**. Nothing else is in scope: not R5 (logs retained), R6 (reboot), R7 (databases retained), R8, the
-ISSUE-348 load, the R2 notifier marker, or either cron line (§4.6).
+owner's, **one block at a time**. Nothing else is in scope: not R5 disposal (logs retained; only the access restriction of §4.5a),
+R6 (reboot), R7 (databases retained), R8, the ISSUE-348 load or the R2 notifier marker.
+
+**Revision 2026-11-22 (run d, owner decisions round 3, `DECISIONS-20261122d.md`).** (1) PREP is no longer a fixed commit: it is the
+`origin/main` tip the owner confirms at the start of the session (§0). (2) The two streamanator cron jobs are APPROVED and installed in
+A2 after their preconditions (§4.2 step 3, §4.3 step 13, §4.6). (3) R5: the pre-fix Caddy logs are retained with restricted access
+(§4.5a, after R4). (4) The A1 time option is the owner's choice from `A1-TIMING-OPTIONS.md`; any work before 10:00 needs the owner's
+explicit yes. (5) The R4 owner log check is count-only (§4.4 step 10).
 
 **Prepared without production contact.** Production facts come from `R0-SITTING-20261122.md` (read-only probe 2026-11-22 02:52
 AEDT), `OWNER-PACKET.md` §3, `kits/KITS-20261122.md` and `RC-371-372.md` (revised 22 Nov, run c). The pre-window probe re-reads
@@ -17,7 +23,7 @@ raw-head probe's JavaScript (`node --check`) were exercised on streamanator on 2
 
 | Pin | Value |
 |---|---|
-| `origin/main` (PREP) | `731a502540ab3a9d8795e185fbad89e02534b2b7` |
+| `origin/main` (PREP) | **the `origin/main` tip the owner confirms at the start of the Tuesday session**: `da4cc0c459f469d3b1a798302f8fe394962a395f` on 2026-11-22 (run c pushed); if anything is pushed before A1, the owner names the final tip in the first message. Rule: PREP must descend from CAND `7d92042f` (W0 here, P2 on the host). What `7d92042f..PREP` changes is irrelevant to A1: P2 fast-forwards the checkout to CAND exactly and `release.mjs build` archives CAND by `git archive`; the session records `git diff --name-only 7d92042f PREP` (workstation) for the report. (Was `731a5025`, stale since the 22 Nov push.) |
 | Candidate (CAND) | `7d92042fd11010eaa20966e2f49ae7a93e286568`; release id will be `7d92042fd110-<BUILD_ID>` |
 | Tested application revision | `cf158d602242a3e7bbf899b951e8423c0d3521e6`; executable tree (ls-tree minus `docs/`, `documentation/`, `issues/`, root `*.md`) sha256 `a18ccac4…e789` = CAND's |
 | Serving now / rollback target | `c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC` (checkout `c8d4202a…`); previous BUILD_ID `aATnIlFOIQjq2z5oDdoHC` |
@@ -38,7 +44,9 @@ verification Wed 25 Nov 03:30); 04:50-05:45 (AFL API settle); 05:45-07:15 (`apt-
 enforces its margin). The window is clear of all of these.
 
 **Time budget: an owner choice, to be given in writing before the day (reviewer F-004).** `release.mjs build` takes about
-15-25 minutes, so build, promote, env, restart and acceptance do not fit 10:00-10:30.
+15-25 minutes, so build, promote, env, restart and acceptance do not fit 10:00-10:30. **Run d:** the full comparison, the owner's
+restart time and what happens to A2 under each option are in `A1-TIMING-OPTIONS.md`; T-1's work before 10:00 (and even T-2's
+09:20-09:30 read-only checks) lies outside the approved 10:00-10:30 window and needs the owner's explicit yes before it runs.
 
 | | **Option T-1 (recommended)**: P2/P3 from 09:30 | **Option T-2**: everything from 10:00 |
 |---|---|---|
@@ -56,8 +64,8 @@ stops before promotion. **Latest restart either way: 10:45**; later than that, s
 
 | # | Step | Pass |
 |---|---|---|
-| W0 | Workstation: `git ls-remote origin refs/heads/main` = PREP; `git rev-parse 7d92042f^{commit}` resolves | equal |
-| W1 | `a1-p1-precheck.sh 731a5025…` | `P1 RESULT PASS`: links as §0, checkout `c8d4202a` clean, `host-gate` PASS (warnings: reboot pending, needrestart hold missing), no apt/writer, ≥ 2,100 MB available, ≥ 6 GB disk, `AFLDB_WORKERS=2`, **both revalidation names absent (counts 0)**, `.env` ends with a newline, ledger 118, 2026 Brownlow revision 3 (183 rows, 1,242 votes, 14 ineligible). Record MainPID, InvocationID and the previous BUILD_ID it prints |
+| W0 | Workstation only (no production command): `git fetch origin`; `git ls-remote origin refs/heads/main` = PREP (the owner-confirmed tip); `git rev-parse 7d92042f^{commit}` resolves; `git merge-base --is-ancestor 7d92042fd11010eaa20966e2f49ae7a93e286568 PREP` exit 0; record `git diff --name-only 7d92042f PREP` (count and the non-records paths) for the report | equal; ancestor |
+| W1 | `a1-p1-precheck.sh <PREP>` | `P1 RESULT PASS`: links as §0, checkout `c8d4202a` clean, `host-gate` PASS (warnings: reboot pending, needrestart hold missing), no apt/writer, ≥ 2,100 MB available, ≥ 6 GB disk, `AFLDB_WORKERS=2`, **both revalidation names absent (counts 0)**, `.env` ends with a newline, ledger 118, 2026 Brownlow revision 3 (183 rows, 1,242 votes, 14 ineligible). Record MainPID, InvocationID and the previous BUILD_ID it prints |
 | W2 | `a1-rawhead.sh baseline` | `RAWHEAD RESULT baseline PASS`; writes `/home/arm/a1-rawhead-baseline.json` (title and robots per page; controls recorded) |
 | W3 | Owner present with the sudo password and a second terminal; streamanator reachable | — |
 
@@ -67,7 +75,7 @@ Any W-step FAIL: STOP before P2; production unchanged.
 
 | # | Step | Who | Pass / stop |
 |---|---|---|---|
-| P2 | `a1-p2-ff.sh 731a5025…` (fetch; ff to **CAND exactly**, never `origin/main`) | Claude | `P2 RESULT PASS`: every delta pin of §0, cf158d60..CAND records-only, executable tree = cf158d60. Any STOP line: production unchanged; a checkout left at CAND is harmless |
+| P2 | `a1-p2-ff.sh <PREP>` (fetch; ff to **CAND exactly**, never `origin/main`) | Claude | `P2 RESULT PASS`: every delta pin of §0, cf158d60..CAND records-only, executable tree = cf158d60. Any STOP line: production unchanged; a checkout left at CAND is harmless |
 | P3 | `a1-p3-build.sh`, then `a1-p3b-build-check.sh <LOG>` | Claude | `P3b RESULT BUILD PASS <NEW_ID>` **only if** the id starts `7d92042fd110-` **and** `release.json` `revision` is the full CAND sha. Otherwise: **STOP before promotion** and report (owner decision 2). One retry only if the cause is understood and needs no code or data change |
 | P4 | `a1-p4-gate-promote.sh <NEW_ID>` (owner present) | Claude | `P4 RESULT PROMOTED`. Gate refusal: wait, re-run; never `--skip-host-gate` |
 | E1-E3, RESTART | owner blocks, §3.1 | **Owner** | each block's own check |
@@ -133,7 +141,7 @@ policy and Caddyfile hashes in the packet hold. **Re-pinned packet texts:** R1's
 <whatever current is> --confirm-restart-invocation <InvocationID>`; R4's approval text binds the file sha256
 `f00859d5c834be09f064d516ea4fa12612da379e377128e784b3523016a6086d`, not the commit (`c8d4202a` and CAND carry the same blob).
 
-## 4. Sitting A2: R1, R2, R3, R4 (no outage expected)
+## 4. Sitting A2: R1, R2, R4, R5 restriction, R3 (no outage expected; order per §4.5)
 
 **A2 P0:** `a2-p0-entry.sh <outcome> [NEW_ID]` → `P0 RESULT PASS (<outcome>)`. It also records kernel, reboot-required, GRUB, the
 timers, settle status, authorized-keys counts (expect 0 and 0), Caddy sha (`4f6972ec…`), `/var/log/caddy`, slugs 0 bad,
@@ -154,20 +162,33 @@ Owner, one block at a time, in `/home/arm/projects/afldb`:
 **Acceptance:** all as stated. **STOP/recovery:** if step 4 would restart `afldb` or PostgreSQL automatically, or 5/6 do not show the
 blacklist: `sudo rm /etc/needrestart/conf.d/50-afldb-hold.conf /etc/apt/apt.conf.d/52-afldb-unattended` (policy not installed).
 
-### 4.2 R2 failure visibility, first manual run only (ISSUE-332; procedure 04 §4) — about 10 min
+### 4.2 R2 failure visibility: first manual run, then the hourly job (ISSUE-332; procedure 04 §4) — about 18 min
 
 1. Claude: `a2-keyline.sh settle` → `KEYLINE RESULT PASS settle`, fingerprint `SHA256:bXNU+c3pIBNqI/hjKeWVGX0Sm3QPjphZUGDfEQ+W5bU`.
 2. streamanator (Claude): `sha256sum /home/arm/afldb-ops/afldb-settle-check.sh` = `c6467ff492afe0e1f28117baf5c4fa2a38edaf8e8f13bf3cacd72ef22b224896`, then
    **once**: `sh /home/arm/afldb-ops/afldb-settle-check.sh; echo rc=$?` → `rc=0` and `rc=0 AFLDB_SETTLE_STATUS OK` in
    `/home/arm/afldb-ops/state/settle-check.log`.
 
+3. streamanator (Claude), **only after step 2 PASSES** (owner decision 3, round 3): `bash a2-cron-install.sh check r2` then
+   `bash a2-cron-install.sh install r2` (piped: `tr -d '\r' < a2-cron-install.sh | ssh … arm@10.0.40.100 bash -s -- install r2`) →
+   `CRON INSTALL r2 PASS: next due <Melbourne time>`; record the next due time. It refuses unless the last `settle-check.log` line is
+   step 2's `rc=0 AFLDB_SETTLE_STATUS OK` (at most 6 h old), the wrapper is `c6467ff4…` and the sender is executable; a re-run prints
+   `ALREADY INSTALLED`; it keeps a 0600 pre-image `state/crontab.pre-a2-r2-install-<STAMP>`. Line installed (with its marker comment):
+   `17 * * * * AFLDB_ALARM_CMD=/home/arm/afldb-ops/alarm-email.sh /bin/sh /home/arm/afldb-ops/afldb-settle-check.sh`.
+4. streamanator (Claude), **cron-environment alarm test (reviewer F-005; the owner watches his inbox)**: once,
+   `env -i HOME=/home/arm LOGNAME=arm SHELL=/bin/sh PATH=/usr/bin:/bin AFLDB_PROD_SSH=arm@afldb-nonexistent.invalid AFLDB_OPS_STATE=/home/arm/afldb-ops/state/a2-cronenv-test AFLDB_ALARM_CMD=/home/arm/afldb-ops/alarm-email.sh /bin/sh /home/arm/afldb-ops/afldb-settle-check.sh; echo rc=$?`
+   → `rc=1` and "alarm-email: sent …" (no production contact: the host is `.invalid`); **pass = the owner confirms the email arrived**.
+   `rc=4` = the sender failed under cron's environment: remove the r2 job (`… remove r2`), record, owner decides. The 22 Nov delivery
+   confirmation stays separate evidence (ISSUE-332); this step proves only that cron's bare environment can run the sender.
+
 **STOP:** ssh 255 (most likely production's firewall or `sshd` refusing streamanator's address; unverified prerequisite) → record,
-no retry loop, leave the key line (inert without a connection) or remove it with the backup the script printed; owner decides.
-**Recovery:** delete the line (`cp -p <backup> ~/.ssh/authorized_keys`). **Not in A2:** the hourly cron and the notifier marker (§4.6).
+no retry loop, leave the key line (inert without a connection) or remove it with the backup the script printed; owner decides; **do
+not install the r2 job** (it would mail an alarm every hour). **Recovery:** delete the line (`cp -p <backup> ~/.ssh/authorized_keys`);
+`bash a2-cron-install.sh remove r2`. **Not in A2:** the notifier marker (§4.6).
 **Email delivery** through the chosen channel was proven separately on 22 Nov (owner confirmed receipt, recorded in `731a5025`);
 that is not an R2 installation step and is not repeated here.
 
-### 4.3 R3 scheduled backups and the off-host pull (ISSUE-352; packet R3, kits R3) — about 35 min
+### 4.3 R3 scheduled backups, the off-host pull and the daily job (ISSUE-352; packet R3, kits R3) — about 40 min
 
 | # | Step | Who | Pass |
 |---|---|---|---|
@@ -182,14 +203,16 @@ that is not an R2 installation step and is not repeated here.
 | 9 | `sudo systemctl enable --now afldb-backup.timer afldb-backup-verify.timer`; `systemctl list-timers 'afldb-backup*' --no-pager` | Owner | next 02:20 and Wed 03:30 |
 | 10 | `a2-keyline.sh backup` | Claude | `KEYLINE RESULT PASS backup`, fingerprint `SHA256:fNuQ1pLEzjpssrxP1Vz9ttT38osax+TDtM09pxxf42M` |
 | 11 | streamanator: check `afldb-offhost-pull-daily.sh` sha `1aa242f2…` and pinned `offhost-pull.sh` `ea48205a…`, then **once** `sh /home/arm/afldb-ops/afldb-offhost-pull-daily.sh; echo rc=$?`; `ls -la /mnt/ssd/afldb-offhost-prod` | Claude | `rc=0`; the dump, its `.sha256`, `.verified-<name>` (**first off-host copy verified**) |
-| 12 | streamanator: `bash a2-r3-firstcopy-restore.sh restore /mnt/ssd/afldb-offhost-prod/<dump>` (new 0700 workspace, socket-only cluster, no TCP port; reviewer F-007), record, then `… cleanup <workspace>` | Claude | `FIRSTCOPY RESULT RESTORE PASS`, `pg_restore exit=0`, counts (ledger 118, seasons max 2026, 2026 Brownlow 183 rows/1,242 votes); cleanup done |
+| 12 | streamanator: copy `a2-r3-firstcopy-restore.sh` to streamanator (as run c tested it), then `D=/mnt/ssd/afldb-offhost-prod/<dump>; { echo "DUMP $D"; bash a2-r3-firstcopy-restore.sh restore "$D"; } 2>&1 \| tee /home/arm/afldb-ops/state/a2-firstcopy-restore.log` (new 0700 workspace, socket-only cluster, no TCP port; reviewer F-007), record, then `… cleanup <workspace>` (the log stays: it is the r3 cron precondition) | Claude | `FIRSTCOPY RESULT RESTORE PASS`, `pg_restore exit=0`, counts (ledger 118, seasons max 2026, 2026 Brownlow 183 rows/1,242 votes); cleanup done |
+| 13 | streamanator, **only after 11 and 12 PASS** (owner decision 3, round 3): `bash a2-cron-install.sh check r3`, then `install r3` (piped as §4.2 step 3). It refuses unless the newest dump's one-line sidecar verifies, its `.verified-<dump>` marker exists and `state/a2-firstcopy-restore.log` records a PASS restore of that dump; pins `1aa242f2…`/`ea48205a…`. Line: `10 3 * * * AFLDB_ALARM_CMD=/home/arm/afldb-ops/alarm-email.sh /bin/sh /home/arm/afldb-ops/afldb-offhost-pull-daily.sh` | Claude | `CRON INSTALL r3 PASS: next due Wed 25 Nov 2026 03:10 AEDT`; record it. May run after 12:00 (streamanator only) |
 
 **STOP on the first failure** (units untested under systemd until now, procedure 05 §10). **Recovery:** `sudo systemctl disable --now
 afldb-backup.timer afldb-backup-verify.timer; sudo rm /etc/systemd/system/afldb-backup*; sudo systemctl daemon-reload`, then the
-key line. Step 11 ssh 255 → as R2's STOP (one attempt). Safe boundaries: after 4, after 9, after 11. **Still open after A2** (no
-daily pull, §4.6): "within 25 h the next nightly appears off-host".
+key line; `bash a2-cron-install.sh remove r3`. Step 11 ssh 255 → as R2's STOP (one attempt; no r3 job). Safe boundaries: after 4,
+after 9, after 11, after 13. **Still open after A2:** "within 25 h the next nightly appears off-host" = the first scheduled pull,
+Wed 25 Nov 03:10 AEDT (after the 02:20 backup), observed with `a2-cron-observe.sh r3`.
 
-### 4.4 R4 combined Caddy install (ISSUE-357, ISSUE-362, beta headers) — about 20 min; **last, and only after P6 PASS**
+### 4.4 R4 combined Caddy install (ISSUE-357, ISSUE-362, beta headers) — about 20 min; **only after P6 PASS, never started after 11:35** (ahead of R3, §4.5)
 
 | # | Step | Who |
 |---|---|---|
@@ -202,32 +225,91 @@ daily pull, §4.6): "within 25 h the next nightly appears off-host".
 | 7 | `sudo -u caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile` → "Valid configuration"; else `sudo cp -p "$B" /etc/caddy/Caddyfile`, STOP (no reload) | Owner |
 | 8 | `ls -l /var/log/caddy` → every file still `caddy:caddy 0600` | Owner |
 | 9 | `sudo systemctl reload caddy; systemctl status caddy --no-pager` (graceful; **never restart**) | Owner |
-| 10 | workstation `bash a2-r4-probes.sh post` → `R4 PROBES RESULT post PASS`; then the owner reads ONLY the two newest access-log lines (`/admin/invite/REDACTED`, no probe string) and loads one player and one season page in a real browser (DevTools: no CSP violation) | Claude + Owner |
+| 10 | workstation `bash a2-r4-probes.sh post` → `R4 PROBES RESULT post PASS`; then the owner runs the three COUNT-ONLY greps the script prints over the newest 50 access-log lines (no line displayed): `ISSUE362-PROBE` **0**, `/admin/invite/REDACTED` **≥ 2**, `"uri":"/beta/verify"` **≥ 1** (probes cover the invite path, its double-slash spelling, a query string, the magic-link `?token=` and a token-bearing Referer; `Location`/`Refresh` redaction was proven on real Caddy in REVIEW-D and is not re-probed); and loads one player and one season page in a real browser (DevTools: no CSP violation) | Claude + Owner |
 
 **Rollback (any failed probe):** `sudo cp -p "$B" /etc/caddy/Caddyfile`; validate as `caddy`; `sudo systemctl reload caddy`; re-run
 the legitimate-page part (`a2-r4-probes.sh pre`); `sha256sum` equals `"$B"`. **Acceptance:** every probe; record the new installed
 sha256. Behaviour changes (beta host): trailing slash on a protected route 404 instead of 308; deny body `Not Found`; match ids ≤ 99,999;
-slugs `[a-z0-9-]`; HSTS and CSP; logs carry no tokens or query strings. **R5 is not run:** the pre-fix logs are retained (owner decision 5).
+slugs `[a-z0-9-]`; HSTS and CSP; logs carry no tokens or query strings. **R5:** nothing is deleted; the pre-fix logs are retained with restricted access (§4.5a).
 
-### 4.5 If time runs short
+### 4.5 Time budget and if time runs short (reviewer F-009)
 
-Stop at the last completed safe boundary, run nothing half-way, and list the outstanding steps by id. R4 is atomic (backup →
-install → validate → reload → probes, or its rollback); do not start it after 11:35. R3 step 12 (streamanator only) may finish after
-12:00.
+| Order | Block | Minutes | T-1 (A2 from 10:30) | T-2 (A2 from about 10:45) |
+|---|---|---|---|---|
+| 1 | R1 | 10 | 10:30-10:40 | 10:45-10:55 |
+| 2 | R2 steps 1-2, cron r2 (step 3), cron-env alarm test (step 4) | 10 + 3 + 5 | 10:40-10:58 | 10:55-11:13 |
+| 3 | R4 (only after P6 PASS; never started after 11:35) | 20 | 11:00-11:20 (P6 ends about 10:48) | 11:15-11:35 (P6 ends about 11:15) |
+| 4 | R5 access restriction §4.5a (owner block) | 10 | 11:20-11:30 | 11:35-11:45 |
+| 5 | R3 steps 1-11 | 30 | 11:30-12:00 | 11:45-12:15 (**overruns**) |
+| 6 | R3 steps 12-13 (streamanator only: first-copy restore, cron r3) | 10 | after 12:00 | after 12:15 |
 
-### 4.6 Separate, still-unapproved owner steps (reviewer F-006: one question to the owner)
+R4 moves ahead of R3 (run d): R4 has the hard 11:35 cut-off and R5 depends on it; R3's production part has no cut-off inside the
+window and its streamanator part has no production contact. **Drop order if short** (first dropped first; each is a safe boundary):
+(1) the cron-env alarm test (§4.2 step 4) moves after 12:00 (streamanator only; the owner reads email); (2) the cron installs r2/r3
+move after 12:00 the same day (streamanator only; their preconditions still bind); (3) R3 steps 1-11 move to a separate attended
+owner slot before Thu 26 Nov (needs the owner's sudo; without it there is no scheduled backup during the leave); (4) R4 not started
+by 11:35: reschedule it, and run §4.5a anyway (the rolled pre-fix files need it whether or not R4 happens). Stop at the last
+completed safe boundary, run nothing half-way, and list the outstanding steps by id. R4 is atomic (backup → install → validate →
+reload → probes, or its rollback).
 
-Packet R2 and R3 list the hourly status check and the daily pull as part of their Targets, but neither approval text names a cron,
-the owner approved "first manual run only" for R2, and both kit lines had a blank `AFLDB_ALARM_CMD`. **Neither is installed in A2.**
-For approval (arm's crontab on streamanator, `crontab -e`, keep existing lines; the alarm command form is the main session's
-sender exactly as used by the 22 Nov delivery test, the executable path; NOT `/bin/sh alarm-email.sh` as `kits/KITS-20261122.md` R2 suggests: the sender is a bash script using process substitution, which `sh` (dash) cannot run):
+### 4.5a R5: retain the pre-fix Caddy logs with restricted access (owner decision 5, round 3; `R5-RETENTION-PROPOSAL.md`)
+
+**Why in A2, not later:** Caddy rotates these logs itself (`roll_size 20MiB`, `roll_keep 5`; R4 does not change that). It already
+deleted the oldest pre-fix access log between 14 and 22 Nov (`afldb-access-2026-09-04T11-02-31.065-size.log.gz` is listed on 14 Nov,
+`run2/ops/raw/prod-ro-ops-notify-logs.txt:210`, and absent on 22 Nov, `R0-prod-probe-20261121T155246Z.txt:146-150`, after the 16 Nov
+roll made six). The next access roll (early December at the 22 Nov growth rate) deletes `afldb-access-2026-09-07…`, during the
+owner's leave. "Retain" therefore needs the rolled files moved out of Caddy's reach.
+
+**Metadata (A2 P0 already lists it as arm: the directory is 0755, no sudo needed).** Expected (R0, 22 Nov): directory `caddy:caddy 0755`;
+`afldb-access-2026-09-07T21-28-03.060-size.log.gz` 1,130,156 B, `…-09-14T12-27-36.536…` 1,121,927, `…-10-15T13-18-15.638…` 1,149,465,
+`…-11-02T07-51-03.012…` 1,113,936, `…-11-16T05-48-24.848…` 1,078,750; `afldb-apex-2026-09-09T13-26-13.354-size.log.gz` 1,413,311,
+`…-09-28T10-33-21.243…` 1,288,778, `…-10-21T04-04-49.343…` 1,463,479; live `afldb-access.log` (8,094,530 B on 22 Nov, growing) and
+`afldb-apex.log` (19,348,347 B on 22 Nov: **it may have rolled by Tuesday**, adding a fourth apex `.gz`; expected, record it); every
+file `caddy:caddy 0600`. A missing `afldb-access-2026-09-07…` means an access roll pruned it: record the loss and continue.
+
+**Owner block (one block, only after §4.4 step 10 PASSES; `sudo`):**
+```bash
+R=/var/log/afldb-r5-prefix-retained-20261124
+sudo install -d -m 0700 -o root -g root "$R"
+sudo sh -c 'mv -n -- /var/log/caddy/afldb-access-2*.log.gz /var/log/caddy/afldb-apex-2*.log.gz '"$R"'/'   # every ROLLED file (all predate R4's filter)
+S=$(date -u +%Y%m%dT%H%M%SZ)
+sudo cp -p /var/log/caddy/afldb-access.log "$R/afldb-access.log.copy-at-r5-$S"   # copies of the LIVE files (pre-fix lines up to R4's reload)
+sudo cp -p /var/log/caddy/afldb-apex.log   "$R/afldb-apex.log.copy-at-r5-$S"
+sudo chown root:root "$R"/*; sudo chmod 0600 "$R"/*
+sudo sh -c 'cd '"$R"' && sha256sum -- * > SHA256SUMS && chmod 0600 SHA256SUMS'
+sudo ls -la "$R"; ls -la /var/log/caddy
 ```
-17 * * * * AFLDB_ALARM_CMD=/home/arm/afldb-ops/alarm-email.sh /bin/sh /home/arm/afldb-ops/afldb-settle-check.sh
-10 3 * * * AFLDB_ALARM_CMD=/home/arm/afldb-ops/alarm-email.sh /bin/sh /home/arm/afldb-ops/afldb-offhost-pull-daily.sh
+**Check:** `$R` is `root:root 0700` and holds the eight (or nine) rolled files, the two copies and `SHA256SUMS`, all `root:root 0600`;
+`/var/log/caddy` holds only the two live files, **unchanged `caddy:caddy 0600`** (their owner and mode are never touched; Caddy keeps
+writing them); then the workstation sends one request (`curl -s -o /dev/null https://beta.afldb.com/`) and `ls -l /var/log/caddy/afldb-access.log`
+shows the size grew (Caddy still logs). Report names, sizes and the `SHA256SUMS` line count only; never any content.
+**Effect:** the rolled pre-fix files and the copies are readable by root only (before: root and the `caddy` service user), their names
+are hidden from other local users, and Caddy can no longer prune them. **Residual:** the live files keep their pre-fix lines,
+`caddy:caddy 0600` as today, until Caddy rolls and later prunes them; the copies preserve those lines. `mv`/`rm` are not secure
+erasure; any DigitalOcean backup or snapshot of the droplet (unverified) is outside this step.
+**Rollback (owner):** `sudo sh -c 'mv -n -- '"$R"'/afldb-*-2*.log.gz /var/log/caddy/' && sudo chown caddy:caddy /var/log/caddy/afldb-*-2*.log.gz && sudo chmod 0600 /var/log/caddy/afldb-*-2*.log.gz`,
+then `sudo rm -- "$R"/*.copy-at-r5-* "$R/SHA256SUMS" && sudo rmdir "$R"` (removes only what this block created). After a rollback Caddy
+prunes the rolled files again by its own rules. Disposal is NOT part of A2: it is the owner's later decision (`R5-RETENTION-PROPOSAL.md`).
+
+### 4.6 The two streamanator cron jobs: APPROVED (owner decision 3, round 3, 2026-11-22)
+
+Supersedes run c's "separate, still-unapproved owner steps". Installed in A2 by `a2-cron-install.sh` (marker comment + one line each;
+idempotent; refuses duplicates and a short or unreadable crontab; keeps a 0600 pre-image; verifies the installed text byte for byte;
+`remove r2|r3` is the way back), dry-tested on streamanator against a stub crontab with the real crontab untouched
+(`a1a2-20261124/dry-tests-20261122d/t-cron.log`, 54/54 PASS). Baseline of arm's real crontab, read-only 2026-11-22 06:55 AEDT: 24 lines,
+all comments (no job), sha256 `043d2510065bd2af43965799c5858e57743ae9a5694281b8c4f8196af003e22e`, no `afldb` line; cron active; system
+timezone `Australia/Melbourne` (so `10 3` is 03:10 Melbourne time: AEDT now, AEST after 2027-04-04). The staged wrapper is already the
+corrected `c6467ff4…` (`-T`); the previous `f4127845…` is kept as `state/afldb-settle-check.sh.pre-T`. The install precondition
+re-verifies the pin; if it ever differs, re-stage from `kits/afldb-settle-check.sh` (`install -m 700 …`) and re-check.
 ```
-**Consequence of not approving them:** no hourly failure visibility (G0b's ongoing part, ISSUE-332 stays open); no daily off-host
-copy, so R3's "within 25 h" acceptance and ISSUE-352's closure stay open, and the R6/R7 prerequisites rest on a manual second pull.
-The R2 notifier marker (packet R2 step 4) is likewise not in the A2 approval.
+17 * * * * AFLDB_ALARM_CMD=/home/arm/afldb-ops/alarm-email.sh /bin/sh /home/arm/afldb-ops/afldb-settle-check.sh        (r2, after §4.2 step 2)
+10 3 * * * AFLDB_ALARM_CMD=/home/arm/afldb-ops/alarm-email.sh /bin/sh /home/arm/afldb-ops/afldb-offhost-pull-daily.sh  (r3, after §4.3 step 12)
+```
+The alarm command is the executable path (the sender is a bash script using process substitution; `sh` cannot run it).
+**First scheduled runs** are observed after A2 with `a2-cron-observe.sh all` (read-only) and recorded in `OPEN-ITEMS-AFTER-SITTINGS.md`
+§4: r2 at the first :17 after its install; r3 at Wed 25 Nov 03:10 AEDT. **Known limit (reviewer F-013, LOW):** the wrapper does not
+de-duplicate alarms, so an unreachable production means one email per hour during the leave; the remedy is `remove r2` (or ignore it).
+The R2 notifier marker (packet R2 step 7) stays unapproved and is not in A2.
 
 ## 5. Records to write after the sittings
 
