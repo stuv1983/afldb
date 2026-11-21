@@ -77,6 +77,111 @@ def load_contract() -> dict:
         return json.load(fh)
 
 
+def reviewed_pin(contract: dict, label: str | None) -> dict | None:
+    """AFLDB-ISSUE-348 F-348-1: the owner-reviewed pin for ``label``, or None.
+
+    Additive: a label absent from ``reviewed_acquisitions`` (annual-html-20260826,
+    annual-html-20260902, any fixture or future label) gets None and every caller keeps its
+    pre-existing behaviour byte for byte (``parity_baseline`` and the frozen CSV oracle).
+    """
+    if not label:
+        return None
+    pins = contract.get("reviewed_acquisitions") or {}
+    pin = pins.get(label)
+    return pin if isinstance(pin, dict) else None
+
+
+def parsed_rows_digest(result: dict) -> str:
+    """sha256 of the parsed rows exactly as ``write_parsed`` serialises ``parsed/rows.jsonl``."""
+    digest = hashlib.sha256()
+    for year in sorted(result["rows_by_year"]):
+        for row in result["rows_by_year"][year]:
+            digest.update((_dump(row) + "\n").encode("utf-8"))
+    return digest.hexdigest()
+
+
+def verify_reviewed_pin_raw(pin: dict, snapshot_dir: Path) -> int:
+    """Every raw year page must exist and equal the pinned sha256; the page set must be exact."""
+    pages: dict = pin.get("raw_pages_sha256") or {}
+    if len(pages) != pin.get("files"):
+        raise ParseFailure("the reviewed pin is malformed: raw_pages_sha256 does not list "
+                           "exactly `files` pages")
+    years_dir = snapshot_dir / "raw" / "years"
+    present = sorted(p.name for p in years_dir.glob("year_*.html")) if years_dir.is_dir() else []
+    if present != sorted(pages):
+        raise ParseFailure(
+            f"reviewed pin: the raw page set differs from the pin ({len(present)} present, "
+            f"{len(pages)} pinned); this is not the reviewed acquisition")
+    for name in sorted(pages):
+        actual = hashlib.sha256((years_dir / name).read_bytes()).hexdigest()
+        if actual != pages[name]:
+            raise ParseFailure(
+                f"reviewed pin: raw page {name} sha256 {actual} != pinned {pages[name]}; "
+                "the source bytes are not the reviewed acquisition")
+    return len(pages)
+
+
+def verify_reviewed_pin(contract: dict, label: str, snapshot_dir: Path, result: dict) -> dict:
+    """The source check for an owner-reviewed acquisition (replaces CSV-oracle parity for it).
+
+    The frozen 2026-08-26 CSV export cannot judge a source that has legitimately changed since
+    (AFLDB-ISSUE-348 F-348-1). For a pinned label the check is instead: the exact reviewed raw
+    bytes, the exact parsed rows, and the reviewed corpus counts. Any difference refuses.
+    """
+    pin = reviewed_pin(contract, label)
+    if pin is None:
+        raise ParseFailure(f"label {label!r} has no reviewed pin")
+    pages = verify_reviewed_pin_raw(pin, snapshot_dir)
+    failures: list[str] = []
+    rows_digest = parsed_rows_digest(result)
+    if rows_digest != pin.get("parsed_rows_sha256"):
+        failures.append(f"parsed rows sha256 {rows_digest} != pinned "
+                        f"{pin.get('parsed_rows_sha256')}")
+    if result["total_rows"] != pin.get("total_rows"):
+        failures.append(f"total rows {result['total_rows']} != pinned {pin.get('total_rows')}")
+    if result["distinct_person_count"] != pin.get("distinct_persons"):
+        failures.append(f"distinct persons {result['distinct_person_count']} != pinned "
+                        f"{pin.get('distinct_persons')}")
+    blank_selection = sum(1 for rows in result["rows_by_year"].values() for r in rows
+                          if r["pick_number"] is None)
+    event_totals = _multiset((r["event_type_raw"] or "__no_draft_column__")
+                             for rows in result["rows_by_year"].values() for r in rows)
+    label_totals: dict[str, int] = {}
+    for rows in result["rows_by_year"].values():
+        for r in rows:
+            if r["pick_note_raw"] is not None:
+                family = classify_pick_label(r["pick_note_raw"])
+                label_totals[family] = label_totals.get(family, 0) + 1
+    if blank_selection != pin.get("selection_number_blank"):
+        failures.append(f"blank selection numbers {blank_selection} != pinned "
+                        f"{pin.get('selection_number_blank')}")
+    if event_totals != pin.get("event_type_totals"):
+        failures.append(f"event totals {event_totals!r} != pinned")
+    if label_totals != pin.get("special_pick_label_totals"):
+        failures.append(f"special pick label totals {label_totals!r} != pinned")
+    if failures:
+        raise ParseFailure("reviewed pin check failed (the input is not the reviewed "
+                           "acquisition):\n  " + "\n  ".join(failures))
+    return {
+        "status": "REVIEWED_PIN",
+        "compared_years": sorted(result["rows_by_year"]),
+        "documented_exceptions": [
+            "Source check by owner-reviewed pin (AFLDB-ISSUE-348 F-348-1): raw page sha256, "
+            "parsed rows sha256 and corpus counts; the frozen 2026-08-26 CSV oracle is not "
+            "consulted for this label",
+        ],
+        "mojibake_repairs_applied": [],
+        "corpus_checks": {
+            "raw_pages_verified": pages,
+            "parsed_rows_sha256": rows_digest,
+            "blank_selection_numbers": blank_selection,
+            "event_totals": event_totals,
+            "special_pick_label_totals": label_totals,
+        },
+        "pin_authority": pin.get("authority"),
+    }
+
+
 def build_year_url(contract: dict, year: int) -> str:
     return contract["year_url_pattern"].format(base_url=contract["base_url"], year=year)
 
@@ -497,7 +602,7 @@ def parse_snapshot(contract: dict, snapshot_dir: Path, *, require_complete: bool
 # ---------------------------------------------------------------------------
 
 def validate_identity(contract: dict, result: dict, *, require_complete: bool,
-                      accept_baseline_drift: bool) -> dict:
+                      accept_baseline_drift: bool, label: str | None = None) -> dict:
     regex = re.compile(contract["canonical_player_url"]["regex"])
     for year in sorted(result["rows_by_year"]):
         for row in result["rows_by_year"][year]:
@@ -509,7 +614,10 @@ def validate_identity(contract: dict, result: dict, *, require_complete: bool,
                 raise ParseFailure(
                     f"year={year} row={row['row_index']}: non-positive ordinal")
 
-    baseline = contract["parity_baseline"]
+    # AFLDB-ISSUE-348 F-348-1: an owner-reviewed label is judged against its own pin; every other
+    # label (no label passed, or one without a pin) keeps the frozen parity_baseline unchanged.
+    pin = reviewed_pin(contract, label)
+    baseline = pin if pin is not None else contract["parity_baseline"]
     report = {
         "total_rows": result["total_rows"],
         "distinct_person_count": result["distinct_person_count"],
@@ -517,6 +625,8 @@ def validate_identity(contract: dict, result: dict, *, require_complete: bool,
         "baseline_distinct_persons": baseline["distinct_persons"],
         "baseline_drift": None,
     }
+    if pin is not None:
+        report["baseline_source"] = f"reviewed_acquisitions[{label}]"
     if require_complete:
         drift = []
         if result["total_rows"] != baseline["total_rows"]:
@@ -903,11 +1013,13 @@ def main(argv: list[str] | None = None) -> int:
                                 require_complete=args.require_complete)
         identity_report = validate_identity(
             contract, result, require_complete=args.require_complete,
-            accept_baseline_drift=args.accept_baseline_drift)
+            accept_baseline_drift=args.accept_baseline_drift, label=args.label)
         trade_profile = build_trade_profile(result)
 
         parity_report = None
-        if args.parity:
+        if args.parity and reviewed_pin(contract, args.label) is not None:
+            parity_report = verify_reviewed_pin(contract, args.label, snapshot_dir, result)
+        elif args.parity:
             parity_dir = Path(args.parity_dir) if args.parity_dir \
                 else REPO_ROOT / contract["csv_artifact"]["path"]
             parity_report = run_parity(contract, result, parity_dir,

@@ -155,6 +155,20 @@ AFLTABLES_PATH_RE = re.compile(r"^players/[A-Za-z]/[^/]+\.html$")
 EXPECTED_ROWS = 6810
 EXPECTED_PERSONS = 5057
 
+
+def expected_population(label: str | None) -> tuple[int, int]:
+    """(rows, persons) a full import of ``label`` must build. AFLDB-ISSUE-348 F-348-1, additive.
+
+    A label with an owner-reviewed pin in the contract (``reviewed_acquisitions``; on
+    2026-11-22 ``annual-html-20261122``: 6,845 / 5,088) is held to that pin. Every other label
+    keeps the module constants above, read at call time, exactly as before. ``--link-only``
+    does not use this: it never loads a population and keeps the constants.
+    """
+    pin = parser_mod.reviewed_pin(parser_mod.load_contract(), label)
+    if pin is not None:
+        return int(pin["total_rows"]), int(pin["distinct_persons"])
+    return EXPECTED_ROWS, EXPECTED_PERSONS
+
 NBSP = " "
 
 # migration 069 reload keys. Row ids are durable application identity, so both tables are
@@ -307,13 +321,29 @@ def verify_stage_a_manifest(label: str) -> dict:
             "the Stage A manifest does not declare identity_complete=true / "
             "import_capable=true; only a snapshot whose own accepted contract admits it may "
             "be imported (B2 handoff §21)")
-    if manifest.get("total_rows") != EXPECTED_ROWS:
+    expected_rows, expected_persons = expected_population(label)
+    if manifest.get("total_rows") != expected_rows:
         raise ImportFailure(f"manifest total_rows is {manifest.get('total_rows')}, "
-                            f"expected {EXPECTED_ROWS}")
-    if manifest.get("distinct_player_url_count") != EXPECTED_PERSONS:
+                            f"expected {expected_rows}")
+    if manifest.get("distinct_player_url_count") != expected_persons:
         raise ImportFailure(
             f"manifest distinct_player_url_count is "
-            f"{manifest.get('distinct_player_url_count')}, expected {EXPECTED_PERSONS}")
+            f"{manifest.get('distinct_player_url_count')}, expected {expected_persons}")
+    pin = parser_mod.reviewed_pin(parser_mod.load_contract(), label)
+    if pin is not None:
+        # The manifest must be the one sealed from the reviewed bytes: its per-page sha256 set,
+        # its source check and its parsed-row digest must equal the contract pin.
+        declared = {Path(e["raw_filename"]).name: e["sha256"]
+                    for e in manifest.get("source_urls") or []}
+        if declared != pin.get("raw_pages_sha256"):
+            raise ImportFailure("the Stage A manifest's raw page sha256 set is not the "
+                                "owner-reviewed pin for this label")
+        parity = manifest.get("parity") or {}
+        if parity.get("status") != "REVIEWED_PIN" or \
+                (parity.get("corpus_checks") or {}).get("parsed_rows_sha256") \
+                != pin.get("parsed_rows_sha256"):
+            raise ImportFailure("the Stage A manifest was not sealed against the "
+                                "owner-reviewed pin for this label")
     return manifest
 
 
@@ -506,8 +536,8 @@ def build_persons(parse_result: dict) -> dict[str, dict]:
 
 def build_picks(parse_result: dict, persons: dict[str, dict], event_map: dict,
                 signing_vocab: set[str], club_slugs: set[str], deliberate_null: dict,
-                competition_of) -> list[dict]:
-    """6,810 picks with every column derived from the frozen contracts."""
+                competition_of, label: str | None = None) -> list[dict]:
+    """6,810 picks (the label's pinned population) with every column derived from the frozen contracts."""
     picks: list[dict] = []
     for year in sorted(parse_result["rows_by_year"]):
         for row in parse_result["rows_by_year"][year]:
@@ -568,10 +598,11 @@ def build_picks(parse_result: dict, persons: dict[str, dict], event_map: dict,
                 "source_record_id": f"{row['source_url']}#{row['row_index']}",
             })
 
-    if len(picks) != EXPECTED_ROWS:
-        raise ImportFailure(f"built {len(picks)} picks, expected {EXPECTED_ROWS}")
-    if len(persons) != EXPECTED_PERSONS:
-        raise ImportFailure(f"built {len(persons)} persons, expected {EXPECTED_PERSONS}")
+    expected_rows, expected_persons = expected_population(label)
+    if len(picks) != expected_rows:
+        raise ImportFailure(f"built {len(picks)} picks, expected {expected_rows}")
+    if len(persons) != expected_persons:
+        raise ImportFailure(f"built {len(persons)} persons, expected {expected_persons}")
 
     seen: set[tuple] = set()
     for pick in picks:
@@ -1382,7 +1413,7 @@ def validate(args) -> dict:
 
     parse_result = parser_mod.parse_snapshot(contract, snapshot_dir, require_complete=True)
     parser_mod.validate_identity(contract, parse_result, require_complete=True,
-                                 accept_baseline_drift=False)
+                                 accept_baseline_drift=False, label=args.label)
 
     event_map, signing_vocab = load_event_mapping()
     club_slugs, deliberate_null = load_club_rules(contract)
@@ -1393,7 +1424,7 @@ def validate(args) -> dict:
 
     persons = build_persons(parse_result)
     picks = build_picks(parse_result, persons, event_map, signing_vocab,
-                        club_slugs, deliberate_null, competition_of)
+                        club_slugs, deliberate_null, competition_of, label=args.label)
 
     for url in ledger:
         if url not in persons:

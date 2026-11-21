@@ -596,3 +596,29 @@ describe("DraftGuru importer — Phase A against the accepted snapshot", () => {
     });
   });
 });
+
+/*
+ * AFLDB-ISSUE-348 F-348-1 (owner, 2026-11-22) — the owner-reviewed acquisition pin.
+ *
+ * tests/python/draftguru_reviewed_pin_contract.py proves that the reviewed acquisition
+ * annual-html-20261122 passes its pin (6,845 rows / 5,088 persons, exact raw page and parsed-row
+ * digests), that an altered page, parsed row, count or manifest is refused, that the seal is
+ * offline, and that every unpinned label (20260826, 20260902, default) keeps the frozen
+ * 6,810 / 5,057 baseline. Its real-data section runs where the untracked raw pages exist.
+ */
+describe("DraftGuru importer — reviewed acquisition pin (ISSUE-348 F-348-1)", () => {
+  const itPin = hasPython() ? it : it.skip;
+  itPin("the pinned input passes, altered input is refused, unpinned labels are unchanged", () => {
+    const result = spawnSync(python, ["tests/python/draftguru_reviewed_pin_contract.py"],
+      { cwd: root, encoding: "utf8", timeout: 110_000 });
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+    expect(result.stdout).toContain("All DraftGuru reviewed-pin checks hold.");
+    expect(result.stdout).not.toContain("FAIL ");
+  }, 120_000);
+
+  it("keeps the legacy constants for the default label and link-only", () => {
+    expect(importerSource).toContain("EXPECTED_ROWS = 6810");
+    expect(importerSource).toContain("EXPECTED_PERSONS = 5057");
+    expect(importerSource).toContain("def expected_population(label: str | None)");
+  });
+});

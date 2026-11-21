@@ -303,6 +303,82 @@ def build_manifest(contract: dict, label: str, snapshot_dir: Path, robots_sha: s
     }
 
 
+def seal_reviewed(contract: dict, args, pin: dict | None) -> int:
+    """AFLDB-ISSUE-348 F-348-1: write the manifest of an owner-reviewed, already acquired snapshot.
+
+    OFFLINE: no Fetcher is constructed and no URL is opened. The label must carry a reviewed pin
+    (contract ``reviewed_acquisitions``); the raw pages, the stored robots.txt record, the parsed
+    rows and the corpus counts must all equal it. The manifest is still written LAST, once, and an
+    existing manifest is never overwritten.
+    """
+    if pin is None:
+        raise AcquisitionError(
+            f"--seal-reviewed: label {args.label!r} has no owner-reviewed pin in the contract "
+            "(reviewed_acquisitions); nothing was written")
+    if args.years or args.accept_baseline_drift:
+        raise AcquisitionError("--seal-reviewed refuses --years and --accept-baseline-drift")
+    if not re.match(contract["snapshot"]["label_pattern"], args.label):
+        raise AcquisitionError(f"label {args.label!r} does not match the required pattern")
+    manifest_dir = Path(args.manifest_dir) if args.manifest_dir \
+        else REPO_ROOT / contract["snapshot"]["manifest_dir"]
+    manifest_path = manifest_dir / f"{args.label}.json"
+    if manifest_path.exists():
+        raise AcquisitionError(f"manifest {manifest_path} already exists; snapshots are immutable")
+    snapshot_root = Path(args.snapshot_root) if args.snapshot_root \
+        else REPO_ROOT / contract["snapshot"]["root"]
+    snapshot_dir = snapshot_root / args.label
+
+    snapshot_parser.verify_reviewed_pin_raw(pin, snapshot_dir)
+    robots_record_path = snapshot_dir / "http" / "robots_txt.json"
+    robots_path = snapshot_dir / "http" / "robots.txt"
+    if not robots_record_path.is_file() or not robots_path.is_file():
+        raise AcquisitionError("--seal-reviewed: the stored robots.txt and its record are required")
+    robots_record = json.loads(robots_record_path.read_text(encoding="utf-8"))
+    robots_sha = sha256_hex(robots_path.read_bytes())
+    if robots_sha != robots_record.get("sha256") or robots_sha != pin.get("robots_txt_sha256"):
+        raise AcquisitionError("--seal-reviewed: the stored robots.txt does not match its record "
+                               "or the reviewed pin")
+    fetched = []
+    for year in contract["expected_years"]:
+        record_path = snapshot_dir / "http" / "years" / f"year_{year}.json"
+        if not record_path.is_file():
+            raise AcquisitionError(f"--seal-reviewed: missing http record for {year}")
+        record = json.loads(record_path.read_text(encoding="utf-8"))
+        if record.get("sha256") != pin["raw_pages_sha256"].get(record.get("raw_filename", "").split("/")[-1]):
+            raise AcquisitionError(f"--seal-reviewed: http record for {year} does not match the pin")
+        fetched.append(record["fetched_at"])
+
+    result = snapshot_parser.parse_snapshot(contract, snapshot_dir, require_complete=True)
+    identity_report = snapshot_parser.validate_identity(
+        contract, result, require_complete=True, accept_baseline_drift=False, label=args.label)
+    parity_report = snapshot_parser.verify_reviewed_pin(contract, args.label, snapshot_dir, result)
+    trade_profile = snapshot_parser.build_trade_profile(result)
+    snapshot_parser.write_parsed(snapshot_dir, result, trade_profile)
+
+    manifest = build_manifest(contract, args.label, snapshot_dir, robots_sha, min(fetched),
+                              result, identity_report, parity_report, trade_profile)
+    manifest["mode"] = "seal-reviewed"
+    manifest["extraction_date"] = min(fetched)[:10]
+    manifest["extraction_completed_utc"] = max(fetched)
+    manifest["sealed_utc"] = utc_now()
+    manifest["reviewed_pin"] = {
+        "contract_key": f"reviewed_acquisitions.{args.label}",
+        "authority": pin.get("authority"),
+        "parsed_rows_sha256": pin.get("parsed_rows_sha256"),
+    }
+    if manifest_path.exists():
+        raise AcquisitionError(f"manifest {manifest_path} appeared during the run; refusing")
+    atomic_write_json(manifest_path, manifest)
+    print(json.dumps({
+        "label": args.label, "mode": "seal-reviewed", "network": "none",
+        "total_rows": result["total_rows"],
+        "distinct_player_url_count": result["distinct_person_count"],
+        "parity": parity_report["status"], "manifest": str(manifest_path),
+        "manifest_written": True,
+    }, ensure_ascii=True, sort_keys=True))
+    return 0
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -322,10 +398,19 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--accept-baseline-drift", action="store_true",
                         help="explicitly accept an investigated drift from the 6,810-row / "
                              "5,057-person baseline (recorded in the manifest)")
+    parser.add_argument("--seal-reviewed", action="store_true",
+                        help="AFLDB-ISSUE-348 F-348-1: OFFLINE. Seal the manifest of an already "
+                             "acquired snapshot whose label carries an owner-reviewed pin in "
+                             "the contract (reviewed_acquisitions). No network request of any "
+                             "kind; every raw page, the parsed rows and the corpus counts must "
+                             "equal the pin")
     args = parser.parse_args(argv)
 
     contract = snapshot_parser.load_contract()
+    pin = snapshot_parser.reviewed_pin(contract, args.label)
     try:
+        if args.seal_reviewed:
+            return seal_reviewed(contract, args, pin)
         if not re.match(contract["snapshot"]["label_pattern"], args.label):
             raise AcquisitionError(
                 f"label {args.label!r} does not match the required pattern "
@@ -395,13 +480,17 @@ def main(argv: list[str] | None = None) -> int:
                                                 require_complete=True)
         identity_report = snapshot_parser.validate_identity(
             contract, result, require_complete=True,
-            accept_baseline_drift=args.accept_baseline_drift)
+            accept_baseline_drift=args.accept_baseline_drift, label=args.label)
         trade_profile = snapshot_parser.build_trade_profile(result)
         snapshot_parser.write_parsed(snapshot_dir, result, trade_profile)
-        parity_report = snapshot_parser.run_parity(
-            contract, result,
-            REPO_ROOT / contract["csv_artifact"]["path"],
-            require_complete=True)
+        if pin is not None:
+            parity_report = snapshot_parser.verify_reviewed_pin(
+                contract, args.label, snapshot_dir, result)
+        else:
+            parity_report = snapshot_parser.run_parity(
+                contract, result,
+                REPO_ROOT / contract["csv_artifact"]["path"],
+                require_complete=True)
 
         manifest = build_manifest(contract, args.label, snapshot_dir, robots_sha,
                                   started_utc, result, identity_report,
