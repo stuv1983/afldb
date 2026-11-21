@@ -1391,10 +1391,14 @@ and it should answer `{"ok":true,...}` naming the worker that handled it:
 curl -s -X POST http://127.0.0.1:3100/api/internal/revalidate-season   -H "x-afldb-revalidate-secret: $(grep '^AFLDB_REVALIDATE_SECRET=' .env | cut -d= -f2-)"   -H 'content-type: application/json' -d '{"season":2026}'
 ```
 
-**What the secret authorises.** One thing: asking the site to re-render
-`/seasons/<year>`. The body carries an integer year and nothing else — the
-path is composed server-side — so there is no arbitrary path, pattern, layout
-or tag to purge. Unconfigured, it answers 503.
+**What the secret authorises.** One thing: asking the site to re-render a
+season's two pages, `/seasons/<year>` and `/brownlow/<year>`. The body carries
+an integer year and nothing else — the paths are composed server-side — so
+there is no arbitrary path, pattern, layout or tag to purge. Unconfigured, it
+answers 503. The Super Admin Brownlow publish action posts the same route, so
+a publication reaches every worker's copy of `/brownlow/<year>`
+(`AFLDB-ISSUE-371`); without this configuration only the worker that served
+the action is invalidated.
 
 **Why the internet cannot reach it.** The route serves a request only when its
 forwarded client address resolves to loopback, and that value is trustworthy

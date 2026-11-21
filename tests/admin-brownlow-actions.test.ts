@@ -29,6 +29,7 @@ import {
   type BrownlowMutationResult,
   type PublishSeasonResult,
 } from '@/db/queries/admin-brownlow';
+import { readRevalidateConfig, revalidateSeason } from '@/lib/acquisition/season-revalidation';
 import { audit, requireCapability } from '@/lib/auth/session';
 import type {
   BrownlowEntryStatus,
@@ -316,6 +317,16 @@ describe('publish', () => {
     expect(paths).toEqual(expect.arrayContaining([
       '/admin/brownlow/2024', '/seasons/2024', '/brownlow', '/brownlow/2024', '/players/[slug]',
     ]));
+    // AFLDB-ISSUE-371: the published season's own page is named as a concrete
+    // path with NO type, which is the form whose tag the page actually carries.
+    expect(revalidatePath).toHaveBeenCalledWith('/brownlow/2024');
+    expect(revalidatePath).not.toHaveBeenCalledWith('/brownlow/2024', 'page');
+  });
+
+  it('asks the cross-worker fan-out for the published season', async () => {
+    vi.mocked(readRevalidateConfig).mockReturnValueOnce({ origin: 'http://127.0.0.1:3100', secret: 's' });
+    await publishSeasonAction({}, publishForm());
+    expect(revalidateSeason).toHaveBeenCalledWith({ origin: 'http://127.0.0.1:3100', secret: 's' }, 2024);
   });
 
   it('audits a stale publication and reports it for a reload prompt', async () => {
@@ -328,5 +339,43 @@ describe('publish', () => {
       { action: 'publish', season: 2024, code: 'stale' },
       { userId: 7, label: 'super@afldb.test' },
     );
+  });
+});
+
+/**
+ * AFLDB-ISSUE-371. Next tags a cached page with its route file
+ * (`/brownlow/[year]/page`) and its pathname (`/brownlow/2026`), and
+ * `revalidatePath(path, type)` appends the type to the path. So a type is
+ * only meaningful with a route pattern or a static route; with a concrete
+ * dynamic path (`/brownlow/2026`, 'page') it names `/brownlow/2026/page`,
+ * a tag no page carries, and silently invalidates nothing. That is how the
+ * published season's page kept its pre-publication 404 entry.
+ */
+describe('revalidatePath arguments name a tag a page carries', () => {
+  const STATIC_ROUTES = new Set(['/brownlow', '/admin/brownlow']);
+  const assertTagShape = () => {
+    const calls = vi.mocked(revalidatePath).mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+    for (const [path, type] of calls) {
+      if (type === undefined) continue;
+      expect(path.includes('[') || STATIC_ROUTES.has(path), `${path} with type '${type}'`).toBe(true);
+    }
+  };
+
+  it.each([
+    ['saveDraft', () => saveDraftAction({}, matchForm())],
+    ['finalise', () => finaliseAction({}, matchForm())],
+    ['void', () => voidAction({}, matchForm())],
+    ['publish', () => publishSeasonAction({}, publishForm())],
+  ] as const)('%s', async (_name, run) => {
+    await run();
+    assertTagShape();
+  });
+
+  it('correct with a re-derived published season', async () => {
+    vi.mocked(correctBrownlowMatch).mockResolvedValue(okMatch({ republishedSeason: 2024 }));
+    await correctAction({}, matchForm({ reason: 'swap 2 and 3' }));
+    expect(revalidatePath).toHaveBeenCalledWith('/brownlow/2024');
+    assertTagShape();
   });
 });

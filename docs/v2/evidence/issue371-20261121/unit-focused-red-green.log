@@ -1,0 +1,503 @@
+
+ RUN  v4.1.10 /mnt/ssd/afldb-i371-20261121/base
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > invalidates exactly the season page and its Brownlow page, as concrete paths
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 1490305)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > reports the worker identity the caller needs to prove coverage
+[revalidate-season] /seasons/2026 invalidated on worker 3 (pid 1490305)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > reports a single-process server truthfully rather than guessing
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 1490305)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > takes the worker identity from process state, never from the request
+[revalidate-season] /seasons/2026 invalidated on worker 2 (pid 1490305)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > refuses to believe a nonsensical worker count rather than reporting it
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 1490305)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > refuses to believe a nonsensical worker count rather than reporting it
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 1490305)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > refuses to believe a nonsensical worker count rather than reporting it
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 1490305)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > refuses to believe a nonsensical worker count rather than reporting it
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 1490305)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > refuses to believe a nonsensical worker count rather than reporting it
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 1490305)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > serves a loopback caller carrying the forwarding headers Next synthesises
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 1490305)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > serves every loopback form the deployment can emit
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 1490305)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > ignores x-forwarded-host, which is client input on every path
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 1490305)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > serves a request with no forwarding identity at all
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 1490305)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > charges only failed secret checks against the limiter
+[revalidate-season] /seasons/2026 invalidated on worker single (pid 1490305)
+
+ ❯ tests/settle-season-revalidation.test.ts (86 tests | 2 failed) 561ms
+     ✓ publishes when an applied run wrote canonical rows 4ms
+     ✓ publishes when an applied run only UPDATED canonical rows 1ms
+     ✓ does nothing for the idempotent 0 canonical / 0 ledger rerun 0ms
+     ✓ does nothing for a rolled-back run, however much it would have written 1ms
+     ✓ does nothing when there is no run at all 0ms
+     ✓ invalidates the bundle's own season after an applied run that changed data 19ms
+     ✓ makes no request at all on an identical 0/0 rerun 9ms
+     ✓ makes no request on a dry run, whatever the run would have written 10ms
+     ✓ makes no request when the settle transaction itself failed 11ms
+     ✓ reports a failed invalidation without disturbing the committed run 7ms
+     ✓ turns a bad host configuration into a reported invalidation failure, not a lost settle 7ms
+     ✓ stays inert on a host that has configured nothing 12ms
+     ✓ leaves the existing counters and outcome shape untouched 7ms
+     ✓ is inert when neither name is set 0ms
+     ✓ refuses a half configuration rather than silently doing nothing 1ms
+     ✓ refuses to send the shared secret anywhere but this host 1ms
+     ✓ accepts the three loopback spellings 1ms
+     ✓ refuses a non-HTTP scheme and unparseable rubbish 1ms
+     ✓ keeps posting until every worker of a 4-worker cluster has answered 1ms
+     ✓ covers the 2-worker production cluster 0ms
+     ✓ tolerates a rotation disturbed by ordinary reader traffic 1ms
+     ✓ accepts a single answer from a single-process server 0ms
+     ✓ FAILS rather than reporting success when a worker never answers 1ms
+     ✓ fails observably when the route refuses, and never throws 1ms
+     ✓ fails observably when the socket does, and never throws 1ms
+     ✓ bounds an unbounded error message rather than logging a blob 1ms
+       ✓ counts DISTINCT ordinals: repeats never accumulate towards coverage 1ms
+       ✓ is not satisfied by 3 of 4 workers 0ms
+       ✓ takes the LARGEST cluster size reported, so a restart cannot shrink coverage 1ms
+       ✓ opens a FRESH connection per attempt, which is what makes the rotation work 1ms
+     × invalidates exactly the season page and its Brownlow page, as concrete paths 34ms
+     ✓ reports the worker identity the caller needs to prove coverage 3ms
+     ✓ reports a single-process server truthfully rather than guessing 2ms
+     ✓ takes the worker identity from process state, never from the request 2ms
+     ✓ refuses to believe a nonsensical worker count rather than reporting it 8ms
+     ✓ is 503 and inert on a host that has configured no secret 2ms
+     ✓ refuses a wrong, empty or absent secret 2ms
+     ✓ serves a loopback caller carrying the forwarding headers Next synthesises 2ms
+     × serves every loopback form the deployment can emit 2ms
+     ✓ ignores x-forwarded-host, which is client input on every path 1ms
+     ✓ refuses a non-loopback forwarded client even with the correct secret 9ms
+     ✓ refuses a forwarded chain rather than trusting either end of it 2ms
+     ✓ refuses a malformed forwarded client 2ms
+     ✓ serves a request with no forwarding identity at all 1ms
+     ✓ checks the caller BEFORE the secret, so a public probe learns nothing 1ms
+     ✓ charges only failed secret checks against the limiter 1ms
+     ✓ refuses once the failure limiter has tripped 1ms
+     ✓ admits no arbitrary path, pattern or tag 7ms
+     ✓ refuses a body that is not JSON at all 1ms
+     ✓ bounds the season a caller may name 1ms
+     ✓ still declares the ISR window and prerenders every season 1ms
+     ✓ is reachable without a session, like the other machine-to-machine route 1ms
+     ✓ is told the cluster size by the supervisor, since a worker cannot derive it 0ms
+     ✓ decides the exit code AFTER the run returns, so a cache failure costs no data 1ms
+     ✓ reaches the boundary only after runSettleAfltables has returned 1ms
+     ✓ accepts only the loopback forms this deployment can emit 1ms
+     ✓ calls a real non-loopback address remote, whatever family it is in 1ms
+     ✓ refuses anything that is not an address, including octal-looking octets 1ms
+     ✓ refuses a chain rather than picking a hop out of it 0ms
+     ✓ reports an absent header as absent rather than as an address 0ms
+     ✓ serves loopback and absent, and nothing else 0ms
+     ✓ deploy/Caddyfile overwrites X-Forwarded-For on every proxy block 104ms
+     ✓ deploy/Caddyfile.production overwrites X-Forwarded-For on every proxy block 175ms
+     ✓ deploy/Caddyfile never appends or forwards a client-supplied hop 1ms
+     ✓ deploy/Caddyfile.production never appends or forwards a client-supplied hop 1ms
+     ✓ deploy/Caddyfile drops the other client-supplied address headers 1ms
+     ✓ deploy/Caddyfile.production drops the other client-supplied address headers 1ms
+       ✓ deploy/Caddyfile defines the redacting log format with the invite, query and Referer rules 1ms
+       ✓ deploy/Caddyfile.production defines the redacting log format with the invite, query and Referer rules 1ms
+       ✓ deploy/Caddyfile imports it in every log block and in the global default log 2ms
+       ✓ deploy/Caddyfile.production imports it in every log block and in the global default log 1ms
+       ✓ deploy/Caddyfile no longer claims query strings are absent without removing them 1ms
+       ✓ deploy/Caddyfile.production no longer claims query strings are absent without removing them 0ms
+     ✓ deploy/Caddyfile redacts the invite token in any spelling of the raw target 0ms
+     ✓ deploy/Caddyfile.production redacts the invite token in any spelling of the raw target 0ms
+     ✓ deploy/Caddyfile redacts the token and query in the logged Location and Refresh response headers 1ms
+     ✓ deploy/Caddyfile.production redacts the token and query in the logged Location and Refresh response headers 1ms
+       ✓ deploy/Caddyfile defines the four layers on the raw request target 1ms
+       ✓ deploy/Caddyfile.production defines the four layers on the raw request target 1ms
+       ✓ deploy/Caddyfile matches the raw target, never the decoded or cleaned path 1ms
+       ✓ deploy/Caddyfile.production matches the raw target, never the decoded or cleaned path 0ms
+       ✓ deploy/Caddyfile imports the snippet before the proxy in the application block 0ms
+       ✓ deploy/Caddyfile.production imports the snippet before the proxy in the application block 0ms
+       ✓ keeps the two Caddyfiles on the same snippet body 1ms
+     ✓ binds the application to loopback, so the proxy is the only way in 72ms
+     ✓ relies on Next filling x-forwarded-for only when the proxy did not 1ms
+ ❯ tests/admin-brownlow-actions.test.ts (38 tests | 6 failed) 118ms
+     ✓ saveDraft is gated on data.brownlow.draft 43ms
+     ✓ finalise is gated on data.brownlow.finalise 2ms
+     ✓ correct is gated on data.brownlow.finalise 1ms
+     ✓ void is gated on data.brownlow.finalise 1ms
+     ✓ publish is gated on data.brownlow.finalise 6ms
+     ✓ an Admin (finalise denied, draft allowed) can draft but not finalise/correct/void/publish 6ms
+     ✓ a fully denied viewer reaches no transaction and no audit 1ms
+     ✓ refuses a non-numeric matchId as invalid, before any transaction 1ms
+     ✓ refuses a zero matchId as invalid, before any transaction 1ms
+     ✓ refuses a missing expectedRevision as invalid, before any transaction 1ms
+     ✓ refuses a negative expectedRevision as invalid, before any transaction 1ms
+     ✓ refuses a non-participant-shaped slot as invalid, before any transaction 0ms
+     ✓ refuses a missing season as invalid, before any transaction 0ms
+     ✓ passes an empty vote slot through as null (a draft may hold one) 4ms
+     ✓ calls the C1 transaction with the parsed ids, revision, fingerprint and actor 1ms
+     ✓ revalidates only the admin routes on success 2ms
+     ✓ finalise forwards the fingerprint and revalidates the public season and match 1ms
+     ✓ correct forwards the typed reason 1ms
+     ✓ a re-derived published season revalidates the public Brownlow and record routes and says so 1ms
+     ✓ calls voidBrownlowMatch with no selection but with the fingerprint and reason 2ms
+     ✓ audits a stale refusal 1ms
+     ✓ audits a already_final refusal 1ms
+     ✓ audits a forbidden refusal 1ms
+     ✓ does not audit a duplicate_player refusal 1ms
+     ✓ does not audit a participants_incomplete refusal 0ms
+     ✓ does not audit a incomplete refusal 0ms
+     ✓ does not audit a not_participant refusal 0ms
+     ✓ does not audit a db_error refusal 0ms
+     ✓ parses a de-duplicated ineligible id list and forwards the revision 1ms
+     ✓ refuses a malformed ineligible id without calling the transaction 0ms
+     × revalidates the public season and Brownlow routes and summarises the outcome 18ms
+     ✓ asks the cross-worker fan-out for the published season 1ms
+     ✓ audits a stale publication and reports it for a reload prompt 1ms
+     × saveDraft 3ms
+     × finalise 1ms
+     × void 1ms
+     × publish 2ms
+     × correct with a re-derived published season 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/admin-brownlow-actions.test.ts > publish > revalidates the public season and Brownlow routes and summarises the outcome
+AssertionError: expected "vi.fn()" to be called with arguments: [ '/brownlow/2024' ]
+
+Received:
+
+  1st vi.fn() call:
+
+  [
+-   "/brownlow/2024",
++   "/admin/brownlow/2024",
++   "page",
+  ]
+
+  2nd vi.fn() call:
+
+  [
+-   "/brownlow/2024",
++   "/admin/brownlow",
++   "page",
+  ]
+
+  3rd vi.fn() call:
+
+  [
+-   "/brownlow/2024",
++   "/seasons/2024",
++   "page",
+  ]
+
+  4th vi.fn() call:
+
+  [
+-   "/brownlow/2024",
++   "/brownlow",
++   "page",
+  ]
+
+  5th vi.fn() call:
+
+  [
+    "/brownlow/2024",
++   "page",
+  ]
+
+  6th vi.fn() call:
+
+  [
+-   "/brownlow/2024",
++   "/players/[slug]",
++   "page",
+  ]
+
+  7th vi.fn() call:
+
+  [
+-   "/brownlow/2024",
++   "/clubs/[slug]",
++   "page",
+  ]
+
+  8th vi.fn() call:
+
+  [
+-   "/brownlow/2024",
++   "/records/[category]",
++   "page",
+  ]
+
+
+Number of calls: 8
+
+ ❯ tests/admin-brownlow-actions.test.ts:322:28
+    320|     // AFLDB-ISSUE-371: the published season's own page is named as a …
+    321|     // path with NO type, which is the form whose tag the page actuall…
+    322|     expect(revalidatePath).toHaveBeenCalledWith('/brownlow/2024');
+       |                            ^
+    323|     expect(revalidatePath).not.toHaveBeenCalledWith('/brownlow/2024', …
+    324|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  tests/admin-brownlow-actions.test.ts > revalidatePath arguments name a tag a page carries > saveDraft
+ FAIL  tests/admin-brownlow-actions.test.ts > revalidatePath arguments name a tag a page carries > finalise
+ FAIL  tests/admin-brownlow-actions.test.ts > revalidatePath arguments name a tag a page carries > void
+AssertionError: /admin/brownlow/2024/5 with type 'page': expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ assertTagShape tests/admin-brownlow-actions.test.ts:361:92
+    359|     for (const [path, type] of calls) {
+    360|       if (type === undefined) continue;
+    361|       expect(path.includes('[') || STATIC_ROUTES.has(path), `${path} w…
+       |                                                                                            ^
+    362|     }
+    363|   };
+ ❯ tests/admin-brownlow-actions.test.ts:372:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+ FAIL  tests/admin-brownlow-actions.test.ts > revalidatePath arguments name a tag a page carries > publish
+AssertionError: /admin/brownlow/2024 with type 'page': expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ assertTagShape tests/admin-brownlow-actions.test.ts:361:92
+    359|     for (const [path, type] of calls) {
+    360|       if (type === undefined) continue;
+    361|       expect(path.includes('[') || STATIC_ROUTES.has(path), `${path} w…
+       |                                                                                            ^
+    362|     }
+    363|   };
+ ❯ tests/admin-brownlow-actions.test.ts:372:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯
+
+ FAIL  tests/admin-brownlow-actions.test.ts > revalidatePath arguments name a tag a page carries > correct with a re-derived published season
+AssertionError: expected "vi.fn()" to be called with arguments: [ '/brownlow/2024' ]
+
+Received:
+
+  1st vi.fn() call:
+
+  [
+-   "/brownlow/2024",
++   "/admin/brownlow/2024/5",
++   "page",
+  ]
+
+  2nd vi.fn() call:
+
+  [
+-   "/brownlow/2024",
++   "/admin/brownlow/2024",
++   "page",
+  ]
+
+  3rd vi.fn() call:
+
+  [
+-   "/brownlow/2024",
++   "/admin/brownlow",
++   "page",
+  ]
+
+  4th vi.fn() call:
+
+  [
+-   "/brownlow/2024",
++   "/seasons/2024",
++   "page",
+  ]
+
+  5th vi.fn() call:
+
+  [
+-   "/brownlow/2024",
++   "/matches/101",
++   "page",
+  ]
+
+  6th vi.fn() call:
+
+  [
+-   "/brownlow/2024",
++   "/brownlow",
++   "page",
+  ]
+
+  7th vi.fn() call:
+
+  [
+    "/brownlow/2024",
++   "page",
+  ]
+
+  8th vi.fn() call:
+
+  [
+-   "/brownlow/2024",
++   "/players/[slug]",
++   "page",
+  ]
+
+  9th vi.fn() call:
+
+  [
+-   "/brownlow/2024",
++   "/clubs/[slug]",
++   "page",
+  ]
+
+  10th vi.fn() call:
+
+  [
+-   "/brownlow/2024",
++   "/records/[category]",
++   "page",
+  ]
+
+
+Number of calls: 10
+
+ ❯ tests/admin-brownlow-actions.test.ts:378:28
+    376|     vi.mocked(correctBrownlowMatch).mockResolvedValue(okMatch({ republ…
+    377|     await correctAction({}, matchForm({ reason: 'swap 2 and 3' }));
+    378|     expect(revalidatePath).toHaveBeenCalledWith('/brownlow/2024');
+       |                            ^
+    379|     assertTagShape();
+    380|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/8]⎯
+
+ FAIL  tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > invalidates exactly the season page and its Brownlow page, as concrete paths
+AssertionError: expected { ok: true, …(3) } to match object { ok: true, …(2) }
+(2 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "ok": true,
+    "path": "/seasons/2026",
+-   "paths": [
+-     "/seasons/2026",
+-     "/brownlow/2026",
+-   ],
+  }
+
+ ❯ tests/settle-season-revalidation.test.ts:676:35
+    674|     const response = await POST(post({ season: 2026 }));
+    675|     expect(response.status).toBe(200);
+    676|     expect(await response.json()).toMatchObject({
+       |                                   ^
+    677|       ok: true, path: '/seasons/2026', paths: ['/seasons/2026', '/brow…
+    678|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/8]⎯
+
+ FAIL  tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > serves every loopback form the deployment can emit
+AssertionError: 127.0.0.1: expected "vi.fn()" to be called 2 times, but got 1 times
+ ❯ tests/settle-season-revalidation.test.ts:757:45
+    755|       const response = await POST(post({ season: 2026 }, { 'x-forwarde…
+    756|       expect(response.status, address).toBe(200);
+    757|       expect(mocks.revalidatePath, address).toHaveBeenCalledTimes(2);
+       |                                             ^
+    758|     }
+    759|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/8]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  8 failed | 116 passed (124)
+   Start at  20:39:55
+   Duration  2.66s (transform 749ms, setup 271ms, import 914ms, tests 680ms, environment 1ms)
+
+
+ RUN  v4.1.10 /mnt/ssd/afldb-i371-20261121/cand
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > invalidates exactly the season page and its Brownlow page, as concrete paths
+[revalidate-season] /seasons/2026 /brownlow/2026 invalidated on worker single (pid 1490439)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > reports the worker identity the caller needs to prove coverage
+[revalidate-season] /seasons/2026 /brownlow/2026 invalidated on worker 3 (pid 1490439)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > reports a single-process server truthfully rather than guessing
+[revalidate-season] /seasons/2026 /brownlow/2026 invalidated on worker single (pid 1490439)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > takes the worker identity from process state, never from the request
+[revalidate-season] /seasons/2026 /brownlow/2026 invalidated on worker 2 (pid 1490439)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > refuses to believe a nonsensical worker count rather than reporting it
+[revalidate-season] /seasons/2026 /brownlow/2026 invalidated on worker single (pid 1490439)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > refuses to believe a nonsensical worker count rather than reporting it
+[revalidate-season] /seasons/2026 /brownlow/2026 invalidated on worker single (pid 1490439)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > refuses to believe a nonsensical worker count rather than reporting it
+[revalidate-season] /seasons/2026 /brownlow/2026 invalidated on worker single (pid 1490439)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > refuses to believe a nonsensical worker count rather than reporting it
+[revalidate-season] /seasons/2026 /brownlow/2026 invalidated on worker single (pid 1490439)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > refuses to believe a nonsensical worker count rather than reporting it
+[revalidate-season] /seasons/2026 /brownlow/2026 invalidated on worker single (pid 1490439)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > serves a loopback caller carrying the forwarding headers Next synthesises
+[revalidate-season] /seasons/2026 /brownlow/2026 invalidated on worker single (pid 1490439)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > serves every loopback form the deployment can emit
+[revalidate-season] /seasons/2026 /brownlow/2026 invalidated on worker single (pid 1490439)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > serves every loopback form the deployment can emit
+[revalidate-season] /seasons/2026 /brownlow/2026 invalidated on worker single (pid 1490439)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > serves every loopback form the deployment can emit
+[revalidate-season] /seasons/2026 /brownlow/2026 invalidated on worker single (pid 1490439)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > serves every loopback form the deployment can emit
+[revalidate-season] /seasons/2026 /brownlow/2026 invalidated on worker single (pid 1490439)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > serves every loopback form the deployment can emit
+[revalidate-season] /seasons/2026 /brownlow/2026 invalidated on worker single (pid 1490439)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > ignores x-forwarded-host, which is client input on every path
+[revalidate-season] /seasons/2026 /brownlow/2026 invalidated on worker single (pid 1490439)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > serves a request with no forwarding identity at all
+[revalidate-season] /seasons/2026 /brownlow/2026 invalidated on worker single (pid 1490439)
+
+stdout | tests/settle-season-revalidation.test.ts > POST /api/internal/revalidate-season > charges only failed secret checks against the limiter
+[revalidate-season] /seasons/2026 /brownlow/2026 invalidated on worker single (pid 1490439)
+
+ ✓ tests/settle-season-revalidation.test.ts (86 tests) 206ms
+ ✓ tests/admin-brownlow-actions.test.ts (38 tests) 97ms
+
+ Test Files  2 passed (2)
+      Tests  124 passed (124)
+   Start at  20:39:58
+   Duration  2.10s (transform 750ms, setup 250ms, import 874ms, tests 304ms, environment 1ms)
+

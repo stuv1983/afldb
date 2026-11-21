@@ -670,12 +670,15 @@ describe('POST /api/internal/revalidate-season', () => {
     delete process.env.AFLDB_WORKER_COUNT;
   });
 
-  it('invalidates exactly the season page it was given', async () => {
+  it('invalidates exactly the season page and its Brownlow page, as concrete paths', async () => {
     const response = await POST(post({ season: 2026 }));
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ ok: true, path: '/seasons/2026' });
-    expect(mocks.revalidatePath).toHaveBeenCalledTimes(1);
-    expect(mocks.revalidatePath).toHaveBeenCalledWith('/seasons/2026');
+    expect(await response.json()).toMatchObject({
+      ok: true, path: '/seasons/2026', paths: ['/seasons/2026', '/brownlow/2026'],
+    });
+    // AFLDB-ISSUE-371: a concrete path takes no type argument; with 'page' it
+    // would name a '/brownlow/2026/page' tag no page carries.
+    expect(mocks.revalidatePath.mock.calls).toEqual([['/seasons/2026'], ['/brownlow/2026']]);
   });
 
   it('reports the worker identity the caller needs to prove coverage', async () => {
@@ -751,7 +754,7 @@ describe('POST /api/internal/revalidate-season', () => {
       mocks.revalidatePath.mockClear();
       const response = await POST(post({ season: 2026 }, { 'x-forwarded-for': address }));
       expect(response.status, address).toBe(200);
-      expect(mocks.revalidatePath, address).toHaveBeenCalledTimes(1);
+      expect(mocks.revalidatePath, address).toHaveBeenCalledTimes(2);
     }
   });
 

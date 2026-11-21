@@ -33,12 +33,14 @@ export const dynamic = 'force-dynamic';
  * connections until every ordinal has answered. See
  * `src/lib/acquisition/season-revalidation.ts` for the framework evidence.
  *
- * WHAT A CALLER MAY ASK FOR. A season year, and nothing else. The path is
- * built here by `seasonPath()`, so there is no input — not a path, not a
+ * WHAT A CALLER MAY ASK FOR. A season year, and nothing else. The paths are
+ * built here from it — `/seasons/<year>` by `seasonPath()` and, since
+ * AFLDB-ISSUE-371 (the Brownlow publication action posts here too),
+ * `/brownlow/<year>` — so there is no input — not a path, not a
  * pattern, not a tag, not a layout flag — by which this route can be turned
  * into a general-purpose cache purge. The blast radius of the shared secret
- * leaking is "someone can make season pages re-render", which is the smallest
- * it can be made without giving up the feature.
+ * leaking is "someone can make a season's two pages re-render", which is the
+ * smallest it can be made without giving up the feature.
  *
  * WHY IT IS NOT REACHABLE FROM THE INTERNET. Two independent gates, both of
  * which must pass:
@@ -84,6 +86,16 @@ function workerIdentity(): { workerId: string | null; workerCount: number } {
   const declared = Number(process.env.AFLDB_WORKER_COUNT);
   const workerCount = Number.isSafeInteger(declared) && declared > 0 ? declared : 1;
   return { workerId, workerCount };
+}
+
+/**
+ * The public pages a season's year names, and the only paths this route can
+ * ever invalidate: the season page, and the season's Brownlow count page
+ * (AFLDB-ISSUE-371 — a publication changes it, and every worker holds its
+ * own copy). Both are composed from the integer; nothing else is reachable.
+ */
+function seasonRevalidationPaths(season: number): string[] {
+  return [seasonPath(season), `/brownlow/${season}`];
 }
 
 function timingSafeStringEqual(a: string, b: string): boolean {
@@ -161,21 +173,24 @@ export async function POST(request: Request) {
     );
   }
 
-  // The path is composed here, from an integer, by the same helper every
-  // season link on the site uses. `revalidatePath` turns it into the implicit
-  // page tag `_N_T_/seasons/<year>` — the tag the deployed prerender was
-  // observed to carry in AFLDB-ISSUE-133 — for this process only.
+  // The paths are composed here, from an integer, by the same helpers every
+  // season link on the site uses. `revalidatePath` turns each into its
+  // implicit pathname tag (`_N_T_/seasons/<year>` — the tag the deployed
+  // prerender was observed to carry in AFLDB-ISSUE-133) for this process only.
+  // A concrete path takes NO type argument: with one it would name a
+  // `/<path>/page` tag that no page carries (AFLDB-ISSUE-371).
   const path = seasonPath(body.season);
-  revalidatePath(path);
+  const paths = seasonRevalidationPaths(body.season);
+  for (const one of paths) revalidatePath(one);
 
   const { workerId, workerCount } = workerIdentity();
   console.log(
-    `[revalidate-season] ${path} invalidated on worker ${workerId ?? 'single'} `
+    `[revalidate-season] ${paths.join(' ')} invalidated on worker ${workerId ?? 'single'} `
     + `(pid ${process.pid})`,
   );
 
   return NextResponse.json(
-    { ok: true, path, workerId, workerCount },
+    { ok: true, path, paths, workerId, workerCount },
     { headers: { 'Cache-Control': 'no-store' } },
   );
 }

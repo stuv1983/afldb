@@ -110,14 +110,23 @@ function parseMatchForm(formData: FormData): ParsedMatchForm | null {
   };
 }
 
-/** §27.18: the admin pages always; the public season/match routes for a fact write. */
+/**
+ * §27.18: the admin pages always; the public season/match routes for a fact write.
+ *
+ * A CONCRETE path (`/brownlow/2026`) is passed WITHOUT a type; only a route
+ * pattern (`/players/[slug]`) or a static route takes `'page'`. Next derives
+ * a page's cache tags from its route file (`/brownlow/[year]/page`) and its
+ * pathname (`/brownlow/2026`), so `revalidatePath('/brownlow/2026', 'page')`
+ * names the tag `/brownlow/2026/page`, which no page carries: it invalidated
+ * nothing (AFLDB-ISSUE-371). tests/admin-brownlow-actions.test.ts holds the rule.
+ */
 async function revalidateAfterMatchWrite(
   action: MatchAction,
   parsed: ParsedMatchForm,
   republishedSeason: number | null,
 ): Promise<void> {
-  revalidatePath(`/admin/brownlow/${parsed.season}/${parsed.round}`, 'page');
-  revalidatePath(`/admin/brownlow/${parsed.season}`, 'page');
+  revalidatePath(`/admin/brownlow/${parsed.season}/${parsed.round}`);
+  revalidatePath(`/admin/brownlow/${parsed.season}`);
   revalidatePath('/admin/brownlow', 'page');
 
   if (action === 'saveDraft') return;
@@ -125,13 +134,13 @@ async function revalidateAfterMatchWrite(
   // A finalise / correct / void changes public facts. The season page has a
   // cross-worker route; everything else refreshes within its ISR window
   // (§27.18 "Known limitation").
-  revalidatePath(`/seasons/${parsed.season}`, 'page');
-  revalidatePath(`/matches/${parsed.matchId}`, 'page');
+  revalidatePath(`/seasons/${parsed.season}`);
+  revalidatePath(`/matches/${parsed.matchId}`);
   await fanOutSeason(parsed.season);
 
   if (republishedSeason !== null) {
     revalidatePath('/brownlow', 'page');
-    revalidatePath(`/brownlow/${republishedSeason}`, 'page');
+    revalidatePath(`/brownlow/${republishedSeason}`);
     revalidatePath('/players/[slug]', 'page');
     revalidatePath('/clubs/[slug]', 'page');
     revalidatePath('/records/[category]', 'page');
@@ -139,7 +148,10 @@ async function revalidateAfterMatchWrite(
 }
 
 /**
- * Best-effort cross-worker invalidation of `/seasons/<year>` (§27.18). Never
+ * Best-effort cross-worker invalidation of `/seasons/<year>` and, since
+ * AFLDB-ISSUE-371, `/brownlow/<year>` (§27.18): the local `revalidatePath`
+ * reaches only the worker that ran this action, and every other worker would
+ * keep its own pre-publication copy of the season's Brownlow page. Never
  * throws: `revalidateSeason` reports a partial cluster rather than raising,
  * and a host with no `AFLDB_REVALIDATE_URL` simply relies on the local
  * `revalidatePath` above plus the ISR window.
@@ -283,11 +295,11 @@ export async function publishSeasonAction(
     return { key, error: result.message, code: result.code };
   }
 
-  revalidatePath(`/admin/brownlow/${season}`, 'page');
+  revalidatePath(`/admin/brownlow/${season}`);
   revalidatePath('/admin/brownlow', 'page');
-  revalidatePath(`/seasons/${season}`, 'page');
+  revalidatePath(`/seasons/${season}`);
   revalidatePath('/brownlow', 'page');
-  revalidatePath(`/brownlow/${season}`, 'page');
+  revalidatePath(`/brownlow/${season}`);
   revalidatePath('/players/[slug]', 'page');
   revalidatePath('/clubs/[slug]', 'page');
   revalidatePath('/records/[category]', 'page');
