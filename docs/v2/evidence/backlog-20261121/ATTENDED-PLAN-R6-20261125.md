@@ -1,5 +1,7 @@
 # Attended runbook: R6, the production reboot into kernel 149, Wednesday 25 November 2026 (APPROVED; prepared 22 Nov, run e; NOT EXECUTED)
 
+> **CURRENT OPERATOR INSTRUCTIONS:** use the dated amendment at the end of this runbook. Earlier pins and pre-Sunday assumptions are historical; Monday installation is required before 03:10 AEDT.
+
 **Authority.** Owner decision 2 of 2026-11-22, round 4 (`DECISIONS-20261122e.md` §2): R6 APPROVED for **Wed 25 Nov 2026 10:00-11:00
 AEDT, fallback 14:00-15:00 the same day**, on run d's verdict (`r6-kernel-check-20261122/README.md` §4) and with the owner's rule:
 **"IF BOOT RECOVERY IS STILL UNCERTAIN, PAUSE BEFORE REBOOTING."** This runbook is therefore **NO-GO by default**: it turns GO only
@@ -319,3 +321,125 @@ the new InvocationID and the owner's attestation; the F-3 counts; F-5 hashes; wh
 alarm email was expected or received; the statement that **nothing in this procedure was rehearsed on a DigitalOcean droplet** and
 which steps were therefore first exercised on production; tracker updates (ISSUE-351 in `issues.md`, `IssuesIndex.md`,
 `OPEN-ITEMS-AFTER-SITTINGS.md`: kernel, the snapshot and its disposal review date, GRUB state, deferred Thu 26 Nov acceptance).
+
+## Amendment — 22 November 2026, Astra Sunday review repairs (CURRENT)
+
+This amendment supersedes earlier script pins, the r3 observation commands and the Tuesday
+fill-in assumptions. It does not alter the historical Sunday PREP contract:
+`ae51cd8d913a7523dd89fb638279e7f910054b79`. Sunday A1/A2 ran and were accepted as recorded in
+`SITTING-A1-A2-20261122.md`; P6's four original NOT OK ticks and the owner's narrow waiver
+remain historical facts. ISSUE-371 and ISSUE-372 remain resolved.
+
+**Wednesday operator: use the scripts from immutable code commit
+`bc3fef3de375259d49001e7a9a478624832703a8` together with this amended runbook.** The code
+was committed before this amendment. The full SHA-256 table below was calculated from raw
+`git cat-file blob <code-commit>:<path>` bytes, without text decoding or newline conversion.
+It covers pre-check, post-check, raw-head, public smoke, both observers, installer, wrapper,
+shared verifier, core pull and regression harnesses. Earlier section 0 pins are historical.
+Do not use PREP's older helpers for Wednesday. No new application deployment is needed.
+
+### Before Monday 23 Nov 03:10 AEDT — owner action required
+
+Install the new wrapper and new verifier on streamanator before that dispatch, preserving
+`state/offhost-pull.log`, existing holds, destination, keys, alarm settings and crontab.
+The core pull stays at `a3775aea879b1d9ce05d0e96482e66d24c69deb62cf38e8fc0407c0d2653dc2b`.
+The wrapper now records BEGIN/run ID/nearest CRON ancestor PID, framed output, per-dump
+full checksums (including unchanged verified copies), and END/completion time/rc. Runs
+are serialized with flock. The cron CMD journal supplies the independent
+streamanator dispatch record (it is streamanator's cron, not production's backup unit).
+
+Prepare an archive of the exact code revision on the workstation (Git Bash):
+
+```bash
+CODE=bc3fef3de375259d49001e7a9a478624832703a8
+B=docs/v2/evidence/backlog-20261121
+git archive --format=tar --output=/tmp/afldb-r6-amended.tar "$CODE" "$B/r6-20261125" "$B/a1a2-20261124" "$B/kits" tools/maintenance/offhost-pull.sh
+```
+
+Transfer that archive to a new owner-chosen staging directory on streamanator; extract it
+there. From the extracted root, the owner installs only these two files (no cron install):
+
+```bash
+B=docs/v2/evidence/backlog-20261121
+install -m 0700 "$B/kits/afldb-offhost-pull-daily.sh" /home/arm/afldb-ops/afldb-offhost-pull-daily.sh
+install -m 0700 "$B/kits/scheduled-pull-evidence.sh" /home/arm/afldb-ops/scheduled-pull-evidence.sh
+sha256sum /home/arm/afldb-ops/afldb-offhost-pull-daily.sh /home/arm/afldb-ops/scheduled-pull-evidence.sh /home/arm/afldb-ops/offhost-pull.sh
+bash "$B/a1a2-20261124/a2-cron-install.sh" check r3
+```
+
+All three SHA lines must equal the full pins below. Installer `check` returns 0 even on
+failed preconditions: require its printed **wrapper pins PASS**, **PRECONDITIONS PASS**
+and **INSTALLED**. Do not reinstall or replace the existing crontab. Verify arm can read
+`journalctl -t CRON -o short-iso --no-pager -n 5`; if not, the owner must retain a readable
+export for the specific 03:10 minute after it occurs, then pass its absolute path as
+`CRON_LOG_FILE`. The checker fails if dispatch evidence is unavailable. New prerequisites
+on streamanator: ps, flock and the ordinary GNU tools used in these scripts. P6 uses
+Python 3's standard HTMLParser on the production host if that observation is run again.
+None of these install actions were performed in the repair session.
+
+Old logs remain useful for individual pull/verification messages and aggregate rc values.
+They cannot retroactively prove which cron invocation completed successfully under the
+new correlation contract. If the new wrapper misses Monday, record that evidence gap;
+a later manual success is not a substitute for the scheduled pull.
+
+### Current observation commands and Wednesday gates
+
+From the pinned extraction, obtain Monday's actual overnight DUMP and full production
+SHA from the successful backup-unit journal and the exact dump's sidecar, corroborated
+by a production re-hash. Set D and S to those exact values; no inferred basename or
+shortened hash is allowed. Then, on streamanator:
+
+```bash
+B=docs/v2/evidence/backlog-20261121
+bash "$B/a1a2-20261124/a2-cron-observe.sh" all 2026-11-23 "$D" "$S"
+```
+
+On Wednesday run A-2 from the pinned pre-check with **accepted**,
+`7d92042fd110-XWruOm_9nLCSMY8nGPqYU`, `r3:yes`, `r4:yes` and the chosen window.
+Capture that day's BOOT_ID, INVOCATION_ID, GRUB-BASELINE, RESTORE-SHA and OFFHOST-COMPARE.
+The overnight 02:2x dump in OFFHOST-COMPARE is distinct from the fresh dump made by the
+03:36:35 verification service, named separately in last-verify.json and RESTORE-SHA.
+Never pass the verification service's dump or a Monday dump for Wednesday's overnight.
+Run A-1/A-4 on streamanator with the Wednesday overnight D/S:
+
+```bash
+bash "$B/a1a2-20261124/a2-cron-observe.sh" all 2026-11-25 "$D" "$S"
+bash "$B/r6-20261125/r6-offhost-verify.sh" 2026-11-25 "$D" "$S"
+```
+
+Both require the exact date's independent 03:10 CMD, unique matching BEGIN and END,
+rc=0 completion by 03:45, exact invocation verification of D/S, recomputed checksum =
+production checksum = one-line named sidecar, verified marker and no retention hold.
+Missing, ambiguous, stale or failed evidence is STOP; a retry cannot replace a failed
+scheduled invocation. Require OFFHOST-COMPARE identical to production's pre-check line.
+The production pre-check still separately requires Wednesday's backup and restore unit
+results and restore database comment. Its pre-existing limitations are unchanged; all
+GO items in section 7, including recovery-console login, snapshot, GRUB fallback,
+timers, apt and window evidence, remain mandatory and unobserved here.
+
+Post-reboot, use the pinned post-check. It now identifies the primary and both release
+workers and requires exactly one non-empty URL and SECRET per process, printing only
+identities and counts for that check. The separate functional **2/2 revalidation** and
+raw-head acceptance steps in the original runbook remain required. A 1/1 environment
+count does not prove successful invalidation. No reboot readiness is implied by tests.
+
+### Full Git blob SHA-256 pins (code commit above)
+
+| Git blob path at code commit | Full SHA-256 |
+|---|---|
+| `docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh` | `53ab32a1bad408104c5534898482486735b3648d761006d28be79388ba72012c` |
+| `docs/v2/evidence/backlog-20261121/r6-20261125/r6-post-verify.sh` | `26070c9e12458f488ebaee6eabb84ea7d8003135d96d83f1bfb3576eb070b44e` |
+| `docs/v2/evidence/backlog-20261121/r6-20261125/r6-offhost-verify.sh` | `848a3371b81eb4ee328c161e0b8590d12ebd3a7fe9d27211ccc1f429460a5e2c` |
+| `docs/v2/evidence/backlog-20261121/r6-20261125/r6-public-smoke.sh` | `de84f1205b4ab4cfec182b1fb7b0770ca916c8570f10a14539daa9a4e450bd9e` |
+| `docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-rawhead.sh` | `cab4a43af09e4b1729d913162c0f27faccd19315c56eb4ad1141c8bf748d81c0` |
+| `docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-s9-public-smoke.sh` | `babb660f7e7555a55281f2a0a07cb6d1147f39ebfa5ff9c119a677a1e2776a71` |
+| `docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-p6-observe.sh` | `c7416ba4975dd37a04537ef9f4ed6aef14625757037439ee929d258b3d97d6d3` |
+| `docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-cron-observe.sh` | `36a078651485561ddfc562c082816877e98c9106df6c22d0b75968c3251db4de` |
+| `docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-cron-install.sh` | `d34693cd61237d662b940f944fadfbfe0d18ab47515a313d36825235c79fbd87` |
+| `docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh` | `6403871ecb1073c2f1a4086bf41fea002c2de7c0178dd8862098ea54d2265da3` |
+| `docs/v2/evidence/backlog-20261121/kits/scheduled-pull-evidence.sh` | `2e42d307de1b63dda8f8e34322effc8747e4bc3c177245f0cc891f18777b0999` |
+| `tools/maintenance/offhost-pull.sh` | `a3775aea879b1d9ce05d0e96482e66d24c69deb62cf38e8fc0407c0d2653dc2b` |
+| `docs/v2/evidence/backlog-20261121/a1a2-20261124/dry-tests-20261122g/t-offhost-stamp.sh` | `a390a8df083a45af5a9590c0d985673b20f9bf21db6c5a2cb3a827be6f8e371c` |
+| `docs/v2/evidence/backlog-20261121/a1a2-20261124/dry-tests-20261122g/t-sunday-review.sh` | `b8f06d5486ad8cd995d59b9634382f615f0535371121846f3a282cb0fb0446e0` |
+
+Validation and first-copy evidence: [Sunday review record](sunday-review-20261122/README.md). Monday pull, Wednesday verification and the reboot remain pending.

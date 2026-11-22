@@ -1,0 +1,14 @@
+docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh: OK
+docs/v2/evidence/backlog-20261121/r6-20261125/r6-post-verify.sh: OK
+docs/v2/evidence/backlog-20261121/r6-20261125/r6-offhost-verify.sh: OK
+docs/v2/evidence/backlog-20261121/r6-20261125/r6-public-smoke.sh: OK
+docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-rawhead.sh: OK
+docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-s9-public-smoke.sh: OK
+docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-p6-observe.sh: OK
+docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-cron-observe.sh: OK
+docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-cron-install.sh: OK
+docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh: OK
+docs/v2/evidence/backlog-20261121/kits/scheduled-pull-evidence.sh: OK
+tools/maintenance/offhost-pull.sh: OK
+docs/v2/evidence/backlog-20261121/a1a2-20261124/dry-tests-20261122g/t-offhost-stamp.sh: OK
+docs/v2/evidence/backlog-20261121/a1a2-20261124/dry-tests-20261122g/t-sunday-review.sh: OK

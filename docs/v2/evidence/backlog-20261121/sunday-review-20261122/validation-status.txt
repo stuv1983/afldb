@@ -1,0 +1,17 @@
+2026-11-22, arm@streamanator, disposable fixtures only
+reviewed_start=0f4accf76d6525b04aacdcee548f27add0daa8d5
+code_commit=bc3fef3de375259d49001e7a9a478624832703a8
+behaviour=29_passed_0_failed actual_exit=0
+stamp_corrected=42_passed_0_failed actual_exit=0
+stamp_pre_fix=20_passed_22_failed actual_exit=1 expected_exit=1
+pre_fix_commit=d6b983b5bfd5e018e319b871c1bd116a2fc3170b
+pre_fix_blob_sha256=ea48205a02e6383c2fe87a9e896afed422ff44834231270cbd22dc78c305de9b
+bash_syntax_files=14 actual_exit=0
+sha256sum_git_blob_pins=14 actual_exit=0
+git_diff_check=0
+git_staged_diff_check_before_code_commit=0
+scheduled_observations=not_run
+production_changes=none
+cron_installation=none
+push=not_run
+reboot=not_run

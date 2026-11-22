@@ -1,5 +1,25 @@
 # AFLDB Current Issues Index
 
+**CURRENT — Sunday review amendment, 22 November 2026.** Seven open issues: **332, 348, 350, 351, 352, 357, 362**.
+**Before Monday 23 Nov 03:10 AEDT:** owner installation of the new wrapper and verifier is required; see the
+[amended R6 runbook](docs/v2/evidence/backlog-20261121/ATTENDED-PLAN-R6-20261125.md) and
+[repair/test evidence](docs/v2/evidence/backlog-20261121/sunday-review-20261122/README.md).
+A1/A2 ran Sunday; 371/372 remain resolved under the recorded narrow waiver. Monday pull, Wednesday verification
+and reboot remain pending. PREP `ae51cd8d913a7523dd89fb638279e7f910054b79` remains the historical Sunday contract.
+
+| Issue | Current action (22 Nov 2026, after Sunday sitting and review) |
+|---|---|
+| 332 | R2 installed; first scheduled :17 run and alarm email accepted Sunday. Keep G0 (2027 opening) and G0c (first nightly without HALT) pending, plus the later G1-G7 seasonal reviews. Do not defer G0/G0c to Opening Round. |
+| 348 | Refresh and re-seal the January rehearsal including groups (f)-(k). Tue 12 Jan 2027 11:00 AEDT is reserved for an attended load after that rehearsal; the production write set still needs separate owner approval. No load executed. |
+| 350 | R8 draft approved: capture Fri 19 Feb 2027; proposed opening Tue 23 Feb 2027 11:00 AEDT. Obtain execution approval for the refreshed plan/revision/write set/window, perform G0 and observe G0c on the first nightly (24 Feb if opened 23 Feb). |
+| 351 | R1 installed Sunday. R6 approved window Wed 25 Nov 10:00-11:00 AEDT, fallback 14:00-15:00; reboot remains pending and NO-GO until every amended runbook gate passes. First weekly window and later acceptance remain pending. |
+| 352 | BEFORE Mon 23 Nov 03:10 AEDT: owner installs the pinned invocation-logging wrapper and new verifier from bc3fef3de375259d49001e7a9a478624832703a8. Observe Monday scheduled pull/next nightly within 25 h, Wednesday 03:10 overnight pull and 03:36:35 separate restore verification; all pending. D-HO-7 remains for R7. |
+| 357 | R4 deny installed and probes passed Sunday. Owner operational acceptance remains open; retain beta gate until a cache bound and disk alert exist, with F-09 prune validation. |
+| 362 | R4 filter live; R5 retained logs restricted and verified Sunday. Earliest disposal REVIEW Thu 7 Jan 2027; disposal needs separate owner approval. No disposal authorized by these fixes. |
+
+## Historical summaries and detailed issue records
+
+
 **Current state, 22 November 2026 (sittings A1 and A2 RUN today, Sunday, attended; local branch `claude/backlog-20261122`; `origin/main` = `ae51cd8d`; commits local, unpublished).**
 Record: [SITTING-A1-A2-20261122.md](docs/v2/evidence/backlog-20261121/SITTING-A1-A2-20261122.md). **A1 PASSED (one owner-waived probe exception): release `7d92042fd110-XWruOm_9nLCSMY8nGPqYU` is serving production**
 (restart 14:42:40, InvocationID `342040625f6d4012a35d598dfbf9afe6`; env counts 1/1 in the primary and both workers; season refresh 2/2 workers; 8/8 fresh-connection heads on both pages; no rollback). **AFLDB-ISSUE-371 and AFLDB-ISSUE-372 RESOLVED.**
@@ -193,6 +213,10 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 
 ### AFLDB-ISSUE-332 — AFL API 2027 season operations (successor of ISSUE-316)
 
+- **Current operator action — 22 Nov Sunday review (OPEN):** R2 installed; first scheduled :17 run and alarm email accepted Sunday. Keep G0 (2027 opening) and G0c (first nightly without HALT) pending, plus the later G1-G7 seasonal reviews. Do not defer G0/G0c to Opening Round.
+
+Historical investigation and dated instructions below are retained for provenance; the current action above takes precedence.
+
 - **2026-11-22 (A2): R2 INSTALLED** (key, first manual run, cron r2; first scheduled run 15:17:01 AEDT `rc=0 OK`). **Missing:** G0/G0c at the opening and the later dated reviews (the cron-environment test alarm email arrived, owner-confirmed, 14:58). Record: [SITTING-A1-A2-20261122.md](docs/v2/evidence/backlog-20261121/SITTING-A1-A2-20261122.md) §3.2.
 - **Severity / area:** Medium; AFL API match and player ingestion operations for the 2027 season.
 - **State:** Open, opened 2026-11-02; **owner decisions recorded 2026-11-04** (supersede the earlier "keep pending" position for these items only). **Decided:** D-316-5 (manual debutant registration and adjudication, whole-night refusal kept; resumption is on a scheduled run after identity resolution, not guaranteed to take one night; review after round 2), D-316-8 (NULL, `attendance_status='not_collected'`), D-316-9 (incomplete 2027 coach coverage accepted; optional audited back-fill; review after round 2; 2026 correction preserved), D-316-10 (existing ISR behaviour; no `AFLDB_REVALIDATE_SECRET` in nightly units; no maximum delay promised); C7 criteria 1 to 7 approved, criterion 8 replaced (settled round shown correctly on public season and match responses; delay and limits reported; no latency guarantee or worker attribution; unobserved or incorrect content fails); the June 2027 opening of the Brownlow successor (D-316-7, action only) approved. **Not decided / future:** C9 (D-316-6; undecided until its June gate; Option C recommendation only), the Brownlow substantive decision and count window, the C7 acceptance (owner's act after the first concluded round); D-316-11 not pursued. **No acceptance, probe, cookie or Brownlow activation is authorised.**
@@ -211,6 +235,10 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 
 ### AFLDB-ISSUE-348 — The next DraftGuru re-acquisition must carry forward the D-336-3 origin revisions and adjudicate three club replacements
 
+- **Current operator action — 22 Nov Sunday review (OPEN):** Refresh and re-seal the January rehearsal including groups (f)-(k). Tue 12 Jan 2027 11:00 AEDT is reserved for an attended load after that rehearsal; the production write set still needs separate owner approval. No load executed.
+
+Historical investigation and dated instructions below are retained for provenance; the current action above takes precedence.
+
 - **Severity / area:** **Medium (raised 2026-11-14, was Low)**; draft data / DraftGuru acquisition.
 - **State:** Open. **2026-11-14 (local, qualified, not published):** fail-closed reload guard `tools/rebuild/draftguru/reload_guard.py` refuses a full import that would delete or rewrite the 35 audited picks / 31 persons (production discriminator confirmed read-only) unless a reviewed, sha256-pinned reconciliation is supplied; REPLACE_CLUB rows need owner rulings.
 - **Key files:** `tools/rebuild/draftguru/reload_guard.py`, `import_draftguru.py`, `docs/v2/evidence/remediation-20261114/draftguru/README.md`.
@@ -222,6 +250,10 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 - **2026-11-22 (run d):** F-1/F-2 accepted; [LOAD-WINDOW-PROPOSAL.md](docs/v2/evidence/backlog-20261121/issue348-acquisition/LOAD-WINDOW-PROPOSAL.md) (digests recomputed, coverage, read-only post-load check 146/146). **Next:** owner confirms "eight" vs (a)-(k) and the window (recommended from Thu 7 Jan 2027; probable re-rehearsal).
 - **2026-11-22 (run e, round 4):** the owner's eight columns = groups (a)-(e); mapping, generators, detection before/after COMMIT per group (no pre-COMMIT detection for (b)-(e), (g), (j), most of (f), (k), `import_batches`, `player_link_resolutions`; post-load check required); effect digest corrected to "refuses before any write"; `afldb_backup` read access **PASS** on production (one read-only session 21:12Z); refresh procedure (§3a). Tue 12 Jan 2027 11:00 **PROPOSED**. No load, no re-seal. **Next:** owner confirms (f)-(k) and the window after the refresh packet.
 ### AFLDB-ISSUE-350 — Production has no 2027 `seasons` row and the AFL API settle never creates one
+
+- **Current operator action — 22 Nov Sunday review (OPEN):** R8 draft approved: capture Fri 19 Feb 2027; proposed opening Tue 23 Feb 2027 11:00 AEDT. Obtain execution approval for the refreshed plan/revision/write set/window, perform G0 and observe G0c on the first nightly (24 Feb if opened 23 Feb).
+
+Historical investigation and dated instructions below are retained for provenance; the current action above takes precedence.
 
 - **Severity / area:** **High**; AFL API ingestion, 2027 operations.
 - **State:** Open. **2026-11-14 (local, qualified, not published):** audited I350 season-opening operation, read-only `season-opening-check.ts` and the settle `season_row_missing` HALT implemented and rehearsed on snapshot copies (digest `de1f574b…` equal to production; apply, verify, idempotent re-apply, reversal). Production still NOT_OPEN (read-only 2026-11-14).
@@ -236,6 +268,10 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 
 
 ### AFLDB-ISSUE-351 — Unattended upgrades restart production app and PostgreSQL; promote/rollback activation window
+
+- **Current operator action — 22 Nov Sunday review (OPEN):** R1 installed Sunday. R6 approved window Wed 25 Nov 10:00-11:00 AEDT, fallback 14:00-15:00; reboot remains pending and NO-GO until every amended runbook gate passes. First weekly window and later acceptance remain pending.
+
+Historical investigation and dated instructions below are retained for provenance; the current action above takes precedence.
 
 - **2026-11-22 (A2): R1 INSTALLED** (`host-gate --strict`: "needrestart holds afldb and postgresql"). **Missing:** the attended reboot to `6.8.0-149` (Wed 25 Nov 10:00 AEDT, own session and approval) and the first weekly window. Record: [SITTING-A1-A2-20261122.md](docs/v2/evidence/backlog-20261121/SITTING-A1-A2-20261122.md) §3.1.
 - **Severity / area:** Medium; production operations.
@@ -254,6 +290,10 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 
 ### AFLDB-ISSUE-352 — No scheduled production backup, restore verification or off-host copy
 
+- **Current operator action — 22 Nov Sunday review (OPEN):** BEFORE Mon 23 Nov 03:10 AEDT: owner installs the pinned invocation-logging wrapper and new verifier from bc3fef3de375259d49001e7a9a478624832703a8. Observe Monday scheduled pull/next nightly within 25 h, Wednesday 03:10 overnight pull and 03:36:35 separate restore verification; all pending. D-HO-7 remains for R7.
+
+Historical investigation and dated instructions below are retained for provenance; the current action above takes precedence.
+
 - **2026-11-22 (A2): R3 installed; first off-host copy verified and restored; cron r3 installed (first pull Mon 23 Nov 03:10 AEDT).** `offhost-pull.sh` stamp-timezone defect found and fixed locally (42/42 tests; installed `a3775aea…`). **Missing evidence:** the next nightly appearing off-host within 25 h (Mon 23 Nov 03:10, `a2-cron-observe.sh r3`), the first Wednesday verification (Wed 25 Nov 03:36:35), D-HO-7 at R7. Record: [SITTING-A1-A2-20261122.md](docs/v2/evidence/backlog-20261121/SITTING-A1-A2-20261122.md) §3.3, §5.
 - **Severity / area:** Medium; backup and recovery.
 - **State:** Open. **2026-11-14 (local, qualified, not published; not installed):** `scheduled-backup.sh` (backup/verify/status), backup units, `offhost-pull.sh`, V2 DR runbook (`docs/backup-restore.md`); proposed RPO 24 h, RTO 1 h (database, host intact).
@@ -266,6 +306,10 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 
 ### AFLDB-ISSUE-357 — ISR persists a page per non-canonical id spelling and per 404 path
 
+- **Current operator action — 22 Nov Sunday review (OPEN):** R4 deny installed and probes passed Sunday. Owner operational acceptance remains open; retain beta gate until a cache bound and disk alert exist, with F-09 prune validation.
+
+Historical investigation and dated instructions below are retained for provenance; the current action above takes precedence.
+
 - **2026-11-22 (A2): R4 DONE; the deny is live** (probes PASS; Caddyfile `f00859d5…`). Open for the owner's acceptance and the pre-launch requirements. Record: [SITTING-A1-A2-20261122.md](docs/v2/evidence/backlog-20261121/SITTING-A1-A2-20261122.md) §3.4.
 - **Severity / area:** Medium; public frontend. **State:** Open, narrowed 2026-11-14: strict canonical id/season parsing implemented locally (non-canonical spellings are 404s, 10–70× less disk per path); every distinct 404 or slug-redirect path still persists about 50 KB.
 - **Next action:** publish; owner O-1 (Caddy deny of junk paths and accept the residual, recommended).
@@ -274,7 +318,11 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 - **2026-11-22 (run c):** R4 approved for A2, last (after the A1 observation). **Next:** A2 R4 probes.
 
 
-### AFLDB-ISSUE-362, AFLDB-ISSUE-363 (Low; 363 resolved 2026-11-22 run b; 364 resolved 2026-11-22)
+### AFLDB-ISSUE-362 — Auth and log hygiene (Low; OPEN)
+
+- **Current operator action — 22 Nov Sunday review (OPEN):** R4 filter live; R5 retained logs restricted and verified Sunday. Earliest disposal REVIEW Thu 7 Jan 2027; disposal needs separate owner approval. No disposal authorized by these fixes.
+
+Historical investigation and dated instructions below are retained for provenance; the current action above takes precedence.
 
 - **2026-11-22 (A2): R4 filter live and proven; R5 DONE** (retained, restricted, `sha256sum -c` VERIFIED, 11 files / 10 sums). Open until the review on or after Thu 7 Jan 2027. Record: [SITTING-A1-A2-20261122.md](docs/v2/evidence/backlog-20261121/SITTING-A1-A2-20261122.md) §3.4-§3.5.
 - **362** Caddy log filter and epoch-held admin claims implemented locally; **next:** owner O-3 install the Caddyfile (A2 R4, Tue 24 Nov); O-1 superseded 22 Nov run c: pre-fix logs RETAINED (R5) pending a retention decision.

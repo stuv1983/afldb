@@ -1,0 +1,49 @@
+workspace /mnt/ssd/afldb-a2-stamptest-OCnSon; script sha256 a3775aea879b1d9c
+== Part A: stamp_to_epoch (the script's own function)
+  PASS AEDT (UTC+11): 20261122 15:03:27 -> 2026-11-22T04:03:27Z
+  PASS AEDT night backup: 20261123 02:21:25 -> 2026-11-22T15:21:25Z
+  PASS AEST (UTC+10): 20260715 02:21:25 -> 2026-07-14T16:21:25Z
+  PASS AEDT->AEST day, before repeat: 20270404 01:59:59 -> 2027-04-03T14:59:59Z
+  PASS AEDT->AEST repeated hour, earliest: 20270404 02:00:00 -> 2027-04-03T15:00:00Z
+  PASS repeated hour mid, earliest: 20270404 02:30:00 -> 2027-04-03T15:30:00Z
+  PASS repeated hour end, earliest: 20270404 02:59:59 -> 2027-04-03T15:59:59Z
+  PASS first unambiguous AEST after repeat: 20270404 03:00:00 -> 2027-04-03T17:00:00Z
+  PASS AEST->AEDT before gap: 20271003 01:59:59 -> 2027-10-02T15:59:59Z
+  PASS AEST->AEDT gap start never existed: 20271003 02:00:00 has no valid Melbourne instant
+  PASS gap middle never existed: 20271003 02:30:00 has no valid Melbourne instant
+  PASS gap end never existed: 20271003 02:59:59 has no valid Melbourne instant
+  PASS first AEDT after gap: 20271003 03:00:00 -> 2027-10-02T16:00:00Z
+  PASS impossible date: 20261340 25:61:61 has no valid Melbourne instant
+  (repeated-hour candidates for 2027-04-04 02:30 are 15:30Z (AEDT) and 16:30Z (AEST); the pull uses the earlier)
+== Part B: whole pulls with an overridden clock
+  PASS B1 AEDT dump stamped 15:03:27 local, pulled 04:06:26Z: verified, rc 0
+  PASS B1 rc 0
+  PASS B1b  (control) stamp read as UTC would be future: 15:03:27Z > 04:06:26Z + 1h
+  PASS B2 AEST dump stamped 02:15:25 local, pulled 16:20Z: verified
+  PASS B3 genuine future dump (next day 15:00 local) quarantined as future
+  PASS B3 reason is 'stamped in the future'
+  PASS B3 rc 1
+  PASS B4a within the 1 h skew (now 03:05Z, stamp 04:03:27Z): verified
+  PASS B4b outside the skew (now 02:50Z): quarantined
+  PASS B5a dump of the FIRST 02:30 (AEDT), pulled 15:40Z: verified
+  PASS B5b dump of the SECOND 02:30 (AEST), pulled 16:40Z: verified
+  PASS B5c same name seen at 14:20Z (before either 02:30): quarantined
+  PASS B5d at 14:45Z (earliest 15:30Z within the 1 h skew): verified
+  PASS B6 nonexistent local time 02:30 on 2027-10-03: quarantined
+  PASS B6 reason named
+  PASS B7 name without HHMMSS quarantined (unexpected name)
+  PASS B8 wrong sidecar hash quarantined
+  PASS B9 non-numeric test clock refused, rc 2
+== Part C: ISSUE-352 retention regression (flood hold, unchanged repeat pull, release, normal pruning)
+  PASS C1 flood (4 new > limit 3): retention hold written
+  PASS C1 nothing deleted (7 dumps held)
+  PASS C1 rc 1
+  PASS C2 UNCHANGED second pull (the ISSUE-352 regression): still nothing deleted (7)
+  PASS C2 rc 1 while the hold exists
+  PASS C3 after the operator removes the hold: normal retention keeps 2
+  PASS C3 rc 0
+  PASS C4 normal day (1 new): keeps 2 newest, removes the 2 oldest
+  PASS C4 the new dump is kept
+  PASS C4 rc 0
+== RESULT: 42 passed, 0 failed (workspace /mnt/ssd/afldb-a2-stamptest-OCnSon kept; remove with rm -rf after review)
+OFFHOST-STAMP RESULT PASS

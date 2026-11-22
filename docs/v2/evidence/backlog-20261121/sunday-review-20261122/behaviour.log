@@ -1,0 +1,101 @@
+PASS scheduled pull date=2026-11-18 cron_pid=777 run=scheduled completion=2026-11-17T16:12:01Z rc=0
+OFFHOST-COMPARE afldb_prod-20261118-022125.dump f16d05ec6b29248d2c61adb1e9263f78e4f7bace1b955014a2d17872cfe4064d
+R6 OFFHOST RESULT PASS
+scheduled-chain actual_exit=0 expected=0
+== A2 cron observation 2026-11-22T05:58:36Z (Sun 22 Nov 2026 16:58:36 AEDT) host=streamanator user=arm
+crontab: 2 lines; AFLDB-A2 markers: 1
+
+-- r3 daily off-host pull
+  crontab: # AFLDB-A2-r3
+  crontab: 10 3 * * * AFLDB_ALARM_CMD=/home/arm/afldb-ops/alarm-email.sh /bin/sh /home/arm/afldb-ops/afldb-offhost-pull-daily.sh
+PASS scheduled pull date=2026-11-18 cron_pid=777 run=scheduled completion=2026-11-17T16:12:01Z rc=0
+OFFHOST-COMPARE afldb_prod-20261118-022125.dump f16d05ec6b29248d2c61adb1e9263f78e4f7bace1b955014a2d17872cfe4064d
+
+alarms.log entries:  (3 on 2026-11-22: the test alarms before A2); newest alarm first line:
+OBSERVE DONE
+r3-observer actual_exit=0 expected=0
+FAIL scheduled pull: dispatch has missing or ambiguous invocation BEGIN
+manual-success actual_exit=1 expected=1
+== A2 cron observation 2026-11-22T05:58:36Z (Sun 22 Nov 2026 16:58:36 AEDT) host=streamanator user=arm
+crontab: 2 lines; AFLDB-A2 markers: 1
+
+-- r3 daily off-host pull
+  crontab: # AFLDB-A2-r3
+  crontab: 10 3 * * * AFLDB_ALARM_CMD=/home/arm/afldb-ops/alarm-email.sh /bin/sh /home/arm/afldb-ops/afldb-offhost-pull-daily.sh
+FAIL scheduled pull: dispatch has missing or ambiguous invocation BEGIN
+r3-propagates-failure actual_exit=1 expected=1
+FAIL scheduled pull: missing or ambiguous 03:10 cron dispatch for 2026-11-18 (count=0)
+monday-for-wednesday actual_exit=1 expected=1
+FAIL scheduled pull: scheduled invocation failed (rc=1); retry cannot replace it
+failed-scheduled-then-retry actual_exit=1 expected=1
+FAIL scheduled pull: named dump/checksum not verified by this invocation
+unrelated-verified actual_exit=1 expected=1
+FAIL scheduled pull: named dump/checksum not verified by this invocation
+verification-service-dump actual_exit=1 expected=1
+FAIL scheduled pull: named dump/checksum not verified by this invocation
+wrong-production-sha actual_exit=1 expected=1
+FAIL scheduled pull: active retention hold
+active-hold actual_exit=1 expected=1
+FAIL scheduled pull: missing or ambiguous 03:10 cron dispatch for 2026-11-18 (count=2)
+ambiguous-dispatch actual_exit=1 expected=1
+FAIL scheduled pull: stale/late/future completion
+late-completion actual_exit=1 expected=1
+FAIL scheduled pull: recomputed off-host checksum differs from production
+changed-dump-bytes actual_exit=1 expected=1
+FAIL scheduled pull: sidecar dump/checksum differs from production
+wrong-sidecar actual_exit=1 expected=1
+FAIL scheduled pull: dump or verified marker missing
+missing-marker actual_exit=1 expected=1
+wrapper actual_exit=0 expected=0
+== A2 cron check r3 20261122T055836Z host=streamanator user=arm crontab=/mnt/ssd/afldb-review-fixture-oaRI0C/bin/crontab
+crontab now: 2 lines, sha256 676ac99b1de64bd6
+installed state: marker=0 job=1 wrapper-mentions=1 exact-pair=0
+PASS system timezone Australia/Melbourne (cron schedules are Melbourne local time)
+PASS cron active
+PASS wrapper pins: 6403871e a3775aea 2e42d307
+PASS alarm sender executable (bash shebang), alarm-smtp.env 0600 (content not read)
+PASS newest off-host dump afldb_prod-20261118-022125.dump: sidecar verifies, .verified marker present
+PASS first-copy restore recorded for that dump (/mnt/ssd/afldb-review-fixture-oaRI0C/ops/state/a2-firstcopy-restore.log)
+CRON CHECK r3 NOT INSTALLED
+CRON CHECK r3 PRECONDITIONS PASS
+installer-pins actual_exit=0 expected=0
+== A2 cron observation 2026-11-22T05:58:36Z (Sun 22 Nov 2026 16:58:36 AEDT) host=streamanator user=arm
+crontab: 2 lines; AFLDB-A2 markers: 1
+
+-- r2 hourly settle check
+  installed (UTC): 2026-11-17T00:00:00Z = Tue 17 Nov 2026 11:00:00 AEDT
+  FIRST SCHEDULED RUN: 2026-11-17T00:17:01Z rc=0 AFLDB_SETTLE_STATUS OK  [Tue 17 Nov 2026 11:17:01 AEDT]
+  scheduled runs since install: 1 (rc=0: 1); latest line: 2026-11-17T00:17:01Z rc=0 AFLDB_SETTLE_STATUS OK
+
+alarms.log entries:  (3 on 2026-11-22: the test alarms before A2); newest alarm first line:
+OBSERVE DONE
+r2-observer-unchanged actual_exit=0 expected=0
+primary pid=101
+pid=101 URL count=1 nonempty=1 SECRET count=1 nonempty=1
+worker=1 pid=102 parent=101
+pid=102 URL count=1 nonempty=1 SECRET count=1 nonempty=1
+worker=2 pid=103 parent=101
+pid=103 URL count=1 nonempty=1 SECRET count=1 nonempty=1
+process-healthy actual_exit=0 expected=0
+primary pid=101
+pid=101 URL count=0 nonempty=0 SECRET count=0 nonempty=0
+process-zero-zero actual_exit=1 expected=1
+primary pid=101
+pid=101 URL count=1 nonempty=1 SECRET count=0 nonempty=0
+process-missing-secret actual_exit=1 expected=1
+primary pid=101
+pid=101 URL count=1 nonempty=0 SECRET count=1 nonempty=1
+process-blank-url actual_exit=1 expected=1
+primary pid=101
+pid=101 URL count=1 nonempty=1 SECRET count=1 nonempty=1
+worker=1 pid=102 parent=101
+pid=102 URL count=1 nonempty=1 SECRET count=2 nonempty=1
+process-duplicate-secret actual_exit=1 expected=1
+FAIL expected both release workers
+process-missing-worker actual_exit=1 expected=1
+title-healthy-rsc actual_exit=0 expected=0
+title-brownlow-healthy-rsc actual_exit=0 expected=0
+title-missing actual_exit=1 expected=1
+title-not-found actual_exit=1 expected=1
+title-unparseable actual_exit=1 expected=1
+SUNDAY-REVIEW RESULT 29 passed, 0 failed

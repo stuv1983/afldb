@@ -1,5 +1,7 @@
 # Attended runbook: sittings A1 and A2, Tuesday 24 November 2026 (APPROVED SCOPE; prepared 22 Nov, run c; NOT EXECUTED)
 
+> CURRENT: A1/A2 executed Sunday 22 Nov. This is the historical sitting contract. For new helper pins, Monday installation and dated r3 commands, use the 22 Nov amendment in ATTENDED-PLAN-R6-20261125.md. Sunday PREP ae51cd8d913a7523dd89fb638279e7f910054b79 is preserved.
+
 **Supersedes** `ATTENDED-DRAFT-20261122b.md` for A1 and A2 (the draft stays as the record of the proposal). **Authority:** owner
 decisions 2 and 3 of 2026-11-22 (`DECISIONS-20261122c.md` §2-§3): A1 10:00-10:30 AEDT, release of the exact DEV-verified
 candidate `7d92042f`, the owner performs the production restart; A2 10:30-12:00 AEDT after A1 passes: R1, R2 (forced-command key

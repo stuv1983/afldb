@@ -1,5 +1,25 @@
 # What stays open after each sitting, and the evidence each issue still needs (prepared 22 Nov 2026, run c; revised runs d and e)
 
+**CURRENT — Sunday review amendment, 22 November 2026.** Seven open issues: **332, 348, 350, 351, 352, 357, 362**.
+**Before Monday 23 Nov 03:10 AEDT:** owner installation of the new wrapper and verifier is required; see the
+[amended R6 runbook](ATTENDED-PLAN-R6-20261125.md) and
+[repair/test evidence](sunday-review-20261122/README.md).
+A1/A2 ran Sunday; 371/372 remain resolved under the recorded narrow waiver. Monday pull, Wednesday verification
+and reboot remain pending. PREP `ae51cd8d913a7523dd89fb638279e7f910054b79` remains the historical Sunday contract.
+
+| Issue | Current action (22 Nov 2026, after Sunday sitting and review) |
+|---|---|
+| 332 | R2 installed; first scheduled :17 run and alarm email accepted Sunday. Keep G0 (2027 opening) and G0c (first nightly without HALT) pending, plus the later G1-G7 seasonal reviews. Do not defer G0/G0c to Opening Round. |
+| 348 | Refresh and re-seal the January rehearsal including groups (f)-(k). Tue 12 Jan 2027 11:00 AEDT is reserved for an attended load after that rehearsal; the production write set still needs separate owner approval. No load executed. |
+| 350 | R8 draft approved: capture Fri 19 Feb 2027; proposed opening Tue 23 Feb 2027 11:00 AEDT. Obtain execution approval for the refreshed plan/revision/write set/window, perform G0 and observe G0c on the first nightly (24 Feb if opened 23 Feb). |
+| 351 | R1 installed Sunday. R6 approved window Wed 25 Nov 10:00-11:00 AEDT, fallback 14:00-15:00; reboot remains pending and NO-GO until every amended runbook gate passes. First weekly window and later acceptance remain pending. |
+| 352 | BEFORE Mon 23 Nov 03:10 AEDT: owner installs the pinned invocation-logging wrapper and new verifier from bc3fef3de375259d49001e7a9a478624832703a8. Observe Monday scheduled pull/next nightly within 25 h, Wednesday 03:10 overnight pull and 03:36:35 separate restore verification; all pending. D-HO-7 remains for R7. |
+| 357 | R4 deny installed and probes passed Sunday. Owner operational acceptance remains open; retain beta gate until a cache bound and disk alert exist, with F-09 prune validation. |
+| 362 | R4 filter live; R5 retained logs restricted and verified Sunday. Earliest disposal REVIEW Thu 7 Jan 2027; disposal needs separate owner approval. No disposal authorized by these fixes. |
+
+## Historical planning matrix (superseded by current actions above)
+
+
 Planning record, not a result. Assumes each sitting PASSES as written; a failed step keeps its issue in the "before" state and
 adds the failure record. Sittings: **A1** (Tue 24 Nov 10:00, release `7d92042f`), **A2** (Tue 24 Nov 10:30, R1-R4),
 **B** (attended reboot R6: **APPROVED for Wed 25 Nov 2026 10:00-11:00 AEDT, fallback 14:00-15:00**, runbook

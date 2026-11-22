@@ -15,6 +15,11 @@ commit.
 
 ## [Unreleased]
 
+### Fixed — 22 November 2026
+
+- Sunday sitting probes now correlate scheduled off-host pulls with cron dispatch and per-invocation checksum evidence, fail timestamp assertions with a nonzero exit, require non-empty revalidation settings in all three release processes, and validate each page's actual head title. Linux fixtures and pre-fix negative control retained; R6 immutable blob pins and current operator actions reconciled. Production installation and future scheduled observations remain pending.
+
+
 ### Production sittings A1 and A2 (2026-11-22; in production)
 
 - **Release `7d92042fd110-XWruOm_9nLCSMY8nGPqYU`** (revision `7d92042f`) now serves production, with `AFLDB_REVALIDATE_URL` and `AFLDB_REVALIDATE_SECRET` added to the production environment by the owner and the service restarted attended (14:42:40 AEDT). ISSUE-371 and ISSUE-372 are resolved: a published Brownlow season and an award-affected season page are refreshed on every worker (`revalidate-season.ts --season 2026`: 2/2 workers). The release carries no migration, dependency or unit change.
