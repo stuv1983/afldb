@@ -9,7 +9,9 @@ temporary directories and a recording stand-in for the connection.
 
 The invariant: a replacement that is not one complete, unaltered parser
 generation is refused before anything can be truncated, and --load copies
-exactly the rows that were verified.
+exactly the rows that were verified. A replacement must also carry exactly the
+committed season inventory (load_staging.EXPECTED_SEASON_KEYS); the scenarios
+substitute a two-season inventory and section 10 asserts the real one by text.
 
 Exit 0 = every scenario holds. Exit 1 = a scenario failed, and it says which.
 """
@@ -54,57 +56,67 @@ def quiet(fn, *args, **kwargs):
 
 COLUMNS = dict(ls.TABLES)
 
+# The real inventory is eleven seasons; the scenarios run on a two-season
+# stand-in so one season can be omitted. Section 10 asserts the real constant.
+SEASONS = ["2098", "2099"]
+REAL_EXPECTED_SEASON_KEYS = list(ls.EXPECTED_SEASON_KEYS) if hasattr(
+    ls, "EXPECTED_SEASON_KEYS") else None
+ls.EXPECTED_SEASON_KEYS = list(SEASONS)
+
 
 def row(table: str, **values) -> dict:
     return {column: str(values.get(column, "")) for column in COLUMNS[table]}
 
 
-def dataset() -> dict[str, list[dict]]:
-    """The smallest complete AFLW generation: one season, one played match."""
-    played = dict(match_key="2099-1-aaa-bbb", season_key="2099", round_code="1",
-                  round_number=1, round_type="home_and_away", is_final="False",
-                  match_date="2099-02-01", venue_raw="Oval", home_team_code="aaa",
-                  home_team_name_raw="A", away_team_code="bbb", away_team_name_raw="B",
-                  home_goals=2, home_behinds=1, home_score=13, away_goals=1,
-                  away_behinds=0, away_score=6, source_page="game__1.html")
-    return {
-        "seasons": [row("seasons", season_key="2099", ordinal=1, calendar_year=2099,
-                        display_label="2099", first_fixture_date="2099-02-01",
-                        last_fixture_date="2099-02-08", fixture_count=2,
-                        played_count=1, ladder_group_count=1, has_grand_final="False")],
-        "ladders": [row("ladders", season_key="2099", team_code=code, team_name_raw=code,
-                        ladder_rank=rank, played=1, premiership_points=pts,
-                        percentage=100, wins=pts // 4, draws=0, losses=1 - pts // 4,
-                        points_for=13, points_against=6, source_page="season__2099.html")
-                    for rank, code, pts in ((1, "aaa", 4), (2, "bbb", 0))],
-        "fixtures": [
+def dataset(seasons: list[str] | None = None) -> dict[str, list[dict]]:
+    """The smallest complete AFLW generation: each season has one played match."""
+    tables: dict[str, list[dict]] = {name: [] for name, _ in ls.TABLES}
+    for ordinal, key in enumerate(seasons or SEASONS, 1):
+        played = dict(match_key=f"{key}-1-aaa-bbb", season_key=key, round_code="1",
+                      round_number=1, round_type="home_and_away", is_final="False",
+                      match_date=f"{key}-02-01", venue_raw="Oval", home_team_code="aaa",
+                      home_team_name_raw="A", away_team_code="bbb", away_team_name_raw="B",
+                      home_goals=2, home_behinds=1, home_score=13, away_goals=1,
+                      away_behinds=0, away_score=6, source_page=f"game__{key}-1.html")
+        tables["seasons"].append(
+            row("seasons", season_key=key, ordinal=ordinal, calendar_year=key,
+                display_label=key, first_fixture_date=f"{key}-02-01",
+                last_fixture_date=f"{key}-02-08", fixture_count=2,
+                played_count=1, ladder_group_count=1, has_grand_final="False"))
+        tables["ladders"] += [
+            row("ladders", season_key=key, team_code=code, team_name_raw=code,
+                ladder_rank=rank, played=1, premiership_points=pts,
+                percentage=100, wins=pts // 4, draws=0, losses=1 - pts // 4,
+                points_for=13, points_against=6, source_page=f"season__{key}.html")
+            for rank, code, pts in ((1, "aaa", 4), (2, "bbb", 0))]
+        tables["fixtures"] += [
             row("fixtures", **played, is_played="True", fixture_status="played"),
-            row("fixtures", match_key="2099-2-bbb-aaa", season_key="2099", round_code="2",
+            row("fixtures", match_key=f"{key}-2-bbb-aaa", season_key=key, round_code="2",
                 round_number=2, round_type="home_and_away", is_final="False",
-                match_date="2099-02-08", venue_raw="Oval", home_team_code="bbb",
+                match_date=f"{key}-02-08", venue_raw="Oval", home_team_code="bbb",
                 home_team_name_raw="B", away_team_code="aaa", away_team_name_raw="A",
                 is_played="False", fixture_status="scheduled",
-                source_page="season__2099.html"),
-        ],
-        "matches": [row("matches", **played)],
-        "player_match_stats": [
-            row("player_match_stats", match_key="2099-1-aaa-bbb", season_key="2099",
+                source_page=f"season__{key}.html")]
+        tables["matches"].append(row("matches", **played))
+        tables["player_match_stats"] += [
+            row("player_match_stats", match_key=f"{key}-1-aaa-bbb", season_key=key,
                 team_code=team, player_slug=slug, player_name_raw=slug, kicks=3,
                 handballs=2, disposals=5, contested=1, metres_gained=10, marks=1,
                 hitouts=0, tackles=1, goals=goals, behinds=behinds,
                 score_points=goals * 6 + behinds, fantasy_points=20,
-                source_page="game__1.html")
-            for team, slug, goals, behinds in (("aaa", "Ann_A", 2, 1), ("bbb", "Bea_B", 1, 0))],
-        "scoring_events": [row("scoring_events", match_key="2099-1-aaa-bbb",
-                               season_key="2099", event_seq=1, period=1, clock="1m",
-                               team_code="aaa", event_type="GOAL", points=6,
-                               home_goals=1, home_behinds=0, away_goals=0,
-                               away_behinds=0, source_page="game__1.html")],
-        "player_seasons": [row("player_seasons", season_key="2099", player_slug=slug,
-                               player_name_raw=slug, team_code=team, games=1)
-                           for team, slug in (("aaa", "Ann_A"), ("bbb", "Bea_B"))],
-        "issues": [],
-    }
+                source_page=f"game__{key}-1.html")
+            for team, slug, goals, behinds in (("aaa", "Ann_A", 2, 1), ("bbb", "Bea_B", 1, 0))]
+        tables["scoring_events"].append(
+            row("scoring_events", match_key=f"{key}-1-aaa-bbb",
+                season_key=key, event_seq=1, period=1, clock="1m",
+                team_code="aaa", event_type="GOAL", points=6,
+                home_goals=1, home_behinds=0, away_goals=0,
+                away_behinds=0, source_page=f"game__{key}-1.html"))
+        tables["player_seasons"] += [
+            row("player_seasons", season_key=key, player_slug=slug,
+                player_name_raw=slug, team_code=team, games=1)
+            for team, slug in (("aaa", "Ann_A"), ("bbb", "Bea_B"))]
+    return tables
 
 
 def write(directory: Path, tables: dict[str, list[dict]]) -> None:
@@ -267,9 +279,9 @@ def main() -> int:
                [s.split(".")[1].split()[0] for s in connection.statements[:8]]
                == [name for name, _ in reversed(ls.TABLES)])
         copied_matches = connection.copied.get("matches", [])
-        expect("the copied match is the verified one",
-               copied_matches == [[verified["matches"][0][c] or None
-                                   for c in COLUMNS["matches"]]])
+        expect("the copied matches are the verified ones",
+               copied_matches == [[m[c] or None for c in COLUMNS["matches"]]
+                                  for m in verified["matches"]])
         expect("the changed file is refused on the next check", check(d) == 1)
         try:
             ls.load(RecordingConnection(), {"seasons": []})
@@ -312,6 +324,117 @@ def main() -> int:
             sys.argv = original_argv
         expect("an empty parse does not seal",
                result == 1 and not (empty_legacy / "manifest.json").exists())
+
+        print("10. Expected season coverage (AFLDB-ISSUE-368)")
+
+        def without(tables: dict[str, list[dict]], key: str, *names: str):
+            """Drop one season's rows from the named tables (default: all)."""
+            kept = copy.deepcopy(tables)
+            for name in names or [n for n, _ in ls.TABLES if n != "issues"]:
+                kept[name] = [r for r in kept[name] if r["season_key"] != key]
+            return kept
+
+        def run_main(*argv: str):
+            """main() with a stubbed connection; returns (exit code, output, calls)."""
+            calls: list[str] = []
+            stub = RecordingConnection()
+            stub.close = lambda: calls.append("close")  # type: ignore[attr-defined]
+            saved = ls.connect, sys.argv
+            ls.connect = lambda: (calls.append("connect"), stub)[1]
+            sys.argv = ["load_staging.py", *argv]
+            try:
+                result, output = quiet(ls.main)
+            finally:
+                ls.connect, sys.argv = saved
+            return result, output, calls, stub
+
+        # Each rejected generation: label, directory, the failing check's text.
+        rejected: list[tuple[str, Path, str]] = []
+        d = base / "coherent-omission"
+        write(d, without(dataset(), "2098"))
+        rejected.append(("a coherent whole-season omission with a valid manifest", d,
+                         "FAIL  every expected season is present"))
+        rejected.append(("a header-only generation", base / "header-only",
+                         "FAIL  every expected season is present"))
+        d = base / "no-player-seasons"
+        write(d, without(dataset(), "2098", "player_seasons"))
+        rejected.append(("a season whose players page produced no player seasons", d,
+                         "FAIL  every season with played fixtures has ladder and "
+                         "player-season rows"))
+        d = base / "no-ladder"
+        write(d, without(dataset(), "2098", "ladders"))
+        rejected.append(("a season whose ladder is missing", d,
+                         "FAIL  every season with played fixtures has ladder and "
+                         "player-season rows"))
+        d = base / "extra-season"
+        write(d, dataset(SEASONS + ["2100"]))
+        rejected.append(("a season outside the inventory", d,
+                         "FAIL  no season outside the committed inventory"))
+
+        for label, directory, text in rejected:
+            result, output = quiet(ls.check, directory)
+            expect(f"{label} is refused", result == 1 and text in output,
+                   output[-300:])
+            result, output, calls, stub = run_main("--in", str(directory), "--load")
+            expect(f"--load of {label} exits 1 before any connection",
+                   result == 1 and calls == [] and stub.statements == [],
+                   f"{result} {calls}")
+
+        reduced = base / "reduced-legacy"
+        write(reduced, without(dataset(), "2098"))
+        (reduced / "manifest.json").unlink()
+        result, output, calls, _ = run_main("--in", str(reduced), "--seal")
+        expect("--seal of a reduced parse is refused and writes no manifest",
+               result == 1 and not (reduced / "manifest.json").exists()
+               and "FAIL  every expected season is present" in output)
+
+        d = base / "full"
+        write(d, dataset())
+        result, output = quiet(ls.check, d)
+        expect("the full two-season replacement passes", result == 0, output[-300:])
+        result, output, calls, stub = run_main("--in", str(d), "--load")
+        expect("--load of the full replacement connects and copies both seasons",
+               result == 0 and calls == ["connect", "close"]
+               and [r[0] for r in stub.copied["seasons"]] == SEASONS,
+               f"{result} {calls}")
+
+        print("   the committed inventory itself (read as text, no bs4)")
+        import ast
+
+        def assigned(path: Path, name: str):
+            for node in ast.parse(path.read_text(encoding="utf-8")).body:
+                if isinstance(node, ast.Assign) and any(
+                        isinstance(t, ast.Name) and t.id == name for t in node.targets):
+                    return node.value
+            return None
+
+        committed = assigned(ROOT / "tools" / "aflw" / "load_staging.py",
+                             "EXPECTED_SEASON_KEYS")
+        expect("EXPECTED_SEASON_KEYS is the eleven committed keys, in order",
+               committed is not None and ast.literal_eval(committed)
+               == ["2017", "2018", "2019", "2020", "2021", "2022", "7",
+                   "2023", "2024", "2025", "2026"])
+        expect("the imported constant was the committed one before the stand-in",
+               REAL_EXPECTED_SEASON_KEYS is not None and REAL_EXPECTED_SEASON_KEYS
+               == (ast.literal_eval(committed) if committed is not None else None))
+        parser_keys = assigned(ROOT / "tools" / "aflw" / "parse_aflw.py", "SEASON_KEYS")
+        expect("parse_aflw.SEASON_KEYS derives from EXPECTED_SEASON_KEYS",
+               parser_keys is not None
+               and ast.unparse(parser_keys) == "list(EXPECTED_SEASON_KEYS)")
+
+        print("   the raw scrape's page coverage (parser main() calls this)")
+        pages = [f"{kind}__{key}.html" for key in SEASONS for kind in ("season", "players")]
+        pages += ["game__2098-1-aaa-bbb.html", "readme.txt"]
+        expect("a complete page set has no coverage failure",
+               ls.raw_page_failures(pages) == [])
+        expect("a missing players page is reported",
+               ls.raw_page_failures([p for p in pages if p != "players__2098.html"])
+               == ["missing players__2098.html"])
+        expect("a missing season page is reported",
+               ls.raw_page_failures([p for p in pages if p != "season__2099.html"])
+               == ["missing season__2099.html"])
+        expect("a page for an unlisted season is reported",
+               len(ls.raw_page_failures(pages + ["season__2100.html"])) == 1)
 
     print()
     if failures:

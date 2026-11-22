@@ -26,6 +26,18 @@ matches and player statistics is refused before any database contact, and
 written before the manifest existed, `load_staging.py --seal` runs the same
 checks and writes the manifest only if they pass.
 
+Season coverage is checked against the committed inventory,
+`EXPECTED_SEASON_KEYS` in `load_staging.py` (eleven keys; the parser derives
+its `SEASON_KEYS` from it). A manifest proves the files are the parser's, not
+that no season was lost, so a replacement is refused unless every expected
+season is present, none falls outside the inventory, and every season with
+played fixtures has ladder and player-season rows. `--check`, `--load` and
+`--seal` all enforce it, with no command-line override: adding a season is a
+reviewed edit of that list. The parser applies the same inventory to the raw
+scrape and exits 1 before writing if any `season__<key>.html` or
+`players__<key>.html` page is missing or a page exists for an unlisted key,
+and a season that parses to no fixtures is fatal rather than skipped.
+
 Nothing here resolves an entity. Team codes, player slugs and venue strings
 are staged exactly as published, with the resolution columns left NULL for a
 later pass. `data/` is gitignored, so the parsed files are rebuildable

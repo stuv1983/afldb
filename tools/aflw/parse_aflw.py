@@ -37,15 +37,17 @@ from bs4 import BeautifulSoup
 # The loader owns the generation format (AFLDB-ISSUE-368). This script runs
 # from tools/aflw, so the sibling module is importable as-is.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from load_staging import write_generation  # noqa: E402
+from load_staging import (  # noqa: E402
+    EXPECTED_SEASON_KEYS, raw_page_failures, write_generation)
 
 DEFAULT_RAW = Path("D:/dev/aflw/raw/raw")
 DEFAULT_OUT = Path(__file__).resolve().parents[2] / "data" / "aflw" / "parsed"
 
-# The source keys Season Seven as "7" because it shares calendar 2022 with
-# Season Six. Ordinal is the league's own season numbering.
-SEASON_KEYS = ["2017", "2018", "2019", "2020", "2021", "2022",
-               "7", "2023", "2024", "2025", "2026"]
+# The season inventory is committed in load_staging.EXPECTED_SEASON_KEYS, the
+# single source the loader enforces (AFLDB-ISSUE-368). The source keys Season
+# Seven as "7" because it shares calendar 2022 with Season Six. Ordinal is the
+# league's own season numbering, the position in that list.
+SEASON_KEYS = list(EXPECTED_SEASON_KEYS)
 SEASON_ORDINAL = {key: i + 1 for i, key in enumerate(SEASON_KEYS)}
 SEASON_CALENDAR_YEAR = {"7": 2022, **{k: int(k) for k in SEASON_KEYS if k != "7"}}
 
@@ -624,8 +626,11 @@ def build_seasons(out: Output) -> None:
     for key in SEASON_KEYS:
         rows = [f for f in fixtures if f["season_key"] == key]
         if not rows:
-            out.issue(f"season__{key}.html", "season_no_fixtures", key)
-            continue
+            # A season that parsed to nothing would be written as an absent
+            # season, and the loader would then replace staging without it
+            # (AFLDB-ISSUE-368). Stop before anything is written.
+            sys.exit(f"ERROR: season__{key}.html produced no fixtures; "
+                     "refusing to write an incomplete parse.")
         dates = sorted(d for d in (f["match_date"] for f in rows) if d)
         groups = {l["conference"] for l in ladders if l["season_key"] == key}
         ordinal = SEASON_ORDINAL[key]
@@ -655,6 +660,17 @@ def main() -> int:
 
     if not args.raw.is_dir():
         sys.exit(f"ERROR: raw directory not found: {args.raw}")
+
+    # Coverage first: every inventory season needs its season and players
+    # page, and no page may exist for an unlisted season. Nothing is parsed or
+    # written for an incomplete scrape (AFLDB-ISSUE-368).
+    coverage = raw_page_failures([p.name for p in args.raw.iterdir() if p.is_file()])
+    if coverage:
+        for failure in coverage:
+            print(f"ERROR: {failure}", file=sys.stderr)
+        print(f"{len(coverage)} season-coverage check(s) failed in {args.raw}; "
+              "nothing was written.", file=sys.stderr)
+        return 1
 
     out = Output(out_dir=args.out)
 

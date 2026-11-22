@@ -27,7 +27,13 @@ each file's SHA-256 and row count. Both modes refuse a directory without a
 manifest, a missing or altered file, a header that does not match the
 schema, and a replacement that is not a complete AFLW dataset: every table
 except the parser's issue list must have rows, and the seasons, fixtures,
-matches and player statistics must agree with one another. Each file is
+matches and player statistics must agree with one another. It must also
+carry exactly the committed season inventory (EXPECTED_SEASON_KEYS): every
+expected season present, none outside it, and a ladder and player-season
+rows for every season with played fixtures. A manifest proves the files are
+the parser's, not that the parser kept every season, so the inventory is the
+independent check; it has no command-line override and --seal enforces it
+too. Each file is
 read once, and --load copies exactly the rows that were verified, so a file
 changed after the check cannot reach the database. A refusal happens before
 the database connection is opened, so it never truncates anything.
@@ -99,6 +105,42 @@ MANIFEST_FORMAT = "afldb-aflw-parsed/1"
 # fixtures, played matches, player statistics, scoring events or player
 # seasons is not an AFLW dataset, and loading it would empty the public views.
 OPTIONAL_EMPTY = {"issues"}
+
+# The committed AFLW season inventory (AFLDB-ISSUE-368): the independent
+# evidence of which seasons a replacement must carry. The source keys Season
+# Seven as "7" because it shares calendar 2022 with Season Six; the position
+# in this list is the league's own season ordinal. It is the single source:
+# parse_aflw.py derives its SEASON_KEYS from it. A replacement is refused
+# unless it holds exactly these seasons, so a parse that silently lost a
+# season can never reach staging, whatever its manifest says. Adding a season
+# is a reviewed edit of this list; there is no command-line override.
+EXPECTED_SEASON_KEYS = ["2017", "2018", "2019", "2020", "2021", "2022",
+                        "7", "2023", "2024", "2025", "2026"]
+
+
+def raw_page_failures(names: list[str]) -> list[str]:
+    """Check the raw scrape's file names against the season inventory.
+
+    Every inventory season needs its season__<key>.html and
+    players__<key>.html page, and no such page may exist for a season outside
+    the inventory. Returns one refusal per problem; empty means coverage holds.
+    """
+    pages: dict[str, set[str]] = {"season": set(), "players": set()}
+    for name in names:
+        if not name.endswith(".html") or "__" not in name:
+            continue
+        kind, _, rest = name[:-len(".html")].partition("__")
+        if kind in pages:
+            pages[kind].add(rest)
+    failures = []
+    for kind, found in pages.items():
+        for key in EXPECTED_SEASON_KEYS:
+            if key not in found:
+                failures.append(f"missing {kind}__{key}.html")
+        for key in sorted(found - set(EXPECTED_SEASON_KEYS)):
+            failures.append(f"{kind}__{key}.html is not in the AFLW season "
+                            "inventory (EXPECTED_SEASON_KEYS)")
+    return failures
 
 
 def _csv_bytes(header: list[str], rows: list[dict]) -> bytes:
@@ -370,6 +412,15 @@ def constraint_failures(data: dict[str, list[dict]]) -> int:
     require("every table except issues has rows",
             [name for name, _ in TABLES
              if name not in OPTIONAL_EMPTY and not data[name]])
+    # Season coverage (AFLDB-ISSUE-368). The manifest only proves the files are
+    # the parser's; the inventory is the independent evidence that the parser
+    # did not lose a whole season. A coherent replacement missing one season
+    # passes every check above and would drop that season from the public views.
+    present = {r["season_key"] for r in data["seasons"]}
+    require("every expected season is present",
+            [key for key in EXPECTED_SEASON_KEYS if key not in present])
+    require("no season outside the committed inventory",
+            sorted(present - set(EXPECTED_SEASON_KEYS)))
     fixtures_by_season: dict[str, int] = {}
     played_by_season: dict[str, int] = {}
     for row in data["fixtures"]:
@@ -377,6 +428,13 @@ def constraint_failures(data: dict[str, list[dict]]) -> int:
         fixtures_by_season[key] = fixtures_by_season.get(key, 0) + 1
         if row["fixture_status"] == "played":
             played_by_season[key] = played_by_season.get(key, 0) + 1
+    ladder_seasons = {r["season_key"] for r in data["ladders"]}
+    player_season_seasons = {r["season_key"] for r in data["player_seasons"]}
+    require("every season with played fixtures has ladder and player-season rows",
+            [f"{key}: ladders {'present' if key in ladder_seasons else 'missing'}, "
+             f"player seasons {'present' if key in player_season_seasons else 'missing'}"
+             for key in sorted(played_by_season)
+             if key not in ladder_seasons or key not in player_season_seasons])
 
     def counted(value: str) -> int | None:
         try:
