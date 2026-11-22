@@ -15,6 +15,20 @@ commit.
 
 ## [Unreleased]
 
+### Local fixes for the 22 November independent review (23 November 2026; local on `claude/review-fixes-20261123`, not pushed, installed or deployed)
+
+- **Scheduled backup and off-host copy (ISSUE-352).** The scheduled-pull observer now reports copy failed (exit 1), copy verified with scheduled origin unproven (exit 10) or scheduled copy verified (exit 0), linking a real cron dispatch to the wrapper run by process lineage; the helper installer no longer exits 0 after a failed precondition. A failed backup, verification or state-record write stops the run with `FAILED-<mode>` and keeps the previous record; the URI-encoded backup password is percent-decoded once for `PGPASSWORD`. The R6 pre-check accepts only one overnight dump bound to the backup service's own journal line. The two streamanator helpers stay on HOLD until the owner approves installation.
+- **Wednesday revalidation step (ISSUE-351).** The R6 runbook gains F-4b and `r6-revalidate-accept.sh`: the post-reboot functional 2/2 season revalidation must exit 0 and name two distinct worker ordinals, otherwise acceptance stops.
+- **Request tracing (ISSUE-362).** With `AFLDB_TRACE_REQUESTS=on` the worker trace logs a route class instead of the raw URL, path, query or fragment.
+- **Brownlow year page (ISSUE-367).** `/brownlow/[year]` metadata, static params, ranking and winner heading and the sitemap read accepted votes only; pending, unpublished and not-applicable years 404 and are not listed.
+- **AFLW replacement (ISSUE-368).** A replacement lacking the committed eleven-season inventory, or any season's ladder or player-season rows, is refused before connecting or truncating staging; the parser refuses a raw scrape with a missing or unlisted season page.
+- **Test-target maintenance (ISSUE-374).** The direct test and code-test migration and privilege commands refuse a DSN that does not name a disposable `_test` / `code_test_db` database and verify `current_database()` before DDL or grants.
+- **Migration ledger (ISSUE-375).** `db:status` and `db:migrate` exit 1 when the ledger holds a migration absent from the checkout.
+- **Award corrections (ISSUE-376).** The cross-worker revalidation carries up to six canonical player-profile paths so the old and new winner's profiles expire on every worker.
+- **DraftGuru importer (ISSUE-348).** The importer compares the fresh parsed-row digest to the reviewed pin before any write; labels without a reviewed digest pin are unchanged (owner decision pending).
+- **Player matching tests (ISSUE-377).** The recall and conflict tests are mandatory against seeded data and report unavailable empirical data as an explicit skip.
+- Evidence and remaining acceptance work: [fix record](issues/reviews/AFLDB-FULL-REVIEW-2026-11-22-FIXES.md). Deployment and production acceptance are separate and unstarted.
+
 ### Fixed — 22 November 2026
 
 - Sunday sitting probes now correlate scheduled off-host pulls with cron dispatch and per-invocation checksum evidence, fail timestamp assertions with a nonzero exit, require non-empty revalidation settings in all three release processes, and validate each page's actual head title. Linux fixtures and pre-fix negative control retained; R6 immutable blob pins and current operator actions reconciled. Production installation and future scheduled observations remain pending.

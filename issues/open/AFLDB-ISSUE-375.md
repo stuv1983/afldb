@@ -11,3 +11,7 @@ Source anchors — `tools/db/migrate.ts:293,303,313; tools/db/migration-safety.t
 Detect applied names absent from the checkout before reporting success or applying anything. Reuse the existing reverse comparison. Exercise both modes against an extra fixture ledger row and assert nonzero and unchanged catalog.
 
 [Independent review](../reviews/AFLDB-FULL-REVIEW-2026-11-22.md)
+
+## Local fix status
+
+**Local fix, 23 November 2026 (`78c47c14`; local, not deployed; this entry stays open pending Astra's re-review).** `migrate.ts` reuses `compareAppliedMigrations`' reverse comparison and exits 1 naming each unknown applied migration in both status and apply modes before anything is applied; apply reads the ledger before creating it. On a copy with an extra ledger row the unfixed tool exited 0 ("0 pending", "schema is up to date"); on the fix both exit 1 and the catalog fingerprint and ledger count (119) are unchanged; a fresh empty target still reports 118 pending and applies. Record: ../reviews/AFLDB-FULL-REVIEW-2026-11-22-FIXES.md
