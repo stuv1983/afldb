@@ -1,0 +1,606 @@
+Independent schema-only rerun on streamanator. Identical file/name failures on both revisions.
+490 failed assertions; 31 other failing files with no failed assertion body.
+
+tests/draftguru-acquisition.test.ts	DraftGuru bridge import gate (plan / verify, read-only) DSN guard, read-only discipline, hash pins, classification refusals, verify checks and the no-artefact guarantee all hold on the real tool
+tests/draftguru-acquisition.test.ts	frozen Stage B1 sample (local snapshot) is the frozen 120 / 8 / 68 / 30 / 14 contract over the accepted Stage A label
+tests/draftguru-acquisition.test.ts	frozen Stage B1 sample (local snapshot) rebuilds byte-identically from the accepted Stage A snapshot
+tests/fitzroy-core-import.test.ts	blank Player fallback covers the four real 2025 players, retaining all 79 rows
+tests/fitzroy-core-import.test.ts	fitzRoy source row corrections corrects exactly two rows and nothing else in 1909
+tests/fitzroy-core-import.test.ts	fitzRoy source row corrections leaves exactly the two genuine Round 10 rows
+tests/fitzroy-core-import.test.ts	fitzRoy source row corrections leaves the younger player's other appearances untouched
+tests/integration/afl-api-c7-observation.test.ts	season opening (AFLDB-ISSUE-350) against PostgreSQL (rolled back) a count mismatch between the plan and the live rows throws, so the transaction cannot commit a wrong write
+tests/integration/afl-api-c7-observation.test.ts	season opening (AFLDB-ISSUE-350) against PostgreSQL (rolled back) production-like state classifies NOT_OPEN, the write opens it, the proof holds, a second write is a no-op and a divergent row is refused
+tests/integration/afl-api-ownership-census.test.ts	AFLDB-ISSUE-233 D-233-3 census SQL (rollback-only) counts afl_api-owned matches per completed season, exactly, and nothing else
+tests/integration/afl-api-ownership-census.test.ts	AFLDB-ISSUE-233 D-233-3 census SQL (rollback-only) never treats an excluded (in-progress) season as completed
+tests/integration/afl-api-ownership-census.test.ts	AFLDB-ISSUE-233 D-233-3 census SQL (rollback-only) the ENFORCING form raises, naming every affected season and count, before the sentinel
+tests/integration/after-siren.test.ts	after-siren durable admin decisions (AFLDB-ISSUE-167 Stage 4) REFUSES to delete a stale row carrying an active override, and writes nothing
+tests/integration/after-siren.test.ts	after-siren durable admin decisions (AFLDB-ISSUE-167 Stage 4) WARNS AND RETAINS a lifecycle override whose row is absent, and proceeds
+tests/integration/after-siren.test.ts	after-siren durable admin decisions (AFLDB-ISSUE-167 Stage 4) leaves the lifecycle columns alone on an ordinary reload (Layer 1)
+tests/integration/after-siren.test.ts	after-siren durable admin decisions (AFLDB-ISSUE-167 Stage 4) re-asserts a lifecycle decision the canonical row lost (Layer 2)
+tests/integration/after-siren.test.ts	after-siren durable admin decisions (AFLDB-ISSUE-167 Stage 4) re-creates a manual record row, and the stale-row DELETE leaves it alone
+tests/integration/after-siren.test.ts	getPlayerAfterSirenEvents David King 1994: an end_of_regulation miss, kick_effect none
+tests/integration/after-siren.test.ts	getPlayerAfterSirenEvents Kerry Good 1980: a non-premiership-season event carries no match id
+tests/integration/after-siren.test.ts	getPlayerAfterSirenEvents Luke Shuey 2017: an extra-time-siren goal to win, linked to its match
+tests/integration/after-siren.test.ts	getPlayerAfterSirenEvents a player with no after-siren events returns an empty array
+tests/integration/club-coach-records.test.ts	getClubCoachRecords Richmond: every row is games = W + D + L and agrees with independent scoreline truth
+tests/integration/club-coach-records.test.ts	getClubCoachRecords a coach who also coached another club contributes only their matches for this club
+tests/integration/club-coach-records.test.ts	getClubCoachRecords a coach who never coached this club is absent
+tests/integration/club-coach-records.test.ts	getClubCoachRecords an equal-scores match counts as a draw for the coach, not a win or loss
+tests/integration/club-coach-records.test.ts	getClubCoachRecords rows are ordered most recently in charge first
+tests/integration/club-coach-records.test.ts	getClubCoachRecords separate periods in charge for one coach at one club aggregate into a single row
+tests/integration/club-comparison-route.test.ts	AFLDB-ISSUE-361 pair comparisons are bounded and unchanged loads at most the default number of comparisons at once and returns what a lone load returns
+tests/integration/club-comparison-route.test.ts	Stage 7 canonical metadata canonicalises a valid pair to the alphabetical pair only
+tests/integration/club-comparison-route.test.ts	Stage 7 route budget loads adelaide vs brisbane-lions inside the route budget
+tests/integration/club-comparison-route.test.ts	Stage 7 route budget loads carlton vs collingwood inside the route budget
+tests/integration/club-comparison-route.test.ts	Stage 7 route state: filter and page normalisation applies a valid match filter
+tests/integration/club-comparison-route.test.ts	Stage 7 route state: filter and page normalisation does not let the page change the head-to-head population
+tests/integration/club-comparison-route.test.ts	Stage 7 route state: filter and page normalisation preserves a page beyond the last one and reports honest totals
+tests/integration/club-comparison-route.test.ts	Stage 7 route state: rejected pairs fails safely on an unknown or malformed slug
+tests/integration/club-comparison-route.test.ts	Stage 7 route state: rejected pairs rejects the same organisation before any comparison query
+tests/integration/club-comparison-route.test.ts	Stage 7 route state: unselected landing offers canonical organisations to the selectors
+tests/integration/club-comparison-route.test.ts	Stage 7 route state: valid pair compares related but distinct organisations
+tests/integration/club-comparison-route.test.ts	Stage 7 route state: valid pair keeps requested presentation order while canonicalising alphabetically
+tests/integration/club-comparison-route.test.ts	Stage 7 route state: valid pair loads the comparison with dynamic defaults
+tests/integration/club-comparison-route.test.ts	Stage 9 rendered route metadata emits one alphabetical canonical for a pair in either order
+tests/integration/club-comparison-route.test.ts	Stage 9 rendered route metadata keeps match filter and page out of the canonical
+tests/integration/club-comparison-route.test.ts	Stage FR-2 route state: era filtering (Club Rivalry Explorer follow-up) falls back to all time on an era outside this rivalry’s recorded history, with a notice
+tests/integration/club-comparison-route.test.ts	Stage FR-2 route state: era filtering (Club Rivalry Explorer follow-up) falls back to all time on an unparsable era, with a notice
+tests/integration/club-comparison-route.test.ts	Stage FR-2 route state: era filtering (Club Rivalry Explorer follow-up) scopes rivalry records and match history to the chosen era, leaving everything else all-time
+tests/integration/club-comparison-route.test.ts	review B-06 a comparison beyond the queue bound is refused, not queued answers busy without loading the pair, then recovers once the slots drain
+tests/integration/club-comparison-view.test.ts	Stage 8 view over real route state carries the match filter and page through the rendered pagination links
+tests/integration/club-comparison-view.test.ts	Stage 8 view over real route state renders every section of a real comparison
+tests/integration/club-comparison-view.test.ts	Stage 8 view over real route state renders the era explorer and scopes rivalry records to the chosen era (Club Rivalry Explorer follow-up, FR-2)
+tests/integration/club-comparison-view.test.ts	Stage 8 view over real route state surfaces an era outside the rivalry’s recorded history as a notice, not a crash
+tests/integration/club-comparison.test.ts	club comparison: maximum canonical season runs the complete selected season path for the maximum canonical season without naming it
+tests/integration/club-crowd-records.test.ts	getClubCrowdRecords Richmond: the three records match the raw attendance maxima and are real crowds
+tests/integration/club-crowd-records.test.ts	getClubCrowdRecords Top 5 is the five largest recorded crowds, strictly ordered, deterministic
+tests/integration/club-crowd-records.test.ts	getClubCrowdRecords the club can be the home or the away team in a crowd record
+tests/integration/club-honours.test.ts	getClubBrownlowMedallists Richmond: every row is a genuine is_winner row attributed to the player's same-season club, within Richmond's lineage
+tests/integration/club-honours.test.ts	getClubBrownlowMedallists a Brownlow won at another club does not appear on this club's page
+tests/integration/club-honours.test.ts	getClubBrownlowMedallists includes the known Richmond Brownlow medallists
+tests/integration/club-honours.test.ts	getClubHonours Richmond: every row is a category=award winner attributed to a lineage club, not the Brownlow
+tests/integration/club-honours.test.ts	getClubHonours an award won at another club does not appear on this club's page
+tests/integration/club-honours.test.ts	getClubHonours is ordered newest first
+tests/integration/club-match-records.test.ts	getClubMatchRecords Richmond: every record value and orientation matches the raw scoreline truth
+tests/integration/club-match-records.test.ts	getClubMatchRecords covers a home case and an away case across the six records
+tests/integration/club-match-records.test.ts	getClubMatchRecords is deterministic — the same match ids on repeated calls
+tests/integration/club-players.test.ts	getClubPlayers Richmond: one row per player, club-scoped totals equal to summed player_clubs
+tests/integration/club-players.test.ts	getClubPlayers another club's games do not leak into this club's totals
+tests/integration/club-players.test.ts	getClubPlayers default order is games descending, then goals descending
+tests/integration/club-premiership-players.test.ts	getClubPremiershipPlayers Richmond: every row is an is_premier player_club_season_stats row for a lineage club
+tests/integration/club-premiership-players.test.ts	getClubPremiershipPlayers a player who won more than one flag appears once per premiership season
+tests/integration/club-premiership-players.test.ts	getClubPremiershipPlayers excludes a non-premiership player-season for the same club
+tests/integration/club-premiership-players.test.ts	getClubPremiershipPlayers is ordered newest premiership season first
+tests/integration/club-premiership-players.test.ts	getClubPremiershipPlayers premiership seasons agree with club_seasons.is_premier and with getClubPremierships
+tests/integration/club-premierships.test.ts	getClubPremierships Richmond: the premiership years equal club_seasons.is_premier, and every row is a won Grand Final
+tests/integration/club-premierships.test.ts	getClubPremierships excludes a Grand Final the club lost
+tests/integration/club-premierships.test.ts	getClubPremierships excludes a finals match that is not a Grand Final
+tests/integration/club-premierships.test.ts	getClubPremierships resolves the opponent whether the premiership club was home or away
+tests/integration/club-premierships.test.ts	getClubPremierships returns one row per premiership, unique years, newest first
+tests/integration/coach-comparison-route.test.ts	Stage 2A metadata is noindex for a stale coach id
+tests/integration/coach-comparison-route.test.ts	Stage 2A metadata is noindex for the same coach twice
+tests/integration/coach-comparison-route.test.ts	Stage 2A metadata names both coaches for a valid pair, canonical URL ordered by id
+tests/integration/coach-comparison-route.test.ts	Stage 2A route state: invalid/stale selection fails safely on a malformed full pair, classified as invalid rather than a thrown error
+tests/integration/coach-comparison-route.test.ts	Stage 2A route state: invalid/stale selection flags a stale first coach id
+tests/integration/coach-comparison-route.test.ts	Stage 2A route state: invalid/stale selection flags a stale second coach id
+tests/integration/coach-comparison-route.test.ts	Stage 2A route state: same coach rejects the same coach on both sides
+tests/integration/coach-comparison-route.test.ts	Stage 2A route state: unselected landing does the same for only the second coach selected
+tests/integration/coach-comparison-route.test.ts	Stage 2A route state: unselected landing offers the full canonical coach population to the selectors
+tests/integration/coach-comparison-route.test.ts	Stage 2A route state: unselected landing treats one selected coach as unselected, but echoes it back
+tests/integration/coach-comparison-route.test.ts	Stage 2A route state: valid pair accepts a coach-only identity paired with a player-linked identity
+tests/integration/coach-comparison-route.test.ts	Stage 2A route state: valid pair orders the SEO canonical path by id, independent of requested order
+tests/integration/coach-comparison-route.test.ts	Stage 2A route state: valid pair resolves two distinct coaches by id, never by name
+tests/integration/coach-comparison-route.test.ts	Stage 2B route state: career comparison does not attempt career comparison for the invalid/stale state
+tests/integration/coach-comparison-route.test.ts	Stage 2B route state: career comparison does not attempt career comparison for the same-coach state
+tests/integration/coach-comparison-route.test.ts	Stage 2B route state: career comparison loads both coaches' CoachCareer records for a resolved pair, using getCoachCareer
+tests/integration/coach-comparison-route.test.ts	Stage 2B route state: career comparison resolves both careers for a coach-only + player-linked pair
+tests/integration/coach-comparison-route.test.ts	Stage 2B route state: career comparison resolves internally consistent career totals: games = wins + draws + losses
+tests/integration/coach-comparison-route.test.ts	Stage 2C route state: direct head-to-head does not attempt head-to-head for the invalid/stale state
+tests/integration/coach-comparison-route.test.ts	Stage 2C route state: direct head-to-head does not attempt head-to-head for the same-coach state
+tests/integration/coach-comparison-route.test.ts	Stage 2C route state: direct head-to-head loads the pair's head-to-head using getCoachHeadToHead, oriented to the requested A/B order
+tests/integration/coach-comparison-route.test.ts	Stage 2C route state: direct head-to-head swapping the requested pair order swaps the head-to-head orientation too
+tests/integration/coach-head-to-head.test.ts	getCoachHeadToHead — first and most recent direct meeting (Stage 2D) firstMeeting and lastMeeting match an independent earliest/latest match-date selection over the FULL meeting population (draws included)
+tests/integration/coach-head-to-head.test.ts	getCoachHeadToHead — invalid coach ids returns null when coach A does not exist
+tests/integration/coach-head-to-head.test.ts	getCoachHeadToHead — invalid coach ids returns null when coach B does not exist
+tests/integration/coach-head-to-head.test.ts	getCoachHeadToHead — orientation swapping A/B preserves the direct-meeting population/dates and overlap, while orientation-specific context (Stage 2D) stays correct
+tests/integration/coach-head-to-head.test.ts	getCoachHeadToHead — orientation swapping A/B swaps every oriented value, without changing the underlying population
+tests/integration/coach-head-to-head.test.ts	getCoachHeadToHead — overlapping coaching seasons (Stage 2D) overlapping-season count, first overlapping season and last overlapping season match an independent SQL intersection of actual season presence
+tests/integration/coach-head-to-head.test.ts	getCoachHeadToHead — totals, biggest wins and venues, cross-checked against a direct-SQL oracle direct-meeting venue history matches independent SQL and is ordered meetings DESC, venue name ASC, venue id ASC
+tests/integration/coach-head-to-head.test.ts	getCoachHeadToHead — totals, biggest wins and venues, cross-checked against a direct-SQL oracle each coach's biggest direct win matches an independent deterministic SQL selection (greatest margin, earliest date, lowest match id)
+tests/integration/coach-head-to-head.test.ts	getCoachHeadToHead — totals, biggest wins and venues, cross-checked against a direct-SQL oracle meetings, wins, draws, win %, finals and Grand Final counts match independent SQL
+tests/integration/data-editor.test.ts	AFLDB-ISSUE-261 Slice 1: bounded lock waits on the Data Editor score edit and deleteMatch 'Data Editor score edit (saveEdit, mat…' BASIC LOCK TIMEOUT (no deadlock): refused at its 5 s bound, rolled back whole, every lock released
+tests/integration/data-editor.test.ts	AFLDB-ISSUE-261 Slice 1: bounded lock waits on the Data Editor score edit and deleteMatch 'Data Editor score edit (saveEdit, mat…' SETTLE/ADMIN DEADLOCK (settle stood in for by a test transaction, settle is the victim): the writer is refused at its bound and the settle recovers on a retry
+tests/integration/data-editor.test.ts	AFLDB-ISSUE-261 Slice 1: bounded lock waits on the Data Editor score edit and deleteMatch 'deleteMatch' BASIC LOCK TIMEOUT (no deadlock): refused at its 5 s bound, rolled back whole, every lock released
+tests/integration/data-editor.test.ts	AFLDB-ISSUE-261 Slice 1: bounded lock waits on the Data Editor score edit and deleteMatch 'deleteMatch' SETTLE/ADMIN DEADLOCK (settle stood in for by a test transaction, settle is the victim): the writer is refused at its bound and the settle recovers on a retry
+tests/integration/data-editor.test.ts	AFLDB-ISSUE-267/269: the matches override replay merges every active row and syncs the final period ISSUE-267: a one-field score edit keeps every unchanged component, and both final-period rows equal the corrected totals
+tests/integration/data-editor.test.ts	AFLDB-ISSUE-267/269: the matches override replay merges every active row and syncs the final period ISSUE-269: an attendance edit and a partial score edit on one match both survive, with derived totals and final periods
+tests/integration/data-editor.test.ts	AFLDB-ISSUE-267/269: the matches override replay merges every active row and syncs the final period a component the source lacks but another active group supplies is derived from the merge: the replay succeeds and census section 4 agrees
+tests/integration/data-editor.test.ts	AFLDB-ISSUE-267/269: the matches override replay merges every active row and syncs the final period a score component neither the source nor the override records is refused, never written as zero
+tests/integration/data-editor.test.ts	AFLDB-ISSUE-267/269: the matches override replay merges every active row and syncs the final period equal-authority overrides that disagree are refused before any write
+tests/integration/data-editor.test.ts	AFLDB-ISSUE-267/269: the matches override replay merges every active row and syncs the final period identical overlapping values merge; an inactive override contributes nothing
+tests/integration/data-editor.test.ts	AFLDB-ISSUE-277 (D-277-1): an edit to a player with no AFL Tables identity is written into the creation record a player who holds an AFL Tables identity is unchanged: the correction is keyed under the source and the record is not touched
+tests/integration/data-editor.test.ts	AFLDB-ISSUE-292: a player with two accepted AFL Tables paths is always keyed under the same one keys two edits of one group under one path, whatever the physical row order
+tests/integration/data-editor.test.ts	AFLDB-ISSUE-335: deleteMatch and active manual coach assignment overrides a source-only assignment (no override) keeps the existing behaviour: deleted, cascading the assignment
+tests/integration/data-editor.test.ts	AFLDB-ISSUE-335: deleteMatch and active manual coach assignment overrides an assignment made through the real coach mutation blocks deletion; match, assignment, override and audit unchanged
+tests/integration/data-editor.test.ts	AFLDB-ISSUE-335: deleteMatch and active manual coach assignment overrides an override retired through the real clear mutation does not block; the inactive record is kept
+tests/integration/data-editor.test.ts	AFLDB-ISSUE-335: deleteMatch and active manual coach assignment overrides overrides naming another match do not block, including keys a prefix pattern would catch
+tests/integration/data-editor.test.ts	AFLDB-ISSUE-353: a line-up row with Brownlow or special-record dependents cannot be removed or re-clubbed Return to source refuses the row deletion of a manual addition that a Brownlow vote names, changing nothing
+tests/integration/data-editor.test.ts	AFLDB-ISSUE-353: a line-up row with Brownlow or special-record dependents cannot be removed or re-clubbed refuses a club change of a player carrying a vote, allows it for a free player, and allows a stat-only edit of the voted player
+tests/integration/data-editor.test.ts	AFLDB-ISSUE-353: a line-up row with Brownlow or special-record dependents cannot be removed or re-clubbed refuses removing a player named by the match's Brownlow vote entry, but not an unnamed player of that match
+tests/integration/data-editor.test.ts	AFLDB-ISSUE-353: a line-up row with Brownlow or special-record dependents cannot be removed or re-clubbed refuses removing a player who holds Brownlow votes; an unvoted player of the same match (published zero) is removable
+tests/integration/data-editor.test.ts	AFLDB-ISSUE-353: a line-up row with Brownlow or special-record dependents cannot be removed or re-clubbed refuses removing or re-clubbing a player whose only vote is a NULL-match_id round row of this season and round (review A-05); zero, unrecorded and other-round rows do not block
+tests/integration/data-editor.test.ts	AFLDB-ISSUE-353: a line-up row with Brownlow or special-record dependents cannot be removed or re-clubbed refuses removing the kicker of an after-the-siren record
+tests/integration/data-editor.test.ts	AFLDB-ISSUE-353: a line-up row with Brownlow or special-record dependents cannot be removed or re-clubbed refuses removing the player of a first-kick-goal record (a suppressed one too), naming where to clear it
+tests/integration/data-editor.test.ts	AFLDB-ISSUE-354: saveEdit merges only into an active override does not revive a retired override, keeps its values in the audit trail, and audits carried keys of an active one
+tests/integration/data-editor.test.ts	Atomic required audit (AFLDB-ISSUE-027) persists the match-sheet mutation and its data_edits audit together
+tests/integration/data-editor.test.ts	Atomic required audit (AFLDB-ISSUE-027) rolls the statistical mutation back when the required audit cannot be written
+tests/integration/data-editor.test.ts	Data Editor - Match Sheet Delta Tests propagates kicks correctly
+tests/integration/data-editor.test.ts	Durable Match Sheet authority (AFLDB-ISSUE-257 Slice 3) commits the row change and its authority together, reusing an existing identity key
+tests/integration/data-editor.test.ts	Durable Match Sheet authority (AFLDB-ISSUE-257 Slice 3) refuses a save whose token is missing
+tests/integration/data-editor.test.ts	Durable Match Sheet authority (AFLDB-ISSUE-257 Slice 3) refuses a stale sheet whole, before any write (a settle must never become authority)
+tests/integration/data-editor.test.ts	Durable Match Sheet authority (AFLDB-ISSUE-257 Slice 3) rolls the row change back when the player has no durable identity
+tests/integration/data-editor.test.ts	Durable Match Sheet authority: delete guard and Return to source (AFLDB-ISSUE-257 Slice 7) F-S7-01: a manual addition owned by an unsupported source refuses, writing nothing
+tests/integration/data-editor.test.ts	Durable Match Sheet authority: delete guard and Return to source (AFLDB-ISSUE-257 Slice 7) a manual addition a settling source has since owned is withdrawn and the row kept
+tests/integration/data-editor.test.ts	Durable Match Sheet authority: delete guard and Return to source (AFLDB-ISSUE-257 Slice 7) a manual addition still unowned is withdrawn and its row deleted
+tests/integration/data-editor.test.ts	Durable Match Sheet authority: delete guard and Return to source (AFLDB-ISSUE-257 Slice 7) a manual removal is withdrawn with no canonical write; the next settle restores the row
+tests/integration/data-editor.test.ts	Durable Match Sheet authority: delete guard and Return to source (AFLDB-ISSUE-257 Slice 7) deleteMatch refuses while active Match Sheet authority exists, and deletes nothing
+tests/integration/data-editor.test.ts	Durable Match Sheet authority: delete guard and Return to source (AFLDB-ISSUE-257 Slice 7) returns ordinary field authority to source: record withdrawn, row untouched
+tests/integration/data-editor.test.ts	Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) (1) rolls the row change AND the authority back when the authority write fails (post-110)
+tests/integration/data-editor.test.ts	Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) (2a) replay re-applies a field correction over a reset source value
+tests/integration/data-editor.test.ts	Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) (2b) replay recreates a durable addition the reload did not supply
+tests/integration/data-editor.test.ts	Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) (2c) replay deletes a reinserted row under a durable removal
+tests/integration/data-editor.test.ts	Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) (3a) an active key whose match_key is absent from matches refuses before any write
+tests/integration/data-editor.test.ts	Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) (3b) an active key whose identity names no accepted external identity refuses before any write
+tests/integration/data-editor.test.ts	Durable Match Sheet authority: rollback, replay and continuity (AFLDB-ISSUE-257 F-S9-03) (5) D-257-9: a save records the folded continuing_url identity and the replay resolves it back
+tests/integration/data-editor.test.ts	Targeted club_seasons rebuild (AFLDB-ISSUE-015) derives the ladder from match facts, following a score correction
+tests/integration/data-editor.test.ts	Targeted club_seasons rebuild (AFLDB-ISSUE-015) follows match facts for the premiership flag
+tests/integration/data-editor.test.ts	Targeted club_seasons rebuild (AFLDB-ISSUE-015) reproduces the canonical full-rebuild rows for a completed season
+tests/integration/database.test.ts	AFLDB-ISSUE-330 player index places career-less players last sort=brownlow_votes desc: page 1 descends and omits the career-less player
+tests/integration/database.test.ts	AFLDB-ISSUE-330 player index places career-less players last sort=finals desc: page 1 descends and omits the career-less player
+tests/integration/database.test.ts	AFLDB-ISSUE-330 player index places career-less players last sort=games desc: page 1 descends and omits the career-less player
+tests/integration/database.test.ts	AFLDB-ISSUE-330 player index places career-less players last sort=goals desc: page 1 descends and omits the career-less player
+tests/integration/database.test.ts	AFLDB-ISSUE-330 player index places career-less players last sort=premierships desc: page 1 descends and omits the career-less player
+tests/integration/database.test.ts	AFLDB-ISSUE-361 player index looks up club names for the returned page only looks up club names for the returned page, not for every skipped row
+tests/integration/database.test.ts	AFLDB-ISSUE-361 player index looks up club names for the returned page only runs against a database large enough for a skipped-row cost to show
+tests/integration/database.test.ts	Brownlow correctness credits Bob Skilton with the votes the legacy derivation lost
+tests/integration/database.test.ts	Brownlow correctness keeps the season total complete across the same years
+tests/integration/database.test.ts	Brownlow correctness marks 1935-1983 as not collected at match grain, not as absent
+tests/integration/database.test.ts	Brownlow correctness separates the war years from merely uncollected seasons
+tests/integration/database.test.ts	Brownlow correctness uses the authoritative season totals for career votes
+tests/integration/database.test.ts	advanced search regression cases 200+ games, 100+ goals and 15+ finals
+tests/integration/database.test.ts	advanced search regression cases 200-249 games with 16 or more finals
+tests/integration/database.test.ts	advanced search regression cases 50-199 goals and no Brownlow votes
+tests/integration/database.test.ts	advanced search regression cases debuted in the 1960s and played for exactly two clubs
+tests/integration/database.test.ts	club identity counts a genuine two-club career as two
+tests/integration/database.test.ts	club identity counts a renamed club once in clubs_played
+tests/integration/database.test.ts	club identity keeps players who share a name distinct
+tests/integration/database.test.ts	data integrity has the full player-match dataset
+tests/integration/database.test.ts	data integrity keeps all 24 historical club identities
+tests/integration/database.test.ts	data integrity preserves NULL rather than defaulting unrecorded statistics
+tests/integration/database.test.ts	search finds both Gary Abletts and ranks the more prominent first
+tests/integration/database.test.ts	search matches a hyphenated surname by its second part
+tests/integration/database.test.ts	search matches an apostrophe surname typed without the apostrophe
+tests/integration/database.test.ts	search uses an index for a prefix search rather than scanning
+tests/integration/datasets.test.ts	match_results dataset computes result/winner/margin correctly for a draw
+tests/integration/datasets.test.ts	match_results dataset rejects a club that is not recognised
+tests/integration/datasets.test.ts	match_results dataset rejects a finals code that also carries a round_number
+tests/integration/datasets.test.ts	match_results dataset rejects a home_and_away round with no round_number and a non-finals code
+tests/integration/datasets.test.ts	match_results dataset rejects an unknown season
+tests/integration/datasets.test.ts	match_results dataset rejects goals/behinds that do not add up to the score
+tests/integration/datasets.test.ts	match_results dataset rejects the same club on both sides
+tests/integration/datasets.test.ts	match_results dataset warns rather than errors on an unrecognised venue, and still resolves clubs/result
+tests/integration/datasets.test.ts	player_match_stats dataset errors (not warns) on an unmatched player -- player_id is NOT NULL on this table
+tests/integration/datasets.test.ts	player_match_stats dataset errors on an unrecognised club
+tests/integration/datasets.test.ts	player_match_stats dataset errors when the named club did not play in that match
+tests/integration/datasets.test.ts	player_match_stats dataset errors when the named match does not exist
+tests/integration/db-health.test.ts	db-health queries reads the submission backlog through authSql without throwing
+tests/integration/db-health.test.ts	db-health queries reports core counts consistent with each other
+tests/integration/derived-rebuild-parity.test.ts	AFLDB-ISSUE-254 — rebuild_derived.py equals the targeted recompute produces the same frees aggregates and the same zero-games career row, and invents none
+tests/integration/draft-linkage.test.ts	DraftGuru bridge on afldb_test — §6.1 reconciliation (read-only) every pick inherits its person and the pick population is the manifest's
+tests/integration/draft-linkage.test.ts	DraftGuru bridge on afldb_test — §6.1 reconciliation (read-only) persons partition exactly as the child + ledger predict
+tests/integration/draft-linkage.test.ts	DraftGuru bridge on afldb_test — §6.4 negative controls (read-only) every admitted child bridge: the exact target is registered once, resolves to the stored player, and the person stores the bridge state (or the agreeing human state)
+tests/integration/draft-linkage.test.ts	DraftGuru bridge on afldb_test — §6.4 negative controls (read-only) no two DraftGuru persons share a player; the confirmed-unlinked person stays unmatched
+tests/integration/draft-linkage.test.ts	DraftGuru bridge on afldb_test — §6.4 negative controls (read-only) §6.2: National Draft picks 1–10 coverage by year is stated for every draft
+tests/integration/draft-linkage.test.ts	Grid Solver draft criteria on the real linked population (read-only, production compiler) drafted_by_club answers for the club with the most linked national picks
+tests/integration/draft-linkage.test.ts	Grid Solver draft criteria on the real linked population (read-only, production compiler) the ISSUE-221 "No data" square is gone: national top-10 × any career is a populated cell
+tests/integration/draft-linkage.test.ts	Grid Solver draft criteria on the real linked population (read-only, production compiler) the six draft builders each answer a non-empty set with sane bounds
+tests/integration/grid-solver.test.ts	AFLDB-ISSUE-355 club season stat leaders ignore unrecorded (NULL) seasons a player whose every season is unrecorded for the stat never led a club in it
+tests/integration/grid-solver.test.ts	AFLDB-ISSUE-355 club season stat leaders ignore unrecorded (NULL) seasons club_season_stat_leader(clearances) is exactly the players with a recorded leading season
+tests/integration/grid-solver.test.ts	AFLDB-ISSUE-355 club season stat leaders ignore unrecorded (NULL) seasons club_season_stat_leader(goal_assists) is exactly the players with a recorded leading season
+tests/integration/grid-solver.test.ts	AFLDB-ISSUE-355 club season stat leaders ignore unrecorded (NULL) seasons club_season_stat_leader(inside_50s) is exactly the players with a recorded leading season
+tests/integration/grid-solver.test.ts	AFLDB-ISSUE-355 club season stat leaders ignore unrecorded (NULL) seasons club_season_stat_leader(rebounds) is exactly the players with a recorded leading season
+tests/integration/grid-solver.test.ts	AFLDB-ISSUE-355 club season stat leaders ignore unrecorded (NULL) seasons club_season_stat_leader_min_times(clearances, 5) counts only recorded leading seasons
+tests/integration/grid-solver.test.ts	All-Australian final team versus 40-man squad (ISSUE-118 reopened) repeat selections count distinct seasons, so a two-row 1984 selection is one honour
+tests/integration/grid-solver.test.ts	All-Australian final team versus 40-man squad (ISSUE-118 reopened) the final team is the all-australian award alone, never the squad rows
+tests/integration/grid-solver.test.ts	age on debut (ISSUE-118 Stage D1) counts completed years on debut day and never qualifies an unknown date
+tests/integration/grid-solver.test.ts	grid solver correctness after_siren_winner is exactly the linked, premiership-season, scoring, match-winning kickers
+tests/integration/grid-solver.test.ts	grid solver correctness career_games_max is inclusive (<=) of the threshold
+tests/integration/grid-solver.test.ts	grid solver correctness club_season_stat_leader(goals) rows really did lead a club-season in goals
+tests/integration/grid-solver.test.ts	grid solver correctness coached_by is exactly the players who played a match for a club while that coach was assigned to it (ISSUE-118 Stage E2)
+tests/integration/grid-solver.test.ts	grid solver correctness drafted_by_club_never_played matches a hand-written equivalent for a real club
+tests/integration/grid-solver.test.ts	grid solver correctness father_son_father and father_son_selection are the linked ends of father_son_selections, and the Abletts sit on the right ends
+tests/integration/grid-solver.test.ts	grid solver correctness has_brother is exactly the linked ends of brothers-labelled sibling rows, and the Abletts sit on the right ends
+tests/integration/grid-solver.test.ts	grid solver correctness lost_grand_final_against finds a real losing-side player against a real winning-side player
+tests/integration/grid-solver.test.ts	grid solver correctness premiership_coach is the linked coaches of Grand Final winners, and coach-only people never appear as players
+tests/integration/grid-solver.test.ts	grid solver correctness solves the mapped ISSUE-076 won-final grid within the four-second safety margin
+tests/integration/grid-solver.test.ts	grid solver correctness solves the three ISSUE-103 finals-win cells under one second with an independent oracle
+tests/integration/grid-solver.test.ts	grid solver correctness teammate_of includes a player independently known to share a club in a season
+tests/integration/gridley-corpus.test.ts	Gridley corpus -- criteria bridges the Gridley player ids the corpus embeds
+tests/integration/gridley-corpus.test.ts	Gridley corpus -- criteria has no probed dataset gap, unless run in diagnostic mode
+tests/integration/gridley-corpus.test.ts	Gridley corpus -- criteria names every dataset this database lacks, and nothing else is empty or unresolved
+tests/integration/gridley-corpus.test.ts	Gridley corpus -- every cell through solveCellSummary conforms to the bounded approved-deferral policy, independently of diagnostic mode
+tests/integration/gridley-corpus.test.ts	Gridley corpus -- every cell through solveCellSummary writes the run report and has no failing cells
+tests/integration/home-records.test.ts	AFL home record catalogue against afldb_test after-siren-most-attempts never hides a holder tied on the cutoff value
+tests/integration/home-records.test.ts	AFL home record catalogue against afldb_test after-siren-most-goals never hides a holder tied on the cutoff value
+tests/integration/home-records.test.ts	AFL home record catalogue against afldb_test coach-most-premierships never hides a holder tied on the cutoff value
+tests/integration/home-records.test.ts	AFL home record catalogue against afldb_test derives coach count and percentage leaders from canonical match assignments
+tests/integration/home-records.test.ts	AFL home record catalogue against afldb_test preserves career records and reuses match and season record semantics
+tests/integration/home-records.test.ts	AFL home record catalogue against afldb_test preserves venue counts and NULL attendance semantics
+tests/integration/home-records.test.ts	AFL home record catalogue against afldb_test uses active linked curated records for after-siren and first-kick leaders
+tests/integration/nl-answer-boundary.test.ts	answerNlQuestion no-results boundary leaves the same semantic family unchanged when rows exist
+tests/integration/nl-answer-boundary.test.ts	answerNlQuestion no-results boundary returns an NlAnswer and logs no_results for a valid supported plan with zero rows
+tests/integration/nl-answers-after-siren.test.ts	after_siren — a named player a player with no after-siren kick is an honest empty result
+tests/integration/nl-answers-after-siren.test.ts	after_siren — a named player returns that player's own events and nobody else's
+tests/integration/nl-answers-after-siren.test.ts	after_siren — club lineage club scope is the KICKER's club and opponent scope is the other side
+tests/integration/nl-answers-after-siren.test.ts	after_siren — club lineage opponent scope folds the whole organization lineage
+tests/integration/nl-answers-after-siren.test.ts	after_siren — parity with the Records board per-player kick and goal counts match getAfterSirenRecords for every player
+tests/integration/nl-answers-after-siren.test.ts	after_siren — ranking is always a tie most goals after the siren returns every joint holder, checked against hand-written SQL
+tests/integration/nl-answers-after-siren.test.ts	after_siren — ranking is always a tie most kicks after the siren is a wider tie than most goals
+tests/integration/nl-answers-after-siren.test.ts	after_siren — the match-link boundary (D10 §7.1) the first kick after the siren is the earliest MATCH-LINKED event
+tests/integration/nl-answers-after-siren.test.ts	after_siren — the match-link boundary (D10 §7.1) the most recent kick is match-linked and is NEVER an unlinked later row
+tests/integration/nl-answers-after-siren.test.ts	after_siren — the three dimensions are independent a goal after the siren and a goal after the siren TO WIN are different counts
+tests/integration/nl-answers-after-siren.test.ts	after_siren — the three dimensions are independent a miss and a miss-and-lost are different counts
+tests/integration/nl-answers-after-siren.test.ts	after_siren — the three dimensions are independent an absent kickScored means EVERY kick, including the misses
+tests/integration/nl-answers-after-siren.test.ts	after_siren — the three dimensions are independent kicker_result is independent of kick_effect: a scoreless kick whose side still won exists
+tests/integration/nl-answers-after-siren.test.ts	after_siren — the trusted player link a player-subject answer counts only trusted-linked kickers, and says how many it left out
+tests/integration/nl-answers-coaching.test.ts	club scope folds the organization lineage and never a merger a Brisbane Lions query returns no Fitzroy coaching rows
+tests/integration/nl-answers-coaching.test.ts	club scope folds the organization lineage and never a merger a Western Bulldogs query returns Footscray-era coaching rows
+tests/integration/nl-answers-coaching.test.ts	club-scoped coaching records match a hand-written getClubCoachRecords-shaped query Damien Hardwick's Richmond record is the measured 307/170/6/131, not his whole career
+tests/integration/nl-answers-coaching.test.ts	club-scoped coaching records match a hand-written getClubCoachRecords-shaped query a season witness returns exactly one Richmond coach for 2017
+tests/integration/nl-answers-coaching.test.ts	club-scoped coaching records match a hand-written getClubCoachRecords-shaped query counts a club's coaches rather than listing them when asked how many
+tests/integration/nl-answers-coaching.test.ts	club-scoped coaching records match a hand-written getClubCoachRecords-shaped query every Richmond coach, same rows in the same order
+tests/integration/nl-answers-coaching.test.ts	coaching coverage the earliest recorded coaching season really is 1902
+tests/integration/nl-answers-coaching.test.ts	coaching thresholds match a hand-written HAVING Richmond coaches with games >= 100
+tests/integration/nl-answers-coaching.test.ts	coaching thresholds match a hand-written HAVING Richmond coaches with games >= 200
+tests/integration/nl-answers-coaching.test.ts	coaching thresholds match a hand-written HAVING Richmond coaches with games >= 50
+tests/integration/nl-answers-coaching.test.ts	coaching thresholds match a hand-written HAVING Richmond coaches with wins >= 100
+tests/integration/nl-answers-coaching.test.ts	coaching thresholds match a hand-written HAVING Richmond coaches with wins >= 25
+tests/integration/nl-answers-coaching.test.ts	coaching thresholds match a hand-written HAVING Richmond coaches with wins >= 50
+tests/integration/nl-answers-coaching.test.ts	nothing is fabricated a season with no coaching records returns an empty result, not a zero-row record
+tests/integration/nl-answers-coaching.test.ts	the Phase B coaching corpora, against the real coach directory every plan row parses to a coaching plan that validates
+tests/integration/nl-answers-coaching.test.ts	the Phase B coaching corpora, against the real coach directory the real coach directory keeps a colliding surname out of the alias set
+tests/integration/nl-answers-coaching.test.ts	the coach/player identity seam coachOnly agrees with coaches.player_id IS NULL on every returned row
+tests/integration/nl-answers-coaching.test.ts	the coach/player identity seam the table splits 368 player-linked / 18 coach-only
+tests/integration/nl-answers-coaching.test.ts	win percentage is draw-weighted, and the qualifier is real George Angus computes 70.00, which a plain W/G control does NOT match
+tests/integration/nl-answers-coaching.test.ts	win percentage is draw-weighted, and the qualifier is real a reader-stated minimum is applied instead of the default
+tests/integration/nl-answers-coaching.test.ts	win percentage is draw-weighted, and the qualifier is real the 50-game board is led by Cliff Rankin, and dropping the qualifier changes the answer
+tests/integration/nl-answers-first-kick-goal.test.ts	E7 — a goal with each of their first N kicks N = 2 matches consecutive_goal_kicks >= N, linked only
+tests/integration/nl-answers-first-kick-goal.test.ts	E7 — a goal with each of their first N kicks N = 3 matches consecutive_goal_kicks >= N, linked only
+tests/integration/nl-answers-first-kick-goal.test.ts	E7 — a goal with each of their first N kicks N = 4 matches consecutive_goal_kicks >= N, linked only
+tests/integration/nl-answers-first-kick-goal.test.ts	E7 — a goal with each of their first N kicks N = 6 matches consecutive_goal_kicks >= N, linked only
+tests/integration/nl-answers-first-kick-goal.test.ts	E7 — a goal with each of their first N kicks the bound is strictly narrowing: N = 6 is a subset of N = 2 is a subset of the family
+tests/integration/nl-answers-first-kick-goal.test.ts	E8 — the first-kick goal was their only career goal W11 is not the kick-level claim E9 declines
+tests/integration/nl-answers-first-kick-goal.test.ts	E8 — the first-kick goal was their only career goal W12 the NL totals are the board summary minus its unlinked rows
+tests/integration/nl-answers-first-kick-goal.test.ts	E8 — the first-kick goal was their only career goal W8 matches no_further_career_goals, linked only, and the board's own feature
+tests/integration/nl-answers-first-kick-goal.test.ts	composition and the link boundary W13 no unlinked row reaches an NL answer
+tests/integration/nl-answers-first-kick-goal.test.ts	composition and the link boundary W9 E7 + club is the single ANDed query, not two independent ones
+tests/integration/nl-answers-first-kick-goal.test.ts	the already-supported subfamilies, now proven against data W2 a named holder answers about that player alone
+tests/integration/nl-answers-first-kick-goal.test.ts	the already-supported subfamilies, now proven against data W3 a non-holder answers 0 rows, with the player still pinned
+tests/integration/nl-answers-first-kick-goal.test.ts	the already-supported subfamilies, now proven against data W4 a club filter matches the records board, filtered to linked rows
+tests/integration/nl-answers-first-kick-goal.test.ts	the already-supported subfamilies, now proven against data W5 a decade filter uses the season the feat happened in
+tests/integration/nl-answers-first-kick-goal.test.ts	the loaded curated extract (D11 / M-E1) matches the measurement the corpus thresholds were finalised from
+tests/integration/nl-answers-game-season.test.ts	AFLDB-ISSUE-110 end-to-end natural-language threshold proof answers an exact question through parser -> validation -> execution -> description
+tests/integration/nl-answers-game-season.test.ts	AFLDB-ISSUE-110 end-to-end natural-language threshold proof answers the review's exact opponent-scoped wording without discarding the opponent
+tests/integration/nl-answers-game-season.test.ts	AFLDB-ISSUE-110 metric thresholds are actually applied a capped threshold list with ties returns identical row identities and order on repeated execution
+tests/integration/nl-answers-game-season.test.ts	AFLDB-ISSUE-110 metric thresholds are actually applied a scoped-sum threshold qualifies the aggregate after aggregation, per player
+tests/integration/nl-answers-game-season.test.ts	AFLDB-ISSUE-110 metric thresholds are actually applied a season-aggregate threshold matches a hand-written filter over season totals
+tests/integration/nl-answers-game-season.test.ts	AFLDB-ISSUE-110 metric thresholds are actually applied a single-game gte threshold returns every qualifying performance, not one ranked leader
+tests/integration/nl-answers-game-season.test.ts	AFLDB-ISSUE-110 metric thresholds are actually applied a single-game lte threshold excludes the non-qualifying record holder
+tests/integration/nl-answers-game-season.test.ts	AFLDB-ISSUE-110 metric thresholds are actually applied a strict less-than threshold excludes the boundary value itself
+tests/integration/nl-answers-game-season.test.ts	AFLDB-ISSUE-110 metric thresholds are actually applied an exact-value season threshold returns exactly the eq set
+tests/integration/nl-answers-game-season.test.ts	player_game mode "single" matches hand-written SQL "most goals in a game" (unscoped) matches a hand-written MAX over player_match_stats
+tests/integration/nl-answers-game-season.test.ts	player_game mode "single" matches hand-written SQL "top 5 goals in a game" includes every hand-written top-5, with ties at the cutoff
+tests/integration/nl-answers-game-season.test.ts	player_game mode "single" matches hand-written SQL a player-scoped question ("dusty's highest disposal game") matches a hand-written MAX for that player
+tests/integration/nl-answers-game-season.test.ts	player_game mode "single" matches hand-written SQL a venue + grand-final scoped question matches a hand-written MAX joined on matches
+tests/integration/nl-answers-game-season.test.ts	player_game mode "single" matches hand-written SQL bare "v Richmond" still ranks only players opposed to Richmond
+tests/integration/nl-answers-game-season.test.ts	player_game mode "single" matches hand-written SQL clean "Fitzroy v Richmond" scopes the exact match, not just Fitzroy players
+tests/integration/nl-answers-game-season.test.ts	player_game mode "single" matches hand-written SQL debut scope ranks only career_game_no = 1 rows
+tests/integration/nl-answers-game-season.test.ts	player_game mode "single" matches hand-written SQL round scope is consumed by the compiler and changes the result set
+tests/integration/nl-answers-game-season.test.ts	player_game mode "sum" matches hand-written SQL "most goals against <club>" matches a hand-written grouped SUM
+tests/integration/nl-answers-game-season.test.ts	player_game mode "sum" matches hand-written SQL a player + opponent scoped sum ("dusty total goals against Carlton") matches a hand-written SUM for that one player
+tests/integration/nl-answers-game-season.test.ts	player_season matches hand-written SQL "most goals in <season>" matches a hand-written MAX over player_season_stats
+tests/integration/nl-answers-game-season.test.ts	player_season matches hand-written SQL a broad live_only season leaderboard pre-aggregates once instead of timing out
+tests/integration/nl-answers-game-season.test.ts	player_season matches hand-written SQL a club-scoped season question ranks by the WHOLE season total, not a club-split figure
+tests/integration/nl-answers-game-season.test.ts	player_season matches hand-written SQL a live_only season metric (clangers, no precomputed column) matches a hand-written SUM grouped by player and season
+tests/integration/nl-answers-game-season.test.ts	player_season matches hand-written SQL a player-scoped season query answers with a real season row for that player
+tests/integration/nl-answers-team-club.test.ts	club_season matches hand-written SQL "fewest wins by a premier" matches a hand-written MIN scoped to is_premier
+tests/integration/nl-answers-team-club.test.ts	club_season matches hand-written SQL a club-scoped percentage ranking matches a hand-written per-club MAX
+tests/integration/nl-answers-team-club.test.ts	club_season matches hand-written SQL unscoped "most wins in a season" matches a hand-written MAX
+tests/integration/nl-answers-team-club.test.ts	team_match matches hand-written SQL "top 5 highest scores" includes every hand-written top-5, with ties at the cutoff
+tests/integration/nl-answers-team-club.test.ts	team_match matches hand-written SQL AFLDB-ISSUE-192 symmetric metrics rank one row per match "top 5" by total_score returns five distinct matches, not three matches in six rows
+tests/integration/nl-answers-team-club.test.ts	team_match matches hand-written SQL AFLDB-ISSUE-192 symmetric metrics rank one row per match AFLDB-ISSUE-194 matchup-scoped symmetric metrics still rank one row per physical match matchup scope cannot coexist with clubFor/clubAgainst (validatePlan rejects it, confirming matchup and side scope are mutually exclusive)
+tests/integration/nl-answers-team-club.test.ts	team_match matches hand-written SQL AFLDB-ISSUE-192 symmetric metrics rank one row per match AFLDB-ISSUE-194 matchup-scoped symmetric metrics still rank one row per physical match matchup-scoped "biggest crowd" (attendance) returns the top-5 physical matches, not doubled perspective rows
+tests/integration/nl-answers-team-club.test.ts	team_match matches hand-written SQL AFLDB-ISSUE-192 symmetric metrics rank one row per match AFLDB-ISSUE-194 matchup-scoped symmetric metrics still rank one row per physical match matchup-scoped "highest combined score" (total_score) returns the top-5 physical matches, not doubled perspective rows
+tests/integration/nl-answers-team-club.test.ts	team_match matches hand-written SQL AFLDB-ISSUE-192 symmetric metrics rank one row per match a clubFor-scoped total_score ranking still returns one row per that club's match (side-specific scope preserved)
+tests/integration/nl-answers-team-club.test.ts	team_match matches hand-written SQL AFLDB-ISSUE-192 symmetric metrics rank one row per match side-dependent metrics (team_score) are unaffected and keep ranking both sides
+tests/integration/nl-answers-team-club.test.ts	team_match matches hand-written SQL AFLDB-ISSUE-192 symmetric metrics rank one row per match unscoped "highest attendance" returns distinct matchIds with total equal to the distinct count
+tests/integration/nl-answers-team-club.test.ts	team_match matches hand-written SQL AFLDB-ISSUE-192 symmetric metrics rank one row per match unscoped "highest combined score" (total_score) returns each match once
+tests/integration/nl-answers-team-club.test.ts	team_match matches hand-written SQL AFLDB-ISSUE-205: q3_deficit_overcome answers the biggest three-quarter-time deficit the eventual winner overcame
+tests/integration/nl-answers-team-club.test.ts	team_match matches hand-written SQL a grouped games count is not silently read as a draws count
+tests/integration/nl-answers-team-club.test.ts	team_match matches hand-written SQL a venue-scoped highest score matches a hand-written per-venue query
+tests/integration/nl-answers-team-club.test.ts	team_match matches hand-written SQL applies "but won" against the final result, not only the checkpoint leader
+tests/integration/nl-answers-team-club.test.ts	team_match matches hand-written SQL counts every match in scope for a grouped games threshold (gt)
+tests/integration/nl-answers-team-club.test.ts	team_match matches hand-written SQL counts every match in scope for a grouped games threshold (gte)
+tests/integration/nl-answers-team-club.test.ts	team_match matches hand-written SQL counts every match in scope for a grouped games threshold (lte)
+tests/integration/nl-answers-team-club.test.ts	team_match matches hand-written SQL derives H2 from final minus half-time, never by summing cumulative Q3 and Q4 checkpoints
+tests/integration/nl-answers-team-club.test.ts	team_match matches hand-written SQL derives Q3 as the three-quarter checkpoint minus half-time
+tests/integration/nl-answers-team-club.test.ts	team_match matches hand-written SQL derives half-time margin from cumulative checkpoints
+tests/integration/nl-answers-team-club.test.ts	team_match matches hand-written SQL drilldown caps the listed rows and discloses the true total
+tests/integration/nl-answers-team-club.test.ts	team_match matches hand-written SQL drilldown preserves and executes a combined complex predicate exact set
+tests/integration/nl-answers-team-club.test.ts	team_match matches hand-written SQL returns organization-level win counts for HAVING queries rather than one arbitrary match
+tests/integration/nl-answers-team-club.test.ts	team_match matches hand-written SQL unscoped "biggest loss ever" matches the same margin distribution from the loser's side
+tests/integration/nl-answers-team-club.test.ts	team_match matches hand-written SQL unscoped "biggest win ever" matches matches.margin (already the winner's advantage)
+tests/integration/nl-answers-team-club.test.ts	team_streak matches chronological truth computes a club lineage winning streak across historical identity rows
+tests/integration/nl-answers.test.ts	player_career: a named player is filtered to that player, not ranked against everyone "Nick Dal Santo most games" answers about Dal Santo, not the outright leader
+tests/integration/nl-answers.test.ts	player_career: a named player is filtered to that player, not ranked against everyone a named player with a career condition is still filtered to just them
+tests/integration/nl-answers.test.ts	player_career: awards match hand-written SQL "most all-australian selections without a premiership" matches a hand-written award_winners count
+tests/integration/nl-answers.test.ts	player_career: awards match hand-written SQL "most brownlow votes without winning a brownlow"
+tests/integration/nl-answers.test.ts	player_career: awards match hand-written SQL "top 10 players by brownlow votes with no medal" -- ranked list matches, with ties past 10 included
+tests/integration/nl-answers.test.ts	player_career: boundary questions match hand-written SQL "players whose last game was a grand final" -- membership matches last_match_date in a real GF
+tests/integration/nl-answers.test.ts	player_career: club scope is projected and filtered, never silently dropped (AFLDB-ISSUE-110) keeps the club filter in the SQL when a career predicate is present
+tests/integration/nl-answers.test.ts	player_career: club scope is projected and filtered, never silently dropped (AFLDB-ISSUE-110) renders club appearances under the Games column, not the whole-career total
+tests/integration/nl-answers.test.ts	player_career: live_only stat metrics use the correct SUM path "most clangers" (a live_only stat) matches a hand-written SUM over player_match_stats
+tests/integration/nl-answers.test.ts	player_career: multi-condition trivia matches hand-written SQL "most games without kicking a goal" -- the leader really has 0 career goals
+tests/integration/nl-answers.test.ts	player_career: multi-condition trivia matches hand-written SQL "players with 200 games and no premiership"
+tests/integration/nl-answers.test.ts	player_career: multi-condition trivia matches hand-written SQL "players with 250 games and exactly two clubs"
+tests/integration/nl-search-telemetry-clear.test.ts	cutoff and concurrency blocks a telemetry writer for the life of the clearing transaction, then the writer proceeds untouched
+tests/integration/nl-search-telemetry-clear.test.ts	retention contract (every destructive path rolled back) keeps every feedback row — matched with its ancestry, and orphaned — and every review
+tests/integration/nl-search-telemetry-clear.test.ts	retention contract (every destructive path rolled back) preserves every app-health row and detaches only the links to deleted logs
+tests/integration/nl-search-telemetry-clear.test.ts	retention contract (every destructive path rolled back) retains the full ancestor chain above a reviewed leaf, to arbitrary depth, and deletes the mid-chain sibling
+tests/integration/nl-search-telemetry-clear.test.ts	retention contract (every destructive path rolled back) rolls back completely: an aborted clearing transaction leaves no trace
+tests/integration/nl-search-telemetry-clear.test.ts	retention contract (every destructive path rolled back) touches nothing unrelated, and the identity sequence is not reset
+tests/integration/nl-vocab.test.ts	CLUB_NICKNAMES every nickname is reachable in the built directory
+tests/integration/nl-vocab.test.ts	VENUE_NICKNAMES every nickname is reachable in the built directory
+tests/integration/nl-vocab.test.ts	VENUE_NICKNAMES resolves the nicknames that were silently dead before
+tests/integration/player-compare.test.ts	player-compare queries best single game matches player_career_stats’ own precomputed bests
+tests/integration/player-compare.test.ts	player-compare queries never shows a shared match for two players who never played together
+tests/integration/player-compare.test.ts	player-compare queries overlap summary agrees with the head-to-head match counts, split by relationship
+tests/integration/player-family-and-coaching.test.ts	getCoach Chris Fagan: a coach-only identity carries no player id or slug
+tests/integration/player-family-and-coaching.test.ts	getCoach Leigh Matthews: a linked coach carries the player id and slug the playing-career link needs
+tests/integration/player-family-and-coaching.test.ts	getCoachCareer Chris Fagan (coach-only, player_id IS NULL): the aggregation still works by coach id
+tests/integration/player-family-and-coaching.test.ts	getCoachCareer Leigh Matthews (linked player/coach): derived totals equal direct canonical SQL, across multiple clubs
+tests/integration/player-family-and-coaching.test.ts	getCoachCareer — biggest win/loss Jim Adamson (coach id 315): zero canonical coaching assignments render safely, never a fabricated record
+tests/integration/player-family-and-coaching.test.ts	getCoachCareer — biggest win/loss Leigh Matthews: biggest win/loss and totals match a direct canonical cross-check
+tests/integration/player-family-and-coaching.test.ts	getCoachCareer — venue history Jim Adamson (coach id 315): zero canonical coaching assignments yield an empty venue list, never a fabricated venue
+tests/integration/player-family-and-coaching.test.ts	getCoachCareer — venue history Leigh Matthews: top venue's W/L/D, win %, finals, Grand Finals and first/last dates match a direct canonical cross-check
+tests/integration/player-family-and-coaching.test.ts	getCoachRecordAgainstOrganization Leigh Matthews: Games/W/D/L, Win%, Finals and Grand Finals against his most-faced opponent organisation match a direct canonical cross-check
+tests/integration/player-family-and-coaching.test.ts	getCoachRecordAgainstOrganization Leigh Matthews: biggest win/loss against that organisation match a direct canonical cross-check
+tests/integration/player-family-and-coaching.test.ts	getCoachRecordAgainstOrganization Leigh Matthews: venue breakdown against that organisation matches a direct canonical cross-check and stays deterministically ordered
+tests/integration/player-family-and-coaching.test.ts	getCoachRecordAgainstOrganization a recognised coach/organisation pair with zero canonical meetings returns a deliberate zero-record, not null
+tests/integration/player-family-and-coaching.test.ts	getCoachRecordAgainstOrganization an unrecognised coach id or organisation id returns null
+tests/integration/player-family-and-coaching.test.ts	getCoachRecordAgainstOrganization organisation lineage: a coach's record against an organisation combines every historical identity it has traded under, not just one
+tests/integration/player-family-and-coaching.test.ts	getPlayerCoachingCareer a player with no linked coaching row returns null
+tests/integration/player-family-and-coaching.test.ts	getPlayerFamily a father with multiple sons: Gary Ablett Sr lists both sons and nothing from player_relationships is duplicated
+tests/integration/player-family-and-coaching.test.ts	getPlayerFamily a father-son selection: Gary Ablett Jr lists his father, not himself as a father
+tests/integration/player-family-and-coaching.test.ts	getPlayerFamily a national-draft son with a recorded pick number carries it; competition is the pathway, not the pick
+tests/integration/player-family-and-coaching.test.ts	getPlayerFamily a player with no family data returns a clean empty result
+tests/integration/player-family-and-coaching.test.ts	getPlayerFamily an unlinked relative stays name-only with a null player link
+tests/integration/player-family-and-coaching.test.ts	listCoaches includes both a linked and a coach-only person, each with their own link fields
+tests/integration/player-family-and-coaching.test.ts	resolveCoachOpponentSelection a real, zero-meeting organisation still resolves — a coverage gap is never reported as an invalid selection
+tests/integration/player-family-and-coaching.test.ts	resolveCoachOpponentSelection a valid opponent slug resolves the same record getCoachRecordAgainstOrganization returns directly
+tests/integration/player-family-and-coaching.test.ts	resolveCoachOpponentSelection an unrecognised opponent slug is "invalid" with the requested value, never a thrown error
+tests/integration/player-family-and-coaching.test.ts	resolveCoachOpponentSelection no requested slug resolves to "none", never running a query
+tests/integration/player-family-and-coaching.test.ts	searchCoaches finds a coach-only person by name
+tests/integration/player-honours.test.ts	getPlayerHonours a Brownlow medallist's generic awards list carries no brownlow-medal row
+tests/integration/player-honours.test.ts	getPlayerHonours a genuinely different award is not swept up by the exclusion
+tests/integration/player-honours.test.ts	getPlayerHonours an All-Australian selection is still excluded from the generic list (unchanged behaviour)
+tests/integration/player-link-concurrency.test.ts	AFLDB-ISSUE-235 S6 (I8–I10) fixture-leftover gate I8–I10 fixture-leftover gate — the races leave zero ISSUE-235 fixture rows
+tests/integration/player-matching.test.ts	candidate blocking finds a player by their exact normalised name
+tests/integration/player-matching.test.ts	club lineage and club text against real clubs keeps a merger out of the lineage: Fitzroy is not Brisbane Lions
+tests/integration/player-matching.test.ts	club lineage and club text against real clubs resolves a relocation to one continuing club: South Melbourne and Sydney
+tests/integration/player-matching.test.ts	club lineage and club text against real clubs resolves a rename to one continuing club: Footscray and Western Bulldogs
+tests/integration/query-builder.test.ts	query builder compiler -- multi-domain cards (ISSUE-115) T-C10: the curated club_is_participant predicate under the Matches anchor equals an independent oracle
+tests/integration/query-builder.test.ts	query builder compiler -- multi-domain cards (ISSUE-115) T-C12: a self-equivalent domain fails closed at runQueryBuilder, not only at parse
+tests/integration/query-builder.test.ts	query builder compiler -- multi-domain cards (ISSUE-115) T-C1: two-domain AND matches an independent JOIN-based count
+tests/integration/query-builder.test.ts	query builder compiler -- multi-domain cards (ISSUE-115) T-C2: two-domain OR matches an independent IN-based count
+tests/integration/query-builder.test.ts	query builder compiler -- multi-domain cards (ISSUE-115) T-C3: three-domain composition (Players + career + match stats) matches an independent count
+tests/integration/query-builder.test.ts	query builder compiler -- multi-domain cards (ISSUE-115) T-C4: "no such row" compiles as NOT EXISTS and equals an independent absence oracle
+tests/integration/query-builder.test.ts	query builder compiler -- multi-domain cards (ISSUE-115) T-C5: a one-to-many card produces no duplicate anchor rows
+tests/integration/query-builder.test.ts	query builder compiler -- multi-domain cards (ISSUE-115) T-C8: LIKE wildcards are still escaped inside a related-domain subquery
+tests/integration/query-builder.test.ts	query builder compiler -- multi-domain cards (ISSUE-115) T-C9: the anchor alone decides the returned grain and columns for the same card set
+tests/integration/query-builder.test.ts	query builder compiler -- page/total split (ISSUE-116) T-E1: the total is the whole match count on every page, including a page past the end
+tests/integration/query-builder.test.ts	query builder compiler -- page/total split (ISSUE-116) T-E2: the pages partition the ordered result set exactly, in the same order
+tests/integration/query-builder.test.ts	query builder compiler -- page/total split (ISSUE-116) T-E3: a related-domain NOT EXISTS total equals an independent count, and the page is its ordered head
+tests/integration/query-builder.test.ts	query builder compiler a card's AND vs OR match rule changes the result set as expected
+tests/integration/query-builder.test.ts	query builder compiler folds three cards left-to-right, so an OR join before an AND join binds first
+tests/integration/query-builder.test.ts	query builder compiler reproduces the "debuted in the 1960s, exactly two clubs" regression case (110 players)
+tests/integration/release-gates.test.ts	gate: Advanced Search regression cases 50-199 goals and zero Brownlow votes returns the cohort an independent oracle derives (261 through 2025)
+tests/integration/release-gates.test.ts	gate: Advanced Search regression cases debuted in the 1960s with exactly two clubs returns the exact 110 players
+tests/integration/release-gates.test.ts	gate: Brownlow authority agrees with the canonical round votes for every career inside their coverage
+tests/integration/release-gates.test.ts	gate: Brownlow authority career totals sum to the authoritative total, not the per-game total
+tests/integration/release-gates.test.ts	gate: Brownlow authority reports representative career totals, resolved by profile identity
+tests/integration/release-gates.test.ts	gate: Brownlow authority season votes total exactly 79,113
+tests/integration/release-gates.test.ts	gate: Brownlow authority season-grain table cannot inflate the total
+tests/integration/release-gates.test.ts	gate: Brownlow coverage semantics records a genuine zero for a player who polled none in a decided season
+tests/integration/release-gates.test.ts	gate: Grand Final replays has two Grand Final rows in each replay season
+tests/integration/release-gates.test.ts	gate: Grand Final replays resolves each replay season to exactly one premier
+tests/integration/release-gates.test.ts	gate: Match Search applies a range filter on both bounds
+tests/integration/release-gates.test.ts	gate: Match Search club_match=both returns only the games between the two clubs
+tests/integration/release-gates.test.ts	gate: Match Search finds the drawn Grand Finals and nothing else
+tests/integration/release-gates.test.ts	gate: Match Search reconciles every returned scoreline with its components
+tests/integration/release-gates.test.ts	gate: Match Search treats two clubs as either, not both
+tests/integration/release-gates.test.ts	gate: a season in progress is provisional (established by this file, rolled back) awards no premier and no wooden spoon
+tests/integration/release-gates.test.ts	gate: a season in progress is provisional (established by this file, rolled back) carries an explicit as-at date and is not completed
+tests/integration/release-gates.test.ts	gate: a season in progress is provisional (established by this file, rolled back) detects a completed season and a missing as-at date
+tests/integration/release-gates.test.ts	gate: a season in progress is provisional (established by this file, rolled back) detects a premier and a wooden spoon on a season in progress
+tests/integration/release-gates.test.ts	gate: a season in progress is provisional (established by this file, rolled back) detects a zero vote, a settled status and a published Brownlow on a season in progress
+tests/integration/release-gates.test.ts	gate: a season in progress is provisional (established by this file, rolled back) is a genuine in-progress season with something for each contract to protect
+tests/integration/release-gates.test.ts	gate: a season in progress is provisional (established by this file, rolled back) reports Brownlow as pending, never as zero
+tests/integration/release-gates.test.ts	gate: absence is never zero does not infer empty pandemic crowds as zero
+tests/integration/release-gates.test.ts	gate: absence is never zero keeps era-limited statistics NULL before they were collected
+tests/integration/release-gates.test.ts	gate: absence is never zero keeps unknown attendance NULL rather than 0
+tests/integration/release-gates.test.ts	gate: absence is never zero records why each attendance is missing
+tests/integration/release-gates.test.ts	gate: absence is never zero refuses a status that disagrees with the figure
+tests/integration/release-gates.test.ts	gate: absence is never zero refuses a zero crowd that cites no source
+tests/integration/release-gates.test.ts	gate: birth dates keeps the evidence behind every recovered date (14,110 historical, 14,294 on the accepted rebuild)
+tests/integration/release-gates.test.ts	gate: birth dates leaves the remaining players honestly without a date
+tests/integration/release-gates.test.ts	gate: birth dates matches players on the profile URL rather than the name (13,275 historical, 13,367 on the accepted rebuild)
+tests/integration/release-gates.test.ts	gate: birth dates populates the canonical dates with no conflicts (13,255 historical, 13,347 on the accepted rebuild)
+tests/integration/release-gates.test.ts	gate: birth dates stores the profile URL it matched on, not a legacy row id
+tests/integration/release-gates.test.ts	gate: club organizations and identities attaches every ladder row to the identity trading that season
+tests/integration/release-gates.test.ts	gate: club organizations and identities counts a rename once but a merger twice in clubs played
+tests/integration/release-gates.test.ts	gate: club organizations and identities groups exactly the three renamed clubs into shared organizations
+tests/integration/release-gates.test.ts	gate: club organizations and identities has 24 identities across 21 organizations
+tests/integration/release-gates.test.ts	gate: club organizations and identities keeps Fitzroy, Brisbane Bears and University as separate organizations
+tests/integration/release-gates.test.ts	gate: club organizations and identities prefers the narrower identity where spans nest
+tests/integration/release-gates.test.ts	gate: club organizations and identities records the merger as a navigable link without combining records
+tests/integration/release-gates.test.ts	gate: draft links retains all 6,810 DraftGuru rows, including unresolved ones, plus durable manual selections
+tests/integration/release-gates.test.ts	gate: draft links retains exactly 5,057 draft persons
+tests/integration/release-gates.test.ts	gate: name collisions resolve by ID keeps the two Ron Barassis distinct
+tests/integration/release-gates.test.ts	gate: name collisions resolve by ID returns more than one Ted Whitten
+tests/integration/release-gates.test.ts	gate: name collisions resolve by ID returns six distinct players named Peter Brown
+tests/integration/sealed-editor-guard.test.ts	other editor families refuse a sealed-season change without a note and change nothing award winner (award_winners)
+tests/integration/sealed-editor-guard.test.ts	other editor families refuse a sealed-season change without a note and change nothing coach assignment (match_coaches / matches)
+tests/integration/sealed-editor-guard.test.ts	other editor families refuse a sealed-season change without a note and change nothing draft selection (draft_picks)
+tests/integration/sealed-editor-guard.test.ts	through the server actions: a crafted over-length note is refused, never truncated into a valid correction award winner action on a sealed season: refused, nothing written
+tests/integration/sealed-editor-guard.test.ts	through the server actions: a crafted over-length note is refused, never truncated into a valid correction coach assignment action on a sealed match: refused, canonical rows, overrides and audit unchanged
+tests/integration/sealed-editor-guard.test.ts	through the server actions: a crafted over-length note is refused, never truncated into a valid correction draft selection action on a sealed year: refused, nothing written
+tests/integration/sealed-editor-guard.test.ts	through the server actions: a crafted over-length note is refused, never truncated into a valid correction leaves an OPEN season unchanged: the same 2001-character note is accepted and stored cut to 2000
+tests/integration/submission-promotion.test.ts	AFLDB-ISSUE-175 promotion locking and atomicity lets exactly one of two concurrent promotions of the same approved submission succeed
+tests/integration/submission-promotion.test.ts	AFLDB-ISSUE-175 promotion locking and atomicity promotes on retry from a failed submission using the same eligibility lock
+tests/integration/submission-promotion.test.ts	AFLDB-ISSUE-273 validation against concurrent review an approve and promote that commit mid-validation stand: no revert, no second batch
+tests/integration/submission-promotion.test.ts	AFLDB-ISSUE-307 the promotion batch counts what each row did records an update for each biography row written and counts a row whose player is gone as neither
+tests/integration/v2-coleman-publication.test.ts	the offline loader (tools/migration/import_awards.py --groups coleman) agrees with the projection (SYNTHETIC, PostgreSQL) a loader-written season is what the projection retains (no row of either writer is rewritten by the other)
+tests/integration/v2-coleman-publication.test.ts	the offline loader (tools/migration/import_awards.py --groups coleman) agrees with the projection (SYNTHETIC, PostgreSQL) after a canonical publication the offline loader refuses and preserves every tuple
+tests/integration/v2-coleman-publication.test.ts	the offline loader (tools/migration/import_awards.py --groups coleman) agrees with the projection (SYNTHETIC, PostgreSQL) the offline guard holds canonical season locks across import-batch commits and releases them on close
+tests/integration/v2-coleman-publication.test.ts	the offline loader (tools/migration/import_awards.py --groups coleman) agrees with the projection (SYNTHETIC, PostgreSQL) the offline guard rejects invalid launcher ports and non-loopback targets before database reads
+tests/integration/venue-records.test.ts	getVenueClubRecords W-D-L, win % and order re-derive from the raw scorelines
+tests/integration/venue-records.test.ts	getVenueMatches an offset past the end still reports the true total
+tests/integration/venue-records.test.ts	getVenueMatches busiest venue: the complete history is reachable by paging, not capped at 50
+tests/integration/venue-records.test.ts	getVenueMatches walking every page returns each match exactly once
+tests/integration/venue-records.test.ts	getVenueOverview busiest venue: match count and first/latest match agree with the raw table
+tests/integration/venue-records.test.ts	getVenuePlayerLeaders busiest venue: boards are capped at 5, ranked, and deterministic
+tests/integration/venue-records.test.ts	getVenuePlayerLeaders small venue: every board re-derives from raw player_match_stats, NULLs excluded
+tests/integration/venue-records.test.ts	getVenueRecords attendance and score records re-derive from the raw table; NULL attendance never wins
+tests/special-records-replay-parity.test.ts	special-record replay adapter parity (AFLDB-ISSUE-167 G-9) a lifecycle payload carrying no valid status FAILS CLOSED — identically in both adapters
+tests/special-records-replay-parity.test.ts	special-record replay adapter parity (AFLDB-ISSUE-167 G-9) a record payload whose player_identity resolves restores the link — identically in both adapters
+tests/special-records-replay-parity.test.ts	special-record replay adapter parity (AFLDB-ISSUE-167 G-9) a void payload carrying no status_reason FAILS CLOSED — identically in both adapters
+tests/special-records-replay-parity.test.ts	special-record replay adapter parity (AFLDB-ISSUE-167 G-9) an unknown field_group FAILS CLOSED — identically in both adapters
+tests/special-records-replay-parity.test.ts	special-record replay adapter parity (AFLDB-ISSUE-167 G-9) correction and lifecycle on one row are NOT a collision — identically in both adapters
+tests/special-records-replay-parity.test.ts	special-record replay adapter parity (AFLDB-ISSUE-167 G-9) correction on a present row applies a DELTA, key presence being the semantics — identically in both adapters
+tests/special-records-replay-parity.test.ts	special-record replay adapter parity (AFLDB-ISSUE-167 G-9) lifecycle on a present row applies the decision — identically in both adapters
+tests/special-records-replay-parity.test.ts	special-record replay adapter parity (AFLDB-ISSUE-167 G-9) record re-creates a VOIDED manual row and voids it again — identically in both adapters
+tests/special-records-replay-parity.test.ts	special-record replay adapter parity (AFLDB-ISSUE-167 G-9) record re-creates the manual row a destructive rebuild removed — identically in both adapters
+
+Other failing suites (setup/teardown/collection):
+tests/integration/admin-awards.test.ts
+tests/integration/admin-brownlow.test.ts
+tests/integration/admin-club-leadership.test.ts
+tests/integration/admin-coaches.test.ts
+tests/integration/admin-draft.test.ts
+tests/integration/admin-fixtures.test.ts
+tests/integration/admin-season-lists.test.ts
+tests/integration/admin-special-records.test.ts
+tests/integration/admin-upload-route.test.ts
+tests/integration/brownlow-pending-coverage.test.ts
+tests/integration/brownlow-pending-projection.test.ts
+tests/integration/brownlow-season-attachment.test.ts
+tests/integration/match-admin-delete.test.ts
+tests/integration/match-results-promotion.test.ts
+tests/integration/nl-answers-cross-domain.test.ts
+tests/integration/nl-answers-relationships.test.ts
+tests/integration/nl-semantic-mapping.test.ts
+tests/integration/settle-afl-api-brownlow-backtest.test.ts
+tests/integration/settle-afl-api-brownlow-reschedule.test.ts
+tests/integration/settle-afl-api-brownlow.test.ts
+tests/integration/settle-afl-api-fixtures.test.ts
+tests/integration/settle-afl-api-issue276.test.ts
+tests/integration/settle-afl-api-state-b.test.ts
+tests/integration/settle-afl-api.test.ts
+tests/integration/settle-afltables.test.ts
+tests/integration/special-records-lifecycle.test.ts
+tests/integration/special-records-public-suppression.test.ts
+tests/integration/v2-afl-api-settle-findings.test.ts
+tests/integration/v2-brownlow-eligibility-2025-rehearsal.test.ts
+tests/integration/v2-brownlow-eligibility.test.ts
+tests/integration/v2-brownlow-production-correction.test.ts
+
+Representative failure signatures by file from this rerun. One signature does not classify every assertion in that file.
+tests/draftguru-acquisition.test.ts | 3 | AssertionError: Required frozen sample is missing: data/sources/draftguru/person-html-20260826/sample.json: expected false to be true // Object.is equality
+tests/fitzroy-core-import.test.ts | 4 | Error: ENOENT: no such file or directory, open 'data/sources/afltables/fitzroy_core/full-history-20260902/player_stats_1909.csv'
+tests/special-records-replay-parity.test.ts | 9 | PostgresError: insert or update on table "player_achievements" violates foreign key constraint "player_achievements_season_fkey"
+tests/integration/admin-awards.test.ts | 0 | Cannot read properties of undefined (reading 'id')
+tests/integration/admin-brownlow.test.ts | 0 | Both sources 'manual_admin_edit' and 'afltables' must exist in this database; the Brownlow writer refuses without the manual one.
+tests/integration/admin-club-leadership.test.ts | 0 | need eligible clubs for the first leadership season: expected 0 to be greater than 1
+tests/integration/admin-coaches.test.ts | 0 | null value in column "source_id" of relation "coaches" violates not-null constraint
+tests/integration/admin-draft.test.ts | 0 | Cannot read properties of undefined (reading 'id')
+tests/integration/admin-fixtures.test.ts | 0 | actual value must be number or bigint, received "object"
+tests/integration/admin-season-lists.test.ts | 0 | need eligible clubs for the first list season: expected 0 to be greater than 1
+tests/integration/admin-special-records.test.ts | 0 | insert or update on table "player_achievements" violates foreign key constraint "player_achievements_season_fkey"
+tests/integration/admin-upload-route.test.ts | 0 | Isolated integration target refused: database_name, port, runner
+tests/integration/afl-api-c7-observation.test.ts | 2 | AssertionError: expected [ …(18) ] to deeply equal []
+tests/integration/afl-api-ownership-census.test.ts | 3 | AssertionError: expected +0 to be 3 // Object.is equality
+tests/integration/after-siren.test.ts | 9 | AssertionError: the after-siren stage has not loaded this database: expected null not to be null
+tests/integration/brownlow-pending-coverage.test.ts | 0 | the ISSUE-155 fixture needs four club identities
+tests/integration/brownlow-pending-projection.test.ts | 0 | (no suite diagnostic in JSON)
+tests/integration/brownlow-season-attachment.test.ts | 0 | Cannot read properties of undefined (reading 'id')
+tests/integration/club-coach-records.test.ts | 6 | AssertionError: club richmond is missing from afldb_test: expected undefined to be defined
+tests/integration/club-comparison-route.test.ts | 19 | AssertionError: expected [ 'issue228-away', 'issue228-home' ] to include 'carlton'
+tests/integration/club-comparison-view.test.ts | 4 | AssertionError: missing section: Head-to-head: expected '<div class="page-header"><p class="ey…' to contain 'Head-to-head'
+tests/integration/club-comparison.test.ts | 1 | AssertionError: expected null not to be null
+tests/integration/club-crowd-records.test.ts | 3 | AssertionError: club richmond is missing from afldb_test: expected undefined to be defined
+tests/integration/club-honours.test.ts | 6 | AssertionError: club richmond is missing from afldb_test: expected undefined to be defined
+tests/integration/club-match-records.test.ts | 3 | AssertionError: club richmond is missing from afldb_test: expected undefined to be defined
+tests/integration/club-players.test.ts | 3 | AssertionError: club richmond is missing from afldb_test: expected undefined to be defined
+tests/integration/club-premiership-players.test.ts | 5 | AssertionError: club richmond is missing from afldb_test: expected undefined to be defined
+tests/integration/club-premierships.test.ts | 5 | AssertionError: club richmond is missing from afldb_test: expected undefined to be defined
+tests/integration/coach-comparison-route.test.ts | 22 | AssertionError: expected 0 to be greater than 300
+tests/integration/coach-head-to-head.test.ts | 9 | AssertionError: afldb_test needs at least one direct coach-v-coach matchup: expected undefined to be defined
+tests/integration/data-editor.test.ts | 47 | TypeError: Cannot read properties of undefined (reading 'id')
+tests/integration/database.test.ts | 26 | AssertionError: expected +0 to be null // Object.is equality
+tests/integration/datasets.test.ts | 12 | Error: AFLDB_AUTH_DATABASE_URL is not set. Run tools/maintenance/02_add_auth_role.sh on the server.
+tests/integration/db-health.test.ts | 2 | AssertionError: expected 0 to be greater than 0
+tests/integration/derived-rebuild-parity.test.ts | 1 | TypeError: Cannot read properties of undefined (reading 'id')
+tests/integration/draft-linkage.test.ts | 8 | AssertionError: expected +0 to be 5057 // Object.is equality
+tests/integration/grid-solver.test.ts | 21 | AssertionError: expected 0 to be greater than 0
+tests/integration/gridley-corpus.test.ts | 5 | AssertionError: expected [ …(515) ] to deeply equal []
+tests/integration/home-records.test.ts | 7 | AssertionError: expected undefined to match object { displayName: 'Tony Lockett', …(1) }
+tests/integration/match-admin-delete.test.ts | 0 | Cannot read properties of undefined (reading 'id')
+tests/integration/match-results-promotion.test.ts | 0 | AFLDB_AUTH_DATABASE_URL is not set. Run tools/maintenance/02_add_auth_role.sh on the server.
+tests/integration/nl-answer-boundary.test.ts | 2 | AssertionError: expected undefined to be defined
+tests/integration/nl-answers-after-siren.test.ts | 14 | AssertionError: expected 0 to be less than 0
+tests/integration/nl-answers-coaching.test.ts | 21 | Error: no club organization named Richmond
+tests/integration/nl-answers-cross-domain.test.ts | 0 | fixture identity Tom Hafey (players/T/Tom_Hafey.html) must resolve to exactly one player; found 0
+tests/integration/nl-answers-first-kick-goal.test.ts | 15 | AssertionError: expected +0 to be 334 // Object.is equality
+tests/integration/nl-answers-game-season.test.ts | 24 | AssertionError: expected null not to be null
+tests/integration/nl-answers-relationships.test.ts | 0 | fixture identity players/B/Brent_Harvey.html must resolve to exactly one player; found 0
+tests/integration/nl-answers-team-club.test.ts | 28 | AssertionError: expected null not to be null
+tests/integration/nl-answers.test.ts | 12 | AssertionError: expected 0 to be greater than 0
+tests/integration/nl-search-telemetry-clear.test.ts | 6 | Error: expected [Function] to throw error including 'rolled back on purpose' but got 'permission denied for table nl_search…'
+tests/integration/nl-semantic-mapping.test.ts | 0 | afldb_test needs one baseline season for ISSUE-094 fixtures
+tests/integration/nl-vocab.test.ts | 3 | AssertionError: These nicknames merged into no venue. The canonical value must be a string the venues table actually holds (canonical_name, legacy_name or a venue_aliases row), lower-cased and verbati
+tests/integration/player-compare.test.ts | 3 | AssertionError: expected undefined to be defined
+tests/integration/player-family-and-coaching.test.ts | 26 | AssertionError: players/G/Gary_Ablett0.html: expected undefined to be defined
+tests/integration/player-honours.test.ts | 3 | AssertionError: the named-medals award family has not loaded this database: expected undefined to be defined
+tests/integration/player-link-concurrency.test.ts | 1 | Error: sources 'afl_api' (migration 077) and 'afltables' must both exist on afldb_test.
+tests/integration/player-matching.test.ts | 4 | TypeError: Cannot read properties of undefined (reading 'searchName')
+tests/integration/query-builder.test.ts | 15 | AssertionError: expected +0 to be 110 // Object.is equality
+tests/integration/release-gates.test.ts | 45 | AssertionError: expected null to be 79113 // Object.is equality
+tests/integration/sealed-editor-guard.test.ts | 7 | AssertionError: expected 'No coach with that id.' to contain 'sealed historical data'
+tests/integration/settle-afl-api-brownlow-backtest.test.ts | 0 | Hawthorn and Brisbane Lions must both exist on afldb_test.
+tests/integration/settle-afl-api-brownlow-reschedule.test.ts | 0 | Hawthorn and Brisbane Lions must both exist on afldb_test.
+tests/integration/settle-afl-api-brownlow.test.ts | 0 | source 'afltables' must exist on afldb_test.
+tests/integration/settle-afl-api-fixtures.test.ts | 0 | source 'afltables' must exist on afldb_test.
+tests/integration/settle-afl-api-issue276.test.ts | 0 | sources 'afl_api' and 'afltables' must both exist on afldb_test.
+tests/integration/settle-afl-api-state-b.test.ts | 0 | --allow-completed-season-backtest refused: connected database is 'tip_full_test'; database_name, port, runner
+tests/integration/settle-afl-api.test.ts | 0 | sources 'afl_api' (migration 077) and 'afltables' must both exist on afldb_test.
+tests/integration/settle-afltables.test.ts | 0 | (no suite diagnostic in JSON)
+tests/integration/special-records-lifecycle.test.ts | 0 | insert or update on table "player_achievements" violates foreign key constraint "player_achievements_season_fkey"
+tests/integration/special-records-public-suppression.test.ts | 0 | no fixture found for "soleInSeason" — this database has not been loaded: expected undefined to be defined
+tests/integration/submission-promotion.test.ts | 4 | AssertionError: expected [] to have a length of 1 but got +0
+tests/integration/v2-afl-api-settle-findings.test.ts | 0 | V2-GAP-025 integration test refused: both AFLDB_TEST_DATABASE_URL (afldb_owner) and AFLDB_TEST_IMPORT_DATABASE_URL (afldb_import) must be set.
+tests/integration/v2-brownlow-eligibility-2025-rehearsal.test.ts | 0 | Marked isolated launcher required
+tests/integration/v2-brownlow-eligibility.test.ts | 0 | AFLDB_TEST_IMPORT_DATABASE_URL must be set (the isolated runner sets it): the callers run as afldb_import.
+tests/integration/v2-brownlow-production-correction.test.ts | 0 | Marked isolated launcher required
+tests/integration/v2-coleman-publication.test.ts | 4 | AssertionError: Traceback (most recent call last):
+tests/integration/venue-records.test.ts | 8 | TypeError: Cannot read properties of undefined (reading 'venueId')
