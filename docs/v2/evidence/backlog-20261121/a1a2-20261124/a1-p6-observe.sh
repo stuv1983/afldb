@@ -5,6 +5,28 @@
 # Runs while A2's R1/R2/R3 proceed (none touches the service or Caddy); R4 (Caddy reload) starts only after this block ends.
 # A tick not OK = rollback trigger (crash restart, errors), decided with the owner.
 # Run: tr -d '\r' < a1-p6-observe.sh | C:/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes afldb bash -s -- <NEW_ID>
+expected_head_title() { # file, expected title; ignore RSC payload outside the HTML head
+  python3 - "$1" "$2" <<'PY'
+from html.parser import HTMLParser
+from html import unescape
+import sys
+class Head(HTMLParser):
+    def __init__(self):
+        super().__init__(); self.head = False; self.title = None; self.titles = []
+    def handle_starttag(self, tag, attrs):
+        if tag == 'head': self.head = True
+        if tag == 'title' and self.head: self.title = ''
+    def handle_data(self, data):
+        if self.title is not None: self.title += data
+    def handle_endtag(self, tag):
+        if tag == 'title' and self.title is not None:
+            self.titles.append(self.title); self.title = None
+        if tag == 'head': self.head = False
+p = Head()
+with open(sys.argv[1]) as f: p.feed(f.read())
+sys.exit(0 if p.titles == [unescape(sys.argv[2])] else 1)
+PY
+}
 main() {
 set -euo pipefail; export LC_ALL=C
 trap 'echo "STOP line $LINENO: $BASH_COMMAND"' ERR
@@ -21,8 +43,10 @@ for t in 0 1 2 3; do
   process.stdout.write("afldb_beta="+p.toString("base64url")+"."+createHmac("sha256",e.AFLDB_SESSION_SECRET).update(p).digest().toString("base64url"))' ) > "$CK"
   S=$(systemctl show afldb -p ActiveState -p NRestarts -p InvocationID -p MemoryCurrent | tr '\n' ' ')
   H=$(curl -s -m 20 "http://127.0.0.1:$P/api/health" || true)
-  G1=$(curl -s -m 60 -o "$T" -w '%{http_code}' -H "Cookie: $(cat "$CK")" "http://127.0.0.1:$P/seasons/2026" || true); NF1=$(grep -o '<title>[^<]*</title>' "$T" | grep -c 'Page not found' || true)
-  G2=$(curl -s -m 60 -o "$T" -w '%{http_code}' -H "Cookie: $(cat "$CK")" "http://127.0.0.1:$P/brownlow/2026" || true); NF2=$(grep -o '<title>[^<]*</title>' "$T" | grep -c 'Page not found' || true)
+  G1=$(curl -s -m 60 -o "$T" -w '%{http_code}' -H "Cookie: $(cat "$CK")" "http://127.0.0.1:$P/seasons/2026" || true); NF1=0
+  expected_head_title "$T" '2026 AFL Season — Ladder, Results &amp; Finals | AFLDB' || NF1=1
+  G2=$(curl -s -m 60 -o "$T" -w '%{http_code}' -H "Cookie: $(cat "$CK")" "http://127.0.0.1:$P/brownlow/2026" || true); NF2=0
+  expected_head_title "$T" '2026 Brownlow Medal — Winner, Votes &amp; Leaderboard | AFLDB' || NF2=1
   rm -f "$CK"
   J=$(journalctl -u afldb --since "$SINCE" -p err -q --no-pager 2>/dev/null | wc -l || echo unreadable)
   echo "tick $t $(date -u +%FT%TZ) $S health=$H seasons=$G1/nf$NF1 brownlow=$G2/nf$NF2 journal_err_lines=$J"

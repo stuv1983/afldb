@@ -16,6 +16,32 @@
 #   r6-pre-verify.sh (BOOT_ID, INVOCATION_ID, RESTORE-SHA, GRUB-BASELINE). In `full`, a GRUB state different from the baseline is
 #   reported as NOTE (expected while the chosen GRUB option is still applied); `grub` mode FAILs on any difference.
 # Dry run: R6_DRYRUN=1 on a non-production host (refused on afldb-prod); production-only facts then FAIL (expected).
+check_revalidation_processes() { # primary PID, immutable release directory; fixture proc root only in direct unit tests
+  local main=$1 release=$2 proc=${3:-/proc} p u s un sn cwd ordinal seen=' ' workers
+  [[ $main =~ ^[1-9][0-9]*$ ]] || return 1
+  workers=$(pgrep -P "$main" || true)
+  [ "$(wc -w <<< "$workers")" = 2 ] || { echo 'FAIL expected both release workers'; return 1; }
+  for p in $main $workers; do
+    [ -r "$proc/$p/environ" ] || return 1
+    cwd=$(readlink "$proc/$p/cwd") || return 1
+    if [ "$p" = "$main" ]; then
+      [ "$cwd" = "$release" ] || return 1
+      echo "primary pid=$p"
+    else
+      [ "$cwd" = "$release" ] || [ "$cwd" = "$release/.next/standalone" ] || return 1
+      ordinal=$(tr '\0' '\n' < "$proc/$p/environ" | sed -n 's/^AFLDB_WORKER_ID=//p')
+      [[ $ordinal =~ ^[12]$ && $seen != *" $ordinal "* ]] || return 1
+      seen="$seen$ordinal "
+      echo "worker=$ordinal pid=$p parent=$main"
+    fi
+    u=$(tr '\0' '\n' < "$proc/$p/environ" | grep -c '^AFLDB_REVALIDATE_URL=' || true)
+    s=$(tr '\0' '\n' < "$proc/$p/environ" | grep -c '^AFLDB_REVALIDATE_SECRET=' || true)
+    un=$(tr '\0' '\n' < "$proc/$p/environ" | grep -c '^AFLDB_REVALIDATE_URL=[^[:space:]]' || true)
+    sn=$(tr '\0' '\n' < "$proc/$p/environ" | grep -c '^AFLDB_REVALIDATE_SECRET=[^[:space:]]' || true)
+    echo "pid=$p URL count=$u nonempty=$un SECRET count=$s nonempty=$sn"
+    [ "$u/$s/$un/$sn" = 1/1/1/1 ] || return 1
+  done
+}
 main() {
 set -uo pipefail; export LC_ALL=C
 MODE=${1:-}
@@ -75,10 +101,7 @@ full)
   MAIN=$(systemctl show afldb -p MainPID --value); NW=0; PIDS=''
   if [[ $MAIN =~ ^[1-9][0-9]*$ ]]; then NW=$(pgrep -P "$MAIN" | wc -l); PIDS="$MAIN $(pgrep -P "$MAIN" | tr '\n' ' ')"; fi
   [ "$NW" = 2 ] && ok "exactly 2 worker processes" || bad "worker processes $NW (expected 2)"
-  E=0; for p in $PIDS; do
-    u=$(tr '\0' '\n' < "/proc/$p/environ" 2>/dev/null | grep -c '^AFLDB_REVALIDATE_URL='); s=$(tr '\0' '\n' < "/proc/$p/environ" 2>/dev/null | grep -c '^AFLDB_REVALIDATE_SECRET=')
-    echo "     pid $p: URL count $u, SECRET count $s"; [ "$u" = "$s" ] || E=1; done
-  [ $E = 0 ] && ok "revalidation names: equal counts per process (counts only; 1/1 when A1 was accepted)" || bad "URL and SECRET counts differ in a process"
+  check_revalidation_processes "$MAIN" "$ROOT/releases/$CUR" && ok 'revalidation configured 1/1 in primary and both release workers' || bad 'revalidation process identity or nonempty 1/1 configuration failed'
   if cd "$CHK" 2>/dev/null; then
     [ "$(readlink "$ROOT/current")" = "releases/$CUR" ] && ok "current = $CUR (unchanged by the reboot)" || bad "current = $(readlink "$ROOT/current")"
     "$N" deploy/release.mjs status 2>&1 | sed 's/^/     /'; info "release.mjs status exit ${PIPESTATUS[0]} (a restart note is expected after a reboot)"

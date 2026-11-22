@@ -111,4 +111,4 @@ C=$W/c4; seed $C; mkdump $C/src afldb_prod-20261104-020000.dump; KEEP=2 run $C 2
 t "C4 normal day (1 new): keeps 2 newest, removes the 2 oldest" eq "$(cnt $C)" 2; t "C4 the new dump is kept" verified $C afldb_prod-20261104-020000.dump; t "C4 rc 0" eq "$(cat $C/rc)" 0
 
 echo "== RESULT: $pass passed, $fail failed (workspace $W kept; remove with rm -rf after review)"
-[ "$fail" = 0 ] && echo "OFFHOST-STAMP RESULT PASS" || echo "OFFHOST-STAMP RESULT FAIL"
+if [ "$fail" = 0 ]; then echo "OFFHOST-STAMP RESULT PASS"; exit 0; else echo "OFFHOST-STAMP RESULT FAIL"; exit 1; fi
