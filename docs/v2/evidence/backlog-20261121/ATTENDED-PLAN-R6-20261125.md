@@ -340,6 +340,12 @@ Do not use PREP's older helpers for Wednesday. No new application deployment is 
 
 ### Before Monday 23 Nov 03:10 AEDT — owner action required
 
+> **SUPERSEDED 23 Nov 2026 (ISSUE-352).** Do not use this install block, its two separate `install -m` commands, the pin table
+> below for the two helpers and `a2-cron-install.sh`/`a2-cron-observe.sh`/`r6-offhost-verify.sh`, or the "wrapper/observer pass"
+> claims in it. Review found the verifier rejects a genuine cron dispatch. The corrected pair, its single-step installer, the new
+> three-outcome contract and the current pins are in `fix-20261123/ISSUE-352-HANDOFF.md` and `fix-20261123/BLOB-PINS.md`.
+> Installation remains on hold for the owner's separate approval. Text below is kept as the historical record.
+
 Install the new wrapper and new verifier on streamanator before that dispatch, preserving
 `state/offhost-pull.log`, existing holds, destination, keys, alarm settings and crontab.
 The core pull stays at `a3775aea879b1d9ce05d0e96482e66d24c69deb62cf38e8fc0407c0d2653dc2b`.
