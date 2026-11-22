@@ -428,6 +428,52 @@ describe.runIf(process.platform === 'linux')('AFLDB-ISSUE-352 — scheduled back
     expect(status(ok.dir).status).toBe(0);
   });
 
+  // 22 Nov 2026 independent review: a successful dump with an unwritable state destination logged "backup ok", exited 0 and removed
+  // FAILED-backup. Each state write and rename must succeed before success is claimed or a failure marker is cleared.
+  it('an unwritable state record is a failure, never "backup ok": nonzero, prior record and marker kept, then a clean retry (review)', () => {
+    const dir = join(root, `case${n + 1}`);
+    const st = join(dir, '.state');
+    mkdirSync(join(st, 'last-backup.json.tmp'), { recursive: true }); // the temporary path is occupied by a directory
+    writeFileSync(join(st, 'last-backup.json'), '{"epoch":1,"file":"prior.dump"}\n');
+    writeFileSync(join(st, 'FAILED-backup'), '{"mode":"backup","step":"backup","exit":3}\n');
+    const bad = run('backup');
+    expect(bad.status, bad.out).toBe(1);
+    expect(bad.out).toMatch(/state write failed/);
+    expect(bad.out).not.toMatch(/backup ok/);
+    expect(bad.state('last-backup.json')).toBe('{"epoch":1,"file":"prior.dump"}\n'); // prior evidence untouched
+    expect(JSON.parse(bad.state('FAILED-backup')!)).toMatchObject({ mode: 'backup', step: 'state-write' });
+    expect(status(dir).status).toBe(1);
+    rmSync(join(st, 'last-backup.json.tmp'), { recursive: true });
+    const again = spawnSync('bash', [WRAPPER, 'backup'], { encoding: 'utf8', env: baseEnv(dir) });
+    expect(again.status, `${again.stdout}${again.stderr}`).toBe(0);
+    expect(existsSync(join(st, 'FAILED-backup'))).toBe(false);
+    expect(JSON.parse(readFileSync(join(st, 'last-backup.json'), 'utf8')).file).not.toBe('prior.dump');
+  });
+
+  it('verify: an unwritable verification record (or backup record) fails, keeps the prior record and the FAILED marker, then a retry succeeds (review)', () => {
+    const dir = join(root, `case${n + 1}`);
+    const st = join(dir, '.state');
+    mkdirSync(join(st, 'last-verify.json.tmp'), { recursive: true });
+    writeFileSync(join(st, 'last-verify.json'), '{"epoch":1,"file":"prior.dump"}\n');
+    writeFileSync(join(st, 'FAILED-verify'), '{"mode":"verify","step":"restore-test","exit":1}\n');
+    const bad = run('verify');
+    expect(bad.status, bad.out).toBe(1);
+    expect(bad.out).not.toMatch(/verify ok/);
+    expect(bad.state('last-verify.json')).toBe('{"epoch":1,"file":"prior.dump"}\n');
+    expect(JSON.parse(bad.state('FAILED-verify')!)).toMatchObject({ mode: 'verify', step: 'verify-state-write' });
+    rmSync(join(st, 'last-verify.json.tmp'), { recursive: true });
+    mkdirSync(join(st, 'last-backup.json.tmp'), { recursive: true }); // now the BACKUP record inside verify is unwritable
+    const bad2 = spawnSync('bash', [WRAPPER, 'verify'], { encoding: 'utf8', env: baseEnv(dir) });
+    expect(bad2.status).toBe(1);
+    expect(`${bad2.stdout}${bad2.stderr}`).not.toMatch(/verify ok/);
+    expect(JSON.parse(readFileSync(join(st, 'FAILED-verify'), 'utf8'))).toMatchObject({ mode: 'verify', step: 'state-write' });
+    rmSync(join(st, 'last-backup.json.tmp'), { recursive: true });
+    const again = spawnSync('bash', [WRAPPER, 'verify'], { encoding: 'utf8', env: baseEnv(dir) });
+    expect(again.status, `${again.stdout}${again.stderr}`).toBe(0);
+    expect(existsSync(join(st, 'FAILED-verify'))).toBe(false);
+    expect(JSON.parse(readFileSync(join(st, 'last-verify.json'), 'utf8')).file).not.toBe('prior.dump');
+  });
+
   it('offhost-pull: binds each sidecar to its dump, refuses future stamps, and a flood cannot evict genuine copies (review A-03)', () => {
     const src = join(root, 'pull-src');
     const dest = join(root, 'pull-dest');
@@ -568,5 +614,74 @@ describe.runIf(process.platform === 'linux')('AFLDB-ISSUE-352 — scheduled back
     }
     // The wrapper wraps; it does not edit what other suites pin.
     expect(readFileSync('tools/maintenance/scheduled-backup.sh', 'utf8')).toContain('never edits or reimplements them');
+  });
+});
+
+/**
+ * 22 Nov 2026 independent review (ISSUE-352): backup.sh copied the URI-encoded password into PGPASSWORD, which libpq does not
+ * decode, so a valid credential containing a percent-encoded character failed authentication and every scheduled backup stopped.
+ * The REAL backup.sh runs from a disposable checkout layout (so no real .env can be sourced) against stub pg_dump/pg_restore that
+ * record what libpq would have received. Synthetic credentials only; no connection is made.
+ */
+describe.runIf(process.platform === 'linux')('AFLDB-ISSUE-352 review — backup.sh decodes the DSN password for PGPASSWORD', () => {
+  const root = mkdtempSync(join(tmpdir(), 'afldb-352-pw-'));
+  const bin = join(root, 'bin');
+  const repoTools = join(root, 'repo', 'tools', 'maintenance');
+  mkdirSync(bin);
+  mkdirSync(repoTools, { recursive: true });
+  writeFileSync(join(repoTools, 'backup.sh'), readFileSync(join(process.cwd(), 'tools', 'maintenance', 'backup.sh')));
+  writeFileSync(join(bin, 'pg_dump'), [
+    '#!/usr/bin/env bash',
+    'printf "PGPASSWORD=%s\\n" "${PGPASSWORD-<unset>}" >> "$STUB_LOG"',
+    'printf "ARGV %s\\n" "$*" >> "$STUB_LOG"',
+    'for a in "$@"; do case $a in --file=*) printf "synthetic dump" > "${a#--file=}";; esac; done',
+  ].join('\n'));
+  writeFileSync(join(bin, 'pg_restore'), '#!/usr/bin/env bash\necho "1; 0 0 TABLE public t owner"\n');
+  for (const f of [join(repoTools, 'backup.sh'), join(bin, 'pg_dump'), join(bin, 'pg_restore')]) chmodSync(f, 0o755);
+
+  let n = 0;
+  const backup = (dsn: string) => {
+    n += 1;
+    const log = join(root, `log${n}`);
+    const dir = join(root, `out${n}`);
+    const r = spawnSync('bash', [join(repoTools, 'backup.sh'), '--dir', dir], {
+      encoding: 'utf8',
+      env: { PATH: `${bin}:/usr/bin:/bin`, HOME: root, STUB_LOG: log, AFLDB_BACKUP_DATABASE_URL: dsn },
+    });
+    return { ...r, out: `${r.stdout}${r.stderr}`, log: existsSync(log) ? readFileSync(log, 'utf8') : '' };
+  };
+
+  it('a percent-encoded password reaches pg_dump decoded in PGPASSWORD, and appears in no argv or output', () => {
+    const r = backup('postgresql://afldb_backup:p%40ss%2Fw%25rd@localhost:5432/afldb_prod');
+    expect(r.status, r.out).toBe(0);
+    expect(r.log).toContain('PGPASSWORD=p@ss/w%rd\n');
+    const argv = r.log.split('\n').filter((l) => l.startsWith('ARGV'))[0];
+    for (const leak of ['p%40ss', 'p@ss', 'w%25rd', 'w%rd']) {
+      expect(argv).not.toContain(leak);
+      expect(r.out).not.toContain(leak);
+    }
+    expect(argv).toContain('postgresql://afldb_backup@localhost:5432/afldb_prod');
+  });
+
+  it('an ordinary password and an encoded backslash are passed through exactly; no password leaves PGPASSWORD unset', () => {
+    const plain = backup('postgresql://afldb_backup:plainSecret1@localhost/afldb_prod');
+    expect(plain.status, plain.out).toBe(0);
+    expect(plain.log).toContain('PGPASSWORD=plainSecret1\n');
+    const slash = backup('postgresql://afldb_backup:a%5Cb@localhost/afldb_prod');
+    expect(slash.status, slash.out).toBe(0);
+    expect(slash.log).toContain('PGPASSWORD=a\\b\n');
+    const none = backup('postgresql://afldb_backup@localhost/afldb_prod');
+    expect(none.status, none.out).toBe(0);
+    expect(none.log).toContain('PGPASSWORD=<unset>\n');
+  });
+
+  it('a password that cannot be decoded exactly is refused before pg_dump runs, without printing it', () => {
+    for (const bad of ['bad%zz', 'trail%4', 'nul%00x', 'back\\slash']) {
+      const r = backup(`postgresql://afldb_backup:${bad}@localhost/afldb_prod`);
+      expect(r.status, r.out).toBe(1);
+      expect(r.out).toMatch(/not cleanly percent-encoded/);
+      expect(r.out).not.toContain(bad);
+      expect(r.log).toBe(''); // pg_dump was never invoked
+    }
   });
 });

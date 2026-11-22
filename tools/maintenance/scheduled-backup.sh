@@ -89,8 +89,15 @@ fail() { # step exit-code
   log "AFLDB_BACKUP_FAILURE mode=$MODE step=$1 exit=$2"
   exit 1
 }
+# A state record is evidence: status and the failure markers are judged against it. Returns 0 ONLY when the temporary write and
+# the rename both succeeded (ISSUE-352 review, 22 Nov 2026: an unwritable destination used to log "backup ok", exit 0 and
+# clear the failure marker). The previous record stays in place on any failure; callers must stop on a non-zero return.
 write_state() { # file json
-  printf '%s\n' "$2" > "$1.tmp" && mv "$1.tmp" "$1"
+  local f="$1" tmp="$1.tmp"
+  if [[ ! -d "$f" ]] && printf '%s\n' "$2" > "$tmp" && mv -f -- "$tmp" "$f"; then return 0; fi
+  log "state write failed for $f (previous record kept)" >&2
+  [[ -f "$tmp" ]] && rm -f -- "$tmp"
+  return 1
 }
 scrub() { sed -E 's#postgres(ql)?://[^[:space:]]+#<dsn>#g'; }
 # A success clears only the markers it disproves (review A-02): backup clears FAILED-backup; verify (which also takes a
@@ -141,9 +148,9 @@ backup_flow() {
   run_backup || fail backup $?
   local offhost sha bytes
   offhost=$(offhost_push "$NEW_DUMP"); local orc=$?
-  sha=$(cut -d' ' -f1 "$NEW_DUMP.sha256"); bytes=$(stat -c %s "$NEW_DUMP")
+  sha=$(cut -d' ' -f1 "$NEW_DUMP.sha256") && bytes=$(stat -c %s "$NEW_DUMP") && [[ -n "$sha" && -n "$bytes" ]] || fail evidence 1
   write_state "$STATE/last-backup.json" "$(printf '{"epoch":%s,"ts":"%s","file":"%s","sha256":"%s","bytes":%s,"offhost":"%s"}' \
-    "$(date +%s)" "$(date -u +%FT%TZ)" "$(basename "$NEW_DUMP")" "$sha" "$bytes" "$offhost")"
+    "$(date +%s)" "$(date -u +%FT%TZ)" "$(basename "$NEW_DUMP")" "$sha" "$bytes" "$offhost")" || fail state-write 1
   [[ $orc -eq 0 ]] || fail offhost "$orc"
   log "backup ok: $(basename "$NEW_DUMP") ${bytes} bytes sha256 ${sha:0:16} offhost=$offhost"
 }
@@ -163,7 +170,7 @@ case "$MODE" in
       sleep "$RETRY_SECONDS"
     done
     write_state "$STATE/last-verify.json" "$(printf '{"epoch":%s,"ts":"%s","file":"%s","sha256":"%s","attempts":%s}' \
-      "$(date +%s)" "$(date -u +%FT%TZ)" "$(basename "$NEW_DUMP")" "$(cut -d' ' -f1 "$NEW_DUMP.sha256")" "$attempt")"
+      "$(date +%s)" "$(date -u +%FT%TZ)" "$(basename "$NEW_DUMP")" "$(cut -d' ' -f1 "$NEW_DUMP.sha256")" "$attempt")" || fail verify-state-write 1
     clear_markers FAILED-backup FAILED-verify
     log "verify ok: $(basename "$NEW_DUMP") restored and proven (attempt $attempt)"
     ;;

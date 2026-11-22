@@ -26,12 +26,27 @@ cd "$(dirname "$0")/../.."
 # /proc/<pid>/cmdline; libpq instead reads PGPASSWORD from the environment
 # (/proc/<pid>/environ, readable only by the owner). This exports PGPASSWORD
 # and assigns a password-less DSN to the named variable.
+#
+# libpq percent-decodes the password in a URL DSN, but PGPASSWORD is NOT decoded,
+# so the raw password must be decoded here exactly once (ISSUE-352 review,
+# 22 Nov 2026: an encoded "@" or "/" in a valid credential made every scheduled
+# backup fail authentication). Same rule as restore-test.sh: a sequence that
+# cannot be decoded exactly, a backslash or an encoded NUL is refused rather than
+# guessed at, and the refusal never prints the password.
+BAD_PERCENT_RE='%([^0-9A-Fa-f]|[0-9A-Fa-f][^0-9A-Fa-f]|[0-9A-Fa-f]?$)'
 dsn_scrub() {
-  local __out_var="$1" dsn="$2"
+  local __out_var="$1" dsn="$2" __scheme __user __raw __rest __pw
   if [[ "$dsn" =~ ^([a-zA-Z][a-zA-Z0-9+.-]*://)([^:/@]+):([^@]*)@(.*)$ ]]; then
-    export PGPASSWORD="${BASH_REMATCH[3]}"
-    printf -v "$__out_var" '%s%s@%s' \
-      "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[4]}"
+    __scheme="${BASH_REMATCH[1]}"; __user="${BASH_REMATCH[2]}"; __raw="${BASH_REMATCH[3]}"; __rest="${BASH_REMATCH[4]}"
+    if [[ -n "$__raw" ]]; then
+      if [[ "$__raw" == *\\* || "$__raw" == *%00* ]] || [[ "$__raw" =~ $BAD_PERCENT_RE ]]; then
+        echo "ERROR: the password in AFLDB_BACKUP_DATABASE_URL is not cleanly percent-encoded; refusing to guess." >&2
+        exit 1
+      fi
+      printf -v __pw '%b' "${__raw//\%/\\x}"
+      export PGPASSWORD="$__pw"
+    fi
+    printf -v "$__out_var" '%s%s@%s' "$__scheme" "$__user" "$__rest"
   else
     printf -v "$__out_var" '%s' "$dsn"
   fi
