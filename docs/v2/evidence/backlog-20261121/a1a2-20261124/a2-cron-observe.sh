@@ -3,8 +3,10 @@
 # a record block to paste into OPEN-ITEMS-AFTER-SITTINGS.md §4 (cron observation record). STREAMANATOR, as arm. READ-ONLY:
 # reads arm's crontab, the wrappers' own logs and the off-host directory listing; runs nothing, sends nothing, writes nothing.
 #   r2  first settle-check.log line stamped after the install time at minute 17 (hourly), and the latest one
-#   r3  explicit Melbourne date: independent 03:10 cron dispatch, framed invocation,
-#       rc=0 completion and named overnight production checksum; fails closed.
+#   r3  explicit Melbourne date: independent 03:10 cron dispatch (command portion; schedule checked against the crontab),
+#       bound to a wrapper invocation through its process lineage, rc=0 completion and named overnight production checksum.
+#       ISSUE-352 outcomes (exit status of this script for r3/all): 0 scheduled copy verified, 10 copy verified but scheduled
+#       origin unproven, 1 copy failed, 2 usage. Only 0 satisfies the scheduled-run criterion.
 # Usage: bash a2-cron-observe.sh r2 | r3|all <Melbourne DATE> <overnight DUMP> <production SHA256>
 # The 22 Nov 2026 email delivery confirmation is SEPARATE evidence (ISSUE-332) and is not re-proven here: a scheduled OK run
 # sends no email. An alarm count change is reported so the owner can match it to an email.

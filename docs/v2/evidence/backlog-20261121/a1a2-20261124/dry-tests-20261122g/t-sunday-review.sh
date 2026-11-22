@@ -1,21 +1,26 @@
 #!/usr/bin/env bash
 # Disposable Linux fixtures only. ROOT is the uploaded source tree, no live ops.
+# ISSUE-352 (22-23 Nov 2026): updated to the corrected contract. The journal CMD record holds the command only (the observed
+# Debian cron format), the wrapper BEGIN carries the process lineage, and the verifier distinguishes COPY-FAILED (exit 1) from
+# COPY-VERIFIED-ORIGIN-UNPROVEN (exit 10). The full three-outcome and installer matrix is t-352-scheduled-origin.sh.
 set -euo pipefail
 ROOT=${1:?source root}; B=$ROOT/docs/v2/evidence/backlog-20261121
 W=$(mktemp -d /mnt/ssd/afldb-review-fixture-XXXXXX); trap 'rm -rf -- "$W"' EXIT
 mkdir -p "$W/ops/state" "$W/dest" "$W/bin"
 export AFLDB_OPS=$W/ops AFLDB_OFFHOST_DEST=$W/dest CRON_LOG_FILE=$W/cron CRONTAB_BIN=$W/bin/crontab
 cp "$B/kits/scheduled-pull-evidence.sh" "$W/ops/"
-LINE='10 3 * * * AFLDB_ALARM_CMD=/home/arm/afldb-ops/alarm-email.sh /bin/sh /home/arm/afldb-ops/afldb-offhost-pull-daily.sh'
+CMD='AFLDB_ALARM_CMD=/home/arm/afldb-ops/alarm-email.sh /bin/sh /home/arm/afldb-ops/afldb-offhost-pull-daily.sh'
+LINE="10 3 * * * $CMD"
+T0=$(date -d '2026-11-17T16:10:01Z' +%s)
 printf '#!/bin/sh\ncat "%s"\n' "$W/ct" > "$CRONTAB_BIN"; chmod +x "$CRONTAB_BIN"
 printf '# AFLDB-A2-r3\n%s\n' "$LINE" > "$W/ct"
 D=afldb_prod-20261118-022125.dump; printf fixture > "$W/dest/$D"
 S=$(sha256sum < "$W/dest/$D" | cut -d' ' -f1)
 printf '%s  %s\n' "$S" "$D" > "$W/dest/$D.sha256"; touch "$W/dest/.verified-$D"
 good() {
-  printf '2026-11-18T03:10:01+11:00 streamanator CRON[777]: (arm) CMD (%s)\n' "$LINE" > "$W/cron"
+  printf '2026-11-18T03:10:01+11:00 streamanator CRON[777]: (arm) CMD (%s)\n' "$CMD" > "$W/cron"
   cat > "$W/ops/state/offhost-pull.log" <<EOF
-2026-11-17T16:10:01Z BEGIN run=scheduled cron_pid=777
+2026-11-17T16:10:01Z BEGIN run=scheduled cron_pid=776 lineage=778:sh:$T0,777:sh:$T0,776:cron:$T0
 2026-11-17T16:12:00Z VERIFIED run=scheduled dump=$D sha256=$S
 2026-11-17T16:12:01Z END run=scheduled rc=0
 EOF
@@ -25,16 +30,16 @@ expect() { local want=$1 name=$2 rc=0; shift 2; "$@" > "$W/result" 2>&1 || rc=$?
 verify() { bash "$B/r6-20261125/r6-offhost-verify.sh" 2026-11-18 "$D" "$S"; }
 observe() { bash "$B/a1a2-20261124/a2-cron-observe.sh" r3 2026-11-18 "$D" "$S"; }
 good; expect 0 scheduled-chain verify; expect 0 r3-observer observe
-good; sed -i 's/cron_pid=777/cron_pid=none/' "$W/ops/state/offhost-pull.log"; expect 1 manual-success verify; expect 1 r3-propagates-failure observe
-good; sed -i 's/2026-11-18/2026-11-16/' "$W/cron"; expect 1 monday-for-wednesday verify
+good; sed -i 's/ lineage=.*$/ lineage=5001:bash:1/' "$W/ops/state/offhost-pull.log"; expect 10 manual-success verify; expect 10 r3-propagates-unproven observe
+good; sed -i 's/2026-11-18/2026-11-16/' "$W/cron"; expect 10 monday-for-wednesday verify
 good; sed -i 's/rc=0/rc=1/' "$W/ops/state/offhost-pull.log"
-printf '2026-11-17T16:20:00Z BEGIN run=retry cron_pid=none\n2026-11-17T16:21:00Z END run=retry rc=0\n' >> "$W/ops/state/offhost-pull.log"
+printf '2026-11-17T16:20:00Z BEGIN run=retry cron_pid=none lineage=5001:bash:1\n2026-11-17T16:21:00Z END run=retry rc=0\n' >> "$W/ops/state/offhost-pull.log"
 expect 1 failed-scheduled-then-retry verify
-good; sed -i '/ VERIFIED /d' "$W/ops/state/offhost-pull.log"; echo "unrelated verified $D" >> "$W/ops/state/offhost-pull.log"; expect 1 unrelated-verified verify
-good; sed -i 's/022125/033635/' "$W/ops/state/offhost-pull.log"; expect 1 verification-service-dump verify
+good; sed -i '/ VERIFIED /d' "$W/ops/state/offhost-pull.log"; echo "unrelated verified $D" >> "$W/ops/state/offhost-pull.log"; expect 10 unrelated-verified verify
+good; sed -i 's/022125/033635/' "$W/ops/state/offhost-pull.log"; expect 10 verification-service-dump verify
 good; expect 1 wrong-production-sha bash "$B/r6-20261125/r6-offhost-verify.sh" 2026-11-18 "$D" "$(printf '%064d' 0)"
 good; touch "$W/dest/.retention-hold"; expect 1 active-hold verify; rm "$W/dest/.retention-hold"
-good; cp "$W/cron" "$W/dup"; cat "$W/dup" >> "$W/cron"; expect 1 ambiguous-dispatch verify
+good; cp "$W/cron" "$W/dup"; cat "$W/dup" >> "$W/cron"; expect 10 ambiguous-dispatch verify
 good; sed -i 's/16:12:01/17:12:01/' "$W/ops/state/offhost-pull.log"; expect 1 late-completion verify
 good; echo corrupt >> "$W/dest/$D"; expect 1 changed-dump-bytes verify; printf fixture > "$W/dest/$D"
 good; printf '%s  other.dump\n' "$S" > "$W/dest/$D.sha256"; expect 1 wrong-sidecar verify; printf '%s  %s\n' "$S" "$D" > "$W/dest/$D.sha256"

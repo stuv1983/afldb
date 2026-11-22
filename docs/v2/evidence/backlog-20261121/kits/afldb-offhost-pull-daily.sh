@@ -12,16 +12,33 @@ STATE="$OPS/state"; mkdir -p "$STATE" && chmod 700 "$STATE"
 export RSYNC_RSH="ssh -o BatchMode=yes -o ConnectTimeout=20 -o IdentitiesOnly=yes -i $HOME/.ssh/afldb_backup_pull"
 exec 9>"$STATE/offhost-pull.lock"
 flock -n 9 || { echo 'offhost wrapper already running' >&2; exit 1; }
-# The nearest CRON ancestor must match the independent journal CMD record.
+# ISSUE-352: Debian cron logs `CRON[pid]: (arm) CMD (command)` from the process about to exec the job shell, which is NOT the
+# process named "cron" above that shell. Record this invocation's whole process lineage (pid:comm:start-epoch, this shell up
+# to init) so an observer can bind the independent journal dispatch to THIS run through that PID and its start time.
+# `cron_pid` is kept for humans only; nothing trusts it. A ps failure degrades to lineage=unknown and never blocks the pull.
+lineage_of() {
+  p=$1; now=$2; n=0; out=''
+  while [ "$p" -gt 1 ] 2>/dev/null && [ "$n" -lt 16 ]; do
+    comm=$(ps -o comm= -p "$p" 2>/dev/null | tr -cd 'A-Za-z0-9._-')
+    et=$(ps -o etimes= -p "$p" 2>/dev/null | tr -d ' ')
+    [ -n "$comm" ] && [ "$et" -ge 0 ] 2>/dev/null || break
+    out="$out${out:+,}$p:$comm:$((now - et))"
+    p=$(ps -o ppid= -p "$p" 2>/dev/null | tr -d ' ')
+    n=$((n + 1))
+  done
+  [ -n "$out" ] && printf '%s' "$out"
+}
 cron_pid=none; ancestor=$PPID
 while [ "$ancestor" -gt 1 ] 2>/dev/null; do
-  comm=$(ps -o comm= -p "$ancestor" | tr -d ' ')
+  comm=$(ps -o comm= -p "$ancestor" 2>/dev/null | tr -d ' ')
   case "$comm" in cron|CRON) cron_pid=$ancestor; break;; esac
-  ancestor=$(ps -o ppid= -p "$ancestor" | tr -d ' ')
+  ancestor=$(ps -o ppid= -p "$ancestor" 2>/dev/null | tr -d ' ')
 done
+lineage=$(lineage_of "$$" "$(date +%s)") || lineage=''
+[ -n "$lineage" ] || lineage=unknown
 stamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 run="$stamp-$$"
-printf '%s BEGIN run=%s cron_pid=%s\n' "$stamp" "$run" "$cron_pid" >> "$STATE/offhost-pull.log"
+printf '%s BEGIN run=%s cron_pid=%s lineage=%s\n' "$stamp" "$run" "$cron_pid" "$lineage" >> "$STATE/offhost-pull.log"
 out=$(timeout 1800 bash "$OPS/offhost-pull.sh" "$PROD:/" "$DEST/" --keep 30 2>&1); rc=$?
 printf '%s\n' "$out" | sed "s/^/OUTPUT run=$run /" >> "$STATE/offhost-pull.log"
 # Include unchanged copies in this invocation's evidence; re-hash their bytes.

@@ -8,8 +8,11 @@
 #       precondition: the newest <dest>/afldb_prod-*.dump has a one-line sidecar that verifies, its .verified-<dump> marker, and
 #       the first-copy restore log state/a2-firstcopy-restore.log names that dump with "pg_restore exit=0" and
 #       "FIRSTCOPY RESULT RESTORE PASS" (A2 R3 steps 11-12)
-# Usage: bash a2-cron-install.sh check|install|remove r2|r3 [--dry-run]
-#   check    read-only: preconditions + installed state; never writes
+# Usage: bash a2-cron-install.sh check|install|remove r2|r3 [--dry-run]    (check also accepts --require-installed)
+#   check    read-only: preconditions + installed state; never writes. ISSUE-352: the exit status is accurate. 0 = every
+#            precondition PASS (and, with --require-installed, the exact marker + job pair is present); 1 = a precondition
+#            FAILED (the printed PRECONDITIONS FAIL line is no longer exit 0); 6 = preconditions pass but the pair is absent
+#            and --require-installed was given
 #   install  one marker comment + one job line appended; a re-run with the identical pair present = "ALREADY INSTALLED", exit 0;
 #            a marker with a different line, or the wrapper scheduled without the marker = STOP (exit 3)
 #   remove   removes exactly the marker + job pair (the leave is six weeks: the documented way back)
@@ -27,7 +30,9 @@ MIN_LINES=${AFLDB_CRON_MIN_LINES:-24}
 EXPECT_HOST=${AFLDB_CRON_EXPECT_HOST:-streamanator}
 MODE=${1:?check|install|remove}; JOB=${2:?r2|r3}; DRY=${3:-}
 [[ $MODE =~ ^(check|install|remove)$ ]] || { echo "STOP mode"; exit 2; }
-[ -z "$DRY" ] || [ "$DRY" = --dry-run ] || { echo "STOP third argument must be --dry-run"; exit 2; }
+[ -z "$DRY" ] || [ "$DRY" = --dry-run ] || [ "$DRY" = --require-installed ] || { echo "STOP third argument must be --dry-run or --require-installed"; exit 2; }
+[ "$DRY" != --require-installed ] || [ "$MODE" = check ] || { echo "STOP --require-installed applies to check only"; exit 2; }
+[ "$DRY" != --dry-run ] || [ "$MODE" != check ] || { echo "STOP --dry-run applies to install|remove only"; exit 2; }
 ALARM='AFLDB_ALARM_CMD=/home/arm/afldb-ops/alarm-email.sh'
 case $JOB in
   r2) LINE="17 * * * * $ALARM /bin/sh /home/arm/afldb-ops/afldb-settle-check.sh"
@@ -35,15 +40,15 @@ case $JOB in
       WRAP=afldb-settle-check.sh; WHAT="ISSUE-332 hourly settle-status pull check";;
   r3) LINE="10 3 * * * $ALARM /bin/sh /home/arm/afldb-ops/afldb-offhost-pull-daily.sh"
       # pin of offhost-pull.sh changed ea48205a -> a3775aea (stamp read in Australia/Melbourne), A2 run 2026-11-22
-      PINS="6403871ecb1073c2f1a4086bf41fea002c2de7c0178dd8862098ea54d2265da3  $OPS/afldb-offhost-pull-daily.sh
+      PINS="2ebac1c09b07e6b3bc1e060d7645efdbb1c2c7f169b5cfafd4e7f77508716e24  $OPS/afldb-offhost-pull-daily.sh
 a3775aea879b1d9ce05d0e96482e66d24c69deb62cf38e8fc0407c0d2653dc2b  $OPS/offhost-pull.sh
-2e42d307de1b63dda8f8e34322effc8747e4bc3c177245f0cc891f18777b0999  $OPS/scheduled-pull-evidence.sh"
+d7574254997ba28dd1f750b7bcdc6f90c0a421b88ba6bb02aa104bd671b8572e  $OPS/scheduled-pull-evidence.sh"
       WRAP=afldb-offhost-pull-daily.sh; WHAT="ISSUE-352 daily off-host pull";;
   *) echo "STOP job must be r2 or r3"; exit 2;;
 esac
 MARK="# AFLDB-A2-$JOB: $WHAT (owner decision 3, 2026-11-22); installed by a2-cron-install.sh"
 STAMP=$(date -u +%Y%m%dT%H%M%SZ)
-echo "== A2 cron $MODE $JOB $STAMP host=$(hostname) user=$(id -un) crontab=$CRONTAB_BIN${DRY:+ (dry run)}"
+echo "== A2 cron $MODE $JOB $STAMP host=$(hostname) user=$(id -un) crontab=$CRONTAB_BIN${DRY:+ ($DRY)}"
 [ "$(hostname)" = "$EXPECT_HOST" ] && [ "$(id -un)" = arm ] || { echo "STOP not arm@$EXPECT_HOST"; exit 3; }
 
 next_due() {   # Melbourne local time (cron runs in the system zone; recorded Australia/Melbourne on 2026-11-22)
@@ -64,7 +69,15 @@ precheck() {
   local tz; tz=$(cat /etc/timezone 2>/dev/null || true)
   if [ "$tz" = Australia/Melbourne ]; then echo "PASS system timezone Australia/Melbourne (cron schedules are Melbourne local time)"; else echo "FAIL system timezone '$tz'"; pre_ok=0; fi
   if [ "$(systemctl is-active cron 2>/dev/null || true)" = active ]; then echo "PASS cron active"; else echo "FAIL cron not active"; pre_ok=0; fi
-  if (printf '%s\n' "$PINS" | sha256sum --quiet -c -); then echo "PASS wrapper pins: $(printf '%s\n' "$PINS" | awk '{print substr($1,1,8)}' | tr '\n' ' ')"; else echo "FAIL a wrapper differs from its pin (re-stage per ATTENDED-PLAN §4.2/§4.6)"; pre_ok=0; fi
+  # ISSUE-352: every pinned file is reported by name, so a missing helper or a mixed pair is visible, not just "differs".
+  local pin_ok=1 want path
+  while read -r want path; do
+    [ -n "$want" ] || continue
+    if [ ! -f "$path" ]; then echo "FAIL pinned file missing: $path"; pin_ok=0
+    elif [ "$(sha256sum < "$path" | cut -d' ' -f1)" = "$want" ]; then echo "PASS pin ${want:0:8} ${path##*/}"
+    else echo "FAIL pinned file differs from its pin ${want:0:8}: $path"; pin_ok=0; fi
+  done <<< "$PINS"
+  if [ "$pin_ok" = 1 ]; then echo "PASS wrapper pins: $(printf '%s\n' "$PINS" | awk '{print substr($1,1,8)}' | tr '\n' ' ')"; else echo "FAIL a wrapper or helper is missing or differs from its pin (install the pair with a2-helper-install.sh)"; pre_ok=0; fi
   if [ -x "$OPS/alarm-email.sh" ] && head -1 "$OPS/alarm-email.sh" | grep -qx '#!/usr/bin/env bash' && [ "$(stat -c %a "$OPS/alarm-smtp.env" 2>/dev/null)" = 600 ]; then
     echo "PASS alarm sender executable (bash shebang), alarm-smtp.env 0600 (content not read)"; else echo "FAIL alarm sender or its 0600 settings file missing"; pre_ok=0; fi
   if [ "$JOB" = r2 ]; then
@@ -100,7 +113,8 @@ case $MODE in
 check)
   precheck
   [ "$pair" = 1 ] && echo "CRON CHECK $JOB INSTALLED (next due $(next_due))" || echo "CRON CHECK $JOB NOT INSTALLED"
-  [ "$pre_ok" = 1 ] && echo "CRON CHECK $JOB PRECONDITIONS PASS" || echo "CRON CHECK $JOB PRECONDITIONS FAIL"
+  if [ "$pre_ok" = 1 ]; then echo "CRON CHECK $JOB PRECONDITIONS PASS"; else echo "CRON CHECK $JOB PRECONDITIONS FAIL"; exit 1; fi
+  [ "$DRY" != --require-installed ] || [ "$pair" = 1 ] || exit 6
   exit 0;;
 install)
   if [ "$pair" = 1 ] && [ "$w" = 1 ]; then echo "CRON INSTALL $JOB ALREADY INSTALLED (exactly one marker + job; next due $(next_due))"; exit 0; fi
