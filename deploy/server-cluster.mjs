@@ -169,6 +169,24 @@ if (cluster.isPrimary) {
       } catch { /* headers still carry worker and pid, which is the point */ }
     }
 
+    // ISSUE-362 (independent review, 22 Nov 2026): the trace line used to log `req.url`, so a path segment or query value
+    // that carries a credential (a token, an email, a search term) reached the service journal independently of Caddy's access-log
+    // filter. The sink now carries only a ROUTE CLASS: the first segment when it is a known application route, then up to three
+    // further segments reduced to a number (a season year or id) or `:x`; the query string and fragment are never logged.
+    const TRACE_ROUTE_ROOTS = new Set([
+      'admin', 'advanced-search', 'aflw', 'api', 'awards', 'beta', 'brownlow', 'clubs', 'coaches', 'draft', 'grid-solver',
+      'hall-of-fame', 'honour-teams', 'match-search', 'matches', 'players', 'privacy', 'records', 'search', 'seasons', 'venues',
+      '_next', 'robots.txt', 'sitemap.xml', 'sitemap-index.xml', 'icon.svg', 'opengraph-image',
+    ]);
+    const routeClass = (rawUrl) => {
+      const path = String(rawUrl ?? '').split(/[?#]/, 1)[0];
+      const segments = path.split('/').filter(Boolean);
+      if (segments.length === 0) return '/';
+      const first = TRACE_ROUTE_ROOTS.has(segments[0]) ? segments[0] : ':x';
+      const rest = segments.slice(1, 4).map((s) => (/^\d{1,6}$/.test(s) ? s : ':x'));
+      return `/${[first, ...rest].join('/')}${segments.length > 4 ? '/*' : ''}`;
+    };
+
     const createServer = http.createServer.bind(http);
     http.createServer = (...args) => {
       const handler = args.find((arg) => typeof arg === 'function');
@@ -193,7 +211,7 @@ if (cluster.isPrimary) {
           console.log(
             `[trace] ts=${new Date(startedAt).toISOString()} worker=${workerId} pid=${process.pid} `
             + `rid=${requestId} build=${buildId} status=${res.statusCode} `
-            + `ms=${Date.now() - startedAt} method=${req.method} url=${req.url}`,
+            + `ms=${Date.now() - startedAt} method=${req.method} route=${routeClass(req.url)}`,
           );
         });
 

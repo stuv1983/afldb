@@ -202,6 +202,62 @@ describe('AFLDB-ISSUE-329 — the systemd drop-in and the supervisor', () => {
     expect(identity).toBeLessThan(source.indexOf("AFLDB_TRACE_REQUESTS === 'on'"));
   });
 
+  // 22 Nov 2026 independent review (ISSUE-362): with AFLDB_TRACE_REQUESTS=on the supervisor logged req.url (path and query) to the
+  // service journal. The REAL server-cluster.mjs runs here against a stub standalone server on a loopback port; a synthetic
+  // sentinel in the path and the query must never reach the captured trace, which carries only a route class.
+  it('request tracing logs a route class, never the raw URL: a synthetic path/query sentinel is absent from the trace', async () => {
+    const { createServer } = await import('node:net');
+    const port = await new Promise<number>((resolve) => {
+      const s = createServer();
+      s.listen(0, '127.0.0.1', () => { const p = (s.address() as { port: number }).port; s.close(() => resolve(p)); });
+    });
+    const dir = mkdtempSync(join(tmpdir(), 'afldb-362-'));
+    mkdirSync(join(dir, 'deploy'));
+    mkdirSync(join(dir, '.next', 'standalone'), { recursive: true });
+    copyFileSync(join(REPO, 'deploy', 'server-cluster.mjs'), join(dir, 'deploy', 'server-cluster.mjs'));
+    writeFileSync(join(dir, '.next', 'standalone', 'server.js'), [
+      "import http from 'node:http';",
+      "http.createServer((req, res) => { res.end('ok'); }).listen(Number(process.env.PORT), '127.0.0.1');",
+    ].join('\n'));
+    let out = '';
+    const server = spawn(process.execPath, ['deploy/server-cluster.mjs'], {
+      cwd: dir, stdio: ['ignore', 'pipe', 'pipe'],
+      env: { PATH: process.env.PATH, PORT: String(port), AFLDB_WORKERS: '1', AFLDB_TRACE_REQUESTS: 'on' } as unknown as NodeJS.ProcessEnv,
+    });
+    server.stdout!.on('data', (d) => { out += d; });
+    server.stderr!.on('data', (d) => { out += d; });
+    try {
+      const until = Date.now() + 15_000;
+      for (;;) {
+        try { if ((await fetch(`http://127.0.0.1:${port}/`, { signal: AbortSignal.timeout(1000) })).ok) break; } catch { /* not up yet */ }
+        if (Date.now() > until) throw new Error(`stub server did not start: ${out}`);
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      const SENTINEL = 'SENTINEL-TOKEN-8f3a91';
+      await fetch(`http://127.0.0.1:${port}/players/${SENTINEL}?token=${SENTINEL}&email=${SENTINEL}%40example.test#frag-${SENTINEL}`);
+      await fetch(`http://127.0.0.1:${port}/seasons/2026/rounds/3?x=1`);
+      await fetch(`http://127.0.0.1:${port}/${SENTINEL}/a/b/c/d/e`);
+      const lines = () => out.split('\n').filter((l) => l.includes('[trace]'));
+      const until2 = Date.now() + 5000;
+      while (lines().length < 4 && Date.now() < until2) await new Promise((r) => setTimeout(r, 50));
+      const trace = lines().join('\n');
+      expect(trace).toMatch(/method=GET route=\/players\/:x\b/);
+      expect(trace).toMatch(/route=\/seasons\/2026\/:x\/3\b/);
+      expect(trace).toMatch(/route=\/:x\/:x\/:x\/:x\/\*/);
+      expect(trace).toMatch(/worker=1 pid=\d+ rid=[0-9a-f-]{36} build=\S+ status=200/); // the identity fields are retained
+      expect(trace).not.toContain('url=');
+      expect(trace).not.toContain('SENTINEL');
+      expect(trace).not.toContain('token=');
+      expect(trace).not.toContain('example.test');
+      expect(trace).not.toContain('frag-');
+      expect(out).not.toContain('SENTINEL'); // nothing else in the supervisor/worker output echoes it either
+    } finally {
+      server.kill('SIGTERM');
+      await new Promise((r) => server.once('exit', r));
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 40_000);
+
   it('needs nothing but Node built-ins and the env-file guard, so it runs before npm ci', () => {
     const imports = [...TOOL.matchAll(/^import .* from '([^']+)';$/gm)].map((m) => m[1]);
     expect(imports.filter((s) => !s.startsWith('node:'))).toEqual(['../tools/build/env-in-standalone.mjs']);
