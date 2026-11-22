@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next';
 
 import { sql } from '@/db/client';
+import { getPublishedBrownlowSeasons } from '@/db/queries/brownlow';
 import { RECORD_CATEGORIES } from '@/db/queries/records';
 import { indexingEnabled } from '@/lib/indexing';
 import { siteUrl } from '@/lib/seo';
@@ -134,13 +135,13 @@ export default async function sitemap({
   // parameter-free page whose content comes from a fixed query.
   if (id === 1) {
     const [brownlowYears, awards, awardSeasons, honourTeams] = await Promise.all([
-      sql<{ season: number }[]>`
-        SELECT DISTINCT season FROM brownlow_season_votes ORDER BY season
-      `,
+      // Accepted seasons only (ISSUE-367): the same selector and votes > 0 rule
+      // /brownlow/[year] uses, so an unaccepted season is not advertised.
+      getPublishedBrownlowSeasons(),
       // The Brownlow Medal is not listed under /awards: /awards/brownlow-medal and
       // /awards/brownlow-medal/<season> permanently redirect to /brownlow and
       // /brownlow/<season> (AFLDB-ISSUE-360 FE-7), which this segment already
-      // lists from `brownlow_season_votes`. A sitemap names canonical, 200
+      // lists from the accepted Brownlow rows (ISSUE-367). A sitemap names canonical, 200
       // URLs only; the redirecting aliases were 47 entries (1 + 46 seasons).
       sql<{ slug: string }[]>`
         SELECT slug FROM awards WHERE slug <> 'brownlow-medal' ORDER BY slug
@@ -172,8 +173,8 @@ export default async function sitemap({
         changeFrequency: 'weekly' as const,
         priority: 0.8,
       })),
-      ...brownlowYears.map((b) => ({
-        url: `${baseUrl}/brownlow/${b.season}`,
+      ...brownlowYears.map((season) => ({
+        url: `${baseUrl}/brownlow/${season}`,
         changeFrequency: 'yearly' as const,
         priority: 0.7,
       })),

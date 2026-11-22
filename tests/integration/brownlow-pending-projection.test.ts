@@ -3,8 +3,18 @@ import './guard';
 import postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import BrownlowYearPage, {
+  generateMetadata as brownlowYearMetadata,
+  generateStaticParams as brownlowStaticParams,
+} from '@/app/brownlow/[year]/page';
+import sitemap from '@/app/sitemap';
 import { getClubBrownlowMedallists } from '@/db/queries/awards';
-import { getBrownlowCareerLeaders, getBrownlowWinners } from '@/db/queries/brownlow';
+import {
+  getBrownlowCareerLeaders,
+  getBrownlowSeasonCount,
+  getBrownlowWinners,
+  getPublishedBrownlowSeasons,
+} from '@/db/queries/brownlow';
 import { axisPlayerIds } from '@/db/queries/grid-solver';
 import {
   recomputeBrownlowCareerTotals,
@@ -277,5 +287,135 @@ describe('AFLDB-ISSUE-316 L2: unaccepted pending-Brownlow source votes reach no 
     await setCoverage(null);
     await setAuthority('unpublished');
     expectNothingAuthoritative(await project(), 'pending');
+  });
+
+  // AFLDB-ISSUE-367: the /brownlow/[year] page, its metadata, its static params and the sitemap
+  // read the same acceptance selector as every projection above. Each unaccepted state must be a
+  // 404 with no winner in the metadata and no URL in either enumeration; each accepted state must
+  // render. The winner text is the unaccepted data the page used to leak.
+  describe('AFLDB-ISSUE-367: /brownlow/[year] publishes accepted votes only', () => {
+    const WINNER_TEXT = 'Won by Synthetic Pending 1 (ISSUE-316 fixture) with 20 votes.';
+    const params = () => ({ params: Promise.resolve({ year: String(SEASON) }) });
+
+    async function sitemapUrls(): Promise<string[]> {
+      const previousIndexing = process.env.AFLDB_INDEXING;
+      const previousGate = process.env.AFLDB_BETA_GATE;
+      process.env.AFLDB_INDEXING = 'on';
+      delete process.env.AFLDB_BETA_GATE;
+      try {
+        return (await sitemap({ id: 1 })).map((entry) => entry.url);
+      } finally {
+        if (previousIndexing === undefined) delete process.env.AFLDB_INDEXING;
+        else process.env.AFLDB_INDEXING = previousIndexing;
+        if (previousGate !== undefined) process.env.AFLDB_BETA_GATE = previousGate;
+      }
+    }
+
+    async function seen() {
+      return {
+        yearRows: await getBrownlowSeasonCount(SEASON),
+        yearMeta: await brownlowYearMetadata(params()),
+        staticYears: (await brownlowStaticParams()).map((p) => p.year),
+        publishedSeasons: await getPublishedBrownlowSeasons(),
+        sitemapYears: (await sitemapUrls()).filter((u) => u.endsWith(`/brownlow/${SEASON}`)),
+      };
+    }
+
+    async function expectHidden(): Promise<void> {
+      const v = await seen();
+      // Soft assertions so one failing run names every leak (metadata, enumerations, page).
+      expect.soft(v.yearRows).toEqual([]);
+      expect.soft(v.yearMeta.description ?? '').not.toContain('Won by');
+      expect.soft(v.yearMeta.description).toBeUndefined();
+      expect.soft(String(v.yearMeta.title)).toContain('not found');
+      expect.soft(v.staticYears).not.toContain(String(SEASON));
+      expect.soft(v.publishedSeasons).not.toContain(SEASON);
+      expect.soft(v.sitemapYears).toEqual([]);
+      // The real notFound() (not the unit-test mock) throws the Next 16 HTTP-fallback 404 error.
+      await expect.soft(BrownlowYearPage(params())).rejects.toThrow('NEXT_HTTP_ERROR_FALLBACK;404');
+    }
+
+    async function expectVisible(winnerText: string): Promise<void> {
+      const v = await seen();
+      expect(v.yearRows.map((r) => r.votes)).not.toEqual([]);
+      expect(String(v.yearMeta.description)).toContain(winnerText);
+      expect(v.staticYears).toContain(String(SEASON));
+      expect(v.publishedSeasons).toContain(SEASON);
+      expect(v.sitemapYears).toHaveLength(1);
+      await expect(BrownlowYearPage(params())).resolves.toBeTruthy();
+    }
+
+    it('no availability row and no authority row: 404, no winner in metadata, in neither enumeration', async () => {
+      await setCoverage(null);
+      await setAuthority('absent');
+      await expectHidden();
+    });
+
+    it("availability 'partial' and an UNPUBLISHED authority row: 404", async () => {
+      await setCoverage('partial');
+      await setAuthority('unpublished');
+      await expectHidden();
+    });
+
+    it("availability 'pending': 404", async () => {
+      await setCoverage('pending');
+      await setAuthority('unpublished');
+      await expectHidden();
+    });
+
+    it("availability 'not_applicable' is 404 even with a PUBLISHED authority row", async () => {
+      await setCoverage('not_applicable');
+      await setAuthority('published');
+      await expectHidden();
+    });
+
+    it('CONTROL (historical shape): complete coverage and no authority row renders and is enumerated', async () => {
+      await setCoverage('complete');
+      await setAuthority('absent');
+      await expectVisible(WINNER_TEXT);
+    });
+
+    it("accepted by publication (2026 shape): coverage 'pending' with a PUBLISHED authority row renders", async () => {
+      await setCoverage('pending');
+      await setAuthority('published');
+      await expectVisible(WINNER_TEXT);
+    });
+
+    it('a corrected count shows the corrected winner total, equal to the season page (rewritten in place)', async () => {
+      await setCoverage('pending');
+      await setAuthority('published');
+      const [first] = fixture.playerIds;
+      await owner`UPDATE brownlow_season_votes SET votes = 21 WHERE season = ${SEASON} AND player_id = ${first}`;
+      try {
+        const v = await seen();
+        expect(String(v.yearMeta.description)).toContain('Won by Synthetic Pending 1 (ISSUE-316 fixture) with 21 votes.');
+        expect(v.yearRows[0]).toMatchObject({ playerId: first, votes: 21, isWinner: true });
+        const seasonPage = await getSeasonBrownlow(SEASON, 10);
+        expect(seasonPage[0]).toMatchObject({ id: first, votes: 21, isWinner: true });
+        expect(v.yearRows[0].votes).toBe(seasonPage[0].votes);
+      } finally {
+        await owner`UPDATE brownlow_season_votes SET votes = 20 WHERE season = ${SEASON} AND player_id = ${first}`;
+      }
+    });
+
+    it('an accepted season with no player who polled a vote is 404 and in neither enumeration', async () => {
+      await setCoverage('complete');
+      await setAuthority('absent');
+      await owner`UPDATE brownlow_season_votes SET votes = 0 WHERE season = ${SEASON}`;
+      try {
+        await expectHidden();
+      } finally {
+        const [first, second, third] = fixture.playerIds;
+        for (const [id, v] of [[first, 20], [second, 18], [third, 12]] as const) {
+          await owner`UPDATE brownlow_season_votes SET votes = ${v} WHERE season = ${SEASON} AND player_id = ${id}`;
+        }
+      }
+    });
+
+    it('withdrawing acceptance hides the page again', async () => {
+      await setCoverage(null);
+      await setAuthority('unpublished');
+      await expectHidden();
+    });
   });
 });

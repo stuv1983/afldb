@@ -65,6 +65,52 @@ export async function getBrownlowWinners(filters: {
   `;
 }
 
+export type BrownlowSeasonCountRow = {
+  playerId: number;
+  slug: string;
+  displayName: string;
+  votes: number;
+  voteRank: number | null;
+  isWinner: boolean;
+  isIneligible: boolean;
+  games: number | null;
+};
+
+/**
+ * The official vote count for one season, for /brownlow/[year].
+ *
+ * Read through the same acceptance selector as every other public Brownlow
+ * reader (`acceptedBrownlowRowsSql`, ISSUE-367): a season whose source votes
+ * are pending, partial-and-unpublished, or not_applicable returns no rows, so
+ * the page, its metadata and its ranking never name an unaccepted winner.
+ */
+export async function getBrownlowSeasonCount(year: number): Promise<BrownlowSeasonCountRow[]> {
+  return sql<BrownlowSeasonCountRow[]>`
+    SELECT p.id AS "playerId", p.slug, p.display_name AS "displayName",
+           b.votes, b.vote_rank AS "voteRank", b.is_winner AS "isWinner",
+           b.is_ineligible AS "isIneligible", b.games
+      FROM ${sql.unsafe(acceptedBrownlowRowsSql())} b
+      JOIN players p ON p.id = b.player_id
+     WHERE b.season = ${year} AND b.votes > 0
+     ORDER BY b.votes DESC, p.sort_name
+  `;
+}
+
+/**
+ * Seasons that /brownlow/[year] will render: accepted, with at least one
+ * player who polled a vote. Same rule as the page's own not-found test, so
+ * static params and the sitemap never list a URL that answers 404.
+ */
+export async function getPublishedBrownlowSeasons(): Promise<number[]> {
+  const rows = await sql<{ season: number }[]>`
+    SELECT DISTINCT b.season
+      FROM ${sql.unsafe(acceptedBrownlowRowsSql())} b
+     WHERE b.votes > 0
+     ORDER BY b.season
+  `;
+  return rows.map((r) => r.season);
+}
+
 export type BrownlowLeaderRow = {
   rank: number;
   playerId: number;

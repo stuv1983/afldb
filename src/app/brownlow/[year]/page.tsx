@@ -6,7 +6,7 @@ import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { CollapsibleTable } from '@/components/CollapsibleTable';
 import { JsonLd } from '@/components/JsonLd';
 import { SortableTable } from '@/components/SortableTable';
-import { sql } from '@/db/client';
+import { getBrownlowSeasonCount, getPublishedBrownlowSeasons } from '@/db/queries/brownlow';
 import { formatNumber, playerPath, seasonPath } from '@/lib/format';
 import { parseSeason } from '@/lib/params';
 import { notFoundMetadata, pageMetadata } from '@/lib/seo';
@@ -14,28 +14,14 @@ import { itemListSchema } from '@/lib/structured-data';
 
 export const revalidate = 3600;
 
-/** One page per season that recorded votes (1924 onwards). */
+/**
+ * One page per ACCEPTED season that recorded votes (1924 onwards). A season
+ * whose source votes are pending, unpublished or not_applicable is not listed
+ * and answers 404 (AFLDB-ISSUE-367).
+ */
 export async function generateStaticParams() {
-  const rows = await sql<{ season: number }[]>`
-    SELECT DISTINCT season FROM brownlow_season_votes ORDER BY season
-  `;
-  return rows.map((r) => ({ year: String(r.season) }));
-}
-
-async function getCount(year: number) {
-  return sql<{
-    playerId: number; slug: string; displayName: string;
-    votes: number; voteRank: number | null; isWinner: boolean;
-    isIneligible: boolean; games: number | null;
-  }[]>`
-    SELECT p.id AS "playerId", p.slug, p.display_name AS "displayName",
-           b.votes, b.vote_rank AS "voteRank", b.is_winner AS "isWinner",
-           b.is_ineligible AS "isIneligible", b.games
-      FROM brownlow_season_votes b
-      JOIN players p ON p.id = b.player_id
-     WHERE b.season = ${year} AND b.votes > 0
-     ORDER BY b.votes DESC, p.sort_name
-  `;
+  const seasons = await getPublishedBrownlowSeasons();
+  return seasons.map((season) => ({ year: String(season) }));
 }
 
 export async function generateMetadata({
@@ -52,7 +38,10 @@ export async function generateMetadata({
   // official season count the page renders — not derived from per-game
   // votes, which exist only for 1931–1934 and 1984 onwards and would give a
   // different, wrong answer for most seasons.
-  const rows = await getCount(parsed);
+  const rows = await getBrownlowSeasonCount(parsed);
+  // No accepted rows (unpublished, pending, not_applicable or empty): the page
+  // answers 404, so its metadata must not describe a count or name a winner.
+  if (rows.length === 0) return notFoundMetadata('Brownlow count');
   const winners = rows.filter((r) => r.isWinner);
   const won = winners.length === 0
     ? ''
@@ -77,7 +66,7 @@ export default async function BrownlowYearPage({
   const parsed = parseSeason(year);
   if (!parsed) notFound();
 
-  const rows = await getCount(parsed);
+  const rows = await getBrownlowSeasonCount(parsed);
   if (rows.length === 0) notFound();
 
   // 2003 was shared by Buckley, Goodes and Ricciuto, and several earlier
