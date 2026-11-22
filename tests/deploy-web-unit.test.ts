@@ -646,7 +646,7 @@ describe.runIf(process.platform === 'linux')('AFLDB-ISSUE-352 review — backup.
     const dir = join(root, `out${n}`);
     const r = spawnSync('bash', [join(repoTools, 'backup.sh'), '--dir', dir], {
       encoding: 'utf8',
-      env: { PATH: `${bin}:/usr/bin:/bin`, HOME: root, STUB_LOG: log, AFLDB_BACKUP_DATABASE_URL: dsn },
+      env: { PATH: `${bin}:/usr/bin:/bin`, HOME: root, STUB_LOG: log, AFLDB_BACKUP_DATABASE_URL: dsn } as unknown as NodeJS.ProcessEnv,
     });
     return { ...r, out: `${r.stdout}${r.stderr}`, log: existsSync(log) ? readFileSync(log, 'utf8') : '' };
   };
