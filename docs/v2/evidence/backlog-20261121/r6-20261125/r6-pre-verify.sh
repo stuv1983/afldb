@@ -5,6 +5,7 @@
 # Every check prints PASS / FAIL / INFO / NOTE; any FAIL = R6 PRE RESULT STOP = do not reboot (runbook section 7, GO/NO-GO).
 # Command inventory (closure allowlist): hostname id date cat uname uptime dpkg-query stat ls sed grep awk sort cut head tail tr wc basename
 #   sha256sum cmp findmnt sysctl apt-config systemctl(show|is-active|is-enabled|list-timers|list-unit-files) pgrep readlink git(rev-parse)
+#   journalctl(-u afldb-backup.service --since --until -o cat --no-pager; read-only, ISSUE-352 dump attribution)
 #   node deploy/release.mjs status | sh deploy/afldb-settle-failure-status.sh | bash tools/maintenance/scheduled-backup.sh status
 #   psql (read-only shape of a2-p0-entry.sh) df free printf echo test; redirections only 2>&1, 2>/dev/null, here-strings, here-docs.
 # Run (workstation Git Bash; never at minute :16-:18, when streamanator's r2 check connects):
@@ -14,6 +15,24 @@
 # Prints, for later steps: BOOT_ID, INVOCATION_ID, GRUB-BASELINE <sha256>, OFFHOST-COMPARE <dump> <sha256>, RESTORE-SHA <sha256>.
 # Dry run (streamanator only): R6_DRYRUN=1 skips the host check (refused on afldb-prod); production-only facts then FAIL, which is the
 # expected dry-run outcome (it proves the script runs to its end and writes nothing).
+# ISSUE-352 (independent review, 22 Nov 2026): the scheduled overnight dump is chosen WITHOUT first-match guessing. Prints
+# "<basename> <full sidecar sha256>" and returns 0 only when exactly ONE 02:2x/02:3x dump of that day exists, its re-hash equals its
+# one-line sidecar, and the afldb-backup.service journal text (3rd argument) reports exactly one "backup ok: <that basename> ...
+# sha256 <the first 16 hex of the sidecar>". Anything else prints "REASON ..." and returns 1. Read-only: glob, sha256sum, sed.
+pick_overnight_dump() { # backup-dir yyyymmdd service-journal-text
+  local bk=$1 day=$2 jl=$3 f sd name ss a; local -a sds jb
+  shopt -s nullglob; sds=("$bk"/afldb_prod-"$day"-02[23]*.dump); shopt -u nullglob
+  [ "${#sds[@]}" -ge 1 ] || { echo "REASON no afldb_prod-$day-02[23]*.dump in $bk"; return 1; }
+  [ "${#sds[@]}" -eq 1 ] || { echo "REASON ambiguous: ${#sds[@]} dumps in the 02:2x/02:3x window ($(printf '%s ' "${sds[@]##*/}")): refusing to choose one"; return 1; }
+  sd=${sds[0]}; name=${sd##*/}
+  [ -f "$sd.sha256" ] && [ "$(wc -l < "$sd.sha256")" = 1 ] || { echo "REASON $name has no one-line sidecar"; return 1; }
+  ss=$(cut -d' ' -f1 "$sd.sha256"); a=$(sha256sum < "$sd" | cut -d' ' -f1)
+  [[ $ss =~ ^[0-9a-f]{64}$ ]] && [ "$a" = "$ss" ] || { echo "REASON $name re-hash $a != sidecar '$ss'"; return 1; }
+  mapfile -t jb < <(sed -n 's/.*scheduled-backup: backup ok: \([^ ]*\) [0-9]* bytes sha256 \([0-9a-f]*\).*/\1 \2/p' <<< "$jl")
+  [ "${#jb[@]}" -eq 1 ] || { echo "REASON the afldb-backup.service journal reports ${#jb[@]} 'backup ok' lines (need exactly 1): dump attribution unproven"; return 1; }
+  [ "${jb[0]%% *}" = "$name" ] && [ "${jb[0]#* }" = "${ss:0:16}" ] || { echo "REASON the service reported '${jb[0]}', not $name sha256 ${ss:0:16}: the same-window file is not the service's dump"; return 1; }
+  echo "$name $ss"
+}
 main() {
 set -uo pipefail; export LC_ALL=C
 OUTC=${1:-}; CUR=${2:-}; R3=${3:-}; R4=${4:-}; WIN=${5:-10:00}
@@ -123,13 +142,12 @@ else
   LV=$BK/.state/last-verify.json; ve=$(jf "$LV" epoch); vf=$(jf "$LV" file); vsha=$(jf "$LV" sha256); va=$(jf "$LV" attempts)
   info "last-verify.json: file=$vf sha256=$vsha attempts=$va"; info "last-backup.json: $(cat "$BK/.state/last-backup.json" 2>/dev/null)"
   # The 03:30 verify run takes its own fresh dump and rewrites last-backup.json, so the 02:20 dump is found by its name.
-  SD=$(ls -1 "$BK"/afldb_prod-"$TODAYC"-02[23]*.dump 2>/dev/null | head -n 1)
-  if [ -n "$SD" ]; then
-    ok "scheduled 02:2x dump present: $(basename "$SD") $(stat -c %s "$SD") B"
-    SS=$(cut -d' ' -f1 "$SD.sha256" 2>/dev/null); A=$(sha256sum < "$SD" | cut -d' ' -f1)
-    [ -n "$SS" ] && [ "$A" = "$SS" ] && ok "02:2x dump re-hashed = its sidecar" || bad "02:2x dump hash $A != sidecar '$SS'"
-    echo "OFFHOST-COMPARE $(basename "$SD") $SS"
-  else bad "no afldb_prod-$TODAYC-02[23]*.dump in $BK"; fi
+  SJ=$(journalctl -u afldb-backup.service --since "@$B0" --until "@$((B1 + 900))" -o cat --no-pager 2>/dev/null)
+  if PICK=$(pick_overnight_dump "$BK" "$TODAYC" "$SJ"); then
+    SDN=${PICK%% *}; SS=${PICK#* }
+    ok "scheduled 02:2x dump is unique, equals the afldb-backup.service journal's own dump, re-hash = its sidecar: $SDN $(stat -c %s "$BK/$SDN") B"
+    echo "OFFHOST-COMPARE $SDN $SS"
+  else bad "scheduled 02:2x dump not attributable: ${PICK#REASON }"; fi
   [ -n "$ve" ] && [ "$ve" -ge "$V0" ] && ok "last-verify.json written by today's 03:30 run ($(mel "$ve"), attempts $va)" || bad "last-verify.json not from today's 03:30 run"
   [ "$va" = 1 ] || info "verify attempts=$va (2 = one benign retry; record it)"
   M=$(ls -1 "$BK"/.state/FAILED-* 2>/dev/null | tr '\n' ' '); [ -z "$M" ] && ok "no FAILED marker" || bad "FAILED marker(s): $M"
