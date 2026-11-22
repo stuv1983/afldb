@@ -432,6 +432,8 @@ count does not prove successful invalidation. No reboot readiness is implied by 
 
 ### Full Git blob SHA-256 pins (code commit above)
 
+> **23 Nov 2026 (ISSUE-351/352 fixes): the `r6-pre-verify.sh` row below is the historical `b445ba7f` pin and is superseded. Wednesday uses `r6-pre-verify.sh` and the new `r6-revalidate-accept.sh` (step F-4b) at the pins in `fix-20261123/BLOB-PINS.md`, "Later ISSUE-352 / 351 / 362 code". Do not run either from this table.**
+
 | Git blob path at code commit | Full SHA-256 |
 |---|---|
 | `docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh` | `53ab32a1bad408104c5534898482486735b3648d761006d28be79388ba72012c` |

@@ -20,3 +20,19 @@ Calculated by hashing the raw stdout bytes of `git show 88be90f0e676112c4239032b
 | `docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-s9-public-smoke.sh` | `babb660f7e7555a55281f2a0a07cb6d1147f39ebfa5ff9c119a677a1e2776a71` | unchanged |
 | `docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-p6-observe.sh` | `c7416ba4975dd37a04537ef9f4ed6aef14625757037439ee929d258b3d97d6d3` | unchanged |
 | `tools/maintenance/offhost-pull.sh` | `a3775aea879b1d9ce05d0e96482e66d24c69deb62cf38e8fc0407c0d2653dc2b` | unchanged |
+
+## Later ISSUE-352 / 351 / 362 code (code commit `3afdf767e8fc42b3989025dca9d10de7e18279d8`)
+
+Same method: SHA-256 of the raw stdout bytes of `git show 3afdf767e8fc42b3989025dca9d10de7e18279d8:<path>`. The two `r6-*` rows **supersede** the `r6-pre-verify.sh` row above and the `r6-pre-verify.sh` row in the Wednesday plan's own table (which is the historical `b445ba7f` pin) for Wednesday's use. `r6-revalidate-accept.sh` is new and is run by plan step F-4b. The three `tools/` and `deploy/` rows are application files that reach production only by a separately approved release; they are listed so the exact reviewed bytes are fixed. None of these files is installed by anything in this commit.
+
+| Git blob path at the code commit | Full SHA-256 | Change |
+|---|---|---|
+| `docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh` | `e36bcce728808737b932350c5915096fd2a1db5f8386679a79e0c72c8bf4b3cd` | changed (overnight dump bound to the service journal) |
+| `docs/v2/evidence/backlog-20261121/r6-20261125/r6-revalidate-accept.sh` | `150fdcef9dcf5e3930feb59da1876a1f2bdbb4c7fddc71132131750e76668b18` | new (F-4b) |
+| `docs/v2/evidence/backlog-20261121/a1a2-20261124/dry-tests-20261123/t-352-preverify-selector.sh` | `2e0bc465ac8e25cd46420e683f4f09dbac7f2f11391f1fd7e1419f6ac5b97efe` | new |
+| `docs/v2/evidence/backlog-20261121/a1a2-20261124/dry-tests-20261123/t-352-revalidate-accept.sh` | `d0e9bf9b343666402e1b1f9de6cfdde8cb10ef6d5e29018c21576ddfb98df736` | new |
+| `tools/maintenance/scheduled-backup.sh` | `234fca6a226da73b125ca3dceec9ac97b2192181fd93ad168a7ca50900cb192d` | changed (checked state writes) |
+| `tools/maintenance/backup.sh` | `df609046a6a322db3f651d9d2c9cf1820fdb9ca0d0d4d9ae9f67c3dede1be3be` | changed (decoded password) |
+| `deploy/server-cluster.mjs` | `cfc4ecb27665ae223b3f374c829e1b5a6a8fe232b084e59378c84b09061217e0` | changed (trace route class) |
+
+The helper-pair rows in the first table (`afldb-offhost-pull-daily.sh`, `scheduled-pull-evidence.sh`, both installers, `r6-offhost-verify.sh`) are unchanged by these commits and keep their pins. Verify before use with `git show <commit>:<path> | sha256sum`.
