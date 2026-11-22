@@ -1,0 +1,108 @@
+Target b445ba7f1442130b0a7f3980f5c93c563d7b3a44
+DEV streamanator / synthetic cluster / November 22-23, 2026 AEDT
+Three exact harness exits: behavioural=0 timestamp=0 pre-fix=1
+scheduled-chain actual_exit=0 expected=0
+r3-observer actual_exit=0 expected=0
+manual-success actual_exit=1 expected=1
+r3-propagates-failure actual_exit=1 expected=1
+monday-for-wednesday actual_exit=1 expected=1
+failed-scheduled-then-retry actual_exit=1 expected=1
+unrelated-verified actual_exit=1 expected=1
+verification-service-dump actual_exit=1 expected=1
+wrong-production-sha actual_exit=1 expected=1
+active-hold actual_exit=1 expected=1
+ambiguous-dispatch actual_exit=1 expected=1
+late-completion actual_exit=1 expected=1
+changed-dump-bytes actual_exit=1 expected=1
+wrong-sidecar actual_exit=1 expected=1
+missing-marker actual_exit=1 expected=1
+wrapper actual_exit=0 expected=0
+installer-pins actual_exit=0 expected=0
+r2-observer-unchanged actual_exit=0 expected=0
+process-healthy actual_exit=0 expected=0
+process-zero-zero actual_exit=1 expected=1
+process-missing-secret actual_exit=1 expected=1
+process-blank-url actual_exit=1 expected=1
+process-duplicate-secret actual_exit=1 expected=1
+process-missing-worker actual_exit=1 expected=1
+title-healthy-rsc actual_exit=0 expected=0
+title-brownlow-healthy-rsc actual_exit=0 expected=0
+title-missing actual_exit=1 expected=1
+title-not-found actual_exit=1 expected=1
+title-unparseable actual_exit=1 expected=1
+SUNDAY-REVIEW RESULT 29 passed, 0 failed
+stamp.log:== RESULT: 42 passed, 0 failed
+stamp.log:OFFHOST-STAMP RESULT PASS
+old.log:== RESULT: 20 passed, 22 failed
+old.log:OFFHOST-STAMP RESULT FAIL
+command-only-journal actual_exit=1 expected=1
+command-only-r3 actual_exit=1 expected=1
+inaccessible-journal actual_exit=1 expected=1
+separate-manual-and-scheduled actual_exit=0 expected=0
+pid-reused-on-another-day actual_exit=1 expected=1
+verifier-absent actual_exit=127 expected=127
+partial-check actual_exit=0 expected=0
+SUNDAY-REVIEW RESULT 36 passed, 0 failed
+primary pid=3418278
+pid=3418278 URL count=1 nonempty=1 SECRET count=1 nonempty=1
+worker=1 pid=3418289 parent=3418278
+pid=3418289 URL count=1 nonempty=1 SECRET count=1 nonempty=1
+worker=2 pid=3418290 parent=3418278
+pid=3418290 URL count=1 nonempty=1 SECRET count=1 nonempty=1
+REVALIDATED season 2026: 2/2 worker(s) reached (2,1) in 2 request(s).
+brownlow/2020 http=200 named=yes
+seasons/2020 http=200 named=yes
+brownlow/2021 http=200 named=yes
+seasons/2021 http=200 named=no
+brownlow/2022 http=200 named=yes
+seasons/2022 http=200 named=no
+brownlow/2023 http=404 named=no
+seasons/2023 http=200 named=no
+brownlow/1950 http=200 named=yes
+seasons/1950 http=200 named=yes
+player HTTP=200
+1950 200 match-BV=no
+2020 200 match-BV=yes
+2021 200 match-BV=no
+2022 200 match-BV=no
+2023 200 match-BV=no
+REVALIDATED season 2020: 2/2 worker(s) reached (1,2) in 2 request(s).
+corrected-metadata=29
+type:0
+build:0
+lint:1
+lintgate:0
+finalunit:1
+int:1
+intbase:1
+seeded:1
+seededbase:1
+browser:0
+proc:0
+fan:0
+recall:0
+---- finalunit.log
+ Test Files  2 failed | 214 passed | 1 skipped (217)
+      Tests  7 failed | 12380 passed | 31 skipped (12418)
+---- pyretry.log
+ Test Files  2 failed | 7 passed (9)
+      Tests  7 failed | 496 passed | 3 skipped (506)
+---- pybase.log
+ Test Files  2 failed | 7 passed (9)
+      Tests  7 failed | 496 passed | 3 skipped (506)
+---- int.log
+ Test Files  1 failed | 3 passed | 2 skipped (6)
+      Tests  61 passed | 32 skipped (116)
+---- settle-seeded.log
+ Test Files  1 failed (1)
+      Tests  18 failed | 3 passed (21)
+---- intbase-seeded.log
+ Test Files  1 failed (1)
+      Tests  18 failed | 3 passed (21)
+lint.log:✖ 483 problems (338 errors, 145 warnings)
+base-lint.log:✖ 483 problems (338 errors, 145 warnings)
+Lint gate (ratchet): 338 error(s) in 43 file(s) now; the ratchet baseline allows 338 in 43 (existing debt, not clean lint).
+Lint gate: PASSED (ratchet; existing debt remains).
+  3 passed (4.2s)
+waiting for server to shut down.... done
+server stopped

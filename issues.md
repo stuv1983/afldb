@@ -2,22 +2,25 @@
 
 ## Open Issues
 
-**CURRENT — Sunday review amendment, 22 November 2026.** Seven open issues: **332, 348, 350, 351, 352, 357, 362**.
-**Before Monday 23 Nov 03:10 AEDT:** owner installation of the new wrapper and verifier is required; see the
-[amended R6 runbook](docs/v2/evidence/backlog-20261121/ATTENDED-PLAN-R6-20261125.md) and
-[repair/test evidence](docs/v2/evidence/backlog-20261121/sunday-review-20261122/README.md).
-A1/A2 ran Sunday; 371/372 remain resolved under the recorded narrow waiver. Monday pull, Wednesday verification
+**Current independent review, 22 November 2026.** Open issues are 332, 348, 350, 351, 352, 357, 362, 367, 368, 374, 375, 376 and 377. HOLD the two streamanator helpers and the candidate. [Findings, tests and owner gates](issues/reviews/AFLDB-FULL-REVIEW-2026-11-22.md).
+A1/A2 ran Sunday; 371/372 remain resolved under the recorded narrow waiver. Monday off-host bytes were verified on 23 November. Scheduled origin and production comparison are unproven. Wednesday verification
 and reboot remain pending. PREP `ae51cd8d913a7523dd89fb638279e7f910054b79` remains the historical Sunday contract.
 
 | ID | Title | Severity | Area | State | Next action |
 |---|---|---|---|---|---|
 | AFLDB-ISSUE-332 | AFL API 2027 season operations | Medium | 2027 operations | Open; Sunday state supersedes earlier planning. | R2 installed; first scheduled :17 run and alarm email accepted Sunday. Keep G0 (2027 opening) and G0c (first nightly without HALT) pending, plus the later G1-G7 seasonal reviews. Do not defer G0/G0c to Opening Round. |
-| AFLDB-ISSUE-348 | DraftGuru re-acquisition | Medium | Draft data | Open; Sunday state supersedes earlier planning. | Refresh and re-seal the January rehearsal including groups (f)-(k). Tue 12 Jan 2027 11:00 AEDT is reserved for an attended load after that rehearsal; the production write set still needs separate owner approval. No load executed. |
+| AFLDB-ISSUE-348 | DraftGuru re-acquisition | Medium | Draft data | Open; Sunday state supersedes earlier planning. | Recompute the parsed-row digest on the exact importer input and refresh and re-seal the January rehearsal including groups (f)–(k). The 12 January 11:00 AEDT load requires separate production write approval. |
 | AFLDB-ISSUE-350 | 2027 season opening | High | Ingestion | Open; Sunday state supersedes earlier planning. | R8 draft approved: capture Fri 19 Feb 2027; proposed opening Tue 23 Feb 2027 11:00 AEDT. Obtain execution approval for the refreshed plan/revision/write set/window, perform G0 and observe G0c on the first nightly (24 Feb if opened 23 Feb). |
-| AFLDB-ISSUE-351 | Host operations and reboot | Medium | Operations | Open; Sunday state supersedes earlier planning. | R1 installed Sunday. R6 approved window Wed 25 Nov 10:00-11:00 AEDT, fallback 14:00-15:00; reboot remains pending and NO-GO until every amended runbook gate passes. First weekly window and later acceptance remain pending. |
-| AFLDB-ISSUE-352 | Scheduled backup and off-host recovery | Medium | Recovery | Open; Sunday state supersedes earlier planning. | BEFORE Mon 23 Nov 03:10 AEDT: owner installs the pinned invocation-logging wrapper and new verifier from bc3fef3de375259d49001e7a9a478624832703a8. Observe Monday scheduled pull/next nightly within 25 h, Wednesday 03:10 overnight pull and 03:36:35 separate restore verification; all pending. D-HO-7 remains for R7. |
+| AFLDB-ISSUE-351 | Host operations and reboot | Medium | Operations | Open; Sunday state supersedes earlier planning. | Wednesday 25 November 10:00–11:00 AEDT (fallback 14:00–15:00) remains NO-GO pending all live gates. Add the explicit attended functional 2/2 step to F-4 and require fresh post-boot evidence. |
+| AFLDB-ISSUE-352 | Scheduled backup and off-host recovery | High | Recovery | Open. Independent review holds helper installation. | HOLD the two helpers. Correct real cron CMD/PID attribution, fail closed on state-write errors, require an unambiguous overnight basename, and requalify on disposable Linux. Monday 03:10:01 dispatch and off-host copy 022145 observed. The old wrapper cannot prove scheduled origin. Production checksum/25-hour corroboration and both Wednesday checks remain pending. Address URI password decoding before credential rotation. Preserve D-HO-7 for R7. |
 | AFLDB-ISSUE-357 | ISR cache limits | Medium | Frontend | Open; Sunday state supersedes earlier planning. | R4 deny installed and probes passed Sunday. Owner operational acceptance remains open; retain beta gate until a cache bound and disk alert exist, with F-09 prune validation. |
-| AFLDB-ISSUE-362 | Auth and log hygiene | Low | Security | Open; Sunday state supersedes earlier planning. | R4 filter live; R5 retained logs restricted and verified Sunday. Earliest disposal REVIEW Thu 7 Jan 2027; disposal needs separate owner approval. No disposal authorized by these fixes. |
+| AFLDB-ISSUE-362 | Auth and log hygiene | Medium | Security | Open. Node tracing follow-up and R5 retention review. | Keep the historical R5 retention plan. Redact diagnostic Node request URLs before enabling request tracing. Earliest disposal review is 7 January 2027. |
+| AFLDB-ISSUE-367 | Brownlow year page publishes unaccepted votes | High | Public awards | Reopened | Reopened for the raw Brownlow year and sitemap readers. Verify pending and explicitly inapplicable rankings are withheld and accepted historical rankings still render. |
+| AFLDB-ISSUE-368 | AFLW replacement can remove a missing season | High | AFLW | Reopened | Reopened for a coherent incomplete season/page generation. Enforce the expected AFLW input scope before replacing staging. |
+| AFLDB-ISSUE-374 | Direct test-target maintenance can operate on a misconfigured database | High | DB tooling | Open | Prove the database identity before a test migration or privilege write. |
+| AFLDB-ISSUE-375 | Migration status accepts an unknown applied migration | Medium | Migrations | Open | Reject unknown applied ledger entries in status and apply modes. |
+| AFLDB-ISSUE-376 | Award correction fan-out omits cached player profiles | Medium | Public cache | Open | Cover old and new award-winner profiles in worker-wide invalidation and regression checks. |
+| AFLDB-ISSUE-377 | Player matching recall test passes without measuring recall | Medium | Test coverage | Open | Make the seeded player matching recall assertion mandatory and report unavailable empirical data explicitly. |
 
 ## Historical dated summaries (superseded where inconsistent with current actions)
 
@@ -54911,6 +54914,9 @@ Acceptance: Every non-public audience refuses data access until must_change_pass
 
 ## AFLDB-ISSUE-348 — The next DraftGuru re-acquisition must carry forward the D-336-3 origin revisions and adjudicate three club replacements
 
+**Current status · open, 22 November independent review.** Recompute the parsed-row digest on the exact importer input and refresh and re-seal the January rehearsal including groups (f)–(k). The 12 January 11:00 AEDT load requires separate production write approval. [Evidence and focused verification](issues/reviews/AFLDB-FULL-REVIEW-2026-11-22.md). Earlier dated dispositions below are historical.
+
+
 - **Current operator action — 22 Nov Sunday review (OPEN):** Refresh and re-seal the January rehearsal including groups (f)-(k). Tue 12 Jan 2027 11:00 AEDT is reserved for an attended load after that rehearsal; the production write set still needs separate owner approval. No load executed.
 
 Historical investigation and dated instructions below are retained for provenance; the current action above takes precedence.
@@ -55022,6 +55028,9 @@ Historical investigation and dated instructions below are retained for provenanc
 
 ## AFLDB-ISSUE-351 — Unattended upgrades restart the production app and PostgreSQL; promote/rollback leave an unattended-activation window
 
+**Current status · open, 22 November independent review.** Wednesday 25 November 10:00–11:00 AEDT (fallback 14:00–15:00) remains NO-GO pending all live gates. Add the explicit attended functional 2/2 step to F-4 and require fresh post-boot evidence. [Evidence and focused verification](issues/reviews/AFLDB-FULL-REVIEW-2026-11-22.md). Earlier dated dispositions below are historical.
+
+
 - **Current operator action — 22 Nov Sunday review (OPEN):** R1 installed Sunday. R6 approved window Wed 25 Nov 10:00-11:00 AEDT, fallback 14:00-15:00; reboot remains pending and NO-GO until every amended runbook gate passes. First weekly window and later acceptance remain pending.
 
 Historical investigation and dated instructions below are retained for provenance; the current action above takes precedence.
@@ -55062,6 +55071,9 @@ Historical investigation and dated instructions below are retained for provenanc
   **`host-gate --strict` (14:57:47): "needrestart holds afldb and postgresql", HOST GATE PASS** (reboot-pending warning for 6 kernel packages, expected). The A1 restart used `status --confirm-restart-invocation 34204062…` in an attended Sunday window. **Open:** the attended reboot to `6.8.0-149` (Wed 25 Nov 10:00, separate approval and session) and the first weekly window.
 
 ## AFLDB-ISSUE-352 — No scheduled production backup, restore verification or off-host copy; the disaster-recovery procedure is stale for V2
+
+**Current status · open, 22 November independent review.** HOLD the two helpers. Correct real cron CMD/PID attribution, fail closed on state-write errors, require an unambiguous overnight basename, and requalify on disposable Linux. Monday 03:10:01 dispatch and off-host copy 022145 observed. The old wrapper cannot prove scheduled origin. Production checksum/25-hour corroboration and both Wednesday checks remain pending. Address URI password decoding before credential rotation. Preserve D-HO-7 for R7. [Evidence and focused verification](issues/reviews/AFLDB-FULL-REVIEW-2026-11-22.md). Earlier dated dispositions below are historical.
+
 
 - **Current operator action — 22 Nov Sunday review (OPEN):** BEFORE Mon 23 Nov 03:10 AEDT: owner installs the pinned invocation-logging wrapper and new verifier from bc3fef3de375259d49001e7a9a478624832703a8. Observe Monday scheduled pull/next nightly within 25 h, Wednesday 03:10 overnight pull and 03:36:35 separate restore verification; all pending. D-HO-7 remains for R7.
 
@@ -55239,6 +55251,9 @@ Historical investigation and dated instructions below are retained for provenanc
 - **Remediation run 2 (2026-11-14, local, qualified at `f10e47ad` (`docs/v2/evidence/remediation-20261114/run2/QUALIFICATION-2.md`), not published):** review B-06 closed (`bb0ad0d9`). The compare gate's queue is bounded: `AFLDB_COMPARE_MAX_QUEUE` 24 and `AFLDB_COMPARE_MAX_WAIT_MS` 10000. A refused comparison renders a noindex "busy" state with HTTP 200 and holds no slot. **Owner decisions:** O-B06-1 (200 + noindex vs a real 503; recommended: keep) and O-B06-2 (the limits).
 
 ## AFLDB-ISSUE-362 — Auth hygiene: Caddy access logs record magic-link and admin-invite tokens; a revoked admin cookie still passes the beta gate
+
+**Current status · open, 22 November independent review.** Keep the historical R5 retention plan. Redact diagnostic Node request URLs before enabling request tracing. Earliest disposal review is 7 January 2027. [Evidence and focused verification](issues/reviews/AFLDB-FULL-REVIEW-2026-11-22.md). Earlier dated dispositions below are historical.
+
 
 - **Current operator action — 22 Nov Sunday review (OPEN):** R4 filter live; R5 retained logs restricted and verified Sunday. Earliest disposal REVIEW Thu 7 Jan 2027; disposal needs separate owner approval. No disposal authorized by these fixes.
 
@@ -55470,6 +55485,9 @@ Historical investigation and dated instructions below are retained for provenanc
 
 ## AFLDB-ISSUE-367 — Public round and match views can show unaccepted Brownlow votes
 
+**Current status · reopened, 22 November independent review.** Reopened for the raw Brownlow year and sitemap readers. Verify pending and explicitly inapplicable rankings are withheld and accepted historical rankings still render. [Evidence and focused verification](issues/reviews/AFLDB-FULL-REVIEW-2026-11-22.md). Earlier dated dispositions below are historical.
+
+
 - **Severity / area** Low, Brownlow publication.
 - **Status** **RESOLVED 2026-11-21 (local, not published, not deployed).** Was: open, blocking correctness sign-off for the public Brownlow views. The enhancement's historical ISSUE-366 refers to this finding. Primary ISSUE-366 remains the resolved Packet 6R repair/release issue.
 - **Evidence at `b82a6b04`** `src/db/queries/rounds.ts:149` filters by year and positive votes. `src/app/seasons/[year]/page.tsx:107` fetches those rows and line 659 selects them for display. The public acceptance rule is in `src/db/queries/brownlow-readiness.ts:5`. The match and player-log mirrors project the stored value directly at `src/db/queries/matches.ts:135` and `src/db/queries/players.ts:731`. The parked branch recorded 621 positive rows for a pending 2026 season on the 4 November snapshot. Live data was not examined.
@@ -55478,6 +55496,9 @@ Historical investigation and dated instructions below are retained for provenanc
 - **Resolution, 2026-11-21 (`295c55c4`; qualified tree `467cd243`).** Root cause confirmed: public per-match and per-round readers projected stored votes without the season acceptance rule. Fix: `brownlowAcceptedSql` now gates `getSeasonRoundVotes` (rows withheld), `getMatchPlayers` (NULL unless accepted; admin match sheet passes `brownlow: 'raw'`, it never writes votes), `getPlayerMatches` (value and the `bv` sort key, so order cannot leak), and two further mirrors found in this pass: `getHeadToHeadMatches` (`player-compare.ts`) and the NL `player_game` `brownlow_votes` metric (rows excluded, like a NULL statistic). Career, season and derived readers were already gated. Validation: integration on a seeded isolated database (accepted vs pending: all six readers) RED at `b82a6b04` (pending season leaked 3 round rows) and GREEN; unit regression in `tests/catalogue-lookups.test.ts`. Limits: VISUAL: UNVERIFIED (no rendered capture); NL corpus not rerun; production observation needs release authority. The parked enhancement `2d83738d` (tag `preserve/enh-20261116-2d83738d`, branch intact, 11 commits) applies the identical season predicate; at its separately approved integration expect a trivial `rounds.ts` conflict, re-point its ISSUE-366 tracker references to 367, and follow its POST-SITTING-HANDOFF requalification. Evidence: [QUALIFICATION.md](docs/v2/evidence/closeout-20261121/QUALIFICATION.md). Published at `a3c8c67c` on 2026-11-21; not deployed (production acceptance under packet 7R2).
 
 ## AFLDB-ISSUE-368 — An empty or mixed AFLW replacement extract can pass validation and replace published data
+
+**Current status · reopened, 22 November independent review.** Reopened for a coherent incomplete season/page generation. Enforce the expected AFLW input scope before replacing staging. [Evidence and focused verification](issues/reviews/AFLDB-FULL-REVIEW-2026-11-22.md). Earlier dated dispositions below are historical.
+
 
 - **Severity / area** High, AFLW import and public views.
 - **Status** **RESOLVED 2026-11-21 (local, not published).** Was: open, blocking closeout and use of the full AFLW replacement loader.
@@ -55736,3 +55757,27 @@ Historical investigation and dated instructions below are retained for provenanc
   - **Rule for the future:** the acceptance covers exactly these 118 findings over these 113 cells. **Any other G-c finding** (another board/cell, category or Gridley player, or one of these cells appearing for a new reason) is new and needs its own explanation: its own issue or owner decision. It is not covered by this resolution.
   - **Not changed (by decision):** `tests/integration/gridley-corpus.test.ts` (N7), `tests/gridley-compat.test.ts` pins (`strictCorpusParity.passed === false` with these counts), the G-b policy, the solver and the data. References kept: D-GAP029-21, D-GAP029-D3, D-GAP029-D4W, AFLDB-ISSUE-118, AFLDB-ISSUE-363.
   - **Validation:** the classification of run c (`issue373-gc-investigation/README.md`, read from the gp1/gp2 tier-P reports; set equality of the 78 with the deferral file and membership of all 40 in the approved sibling files) re-derived in run d from the tracked CSV and deferral file (counts 78/40, 113 distinct, 5 two-finding cells, 0 overlap). Recorded in `CHANGELOG.md` (retained validation state).
+
+## AFLDB-ISSUE-374 — Direct test-target maintenance can operate on a misconfigured database
+
+**Open · High · 22 November 2026.** The direct db:migrate:test and db:privileges:test scripts select an environment variable by target name. A nonempty DSN for another writable database passes that selection. Test migration mode skips the shared-target branch guard and bootstraps/applies DDL. The privilege launcher hands the same destination to the grant script. The rebuild orchestrator’s separate checks do not protect direct npm calls. Actual consequences depend on the connecting role’s rights. Confirmed by source, no non-test database contacted.
+
+Prove the database identity before a test migration or privilege write. [Source and acceptance](issues/open/AFLDB-ISSUE-374.md).
+
+## AFLDB-ISSUE-375 — Migration status accepts an unknown applied migration
+
+**Open · Medium · 22 November 2026.** Inserted one extra ledger row in a new disposable copy of the migrated test database. Status returned 0 with “0 pending”. Apply returned 0 with “schema is up to date”. The checksum loop walks only local files. Operators using the direct commands miss a newer or divergent database. The earlier status-only DDL fix remains effective.
+
+Reject unknown applied ledger entries in status and apply modes. [Source and acceptance](issues/open/AFLDB-ISSUE-375.md).
+
+## AFLDB-ISSUE-376 — Award correction fan-out omits cached player profiles
+
+**Open · Medium · 22 November 2026.** A winner replacement generates old and new player paths. The handling worker invalidates all admitted paths. The cross-worker request derives only season and Brownlow paths. A second worker with a warm profile can continue displaying the prior winner until profile regeneration. Source-confirmed invalidation gap. The exact duration and a two-worker stale profile response were not measured. Sunday’s separate season-page acceptance remains recorded.
+
+Cover old and new award-winner profiles in worker-wide invalidation and regression checks. [Source and acceptance](issues/open/AFLDB-ISSUE-376.md).
+
+## AFLDB-ISSUE-377 — Player matching recall test passes without measuring recall
+
+**Open · Medium · 22 November 2026.** The known-link recall test returns successfully below 20 trusted links before candidate retrieval or the 95% assertion. A similar return drops conflict coverage. Empty fixtures or a broken evidence query can make the tests green. The earlier apostrophe regression exercised a different assertion.
+
+Make the seeded player matching recall assertion mandatory and report unavailable empirical data explicitly. [Source and acceptance](issues/open/AFLDB-ISSUE-377.md).

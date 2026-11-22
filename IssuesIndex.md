@@ -1,21 +1,24 @@
 # AFLDB Current Issues Index
 
-**CURRENT — Sunday review amendment, 22 November 2026.** Seven open issues: **332, 348, 350, 351, 352, 357, 362**.
-**Before Monday 23 Nov 03:10 AEDT:** owner installation of the new wrapper and verifier is required; see the
-[amended R6 runbook](docs/v2/evidence/backlog-20261121/ATTENDED-PLAN-R6-20261125.md) and
-[repair/test evidence](docs/v2/evidence/backlog-20261121/sunday-review-20261122/README.md).
-A1/A2 ran Sunday; 371/372 remain resolved under the recorded narrow waiver. Monday pull, Wednesday verification
+**Current independent review, 22 November 2026.** Open issues are 332, 348, 350, 351, 352, 357, 362, 367, 368, 374, 375, 376 and 377. HOLD the two streamanator helpers and the candidate. [Findings, tests and owner gates](issues/reviews/AFLDB-FULL-REVIEW-2026-11-22.md).
+A1/A2 ran Sunday; 371/372 remain resolved under the recorded narrow waiver. Monday off-host bytes were verified on 23 November. Scheduled origin and production comparison are unproven. Wednesday verification
 and reboot remain pending. PREP `ae51cd8d913a7523dd89fb638279e7f910054b79` remains the historical Sunday contract.
 
 | Issue | Current action (22 Nov 2026, after Sunday sitting and review) |
 |---|---|
 | 332 | R2 installed; first scheduled :17 run and alarm email accepted Sunday. Keep G0 (2027 opening) and G0c (first nightly without HALT) pending, plus the later G1-G7 seasonal reviews. Do not defer G0/G0c to Opening Round. |
-| 348 | Refresh and re-seal the January rehearsal including groups (f)-(k). Tue 12 Jan 2027 11:00 AEDT is reserved for an attended load after that rehearsal; the production write set still needs separate owner approval. No load executed. |
+| 348 | Recompute the parsed-row digest on the exact importer input and refresh and re-seal the January rehearsal including groups (f)–(k). The 12 January 11:00 AEDT load requires separate production write approval. |
 | 350 | R8 draft approved: capture Fri 19 Feb 2027; proposed opening Tue 23 Feb 2027 11:00 AEDT. Obtain execution approval for the refreshed plan/revision/write set/window, perform G0 and observe G0c on the first nightly (24 Feb if opened 23 Feb). |
-| 351 | R1 installed Sunday. R6 approved window Wed 25 Nov 10:00-11:00 AEDT, fallback 14:00-15:00; reboot remains pending and NO-GO until every amended runbook gate passes. First weekly window and later acceptance remain pending. |
-| 352 | BEFORE Mon 23 Nov 03:10 AEDT: owner installs the pinned invocation-logging wrapper and new verifier from bc3fef3de375259d49001e7a9a478624832703a8. Observe Monday scheduled pull/next nightly within 25 h, Wednesday 03:10 overnight pull and 03:36:35 separate restore verification; all pending. D-HO-7 remains for R7. |
+| 351 | Wednesday 25 November 10:00–11:00 AEDT (fallback 14:00–15:00) remains NO-GO pending all live gates. Add the explicit attended functional 2/2 step to F-4 and require fresh post-boot evidence. |
+| 352 | HOLD the two helpers. Correct real cron CMD/PID attribution, fail closed on state-write errors, require an unambiguous overnight basename, and requalify on disposable Linux. Monday 03:10:01 dispatch and off-host copy 022145 observed. The old wrapper cannot prove scheduled origin. Production checksum/25-hour corroboration and both Wednesday checks remain pending. Address URI password decoding before credential rotation. Preserve D-HO-7 for R7. |
 | 357 | R4 deny installed and probes passed Sunday. Owner operational acceptance remains open; retain beta gate until a cache bound and disk alert exist, with F-09 prune validation. |
-| 362 | R4 filter live; R5 retained logs restricted and verified Sunday. Earliest disposal REVIEW Thu 7 Jan 2027; disposal needs separate owner approval. No disposal authorized by these fixes. |
+| 362 | Keep the historical R5 retention plan. Redact diagnostic Node request URLs before enabling request tracing. Earliest disposal review is 7 January 2027. |
+| 367 | Reopened for the raw Brownlow year and sitemap readers. Verify pending and explicitly inapplicable rankings are withheld and accepted historical rankings still render. |
+| 368 | Reopened for a coherent incomplete season/page generation. Enforce the expected AFLW input scope before replacing staging. |
+| 374 | Prove the database identity before a test migration or privilege write. |
+| 375 | Reject unknown applied ledger entries in status and apply modes. |
+| 376 | Cover old and new award-winner profiles in worker-wide invalidation and regression checks. |
+| 377 | Make the seeded player matching recall assertion mandatory and report unavailable empirical data explicitly. |
 
 ## Historical summaries and detailed issue records
 
