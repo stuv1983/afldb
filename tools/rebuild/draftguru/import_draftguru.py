@@ -368,6 +368,27 @@ def verify_raw_bytes(manifest: dict, snapshot_dir: Path) -> int:
     return len(entries)
 
 
+def verify_parsed_rows_pin(contract: dict, label: str, parse_result: dict) -> None:
+    """AFLDB-ISSUE-348 (F-348-3): the FRESH parsed-row digest must equal the reviewed pin.
+
+    The manifest digest is only compared to the pin, and the raw HTML is only rehashed; neither
+    covers the HTTP sidecar (``http/years/year_*.json``), whose ``final_url`` becomes every row's
+    ``source_url`` and so ``source_record_id``. Re-deriving the digest of the exact in-memory rows
+    (the parser's own ``parsed_rows_digest``, no second implementation) closes that gap. Runs
+    before any write preparation. A label without a reviewed pin is unchanged (additive).
+    """
+    pin = parser_mod.reviewed_pin(contract, label)
+    if pin is None:
+        return
+    fresh = parser_mod.parsed_rows_digest(parse_result)
+    if fresh != pin.get("parsed_rows_sha256"):
+        raise ImportFailure(
+            f"the freshly parsed rows' digest {fresh} is not the owner-reviewed pin "
+            f"{pin.get('parsed_rows_sha256')} for this label; the parsed rows (including row "
+            "provenance such as the HTTP sidecar final_url) are not the reviewed acquisition. "
+            "Nothing was prepared or written.")
+
+
 def load_event_mapping() -> tuple[dict[str | None, tuple[str, str]], set[str]]:
     """(event_type_raw -> (draft_type, draft_kind), closed signing-kind vocabulary)."""
     doc = load_json(EVENT_KINDS_PATH, "event-kind mapping")
@@ -1412,6 +1433,7 @@ def validate(args) -> dict:
     year_count = verify_raw_bytes(manifest, snapshot_dir)
 
     parse_result = parser_mod.parse_snapshot(contract, snapshot_dir, require_complete=True)
+    verify_parsed_rows_pin(contract, args.label, parse_result)
     parser_mod.validate_identity(contract, parse_result, require_complete=True,
                                  accept_baseline_drift=False, label=args.label)
 

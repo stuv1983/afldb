@@ -217,6 +217,103 @@ if m is not None:
             imp.MANIFEST_DIR = real_dir
 
 # ---------------------------------------------------------------------------
+section("3b. AFLDB-ISSUE-348 F-348-3: the importer compares the FRESH parsed-row digest to the pin")
+
+SYN = "annual-html-synthetic-348"
+SYN_URL = "https://www.draftguru.com.au/years/2001"
+SYN_COLS = ["Pick", "Draft", "# ↧", "Club", "Signing", "Player", "Age", "Height",
+            "Original Club", "Grade", "Games", "Goals", "Coaches", "Brownlow", "Awards"]
+
+
+def syn_html() -> bytes:
+    def tr(i: int) -> str:
+        cells = ["", "National", str(i), '<a href="/clubs/carlton">Carlton</a>', "",
+                 f'<a href="/players/syn_p{i}/1">Syn P{i}</a>', "18yr", "180cm", "Syn FC",
+                 "", "0", "0", "0", "0", ""]
+        return "<tr>" + "".join(f"<td>{c}</td>" for c in cells) + "</tr>"
+    head = "<tr>" + "".join(f"<th>{c}</th>" for c in SYN_COLS) + "</tr>"
+    return f"<html><body><table>{head}{tr(1)}{tr(2)}</table></body></html>".encode("utf-8")
+
+
+def validate_only(contract_doc: dict, root: Path, manifest_dir: Path) -> tuple[int, str]:
+    """imp.main(--validate-only) over the synthetic snapshot, contract/manifest dir substituted."""
+    saved = (p.load_contract, imp.MANIFEST_DIR, imp.load_ledger)
+    p.load_contract = lambda: contract_doc
+    imp.MANIFEST_DIR = manifest_dir
+    imp.load_ledger = lambda: {}
+    buf = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(buf):
+            rc = imp.main(["--label", SYN, "--snapshot-root", str(root), "--validate-only"])
+    finally:
+        p.load_contract, imp.MANIFEST_DIR, imp.load_ledger = saved
+    return rc, buf.getvalue()
+
+
+check("3b.0 the importer and the parser module share one parser_mod (the substitution is real)",
+      imp.parser_mod is p)
+with tempfile.TemporaryDirectory() as td:
+    root = Path(td) / "snaps"
+    snap = root / SYN
+    (snap / "raw" / "years").mkdir(parents=True)
+    (snap / "http" / "years").mkdir(parents=True)
+    page = syn_html()
+    (snap / "raw" / "years" / "year_2001.html").write_bytes(page)
+    sidecar = snap / "http" / "years" / "year_2001.json"
+    sidecar.write_text(json.dumps({"url": SYN_URL, "final_url": SYN_URL}), encoding="utf-8")
+    page_sha = hashlib.sha256(page).hexdigest()
+
+    syn_contract = copy.deepcopy(p.load_contract())
+    syn_contract["expected_years"] = [2001]
+    pristine = p.parse_snapshot(syn_contract, snap, require_complete=True)
+    syn_contract["reviewed_acquisitions"] = {SYN: {
+        "files": 1, "total_rows": 2, "distinct_persons": 2, "selection_number_blank": 0,
+        "event_type_totals": {"National": 2}, "special_pick_label_totals": {},
+        "parsed_rows_sha256": p.parsed_rows_digest(pristine),
+        "raw_pages_sha256": {"year_2001.html": page_sha}, "authority": "synthetic"}}
+    mdir = Path(td) / "manifests"
+    mdir.mkdir()
+    (mdir / f"{SYN}.json").write_text(json.dumps({
+        "snapshot_label": SYN, "identity_complete": True, "import_capable": True,
+        "total_rows": 2, "distinct_player_url_count": 2,
+        "source_urls": [{"raw_filename": "raw/years/year_2001.html", "sha256": page_sha}],
+        "parity": {"status": "REVIEWED_PIN",
+                   "corpus_checks": {"parsed_rows_sha256": p.parsed_rows_digest(pristine)}},
+    }), encoding="utf-8")
+
+    rc, out = validate_only(syn_contract, root, mdir)
+    check("3b.1 the unchanged synthetic fixture passes --validate-only (rc 0, 2 picks)",
+          rc == 0 and "picks      : 2" in out, f"rc={rc} {out[-300:]}")
+
+    sidecar.write_text(json.dumps({"url": SYN_URL, "final_url": SYN_URL + "?altered=1"}),
+                       encoding="utf-8")
+    check("3b.2 the altered sidecar leaves the raw page and the manifest byte-identical",
+          hashlib.sha256((snap / "raw" / "years" / "year_2001.html").read_bytes()).hexdigest()
+          == page_sha)
+    rc, out = validate_only(syn_contract, root, mdir)
+    check("3b.3 ONLY the HTTP sidecar final_url changed: --validate-only refuses (rc 1, digest "
+          "mismatch naming the reviewed pin)",
+          rc == 1 and "REFUSED" in out and "freshly parsed rows' digest" in out
+          and "owner-reviewed pin" in out, f"rc={rc} {out[-300:]}")
+    sidecar.write_text(json.dumps({"url": SYN_URL, "final_url": SYN_URL}), encoding="utf-8")
+    rc, out = validate_only(syn_contract, root, mdir)
+    check("3b.4 restoring the sidecar restores a clean pass", rc == 0, f"rc={rc} {out[-300:]}")
+
+    try:
+        ok = imp.verify_parsed_rows_pin(syn_contract, "unpinned-label", {}) is None
+    except Exception:  # noqa: BLE001
+        ok = False
+    check("3b.5 a label without a reviewed pin is untouched by the digest check (additive)", ok)
+    no_digest = copy.deepcopy(syn_contract)
+    del no_digest["reviewed_acquisitions"][SYN]["parsed_rows_sha256"]
+    try:
+        imp.verify_parsed_rows_pin(no_digest, SYN, pristine)
+        ok = False
+    except Exception as e:  # noqa: BLE001
+        ok = isinstance(e, imp.ImportFailure) and "owner-reviewed pin" in str(e)
+    check("3b.6 a pin that carries no parsed_rows_sha256 fails closed", ok)
+
+# ---------------------------------------------------------------------------
 section("4. acquire_draft.py --seal-reviewed is offline and fail-closed")
 
 
