@@ -34,6 +34,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { PSQL_BIN, PsqlCredentialRefused, psqlConnection, redact, type EnvLike } from './psql';
+import { TargetIdentityRefused, expectedTargetDatabase, targetIdentityAssertionSql } from './target-identity';
 
 const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const PRIVILEGES_SQL = join('tools', 'maintenance', 'privileges.sql');
@@ -98,6 +99,17 @@ export function main(
     return 1;
   }
 
+  // AFLDB-ISSUE-374: test and code-test must name a permitted database (refused before psql
+  // starts), and psql's own session must then report that database before privileges.sql runs.
+  let expected: string | null;
+  try {
+    expected = expectedTargetDatabase(requested, variable, dsn);
+  } catch (error) {
+    if (!(error instanceof TargetIdentityRefused)) throw error;
+    console.error(`ERROR: ${error.message}`);
+    return 1;
+  }
+
   // The password never rides in argv (ISSUE-313): `-d` gets the password-free DSN and the
   // password goes to the child as PGPASSWORD. A DSN whose password cannot be moved without
   // guessing is refused here, before psql is launched.
@@ -112,7 +124,10 @@ export function main(
 
   // Options first, DSN via -d and never as a positional operand: PostgreSQL's own
   // non-permuting getopt_long stops at the first non-option argument (see tools/db/psql.ts).
-  const argv = ['-v', 'ON_ERROR_STOP=1', '-f', PRIVILEGES_SQL, '-d', connection.dsn];
+  // ISSUE-374: for test/code-test a `-c` identity assertion runs first in the SAME psql session;
+  // psql processes -c/-f in order and ON_ERROR_STOP ends the run before privileges.sql on failure.
+  const identity = expected === null ? [] : ['-c', targetIdentityAssertionSql(expected)];
+  const argv = ['-v', 'ON_ERROR_STOP=1', ...identity, '-f', PRIVILEGES_SQL, '-d', connection.dsn];
 
   const result = spawn(PSQL_BIN, argv, {
     cwd: PROJECT_ROOT,

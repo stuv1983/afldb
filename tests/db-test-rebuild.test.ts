@@ -1882,6 +1882,12 @@ import {
 } from '../tools/db/psql';
 import type { PrivilegesSpawn } from '../tools/db/privileges';
 import {
+  TargetIdentityRefused,
+  connectedDatabaseRefusal,
+  expectedTargetDatabase,
+  targetIdentityAssertionSql,
+} from '../tools/db/target-identity';
+import {
   READ_ONLY_SQL,
   IDENTITY_SQL as VERIFIER_IDENTITY_SQL,
   parseArgs,
@@ -6980,8 +6986,10 @@ describe('reset proof', () => {
         expect(code).toBe(0);
         expect(calls).toHaveLength(1);
         expect(calls[0].bin).toBe(PSQL_BIN);
+        // ISSUE-374: the identity assertion runs first, in the same psql session, before the file.
         expect(calls[0].argv).toEqual([
-          '-v', 'ON_ERROR_STOP=1', '-f', join('tools', 'maintenance', 'privileges.sql'),
+          '-v', 'ON_ERROR_STOP=1', '-c', targetIdentityAssertionSql('afldb_test'),
+          '-f', join('tools', 'maintenance', 'privileges.sql'),
           '-d', 'postgres://afldb_owner@db.example:5432/afldb_test?sslmode=require']);
         expect(calls[0].argv.join('\0')).not.toContain(SECRET);
         expect(calls[0].options.env.PGPASSWORD).toBe(SECRET);
@@ -7035,6 +7043,65 @@ describe('reset proof', () => {
           expect(privilegesMain(argvFor('test'), PARENT, spawn)).toBe(1);
         } finally { spy.mockRestore(); }
         expect(calls).toHaveLength(0);
+      });
+
+      // AFLDB-ISSUE-374: a nonempty variable for another database is not a test target.
+      it('refuses a test or code-test DSN naming another database, before psql is launched', () => {
+        const { calls, spawn } = capture(0);
+        const errors: string[] = [];
+        const spy = vi.spyOn(console, 'error').mockImplementation((...a: unknown[]) => { errors.push(a.join(' ')); });
+        try {
+          for (const database of ['afldb_dev', 'afldb', 'afldb_prod_test', 'scratch', 'Afldb_test', 'code_test_db']) {
+            expect(privilegesMain(argvFor('test'),
+              { ...PARENT, AFLDB_TEST_DATABASE_URL: `postgres://o:${SECRET}@h/${database}` }, spawn), database).toBe(1);
+          }
+          for (const database of ['afldb_test', 'code_test_db_copy', 'afldb_dev']) {
+            expect(privilegesMain(argvFor('code-test'),
+              { ...PARENT, AFLDB_CODE_TEST_DATABASE_URL: `postgres://o:${SECRET}@h/${database}` }, spawn), database).toBe(1);
+          }
+        } finally { spy.mockRestore(); }
+        expect(calls).toHaveLength(0);
+        expect(errors.join('\n')).toContain("AFLDB_TEST_DATABASE_URL names 'afldb_dev', which is not a disposable *_test database");
+        expect(errors.join('\n')).toContain("the code-test target is exactly 'code_test_db'");
+        expect(errors.join('\n')).not.toContain(SECRET);
+      });
+
+      it('asserts code_test_db on the code-test session and leaves the dev invocation unchanged', () => {
+        const env = {
+          ...PARENT,
+          AFLDB_OWNER_DATABASE_URL: 'postgres://o:fake-owner@h/afldb_dev',
+          AFLDB_CODE_TEST_DATABASE_URL: 'postgres://c:fake-code@h/code_test_db',
+        };
+        const code = capture(0);
+        expect(privilegesMain(argvFor('code-test'), env, code.spawn)).toBe(0);
+        expect(code.calls[0].argv.slice(2, 4)).toEqual(['-c', targetIdentityAssertionSql('code_test_db')]);
+        const dev = capture(0);
+        expect(privilegesMain(argvFor('dev'), env, dev.spawn)).toBe(0);
+        expect(dev.calls[0].argv).toEqual([
+          '-v', 'ON_ERROR_STOP=1', '-f', join('tools', 'maintenance', 'privileges.sql'), '-d', 'postgres://o@h/afldb_dev']);
+      });
+    });
+
+    describe('connected-database identity (AFLDB-ISSUE-374)', () => {
+      it('derives the expected database by target and refuses everything else', () => {
+        expect(expectedTargetDatabase('test', 'V', 'postgres://u@h/afldb_test')).toBe('afldb_test');
+        expect(expectedTargetDatabase('test', 'V', 'postgres://u@h/afldb_v2_rb_x_test')).toBe('afldb_v2_rb_x_test');
+        expect(expectedTargetDatabase('code-test', 'V', 'postgres://u@h/code_test_db')).toBe('code_test_db');
+        expect(expectedTargetDatabase('dev', 'V', 'postgres://u@h/anything')).toBeNull();
+        expect(expectedTargetDatabase('prod', 'V', 'postgres://u@h/afldb_prod')).toBeNull();
+        for (const dsn of ['postgres://u@h/afldb_dev', 'postgres://u@h/', 'postgres://u@h/afldb_prod_test',
+          'postgres://u@h/a%22b_test', 'not a url']) {
+          expect(() => expectedTargetDatabase('test', 'V', dsn), dsn).toThrow(TargetIdentityRefused);
+        }
+        expect(() => expectedTargetDatabase('code-test', 'V', 'postgres://u@h/afldb_test')).toThrow(TargetIdentityRefused);
+      });
+
+      it('compares the connected database exactly and builds an inlined assertion only for plain names', () => {
+        expect(connectedDatabaseRefusal('afldb_test', 'afldb_test')).toBeNull();
+        expect(connectedDatabaseRefusal('afldb_test', 'afldb_dev'))
+          .toContain("AFLDB-TARGET-IDENTITY connected to database 'afldb_dev', not 'afldb_test'");
+        expect(targetIdentityAssertionSql('afldb_test')).toContain("IF current_database() <> 'afldb_test' THEN");
+        expect(() => targetIdentityAssertionSql("x'; DROP")).toThrow(TargetIdentityRefused);
       });
     });
 

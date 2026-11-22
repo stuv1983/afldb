@@ -1278,3 +1278,71 @@ describe('AFLDB-ISSUE-369 migration status is read-only', () => {
     expect(await catalog()).toEqual(before);
   });
 });
+
+/** Spawn a tools/db runner against the test target with AFLDB_TEST_DATABASE_URL replaced. */
+function runDbTool(script: string, args: readonly string[], testDsn: string) {
+  const env: NodeJS.ProcessEnv = { ...process.env, AFLDB_TEST_DATABASE_URL: testDsn };
+  delete env.AFLDB_MIGRATE_TARGET;
+  const run = spawnSync(process.execPath, ['--import', 'tsx', script, ...args], {
+    env, encoding: 'utf8', timeout: 120_000,
+  });
+  return { status: run.status, out: `${run.stdout}\n${run.stderr}` };
+}
+
+const catalogFingerprint = async () => {
+  const [row] = await sql<{ relations: string; acl: string; ledger: number }[]>`
+    SELECT md5(string_agg(n.nspname || '.' || c.relname || ':' || c.relkind::text, ',' ORDER BY n.nspname, c.relname)) AS relations,
+           md5(string_agg(coalesce(c.relacl::text, ''), ',' ORDER BY n.nspname, c.relname)) AS acl,
+           (SELECT count(*)::int FROM afldb_meta.schema_migrations) AS ledger
+      FROM pg_catalog.pg_class c
+      JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+     WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') AND n.nspname NOT LIKE 'pg_toast%'
+  `;
+  return row;
+};
+
+/*
+ * AFLDB-ISSUE-374. The direct test-target runners select AFLDB_TEST_DATABASE_URL by target name.
+ * A nonempty value naming, or reaching, another database used to be migrated and granted on.
+ * They now refuse a DSN that does not NAME a disposable *_test database before connecting, and
+ * refuse when the connection that would act reports a different current_database().
+ * The populated second-database proof (a writable non-test database left intact) is recorded
+ * with the run evidence; here the refusals are asserted against the real server.
+ */
+describe('AFLDB-ISSUE-374 direct test-target runners verify the connected database', () => {
+  const named = (database: string, search = '') => {
+    const url = new URL(process.env.AFLDB_TEST_DATABASE_URL!);
+    url.pathname = `/${database}`;
+    url.search = search;
+    return url.toString();
+  };
+
+  it('refuses a DSN naming a non-test database before any connection or DDL', async () => {
+    const before = await catalogFingerprint();
+    for (const script of ['tools/db/migrate.ts', 'tools/db/privileges.ts']) {
+      const run = runDbTool(script, ['--target', 'test'], named('postgres'));
+      expect(run.status, run.out).toBe(1);
+      expect(run.out).toContain("AFLDB_TEST_DATABASE_URL names 'postgres', which is not a disposable *_test database");
+      expect(run.out).not.toMatch(/applying \d{3}_|^DO$/m);
+    }
+    expect(await catalogFingerprint()).toEqual(before);
+  });
+
+  it('refuses when psql\'s own session lands on another database (libpq dbname= redirect), before any grant', async () => {
+    const own = new URL(process.env.AFLDB_TEST_DATABASE_URL!).pathname.slice(1);
+    const run = runDbTool('tools/db/privileges.ts', ['--target', 'test'], named(own, '?dbname=postgres'));
+    expect(run.status, run.out).not.toBe(0);
+    expect(run.out).toContain(`AFLDB-TARGET-IDENTITY connected to database postgres, not ${own}`);
+    expect(run.out).not.toMatch(/privileges\.sql:\d+/);
+  });
+
+  it('still migrates and grants on the permitted disposable target', async () => {
+    const before = await catalogFingerprint();
+    const migrate = runDbTool('tools/db/migrate.ts', ['--target', 'test'], process.env.AFLDB_TEST_DATABASE_URL!);
+    expect(migrate.status, migrate.out).toBe(0);
+    expect(migrate.out).toContain('Nothing to apply');
+    expect(await catalogFingerprint()).toEqual(before);
+    const privileges = runDbTool('tools/db/privileges.ts', ['--target', 'test'], process.env.AFLDB_TEST_DATABASE_URL!);
+    expect(privileges.status, privileges.out).toBe(0);
+  });
+});

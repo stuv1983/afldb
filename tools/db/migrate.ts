@@ -32,6 +32,11 @@ import {
   findMigrationConflicts,
   readWorkingTreeMigrations,
 } from './migration-safety';
+import {
+  TargetIdentityRefused,
+  connectedDatabaseRefusal,
+  expectedTargetDatabase,
+} from './target-identity';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(__dirname, '..', '..');
@@ -146,6 +151,20 @@ if (allowBranchLocal && target !== 'dev') {
 
 if (!connectionString) {
   console.error(`ERROR: ${variable} is not set (target '${target}').`);
+  process.exit(1);
+}
+
+/**
+ * AFLDB-ISSUE-374: the test and code-test targets must NAME a permitted database before any
+ * connection, and the connection itself must report that database before the first DDL
+ * (`assertConnectedTarget`). Null for dev/prod, which have no name contract.
+ */
+let expectedDatabase: string | null;
+try {
+  expectedDatabase = expectedTargetDatabase(target, variable, connectionString);
+} catch (error) {
+  if (!(error instanceof TargetIdentityRefused)) throw error;
+  console.error(`ERROR: ${error.message}`);
   process.exit(1);
 }
 
@@ -267,15 +286,32 @@ async function readLedger(q: postgres.Sql | postgres.TransactionSql): Promise<Le
   return { present, applied: [...applied] };
 }
 
+/**
+ * AFLDB-ISSUE-374: refuse unless `q`'s session is connected to the expected database. Runs on the
+ * single connection (max: 1) before anything else and again inside every write transaction.
+ */
+async function assertConnectedTarget(q: postgres.Sql | postgres.TransactionSql): Promise<void> {
+  if (expectedDatabase === null) return;
+  const [{ db }] = await q<{ db: string }[]>`SELECT current_database() AS db`;
+  const refusal = connectedDatabaseRefusal(expectedDatabase, db);
+  if (refusal) throw new TargetIdentityRefused(refusal);
+}
+
 async function main() {
   const sql = postgres(connectionString!, { max: 1, onnotice: () => {} });
 
   try {
+    await assertConnectedTarget(sql);
     // --status inspects inside a READ ONLY transaction, so even an owner connection cannot change the target, and a
     // server-enforced read-only connection is enough to report. Only apply mode creates the ledger.
-    if (!statusOnly) await sql.unsafe(LEDGER_BOOTSTRAP_SQL);
+    if (!statusOnly) {
+      await sql.begin(async (tx) => {
+        await assertConnectedTarget(tx);
+        await tx.unsafe(LEDGER_BOOTSTRAP_SQL);
+      });
+    }
     const ledger = statusOnly
-      ? await sql.begin('read only', (tx) => readLedger(tx))
+      ? await sql.begin('read only', async (tx) => { await assertConnectedTarget(tx); return readLedger(tx); })
       : await readLedger(sql);
     const { applied } = ledger;
     const appliedByName = new Map(applied.map((r) => [r.name, r.checksum]));
@@ -321,6 +357,7 @@ async function main() {
       try {
         // begin() rolls back automatically if the migration throws.
         await sql.begin(async (tx) => {
+          await assertConnectedTarget(tx);
           await tx.unsafe(m.sql);
           await tx`
             INSERT INTO afldb_meta.schema_migrations (name, checksum, duration_ms)
