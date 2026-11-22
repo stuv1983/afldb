@@ -34,8 +34,9 @@ case $JOB in
       PINS="c6467ff492afe0e1f28117baf5c4fa2a38edaf8e8f13bf3cacd72ef22b224896  $OPS/afldb-settle-check.sh"
       WRAP=afldb-settle-check.sh; WHAT="ISSUE-332 hourly settle-status pull check";;
   r3) LINE="10 3 * * * $ALARM /bin/sh /home/arm/afldb-ops/afldb-offhost-pull-daily.sh"
+      # pin of offhost-pull.sh changed ea48205a -> a3775aea (stamp read in Australia/Melbourne), A2 run 2026-11-22
       PINS="1aa242f2627488a08b771851cb1e1ae94f1acc5b704c15b3f57b3a17718855bb  $OPS/afldb-offhost-pull-daily.sh
-ea48205a02e6383c2fe87a9e896afed422ff44834231270cbd22dc78c305de9b  $OPS/offhost-pull.sh"
+a3775aea879b1d9ce05d0e96482e66d24c69deb62cf38e8fc0407c0d2653dc2b  $OPS/offhost-pull.sh"
       WRAP=afldb-offhost-pull-daily.sh; WHAT="ISSUE-352 daily off-host pull";;
   *) echo "STOP job must be r2 or r3"; exit 2;;
 esac

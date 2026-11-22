@@ -56,7 +56,7 @@ for (const p of PAGES) {
       if (p === '/brownlow/2026') {
         const x = text(r.body);
         if (!/Won by Nick Daicos with 47 votes/.test(x)) why.push('winner sentence missing');
-        const n = (x.match(/Recorded ineligible/g) || []).length; s.ineligibleMarkers = n;
+        const n = (r.body.match(/badge badge-warn">Recorded ineligible</g) || []).length; s.ineligibleBadgeSpans = n; s.textOccurrences = (x.match(/Recorded ineligible/g) || []).length;
         if (n !== 14) why.push(`ineligible markers ${n}`);
       }
     }

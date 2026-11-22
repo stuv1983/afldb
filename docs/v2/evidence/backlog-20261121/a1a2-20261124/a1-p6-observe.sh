@@ -21,8 +21,8 @@ for t in 0 1 2 3; do
   process.stdout.write("afldb_beta="+p.toString("base64url")+"."+createHmac("sha256",e.AFLDB_SESSION_SECRET).update(p).digest().toString("base64url"))' ) > "$CK"
   S=$(systemctl show afldb -p ActiveState -p NRestarts -p InvocationID -p MemoryCurrent | tr '\n' ' ')
   H=$(curl -s -m 20 "http://127.0.0.1:$P/api/health" || true)
-  G1=$(curl -s -m 60 -o "$T" -w '%{http_code}' -H "Cookie: $(cat "$CK")" "http://127.0.0.1:$P/seasons/2026" || true); NF1=$(grep -c 'Page not found' "$T" || true)
-  G2=$(curl -s -m 60 -o "$T" -w '%{http_code}' -H "Cookie: $(cat "$CK")" "http://127.0.0.1:$P/brownlow/2026" || true); NF2=$(grep -c 'Page not found' "$T" || true)
+  G1=$(curl -s -m 60 -o "$T" -w '%{http_code}' -H "Cookie: $(cat "$CK")" "http://127.0.0.1:$P/seasons/2026" || true); NF1=$(grep -o '<title>[^<]*</title>' "$T" | grep -c 'Page not found' || true)
+  G2=$(curl -s -m 60 -o "$T" -w '%{http_code}' -H "Cookie: $(cat "$CK")" "http://127.0.0.1:$P/brownlow/2026" || true); NF2=$(grep -o '<title>[^<]*</title>' "$T" | grep -c 'Page not found' || true)
   rm -f "$CK"
   J=$(journalctl -u afldb --since "$SINCE" -p err -q --no-pager 2>/dev/null | wc -l || echo unreadable)
   echo "tick $t $(date -u +%FT%TZ) $S health=$H seasons=$G1/nf$NF1 brownlow=$G2/nf$NF2 journal_err_lines=$J"

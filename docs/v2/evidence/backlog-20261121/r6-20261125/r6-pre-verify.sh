@@ -90,7 +90,7 @@ echo "-- 4. services and the release (outcome $OUTC)"
 for u in postgresql@16-main afldb caddy; do [ "$(systemctl is-active "$u")" = active ] && ok "$u active" || bad "$u $(systemctl is-active "$u")"; done
 echo "INVOCATION_ID $(systemctl show afldb -p InvocationID --value)"
 systemctl show afldb -p NRestarts -p MainPID -p ActiveEnterTimestamp --no-pager | sed 's/^/     /'
-MAIN=$(systemctl show afldb -p MainPID --value); NW=0; [[ $MAIN =~ ^[1-9][0-9]*$ ]] && NW=$(pgrep -P "$MAIN" -x node | wc -l)
+MAIN=$(systemctl show afldb -p MainPID --value); NW=0; [[ $MAIN =~ ^[1-9][0-9]*$ ]] && NW=$(pgrep -P "$MAIN" | wc -l)
 [ "$NW" = 2 ] && ok "exactly 2 worker processes" || bad "worker processes $NW (expected 2)"
 if cd "$CHK" 2>/dev/null; then
   [ "$(readlink "$ROOT/current")" = "releases/$CUR" ] && ok "current = $CUR" || bad "current = $(readlink "$ROOT/current") (expected $CUR)"

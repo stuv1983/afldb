@@ -73,7 +73,7 @@ full)
   [ "$NR" = 0 ] && ok "afldb NRestarts 0" || bad "afldb NRestarts $NR (restart loop after boot?)"
   info "afldb active since $(systemctl show afldb -p ActiveEnterTimestamp --value)"
   MAIN=$(systemctl show afldb -p MainPID --value); NW=0; PIDS=''
-  if [[ $MAIN =~ ^[1-9][0-9]*$ ]]; then NW=$(pgrep -P "$MAIN" -x node | wc -l); PIDS="$MAIN $(pgrep -P "$MAIN" -x node | tr '\n' ' ')"; fi
+  if [[ $MAIN =~ ^[1-9][0-9]*$ ]]; then NW=$(pgrep -P "$MAIN" | wc -l); PIDS="$MAIN $(pgrep -P "$MAIN" | tr '\n' ' ')"; fi
   [ "$NW" = 2 ] && ok "exactly 2 worker processes" || bad "worker processes $NW (expected 2)"
   E=0; for p in $PIDS; do
     u=$(tr '\0' '\n' < "/proc/$p/environ" 2>/dev/null | grep -c '^AFLDB_REVALIDATE_URL='); s=$(tr '\0' '\n' < "/proc/$p/environ" 2>/dev/null | grep -c '^AFLDB_REVALIDATE_SECRET=')

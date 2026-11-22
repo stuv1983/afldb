@@ -37,7 +37,32 @@ rsync -a --partial --partial-dir=.rsync-partial --ignore-existing --chmod=F600 \
 
 mkdir -p "$DEST/quarantine"
 bad=0 checked=0 pending=0
-now=$(date -u +%s)
+# Dump names carry the SOURCE host's local wall-clock time (backup.sh: STAMP="$(date +%Y%m%d-%H%M%S)", production runs in
+# Australia/Melbourne), not UTC. They are read in that zone (AFLDB-ISSUE-352, found at the first A2 pull on 2026-11-22:
+# reading them as UTC put every dump about 11 h in the future and quarantined it). AFLDB_OFFHOST_TEST_NOW is a test-only
+# clock override (epoch seconds); the daily wrapper never sets it.
+STAMP_TZ="${AFLDB_OFFHOST_STAMP_TZ:-Australia/Melbourne}"
+now="${AFLDB_OFFHOST_TEST_NOW:-$(date -u +%s)}"
+[[ "$now" =~ ^[0-9]+$ ]] || { echo "offhost-pull: AFLDB_OFFHOST_TEST_NOW must be epoch seconds" >&2; exit 2; }
+# stamp_to_epoch "YYYYMMDD HH:MM:SS": print the EARLIEST UTC instant at which that was the wall-clock time in $STAMP_TZ.
+# A repeated local hour (daylight saving ends) has two valid instants: the earliest is used, so a genuine dump from either
+# pass is never rejected as future-dated (the only slack this gives is the one repeated hour). A local time that never
+# existed (daylight saving starts) and an unparseable stamp both fail.
+stamp_to_epoch() {
+  local s="$1" naive o z sign hh mm off e back best=""
+  naive=$(date -u -d "$s" +%s 2> /dev/null) || return 1
+  for o in -86400 0 86400; do
+    z=$(TZ="$STAMP_TZ" date -d "@$((naive + o))" +%z 2> /dev/null) || return 1
+    [[ "$z" =~ ^([+-])([0-9]{2})([0-9]{2})$ ]] || return 1
+    sign="${BASH_REMATCH[1]}"; hh="${BASH_REMATCH[2]}"; mm="${BASH_REMATCH[3]}"
+    off=$(( 10#$hh * 3600 + 10#$mm * 60 )); [[ "$sign" == - ]] && off=$((-off))
+    e=$((naive - off))
+    back=$(TZ="$STAMP_TZ" date -d "@$e" '+%Y%m%d %H:%M:%S' 2> /dev/null) || continue
+    if [[ "$back" == "$s" ]] && { [[ -z "$best" ]] || (( e < best )); }; then best="$e"; fi
+  done
+  [[ -n "$best" ]] || return 1
+  printf '%s\n' "$best"
+}
 prior=$(ls -1 "$DEST"/.verified-*.dump 2> /dev/null | wc -l)
 quarantine() { # basename reason
   bad=$((bad + 1)); log "FAILED verification ($2), quarantined: $1"
@@ -49,10 +74,10 @@ for dump in "$DEST"/*.dump; do
   if [[ -e "$DEST/.verified-$b" ]]; then continue; fi
   if [[ ! -f "$DEST/$b.sha256" ]]; then pending=$((pending + 1)); log "pending (no sidecar yet): $b"; continue; fi
   # Names are chosen by the source (review A-03): only <db>-YYYYMMDD-HHMMSS.dump, and never stamped in the future by
-  # this machine's clock (one hour of skew allowed).
+  # this machine's clock (one hour of skew allowed). The stamp is the source's local time ($STAMP_TZ), see above.
   stamp=$(printf '%s' "$b" | sed -n 's/^[A-Za-z0-9_]*-\([0-9]\{8\}\)-\([0-9]\{2\}\)\([0-9]\{2\}\)\([0-9]\{2\}\)\.dump$/\1 \2:\3:\4/p')
   if [[ -z "$stamp" ]]; then quarantine "$b" "unexpected name"; continue; fi
-  stamp_epoch=$(date -u -d "$stamp" +%s 2> /dev/null) || { quarantine "$b" "unparseable stamp"; continue; }
+  stamp_epoch=$(stamp_to_epoch "$stamp") || { quarantine "$b" "unparseable stamp or not a $STAMP_TZ local time"; continue; }
   if (( stamp_epoch > now + 3600 )); then quarantine "$b" "stamped in the future"; continue; fi
   # The sidecar must be exactly one line naming THIS dump, and the dump's own hash must equal it: sha256sum -c alone
   # checks whatever file the source-supplied sidecar names.

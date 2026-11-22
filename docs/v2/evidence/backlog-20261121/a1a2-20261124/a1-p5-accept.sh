@@ -25,8 +25,8 @@ F=0
 "$N" deploy/release.mjs status --expect "$NEW_ID" --confirm-restart-invocation "$INV" && echo "PASS 1 status --expect" || { echo "FAIL 1 status --expect (rollback trigger)"; F=1; }
 bash deploy/post-install-check.sh --confirm-restart-invocation "$INV" "$NEW_ID" "$OLD_BUILD" && echo "PASS 2 post-install-check" || { echo "FAIL 2 post-install-check (rollback trigger)"; F=1; }
 MAIN=$(systemctl show afldb -p MainPID --value); [[ $MAIN =~ ^[1-9][0-9]*$ ]]
-PIDS="$MAIN $(pgrep -P "$MAIN" -x node | tr '\n' ' ' || true)"; echo "processes: $PIDS"
-NW=$(pgrep -P "$MAIN" -x node | wc -l || true); echo "worker processes: $NW (expect 2)"
+PIDS="$MAIN $(pgrep -P "$MAIN" | tr '\n' ' ' || true)"; echo "processes: $PIDS"
+NW=$(pgrep -P "$MAIN" | wc -l || true); echo "worker processes: $NW (expect 2)"
 E=0
 for p in $PIDS; do
   u=$(tr '\0' '\n' < "/proc/$p/environ" | grep -c '^AFLDB_REVALIDATE_URL=' || true)

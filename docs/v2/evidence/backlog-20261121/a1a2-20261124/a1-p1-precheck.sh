@@ -36,7 +36,7 @@ if ls -d "$ROOT"/releases/7d92042fd110-* >/dev/null 2>&1; then echo "RECORD an e
 [ "$(systemctl is-active afldb-settle-afl-api.service || true)" = inactive ]; echo "PASS settle inactive"
 echo "settle next: $(systemctl show afldb-settle-afl-api.timer -p NextElapseUSecRealtime --value)"
 for u in apt-daily.service apt-daily-upgrade.service; do [ "$(systemctl is-active $u || true)" = inactive ]; done; echo "PASS apt services inactive"
-for p in apt apt-get dpkg unattended-upgr; do [ -z "$(pgrep -x $p || true)" ]; done; echo "PASS no apt/dpkg process"
+for p in apt apt-get dpkg; do [ -z "$(pgrep -x $p || true)" ]; done; [ -z "$(pgrep -f "(^|/)(unattended-upgrade( |$)|apt.systemd.daily)" || true)" ]; echo "PASS no apt/dpkg/unattended-upgrade run (the always-on unattended-upgrade-shutdown handler is not a run)"
 systemctl list-timers 'afldb*' apt-daily-upgrade.timer apt-daily.timer --all --no-pager
 W=$(pgrep -af 'settle|import_|rebuild|pg_dump|pg_restore|brownlow-season-attach|prod-stage' | grep -v pgrep || true); [ -z "$W" ]; echo "PASS no writer, dump or attach processes"
 avail=$(awk '/^MemAvailable:/{print int($2/1024)}' /proc/meminfo); echo "MemAvailable $avail MB"; [ "$avail" -ge 2100 ]
