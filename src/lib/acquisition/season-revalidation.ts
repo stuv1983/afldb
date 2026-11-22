@@ -172,6 +172,31 @@ export function isPlausibleSeason(value: unknown): value is number {
     && value <= LAST_PLAUSIBLE_SEASON;
 }
 
+/**
+ * AFLDB-ISSUE-376 — the player profiles an award correction changes.
+ *
+ * A winner replacement changes TWO players' pages (the removed winner's and the
+ * added winner's), and `/players/[slug]` is ISR with its own per-worker copy.
+ * The season fan-out may therefore carry a small, strictly shaped list of
+ * concrete player paths for every worker to expire. This is still not a
+ * general purge: at most `MAX_REVALIDATE_PLAYER_PATHS` entries, each a
+ * canonical `/players/<slug>-<id>` (the shape `playerPath()` emits), nothing
+ * else — no pattern, tag, query string or other route.
+ *
+ * The bound is two players for each of the (at most three) seasons a fan-out
+ * names. A request over the bound is refused whole by the route (never
+ * truncated there); the caller (`award-season-fanout.ts`) truncates BEFORE
+ * sending, so an over-long correction keeps its ISR window for the surplus
+ * rather than failing.
+ */
+export const MAX_REVALIDATE_PLAYER_PATHS = 6;
+
+const PLAYER_PROFILE_PATH = /^\/players\/[a-z0-9]+(?:-[a-z0-9]+)*-[1-9]\d{0,8}$/;
+
+export function isRevalidatablePlayerPath(value: unknown): value is string {
+  return typeof value === 'string' && value.length <= 120 && PLAYER_PROFILE_PATH.test(value);
+}
+
 export type RevalidateConfig = {
   /** Origin of the running site, e.g. `http://127.0.0.1:3100`. Loopback only. */
   origin: string;
@@ -265,7 +290,7 @@ export type RevalidateReply = {
  * status as a failure too).
  */
 export type RevalidatePoster = (
-  config: RevalidateConfig, season: number,
+  config: RevalidateConfig, season: number, playerPaths?: readonly string[],
 ) => Promise<RevalidateReply>;
 
 export type RevalidateOutcome = {
@@ -313,6 +338,7 @@ export async function revalidateSeason(
   config: RevalidateConfig,
   season: number,
   post: RevalidatePoster = postRevalidate,
+  playerPaths: readonly string[] = [],
 ): Promise<RevalidateOutcome> {
   const workersReached: string[] = [];
   const failures: string[] = [];
@@ -330,7 +356,9 @@ export async function revalidateSeason(
     attempts += 1;
     let reply: RevalidateReply;
     try {
-      reply = await post(config, season);
+      reply = playerPaths.length > 0
+        ? await post(config, season, playerPaths)
+        : await post(config, season);
     } catch (error) {
       failures.push(boundedMessage(error));
       continue;
@@ -371,7 +399,11 @@ export async function revalidateSeason(
  * `Connection: close` stops the server holding it open afterwards. Together
  * they put every attempt back through the primary's rotation.
  */
-export function buildRevalidateRequest(config: RevalidateConfig, season: number): {
+export function buildRevalidateRequest(
+  config: RevalidateConfig,
+  season: number,
+  playerPaths: readonly string[] = [],
+): {
   url: URL;
   body: string;
   options: {
@@ -382,7 +414,9 @@ export function buildRevalidateRequest(config: RevalidateConfig, season: number)
   };
 } {
   const url = new URL(REVALIDATE_ROUTE, config.origin);
-  const body = JSON.stringify({ season });
+  // Season-only callers (the settle, the attended CLI, the Brownlow action)
+  // keep the exact body they always sent.
+  const body = JSON.stringify(playerPaths.length > 0 ? { season, playerPaths } : { season });
   return {
     url,
     body,
@@ -401,8 +435,8 @@ export function buildRevalidateRequest(config: RevalidateConfig, season: number)
 }
 
 /** The real transport. */
-export const postRevalidate: RevalidatePoster = (config, season) => {
-  const { url, body, options } = buildRevalidateRequest(config, season);
+export const postRevalidate: RevalidatePoster = (config, season, playerPaths) => {
+  const { url, body, options } = buildRevalidateRequest(config, season, playerPaths);
   const send = url.protocol === 'https:' ? httpsRequest : httpRequest;
 
   return new Promise<RevalidateReply>((resolve, reject) => {

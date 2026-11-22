@@ -1,5 +1,7 @@
 import {
   isPlausibleSeason,
+  isRevalidatablePlayerPath,
+  MAX_REVALIDATE_PLAYER_PATHS,
   readRevalidateConfig,
   revalidateSeason,
   type RevalidateConfig,
@@ -32,6 +34,13 @@ import {
  * - never throws: the mutation is committed before this runs, and a host with
  *   no `AFLDB_REVALIDATE_URL`/`SECRET` keeps the acting-worker behaviour.
  *
+ * AFLDB-ISSUE-376: a winner replacement also changes the removed and the added
+ * winner's profiles (`/players/[slug]`, ISR, a copy per worker), so the admitted
+ * `/players/<slug>-<id>` paths (bounded, canonical shape only) ride with the first
+ * season's fan-out and are expired on every worker too. A correction naming a
+ * player but no season keeps the acting-worker refresh (the fan-out is
+ * season-keyed).
+ *
  * Route handler only, never a Server Action (the ISSUE-156 R-7 hang rule).
  */
 
@@ -54,9 +63,29 @@ export function awardSeasonsToFanOut(paths: readonly unknown[]): number[] {
   return seasons;
 }
 
+/**
+ * AFLDB-ISSUE-376: the distinct canonical player-profile paths among the
+ * admitted paths, deduplicated, in first-seen order, capped at
+ * `MAX_REVALIDATE_PLAYER_PATHS`. A winner replacement names the removed and the
+ * added winner (`replacementPaths`), and `/players/[slug]` is ISR with a copy per
+ * worker; shapes are the route's own (`isRevalidatablePlayerPath`), so anything
+ * the internal route would refuse is dropped here rather than failing the post.
+ */
+export function awardPlayerPathsToFanOut(paths: readonly unknown[]): string[] {
+  const players: string[] = [];
+  for (const path of paths) {
+    if (!isRevalidatablePlayerPath(path) || players.includes(path)) continue;
+    players.push(path);
+    if (players.length === MAX_REVALIDATE_PLAYER_PATHS) break;
+  }
+  return players;
+}
+
 export type AwardFanOutDeps = {
   env?: Record<string, string | undefined>;
-  revalidate?: (config: RevalidateConfig, season: number) => Promise<RevalidateOutcome>;
+  revalidate?: (
+    config: RevalidateConfig, season: number, playerPaths?: readonly string[],
+  ) => Promise<RevalidateOutcome>;
   logError?: (message: string, detail: unknown) => void;
 };
 
@@ -80,10 +109,24 @@ export async function fanOutAwardSeasons(
     return [];
   }
   if (!config) return [];
-  const revalidate = deps.revalidate ?? revalidateSeason;
+  // `revalidateSeason`'s third parameter is its transport, so the player paths
+  // (this dependency's third) are passed as its fourth.
+  const revalidate = deps.revalidate
+    ?? ((cfg: RevalidateConfig, season: number, playerPaths?: readonly string[]) => (
+      revalidateSeason(cfg, season, undefined, playerPaths)
+    ));
+  // The player paths ride with the FIRST season's fan-out only: that request
+  // already reaches every worker, and repeating them per season would be
+  // redundant cluster-wide work.
+  let playerPaths = awardPlayerPathsToFanOut(revalidated);
   for (const season of seasons) {
     try {
-      const outcome = await revalidate(config, season);
+      const outcome = playerPaths.length > 0
+        ? await revalidate(config, season, playerPaths)
+        : await revalidate(config, season);
+      // Cleared only once every worker acknowledged: an incomplete fan-out
+      // retries the player paths with the next season.
+      if (outcome.ok) playerPaths = [];
       if (!outcome.ok) logError('[admin-awards] award-season fan-out incomplete', outcome.failures);
     } catch (error) {
       logError('[admin-awards] award-season fan-out failed', error);

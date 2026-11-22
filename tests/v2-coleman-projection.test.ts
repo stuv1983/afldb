@@ -34,7 +34,9 @@ import {
 } from '@afldb/derived';
 
 import { isAllowedRevalidatePath } from '@/app/admin/awards/revalidate-paths';
+import { MAX_REVALIDATE_PLAYER_PATHS } from '@/lib/acquisition/season-revalidation';
 import {
+  awardPlayerPathsToFanOut,
   awardSeasonsToFanOut,
   fanOutAwardSeasons,
   MAX_AWARD_FANOUT_SEASONS,
@@ -590,6 +592,82 @@ describe('AFLDB-ISSUE-372 option B: the season fan-out after /admin/awards/reval
       '[admin-awards] award-season fan-out failed',
       '[admin-awards] award-season fan-out incomplete',
     ]);
+  });
+
+  describe('AFLDB-ISSUE-376: the removed and the added winner\'s profiles reach every worker', () => {
+    const OLD = playerPath('synthetic-old-winner', 11);
+    const NEW = playerPath('synthetic-new-winner', 12);
+    // What a winner replacement admits: both rows' paths (`replacementPaths`), the season among them.
+    const admitted = ['/awards', awardPath('coleman'), '/sitemap-index.xml', awardSeasonPath('coleman', 2027), seasonPath(2027), OLD, NEW];
+
+    it('derives the old and the new winner\'s canonical player paths, deduplicated, in order, bounded, shape-checked', () => {
+      expect(awardPlayerPathsToFanOut(admitted)).toEqual([OLD, NEW]);
+      expect(awardPlayerPathsToFanOut([NEW, OLD, NEW, OLD])).toEqual([NEW, OLD]);
+      const many = [1, 2, 3, 4, 5, 6, 7, 8].map((id) => playerPath('p', id));
+      expect(awardPlayerPathsToFanOut(many)).toEqual(many.slice(0, MAX_REVALIDATE_PLAYER_PATHS));
+      expect(MAX_REVALIDATE_PLAYER_PATHS).toBe(6);
+      expect(awardPlayerPathsToFanOut([
+        '/players/[slug]', '/players/x', '/players/x-0', '/players/X-5', '/players/x-5?y=1', '/players/x-5/',
+        '/players/../x-5', '/clubs/x-5', 'https://example.com/players/x-5', 5, null, {}, [OLD],
+      ])).toEqual([]);
+    });
+
+    it('posts the player paths with the first season\'s fan-out only, and the season alone after it', async () => {
+      const calls: Array<[number, readonly string[] | undefined]> = [];
+      const seasons = await fanOutAwardSeasons([...admitted, awardSeasonPath('coleman', 2026)], {
+        env: CONFIG_ENV,
+        revalidate: async (_config, season, playerPaths) => { calls.push([season, playerPaths]); return okOutcome(season); },
+        logError: () => { throw new Error('no error expected'); },
+      });
+      expect(seasons).toEqual([2027, 2026]);
+      expect(calls).toEqual([[2027, [OLD, NEW]], [2026, undefined]]);
+    });
+
+    it('keeps season-only calls to exactly (config, season) when no player is named', async () => {
+      const seen: unknown[][] = [];
+      await fanOutAwardSeasons([awardSeasonPath('coleman', 2027)], {
+        env: CONFIG_ENV,
+        revalidate: async (...args) => { seen.push(args); return okOutcome(2027); },
+      });
+      expect(seen).toEqual([[{ origin: 'http://127.0.0.1:3100', secret: 'synthetic-secret' }, 2027]]);
+    });
+
+    it('documents the limit: a correction naming players but no season keeps the acting-worker refresh', async () => {
+      let called = 0;
+      expect(await fanOutAwardSeasons([OLD, NEW], {
+        env: CONFIG_ENV, revalidate: async (_c, season) => { called += 1; return okOutcome(season); },
+      })).toEqual([]);
+      expect(called).toBe(0);
+    });
+
+    it('retries the player paths with the next season when the first post throws, and never throws', async () => {
+      const calls: Array<[number, readonly string[] | undefined]> = [];
+      await fanOutAwardSeasons(admitted.concat(awardSeasonPath('coleman', 2026)), {
+        env: CONFIG_ENV,
+        logError: () => undefined,
+        revalidate: async (_config, season, playerPaths) => {
+          calls.push([season, playerPaths]);
+          if (season === 2027) throw new Error('transport');
+          return okOutcome(season);
+        },
+      });
+      expect(calls).toEqual([[2027, [OLD, NEW]], [2026, [OLD, NEW]]]);
+    });
+
+    it('retries the player paths with the next season when the first fan-out reaches only some workers', async () => {
+      const calls: Array<[number, readonly string[] | undefined]> = [];
+      await fanOutAwardSeasons(admitted.concat(awardSeasonPath('coleman', 2026)), {
+        env: CONFIG_ENV,
+        logError: () => undefined,
+        revalidate: async (_config, season, playerPaths) => {
+          calls.push([season, playerPaths]);
+          return season === 2027
+            ? { ...okOutcome(season), ok: false, workersReached: ['1'], failures: ['worker 2 not reached'] }
+            : okOutcome(season);
+        },
+      });
+      expect(calls).toEqual([[2027, [OLD, NEW]], [2026, [OLD, NEW]]]);
+    });
   });
 
   it('reads the revalidated list without consuming the response', async () => {

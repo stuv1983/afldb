@@ -73,7 +73,9 @@ import {
   buildRevalidateRequest,
   classifyForwardedClient,
   isPlausibleSeason,
+  isRevalidatablePlayerPath,
   isServableForwardedClient,
+  MAX_REVALIDATE_PLAYER_PATHS,
   readRevalidateConfig,
   renderRevalidateOutcome,
   revalidateSeason,
@@ -614,6 +616,37 @@ describe('AFLDB-ISSUE-134 — every worker, or a reported failure', () => {
         expect(options.headers[REVALIDATE_SECRET_HEADER]).toBe('s3cret');
         expect(JSON.parse(body)).toEqual({ season: 2026 });
       });
+
+    it('AFLDB-ISSUE-376: carries player paths only when given, and the season-only body is unchanged', () => {
+      const players = ['/players/old-winner-11', '/players/new-winner-12'];
+      expect(JSON.parse(buildRevalidateRequest(config, 2026, players).body))
+        .toEqual({ season: 2026, playerPaths: players });
+      expect(buildRevalidateRequest(config, 2026, []).body).toBe(buildRevalidateRequest(config, 2026).body);
+      expect(buildRevalidateRequest(config, 2026).body).toBe('{"season":2026}');
+    });
+
+    it('AFLDB-ISSUE-376: hands the player paths to EVERY attempt of the coverage loop', async () => {
+      const players = ['/players/old-winner-11', '/players/new-winner-12'];
+      const calls: Array<readonly string[] | undefined> = [];
+      const outcome = await revalidateSeason(config, 2026, async (_c, _s, playerPaths) => {
+        calls.push(playerPaths);
+        return {
+          status: 200, workerId: String(calls.length), workerCount: 3, path: '/seasons/2026',
+        };
+      }, players);
+      expect(outcome.ok).toBe(true);
+      expect(outcome.workersReached).toEqual(['1', '2', '3']);
+      expect(calls).toEqual([players, players, players]);
+    });
+
+    it('AFLDB-ISSUE-376: a season-only call still posts exactly (config, season) to the transport', async () => {
+      const seen: unknown[][] = [];
+      await revalidateSeason(config, 2026, async (...args) => {
+        seen.push(args);
+        return { status: 200, workerId: null, workerCount: 1, path: '/seasons/2026' };
+      });
+      expect(seen).toEqual([[config, 2026]]);
+    });
   });
 });
 
@@ -876,6 +909,79 @@ describe('POST /api/internal/revalidate-season', () => {
       expect(response.status).toBe(400);
     }
     expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  describe('AFLDB-ISSUE-376: bounded, validated player-profile paths', () => {
+    it('invalidates the old and the new winner\'s profile on this worker, deduplicated, after the season pages', async () => {
+      const response = await POST(post({
+        season: 2026,
+        playerPaths: ['/players/old-winner-11', '/players/new-winner-12', '/players/old-winner-11'],
+      }));
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        ok: true,
+        paths: ['/seasons/2026', '/brownlow/2026'],
+        playerPaths: ['/players/old-winner-11', '/players/new-winner-12'],
+      });
+      expect(mocks.revalidatePath.mock.calls).toEqual([
+        ['/seasons/2026'], ['/brownlow/2026'], ['/players/old-winner-11'], ['/players/new-winner-12'],
+      ]);
+    });
+
+    it('stays season-only when playerPaths is absent or empty', async () => {
+      const absent = await (await POST(post({ season: 2026 }))).json();
+      expect(absent.playerPaths).toEqual([]);
+      expect((await POST(post({ season: 2026, playerPaths: [] }))).status).toBe(200);
+      expect(mocks.revalidatePath.mock.calls).toEqual([
+        ['/seasons/2026'], ['/brownlow/2026'], ['/seasons/2026'], ['/brownlow/2026'],
+      ]);
+    });
+
+    it('accepts exactly the bound and refuses one more, invalidating nothing', async () => {
+      const at = Array.from({ length: MAX_REVALIDATE_PLAYER_PATHS }, (_, i) => `/players/p-${i + 1}`);
+      expect((await POST(post({ season: 2026, playerPaths: at }))).status).toBe(200);
+      mocks.revalidatePath.mockClear();
+      const over = [...at, '/players/p-99'];
+      const response = await POST(post({ season: 2026, playerPaths: over }));
+      expect(response.status).toBe(400);
+      expect(mocks.revalidatePath).not.toHaveBeenCalled();
+    });
+
+    it('refuses any unvalidated entry whole: no pattern, tag, other route, traversal, query or wrong type', async () => {
+      const bad: unknown[] = [
+        '/players/[slug]', '/players/', '/players/-5', '/players/x', '/players/x-0', '/players/x-007',
+        '/players/x-1234567890', '/players/X-5', '/players/x-5/', '/players/x-5?y=1', '/players/x-5#f',
+        '/players/../admin-5', '/players/a/b-5', '/admin/players/x-5', '/clubs/x-5', '/seasons/2026',
+        '//evil.example/players/x-5', 'https://example.com/players/x-5', '_N_T_/players/x-5',
+        `/players/${'a'.repeat(200)}-5`, 5, null, { path: '/players/x-5' }, ['/players/x-5'],
+      ];
+      for (const entry of bad) {
+        mocks.revalidatePath.mockClear();
+        const response = await POST(post({ season: 2026, playerPaths: ['/players/ok-1', entry] }));
+        expect(response.status, JSON.stringify(entry)).toBe(400);
+        expect(mocks.revalidatePath, JSON.stringify(entry)).not.toHaveBeenCalled();
+      }
+    });
+
+    it('refuses a playerPaths value that is not an array', async () => {
+      for (const playerPaths of ['/players/x-5', null, 5, { 0: '/players/x-5', length: 1 }]) {
+        const response = await POST(post({ season: 2026, playerPaths }));
+        expect(response.status, JSON.stringify(playerPaths)).toBe(400);
+      }
+      expect(mocks.revalidatePath).not.toHaveBeenCalled();
+    });
+
+    it('still requires a valid season and the secret when player paths are present', async () => {
+      expect((await POST(post({ playerPaths: ['/players/x-5'] }))).status).toBe(400);
+      expect((await POST(post({ season: 2026, playerPaths: ['/players/x-5'] }, { [REVALIDATE_SECRET_HEADER]: 'wrong' }))).status).toBe(401);
+      expect(mocks.revalidatePath).not.toHaveBeenCalled();
+    });
+
+    it('the shape predicate matches the canonical playerPath() output', () => {
+      expect(isRevalidatablePlayerPath('/players/jack-riewoldt-1234')).toBe(true);
+      expect(isRevalidatablePlayerPath('/players/a-1')).toBe(true);
+      expect(isRevalidatablePlayerPath('/players/x-5/')).toBe(false);
+    });
   });
 
   it('refuses a body that is not JSON at all', async () => {

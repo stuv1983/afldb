@@ -7,7 +7,9 @@ import { RateLimiter } from '@/lib/auth/rate-limit';
 import {
   classifyForwardedClient,
   isPlausibleSeason,
+  isRevalidatablePlayerPath,
   isServableForwardedClient,
+  MAX_REVALIDATE_PLAYER_PATHS,
   REVALIDATE_SECRET_ENV,
   REVALIDATE_SECRET_HEADER,
 } from '@/lib/acquisition/season-revalidation';
@@ -33,7 +35,10 @@ export const dynamic = 'force-dynamic';
  * connections until every ordinal has answered. See
  * `src/lib/acquisition/season-revalidation.ts` for the framework evidence.
  *
- * WHAT A CALLER MAY ASK FOR. A season year, and nothing else. The paths are
+ * WHAT A CALLER MAY ASK FOR. A season year, and (AFLDB-ISSUE-376) optionally
+ * up to `MAX_REVALIDATE_PLAYER_PATHS` canonical `/players/<slug>-<id>` paths —
+ * the old and new winner of an award correction, whose profiles each worker
+ * caches separately — each re-validated here by shape; nothing else. The paths are
  * built here from it — `/seasons/<year>` by `seasonPath()` and, since
  * AFLDB-ISSUE-371 (the Brownlow publication action posts here too),
  * `/brownlow/<year>` — so there is no input — not a path, not a
@@ -157,9 +162,9 @@ export async function POST(request: Request) {
     );
   }
 
-  let body: { season?: unknown };
+  let body: { season?: unknown; playerPaths?: unknown };
   try {
-    body = await request.json() as { season?: unknown };
+    body = await request.json() as { season?: unknown; playerPaths?: unknown };
   } catch {
     return NextResponse.json(
       { error: 'Invalid JSON body.' },
@@ -177,6 +182,29 @@ export async function POST(request: Request) {
     );
   }
 
+  // AFLDB-ISSUE-376: an optional, bounded list of canonical player-profile
+  // paths (the old and new winner of an award correction). Absent is the
+  // season-only contract; present it must be an array of at most
+  // MAX_REVALIDATE_PLAYER_PATHS strings, EVERY one a canonical
+  // `/players/<slug>-<id>`. One bad entry refuses the whole request (nothing is
+  // invalidated, not even the season): a caller that sends an unvalidated
+  // string has a bug worth surfacing, not a partial purge worth tolerating.
+  let playerPaths: string[] = [];
+  if (body.playerPaths !== undefined) {
+    const requested = body.playerPaths;
+    if (
+      !Array.isArray(requested)
+      || requested.length > MAX_REVALIDATE_PLAYER_PATHS
+      || !requested.every(isRevalidatablePlayerPath)
+    ) {
+      return NextResponse.json(
+        { error: `playerPaths must be at most ${MAX_REVALIDATE_PLAYER_PATHS} canonical /players/<slug>-<id> paths.` },
+        { status: 400, headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
+    playerPaths = [...new Set(requested)];
+  }
+
   // The paths are composed here, from an integer, by the same helpers every
   // season link on the site uses. `revalidatePath` turns each into its
   // implicit pathname tag (`_N_T_/seasons/<year>` — the tag the deployed
@@ -186,15 +214,16 @@ export async function POST(request: Request) {
   const path = seasonPath(body.season);
   const paths = seasonRevalidationPaths(body.season);
   for (const one of paths) revalidatePath(one);
+  for (const one of playerPaths) revalidatePath(one);
 
   const { workerId, workerCount } = workerIdentity();
   console.log(
-    `[revalidate-season] ${paths.join(' ')} invalidated on worker ${workerId ?? 'single'} `
-    + `(pid ${process.pid})`,
+    `[revalidate-season] ${[...paths, ...playerPaths].join(' ')} invalidated on worker `
+    + `${workerId ?? 'single'} (pid ${process.pid})`,
   );
 
   return NextResponse.json(
-    { ok: true, path, paths, workerId, workerCount },
+    { ok: true, path, paths, playerPaths, workerId, workerCount },
     { headers: { 'Cache-Control': 'no-store' } },
   );
 }
