@@ -1,6 +1,13 @@
 # AFLDB Current Issues Index
 
-**Current state, 22 November 2026 (backlog run e, owner decisions round 4 of 22 Nov; local branch `claude/backlog-20261122`, unpublished: `origin/main` = `da4cc0c4`; the push is the main session's).**
+**Current state, 22 November 2026 (sittings A1 and A2 RUN today, Sunday, attended; local branch `claude/backlog-20261122`; `origin/main` = `ae51cd8d`; commits local, unpublished).**
+Record: [SITTING-A1-A2-20261122.md](docs/v2/evidence/backlog-20261121/SITTING-A1-A2-20261122.md). **A1 PASSED (one owner-waived probe exception): release `7d92042fd110-XWruOm_9nLCSMY8nGPqYU` is serving production**
+(restart 14:42:40, InvocationID `342040625f6d4012a35d598dfbf9afe6`; env counts 1/1 in the primary and both workers; season refresh 2/2 workers; 8/8 fresh-connection heads on both pages; no rollback). **AFLDB-ISSUE-371 and AFLDB-ISSUE-372 RESOLVED.**
+**A2:** R1 installed; R2 key, first run and **cron r2 (first scheduled run 15:17:01 OK)**; R3 units, attended backup and restore verification, timers (**next backup Mon 23 Nov 02:21:25; first Wednesday verification Wed 25 Nov 03:36:35**), first off-host copy verified and restored,
+**cron r3 installed (first pull Mon 23 Nov 03:10 AEDT)**; R4 combined Caddyfile live and probes PASS; R5 pre-fix logs retained with restricted access (re-verified). **New defect fixed locally:** `offhost-pull.sh` read the backup stamp as UTC (it is Melbourne time) and would have quarantined every nightly dump; 42/42 tests, installed `a3775aea…`.
+Still open: the owner's confirmation of the cron-environment alarm email; the R6 reboot (separate approval, Wed 25 Nov 10:00); the scheduled-run criteria of 352; the 7 Jan 2027 retention review; the ISSUE-348 load and the 2027 opening (separate approvals). Seven open issues: 332, 348, 350, 351, 352, 357 and 362.
+
+**Earlier state, 22 November 2026 (backlog run e, owner decisions round 4 of 22 Nov; local branch `claude/backlog-20261122`, unpublished: `origin/main` = `da4cc0c4`; the push is the main session's).**
 Record: [DECISIONS-20261122e.md](docs/v2/evidence/backlog-20261121/DECISIONS-20261122e.md). **R6 APPROVED** for Wed 25 Nov 10:00-11:00 AEDT (fallback
 14:00-15:00): [runbook](docs/v2/evidence/backlog-20261121/ATTENDED-PLAN-R6-20261125.md), NO-GO by default, GRUB option B, scripts in `r6-20261125/`;
 [advisories re-verified](docs/v2/evidence/backlog-20261121/r6-20261125/ADVISORY-VERIFICATION.md) (run d correct). **R5 APPROVED** (retention; owner re-verify +
@@ -22,7 +29,7 @@ proposed Wed 25 Nov 10:00 AEDT (owner decides); owner on leave 26 Nov-6 Jan; R7 
 **350:** R8 draft APPROVED; capture Fri 19 Feb 2027. **AFLDB-ISSUE-373 RESOLVED** as an accepted residual (118 findings listed).
 Eight open issues: 332, 348, 350, 351, 352, 357, 362 and 372.
 
-**Current state, 22 November 2026 (backlog run c, owner decisions round 2 of 22 Nov; local branch `claude/backlog-20261122`, unpublished; no production contact).**
+**Earlier state, 22 November 2026 (backlog run c, owner decisions round 2 of 22 Nov; local branch `claude/backlog-20261122`, unpublished; no production contact).**
 `origin/main` = `731a5025` (the main session pushed the run a/b commits). Record: [DECISIONS-20261122c.md](docs/v2/evidence/backlog-20261121/DECISIONS-20261122c.md).
 **A1 approved** Tue 24 Nov 2026 10:00-10:30 AEDT (release `7d92042f` for 371/372; the owner adds the revalidation env and restarts) and
 **A2** 10:30-12:00 (R1; R2 key + first manual run only; R3; R4): [runbook](docs/v2/evidence/backlog-20261121/ATTENDED-PLAN-A1-A2-20261124.md) with scripts in
@@ -34,7 +41,7 @@ separate approval. **R5** logs retained; **R6/R7** after the owner's return (dat
 already approved under G-b; owner chooses between recording the residual and an N7 gate change.
 [Open items after each sitting](docs/v2/evidence/backlog-20261121/OPEN-ITEMS-AFTER-SITTINGS.md). Nine open issues: 332, 348, 350, 351, 352, 357, 362, 372 and 373.
 
-**Current state, 22 November 2026 (backlog run b, owner decisions 3-7 of 22 Nov; local branch `claude/backlog-20261122`, unpublished; no production contact).**
+**Earlier state, 22 November 2026 (backlog run b, owner decisions 3-7 of 22 Nov; local branch `claude/backlog-20261122`, unpublished; no production contact).**
 Run record: [RUN-20261122b.md](docs/v2/evidence/backlog-20261121/RUN-20261122b.md). **AFLDB-ISSUE-363 resolved** (S + P-full: opt-in
 tier P `1fd51dae`, G-a/G-b pass on two deterministic builds, tier S unchanged); its G-c re-homed as new **AFLDB-ISSUE-373** (Low).
 **348:** F-348-1 executed locally (`7b52c46c`, `552e5e96`): reviewed acquisition pinned by digest, guarded dry run and load
@@ -43,7 +50,7 @@ rehearsals on R0 restores, [sealed plan](docs/v2/evidence/backlog-20261121/issue
 [consolidated attended draft](docs/v2/evidence/backlog-20261121/ATTENDED-DRAFT-20261122b.md). **332:** destination the owner's email (SMTP relay),
 wrapper dry-tested; test-alarm delivery to the owner's email verified 2026-11-22 (owner confirmed receipt). Nine open issues: 332, 348, 350, 351, 352, 357, 362, 372 and 373.
 
-**Current state, 22 November 2026 (backlog run, owner decisions of 22 Nov; local branch `claude/backlog-20261121`, unpublished).**
+**Earlier state, 22 November 2026 (backlog run, owner decisions of 22 Nov; local branch `claude/backlog-20261121`, unpublished).**
 Run record: [RUN-20261122.md](docs/v2/evidence/backlog-20261121/RUN-20261122.md). **AFLDB-ISSUE-364 resolved** (owner Q8:
 merge-time lint ratchet accepted as O-2; criteria verified). **AFLDB-ISSUE-372** option B implemented and qualified locally
 (`b40c13ff`, `cf158d60`): the awards follow-up refreshes its season page on every worker; award-season pages are dynamic and need
@@ -186,6 +193,7 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 
 ### AFLDB-ISSUE-332 — AFL API 2027 season operations (successor of ISSUE-316)
 
+- **2026-11-22 (A2): R2 INSTALLED** (key, first manual run, cron r2; first scheduled run 15:17:01 AEDT `rc=0 OK`). **Missing:** the owner's confirmation that the cron-environment test alarm email (sent 14:58:20) arrived; then G0/G0c at the opening and the later dated reviews. Record: [SITTING-A1-A2-20261122.md](docs/v2/evidence/backlog-20261121/SITTING-A1-A2-20261122.md) §3.2.
 - **Severity / area:** Medium; AFL API match and player ingestion operations for the 2027 season.
 - **State:** Open, opened 2026-11-02; **owner decisions recorded 2026-11-04** (supersede the earlier "keep pending" position for these items only). **Decided:** D-316-5 (manual debutant registration and adjudication, whole-night refusal kept; resumption is on a scheduled run after identity resolution, not guaranteed to take one night; review after round 2), D-316-8 (NULL, `attendance_status='not_collected'`), D-316-9 (incomplete 2027 coach coverage accepted; optional audited back-fill; review after round 2; 2026 correction preserved), D-316-10 (existing ISR behaviour; no `AFLDB_REVALIDATE_SECRET` in nightly units; no maximum delay promised); C7 criteria 1 to 7 approved, criterion 8 replaced (settled round shown correctly on public season and match responses; delay and limits reported; no latency guarantee or worker attribution; unobserved or incorrect content fails); the June 2027 opening of the Brownlow successor (D-316-7, action only) approved. **Not decided / future:** C9 (D-316-6; undecided until its June gate; Option C recommendation only), the Brownlow substantive decision and count window, the C7 acceptance (owner's act after the first concluded round); D-316-11 not pursued. **No acceptance, probe, cookie or Brownlow activation is authorised.**
 - **Key files:** `docs/v2/afl-api-2027-season-operations-successor-2026-11-02.md` (the single operating record: decision register, C7 criteria, per-round routine, ISR measurement plan, ownership guards, Brownlow gates), `tools/v2/c7-observe.ts`, `src/lib/acquisition/afl-api-c7-observation.ts`.
@@ -229,6 +237,7 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 
 ### AFLDB-ISSUE-351 — Unattended upgrades restart production app and PostgreSQL; promote/rollback activation window
 
+- **2026-11-22 (A2): R1 INSTALLED** (`host-gate --strict`: "needrestart holds afldb and postgresql"). **Missing:** the attended reboot to `6.8.0-149` (Wed 25 Nov 10:00 AEDT, own session and approval) and the first weekly window. Record: [SITTING-A1-A2-20261122.md](docs/v2/evidence/backlog-20261121/SITTING-A1-A2-20261122.md) §3.1.
 - **Severity / area:** Medium; production operations.
 - **State:** Open. **2026-11-14 (local, qualified, not published):** `release.mjs` promote/rollback require `--attended`, `host-gate`, activation audit (`InvocationID`/`NRestarts`), rollback ledger check; needrestart hold and PostgreSQL apt blacklist PREPARED, NOT INSTALLED. Reboot pending on production (separate owner operation).
 - **Key files:** `deploy/release.mjs`, `deploy/host-policy/`, `docs/deployment.md`, `docs/v2/evidence/remediation-20261114/hostops/README.md`.
@@ -245,6 +254,7 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 
 ### AFLDB-ISSUE-352 — No scheduled production backup, restore verification or off-host copy
 
+- **2026-11-22 (A2): R3 installed; first off-host copy verified and restored; cron r3 installed (first pull Mon 23 Nov 03:10 AEDT).** `offhost-pull.sh` stamp-timezone defect found and fixed locally (42/42 tests; installed `a3775aea…`). **Missing evidence:** the next nightly appearing off-host within 25 h (Mon 23 Nov 03:10, `a2-cron-observe.sh r3`), the first Wednesday verification (Wed 25 Nov 03:36:35), D-HO-7 at R7. Record: [SITTING-A1-A2-20261122.md](docs/v2/evidence/backlog-20261121/SITTING-A1-A2-20261122.md) §3.3, §5.
 - **Severity / area:** Medium; backup and recovery.
 - **State:** Open. **2026-11-14 (local, qualified, not published; not installed):** `scheduled-backup.sh` (backup/verify/status), backup units, `offhost-pull.sh`, V2 DR runbook (`docs/backup-restore.md`); proposed RPO 24 h, RTO 1 h (database, host intact).
 - **Next action:** publish; owner D-HO-2 (install units), D-HO-3 (off-host destination; recommended pull), D-HO-5, D-HO-7.
@@ -256,6 +266,7 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 
 ### AFLDB-ISSUE-357 — ISR persists a page per non-canonical id spelling and per 404 path
 
+- **2026-11-22 (A2): R4 DONE; the deny is live** (probes PASS; Caddyfile `f00859d5…`). Open for the owner's acceptance and the pre-launch requirements. Record: [SITTING-A1-A2-20261122.md](docs/v2/evidence/backlog-20261121/SITTING-A1-A2-20261122.md) §3.4.
 - **Severity / area:** Medium; public frontend. **State:** Open, narrowed 2026-11-14: strict canonical id/season parsing implemented locally (non-canonical spellings are 404s, 10–70× less disk per path); every distinct 404 or slug-redirect path still persists about 50 KB.
 - **Next action:** publish; owner O-1 (Caddy deny of junk paths and accept the residual, recommended).
 - **Update 2026-11-14 (run 2):** O-1 (A) implemented: the Caddy path-shape deny, 0 mismatches over 35,340 legitimate and 2,131 deny paths. **Residual MED:** unknown well-formed slugs persist about 76 KiB each, and only the beta gate protects against that. **Next:** publish; owner installs (combined Caddy install, packet B7); keep the gate on until a bound and a disk alert exist; operational acceptance is the owner's.
@@ -265,6 +276,7 @@ Record: its `issues.md` entry and runbook `issues/closed/AFLDB-ISSUE-344.md`; th
 
 ### AFLDB-ISSUE-362, AFLDB-ISSUE-363 (Low; 363 resolved 2026-11-22 run b; 364 resolved 2026-11-22)
 
+- **2026-11-22 (A2): R4 filter live and proven; R5 DONE** (retained, restricted, `sha256sum -c` VERIFIED, 11 files / 10 sums). Open until the review on or after Thu 7 Jan 2027. Record: [SITTING-A1-A2-20261122.md](docs/v2/evidence/backlog-20261121/SITTING-A1-A2-20261122.md) §3.4-§3.5.
 - **362** Caddy log filter and epoch-held admin claims implemented locally; **next:** owner O-3 install the Caddyfile (A2 R4, Tue 24 Nov); O-1 superseded 22 Nov run c: pre-fix logs RETAINED (R5) pending a retention decision.
 - **362 (run d, 2026-11-22):** R5 = retain with **restricted access** (A2 §4.5a after R4); [expiry options](docs/v2/evidence/backlog-20261121/R5-RETENTION-PROPOSAL.md) for the owner; R4 probes extended (magic link, Referer).
 - **362 (run e, 2026-11-22, round 4):** R5 **APPROVED** as retention: §4.5a + owner re-verify + inventory in A2; the 4 Sep file recorded ALREADY ROTATED OUT; **Thu 7 Jan 2027 = earliest disposal REVIEW date** (disposal a separate approval); retained-paths template and review helper. **Next:** A2 R4/R5 (Tue); review on or after 7 Jan 2027.

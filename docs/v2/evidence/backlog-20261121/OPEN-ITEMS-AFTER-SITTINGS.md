@@ -20,7 +20,7 @@ inclusive. Sources: `ATTENDED-PLAN-A1-A2-20261124.md`, `ATTENDED-PLAN-R6-2026112
 | **357** (ISR per 404 path) | R4 deny installed and probes PASS; operational acceptance is the owner's; the residual (well-formed unknown slugs, about 76 KiB each) stays behind the beta gate; pre-launch requirements (a cache bound and a disk alert; F-09 prune script promoted with a test) before the gate is turned off | open | R4 done: owner decides whether to resolve with the residual recorded or keep open for the pre-launch requirements | — | — | — |
 | **362** (auth hygiene) | R4 log filter (redaction probe PASS); O-1 pre-fix logs: **retained with restricted access** (R5 APPROVED round 4: A2 §4.5a + owner re-verify + inventory); **earliest disposal REVIEW Thu 7 Jan 2027** (not a disposal date; disposal needs a separate approval; `R5-RETENTION-PROPOSAL.md` §5, §7) | open | R4 done; R5 restriction, re-verify and inventory done; open for the review | open | open until the 7 Jan review decides (closable then; disposal itself is a later sitting) | — |
 | **350** (2027 season row) | The R8 opening with G0 OPEN, G0c (first nightly, no HALT) | open | open | open | open | **closable** after G0c (24 Feb nightly) |
-| **348** (DraftGuru re-acquisition) | F-1 and F-2 ACCEPTED (22 Nov round 3); round 4: the eight named columns = groups (a)-(e), **(f)-(k) still to confirm** (`LOAD-WINDOW-PROPOSAL.md` §2a); `afldb_backup` read access **verified on production 22 Nov** (§2b); window approval (PROPOSED Tue 12 Jan 2027 11:00); the §3a refresh; a fresh backup; the load (`i348-load.sh` verify, digest pre MATCHES, load, digest post MATCHES); draft pages render. Precondition: `7b52c46c`'s blobs published (done, in `731a5025`) | open | open | open | **closable** on `digest post MATCHES` and `POSTLOAD RESULT PASS` | — |
+| **348** (DraftGuru re-acquisition) | F-1 and F-2 ACCEPTED (22 Nov round 3); round 4: the eight named columns = groups (a)-(e); **Groups (f)–(k) are confirmed for the January rehearsal. The production write set needs separate owner approval after re-sealing.** (round 5, `DECISIONS-20261122f.md` §3; `LOAD-WINDOW-PROPOSAL.md` §2a); `afldb_backup` read access **verified on production 22 Nov** (§2b); window approval (PROPOSED Tue 12 Jan 2027 11:00); the §3a refresh; a fresh backup; the load (`i348-load.sh` verify, digest pre MATCHES, load, digest post MATCHES); draft pages render. Precondition: `7b52c46c`'s blobs published (done, in `731a5025`) | open | open | open | **closable** on `digest post MATCHES` and `POSTLOAD RESULT PASS` | — |
 | **373** (Gridley G-c) | **RESOLVED 2026-11-22 (run d)** as an accepted residual: 118 findings listed in `issue373-gc-investigation/ACCEPTED-RESIDUAL-118.md`; any other G-c finding needs its own explanation | — | — | — | — | — |
 | **363** follow-ups | 363 is resolved (tier P opt-in). Its only follow-up, ISSUE-373, is resolved | — | — | — | — | — |
 
@@ -66,3 +66,17 @@ inclusive. Sources: `ATTENDED-PLAN-A1-A2-20261124.md`, `ATTENDED-PLAN-R6-2026112
 
 The 22 Nov test-alarm email delivery stays separate evidence (`DECISIONS-20261122c.md`); the cron-environment alarm test of A2 §4.2
 step 4 is recorded in the A2 report.
+
+### 4a. Filled in after the sittings of Sunday 22 November 2026 (`SITTING-A1-A2-20261122.md`)
+
+The sittings ran on Sunday 22 Nov (attended), not Tuesday 24 Nov; this supersedes the dates above. Cron and timer times are Melbourne.
+
+| Job | Installed | Next due printed by the installer | First scheduled run seen | Result line | Alarm emails since install | Recorded by, when |
+|---|---|---|---|---|---|---|
+| r2 hourly settle check | Sun 22 Nov 14:58:11 | Sun 22 Nov 15:17 | **Sun 22 Nov 15:17:01** | `rc=0 AFLDB_SETTLE_STATUS OK` | 0 from the scheduled run (the one extra `alarms.log` entry is the manual failed pull of 04:06:26Z) | `a2-cron-observe.sh r2`, 15:20:56 |
+| r3 daily off-host pull | Sun 22 Nov 15:14:11 | **Mon 23 Nov 2026 03:10** | pending (Mon 23 Nov 03:10, after the 02:21:25 backup) | — | — | observe with `a2-cron-observe.sh r3` |
+
+Other due times: first scheduled backup **Mon 23 Nov 02:21:25**; first Wednesday restore verification **Wed 25 Nov 03:36:35**; the R6 plan's "Wed 02:20 / 03:10" assumptions are superseded (Mon and Tue backups and pulls will already have run).
+
+Per issue after the sittings: **371 and 372 RESOLVED** (A1). Still open and the exact missing evidence: **332** the owner's confirmation that the cron-environment test email (sent 14:58:20) arrived, then the 2027 reviews; **351** the R6 reboot (Wed 25 Nov 10:00, own approval) and the first weekly window; **352** the Mon 23 Nov 03:10 pull (next nightly off-host within 25 h), the Wed 25 Nov 03:36 verification, D-HO-7 at R7; **357** the owner's acceptance of the live deny and the pre-launch requirements; **362** the 7 Jan 2027 retention review; **350, 348** unchanged.
+New artefact needing disposal: `/mnt/ssd/afldb-offhost-prod-recovery-20261122` on streamanator (the two originally quarantined dumps, kept as recovery copies; review with the R5/R6 disposals), and `state/offhost-pull.sh.pre-stamp-fix-ea48205a`. The `~/env-before-revalidate-20261122T033359Z.bak` on production (every production secret, 0600) is as §2.

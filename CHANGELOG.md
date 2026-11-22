@@ -15,6 +15,18 @@ commit.
 
 ## [Unreleased]
 
+### Production sittings A1 and A2 (2026-11-22; in production)
+
+- **Release `7d92042fd110-XWruOm_9nLCSMY8nGPqYU`** (revision `7d92042f`) now serves production, with `AFLDB_REVALIDATE_URL` and `AFLDB_REVALIDATE_SECRET` added to the production environment by the owner and the service restarted attended (14:42:40 AEDT). ISSUE-371 and ISSUE-372 are resolved: a published Brownlow season and an award-affected season page are refreshed on every worker (`revalidate-season.ts --season 2026`: 2/2 workers). The release carries no migration, dependency or unit change.
+- **Host patching policy installed** (ISSUE-351 R1): `needrestart` holds `afldb` and PostgreSQL; unattended upgrades blacklist the four postgresql packages. The reboot to the newer kernel is a separate, later sitting.
+- **Failure visibility and backups installed** (ISSUE-332 R2, ISSUE-352 R3): a forced-command, read-only settle-status key and an hourly check on streamanator (cron r2, alarm email on failure); systemd units for a nightly backup (02:20 Melbourne, `--keep 14`) and a Wednesday restore verification (03:30); a read-only off-host pull key and a daily pull (cron r3, 03:10 Melbourne). First attended backup, restore verification, off-host copy and disposable restore all passed.
+- **Combined Caddy configuration live** (ISSUE-357, ISSUE-362): access logs redact invite and magic-link tokens, query strings and Referer paths; non-canonical ISR path shapes answer 404 at the proxy; HSTS and CSP headers on the beta host. The pre-fix logs are retained, root-only, with a checksum list (ISSUE-362 O-1); disposal is a separate decision on or after 7 Jan 2027.
+
+### The off-host pull reads dump-name timestamps in the source's time zone (ISSUE-352; local, not released)
+
+- `tools/maintenance/offhost-pull.sh` read the `YYYYMMDD-HHMMSS` in a dump name as UTC although `backup.sh` writes it in the production host's local time (Australia/Melbourne). At the first production pull this quarantined both dumps as "stamped in the future", and every nightly dump would have been rejected. The stamp is now read in `Australia/Melbourne` (`AFLDB_OFFHOST_STAMP_TZ`); for the repeated hour at the end of daylight saving the earlier instant is used, and a local time that never existed is rejected.
+- Retention, the retention hold and the one-hour skew limit are unchanged. 42 scratch tests (AEDT, AEST, both daylight-saving transitions, a genuinely future dump, the unchanged-pull retention regression) pass; the previous script fails 22 of them. The pinned copy on streamanator is `a3775aea…`; production's checkout carries the old copy until the next release.
+
 ### Gridley G-c recorded as an accepted residual (ISSUE-373 resolved; validation state only, no code or test change)
 
 - The Gridley strict-parity acceptance G-c (N7) keeps its raw result, 118 findings over 113 distinct cells, and the owner accepted
@@ -42,7 +54,7 @@ commit.
   unchanged legacy labels). The production load is a separate, sealed, owner-approved step
   (`docs/v2/evidence/backlog-20261121/issue348-acquisition/SEALED-PLAN.md`); nothing was written to production.
 
-### An award publication refreshes its season page on every worker (ISSUE-372 option B; local, not released)
+### An award publication refreshes its season page on every worker (ISSUE-372 option B; released to production 2026-11-22)
 
 - `/admin/awards/revalidate` (the follow-up of every awards and Coleman mutation) now also posts the cross-worker season
   fan-out (`/api/internal/revalidate-season`) for each season its admitted paths name (`/seasons/<yyyy>`,
@@ -61,7 +73,7 @@ commit.
 - The owner accepted `npm run lint:gate` in `preflight` (implementation, merge) and `merge:ready` as the O-2 gate: a
   ratchet at 338 errors in 43 files, not clean lint; release, `sync-dev` and CI do not run it.
 
-### A newly published Brownlow season no longer keeps the "Page not found" title (ISSUE-371; local, not released)
+### A newly published Brownlow season no longer keeps the "Page not found" title (ISSUE-371; released to production 2026-11-22)
 
 - Brownlow admin actions now revalidate concrete paths without a type argument. Under Next 16 the old
   `revalidatePath('/brownlow/<year>', 'page')` form expired a tag no page carries, so publication invalidated nothing.
