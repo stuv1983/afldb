@@ -28,8 +28,10 @@ import {
 } from './migration-checksum';
 import {
   collectMigrationSources,
+  compareAppliedMigrations,
   compareMigrationSets,
   findMigrationConflicts,
+  migrationContentId,
   readWorkingTreeMigrations,
 } from './migration-safety';
 import {
@@ -303,13 +305,8 @@ async function main() {
   try {
     await assertConnectedTarget(sql);
     // --status inspects inside a READ ONLY transaction, so even an owner connection cannot change the target, and a
-    // server-enforced read-only connection is enough to report. Only apply mode creates the ledger.
-    if (!statusOnly) {
-      await sql.begin(async (tx) => {
-        await assertConnectedTarget(tx);
-        await tx.unsafe(LEDGER_BOOTSTRAP_SQL);
-      });
-    }
+    // server-enforced read-only connection is enough to report. Apply mode reads the ledger BEFORE creating it, so a
+    // refusal below (drift, unknown applied names) leaves the catalog untouched (AFLDB-ISSUE-375).
     const ledger = statusOnly
       ? await sql.begin('read only', async (tx) => { await assertConnectedTarget(tx); return readLedger(tx); })
       : await readLedger(sql);
@@ -319,8 +316,8 @@ async function main() {
 
     console.log(`AFLDB migrations -> ${target} (${safeTarget(connectionString!)})`);
     console.log(`  ${migrations.length} migration file(s), ${applied.length} already applied\n`);
-    if (!ledger.present) {
-      // Reachable only under --status: apply mode created the ledger above.
+    if (!ledger.present && statusOnly) {
+      // Apply mode creates the ledger below, once nothing has refused.
       console.log('  No migration ledger (afldb_meta.schema_migrations): every file is pending.');
       console.log('  --status does not create it; db:migrate does.\n');
     }
@@ -333,6 +330,19 @@ async function main() {
       console.error('ERROR: these applied migrations have been modified since they ran:');
       for (const m of drifted) console.error(`  - ${m.name}`);
       console.error('\nAdd a new migration instead of editing an applied one.');
+      process.exit(1);
+    }
+
+    // AFLDB-ISSUE-375: an applied name this checkout does not have means the database is newer than, or has
+    // diverged from, this checkout. Neither "N pending" nor "up to date" is true; refuse before applying anything.
+    const unknown = compareAppliedMigrations(
+      migrations.map((m) => ({ name: m.name, contentId: migrationContentId(m.sql), checksum: m.reps })),
+      applied,
+    ).filter((finding) => finding.code === 'unknown-applied-migration');
+    if (unknown.length > 0) {
+      console.error('ERROR: the target database has applied migration(s) that this checkout does not contain:');
+      for (const finding of unknown) console.error(`  - ${finding.message}`);
+      console.error('\nThe database is newer than or diverged from this checkout. Update the checkout; nothing has been applied.');
       process.exit(1);
     }
 
@@ -349,6 +359,13 @@ async function main() {
     if (pending.length === 0) {
       console.log('Nothing to apply — schema is up to date.');
       return;
+    }
+
+    if (!ledger.present) {
+      await sql.begin(async (tx) => {
+        await assertConnectedTarget(tx);
+        await tx.unsafe(LEDGER_BOOTSTRAP_SQL);
+      });
     }
 
     for (const m of pending) {

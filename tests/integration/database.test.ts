@@ -1346,3 +1346,30 @@ describe('AFLDB-ISSUE-374 direct test-target runners verify the connected databa
     expect(privileges.status, privileges.out).toBe(0);
   });
 });
+
+/*
+ * AFLDB-ISSUE-375. A ledger row this checkout has no file for means the database is newer than,
+ * or diverged from, the checkout. Status used to print "0 pending" and apply "schema is up to
+ * date", both exit 0. Both now exit 1 naming the unknown migration and change nothing.
+ */
+describe('AFLDB-ISSUE-375 an applied migration absent from the checkout is refused', () => {
+  const EXTRA = '999_issue375_unknown_from_newer_checkout.sql';
+
+  it('status and apply exit nonzero and leave the catalog unchanged', async () => {
+    await sql`
+      INSERT INTO afldb_meta.schema_migrations (name, checksum, duration_ms) VALUES (${EXTRA}, 'issue375-fixture', 0)
+    `;
+    try {
+      const before = await catalogFingerprint();
+      for (const args of [['--status', '--target', 'test'], ['--target', 'test']]) {
+        const run = runDbTool('tools/db/migrate.ts', args, process.env.AFLDB_TEST_DATABASE_URL!);
+        expect(run.status, run.out).toBe(1);
+        expect(run.out).toContain(`${EXTRA} is applied in the target database but absent from this checkout.`);
+        expect(run.out).not.toMatch(/\b0 pending\.|schema is up to date/);
+      }
+      expect(await catalogFingerprint()).toEqual(before);
+    } finally {
+      await sql`DELETE FROM afldb_meta.schema_migrations WHERE name = ${EXTRA}`;
+    }
+  });
+});
