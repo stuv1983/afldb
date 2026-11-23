@@ -458,3 +458,52 @@ Historical revision `bc3fef3de375259d49001e7a9a478624832703a8`. Use §0 for Wedn
 | `docs/v2/evidence/backlog-20261121/a1a2-20261124/dry-tests-20261122g/t-sunday-review.sh` | `b8f06d5486ad8cd995d59b9634382f615f0535371121846f3a282cb0fb0446e0` |
 
 Validation and first-copy evidence: [Sunday review record](sunday-review-20261122/README.md). Wednesday verification and the attended reboot decision remain pending.
+
+## Amendment — 23 November 2026, Tuesday's application release of 17822b29 (PROPOSED; independent review required before the reboot)
+
+**Why.** Tuesday 24 Nov may release `17822b29e6de2b6248cd7ada4221800fd81e0003` ([release runbook](../release-17822b29-20261124/RUNBOOK.md)). The pinned scripts admit only these CURRENT_ID values:
+
+* `r6-pre-verify.sh:81`, outcome `accepted`: `7d92042fd110-*` only;
+* `r6-post-verify.sh:81`: `7d92042fd110-*` or `c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC`.
+
+So after a successful Tuesday release, A-2 and F-2 would STOP with usage exit 2. Nothing else in R6 pins Sunday's build. There is no BUILD_ID pin. Process, worker, revalidation and raw-head checks are written against `releases/$CUR` and Sunday's raw-head titles and robots, which the 17822b29 release keeps (its raw-head check prints `R6-NOTE`).
+
+**Change.** Two lines only, in script revision `58e35ce8805e9f559d3dd1008606f90efb84fbab`:
+
+```diff
+-case $OUTC in accepted) [[ $CUR =~ ^7d92042fd110-[A-Za-z0-9_-]{1,64}$ ]];; *) [ "$CUR" = c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC ];; esac \
++case $OUTC in accepted) [[ $CUR =~ ^(7d92042fd110|17822b29e6de)-[A-Za-z0-9_-]{1,64}$ ]];; *) [ "$CUR" = c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC ];; esac \
+-  [[ $K =~ ^6\.8\.0-(149|137)-generic$ ]] && [[ $CUR =~ ^(7d92042fd110-[A-Za-z0-9_-]{1,64}|c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC)$ ]] \
++  [[ $K =~ ^6\.8\.0-(149|137)-generic$ ]] && [[ $CUR =~ ^((7d92042fd110|17822b29e6de)-[A-Za-z0-9_-]{1,64}|c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC)$ ]] \
+```
+
+**Amended archive.** Use §0's command and the same 14 paths, with `CODE=58e35ce8805e9f559d3dd1008606f90efb84fbab`.
+
+* Two pins change:
+  * `r6-pre-verify.sh` `1d61b086…` → `fa8d34f0bae6f4d3250260dd44419d7f6b4020a7cfc4eda9626adb027d1043e5`;
+  * `r6-post-verify.sh` `26070c9e…` → `478f85cd8930199796c046ea43cdbaab7882921d286a3c9f6015c4a70cd5c66c`.
+* The other twelve §0 pins are byte-identical at `58e35ce8` and at `17822b29`. I checked each against `b48a2c5e`.
+* The rehearsal ran the exact amended and original gate lines. The amended scripts admit `17822b29e6de-*` and `7d92042fd110-XWruOm…`, and post-verify still admits `c8d4202a…`. Pre-verify refuses `accepted` with `c8d4202a…` and a foreign id. The originals refuse `17822b29e6de-*` ([REHEARSAL.md §3 K](../release-17822b29-20261124/rehearsal/REHEARSAL.md)).
+
+**Which archive on Wednesday.** Find Tuesday's outcome in the [release runbook §8](../release-17822b29-20261124/RUNBOOK.md); the arguments come from its sitting record.
+
+| Tuesday | Wednesday arguments | Archive |
+|---|---|---|
+| 17822b29 released and accepted | outcome `accepted`, CURRENT_ID `17822b29e6de-<BUILD_ID from P3b>` | **amended archive, and only after an independent review of this amendment records PASS; without it R6 is NO-GO** |
+| rolled back with the rollback verify PASS | outcome `accepted`, CURRENT_ID `7d92042fd110-XWruOm_9nLCSMY8nGPqYU` | §0 (original) or amended |
+| deferred (nothing promoted) | outcome `accepted`, CURRENT_ID `7d92042fd110-XWruOm_9nLCSMY8nGPqYU` | §0 (original) or amended |
+| promoted but not restarted, rollback verify failed, or unknown | — | **NO-GO** |
+
+The `stopped` and `rolledback` outcome values in §1 describe Sunday's A1 relative to `c8d4202a`. **Do not use them for Tuesday's outcomes.**
+
+**Unchanged gates.** Wednesday still requires all of the following. Tuesday's G0 replaces none of them:
+
+* its own 02:20 scheduled backup;
+* an attributable 03:10 off-host copy (A-1 and A-4 exit 0);
+* the 03:30 verification-service restore, matched to its journal, state and database comment;
+* the GRUB reads and recovery path;
+* writer timers stopped before and active again after;
+* F-2 process identity, F-4 status and post-install checks, F-4b functional revalidation with workers 1 and 2;
+* the §7 GO/NO-GO checklist.
+
+If Tuesday ran P2, Wednesday's backup and verification are the first production runs of the 17822b29 `backup.sh` and `scheduled-backup.sh`. The checkout units run them. A failure there fails these gates, and the reboot is NO-GO.

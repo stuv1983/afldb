@@ -15,6 +15,12 @@ commit.
 
 ## [Unreleased]
 
+### Attended application release packet for `17822b29` (23 November 2026; local on `claude/release-17822b29-prep-20261123`, not pushed; nothing deployed)
+
+- **Operations, prepared only.** Pinned release scripts (`docs/v2/evidence/release-17822b29-20261124/scripts/`, revision `58e35ce8`, `SHA256SUMS` `b4e9e584…`) and [runbook](docs/v2/evidence/release-17822b29-20261124/RUNBOOK.md) for releasing `17822b29` to production with rollback to `7d92042fd110-XWruOm_9nLCSMY8nGPqYU`. P1 checks the actual serving release, the systemd route and the supervisor bytes. The 03:10 scheduled off-host copy is a hard gate. Proposed window Tue 24 Nov 10:30–12:30 AEDT. Rehearsed from a clean export on streamanator: 87/0.
+- **R6 amendment, proposed.** `r6-pre-verify.sh` and `r6-post-verify.sh` also admit a `17822b29e6de-*` CURRENT_ID. This needs independent review before Wednesday's reboot, if Tuesday is accepted.
+- **Records.** `issues.md`, `IssuesIndex.md` and the open records for 367, 368 and 374–377 now show the published `17822b29`, Astra's final verdict and each issue's remaining acceptance.
+
 ### Qualification of Astra's candidate `91c04159` (23 November 2026; local on `codex/astra-fix-20261123`, not pushed, installed or deployed)
 
 - **Test-only.** The AFLW concurrent-replacement regression `tests/python/aflw_staging_race.py` now accepts any Unix-socket `*_test` target (its guard was hard-coded to `/tmp/afldb-astra-*`) and enforces that restriction on the live writer and child-loader connections (database and Unix-socket transport checked before first use, explicit, exit 3, also under `python -O`) instead of an assertable DSN check; new `aflw_race_guard.py`, `aflw_race_loader.py` and a refusal proof `aflw_race_guard_refusals.py`, which snapshots all three disposable databases from read-only observers and never writes to the unsuffixed one (it no longer seeds it). No application code changed (ISSUE-368).
