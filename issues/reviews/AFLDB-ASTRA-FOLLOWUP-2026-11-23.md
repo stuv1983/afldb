@@ -55,3 +55,7 @@ The names and causes of the earlier **476** remain unknown. These targeted tests
 
 **Push holds. Application release holds. Wednesday reboot remains NO-GO** until Wednesday's own overnight backup,
 attributable 03:10 off-host copy, separate attributable verification-service restore, and attended recovery evidence.
+
+## Addendum, 23 November 2026 (fix branch `codex/astra-fix-20261123`; the text above is unchanged)
+
+The typecheck paragraph above says the referenced `coach-row-selector.mjs` is absent. The test imports `.mjs` on purpose and TypeScript's bundler resolution maps it to the tracked `coach-row-selector.mts`, which is present in `91c04159` (and in `c154f36b` and `2bec8060`). From fresh exports of `91c04159` on Windows and on streamanator, `npm run typecheck` exits 0; deleting only the `.mts` reproduces the quoted TS2307 exactly. ISSUE-333 stays resolved. Details, the qualification results and the one test-only repair (the AFLW race test's hard-coded `/tmp/afldb-astra-*` guard) are in [AFLDB-ASTRA-FIX-2026-11-23](AFLDB-ASTRA-FIX-2026-11-23.md).

@@ -15,6 +15,12 @@ commit.
 
 ## [Unreleased]
 
+### Qualification of Astra's candidate `91c04159` (23 November 2026; local on `codex/astra-fix-20261123`, not pushed, installed or deployed)
+
+- **Test-only.** The AFLW concurrent-replacement regression `tests/python/aflw_staging_race.py` now accepts any Unix-socket `*_test` target; its guard was hard-coded to a directory named `/tmp/afldb-astra-*`, so no one else could run it (ISSUE-368). It documents its invocation.
+- **ISSUE-333 typecheck finding: no repository defect.** `docs/v2/evidence/issue333-o2-20261104/scripts/coach-row-selector.mts` is tracked, hash-pinned and unchanged since `2131428a`; `tsc --noEmit` passes from fresh Windows and Linux exports of `91c04159`. The reported TS2307 reproduces exactly when that tracked file is absent from the workspace. ISSUE-333 stays resolved.
+- Record: `issues/reviews/AFLDB-ASTRA-FIX-2026-11-23.md`.
+
 ### Astra follow-up (23 November 2026)
 
 - AFLW staging replacements lock all staging tables before checking for existing season keys, refusing a replacement that would erase any of them. The independent expected inventory remains required (ISSUE-368).

@@ -12,6 +12,10 @@ Require the expected season and required page inventory before admitting a repla
 
 [Independent review](../reviews/AFLDB-FULL-REVIEW-2026-11-22.md) · [Earlier closed scope](../closed/AFLDB-ISSUE-368.md)
 
+## Fix-branch qualification, 23 November 2026
+
+`tests/python/aflw_staging_race.py` guarded its target with `host.startswith("/tmp/afldb-astra-")`, so only Astra's own temporary cluster could run it. The guard is now "absolute Unix-socket directory and a `*_test` database"; TCP and non-test targets are still refused (both exercised). On a fresh PG16 socket cluster the reviewed `c154f36b` loader erased the committed 2027 season (reproduced); the candidate loader exited 1 and preserved all staging rows and six public views; a complete replacement succeeded; staging contract 54/54. No loader code changed. Invocation: the file's docstring. Record: [fix-branch record](../reviews/AFLDB-ASTRA-FIX-2026-11-23.md).
+
 ## Local fix status
 
 **Local fix, 23 November 2026 (`d4c4d760`; local, not published; this entry stays open pending Astra's re-review).** `EXPECTED_SEASON_KEYS` (the committed eleven-key inventory) is the independent evidence: `constraint_failures` (run for `--check`, `--load` and `--seal` before connecting or truncating) requires every expected season, no season outside it, and ladder and player-season rows for every season with played fixtures; the parser refuses a raw scrape missing or carrying an unlisted page and a season that parses to no fixtures. Populated disposable database (eleven synthetic seasons, 121 rows): omitted season, missing player seasons and header-only inputs each exit 1 with per-table counts and the `aflw.seasons` checksum unchanged; the unfixed loader dropped the omitted season (11 to 10 rows). Contract scenario 10, 54 checks. Owner decision: confirm the committed list as authoritative (no command-line override; 2027 needs a reviewed edit and belongs on the rollover checklist) and whether to add the deferred in-transaction subset check. Record: ../reviews/AFLDB-FULL-REVIEW-2026-11-22-FIXES.md

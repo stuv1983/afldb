@@ -1,4 +1,12 @@
-"""Matched CLI race regression on a fresh, socket-only PostgreSQL test cluster."""
+"""Matched CLI race regression on a fresh, socket-only PostgreSQL test cluster (AFLDB-ISSUE-368).
+
+    AFLDB_TEST_DATABASE_URL='postgresql://<superuser>@/<name>_test?host=/abs/socket/dir&port=<port>' \\
+        python tests/python/aflw_staging_race.py <source root holding tools/aflw and tools/migration> base|fixed
+
+The target must be a migrated, privileged, disposable *_test database reached over a Unix socket directory
+(the guard in main() refuses TCP and non-*_test targets). `base` is the expectation for the reviewed c154f36b
+loader (it reproduces the erased 2027 season); `fixed` is the expectation for the replacement-lock loader.
+Needs psycopg (the project virtual environment). A writer role that can SET ROLE afldb_import is required."""
 
 import os
 from pathlib import Path
@@ -51,7 +59,10 @@ def main():
     source, expectation = sys.argv[1:]
     dsn = os.environ["AFLDB_TEST_DATABASE_URL"]
     params = conninfo_to_dict(dsn)
-    assert params["host"].startswith("/tmp/afldb-astra-") and params["dbname"].endswith("_test")
+    # Disposable-target guard: a Unix-socket-only DSN (an absolute socket directory, never TCP/remote) naming a *_test database.
+    assert params.get("host", "").startswith("/") and params["dbname"].endswith("_test"), (
+        "refusing to run: AFLDB_TEST_DATABASE_URL must use a Unix socket directory (host=/abs/path) and a *_test database"
+    )
     old_keys = REAL_EXPECTED_SEASON_KEYS
     new_keys = [*old_keys, "2027"]
     launcher = """
