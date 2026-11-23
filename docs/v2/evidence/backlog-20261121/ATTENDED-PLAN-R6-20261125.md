@@ -461,6 +461,11 @@ Validation and first-copy evidence: [Sunday review record](sunday-review-2026112
 
 ## Amendment — 23 November 2026, Tuesday's application release of 17822b29 (PROPOSED; independent review required before the reboot)
 
+> **SUPERSEDED 23 Nov 2026 (late) by the r2 amendment below.** Its CURRENT_ID change is kept unchanged in the r2 archive
+> (`r6-post-verify.sh` `478f85cd…`; `r6-pre-verify.sh` carries the same line). Its archive (`58e35ce8`) and the original §0
+> archive (`b48a2c5e`) are **no longer valid for any Tuesday outcome**. Both lack the A-2 serving-release gate and the F-4 host
+> guard that the independent R6 review required.
+
 **Why.** Tuesday 24 Nov may release `17822b29e6de2b6248cd7ada4221800fd81e0003` ([release runbook](../release-17822b29-20261124/RUNBOOK.md)). The pinned scripts admit only these CURRENT_ID values:
 
 * `r6-pre-verify.sh:81`, outcome `accepted`: `7d92042fd110-*` only;
@@ -507,3 +512,140 @@ The `stopped` and `rolledback` outcome values in §1 describe Sunday's A1 relati
 * the §7 GO/NO-GO checklist.
 
 If Tuesday ran P2, Wednesday's backup and verification are the first production runs of the 17822b29 `backup.sh` and `scheduled-backup.sh`. The checkout units run them. A failure there fails these gates, and the reboot is NO-GO.
+
+## Amendment — 23 November 2026 (r2), independent R6 review fixes (CURRENT; PROPOSED; Astra re-review required before the reboot)
+
+This amendment supersedes §0 and the 23 Nov CURRENT_ID amendment's archive. It applies to **every** Tuesday outcome. Without a
+recorded PASS from Astra's re-review of this amendment at its review commit, R6 is NO-GO. Everything else in this runbook stands.
+
+**What changed (helper revision `7af24a74b15af39b0bdebeec9be0b089c8adc8a1`).**
+
+1. **A-2 stops when the serving-release check fails.** Previously, `r6-pre-verify.sh` printed `release.mjs status`'s exit code as
+   INFO only. A service still running the previous release behind a matching `current` symlink and two workers therefore passed
+   A-2. The rehearsal reproduced this with the 58e35ce8 script. `release.mjs status --expect` is **not** read-only: a live PASS
+   appends one `status-pass` line to `/home/arm/afldb-releases/events.log` (`deploy/release.mjs:1539-1545`, the same bytes at
+   7d92042f and 17822b29). The owner therefore chose the read-only form. A-2 runs `node deploy/release.mjs status` (no `--expect`)
+   once, captures that one invocation's output and exit code, and passes only when all of these hold:
+   * the exit code is 0;
+   * there is exactly one result line (`release: STATUS PASS|FAIL …`), and it is exactly `release: STATUS PASS <CURRENT_ID>`;
+   * there is no `restarted since the last attested PASS` note.
+
+   Anything else is a FAIL line, so the result is `R6 PRE RESULT STOP` with a nonzero exit. `CURRENT_ID` is the **full** release ID
+   from Tuesday's sitting record, exactly as below. A truncated or mistyped ID STOPs. A-2 writes nothing: the rehearsal compared
+   `events.log` byte for byte in every case.
+2. **F-4's raw-head check goes through a guarded entry point.** Sunday's `a1-rawhead.sh` has no host or user guard: on any host it
+   reads `/home/arm/projects/afldb/.env`, creates a temporary probe file and makes requests. F-4 now runs
+   `bash "$STAGE/$B/r6-20261125/r6-rawhead-check.sh"`. It runs only `hostname` and `id -un` until it has confirmed user `arm` on
+   host `afldb-prod`. Otherwise it exits 2 and nothing is read, written or requested. It then confirms that the staged
+   `a1-rawhead.sh` is Sunday's pinned `cab4a43a…` and runs it unchanged in `check` mode against Sunday's
+   `/home/arm/a1-rawhead-baseline.json`. Sunday's helper, its pin and its baseline are not changed. F-4's row (§5) now reads:
+   `… and bash deploy/post-install-check.sh --confirm-restart-invocation <INV> <CURRENT_ID>; if the A1 raw-head baseline exists,
+   bash "$STAGE/$B/r6-20261125/r6-rawhead-check.sh"`. Expected output: `RAWHEAD RESULT check PASS`. Exit 2 (`STOP not
+   arm@afldb-prod …`, or a helper-pin STOP) is a FAIL.
+3. **One copy-ready archive and checksum procedure**, below. It replaces §0's command and the earlier "use §0 with two changed
+   pins" instruction. It has 15 files: §0's 14 plus `r6-rawhead-check.sh`. Three pins differ from §0: `r6-pre-verify.sh`,
+   `r6-post-verify.sh` (the CURRENT_ID line, unchanged since `58e35ce8`) and the new `r6-rawhead-check.sh`. The other twelve are
+   byte-identical to §0's `b48a2c5e` pins.
+
+**Wednesday arguments (unchanged release-ID mapping).** Take them from Tuesday's sitting record:
+
+| Tuesday | A-2 `OUTCOME` | A-2 `CURRENT_ID` (full, exactly) | Archive |
+|---|---|---|---|
+| 17822b29 released and accepted | `accepted` | `17822b29e6de-<BUILD_ID from P3b>` | this r2 archive |
+| rolled back with the rollback verify PASS | `accepted` | `7d92042fd110-XWruOm_9nLCSMY8nGPqYU` | this r2 archive |
+| deferred (nothing promoted) | `accepted` | `7d92042fd110-XWruOm_9nLCSMY8nGPqYU` | this r2 archive |
+| promoted but not restarted, rollback verify failed, or unknown | — | — | **NO-GO** |
+
+The `stopped` and `rolledback` outcome values in §1 describe Sunday's A1. **Do not use them for Tuesday's outcomes.** The last
+attested `status-pass` line that A-2's restart rule compares against is:
+
+* accepted: Tuesday's P5 `status --expect … --confirm-restart-invocation`;
+* rolled back: the rollback verification;
+* deferred: Sunday's A1 acceptance.
+
+Any service restart after that line that nobody attested makes A-2 STOP.
+
+### R6 archive r2: workstation (Git Bash), before 09:25
+
+```bash
+CODE=7af24a74b15af39b0bdebeec9be0b089c8adc8a1
+B=docs/v2/evidence/backlog-20261121
+git -C /d/dev/afldb archive --format=tar --output=/tmp/afldb-r6-20261125-r2.tar "$CODE" \
+  "$B/r6-20261125/r6-pre-verify.sh" \
+  "$B/r6-20261125/r6-offhost-verify.sh" \
+  "$B/r6-20261125/r6-post-verify.sh" \
+  "$B/r6-20261125/r6-public-smoke.sh" \
+  "$B/r6-20261125/r6-revalidate-accept.sh" \
+  "$B/r6-20261125/r6-rawhead-check.sh" \
+  "$B/a1a2-20261124/a1-s9-public-smoke.sh" \
+  "$B/a1a2-20261124/a1-rawhead.sh" \
+  "$B/a1a2-20261124/a2-cron-observe.sh" \
+  "$B/a1a2-20261124/a2-helper-install.sh" \
+  "$B/kits/afldb-offhost-pull-daily.sh" \
+  "$B/kits/scheduled-pull-evidence.sh" \
+  "tools/maintenance/offhost-pull.sh" \
+  "tools/maintenance/revalidate-season.ts" \
+  "src/lib/acquisition/season-revalidation.ts" &&
+  sha256sum /tmp/afldb-r6-20261125-r2.tar
+```
+
+### R6 archive r2: transfer (workstation Git Bash; one line per host; never at minute :16–:18)
+
+```bash
+C:/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes -i C:/Users/stuar/.ssh/afldb_dev arm@10.0.40.100 'cat > /tmp/afldb-r6-20261125-r2.tar' < /tmp/afldb-r6-20261125-r2.tar
+```
+
+```bash
+C:/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes afldb 'cat > /tmp/afldb-r6-20261125-r2.tar' < /tmp/afldb-r6-20261125-r2.tar
+```
+
+### R6 archive r2: staging and verification (run once on each host: workstation, production, streamanator)
+
+Paste the block into a shell on that host, or pipe it there with `tr -d '\r' < block | ssh.exe … bash -s`. Record the printed
+staging root. STOP unless the block prints 15 `: OK` lines and `R6 STAGE VERIFIED <path> (15 files)`. The block also STOPs on
+an extra or missing file and on a manifest that differs from the one printed here (digest
+`53b8cb1031c1d0204c7bf0a413efa5cb2ea1e5c37b2025f111ed1bc1de78b0fc`).
+
+```bash
+B=docs/v2/evidence/backlog-20261121
+STAGE=$(mktemp -d /tmp/afldb-r6-20261125-r2.XXXXXX) &&
+  tar -xf /tmp/afldb-r6-20261125-r2.tar -C "$STAGE" &&
+  cat > "$STAGE/R6-SHA256SUMS" <<'R6_PINS' &&
+0d9e97a5d5882203703ca36083a84284f30158c0475f6a1b1926359854bd6ad9  docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh
+429eec29acf254179c3b7ae7d6489a6c695981fd90996c5c2ce1301314bcc18c  docs/v2/evidence/backlog-20261121/r6-20261125/r6-offhost-verify.sh
+478f85cd8930199796c046ea43cdbaab7882921d286a3c9f6015c4a70cd5c66c  docs/v2/evidence/backlog-20261121/r6-20261125/r6-post-verify.sh
+de84f1205b4ab4cfec182b1fb7b0770ca916c8570f10a14539daa9a4e450bd9e  docs/v2/evidence/backlog-20261121/r6-20261125/r6-public-smoke.sh
+5e5ce991a5e4bf0875c49e01cc0f90db7da720a0f1c022507cec869d3cc067f0  docs/v2/evidence/backlog-20261121/r6-20261125/r6-revalidate-accept.sh
+cc8854f0bbce305e1071e3eea30100e18d742ae15cddbd1f9a19b908ad100b50  docs/v2/evidence/backlog-20261121/r6-20261125/r6-rawhead-check.sh
+babb660f7e7555a55281f2a0a07cb6d1147f39ebfa5ff9c119a677a1e2776a71  docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-s9-public-smoke.sh
+cab4a43af09e4b1729d913162c0f27faccd19315c56eb4ad1141c8bf748d81c0  docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-rawhead.sh
+2ac943b113af2247ab3acb3863e97201c8794ff830520338faa8b299268eeee5  docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-cron-observe.sh
+6c1b57e57c7dc57a6094f44354ba9cec91a1dec310e57b9fae371670be388e47  docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-helper-install.sh
+2ebac1c09b07e6b3bc1e060d7645efdbb1c2c7f169b5cfafd4e7f77508716e24  docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh
+d7574254997ba28dd1f750b7bcdc6f90c0a421b88ba6bb02aa104bd671b8572e  docs/v2/evidence/backlog-20261121/kits/scheduled-pull-evidence.sh
+a3775aea879b1d9ce05d0e96482e66d24c69deb62cf38e8fc0407c0d2653dc2b  tools/maintenance/offhost-pull.sh
+20ee3b452da9cb025a938a75c3200f44101fb094c1ad4662e70673df3d96b14e  tools/maintenance/revalidate-season.ts
+bd88c915c2643fc1bc8ec005c5c6825d43af0742b33ca83f0461e9348414dbc9  src/lib/acquisition/season-revalidation.ts
+R6_PINS
+  (cd "$STAGE" && sha256sum -c R6-SHA256SUMS &&
+    [ "$(find . -type f ! -name R6-SHA256SUMS | wc -l)" -eq 15 ] &&
+    [ "$(sha256sum < R6-SHA256SUMS | cut -c1-64)" = 53b8cb1031c1d0204c7bf0a413efa5cb2ea1e5c37b2025f111ed1bc1de78b0fc ]) &&
+  printf 'R6 STAGE VERIFIED %s (15 files)\n' "$STAGE" ||
+  { echo 'R6 STAGE STOP: do not use this staging root'; false; }
+```
+
+### R6 archive r2: re-check before each use (later sessions; set `STAGE` to the recorded root first)
+
+```bash
+(cd "$STAGE" && sha256sum -c --quiet R6-SHA256SUMS &&
+  [ "$(find . -type f ! -name R6-SHA256SUMS | wc -l)" -eq 15 ] &&
+  [ "$(sha256sum < R6-SHA256SUMS | cut -c1-64)" = 53b8cb1031c1d0204c7bf0a413efa5cb2ea1e5c37b2025f111ed1bc1de78b0fc ]) &&
+  echo "R6 STAGE OK $STAGE" || { echo "R6 STAGE STOP $STAGE"; false; }
+```
+
+Then set `B=docs/v2/evidence/backlog-20261121` and use only the staged copies, as §0's last paragraph describes (A-1 and A-4 on
+streamanator after `a2-helper-install.sh check`; the F-4b PATH line is unchanged).
+
+**Rehearsal (streamanator, disposable, production not contacted):**
+[review-fixes-20261123/README.md](r6-20261125/review-fixes-20261123/README.md). It covers the printed blocks run verbatim from a
+clean export, the file count, the stops on a changed staged file, and the A-2 and F-4 cases in disposable containers.

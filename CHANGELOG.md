@@ -15,10 +15,16 @@ commit.
 
 ## [Unreleased]
 
+### R6 independent-review fixes (23 November 2026, late; local on `claude/r6-review-fixes-20261123`, not pushed; nothing deployed)
+
+- **R6 A-2 now gates on the serving release.** `r6-pre-verify.sh` runs `release.mjs status` without `--expect`, which writes nothing (`--expect` appends to `events.log`). It STOPs unless that one invocation exits 0 with exactly one result line, `release: STATUS PASS <CURRENT_ID>`, and no "restarted since the last attested PASS" note. Before this, a service still running the previous release behind a matching `current` symlink passed A-2.
+- **R6 F-4 raw-head entry point guarded.** New `r6-rawhead-check.sh` refuses (exit 2) unless the user is `arm` on host `afldb-prod`, before `.env` is read, a probe file is created or a request is made. It then runs Sunday's pinned `a1-rawhead.sh` unchanged.
+- **One copy-ready R6 archive procedure** at helper revision `7af24a74`: 15 files and the complete manifest (digest `53b8cb10…`) in the [R6 runbook r2 amendment](docs/v2/evidence/backlog-20261121/ATTENDED-PLAN-R6-20261125.md). It supersedes the `b48a2c5e` and `58e35ce8` archives for every Tuesday outcome. Rehearsed verbatim from a clean export, with disposable containers on streamanator ([record](docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-20261123/README.md)). Astra's re-review is required before the reboot.
+
 ### Attended application release packet for `17822b29` (23 November 2026; local on `claude/release-17822b29-prep-20261123`, not pushed; nothing deployed)
 
 - **Operations, prepared only.** Pinned release scripts (`docs/v2/evidence/release-17822b29-20261124/scripts/`, revision `58e35ce8`, `SHA256SUMS` `b4e9e584…`) and [runbook](docs/v2/evidence/release-17822b29-20261124/RUNBOOK.md) for releasing `17822b29` to production with rollback to `7d92042fd110-XWruOm_9nLCSMY8nGPqYU`. P1 checks the actual serving release, the systemd route and the supervisor bytes. The 03:10 scheduled off-host copy is a hard gate. Proposed window Tue 24 Nov 10:30–12:30 AEDT. Rehearsed from a clean export on streamanator: 87/0.
-- **R6 amendment, proposed.** `r6-pre-verify.sh` and `r6-post-verify.sh` also admit a `17822b29e6de-*` CURRENT_ID. This needs independent review before Wednesday's reboot, if Tuesday is accepted.
+- **R6 amendment, proposed.** `r6-pre-verify.sh` and `r6-post-verify.sh` also admit a `17822b29e6de-*` CURRENT_ID. This needs independent review before Wednesday's reboot, if Tuesday is accepted. *(Its archive was superseded the same day by the r2 review fixes above.)*
 - **Records.** `issues.md`, `IssuesIndex.md` and the open records for 367, 368 and 374–377 now show the published `17822b29`, Astra's final verdict and each issue's remaining acceptance.
 
 ### Qualification of Astra's candidate `91c04159` (23 November 2026; local on `codex/astra-fix-20261123`, not pushed, installed or deployed)

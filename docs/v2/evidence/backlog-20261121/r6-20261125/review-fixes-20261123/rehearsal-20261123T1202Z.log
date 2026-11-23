@@ -1,0 +1,460 @@
+== R6 r2 printed blocks 2026-11-23T12:02:28Z workstation=Office runbook=d0f88474f0d9d18267a4d4c1bc1d388c4a487322566139d752fd46297fa1b415
+   block 1: 19 lines, sha256 6656f4f17d38d92de571e15e612cf9846d016f91cd4d85966a40e433e17dd6b0
+   block 2: 1 lines, sha256 87275340694e13adc48dd71ddc332d927f1b393884ce383bcceab96547d87c4f
+   block 3: 1 lines, sha256 354a7011cbf92642d75c0218f5bf924c2f3b0bce426ca8d9c9ed19355bfc8c2f
+   block 4: 25 lines, sha256 2429445951e65f5b5eedc6760f10073b3188c3f4bbad443c95295e63f19d8c9e
+   block 5: 4 lines, sha256 0e1454df6a5208922d144fd90702bb30d15642d5edab6608824de3118e9174ba
+-- block 1 (archive), verbatim, workstation
+f404d94477fbcbab5390bf27cbbf55d37111f4a8a3b54a1e4bce3c700c6ca7a9 */tmp/afldb-r6-20261125-r2.tar
+   rc=0
+-- block 4 (staging), verbatim, workstation
+docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh: OK
+docs/v2/evidence/backlog-20261121/r6-20261125/r6-offhost-verify.sh: OK
+docs/v2/evidence/backlog-20261121/r6-20261125/r6-post-verify.sh: OK
+docs/v2/evidence/backlog-20261121/r6-20261125/r6-public-smoke.sh: OK
+docs/v2/evidence/backlog-20261121/r6-20261125/r6-revalidate-accept.sh: OK
+docs/v2/evidence/backlog-20261121/r6-20261125/r6-rawhead-check.sh: OK
+docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-s9-public-smoke.sh: OK
+docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-rawhead.sh: OK
+docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-cron-observe.sh: OK
+docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-helper-install.sh: OK
+docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh: OK
+docs/v2/evidence/backlog-20261121/kits/scheduled-pull-evidence.sh: OK
+tools/maintenance/offhost-pull.sh: OK
+tools/maintenance/revalidate-season.ts: OK
+src/lib/acquisition/season-revalidation.ts: OK
+R6 STAGE VERIFIED /tmp/afldb-r6-20261125-r2.IQqyXW (15 files)
+   rc=0
+-- block 2 (transfer to streamanator), verbatim
+   rc=0
+-- block 4 (staging), verbatim, streamanator
+docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh: OK
+docs/v2/evidence/backlog-20261121/r6-20261125/r6-offhost-verify.sh: OK
+docs/v2/evidence/backlog-20261121/r6-20261125/r6-post-verify.sh: OK
+docs/v2/evidence/backlog-20261121/r6-20261125/r6-public-smoke.sh: OK
+docs/v2/evidence/backlog-20261121/r6-20261125/r6-revalidate-accept.sh: OK
+docs/v2/evidence/backlog-20261121/r6-20261125/r6-rawhead-check.sh: OK
+docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-s9-public-smoke.sh: OK
+docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-rawhead.sh: OK
+docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-cron-observe.sh: OK
+docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-helper-install.sh: OK
+docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh: OK
+docs/v2/evidence/backlog-20261121/kits/scheduled-pull-evidence.sh: OK
+tools/maintenance/offhost-pull.sh: OK
+tools/maintenance/revalidate-season.ts: OK
+src/lib/acquisition/season-revalidation.ts: OK
+R6 STAGE VERIFIED /tmp/afldb-r6-20261125-r2.stnHv0 (15 files)
+   rc=0
+   files verified: 15
+   tar on streamanator: f404d94477fbcbab5390bf27cbbf55d37111f4a8a3b54a1e4bce3c700c6ca7a9 (workstation: f404d94477fbcbab5390bf27cbbf55d37111f4a8a3b54a1e4bce3c700c6ca7a9)
+-- block 5 (re-check), verbatim, streamanator: unchanged copy of the verified root
+     | R6 STAGE OK /tmp/afldb-r6-recheck.38bN5O
+     |    rc=0
+-- block 5 (re-check), verbatim, streamanator: one staged file changed by one byte (r6-pre-verify.sh)
+     | docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh: FAILED
+     | sha256sum: WARNING: 1 computed checksum did NOT match
+     | R6 STAGE STOP /tmp/afldb-r6-recheck.QFizIV
+     |    rc=1
+-- block 5 (re-check), verbatim, streamanator: one staged file changed and its manifest line rewritten to match (digest rule)
+     | R6 STAGE STOP /tmp/afldb-r6-recheck.amMjUy
+     |    rc=1
+-- block 5 (re-check), verbatim, streamanator: an extra file in the staging root (file-count rule)
+     | R6 STAGE STOP /tmp/afldb-r6-recheck.3JQinA
+     |    rc=1
+-- block 5 (re-check), verbatim, streamanator: a staged file removed (r6-rawhead-check.sh)
+     | sha256sum: docs/v2/evidence/backlog-20261121/r6-20261125/r6-rawhead-check.shdocs/v2/evidence/backlog-20261121/r6-20261125/r6-rawhead-check.sh: FAILED open or read
+     | : No such file or directory
+     | sha256sum: WARNING: 1 listed file could not be read
+     | R6 STAGE STOP /tmp/afldb-r6-recheck.2aQjQQ
+     |    rc=1
+-- block 4 (staging), verbatim, streamanator, from an archive with one changed file
+     | docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh: OK
+     | docs/v2/evidence/backlog-20261121/r6-20261125/r6-offhost-verify.sh: OK
+     | docs/v2/evidence/backlog-20261121/r6-20261125/r6-post-verify.sh: OK
+     | docs/v2/evidence/backlog-20261121/r6-20261125/r6-public-smoke.sh: OK
+     | docs/v2/evidence/backlog-20261121/r6-20261125/r6-revalidate-accept.sh: OK
+     | docs/v2/evidence/backlog-20261121/r6-20261125/r6-rawhead-check.sh: FAILED
+     | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-s9-public-smoke.sh: OK
+     | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-rawhead.sh: OK
+     | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-cron-observe.sh: OK
+     | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-helper-install.sh: OK
+     | docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh: OK
+     | docs/v2/evidence/backlog-20261121/kits/scheduled-pull-evidence.sh: OK
+     | tools/maintenance/offhost-pull.sh: OK
+     | sha256sum: WARNING: 1 computed checksum did NOT match
+     | tools/maintenance/revalidate-season.ts: OK
+     | src/lib/acquisition/season-revalidation.ts: OK
+     | R6 STAGE STOP: do not use this staging root
+   rc=1
+f404d94477fbcbab5390bf27cbbf55d37111f4a8a3b54a1e4bce3c700c6ca7a9
+-- fixture export of 7af24a74b15af39b0bdebeec9be0b089c8adc8a1 and the container rehearsal (streamanator, one connection)
+   fixture tar sha256 2818f8d0876940f243e8233fe1ec36e9a57f3e36bfa2e32e840a897bb57b43c6
+== R6 FIX REHEARSAL 2026-11-23T12:02:34Z host=streamanator user=arm stage=/tmp/afldb-r6-20261125-r2.stnHv0 fixture=/tmp/afldb-r6fix-fixture.mTELIv
+   image sha256:d71c0b286c54a7cc48645aa8d4d9d0c57e4260128cb91a6fb18c29d7589205ba (linux/amd64 created 2026-05-05T20:43:14.149402711Z)
+== R6 FIX in-container role=prod 2026-11-23T12:02:34Z hostname=afldb-prod image-os=Ubuntu 24.04.4 LTS
+   staged sha256: 0d9e97a5d5882203703ca36083a84284f30158c0475f6a1b1926359854bd6ad9 r6-pre-verify.sh; cc8854f0bbce305e1071e3eea30100e18d742ae15cddbd1f9a19b908ad100b50 r6-rawhead-check.sh; cab4a43af09e4b1729d913162c0f27faccd19315c56eb4ad1141c8bf748d81c0 a1-rawhead.sh
+made 17822b29e6de-R6fixRehearsalBuild01x: 3 files, manifest 69b425be1a79, supervisor 11190 B
+made 7d92042fd110-XWruOm_9nLCSMY8nGPqYU: 3 files, manifest 2b32e8d15aba, supervisor 11190 B
+   service: primary 133 cwd /home/arm/afldb-releases/releases/17822b29e6de-R6fixRehearsalBuild01x, workers 155 156 
+   baseline written by the staged a1-rawhead.sh (connections=24 mktemp-calls=1 env-opens=0)
+-- 1. A-2 (r6-pre-verify.sh accepted 17822b29e6de-R6fixRehearsalBuild01x r3:yes r4:yes 10:00), events.log compared byte for byte
+   [P1-attested-release] rc=0 fail-lines=0 events.log 26b2b68ebb36f9e5 -> 26b2b68ebb36f9e5
+     | PASS exactly 2 worker processes
+     | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+     |      release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x
+     | PASS release.mjs status (read-only): exit 0, one result line 'STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x', no unattested restart
+     | R6 PRE RESULT PASS
+   ---- full A-2 output [P1-attested-release]
+     # == R6 PRE 2026-11-24T22:25:00Z local Wed 2026-11-25 09:25:00 AEDT host=afldb-prod user=arm outcome=accepted current=17822b29e6de-R6fixRehearsalBuild01x r3:yes r4:yes window=2026-11-25 10:00
+     # PASS today is Wednesday (2026-11-25)
+     # BOOT_ID c3524e47-59ab-4e0f-8050-875471b56b12
+     # -- 1. kernels and reboot state
+     # PASS running 6.8.0-137-generic
+     # INFO up since 2026-11-21 03:01:19
+     #      linux-image-6.8.0-137-generic|6.8.0-137.147
+     #      linux-image-6.8.0-149-generic|6.8.0-149.159
+     #      linux-image-virtual|6.8.0.149.159
+     # PASS installed kernel images are exactly {137, 149}
+     # PASS present /boot/vmlinuz-6.8.0-149-generic (8 B, 2026-11-23 23:02:34.732823657 +1100)
+     # PASS present /boot/initrd.img-6.8.0-149-generic (8 B, 2026-11-23 23:02:34.732823657 +1100)
+     # PASS present /boot/vmlinuz-6.8.0-137-generic (8 B, 2026-11-23 23:02:34.731823643 +1100)
+     # PASS present /boot/initrd.img-6.8.0-137-generic (8 B, 2026-11-23 23:02:34.732823657 +1100)
+     # PASS modules 149 and 137 present
+     # PASS reboot-required present (expected before the reboot)
+     # -- 2. boot facts for the GRUB decision (arm-readable part; grub.cfg itself is root-only: owner step C1)
+     # INFO firmware BIOS (no /sys/firmware/efi)
+     #      ii  grub-common 2.12-1ubuntu7.3
+     #      ii  grub-pc 2.12-1ubuntu7.3
+     # INFO root fs type overlay; /boot: on /; root source kind overlay
+     #      ls: cannot access '/etc/default/grub': No such file or directory
+     #      ls: cannot access '/etc/default/grub.d/': No such file or directory
+     #      ls: cannot access '/boot/grub/grubenv': No such file or directory
+     # INFO grubenv variables (non-padding lines): ''
+     # GRUB-BASELINE e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+     # INFO kernel.panic= kernel.panic_on_oops=
+     # -- 3. apt/dpkg idle and every timer (the owner re-runs the apt gate immediately before the reboot)
+     # PASS apt-daily.service inactive
+     # PASS apt-daily-upgrade.service inactive
+     # PASS no apt/dpkg/unattended-upgrade process
+     #      unit-file: afldb-backup-verify.service static -
+     #      unit-file: afldb-backup-verify.timer   enabled enabled
+     #      unit-file: afldb-backup.service        static -
+     #      unit-file: afldb-backup.timer          enabled enabled
+     #      unit-file: afldb.service               enabled enabled
+     # PASS afldb-backup-verify.timer active=active enabled=enabled triggers=afldb-backup-verify.service (inactive) next=Thu 2026-11-26 03:30:00 AEDT
+     # PASS afldb-backup.timer active=active enabled=enabled triggers=afldb-backup.service (inactive) next=Thu 2026-11-26 02:20:00 AEDT
+     # PASS apt-daily-upgrade.timer active=active enabled=enabled triggers=apt-daily-upgrade.service (inactive) next=Thu 2026-11-26 06:30:00 AEDT
+     # -- 4. services and the release (outcome accepted)
+     # PASS postgresql@16-main active
+     # PASS afldb active
+     # PASS caddy active
+     # INVOCATION_ID 3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b
+     #      NRestarts=0
+     #      MainPID=133
+     #      ActiveEnterTimestamp=Tue 2026-11-24 11:33:10 AEDT
+     # PASS exactly 2 worker processes
+     # PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+     # INFO previous = releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU; checkout HEAD 
+     #      release: current  17822b29e6de-R6fixRehearsalBuild01x revision 17822b29e6de2b6248cd7ada4221800fd81e0003 BUILD_ID R6fixRehearsalBuild01x production
+     #      release: previous 7d92042fd110-XWruOm_9nLCSMY8nGPqYU revision 17822b29e6de2b6248cd7ada4221800fd81e0003 BUILD_ID XWruOm_9nLCSMY8nGPqYU
+     #      release: memory   afldb MemoryCurrent 500 MB
+     #      release: process  133 runs in /home/arm/afldb-releases/releases/17822b29e6de-R6fixRehearsalBuild01x
+     #      release: health   200 status=ok database=ok
+     #      release: build    /_next/static/R6fixRehearsalBuild01x/_buildManifest.js 200
+     #      release: build    /_next/static/XWruOm_9nLCSMY8nGPqYU/_buildManifest.js 404 (previous; expect 404)
+     #      release: activation service InvocationID 3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b NRestarts 0 ActiveEnter 2026-11-24T00:33:10.000Z
+     #      release: activation restarted since promote (InvocationID 342040625f6d4012a35d598dfbf9afe6 -> 3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b)
+     #      release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x
+     # PASS release.mjs status (read-only): exit 0, one result line 'STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x', no unattested restart
+     # PASS env counts 1/1
+     #      AFLDB_SETTLE_STATUS UNKNOWN
+     #      unit afldb-settle-afl-api.service: not loaded or unreadable (LoadState=empty)
+     #      unit afldb-settle-afl-api-brownlow.service: not loaded or unreadable (LoadState=empty)
+     #      timer afldb-settle-afl-api.timer: not loaded or unreadable
+     # INFO settle-failure-status rc 2 (packet R6 prerequisite 5: recorded before the reboot)
+     # PASS Caddyfile = R4 f00859d5
+     # PASS R1 host policy installed (both files equal the repo)
+     # PASS A1 raw-head baseline present (post-reboot raw-head check runs)
+     # INFO R5 directory root:root 755
+     # -- 5. first scheduled backup (Wed 02:20 unit) and restore check (Wed 03:30 unit)
+     # PASS afldb-backup.service scheduled run Wed 2026-11-25 02:20:01 AEDT Result=success status=0
+     # PASS afldb-backup-verify.service scheduled run Wed 2026-11-25 03:30:02 AEDT Result=success status=0
+     # INFO last-verify.json: file=afldb_prod-20261125-033012.dump sha256=523745cac96e7acdb3d28e3bb56afed8ccafc8a9380e510959d5af9e9d97539f attempts=1
+     # INFO last-backup.json: {"epoch":1795537820,"file":"afldb_prod-20261125-033012.dump","sha256":"523745cac96e7acdb3d28e3bb56afed8ccafc8a9380e510959d5af9e9d97539f","offhost":"none"}
+     # PASS scheduled 02:2x dump is unique, equals the afldb-backup.service journal's own dump, re-hash = its sidecar: afldb_prod-20261125-022001.dump 4096 B
+     # OFFHOST-COMPARE afldb_prod-20261125-022001.dump d6e70cdf173313d11808ca15baedb9c7978b20b96753290ef7673b4194287e4b
+     # PASS restore journal invocation, completion, dump, state and rehash agree (attempts 1)
+     # PASS no FAILED marker
+     #      2026-11-24T22:25:00Z scheduled-backup: STATUS ok   backup: afldb_prod-20261125-033012.dump 5h ago
+     #      2026-11-24T22:25:00Z scheduled-backup: STATUS ok   restore verification: afldb_prod-20261125-033012.dump 5h ago
+     # PASS scheduled-backup.sh status rc 0
+     # INFO dumps held: 2
+     #      ledger|118|118_fixtures_unconfirmed_participants.sql
+     #      rt|afldb_restore_test|afldb.restore_test.v1 sha256=523745cac96e7acdb3d28e3bb56afed8ccafc8a9380e510959d5af9e9d97539f|0
+     # PASS ledger 118
+     # PASS afldb_restore_test comment matches the scheduled restore dump, numbackends 0
+     # RESTORE-EVIDENCE 0d1c2b3a4f5e60718293a4b5c6d7e8f9 1795537885 afldb_prod-20261125-033012.dump 523745cac96e7acdb3d28e3bb56afed8ccafc8a9380e510959d5af9e9d97539f
+     # RESTORE-SHA 523745cac96e7acdb3d28e3bb56afed8ccafc8a9380e510959d5af9e9d97539f
+     # -- 6. capacity
+     #      Filesystem Size Used Avail Use% Mounted on
+     #      /dev/vda1 49G 20G 29G 40% /
+     #      /dev/vda16 881M 100M 720M 13% /boot
+     #                     total        used        free      shared  buff/cache   available
+     #      Mem:           32018        5726        2950         410       24212       26292
+     #      Swap:           8191        1651        6540
+     # PASS root fs free 30000 MB >= 6144
+     # 
+     # R6 PRE RESULT PASS
+REH PASS [P1-attested-release] events.log byte-identical
+REH PASS [P1-attested-release] A-2 exit 0, R6 PRE RESULT PASS
+   [F-wrong-build-id] rc=1 fail-lines=2 events.log 26b2b68ebb36f9e5 -> 26b2b68ebb36f9e5
+     | PASS exactly 2 worker processes
+     | FAIL current = releases/17822b29e6de-R6fixRehearsalBuild01x (expected 17822b29e6de-WrongBuildId0000000000)
+     |      release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x
+     | FAIL release.mjs status does not prove 17822b29e6de-WrongBuildId0000000000 is serving: no line 'release: STATUS PASS 17822b29e6de-WrongBuildId0000000000'
+     | R6 PRE RESULT STOP (2 FAIL line(s)): do not reboot; take them to the owner
+REH PASS [F-wrong-build-id] events.log byte-identical
+REH PASS [F-wrong-build-id] A-2 exit 1, STOP, 2 FAIL line(s) incl. the serving-release check
+   later unattested restart: the service restarts (new MainPID and InvocationID) after Tuesday's attested PASS
+   [F-unattested-restart] rc=1 fail-lines=1 events.log 26b2b68ebb36f9e5 -> 26b2b68ebb36f9e5
+     | PASS exactly 2 worker processes
+     | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+     |      release: note: the service restarted since the last attested PASS (InvocationID 3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b -> 9a8b7c6d5e4f30211203f4e5d6c7b8a9); compare with your maintenance log: this was not a restart you attested
+     |      release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x
+     | FAIL release.mjs status does not prove 17822b29e6de-R6fixRehearsalBuild01x is serving: the service restarted since the last attested PASS
+     | R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+REH PASS [F-unattested-restart] events.log byte-identical
+REH PASS [F-unattested-restart] A-2 exit 1, STOP, 1 FAIL line(s) incl. the serving-release check
+   current symlink = 17822b29e6de-R6fixRehearsalBuild01x and two workers, but the service still runs the previous release (promoted, not restarted)
+   service: primary 1376 cwd /home/arm/afldb-releases/releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU, workers 2; current -> releases/17822b29e6de-R6fixRehearsalBuild01x
+   [F-status-exit-nonzero] rc=1 fail-lines=1 events.log 26b2b68ebb36f9e5 -> 26b2b68ebb36f9e5
+     | PASS exactly 2 worker processes
+     | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+     |      release: FAIL process 1376 runs in /home/arm/afldb-releases/releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU, not /home/arm/afldb-releases/releases/17822b29e6de-R6fixRehearsalBuild01x (restart pending?)
+     |      release: FAIL current BUILD_ID manifest answered 404
+     |      release: FAIL previous BUILD_ID manifest answered 200
+     |      release: STATUS FAIL
+     | FAIL release.mjs status does not prove 17822b29e6de-R6fixRehearsalBuild01x is serving: exit 1; no line 'release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x'
+     | R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+   ---- full A-2 output [F-status-exit-nonzero]
+     # == R6 PRE 2026-11-24T22:25:00Z local Wed 2026-11-25 09:25:00 AEDT host=afldb-prod user=arm outcome=accepted current=17822b29e6de-R6fixRehearsalBuild01x r3:yes r4:yes window=2026-11-25 10:00
+     # PASS today is Wednesday (2026-11-25)
+     # BOOT_ID c3524e47-59ab-4e0f-8050-875471b56b12
+     # -- 1. kernels and reboot state
+     # PASS running 6.8.0-137-generic
+     # INFO up since 2026-11-21 03:01:19
+     #      linux-image-6.8.0-137-generic|6.8.0-137.147
+     #      linux-image-6.8.0-149-generic|6.8.0-149.159
+     #      linux-image-virtual|6.8.0.149.159
+     # PASS installed kernel images are exactly {137, 149}
+     # PASS present /boot/vmlinuz-6.8.0-149-generic (8 B, 2026-11-23 23:02:34.732823657 +1100)
+     # PASS present /boot/initrd.img-6.8.0-149-generic (8 B, 2026-11-23 23:02:34.732823657 +1100)
+     # PASS present /boot/vmlinuz-6.8.0-137-generic (8 B, 2026-11-23 23:02:34.731823643 +1100)
+     # PASS present /boot/initrd.img-6.8.0-137-generic (8 B, 2026-11-23 23:02:34.732823657 +1100)
+     # PASS modules 149 and 137 present
+     # PASS reboot-required present (expected before the reboot)
+     # -- 2. boot facts for the GRUB decision (arm-readable part; grub.cfg itself is root-only: owner step C1)
+     # INFO firmware BIOS (no /sys/firmware/efi)
+     #      ii  grub-common 2.12-1ubuntu7.3
+     #      ii  grub-pc 2.12-1ubuntu7.3
+     # INFO root fs type overlay; /boot: on /; root source kind overlay
+     #      ls: cannot access '/etc/default/grub': No such file or directory
+     #      ls: cannot access '/etc/default/grub.d/': No such file or directory
+     #      ls: cannot access '/boot/grub/grubenv': No such file or directory
+     # INFO grubenv variables (non-padding lines): ''
+     # GRUB-BASELINE e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+     # INFO kernel.panic= kernel.panic_on_oops=
+     # -- 3. apt/dpkg idle and every timer (the owner re-runs the apt gate immediately before the reboot)
+     # PASS apt-daily.service inactive
+     # PASS apt-daily-upgrade.service inactive
+     # PASS no apt/dpkg/unattended-upgrade process
+     #      unit-file: afldb-backup-verify.service static -
+     #      unit-file: afldb-backup-verify.timer   enabled enabled
+     #      unit-file: afldb-backup.service        static -
+     #      unit-file: afldb-backup.timer          enabled enabled
+     #      unit-file: afldb.service               enabled enabled
+     # PASS afldb-backup-verify.timer active=active enabled=enabled triggers=afldb-backup-verify.service (inactive) next=Thu 2026-11-26 03:30:00 AEDT
+     # PASS afldb-backup.timer active=active enabled=enabled triggers=afldb-backup.service (inactive) next=Thu 2026-11-26 02:20:00 AEDT
+     # PASS apt-daily-upgrade.timer active=active enabled=enabled triggers=apt-daily-upgrade.service (inactive) next=Thu 2026-11-26 06:30:00 AEDT
+     # -- 4. services and the release (outcome accepted)
+     # PASS postgresql@16-main active
+     # PASS afldb active
+     # PASS caddy active
+     # INVOCATION_ID 3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b
+     #      NRestarts=0
+     #      MainPID=1376
+     #      ActiveEnterTimestamp=Tue 2026-11-24 11:33:10 AEDT
+     # PASS exactly 2 worker processes
+     # PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+     # INFO previous = releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU; checkout HEAD 
+     #      release: current  17822b29e6de-R6fixRehearsalBuild01x revision 17822b29e6de2b6248cd7ada4221800fd81e0003 BUILD_ID R6fixRehearsalBuild01x production
+     #      release: previous 7d92042fd110-XWruOm_9nLCSMY8nGPqYU revision 17822b29e6de2b6248cd7ada4221800fd81e0003 BUILD_ID XWruOm_9nLCSMY8nGPqYU
+     #      release: memory   afldb MemoryCurrent 500 MB
+     #      release: process  1376 runs in /home/arm/afldb-releases/releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+     #      release: health   200 status=ok database=ok
+     #      release: build    /_next/static/R6fixRehearsalBuild01x/_buildManifest.js 404
+     #      release: build    /_next/static/XWruOm_9nLCSMY8nGPqYU/_buildManifest.js 200 (previous; expect 404)
+     #      release: activation service InvocationID 3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b NRestarts 0 ActiveEnter 2026-11-24T00:33:10.000Z
+     #      release: activation restarted since promote (InvocationID 342040625f6d4012a35d598dfbf9afe6 -> 3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b)
+     #      release: FAIL process 1376 runs in /home/arm/afldb-releases/releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU, not /home/arm/afldb-releases/releases/17822b29e6de-R6fixRehearsalBuild01x (restart pending?)
+     #      release: FAIL current BUILD_ID manifest answered 404
+     #      release: FAIL previous BUILD_ID manifest answered 200
+     #      release: STATUS FAIL
+     # FAIL release.mjs status does not prove 17822b29e6de-R6fixRehearsalBuild01x is serving: exit 1; no line 'release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x'
+     # PASS env counts 1/1
+     #      AFLDB_SETTLE_STATUS UNKNOWN
+     #      unit afldb-settle-afl-api.service: not loaded or unreadable (LoadState=empty)
+     #      unit afldb-settle-afl-api-brownlow.service: not loaded or unreadable (LoadState=empty)
+     #      timer afldb-settle-afl-api.timer: not loaded or unreadable
+     # INFO settle-failure-status rc 2 (packet R6 prerequisite 5: recorded before the reboot)
+     # PASS Caddyfile = R4 f00859d5
+     # PASS R1 host policy installed (both files equal the repo)
+     # PASS A1 raw-head baseline present (post-reboot raw-head check runs)
+     # INFO R5 directory root:root 755
+     # -- 5. first scheduled backup (Wed 02:20 unit) and restore check (Wed 03:30 unit)
+     # PASS afldb-backup.service scheduled run Wed 2026-11-25 02:20:01 AEDT Result=success status=0
+     # PASS afldb-backup-verify.service scheduled run Wed 2026-11-25 03:30:02 AEDT Result=success status=0
+     # INFO last-verify.json: file=afldb_prod-20261125-033012.dump sha256=523745cac96e7acdb3d28e3bb56afed8ccafc8a9380e510959d5af9e9d97539f attempts=1
+     # INFO last-backup.json: {"epoch":1795537820,"file":"afldb_prod-20261125-033012.dump","sha256":"523745cac96e7acdb3d28e3bb56afed8ccafc8a9380e510959d5af9e9d97539f","offhost":"none"}
+     # PASS scheduled 02:2x dump is unique, equals the afldb-backup.service journal's own dump, re-hash = its sidecar: afldb_prod-20261125-022001.dump 4096 B
+     # OFFHOST-COMPARE afldb_prod-20261125-022001.dump d6e70cdf173313d11808ca15baedb9c7978b20b96753290ef7673b4194287e4b
+     # PASS restore journal invocation, completion, dump, state and rehash agree (attempts 1)
+     # PASS no FAILED marker
+     #      2026-11-24T22:25:00Z scheduled-backup: STATUS ok   backup: afldb_prod-20261125-033012.dump 5h ago
+     #      2026-11-24T22:25:00Z scheduled-backup: STATUS ok   restore verification: afldb_prod-20261125-033012.dump 5h ago
+     # PASS scheduled-backup.sh status rc 0
+     # INFO dumps held: 2
+     #      ledger|118|118_fixtures_unconfirmed_participants.sql
+     #      rt|afldb_restore_test|afldb.restore_test.v1 sha256=523745cac96e7acdb3d28e3bb56afed8ccafc8a9380e510959d5af9e9d97539f|0
+     # PASS ledger 118
+     # PASS afldb_restore_test comment matches the scheduled restore dump, numbackends 0
+     # RESTORE-EVIDENCE 0d1c2b3a4f5e60718293a4b5c6d7e8f9 1795537885 afldb_prod-20261125-033012.dump 523745cac96e7acdb3d28e3bb56afed8ccafc8a9380e510959d5af9e9d97539f
+     # RESTORE-SHA 523745cac96e7acdb3d28e3bb56afed8ccafc8a9380e510959d5af9e9d97539f
+     # -- 6. capacity
+     #      Filesystem Size Used Avail Use% Mounted on
+     #      /dev/vda1 49G 20G 29G 40% /
+     #      /dev/vda16 881M 100M 720M 13% /boot
+     #                     total        used        free      shared  buff/cache   available
+     #      Mem:           32018        5783        2891         410       24213       26234
+     #      Swap:           8191        1651        6540
+     # PASS root fs free 30000 MB >= 6144
+     # 
+     # R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+REH PASS [F-status-exit-nonzero] events.log byte-identical
+REH PASS [F-status-exit-nonzero] A-2 exit 1, STOP, 1 FAIL line(s) incl. the serving-release check
+   the same fixture through the previously staged A-2 (58e35ce8; INFO-only status), to show the finding
+     | INFO release.mjs status exit 1
+     | R6 PRE RESULT PASS
+REH PASS [old A-2] passes the promoted-not-restarted fixture (rc 0): the defect the review found
+   stub release.mjs outputs (all other A-2 checks still pass; isolates the result-line rules)
+   [S-exact-pass] rc=0 fail-lines=0 events.log 26b2b68ebb36f9e5 -> 26b2b68ebb36f9e5
+     | PASS exactly 2 worker processes
+     | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+     |      release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x
+     | PASS release.mjs status (read-only): exit 0, one result line 'STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x', no unattested restart
+     | R6 PRE RESULT PASS
+REH PASS [S-exact-pass] events.log byte-identical
+REH PASS [S-exact-pass] A-2 exit 0, R6 PRE RESULT PASS
+   [S-pass-line-exit-1] rc=1 fail-lines=1 events.log 26b2b68ebb36f9e5 -> 26b2b68ebb36f9e5
+     | PASS exactly 2 worker processes
+     | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+     |      release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x
+     | FAIL release.mjs status does not prove 17822b29e6de-R6fixRehearsalBuild01x is serving: exit 1
+     | R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+REH PASS [S-pass-line-exit-1] events.log byte-identical
+REH PASS [S-pass-line-exit-1] A-2 exit 1, STOP, 1 FAIL line(s) incl. the serving-release check
+   [S-wrong-build-line] rc=1 fail-lines=1 events.log 26b2b68ebb36f9e5 -> 26b2b68ebb36f9e5
+     | PASS exactly 2 worker processes
+     | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+     |      release: STATUS PASS 17822b29e6de-OtherBuild
+     | FAIL release.mjs status does not prove 17822b29e6de-R6fixRehearsalBuild01x is serving: no line 'release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x'
+     | R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+REH PASS [S-wrong-build-line] events.log byte-identical
+REH PASS [S-wrong-build-line] A-2 exit 1, STOP, 1 FAIL line(s) incl. the serving-release check
+   [S-longer-id-line] rc=1 fail-lines=1 events.log 26b2b68ebb36f9e5 -> 26b2b68ebb36f9e5
+     | PASS exactly 2 worker processes
+     | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+     |      release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01xx
+     | FAIL release.mjs status does not prove 17822b29e6de-R6fixRehearsalBuild01x is serving: no line 'release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x'
+     | R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+REH PASS [S-longer-id-line] events.log byte-identical
+REH PASS [S-longer-id-line] A-2 exit 1, STOP, 1 FAIL line(s) incl. the serving-release check
+   [S-missing-result-line] rc=1 fail-lines=1 events.log 26b2b68ebb36f9e5 -> 26b2b68ebb36f9e5
+     | PASS exactly 2 worker processes
+     | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+     | FAIL release.mjs status does not prove 17822b29e6de-R6fixRehearsalBuild01x is serving: 0 result lines (need exactly 1); no line 'release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x'
+     | R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+REH PASS [S-missing-result-line] events.log byte-identical
+REH PASS [S-missing-result-line] A-2 exit 1, STOP, 1 FAIL line(s) incl. the serving-release check
+   [S-duplicate-result-line] rc=1 fail-lines=1 events.log 26b2b68ebb36f9e5 -> 26b2b68ebb36f9e5
+     | PASS exactly 2 worker processes
+     | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+     |      release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x
+     |      release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x
+     | FAIL release.mjs status does not prove 17822b29e6de-R6fixRehearsalBuild01x is serving: 2 result lines (need exactly 1)
+     | R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+REH PASS [S-duplicate-result-line] events.log byte-identical
+REH PASS [S-duplicate-result-line] A-2 exit 1, STOP, 1 FAIL line(s) incl. the serving-release check
+   [S-fail-and-pass-lines] rc=1 fail-lines=1 events.log 26b2b68ebb36f9e5 -> 26b2b68ebb36f9e5
+     | PASS exactly 2 worker processes
+     | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+     |      release: STATUS FAIL
+     |      release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x
+     | FAIL release.mjs status does not prove 17822b29e6de-R6fixRehearsalBuild01x is serving: 2 result lines (need exactly 1)
+     | R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+REH PASS [S-fail-and-pass-lines] events.log byte-identical
+REH PASS [S-fail-and-pass-lines] A-2 exit 1, STOP, 1 FAIL line(s) incl. the serving-release check
+   [S-restart-note] rc=1 fail-lines=1 events.log 26b2b68ebb36f9e5 -> 26b2b68ebb36f9e5
+     | PASS exactly 2 worker processes
+     | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+     |      release: note: the service restarted since the last attested PASS (InvocationID a -> b); x
+     |      release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x
+     | FAIL release.mjs status does not prove 17822b29e6de-R6fixRehearsalBuild01x is serving: the service restarted since the last attested PASS
+     | R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+REH PASS [S-restart-note] events.log byte-identical
+REH PASS [S-restart-note] A-2 exit 1, STOP, 1 FAIL line(s) incl. the serving-release check
+REH PASS real release.mjs restored
+-- 3. F-4 entry point (r6-rawhead-check.sh)
+     | == R6 F-4 raw-head entry 2026-11-24T22:25:00Z host=afldb-prod user=arm helper=cab4a43af09e4b1729d913162c0f27faccd19315c56eb4ad1141c8bf748d81c0
+     | == A1 rawhead check 2026-11-24T22:25:00Z
+     | {
+     | }
+     | RAWHEAD RESULT check PASS
+   [F4-valid] rc=0 connections=24 mktemp-calls=1 env-opens=0
+REH PASS [F4-valid] arm@afldb-prod: probe ran (24 connections), RAWHEAD RESULT check PASS, exit 0
+   [F4-valid, .env as a FIFO detector] rc=0 connections=24 mktemp-calls=1 env-opens=2
+REH PASS [F4-valid] the three detectors see a real run (.env opened, temp file created, requests made)
+     | STOP not arm@afldb-prod (host 'afldb-prod', user 'ops'): the raw-head probe was not started
+   [F4-wrong-user ops@afldb-prod] rc=2 connections=0 mktemp-calls=0 env-opens=0
+REH PASS [F4-wrong-user] exit 2; .env never opened, no temp file, no request
+     | STOP /tmp/st2/docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-rawhead.sh is 4f25b6a43c0eb97cfd6a60effe6706f74ee301c1c3db1c80b3e6a960d7edd6e6, not Sunday's pinned cab4a43af09e4b1729d913162c0f27faccd19315c56eb4ad1141c8bf748d81c0
+   [F4-changed-helper] rc=2 connections=0 mktemp-calls=0 env-opens=0
+REH PASS [F4-changed-helper] exit 2, probe not started
+REH PASS Sunday-shaped baseline unchanged by every F-4 run
+== in-container role=prod: 31 passed, 0 failed
+== R6 FIX in-container role=wronghost 2026-11-23T12:02:47Z hostname=afldb-dev image-os=Ubuntu 24.04.4 LTS
+   staged sha256: 0d9e97a5d5882203703ca36083a84284f30158c0475f6a1b1926359854bd6ad9 r6-pre-verify.sh; cc8854f0bbce305e1071e3eea30100e18d742ae15cddbd1f9a19b908ad100b50 r6-rawhead-check.sh; cab4a43af09e4b1729d913162c0f27faccd19315c56eb4ad1141c8bf748d81c0 a1-rawhead.sh
+made 17822b29e6de-R6fixRehearsalBuild01x: 3 files, manifest 69b425be1a79, supervisor 11190 B
+made 7d92042fd110-XWruOm_9nLCSMY8nGPqYU: 3 files, manifest 2b32e8d15aba, supervisor 11190 B
+   service: primary 133 cwd /home/arm/afldb-releases/releases/17822b29e6de-R6fixRehearsalBuild01x, workers 154 155 
+-- 3. F-4 entry point on the wrong host (afldb-dev) as arm
+     | STOP not arm@afldb-prod (host 'afldb-dev', user 'arm'): the raw-head probe was not started
+   [F4-wrong-host] rc=2 connections=0 mktemp-calls=0 env-opens=0
+REH PASS [F4-wrong-host] exit 2; .env never opened, no temp file, no request
+   [contrast: Sunday's bare helper on the same wrong host] rc=1 connections=1 mktemp-calls=1 env-opens=2
+REH PASS [contrast] the unguarded helper reads .env, creates its probe file and makes requests on the wrong host: the defect
+== in-container role=wronghost: 2 passed, 0 failed
+== containers: prod rc=0, wronghost rc=0; left behind: 0 container(s)
+R6 FIX REHEARSAL RESULT PASS
+   rc=0
+-- cleanup on streamanator (everything this rehearsal created)
+   removing /tmp/afldb-r6-20261125-r2.stnHv0
+   removing /tmp/afldb-r6-20261125-r2.tar
+   removing /tmp/afldb-r6-20261125-r2.YU12lc
+   left: 0
+   containers left: 0
+-- cleanup on the workstation
+   removing /tmp/afldb-r6-20261125-r2.IQqyXW
+   removing /tmp/afldb-r6-20261125-r2.tar
+   removing /tmp/afldb-r6fix-fixture.tar
+== done 2026-11-23T12:02:48Z
