@@ -3,9 +3,13 @@
     AFLDB_TEST_DATABASE_URL='postgresql://<superuser>@/<name>_test?host=/abs/socket/dir&port=<port>' \\
         python tests/python/aflw_staging_race.py <source root holding tools/aflw and tools/migration> base|fixed
 
-The target must be a migrated, privileged, disposable *_test database reached over a Unix socket directory
-(the guard in main() refuses TCP and non-*_test targets). `base` is the expectation for the reviewed c154f36b
-loader (it reproduces the erased 2027 season); `fixed` is the expectation for the replacement-lock loader.
+The target must be a migrated, privileged, disposable *_test database reached over a Unix socket directory.
+Target enforcement is on the live connections, not on the DSN text: the writer and every connection the child
+loader (tests/python/aflw_race_loader.py) opens are checked against the server-reported database and the
+Unix-socket transport before their first write, with explicit checks that also hold under `python -O`
+(tests/python/aflw_race_guard.py; refusals exit 3). The DSN check in main() is only an early diagnostic.
+`base` is the expectation for the reviewed c154f36b loader (it reproduces the erased 2027 season); `fixed` is
+the expectation for the replacement-lock loader.
 Needs psycopg (the project virtual environment). A writer role that can SET ROLE afldb_import is required."""
 
 import os
@@ -18,7 +22,10 @@ import time
 import psycopg
 from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
+from aflw_race_guard import EXPECTED_ENV, REFUSAL_EXIT, connect_writer
 from aflw_staging_contract import REAL_EXPECTED_SEASON_KEYS, dataset, ls, write
+
+LOADER = Path(__file__).resolve().with_name("aflw_race_loader.py")
 
 
 def fixture(keys):
@@ -59,31 +66,28 @@ def main():
     source, expectation = sys.argv[1:]
     dsn = os.environ["AFLDB_TEST_DATABASE_URL"]
     params = conninfo_to_dict(dsn)
-    # Disposable-target guard: a Unix-socket-only DSN (an absolute socket directory, never TCP/remote) naming a *_test database.
-    assert params.get("host", "").startswith("/") and params["dbname"].endswith("_test"), (
-        "refusing to run: AFLDB_TEST_DATABASE_URL must use a Unix socket directory (host=/abs/path) and a *_test database"
-    )
+    # Early diagnostic only (explicit, so it survives `python -O`). The enforcement is on the live writer and
+    # loader connections below; this only fails fast on an obviously wrong DSN.
+    expected_db = params.get("dbname", "")
+    if not (params.get("host", "").startswith("/") and expected_db.endswith("_test")):
+        print("REFUSED [dsn]: AFLDB_TEST_DATABASE_URL must use a Unix socket directory (host=/abs/path) "
+              "and a *_test database", file=sys.stderr)
+        raise SystemExit(REFUSAL_EXIT)
     old_keys = REAL_EXPECTED_SEASON_KEYS
     new_keys = [*old_keys, "2027"]
-    launcher = """
-import sys
-sys.path.insert(0, sys.argv.pop(1) + '/tools/aflw')
-import load_staging as ls
-if sys.argv.pop(1) == 'expanded':
-    ls.EXPECTED_SEASON_KEYS = [*ls.EXPECTED_SEASON_KEYS, '2027']
-raise SystemExit(ls.main())
-"""
     loader_dsn = make_conninfo(dsn, application_name="aflw_staging_race_loader", options="-c role=afldb_import")
-    env = dict(os.environ, AFLDB_IMPORT_DATABASE_URL=loader_dsn)
+    env = dict(os.environ, AFLDB_IMPORT_DATABASE_URL=loader_dsn, **{EXPECTED_ENV: expected_db})
+    # The child is a separate interpreter: carry -O across so the child guard is exercised under it too.
+    interpreter = [sys.executable, *(["-" + "O" * sys.flags.optimize] if sys.flags.optimize else [])]
 
-    with tempfile.TemporaryDirectory() as tmp, psycopg.connect(dsn) as writer:
+    with tempfile.TemporaryDirectory() as tmp, connect_writer(psycopg, dsn, expected_db) as writer:
         old = Path(tmp) / "old"
         complete = Path(tmp) / "complete"
         write(old, fixture(old_keys))
         write(complete, fixture(new_keys))
 
         def command(directory, inventory="stock"):
-            return [sys.executable, "-c", launcher, source, inventory, "--load", "--in", str(directory)]
+            return [*interpreter, str(LOADER), source, inventory, "--load", "--in", str(directory)]
 
         def run(directory, inventory="stock"):
             return subprocess.run(command(directory, inventory), env=env, capture_output=True, text=True, timeout=20)
