@@ -673,7 +673,7 @@ archive below. Its InvocationID column is now enforced by A-2 from the sitting r
 `58e35ce8`, `SHA256SUMS` `b4e9e584…`) and Sunday's `a1-rawhead.sh` (`cab4a43a…`) are unchanged and are not modified by this
 amendment. The r2 archive (`7af24a74`, manifest `53b8cb10…`) is superseded.
 
-**What changed (helper revision `dc88fe7f4128ce5d3b0997606382e70696ade24d`).**
+**What changed (helper revision `9a9a01c195602e430d0d514e5fbe550eb77d0a9f`).**
 
 1. **A-2 verifies the owner-attested service InvocationID.** `r6-pre-verify.sh` keeps the single plain `release.mjs status` call
    (no `--expect`), its merged output and its actual exit code, the exact `release: STATUS PASS <CURRENT_ID>` rule and the
@@ -740,7 +740,7 @@ the rehearsal's disposable containers and must never be written into the real re
 ### R6 archive r3: workstation (Git Bash), before 09:25
 
 ```bash
-CODE=dc88fe7f4128ce5d3b0997606382e70696ade24d
+CODE=9a9a01c195602e430d0d514e5fbe550eb77d0a9f
 B=docs/v2/evidence/backlog-20261121
 git -C /d/dev/afldb archive --format=tar --output=/tmp/afldb-r6-20261125-r3.tar "$CODE" \
   "$B/r6-20261125/r6-pre-verify.sh" \
@@ -780,7 +780,7 @@ C:/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes afldb 'set -C; cat > /tmp/a
 Paste the block into a shell on that host, or pipe it there with `tr -d '\r' < block | ssh.exe … bash -s`. Record the printed
 staging root. STOP unless the block prints 16 `: OK` lines and `R6 STAGE VERIFIED <path> (16 files)`. Manifest digest
 `2c7ee8e2e1758f1002a36c4b75239d4ff4dea6958e7b2410a1f0253a38978007`. Every pin is the SHA-256 of the Git blob at the tested
-revision (`git cat-file blob dc88fe7f4128ce5d3b0997606382e70696ade24d:<path> | sha256sum`). Three differ from r2: `r6-pre-verify.sh`
+revision (`git cat-file blob 9a9a01c195602e430d0d514e5fbe550eb77d0a9f:<path> | sha256sum`). Three differ from r2: `r6-pre-verify.sh`
 (`0d9e97a5…` → `48185fca…`), `r6-rawhead-check.sh` (`cc8854f0…` → `7c3d0fc2…`) and the new `r6-tuesday-handoff.sh`. The other
 thirteen are byte-identical to r2's, and Sunday's `a1-rawhead.sh` is still `cab4a43a…`.
 
@@ -840,7 +840,9 @@ bash "$STAGE/$B/r6-20261125/r6-tuesday-handoff.sh" "$TUESDAY_RECORD"
 
 It must print `R6 HANDOFF RESULT PASS` and three values. Copy them exactly into `TUESDAY` (`tue:…`), `CURRENT_ID` and `ATTESTED`
 (`inv:…`). Then on production, after the re-check of production's staging root in the same shell (`R4` with its `r4:` prefix;
-`WINDOW` 10:00 or 14:00):
+`WINDOW` 10:00 or 14:00). When a step is sent from Git Bash with `ssh.exe`, pass the whole remote command as **one** quoted
+string (as every line here does) or set `MSYS_NO_PATHCONV=1`: Git Bash rewrites a separate argument that starts with `/` (such
+as a `/tmp/…` staging path) into a Windows path before `ssh.exe` sees it.
 
 ```bash
 bash "$STAGE/$B/r6-20261125/r6-pre-verify.sh" accepted "$CURRENT_ID" r3:yes "$R4" "$WINDOW" "$TUESDAY" "$ATTESTED"
