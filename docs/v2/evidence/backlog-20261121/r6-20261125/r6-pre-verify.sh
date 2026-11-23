@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 # R6 (attended reboot, Wed 25 Nov 2026), runbook step (a): PRE-REBOOT verification. PRODUCTION (afldb-prod), as arm, ONE connection.
-# READ-ONLY by construction: no sudo, no write of any kind (no temp file, no redirection into a file), no restart, no apt; one
-# read-only database transaction through the backup role (ledger count and the afldb_restore_test catalog comment; no row data).
+# READ-ONLY by construction: no sudo, no restart, no apt, and this script itself creates, changes or removes no file (no temp file,
+# no redirection into a file; events.log is never written: `release.mjs status` runs WITHOUT --expect). One read-only database
+# transaction through the backup role (ledger count and the afldb_restore_test catalog comment; no row data). What the services it
+# queries may record is theirs, not A-2's: `release.mjs status` makes loopback GETs (/api/health, which asks the database, and the
+# current and previous _buildManifest.js), so the application may write its ordinary request/health log lines to the afldb
+# journal; PostgreSQL may log the read-only session if connection logging is on; sshd/PAM record the login itself.
 # Every check prints PASS / FAIL / INFO / NOTE; any FAIL = R6 PRE RESULT STOP = do not reboot (runbook section 7, GO/NO-GO).
 # Command inventory (closure allowlist): hostname id date cat uname uptime dpkg-query stat ls sed grep awk sort cut head tail tr wc basename
 #   sha256sum cmp findmnt sysctl apt-config systemctl(show|is-active|is-enabled|list-timers|list-unit-files) pgrep readlink git(rev-parse)
@@ -9,9 +13,16 @@
 #   node deploy/release.mjs status (never --expect: that form writes events.log) | sh deploy/afldb-settle-failure-status.sh | bash tools/maintenance/scheduled-backup.sh status
 #   psql (read-only shape of a2-p0-entry.sh) df free printf echo test; redirections only 2>&1, 2>/dev/null, here-strings, here-docs.
 # Run (workstation Git Bash; never at minute :16-:18, when streamanator's r2 check connects):
-#   tr -d '\r' < r6-pre-verify.sh | C:/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes afldb bash -s -- \
-#      <accepted|stopped|rolledback> <CURRENT_ID> <r3:yes|no> <r4:yes|no> [10:00|14:00]
-#   arguments come from the Tue 24 Nov sitting record (runbook section 2, fill-in table); 14:00 = the fallback window.
+#   bash "$STAGE/$B/r6-20261125/r6-pre-verify.sh" accepted <CURRENT_ID> r3:yes <r4:yes|no> <10:00|14:00> \
+#      <tue:released|tue:rolledback|tue:deferred> <inv:ATTESTED_INVOCATION_ID>
+#   All seven arguments are required (R6 r3 amendment). OUTCOME is always `accepted` for Tuesday's outcomes. CURRENT_ID, tue: and
+#   inv: come from the Tuesday sitting record through r6-tuesday-handoff.sh, never from the live service or events.log:
+#     tue:released    CURRENT_ID 17822b29e6de-<BUILD_ID from P3b>, inv: the owner-attested Tuesday restart (not Sunday's);
+#     tue:rolledback  CURRENT_ID 7d92042fd110-XWruOm_9nLCSMY8nGPqYU, inv: the owner-attested rollback restart (not Sunday's);
+#     tue:deferred    CURRENT_ID 7d92042fd110-XWruOm_9nLCSMY8nGPqYU, inv: Sunday's attested 342040625f6d4012a35d598dfbf9afe6.
+#   Any other combination, a missing or extra argument, or a malformed ID is a usage STOP (exit 2). 14:00 = the fallback window.
+#   The live `systemctl show afldb -p InvocationID` must equal inv: exactly; a failed read, an empty or malformed value or a
+#   mismatch is a FAIL line, so R6 PRE RESULT STOP (exit 1). It is a separate read: the status gate below is unchanged by it.
 # Prints, for later steps: BOOT_ID, INVOCATION_ID, GRUB-BASELINE <sha256>, OFFHOST-COMPARE <dump> <sha256>, RESTORE-SHA <sha256>.
 # Dry run (streamanator only): R6_DRYRUN=1 skips the host check (refused on afldb-prod); production-only facts then FAIL, which is the
 # expected dry-run outcome (it proves the script runs to its end and writes nothing).
@@ -58,18 +69,38 @@ match_restore() { # backup-dir YYYYMMDD start exit journal state-epoch state-fil
 # exactly one result line ("release: STATUS PASS|FAIL ..."), and it is exactly "release: STATUS PASS <CURRENT_ID>"; and no
 # "restarted since the last attested PASS" note (a restart after Tuesday's attested acceptance that nobody attested). Prints the
 # output indented; sets SR_WHY to the reasons; returns 0 only when every condition holds. Run with cwd = the checkout.
+# R6 r3 (Astra, 24 Nov 2026): a carriage return anywhere in the output STOPs, and every line that contains "STATUS PASS" or
+# "STATUS FAIL" anywhere counts as a result line: "release: STATUS FAIL\r" followed by "release: STATUS PASS <id>" was one
+# result line under the earlier "( |$)" pattern, so a CRLF FAIL beside an LF PASS passed.
 serving_release() { # node current-id
   local out rc n
   SR_WHY=
   out=$("$1" deploy/release.mjs status 2>&1); rc=$?
   printf '%s\n' "$out" | sed 's/^/     /'
   [ "$rc" = 0 ] || SR_WHY="$SR_WHY; exit $rc"
-  n=$(grep -cE '^release: STATUS (PASS|FAIL)( |$)' <<< "$out")
+  [[ $out != *$'\r'* ]] || SR_WHY="$SR_WHY; the output contains a carriage return"
+  n=$(grep -cE 'STATUS (PASS|FAIL)' <<< "$out")
   [ "$n" = 1 ] || SR_WHY="$SR_WHY; $n result lines (need exactly 1)"
   grep -Fxq "release: STATUS PASS $2" <<< "$out" || SR_WHY="$SR_WHY; no line 'release: STATUS PASS $2'"
   ! grep -Fq 'restarted since the last attested PASS' <<< "$out" || SR_WHY="$SR_WHY; the service restarted since the last attested PASS"
   SR_WHY=${SR_WHY#; }
   [ -z "$SR_WHY" ]
+}
+
+# R6 r3 (Astra, 24 Nov 2026): plain `status` cannot see a restart after the attested PASS when events.log is unreadable or
+# malformed, or when a later unconfirmed status-pass names the new InvocationID; it then reports PASS. So A-2 also compares the
+# live InvocationID (one read-only `systemctl show`) with the owner-attested ID passed in from the sitting record. Sets AI_WHY;
+# returns 0 only when the read succeeds and yields exactly one 32-hex ID equal to the attested one.
+attested_invocation() { # attested-id
+  local live rc
+  AI_WHY=
+  live=$(systemctl show afldb -p InvocationID --value 2>&1); rc=$?
+  if [ "$rc" != 0 ]; then AI_WHY="systemctl show afldb failed (exit $rc)"
+  elif [ -z "$live" ]; then AI_WHY="the live InvocationID is empty"
+  elif ! [[ $live =~ ^[0-9a-f]{32}$ ]]; then AI_WHY="the live InvocationID '$(printf '%s' "$live" | tr -c '[:alnum:]' '?' | cut -c1-80)' is malformed"
+  elif [ "$live" != "$1" ]; then AI_WHY="live InvocationID $live != owner-attested $1 (a restart nobody attested, or the wrong record)"
+  fi
+  [ -z "$AI_WHY" ]
 }
 
 restore_journal() {
@@ -95,11 +126,16 @@ ts() {
 
 main() {
 set -uo pipefail; export LC_ALL=C
-OUTC=${1:-}; CUR=${2:-}; R3=${3:-}; R4=${4:-}; WIN=${5:-10:00}
-[[ $OUTC =~ ^(accepted|stopped|rolledback)$ ]] && [[ $R3 =~ ^r3:(yes|no)$ ]] && [[ $R4 =~ ^r4:(yes|no)$ ]] && [[ $WIN =~ ^(10:00|14:00)$ ]] \
-  || { echo "STOP usage: <accepted|stopped|rolledback> <CURRENT_ID> <r3:yes|no> <r4:yes|no> [10:00|14:00]"; exit 2; }
-case $OUTC in accepted) [[ $CUR =~ ^(7d92042fd110|17822b29e6de)-[A-Za-z0-9_-]{1,64}$ ]];; *) [ "$CUR" = c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC ];; esac \
-  || { echo "STOP CURRENT_ID does not fit outcome $OUTC"; exit 2; }
+OUTC=${1:-}; CUR=${2:-}; R3=${3:-}; R4=${4:-}; WIN=${5:-}; TUE=${6:-}; INVA=${7:-}
+[ "$#" = 7 ] && [ "$OUTC" = accepted ] && [[ $R3 =~ ^r3:(yes|no)$ ]] && [[ $R4 =~ ^r4:(yes|no)$ ]] && [[ $WIN =~ ^(10:00|14:00)$ ]] \
+  && [[ $TUE =~ ^tue:(released|rolledback|deferred)$ ]] && [[ $INVA =~ ^inv:[0-9a-f]{32}$ ]] \
+  || { echo "STOP usage: accepted <CURRENT_ID> <r3:yes|no> <r4:yes|no> <10:00|14:00> <tue:released|tue:rolledback|tue:deferred> <inv:32-hex>"; exit 2; }
+ATT=${INVA#inv:}; OLD_ID=7d92042fd110-XWruOm_9nLCSMY8nGPqYU; SUNDAY_INV=342040625f6d4012a35d598dfbf9afe6
+case $TUE in
+  tue:released)   [[ $CUR =~ ^17822b29e6de-[A-Za-z0-9_-]{1,64}$ ]] && [ "$ATT" != "$SUNDAY_INV" ];;
+  tue:rolledback) [ "$CUR" = "$OLD_ID" ] && [ "$ATT" != "$SUNDAY_INV" ];;
+  tue:deferred)   [ "$CUR" = "$OLD_ID" ] && [ "$ATT" = "$SUNDAY_INV" ];;
+esac || { echo "STOP CURRENT_ID $CUR and attested InvocationID $ATT do not fit Tuesday outcome ${TUE#tue:} (see the usage header)"; exit 2; }
 F=0
 ok()   { echo "PASS $*"; }
 bad()  { echo "FAIL $*"; F=$((F+1)); }
@@ -114,7 +150,7 @@ nxt()  { systemctl list-timers --all -o json --no-pager 2>/dev/null | tr '{' '\n
 N=/home/arm/.nvm/versions/node/v22.23.2/bin/node; CHK=/home/arm/projects/afldb; ROOT=/home/arm/afldb-releases
 BK=/home/arm/backups/afldb-scheduled
 DAY=$(TZ=Australia/Melbourne date +%F); TODAYC=$(TZ=Australia/Melbourne date +%Y%m%d)
-echo "== R6 PRE $(date -u +%FT%TZ) local $(mel "$(date +%s)") host=$(hostname) user=$(id -un) outcome=$OUTC current=$CUR $R3 $R4 window=$DAY $WIN"
+echo "== R6 PRE $(date -u +%FT%TZ) local $(mel "$(date +%s)") host=$(hostname) user=$(id -un) outcome=$OUTC current=$CUR $R3 $R4 window=$DAY $WIN $TUE attested=$ATT"
 if [ "${R6_DRYRUN:-0}" = 1 ]; then [ "$(hostname)" != afldb-prod ] || { echo "STOP R6_DRYRUN is refused on afldb-prod"; exit 2; }; info "DRY RUN (not production)"
 else [ "$(hostname)" = afldb-prod ] && [ "$(id -un)" = arm ] || { echo "STOP not arm@afldb-prod"; exit 2; }; fi
 [ "$DAY" = 2026-11-25 ] && ok "today is Wednesday ($DAY)" || bad "today is not the scheduled Wednesday (2026-11-25); re-plan"
@@ -167,6 +203,8 @@ done
 echo "-- 4. services and the release (outcome $OUTC)"
 for u in postgresql@16-main afldb caddy; do [ "$(systemctl is-active "$u")" = active ] && ok "$u active" || bad "$u $(systemctl is-active "$u")"; done
 echo "INVOCATION_ID $(systemctl show afldb -p InvocationID --value)"
+if attested_invocation "$ATT"; then ok "live InvocationID = the owner-attested $ATT (Tuesday ${TUE#tue:}; from the sitting record)"
+else bad "InvocationID: $AI_WHY"; fi
 systemctl show afldb -p NRestarts -p MainPID -p ActiveEnterTimestamp --no-pager | sed 's/^/     /'
 MAIN=$(systemctl show afldb -p MainPID --value); NW=0; [[ $MAIN =~ ^[1-9][0-9]*$ ]] && NW=$(pgrep -P "$MAIN" | wc -l)
 [ "$NW" = 2 ] && ok "exactly 2 worker processes" || bad "worker processes $NW (expected 2)"
