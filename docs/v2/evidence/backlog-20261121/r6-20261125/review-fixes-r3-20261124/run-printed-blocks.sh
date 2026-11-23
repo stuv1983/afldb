@@ -28,24 +28,35 @@ step() { # label expected(0|nonzero) actual-rc
   STEPS=$((STEPS+1))
   if { [ "$2" = 0 ] && [ "$3" = 0 ]; } || { [ "$2" = nonzero ] && [ "$3" != 0 ]; }; then echo "   STEP OK $1 (expected exit $2, got $3)"
   else echo "   STEP UNEXPECTED $1 (expected exit $2, got $3)"; BAD=$((BAD+1)); fi; }
-cleanup() {
+cleanup() { # returns nonzero if anything this run created is still there afterwards (then the run is a FAIL)
+  local left=0
   echo "-- cleanup (only what run $RID created)"
   if [ -n "$RUN" ] || [ "$MADE_RTAR" = 1 ]; then
-    "${SSH[@]}" bash -s -- "${RUN:-none}" "$RID" "$MADE_RTAR" "${TARSUM:-none}" "$TAR" <<'REMOTE'
-set -u; R=$1; RID=$2; MADE=$3; SUM=$4; TAR=$5
-if [ "$R" != none ] && [[ $R == /tmp/r6reh."$RID".* ]] && [[ ${R#/tmp/r6reh."$RID".} =~ ^[A-Za-z0-9]+$ ]] && [ -d "$R" ] && [ ! -L "$R" ] && [ -O "$R" ]; then
-  rm -rf -- "$R" && echo "   removed $R (this run's private directory)"
+    # MSYS_NO_PATHCONV: Git Bash rewrites a separate argument that starts with / (here /tmp/...) into a Windows path before
+    # ssh.exe sees it; the first rehearsal of this driver lost its cleanup that way (README §5).
+    MSYS_NO_PATHCONV=1 "${SSH[@]}" bash -s -- "${RUN:-none}" "$RID" "$MADE_RTAR" "${TARSUM:-none}" "$TAR" <<'REMOTE' || left=$((left+1))
+set -u; R=$1; RID=$2; MADE=$3; SUM=$4; TAR=$5; bad=0
+if [ "$R" != none ]; then
+  if [[ $R == /tmp/r6reh."$RID".* ]] && [[ ${R#/tmp/r6reh."$RID".} =~ ^[A-Za-z0-9]+$ ]] && [ -d "$R" ] && [ ! -L "$R" ] && [ -O "$R" ]; then
+    rm -rf -- "$R" && echo "   removed $R (this run's private directory)"
+  fi
+  [ ! -e "$R" ] || { echo "   LEFT $R on streamanator"; bad=1; }
 fi
-if [ "$MADE" = 1 ] && [ "$(sha256sum < "$TAR" 2>/dev/null | cut -c1-64)" = "$SUM" ]; then rm -f -- "$TAR" && echo "   removed $TAR on streamanator (absent before this run; bytes unchanged)"
-elif [ -e "$TAR" ]; then echo "   LEFT $TAR on streamanator: not provably this run's bytes"; fi
+if [ "$MADE" = 1 ] && [ "$(sha256sum < "$TAR" 2>/dev/null | cut -c1-64)" = "$SUM" ]; then rm -f -- "$TAR" && echo "   removed $TAR on streamanator (absent before this run; bytes unchanged)"; fi
+if [ "$MADE" = 1 ] && [ -e "$TAR" ]; then echo "   LEFT $TAR on streamanator: not provably this run's bytes"; bad=1; fi
 ids=$(docker ps -aq --filter "label=r6reh.run=$RID"); [ -z "$ids" ] || docker rm -f $ids >/dev/null
-echo "   containers labelled r6reh.run=$RID left: $(docker ps -aq --filter "label=r6reh.run=$RID" | wc -l)"
+n=$(docker ps -aq --filter "label=r6reh.run=$RID" | wc -l); echo "   containers labelled r6reh.run=$RID left: $n"; [ "$n" = 0 ] || bad=1
+exit $bad
 REMOTE
   fi
   if [ -n "$STAGE_WS" ] && [[ $STAGE_WS =~ ^/tmp/afldb-r6-20261125-r3\.[A-Za-z0-9]{6}$ ]] && [ -d "$STAGE_WS" ]; then rm -rf -- "$STAGE_WS" && echo "   removed $STAGE_WS (workstation staging root printed by block 4 in this run)"; fi
+  [ -z "$STAGE_WS" ] || [ ! -e "$STAGE_WS" ] || { echo "   LEFT $STAGE_WS"; left=$((left+1)); }
   if [ "$MADE_TAR" = 1 ] && [ "$(sha256sum < "$TAR" 2>/dev/null | cut -c1-64)" = "$TARSUM" ]; then rm -f -- "$TAR" && echo "   removed $TAR (workstation; this run wrote it)"; fi
+  [ "$MADE_TAR" != 1 ] || [ ! -e "$TAR" ] || { echo "   LEFT $TAR on the workstation"; left=$((left+1)); }
   [ -n "$WS" ] && [ -d "$WS" ] && rm -rf -- "$WS" && echo "   removed $WS"
+  [ -z "$WS" ] || [ ! -e "$WS" ] || { echo "   LEFT $WS"; left=$((left+1)); }
   RUN=; STAGE_WS=; WS=; MADE_TAR=0; MADE_RTAR=0
+  [ "$left" = 0 ]
 }
 trap 'cleanup; exit 1' INT TERM
 mkdir -p "$OUT" || exit 2
@@ -99,6 +110,6 @@ step "container rehearsal (every case as expected)" 0 $rc
 echo "   case results: $(grep -c 'CASE-RESULT .* OK' "$OUT/containers.out") OK, $(grep -c 'CASE-RESULT .* UNEXPECTED' "$OUT/containers.out") UNEXPECTED"
 grep 'CASE-RESULT .* UNEXPECTED' "$OUT/containers.out" | sed 's/^ */   /'
 
-cleanup
+cleanup; step "cleanup removed everything this run created, and only that" 0 $?
 echo "== done $(date -u +%FT%TZ): $STEPS steps, $BAD unexpected"
 [ "$BAD" = 0 ] && echo "R6 r3 REHEARSAL RESULT PASS" || { echo "R6 r3 REHEARSAL RESULT FAIL ($BAD unexpected)"; exit 1; }
