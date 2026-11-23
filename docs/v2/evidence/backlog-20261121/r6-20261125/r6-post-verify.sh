@@ -78,7 +78,7 @@ grub)
   ;;
 full)
   K=${2:-}; CUR=${3:-}; PB=${4:-}; PI=${5:-}; RS=${6:-}; R4=${7:-}; GB=${8:-}
-  [[ $K =~ ^6\.8\.0-(149|137)-generic$ ]] && [[ $CUR =~ ^(7d92042fd110-[A-Za-z0-9_-]{1,64}|c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC)$ ]] \
+  [[ $K =~ ^6\.8\.0-(149|137)-generic$ ]] && [[ $CUR =~ ^((7d92042fd110|17822b29e6de)-[A-Za-z0-9_-]{1,64}|c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC)$ ]] \
     && [[ $PB =~ ^[0-9a-f-]{36}$ ]] && [[ $PI =~ ^[0-9a-f]{32}$ ]] && [[ $RS =~ ^([0-9a-f]{64}|none)$ ]] && [[ $R4 =~ ^r4:(yes|no)$ ]] && [[ $GB =~ ^[0-9a-f]{64}$ ]] \
     || { echo "STOP usage: full <KERNEL> <CURRENT_ID> <PRE_BOOT_ID> <PRE_INVOCATION_ID> <RESTORE_SHA|none> <r4:yes|no> <GRUB_BASELINE>"; exit 2; }
   N=/home/arm/.nvm/versions/node/v22.23.2/bin/node; CHK=/home/arm/projects/afldb; ROOT=/home/arm/afldb-releases; BK=/home/arm/backups/afldb-scheduled; NOW=$(date +%s)

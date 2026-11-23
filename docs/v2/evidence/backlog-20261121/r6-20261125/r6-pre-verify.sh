@@ -78,7 +78,7 @@ set -uo pipefail; export LC_ALL=C
 OUTC=${1:-}; CUR=${2:-}; R3=${3:-}; R4=${4:-}; WIN=${5:-10:00}
 [[ $OUTC =~ ^(accepted|stopped|rolledback)$ ]] && [[ $R3 =~ ^r3:(yes|no)$ ]] && [[ $R4 =~ ^r4:(yes|no)$ ]] && [[ $WIN =~ ^(10:00|14:00)$ ]] \
   || { echo "STOP usage: <accepted|stopped|rolledback> <CURRENT_ID> <r3:yes|no> <r4:yes|no> [10:00|14:00]"; exit 2; }
-case $OUTC in accepted) [[ $CUR =~ ^7d92042fd110-[A-Za-z0-9_-]{1,64}$ ]];; *) [ "$CUR" = c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC ];; esac \
+case $OUTC in accepted) [[ $CUR =~ ^(7d92042fd110|17822b29e6de)-[A-Za-z0-9_-]{1,64}$ ]];; *) [ "$CUR" = c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC ];; esac \
   || { echo "STOP CURRENT_ID does not fit outcome $OUTC"; exit 2; }
 F=0
 ok()   { echo "PASS $*"; }
