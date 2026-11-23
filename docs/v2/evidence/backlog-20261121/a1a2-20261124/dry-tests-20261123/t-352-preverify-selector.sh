@@ -36,6 +36,21 @@ journalctl() { cat "$JOURNAL"; }
 expect 0 collect-only-verification-unit-proof restore_journal 1795538190 1795538211 "$(command -v node)"
 has "$J"
 unset -f journalctl
+systemctl() {
+  [ "$TZ" = UTC ] || return 1
+  case $4 in
+    LastTriggerUSec) echo 'Tue 2026-11-24 16:36:30 UTC';;
+    ExecMainStartTimestamp) echo '@1795538190';;
+    *) echo 'n/a';;
+  esac
+}
+expect 0 systemd-formatted-timer-dispatch ts fixture.timer LastTriggerUSec
+has 1795538190
+expect 0 systemd-unix-service-start ts fixture.service ExecMainStartTimestamp
+has 1795538190
+expect 0 missing-systemd-timestamp-is-zero ts fixture.service ExecMainExitTimestamp
+has 0
+unset -f systemctl
 restore() { match_restore "$W/bk" "$DAY" 1795538190 1795538211 "$@"; }
 expect 0 scheduled-restore-dump-and-state-match restore "$J" 1795538209 "$VER" "$HS" 1
 expect 1 later-manual-restore-overwrote-state restore "$J" 1795550400 "$MANUAL" "$MH" 1

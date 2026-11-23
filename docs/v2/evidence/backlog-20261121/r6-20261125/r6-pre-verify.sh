@@ -65,6 +65,14 @@ restore_journal() {
       });'
 }
 
+ts() {
+  local value
+  value=$(TZ=UTC systemctl show --timestamp=unix -p "$2" --value "$1" 2>/dev/null)
+  # LastTriggerUSec ignores --timestamp on the host's systemd. Render it in
+  # UTC to keep GNU date independent of the host's AEDT/AEST abbreviation.
+  date -u -d "${value:-invalid}" +%s 2>/dev/null || echo 0
+}
+
 main() {
 set -uo pipefail; export LC_ALL=C
 OUTC=${1:-}; CUR=${2:-}; R3=${3:-}; R4=${4:-}; WIN=${5:-10:00}
@@ -78,7 +86,6 @@ bad()  { echo "FAIL $*"; F=$((F+1)); }
 info() { echo "INFO $*"; }
 mel()  { TZ=Australia/Melbourne date -d "@$1" '+%a %F %H:%M:%S %Z'; }
 ep()   { TZ=Australia/Melbourne date -d "$1" +%s; }
-ts()   { local v; v=$(systemctl show --timestamp=unix -p "$2" --value "$1" 2>/dev/null); v=${v#@}; [[ $v =~ ^[0-9]+$ ]] && echo "$v" || echo 0; }
 # Timer next elapse in epoch seconds (0 = none). `--timestamp=unix` does not apply to NextElapseUSecRealtime (dry run, run e),
 # so it is read from `systemctl list-timers --all -o json` ("next" in microseconds; null for an inactive timer).
 nxt()  { systemctl list-timers --all -o json --no-pager 2>/dev/null | tr '{' '\n' \
