@@ -17,7 +17,7 @@ commit.
 
 ### Qualification of Astra's candidate `91c04159` (23 November 2026; local on `codex/astra-fix-20261123`, not pushed, installed or deployed)
 
-- **Test-only.** The AFLW concurrent-replacement regression `tests/python/aflw_staging_race.py` now accepts any Unix-socket `*_test` target; its guard was hard-coded to a directory named `/tmp/afldb-astra-*`, so no one else could run it (ISSUE-368). It documents its invocation.
+- **Test-only.** The AFLW concurrent-replacement regression `tests/python/aflw_staging_race.py` now accepts any Unix-socket `*_test` target (its guard was hard-coded to `/tmp/afldb-astra-*`) and enforces that restriction on the live writer and child-loader connections (database and Unix-socket transport checked before first use, explicit, exit 3, also under `python -O`) instead of an assertable DSN check; new `aflw_race_guard.py`, `aflw_race_loader.py` and a refusal proof `aflw_race_guard_refusals.py`. No application code changed (ISSUE-368).
 - **ISSUE-333 typecheck finding: no repository defect.** `docs/v2/evidence/issue333-o2-20261104/scripts/coach-row-selector.mts` is tracked, hash-pinned and unchanged since `2131428a`; `tsc --noEmit` passes from fresh Windows and Linux exports of `91c04159`. The reported TS2307 reproduces exactly when that tracked file is absent from the workspace. ISSUE-333 stays resolved.
 - Record: `issues/reviews/AFLDB-ASTRA-FIX-2026-11-23.md`.
 
