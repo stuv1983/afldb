@@ -67,3 +67,70 @@ Application and release evidence, selector and build, Wednesday helpers, and the
 ## Not done
 
 Nothing was pushed, deployed or installed. Deployment and Wednesday's reboot remain owner decisions. The disposable cluster is stopped; its workspace is `/mnt/ssd/afldb-pushfix-20261123` on the DEV host.
+
+---
+
+# Addendum: the unsuffixed database is no longer seeded (Astra's remaining push blocker)
+
+Astra's remaining blocker on top of `d9cedc7a2cdc17022354744979e7db1f181a7df5`: `tests/python/aflw_race_guard_refusals.py` seeded the unsuffixed database directly (an owner-role connection and `ls.load`, former lines 118 to 121), a deliberate unguarded write to a database the guard exists to protect. Local, not published.
+
+**Tested SHA: `635d4df2c073dee8e2fc3787f1c8ed736cedc378`** (tree `c91c89818d45dc67e6716b35da82056239d0ec66`), a child of `d9cedc7a` on branch `claude/astra-push-blocker2-20261123` (worktree `D:\dev\afldb-pushfix2-20261123`; the earlier `claude/astra-push-blocker-20261123` worktree is untouched). The records commit that carries this addendum is a documentation-only successor; the final SHA is reported in the hand-back.
+
+**Changed path: `tests/python/aflw_race_guard_refusals.py` only** (`git diff --stat d9cedc7a 635d4df2`: 1 file, 61 insertions, 31 deletions). `git diff d9cedc7a 635d4df2` is empty for `src/`, `tools/`, `tests/python/aflw_race_guard.py`, `tests/python/aflw_race_loader.py`, `tests/python/aflw_staging_race.py` and `tests/python/aflw_staging_contract.py`: the writer guard, the child guard and the application loader are unchanged.
+
+## The change
+
+- The direct seed of the unsuffixed database is removed, together with its `ls` import. The unsuffixed database starts empty and must stay empty.
+- Before any fixture setup the driver takes a snapshot of all three databases from independent observer connections. Those connections are read-only on the server (`options=-c default_transaction_read_only=on`), and the driver confirms each with `SHOW transaction_read_only` before reading, refusing to observe otherwise. The snapshot covers every row of the eight `staging_aflw` tables and the six `aflw` public views (`seasons`, `fixtures`, `matches`, `ladders`, `player_match_stats`, `player_seasons`), as per-object row counts and digests, plus the 2027 staging season count. The previous observer covered the staging tables only.
+- Only the two `_test` databases are seeded, through the guarded loader. After each seed the driver checks that only the seeded database changed. After setup, and after every refusal group, every database is compared against its snapshot, and the unsuffixed database must still equal its initial empty snapshot. The final control asserts that 2027 appears only in the intended database and the unsuffixed database still equals its initial snapshot.
+- Setup fails closed: any non-empty database at the start (staging tables or views) stops the run.
+
+## Inspection of every path in the driver that can reach the unsuffixed database
+
+| Path | Status |
+|---|---|
+| Former seed (owner role + `ls.load`) | **Removed.** |
+| Former emptiness probe (plain connection) | Replaced by the read-only observer. |
+| `observe()` | Read-only, server-enforced and checked with `SHOW`. |
+| Loader refusal probe with the unsuffixed database as target (normal and `-O`) | Child process under the connection guard; refused at `connect`, before its first statement (exit 3). By design this is a writing path that is reachable only if the guard fails; Run C shows what the driver then reports. |
+| Writer refusal probe (`writer-direct`) with the unsuffixed database | `connect_writer` runs the guard's first statement, a `SELECT`, then exits 3; there is no write statement on this path. |
+| Race `main()` probes | Redirected to `ok_test`, `other_test` or TCP `ok_test`; the unsuffixed database is never their target. |
+| Controls | Target `ok_test` only. |
+| Retry or cleanup | None: every `subprocess.run` is a single attempt; no `DROP`, `TRUNCATE`, teardown or reconnect loop; the `TemporaryDirectory` removes local files only. Fresh clones are created outside the driver (`CREATE DATABASE ... TEMPLATE`). |
+
+## Environment and certification
+
+DEV host `streamanator`, the disposable workspace `/mnt/ssd/afldb-pushfix-20261123` of the earlier qualification. Certified before use: its own postmaster (from `postmaster.pid`, user `arm`, `-D /mnt/ssd/afldb-pushfix-20261123/pg/data`), PostgreSQL 16.15, port 61561 on `127.0.0.1` plus the private socket directory `/mnt/ssd/afldb-pushfix-20261123/sock`, `pg_hba.conf` trust for local and loopback only, no listener on the port before start, databases only `afldb_v2_pushfix_*` and `postgres`, the template migrated (8 `staging_aflw` base tables, 12 `aflw` views, 0 staging seasons, roles `afldb_*`). The other PostgreSQL clusters on the host were not touched. Python 3.12.3 and psycopg 3.3.4 from the project virtual environment. The tested commit was exported with `git archive` into `.../fix2`; the SHA-256 of the seven relevant files (the five under `tests/python/`, `tools/aflw/load_staging.py`, `tools/migration/common.py`) matched the local worktree.
+
+Commands (cluster in loopback mode, `bash cluster-mode.sh tcp`; each run clones fresh databases from the template and runs a read-only polling observer beside the driver):
+
+```
+bash run-refusals2.sh normal   .../fix2     ""   # python    tests/python/aflw_race_guard_refusals.py
+bash run-refusals2.sh optimize .../fix2     "-O" # python -O tests/python/aflw_race_guard_refusals.py
+bash run-refusals2.sh mutant   .../fix2mut  ""   # detection control, below
+```
+
+Condensed logs: [`AFLDB-ASTRA-PUSH-BLOCKER-2026-11-23-REFUSAL-RUNS.txt`](AFLDB-ASTRA-PUSH-BLOCKER-2026-11-23-REFUSAL-RUNS.txt). Per-object detail files stay on the host (`ev-normal`, `ev-optimize`, `ev-mutant` under the workspace).
+
+## Results
+
+| Run | Driver exit | Checks | Refusal exit codes | Controls |
+|---|---|---|---|---|
+| A: normal Python | **0** | All 41 hold | 22 of 22 refusals exit 3 (11 under the `python` child interpreter, 11 under `python -O`), each with the guard's own `REFUSED [loader\|writer\|dsn]` message | `python` and `python -O` controls exit 0 |
+| B: `python -O` (the driver itself under `-O`) | **0** | All 41 hold | 22 of 22 exit 3 | both exit 0 |
+
+The 41 checks: initial emptiness is a precondition (not counted), two seeds, two "only the seeded database changed" checks, setup leaving the unsuffixed database identical to its empty snapshot, both seeded databases at eleven seasons with no 2027 rows, 22 refusals, 10 unchanged-comparisons (every database including the unsuffixed one against its snapshot), two controls and the final target check.
+
+**Independent observer (separate from the driver, plain `psql`, read-only sessions, 408 and 426 polls).** Every poll computed a digest over all eight staging tables and six public views per database. In both runs the unsuffixed database showed one state for the whole run: 0 rows, digest `58d98ef1bd95` (136 and 142 polls), equal to its initial snapshot. `other_test` moved once, empty to the eleven-season seed (231 rows, `bf3c7860cb7d`). `ok_test` moved twice, empty to the seed, then at the intended control to 252 rows (`939e524bc06d`). The final snapshots matched the polled states; all observer sessions reported `transaction_read_only=on`. Setup therefore leaves the unsuffixed database untouched, every refusal exits 3, and the valid controls and seeds succeed only on their intended target.
+
+**Detection control (Run C).** The same committed driver, run against a scratch copy of the tested tree in which only `aflw_race_loader.py` differs (its `install_connection_guard(...)` line deleted, so the child loader is unguarded), exits **1** with 21 of 41 checks failed: ten loader refusals exit 0 instead of 3, all ten unchanged-comparisons fail (including the explicit "unsuffixed database still equal to its initial snapshot" clause) and the final target check fails. The independent observer saw the unsuffixed database go from 0 rows to 252 rows (digest `939e524bc06d`, the same as the expanded `ok_test`) at +2.3 s. The writer refusals, which the mutant leaves guarded, still exit 3. So an accidental load into the now-empty unsuffixed database is detected both by the driver and by an independent observer. This supplements Astra's existing unsafe-launcher evidence (the pre-fix launcher written to the unsuffixed database over TCP, recorded above), which is unchanged and still applies; the mutant is a scratch construct on the host and is not committed.
+
+**Observer artefact found and fixed (not a driver defect).** The first Run A attempt had a polling observer that read all fourteen objects in a single statement. It deadlocked once against the loader's exclusive locks during the intended `ok_test` control (`deadlock detected`, loader the victim, driver exit 1, 1 of 41 failed). The driver itself reads sequentially between loader runs and cannot overlap one. The polling observer was given `lock_timeout=150ms` so a contended poll is skipped and the observer never waits while holding a lock; A, B and C were then run from fresh clones (A and B skipped 0 polls, C skipped 3). The first attempt is kept in the logs file as Run 0 for transparency and is not counted.
+
+## Reused, not repeated
+
+The valid two-session race, the loader's behaviour and Astra's independently observed race evidence apply unchanged: `aflw_staging_race.py`, `aflw_race_guard.py`, `aflw_race_loader.py`, `aflw_staging_contract.py`, `tools/aflw/load_staging.py` and `tools/migration/common.py` are byte-identical between `bd50bde8` (the SHA tested earlier in this record) and `635d4df2` (`git diff --quiet bd50bde8 635d4df2 -- tools src tests/python/...` exits 0). The valid race and the staging contract were therefore not re-run. `git diff --check` is clean.
+
+## Not done
+
+Nothing was pushed, deployed or installed, and no other cluster or application database was touched. The application keeps its READY FOR ATTENDED APPLICATION RELEASE verdict. Push, deployment and Wednesday's reboot remain separate owner decisions. The disposable cluster is stopped again (nothing listens on port 61561); its workspace is `/mnt/ssd/afldb-pushfix-20261123` on `streamanator`.

@@ -1,0 +1,213 @@
+ISSUE-368 refusal driver runs on tested SHA 635d4df2c073dee8e2fc3787f1c8ed736cedc378 (tree c91c89818d45dc67e6716b35da82056239d0ec66).
+Disposable PostgreSQL 16.15 cluster on streamanator, /mnt/ssd/afldb-pushfix-20261123 (port 61561, loopback + private socket dir, trust auth).
+Each run: fresh clones of the migrated template -> independent read-only psql observer polling -> driver. Lines over 300 characters are truncated.
+
+################################################################
+# RUN A  python tests/python/aflw_race_guard_refusals.py
+################################################################
+observed objects: 8 staging tables, 6 public views
+=== T0: initial snapshot, fresh clones, before the driver
+T0 afldb_v2_pushfix_ok_test: read_only=on total_rows=0 digest=58d98ef1bd95
+T0 afldb_v2_pushfix_other_test: read_only=on total_rows=0 digest=58d98ef1bd95
+T0 afldb_v2_pushfix_plain: read_only=on total_rows=0 digest=58d98ef1bd95
+=== driver: python  tests/python/aflw_race_guard_refusals.py (source /mnt/ssd/afldb-pushfix-20261123/fix2)
+initial snapshot (read-only observers): 3 databases, all eight staging tables and six public views empty
+PASS seed afldb_v2_pushfix_ok_test through the guarded loader
+PASS seed afldb_v2_pushfix_ok_test: only afldb_v2_pushfix_ok_test changed (the other two databases are identical to their previous snapshot)
+PASS seed afldb_v2_pushfix_other_test through the guarded loader
+PASS seed afldb_v2_pushfix_other_test: only afldb_v2_pushfix_other_test changed (the other two databases are identical to their previous snapshot)
+PASS setup left the unsuffixed database identical to its initial (empty) snapshot
+PASS the two _test databases are seeded with eleven seasons and no 2027 rows
+PASS [python] loader, TCP to disposable _test database: exit 3, guard message: REFUSED [loader]: the connection is not over a Unix socket
+PASS [python] loader TCP: independent read-only connection sees every protected database unchanged (unsuffixed database still equal to its initial snapshot)
+PASS [python] loader, Unix socket to disposable database without the suffix: exit 3, guard message: REFUSED [loader]: the intended database is missing or does not end in _test
+PASS [python] loader unsuffixed: independent read-only connection sees every protected database unchanged (unsuffixed database still equal to its initial snapshot)
+PASS [python] loader, actual database afldb_v2_pushfix_other_test differs from intended afldb_v2_pushfix_ok_test: exit 3, guard message: REFUSED [loader]: the server reports database 'afldb_v2_pushfix_other_test', not the intended 'afldb_v2_pushfix_ok_test'
+PASS [python] loader, actual database afldb_v2_pushfix_ok_test differs from intended afldb_v2_pushfix_other_test: exit 3, guard message: REFUSED [loader]: the server reports database 'afldb_v2_pushfix_ok_test', not the intended 'afldb_v2_pushfix_other_test'
+PASS [python] loader mismatch: independent read-only connection sees every protected database unchanged (unsuffixed database still equal to its initial snapshot)
+PASS [python] loader, no intended database supplied: exit 3, guard message: REFUSED [loader]: the intended database is missing or does not end in _test
+PASS [python] loader unconfigured: independent read-only connection sees every protected database unchanged (unsuffixed database still equal to its initial snapshot)
+PASS [python] writer, TCP to disposable _test database: exit 3, guard message: REFUSED [writer]: the connection is not over a Unix socket
+PASS [python] writer, Unix socket to disposable database without the suffix: exit 3, guard message: REFUSED [writer]: the intended database is missing or does not end in _test
+PASS [python] writer, actual database afldb_v2_pushfix_other_test differs from intended afldb_v2_pushfix_ok_test: exit 3, guard message: REFUSED [writer]: the server reports database 'afldb_v2_pushfix_other_test', not the intended 'afldb_v2_pushfix_ok_test'
+PASS [python] race test main(): valid-looking DSN whose live connection is TCP: exit 3, guard message: REFUSED [writer]: the connection is not over a Unix socket
+PASS [python] race test main(): valid-looking DSN whose live database differs: exit 3, guard message: REFUSED [writer]: the server reports database 'afldb_v2_pushfix_other_test', not the intended 'afldb_v2_pushfix_ok_test'
+PASS [python] race test main(): TCP DSN (early diagnostic): exit 3, guard message: REFUSED [dsn]: AFLDB_TEST_DATABASE_URL must use a Unix socket directory (host=/abs/path) and a *_test database
+PASS [python] writer: independent read-only connection sees every protected database unchanged (unsuffixed database still equal to its initial snapshot)
+PASS [python -O] loader, TCP to disposable _test database: exit 3, guard message: REFUSED [loader]: the connection is not over a Unix socket
+PASS [python -O] loader TCP: independent read-only connection sees every protected database unchanged (unsuffixed database still equal to its initial snapshot)
+PASS [python -O] loader, Unix socket to disposable database without the suffix: exit 3, guard message: REFUSED [loader]: the intended database is missing or does not end in _test
+PASS [python -O] loader unsuffixed: independent read-only connection sees every protected database unchanged (unsuffixed database still equal to its initial snapshot)
+PASS [python -O] loader, actual database afldb_v2_pushfix_other_test differs from intended afldb_v2_pushfix_ok_test: exit 3, guard message: REFUSED [loader]: the server reports database 'afldb_v2_pushfix_other_test', not the intended 'afldb_v2_pushfix_ok_test'
+PASS [python -O] loader, actual database afldb_v2_pushfix_ok_test differs from intended afldb_v2_pushfix_other_test: exit 3, guard message: REFUSED [loader]: the server reports database 'afldb_v2_pushfix_ok_test', not the intended 'afldb_v2_pushfix_other_test'
+PASS [python -O] loader mismatch: independent read-only connection sees every protected database unchanged (unsuffixed database still equal to its initial snapshot)
+PASS [python -O] loader, no intended database supplied: exit 3, guard message: REFUSED [loader]: the intended database is missing or does not end in _test
+PASS [python -O] loader unconfigured: independent read-only connection sees every protected database unchanged (unsuffixed database still equal to its initial snapshot)
+PASS [python -O] writer, TCP to disposable _test database: exit 3, guard message: REFUSED [writer]: the connection is not over a Unix socket
+PASS [python -O] writer, Unix socket to disposable database without the suffix: exit 3, guard message: REFUSED [writer]: the intended database is missing or does not end in _test
+PASS [python -O] writer, actual database afldb_v2_pushfix_other_test differs from intended afldb_v2_pushfix_ok_test: exit 3, guard message: REFUSED [writer]: the server reports database 'afldb_v2_pushfix_other_test', not the intended 'afldb_v2_pushfix_ok_test'
+PASS [python -O] race test main(): valid-looking DSN whose live connection is TCP: exit 3, guard message: REFUSED [writer]: the connection is not over a Unix socket
+PASS [python -O] race test main(): valid-looking DSN whose live database differs: exit 3, guard message: REFUSED [writer]: the server reports database 'afldb_v2_pushfix_other_test', not the intended 'afldb_v2_pushfix_ok_test'
+PASS [python -O] race test main(): TCP DSN (early diagnostic): exit 3, guard message: REFUSED [dsn]: AFLDB_TEST_DATABASE_URL must use a Unix socket directory (host=/abs/path) and a *_test database
+PASS [python -O] writer: independent read-only connection sees every protected database unchanged (unsuffixed database still equal to its initial snapshot)
+PASS control [python]: intended socket target admitted, exit 0
+PASS control [python -O]: intended socket target admitted, exit 0
+PASS control wrote 2027 only to the intended database; the unsuffixed database still equals its initial snapshot
+All 41 AFLW race guard refusal checks hold.
+DRIVER EXIT CODE: 0
+=== T1: final snapshot after the driver
+T1 afldb_v2_pushfix_ok_test: read_only=on total_rows=252 digest=939e524bc06d
+T1 afldb_v2_pushfix_other_test: read_only=on total_rows=231 digest=bf3c7860cb7d
+T1 afldb_v2_pushfix_plain: read_only=on total_rows=0 digest=58d98ef1bd95
+=== polled states seen by the independent observer (db, rows, digest, polls, first-seen offset s)
+  afldb_v2_pushfix_ok_test rows=0 digest=58d98ef1bd95 polls=6 first=+0.0s
+  afldb_v2_pushfix_ok_test rows=231 digest=bf3c7860cb7d polls=120 first=+0.8s
+  afldb_v2_pushfix_ok_test rows=252 digest=939e524bc06d polls=10 first=+16.8s
+  afldb_v2_pushfix_other_test rows=0 digest=58d98ef1bd95 polls=9 first=+0.0s
+  afldb_v2_pushfix_other_test rows=231 digest=bf3c7860cb7d polls=127 first=+1.3s
+  afldb_v2_pushfix_plain rows=0 digest=58d98ef1bd95 polls=136 first=+0.1s
+total polls: 408, skipped (lock-contended): 0
+
+################################################################
+# RUN B  python -O tests/python/aflw_race_guard_refusals.py
+################################################################
+observed objects: 8 staging tables, 6 public views
+=== T0: initial snapshot, fresh clones, before the driver
+T0 afldb_v2_pushfix_ok_test: read_only=on total_rows=0 digest=58d98ef1bd95
+T0 afldb_v2_pushfix_other_test: read_only=on total_rows=0 digest=58d98ef1bd95
+T0 afldb_v2_pushfix_plain: read_only=on total_rows=0 digest=58d98ef1bd95
+=== driver: python -O tests/python/aflw_race_guard_refusals.py (source /mnt/ssd/afldb-pushfix-20261123/fix2)
+initial snapshot (read-only observers): 3 databases, all eight staging tables and six public views empty
+PASS seed afldb_v2_pushfix_ok_test through the guarded loader
+PASS seed afldb_v2_pushfix_ok_test: only afldb_v2_pushfix_ok_test changed (the other two databases are identical to their previous snapshot)
+PASS seed afldb_v2_pushfix_other_test through the guarded loader
+PASS seed afldb_v2_pushfix_other_test: only afldb_v2_pushfix_other_test changed (the other two databases are identical to their previous snapshot)
+PASS setup left the unsuffixed database identical to its initial (empty) snapshot
+PASS the two _test databases are seeded with eleven seasons and no 2027 rows
+PASS [python] loader, TCP to disposable _test database: exit 3, guard message: REFUSED [loader]: the connection is not over a Unix socket
+PASS [python] loader TCP: independent read-only connection sees every protected database unchanged (unsuffixed database still equal to its initial snapshot)
+PASS [python] loader, Unix socket to disposable database without the suffix: exit 3, guard message: REFUSED [loader]: the intended database is missing or does not end in _test
+PASS [python] loader unsuffixed: independent read-only connection sees every protected database unchanged (unsuffixed database still equal to its initial snapshot)
+PASS [python] loader, actual database afldb_v2_pushfix_other_test differs from intended afldb_v2_pushfix_ok_test: exit 3, guard message: REFUSED [loader]: the server reports database 'afldb_v2_pushfix_other_test', not the intended 'afldb_v2_pushfix_ok_test'
+PASS [python] loader, actual database afldb_v2_pushfix_ok_test differs from intended afldb_v2_pushfix_other_test: exit 3, guard message: REFUSED [loader]: the server reports database 'afldb_v2_pushfix_ok_test', not the intended 'afldb_v2_pushfix_other_test'
+PASS [python] loader mismatch: independent read-only connection sees every protected database unchanged (unsuffixed database still equal to its initial snapshot)
+PASS [python] loader, no intended database supplied: exit 3, guard message: REFUSED [loader]: the intended database is missing or does not end in _test
+PASS [python] loader unconfigured: independent read-only connection sees every protected database unchanged (unsuffixed database still equal to its initial snapshot)
+PASS [python] writer, TCP to disposable _test database: exit 3, guard message: REFUSED [writer]: the connection is not over a Unix socket
+PASS [python] writer, Unix socket to disposable database without the suffix: exit 3, guard message: REFUSED [writer]: the intended database is missing or does not end in _test
+PASS [python] writer, actual database afldb_v2_pushfix_other_test differs from intended afldb_v2_pushfix_ok_test: exit 3, guard message: REFUSED [writer]: the server reports database 'afldb_v2_pushfix_other_test', not the intended 'afldb_v2_pushfix_ok_test'
+PASS [python] race test main(): valid-looking DSN whose live connection is TCP: exit 3, guard message: REFUSED [writer]: the connection is not over a Unix socket
+PASS [python] race test main(): valid-looking DSN whose live database differs: exit 3, guard message: REFUSED [writer]: the server reports database 'afldb_v2_pushfix_other_test', not the intended 'afldb_v2_pushfix_ok_test'
+PASS [python] race test main(): TCP DSN (early diagnostic): exit 3, guard message: REFUSED [dsn]: AFLDB_TEST_DATABASE_URL must use a Unix socket directory (host=/abs/path) and a *_test database
+PASS [python] writer: independent read-only connection sees every protected database unchanged (unsuffixed database still equal to its initial snapshot)
+PASS [python -O] loader, TCP to disposable _test database: exit 3, guard message: REFUSED [loader]: the connection is not over a Unix socket
+PASS [python -O] loader TCP: independent read-only connection sees every protected database unchanged (unsuffixed database still equal to its initial snapshot)
+PASS [python -O] loader, Unix socket to disposable database without the suffix: exit 3, guard message: REFUSED [loader]: the intended database is missing or does not end in _test
+PASS [python -O] loader unsuffixed: independent read-only connection sees every protected database unchanged (unsuffixed database still equal to its initial snapshot)
+PASS [python -O] loader, actual database afldb_v2_pushfix_other_test differs from intended afldb_v2_pushfix_ok_test: exit 3, guard message: REFUSED [loader]: the server reports database 'afldb_v2_pushfix_other_test', not the intended 'afldb_v2_pushfix_ok_test'
+PASS [python -O] loader, actual database afldb_v2_pushfix_ok_test differs from intended afldb_v2_pushfix_other_test: exit 3, guard message: REFUSED [loader]: the server reports database 'afldb_v2_pushfix_ok_test', not the intended 'afldb_v2_pushfix_other_test'
+PASS [python -O] loader mismatch: independent read-only connection sees every protected database unchanged (unsuffixed database still equal to its initial snapshot)
+PASS [python -O] loader, no intended database supplied: exit 3, guard message: REFUSED [loader]: the intended database is missing or does not end in _test
+PASS [python -O] loader unconfigured: independent read-only connection sees every protected database unchanged (unsuffixed database still equal to its initial snapshot)
+PASS [python -O] writer, TCP to disposable _test database: exit 3, guard message: REFUSED [writer]: the connection is not over a Unix socket
+PASS [python -O] writer, Unix socket to disposable database without the suffix: exit 3, guard message: REFUSED [writer]: the intended database is missing or does not end in _test
+PASS [python -O] writer, actual database afldb_v2_pushfix_other_test differs from intended afldb_v2_pushfix_ok_test: exit 3, guard message: REFUSED [writer]: the server reports database 'afldb_v2_pushfix_other_test', not the intended 'afldb_v2_pushfix_ok_test'
+PASS [python -O] race test main(): valid-looking DSN whose live connection is TCP: exit 3, guard message: REFUSED [writer]: the connection is not over a Unix socket
+PASS [python -O] race test main(): valid-looking DSN whose live database differs: exit 3, guard message: REFUSED [writer]: the server reports database 'afldb_v2_pushfix_other_test', not the intended 'afldb_v2_pushfix_ok_test'
+PASS [python -O] race test main(): TCP DSN (early diagnostic): exit 3, guard message: REFUSED [dsn]: AFLDB_TEST_DATABASE_URL must use a Unix socket directory (host=/abs/path) and a *_test database
+PASS [python -O] writer: independent read-only connection sees every protected database unchanged (unsuffixed database still equal to its initial snapshot)
+PASS control [python]: intended socket target admitted, exit 0
+PASS control [python -O]: intended socket target admitted, exit 0
+PASS control wrote 2027 only to the intended database; the unsuffixed database still equals its initial snapshot
+All 41 AFLW race guard refusal checks hold.
+DRIVER EXIT CODE: 0
+=== T1: final snapshot after the driver
+T1 afldb_v2_pushfix_ok_test: read_only=on total_rows=252 digest=939e524bc06d
+T1 afldb_v2_pushfix_other_test: read_only=on total_rows=231 digest=bf3c7860cb7d
+T1 afldb_v2_pushfix_plain: read_only=on total_rows=0 digest=58d98ef1bd95
+=== polled states seen by the independent observer (db, rows, digest, polls, first-seen offset s)
+  afldb_v2_pushfix_ok_test rows=0 digest=58d98ef1bd95 polls=12 first=+0.0s
+  afldb_v2_pushfix_ok_test rows=231 digest=bf3c7860cb7d polls=120 first=+1.5s
+  afldb_v2_pushfix_ok_test rows=252 digest=939e524bc06d polls=10 first=+17.4s
+  afldb_v2_pushfix_other_test rows=0 digest=58d98ef1bd95 polls=15 first=+0.0s
+  afldb_v2_pushfix_other_test rows=231 digest=bf3c7860cb7d polls=127 first=+2.0s
+  afldb_v2_pushfix_plain rows=0 digest=58d98ef1bd95 polls=142 first=+0.1s
+total polls: 426, skipped (lock-contended): 0
+
+################################################################
+# RUN C  DETECTION CONTROL: same driver, child loader with its connection-guard line removed (scratch copy, not committed)
+################################################################
+observed objects: 8 staging tables, 6 public views
+=== T0: initial snapshot, fresh clones, before the driver
+T0 afldb_v2_pushfix_ok_test: read_only=on total_rows=0 digest=58d98ef1bd95
+T0 afldb_v2_pushfix_other_test: read_only=on total_rows=0 digest=58d98ef1bd95
+T0 afldb_v2_pushfix_plain: read_only=on total_rows=0 digest=58d98ef1bd95
+=== driver: python  tests/python/aflw_race_guard_refusals.py (source /mnt/ssd/afldb-pushfix-20261123/fix2mut)
+initial snapshot (read-only observers): 3 databases, all eight staging tables and six public views empty
+PASS seed afldb_v2_pushfix_ok_test through the guarded loader
+PASS seed afldb_v2_pushfix_ok_test: only afldb_v2_pushfix_ok_test changed (the other two databases are identical to their previous snapshot)
+PASS seed afldb_v2_pushfix_other_test through the guarded loader
+PASS seed afldb_v2_pushfix_other_test: only afldb_v2_pushfix_other_test changed (the other two databases are identical to their previous snapshot)
+PASS setup left the unsuffixed database identical to its initial (empty) snapshot
+PASS the two _test databases are seeded with eleven seasons and no 2027 rows
+FAIL [python] loader, TCP to disposable _test database: exit 0, guard message:   [g_aflw.scoring_events              12 rows
+FAIL [python] loader TCP: independent read-only connection sees every protected database unchanged (unsuffixed database still equal to its initial snapshot)  [before={'afldb_v2_pushfix_ok_test': {'staging': 'fb6a9c22e0b9842a', 'staging_counts': {'seasons': 11, 'ladders': 22, 'fixtures': 22, 'matches
+FAIL [python] loader, Unix socket to disposable database without the suffix: exit 0, guard message:   [g_aflw.scoring_events              12 rows
+FAIL [python] loader unsuffixed: independent read-only connection sees every protected database unchanged (unsuffixed database still equal to its initial snapshot)  [before={'afldb_v2_pushfix_ok_test': {'staging': 'fb6a9c22e0b9842a', 'staging_counts': {'seasons': 11, 'ladders': 22, 'fixtures': 22, '
+FAIL [python] loader, actual database afldb_v2_pushfix_other_test differs from intended afldb_v2_pushfix_ok_test: exit 0, guard message:   [g_aflw.scoring_events              12 rows
+FAIL [python] loader, actual database afldb_v2_pushfix_ok_test differs from intended afldb_v2_pushfix_other_test: exit 0, guard message:   [g_aflw.scoring_events              12 rows
+FAIL [python] loader mismatch: independent read-only connection sees every protected database unchanged (unsuffixed database still equal to its initial snapshot)  [before={'afldb_v2_pushfix_ok_test': {'staging': 'fb6a9c22e0b9842a', 'staging_counts': {'seasons': 11, 'ladders': 22, 'fixtures': 22, 'ma
+FAIL [python] loader, no intended database supplied: exit 0, guard message:   [g_aflw.scoring_events              12 rows
+FAIL [python] loader unconfigured: independent read-only connection sees every protected database unchanged (unsuffixed database still equal to its initial snapshot)  [before={'afldb_v2_pushfix_ok_test': {'staging': 'fb6a9c22e0b9842a', 'staging_counts': {'seasons': 11, 'ladders': 22, 'fixtures': 22,
+PASS [python] writer, TCP to disposable _test database: exit 3, guard message: REFUSED [writer]: the connection is not over a Unix socket
+PASS [python] writer, Unix socket to disposable database without the suffix: exit 3, guard message: REFUSED [writer]: the intended database is missing or does not end in _test
+PASS [python] writer, actual database afldb_v2_pushfix_other_test differs from intended afldb_v2_pushfix_ok_test: exit 3, guard message: REFUSED [writer]: the server reports database 'afldb_v2_pushfix_other_test', not the intended 'afldb_v2_pushfix_ok_test'
+PASS [python] race test main(): valid-looking DSN whose live connection is TCP: exit 3, guard message: REFUSED [writer]: the connection is not over a Unix socket
+PASS [python] race test main(): valid-looking DSN whose live database differs: exit 3, guard message: REFUSED [writer]: the server reports database 'afldb_v2_pushfix_other_test', not the intended 'afldb_v2_pushfix_ok_test'
+PASS [python] race test main(): TCP DSN (early diagnostic): exit 3, guard message: REFUSED [dsn]: AFLDB_TEST_DATABASE_URL must use a Unix socket directory (host=/abs/path) and a *_test database
+FAIL [python] writer: independent read-only connection sees every protected database unchanged (unsuffixed database still equal to its initial snapshot)  [before={'afldb_v2_pushfix_ok_test': {'staging': 'fb6a9c22e0b9842a', 'staging_counts': {'seasons': 11, 'ladders': 22, 'fixtures': 22, 'matches': 1
+FAIL [python -O] loader, TCP to disposable _test database: exit 0, guard message:   [g_aflw.scoring_events              12 rows
+FAIL [python -O] loader TCP: independent read-only connection sees every protected database unchanged (unsuffixed database still equal to its initial snapshot)  [before={'afldb_v2_pushfix_ok_test': {'staging': 'fb6a9c22e0b9842a', 'staging_counts': {'seasons': 11, 'ladders': 22, 'fixtures': 22, 'matc
+FAIL [python -O] loader, Unix socket to disposable database without the suffix: exit 0, guard message:   [g_aflw.scoring_events              12 rows
+FAIL [python -O] loader unsuffixed: independent read-only connection sees every protected database unchanged (unsuffixed database still equal to its initial snapshot)  [before={'afldb_v2_pushfix_ok_test': {'staging': 'fb6a9c22e0b9842a', 'staging_counts': {'seasons': 11, 'ladders': 22, 'fixtures': 22
+FAIL [python -O] loader, actual database afldb_v2_pushfix_other_test differs from intended afldb_v2_pushfix_ok_test: exit 0, guard message:   [g_aflw.scoring_events              12 rows
+FAIL [python -O] loader, actual database afldb_v2_pushfix_ok_test differs from intended afldb_v2_pushfix_other_test: exit 0, guard message:   [g_aflw.scoring_events              12 rows
+FAIL [python -O] loader mismatch: independent read-only connection sees every protected database unchanged (unsuffixed database still equal to its initial snapshot)  [before={'afldb_v2_pushfix_ok_test': {'staging': 'fb6a9c22e0b9842a', 'staging_counts': {'seasons': 11, 'ladders': 22, 'fixtures': 22,
+FAIL [python -O] loader, no intended database supplied: exit 0, guard message:   [g_aflw.scoring_events              12 rows
+FAIL [python -O] loader unconfigured: independent read-only connection sees every protected database unchanged (unsuffixed database still equal to its initial snapshot)  [before={'afldb_v2_pushfix_ok_test': {'staging': 'fb6a9c22e0b9842a', 'staging_counts': {'seasons': 11, 'ladders': 22, 'fixtures':
+PASS [python -O] writer, TCP to disposable _test database: exit 3, guard message: REFUSED [writer]: the connection is not over a Unix socket
+PASS [python -O] writer, Unix socket to disposable database without the suffix: exit 3, guard message: REFUSED [writer]: the intended database is missing or does not end in _test
+PASS [python -O] writer, actual database afldb_v2_pushfix_other_test differs from intended afldb_v2_pushfix_ok_test: exit 3, guard message: REFUSED [writer]: the server reports database 'afldb_v2_pushfix_other_test', not the intended 'afldb_v2_pushfix_ok_test'
+PASS [python -O] race test main(): valid-looking DSN whose live connection is TCP: exit 3, guard message: REFUSED [writer]: the connection is not over a Unix socket
+PASS [python -O] race test main(): valid-looking DSN whose live database differs: exit 3, guard message: REFUSED [writer]: the server reports database 'afldb_v2_pushfix_other_test', not the intended 'afldb_v2_pushfix_ok_test'
+PASS [python -O] race test main(): TCP DSN (early diagnostic): exit 3, guard message: REFUSED [dsn]: AFLDB_TEST_DATABASE_URL must use a Unix socket directory (host=/abs/path) and a *_test database
+FAIL [python -O] writer: independent read-only connection sees every protected database unchanged (unsuffixed database still equal to its initial snapshot)  [before={'afldb_v2_pushfix_ok_test': {'staging': 'fb6a9c22e0b9842a', 'staging_counts': {'seasons': 11, 'ladders': 22, 'fixtures': 22, 'matches'
+PASS control [python]: intended socket target admitted, exit 0
+PASS control [python -O]: intended socket target admitted, exit 0
+FAIL control wrote 2027 only to the intended database; the unsuffixed database still equals its initial snapshot  [{'afldb_v2_pushfix_ok_test': {'staging': 'ef5ecdefbb14d3ce', 'staging_counts': {'seasons': 12, 'ladders': 24, 'fixtures': 24, 'matches': 12, 'player_match_stats': 24, 'scoring_events':
+21 of 41 refusal checks FAILED
+DRIVER EXIT CODE: 1
+=== T1: final snapshot after the driver
+T1 afldb_v2_pushfix_ok_test: read_only=on total_rows=252 digest=939e524bc06d
+T1 afldb_v2_pushfix_other_test: read_only=on total_rows=252 digest=939e524bc06d
+T1 afldb_v2_pushfix_plain: read_only=on total_rows=252 digest=939e524bc06d
+=== polled states seen by the independent observer (db, rows, digest, polls, first-seen offset s)
+  afldb_v2_pushfix_ok_test rows=0 digest=58d98ef1bd95 polls=6 first=+0.0s
+  afldb_v2_pushfix_ok_test rows=231 digest=bf3c7860cb7d polls=7 first=+0.8s
+  afldb_v2_pushfix_ok_test rows=252 digest=939e524bc06d polls=120 first=+1.8s
+  afldb_v2_pushfix_other_test rows=0 digest=58d98ef1bd95 polls=9 first=+0.0s
+  afldb_v2_pushfix_other_test rows=231 digest=bf3c7860cb7d polls=11 first=+1.3s
+  afldb_v2_pushfix_other_test rows=252 digest=939e524bc06d polls=116 first=+2.8s
+  afldb_v2_pushfix_plain rows=0 digest=58d98ef1bd95 polls=16 first=+0.1s
+  afldb_v2_pushfix_plain rows=252 digest=939e524bc06d polls=120 first=+2.3s
+total polls: 408, skipped (lock-contended): 3
+
+################################################################
+# RUN 0  first attempt, observer artefact (superseded; see record)
+################################################################
+FAIL control [python]: intended socket target admitted, exit 1  [-season rows
+lockDetected: deadlock detected
+DETAIL:  Process 1195484 waits for AccessExclusiveLock on relation 17917 of database 20609; blocked by process 1195485.
+Process 1195485 waits for AccessShareLock on relation 17904 of database 20609; blocked by process 1195484.
+1 of 41 refusal checks FAILED
+DRIVER EXIT CODE: 1
