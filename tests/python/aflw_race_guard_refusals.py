@@ -6,9 +6,14 @@
 
 The cluster must serve the same port on that Unix socket directory and on 127.0.0.1 (trust auth for the
 superuser), and the three databases must be migrated, privileged and have EMPTY staging_aflw tables (fresh
-clones of one template). The driver seeds each with the reviewed eleven-season generation, then tries to load a
-different generation (twelve seasons, so a stray write is visible) through each refused path, in normal and
-`python -O` interpreters, and compares every database's staging rows from an independent connection afterwards.
+clones of one template). The driver first snapshots all three from read-only observer connections. It then seeds
+ONLY the two `_test` databases with the reviewed eleven-season generation, through the guarded loader; the
+unsuffixed database is never seeded and stays empty. It then tries to load a different generation (twelve seasons,
+so a stray write is visible) through each refused path, in normal and `python -O` interpreters, and after setup
+and after every refusal group compares every database against its snapshot from an independent read-only
+connection (the eight staging_aflw tables and the six aflw public views). Every connection the driver makes to
+the unsuffixed database for setup or observation is read-only (default_transaction_read_only, verified with SHOW);
+the only other connections to it are the refusal probes, which exist to be refused by the guard under test.
 
 The writer and the child loader are exercised independently: the loader cases invoke
 tests/python/aflw_race_loader.py directly, so an early refusal by the writer cannot mask a missing loader guard.
@@ -28,10 +33,11 @@ from psycopg.conninfo import make_conninfo
 
 import aflw_staging_race as race
 from aflw_race_guard import EXPECTED_ENV, REFUSAL_EXIT, connect_writer
-from aflw_staging_contract import REAL_EXPECTED_SEASON_KEYS, ls, write
+from aflw_staging_contract import REAL_EXPECTED_SEASON_KEYS, write
 
 HERE = Path(__file__).resolve()
 LOADER = HERE.with_name("aflw_race_loader.py")
+AFLW_VIEWS = ("seasons", "fixtures", "matches", "ladders", "player_match_stats", "player_seasons")
 
 
 def probe(argv):
@@ -66,10 +72,11 @@ def main():
     if not (ok_db.endswith("_test") and other_db.endswith("_test") and not plain_db.endswith("_test")):
         raise SystemExit("OK_DB and OTHER_DB must end in _test; PLAIN_DB must not")
 
-    def dsn(db, tcp=False, role=False):
+    def dsn(db, tcp=False, role=False, readonly=False):
         params = dict(user=cfg["USER"], port=cfg["PORT"], dbname=db, host=tcp_host if tcp else cfg["SOCKET_DIR"])
-        if role:
-            params["options"] = "-c role=afldb_import"
+        options = (["-c role=afldb_import"] if role else []) + (["-c default_transaction_read_only=on"] if readonly else [])
+        if options:
+            params["options"] = " ".join(options)
         return make_conninfo(**params)
 
     failures, checked = [], 0
@@ -82,15 +89,29 @@ def main():
             failures.append(label)
 
     def observe():
-        """Independent unguarded read-only observer connection per protected database."""
+        """Independent read-only observer connection per protected database (unguarded, no role, no writes).
+
+        The session is read-only on the server (default_transaction_read_only, confirmed with SHOW), so the
+        observer cannot change a database even by mistake. It reads every row of the eight staging_aflw tables and
+        of the six aflw public views and returns digests, per-object row counts and the 2027 staging season count."""
         out = {}
         for db in (ok_db, plain_db, other_db):
-            with psycopg.connect(dsn(db)) as conn:
-                snap = race.snapshot(conn)
-                out[db] = (hashlib.sha256(repr(snap).encode()).hexdigest()[:16],
-                           sum(len(rows) for rows in snap.values()),
-                           conn.execute("SELECT count(*) FROM staging_aflw.seasons WHERE season_key = '2027'").fetchone()[0])
+            with psycopg.connect(dsn(db, readonly=True)) as conn:
+                if conn.execute("SHOW transaction_read_only").fetchone()[0] != "on":
+                    raise SystemExit(f"{db}: the observer connection is not read-only; refusing to observe")
+                staging = race.snapshot(conn)
+                views = {v: conn.execute(f"SELECT to_jsonb(t)::text FROM aflw.{v} t ORDER BY 1").fetchall() for v in AFLW_VIEWS}
+                out[db] = dict(
+                    staging=hashlib.sha256(repr(staging).encode()).hexdigest()[:16],
+                    staging_counts={t: len(rows) for t, rows in staging.items()},
+                    views=hashlib.sha256(repr(views).encode()).hexdigest()[:16],
+                    view_counts={v: len(rows) for v, rows in views.items()},
+                    seasons_2027=conn.execute("SELECT count(*) FROM staging_aflw.seasons WHERE season_key = '2027'").fetchone()[0],
+                )
         return out
+
+    def rows(snapshot):
+        return sum(snapshot["staging_counts"].values()) + sum(snapshot["view_counts"].values())
 
     with tempfile.TemporaryDirectory() as tmp:
         old_dir, new_dir = Path(tmp) / "old", Path(tmp) / "new"
@@ -105,28 +126,36 @@ def main():
             return subprocess.run([sys.executable, *flags, str(LOADER), source, inventory, "--load", "--in", str(directory)],
                                   env=env, capture_output=True, text=True, timeout=120)
 
-        # Seed: each protected database holds the eleven-season generation, loaded through the guarded loader.
-        for db in (ok_db, plain_db, other_db):
-            with psycopg.connect(dsn(db)) as conn:
-                empty = sum(conn.execute(f"SELECT count(*) FROM staging_aflw.{t}").fetchone()[0] for t, _ in ls.TABLES)
-            if empty:
-                raise SystemExit(f"{db}: staging_aflw is not empty; use fresh clones of a migrated template")
+        # Initial read-only snapshot of all three databases, before any fixture setup. All must start EMPTY: the
+        # unsuffixed database stays empty for the whole run, so any row that appears in it is a stray write.
+        initial = observe()
+        for db, snap in initial.items():
+            if rows(snap):
+                raise SystemExit(f"{db}: staging_aflw or its views are not empty; use fresh clones of a migrated template")
+        print(f"initial snapshot (read-only observers): {len(initial)} databases, all eight staging tables and six public views empty")
+
+        # Setup: the two _test databases are seeded with the eleven-season generation through the guarded loader.
+        # Nothing here connects to the unsuffixed database for writing; each seed must change only its own target.
+        previous = initial
         for db in (ok_db, other_db):
             seeded = loader([], old_dir, "stock", dsn(db, role=True), db)
             expect(f"seed {db} through the guarded loader", seeded.returncode == 0, seeded.stdout[-300:] + seeded.stderr[-300:])
-        # The unsuffixed database cannot be seeded through the guard (that is the point); seed it as its owner.
-        with psycopg.connect(dsn(plain_db, role=True)) as conn:
-            ls.EXPECTED_SEASON_KEYS = list(REAL_EXPECTED_SEASON_KEYS)  # the contract module may have substituted a short inventory
-            data, _ = ls.verify(old_dir)
-            ls.load(conn, data)
-        baseline = observe()
-        expect("protected databases seeded with eleven seasons and no 2027 rows",
-               all(rows > 0 and seasons == 0 for _, rows, seasons in baseline.values()), repr(baseline))
+            now = observe()
+            others = [d for d in now if d != db]
+            expect(f"seed {db}: only {db} changed (the other two databases are identical to their previous snapshot)",
+                   rows(now[db]) > 0 and all(now[d] == previous[d] for d in others), f"previous={previous} now={now}")
+            previous = now
+        baseline = previous
+        expect("setup left the unsuffixed database identical to its initial (empty) snapshot",
+               baseline[plain_db] == initial[plain_db] and rows(baseline[plain_db]) == 0, repr(baseline[plain_db]))
+        expect("the two _test databases are seeded with eleven seasons and no 2027 rows",
+               all(rows(baseline[db]) > 0 and baseline[db]["seasons_2027"] == 0 for db in (ok_db, other_db)), repr(baseline))
 
         def unchanged(label):
             now = observe()
-            expect(f"{label}: independent connection sees every protected database unchanged", now == baseline,
-                   f"before={baseline} after={now}")
+            expect(f"{label}: independent read-only connection sees every protected database unchanged "
+                   f"(unsuffixed database still equal to its initial snapshot)",
+                   now == baseline and now[plain_db] == initial[plain_db], f"before={baseline} after={now}")
 
         def refusal(label, result, who):
             ok = result.returncode == REFUSAL_EXIT and f"REFUSED [{who}]" in result.stderr
@@ -181,8 +210,9 @@ def main():
             expect(f"control [{'python -O' if flags else 'python'}]: intended socket target admitted, exit {admitted.returncode}",
                    admitted.returncode == 0, admitted.stdout[-300:] + admitted.stderr[-300:])
         final = observe()
-        expect("control wrote 2027 only to the intended database",
-               final[ok_db][2] > 0 and final[plain_db] == baseline[plain_db] and final[other_db] == baseline[other_db], repr(final))
+        expect("control wrote 2027 only to the intended database; the unsuffixed database still equals its initial snapshot",
+               final[ok_db]["seasons_2027"] > 0 and final[ok_db] != baseline[ok_db] and final[other_db] == baseline[other_db]
+               and final[plain_db] == initial[plain_db], repr(final))
 
     if failures:
         print(f"{len(failures)} of {checked} refusal checks FAILED")
