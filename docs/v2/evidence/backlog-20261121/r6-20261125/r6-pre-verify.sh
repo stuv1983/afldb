@@ -6,7 +6,7 @@
 # Command inventory (closure allowlist): hostname id date cat uname uptime dpkg-query stat ls sed grep awk sort cut head tail tr wc basename
 #   sha256sum cmp findmnt sysctl apt-config systemctl(show|is-active|is-enabled|list-timers|list-unit-files) pgrep readlink git(rev-parse)
 #   journalctl (backup and verification units, bounded time windows, cat/JSON output; read-only)
-#   node deploy/release.mjs status | sh deploy/afldb-settle-failure-status.sh | bash tools/maintenance/scheduled-backup.sh status
+#   node deploy/release.mjs status (never --expect: that form writes events.log) | sh deploy/afldb-settle-failure-status.sh | bash tools/maintenance/scheduled-backup.sh status
 #   psql (read-only shape of a2-p0-entry.sh) df free printf echo test; redirections only 2>&1, 2>/dev/null, here-strings, here-docs.
 # Run (workstation Git Bash; never at minute :16-:18, when streamanator's r2 check connects):
 #   tr -d '\r' < r6-pre-verify.sh | C:/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes afldb bash -s -- \
@@ -50,6 +50,26 @@ match_restore() { # backup-dir YYYYMMDD start exit journal state-epoch state-fil
   actual=$(sha256sum < "$bk/$file") || return 1
   [[ ${actual%% *} = "$digest" ]] || return 1
   printf '%s %s %s %s\n' "$invocation" "$timestamp" "$file" "$digest"
+}
+
+# R6 review finding 1 (23 Nov 2026): the serving-release check decides the A-2 verdict. `release.mjs status --expect` is NOT
+# read-only (a live PASS appends a status-pass line to events.log, deploy/release.mjs:1539-1545), so A-2 runs `status` WITHOUT
+# --expect, which writes nothing, and applies the expectation itself to the output and exit code of that ONE invocation: exit 0;
+# exactly one result line ("release: STATUS PASS|FAIL ..."), and it is exactly "release: STATUS PASS <CURRENT_ID>"; and no
+# "restarted since the last attested PASS" note (a restart after Tuesday's attested acceptance that nobody attested). Prints the
+# output indented; sets SR_WHY to the reasons; returns 0 only when every condition holds. Run with cwd = the checkout.
+serving_release() { # node current-id
+  local out rc n
+  SR_WHY=
+  out=$("$1" deploy/release.mjs status 2>&1); rc=$?
+  printf '%s\n' "$out" | sed 's/^/     /'
+  [ "$rc" = 0 ] || SR_WHY="$SR_WHY; exit $rc"
+  n=$(grep -cE '^release: STATUS (PASS|FAIL)( |$)' <<< "$out")
+  [ "$n" = 1 ] || SR_WHY="$SR_WHY; $n result lines (need exactly 1)"
+  grep -Fxq "release: STATUS PASS $2" <<< "$out" || SR_WHY="$SR_WHY; no line 'release: STATUS PASS $2'"
+  ! grep -Fq 'restarted since the last attested PASS' <<< "$out" || SR_WHY="$SR_WHY; the service restarted since the last attested PASS"
+  SR_WHY=${SR_WHY#; }
+  [ -z "$SR_WHY" ]
 }
 
 restore_journal() {
@@ -153,7 +173,8 @@ MAIN=$(systemctl show afldb -p MainPID --value); NW=0; [[ $MAIN =~ ^[1-9][0-9]*$
 if cd "$CHK" 2>/dev/null; then
   [ "$(readlink "$ROOT/current")" = "releases/$CUR" ] && ok "current = $CUR" || bad "current = $(readlink "$ROOT/current") (expected $CUR)"
   info "previous = $(readlink "$ROOT/previous"); checkout HEAD $(git rev-parse HEAD 2>/dev/null)"
-  "$N" deploy/release.mjs status 2>&1 | sed 's/^/     /'; info "release.mjs status exit ${PIPESTATUS[0]}"
+  if serving_release "$N" "$CUR"; then ok "release.mjs status (read-only): exit 0, one result line 'STATUS PASS $CUR', no unattested restart"
+  else bad "release.mjs status does not prove $CUR is serving: $SR_WHY"; fi
   U=$(grep -c '^AFLDB_REVALIDATE_URL=' .env 2>/dev/null); S=$(grep -c '^AFLDB_REVALIDATE_SECRET=' .env 2>/dev/null)
   if [ "$OUTC" = accepted ]; then [ "$U/$S" = 1/1 ] && ok "env counts 1/1" || bad "env counts $U/$S (accepted A1 left 1/1)"; else info "env counts $U/$S (outcome $OUTC: record)"; fi
   sh deploy/afldb-settle-failure-status.sh 2>&1 | sed 's/^/     /'; info "settle-failure-status rc ${PIPESTATUS[0]} (packet R6 prerequisite 5: recorded before the reboot)"
