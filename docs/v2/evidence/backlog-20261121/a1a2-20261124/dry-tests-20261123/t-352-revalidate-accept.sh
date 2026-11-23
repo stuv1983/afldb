@@ -15,7 +15,9 @@ expect 0 both-workers-distinct-ordinals run; has 'R6 REVALIDATE RESULT PASS seas
 stub 'echo "REVALIDATED season 2026: 1/2 worker(s) reached (1) in 4 request(s)."' 0;       expect 1 one-of-two run;        has 'reached 1 of 2'
 stub 'echo "INCOMPLETE season 2026: 1/2 worker(s) reached in 20 request(s): timeout."' 1;   expect 1 incomplete-exit-1 run;  has 'exited 1'
 stub 'echo "INCOMPLETE season 2026: 1/2 worker(s) reached in 20 request(s)."' 0;            expect 1 incomplete-line-exit-0 run; has 'INCOMPLETE'
-stub 'echo "REVALIDATED season 2026: 2/2 worker(s) reached (1,1) in 2 request(s)."' 0;      expect 1 repeated-ordinal run;  has 'not distinct'
+stub 'echo "REVALIDATED season 2026: 2/2 worker(s) reached (1,1) in 2 request(s)."' 0;      expect 1 repeated-ordinal run;  has 'do not identify workers 1 and 2'
+stub 'echo "REVALIDATED season 2026: 2/2 worker(s) reached (3,4) in 2 request(s)."' 0;      expect 1 wrong-ordinal-pair run
+stub 'echo "REVALIDATED season 2026: 2/2 worker(s) reached (1) in 2 request(s)."' 0;        expect 1 missing-worker-identity run
 stub 'echo "REVALIDATED season 2026: 3/3 worker(s) reached (1,2,3) in 3 request(s)."' 0;    expect 1 three-workers-when-two-expected run; has 'reached 3 of 3'
 stub 'echo "REVALIDATED season 2026: 1 worker(s) reached (single) in 1 request(s)."' 0;     expect 1 single-process-answer run
 stub 'echo "NOT CONFIGURED: neither AFLDB_REVALIDATE_URL nor AFLDB_REVALIDATE_SECRET is set; nothing was posted."' 2; expect 1 not-configured run; has 'exited 2'
@@ -25,7 +27,7 @@ stub 'echo "REVALIDATED season 2025: 2/2 worker(s) reached (2,1) in 2 request(s)
 stub 'echo "REVALIDATED season 2026: 2/2 worker(s) reached (2,1) in 2 request(s)."' 0
 expect 2 bad-season-argument run 26
 expect 0 explicit-season-and-count run 2026 2
-stub 'echo "REVALIDATED season 2026: 1/1 worker(s) reached (1) in 1 request(s)."' 0;        expect 0 one-worker-cluster-when-one-expected run 2026 1
+stub 'echo "REVALIDATED season 2026: 1/1 worker(s) reached (1) in 1 request(s)."' 0;        expect 2 one-worker-count-refused run 2026 1
 bash -n "$S" && pass=$((pass+1)) || { fails=$((fails+1)); echo '***** FAIL syntax'; }
 echo "T352-REVALIDATE RESULT $pass passed, $fails failed"
 [ "$fails" = 0 ]

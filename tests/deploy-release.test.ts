@@ -236,13 +236,16 @@ describe('AFLDB-ISSUE-329 — the systemd drop-in and the supervisor', () => {
       const SENTINEL = 'SENTINEL-TOKEN-8f3a91';
       await fetch(`http://127.0.0.1:${port}/players/${SENTINEL}?token=${SENTINEL}&email=${SENTINEL}%40example.test#frag-${SENTINEL}`);
       await fetch(`http://127.0.0.1:${port}/seasons/2026/rounds/3?x=1`);
+      await fetch(`http://127.0.0.1:${port}/admin/584193`);
       await fetch(`http://127.0.0.1:${port}/${SENTINEL}/a/b/c/d/e`);
       const lines = () => out.split('\n').filter((l) => l.includes('[trace]'));
       const until2 = Date.now() + 5000;
-      while (lines().length < 4 && Date.now() < until2) await new Promise((r) => setTimeout(r, 50));
+      while (lines().length < 5 && Date.now() < until2) await new Promise((r) => setTimeout(r, 50));
       const trace = lines().join('\n');
       expect(trace).toMatch(/method=GET route=\/players\/:x\b/);
-      expect(trace).toMatch(/route=\/seasons\/2026\/:x\/3\b/);
+      expect(trace).toMatch(/route=\/seasons\/:x\/:x\/:x\b/);
+      expect(trace).toMatch(/route=\/admin\/:x\b/);
+      expect(out).not.toContain('584193');
       expect(trace).toMatch(/route=\/:x\/:x\/:x\/:x\/\*/);
       expect(trace).toMatch(/worker=1 pid=\d+ rid=[0-9a-f-]{36} build=\S+ status=200/); // the identity fields are retained
       expect(trace).not.toContain('url=');

@@ -374,8 +374,12 @@ export async function revalidateSeason(
     // let a partly-covered cluster report success.
     if (reply.workerCount > workerCount) workerCount = reply.workerCount;
     if (reply.path) path = reply.path;
-    // A single-process `next start` reports no ordinal; one reply is then
-    // total coverage and the loop is done.
+    // An anonymous reply cannot acknowledge any member of a cluster.
+    if (reply.workerId === null && workerCount > 1) {
+      failures.push('Missing clustered worker identity');
+      continue;
+    }
+    // A single-process `next start` reports no ordinal.
     const id = reply.workerId ?? '1';
     if (!workersReached.includes(id)) workersReached.push(id);
     if (workersReached.length >= Math.max(1, workerCount)) break;

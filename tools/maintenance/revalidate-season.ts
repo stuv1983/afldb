@@ -80,7 +80,7 @@ export async function main(args: readonly string[], deps: RevalidateSeasonCliDep
 
   const readDotEnv = deps.readDotEnv ?? (() => {
     try {
-      return readFileSync(join(PROJECT_ROOT, '.env'), 'utf8');
+      return readFileSync(join(args.includes('--checkout-env') ? process.cwd() : PROJECT_ROOT, '.env'), 'utf8');
     } catch {
       return null;
     }

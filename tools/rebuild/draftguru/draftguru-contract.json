@@ -90,6 +90,9 @@
     "selection_number_blank": 1686,
     "note": "Live-source drift from this baseline is investigated and explicitly recorded, never silently accepted (runbook §7/§8, unresolved decision U5); --accept-baseline-drift is the explicit per-run human acknowledgement and records the measured delta"
   },
+  "historical_parsed_rows_sha256": {
+    "annual-html-20260826": "06936baca3b37133949847e7589008a06be76bbc8f1fb5b4d2fef8b743838a64"
+  },
   "reviewed_acquisitions": {
     "$comment": "AFLDB-ISSUE-348 F-348-1 (owner, 2026-11-22): an owner-reviewed acquisition is source-checked against this pin (exact raw page sha256 set, parsed rows sha256, corpus counts) instead of the frozen 2026-08-26 CSV oracle, which cannot judge a source that legitimately changed after it was frozen. ADDITIVE: a label not listed here (annual-html-20260826, annual-html-20260902, any other) keeps parity_baseline and CSV-oracle parity unchanged. Consumers: parse_draft_snapshot.reviewed_pin / validate_identity(label=) / verify_reviewed_pin, acquire_draft.py --seal-reviewed, import_draftguru.expected_population / verify_stage_a_manifest.",
     "annual-html-20261122": {

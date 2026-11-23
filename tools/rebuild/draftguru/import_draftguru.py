@@ -375,16 +375,18 @@ def verify_parsed_rows_pin(contract: dict, label: str, parse_result: dict) -> No
     covers the HTTP sidecar (``http/years/year_*.json``), whose ``final_url`` becomes every row's
     ``source_url`` and so ``source_record_id``. Re-deriving the digest of the exact in-memory rows
     (the parser's own ``parsed_rows_digest``, no second implementation) closes that gap. Runs
-    before any write preparation. A label without a reviewed pin is unchanged (additive).
+    before any write preparation. Historical digest pins supplement CSV parity.
     """
     pin = parser_mod.reviewed_pin(contract, label)
-    if pin is None:
+    digest = (pin.get("parsed_rows_sha256") if pin is not None else
+              contract.get("historical_parsed_rows_sha256", {}).get(label))
+    if pin is None and digest is None:
         return
     fresh = parser_mod.parsed_rows_digest(parse_result)
-    if fresh != pin.get("parsed_rows_sha256"):
+    if fresh != digest:
         raise ImportFailure(
             f"the freshly parsed rows' digest {fresh} is not the owner-reviewed pin "
-            f"{pin.get('parsed_rows_sha256')} for this label; the parsed rows (including row "
+            f"{digest} for this label; the parsed rows (including row "
             "provenance such as the HTTP sidecar final_url) are not the reviewed acquisition. "
             "Nothing was prepared or written.")
 
@@ -1428,6 +1430,11 @@ def link_only_cli_refusal(args) -> str | None:
 def validate(args) -> dict:
     """Phase A in full. Needs no psycopg."""
     contract = parser_mod.load_contract()
+    if args.label == "annual-html-20260902" and not (
+        parser_mod.reviewed_pin(contract, args.label)
+        or contract.get("historical_parsed_rows_sha256", {}).get(args.label)
+    ):
+        raise ImportFailure("Direct annual-html-20260902 import is held pending an independently reviewed parsed-row digest.")
     manifest = verify_stage_a_manifest(args.label)
     snapshot_dir = parser_mod.resolve_snapshot_dir(contract, args.snapshot_root, args.label)
     year_count = verify_raw_bytes(manifest, snapshot_dir)

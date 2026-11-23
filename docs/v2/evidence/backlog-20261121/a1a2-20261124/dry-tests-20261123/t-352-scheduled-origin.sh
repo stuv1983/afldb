@@ -240,6 +240,19 @@ chmod +x "$W/bin/mv"; rm -f "$MV_COUNT"
 expect 4 helper-second-rename-fails-restores env MV_FAIL_ON=2 bash -c 'PATH="$1" bash "$2/a2-helper-install.sh" install "$3"' _ "$PATHY" "$A" "$PAIR"; has 'RESTORED the previous helpers'
 [ "$(sha256sum < "$W/ops/afldb-offhost-pull-daily.sh" | cut -d' ' -f1)" = "$OLD" ] && [ ! -e "$W/ops/scheduled-pull-evidence.sh" ] && pass=$((pass+1)) || { fails=$((fails+1)); echo '***** FAIL previous state not restored'; }
 hreset; rm -f "$MV_COUNT"
+cat > "$W/bin/rm" <<'EOF'
+#!/bin/sh
+for path in "$@"; do
+  case "$path" in */ops/scheduled-pull-evidence.sh) exit 1;; esac
+done
+exec /bin/rm "$@"
+EOF
+chmod +x "$W/bin/rm"
+expect 5 helper-verifier-removal-fails-after-wrapper-rename-fails env MV_FAIL_ON=2 bash -c 'PATH="$1" bash "$2/a2-helper-install.sh" install "$3"' _ "$PATHY" "$A" "$PAIR"; has 'RESTORE NOT VERIFIED'
+expect 1 helper-pair-remains-partial hinst check; has 'verifier current, wrapper not'
+[ "$(sha256sum < "$W/ops/afldb-offhost-pull-daily.sh" | cut -d' ' -f1)" = "$OLD" ] && pass=$((pass+1)) || { fails=$((fails+1)); echo '***** FAIL previous wrapper was not preserved'; }
+rm -f "$W/bin/rm"
+hreset; rm -f "$MV_COUNT"
 cat > "$W/bin/mv" <<'EOF'
 #!/bin/sh
 exit 1

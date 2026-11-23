@@ -78,6 +78,10 @@ envgood; : > "$W/proc/101/environ"; expect 1 process-zero-zero checkenv
 envgood; printf 'AFLDB_REVALIDATE_URL=http://fixture\0' > "$W/proc/101/environ"; expect 1 process-missing-secret checkenv
 envgood; printf 'AFLDB_REVALIDATE_URL=\0AFLDB_REVALIDATE_SECRET=fixture\0' > "$W/proc/101/environ"; expect 1 process-blank-url checkenv
 envgood; printf 'AFLDB_REVALIDATE_SECRET=\0' >> "$W/proc/102/environ"; expect 1 process-duplicate-secret checkenv
+envgood; for p in 102 103; do tr '12' '34' < "$W/proc/$p/environ" > "$W/env"; mv "$W/env" "$W/proc/$p/environ"; done
+expect 1 process-wrong-worker-ordinals checkenv
+envgood; tr 2 1 < "$W/proc/103/environ" > "$W/env"; mv "$W/env" "$W/proc/103/environ"
+expect 1 process-duplicate-worker-ordinal checkenv
 envgood; WORKERS=102; expect 1 process-missing-worker checkenv
 source <(sed -n '/^expected_head_title()/,/^main() {/p' "$B/a1a2-20261124/a1-p6-observe.sh" | sed '$d')
 TITLE='2026 AFL Season — Ladder, Results &amp; Finals | AFLDB'

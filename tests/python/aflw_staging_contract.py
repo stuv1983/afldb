@@ -146,6 +146,9 @@ class RecordingConnection:
     def execute(self, statement: str) -> None:
         self.statements.append(statement)
 
+    def fetchall(self):
+        return []
+
     @contextlib.contextmanager
     def copy(self, statement: str):
         table = statement.split()[1].split(".")[1]
@@ -276,7 +279,7 @@ def main() -> int:
         connection = RecordingConnection()
         quiet(ls.load, connection, data)
         expect("every table is truncated, children first",
-               [s.split(".")[1].split()[0] for s in connection.statements[:8]]
+               [s.split(".")[1].split()[0] for s in connection.statements if s.startswith("TRUNCATE ")]
                == [name for name, _ in reversed(ls.TABLES)])
         copied_matches = connection.copied.get("matches", [])
         expect("the copied matches are the verified ones",

@@ -1,0 +1,135 @@
+"""Matched CLI race regression on a fresh, socket-only PostgreSQL test cluster."""
+
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+import time
+
+import psycopg
+from psycopg.conninfo import conninfo_to_dict, make_conninfo
+
+from aflw_staging_contract import REAL_EXPECTED_SEASON_KEYS, dataset, ls, write
+
+
+def fixture(keys):
+    tables = dataset(["2037" if key == "7" else key for key in keys])
+    for row in tables["matches"]:
+        row["weather_raw"] = "Clear"
+    for row in tables["player_match_stats"]:
+        row.update(jumper_number="1", position="MID")
+    for row in tables["player_seasons"]:
+        row.update(kicks="3", handballs="2", disposals="5", contested="1", metres_gained="10",
+                   marks="1", tackles="1", hitouts="0", fantasy_points="20",
+                   source_page=f"player__{row['player_slug']}.html")
+    for rows in tables.values():
+        for row in rows:
+            if row.get("season_key") == "2037":
+                for col, value in row.items():
+                    row[col] = value.replace("2037", "2022" if "date" in col or col == "calendar_year" else "7")
+    return tables
+
+
+def snapshot(conn):
+    return {
+        table: conn.execute(
+            f"SELECT to_jsonb(t)::text FROM staging_aflw.{table} t ORDER BY 1"
+        ).fetchall()
+        for table, _ in ls.TABLES
+    }
+
+
+def public_2027(conn):
+    return tuple(
+        conn.execute(f"SELECT to_jsonb(t)::text FROM aflw.{view} t WHERE season_key = '2027' ORDER BY 1").fetchall()
+        for view in ("seasons", "fixtures", "matches", "ladders", "player_match_stats", "player_seasons")
+    )
+
+
+def main():
+    source, expectation = sys.argv[1:]
+    dsn = os.environ["AFLDB_TEST_DATABASE_URL"]
+    params = conninfo_to_dict(dsn)
+    assert params["host"].startswith("/tmp/afldb-astra-") and params["dbname"].endswith("_test")
+    old_keys = REAL_EXPECTED_SEASON_KEYS
+    new_keys = [*old_keys, "2027"]
+    launcher = """
+import sys
+sys.path.insert(0, sys.argv.pop(1) + '/tools/aflw')
+import load_staging as ls
+if sys.argv.pop(1) == 'expanded':
+    ls.EXPECTED_SEASON_KEYS = [*ls.EXPECTED_SEASON_KEYS, '2027']
+raise SystemExit(ls.main())
+"""
+    loader_dsn = make_conninfo(dsn, application_name="aflw_staging_race_loader", options="-c role=afldb_import")
+    env = dict(os.environ, AFLDB_IMPORT_DATABASE_URL=loader_dsn)
+
+    with tempfile.TemporaryDirectory() as tmp, psycopg.connect(dsn) as writer:
+        old = Path(tmp) / "old"
+        complete = Path(tmp) / "complete"
+        write(old, fixture(old_keys))
+        write(complete, fixture(new_keys))
+
+        def command(directory, inventory="stock"):
+            return [sys.executable, "-c", launcher, source, inventory, "--load", "--in", str(directory)]
+
+        def run(directory, inventory="stock"):
+            return subprocess.run(command(directory, inventory), env=env, capture_output=True, text=True, timeout=20)
+
+        initial = run(old)
+        assert initial.returncode == 0, initial.stdout + initial.stderr
+        print("PASS complete reviewed eleven-season generation loads through CLI")
+        writer.execute("SET LOCAL ROLE afldb_import")
+        rows = fixture(new_keys)
+        for table, columns in ls.TABLES:
+            for row in rows[table]:
+                if row.get("season_key") != "2027":
+                    continue
+                with writer.cursor().copy(f"COPY staging_aflw.{table} ({', '.join(columns)}) FROM STDIN") as copy:
+                    copy.write_row([row[c] if row[c] or c in ls.BLANK_IS_EMPTY_STRING else None for c in columns])
+        before = snapshot(writer)
+        public = public_2027(writer)
+        assert all(public), "writer did not produce 2027 public rows"
+
+        with subprocess.Popen(command(old), env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) as loader:
+            try:
+                deadline = time.monotonic() + 10
+                while time.monotonic() < deadline:
+                    writer.execute("SELECT pg_stat_clear_snapshot()")
+                    blocked = writer.execute(
+                        "SELECT true FROM pg_stat_activity WHERE application_name = 'aflw_staging_race_loader' "
+                        "AND pg_backend_pid() = ANY(pg_blocking_pids(pid))"
+                    ).fetchone()
+                    if blocked:
+                        break
+                    assert loader.poll() is None, "loader exited before waiting for writer"
+                    time.sleep(0.02)
+                else:
+                    raise AssertionError("loader never blocked behind writer")
+                print("PASS PostgreSQL identifies the writer as the CLI loader's blocker before commit")
+                writer.commit()
+                stdout, stderr = loader.communicate(timeout=20)
+            finally:
+                if loader.poll() is None:
+                    loader.kill()
+
+        if expectation == "base":
+            assert loader.returncode == 0, stdout + stderr
+            assert not any(public_2027(writer)) and snapshot(writer) != before
+            print("REPRODUCED base exits 0 and erases the committed 2027 season and public rows")
+            return
+        assert expectation == "fixed"
+        assert loader.returncode == 1 and "omits existing staging seasons: 2027" in stderr, stdout + stderr
+        assert snapshot(writer) == before
+        assert public_2027(writer) == public
+        print("PASS fixed CLI exits 1 and preserves every staging row and all six 2027 public views")
+        writer.commit()
+        replacement = run(complete, "expanded")
+        assert replacement.returncode == 0, replacement.stdout + replacement.stderr
+        assert snapshot(writer) == before and public_2027(writer) == public
+        print("PASS complete replacement succeeds with an independently advanced test inventory")
+
+
+if __name__ == "__main__":
+    main()

@@ -21,6 +21,28 @@ reset() { rm -rf "$W/bk"; mkdir -p "$W/bk"; mk "$G"; JL=$(journal "$G"); }
 pick() { pick_overnight_dump "$W/bk" "$DAY" "$JL"; }
 
 reset; expect 0 unique-dump-attributed pick; has "$G $(cut -d' ' -f1 "$W/bk/$G.sha256")"
+reset; printf '%s  wrong.dump\n' "$(cut -d' ' -f1 "$W/bk/$G.sha256")" > "$W/bk/$G.sha256"
+expect 1 correct-digest-wrong-sidecar-basename pick
+reset; sed -i 's/  afldb/ *afldb/' "$W/bk/$G.sha256"; expect 0 exact-basename-binary-sidecar pick
+reset; mk "$VER"; mk "afldb_prod-$DAY-090000.dump"
+HS=$(cut -d' ' -f1 "$W/bk/$VER.sha256")
+MANUAL="afldb_prod-$DAY-090000.dump"; MH=$(cut -d' ' -f1 "$W/bk/$MANUAL.sha256")
+J="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 1795538210 $VER 1"
+JOURNAL=$W/verify-journal.json
+printf '%s\n' \
+  "{\"_SYSTEMD_UNIT\":\"afldb-backup-verify.service\",\"_SYSTEMD_INVOCATION_ID\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"__REALTIME_TIMESTAMP\":\"1795538210123456\",\"MESSAGE\":\"2026-11-24T16:36:50Z scheduled-backup: verify ok: $VER restored and proven (attempt 1)\"}" \
+  "{\"_SYSTEMD_UNIT\":\"session-1.scope\",\"_SYSTEMD_INVOCATION_ID\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"__REALTIME_TIMESTAMP\":\"1795550400123456\",\"MESSAGE\":\"2026-11-24T22:00:00Z scheduled-backup: verify ok: $MANUAL restored and proven (attempt 1)\"}" > "$JOURNAL"
+journalctl() { cat "$JOURNAL"; }
+expect 0 collect-only-verification-unit-proof restore_journal 1795538190 1795538211 "$(command -v node)"
+has "$J"
+unset -f journalctl
+restore() { match_restore "$W/bk" "$DAY" 1795538190 1795538211 "$@"; }
+expect 0 scheduled-restore-dump-and-state-match restore "$J" 1795538209 "$VER" "$HS" 1
+expect 1 later-manual-restore-overwrote-state restore "$J" 1795550400 "$MANUAL" "$MH" 1
+expect 1 same-dump-late-manual-state restore "$J" 1795550400 "$VER" "$HS" 1
+expect 1 ambiguous-restore-invocation restore "$J"$'\n'"$J" 1795538209 "$VER" "$HS" 1
+printf changed >> "$W/bk/$VER"
+expect 1 changed-restored-dump restore "$J" 1795538209 "$VER" "$HS" 1
 reset; mk "$VER"; expect 0 verification-service-dump-beside-overnight pick; has "$G "
 echo 'Old selector (ls | head -1) on the ambiguous fixture picks the decoy; the new selector refuses.'
 reset; mk "$DECOY"

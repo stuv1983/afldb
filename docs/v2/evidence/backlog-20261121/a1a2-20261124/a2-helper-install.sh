@@ -98,7 +98,7 @@ rollback() {
       cp -p "$OPS/$n.pre-352-$STAMP" "$OPS/.$n.restore-$STAMP" && mv -f "$OPS/.$n.restore-$STAMP" "$OPS/$n" || bad=1
       [ "$(sha "$OPS/$n.pre-352-$STAMP")" = "$(sha "$OPS/$n")" ] || bad=1
     else
-      rm -f -- "$OPS/$n"
+      rm -f -- "$OPS/$n" && [ ! -e "$OPS/$n" ] && [ ! -L "$OPS/$n" ] || bad=1
     fi
   done
   rm -f -- "$OPS"/."$W_NAME".new-"$STAMP" "$OPS"/."$V_NAME".new-"$STAMP" "$OPS"/."$W_NAME".restore-"$STAMP" "$OPS"/."$V_NAME".restore-"$STAMP"

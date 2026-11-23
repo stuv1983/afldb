@@ -492,7 +492,13 @@ def connect():
     import psycopg
     # afldb_import: the role every ETL script writes with (see common.py).
     # Not the owner role — this script never alters schema, only rows.
-    return psycopg.connect(require_env("AFLDB_IMPORT_DATABASE_URL"))
+    conn = psycopg.connect(require_env("AFLDB_IMPORT_DATABASE_URL"))
+    conn.isolation_level = psycopg.IsolationLevel.READ_COMMITTED
+    return conn
+
+
+class ReplacementOmitsSeason(ValueError):
+    """The verified generation would remove an existing staging season."""
 
 
 def load(conn, data: dict[str, list[dict]]) -> None:
@@ -506,6 +512,15 @@ def load(conn, data: dict[str, list[dict]]) -> None:
         raise ValueError(f"unverified generation, missing {missing}")
     total = 0
     with conn.cursor() as cur:
+        # Lock parents before children, then take a READ COMMITTED snapshot.
+        # A writer may commit while we are waiting for these locks.
+        targets = ", ".join(f"staging_aflw.{name}" for name, _ in TABLES)
+        cur.execute(f"LOCK TABLE {targets} IN ACCESS EXCLUSIVE MODE")
+        cur.execute("SELECT season_key FROM staging_aflw.seasons")
+        incoming = {row["season_key"] for row in data["seasons"]}
+        omitted = sorted({key for (key,) in cur.fetchall()} - incoming)
+        if omitted:
+            raise ReplacementOmitsSeason(f"replacement omits existing staging seasons: {', '.join(omitted)}")
         for name, _ in reversed(TABLES):
             cur.execute(f"TRUNCATE staging_aflw.{name} CASCADE")
         for name, columns in TABLES:
@@ -573,6 +588,9 @@ def main() -> int:
         with conn:
             load(conn, data)
         print("Committed.")
+    except ReplacementOmitsSeason as exc:
+        print(f"ERROR: {exc}. Staging was preserved.", file=sys.stderr)
+        return 1
     finally:
         conn.close()
     return 0

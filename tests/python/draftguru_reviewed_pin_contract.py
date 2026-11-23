@@ -313,6 +313,19 @@ with tempfile.TemporaryDirectory() as td:
         ok = isinstance(e, imp.ImportFailure) and "owner-reviewed pin" in str(e)
     check("3b.6 a pin that carries no parsed_rows_sha256 fails closed", ok)
 
+    historical = {"historical_parsed_rows_sha256": {"annual-html-20260826": p.parsed_rows_digest(pristine)}}
+    check("3b.7 August uses its independent digest without changing its CSV parity contract",
+          imp.verify_parsed_rows_pin(historical, "annual-html-20260826", pristine) is None)
+    rejected, _ = refuses(lambda: imp.verify_parsed_rows_pin(
+        historical, "annual-html-20260826", {"rows_by_year": {}}),
+                          "owner-reviewed pin")
+    check("3b.8 August rejects different freshly parsed rows", rejected)
+
+    from types import SimpleNamespace
+    rejected, _ = refuses(lambda: imp.validate(SimpleNamespace(label="annual-html-20260902")),
+                          "held pending an independently reviewed parsed-row digest")
+    check("3b.9 September is held before reading the acquisition", rejected)
+
 # ---------------------------------------------------------------------------
 section("4. acquire_draft.py --seal-reviewed is offline and fail-closed")
 

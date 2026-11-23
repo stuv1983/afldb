@@ -5,7 +5,7 @@
 # Every check prints PASS / FAIL / INFO / NOTE; any FAIL = R6 PRE RESULT STOP = do not reboot (runbook section 7, GO/NO-GO).
 # Command inventory (closure allowlist): hostname id date cat uname uptime dpkg-query stat ls sed grep awk sort cut head tail tr wc basename
 #   sha256sum cmp findmnt sysctl apt-config systemctl(show|is-active|is-enabled|list-timers|list-unit-files) pgrep readlink git(rev-parse)
-#   journalctl(-u afldb-backup.service --since --until -o cat --no-pager; read-only, ISSUE-352 dump attribution)
+#   journalctl (backup and verification units, bounded time windows, cat/JSON output; read-only)
 #   node deploy/release.mjs status | sh deploy/afldb-settle-failure-status.sh | bash tools/maintenance/scheduled-backup.sh status
 #   psql (read-only shape of a2-p0-entry.sh) df free printf echo test; redirections only 2>&1, 2>/dev/null, here-strings, here-docs.
 # Run (workstation Git Bash; never at minute :16-:18, when streamanator's r2 check connects):
@@ -28,11 +28,43 @@ pick_overnight_dump() { # backup-dir yyyymmdd service-journal-text
   [ -f "$sd.sha256" ] && [ "$(wc -l < "$sd.sha256")" = 1 ] || { echo "REASON $name has no one-line sidecar"; return 1; }
   ss=$(cut -d' ' -f1 "$sd.sha256"); a=$(sha256sum < "$sd" | cut -d' ' -f1)
   [[ $ss =~ ^[0-9a-f]{64}$ ]] && [ "$a" = "$ss" ] || { echo "REASON $name re-hash $a != sidecar '$ss'"; return 1; }
+  awk -v h="$ss" -v n="$name" 'NF==2 && $1==h {sub(/^\*/, "", $2); if ($2==n) good=1} END {exit !(NR==1 && good)}' "$sd.sha256" \
+    || { echo "REASON checksum sidecar does not name $name"; return 1; }
   mapfile -t jb < <(sed -n 's/.*scheduled-backup: backup ok: \([^ ]*\) [0-9]* bytes sha256 \([0-9a-f]*\).*/\1 \2/p' <<< "$jl")
   [ "${#jb[@]}" -eq 1 ] || { echo "REASON the afldb-backup.service journal reports ${#jb[@]} 'backup ok' lines (need exactly 1): dump attribution unproven"; return 1; }
   [ "${jb[0]%% *}" = "$name" ] && [ "${jb[0]#* }" = "${ss:0:16}" ] || { echo "REASON the service reported '${jb[0]}', not $name sha256 ${ss:0:16}: the same-window file is not the service's dump"; return 1; }
   echo "$name $ss"
 }
+
+# Accept only the scheduled service's unique completion, and reject a
+# last-verify record subsequently replaced by a manual restore.
+match_restore() { # backup-dir YYYYMMDD start exit journal state-epoch state-file state-sha attempts
+  local bk=$1 day=$2 start=$3 end=$4 journal=$5 epoch=$6 file=$7 digest=$8 attempts=$9
+  local invocation timestamp restored count actual
+  [[ $journal != *$'\n'* ]] || return 1
+  read -r invocation timestamp restored count <<< "$journal"
+  [[ $invocation =~ ^[0-9a-f]{32}$ && $timestamp =~ ^[0-9]{10}$ && $epoch =~ ^[0-9]{10}$ &&
+     $file =~ ^afldb_prod-${day}-03[0-5][0-9][0-5][0-9]\.dump$ && $digest =~ ^[0-9a-f]{64}$ &&
+     $attempts =~ ^[12]$ && $file = "$restored" && $attempts = "$count" ]] || return 1
+  (( start <= epoch && epoch <= timestamp && timestamp <= end && timestamp - epoch <= 10 )) || return 1
+  actual=$(sha256sum < "$bk/$file") || return 1
+  [[ ${actual%% *} = "$digest" ]] || return 1
+  printf '%s %s %s %s\n' "$invocation" "$timestamp" "$file" "$digest"
+}
+
+restore_journal() {
+  journalctl -u afldb-backup-verify.service --since "@$1" --until "@$(($2 + 1))" -o json --no-pager |
+    "$3" -e '
+      const readline = require("node:readline");
+      readline.createInterface({ input: process.stdin }).on("line", (line) => {
+        const entry = JSON.parse(line);
+        const ok = /^\S+ scheduled-backup: verify ok: (\S+) restored and proven \(attempt ([12])\)$/.exec(entry.MESSAGE);
+        if (ok && entry._SYSTEMD_UNIT === "afldb-backup-verify.service") {
+          console.log(entry._SYSTEMD_INVOCATION_ID, Math.floor(Number(entry.__REALTIME_TIMESTAMP) / 1e6), ok[1], ok[2]);
+        }
+      });'
+}
+
 main() {
 set -uo pipefail; export LC_ALL=C
 OUTC=${1:-}; CUR=${2:-}; R3=${3:-}; R4=${4:-}; WIN=${5:-10:00}
@@ -58,7 +90,7 @@ DAY=$(TZ=Australia/Melbourne date +%F); TODAYC=$(TZ=Australia/Melbourne date +%Y
 echo "== R6 PRE $(date -u +%FT%TZ) local $(mel "$(date +%s)") host=$(hostname) user=$(id -un) outcome=$OUTC current=$CUR $R3 $R4 window=$DAY $WIN"
 if [ "${R6_DRYRUN:-0}" = 1 ]; then [ "$(hostname)" != afldb-prod ] || { echo "STOP R6_DRYRUN is refused on afldb-prod"; exit 2; }; info "DRY RUN (not production)"
 else [ "$(hostname)" = afldb-prod ] && [ "$(id -un)" = arm ] || { echo "STOP not arm@afldb-prod"; exit 2; }; fi
-[ "$(TZ=Australia/Melbourne date +%a)" = Wed ] && ok "today is Wednesday ($DAY)" || bad "today is not Wednesday: the first-scheduled-run expectations do not apply; re-plan"
+[ "$DAY" = 2026-11-25 ] && ok "today is Wednesday ($DAY)" || bad "today is not the scheduled Wednesday (2026-11-25); re-plan"
 echo "BOOT_ID $(cat /proc/sys/kernel/random/boot_id)"
 
 echo "-- 1. kernels and reboot state"
@@ -129,15 +161,22 @@ else bad "no checkout $CHK"; fi
 
 echo "-- 5. first scheduled backup (Wed 02:20 unit) and restore check (Wed 03:30 unit)"
 if [ "$R3" = r3:no ]; then
-  echo "NOTE r3:no: no scheduled backup exists by design; NG-FALLBACK can then only be met by a completed snapshot"
+  bad "r3:no: Wednesday requires its own scheduled backup, off-host copy and restore verification"
 else
   B0=$(ep "$DAY 02:20"); B1=$(ep "$DAY 02:31"); V0=$(ep "$DAY 03:30"); V1=$(ep "$DAY 03:41")
   bs=$(ts afldb-backup.service ExecMainStartTimestamp); br=$(systemctl show afldb-backup.service -p Result --value 2>/dev/null); bx=$(systemctl show afldb-backup.service -p ExecMainStatus --value 2>/dev/null)
   [ "$bs" -ge "$B0" ] && [ "$bs" -le "$B1" ] && [ "$br" = success ] && [ "$bx" = 0 ] && ok "afldb-backup.service scheduled run $(mel "$bs") Result=$br status=$bx" \
     || bad "afldb-backup.service last start $([ "$bs" -gt 0 ] && mel "$bs" || echo never) Result=$br status=$bx (expected today 02:20-02:31, success, 0)"
   vs=$(ts afldb-backup-verify.service ExecMainStartTimestamp); vr=$(systemctl show afldb-backup-verify.service -p Result --value 2>/dev/null); vx=$(systemctl show afldb-backup-verify.service -p ExecMainStatus --value 2>/dev/null)
-  [ "$vs" -ge "$V0" ] && [ "$vs" -le "$V1" ] && [ "$vr" = success ] && [ "$vx" = 0 ] && ok "afldb-backup-verify.service scheduled run $(mel "$vs") Result=$vr status=$vx" \
-    || bad "afldb-backup-verify.service last start $([ "$vs" -gt 0 ] && mel "$vs" || echo never) Result=$vr status=$vx (expected today 03:30-03:41, success, 0)"
+  vf_end=$(ts afldb-backup-verify.service ExecMainExitTimestamp)
+  vt=$(ts afldb-backup-verify.timer LastTriggerUSec)
+  vf_window=$((V1 + 3600))
+  restore_service_ok=0
+  if (( V0 <= vt && vt <= vs && vs <= V1 && vs - vt <= 5 && vs <= vf_end && vf_end <= vf_window )) &&
+      [ "$vr" = success ] && [ "$vx" = 0 ]; then
+    ok "afldb-backup-verify.service scheduled run $(mel "$vs") Result=$vr status=$vx"
+    restore_service_ok=1
+  else bad "restore service lacks a matching timer dispatch, start and successful completion in the Wednesday window"; fi
   jf() { sed -n "s/.*\"$2\":\"\{0,1\}\([^\",}]*\)\"\{0,1\}[,}].*/\1/p" "$1" 2>/dev/null | head -1; }
   LV=$BK/.state/last-verify.json; ve=$(jf "$LV" epoch); vf=$(jf "$LV" file); vsha=$(jf "$LV" sha256); va=$(jf "$LV" attempts)
   info "last-verify.json: file=$vf sha256=$vsha attempts=$va"; info "last-backup.json: $(cat "$BK/.state/last-backup.json" 2>/dev/null)"
@@ -148,7 +187,11 @@ else
     ok "scheduled 02:2x dump is unique, equals the afldb-backup.service journal's own dump, re-hash = its sidecar: $SDN $(stat -c %s "$BK/$SDN") B"
     echo "OFFHOST-COMPARE $SDN $SS"
   else bad "scheduled 02:2x dump not attributable: ${PICK#REASON }"; fi
-  [ -n "$ve" ] && [ "$ve" -ge "$V0" ] && ok "last-verify.json written by today's 03:30 run ($(mel "$ve"), attempts $va)" || bad "last-verify.json not from today's 03:30 run"
+  RESTORE=
+  if [ "$restore_service_ok" = 1 ] && VJ=$(restore_journal "$vs" "$vf_end" "$N") &&
+      RESTORE=$(match_restore "$BK" "$TODAYC" "$vs" "$vf_end" "$VJ" "$ve" "$vf" "$vsha" "$va"); then
+    ok "restore journal invocation, completion, dump, state and rehash agree (attempts $va)"
+  else bad "last-verify.json and restored dump do not match the scheduled service invocation"; fi
   [ "$va" = 1 ] || info "verify attempts=$va (2 = one benign retry; record it)"
   M=$(ls -1 "$BK"/.state/FAILED-* 2>/dev/null | tr '\n' ' '); [ -z "$M" ] && ok "no FAILED marker" || bad "FAILED marker(s): $M"
   (cd "$CHK" && AFLDB_BACKUP_DIR=$BK bash tools/maintenance/scheduled-backup.sh status) 2>&1 | sed 's/^/     /'; [ "${PIPESTATUS[0]}" = 0 ] && ok "scheduled-backup.sh status rc 0" || bad "scheduled-backup.sh status not 0"
@@ -165,9 +208,11 @@ SQL
   ) 2>&1 )
   printf '%s\n' "$RO" | sed 's/^/     /'
   grep -qx 'ledger|118|118_fixtures_unconfirmed_participants.sql' <<< "$RO" && ok "ledger 118" || bad "ledger differs"
-  [ -n "$vsha" ] && grep -qx "rt|afldb_restore_test|afldb.restore_test.v1 sha256=$vsha|0" <<< "$RO" && ok "afldb_restore_test proven by today's verify (comment sha = last-verify sha), numbackends 0" \
-    || bad "afldb_restore_test comment or numbackends not as expected"
-  echo "RESTORE-SHA ${vsha:-none}"
+  if [ -n "$RESTORE" ] && grep -Fxq "rt|afldb_restore_test|afldb.restore_test.v1 sha256=$vsha|0" <<< "$RO"; then
+    ok "afldb_restore_test comment matches the scheduled restore dump, numbackends 0"
+    echo "RESTORE-EVIDENCE $RESTORE"
+    echo "RESTORE-SHA $vsha"
+  else bad "afldb_restore_test lacks the scheduled restore digest or has active connections"; fi
 fi
 
 echo "-- 6. capacity"

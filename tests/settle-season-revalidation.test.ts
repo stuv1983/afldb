@@ -531,6 +531,16 @@ describe('AFLDB-ISSUE-134 — every worker, or a reported failure', () => {
     expect(outcome.attempts).toBe(16);
   });
 
+  it('does not count a reply missing its clustered worker identity as worker 1', async () => {
+    let calls = 0;
+    const outcome = await revalidateSeason(config, 2026, async () => ({
+      status: 200, workerId: calls++ === 0 ? '2' : null, workerCount: 2, path: '/seasons/2026',
+    }));
+    expect(outcome.ok).toBe(false);
+    expect(outcome.workersReached).toEqual(['2']);
+    expect(outcome.failures).toContain('Missing clustered worker identity');
+  });
+
   it('fails observably when the route refuses, and never throws', async () => {
     const outcome = await revalidateSeason(config, 2026, async () => ({
       status: 401, workerId: null, workerCount: 0, path: null,
