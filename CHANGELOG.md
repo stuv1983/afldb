@@ -15,7 +15,13 @@ commit.
 
 ## [Unreleased]
 
-### R6 independent-review fixes (23 November 2026, late; local on `claude/r6-review-fixes-20261123`, not pushed; nothing deployed)
+### R6 r3 re-review fixes (24 November 2026; local on `claude/r6-review-fixes-r3-20261124`, not pushed; nothing deployed)
+
+- **R6 A-2 verifies the owner-attested service InvocationID.** `r6-pre-verify.sh` now takes the Tuesday outcome and the attested InvocationID from the Tuesday sitting record (new read-only `r6-tuesday-handoff.sh`). It STOPs unless the live `systemctl` InvocationID equals that ID, which closes a false PASS after an unattested restart when `events.log` is unreadable, malformed or superseded. It also STOPs on a carriage return in the `release.mjs status` output.
+- **R6 staging and re-check enforce exact archive contents.** Both printed blocks check the manifest against its independent pin, owner/permissions/hard links, the exact path-and-type listing and the hashes, so extra entries, nested manifests and symlinks to identical bytes are rejected. Helper revision `9a9a01c1`, 16 files, manifest `2c7ee8e2…` ([R6 runbook r3 amendment](docs/v2/evidence/backlog-20261121/ATTENDED-PLAN-R6-20261125.md)). Supersedes the r2 archive.
+- **R6 F-4 executes the hashed helper bytes** behind the unchanged arm@afldb-prod guard. The rehearsal driver is run-scoped and fails on any unexpected result ([record](docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r3-20261124/README.md)).
+
+### R6 independent-review fixes (23 November 2026, late; local on `claude/r6-review-fixes-20261123`, not pushed; nothing deployed; superseded by r3)
 
 - **R6 A-2 now gates on the serving release.** `r6-pre-verify.sh` runs `release.mjs status` without `--expect`, which writes nothing (`--expect` appends to `events.log`). It STOPs unless that one invocation exits 0 with exactly one result line, `release: STATUS PASS <CURRENT_ID>`, and no "restarted since the last attested PASS" note. Before this, a service still running the previous release behind a matching `current` symlink passed A-2.
 - **R6 F-4 raw-head entry point guarded.** New `r6-rawhead-check.sh` refuses (exit 2) unless the user is `arm` on host `afldb-prod`, before `.env` is read, a probe file is created or a request is made. It then runs Sunday's pinned `a1-rawhead.sh` unchanged.
