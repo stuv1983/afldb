@@ -101,4 +101,29 @@ system Python: 535 failed assertions in 319 files, 14,378 passed, 1,131 skipped,
 
 ## 8. Hand-back
 
-EXACT_PLACEHOLDER
+**Exact-commit confirmation.** The tree of `53e59cd74d8a0a0c34bf1427f6309afa0801bd56` (the commit that carries the test repair and the
+records) was exported with `git archive` into a new directory on streamanator (no `.git`, no prior `node_modules`) and run from scratch.
+Every step exited 0:
+
+| Step | Result |
+|---|---|
+| `npm ci`; `npm run typecheck`; `npm run lint:gate` | 0; 0; 0 (ratchet 338 errors in 43 files = baseline) |
+| `npm run build` | 0 on the first attempt (standalone bundle ready) |
+| `vitest` selector test | 12/12 |
+| `vitest` deploy-release, settle-season-revalidation, deploy-web-unit | 3 files, 213/213 |
+| `t-352-scheduled-origin` / `-preverify-selector` / `-revalidate-accept` / `t-sunday-review` / `t-offhost-stamp` | 139/139; 42/42; 27/27; 31/31; PASS |
+| `aflw_staging_contract.py`; DraftGuru pin and operator-review contracts | 54/54; hold; hold |
+| `aflw_staging_race.py` against the reviewed `c154f36b` loader (`base`) / the candidate (`fixed`) | REPRODUCED erasure of 2027 / all four PASS lines |
+| the same script against a TCP DSN | exit 1, guard refusal (expected) |
+
+The Windows worktree at that commit also gives `npm run typecheck` exit 0 and the selector test 12/12. The commit that follows adds only
+this section to this file.
+
+**Remaining blockers (technical versus pending decision).**
+* **Technical:** none demonstrated against the push or the application release. The one repository defect found was test-only and is repaired.
+  The production build needs a stable Google Fonts fetch (it passed on retry) and a reachable migrated database, as before.
+* **Pending review or owner approval, not technical:** Astra's re-review of this fix branch; the push; the application release; and the
+  Wednesday reboot, which stays NO-GO until its own overnight backup, attributable 03:10 off-host copy, separate verification-service
+  restore and attended recovery checks. Tuesday 24 November 03:10 AEDT is the next scheduled observation of ISSUE-352's origin.
+* **Open evidence gaps:** the original 476 failure names; September DraftGuru's independent digest; the unknown construction of the workspace
+  whose typecheck lacked the tracked `.mts`.
