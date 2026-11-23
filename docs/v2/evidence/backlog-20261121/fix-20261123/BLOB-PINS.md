@@ -1,5 +1,8 @@
 # Raw Git-blob SHA-256 pins — ISSUE-352 helper pair (code commit `88be90f0e676112c4239032b2e8548389db5ec7d`)
 
+Historical preparation and installation evidence. For Wednesday's active archive command and full pins, use
+[the attended R6 plan, section 0](../ATTENDED-PLAN-R6-20261125.md#0-scripts-and-pins).
+
 Calculated by hashing the raw stdout bytes of `git show 88be90f0e676112c4239032b2e8548389db5ec7d:<path>` with SHA-256. Supersedes the 22 Nov table in `../sunday-review-20261122/BLOB-PINS.md` for every file listed here; rows marked unchanged are identical to that table.
 
 | Git blob path at the code commit | Full SHA-256 | Change |

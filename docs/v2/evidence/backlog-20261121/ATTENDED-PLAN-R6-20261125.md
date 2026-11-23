@@ -19,18 +19,61 @@ parse, run to their end, refuse the wrong host and write nothing; they prove not
 
 ## 0. Scripts and pins
 
-| Script (all in `r6-20261125/` unless noted) | Where, as whom | sha256 of the LF form (`tr -d '\r' < f \| sha256sum`) |
-|---|---|---|
-| `r6-pre-verify.sh <accepted\|stopped\|rolledback> <CURRENT_ID> <r3:yes\|no> <r4:yes\|no> [10:00\|14:00]` | production, arm, one connection, read-only | `f142f9fc1f51d08e1b6d6e5d5545b0f2569ec1ced80e3efcea2d846713c7ba36` |
-| `r6-offhost-verify.sh <DUMP_NAME> <DUMP_SHA256>` | streamanator, arm, read-only | `787ec230ea33eb42cfb18d65771390d42e749d92bfa64c8547ca81a84e387b8f` |
-| `r6-post-verify.sh full <KERNEL> <CURRENT_ID> <PRE_BOOT_ID> <PRE_INVOCATION_ID> <RESTORE_SHA\|none> <r4:yes\|no> <GRUB_BASELINE>` / `grub <GRUB_BASELINE>` | production, arm, one connection per run, read-only | `818aa00978d1bb2f897d879e4ffd8c6cab000c60a56fe2343608e1eff4b63ba8` |
-| `r6-public-smoke.sh` | workstation, public GETs only | `de84f1205b4ab4cfec182b1fb7b0770ca916c8570f10a14539daa9a4e450bd9e` |
-| `../a1a2-20261124/a1-s9-public-smoke.sh <BUILD_ID>`, `../a1a2-20261124/a1-rawhead.sh check` | as in the A1 runbook | unchanged since run d |
+Use the immutable helper revision `b48a2c5e1925e0a1dfa148b14203577df120b0a4` below. Stage the same archive on the workstation, production and streamanator. On the workstation, from the repository in Git Bash:
 
-Each script's header carries its complete command inventory (reviewer F-008); `R6_DRYRUN=1` is refused on host `afldb-prod`.
-**Transport** (as A1/A2): `tr -d '\r' < <script> | C:/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes afldb bash -s -- <args>`; one
-connection per step; never at minute :16-:18 (streamanator's hourly r2 check connects then); never a retry loop (the home IPS blocks
-bursts of SSH and then the host only *looks* dead). streamanator: `ssh -o BatchMode=yes -i ~/.ssh/afldb_dev arm@10.0.40.100`.
+```bash
+CODE=b48a2c5e1925e0a1dfa148b14203577df120b0a4
+B=docs/v2/evidence/backlog-20261121
+git archive --format=tar --output=/tmp/afldb-r6-20261125.tar "$CODE" \
+  "$B/r6-20261125/r6-pre-verify.sh" \
+  "$B/r6-20261125/r6-offhost-verify.sh" \
+  "$B/r6-20261125/r6-post-verify.sh" \
+  "$B/r6-20261125/r6-public-smoke.sh" \
+  "$B/r6-20261125/r6-revalidate-accept.sh" \
+  "$B/a1a2-20261124/a1-s9-public-smoke.sh" \
+  "$B/a1a2-20261124/a1-rawhead.sh" \
+  "$B/a1a2-20261124/a2-cron-observe.sh" \
+  "$B/a1a2-20261124/a2-helper-install.sh" \
+  "$B/kits/afldb-offhost-pull-daily.sh" \
+  "$B/kits/scheduled-pull-evidence.sh" \
+  "tools/maintenance/offhost-pull.sh" \
+  "tools/maintenance/revalidate-season.ts" \
+  "src/lib/acquisition/season-revalidation.ts"
+```
+
+Transfer the archive to `/tmp/afldb-r6-20261125.tar` on each named host. On each host, keep the printed staging path for the later commands. STOP if extraction or any hash check fails.
+
+```bash
+B=docs/v2/evidence/backlog-20261121
+STAGE=$(mktemp -d /tmp/afldb-r6-20261125.XXXXXX) &&
+  tar -xf /tmp/afldb-r6-20261125.tar -C "$STAGE" &&
+  (cd "$STAGE" && sha256sum -c <<'R6_PINS'
+1d61b08618a6f2b762a46047f94c68550b9179d6c73e2c58cacb8a2d551cb0a8  docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh
+429eec29acf254179c3b7ae7d6489a6c695981fd90996c5c2ce1301314bcc18c  docs/v2/evidence/backlog-20261121/r6-20261125/r6-offhost-verify.sh
+26070c9e12458f488ebaee6eabb84ea7d8003135d96d83f1bfb3576eb070b44e  docs/v2/evidence/backlog-20261121/r6-20261125/r6-post-verify.sh
+de84f1205b4ab4cfec182b1fb7b0770ca916c8570f10a14539daa9a4e450bd9e  docs/v2/evidence/backlog-20261121/r6-20261125/r6-public-smoke.sh
+5e5ce991a5e4bf0875c49e01cc0f90db7da720a0f1c022507cec869d3cc067f0  docs/v2/evidence/backlog-20261121/r6-20261125/r6-revalidate-accept.sh
+babb660f7e7555a55281f2a0a07cb6d1147f39ebfa5ff9c119a677a1e2776a71  docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-s9-public-smoke.sh
+cab4a43af09e4b1729d913162c0f27faccd19315c56eb4ad1141c8bf748d81c0  docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-rawhead.sh
+2ac943b113af2247ab3acb3863e97201c8794ff830520338faa8b299268eeee5  docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-cron-observe.sh
+6c1b57e57c7dc57a6094f44354ba9cec91a1dec310e57b9fae371670be388e47  docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-helper-install.sh
+2ebac1c09b07e6b3bc1e060d7645efdbb1c2c7f169b5cfafd4e7f77508716e24  docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh
+d7574254997ba28dd1f750b7bcdc6f90c0a421b88ba6bb02aa104bd671b8572e  docs/v2/evidence/backlog-20261121/kits/scheduled-pull-evidence.sh
+a3775aea879b1d9ce05d0e96482e66d24c69deb62cf38e8fc0407c0d2653dc2b  tools/maintenance/offhost-pull.sh
+20ee3b452da9cb025a938a75c3200f44101fb094c1ad4662e70673df3d96b14e  tools/maintenance/revalidate-season.ts
+bd88c915c2643fc1bc8ec005c5c6825d43af0742b33ca83f0461e9348414dbc9  src/lib/acquisition/season-revalidation.ts
+R6_PINS
+  ) && printf 'Verified staging root %s\n' "$STAGE"
+```
+
+In later sessions, set `STAGE` to the verified absolute path on that host and `B` to the value above. Run the production steps as arm, one connection per step, avoiding :16–:18. Use the application checkout when a step names its deployed release tooling. On streamanator, verify the live helper pair and core against the pins with `bash "$STAGE/$B/a1a2-20261124/a2-helper-install.sh" check` before A-1 and A-4.
+
+For F-4b, put the release's Node tools on PATH before running the staged helper:
+
+```bash
+export PATH=/home/arm/.nvm/versions/node/v22.23.2/bin:$PATH
+```
+
 **Writes in this runbook, all named:** the owner's GRUB drop-in and `grubenv` changes (§3, undone in F5), the copy
 `/root/grub.cfg.pre-r6-20261125`, the timer stops (§4), the reboot itself, and acceptance step A3 (one `status-pass` line in
 `/home/arm/afldb-releases/events.log` and one POST to the retired email-intake route, which answers 410; `deploy/post-install-check.sh`
@@ -54,8 +97,8 @@ header). The snapshot lives in the owner's DigitalOcean account (§2).
 | A1 accepted, stopped, or rolled back **with** the rollback verify PASS | R6 may proceed (pass the matching arguments) |
 | A1 rolled back without a PASS verify, or state unknown | **NO-GO** (NG-PRE): the release state must be known before a reboot |
 | R1 not installed | **NO-GO** (NG-PRE fails it; run d prerequisite 4); owner may re-plan |
-| `r3:no` (R3 moved to another slot) | no scheduled backup exists: NG-DATA can only be met by a **completed snapshot**; the latest verified off-host dump is then R0's of 22 Nov |
-| `r3:yes` but the 02:20 backup, 03:30 verify or 03:10 off-host pull is not PASS | **NO-GO** (NG-PRE / NG-OFFHOST); the owner may decide to proceed on a completed snapshot alone, recorded as his decision |
+| `r3:no` (R3 moved to another slot) | **NO-GO.** Wednesday requires its own overnight backup, attributable off-host copy and attributable restore. |
+| `r3:yes` but the 02:20 backup, 03:30 verify or 03:10 off-host pull is not PASS | **NO-GO** (NG-PRE / NG-OFFHOST). Record the completed snapshot for recovery. |
 | `r4:no` | no effect on R6 (the scripts then expect Caddyfile `4f6972ec…`) |
 
 ## 2. (a) Pre-reboot verification (read-only), and (b) DigitalOcean console and snapshot
@@ -64,10 +107,10 @@ header). The snapshot lives in the owner's DigitalOcean account (§2).
 
 | # | Step | Expected (PASS) | STOP if |
 |---|---|---|---|
-| A-1 | streamanator: `bash a2-cron-observe.sh all` (read-only, run c/d) | r2: first `:17` line after the install `rc=0 … OK`; r3: Wed 03:10 `rc=0` | any `rc` other than 0 |
-| A-2 | production: `r6-pre-verify.sh <outcome> <CURRENT_ID> <r3> <r4> 10:00` | `R6 PRE RESULT PASS`. Section 1: running 137, **installed images exactly {137, 149}** (a third kernel from the Mon-Wed 06:30 unattended run = STOP, owner decision), 137/149 boot files and modules present, `reboot-required` present. Section 3: `apt-daily*` services inactive, no apt/dpkg process, no writer timer (`afldb*`, `apt-daily*`) running or due in [window − 15 min, window + 90 min]. Section 4: `postgresql@16-main`, `afldb`, `caddy` active; 2 workers; `current` = CURRENT_ID; env counts 1/1 if accepted; Caddyfile per r4; R1 files equal the repo. Section 5 (r3:yes): `afldb-backup.service` started today 02:20-02:31, `success`/0; `afldb-backup-verify.service` 03:30-03:41, `success`/0; the 02:2x dump re-hashes to its sidecar; `last-verify.json` from today; no `FAILED-*` marker; `scheduled-backup.sh status` rc 0; ledger 118; `afldb_restore_test` comment `afldb.restore_test.v1 sha256=<last-verify sha>`, `numbackends` 0. Section 6: ≥ 6,144 MB free | any FAIL line (= `R6 PRE RESULT STOP`) |
-| A-3 | record the lines it prints: `BOOT_ID`, `INVOCATION_ID`, `GRUB-BASELINE`, `OFFHOST-COMPARE`, `RESTORE-SHA`; and the firmware (BIOS/UEFI), `/` and `/boot` file-system kind, `kernel.panic`, the `GRUB_*` lines, the grubenv variables | recorded | — |
-| A-4 | streamanator (r3:yes): `r6-offhost-verify.sh <DUMP> <SHA>` with the `OFFHOST-COMPARE` values | `R6 OFFHOST RESULT PASS`; its `OFFHOST-COMPARE` line **identical** to production's | any FAIL, or the two lines differ |
+| A-1 | streamanator after A-2: `bash "$STAGE/$B/a1a2-20261124/a2-cron-observe.sh" all 2026-11-25 "$D" "$S"` | Wednesday 03:10 `RESULT SCHEDULED-COPY-VERIFIED` | any `rc` other than 0 |
+| A-2 | production: `bash "$STAGE/$B/r6-20261125/r6-pre-verify.sh" "$OUTCOME" "$CURRENT_ID" r3:yes "$R4" "$WINDOW"` | `R6 PRE RESULT PASS`. Section 1: running 137, **installed images exactly {137, 149}** (a third kernel from the Mon-Wed 06:30 unattended run = STOP, owner decision), 137/149 boot files and modules present, `reboot-required` present. Section 3: `apt-daily*` services inactive, no apt/dpkg process, no writer timer (`afldb*`, `apt-daily*`) running or due in [window − 15 min, window + 90 min]. Section 4: `postgresql@16-main`, `afldb`, `caddy` active; 2 workers; `current` = CURRENT_ID; env counts 1/1 if accepted; Caddyfile per r4; R1 files equal the repo. Section 5 (r3:yes): `afldb-backup.service` started today 02:20-02:31, `success`/0; `afldb-backup-verify.service` 03:30-03:41, `success`/0; the 02:2x dump re-hashes to its exact named sidecar; the timer dispatch, verification-service journal invocation, completion, restored dump and `last-verify.json` agree; no `FAILED-*` marker; `scheduled-backup.sh status` rc 0; ledger 118; `afldb_restore_test` comment `afldb.restore_test.v1 sha256=<last-verify sha>`, `numbackends` 0. Section 6: ≥ 6,144 MB free | any FAIL line (= `R6 PRE RESULT STOP`) |
+| A-3 | record the lines it prints: `BOOT_ID`, `INVOCATION_ID`, `GRUB-BASELINE`, `OFFHOST-COMPARE`, `RESTORE-EVIDENCE`, `RESTORE-SHA`; and the firmware (BIOS/UEFI), `/` and `/boot` file-system kind, `kernel.panic`, the `GRUB_*` lines, the grubenv variables | recorded | — |
+| A-4 | streamanator after A-2: `bash "$STAGE/$B/r6-20261125/r6-offhost-verify.sh" 2026-11-25 "$D" "$S"` with the `OFFHOST-COMPARE` values | `R6 OFFHOST RESULT PASS`; its `OFFHOST-COMPARE` line **identical** to production's | any FAIL, or the two lines differ |
 | A-5 | `deploy/afldb-settle-failure-status.sh` output | printed inside A-2 (packet R6 prerequisite 5: recorded before a reboot erases `Result`) | — |
 
 ### 2.2 (b) DigitalOcean: what the console and the snapshot are (sources fetched 2026-11-21 21:03Z; raw pages kept outside the repository)
@@ -217,15 +260,15 @@ FAILED there). If that cannot be met, **expect exactly one R2 alarm email per ho
 | # | Step | Who | Pass / next |
 |---|---|---|---|
 | E-1 | GO (§7) confirmed aloud; the owner keeps the Recovery Console open; `sudo systemctl reboot` **no later than 10:25** (14:25). Record T0 | Owner | — |
-| E-2 | Workstation: `bash r6-public-smoke.sh` from T0+2 min, at most once a minute (HTTPS, not SSH) | Claude | `R6 PUBLIC RESULT PASS`; a Cloudflare error page while down is expected |
+| E-2 | Workstation: `bash "$STAGE/$B/r6-20261125/r6-public-smoke.sh"` from T0+2 min, at most once a minute (HTTPS, not SSH) | Claude | `R6 PUBLIC RESULT PASS`; a Cloudflare error page while down is expected |
 | E-3 | SSH only after E-2 passes, or on the fixed schedule **T0+3, T0+6, T0+10** (one attempt each; the first SSH is F-2 itself), never a loop. HTTPS answering while SSH times out = the home IPS, not the host: wait for the next slot | Claude | — |
 | E-4 | No HTTPS and no SSH at T0+10: the owner reads the Recovery Console (kernel messages, login prompt; logs in as `arm`, `uname -r`, `systemctl --failed`) → §6 | Owner | — |
-| F-1 | `bash r6-public-smoke.sh`; if A1 was accepted also `bash ../a1a2-20261124/a1-s9-public-smoke.sh <BUILD_ID>` | Claude | both PASS |
-| F-2 | `r6-post-verify.sh full 6.8.0-149-generic <CURRENT_ID> <BOOT_ID> <INVOCATION_ID> <RESTORE-SHA\|none> <r4> <GRUB-BASELINE>` | Claude | `R6 POST RESULT PASS (6.8.0-149-generic)` with one `NOTE GRUB inputs … differ` (option B still applied): new boot_id, uptime < 2 h, `reboot-required` absent, units active, `pg_isready`, new InvocationID, NRestarts 0, 2 workers, equal revalidation-name counts, `current` unchanged, Caddyfile unchanged, loopback health 200, timers sane, no failed unit, ledger 118, `afldb_restore_test` unchanged |
+| F-1 | `bash "$STAGE/$B/r6-20261125/r6-public-smoke.sh"`; if A1 was accepted also `bash "$STAGE/$B/a1a2-20261124/a1-s9-public-smoke.sh" "$BUILD_ID"` | Claude | both PASS |
+| F-2 | `bash "$STAGE/$B/r6-20261125/r6-post-verify.sh" full 6.8.0-149-generic "$CURRENT_ID" "$PRE_BOOT_ID" "$PRE_INVOCATION_ID" "$RESTORE_SHA" "$R4" "$GRUB_BASELINE"` | Claude | `R6 POST RESULT PASS (6.8.0-149-generic)` with one `NOTE GRUB inputs … differ` (option B still applied): new boot_id, uptime < 2 h, `reboot-required` absent, units active, `pg_isready`, new InvocationID, NRestarts 0, 2 workers, equal revalidation-name counts, `current` unchanged, Caddyfile unchanged, loopback health 200, timers sane, no failed unit, ledger 118, `afldb_restore_test` unchanged |
 | F-3 | Owner: block F-3 below (counts and unit names only) | Owner | nothing from `postgresql`, `afldb` or `caddy`; anything else is recorded and judged |
-| F-4 | **Acceptance step A3 (writes, named in §0):** the owner attests that InvocationID `<from F-2>` is the R6 boot's; then `node deploy/release.mjs status --expect <CURRENT_ID> --confirm-restart-invocation <INV>` and `bash deploy/post-install-check.sh --confirm-restart-invocation <INV> <CURRENT_ID>`; if the A1 raw-head baseline exists, `a1-rawhead.sh check` | Claude (one connection) | `status` PASS, `POST-INSTALL CHECK PASS`, `RAWHEAD RESULT check PASS` |
-| F-4b | **Functional revalidation 2/2 (ISSUE-351; owner write scope: none to files or the database, no restart).** Claude, one connection, from `/home/arm/projects/afldb` as arm, AFTER F-2 and F-4 PASS and with fresh output from THIS boot (Sunday's 2/2 is not evidence): `bash r6-revalidate-accept.sh 2026 2` (pinned; it runs `npx tsx tools/maintenance/revalidate-season.ts --season 2026` and judges the result). It posts the existing fan-out until every worker has answered; the URL and secret come from `.env` and are never printed or passed in argv | Claude | `R6 REVALIDATE RESULT PASS season 2026 workers …`, i.e. exit 0 and the line `REVALIDATED season 2026: 2/2 worker(s) reached (…)` naming **two distinct worker ordinals** (1 and 2). `exit=1`, `INCOMPLETE`, `1/2`, a repeated ordinal or no output is **STOP: acceptance is not recorded**; never restart as a fallback (the process-level F-2 environment counts do not substitute for this step) |
-| F-5 | **GRUB restore (owner, only after F-1..F-4b PASS):** block F-5 below; then Claude: `r6-post-verify.sh grub <GRUB-BASELINE>` | Owner, Claude | as commented; `R6 GRUB RESULT PASS` |
+| F-4 | **Acceptance step A3 (writes, named in §0):** the owner attests that InvocationID `<from F-2>` is the R6 boot's; then `node deploy/release.mjs status --expect <CURRENT_ID> --confirm-restart-invocation <INV>` and `bash deploy/post-install-check.sh --confirm-restart-invocation <INV> <CURRENT_ID>`; if the A1 raw-head baseline exists, `bash "$STAGE/$B/a1a2-20261124/a1-rawhead.sh" check` | Claude (one connection) | `status` PASS, `POST-INSTALL CHECK PASS`, `RAWHEAD RESULT check PASS` |
+| F-4b | **Functional revalidation 2/2 (ISSUE-351; owner write scope: none to files or the database, no restart).** Claude, one connection, from `/home/arm/projects/afldb` as arm, AFTER F-2 and F-4 PASS and with fresh output from THIS boot (Sunday's 2/2 is not evidence): `bash "$STAGE/$B/r6-20261125/r6-revalidate-accept.sh" 2026 2` (runs the pinned CLI with the application checkout as its working directory and reads the checkout configuration). It posts the existing fan-out until every worker has answered; the URL and secret come from `.env` and are never printed or passed in argv | Claude | `R6 REVALIDATE RESULT PASS season 2026 workers …`, i.e. exit 0 and the line `REVALIDATED season 2026: 2/2 worker(s) reached (…)` naming **exactly workers 1 and 2**. `exit=1`, `INCOMPLETE`, `1/2`, a repeated ordinal or no output is **STOP: acceptance is not recorded**; never restart as a fallback (the process-level F-2 environment counts do not substitute for this step) |
+| F-5 | **GRUB restore (owner, only after F-1..F-4b PASS):** block F-5 below; then Claude: `bash "$STAGE/$B/r6-20261125/r6-post-verify.sh" grub "$GRUB_BASELINE"` | Owner, Claude | as commented; `R6 GRUB RESULT PASS` |
 | F-6 | D-4 timers; `systemctl list-timers --all 'afldb*' --no-pager` | Owner | every timer of D-1 active with a next elapse, before 11:17 |
 | F-7 | Record (§9). `/root/grub.cfg.pre-r6-20261125` may stay (root-only) until 7 Jan | Claude | — |
 
@@ -263,7 +306,7 @@ with all units healthy) is the A1 application rollback (`A1-A2` runbook §3.2), 
 | G-2: 149 never comes up (E-4: panic, hang, emergency mode, no login) | panel **power cycle**, Recovery Console open | GRUB boots 137 (`saved_entry`); acceptance below |
 | G-3: 137 does not come up either | Recovery Console → recovery ISO (§2.2), or **restore the B-2 snapshot** (all writes since 08:30 lost; the 02:20 dump off-host is the data complement); host loss: `docs/backup-restore.md` §6 procedure B | owner decisions, recorded; nothing else is attempted in the window |
 
-**Rollback acceptance (137):** `r6-post-verify.sh full 6.8.0-137-generic …` PASS (`reboot-required` present is expected; GRUB
+**Rollback acceptance (137):** `bash "$STAGE/$B/r6-20261125/r6-post-verify.sh" full 6.8.0-137-generic "$CURRENT_ID" "$PRE_BOOT_ID" "$PRE_INVOCATION_ID" "$RESTORE_SHA" "$R4" "$GRUB_BASELINE"` PASS (`reboot-required` present is expected; GRUB
 `NOTE` expected), `r6-public-smoke.sh` PASS, F-3, F-4 (A3) and D-4. **GRUB after a rollback: keep option B in place for the leave**
 (`99-afldb-r6.cfg` stays; `saved_entry=P137`, no `next_entry`, verified by the owner's `sudo grub-editenv /boot/grub/grubenv list`):
 an unplanned reboot during the leave then boots the known-good 137, not the 149 that just failed. An unattended kernel install runs
@@ -279,7 +322,7 @@ attempt on Wed 25 Nov** unless the owner decides otherwise.
 | **NG-PRE** | A-2 `R6 PRE RESULT PASS` with the §1 arguments | A-2 output |
 | **NG-OFFHOST** | (r3:yes) A-4 PASS and the two `OFFHOST-COMPARE` lines identical; A-1 r3 `rc=0` | A-1, A-4 |
 | **NG-CONSOLE** | B-1 done today: Recovery Console, `arm` login by typed password, `uname -r` = `6.8.0-137-generic` | owner statement + time |
-| **NG-DATA** | B-2 snapshot **listed complete**, or (r3:yes) NG-PRE section 5 and NG-OFFHOST PASS; both preferred | panel, A-2 |
+| **NG-DATA** | NG-PRE section 5 and NG-OFFHOST PASS for Wednesday. Record the B-2 snapshot status and the owner's recovery decision. | panel, A-2 |
 | **NG-GRUBREAD** | C-1 shapes 1-6 as expected | owner output (UUIDs redacted) |
 | **NG-FALLBACK** | C-2 applied and every check as commented | owner output |
 | **NG-TIMERS** | D-1, D-2 done at or after 10:18 | owner output |
@@ -295,8 +338,8 @@ NG-FALLBACK, NG-DATA) is uncertain, pause; nothing in this runbook overrides tha
 | AEDT | Step | Notes |
 |---|---|---|
 | 08:30 | B-2 live snapshot starts | after the 03:30 verify; must be listed complete before 10:00 |
-| 09:30 | A-1, A-4 (streamanator) | no production contact |
-| 09:35 | A-2 (production, one connection) | not at :16-:18 |
+| 09:25 | A-2 (production, one connection) | capture the exact Wednesday D/S for A-1 and A-4 |
+| 09:35 | A-1, A-4 (streamanator) | use the Wednesday D/S from A-2 |
 | 09:40-09:55 | B-1 (Recovery Console), C-1 (GRUB read) | owner |
 | 10:00 | GO/NO-GO, all items except NG-TIMERS/NG-APT | — |
 | 10:00-10:15 | C-2 option B | owner |
@@ -331,13 +374,7 @@ fill-in assumptions. It does not alter the historical Sunday PREP contract:
 `SITTING-A1-A2-20261122.md`; P6's four original NOT OK ticks and the owner's narrow waiver
 remain historical facts. ISSUE-371 and ISSUE-372 remain resolved.
 
-**Wednesday operator: use the scripts from immutable code commit
-`bc3fef3de375259d49001e7a9a478624832703a8` together with this amended runbook.** The code
-was committed before this amendment. The full SHA-256 table below was calculated from raw
-`git cat-file blob <code-commit>:<path>` bytes, without text decoding or newline conversion.
-It covers pre-check, post-check, raw-head, public smoke, both observers, installer, wrapper,
-shared verifier, core pull and regression harnesses. Earlier section 0 pins are historical.
-Do not use PREP's older helpers for Wednesday. No new application deployment is needed.
+**Historical preparation and pins.** The following Monday preparation block and raw pins describe the earlier sitting. Wednesday uses §0.
 
 ### Before Monday 23 Nov 03:10 AEDT — owner action required
 
@@ -345,7 +382,7 @@ Do not use PREP's older helpers for Wednesday. No new application deployment is 
 > below for the two helpers and `a2-cron-install.sh`/`a2-cron-observe.sh`/`r6-offhost-verify.sh`, or the "wrapper/observer pass"
 > claims in it. Review found the verifier rejects a genuine cron dispatch. The corrected pair, its single-step installer, the new
 > three-outcome contract and the current pins are in `fix-20261123/ISSUE-352-HANDOFF.md` and `fix-20261123/BLOB-PINS.md`.
-> Installation remains on hold for the owner's separate approval. Text below is kept as the historical record.
+> The text below records the earlier preparation. The owner subsequently approved installation of the independently reviewed pair.
 
 Install the new wrapper and new verifier on streamanator before that dispatch, preserving
 `state/offhost-pull.log`, existing holds, destination, keys, alarm settings and crontab.
@@ -389,50 +426,19 @@ They cannot retroactively prove which cron invocation completed successfully und
 new correlation contract. If the new wrapper misses Monday, record that evidence gap;
 a later manual success is not a substitute for the scheduled pull.
 
-### Current observation commands and Wednesday gates
+### Wednesday evidence
 
-From the pinned extraction, obtain Monday's actual overnight DUMP and full production
-SHA from the successful backup-unit journal and the exact dump's sidecar, corroborated
-by a production re-hash. Set D and S to those exact values; no inferred basename or
-shortened hash is allowed. Then, on streamanator:
+Set `OUTCOME`, `CURRENT_ID`, `R4` (including the `r4:` prefix) and `WINDOW` (10:00 or 14:00) from §1 and the selected window. Run A-2 first. Record `PRE_BOOT_ID`, `PRE_INVOCATION_ID`, `GRUB_BASELINE` and `RESTORE_SHA` from its output for F-2.
 
-```bash
-B=docs/v2/evidence/backlog-20261121
-bash "$B/a1a2-20261124/a2-cron-observe.sh" all 2026-11-23 "$D" "$S"
-```
+On streamanator, set `D` and `S` to the exact Wednesday overnight filename and full digest from A-2’s `OFFHOST-COMPARE`. Run A-1 and A-4 with those values. Require the same pair from both hosts and a verified 03:10 invocation. Monday was “copy verified, scheduled origin unproven”. Tuesday’s dispatch is a separate observation.
 
-On Wednesday run A-2 from the pinned pre-check with **accepted**,
-`7d92042fd110-XWruOm_9nLCSMY8nGPqYU`, `r3:yes`, `r4:yes` and the chosen window.
-Capture that day's BOOT_ID, INVOCATION_ID, GRUB-BASELINE, RESTORE-SHA and OFFHOST-COMPARE.
-The overnight 02:2x dump in OFFHOST-COMPARE is distinct from the fresh dump made by the
-03:36:35 verification service, named separately in last-verify.json and RESTORE-SHA.
-Never pass the verification service's dump or a Monday dump for Wednesday's overnight.
-Run A-1/A-4 on streamanator with the Wednesday overnight D/S:
+Keep A-2’s `RESTORE-EVIDENCE` separately. It records the verification-service invocation ID, journal completion epoch, verification dump filename and full digest. The timer dispatch and service execution bound the matching journal record. A later manual restore that overwrites the state or changes the database comment causes STOP. A backup or restore from another day cannot clear the Wednesday gate.
 
-```bash
-bash "$B/a1a2-20261124/a2-cron-observe.sh" all 2026-11-25 "$D" "$S"
-bash "$B/r6-20261125/r6-offhost-verify.sh" 2026-11-25 "$D" "$S"
-```
+After the reboot, require the pinned F-2 process check, F-4b functional revalidation with workers 1 and 2, and every attended check in §7.
 
-Both require the exact date's independent 03:10 CMD, unique matching BEGIN and END,
-rc=0 completion by 03:45, exact invocation verification of D/S, recomputed checksum =
-production checksum = one-line named sidecar, verified marker and no retention hold.
-Missing, ambiguous, stale or failed evidence is STOP; a retry cannot replace a failed
-scheduled invocation. Require OFFHOST-COMPARE identical to production's pre-check line.
-The production pre-check still separately requires Wednesday's backup and restore unit
-results and restore database comment. Its pre-existing limitations are unchanged; all
-GO items in section 7, including recovery-console login, snapshot, GRUB fallback,
-timers, apt and window evidence, remain mandatory and unobserved here.
+### Historical Git blob SHA-256 pins for the previous sitting
 
-Post-reboot, use the pinned post-check. It now identifies the primary and both release
-workers and requires exactly one non-empty URL and SECRET per process, printing only
-identities and counts for that check. The separate functional **2/2 revalidation** and
-raw-head acceptance steps in the original runbook remain required. A 1/1 environment
-count does not prove successful invalidation. No reboot readiness is implied by tests.
-
-### Full Git blob SHA-256 pins (code commit above)
-
-> **23 Nov 2026 (ISSUE-351/352 fixes): the `r6-pre-verify.sh` row below is the historical `b445ba7f` pin and is superseded. Wednesday uses `r6-pre-verify.sh` and the new `r6-revalidate-accept.sh` (step F-4b) at the pins in `fix-20261123/BLOB-PINS.md`, "Later ISSUE-352 / 351 / 362 code". Do not run either from this table.**
+Historical revision `bc3fef3de375259d49001e7a9a478624832703a8`. Use §0 for Wednesday.
 
 | Git blob path at code commit | Full SHA-256 |
 |---|---|
@@ -451,4 +457,4 @@ count does not prove successful invalidation. No reboot readiness is implied by 
 | `docs/v2/evidence/backlog-20261121/a1a2-20261124/dry-tests-20261122g/t-offhost-stamp.sh` | `a390a8df083a45af5a9590c0d985673b20f9bf21db6c5a2cb3a827be6f8e371c` |
 | `docs/v2/evidence/backlog-20261121/a1a2-20261124/dry-tests-20261122g/t-sunday-review.sh` | `b8f06d5486ad8cd995d59b9634382f615f0535371121846f3a282cb0fb0446e0` |
 
-Validation and first-copy evidence: [Sunday review record](sunday-review-20261122/README.md). Monday pull, Wednesday verification and the reboot remain pending.
+Validation and first-copy evidence: [Sunday review record](sunday-review-20261122/README.md). Wednesday verification and the attended reboot decision remain pending.

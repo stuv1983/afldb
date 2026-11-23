@@ -80,12 +80,15 @@ restored), unrestorable failure (exit 5); embedded pins equal repository bytes; 
    `cron` entry; then the observer below. Independent production evidence (the backup unit's dump basename and full SHA) remains
    owner evidence.
 
-## Install instructions (owner; Tuesday 24 Nov before 03:00 Melbourne, or a later day outside 03:00-03:55)
+## Reviewed installation record
+
+The approved pair was installed before Tuesday's window. See the [installation results](../../../../../issues/reviews/AFLDB-ASTRA-FOLLOWUP-2026-11-23.md).
+The following block records the immutable source used for the installation.
 
 On the workstation (Git Bash), from the repository:
 
 ```bash
-CODE=88be90f0e676112c4239032b2e8548389db5ec7d
+CODE=c154f36bb9a2a9b8ba5db507eb1748fa6f716622
 B=docs/v2/evidence/backlog-20261121
 git archive --format=tar --output=/tmp/afldb-352-helpers.tar "$CODE" "$B/r6-20261125" "$B/a1a2-20261124" "$B/kits" tools/maintenance/offhost-pull.sh
 ```
@@ -106,10 +109,13 @@ bash "$B/a1a2-20261124/a2-helper-install.sh" check; echo rc=$?
 bash "$B/a1a2-20261124/a2-cron-install.sh" check r3 --require-installed; echo rc=$?
 ```
 
-Expected: first `check` rc=1 (current wrapper differs, verifier absent), `install` rc=0 with `HELPER INSTALL PASS`, second
-`check` rc=0, cron `check` rc=0 with `PRECONDITIONS PASS` and `INSTALLED`. Any other rc is STOP: the installer restores or never
-changes the previous wrapper, and the existing crontab, state log, hold and keys are untouched. The two helpers are never
-installed with separate `install -m` commands any more. The crontab is **not** modified by either installer command above.
+Expected: first `check` rc=1 (old wrapper and absent verifier), `install` rc=0 with `HELPER INSTALL PASS`, second
+`check` rc=0, cron `check` rc=0 with `PRECONDITIONS PASS` and `INSTALLED`.
+On installer exit 4 or 5, stop and inspect both installed destinations before retrying. The reviewed installer can return 4
+with the new verifier and old wrapper still installed. Use `sha256sum` on both files and the core, and compare them with the
+pre-install evidence and retained `*.pre-352-<stamp>` recovery copies. Record any absent file. Restore differing prior
+files from their verified recovery copies. An originally absent file requires verified absence. Recheck the cron entry and
+preserve the recovery copies before considering a verified pair retry outside the scheduled window.
 
 ## Observing the first scheduled run (read-only)
 
@@ -121,6 +127,5 @@ bash "$B/a1a2-20261124/a2-cron-observe.sh" all 2026-11-24 "$D" "$S"; echo rc=$?
 ```
 
 rc=0 and `RESULT SCHEDULED-COPY-VERIFIED` is the first scheduled-run observation. rc=10 is recorded as "copy verified,
-scheduled origin unproven"; rc=1 is a failed copy. Wednesday uses the same command with Wednesday's date and overnight dump;
-the 03:36 verification-service dump is rejected as an overnight dump. The R6 pre-check's separate selector limitation
-(`r6-pre-verify.sh` first-match of 02:2x/02:3x files) is tracked under ISSUE-352 and handled in a later commit.
+scheduled origin unproven"; rc=1 is a failed copy. Use the Wednesday runbook's separate pinned staging and observation steps
+on Wednesday. The verification-service dump is checked separately from the overnight dump.

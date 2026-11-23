@@ -15,6 +15,13 @@ commit.
 
 ## [Unreleased]
 
+### Astra follow-up (23 November 2026)
+
+- AFLW staging replacements lock all staging tables before checking for existing season keys, refusing a replacement that would erase any of them. The independent expected inventory remains required (ISSUE-368).
+- Wednesday’s R6 checks require the named overnight checksum sidecar, timer and journal attribution for the separate restored dump, and two identified workers with ordinals 1 and 2. The checked helper installer reports an unverifiable rollback as exit 5 (ISSUE-351/352).
+- Optional application trace output masks numeric path values. Clustered revalidation no longer treats a missing worker identity as worker 1 (ISSUE-362/351).
+- DraftGuru imports verify the historical August parsed-row digest in addition to CSV parity, and hold direct September imports pending a reviewed digest (ISSUE-348).
+
 ### Local fixes for the 22 November independent review (23 November 2026; local on `claude/review-fixes-20261123`, not pushed, installed or deployed)
 
 - **Scheduled backup and off-host copy (ISSUE-352).** The scheduled-pull observer now reports copy failed (exit 1), copy verified with scheduled origin unproven (exit 10) or scheduled copy verified (exit 0), linking a real cron dispatch to the wrapper run by process lineage; the helper installer no longer exits 0 after a failed precondition. A failed backup, verification or state-record write stops the run with `FAILED-<mode>` and keeps the previous record; the URI-encoded backup password is percent-decoded once for `PGPASSWORD`. The R6 pre-check accepts only one overnight dump bound to the backup service's own journal line. The two streamanator helpers stay on HOLD until the owner approves installation.
