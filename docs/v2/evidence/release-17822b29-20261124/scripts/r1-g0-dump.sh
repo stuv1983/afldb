@@ -16,7 +16,9 @@
 #   while the run's start job was live, proves the job was created by afldb-backup.timer at its LastTriggerUSec to the microsecond,
 #   with no stop or failure of the unit in between (see backup_journal for the links, attested_origin for the rule, and the residual
 #   limits); without the installed writer (production until the owner installs review-fixes-r6-20261128/attest/) the result is
-#   "scheduled origin unproven", G0 FAIL;
+#   "scheduled origin unproven", G0 FAIL; and (record format 2, 28 Nov 2026, independent review MED-1) the record BINDS THE DUMP: the
+#   name and full sha256 of the single dump the run left, found and hashed by the writer as uid arm; its name and 16 hex must equal
+#   the "backup ok" line's, and the picked dump's full re-hash must equal the record's sha256 before OFFHOST-COMPARE is printed;
 #   exactly ONE afldb_prod-<today>-02[23]*.dump; its re-hash equals its one-line sidecar; that journal line names it:
 #   "backup ok: <that name> ... sha256 <first 16 hex>" (ISSUE-352, pick_overnight_dump verbatim from r6-20261125/r6-pre-verify.sh;
 #   ts, timer_usec, read_invocation, backup_journal, match_backup, trusted_path, attested_origin and scheduled_backup_run are
@@ -27,6 +29,9 @@
 # (SCHEDULED-COPY-VERIFIED). Without an attributed timer run (origin included) the dump is not examined, no OFFHOST-COMPARE line is
 # printed, and nothing here reads the off-host copy or the pull stamp.
 # Any other result: G0 FAIL.
+# Not independent of arm (independent review MED-2, recorded as an owner decision): this gate runs in arm's login, so a gate run as
+# arm cannot be independent of arm's login environment (~/.bashrc, PATH, functions); the verdict needs a non-arm verifier (Stu's
+# decision). The root record is out of arm's reach; this script's output is not.
 # Run (workstation Git Bash; never at minute :16-:18):
 #   tr -d '\r' < r1-g0-dump.sh | C:/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes afldb bash -s -- 2026-11-24
 # Test seam: R1_LIB_ONLY=1 when sourced.
@@ -86,7 +91,8 @@ read_invocation() { # unit
 #     attached to exactly one "backup ok" line logged by the service's own process between that start and exit (+5 s for
 #     journald's receipt time), and NO other invocation of the unit appears in the journal from the window start to window end
 #     + 15 min (a timer run that failed or was replaced, then a start by hand, is two invocations: ambiguous, STOP);
-#   journal -> dump: that line's dump name and 16 hex are what pick_overnight_dump requires of the unique 02:2x file and sidecar;
+#   journal -> dump: that line's dump name and 16 hex are what pick_overnight_dump requires of the unique 02:2x file and sidecar
+#     (this link runs through arm's node, which arm can replace: since record format 2 the ROOT record binds the dump itself, below);
 #   ORIGIN (r6, 28 Nov 2026; review-fixes-r6-20261128/DESIGN.md): the links above hold equally for a start by hand 3 s after a timer
 #     dispatch whose own run failed where arm cannot see it (PID 1 alone logs a failed dependency or an exec failure), so the
 #     invocation itself must carry the dispatch, and the carrier must be out of arm's reach. r5 read a "trigger:" journal line that
@@ -101,6 +107,11 @@ read_invocation() { # unit
 #     this invocation, a JobType=start job created by afldb-backup.timer at the timer's LastTriggerUSec (busctl, microseconds) exactly,
 #     the unit in activating/start-post with ExecStart exited 0, no stop or failure of the unit between that dispatch and this
 #     invocation (inactive-enter before the dispatch; inactive-exit and main start each at or after it and within 5 s, in either order: PID 1 stamps the main start at the fork and inactive-exit about 0.2 ms later), and no other record names the same dispatch.
+#     DUMP BINDING (record format 2, 28 Nov 2026, independent review MED-1: a genuine run's record plus a planted dump and a node that
+#     rewrote the "backup ok" line passed G0): the writer finds, AS UID ARM (setpriv, never root's credentials), the single dump the
+#     run left in /home/arm/backups/afldb-scheduled (modified at or after the main start) and records its name and full sha256
+#     (none if not exactly one). attested_origin requires that name and the first 16 hex to equal the "backup ok" line's dump, and
+#     each caller requires the picked dump's FULL re-hash to equal the record's dump_sha256 before it prints OFFHOST-COMPARE.
 #     Otherwise "scheduled origin unproven": exit nonzero, the dump is not examined, no OFFHOST-COMPARE line is printed. A start by
 #     hand gets a record too (trigger_unit=none) and is refused; accepting one is the owner's decision, not a script's. Until the
 #     writer is installed (production today) every run is "scheduled origin unproven", by design.
@@ -111,11 +122,14 @@ read_invocation() { # unit
 # from; PID 1's own lines would, and arm cannot read them. The start job, which does carry the dispatch, exists only during the run.
 # Only trusted journal fields are used (_SYSTEMD_UNIT, _SYSTEMD_INVOCATION_ID, _PID, __REALTIME_TIMESTAMP). Lines PID 1 logs
 # about the unit (UNIT=, INVOCATION_ID=) count as invocation evidence when arm can read them; nothing depends on their presence.
-# Residual limits (DESIGN.md 2 and 5): root (or sudo) can write any record, edit any trusted file or re-arm the timer; a manual
-# re-arm of afldb-backup.timer or a Persistent= catch-up at boot IS a timer dispatch (the PASS line prints how long after the
-# timer's last (re)activation the dispatch came, information only, for the owner to judge); this gate runs as arm, so a compromised
-# arm login environment controls what it prints; the "backup ok" line and the dump are written by the attested run's own (arm) code,
-# so the record proves which run it was, not what that run wrote; the writer needs systemd's Job ActivationDetails (systemd
+# Residual limits (DESIGN.md 2 and 5): root (or sudo) can write any record, edit any trusted file or re-arm the timer; starting or
+# restarting afldb-backup.timer dispatches the service only when Persistent= finds a missed elapse (or the calendar elapses while
+# it is active), and such a dispatch is a genuine dispatch by the timer unit, not proof that the calendar elapsed unattended (the
+# PASS line prints how long after the timer's last (re)activation the dispatch came, information only; the policy is Stu's);
+# a gate run as arm cannot be independent of arm's login environment (a compromised ~/.bashrc or PATH controls what any arm
+# process prints, this gate included), so the verdict needs a non-arm verifier (Stu's decision); the dump is written by the attested
+# run's own (arm) code, and the record binds the file that run left, not what it should have written (an arm process racing the
+# run inside its own minutes could substitute the file before the writer hashes it); the writer needs systemd's Job ActivationDetails (systemd
 # 255.4-1ubuntu8.19); a start by hand that arrives while the timer's own start job is still queued joins that job (one job, one
 # invocation: the timer's); a journal receipt later than 5 s after the exit is a false STOP.
 #
@@ -218,17 +232,19 @@ trusted_path() { # absolute-path dir|file|record
 
 # R6 r6: ORIGIN from the root writer's record (DESIGN.md 4, items 1-6; see the ORIGIN paragraph above). Every path, digest and
 # command line is a constant HERE: nothing comes from the environment or an argument but the invocation and the timer's
-# LastTriggerUSec in microseconds, both validated reads of the caller. Returns 0 and sets AO_INFO (record facts and the item-6
-# information for the PASS line) only when every item holds; otherwise sets AO_WHY and returns 1. Read-only: systemctl show, stat,
-# sha256sum, awk, and bash reads of the record; no write.
-attested_origin() { # invocation timer-usec
-  local inv=$1 tu=$2 W=/usr/local/libexec/afldb/afldb-backup-attest D=/etc/systemd/system/afldb-backup.service.d/60-afldb-backup-attest.conf
-  local WS=35a0f3ac5de278784d39207cdf95173190627d5511343f2042a1a731f3d23c2d DS=2a3a067ef408377ccf6deae7c97c38366854c581a16e3f33ce2265787abc440e
+# LastTriggerUSec in microseconds, both validated reads of the caller, and the dump name and 16 hex of the run's "backup ok" line
+# (match_backup's). Returns 0 and sets AO_INFO (record facts and the item-6 information for the PASS line), AO_DUMP and
+# AO_DUMP_SHA (the record's dump binding, which the callers compare with the picked dump's full re-hash) only when every item holds;
+# otherwise sets AO_WHY and returns 1. Read-only: systemctl show, stat, sha256sum, awk, and bash reads of the record; no write.
+attested_origin() { # invocation timer-usec dump-name dump-16-hex
+  local inv=$1 tu=$2 bn=$3 bh=$4 W=/usr/local/libexec/afldb/afldb-backup-attest D=/etc/systemd/system/afldb-backup.service.d/60-afldb-backup-attest.conf
+  local WS=799e6691954e4d7562cbc6b7af82f307cde0c8af71e450cd5f66f2af9994b398 DS=2a3a067ef408377ccf6deae7c97c38366854c581a16e3f33ce2265787abc440e
   local RD=/var/lib/afldb-backup-attest X='/usr/bin/env -i PATH=/usr/sbin:/usr/bin /usr/bin/bash --noprofile --norc /usr/local/libexec/afldb/afldb-backup-attest'
   local XF='ignore-failure privileged' N='(0|[1-9][0-9]{0,17})' out l p h rec i n=0 sz frag= drop= tfrag= tdrop= ef=0 ne=0 ex= argv= flags= ie tm ix xs ta d re
   local -a ps tps L recs K R; local -A F
-  AO_WHY=; AO_INFO=
+  AO_WHY=; AO_INFO=; AO_DUMP=; AO_DUMP_SHA=
   [[ $inv =~ ^[0-9a-f]{32}$ && $tu =~ ^[1-9][0-9]{6,17}$ ]] || { AO_WHY="invalid invocation or LastTriggerUSec"; return 1; }
+  [[ $bn =~ ^afldb_prod-[0-9]{8}-[0-9]{6}\.dump$ && $bh =~ ^[0-9a-f]{16}$ ]] || { AO_WHY="invalid dump name or 16 hex from the 'backup ok' line"; return 1; }
   # item 3: the unit as PID 1 has it loaded
   out=$(systemctl show afldb-backup.service -p FragmentPath -p DropInPaths -p EnvironmentFiles -p ExecStartPostEx 2>/dev/null) \
     || { AO_WHY="systemctl show afldb-backup.service failed"; return 1; }
@@ -248,7 +264,7 @@ attested_origin() { # invocation timer-usec
   read -ra tps <<< "$tdrop"
   [ -n "$frag" ] && [ -n "$tfrag" ] || { AO_WHY="afldb-backup.service or afldb-backup.timer has no FragmentPath"; return 1; }
   # item 1: trusted paths; item 2: the writer's and the drop-in's identity at gate time
-  for p in /usr/bin/env /usr/bin/bash /usr/bin/systemctl /usr/bin/busctl /usr/bin/sha256sum /usr/bin/timeout /usr/bin/mv "$W" "$D" \
+  for p in /usr/bin/env /usr/bin/bash /usr/bin/systemctl /usr/bin/busctl /usr/bin/sha256sum /usr/bin/timeout /usr/bin/mv /usr/bin/setpriv /usr/bin/stat "$W" "$D" \
       "$frag" "${ps[@]}" "$tfrag" "${tps[@]}"; do
     trusted_path "$p" file || { AO_WHY="untrusted path: $TP_WHY"; return 1; }
   done
@@ -261,18 +277,19 @@ attested_origin() { # invocation timer-usec
   trusted_path "$rec" record || { AO_WHY="untrusted record: $TP_WHY"; return 1; }
   K=(writer_sha256 unit invocation job job_type active_state sub_state exec_main_code exec_main_status inactive_enter_mono
     inactive_exit_mono exec_main_start_mono trigger_unit trigger_timer_realtime_usec timer_last_trigger_usec timer_last_trigger_mono
-    timer_active_enter_mono boot_id written_realtime_usec)
+    timer_active_enter_mono dump dump_sha256 boot_id written_realtime_usec)
   R=('[0-9a-f]{64}' 'afldb-backup\.service' '[0-9a-f]{32}' '[1-9][0-9]{0,9}' '[a-z-]{1,32}' '[a-z-]{1,32}' '[a-z-]{1,32}' '[0-9]{1,3}'
-    '[0-9]{1,3}' "$N" "$N" "$N" 'none|[A-Za-z0-9_.@:-]{1,255}' 'none|[1-9][0-9]{0,17}' "$N" "$N" "$N" '[0-9a-f]{32}' '[1-9][0-9]{15,17}')
+    '[0-9]{1,3}' "$N" "$N" "$N" 'none|[A-Za-z0-9_.@:-]{1,255}' 'none|[1-9][0-9]{0,17}' "$N" "$N" "$N"
+    'none|afldb_prod-[0-9]{8}-[0-9]{6}\.dump' 'none|[0-9a-f]{64}' '[0-9a-f]{32}' '[1-9][0-9]{15,17}')
   mapfile -t L 2>/dev/null < "$rec"
-  [ "${#L[@]}" = 20 ] && [ "${L[0]}" = afldb-backup-attest/1 ] || { AO_WHY="record $rec is malformed (${#L[@]} lines, need the 20-line afldb-backup-attest/1 format)"; return 1; }
+  [ "${#L[@]}" = 22 ] && [ "${L[0]}" = afldb-backup-attest/2 ] || { AO_WHY="record $rec is malformed (${#L[@]} lines, need the 22-line afldb-backup-attest/2 format)"; return 1; }
   n=22
   for i in "${!K[@]}"; do
     re="^${K[i]}=(${R[i]})\$"
     [[ ${L[i + 1]} =~ $re ]] || { AO_WHY="record $rec line $((i + 2)) is not ${K[i]}=<value>"; return 1; }
     F[${K[i]}]=${BASH_REMATCH[1]}; n=$((n + ${#L[i + 1]} + 1))
   done
-  sz=$(stat -c %s -- "$rec" 2>/dev/null); [ "$sz" = "$n" ] || { AO_WHY="record $rec has $sz bytes, not the $n of its 20 lines"; return 1; }
+  sz=$(stat -c %s -- "$rec" 2>/dev/null); [ "$sz" = "$n" ] || { AO_WHY="record $rec has $sz bytes, not the $n of its 22 lines"; return 1; }
   [ "${F[writer_sha256]}" = "$WS" ] || { AO_WHY="record $rec was written by writer ${F[writer_sha256]:0:16}..., not the pinned ${WS:0:16}..."; return 1; }
   [ "${F[invocation]}" = "$inv" ] || { AO_WHY="record $rec names invocation ${F[invocation]}, not the run's $inv"; return 1; }
   [ "${F[job_type]}" = start ] || { AO_WHY="record $rec: the run's job is a ${F[job_type]} job, not a start job"; return 1; }
@@ -281,6 +298,10 @@ attested_origin() { # invocation timer-usec
   [ "${F[trigger_unit]}" = afldb-backup.timer ] || { AO_WHY="record $rec: the run's start job names trigger unit '${F[trigger_unit]}', not afldb-backup.timer (a start by hand, or by a dependency, carries no timer dispatch)"; return 1; }
   [ "${F[trigger_timer_realtime_usec]}" = "$tu" ] || { AO_WHY="record $rec: the run's start job records the dispatch at ${F[trigger_timer_realtime_usec]} us, but the timer's LastTriggerUSec is $tu us (an earlier or another dispatch)"; return 1; }
   [ "${F[timer_last_trigger_usec]}" = "$tu" ] || { AO_WHY="record $rec: the timer's LastTriggerUSec was ${F[timer_last_trigger_usec]} us when attested, $tu us now"; return 1; }
+  [ "${F[dump]}" != none ] && [ "${F[dump_sha256]}" != none ] \
+    || { AO_WHY="record $rec: the writer found no single dump of this run (dump=${F[dump]} dump_sha256=${F[dump_sha256]:0:16})"; return 1; }
+  [ "${F[dump]}" = "$bn" ] || { AO_WHY="record $rec binds the dump ${F[dump]}, but the run's 'backup ok' line (read through node) names $bn"; return 1; }
+  [ "${F[dump_sha256]:0:16}" = "$bh" ] || { AO_WHY="record $rec binds ${F[dump]} with sha256 ${F[dump_sha256]:0:16}..., but the 'backup ok' line says $bh"; return 1; }
   ie=${F[inactive_enter_mono]}; tm=${F[timer_last_trigger_mono]}; ix=${F[inactive_exit_mono]}; xs=${F[exec_main_start_mono]}; ta=${F[timer_active_enter_mono]}
   (( ie < tm )) || { AO_WHY="record $rec: the unit entered inactive (monotonic $ie) after the dispatch ($tm): it stopped or failed between the dispatch and this invocation (a restart inside the timer's job)"; return 1; }
   (( tm <= ix && tm <= xs )) || { AO_WHY="record $rec: inactive-exit $ix or main start $xs (monotonic) precedes the dispatch $tm"; return 1; }
@@ -292,23 +313,26 @@ attested_origin() { # invocation timer-usec
   [ "$i" = 1 ] || { AO_WHY="$i records in $RD name the dispatch at $tu us (need exactly 1)"; return 1; }
   # item 6, information only (not a criterion)
   d=$((tm - ta)); if (( d >= 0 )); then d="$((d / 1000000)).$(( d % 1000000 / 100000 )) s"; else d="$d us"; fi
-  AO_INFO="its start job was dispatched by afldb-backup.timer at $tu us = LastTriggerUSec (job ${F[job]}, JobType start; root record $rec, writer ${WS:0:16}; main start $((xs - tm)) us after the dispatch, no stop or failure between); INFO, not a criterion: the dispatch came $d after afldb-backup.timer's last (re)activation"
+  AO_INFO="its start job was dispatched by afldb-backup.timer at $tu us = LastTriggerUSec (job ${F[job]}, JobType start; root record $rec, writer ${WS:0:16}, dump ${F[dump]} sha256 ${F[dump_sha256]:0:16}; main start $((xs - tm)) us after the dispatch, no stop or failure between); INFO, not a criterion: the dispatch came $d after afldb-backup.timer's last (re)activation"
+  AO_DUMP=${F[dump]}; AO_DUMP_SHA=${F[dump_sha256]}
 }
 
 # The live reads for match_backup and attested_origin. Sets BR_EVID (match_backup's line), BR_JOURNAL (the MESSAGE text of the
-# service's own lines, for pick_overnight_dump), BR_TUSEC, BR_ORIGIN (attested_origin's facts for the PASS line) and BR_WHY; returns 0
+# service's own lines, for pick_overnight_dump), BR_TUSEC, BR_ORIGIN (attested_origin's facts for the PASS line), BR_DUMP and
+# BR_DUMP_SHA (the root record's dump binding: the callers require the picked dump's full re-hash to equal it) and BR_WHY; returns 0
 # only when the run is attributed, origin included. Uses ts, timer_usec, read_invocation, backup_journal, match_backup, attested_origin.
 scheduled_backup_run() { # B0 B1 node
-  local bt btu bs be res xs jl jrc
-  BR_EVID=; BR_JOURNAL=; BR_WHY=; BR_TUSEC=; BR_ORIGIN=
+  local bt btu bs be res xs jl jrc x bn bh
+  BR_EVID=; BR_JOURNAL=; BR_WHY=; BR_TUSEC=; BR_ORIGIN=; BR_DUMP=; BR_DUMP_SHA=
   bt=$(ts afldb-backup.timer LastTriggerUSec); btu=$(timer_usec); BR_TUSEC=$btu; bs=$(ts afldb-backup.service ExecMainStartTimestamp); be=$(ts afldb-backup.service ExecMainExitTimestamp)
   res=$(systemctl show afldb-backup.service -p Result --value 2>/dev/null); xs=$(systemctl show afldb-backup.service -p ExecMainStatus --value 2>/dev/null)
   read_invocation afldb-backup.service || { BR_WHY="afldb-backup.service InvocationID: $RI_WHY"; return 1; }
   [ -x "$3" ] || { BR_WHY="node is not executable at $3: the journal cannot be read"; return 1; }
   jl=$(backup_journal "$1" "$(($2 + 906))" "$3"); jrc=$?
   BR_EVID=$(match_backup "$1" "$2" "$bt" "$bs" "$be" "$res" "$xs" "$RI_ID" "$jrc" "$jl" "$btu") || { BR_WHY=${BR_EVID#REASON }; BR_EVID=; return 1; }
-  attested_origin "$RI_ID" "$btu" || { BR_WHY="scheduled origin unproven: $AO_WHY"; BR_EVID=; return 1; }
-  BR_ORIGIN=$AO_INFO
+  read -r x x x x x bn bh <<< "$BR_EVID"
+  attested_origin "$RI_ID" "$btu" "$bn" "$bh" || { BR_WHY="scheduled origin unproven: $AO_WHY"; BR_EVID=; return 1; }
+  BR_ORIGIN=$AO_INFO; BR_DUMP=$AO_DUMP; BR_DUMP_SHA=$AO_DUMP_SHA
   BR_JOURNAL=$(sed -n 's/^[0-9a-f]\{32\} [0-9]\{10\} own //p' <<< "$jl")
 }
 
@@ -329,10 +353,13 @@ if scheduled_backup_run "$B0" "$B1" "$N"; then
   echo "BACKUP-EVIDENCE $BR_EVID"
   if PICK=$(pick_overnight_dump "$BK" "$DC" "$BR_JOURNAL"); then
     SDN=${PICK%% *}; SS=${PICK#* }
-    if [ "$SDN ${SS:0:16}" = "$bn $bh" ]; then
-      echo "PASS scheduled dump unique, is the dump the timer's invocation $bi reported, re-hash = sidecar: $SDN $(stat -c %s "$BK/$SDN") B"
+    if [ "$SDN ${SS:0:16}" != "$bn $bh" ]; then echo "FAIL scheduled dump $SDN ${SS:0:16} is not the dump the timer's invocation reported ($bn $bh)"; F=1
+    elif [ "$SDN $SS" != "$BR_DUMP $BR_DUMP_SHA" ]; then
+      echo "FAIL scheduled dump $SDN sha256 $SS is not the dump the root record bound ($BR_DUMP sha256 $BR_DUMP_SHA)"; F=1
+    else
+      echo "PASS scheduled dump unique, is the dump the timer's invocation $bi reported and its root record bound (full sha256), re-hash = sidecar: $SDN $(stat -c %s "$BK/$SDN") B"
       echo "OFFHOST-COMPARE $PICK"
-    else echo "FAIL scheduled dump $SDN ${SS:0:16} is not the dump the timer's invocation reported ($bn $bh)"; F=1; fi
+    fi
   else echo "FAIL dump not attributable: ${PICK#REASON }"; F=1; fi
 else
   echo "FAIL afldb-backup.service scheduled run is not attributed to the backup timer: $BR_WHY"; F=1

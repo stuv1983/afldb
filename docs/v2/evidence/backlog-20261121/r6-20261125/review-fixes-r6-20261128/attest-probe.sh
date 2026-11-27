@@ -20,6 +20,13 @@
 #      (killed in ExecStart) has no record; invocation #2's record vs a genuine one; attested_origin refuses #2;
 #   P6 Astra's case: the timer's job fails on its dependency, a start by hand 3 s later succeeds: record trigger_unit=none; refused;
 #   P7 a writer failure (record directory moved away): the backup still succeeds (the '-' prefix), no record, one journal line.
+# Record format 2 (28 Nov, independent review MED-1): P3 also shows the record's dump binding (dump= the run's dump, dump_sha256= its
+#   sha256 = its sidecar) and the identity the writer's setpriv child runs with; then
+#   P8 the dump is hashed AS ARM: the stub chmods its dump to 000 just after scheduled-backup.sh exits (arm, its owner, can no longer
+#      read it; root still can): the record says dump=none, the journal says why, the gate refuses;
+#   P9 a symbolic link named like a dump of this run (to a root-only file): dump=none, the gate refuses;
+#   P10 a genuine timer run, then the reviewer's bypass at the gate: the "backup ok" line names a planted dump (as a replaced node
+#      would print it): attested_origin refuses; with the real line it passes.
 set -uo pipefail; export LC_ALL=C
 MODE=${1:?host|container}
 B=docs/v2/evidence/backlog-20261121; H6=$B/r6-20261125/review-fixes-r6-20261128
@@ -80,7 +87,12 @@ echo "==> Backing up afldb_prod to $target"
 echo "stub-backup: uid=$(id -u) NoNewPrivs=$(awk '/^NoNewPrivs/ {print $2}' /proc/self/status)"
 [ -e /run/afldb-probe-slow ] && sleep 8
 head -c 4096 /dev/urandom > "$target"
+# P8: once scheduled-backup.sh (the parent) has exited, make the dump unreadable to arm (its owner); root could still read it
+[ -e /run/afldb-probe-chmod000 ] && { ( while pgrep -u arm -f tools/maintenance/scheduled-backup.sh > /dev/null; do sleep 0.01; done; chmod 000 "$target" ) > /dev/null 2>&1 < /dev/null & }
+# P9: a symbolic link named like a second dump of this run, to a root-only file
+[ -e /run/afldb-probe-symlink ] && ln -s /etc/shadow "$dir/afldb_prod-$(date +%Y%m%d)-235959.dump"
 echo "==> Done."
+sleep 1.1   # the next run's main start is then at least 1 s after this dump's mtime (the writer's candidate rule has 1 s granularity)
 EOF
 printf '#!/usr/bin/env bash\nexit 0\n' > "$CHK/tools/maintenance/restore-test.sh"
 chown -R arm:arm /home/arm/projects; chmod 755 "$CHK"/tools/maintenance/*.sh
@@ -93,8 +105,13 @@ systemctl daemon-reload
 
 # extract the gate's functions verbatim (as r5's run_a2fn does) and run attested_origin as arm against the live unit
 : > /tmp/gfn.sh; for fn in timer_usec read_invocation trusted_path attested_origin; do sed -n "/^$fn() {/,/^}/p" "$G0" >> /tmp/gfn.sh; done; chmod 644 /tmp/gfn.sh
-gate() { as_arm bash -c '. /tmp/gfn.sh; read_invocation afldb-backup.service || { echo "RI_WHY $RI_WHY"; exit 3; }; tu=$(timer_usec) || { echo "no timer usec"; exit 4; }
-  if attested_origin "$RI_ID" "$tu"; then echo "attested_origin rc 0: $AO_INFO"; else rc=$?; echo "attested_origin rc $rc: $AO_WHY"; exit $rc; fi'; }
+# gate [dump-name 16-hex]: the "backup ok" line's dump as match_backup passes it (default: read from the journal as root, which is
+# what an honest node reports; P10 passes a planted one, as a replaced node would)
+gate() { local inv ok; inv=$(systemctl show afldb-backup.service -p InvocationID --value)
+  ok=$(journalctl _SYSTEMD_INVOCATION_ID="$inv" -o cat -q | sed -n 's/.*scheduled-backup: backup ok: \([^ ]*\) [0-9]* bytes sha256 \([0-9a-f]\{16\}\).*/\1 \2/p' | tail -1)
+  as_arm bash -c '. /tmp/gfn.sh; read_invocation afldb-backup.service || { echo "RI_WHY $RI_WHY"; exit 3; }; tu=$(timer_usec) || { echo "no timer usec"; exit 4; }
+  if attested_origin "$RI_ID" "$tu" "$1" "$2"; then echo "attested_origin rc 0: $AO_INFO (AO_DUMP $AO_DUMP AO_DUMP_SHA $AO_DUMP_SHA)"; else rc=$?; echo "attested_origin rc $rc: $AO_WHY"; exit $rc; fi' _ "${1:-${ok% *}}" "${2:-${ok#* }}"; }
+fld() { sed -n "s/^$1=//p" "$RD/$2.attest" 2>/dev/null; }
 rec() { local f=$RD/$1.attest; if [ -e "$f" ]; then line "   record $f ($(stat -c '%U:%G %a links=%h %s B' "$f")):"; sed 's/^/     | /' "$f"; else line "   no record $f"; fi; }
 svc() { systemctl show afldb-backup.service -p InvocationID -p Result -p ExecMainStatus -p InactiveEnterTimestampMonotonic -p InactiveExitTimestampMonotonic -p ExecMainStartTimestampMonotonic -p ActiveEnterTimestampMonotonic | tr '\n' ' '; }
 tmr() { line "   timer: $(systemctl show afldb-backup.timer -p ActiveEnterTimestampMonotonic -p InactiveExitTimestampMonotonic | tr '\n' ' ')busctl LastTriggerUSec/Monotonic: $(busctl get-property org.freedesktop.systemd1 /org/freedesktop/systemd1/unit/afldb_2dbackup_2etimer org.freedesktop.systemd1.Timer LastTriggerUSec LastTriggerUSecMonotonic | tr '\n' ' ')"; }
@@ -133,6 +150,12 @@ line "   service: $(svc)"; tmr; jrnl "$I3"; rec "$I3"
 o=$(gate 2>&1); rc=$?; line "   gate attested_origin (as arm): $o"
 [ "$rc" = 0 ] && grep -q "^job_type=start$" "$RD/$I3.attest" && grep -q '^sub_state=start-post$' "$RD/$I3.attest" && grep -q "^trigger_timer_realtime_usec=$LT$" "$RD/$I3.attest" \
   && expect ok "genuine timer run: job live as JobType=start in start-post, trigger usec = LastTriggerUSec $LT, gate PASS" || expect bad "genuine timer run"
+D3=$(fld dump "$I3"); H3=$(fld dump_sha256 "$I3")
+line "   dump binding: record dump=$D3 dump_sha256=$H3; in $BKD (root's view): $(ls -l --time-style=+%s "$BKD" | grep -c '\.dump$') dump(s), this one $(stat -c '%U %a %s B mtime %Y' "$BKD/$D3" 2>/dev/null), root's sha256 $(sha256sum < "$BKD/$D3" 2>/dev/null | cut -c1-64), sidecar $(cut -c1-64 "$BKD/$D3.sha256" 2>/dev/null)"
+[ -n "$D3" ] && [ "$D3" != none ] && [ "$H3" = "$(sha256sum < "$BKD/$D3" | cut -c1-64)" ] && [ "$H3" = "$(cut -c1-64 "$BKD/$D3.sha256")" ] \
+  && journalctl _SYSTEMD_INVOCATION_ID="$I3" -o cat -q | grep -q "backup ok: $D3 [0-9]* bytes sha256 ${H3:0:16}" \
+  && expect ok "the record binds the run's dump: dump= the file the run wrote, dump_sha256 = its sha256 = its sidecar = the 'backup ok' line's 16 hex" || expect bad "record dump binding"
+line "   the writer's child identity (the same setpriv prefix the writer uses, run here by root): $(/usr/bin/setpriv --reuid=arm --regid=arm --clear-groups --no-new-privs --reset-env /usr/bin/bash --noprofile --norc -c 'echo uid=$(/usr/bin/id -u) gid=$(/usr/bin/id -g) groups=$(/usr/bin/id -G) $(/usr/bin/grep -E "^(NoNewPrivs|CapEff)" /proc/self/status | /usr/bin/tr "\t\n" "  ")env=[$(/usr/bin/env | /usr/bin/sort | /usr/bin/tr "\n" " ")]')"
 cp "$RD/$I3.attest" /tmp/genuine.attest
 as_arm bash -c ": > $RD/arm-was-here" 2>/dev/null && expect bad "arm could create a file in $RD" || line "   (arm cannot create files in $RD: as expected; live write attempts are the harness's job)"
 
@@ -177,7 +200,7 @@ I5b=$(systemctl show afldb-backup.service -p InvocationID --value); LT=$(tusec)
 line "   after the restart: $(svc)"; tmr; jrnl "$I5a"; jrnl "$I5b"
 rec "$I5a"; rec "$I5b"
 line "   the restart record vs the genuine P3 record (field by field, values differ by dispatch; the decisive relation is inactive_enter_mono vs timer_last_trigger_mono):"
-diff <(sed 's/=.*//' /tmp/genuine.attest) <(sed 's/=.*//' "$RD/$I5b.attest") > /dev/null && line "     same 20 keys"
+diff <(sed 's/=.*//' /tmp/genuine.attest) <(sed 's/=.*//' "$RD/$I5b.attest") > /dev/null && line "     same $(grep -c . /tmp/genuine.attest) lines, same keys"
 for k in job job_type active_state sub_state exec_main_code exec_main_status trigger_unit inactive_enter_mono timer_last_trigger_mono inactive_exit_mono exec_main_start_mono; do
   g=$(sed -n "s/^$k=//p" /tmp/genuine.attest); r=$(sed -n "s/^$k=//p" "$RD/$I5b.attest"); line "     $k: genuine $g | restart #2 $r"; done
 ie=$(sed -n 's/^inactive_enter_mono=//p' "$RD/$I5b.attest"); tm=$(sed -n 's/^timer_last_trigger_mono=//p' "$RD/$I5b.attest"); xs=$(sed -n 's/^exec_main_start_mono=//p' "$RD/$I5b.attest")
@@ -205,6 +228,45 @@ mv "$RD" "$RD.away"; systemctl start afldb-backup.service; settle; I7=$(systemct
 line "   service: $(svc)"; jrnl "$I7"; rec "$I7"
 [ "$(systemctl show afldb-backup.service -p Result --value)" = success ] && [ ! -e "$RD/$I7.attest" ] && journalctl _SYSTEMD_INVOCATION_ID="$I7" -o cat -q | grep -q '^afldb-backup-attest: no record: no record directory' \
   && expect ok "writer failure: the backup still succeeds, no record, one journal line" || expect bad "writer failure"
+
+timer_run() { local at LT0 i; at=$(date -d '+20 sec' '+%H:%M:%S')
+  printf '[Timer]\nOnCalendar=\nOnCalendar=*-*-* %s\nRandomizedDelaySec=0\nAccuracySec=1s\nPersistent=false\n' "$at" > /etc/systemd/system/afldb-backup.timer.d/probe.conf
+  systemctl daemon-reload; systemctl restart afldb-backup.timer; LT0=$(tusec)
+  for i in $(seq 1 300); do [ "$(tusec)" != "$LT0" ] && break; sleep 0.2; done; sleep 1; settle; }
+hdr "P8 the dump is hashed as arm: the dump is chmod 000 (by arm, its owner) after scheduled-backup.sh exits, before the writer runs"
+touch /run/afldb-probe-chmod000; timer_run; rm -f /run/afldb-probe-chmod000   # a timer run: only the dump binding can refuse it
+I8=$(systemctl show afldb-backup.service -p InvocationID --value); D8=$(journalctl _SYSTEMD_INVOCATION_ID="$I8" -o cat -q | sed -n 's/.*backup ok: \([^ ]*\) .*/\1/p')
+line "   service: $(svc)"; jrnl "$I8"; rec "$I8"
+line "   the dump now: $(stat -c '%U %a %s B' "$BKD/$D8" 2>/dev/null); root can read it: sha256 $(sha256sum < "$BKD/$D8" 2>/dev/null | cut -c1-16); arm can: $(as_arm bash -c "sha256sum < '$BKD/$D8'" 2>&1 | head -1 | cut -c1-80)"
+o=$(gate 2>&1); rc=$?; line "   gate: $o"
+[ "$(stat -c %a "$BKD/$D8" 2>/dev/null)" = 0 ] && [ "$(fld dump "$I8")" = none ] && [ "$(fld dump_sha256 "$I8")" = none ] \
+  && journalctl _SYSTEMD_INVOCATION_ID="$I8" -o cat -q | grep -q "^afldb-backup-attest: dump=none: none $D8 cannot be read as this uid" \
+  && grep -q '^trigger_unit=afldb-backup.timer$' "$RD/$I8.attest" && [ "$rc" != 0 ] && grep -q 'found no single dump' <<< "$o" \
+  && expect ok "the writer hashes the dump as uid arm: a dump only root can read gives dump=none (root would have read it), and the gate refuses that timer run on the dump alone" \
+  || expect bad "dump hashed as arm"
+chmod 644 "$BKD/$D8"
+
+hdr "P9 a symbolic link named like a second dump of this run (to /etc/shadow)"
+touch /run/afldb-probe-symlink; systemctl start afldb-backup.service; settle; rm -f /run/afldb-probe-symlink
+I9=$(systemctl show afldb-backup.service -p InvocationID --value); jrnl "$I9"; rec "$I9"
+o=$(gate 2>&1); rc=$?; line "   gate: $o"
+[ "$(fld dump "$I9")" = none ] && journalctl _SYSTEMD_INVOCATION_ID="$I9" -o cat -q | grep -q '^afldb-backup-attest: dump=none: none afldb_prod-[0-9]*-235959.dump (modified in this run) is a symbolic link' \
+  && [ "$rc" != 0 ] && expect ok "a symbolic link among this run's dump candidates gives dump=none; the gate refuses" || expect bad "symlink candidate"
+rm -f "$BKD"/afldb_prod-*-235959.dump
+
+hdr "P10 a genuine timer run; at the gate, the reviewer's bypass (the 'backup ok' line names a planted dump, as a replaced node prints it)"
+at=$(date -d '+20 sec' '+%H:%M:%S')
+printf '[Timer]\nOnCalendar=\nOnCalendar=*-*-* %s\nRandomizedDelaySec=0\nAccuracySec=1s\nPersistent=false\n' "$at" > /etc/systemd/system/afldb-backup.timer.d/probe.conf
+systemctl daemon-reload; systemctl restart afldb-backup.timer; LT0=$(tusec)
+for i in $(seq 1 300); do [ "$(tusec)" != "$LT0" ] && break; sleep 0.2; done; sleep 1; settle
+I10=$(systemctl show afldb-backup.service -p InvocationID --value); rec "$I10"
+PL=afldb_prod-$(date +%Y%m%d)-022130.dump; as_arm bash -c "head -c 4096 /dev/urandom > '$BKD/$PL'; cd '$BKD' && sha256sum '$PL' > '$PL.sha256'"
+PH=$(cut -c1-16 "$BKD/$PL.sha256"); line "   planted by arm: $PL sha256 $PH (with its own sidecar)"
+o=$(gate "$PL" "$PH" 2>&1); rc=$?; line "   gate with the planted line: $o"
+o2=$(gate 2>&1); rc2=$?; line "   gate with the real line: $o2"
+[ "$rc" != 0 ] && grep -q "binds the dump $(fld dump "$I10"), but the run's 'backup ok' line (read through node) names $PL" <<< "$o" && [ "$rc2" = 0 ] \
+  && expect ok "the planted dump is refused against the root record's binding; the real line passes" || expect bad "planted dump at the gate"
+rm -f "$BKD/$PL" "$BKD/$PL.sha256"
 
 hdr "verify-attest-install.sh after the runs (root, then arm)"
 bash "$ST/verify-attest-install.sh" | sed 's/^/   | /'

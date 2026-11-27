@@ -12,6 +12,8 @@
 # Input:  RUN/fix = a tar export of the worktree files listed in INPUTS below (unpacked by the caller). Output: RUN/logs/*.log.
 # Labels: everything created carries r6h.run=<RID>: image r6h-sysd-<RID>:1, containers r6h-<RID>-<scenario>. The driver removes its
 #   containers always and its image unless --keep-image. Nothing else on the host is touched (no sudo, no lxc, no package install).
+# r6 review (28 Nov): scenario arm-node-swap (MED-1): arm replaces its own ~/.nvm node (the gates' journal parser) with a wrapper.
+#   RUN/presend.txt, when the transport wrote one, is printed in every scenario header (pre-send verification against a git revision).
 # Usage:  bash real-systemd-callers.sh <RUN> <RID> [--smoke] [--keep-image] [scenario ...]   (default: every scenario, in parallel)
 #   --smoke  plumbing check: an absent attest bundle is noted instead of a STOP, and logs are named smoke-real-systemd-callers-*.log
 # INPUTS (relative to RUN/fix): deploy/afldb-backup.service deploy/afldb-backup.timer deploy/afldb-backup-failed.service
@@ -24,7 +26,7 @@ RUN=${1:?run directory}; RID=${2:?run id}; shift 2
 SMOKE=0; KEEPIMG=0
 while [ $# -gt 0 ]; do case $1 in --smoke) SMOKE=1; shift;; --keep-image) KEEPIMG=1; shift;; *) break;; esac; done
 ALL=(genuine-attested astra-manual-after-hidden-failure old-install-r5-trigger forged-trigger-manual record-missing record-ambiguous
-     record-groupwritable restart-hidden-first timer-rearm)
+     record-groupwritable restart-hidden-first timer-rearm arm-node-swap)
 SCEN=("$@"); [ ${#SCEN[@]} -gt 0 ] || SCEN=("${ALL[@]}")
 for sc in "${SCEN[@]}"; do [[ " ${ALL[*]} " == *" $sc "* ]] || { echo "STOP unknown scenario $sc"; exit 2; }; done
 PIN=sha256:d71c0b286c54a7cc48645aa8d4d9d0c57e4260128cb91a6fb18c29d7589205ba   # grafana/alloy:latest on streamanator, Ubuntu 24.04.4
@@ -65,20 +67,25 @@ run_one() { # scenario
     echo "== real-systemd caller scenario $sc (smoke=$SMOKE)"
     echo "host $(hostname) ($(id -un)); started $(date -u +%FT%TZ); container $name; image $IMG"
     echo "[FIXTURE] fake Melbourne offset $(hms "$off"): the 02:20:00 dispatch on $DAY is due at real $(date -u -d @$td +%FT%TZ)"
+    [ -f "$RUN/presend.txt" ] && cat "$RUN/presend.txt"
     echo "inputs (sha256):"
     for f in docs/v2/evidence/release-17822b29-20261124/scripts/r1-g0-dump.sh docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh \
              tools/maintenance/scheduled-backup.sh deploy/afldb-backup.service deploy/afldb-backup.timer deploy/afldb-backup-failed.service \
              "$H6"/orig-624bf721/r1-g0-dump.sh "$H6"/orig-624bf721/r6-pre-verify.sh "$H6"/orig-624bf721/scheduled-backup.sh \
-             "$H6"/real-systemd-callers.sh "$H6"/real-systemd-callers-container.sh $(cd "$RUN/fix" && ls -1d "$H6"/attest/* 2>/dev/null); do
+             "$H6"/real-systemd-callers.sh "$H6"/real-systemd-callers-container.sh $(cd "$RUN/fix" && ls -1d "$H6"/attest/* contrast-*/* 2>/dev/null); do
       [ -f "$RUN/fix/$f" ] && echo "   $(sha256sum < "$RUN/fix/$f" | cut -c1-64)  $f" || echo "   ABSENT  $f"
     done
     [ -n "$(ls -A "$RUN/fix/$H6/attest" 2>/dev/null)" ] || echo "   (attest bundle directory empty or absent)"
     printf 'container id: '
   } > "$log"
+  # Node: the host's real node is ALWAYS mounted read-only at /opt/realnode (the harness's own journal printer uses it, so root never
+  # executes an arm-controlled binary). At the gates' pinned path it is a read-only bind mount too, EXCEPT in arm-node-swap, where the
+  # controller copies it into an arm-owned ~/.nvm (FIXTURE-ATTACK: production's arm owns ~/.nvm).
+  local nodemnt=(-v "$NODED:/opt/realnode:ro"); [ "$sc" = arm-node-swap ] || nodemnt+=(-v "$NODED:$NODED:ro")
   if ! docker run -d --name "$name" --label "$LBL" --network none --hostname afldb-prod --cgroupns=private --tmpfs /run --tmpfs /run/lock \
       --cap-add SYS_ADMIN --security-opt apparmor=unconfined --stop-signal SIGRTMIN+3 \
       -e "FAKE_STDOFF=$(hms "$off")" -e "R6H_DAY=$DAY" -e "R6H_SMOKE=$SMOKE" -e "R6H_DISPATCH=$td" \
-      -v "$RUN/entry-real.sh:/entry.sh:ro" -v "$RUN/fix:/in/fix:ro" -v "$NODED:$NODED:ro" --entrypoint /entry.sh "$IMG" >> "$log" 2>&1; then
+      -v "$RUN/entry-real.sh:/entry.sh:ro" -v "$RUN/fix:/in/fix:ro" "${nodemnt[@]}" --entrypoint /entry.sh "$IMG" >> "$log" 2>&1; then
     echo "controller exit 99 (container did not start)" >> "$log"; return 99
   fi
   docker exec "$name" bash "$ctl" "$sc" >> "$log" 2>&1; rc=$?

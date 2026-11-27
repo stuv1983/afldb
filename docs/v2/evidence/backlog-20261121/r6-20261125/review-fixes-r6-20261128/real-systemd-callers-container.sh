@@ -28,14 +28,23 @@
 #                                      `systemctl restart` during that sleep; invocation #2 succeeds
 #   timer-rearm                        timer stopped before 02:20, the 02:20 elapse missed, root starts the timer at 02:20:15:
 #                                      Persistent= catch-up fires at once (no policy expectation: the facts are recorded)
+#   arm-node-swap                      (independent review MED-1) genuine dispatch with writer; node at the gates' pinned path is an
+#                                      ARM-OWNED copy (FIXTURE-ATTACK: production's arm owns ~/.nvm). After the run, as arm: delete the
+#                                      timer's dump, plant afldb_prod-<day>-022130.dump with its own sidecar, replace ~/.nvm node with a
+#                                      wrapper that rewrites the 'backup ok' line to name the planted dump. Must be refused.
+#                                      CONTRAST: the bda102aa gates (git show bda102aa:<path>, sent as contrast-bda102aa/) on the same evidence
+# Record format: /1 (DESIGN.md at 297175f9) or /2 (adds dump= and dump_sha256=, the MED-1 fix). When a record carries them they are
+# checked against the dump the attested run wrote, as root captured it before any attack.
 set -uo pipefail; export LC_ALL=C
 SC=${1:?scenario}; FIX=/in/fix; DAY=${R6H_DAY:?}; SMOKE=${R6H_SMOKE:-0}; TD=${R6H_DISPATCH:?}; DAYC=${DAY//-/}
 B=docs/v2/evidence/backlog-20261121; H6=$B/r6-20261125/review-fixes-r6-20261128
 G0=$FIX/docs/v2/evidence/release-17822b29-20261124/scripts/r1-g0-dump.sh; PRE=$FIX/$B/r6-20261125/r6-pre-verify.sh
 OG0=$FIX/$H6/orig-624bf721/r1-g0-dump.sh; OPRE=$FIX/$H6/orig-624bf721/r6-pre-verify.sh
+BG0=$FIX/contrast-bda102aa/r1-g0-dump.sh; BPRE=$FIX/contrast-bda102aa/r6-pre-verify.sh
 PRODSB=$FIX/tools/maintenance/scheduled-backup.sh; R5SB=$FIX/$H6/orig-624bf721/scheduled-backup.sh; BUNDLE=$FIX/$H6/attest
 A2ARGS=(accepted 7d92042fd110-XWruOm_9nLCSMY8nGPqYU r3:yes r4:no 10:00 tue:deferred inv:342040625f6d4012a35d598dfbf9afe6)
-NODE=/home/arm/.nvm/versions/node/v22.23.2/bin/node
+NB=/home/arm/.nvm/versions/node/v22.23.2/bin   # the gates' pinned node directory (the gates use it; the harness never does)
+RNODE=/opt/realnode/bin/node                     # the host's node, read-only: the harness's own journal printer (as root)
 WD=/usr/local/libexec/afldb; W=$WD/afldb-backup-attest
 DID=/etc/systemd/system/afldb-backup.service.d; DI=$DID/60-afldb-backup-attest.conf; RD=/var/lib/afldb-backup-attest
 UNITF=/etc/systemd/system/afldb-backup.service; TIMERF=/etc/systemd/system/afldb-backup.timer; TDD=/etc/systemd/system/afldb-backup.timer.d
@@ -55,17 +64,18 @@ sha() { sha256sum < "$1" | cut -c1-64; }
 mkdir -p $OUT
 
 # ------------------------------------------------------------------------------------------------------------------ scenario table
-WRITER=1; SBK=prod; HIDDEN=0; POST=none; RESTART=0; REARM=0; CONTRAST=0; OFFHOST=0; SUITE=0; EXPECT=refused
+WRITER=1; SBK=prod; HIDDEN=0; POST=none; RESTART=0; REARM=0; CONTRAST=0; OFFHOST=0; SUITE=0; NODESWAP=0; EXPECT=refused
 case $SC in
   genuine-attested)                   EXPECT=attributed; SUITE=1;;
   astra-manual-after-hidden-failure)  HIDDEN=1; OFFHOST=1;;
   old-install-r5-trigger)             WRITER=0; SBK=r5;;
-  forged-trigger-manual)              SBK=forged; HIDDEN=1; CONTRAST=1;;
+  forged-trigger-manual)              SBK=forged; HIDDEN=1; CONTRAST=624bf721;;
   record-missing)                     POST=rm;;
   record-ambiguous)                   POST=plant;;
   record-groupwritable)               POST=chmod;;
   restart-hidden-first)               RESTART=1;;
   timer-rearm)                        REARM=1; EXPECT=record;;
+  arm-node-swap)                      NODESWAP=1; CONTRAST=bda102aa;;
   *) echo "STOP unknown scenario $SC"; exit 2;;
 esac
 
@@ -77,7 +87,7 @@ userdel -r ubuntu > /dev/null 2>&1; id arm > /dev/null 2>&1 || useradd -M -u 100
 install -d -o arm -g arm -m 755 /home/arm /home/arm/projects $CHK $CHK/tools $CHK/tools/maintenance /home/arm/backups "$BKD"
 line "arm as the gates run: $(as_arm id) (adm members: '$(getent group adm | cut -d: -f4)', systemd-journal members: '$(getent group systemd-journal | cut -d: -f4)'); env: $(as_arm env | tr '\n' ' ')"
 line "fs.protected_hardlinks=$(cat /proc/sys/fs/protected_hardlinks) fs.protected_symlinks=$(cat /proc/sys/fs/protected_symlinks); journal: $(ls -ld /var/log/journal 2>&1 | cut -c1-40)"
-line "scenario $SC: writer=$WRITER checkout-script=$SBK hidden-failure=$HIDDEN post=$POST restart=$RESTART rearm=$REARM contrast=$CONTRAST offhost-copy=$OFFHOST arm-suite=$SUITE expect=$EXPECT"
+line "scenario $SC: writer=$WRITER checkout-script=$SBK hidden-failure=$HIDDEN post=$POST restart=$RESTART rearm=$REARM contrast=$CONTRAST offhost-copy=$OFFHOST arm-suite=$SUITE node-swap=$NODESWAP expect=$EXPECT"
 
 # ------------------------------------------------------------------------------------------------------------------ checkout and units
 case $SBK in
@@ -113,7 +123,12 @@ L FIXTURE "checkout $CHK/tools/maintenance/scheduled-backup.sh = $SBK, sha256 $(
 L FIXTURE "backup.sh STUB sha256 $(sha $CHK/tools/maintenance/backup.sh); restore-test.sh empty stub; postgresql.service stub (up=$([ -e /run/pg-ok ] && echo yes || echo 'NO: the timer job will fail on Requires='))"
 L FIXTURE "timer drop-in $TDD/50-r6h-fixture-timing.conf: $(tr '\n' ' ' < $TDD/50-r6h-fixture-timing.conf)(the real timer has RandomizedDelaySec=10min AccuracySec=1min)"
 L REAL-SYSTEMD "unit files from deploy/ installed root:root 0644: service $(sha $UNITF) timer $(sha $TIMERF) failed $(sha /etc/systemd/system/afldb-backup-failed.service)"
-L REAL-SYSTEMD "callers (unmodified, run from the read-only export): G0 $(sha "$G0") A-2 $(sha "$PRE"); 624bf721 G0 $(sha "$OG0") A-2 $(sha "$OPRE")"
+L REAL-SYSTEMD "callers (unmodified, run from the read-only export): G0 $(sha "$G0") A-2 $(sha "$PRE"); 624bf721 G0 $(sha "$OG0") A-2 $(sha "$OPRE")$([ -f "$BG0" ] && echo "; bda102aa G0 $(sha "$BG0") A-2 $(sha "$BPRE")")"
+if [ "$NODESWAP" = 1 ]; then
+  install -d -o arm -g arm -m 755 /home/arm/.nvm /home/arm/.nvm/versions /home/arm/.nvm/versions/node /home/arm/.nvm/versions/node/v22.23.2 $NB
+  install -o arm -g arm -m 755 $RNODE $NB/node
+  L FIXTURE-ATTACK "the gates' pinned node $NB/node is an ARM-OWNED copy of the real node ($(stat -c '%U:%G %a' $NB/node), sha256 $(sha $NB/node)), as on production where arm owns ~/.nvm"
+else L FIXTURE "the gates' pinned node $NB/node is the host's node, bind-mounted read-only ($(stat -c '%U:%G %a' $NB/node 2>&1))"; fi
 
 # ------------------------------------------------------------------------------------------------------------------ the protected writer
 BUNDLE_OK=1
@@ -235,7 +250,7 @@ touch $OUT/poll-stop; wait $POLLPID 2>/dev/null
 hdr "LIVE capture while the job existed (REAL-SYSTEMD, root; one line per change)"; sed 's/^/   /' $OUT/live.log | cut -c1-800
 
 # ------------------------------------------------------------------------------------------------------------------ raw evidence
-jsum() { "$NODE" -e '
+jsum() { "$RNODE" -e '
   const rl = require("readline").createInterface({ input: process.stdin });
   rl.on("line", l => { try { const e = JSON.parse(l); const m = Array.isArray(e.MESSAGE) ? "[binary]" : String(e.MESSAGE);
     console.log([new Date(Number(e.__REALTIME_TIMESTAMP) / 1000).toISOString(), "pid=" + e._PID, "uid=" + e._UID,
@@ -271,7 +286,14 @@ check_record() { # file: the DESIGN section 4 item-4 predicates, HARNESS-compute
   lt=$(tprop LastTriggerUSec)
   n() { [[ ${R[$1]:-} =~ ^[0-9]+$ ]]; }
   p() { printf '   [HARNESS] %-72s %s\n' "$1" "$([ "$2" = 0 ] && echo holds || echo FAILS)"; }
-  p "line 1 = afldb-backup-attest/1" "$([ "$(head -1 "$f")" = afldb-backup-attest/1 ]; echo $?)"
+  RECFMT=$(head -1 "$f")
+  p "line 1 = afldb-backup-attest/1 or /2 ($RECFMT)" "$([[ $RECFMT =~ ^afldb-backup-attest/[12]$ ]]; echo $?)"
+  if [ -n "${R[dump]+x}" ] || [ -n "${R[dump_sha256]+x}" ] || [ "$RECFMT" = afldb-backup-attest/2 ]; then
+    p "dump = the attested run's dump (${R[dump]:-?} vs ${EXPN:-none})" "$([ -n "$EXPN" ] && [ "${R[dump]:-}" = "$EXPN" ]; echo $?)"
+    p "dump_sha256 = its re-hash (${R[dump_sha256]:-?})" "$([ -n "$EXPS" ] && [ "${R[dump_sha256]:-}" = "$EXPS" ]; echo $?)"
+    if [ -n "$EXPN" ] && [ "${R[dump]:-}" = "$EXPN" ] && [ "${R[dump_sha256]:-}" = "$EXPS" ]; then RECDUMP=bound-correct
+    else RECDUMP="bound-WRONG(${R[dump]:-?} ${R[dump_sha256]:-?})"; fi
+  else line "   [HARNESS] record carries no dump= / dump_sha256= ($RECFMT): the dump is NOT bound by the record"; RECDUMP=not-bound; fi
   p "invocation = the successful InvocationID ($SINV)" "$([ "${R[invocation]:-}" = "$SINV" ]; echo $?)"
   p "job_type=start (${R[job_type]:-?})" "$([ "${R[job_type]:-}" = start ]; echo $?)"
   p "active_state=activating sub_state=start-post (${R[active_state]:-?}/${R[sub_state]:-?})" "$([ "${R[active_state]:-}/${R[sub_state]:-}" = activating/start-post ]; echo $?)"
@@ -281,12 +303,15 @@ check_record() { # file: the DESIGN section 4 item-4 predicates, HARNESS-compute
   if n inactive_enter_mono && n timer_last_trigger_mono && n inactive_exit_mono && n exec_main_start_mono; then
     p "inactive_enter_mono ${R[inactive_enter_mono]} < timer_last_trigger_mono ${R[timer_last_trigger_mono]}" "$(( R[inactive_enter_mono] < R[timer_last_trigger_mono] ? 0 : 1 ))"
     p "timer_last_trigger_mono <= inactive_exit_mono ${R[inactive_exit_mono]}" "$(( R[timer_last_trigger_mono] <= R[inactive_exit_mono] ? 0 : 1 ))"
-    p "inactive_exit_mono <= exec_main_start_mono ${R[exec_main_start_mono]}" "$(( R[inactive_exit_mono] <= R[exec_main_start_mono] ? 0 : 1 ))"
+    p "timer_last_trigger_mono <= exec_main_start_mono ${R[exec_main_start_mono]}" "$(( R[timer_last_trigger_mono] <= R[exec_main_start_mono] ? 0 : 1 ))"
+    p "inactive_exit_mono - timer_last_trigger_mono = $(( R[inactive_exit_mono] - R[timer_last_trigger_mono] )) us <= 5000000" "$(( R[inactive_exit_mono] - R[timer_last_trigger_mono] <= 5000000 ? 0 : 1 ))"
+    line "   [HARNESS] info: order of the two stamps (not a rule): exec_main_start_mono - inactive_exit_mono = $(( R[exec_main_start_mono] - R[inactive_exit_mono] )) us"
     p "exec_main_start_mono - timer_last_trigger_mono = $(( R[exec_main_start_mono] - R[timer_last_trigger_mono] )) us <= 5000000" "$(( R[exec_main_start_mono] - R[timer_last_trigger_mono] <= 5000000 ? 0 : 1 ))"
   else p "monotonic fields numeric" 1; fi
   n timer_last_trigger_mono && n timer_active_enter_mono && line "   [HARNESS] information: dispatch $(( (R[timer_last_trigger_mono] - R[timer_active_enter_mono]) / 1000 )) ms after the timer unit's last (re)activation"
   p "writer_sha256 = sha256 of the installed writer" "$([ -f $W ] && [ "${R[writer_sha256]:-}" = "$(sha $W)" ]; echo $?)"
 }
+RECDUMP=none; RECFMT=none
 hdr "protected record(s) ($RD)"
 if [ -d $RD ]; then
   for f in $RD/* $RD/.[!.]*; do [ -e "$f" ] || continue
@@ -339,13 +364,44 @@ report_callers() { # tagG0 tagA2 label
   line "RESULT-A2-UNRELATED ($lab): $(wc -l < $OUT/$a.unrelated) FAIL line(s) outside section 5; $(wc -l < $OUT/$a.s5other) FAIL line(s) inside section 5 not about the backup origin (restore/ledger/status: no database here)"
   sed 's/^/   outside-s5: /' $OUT/$a.unrelated | cut -c1-300; sed 's/^/   inside-s5-not-origin: /' $OUT/$a.s5other | cut -c1-300
 }
+GENN=$EXPN; GENS=$EXPS
+if [ "$NODESWAP" = 1 ]; then
+  hdr "FIXTURE-ATTACK arm-node-swap (review MED-1): every step as arm (uid 1000, no groups, env -i); the root record is not touched"
+  REC0=$(ls -1 $RD/*.attest 2>/dev/null | head -1); line "root record before: ${REC0:-none} sha256 $([ -n "$REC0" ] && sha "$REC0")"
+  FN=afldb_prod-$DAYC-022130.dump
+  cat > /tmp/r6h-node-wrapper <<'EOW'
+#!/bin/bash
+# arm's wrapper at the gates' pinned node path: run the real node (arm's own copy), rewrite the 'backup ok' line to name the planted dump.
+read -r FN FH FB < /home/arm/.fake
+/home/arm/.nvm/versions/node/v22.23.2/bin/node.real "$@" | sed -E "s/(scheduled-backup: backup ok: )[^ ]+ [0-9]+ bytes sha256 [0-9a-f]{16}/\1$FN $FB bytes sha256 $FH/"
+exit ${PIPESTATUS[0]}
+EOW
+  cat > /tmp/r6h-arm-attack.sh <<'EOA'
+set -e; BK=$1; FN=$2; NB=$3
+printf 'arm-made bytes: this dump was NOT written by the timer-dispatched run\n' > "$BK/$FN"
+H=$(sha256sum < "$BK/$FN" | cut -c1-64); (cd "$BK" && sha256sum "$FN" > "$FN.sha256"); chmod 600 "$BK/$FN.sha256"
+for f in "$BK"/afldb_prod-*.dump; do [ "${f##*/}" = "$FN" ] || rm -f "$f" "$f.sha256"; done
+printf '%s %s %s\n' "$FN" "${H:0:16}" "$(stat -c %s "$BK/$FN")" > /home/arm/.fake
+mv "$NB/node" "$NB/node.real"; cp /tmp/r6h-node-wrapper "$NB/node"; chmod 755 "$NB/node"
+EOA
+  chmod 644 /tmp/r6h-node-wrapper /tmp/r6h-arm-attack.sh
+  if as_arm bash /tmp/r6h-arm-attack.sh "$BKD" "$FN" "$NB"; then
+    L FIXTURE-ATTACK "as arm: the timer's dump $GENN deleted, $FN planted with its own sidecar, $NB/node replaced by the rewriting wrapper (real node kept as node.real)"
+  else echo "STOP the arm attack steps failed"; exit 1; fi
+  ls -la --time-style=+%T "$BKD" | sed 's/^/   /'; line "wrapper $NB/node: $(stat -c '%U:%G %a' $NB/node)"; sed 's/^/   | /' $NB/node
+  line "root record after: ${REC0:-none} sha256 $([ -n "$REC0" ] && sha "$REC0") (unchanged = genuine)"
+  EXPN=$FN; EXPS=$(sha "$BKD/$FN")
+  L FIXTURE-ATTACK "judgement target from here on: the PLANTED dump $EXPN $EXPS (a caller attributing it is the MED-1 bypass); the genuine dump was $GENN $GENS"
+fi
 run_caller G0 "$G0" "$DAY"
 run_caller A2 "$PRE" "${A2ARGS[@]}"
 report_callers G0 A2 "callers under test"
-if [ "$CONTRAST" = 1 ]; then
-  run_caller G0-624bf721 "$OG0" "$DAY"; run_caller A2-624bf721 "$OPRE" "${A2ARGS[@]}"
-  report_callers G0-624bf721 A2-624bf721 "CONTRAST 624bf721"
-  CG=$JG; CA=$JA; CGRC=$(cat $OUT/G0-624bf721.rc)
+if [ "$CONTRAST" != 0 ]; then
+  case $CONTRAST in 624bf721) CG0=$OG0; CPRE=$OPRE;; bda102aa) CG0=$BG0; CPRE=$BPRE;; esac
+  [ -f "$CG0" ] && [ -f "$CPRE" ] || { echo "STOP contrast $CONTRAST gates are not in the export"; exit 1; }
+  run_caller G0-$CONTRAST "$CG0" "$DAY"; run_caller A2-$CONTRAST "$CPRE" "${A2ARGS[@]}"
+  report_callers G0-$CONTRAST A2-$CONTRAST "CONTRAST $CONTRAST"
+  CG=$JG; CA=$JA; CGRC=$(cat $OUT/G0-$CONTRAST.rc)
   judge $OUT/G0.out; JG=$J; judge $OUT/A2.s5; JA=$J   # restore the judgement of the callers under test
 fi
 GRC=$(cat $OUT/G0.rc)
@@ -421,9 +477,12 @@ hdr "verdict [HARNESS]"
 bad=0
 case $EXPECT in
   attributed)
-    if [ "$GRC" = 0 ] && grep -q '^G0 PROD RESULT PASS' $OUT/G0.out && [ "$JG" = attributed-correct ] && [ "$JA" = attributed-correct ] && [ "$SUITE_BAD" = 0 ]; then
-      line "VERDICT $SC: AS EXPECTED. G0 exit 0 'G0 PROD RESULT PASS' with its own OFFHOST-COMPARE = $EXPN $EXPS; A-2 section 5 attributed with its own BACKUP-EVIDENCE and OFFHOST-COMPARE correct; A-2 whole caller exit $(cat $OUT/A2.rc) for $(wc -l < $OUT/A2.unrelated)+$(wc -l < $OUT/A2.s5other) unrelated FAIL line(s) (NOT a full A-2 PASS); arm suite 0 findings"
-    else line "VERDICT $SC: NOT AS EXPECTED (G0 exit $GRC origin $JG; A-2 section 5 $JA; arm suite findings $SUITE_BAD)"; bad=1; fi;;
+    line "RESULT-RECORD-DUMP $SC: record $RECFMT, dump binding $RECDUMP"
+    # A /2 record must bind the run's own dump; a /1 record (no binding) is reported, not failed, so the 297175f9 bundle stays comparable.
+    if [ "$GRC" = 0 ] && grep -q '^G0 PROD RESULT PASS' $OUT/G0.out && [ "$JG" = attributed-correct ] && [ "$JA" = attributed-correct ] && [ "$SUITE_BAD" = 0 ] \
+       && { [ "$RECDUMP" = bound-correct ] || [ "$RECDUMP" = not-bound ]; }; then
+      line "VERDICT $SC: AS EXPECTED. G0 exit 0 'G0 PROD RESULT PASS' with its own OFFHOST-COMPARE = $EXPN $EXPS; A-2 section 5 attributed with its own BACKUP-EVIDENCE and OFFHOST-COMPARE correct; A-2 whole caller exit $(cat $OUT/A2.rc) for $(wc -l < $OUT/A2.unrelated)+$(wc -l < $OUT/A2.s5other) unrelated FAIL line(s) (NOT a full A-2 PASS); arm suite 0 findings; record dump binding: $RECDUMP"
+    else line "VERDICT $SC: NOT AS EXPECTED (G0 exit $GRC origin $JG; A-2 section 5 $JA; arm suite findings $SUITE_BAD; record dump binding $RECDUMP)"; bad=1; fi;;
   refused)
     if [ "$GRC" != 0 ] && [ "$JG" = refused ] && [ "$JA" = refused ] && [ "$(grep -c '^OFFHOST-COMPARE ' $OUT/A2.out)" = 0 ]; then
       line "VERDICT $SC: AS EXPECTED. both callers 'scheduled origin unproven', no OFFHOST-COMPARE (G0 exit $GRC, A-2 exit $(cat $OUT/A2.rc))"
@@ -433,9 +492,10 @@ case $EXPECT in
   record)
     line "VERDICT $SC: RECORDED (no policy expectation). G0 exit $GRC origin $JG; A-2 section 5 $JA; this proves the timer UNIT dispatched the run (re-armed by root inside the window, Persistent= catch-up), not that the calendar elapsed unattended";;
 esac
-if [ "$CONTRAST" = 1 ]; then
+if [ "$CONTRAST" != 0 ]; then
+  case $CONTRAST in 624bf721) what='the forged run (the r5 defect, on real systemd)';; *) what="arm's PLANTED dump $EXPN (review MED-1, on real systemd)";; esac
   [ "$CGRC" = 0 ] && [ "$CG" = attributed-correct ] && [ "$CA" = attributed-correct ] \
-    && line "CONTRAST $SC: the 624bf721 G0 exits 0 and its A-2 section 5 attributes the forged run, each with OFFHOST-COMPARE (the r5 defect, on real systemd)" \
-    || line "CONTRAST $SC: the 624bf721 gates did NOT pass the forged run (G0 exit $CGRC $CG; A-2 section 5 $CA)"
+    && line "CONTRAST $SC: the $CONTRAST G0 exits 0 and its A-2 section 5 attributes $what, each with OFFHOST-COMPARE" \
+    || line "CONTRAST $SC: the $CONTRAST gates did NOT pass $what (G0 exit $CGRC $CG; A-2 section 5 $CA)"
 fi
 exit $bad

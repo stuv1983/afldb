@@ -192,7 +192,7 @@ chown -R arm:arm /home/arm/backups
 # install (the real reviewed writer and drop-in, root-owned, at their real paths) and the record come from cases/lib-f23-fixture.sh.
 . "$FX/$B/r6-20261125/review-fixes-r4-20261127/cases/lib-f23-fixture.sh" || { echo "REH STOP cannot load lib-f23-fixture.sh"; exit 1; }
 f23_attest_install "$FX" || { echo "REH STOP the attestation install failed"; exit 1; }
-f23_attest_record "$BINV" afldb-backup.timer "$BTU"
+f23_attest_record "$BINV" afldb-backup.timer "$BTU" "dump=$SD" "dump_sha256=$SS"   # format 2: the record binds the dump
 
 # ---------------------------------------------------------------- systemd fixture table and timers
 THU=$(mel_ep "2026-11-26 02:20:00"); THV=$(mel_ep "2026-11-26 03:30:00"); THA=$(mel_ep "2026-11-26 06:30:00")

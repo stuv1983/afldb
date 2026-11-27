@@ -34,6 +34,13 @@
 #   * contrasts: the 624bf721 (r5) gates PASS the forged-trigger states (F2_R5_G0 / F2_R5_PRE, default <FIX>/<r6 dir>/orig-624bf721/);
 #   * match_backup no longer requires or counts a trigger line: the mb-origin-* cases built on trigger-line content now expect rc 0
 #     (named at the mbc block), the LastTriggerUSec-in-microseconds checks it keeps are unchanged; bj-genuine has 2 lines (no trigger line).
+# R6 r6 record format 2 (28 Nov 2026, independent review MED-1: a genuine record plus a planted dump and a node that rewrote the
+# "backup ok" line passed G0): the record binds the dump (dump=, dump_sha256=). want_pass also requires the binding in the PASS line;
+# journal-other-name / journal-other-hash now STOP in attested_origin ("record ... binds the dump ...") instead of in
+# pick_overnight_dump (expected text changed by design); new STOP states attest-format-1, attest-dump-none, -dump-name-differs,
+# -dump-sha16-differs, -dump-full-sha-differs (same 16 hex, other full sha256: only the callers' full re-hash comparison refuses it)
+# and attest-node-lies-planted-dump (the reviewer's bypass: real dump deleted, a planted one with its own sidecar, the "backup ok" line
+# naming it); malformed-record line counts are 22-line based.
 # Usage: bash cases/f2-backup-attribution.sh <FIX> [<STAGE>]
 set -uo pipefail; export LC_ALL=C
 FIX=${1:?usage: f2-backup-attribution.sh <FIX> [<STAGE>]}; STAGE=${2:-$FIX}
@@ -72,7 +79,7 @@ want_pass() { # case gate script inv
   if [ "$RC" = 0 ] && [ "$(grep -c '^FAIL' <<< "$OUT")" = 0 ] && [[ "$(verdict)" == "$v"* ]] \
      && grep -q "^PASS afldb-backup\.service scheduled run: timer dispatch .* invocation $4 alone in the window journal" <<< "$OUT" \
      && grep -q "^BACKUP-EVIDENCE $4 [0-9]* [0-9]* [0-9]* [0-9]* $F23_SD ${F23_SS:0:16}\$" <<< "$OUT" \
-     && grep -q "its start job was dispatched by afldb-backup\.timer at $F23_TRIG_US us = LastTriggerUSec (job [0-9]*, JobType start; root record /var/lib/afldb-backup-attest/$4\.attest, writer [0-9a-f]*; main start [0-9]* us after the dispatch, no stop or failure between); INFO, not a criterion: the dispatch came [0-9.]* s after afldb-backup\.timer's last (re)activation" <<< "$OUT" \
+     && grep -q "its start job was dispatched by afldb-backup\.timer at $F23_TRIG_US us = LastTriggerUSec (job [0-9]*, JobType start; root record /var/lib/afldb-backup-attest/$4\.attest, writer [0-9a-f]*, dump $F23_SD sha256 ${F23_SS:0:16}; main start [0-9]* us after the dispatch, no stop or failure between); INFO, not a criterion: the dispatch came [0-9.]* s after afldb-backup\.timer's last (re)activation" <<< "$OUT" \
      && [ "$(grep '^OFFHOST-COMPARE ' <<< "$OUT")" = "OFFHOST-COMPARE $F23_SD $F23_SS" ]; then
     okc "$1" "exit 0, no FAIL, $v, timer run attributed to $4 by its root record, OFFHOST-COMPARE of the fixture dump" "$(got)"
   else unx "$1" "exit 0, no FAIL, $v, timer run attributed by its root record, OFFHOST-COMPARE" "$(got)"; fi

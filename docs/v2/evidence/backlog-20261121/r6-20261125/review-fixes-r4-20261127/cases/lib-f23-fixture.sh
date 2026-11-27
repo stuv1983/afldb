@@ -149,7 +149,8 @@ f23_attest_espx() { # [argv [flags]]: one ExecStartPostEx value, after a run (as
     "${1:-$F23_ATT_X}" "${2:-ignore-failure privileged}"
 }
 # f23_attest_record <invocation> <trigger_unit|none> <trigger usec|none> [key=value | -key | +raw-line ...]: one record in the writer's
-# exact format, root:root 0644, at <RD>/<invocation>.attest. Defaults are a genuine run (the monotonic values of a real systemd 255.4 run:
+# exact format (format 2: dump= and dump_sha256= bind the run's dump; default: the fixture's current dump F23_SD / F23_SS, as the
+# writer would find and hash it as arm), root:root 0644, at <RD>/<invocation>.attest. Defaults are a genuine run (the monotonic values of a real systemd 255.4 run:
 # inactive-exit 245 us AFTER the main start, as PID 1 stamps them without an ExecStartPre); timer_last_trigger_usec = the given usec, or
 # the fixture's dispatch when the job has none. key=value replaces a value, -key drops that line, +line appends a raw line.
 f23_attest_record() {
@@ -157,9 +158,10 @@ f23_attest_record() {
   ws=$(sha256sum < "$F23_ATT_FIX/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r6-20261128/attest/afldb-backup-attest" | cut -c1-64)
   K=(writer_sha256 unit invocation job job_type active_state sub_state exec_main_code exec_main_status inactive_enter_mono
     inactive_exit_mono exec_main_start_mono trigger_unit trigger_timer_realtime_usec timer_last_trigger_usec timer_last_trigger_mono
-    timer_active_enter_mono boot_id written_realtime_usec)
+    timer_active_enter_mono dump dump_sha256 boot_id written_realtime_usec)
   V=("$ws" afldb-backup.service "$inv" 151 start activating start-post 1 0 616427771245 617083858683 617083858438 "$tu" "$tus"
-    "$([ "$tus" = none ] && echo "${F23_TRIG_US:-1795807706054226}" || echo "$tus")" 617083613000 616422329687 c3524e4759ab4e0f8050875471b56b12
+    "$([ "$tus" = none ] && echo "${F23_TRIG_US:-1795807706054226}" || echo "$tus")" 617083613000 616422329687
+    "${F23_SD:-none}" "${F23_SS:-none}" c3524e4759ab4e0f8050875471b56b12
     "$(( ${F23_TRIG_US:-1795807706054226} + 19000000 ))")
   local extra=()
   for a in "$@"; do case $a in
@@ -167,7 +169,7 @@ f23_attest_record() {
     -*) for i in "${!K[@]}"; do [ "${K[i]}" = "${a#-}" ] && V[i]=__DROP__; done;;
     *=*) for i in "${!K[@]}"; do [ "${K[i]}" = "${a%%=*}" ] && V[i]=${a#*=}; done;;
   esac; done
-  { echo afldb-backup-attest/1; for i in "${!K[@]}"; do [ "${V[i]}" = __DROP__ ] || printf '%s=%s\n' "${K[i]}" "${V[i]}"; done
+  { echo afldb-backup-attest/2; for i in "${!K[@]}"; do [ "${V[i]}" = __DROP__ ] || printf '%s=%s\n' "${K[i]}" "${V[i]}"; done
     for a in "${extra[@]}"; do printf '%s\n' "$a"; done; } > "$F23_ATT_RD/$inv.attest"
   chown root:root "$F23_ATT_RD/$inv.attest"; chmod 644 "$F23_ATT_RD/$inv.attest"
 }
@@ -590,14 +592,29 @@ f23_scenario() { # name
     attest-malformed-extra-line) ar +extra=1;;
     attest-malformed-missing-line) ar -boot_id;;
     attest-malformed-reordered) sed -i '3{h;d};4{G}' "$rec";;                 # unit= and invocation= swapped
-    attest-malformed-header) sed -i '1s/1$/2/' "$rec";;
+    attest-malformed-header) sed -i '1s/2$/3/' "$rec";;   # afldb-backup-attest/3
     attest-malformed-crlf) sed -i '5s/$/\r/' "$rec";;
     attest-malformed-trailing-space) sed -i '6s/$/ /' "$rec";;
     attest-malformed-value) sed -i '5s/=.*/=12a/' "$rec";;
     attest-malformed-no-final-newline) truncate -s -1 "$rec";;
     attest-malformed-nul) sed -i '7s/=/=\x00/' "$rec";;
-    attest-malformed-duplicate-key) sed -i '19s/.*/timer_active_enter_mono=1/' "$rec";;
+    attest-malformed-duplicate-key) sed -i '21s/.*/timer_active_enter_mono=1/' "$rec";;
     attest-malformed-empty) : > "$rec";;
+    # ---- r6 format 2 (independent review MED-1): the record binds the dump
+    attest-format-1)            # a format-1 record (no dump binding) of the genuine run
+      sed -i -e '1s/2$/1/' -e '/^dump=/d' -e '/^dump_sha256=/d' "$rec";;
+    attest-dump-none) ar dump=none dump_sha256=none;;                 # the writer did not find exactly one dump of this run
+    attest-dump-name-differs) ar dump=afldb_prod-$F23_DAYC-022130.dump;;
+    attest-dump-sha16-differs) ar dump_sha256=$(tr '0-9a-f' '1-9a-f0' <<< "$F23_SS");;
+    attest-dump-full-sha-differs)   # same first 16 hex, a different full sha256: only the callers' full re-hash comparison refuses it
+      ar dump_sha256=${F23_SS:0:16}$(tr '0-9a-f' '1-9a-f0' <<< "${F23_SS:16}");;
+    attest-node-lies-planted-dump)  # the reviewer's MED-1 bypass: genuine run and record; arm deletes the real dump, plants its own
+      # (in the window, with its own sidecar), and its node prints a "backup ok" line naming the planted dump (here: the journal the
+      # node parses says so; the gate sees only node's output either way)
+      rm -f "$F23_BK/$F23_SD" "$F23_BK/$F23_SD.sha256"; head -c 4096 /dev/urandom > "$F23_BK/afldb_prod-$F23_DAYC-022130.dump"
+      (cd "$F23_BK" && sha256sum "afldb_prod-$F23_DAYC-022130.dump" > "afldb_prod-$F23_DAYC-022130.dump.sha256"); chown arm:arm "$F23_BK"/afldb_prod-*
+      f23_journal_reset; f23_jline "$F23_BINV" 02:20:01 "$tgt"
+      f23_jline "$F23_BINV" 02:20:19 "backup ok: afldb_prod-$F23_DAYC-022130.dump 4096 bytes sha256 $(sha256sum < "$F23_BK/afldb_prod-$F23_DAYC-022130.dump" | cut -c1-16) offhost=skipped";;
     *) echo "STOP unknown scenario $1"; return 1;;
   esac
 }
@@ -630,7 +647,10 @@ f23_reason() { # name
     no-dump) echo 'dump not attributable: no afldb_prod-20261125-02\[23\]\*\.dump';;
     two-dumps) echo 'dump not attributable: ambiguous: 2 dumps in the 02:2x/02:3x window';;
     bad-sidecar) echo 'dump not attributable: afldb_prod-20261125-022001\.dump re-hash [0-9a-f]{64} != sidecar';;
-    journal-other-name|journal-other-hash) echo "dump not attributable: the service reported '[^']*', not afldb_prod-20261125-022001\.dump sha256 [0-9a-f]{16}";;
+    # r6 format 2: the root record binds the dump, so a "backup ok" line naming another dump or hash is refused by attested_origin
+    # (r6 rev 1 expected pick_overnight_dump's "dump not attributable: the service reported ..."; the expected text changed by design)
+    journal-other-name) echo "scheduled origin unproven: record [^ ]+ binds the dump afldb_prod-20261125-022001\.dump, but the run's 'backup ok' line \(read through node\) names afldb_prod-20261125-022002\.dump";;
+    journal-other-hash) echo "scheduled origin unproven: record [^ ]+ binds afldb_prod-20261125-022001\.dump with sha256 [0-9a-f]{16}\.\.\., but the 'backup ok' line says 0000000000000000";;
     # r6
     attest-not-installed-r5-line|attest-execpost-missing) echo 'scheduled origin unproven: afldb-backup\.service has 0 ExecStartPost commands';;
     attest-execpost-two) echo 'scheduled origin unproven: afldb-backup\.service has 2 ExecStartPost commands';;
@@ -669,15 +689,21 @@ f23_reason() { # name
     attest-exec-status-1) echo 'scheduled origin unproven: record [^ ]+: ExecStart ended with code 1 status 1, not exited 0';;
     attest-exec-code-killed) echo 'scheduled origin unproven: record [^ ]+: ExecStart ended with code 2 status 15';;
     attest-record-writer-sha) echo 'scheduled origin unproven: record [^ ]+ was written by writer 0000000000000000\.\.\., not the pinned';;
-    attest-malformed-extra-line) echo 'scheduled origin unproven: record [^ ]+ is malformed \(21 lines';;
-    attest-malformed-missing-line) echo 'scheduled origin unproven: record [^ ]+ is malformed \(19 lines';;
-    attest-malformed-header) echo 'scheduled origin unproven: record [^ ]+ is malformed \(20 lines';;
+    attest-malformed-extra-line) echo 'scheduled origin unproven: record [^ ]+ is malformed \(23 lines';;
+    attest-malformed-missing-line) echo 'scheduled origin unproven: record [^ ]+ is malformed \(21 lines';;
+    attest-malformed-header) echo 'scheduled origin unproven: record [^ ]+ is malformed \(22 lines';;
+    attest-format-1) echo 'scheduled origin unproven: record [^ ]+ is malformed \(20 lines, need the 22-line afldb-backup-attest/2 format';;
+    attest-dump-none) echo 'scheduled origin unproven: record [^ ]+: the writer found no single dump of this run \(dump=none';;
+    attest-dump-name-differs) echo "scheduled origin unproven: record [^ ]+ binds the dump afldb_prod-20261125-022130\.dump, but the run's 'backup ok' line \(read through node\) names afldb_prod-20261125-022001\.dump";;
+    attest-dump-sha16-differs) echo "scheduled origin unproven: record [^ ]+ binds afldb_prod-20261125-022001\.dump with sha256 [0-9a-f]{16}\.\.\., but the 'backup ok' line says [0-9a-f]{16}";;
+    attest-dump-full-sha-differs) echo 'scheduled 02:2x dump afldb_prod-20261125-022001\.dump sha256 [0-9a-f]{64} is not the dump the root record bound|scheduled dump afldb_prod-20261125-022001\.dump sha256 [0-9a-f]{64} is not the dump the root record bound';;
+    attest-node-lies-planted-dump) echo "scheduled origin unproven: record [^ ]+ binds the dump afldb_prod-20261125-022001\.dump, but the run's 'backup ok' line \(read through node\) names afldb_prod-20261125-022130\.dump";;
     attest-malformed-reordered) echo 'scheduled origin unproven: record [^ ]+ line 3 is not unit=<value>';;
     attest-malformed-crlf|attest-malformed-value) echo 'scheduled origin unproven: record [^ ]+ line 5 is not job=<value>';;
     attest-malformed-trailing-space) echo 'scheduled origin unproven: record [^ ]+ line 6 is not job_type=<value>';;
-    attest-malformed-no-final-newline) echo 'scheduled origin unproven: record [^ ]+ has [0-9]+ bytes, not the [0-9]+ of its 20 lines';;
+    attest-malformed-no-final-newline) echo 'scheduled origin unproven: record [^ ]+ has [0-9]+ bytes, not the [0-9]+ of its 22 lines';;
     attest-malformed-nul) echo 'scheduled origin unproven: record [^ ]+ (line 7 is not active_state=<value>|has [0-9]+ bytes, not the)';;
-    attest-malformed-duplicate-key) echo 'scheduled origin unproven: record [^ ]+ line 19 is not boot_id=<value>';;
+    attest-malformed-duplicate-key) echo 'scheduled origin unproven: record [^ ]+ line 21 is not boot_id=<value>';;
     attest-malformed-empty) echo 'scheduled origin unproven: untrusted record: /var/lib/afldb-backup-attest/[0-9a-f]{32}\.attest is a regular empty file, not a regular file';;
     *) echo 'NO-SUCH-SCENARIO';;
   esac
@@ -698,7 +724,8 @@ F23_ATTEST_STOP_SCENARIOS=(attest-not-installed-r5-line attest-forged-trigger-no
   attest-start-before-dispatch attest-start-over-5s attest-exit-over-5s attest-job-restart attest-state-active attest-exec-status-1
   attest-exec-code-killed attest-record-writer-sha attest-malformed-extra-line attest-malformed-missing-line attest-malformed-reordered
   attest-malformed-header attest-malformed-crlf attest-malformed-trailing-space attest-malformed-value attest-malformed-no-final-newline
-  attest-malformed-nul attest-malformed-duplicate-key attest-malformed-empty)
+  attest-malformed-nul attest-malformed-duplicate-key attest-malformed-empty attest-format-1 attest-dump-none attest-dump-name-differs
+  attest-dump-sha16-differs attest-dump-full-sha-differs attest-node-lies-planted-dump)
 
 # ---- body of one function of a script, for the byte-identity assertions
 f23_fn() { sed -n "/^$2() {/,/^}/p" "$1"; }

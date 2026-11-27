@@ -22,8 +22,8 @@ edit it to print a matching line and pass both gates with a start by hand (chall
 ## 3. Mechanism (smallest protected writer)
 
 A root-owned writer runs as a full-privilege `ExecStartPost` of `afldb-backup.service`, after `ExecStart` succeeded, **while the
-run's start job is still live**. It reads only PID 1's state (systemctl / busctl over the system bus), and writes one record
-into a root-only directory. The backup workload (`ExecStart`, `User=arm`) is unchanged; `scheduled-backup.sh` returns to the
+run's start job is still live**. It reads PID 1's state (systemctl / busctl over the system bus) and, **as uid arm**, the run's
+dump, and writes one record into a root-only directory. The backup workload (`ExecStart`, `User=arm`) is unchanged; `scheduled-backup.sh` returns to the
 production bytes `234fca6a…` (the `17822b29` blob), so the r5 `log_trigger` change is withdrawn and nothing needs installing in
 the checkout (P1/P2 clean-tree checks unaffected).
 
@@ -41,13 +41,23 @@ the checkout (P1/P2 clean-tree checks unaffected).
 * `env -i` gives the writer an empty environment (no `BASH_ENV`, `INVOCATION_ID` or anything from the unit); `bash --noprofile
   --norc` reads no startup file; the writer does `cd /` first, uses absolute paths only, and never reads, sources or executes
   anything under `/home`. The unit has no `EnvironmentFile=` (the gates check this), so the unit environment is root-controlled.
-* Helpers: `/usr/bin/systemctl`, `/usr/bin/busctl`, `/usr/bin/sha256sum`, `/usr/bin/timeout` (with `-k`), `/usr/bin/mv`; bash
-  builtins otherwise (`$EPOCHREALTIME`, `read`, `printf`).
+* Helpers: `/usr/bin/systemctl`, `/usr/bin/busctl`, `/usr/bin/sha256sum`, `/usr/bin/timeout` (with `-k`), `/usr/bin/mv`,
+  `/usr/bin/setpriv`, `/usr/bin/stat`; bash builtins otherwise (`$EPOCHREALTIME`, `read`, `printf`).
+* **Dump binding (record format 2, 28 Nov, independent review MED-1).** Format 1 left the invocation-to-dump link to the
+  `backup ok` line, which the gates read through arm's `node`; the reviewer reproduced G0 PASS on a genuine run and record with
+  the real dump deleted, a planted one with its own sidecar, and a replaced `node` that rewrote the line. The writer now finds and
+  hashes the dump itself, **with arm's credentials, never root's**: a child under `/usr/bin/timeout -k 5 600 /usr/bin/setpriv
+  --reuid=arm --regid=arm --clear-groups --no-new-privs --reset-env /usr/bin/bash --noprofile --norc -c <constant script>` (root's
+  timeout outside, so arm cannot stop the bound), so a symlink, FIFO or hard link can make it read only what arm itself can read.
+  Candidates: entries named `afldb_prod-<8 digits>-<6 digits>.dump` in the constant `/home/arm/backups/afldb-scheduled` (the unit's
+  `AFLDB_BACKUP_DIR`, hard-coded in the writer and in both gates) whose mtime (lstat, whole seconds) is at or after the run's
+  `ExecMainStartTimestamp`. Exactly one, and it a regular non-empty file: `dump=<name>`, `dump_sha256=<its sha256>`; otherwise
+  `dump=none`, `dump_sha256=none` (and one journal line says why); the gates refuse `none`.
 
 ### Record format (exact key order, one `key=value` per line, LF, no other lines)
 
 ```
-afldb-backup-attest/1
+afldb-backup-attest/2
 writer_sha256=<64 hex: sha256 of the writer file, read by the writer at write time>
 unit=afldb-backup.service
 invocation=<32 hex: the unit's InvocationID at write time>
@@ -65,6 +75,8 @@ trigger_timer_realtime_usec=<the start job's trigger_timer_realtime_usec, or non
 timer_last_trigger_usec=<afldb-backup.timer LastTriggerUSec, microseconds, busctl>
 timer_last_trigger_mono=<afldb-backup.timer LastTriggerUSecMonotonic>
 timer_active_enter_mono=<afldb-backup.timer ActiveEnterTimestampMonotonic>
+dump=<the run's dump, afldb_prod-<8 digits>-<6 digits>.dump, or none>
+dump_sha256=<64 hex: its sha256, computed as uid arm, or none>
 boot_id=<32 hex, /proc/sys/kernel/random/boot_id without dashes>
 written_realtime_usec=<digits>
 ```
@@ -78,13 +90,16 @@ If a fact cannot be read or fails its own pattern, the writer writes no record a
 the callers print as `scheduled origin unproven: <reason>`, examine no dump and print no `OFFHOST-COMPARE`. All paths and digests
 are constants in the gate text, never taken from the environment or arguments.
 
-1. **Trusted path** (each of: the writer; `/usr/bin/env`, `/usr/bin/bash` and the helpers; the drop-in; the service's
+0. **Arguments:** the invocation and the gate-time `LastTriggerUSec` (validated reads of the caller) and the dump name and first
+   16 hex of the run's single `backup ok` line (match_backup's).
+1. **Trusted path** (each of: the writer; `/usr/bin/env`, `/usr/bin/bash` and the helpers, `setpriv` and `stat` included; the drop-in; the service's
    `FragmentPath` and every `DropInPaths` entry; the timer's `FragmentPath` and every `DropInPaths` entry; the record directory;
    the record): no component from `/` to the leaf is a symlink, every component is owned by uid 0, no component is group- or
    other-writable; the leaf has the expected type; the record also has link count 1.
 2. **Writer identity at gate time:** sha256 of the writer = the pinned digest; sha256 of the drop-in = the pinned digest.
 3. **Effective unit:** `EnvironmentFiles` is empty; `DropInPaths` contains the drop-in; `ExecStartPostEx` has exactly one entry;
-   its argv is exactly the drop-in's command line and its flags include `full-privileges`.
+   its argv is exactly the drop-in's command line and its flags are exactly `ignore-failure privileged` (systemd 255.4 prints
+   `privileged` for `+`; this file said `full-privileges` before the probe measured it).
 4. **Record:** exactly the format above; `writer_sha256` = the pinned digest; `invocation` = the service's InvocationID that the
    r4 links attributed (the invocation whose single `backup ok` line names the dump); `job_type=start`;
    `active_state=activating`; `sub_state=start-post`; `exec_main_code=1` and `exec_main_status=0`;
@@ -96,6 +111,9 @@ are constants in the gate text, never taken from the environment or arguments.
    first run inside the same job is refused). **No order is required between `inactive_exit_mono` and `exec_main_start_mono`**
    (correction, 28 Nov, from the harness on real systemd 255.4: with no ExecStartPre, PID 1 stamps ExecMainStartTimestamp at the
    fork and InactiveExitTimestamp about 0.2 ms later; with an ExecStartPre the order reverses).
+   `dump` and `dump_sha256` are not `none`; `dump` = the `backup ok` line's dump name and the first 16 hex of `dump_sha256` = its
+   16 hex. **Each caller** then requires the picked dump's FULL sha256 (its re-hash, equal to its sidecar) to equal the record's
+   `dump_sha256` before printing `OFFHOST-COMPARE` (the shared function exposes it as `BR_DUMP` / `BR_DUMP_SHA`).
 5. **Uniqueness:** no other `*.attest` in the directory carries the same `trigger_timer_realtime_usec`.
 6. **Information only (not a criterion; Stu's policy):** the callers print how long after the timer unit's last (re)activation
    the dispatch came (`timer_last_trigger_mono - timer_active_enter_mono`), so a manual re-arm or a boot catch-up is visible.
@@ -107,12 +125,17 @@ The r5 `trigger:` journal line is no longer read for origin by either gate. A li
 * Proves (against any arm process): a successful invocation `<id>` of `afldb-backup.service` ran inside a start job that
   `afldb-backup.timer` created at `<usec>`, with no stop or failure of the unit between that dispatch and the invocation, as PID 1
   reported it to a root process while the job was live.
-* The invocation-to-dump link stays the r4 link: journald stamps the invocation's single `backup ok` line with the trusted
-  `_SYSTEMD_INVOCATION_ID`; that line's name and 16 hex must match the unique 02:2x dump and its sidecar. The text of that line
-  is written by the workload (arm's code), so it proves what the attested run reported, at the workload's trust level.
-* A manual re-arm of the timer (`systemctl restart`/`start afldb-backup.timer`, `Persistent=` catch-up) is a genuine timer
-  dispatch: it proves the timer unit dispatched the run, not that the calendar elapsed unattended. Whether to refuse it is
-  Stu's decision; the callers print the facts.
+* The invocation-to-dump link is the ROOT record's (format 2): the dump file the run left, found and hashed as uid arm while the
+  run's job was live. The r4 link (journald stamps the single `backup ok` line with the trusted `_SYSTEMD_INVOCATION_ID`, read
+  through arm's `node`) must agree with it, but no longer carries it alone: a replaced `node`, a deleted or planted dump, or a
+  rewritten sidecar is refused. It does not prove what the dump should contain: the dump is written by the attested run's own
+  (arm) code, and an arm process racing the run inside its own minutes could substitute the file before the writer hashes it.
+* Starting or restarting `afldb-backup.timer` dispatches the service only when `Persistent=` finds a missed elapse (or the calendar
+  elapses while the timer is active); a re-arm after the night's dispatch fires nothing. Such a dispatch is a genuine dispatch by
+  the timer unit, not proof that the calendar elapsed unattended. The INFO line shows the delay after the timer's (re)activation
+  (item 6); the policy is Stu's.
+* Not proved by a gate run as arm (independent review MED-2, an owner decision): a gate run as arm cannot be independent of arm's
+  login environment (`~/.bashrc`, PATH, shell functions), so the verdict needs a non-arm verifier (Stu's decision).
 
 ## 6. Installation (prospective, owner, outside the checkout)
 

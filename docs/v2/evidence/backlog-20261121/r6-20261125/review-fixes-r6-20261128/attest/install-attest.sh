@@ -19,7 +19,7 @@ cd / || exit 2
 export LC_ALL=C PATH=/usr/sbin:/usr/bin
 umask 022
 set -u -o pipefail
-WS=35a0f3ac5de278784d39207cdf95173190627d5511343f2042a1a731f3d23c2d
+WS=799e6691954e4d7562cbc6b7af82f307cde0c8af71e450cd5f66f2af9994b398
 DS=2a3a067ef408377ccf6deae7c97c38366854c581a16e3f33ce2265787abc440e
 W=/usr/local/libexec/afldb/afldb-backup-attest
 D=/etc/systemd/system/afldb-backup.service.d/60-afldb-backup-attest.conf

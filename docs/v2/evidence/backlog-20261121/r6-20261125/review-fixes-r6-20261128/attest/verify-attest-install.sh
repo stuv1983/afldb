@@ -10,12 +10,12 @@ export LC_ALL=C PATH=/usr/sbin:/usr/bin
 set -u -o pipefail
 W=/usr/local/libexec/afldb/afldb-backup-attest
 D=/etc/systemd/system/afldb-backup.service.d/60-afldb-backup-attest.conf
-WS=35a0f3ac5de278784d39207cdf95173190627d5511343f2042a1a731f3d23c2d
+WS=799e6691954e4d7562cbc6b7af82f307cde0c8af71e450cd5f66f2af9994b398
 DS=2a3a067ef408377ccf6deae7c97c38366854c581a16e3f33ce2265787abc440e
 RD=/var/lib/afldb-backup-attest
 X='/usr/bin/env -i PATH=/usr/sbin:/usr/bin /usr/bin/bash --noprofile --norc /usr/local/libexec/afldb/afldb-backup-attest'
 XF='ignore-failure privileged'
-HELPERS=(/usr/bin/env /usr/bin/bash /usr/bin/systemctl /usr/bin/busctl /usr/bin/sha256sum /usr/bin/timeout /usr/bin/mv)
+HELPERS=(/usr/bin/env /usr/bin/bash /usr/bin/systemctl /usr/bin/busctl /usr/bin/sha256sum /usr/bin/timeout /usr/bin/mv /usr/bin/setpriv /usr/bin/stat)
 U=${1:-arm}
 F=0
 pass() { echo "PASS $*"; }
@@ -88,10 +88,10 @@ info "${#recs[@]} record(s); ${#tmps[@]} leftover temporary file(s) of a writer 
 nb=0
 for r in "${recs[@]}"; do
   st=$(stat -c '%u %a %h %F' -- "$r" 2>/dev/null)
-  if [ "$st" != "0 644 1 regular file" ] || [ "$(head -n 1 -- "$r" 2>/dev/null)" != afldb-backup-attest/1 ] || [ "$(wc -l < "$r" 2>/dev/null)" != 20 ]; then
+  if [ "$st" != "0 644 1 regular file" ] || [ "$(head -n 1 -- "$r" 2>/dev/null)" != afldb-backup-attest/2 ] || [ "$(wc -l < "$r" 2>/dev/null)" != 22 ]; then
     nb=$((nb + 1)); echo "     not a well-formed root record: $r ($st)"; fi
 done
-[ "$nb" = 0 ] && pass "every record file is root:0644, one link, 20 lines, afldb-backup-attest/1" || fail "$nb record file(s) are not well-formed root records"
+[ "$nb" = 0 ] && pass "every record file is root:0644, one link, 22 lines, afldb-backup-attest/2" || fail "$nb record file(s) are not well-formed root records"
 if [ "${#recs[@]}" -gt 0 ]; then
   last=$(ls -1t -- "${recs[@]}" 2>/dev/null | head -n 1)
   info "newest record $last:"; sed 's/^/     /' -- "$last"
