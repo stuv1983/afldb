@@ -60,7 +60,7 @@ INV0=${2:?InvocationID}; [[ $INV0 =~ ^[0-9a-f]{32}$ ]]
 P=$(sed -n 's/^PORT=//p' "$C/.env" | tail -1 | tr -d '"'); P=${P:-3100}
 REL=$(realpath "$ROOT/releases/$NEW_ID"); SINCE=$(systemctl show afldb -p ActiveEnterTimestamp --value)
 echo "== R1 P6 $(date -u +%FT%TZ) release $NEW_ID invocation $INV0 since $SINCE"
-bad=0
+bad=0; unread=0
 for t in 0 1 2 3; do
   [ $t = 0 ] || sleep 600
   S=$(systemctl show afldb -p ActiveState -p NRestarts -p InvocationID -p MemoryCurrent | tr '\n' ' ')
@@ -68,6 +68,7 @@ for t in 0 1 2 3; do
   G=$(p6_tick "$C/.env" "$P" || echo "probe-error")
   J=$(p6_journal_errs "$SINCE")
   echo "tick $t $(date -u +%FT%TZ) $S cwd=$CW $G journal_err_lines=$J"
+  [ "$J" != unreadable ] || unread=$((unread+1))
   { [[ $S == *ActiveState=active* ]] && [[ $S == *NRestarts=0* ]] && [[ $S == *"InvocationID=$INV0"* ]] && [ "$CW" = "$REL" ] \
     && [[ $G == "health=200:ok seasons=200:title-ok brownlow=200:title-ok" ]] && { [ "$J" = 0 ] || [ "$J" = unreadable ]; }; } || { echo "  TICK $t NOT OK"; bad=$((bad+1)); }
 done
@@ -75,6 +76,8 @@ echo "== final status $(date -u +%FT%TZ)"
 "$N" deploy/release.mjs status
 echo "OWNER NOW (two lines, sudo; expect JOURNAL PASS rc=0 entries=0; anything else, or no verdict line, is not a pass):"
 p6_owner_block "$SINCE"
+# The ticks accept 'unreadable' (arm may not see the unit's journal), so a tick PASS never proves the journal by itself:
+echo "P6 JOURNAL arm read it on $((4-unread)) of 4 ticks ($unread unreadable): P6 is complete only with the owner's line 'JOURNAL PASS rc=0 entries=0' in the record"
 if [ $bad = 0 ]; then echo "P6 RESULT OBSERVATION PASS (4 ticks)"; else echo "P6 RESULT $bad tick(s) not OK"; exit 1; fi
 }
 if [ "${R1_LIB_ONLY:-0}" = 1 ]; then return 0 2>/dev/null || exit 0; fi

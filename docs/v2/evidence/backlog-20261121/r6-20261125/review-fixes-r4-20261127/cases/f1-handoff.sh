@@ -205,6 +205,22 @@ main() {
   rec n35.md "$P3B" "$P4P" "$RBL" "$INVR" "$RBV" "$INV5" "$P5A" "${HRB[@]}"
   stop rollback-verified-before-p5 n35.md 'record order: the RBL line'
 
+  # ---- r4 pre-publication review: a P4 (or rollback) interrupted after release.mjs switched the links leaves the tool's own
+  # line and no RESULT line; such a record is not a deferral
+  rec n36.md "$P3B" "release: PROMOTED $CUR; previous $PREV. The running service is unchanged until it restarts." "${HDEF[@]}"
+  stop deferred-after-interrupted-p4-promotion n36.md "release.mjs 'release: PROMOTED ...' or 'release: ROLLED BACK ...' line(s)"
+  rec n37.md "$P3B" "     release: ROLLED BACK to $PREV (no rebuild); previous is now $CUR." "${HDEF[@]}"
+  stop deferred-with-indented-rolled-back-tool-line n37.md "release.mjs 'release: PROMOTED ...' or 'release: ROLLED BACK ...' line(s)"
+  # ---- the real 24 Nov sitting record (read-only), when the export carries it: it must still parse as deferred
+  local REAL=$FIX/docs/v2/evidence/release-17822b29-20261124/SITTING-20261124.md h0
+  if [ -f "$REAL" ]; then
+    h0=$(sha256sum < "$REAL"); run "$HAND" "$REAL"
+    if [ "$RC" = 0 ] && [ "$(grep '^R6-A2-' <<< "$OUT" | tr '
+' '|')" = "R6-A2-TUESDAY tue:deferred|R6-A2-CURRENT_ID $PREV|R6-A2-ATTESTED inv:$SUN|" ]       && [ "$(tail -n 1 <<< "$OUT")" = 'R6 HANDOFF RESULT PASS' ] && grep -q '^R6-NOTE parser PASS means only' <<< "$OUT" && [ "$(sha256sum < "$REAL")" = "$h0" ]
+    then res OK real-sitting-record-deferred "the real SITTING-20261124.md: exit 0, tue:deferred, Sunday's ID, the R6-NOTE, record unchanged" "$(got)"
+    else res UNEXPECTED real-sitting-record-deferred "the real SITTING-20261124.md parses as deferred" "$(got)"; fi
+  else echo "NOTE f1-real-sitting-record-deferred skipped: this export has no SITTING-20261124.md"; fi
+
   if [ "$BADN" = 0 ]; then echo "SUITE f1 RESULT PASS ($N cases)"; exit 0; fi
   echo "SUITE f1 RESULT FAIL ($BADN unexpected)"; exit 1
 }

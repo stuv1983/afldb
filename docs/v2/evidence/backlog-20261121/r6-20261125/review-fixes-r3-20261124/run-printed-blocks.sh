@@ -20,7 +20,7 @@
 # exclusive create that succeeded; "the file exists" or "the bytes equal mine" never confers ownership (two runs of one revision
 # write identical bytes).
 #   workstation: ws_reserve creates the path itself under noclobber (O_EXCL) holding a one-line marker that names RID, BEFORE
-#     block 1. Only the run whose create succeeded goes on; every other run is REFUSED (exit 2) and touches nothing. Printed block
+#     block 1. Only the run whose create succeeded goes on; every other run is REFUSED (exit 2) and touches no archive, staging root or host (it has only made its own output directory). Printed block
 #     1 then runs verbatim: `git archive --output=<path>` opens that path with O_TRUNC and writes the archive into the file this
 #     run reserved (it never runs in a run that lost). ws_release removes the path only while it is still that same file
 #     (device:inode) holding this run's marker, this run's archive bytes, or what this run's own failed or interrupted block 1
@@ -56,8 +56,8 @@ set_tag() { # r3|r4 -> everything that differs between the amendments; anything 
           $b/r6-20261125/review-fixes-20261123/orig-r6-pre-verify-58e35ce8.sh "$H") ;;
     r4) HEADING='## Amendment — 27 November 2026 (r4)'; H=$b/r6-20261125/review-fixes-r4-20261127
         FIXPATHS=(deploy tools/build/env-in-standalone.mjs tools/maintenance/scheduled-backup.sh tests/deploy-release.test.ts
-          $e/release-17822b29-20261124/scripts $e/release-17822b29-20261124/rehearsal $e/release-17822b29-20261124/RUNBOOK.md
-          $b/a1a2-20261124 $b/r6-20261125/review-fixes-20261123/orig-r6-pre-verify-58e35ce8.sh
+          $e/release-17822b29-20261124/scripts $e/release-17822b29-20261124/rehearsal $e/release-17822b29-20261124/RUNBOOK.md $e/release-17822b29-20261124/SITTING-20261124.md
+          $b/a1a2-20261124 $b/r6-20261125/review-fixes-20261123/orig-r6-pre-verify-58e35ce8.sh $b/r6-20261125/review-fixes-20261123/run-printed-blocks.sh $b/r6-20261125/review-fixes-20261123/rehearse-r6-fixes.sh
           $b/r6-20261125/review-fixes-r3-20261124 "$H") ;;
     *) return 1 ;;
   esac

@@ -137,7 +137,10 @@ main() {
       [ "${C[P4P]}" = 0 ] || stop "deferred, but the record has 'P4 RESULT PROMOTED': ambiguous"
       [ "$p5" = 0 ] || stop "deferred, but the record has a P5 RESULT line: ambiguous"
       [ "$rb" = 0 ] || stop "deferred, but the record has a ROLLBACK RESULT line: ambiguous"
-      [ "$((C[INV5] + C[INVR]))" = 0 ] || stop "deferred, but the record has a restart confirmation line (PASS running invocation = the owner's ...): ambiguous";;
+      [ "$((C[INV5] + C[INVR]))" = 0 ] || stop "deferred, but the record has a restart confirmation line (PASS running invocation = the owner's ...): ambiguous"
+      # a P4 or rollback interrupted after release.mjs switched the links prints the tool's line but no RESULT line
+      tool=$(grep -cE '(^|[^A-Za-z])release: (PROMOTED|ROLLED BACK) ' <<< "$text")
+      [ "$tool" = 0 ] || stop "deferred, but the record has $tool release.mjs 'release: PROMOTED ...' or 'release: ROLLED BACK ...' line(s): the links were switched, so this is not a deferral";;
   esac
   if [ "$stops" != 0 ]; then echo "R6 HANDOFF RESULT STOP ($stops): do not run A-2; R6 is NO-GO until the owner resolves the record"; exit 1; fi
   echo "R6-A2-TUESDAY tue:$outcome"

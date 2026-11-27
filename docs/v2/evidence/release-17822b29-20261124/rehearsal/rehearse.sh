@@ -185,6 +185,7 @@ git -C "$CHK" show "$CAND:docs/v2/evidence/backlog-20261121/r6-20261125/r6-post-
 gate_pre7() { ( g=$(sed -n '/^OUTC=\${1:-}; CUR=/,/do not fit Tuesday outcome/p' "$1"); [ "$(wc -l <<< "$g")" = 10 ] || exit 0
   set -- accepted "$2" r3:yes r4:yes 10:00 "$3" "inv:$4"; eval "$g"; echo GATE-OPEN ) | grep -q GATE-OPEN; }
 SUNI=342040625f6d4012a35d598dfbf9afe6; TUEI=0123456789abcdef0123456789abcdef
+t  "amended pre-verify: the argument gate gate_pre7 evaluates is the expected 10 lines (the refusals below are not vacuous)" bash -c "[ \"$(sed -n '/^OUTC=\${1:-}; CUR=/,/do not fit Tuesday outcome/p' '$R6/r6-pre-verify.sh' | wc -l)\" = 10 ]"
 t  "amended pre-verify admits $NEW as tue:released" gate_pre7 "$R6/r6-pre-verify.sh" "$NEW" tue:released "$TUEI"
 t  "amended pre-verify admits $OLD as tue:rolledback" gate_pre7 "$R6/r6-pre-verify.sh" "$OLD" tue:rolledback "$TUEI"
 t  "amended pre-verify admits $OLD as tue:deferred with Sunday's InvocationID" gate_pre7 "$R6/r6-pre-verify.sh" "$OLD" tue:deferred "$SUNI"
