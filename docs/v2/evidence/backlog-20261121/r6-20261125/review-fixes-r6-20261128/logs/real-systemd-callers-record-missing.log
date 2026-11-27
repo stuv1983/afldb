@@ -1,0 +1,815 @@
+== real-systemd caller scenario record-missing (smoke=0)
+host streamanator (arm); started 2026-11-27T20:44:04Z; container r6h-final2-record-missing; image r6h-sysd-final2:1
+[FIXTURE] fake Melbourne offset 5:34:16: the 02:20:00 dispatch on 2026-11-28 is due at real 2026-11-27T20:45:44Z
+[TRANSPORT] workstation 2026-11-27T20:43:31Z: attest bundle source: worktree
+   CONTRAST contrast-bda102aa/r1-g0-dump.sh = git show bda102aa: 67119fd602a12c28e006ca22de16df519c6b58b4f29d8858576ceb7bd0b0b009
+   CONTRAST contrast-bda102aa/r6-pre-verify.sh = git show bda102aa: 92425f2ae341582a683e3f8847af598a04a5cf9e26473e7be8732397370c3feb
+[TRANSPORT] pre-send verification: every worktree file sent vs its blob at 937c7d437b1fbe96a5102fa3db0011c7d751a48d (git show <rev>:<path> | sha256sum)
+   EQUAL edf002913282e7b1b0fe39970f652ab0120d9963a52b1696768cf928893bbdc8  deploy/afldb-backup.service
+   EQUAL 76a7ab3ad73377a543434f4174f7948859ac4f28978013a3fa98215fff0e9d84  deploy/afldb-backup.timer
+   EQUAL c6a5b5fe573c000a908ef6dd0d7c28fc16878e1eada8fdaf3bed034c823f8b61  deploy/afldb-backup-failed.service
+   EQUAL 234fca6a226da73b125ca3dceec9ac97b2192181fd93ad168a7ca50900cb192d  tools/maintenance/scheduled-backup.sh
+   EQUAL 6a0a0e581d4a50b784119d58d5ae8a8b87de7d5a3d639a644cf8ba71f9cd0622  docs/v2/evidence/release-17822b29-20261124/scripts/r1-g0-dump.sh
+   EQUAL eac16cecce1a7ad56b6c8c28431cf102ef7d5609b37d9e08990fb925490be703  docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh
+   EQUAL 2a3a067ef408377ccf6deae7c97c38366854c581a16e3f33ce2265787abc440e  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r6-20261128/attest/60-afldb-backup-attest.conf
+   EQUAL 8f0c49b8307d62e2232ba34bf7648ee8934d06ab73ecb04252d5cbf3c9b8f8f5  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r6-20261128/attest/SHA256SUMS
+   EQUAL 799e6691954e4d7562cbc6b7af82f307cde0c8af71e450cd5f66f2af9994b398  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r6-20261128/attest/afldb-backup-attest
+   EQUAL 13e6ba4f13453ebbea41b36b776cf2f06f9ac5dc0ae12fcdbeb3a0cc4cd4bb6e  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r6-20261128/attest/install-attest.sh
+   EQUAL 337c8a37ea9482cc9694eaec0cf1fd831ff4e06a2727bbc98190c51c3fdf11d8  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r6-20261128/attest/verify-attest-install.sh
+   EQUAL 32d7315a97d3670f1a2317da8ffaadcd0e2b50afa04ca804f0eb5959e849c8c4  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r6-20261128/orig-624bf721/r1-g0-dump.sh
+   EQUAL 64cc5166fea21438e8c5880e919e61398ff7381dd70ae359f19c392d33d18c49  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r6-20261128/orig-624bf721/r6-pre-verify.sh
+   EQUAL 820f5d53fe1d8ac841bf5f41103e2b720e2ecf1159bd28a6090308d65cedc726  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r6-20261128/orig-624bf721/r6-tuesday-handoff.sh
+   EQUAL bab61796ba92081e98af3d99551fb8b228b3de22c3df8fa39c4b32c96b4597c3  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r6-20261128/orig-624bf721/scheduled-backup.sh
+   EQUAL 706670260ec28633b5171e020d84932fa64f1ba1576710423d56abe24fc4bfba  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r6-20261128/real-systemd-callers.sh
+   EQUAL a4d9e8cba6cd5e9c9ad0fdd7e36c6c766485cf85746c81ab55fc55a4bb9d9be8  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r6-20261128/real-systemd-callers-container.sh
+   EQUAL 075932c17354344d2a189483cb007d1eced0634decb0b051a3b2578da107e609  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r6-20261128/r6h-run.sh
+   untracked files in the sent directories: 0
+   result: every sent file equals its blob at 937c7d437b1fbe96a5102fa3db0011c7d751a48d
+inputs (sha256):
+   6a0a0e581d4a50b784119d58d5ae8a8b87de7d5a3d639a644cf8ba71f9cd0622  docs/v2/evidence/release-17822b29-20261124/scripts/r1-g0-dump.sh
+   eac16cecce1a7ad56b6c8c28431cf102ef7d5609b37d9e08990fb925490be703  docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh
+   234fca6a226da73b125ca3dceec9ac97b2192181fd93ad168a7ca50900cb192d  tools/maintenance/scheduled-backup.sh
+   edf002913282e7b1b0fe39970f652ab0120d9963a52b1696768cf928893bbdc8  deploy/afldb-backup.service
+   76a7ab3ad73377a543434f4174f7948859ac4f28978013a3fa98215fff0e9d84  deploy/afldb-backup.timer
+   c6a5b5fe573c000a908ef6dd0d7c28fc16878e1eada8fdaf3bed034c823f8b61  deploy/afldb-backup-failed.service
+   32d7315a97d3670f1a2317da8ffaadcd0e2b50afa04ca804f0eb5959e849c8c4  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r6-20261128/orig-624bf721/r1-g0-dump.sh
+   64cc5166fea21438e8c5880e919e61398ff7381dd70ae359f19c392d33d18c49  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r6-20261128/orig-624bf721/r6-pre-verify.sh
+   bab61796ba92081e98af3d99551fb8b228b3de22c3df8fa39c4b32c96b4597c3  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r6-20261128/orig-624bf721/scheduled-backup.sh
+   706670260ec28633b5171e020d84932fa64f1ba1576710423d56abe24fc4bfba  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r6-20261128/real-systemd-callers.sh
+   a4d9e8cba6cd5e9c9ad0fdd7e36c6c766485cf85746c81ab55fc55a4bb9d9be8  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r6-20261128/real-systemd-callers-container.sh
+   67119fd602a12c28e006ca22de16df519c6b58b4f29d8858576ceb7bd0b0b009  contrast-bda102aa/r1-g0-dump.sh
+   92425f2ae341582a683e3f8847af598a04a5cf9e26473e7be8732397370c3feb  contrast-bda102aa/r6-pre-verify.sh
+   2a3a067ef408377ccf6deae7c97c38366854c581a16e3f33ce2265787abc440e  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r6-20261128/attest/60-afldb-backup-attest.conf
+   8f0c49b8307d62e2232ba34bf7648ee8934d06ab73ecb04252d5cbf3c9b8f8f5  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r6-20261128/attest/SHA256SUMS
+   799e6691954e4d7562cbc6b7af82f307cde0c8af71e450cd5f66f2af9994b398  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r6-20261128/attest/afldb-backup-attest
+   13e6ba4f13453ebbea41b36b776cf2f06f9ac5dc0ae12fcdbeb3a0cc4cd4bb6e  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r6-20261128/attest/install-attest.sh
+   337c8a37ea9482cc9694eaec0cf1fd831ff4e06a2727bbc98190c51c3fdf11d8  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r6-20261128/attest/verify-attest-install.sh
+container id: 3cf2b9fcbd97f84ca4db2e563e2cec6c87e8e68d150409bc466099435d2c0c5e
+
+== environment
+[REAL-SYSTEMD] systemd: systemd 255 (255.4-1ubuntu8.19); kernel 6.8.0-151-generic; image Ubuntu 24.04.4 LTS; PID 1: systemd; hostname afldb-prod
+[FIXTURE] zone: /usr/share/zoneinfo/Australia/Melbourne fixed offset; now UTC 2026-11-27T20:44:05, local 2026-11-28 02:18:21 AEDT; dispatch due real 20:45:44Z = local 2026-11-28 02:20:00 AEDT
+arm as the gates run: uid=1000(arm) gid=1000(arm) groups=1000(arm) (adm members: '', systemd-journal members: ''); env: HOME=/home/arm USER=arm LOGNAME=arm PATH=/usr/local/bin:/usr/bin:/bin LANG=C.UTF-8 
+fs.protected_hardlinks=1 fs.protected_symlinks=1; journal: drwxr-sr-x+ 1 root systemd-journal 4096 
+scenario record-missing: writer=1 checkout-script=prod hidden-failure=0 post=rm restart=0 rearm=0 contrast=0 offhost-copy=0 arm-suite=0 node-swap=0 expect=refused
+
+== inputs
+[FIXTURE] checkout /home/arm/projects/afldb/tools/maintenance/scheduled-backup.sh = prod, sha256 234fca6a226da73b125ca3dceec9ac97b2192181fd93ad168a7ca50900cb192d (prod 234fca6a = the 17822b29 blob; r5 bab61796; forged = prod + one arm-written trigger line)
+[FIXTURE] backup.sh STUB sha256 3547b8b2c06aaec0b0d5c18d744494f87beb249f3eece80ecf55643802b9c36b; restore-test.sh empty stub; postgresql.service stub (up=yes)
+[FIXTURE] timer drop-in /etc/systemd/system/afldb-backup.timer.d/50-r6h-fixture-timing.conf: [Timer] RandomizedDelaySec=0 AccuracySec=1s (the real timer has RandomizedDelaySec=10min AccuracySec=1min)
+[REAL-SYSTEMD] unit files from deploy/ installed root:root 0644: service edf002913282e7b1b0fe39970f652ab0120d9963a52b1696768cf928893bbdc8 timer 76a7ab3ad73377a543434f4174f7948859ac4f28978013a3fa98215fff0e9d84 failed c6a5b5fe573c000a908ef6dd0d7c28fc16878e1eada8fdaf3bed034c823f8b61
+[REAL-SYSTEMD] callers (unmodified, run from the read-only export): G0 6a0a0e581d4a50b784119d58d5ae8a8b87de7d5a3d639a644cf8ba71f9cd0622 A-2 eac16cecce1a7ad56b6c8c28431cf102ef7d5609b37d9e08990fb925490be703; 624bf721 G0 32d7315a97d3670f1a2317da8ffaadcd0e2b50afa04ca804f0eb5959e849c8c4 A-2 64cc5166fea21438e8c5880e919e61398ff7381dd70ae359f19c392d33d18c49; bda102aa G0 67119fd602a12c28e006ca22de16df519c6b58b4f29d8858576ceb7bd0b0b009 A-2 92425f2ae341582a683e3f8847af598a04a5cf9e26473e7be8732397370c3feb
+[FIXTURE] the gates' pinned node /home/arm/.nvm/versions/node/v22.23.2/bin/node is the host's node, bind-mounted read-only (arm:arm 755)
+
+== install the protected writer from a root-owned staging directory (the prospective owner procedure)
+staging /opt/r6h-attest-staging: root:root 755; files: -rw-r--r-- root:root 60-afldb-backup-attest.conf;-rw-r--r-- root:root SHA256SUMS;-rwxr-xr-x root:root afldb-backup-attest;-rwxr-xr-x root:root install-attest.sh;-rwxr-xr-x root:root verify-attest-install.sh;
+SHA256SUMS check: afldb-backup-attest: OK 60-afldb-backup-attest.conf: OK install-attest.sh: OK verify-attest-install.sh: OK 
+install-attest.sh /opt/r6h-attest-staging (root): exit 0
+   | == install-attest.sh install 2026-11-27T20:44:06Z host=afldb-prod staging=/opt/r6h-attest-staging
+   | PASS bundle: 4 files match SHA256SUMS (sha256 8f0c49b8307d62e2232ba34bf7648ee8934d06ab73ecb04252d5cbf3c9b8f8f5); writer 799e6691954e4d7562cbc6b7af82f307cde0c8af71e450cd5f66f2af9994b398, drop-in 2a3a067ef408377ccf6deae7c97c38366854c581a16e3f33ce2265787abc440e
+   | PASS afldb-backup.service (before): loaded from trusted /etc/systemd/system/afldb-backup.service, no EnvironmentFile=
+   | PASS installed /usr/local/libexec/afldb/afldb-backup-attest, /etc/systemd/system/afldb-backup.service.d/60-afldb-backup-attest.conf, /var/lib/afldb-backup-attest; daemon-reload done
+   | PASS afldb-backup.service (after daemon-reload): loaded from trusted /etc/systemd/system/afldb-backup.service, no EnvironmentFile=
+   | -- verify-attest-install.sh as root
+   | == afldb-backup-attest install check 2026-11-27T20:44:07Z host=afldb-prod as root (uid 0); subject user arm
+   | INFO user arm: uid 1000 groups 1000 (sudo/admin membership is root-equivalent and out of this check's scope: arm)
+   | -- 1. the unit as PID 1 has it loaded
+   |      ExecStartPostEx={ path=/usr/bin/env ; argv[]=/usr/bin/env -i PATH=/usr/sbin:/usr/bin /usr/bin/bash --noprofile --norc /usr/local/libexec/afldb/afldb-backup-attest ; flags=ignore-failure privileged ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }
+   |      LoadState=loaded
+   |      FragmentPath=/etc/systemd/system/afldb-backup.service
+   |      DropInPaths=/etc/systemd/system/afldb-backup.service.d/60-afldb-backup-attest.conf
+   | PASS afldb-backup.service LoadState=loaded
+   | PASS EnvironmentFiles is empty (the unit's environment is root-controlled)
+   | PASS DropInPaths contains /etc/systemd/system/afldb-backup.service.d/60-afldb-backup-attest.conf
+   | PASS ExecStartPostEx has exactly one entry: the writer's command line, flags 'ignore-failure privileged' (root, failure ignored)
+   |      LoadState=loaded
+   |      FragmentPath=/etc/systemd/system/afldb-backup.timer
+   |      DropInPaths=/etc/systemd/system/afldb-backup.timer.d/50-r6h-fixture-timing.conf
+   | PASS both units have a FragmentPath
+   | -- 2. trusted paths (every component; arm's possible writes by permission analysis)
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin/env uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/bin/env: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin/bash uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/bin/bash: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin/systemctl uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/bin/systemctl: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin/busctl uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/bin/busctl: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin/sha256sum uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/bin/sha256sum: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin/timeout uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/bin/timeout: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin/mv uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/bin/mv: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin/setpriv uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/bin/setpriv: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin/stat uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/bin/stat: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/local uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/local/libexec uid=0 gid=0 mode=755 links=3 type=directory
+   |      /usr/local/libexec/afldb uid=0 gid=0 mode=755 links=2 type=directory
+   |      /usr/local/libexec/afldb/afldb-backup-attest uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/local/libexec/afldb/afldb-backup-attest: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system/afldb-backup.service.d uid=0 gid=0 mode=755 links=2 type=directory
+   |      /etc/systemd/system/afldb-backup.service.d/60-afldb-backup-attest.conf uid=0 gid=0 mode=644 links=1 type=regular file
+   | PASS trusted file /etc/systemd/system/afldb-backup.service.d/60-afldb-backup-attest.conf: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system/afldb-backup.service uid=0 gid=0 mode=644 links=1 type=regular file
+   | PASS trusted file /etc/systemd/system/afldb-backup.service: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system/afldb-backup.service.d uid=0 gid=0 mode=755 links=2 type=directory
+   |      /etc/systemd/system/afldb-backup.service.d/60-afldb-backup-attest.conf uid=0 gid=0 mode=644 links=1 type=regular file
+   | PASS trusted file /etc/systemd/system/afldb-backup.service.d/60-afldb-backup-attest.conf: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system/afldb-backup.timer uid=0 gid=0 mode=644 links=1 type=regular file
+   | PASS trusted file /etc/systemd/system/afldb-backup.timer: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system/afldb-backup.timer.d uid=0 gid=0 mode=755 links=2 type=directory
+   |      /etc/systemd/system/afldb-backup.timer.d/50-r6h-fixture-timing.conf uid=0 gid=0 mode=644 links=1 type=regular file
+   | PASS trusted file /etc/systemd/system/afldb-backup.timer.d/50-r6h-fixture-timing.conf: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /var uid=0 gid=0 mode=755 links=1 type=directory
+   |      /var/lib uid=0 gid=0 mode=755 links=1 type=directory
+   |      /var/lib/afldb-backup-attest uid=0 gid=0 mode=755 links=2 type=directory
+   | PASS trusted dir /var/lib/afldb-backup-attest: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   | -- 3. writer and drop-in identity (pinned: writer 799e6691954e4d7562cbc6b7af82f307cde0c8af71e450cd5f66f2af9994b398, drop-in 2a3a067ef408377ccf6deae7c97c38366854c581a16e3f33ce2265787abc440e)
+   | PASS writer sha256 799e6691954e4d7562cbc6b7af82f307cde0c8af71e450cd5f66f2af9994b398
+   | PASS drop-in sha256 2a3a067ef408377ccf6deae7c97c38366854c581a16e3f33ce2265787abc440e
+   | -- 4. records in /var/lib/afldb-backup-attest (information; the gates judge the record of the run they attribute)
+   | INFO 0 record(s); 0 leftover temporary file(s) of a writer run that did not finish
+   | PASS every record file is root:0644, one link, 22 lines, afldb-backup-attest/2
+   | ATTEST INSTALL RESULT PASS
+   | -- verify-attest-install.sh as arm
+   | == afldb-backup-attest install check 2026-11-27T20:44:08Z host=afldb-prod as arm (uid 1000); subject user arm
+   | INFO user arm: uid 1000 groups 1000 (sudo/admin membership is root-equivalent and out of this check's scope: arm)
+   | -- 1. the unit as PID 1 has it loaded
+   |      ExecStartPostEx={ path=/usr/bin/env ; argv[]=/usr/bin/env -i PATH=/usr/sbin:/usr/bin /usr/bin/bash --noprofile --norc /usr/local/libexec/afldb/afldb-backup-attest ; flags=ignore-failure privileged ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }
+   |      LoadState=loaded
+   |      FragmentPath=/etc/systemd/system/afldb-backup.service
+   |      DropInPaths=/etc/systemd/system/afldb-backup.service.d/60-afldb-backup-attest.conf
+   | PASS afldb-backup.service LoadState=loaded
+   | PASS EnvironmentFiles is empty (the unit's environment is root-controlled)
+   | PASS DropInPaths contains /etc/systemd/system/afldb-backup.service.d/60-afldb-backup-attest.conf
+   | PASS ExecStartPostEx has exactly one entry: the writer's command line, flags 'ignore-failure privileged' (root, failure ignored)
+   |      LoadState=loaded
+   |      FragmentPath=/etc/systemd/system/afldb-backup.timer
+   |      DropInPaths=/etc/systemd/system/afldb-backup.timer.d/50-r6h-fixture-timing.conf
+   | PASS both units have a FragmentPath
+   | -- 2. trusted paths (every component; arm's possible writes by permission analysis)
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin/env uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/bin/env: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin/bash uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/bin/bash: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin/systemctl uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/bin/systemctl: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin/busctl uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/bin/busctl: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin/sha256sum uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/bin/sha256sum: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin/timeout uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/bin/timeout: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin/mv uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/bin/mv: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin/setpriv uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/bin/setpriv: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin/stat uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/bin/stat: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/local uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/local/libexec uid=0 gid=0 mode=755 links=3 type=directory
+   |      /usr/local/libexec/afldb uid=0 gid=0 mode=755 links=2 type=directory
+   |      /usr/local/libexec/afldb/afldb-backup-attest uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/local/libexec/afldb/afldb-backup-attest: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system/afldb-backup.service.d uid=0 gid=0 mode=755 links=2 type=directory
+   |      /etc/systemd/system/afldb-backup.service.d/60-afldb-backup-attest.conf uid=0 gid=0 mode=644 links=1 type=regular file
+   | PASS trusted file /etc/systemd/system/afldb-backup.service.d/60-afldb-backup-attest.conf: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system/afldb-backup.service uid=0 gid=0 mode=644 links=1 type=regular file
+   | PASS trusted file /etc/systemd/system/afldb-backup.service: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system/afldb-backup.service.d uid=0 gid=0 mode=755 links=2 type=directory
+   |      /etc/systemd/system/afldb-backup.service.d/60-afldb-backup-attest.conf uid=0 gid=0 mode=644 links=1 type=regular file
+   | PASS trusted file /etc/systemd/system/afldb-backup.service.d/60-afldb-backup-attest.conf: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system/afldb-backup.timer uid=0 gid=0 mode=644 links=1 type=regular file
+   | PASS trusted file /etc/systemd/system/afldb-backup.timer: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system/afldb-backup.timer.d uid=0 gid=0 mode=755 links=2 type=directory
+   |      /etc/systemd/system/afldb-backup.timer.d/50-r6h-fixture-timing.conf uid=0 gid=0 mode=644 links=1 type=regular file
+   | PASS trusted file /etc/systemd/system/afldb-backup.timer.d/50-r6h-fixture-timing.conf: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /var uid=0 gid=0 mode=755 links=1 type=directory
+   |      /var/lib uid=0 gid=0 mode=755 links=1 type=directory
+   |      /var/lib/afldb-backup-attest uid=0 gid=0 mode=755 links=2 type=directory
+   | PASS trusted dir /var/lib/afldb-backup-attest: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   | -- 3. writer and drop-in identity (pinned: writer 799e6691954e4d7562cbc6b7af82f307cde0c8af71e450cd5f66f2af9994b398, drop-in 2a3a067ef408377ccf6deae7c97c38366854c581a16e3f33ce2265787abc440e)
+   | PASS writer sha256 799e6691954e4d7562cbc6b7af82f307cde0c8af71e450cd5f66f2af9994b398
+   | PASS drop-in sha256 2a3a067ef408377ccf6deae7c97c38366854c581a16e3f33ce2265787abc440e
+   | -- 4. records in /var/lib/afldb-backup-attest (information; the gates judge the record of the run they attribute)
+   | INFO 0 record(s); 0 leftover temporary file(s) of a writer run that did not finish
+   | PASS every record file is root:0644, one link, 22 lines, afldb-backup-attest/2
+   | ATTEST INSTALL RESULT PASS
+   | INSTALL RESULT PASS: the next successful run of afldb-backup.service writes /var/lib/afldb-backup-attest/<invocation>.attest
+verify-attest-install.sh as root: exit 0
+   | == afldb-backup-attest install check 2026-11-27T20:44:09Z host=afldb-prod as root (uid 0); subject user arm
+   | INFO user arm: uid 1000 groups 1000 (sudo/admin membership is root-equivalent and out of this check's scope: arm)
+   | -- 1. the unit as PID 1 has it loaded
+   |      ExecStartPostEx={ path=/usr/bin/env ; argv[]=/usr/bin/env -i PATH=/usr/sbin:/usr/bin /usr/bin/bash --noprofile --norc /usr/local/libexec/afldb/afldb-backup-attest ; flags=ignore-failure privileged ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }
+   |      LoadState=loaded
+   |      FragmentPath=/etc/systemd/system/afldb-backup.service
+   |      DropInPaths=/etc/systemd/system/afldb-backup.service.d/60-afldb-backup-attest.conf
+   | PASS afldb-backup.service LoadState=loaded
+   | PASS EnvironmentFiles is empty (the unit's environment is root-controlled)
+   | PASS DropInPaths contains /etc/systemd/system/afldb-backup.service.d/60-afldb-backup-attest.conf
+   | PASS ExecStartPostEx has exactly one entry: the writer's command line, flags 'ignore-failure privileged' (root, failure ignored)
+   |      LoadState=loaded
+   |      FragmentPath=/etc/systemd/system/afldb-backup.timer
+   |      DropInPaths=/etc/systemd/system/afldb-backup.timer.d/50-r6h-fixture-timing.conf
+   | PASS both units have a FragmentPath
+   | -- 2. trusted paths (every component; arm's possible writes by permission analysis)
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin/env uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/bin/env: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin/bash uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/bin/bash: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin/systemctl uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/bin/systemctl: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin/busctl uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/bin/busctl: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin/sha256sum uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/bin/sha256sum: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin/timeout uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/bin/timeout: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin/mv uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/bin/mv: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin/setpriv uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/bin/setpriv: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin/stat uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/bin/stat: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/local uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/local/libexec uid=0 gid=0 mode=755 links=3 type=directory
+   |      /usr/local/libexec/afldb uid=0 gid=0 mode=755 links=2 type=directory
+   |      /usr/local/libexec/afldb/afldb-backup-attest uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/local/libexec/afldb/afldb-backup-attest: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system/afldb-backup.service.d uid=0 gid=0 mode=755 links=2 type=directory
+   |      /etc/systemd/system/afldb-backup.service.d/60-afldb-backup-attest.conf uid=0 gid=0 mode=644 links=1 type=regular file
+   | PASS trusted file /etc/systemd/system/afldb-backup.service.d/60-afldb-backup-attest.conf: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system/afldb-backup.service uid=0 gid=0 mode=644 links=1 type=regular file
+   | PASS trusted file /etc/systemd/system/afldb-backup.service: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system/afldb-backup.service.d uid=0 gid=0 mode=755 links=2 type=directory
+   |      /etc/systemd/system/afldb-backup.service.d/60-afldb-backup-attest.conf uid=0 gid=0 mode=644 links=1 type=regular file
+   | PASS trusted file /etc/systemd/system/afldb-backup.service.d/60-afldb-backup-attest.conf: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system/afldb-backup.timer uid=0 gid=0 mode=644 links=1 type=regular file
+   | PASS trusted file /etc/systemd/system/afldb-backup.timer: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system/afldb-backup.timer.d uid=0 gid=0 mode=755 links=2 type=directory
+   |      /etc/systemd/system/afldb-backup.timer.d/50-r6h-fixture-timing.conf uid=0 gid=0 mode=644 links=1 type=regular file
+   | PASS trusted file /etc/systemd/system/afldb-backup.timer.d/50-r6h-fixture-timing.conf: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /var uid=0 gid=0 mode=755 links=1 type=directory
+   |      /var/lib uid=0 gid=0 mode=755 links=1 type=directory
+   |      /var/lib/afldb-backup-attest uid=0 gid=0 mode=755 links=2 type=directory
+   | PASS trusted dir /var/lib/afldb-backup-attest: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   | -- 3. writer and drop-in identity (pinned: writer 799e6691954e4d7562cbc6b7af82f307cde0c8af71e450cd5f66f2af9994b398, drop-in 2a3a067ef408377ccf6deae7c97c38366854c581a16e3f33ce2265787abc440e)
+   | PASS writer sha256 799e6691954e4d7562cbc6b7af82f307cde0c8af71e450cd5f66f2af9994b398
+   | PASS drop-in sha256 2a3a067ef408377ccf6deae7c97c38366854c581a16e3f33ce2265787abc440e
+   | -- 4. records in /var/lib/afldb-backup-attest (information; the gates judge the record of the run they attribute)
+   | INFO 0 record(s); 0 leftover temporary file(s) of a writer run that did not finish
+   | PASS every record file is root:0644, one link, 22 lines, afldb-backup-attest/2
+   | ATTEST INSTALL RESULT PASS
+verify-attest-install.sh as arm:  exit 0
+   | == afldb-backup-attest install check 2026-11-27T20:44:10Z host=afldb-prod as arm (uid 1000); subject user arm
+   | INFO user arm: uid 1000 groups 1000 (sudo/admin membership is root-equivalent and out of this check's scope: arm)
+   | -- 1. the unit as PID 1 has it loaded
+   |      ExecStartPostEx={ path=/usr/bin/env ; argv[]=/usr/bin/env -i PATH=/usr/sbin:/usr/bin /usr/bin/bash --noprofile --norc /usr/local/libexec/afldb/afldb-backup-attest ; flags=ignore-failure privileged ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }
+   |      LoadState=loaded
+   |      FragmentPath=/etc/systemd/system/afldb-backup.service
+   |      DropInPaths=/etc/systemd/system/afldb-backup.service.d/60-afldb-backup-attest.conf
+   | PASS afldb-backup.service LoadState=loaded
+   | PASS EnvironmentFiles is empty (the unit's environment is root-controlled)
+   | PASS DropInPaths contains /etc/systemd/system/afldb-backup.service.d/60-afldb-backup-attest.conf
+   | PASS ExecStartPostEx has exactly one entry: the writer's command line, flags 'ignore-failure privileged' (root, failure ignored)
+   |      LoadState=loaded
+   |      FragmentPath=/etc/systemd/system/afldb-backup.timer
+   |      DropInPaths=/etc/systemd/system/afldb-backup.timer.d/50-r6h-fixture-timing.conf
+   | PASS both units have a FragmentPath
+   | -- 2. trusted paths (every component; arm's possible writes by permission analysis)
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin/env uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/bin/env: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin/bash uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/bin/bash: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin/systemctl uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/bin/systemctl: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin/busctl uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/bin/busctl: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin/sha256sum uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/bin/sha256sum: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin/timeout uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/bin/timeout: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin/mv uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/bin/mv: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin/setpriv uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/bin/setpriv: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/bin/stat uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/bin/stat: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/local uid=0 gid=0 mode=755 links=1 type=directory
+   |      /usr/local/libexec uid=0 gid=0 mode=755 links=3 type=directory
+   |      /usr/local/libexec/afldb uid=0 gid=0 mode=755 links=2 type=directory
+   |      /usr/local/libexec/afldb/afldb-backup-attest uid=0 gid=0 mode=755 links=1 type=regular file
+   | PASS trusted file /usr/local/libexec/afldb/afldb-backup-attest: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system/afldb-backup.service.d uid=0 gid=0 mode=755 links=2 type=directory
+   |      /etc/systemd/system/afldb-backup.service.d/60-afldb-backup-attest.conf uid=0 gid=0 mode=644 links=1 type=regular file
+   | PASS trusted file /etc/systemd/system/afldb-backup.service.d/60-afldb-backup-attest.conf: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system/afldb-backup.service uid=0 gid=0 mode=644 links=1 type=regular file
+   | PASS trusted file /etc/systemd/system/afldb-backup.service: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system/afldb-backup.service.d uid=0 gid=0 mode=755 links=2 type=directory
+   |      /etc/systemd/system/afldb-backup.service.d/60-afldb-backup-attest.conf uid=0 gid=0 mode=644 links=1 type=regular file
+   | PASS trusted file /etc/systemd/system/afldb-backup.service.d/60-afldb-backup-attest.conf: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system/afldb-backup.timer uid=0 gid=0 mode=644 links=1 type=regular file
+   | PASS trusted file /etc/systemd/system/afldb-backup.timer: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system uid=0 gid=0 mode=755 links=1 type=directory
+   |      /etc/systemd/system/afldb-backup.timer.d uid=0 gid=0 mode=755 links=2 type=directory
+   |      /etc/systemd/system/afldb-backup.timer.d/50-r6h-fixture-timing.conf uid=0 gid=0 mode=644 links=1 type=regular file
+   | PASS trusted file /etc/systemd/system/afldb-backup.timer.d/50-r6h-fixture-timing.conf: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   |      / uid=0 gid=0 mode=755 links=1 type=directory
+   |      /var uid=0 gid=0 mode=755 links=1 type=directory
+   |      /var/lib uid=0 gid=0 mode=755 links=1 type=directory
+   |      /var/lib/afldb-backup-attest uid=0 gid=0 mode=755 links=2 type=directory
+   | PASS trusted dir /var/lib/afldb-backup-attest: root-owned, not group/other-writable, no symlink from /; arm cannot modify or replace any component
+   | -- 3. writer and drop-in identity (pinned: writer 799e6691954e4d7562cbc6b7af82f307cde0c8af71e450cd5f66f2af9994b398, drop-in 2a3a067ef408377ccf6deae7c97c38366854c581a16e3f33ce2265787abc440e)
+   | PASS writer sha256 799e6691954e4d7562cbc6b7af82f307cde0c8af71e450cd5f66f2af9994b398
+   | PASS drop-in sha256 2a3a067ef408377ccf6deae7c97c38366854c581a16e3f33ce2265787abc440e
+   | -- 4. records in /var/lib/afldb-backup-attest (information; the gates judge the record of the run they attribute)
+   | INFO 0 record(s); 0 leftover temporary file(s) of a writer run that did not finish
+   | PASS every record file is root:0644, one link, 22 lines, afldb-backup-attest/2
+   | ATTEST INSTALL RESULT PASS
+
+== effective unit (REAL-SYSTEMD, as root after daemon-reload)
+   service: ExecStart={ path=/bin/bash ; argv[]=/bin/bash /home/arm/projects/afldb/tools/maintenance/scheduled-backup.sh backup ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }
+   service: ExecStartPostEx={ path=/usr/bin/env ; argv[]=/usr/bin/env -i PATH=/usr/sbin:/usr/bin /usr/bin/bash --noprofile --norc /usr/local/libexec/afldb/afldb-backup-attest ; flags=ignore-failure privileged ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }
+   service: User=arm
+   service: FragmentPath=/etc/systemd/system/afldb-backup.service
+   service: DropInPaths=/etc/systemd/system/afldb-backup.service.d/60-afldb-backup-attest.conf
+   timer: TimersCalendar={ OnCalendar=*-*-* 02:20:00 ; next_elapse=(null) }
+   timer: Persistent=yes
+   timer: FragmentPath=/etc/systemd/system/afldb-backup.timer
+   timer: DropInPaths=/etc/systemd/system/afldb-backup.timer.d/50-r6h-fixture-timing.conf
+stat of every installed path and parent:
+   directory 755 root:root links=1 size=4096 ino=7244104 mtime=1795812244 /
+   directory 755 root:root links=1 size=4096 ino=7244106 mtime=1795812246 /etc
+   directory 755 root:root links=1 size=4096 ino=7243635 mtime=1795812236 /etc/systemd
+   directory 755 root:root links=1 size=4096 ino=7243900 mtime=1795812246 /etc/systemd/system
+   regular file 644 root:root links=1 size=1909 ino=7244337 mtime=1795812246 /etc/systemd/system/afldb-backup.service sha256=edf002913282e7b1b0fe39970f652ab0120d9963a52b1696768cf928893bbdc8
+   directory 755 root:root links=2 size=4096 ino=7244414 mtime=1795812246 /etc/systemd/system/afldb-backup.service.d
+   regular file 644 root:root links=1 size=903 ino=7244418 mtime=1795812246 /etc/systemd/system/afldb-backup.service.d/60-afldb-backup-attest.conf sha256=2a3a067ef408377ccf6deae7c97c38366854c581a16e3f33ce2265787abc440e
+   regular file 644 root:root links=1 size=751 ino=7244338 mtime=1795812246 /etc/systemd/system/afldb-backup.timer sha256=76a7ab3ad73377a543434f4174f7948859ac4f28978013a3fa98215fff0e9d84
+   directory 755 root:root links=2 size=4096 ino=7244341 mtime=1795812246 /etc/systemd/system/afldb-backup.timer.d
+   regular file 644 root:root links=1 size=44 ino=7244342 mtime=1795812246 /etc/systemd/system/afldb-backup.timer.d/50-r6h-fixture-timing.conf sha256=3aff31d2942349c6de4a307f4ce2d0f4801ed0ae0d8a085f40a90696e114560e
+   regular file 644 root:root links=1 size=146 ino=7244340 mtime=1795812246 /etc/systemd/system/postgresql.service sha256=c9f0ffad6b1fbb26c671c0ac84de44628715b1a31587b5f7931cf3bf3c75b4fd
+   directory 755 root:root links=1 size=4096 ino=7245223 mtime=1771293773 /usr
+   directory 755 root:root links=1 size=4096 ino=7245228 mtime=1795812237 /usr/bin
+   regular file 755 root:root links=1 size=1446024 ino=3312095 mtime=1711874463 /usr/bin/bash sha256=bc5945feb8bd26203ebfafea5ce1878bb2e32cb8fb50ab7ae395cfb1e1aaaef1
+   regular file 755 root:root links=1 size=96864 ino=7245335 mtime=1792079892 /usr/bin/busctl sha256=a2097279e86e5d56942faf65dc296c151efe1bb35a8966b5a014e227f1291b99
+   regular file 755 root:root links=1 size=48072 ino=7245365 mtime=1787670543 /usr/bin/env sha256=886e5fa8be716b03eeda48856e0f04493f2969fc148fb7812594ffac647fa050
+   regular file 755 root:root links=1 size=137752 ino=7245422 mtime=1787670543 /usr/bin/mv sha256=c5ef5f09e99844e7c49049d78ed26e23ff0e8b65a04da9ac2d62164882b9945e
+   regular file 755 root:root links=1 size=39336 ino=7245467 mtime=1787670543 /usr/bin/sha256sum sha256=4d2db56c867e5324e0084c9e897f6360d37517de77ac96f2bd31494223d69a60
+   regular file 755 root:root links=1 size=1501304 ino=7245484 mtime=1792079892 /usr/bin/systemctl sha256=f79de86cdda039e58e70c00dcaac1004826ac4d56a9d65af6a987b5dbb785eb2
+   regular file 755 root:root links=1 size=39880 ino=7245521 mtime=1787670543 /usr/bin/timeout sha256=12690a043dfd555a6c14ccc1564f5649c18f1762c0d6ff66729948130898ec52
+   directory 755 root:root links=1 size=4096 ino=3705093 mtime=1795812246 /usr/local
+   directory 755 root:root links=3 size=4096 ino=7244129 mtime=1795812246 /usr/local/libexec
+   directory 755 root:root links=2 size=4096 ino=7244412 mtime=1795812246 /usr/local/libexec/afldb
+   regular file 755 root:root links=1 size=10883 ino=7244416 mtime=1795812246 /usr/local/libexec/afldb/afldb-backup-attest sha256=799e6691954e4d7562cbc6b7af82f307cde0c8af71e450cd5f66f2af9994b398
+   directory 755 root:root links=1 size=4096 ino=7246660 mtime=1795812245 /var
+   directory 755 root:root links=1 size=4096 ino=7246691 mtime=1795812246 /var/lib
+   directory 755 root:root links=2 size=4096 ino=7244413 mtime=1795812246 /var/lib/afldb-backup-attest
+[REAL-SYSTEMD] timer armed at 02:18:27: next elapse Sat 2026-11-28 02:20:00 AEDT; window 2026-11-28 02:20:00 AEDT..02:31:00
+[REAL-SYSTEMD] DISPATCH: LastTriggerUSec 1795812344004550 = 2026-11-28 02:20:00 AEDT + 4550 us; LastTriggerUSecMonotonic 621864825999
+
+== LIVE capture while the job existed (REAL-SYSTEMD, root; one line per change)
+   02:18:27.468 job=none JobType=- JobState=- ActivationDetails=[-] InvocationID=none unit=inactive/dead/ timer.LastTriggerUSec=0 LastTriggerUSecMonotonic=0
+   02:20:00.040 job=none JobType=- JobState=- ActivationDetails=[-] InvocationID=none unit=activating/start/ timer.LastTriggerUSec=1795812344004550 LastTriggerUSecMonotonic=621864825999
+   02:20:00.143 job=151 JobType=start JobState=running ActivationDetails=[a(ss) 3 "trigger_unit" "afldb-backup.timer" "trigger_timer_realtime_usec" "1795812344004550" "trigger_timer_monotonic_usec" "621864825999"] InvocationID=58d888aebd0f4ecdbd96a5c0e5baddb4 unit=activating/start/ timer.LastTriggerUSec=1795812344004550 LastTriggerUSecMonotonic=621864825999
+   02:20:03.152 job=151 JobType=start JobState=running ActivationDetails=[a(ss) 3 "trigger_unit" "afldb-backup.timer" "trigger_timer_realtime_usec" "1795812344004550" "trigger_timer_monotonic_usec" "621864825999"] InvocationID=58d888aebd0f4ecdbd96a5c0e5baddb4 unit=activating/start-post/ timer.LastTriggerUSec=1795812344004550 LastTriggerUSecMonotonic=621864825999
+   02:20:03.242 job=none JobType=- JobState=- ActivationDetails=[-] InvocationID=58d888aebd0f4ecdbd96a5c0e5baddb4 unit=inactive/dead/ timer.LastTriggerUSec=1795812344004550 LastTriggerUSecMonotonic=621864825999
+
+== after the run (REAL-SYSTEMD)
+timer: LastTriggerUSec=1795812344004550 LastTriggerUSecMonotonic=621864825999 ActiveEnterTimestampMonotonic=621772242657 Result=success
+service: Result=success NRestarts=0 ExecMainStartTimestampMonotonic=621864851209 ExecMainCode=1 ExecMainStatus=0 ActiveState=inactive InactiveExitTimestampMonotonic=621864851406 InactiveEnterTimestampMonotonic=621867999157 InvocationID=58d888aebd0f4ecdbd96a5c0e5baddb4 
+root's journal for the service, timer and stub dependency (PID 1 lines included; arm cannot read PID 1's):
+   root| 2026-11-27T20:44:11.421Z pid=1 uid=0 INVOCATION_ID=8af3240a94f94d7eb1bf087ebdbe5418 _SYSTEMD_INVOCATION_ID=- Started afldb-backup.timer - AFLDB — nightly scheduled database backup (ISSUE-352).
+   root| 2026-11-27T20:45:44.024Z pid=1 uid=0 INVOCATION_ID=4030e5a1eff840659fdaddc518928d11 _SYSTEMD_INVOCATION_ID=- Starting postgresql.service - FIXTURE stub postgresql for the rehearsal...
+   root| 2026-11-27T20:45:44.026Z pid=1 uid=0 INVOCATION_ID=4030e5a1eff840659fdaddc518928d11 _SYSTEMD_INVOCATION_ID=- Finished postgresql.service - FIXTURE stub postgresql for the rehearsal.
+   root| 2026-11-27T20:45:44.030Z pid=1 uid=0 INVOCATION_ID=58d888aebd0f4ecdbd96a5c0e5baddb4 _SYSTEMD_INVOCATION_ID=- Starting afldb-backup.service - AFLDB — scheduled database backup (ISSUE-352)...
+   root| 2026-11-27T20:45:44.049Z pid=14023 uid=1000 INVOCATION_ID=- _SYSTEMD_INVOCATION_ID=58d888aebd0f4ecdbd96a5c0e5baddb4 2026-11-27T20:45:44Z scheduled-backup: target: mode=backup dir=/home/arm/backups/afldb-scheduled keep=14 offhost=none tools=/home/arm/projects/afldb/tools/maintenance
+   root| 2026-11-27T20:45:47.061Z pid=14637 uid=1000 INVOCATION_ID=- _SYSTEMD_INVOCATION_ID=58d888aebd0f4ecdbd96a5c0e5baddb4 ==> Backing up afldb_prod to /home/arm/backups/afldb-scheduled/afldb_prod-20261128-022003.dump
+   root| 2026-11-27T20:45:47.061Z pid=14637 uid=1000 INVOCATION_ID=- _SYSTEMD_INVOCATION_ID=58d888aebd0f4ecdbd96a5c0e5baddb4 ==> Done.
+   root| 2026-11-27T20:45:47.085Z pid=14023 uid=1000 INVOCATION_ID=- _SYSTEMD_INVOCATION_ID=58d888aebd0f4ecdbd96a5c0e5baddb4 2026-11-27T20:45:47Z scheduled-backup: backup ok: afldb_prod-20261128-022003.dump 4096 bytes sha256 22df46a8eb9fd3c4 offhost=skipped
+   root| 2026-11-27T20:45:47.177Z pid=1 uid=0 INVOCATION_ID=58d888aebd0f4ecdbd96a5c0e5baddb4 _SYSTEMD_INVOCATION_ID=- afldb-backup.service: Deactivated successfully.
+   root| 2026-11-27T20:45:47.177Z pid=1 uid=0 INVOCATION_ID=58d888aebd0f4ecdbd96a5c0e5baddb4 _SYSTEMD_INVOCATION_ID=- Finished afldb-backup.service - AFLDB — scheduled database backup (ISSUE-352).
+arm's journal for afldb-backup.service:
+   arm | 2026-11-27T20:45:44.049Z pid=14023 uid=1000 INVOCATION_ID=- _SYSTEMD_INVOCATION_ID=58d888aebd0f4ecdbd96a5c0e5baddb4 2026-11-27T20:45:44Z scheduled-backup: target: mode=backup dir=/home/arm/backups/afldb-scheduled keep=14 offhost=none tools=/home/arm/projects/afldb/tools/maintenance
+   arm | 2026-11-27T20:45:47.061Z pid=14637 uid=1000 INVOCATION_ID=- _SYSTEMD_INVOCATION_ID=58d888aebd0f4ecdbd96a5c0e5baddb4 ==> Backing up afldb_prod to /home/arm/backups/afldb-scheduled/afldb_prod-20261128-022003.dump
+   arm | 2026-11-27T20:45:47.061Z pid=14637 uid=1000 INVOCATION_ID=- _SYSTEMD_INVOCATION_ID=58d888aebd0f4ecdbd96a5c0e5baddb4 ==> Done.
+   arm | 2026-11-27T20:45:47.085Z pid=14023 uid=1000 INVOCATION_ID=- _SYSTEMD_INVOCATION_ID=58d888aebd0f4ecdbd96a5c0e5baddb4 2026-11-27T20:45:47Z scheduled-backup: backup ok: afldb_prod-20261128-022003.dump 4096 bytes sha256 22df46a8eb9fd3c4 offhost=skipped
+invocation IDs, root view:  3 "INVOCATION_ID":"58d888aebd0f4ecdbd96a5c0e5baddb4"; 4 "_SYSTEMD_INVOCATION_ID":"58d888aebd0f4ecdbd96a5c0e5baddb4";
+invocation IDs, arm view:   4 "_SYSTEMD_INVOCATION_ID":"58d888aebd0f4ecdbd96a5c0e5baddb4";
+the successful InvocationID (service, after the run): 58d888aebd0f4ecdbd96a5c0e5baddb4
+
+== dump, sidecar, digest
+   total 20
+   drwxr-xr-x 3 arm arm 4096 02:20:03 .
+   drwxr-xr-x 3 arm arm 4096 02:18:22 ..
+   drwx------ 2 arm arm 4096 02:20:03 .state
+   -rw-r--r-- 1 arm arm 4096 02:20:03 afldb_prod-20261128-022003.dump
+   -rw------- 1 arm arm   98 02:20:03 afldb_prod-20261128-022003.dump.sha256
+[REAL-SYSTEMD] dump afldb_prod-20261128-022003.dump 4096 B sha256 22df46a8eb9fd3c49dafb44c39038eca7d4fd4d9490e244697e6657675b9c3b0; sidecar: 22df46a8eb9fd3c49dafb44c39038eca7d4fd4d9490e244697e6657675b9c3b0  afldb_prod-20261128-022003.dump
+   sidecar = re-hash
+
+== protected record(s) (/var/lib/afldb-backup-attest)
+[REAL-SYSTEMD] record /var/lib/afldb-backup-attest/58d888aebd0f4ecdbd96a5c0e5baddb4.attest: regular file 644 root:root links=1 size=749
+   | afldb-backup-attest/2
+   | writer_sha256=799e6691954e4d7562cbc6b7af82f307cde0c8af71e450cd5f66f2af9994b398
+   | unit=afldb-backup.service
+   | invocation=58d888aebd0f4ecdbd96a5c0e5baddb4
+   | job=151
+   | job_type=start
+   | active_state=activating
+   | sub_state=start-post
+   | exec_main_code=1
+   | exec_main_status=0
+   | inactive_enter_mono=0
+   | inactive_exit_mono=621864851406
+   | exec_main_start_mono=621864851209
+   | trigger_unit=afldb-backup.timer
+   | trigger_timer_realtime_usec=1795812344004550
+   | timer_last_trigger_usec=1795812344004550
+   | timer_last_trigger_mono=621864825999
+   | timer_active_enter_mono=621772242657
+   | dump=afldb_prod-20261128-022003.dump
+   | dump_sha256=22df46a8eb9fd3c49dafb44c39038eca7d4fd4d9490e244697e6657675b9c3b0
+   | boot_id=c3524e4759ab4e0f8050875471b56b12
+   | written_realtime_usec=1795812347174200
+   [HARNESS] line 1 = afldb-backup-attest/1 or /2 (afldb-backup-attest/2)             holds
+   [HARNESS] dump = the attested run's dump (afldb_prod-20261128-022003.dump vs afldb_prod-20261128-022003.dump) holds
+   [HARNESS] dump_sha256 = its re-hash (22df46a8eb9fd3c49dafb44c39038eca7d4fd4d9490e244697e6657675b9c3b0) holds
+   [HARNESS] invocation = the successful InvocationID (58d888aebd0f4ecdbd96a5c0e5baddb4) holds
+   [HARNESS] job_type=start (start)                                                   holds
+   [HARNESS] active_state=activating sub_state=start-post (activating/start-post)     holds
+   [HARNESS] exec_main_code=1 exec_main_status=0 (1/0)                                holds
+   [HARNESS] trigger_unit=afldb-backup.timer (afldb-backup.timer)                     holds
+   [HARNESS] trigger_timer_realtime_usec = timer_last_trigger_usec = gate-time LastTriggerUSec 1795812344004550 holds
+   [HARNESS] inactive_enter_mono 0 < timer_last_trigger_mono 621864825999             holds
+   [HARNESS] timer_last_trigger_mono <= inactive_exit_mono 621864851406               holds
+   [HARNESS] timer_last_trigger_mono <= exec_main_start_mono 621864851209             holds
+   [HARNESS] inactive_exit_mono - timer_last_trigger_mono = 25407 us <= 5000000       holds
+   [HARNESS] info: order of the two stamps (not a rule): exec_main_start_mono - inactive_exit_mono = -197 us
+   [HARNESS] exec_main_start_mono - timer_last_trigger_mono = 25210 us <= 5000000     holds
+   [HARNESS] information: dispatch 92583 ms after the timer unit's last (re)activation
+   [HARNESS] writer_sha256 = sha256 of the installed writer                           holds
+[FIXTURE] root removed the record /var/lib/afldb-backup-attest/58d888aebd0f4ecdbd96a5c0e5baddb4.attest (damage simulation)
+record directory now:
+   total 12
+   drwxr-xr-x 2 root root 4096 Nov 28 02:20 .
+   drwxr-xr-x 1 root root 4096 Nov 28 02:18 ..
+
+== CALLER G0: as arm (uid 1000, no supplementary groups, env -i): bash docs/v2/evidence/release-17822b29-20261124/scripts/r1-g0-dump.sh 2026-11-28
+exit status: 1
+----- BEGIN G0 stdout (verbatim) -----
+== R1 G0 2026-11-27T20:45:54Z local Sat 2026-11-28 02:20:10 AEDT day 2026-11-28
+FAIL afldb-backup.service scheduled run is not attributed to the backup timer: scheduled origin unproven: no root record /var/lib/afldb-backup-attest/58d888aebd0f4ecdbd96a5c0e5baddb4.attest: the writer did not attest invocation 58d888aebd0f4ecdbd96a5c0e5baddb4
+INFO the 02:2x dump is not examined and no OFFHOST-COMPARE line is printed: without an attributed timer run, origin included, no dump is the scheduled one
+PASS no FAILED marker
+INFO afldb-backup-verify.service last: success  0 (record; not a G0 criterion)
+G0 PROD RESULT FAIL: STOP, the release is deferred, production unchanged
+----- END G0 stdout -----
+----- BEGIN G0 stderr (verbatim) -----
+----- END G0 stderr -----
+
+== CALLER A2: as arm (uid 1000, no supplementary groups, env -i): bash docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh accepted 7d92042fd110-XWruOm_9nLCSMY8nGPqYU r3:yes r4:no 10:00 tue:deferred inv:342040625f6d4012a35d598dfbf9afe6
+exit status: 1
+----- BEGIN A2 stdout (verbatim) -----
+== R6 PRE 2026-11-27T20:45:55Z local Sat 2026-11-28 02:20:11 AEDT host=afldb-prod user=arm outcome=accepted current=7d92042fd110-XWruOm_9nLCSMY8nGPqYU r3:yes r4:no window=2026-11-28 10:00 tue:deferred attested=342040625f6d4012a35d598dfbf9afe6
+FAIL today is not the scheduled Wednesday (2026-11-25); re-plan
+BOOT_ID c3524e47-59ab-4e0f-8050-875471b56b12
+-- 1. kernels and reboot state
+FAIL running 6.8.0-151-generic (expected 6.8.0-137-generic)
+INFO up since 2026-11-20 21:35:35
+     
+FAIL installed kernel images are '' (expected exactly 137 and 149): another kernel would change what boots; STOP, owner decision
+FAIL missing /boot/vmlinuz-6.8.0-149-generic
+FAIL missing /boot/initrd.img-6.8.0-149-generic
+FAIL missing /boot/vmlinuz-6.8.0-137-generic
+FAIL missing /boot/initrd.img-6.8.0-137-generic
+FAIL a modules directory is missing
+INFO reboot-required absent
+-- 2. boot facts for the GRUB decision (arm-readable part; grub.cfg itself is root-only: owner step C1)
+INFO firmware BIOS (no /sys/firmware/efi)
+INFO root fs type overlay; /boot: on /; root source kind overlay
+     ls: cannot access '/etc/default/grub': No such file or directory
+     ls: cannot access '/etc/default/grub.d/': No such file or directory
+     ls: cannot access '/boot/grub/grubenv': No such file or directory
+INFO grubenv variables (non-padding lines): ''
+GRUB-BASELINE e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+INFO kernel.panic= kernel.panic_on_oops=
+-- 3. apt/dpkg idle and every timer (the owner re-runs the apt gate immediately before the reboot)
+PASS apt-daily.service inactive
+PASS apt-daily-upgrade.service inactive
+PASS no apt/dpkg/unattended-upgrade process
+     unit-file: afldb-backup-failed.service static   -
+     unit-file: afldb-backup.service        static   -
+     unit-file: afldb-backup.timer          disabled enabled
+PASS afldb-backup.timer active=active enabled=disabled triggers=afldb-backup.service (inactive) next=Sun 2026-11-29 02:20:00 AEDT
+PASS apt-daily-upgrade.timer active=active enabled=enabled triggers=apt-daily-upgrade.service (inactive) next=Sat 2026-11-28 06:00:14 AEDT
+PASS apt-daily.timer active=active enabled=enabled triggers=apt-daily.service (inactive) next=Sat 2026-11-28 11:37:39 AEDT
+PASS dpkg-db-backup.timer active=active enabled=enabled triggers=dpkg-db-backup.service (inactive) next=Sun 2026-11-29 00:00:00 AEDT
+PASS e2scrub_all.timer active=active enabled=enabled triggers=e2scrub_all.service (inactive) next=Sun 2026-11-29 03:10:00 AEDT
+PASS fstrim.timer active=inactive enabled=enabled triggers=fstrim.service (inactive) next=none
+PASS motd-news.timer active=active enabled=enabled triggers=motd-news.service (inactive) next=Sat 2026-11-28 09:02:28 AEDT
+PASS systemd-tmpfiles-clean.timer active=active enabled=static triggers=systemd-tmpfiles-clean.service (inactive) next=Sat 2026-11-28 02:33:20 AEDT
+-- 4. services and the release (outcome accepted)
+FAIL postgresql@16-main inactive
+FAIL afldb inactive
+FAIL caddy inactive
+INVOCATION_ID none (the live InvocationID was not validated: nothing to carry to F-2)
+FAIL InvocationID: the live InvocationID is empty
+     MainPID=0
+     NRestarts=0
+     ActiveEnterTimestamp=
+FAIL worker processes 0 (expected 2)
+FAIL current =  (expected 7d92042fd110-XWruOm_9nLCSMY8nGPqYU)
+INFO previous = ; checkout HEAD 
+     node:internal/modules/cjs/loader:1433
+       throw err;
+       ^
+     
+     Error: Cannot find module '/home/arm/projects/afldb/deploy/release.mjs'
+         at Function._resolveFilename (node:internal/modules/cjs/loader:1430:15)
+         at defaultResolveImpl (node:internal/modules/cjs/loader:1040:19)
+         at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1045:22)
+         at Function._load (node:internal/modules/cjs/loader:1216:25)
+         at wrapModuleLoad (node:internal/modules/cjs/loader:254:19)
+         at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+         at node:internal/main/run_main_module:36:49 {
+       code: 'MODULE_NOT_FOUND',
+       requireStack: []
+     }
+     
+     Node.js v22.23.2
+FAIL release.mjs status does not prove 7d92042fd110-XWruOm_9nLCSMY8nGPqYU is serving: exit 1; 0 result lines (need exactly 1); no line 'release: STATUS PASS 7d92042fd110-XWruOm_9nLCSMY8nGPqYU'
+FAIL env counts / (accepted A1 left 1/1)
+     sh: 0: cannot open deploy/afldb-settle-failure-status.sh: No such file
+INFO settle-failure-status rc 2 (packet R6 prerequisite 5: recorded before the reboot)
+FAIL Caddyfile  (r4:no expects 4f6972ec)
+FAIL R1 host policy not installed (packet R6 prerequisite 4)
+INFO no A1 raw-head baseline: the post-reboot raw-head check is skipped
+INFO R5 directory absent
+-- 5. first scheduled backup (Wed 02:20 unit) and restore check (Wed 03:30 unit)
+FAIL afldb-backup.service scheduled run is not attributed to the backup timer: scheduled origin unproven: no root record /var/lib/afldb-backup-attest/58d888aebd0f4ecdbd96a5c0e5baddb4.attest: the writer did not attest invocation 58d888aebd0f4ecdbd96a5c0e5baddb4
+FAIL restore service lacks a matching timer dispatch, start and successful completion in the Wednesday window
+INFO last-verify.json: file= sha256= attempts=
+INFO last-backup.json: {"epoch":1795812347,"ts":"2026-11-27T20:45:47Z","file":"afldb_prod-20261128-022003.dump","sha256":"22df46a8eb9fd3c49dafb44c39038eca7d4fd4d9490e244697e6657675b9c3b0","bytes":4096,"offhost":"skipped"}
+INFO the 02:2x dump is not examined and no OFFHOST-COMPARE line is printed: without an attributed timer run, origin included, no dump is the scheduled one
+FAIL last-verify.json and restored dump do not match the scheduled service invocation
+INFO verify attempts= (2 = one benign retry; record it)
+PASS no FAILED marker
+     2026-11-27T20:45:57Z scheduled-backup: STATUS ok   backup: afldb_prod-20261128-022003.dump 0h ago
+     2026-11-27T20:45:57Z scheduled-backup: STATUS FAIL restore verification: never recorded (/home/arm/backups/afldb-scheduled/.state/last-verify.json absent)
+FAIL scheduled-backup.sh status not 0
+INFO dumps held: 1
+     /in/fix/docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh: line 574: ./.env: No such file or directory
+     bad DSN shape
+FAIL ledger differs
+FAIL afldb_restore_test lacks the scheduled restore digest or has active connections
+-- 6. capacity
+     Filesystem      Size  Used Avail Use% Mounted on
+     overlay         232G  156G   66G  71% /
+     overlay         232G  156G   66G  71% /
+                    total        used        free      shared  buff/cache   available
+     Mem:           32018        5935        1030         241       25755       26082
+     Swap:           8191        2450        5741
+PASS root fs free 66755 MB >= 6144
+
+R6 PRE RESULT STOP (24 FAIL line(s)): do not reboot; take them to the owner
+----- END A2 stdout -----
+----- BEGIN A2 stderr (verbatim) -----
+/in/fix/docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh: line 512: /etc/caddy/Caddyfile: No such file or directory
+----- END A2 stderr -----
+
+== judgement of the callers (callers under test) [HARNESS]
+RESULT-G0 (callers under test): exit 1; result line: 'G0 PROD RESULT FAIL: STOP, the release is deferred, production unchanged'; origin: refused
+   G0 origin lines: FAIL afldb-backup.service scheduled run is not attributed to the backup timer: scheduled origin unproven: no root record /var/lib/afldb-backup-attest/58d888aebd0f4ecdbd96a5c0e5baddb4.attest: the writer did not attest invocation 58d888aebd0f4ecdbd96a5c0e5baddb4|INFO the 02:2x dump is not examined and no OFFHOST-COMPARE line is printed: without an attributed timer run, origin included, no dump is the scheduled one|
+RESULT-A2 (callers under test) whole caller: exit 1; result line: 'R6 PRE RESULT STOP (24 FAIL line(s)): do not reboot; take them to the owner'
+RESULT-A2-S5 (callers under test) section 5 backup origin: refused (OFFHOST-COMPARE lines: section 5 0, whole output 0)
+   section 5 origin lines: FAIL afldb-backup.service scheduled run is not attributed to the backup timer: scheduled origin unproven: no root record /var/lib/afldb-backup-attest/58d888aebd0f4ecdbd96a5c0e5baddb4.attest: the writer did not attest invocation 58d888aebd0f4ecdbd96a5c0e5baddb4|INFO the 02:2x dump is not examined and no OFFHOST-COMPARE line is printed: without an attributed timer run, origin included, no dump is the scheduled one|
+RESULT-A2-UNRELATED (callers under test): 18 FAIL line(s) outside section 5; 5 FAIL line(s) inside section 5 not about the backup origin (restore/ledger/status: no database here)
+   outside-s5: FAIL today is not the scheduled Wednesday (2026-11-25); re-plan
+   outside-s5: FAIL running 6.8.0-151-generic (expected 6.8.0-137-generic)
+   outside-s5: FAIL installed kernel images are '' (expected exactly 137 and 149): another kernel would change what boots; STOP, owner decision
+   outside-s5: FAIL missing /boot/vmlinuz-6.8.0-149-generic
+   outside-s5: FAIL missing /boot/initrd.img-6.8.0-149-generic
+   outside-s5: FAIL missing /boot/vmlinuz-6.8.0-137-generic
+   outside-s5: FAIL missing /boot/initrd.img-6.8.0-137-generic
+   outside-s5: FAIL a modules directory is missing
+   outside-s5: FAIL postgresql@16-main inactive
+   outside-s5: FAIL afldb inactive
+   outside-s5: FAIL caddy inactive
+   outside-s5: FAIL InvocationID: the live InvocationID is empty
+   outside-s5: FAIL worker processes 0 (expected 2)
+   outside-s5: FAIL current =  (expected 7d92042fd110-XWruOm_9nLCSMY8nGPqYU)
+   outside-s5: FAIL release.mjs status does not prove 7d92042fd110-XWruOm_9nLCSMY8nGPqYU is serving: exit 1; 0 result lines (need exactly 1); no line 'release: STATUS PASS 7d92042fd110-XWruOm_9nLCSMY8nGPqYU'
+   outside-s5: FAIL env counts / (accepted A1 left 1/1)
+   outside-s5: FAIL Caddyfile  (r4:no expects 4f6972ec)
+   outside-s5: FAIL R1 host policy not installed (packet R6 prerequisite 4)
+   inside-s5-not-origin: FAIL restore service lacks a matching timer dispatch, start and successful completion in the Wednesday window
+   inside-s5-not-origin: FAIL last-verify.json and restored dump do not match the scheduled service invocation
+   inside-s5-not-origin: FAIL scheduled-backup.sh status not 0
+   inside-s5-not-origin: FAIL ledger differs
+   inside-s5-not-origin: FAIL afldb_restore_test lacks the scheduled restore digest or has active connections
+
+== verdict [HARNESS]
+VERDICT record-missing: AS EXPECTED. both callers 'scheduled origin unproven', no OFFHOST-COMPARE (G0 exit 1, A-2 exit 1)
+== controller exit 0 (2026-11-27T20:45:57Z); container removed

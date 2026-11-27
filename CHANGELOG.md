@@ -15,6 +15,14 @@ commit.
 
 ## [Unreleased]
 
+### R6 r6 and release G0: root-protected backup origin, real-systemd callers, parser boundary (28 November 2026; on `claude/closeout-20261127`, draft PR 5; PROPOSED, Astra re-review pending; nothing installed or deployed)
+
+- **Backup origin no longer trusts anything arm writes.** A prospective root-owned writer (`afldb-backup-attest`, run as `ExecStartPost=-+` through `env -i bash --noprofile --norc`) records, while the timer's start job is live, the invocation, the job's own `ActivationDetails`, the timer's dispatch stamps and the run's single dump with its full sha256 (hashed as uid arm) in `/var/lib/afldb-backup-attest/<invocation>.attest`. Release G0 and R6 A-2 verify the writer's and drop-in's pinned digests, the loaded unit, the helpers, every path component and the record, and require the record's dump to be the dump they compare off-host. The r5 `trigger:` line is no longer read, and `tools/maintenance/scheduled-backup.sh` is back to the production bytes. Until the writer is installed, both gates STOP by design.
+- **Both callers were run unmodified against real systemd 255.4** in ten scenarios (genuine timer run, Astra's hidden failure then manual start, old install, forged trigger, missing/ambiguous/writable record, restart with the first invocation hidden, the independent review's node-swap attack, timer re-arm). Every scenario came out as expected; the genuine run's own `OFFHOST-COMPARE` names the dump and full digest. A-2 as a whole STOPs in a container (historical date gate and host facts), reported separately from section 5.
+- **One rollback-token boundary for `released` and `deferred`** in `r6-tuesday-handoff.sh`: backtick, punctuation and end of line all count; word continuations do not. The 24 Nov record still parses `tue:deferred`.
+- **Open (owner decisions):** the gates run as arm, so arm's login environment can still forge their printed verdict (closing it needs a non-arm verifier); and an arm process can substitute the dump during the run before its sidecar is written, so a PASS does not prove the bytes are tonight's dump (closing it needs a non-arm dump writer).
+- Tested revision `937c7d43`, R6 manifest `57c8aa50…`, release `scripts/SHA256SUMS` `9c4b6ca6…` ([record](docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r6-20261128/README.md)).
+
 ### R6 r5 and release G0: Astra's two remaining findings (27 November 2026; on `claude/closeout-20261127`, draft PR 5; PROPOSED, Astra re-review pending; nothing deployed)
 
 - **The Tuesday handoff parser refuses an interrupted rollback.** A `released` or `deferred` record that carries any rollback trace (`release.mjs`'s `release: ROLLED BACK …` line, the `r1-rollback.sh` headers or post-switch line, an events.log rollback entry) is now a STOP, even when the wrapper was interrupted before its RESULT line.

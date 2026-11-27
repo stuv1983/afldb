@@ -1,0 +1,63 @@
+== INDEPENDENT REVIEW 2 harness inputs (28 Nov 2026). Export = git archive 69d2a728 of the files the harness sends, plus:
+   contrast-bda102aa/{r1-g0-dump.sh,r6-pre-verify.sh} = git show bda102aa:<path>
+   callers sent: G0 6a0a0e581d4a50b784119d58d5ae8a8b87de7d5a3d639a644cf8ba71f9cd0622 A-2 eac16cecce1a7ad56b6c8c28431cf102ef7d5609b37d9e08990fb925490be703 writer 799e6691954e4d7562cbc6b7af82f307cde0c8af71e450cd5f66f2af9994b398
+
+== review changes to the harness (diff vs 69d2a728; only scenario plumbing, names/labels and log prefix; callers, writer, units untouched)
+   real-systemd-callers-container.sh: 78a79
+   real-systemd-callers-container.sh: >   review-race)                        EXPECT=record;;
+   real-systemd-callers-container.sh: 192a194
+   real-systemd-callers-container.sh: > [ "$SC" = review-race ] && . /in/fix/review2-race.sh
+   real-systemd-callers-container.sh: 406a409
+   real-systemd-callers-container.sh: > [ "$SC" = review-race ] && . /in/fix/review2-judge.sh
+   real-systemd-callers.sh: 29c29
+   real-systemd-callers.sh: <      record-groupwritable restart-hidden-first timer-rearm arm-node-swap)
+   real-systemd-callers.sh: ---
+   real-systemd-callers.sh: >      record-groupwritable restart-hidden-first timer-rearm arm-node-swap review-race)
+   real-systemd-callers.sh: 33c33
+   real-systemd-callers.sh: < IMG=r6h-sysd-$RID:1; LBL=r6h.run=$RID; NODED=/home/arm/.nvm/versions/node/v22.23.2
+   real-systemd-callers.sh: ---
+   real-systemd-callers.sh: > IMG=r6rev-sysd-$RID:1; LBL=r6rev.run=$RID; NODED=/home/arm/.nvm/versions/node/v22.23.2
+   real-systemd-callers.sh: 35c35
+   real-systemd-callers.sh: < PFX=real-systemd-callers; [ "$SMOKE" = 1 ] && PFX=smoke-real-systemd-callers
+   real-systemd-callers.sh: ---
+   real-systemd-callers.sh: > PFX=review2-real-systemd; [ "$SMOKE" = 1 ] && PFX=review2-smoke
+   real-systemd-callers.sh: 63c63
+   real-systemd-callers.sh: <   local sc=$1 name=r6h-$RID-$1 log=$LOGS/$PFX-$1.log now0 lead=100 td off rc ctl=/in/fix/$H6/real-systemd-callers-container.sh
+   real-systemd-callers.sh: ---
+   real-systemd-callers.sh: >   local sc=$1 name=r6rev-$RID-$1 log=$LOGS/$PFX-$1.log now0 lead=100 td off rc ctl=/in/fix/$H6/real-systemd-callers-container.sh
+
+== review2-race.sh (final; attempt 1 watcher stopped by pkill after the dump appeared and lost the timing; attempt 2 used kill -0, which never fails on the zombie child, and hung)
+   | # sourced before the timer is armed (review-race only)
+   | install -m 644 /in/fix/review2-watch.sh /tmp/review2-watch.sh
+   | as_arm setsid bash /tmp/review2-watch.sh > /tmp/review2-watch.log 2>&1 < /dev/null &
+   | L FIXTURE-ATTACK "review-race: arm watcher started OUTSIDE afldb-backup.service (setsid, uid 1000, no groups) before the dispatch"
+
+== review2-judge.sh (final; attempt 1 watcher stopped by pkill after the dump appeared and lost the timing; attempt 2 used kill -0, which never fails on the zombie child, and hung)
+   | # sourced after the callers ran (review-race only)
+   | hdr "[REVIEW2] arm watcher log (an arm process outside the attested invocation)"; sed 's/^/   | /' /tmp/review2-watch.log
+   | read -r SUBN SUBS < /home/arm/review2-sub.txt 2>/dev/null
+   | REC=$(ls -1 $RD/*.attest 2>/dev/null | head -1)
+   | line "[REVIEW2] substituted: $SUBN $SUBS; root record $REC: $(grep -E '^(trigger_unit|dump|dump_sha256)=' "$REC" 2>/dev/null | tr '\n' ' ')"
+   | line "RESULT-REVIEW2 G0: exit $(cat $OUT/G0.rc); '$(grep '^G0 PROD RESULT' $OUT/G0.out)'; '$(grep '^OFFHOST-COMPARE' $OUT/G0.out)'"
+   | line "RESULT-REVIEW2 A-2 s5: '$(grep '^OFFHOST-COMPARE' $OUT/A2.out)'"
+   | if [ -n "$SUBS" ] && grep -qx "OFFHOST-COMPARE $SUBN $SUBS" $OUT/G0.out && grep -qx "dump_sha256=$SUBS" "$REC"; then
+   |   line "FINDING-REVIEW2-RACE: G0 exit $(cat $OUT/G0.rc) PASS; the ROOT record binds, and OFFHOST-COMPARE names, bytes an arm process outside the run substituted ($SUBS)"
+   | else line "REVIEW2-RACE: the substituted bytes were NOT accepted"; fi
+
+== review2-watch.sh (final; attempt 1 watcher stopped by pkill after the dump appeared and lost the timing; attempt 2 used kill -0, which never fails on the zombie child, and hung)
+   | # INDEPENDENT REVIEW 2 (attempt 2): an ARM process OUTSIDE the attested invocation (started before the dispatch, as arm's crontab or
+   | # any lingering arm process could be on production). It never touches the checkout, the unit, the record, the sidecar or node.
+   | # Deterministic, no timing race: while backup.sh (pg_dump on production, minutes) runs, it SIGSTOPs the PARENT scheduled-backup.sh
+   | # (same uid); the child keeps running; once backup.sh has exited (the dump renamed into place), it substitutes the bytes, then SIGCONT.
+   | BK=/home/arm/backups/afldb-scheduled
+   | log() { printf '%s %s\n' "$(date +%T.%N | cut -c1-12)" "$*"; }
+   | log "watcher uid=$(id -u) groups=$(id -G) pid=$$ cgroup=$(cat /proc/self/cgroup)"
+   | until c=$(pgrep -u arm -f 'maintenance/backup.sh') && [ -n "$c" ]; do sleep 0.02; done
+   | p=$(ps -o ppid= -p "$c" | tr -d ' '); log "backup.sh running: pid $c, parent $p: $(tr '\0' ' ' < /proc/$p/cmdline); parent cgroup $(cat /proc/$p/cgroup)"
+   | kill -STOP "$p"; log "SIGSTOP parent $p: state $(awk '{print $3}' /proc/$p/stat)"
+   | while st=$(awk '{print $3}' /proc/$c/stat 2>/dev/null) && [ "$st" != Z ]; do sleep 0.05; done   # the exited child stays a zombie (its parent is stopped)
+   | f=$(ls -1 "$BK"/afldb_prod-*.dump | head -1); log "backup.sh exited; dump $f real bytes sha256 $(sha256sum < "$f" | cut -c1-64)"
+   | printf 'HAND-MADE: bytes chosen by an arm process outside the attested run, not written by the timer-dispatched backup.sh\n' > "$BK/.sub" && mv -f "$BK/.sub" "$f"
+   | log "substituted $f: sha256 $(sha256sum < "$f" | cut -c1-64)"
+   | kill -CONT "$p"; log "SIGCONT parent $p"
+   | printf '%s %s\n' "${f##*/}" "$(sha256sum < "$f" | cut -c1-64)" > /home/arm/review2-sub.txt

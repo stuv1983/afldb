@@ -129,7 +129,7 @@ The r5 `trigger:` journal line is no longer read for origin by either gate. A li
   run's job was live. The r4 link (journald stamps the single `backup ok` line with the trusted `_SYSTEMD_INVOCATION_ID`, read
   through arm's `node`) must agree with it, but no longer carries it alone: a replaced `node`, a deleted or planted dump, or a
   rewritten sidecar is refused. It does not prove what the dump should contain: the dump is written by the attested run's own
-  (arm) code, and an arm process racing the run inside its own minutes could substitute the file before the writer hashes it.
+  (arm) code, and an arm process can substitute the file before the workload writes its sidecar. This is deterministic, not a race: it needs only SIGSTOP on the same-uid `scheduled-backup.sh` (independent review MED-3, reproduced). A PASS proves the timer dispatched the run and which file arm's uid let stand at the sidecar step, not that the bytes are tonight's `pg_dump` output; closing it needs a non-arm writer of the dump (owner decision).
 * Starting or restarting `afldb-backup.timer` dispatches the service only when `Persistent=` finds a missed elapse (or the calendar
   elapses while the timer is active); a re-arm after the night's dispatch fires nothing. Such a dispatch is a genuine dispatch by
   the timer unit, not proof that the calendar elapsed unattended. The INFO line shows the delay after the timer's (re)activation

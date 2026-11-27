@@ -1,0 +1,15 @@
+== R6 r4 in-container role=wronghost 2026-11-27T20:41:57Z hostname=afldb-dev image-os=Ubuntu 24.04.4 LTS
+   staged sha256: eac16cecce1a7ad56b6c8c28431cf102ef7d5609b37d9e08990fb925490be703 r6-pre-verify.sh; 7c3d0fc295512a2f990bdbed24ae9ddb97a49f5f13e9bf01019ea3fa7e1f0543 r6-rawhead-check.sh
+   staged sha256: b5fb980baed582adea5e944ac9ace00007d3eecad5eb16985fea815da31777b9 r6-tuesday-handoff.sh; cab4a43af09e4b1729d913162c0f27faccd19315c56eb4ad1141c8bf748d81c0 a1-rawhead.sh
+   staged modes: 755 1000 (staging umask 077); contrast copies: r2 0d9e97a5d5882203 58e35ce8 fa8d34f0bae6f4d3
+made 17822b29e6de-R6fixRehearsalBuild01x: 3 files, manifest 69b425be1a79, supervisor 11190 B
+made 7d92042fd110-XWruOm_9nLCSMY8nGPqYU: 3 files, manifest 2b32e8d15aba, supervisor 11190 B
+made c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC: 3 files, manifest 5bf51921ada9, supervisor 11190 B
+-- F. F-4 entry point on the wrong host (afldb-dev) as arm
+   state released live=3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b: current -> releases/17822b29e6de-R6fixRehearsalBuild01x, previous -> releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU, primary 221 cwd /home/arm/afldb-releases/releases/17822b29e6de-R6fixRehearsalBuild01x, workers 2
+     | STOP not arm@afldb-prod (host 'afldb-dev', user 'arm'): the raw-head probe was not started
+   [F4-wrong-host] rc=2 connections=0 mktemp-calls=0 env-opens=0
+REH PASS [F4-wrong-host] exit 2; .env never opened, no temp file, no request
+   [contrast: Sunday's bare helper on the same wrong host] rc=1 connections=1 mktemp-calls=1 env-opens=2
+REH PASS [contrast] the unguarded helper reads .env, creates its probe file and makes requests on the wrong host: the defect
+== in-container role=wronghost: 2 passed, 0 failed

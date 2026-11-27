@@ -1,0 +1,115 @@
+== Independent review reproduction inputs (28 Nov 2026). Run on streamanator as arm, private mktemp -d workspace (removed), image/containers labelled r6rev.run=rev1 (removed).
+Fix tree = git archive 4a88f68d of the same paths r6h-run.sh exports. Callers under test unmodified: r1-g0-dump.sh 67119fd602a12c28e006ca22de16df519c6b58b4f29d8858576ceb7bd0b0b009, r6-pre-verify.sh 92425f2ae341582a683e3f8847af598a04a5cf9e26473e7be8732397370c3feb.
+Harness changes (review copies only; repository files untouched):
+--- diff real-systemd-callers-container.sh (4a88f68d blob -> review copy)
+38c38
+< NODE=/home/arm/.nvm/versions/node/v22.23.2/bin/node
+---
+> NODE=/opt/realnode/bin/node
+68a69
+>   review-arm)                         EXPECT=record;;
+341a343
+> . /in/fix/review-setup.sh
+350a353
+> [ "$SC" = review-arm ] && . /in/fix/review-phase.sh
+--- diff real-systemd-callers.sh (4a88f68d blob -> review copy)
+26,27c26,27
+< ALL=(genuine-attested astra-manual-after-hidden-failure old-install-r5-trigger forged-trigger-manual record-missing record-ambiguous
+<      record-groupwritable restart-hidden-first timer-rearm)
+---
+> ALL=(review-arm
+>      )
+31c31
+< IMG=r6h-sysd-$RID:1; LBL=r6h.run=$RID; NODED=/home/arm/.nvm/versions/node/v22.23.2
+---
+> IMG=r6rev-sysd-$RID:1; LBL=r6rev.run=$RID; NODED=/home/arm/.nvm/versions/node/v22.23.2
+33c33
+< PFX=real-systemd-callers; [ "$SMOKE" = 1 ] && PFX=smoke-real-systemd-callers
+---
+> PFX=review-real-systemd; [ "$SMOKE" = 1 ] && PFX=review-smoke
+42c42
+<   printf 'FROM %s\nLABEL %s\nENV DEBIAN_FRONTEND=noninteractive\nRUN apt-get update && apt-get install -y --no-install-recommends systemd systemd-sysv dbus libpam-systemd util-linux coreutils procps && rm -rf /var/lib/apt/lists/* && systemctl --version | head -1\n' \
+---
+>   printf 'FROM %s\nLABEL %s\nENV DEBIAN_FRONTEND=noninteractive\nRUN apt-get update && apt-get install -y --no-install-recommends systemd systemd-sysv dbus libpam-systemd util-linux coreutils procps openssh-server openssh-client iproute2 && rm -rf /var/lib/apt/lists/* && systemctl --version | head -1\n' \
+61c61
+<   local sc=$1 name=r6h-$RID-$1 log=$LOGS/$PFX-$1.log now0 lead=100 td off rc ctl=/in/fix/$H6/real-systemd-callers-container.sh
+---
+>   local sc=$1 name=r6rev-$RID-$1 log=$LOGS/$PFX-$1.log now0 lead=100 td off rc ctl=/in/fix/$H6/real-systemd-callers-container.sh
+81c81
+<       -v "$RUN/entry-real.sh:/entry.sh:ro" -v "$RUN/fix:/in/fix:ro" -v "$NODED:$NODED:ro" --entrypoint /entry.sh "$IMG" >> "$log" 2>&1; then
+---
+>       -v "$RUN/entry-real.sh:/entry.sh:ro" -v "$RUN/fix:/in/fix:ro" -v "$NODED:/opt/realnode:ro" --entrypoint /entry.sh "$IMG" >> "$log" 2>&1; then
+--- review-setup.sh
+# INDEPENDENT REVIEW (sourced by the review copy of real-systemd-callers-container.sh, right before the callers run).
+# Production fact modelled: arm owns /home/arm/.nvm. Here the real node is mounted read-only at /opt/realnode and the gates' pinned
+# path /home/arm/.nvm/versions/node/v22.23.2/bin/node is an ARM-OWNED file. For the baseline caller runs it is a pure pass-through.
+RVN=/home/arm/.nvm/versions/node/v22.23.2/bin
+install -d -o arm -g arm -m 755 /home/arm/.nvm /home/arm/.nvm/versions /home/arm/.nvm/versions/node /home/arm/.nvm/versions/node/v22.23.2 $RVN
+printf '#!/bin/bash\nexec /opt/realnode/bin/node "$@"\n' > $RVN/node; chown arm:arm $RVN/node; chmod 755 $RVN/node
+line "[REVIEW] baseline: $RVN/node is an arm-owned pass-through to /opt/realnode/bin/node: $(stat -c '%U:%G %a' $RVN/node)"
+--- review-phase.sh
+# INDEPENDENT REVIEW phases (sourced by the review copy of real-systemd-callers-container.sh after the baseline callers ran).
+# Every step below that is labelled "as arm" runs as uid 1000 with no groups (as_arm). Root steps only set up sshd or simulate state.
+RVN=/home/arm/.nvm/versions/node/v22.23.2/bin
+hdr "[REVIEW] PHASE A: arm replaces its own ~/.nvm node (the gates' pinned journal parser); genuine dispatch and genuine root record untouched"
+REC0=$(ls -1 $RD/*.attest 2>/dev/null | head -1); line "[REVIEW] root record before: $REC0 sha256 $(sha "$REC0" 2>/dev/null)"
+FN=afldb_prod-$DAYC-022130.dump
+cat > /tmp/review-wrapper <<'EOF'
+#!/bin/bash
+read -r FN FH < /home/arm/.fake
+/opt/realnode/bin/node "$@" | sed -E "s/(scheduled-backup: backup ok: )[^ ]+ [0-9]+ bytes sha256 [0-9a-f]{16}/\1$FN 71 bytes sha256 $FH/"
+exit ${PIPESTATUS[0]}
+EOF
+cat > /tmp/review-arm-a.sh <<'EOF'
+set -e; BK=$1; FN=$2; RVN=$3
+printf 'arm-made bytes: this dump was NOT written by the timer-dispatched run\n' > "$BK/$FN"
+H=$(sha256sum < "$BK/$FN" | cut -c1-64); printf '%s  %s\n' "$H" "$FN" > "$BK/$FN.sha256"
+for f in "$BK"/afldb_prod-*.dump; do [ "${f##*/}" = "$FN" ] || rm -f "$f" "$f.sha256"; done
+printf '%s %s\n' "$FN" "${H:0:16}" > /home/arm/.fake
+cat /tmp/review-wrapper > "$RVN/node"
+EOF
+chmod 644 /tmp/review-wrapper /tmp/review-arm-a.sh
+as_arm bash /tmp/review-arm-a.sh "$BKD" "$FN" "$RVN" && line "[REVIEW] as arm: genuine dump deleted, $FN planted with its own sidecar, ~/.nvm node replaced by a rewriting wrapper"
+ls -la --time-style=+%T "$BKD" | sed 's/^/   /'; line "[REVIEW] wrapper: $(stat -c '%U:%G %a' $RVN/node)"; sed 's/^/   | /' $RVN/node
+line "[REVIEW] root record after: $REC0 sha256 $(sha "$REC0" 2>/dev/null) (unchanged = genuine)"
+FSHA=$(sha "$BKD/$FN")
+run_caller G0-NODESUB "$G0" "$DAY"; run_caller A2-NODESUB "$PRE" "${A2ARGS[@]}"
+line "RESULT-REVIEW-A G0: exit $(cat $OUT/G0-NODESUB.rc); '$(grep '^G0 PROD RESULT' $OUT/G0-NODESUB.out)'; OFFHOST-COMPARE: '$(grep '^OFFHOST-COMPARE' $OUT/G0-NODESUB.out)'"
+line "RESULT-REVIEW-A A-2 section 5: '$(grep '^OFFHOST-COMPARE' $OUT/A2-NODESUB.out)'; origin line: '$(grep -E '^(PASS|FAIL) afldb-backup.service scheduled run' $OUT/A2-NODESUB.out | cut -c1-200)'"
+if grep -qx "OFFHOST-COMPARE $FN $FSHA" $OUT/G0-NODESUB.out && [ "$(cat $OUT/G0-NODESUB.rc)" = 0 ]; then
+  line "FINDING-REVIEW-A: G0 exit 0 'G0 PROD RESULT PASS' and OFFHOST-COMPARE names $FN ($FSHA), a file arm planted after the run; the timer's own dump ($EXPN $EXPS) is gone"
+else line "REVIEW-A: G0 did not accept the planted dump"; fi
+grep -qx "OFFHOST-COMPARE $FN $FSHA" $OUT/A2-NODESUB.out && line "FINDING-REVIEW-A: A-2 section 5 also attributes and prints OFFHOST-COMPARE $FN $FSHA"
+
+hdr "[REVIEW] PHASE B: the gates run as arm over ssh; arm's own ~/.bashrc (no root, no record) decides what they print"
+printf '#!/bin/bash\nexec /opt/realnode/bin/node "$@"\n' > $RVN/node   # back to a pass-through (root restores, isolation of phase B)
+rm -f "$REC0"; L FIXTURE "root removed the genuine record (now NO run is attested: the honest gate must refuse)"
+command -v sshd > /dev/null || line "[REVIEW] no sshd in the image"
+systemctl start ssh.service 2>&1 | head -3; sleep 1; line "[REVIEW] sshd: $(systemctl is-active ssh.service) $(ss -ltn 2>/dev/null | grep -c ':22 ') listener(s)"
+grep -q '^arm:!' /etc/shadow && usermod -p '*' arm
+ssh-keygen -q -t ed25519 -N '' -f /root/rk; install -d -o arm -g arm -m 700 /home/arm/.ssh; install -o arm -g arm -m 600 /root/rk.pub /home/arm/.ssh/authorized_keys
+SSHC=(ssh -i /root/rk -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR arm@127.0.0.1)
+"${SSHC[@]}" bash -s -- "$DAY" < "$G0" > $OUT/G0-SSH-CONTROL.out 2>&1; echo $? > $OUT/G0-SSH-CONTROL.rc
+line "[REVIEW] control, no ~/.bashrc: ssh arm@127.0.0.1 bash -s -- $DAY < r1-g0-dump.sh: exit $(cat $OUT/G0-SSH-CONTROL.rc); $(grep -E '^G0 PROD RESULT|scheduled origin unproven' $OUT/G0-SSH-CONTROL.out | cut -c1-220 | tr '\n' '|')"
+as_arm sh -c 'cat > /home/arm/.bashrc' <<'EOF'
+# arm's own ~/.bashrc (arm owns it; no root involved). Debian/Ubuntu bash reads it for an ssh-launched non-interactive `bash -c`.
+bash() {
+  if [ "$1" = -s ]; then
+    local s; s=$(cat)
+    case $s in
+      *"gate G0 (production half)"*) printf '%s\n' "== R1 G0 FORGED by ~/.bashrc (the pinned gate text arrived on stdin and was discarded)" \
+        "PASS afldb-backup.service scheduled run: FORGED" "OFFHOST-COMPARE afldb_prod-FORGED.dump 0000000000000000000000000000000000000000000000000000000000000000" \
+        "PASS no FAILED marker" "G0 PROD RESULT PASS: now on streamanator: r6-offhost-verify.sh $3 <dump> <sha256> must exit 0"; return 0;;
+      *) printf '%s\n' "R6 PRE RESULT PASS"; return 0;;
+    esac
+  fi
+  command bash "$@"
+}
+EOF
+line "[REVIEW] as arm: wrote ~/.bashrc ($(stat -c '%U:%G %a' /home/arm/.bashrc))"
+"${SSHC[@]}" bash -s -- "$DAY" < "$G0" > $OUT/G0-SSH-BASHRC.out 2>&1; echo $? > $OUT/G0-SSH-BASHRC.rc
+"${SSHC[@]}" bash -s -- "${A2ARGS[@]}" < "$PRE" > $OUT/A2-SSH-BASHRC.out 2>&1; echo $? > $OUT/A2-SSH-BASHRC.rc
+for t in G0-SSH-CONTROL G0-SSH-BASHRC A2-SSH-BASHRC; do line "----- $t exit $(cat $OUT/$t.rc) stdout+stderr -----"; cut -c1-300 $OUT/$t.out | sed 's/^/   | /'; done
+grep -q '^G0 PROD RESULT PASS' $OUT/G0-SSH-BASHRC.out && [ "$(cat $OUT/G0-SSH-BASHRC.rc)" = 0 ] && \
+  line "FINDING-REVIEW-B: with NO root record, ssh 'bash -s' G0 exits 0 with 'G0 PROD RESULT PASS' and an OFFHOST-COMPARE line, from arm's ~/.bashrc alone"
+grep -q '^R6 PRE RESULT PASS' $OUT/A2-SSH-BASHRC.out && [ "$(cat $OUT/A2-SSH-BASHRC.rc)" = 0 ] && line "FINDING-REVIEW-B: A-2 likewise prints 'R6 PRE RESULT PASS', exit 0"
