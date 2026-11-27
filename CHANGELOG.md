@@ -15,6 +15,13 @@ commit.
 
 ## [Unreleased]
 
+### R6 r4 and release-packet review fixes (27 November 2026; on `claude/closeout-20261127`, draft PR 5; PROPOSED, Astra re-review pending; nothing deployed)
+
+- **`deploy/release.mjs promote` and `host-gate` accept `--not-after <epoch seconds>`.** With it, promotion is refused once the deadline has passed, checked before validation and again immediately before the link switch; `host-gate` prints a line proving enforcement. Without the option, behaviour is unchanged; rollback ignores it. The release packet's P4 passes its 11:30 cutoff this way and STOPs against a tool that lacks the option.
+- **Scheduled-backup evidence is attributed to the timer.** The release G0 gate and R6 A-2 now require the backup timer's dispatch, the one successful service invocation it started and that invocation's dump to agree; a hand-started backup in the same window no longer passes.
+- **R6 handoff, identity and manifest checks tightened.** The Tuesday handoff parser matches complete result lines and binds the attested InvocationID to the outcome; A-2 and F-2 validate the InvocationID they report and F-2 requires a strict serving status; F-1 probes the serving build for every Tuesday outcome; the P6 journal check needs a successful query with zero error entries.
+- **Rehearsal drivers.** The r2 repeat command is retired and refuses to run; the r3/r4 driver removes only an archive it exclusively created. Helper revision `a203c927`, R6 manifest `3c671c4b…`, release `scripts/SHA256SUMS` `744e52ca…` ([record](docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r4-20261127/README.md)).
+
 ### Closeout (27 November 2026; local on `claude/closeout-20261127`, from `cdeaf31f`, not pushed; nothing deployed)
 
 - **Retained audit evidence: the Tue 24 Nov release sitting.** It ended DEFERRED before promotion. The sitting record, approval and both R6-handoff parser logs are now tracked in `docs/v2/evidence/release-17822b29-20261124/`. They are byte-identical to the untracked originals, with digests in `SHA256SUMS-SITTING`.
