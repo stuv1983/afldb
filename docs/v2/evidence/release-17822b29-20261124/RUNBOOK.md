@@ -15,7 +15,7 @@
 > describe the packet that sitting used: scripts at `58e35ce8`, manifest `b4e9e584…` (kept as
 > [`orig-aa33f0fc/release-scripts-SHA256SUMS`](../backlog-20261121/r6-20261125/review-fixes-r4-20261127/orig-aa33f0fc/release-scripts-SHA256SUMS);
 > the old bytes are `git show 58e35ce8805e9f559d3dd1008606f90efb84fbab:<path>`). Three scripts were then corrected after
-> Astra's review of draft PR 5, at revision `2e58a0b7d3962bc6fc8424d863f5be06677adcaf`; `scripts/SHA256SUMS` now has SHA-256 `9a987fbef356f9e0fa98daa94d07581cfc762f43ca14091dc99cfd3f8e41cd3c`:
+> Astra's review of draft PR 5, at revision `a203c927d24bbd0b2bf4f67b3ddb2865a0fee0d3`; `scripts/SHA256SUMS` now has SHA-256 `744e52ca1d23bd4f5bfa45acf2084146f8a55c938898bcb85bcdf2e4512f5c46`:
 >
 > * **G0 (`r1-g0-dump.sh`)**: the scheduled dump must be attributable to the backup **timer's dispatch** and to the one
 >   successful service invocation it started; a successful start inside 02:20–02:31 alone is not enough (the same rule as R6 A-2).
@@ -24,6 +24,8 @@
 >   proving the tool enforces it (§2). **P4 therefore STOPs against a checkout whose `deploy/release.mjs` lacks the option,
 >   which includes `17822b29` itself.** A future sitting must run P4 from a checkout that contains this change, under a new pin.
 > * **P6 and the owner's journal check (`r1-p6-observe.sh`, §4.2)**: a successful query with zero `err` entries, not a line count.
+>   A tick may still report `unreadable` (arm may not see the journal), so P6 prints a `P6 JOURNAL …` line saying how many ticks
+>   read it: **P6 is complete only with the owner's `JOURNAL PASS rc=0 entries=0` line in the record.**
 >
 > The dated gates are unchanged on purpose (P4's cutoff is still 24 Nov 11:30; G0 accepts 24–29 Nov). A re-run needs a new date
 > and pin, Astra's PASS at that review commit, a new owner approval and that day's evidence. Record:
