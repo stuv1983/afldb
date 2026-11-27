@@ -920,7 +920,7 @@ default. Production's checkout keeps `234fca6a…`, and no gate executes either 
 Record: [review-fixes-r6-20261128/README.md](r6-20261125/review-fixes-r6-20261128/README.md).
 
 **r7, 28 November 2026 (owner decisions of 28 Nov: G1 and G2 both required for PR 5; PROPOSED; independent review pending; nothing
-installed; R6 stays NO-GO).** The blocks below are re-pinned in place to tested revision `R7_TESTED_REV`, manifest `426c07ff…`.
+installed; R6 stays NO-GO).** The blocks below are re-pinned in place to tested revision `5c2c2280e4688a063a5f943512e4460e250b1135`, manifest `426c07ff…`.
 Only `r6-pre-verify.sh` changed (`eac16cec…` → `97b85721…`), and only in a comment: MED-3 is a deterministic substitution (SIGSTOP of
 the same-uid workload), not a race. Its logic is unchanged. Two things change how Wednesday's GO evidence is produced:
 (a) **G1, backup production (MED-3).** The nightly dump is produced by the system account `afldb-backup`, not arm. A root `ExecStartPost`
@@ -999,7 +999,7 @@ The owner's "before P4" ruling stays open. Record: [review-fixes-r7-20261128/REA
 ### R6 archive r4: workstation (Git Bash)
 
 ```bash
-CODE=937c7d437b1fbe96a5102fa3db0011c7d751a48d
+CODE=5c2c2280e4688a063a5f943512e4460e250b1135
 B=docs/v2/evidence/backlog-20261121
 git -C /d/dev/afldb archive --format=tar --output=/tmp/afldb-r6-20261125-r4.tar "$CODE" \
   "$B/r6-20261125/r6-pre-verify.sh" \
@@ -1037,7 +1037,7 @@ C:/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes afldb 'set -C; cat > /tmp/a
 
 As r3: record the printed staging root; STOP unless the block prints 16 `: OK` lines and `R6 STAGE VERIFIED <path> (16 files)`.
 Manifest digest `426c07ff8267bb82a1e15fe04923350d6daa267bde4b9a09b5560d00814ee6f8` (r7 re-pin, 28 Nov 2026; r6 was `57c8aa50…` at `937c7d43`, r5 `182efbb6…` at `5553ecaf`, r4 `3c671c4b…` at `a203c927`). Every pin is the SHA-256 of the Git blob at the tested revision
-(`git cat-file blob R7_TESTED_REV:<path> | sha256sum`). Three differ from r3: `r6-pre-verify.sh`
+(`git cat-file blob 5c2c2280e4688a063a5f943512e4460e250b1135:<path> | sha256sum`). Three differ from r3: `r6-pre-verify.sh`
 (`48185fca…` → r4 `ea4355f0…` → r5 `64cc5166…` → r6 `eac16cec…` → r7 `97b85721…`, a comment only), `r6-post-verify.sh` (`478f85cd…` → `319c2e09…`) and `r6-tuesday-handoff.sh` (`92c1809b…` →
 r4 `be0fbca2…` → r5 `820f5d53…` → r6 `b5fb980b…`). The other thirteen are byte-identical to r3's, and Sunday's `a1-rawhead.sh` is still `cab4a43a…`. The
 verification lines are r3's, unchanged.
