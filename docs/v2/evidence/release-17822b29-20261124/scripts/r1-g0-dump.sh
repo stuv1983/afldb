@@ -1,20 +1,24 @@
 #!/usr/bin/env bash
 # Release 17822b29, gate G0 (production half): identify Tuesday's scheduled 02:2x dump. PRODUCTION, as arm, READ-ONLY: no write,
 # no sudo, no database, no temp file. Command inventory: hostname id date systemctl(show) journalctl (afldb-backup.service, one
-# bounded window, JSON output) node -e (the pinned /home/arm/.nvm/versions/node/v22.23.2/bin/node, only to parse that JSON from
+# bounded window, JSON output) busctl(get-property: afldb-backup.timer LastTriggerUSec, in microseconds, nothing else) node -e (the pinned /home/arm/.nvm/versions/node/v22.23.2/bin/node, only to parse that JSON from
 # stdin; it opens no file) sha256sum sed awk cut wc tr stat ls printf echo test; redirections only 2>&1, 2>/dev/null, here-strings.
 # PASS requires (r4, 27 Nov 2026: a successful start inside the window is NOT enough, a start by hand gives the same):
 #   the backup TIMER's run: afldb-backup.timer LastTriggerUSec today 02:20-02:31; the service's last start at or after it and
 #   within 5 s; exit by 02:46; Result=success, ExecMainStatus=0; the service's InvocationID (one validated read) is the
 #   _SYSTEMD_INVOCATION_ID of exactly one "backup ok" line of the service's own process, logged during that run; no other
-#   invocation of the unit in the journal 02:20-02:46 (see backup_journal for the links and the residual limit);
+#   invocation of the unit in the journal 02:20-02:46; AND (r5, 27 Nov 2026: the origin) that same invocation logged exactly ONE
+#   "trigger: ... unit=afldb-backup.timer realtime_usec=<n>" line whose <n> equals the timer's LastTriggerUSec in microseconds
+#   exactly (see backup_journal for the links, the origin rule and the residual limits); with no trigger line, which is what
+#   production's scheduled-backup.sh writes until the r5 change is installed, the result is "scheduled origin unproven", G0 FAIL;
 #   exactly ONE afldb_prod-<today>-02[23]*.dump; its re-hash equals its one-line sidecar; that journal line names it:
 #   "backup ok: <that name> ... sha256 <first 16 hex>" (ISSUE-352, pick_overnight_dump verbatim from r6-20261125/r6-pre-verify.sh;
-#   ts, read_invocation, backup_journal, match_backup and scheduled_backup_run are byte-identical to that script's too);
+#   ts, timer_usec, read_invocation, backup_journal, match_backup and scheduled_backup_run are byte-identical to that script's too);
 #   no FAILED marker.
 # Prints "BACKUP-EVIDENCE <invocation> <timer> <start> <exit> <ok-line> <dump> <16 hex>" (epochs) and "OFFHOST-COMPARE <dump>
 # <sha256>" for the streamanator half: r6-offhost-verify.sh <YYYY-MM-DD> <dump> <sha256>, which must exit 0
-# (SCHEDULED-COPY-VERIFIED). Without an attributed timer run the dump is not examined and no OFFHOST-COMPARE line is printed.
+# (SCHEDULED-COPY-VERIFIED). Without an attributed timer run (origin included) the dump is not examined, no OFFHOST-COMPARE line is
+# printed, and nothing here reads the off-host copy or the pull stamp.
 # Any other result: G0 FAIL.
 # Run (workstation Git Bash; never at minute :16-:18):
 #   tr -d '\r' < r1-g0-dump.sh | C:/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes afldb bash -s -- 2026-11-24
@@ -44,6 +48,15 @@ ts() {
   date -u -d "${value:-invalid}" +%s 2>/dev/null || echo 0
 }
 
+# R6 r5 (27 Nov 2026): the timer's LastTriggerUSec in MICROSECONDS. `systemctl show` prints whole seconds; the system bus gives the
+# exact value to any user (busctl get-property, read-only). Prints the integer; prints nothing and returns 1 on any failure.
+timer_usec() {
+  local out
+  out=$(busctl get-property org.freedesktop.systemd1 /org/freedesktop/systemd1/unit/afldb_2dbackup_2etimer org.freedesktop.systemd1.Timer LastTriggerUSec 2>/dev/null) || return 1
+  [[ $out =~ ^t\ ([1-9][0-9]{6,19})$ ]] || return 1
+  printf '%s\n' "${BASH_REMATCH[1]}"
+}
+
 # R6 r4 (review finding 3, 27 Nov 2026): ONE read of a unit's InvocationID, validated before anything uses or prints it. Sets
 # RI_ID to the value only when `systemctl show` exited 0 and printed exactly one lower-case 32-hex ID (otherwise RI_ID is empty)
 # and RI_WHY to the reason; returns 0 only for a valid ID. Callers print and compare RI_ID, never a second read.
@@ -59,20 +72,34 @@ read_invocation() { # unit
 }
 
 # R6 r4 (review finding 2, 27 Nov 2026): "afldb-backup.service started in the 02:20 window and succeeded" is also true of a manual
-# `systemctl start` in that window. The scheduled run is now attributed in three links, all read-only and unprivileged:
+# `systemctl start` in that window. The scheduled run is attributed in four links, all read-only and unprivileged:
 #   timer -> invocation: afldb-backup.timer LastTriggerUSec lies in the window and the service's last ExecMainStartTimestamp is at
 #     or after it and within 5 s; that run exited (ExecMainExitTimestamp) by window end + 15 min with Result=success, status 0;
 #   invocation -> journal: the service's InvocationID (one validated read) is the _SYSTEMD_INVOCATION_ID that journald itself
 #     attached to exactly one "backup ok" line logged by the service's own process between that start and exit (+5 s for
 #     journald's receipt time), and NO other invocation of the unit appears in the journal from the window start to window end
 #     + 15 min (a timer run that failed or was replaced, then a start by hand, is two invocations: ambiguous, STOP);
-#   journal -> dump: that line's dump name and 16 hex are what pick_overnight_dump requires of the unique 02:2x file and sidecar.
+#   journal -> dump: that line's dump name and 16 hex are what pick_overnight_dump requires of the unique 02:2x file and sidecar;
+#   ORIGIN (r5, review of f92d6e29, 27 Nov 2026): the links above hold equally for a start by hand 3 s after a timer dispatch whose
+#     own run failed where arm cannot see it (PID 1 alone logs a failed dependency or an exec failure; arm reads only its own
+#     service's lines), so the invocation itself must carry the dispatch. The run's own scheduled-backup.sh logs ONE line
+#     "trigger: invocation=<id> job=<n> unit=<name|none> realtime_usec=<n|none>" from its start JOB's ActivationDetails (log_trigger
+#     there); journald stamps it with the trusted _SYSTEMD_UNIT and _SYSTEMD_INVOCATION_ID. The run is attributed only if exactly
+#     ONE such line of this invocation names this invocation, unit=afldb-backup.timer, and a realtime_usec that equals the timer's
+#     LastTriggerUSec in MICROSECONDS (timer_usec, busctl) exactly. A start by hand has a job with no details (unit=none).
+#     No trigger line at all, which is what production's scheduled-backup.sh writes until the r5 change is installed, is
+#     "scheduled origin unproven": exit nonzero, the dump is not examined, no OFFHOST-COMPARE line is printed. Nothing accepts a
+#     start by hand; that is the owner's decision, not a script's.
+# Not used, and why (proved on real systemd 255.4 in review-fixes-r5-20261127/logs): $TRIGGER_UNIT and $TRIGGER_TIMER_REALTIME_USEC
+# in the run's environment, and the unit's own ActivationDetails, keep the FIRST timer start since the unit was loaded, so every
+# later run, a start by hand included, inherits an old dispatch; a shorter timing tolerance, a second timestamp comparison and a
+# search for competing invocation IDs cannot show where a start came from; PID 1's own lines would, and arm cannot read them.
 # Only trusted journal fields are used (_SYSTEMD_UNIT, _SYSTEMD_INVOCATION_ID, _PID, __REALTIME_TIMESTAMP). Lines PID 1 logs
 # about the unit (UNIT=, INVOCATION_ID=) count as invocation evidence when arm can read them; nothing depends on their presence.
-# ActivationDetails is not used (unprintable through systemctl, and its trigger time was observed stale).
-# Residual limit: a timer-started run that ends within 5 s having logged nothing readable by arm (scheduled-backup.sh logs its
-# "target:" line first, so this needs an exec or unit-level failure), followed inside those 5 s by a start by hand, is not
-# distinguishable with unprivileged reads; PID 1's journal lines (owner, sudo journalctl) would show both invocations.
+# Residual limits: the trigger line is written by the arm-owned backup script, so it is exactly as trustworthy as that file and as
+# the host's systemd (it needs Job ActivationDetails, present in systemd 255.4-1ubuntu8.19; an older build logs unit=none and STOPs);
+# a start by hand that arrives while the timer's own start job is still queued joins that job (one job, one invocation: the
+# timer's); a journal receipt later than 5 s after the exit is a false STOP; an operator with root can still run a rewritten script.
 #
 # backup_journal prints one line per journal entry that carries invocation evidence, "<invocation> <epoch> own <MESSAGE>" for
 # the service's own process and "<invocation> <epoch> pid1 -" for PID 1, nothing on any failure. Returns 0; 10 journalctl failed;
@@ -111,9 +138,10 @@ backup_journal() { # since-epoch until-epoch node
 
 # Prints "<invocation> <timer-epoch> <start-epoch> <exit-epoch> <ok-line-epoch> <dump> <16 hex>" and returns 0 only when every
 # link above holds; otherwise prints "REASON ..." and returns 1. Pure: every fact is an argument.
-match_backup() { # B0 B1 timer start exit Result ExecMainStatus invocation journal-rc journal-lines
-  local b0=$1 b1=$2 bt=$3 bs=$4 be=$5 res=$6 xs=$7 inv=$8 jrc=$9 jl=${10} limit=$(($2 + 900)) id at kind msg n=0 hit=
+match_backup() { # B0 B1 timer start exit Result ExecMainStatus invocation journal-rc journal-lines timer-usec
+  local b0=$1 b1=$2 bt=$3 bs=$4 be=$5 res=$6 xs=$7 inv=$8 jrc=$9 jl=${10} btu=${11:-} limit=$(($2 + 900)) id at kind msg n=0 hit= nt=0 trig= ti tn tr
   local re='^[^ ]+ scheduled-backup: backup ok: ([^ ]+) [0-9]+ bytes sha256 ([0-9a-f]{16})( offhost=[^ ]+)?$'
+  local tre='^[^ ]+ scheduled-backup: trigger: invocation=([0-9a-f]{32}) job=([0-9]+|none) unit=([^ ]+) realtime_usec=([0-9]+|none)$'
   [[ $b0 =~ ^[0-9]{10}$ && $b1 =~ ^[0-9]{10}$ && $bt =~ ^[0-9]{1,10}$ && $bs =~ ^[0-9]{1,10}$ && $be =~ ^[0-9]{1,10}$ ]] \
     || { echo "REASON a timestamp is not a number (timer '$bt' start '$bs' exit '$be')"; return 1; }
   [ "$bt" -gt 0 ] || { echo "REASON afldb-backup.timer LastTriggerUSec is missing or unreadable: no timer dispatch is recorded"; return 1; }
@@ -138,23 +166,32 @@ match_backup() { # B0 B1 timer start exit Result ExecMainStatus invocation journ
     [ "$id" = "$inv" ] || { echo "REASON ambiguous: another invocation of afldb-backup.service ($id, epoch $at) is in the window journal; the service's last invocation is $inv"; return 1; }
     [ "$kind" = own ] || continue
     (( bs <= at && at <= be + 5 )) || { echo "REASON invocation $inv logged at epoch $at, outside its own run $bs..$be"; return 1; }
-    if [[ $msg =~ $re ]]; then n=$((n + 1)); hit="$at ${BASH_REMATCH[1]} ${BASH_REMATCH[2]}"; fi
+    if [[ $msg =~ $re ]]; then n=$((n + 1)); hit="$at ${BASH_REMATCH[1]} ${BASH_REMATCH[2]}"
+    elif [[ $msg =~ $tre ]]; then nt=$((nt + 1)); trig="${BASH_REMATCH[1]} ${BASH_REMATCH[3]} ${BASH_REMATCH[4]}"; fi
   done <<< "$jl"
   [ "$n" = 1 ] || { echo "REASON invocation $inv logged $n 'backup ok' lines in the window (need exactly 1): the timer's run is not tied to a dump"; return 1; }
+  # ORIGIN (r5): the same invocation must say, in its own trusted journal line, that the backup timer's dispatch started it.
+  [ "$nt" = 1 ] || { echo "REASON scheduled origin unproven: invocation $inv logged $nt trigger lines (need exactly 1): nothing arm can read binds the timer's dispatch to this run (production's scheduled-backup.sh logs no trigger line until the r5 change is installed)"; return 1; }
+  read -r ti tn tr <<< "$trig"
+  [ "$ti" = "$inv" ] || { echo "REASON scheduled origin unproven: the trigger line names invocation $ti, not the run's $inv"; return 1; }
+  [ "$tn" = afldb-backup.timer ] || { echo "REASON scheduled origin unproven: the run's start job names trigger unit '$tn', not afldb-backup.timer (a start by hand, or by a dependency, carries no timer dispatch)"; return 1; }
+  [[ $btu =~ ^[1-9][0-9]{6,19}$ ]] || { echo "REASON scheduled origin unproven: afldb-backup.timer LastTriggerUSec could not be read in microseconds (busctl)"; return 1; }
+  [ "${btu:0:${#btu}-6}" = "$bt" ] || { echo "REASON scheduled origin unproven: LastTriggerUSec in microseconds ($btu) and in seconds ($bt) disagree"; return 1; }
+  [ "$tr" = "$btu" ] || { echo "REASON scheduled origin unproven: the run's start job records the dispatch at $tr us, but the timer's LastTriggerUSec is $btu us (an earlier or another dispatch)"; return 1; }
   echo "$inv $bt $bs $be $hit"
 }
 
 # The live reads for match_backup. Sets BR_EVID (match_backup's line), BR_JOURNAL (the MESSAGE text of the service's own lines,
 # for pick_overnight_dump) and BR_WHY; returns 0 only when the run is attributed. Uses ts, read_invocation, backup_journal.
 scheduled_backup_run() { # B0 B1 node
-  local bt bs be res xs jl jrc
-  BR_EVID=; BR_JOURNAL=; BR_WHY=
-  bt=$(ts afldb-backup.timer LastTriggerUSec); bs=$(ts afldb-backup.service ExecMainStartTimestamp); be=$(ts afldb-backup.service ExecMainExitTimestamp)
+  local bt btu bs be res xs jl jrc
+  BR_EVID=; BR_JOURNAL=; BR_WHY=; BR_TUSEC=
+  bt=$(ts afldb-backup.timer LastTriggerUSec); btu=$(timer_usec); BR_TUSEC=$btu; bs=$(ts afldb-backup.service ExecMainStartTimestamp); be=$(ts afldb-backup.service ExecMainExitTimestamp)
   res=$(systemctl show afldb-backup.service -p Result --value 2>/dev/null); xs=$(systemctl show afldb-backup.service -p ExecMainStatus --value 2>/dev/null)
   read_invocation afldb-backup.service || { BR_WHY="afldb-backup.service InvocationID: $RI_WHY"; return 1; }
   [ -x "$3" ] || { BR_WHY="node is not executable at $3: the journal cannot be read"; return 1; }
   jl=$(backup_journal "$1" "$(($2 + 906))" "$3"); jrc=$?
-  BR_EVID=$(match_backup "$1" "$2" "$bt" "$bs" "$be" "$res" "$xs" "$RI_ID" "$jrc" "$jl") || { BR_WHY=${BR_EVID#REASON }; BR_EVID=; return 1; }
+  BR_EVID=$(match_backup "$1" "$2" "$bt" "$bs" "$be" "$res" "$xs" "$RI_ID" "$jrc" "$jl" "$btu") || { BR_WHY=${BR_EVID#REASON }; BR_EVID=; return 1; }
   BR_JOURNAL=$(sed -n 's/^[0-9a-f]\{32\} [0-9]\{10\} own //p' <<< "$jl")
 }
 
@@ -171,7 +208,7 @@ B0=$(ep "$DAY 02:20"); B1=$(ep "$DAY 02:31")
 N=/home/arm/.nvm/versions/node/v22.23.2/bin/node
 if scheduled_backup_run "$B0" "$B1" "$N"; then
   read -r bi bt bs be bj bn bh <<< "$BR_EVID"
-  echo "PASS afldb-backup.service scheduled run: timer dispatch $(mel "$bt"), its start $(mel "$bs"), exit $(mel "$be"), Result=success status=0; invocation $bi alone in the window journal, 'backup ok' at $(mel "$bj")"
+  echo "PASS afldb-backup.service scheduled run: timer dispatch $(mel "$bt"), its start $(mel "$bs"), exit $(mel "$be"), Result=success status=0; invocation $bi alone in the window journal, 'backup ok' at $(mel "$bj"); its start job was dispatched by afldb-backup.timer at $BR_TUSEC us = LastTriggerUSec"
   echo "BACKUP-EVIDENCE $BR_EVID"
   if PICK=$(pick_overnight_dump "$BK" "$DC" "$BR_JOURNAL"); then
     SDN=${PICK%% *}; SS=${PICK#* }
@@ -182,7 +219,7 @@ if scheduled_backup_run "$B0" "$B1" "$N"; then
   else echo "FAIL dump not attributable: ${PICK#REASON }"; F=1; fi
 else
   echo "FAIL afldb-backup.service scheduled run is not attributed to the backup timer: $BR_WHY"; F=1
-  echo "INFO the 02:2x dump is not examined and no OFFHOST-COMPARE line is printed: without an attributed timer run no dump is the scheduled one"
+  echo "INFO the 02:2x dump is not examined and no OFFHOST-COMPARE line is printed: without an attributed timer run, origin included, no dump is the scheduled one"
 fi
 M=$(ls -1 "$BK"/.state/FAILED-* 2>/dev/null | tr '\n' ' '); [ -z "$M" ] && echo "PASS no FAILED marker" || { echo "FAIL FAILED marker(s): $M"; F=1; }
 echo "INFO afldb-backup-verify.service last: $(systemctl show afldb-backup-verify.service -p Result -p ExecMainStatus -p ExecMainStartTimestamp --value | tr '\n' ' ')(record; not a G0 criterion)"

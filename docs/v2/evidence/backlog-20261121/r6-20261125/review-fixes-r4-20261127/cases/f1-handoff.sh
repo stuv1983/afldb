@@ -8,6 +8,12 @@
 # Contrast: the three reviewer-named STOP cases are also run against the ORIGINAL parser (aa33f0fc), which must falsely PASS
 # them. Original = $F1_ORIG if set, else <FIX>/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r4-20261127/
 # orig-aa33f0fc/r6-tuesday-handoff.sh; if neither exists the contrast is skipped with a printed note.
+# r5 (Astra, 27 Nov 2026): a rollback interrupted after release.mjs switched the links leaves the tool's own trace and no RESULT
+# line; released and deferred must STOP on any rollback trace (section "r5" below). Contrast: the f92d6e29 parser (the parser
+# at the r4 head) must falsely certify tue:released on the reconstructed Astra record. f92d6e29 parser = $F1_ORIG_R5 if set, else
+# <FIX>/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r5-20261127/orig-f92d6e29/r6-tuesday-handoff.sh; the exact Astra
+# record file = $F1_ASTRA if set, else <FIX>/.../review-fixes-r5-20261127/cases/astra-released-interrupted-rollback.md; each
+# contrast or file case is skipped with a printed note when its file is absent.
 # Usage: bash cases/f1-handoff.sh <FIX> [<STAGE>]
 # Output: one "CASE-RESULT f1-<case> OK|UNEXPECTED (...)" line per case; last line "SUITE f1 RESULT PASS (<n> cases)" exit 0,
 # or "SUITE f1 RESULT FAIL (<k> unexpected)" exit 1.
@@ -16,6 +22,8 @@ main() {
   local FIX=${1:-} STAGE=${2:-${1:-}} B=docs/v2/evidence/backlog-20261121/r6-20261125
   [ -n "$FIX" ] && [ -d "$FIX" ] && [ -d "$STAGE" ] || { echo "usage: f1-handoff.sh <FIX> [<STAGE>]"; exit 2; }
   local HAND=$STAGE/$B/r6-tuesday-handoff.sh ORIG=${F1_ORIG:-$FIX/$B/review-fixes-r4-20261127/orig-aa33f0fc/r6-tuesday-handoff.sh}
+  local R5=$B/review-fixes-r5-20261127
+  local ORIG5=${F1_ORIG_R5:-$FIX/$R5/orig-f92d6e29/r6-tuesday-handoff.sh} ASTRA=${F1_ASTRA:-$FIX/$R5/cases/astra-released-interrupted-rollback.md}
   [ -f "$HAND" ] || { echo "STOP no parser at $HAND"; exit 2; }
   RD=$(mktemp -d "${TMPDIR:-/tmp}/f1-handoff.XXXXXX") || exit 2; trap 'rm -rf -- "$RD"' EXIT
   N=0; BADN=0
@@ -62,6 +70,14 @@ main() {
     if [ "$RC" = 0 ] && grep -qx 'R6 HANDOFF RESULT PASS' <<< "$OUT" && [ "$(grep -c '^R6-A2-' <<< "$OUT")" = 3 ]
     then res OK "orig-$1" "the aa33f0fc parser falsely PASSes (exit 0, 3 R6-A2- lines): defect reproduced" "$(got)"
     else res UNEXPECTED "orig-$1" "the aa33f0fc parser falsely PASSes" "$(got)"; fi
+  }
+
+  orig5() { # case file : the f92d6e29 parser must falsely certify tue:released on this record
+    if [ ! -f "$ORIG5" ]; then echo "NOTE f1-orig5-$1 skipped: no f92d6e29 parser at $ORIG5 (set F1_ORIG_R5)"; return 0; fi
+    run "$ORIG5" "$2"
+    if [ "$RC" = 0 ] && grep -qx 'R6 HANDOFF RESULT PASS' <<< "$OUT" && grep -qx 'R6-A2-TUESDAY tue:released' <<< "$OUT" && [ "$(grep -c '^R6-A2-' <<< "$OUT")" = 3 ]
+    then res OK "orig5-$1" "the f92d6e29 parser falsely PASSes (exit 0, R6-A2-TUESDAY tue:released): defect reproduced" "$(got)"
+    else res UNEXPECTED "orig5-$1" "the f92d6e29 parser falsely PASSes" "$(got)"; fi
   }
 
   # ---- valid records -> PASS with the exact values
@@ -211,6 +227,64 @@ main() {
   stop deferred-after-interrupted-p4-promotion n36.md "release.mjs 'release: PROMOTED ...' or 'release: ROLLED BACK ...' line(s)"
   rec n37.md "$P3B" "     release: ROLLED BACK to $PREV (no rebuild); previous is now $CUR." "${HDEF[@]}"
   stop deferred-with-indented-rolled-back-tool-line n37.md "release.mjs 'release: PROMOTED ...' or 'release: ROLLED BACK ...' line(s)"
+  # ---- r5 (Astra, 27 Nov 2026): a rollback interrupted after release.mjs switched the links (r1-rollback.sh links) prints the
+  # tool's own line and no RESULT line; released and deferred must STOP on any rollback trace, rolledback keeps its rules.
+  # The record Astra reproduced is reconstructed from her description (her text was not available) with the text the scripts print.
+  local TOOL="release: ROLLED BACK to $PREV (no rebuild); previous is now $CUR." HDR="== R1 rollback links 2026-11-24T01:03:44Z" HDRV="== R1 rollback verify 2026-11-24T01:20:10Z"
+  local VER="release: VERIFY PASS $PREV (revision 7d92042fd11010eaa20966e2f49ae7a93e286568, BUILD_ID XWruOm_9nLCSMY8nGPqYU, 1234 files)"
+  local LEDG="release: ledger: database ledger head not supplied (--ledger-head): compatibility NOT checked" BEFORE="current before: releases/$CUR"
+  local PCUR="PASS current -> $PREV, previous -> $CUR"
+  local EVR="{\"ts\":\"2026-11-24T01:05:09.123Z\",\"op\":\"rollback\",\"id\":\"$PREV\",\"from\":\"$CUR\",\"attended\":true,\"ledger\":\"not-checked\"}"
+  local EVS="{\"ts\":\"2026-11-24T01:05:09.001Z\",\"op\":\"rollback-start\",\"id\":\"$PREV\",\"from\":\"$CUR\"}"
+  local R_TOOL="release.mjs 'release: ROLLED BACK ...' line(s)" R_HDR="r1-rollback.sh header '== R1 rollback links|verify'"
+  local R_PCUR="r1-rollback.sh 'PASS current -> <old id>, previous -> <new id>'" R_EV='events.log "op":"rollback-start"|"rollback"'
+  local -a BASE=("$P3B" "$P4P" "$INV5" "$P5A")
+  rec a1.md "${BASE[@]}" "$HDR" "$BEFORE" "$VER" "$LEDG" "$TOOL" "${HREL[@]}"
+  stop released-interrupted-rollback-astra-record a1.md "$R_TOOL"
+  stop released-interrupted-rollback-astra-record-flags-wrapper-header a1.md "$R_HDR"
+  orig5 astra-record-reconstructed-by-the-suite "$RD/a1.md"
+  if [ -f "$ASTRA" ]; then
+    cp -- "$ASTRA" "$RD/astra-exact.md"
+    stop released-interrupted-rollback-astra-record-file astra-exact.md "$R_TOOL"
+    orig5 astra-record-file "$RD/astra-exact.md"
+  else echo "NOTE f1-released-interrupted-rollback-astra-record-file and f1-orig5-astra-record-file skipped: no record at $ASTRA (set F1_ASTRA)"; fi
+  rec a2.md "${BASE[@]}" "$TOOL" "${HREL[@]}";                       stop released-bare-rolled-back-tool-line a2.md "$R_TOOL";            orig5 bare-tool-line "$RD/a2.md"
+  rec a3.md "${BASE[@]}" "        $TOOL" "${HREL[@]}";               stop released-indented-rolled-back-tool-line a3.md "$R_TOOL";        orig5 indented-tool-line "$RD/a3.md"
+  rec a4.md "${BASE[@]}" '```' "$TOOL" '```' "${HREL[@]}";           stop released-rolled-back-tool-line-in-fence a4.md "$R_TOOL";        orig5 fenced-tool-line "$RD/a4.md"
+  rec a5.md "${BASE[@]}" "> $TOOL" "${HREL[@]}";                     stop released-quoted-rolled-back-tool-line a5.md "$R_TOOL"
+  rec a6.md "${BASE[@]}" "| \`$TOOL\` |" "${HREL[@]}";              stop released-rolled-back-tool-line-in-table-cell a6.md "$R_TOOL"
+  rec a7.md "${BASE[@]}" "[01:05:11] $TOOL" "${HREL[@]}";            stop released-prefixed-rolled-back-tool-line a7.md "$R_TOOL"
+  rec a8.md "${BASE[@]}" "release: ROLLED BACK" "${HREL[@]}";        stop released-truncated-rolled-back-tool-line a8.md "$R_TOOL"
+  rec a9.md "${BASE[@]}" "$HDR" "$BEFORE" "${HREL[@]}";              stop released-wrapper-header-without-tool-line a9.md "$R_HDR";       orig5 wrapper-header-only "$RD/a9.md"
+  rec a10.md "${BASE[@]}" "$HDRV" "${HREL[@]}";                      stop released-verify-header a10.md "$R_HDR"
+  rec a11.md "${BASE[@]}" "  $HDR" "${HREL[@]}";                     stop released-indented-wrapper-header a11.md "$R_HDR"
+  rec a12.md "${BASE[@]}" "$PCUR" "${HREL[@]}";                      stop released-wrapper-pass-current-line a12.md "$R_PCUR";            orig5 wrapper-pass-current-line "$RD/a12.md"
+  rec a13.md "${BASE[@]}" "$EVR" "${HREL[@]}";                       stop released-events-tail-rollback-alone a13.md "$R_EV";             orig5 events-tail-rollback-alone "$RD/a13.md"
+  rec a14.md "${BASE[@]}" "$EVS" "${HREL[@]}";                       stop released-events-rollback-start-alone a14.md "$R_EV";            orig5 events-rollback-start-alone "$RD/a14.md"
+  rec a15.md "${BASE[@]}" "{\"ts\":\"2026-11-24T01:05:09.123Z\", \"op\": \"rollback\", \"id\":\"$PREV\"}" "${HREL[@]}"; stop released-events-rollback-with-space-after-colon a15.md "$R_EV"
+  rec a16.md "${BASE[@]}" '```json' "$EVR" '```' "${HREL[@]}";       stop released-events-rollback-in-fence a16.md "$R_EV"
+  rec a17.md "${BASE[@]}" "{\\\"op\\\":\\\"rollback\\\",\\\"id\\\":\\\"$PREV\\\"}" "${HREL[@]}"; stop released-events-rollback-escaped-quotes a17.md "$R_EV"
+  rec a18.md "${BASE[@]}" "$HDR" "$BEFORE" "$VER" "$LEDG" "$TOOL" "$PCUR" "$EVS" "$EVR" "${HREL[@]}"; stop released-whole-links-mode-output a18.md "$R_TOOL"
+  # deferred: the same traces
+  rec b1.md "$HDR" "$BEFORE" "${HDEF[@]}";   stop deferred-with-wrapper-header b1.md "deferred, but the record has 1 rollback trace line(s) ($R_HDR)"
+  rec b2.md "$HDRV" "${HDEF[@]}";            stop deferred-with-verify-header b2.md "deferred, but the record has 1 rollback trace line(s) ($R_HDR)"
+  rec b3.md "$PCUR" "${HDEF[@]}";            stop deferred-with-wrapper-pass-current-line b3.md "deferred, but the record has 1 rollback trace line(s) ($R_PCUR)"
+  rec b4.md "$EVR" "${HDEF[@]}";             stop deferred-with-events-rollback-line b4.md "deferred, but the record has 1 rollback trace line(s) ($R_EV)"
+  rec b5.md "$EVS" "${HDEF[@]}";             stop deferred-with-events-rollback-start-line b5.md "deferred, but the record has 1 rollback trace line(s) ($R_EV)"
+  rec b6.md "$HDR" "$BEFORE" "$VER" "$LEDG" "$TOOL" "${HDEF[@]}"; stop deferred-with-interrupted-rollback-output b6.md "release.mjs 'release: PROMOTED ...' or 'release: ROLLED BACK ...' line(s)"
+  # an interrupted rollback is not a rollback either: the claimed rolledback has no RBL, INVR or RBV
+  rec b7.md "$P3B" "$P4P" "$INV5" "$P5A" "$HDR" "$BEFORE" "$VER" "$LEDG" "$TOOL" "${HRB[@]}"
+  stop rolledback-claimed-on-interrupted-rollback b7.md "rolledback, but the record has no complete 'ROLLBACK RESULT LINKS SWITCHED"
+  # innocuous: not a rollback trace
+  rec c1.md "$P3B" "Owner note: had a P5 check failed, the owner would have followed the rollback section of the runbook (r1-rollback.sh links, then verify)." \
+    "PASS current -> $PREV" "PASS previous -> c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC" "release: PROMOTED $CUR; previous $PREV. The running service is unchanged until it restarts." \
+    "{\"ts\":\"2026-11-24T00:12:02.001Z\",\"op\":\"promote\",\"id\":\"$CUR\",\"previous\":\"$PREV\",\"attended\":true}" "$P4P" "$INV5" "$P5A" "${HREL[@]}"
+  pass released-with-p1-current-line-promote-tool-line-and-rollback-prose c1.md released "$CUR" "$INV_TUE"
+  rec c2.md "Run at 10:30: PASS current -> $PREV" "P4 was refused; the rollback section of the runbook was not needed." "${HDEF[@]}"
+  pass deferred-with-p1-current-line-and-rollback-prose c2.md deferred "$PREV" "$SUN" 'R6-NOTE parser PASS means only that the record is internally consistent'
+  rec c3.md "$P3B" "$P4P" "$INV5" "$P5A" "$HDR" "$BEFORE" "$VER" "$LEDG" "$TOOL" "$PCUR" "$EVR" "$RBL" "$HDRV" "$INVR" "$RBV" "${HRB[@]}"
+  pass rolledback-keeps-its-rollback-traces c3.md rolledback "$PREV" "$INV_RB"
+
   # ---- the real 24 Nov sitting record (read-only), when the export carries it: it must still parse as deferred
   local REAL=$FIX/docs/v2/evidence/release-17822b29-20261124/SITTING-20261124.md h0
   if [ -f "$REAL" ]; then

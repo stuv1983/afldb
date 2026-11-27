@@ -36,6 +36,46 @@ MODE="${1:-}"
 log() { printf '%s scheduled-backup: %s\n' "$(date -u +%FT%TZ)" "$*"; }
 die_config() { log "CONFIGURATION: $*" >&2; exit 2; }
 
+# R6 r5 (27 Nov 2026), PROSPECTIVE: NOT INSTALLED ON PRODUCTION. Production's checkout keeps the script without this function
+# until the owner installs it (docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r5-20261127/README.md, section
+# "Installing the trigger record"); until then the release gates STOP with "scheduled origin unproven", by design.
+# It writes ONE journal line, "trigger: invocation=<id> job=<n> unit=<name|none> realtime_usec=<n|none>", recording how systemd
+# started THIS run, so that the release gates (G0, R6 A-2 section 5) can tell the backup timer's dispatch from a start by hand
+# (`systemctl start afldb-backup.service`), which is otherwise identical to every reader without root. journald stamps the line
+# with _SYSTEMD_UNIT and _SYSTEMD_INVOCATION_ID, which this process cannot choose; the gate matches `realtime_usec` to the timer's
+# LastTriggerUSec exactly.
+# The source is the run's own START JOB: org.freedesktop.systemd1.Job ActivationDetails, read over the system bus (read-only,
+# any user). The job exists for this start only and carries the timer's details only when afldb-backup.timer created it; a start
+# by hand creates a job with none. It deliberately does NOT use $TRIGGER_UNIT / $TRIGGER_TIMER_REALTIME_USEC or the unit's own
+# ActivationDetails: on systemd 255.4 (Ubuntu 24.04) both keep the first timer start since the unit was loaded, so every later
+# run (a start by hand included) inherits that old dispatch (proved with real systemd in review-fixes-r5-20261127/logs).
+# Only the backup mode logs it. Nothing here can fail the backup or change its exit code: anything unreadable is logged as none.
+log_trigger() {
+  local inv="${INVOCATION_ID:-}" unit='' cur='' job='' det='' tu=none rt=none why=''
+  if [[ ! "$inv" =~ ^[0-9a-f]{32}$ ]]; then why='not started by systemd (no INVOCATION_ID)'
+  else
+    unit=$(sed -n 's#^0::/.*/\([^/]*\.service\)$#\1#p' /proc/self/cgroup 2> /dev/null | head -1)
+    if [[ -z "$unit" ]]; then why='not running inside a service cgroup'
+    else
+      cur=$(timeout 5 systemctl show "$unit" -p InvocationID --value 2> /dev/null)
+      job=$(timeout 5 systemctl show "$unit" -p Job --value 2> /dev/null)
+      if [[ "$cur" != "$inv" ]]; then why="$unit current InvocationID is not this run's"
+      elif [[ ! "$job" =~ ^[0-9]+$ ]]; then why="$unit has no start job"; job=''
+      else
+        det=$(timeout 5 busctl get-property org.freedesktop.systemd1 "/org/freedesktop/systemd1/job/$job" org.freedesktop.systemd1.Job ActivationDetails 2> /dev/null)
+        if [[ "$det" != 'a(ss) '* ]]; then why='the start job'"'"'s ActivationDetails are unreadable (busctl failed or not supported by this systemd)'
+        else
+          tu=$(sed -n 's/.*"trigger_unit" "\([^"]*\)".*/\1/p' <<< "$det"); rt=$(sed -n 's/.*"trigger_timer_realtime_usec" "\([^"]*\)".*/\1/p' <<< "$det")
+          [[ "$tu" =~ ^[A-Za-z0-9:_.@-]+$ ]] || tu=none; [[ "$rt" =~ ^[0-9]+$ ]] || rt=none
+          [[ "$tu" != none ]] || why='the start job carries no activation details (started by hand or by a dependency)'
+        fi
+      fi
+    fi
+  fi
+  [[ -z "$why" ]] || log "trigger-note: $why"
+  log "trigger: invocation=${inv:-none} job=${job:-none} unit=$tu realtime_usec=$rt"
+}
+
 case "$MODE" in backup|verify|status) ;; *) die_config "usage: scheduled-backup.sh backup|verify|status" ;; esac
 
 BACKUP_DIR="${AFLDB_BACKUP_DIR:-}"
@@ -78,6 +118,7 @@ fi
 mkdir -p "$BACKUP_DIR" "$STATE" || die_config "cannot create $BACKUP_DIR"
 chmod 700 "$STATE"
 log "target: mode=$MODE dir=$BACKUP_DIR keep=$KEEP offhost=${OFFHOST_DEST:-none} tools=$TOOLS"
+[[ "$MODE" == backup ]] && log_trigger
 for tool in backup.sh restore-test.sh; do [[ -f "$TOOLS/$tool" ]] || die_config "$TOOLS/$tool not found"; done
 
 # One run at a time; a second one is not a failure.

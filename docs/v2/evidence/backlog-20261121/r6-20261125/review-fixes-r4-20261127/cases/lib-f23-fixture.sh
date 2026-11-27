@@ -12,6 +12,11 @@
 #   the afldb service is a process tree owned by arm (a primary with two children carrying AFLDB_WORKER_ID, cwd = the release),
 #   and deploy/release.mjs in the fixture checkout is a stub that prints /fx/stub-out and exits /fx/stub-rc (as r3 section S);
 #   awk /proc/uptime, pg_isready and curl are shims so that F-2 (r6-post-verify.sh full) can pass in a container.
+# R6 r5 (27 Nov 2026): the genuine state now carries the TRIGGER line the prospective scheduled-backup.sh writes (journal line
+#   "trigger: invocation=<id> job=<n> unit=afldb-backup.timer realtime_usec=<n>" of the timer's invocation; unit=none for a start by
+#   hand), and a fixture busctl prints the timer's LastTriggerUSec in microseconds ("t <n>", from the table row LastTriggerUSecRaw,
+#   else seconds x 1e6; /fx/busctl-mode = fail|garbage|empty changes the read). F23_SCRIPT=current writes NO trigger line
+#   at all: what today's production scheduled-backup.sh logs.
 # Must run as root inside a disposable container whose hostname is afldb-prod (the scripts' host guard is never weakened);
 # creates the users arm (uid 1000) and files at the absolute paths the gates read. Nothing here edits a script under test.
 #
@@ -29,6 +34,8 @@ F23_BINV=b1b2b3b4b5b6b7b8b9b0babbbcbdbebf        # afldb-backup.service: the tim
 F23_BINV2=c1c2c3c4c5c6c7c8c9c0cacbcccdcecf       # afldb-backup.service: an invocation started by hand
 F23_VINV=0d1c2b3a4f5e60718293a4b5c6d7e8f9        # afldb-backup-verify.service: the 03:30 run
 F23_SPID=
+F23_SCRIPT=${F23_SCRIPT:-r5}                       # r5 = the prospective scheduled-backup.sh (trigger line); current = f92d6e29's (none)
+F23_TRIG_US=                                       # the genuine dispatch in microseconds (set by f23_backup_genuine)
 
 f23_ep() { TZ=Australia/Melbourne /usr/bin/date -d "$1" +%s; }
 f23_as_arm() { setpriv --reuid=arm --regid=arm --init-groups env -i HOME=/home/arm USER=arm LOGNAME=arm \
@@ -61,6 +68,14 @@ f23_jline() { # invocation "HH:MM:SS" message-after-the-prefix
 }
 f23_jpid1() { f23_pid1_json "$1" "$(f23_ep "$F23_DAY $2")" "$3" >> /fx/journal-backup.json; }   # PID 1 lines: arm's `-o cat` view may lack them
 
+# The r5 trigger line of an invocation: unit=afldb-backup.timer (realtime_usec = the genuine dispatch unless given) or unit=none.
+# A no-op under F23_SCRIPT=current (today's production script writes no such line).
+f23_trigger_line() { # invocation "HH:MM:SS" unit|none [usec] [job]
+  [ "$F23_SCRIPT" = current ] && return 0
+  local us=${4:-none}; [ "$3" = afldb-backup.timer ] && us=${4:-$F23_TRIG_US}
+  f23_jline "$1" "$2" "trigger: invocation=$1 job=${5:-4242} unit=$3 realtime_usec=$us"
+}
+
 # ---- the 02:2x dump
 F23_SD=; F23_SS=
 f23_dump() { # HHMMSS: exactly one scheduled-window dump with a correct one-line sidecar
@@ -76,8 +91,11 @@ f23_backup_genuine() {
   f23_dump 022001
   while IFS='|' read -r u p v; do f23_set "$u" "$p" "$v"; done < <(f23_backup_rows "$(f23_ep "$F23_DAY 02:20:00")" \
     "$(f23_ep "$F23_DAY 02:20:01")" "$(f23_ep "$F23_DAY 02:20:19")" "$F23_BINV")
-  f23_journal_reset; : > /fx/binv-mode
+  F23_TRIG_US=$(( $(f23_ep "$F23_DAY 02:20:00") * 1000000 + 123456 ))      # the dispatch's microseconds (a fraction, so equality is exact)
+  f23_set afldb-backup.timer LastTriggerUSecRaw "$F23_TRIG_US"
+  f23_journal_reset; : > /fx/binv-mode; echo > /fx/busctl-mode
   f23_jline "$F23_BINV" 02:20:01 "target: mode=backup dir=$F23_BK keep=14 offhost=none tools=$F23_CHK/tools/maintenance"
+  f23_trigger_line "$F23_BINV" 02:20:01 afldb-backup.timer
   f23_jline "$F23_BINV" 02:20:19 "backup ok: $F23_SD 4096 bytes sha256 ${F23_SS:0:16} offhost=skipped"
   rm -f "$F23_BK"/.state/FAILED-*
 }
@@ -88,6 +106,7 @@ f23_manual_run() { # start exit
   f23_set afldb-backup.service ExecMainStartTimestamp "@$(f23_ep "$F23_DAY $1")"; f23_set afldb-backup.service ExecMainExitTimestamp "@$(f23_ep "$F23_DAY $2")"
   f23_set afldb-backup.service InvocationID "$F23_BINV2"; f23_set afldb-backup.service Result success; f23_set afldb-backup.service ExecMainStatus 0
   f23_jline "$F23_BINV2" "$1" "target: mode=backup dir=$F23_BK keep=14 offhost=none tools=$F23_CHK/tools/maintenance"
+  f23_trigger_line "$F23_BINV2" "$1" none
   f23_jline "$F23_BINV2" "$2" "backup ok: $F23_SD 4096 bytes sha256 ${F23_SS:0:16} offhost=skipped"
 }
 
@@ -187,6 +206,20 @@ case "$u/$o" in
   afldb-backup-verify.service/json) cat /fx/journal-verify.json;;
 esac
 SH
+  cat > /usr/local/bin/busctl <<'SH'
+#!/bin/bash
+# Fixture busctl (R6 r5): the one read the gates make: `busctl get-property org.freedesktop.systemd1 <afldb-backup.timer path>
+# org.freedesktop.systemd1.Timer LastTriggerUSec`, printed as the real tool does ("t <microseconds>").
+# /fx/busctl-mode: fail (bus error, exit 1), garbage ("t not-a-number"), empty (exit 0, no output).
+T=/fx/sysd.tbl; m=$(cat /fx/busctl-mode 2>/dev/null)
+look() { awk -F'|' -v u="$1" -v p="$2" '$1==u && $2==p { sub(/^[^|]*\|[^|]*\|/, ""); print; f=1; exit } END { exit !f }' "$T"; }
+[ "$*" = "get-property org.freedesktop.systemd1 /org/freedesktop/systemd1/unit/afldb_2dbackup_2etimer org.freedesktop.systemd1.Timer LastTriggerUSec" ] \
+  || { echo "fixture busctl: unsupported: $*" >&2; exit 1; }
+case $m in fail) echo "Failed to connect to bus: fixture failure" >&2; exit 1;; garbage) echo "t not-a-number"; exit 0;; empty) exit 0;; esac
+if v=$(look afldb-backup.timer LastTriggerUSecRaw); then echo "t $v"
+elif e=$(look afldb-backup.timer LastTriggerUSec); then echo "t $(( ${e#@} * 1000000 ))"
+else echo "t 0"; fi
+SH
   cat > /usr/local/bin/psql <<'SH'
 #!/bin/bash
 cat > /dev/null
@@ -207,10 +240,10 @@ exec /usr/bin/awk "$@"
 SH
   printf '#!/bin/bash\nexit 0\n' > /usr/local/bin/pg_isready
   printf '#!/bin/bash\nprintf 200\n' > /usr/local/bin/curl
-  chmod 755 /usr/local/bin/date /usr/local/bin/uname /usr/local/bin/dpkg-query /usr/local/bin/systemctl /usr/local/bin/journalctl \
+  chmod 755 /usr/local/bin/date /usr/local/bin/uname /usr/local/bin/dpkg-query /usr/local/bin/systemctl /usr/local/bin/journalctl /usr/local/bin/busctl \
     /usr/local/bin/psql /usr/local/bin/df /usr/local/bin/awk /usr/local/bin/pg_isready /usr/local/bin/curl
-  : > /fx/inv-mode; : > /fx/binv-mode; : > /fx/inv-calls; echo "$F23_INV_OTHER" > /fx/inv-other; echo ok > /fx/journal-mode
-  chmod 666 /fx/inv-calls; chmod 644 /fx/inv-mode /fx/binv-mode /fx/inv-other /fx/journal-mode /fx/now
+  : > /fx/inv-mode; : > /fx/binv-mode; : > /fx/busctl-mode; : > /fx/inv-calls; echo "$F23_INV_OTHER" > /fx/inv-other; echo ok > /fx/journal-mode
+  chmod 666 /fx/inv-calls; chmod 644 /fx/inv-mode /fx/binv-mode /fx/busctl-mode /fx/inv-other /fx/journal-mode /fx/now
   ln -sf /usr/share/zoneinfo/Australia/Melbourne /etc/localtime     # production's zone
 
   # host files A-2 reads by absolute path (as r3)
@@ -292,6 +325,27 @@ TBL
   chmod 644 /fx/journal-backup.json /fx/journal-backup.txt
 }
 
+# r5: the 03:10 off-host pull has copied the hand-started dump (and its sidecar and a pull stamp) to an off-host directory. The gates
+# run on production and have no business with it; the files are made with an OLD atime and a NEW mtime so that a read bumps atime
+# (relatime), and the suite asserts that no gate read them. A gate that consulted this copy would be the defect.
+F23_OFF=/mnt/afldb-offhost
+f23_offhost_copy() {
+  mkdir -p "$F23_OFF"; cp "$F23_BK/$F23_SD" "$F23_BK/$F23_SD.sha256" "$F23_OFF/"
+  printf 'pull 2026-11-24T16:10:07Z %s\n' "$F23_SD" > "$F23_OFF/.last-pull"
+  touch -a -d '2020-01-01 00:00:00' "$F23_OFF/$F23_SD" "$F23_OFF/$F23_SD.sha256" "$F23_OFF/.last-pull"
+  chown -R arm:arm "$F23_OFF"
+}
+# r5: a hand run of scheduled-backup.sh from an ssh session scope with TRIGGER_UNIT set: its lines carry a perfect-looking trigger
+# line and a "backup ok" line, but not _SYSTEMD_UNIT=afldb-backup.service. journalctl -u would not return them; the fixture shim
+# returns everything it holds, so the gate's own filter is what is tested.
+f23_scope_run_lines() {
+  local e=$(f23_ep "$F23_DAY 02:20:02") m
+  for m in "trigger: invocation=$F23_BINV job=4242 unit=afldb-backup.timer realtime_usec=$F23_TRIG_US" "backup ok: $F23_SD 4096 bytes sha256 ${F23_SS:0:16} offhost=skipped"; do
+    printf '{"__REALTIME_TIMESTAMP":"%s000000","_UID":"1000","_PID":"5150","_SYSTEMD_UNIT":"session-42.scope","_SYSTEMD_INVOCATION_ID":"%s","MESSAGE":"%s scheduled-backup: %s"}\n' \
+      "$e" "$F23_BINV" "$(TZ=UTC /usr/bin/date -d "@$e" +%FT%TZ)" "$m" >> /fx/journal-backup.json
+  done
+}
+
 # ---- suite f2: one named state of the 02:20 backup evidence, always built from the genuine state
 f23_scenario() { # name
   local tgt="target: mode=backup dir=$F23_BK keep=14 offhost=none tools=$F23_CHK/tools/maintenance" okl
@@ -303,13 +357,57 @@ f23_scenario() { # name
       f23_jpid1 "$F23_BINV" 02:20:01 "Starting afldb-backup.service - AFLDB scheduled backup..."
       f23_jpid1 "$F23_BINV" 02:20:19 "Finished afldb-backup.service - AFLDB scheduled backup.";;
     manual-no-timer)           # the timer did not dispatch today (last trigger: Tuesday); someone started the service at 02:24:10
-      f23_set afldb-backup.timer LastTriggerUSec "@$(f23_ep "2026-11-24 02:20:00")"; f23_journal_reset; f23_manual_run 02:24:10 02:24:30;;
+      f23_set afldb-backup.timer LastTriggerUSec "@$(f23_ep "2026-11-24 02:20:00")"; f23_unset afldb-backup.timer LastTriggerUSecRaw
+      f23_journal_reset; f23_manual_run 02:24:10 02:24:30;;
     timer-failed-then-manual)  # the timer fired, its own run logged and failed; a start by hand four minutes later succeeded
       f23_journal_reset; f23_jline "$F23_BINV" 02:20:01 "$tgt"; f23_jline "$F23_BINV" 02:20:03 "AFLDB_BACKUP_FAILURE mode=backup step=backup exit=1"
       f23_manual_run 02:24:10 02:24:30;;
     manual-within-5s)          # as above, but the start by hand is 3 s after the dispatch: the timing links alone would hold
       f23_journal_reset; f23_jline "$F23_BINV" 02:20:00 "$tgt"; f23_jline "$F23_BINV" 02:20:01 "AFLDB_BACKUP_FAILURE mode=backup step=backup exit=1"
       f23_manual_run 02:20:03 02:20:25;;
+    astra)                     # r5, Astra's case: the timer's invocation failed at 02:20:00 and left NOTHING arm can read (PID 1's
+      f23_journal_reset        # lines only, e.g. a failed dependency); a start by hand at 02:20:03 then succeeded: one visible invocation
+      f23_manual_run 02:20:03 02:20:25;;    # (the r5 script installed: its start job has no activation details, so it logs unit=none)
+    astra-current-script)      # the same, with today's production script: the hand-started run logs no trigger line at all
+      F23_SCRIPT=current f23_journal_reset; F23_SCRIPT=current f23_manual_run 02:20:03 02:20:25;;
+    genuine-current-script)    # a genuine timer run of today's production script: it logs no trigger line, so nothing proves its origin
+      f23_journal_reset; f23_jline "$F23_BINV" 02:20:01 "$tgt"; f23_jline "$F23_BINV" 02:20:19 "$okl";;
+    astra-offhost-later)       # Astra's case, and the 03:10 off-host pull has already copied the hand-started dump: nothing may read it
+      f23_journal_reset; f23_manual_run 02:20:03 02:20:25; f23_offhost_copy;;
+    astra-with-hand-run-lines) # Astra's case, plus a session-scope hand run of the script with TRIGGER_UNIT set: its lines are not the service's
+      f23_journal_reset; f23_manual_run 02:20:03 02:20:25; f23_scope_run_lines;;
+    timer-trigger-then-fail-manual-3s) # the timer's run logged its trigger line, then failed; a start by hand 3 s later succeeded
+      f23_journal_reset; f23_jline "$F23_BINV" 02:20:00 "$tgt"; f23_trigger_line "$F23_BINV" 02:20:00 afldb-backup.timer
+      f23_jline "$F23_BINV" 02:20:01 "AFLDB_BACKUP_FAILURE mode=backup step=backup exit=1"; f23_manual_run 02:20:03 02:20:25;;
+    trigger-stale-dispatch)    # the run's start job records an EARLIER dispatch (Tuesday), not the timer's LastTriggerUSec
+      f23_journal_reset; f23_jline "$F23_BINV" 02:20:01 "$tgt"
+      f23_trigger_line "$F23_BINV" 02:20:01 afldb-backup.timer "$(( $(f23_ep "2026-11-24 02:20:00") * 1000000 + 123456 ))"
+      f23_jline "$F23_BINV" 02:20:19 "$okl";;
+    trigger-off-by-1us)        # same second, one microsecond away: not equal
+      f23_journal_reset; f23_jline "$F23_BINV" 02:20:01 "$tgt"; f23_trigger_line "$F23_BINV" 02:20:01 afldb-backup.timer "$((F23_TRIG_US + 1))"
+      f23_jline "$F23_BINV" 02:20:19 "$okl";;
+    trigger-seconds-only)      # the line carries whole seconds (not microseconds)
+      f23_journal_reset; f23_jline "$F23_BINV" 02:20:01 "$tgt"; f23_trigger_line "$F23_BINV" 02:20:01 afldb-backup.timer "$((F23_TRIG_US / 1000000))"
+      f23_jline "$F23_BINV" 02:20:19 "$okl";;
+    trigger-two-lines)         # the same genuine trigger line twice
+      f23_trigger_line "$F23_BINV" 02:20:02 afldb-backup.timer;;
+    trigger-timer-and-none)    # a timer line and a unit=none line of the same invocation
+      f23_trigger_line "$F23_BINV" 02:20:02 none;;
+    trigger-other-invocation-field) # the line is the service's own, but names another invocation
+      f23_journal_reset; f23_jline "$F23_BINV" 02:20:01 "$tgt"
+      f23_jline "$F23_BINV" 02:20:01 "trigger: invocation=$F23_BINV2 job=4242 unit=afldb-backup.timer realtime_usec=$F23_TRIG_US"; f23_jline "$F23_BINV" 02:20:19 "$okl";;
+    trigger-other-unit)        # a path or other timer, not afldb-backup.timer
+      f23_journal_reset; f23_jline "$F23_BINV" 02:20:01 "$tgt"; f23_trigger_line "$F23_BINV" 02:20:01 afldb-backup-verify.timer
+      f23_jline "$F23_BINV" 02:20:19 "$okl";;
+    trigger-malformed)         # a trailing word: the anchored line does not match, so there is no trigger line
+      f23_journal_reset; f23_jline "$F23_BINV" 02:20:01 "$tgt"
+      f23_jline "$F23_BINV" 02:20:01 "trigger: invocation=$F23_BINV job=4242 unit=afldb-backup.timer realtime_usec=$F23_TRIG_US extra"; f23_jline "$F23_BINV" 02:20:19 "$okl";;
+    trigger-note-only)         # the script could not read its start job: it logs a note and unit=none
+      f23_journal_reset; f23_jline "$F23_BINV" 02:20:01 "$tgt"; f23_jline "$F23_BINV" 02:20:01 "trigger-note: the start job's ActivationDetails are unreadable"
+      f23_trigger_line "$F23_BINV" 02:20:01 none; f23_jline "$F23_BINV" 02:20:19 "$okl";;
+    trigger-after-run)         # the trigger line is outside the run (logged long after the exit)
+      f23_journal_reset; f23_jline "$F23_BINV" 02:20:01 "$tgt"; f23_jline "$F23_BINV" 02:20:19 "$okl"; f23_trigger_line "$F23_BINV" 02:21:00 afldb-backup.timer;;
+    busctl-fail|busctl-garbage|busctl-empty) echo "${1#busctl-}" > /fx/busctl-mode;;
     ok-line-other-invocation)  # the only "backup ok" line belongs to another invocation than the service reports
       f23_journal_reset; f23_jline "$F23_BINV2" 02:20:01 "$tgt"; f23_jline "$F23_BINV2" 02:20:19 "$okl";;
     two-invocations)           # a second invocation logged later in the window
@@ -333,9 +431,9 @@ f23_scenario() { # name
     two-dumps) head -c 64 /dev/urandom > "$F23_BK/afldb_prod-$F23_DAYC-022500.dump"
       (cd "$F23_BK" && sha256sum "afldb_prod-$F23_DAYC-022500.dump" > "afldb_prod-$F23_DAYC-022500.dump.sha256");;
     bad-sidecar) printf 'x' >> "$F23_BK/$F23_SD";;
-    journal-other-name) f23_journal_reset; f23_jline "$F23_BINV" 02:20:01 "$tgt"
+    journal-other-name) f23_journal_reset; f23_jline "$F23_BINV" 02:20:01 "$tgt"; f23_trigger_line "$F23_BINV" 02:20:01 afldb-backup.timer
       f23_jline "$F23_BINV" 02:20:19 "backup ok: afldb_prod-$F23_DAYC-022002.dump 4096 bytes sha256 ${F23_SS:0:16} offhost=skipped";;
-    journal-other-hash) f23_journal_reset; f23_jline "$F23_BINV" 02:20:01 "$tgt"
+    journal-other-hash) f23_journal_reset; f23_jline "$F23_BINV" 02:20:01 "$tgt"; f23_trigger_line "$F23_BINV" 02:20:01 afldb-backup.timer
       f23_jline "$F23_BINV" 02:20:19 "backup ok: $F23_SD 4096 bytes sha256 0000000000000000 offhost=skipped";;
     *) echo "STOP unknown scenario $1"; return 1;;
   esac
@@ -343,6 +441,18 @@ f23_scenario() { # name
 # The reason (extended regex, matched inside one FAIL line) each non-genuine scenario must be refused for.
 f23_reason() { # name
   case $1 in
+    astra|astra-offhost-later|astra-with-hand-run-lines) echo "not attributed to the backup timer: scheduled origin unproven: the run's start job names trigger unit 'none', not afldb-backup\\.timer";;
+    astra-current-script|genuine-current-script) echo 'not attributed to the backup timer: scheduled origin unproven: invocation [0-9a-f]{32} logged 0 trigger lines';;
+    timer-trigger-then-fail-manual-3s) echo 'not attributed to the backup timer: ambiguous: another invocation of afldb-backup\.service \([0-9a-f]{32}, epoch [0-9]+\)';;
+    trigger-stale-dispatch|trigger-off-by-1us) echo 'scheduled origin unproven: the run.s start job records the dispatch at [0-9]+ us, but the timer.s LastTriggerUSec is [0-9]+ us';;
+    trigger-seconds-only) echo 'scheduled origin unproven: the run.s start job records the dispatch at [0-9]+ us, but the timer.s LastTriggerUSec is [0-9]+ us';;
+    trigger-two-lines|trigger-timer-and-none) echo 'scheduled origin unproven: invocation [0-9a-f]{32} logged 2 trigger lines';;
+    trigger-other-invocation-field) echo 'scheduled origin unproven: the trigger line names invocation [0-9a-f]{32}, not the run.s [0-9a-f]{32}';;
+    trigger-other-unit) echo "scheduled origin unproven: the run's start job names trigger unit 'afldb-backup-verify\\.timer'";;
+    trigger-malformed) echo 'scheduled origin unproven: invocation [0-9a-f]{32} logged 0 trigger lines';;
+    trigger-note-only) echo "scheduled origin unproven: the run's start job names trigger unit 'none'";;
+    trigger-after-run) echo 'invocation [0-9a-f]{32} logged at epoch [0-9]+, outside its own run';;
+    busctl-fail|busctl-garbage|busctl-empty) echo 'scheduled origin unproven: afldb-backup\.timer LastTriggerUSec could not be read in microseconds';;
     manual-no-timer) echo 'not attributed to the backup timer: no timer dispatch in the window: afldb-backup\.timer last triggered at epoch [0-9]+';;
     timer-failed-then-manual) echo 'not attributed to the backup timer: the service.s last start \(epoch [0-9]+\) is not within 5 s after the timer dispatch';;
     manual-within-5s|ok-line-other-invocation|two-invocations|pid1-other-invocation)

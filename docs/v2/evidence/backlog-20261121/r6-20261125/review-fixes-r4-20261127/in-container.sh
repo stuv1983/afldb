@@ -113,6 +113,15 @@ cat > /usr/local/bin/journalctl <<'SH'
 u=; o=; while [ $# -gt 0 ]; do case $1 in -u) u=$2; shift 2;; -o) o=$2; shift 2;; *) shift;; esac; done
 case "$u/$o" in afldb-backup.service/cat) cat /fx/journal-backup.txt;; afldb-backup.service/json) cat /fx/journal-backup.json;; afldb-backup-verify.service/json) cat /fx/journal-verify.json;; esac
 SH
+cat > /usr/local/bin/busctl <<'SH'
+#!/bin/bash
+# Fixture busctl (R6 r5): the one read the gates make, `busctl get-property org.freedesktop.systemd1 <afldb-backup.timer path>
+# org.freedesktop.systemd1.Timer LastTriggerUSec`, printed as the real tool does ("t <microseconds>") from the fixture table.
+[ "$*" = "get-property org.freedesktop.systemd1 /org/freedesktop/systemd1/unit/afldb_2dbackup_2etimer org.freedesktop.systemd1.Timer LastTriggerUSec" ] \
+  || { echo "fixture busctl: unsupported: $*" >&2; exit 1; }
+v=$(awk -F'|' '$1=="afldb-backup.timer" && $2=="LastTriggerUSecRaw" { print $3; f=1; exit } END { exit !f }' /fx/sysd.tbl) || { echo "t 0"; exit 0; }
+echo "t $v"
+SH
 cat > /usr/local/bin/psql <<'SH'
 #!/bin/bash
 cat > /dev/null
@@ -166,14 +175,17 @@ SD=afldb_prod-20261125-022001.dump; VD=afldb_prod-20261125-033012.dump
 head -c 4096 /dev/urandom > "$BK/$SD"; SS=$(sha256sum < "$BK/$SD" | cut -c1-64); printf '%s  %s\n' "$SS" "$SD" > "$BK/$SD.sha256"
 head -c 4096 /dev/urandom > "$BK/$VD"; VS=$(sha256sum < "$BK/$VD" | cut -c1-64); printf '%s  %s\n' "$VS" "$VD" > "$BK/$VD.sha256"
 BT=$(mel_ep "2026-11-25 02:20:00"); BX=$(mel_ep "2026-11-25 02:20:06"); BJ=$(mel_ep "2026-11-25 02:20:05"); BINV=7a6b5c4d3e2f41a0b9c8d7e6f5a4b3c2
-BS=$(mel_ep "2026-11-25 02:20:01"); VT=$(mel_ep "2026-11-25 03:30:00"); VSS=$(mel_ep "2026-11-25 03:30:02")
+BTU=$((BT * 1000000 + 123456)); BS=$(mel_ep "2026-11-25 02:20:01"); VT=$(mel_ep "2026-11-25 03:30:00"); VSS=$(mel_ep "2026-11-25 03:30:02")
 VE=$(mel_ep "2026-11-25 03:31:20"); JT=$(mel_ep "2026-11-25 03:31:25"); VX=$(mel_ep "2026-11-25 03:31:30")
 printf '{"epoch":%s,"file":"%s","sha256":"%s","attempts":1}\n' "$VE" "$VD" "$VS" > "$BK/.state/last-verify.json"
 printf '{"epoch":%s,"file":"%s","sha256":"%s","offhost":"none"}\n' "$(mel_ep "2026-11-25 03:30:20")" "$VD" "$VS" > "$BK/.state/last-backup.json"
 echo "$VS" > /fx/verify.sha
-echo "Wed 2026-11-25 02:20:05 afldb-prod scheduled-backup: backup ok: $SD 4096 bytes sha256 ${SS:0:16}" > /fx/journal-backup.txt
+echo "Wed 2026-11-25 02:20:01 afldb-prod scheduled-backup: trigger: invocation=$BINV job=4242 unit=afldb-backup.timer realtime_usec=$BTU" > /fx/journal-backup.txt
+echo "Wed 2026-11-25 02:20:05 afldb-prod scheduled-backup: backup ok: $SD 4096 bytes sha256 ${SS:0:16}" >> /fx/journal-backup.txt
 # r4: the same completion as the service's own JSON journal entry (timer dispatch 02:20:00, start :01, this line :05, exit :06)
-printf '{"__REALTIME_TIMESTAMP":"%s000000","_UID":"1000","_PID":"4711","_SYSTEMD_UNIT":"afldb-backup.service","_SYSTEMD_INVOCATION_ID":"%s","MESSAGE":"2026-11-25T02:20:05+11:00 scheduled-backup: backup ok: %s 4096 bytes sha256 %s"}\n' "$BJ" "$BINV" "$SD" "${SS:0:16}" > /fx/journal-backup.json
+# r5: the timer's run also logs the trigger line of its start job (journal line at :01, usec = the timer's LastTriggerUSec)
+printf '{"__REALTIME_TIMESTAMP":"%s000000","_UID":"1000","_PID":"4711","_SYSTEMD_UNIT":"afldb-backup.service","_SYSTEMD_INVOCATION_ID":"%s","MESSAGE":"2026-11-25T02:20:01+11:00 scheduled-backup: trigger: invocation=%s job=4242 unit=afldb-backup.timer realtime_usec=%s"}\n' "$BS" "$BINV" "$BINV" "$BTU" > /fx/journal-backup.json
+printf '{"__REALTIME_TIMESTAMP":"%s000000","_UID":"1000","_PID":"4711","_SYSTEMD_UNIT":"afldb-backup.service","_SYSTEMD_INVOCATION_ID":"%s","MESSAGE":"2026-11-25T02:20:05+11:00 scheduled-backup: backup ok: %s 4096 bytes sha256 %s"}\n' "$BJ" "$BINV" "$SD" "${SS:0:16}" >> /fx/journal-backup.json
 printf '{"MESSAGE":"2026-11-25T03:31:25+11:00 scheduled-backup: verify ok: %s restored and proven (attempt 1)","_SYSTEMD_UNIT":"afldb-backup-verify.service","_SYSTEMD_INVOCATION_ID":"0d1c2b3a4f5e60718293a4b5c6d7e8f9","__REALTIME_TIMESTAMP":"%s000000"}\n' "$VD" "$JT" > /fx/journal-verify.json
 chown -R arm:arm /home/arm/backups
 
@@ -208,6 +220,7 @@ afldb-backup.service|ExecMainStatus|0
 afldb-backup.service|ExecMainExitTimestamp|@$BX
 afldb-backup.service|InvocationID|$BINV
 afldb-backup.timer|LastTriggerUSec|@$BT
+afldb-backup.timer|LastTriggerUSecRaw|$BTU
 afldb-backup-verify.service|ExecMainStartTimestamp|@$VSS
 afldb-backup-verify.service|ExecMainExitTimestamp|@$VX
 afldb-backup-verify.service|Result|success

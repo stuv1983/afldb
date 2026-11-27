@@ -5,6 +5,9 @@
 # never from the live service or the latest events.log entry. This script is the only source of A-2's CURRENT_ID, tue: and inv:.
 # R6 r4 (Astra, 27 Nov 2026): results are matched as COMPLETE lines, contradictory terminal results are refused for every
 # outcome, and the attested InvocationID is bound to the confirmation line of the SELECTED outcome (no "appears twice" test).
+# R6 r5 (Astra, 27 Nov 2026): a rollback interrupted after release.mjs switched the links, and before r1-rollback.sh printed its
+# RESULT line, leaves the tool's own trace and no RESULT line. Such a record must not certify released (or deferred): see "Rollback
+# traces" below.
 #
 # The record (docs/v2/evidence/release-17822b29-20261124/SITTING-20261124.md) must contain exactly three lines carrying the
 # token R6-HANDOFF, each exactly in this form (no indentation; a trailing CR is tolerated), owner-confirmed and copied from the
@@ -45,6 +48,17 @@
 #   deferred    current-id 7d92042fd110-XWruOm_9nLCSMY8nGPqYU; attested ID = Sunday's 342040625f6d4012a35d598dfbf9afe6; the
 #               record contains NO P4P, P5A, P5T, P5C, RBL, RBV, RBF, INV5 or INVR line. (The record line itself is the
 #               confirmation of deferral; without a Tuesday record there is no deferral.)
+# Rollback traces (released and deferred only; rolledback records carry them by design). The links are switched by release.mjs
+# before the wrapper prints any RESULT line, so an interrupted rollback leaves these and none of RBL, INVR or RBV. Each is matched
+# anywhere on a line (any indentation, quote mark, table cell, backticks or prefix; inside or outside a fence), and ANY one of them
+# is a STOP for released and deferred:
+#   release: ROLLED BACK <...>               release.mjs cmdRollback's own line (log() prefixes "release: ")
+#   == R1 rollback links <ts> / == R1 rollback verify <ts>     r1-rollback.sh's mode headers (printed before it touches anything)
+#   PASS current -> 7d92042fd110-<BUILD_ID>, previous -> 17822b29e6de-<BUILD_ID>    r1-rollback.sh links, after the switch (the ", previous ->"
+#                                            form is the wrapper's; r1-p1-precheck.sh prints "PASS current -> <id>" alone, which is NOT a trace)
+#   {"op":"rollback-start",...} / {"op":"rollback",...}     events.log lines release.mjs appends before and after the switch
+# Prose that merely names the runbook's rollback section is not a trace. deferred has always also refused release.mjs's
+# "release: PROMOTED " line (below).
 # What a PASS does NOT decide. This parser judges only whether the record is internally consistent and unambiguous for the
 # outcome its handoff lines claim. Whether the owner accepts a deferral as "before P4" is the owner's ruling, recorded
 # separately; it is not a parser rule. A P4 REFUSAL ("STOP past the promotion cutoff ...") is not a P4 RESULT line: it is
@@ -107,6 +121,19 @@ main() {
     for k in "$@"; do [ "${C[$k]}" != 0 ] || continue; ln=$(first "$k")
       [ "$ln" -gt "$prev" ] || stop "record order: the $k line (line $ln) comes before the $pk line (line $prev)"; prev=$ln; pk=$k; done
   }
+  rbtrace() { # outcome: STOP on any evidence that a rollback ran or was started (released and deferred; see "Rollback traces")
+    local o=$1 id='[A-Za-z0-9_-]{1,64}' q='\\?"' n i
+    local -a RXT=('(^|[^A-Za-z])== R1 rollback (links|verify)( |$)' "PASS current -> 7d92042fd110-$id, previous -> 17822b29e6de-$id" "${q}op${q} *: *${q}rollback(-start)?${q}")
+    local -a LBL=("r1-rollback.sh header '== R1 rollback links|verify'" "r1-rollback.sh 'PASS current -> <old id>, previous -> <new id>'" 'events.log "op":"rollback-start"|"rollback"')
+    if [ "$o" != deferred ]; then # deferred refuses the release.mjs tool lines itself, below
+      n=$(grep -cE '(^|[^A-Za-z])release: ROLLED BACK( |$)' <<< "$text")
+      [ "$n" = 0 ] || stop "$o, but the record has $n release.mjs 'release: ROLLED BACK ...' line(s): the rollback switched the links, so this is not $o (an interrupted rollback prints no RESULT line)"
+    fi
+    for i in 0 1 2; do
+      n=$(grep -cE -- "${RXT[$i]}" <<< "$text")
+      [ "$n" = 0 ] || stop "$o, but the record has $n rollback trace line(s) (${LBL[$i]}): a rollback ran or was started, so this is not $o"
+    done
+  }
   case $outcome in
     released)
       [[ $cur =~ ^17822b29e6de-[A-Za-z0-9_-]{1,64}$ ]] || stop "released needs current-id 17822b29e6de-<BUILD_ID>, not '$cur'"
@@ -119,6 +146,7 @@ main() {
       [ "$att" != "$SUNDAY_INV" ] || stop "released, but the attested InvocationID is Sunday's: Tuesday's restart was not recorded"
       [ "${C[INV5]}" = 1 ] || stop "released needs exactly one P5 line \"PASS running invocation = the owner's restart <32 hex>\" (found ${C[INV5]}): the attested InvocationID is not bound to the accepting P5 run"
       [ "${C[INV5]}" != 1 ] || [ "$inv5" = "$att" ] || stop "released, but the attested InvocationID $att is not the one the accepting P5 run confirmed ($inv5)"
+      rbtrace released
       ordered P3B P4P INV5 P5A;;
     rolledback)
       [ "$cur" = "$OLD_ID" ] || stop "rolledback needs current-id $OLD_ID, not '$cur'"
@@ -140,7 +168,8 @@ main() {
       [ "$((C[INV5] + C[INVR]))" = 0 ] || stop "deferred, but the record has a restart confirmation line (PASS running invocation = the owner's ...): ambiguous"
       # a P4 or rollback interrupted after release.mjs switched the links prints the tool's line but no RESULT line
       tool=$(grep -cE '(^|[^A-Za-z])release: (PROMOTED|ROLLED BACK) ' <<< "$text")
-      [ "$tool" = 0 ] || stop "deferred, but the record has $tool release.mjs 'release: PROMOTED ...' or 'release: ROLLED BACK ...' line(s): the links were switched, so this is not a deferral";;
+      [ "$tool" = 0 ] || stop "deferred, but the record has $tool release.mjs 'release: PROMOTED ...' or 'release: ROLLED BACK ...' line(s): the links were switched, so this is not a deferral"
+      rbtrace deferred;;
   esac
   if [ "$stops" != 0 ]; then echo "R6 HANDOFF RESULT STOP ($stops): do not run A-2; R6 is NO-GO until the owner resolves the record"; exit 1; fi
   echo "R6-A2-TUESDAY tue:$outcome"

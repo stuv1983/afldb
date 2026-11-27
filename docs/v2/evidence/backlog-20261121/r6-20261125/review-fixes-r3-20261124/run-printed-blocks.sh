@@ -58,7 +58,7 @@ set_tag() { # r3|r4 -> everything that differs between the amendments; anything 
         FIXPATHS=(deploy tools/build/env-in-standalone.mjs tools/maintenance/scheduled-backup.sh tests/deploy-release.test.ts
           $e/release-17822b29-20261124/scripts $e/release-17822b29-20261124/rehearsal $e/release-17822b29-20261124/RUNBOOK.md $e/release-17822b29-20261124/SITTING-20261124.md
           $b/a1a2-20261124 $b/r6-20261125/review-fixes-20261123/orig-r6-pre-verify-58e35ce8.sh $b/r6-20261125/review-fixes-20261123/run-printed-blocks.sh $b/r6-20261125/review-fixes-20261123/rehearse-r6-fixes.sh
-          $b/r6-20261125/review-fixes-r3-20261124 "$H") ;;
+          $b/r6-20261125/review-fixes-r3-20261124 $b/r6-20261125/review-fixes-r5-20261127 "$H") ;;
     *) return 1 ;;
   esac
   TAG=$1; REH=rehearse-$TAG.sh; TAR=/tmp/afldb-r6-20261125-$TAG.tar; RTAR=$TAR
