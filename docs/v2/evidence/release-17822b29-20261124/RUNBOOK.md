@@ -15,10 +15,15 @@
 > describe the packet that sitting used: scripts at `58e35ce8`, manifest `b4e9e584…` (kept as
 > [`orig-aa33f0fc/release-scripts-SHA256SUMS`](../backlog-20261121/r6-20261125/review-fixes-r4-20261127/orig-aa33f0fc/release-scripts-SHA256SUMS);
 > the old bytes are `git show 58e35ce8805e9f559d3dd1008606f90efb84fbab:<path>`). Three scripts were then corrected after
-> Astra's review of draft PR 5, at revision `a203c927d24bbd0b2bf4f67b3ddb2865a0fee0d3`; `scripts/SHA256SUMS` now has SHA-256 `744e52ca1d23bd4f5bfa45acf2084146f8a55c938898bcb85bcdf2e4512f5c46`:
+> Astra's review of draft PR 5, at revision `a203c927d24bbd0b2bf4f67b3ddb2865a0fee0d3` (manifest `744e52ca…`), and G0 again after her review of
+> `f92d6e29`, at revision `5553ecaf922d27a82da1d8f9a63633bb2883372d` (r5); `scripts/SHA256SUMS` now has SHA-256 `14f0f89f36bffbbabf0309adb4541973fb7a6d5854dddfa31fce66532bb87567`:
 >
 > * **G0 (`r1-g0-dump.sh`)**: the scheduled dump must be attributable to the backup **timer's dispatch** and to the one
 >   successful service invocation it started; a successful start inside 02:20–02:31 alone is not enough (the same rule as R6 A-2).
+>   **r5:** that invocation must also carry its origin, one `trigger:` journal line naming `afldb-backup.timer` with the timer's
+>   `LastTriggerUSec` in microseconds, written only by the **prospective** `tools/maintenance/scheduled-backup.sh` (not installed on
+>   production). **Until the owner installs it, G0 STOPs with `scheduled origin unproven` and prints no `OFFHOST-COMPARE`, by design**;
+>   a manual backup never counts ([r5 record](../backlog-20261121/r6-20261125/review-fixes-r5-20261127/README.md)).
 > * **P4 (`r1-p4-gate-promote.sh`, `deploy/release.mjs`)**: the 11:30 cutoff is enforced by `release.mjs promote --not-after`
 >   immediately before the link switch, after all validation, and P4 first requires `host-gate --not-after` to print the line
 >   proving the tool enforces it (§2). **P4 therefore STOPs against a checkout whose `deploy/release.mjs` lacks the option,
