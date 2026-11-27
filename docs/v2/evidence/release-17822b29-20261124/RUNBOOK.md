@@ -10,6 +10,25 @@
 | Rehearsal | Clean export of SCRIPT_REV, streamanator, **87 passed, 0 failed** ([REHEARSAL.md](rehearsal/REHEARSAL.md)) |
 | Out of scope | `.env`, schema, database, award and Brownlow data changes; publishing this prep commit; Wednesday's reboot (R6, separate approval, §8) |
 
+> **Correction — 27 November 2026 (PROPOSED; Astra re-review required; not approved; this packet cannot run as it stands).**
+> The 24 Nov sitting ended deferred ([record](SITTING-20261124.md)); its approval is spent, and the table above, §0 and §10 still
+> describe the packet that sitting used: scripts at `58e35ce8`, manifest `b4e9e584…` (kept as
+> [`orig-aa33f0fc/release-scripts-SHA256SUMS`](../backlog-20261121/r6-20261125/review-fixes-r4-20261127/orig-aa33f0fc/release-scripts-SHA256SUMS);
+> the old bytes are `git show 58e35ce8805e9f559d3dd1008606f90efb84fbab:<path>`). Three scripts were then corrected after
+> Astra's review of draft PR 5, at revision `2e58a0b7d3962bc6fc8424d863f5be06677adcaf`; `scripts/SHA256SUMS` now has SHA-256 `9a987fbef356f9e0fa98daa94d07581cfc762f43ca14091dc99cfd3f8e41cd3c`:
+>
+> * **G0 (`r1-g0-dump.sh`)**: the scheduled dump must be attributable to the backup **timer's dispatch** and to the one
+>   successful service invocation it started; a successful start inside 02:20–02:31 alone is not enough (the same rule as R6 A-2).
+> * **P4 (`r1-p4-gate-promote.sh`, `deploy/release.mjs`)**: the 11:30 cutoff is enforced by `release.mjs promote --not-after`
+>   immediately before the link switch, after all validation, and P4 first requires `host-gate --not-after` to print the line
+>   proving the tool enforces it (§2). **P4 therefore STOPs against a checkout whose `deploy/release.mjs` lacks the option,
+>   which includes `17822b29` itself.** A future sitting must run P4 from a checkout that contains this change, under a new pin.
+> * **P6 and the owner's journal check (`r1-p6-observe.sh`, §4.2)**: a successful query with zero `err` entries, not a line count.
+>
+> The dated gates are unchanged on purpose (P4's cutoff is still 24 Nov 11:30; G0 accepts 24–29 Nov). A re-run needs a new date
+> and pin, Astra's PASS at that review commit, a new owner approval and that day's evidence. Record:
+> [review-fixes-r4-20261127/README.md](../backlog-20261121/r6-20261125/review-fixes-r4-20261127/README.md).
+
 Every production step is a pinned script piped over **one SSH connection** as arm (`tr -d '\r' < <script> | C:/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes afldb bash -s -- <args>`). Claude runs them only under the owner's approval statement (§10). The owner runs only the `sudo` lines and the browser check. Never open a new connection at minute :16–:18 (streamanator's r2 check connects then): 10:16–10:18, 11:16–11:18 and 12:16–12:18. Never print `.env` values: names and counts only.
 
 ## 0. Staging (workstation Git Bash, before 10:30)
@@ -99,7 +118,7 @@ Budgets, with worst-case values:
 | 11:42 | P6 start | 12:15 − 33 |
 | 11:36 | Acceptance start | 11:42 − 6 |
 | **11:35** | **Restart cutoff**: the owner issues `sudo systemctl restart afldb` no later than this | 11:36 − 1 |
-| **11:30** | **Promotion cutoff**: P4 refuses after it | 11:35 − 2 (P4) − 3 (handover margin) |
+| **11:30** | **Promotion cutoff**: P4 refuses after it. Promotion is permitted up to and including 11:30:00.000 and refused from 1 ms later. P4 checks it at its start, requires `release.mjs host-gate --not-after` to state that the tool enforces it, and `release.mjs promote --not-after` checks it again after all validation, immediately before the links move. A refusal moves no link and writes no event | 11:35 − 2 (P4) − 3 (handover margin) |
 
 **The asked-for 11:00–12:30 does not fit the worst case.** From 11:00, the steps before promotion take 5+4+2+2+25+2 = 40 minutes in the worst case. Promotion would come at 11:40, past the 11:30 cutoff: the release would defer with nothing served changed. It fits only with a build near Sunday's 5 minutes (promotion about 11:21), which leaves 9 minutes of slack for everything.
 
@@ -168,7 +187,7 @@ Claude runs each line from the staged `scripts/` directory (`cd "$ST/$R/scripts"
 | +5 | **P6** observation, one connection, ≈31 min, in the background | `tr -d '\r' < r1-p6-observe.sh \| $S bash -s -- <NEW_ID> <INV>` | `P6 RESULT OBSERVATION PASS (4 ticks)` |
 | during P6 | **S9** public smoke (workstation) | `bash r1-s9-public-smoke.sh <NEW_BUILD> XWruOm_9nLCSMY8nGPqYU` | `S9 RESULT PASS` |
 | during P6 | **B** signed-in browser (owner, §4.3) | | `VERDICT PASS n/n`, screenshots |
-| end of P6 | Owner journal count (§4.2) | | 1 line, `-- No entries --` |
+| end of P6 | Owner journal check (§4.2) | | `JOURNAL PASS rc=0 entries=0` |
 
 ### 4.1 G0, the 03:10 backup gate (it must PASS before P2)
 
@@ -198,13 +217,14 @@ sudo journalctl -u afldb -n 20 --no-pager | grep 'serving build'
 
 Report the InvocationID, and the line `[afldb] serving build <NEW_BUILD> release <NEW_ID> revision 17822b29e6de2b6248cd7ada4221800fd81e0003` (after a rollback: `… XWruOm_9nLCSMY8nGPqYU release 7d92042fd110-XWruOm_9nLCSMY8nGPqYU revision 7d92042f…`). The owner attests that this InvocationID is their restart. P5 and the rollback verify bind to it.
 
-At the end of P6 (arm cannot read the system journal), run the line P6 prints:
+At the end of P6 (arm cannot read the system journal), run the two lines P6 prints, in this order:
 
 ```
-sudo journalctl -u afldb -p err --since "<since>" --no-pager | wc -l
+J=$(sudo journalctl -u afldb -p err --since "<since>" -q -o json --no-pager); R=$?
+[ "$R" = 0 ] && [ -z "$J" ] && echo "JOURNAL PASS rc=0 entries=0" || echo "JOURNAL FAIL rc=$R entries=$(grep -c "^{" <<< "$J")"
 ```
 
-The expected answer is `1`.
+The only passing answer is `JOURNAL PASS rc=0 entries=0`: sudo and journalctl exited 0 and returned no `afldb` entry at priority err or worse since `<since>` (the service's `ActiveEnterTimestamp`, which P6 fills in). `JOURNAL FAIL` gives the exit code and the number of entries (`-o json` prints one line per entry). A non-zero `rc` means the query itself failed (sudo refused, bad `--since`, journal unreadable) and proves nothing about the service. No verdict line is not a pass.
 
 ### 4.3 Signed-in browser check (owner, workstation Git Bash, during P6)
 
@@ -239,7 +259,7 @@ Requirements: Playwright 1.62.1 from the primary checkout, and the workstation's
 | ISSUE-367 live control | each `UNACCEPTED_YEARS` season from P1 (votes stored, not accepted): baseline records the old answer; check requires 404 + not-found title + no winner | PASS, or `none` (§5.1) |
 | Sitemap | raw-head: `/sitemap.xml` and `/sitemap/1.xml` 404 on both builds (withheld while the beta gate is on); `/robots.txt` 200 and byte-equal to the baseline; S9 records the anonymous codes | PASS |
 | Signed-in observation | §4.3 | `VERDICT PASS`, or `VISUAL: UNVERIFIED` recorded |
-| Stability | P6: 4 ticks, active, NRestarts 0, same InvocationID, cwd = release, health ok, both titles; owner journal count 1 | PASS |
+| Stability | P6: 4 ticks, active, NRestarts 0, same InvocationID, cwd = release, health ok, both titles; owner journal check `JOURNAL PASS rc=0 entries=0` (§4.2) | PASS |
 
 ### 5.1 Cases with no live example use the existing test evidence
 
