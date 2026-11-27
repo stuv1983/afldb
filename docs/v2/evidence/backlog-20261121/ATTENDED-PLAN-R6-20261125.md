@@ -902,6 +902,18 @@ ActivationDetails), which is **not installed on production**. Until the owner in
 `scheduled origin unproven`, by design, and print no `OFFHOST-COMPARE`. A manual backup never counts. Record:
 [review-fixes-r5-20261127/README.md](r6-20261125/review-fixes-r5-20261127/README.md).
 
+**r6 re-pin, 28 November 2026 (Astra's remaining findings on PR 5 at `624bf721`; PROPOSED; Astra re-review required; R6 stays NO-GO).** The blocks below are
+re-pinned in place to tested revision `297175f996f71aa9549592c2fabb9fa908c43f31`, manifest `c06f5b61…`. Two scripts changed:
+(a) **handoff parser:** `released` and `deferred` share ONE token boundary for `release.mjs`'s own lines and the rollback wrapper headers: the
+token followed by end of line or any non-word character (a backtick, punctuation) is a trace, so an inline excerpt can no longer slip past;
+(b) **A-2 section 5 origin:** the arm-written `trigger:` line is no longer read. The attributed invocation must have a **root record**
+`/var/lib/afldb-backup-attest/<invocation>.attest` written by the root-owned `afldb-backup-attest` (a full-privilege `ExecStartPost` drop-in,
+run while the start job is live) naming `afldb-backup.timer` and the exact `LastTriggerUSec`, with no stop or failure of the unit since the
+dispatch; A-2 checks the writer, the drop-in, the loaded unit, the helpers, the record and every parent directory at run time. The writer is
+**not installed on production**; its owner procedure runs outside the production checkout. Until it is installed, A-2 section 5 and the release
+G0 STOP with `scheduled origin unproven`, by design. `tools/maintenance/scheduled-backup.sh` is back to the production bytes `234fca6a…`.
+Record: [review-fixes-r6-20261128/README.md](r6-20261125/review-fixes-r6-20261128/README.md).
+
 **What changed (helper revision `a203c927d24bbd0b2bf4f67b3ddb2865a0fee0d3`).**
 
 1. **Tuesday handoff parser (`r6-tuesday-handoff.sh`).** It now counts only complete result lines, exactly as the Tuesday scripts
@@ -937,7 +949,7 @@ ActivationDetails), which is **not installed on production**. Until the owner in
 ### R6 archive r4: workstation (Git Bash)
 
 ```bash
-CODE=5553ecaf922d27a82da1d8f9a63633bb2883372d
+CODE=297175f996f71aa9549592c2fabb9fa908c43f31
 B=docs/v2/evidence/backlog-20261121
 git -C /d/dev/afldb archive --format=tar --output=/tmp/afldb-r6-20261125-r4.tar "$CODE" \
   "$B/r6-20261125/r6-pre-verify.sh" \
@@ -974,10 +986,10 @@ C:/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes afldb 'set -C; cat > /tmp/a
 ### R6 archive r4: staging and verification (run once on each host: workstation, production, streamanator)
 
 As r3: record the printed staging root; STOP unless the block prints 16 `: OK` lines and `R6 STAGE VERIFIED <path> (16 files)`.
-Manifest digest `182efbb6b31f70833eb6bfd4be8e1a80bb887b66da0bbeca782ea86f2dc90c82` (r5 re-pin, 27 Nov 2026; r4 was `3c671c4b…` at `a203c927`). Every pin is the SHA-256 of the Git blob at the tested revision
-(`git cat-file blob 5553ecaf922d27a82da1d8f9a63633bb2883372d:<path> | sha256sum`). Three differ from r3: `r6-pre-verify.sh`
-(`48185fca…` → r4 `ea4355f0…` → r5 `64cc5166…`), `r6-post-verify.sh` (`478f85cd…` → `319c2e09…`) and `r6-tuesday-handoff.sh` (`92c1809b…` →
-r4 `be0fbca2…` → r5 `820f5d53…`). The other thirteen are byte-identical to r3's, and Sunday's `a1-rawhead.sh` is still `cab4a43a…`. The
+Manifest digest `c06f5b61c809258ee130dff43d918a67ad1f94d2c8755e4201643c84bbb3bdab` (r6 re-pin, 28 Nov 2026; r5 was `182efbb6…` at `5553ecaf`, r4 `3c671c4b…` at `a203c927`). Every pin is the SHA-256 of the Git blob at the tested revision
+(`git cat-file blob 297175f996f71aa9549592c2fabb9fa908c43f31:<path> | sha256sum`). Three differ from r3: `r6-pre-verify.sh`
+(`48185fca…` → r4 `ea4355f0…` → r5 `64cc5166…` → r6 `92425f2a…`), `r6-post-verify.sh` (`478f85cd…` → `319c2e09…`) and `r6-tuesday-handoff.sh` (`92c1809b…` →
+r4 `be0fbca2…` → r5 `820f5d53…` → r6 `b5fb980b…`). The other thirteen are byte-identical to r3's, and Sunday's `a1-rawhead.sh` is still `cab4a43a…`. The
 verification lines are r3's, unchanged.
 
 ```bash
@@ -985,13 +997,13 @@ B=docs/v2/evidence/backlog-20261121
 STAGE=$(umask 077 && mktemp -d /tmp/afldb-r6-20261125-r4.XXXXXX) &&
   (umask 077 && cd "$STAGE" && tar -xf /tmp/afldb-r6-20261125-r4.tar &&
     [ ! -e R6-SHA256SUMS ] && [ ! -L R6-SHA256SUMS ] && cat > R6-SHA256SUMS) <<'R6_PINS' &&
-64cc5166fea21438e8c5880e919e61398ff7381dd70ae359f19c392d33d18c49  docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh
+92425f2ae341582a683e3f8847af598a04a5cf9e26473e7be8732397370c3feb  docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh
 429eec29acf254179c3b7ae7d6489a6c695981fd90996c5c2ce1301314bcc18c  docs/v2/evidence/backlog-20261121/r6-20261125/r6-offhost-verify.sh
 319c2e097fab61be823b175c25a2f3feb30929124b70af2a6acfe5937d557bd5  docs/v2/evidence/backlog-20261121/r6-20261125/r6-post-verify.sh
 de84f1205b4ab4cfec182b1fb7b0770ca916c8570f10a14539daa9a4e450bd9e  docs/v2/evidence/backlog-20261121/r6-20261125/r6-public-smoke.sh
 5e5ce991a5e4bf0875c49e01cc0f90db7da720a0f1c022507cec869d3cc067f0  docs/v2/evidence/backlog-20261121/r6-20261125/r6-revalidate-accept.sh
 7c3d0fc295512a2f990bdbed24ae9ddb97a49f5f13e9bf01019ea3fa7e1f0543  docs/v2/evidence/backlog-20261121/r6-20261125/r6-rawhead-check.sh
-820f5d53fe1d8ac841bf5f41103e2b720e2ecf1159bd28a6090308d65cedc726  docs/v2/evidence/backlog-20261121/r6-20261125/r6-tuesday-handoff.sh
+b5fb980baed582adea5e944ac9ace00007d3eecad5eb16985fea815da31777b9  docs/v2/evidence/backlog-20261121/r6-20261125/r6-tuesday-handoff.sh
 babb660f7e7555a55281f2a0a07cb6d1147f39ebfa5ff9c119a677a1e2776a71  docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-s9-public-smoke.sh
 cab4a43af09e4b1729d913162c0f27faccd19315c56eb4ad1141c8bf748d81c0  docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-rawhead.sh
 2ac943b113af2247ab3acb3863e97201c8794ff830520338faa8b299268eeee5  docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-cron-observe.sh
@@ -1003,7 +1015,7 @@ a3775aea879b1d9ce05d0e96482e66d24c69deb62cf38e8fc0407c0d2653dc2b  tools/maintena
 bd88c915c2643fc1bc8ec005c5c6825d43af0742b33ca83f0461e9348414dbc9  src/lib/acquisition/season-revalidation.ts
 R6_PINS
   ([ -d "$STAGE" ] && [ ! -L "$STAGE" ] && cd "$STAGE" &&
-    [ "$(sha256sum < R6-SHA256SUMS | cut -c1-64)" = 182efbb6b31f70833eb6bfd4be8e1a80bb887b66da0bbeca782ea86f2dc90c82 ] &&
+    [ "$(sha256sum < R6-SHA256SUMS | cut -c1-64)" = c06f5b61c809258ee130dff43d918a67ad1f94d2c8755e4201643c84bbb3bdab ] &&
     [ -z "$(find . \( ! -uid "$(id -u)" -o -perm /022 -o \( -type f -links +1 \) \) -print)" ] &&
     [ "$(find . -mindepth 1 -printf '%y %p\n' | LC_ALL=C sort)" = "$(awk '{p = "./" $2; print "f " p; while (sub(/\/[^\/]+$/, "", p) && p != ".") print "d " p} END {print "f ./R6-SHA256SUMS"}' R6-SHA256SUMS | LC_ALL=C sort -u)" ] &&
     sha256sum -c R6-SHA256SUMS) &&
@@ -1015,7 +1027,7 @@ R6_PINS
 
 ```bash
 ([ -d "$STAGE" ] && [ ! -L "$STAGE" ] && cd "$STAGE" &&
-    [ "$(sha256sum < R6-SHA256SUMS | cut -c1-64)" = 182efbb6b31f70833eb6bfd4be8e1a80bb887b66da0bbeca782ea86f2dc90c82 ] &&
+    [ "$(sha256sum < R6-SHA256SUMS | cut -c1-64)" = c06f5b61c809258ee130dff43d918a67ad1f94d2c8755e4201643c84bbb3bdab ] &&
     [ -z "$(find . \( ! -uid "$(id -u)" -o -perm /022 -o \( -type f -links +1 \) \) -print)" ] &&
     [ "$(find . -mindepth 1 -printf '%y %p\n' | LC_ALL=C sort)" = "$(awk '{p = "./" $2; print "f " p; while (sub(/\/[^\/]+$/, "", p) && p != ".") print "d " p} END {print "f ./R6-SHA256SUMS"}' R6-SHA256SUMS | LC_ALL=C sort -u)" ] &&
     sha256sum -c R6-SHA256SUMS) &&
