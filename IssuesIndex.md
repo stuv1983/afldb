@@ -1,10 +1,31 @@
 # AFLDB Current Issues Index
 
-**23 November 2026, release record (late).** Open issues: 332, 348, 350, 351, 352, 357, 362, 367, 368, 374, 375, 376 and 377. **Published:** `origin/main` = `17822b29e6de2b6248cd7ada4221800fd81e0003` (owner-approved fast-forward from `ae51cd8d`, 33 commits; `git ls-remote` 21:29 AEDT). **Not deployed:** production still serves `7d92042fd110-XWruOm_9nLCSMY8nGPqYU`. **Independent review complete.** Astra's final verdict, on 69538980: application READY FOR ATTENDED APPLICATION RELEASE, technically; the push was HOLD on the ISSUE-368 race harness only, since addressed by `bd50bde8`/`635d4df2` (tests only; no written independent check of 17822b29 itself, whose application tree equals 69538980's); Wednesday NO-GO. The attended release is prepared but not approved or executed: [runbook](docs/v2/evidence/release-17822b29-20261124/RUNBOOK.md), proposed Tue 24 Nov 10:30–12:30 AEDT, promotion by 11:30, restart by 11:35, gated on Tuesday's 03:10 copy (exit 0). Wednesday's reboot remains NO-GO pending its own evidence. Whatever Tuesday's outcome, it also needs Astra's PASS on the R6 r2 amendment (review fixes at `7af24a74`, local, not pushed).
+**27 November 2026, closeout** (branch `claude/closeout-20261127` from `cdeaf31f`; local, pending Astra's review of R6 r3).
+- **Resolved today:** 368 (owner D1/D2), 374, 375 and 377 (owner confirmation).
+- **Open issues (9):** 332, 348, 350, 351, 352, 357, 362, 367 and 376.
+- **Production:** serves `7d92042fd110-XWruOm_9nLCSMY8nGPqYU`.
+- **Release 17822b29:** the Tue 24 Nov attended release was approved and run, and ended **DEFERRED before promotion**. G0 to P3b passed, and P4 refused at its 11:30 cutoff when the owner's "go" came at 12:50. The [sitting record](docs/v2/evidence/release-17822b29-20261124/SITTING-20261124.md) and approval are now in this branch (`SHA256SUMS-SITTING`). Re-releasing needs re-prepared scripts (the P4 cutoff is hard-coded to 2026-11-24), a new owner-approved window and that day's G0 exit 0.
+- **R6 (Wed 25 Nov):** did not run and is NO-GO; see 351.
+- **Owner availability:** the owner is on leave 26 Nov 2026 to 6 Jan 2027, so dated work resumes on or after 7 Jan unless an alternate operator is named.
+- The 23 November paragraph below is historical.
+
+| Issue | Current action (27 November 2026, closeout) |
+|---|---|
+| 332 | R2 is installed and its alarm email accepted (22 Nov). Keep pending: G0 (the 2027 season opened on production through 350, due by 2027-03-10; not the release gate of the same name), G0c (the first nightly after G0 with no `season_row_missing` HALT) and the later G1–G7 seasonal reviews. Neither may slip to Opening Round (2027-03-17). |
+| 348 | Fixes are published in `17822b29` and verified. Remaining, each under its own approval: an independently reviewed `annual-html-20260902` digest before any direct import of it; the refreshed and re-sealed January rehearsal; and the production write decision. Tue 12 Jan 2027 11:00 is reserved for the attended load (owner availability; it must finish before the R8 capture). |
+| 350 | The R8 draft is approved, and the opening is proposed for Tue 23 Feb 2027 11:00 inside D-350-1's window (2027-02-15 to 03-03). Capture and plan run a few days before the opening (proposed 19 Feb), after the 17822b29 promotion and the 348 load, with R and the pins re-derived. Then execution approval, G0, and G0c on the next nightly. |
+| 351 | **R6 is NO-GO.** The 25 Nov window lapsed unused. The pinned parser (`92c1809b…`) passed the Tuesday handoff lines, but the release was deferred when P4 refused at its cutoff check, and whether that is "a confirmed deferral before P4" (APPROVAL:9) is unresolved: the owner treats it as ambiguous, so the handoff input is unsettled. **Needed:**<br>- a ruling, or the next release's handoff lines;<br>- re-dating `r6-pre-verify.sh:156`, with a new pin;<br>- Astra's PASS at that commit;<br>- a new approval;<br>- the day's own backup, pull and 03:30 verification (a Wednesday), with console and recovery checks.<br>R7 is on or after 7 Jan 2027. |
+| 352 | **The Tuesday 24 Nov scheduled copy is VERIFIED** (G0, verifier exit 0). Remaining: one captured scheduled weekly verification restore with its backup and pull (any Wednesday 03:30 run; 25 Nov counts if read), and D-HO-7 at R7. |
+| 357 | R4 deny installed and probes passed (22 Nov). Owner operational acceptance remains open; retain the beta gate until a cache bound and disk alert exist, with F-09 prune validation. |
+| 362 | Trace masking is published and reviewed. It ships with the deferred 17822b29 release (inert on production). Remaining: the R5 earliest disposal review, on or after Thu 7 Jan 2027, and its separate disposal decision. |
+| 367 | The correction is test-verified, but §5 production acceptance did not run, because the release was deferred. **Next:** a re-prepared, newly approved release with that day's G0, then promotion and §5. P1 found no unaccepted years, so the control uses the test evidence. |
+| 376 | The correction is verified by Astra's two-worker run. **Next:** the same re-prepared, newly approved release, then §5. |
+
+Earlier, **23 November 2026, release record (late).** Open issues: 332, 348, 350, 351, 352, 357, 362, 367, 368, 374, 375, 376 and 377. **Published:** `origin/main` = `17822b29e6de2b6248cd7ada4221800fd81e0003` (owner-approved fast-forward from `ae51cd8d`, 33 commits; `git ls-remote` 21:29 AEDT). **Not deployed:** production still serves `7d92042fd110-XWruOm_9nLCSMY8nGPqYU`. **Independent review complete.** Astra's final verdict, on 69538980: application READY FOR ATTENDED APPLICATION RELEASE, technically; the push was HOLD on the ISSUE-368 race harness only, since addressed by `bd50bde8`/`635d4df2` (tests only; no written independent check of 17822b29 itself, whose application tree equals 69538980's); Wednesday NO-GO. The attended release is prepared but not approved or executed: [runbook](docs/v2/evidence/release-17822b29-20261124/RUNBOOK.md), proposed Tue 24 Nov 10:30–12:30 AEDT, promotion by 11:30, restart by 11:35, gated on Tuesday's 03:10 copy (exit 0). Wednesday's reboot remains NO-GO pending its own evidence. Whatever Tuesday's outcome, it also needs Astra's PASS on the R6 r2 amendment (review fixes at `7af24a74`, local, not pushed).
 
 Earlier, **23 November 2026 Astra follow-up.** The current open issues are 332, 348, 350, 351, 352, 357, 362, 367, 368, 374, 375, 376 and 377. The owner-approved helpers were installed on streamanator. Monday was copy verified, scheduled origin unproven. Tuesday’s dispatch is separate. Candidate push and application release hold. Wednesday’s reboot remains NO-GO. [Evidence](issues/reviews/AFLDB-ASTRA-FOLLOWUP-2026-11-23.md).
 
-| Issue | Current action (23 November 2026, release record) |
+| Issue | Historical action (23 November 2026, release record; superseded by the 27 November table above) |
 |---|---|
 | 332 | R2 installed; first scheduled :17 run and alarm email accepted Sunday. Keep G0 (2027 opening) and G0c (first nightly without HALT) pending, plus the later G1-G7 seasonal reviews. Do not defer G0/G0c to Opening Round. |
 | 348 | Fixes published in `17822b29` and verified by the independent re-review. August's validate-only case passed (5,057 persons, 6,810 picks). Remaining: an independently reviewed September digest before any direct September import; the January rehearsal and the production write decision (separate approvals). Not part of Tuesday's release. |
@@ -254,7 +275,7 @@ Historical investigation and dated instructions below are retained for provenanc
 - **2026-11-22 (run e, round 4):** the owner's eight columns = groups (a)-(e); mapping, generators, detection before/after COMMIT per group (no pre-COMMIT detection for (b)-(e), (g), (j), most of (f), (k), `import_batches`, `player_link_resolutions`; post-load check required); effect digest corrected to "refuses before any write"; `afldb_backup` read access **PASS** on production (one read-only session 21:12Z); refresh procedure (§3a). Tue 12 Jan 2027 11:00 **PROPOSED**. No load, no re-seal. **Next:** owner confirms (f)-(k) and the window after the refresh packet.
 ### AFLDB-ISSUE-350 — Production has no 2027 `seasons` row and the AFL API settle never creates one
 
-- **Current operator action — 22 Nov Sunday review (OPEN):** R8 draft approved: capture Fri 19 Feb 2027; proposed opening Tue 23 Feb 2027 11:00 AEDT. Obtain execution approval for the refreshed plan/revision/write set/window, perform G0 and observe G0c on the first nightly (24 Feb if opened 23 Feb).
+- **Current operator action (OPEN; reworded 27 Nov 2026):** the R8 draft is approved, and the opening is proposed for Tue 23 Feb 2027 11:00 AEDT, inside D-350-1's window (2027-02-15 to 03-03; G0 by 2027-03-10). Capture and plan run a few days before the opening (proposed Fri 19 Feb), after the 17822b29 promotion and the ISSUE-348 load, with R and every pin re-derived; re-plan on the day if the digest drifts. Then execution approval, G0, and G0c on the next nightly.
 
 Historical investigation and dated instructions below are retained for provenance; the current action above takes precedence.
 
@@ -272,7 +293,13 @@ Historical investigation and dated instructions below are retained for provenanc
 
 ### AFLDB-ISSUE-351 — Unattended upgrades restart production app and PostgreSQL; promote/rollback activation window
 
-- **Current operator action — 23 November (OPEN).** R1 was installed Sunday. R6 is pinned to the tested helper commit. Wednesday’s restore must match the scheduled verification service journal record, dump, state and database comment. Functional revalidation requires worker identities 1 and 2. The reboot remains NO-GO pending Wednesday’s own evidence and attended recovery.
+- **Current operator action — 27 November (OPEN; R6 NO-GO).** R6 did not run, and the 25 Nov window lapsed unused. The Tuesday deferral is treated as ambiguous by the owner (27 Nov). **Needed before R6 can be GO:**
+  - the handoff input: an owner ruling on APPROVAL-20261124.md:9, or the next release sitting's `R6-HANDOFF` lines;
+  - a re-dating amendment of `r6-pre-verify.sh:156`, with a new pin;
+  - Astra's PASS at that commit;
+  - a new owner approval;
+  - on the day: its own backup, pull and 03:30 verification restore (a Wednesday, by the same-day rule), plus console and recovery checks.
+  Full list: the 27 Nov block in the `issues.md` entry. *Superseded 23 Nov wording:* R1 was installed Sunday. R6 is pinned to the tested helper commit. Wednesday’s restore must match the scheduled verification service journal record, dump, state and database comment. Functional revalidation requires worker identities 1 and 2. The reboot remains NO-GO pending Wednesday’s own evidence and attended recovery.
 
 Historical investigation and dated instructions below are retained for provenance; the current action above takes precedence.
 
@@ -293,7 +320,7 @@ Historical investigation and dated instructions below are retained for provenanc
 
 ### AFLDB-ISSUE-352 — No scheduled production backup, restore verification or off-host copy
 
-- **Current operator action — 23 November (OPEN).** Reviewed helpers installed on streamanator at 11:20:29 AEDT. Monday’s attended restore passed at 11:35:34 AEDT and the private cluster was cleaned. Both post-install checks now pass. Monday remains copy verified, scheduled origin unproven. Tuesday’s 03:10 dispatch and Wednesday’s separate 03:10 copy and verification restore remain open. Local rollback reports exit 5 when it cannot verify prior state. Preserve D-HO-7 for R7.
+- **Current operator action — 27 November (OPEN).** **Met:** the Tuesday 24 Nov scheduled copy, `SCHEDULED-COPY-VERIFIED`, verifier exit 0 (release G0; sitting record in `docs/v2/evidence/release-17822b29-20261124/`). **Remaining:** one captured scheduled weekly verification restore with its backup and pull (any Wednesday 03:30 timer run; the 25 Nov run counts if read), and D-HO-7 at R7 (on or after 7 Jan 2027). *Superseded 23 Nov wording:* Reviewed helpers installed on streamanator at 11:20:29 AEDT. Monday’s attended restore passed at 11:35:34 AEDT and the private cluster was cleaned. Both post-install checks now pass. Monday remains copy verified, scheduled origin unproven. Tuesday’s 03:10 dispatch and Wednesday’s separate 03:10 copy and verification restore remain open. Local rollback reports exit 5 when it cannot verify prior state. Preserve D-HO-7 for R7.
 
 Historical investigation and dated instructions below are retained for provenance; the current action above takes precedence.
 

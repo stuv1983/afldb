@@ -1,5 +1,23 @@
 # AFLDB Waiting and Blocker Register
 
+> **2026-11-27 closeout (current; supersedes the date-bound items in every banner below).** Branch `claude/closeout-20261127` from `cdeaf31f`, local, pending Astra's review of R6 r3. Production serves `7d92042fd110-XWruOm_9nLCSMY8nGPqYU`.
+> - **Resolved today:** 368 (owner D1/D2), 374, 375 and 377 (owner confirmation).
+> - **Release 17822b29 (367, 376; also carries 362's masking):** the Tue 24 Nov sitting was DEFERRED before promotion. The record is in `docs/v2/evidence/release-17822b29-20261124/SITTING-20261124.md`. **Waiting on:**
+>   - re-prepared scripts, because `r1-p4-gate-promote.sh` hard-codes the 2026-11-24 11:30 cutoff, and the RUNBOOK window, the G0 dump glob and the §10 text are dated;
+>   - a new owner approval naming the window;
+>   - that day's G0 exit 0.
+>   Then promotion, and §5 acceptance.
+> - **R6 reboot (351): NO-GO.** The Wed 25 Nov window lapsed unused. **Waiting on:**
+>   - the Tuesday-handoff input: the owner treats the P4-cutoff deferral as ambiguous, so it needs an owner ruling, or the next release sitting's `R6-HANDOFF` lines;
+>   - an amendment re-dating `r6-pre-verify.sh:156`, with a new pin;
+>   - Astra's PASS at that commit (no PASS on r3 exists);
+>   - a new owner approval;
+>   - the same-day backup, pull, 03:30 verification and console checks.
+> - **352:** the Tuesday scheduled copy is VERIFIED (G0, 24 Nov). **Waiting on:** one captured scheduled weekly verification (any Wednesday 03:30 run, with its backup and pull), and D-HO-7 at R7.
+> - **Owner availability:** leave runs 26 Nov 2026 to 6 Jan 2027. R7, the 348 load (reserved Tue 12 Jan 2027 11:00), the 362 earliest disposal review and any R6 or release re-dating all fall on or after 7 Jan, unless the owner names an alternate operator. No order among the release, R6, R7, the 348 load and the R8 capture is recorded.
+> - **Unchanged and event-bound:** 332 (G0 by 2027-03-10 via 350; G0c; G1–G7); 350 (R8 opening proposed Tue 23 Feb 2027 inside D-350-1's 2027-02-15..03-03 window; capture a few days before, after the release and the 348 load); 357 (the beta gate stays until a cache bound and disk alert exist).
+> - Open issues: 9 (332, 348, 350, 351, 352, 357, 362, 367, 376).
+
 > **2026-11-22 backlog run b (owner decisions 3-7; counts NOT recomputed).** Record: `docs/v2/evidence/backlog-20261121/RUN-20261122b.md`. Local on `claude/backlog-20261122`, unpublished; no production contact.
 > - **Resolved:** ISSUE-363 (S + P-full, tier P `1fd51dae`). **New:** ISSUE-373 (Low, Gridley G-c 118).
 > - **Awaiting publication:** `7b52c46c`, `552e5e96` (348), `1fd51dae` (363), the run b docs commit.

@@ -135,3 +135,11 @@ Until then, the nightly empty batches (row 10) need no action. Section 8 still a
 | G0 | **By 2027-03-10**, before Opening Round | The 2027 season is open in the production database (ISSUE-350, decision D-350-1) | **Owner** approves and runs the I350 ceremony | `node --import tsx tools/v2/season-opening-check.ts --dsn-env AFLDB_BACKUP_DATABASE_URL --expect-database afldb_prod --expect-oid 66668 --expect-sysid 7674454702926115004 --json` exits 0 (`OPEN`), or the accepted I350 outcome. Exit 10 (`NOT_OPEN`) on or after 2027-03-10 blocks G1/G2; exit 11 (`REFUSED`) is a stop. |
 | G0b | Before Opening Round | A failed or missing nightly is delivered to the owner (D-332-1 as amended, option A) | **Owner** | The forced-command pull check runs hourly from the owner host (streamanator) and one deliberate test alarm has arrived (procedure 04 §4); or a written owner record that the per-round manual check (section 3) stands in for it. Superseded wording (2026-11-14): "The notifier template and drop-in installed with a transport configured". |
 | G0c | The first nightly after G0 | The first nightly after the opening applies with no `season_row_missing` HALT | Operator reads, owner accepts | `c7-observe.ts` for that night, or the pull check's OK plus the unit `Result=success`, recorded in the ledger. |
+
+## 11. 2027 rollover checklist items outside the ISSUE-332 gates (added 2026-11-27)
+
+These items are not ISSUE-332 gates and do not keep it open. They are recorded here so that the 2027 rollover has one checklist.
+
+| # | Trigger | Item | Who acts | Evidence |
+|---|---|---|---|---|
+| RC-AFLW-1 | Before the first AFLW staging replacement that is meant to include the 2027 AFLW season | Add `"2027"` to `EXPECTED_SEASON_KEYS` in `tools/aflw/load_staging.py`, which currently holds the eleven keys from `2017` to `2026`, including the league ordinal `7`. Make it a reviewed commit, and extend the staging contract in the same change. There is no command-line override. Until the edit lands, the loader refuses an extract that carries an unlisted season. This is by design, not a fault. | Implementation by a session; the owner approves the reviewed commit | The reviewed commit, the staging contract run, and the load record. Owner decision D1 of 2026-11-27 under ISSUE-368, which is resolved. |

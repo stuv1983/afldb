@@ -15,6 +15,12 @@ commit.
 
 ## [Unreleased]
 
+### Closeout (27 November 2026; local on `claude/closeout-20261127`, from `cdeaf31f`, not pushed; nothing deployed)
+
+- **Retained audit evidence: the Tue 24 Nov release sitting.** It ended DEFERRED before promotion. The sitting record, approval and both R6-handoff parser logs are now tracked in `docs/v2/evidence/release-17822b29-20261124/`. They are byte-identical to the untracked originals, with digests in `SHA256SUMS-SITTING`.
+- **2027 rollover checklist.** It gains RC-AFLW-1: adding 2027 to `EXPECTED_SEASON_KEYS` is a reviewed edit with no command-line override (owner decision D1, ISSUE-368). See section 11 of `docs/v2/afl-api-2027-season-operations-successor-2026-11-02.md`.
+- **Records.** ISSUE-368 is resolved on the owner's decisions D1/D2, and 374, 375 and 377 on the owner's confirmation; their runbooks are in `issues/closed/`. The open records for 351, 352, 367 and 376 replace the lapsed Tuesday and Wednesday instructions with the conditions that now permit progress.
+
 ### R6 r3 re-review fixes (24 November 2026; local on `claude/r6-review-fixes-r3-20261124`, not pushed; nothing deployed)
 
 - **R6 A-2 verifies the owner-attested service InvocationID.** `r6-pre-verify.sh` now takes the Tuesday outcome and the attested InvocationID from the Tuesday sitting record (new read-only `r6-tuesday-handoff.sh`). It STOPs unless the live `systemctl` InvocationID equals that ID, which closes a false PASS after an unattested restart when `events.log` is unreadable, malformed or superseded. It also STOPs on a carriage return in the `release.mjs status` output.
