@@ -17,6 +17,16 @@
 #   hand), and a fixture busctl prints the timer's LastTriggerUSec in microseconds ("t <n>", from the table row LastTriggerUSecRaw,
 #   else seconds x 1e6; /fx/busctl-mode = fail|garbage|empty changes the read). F23_SCRIPT=current writes NO trigger line
 #   at all: what today's production scheduled-backup.sh logs.
+# R6 r6 (28 Nov 2026): the r5 trigger line is WITHDRAWN as origin evidence (the gates no longer read it), and scheduled-backup.sh is
+#   back to the production bytes, so F23_SCRIPT now defaults to `current` (no trigger line); f23_trigger_line still writes the old
+#   line when a scenario asks for it (it must count toward nothing). Origin now comes from the ROOT writer's record: f23_attest_install
+#   puts the REAL reviewed writer and drop-in (review-fixes-r6-20261128/attest/ of <FIX>) and copies of the real unit files at their
+#   real paths, root:root, plus root-owned placeholders for /usr/bin/systemctl and /usr/bin/busctl where the image lacks them (never
+#   executed: the gates run the /usr/local/bin shims); the systemctl table gains the unit's FragmentPath, DropInPaths and
+#   ExecStartPostEx rows in systemd 255's exact format (measured: review-fixes-r6-20261128/logs/attest-probe-*.log), /fx/espx
+#   replaces the ExecStartPostEx output verbatim (two entries); f23_attest_record writes a record in the writer's exact format
+#   (root:root 0644). Every scenario starts from f23_attest_reset (the trusted install, an empty record directory). Root-owned
+#   trust cannot be shimmed: these are real files with real owners and modes, and the gates run as arm.
 # Must run as root inside a disposable container whose hostname is afldb-prod (the scripts' host guard is never weakened);
 # creates the users arm (uid 1000) and files at the absolute paths the gates read. Nothing here edits a script under test.
 #
@@ -34,7 +44,7 @@ F23_BINV=b1b2b3b4b5b6b7b8b9b0babbbcbdbebf        # afldb-backup.service: the tim
 F23_BINV2=c1c2c3c4c5c6c7c8c9c0cacbcccdcecf       # afldb-backup.service: an invocation started by hand
 F23_VINV=0d1c2b3a4f5e60718293a4b5c6d7e8f9        # afldb-backup-verify.service: the 03:30 run
 F23_SPID=
-F23_SCRIPT=${F23_SCRIPT:-r5}                       # r5 = the prospective scheduled-backup.sh (trigger line); current = f92d6e29's (none)
+F23_SCRIPT=${F23_SCRIPT:-current}                  # current = production's scheduled-backup.sh (no trigger line); r5 = the withdrawn r5 script
 F23_TRIG_US=                                       # the genuine dispatch in microseconds (set by f23_backup_genuine)
 
 f23_ep() { TZ=Australia/Melbourne /usr/bin/date -d "$1" +%s; }
@@ -69,9 +79,8 @@ f23_jline() { # invocation "HH:MM:SS" message-after-the-prefix
 f23_jpid1() { f23_pid1_json "$1" "$(f23_ep "$F23_DAY $2")" "$3" >> /fx/journal-backup.json; }   # PID 1 lines: arm's `-o cat` view may lack them
 
 # The r5 trigger line of an invocation: unit=afldb-backup.timer (realtime_usec = the genuine dispatch unless given) or unit=none.
-# A no-op under F23_SCRIPT=current (today's production script writes no such line).
+# r6: always written when called; f23_backup_genuine and f23_manual_run call it only under F23_SCRIPT=r5.
 f23_trigger_line() { # invocation "HH:MM:SS" unit|none [usec] [job]
-  [ "$F23_SCRIPT" = current ] && return 0
   local us=${4:-none}; [ "$3" = afldb-backup.timer ] && us=${4:-$F23_TRIG_US}
   f23_jline "$1" "$2" "trigger: invocation=$1 job=${5:-4242} unit=$3 realtime_usec=$us"
 }
@@ -95,9 +104,72 @@ f23_backup_genuine() {
   f23_set afldb-backup.timer LastTriggerUSecRaw "$F23_TRIG_US"
   f23_journal_reset; : > /fx/binv-mode; echo > /fx/busctl-mode
   f23_jline "$F23_BINV" 02:20:01 "target: mode=backup dir=$F23_BK keep=14 offhost=none tools=$F23_CHK/tools/maintenance"
-  f23_trigger_line "$F23_BINV" 02:20:01 afldb-backup.timer
+  [ "$F23_SCRIPT" != r5 ] || f23_trigger_line "$F23_BINV" 02:20:01 afldb-backup.timer
   f23_jline "$F23_BINV" 02:20:19 "backup ok: $F23_SD 4096 bytes sha256 ${F23_SS:0:16} offhost=skipped"
   rm -f "$F23_BK"/.state/FAILED-*
+  # r6: the trusted install and the root writer's record of the timer's run
+  f23_attest_reset; f23_attest_rows | while IFS='|' read -r u p v; do f23_set "$u" "$p" "$v"; done
+  f23_unset afldb-backup.service EnvironmentFiles
+  f23_attest_record "$F23_BINV" afldb-backup.timer "$F23_TRIG_US"
+}
+
+# ---- R6 r6: the root attestation (review-fixes-r6-20261128/DESIGN.md). Real root-owned files at the real paths.
+F23_ATT_W=/usr/local/libexec/afldb/afldb-backup-attest
+F23_ATT_D=/etc/systemd/system/afldb-backup.service.d/60-afldb-backup-attest.conf
+F23_ATT_RD=/var/lib/afldb-backup-attest
+F23_ATT_X='/usr/bin/env -i PATH=/usr/sbin:/usr/bin /usr/bin/bash --noprofile --norc /usr/local/libexec/afldb/afldb-backup-attest'
+F23_ATT_FIX=
+f23_attest_install() { # FIX: remember the tree whose reviewed bundle and unit files are installed; placeholders for absent helpers
+  F23_ATT_FIX=$1; local h
+  [ -f "$1/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r6-20261128/attest/afldb-backup-attest" ] || { echo "STOP fixture: no attestation bundle in $1"; return 1; }
+  for h in /usr/bin/systemctl /usr/bin/busctl; do
+    [ -e "$h" ] || { printf '#!/bin/sh\necho "fixture placeholder: never executed (the gates run the /usr/local/bin shims)" >&2\nexit 1\n' > "$h"; chown root:root "$h"; chmod 755 "$h"; }
+  done
+  f23_attest_reset
+}
+f23_attest_reset() { # the trusted install exactly; an empty record directory; every helper and parent restored to root, not g/o-writable
+  local A=$F23_ATT_FIX/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r6-20261128/attest h
+  for h in / /usr /usr/bin /usr/local /etc /etc/systemd /etc/systemd/system /var /var/lib; do chown root:root "$h"; chmod 755 "$h"; done
+  for h in /usr/bin/env /usr/bin/bash /usr/bin/systemctl /usr/bin/busctl /usr/bin/sha256sum /usr/bin/timeout /usr/bin/mv; do chown root:root "$h"; chmod 755 "$h"; done
+  rm -rf /usr/local/libexec/afldb /etc/systemd/system/afldb-backup.service.d /etc/systemd/system/afldb-backup.timer.d "$F23_ATT_RD" /var/lib/afldb-attest-elsewhere
+  rm -f /etc/systemd/system/afldb-backup.service /etc/systemd/system/afldb-backup.timer /fx/espx
+  install -d -o root -g root -m 0755 /usr/local/libexec /usr/local/libexec/afldb /etc/systemd/system/afldb-backup.service.d "$F23_ATT_RD"
+  install -o root -g root -m 0755 "$A/afldb-backup-attest" "$F23_ATT_W"
+  install -o root -g root -m 0644 "$A/60-afldb-backup-attest.conf" "$F23_ATT_D"
+  install -o root -g root -m 0644 "$F23_ATT_FIX/deploy/afldb-backup.service" /etc/systemd/system/afldb-backup.service
+  install -o root -g root -m 0644 "$F23_ATT_FIX/deploy/afldb-backup.timer" /etc/systemd/system/afldb-backup.timer
+}
+f23_attest_rows() { # the loaded unit's rows, as systemd 255 prints them with the drop-in installed (no EnvironmentFiles row: none)
+  printf '%s\n' "afldb-backup.service|FragmentPath|/etc/systemd/system/afldb-backup.service" "afldb-backup.service|DropInPaths|$F23_ATT_D" \
+    "afldb-backup.service|ExecStartPostEx|$(f23_attest_espx)" "afldb-backup.timer|FragmentPath|/etc/systemd/system/afldb-backup.timer" \
+    "afldb-backup.timer|DropInPaths|"
+}
+f23_attest_espx() { # [argv [flags]]: one ExecStartPostEx value, after a run (as measured on systemd 255.4)
+  printf '{ path=/usr/bin/env ; argv[]=%s ; flags=%s ; start_time=[Wed 2026-11-25 02:20:19 AEDT] ; stop_time=[Wed 2026-11-25 02:20:19 AEDT] ; pid=4712 ; code=exited ; status=0 }' \
+    "${1:-$F23_ATT_X}" "${2:-ignore-failure privileged}"
+}
+# f23_attest_record <invocation> <trigger_unit|none> <trigger usec|none> [key=value | -key | +raw-line ...]: one record in the writer's
+# exact format, root:root 0644, at <RD>/<invocation>.attest. Defaults are a genuine run (the monotonic values of a real systemd 255.4 run:
+# inactive-exit 245 us AFTER the main start, as PID 1 stamps them without an ExecStartPre); timer_last_trigger_usec = the given usec, or
+# the fixture's dispatch when the job has none. key=value replaces a value, -key drops that line, +line appends a raw line.
+f23_attest_record() {
+  local inv=$1 tu=$2 tus=$3 a k i ws; local -a K V; shift 3
+  ws=$(sha256sum < "$F23_ATT_FIX/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r6-20261128/attest/afldb-backup-attest" | cut -c1-64)
+  K=(writer_sha256 unit invocation job job_type active_state sub_state exec_main_code exec_main_status inactive_enter_mono
+    inactive_exit_mono exec_main_start_mono trigger_unit trigger_timer_realtime_usec timer_last_trigger_usec timer_last_trigger_mono
+    timer_active_enter_mono boot_id written_realtime_usec)
+  V=("$ws" afldb-backup.service "$inv" 151 start activating start-post 1 0 616427771245 617083858683 617083858438 "$tu" "$tus"
+    "$([ "$tus" = none ] && echo "${F23_TRIG_US:-1795807706054226}" || echo "$tus")" 617083613000 616422329687 c3524e4759ab4e0f8050875471b56b12
+    "$(( ${F23_TRIG_US:-1795807706054226} + 19000000 ))")
+  local extra=()
+  for a in "$@"; do case $a in
+    +*) extra+=("${a#+}");;
+    -*) for i in "${!K[@]}"; do [ "${K[i]}" = "${a#-}" ] && V[i]=__DROP__; done;;
+    *=*) for i in "${!K[@]}"; do [ "${K[i]}" = "${a%%=*}" ] && V[i]=${a#*=}; done;;
+  esac; done
+  { echo afldb-backup-attest/1; for i in "${!K[@]}"; do [ "${V[i]}" = __DROP__ ] || printf '%s=%s\n' "${K[i]}" "${V[i]}"; done
+    for a in "${extra[@]}"; do printf '%s\n' "$a"; done; } > "$F23_ATT_RD/$inv.attest"
+  chown root:root "$F23_ATT_RD/$inv.attest"; chmod 644 "$F23_ATT_RD/$inv.attest"
 }
 # A start by hand at <start>, exit <exit> (HH:MM:SS), success, its own invocation and dump; the caller sets the timer and any
 # earlier journal lines first (the journal is NOT reset here).
@@ -106,8 +178,10 @@ f23_manual_run() { # start exit
   f23_set afldb-backup.service ExecMainStartTimestamp "@$(f23_ep "$F23_DAY $1")"; f23_set afldb-backup.service ExecMainExitTimestamp "@$(f23_ep "$F23_DAY $2")"
   f23_set afldb-backup.service InvocationID "$F23_BINV2"; f23_set afldb-backup.service Result success; f23_set afldb-backup.service ExecMainStatus 0
   f23_jline "$F23_BINV2" "$1" "target: mode=backup dir=$F23_BK keep=14 offhost=none tools=$F23_CHK/tools/maintenance"
-  f23_trigger_line "$F23_BINV2" "$1" none
+  [ "$F23_SCRIPT" != r5 ] || f23_trigger_line "$F23_BINV2" "$1" none
   f23_jline "$F23_BINV2" "$2" "backup ok: $F23_SD 4096 bytes sha256 ${F23_SS:0:16} offhost=skipped"
+  # r6: the timer's own run did not succeed, so the writer never ran for it; the hand start's own job carries no details
+  rm -f "$F23_ATT_RD/$F23_BINV.attest"; f23_attest_record "$F23_BINV2" none none job=209
 }
 
 # ---- the afldb service: a real process tree owned by arm
@@ -186,6 +260,8 @@ case $cmd in
       if [ "$value" = 1 ]; then printf '%s\n' "$real"; else printf 'InvocationID=%s\n' "$real"; fi; exit 0
     fi
     for p in "${props[@]}"; do
+      # r6: /fx/espx, when present, is the verbatim ExecStartPostEx output of the backup service (e.g. two entries)
+      if [ "$unit/$p" = afldb-backup.service/ExecStartPostEx ] && [ -s /fx/espx ]; then cat /fx/espx; continue; fi
       v=$(look "$unit" "$p") || v=
       if [[ $v == @* ]]; then e=${v#@}
         if [ "$p" = LastTriggerUSec ]; then v=$(TZ=${TZ:-Australia/Melbourne} /usr/bin/date -d "@$e" '+%a %Y-%m-%d %H:%M:%S %Z')
@@ -301,6 +377,7 @@ TXT
   printf '[{"next":%s000000,"left":0,"last":0,"passed":0,"unit":"apt-daily.timer","activates":"apt-daily.service"},{"next":%s000000,"left":0,"last":0,"passed":0,"unit":"afldb-settle-afl-api.timer","activates":"afldb-settle-afl-api.service"},{"next":%s000000,"left":0,"last":0,"passed":0,"unit":"afldb-backup.timer","activates":"afldb-backup.service"},{"next":%s000000,"left":0,"last":0,"passed":0,"unit":"afldb-backup-verify.timer","activates":"afldb-backup-verify.service"},{"next":%s000000,"left":0,"last":0,"passed":0,"unit":"apt-daily-upgrade.timer","activates":"apt-daily-upgrade.service"}]\n' \
     "$WAD" "$WSE" "$THU" "$THV" "$THA" > /fx/list-timers.json
 
+  f23_attest_install "$FX" || return 1
   f23_service_start "$F23_CUR" || return 1
   cat > /fx/sysd.tbl <<TBL
 afldb|ActiveState|active
@@ -351,6 +428,7 @@ f23_scenario() { # name
   local tgt="target: mode=backup dir=$F23_BK keep=14 offhost=none tools=$F23_CHK/tools/maintenance" okl
   f23_backup_genuine
   okl="backup ok: $F23_SD 4096 bytes sha256 ${F23_SS:0:16} offhost=skipped"
+  local tm=617083613000 R=$F23_ATT_RD rec=$F23_ATT_RD/$F23_BINV.attest T=$F23_TRIG_US   # r6: the genuine record's dispatch (monotonic)
   case $1 in
     genuine) ;;
     genuine-pid1-lines)        # arm can read PID 1's lines about the same invocation: still the timer's run
@@ -367,7 +445,7 @@ f23_scenario() { # name
       f23_manual_run 02:20:03 02:20:25;;
     astra)                     # r5, Astra's case: the timer's invocation failed at 02:20:00 and left NOTHING arm can read (PID 1's
       f23_journal_reset        # lines only, e.g. a failed dependency); a start by hand at 02:20:03 then succeeded: one visible invocation
-      f23_manual_run 02:20:03 02:20:25;;    # (the r5 script installed: its start job has no activation details, so it logs unit=none)
+      F23_SCRIPT=r5 f23_manual_run 02:20:03 02:20:25;;    # (the r5 script: unit=none; r6: the writer's record says trigger_unit=none)
     astra-current-script)      # the same, with today's production script: the hand-started run logs no trigger line at all
       F23_SCRIPT=current f23_journal_reset; F23_SCRIPT=current f23_manual_run 02:20:03 02:20:25;;
     genuine-current-script)    # a genuine timer run of today's production script: it logs no trigger line, so nothing proves its origin
@@ -435,22 +513,102 @@ f23_scenario() { # name
       f23_jline "$F23_BINV" 02:20:19 "backup ok: afldb_prod-$F23_DAYC-022002.dump 4096 bytes sha256 ${F23_SS:0:16} offhost=skipped";;
     journal-other-hash) f23_journal_reset; f23_jline "$F23_BINV" 02:20:01 "$tgt"; f23_trigger_line "$F23_BINV" 02:20:01 afldb-backup.timer
       f23_jline "$F23_BINV" 02:20:19 "backup ok: $F23_SD 4096 bytes sha256 0000000000000000 offhost=skipped";;
+    # ---- r6: the root record. PASS states (the trigger-* states above PASS too now: a trigger line counts toward nothing)
+    genuine-r5-script)         # a genuine run of the withdrawn r5 script: its trigger line is ignored
+      f23_trigger_line "$F23_BINV" 02:20:01 afldb-backup.timer;;
+    attest-exit-after-start)   # the measured real order: inactive-exit 245 us AFTER the main start (no ExecStartPre)
+      ar inactive_exit_mono=617083858683 exec_main_start_mono=617083858438;;
+    attest-exit-before-start)  ar inactive_exit_mono=617083858000 exec_main_start_mono=617083858438;;
+    attest-start-5s-exactly)   ar inactive_exit_mono=$((tm + 4999000)) exec_main_start_mono=$((tm + 5000000));;
+    attest-first-run-since-boot) ar inactive_enter_mono=0;;
+    attest-other-dispatch-records)   # earlier nights and hand starts are in the same directory
+      f23_attest_record 0a0b0c0d0e0f40112233445566778899 afldb-backup.timer $((T - 86400000000)); f23_attest_record 1a1b1c1d1e1f40112233445566778899 none none;;
+    attest-leftover-tmp)       printf 'partial\n' > "$R/.2a2b2c2d2e2f40112233445566778899.tmp";;
+    attest-timer-rearmed)      ar timer_active_enter_mono=$((tm - 5000000));;   # information only: "the dispatch came 5.0 s after ..."
+    # ---- r6: STOP states. Install and unit.
+    attest-not-installed-r5-line)    # an older install: the r5 trigger line, no writer, no drop-in, no record
+      f23_trigger_line "$F23_BINV" 02:20:01 afldb-backup.timer; rm -rf /usr/local/libexec/afldb /etc/systemd/system/afldb-backup.service.d "$R"
+      f23_set afldb-backup.service ExecStartPostEx ""; f23_set afldb-backup.service DropInPaths "";;
+    attest-forged-trigger-no-record) # writer installed, no record for the run; arm logged a perfect trigger line itself
+      f23_trigger_line "$F23_BINV" 02:20:01 afldb-backup.timer; rm -f "$rec";;
+    attest-astra-forged-trigger)     # Astra's case with an arm-edited script logging a perfect trigger line for the hand start
+      f23_journal_reset; f23_manual_run 02:20:03 02:20:25; f23_trigger_line "$F23_BINV2" 02:20:03 afldb-backup.timer;;
+    attest-envfile) f23_set afldb-backup.service EnvironmentFiles "/home/arm/projects/afldb/.env (ignore_errors=no)";;
+    attest-execpost-missing) f23_set afldb-backup.service ExecStartPostEx "";;
+    attest-execpost-two) printf 'ExecStartPostEx=%s\nExecStartPostEx=%s\n' "$(f23_attest_espx)" \
+      "$(f23_attest_espx '/usr/bin/bash -c echo second' privileged)" > /fx/espx; chmod 644 /fx/espx;;
+    attest-execpost-not-privileged) f23_set afldb-backup.service ExecStartPostEx "$(f23_attest_espx "" ignore-failure)";;
+    attest-execpost-other-argv) f23_set afldb-backup.service ExecStartPostEx "$(f23_attest_espx '/usr/bin/bash /home/arm/projects/afldb/attest.sh')";;
+    attest-dropin-not-loaded) f23_set afldb-backup.service DropInPaths "";;
+    attest-fragment-under-home)      # the unit loaded from arm's checkout (a `systemctl link`)
+      mkdir -p "$F23_CHK/deploy"; cp /etc/systemd/system/afldb-backup.service "$F23_CHK/deploy/"; chown -R arm:arm "$F23_CHK/deploy"
+      f23_set afldb-backup.service FragmentPath "$F23_CHK/deploy/afldb-backup.service";;
+    attest-extra-dropin-arm-owned)
+      printf '[Service]\nNice=10\n' > /etc/systemd/system/afldb-backup.service.d/99-arm.conf; chown arm:arm /etc/systemd/system/afldb-backup.service.d/99-arm.conf
+      f23_set afldb-backup.service DropInPaths "$F23_ATT_D /etc/systemd/system/afldb-backup.service.d/99-arm.conf";;
+    attest-timer-dropin-writable)
+      install -d -m 0755 /etc/systemd/system/afldb-backup.timer.d; printf '[Timer]\nAccuracySec=1s\n' > /etc/systemd/system/afldb-backup.timer.d/x.conf
+      chmod 666 /etc/systemd/system/afldb-backup.timer.d/x.conf; f23_set afldb-backup.timer DropInPaths /etc/systemd/system/afldb-backup.timer.d/x.conf;;
+    attest-helper-writable) chmod 777 /usr/bin/timeout;;
+    attest-writer-digest) printf '# arm was here\n' >> "$F23_ATT_W";;
+    attest-writer-arm-owned) chown arm:arm "$F23_ATT_W";;
+    attest-writer-dir-writable) chmod 775 /usr/local/libexec/afldb;;
+    attest-dropin-digest) printf '\n' >> "$F23_ATT_D";;
+    # ---- r6: STOP states. The record's place and file.
+    attest-record-of-other-invocation) rm -f "$rec"; f23_attest_record "$F23_BINV2" afldb-backup.timer "$T";;
+    attest-record-arm-owned) chown arm:arm "$rec";;
+    attest-record-group-writable) chmod 664 "$rec";;
+    attest-record-other-writable) chmod 646 "$rec";;
+    attest-record-symlink) mkdir -p /var/lib/afldb-attest-elsewhere; mv "$rec" /var/lib/afldb-attest-elsewhere/; ln -s "/var/lib/afldb-attest-elsewhere/$F23_BINV.attest" "$rec";;
+    attest-record-nlink2) mkdir -p /var/lib/afldb-attest-elsewhere; ln "$rec" /var/lib/afldb-attest-elsewhere/copy.attest;;
+    attest-record-dir-arm-owned) chown arm:arm "$R";;
+    attest-record-dir-writable) chmod 777 "$R";;
+    attest-record-parent-writable) chmod 777 /var/lib;;
+    attest-record-dir-symlink) mkdir -p /var/lib/afldb-attest-elsewhere; mv "$R" /var/lib/afldb-attest-elsewhere/rd; ln -s /var/lib/afldb-attest-elsewhere/rd "$R";;
+    attest-duplicate-dispatch) f23_attest_record "$F23_BINV2" afldb-backup.timer "$T" job=152;;
+    # ---- r6: STOP states. The record's facts.
+    attest-trigger-none) ar trigger_unit=none trigger_timer_realtime_usec=none;;
+    attest-trigger-other-unit) ar trigger_unit=afldb-backup-verify.timer;;
+    attest-wrong-invocation-field) ar invocation=$F23_BINV2;;
+    attest-usec-plus-1) ar trigger_timer_realtime_usec=$((T + 1)) timer_last_trigger_usec=$((T + 1));;
+    attest-usec-minus-1) ar trigger_timer_realtime_usec=$((T - 1)) timer_last_trigger_usec=$((T - 1));;
+    attest-stale-dispatch) ar trigger_timer_realtime_usec=$((T - 86400000000)) timer_last_trigger_usec=$((T - 86400000000));;
+    attest-timer-usec-at-write-differs) ar timer_last_trigger_usec=$((T - 1000000));;
+    attest-restart-ordering)   # the measured restart case: same job and details, inactive-enter 1.8 s AFTER the dispatch
+      ar inactive_enter_mono=$((tm + 1818455)) inactive_exit_mono=$((tm + 2287900)) exec_main_start_mono=$((tm + 2287607));;
+    attest-inactive-enter-equal) ar inactive_enter_mono=$tm;;
+    attest-exit-before-dispatch) ar inactive_exit_mono=$((tm - 1));;
+    attest-start-before-dispatch) ar exec_main_start_mono=$((tm - 1));;
+    attest-start-over-5s) ar exec_main_start_mono=$((tm + 5000001));;
+    attest-exit-over-5s) ar inactive_exit_mono=$((tm + 5000001));;
+    attest-job-restart) ar job_type=restart;;
+    attest-state-active) ar active_state=active sub_state=exited;;
+    attest-exec-status-1) ar exec_main_status=1;;
+    attest-exec-code-killed) ar exec_main_code=2 exec_main_status=15;;
+    attest-record-writer-sha) ar writer_sha256=00000000000000000000000000000000000000000000000000000000000000ff;;
+    # ---- r6: STOP states. Malformed records.
+    attest-malformed-extra-line) ar +extra=1;;
+    attest-malformed-missing-line) ar -boot_id;;
+    attest-malformed-reordered) sed -i '3{h;d};4{G}' "$rec";;                 # unit= and invocation= swapped
+    attest-malformed-header) sed -i '1s/1$/2/' "$rec";;
+    attest-malformed-crlf) sed -i '5s/$/\r/' "$rec";;
+    attest-malformed-trailing-space) sed -i '6s/$/ /' "$rec";;
+    attest-malformed-value) sed -i '5s/=.*/=12a/' "$rec";;
+    attest-malformed-no-final-newline) truncate -s -1 "$rec";;
+    attest-malformed-nul) sed -i '7s/=/=\x00/' "$rec";;
+    attest-malformed-duplicate-key) sed -i '19s/.*/timer_active_enter_mono=1/' "$rec";;
+    attest-malformed-empty) : > "$rec";;
     *) echo "STOP unknown scenario $1"; return 1;;
   esac
 }
+ar() { f23_attest_record "$F23_BINV" afldb-backup.timer "$F23_TRIG_US" "$@"; }   # r6: rewrite the genuine run's record with changes
 # The reason (extended regex, matched inside one FAIL line) each non-genuine scenario must be refused for.
 f23_reason() { # name
   case $1 in
-    astra|astra-offhost-later|astra-with-hand-run-lines) echo "not attributed to the backup timer: scheduled origin unproven: the run's start job names trigger unit 'none', not afldb-backup\\.timer";;
-    astra-current-script|genuine-current-script) echo 'not attributed to the backup timer: scheduled origin unproven: invocation [0-9a-f]{32} logged 0 trigger lines';;
+    # r6: the hand start's ROOT record says trigger_unit=none (r5: its trigger line did; the expected text gained "record <path>: ")
+    astra|astra-offhost-later|astra-with-hand-run-lines|astra-current-script|attest-astra-forged-trigger|attest-trigger-none)
+      echo "not attributed to the backup timer: scheduled origin unproven: record /var/lib/afldb-backup-attest/[0-9a-f]{32}\\.attest: the run's start job names trigger unit 'none', not afldb-backup\\.timer";;
     timer-trigger-then-fail-manual-3s) echo 'not attributed to the backup timer: ambiguous: another invocation of afldb-backup\.service \([0-9a-f]{32}, epoch [0-9]+\)';;
-    trigger-stale-dispatch|trigger-off-by-1us) echo 'scheduled origin unproven: the run.s start job records the dispatch at [0-9]+ us, but the timer.s LastTriggerUSec is [0-9]+ us';;
-    trigger-seconds-only) echo 'scheduled origin unproven: the run.s start job records the dispatch at [0-9]+ us, but the timer.s LastTriggerUSec is [0-9]+ us';;
-    trigger-two-lines|trigger-timer-and-none) echo 'scheduled origin unproven: invocation [0-9a-f]{32} logged 2 trigger lines';;
-    trigger-other-invocation-field) echo 'scheduled origin unproven: the trigger line names invocation [0-9a-f]{32}, not the run.s [0-9a-f]{32}';;
-    trigger-other-unit) echo "scheduled origin unproven: the run's start job names trigger unit 'afldb-backup-verify\\.timer'";;
-    trigger-malformed) echo 'scheduled origin unproven: invocation [0-9a-f]{32} logged 0 trigger lines';;
-    trigger-note-only) echo "scheduled origin unproven: the run's start job names trigger unit 'none'";;
     trigger-after-run) echo 'invocation [0-9a-f]{32} logged at epoch [0-9]+, outside its own run';;
     busctl-fail|busctl-garbage|busctl-empty) echo 'scheduled origin unproven: afldb-backup\.timer LastTriggerUSec could not be read in microseconds';;
     manual-no-timer) echo 'not attributed to the backup timer: no timer dispatch in the window: afldb-backup\.timer last triggered at epoch [0-9]+';;
@@ -473,9 +631,74 @@ f23_reason() { # name
     two-dumps) echo 'dump not attributable: ambiguous: 2 dumps in the 02:2x/02:3x window';;
     bad-sidecar) echo 'dump not attributable: afldb_prod-20261125-022001\.dump re-hash [0-9a-f]{64} != sidecar';;
     journal-other-name|journal-other-hash) echo "dump not attributable: the service reported '[^']*', not afldb_prod-20261125-022001\.dump sha256 [0-9a-f]{16}";;
+    # r6
+    attest-not-installed-r5-line|attest-execpost-missing) echo 'scheduled origin unproven: afldb-backup\.service has 0 ExecStartPost commands';;
+    attest-execpost-two) echo 'scheduled origin unproven: afldb-backup\.service has 2 ExecStartPost commands';;
+    attest-forged-trigger-no-record|attest-record-of-other-invocation) echo 'scheduled origin unproven: no root record /var/lib/afldb-backup-attest/[0-9a-f]{32}\.attest: the writer did not attest invocation [0-9a-f]{32}';;
+    attest-envfile) echo 'scheduled origin unproven: afldb-backup\.service has 1 EnvironmentFile= entries';;
+    attest-execpost-not-privileged) echo "scheduled origin unproven: afldb-backup\\.service ExecStartPost flags are 'ignore-failure', not 'ignore-failure privileged'";;
+    attest-execpost-other-argv) echo "scheduled origin unproven: afldb-backup\\.service ExecStartPost is not the attestation writer's command line";;
+    attest-dropin-not-loaded) echo 'scheduled origin unproven: afldb-backup\.service DropInPaths lacks /etc/systemd/system/afldb-backup\.service\.d/60-afldb-backup-attest\.conf';;
+    attest-fragment-under-home) echo 'scheduled origin unproven: untrusted path: /home/arm is owned by uid 1000, not root';;
+    attest-extra-dropin-arm-owned) echo 'scheduled origin unproven: untrusted path: /etc/systemd/system/afldb-backup\.service\.d/99-arm\.conf is owned by uid 1000';;
+    attest-timer-dropin-writable) echo 'scheduled origin unproven: untrusted path: /etc/systemd/system/afldb-backup\.timer\.d/x\.conf has mode 666';;
+    attest-helper-writable) echo 'scheduled origin unproven: untrusted path: /usr/bin/timeout has mode 777';;
+    attest-writer-digest) echo 'scheduled origin unproven: the writer /usr/local/libexec/afldb/afldb-backup-attest has sha256 [0-9a-f]{16}\.\.\., not the pinned';;
+    attest-writer-arm-owned) echo 'scheduled origin unproven: untrusted path: /usr/local/libexec/afldb/afldb-backup-attest is owned by uid 1000';;
+    attest-writer-dir-writable) echo 'scheduled origin unproven: untrusted path: /usr/local/libexec/afldb has mode 775';;
+    attest-dropin-digest) echo 'scheduled origin unproven: the drop-in /etc/systemd/system/afldb-backup\.service\.d/60-afldb-backup-attest\.conf has sha256';;
+    attest-record-arm-owned) echo 'scheduled origin unproven: untrusted record: /var/lib/afldb-backup-attest/[0-9a-f]{32}\.attest is owned by uid 1000';;
+    attest-record-group-writable) echo 'scheduled origin unproven: untrusted record: /var/lib/afldb-backup-attest/[0-9a-f]{32}\.attest has mode 664';;
+    attest-record-other-writable) echo 'scheduled origin unproven: untrusted record: /var/lib/afldb-backup-attest/[0-9a-f]{32}\.attest has mode 646';;
+    attest-record-symlink) echo 'scheduled origin unproven: untrusted record: /var/lib/afldb-backup-attest/[0-9a-f]{32}\.attest is a symbolic link';;
+    attest-record-nlink2) echo 'scheduled origin unproven: untrusted record: /var/lib/afldb-backup-attest/[0-9a-f]{32}\.attest has 2 hard links';;
+    attest-record-dir-arm-owned) echo 'scheduled origin unproven: untrusted record directory: /var/lib/afldb-backup-attest is owned by uid 1000';;
+    attest-record-dir-writable) echo 'scheduled origin unproven: untrusted record directory: /var/lib/afldb-backup-attest has mode 777';;
+    attest-record-parent-writable) echo 'scheduled origin unproven: untrusted record directory: /var/lib has mode 777';;
+    attest-record-dir-symlink) echo 'scheduled origin unproven: untrusted record directory: /var/lib/afldb-backup-attest is a symbolic link';;
+    attest-duplicate-dispatch) echo 'scheduled origin unproven: 2 records in /var/lib/afldb-backup-attest name the dispatch at [0-9]+ us';;
+    attest-trigger-other-unit) echo "scheduled origin unproven: record [^ ]+: the run's start job names trigger unit 'afldb-backup-verify\\.timer'";;
+    attest-wrong-invocation-field) echo 'scheduled origin unproven: record [^ ]+ names invocation [0-9a-f]{32}, not the run.s';;
+    attest-usec-plus-1|attest-usec-minus-1|attest-stale-dispatch) echo 'scheduled origin unproven: record [^ ]+: the run.s start job records the dispatch at [0-9]+ us, but the timer.s LastTriggerUSec is [0-9]+ us';;
+    attest-timer-usec-at-write-differs) echo 'scheduled origin unproven: record [^ ]+: the timer.s LastTriggerUSec was [0-9]+ us when attested';;
+    attest-restart-ordering|attest-inactive-enter-equal) echo 'scheduled origin unproven: record [^ ]+: the unit entered inactive \(monotonic [0-9]+\) after the dispatch';;
+    attest-exit-before-dispatch|attest-start-before-dispatch) echo 'scheduled origin unproven: record [^ ]+: inactive-exit [0-9]+ or main start [0-9]+ \(monotonic\) precedes the dispatch';;
+    attest-start-over-5s|attest-exit-over-5s) echo 'scheduled origin unproven: record [^ ]+: the unit left inactive [0-9]+ us and its main process started [0-9]+ us after the dispatch \(more than 5 s\)';;
+    attest-job-restart) echo 'scheduled origin unproven: record [^ ]+: the run.s job is a restart job, not a start job';;
+    attest-state-active) echo 'scheduled origin unproven: record [^ ]+: the unit was active/exited when attested';;
+    attest-exec-status-1) echo 'scheduled origin unproven: record [^ ]+: ExecStart ended with code 1 status 1, not exited 0';;
+    attest-exec-code-killed) echo 'scheduled origin unproven: record [^ ]+: ExecStart ended with code 2 status 15';;
+    attest-record-writer-sha) echo 'scheduled origin unproven: record [^ ]+ was written by writer 0000000000000000\.\.\., not the pinned';;
+    attest-malformed-extra-line) echo 'scheduled origin unproven: record [^ ]+ is malformed \(21 lines';;
+    attest-malformed-missing-line) echo 'scheduled origin unproven: record [^ ]+ is malformed \(19 lines';;
+    attest-malformed-header) echo 'scheduled origin unproven: record [^ ]+ is malformed \(20 lines';;
+    attest-malformed-reordered) echo 'scheduled origin unproven: record [^ ]+ line 3 is not unit=<value>';;
+    attest-malformed-crlf|attest-malformed-value) echo 'scheduled origin unproven: record [^ ]+ line 5 is not job=<value>';;
+    attest-malformed-trailing-space) echo 'scheduled origin unproven: record [^ ]+ line 6 is not job_type=<value>';;
+    attest-malformed-no-final-newline) echo 'scheduled origin unproven: record [^ ]+ has [0-9]+ bytes, not the [0-9]+ of its 20 lines';;
+    attest-malformed-nul) echo 'scheduled origin unproven: record [^ ]+ (line 7 is not active_state=<value>|has [0-9]+ bytes, not the)';;
+    attest-malformed-duplicate-key) echo 'scheduled origin unproven: record [^ ]+ line 19 is not boot_id=<value>';;
+    attest-malformed-empty) echo 'scheduled origin unproven: untrusted record: /var/lib/afldb-backup-attest/[0-9a-f]{32}\.attest is a regular empty file, not a regular file';;
     *) echo 'NO-SUCH-SCENARIO';;
   esac
 }
+# r6: the scenarios that must PASS at both gates (f2 runs them through each main with want_pass)
+F23_PASS_SCENARIOS=(genuine genuine-pid1-lines genuine-current-script genuine-r5-script trigger-stale-dispatch trigger-off-by-1us trigger-seconds-only
+  trigger-two-lines trigger-timer-and-none trigger-other-invocation-field trigger-other-unit trigger-malformed trigger-note-only
+  attest-exit-after-start attest-exit-before-start attest-start-5s-exactly attest-first-run-since-boot attest-other-dispatch-records
+  attest-leftover-tmp attest-timer-rearmed)
+F23_ATTEST_STOP_SCENARIOS=(attest-not-installed-r5-line attest-forged-trigger-no-record attest-astra-forged-trigger attest-envfile
+  attest-execpost-missing attest-execpost-two attest-execpost-not-privileged attest-execpost-other-argv attest-dropin-not-loaded
+  attest-fragment-under-home attest-extra-dropin-arm-owned attest-timer-dropin-writable attest-helper-writable attest-writer-digest
+  attest-writer-arm-owned attest-writer-dir-writable attest-dropin-digest attest-record-of-other-invocation attest-record-arm-owned
+  attest-record-group-writable attest-record-other-writable attest-record-symlink attest-record-nlink2 attest-record-dir-arm-owned
+  attest-record-dir-writable attest-record-parent-writable attest-record-dir-symlink attest-duplicate-dispatch attest-trigger-none
+  attest-trigger-other-unit attest-wrong-invocation-field attest-usec-plus-1 attest-usec-minus-1 attest-stale-dispatch
+  attest-timer-usec-at-write-differs attest-restart-ordering attest-inactive-enter-equal attest-exit-before-dispatch
+  attest-start-before-dispatch attest-start-over-5s attest-exit-over-5s attest-job-restart attest-state-active attest-exec-status-1
+  attest-exec-code-killed attest-record-writer-sha attest-malformed-extra-line attest-malformed-missing-line attest-malformed-reordered
+  attest-malformed-header attest-malformed-crlf attest-malformed-trailing-space attest-malformed-value attest-malformed-no-final-newline
+  attest-malformed-nul attest-malformed-duplicate-key attest-malformed-empty)
 
 # ---- body of one function of a script, for the byte-identity assertions
 f23_fn() { sed -n "/^$2() {/,/^}/p" "$1"; }

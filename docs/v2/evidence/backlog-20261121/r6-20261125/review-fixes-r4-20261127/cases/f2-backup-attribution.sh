@@ -20,6 +20,20 @@
 # <FIX>/<r5 dir>/orig-f92d6e29/), the same case with a later off-host copy present (never read: atime), today's production script
 # (no trigger line: STOP), a genuine run with the line (PASS), hostile and malformed trigger lines, busctl failures, a hand run in a
 # session scope, and direct match_backup / timer_usec boundary cases. The real-systemd proofs are in review-fixes-r5-20261127/.
+# R6 r6 (28 Nov 2026, review-fixes-r6-20261128/DESIGN.md): the r5 trigger line came from the arm-owned scheduled-backup.sh, so arm
+# could forge it (r5 challenger, MED). It is WITHDRAWN: the gates no longer read it and it counts toward nothing; origin comes from
+# the ROOT writer's record, checked by attested_origin. The fixture (lib-f23-fixture.sh) installs the REAL reviewed writer and drop-in
+# and the real unit files as root-owned files at their real paths, and the gates run as arm, so trust is never shimmed. Changes here:
+#   * the genuine state is production's script (no trigger line) plus the root record; the trigger-* states that STOPped under r5
+#     (stale, off by 1 us, whole seconds, two lines, timer and none, another invocation field, another unit, malformed, note only)
+#     and genuine-current-script now PASS: a trigger line, right or wrong, changes nothing (expected outcome changed, by design);
+#   * the astra* states STOP on the hand start's ROOT record (trigger_unit=none): expected text gained "record <path>: ";
+#   * F23_ATTEST_STOP_SCENARIOS: no install, a forged trigger line with no record, every refusal of DESIGN.md 4 items 1-5, malformed
+#     records; F23_PASS_SCENARIOS adds the measured real ordering (inactive-exit after the main start), the 5 s edge, a first run since
+#     boot, other records and a leftover temporary file, and a re-armed timer (item 6 is information only);
+#   * contrasts: the 624bf721 (r5) gates PASS the forged-trigger states (F2_R5_G0 / F2_R5_PRE, default <FIX>/<r6 dir>/orig-624bf721/);
+#   * match_backup no longer requires or counts a trigger line: the mb-origin-* cases built on trigger-line content now expect rc 0
+#     (named at the mbc block), the LastTriggerUSec-in-microseconds checks it keeps are unchanged; bj-genuine has 2 lines (no trigger line).
 # Usage: bash cases/f2-backup-attribution.sh <FIX> [<STAGE>]
 set -uo pipefail; export LC_ALL=C
 FIX=${1:?usage: f2-backup-attribution.sh <FIX> [<STAGE>]}; STAGE=${2:-$FIX}
@@ -30,15 +44,17 @@ PRE=$STAGE/$B/r6-20261125/r6-pre-verify.sh; G0=$FIX/docs/v2/evidence/release-178
 OPRE=${F2_ORIG_PRE:-$FIX/$H4/orig-aa33f0fc/r6-pre-verify.sh}; OG0=${F2_ORIG_G0:-$FIX/$H4/orig-aa33f0fc/r1-g0-dump.sh}
 H5=$B/r6-20261125/review-fixes-r5-20261127
 FPRE=${F2_F92_PRE:-$FIX/$H5/orig-f92d6e29/r6-pre-verify.sh}; FG0=${F2_F92_G0:-$FIX/$H5/orig-f92d6e29/r1-g0-dump.sh}
+H6=$B/r6-20261125/review-fixes-r6-20261128
+RPRE=${F2_R5_PRE:-$FIX/$H6/orig-624bf721/r6-pre-verify.sh}; RG0=${F2_R5_G0:-$FIX/$H6/orig-624bf721/r1-g0-dump.sh}
 N=0; U=0
 okc() { echo "CASE-RESULT f2-$1 OK ($2 ; got $3)"; N=$((N+1)); }
 unx() { echo "CASE-RESULT f2-$1 UNEXPECTED ($2 ; got $3)"; U=$((U+1)); }
 finish() { if [ "$U" = 0 ]; then echo "SUITE f2 RESULT PASS ($N cases)"; exit 0; else echo "SUITE f2 RESULT FAIL ($U unexpected)"; exit 1; fi; }
 TMP=$(mktemp -d) || { echo "CASE-RESULT f2-setup UNEXPECTED (mktemp ; got failure)"; U=1; finish; }
 trap 'f23_service_stop; rm -rf "$TMP"' EXIT
-for f in "$PRE" "$G0" "$OPRE" "$OG0" "$FPRE" "$FG0"; do [ -f "$f" ] || { unx setup "script present" "missing $f"; finish; }; done
+for f in "$PRE" "$G0" "$OPRE" "$OG0" "$FPRE" "$FG0" "$RPRE" "$RG0"; do [ -f "$f" ] || { unx setup "script present" "missing $f"; finish; }; done
 f23_setup "$FIX" > "$TMP/setup.out" 2>&1 || { unx setup "fixture built" "$(tail -n 1 "$TMP/setup.out")"; finish; }
-echo "== f2 $(/usr/bin/date -u +%FT%TZ) host=$(hostname) G0 $(sha256sum < "$G0" | cut -c1-16) A-2 $(sha256sum < "$PRE" | cut -c1-16) orig G0 $(sha256sum < "$OG0" | cut -c1-16) orig A-2 $(sha256sum < "$OPRE" | cut -c1-16) f92d6e29 G0 $(sha256sum < "$FG0" | cut -c1-16) A-2 $(sha256sum < "$FPRE" | cut -c1-16)"
+echo "== f2 $(/usr/bin/date -u +%FT%TZ) host=$(hostname) G0 $(sha256sum < "$G0" | cut -c1-16) A-2 $(sha256sum < "$PRE" | cut -c1-16) orig G0 $(sha256sum < "$OG0" | cut -c1-16) orig A-2 $(sha256sum < "$OPRE" | cut -c1-16) f92d6e29 G0 $(sha256sum < "$FG0" | cut -c1-16) A-2 $(sha256sum < "$FPRE" | cut -c1-16) 624bf721 G0 $(sha256sum < "$RG0" | cut -c1-16) A-2 $(sha256sum < "$RPRE" | cut -c1-16); installed writer $(sha256sum < "$F23_ATT_W" | cut -c1-16) drop-in $(sha256sum < "$F23_ATT_D" | cut -c1-16)"
 
 OUT=; RC=
 gate() { # g0|a2 script
@@ -56,10 +72,10 @@ want_pass() { # case gate script inv
   if [ "$RC" = 0 ] && [ "$(grep -c '^FAIL' <<< "$OUT")" = 0 ] && [[ "$(verdict)" == "$v"* ]] \
      && grep -q "^PASS afldb-backup\.service scheduled run: timer dispatch .* invocation $4 alone in the window journal" <<< "$OUT" \
      && grep -q "^BACKUP-EVIDENCE $4 [0-9]* [0-9]* [0-9]* [0-9]* $F23_SD ${F23_SS:0:16}\$" <<< "$OUT" \
-     && grep -q "its start job was dispatched by afldb-backup\.timer at $F23_TRIG_US us = LastTriggerUSec" <<< "$OUT" \
+     && grep -q "its start job was dispatched by afldb-backup\.timer at $F23_TRIG_US us = LastTriggerUSec (job [0-9]*, JobType start; root record /var/lib/afldb-backup-attest/$4\.attest, writer [0-9a-f]*; main start [0-9]* us after the dispatch, no stop or failure between); INFO, not a criterion: the dispatch came [0-9.]* s after afldb-backup\.timer's last (re)activation" <<< "$OUT" \
      && [ "$(grep '^OFFHOST-COMPARE ' <<< "$OUT")" = "OFFHOST-COMPARE $F23_SD $F23_SS" ]; then
-    okc "$1" "exit 0, no FAIL, $v, timer run attributed to $4, OFFHOST-COMPARE of the fixture dump" "$(got)"
-  else unx "$1" "exit 0, no FAIL, $v, timer run attributed, OFFHOST-COMPARE" "$(got)"; fi
+    okc "$1" "exit 0, no FAIL, $v, timer run attributed to $4 by its root record, OFFHOST-COMPARE of the fixture dump" "$(got)"
+  else unx "$1" "exit 0, no FAIL, $v, timer run attributed by its root record, OFFHOST-COMPARE" "$(got)"; fi
 }
 want_stop() { # case gate script reason-regex
   local v; case $2 in g0) v='G0 PROD RESULT FAIL';; a2) v='R6 PRE RESULT STOP';; esac
@@ -80,12 +96,25 @@ want_false_pass() { # case gate orig-script: an ORIGINAL gate (aa33f0fc, or f92d
 
 echo "-- shared functions: byte-identical in both gates; pick_overnight_dump unchanged from aa33f0fc"
 same=1; list=
-for fn in pick_overnight_dump ts timer_usec read_invocation backup_journal match_backup scheduled_backup_run; do
+for fn in pick_overnight_dump ts timer_usec read_invocation backup_journal match_backup trusted_path attested_origin scheduled_backup_run; do
   a=$(f23_fn "$G0" "$fn" | sha256sum | cut -c1-16); b=$(f23_fn "$PRE" "$fn" | sha256sum | cut -c1-16)
   [ -n "$(f23_fn "$G0" "$fn")" ] && [ "$a" = "$b" ] || same=0; list="$list $fn=$a/$b"
 done
-[ "$same" = 1 ] && okc fn-identical "seven shared function bodies hash the same in r1-g0-dump.sh and r6-pre-verify.sh" "${list# }" \
-  || unx fn-identical "seven shared function bodies hash the same" "${list# }"
+[ "$same" = 1 ] && okc fn-identical "nine shared function bodies hash the same in r1-g0-dump.sh and r6-pre-verify.sh" "${list# }" \
+  || unx fn-identical "nine shared function bodies hash the same" "${list# }"
+same=1; list=
+for fn in pick_overnight_dump ts timer_usec read_invocation backup_journal; do   # r6 changed only match_backup and scheduled_backup_run
+  a=$(f23_fn "$G0" "$fn" | sha256sum | cut -c1-16); b=$(f23_fn "$RG0" "$fn" | sha256sum | cut -c1-16); [ "$a" = "$b" ] || same=0; list="$list $fn=$a/$b"
+done
+[ "$same" = 1 ] && okc fn-unchanged-624bf721 "five shared functions are byte-identical to the 624bf721 (r5) bodies" "${list# }" \
+  || unx fn-unchanged-624bf721 "five shared functions unchanged from 624bf721" "${list# }"
+grep -q 'trigger:' <<< "$(f23_fn "$G0" match_backup; f23_fn "$G0" scheduled_backup_run; f23_fn "$G0" attested_origin)" \
+  && unx no-trigger-rule "no shared origin function mentions a trigger: line" "found" || okc no-trigger-rule "no shared origin function mentions a trigger: line" "none"
+n=$(grep -cE "^  local WS=[0-9a-f]{64} DS=[0-9a-f]{64}\$" "$G0"); m=$(grep -c "@@" "$G0" "$PRE" | awk -F: '{s+=$2} END {print s}')
+w=$(sha256sum < "$F23_ATT_W" | cut -c1-64); d=$(sha256sum < "$F23_ATT_D" | cut -c1-64)
+[ "$n" = 1 ] && [ "$m" = 0 ] && grep -q "^  local WS=$w DS=$d\$" "$G0" && grep -q "^  local WS=$w DS=$d\$" "$PRE" \
+  && okc pins-real "both gates pin the installed (reviewed) writer $w and drop-in $d; no placeholder" "WS ${w:0:16} DS ${d:0:16}" \
+  || unx pins-real "both gates pin the reviewed writer and drop-in" "pin lines $n, placeholders $m"
 a=$(f23_fn "$G0" pick_overnight_dump | sha256sum | cut -c1-16); b=$(f23_fn "$OG0" pick_overnight_dump | sha256sum | cut -c1-16)
 [ "$a" = "$b" ] && okc pick-unchanged "pick_overnight_dump body = the aa33f0fc body" "$a = $b" || unx pick-unchanged "pick_overnight_dump body = the aa33f0fc body" "$a != $b"
 b=$(f23_fn "$FG0" pick_overnight_dump | sha256sum | cut -c1-16)
@@ -93,19 +122,21 @@ b=$(f23_fn "$FG0" pick_overnight_dump | sha256sum | cut -c1-16)
 
 echo "-- G0 and A-2 main on each fixture state"
 for g in g0 a2; do
-  case $g in g0) S=$G0; O=$OG0; FO=$FG0;; a2) S=$PRE; O=$OPRE; FO=$FPRE;; esac
-  f23_scenario genuine;            want_pass "$g-genuine-timer-run" "$g" "$S" "$F23_BINV"
-  f23_scenario genuine-pid1-lines; want_pass "$g-genuine-with-pid1-lines" "$g" "$S" "$F23_BINV"
+  case $g in g0) S=$G0; O=$OG0; FO=$FG0; RO=$RG0;; a2) S=$PRE; O=$OPRE; FO=$FPRE; RO=$RPRE;; esac
+  for sc in "${F23_PASS_SCENARIOS[@]}"; do         # r6: includes the trigger-* states that STOPped under r5 (a trigger line counts toward nothing)
+    f23_scenario "$sc" > /dev/null || { unx "$g-$sc" "scenario built" "unknown scenario"; continue; }
+    want_pass "$g-$sc" "$g" "$S" "$F23_BINV"
+  done
   for sc in manual-no-timer timer-failed-then-manual manual-within-5s ok-line-other-invocation two-invocations pid1-other-invocation \
       binv-fail binv-empty binv-malformed binv-multi journal-fail journal-malformed journal-no-invocation no-timer-property \
       timer-run-failed no-completion no-ok-line two-ok-lines ok-line-after-run no-dump two-dumps bad-sidecar journal-other-name journal-other-hash \
-      astra astra-current-script genuine-current-script astra-with-hand-run-lines timer-trigger-then-fail-manual-3s trigger-stale-dispatch \
-      trigger-off-by-1us trigger-seconds-only trigger-two-lines trigger-timer-and-none trigger-other-invocation-field trigger-other-unit \
-      trigger-malformed trigger-note-only trigger-after-run busctl-fail busctl-garbage busctl-empty; do
+      astra astra-current-script astra-with-hand-run-lines timer-trigger-then-fail-manual-3s trigger-after-run busctl-fail busctl-garbage busctl-empty \
+      "${F23_ATTEST_STOP_SCENARIOS[@]}"; do
     f23_scenario "$sc" > /dev/null || { unx "$g-$sc" "scenario built" "unknown scenario"; continue; }
     want_stop "$g-$sc" "$g" "$S" "$(f23_reason "$sc")"
     case $sc in manual-no-timer|timer-failed-then-manual|manual-within-5s) want_false_pass "$g-$sc-aa33f0fc" "$g" "$O";; esac
     case $sc in astra|astra-current-script|astra-with-hand-run-lines) want_false_pass "$g-$sc-f92d6e29" "$g" "$FO";; esac   # the f92d6e29 gates PASS Astra's case
+    case $sc in attest-forged-trigger-no-record|attest-astra-forged-trigger) want_false_pass "$g-$sc-624bf721" "$g" "$RO";; esac   # the r5 gates PASS a forged line
   done
   # Astra's case with the 03:10 off-host pull already holding the hand-started dump: STOP, and no gate read the copy (atime)
   f23_scenario astra-offhost-later > /dev/null
@@ -151,7 +182,9 @@ mbc mb-invocation-not-hex 1 '^REASON the service InvocationID is not one 32-hex 
 mbc mb-reader-other-failure 1 '^REASON the journal JSON reader failed \(exit 127\)' "$B0" "$B1" "$B0" $((B0+1)) $((B0+19)) success 0 "$I" 127 "" "$TU"
 mbc mb-ok-line-not-anchored 1 "^REASON .*logged 0 'backup ok' lines" "$B0" "$B1" "$B0" $((B0+1)) $((B0+19)) success 0 "$I" 0 \
   "$I $((B0+19)) own echo of: x scheduled-backup: backup ok: $D 4096 bytes sha256 0123456789abcdef offhost=skipped trailing" "$TU"
-# r5: the origin rule (match_backup's 11th argument is what busctl printed for LastTriggerUSec)
+# r5: the origin rule (match_backup's 11th argument is what busctl printed for LastTriggerUSec). r6: match_backup no longer reads a trigger
+# line: the cases built on its content (1us-later .. job-not-a-number, unit-*, no-/two-trigger-lines) now expect rc 0 (r5 expected 1);
+# a trigger line is still an own line, so its time must lie inside the run (after-exit-6s still STOPs); origin is attested_origin's.
 OR='^REASON scheduled origin unproven: '
 mbc mb-origin-valid 0 "^$I $B0 $((B0+1)) $((B0+19)) $((B0+19)) $D 0123456789abcdef\$" "$B0" "$B1" "$B0" $((B0+1)) $((B0+19)) success 0 "$I" 0 "$(jl $((B0+19)))" "$TU"
 mbc mb-origin-no-timer-usec 1 "${OR}afldb-backup\\.timer LastTriggerUSec could not be read in microseconds" "$B0" "$B1" "$B0" $((B0+1)) $((B0+19)) success 0 "$I" 0 "$(jl $((B0+19)))"
@@ -159,20 +192,20 @@ mbc mb-origin-empty-timer-usec 1 "${OR}afldb-backup\\.timer LastTriggerUSec coul
 mbc mb-origin-timer-usec-not-a-number 1 "${OR}afldb-backup\\.timer LastTriggerUSec could not be read in microseconds" "$B0" "$B1" "$B0" $((B0+1)) $((B0+19)) success 0 "$I" 0 "$(jl $((B0+19)))" "12x"
 mbc mb-origin-timer-usec-leading-zero 1 "${OR}afldb-backup\\.timer LastTriggerUSec could not be read in microseconds" "$B0" "$B1" "$B0" $((B0+1)) $((B0+19)) success 0 "$I" 0 "$(jl $((B0+19)) "0$TU")" "0$TU"
 mbc mb-origin-seconds-disagree 1 "${OR}LastTriggerUSec in microseconds \($((TU+1000000))\) and in seconds \($B0\) disagree" "$B0" "$B1" "$B0" $((B0+1)) $((B0+19)) success 0 "$I" 0 "$(jl $((B0+19)) "$((TU+1000000))")" "$((TU+1000000))"
-mbc mb-origin-line-1us-later 1 "${OR}the run's start job records the dispatch at $((TU+1)) us, but the timer's LastTriggerUSec is $TU us" "$B0" "$B1" "$B0" $((B0+1)) $((B0+19)) success 0 "$I" 0 "$(jl $((B0+19)) "$((TU+1))")" "$TU"
-mbc mb-origin-line-1us-earlier 1 "${OR}the run's start job records the dispatch at $((TU-1)) us, but the timer's LastTriggerUSec is $TU us" "$B0" "$B1" "$B0" $((B0+1)) $((B0+19)) success 0 "$I" 0 "$(jl $((B0+19)) "$((TU-1))")" "$TU"
-mbc mb-origin-line-whole-seconds 1 "${OR}the run's start job records the dispatch at $B0 us, but" "$B0" "$B1" "$B0" $((B0+1)) $((B0+19)) success 0 "$I" 0 "$(jl $((B0+19)) "$B0")" "$TU"
-mbc mb-origin-line-yesterdays-dispatch 1 "${OR}the run's start job records the dispatch at $((TU-86400000000)) us" "$B0" "$B1" "$B0" $((B0+1)) $((B0+19)) success 0 "$I" 0 "$(jl $((B0+19)) "$((TU-86400000000))")" "$TU"
-mbc mb-origin-unit-none 1 "${OR}the run's start job names trigger unit 'none', not afldb-backup\\.timer" "$B0" "$B1" "$B0" $((B0+1)) $((B0+19)) success 0 "$I" 0 "$(jl $((B0+19)) none none)" "$TU"
-mbc mb-origin-unit-other-timer 1 "${OR}the run's start job names trigger unit 'afldb-backup-verify\\.timer'" "$B0" "$B1" "$B0" $((B0+1)) $((B0+19)) success 0 "$I" 0 "$(jl $((B0+19)) "$TU" afldb-backup-verify.timer)" "$TU"
-mbc mb-origin-unit-a-path "1" "${OR}the run's start job names trigger unit 'afldb-backup\\.path'" "$B0" "$B1" "$B0" $((B0+1)) $((B0+19)) success 0 "$I" 0 "$(jl $((B0+19)) "$TU" afldb-backup.path)" "$TU"
-mbc mb-origin-no-trigger-line 1 "${OR}invocation $I logged 0 trigger lines" "$B0" "$B1" "$B0" $((B0+1)) $((B0+19)) success 0 "$I" 0 \
+mbc mb-origin-line-1us-later 0 "^$I " "$B0" "$B1" "$B0" $((B0+1)) $((B0+19)) success 0 "$I" 0 "$(jl $((B0+19)) "$((TU+1))")" "$TU"
+mbc mb-origin-line-1us-earlier 0 "^$I " "$B0" "$B1" "$B0" $((B0+1)) $((B0+19)) success 0 "$I" 0 "$(jl $((B0+19)) "$((TU-1))")" "$TU"
+mbc mb-origin-line-whole-seconds 0 "^$I " "$B0" "$B1" "$B0" $((B0+1)) $((B0+19)) success 0 "$I" 0 "$(jl $((B0+19)) "$B0")" "$TU"
+mbc mb-origin-line-yesterdays-dispatch 0 "^$I " "$B0" "$B1" "$B0" $((B0+1)) $((B0+19)) success 0 "$I" 0 "$(jl $((B0+19)) "$((TU-86400000000))")" "$TU"
+mbc mb-origin-unit-none 0 "^$I " "$B0" "$B1" "$B0" $((B0+1)) $((B0+19)) success 0 "$I" 0 "$(jl $((B0+19)) none none)" "$TU"
+mbc mb-origin-unit-other-timer 0 "^$I " "$B0" "$B1" "$B0" $((B0+1)) $((B0+19)) success 0 "$I" 0 "$(jl $((B0+19)) "$TU" afldb-backup-verify.timer)" "$TU"
+mbc mb-origin-unit-a-path 0 "^$I " "$B0" "$B1" "$B0" $((B0+1)) $((B0+19)) success 0 "$I" 0 "$(jl $((B0+19)) "$TU" afldb-backup.path)" "$TU"
+mbc mb-origin-no-trigger-line 0 "^$I " "$B0" "$B1" "$B0" $((B0+1)) $((B0+19)) success 0 "$I" 0 \
   "$I $((B0+19)) own 2026-11-24T15:20:19Z scheduled-backup: backup ok: $D 4096 bytes sha256 0123456789abcdef offhost=skipped" "$TU"
-mbc mb-origin-two-trigger-lines 1 "${OR}invocation $I logged 2 trigger lines" "$B0" "$B1" "$B0" $((B0+1)) $((B0+19)) success 0 "$I" 0 "$(jl $((B0+19)); jl $((B0+19)) | head -1)" "$TU"
-mbc mb-origin-line-names-another-invocation 1 "${OR}the trigger line names invocation $F23_BINV2, not the run's $I" "$B0" "$B1" "$B0" $((B0+1)) $((B0+19)) success 0 "$I" 0 \
+mbc mb-origin-two-trigger-lines 0 "^$I " "$B0" "$B1" "$B0" $((B0+1)) $((B0+19)) success 0 "$I" 0 "$(jl $((B0+19)); jl $((B0+19)) | head -1)" "$TU"
+mbc mb-origin-line-names-another-invocation 0 "^$I " "$B0" "$B1" "$B0" $((B0+1)) $((B0+19)) success 0 "$I" 0 \
   "$(jl $((B0+19)) | sed "s/invocation=$I/invocation=$F23_BINV2/")" "$TU"
-mbc mb-origin-line-trailing-word 1 "${OR}invocation $I logged 0 trigger lines" "$B0" "$B1" "$B0" $((B0+1)) $((B0+19)) success 0 "$I" 0 "$(jl $((B0+19)) | sed 's/realtime_usec=\([0-9]*\)$/realtime_usec=\1 x/')" "$TU"
-mbc mb-origin-line-job-not-a-number 1 "${OR}invocation $I logged 0 trigger lines" "$B0" "$B1" "$B0" $((B0+1)) $((B0+19)) success 0 "$I" 0 "$(jl $((B0+19)) | sed 's/job=4242/job=4x/')" "$TU"
+mbc mb-origin-line-trailing-word 0 "^$I " "$B0" "$B1" "$B0" $((B0+1)) $((B0+19)) success 0 "$I" 0 "$(jl $((B0+19)) | sed 's/realtime_usec=\([0-9]*\)$/realtime_usec=\1 x/')" "$TU"
+mbc mb-origin-line-job-not-a-number 0 "^$I " "$B0" "$B1" "$B0" $((B0+1)) $((B0+19)) success 0 "$I" 0 "$(jl $((B0+19)) | sed 's/job=4242/job=4x/')" "$TU"
 mbc mb-origin-line-job-none-is-fine 0 "^$I " "$B0" "$B1" "$B0" $((B0+1)) $((B0+19)) success 0 "$I" 0 "$(jl $((B0+19)) | sed 's/job=4242/job=none/')" "$TU"
 mbc mb-origin-trigger-line-after-exit-6s 1 '^REASON .*outside its own run' "$B0" "$B1" "$B0" $((B0+1)) $((B0+19)) success 0 "$I" 0 "$(jl $((B0+19)) "$TU" afldb-backup.timer $((B0+25)))" "$TU"
 mbc mb-origin-trigger-line-5s-after-exit 0 "^$I " "$B0" "$B1" "$B0" $((B0+1)) $((B0+19)) success 0 "$I" 0 "$(jl $((B0+19)) "$TU" afldb-backup.timer $((B0+24)))" "$TU"
@@ -202,9 +235,9 @@ bjc() { # case scenario want-rc want-lines regex
   if [ "$rc" = "$3" ] && [ "$n" = "$4" ] && grep -Eq -- "$5" <<< "$o"; then okc "$1" "backup_journal returns $3 with $4 line(s) matching /$5/" "rc $rc, $n line(s)"
   else unx "$1" "backup_journal returns $3 with $4 line(s) matching /$5/" "rc $rc, $n line(s): $(head -1 <<< "$o" | cut -c1-160)"; fi
 }
-bjc bj-genuine genuine 0 3 "^$F23_BINV [0-9]{10} own [^ ]+ scheduled-backup: backup ok: "
-bjc bj-genuine-trigger-line genuine 0 3 "^$F23_BINV [0-9]{10} own [^ ]+ scheduled-backup: trigger: invocation=$F23_BINV job=4242 unit=afldb-backup\\.timer realtime_usec=$F23_TRIG_US\$"
-bjc bj-pid1-lines genuine-pid1-lines 0 5 "^$F23_BINV [0-9]{10} pid1 -\$"
+bjc bj-genuine genuine 0 2 "^$F23_BINV [0-9]{10} own [^ ]+ scheduled-backup: backup ok: "
+bjc bj-genuine-trigger-line genuine-r5-script 0 3 "^$F23_BINV [0-9]{10} own [^ ]+ scheduled-backup: trigger: invocation=$F23_BINV job=4242 unit=afldb-backup\\.timer realtime_usec=$F23_TRIG_US\$"
+bjc bj-pid1-lines genuine-pid1-lines 0 4 "^$F23_BINV [0-9]{10} pid1 -\$"
 bjc bj-journalctl-fails journal-fail 10 0 '^$'
 bjc bj-malformed-json journal-malformed 3 0 '^$'
 bjc bj-own-entry-without-invocation journal-no-invocation 4 0 '^$'

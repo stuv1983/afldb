@@ -14,6 +14,11 @@
 # <FIX>/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r5-20261127/orig-f92d6e29/r6-tuesday-handoff.sh; the exact Astra
 # record file = $F1_ASTRA if set, else <FIX>/.../review-fixes-r5-20261127/cases/astra-released-interrupted-rollback.md; each
 # contrast or file case is skipped with a printed note when its file is absent.
+# r6 (challenger LOW at r5, 28 Nov 2026): released and deferred share ONE token boundary rule; a release.mjs token or wrapper
+# header followed by a backtick, punctuation, a non-ASCII byte or end of line is a trace, a word continuation is not (section
+# "r6" below). Contrast: the 624bf721 parser (the parser at the r5 head) must falsely certify the backtick and punctuation
+# variants (for deferred also end of line). 624bf721 parser = $F1_ORIG_R6 if set, else <FIX>/docs/v2/evidence/backlog-20261121/
+# r6-20261125/review-fixes-r6-20261128/orig-624bf721/r6-tuesday-handoff.sh; skipped with a printed note when absent.
 # Usage: bash cases/f1-handoff.sh <FIX> [<STAGE>]
 # Output: one "CASE-RESULT f1-<case> OK|UNEXPECTED (...)" line per case; last line "SUITE f1 RESULT PASS (<n> cases)" exit 0,
 # or "SUITE f1 RESULT FAIL (<k> unexpected)" exit 1.
@@ -24,6 +29,7 @@ main() {
   local HAND=$STAGE/$B/r6-tuesday-handoff.sh ORIG=${F1_ORIG:-$FIX/$B/review-fixes-r4-20261127/orig-aa33f0fc/r6-tuesday-handoff.sh}
   local R5=$B/review-fixes-r5-20261127
   local ORIG5=${F1_ORIG_R5:-$FIX/$R5/orig-f92d6e29/r6-tuesday-handoff.sh} ASTRA=${F1_ASTRA:-$FIX/$R5/cases/astra-released-interrupted-rollback.md}
+  local ORIG6=${F1_ORIG_R6:-$FIX/$B/review-fixes-r6-20261128/orig-624bf721/r6-tuesday-handoff.sh}
   [ -f "$HAND" ] || { echo "STOP no parser at $HAND"; exit 2; }
   RD=$(mktemp -d "${TMPDIR:-/tmp}/f1-handoff.XXXXXX") || exit 2; trap 'rm -rf -- "$RD"' EXIT
   N=0; BADN=0
@@ -78,6 +84,13 @@ main() {
     if [ "$RC" = 0 ] && grep -qx 'R6 HANDOFF RESULT PASS' <<< "$OUT" && grep -qx 'R6-A2-TUESDAY tue:released' <<< "$OUT" && [ "$(grep -c '^R6-A2-' <<< "$OUT")" = 3 ]
     then res OK "orig5-$1" "the f92d6e29 parser falsely PASSes (exit 0, R6-A2-TUESDAY tue:released): defect reproduced" "$(got)"
     else res UNEXPECTED "orig5-$1" "the f92d6e29 parser falsely PASSes" "$(got)"; fi
+  }
+  orig6() { # case file outcome : the 624bf721 parser must falsely certify tue:<outcome> on this record
+    if [ ! -f "$ORIG6" ]; then echo "NOTE f1-orig6-$1 skipped: no 624bf721 parser at $ORIG6 (set F1_ORIG_R6)"; return 0; fi
+    run "$ORIG6" "$2"
+    if [ "$RC" = 0 ] && grep -qx 'R6 HANDOFF RESULT PASS' <<< "$OUT" && grep -qx "R6-A2-TUESDAY tue:$3" <<< "$OUT" && [ "$(grep -c '^R6-A2-' <<< "$OUT")" = 3 ]
+    then res OK "orig6-$1" "the 624bf721 parser falsely PASSes (exit 0, R6-A2-TUESDAY tue:$3): defect reproduced" "$(got)"
+    else res UNEXPECTED "orig6-$1" "the 624bf721 parser falsely PASSes (tue:$3)" "$(got)"; fi
   }
 
   # ---- valid records -> PASS with the exact values
@@ -284,6 +297,74 @@ main() {
   pass deferred-with-p1-current-line-and-rollback-prose c2.md deferred "$PREV" "$SUN" 'R6-NOTE parser PASS means only that the record is internally consistent'
   rec c3.md "$P3B" "$P4P" "$INV5" "$P5A" "$HDR" "$BEFORE" "$VER" "$LEDG" "$TOOL" "$PCUR" "$EVR" "$RBL" "$HDRV" "$INVR" "$RBV" "${HRB[@]}"
   pass rolledback-keeps-its-rollback-traces c3.md rolledback "$PREV" "$INV_RB"
+
+  # ---- r6 (challenger LOW at r5, 28 Nov 2026): ONE token boundary rule for released and deferred. A token (release: ROLLED
+  # BACK; for deferred also release: PROMOTED; the wrapper header) followed by a backtick, punctuation, a non-ASCII byte or end of
+  # line is a trace; followed by a word character ([A-Za-z0-9_]) it is a different word and not a trace.
+  local R_DTOOL="release.mjs 'release: PROMOTED ...' or 'release: ROLLED BACK ...' line(s)" v
+  local -a BV=(backtick dot comma semicolon paren colon bracket squote dquote star ellipsis eol)
+  bline() { # variant token -> one prose line carrying the token with that right boundary
+    case $1 in
+      backtick)  printf '%s' "The interrupted wrapper had printed \`$2\` and nothing after it.";;
+      dot)       printf '%s' "Last tool line seen: $2.";;
+      comma)     printf '%s' "The tool printed $2, then the session dropped.";;
+      semicolon) printf '%s' "The tool printed $2; then the session dropped.";;
+      paren)     printf '%s' "(the tool printed $2)";;
+      colon)     printf '%s' "Tool line $2: nothing after it.";;
+      bracket)   printf '%s' "[$2]";;
+      squote)    printf '%s' "Owner note: '$2'";;
+      dquote)    printf '%s' "Owner note: \"$2\"";;
+      star)      printf '%s' "**$2**";;
+      ellipsis)  printf '%s' "$2"$'\xe2\x80\xa6'" (output cut)";;
+      eol)       printf '%s' "Last tool line seen: $2";;
+    esac
+  }
+  for v in "${BV[@]}"; do
+    rec "r6-rel-rb-$v.md" "${BASE[@]}" "$(bline "$v" 'release: ROLLED BACK')" "${HREL[@]}"
+    rec "r6-def-rb-$v.md" "$(bline "$v" 'release: ROLLED BACK')" "${HDEF[@]}"
+    rec "r6-def-pr-$v.md" "$(bline "$v" 'release: PROMOTED')" "${HDEF[@]}"
+    stop "r6-released-rolled-back-token-$v" "r6-rel-rb-$v.md" "$R_TOOL"
+    stop "r6-deferred-rolled-back-token-$v" "r6-def-rb-$v.md" "$R_DTOOL"
+    stop "r6-deferred-promoted-token-$v" "r6-def-pr-$v.md" "$R_DTOOL"
+    # the 624bf721 released rule already took end of line ("( |$)"), so released has no end-of-line contrast
+    [ "$v" = eol ] || orig6 "released-rolled-back-token-$v" "$RD/r6-rel-rb-$v.md" released
+    orig6 "deferred-rolled-back-token-$v" "$RD/r6-def-rb-$v.md" deferred
+    orig6 "deferred-promoted-token-$v" "$RD/r6-def-pr-$v.md" deferred
+  done
+  # the wrapper header takes the same right boundary
+  rec r6-rel-hdr-bt.md "${BASE[@]}" "The wrapper printed \`== R1 rollback links\` and stopped." "${HREL[@]}"
+  stop r6-released-wrapper-header-in-backticks r6-rel-hdr-bt.md "$R_HDR"; orig6 released-wrapper-header-in-backticks "$RD/r6-rel-hdr-bt.md" released
+  rec r6-rel-hdr-colon.md "${BASE[@]}" "== R1 rollback verify: not reached" "${HREL[@]}"
+  stop r6-released-wrapper-header-colon r6-rel-hdr-colon.md "$R_HDR"; orig6 released-wrapper-header-colon "$RD/r6-rel-hdr-colon.md" released
+  rec r6-def-hdr-bt.md "Seen: \`== R1 rollback links\`." "${HDEF[@]}"
+  stop r6-deferred-wrapper-header-in-backticks r6-def-hdr-bt.md "deferred, but the record has 1 rollback trace line(s) ($R_HDR)"; orig6 deferred-wrapper-header-in-backticks "$RD/r6-def-hdr-bt.md" deferred
+  rec r6-def-hdr-dot.md "Seen: == R1 rollback verify." "${HDEF[@]}"
+  stop r6-deferred-wrapper-header-dot r6-def-hdr-dot.md "deferred, but the record has 1 rollback trace line(s) ($R_HDR)"; orig6 deferred-wrapper-header-dot "$RD/r6-def-hdr-dot.md" deferred
+  # word continuation: a different word, NOT the token, so not a trace (the record PASSes when nothing else stops it)
+  rec r6-rel-backup.md "${BASE[@]}" "release: ROLLED BACKUP of the previous tree was not taken" "${HREL[@]}"
+  pass r6-released-rolled-backup-is-not-the-token r6-rel-backup.md released "$CUR" "$INV_TUE"
+  rec r6-rel-back-us.md "${BASE[@]}" "label release: ROLLED BACK_2 (not tool output)" "${HREL[@]}"
+  pass r6-released-rolled-back-underscore-is-not-the-token r6-rel-back-us.md released "$CUR" "$INV_TUE"
+  rec r6-rel-back-digit.md "${BASE[@]}" "label release: ROLLED BACK9" "${HREL[@]}"
+  pass r6-released-rolled-back-digit-is-not-the-token r6-rel-back-digit.md released "$CUR" "$INV_TUE"
+  rec r6-def-promotedx.md "release: PROMOTEDX is not a release.mjs line" "${HDEF[@]}"
+  pass r6-deferred-promotedx-is-not-the-token r6-def-promotedx.md deferred "$PREV" "$SUN" 'R6-NOTE parser PASS means only that the record is internally consistent'
+  rec r6-def-backup.md "release: ROLLED BACKUP" "${HDEF[@]}"
+  pass r6-deferred-rolled-backup-is-not-the-token r6-def-backup.md deferred "$PREV" "$SUN" 'R6-NOTE parser PASS means only that the record is internally consistent'
+  rec r6-rel-verifying.md "${BASE[@]}" "== R1 rollback verifying is a runbook heading, not a wrapper header" "${HREL[@]}"
+  pass r6-released-header-word-continuation-is-not-a-trace r6-rel-verifying.md released "$CUR" "$INV_TUE"
+  rec r6-def-linksx.md "== R1 rollback linksX" "${HDEF[@]}"
+  pass r6-deferred-header-word-continuation-is-not-a-trace r6-def-linksx.md deferred "$PREV" "$SUN" 'R6-NOTE parser PASS means only that the record is internally consistent'
+  # the left boundary is unchanged: a letter before "release:" makes a different word; a digit or "_" does not
+  rec r6-rel-prerelease.md "${BASE[@]}" "prerelease: ROLLED BACK is not a release.mjs line" "${HREL[@]}"
+  pass r6-released-letter-before-token-is-not-a-trace r6-rel-prerelease.md released "$CUR" "$INV_TUE"
+  rec r6-rel-us-left.md "${BASE[@]}" "log_release: ROLLED BACK." "${HREL[@]}"
+  stop r6-released-underscore-before-token-is-a-trace r6-rel-us-left.md "$R_TOOL"
+  # the valid outcomes still PASS: rolledback keeps every boundary variant by design; prose without the token is not a trace
+  rec r6-rb-keeps.md "$P3B" "$P4P" "$INV5" "$P5A" "$RBL" "Tool line: \`release: ROLLED BACK\`." "Header: \`== R1 rollback verify\`." "$INVR" "$RBV" "${HRB[@]}"
+  pass r6-rolledback-keeps-boundary-variants r6-rb-keeps.md rolledback "$PREV" "$INV_RB"
+  rec r6-def-prose.md "No release.mjs PROMOTED or ROLLED BACK line was printed; the rollback section of the runbook was not used." "PASS current -> $PREV" "${HDEF[@]}"
+  pass r6-deferred-prose-without-token r6-def-prose.md deferred "$PREV" "$SUN" 'R6-NOTE parser PASS means only that the record is internally consistent'
 
   # ---- the real 24 Nov sitting record (read-only), when the export carries it: it must still parse as deferred
   local REAL=$FIX/docs/v2/evidence/release-17822b29-20261124/SITTING-20261124.md h0

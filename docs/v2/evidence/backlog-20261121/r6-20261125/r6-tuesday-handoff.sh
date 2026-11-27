@@ -8,6 +8,10 @@
 # R6 r5 (Astra, 27 Nov 2026): a rollback interrupted after release.mjs switched the links, and before r1-rollback.sh printed its
 # RESULT line, leaves the tool's own trace and no RESULT line. Such a record must not certify released (or deferred): see "Rollback
 # traces" below.
+# R6 r6 (challenger LOW at r5, 28 Nov 2026): released and deferred used two different right boundaries for the release.mjs token
+# ("( |$)" and a required trailing space), so a token in backticks or followed by punctuation was not a trace. Both outcomes now
+# use ONE token boundary rule (TOKL/TOKR and tooltrace() below); the wrapper header uses the same right boundary. See "Token
+# boundary" below.
 #
 # The record (docs/v2/evidence/release-17822b29-20261124/SITTING-20261124.md) must contain exactly three lines carrying the
 # token R6-HANDOFF, each exactly in this form (no indentation; a trailing CR is tolerated), owner-confirmed and copied from the
@@ -57,8 +61,17 @@
 #   PASS current -> 7d92042fd110-<BUILD_ID>, previous -> 17822b29e6de-<BUILD_ID>    r1-rollback.sh links, after the switch (the ", previous ->"
 #                                            form is the wrapper's; r1-p1-precheck.sh prints "PASS current -> <id>" alone, which is NOT a trace)
 #   {"op":"rollback-start",...} / {"op":"rollback",...}     events.log lines release.mjs appends before and after the switch
-# Prose that merely names the runbook's rollback section is not a trace. deferred has always also refused release.mjs's
-# "release: PROMOTED " line (below).
+# Prose that merely names the runbook's rollback section is not a trace. deferred also refuses release.mjs's "release: PROMOTED"
+# line (cmdPromote's own line, printed after the switch): a P4 interrupted after it is not a deferral.
+# Token boundary (ONE rule, shared by released and deferred through TOKL, TOKR and tooltrace(); the wrapper header uses TOKR):
+#   a token (release: ROLLED BACK; for deferred also release: PROMOTED; == R1 rollback links|verify) is a trace when it is
+#   preceded by start of line or any character that is not a letter (TOKL = (^|[^A-Za-z]); a digit, "_", space, backtick, quote,
+#   bracket or any punctuation all qualify), AND followed by end of line or any character that is not a word character
+#   (TOKR = ([^A-Za-z0-9_]|$): a space, backtick, . , ; : ) ] ' " * or any other punctuation, a non-ASCII byte such as an
+#   ellipsis, or end of line). A word continuation ("release: ROLLED BACKUP", "release: PROMOTEDX", "release: ROLLED BACK_2",
+#   "== R1 rollback verifying") is a different word, NOT the token, and is not a trace by this rule (it would still be caught
+#   by any other rule that matches the line). The two other traces need no boundary: "PASS current -> <old>, previous -> <new>"
+#   and the events.log "op" pair are matched as substrings with no right anchor, so any following character already matches.
 # What a PASS does NOT decide. This parser judges only whether the record is internally consistent and unambiguous for the
 # outcome its handoff lines claim. Whether the owner accepts a deferral as "before P4" is the owner's ruling, recorded
 # separately; it is not a parser rule. A P4 REFUSAL ("STOP past the promotion cutoff ...") is not a P4 RESULT line: it is
@@ -121,12 +134,15 @@ main() {
     for k in "$@"; do [ "${C[$k]}" != 0 ] || continue; ln=$(first "$k")
       [ "$ln" -gt "$prev" ] || stop "record order: the $k line (line $ln) comes before the $pk line (line $prev)"; prev=$ln; pk=$k; done
   }
+  # the ONE token boundary rule (see "Token boundary"): released and deferred both count release.mjs tokens through tooltrace()
+  local TOKL='(^|[^A-Za-z])' TOKR='([^A-Za-z0-9_]|$)'
+  tooltrace() { grep -cE -- "${TOKL}release: ($1)${TOKR}" <<< "$text"; } # alternation of release.mjs tokens -> lines carrying one
   rbtrace() { # outcome: STOP on any evidence that a rollback ran or was started (released and deferred; see "Rollback traces")
     local o=$1 id='[A-Za-z0-9_-]{1,64}' q='\\?"' n i
-    local -a RXT=('(^|[^A-Za-z])== R1 rollback (links|verify)( |$)' "PASS current -> 7d92042fd110-$id, previous -> 17822b29e6de-$id" "${q}op${q} *: *${q}rollback(-start)?${q}")
+    local -a RXT=("${TOKL}== R1 rollback (links|verify)${TOKR}" "PASS current -> 7d92042fd110-$id, previous -> 17822b29e6de-$id" "${q}op${q} *: *${q}rollback(-start)?${q}")
     local -a LBL=("r1-rollback.sh header '== R1 rollback links|verify'" "r1-rollback.sh 'PASS current -> <old id>, previous -> <new id>'" 'events.log "op":"rollback-start"|"rollback"')
-    if [ "$o" != deferred ]; then # deferred refuses the release.mjs tool lines itself, below
-      n=$(grep -cE '(^|[^A-Za-z])release: ROLLED BACK( |$)' <<< "$text")
+    if [ "$o" != deferred ]; then # deferred refuses the release.mjs tool lines itself, below, by the same tooltrace() rule
+      n=$(tooltrace 'ROLLED BACK')
       [ "$n" = 0 ] || stop "$o, but the record has $n release.mjs 'release: ROLLED BACK ...' line(s): the rollback switched the links, so this is not $o (an interrupted rollback prints no RESULT line)"
     fi
     for i in 0 1 2; do
@@ -167,7 +183,7 @@ main() {
       [ "$rb" = 0 ] || stop "deferred, but the record has a ROLLBACK RESULT line: ambiguous"
       [ "$((C[INV5] + C[INVR]))" = 0 ] || stop "deferred, but the record has a restart confirmation line (PASS running invocation = the owner's ...): ambiguous"
       # a P4 or rollback interrupted after release.mjs switched the links prints the tool's line but no RESULT line
-      tool=$(grep -cE '(^|[^A-Za-z])release: (PROMOTED|ROLLED BACK) ' <<< "$text")
+      tool=$(tooltrace 'PROMOTED|ROLLED BACK')
       [ "$tool" = 0 ] || stop "deferred, but the record has $tool release.mjs 'release: PROMOTED ...' or 'release: ROLLED BACK ...' line(s): the links were switched, so this is not a deferral"
       rbtrace deferred;;
   esac

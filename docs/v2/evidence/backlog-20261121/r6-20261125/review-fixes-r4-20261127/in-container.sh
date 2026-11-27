@@ -188,6 +188,11 @@ printf '{"__REALTIME_TIMESTAMP":"%s000000","_UID":"1000","_PID":"4711","_SYSTEMD
 printf '{"__REALTIME_TIMESTAMP":"%s000000","_UID":"1000","_PID":"4711","_SYSTEMD_UNIT":"afldb-backup.service","_SYSTEMD_INVOCATION_ID":"%s","MESSAGE":"2026-11-25T02:20:05+11:00 scheduled-backup: backup ok: %s 4096 bytes sha256 %s"}\n' "$BJ" "$BINV" "$SD" "${SS:0:16}" >> /fx/journal-backup.json
 printf '{"MESSAGE":"2026-11-25T03:31:25+11:00 scheduled-backup: verify ok: %s restored and proven (attempt 1)","_SYSTEMD_UNIT":"afldb-backup-verify.service","_SYSTEMD_INVOCATION_ID":"0d1c2b3a4f5e60718293a4b5c6d7e8f9","__REALTIME_TIMESTAMP":"%s000000"}\n' "$VD" "$JT" > /fx/journal-verify.json
 chown -R arm:arm /home/arm/backups
+# r6 (28 Nov): the trigger line above is ignored now (the r5 origin rule is withdrawn); the origin is the ROOT writer's record. The
+# install (the real reviewed writer and drop-in, root-owned, at their real paths) and the record come from cases/lib-f23-fixture.sh.
+. "$FX/$B/r6-20261125/review-fixes-r4-20261127/cases/lib-f23-fixture.sh" || { echo "REH STOP cannot load lib-f23-fixture.sh"; exit 1; }
+f23_attest_install "$FX" || { echo "REH STOP the attestation install failed"; exit 1; }
+f23_attest_record "$BINV" afldb-backup.timer "$BTU"
 
 # ---------------------------------------------------------------- systemd fixture table and timers
 THU=$(mel_ep "2026-11-26 02:20:00"); THV=$(mel_ep "2026-11-26 03:30:00"); THA=$(mel_ep "2026-11-26 06:30:00")
@@ -236,6 +241,7 @@ apt-daily-upgrade.timer|ActiveState|active
 apt-daily-upgrade.timer|UnitFileState|enabled
 apt-daily-upgrade.timer|Triggers|apt-daily-upgrade.service
 TBL
+  f23_attest_rows >> /fx/sysd.tbl   # r6: the unit rows attested_origin reads (FragmentPath, DropInPaths, ExecStartPostEx)
   chmod 644 /fx/sysd.tbl; }
 
 # ---------------------------------------------------------------- the service: real supervisor, 2 workers; connection counter
