@@ -17,7 +17,7 @@
 > the old bytes are `git show 58e35ce8805e9f559d3dd1008606f90efb84fbab:<path>`). Three scripts were then corrected after
 > Astra's review of draft PR 5, at revision `a203c927d24bbd0b2bf4f67b3ddb2865a0fee0d3` (manifest `744e52ca…`), and G0 again after her review of
 > `f92d6e29`, at revision `5553ecaf922d27a82da1d8f9a63633bb2883372d` (r5, manifest `14f0f89f…`), and G0 once more after her review of `624bf721`, at revision
-> `297175f996f71aa9549592c2fabb9fa908c43f31` (r6); `scripts/SHA256SUMS` now has SHA-256 `cd4a7ad80393cd6db7a1548c8570bafc741f60b4a3c35e9d3c6e90274a194a68`:
+> `bda102aa1757bab7f74ab5b91c4b7e744964d1bc` (r6); `scripts/SHA256SUMS` now has SHA-256 `cd4a7ad80393cd6db7a1548c8570bafc741f60b4a3c35e9d3c6e90274a194a68`:
 >
 > * **G0 (`r1-g0-dump.sh`)**: the scheduled dump must be attributable to the backup **timer's dispatch** and to the one
 >   successful service invocation it started; a successful start inside 02:20–02:31 alone is not enough (the same rule as R6 A-2).

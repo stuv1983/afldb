@@ -903,7 +903,7 @@ ActivationDetails), which is **not installed on production**. Until the owner in
 [review-fixes-r5-20261127/README.md](r6-20261125/review-fixes-r5-20261127/README.md).
 
 **r6 re-pin, 28 November 2026 (Astra's remaining findings on PR 5 at `624bf721`; PROPOSED; Astra re-review required; R6 stays NO-GO).** The blocks below are
-re-pinned in place to tested revision `297175f996f71aa9549592c2fabb9fa908c43f31`, manifest `c06f5b61…`. Two scripts changed:
+re-pinned in place to tested revision `bda102aa1757bab7f74ab5b91c4b7e744964d1bc`, manifest `c06f5b61…`. Two scripts changed:
 (a) **handoff parser:** `released` and `deferred` share ONE token boundary for `release.mjs`'s own lines and the rollback wrapper headers: the
 token followed by end of line or any non-word character (a backtick, punctuation) is a trace, so an inline excerpt can no longer slip past;
 (b) **A-2 section 5 origin:** the arm-written `trigger:` line is no longer read. The attributed invocation must have a **root record**
@@ -949,7 +949,7 @@ Record: [review-fixes-r6-20261128/README.md](r6-20261125/review-fixes-r6-2026112
 ### R6 archive r4: workstation (Git Bash)
 
 ```bash
-CODE=297175f996f71aa9549592c2fabb9fa908c43f31
+CODE=bda102aa1757bab7f74ab5b91c4b7e744964d1bc
 B=docs/v2/evidence/backlog-20261121
 git -C /d/dev/afldb archive --format=tar --output=/tmp/afldb-r6-20261125-r4.tar "$CODE" \
   "$B/r6-20261125/r6-pre-verify.sh" \
@@ -987,7 +987,7 @@ C:/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes afldb 'set -C; cat > /tmp/a
 
 As r3: record the printed staging root; STOP unless the block prints 16 `: OK` lines and `R6 STAGE VERIFIED <path> (16 files)`.
 Manifest digest `c06f5b61c809258ee130dff43d918a67ad1f94d2c8755e4201643c84bbb3bdab` (r6 re-pin, 28 Nov 2026; r5 was `182efbb6…` at `5553ecaf`, r4 `3c671c4b…` at `a203c927`). Every pin is the SHA-256 of the Git blob at the tested revision
-(`git cat-file blob 297175f996f71aa9549592c2fabb9fa908c43f31:<path> | sha256sum`). Three differ from r3: `r6-pre-verify.sh`
+(`git cat-file blob bda102aa1757bab7f74ab5b91c4b7e744964d1bc:<path> | sha256sum`). Three differ from r3: `r6-pre-verify.sh`
 (`48185fca…` → r4 `ea4355f0…` → r5 `64cc5166…` → r6 `92425f2a…`), `r6-post-verify.sh` (`478f85cd…` → `319c2e09…`) and `r6-tuesday-handoff.sh` (`92c1809b…` →
 r4 `be0fbca2…` → r5 `820f5d53…` → r6 `b5fb980b…`). The other thirteen are byte-identical to r3's, and Sunday's `a1-rawhead.sh` is still `cab4a43a…`. The
 verification lines are r3's, unchanged.
