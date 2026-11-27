@@ -28,7 +28,9 @@
 >   **r6 (28 Nov 2026), superseding that r5 origin rule:** the `trigger:` line came from arm's own checkout, so arm could forge it.
 >   G0 now reads origin ONLY from a root record, `/var/lib/afldb-backup-attest/<invocation>.attest`. A root-owned writer
 >   (`/usr/local/libexec/afldb/afldb-backup-attest`, a full-privilege `ExecStartPost` drop-in) writes it while the run's start job is live.
+>   The record also binds the dump's name and full sha256 (hashed as arm), and G0 prints `OFFHOST-COMPARE` only for that dump.
 >   At run time G0 verifies the writer's and the drop-in's pinned digests, the loaded unit, the helpers, the record and every parent directory.
+>   **Open (owner decision):** G0 itself runs as arm, so arm's login environment can still forge its printed verdict; closing that needs a non-arm verifier.
 >   `scheduled-backup.sh` stays at the production bytes. The writer is installed by a separate owner procedure outside the production checkout,
 >   so P1/P2's clean-tree checks are unaffected. **Until it is installed, G0 STOPs with `scheduled origin unproven`, by design**
 >   ([r6 record](../backlog-20261121/r6-20261125/review-fixes-r6-20261128/README.md)).
