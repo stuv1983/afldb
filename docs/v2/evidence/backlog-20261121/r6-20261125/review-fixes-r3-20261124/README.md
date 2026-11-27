@@ -17,9 +17,31 @@ backup, attributable off-host pull, attributable restore, console and recovery c
 | Final review | the commit adding this README | this README, `logs/`, `issues.md`, `IssuesIndex.md`, `CHANGELOG.md` |
 
 **Tree difference, tested `9a9a01c1` → final review:** `ATTENDED-PLAN-R6-20261125.md` (CODE re-pin and one operator note;
-the printed blocks 1–5 hash identically, see §4), and the files of the final review commit listed above. No script, harness file
-or pinned file differs. Check with `git diff --stat 9a9a01c195602e430d0d514e5fbe550eb77d0a9f <final review>`; the driver also
-prints this difference on every run.
+~~the printed blocks 1–5 hash identically, see §4~~ **corrected 27 Nov 2026, see below**), and the files of the final review
+commit listed above. No script, harness file or pinned file differs. Check with
+`git diff --stat 9a9a01c195602e430d0d514e5fbe550eb77d0a9f <final review>`; the driver also prints this difference on every run.
+
+> **Correction, 27 November 2026 (review finding 8).** The struck clause was wrong for block 1. The CODE re-pin is *inside*
+> printed block 1 (its first line, `CODE=dc88fe7f…` → `CODE=9a9a01c1…`; no other line of any block differs), so block 1's
+> hash changed between the tested commit and the review commit; blocks 2–5 and the shared verification lines did not. The
+> proof cut its blocks from the review commit `de106597`, whose runbook and blocks are byte-identical to the final review
+> commit `cdeaf31f` (the commit that added this README). The hashes in §4 are therefore those of `de106597` = `cdeaf31f`, not
+> of `9a9a01c1`. Recomputed on 27 Nov from the Git blobs (`git show <commit>:docs/v2/evidence/backlog-20261121/ATTENDED-PLAN-R6-20261125.md`,
+> each block cut by the driver's `blk`, the verification lines by its `snip`; SHA-256):
+>
+> | | tested `9a9a01c1` | review `de106597` | final review `cdeaf31f` |
+> |---|---|---|---|
+> | runbook | `88dd44a8d4def03a64628b3fcc4bfb49d6320d439f22e15f22299aac119f11ed` | `3c2bfd79d0c14e2bdbf8eeae9fc93ed3408f1b67ebe9d6d962e635dcd1fa25a4` | `3c2bfd79d0c14e2bdbf8eeae9fc93ed3408f1b67ebe9d6d962e635dcd1fa25a4` |
+> | block 1 (archive, 20 lines) | **`5152d440e582449c811b164da13ed314645e5f7c41c8a7f6823c5d56873aa5d2`** | **`2d3150737a12c1e52b191838f46a1d0fe7094be4b25440078b3cccc0e83c4328`** | `2d3150737a12c1e52b191838f46a1d0fe7094be4b25440078b3cccc0e83c4328` |
+> | block 2 (to streamanator, 1 line) | `31d9ee5b16a08bc059055fb6bfb831fb52aa3618c2a90028fe405370303a639d` | `31d9ee5b16a08bc059055fb6bfb831fb52aa3618c2a90028fe405370303a639d` | `31d9ee5b16a08bc059055fb6bfb831fb52aa3618c2a90028fe405370303a639d` |
+> | block 3 (to production, 1 line, never run) | `034edc1f57ad4ee3162d1c6f8a6d69f2da0de975b36ea1041983c50eb895aaae` | `034edc1f57ad4ee3162d1c6f8a6d69f2da0de975b36ea1041983c50eb895aaae` | `034edc1f57ad4ee3162d1c6f8a6d69f2da0de975b36ea1041983c50eb895aaae` |
+> | block 4 (staging, 28 lines) | `0b0f56692620f9fa6f46cc2e286ac4db07653366c572e397ddafdd3940950729` | `0b0f56692620f9fa6f46cc2e286ac4db07653366c572e397ddafdd3940950729` | `0b0f56692620f9fa6f46cc2e286ac4db07653366c572e397ddafdd3940950729` |
+> | block 5 (re-check, 6 lines) | `d28f399a248855df1a34bcb54805d3533888e28876071b6610345c8147a0eaeb` | `d28f399a248855df1a34bcb54805d3533888e28876071b6610345c8147a0eaeb` | `d28f399a248855df1a34bcb54805d3533888e28876071b6610345c8147a0eaeb` |
+> | verification lines of blocks 4 and 5 (5 lines) | `0917cf6fae503f22ac1263511165c623ced2b1b359faec783b6a3166e037888f` | `0917cf6fae503f22ac1263511165c623ced2b1b359faec783b6a3166e037888f` | `0917cf6fae503f22ac1263511165c623ced2b1b359faec783b6a3166e037888f` |
+>
+> The runbook at `9a9a01c1` is the blob committed at `cc59b2f2` (same SHA-256). What the correction does not change: the
+> block 1 the proof RAN is the `2d315073…` one (review commit), which pins and archives `9a9a01c1`; the logs are untouched.
+> Statements re-verified unchanged on 27 Nov are listed in §7.
 
 ## 2. The pinned archive (from Git blobs)
 
@@ -58,6 +80,8 @@ including Sunday's `a1-rawhead.sh` `cab4a43af09e4b1729d913162c0f27faccd19315c56e
    removed only if this run created it and its bytes are unchanged, and the run refuses to start if the archive path already
    exists. No wildcard cleanup remains. Any step result other than expected, including a negative case that passes, a leftover
    container, or anything this run created that survives cleanup, makes the driver exit nonzero.
+   *(27 Nov 2026: "only if this run created it" was implemented at `9a9a01c1` as "the path was absent at start, exists now and
+   holds my bytes", which two runs of one revision both satisfy. Superseded by the ownership rule in §7.)*
 
 ## 4. Commands, expected and actual exit codes
 
@@ -80,7 +104,9 @@ bash <(git -C /d/dev/afldb show 9a9a01c195602e430d0d514e5fbe550eb77d0a9f:$H/prov
 
 The driver itself (`run-printed-blocks.sh` from the tested commit, sha256 `abfaf65a5e1c5d303ea5c6545f9b44469d2e2046f24c33d173e36af3b70cd659`)
 cuts the blocks from the runbook at the review commit (runbook sha256 `3c2bfd79…`; block 1 `2d315073…`, 2 `31d9ee5b…`, 3 `034edc1f…`,
-4 `0b0f5669…`, 5 `d28f399a…`; the five verification lines of blocks 4 and 5 identical, `0917cf6f…`) and runs, verbatim:
+4 `0b0f5669…`, 5 `d28f399a…`; the five verification lines of blocks 4 and 5 identical, `0917cf6f…`) and runs, verbatim
+(27 Nov 2026: these are the review commit's hashes, as the log prints them; block 1 at the tested commit is `5152d440…`,
+full values and the comparison in the §1 correction):
 
 | Step (run 1) | Expected | Actual |
 |---|---|---|
@@ -160,3 +186,52 @@ pass each remote command as one quoted string; the amendment now says why.
   production. Real `release.mjs` from the tested commit is used.
 - The workstation steps ran under Git Bash on Windows; the Linux steps ran in the pinned image on streamanator.
 - Nothing here substitutes for Wednesday's live gates or Astra's review.
+
+## 7. 27 November 2026: correction (finding 8) and driver amendment (finding 5)
+
+Added on 27 Nov 2026. Nothing above was removed; `logs/` is byte-for-byte as committed on 24 Nov
+(`proof-1-cleanup-defect-dc88fe7f.log` sha256 `a64292d6828af582b4fbb1c45ca0c3dd31828acc7d08624f14b3b20e63cdf425`,
+`proof-2-tested-9a9a01c1.log` `6c49b37fc7f97d0ffd353fe5e4ee5df1e367ee46c041b523a9ba7807d1fe5b91`).
+
+**Finding 8, printed-block comparison.** One statement was wrong and is corrected in §1: block 1 does *not* hash identically at
+the tested commit and the review commit (`5152d440…` at `9a9a01c1`, `2d315073…` at `de106597` and `cdeaf31f`). Re-verified
+unchanged on 27 Nov, each from the Git blobs or the committed log:
+
+- §4's runbook, block 1–5 and verification-line hashes are exactly those of the review commit `de106597` (and of `cdeaf31f`),
+  and are what `logs/proof-2-tested-9a9a01c1.log` prints for both runs; blocks 2–5 and the verification lines are also identical
+  at `9a9a01c1`.
+- Driver `run-printed-blocks.sh` at `9a9a01c1`: sha256 `abfaf65a5e1c5d303ea5c6545f9b44469d2e2046f24c33d173e36af3b70cd659`
+  (the same blob at `de106597`, `cdeaf31f` and `aa33f0fc`).
+- §2: all 16 per-file pins equal `git cat-file blob 9a9a01c1:<path> | sha256sum` and the same at `dc88fe7f`; the 16-line
+  manifest cut from block 4 has digest `2c7ee8e2e1758f1002a36c4b75239d4ff4dea6958e7b2410a1f0253a38978007`; r2's
+  `r6-pre-verify.sh` at `cc3369a5` is `0d9e97a5…`.
+- §4: the block 1 archive of `9a9a01c1` re-derives to `2b088bf5b8f59fdf16c3153637341a090aecb7e8cfb1e733b310696ffb8745e8` and the
+  fixture export to `9bd34de0768165573c96b5b9519a4c5251187082d7b9ec77eac1bfc7fc68d2f7` (git 2.56.0.windows.4); the log's counts
+  (10 steps; 25 OK / 0 UNEXPECTED, then 24 / 1; 162 and 2 passed; exits 0 and 1; sentinels intact twice) are as tabled.
+- §1: `git diff --stat 9a9a01c1 cdeaf31f` lists only the runbook, this README, the two logs, `issues.md`, `IssuesIndex.md` and
+  `CHANGELOG.md`: no script, harness file or pinned file differs.
+
+**Finding 5, the driver was amended in place on 27 Nov.** `run-printed-blocks.sh` and `prove-driver-fixes.sh` in this directory
+are no longer the files the 24 Nov proof ran. **Every result in §4 and in `logs/` belongs to the driver at `9a9a01c1`**
+(sha256 `abfaf65a…`; read it with
+`git show 9a9a01c1:docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r3-20261124/run-printed-blocks.sh`; a snapshot is
+also kept as `../review-fixes-r4-20261127/orig-aa33f0fc/r3-run-printed-blocks.sh`). What changed, and why:
+
+- *Defect.* The `9a9a01c1` driver decided archive ownership from "the path exists" (workstation) and "`sha256sum` of the path
+  printed something" (streamanator), and removed either archive when its bytes equalled this run's. Two runs of one revision
+  write identical bytes: both pass the start check, and the one that cleans up first, or loses block 2's `set -C` create, or
+  fails part-way, removes the other run's archive.
+- *Rule now.* A run may remove an archive path only if that run created it by an atomic exclusive create that succeeded. On
+  the workstation the driver reserves the path itself under noclobber with a marker naming its run id before block 1; printed
+  block 1 then runs verbatim and `git archive --output=` writes into that reserved file. On streamanator, printed block 2's own
+  `set -C` create is the reservation: ownership only if block 2 exited 0, and the bytes must equal what was sent. The losing
+  side of a collision is REFUSED (exit 2, workstation) or STOPs (exit 1, streamanator), removes only what it owns, and leaves
+  the other run's file untouched. Cleanup also requires the same file (device:inode) and this run's bytes.
+- *Also.* An optional third argument `r3|r4` (default `r3`: the usage in §4 is unchanged) selects the amendment heading,
+  archive path, staging-root pattern, harness directory, container runner and fixture export list; the runbook as cut is
+  shipped to the run directory as `blocks/runbook.md`. A failed block 1 or block 2 now stops the run instead of continuing.
+- *Proof and record.* Suite `../review-fixes-r4-20261127/cases/f5-cleanup-ownership.sh` (isolated; both sides; the exact race,
+  a concurrent loop, partial failures, the original logic as contrast) and its wrapper
+  `../review-fixes-r4-20261127/prove-archive-ownership.sh`. Results, and the r4 repeat of the sentinel proof, are recorded in
+  [`../review-fixes-r4-20261127/README.md`](../review-fixes-r4-20261127/README.md), not here.
+- The r2 driver in `../review-fixes-20261123/` is retired (it refuses to run); see its README.

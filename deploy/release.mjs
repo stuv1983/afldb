@@ -20,11 +20,13 @@
  *                                    [--typecheck off-host --typecheck-evidence <text>] [--smoke-paths /a,/b]
  *   node deploy/release.mjs verify   <id>
  *   node deploy/release.mjs promote  <id> --attended [--skip-host-gate "<reason>"] [--window-min 90] [--strict]
+ *                                    [--not-after <epoch seconds>]   promotion deadline, re-checked immediately before the link switch
  *   node deploy/release.mjs rollback [--to <id>] --attended [--ledger-head <name> [--accept-schema-ahead <name>]]
  *   node deploy/release.mjs status   [--expect <id>] [--url http://127.0.0.1:3100] [--checkout <dir>]
  *                                    [--confirm-restart-invocation <InvocationID>]   owner-attested restart, that invocation only
  *                                    [--confirm-attended-restart]                    legacy unbound form, kept for compatibility
  *   node deploy/release.mjs host-gate [--mode promote|rollback] [--strict] [--window-min 90]     read-only packet gate
+ *                                    [--not-after <epoch seconds>]   also proves this tool enforces that deadline (one exact line)
  *   node deploy/release.mjs check-node-modules --checkout <dir>                                  installed tree vs lock
  *   node deploy/release.mjs adopt    --checkout <dir> --revision <sha> --afldb-env production
  *                                    [--from-manifest <sha256sum file>] [--expect-build-id <id>]
@@ -1274,6 +1276,37 @@ function requireAttended(opts, what) {
     + `status gate, and say so with --attended. Nothing was changed.`);
 }
 
+/**
+ * `--not-after <epoch seconds>` (promote, and host-gate --mode promote): the promotion deadline of an approved window.
+ * Optional: absent means no deadline, exactly as before. Strict: ten ASCII digits naming an instant from 2020-09-13 to
+ * 2100-01-01; anything else is a Refusal before any state is read or changed. Rollback never has a deadline.
+ */
+export function parseNotAfter(value) {
+  if (value === undefined || value === null) return null;
+  const seconds = typeof value === 'string' && /^[0-9]{10}$/.test(value) ? Number(value) : NaN;
+  if (!(seconds >= 1_600_000_000 && seconds <= 4_102_444_800)) {
+    throw new Refusal(`--not-after must be an epoch time in whole seconds (ten digits, 1600000000 to 4102444800), got ${JSON.stringify(value)}. Nothing was changed.`);
+  }
+  return seconds;
+}
+
+/** The deadline rule: promotion is permitted up to and including the deadline instant, and refused from 1 ms after it. */
+export function deadlinePassed(nowMs, notAfterSeconds) {
+  return nowMs > notAfterSeconds * 1000;
+}
+
+/** The exact line `host-gate --not-after <s>` prints when this tool enforces that deadline and it has not passed. */
+export function deadlineEnforcedLine(notAfterSeconds) {
+  return `PROMOTION DEADLINE ENFORCED not-after=${notAfterSeconds} not-reached`;
+}
+
+function refuseAfterDeadline(notAfterSeconds, nowMs, stage) {
+  if (!deadlinePassed(nowMs, notAfterSeconds)) return;
+  throw new Refusal(`promotion deadline passed (${stage}): --not-after ${notAfterSeconds} `
+    + `(${new Date(notAfterSeconds * 1000).toISOString()}), now ${new Date(nowMs).toISOString()}. `
+    + 'No link was switched and events.log was not written. Nothing was changed.');
+}
+
 /** The pre-switch host gate; returns what is recorded in the event. Rollback only warns; promote refuses. */
 function runHostGate(opts, mode) {
   if (opts['no-live']) return { skipped: '--no-live (service deliberately stopped)', window: null };
@@ -1315,10 +1348,18 @@ function gitMigrationHead(checkout, revision) {
  * Promote only from a settled state: the service must be running the release
  * `current` names. Otherwise an earlier promotion is still waiting for its
  * restart, and `previous` would name a release that never served.
+ *
+ * With `--not-after <epoch seconds>` the deadline is checked twice on `now()` (the wall clock): once before anything
+ * is read, and again inside the links lock after every validation (release hashing, the live-service check, the host
+ * gate), as the last act before the two renames. Validation that outlasts the deadline therefore moves no link and
+ * writes no event. One check covers both renames: nothing is re-checked between `previous` and `current`, so a
+ * promotion is never left half-switched.
  */
-async function cmdPromote(opts, id) {
+export async function cmdPromote(opts, id, now = Date.now) {
   const root = resolve(opts.root);
   requireAttended(opts, 'promote');
+  const notAfter = parseNotAfter(opts['not-after']);
+  if (notAfter !== null) refuseAfterDeadline(notAfter, now(), 'before validation');
   return withLock(root, 'links', 'promote', async () => {
     const { drift } = await verifyRelease(root, id);
     reportDrift(id, drift);
@@ -1334,9 +1375,12 @@ async function cmdPromote(opts, id) {
       }
     }
     const gate = runHostGate(opts, 'promote');
+    // Nothing may be added between this check and the two renames.
+    if (notAfter !== null) refuseAfterDeadline(notAfter, now(), 'after validation, immediately before the link switch');
     if (current) switchLink(root, 'previous', `releases/${current}`);
     switchLink(root, 'current', `releases/${id}`);
-    event(root, 'promote', { id, previous: current, attended: true, hostGateSkipped: gate.skipped, window: gate.window });
+    event(root, 'promote', { id, previous: current, attended: true, hostGateSkipped: gate.skipped, window: gate.window,
+      ...(notAfter !== null ? { notAfter } : {}) });
     log(`PROMOTED ${id}; previous ${current ?? '(none)'}. The running service is unchanged until it restarts.`);
     afterSwitch(id, root, true);
     return 0;
@@ -1360,6 +1404,7 @@ function everPassed(root, id) {
 async function cmdRollback(opts) {
   const root = resolve(opts.root);
   requireAttended(opts, 'rollback');
+  if (opts['not-after'] !== undefined) log('--not-after ignored: a rollback has no deadline');
   return withLock(root, 'links', 'rollback', async () => {
     const current = readReleaseLink(root, 'current');
     const target = opts.to ?? readReleaseLink(root, 'previous');
@@ -1573,17 +1618,28 @@ async function cmdCheckNodeModules(opts) {
 }
 
 /** `host-gate [--mode promote|rollback] [--strict] [--window-min N]`: the packet gate. Read-only; exit 1 on refusal. */
-async function cmdHostGate(opts) {
+export async function cmdHostGate(opts, now = Date.now) {
   const mode = opts.mode ?? 'promote';
   if (!['promote', 'rollback'].includes(mode)) throw new Refusal('--mode must be promote or rollback');
+  // A rollback has no deadline: --not-after is validated and enforced for --mode promote only.
+  const notAfter = mode === 'promote' ? parseNotAfter(opts['not-after']) : null;
   const state = collectHostState(opts);
   const verdict = evaluateHostGate(state, { windowMin: opts['window-min'] ? num(opts, 'window-min') : 90, strict: Boolean(opts.strict), mode });
   log(`host gate (${state.source}, ${mode}) at ${new Date(state.nowMs).toISOString()}`);
   for (const fact of verdict.facts) log(`  ${fact}`);
   for (const w of verdict.warnings) log(`  WARNING ${w}`);
   for (const r of verdict.refusals) console.error(`release: REFUSE ${r}`);
-  log(verdict.ok ? 'HOST GATE PASS' : 'HOST GATE REFUSED');
-  return verdict.ok ? 0 : 1;
+  let late = false;
+  if (notAfter !== null) {
+    // Read-only proof for a packet script that this tool enforces the deadline it is about to pass to `promote`.
+    const nowMs = now();
+    late = deadlinePassed(nowMs, notAfter);
+    if (late) console.error(`release: REFUSE promotion deadline passed: --not-after ${notAfter} (${new Date(notAfter * 1000).toISOString()}), now ${new Date(nowMs).toISOString()}`);
+    else log(deadlineEnforcedLine(notAfter));
+  }
+  const ok = verdict.ok && !late;
+  log(ok ? 'HOST GATE PASS' : 'HOST GATE REFUSED');
+  return ok ? 0 : 1;
 }
 
 /**

@@ -3,11 +3,33 @@
 # (t+0, +10, +20, +30) then release.mjs status (plain form, no events.log write). Each tick requires: ActiveState active, NRestarts 0,
 # InvocationID = the owner's restart, the primary still running in releases/<NEW_ID>, loopback /api/health "status":"ok",
 # /seasons/2026 and /brownlow/2026 200 with exactly one document <title> equal to the expected text (outside <script> and <svg>;
-# Sunday defect D4: the RSC payload carries "Page not found" on every page), and no afldb journal error line visible to arm
-# ("unreadable" is allowed; the owner's sudo journal count at the end decides). A tick not OK = rollback trigger, decided with the
-# owner. The owner's browser check (r1-browser.cjs) and S9 run during this block; they do not touch the service.
+# Sunday defect D4: the RSC payload carries "Page not found" on every page), and journal_err_lines = 0 or "unreadable".
+# journal_err_lines (p6_journal_errs) is the number of afldb journal ENTRIES at priority err or worse since the service's
+# ActiveEnterTimestamp, as arm sees them: a number only when the control query (newest afldb entry, any priority) returns exactly
+# one JSON object, which proves arm can read this unit's journal, AND the err query exits 0 with nothing but JSON objects (one
+# line per entry, -o json). 0 = both succeeded and no entry; N > 0 = tick not OK; any failed, empty-control or non-JSON answer
+# (no permission, bad --since, journalctl missing) = "unreadable", which is allowed for arm: the owner's sudo journal check
+# printed at the end (p6_owner_block; the same two lines as RUNBOOK section 4.2) decides. That check passes only when sudo and
+# journalctl exit 0 AND return no entry, and prints JOURNAL PASS or JOURNAL FAIL with the exit code and the entry count.
+# A tick not OK = rollback trigger, decided with the owner. The owner's browser check (r1-browser.cjs) and S9 run during this
+# block; they do not touch the service.
 # Run: tr -d '\r' < r1-p6-observe.sh | C:/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes afldb bash -s -- <NEW_ID> <InvocationID>
-# Test seam: R1_LIB_ONLY=1 when sourced; p6_tick <env-file> <port> prints "codes|titles" for the three GETs.
+# Test seam: R1_LIB_ONLY=1 when sourced; p6_tick <env-file> <port> prints "codes|titles" for the three GETs;
+# p6_journal_errs <since> prints 0, N or unreadable; p6_owner_block <since> prints the owner's two lines.
+p6_journal_errs() { # since
+  local c o
+  c=$(journalctl -u afldb -n 1 -o json --no-pager 2>&1) || { echo unreadable; return 0; }
+  [ "$(grep -c '^{' <<< "$c")" = 1 ] && [ "$(grep -c '' <<< "$c")" = 1 ] || { echo unreadable; return 0; }
+  o=$(journalctl -u afldb -p err --since "$1" -o json --no-pager 2>&1) || { echo unreadable; return 0; }
+  [ -n "$o" ] || { echo 0; return 0; }
+  if grep -qv '^{' <<< "$o"; then echo unreadable; else grep -c '^{' <<< "$o"; fi
+}
+p6_owner_block() { # since
+  local re='^[A-Za-z0-9:+-]+( [A-Za-z0-9:+-]+)*$'
+  [[ $1 =~ $re ]] || { echo "NO JOURNAL COMMAND: afldb ActiveEnterTimestamp is not a timestamp ('$1'); the journal check is NOT passed"; return 0; }
+  echo 'J=$(sudo journalctl -u afldb -p err --since "'"$1"'" -q -o json --no-pager); R=$?'
+  echo '[ "$R" = 0 ] && [ -z "$J" ] && echo "JOURNAL PASS rc=0 entries=0" || echo "JOURNAL FAIL rc=$R entries=$(grep -c "^{" <<< "$J")"'
+}
 p6_tick() { # env-file port
   ( set -a; . "$1"; set +a; node -e '
 const { createHmac } = require("node:crypto"); const http = require("node:http");
@@ -44,14 +66,15 @@ for t in 0 1 2 3; do
   S=$(systemctl show afldb -p ActiveState -p NRestarts -p InvocationID -p MemoryCurrent | tr '\n' ' ')
   M=$(systemctl show afldb -p MainPID --value); CW=$(readlink "/proc/$M/cwd" 2>/dev/null || echo '?')
   G=$(p6_tick "$C/.env" "$P" || echo "probe-error")
-  J=$(journalctl -u afldb --since "$SINCE" -p err -q --no-pager 2>/dev/null | wc -l || echo unreadable)
+  J=$(p6_journal_errs "$SINCE")
   echo "tick $t $(date -u +%FT%TZ) $S cwd=$CW $G journal_err_lines=$J"
   { [[ $S == *ActiveState=active* ]] && [[ $S == *NRestarts=0* ]] && [[ $S == *"InvocationID=$INV0"* ]] && [ "$CW" = "$REL" ] \
     && [[ $G == "health=200:ok seasons=200:title-ok brownlow=200:title-ok" ]] && { [ "$J" = 0 ] || [ "$J" = unreadable ]; }; } || { echo "  TICK $t NOT OK"; bad=$((bad+1)); }
 done
 echo "== final status $(date -u +%FT%TZ)"
 "$N" deploy/release.mjs status
-echo "OWNER NOW (one line, sudo): sudo journalctl -u afldb -p err --since \"$SINCE\" --no-pager | wc -l   (expect 1, the '-- No entries --' line)"
+echo "OWNER NOW (two lines, sudo; expect JOURNAL PASS rc=0 entries=0; anything else, or no verdict line, is not a pass):"
+p6_owner_block "$SINCE"
 if [ $bad = 0 ]; then echo "P6 RESULT OBSERVATION PASS (4 ticks)"; else echo "P6 RESULT $bad tick(s) not OK"; exit 1; fi
 }
 if [ "${R1_LIB_ONLY:-0}" = 1 ]; then return 0 2>/dev/null || exit 0; fi

@@ -7,6 +7,15 @@
 #   * the production Node build v22.23.2 mounted read-only at its production path.
 # Docker sets the container hostname (afldb-prod, then afldb-dev); users arm and ops exist only inside. See in-container.sh.
 # Usage: bash rehearse-r6-fixes.sh <verified STAGE> <fixture root>
+#
+# RETIRED 27 Nov 2026 (review finding 5), with the r2 driver that invoked it: this script now does exactly one thing, the two
+# lines below: it prints the REFUSED line and exits 2, unconditionally, before it reads anything or starts a container (no
+# override). Reason: its containers carry no run label or name and it counts leftovers by image ancestor, so a repeat cannot tell
+# its own containers from another run's. Use ../review-fixes-r3-20261124/rehearse-r3.sh through the run-scoped driver there.
+# Everything below the refusal is the body that ran on 23 Nov 2026, kept unchanged for the record and unreachable.
+echo "REFUSED: RETIRED 27 Nov 2026: the r2 container rehearsal must not be run again (unlabelled containers, counted by image ancestor); nothing was read or started. Use review-fixes-r3-20261124/run-printed-blocks.sh" >&2
+exit 2
+# ---- historical body (23 Nov 2026), unreachable ----
 set -uo pipefail; export LC_ALL=C
 [ "$(hostname)" != afldb-prod ] || { echo "REFUSED: rehearsal never runs on production"; exit 2; }
 STAGE=${1:?verified staging root}; FIX=${2:?fixture root}

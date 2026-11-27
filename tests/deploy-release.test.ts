@@ -1,6 +1,6 @@
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import {
-  appendFileSync, copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync,
+  appendFileSync, copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, rmSync, symlinkSync,
   utimesSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -10,10 +10,14 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { verifyClaim } from '../src/lib/auth/tokens';
 import {
   DEFAULTS,
+  Refusal,
   auditActivation,
   checkRollbackLedger,
   classifyDrift,
+  cmdPromote,
   compareNodeModulesToLock,
+  deadlineEnforcedLine,
+  deadlinePassed,
   evaluateHostGate,
   formatManifest,
   hashTree,
@@ -27,6 +31,7 @@ import {
   parseExecStartNode,
   parseManifest,
   parseMeminfo,
+  parseNotAfter,
   parseShowProps,
   parseSystemdTimestampUtc,
   parseUnsetEnvironment,
@@ -585,6 +590,32 @@ describe('AFLDB-ISSUE-351 — the attended gate and the activation audit (pure)'
     expect(() => parseArgs(['status', '--confirm-restart-invocation'])).toThrow(/needs a value/);
     expect(parseArgs(['status']).opts['confirm-restart-invocation']).toBeUndefined();
   });
+
+  it('review finding 6: --not-after is strict, and promotion is permitted at the deadline instant and refused from 1 ms after it', () => {
+    const cutoff = Date.UTC(2026, 10, 24, 0, 30, 0) / 1000; // Tue 24 Nov 2026 11:30 Australia/Melbourne
+    expect(cutoff).toBe(1795480200);
+    // Optional: absent means no deadline (every caller that predates the option).
+    expect(parseArgs(['promote', 'x', '--attended']).opts['not-after']).toBeUndefined();
+    expect(parseNotAfter(undefined)).toBeNull();
+    expect(parseArgs(['promote', 'x', '--not-after', '1795480200']).opts['not-after']).toBe('1795480200');
+    expect(parseNotAfter('1795480200')).toBe(1795480200);
+    expect(parseNotAfter('1600000000')).toBe(1600000000);
+    expect(parseNotAfter('4102444800')).toBe(4102444800);
+    for (const bad of ['', '0', '179548020', '17954802000', '1795480200.5', ' 1795480200', '1795480200 ', '1795480200\n', '+795480200', '-795480200',
+      '1.79548e9', '0x6b04a548', 'tomorrow', '--attended', '1599999999', '4102444801', '9999999999', '\uff11795480200', 1795480200, true]) {
+      expect(() => parseNotAfter(bad), JSON.stringify(bad)).toThrow(Refusal);
+      expect(() => parseNotAfter(bad), JSON.stringify(bad)).toThrow(/^--not-after must be an epoch time in whole seconds .* Nothing was changed\.$/s);
+    }
+    expect(() => parseArgs(['promote', 'x', '--not-after'])).toThrow(/--not-after needs a value/);
+    // The boundary, in milliseconds: the deadline instant itself is still permitted.
+    expect(deadlinePassed(cutoff * 1000 - 1, cutoff)).toBe(false);
+    expect(deadlinePassed(cutoff * 1000, cutoff)).toBe(false);
+    expect(deadlinePassed(cutoff * 1000 + 1, cutoff)).toBe(true);
+    expect(deadlinePassed(cutoff * 1000 + 999, cutoff)).toBe(true);
+    expect(deadlinePassed((cutoff + 1) * 1000, cutoff)).toBe(true);
+    // The line a packet script requires from host-gate before it calls promote.
+    expect(deadlineEnforcedLine(cutoff)).toBe('PROMOTION DEADLINE ENFORCED not-after=1795480200 not-reached');
+  });
 });
 
 // ---------------------------------------------------------------------------- Linux route test
@@ -1084,6 +1115,77 @@ describe.runIf(linux)('AFLDB-ISSUE-329 — route on Linux: failed builds never t
     // Restore the previous order (current ids[0], previous ids[1]) for the tests that follow.
     const restored = await tool('rollback', '--to', ids[0], ...att());
     expect(restored.code, restored.out).toBe(0);
+    expect(readReleaseLink(root, 'current')).toBe(ids[0]);
+    expect(readReleaseLink(root, 'previous')).toBe(ids[1]);
+  }, 60_000);
+
+  it('review finding 6: promote --not-after moves no link after the deadline, even when it passes during validation; rollback has no deadline', async () => {
+    const snap = () => [readlinkSync(join(root, 'current')), readlinkSync(join(root, 'previous')), readFileSync(join(root, 'events.log'), 'hex')].join('|');
+    const before = snap();
+    expect(before.startsWith(`releases/${ids[0]}|releases/${ids[1]}|`)).toBe(true);
+    const clear = join(base, 'host-state-clear.json');
+    const nowS = Math.floor(Date.now() / 1000);
+    // A malformed value is refused before anything is read; nothing changes.
+    for (const bad of ['soon', '12345', `${nowS}.5`, `${nowS}0`]) {
+      const run = await tool('promote', ids[1], ...att(), ...live(), '--not-after', bad);
+      expect(run.code, run.out).toBe(1);
+      expect(run.out).toMatch(/REFUSED: --not-after must be an epoch time in whole seconds .* Nothing was changed\./);
+      expect(snap()).toBe(before);
+    }
+    // Through the CLI on the real clock: a deadline already past is refused, links and events.log byte-identical.
+    const past = await tool('promote', ids[1], ...att(), ...live(), '--not-after', String(nowS - 1));
+    expect(past.code, past.out).toBe(1);
+    expect(past.out).toMatch(/REFUSED: promotion deadline passed \(before validation\): --not-after \d{10} .*No link was switched and events\.log was not written\. Nothing was changed\./);
+    expect(snap()).toBe(before);
+    // host-gate (read-only) proves the tool enforces the deadline: one exact line when it has not passed, a refusal when it has.
+    const proof = await tool('host-gate', '--host-state', clear, '--not-after', String(nowS + 3600));
+    expect(proof.code, proof.out).toBe(0);
+    expect(proof.out.split('\n')).toContain(`release: ${deadlineEnforcedLine(nowS + 3600)}`);
+    expect(proof.out).toMatch(/HOST GATE PASS/);
+    const lateGate = await tool('host-gate', '--host-state', clear, '--not-after', String(nowS - 1));
+    expect(lateGate.code, lateGate.out).toBe(1);
+    expect(lateGate.out).toMatch(/release: REFUSE promotion deadline passed: --not-after \d{10} /);
+    expect(lateGate.out).toMatch(/HOST GATE REFUSED/);
+    expect(lateGate.out).not.toMatch(/DEADLINE ENFORCED/);
+    const badGate = await tool('host-gate', '--host-state', clear, '--not-after', 'soon');
+    expect(badGate.code, badGate.out).toBe(1);
+    expect(badGate.out).toMatch(/REFUSED: --not-after must be an epoch time/);
+    const plainGate = await tool('host-gate', '--host-state', clear);
+    expect(plainGate.code, plainGate.out).toBe(0);
+    expect(plainGate.out).not.toMatch(/DEADLINE/);
+    const rollbackGate = await tool('host-gate', '--mode', 'rollback', '--host-state', clear, '--not-after', String(nowS - 1));
+    expect(rollbackGate.code, rollbackGate.out).toBe(0);
+    expect(snap()).toBe(before);
+
+    // Injected clock, in process: the same command function the CLI runs, with the deadline of the 24 Nov packet.
+    const deadline = 1795480200;
+    const opts = parseArgs(['promote', ids[1], ...att(), ...live(), '--root', root, '--not-after', String(deadline)]).opts;
+    const clock = (...values: number[]) => { let i = 0; return () => values[Math.min(i++, values.length - 1)]; };
+    // 1 ms late at the first check.
+    await expect(cmdPromote(opts, ids[1], clock(deadline * 1000 + 1))).rejects.toThrow(/promotion deadline passed \(before validation\)/);
+    expect(snap()).toBe(before);
+    // In time at the first check (the deadline instant itself), 1 ms late once validation has finished: no link moves.
+    const expired = await cmdPromote(opts, ids[1], clock(deadline * 1000, deadline * 1000 + 1)).then(() => null, (error: unknown) => error);
+    expect(expired).toBeInstanceOf(Refusal);
+    expect((expired as Error).message).toBe('promotion deadline passed (after validation, immediately before the link switch): --not-after 1795480200 '
+      + '(2026-11-24T00:30:00.000Z), now 2026-11-24T00:30:00.001Z. No link was switched and events.log was not written. Nothing was changed.');
+    expect(snap()).toBe(before);
+    expect(existsSync(join(root, 'links.lock'))).toBe(false);
+    // Exactly at the deadline instant at both checks: permitted. The event records the deadline it ran under.
+    expect(await cmdPromote(opts, ids[1], clock(deadline * 1000))).toBe(0);
+    expect(readReleaseLink(root, 'current')).toBe(ids[1]);
+    expect(readReleaseLink(root, 'previous')).toBe(ids[0]);
+    const events = () => readFileSync(join(root, 'events.log'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+    expect(events().at(-1)).toMatchObject({ op: 'promote', id: ids[1], previous: ids[0], attended: true, notAfter: deadline });
+    // Without the option nothing is recorded or checked: the promotions earlier in this file carry no notAfter.
+    const earlier = events().filter((e) => e.op === 'promote').slice(0, -1);
+    expect(earlier.length).toBeGreaterThan(0);
+    for (const e of earlier) expect(e).not.toHaveProperty('notAfter');
+    // A rollback is never subject to a deadline, even one long past, and it restores the order for the tests that follow.
+    const back = await tool('rollback', '--to', ids[0], ...att(), '--not-after', String(nowS - 86_400));
+    expect(back.code, back.out).toBe(0);
+    expect(back.out).toMatch(/--not-after ignored: a rollback has no deadline/);
+    expect(back.out).toMatch(/ROLLED BACK to /);
     expect(readReleaseLink(root, 'current')).toBe(ids[0]);
     expect(readReleaseLink(root, 'previous')).toBe(ids[1]);
   }, 60_000);

@@ -9,6 +9,17 @@
 # Then exports the fixture (same revision) to streamanator and runs rehearse-r6-fixes.sh there (disposable containers), and
 # finally removes everything this rehearsal created on streamanator. Production is never contacted.
 # Usage: bash run-printed-blocks.sh <worktree holding the runbook> <output dir>
+#
+# RETIRED 27 Nov 2026 (review finding 5): this script now does exactly one thing, the two lines below: it prints the REFUSED line
+# and exits 2, unconditionally, before it reads, creates or removes anything (no override). Reason: a repeat run is unsafe. It
+# overwrites fixed /tmp paths, swaps the shared /tmp/afldb-r6-20261125-r2.tar in place, and ends with wildcard removal on
+# streamanator and the workstation (/tmp/afldb-r6-20261125-r2.*, /tmp/afldb-r6-recheck.*, /tmp/afldb-r6-bad.*,
+# /tmp/afldb-r6fix-fixture.*), which can destroy an operator's real staging root or another run's files. Use the run-scoped driver
+# ../review-fixes-r3-20261124/run-printed-blocks.sh (tags r3 and r4). Everything below the refusal is the body that ran on
+# 23 Nov 2026 (rehearsal-20261123T1202Z.log), kept unchanged for the record and unreachable.
+echo "REFUSED: RETIRED 27 Nov 2026: the r2 rehearsal driver must not be run again (fixed /tmp paths, in-place archive swap, wildcard cleanup); nothing was read, created or removed. Use review-fixes-r3-20261124/run-printed-blocks.sh" >&2
+exit 2
+# ---- historical body (23 Nov 2026), unreachable ----
 set -uo pipefail; export LC_ALL=C
 WT=${1:?worktree}; OUT=${2:?output dir}; mkdir -p "$OUT"
 RB=$WT/docs/v2/evidence/backlog-20261121/ATTENDED-PLAN-R6-20261125.md

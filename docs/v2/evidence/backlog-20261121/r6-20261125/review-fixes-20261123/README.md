@@ -105,16 +105,28 @@ The baseline was written by the staged `a1-rawhead.sh baseline`, as on Sunday.
 
 Sunday's baseline was unchanged by every F-4 run.
 
-## Repeat (Astra)
+## Repeat (Astra): RETIRED 27 November 2026, do not run
 
-From a Git Bash workstation with the repository at `/d/dev/afldb` holding `7af24a74`, run this from any checkout of the review
-commit:
+**RETIRED (review finding 5, 27 Nov 2026).** The repeat command below is kept only as the record of what was run on
+23 November; the results above and the log are unchanged. It must not be run again: the r2 driver overwrites fixed `/tmp`
+paths, swaps the shared `/tmp/afldb-r6-20261125-r2.tar` in place, and ends with wildcard removal on streamanator and the
+workstation (`/tmp/afldb-r6-20261125-r2.*`, `/tmp/afldb-r6-recheck.*`, `/tmp/afldb-r6-bad.*`, `/tmp/afldb-r6fix-fixture.*`), so
+a repeat can destroy an operator's real staging root or another run's files. From 27 Nov both entry points,
+[run-printed-blocks.sh](run-printed-blocks.sh) and [rehearse-r6-fixes.sh](rehearse-r6-fixes.sh), print `REFUSED: RETIRED …`
+and exit 2 before they read, create or remove anything (no override; the 23 Nov body is kept below the refusal, unreachable;
+the bytes that ran are `git show 7af24a74:<path>`). To repeat a printed-block rehearsal use the run-scoped driver
+[`../review-fixes-r3-20261124/run-printed-blocks.sh`](../review-fixes-r3-20261124/run-printed-blocks.sh) (tags `r3`, `r4`);
+the refusal is proved by suite f5, `../review-fixes-r4-20261127/cases/f5-cleanup-ownership.sh`
+(record: `../review-fixes-r4-20261127/README.md`).
 
-```bash
+What was run on 23 November (historical; the fence is no longer marked as a shell block because it is not to be copied), from
+a Git Bash workstation with the repository at `/d/dev/afldb` holding `7af24a74`, from any checkout of the review commit:
+
+```text
 bash docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-20261123/run-printed-blocks.sh "$PWD" /tmp/r6-repeat
 ```
 
-Expected results:
+Results it gave on 23 November (expected then; today the command prints only the refusal):
 
 * `files verified: 15`;
 * the five block-5 rows and the bad-archive row above;
@@ -122,7 +134,8 @@ Expected results:
 * `left: 0` and `containers left: 0`.
 
 The driver needs streamanator (`arm@10.0.40.100`, key `afldb_dev`), Docker for arm there, the image above and
-`/home/arm/.nvm/versions/node/v22.23.2`. It removes what it creates on both machines.
+`/home/arm/.nvm/versions/node/v22.23.2`. It removes what it creates on both machines. (27 Nov 2026: that sentence is the
+23 Nov claim; the removal was by wildcard and by image ancestor, not by ownership, which is why the driver is retired.)
 
 ## Limits
 

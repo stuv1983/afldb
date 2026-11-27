@@ -178,10 +178,23 @@ gate_post() { ( K=6.8.0-149-generic; CUR=$2; PB=01234567-89ab-cdef-0123-456789ab
   GB=$(printf '0%.0s' $(seq 64)); eval "$(sed -n '/^  \[\[ \$K =~/,/exit 2; }/p' "$1")"; echo GATE-OPEN ) | grep -q GATE-OPEN; }
 git -C "$CHK" show "$CAND:docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh" > "$W/r6-pre-orig.sh"
 git -C "$CHK" show "$CAND:docs/v2/evidence/backlog-20261121/r6-20261125/r6-post-verify.sh" > "$W/r6-post-orig.sh"
-for c in "$NEW" "$OLD"; do t "amended pre-verify admits accepted $c" gate_pre "$R6/r6-pre-verify.sh" "$c"; t "amended post-verify admits $c" gate_post "$R6/r6-post-verify.sh" "$c"; done
+# 27 Nov 2026 (r4): since R6 r3 the pre-verify gate takes seven arguments (Tuesday outcome and attested InvocationID), so the
+# one-line gate that gate_pre extracts is no longer in the amended script; with nothing extracted, the two refusals below could
+# not refuse. gate_pre7 evaluates the amended script's own argument-gate lines with seven arguments (and refuses to pass if the
+# extraction is not the expected 10 lines). gate_pre stays for the reviewed originals.
+gate_pre7() { ( g=$(sed -n '/^OUTC=\${1:-}; CUR=/,/do not fit Tuesday outcome/p' "$1"); [ "$(wc -l <<< "$g")" = 10 ] || exit 0
+  set -- accepted "$2" r3:yes r4:yes 10:00 "$3" "inv:$4"; eval "$g"; echo GATE-OPEN ) | grep -q GATE-OPEN; }
+SUNI=342040625f6d4012a35d598dfbf9afe6; TUEI=0123456789abcdef0123456789abcdef
+t  "amended pre-verify admits $NEW as tue:released" gate_pre7 "$R6/r6-pre-verify.sh" "$NEW" tue:released "$TUEI"
+t  "amended pre-verify admits $OLD as tue:rolledback" gate_pre7 "$R6/r6-pre-verify.sh" "$OLD" tue:rolledback "$TUEI"
+t  "amended pre-verify admits $OLD as tue:deferred with Sunday's InvocationID" gate_pre7 "$R6/r6-pre-verify.sh" "$OLD" tue:deferred "$SUNI"
+for c in "$NEW" "$OLD"; do t "amended post-verify admits $c" gate_post "$R6/r6-post-verify.sh" "$c"; done
 t  "amended post-verify still admits $PREV" gate_post "$R6/r6-post-verify.sh" "$PREV"
-tn "amended pre-verify: accepted with $PREV" gate_pre "$R6/r6-pre-verify.sh" "$PREV"
-tn "amended pre-verify: a foreign release id" gate_pre "$R6/r6-pre-verify.sh" "0123456789ab-X"
+tn "amended pre-verify: $PREV as tue:released" gate_pre7 "$R6/r6-pre-verify.sh" "$PREV" tue:released "$TUEI"
+tn "amended pre-verify: $PREV as tue:rolledback" gate_pre7 "$R6/r6-pre-verify.sh" "$PREV" tue:rolledback "$TUEI"
+tn "amended pre-verify: $PREV as tue:deferred" gate_pre7 "$R6/r6-pre-verify.sh" "$PREV" tue:deferred "$SUNI"
+tn "amended pre-verify: a foreign release id" gate_pre7 "$R6/r6-pre-verify.sh" "0123456789ab-X" tue:released "$TUEI"
+tn "amended pre-verify: tue:released with Sunday's InvocationID" gate_pre7 "$R6/r6-pre-verify.sh" "$NEW" tue:released "$SUNI"
 tn "reviewed original pre-verify on a 17822b29 release (why the amendment is needed)" gate_pre "$W/r6-pre-orig.sh" "$NEW"
 tn "reviewed original post-verify on a 17822b29 release" gate_post "$W/r6-post-orig.sh" "$NEW"
 t  "reviewed original pre-verify on the rollback target $OLD (rollback/deferral need no amendment)" gate_pre "$W/r6-pre-orig.sh" "$OLD"
