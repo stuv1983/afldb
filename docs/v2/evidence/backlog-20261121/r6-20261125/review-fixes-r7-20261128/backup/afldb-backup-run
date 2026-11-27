@@ -1,0 +1,53 @@
+#!/usr/bin/bash
+# afldb-backup-run: R6 r7 (28 Nov 2026) sealed backup production, the ExecStart of afldb-backup.service. PREPARED, NOT INSTALLED.
+# Installed by install-backup.sh as /usr/local/lib/afldb-backup/afldb-backup-run, root:root 0755. Contract: review-fixes-r7-20261128/
+# DESIGN.md sections 2 and 3.1 (step 1).
+# Runs as the system user afldb-backup (no login, no key, no sudo; this file and everything it executes are root-owned), from
+#   ExecStart=/usr/bin/bash --noprofile --norc /usr/local/lib/afldb-backup/afldb-backup-run
+# with ProtectHome=yes, ProtectSystem=strict and ReadWritePaths=/var/lib/afldb-backup/staging (the only path it can write).
+# 1. removes everything an earlier run left in staging;
+# 2. runs the installed, byte-identical copy of tools/maintenance/backup.sh (in /usr/local/lib/afldb-backup, so its
+#    `cd "$(dirname "$0")/../.."` lands in a root-owned directory with no .env) with an EMPTY environment plus constants:
+#    --dir /var/lib/afldb-backup/staging --keep 1, peer authentication (no secret anywhere), pg_dump to .partial,
+#    pg_restore --list, rename;
+# 3. writes the staging sidecar "<sha256>  <name>" (the root sealer requires its own copy to hash to this value);
+# 4. logs "backup ok: <name> <bytes> bytes sha256 <16 hex> offhost=skipped" (continuity only: NO GATE READS IT).
+# Exit 0 only when all of that held; any failure exits non-zero, the sealer does not run (systemd runs ExecStartPost only after a
+# successful ExecStart), the unit fails and OnFailure= fires. It never reads or executes anything under /home.
+cd / || exit 90
+export LC_ALL=C PATH=/usr/sbin:/usr/bin
+umask 077
+set -u -o pipefail
+STG=/var/lib/afldb-backup/staging
+BK=/usr/local/lib/afldb-backup/tools/maintenance/backup.sh
+# Peer authentication over the local socket: the OS user afldb-backup is mapped to the read-only role afldb_backup
+# (pg_ident.conf "afldbbackup afldb-backup afldb_backup"; pg_hba.conf "local afldb_prod afldb_backup peer map=afldbbackup").
+DSN='postgresql://afldb_backup@/afldb_prod?host=/var/run/postgresql'
+NAMERE='^afldb_prod-[0-9]{8}-[0-9]{6}\.dump$'
+die() { printf 'afldb-backup-run: FAILED: %s\n' "$1" >&2; exit "${2:-1}"; }
+
+[ "$(/usr/bin/id -un)" = afldb-backup ] || die "not running as afldb-backup (uid $(/usr/bin/id -u))" 2
+[ -d "$STG" ] && [ ! -L "$STG" ] && [ -O "$STG" ] || die "$STG is missing, a symbolic link, or not owned by afldb-backup" 2
+
+# 1. A clean staging directory: nothing from an earlier (failed or interrupted) run can be picked up by the sealer.
+/usr/bin/find "$STG" -mindepth 1 -maxdepth 1 -exec /usr/bin/rm -rf -- {} + || die "cannot empty $STG"
+[ -z "$(/usr/bin/find "$STG" -mindepth 1 -maxdepth 1 -print -quit)" ] || die "$STG is not empty after cleaning"
+
+# 2. backup.sh, unmodified, with an empty environment plus constants (HOME and AFLDB_BACKUP_DIR only because backup.sh reads them
+#    under set -u; --dir decides the target).
+out=$(/usr/bin/env -i PATH=/usr/sbin:/usr/bin LC_ALL=C HOME=/nonexistent AFLDB_BACKUP_DIR="$STG" AFLDB_BACKUP_DATABASE_URL="$DSN" \
+  /usr/bin/bash --noprofile --norc "$BK" --dir "$STG" --keep 1 2>&1); rc=$?
+printf '%s\n' "$out"
+[ "$rc" = 0 ] || die "backup.sh exited $rc" "$rc"
+dump=$(printf '%s\n' "$out" | /usr/bin/sed -n 's/^==> Backing up .* to \(.*\)$/\1/p' | /usr/bin/head -1)
+name=${dump##*/}
+[ "$dump" = "$STG/$name" ] && [[ $name =~ $NAMERE ]] || die "backup.sh reported '${dump:0:200}', not $STG/afldb_prod-<8 digits>-<6 digits>.dump"
+[ -f "$dump" ] && [ ! -L "$dump" ] && [ -s "$dump" ] || die "$dump is not a regular non-empty file"
+
+# 3. The staging sidecar (sha256sum -c format), and 4. the continuity line.
+h=$(/usr/bin/sha256sum < "$dump") && [[ $h =~ ^([0-9a-f]{64})\ \ -$ ]] || die "cannot hash $dump"
+sha=${BASH_REMATCH[1]}
+bytes=$(/usr/bin/stat -c %s -- "$dump") && [[ $bytes =~ ^[1-9][0-9]*$ ]] || die "cannot stat $dump"
+printf '%s  %s\n' "$sha" "$name" > "$dump.sha256" || die "cannot write $dump.sha256"
+printf 'backup ok: %s %s bytes sha256 %s offhost=skipped\n' "$name" "$bytes" "${sha:0:16}"
+exit 0

@@ -23,6 +23,9 @@
 #   AFLDB_BACKUP_MAX_AGE_HOURS    status: newest backup must be younger than this (default 30)
 #   AFLDB_VERIFY_MAX_AGE_HOURS    status: newest verification must be younger than this (default 216 = 9 days)
 #   AFLDB_BACKUP_TOOLS_DIR        where backup.sh and restore-test.sh live (default: this script's directory)
+#   AFLDB_BACKUP_SEALED_STATE_DIR status only, optional, no default: an absolute path (production: /var/lib/afldb-backup/state)
+#                                 whose last-backup.json the "backup" check reads instead of $AFLDB_BACKUP_DIR/.state's, once
+#                                 the nightly backup is produced and sealed outside arm (R6 r7, DESIGN.md 3.3). Unset = unchanged.
 #
 # backup.sh / restore-test.sh read the DSNs from the checkout's .env themselves (a DSN is never put on a command line).
 # Exit codes: 0 ok; 1 failed (FAILED-<mode> marker written); 2 usage/configuration; 75 another run holds the lock (no marker).
@@ -64,14 +67,19 @@ if [[ "$MODE" == status ]]; then
     if [[ -z "$epoch" || "$age" -gt "$max" ]]; then log "STATUS FAIL $label: last success ${age}h ago (limit ${max}h)"; rc=1
     else log "STATUS ok   $label: $(field "$file" file) ${age}h ago"; fi
   }
-  check "backup" "$STATE/last-backup.json" "$MAX_BACKUP_H"
+  BSTATE="$STATE"
+  if [[ -n "${AFLDB_BACKUP_SEALED_STATE_DIR:-}" ]]; then
+    [[ "$AFLDB_BACKUP_SEALED_STATE_DIR" == /* ]] || die_config "AFLDB_BACKUP_SEALED_STATE_DIR must be an absolute path"
+    BSTATE="$AFLDB_BACKUP_SEALED_STATE_DIR"
+  fi
+  check "backup" "$BSTATE/last-backup.json" "$MAX_BACKUP_H"
   check "restore verification" "$STATE/last-verify.json" "$MAX_VERIFY_H"
   # Per-mode markers (review A-02): a backup success must not erase a failed restore verification.
   for marker in FAILED-backup FAILED-verify; do
     if [[ -f "$STATE/$marker" ]]; then log "STATUS FAIL a run failed: $(cat "$STATE/$marker")"; rc=1; fi
   done
   if [[ -f "$STATE/FAILED-unit" ]]; then log "STATUS FAIL the failure unit fired at $(cat "$STATE/FAILED-unit")"; rc=1; fi
-  [[ -f "$STATE/last-backup.json" ]] && grep -q '"offhost":"failed"' "$STATE/last-backup.json" && { log "STATUS FAIL the last off-host copy failed"; rc=1; }
+  [[ -f "$BSTATE/last-backup.json" ]] && grep -q '"offhost":"failed"' "$BSTATE/last-backup.json" && { log "STATUS FAIL the last off-host copy failed"; rc=1; }
   exit "$rc"
 fi
 

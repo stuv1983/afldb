@@ -1,0 +1,17 @@
+# afldb-verify-rootfacts.socket (R6 r7, MED-2): the root facts reader's socket. ROOT-OWNED, installed by install-verify.sh as
+# /etc/systemd/system/afldb-verify-rootfacts.socket (a copy of the bundle file; the verifier compares the two on every run).
+# Only root and members of group afldb-verify (the verifier account alone; arm is NOT a member) can connect.
+[Unit]
+Description=AFLDB verifier root facts reader (socket)
+
+[Socket]
+ListenStream=/run/afldb-verify-rootfacts.sock
+SocketUser=root
+SocketGroup=afldb-verify
+SocketMode=0660
+Accept=yes
+MaxConnections=4
+MaxConnectionsPerSource=2
+
+[Install]
+WantedBy=sockets.target

@@ -1,0 +1,30 @@
+# afldb-verify-rootfacts@.service (R6 r7, MED-2): one root facts reader per connection. ROOT-OWNED, installed by install-verify.sh as
+# /etc/systemd/system/afldb-verify-rootfacts@.service. Root, but bounded: only CAP_DAC_READ_SEARCH (read arm's 0700 state, the
+# crontab spool and the off-host copy) and CAP_SYS_PTRACE (readlink /proc/<afldb MainPID>/cwd); read-only file system; no network;
+# no new privileges; a fixed, argument-free command; the client's single request line is validated against a fixed grammar.
+[Unit]
+Description=AFLDB verifier root facts reader (one connection)
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/bin/python3.12 -I -S /usr/local/lib/afldb-verify/afldb-verify-rootfacts
+StandardInput=socket
+StandardOutput=socket
+StandardError=journal
+WorkingDirectory=/
+Environment=LC_ALL=C PATH=/usr/sbin:/usr/bin
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH CAP_SYS_PTRACE
+AmbientCapabilities=
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+PrivateNetwork=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX
+LockPersonality=yes
+RuntimeMaxSec=900

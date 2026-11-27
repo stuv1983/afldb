@@ -1,0 +1,7 @@
+#!/bin/sh
+# afldb-verify-entry (R6 r7, MED-2): the sshd ForceCommand of the afldb-verify account. ROOT-OWNED, pinned by SHA256SUMS.
+# sshd runs it as `/bin/sh -c <ForceCommand>` (the account's shell is dash, which reads no startup file for -c). Its FIRST act is
+# the re-exec below: an empty environment except PATH, LC_ALL and the client's command line (as data), and bash with no startup
+# file. Nothing sshd, the client (AcceptEnv LANG LC_*) or any account placed in the environment survives.
+exec /usr/bin/env -i PATH=/usr/sbin:/usr/bin LC_ALL=C "SSH_ORIGINAL_COMMAND=${SSH_ORIGINAL_COMMAND-}" \
+  /usr/bin/bash --noprofile --norc /usr/local/lib/afldb-verify/afldb-verify-dispatch

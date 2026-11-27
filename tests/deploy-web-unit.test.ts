@@ -474,6 +474,29 @@ describe.runIf(process.platform === 'linux')('AFLDB-ISSUE-352 — scheduled back
     expect(JSON.parse(readFileSync(join(st, 'last-verify.json'), 'utf8')).file).not.toBe('prior.dump');
   });
 
+  // R6 r7 (28 Nov 2026, DESIGN 3.3): the nightly dump is produced and sealed outside arm; its state record lives in
+  // /var/lib/afldb-backup/state. status reads it only through the explicit absolute-path opt-in; unset keeps today's behaviour.
+  it('status: AFLDB_BACKUP_SEALED_STATE_DIR (absolute, opt-in) is where the backup check reads last-backup.json (R6 r7)', () => {
+    const ok = run('verify');
+    expect(ok.status, ok.out).toBe(0);
+    const sealed = join(root, `sealed${n}`);
+    mkdirSync(sealed);
+    const st = (extra: Record<string, string>) => spawnSync('bash', [WRAPPER, 'status'], { encoding: 'utf8', env: baseEnv(ok.dir, extra) });
+    const absent = st({ AFLDB_BACKUP_SEALED_STATE_DIR: sealed });
+    expect(absent.status).toBe(1);
+    expect(absent.stdout).toContain(`STATUS FAIL backup: never recorded (${sealed}/last-backup.json absent)`);
+    const now = Math.floor(Date.now() / 1000);
+    writeFileSync(join(sealed, 'last-backup.json'),
+      `{"epoch":${now},"ts":"x","file":"afldb_prod-20261128-022003.dump","sha256":"${'a'.repeat(64)}","bytes":9,"offhost":"skipped"}\n`);
+    const fresh = st({ AFLDB_BACKUP_SEALED_STATE_DIR: sealed });
+    expect(fresh.status, fresh.stdout).toBe(0);
+    expect(fresh.stdout).toMatch(/STATUS ok {3}backup: afldb_prod-20261128-022003\.dump 0h ago/);
+    writeFileSync(join(sealed, 'last-backup.json'), `{"epoch":${now - 40 * 3600},"file":"old.dump","offhost":"skipped"}\n`);
+    expect(st({ AFLDB_BACKUP_SEALED_STATE_DIR: sealed }).status).toBe(1); // stale sealed record, although arm's own one is fresh
+    expect(st({ AFLDB_BACKUP_SEALED_STATE_DIR: 'var/lib/afldb-backup/state' }).status).toBe(2);
+    expect(status(ok.dir).status).toBe(0); // unset: unchanged
+  });
+
   it('offhost-pull: binds each sidecar to its dump, refuses future stamps, and a flood cannot evict genuine copies (review A-03)', () => {
     const src = join(root, 'pull-src');
     const dest = join(root, 'pull-dest');

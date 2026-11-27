@@ -34,6 +34,18 @@
 >   `scheduled-backup.sh` stays at the production bytes. The writer is installed by a separate owner procedure outside the production checkout,
 >   so P1/P2's clean-tree checks are unaffected. **Until it is installed, G0 STOPs with `scheduled origin unproven`, by design**
 >   ([r6 record](../backlog-20261121/r6-20261125/review-fixes-r6-20261128/README.md)).
+>   **r7 (28 Nov 2026), superseding the r6 origin rule and the arm-run G0 verdict (PROPOSED; independent review pending; nothing installed).**
+>   (1) **G1:** the nightly dump is produced by the system account `afldb-backup`, not arm. A root `ExecStartPost` hashes its own copy,
+>   writes a root seal and only then publishes the copy. G0 reads origin and dump only through `sealed_origin`, which uses PID 1, the
+>   seal and the root-published copy re-hashed in full. (2) **G2: the GO evidence is the owner path only.** Stu runs
+>   `afldb-verify-call.sh g0 <date>` on his workstation with his own verify key. It reaches the root-owned forced-command verifier on
+>   production (G0a) and then on streamanator (G0b), and G0b gets the dump and sha256 only from the authenticated G0a RESULT line.
+>   **A verdict printed by an arm-run script is no longer GO evidence**: `r1-g0-dump.sh` or `r6-offhost-verify.sh` over arm's ssh. arm's
+>   login environment can forge it, which the r7 rehearsal reproduced as the contrast in scenario d. §4's G0 row and §4.1 are changed in
+>   place, and §4.1a lists the installation preconditions. `r1-g0-dump.sh` changed in a comment only: MED-3 is a deterministic
+>   substitution, not a race. A future approval statement (§10) must name Stu's owner-path G0 instead of a G0 that Claude runs as arm.
+>   Until both installs are done and a sealed 02:20 run exists for the gate date, G0 STOPs, by design
+>   ([r7 record](../backlog-20261121/r6-20261125/review-fixes-r7-20261128/README.md)).
 > * **P4 (`r1-p4-gate-promote.sh`, `deploy/release.mjs`)**: the 11:30 cutoff is enforced by `release.mjs promote --not-after`
 >   immediately before the link switch, after all validation, and P4 first requires `host-gate --not-after` to print the line
 >   proving the tool enforces it (§2). **P4 therefore STOPs against a checkout whose `deploy/release.mjs` lacks the option,
@@ -46,7 +58,7 @@
 > and pin, Astra's PASS at that review commit, a new owner approval and that day's evidence. Record:
 > [review-fixes-r4-20261127/README.md](../backlog-20261121/r6-20261125/review-fixes-r4-20261127/README.md).
 
-Every production step is a pinned script piped over **one SSH connection** as arm (`tr -d '\r' < <script> | C:/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes afldb bash -s -- <args>`). Claude runs them only under the owner's approval statement (§10). The owner runs only the `sudo` lines and the browser check. Never open a new connection at minute :16–:18 (streamanator's r2 check connects then): 10:16–10:18, 11:16–11:18 and 12:16–12:18. Never print `.env` values: names and counts only.
+Every production step except G0 is a pinned script piped over **one SSH connection** as arm (`tr -d '\r' < <script> | C:/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes afldb bash -s -- <args>`). Since r7, G0 is Stu's owner-path call (§4.1). Claude runs the others only under the owner's approval statement (§10). The owner runs only the `sudo` lines and the browser check. Never open a new connection at minute :16–:18 (streamanator's r2 check connects then): 10:16–10:18, 11:16–11:18 and 12:16–12:18. Never print `.env` values: names and counts only.
 
 ## 0. Staging (workstation Git Bash, before 10:30)
 
@@ -190,8 +202,8 @@ Claude runs each line from the staged `scripts/` directory (`cd "$ST/$R/scripts"
 
 | Time (latest) | Step | Command | PASS line |
 |---|---|---|---|
-| 10:30 | **G0a** scheduled dump (read-only) | `tr -d '\r' < r1-g0-dump.sh \| $S bash -s -- 2026-11-24` | `G0 PROD RESULT PASS` + `OFFHOST-COMPARE <D> <SHA>` |
-| 10:32 | **G0b** off-host copy (streamanator, read-only) | `tr -d '\r' < "$ST/$O" \| C:/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes -i C:/Users/stuar/.ssh/afldb_dev arm@10.0.40.100 bash -s -- 2026-11-24 <D> <SHA>` | exit 0, `R6 OFFHOST RESULT PASS` |
+| 10:30 | **G0** (r7 owner path, read-only, **Stu runs it on the workstation**: G0a scheduled dump on production, then G0b off-host copy on streamanator) | `bash "$V7/afldb-verify-call.sh" g0 2026-11-24` (`$V7`: §4.1a) | wrapper exit 0 and last line `OWNER VERDICT G0 PASS transport=production … date=2026-11-24 invocation=<INV> dump=<D> sha256=<SHA> dispatch=<scheduled\|catch-up> …`; record `<D>`, `<SHA>` and `dispatch=` |
+| — | *superseded by r7, information only:* `tr -d '\r' < r1-g0-dump.sh \| $S bash -s -- 2026-11-24` (G0a as arm) and `r6-offhost-verify.sh` over arm's ssh to streamanator (G0b as arm) | as before | their `G0 PROD RESULT PASS` / `R6 OFFHOST RESULT PASS` lines are **not GO evidence** |
 | 10:35 | **P1** serving release and route (read-only) | `tr -d '\r' < r1-p1-precheck.sh \| $S bash -s -- <PREP>` | `P1 RESULT PASS`; note `UNACCEPTED_YEARS` |
 | 10:39 | **Baseline** raw head (writes `/home/arm/r1-rawhead-baseline.json` only) | `tr -d '\r' < r1-rawhead.sh \| $S bash -s -- baseline <UNACCEPTED_YEARS>` | `RAWHEAD RESULT baseline PASS` |
 | 10:41 | **P2** fast-forward to CAND exactly (checkout only) | `tr -d '\r' < r1-p2-ff.sh \| $S bash -s -- <PREP>` | `P2 RESULT PASS` |
@@ -208,7 +220,42 @@ Claude runs each line from the staged `scripts/` directory (`cd "$ST/$R/scripts"
 
 ### 4.1 G0, the 03:10 backup gate (it must PASS before P2)
 
-G0 needs **positive** evidence of all three of the following:
+**r7 (28 Nov 2026): G0 passes only on `OWNER VERDICT G0 PASS transport=production` with wrapper exit 0.** The wrapper accepts a
+verifier answer only when it meets every condition below. Anything else is `OWNER VERDICT G0 STOP … step=G0a|G0b reason=…`:
+* the answer has exactly one `AFLDB-VERIFY RESULT` line, and it is the last line;
+* the RESULT line carries this call's nonce, the pinned bundle digest and the expected host (`afldb-prod` for G0a, `streamanator` for G0b);
+* its `at=` is within 300 s of the workstation's clock;
+* its `exit=` equals the ssh exit status, and PASS ⇔ 0;
+* every argument field equals the request.
+
+What a PASS proves, as far as the r7 rehearsal on real systemd 255 shows ([r7 record](../backlog-20261121/r6-20261125/review-fixes-r7-20261128/README.md)):
+
+1. **G0a, the scheduled dispatch** (production, `sealed_origin`):
+   * exactly one root seal records a start job of `afldb-backup.service` that `afldb-backup.timer` created, with its dispatch
+     (= the timer's `LastTriggerUSec`) inside the gate date's 02:20–02:31 window;
+   * the unit did not stop or fail between the dispatch and the run, and no other run was sealed in the window;
+   * the run exited 0 as `afldb-backup` under the pinned code, drop-in and effective unit, and PID 1's `Result=success`.
+
+   A start by hand never counts. A `Persistent=` catch-up or an attended re-arm counts only when systemd genuinely dispatched it inside
+   the window. It is printed as `DISPATCH catch-up <delay> s after timer activation` and carried as `dispatch=catch-up`, so the record must
+   name it.
+2. **G0a, the dump.** `/var/lib/afldb-backup/published/<D>` is root:afldb-backup-read 0440 with link count 1. Its full re-hash equals the
+   seal's `dump_sha256` (root's hash of its own copy before publication) and the root sidecar. arm cannot write, rename, replace or
+   signal anything in this chain (rehearsed: every attempt EACCES/EPERM).
+3. **G0b, the off-host copy** (streamanator, the verifier port of `r6-offhost-verify.sh` and `scheduled-pull-evidence.sh`):
+   * the streamanator copy of `<D>` hashes, by root, to `<SHA>` from the authenticated G0a line;
+   * the 03:10 cron dispatch is taken from journald only with `_UID=0` (a `logger` line from arm cannot match).
+
+   The only PASS is exit 0 (`SCHEDULED-COPY-VERIFIED`). The pull log lineage, the sidecar and the `.verified-` marker remain data that
+   streamanator's arm produces.
+
+A PASS does **not** prove:
+* that the database content is honest (arm holds the owner DSN);
+* production's sshd configuration, its host key or the `-F none` production transport (the rehearsal used a ProxyCommand transport,
+  printed as `transport=rehearsal`);
+* the off-host rsync from production (a fixture in the rehearsal).
+
+*Pre-r7 text, kept for the record: it describes the superseded arm-run G0a/G0b.* G0 needs **positive** evidence of all three of the following:
 
 1. **The scheduled dispatch.** On production, G0a requires `afldb-backup.service` to have started today in 02:20–02:31 with `Result=success` and `ExecMainStatus=0`. That is the timer's run, the same one-shot unit as R6 A-1. On streamanator, the reviewed verifier (`scheduled-pull-evidence.sh`, installed bytes `d7574254…` = the 17822b29 kit) links the 03:10 copy to the `afldb-offhost-pull.timer` dispatch.
 2. **The wrapper invocation.** The verifier requires the wrapper invocation that this dispatch started to be recorded with its lineage, and to have completed successfully.
@@ -220,7 +267,47 @@ Only **exit 0** (`SCHEDULED-COPY-VERIFIED`) passes. Every other result has the s
 * **unattributable:** exit 10, `COPY-VERIFIED-ORIGIN-UNPROVEN` (the result Monday 23 Nov returns: REHEARSAL.md §2);
 * **missing:** no dump, no journal line, an ambiguous window, exit 2 or 127, or a G0a FAIL.
 
+r7: every `OWNER VERDICT G0 STOP` has the same action, **STOP before P2**. That includes G0a `scheduled origin unproven: <reason>`
+(before installation `0 seals … in the window`), G0b exit 10 or 1, and a refused or unauthenticated answer.
+
 A retry cannot supply the missing scheduled evidence. An attended copy would need its own approval and would not satisfy ISSUE-352. The release may be rescheduled after a day whose 03:10 evidence passes. The owner may also decide to release without this gate, but that is a separate explicit decision and is not covered by §10.
+
+### 4.1a r7 installation preconditions (all met before the qualifying 02:20 backup; outside the release checkout)
+
+The qualifying backup is the 02:20 run of the gate date. Complete these before it starts, in this order:
+* outside 02:15–02:50;
+* from a trusted root session;
+* from root-owned staging directories outside `/home` that hold a `git archive` of the pinned revision.
+
+None of them writes `/home/arm/projects/afldb`, so P1/P2's clean-tree checks are unchanged. Production's checkout keeps
+`scheduled-backup.sh` `234fca6a…`: the verifier ports `status` itself, and the repository's opt-in `7e2b470a…` is not needed there.
+
+1. **Production, sealed backup** ([R7 backup README](../backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/README.md) §5).
+   * Preconditions: the base `afldb-backup.service` and `.timer` are root-owned copies, not links into the checkout; the r6 attest
+     drop-in is not installed; `/usr/share/zoneinfo/Australia/Melbourne` is a root-owned regular file.
+   * Check `backup/SHA256SUMS` = `aada42cb…`, then run `sha256sum -c`.
+   * Run `install-backup.sh <staging>` as root.
+   * Add the `pg_ident.conf` line `afldbbackup afldb-backup afldb_backup` and the `pg_hba.conf` line
+     `local afldb_prod afldb_backup peer map=afldbbackup` before any broader `local` line, then run `SELECT pg_reload_conf()`.
+   * Run `verify-backup-install.sh` as root, and as arm in a **new** login. Both must print `BACKUP INSTALL RESULT PASS`.
+2. **Production, verifier** ([R7 verify README](../backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/README.md) §8, §10).
+   * Preconditions: step 1 is done, because the verifier joins `afldb-backup-read`. The host has `/usr/bin/python3.12`, group
+     `systemd-journal` and `/usr/lib/postgresql/16/bin/psql`, and `sshd_config` starts with `Include /etc/ssh/sshd_config.d/*.conf`.
+     Stu's workstation has a NEW key pair `~/.ssh/afldb_verify`, never arm's key.
+   * Check `verify/SHA256SUMS` = `ee4963bd…`.
+   * Run `install-verify.sh --role prod --key <staging>/afldb_verify.pub`.
+   * As postgres, apply `verifier-db.sql`, add the two `pg-auth-lines.txt` lines above the first other `local` line, and reload.
+   * Run `verify-verify-install.sh --role prod` as root.
+3. **streamanator** (owner, root there).
+   * Run `install-verify.sh --role offhost --key …`, then `verify-verify-install.sh --role offhost`.
+   * The off-host pull source becomes `<prod>:/var/lib/afldb-backup/published/` (`offhost-pull.sh` unchanged).
+4. **Workstation.** `V7` is a fresh `git archive` export of
+   `docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify` at the pinned revision.
+   * Run `sha256sum -c SHA256SUMS` in it. The wrapper's pinned bundle digest is `5333d215…`.
+   * Run `bash "$V7/afldb-verify-call.sh" version`. It must print `OWNER VERDICT VERSION PASS` for `afldb-prod` (role prod) and for
+     `streamanator` (role offhost).
+
+Until all four are done and a sealed timer run exists for the gate date, G0 STOPs, by design. Rollback: R7 backup README §6.
 
 ### 4.2 Owner blocks (short lines, one per line)
 
@@ -327,7 +414,7 @@ The checkout stays at 17822b29. This is harmless: the service runs the release t
 Record the following in `docs/v2/evidence/release-17822b29-20261124/SITTING-20261124.md`, as excerpts only:
 
 * every RESULT line;
-* G0's dump, SHA and verifier exit;
+* G0's dump, SHA and verifier exit; r7: the whole `OWNER VERDICT G0 …` line, including `dispatch=`;
 * the P1 identity block and `UNACCEPTED_YEARS`;
 * the P2 path list;
 * NEW_ID and NEW_BUILD;

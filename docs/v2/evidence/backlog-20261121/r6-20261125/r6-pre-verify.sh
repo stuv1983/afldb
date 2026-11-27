@@ -210,8 +210,10 @@ timer_usec() {
 # PASS line prints how long after the timer's last (re)activation the dispatch came, information only; the policy is Stu's);
 # a gate run as arm cannot be independent of arm's login environment (a compromised ~/.bashrc or PATH controls what any arm
 # process prints, this gate included), so the verdict needs a non-arm verifier (Stu's decision); the dump is written by the attested
-# run's own (arm) code, and the record binds the file that run left, not what it should have written (an arm process racing the
-# run inside its own minutes could substitute the file before the writer hashes it); the writer needs systemd's Job ActivationDetails (systemd
+# run's own (arm) code, and the record binds the file that run left, not what it should have written (MED-3, deterministic, not a
+# race: an arm process outside the unit can SIGSTOP the same-uid workload after backup.sh, substitute the file and SIGCONT it before
+# the writer hashes it; R6 r7 moves dump production to the separate afldb-backup account and the verdict to the owner verifier, so
+# a verdict this script prints as arm is no longer GO evidence); the writer needs systemd's Job ActivationDetails (systemd
 # 255.4-1ubuntu8.19); a start by hand that arrives while the timer's own start job is still queued joins that job (one job, one
 # invocation: the timer's); a journal receipt later than 5 s after the exit is a false STOP.
 #
