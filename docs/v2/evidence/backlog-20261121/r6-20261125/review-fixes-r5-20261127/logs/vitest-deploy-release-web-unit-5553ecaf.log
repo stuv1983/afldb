@@ -1,0 +1,44 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/tmp/r5coord.QxymtV/u[39m
+
+[90mstdout[2m | tests/deploy-release.test.ts[2m > [22m[2mAFLDB-ISSUE-329 — route on Linux: failed builds never touch the serving release[2m > [22m[2mreview finding 6: promote --not-after moves no link after the deadline, even when it passes during validation; rollback has no deadline
+[22m[39mrelease: host gate (fixture, promote):
+release:   next apt-daily-upgrade in 1200 min
+release:   needrestart holds afldb and postgresql
+
+[90mstdout[2m | tests/deploy-release.test.ts[2m > [22m[2mAFLDB-ISSUE-329 — route on Linux: failed builds never touch the serving release[2m > [22m[2mreview finding 6: promote --not-after moves no link after the deadline, even when it passes during validation; rollback has no deadline
+[22m[39mrelease: host gate (fixture, promote):
+release:   next apt-daily-upgrade in 1200 min
+release:   needrestart holds afldb and postgresql
+release: PROMOTED 7fa8f73de64d-bxgNan0hW05h05kz; previous cbcb7ee9475b-29oYU_qJ_u5LbdpR. The running service is unchanged until it restarts.
+release: next, NOW and attended: sudo systemctl restart afldb
+release: then: node deploy/release.mjs status --expect 7fa8f73de64d-bxgNan0hW05h05kz --root /tmp/afldb-329-route-ljk4xY/afldb-releases
+release: the activation window is OPEN: `current` names the new release but the service still runs the old one; any restart before yours (an unattended upgrade, a PostgreSQL restart) activates it without the gate (ISSUE-351)
+release: the database is not rolled back: migrations are forward-only (docs/deployment.md §11, including the ISSUE-257 guard); check a release older than an applied migration against it before the restart
+
+ [32m✓[39m tests/deploy-release.test.ts [2m([22m[2m62 tests[22m[2m)[22m[33m 26340[2mms[22m[39m
+     [33m[2m✓[22m[39m request tracing logs a route class, never the raw URL: a synthetic path/query sentinel is absent from the trace [33m 359[2mms[22m[39m
+     [33m[2m✓[22m[39m check-node-modules exits 1 on drift, 0 on a matching or unrecorded tree; the settle wrapper only warns [33m 313[2mms[22m[39m
+     [33m[2m✓[22m[39m builds outside the checkout, validates, boots the candidate and promotes it [33m 2814[2mms[22m[39m
+     [33m[2m✓[22m[39m a failing build leaves the serving release, its assets and the links untouched [33m 1203[2mms[22m[39m
+     [33m[2m✓[22m[39m a type error fails the build; off-host type-checking needs recorded evidence; nothing changes [33m 1279[2mms[22m[39m
+     [33m[2m✓[22m[39m a build interrupted by SIGTERM is stopped with its whole process group; nothing changes [33m 1302[2mms[22m[39m
+     [33m[2m✓[22m[39m a build interrupted by SIGHUP is stopped with its whole process group; nothing changes [33m 1288[2mms[22m[39m
+     [33m[2m✓[22m[39m a SIGKILLed tool leaves an orphan only in its workspace; the next build reaps it [33m 2353[2mms[22m[39m
+     [33m[2m✓[22m[39m the memory guard kills a build that drives MemAvailable below the floor; nothing changes [33m 1915[2mms[22m[39m
+     [33m[2m✓[22m[39m promotes a second release, then rolls back to the retained one without building, even mid-build [33m 6568[2mms[22m[39m
+     [33m[2m✓[22m[39m ISSUE-351: promote and rollback are attended; the host gate and the ledger check refuse before any link moves [33m 613[2mms[22m[39m
+     [33m[2m✓[22m[39m ISSUE-351: status --expect fails a restart that coincides with an apt run, and names the owner's way past it [33m 1339[2mms[22m[39m
+     [33m[2m✓[22m[39m review finding 6: promote --not-after moves no link after the deadline, even when it passes during validation; rollback has no deadline [33m 893[2mms[22m[39m
+     [33m[2m✓[22m[39m fails a public asset whose bytes are not the release's, and one that is missing [33m 379[2mms[22m[39m
+       [33m[2m✓[22m[39m forwards --confirm-restart-invocation, before or after the positionals, and says so [33m 586[2mms[22m[39m
+       [33m[2m✓[22m[39m without it, status --expect gets no confirmation (legacy forms, with and without the previous BUILD_ID) [33m 382[2mms[22m[39m
+ [32m✓[39m tests/deploy-web-unit.test.ts [2m([22m[2m45 tests[22m[2m)[22m[33m 3734[2mms[22m[39m
+     [33m[2m✓[22m[39m offhost-pull: binds each sidecar to its dump, refuses future stamps, and a flood cannot evict genuine copies (review A-03) [33m 2128[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+[2m      Tests [22m [1m[32m107 passed[39m[22m[90m (107)[39m
+[2m   Start at [22m 22:53:36
+[2m   Duration [22m 31.64s[2m (transform 704ms, setup 224ms, import 740ms, tests 30.07s, environment 1ms)[22m
+
+vitest-exit=0

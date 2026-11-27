@@ -15,6 +15,13 @@ commit.
 
 ## [Unreleased]
 
+### R6 r5 and release G0: Astra's two remaining findings (27 November 2026; on `claude/closeout-20261127`, draft PR 5; PROPOSED, Astra re-review pending; nothing deployed)
+
+- **The Tuesday handoff parser refuses an interrupted rollback.** A `released` or `deferred` record that carries any rollback trace (`release.mjs`'s `release: ROLLED BACK …` line, the `r1-rollback.sh` headers or post-switch line, an events.log rollback entry) is now a STOP, even when the wrapper was interrupted before its RESULT line.
+- **Scheduled-backup attribution requires the timer's own trigger record.** The release G0 gate and R6 A-2 now also require the attributed backup invocation to have logged one `trigger:` line naming `afldb-backup.timer`, with the timer's `LastTriggerUSec` in microseconds. Without it they report "scheduled origin unproven", exit nonzero and print no `OFFHOST-COMPARE`. A manual backup never counts.
+- **`tools/maintenance/scheduled-backup.sh` logs its start job's activation details** (`trigger:` line, read-only D-Bus query, bounded, never fails the backup). This is prospective and not installed on production. Until it is, both gates STOP by design.
+- Tested revision `5553ecaf`, R6 manifest `182efbb6…`, release `scripts/SHA256SUMS` `14f0f89f…` ([record](docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r5-20261127/README.md)).
+
 ### R6 r4 and release-packet review fixes (27 November 2026; on `claude/closeout-20261127`, draft PR 5; PROPOSED, Astra re-review pending; nothing deployed)
 
 - **`deploy/release.mjs promote` and `host-gate` accept `--not-after <epoch seconds>`.** With it, promotion is refused once the deadline has passed, checked before validation and again immediately before the link switch; `host-gate` prints a line proving enforcement. Without the option, behaviour is unchanged; rollback ignores it. The release packet's P4 passes its 11:30 cutoff this way and STOPs against a tool that lacks the option.

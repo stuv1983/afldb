@@ -1,0 +1,13 @@
+== rehearse-seam-check
+host streamanator (arm) via disposable --network none container of the pinned image sha256:d71c0b28..., run at 2026-11-27T11:43:52Z
+gate scripts: G0 32d7315a97d3670f1a2317da8ffaadcd0e2b50afa04ca804f0eb5959e849c8c4 A-2 64cc5166fea21438e8c5880e919e61398ff7381dd70ae359f19c392d33d18c49 scheduled-backup.sh bab61796ba92081e98af3d99551fb8b228b3de22c3df8fa39c4b32c96b4597c3
+SEAM PASS pick_overnight_dump identical (522450689799c42bed227585d478619206fb0a0b6dfd846662f8427e4897cdaa)
+SEAM PASS ts identical
+SEAM PASS timer_usec identical
+SEAM PASS read_invocation identical
+SEAM PASS backup_journal identical
+SEAM PASS match_backup identical
+SEAM PASS scheduled_backup_run identical
+SEAM PASS R1_LIB_ONLY load defines the functions and runs no main
+SEAM RESULT PASS
+exit code 0

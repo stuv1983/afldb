@@ -1,0 +1,110 @@
+== real-systemd scenario astra-dep-r5
+host streamanator (arm); started 2026-11-27T11:34:13Z; container r5f2-r5f2220241-astra-dep-r5; fake Melbourne offset 14:44:32 (the 02:20:00 dispatch is due at real 2026-11-27T11:35:28Z)
+gate scripts: G0 32d7315a97d3670f1a2317da8ffaadcd0e2b50afa04ca804f0eb5959e849c8c4
+              A-2 64cc5166fea21438e8c5880e919e61398ff7381dd70ae359f19c392d33d18c49
+              scheduled-backup.sh (r5) bab61796ba92081e98af3d99551fb8b228b3de22c3df8fa39c4b32c96b4597c3
+              f92d6e29 G0 bbc3d96f808e1d4293f052e1cf5e51f73fbee9cc08c647ad82776a293fc61d1b, A-2 ea4355f0a72f91125a3805a2ba70eefd1b7b5cc785a779ff93de140f495140d2, scheduled-backup.sh 234fca6a226da73b125ca3dceec9ac97b2192181fd93ad168a7ca50900cb192d
+d504b3eb22a5c69dfc924a7a9d5bd5142aa9b761d4f81d74238deab8918f0b03
+
+== environment
+systemd: systemd 255 (255.4-1ubuntu8.19); kernel 6.8.0-151-generic; image Ubuntu 24.04.4 LTS; PID 1: systemd; hostname afldb-prod
+date now (UTC) 2026-11-27T11:34:15; zone file in use: /usr/share/zoneinfo/Australia/Melbourne; local 2026-11-28 02:18:47 AEDT
+arm: uid=1000(arm) gid=1000(arm) groups=1000(arm) (journal-reading groups: none expected: adm= systemd-journal=)
+journal storage: drwxr-sr-x+ 1 root systemd-journal 4096 Nov 28 02:18 /var/lo; journald files: system.journal 
+
+== the unit as loaded (astra-dep-r5; scheduled-backup.sh = r5)
+scheduled-backup.sh sha256 bab61796ba92081e98af3d99551fb8b228b3de22c3df8fa39c4b32c96b4597c3 (r5); G0 32d7315a97d3670f A-2 64cc5166fea21438 f92d6e29 G0 bbc3d96f808e1d42 A-2 ea4355f0a72f9112
+afldb-backup.service on disk: edf002913282e7b1 timer 76a7ab3ad73377a5; drop-in: [Timer] RandomizedDelaySec=0 AccuracySec=1s 
+   timer: # /etc/systemd/system/afldb-backup.timer
+   timer: OnCalendar=*-*-* 02:20
+   timer: RandomizedDelaySec=10min
+   timer: AccuracySec=1min
+   timer: Persistent=true
+   timer: # /etc/systemd/system/afldb-backup.timer.d/rehearsal.conf
+   timer: RandomizedDelaySec=0
+   timer: AccuracySec=1s
+   service: ExecStart={ path=/bin/bash ; argv[]=/bin/bash /home/arm/projects/afldb/tools/maintenance/scheduled-backup.sh backup ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }
+   service: User=arm
+   service: PrivateTmp=yes
+   service: ProtectHome=read-only
+   service: ProtectSystem=strict
+   service: NoNewPrivileges=yes
+   service: Requires=postgresql.service sysinit.target system.slice
+   service: After=systemd-journald.socket postgresql.service sysinit.target tmp.mount system.slice systemd-tmpfiles-setup.service basic.target -.mount
+   service: OnFailure=afldb-backup-failed.service
+timer armed: Sat 2026-11-28 02:20:00 AEDT (local); window 02:20:00-02:31:00 2026-11-28
+DISPATCH observed: LastTriggerUSec 1795779328011631 = 2026-11-28 02:20:00 AEDT + 11631 us
+   (the timer's start failed; postgresql stub brought up)
+   root: systemctl start afldb-backup.service at +3061 ms after the dispatch
+   systemctl start returned 0
+
+== raw evidence (as ARM unless stated)
+timer: LastTriggerUSec=Sat 2026-11-28 02:20:00 AEDT Result=success TriggeredBy=  busctl: t 1795779328011631
+service: Result=success ExecMainStartTimestamp=Sat 2026-11-28 02:20:03 AEDT ExecMainExitTimestamp=Sat 2026-11-28 02:20:03 AEDT ExecMainStatus=0 TriggeredBy=afldb-backup.timer InvocationID=2e5c9ed5504a46b091bbbe70cbe7fcf2 ActivationDetails=[unprintable] 
+service UNIT ActivationDetails (busctl): a(ss) 0
+arm's journal for afldb-backup.service (-o cat):
+   | 2026-11-27T11:35:31Z scheduled-backup: target: mode=backup dir=/home/arm/backups/afldb-scheduled keep=14 offhost=none tools=/home/arm/projects/afldb/tools/maintenance
+   | 2026-11-27T11:35:31Z scheduled-backup: trigger-note: the start job carries no activation details (started by hand or by a dependency)
+   | 2026-11-27T11:35:31Z scheduled-backup: trigger: invocation=2e5c9ed5504a46b091bbbe70cbe7fcf2 job=326 unit=none realtime_usec=none
+   | ==> Backing up afldb_prod to /home/arm/backups/afldb-scheduled/afldb_prod-20261128-022003.dump
+   | stub-backup: environment TRIGGER_UNIT=none TRIGGER_TIMER_REALTIME_USEC=none INVOCATION_ID=2e5c9ed5504a46b091bbbe70cbe7fcf2
+   | ==> Done.
+   | 2026-11-27T11:35:31Z scheduled-backup: backup ok: afldb_prod-20261128-022003.dump 4096 bytes sha256 60fd8ee8bfeb966b offhost=skipped
+arm's journal entries by _PID:  4 "_PID":"1741"; 3 "_PID":"1772";  (PID 1 = "_PID":"1": 0 entries)
+ROOT's journal for afldb-backup.service and the timer (what only PID 1 / root can see):
+   | Nov 28 02:18:47.665264 afldb-prod systemd[1]: Started afldb-backup.timer - AFLDB — nightly scheduled database backup (ISSUE-352).
+   | Nov 28 02:20:00.023935 afldb-prod systemd[1]: Starting postgresql.service - stub postgresql for the rehearsal...
+   | Nov 28 02:20:00.026233 afldb-prod systemd[1]: postgresql.service: Main process exited, code=exited, status=1/FAILURE
+   | Nov 28 02:20:00.026430 afldb-prod systemd[1]: postgresql.service: Failed with result 'exit-code'.
+   | Nov 28 02:20:00.026686 afldb-prod systemd[1]: Failed to start postgresql.service - stub postgresql for the rehearsal.
+   | Nov 28 02:20:00.026819 afldb-prod systemd[1]: Dependency failed for afldb-backup.service - AFLDB — scheduled database backup (ISSUE-352).
+   | Nov 28 02:20:00.026843 afldb-prod systemd[1]: afldb-backup.service: Job afldb-backup.service/start failed with result 'dependency'.
+   | Nov 28 02:20:00.026850 afldb-prod systemd[1]: afldb-backup.service: Triggering OnFailure= dependencies.
+   | Nov 28 02:20:00.030039 afldb-prod systemd[1]: Starting afldb-backup-failed.service - AFLDB — a scheduled backup or restore verification failed (ISSUE-352)...
+   | Nov 28 02:20:00.045076 afldb-prod afldb-backup[1566]: AFLDB_BACKUP_FAILURE a scheduled backup or restore verification unit failed; see: journalctl -u afldb-backup -u afldb-backup-verify
+   | Nov 28 02:20:00.059918 afldb-prod sh[1567]: /bin/sh: 1: cannot create /home/arm/backups/afldb-scheduled/.state/FAILED-unit: Directory nonexistent
+   | Nov 28 02:20:00.060299 afldb-prod systemd[1]: afldb-backup-failed.service: Main process exited, code=exited, status=2/INVALIDARGUMENT
+   | Nov 28 02:20:00.060515 afldb-prod systemd[1]: afldb-backup-failed.service: Failed with result 'exit-code'.
+   | Nov 28 02:20:00.060792 afldb-prod systemd[1]: Failed to start afldb-backup-failed.service - AFLDB — a scheduled backup or restore verification failed (ISSUE-352).
+   | Nov 28 02:20:03.066980 afldb-prod systemd[1]: Starting postgresql.service - stub postgresql for the rehearsal...
+   | Nov 28 02:20:03.069366 afldb-prod systemd[1]: Finished postgresql.service - stub postgresql for the rehearsal.
+   | Nov 28 02:20:03.081416 afldb-prod systemd[1]: Starting afldb-backup.service - AFLDB — scheduled database backup (ISSUE-352)...
+   | Nov 28 02:20:03.106131 afldb-prod bash[1741]: 2026-11-27T11:35:31Z scheduled-backup: target: mode=backup dir=/home/arm/backups/afldb-scheduled keep=14 offhost=none tools=/home/arm/projects/afldb/tools/maintenance
+   | Nov 28 02:20:03.151547 afldb-prod bash[1741]: 2026-11-27T11:35:31Z scheduled-backup: trigger-note: the start job carries no activation details (started by hand or by a dependency)
+   | Nov 28 02:20:03.153595 afldb-prod bash[1741]: 2026-11-27T11:35:31Z scheduled-backup: trigger: invocation=2e5c9ed5504a46b091bbbe70cbe7fcf2 job=326 unit=none realtime_usec=none
+   | Nov 28 02:20:03.165857 afldb-prod bash[1772]: ==> Backing up afldb_prod to /home/arm/backups/afldb-scheduled/afldb_prod-20261128-022003.dump
+   | Nov 28 02:20:03.165857 afldb-prod bash[1772]: stub-backup: environment TRIGGER_UNIT=none TRIGGER_TIMER_REALTIME_USEC=none INVOCATION_ID=2e5c9ed5504a46b091bbbe70cbe7fcf2
+   | Nov 28 02:20:03.165857 afldb-prod bash[1772]: ==> Done.
+   | Nov 28 02:20:03.196930 afldb-prod bash[1741]: 2026-11-27T11:35:31Z scheduled-backup: backup ok: afldb_prod-20261128-022003.dump 4096 bytes sha256 60fd8ee8bfeb966b offhost=skipped
+   | Nov 28 02:20:03.199593 afldb-prod systemd[1]: afldb-backup.service: Deactivated successfully.
+   | Nov 28 02:20:03.199805 afldb-prod systemd[1]: Finished afldb-backup.service - AFLDB — scheduled database backup (ISSUE-352).
+backup dir: afldb_prod-20261128-022003.dump afldb_prod-20261128-022003.dump.sha256  FAILED markers: 
+
+== G0 (corrected, real main): exit 1
+   FAIL afldb-backup.service scheduled run is not attributed to the backup timer: scheduled origin unproven: the run's start job names trigger unit 'none', not afldb-backup.timer (a start by hand, or by a dependency, carries no timer dispatch)
+   INFO the 02:2x dump is not examined and no OFFHOST-COMPARE line is printed: without an attributed timer run, origin included, no dump is the scheduled one
+   G0 PROD RESULT FAIL: STOP, the release is deferred, production unchanged
+   (OFFHOST-COMPARE lines: 0)
+
+== A-2 section 5 functions (corrected): exit 1
+   A2-FUNCTIONS FAIL not attributed to the backup timer: scheduled origin unproven: the run's start job names trigger unit 'none', not afldb-backup.timer (a start by hand, or by a dependency, carries no timer dispatch)
+   INFO the dump is not examined and no OFFHOST-COMPARE line is printed
+   (OFFHOST-COMPARE lines: 0)
+
+== G0 (f92d6e29, real main): exit 0
+   PASS afldb-backup.service scheduled run: timer dispatch Sat 2026-11-28 02:20:00 AEDT, its start Sat 2026-11-28 02:20:03 AEDT, exit Sat 2026-11-28 02:20:03 AEDT, Result=success status=0; invocation 2e5c9ed5504a46b091bbbe70cbe7fcf2 alone in the window journal, 'backup ok' at Sat 2026-11-28 02:20:03 AEDT
+   BACKUP-EVIDENCE 2e5c9ed5504a46b091bbbe70cbe7fcf2 1795779328 1795779331 1795779331 1795779331 afldb_prod-20261128-022003.dump 60fd8ee8bfeb966b
+   OFFHOST-COMPARE afldb_prod-20261128-022003.dump 60fd8ee8bfeb966b5d63f62645dd217628b53bbcd3f514c0b5187912a249630c
+   G0 PROD RESULT PASS: now on streamanator: r6-offhost-verify.sh 2026-11-28 <dump> <sha256> must exit 0
+   (OFFHOST-COMPARE lines: 1)
+
+== A-2 section 5 functions (f92d6e29): exit 0
+   A2-FUNCTIONS PASS run attributed: 2e5c9ed5504a46b091bbbe70cbe7fcf2 1795779328 1795779331 1795779331 1795779331 afldb_prod-20261128-022003.dump 60fd8ee8bfeb966b (timer  us)
+   A2-FUNCTIONS PASS dump afldb_prod-20261128-022003.dump 60fd8ee8bfeb966b5d63f62645dd217628b53bbcd3f514c0b5187912a249630c
+   OFFHOST-COMPARE afldb_prod-20261128-022003.dump 60fd8ee8bfeb966b5d63f62645dd217628b53bbcd3f514c0b5187912a249630c
+   (OFFHOST-COMPARE lines: 1)
+
+== verdict
+VERDICT astra-dep-r5: corrected G0 exit 1 and the A-2 functions exit 1, both 'scheduled origin unproven', no OFFHOST-COMPARE: as required
+CONTRAST astra-dep-r5: the f92d6e29 G0 exits 0 and its A-2 functions PASS, each with OFFHOST-COMPARE (the defect, on real systemd)
+== controller exit 0 (2026-11-27T11:35:38Z); container removed
