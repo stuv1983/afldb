@@ -9,7 +9,7 @@
 # Container flags (never --privileged): --network none --cgroupns=private --tmpfs /run --tmpfs /run/lock --cap-add SYS_ADMIN (systemd
 # as PID 1) --cap-add DAC_READ_SEARCH --cap-add SYS_PTRACE (the two capabilities the root facts reader's unit keeps; Docker's default
 # set lacks them; production root has them) --security-opt apparmor=unconfined. Labels r7v.run=<RID> on the image and containers.
-# Usage: bash r7v-host.sh <WS> <RID> up|hostile|tamper|untamper|pull-log|down [--keep-image]
+# Usage: bash r7v-host.sh <WS> <RID> up|hostile|tamper|untamper|forge|unforge|pull-log|down [--keep-image]
 set -uo pipefail; export LC_ALL=C
 [ "$(hostname)" != afldb-prod ] || { echo "REFUSED: rehearsal never runs on production"; exit 2; }
 WS=${1:?workspace}; RID=${2:?rid}; CMD=${3:?command}; KEEP=${4:-}
@@ -66,7 +66,7 @@ EOF
   echo "R7V HOSTKEY prod $(docker exec "$A" bash "$CT" hostkey)"; echo "R7V HOSTKEY offhost $(docker exec "$B" bash "$CT" hostkey)"
   echo "R7V READY";;
 hostile) for c in "$A" "$B"; do echo "== $c hostile"; docker exec "$c" bash "$CT" hostile; done;;
-tamper|untamper) docker exec "$A" bash "$CT" "$CMD";;
+tamper|untamper|forge|unforge) docker exec "$A" bash "$CT" "$CMD";;
 pull-log) docker exec "$B" bash "$CT" pull-log;;
 down)
   n=$(docker ps -aq --filter "label=$LBL" | wc -l); [ "$n" = 0 ] || docker ps -aq --filter "label=$LBL" | xargs -r docker rm -f > /dev/null

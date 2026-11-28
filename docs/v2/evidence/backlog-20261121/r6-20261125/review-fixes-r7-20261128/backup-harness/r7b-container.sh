@@ -14,9 +14,15 @@
 #                  failure), and the HOLDS: a root psql session holding ACCESS EXCLUSIVE on table fixture (pg_dump waits: holds the
 #                  CREATION stage open) and a root strace that delays the sealer's first chown (holds the SEALING stage open between
 #                  the seal and the publication; production has neither)
+#                  Review round 1: genuine-rd and rearm-in-rd install NO timing drop-in, so the REAL deploy timer's production timing
+#                  applies (RandomizedDelaySec=10min, AccuracySec=1min); post-pub-fail plants a root directory where the sealer's state
+#                  record goes, so the sealer fails AFTER publication (F4).
+#                  The other scenarios keep the fixture timing: their holds (lock, strace), the restart and the 02:32 re-arm need the
+#                  dispatch at a known second, and a random 0-10 min delay per scenario would also push some past the window.
 #   [FIXTURE-ATTACK] arm's actions: the permission suite and the review-2 watcher (arm processes outside the unit)
 #   [HARNESS]      this script's own judgement (never an input to the gate)
 # Scenarios (argument 1): genuine perm review2 hand-start timer-then-hand restart rearm-in rearm-out pgdump-fails seal-interrupted
+#                         genuine-rd rearm-in-rd post-pub-fail (review round 1)
 # The last line printed is "SCENARIO <name> PASS|FAIL ...".
 set -uo pipefail; export LC_ALL=C
 SC=${1:?scenario}; FIX=/in/fix; DAY=${R7B_DAY:?}; TD=${R7B_TD:?}; DAYC=${DAY//-/}
@@ -50,8 +56,11 @@ dump_waiting() { # seconds count: at least <count> pg_dump backends wait on the 
   local i; for i in $(seq 1 $(( $1 * 5 ))); do [ "$(pg -c "SELECT count(*) FROM pg_stat_activity WHERE application_name='pg_dump' AND wait_event_type='Lock'")" -ge "$2" ] && return 0; sleep 0.2; done; return 1; }
 
 # ------------------------------------------------------------------------------------------------------------------ scenario table
-EXPECT=refused; KIND=scheduled; TIMER=early; LOCK=0; HOLD=0; RET=0; REFUSAL=; ARMSUITE=0
+EXPECT=refused; KIND=scheduled; TIMER=early; LOCK=0; HOLD=0; RET=0; REFUSAL=; ARMSUITE=0; RD=0
 case $SC in
+  genuine-rd)       EXPECT=attributed; RD=1;;
+  rearm-in-rd)      EXPECT=attributed; KIND=catch-up; TIMER=at-td; RD=1;;
+  post-pub-fail)    REFUSAL='has no valid completion record';;
   genuine)          EXPECT=attributed; RET=1;;
   perm)             EXPECT=attributed; LOCK=1; HOLD=1; ARMSUITE=1;;
   review2)          EXPECT=attributed;;
@@ -69,7 +78,7 @@ wait_systemd || { echo "SCENARIO $SC FAIL systemd did not come up"; exit 1; }
 hdr "environment"
 L REAL-SYSTEMD "systemd: $(systemctl --version | head -1); kernel $(uname -r); $(. /etc/os-release; echo "$PRETTY_NAME"); PID 1: $(cat /proc/1/comm)"
 L FIXTURE "zone: $(readlink -f /etc/localtime) fixed offset ($(stat -c '%U:%G %a %F' /usr/share/zoneinfo/Australia/Melbourne)); now UTC $(date -u +%FT%T), local $(TZ=Australia/Melbourne date '+%F %T %Z'); planned moment real $(date -u -d @$TD +%T)Z = local $(mel $TD)"
-L HARNESS "scenario $SC: expect=$EXPECT kind=$KIND timer=$TIMER lock-hold=$LOCK seal-hold=$HOLD retention-fixture=$RET arm-suite=$ARMSUITE refusal='$REFUSAL'"
+L HARNESS "scenario $SC: expect=$EXPECT kind=$KIND timer=$TIMER lock-hold=$LOCK seal-hold=$HOLD retention-fixture=$RET arm-suite=$ARMSUITE production-timing=$RD refusal='$REFUSAL'"
 echo "fs.protected_hardlinks=$(cat /proc/sys/fs/protected_hardlinks) fs.protected_symlinks=$(cat /proc/sys/fs/protected_symlinks) kernel.yama.ptrace_scope=$(cat /proc/sys/kernel/yama/ptrace_scope 2>&1)"
 userdel -r ubuntu > /dev/null 2>&1
 useradd -M -u 1000 -d /home/arm -s /bin/bash arm && useradd -M -u 1500 -d /nonexistent -s /usr/sbin/nologin r7reader || { echo "SCENARIO $SC FAIL useradd"; exit 1; }
@@ -86,9 +95,14 @@ L FIXTURE "afldb_prod: fixture 5000 rows, marker nonce $NONCE; role afldb_backup
 
 hdr "units [REAL deploy/ files] and the timer timing drop-in [FIXTURE]"
 for u in afldb-backup.service afldb-backup.timer afldb-backup-failed.service; do install -o root -g root -m 0644 "$FIX/deploy/$u" /etc/systemd/system/$u; done
-install -d -o root -g root -m 0755 $TDD
-printf '[Timer]\nRandomizedDelaySec=0\nAccuracySec=1s\n' > $TDD/50-r7b-fixture-timing.conf; chmod 644 $TDD/50-r7b-fixture-timing.conf
+if [ "$RD" = 1 ]; then
+  L REAL "timer timing: the deploy/afldb-backup.timer file as is, no drop-in (production: RandomizedDelaySec=10min, AccuracySec=1min)"
+else
+  install -d -o root -g root -m 0755 $TDD
+  printf '[Timer]\nRandomizedDelaySec=0\nAccuracySec=1s\n' > $TDD/50-r7b-fixture-timing.conf; chmod 644 $TDD/50-r7b-fixture-timing.conf
+fi
 systemctl daemon-reload
+echo "timer effective: $(systemctl show afldb-backup.timer -p RandomizedDelayUSec -p AccuracyUSec -p Persistent | tr '\n' ' ')"
 echo "service $(sha /etc/systemd/system/afldb-backup.service) timer $(sha /etc/systemd/system/afldb-backup.timer) failed $(sha /etc/systemd/system/afldb-backup-failed.service)"
 
 hdr "owner install from a root-owned staging directory [REAL install-backup.sh]"
@@ -204,7 +218,11 @@ arm_suite() { # stage: build the attempt list from what exists now, run it as ar
 # ------------------------------------------------------------------------------------------------------------------ before the dispatch
 B0=$(TZ=Australia/Melbourne date -d "$DAY 02:20" +%s); B1=$(TZ=Australia/Melbourne date -d "$DAY 02:31" +%s)
 [ "$SC" = pgdump-fails ] && { pg -c "ALTER ROLE afldb_backup NOLOGIN"; L FIXTURE "role afldb_backup made NOLOGIN: pg_dump will fail to connect"; }
-if [ "$SC" = rearm-in ] || [ "$SC" = rearm-out ]; then
+if [ "$SC" = post-pub-fail ]; then
+  install -d -o root -g root -m 0755 $STATE/last-backup.json
+  L FIXTURE "a root directory now sits at $STATE/last-backup.json: the sealer's state-record rename fails AFTER the dump and its sidecar are published (F4)"
+fi
+if [ "$SC" = rearm-in ] || [ "$SC" = rearm-out ] || [ "$SC" = rearm-in-rd ]; then
   mkdir -p /var/lib/systemd/timers; touch -d "$(date -d "$DAY -1 day" +%F) 02:20:03" /var/lib/systemd/timers/stamp-afldb-backup.timer
   L FIXTURE "timer stamp set to the previous night's dispatch: $(stat -c %y /var/lib/systemd/timers/stamp-afldb-backup.timer); the timer is NOT started before the 02:20 elapse"
 fi
@@ -259,7 +277,8 @@ case $TIMER in
   at-td) systemctl start afldb-backup.timer; L REAL-SYSTEMD "root (attended re-arm) started afldb-backup.timer at $(TZ=Australia/Melbourne date '+%T.%N' | cut -c1-12)";;
   never) systemctl start --no-block afldb-backup.service; L REAL-SYSTEMD "root started afldb-backup.service BY HAND at $(TZ=Australia/Melbourne date '+%T.%N' | cut -c1-12)";;
 esac
-for i in $(seq 1 30); do [ -n "$(svc InvocationID)" ] && break; sleep 0.5; done
+NW=30; [ "$RD" = 1 ] && NW=1500   # production timing: the dispatch comes up to 10 min (+ 1 min accuracy) after the elapse
+for i in $(seq 1 $NW); do [ -n "$(svc InvocationID)" ] && break; sleep 0.5; done
 INV1=$(svc InvocationID); L REAL-SYSTEMD "invocation $INV1 job $(svc Job) state $(svc ActiveState)/$(svc SubState)"
 if [ "$LOCK" = 1 ]; then
   dump_waiting 60 1 && L FIXTURE "HOLD engaged: pg_dump of invocation $INV1 is waiting on the fixture lock (CREATION stage held open)" || hfail "pg_dump never waited on the lock"
@@ -314,7 +333,12 @@ echo "timer: $(systemctl show afldb-backup.timer -p LastTriggerUSec -p LastTrigg
 echo "service: $(systemctl show afldb-backup.service -p Result -p InvocationID -p NRestarts -p ExecMainCode -p ExecMainStatus -p ActiveState -p SubState | tr '\n' ' ')"
 echo "failed unit: $(systemctl show afldb-backup-failed.service -p Result -p ExecMainStartTimestamp | tr '\n' ' '); marker: $(cat /home/arm/backups/afldb-scheduled/.state/FAILED-unit 2>&1)"
 echo "journal (root) of afldb-backup.service:"; journalctl -u afldb-backup.service -o short-precise --no-pager 2>&1 | tail -40 | cut -c1-260 | sed 's/^/   | /'
-echo "seals:"; for s in $SEALS/*.seal; do [ -e "$s" ] || continue; echo "   $(stat -c '%A %U:%G links=%h size=%s' $s) $s"; sed 's/^/      /' "$s"; done
+echo "seals and completion records:"; for s in $SEALS/*.seal $SEALS/*.done; do [ -e "$s" ] || continue; echo "   $(stat -c '%A %U:%G links=%h size=%s' $s) $s"; sed 's/^/      /' "$s"; done
+if [ "$SC" = post-pub-fail ]; then
+  echo "service before reset-failed: Result=$(svc Result) ActiveState=$(svc ActiveState)"
+  systemctl reset-failed afldb-backup.service
+  L REAL-SYSTEMD "root ran systemctl reset-failed afldb-backup.service: Result=$(svc Result) ActiveState=$(svc ActiveState) (the unit's current Result no longer shows the failure)"
+fi
 echo "published: $(ls -la $PUB | tail -n +2 | awk '{ print $1, $3":"$4, $9 }' | tr '\n' ';')"
 echo "state: $(ls -la $STATE | tail -n +2 | awk '{ print $1, $3":"$4, $9 }' | tr '\n' ';') last-backup.json: $(cat $STATE/last-backup.json 2>&1)"
 echo "staging (root): $(ls -la $STGD | tail -n +2 | awk '{ print $1, $3":"$4, $9 }' | tr '\n' ';')"
@@ -345,6 +369,15 @@ if [ "$EXPECT" = attributed ]; then
     D=$(sov SO_DUMP); S=$(sov SO_SHA)
     [ "$(sov SO_INVOCATION)" = "$INV" ] && hok "invocation $INV (the service's last, root view)" || hfail "SO_INVOCATION $(sov SO_INVOCATION) != the service's $INV"
     [ "$(sov SO_DISPATCH_KIND)" = "$KIND" ] && hok "dispatch=$KIND, $(sov SO_DISPATCH_DELAY_S) s after timer activation" || hfail "dispatch kind $(sov SO_DISPATCH_KIND), expected $KIND"
+    tar=$(sed -n 's/^timer_active_enter_usec=//p' $SEALS/$INV.seal); tlu=$(sed -n 's/^timer_last_trigger_usec=//p' $SEALS/$INV.seal)
+    L HARNESS "sealed timer activation $(mel $((tar / 1000000))) (realtime), dispatch $(mel $((tlu / 1000000))), the window opens $(mel $B0)"
+    if [ "$RD" = 1 ] && [ "$KIND" = catch-up ]; then
+      (( tlu - tar >= 5000000 )) && hok "F3 exercised: the catch-up dispatch came $(( (tlu - tar) / 1000000 )) s after activation (>= 5 s, the old rule said scheduled); labelled catch-up because the timer became active at or after 02:20:00" \
+        || L HARNESS "the random delay was under 5 s this time ($(( (tlu - tar) / 1000 )) ms): the 5 s rule also labels it catch-up; F3 itself not exercised by this run"
+    fi
+    [ "$RD" = 1 ] && [ "$KIND" = scheduled ] && L HARNESS "production timing, scheduled: activation before 02:20:00, dispatch $(( (tlu - B0 * 1000000) / 1000000 )) s after 02:20:00 (RandomizedDelaySec=10min)"
+    dn=$SEALS/$INV.done
+    [ "$(stat -c '%U:%G %a %h' $dn 2>/dev/null)" = "root:root 644 1" ] && grep -qx "dump_sha256=$S" $dn && hok "completion record $dn written last (root 0644): $(tr '\n' ' ' < $dn | cut -c1-160)" || hfail "no valid completion record $dn"
     [ "$(sha $PUB/$D)" = "$S" ] && hok "root re-hash of $PUB/$D = SO_SHA" || hfail "root re-hash of $PUB/$D differs from SO_SHA"
     jl=$(journalctl -o cat --no-pager _SYSTEMD_INVOCATION_ID="$INV" | grep '^backup ok: ' | tail -1)
     [ "$jl" = "backup ok: $D $(sov SO_BYTES) bytes sha256 ${S:0:16} offhost=skipped" ] && hok "the run's own 'backup ok' line (root journal) names $D and ${S:0:16}" || hfail "the run's line '$jl' does not match $D ${S:0:16}"
@@ -382,7 +415,12 @@ else
   [ -n "$REFUSAL" ] && { [[ $SOR =~ $REFUSAL ]] && hok "refusal reason matches /$REFUSAL/" || hfail "refusal reason does not match /$REFUSAL/"; }
   case $SC in
     hand-start) s=$SEALS/$INV.seal; grep -qx 'trigger_unit=none' $s 2>/dev/null && [ "$RES" = success ] && hok "the hand start succeeded and was sealed with trigger_unit=none" || hfail "hand-start seal/result unexpected";;
-    timer-then-hand) [ "$(ls $SEALS | wc -l)" = 2 ] && hok "two seals (timer, then by hand)" || hfail "expected two seals";;
+    timer-then-hand) [ "$(ls $SEALS | grep -c '\.seal$')" = 2 ] && hok "two seals (timer, then by hand)" || hfail "expected two seals";;
+    post-pub-fail) s=$SEALS/$INV.seal; d=$(sed -n 's/^dump=//p' $s 2>/dev/null); h=$(sed -n 's/^dump_sha256=//p' $s 2>/dev/null)
+      [ "$RES" = success ] && [ -n "$d" ] && [ "$d" != none ] && [ -f "$PUB/$d" ] && [ "$(sha $PUB/$d)" = "$h" ] && [ -f "$PUB/$d.sha256" ] && [ ! -e $SEALS/$INV.done ] \
+        && grep -q 'cannot write /var/lib/afldb-backup/state/last-backup.json' <<< "$(journalctl -u afldb-backup.service -o cat --no-pager)" \
+        && hok "the sealer failed after publication (state record); seal, published dump ($d, re-hash = seal) and sidecar exist, no completion record; Result=$RES after reset-failed; refused anyway" \
+        || hfail "post-pub-fail facts unexpected: Result=$RES dump=$d done=$([ -e $SEALS/$INV.done ] && echo present || echo absent)";;
     restart) s=$SEALS/$INV.seal; grep -qx 'trigger_unit=afldb-backup.timer' $s 2>/dev/null && [ "$INV" != "$INV1" ] && hok "invocation #2 $INV kept the timer's job and trigger (sealed), refused on inactive_enter" || hfail "restart facts unexpected";;
     rearm-out) s=$SEALS/$INV.seal; grep -qx 'dispatch_kind=catch-up' $s 2>/dev/null && grep -qx 'trigger_unit=afldb-backup.timer' $s && hok "the catch-up was sealed (trigger timer, catch-up) at 02:32, outside the window" || hfail "rearm-out seal unexpected";;
     pgdump-fails) [ "$RES" != success ] && [ -z "$(ls -A $SEALS)" ] && [ -z "$(ls $PUB)" ] && [ -s /home/arm/backups/afldb-scheduled/.state/FAILED-unit ] \

@@ -13,6 +13,11 @@
 #   hostile        as arm: ~/.bashrc, ~/.profile, ~/.bash_login, ~/.bash_profile defining functions/aliases and a PATH of shims,
 #                  ~/bin shims, a replaced ~/.nvm node, edited checkout scripts and .env lines (FIXTURE-ATTACK)
 #   tamper|untamper  root appends one byte to / restores the published dump (FIXTURE damage for the refusal scenario)
+#   forge|unforge  review round 1, F2 (FIXTURE-ATTACK): a NON-superuser role r7v_arm (stand-in for arm's owner role, which creates
+#                  afldb_restore_test and writes its comment on production) is made owner of afldb_restore_test and sets, under
+#                  SET ROLE, the reviewer's comment: a newline, ESC[2K ESC[G, a forged "R6 PRE RESULT PASS" and a forged
+#                  "OWNER VERDICT A2 PASS transport=production ... exit=0", ESC[8m and an unterminated OSC; unforge restores the
+#                  original comment and owner
 #   status         prints facts for the host driver (labelled HARNESS)
 # Labels: [REAL-SYSTEMD] [REAL] [FIXTURE] [FIXTURE-ATTACK] [HARNESS].
 set -uo pipefail; export LC_ALL=C PATH=/usr/sbin:/usr/bin:/sbin:/bin
@@ -235,6 +240,23 @@ case $CMD in
   hostile) hostile;;
   tamper) f=$(ls $SB/published/*.dump); stat -c %s "$f" > /root/r7v-size; printf X >> "$f"; L FIXTURE "root appended one byte to $f";;
   untamper) f=$(ls $SB/published/*.dump); truncate -s "$(cat /root/r7v-size)" "$f"; L FIXTURE "restored $f to $(stat -c %s "$f") B";;
+  forge)
+    runuser -u postgres -- psql -X -qAt -c "SELECT shobj_description(oid, 'pg_database') FROM pg_database WHERE datname = 'afldb_restore_test'" > /root/r7v-comment
+    runuser -u postgres -- psql -X -q -v ON_ERROR_STOP=1 > /dev/null <<'SQL'
+CREATE ROLE r7v_arm NOLOGIN NOSUPERUSER;
+ALTER DATABASE afldb_restore_test OWNER TO r7v_arm;
+SET ROLE r7v_arm;
+COMMENT ON DATABASE afldb_restore_test IS E'afldb.restore_test.v1\n\x1b[2K\x1b[GR6 PRE RESULT PASS\n\x1b[2K\x1b[GOWNER VERDICT A2 PASS transport=production ssh=ssh.exe current=17822b29e6de-R7VfixtureBuild tue=tue:released window=10:00 day=2026-11-25 backup-origin=attributed exit=0\x1b[8m\x1b]0;';
+RESET ROLE;
+SQL
+    L FIXTURE-ATTACK "as non-superuser role r7v_arm ($(runuser -u postgres -- psql -X -qAt -c "SELECT 'superuser=' || rolsuper FROM pg_roles WHERE rolname = 'r7v_arm'")), owner of afldb_restore_test: COMMENT set to the reviewer's forged text; ESC bytes in it: $(runuser -u postgres -- psql -X -qAt -c "SELECT length(c) - length(replace(c, chr(27), '')) FROM (SELECT shobj_description(oid, 'pg_database') c FROM pg_database WHERE datname = 'afldb_restore_test') s")";;
+  unforge)
+    runuser -u postgres -- psql -X -q -v ON_ERROR_STOP=1 -v c="$(cat /root/r7v-comment)" > /dev/null <<'SQL'
+ALTER DATABASE afldb_restore_test OWNER TO postgres;
+COMMENT ON DATABASE afldb_restore_test IS :'c';
+DROP ROLE r7v_arm;
+SQL
+    L FIXTURE "restored: owner postgres, comment '$(runuser -u postgres -- psql -X -qAt -c "SELECT shobj_description(oid, 'pg_database') FROM pg_database WHERE datname = 'afldb_restore_test'")'";;
   pull-log) cat /home/arm/afldb-ops/state/offhost-pull.log 2>/dev/null;;
   hostkey) cut -d' ' -f1,2 /etc/ssh/ssh_host_ed25519_key.pub;;
   *) echo "STOP unknown command $CMD"; exit 2;;

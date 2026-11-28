@@ -8,9 +8,11 @@
 #      version <nonce>                                            either
 #    nonce = 32 lower-case hex, chosen by the caller (afldb-verify-call.sh) and echoed in the RESULT line.
 # 2. Self-check of the installed bundle and configuration on EVERY run (bundle_selfcheck): any failure is a STOP (exit 3).
-# 3. Runs the core under a root-owned timeout, prints its output verbatim except (a) its token-prefixed FIELD lines, which it
-#    consumes, and (b) any line that begins "AFLDB-VERIFY" or "OWNER VERDICT", which it prefixes "[neutralised] " (defence in
-#    depth: the cores already pass every arm-owned value through san()).
+# 3. Runs the core under a root-owned timeout and prints its output line by line, except (a) its token-prefixed FIELD lines, which
+#    it consumes. Review round 1 (F2): every other line is printed with each byte outside printable ASCII replaced by '?' (no ESC,
+#    CR or other control byte reaches the client), and (b) any line that CONTAINS "AFLDB-VERIFY RESULT" or "OWNER VERDICT" anywhere
+#    (leading spaces or control bytes included) is prefixed "[neutralised] " (defence in depth: the cores already pass every
+#    arm-owned value through san(); the wrapper sanitises and neutralises again).
 # 4. Prints exactly one final line and exits with the core's exit status (sshd returns it to the client):
 #    AFLDB-VERIFY RESULT <G0|A2|G0B|VERSION> <PASS|STOP> nonce=<n> host=<h> boot=<b> bundle=<sha256 of SHA256SUMS> at=<UTC> exit=<n> <fields>
 set -uo pipefail
@@ -112,8 +114,11 @@ out=$(AFLDB_VERIFY_TOKEN=$TOK timeout -k 10 1500 /usr/bin/bash --noprofile --nor
 while IFS= read -r l; do
   if [[ $l == "FIELD-$TOK "* ]]; then
     l=${l#"FIELD-$TOK "}; [[ $l =~ ^([a-z0-9-]{1,32})=([A-Za-z0-9:._-]{1,200})$ ]] && FLD[${BASH_REMATCH[1]}]=${BASH_REMATCH[2]}
-  elif [[ $l == AFLDB-VERIFY* || $l == "OWNER VERDICT"* ]]; then printf '[neutralised] %s\n' "$l"
-  else printf '%s\n' "$l"; fi
+  else
+    l=${l//[^[:print:]]/?}
+    if [[ $l == *"AFLDB-VERIFY RESULT"* || $l == *"OWNER VERDICT"* || $l == AFLDB-VERIFY* ]]; then printf '[neutralised] %s\n' "$l"
+    else printf '%s\n' "$l"; fi
+  fi
 done <<< "$out"
 [ "$rc" != 124 ] && [ "$rc" != 137 ] || echo "STOP the core did not finish within 1500 s (timeout, exit $rc)"
 for k in "${!FLD[@]}"; do

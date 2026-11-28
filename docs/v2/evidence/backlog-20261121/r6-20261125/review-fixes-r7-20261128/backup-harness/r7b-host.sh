@@ -17,7 +17,7 @@ RUN=${1:?run directory}; RID=${2:?run id}; shift 2
 [[ $RID =~ ^[A-Za-z0-9-]+$ ]] && [ -d "$RUN/fix" ] && [ -O "$RUN" ] || { echo "STOP not this run's private directory: $RUN ($RID)"; exit 2; }
 KEEPIMG=0; IMG=
 while [ $# -gt 0 ]; do case $1 in --keep-image) KEEPIMG=1; shift;; --image) IMG=${2:?tag}; KEEPIMG=1; shift 2;; *) break;; esac; done
-ALL=(genuine perm review2 hand-start timer-then-hand restart rearm-in rearm-out pgdump-fails seal-interrupted)
+ALL=(genuine perm review2 hand-start timer-then-hand restart rearm-in rearm-out pgdump-fails seal-interrupted genuine-rd rearm-in-rd post-pub-fail)
 SCEN=("$@"); [ ${#SCEN[@]} -gt 0 ] || SCEN=("${ALL[@]}")
 for sc in "${SCEN[@]}"; do [[ " ${ALL[*]} " == *" $sc "* ]] || { echo "STOP unknown scenario $sc"; exit 2; }; done
 PIN=sha256:d71c0b286c54a7cc48645aa8d4d9d0c57e4260128cb91a6fb18c29d7589205ba   # grafana/alloy:latest on streamanator, Ubuntu 24.04.4
@@ -48,7 +48,7 @@ EOF
 chmod 755 "$RUN/entry.sh"
 hms() { local s=$1 sign=; [ "$s" -lt 0 ] && { sign=-; s=$((-s)); }; printf '%s%d:%02d:%02d' "$sign" $((s / 3600)) $((s % 3600 / 60)) $((s % 60)); }
 # The local wall-clock time each scenario's planned moment (the dispatch, the re-arm or the start by hand) must read.
-local_at() { case $1 in rearm-in) echo 02:20:15;; rearm-out) echo 02:32:00;; hand-start) echo 02:20:30;; *) echo 02:20:00;; esac; }
+local_at() { case $1 in rearm-in|rearm-in-rd) echo 02:20:15;; rearm-out) echo 02:32:00;; hand-start) echo 02:20:30;; *) echo 02:20:00;; esac; }
 run_one() { # scenario
   local sc=$1 name=r7b-$RID-$1 log=$LOGS/r7b-$1.log lead=120 td off rc
   # whole-minute offset (offhost-pull.sh reads zone offsets as +hhmm): td moves later by up to 59 s

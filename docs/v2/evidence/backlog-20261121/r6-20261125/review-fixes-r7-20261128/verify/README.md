@@ -53,6 +53,16 @@ the digest pinned in the wrapper (`BUNDLE_SHA`, set by `build-sums.sh`); `host=`
 equals the request. Otherwise the verdict is STOP with `reason=`. This refuses stale, replayed, crossed and edited answers
 (scenario e of the harness exercises each one).
 
+**Relayed text is data (independent review round 1, F2).** Authentication covers the RESULT line, not the lines above it, and some
+of those carry text arm can write (the comment on `afldb_restore_test`, the migrations ledger, arm's files). Three layers keep it
+from drawing on Stu's terminal or passing for a verdict: (1) the cores print every arm- or database-sourced value through `san()`
+(printable ASCII, length-capped), the A-2 catalogue answer included; (2) the dispatcher replaces every byte outside printable ASCII
+in every core line with `?` and prefixes `[neutralised] ` to any line containing `AFLDB-VERIFY RESULT` or `OWNER VERDICT` anywhere;
+(3) the wrapper (`show`) again maps every byte outside printable ASCII (ESC and CR included) to `?`, in stdout and ssh stderr, and
+prefixes `[relayed, neutralised] ` to every relayed line containing `OWNER VERDICT` or `AFLDB-VERIFY RESULT` except the final
+authenticated RESULT line. So a transcript has exactly one line that **begins** `OWNER VERDICT` per call: the wrapper's own.
+Harness scenario g replays the reviewer's forged comment.
+
 ## 4. G0a to G0b handoff
 
 `g0` calls production first (G0a). Only an authenticated G0a PASS continues, and the wrapper then takes `dump=`, `sha256=`,
@@ -70,9 +80,18 @@ result for the night under test, reported apart from the gate verdict (DESIGN 5.
 ## 6. Trusted inputs (and what each core trusts)
 
 Trusted: root, PID 1 (`systemctl show`, `busctl`), sshd, journald's trusted fields (`_UID`, `_SYSTEMD_INVOCATION_ID`,
-`_TRANSPORT`), root-owned files, the two service accounts (afldb-backup, afldb-verify), PostgreSQL's catalogue as seen by the peer
-role `afldb_verify`. Untrusted data: everything uid arm owns or writes. Data from arm is read only through the root facts reader
-(below), as bytes, sanitised to printable ASCII before printing, and never executed, sourced or loaded.
+`_TRANSPORT`), root-owned files, the two service accounts (afldb-backup, afldb-verify), and the PostgreSQL server's own answers to
+the peer role `afldb_verify` as **facts about the catalogue as it stands**. Untrusted data: everything uid arm owns or writes. Data
+from arm is read only through the root facts reader (below), as bytes, sanitised to printable ASCII before printing, and never
+executed, sourced or loaded.
+
+**Correction (independent review round 1, F2).** r7 called "PostgreSQL's catalogue" trusted. Its **contents** are not: arm holds the
+owner DSN, so arm's role writes the migrations ledger (`ledger 118`) and creates `afldb_restore_test` and sets its comment (the
+restore test runs as arm). The authenticated `afldb_verify` login proves only that the server, not arm, answered; what it answered
+about those objects is arm-influenced data. A-2's `ledger 118` and the `afldb_restore_test` comment and connection-count lines are
+therefore arm-decided (R7 README §4) and are printed through `san()` like every other arm-derived value. If arm's role were a
+superuser it could also act as OS user `postgres`, which owns `pg_hba.conf`/`pg_ident.conf` (both peer maps): unchecked on
+production (R7 README §4, item 9).
 
 - **G0 (production)**: origin, dump and its digest exclusively from `sealed_origin <date>` (the R7/backup library, sourced from the
   bundle copy). The sealed run's failure record is PID 1's `Result=` of afldb-backup.service; arm's `.state` markers are reported as arm-produced.
@@ -121,6 +140,10 @@ The staging directory is root-only, so feed the SQL on stdin from the root shell
    is trusted (journald fields), the copy's sha256 is re-hashed by root, but the lineage lines are arm's.
 5. arm's crontab line (read from the root-only spool, but arm edits it).
 
+The complete list after the independent review (round 1), including the path to root (F1), the database-decided A-2 lines, the
+worker count, `events.log`'s restart note, the arm-served off-host pull, denial, and the unchecked PostgreSQL superuser question, is
+in the R7 README §4; this section is not narrower than that list.
+
 ## 10. Install
 
 Prerequisites, production: R7/backup installed first (group `afldb-backup-read` and `/var/lib/afldb-backup`; install-verify.sh
@@ -128,6 +151,13 @@ refuses without the group), `/usr/bin/python3.12`, group `systemd-journal`, Post
 sshd with `Include /etc/ssh/sshd_config.d/*.conf` at the top of `sshd_config`, a new key pair `~/.ssh/afldb_verify` on the
 workstation. Streamanator: the same minus PostgreSQL and afldb-backup-read (prospective: streamanator's host install has not been
 done).
+
+**Root path (independent review round 1, F1, HIGH, not fixable in code).** On production root is reached through arm's login (the
+owner's `sudo` inside an arm SSH session), so a hostile arm login environment can capture or reuse it: it could install a different
+verifier, edit `authorized_keys`, the sshd drop-in or the peer maps, and every verdict would then be arm's. G2 holds only if this
+install and every later root action (the `postgres` steps of §8, any re-install or rollback) use a root path that does not pass
+through arm's login: the console, or a separate administrative account with its own key that arm cannot write to. Creating it is a
+host-account change that needs owner approval; production `sudoers` has not been checked.
 
 ```text
 # as root, from a root-owned staging copy of verify/ (never from arm's checkout):
@@ -166,7 +196,7 @@ read-only check, and **never writes arm's checkout**.
    r6 form (checked: r6-post-verify.sh does not parse it).
 8. **The sealed run's FAILED marker** is PID 1's `Result=` of afldb-backup.service (R7/backup README item 6: the sealed install writes
    no root marker file). G0 and A-2 require `Result=success`; arm's `.state` markers are still reported (arm-produced).
-9. **`bundle/sealed-origin.sh` is a byte-identical copy of the final `R7/backup/sealed-origin.sh`** (sha256 `48827fb1…`). Any later
+9. **`bundle/sealed-origin.sh` is a byte-identical copy of the final `R7/backup/sealed-origin.sh`** (sha256 `1e5b5da4…`). Any later
    change there must be copied here and followed by `build-sums.sh` (the wrapper's pinned bundle digest changes with it).
 10. Harness image adds `python3`, `cron` and `tzdata` to r6's package list (the verifier needs python3.12; G0B needs a real cron).
 
@@ -185,6 +215,11 @@ copy. `streamanator` installs `install-verify.sh --role offhost`, and **arm's re
 production. The workstation runs the documented wrapper with the real Windows OpenSSH client, a fresh test key, pinned container
 host keys and a ProxyCommand of `ssh arm@streamanator docker exec -i <ctr> nc 127.0.0.1 22`. Every line in the logs is labelled
 REAL-SYSTEMD / REAL / FIXTURE / FIXTURE-ATTACK / HARNESS.
+
+Review round 1 added scenario **g (forged-comment)**: a non-superuser role made owner of `afldb_restore_test` sets the reviewer's
+comment (newlines, `ESC[2K ESC[G`, a forged `R6 PRE RESULT PASS` and a forged `OWNER VERDICT A2 PASS transport=production … exit=0`,
+`ESC[8m`, an unterminated OSC); the A-2 call must show zero ESC/control bytes, the forged text only on `[relayed, neutralised]`
+lines, exactly one line beginning `OWNER VERDICT`, and the same verdict and exit as scenario c.
 
 What the rehearsal does **not** prove (container limits, or arm-produced evidence):
 

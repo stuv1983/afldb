@@ -1,6 +1,7 @@
 #!/usr/bin/bash
 # install-backup.sh: R6 r7 (28 Nov 2026) owner installation of the sealed nightly backup (DESIGN.md sections 2 and 3). PREPARED,
-# NOT RUN ON PRODUCTION. Run by the OWNER, as root, from a trusted root session:
+# NOT RUN ON PRODUCTION. Run by the OWNER, as root reached by a path that does NOT pass through arm's login (the console, or a
+# separate administrative account with its own key; not sudo in an arm SSH session: R7 independent review round 1, F1; README 5):
 #   bash <staging>/install-backup.sh <staging>
 # <staging> is a root-owned directory (not under /home, no group/other write anywhere on its path) holding exactly the reviewed
 # bundle: SHA256SUMS, afldb-backup-run, afldb-backup-seal, 70-afldb-backup-sealed.conf, sealed-origin.sh, install-backup.sh,

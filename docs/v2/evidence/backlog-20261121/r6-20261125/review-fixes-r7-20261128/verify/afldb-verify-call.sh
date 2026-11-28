@@ -16,7 +16,7 @@
 # from the authenticated G0a RESULT line. NG-PRE consumes only "OWNER VERDICT A2 PASS"; release G0 only "OWNER VERDICT G0 PASS".
 # Exit: 0 PASS, 1 STOP, 2 usage.
 set -uo pipefail; export LC_ALL=C
-BUNDLE_SHA=5333d2155a1fa26de5e86af3e866f17c0ba0c207a00f94e6682d4fc3a85576e4     # sha256 of verify/bundle/SHA256SUMS (= the installed /usr/local/lib/afldb-verify/SHA256SUMS); build-sums.sh sets it
+BUNDLE_SHA=f75ba83dc25072f7fd4846d86f6eed0791ec46205dcde8e417e1ccc700acdff9     # sha256 of verify/bundle/SHA256SUMS (= the installed /usr/local/lib/afldb-verify/SHA256SUMS); build-sums.sh sets it
 PROD_NAME=afldb-prod; OFF_NAME=streamanator; OFF_ADDR=10.0.40.100; PROD_ALIAS=afldb
 SSHBIN=${AFLDB_VERIFY_SSH:-C:/Windows/System32/OpenSSH/ssh.exe}
 KEY=$HOME/.ssh/afldb_verify; TRANSPORT=production; CFG=
@@ -40,6 +40,22 @@ else
 fi
 nonce() { od -An -N16 -tx1 /dev/urandom | tr -d ' \n'; }
 
+# show <relayed text> (review round 1, F2): prints what the host sent so that nothing in it can draw on Stu's terminal or pass for a
+# verdict. Every byte outside printable ASCII (ESC, CR, every other control byte, every byte >= 0x80) becomes '?'. Every line that
+# contains "OWNER VERDICT" or "AFLDB-VERIFY RESULT" is prefixed "[relayed, neutralised] ", except the last non-empty line when it
+# begins "AFLDB-VERIFY RESULT " (the line call() authenticates). The wrapper's own OWNER VERDICT line is printed after this, so a
+# transcript has exactly one line that begins "OWNER VERDICT" per verdict. Authentication below reads the unmodified answer.
+show() {
+  local i last=-1; local -a SL
+  mapfile -t SL < <(printf '%s\n' "$1" | tr -c '\n\40-\176' '?')
+  for i in "${!SL[@]}"; do [ -n "${SL[i]}" ] && last=$i; done
+  for i in "${!SL[@]}"; do
+    if [[ ${SL[i]} == *"OWNER VERDICT"* || ${SL[i]} == *"AFLDB-VERIFY RESULT"* ]] && ! { [ "$i" = "$last" ] && [[ ${SL[i]} == "AFLDB-VERIFY RESULT "* ]]; }; then
+      printf '[relayed, neutralised] %s\n' "${SL[i]}"
+    else printf '%s\n' "${SL[i]}"; fi
+  done
+}
+
 # call <target> <MODE> <expected host> <command words...>: runs one verifier call; sets V_LINE, V_RC, V_WHY, and V[] (RESULT fields).
 declare -A V
 call() {
@@ -48,8 +64,8 @@ call() {
   [[ $n =~ ^[0-9a-f]{32}$ ]] || { V_WHY="no nonce"; V_RC=1; return 1; }
   err=$(mktemp); out=$("$SSHBIN" "${OPTS[@]}" "$target" "$* $n" 2> "$err"); rc=$?
   out=${out//$'\r'/}
-  printf '%s\n' "$out"
-  [ -s "$err" ] && sed 's/^/[ssh stderr] /' "$err" | tr -d '\r'; rm -f "$err"
+  show "$out"
+  [ -s "$err" ] && tr -d '\r' < "$err" | tr -c '\n\40-\176' '?' | sed 's/^/[ssh stderr] /'; rm -f "$err"
   V_RC=$rc; V[nonce]=$n
   [ "$(grep -c '^AFLDB-VERIFY RESULT ' <<< "$out")" = 1 ] || { V_WHY="$(grep -c '^AFLDB-VERIFY RESULT ' <<< "$out") RESULT lines (need exactly 1; ssh exit $rc)"; return 1; }
   line=$(printf '%s\n' "$out" | sed '/^$/d' | tail -n 1); V_LINE=$line

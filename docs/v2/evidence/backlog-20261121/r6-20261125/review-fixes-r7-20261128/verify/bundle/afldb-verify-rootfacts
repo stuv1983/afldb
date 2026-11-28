@@ -88,14 +88,27 @@ def read_tail(path, cap):
         os.close(fd)
 
 
+# Review round 1, F5: the largest file this reader hashes is one nightly custom-format dump (the weekly restore's dump in arm's
+# directory on production, the pulled copy on streamanator). 16 GiB is far above a dump of afldb_prod and, at the sha256 rates of
+# both hosts (hundreds of MB/s), hashes well inside the unit's 900 s TimeoutStartSec; a larger (or sparse, or growing) file is
+# refused before or while reading, so arm can cause a STOP, never an unbounded root job.
+HASH_CAP = 16 << 30
+
+
 def sha256_of(path):
     fd, st = open_reg(path)
     h = hashlib.sha256()
+    n = 0
     try:
+        if st.st_size > HASH_CAP:
+            raise OSError('larger than %d bytes' % HASH_CAP)
         while True:
             c = os.read(fd, 1 << 20)
             if not c:
                 break
+            n += len(c)
+            if n > st.st_size or n > HASH_CAP:
+                raise OSError('the file grew while it was hashed')
             h.update(c)
         return h.hexdigest(), st.st_size
     finally:
@@ -177,6 +190,10 @@ def facts_prod(req):
             m = re.fullmatch(r'releases/(' + RELID.pattern + ')', t)
             if m:
                 if name == 'current':
+                    # Review round 1 (INFO), recorded rather than changed: realpath() lstat()s and readlink()s the components of an
+                    # arm-owned path with DAC bypass and FOLLOWS arm's symbolic links. It opens no file and reads no content; the
+                    # resulting path string goes only to the verifier, which compares it with the MainPID's cwd (also arm-chosen).
+                    # The comparison proves only which directory the process runs in (README section 4, item 4).
                     emit('current_realpath', os.path.realpath(RELROOT + '/releases/' + m.group(1)))
                 jfield(RELROOT + '/releases/' + m.group(1) + '/release.json',
                        (('revision', 'revision'), ('buildId', 'buildid'), ('afldbEnv', 'env')), pre)

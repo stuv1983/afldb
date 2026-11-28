@@ -91,7 +91,11 @@ def main(argv):
         url = argv[2]
         if not re.fullmatch(r'http://127\.0\.0\.1:3100/[A-Za-z0-9/._-]{1,200}', url):
             sys.exit(2)
-        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        class NoRedirect(urllib.request.HTTPRedirectHandler):
+            # Review round 1 (INFO): never follow a redirect from arm's server; a 3xx is reported as its own status (not a PASS).
+            def redirect_request(self, req, fp, code, msg, headers, newurl):
+                return None
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
         try:
             r = opener.open(url, timeout=15)
             status, ctype, body = r.status, r.headers.get('Content-Type', ''), r.read(65536)

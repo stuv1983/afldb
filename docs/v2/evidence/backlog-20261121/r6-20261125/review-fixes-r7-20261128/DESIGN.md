@@ -23,6 +23,14 @@ It supersedes the r6 DESIGN.md (`review-fixes-r6-20261128/DESIGN.md`) for origin
   service accounts (they have no login, no key, no sudo; all their code and configuration is root-owned), and Stu's workstation.
 * **Out of scope (residuals, stated):** root/sudo; the PostgreSQL server and its data (arm holds the owner DSN and can change the
   data, which is a different property from the dump's provenance); streamanator's own arm for the off-host copy (§5.4).
+* **F1 (independent review round 1, HIGH; not fixable in code, an owner decision):** "root is trusted" holds only for a root that
+  arm cannot reach. On production today root is reached through arm's login (the owner runs `sudo` inside an arm SSH session), so a
+  hostile arm login environment (`~/.bashrc`, `~/.profile`, PATH shims, an alias or function named `sudo`, a terminal-injected
+  command) can capture or reuse that root session, and the install itself, the `sudo -u postgres` steps and every root step of the
+  plan pass through it. **G1 and G2 therefore hold only if the install and every later root action use a root path that does not
+  pass through arm's login**: the console, or a separate administrative account with its own key that arm cannot write to. Setting
+  that up is a host-account change that needs owner approval; production `sudoers` has not been checked. Until then MED-2 and MED-3
+  stay OPEN regardless of any rehearsal result.
 
 ## 2. Accounts and paths (prospective production layout; created only by the owner's install, never by Claude)
 
@@ -64,11 +72,14 @@ its dumps are never gate-eligible because gates read only seals and `published/`
    updates `state/last-backup.json`; applies retention (§3.3); removes the staging copy. Any failure: no rename, temporaries removed,
    exit non-zero (the unit fails, OnFailure fires).
 3. **No partial artefact is eligible:** gates accept only a final-named, root-owned 0440, link-count-1 published file whose re-hash
-   equals a valid seal's `dump_sha256`; staging, temporaries and seal-without-file are refused.
+   equals a valid seal's `dump_sha256` **and whose seal has its completion record (§3.6)**; staging, temporaries, seal-without-file
+   and seal-without-completion-record are refused.
 
-### 3.2 Seal format (`afldb-backup-seal/3`; exact key order, one `key=value` per line, LF, no other lines)
+### 3.2 Seal format (`afldb-backup-seal/4`; exact key order, one `key=value` per line, LF, no other lines; 26 lines)
+Review round 1 (F3) bumped `/3` to `/4` and added `timer_active_enter_usec` (the timer unit's `ActiveEnterTimestamp`, realtime,
+read from PID 1 with `busctl`; 0 when the timer was never active, i.e. a start by hand). A `/3` seal is refused.
 ```
-afldb-backup-seal/3
+afldb-backup-seal/4
 sealer_sha256=<64 hex: the sealer file, read at write time>
 unit=afldb-backup.service
 invocation=<32 hex>
@@ -87,6 +98,7 @@ trigger_timer_realtime_usec=<digits or none>
 timer_last_trigger_usec=<digits>
 timer_last_trigger_mono=<digits>
 timer_active_enter_mono=<digits>
+timer_active_enter_usec=<digits>
 dispatch_kind=<scheduled|catch-up>
 dump=<afldb_prod-YYYYMMDD-HHMMSS.dump or none>
 dump_sha256=<64 hex of the ROOT copy that is published, or none>
@@ -103,10 +115,19 @@ state through an explicit, absolute-path setting; no default changes for other c
 `<prod>:/var/lib/afldb-backup/published/` (streamanator configuration, an installation prerequisite); `offhost-pull.sh` is unchanged.
 
 ### 3.4 Dispatch kind (catch-up identification)
-`dispatch_kind=catch-up` when the dispatch came within 5 s of the timer unit's (re)activation (`timer_last_trigger_mono -
-timer_active_enter_mono < 5000000`: a `Persistent=` catch-up at boot or after an attended re-arm), otherwise `scheduled`. Both are
-accepted when every other rule holds and the dispatch is in-window; every gate prints `DISPATCH <kind> <delay> s after timer
-activation` and the verdict line carries `dispatch=<kind>`.
+Review round 1 (F3) replaced the r7 rule, which depended on `RandomizedDelaySec`: under production's `RandomizedDelaySec=10min` a
+re-arm at 02:20:15 was dispatched at 02:29:06 (531 s after activation) and labelled `scheduled`. The rule is now:
+
+`dispatch_kind=catch-up` when **either** the timer unit's last activation (`timer_active_enter_usec`, realtime `ActiveEnterTimestamp`)
+is at or after **02:20:00 Australia/Melbourne on the dispatch's date** (the timer was (re)armed at or after the elapse it then
+served: an attended re-arm, or a boot after 02:20), **or** the dispatch came less than 5 s after that activation
+(`timer_last_trigger_mono - timer_active_enter_mono < 5000000`: a `Persistent=` catch-up); otherwise `scheduled`. A timer activated
+before 02:20:00 whose elapse fell at 02:20:00 and whose dispatch followed by the random delay is `scheduled`, whatever the delay.
+The sealer computes the label from its own PID 1 reads; **the gate recomputes it from the sealed stamps** (the dispatch lies in the
+gate date's window, so the dispatch's date is the gate date) and refuses a seal whose label differs. Both kinds are accepted when
+every other rule holds and the dispatch is in-window; every gate prints `DISPATCH <kind> <delay> s after timer activation` and the
+verdict line carries `dispatch=<kind>`. Rehearsed under the real deploy timer's production timing (`RandomizedDelaySec=10min`,
+`AccuracySec=1min`): `genuine-rd` (scheduled) and `rearm-in-rd` (re-arm at 02:20:15, catch-up) in the backup harness.
 
 ### 3.5 Gate rule for origin + dump (`sealed_origin`, one function, byte-identical wherever used)
 r6 §4 items 1–5 with these changes: trusted paths add `/usr/local/lib/afldb-backup` (every file), `/var/lib/afldb-backup` and its
@@ -117,6 +138,23 @@ seal exact format, `service_user=afldb-backup`; the published dump is root:afldb
 re-hash equals `dump_sha256`; its root sidecar is exactly `<dump_sha256>  <dump>`; dispatch in the gate date's window; uniqueness of
 the dispatch across seals. **No journal line, no arm-owned path and no arm-owned binary is read or executed for origin or the dump.**
 Output: `OFFHOST-COMPARE <dump> <full sha256>` only when every item holds; otherwise `scheduled origin unproven: <reason>`.
+Review round 1 (INFO) added to the effective-unit rule: no `ExecCondition`, `ExecStartPre`, `ExecStop`, `ExecStopPost` or
+`ExecReload` command, and no `.env` (file or link) in `/usr/local/lib/afldb-backup` (backup.sh would source it); and rule 6 (§3.6).
+
+### 3.6 Completion record (review round 1, F4)
+A sealer failure after publication (state record, retention, staging removal) used to leave a valid seal, a published dump and a
+sidecar; once the unit's failure left `Result=` (a later successful run, `systemctl reset-failed`, a reboot), that run was eligible.
+The sealer now writes, as its **very last step** (after the staging removal, `.tmp` then `mv -n`, never overwritten),
+`seals/<invocation>.done` root:root 0644, link count 1, exactly:
+```
+afldb-backup-done/1
+invocation=<32 hex, = the seal's>
+dump=<= the seal's>
+dump_sha256=<= the seal's>
+completed_realtime_usec=<digits, >= the seal's sealed_realtime_usec>
+```
+`sealed_origin` requires it (exact lines and byte size) after rule 5; a seal without it is refused with "has no valid completion
+record". Rehearsed by `post-pub-fail` (the state-record rename fails after publication; then `reset-failed`: refused).
 
 ## 4. Permission proof obligations (G1 acceptance)
 
@@ -182,13 +220,13 @@ G0b checks must hash to the sha256 from the authenticated G0a line, so streamana
 ## 7. Implementation deviations (coordinator record, 28 Nov 2026)
 
 The coordinator checked both deliveries against this contract.
-* The bundle's `sealed-origin.sh` is byte-identical to `backup/sealed-origin.sh` (`48827fb1…`).
-* The pins inside `sealed-origin.sh` equal the files: run `2c62ff91…`, sealer `33ab0cc3…`, the repository `backup.sh` `df609046…`,
+* The bundle's `sealed-origin.sh` is byte-identical to `backup/sealed-origin.sh` (`1e5b5da4…`).
+* The pins inside `sealed-origin.sh` equal the files: run `2c62ff91…`, sealer `143f4ba7…`, the repository `backup.sh` `df609046…`,
   drop-in `f8a18580…`.
-* `verify-backup-install.sh` pins the library `48827fb1…`.
-* `backup/SHA256SUMS` (`aada42cb…`) matches its seven files.
-* `verify/bundle/SHA256SUMS` (`5333d215…`) matches its files and equals the wrapper's `BUNDLE_SHA`.
-* `verify/SHA256SUMS` (`ee4963bd…`) matches, and `build-sums.sh --check` gives PASS.
+* `verify-backup-install.sh` pins the library `1e5b5da4…`.
+* `backup/SHA256SUMS` (`4a9d437f…`) matches its seven files.
+* `verify/bundle/SHA256SUMS` (`f75ba83d…`) matches its files and equals the wrapper's `BUNDLE_SHA`.
+* `verify/SHA256SUMS` (`237dee30…`) matches, and `build-sums.sh --check` gives PASS.
 * `a2-core.sh`'s host-policy pins equal `deploy/host-policy/*`, and the bundled `afldb-settle-failure-status.sh` equals the `17822b29` blob
   (`d80838cb…`).
 * The install order fits. `install-backup.sh` creates `afldb-backup-read` and adds arm to it. `install-verify.sh --role prod` refuses

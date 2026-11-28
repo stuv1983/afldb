@@ -27,4 +27,7 @@ ProtectKernelModules=yes
 ProtectControlGroups=yes
 RestrictAddressFamilies=AF_UNIX
 LockPersonality=yes
-RuntimeMaxSec=900
+# Review round 1, F5: RuntimeMaxSec= does not apply to Type=oneshot (the installed unit showed TimeoutStartUSec=infinity);
+# TimeoutStartSec= does. 900 s = the client's own limit (lib.sh rootfacts: timeout 900), so the reader never outlives the verifier
+# waiting for it; its longest job, hashing one dump of at most 16 GiB (HASH_CAP), fits inside it.
+TimeoutStartSec=900

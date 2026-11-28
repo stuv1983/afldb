@@ -9,7 +9,7 @@ set -u -o pipefail
 export LC_ALL=C PATH=/usr/sbin:/usr/bin
 cd / || exit 90
 LIB=/usr/local/lib/afldb-backup/sealed-origin.sh
-LIB_SHA=48827fb1791d3a1e6d9cfd827be1f4e6c5471c2d6292de01b246b7e2c54f98f5
+LIB_SHA=1e5b5da45849beaf9f46ce191c15a50f6d2ea3e24ec8061a108d230e0c23703a
 CODE=/usr/local/lib/afldb-backup; DR=/var/lib/afldb-backup; DID=/etc/systemd/system/afldb-backup.service.d
 DSN='postgresql://afldb_backup@/afldb_prod?host=/var/run/postgresql'
 F=0

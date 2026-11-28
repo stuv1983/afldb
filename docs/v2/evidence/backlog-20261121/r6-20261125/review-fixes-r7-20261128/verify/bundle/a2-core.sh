@@ -297,7 +297,9 @@ ROLLBACK;
 SQL
     )
   else RO="psql unavailable: $TP_WHY"; fi
-  printf '%s\n' "$RO" | sed 's/^/     /'
+  # review round 1, F2: the comment on afldb_restore_test and the migrations ledger are written by arm's role; each line is printed
+  # through san() (printable ASCII only), like every other arm-derived value. The checks below still read the raw answer.
+  while IFS= read -r ROL; do printf '     %s\n' "$(san "$ROL" 400)"; done <<< "$RO"
   grep -qx 'ledger|118|118_fixtures_unconfirmed_participants.sql' <<< "$RO" && ok "ledger 118" || bad "ledger differs"
   if [ -n "$RESTORE" ] && grep -Fxq "rt|afldb_restore_test|afldb.restore_test.v1 sha256=$vsha|0" <<< "$RO"; then
     ok "afldb_restore_test comment matches the scheduled restore dump, numbackends 0"

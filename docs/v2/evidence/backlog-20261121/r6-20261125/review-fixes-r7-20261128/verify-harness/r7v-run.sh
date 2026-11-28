@@ -16,6 +16,9 @@
 #   f  keys            another key and arm's key cannot reach afldb-verify; the verify key cannot reach arm; the verify key gets no
 #                      shell, no PTY, no forwarding, and an extra command word is a usage refusal
 #   b  g0-refusal      root damages the published dump: G0 STOP at G0a ("scheduled origin unproven"), G0b never called
+#   g  forged-comment  review round 1, F2: the reviewer's attack (a forged verdict and terminal escapes in the database comment arm's
+#                      role writes) through the owner path: no control byte reaches the output, the forged text appears only on
+#                      '[relayed, neutralised]' lines, and the genuine A-2 verdict and exit equal scenario c's (run right after c)
 # Logs: verify-harness/logs/<RID>-*.log (workstation). Containers, image, workspace and test keys are removed at the end.
 # Development only (never in a recorded run): R7V_IMAGE=<kept image> reuses an image; --keep-image keeps it; R7V_KEEP_CTRS=1 keeps
 # the containers and workspace for inspection (the summary prints the `down` command).
@@ -127,6 +130,22 @@ if [ "$C_RC" = 1 ] && [[ $C_V == "OWNER VERDICT A2 STOP transport=rehearsal"* ]]
    && grep -q '^AFLDB-VERIFY RESULT A2 STOP ' <<< "$WOUT" && grep -q '^R6 PRE RESULT STOP' <<< "$WOUT"; then
   res c "PASS a2-whole: the verifier's own STOP (exit 1, $NF FAIL / $NP PASS lines), backup-origin=attributed reported separately; FAILs: $(grep '^FAIL ' <<< "$WOUT" | cut -c6-60 | tr '\n' '|' | cut -c1-600)"
 else res c "FAIL a2-whole: exit $C_RC; $(cut -c1-300 <<< "$C_V")"; fi
+
+# ---- g (review round 1, F2): the reviewer's forged database comment, replayed through the owner path
+LG=$LOGS/$RID-g-forged-comment.log; hdr g "$LG"
+"${DEVSSH[@]}" "$HOSTSH forge" >> "$LG" 2>&1
+wcall "$LG" a2 $A2ARGS; G_OUT=$WOUT; G_RC=$WRC; G_V=$(vline "$WOUT")
+"${DEVSSH[@]}" "$HOSTSH unforge" >> "$LG" 2>&1
+G_ESC=$(printf '%s' "$G_OUT" | tr -dc '\033' | wc -c); G_CTL=$(printf '%s' "$G_OUT" | tr -d '\n' | tr -dc '\000-\037\177-\377' | wc -c)
+G_NV=$(grep -c '^OWNER VERDICT' <<< "$G_OUT"); G_NR=$(grep -c '^AFLDB-VERIFY RESULT' <<< "$G_OUT")
+G_FORGED=$(grep -c 'OWNER VERDICT A2 PASS transport=production' <<< "$G_OUT"); G_NEUT=$(grep -c '^\[relayed, neutralised\] .*OWNER VERDICT A2 PASS transport=production' <<< "$G_OUT")
+{ echo "[HARNESS] wrapper output after the attack: ESC bytes $G_ESC, other control or non-ASCII bytes $G_CTL; lines beginning 'OWNER VERDICT' $G_NV, beginning 'AFLDB-VERIFY RESULT' $G_NR"
+  echo "[HARNESS] lines carrying the forged verdict text ($G_FORGED; neutralised $G_NEUT):"; grep -n 'OWNER VERDICT A2 PASS transport=production\|R6 PRE RESULT PASS\|afldb.restore_test.v1' <<< "$G_OUT" | sed 's/^/   /'
+  echo "[HARNESS] verdict comparison with scenario c (nonce= and at= removed):"; echo "   c: $(norm <<< "$C_V") exit $C_RC"; echo "   g: $(norm <<< "$G_V") exit $G_RC"; } >> "$LG"
+if [ "$G_RC" = "$C_RC" ] && [ "$(norm <<< "$G_V")" = "$(norm <<< "$C_V")" ] && [ "$G_ESC" = 0 ] && [ "$G_CTL" = 0 ] && [ "$G_NV" = 1 ] && [ "$G_NR" = 1 ] \
+   && [ "$G_FORGED" -ge 1 ] && [ "$G_FORGED" = "$G_NEUT" ] && ! grep -q '^R6 PRE RESULT PASS' <<< "$G_OUT"; then
+  res g "PASS forged-comment: the forged text reached the wrapper only as data ($G_NEUT line(s) '[relayed, neutralised] ...', 0 ESC, 0 control bytes); genuine verdict and exit unchanged ($(norm <<< "$G_V" | cut -c1-60)... exit $G_RC)"
+else res g "FAIL forged-comment: exit $G_RC (c: $C_RC) esc=$G_ESC ctl=$G_CTL verdict-lines=$G_NV result-lines=$G_NR forged=$G_FORGED neutralised=$G_NEUT; $(cut -c1-200 <<< "$G_V")"; fi
 
 # ---- d: hostile arm login environment
 LD=$LOGS/$RID-d-hostile-arm.log; hdr d "$LD"

@@ -20,13 +20,13 @@ no arm-owned path and no arm-owned binary is read or executed for origin or the 
 | File (this directory) | Installed as (root:root unless stated) | sha256 |
 |---|---|---|
 | `afldb-backup-run` | `/usr/local/lib/afldb-backup/afldb-backup-run` 0755 (ExecStart, as afldb-backup) | `2c62ff91…` |
-| `afldb-backup-seal` | `/usr/local/lib/afldb-backup/afldb-backup-seal` 0755 (ExecStartPost, root) | `33ab0cc3…` |
+| `afldb-backup-seal` | `/usr/local/lib/afldb-backup/afldb-backup-seal` 0755 (ExecStartPost, root) | `143f4ba7…` |
 | `70-afldb-backup-sealed.conf` | `/etc/systemd/system/afldb-backup.service.d/70-afldb-backup-sealed.conf` 0644 | `f8a18580…` |
-| `sealed-origin.sh` | `/usr/local/lib/afldb-backup/sealed-origin.sh` 0644 (gate library; the verifier sources its own byte-identical copy) | `48827fb1…` |
-| `install-backup.sh` | not installed (owner runs it from the staging directory) | `f5d80c2b…` |
-| `verify-backup-install.sh` | not installed (read-only check, run as root and as arm) | `29674856…` |
+| `sealed-origin.sh` | `/usr/local/lib/afldb-backup/sealed-origin.sh` 0644 (gate library; the verifier sources its own byte-identical copy) | `1e5b5da4…` |
+| `install-backup.sh` | not installed (owner runs it from the staging directory) | `f433b81a…` |
+| `verify-backup-install.sh` | not installed (read-only check, run as root and as arm) | `a2388fb6…` |
 | repository `tools/maintenance/backup.sh` (staged as `backup.sh`) | `/usr/local/lib/afldb-backup/tools/maintenance/backup.sh` 0755, byte-identical | `df609046…` |
-| `SHA256SUMS` (the seven staged files) | not installed; `install-backup.sh` writes `/usr/local/lib/afldb-backup/SHA256SUMS` for the four installed code files | `aada42cb…` |
+| `SHA256SUMS` (the seven staged files) | not installed; `install-backup.sh` writes `/usr/local/lib/afldb-backup/SHA256SUMS` for the four installed code files | `4a9d437f…` |
 
 Full digests: `SHA256SUMS`. `sealed-origin.sh` pins the run, the sealer, `backup.sh` and the drop-in; `verify-backup-install.sh` pins
 `sealed-origin.sh`. If any of those bytes change, re-pin in that order (library, then verify script, then `SHA256SUMS`).
@@ -58,14 +58,17 @@ activation`, `OFFHOST-COMPARE $SO_DUMP $SO_SHA` on success, and `scheduled origi
    equal the sealed dispatch (r6 item 4); `Group`, `SupplementaryGroups` and `NoNewPrivileges` are checked too; the seal's file name must be
    its invocation. Helpers in the trusted-path set: everything the run, the sealer and the rule execute, plus the zone file
    `/usr/share/zoneinfo/Australia/Melbourne` (must be a root-owned regular file: check on production; the install checks it).
-4. **`dispatch_kind`** is DESIGN 3.4's formula literally (`timer_last_trigger_mono - timer_active_enter_mono < 5000000`). A timer
+4. **`dispatch_kind`** is DESIGN 3.4's formula literally. Review round 1 (F3): catch-up when the timer's realtime activation
+   (`timer_active_enter_usec`, sealed) is at or after 02:20:00 Melbourne of the dispatch's date, or when
+   `timer_last_trigger_mono - timer_active_enter_mono < 5000000`; the gate recomputes it and refuses a differing label. A timer
    restarted AFTER its own dispatch (negative delay) is therefore labelled catch-up: conservative, printed with its (negative) delay.
+   A start by hand (timer never active: activation 0) can only be labelled by the 5 s rule; it is refused anyway (no timer job).
 5. **Seal with `dump=none`.** When PID 1's facts are valid but the staging dump fails a check, the sealer writes the raw facts with
    `dump=none` and fails the unit (DESIGN: "raw facts for every successful ExecStart"; the gate refuses `none`).
 6. **Failure marker.** No new root marker: a failure is PID 1's `Result=` of the unit (root fact) plus the unchanged `OnFailure=`
    unit's `FAILED-unit` marker in arm's `.state` (arm-writable, informational, as before). `state/last-backup.json` is written only on success.
 7. **`sealed-origin.sh` is also installed** in `/usr/local/lib/afldb-backup` (the install's self-check and `verify-backup-install.sh`
-   source it); the verifier may source its own copy, which must be byte-identical (`48827fb1…`).
+   source it); the verifier may source its own copy, which must be byte-identical (`1e5b5da4…`).
 8. **`scheduled-backup.sh`:** one explicit opt-in, `AFLDB_BACKUP_SEALED_STATE_DIR=<absolute path>` (status mode only, no default): the
    "backup" check and the off-host-failed check read `<dir>/last-backup.json`; verification, markers and every other mode are unchanged.
    This changes the checkout bytes (`234fca6a…` -> `7e2b470a…`); a probe that needs the nightly's freshness from arm's checkout needs a
@@ -77,10 +80,15 @@ activation`, `OFFHOST-COMPARE $SO_DUMP $SO_SHA` on success, and `scheduled origi
 ## 5. Installation (owner; can be done BEFORE the qualifying backup; the production checkout is never written)
 
 Prerequisites: the base `afldb-backup.service` and `.timer` installed as root-owned copies (not links into the checkout); PostgreSQL with
-the existing read-only role `afldb_backup`; the r6 attest drop-in NOT installed; a trusted root session; outside 02:15-02:50.
+the existing read-only role `afldb_backup`; the r6 attest drop-in NOT installed; outside 02:15-02:50; and **root reached by a path that
+does not pass through arm's login** (independent review round 1, **F1**, HIGH, not fixable in code): the console, or a separate
+administrative account with its own key that arm cannot write to. On production root is today reached by the owner's `sudo` inside an
+arm SSH session; a hostile arm login environment can capture or reuse that root, and then G1 does not hold (whoever holds root can
+write seals and published dumps). Creating such a path is a host-account change needing owner approval; production `sudoers` is
+unchecked. Every later root action (step 3's `sudo -u postgres`, rollback) must use the same path.
 
 1. Stage the bundle in a new root-owned directory outside `/home` (e.g. `install -d -m 0755 /root/afldb-r7-backup`): the seven files of
-   `SHA256SUMS`, with `backup.sh` = the repository's `tools/maintenance/backup.sh`. Check `sha256sum SHA256SUMS` = `aada42cb…` (this README)
+   `SHA256SUMS`, with `backup.sh` = the repository's `tools/maintenance/backup.sh`. Check `sha256sum SHA256SUMS` = `4a9d437f…` (this README)
    and `sha256sum -c SHA256SUMS`.
 2. `bash /root/afldb-r7-backup/install-backup.sh /root/afldb-r7-backup` as root. It refuses staging under `/home`, group/other-writable
    staging, any mismatch with `SHA256SUMS`, a library/bundle pin mismatch, a missing helper, an unloaded or untrusted base unit, the r6
@@ -133,14 +141,22 @@ the installed `sealed_origin` run as `r7reader` (not arm, not root, in `afldb-ba
 | rearm-in / rearm-out | attributed `dispatch=catch-up` 0.0 s / refused (catch-up at 02:32) |
 | pgdump-fails / seal-interrupted | refused; unit failed; no seal (pgdump) or seal without a published file (SIGKILL between seal and rename); OnFailure fired |
 
-FIXTURE differences from production: fixed-offset zone (whole minutes); timer `RandomizedDelaySec=0`, `AccuracySec=1s`; fixture database
+Review round 1 added three scenarios (results at the tested revision: [../README.md](../README.md), "review round 1 fixes"):
+`genuine-rd` (no timing drop-in: the real deploy timer's `RandomizedDelaySec=10min`, `AccuracySec=1min`; attributed, scheduled),
+`rearm-in-rd` (the same production timing, re-armed at 02:20:15: attributed, catch-up, F3) and `post-pub-fail` (a root directory at
+`state/last-backup.json` makes the sealer fail after publication; `systemctl reset-failed` clears `Result=`; refused for the missing
+completion record, F4). Every attributed scenario also checks the completion record.
+
+FIXTURE differences from production: fixed-offset zone (whole minutes); timer `RandomizedDelaySec=0`, `AccuracySec=1s` (except the two
+`-rd` scenarios, which use production timing); fixture database
 and role grant; owner pg edit applied by the harness; the two HOLDS (a root psql lock that keeps pg_dump waiting: creation stage; a root
 `strace` delaying the sealer's first chown by 25 s: sealing stage) - neither exists in production and neither changes any pinned byte.
 
 ## 9. Residuals and what is not proven
 
 * Root/sudo, the PostgreSQL server and its data (arm holds the owner DSN and can change the data: a different property from provenance),
-  and streamanator's arm (DESIGN 5.4) are out of scope.
+  and streamanator's arm (DESIGN 5.4) are out of scope. **F1:** root is reached through arm's login on production today, so this
+  exclusion holds only once the owner uses a root path that does not pass through arm's login (section 5).
 * Production facts unverified: unit install form (copy vs link), `/usr/local/lib` and `/var/lib` modes, the zone file type, the
   PostgreSQL major/cluster path (`/etc/postgresql/*/main`), the socket `/var/run/postgresql`, systemd 255.4's job ActivationDetails there.
   `install-backup.sh` and `verify-backup-install.sh` check each of these on the host.
