@@ -1,0 +1,1078 @@
+== p4-run dev-p4h 2026-11-28T08:01:45Z workstation Office; worktree HEAD b2ef6bedb971375b47abf8c84e9c72890fd0f214
+[TRANSPORT] WORKTREE bytes (development evidence, not a committed revision):
+   d9083bc4a508c54fdf7c4e232db8e5046e80206798f5f80638d0f004b5e329a5  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r9-20261128/phase4/afldb-phase4.sh
+   1f8ab884a1f6c3bf6d23d905cac602b3408fe2ae1e709cee3990c569676706dc  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r9-20261128/phase4/p4-scen.sh
+   427fec97c70504568e912a24a7665b91681cf929198a947da6db688702388754  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r9-20261128/phase4/p4-host.sh
+   287cdec9067277f89becc870f41fc331b80c4517f1114ba0a6bbb8f5c634693f  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r9-20261128/phase4/p4-ed-remove-arm.sh
+   5f2f9d8bc6572a8007517ac3beed62e63520469c04f5ddd60bfd0b69251c59aa  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/owner-checks/afldb-owner-checks.sh
+[PIN] afldb-phase4.sh: OK 
+== p4-host dev-p4h 2026-11-28T08:01:46Z host=streamanator id=[uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),27(sudo),30(dip),44(video),46(plugdev),101(lxd),111(docker)] docker 29.1.3 build-cache-before=[Cache entries, 0]
+image r9p4-dev-p4h:1 id sha256:1d29d17e7cd6 from sha256:d71c0b286c54a7cc48645aa8d4d9d0c57e4260128cb91a6fb18c29d7589205ba (tags [grafana/alloy:latest] entrypoint [/bin/alloy]: an Ubuntu 24.04 userland; the entrypoint is replaced by /bin/bash)
+files sent: 5f2f9d8bc6572a80 afldb-owner-checks.sh; d9083bc4a508c54f afldb-phase4.sh; 287cdec9067277f8 p4-ed-remove-arm.sh; 427fec97c7050456 p4-host.sh; 1f8ab884a1f6c3bf p4-scen.sh; 
+== scenario group-only 08:02:03
+[FIXTURE] uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev); sudo 1.9.15p5-3ubuntu5.24.04.4; /etc/sudoers rules: 47:root	ALL=(ALL:ALL) ALL;50:%admin ALL=(ALL) ALL;53:%sudo	ALL=(ALL:ALL) ALL;57:@includedir /etc/sudoers.d;
+[REAL] owner-checks before: CHECK B1 FAIL sudo -l -U arm: arm may run: (ALL : ALL) ALL;|CHECK B2 FAIL arm is in: sudo (arm's groups: arm adm cdrom sudo dip plugdev)|CHECK B3 FAIL sudoers lines naming arm or a group of arm (%arm,adm,cdrom,sudo,dip,plugdev) in: /etc/sudoers|CHECK B5 PASS sudoers include targets trusted (root-owned, not group/other-writable, no ACL, no link): /etc/sudoers.d |
+[RUN] p4 entry --state /root/afldb-phase4-state (exit 0)
+    PHASE4 ENTRY match /etc/sudoers:53 token %sudo class group-only: %sudo?ALL=(ALL:ALL) ALL
+    PHASE4 ENTRY pre-change: arm's groups: adm arm cdrom dip plugdev sudo (primary gid 1000)
+    PHASE4 ENTRY pre-change: group line: sudo:x:27:arm
+    PHASE4 ENTRY pre-change: /etc/sudoers.d: 0 0 755 directory
+    PHASE4 ENTRY pre-change: file /etc/sudoers uid gid mode sha256: 0 0 440 5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/README uid gid mode sha256: 0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8
+    PHASE4 ENTRY pre-change: sudo -l -U arm: arm may run: (ALL : ALL) ALL;
+    PHASE4 ENTRY pre-change: sudo -l -U afldb-admin: no account afldb-admin (not compared by verify)
+    PHASE4 ENTRY pre-change: include directives: @includedir /etc/sudoers.d;
+    PHASE4 ENTRY change 1 (group-only, step 4.1, [ADM-ROOT]): gpasswd -d arm sudo
+    PHASE4 ENTRY back-out 1 ([CON]): gpasswd -a arm sudo; then id -Gn arm lists exactly: adm arm cdrom dip plugdev sudo 
+    PHASE4 ENTRY back-out, all of it, in one command ([CON]): env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/p4/afldb-phase4.sh backout --state /root/afldb-phase4-state
+    PHASE4 ENTRY realised change, after 4.1: env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/p4/afldb-phase4.sh verify --state /root/afldb-phase4-state
+    PHASE4 ENTRY precondition, NOT checked by this script: the [CON] root session is open now and stays open until 4.7
+    PHASE4 ENTRY precondition, NOT checked by this script: Phase 1 verified twice (1.13), two independently authenticated admin logins
+    PHASE4 ENTRY precondition, NOT checked by this script: the owner's separate written approval of this privilege removal, given after reading this output
+    PHASE4 ENTRY precondition, NOT checked by this script: every other Phase 2 FAIL resolved, every UNKNOWN resolved or accepted, the section 0 residual accepted
+    PHASE4 ENTRY state /root/afldb-phase4-state seal sha256 8e0ed8e9a090ff4f3793f9824cd5c76340202e0a22836de324b3764676b896fa (write it down; verify and backout print it again)
+    PHASE4 ENTRY RESULT PASS change=group-only matches=1 disposed=0 state=/root/afldb-phase4-state
+[CHECK] ok   entry exit 0
+[CHECK] ok   entry RESULT PASS change=group-only
+[CHECK] paths modified since the marker: /root /root/afldb-phase4-state /root/afldb-phase4-state/groups.pre /root/afldb-phase4-state/admin-l.pre /root/afldb-phase4-state/sudo-group.pre /root/afldb-phase4-state/gid.pre /root/afldb-phase4-state/copy.2 /root/afldb-phase4-state/inv.pre /root/afldb-phase4-state/includes.pre /root/afldb-phase4-state/copy.1 /root/afldb-phase4-state/disposed /root/afldb-phase4-state/copies /root/afldb-phase4-state/plan /root/afldb-phase4-state/RESULT /root/afldb-phase4-state/sudo-l.pre /root/afldb-phase4-state/SHA256SUMS /root/afldb-phase4-state/dir.pre /root/afldb-phase4-state/classified.pre /root/afldb-phase4-state/matches.pre 
+[CHECK] ok   entry wrote nothing outside /root/afldb-phase4-state (found: )
+[CHECK] ok   exactly one match, %sudo, class group-only
+[CHECK] owner-checks B3 files [/etc/sudoers ], entry match files [/etc/sudoers ]
+[CHECK] ok   every B3 file is among entry's matches (missing: none)
+Removing user arm from group sudo
+[CHECK] ok   step 4.1 gpasswd -d arm sudo
+[REAL] after 4.1: uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),30(dip),46(plugdev); sudo:x:27:
+[RUN] p4 verify --state /root/afldb-phase4-state (exit 0)
+    PHASE4 VERIFY state /root/afldb-phase4-state seal sha256 8e0ed8e9a090ff4f3793f9824cd5c76340202e0a22836de324b3764676b896fa (equal to the value entry printed); plan: change=group-only disposed=
+    PHASE4 VERIFY check groups PASS arm's groups: adm arm cdrom dip plugdev (pre-change minus sudo)
+    PHASE4 VERIFY check file PASS /etc/sudoers unchanged
+    PHASE4 VERIFY check file PASS /etc/sudoers.d/README unchanged
+    PHASE4 VERIFY check admin-sudo-l not compared: no account afldb-admin at entry
+    PHASE4 VERIFY check visudo-c PASS
+    PHASE4 VERIFY check rescan PASS no sudoers line names arm, a group of arm or a grant form entry refuses, and no outside rule source
+    PHASE4 VERIFY check sudo-l PASS sudo -l -U arm: arm is not allowed to run sudo
+    PHASE4 VERIFY RESULT PASS the realised change equals the plan (change=group-only disposed=) and arm cannot sudo
+[CHECK] ok   verify RESULT PASS
+[REAL] owner-checks after: CHECK B1 PASS sudo -l -U arm: arm is not allowed to run sudo|CHECK B2 PASS arm's groups (arm adm cdrom dip plugdev) include none of sudo, admin, wheel|CHECK B3 PASS no non-comment line of /etc/sudoers or /etc/sudoers.d/* names arm or a group of arm (%arm,adm,cdrom,dip,plugdev); 2 file(s) read; include directives: /etc/sudoers.d |CHECK B5 PASS sudoers include targets trusted (root-owned, not group/other-writable, no ACL, no link): /etc/sudoers.d |
+[CHECK] ok   owner-checks B1 PASS after Phase 4
+[CHECK] ok   owner-checks B2 PASS after Phase 4
+[CHECK] ok   owner-checks B3 PASS after Phase 4
+[CHECK] ok   owner-checks B5 PASS after Phase 4
+SCENARIO group-only PASS expect=entry=PASS(group-only),verify=PASS,B1-B3,B5=PASS got=entry=PASS(group-only),verify=PASS,B1-B3,B5=PASS
+== scenario group-only exit 0 containers-left=0
+== scenario group-only-backout 08:02:07
+[FIXTURE] uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev); sudo 1.9.15p5-3ubuntu5.24.04.4; /etc/sudoers rules: 47:root	ALL=(ALL:ALL) ALL;50:%admin ALL=(ALL) ALL;53:%sudo	ALL=(ALL:ALL) ALL;57:@includedir /etc/sudoers.d;
+[RUN] p4 entry --state /root/afldb-phase4-state (exit 0)
+    PHASE4 ENTRY match /etc/sudoers:53 token %sudo class group-only: %sudo?ALL=(ALL:ALL) ALL
+    PHASE4 ENTRY pre-change: arm's groups: adm arm cdrom dip plugdev sudo (primary gid 1000)
+    PHASE4 ENTRY pre-change: group line: sudo:x:27:arm
+    PHASE4 ENTRY pre-change: /etc/sudoers.d: 0 0 755 directory
+    PHASE4 ENTRY pre-change: file /etc/sudoers uid gid mode sha256: 0 0 440 5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/README uid gid mode sha256: 0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8
+    PHASE4 ENTRY pre-change: sudo -l -U arm: arm may run: (ALL : ALL) ALL;
+    PHASE4 ENTRY pre-change: sudo -l -U afldb-admin: no account afldb-admin (not compared by verify)
+    PHASE4 ENTRY pre-change: include directives: @includedir /etc/sudoers.d;
+    PHASE4 ENTRY change 1 (group-only, step 4.1, [ADM-ROOT]): gpasswd -d arm sudo
+    PHASE4 ENTRY back-out 1 ([CON]): gpasswd -a arm sudo; then id -Gn arm lists exactly: adm arm cdrom dip plugdev sudo 
+    PHASE4 ENTRY back-out, all of it, in one command ([CON]): env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/p4/afldb-phase4.sh backout --state /root/afldb-phase4-state
+    PHASE4 ENTRY realised change, after 4.1: env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/p4/afldb-phase4.sh verify --state /root/afldb-phase4-state
+    PHASE4 ENTRY precondition, NOT checked by this script: the [CON] root session is open now and stays open until 4.7
+    PHASE4 ENTRY precondition, NOT checked by this script: Phase 1 verified twice (1.13), two independently authenticated admin logins
+    PHASE4 ENTRY precondition, NOT checked by this script: the owner's separate written approval of this privilege removal, given after reading this output
+    PHASE4 ENTRY precondition, NOT checked by this script: every other Phase 2 FAIL resolved, every UNKNOWN resolved or accepted, the section 0 residual accepted
+    PHASE4 ENTRY state /root/afldb-phase4-state seal sha256 8e0ed8e9a090ff4f3793f9824cd5c76340202e0a22836de324b3764676b896fa (write it down; verify and backout print it again)
+    PHASE4 ENTRY RESULT PASS change=group-only matches=1 disposed=0 state=/root/afldb-phase4-state
+[CHECK] ok   entry exit 0
+[CHECK] ok   entry RESULT PASS change=group-only
+[CHECK] paths modified since the marker: /root /root/afldb-phase4-state /root/afldb-phase4-state/groups.pre /root/afldb-phase4-state/admin-l.pre /root/afldb-phase4-state/sudo-group.pre /root/afldb-phase4-state/gid.pre /root/afldb-phase4-state/copy.2 /root/afldb-phase4-state/inv.pre /root/afldb-phase4-state/includes.pre /root/afldb-phase4-state/copy.1 /root/afldb-phase4-state/disposed /root/afldb-phase4-state/copies /root/afldb-phase4-state/plan /root/afldb-phase4-state/RESULT /root/afldb-phase4-state/sudo-l.pre /root/afldb-phase4-state/SHA256SUMS /root/afldb-phase4-state/dir.pre /root/afldb-phase4-state/classified.pre /root/afldb-phase4-state/matches.pre 
+[CHECK] ok   entry wrote nothing outside /root/afldb-phase4-state (found: )
+Removing user arm from group sudo
+[CHECK] ok   step 4.1 gpasswd -d arm sudo
+[REAL] after 4.1: uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),30(dip),46(plugdev); sudo:x:27:
+[RUN] p4 verify --state /root/afldb-phase4-state (exit 0)
+    PHASE4 VERIFY state /root/afldb-phase4-state seal sha256 8e0ed8e9a090ff4f3793f9824cd5c76340202e0a22836de324b3764676b896fa (equal to the value entry printed); plan: change=group-only disposed=
+    PHASE4 VERIFY check groups PASS arm's groups: adm arm cdrom dip plugdev (pre-change minus sudo)
+    PHASE4 VERIFY check file PASS /etc/sudoers unchanged
+    PHASE4 VERIFY check file PASS /etc/sudoers.d/README unchanged
+    PHASE4 VERIFY check admin-sudo-l not compared: no account afldb-admin at entry
+    PHASE4 VERIFY check visudo-c PASS
+    PHASE4 VERIFY check rescan PASS no sudoers line names arm, a group of arm or a grant form entry refuses, and no outside rule source
+    PHASE4 VERIFY check sudo-l PASS sudo -l -U arm: arm is not allowed to run sudo
+    PHASE4 VERIFY RESULT PASS the realised change equals the plan (change=group-only disposed=) and arm cannot sudo
+[CHECK] ok   verify RESULT PASS
+[RUN] p4 backout --state /root/afldb-phase4-state (exit 0)
+    PHASE4 BACKOUT state /root/afldb-phase4-state seal sha256 8e0ed8e9a090ff4f3793f9824cd5c76340202e0a22836de324b3764676b896fa (equal to the value entry printed); plan: change=group-only disposed=
+    PHASE4 BACKOUT ran: gpasswd -a arm sudo
+    PHASE4 BACKOUT check visudo-c PASS
+    PHASE4 BACKOUT check file PASS /etc/sudoers equals its pre-change record (0 0 440 5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8)
+    PHASE4 BACKOUT check file PASS /etc/sudoers.d/README equals its pre-change record (0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8)
+    PHASE4 BACKOUT check groups PASS arm's groups equal the pre-change record: adm arm cdrom dip plugdev sudo 
+    PHASE4 BACKOUT check sudo-l PASS sudo -l -U arm equals the pre-change record: arm may run: (ALL : ALL) ALL;
+    PHASE4 BACKOUT check admin-sudo-l not compared: no account afldb-admin at entry
+    PHASE4 BACKOUT pre-change group line: sudo:x:27:arm; now: sudo:x:27:arm (member order may differ; membership is compared)
+    PHASE4 BACKOUT RESULT PASS the sudoers scope, arm's groups and sudo -l -U arm equal the pre-change record of /root/afldb-phase4-state
+[CHECK] ok   backout RESULT PASS
+[CHECK] ok   after backout: sudoers scope, /etc/group, /etc/gshadow, id arm and sudo -l -U arm equal the pre-change snapshot
+SCENARIO group-only-backout PASS expect=entry=PASS,verify=PASS,backout=PASS,state=pre-change got=entry=PASS,verify=PASS,backout=PASS,state=pre-change
+== scenario group-only-backout exit 0 containers-left=0
+== scenario refuse-90-arm 08:02:10
+[FIXTURE] uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev); sudo 1.9.15p5-3ubuntu5.24.04.4; /etc/sudoers rules: 47:root	ALL=(ALL:ALL) ALL;50:%admin ALL=(ALL) ALL;53:%sudo	ALL=(ALL:ALL) ALL;57:@includedir /etc/sudoers.d;
+[FIXTURE] /etc/sudoers.d/90-arm (root:root 440): arm ALL=(ALL) NOPASSWD: ALL; visudo -c: /etc/sudoers: parsed OK;/etc/sudoers.d/90-arm: parsed OK;/etc/sudoers.d/README: parsed OK;
+[REAL] owner-checks: CHECK B1 FAIL sudo -l -U arm: arm may run: (ALL : ALL) ALL;(ALL) NOPASSWD: ALL;|CHECK B2 FAIL arm is in: sudo (arm's groups: arm adm cdrom sudo dip plugdev)|CHECK B3 FAIL sudoers lines naming arm or a group of arm (%arm,adm,cdrom,sudo,dip,plugdev) in: /etc/sudoers /etc/sudoers.d/90-arm|CHECK B5 PASS sudoers include targets trusted (root-owned, not group/other-writable, no ACL, no link): /etc/sudoers.d |
+[RUN] p4 entry --state /root/afldb-phase4-state (exit 1)
+    PHASE4 ENTRY match /etc/sudoers:53 token %sudo class group-only: %sudo?ALL=(ALL:ALL) ALL
+    PHASE4 ENTRY match /etc/sudoers.d/90-arm:1 token arm class unrelated: arm ALL=(ALL) NOPASSWD: ALL
+    PHASE4 ENTRY REFUSED /etc/sudoers.d/90-arm:1 names arm ('arm ALL=(ALL) NOPASSWD: ALL'): an explicit or unrelated sudoers grant, not removed by gpasswd -d arm sudo; dispose of it separately, or name /etc/sudoers.d/90-arm with --dispose to edit it in 4.1
+    PHASE4 ENTRY pre-change: arm's groups: adm arm cdrom dip plugdev sudo (primary gid 1000)
+    PHASE4 ENTRY pre-change: group line: sudo:x:27:arm
+    PHASE4 ENTRY pre-change: /etc/sudoers.d: 0 0 755 directory
+    PHASE4 ENTRY pre-change: file /etc/sudoers uid gid mode sha256: 0 0 440 5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/90-arm uid gid mode sha256: 0 0 440 6daaf5185c4a9ed332a447d85ca7a6632cca38cdabe71c5a41dd1283be381f2f
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/README uid gid mode sha256: 0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8
+    PHASE4 ENTRY pre-change: sudo -l -U arm: arm may run: (ALL : ALL) ALL;(ALL) NOPASSWD: ALL;
+    PHASE4 ENTRY pre-change: sudo -l -U afldb-admin: no account afldb-admin (not compared by verify)
+    PHASE4 ENTRY pre-change: include directives: @includedir /etc/sudoers.d;
+    PHASE4 ENTRY RESULT REFUSED /etc/sudoers.d/90-arm:1 names arm ('arm ALL=(ALL) NOPASSWD: ALL'): an explicit or unrelated sudoers grant, not removed by gpasswd -d arm sudo; dispose of it separately, or name /etc/sudoers.d/90-arm with --dispose to edit it in 4.1
+[CHECK] ok   entry exit 1
+[CHECK] ok   entry RESULT REFUSED
+[CHECK] ok   the refusal names: /etc/sudoers.d/90-arm:1 names arm
+[CHECK] ok   nothing changed: sudoers scope, group files, arm's groups and sudo -l -U arm equal the pre-entry snapshot
+[CHECK] paths modified since the marker: /root /root/afldb-phase4-state /root/afldb-phase4-state/groups.pre /root/afldb-phase4-state/admin-l.pre /root/afldb-phase4-state/sudo-group.pre /root/afldb-phase4-state/gid.pre /root/afldb-phase4-state/copy.2 /root/afldb-phase4-state/inv.pre /root/afldb-phase4-state/includes.pre /root/afldb-phase4-state/copy.1 /root/afldb-phase4-state/disposed /root/afldb-phase4-state/copies /root/afldb-phase4-state/RESULT /root/afldb-phase4-state/copy.3 /root/afldb-phase4-state/sudo-l.pre /root/afldb-phase4-state/dir.pre /root/afldb-phase4-state/classified.pre /root/afldb-phase4-state/matches.pre 
+[CHECK] ok   entry wrote nothing outside /root/afldb-phase4-state (found: )
+[CHECK] owner-checks B3 files [/etc/sudoers /etc/sudoers.d/90-arm ], entry match files [/etc/sudoers /etc/sudoers.d/90-arm ]
+[CHECK] ok   every B3 file is among entry's matches (missing: none)
+[RUN] p4 verify --state /root/afldb-phase4-state (exit 1)
+    PHASE4 VERIFY STOP state /root/afldb-phase4-state: seal check (SHA256SUMS) failed
+    PHASE4 VERIFY RESULT STOP state /root/afldb-phase4-state: seal check (SHA256SUMS) failed
+[CHECK] ok   verify refuses a REFUSED entry's state
+[RUN] p4 backout --state /root/afldb-phase4-state (exit 1)
+    PHASE4 BACKOUT FAIL state /root/afldb-phase4-state: seal check (SHA256SUMS) failed
+    PHASE4 BACKOUT RESULT FAIL state /root/afldb-phase4-state: seal check (SHA256SUMS) failed
+[CHECK] ok   backout refuses a REFUSED entry's state
+SCENARIO refuse-90-arm PASS expect=entry=REFUSED(90-arm:1 arm),nothing-changed got=entry=REFUSED(90-arm:1 arm),nothing-changed
+== scenario refuse-90-arm exit 0 containers-left=0
+== scenario refuse-user-alias 08:02:13
+[FIXTURE] uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev); sudo 1.9.15p5-3ubuntu5.24.04.4; /etc/sudoers rules: 47:root	ALL=(ALL:ALL) ALL;50:%admin ALL=(ALL) ALL;53:%sudo	ALL=(ALL:ALL) ALL;57:@includedir /etc/sudoers.d;
+[FIXTURE] /etc/sudoers.d/80-alias (root:root 440): User_Alias OPS = deploy, arm
+OPS ALL=(ALL:ALL) ALL; visudo -c: /etc/sudoers: parsed OK;/etc/sudoers.d/80-alias: parsed OK;/etc/sudoers.d/README: parsed OK;
+[RUN] p4 entry --state /root/afldb-phase4-state (exit 1)
+    PHASE4 ENTRY match /etc/sudoers:53 token %sudo class group-only: %sudo?ALL=(ALL:ALL) ALL
+    PHASE4 ENTRY match /etc/sudoers.d/80-alias:1 token arm class unrelated: User_Alias OPS = deploy, arm
+    PHASE4 ENTRY REFUSED /etc/sudoers.d/80-alias:1 names arm ('User_Alias OPS = deploy, arm'): an explicit or unrelated sudoers grant, not removed by gpasswd -d arm sudo; dispose of it separately, or name /etc/sudoers.d/80-alias with --dispose to edit it in 4.1
+    PHASE4 ENTRY pre-change: arm's groups: adm arm cdrom dip plugdev sudo (primary gid 1000)
+    PHASE4 ENTRY pre-change: group line: sudo:x:27:arm
+    PHASE4 ENTRY pre-change: /etc/sudoers.d: 0 0 755 directory
+    PHASE4 ENTRY pre-change: file /etc/sudoers uid gid mode sha256: 0 0 440 5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/80-alias uid gid mode sha256: 0 0 440 02366790c61cca3aa172cc80713a0037361a0f91d19a2b3728b33e33fcbbdf67
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/README uid gid mode sha256: 0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8
+    PHASE4 ENTRY pre-change: sudo -l -U arm: arm may run: (ALL : ALL) ALL;(ALL : ALL) ALL;
+    PHASE4 ENTRY pre-change: sudo -l -U afldb-admin: no account afldb-admin (not compared by verify)
+    PHASE4 ENTRY pre-change: include directives: @includedir /etc/sudoers.d;
+    PHASE4 ENTRY RESULT REFUSED /etc/sudoers.d/80-alias:1 names arm ('User_Alias OPS = deploy, arm'): an explicit or unrelated sudoers grant, not removed by gpasswd -d arm sudo; dispose of it separately, or name /etc/sudoers.d/80-alias with --dispose to edit it in 4.1
+[CHECK] ok   entry exit 1
+[CHECK] ok   entry RESULT REFUSED
+[CHECK] ok   the refusal names: /etc/sudoers.d/80-alias:1 names arm
+[CHECK] ok   nothing changed: sudoers scope, group files, arm's groups and sudo -l -U arm equal the pre-entry snapshot
+[CHECK] paths modified since the marker: /root /root/afldb-phase4-state /root/afldb-phase4-state/groups.pre /root/afldb-phase4-state/admin-l.pre /root/afldb-phase4-state/sudo-group.pre /root/afldb-phase4-state/gid.pre /root/afldb-phase4-state/copy.2 /root/afldb-phase4-state/inv.pre /root/afldb-phase4-state/includes.pre /root/afldb-phase4-state/copy.1 /root/afldb-phase4-state/disposed /root/afldb-phase4-state/copies /root/afldb-phase4-state/RESULT /root/afldb-phase4-state/copy.3 /root/afldb-phase4-state/sudo-l.pre /root/afldb-phase4-state/dir.pre /root/afldb-phase4-state/classified.pre /root/afldb-phase4-state/matches.pre 
+[CHECK] ok   entry wrote nothing outside /root/afldb-phase4-state (found: )
+[CHECK] owner-checks B3 files [/etc/sudoers /etc/sudoers.d/80-alias ], entry match files [/etc/sudoers /etc/sudoers.d/80-alias ]
+[CHECK] ok   every B3 file is among entry's matches (missing: none)
+SCENARIO refuse-user-alias PASS expect=entry=REFUSED(80-alias:1 arm),nothing-changed got=entry=REFUSED(80-alias:1 arm),nothing-changed
+== scenario refuse-user-alias exit 0 containers-left=0
+== scenario refuse-group-adm 08:02:16
+[FIXTURE] uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev); sudo 1.9.15p5-3ubuntu5.24.04.4; /etc/sudoers rules: 47:root	ALL=(ALL:ALL) ALL;50:%admin ALL=(ALL) ALL;53:%sudo	ALL=(ALL:ALL) ALL;57:@includedir /etc/sudoers.d;
+[FIXTURE] /etc/sudoers.d/70-adm (root:root 440): %adm ALL=(root) /usr/bin/journalctl; visudo -c: /etc/sudoers: parsed OK;/etc/sudoers.d/70-adm: parsed OK;/etc/sudoers.d/README: parsed OK;
+[RUN] p4 entry --state /root/afldb-phase4-state (exit 1)
+    PHASE4 ENTRY match /etc/sudoers:53 token %sudo class group-only: %sudo?ALL=(ALL:ALL) ALL
+    PHASE4 ENTRY match /etc/sudoers.d/70-adm:1 token %adm class unrelated: %adm ALL=(root) /usr/bin/journalctl
+    PHASE4 ENTRY REFUSED /etc/sudoers.d/70-adm:1 names %adm ('%adm ALL=(root) /usr/bin/journalctl'): an explicit or unrelated sudoers grant, not removed by gpasswd -d arm sudo; dispose of it separately, or name /etc/sudoers.d/70-adm with --dispose to edit it in 4.1
+    PHASE4 ENTRY pre-change: arm's groups: adm arm cdrom dip plugdev sudo (primary gid 1000)
+    PHASE4 ENTRY pre-change: group line: sudo:x:27:arm
+    PHASE4 ENTRY pre-change: /etc/sudoers.d: 0 0 755 directory
+    PHASE4 ENTRY pre-change: file /etc/sudoers uid gid mode sha256: 0 0 440 5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/70-adm uid gid mode sha256: 0 0 440 f61ef0156c247616866410ca6c0a04fc9694457a0a3f6b8ade1bb83760077b7b
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/README uid gid mode sha256: 0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8
+    PHASE4 ENTRY pre-change: sudo -l -U arm: arm may run: (ALL : ALL) ALL;(root) /usr/bin/journalctl;
+    PHASE4 ENTRY pre-change: sudo -l -U afldb-admin: no account afldb-admin (not compared by verify)
+    PHASE4 ENTRY pre-change: include directives: @includedir /etc/sudoers.d;
+    PHASE4 ENTRY RESULT REFUSED /etc/sudoers.d/70-adm:1 names %adm ('%adm ALL=(root) /usr/bin/journalctl'): an explicit or unrelated sudoers grant, not removed by gpasswd -d arm sudo; dispose of it separately, or name /etc/sudoers.d/70-adm with --dispose to edit it in 4.1
+[CHECK] ok   entry exit 1
+[CHECK] ok   entry RESULT REFUSED
+[CHECK] ok   the refusal names: /etc/sudoers.d/70-adm:1 names %adm
+[CHECK] ok   nothing changed: sudoers scope, group files, arm's groups and sudo -l -U arm equal the pre-entry snapshot
+[CHECK] paths modified since the marker: /root /root/afldb-phase4-state /root/afldb-phase4-state/groups.pre /root/afldb-phase4-state/admin-l.pre /root/afldb-phase4-state/sudo-group.pre /root/afldb-phase4-state/gid.pre /root/afldb-phase4-state/copy.2 /root/afldb-phase4-state/inv.pre /root/afldb-phase4-state/includes.pre /root/afldb-phase4-state/copy.1 /root/afldb-phase4-state/disposed /root/afldb-phase4-state/copies /root/afldb-phase4-state/RESULT /root/afldb-phase4-state/copy.3 /root/afldb-phase4-state/sudo-l.pre /root/afldb-phase4-state/dir.pre /root/afldb-phase4-state/classified.pre /root/afldb-phase4-state/matches.pre 
+[CHECK] ok   entry wrote nothing outside /root/afldb-phase4-state (found: )
+[CHECK] owner-checks B3 files [/etc/sudoers /etc/sudoers.d/70-adm ], entry match files [/etc/sudoers /etc/sudoers.d/70-adm ]
+[CHECK] ok   every B3 file is among entry's matches (missing: none)
+SCENARIO refuse-group-adm PASS expect=entry=REFUSED(70-adm:1 %adm),nothing-changed got=entry=REFUSED(70-adm:1 %adm),nothing-changed
+== scenario refuse-group-adm exit 0 containers-left=0
+== scenario refuse-admin-group 08:02:19
+[FIXTURE] uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev); sudo 1.9.15p5-3ubuntu5.24.04.4; /etc/sudoers rules: 47:root	ALL=(ALL:ALL) ALL;50:%admin ALL=(ALL) ALL;53:%sudo	ALL=(ALL:ALL) ALL;57:@includedir /etc/sudoers.d;
+[FIXTURE] uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev),1001(admin)
+[RUN] p4 entry --state /root/afldb-phase4-state (exit 1)
+    PHASE4 ENTRY match /etc/sudoers:50 token %admin class unrelated: %admin ALL=(ALL) ALL
+    PHASE4 ENTRY REFUSED /etc/sudoers:50 names %admin ('%admin ALL=(ALL) ALL'): an explicit or unrelated sudoers grant, not removed by gpasswd -d arm sudo; dispose of it separately, or name /etc/sudoers with --dispose to edit it in 4.1
+    PHASE4 ENTRY match /etc/sudoers:53 token %sudo class group-only: %sudo?ALL=(ALL:ALL) ALL
+    PHASE4 ENTRY REFUSED arm is in group admin (sudo's other admin groups): dispose of it separately
+    PHASE4 ENTRY pre-change: arm's groups: adm admin arm cdrom dip plugdev sudo (primary gid 1000)
+    PHASE4 ENTRY pre-change: group line: sudo:x:27:arm
+    PHASE4 ENTRY pre-change: /etc/sudoers.d: 0 0 755 directory
+    PHASE4 ENTRY pre-change: file /etc/sudoers uid gid mode sha256: 0 0 440 5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/README uid gid mode sha256: 0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8
+    PHASE4 ENTRY pre-change: sudo -l -U arm: arm may run: (ALL) ALL;(ALL : ALL) ALL;
+    PHASE4 ENTRY pre-change: sudo -l -U afldb-admin: no account afldb-admin (not compared by verify)
+    PHASE4 ENTRY pre-change: include directives: @includedir /etc/sudoers.d;
+    PHASE4 ENTRY RESULT REFUSED /etc/sudoers:50 names %admin ('%admin ALL=(ALL) ALL'): an explicit or unrelated sudoers grant, not removed by gpasswd -d arm sudo; dispose of it separately, or name /etc/sudoers with --dispose to edit it in 4.1;arm is in group admin (sudo's other admin groups): dispose of it separately
+[CHECK] ok   entry exit 1
+[CHECK] ok   entry RESULT REFUSED
+[CHECK] ok   the refusal names: arm is in group admin
+[CHECK] ok   nothing changed: sudoers scope, group files, arm's groups and sudo -l -U arm equal the pre-entry snapshot
+[CHECK] paths modified since the marker: /root /root/afldb-phase4-state /root/afldb-phase4-state/groups.pre /root/afldb-phase4-state/admin-l.pre /root/afldb-phase4-state/sudo-group.pre /root/afldb-phase4-state/gid.pre /root/afldb-phase4-state/copy.2 /root/afldb-phase4-state/inv.pre /root/afldb-phase4-state/includes.pre /root/afldb-phase4-state/copy.1 /root/afldb-phase4-state/disposed /root/afldb-phase4-state/copies /root/afldb-phase4-state/RESULT /root/afldb-phase4-state/sudo-l.pre /root/afldb-phase4-state/dir.pre /root/afldb-phase4-state/classified.pre /root/afldb-phase4-state/matches.pre 
+[CHECK] ok   entry wrote nothing outside /root/afldb-phase4-state (found: )
+SCENARIO refuse-admin-group PASS expect=entry=REFUSED(arm in admin),nothing-changed got=entry=REFUSED(arm in admin),nothing-changed
+== scenario refuse-admin-group exit 0 containers-left=0
+== scenario refuse-include 08:02:21
+[FIXTURE] uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev); sudo 1.9.15p5-3ubuntu5.24.04.4; /etc/sudoers rules: 47:root	ALL=(ALL:ALL) ALL;50:%admin ALL=(ALL) ALL;53:%sudo	ALL=(ALL:ALL) ALL;57:@includedir /etc/sudoers.d;
+[FIXTURE] /etc/sudoers.d/60-inc (root:root 440): @include /etc/sudoers.local; visudo -c: /etc/sudoers: parsed OK;/etc/sudoers.d/60-inc: parsed OK;/etc/sudoers.local: parsed OK;/etc/sudoers.d/README: parsed OK;
+[RUN] p4 entry --state /root/afldb-phase4-state (exit 1)
+    PHASE4 ENTRY match /etc/sudoers:53 token %sudo class group-only: %sudo?ALL=(ALL:ALL) ALL
+    PHASE4 ENTRY REFUSED /etc/sudoers.d/60-inc:1: include directive '@include /etc/sudoers.local' names a target other than /etc/sudoers.d: dispose of it separately
+    PHASE4 ENTRY pre-change: arm's groups: adm arm cdrom dip plugdev sudo (primary gid 1000)
+    PHASE4 ENTRY pre-change: group line: sudo:x:27:arm
+    PHASE4 ENTRY pre-change: /etc/sudoers.d: 0 0 755 directory
+    PHASE4 ENTRY pre-change: file /etc/sudoers uid gid mode sha256: 0 0 440 5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/60-inc uid gid mode sha256: 0 0 440 0e597ce4529beee86624bca795a4e02c781ce027b3f463fc1c417ba4f79a8d4d
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/README uid gid mode sha256: 0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8
+    PHASE4 ENTRY pre-change: sudo -l -U arm: arm may run: (ALL : ALL) ALL;
+    PHASE4 ENTRY pre-change: sudo -l -U afldb-admin: no account afldb-admin (not compared by verify)
+    PHASE4 ENTRY pre-change: include directives: @includedir /etc/sudoers.d;@include /etc/sudoers.local;
+    PHASE4 ENTRY RESULT REFUSED /etc/sudoers.d/60-inc:1: include directive '@include /etc/sudoers.local' names a target other than /etc/sudoers.d: dispose of it separately
+[CHECK] ok   entry exit 1
+[CHECK] ok   entry RESULT REFUSED
+[CHECK] ok   the refusal names: include directive '@include /etc/sudoers.local' names a target other than /etc/sudoers.d
+[CHECK] ok   nothing changed: sudoers scope, group files, arm's groups and sudo -l -U arm equal the pre-entry snapshot
+[CHECK] paths modified since the marker: /root /root/afldb-phase4-state /root/afldb-phase4-state/groups.pre /root/afldb-phase4-state/admin-l.pre /root/afldb-phase4-state/sudo-group.pre /root/afldb-phase4-state/gid.pre /root/afldb-phase4-state/copy.2 /root/afldb-phase4-state/inv.pre /root/afldb-phase4-state/includes.pre /root/afldb-phase4-state/copy.1 /root/afldb-phase4-state/disposed /root/afldb-phase4-state/copies /root/afldb-phase4-state/RESULT /root/afldb-phase4-state/copy.3 /root/afldb-phase4-state/sudo-l.pre /root/afldb-phase4-state/dir.pre /root/afldb-phase4-state/classified.pre /root/afldb-phase4-state/matches.pre 
+[CHECK] ok   entry wrote nothing outside /root/afldb-phase4-state (found: )
+SCENARIO refuse-include PASS expect=entry=REFUSED(@include /etc/sudoers.local),nothing-changed got=entry=REFUSED(@include /etc/sudoers.local),nothing-changed
+== scenario refuse-include exit 0 containers-left=0
+== scenario refuse-dispose-nomatch 08:02:23
+[FIXTURE] uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev); sudo 1.9.15p5-3ubuntu5.24.04.4; /etc/sudoers rules: 47:root	ALL=(ALL:ALL) ALL;50:%admin ALL=(ALL) ALL;53:%sudo	ALL=(ALL:ALL) ALL;57:@includedir /etc/sudoers.d;
+[RUN] p4 entry --state /root/afldb-phase4-state --dispose /etc/sudoers.d/README (exit 1)
+    PHASE4 ENTRY REFUSED --dispose /etc/sudoers.d/README: entry reports no match in it, so there is nothing to dispose of
+    PHASE4 ENTRY match /etc/sudoers:53 token %sudo class group-only: %sudo?ALL=(ALL:ALL) ALL
+    PHASE4 ENTRY pre-change: arm's groups: adm arm cdrom dip plugdev sudo (primary gid 1000)
+    PHASE4 ENTRY pre-change: group line: sudo:x:27:arm
+    PHASE4 ENTRY pre-change: /etc/sudoers.d: 0 0 755 directory
+    PHASE4 ENTRY pre-change: file /etc/sudoers uid gid mode sha256: 0 0 440 5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/README uid gid mode sha256: 0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8
+    PHASE4 ENTRY pre-change: sudo -l -U arm: arm may run: (ALL : ALL) ALL;
+    PHASE4 ENTRY pre-change: sudo -l -U afldb-admin: no account afldb-admin (not compared by verify)
+    PHASE4 ENTRY pre-change: include directives: @includedir /etc/sudoers.d;
+    PHASE4 ENTRY RESULT REFUSED --dispose /etc/sudoers.d/README: entry reports no match in it, so there is nothing to dispose of
+[CHECK] ok   entry exit 1
+[CHECK] ok   entry RESULT REFUSED
+[CHECK] ok   the refusal names: --dispose /etc/sudoers.d/README: entry reports no match in it
+[CHECK] ok   nothing changed: sudoers scope, group files, arm's groups and sudo -l -U arm equal the pre-entry snapshot
+[CHECK] paths modified since the marker: /root /root/afldb-phase4-state /root/afldb-phase4-state/groups.pre /root/afldb-phase4-state/admin-l.pre /root/afldb-phase4-state/sudo-group.pre /root/afldb-phase4-state/gid.pre /root/afldb-phase4-state/copy.2 /root/afldb-phase4-state/inv.pre /root/afldb-phase4-state/includes.pre /root/afldb-phase4-state/copy.1 /root/afldb-phase4-state/disposed /root/afldb-phase4-state/copies /root/afldb-phase4-state/RESULT /root/afldb-phase4-state/sudo-l.pre /root/afldb-phase4-state/dir.pre /root/afldb-phase4-state/classified.pre /root/afldb-phase4-state/matches.pre 
+[CHECK] ok   entry wrote nothing outside /root/afldb-phase4-state (found: )
+SCENARIO refuse-dispose-nomatch PASS expect=entry=REFUSED(--dispose without a match),nothing-changed got=entry=REFUSED(--dispose without a match),nothing-changed
+== scenario refuse-dispose-nomatch exit 0 containers-left=0
+== scenario disposed 08:02:25
+[FIXTURE] uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev); sudo 1.9.15p5-3ubuntu5.24.04.4; /etc/sudoers rules: 47:root	ALL=(ALL:ALL) ALL;50:%admin ALL=(ALL) ALL;53:%sudo	ALL=(ALL:ALL) ALL;57:@includedir /etc/sudoers.d;
+[FIXTURE] /etc/sudoers.d/90-arm (root:root 440): # deploy access for arm (fixture)
+arm ALL=(ALL) NOPASSWD: ALL; visudo -c: /etc/sudoers: parsed OK;/etc/sudoers.d/90-arm: parsed OK;/etc/sudoers.d/README: parsed OK;
+[CHECK] ok   before: arm runs sudo -n id -u as root (the disposed NOPASSWD rule)
+[RUN] p4 entry --state /root/afldb-phase4-state --dispose /etc/sudoers.d/90-arm (exit 0)
+    PHASE4 ENTRY match /etc/sudoers:53 token %sudo class group-only: %sudo?ALL=(ALL:ALL) ALL
+    PHASE4 ENTRY match /etc/sudoers.d/90-arm:2 token arm class disposed: arm ALL=(ALL) NOPASSWD: ALL
+    PHASE4 ENTRY pre-change: arm's groups: adm arm cdrom dip plugdev sudo (primary gid 1000)
+    PHASE4 ENTRY pre-change: group line: sudo:x:27:arm
+    PHASE4 ENTRY pre-change: /etc/sudoers.d: 0 0 755 directory
+    PHASE4 ENTRY pre-change: file /etc/sudoers uid gid mode sha256: 0 0 440 5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/90-arm uid gid mode sha256: 0 0 440 fda57f0db6ef425bd90a3445180bcc7682cdc28de13d6fa0bcf4435b6acfad72
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/README uid gid mode sha256: 0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8
+    PHASE4 ENTRY pre-change: sudo -l -U arm: arm may run: (ALL : ALL) ALL;(ALL) NOPASSWD: ALL;
+    PHASE4 ENTRY pre-change: sudo -l -U afldb-admin: no account afldb-admin (not compared by verify)
+    PHASE4 ENTRY pre-change: include directives: @includedir /etc/sudoers.d;
+    PHASE4 ENTRY change 1 (group-only, step 4.1, [ADM-ROOT]): gpasswd -d arm sudo
+    PHASE4 ENTRY back-out 1 ([CON]): gpasswd -a arm sudo; then id -Gn arm lists exactly: adm arm cdrom dip plugdev sudo 
+    PHASE4 ENTRY change 2 (disposed, step 4.1, [ADM-ROOT]): visudo -f /etc/sudoers.d/90-arm, removing or changing ONLY line(s) 2(arm) and no other line
+    PHASE4 ENTRY back-out 2 ([CON]): install -o 0 -g 0 -m 0440 /root/afldb-phase4-state/copy.2 /etc/sudoers.d/90-arm && visudo -c && sha256sum /etc/sudoers.d/90-arm (must print fda57f0db6ef425bd90a3445180bcc7682cdc28de13d6fa0bcf4435b6acfad72)
+    PHASE4 ENTRY back-out, all of it, in one command ([CON]): env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/p4/afldb-phase4.sh backout --state /root/afldb-phase4-state
+    PHASE4 ENTRY realised change, after 4.1: env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/p4/afldb-phase4.sh verify --state /root/afldb-phase4-state
+    PHASE4 ENTRY precondition, NOT checked by this script: the [CON] root session is open now and stays open until 4.7
+    PHASE4 ENTRY precondition, NOT checked by this script: Phase 1 verified twice (1.13), two independently authenticated admin logins
+    PHASE4 ENTRY precondition, NOT checked by this script: the owner's separate written approval of this privilege removal, given after reading this output
+    PHASE4 ENTRY precondition, NOT checked by this script: every other Phase 2 FAIL resolved, every UNKNOWN resolved or accepted, the section 0 residual accepted
+    PHASE4 ENTRY state /root/afldb-phase4-state seal sha256 7af0da443ed5a02ff15c083ef94bc5f22247e3125d1fb3b749a75bdb0d696954 (write it down; verify and backout print it again)
+    PHASE4 ENTRY RESULT PASS change=group-and-disposed matches=2 disposed=1 state=/root/afldb-phase4-state
+[CHECK] ok   entry exit 0
+[CHECK] ok   entry RESULT PASS change=group-and-disposed
+[CHECK] paths modified since the marker: /root /root/afldb-phase4-state /root/afldb-phase4-state/groups.pre /root/afldb-phase4-state/admin-l.pre /root/afldb-phase4-state/sudo-group.pre /root/afldb-phase4-state/gid.pre /root/afldb-phase4-state/copy.2 /root/afldb-phase4-state/inv.pre /root/afldb-phase4-state/includes.pre /root/afldb-phase4-state/copy.1 /root/afldb-phase4-state/disposed /root/afldb-phase4-state/copies /root/afldb-phase4-state/plan /root/afldb-phase4-state/RESULT /root/afldb-phase4-state/copy.3 /root/afldb-phase4-state/sudo-l.pre /root/afldb-phase4-state/SHA256SUMS /root/afldb-phase4-state/dir.pre /root/afldb-phase4-state/classified.pre /root/afldb-phase4-state/matches.pre 
+[CHECK] ok   entry wrote nothing outside /root/afldb-phase4-state (found: )
+[CHECK] ok   90-arm:2 classified disposed
+[CHECK] ok   entry prints the exact disposed back-out with owner 0:0 mode 0440
+[CHECK] ok   visudo -f /etc/sudoers.d/90-arm exit 0
+[CHECK] ok   visudo -c after the owner edit
+[REAL] /etc/sudoers.d/90-arm after the owner edit: root:root 440, sha256 650222e725244ca8..., content: [# deploy access for arm (fixture);]
+Removing user arm from group sudo
+[CHECK] ok   step 4.1 gpasswd -d arm sudo
+[REAL] after 4.1: uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),30(dip),46(plugdev); sudo:x:27:
+[CHECK] ok   after 4.1: arm can no longer sudo -n (sudo: a password is required)
+[RUN] p4 verify --state /root/afldb-phase4-state (exit 0)
+    PHASE4 VERIFY state /root/afldb-phase4-state seal sha256 7af0da443ed5a02ff15c083ef94bc5f22247e3125d1fb3b749a75bdb0d696954 (equal to the value entry printed); plan: change=group-and-disposed disposed=/etc/sudoers.d/90-arm 
+    PHASE4 VERIFY check groups PASS arm's groups: adm arm cdrom dip plugdev (pre-change minus sudo)
+    PHASE4 VERIFY check file PASS /etc/sudoers unchanged
+    PHASE4 VERIFY check file PASS /etc/sudoers.d/90-arm (disposed) now: 0 0 440 650222e725244ca8e303dc72c67301d85595ff85e5e07fdde39ccd5851b9c0e1
+    PHASE4 VERIFY check file PASS /etc/sudoers.d/README unchanged
+    PHASE4 VERIFY check kept PASS /etc/sudoers.d/90-arm: only its disposed line(s) 2(arm) changed; every other line is byte-identical
+    PHASE4 VERIFY check admin-sudo-l not compared: no account afldb-admin at entry
+    PHASE4 VERIFY check visudo-c PASS
+    PHASE4 VERIFY check rescan PASS no sudoers line names arm, a group of arm or a grant form entry refuses, and no outside rule source
+    PHASE4 VERIFY check sudo-l PASS sudo -l -U arm: arm is not allowed to run sudo
+    PHASE4 VERIFY RESULT PASS the realised change equals the plan (change=group-and-disposed disposed=/etc/sudoers.d/90-arm ) and arm cannot sudo
+[CHECK] ok   verify RESULT PASS
+[RUN] p4 backout --state /root/afldb-phase4-state (exit 0)
+    PHASE4 BACKOUT state /root/afldb-phase4-state seal sha256 7af0da443ed5a02ff15c083ef94bc5f22247e3125d1fb3b749a75bdb0d696954 (equal to the value entry printed); plan: change=group-and-disposed disposed=/etc/sudoers.d/90-arm 
+    PHASE4 BACKOUT restored /etc/sudoers.d/90-arm from /root/afldb-phase4-state/copy.2 (owner 0:0, mode 0440)
+    PHASE4 BACKOUT ran: gpasswd -a arm sudo
+    PHASE4 BACKOUT check visudo-c PASS
+    PHASE4 BACKOUT check file PASS /etc/sudoers equals its pre-change record (0 0 440 5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8)
+    PHASE4 BACKOUT check file PASS /etc/sudoers.d/90-arm equals its pre-change record (0 0 440 fda57f0db6ef425bd90a3445180bcc7682cdc28de13d6fa0bcf4435b6acfad72)
+    PHASE4 BACKOUT check file PASS /etc/sudoers.d/README equals its pre-change record (0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8)
+    PHASE4 BACKOUT check groups PASS arm's groups equal the pre-change record: adm arm cdrom dip plugdev sudo 
+    PHASE4 BACKOUT check sudo-l PASS sudo -l -U arm equals the pre-change record: arm may run: (ALL : ALL) ALL;(ALL) NOPASSWD: ALL;
+    PHASE4 BACKOUT check admin-sudo-l not compared: no account afldb-admin at entry
+    PHASE4 BACKOUT pre-change group line: sudo:x:27:arm; now: sudo:x:27:arm (member order may differ; membership is compared)
+    PHASE4 BACKOUT RESULT PASS the sudoers scope, arm's groups and sudo -l -U arm equal the pre-change record of /root/afldb-phase4-state
+[CHECK] ok   backout RESULT PASS
+[CHECK] ok   after backout: 90-arm is byte-identical to the fixture copy
+[CHECK] ok   after backout: 90-arm is root:root 0440 (root:root 440)
+[CHECK] ok   after backout: visudo -c
+[CHECK] ok   after backout: arm runs sudo -n id -u as root again
+[CHECK] ok   after backout: sudo -l -U arm equals the pre-change answer
+[CHECK] ok   after backout: the whole snapshot equals pre-change
+SCENARIO disposed PASS expect=entry=PASS(group-and-disposed),verify=PASS,backout=PASS,rule=byte-identical,arm-sudo=as-before got=entry=PASS(group-and-disposed),verify=PASS,backout=PASS,rule=byte-identical,arm-sudo=as-before
+== scenario disposed exit 0 containers-left=0
+== scenario disposed-removed 08:02:28
+[FIXTURE] uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev); sudo 1.9.15p5-3ubuntu5.24.04.4; /etc/sudoers rules: 47:root	ALL=(ALL:ALL) ALL;50:%admin ALL=(ALL) ALL;53:%sudo	ALL=(ALL:ALL) ALL;57:@includedir /etc/sudoers.d;
+[FIXTURE] /etc/sudoers.d/90-arm (root:root 440): # deploy access for arm (fixture)
+arm ALL=(ALL) NOPASSWD: ALL; visudo -c: /etc/sudoers: parsed OK;/etc/sudoers.d/90-arm: parsed OK;/etc/sudoers.d/README: parsed OK;
+[CHECK] ok   before: arm runs sudo -n id -u as root (the disposed NOPASSWD rule)
+[RUN] p4 entry --state /root/afldb-phase4-state --dispose /etc/sudoers.d/90-arm (exit 0)
+    PHASE4 ENTRY match /etc/sudoers:53 token %sudo class group-only: %sudo?ALL=(ALL:ALL) ALL
+    PHASE4 ENTRY match /etc/sudoers.d/90-arm:2 token arm class disposed: arm ALL=(ALL) NOPASSWD: ALL
+    PHASE4 ENTRY pre-change: arm's groups: adm arm cdrom dip plugdev sudo (primary gid 1000)
+    PHASE4 ENTRY pre-change: group line: sudo:x:27:arm
+    PHASE4 ENTRY pre-change: /etc/sudoers.d: 0 0 755 directory
+    PHASE4 ENTRY pre-change: file /etc/sudoers uid gid mode sha256: 0 0 440 5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/90-arm uid gid mode sha256: 0 0 440 fda57f0db6ef425bd90a3445180bcc7682cdc28de13d6fa0bcf4435b6acfad72
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/README uid gid mode sha256: 0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8
+    PHASE4 ENTRY pre-change: sudo -l -U arm: arm may run: (ALL : ALL) ALL;(ALL) NOPASSWD: ALL;
+    PHASE4 ENTRY pre-change: sudo -l -U afldb-admin: no account afldb-admin (not compared by verify)
+    PHASE4 ENTRY pre-change: include directives: @includedir /etc/sudoers.d;
+    PHASE4 ENTRY change 1 (group-only, step 4.1, [ADM-ROOT]): gpasswd -d arm sudo
+    PHASE4 ENTRY back-out 1 ([CON]): gpasswd -a arm sudo; then id -Gn arm lists exactly: adm arm cdrom dip plugdev sudo 
+    PHASE4 ENTRY change 2 (disposed, step 4.1, [ADM-ROOT]): visudo -f /etc/sudoers.d/90-arm, removing or changing ONLY line(s) 2(arm) and no other line
+    PHASE4 ENTRY back-out 2 ([CON]): install -o 0 -g 0 -m 0440 /root/afldb-phase4-state/copy.2 /etc/sudoers.d/90-arm && visudo -c && sha256sum /etc/sudoers.d/90-arm (must print fda57f0db6ef425bd90a3445180bcc7682cdc28de13d6fa0bcf4435b6acfad72)
+    PHASE4 ENTRY back-out, all of it, in one command ([CON]): env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/p4/afldb-phase4.sh backout --state /root/afldb-phase4-state
+    PHASE4 ENTRY realised change, after 4.1: env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/p4/afldb-phase4.sh verify --state /root/afldb-phase4-state
+    PHASE4 ENTRY precondition, NOT checked by this script: the [CON] root session is open now and stays open until 4.7
+    PHASE4 ENTRY precondition, NOT checked by this script: Phase 1 verified twice (1.13), two independently authenticated admin logins
+    PHASE4 ENTRY precondition, NOT checked by this script: the owner's separate written approval of this privilege removal, given after reading this output
+    PHASE4 ENTRY precondition, NOT checked by this script: every other Phase 2 FAIL resolved, every UNKNOWN resolved or accepted, the section 0 residual accepted
+    PHASE4 ENTRY state /root/afldb-phase4-state seal sha256 7af0da443ed5a02ff15c083ef94bc5f22247e3125d1fb3b749a75bdb0d696954 (write it down; verify and backout print it again)
+    PHASE4 ENTRY RESULT PASS change=group-and-disposed matches=2 disposed=1 state=/root/afldb-phase4-state
+[CHECK] ok   entry exit 0
+[CHECK] ok   entry RESULT PASS change=group-and-disposed
+[CHECK] paths modified since the marker: /root /root/afldb-phase4-state /root/afldb-phase4-state/groups.pre /root/afldb-phase4-state/admin-l.pre /root/afldb-phase4-state/sudo-group.pre /root/afldb-phase4-state/gid.pre /root/afldb-phase4-state/copy.2 /root/afldb-phase4-state/inv.pre /root/afldb-phase4-state/includes.pre /root/afldb-phase4-state/copy.1 /root/afldb-phase4-state/disposed /root/afldb-phase4-state/copies /root/afldb-phase4-state/plan /root/afldb-phase4-state/RESULT /root/afldb-phase4-state/copy.3 /root/afldb-phase4-state/sudo-l.pre /root/afldb-phase4-state/SHA256SUMS /root/afldb-phase4-state/dir.pre /root/afldb-phase4-state/classified.pre /root/afldb-phase4-state/matches.pre 
+[CHECK] ok   entry wrote nothing outside /root/afldb-phase4-state (found: )
+[CHECK] ok   90-arm:2 classified disposed
+[CHECK] ok   entry prints the exact disposed back-out with owner 0:0 mode 0440
+[CHECK] ok   the owner removes /etc/sudoers.d/90-arm
+Removing user arm from group sudo
+[CHECK] ok   step 4.1 gpasswd -d arm sudo
+[REAL] after 4.1: uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),30(dip),46(plugdev); sudo:x:27:
+[CHECK] ok   after 4.1: arm can no longer sudo -n (sudo: a password is required)
+[RUN] p4 verify --state /root/afldb-phase4-state (exit 0)
+    PHASE4 VERIFY state /root/afldb-phase4-state seal sha256 7af0da443ed5a02ff15c083ef94bc5f22247e3125d1fb3b749a75bdb0d696954 (equal to the value entry printed); plan: change=group-and-disposed disposed=/etc/sudoers.d/90-arm 
+    PHASE4 VERIFY check groups PASS arm's groups: adm arm cdrom dip plugdev (pre-change minus sudo)
+    PHASE4 VERIFY check file PASS /etc/sudoers unchanged
+    PHASE4 VERIFY check file PASS /etc/sudoers.d/90-arm (disposed) was removed
+    PHASE4 VERIFY check file PASS /etc/sudoers.d/README unchanged
+    PHASE4 VERIFY check kept PASS /etc/sudoers.d/90-arm: only its disposed line(s) 2(arm) changed; every other line is byte-identical
+    PHASE4 VERIFY check admin-sudo-l not compared: no account afldb-admin at entry
+    PHASE4 VERIFY check visudo-c PASS
+    PHASE4 VERIFY check rescan PASS no sudoers line names arm, a group of arm or a grant form entry refuses, and no outside rule source
+    PHASE4 VERIFY check sudo-l PASS sudo -l -U arm: arm is not allowed to run sudo
+    PHASE4 VERIFY RESULT PASS the realised change equals the plan (change=group-and-disposed disposed=/etc/sudoers.d/90-arm ) and arm cannot sudo
+[CHECK] ok   verify RESULT PASS
+[RUN] p4 backout --state /root/afldb-phase4-state (exit 0)
+    PHASE4 BACKOUT state /root/afldb-phase4-state seal sha256 7af0da443ed5a02ff15c083ef94bc5f22247e3125d1fb3b749a75bdb0d696954 (equal to the value entry printed); plan: change=group-and-disposed disposed=/etc/sudoers.d/90-arm 
+    PHASE4 BACKOUT restored /etc/sudoers.d/90-arm from /root/afldb-phase4-state/copy.2 (owner 0:0, mode 0440)
+    PHASE4 BACKOUT ran: gpasswd -a arm sudo
+    PHASE4 BACKOUT check visudo-c PASS
+    PHASE4 BACKOUT check file PASS /etc/sudoers equals its pre-change record (0 0 440 5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8)
+    PHASE4 BACKOUT check file PASS /etc/sudoers.d/90-arm equals its pre-change record (0 0 440 fda57f0db6ef425bd90a3445180bcc7682cdc28de13d6fa0bcf4435b6acfad72)
+    PHASE4 BACKOUT check file PASS /etc/sudoers.d/README equals its pre-change record (0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8)
+    PHASE4 BACKOUT check groups PASS arm's groups equal the pre-change record: adm arm cdrom dip plugdev sudo 
+    PHASE4 BACKOUT check sudo-l PASS sudo -l -U arm equals the pre-change record: arm may run: (ALL : ALL) ALL;(ALL) NOPASSWD: ALL;
+    PHASE4 BACKOUT check admin-sudo-l not compared: no account afldb-admin at entry
+    PHASE4 BACKOUT pre-change group line: sudo:x:27:arm; now: sudo:x:27:arm (member order may differ; membership is compared)
+    PHASE4 BACKOUT RESULT PASS the sudoers scope, arm's groups and sudo -l -U arm equal the pre-change record of /root/afldb-phase4-state
+[CHECK] ok   backout RESULT PASS
+[CHECK] ok   after backout: 90-arm is byte-identical to the fixture copy
+[CHECK] ok   after backout: 90-arm is root:root 0440 (root:root 440)
+[CHECK] ok   after backout: visudo -c
+[CHECK] ok   after backout: arm runs sudo -n id -u as root again
+[CHECK] ok   after backout: sudo -l -U arm equals the pre-change answer
+[CHECK] ok   after backout: the whole snapshot equals pre-change
+SCENARIO disposed-removed PASS expect=entry=PASS(group-and-disposed),verify=PASS,backout=PASS,rule=byte-identical,arm-sudo=as-before got=entry=PASS(group-and-disposed),verify=PASS,backout=PASS,rule=byte-identical,arm-sudo=as-before
+== scenario disposed-removed exit 0 containers-left=0
+== scenario residual-uid 08:02:31
+[FIXTURE] uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev); sudo 1.9.15p5-3ubuntu5.24.04.4; /etc/sudoers rules: 47:root	ALL=(ALL:ALL) ALL;50:%admin ALL=(ALL) ALL;53:%sudo	ALL=(ALL:ALL) ALL;57:@includedir /etc/sudoers.d;
+[FIXTURE] /etc/sudoers.d/91-uid (root:root 440): #1000 ALL=(ALL) NOPASSWD: ALL; visudo -c: /etc/sudoers: parsed OK;/etc/sudoers.d/91-uid: parsed OK;/etc/sudoers.d/README: parsed OK;
+[REAL] owner-checks: CHECK B1 FAIL sudo -l -U arm: arm may run: (ALL : ALL) ALL;(ALL) NOPASSWD: ALL;|CHECK B2 FAIL arm is in: sudo (arm's groups: arm adm cdrom sudo dip plugdev)|CHECK B3 FAIL sudoers lines naming arm or a group of arm (%arm,adm,cdrom,sudo,dip,plugdev) in: /etc/sudoers|CHECK B5 PASS sudoers include targets trusted (root-owned, not group/other-writable, no ACL, no link): /etc/sudoers.d |
+[CHECK] ok   owner-checks B3 (unchanged, at its pin) does not name /etc/sudoers.d/91-uid
+[RUN] p4 entry --state /root/afldb-phase4-state (exit 1)
+    PHASE4 ENTRY match /etc/sudoers:53 token %sudo class group-only: %sudo?ALL=(ALL:ALL) ALL
+    PHASE4 ENTRY match /etc/sudoers.d/91-uid:1 token uid:#1000 class unrelated: #1000 ALL=(ALL) NOPASSWD: ALL
+    PHASE4 ENTRY REFUSED /etc/sudoers.d/91-uid:1 names uid:#1000 ('#1000 ALL=(ALL) NOPASSWD: ALL'): an explicit or unrelated sudoers grant, not removed by gpasswd -d arm sudo; dispose of it separately, or name /etc/sudoers.d/91-uid with --dispose to edit it in 4.1
+    PHASE4 ENTRY pre-change: arm's groups: adm arm cdrom dip plugdev sudo (primary gid 1000)
+    PHASE4 ENTRY pre-change: group line: sudo:x:27:arm
+    PHASE4 ENTRY pre-change: /etc/sudoers.d: 0 0 755 directory
+    PHASE4 ENTRY pre-change: file /etc/sudoers uid gid mode sha256: 0 0 440 5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/91-uid uid gid mode sha256: 0 0 440 8f225040df3b6b498460ae1e4dad955af339d3fdea5318e76909a3c937aaea8d
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/README uid gid mode sha256: 0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8
+    PHASE4 ENTRY pre-change: sudo -l -U arm: arm may run: (ALL : ALL) ALL;(ALL) NOPASSWD: ALL;
+    PHASE4 ENTRY pre-change: sudo -l -U afldb-admin: no account afldb-admin (not compared by verify)
+    PHASE4 ENTRY pre-change: include directives: @includedir /etc/sudoers.d;
+    PHASE4 ENTRY RESULT REFUSED /etc/sudoers.d/91-uid:1 names uid:#1000 ('#1000 ALL=(ALL) NOPASSWD: ALL'): an explicit or unrelated sudoers grant, not removed by gpasswd -d arm sudo; dispose of it separately, or name /etc/sudoers.d/91-uid with --dispose to edit it in 4.1
+[CHECK] ok   entry exit 1
+[CHECK] ok   entry RESULT REFUSED
+[CHECK] ok   the refusal names: /etc/sudoers.d/91-uid:1 names uid:#1000
+[CHECK] ok   nothing changed: sudoers scope, group files, arm's groups and sudo -l -U arm equal the pre-entry snapshot
+[CHECK] paths modified since the marker: /root /root/afldb-phase4-state /root/afldb-phase4-state/groups.pre /root/afldb-phase4-state/admin-l.pre /root/afldb-phase4-state/sudo-group.pre /root/afldb-phase4-state/gid.pre /root/afldb-phase4-state/copy.2 /root/afldb-phase4-state/inv.pre /root/afldb-phase4-state/includes.pre /root/afldb-phase4-state/copy.1 /root/afldb-phase4-state/disposed /root/afldb-phase4-state/copies /root/afldb-phase4-state/RESULT /root/afldb-phase4-state/copy.3 /root/afldb-phase4-state/sudo-l.pre /root/afldb-phase4-state/dir.pre /root/afldb-phase4-state/classified.pre /root/afldb-phase4-state/matches.pre 
+[CHECK] ok   entry wrote nothing outside /root/afldb-phase4-state (found: )
+[CHECK] owner-checks B3 files [/etc/sudoers ], entry match files [/etc/sudoers /etc/sudoers.d/91-uid ]
+[CHECK] ok   every B3 file is among entry's matches (missing: none)
+SCENARIO residual-uid PASS expect=entry=REFUSED(/etc/sudoers.d/91-uid:1 names uid:#1000),B3-blind,nothing-changed got=entry=REFUSED(/etc/sudoers.d/91-uid:1 names uid:#1000),B3-blind,nothing-changed
+== scenario residual-uid exit 0 containers-left=0
+== scenario residual-all 08:02:34
+[FIXTURE] uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev); sudo 1.9.15p5-3ubuntu5.24.04.4; /etc/sudoers rules: 47:root	ALL=(ALL:ALL) ALL;50:%admin ALL=(ALL) ALL;53:%sudo	ALL=(ALL:ALL) ALL;57:@includedir /etc/sudoers.d;
+[FIXTURE] /etc/sudoers.d/92-all (root:root 440): ALL ALL=(root) NOPASSWD: /usr/bin/id; visudo -c: /etc/sudoers: parsed OK;/etc/sudoers.d/92-all: parsed OK;/etc/sudoers.d/README: parsed OK;
+[REAL] owner-checks: CHECK B1 FAIL sudo -l -U arm: arm may run: (ALL : ALL) ALL;(root) NOPASSWD: /usr/bin/id;|CHECK B2 FAIL arm is in: sudo (arm's groups: arm adm cdrom sudo dip plugdev)|CHECK B3 FAIL sudoers lines naming arm or a group of arm (%arm,adm,cdrom,sudo,dip,plugdev) in: /etc/sudoers|CHECK B5 PASS sudoers include targets trusted (root-owned, not group/other-writable, no ACL, no link): /etc/sudoers.d |
+[CHECK] ok   owner-checks B3 (unchanged, at its pin) does not name /etc/sudoers.d/92-all
+[RUN] p4 entry --state /root/afldb-phase4-state (exit 1)
+    PHASE4 ENTRY match /etc/sudoers:53 token %sudo class group-only: %sudo?ALL=(ALL:ALL) ALL
+    PHASE4 ENTRY match /etc/sudoers.d/92-all:1 token ALL-user class unrelated: ALL ALL=(root) NOPASSWD: /usr/bin/id
+    PHASE4 ENTRY REFUSED /etc/sudoers.d/92-all:1 names ALL-user ('ALL ALL=(root) NOPASSWD: /usr/bin/id'): an explicit or unrelated sudoers grant, not removed by gpasswd -d arm sudo; dispose of it separately, or name /etc/sudoers.d/92-all with --dispose to edit it in 4.1
+    PHASE4 ENTRY pre-change: arm's groups: adm arm cdrom dip plugdev sudo (primary gid 1000)
+    PHASE4 ENTRY pre-change: group line: sudo:x:27:arm
+    PHASE4 ENTRY pre-change: /etc/sudoers.d: 0 0 755 directory
+    PHASE4 ENTRY pre-change: file /etc/sudoers uid gid mode sha256: 0 0 440 5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/92-all uid gid mode sha256: 0 0 440 4d64ac440883210c53ae9e68e61cda2771173b03cc6bc96ebc90cce14221ae24
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/README uid gid mode sha256: 0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8
+    PHASE4 ENTRY pre-change: sudo -l -U arm: arm may run: (ALL : ALL) ALL;(root) NOPASSWD: /usr/bin/id;
+    PHASE4 ENTRY pre-change: sudo -l -U afldb-admin: no account afldb-admin (not compared by verify)
+    PHASE4 ENTRY pre-change: include directives: @includedir /etc/sudoers.d;
+    PHASE4 ENTRY RESULT REFUSED /etc/sudoers.d/92-all:1 names ALL-user ('ALL ALL=(root) NOPASSWD: /usr/bin/id'): an explicit or unrelated sudoers grant, not removed by gpasswd -d arm sudo; dispose of it separately, or name /etc/sudoers.d/92-all with --dispose to edit it in 4.1
+[CHECK] ok   entry exit 1
+[CHECK] ok   entry RESULT REFUSED
+[CHECK] ok   the refusal names: /etc/sudoers.d/92-all:1 names ALL-user
+[CHECK] ok   nothing changed: sudoers scope, group files, arm's groups and sudo -l -U arm equal the pre-entry snapshot
+[CHECK] paths modified since the marker: /root /root/afldb-phase4-state /root/afldb-phase4-state/groups.pre /root/afldb-phase4-state/admin-l.pre /root/afldb-phase4-state/sudo-group.pre /root/afldb-phase4-state/gid.pre /root/afldb-phase4-state/copy.2 /root/afldb-phase4-state/inv.pre /root/afldb-phase4-state/includes.pre /root/afldb-phase4-state/copy.1 /root/afldb-phase4-state/disposed /root/afldb-phase4-state/copies /root/afldb-phase4-state/RESULT /root/afldb-phase4-state/copy.3 /root/afldb-phase4-state/sudo-l.pre /root/afldb-phase4-state/dir.pre /root/afldb-phase4-state/classified.pre /root/afldb-phase4-state/matches.pre 
+[CHECK] ok   entry wrote nothing outside /root/afldb-phase4-state (found: )
+[CHECK] owner-checks B3 files [/etc/sudoers ], entry match files [/etc/sudoers /etc/sudoers.d/92-all ]
+[CHECK] ok   every B3 file is among entry's matches (missing: none)
+SCENARIO residual-all PASS expect=entry=REFUSED(/etc/sudoers.d/92-all:1 names ALL-user),B3-blind,nothing-changed got=entry=REFUSED(/etc/sudoers.d/92-all:1 names ALL-user),B3-blind,nothing-changed
+== scenario residual-all exit 0 containers-left=0
+== scenario refuse-uid-alias 08:02:37
+[FIXTURE] uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev); sudo 1.9.15p5-3ubuntu5.24.04.4; /etc/sudoers rules: 47:root	ALL=(ALL:ALL) ALL;50:%admin ALL=(ALL) ALL;53:%sudo	ALL=(ALL:ALL) ALL;57:@includedir /etc/sudoers.d;
+[FIXTURE] /etc/sudoers.d/81-uidalias (root:root 440): User_Alias OPS = deploy, #1000
+OPS ALL=(ALL:ALL) ALL; visudo -c: /etc/sudoers: parsed OK;/etc/sudoers.d/81-uidalias: parsed OK;/etc/sudoers.d/README: parsed OK;
+[RUN] p4 entry --state /root/afldb-phase4-state (exit 1)
+    PHASE4 ENTRY match /etc/sudoers:53 token %sudo class group-only: %sudo?ALL=(ALL:ALL) ALL
+    PHASE4 ENTRY match /etc/sudoers.d/81-uidalias:1 token uid:#1000 class unrelated: User_Alias OPS = deploy, #1000
+    PHASE4 ENTRY REFUSED /etc/sudoers.d/81-uidalias:1 names uid:#1000 ('User_Alias OPS = deploy, #1000'): an explicit or unrelated sudoers grant, not removed by gpasswd -d arm sudo; dispose of it separately, or name /etc/sudoers.d/81-uidalias with --dispose to edit it in 4.1
+    PHASE4 ENTRY pre-change: arm's groups: adm arm cdrom dip plugdev sudo (primary gid 1000)
+    PHASE4 ENTRY pre-change: group line: sudo:x:27:arm
+    PHASE4 ENTRY pre-change: /etc/sudoers.d: 0 0 755 directory
+    PHASE4 ENTRY pre-change: file /etc/sudoers uid gid mode sha256: 0 0 440 5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/81-uidalias uid gid mode sha256: 0 0 440 88ff7d0df1e6e6c36a3fe7c4f6fb339a1139042d79b530ada2b29b19c5fb2a47
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/README uid gid mode sha256: 0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8
+    PHASE4 ENTRY pre-change: sudo -l -U arm: arm may run: (ALL : ALL) ALL;(ALL : ALL) ALL;
+    PHASE4 ENTRY pre-change: sudo -l -U afldb-admin: no account afldb-admin (not compared by verify)
+    PHASE4 ENTRY pre-change: include directives: @includedir /etc/sudoers.d;
+    PHASE4 ENTRY RESULT REFUSED /etc/sudoers.d/81-uidalias:1 names uid:#1000 ('User_Alias OPS = deploy, #1000'): an explicit or unrelated sudoers grant, not removed by gpasswd -d arm sudo; dispose of it separately, or name /etc/sudoers.d/81-uidalias with --dispose to edit it in 4.1
+[CHECK] ok   entry exit 1
+[CHECK] ok   entry RESULT REFUSED
+[CHECK] ok   the refusal names: /etc/sudoers.d/81-uidalias:1 names uid:#1000
+[CHECK] ok   nothing changed: sudoers scope, group files, arm's groups and sudo -l -U arm equal the pre-entry snapshot
+[CHECK] paths modified since the marker: /root /root/afldb-phase4-state /root/afldb-phase4-state/groups.pre /root/afldb-phase4-state/admin-l.pre /root/afldb-phase4-state/sudo-group.pre /root/afldb-phase4-state/gid.pre /root/afldb-phase4-state/copy.2 /root/afldb-phase4-state/inv.pre /root/afldb-phase4-state/includes.pre /root/afldb-phase4-state/copy.1 /root/afldb-phase4-state/disposed /root/afldb-phase4-state/copies /root/afldb-phase4-state/RESULT /root/afldb-phase4-state/copy.3 /root/afldb-phase4-state/sudo-l.pre /root/afldb-phase4-state/dir.pre /root/afldb-phase4-state/classified.pre /root/afldb-phase4-state/matches.pre 
+[CHECK] ok   entry wrote nothing outside /root/afldb-phase4-state (found: )
+SCENARIO refuse-uid-alias PASS expect=entry=REFUSED(81-uidalias:1 uid:#1000),nothing-changed got=entry=REFUSED(81-uidalias:1 uid:#1000),nothing-changed
+== scenario refuse-uid-alias exit 0 containers-left=0
+== scenario refuse-continued 08:02:39
+[FIXTURE] uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev); sudo 1.9.15p5-3ubuntu5.24.04.4; /etc/sudoers rules: 47:root	ALL=(ALL:ALL) ALL;50:%admin ALL=(ALL) ALL;53:%sudo	ALL=(ALL:ALL) ALL;57:@includedir /etc/sudoers.d;
+[FIXTURE] /etc/sudoers.d/82-cont (root:root 440): User_Alias OPS = deploy, \
+    #1000
+OPS ALL=(ALL) ALL; visudo -c: /etc/sudoers: parsed OK;/etc/sudoers.d/82-cont: parsed OK;/etc/sudoers.d/README: parsed OK;
+[RUN] p4 entry --state /root/afldb-phase4-state (exit 1)
+    PHASE4 ENTRY match /etc/sudoers:53 token %sudo class group-only: %sudo?ALL=(ALL:ALL) ALL
+    PHASE4 ENTRY match /etc/sudoers.d/82-cont:1 token uid:#1000 class unrelated: User_Alias OPS = deploy,      #1000
+    PHASE4 ENTRY REFUSED /etc/sudoers.d/82-cont:1 names uid:#1000 ('User_Alias OPS = deploy,      #1000'): an explicit or unrelated sudoers grant, not removed by gpasswd -d arm sudo; dispose of it separately, or name /etc/sudoers.d/82-cont with --dispose to edit it in 4.1
+    PHASE4 ENTRY pre-change: arm's groups: adm arm cdrom dip plugdev sudo (primary gid 1000)
+    PHASE4 ENTRY pre-change: group line: sudo:x:27:arm
+    PHASE4 ENTRY pre-change: /etc/sudoers.d: 0 0 755 directory
+    PHASE4 ENTRY pre-change: file /etc/sudoers uid gid mode sha256: 0 0 440 5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/82-cont uid gid mode sha256: 0 0 440 2c116d7d325fe54219ae6048144dfe500f582f03c08c5b018b1eabd3c1b37eab
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/README uid gid mode sha256: 0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8
+    PHASE4 ENTRY pre-change: sudo -l -U arm: arm may run: (ALL : ALL) ALL;(ALL) ALL;
+    PHASE4 ENTRY pre-change: sudo -l -U afldb-admin: no account afldb-admin (not compared by verify)
+    PHASE4 ENTRY pre-change: include directives: @includedir /etc/sudoers.d;
+    PHASE4 ENTRY RESULT REFUSED /etc/sudoers.d/82-cont:1 names uid:#1000 ('User_Alias OPS = deploy,      #1000'): an explicit or unrelated sudoers grant, not removed by gpasswd -d arm sudo; dispose of it separately, or name /etc/sudoers.d/82-cont with --dispose to edit it in 4.1
+[CHECK] ok   entry exit 1
+[CHECK] ok   entry RESULT REFUSED
+[CHECK] ok   the refusal names: /etc/sudoers.d/82-cont:1 names uid:#1000
+[CHECK] ok   nothing changed: sudoers scope, group files, arm's groups and sudo -l -U arm equal the pre-entry snapshot
+[CHECK] paths modified since the marker: /root /root/afldb-phase4-state /root/afldb-phase4-state/groups.pre /root/afldb-phase4-state/admin-l.pre /root/afldb-phase4-state/sudo-group.pre /root/afldb-phase4-state/gid.pre /root/afldb-phase4-state/copy.2 /root/afldb-phase4-state/inv.pre /root/afldb-phase4-state/includes.pre /root/afldb-phase4-state/copy.1 /root/afldb-phase4-state/disposed /root/afldb-phase4-state/copies /root/afldb-phase4-state/RESULT /root/afldb-phase4-state/copy.3 /root/afldb-phase4-state/sudo-l.pre /root/afldb-phase4-state/dir.pre /root/afldb-phase4-state/classified.pre /root/afldb-phase4-state/matches.pre 
+[CHECK] ok   entry wrote nothing outside /root/afldb-phase4-state (found: )
+SCENARIO refuse-continued PASS expect=entry=REFUSED(82-cont:1 uid:#1000, joined line),nothing-changed got=entry=REFUSED(82-cont:1 uid:#1000, joined line),nothing-changed
+== scenario refuse-continued exit 0 containers-left=0
+== scenario refuse-negated 08:02:42
+[FIXTURE] uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev); sudo 1.9.15p5-3ubuntu5.24.04.4; /etc/sudoers rules: 47:root	ALL=(ALL:ALL) ALL;50:%admin ALL=(ALL) ALL;53:%sudo	ALL=(ALL:ALL) ALL;57:@includedir /etc/sudoers.d;
+[FIXTURE] /etc/sudoers.d/83-neg (root:root 440): User_Alias OPS = !deploy
+OPS ALL=(ALL) ALL; visudo -c: /etc/sudoers: parsed OK;/etc/sudoers.d/83-neg: parsed OK;/etc/sudoers.d/README: parsed OK;
+[RUN] p4 entry --state /root/afldb-phase4-state (exit 1)
+    PHASE4 ENTRY match /etc/sudoers:53 token %sudo class group-only: %sudo?ALL=(ALL:ALL) ALL
+    PHASE4 ENTRY match /etc/sudoers.d/83-neg:1 token negated-in-User_Alias:!deploy class unrelated: User_Alias OPS = !deploy
+    PHASE4 ENTRY REFUSED /etc/sudoers.d/83-neg:1 names negated-in-User_Alias:!deploy ('User_Alias OPS = !deploy'): an explicit or unrelated sudoers grant, not removed by gpasswd -d arm sudo; dispose of it separately, or name /etc/sudoers.d/83-neg with --dispose to edit it in 4.1
+    PHASE4 ENTRY pre-change: arm's groups: adm arm cdrom dip plugdev sudo (primary gid 1000)
+    PHASE4 ENTRY pre-change: group line: sudo:x:27:arm
+    PHASE4 ENTRY pre-change: /etc/sudoers.d: 0 0 755 directory
+    PHASE4 ENTRY pre-change: file /etc/sudoers uid gid mode sha256: 0 0 440 5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/83-neg uid gid mode sha256: 0 0 440 6ba35d410d7f2cb0df2be2705e3d93fad5ea1151dfa678051764e2ab10d593b4
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/README uid gid mode sha256: 0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8
+    PHASE4 ENTRY pre-change: sudo -l -U arm: arm may run: (ALL : ALL) ALL;
+    PHASE4 ENTRY pre-change: sudo -l -U afldb-admin: no account afldb-admin (not compared by verify)
+    PHASE4 ENTRY pre-change: include directives: @includedir /etc/sudoers.d;
+    PHASE4 ENTRY RESULT REFUSED /etc/sudoers.d/83-neg:1 names negated-in-User_Alias:!deploy ('User_Alias OPS = !deploy'): an explicit or unrelated sudoers grant, not removed by gpasswd -d arm sudo; dispose of it separately, or name /etc/sudoers.d/83-neg with --dispose to edit it in 4.1
+[CHECK] ok   entry exit 1
+[CHECK] ok   entry RESULT REFUSED
+[CHECK] ok   the refusal names: /etc/sudoers.d/83-neg:1 names negated-in-User_Alias:!deploy
+[CHECK] ok   nothing changed: sudoers scope, group files, arm's groups and sudo -l -U arm equal the pre-entry snapshot
+[CHECK] paths modified since the marker: /root /root/afldb-phase4-state /root/afldb-phase4-state/groups.pre /root/afldb-phase4-state/admin-l.pre /root/afldb-phase4-state/sudo-group.pre /root/afldb-phase4-state/gid.pre /root/afldb-phase4-state/copy.2 /root/afldb-phase4-state/inv.pre /root/afldb-phase4-state/includes.pre /root/afldb-phase4-state/copy.1 /root/afldb-phase4-state/disposed /root/afldb-phase4-state/copies /root/afldb-phase4-state/RESULT /root/afldb-phase4-state/copy.3 /root/afldb-phase4-state/sudo-l.pre /root/afldb-phase4-state/dir.pre /root/afldb-phase4-state/classified.pre /root/afldb-phase4-state/matches.pre 
+[CHECK] ok   entry wrote nothing outside /root/afldb-phase4-state (found: )
+SCENARIO refuse-negated PASS expect=entry=REFUSED(83-neg:1 negated),nothing-changed got=entry=REFUSED(83-neg:1 negated),nothing-changed
+== scenario refuse-negated exit 0 containers-left=0
+== scenario refuse-nsswitch 08:02:44
+[FIXTURE] uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev); sudo 1.9.15p5-3ubuntu5.24.04.4; /etc/sudoers rules: 47:root	ALL=(ALL:ALL) ALL;50:%admin ALL=(ALL) ALL;53:%sudo	ALL=(ALL:ALL) ALL;57:@includedir /etc/sudoers.d;
+[FIXTURE] /etc/nsswitch.conf: 21:sudoers: files sss
+[RUN] p4 entry --state /root/afldb-phase4-state (exit 1)
+    PHASE4 ENTRY match /etc/sudoers:53 token %sudo class group-only: %sudo?ALL=(ALL:ALL) ALL
+    PHASE4 ENTRY match /etc/nsswitch.conf:21 token sudoers-source:files,sss class unrelated: sudoers: files sss
+    PHASE4 ENTRY REFUSED /etc/nsswitch.conf:21 names sudoers-source:files,sss ('sudoers: files sss'): a sudo rule source entry cannot read; dispose of it separately (it cannot be disposed of in 4.1)
+    PHASE4 ENTRY pre-change: arm's groups: adm arm cdrom dip plugdev sudo (primary gid 1000)
+    PHASE4 ENTRY pre-change: group line: sudo:x:27:arm
+    PHASE4 ENTRY pre-change: /etc/sudoers.d: 0 0 755 directory
+    PHASE4 ENTRY pre-change: file /etc/sudoers uid gid mode sha256: 0 0 440 5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/README uid gid mode sha256: 0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8
+    PHASE4 ENTRY pre-change: sudo -l -U arm: arm may run: (ALL : ALL) ALL;
+    PHASE4 ENTRY pre-change: sudo -l -U afldb-admin: no account afldb-admin (not compared by verify)
+    PHASE4 ENTRY pre-change: include directives: @includedir /etc/sudoers.d;
+    PHASE4 ENTRY RESULT REFUSED /etc/nsswitch.conf:21 names sudoers-source:files,sss ('sudoers: files sss'): a sudo rule source entry cannot read; dispose of it separately (it cannot be disposed of in 4.1)
+[CHECK] ok   entry exit 1
+[CHECK] ok   entry RESULT REFUSED
+[CHECK] ok   the refusal names: /etc/nsswitch.conf:21 names sudoers-source:files,sss ('sudoers: files sss'): a sudo rule source entry cannot read
+[CHECK] ok   nothing changed: sudoers scope, group files, arm's groups and sudo -l -U arm equal the pre-entry snapshot
+[CHECK] paths modified since the marker: /root /root/afldb-phase4-state /root/afldb-phase4-state/groups.pre /root/afldb-phase4-state/admin-l.pre /root/afldb-phase4-state/sudo-group.pre /root/afldb-phase4-state/gid.pre /root/afldb-phase4-state/copy.2 /root/afldb-phase4-state/inv.pre /root/afldb-phase4-state/includes.pre /root/afldb-phase4-state/copy.1 /root/afldb-phase4-state/disposed /root/afldb-phase4-state/copies /root/afldb-phase4-state/RESULT /root/afldb-phase4-state/sudo-l.pre /root/afldb-phase4-state/dir.pre /root/afldb-phase4-state/classified.pre /root/afldb-phase4-state/matches.pre 
+[CHECK] ok   entry wrote nothing outside /root/afldb-phase4-state (found: )
+SCENARIO refuse-nsswitch PASS expect=entry=REFUSED(nsswitch sudoers: files sss),nothing-changed got=entry=REFUSED(nsswitch sudoers: files sss),nothing-changed
+== scenario refuse-nsswitch exit 0 containers-left=0
+== scenario late-grant 08:02:46
+[FIXTURE] uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev); sudo 1.9.15p5-3ubuntu5.24.04.4; /etc/sudoers rules: 47:root	ALL=(ALL:ALL) ALL;50:%admin ALL=(ALL) ALL;53:%sudo	ALL=(ALL:ALL) ALL;57:@includedir /etc/sudoers.d;
+[RUN] p4 entry --state /root/afldb-phase4-state (exit 0)
+    PHASE4 ENTRY match /etc/sudoers:53 token %sudo class group-only: %sudo?ALL=(ALL:ALL) ALL
+    PHASE4 ENTRY pre-change: arm's groups: adm arm cdrom dip plugdev sudo (primary gid 1000)
+    PHASE4 ENTRY pre-change: group line: sudo:x:27:arm
+    PHASE4 ENTRY pre-change: /etc/sudoers.d: 0 0 755 directory
+    PHASE4 ENTRY pre-change: file /etc/sudoers uid gid mode sha256: 0 0 440 5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/README uid gid mode sha256: 0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8
+    PHASE4 ENTRY pre-change: sudo -l -U arm: arm may run: (ALL : ALL) ALL;
+    PHASE4 ENTRY pre-change: sudo -l -U afldb-admin: no account afldb-admin (not compared by verify)
+    PHASE4 ENTRY pre-change: include directives: @includedir /etc/sudoers.d;
+    PHASE4 ENTRY change 1 (group-only, step 4.1, [ADM-ROOT]): gpasswd -d arm sudo
+    PHASE4 ENTRY back-out 1 ([CON]): gpasswd -a arm sudo; then id -Gn arm lists exactly: adm arm cdrom dip plugdev sudo 
+    PHASE4 ENTRY back-out, all of it, in one command ([CON]): env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/p4/afldb-phase4.sh backout --state /root/afldb-phase4-state
+    PHASE4 ENTRY realised change, after 4.1: env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/p4/afldb-phase4.sh verify --state /root/afldb-phase4-state
+    PHASE4 ENTRY precondition, NOT checked by this script: the [CON] root session is open now and stays open until 4.7
+    PHASE4 ENTRY precondition, NOT checked by this script: Phase 1 verified twice (1.13), two independently authenticated admin logins
+    PHASE4 ENTRY precondition, NOT checked by this script: the owner's separate written approval of this privilege removal, given after reading this output
+    PHASE4 ENTRY precondition, NOT checked by this script: every other Phase 2 FAIL resolved, every UNKNOWN resolved or accepted, the section 0 residual accepted
+    PHASE4 ENTRY state /root/afldb-phase4-state seal sha256 8e0ed8e9a090ff4f3793f9824cd5c76340202e0a22836de324b3764676b896fa (write it down; verify and backout print it again)
+    PHASE4 ENTRY RESULT PASS change=group-only matches=1 disposed=0 state=/root/afldb-phase4-state
+[CHECK] ok   entry exit 0
+[CHECK] ok   entry RESULT PASS change=group-only
+[CHECK] paths modified since the marker: /root /root/afldb-phase4-state /root/afldb-phase4-state/groups.pre /root/afldb-phase4-state/admin-l.pre /root/afldb-phase4-state/sudo-group.pre /root/afldb-phase4-state/gid.pre /root/afldb-phase4-state/copy.2 /root/afldb-phase4-state/inv.pre /root/afldb-phase4-state/includes.pre /root/afldb-phase4-state/copy.1 /root/afldb-phase4-state/disposed /root/afldb-phase4-state/copies /root/afldb-phase4-state/plan /root/afldb-phase4-state/RESULT /root/afldb-phase4-state/sudo-l.pre /root/afldb-phase4-state/SHA256SUMS /root/afldb-phase4-state/dir.pre /root/afldb-phase4-state/classified.pre /root/afldb-phase4-state/matches.pre 
+[CHECK] ok   entry wrote nothing outside /root/afldb-phase4-state (found: )
+[FIXTURE] /etc/sudoers.d/95-late (root:root 440): arm ALL=(ALL) NOPASSWD: ALL; visudo -c: /etc/sudoers: parsed OK;/etc/sudoers.d/95-late: parsed OK;/etc/sudoers.d/README: parsed OK;
+Removing user arm from group sudo
+[CHECK] ok   step 4.1 gpasswd -d arm sudo
+[REAL] after 4.1: uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),30(dip),46(plugdev); sudo:x:27:
+[RUN] p4 verify --state /root/afldb-phase4-state (exit 1)
+    PHASE4 VERIFY state /root/afldb-phase4-state seal sha256 8e0ed8e9a090ff4f3793f9824cd5c76340202e0a22836de324b3764676b896fa (equal to the value entry printed); plan: change=group-only disposed=
+    PHASE4 VERIFY check groups PASS arm's groups: adm arm cdrom dip plugdev (pre-change minus sudo)
+    PHASE4 VERIFY check file PASS /etc/sudoers unchanged
+    PHASE4 VERIFY check file PASS /etc/sudoers.d/README unchanged
+    PHASE4 VERIFY STOP /etc/sudoers.d/95-late was added: [0 0 440 6daaf5185c4a9ed332a447d85ca7a6632cca38cdabe71c5a41dd1283be381f2f]
+    PHASE4 VERIFY check admin-sudo-l not compared: no account afldb-admin at entry
+    PHASE4 VERIFY check visudo-c PASS
+    PHASE4 VERIFY STOP the rescan still finds (B3 and stricter rules): /etc/sudoers.d/95-late:1(arm) 
+    PHASE4 VERIFY STOP sudo -l -U arm: arm may run: (ALL) NOPASSWD: ALL;
+    PHASE4 VERIFY STOP: back out now in [CON] with: env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/p4/afldb-phase4.sh backout --state /root/afldb-phase4-state; then dispose of the residual separately and run a NEW entry. Do NOT return to step 4.1.
+    PHASE4 VERIFY RESULT STOP /etc/sudoers.d/95-late was added: [0 0 440 6daaf5185c4a9ed332a447d85ca7a6632cca38cdabe71c5a41dd1283be381f2f];the rescan still finds (B3 and stricter rules): /etc/sudoers.d/95-late:1(arm) ;sudo -l -U arm: arm may run: (ALL) NOPASSWD: ALL;
+[CHECK] ok   verify RESULT STOP
+[CHECK] ok   verify names the added file
+[CHECK] ok   verify says back out, never go back to 4.1
+[RUN] p4 backout --state /root/afldb-phase4-state (exit 1)
+    PHASE4 BACKOUT state /root/afldb-phase4-state seal sha256 8e0ed8e9a090ff4f3793f9824cd5c76340202e0a22836de324b3764676b896fa (equal to the value entry printed); plan: change=group-only disposed=
+    PHASE4 BACKOUT ran: gpasswd -a arm sudo
+    PHASE4 BACKOUT check visudo-c PASS
+    PHASE4 BACKOUT check file PASS /etc/sudoers equals its pre-change record (0 0 440 5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8)
+    PHASE4 BACKOUT check file PASS /etc/sudoers.d/README equals its pre-change record (0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8)
+    PHASE4 BACKOUT FAIL /etc/sudoers.d/95-late was added after entry: review and remove it by hand
+    PHASE4 BACKOUT check groups PASS arm's groups equal the pre-change record: adm arm cdrom dip plugdev sudo 
+    PHASE4 BACKOUT FAIL sudo -l -U arm differs from the pre-change record: now arm may run: (ALL : ALL) ALL;(ALL) NOPASSWD: ALL;; diff record/now: 5a6;>     (ALL) NOPASSWD: ALL;
+    PHASE4 BACKOUT check admin-sudo-l not compared: no account afldb-admin at entry
+    PHASE4 BACKOUT pre-change group line: sudo:x:27:arm; now: sudo:x:27:arm (member order may differ; membership is compared)
+    PHASE4 BACKOUT RESULT FAIL /etc/sudoers.d/95-late was added after entry: review and remove it by hand;sudo -l -U arm differs from the pre-change record: now arm may run: (ALL : ALL) ALL;(ALL) NOPASSWD: ALL;; diff record/now: 5a6;>     (ALL) NOPASSWD: ALL;
+[CHECK] ok   backout RESULT FAIL
+[CHECK] ok   backout names the added file and does not delete it
+[CHECK] ok   the added file is still present (backout deletes nothing it did not plan)
+[CHECK] ok   backout restored arm's sudo membership
+[FIXTURE] the owner removes /etc/sudoers.d/95-late by hand after review
+[RUN] p4 backout --state /root/afldb-phase4-state (exit 0)
+    PHASE4 BACKOUT state /root/afldb-phase4-state seal sha256 8e0ed8e9a090ff4f3793f9824cd5c76340202e0a22836de324b3764676b896fa (equal to the value entry printed); plan: change=group-only disposed=
+    PHASE4 BACKOUT arm is already in group sudo
+    PHASE4 BACKOUT check visudo-c PASS
+    PHASE4 BACKOUT check file PASS /etc/sudoers equals its pre-change record (0 0 440 5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8)
+    PHASE4 BACKOUT check file PASS /etc/sudoers.d/README equals its pre-change record (0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8)
+    PHASE4 BACKOUT check groups PASS arm's groups equal the pre-change record: adm arm cdrom dip plugdev sudo 
+    PHASE4 BACKOUT check sudo-l PASS sudo -l -U arm equals the pre-change record: arm may run: (ALL : ALL) ALL;
+    PHASE4 BACKOUT check admin-sudo-l not compared: no account afldb-admin at entry
+    PHASE4 BACKOUT pre-change group line: sudo:x:27:arm; now: sudo:x:27:arm (member order may differ; membership is compared)
+    PHASE4 BACKOUT RESULT PASS the sudoers scope, arm's groups and sudo -l -U arm equal the pre-change record of /root/afldb-phase4-state
+[CHECK] ok   backout RESULT PASS
+[CHECK] ok   after the second backout: snapshot equals pre-change
+SCENARIO late-grant PASS expect=verify=STOP(95-late added),backout=FAIL(names 95-late),manual-rm,backout=PASS,state=pre-change got=verify=STOP(95-late added),backout=FAIL(names 95-late),manual-rm,backout=PASS,state=pre-change
+== scenario late-grant exit 0 containers-left=0
+== scenario old-r8-backout 08:02:49
+[FIXTURE] uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev); sudo 1.9.15p5-3ubuntu5.24.04.4; /etc/sudoers rules: 47:root	ALL=(ALL:ALL) ALL;50:%admin ALL=(ALL) ALL;53:%sudo	ALL=(ALL:ALL) ALL;57:@includedir /etc/sudoers.d;
+[FIXTURE] /etc/sudoers.d/90-arm (root:root 440): # deploy access for arm (fixture)
+arm ALL=(ALL) NOPASSWD: ALL; visudo -c: /etc/sudoers: parsed OK;/etc/sudoers.d/90-arm: parsed OK;/etc/sudoers.d/README: parsed OK;
+[CHECK] ok   before: arm runs sudo -n id -u as root (the disposed NOPASSWD rule)
+[RUN] p4 entry --state /root/afldb-phase4-state --dispose /etc/sudoers.d/90-arm (exit 0)
+    PHASE4 ENTRY match /etc/sudoers:53 token %sudo class group-only: %sudo?ALL=(ALL:ALL) ALL
+    PHASE4 ENTRY match /etc/sudoers.d/90-arm:2 token arm class disposed: arm ALL=(ALL) NOPASSWD: ALL
+    PHASE4 ENTRY pre-change: arm's groups: adm arm cdrom dip plugdev sudo (primary gid 1000)
+    PHASE4 ENTRY pre-change: group line: sudo:x:27:arm
+    PHASE4 ENTRY pre-change: /etc/sudoers.d: 0 0 755 directory
+    PHASE4 ENTRY pre-change: file /etc/sudoers uid gid mode sha256: 0 0 440 5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/90-arm uid gid mode sha256: 0 0 440 fda57f0db6ef425bd90a3445180bcc7682cdc28de13d6fa0bcf4435b6acfad72
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/README uid gid mode sha256: 0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8
+    PHASE4 ENTRY pre-change: sudo -l -U arm: arm may run: (ALL : ALL) ALL;(ALL) NOPASSWD: ALL;
+    PHASE4 ENTRY pre-change: sudo -l -U afldb-admin: no account afldb-admin (not compared by verify)
+    PHASE4 ENTRY pre-change: include directives: @includedir /etc/sudoers.d;
+    PHASE4 ENTRY change 1 (group-only, step 4.1, [ADM-ROOT]): gpasswd -d arm sudo
+    PHASE4 ENTRY back-out 1 ([CON]): gpasswd -a arm sudo; then id -Gn arm lists exactly: adm arm cdrom dip plugdev sudo 
+    PHASE4 ENTRY change 2 (disposed, step 4.1, [ADM-ROOT]): visudo -f /etc/sudoers.d/90-arm, removing or changing ONLY line(s) 2(arm) and no other line
+    PHASE4 ENTRY back-out 2 ([CON]): install -o 0 -g 0 -m 0440 /root/afldb-phase4-state/copy.2 /etc/sudoers.d/90-arm && visudo -c && sha256sum /etc/sudoers.d/90-arm (must print fda57f0db6ef425bd90a3445180bcc7682cdc28de13d6fa0bcf4435b6acfad72)
+    PHASE4 ENTRY back-out, all of it, in one command ([CON]): env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/p4/afldb-phase4.sh backout --state /root/afldb-phase4-state
+    PHASE4 ENTRY realised change, after 4.1: env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/p4/afldb-phase4.sh verify --state /root/afldb-phase4-state
+    PHASE4 ENTRY precondition, NOT checked by this script: the [CON] root session is open now and stays open until 4.7
+    PHASE4 ENTRY precondition, NOT checked by this script: Phase 1 verified twice (1.13), two independently authenticated admin logins
+    PHASE4 ENTRY precondition, NOT checked by this script: the owner's separate written approval of this privilege removal, given after reading this output
+    PHASE4 ENTRY precondition, NOT checked by this script: every other Phase 2 FAIL resolved, every UNKNOWN resolved or accepted, the section 0 residual accepted
+    PHASE4 ENTRY state /root/afldb-phase4-state seal sha256 7af0da443ed5a02ff15c083ef94bc5f22247e3125d1fb3b749a75bdb0d696954 (write it down; verify and backout print it again)
+    PHASE4 ENTRY RESULT PASS change=group-and-disposed matches=2 disposed=1 state=/root/afldb-phase4-state
+[CHECK] ok   entry exit 0
+[CHECK] ok   entry RESULT PASS change=group-and-disposed
+[CHECK] paths modified since the marker: /root /root/afldb-phase4-state /root/afldb-phase4-state/groups.pre /root/afldb-phase4-state/admin-l.pre /root/afldb-phase4-state/sudo-group.pre /root/afldb-phase4-state/gid.pre /root/afldb-phase4-state/copy.2 /root/afldb-phase4-state/inv.pre /root/afldb-phase4-state/includes.pre /root/afldb-phase4-state/copy.1 /root/afldb-phase4-state/disposed /root/afldb-phase4-state/copies /root/afldb-phase4-state/plan /root/afldb-phase4-state/RESULT /root/afldb-phase4-state/copy.3 /root/afldb-phase4-state/sudo-l.pre /root/afldb-phase4-state/SHA256SUMS /root/afldb-phase4-state/dir.pre /root/afldb-phase4-state/classified.pre /root/afldb-phase4-state/matches.pre 
+[CHECK] ok   entry wrote nothing outside /root/afldb-phase4-state (found: )
+[CHECK] ok   visudo -f /etc/sudoers.d/90-arm exit 0
+[CHECK] ok   visudo -c after the owner edit
+[REAL] /etc/sudoers.d/90-arm after the owner edit: root:root 440, sha256 650222e725244ca8..., content: [# deploy access for arm (fixture);]
+Removing user arm from group sudo
+[CHECK] ok   step 4.1 gpasswd -d arm sudo
+[REAL] after 4.1: uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),30(dip),46(plugdev); sudo:x:27:
+[RUN] p4 verify --state /root/afldb-phase4-state (exit 0)
+    PHASE4 VERIFY state /root/afldb-phase4-state seal sha256 7af0da443ed5a02ff15c083ef94bc5f22247e3125d1fb3b749a75bdb0d696954 (equal to the value entry printed); plan: change=group-and-disposed disposed=/etc/sudoers.d/90-arm 
+    PHASE4 VERIFY check groups PASS arm's groups: adm arm cdrom dip plugdev (pre-change minus sudo)
+    PHASE4 VERIFY check file PASS /etc/sudoers unchanged
+    PHASE4 VERIFY check file PASS /etc/sudoers.d/90-arm (disposed) now: 0 0 440 650222e725244ca8e303dc72c67301d85595ff85e5e07fdde39ccd5851b9c0e1
+    PHASE4 VERIFY check file PASS /etc/sudoers.d/README unchanged
+    PHASE4 VERIFY check kept PASS /etc/sudoers.d/90-arm: only its disposed line(s) 2(arm) changed; every other line is byte-identical
+    PHASE4 VERIFY check admin-sudo-l not compared: no account afldb-admin at entry
+    PHASE4 VERIFY check visudo-c PASS
+    PHASE4 VERIFY check rescan PASS no sudoers line names arm, a group of arm or a grant form entry refuses, and no outside rule source
+    PHASE4 VERIFY check sudo-l PASS sudo -l -U arm: arm is not allowed to run sudo
+    PHASE4 VERIFY RESULT PASS the realised change equals the plan (change=group-and-disposed disposed=/etc/sudoers.d/90-arm ) and arm cannot sudo
+[CHECK] ok   verify RESULT PASS
+Adding user arm to group sudo
+[REAL] r8 back-out text run: gpasswd -a arm sudo -> uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev)
+[CHECK] lost: 90-arm differs from the pre-change rule (now [# deploy access for arm (fixture);], root:root 440)
+[CHECK] lost: arm's NOPASSWD sudo is gone (sudo: a password is required)
+[CHECK] lost: sudo -l -U arm differs from pre-change:     (ALL : ALL) ALL;
+[CHECK] ok   the r8 back-out text does NOT restore the previous state (3 of 3 differences)
+[RUN] p4 backout --state /root/afldb-phase4-state (exit 0)
+    PHASE4 BACKOUT state /root/afldb-phase4-state seal sha256 7af0da443ed5a02ff15c083ef94bc5f22247e3125d1fb3b749a75bdb0d696954 (equal to the value entry printed); plan: change=group-and-disposed disposed=/etc/sudoers.d/90-arm 
+    PHASE4 BACKOUT restored /etc/sudoers.d/90-arm from /root/afldb-phase4-state/copy.2 (owner 0:0, mode 0440)
+    PHASE4 BACKOUT arm is already in group sudo
+    PHASE4 BACKOUT check visudo-c PASS
+    PHASE4 BACKOUT check file PASS /etc/sudoers equals its pre-change record (0 0 440 5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8)
+    PHASE4 BACKOUT check file PASS /etc/sudoers.d/90-arm equals its pre-change record (0 0 440 fda57f0db6ef425bd90a3445180bcc7682cdc28de13d6fa0bcf4435b6acfad72)
+    PHASE4 BACKOUT check file PASS /etc/sudoers.d/README equals its pre-change record (0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8)
+    PHASE4 BACKOUT check groups PASS arm's groups equal the pre-change record: adm arm cdrom dip plugdev sudo 
+    PHASE4 BACKOUT check sudo-l PASS sudo -l -U arm equals the pre-change record: arm may run: (ALL : ALL) ALL;(ALL) NOPASSWD: ALL;
+    PHASE4 BACKOUT check admin-sudo-l not compared: no account afldb-admin at entry
+    PHASE4 BACKOUT pre-change group line: sudo:x:27:arm; now: sudo:x:27:arm (member order may differ; membership is compared)
+    PHASE4 BACKOUT RESULT PASS the sudoers scope, arm's groups and sudo -l -U arm equal the pre-change record of /root/afldb-phase4-state
+[CHECK] ok   backout RESULT PASS
+[CHECK] ok   the r9 backout then restores the rule and arm's sudo
+SCENARIO old-r8-backout PASS expect=r8-backout=LOST(rule,NOPASSWD,sudo-l),r9-backout=PASS got=r8-backout=LOST(rule,NOPASSWD,sudo-l),r9-backout=PASS
+== scenario old-r8-backout exit 0 containers-left=0
+== scenario unplanned-edit 08:02:52
+[FIXTURE] uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev); sudo 1.9.15p5-3ubuntu5.24.04.4; /etc/sudoers rules: 47:root	ALL=(ALL:ALL) ALL;50:%admin ALL=(ALL) ALL;53:%sudo	ALL=(ALL:ALL) ALL;57:@includedir /etc/sudoers.d;
+[RUN] p4 entry --state /root/afldb-phase4-state (exit 0)
+    PHASE4 ENTRY match /etc/sudoers:53 token %sudo class group-only: %sudo?ALL=(ALL:ALL) ALL
+    PHASE4 ENTRY pre-change: arm's groups: adm arm cdrom dip plugdev sudo (primary gid 1000)
+    PHASE4 ENTRY pre-change: group line: sudo:x:27:arm
+    PHASE4 ENTRY pre-change: /etc/sudoers.d: 0 0 755 directory
+    PHASE4 ENTRY pre-change: file /etc/sudoers uid gid mode sha256: 0 0 440 5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/README uid gid mode sha256: 0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8
+    PHASE4 ENTRY pre-change: sudo -l -U arm: arm may run: (ALL : ALL) ALL;
+    PHASE4 ENTRY pre-change: sudo -l -U afldb-admin: no account afldb-admin (not compared by verify)
+    PHASE4 ENTRY pre-change: include directives: @includedir /etc/sudoers.d;
+    PHASE4 ENTRY change 1 (group-only, step 4.1, [ADM-ROOT]): gpasswd -d arm sudo
+    PHASE4 ENTRY back-out 1 ([CON]): gpasswd -a arm sudo; then id -Gn arm lists exactly: adm arm cdrom dip plugdev sudo 
+    PHASE4 ENTRY back-out, all of it, in one command ([CON]): env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/p4/afldb-phase4.sh backout --state /root/afldb-phase4-state
+    PHASE4 ENTRY realised change, after 4.1: env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/p4/afldb-phase4.sh verify --state /root/afldb-phase4-state
+    PHASE4 ENTRY precondition, NOT checked by this script: the [CON] root session is open now and stays open until 4.7
+    PHASE4 ENTRY precondition, NOT checked by this script: Phase 1 verified twice (1.13), two independently authenticated admin logins
+    PHASE4 ENTRY precondition, NOT checked by this script: the owner's separate written approval of this privilege removal, given after reading this output
+    PHASE4 ENTRY precondition, NOT checked by this script: every other Phase 2 FAIL resolved, every UNKNOWN resolved or accepted, the section 0 residual accepted
+    PHASE4 ENTRY state /root/afldb-phase4-state seal sha256 8e0ed8e9a090ff4f3793f9824cd5c76340202e0a22836de324b3764676b896fa (write it down; verify and backout print it again)
+    PHASE4 ENTRY RESULT PASS change=group-only matches=1 disposed=0 state=/root/afldb-phase4-state
+[CHECK] ok   entry exit 0
+[CHECK] ok   entry RESULT PASS change=group-only
+[CHECK] paths modified since the marker: /root /root/afldb-phase4-state /root/afldb-phase4-state/groups.pre /root/afldb-phase4-state/admin-l.pre /root/afldb-phase4-state/sudo-group.pre /root/afldb-phase4-state/gid.pre /root/afldb-phase4-state/copy.2 /root/afldb-phase4-state/inv.pre /root/afldb-phase4-state/includes.pre /root/afldb-phase4-state/copy.1 /root/afldb-phase4-state/disposed /root/afldb-phase4-state/copies /root/afldb-phase4-state/plan /root/afldb-phase4-state/RESULT /root/afldb-phase4-state/sudo-l.pre /root/afldb-phase4-state/SHA256SUMS /root/afldb-phase4-state/dir.pre /root/afldb-phase4-state/classified.pre /root/afldb-phase4-state/matches.pre 
+[CHECK] ok   entry wrote nothing outside /root/afldb-phase4-state (found: )
+Removing user arm from group sudo
+[CHECK] ok   step 4.1 gpasswd -d arm sudo
+[REAL] after 4.1: uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),30(dip),46(plugdev); sudo:x:27:
+[RUN] p4 verify --state /root/afldb-phase4-state (exit 1)
+    PHASE4 VERIFY state /root/afldb-phase4-state seal sha256 8e0ed8e9a090ff4f3793f9824cd5c76340202e0a22836de324b3764676b896fa (equal to the value entry printed); plan: change=group-only disposed=
+    PHASE4 VERIFY check groups PASS arm's groups: adm arm cdrom dip plugdev (pre-change minus sudo)
+    PHASE4 VERIFY check file PASS /etc/sudoers unchanged
+    PHASE4 VERIFY STOP /etc/sudoers.d/README changed outside the plan: was [0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8], now [0 0 440 edac1d8a4cd56b8cdb1cfb882e6822513536fa79cb37ef6397602683ce86caf5]
+    PHASE4 VERIFY check admin-sudo-l not compared: no account afldb-admin at entry
+    PHASE4 VERIFY check visudo-c PASS
+    PHASE4 VERIFY check rescan PASS no sudoers line names arm, a group of arm or a grant form entry refuses, and no outside rule source
+    PHASE4 VERIFY check sudo-l PASS sudo -l -U arm: arm is not allowed to run sudo
+    PHASE4 VERIFY STOP: back out now in [CON] with: env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/p4/afldb-phase4.sh backout --state /root/afldb-phase4-state; then dispose of the residual separately and run a NEW entry. Do NOT return to step 4.1.
+    PHASE4 VERIFY RESULT STOP /etc/sudoers.d/README changed outside the plan: was [0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8], now [0 0 440 edac1d8a4cd56b8cdb1cfb882e6822513536fa79cb37ef6397602683ce86caf5]
+[CHECK] ok   verify RESULT STOP
+[CHECK] ok   verify names README
+[RUN] p4 backout --state /root/afldb-phase4-state (exit 1)
+    PHASE4 BACKOUT state /root/afldb-phase4-state seal sha256 8e0ed8e9a090ff4f3793f9824cd5c76340202e0a22836de324b3764676b896fa (equal to the value entry printed); plan: change=group-only disposed=
+    PHASE4 BACKOUT ran: gpasswd -a arm sudo
+    PHASE4 BACKOUT check visudo-c PASS
+    PHASE4 BACKOUT check file PASS /etc/sudoers equals its pre-change record (0 0 440 5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8)
+    PHASE4 BACKOUT FAIL /etc/sudoers.d/README changed outside the plan (now [0 0 440 edac1d8a4cd56b8cdb1cfb882e6822513536fa79cb37ef6397602683ce86caf5], was [0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8]): review it, then restore it by hand from /root/afldb-phase4-state/copy.2
+    PHASE4 BACKOUT check groups PASS arm's groups equal the pre-change record: adm arm cdrom dip plugdev sudo 
+    PHASE4 BACKOUT check sudo-l PASS sudo -l -U arm equals the pre-change record: arm may run: (ALL : ALL) ALL;
+    PHASE4 BACKOUT check admin-sudo-l not compared: no account afldb-admin at entry
+    PHASE4 BACKOUT pre-change group line: sudo:x:27:arm; now: sudo:x:27:arm (member order may differ; membership is compared)
+    PHASE4 BACKOUT RESULT FAIL /etc/sudoers.d/README changed outside the plan (now [0 0 440 edac1d8a4cd56b8cdb1cfb882e6822513536fa79cb37ef6397602683ce86caf5], was [0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8]): review it, then restore it by hand from /root/afldb-phase4-state/copy.2
+[CHECK] ok   backout RESULT FAIL
+[CHECK] ok   backout names README
+[CHECK] ok   backout still restored arm's sudo membership
+SCENARIO unplanned-edit PASS expect=verify=STOP(README),backout=FAIL(README),group-restored got=verify=STOP(README),backout=FAIL(README),group-restored
+== scenario unplanned-edit exit 0 containers-left=0
+== scenario state-tamper 08:02:55
+[FIXTURE] uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev); sudo 1.9.15p5-3ubuntu5.24.04.4; /etc/sudoers rules: 47:root	ALL=(ALL:ALL) ALL;50:%admin ALL=(ALL) ALL;53:%sudo	ALL=(ALL:ALL) ALL;57:@includedir /etc/sudoers.d;
+[RUN] p4 entry --state /root/afldb-phase4-state (exit 0)
+    PHASE4 ENTRY match /etc/sudoers:53 token %sudo class group-only: %sudo?ALL=(ALL:ALL) ALL
+    PHASE4 ENTRY pre-change: arm's groups: adm arm cdrom dip plugdev sudo (primary gid 1000)
+    PHASE4 ENTRY pre-change: group line: sudo:x:27:arm
+    PHASE4 ENTRY pre-change: /etc/sudoers.d: 0 0 755 directory
+    PHASE4 ENTRY pre-change: file /etc/sudoers uid gid mode sha256: 0 0 440 5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/README uid gid mode sha256: 0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8
+    PHASE4 ENTRY pre-change: sudo -l -U arm: arm may run: (ALL : ALL) ALL;
+    PHASE4 ENTRY pre-change: sudo -l -U afldb-admin: no account afldb-admin (not compared by verify)
+    PHASE4 ENTRY pre-change: include directives: @includedir /etc/sudoers.d;
+    PHASE4 ENTRY change 1 (group-only, step 4.1, [ADM-ROOT]): gpasswd -d arm sudo
+    PHASE4 ENTRY back-out 1 ([CON]): gpasswd -a arm sudo; then id -Gn arm lists exactly: adm arm cdrom dip plugdev sudo 
+    PHASE4 ENTRY back-out, all of it, in one command ([CON]): env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/p4/afldb-phase4.sh backout --state /root/afldb-phase4-state
+    PHASE4 ENTRY realised change, after 4.1: env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/p4/afldb-phase4.sh verify --state /root/afldb-phase4-state
+    PHASE4 ENTRY precondition, NOT checked by this script: the [CON] root session is open now and stays open until 4.7
+    PHASE4 ENTRY precondition, NOT checked by this script: Phase 1 verified twice (1.13), two independently authenticated admin logins
+    PHASE4 ENTRY precondition, NOT checked by this script: the owner's separate written approval of this privilege removal, given after reading this output
+    PHASE4 ENTRY precondition, NOT checked by this script: every other Phase 2 FAIL resolved, every UNKNOWN resolved or accepted, the section 0 residual accepted
+    PHASE4 ENTRY state /root/afldb-phase4-state seal sha256 8e0ed8e9a090ff4f3793f9824cd5c76340202e0a22836de324b3764676b896fa (write it down; verify and backout print it again)
+    PHASE4 ENTRY RESULT PASS change=group-only matches=1 disposed=0 state=/root/afldb-phase4-state
+[CHECK] ok   entry exit 0
+[CHECK] ok   entry RESULT PASS change=group-only
+[CHECK] paths modified since the marker: /root /root/afldb-phase4-state /root/afldb-phase4-state/groups.pre /root/afldb-phase4-state/admin-l.pre /root/afldb-phase4-state/sudo-group.pre /root/afldb-phase4-state/gid.pre /root/afldb-phase4-state/copy.2 /root/afldb-phase4-state/inv.pre /root/afldb-phase4-state/includes.pre /root/afldb-phase4-state/copy.1 /root/afldb-phase4-state/disposed /root/afldb-phase4-state/copies /root/afldb-phase4-state/plan /root/afldb-phase4-state/RESULT /root/afldb-phase4-state/sudo-l.pre /root/afldb-phase4-state/SHA256SUMS /root/afldb-phase4-state/dir.pre /root/afldb-phase4-state/classified.pre /root/afldb-phase4-state/matches.pre 
+[CHECK] ok   entry wrote nothing outside /root/afldb-phase4-state (found: )
+Removing user arm from group sudo
+[CHECK] ok   step 4.1 gpasswd -d arm sudo
+[REAL] after 4.1: uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),30(dip),46(plugdev); sudo:x:27:
+[RUN] p4 verify --state /root/afldb-phase4-state (exit 1)
+    PHASE4 VERIFY STOP state /root/afldb-phase4-state: seal check (SHA256SUMS) failed
+    PHASE4 VERIFY RESULT STOP state /root/afldb-phase4-state: seal check (SHA256SUMS) failed
+[CHECK] ok   verify RESULT STOP
+[CHECK] ok   verify names the seal
+[RUN] p4 backout --state /root/afldb-phase4-state (exit 1)
+    PHASE4 BACKOUT FAIL state /root/afldb-phase4-state: seal check (SHA256SUMS) failed
+    PHASE4 BACKOUT RESULT FAIL state /root/afldb-phase4-state: seal check (SHA256SUMS) failed
+[CHECK] ok   backout RESULT FAIL
+[CHECK] ok   backout names the seal
+[CHECK] ok   the refused backout changed nothing
+SCENARIO state-tamper PASS expect=verify=STOP(seal),backout=FAIL(seal),nothing-changed got=verify=STOP(seal),backout=FAIL(seal),nothing-changed
+== scenario state-tamper exit 0 containers-left=0
+== scenario dispose-etc-sudoers 08:02:57
+[FIXTURE] uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev); sudo 1.9.15p5-3ubuntu5.24.04.4; /etc/sudoers rules: 47:root	ALL=(ALL:ALL) ALL;50:%admin ALL=(ALL) ALL;53:%sudo	ALL=(ALL:ALL) ALL;57:@includedir /etc/sudoers.d;
+[FIXTURE] uid=1001(afldb-admin) gid=1001(afldb-admin) groups=1001(afldb-admin),27(sudo) (the admin: sudo by group, 1.8)
+[CHECK] ok   fixture: visudo -c with the appended arm rule
+[FIXTURE] /etc/sudoers: %sudo at line 53 [%sudo?ALL=(ALL:ALL) ALL], arm rule at line 59
+[CHECK] ok   before: afldb-admin may run (ALL : ALL) ALL
+[RUN] p4 entry --state /root/afldb-phase4-state --dispose /etc/sudoers (exit 0)
+    PHASE4 ENTRY match /etc/sudoers:53 token %sudo class group-only: %sudo?ALL=(ALL:ALL) ALL
+    PHASE4 ENTRY match /etc/sudoers:59 token arm class disposed: arm ALL=(ALL) NOPASSWD: ALL
+    PHASE4 ENTRY pre-change: arm's groups: adm arm cdrom dip plugdev sudo (primary gid 1000)
+    PHASE4 ENTRY pre-change: group line: sudo:x:27:arm,afldb-admin
+    PHASE4 ENTRY pre-change: /etc/sudoers.d: 0 0 755 directory
+    PHASE4 ENTRY pre-change: file /etc/sudoers uid gid mode sha256: 0 0 440 f7ad90d202a94d4060598fd56d9e0bce439b9cd90de49d51456f4e119342daf9
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/README uid gid mode sha256: 0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8
+    PHASE4 ENTRY pre-change: sudo -l -U arm: arm may run: (ALL : ALL) ALL;(ALL) NOPASSWD: ALL;
+    PHASE4 ENTRY pre-change: sudo -l -U afldb-admin: (ALL : ALL) ALL;
+    PHASE4 ENTRY pre-change: include directives: @includedir /etc/sudoers.d;
+    PHASE4 ENTRY change 1 (group-only, step 4.1, [ADM-ROOT]): gpasswd -d arm sudo
+    PHASE4 ENTRY back-out 1 ([CON]): gpasswd -a arm sudo; then id -Gn arm lists exactly: adm arm cdrom dip plugdev sudo 
+    PHASE4 ENTRY change 2 (disposed, step 4.1, [ADM-ROOT]): visudo -f /etc/sudoers, removing or changing ONLY line(s) 59(arm) and no other line; KEEP line(s) 53(%sudo) exactly as they are (%sudo, group-only: the route to root of afldb-admin)
+    PHASE4 ENTRY back-out 2 ([CON]): install -o 0 -g 0 -m 0440 /root/afldb-phase4-state/copy.1 /etc/sudoers && visudo -c && sha256sum /etc/sudoers (must print f7ad90d202a94d4060598fd56d9e0bce439b9cd90de49d51456f4e119342daf9)
+    PHASE4 ENTRY back-out, all of it, in one command ([CON]): env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/p4/afldb-phase4.sh backout --state /root/afldb-phase4-state
+    PHASE4 ENTRY realised change, after 4.1: env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/p4/afldb-phase4.sh verify --state /root/afldb-phase4-state
+    PHASE4 ENTRY precondition, NOT checked by this script: the [CON] root session is open now and stays open until 4.7
+    PHASE4 ENTRY precondition, NOT checked by this script: Phase 1 verified twice (1.13), two independently authenticated admin logins
+    PHASE4 ENTRY precondition, NOT checked by this script: the owner's separate written approval of this privilege removal, given after reading this output
+    PHASE4 ENTRY precondition, NOT checked by this script: every other Phase 2 FAIL resolved, every UNKNOWN resolved or accepted, the section 0 residual accepted
+    PHASE4 ENTRY state /root/afldb-phase4-state seal sha256 5cc84f1e3d9d2e86724cb8a0166ca6b69985f6e1347af99c93798df52234a9c1 (write it down; verify and backout print it again)
+    PHASE4 ENTRY RESULT PASS change=group-and-disposed matches=2 disposed=1 state=/root/afldb-phase4-state
+[CHECK] ok   entry exit 0
+[CHECK] ok   entry RESULT PASS change=group-and-disposed
+[CHECK] paths modified since the marker: /root /root/afldb-phase4-state /root/afldb-phase4-state/groups.pre /root/afldb-phase4-state/admin-l.pre /root/afldb-phase4-state/sudo-group.pre /root/afldb-phase4-state/gid.pre /root/afldb-phase4-state/copy.2 /root/afldb-phase4-state/inv.pre /root/afldb-phase4-state/includes.pre /root/afldb-phase4-state/copy.1 /root/afldb-phase4-state/disposed /root/afldb-phase4-state/copies /root/afldb-phase4-state/plan /root/afldb-phase4-state/RESULT /root/afldb-phase4-state/sudo-l.pre /root/afldb-phase4-state/SHA256SUMS /root/afldb-phase4-state/dir.pre /root/afldb-phase4-state/classified.pre /root/afldb-phase4-state/matches.pre 
+[CHECK] ok   entry wrote nothing outside /root/afldb-phase4-state (found: )
+[CHECK] ok   %sudo in the disposed /etc/sudoers is classified group-only
+[CHECK] ok   the arm rule (line 59) is classified disposed
+[CHECK] ok   the 4.1 instruction names only line 59 and says to keep line 53
+[CHECK] ok   visudo -f /etc/sudoers exit 0
+[CHECK] ok   visudo -c after the owner edit
+[REAL] /etc/sudoers after the owner edit: root:root 440, sha256 de205826d5bb7e01..., content: [#;# This file MUST be edited with the 'visudo' command as root.;#;# Please consider adding local content in /etc/sudoers.d/ instead of;# directly modifying this file.;#;# See the man page for details on how to write a sudoers file.;#;Defaults	env_reset;Defaults	mail_badpass;Defaults	secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin";;# This fixes CVE-2005-4890 and possibly breaks some versions of kdesu;# (#1011624, https://bugs.kde.org/show_bug.cgi?id=452532);Defaults	use_pty;;# This preserves proxy settings from user environments of root;# equivalent users (group sudo);#Defaults:%sudo env_keep += "http_proxy https_proxy ftp_proxy all_proxy no_proxy";;# This allows running arbitrary commands, but so does ALL, and it means;# different sudoers have their choice of editor respected.;#Defaults:%sudo env_keep += "EDITOR";;# Completely harmless preservation of a user preference.;#Defaults:%sudo env_keep += "GREP_COLOR";;# While you shouldn't normally run git as root, you need to with etckeeper;#Defaults:%sudo env_keep += "GIT_AUTHOR_* GIT_COMMITTER_*";;# Per-user preferences; root won't have sensible values for them.;#Defaults:%sudo env_keep += "EMAIL DEBEMAIL DEBFULLNAME";;# "sudo scp" or "sudo rsync" should be able to use your SSH agent.;#Defaults:%sudo env_keep += "SSH_AGENT_PID SSH_AUTH_SOCK";;# Ditto for GPG agent;#Defaults:%sudo env_keep += "GPG_AGENT_INFO";;# Host alias specification;;# User alias specification;;# Cmnd alias specification;;# User privilege specification;root	ALL=(ALL:ALL) ALL;;# Members of the admin group may gain root privileges;%admin ALL=(ALL) ALL;;# Allow members of group sudo to execute any command;%sudo	ALL=(ALL:ALL) ALL;;# See sudoers(5) for more information on "@include" directives:;;@includedir /etc/sudoers.d;# deploy access for arm (fixture);]
+Removing user arm from group sudo
+[CHECK] ok   step 4.1 gpasswd -d arm sudo
+[REAL] after 4.1: uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),30(dip),46(plugdev); sudo:x:27:afldb-admin
+[RUN] p4 verify --state /root/afldb-phase4-state (exit 0)
+    PHASE4 VERIFY state /root/afldb-phase4-state seal sha256 5cc84f1e3d9d2e86724cb8a0166ca6b69985f6e1347af99c93798df52234a9c1 (equal to the value entry printed); plan: change=group-and-disposed disposed=/etc/sudoers 
+    PHASE4 VERIFY check groups PASS arm's groups: adm arm cdrom dip plugdev (pre-change minus sudo)
+    PHASE4 VERIFY check file PASS /etc/sudoers (disposed) now: 0 0 440 de205826d5bb7e01176bc6be7ea2489b32564d3fb26829f9bd5d863825345455
+    PHASE4 VERIFY check file PASS /etc/sudoers.d/README unchanged
+    PHASE4 VERIFY check kept PASS /etc/sudoers: only its disposed line(s) 59(arm) changed; every other line is byte-identical, including the %sudo line(s) 53(%sudo) 
+    PHASE4 VERIFY check admin-sudo-l PASS sudo -l -U afldb-admin equals the pre-change record: (ALL : ALL) ALL;
+    PHASE4 VERIFY check visudo-c PASS
+    PHASE4 VERIFY check rescan PASS no sudoers line names arm, a group of arm or a grant form entry refuses, and no outside rule source
+    PHASE4 VERIFY check sudo-l PASS sudo -l -U arm: arm is not allowed to run sudo
+    PHASE4 VERIFY RESULT PASS the realised change equals the plan (change=group-and-disposed disposed=/etc/sudoers ) and arm cannot sudo
+[CHECK] ok   verify RESULT PASS
+[CHECK] ok   verify: every other line byte-identical, %sudo included
+[CHECK] ok   verify: sudo -l -U afldb-admin equals its pre-change record
+[CHECK] ok   the %sudo line is still in /etc/sudoers
+[CHECK] ok   after 4.1: afldb-admin may still run (ALL : ALL) ALL
+[CHECK] ok   after 4.1: arm can no longer sudo -n (sudo: a password is required)
+[RUN] p4 backout --state /root/afldb-phase4-state (exit 0)
+    PHASE4 BACKOUT state /root/afldb-phase4-state seal sha256 5cc84f1e3d9d2e86724cb8a0166ca6b69985f6e1347af99c93798df52234a9c1 (equal to the value entry printed); plan: change=group-and-disposed disposed=/etc/sudoers 
+    PHASE4 BACKOUT restored /etc/sudoers from /root/afldb-phase4-state/copy.1 (owner 0:0, mode 0440)
+    PHASE4 BACKOUT ran: gpasswd -a arm sudo
+    PHASE4 BACKOUT check visudo-c PASS
+    PHASE4 BACKOUT check file PASS /etc/sudoers equals its pre-change record (0 0 440 f7ad90d202a94d4060598fd56d9e0bce439b9cd90de49d51456f4e119342daf9)
+    PHASE4 BACKOUT check file PASS /etc/sudoers.d/README equals its pre-change record (0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8)
+    PHASE4 BACKOUT check groups PASS arm's groups equal the pre-change record: adm arm cdrom dip plugdev sudo 
+    PHASE4 BACKOUT check sudo-l PASS sudo -l -U arm equals the pre-change record: arm may run: (ALL : ALL) ALL;(ALL) NOPASSWD: ALL;
+    PHASE4 BACKOUT check admin-sudo-l PASS sudo -l -U afldb-admin equals the pre-change record
+    PHASE4 BACKOUT pre-change group line: sudo:x:27:arm,afldb-admin; now: sudo:x:27:afldb-admin,arm (member order may differ; membership is compared)
+    PHASE4 BACKOUT RESULT PASS the sudoers scope, arm's groups and sudo -l -U arm equal the pre-change record of /root/afldb-phase4-state
+[CHECK] ok   backout RESULT PASS
+[CHECK] ok   after backout: /etc/sudoers is byte-identical to the fixture copy
+[CHECK] ok   after backout: arm runs sudo -n id -u as root again
+[CHECK] ok   after backout: the snapshot equals pre-change (sudo members compared as a set)
+SCENARIO dispose-etc-sudoers PASS expect=entry=PASS(%sudo group-only, only line 59 listed),verify=PASS(kept,admin-sudo-l),backout=PASS,exact got=entry=PASS(%sudo group-only, only line 59 listed),verify=PASS(kept,admin-sudo-l),backout=PASS,exact
+== scenario dispose-etc-sudoers exit 0 containers-left=0
+== scenario dispose-removes-percent-sudo 08:03:00
+[FIXTURE] uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev); sudo 1.9.15p5-3ubuntu5.24.04.4; /etc/sudoers rules: 47:root	ALL=(ALL:ALL) ALL;50:%admin ALL=(ALL) ALL;53:%sudo	ALL=(ALL:ALL) ALL;57:@includedir /etc/sudoers.d;
+[FIXTURE] uid=1001(afldb-admin) gid=1001(afldb-admin) groups=1001(afldb-admin),27(sudo) (the admin: sudo by group, 1.8)
+[CHECK] ok   fixture: visudo -c with the appended arm rule
+[FIXTURE] /etc/sudoers: %sudo at line 53 [%sudo?ALL=(ALL:ALL) ALL], arm rule at line 59
+[CHECK] ok   before: afldb-admin may run (ALL : ALL) ALL
+[RUN] p4 entry --state /root/afldb-phase4-state --dispose /etc/sudoers (exit 0)
+    PHASE4 ENTRY match /etc/sudoers:53 token %sudo class group-only: %sudo?ALL=(ALL:ALL) ALL
+    PHASE4 ENTRY match /etc/sudoers:59 token arm class disposed: arm ALL=(ALL) NOPASSWD: ALL
+    PHASE4 ENTRY pre-change: arm's groups: adm arm cdrom dip plugdev sudo (primary gid 1000)
+    PHASE4 ENTRY pre-change: group line: sudo:x:27:arm,afldb-admin
+    PHASE4 ENTRY pre-change: /etc/sudoers.d: 0 0 755 directory
+    PHASE4 ENTRY pre-change: file /etc/sudoers uid gid mode sha256: 0 0 440 f7ad90d202a94d4060598fd56d9e0bce439b9cd90de49d51456f4e119342daf9
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/README uid gid mode sha256: 0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8
+    PHASE4 ENTRY pre-change: sudo -l -U arm: arm may run: (ALL : ALL) ALL;(ALL) NOPASSWD: ALL;
+    PHASE4 ENTRY pre-change: sudo -l -U afldb-admin: (ALL : ALL) ALL;
+    PHASE4 ENTRY pre-change: include directives: @includedir /etc/sudoers.d;
+    PHASE4 ENTRY change 1 (group-only, step 4.1, [ADM-ROOT]): gpasswd -d arm sudo
+    PHASE4 ENTRY back-out 1 ([CON]): gpasswd -a arm sudo; then id -Gn arm lists exactly: adm arm cdrom dip plugdev sudo 
+    PHASE4 ENTRY change 2 (disposed, step 4.1, [ADM-ROOT]): visudo -f /etc/sudoers, removing or changing ONLY line(s) 59(arm) and no other line; KEEP line(s) 53(%sudo) exactly as they are (%sudo, group-only: the route to root of afldb-admin)
+    PHASE4 ENTRY back-out 2 ([CON]): install -o 0 -g 0 -m 0440 /root/afldb-phase4-state/copy.1 /etc/sudoers && visudo -c && sha256sum /etc/sudoers (must print f7ad90d202a94d4060598fd56d9e0bce439b9cd90de49d51456f4e119342daf9)
+    PHASE4 ENTRY back-out, all of it, in one command ([CON]): env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/p4/afldb-phase4.sh backout --state /root/afldb-phase4-state
+    PHASE4 ENTRY realised change, after 4.1: env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/p4/afldb-phase4.sh verify --state /root/afldb-phase4-state
+    PHASE4 ENTRY precondition, NOT checked by this script: the [CON] root session is open now and stays open until 4.7
+    PHASE4 ENTRY precondition, NOT checked by this script: Phase 1 verified twice (1.13), two independently authenticated admin logins
+    PHASE4 ENTRY precondition, NOT checked by this script: the owner's separate written approval of this privilege removal, given after reading this output
+    PHASE4 ENTRY precondition, NOT checked by this script: every other Phase 2 FAIL resolved, every UNKNOWN resolved or accepted, the section 0 residual accepted
+    PHASE4 ENTRY state /root/afldb-phase4-state seal sha256 5cc84f1e3d9d2e86724cb8a0166ca6b69985f6e1347af99c93798df52234a9c1 (write it down; verify and backout print it again)
+    PHASE4 ENTRY RESULT PASS change=group-and-disposed matches=2 disposed=1 state=/root/afldb-phase4-state
+[CHECK] ok   entry exit 0
+[CHECK] ok   entry RESULT PASS change=group-and-disposed
+[CHECK] paths modified since the marker: /root /root/afldb-phase4-state /root/afldb-phase4-state/groups.pre /root/afldb-phase4-state/admin-l.pre /root/afldb-phase4-state/sudo-group.pre /root/afldb-phase4-state/gid.pre /root/afldb-phase4-state/copy.2 /root/afldb-phase4-state/inv.pre /root/afldb-phase4-state/includes.pre /root/afldb-phase4-state/copy.1 /root/afldb-phase4-state/disposed /root/afldb-phase4-state/copies /root/afldb-phase4-state/plan /root/afldb-phase4-state/RESULT /root/afldb-phase4-state/sudo-l.pre /root/afldb-phase4-state/SHA256SUMS /root/afldb-phase4-state/dir.pre /root/afldb-phase4-state/classified.pre /root/afldb-phase4-state/matches.pre 
+[CHECK] ok   entry wrote nothing outside /root/afldb-phase4-state (found: )
+[CHECK] ok   %sudo in the disposed /etc/sudoers is classified group-only
+[CHECK] ok   the arm rule (line 59) is classified disposed
+[CHECK] ok   the 4.1 instruction names only line 59 and says to keep line 53
+[CHECK] ok   visudo -c after the wrong edit (it is valid sudoers)
+[FIXTURE] the owner WRONGLY deletes the %sudo line too: 0 %sudo line(s) left
+Removing user arm from group sudo
+[CHECK] ok   step 4.1 gpasswd -d arm sudo
+[REAL] after 4.1: uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),30(dip),46(plugdev); sudo:x:27:afldb-admin
+[RUN] p4 verify --state /root/afldb-phase4-state (exit 1)
+    PHASE4 VERIFY state /root/afldb-phase4-state seal sha256 5cc84f1e3d9d2e86724cb8a0166ca6b69985f6e1347af99c93798df52234a9c1 (equal to the value entry printed); plan: change=group-and-disposed disposed=/etc/sudoers 
+    PHASE4 VERIFY check groups PASS arm's groups: adm arm cdrom dip plugdev (pre-change minus sudo)
+    PHASE4 VERIFY check file PASS /etc/sudoers (disposed) now: 0 0 440 776855f7c13dabfa24f9a63ae23e383b0f7fa89bed1dc99f482638f282e9ff46
+    PHASE4 VERIFY check file PASS /etc/sudoers.d/README unchanged
+    PHASE4 VERIFY STOP /etc/sudoers:53 ('%sudo?ALL=(ALL:ALL) ALL') was changed or removed, but 4.0 did not name it for change (it is %sudo, group-only: afldb-admin's route to root)
+    PHASE4 VERIFY STOP sudo -l -U afldb-admin differs from the pre-change record (the admin's own route to root): now ; diff record/now: 1,5c1;< Matching Defaults entries for afldb-admin on afldb-prod:;<     env_reset, mail_badpass, secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin\:/snap/bin, use_pty;< ;< User afldb-admin may run the following commands on afldb-prod:;<     (ALL : ALL) ALL;---;> User afldb-admin is not allowed to run sudo on afldb-prod.;
+    PHASE4 VERIFY check visudo-c PASS
+    PHASE4 VERIFY check rescan PASS no sudoers line names arm, a group of arm or a grant form entry refuses, and no outside rule source
+    PHASE4 VERIFY check sudo-l PASS sudo -l -U arm: arm is not allowed to run sudo
+    PHASE4 VERIFY STOP: back out now in [CON] with: env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/p4/afldb-phase4.sh backout --state /root/afldb-phase4-state; then dispose of the residual separately and run a NEW entry. Do NOT return to step 4.1.
+    PHASE4 VERIFY RESULT STOP /etc/sudoers:53 ('%sudo?ALL=(ALL:ALL) ALL') was changed or removed, but 4.0 did not name it for change (it is %sudo, group-only: afldb-admin's route to root);sudo -l -U afldb-admin differs from the pre-change record (the admin's own route to root): now ; diff record/now: 1,5c1;< Matching Defaults entries for afldb-admin on afldb-prod:;<     env_reset, mail_badpass, secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin\:/snap/bin, use_pty;< ;< User afldb-admin may run the following commands on afldb-prod:;<     (ALL : ALL) ALL;---;> User afldb-admin is not allowed to run sudo on afldb-prod.;
+[CHECK] ok   verify RESULT STOP
+[CHECK] ok   verify names the removed %sudo line
+[CHECK] ok   verify names afldb-admin's lost route
+[CHECK] ok   verify says back out
+[RUN] p4 backout --state /root/afldb-phase4-state (exit 0)
+    PHASE4 BACKOUT state /root/afldb-phase4-state seal sha256 5cc84f1e3d9d2e86724cb8a0166ca6b69985f6e1347af99c93798df52234a9c1 (equal to the value entry printed); plan: change=group-and-disposed disposed=/etc/sudoers 
+    PHASE4 BACKOUT restored /etc/sudoers from /root/afldb-phase4-state/copy.1 (owner 0:0, mode 0440)
+    PHASE4 BACKOUT ran: gpasswd -a arm sudo
+    PHASE4 BACKOUT check visudo-c PASS
+    PHASE4 BACKOUT check file PASS /etc/sudoers equals its pre-change record (0 0 440 f7ad90d202a94d4060598fd56d9e0bce439b9cd90de49d51456f4e119342daf9)
+    PHASE4 BACKOUT check file PASS /etc/sudoers.d/README equals its pre-change record (0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8)
+    PHASE4 BACKOUT check groups PASS arm's groups equal the pre-change record: adm arm cdrom dip plugdev sudo 
+    PHASE4 BACKOUT check sudo-l PASS sudo -l -U arm equals the pre-change record: arm may run: (ALL : ALL) ALL;(ALL) NOPASSWD: ALL;
+    PHASE4 BACKOUT check admin-sudo-l PASS sudo -l -U afldb-admin equals the pre-change record
+    PHASE4 BACKOUT pre-change group line: sudo:x:27:arm,afldb-admin; now: sudo:x:27:afldb-admin,arm (member order may differ; membership is compared)
+    PHASE4 BACKOUT RESULT PASS the sudoers scope, arm's groups and sudo -l -U arm equal the pre-change record of /root/afldb-phase4-state
+[CHECK] ok   backout RESULT PASS
+[CHECK] ok   after backout: /etc/sudoers is byte-identical to the fixture copy (%sudo back)
+[CHECK] ok   after backout: afldb-admin's sudo -l equals the pre-change answer
+[CHECK] ok   after backout: the snapshot equals pre-change (sudo members compared as a set)
+SCENARIO dispose-removes-percent-sudo PASS expect=verify=STOP(%sudo line 53 removed,afldb-admin route),backout=PASS,exact got=verify=STOP(%sudo line 53 removed,afldb-admin route),backout=PASS,exact
+== scenario dispose-removes-percent-sudo exit 0 containers-left=0
+== scenario refuse-dispose-percent-sudo 08:03:03
+[FIXTURE] uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev); sudo 1.9.15p5-3ubuntu5.24.04.4; /etc/sudoers rules: 47:root	ALL=(ALL:ALL) ALL;50:%admin ALL=(ALL) ALL;53:%sudo	ALL=(ALL:ALL) ALL;57:@includedir /etc/sudoers.d;
+[RUN] p4 entry --state /root/afldb-phase4-state --dispose /etc/sudoers (exit 1)
+    PHASE4 ENTRY REFUSED --dispose /etc/sudoers: its only match is %sudo (group-only: 4.1's gpasswd -d arm sudo removes it, and its line is never edited), so there is nothing to dispose of
+    PHASE4 ENTRY match /etc/sudoers:53 token %sudo class group-only: %sudo?ALL=(ALL:ALL) ALL
+    PHASE4 ENTRY pre-change: arm's groups: adm arm cdrom dip plugdev sudo (primary gid 1000)
+    PHASE4 ENTRY pre-change: group line: sudo:x:27:arm
+    PHASE4 ENTRY pre-change: /etc/sudoers.d: 0 0 755 directory
+    PHASE4 ENTRY pre-change: file /etc/sudoers uid gid mode sha256: 0 0 440 5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/README uid gid mode sha256: 0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8
+    PHASE4 ENTRY pre-change: sudo -l -U arm: arm may run: (ALL : ALL) ALL;
+    PHASE4 ENTRY pre-change: sudo -l -U afldb-admin: no account afldb-admin (not compared by verify)
+    PHASE4 ENTRY pre-change: include directives: @includedir /etc/sudoers.d;
+    PHASE4 ENTRY RESULT REFUSED --dispose /etc/sudoers: its only match is %sudo (group-only: 4.1's gpasswd -d arm sudo removes it, and its line is never edited), so there is nothing to dispose of
+[CHECK] ok   entry exit 1
+[CHECK] ok   entry RESULT REFUSED
+[CHECK] ok   the refusal names: --dispose /etc/sudoers: its only match is %sudo
+[CHECK] ok   nothing changed: sudoers scope, group files, arm's groups and sudo -l -U arm equal the pre-entry snapshot
+[CHECK] paths modified since the marker: /root /root/afldb-phase4-state /root/afldb-phase4-state/groups.pre /root/afldb-phase4-state/admin-l.pre /root/afldb-phase4-state/sudo-group.pre /root/afldb-phase4-state/gid.pre /root/afldb-phase4-state/copy.2 /root/afldb-phase4-state/inv.pre /root/afldb-phase4-state/includes.pre /root/afldb-phase4-state/copy.1 /root/afldb-phase4-state/disposed /root/afldb-phase4-state/copies /root/afldb-phase4-state/RESULT /root/afldb-phase4-state/sudo-l.pre /root/afldb-phase4-state/dir.pre /root/afldb-phase4-state/classified.pre /root/afldb-phase4-state/matches.pre 
+[CHECK] ok   entry wrote nothing outside /root/afldb-phase4-state (found: )
+SCENARIO refuse-dispose-percent-sudo PASS expect=entry=REFUSED(--dispose /etc/sudoers: only %sudo),nothing-changed got=entry=REFUSED(--dispose /etc/sudoers: only %sudo),nothing-changed
+== scenario refuse-dispose-percent-sudo exit 0 containers-left=0
+== scenario refuse-mixed-line 08:03:06
+[FIXTURE] uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev); sudo 1.9.15p5-3ubuntu5.24.04.4; /etc/sudoers rules: 47:root	ALL=(ALL:ALL) ALL;50:%admin ALL=(ALL) ALL;53:%sudo	ALL=(ALL:ALL) ALL;57:@includedir /etc/sudoers.d;
+[FIXTURE] /etc/sudoers.d/86-mixed (root:root 440): # fixture
+%sudo,arm ALL=(ALL) ALL; visudo -c: /etc/sudoers: parsed OK;/etc/sudoers.d/86-mixed: parsed OK;/etc/sudoers.d/README: parsed OK;
+[RUN] p4 entry --state /root/afldb-phase4-state --dispose /etc/sudoers.d/86-mixed (exit 1)
+    PHASE4 ENTRY match /etc/sudoers:53 token %sudo class group-only: %sudo?ALL=(ALL:ALL) ALL
+    PHASE4 ENTRY match /etc/sudoers.d/86-mixed:2 token arm class disposed: %sudo,arm ALL=(ALL) ALL
+    PHASE4 ENTRY match /etc/sudoers.d/86-mixed:2 token %sudo class group-only: %sudo,arm ALL=(ALL) ALL
+    PHASE4 ENTRY REFUSED /etc/sudoers.d/86-mixed:2 (%sudo, lines 2-2) shares a line with the disposed match /etc/sudoers.d/86-mixed:2 (arm): entry cannot plan an edit that keeps %sudo; dispose of it separately
+    PHASE4 ENTRY pre-change: arm's groups: adm arm cdrom dip plugdev sudo (primary gid 1000)
+    PHASE4 ENTRY pre-change: group line: sudo:x:27:arm
+    PHASE4 ENTRY pre-change: /etc/sudoers.d: 0 0 755 directory
+    PHASE4 ENTRY pre-change: file /etc/sudoers uid gid mode sha256: 0 0 440 5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/86-mixed uid gid mode sha256: 0 0 440 6a25b6e0cb314c754c74174c27f9247bb920ff853a0dad47af7e6e11a0a638ee
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/README uid gid mode sha256: 0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8
+    PHASE4 ENTRY pre-change: sudo -l -U arm: arm may run: (ALL : ALL) ALL;(ALL) ALL;
+    PHASE4 ENTRY pre-change: sudo -l -U afldb-admin: no account afldb-admin (not compared by verify)
+    PHASE4 ENTRY pre-change: include directives: @includedir /etc/sudoers.d;
+    PHASE4 ENTRY RESULT REFUSED /etc/sudoers.d/86-mixed:2 (%sudo, lines 2-2) shares a line with the disposed match /etc/sudoers.d/86-mixed:2 (arm): entry cannot plan an edit that keeps %sudo; dispose of it separately
+[CHECK] ok   entry exit 1
+[CHECK] ok   entry RESULT REFUSED
+[CHECK] ok   the refusal names: /etc/sudoers.d/86-mixed:2 (%sudo, lines 2-2) shares a line with the disposed match /etc/sudoers.d/86-mixed:2 (arm)
+[CHECK] ok   nothing changed: sudoers scope, group files, arm's groups and sudo -l -U arm equal the pre-entry snapshot
+[CHECK] paths modified since the marker: /root /root/afldb-phase4-state /root/afldb-phase4-state/groups.pre /root/afldb-phase4-state/admin-l.pre /root/afldb-phase4-state/sudo-group.pre /root/afldb-phase4-state/gid.pre /root/afldb-phase4-state/copy.2 /root/afldb-phase4-state/inv.pre /root/afldb-phase4-state/includes.pre /root/afldb-phase4-state/copy.1 /root/afldb-phase4-state/disposed /root/afldb-phase4-state/copies /root/afldb-phase4-state/RESULT /root/afldb-phase4-state/copy.3 /root/afldb-phase4-state/sudo-l.pre /root/afldb-phase4-state/dir.pre /root/afldb-phase4-state/classified.pre /root/afldb-phase4-state/matches.pre 
+[CHECK] ok   entry wrote nothing outside /root/afldb-phase4-state (found: )
+SCENARIO refuse-mixed-line PASS expect=entry=REFUSED(86-mixed:2 %sudo shares a line with arm),nothing-changed got=entry=REFUSED(86-mixed:2 %sudo shares a line with arm),nothing-changed
+== scenario refuse-mixed-line exit 0 containers-left=0
+== scenario refuse-escaped-alias 08:03:08
+[FIXTURE] uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev); sudo 1.9.15p5-3ubuntu5.24.04.4; /etc/sudoers rules: 47:root	ALL=(ALL:ALL) ALL;50:%admin ALL=(ALL) ALL;53:%sudo	ALL=(ALL:ALL) ALL;57:@includedir /etc/sudoers.d;
+[FIXTURE] /etc/sudoers.d/84-esc (root:root 440): User_Alias OPS = deploy, ar\m
+OPS ALL=(ALL) ALL; visudo -c: /etc/sudoers: parsed OK;/etc/sudoers.d/84-esc: parsed OK;/etc/sudoers.d/README: parsed OK;
+[CHECK] ok   sudo itself reads ar\m as arm (sudo -l -U arm lists the OPS rule '(ALL) ALL')
+[CHECK] ok   owner-checks B3 (unchanged, at its pin) does not name 84-esc
+[RUN] p4 entry --state /root/afldb-phase4-state (exit 1)
+    PHASE4 ENTRY match /etc/sudoers:53 token %sudo class group-only: %sudo?ALL=(ALL:ALL) ALL
+    PHASE4 ENTRY match /etc/sudoers.d/84-esc:1 token unparsed-alias-member:ar\m class unrelated: User_Alias OPS = deploy, ar\m
+    PHASE4 ENTRY REFUSED /etc/sudoers.d/84-esc:1 names unparsed-alias-member:ar\m ('User_Alias OPS = deploy, ar\m'): an explicit or unrelated sudoers grant, not removed by gpasswd -d arm sudo; dispose of it separately, or name /etc/sudoers.d/84-esc with --dispose to edit it in 4.1
+    PHASE4 ENTRY pre-change: arm's groups: adm arm cdrom dip plugdev sudo (primary gid 1000)
+    PHASE4 ENTRY pre-change: group line: sudo:x:27:arm
+    PHASE4 ENTRY pre-change: /etc/sudoers.d: 0 0 755 directory
+    PHASE4 ENTRY pre-change: file /etc/sudoers uid gid mode sha256: 0 0 440 5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/84-esc uid gid mode sha256: 0 0 440 70ce7584cf49f01000ece951046aefe370a19f688401510c03d0d13eef5e35fe
+    PHASE4 ENTRY pre-change: file /etc/sudoers.d/README uid gid mode sha256: 0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8
+    PHASE4 ENTRY pre-change: sudo -l -U arm: arm may run: (ALL : ALL) ALL;(ALL) ALL;
+    PHASE4 ENTRY pre-change: sudo -l -U afldb-admin: no account afldb-admin (not compared by verify)
+    PHASE4 ENTRY pre-change: include directives: @includedir /etc/sudoers.d;
+    PHASE4 ENTRY RESULT REFUSED /etc/sudoers.d/84-esc:1 names unparsed-alias-member:ar\m ('User_Alias OPS = deploy, ar\m'): an explicit or unrelated sudoers grant, not removed by gpasswd -d arm sudo; dispose of it separately, or name /etc/sudoers.d/84-esc with --dispose to edit it in 4.1
+[CHECK] ok   entry exit 1
+[CHECK] ok   entry RESULT REFUSED
+[CHECK] ok   the refusal names: /etc/sudoers.d/84-esc:1 names unparsed-alias-member:ar\m
+[CHECK] ok   nothing changed: sudoers scope, group files, arm's groups and sudo -l -U arm equal the pre-entry snapshot
+[CHECK] paths modified since the marker: /root /root/afldb-phase4-state /root/afldb-phase4-state/groups.pre /root/afldb-phase4-state/admin-l.pre /root/afldb-phase4-state/sudo-group.pre /root/afldb-phase4-state/gid.pre /root/afldb-phase4-state/copy.2 /root/afldb-phase4-state/inv.pre /root/afldb-phase4-state/includes.pre /root/afldb-phase4-state/copy.1 /root/afldb-phase4-state/disposed /root/afldb-phase4-state/copies /root/afldb-phase4-state/RESULT /root/afldb-phase4-state/copy.3 /root/afldb-phase4-state/sudo-l.pre /root/afldb-phase4-state/dir.pre /root/afldb-phase4-state/classified.pre /root/afldb-phase4-state/matches.pre 
+[CHECK] ok   entry wrote nothing outside /root/afldb-phase4-state (found: )
+SCENARIO refuse-escaped-alias PASS expect=entry=REFUSED(84-esc:1 unparsed-alias-member),B3-blind,nothing-changed got=entry=REFUSED(84-esc:1 unparsed-alias-member),B3-blind,nothing-changed
+== scenario refuse-escaped-alias exit 0 containers-left=0
+R9P4 RESIDUE containers=0 images=0 workspace=removed r9p4-workspaces=0 base-image=sha256:d71c0b286c54 build-cache=[Cache entries, 0]
+== ssh 1 exit 0
+R9P4 RESIDUE-CHECK 2026-11-28T08:03:18Z containers-this-run=0 containers-any-r9p4=0 images-any-r9p4=0 workspaces=0
+secret scan of dev-p4h-run.txt: 0 match(es) for private key blocks, DSNs, password= assignments or crypt hashes
+R9 PHASE4 HARNESS RESULT PASS (25 of 25 scenarios; residue 0 containers, 0 images, 0 workspaces)

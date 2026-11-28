@@ -1,0 +1,15 @@
+== r9p-dev1 2026-11-28T07:38:59Z console: afldb-phase4.sh backout (the documented Phase 4 back-out)
+---- [CON] (console stand-in) pin check, then afldb-phase4.sh backout
+afldb-phase4.sh: OK
+PHASE4 BACKOUT state /root/afldb-phase4-state seal sha256 ab41995e09a610100e0fc6178712f703a496e4a977ce59179fed65275733052e (equal to the value entry printed); plan: change=group-only disposed=
+PHASE4 BACKOUT ran: gpasswd -a arm sudo
+PHASE4 BACKOUT check visudo-c PASS
+PHASE4 BACKOUT check file PASS /etc/sudoers equals its pre-change record (0 0 440 5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8)
+PHASE4 BACKOUT check file PASS /etc/sudoers.d/README equals its pre-change record (0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8)
+PHASE4 BACKOUT check groups PASS arm's groups equal the pre-change record: afldb-backup-read arm sudo 
+PHASE4 BACKOUT check sudo-l PASS sudo -l -U arm equals the pre-change record: arm may run: (ALL : ALL) ALL;
+PHASE4 BACKOUT pre-change group line: sudo:x:27:arm,afldb-admin; now: sudo:x:27:afldb-admin,arm (member order may differ; membership is compared)
+PHASE4 BACKOUT RESULT PASS the sudoers scope, arm's groups and sudo -l -U arm equal the pre-change record of /root/afldb-phase4-state
+R8P P4-BACKOUT exit 0
+   id arm: uid=1000(arm) gid=1000(arm) groups=1000(arm),27(sudo),997(afldb-backup-read)
+   sudo -l -U arm:     (ALL : ALL) ALL

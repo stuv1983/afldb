@@ -474,6 +474,29 @@ describe.runIf(process.platform === 'linux')('AFLDB-ISSUE-352 — scheduled back
     expect(JSON.parse(readFileSync(join(st, 'last-verify.json'), 'utf8')).file).not.toBe('prior.dump');
   });
 
+  // R6 r7 (28 Nov 2026, DESIGN 3.3): the nightly dump is produced and sealed outside arm; its state record lives in
+  // /var/lib/afldb-backup/state. status reads it only through the explicit absolute-path opt-in; unset keeps today's behaviour.
+  it('status: AFLDB_BACKUP_SEALED_STATE_DIR (absolute, opt-in) is where the backup check reads last-backup.json (R6 r7)', () => {
+    const ok = run('verify');
+    expect(ok.status, ok.out).toBe(0);
+    const sealed = join(root, `sealed${n}`);
+    mkdirSync(sealed);
+    const st = (extra: Record<string, string>) => spawnSync('bash', [WRAPPER, 'status'], { encoding: 'utf8', env: baseEnv(ok.dir, extra) });
+    const absent = st({ AFLDB_BACKUP_SEALED_STATE_DIR: sealed });
+    expect(absent.status).toBe(1);
+    expect(absent.stdout).toContain(`STATUS FAIL backup: never recorded (${sealed}/last-backup.json absent)`);
+    const now = Math.floor(Date.now() / 1000);
+    writeFileSync(join(sealed, 'last-backup.json'),
+      `{"epoch":${now},"ts":"x","file":"afldb_prod-20261128-022003.dump","sha256":"${'a'.repeat(64)}","bytes":9,"offhost":"skipped"}\n`);
+    const fresh = st({ AFLDB_BACKUP_SEALED_STATE_DIR: sealed });
+    expect(fresh.status, fresh.stdout).toBe(0);
+    expect(fresh.stdout).toMatch(/STATUS ok {3}backup: afldb_prod-20261128-022003\.dump 0h ago/);
+    writeFileSync(join(sealed, 'last-backup.json'), `{"epoch":${now - 40 * 3600},"file":"old.dump","offhost":"skipped"}\n`);
+    expect(st({ AFLDB_BACKUP_SEALED_STATE_DIR: sealed }).status).toBe(1); // stale sealed record, although arm's own one is fresh
+    expect(st({ AFLDB_BACKUP_SEALED_STATE_DIR: 'var/lib/afldb-backup/state' }).status).toBe(2);
+    expect(status(ok.dir).status).toBe(0); // unset: unchanged
+  });
+
   it('offhost-pull: binds each sidecar to its dump, refuses future stamps, and a flood cannot evict genuine copies (review A-03)', () => {
     const src = join(root, 'pull-src');
     const dest = join(root, 'pull-dest');
@@ -544,6 +567,48 @@ describe.runIf(process.platform === 'linux')('AFLDB-ISSUE-352 — scheduled back
     expect(held()).toEqual([...genuine.slice(1), 'afldb_prod-20261104-022000.dump']);
     expect(existsSync(join(dest, `${genuine[0]}.sha256`))).toBe(false);
     expect(existsSync(join(dest, `.verified-${genuine[0]}`))).toBe(false);
+
+    // R6 r10 (Astra case 1): a RECEIVED line only for a dump THIS run transferred in full and verified, never for possession.
+    const rcv = (out: string) => [...out.matchAll(/offhost-pull: RECEIVED (afldb_prod-\d{8}-\d{6}\.dump) sha256=[0-9a-f]{64} bytes=\d+ size=\d+/g)].map((m) => m[1]);
+    expect(rcv(seed.stdout)).toEqual(genuine);
+    expect(rcv(daily.stdout)).toEqual(['afldb_prod-20261104-022000.dump']);
+    expect(rcv(released.stdout)).toEqual([]); // nothing new crossed the wire
+    // As in production, the source keeps fewer dumps than the off-host: drop from the fixture source each dump the destination's
+    // retention pruned, so a later pull does not fetch it again (a genuine re-transfer that would be, and is, a receipt).
+    const trimSrc = () => { const h = new Set(held()); for (const f of readdirSync(src)) if (f.endsWith('.dump') && !h.has(f)) { rmSync(join(src, f)); rmSync(join(src, `${f}.sha256`), { force: true }); } };
+    // Pre-placed: the right dump and sidecar are already in the destination; --ignore-existing moves nothing; verified, not received.
+    trimSrc(); put('afldb_prod-20261105-022000.dump');
+    for (const f of ['afldb_prod-20261105-022000.dump', 'afldb_prod-20261105-022000.dump.sha256']) writeFileSync(join(dest, f), readFileSync(join(src, f)));
+    const preplaced = pull();
+    expect(preplaced.status, `${preplaced.stdout}${preplaced.stderr}`).toBe(0);
+    expect(preplaced.stdout).toMatch(/verified afldb_prod-20261105-022000\.dump/);
+    expect(rcv(preplaced.stdout)).toEqual([]);
+    // Partial failure: a later source file is unreadable, rsync fails part-way: no receipt for any file of that run; the retry
+    // receives the file it moves.
+    trimSrc(); put('afldb_prod-20261106-022000.dump');
+    chmodSync(join(src, 'afldb_prod-20261106-022000.dump'), 0o000);
+    const partial = pull();
+    expect(partial.status).toBe(1);
+    expect(partial.stdout).toMatch(/rsync failed \(exit 23\); no receipt is issued for any file of this run/);
+    expect(rcv(partial.stdout)).toEqual([]);
+    chmodSync(join(src, 'afldb_prod-20261106-022000.dump'), 0o644);
+    const retry = pull();
+    expect(retry.status, `${retry.stdout}${retry.stderr}`).toBe(0);
+    expect(rcv(retry.stdout)).toEqual(['afldb_prod-20261106-022000.dump']);
+    // r10 round 2 (independent review F5): a partial left under .rsync-partial before the run is not a receipt, even when this run
+    // completes the file and verifies it.
+    trimSrc(); put('afldb_prod-20261107-022000.dump');
+    mkdirSync(join(dest, '.rsync-partial'), { recursive: true });
+    writeFileSync(join(dest, '.rsync-partial', 'afldb_prod-20261107-022000.dump'), 'dump');
+    const resumed = pull();
+    expect(resumed.status, `${resumed.stdout}${resumed.stderr}`).toBe(0);
+    expect(resumed.stdout).toMatch(/not a receipt: afldb_prod-20261107-022000\.dump/);
+    expect(rcv(resumed.stdout)).toEqual([]);
+    // r10 round 2 (F6): the machine-readable receipt is written to fd 3, which rsync and ssh never get; callers parse fd 3 only.
+    trimSrc(); put('afldb_prod-20261108-022000.dump');
+    const fd3 = spawnSync('bash', ['-c', 'bash tools/maintenance/offhost-pull.sh "$1" "$2" --keep 3 3>&1 1>/dev/null 2>/dev/null', '_', src, dest], { encoding: 'utf8', env });
+    expect(fd3.status).toBe(0);
+    expect(fd3.stdout.trim().split('\n')).toEqual([expect.stringMatching(/^RECEIVED afldb_prod-20261108-022000\.dump sha256=[0-9a-f]{64} bytes=\d+ size=\d+$/)]);
   });
 
   it('off-host: copies, re-hashes and prunes at the destination; a missing destination keeps the local dump and fails the run', () => {

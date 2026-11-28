@@ -1,0 +1,10 @@
+== r9p-t0c8de418 independent residue check: a separate SSH connection to streamanator after the run's own cleanup trap
+in-run cleanup (r8p-run.sh trap): removed 1 container(s); left: containers 0, images 0, workspace removed, other r8p workspaces: 0
+independent residue check 2026-11-28T08:48:01Z host=streamanator
+containers(label r8p.run=r9p-t0c8de418): 0
+containers(any r8p.run): 0
+containers(any r9p4.run): 0
+images r8p-*/r9p4-*: 0
+workspaces ~/r8p-ws.* ~/r9p4-*: 0
+pinned base image present: sha256:d71c0b286c54
+(the pinned base image is pre-existing, not created by this run)

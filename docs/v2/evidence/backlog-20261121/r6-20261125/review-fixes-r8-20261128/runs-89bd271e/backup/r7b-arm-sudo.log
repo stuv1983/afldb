@@ -1,0 +1,186 @@
+== R7 sealed-backup scenario arm-sudo
+host streamanator (arm); started 2026-11-28T03:51:24Z; container r7b-t89bd271e-arm-sudo; image r7b-sysd-t89bd271e:1
+[FIXTURE] fake Melbourne offset -1:34:00: local 2026-11-28 02:20:00 is real 2026-11-28T03:54:00Z
+[TRANSPORT] workstation 2026-11-28T03:49:48Z: 16 worktree files, CR stripped (none expected)
+[TRANSPORT] pre-send verification: every worktree file sent vs its blob at 89bd271e0741bc0b390137547db4077d6075e070 (git show <rev>:<path> | sha256sum)
+   EQUAL 2c62ff919908cddadd4ccf57bd6f0344d3aba4be2ae49a413ab13a58e8658085  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/afldb-backup-run
+   EQUAL 793e94bef7e9797815709da530beab09652e4cce200f7a769fdd5fb092a2ece5  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/afldb-backup-seal
+   EQUAL f8a18580e8638f0a0923519b4280c24c3e94f4eba5c82f23a03a65b7fb7fbdeb  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/70-afldb-backup-sealed.conf
+   EQUAL 1153df783e622623bc551522dd02b4242da92acb165d7af4978f9aa6d298bfa4  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/sealed-origin.sh
+   EQUAL 21c33fa42acbd083ac9368907d4fb243598fb33e264058d9cf64d40b52d68fff  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/install-backup.sh
+   EQUAL f1dcc7db69cbdf2b78d5a129fafb62e02dbeebe4c42e563327e9e693ca0777c3  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/verify-backup-install.sh
+   EQUAL d1c11c25a35ba16aed0729617ea514078ece390e85b1b73a4eebe85cb2ad1682  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/SHA256SUMS
+   EQUAL ebe4c7ece669c4040fde0998f99d0a9031da26b8978c37f08bf095cfe5b31f72  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-run.sh
+   EQUAL 5f13c5a4d736502e45ec2be500508d74e2ec442a91b3ff024ce9f26161c83134  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-host.sh
+   EQUAL 3c149dbff19d697b09188f9eed5f252e9d1f469a6608d903ced790d3e5520e31  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-container.sh
+   EQUAL df609046a6a322db3f651d9d2c9cf1820fdb9ca0d0d4d9ae9f67c3dede1be3be  tools/maintenance/backup.sh
+   EQUAL a3775aea879b1d9ce05d0e96482e66d24c69deb62cf38e8fc0407c0d2653dc2b  tools/maintenance/offhost-pull.sh
+   EQUAL 7e2b470aed441208b990204115f892b3c0c4e9c402800a4c038aadc386105903  tools/maintenance/scheduled-backup.sh
+   EQUAL edf002913282e7b1b0fe39970f652ab0120d9963a52b1696768cf928893bbdc8  deploy/afldb-backup.service
+   EQUAL 76a7ab3ad73377a543434f4174f7948859ac4f28978013a3fa98215fff0e9d84  deploy/afldb-backup.timer
+   EQUAL c6a5b5fe573c000a908ef6dd0d7c28fc16878e1eada8fdaf3bed034c823f8b61  deploy/afldb-backup-failed.service
+   result: every sent file equals its blob at 89bd271e0741bc0b390137547db4077d6075e070
+inputs (sha256, as sent):
+   c6a5b5fe573c000a908ef6dd0d7c28fc16878e1eada8fdaf3bed034c823f8b61  deploy/afldb-backup-failed.service
+   edf002913282e7b1b0fe39970f652ab0120d9963a52b1696768cf928893bbdc8  deploy/afldb-backup.service
+   76a7ab3ad73377a543434f4174f7948859ac4f28978013a3fa98215fff0e9d84  deploy/afldb-backup.timer
+   3c149dbff19d697b09188f9eed5f252e9d1f469a6608d903ced790d3e5520e31  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-container.sh
+   5f13c5a4d736502e45ec2be500508d74e2ec442a91b3ff024ce9f26161c83134  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-host.sh
+   ebe4c7ece669c4040fde0998f99d0a9031da26b8978c37f08bf095cfe5b31f72  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-run.sh
+   f8a18580e8638f0a0923519b4280c24c3e94f4eba5c82f23a03a65b7fb7fbdeb  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/70-afldb-backup-sealed.conf
+   d1c11c25a35ba16aed0729617ea514078ece390e85b1b73a4eebe85cb2ad1682  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/SHA256SUMS
+   2c62ff919908cddadd4ccf57bd6f0344d3aba4be2ae49a413ab13a58e8658085  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/afldb-backup-run
+   793e94bef7e9797815709da530beab09652e4cce200f7a769fdd5fb092a2ece5  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/afldb-backup-seal
+   21c33fa42acbd083ac9368907d4fb243598fb33e264058d9cf64d40b52d68fff  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/install-backup.sh
+   1153df783e622623bc551522dd02b4242da92acb165d7af4978f9aa6d298bfa4  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/sealed-origin.sh
+   f1dcc7db69cbdf2b78d5a129fafb62e02dbeebe4c42e563327e9e693ca0777c3  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/verify-backup-install.sh
+   df609046a6a322db3f651d9d2c9cf1820fdb9ca0d0d4d9ae9f67c3dede1be3be  tools/maintenance/backup.sh
+   a3775aea879b1d9ce05d0e96482e66d24c69deb62cf38e8fc0407c0d2653dc2b  tools/maintenance/offhost-pull.sh
+   7e2b470aed441208b990204115f892b3c0c4e9c402800a4c038aadc386105903  tools/maintenance/scheduled-backup.sh
+container id: f04822b1f141ae644b98ea15dc5025c87e63c481edecbfca845ca091f4bb4ff2
+
+== environment
+[REAL-SYSTEMD] systemd: systemd 255 (255.4-1ubuntu8.19); kernel 6.8.0-151-generic; Ubuntu 24.04.4 LTS; PID 1: systemd
+[FIXTURE] zone: /usr/share/zoneinfo/Australia/Melbourne fixed offset (root:root 644 regular file); now UTC 2026-11-28T03:51:33, local 2026-11-28 02:17:33 AEDT; planned moment real 03:54:00Z = local 2026-11-28 02:20:00 AEDT
+[HARNESS] scenario arm-sudo: expect=none kind=scheduled timer=early lock-hold=0 seal-hold=0 retention-fixture=0 arm-suite=0 production-timing=0 refusal=''
+fs.protected_hardlinks=1 fs.protected_symlinks=1 kernel.yama.ptrace_scope=1
+
+== PostgreSQL 16 fixture database afldb_prod [REAL server, FIXTURE contents]
+[FIXTURE] afldb_prod: fixture 5000 rows, marker nonce r7b-376e7f8336602084; role afldb_backup LOGIN + pg_read_all_data (production: the existing read-only role); PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1) on x86_64-p
+
+== units [REAL deploy/ files] and the timer timing drop-in [FIXTURE]
+timer effective: AccuracyUSec=1s RandomizedDelayUSec=0 Persistent=yes 
+service edf002913282e7b1b0fe39970f652ab0120d9963a52b1696768cf928893bbdc8 timer 76a7ab3ad73377a543434f4174f7948859ac4f28978013a3fa98215fff0e9d84 failed c6a5b5fe573c000a908ef6dd0d7c28fc16878e1eada8fdaf3bed034c823f8b61
+
+== owner install from a root-owned staging directory [REAL install-backup.sh]
+staging /opt/r7b-staging: -rw-r--r-- root:root 70-afldb-backup-sealed.conf; -rw-r--r-- root:root SHA256SUMS; -rw-r--r-- root:root afldb-backup-run; -rw-r--r-- root:root afldb-backup-seal; -rw-r--r-- root:root backup.sh; -rw-r--r-- root:root install-backup.sh; -rw-r--r-- root:root sealed-origin.sh; -rw-r--r-- root:root verify-backup-install.sh; 
+SHA256SUMS d1c11c25a35ba16aed0729617ea514078ece390e85b1b73a4eebe85cb2ad1682; check: afldb-backup-run: OK afldb-backup-seal: OK 70-afldb-backup-sealed.conf: OK sealed-origin.sh: OK install-backup.sh: OK verify-backup-install.sh: OK backup.sh: OK 
+
+== r8: install-backup.sh as root THROUGH ARM'S SUDO [FIXTURE: arm's sudo exists inside this container only; FIXTURE-ATTACK: arm's session]
+[FIXTURE] /etc/sudoers.d/r8-arm-fixture: arm ALL=(ALL) NOPASSWD: ALL (container only); arm's session: uid=1000(arm) gid=1000(arm) groups=1000(arm)
+[HARNESS] state digest before (accounts, /usr/local/lib/afldb-backup, /var/lib/afldb-backup, /etc/systemd/system/afldb-backup.service.d, DropInPaths): 4178a1406bd5021ae76e09739b1cb7d25ab5c5d461231198d69ebc2c0c57139a
+   [FIXTURE-ATTACK] su -s /bin/bash arm -c 'sudo -n bash /opt/r7b-staging/install-backup.sh /opt/r7b-staging; exit $?'  (sudo in an arm session)
+   | sudo: unable to resolve host r7b-rehearsal: Temporary failure in name resolution
+   | REFUSED: root session descends from arm: test ancestor: pid 250 (sudo) has real/effective uid 1000/0, arm is 1000; test ancestor: pid 249 (bash) has real/effective uid 1000/1000, arm is 1000; test SUDO_USER: SUDO_USER=arm; test SUDO_UID: SUDO_UID=1000 (arm)
+   | BACKUP INSTALL RESULT FAIL (nothing was changed)
+[HARNESS] ok sudo in an arm session: REFUSED (test SUDO_USER: SUDO_USER=arm fired), exit 1, state digest unchanged
+   [FIXTURE-ATTACK] su -s /bin/bash arm -c 'sudo -n env -u SUDO_USER -u SUDO_UID -u SUDO_GID -u SUDO_COMMAND bash /opt/r7b-staging/install-backup.sh /opt/r7b-staging; exit $?'  (sudo with SUDO_USER/SUDO_UID removed, arm's shell kept)
+   | sudo: unable to resolve host r7b-rehearsal: Temporary failure in name resolution
+   | REFUSED: root session descends from arm: test ancestor: pid 287 (sudo) has real/effective uid 1000/0, arm is 1000; test ancestor: pid 286 (bash) has real/effective uid 1000/1000, arm is 1000
+   | BACKUP INSTALL RESULT FAIL (nothing was changed)
+[HARNESS] ok sudo with SUDO_USER/SUDO_UID removed, arm's shell kept: REFUSED (test ancestor: pid [0-9]* (bash) fired), exit 1, state digest unchanged
+   [FIXTURE-ATTACK] su -s /bin/bash arm -c 'exec sudo -n env -u SUDO_USER -u SUDO_UID -u SUDO_GID -u SUDO_COMMAND bash /opt/r7b-staging/install-backup.sh /opt/r7b-staging'  (exec sudo with SUDO_* removed (arm's shell replaced; sudo itself is the arm-uid ancestor))
+   | sudo: unable to resolve host r7b-rehearsal: Temporary failure in name resolution
+   | REFUSED: root session descends from arm: test ancestor: pid 323 (sudo) has real/effective uid 1000/0, arm is 1000
+   | BACKUP INSTALL RESULT FAIL (nothing was changed)
+[HARNESS] ok exec sudo with SUDO_* removed (arm's shell replaced; sudo itself is the arm-uid ancestor): REFUSED (test ancestor: pid [0-9]* (sudo) fired), exit 1, state digest unchanged
+[HARNESS] loginuid of this root session: 4294967295 (the container cannot set one without CAP_AUDIT_CONTROL; the loginuid test is not exercised here)
+[FIXTURE] arm's sudo removed before the owner install
+[HARNESS] ok after the three refusals the state digest still equals the one before (4178a1406bd5021ae76e09739b1cb7d25ab5c5d461231198d69ebc2c0c57139a)
+install-backup.sh /opt/r7b-staging (root): exit 0
+   | session check: no ancestor of pid 366 has arm's uid (1 hops to pid 27), SUDO_USER=unset SUDO_UID=unset, loginuid=4294967295 (a tripwire for sudo in an arm login, not a proof of an independent root path: README.md section 4 item 9)
+   | bundle /opt/r7b-staging verified: SHA256SUMS d1c11c25a35ba16aed0729617ea514078ece390e85b1b73a4eebe85cb2ad1682 (compare with README.md before going on; the install continues only on a match you have checked)
+   | accounts: uid=999(afldb-backup) gid=996(afldb-backup) groups=996(afldb-backup); arm: uid=1000(arm) gid=1000(arm) groups=1000(arm),997(afldb-backup-read) (a session started before this sees the new group only after a new login)
+   | sealed_origin_install: PASS (trusted paths, pinned digests, effective unit)
+   | OWNER STEPS STILL REQUIRED (not done by this script):
+   |  1. PostgreSQL peer authentication for the backup account, then reload (no restart):
+   |       pg_ident.conf, add:   afldbbackup afldb-backup afldb_backup
+   |       pg_hba.conf, add BEFORE any broader 'local' line:
+   |                             local afldb_prod afldb_backup peer map=afldbbackup
+   |       then, in this root session:  runuser -u postgres -- psql -X -c 'SELECT pg_reload_conf()'
+   |  2. In this root session: bash verify-backup-install.sh, then bash verify-backup-install.sh --as-arm (arm's checks, run as arm
+   |     through setpriv without arm's login); both must end BACKUP INSTALL RESULT PASS. A run in an arm login is INFO only.
+   |  3. streamanator: change the off-host pull source to <prod>:/var/lib/afldb-backup/published/ (offhost-pull.sh is unchanged).
+   |  4. Status probes: AFLDB_BACKUP_SEALED_STATE_DIR=/var/lib/afldb-backup/state for `scheduled-backup.sh status`.
+   |  5. Leave the timer as it is: the next 02:20 run is the first sealed one (seals/<invocation>.seal + published/<dump>).
+   | BACKUP INSTALL RESULT PASS (installed; owner steps above remain)
+verify-backup-install.sh as root BEFORE the owner's PostgreSQL step: exit 1 (expected FAIL: pg_hba/pg_ident lines absent)
+   | FAIL /etc/postgresql/16/main/pg_hba.conf: the first local line is 'local all postgres peer', not 'local afldb_prod afldb_backup peer map=afldbbackup'
+   | FAIL /etc/postgresql/16/main/pg_ident.conf lacks 'afldbbackup afldb-backup afldb_backup'
+   | FAIL no PostgreSQL configuration with both lines was found
+   | FAIL afldb-backup peer login: 'psql: error: connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed: FATAL:  Peer authentication failed for user "afldb_backup"' (reload PostgreSQL after the pg_hba/pg_ident lines?)
+   | BACKUP INSTALL RESULT FAIL
+[FIXTURE] owner step 1 applied as printed: pg_hba first line 'local afldb_prod afldb_backup peer map=afldbbackup', pg_ident 'afldbbackup afldb-backup afldb_backup', pg_reload_conf()
+verify-backup-install.sh as root: exit 0
+   | == verify-backup-install 2026-11-28T03:52:10Z as uid=0(root) gid=0(root) groups=0(root)
+   | PASS sealed_origin_install: trusted paths, pinned digests (run, sealer, backup.sh, drop-in), effective unit
+   | PASS /usr/local/lib/afldb-backup/SHA256SUMS matches the installed files
+   | PASS the r6 attest drop-in is absent
+   | PASS afldb-backup (uid 999): home /nonexistent, shell /usr/sbin/nologin
+   | PASS afldb-backup's only group is afldb-backup
+   | PASS group afldb-backup has no members
+   | PASS arm is in afldb-backup-read (account database)
+   | PASS arm is not in afldb-backup
+   | INFO timer: enabled=disabled active=inactive TimersCalendar={ OnCalendar=*-*-* 02:20:00 ; next_elapse=(null) } RandomizedDelayUSec=0 Persistent=yes 
+   | INFO seals: 0; published dumps: 0; last seal: none
+   | PASS /etc/postgresql/16/main/pg_hba.conf: the first local line is the afldb_backup peer line
+   | PASS /etc/postgresql/16/main/pg_ident.conf maps afldb-backup to afldb_backup
+   | PASS afldb-backup authenticates by peer as afldb_backup (no secret)
+   | INFO arm's checks: run 'bash verify-backup-install.sh --as-arm' in this root session (acceptance evidence)
+   | BACKUP INSTALL RESULT PASS
+[REAL] verify-backup-install.sh --as-arm, run by root (r8 ACCEPTANCE path: setpriv to arm, no login, stdin /dev/null, new session): exit 0
+   | == verify-backup-install --as-arm 2026-11-28T03:52:12Z as uid=0(root) gid=0(root) groups=0(root)
+   | script /opt/r7b-staging/verify-backup-install.sh: file sha256 f1dcc7db69cbdf2b78d5a129fafb62e02dbeebe4c42e563327e9e693ca0777c3, bytes passed to the arm process sha256 f1dcc7db69cbdf2b78d5a129fafb62e02dbeebe4c42e563327e9e693ca0777c3
+   | drop: setsid -w setpriv --reuid=arm --regid=arm --init-groups --reset-env /usr/bin/bash --noprofile --norc -c <script> verify-backup-install.sh --as-arm-child < /dev/null
+   | dropped identity (setsid -w setpriv --reuid=arm --regid=arm --init-groups --reset-env /usr/bin/id): uid=1000(arm) gid=1000(arm) groups=1000(arm),997(afldb-backup-read)
+   | root's id arm:                                                            uid=1000(arm) gid=1000(arm) groups=1000(arm),997(afldb-backup-read)
+   | [as arm] == verify-backup-install 2026-11-28T03:52:12Z as uid=1000(arm) gid=1000(arm) groups=1000(arm),997(afldb-backup-read) (--as-arm child: started by root through setpriv, no login)
+   | [as arm] PASS sealed_origin_install: trusted paths, pinned digests (run, sealer, backup.sh, drop-in), effective unit
+   | [as arm] PASS /usr/local/lib/afldb-backup/SHA256SUMS matches the installed files
+   | [as arm] PASS the r6 attest drop-in is absent
+   | [as arm] PASS afldb-backup (uid 999): home /nonexistent, shell /usr/sbin/nologin
+   | [as arm] PASS afldb-backup's only group is afldb-backup
+   | [as arm] PASS group afldb-backup has no members
+   | [as arm] PASS arm is in afldb-backup-read (account database)
+   | [as arm] PASS arm is not in afldb-backup
+   | [as arm] INFO timer: enabled=disabled active=inactive TimersCalendar={ OnCalendar=*-*-* 02:20:00 ; next_elapse=(null) } RandomizedDelayUSec=0 Persistent=yes 
+   | [as arm] INFO seals: 0; published dumps: 0; last seal: none
+   | [as arm] PASS this arm process carries afldb-backup-read
+   | [as arm] PASS arm cannot list /var/lib/afldb-backup/staging (Permission denied)
+   | [as arm] PASS arm cannot write /var/lib/afldb-backup
+   | [as arm] PASS arm cannot write /var/lib/afldb-backup/staging
+   | [as arm] PASS arm cannot write /var/lib/afldb-backup/seals
+   | [as arm] PASS arm cannot write /var/lib/afldb-backup/published
+   | [as arm] PASS arm cannot write /var/lib/afldb-backup/state
+   | [as arm] PASS arm cannot write /usr/local/lib/afldb-backup
+   | [as arm] PASS arm cannot write /usr/local/lib/afldb-backup/tools/maintenance
+   | [as arm] PASS arm cannot write /etc/systemd/system/afldb-backup.service.d
+   | [as arm] PASS arm can list /var/lib/afldb-backup/published (read only: off-host pull, restore)
+   | [as arm] PASS arm cannot authenticate by peer as afldb_backup (psql: error: connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed: FATAL:  Peer authentication fail)
+   | [as arm] AS-ARM CHILD RESULT PASS
+   | arm process exit status 0
+   | BACKUP INSTALL RESULT PASS (as arm via setpriv, no login: uid=1000(arm) gid=1000(arm) groups=1000(arm),997(afldb-backup-read))
+[INFO] verify-backup-install.sh in an arm session (setpriv env -i, the r7 path; INFO only, not acceptance evidence): exit 0
+   | == verify-backup-install 2026-11-28T03:52:14Z as uid=1000(arm) gid=1000(arm) groups=1000(arm),997(afldb-backup-read)
+   | INFO this run is in arm's own session: INFO ONLY, not acceptance evidence (arm's login environment chooses this process); the acceptance run is root's 'bash verify-backup-install.sh --as-arm'
+   | PASS sealed_origin_install: trusted paths, pinned digests (run, sealer, backup.sh, drop-in), effective unit
+   | PASS /usr/local/lib/afldb-backup/SHA256SUMS matches the installed files
+   | PASS the r6 attest drop-in is absent
+   | PASS afldb-backup (uid 999): home /nonexistent, shell /usr/sbin/nologin
+   | PASS afldb-backup's only group is afldb-backup
+   | PASS group afldb-backup has no members
+   | PASS arm is in afldb-backup-read (account database)
+   | PASS arm is not in afldb-backup
+   | INFO timer: enabled=disabled active=inactive TimersCalendar={ OnCalendar=*-*-* 02:20:00 ; next_elapse=(null) } RandomizedDelayUSec=0 Persistent=yes 
+   | INFO seals: 0; published dumps: 0; last seal: none
+   | PASS this arm process carries afldb-backup-read
+   | PASS arm cannot list /var/lib/afldb-backup/staging (Permission denied)
+   | PASS arm cannot write /var/lib/afldb-backup
+   | PASS arm cannot write /var/lib/afldb-backup/staging
+   | PASS arm cannot write /var/lib/afldb-backup/seals
+   | PASS arm cannot write /var/lib/afldb-backup/published
+   | PASS arm cannot write /var/lib/afldb-backup/state
+   | PASS arm cannot write /usr/local/lib/afldb-backup
+   | PASS arm cannot write /usr/local/lib/afldb-backup/tools/maintenance
+   | PASS arm cannot write /etc/systemd/system/afldb-backup.service.d
+   | PASS arm can list /var/lib/afldb-backup/published (read only: off-host pull, restore)
+   | PASS arm cannot authenticate by peer as afldb_backup (psql: error: connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed: FATAL:  Peer authentication fail)
+   | BACKUP INSTALL RESULT INFO-ONLY pass in arm's own session (not acceptance evidence: use --as-arm as root)
+[HARNESS] dropped identity logged by --as-arm: uid=1000(arm) gid=1000(arm) groups=1000(arm),997(afldb-backup-read)
+[HARNESS] ok verify-backup-install.sh PASS as root and --as-arm (dropped identity: uid=1000(arm) gid=1000(arm) groups=1000(arm),997(afldb-backup-read))
+[HARNESS] ok the arm-session run (INFO) ends INFO-ONLY, not 'BACKUP INSTALL RESULT PASS'
+[HARNESS] ok the owner install (root, not through arm) passed the session check: session check: no ancestor of pid 366 has arm's uid (1 hops to pid 27), SUDO_USER=unset SUDO_UID=unset, loginuid=4294967295 (a tripwire for sudo in an arm login
+--as-arm started by arm itself: exit 1: BACKUP INSTALL RESULT FAIL
+[HARNESS] ok --as-arm refuses to run as arm
+SCENARIO arm-sudo PASS installer refused 3 arm-descended root sessions (SUDO_USER; ancestor bash; ancestor sudo), state unchanged; owner install passed the session check; --as-arm PASS as uid=1000(arm) gid=1000(arm) groups=1000(arm),997(afldb-backup-read)
+== controller exit 0 (2026-11-28T03:52:17Z); container removed

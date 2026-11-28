@@ -1,0 +1,16 @@
+== verify-backup-install 2026-11-28T07:33:53Z as uid=0(root) gid=0(root) groups=0(root)
+PASS sealed_origin_install: trusted paths, pinned digests (run, sealer, backup.sh, drop-in, base unit = deploy/afldb-backup.service), effective unit (exactly the drop-in, no environment or bind settings)
+PASS /usr/local/lib/afldb-backup/SHA256SUMS matches the installed files
+PASS the r6 attest drop-in is absent
+PASS afldb-backup (uid 999): home /nonexistent, shell /usr/sbin/nologin
+PASS afldb-backup's only group is afldb-backup
+PASS group afldb-backup has no members
+PASS arm is in afldb-backup-read (account database)
+PASS arm is not in afldb-backup
+INFO timer: enabled=disabled active=inactive TimersCalendar={ OnCalendar=*-*-* 02:20:00 ; next_elapse=(null) } RandomizedDelayUSec=10min Persistent=yes 
+INFO seals: 0; published dumps: 0; last seal: none
+PASS /etc/postgresql/16/main/pg_hba.conf: the first local line is the afldb_backup peer line
+PASS /etc/postgresql/16/main/pg_ident.conf maps afldb-backup to afldb_backup
+PASS afldb-backup authenticates by peer as afldb_backup (no secret)
+INFO arm's checks: run 'bash verify-backup-install.sh --as-arm' in this root session (acceptance evidence)
+BACKUP INSTALL RESULT PASS

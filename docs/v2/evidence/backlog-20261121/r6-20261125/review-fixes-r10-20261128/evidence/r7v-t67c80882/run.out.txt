@@ -1,0 +1,25 @@
+   97b85721690ea31e2ddb5b73a6f2f4e88444363ed542c0923d1cfb49c2abe218  docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh
+[TRANSPORT] pre-send verification against 67c80882c3caf3883ee037136da025404336c3a7:
+   untracked files in the sent directories: 0
+   result: every sent file equals its blob at 67c80882c3caf3883ee037136da025404336c3a7
+PASS bundle digest 059f2ad445825757873d77b8329fd6be668d2da6bf5e816d599b55b396f20cba; bundle/SHA256SUMS, wrapper pin and packet SHA256SUMS consistent
+workspace /home/arm/r7v-ws.p7Qjyq
+== r7v t67c80882 day 2026-11-28 containers r7v-t67c80882-prod r7v-t67c80882-offhost; transport ProxyCommand docker exec; client C:/Windows/System32/OpenSSH/ssh.exe (OpenSSH_for_Windows_9.5p2, LibreSSL 3.8.2)
+SCENARIO a PASS g0-success (FIXTURE qualification): exit 0, G0 SCOPE line (FIXTURE), five evidence fields, 4 ARM-PRODUCED label(s); dispatch-at=2026-11-28T11:54:01Z received-at=2026-11-28T11:54:02Z complete-at=2026-11-28T11:54:02Z qualification=FIXTURE
+SCENARIO c PASS a2-whole: the verifier's own STOP (exit 1, 13 FAIL / 25 PASS lines), backup-origin=attributed reported separately; A2 SCOPE line; 9 ARM-PRODUCED PASS lines; FAILs: today is not the scheduled Wednesday (2026-11-25); re-p|running 6.8.0-151-generic (expected 6.8.0-137-generic)|installed kernel images are '' (expected exactly 137 an|missing /boot/vmlinuz-6.8.0-149-generic|missing /boot/initrd.img-6.8.0-149-generic|missing /boot/vmlinuz-6.8.0-137-generic|missing /boot/initrd.img-6.8.0-137-generic|a modules directory is missing|caddy inactive|Caddyfile  (r4:no expects 4f6972ec)|restore service lacks a matching timer dispatch, start |last-verify.json and restored dump do not match the sch|afldb_restore_test lacks the scheduled restore digest o|
+SCENARIO g PASS forged-comment: the forged text reached the wrapper only as data (1 line(s) '[relayed, neutralised] ...', 0 ESC, 0 control bytes); genuine verdict and exit unchanged (OWNER VERDICT A2 STOP transport=rehearsal ssh=ssh.exe curren... exit 1)
+SCENARIO h PASS installer-guard: install-verify.sh through arm's sudo over a real arm ssh login REFUSED (plain:refused stripped:refused ), verifier state digest unchanged
+SCENARIO i PASS staging-libsh: refused before sourcing (home-arm, group-writable, tampered: marker absent); CONTRAST r7 ran the hostile lib.sh as root (marker present); state unchanged
+SCENARIO d PASS hostile-arm: owner-path verdicts and exits unchanged (g0: OWNER VERDICT G0 PASS transport=rehearsal ssh=ssh.exe date=2... exit 0; a2 STOP exit 1); CONTRAST old path forged 'G0 PROD RESULT PASS' + OFFHOST-COMPARE (exit 0) and 'R6 PRE RESULT PASS' (exit 0)
+SCENARIO e PASS stale-replay: fresh control accepted, replay/stale/wrong-bundle/exit-lie/two-RESULT refused (fresh:0 replay:1 stale:1 bundle:1 exitlie:1 tworesults:1 )
+SCENARIO f PASS keys: other-key-as-verify:ok arm-key-as-verify:ok verify-key-as-arm:ok verify-key-forced-tty:ok verify-key-no-command:ok verify-key-shell-command:ok verify-key-extra-words:ok verify-key-stdio-forward:ok arm-key-as-arm-control:ok 
+SCENARIO j PASS version-exit: both PASS (FIXTURE) -> exit 0 (2 PASS lines); off-host STOP -> exit 1; CONTRAST r7 wrapper exited 0 with a STOP line; unqualified: production PASS line + off-host 'no qualified off-host endpoint' STOP -> exit 1
+SCENARIO k PASS offhost-qualification: unqualified:STOP(info=PASS) fixture-naming-streamanator:refused production-transport-fixture-flag:refused unknown-host-key:STOP 
+SCENARIO n PASS candidate-sequence: candidate-g0:exit3,no-verdict candidate-version:exit3,no-verdict gate-on-candidate:NO-GO old-export:STOP(qualification=none) pinned-export:G0-PASS(qual-sha256=pin) checker-pin-C1:PASS checker-pin-C0:FAIL checker-production-fixture-pin:FAIL production-on-fixture-pin:refused(no-ssh) 
+SCENARIO b PASS g0-refusal: exit 1, FAIL scheduled origin unproven: /var/lib/afldb-backup/published/afldb_prod-20261128-022000.dump has 3994 bytes, the seal says 3993; G0b not called, no OFFHOST-COMPARE
+SCENARIO l PASS possession-only: END removed -> G0 STOP exit 1 '...possession only ... complete-at missing'; dispatch journal removed -> G0 STOP exit 1 '...possession only ... dispatch-at missing'; both qualification=FIXTURE
+SCENARIO m PASS receipt: m2-preplaced:END-rc0,HELD,no-RECEIVED->STOP m3-other-dump:RECEIPT-for-afldb_prod-20261128-022700.dump-only->STOP m4-partial:END-rc1,no-RECEIPT->STOP( dump or verified marker missing) m4-retry:manual-exit0,G0-STOP(failed-0310-run) m1-genuine:RECEIVED+RECEIPT->PASS(received-at=2026-11-28T12:09:01Z) 
+logs: t67c80882-a-g0-success.log t67c80882-b-g0-refusal.log t67c80882-c-a2-whole.log t67c80882-d-hostile-arm.log t67c80882-e-stale-replay.log t67c80882-f-keys.log t67c80882-g-forged-comment.log t67c80882-h-installer-guard.log t67c80882-i-staging-libsh.log t67c80882-inputs.log t67c80882-j-version-exit.log t67c80882-k-offhost-qualification.log t67c80882-l-possession-only.log t67c80882-m-receipt.log t67c80882-n-candidate-sequence.log t67c80882-setup.log t67c80882-summary.log 
+R7 VERIFY HARNESS RESULT PASS
+removed 2 container(s); left: containers 0, images 1, workspace removed
+exit 0

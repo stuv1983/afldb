@@ -1,0 +1,8 @@
+== t74f7694f 2026-11-28T12:21:57Z admin login 1: -F <cfg>, IdentitiesOnly, the admin key only, StrictHostKeyChecking=yes against the pinned host key
+uid=1001(afldb-admin) gid=1001(afldb-admin) groups=1001(afldb-admin),27(sudo)
+sudo: unable to resolve host afldb-prod: Temporary failure in name resolution
+sudo: unable to resolve host afldb-prod: Temporary failure in name resolution
+R8P SUDO-V ok
+sudo: unable to resolve host afldb-prod: Temporary failure in name resolution
+User afldb-admin may run the following commands on afldb-prod:
+    (ALL : ALL) ALL

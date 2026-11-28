@@ -1,0 +1,10 @@
+== reviewer residue check 2026-11-28T04:23:50Z (HARNESS; DEV host as arm, read-only docker listing)
+containers matching rvw8:
+0
+images matching rvw8:
+0
+workspaces matching rvw8 under ~ and /tmp:
+0
+volumes/networks matching rvw8:
+0
+ssh exit 1

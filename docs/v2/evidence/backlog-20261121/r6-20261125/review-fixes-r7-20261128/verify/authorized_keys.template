@@ -1,0 +1,4 @@
+# authorized_keys.template (R6 r7, MED-2): the ONE line install-verify.sh writes to /etc/ssh/afldb-verify/authorized_keys (root:root
+# 0644 in root-owned directories), from a NEW ed25519 keypair held only on Stu's workstation (~/.ssh/afldb_verify, never arm's key):
+#   ssh-keygen -t ed25519 -f ~/.ssh/afldb_verify -C afldb-verify-owner     (on the workstation; copy only the .pub to the staging)
+restrict,command="/usr/local/lib/afldb-verify/afldb-verify-entry" ssh-ed25519 <BASE64 OF ~/.ssh/afldb_verify.pub> afldb-verify-owner

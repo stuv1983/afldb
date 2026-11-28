@@ -1,11 +1,21 @@
 # Attended runbook: R6, the production reboot into kernel 149, Wednesday 25 November 2026 (APPROVED; prepared 22 Nov, run e; NOT EXECUTED)
 
 > **CURRENT OPERATOR INSTRUCTIONS:** use the dated amendment at the end of this runbook. Earlier pins and pre-Sunday assumptions are historical; Monday installation is required before 03:10 AEDT.
+>
+> **24 Nov 2026: the r3 amendment (last section) is the only valid archive and A-2 procedure for every Tuesday outcome.** §0's archive, the 23 Nov CURRENT_ID amendment's archive and the r2 archive are superseded. R6 is NO-GO without Astra's PASS on r3.
 
 **Authority.** Owner decision 2 of 2026-11-22, round 4 (`DECISIONS-20261122e.md` §2): R6 APPROVED for **Wed 25 Nov 2026 10:00-11:00
 AEDT, fallback 14:00-15:00 the same day**, on run d's verdict (`r6-kernel-check-20261122/README.md` §4) and with the owner's rule:
 **"IF BOOT RECOVERY IS STILL UNCERTAIN, PAUSE BEFORE REBOOTING."** This runbook is therefore **NO-GO by default**: it turns GO only
-when every named item of §7 holds on the day. Every `sudo` step is the owner's, one block at a time, in his own SSH session; Claude
+when every named item of §7 holds on the day. Every `sudo` step is the owner's, one block at a time, through a root path that does not pass through arm's login (r7 F1:
+an SSH session as arm lets a hostile arm login environment reuse the owner's sudo; see install precondition 0 and
+`review-fixes-r7-20261128/README.md` §4 item 9). **r8 session rule:** every privileged block of this plan is typed in the admin
+session of `r6-20261125/review-fixes-r8-20261128/OWNER-PROCEDURE.md` (`afldb-admin`'s own SSH login with its own key; `sudo` there
+asks for the admin's password), in its admin root session, or at the Recovery Console logged in **as root**. That covers C-1, C-2 and
+NG-FALLBACK's undo, D-1, D-3, D-4, E-1, F-3, F-5, G-1 and the rollback acceptance; the `sudo` prefixes in those blocks are unchanged
+and work in all three. arm's SSH session carries only the unprivileged pinned scripts of `r6-20261125/`. A console login as arm is
+not a privileged path. Until OWNER-PROCEDURE Phases 0-1 exist on production, these steps have no qualifying session, and the plan
+stays NO-GO; Claude
 runs the read-only scripts of `r6-20261125/` and records. The ISSUE-348 load, R5 disposal, R7 and anything else are NOT in scope.
 
 **Prepared without production contact** (run e's only production session was the ISSUE-348 privilege check). Production facts come
@@ -18,6 +28,9 @@ exercised on this or any DigitalOcean droplet. The streamanator dry runs (`r6-20
 parse, run to their end, refuse the wrong host and write nothing; they prove nothing about production's boot path.
 
 ## 0. Scripts and pins
+
+> **SUPERSEDED (24 Nov 2026) for every Tuesday outcome by the r3 amendment's archive and blocks.** Kept as the historical Sunday
+> contract; do not stage this archive for Wednesday.
 
 Use the immutable helper revision `b48a2c5e1925e0a1dfa148b14203577df120b0a4` below. Stage the same archive on the workstation, production and streamanator. On the workstation, from the repository in Git Bash:
 
@@ -85,7 +98,7 @@ header). The snapshot lives in the owner's DigitalOcean account (§2).
 |---|---|---|
 | A1 outcome | `accepted` / `stopped` (before promotion) / `rolledback` (with rollback verify PASS) | ________ |
 | CURRENT_ID | accepted: `7d92042fd110-<BUILD_ID>`; otherwise `c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC` | ________ |
-| BUILD_ID (accepted only) | P3b | ________ |
+| BUILD_ID | r4 amendment (27 Nov): not filled in by hand and not taken from P3b; the F-1 block derives it from the handoff `CURRENT_ID` (the suffix after the 12-hex revision) | derived |
 | r3 | `yes` = R3 steps 1-11 done and both `afldb-backup*.timer` enabled (§4.3 step 9) | ________ |
 | r4 | `yes` = R4 accepted (installed Caddyfile `f00859d5…`) | ________ |
 | R1 installed | §4.1 accepted | ________ |
@@ -107,10 +120,11 @@ header). The snapshot lives in the owner's DigitalOcean account (§2).
 
 | # | Step | Expected (PASS) | STOP if |
 |---|---|---|---|
-| A-1 | streamanator after A-2: `bash "$STAGE/$B/a1a2-20261124/a2-cron-observe.sh" all 2026-11-25 "$D" "$S"` | Wednesday 03:10 `RESULT SCHEDULED-COPY-VERIFIED` | any `rc` other than 0 |
-| A-2 | production: `bash "$STAGE/$B/r6-20261125/r6-pre-verify.sh" "$OUTCOME" "$CURRENT_ID" r3:yes "$R4" "$WINDOW"` | `R6 PRE RESULT PASS`. Section 1: running 137, **installed images exactly {137, 149}** (a third kernel from the Mon-Wed 06:30 unattended run = STOP, owner decision), 137/149 boot files and modules present, `reboot-required` present. Section 3: `apt-daily*` services inactive, no apt/dpkg process, no writer timer (`afldb*`, `apt-daily*`) running or due in [window − 15 min, window + 90 min]. Section 4: `postgresql@16-main`, `afldb`, `caddy` active; 2 workers; `current` = CURRENT_ID; env counts 1/1 if accepted; Caddyfile per r4; R1 files equal the repo. Section 5 (r3:yes): `afldb-backup.service` started today 02:20-02:31, `success`/0; `afldb-backup-verify.service` 03:30-03:41, `success`/0; the 02:2x dump re-hashes to its exact named sidecar; the timer dispatch, verification-service journal invocation, completion, restored dump and `last-verify.json` agree; no `FAILED-*` marker; `scheduled-backup.sh status` rc 0; ledger 118; `afldb_restore_test` comment `afldb.restore_test.v1 sha256=<last-verify sha>`, `numbackends` 0. Section 6: ≥ 6,144 MB free | any FAIL line (= `R6 PRE RESULT STOP`) |
+| A-1 | streamanator after A-2: `bash "$STAGE/$B/a1a2-20261124/a2-cron-observe.sh" all 2026-11-25 "$D" "$S"` (**r7: information only.** It runs as arm; its verdict is not GO evidence. The GO evidence for the off-host copy is A-4r7.) | Wednesday 03:10 `RESULT SCHEDULED-COPY-VERIFIED` | any `rc` other than 0 |
+| A-2 | **r7 (28 Nov 2026; supersedes the arm-run form): Stu runs it on the workstation through the owner verifier, never as arm:** `bash "$V7/afldb-verify-call.sh" a2 accepted "$CURRENT_ID" r3:yes "$R4" "$WINDOW" "$TUESDAY" "$ATTESTED"` (the same seven arguments; `$V7` and the installation preconditions are in the r7 note of the last amendment). `CURRENT_ID`, `TUESDAY` and `ATTESTED` still come only from `r6-tuesday-handoff.sh` on the Tuesday sitting record. The verifier (account `afldb-verify`, root-owned forced command) runs the port of `r6-pre-verify.sh`, which keeps every check. **A verdict printed by `r6-pre-verify.sh` run as arm (`bash "$STAGE/…/r6-pre-verify.sh" …` over arm's ssh) is no longer GO evidence:** arm's login environment can forge it | **`OWNER VERDICT A2 PASS transport=production`, wrapper exit 0.** Record its `backup-origin=` field separately: `attributed` means the sealed-origin rule held for the night. It is not the whole A-2 status, and A2 PASS requires it. The output still prints `R6 PRE RESULT PASS`, but only as part of that verdict. Checks whose evidence arm produces carry the label `ARM-PRODUCED` and are not independent of arm: the weekly restore's `last-verify.json` and restored dump, the release directories and `release.json`, the HTTP answers, and the `.env` counts. Section 4 also: the live InvocationID equals the owner-attested one. Section 1: running 137, **installed images exactly {137, 149}** (a third kernel from the Mon-Wed 06:30 unattended run = STOP, owner decision), 137/149 boot files and modules present, `reboot-required` present. Section 3: `apt-daily*` services inactive, no apt/dpkg process, no writer timer (`afldb*`, `apt-daily*`) running or due in [window − 15 min, window + 90 min]. Section 4: `postgresql@16-main`, `afldb`, `caddy` active; 2 workers; `current` = CURRENT_ID; env counts 1/1 if accepted; Caddyfile per r4; R1 files equal the repo. Section 5 (r3:yes): `afldb-backup.service` started today 02:20-02:31, `success`/0 (r7: from the root seal and PID 1 only, through `sealed_origin`: the timer's own start job in the window, `scheduled` or an explicitly printed `catch-up`, the root-published dump re-hashed in full; no arm journal line or arm path); `afldb-backup-verify.service` 03:30-03:41, `success`/0; the 02:2x dump re-hashes to its exact named sidecar; the timer dispatch, verification-service journal invocation, completion, restored dump and `last-verify.json` agree; no `FAILED-*` marker; `scheduled-backup.sh status` rc 0; ledger 118; `afldb_restore_test` comment `afldb.restore_test.v1 sha256=<last-verify sha>`, `numbackends` 0. Section 6: ≥ 6,144 MB free | any FAIL line (= `R6 PRE RESULT STOP`); r7: any `OWNER VERDICT A2 STOP`, including a refused or unauthenticated answer |
 | A-3 | record the lines it prints: `BOOT_ID`, `INVOCATION_ID`, `GRUB-BASELINE`, `OFFHOST-COMPARE`, `RESTORE-EVIDENCE`, `RESTORE-SHA`; and the firmware (BIOS/UEFI), `/` and `/boot` file-system kind, `kernel.panic`, the `GRUB_*` lines, the grubenv variables | recorded | — |
-| A-4 | streamanator after A-2: `bash "$STAGE/$B/r6-20261125/r6-offhost-verify.sh" 2026-11-25 "$D" "$S"` with the `OFFHOST-COMPARE` values | `R6 OFFHOST RESULT PASS`; its `OFFHOST-COMPARE` line **identical** to production's | any FAIL, or the two lines differ |
+| A-4 | streamanator after A-2: `bash "$STAGE/$B/r6-20261125/r6-offhost-verify.sh" 2026-11-25 "$D" "$S"` with the `OFFHOST-COMPARE` values (**r7: information only.** It runs over arm's ssh, so its verdict is not GO evidence.) | `R6 OFFHOST RESULT PASS`; its `OFFHOST-COMPARE` line **identical** to production's | any FAIL, or the two lines differ |
+| A-4r7 | **r7, the GO evidence for the off-host copy.** Stu runs `bash "$V7/afldb-verify-call.sh" g0 2026-11-25` after A-2. It runs G0a on production and then G0b on the qualified off-host endpoint (r9; never streamanator), which gets the dump and sha256 only from the authenticated G0a RESULT line | **`OWNER VERDICT G0 PASS transport=production date=2026-11-25 … dump=<D> sha256=<S> dispatch=<scheduled\|catch-up>`, wrapper exit 0**, and `<D> <S>` identical to the `OFFHOST-COMPARE` line in A-2's owner-path output. Record `dispatch=`: a catch-up is accepted only inside the window and must be named in the record | any `OWNER VERDICT G0 STOP`, or the pair differs from A-2's |
 | A-5 | `deploy/afldb-settle-failure-status.sh` output | printed inside A-2 (packet R6 prerequisite 5: recorded before a reboot erases `Result`) | — |
 
 ### 2.2 (b) DigitalOcean: what the console and the snapshot are (sources fetched 2026-11-21 21:03Z; raw pages kept outside the repository)
@@ -128,7 +142,7 @@ header). The snapshot lives in the owner's DigitalOcean account (§2).
   network; **it is not a recovery path**. The **Recovery Console** "is an older, browser-based connection option based on VNC. Using
   it is like plugging a keyboard and monitor directly into the Droplet. The Recovery Console is available even if a Droplet has lost
   network access or the sshd process has failed", and "it requires password authentication on the Droplet and doesn't fully support
-  features like copying and pasting". So **NG-CONSOLE** means: the owner opened the **Recovery Console**, logged in as `arm` by typing
+  features like copying and pasting". So **NG-CONSOLE** (r8: with a **root** or `afldb-admin` login, not `arm`; see B-1) means: the owner opened the **Recovery Console**, ~~logged in as `arm`~~ **[superseded by r8: log in as root or `afldb-admin`]** by typing
   the password (not pasting), ran `uname -r` and saw `6.8.0-137-generic`, then `exit`. A login prompt alone proves nothing (reviewer
   F-003). Limits stated honestly: the kernel command line ends `console=ttyS0`, so systemd's emergency-mode output goes to the serial
   line, not to the VNC screen (tty1 shows kernel messages and the login prompt); root is locked on the cloud image, so emergency mode
@@ -146,7 +160,7 @@ header). The snapshot lives in the owner's DigitalOcean account (§2).
 
 | # | Owner step (panel) | Pass |
 |---|---|---|
-| B-1 | Before 09:55: open the **Recovery Console**; log in as `arm` (typed password); `uname -r` → `6.8.0-137-generic`; `exit`. Note where the panel's power-cycle and power-off actions are (do not use them) | NG-CONSOLE met; record time |
+| B-1 | Before 09:55: open the **Recovery Console**; ~~log in as `arm`~~ **[superseded by r8, do not follow: see the r8 text in this row]** (typed password); `uname -r` → `6.8.0-137-generic`; `exit`. **r8:** log in as **root** (OWNER-PROCEDURE Phase 0), or as `afldb-admin`, never as arm: arm's startup files can fake `uname`. If no root or admin console login exists, NG-CONSOLE is not met. Note where the panel's power-cycle and power-off actions are (do not use them) | NG-CONSOLE met; record time |
 | B-2 | **From 08:30** (after the 03:30 verification; a live snapshot runs while the site serves): Backups & Snapshots → Take Live Snapshot, name `afldb-prod-pre-r6-20261125`. Wait for the progress bar to finish and the snapshot to be **listed**. Locate (do not run) its restore action | snapshot listed as complete before 10:00; record name, time, size shown |
 
 **What the snapshot is (reviewer F-013).** A full copy of the droplet disk: `.env` with every production secret, the database files,
@@ -170,6 +184,8 @@ from memory. Firmware (BIOS or UEFI, printed by A-2) does not change any command
 `/boot/grub/grubenv` in both cases; on UEFI `/boot/efi` must be mounted for `update-grub` (A-2 prints the mounts).
 
 ### 3.1 C-1 owner read steps (sudo, read-only apart from the saved copy), 09:40-09:55
+
+r8: typed in the admin session (OWNER-PROCEDURE), never in an arm session.
 
 ```bash
 S=20261125; sudo cp -p /boot/grub/grub.cfg /root/grub.cfg.pre-r6-$S && sudo sha256sum /boot/grub/grub.cfg /root/grub.cfg.pre-r6-$S   # record (the two equal)
@@ -214,6 +230,8 @@ time are his; not required by this runbook).
 
 ### 3.3 C-2 owner: apply option B (10:00-10:15; one block; only if NG-GRUBREAD holds)
 
+r8: the block and its NG-FALLBACK undo are typed in the admin session (OWNER-PROCEDURE), never in an arm session.
+
 ```bash
 printf '%s\n' '# AFLDB R6 2026-11-25: temporary; removed in step F5 of ATTENDED-PLAN-R6-20261125.md' 'GRUB_DEFAULT=saved' \
   | sudo tee /etc/default/grub.d/99-afldb-r6.cfg >/dev/null && sudo chmod 0644 /etc/default/grub.d/99-afldb-r6.cfg
@@ -237,7 +255,7 @@ A2 also `afldb-backup.timer` and `afldb-backup-verify.timer`. A-2 lists **every*
 
 | # | Owner, at or after **10:18** (after the 10:17 r2 check; 14:18 in the fallback) | Pass |
 |---|---|---|
-| D-1 | `sudo systemctl stop afldb-settle-afl-api.timer` **first**, then every other `afldb*` timer A-2 showed `active` (settle-afltables, settle-afl-api-brownlow, email-intake if present) **except** `afldb-backup.timer` and `afldb-backup-verify.timer` | — |
+| D-1 | (r8: D-1, D-3 and D-4 in the admin session, never in an arm session) `sudo systemctl stop afldb-settle-afl-api.timer` **first**, then every other `afldb*` timer A-2 showed `active` (settle-afltables, settle-afl-api-brownlow, email-intake if present) **except** `afldb-backup.timer` and `afldb-backup-verify.timer` | — |
 | D-2 | `systemctl is-active afldb-settle-afl-api.service afldb-settle-afltables.service afldb-settle-afl-api-brownlow.service afldb-email-intake.service afldb-backup.service afldb-backup-verify.service` | all `inactive` (a unit not installed also prints `inactive`); a running one: wait for it, never kill it |
 | D-3 | apt gate, **immediately before E-1**: the block below | `inactive` twice, and the three other commands print nothing (NG-APT) |
 
@@ -259,25 +277,25 @@ FAILED there). If that cannot be met, **expect exactly one R2 alarm email per ho
 
 | # | Step | Who | Pass / next |
 |---|---|---|---|
-| E-1 | GO (§7) confirmed aloud; the owner keeps the Recovery Console open; `sudo systemctl reboot` **no later than 10:25** (14:25). Record T0 | Owner | — |
+| E-1 | GO (§7) confirmed aloud; the owner keeps the Recovery Console open; `sudo systemctl reboot` **no later than 10:25** (14:25), typed in the admin session (r8), never in an arm session. Record T0 | Owner | — |
 | E-2 | Workstation: `bash "$STAGE/$B/r6-20261125/r6-public-smoke.sh"` from T0+2 min, at most once a minute (HTTPS, not SSH) | Claude | `R6 PUBLIC RESULT PASS`; a Cloudflare error page while down is expected |
 | E-3 | SSH only after E-2 passes, or on the fixed schedule **T0+3, T0+6, T0+10** (one attempt each; the first SSH is F-2 itself), never a loop. HTTPS answering while SSH times out = the home IPS, not the host: wait for the next slot | Claude | — |
-| E-4 | No HTTPS and no SSH at T0+10: the owner reads the Recovery Console (kernel messages, login prompt; logs in as `arm`, `uname -r`, `systemctl --failed`) → §6 | Owner | — |
-| F-1 | `bash "$STAGE/$B/r6-20261125/r6-public-smoke.sh"`; if A1 was accepted also `bash "$STAGE/$B/a1a2-20261124/a1-s9-public-smoke.sh" "$BUILD_ID"` | Claude | both PASS |
+| E-4 | No HTTPS and no SSH at T0+10: the owner reads the Recovery Console (kernel messages, login prompt; ~~logs in as `arm`~~ **[superseded by r8]**, `uname -r`, `systemctl --failed`) → §6. r8: log in as root or `afldb-admin`, not as `arm`, whose startup files can fake both commands | Owner | — |
+| F-1 | The r4 amendment's block "Wednesday F-1 (r4)" (changed in place, 27 Nov): it runs `r6-public-smoke.sh` and `a1-s9-public-smoke.sh` with `BUILD_ID` derived from the validated handoff `CURRENT_ID` for every Tuesday outcome; never a `BUILD_ID` taken from P3b | Claude | `R6 F-1 RESULT PASS build <BUILD_ID>` (both smokes PASS) |
 | F-2 | `bash "$STAGE/$B/r6-20261125/r6-post-verify.sh" full 6.8.0-149-generic "$CURRENT_ID" "$PRE_BOOT_ID" "$PRE_INVOCATION_ID" "$RESTORE_SHA" "$R4" "$GRUB_BASELINE"` | Claude | `R6 POST RESULT PASS (6.8.0-149-generic)` with one `NOTE GRUB inputs … differ` (option B still applied): new boot_id, uptime < 2 h, `reboot-required` absent, units active, `pg_isready`, new InvocationID, NRestarts 0, 2 workers, equal revalidation-name counts, `current` unchanged, Caddyfile unchanged, loopback health 200, timers sane, no failed unit, ledger 118, `afldb_restore_test` unchanged |
 | F-3 | Owner: block F-3 below (counts and unit names only) | Owner | nothing from `postgresql`, `afldb` or `caddy`; anything else is recorded and judged |
-| F-4 | **Acceptance step A3 (writes, named in §0):** the owner attests that InvocationID `<from F-2>` is the R6 boot's; then `node deploy/release.mjs status --expect <CURRENT_ID> --confirm-restart-invocation <INV>` and `bash deploy/post-install-check.sh --confirm-restart-invocation <INV> <CURRENT_ID>`; if the A1 raw-head baseline exists, `bash "$STAGE/$B/a1a2-20261124/a1-rawhead.sh" check` | Claude (one connection) | `status` PASS, `POST-INSTALL CHECK PASS`, `RAWHEAD RESULT check PASS` |
+| F-4 | **Acceptance step A3 (writes, named in §0):** the owner attests that InvocationID `<from F-2>` is the R6 boot's; then `node deploy/release.mjs status --expect <CURRENT_ID> --confirm-restart-invocation <INV>` and `bash deploy/post-install-check.sh --confirm-restart-invocation <INV> <CURRENT_ID>`; if the A1 raw-head baseline exists, the r3 re-check of the staging root and then, in the same shell, the guarded entry point `bash "$STAGE/$B/r6-20261125/r6-rawhead-check.sh"` (r3 amendment; it runs Sunday's pinned `a1-rawhead.sh` in check mode only as arm on afldb-prod; never run `a1-rawhead.sh` directly) | Claude (one connection) | `status` PASS, `POST-INSTALL CHECK PASS`, `RAWHEAD RESULT check PASS`; exit 2 from the entry point (`STOP not arm@afldb-prod …` or a helper-pin STOP) is a FAIL |
 | F-4b | **Functional revalidation 2/2 (ISSUE-351; owner write scope: none to files or the database, no restart).** Claude, one connection, from `/home/arm/projects/afldb` as arm, AFTER F-2 and F-4 PASS and with fresh output from THIS boot (Sunday's 2/2 is not evidence): `bash "$STAGE/$B/r6-20261125/r6-revalidate-accept.sh" 2026 2` (runs the pinned CLI with the application checkout as its working directory and reads the checkout configuration). It posts the existing fan-out until every worker has answered; the URL and secret come from `.env` and are never printed or passed in argv | Claude | `R6 REVALIDATE RESULT PASS season 2026 workers …`, i.e. exit 0 and the line `REVALIDATED season 2026: 2/2 worker(s) reached (…)` naming **exactly workers 1 and 2**. `exit=1`, `INCOMPLETE`, `1/2`, a repeated ordinal or no output is **STOP: acceptance is not recorded**; never restart as a fallback (the process-level F-2 environment counts do not substitute for this step) |
 | F-5 | **GRUB restore (owner, only after F-1..F-4b PASS):** block F-5 below; then Claude: `bash "$STAGE/$B/r6-20261125/r6-post-verify.sh" grub "$GRUB_BASELINE"` | Owner, Claude | as commented; `R6 GRUB RESULT PASS` |
 | F-6 | D-4 timers; `systemctl list-timers --all 'afldb*' --no-pager` | Owner | every timer of D-1 active with a next elapse, before 11:17 |
 | F-7 | Record (§9). `/root/grub.cfg.pre-r6-20261125` may stay (root-only) until 7 Jan | Claude | — |
 
-**F-3 (owner):**
+**F-3 (owner; r8: in the admin session, never in an arm session):**
 ```bash
 sudo journalctl -b -p err --no-pager | wc -l
 sudo journalctl -b -p err --no-pager -o cat --output-fields=SYSLOG_IDENTIFIER | sort | uniq -c | sort -rn | head -n 15   # count per source, no message text
 ```
-**F-5 (owner, one block):**
+**F-5 (owner, one block; r8: in the admin session, never in an arm session):**
 ```bash
 sudo rm /etc/default/grub.d/99-afldb-r6.cfg
 sudo update-grub 2>&1 | grep -E 'Found linux image|done'        # both images listed
@@ -302,7 +320,7 @@ with all units healthy) is the A1 application rollback (`A1-A2` runbook §3.2), 
 
 | Case | Owner action | Then |
 |---|---|---|
-| G-1: 149 is up but fails F-2/F-3 | D-1..D-3 again, then `sudo systemctl reboot` (no GRUB command: `next_entry` was consumed by the 149 boot, so GRUB boots `saved_entry` = 137) | E-2..E-4, then the acceptance below |
+| G-1: 149 is up but fails F-2/F-3 | D-1..D-3 again, then `sudo systemctl reboot` (r8: all in the admin session) (no GRUB command: `next_entry` was consumed by the 149 boot, so GRUB boots `saved_entry` = 137) | E-2..E-4, then the acceptance below |
 | G-2: 149 never comes up (E-4: panic, hang, emergency mode, no login) | panel **power cycle**, Recovery Console open | GRUB boots 137 (`saved_entry`); acceptance below |
 | G-3: 137 does not come up either | Recovery Console → recovery ISO (§2.2), or **restore the B-2 snapshot** (all writes since 08:30 lost; the 02:20 dump off-host is the data complement); host loss: `docs/backup-restore.md` §6 procedure B | owner decisions, recorded; nothing else is attempted in the window |
 
@@ -318,11 +336,11 @@ attempt on Wed 25 Nov** unless the owner decides otherwise.
 
 | Item | GO when | Evidence |
 |---|---|---|
-| **NG-OWNER** | owner present with `sudo` from 09:40 to the end of the window, Recovery Console and panel open | owner |
-| **NG-PRE** | A-2 `R6 PRE RESULT PASS` with the §1 arguments | A-2 output |
-| **NG-OFFHOST** | (r3:yes) A-4 PASS and the two `OFFHOST-COMPARE` lines identical; A-1 r3 `rc=0` | A-1, A-4 |
-| **NG-CONSOLE** | B-1 done today: Recovery Console, `arm` login by typed password, `uname -r` = `6.8.0-137-generic` | owner statement + time |
-| **NG-DATA** | NG-PRE section 5 and NG-OFFHOST PASS for Wednesday. Record the B-2 snapshot status and the owner's recovery decision. | panel, A-2 |
+| **NG-OWNER** | owner present with `sudo` from 09:40 to the end of the window, Recovery Console and panel open. r8: that `sudo` is the admin session's (OWNER-PROCEDURE Phases 0-1 done and verified twice), not arm's | owner |
+| **NG-PRE** | r9: **only** `GATE ACCEPT NG-PRE GO transport=production` (exit 0) from `bash "$R9/accept/afldb-gate-accept.sh" --gate ng-pre --owner-checks … --reverify … --version … --verdict <saved A-2 output> --verdict-exit <its exit> --confirm <the confirm version call, made after the A-2 call and immediately before this check>` (r10 round 2; act on GO at once). It requires the gate-day OWNER-PROCEDURE 4.4–4.6 outputs (owner checks PASS, both installs re-verified with arm out of `sudo`, a version check after them), and then the wrapper's final line `OWNER VERDICT A2 PASS transport=production` with exit 0, from `afldb-verify-call.sh a2` with the §1 arguments, made after the version check (the r7 whole-caller rule, kept). **r10: a permission change or a Phase 4 back-out after 4.4 voids 4.4, 4.5, 4.6 and any gate verdict already made, even on the same boot and inside the 3 h window: repeat all three and make a new gate call (the checker answers `failed=access`).** An `OWNER VERDICT A2 STOP` is NO-GO whatever its `backup-origin=` says: `backup-origin=attributed` alone never satisfies NG-PRE and is recorded separately (NG-DATA). An `R6 PRE RESULT PASS` from `r6-pre-verify.sh` run as arm, any OWNER-PROCEDURE Phase 3 output (its VERSION PASS included) and any `GATE ACCEPT REHEARSAL …` line are **not** GO evidence | the four saved outputs, the A-2 exit status and the `GATE ACCEPT NG-PRE` line r10 round 2: plus `--confirm <a version call made after the A-2 call, immediately before the check>`; an access change before the confirm call is `failed=access`; act on GO at once (OWNER-PROCEDURE "Saved evidence"). |
+| **NG-OFFHOST** | (r3:yes) r7: A-4r7 `OWNER VERDICT G0 PASS transport=production date=2026-11-25`, with its `dump=`/`sha256=` identical to A-2's `OFFHOST-COMPARE`. r9: the verdict must carry `qualification=pinned` with the `qual-sha256=` of the committed pin (`$R9/offhost/QUALIFY-OFFHOST.md`) and the five scheduled-transfer fields, and `afldb-gate-accept.sh --gate release-g0` on it must print `GATE ACCEPT RELEASE-G0 GO transport=production`. Any of `qualification=none\|refused\|FIXTURE`, a "possession only" reason, or a G0B from streamanator is NO-GO; there is no arm-attested alternative. No endpoint is qualified today, so NG-OFFHOST is NO-GO until one is. A-1 and A-4 (arm-run) are recorded as information and do not count as GO | A-4r7 and its GATE ACCEPT line (A-1, A-4 information) |
+| **NG-CONSOLE** | B-1 done today: Recovery Console, ~~`arm` login~~ **[superseded by r8: a root or `afldb-admin` login]** by typed password, `uname -r` = `6.8.0-137-generic`. r8: a **root** (or `afldb-admin`) login, not `arm` (B-1) | owner statement + time |
+| **NG-DATA** | NG-PRE section 5 and NG-OFFHOST PASS for Wednesday. r7: `backup-origin=attributed` on the A-2 owner verdict, NG-OFFHOST's owner G0 PASS, and the `dispatch=` kind recorded. r9: NG-PRE and NG-OFFHOST must each be GO as their rows now define them (GATE ACCEPT); also record the G0 verdict's `offhost=`, `qual-sha256=`, `dispatch-at=`, `received-at=` and `complete-at=`; an unqualified or arm-attested off-host copy never satisfies NG-DATA, so NG-DATA stays NO-GO while no endpoint is qualified. Section 5's restore-chain lines are reported as `ARM-PRODUCED`: the weekly restore runs as arm. Record the B-2 snapshot status and the owner's recovery decision. | panel, A-2 owner path, A-4r7 |
 | **NG-GRUBREAD** | C-1 shapes 1-6 as expected | owner output (UUIDs redacted) |
 | **NG-FALLBACK** | C-2 applied and every check as commented | owner output |
 | **NG-TIMERS** | D-1, D-2 done at or after 10:18 | owner output |
@@ -338,8 +356,8 @@ NG-FALLBACK, NG-DATA) is uncertain, pause; nothing in this runbook overrides tha
 | AEDT | Step | Notes |
 |---|---|---|
 | 08:30 | B-2 live snapshot starts | after the 03:30 verify; must be listed complete before 10:00 |
-| 09:25 | A-2 (production, one connection) | capture the exact Wednesday D/S for A-1 and A-4 |
-| 09:35 | A-1, A-4 (streamanator) | use the Wednesday D/S from A-2 |
+| 09:25 | A-2 (r7: owner path, Stu on the workstation) | capture the exact Wednesday D/S for A-1 and A-4 |
+| 09:35 | A-4r7 (owner path, G0a + G0b); A-1, A-4 (streamanator, information only) | use the Wednesday D/S from A-2 |
 | 09:40-09:55 | B-1 (Recovery Console), C-1 (GRUB read) | owner |
 | 10:00 | GO/NO-GO, all items except NG-TIMERS/NG-APT | — |
 | 10:00-10:15 | C-2 option B | owner |
@@ -458,3 +476,697 @@ Historical revision `bc3fef3de375259d49001e7a9a478624832703a8`. Use §0 for Wedn
 | `docs/v2/evidence/backlog-20261121/a1a2-20261124/dry-tests-20261122g/t-sunday-review.sh` | `b8f06d5486ad8cd995d59b9634382f615f0535371121846f3a282cb0fb0446e0` |
 
 Validation and first-copy evidence: [Sunday review record](sunday-review-20261122/README.md). Wednesday verification and the attended reboot decision remain pending.
+
+## Amendment — 23 November 2026, Tuesday's application release of 17822b29 (PROPOSED; independent review required before the reboot)
+
+> **SUPERSEDED 23 Nov 2026 (late) by the r2 amendment below.** Its CURRENT_ID change is kept unchanged in the r2 archive
+> (`r6-post-verify.sh` `478f85cd…`; `r6-pre-verify.sh` carries the same line). Its archive (`58e35ce8`) and the original §0
+> archive (`b48a2c5e`) are **no longer valid for any Tuesday outcome**. Both lack the A-2 serving-release gate and the F-4 host
+> guard that the independent R6 review required.
+
+**Why.** Tuesday 24 Nov may release `17822b29e6de2b6248cd7ada4221800fd81e0003` ([release runbook](../release-17822b29-20261124/RUNBOOK.md)). The pinned scripts admit only these CURRENT_ID values:
+
+* `r6-pre-verify.sh:81`, outcome `accepted`: `7d92042fd110-*` only;
+* `r6-post-verify.sh:81`: `7d92042fd110-*` or `c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC`.
+
+So after a successful Tuesday release, A-2 and F-2 would STOP with usage exit 2. Nothing else in R6 pins Sunday's build. There is no BUILD_ID pin. Process, worker, revalidation and raw-head checks are written against `releases/$CUR` and Sunday's raw-head titles and robots, which the 17822b29 release keeps (its raw-head check prints `R6-NOTE`).
+
+**Change.** Two lines only, in script revision `58e35ce8805e9f559d3dd1008606f90efb84fbab`:
+
+```diff
+-case $OUTC in accepted) [[ $CUR =~ ^7d92042fd110-[A-Za-z0-9_-]{1,64}$ ]];; *) [ "$CUR" = c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC ];; esac \
++case $OUTC in accepted) [[ $CUR =~ ^(7d92042fd110|17822b29e6de)-[A-Za-z0-9_-]{1,64}$ ]];; *) [ "$CUR" = c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC ];; esac \
+-  [[ $K =~ ^6\.8\.0-(149|137)-generic$ ]] && [[ $CUR =~ ^(7d92042fd110-[A-Za-z0-9_-]{1,64}|c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC)$ ]] \
++  [[ $K =~ ^6\.8\.0-(149|137)-generic$ ]] && [[ $CUR =~ ^((7d92042fd110|17822b29e6de)-[A-Za-z0-9_-]{1,64}|c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC)$ ]] \
+```
+
+**Amended archive.** Use §0's command and the same 14 paths, with `CODE=58e35ce8805e9f559d3dd1008606f90efb84fbab`.
+
+* Two pins change:
+  * `r6-pre-verify.sh` `1d61b086…` → `fa8d34f0bae6f4d3250260dd44419d7f6b4020a7cfc4eda9626adb027d1043e5`;
+  * `r6-post-verify.sh` `26070c9e…` → `478f85cd8930199796c046ea43cdbaab7882921d286a3c9f6015c4a70cd5c66c`.
+* The other twelve §0 pins are byte-identical at `58e35ce8` and at `17822b29`. I checked each against `b48a2c5e`.
+* The rehearsal ran the exact amended and original gate lines. The amended scripts admit `17822b29e6de-*` and `7d92042fd110-XWruOm…`, and post-verify still admits `c8d4202a…`. Pre-verify refuses `accepted` with `c8d4202a…` and a foreign id. The originals refuse `17822b29e6de-*` ([REHEARSAL.md §3 K](../release-17822b29-20261124/rehearsal/REHEARSAL.md)).
+
+**Which archive on Wednesday.** Find Tuesday's outcome in the [release runbook §8](../release-17822b29-20261124/RUNBOOK.md); the arguments come from its sitting record.
+
+| Tuesday | Wednesday arguments | Archive |
+|---|---|---|
+| 17822b29 released and accepted | outcome `accepted`, CURRENT_ID `17822b29e6de-<BUILD_ID from P3b>` | **amended archive, and only after an independent review of this amendment records PASS; without it R6 is NO-GO** |
+| rolled back with the rollback verify PASS | outcome `accepted`, CURRENT_ID `7d92042fd110-XWruOm_9nLCSMY8nGPqYU` | §0 (original) or amended |
+| deferred (nothing promoted) | outcome `accepted`, CURRENT_ID `7d92042fd110-XWruOm_9nLCSMY8nGPqYU` | §0 (original) or amended |
+| promoted but not restarted, rollback verify failed, or unknown | — | **NO-GO** |
+
+The `stopped` and `rolledback` outcome values in §1 describe Sunday's A1 relative to `c8d4202a`. **Do not use them for Tuesday's outcomes.**
+
+**Unchanged gates.** Wednesday still requires all of the following. Tuesday's G0 replaces none of them:
+
+* its own 02:20 scheduled backup;
+* an attributable 03:10 off-host copy (A-1 and A-4 exit 0);
+* the 03:30 verification-service restore, matched to its journal, state and database comment;
+* the GRUB reads and recovery path;
+* writer timers stopped before and active again after;
+* F-2 process identity, F-4 status and post-install checks, F-4b functional revalidation with workers 1 and 2;
+* the §7 GO/NO-GO checklist.
+
+If Tuesday ran P2, Wednesday's backup and verification are the first production runs of the 17822b29 `backup.sh` and `scheduled-backup.sh`. The checkout units run them. A failure there fails these gates, and the reboot is NO-GO.
+
+## Amendment — 23 November 2026 (r2), independent R6 review fixes (SUPERSEDED by r3, 24 Nov 2026)
+
+> **SUPERSEDED 24 Nov 2026 by the r3 amendment below**, after Astra's re-review of `cc3369a5` failed. Its archive (`7af24a74`,
+> manifest `53b8cb10…`), its staging and re-check blocks (a file count, no type or path check) and its five-argument A-2 are not
+> valid for any Tuesday outcome. Kept as the record of what Astra reviewed.
+
+This amendment supersedes §0 and the 23 Nov CURRENT_ID amendment's archive. It applies to **every** Tuesday outcome. Without a
+recorded PASS from Astra's re-review of this amendment at its review commit, R6 is NO-GO. Everything else in this runbook stands.
+
+**What changed (helper revision `7af24a74b15af39b0bdebeec9be0b089c8adc8a1`).**
+
+1. **A-2 stops when the serving-release check fails.** Previously, `r6-pre-verify.sh` printed `release.mjs status`'s exit code as
+   INFO only. A service still running the previous release behind a matching `current` symlink and two workers therefore passed
+   A-2. The rehearsal reproduced this with the 58e35ce8 script. `release.mjs status --expect` is **not** read-only: a live PASS
+   appends one `status-pass` line to `/home/arm/afldb-releases/events.log` (`deploy/release.mjs:1539-1545`, the same bytes at
+   7d92042f and 17822b29). The owner therefore chose the read-only form. A-2 runs `node deploy/release.mjs status` (no `--expect`)
+   once, captures that one invocation's output and exit code, and passes only when all of these hold:
+   * the exit code is 0;
+   * there is exactly one result line (`release: STATUS PASS|FAIL …`), and it is exactly `release: STATUS PASS <CURRENT_ID>`;
+   * there is no `restarted since the last attested PASS` note.
+
+   Anything else is a FAIL line, so the result is `R6 PRE RESULT STOP` with a nonzero exit. `CURRENT_ID` is the **full** release ID
+   from Tuesday's sitting record, exactly as below. A truncated or mistyped ID STOPs. A-2 writes nothing: the rehearsal compared
+   `events.log` byte for byte in every case.
+2. **F-4's raw-head check goes through a guarded entry point.** Sunday's `a1-rawhead.sh` has no host or user guard: on any host it
+   reads `/home/arm/projects/afldb/.env`, creates a temporary probe file and makes requests. F-4 now runs
+   `bash "$STAGE/$B/r6-20261125/r6-rawhead-check.sh"`. It runs only `hostname` and `id -un` until it has confirmed user `arm` on
+   host `afldb-prod`. Otherwise it exits 2 and nothing is read, written or requested. It then confirms that the staged
+   `a1-rawhead.sh` is Sunday's pinned `cab4a43a…` and runs it unchanged in `check` mode against Sunday's
+   `/home/arm/a1-rawhead-baseline.json`. Sunday's helper, its pin and its baseline are not changed. F-4's row (§5) now reads:
+   `… and bash deploy/post-install-check.sh --confirm-restart-invocation <INV> <CURRENT_ID>; if the A1 raw-head baseline exists,
+   bash "$STAGE/$B/r6-20261125/r6-rawhead-check.sh"`. Expected output: `RAWHEAD RESULT check PASS`. Exit 2 (`STOP not
+   arm@afldb-prod …`, or a helper-pin STOP) is a FAIL.
+3. **One copy-ready archive and checksum procedure**, below. It replaces §0's command and the earlier "use §0 with two changed
+   pins" instruction. It has 15 files: §0's 14 plus `r6-rawhead-check.sh`. Three pins differ from §0: `r6-pre-verify.sh`,
+   `r6-post-verify.sh` (the CURRENT_ID line, unchanged since `58e35ce8`) and the new `r6-rawhead-check.sh`. The other twelve are
+   byte-identical to §0's `b48a2c5e` pins.
+
+**Wednesday arguments (unchanged release-ID mapping).** Take them from Tuesday's sitting record:
+
+| Tuesday | A-2 `OUTCOME` | A-2 `CURRENT_ID` (full, exactly) | Archive |
+|---|---|---|---|
+| 17822b29 released and accepted | `accepted` | `17822b29e6de-<BUILD_ID from P3b>` | this r2 archive |
+| rolled back with the rollback verify PASS | `accepted` | `7d92042fd110-XWruOm_9nLCSMY8nGPqYU` | this r2 archive |
+| deferred (nothing promoted) | `accepted` | `7d92042fd110-XWruOm_9nLCSMY8nGPqYU` | this r2 archive |
+| promoted but not restarted, rollback verify failed, or unknown | — | — | **NO-GO** |
+
+The `stopped` and `rolledback` outcome values in §1 describe Sunday's A1. **Do not use them for Tuesday's outcomes.** The last
+attested `status-pass` line that A-2's restart rule compares against is:
+
+* accepted: Tuesday's P5 `status --expect … --confirm-restart-invocation`;
+* rolled back: the rollback verification;
+* deferred: Sunday's A1 acceptance.
+
+Any service restart after that line that nobody attested makes A-2 STOP.
+
+### R6 archive r2: workstation (Git Bash), before 09:25
+
+```bash
+CODE=7af24a74b15af39b0bdebeec9be0b089c8adc8a1
+B=docs/v2/evidence/backlog-20261121
+git -C /d/dev/afldb archive --format=tar --output=/tmp/afldb-r6-20261125-r2.tar "$CODE" \
+  "$B/r6-20261125/r6-pre-verify.sh" \
+  "$B/r6-20261125/r6-offhost-verify.sh" \
+  "$B/r6-20261125/r6-post-verify.sh" \
+  "$B/r6-20261125/r6-public-smoke.sh" \
+  "$B/r6-20261125/r6-revalidate-accept.sh" \
+  "$B/r6-20261125/r6-rawhead-check.sh" \
+  "$B/a1a2-20261124/a1-s9-public-smoke.sh" \
+  "$B/a1a2-20261124/a1-rawhead.sh" \
+  "$B/a1a2-20261124/a2-cron-observe.sh" \
+  "$B/a1a2-20261124/a2-helper-install.sh" \
+  "$B/kits/afldb-offhost-pull-daily.sh" \
+  "$B/kits/scheduled-pull-evidence.sh" \
+  "tools/maintenance/offhost-pull.sh" \
+  "tools/maintenance/revalidate-season.ts" \
+  "src/lib/acquisition/season-revalidation.ts" &&
+  sha256sum /tmp/afldb-r6-20261125-r2.tar
+```
+
+### R6 archive r2: transfer (workstation Git Bash; one line per host; never at minute :16–:18)
+
+```bash
+C:/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes -i C:/Users/stuar/.ssh/afldb_dev arm@10.0.40.100 'cat > /tmp/afldb-r6-20261125-r2.tar' < /tmp/afldb-r6-20261125-r2.tar
+```
+
+```bash
+C:/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes afldb 'cat > /tmp/afldb-r6-20261125-r2.tar' < /tmp/afldb-r6-20261125-r2.tar
+```
+
+### R6 archive r2: staging and verification (run once on each host: workstation, production, streamanator)
+
+Paste the block into a shell on that host, or pipe it there with `tr -d '\r' < block | ssh.exe … bash -s`. Record the printed
+staging root. STOP unless the block prints 15 `: OK` lines and `R6 STAGE VERIFIED <path> (15 files)`. The block also STOPs on
+an extra or missing file and on a manifest that differs from the one printed here (digest
+`53b8cb1031c1d0204c7bf0a413efa5cb2ea1e5c37b2025f111ed1bc1de78b0fc`).
+
+```bash
+B=docs/v2/evidence/backlog-20261121
+STAGE=$(mktemp -d /tmp/afldb-r6-20261125-r2.XXXXXX) &&
+  tar -xf /tmp/afldb-r6-20261125-r2.tar -C "$STAGE" &&
+  cat > "$STAGE/R6-SHA256SUMS" <<'R6_PINS' &&
+0d9e97a5d5882203703ca36083a84284f30158c0475f6a1b1926359854bd6ad9  docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh
+429eec29acf254179c3b7ae7d6489a6c695981fd90996c5c2ce1301314bcc18c  docs/v2/evidence/backlog-20261121/r6-20261125/r6-offhost-verify.sh
+478f85cd8930199796c046ea43cdbaab7882921d286a3c9f6015c4a70cd5c66c  docs/v2/evidence/backlog-20261121/r6-20261125/r6-post-verify.sh
+de84f1205b4ab4cfec182b1fb7b0770ca916c8570f10a14539daa9a4e450bd9e  docs/v2/evidence/backlog-20261121/r6-20261125/r6-public-smoke.sh
+5e5ce991a5e4bf0875c49e01cc0f90db7da720a0f1c022507cec869d3cc067f0  docs/v2/evidence/backlog-20261121/r6-20261125/r6-revalidate-accept.sh
+cc8854f0bbce305e1071e3eea30100e18d742ae15cddbd1f9a19b908ad100b50  docs/v2/evidence/backlog-20261121/r6-20261125/r6-rawhead-check.sh
+babb660f7e7555a55281f2a0a07cb6d1147f39ebfa5ff9c119a677a1e2776a71  docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-s9-public-smoke.sh
+cab4a43af09e4b1729d913162c0f27faccd19315c56eb4ad1141c8bf748d81c0  docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-rawhead.sh
+2ac943b113af2247ab3acb3863e97201c8794ff830520338faa8b299268eeee5  docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-cron-observe.sh
+6c1b57e57c7dc57a6094f44354ba9cec91a1dec310e57b9fae371670be388e47  docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-helper-install.sh
+2ebac1c09b07e6b3bc1e060d7645efdbb1c2c7f169b5cfafd4e7f77508716e24  docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh
+d7574254997ba28dd1f750b7bcdc6f90c0a421b88ba6bb02aa104bd671b8572e  docs/v2/evidence/backlog-20261121/kits/scheduled-pull-evidence.sh
+a3775aea879b1d9ce05d0e96482e66d24c69deb62cf38e8fc0407c0d2653dc2b  tools/maintenance/offhost-pull.sh
+20ee3b452da9cb025a938a75c3200f44101fb094c1ad4662e70673df3d96b14e  tools/maintenance/revalidate-season.ts
+bd88c915c2643fc1bc8ec005c5c6825d43af0742b33ca83f0461e9348414dbc9  src/lib/acquisition/season-revalidation.ts
+R6_PINS
+  (cd "$STAGE" && sha256sum -c R6-SHA256SUMS &&
+    [ "$(find . -type f ! -name R6-SHA256SUMS | wc -l)" -eq 15 ] &&
+    [ "$(sha256sum < R6-SHA256SUMS | cut -c1-64)" = 53b8cb1031c1d0204c7bf0a413efa5cb2ea1e5c37b2025f111ed1bc1de78b0fc ]) &&
+  printf 'R6 STAGE VERIFIED %s (15 files)\n' "$STAGE" ||
+  { echo 'R6 STAGE STOP: do not use this staging root'; false; }
+```
+
+### R6 archive r2: re-check before each use (later sessions; set `STAGE` to the recorded root first)
+
+```bash
+(cd "$STAGE" && sha256sum -c --quiet R6-SHA256SUMS &&
+  [ "$(find . -type f ! -name R6-SHA256SUMS | wc -l)" -eq 15 ] &&
+  [ "$(sha256sum < R6-SHA256SUMS | cut -c1-64)" = 53b8cb1031c1d0204c7bf0a413efa5cb2ea1e5c37b2025f111ed1bc1de78b0fc ]) &&
+  echo "R6 STAGE OK $STAGE" || { echo "R6 STAGE STOP $STAGE"; false; }
+```
+
+Then set `B=docs/v2/evidence/backlog-20261121` and use only the staged copies, as §0's last paragraph describes (A-1 and A-4 on
+streamanator after `a2-helper-install.sh check`; the F-4b PATH line is unchanged).
+
+**Rehearsal (streamanator, disposable, production not contacted):**
+[review-fixes-20261123/README.md](r6-20261125/review-fixes-20261123/README.md). It covers the printed blocks run verbatim from a
+clean export, the file count, the stops on a changed staged file, and the A-2 and F-4 cases in disposable containers.
+
+## Amendment — 24 November 2026 (r3), fixes for Astra's failed R6 re-review (SUPERSEDED by r4, 27 Nov 2026)
+
+This amendment supersedes §0, the 23 Nov CURRENT_ID amendment's archive and the **whole r2 amendment's archive, staging and
+re-check procedure**, for every Tuesday outcome: released and accepted, rollback verified, and deferred before promotion. Without
+a recorded PASS from Astra's independent re-review at this amendment's review commit, R6 is NO-GO. Wednesday is also NO-GO until
+its own 02:20 backup, attributable 03:10 off-host pull, attributable 03:30 verification restore, console and recovery checks pass
+(§7). Everything else in this runbook stands.
+
+**Tuesday's release runbook §8 is superseded for Wednesday** ([RUNBOOK.md §8](../release-17822b29-20261124/RUNBOOK.md)): its
+"Wednesday archive" column (`b48a2c5e` original, `58e35ce8` amended) no longer applies to any outcome; every outcome uses the r3
+archive below. Its InvocationID column is now enforced by A-2 from the sitting record. Tuesday's own pinned packet (scripts
+`58e35ce8`, `SHA256SUMS` `b4e9e584…`) and Sunday's `a1-rawhead.sh` (`cab4a43a…`) are unchanged and are not modified by this
+amendment. The r2 archive (`7af24a74`, manifest `53b8cb10…`) is superseded.
+
+**What changed (helper revision `9a9a01c195602e430d0d514e5fbe550eb77d0a9f`).**
+
+1. **A-2 verifies the owner-attested service InvocationID.** `r6-pre-verify.sh` keeps the single plain `release.mjs status` call
+   (no `--expect`), its merged output and its actual exit code, the exact `release: STATUS PASS <CURRENT_ID>` rule and the
+   restart-note rejection. Plain `status` cannot see a restart after the attested PASS when `events.log` is unreadable, malformed,
+   or superseded by a later unconfirmed `status-pass`: it then prints PASS with no note (reproduced, below). So A-2 now takes two
+   more arguments and makes a **separate** read-only comparison, `systemctl show afldb -p InvocationID --value`, against the
+   owner-attested ID. A failed read, an empty or malformed value (anything but one 32-hex ID), or a mismatch is a FAIL line, so
+   `R6 PRE RESULT STOP`, exit 1. The expected ID comes only from the sitting record, through `r6-tuesday-handoff.sh`; neither
+   the live service nor `events.log` can supply it. All seven arguments are required; a missing, extra or ambiguous Tuesday
+   outcome, a malformed ID, or an outcome/ID combination outside the table below is a usage STOP, exit 2, before any check.
+   A carriage return anywhere in the status output, or any line containing `STATUS PASS`/`STATUS FAIL` beyond the one exact
+   line, now STOPs too: a CRLF `release: STATUS FAIL` beside an LF `release: STATUS PASS <id>` passed r2.
+2. **Exact archive contents in both printed blocks.** The staging block and the re-check block run the **same** verification
+   lines: the staging root is a real directory owned by the running user; the manifest matches its independent digest pin
+   below; nothing in the root is group- or world-writable or a hard-linked file; the root holds **exactly** the manifest
+   `R6-SHA256SUMS`, the 16 pinned regular files and their parent directories (each path with its object type, compared as one
+   sorted listing); and every file matches its pin. An extra file, a nested `docs/R6-SHA256SUMS`, an extra symlink, an empty
+   directory, or an expected file (or the manifest) replaced by a symlink to identical bytes is a STOP. A file count is no
+   longer used. Extraction and the manifest write happen under `umask 077`; an archive that carries its own root
+   `R6-SHA256SUMS` STOPs before anything is written through it.
+3. **Wednesday operator instructions.** §5's F-4 row now names the guarded entry point (changed in place above). The A-2 row of
+   §2.1 names the seven-argument form. `r6-rawhead-check.sh` now hashes Sunday's helper from **one read into memory and executes
+   those same bytes**, so the helper's path is not reopened between the pin check and execution. Its wrong-host and wrong-user
+   paths still stop (exit 2) before `.env` is opened, a temporary file is created or a request is made (rehearsed below).
+4. **New helper `r6-tuesday-handoff.sh`** (workstation, read-only, no network): reads the Tuesday sitting record and prints A-2's
+   Tuesday arguments, or STOPs.
+
+**A-2's read-only behaviour, precisely.** A-2 itself creates, changes or removes no file, unit, timer, database row or
+`events.log` line, and runs no sudo, restart or apt. What the services it queries may record is theirs: `release.mjs status`
+makes loopback GETs (`/api/health`, which queries the database, and the current and previous `_buildManifest.js`), so the
+application may write its ordinary request and health log lines to the `afldb` journal; PostgreSQL may log the one read-only
+backup-role session if connection logging is on; sshd and PAM record the login. The rehearsal compared `events.log` byte for
+byte around every A-2 run.
+
+**Wednesday arguments (from Tuesday's sitting record only).**
+
+| Tuesday | handoff `tuesday-outcome` | A-2 `CURRENT_ID` (full, exactly) | A-2 attested InvocationID | Archive |
+|---|---|---|---|---|
+| 17822b29 released and accepted | `released` | `17822b29e6de-<BUILD_ID from P3b>` | the owner-attested Tuesday restart (bound by P5) | r3 |
+| rolled back with the rollback verify PASS | `rolledback` | `7d92042fd110-XWruOm_9nLCSMY8nGPqYU` | the owner-attested rollback restart (bound by `ROLLBACK RESULT VERIFIED`) | r3 |
+| deferred before promotion | `deferred` | `7d92042fd110-XWruOm_9nLCSMY8nGPqYU` | Sunday's `342040625f6d4012a35d598dfbf9afe6` | r3; **a Tuesday sitting record confirming the deferral is required** |
+| promoted but not restarted, rollback verify failed, no Tuesday record, or unknown | — | — | — | **NO-GO** |
+
+A-2's `OUTCOME` is always `accepted`; `stopped` and `rolledback` describe Sunday's A1 and are refused.
+
+**The handoff block in the Tuesday sitting record.** The record (Tuesday runbook §7:
+`docs/v2/evidence/release-17822b29-20261124/SITTING-20261124.md`) must contain exactly these three lines, unindented, and no other
+line containing `R6-HANDOFF`:
+
+```text
+R6-HANDOFF tuesday-outcome <released|rolledback|deferred>
+R6-HANDOFF current-id <the full release id>
+R6-HANDOFF attested-invocation <the 32-hex InvocationID>
+```
+
+Tuesday's session writes them at its end, or Wednesday's session adds them before 09:25 with the owner confirming each value.
+Every value is copied from the record's own lines (P3b's `NEW_ID`, the owner's restart report, the P5 or rollback-verify
+result); never from the live service or `events.log`. `r6-tuesday-handoff.sh` STOPs unless the outcome is unambiguous:
+`released` needs `P3b RESULT BUILD PASS <id>` and `P5 RESULT ACCEPT PASS` and no `ROLLBACK RESULT`; `rolledback` needs
+`ROLLBACK RESULT VERIFIED`; for both, the attested ID is not Sunday's and also appears in the record's own restart report;
+`deferred` needs Sunday's ID and no `P4 RESULT PROMOTED` or `ROLLBACK RESULT`. Fixture records and fixture IDs exist only inside
+the rehearsal's disposable containers and must never be written into the real record.
+
+### R6 archive r3: workstation (Git Bash), before 09:25
+
+```bash
+CODE=9a9a01c195602e430d0d514e5fbe550eb77d0a9f
+B=docs/v2/evidence/backlog-20261121
+git -C /d/dev/afldb archive --format=tar --output=/tmp/afldb-r6-20261125-r3.tar "$CODE" \
+  "$B/r6-20261125/r6-pre-verify.sh" \
+  "$B/r6-20261125/r6-offhost-verify.sh" \
+  "$B/r6-20261125/r6-post-verify.sh" \
+  "$B/r6-20261125/r6-public-smoke.sh" \
+  "$B/r6-20261125/r6-revalidate-accept.sh" \
+  "$B/r6-20261125/r6-rawhead-check.sh" \
+  "$B/r6-20261125/r6-tuesday-handoff.sh" \
+  "$B/a1a2-20261124/a1-s9-public-smoke.sh" \
+  "$B/a1a2-20261124/a1-rawhead.sh" \
+  "$B/a1a2-20261124/a2-cron-observe.sh" \
+  "$B/a1a2-20261124/a2-helper-install.sh" \
+  "$B/kits/afldb-offhost-pull-daily.sh" \
+  "$B/kits/scheduled-pull-evidence.sh" \
+  "tools/maintenance/offhost-pull.sh" \
+  "tools/maintenance/revalidate-season.ts" \
+  "src/lib/acquisition/season-revalidation.ts" &&
+  sha256sum /tmp/afldb-r6-20261125-r3.tar
+```
+
+### R6 archive r3: transfer (workstation Git Bash; one line per host; never at minute :16–:18)
+
+The remote side writes with `noclobber`: if anything already exists at that path (a stale copy, or a file or link someone else
+put there) the transfer fails instead of writing into it. Investigate before removing anything.
+
+```bash
+C:/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes -i C:/Users/stuar/.ssh/afldb_dev arm@10.0.40.100 'set -C; cat > /tmp/afldb-r6-20261125-r3.tar' < /tmp/afldb-r6-20261125-r3.tar
+```
+
+```bash
+C:/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes afldb 'set -C; cat > /tmp/afldb-r6-20261125-r3.tar' < /tmp/afldb-r6-20261125-r3.tar
+```
+
+### R6 archive r3: staging and verification (run once on each host: workstation, production, streamanator)
+
+Paste the block into a shell on that host, or pipe it there with `tr -d '\r' < block | ssh.exe … bash -s`. Record the printed
+staging root. STOP unless the block prints 16 `: OK` lines and `R6 STAGE VERIFIED <path> (16 files)`. Manifest digest
+`2c7ee8e2e1758f1002a36c4b75239d4ff4dea6958e7b2410a1f0253a38978007`. Every pin is the SHA-256 of the Git blob at the tested
+revision (`git cat-file blob 9a9a01c195602e430d0d514e5fbe550eb77d0a9f:<path> | sha256sum`). Three differ from r2: `r6-pre-verify.sh`
+(`0d9e97a5…` → `48185fca…`), `r6-rawhead-check.sh` (`cc8854f0…` → `7c3d0fc2…`) and the new `r6-tuesday-handoff.sh`. The other
+thirteen are byte-identical to r2's, and Sunday's `a1-rawhead.sh` is still `cab4a43a…`.
+
+```bash
+B=docs/v2/evidence/backlog-20261121
+STAGE=$(umask 077 && mktemp -d /tmp/afldb-r6-20261125-r3.XXXXXX) &&
+  (umask 077 && cd "$STAGE" && tar -xf /tmp/afldb-r6-20261125-r3.tar &&
+    [ ! -e R6-SHA256SUMS ] && [ ! -L R6-SHA256SUMS ] && cat > R6-SHA256SUMS) <<'R6_PINS' &&
+48185fcaec83eff1cb26f1612febb32ba7d223f953cd4f6941fcc38c5eebebfb  docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh
+429eec29acf254179c3b7ae7d6489a6c695981fd90996c5c2ce1301314bcc18c  docs/v2/evidence/backlog-20261121/r6-20261125/r6-offhost-verify.sh
+478f85cd8930199796c046ea43cdbaab7882921d286a3c9f6015c4a70cd5c66c  docs/v2/evidence/backlog-20261121/r6-20261125/r6-post-verify.sh
+de84f1205b4ab4cfec182b1fb7b0770ca916c8570f10a14539daa9a4e450bd9e  docs/v2/evidence/backlog-20261121/r6-20261125/r6-public-smoke.sh
+5e5ce991a5e4bf0875c49e01cc0f90db7da720a0f1c022507cec869d3cc067f0  docs/v2/evidence/backlog-20261121/r6-20261125/r6-revalidate-accept.sh
+7c3d0fc295512a2f990bdbed24ae9ddb97a49f5f13e9bf01019ea3fa7e1f0543  docs/v2/evidence/backlog-20261121/r6-20261125/r6-rawhead-check.sh
+92c1809b61473ab8d326b5a65bc1a30bb1eaf16e272ad0adf90a030ec039f9d8  docs/v2/evidence/backlog-20261121/r6-20261125/r6-tuesday-handoff.sh
+babb660f7e7555a55281f2a0a07cb6d1147f39ebfa5ff9c119a677a1e2776a71  docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-s9-public-smoke.sh
+cab4a43af09e4b1729d913162c0f27faccd19315c56eb4ad1141c8bf748d81c0  docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-rawhead.sh
+2ac943b113af2247ab3acb3863e97201c8794ff830520338faa8b299268eeee5  docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-cron-observe.sh
+6c1b57e57c7dc57a6094f44354ba9cec91a1dec310e57b9fae371670be388e47  docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-helper-install.sh
+2ebac1c09b07e6b3bc1e060d7645efdbb1c2c7f169b5cfafd4e7f77508716e24  docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh
+d7574254997ba28dd1f750b7bcdc6f90c0a421b88ba6bb02aa104bd671b8572e  docs/v2/evidence/backlog-20261121/kits/scheduled-pull-evidence.sh
+a3775aea879b1d9ce05d0e96482e66d24c69deb62cf38e8fc0407c0d2653dc2b  tools/maintenance/offhost-pull.sh
+20ee3b452da9cb025a938a75c3200f44101fb094c1ad4662e70673df3d96b14e  tools/maintenance/revalidate-season.ts
+bd88c915c2643fc1bc8ec005c5c6825d43af0742b33ca83f0461e9348414dbc9  src/lib/acquisition/season-revalidation.ts
+R6_PINS
+  ([ -d "$STAGE" ] && [ ! -L "$STAGE" ] && cd "$STAGE" &&
+    [ "$(sha256sum < R6-SHA256SUMS | cut -c1-64)" = 2c7ee8e2e1758f1002a36c4b75239d4ff4dea6958e7b2410a1f0253a38978007 ] &&
+    [ -z "$(find . \( ! -uid "$(id -u)" -o -perm /022 -o \( -type f -links +1 \) \) -print)" ] &&
+    [ "$(find . -mindepth 1 -printf '%y %p\n' | LC_ALL=C sort)" = "$(awk '{p = "./" $2; print "f " p; while (sub(/\/[^\/]+$/, "", p) && p != ".") print "d " p} END {print "f ./R6-SHA256SUMS"}' R6-SHA256SUMS | LC_ALL=C sort -u)" ] &&
+    sha256sum -c R6-SHA256SUMS) &&
+  printf 'R6 STAGE VERIFIED %s (16 files)\n' "$STAGE" ||
+  { echo 'R6 STAGE STOP: do not use this staging root'; false; }
+```
+
+### R6 archive r3: re-check, immediately before each use (set `STAGE` to the recorded root first)
+
+The verification lines are the staging block's own, unchanged. Run this block, and then the step, in the **same** shell on that
+host, and run the step only after `R6 STAGE OK`.
+
+```bash
+([ -d "$STAGE" ] && [ ! -L "$STAGE" ] && cd "$STAGE" &&
+    [ "$(sha256sum < R6-SHA256SUMS | cut -c1-64)" = 2c7ee8e2e1758f1002a36c4b75239d4ff4dea6958e7b2410a1f0253a38978007 ] &&
+    [ -z "$(find . \( ! -uid "$(id -u)" -o -perm /022 -o \( -type f -links +1 \) \) -print)" ] &&
+    [ "$(find . -mindepth 1 -printf '%y %p\n' | LC_ALL=C sort)" = "$(awk '{p = "./" $2; print "f " p; while (sub(/\/[^\/]+$/, "", p) && p != ".") print "d " p} END {print "f ./R6-SHA256SUMS"}' R6-SHA256SUMS | LC_ALL=C sort -u)" ] &&
+    sha256sum -c R6-SHA256SUMS) &&
+  echo "R6 STAGE OK $STAGE" || { echo "R6 STAGE STOP $STAGE"; false; }
+```
+
+### Wednesday A-2 with the attested InvocationID
+
+On the workstation, after the re-check of the workstation's staging root, with `TUESDAY_RECORD` set to the committed Tuesday
+sitting record:
+
+```bash
+bash "$STAGE/$B/r6-20261125/r6-tuesday-handoff.sh" "$TUESDAY_RECORD"
+```
+
+It must print `R6 HANDOFF RESULT PASS` and three values. Copy them exactly into `TUESDAY` (`tue:…`), `CURRENT_ID` and `ATTESTED`
+(`inv:…`). Then on production, after the re-check of production's staging root in the same shell (`R4` with its `r4:` prefix;
+`WINDOW` 10:00 or 14:00). When a step is sent from Git Bash with `ssh.exe`, pass the whole remote command as **one** quoted
+string (as every line here does) or set `MSYS_NO_PATHCONV=1`: Git Bash rewrites a separate argument that starts with `/` (such
+as a `/tmp/…` staging path) into a Windows path before `ssh.exe` sees it.
+
+```bash
+bash "$STAGE/$B/r6-20261125/r6-pre-verify.sh" accepted "$CURRENT_ID" r3:yes "$R4" "$WINDOW" "$TUESDAY" "$ATTESTED"
+```
+
+Expected: `PASS live InvocationID = the owner-attested …`, `PASS release.mjs status (read-only) …` and `R6 PRE RESULT PASS`,
+exit 0. Anything else is STOP. Then set `B=docs/v2/evidence/backlog-20261121` and use only the staged copies, as §0's last
+paragraph describes (A-1 and A-4 on streamanator after `a2-helper-install.sh check`; the F-4b PATH line is unchanged).
+
+### What the private staging directory protects, and what remains
+
+* **Protected.** `STAGE` is made by `mktemp -d` under `umask 077` (mode 0700 on Linux, owner arm on production) inside sticky
+  `/tmp`. No other unprivileged user can rename, replace or remove it, or create, replace or modify anything in it. Both blocks
+  check that it is a real directory owned by the running user, that nothing in it is group- or world-writable or hard-linked,
+  that its entries and object types are exactly the pinned set, and that every byte matches the pins. The `/tmp` archive is never
+  trusted: only the extracted, checked tree is. GNU tar strips a leading `/` and refuses `..` member names; the tree check then
+  rejects any unexpected entry, including links. The transfer refuses an existing destination (`noclobber`).
+* **Closed inside F-4.** `r6-rawhead-check.sh` executes the bytes it hashed, read once into memory.
+* **Remains.** For every other step the operator runs `bash "$STAGE/…/script"`, so bash opens the path again after the re-check,
+  and bash reads a script incrementally while it runs. A process running **as arm or as root** on that host could change a staged
+  file between the re-check and execution, or during it. Those two principals already control the service, its `.env`, the
+  release tree and `events.log`, so this adds no new principal; the runbook narrows the window to one shell by running the
+  re-check immediately before each step. The scripts that locate their siblings through their own path (`r6-rawhead-check.sh`,
+  `r6-revalidate-accept.sh`) cannot run from memory without changing that behaviour, so the remaining gap is documented, not
+  closed. On the workstation (Git Bash on NTFS) mode bits are emulated (`mktemp -d` shows 0755): the owner, type, link and hash
+  checks still apply; the workstation is single-user.
+* **Pins.** The manifest's authority is its digest printed here at the review commit. The pins were taken from Git blobs at
+  the tested revision; the review record lists the command.
+
+**Rehearsal (streamanator and workstation, disposable, production not contacted):**
+[review-fixes-r3-20261124/README.md](r6-20261125/review-fixes-r3-20261124/README.md).
+
+## Amendment — 27 November 2026 (r4), fixes for Astra's eight findings on draft PR 5 (CURRENT; PROPOSED; Astra re-review required; R6 stays NO-GO)
+
+**Status.** The Wed 25 Nov window lapsed unused and its approval is spent. This amendment corrects the packet's scripts and
+printed commands; it does **not** make R6 runnable. `r6-pre-verify.sh` still requires the Melbourne date `2026-11-25` (the dated
+production gate is preserved on purpose), so these bytes STOP on any other day. A future sitting needs, in this order: a new date
+and a re-dated, re-pinned amendment; Astra's independent PASS at that review commit; a new owner approval naming the date and
+window; and that day's own evidence (02:20 scheduled backup, attributable 03:10 off-host pull, attributable 03:30 verification
+restore, console and recovery checks, A-2's live InvocationID match). The owner's ruling that Tuesday's deferral is ambiguous
+("before P4") is a separate open input and is not decided by anything here.
+
+This amendment supersedes the r3 archive, staging and re-check blocks, the r3 handoff rules and §5's F-1 row, for every Tuesday
+outcome. Everything else in this runbook stands. The release-packet side of the same review (G0 backup attribution, the P4
+promotion deadline, the P6 journal check) is in the
+[release runbook's 27 November correction](../release-17822b29-20261124/RUNBOOK.md).
+
+**r5 re-pin, 27 November 2026 (Astra's review of `f92d6e29`; PROPOSED; Astra re-review required; R6 stays NO-GO).** The blocks below are
+re-pinned in place to tested revision `5553ecaf922d27a82da1d8f9a63633bb2883372d`, manifest `182efbb6…`. Two scripts changed:
+(a) **handoff parser:** a `released` or `deferred` record that carries any rollback trace (`release.mjs`'s `release: ROLLED BACK …`,
+the `r1-rollback.sh` mode headers or its post-switch line, an events.log rollback entry) is a STOP, so a rollback interrupted after
+the link switch can no longer certify `released`;
+(b) **A-2 section 5:** the attributed backup invocation must also carry its **origin**: exactly one `trigger:` journal line of that
+invocation naming `afldb-backup.timer`, with `realtime_usec` equal to the timer's `LastTriggerUSec` in microseconds. That line is
+written only by the **prospective** `tools/maintenance/scheduled-backup.sh` (`log_trigger`, from the run's start job's
+ActivationDetails), which is **not installed on production**. Until the owner installs it, A-2 section 5 and the release G0 STOP with
+`scheduled origin unproven`, by design, and print no `OFFHOST-COMPARE`. A manual backup never counts. Record:
+[review-fixes-r5-20261127/README.md](r6-20261125/review-fixes-r5-20261127/README.md).
+
+**r6 re-pin, 28 November 2026 (Astra's remaining findings on PR 5 at `624bf721`; PROPOSED; Astra re-review required; R6 stays NO-GO).** The blocks below are
+re-pinned in place to tested revision `937c7d437b1fbe96a5102fa3db0011c7d751a48d`, manifest `57c8aa50…`. Two scripts changed:
+(a) **handoff parser:** `released` and `deferred` share ONE token boundary for `release.mjs`'s own lines and the rollback wrapper headers: the
+token followed by end of line or any non-word character (a backtick, punctuation) is a trace, so an inline excerpt can no longer slip past;
+(b) **A-2 section 5 origin:** the arm-written `trigger:` line is no longer read. The attributed invocation must have a **root record**
+`/var/lib/afldb-backup-attest/<invocation>.attest` written by the root-owned `afldb-backup-attest` (a full-privilege `ExecStartPost` drop-in,
+run while the start job is live) naming `afldb-backup.timer` and the exact `LastTriggerUSec`, with no stop or failure of the unit since the
+dispatch, and binding the dump's name and full sha256 (hashed as arm, so a dump planted afterwards does not match); A-2 checks the writer,
+the drop-in, the loaded unit, the helpers, the record and every parent directory at run time. **Open (owner decision):** A-2 itself runs as arm,
+so arm's login environment can still forge its printed verdict; closing that needs a non-arm verifier. The writer is
+**not installed on production**; its owner procedure runs outside the production checkout. Until it is installed, A-2 section 5 and the release
+G0 STOP with `scheduled origin unproven`, by design. `tools/maintenance/scheduled-backup.sh` is back to the production bytes `234fca6a…`
+(r7: the repository copy is now `7e2b470a…`. The only change is the status-mode opt-in `AFLDB_BACKUP_SEALED_STATE_DIR`, which has no
+default. Production's checkout keeps `234fca6a…`, and no gate executes either copy.)
+Record: [review-fixes-r6-20261128/README.md](r6-20261125/review-fixes-r6-20261128/README.md).
+
+**r7, 28 November 2026 (owner decisions of 28 Nov: G1 and G2 both required for PR 5; PROPOSED; independent review pending; nothing
+installed; R6 stays NO-GO).** The blocks below are re-pinned in place to tested revision `5c2c2280e4688a063a5f943512e4460e250b1135`, manifest `426c07ff…`.
+Only `r6-pre-verify.sh` changed (`eac16cec…` → `97b85721…`), and only in a comment: MED-3 is a deterministic substitution (SIGSTOP of
+the same-uid workload), not a race. Its logic is unchanged. Two things change how Wednesday's GO evidence is produced:
+(a) **G1, backup production (MED-3).** The nightly dump is produced by the system account `afldb-backup`, not arm. A root `ExecStartPost`
+copies it, hashes the root copy, writes a root seal (`/var/lib/afldb-backup/seals/<invocation>.seal`) and only then publishes the copy
+(`/var/lib/afldb-backup/published/`, root:afldb-backup-read 0440). A-2 section 5 and G0 read origin and dump only through `sealed_origin`,
+which uses root facts only. The written in-window rule is kept: a dispatch counts only if systemd's timer job dispatched it inside
+02:20–02:31 on the gate date. An attended re-arm counts only when the timer genuinely dispatched in the window. It is identified as
+`dispatch=catch-up` (printed as `DISPATCH catch-up <delay> s after timer activation`). A start by hand never counts.
+(b) **G2, the verdict (MED-2).** **The GO evidence is the owner path only.** Stu runs
+`bash "$V7/afldb-verify-call.sh" a2 accepted …` (A-2) and `bash "$V7/afldb-verify-call.sh" g0 2026-11-25` (A-4r7: G0a, then G0b with the
+dump and sha256 from the authenticated G0a line). Each call uses his own key `~/.ssh/afldb_verify` and the root-owned forced-command
+verifier (`afldb-verify`). NG-PRE consumes only `OWNER VERDICT A2 PASS`; NG-OFFHOST consumes only `OWNER VERDICT G0 PASS` (r9: each only through `GATE ACCEPT … GO`, which
+requires the post-Phase-4 owner evidence, and NG-OFFHOST only from a qualified off-host endpoint; §7). **A verdict
+printed by an arm-run script is no longer GO evidence**: `r6-pre-verify.sh`, `r6-offhost-verify.sh` or `a2-cron-observe.sh` run as
+arm, or the release `r1-g0-dump.sh` over arm's ssh. They may be run and recorded as information.
+
+**r7 installation preconditions. All must be met before the qualifying 02:20 backup (the 02:20 run of the gate date), outside
+02:15–02:50, as root reached by a path that does NOT pass through arm's login. Nothing writes the production checkout
+`/home/arm/projects/afldb`; every install runs from a root-owned staging directory outside `/home` holding a `git archive` of the
+pinned revision: the R7 tested revision ~~`7d69302007568d3141a567c8eba89e4ee473c9a6`~~ (review round 1; superseded by the r8 pin below).**
+**r8 (28 Nov 2026) supersedes the pins and the root path below**, following `r6-20261125/review-fixes-r8-20261128/OWNER-PROCEDURE.md`:
+* **Pins.** ~~The revision is `12e46305bf6b3ab063ffd7a2e8daf481eedfb8f3`, and the digests are `e3a68821c6f97ec7a5775cbf845b4018198556f44d29e89ceb6ff0c4e2672e7d`, `49e0fa7c84a549ba5153cec9d94c2fa2ca91d89aff34458dd9dc2fa9a4f13901` and
+  `58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8`.~~ **r9 (supersedes r8's pins):** the revision is `0c8de418da271068add1528c0a57e416ade51151`; backup `e3a68821c6f97ec7a5775cbf845b4018198556f44d29e89ceb6ff0c4e2672e7d` (unchanged), verify packet `c9910a87b977dc3c8857064a1a31aba3974fe1a6b0e2027a481d0cb00eb873da`, bundle `3ea412092a3b024bd6520d9106694f874e45335974b6be96a85083ffac2ecb95`, owner checks `70d05b10b4b1898e978550e113c9fefa06dd873c585e7d3445bf73b0fb8b648f` (unchanged), phase4 `1283172531eabc76928e57dbb3c4c965c2b475a6a6dcaf1c23f6622573ebdec8`, acceptance `0baf090cb0a40de46d1d563de7aa3085627c3d152c3740e394932026f081225e` (OWNER-PROCEDURE §0). The r8 wrapper has no off-host qualification rule: never use it. **r10 (supersedes r9's pins):** the revision is `6d0e75ad86bf4b9e2c49b85f453b5fff201c558d`; verify packet `e253e97545545b7183cf474750cea2b54e36158e6f7b0d80552939bd42665324`, bundle `059f2ad445825757873d77b8329fd6be668d2da6bf5e816d599b55b396f20cba`, phase4 `$R10/phase4/SHA256SUMS` `8bed56298b8fd3aada979d4c10e9bc5e1734075676b064da3c1c9756d8ca985b` (r9's `$R9/phase4` is superseded), acceptance `6d49ce2a52b71b38d65b9c41d358b94af24ef7a89162c4171f8662fd28e00539`; backup and owner checks unchanged (OWNER-PROCEDURE §0). The r9 values are superseded: never use them.
+* **Bytes.** They come only from a `git archive` made in the owner's workstation clone, hashed there, carried over the admin path and
+  re-verified in the admin root session against the workstation value. They never come from arm's checkout, git is never run as root
+  there, and no expected digest is read from a file on production.
+* **Session.** Every step below runs in the admin root session or at the console as root. The installers refuse a root session that
+  descends from arm (`REFUSED: root session descends from arm`).
+0. **Root path (R7 independent review round 1, F1; owner decision, not done).** Root today is reached through arm's login (the
+   owner's `sudo` in an arm SSH session), so a hostile arm login environment (`~/.bashrc`, `~/.profile`, PATH, an alias or function
+   named `sudo`) can capture or reuse it. G1 and G2 hold only if the installs below and every later root action (the
+   `sudo -u postgres` steps, every root step of this plan) use a root path that does not pass through arm's login: the console, or a
+   separate administrative account with its own key that arm cannot write to. Setting that up is a host-account change that needs
+   owner approval; production `sudoers` has not been checked. Until then MED-2 and MED-3 stay OPEN whatever the rehearsals show.
+   **r8:** OWNER-PROCEDURE Phases 0-2 are this precondition:
+   * a console login **as root** (if none is possible: STOP, F1 stays open);
+   * `afldb-admin` with its own key and password, verified twice;
+   * the read-only owner checks.
+   Phase 4 (arm out of sudo) is a separate owner decision, after which the checks must PASS.
+1. Production, sealed backup ([R7 backup README](r6-20261125/review-fixes-r7-20261128/backup/README.md) §5). The base
+   `afldb-backup.service`/`.timer` must be root-owned copies, not links into the checkout. The r6 attest drop-in must NOT be installed.
+   `/usr/share/zoneinfo/Australia/Melbourne` must be a root-owned regular file. Then: check `backup/SHA256SUMS` (~~`d0023d10…`~~, r7, superseded by the r8 pin above) and
+   `sha256sum -c`; run `install-backup.sh <staging>` as root; add the `pg_ident.conf` line `afldbbackup afldb-backup afldb_backup` and
+   the `pg_hba.conf` line `local afldb_prod afldb_backup peer map=afldbbackup` before any broader `local` line, then
+   `SELECT pg_reload_conf()`; run `verify-backup-install.sh` as root and ~~as arm in a **new** login~~ (superseded by r8: `--as-arm`, below). Both must print
+   `BACKUP INSTALL RESULT PASS`. **r8:** both runs are made from the admin root session: `verify-backup-install.sh`, then
+   `verify-backup-install.sh --as-arm`, where root drops to arm via `setpriv … --reset-env`, `bash --noprofile --norc` and stdin
+   `/dev/null`. There is no arm login. The pg edits and the reload (`runuser -u postgres`) run in the same session.
+2. Production, verifier ([R7 verify README](r6-20261125/review-fixes-r7-20261128/verify/README.md) §8, §10). Step 1 must be done
+   first, because the verifier joins group `afldb-backup-read`. It also needs `/usr/bin/python3.12`, group `systemd-journal`,
+   `/usr/lib/postgresql/16/bin/psql`, `Include /etc/ssh/sshd_config.d/*.conf` at the top of `sshd_config`, and a NEW key pair
+   `~/.ssh/afldb_verify` on Stu's workstation, never arm's key. Then: check `verify/SHA256SUMS` (~~`221b254a…`~~, r7, superseded by the r8 pin above); run
+   `install-verify.sh --role prod --key <staging>/afldb_verify.pub`; as postgres, apply `verifier-db.sql` and the two
+   `pg-auth-lines.txt` lines above the first other `local` line, then reload; finally `verify-verify-install.sh --role prod` as root.
+   **r8:** all of it runs in the admin root session. The "as postgres" step is `runuser -u postgres` there. `afldb_verify.pub`
+   travels over the admin path and is fingerprint-checked against the workstation.
+3. The qualified off-host endpoint (r9: owner, root there through its own admin path, `$R9/offhost/QUALIFY-OFFHOST.md`; formerly
+   streamanator): `install-verify.sh --role offhost --key …` and `verify-verify-install.sh --role offhost`. The
+   off-host pull source becomes `<prod>:/var/lib/afldb-backup/published/` (`offhost-pull.sh` unchanged). Status probes that need the
+   nightly's freshness set `AFLDB_BACKUP_SEALED_STATE_DIR=/var/lib/afldb-backup/state`. **r8:**
+   * r9: streamanator's arm is in `docker`, `lxd` and `sudo`, all root-equivalent. streamanator can therefore forge the off-host claim
+     (not the dump bytes), and it is **not qualifiable**: the wrapper refuses a pin naming it and treats its G0B answer as information
+     only (OWNER-PROCEDURE §8). The off-host role belongs on an endpoint the owner qualifies by `$R9/offhost/QUALIFY-OFFHOST.md`. No
+     endpoint is qualified today, so A-4r7 STOPs and NG-OFFHOST is NO-GO. *(r8 text, withdrawn: "until the owner decides otherwise
+     `G0B PASS` is attested by a host arm controls".)*
+   * The pull-source change is an unprivileged edit of arm's own files: the production `authorized_keys` forced `rrsync -ro` path,
+     and streamanator's pull configuration.
+4. Workstation: `V7` is a fresh `git archive` export of `docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify`
+   at ~~`7d69302007568d3141a567c8eba89e4ee473c9a6`~~ (r7, superseded). Run `sha256sum -c SHA256SUMS` in it. The wrapper's pinned bundle digest is ~~`df3457cc…`~~ (r7, superseded)
+   ~~(r8: at `12e46305bf6b3ab063ffd7a2e8daf481eedfb8f3`, `49e0fa7c84a549ba5153cec9d94c2fa2ca91d89aff34458dd9dc2fa9a4f13901`, `58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8`, in the owner's own clone)~~; r9: at `0c8de418da271068add1528c0a57e416ade51151`, `c9910a87b977dc3c8857064a1a31aba3974fe1a6b0e2027a481d0cb00eb873da`,
+   `3ea412092a3b024bd6520d9106694f874e45335974b6be96a85083ffac2ecb95` (r9, superseded); r10: at `6d0e75ad86bf4b9e2c49b85f453b5fff201c558d`, `e253e97545545b7183cf474750cea2b54e36158e6f7b0d80552939bd42665324`, `059f2ad445825757873d77b8329fd6be668d2da6bf5e816d599b55b396f20cba`, exporting `$R7/verify` and `$R9/offhost` together, in the owner's own clone. Then
+   `bash "$V7/afldb-verify-call.sh" version` must print `OWNER VERDICT VERSION PASS` for `afldb-prod` (role prod) and for the
+   **qualified** off-host endpoint (`role=offhost … qualification=pinned`; r9: never streamanator; with no pin the off-host line is
+   `STOP … no qualified off-host endpoint`). This call is an installation diagnostic; GO evidence is `GATE ACCEPT` (§7).
+Until all four are done and a sealed timer run exists for the gate date, A-2 and A-4r7 STOP, by design. Rollback: R7 backup README §6.
+The dated gates are unchanged: A-2 still requires Wednesday 2026-11-25, and `g0` accepts 2026-11-24..29. So a future sitting still
+needs a new date, re-dated and re-pinned packets, the independent PASS at that commit, a new owner approval and that day's evidence.
+The owner's "before P4" ruling stays open. Record: [review-fixes-r7-20261128/README.md](r6-20261125/review-fixes-r7-20261128/README.md).
+
+**What changed (helper revision `a203c927d24bbd0b2bf4f67b3ddb2865a0fee0d3`).**
+
+1. **Tuesday handoff parser (`r6-tuesday-handoff.sh`).** It now counts only complete result lines, exactly as the Tuesday scripts
+   print them, unindented: `P3b RESULT BUILD PASS <id>`, `P4 RESULT PROMOTED <ts>: …`, `P5 RESULT ACCEPT PASS (1-4)`, the two
+   `P5 RESULT FAIL: …` lines, `ROLLBACK RESULT LINKS SWITCHED <ts>: …`, `ROLLBACK RESULT VERIFIED (1-3): …`,
+   `ROLLBACK RESULT VERIFY FAIL: …`, and the two binding lines `PASS running invocation = the owner's restart <INV>` (P5) and
+   `PASS running invocation = the owner's rollback restart <INV>` (rollback verify). Any other line that mentions one of those
+   results (prose, a quotation, an indented or truncated copy) is not counted and is itself a STOP. Contradictory terminal
+   results STOP for every outcome: more than one P5 terminal line, VERIFIED with VERIFY FAIL, a P5 or rollback line without
+   `P4 RESULT PROMOTED`. The attested InvocationID is bound to the confirmation of the selected outcome: `released` to the ID on
+   the accepting P5 run's binding line; `rolledback` to the ID on the rollback verify's binding line, which must differ from the
+   initial (P5) restart ID; `deferred` to Sunday's ID with **no** P4, P5 or rollback result line, no binding line at all, and no
+   `release: PROMOTED …` or `release: ROLLED BACK …` line from `release.mjs` itself (a P4 or rollback interrupted after the link switch).
+   **A parser PASS for `deferred` says only that the record is internally consistent. It does not decide whether the owner
+   accepts the deferral as "before P4"; the parser prints an `R6-NOTE` saying so, and reports (without judging) a P4
+   cutoff-refusal line, which is not a `P4 RESULT`.**
+2. **Scheduled-backup attribution (A-2 section 5).** A successful `afldb-backup.service` start inside 02:20–02:31 is no longer
+   enough. A-2 now requires the timer dispatch, the one service invocation it started, that invocation's success and that
+   invocation's dump to agree; missing or ambiguous attribution is a FAIL. The exact rule is in the script header and in the
+   [r4 record](r6-20261125/review-fixes-r4-20261127/README.md). The release packet's G0 (`r1-g0-dump.sh`) applies the same rule.
+3. **A-2 and F-2 identity.** A-2 reads the live InvocationID once and prints, as `INVOCATION_ID`, only the value it validated.
+   F-2 (`r6-post-verify.sh full`) now requires a successful read of exactly one 32-hex ID that differs from the pre-boot ID,
+   and a successful serving status for the exact `CURRENT_ID` (one plain `release.mjs status`, exit 0, exactly one result line,
+   exactly `release: STATUS PASS <CURRENT_ID>`); the "restarted since the last attested PASS" note is expected after the reboot
+   and is permitted there.
+4. **F-1 probes the serving build for every outcome.** `BUILD_ID` is no longer "from P3b" (wrong after a rollback, absent after
+   an early deferral). The F-1 block below derives it from the validated handoff `CURRENT_ID`, as the whole suffix after the
+   12-hex revision (`deploy/release.mjs` `releaseId`: `<rev12>-<BUILD_ID>`; a BUILD_ID may itself contain hyphens). §5's F-1 row
+   is changed in place to point here.
+5. **Rehearsal drivers.** The r2 repeat command is retired and its entry point refuses to run. The r3/r4 repeat driver reserves
+   the shared archive path exclusively and owns, for cleanup, only what its own exclusive creation produced.
+
+### R6 archive r4: workstation (Git Bash)
+
+```bash
+CODE=5c2c2280e4688a063a5f943512e4460e250b1135
+B=docs/v2/evidence/backlog-20261121
+git -C /d/dev/afldb archive --format=tar --output=/tmp/afldb-r6-20261125-r4.tar "$CODE" \
+  "$B/r6-20261125/r6-pre-verify.sh" \
+  "$B/r6-20261125/r6-offhost-verify.sh" \
+  "$B/r6-20261125/r6-post-verify.sh" \
+  "$B/r6-20261125/r6-public-smoke.sh" \
+  "$B/r6-20261125/r6-revalidate-accept.sh" \
+  "$B/r6-20261125/r6-rawhead-check.sh" \
+  "$B/r6-20261125/r6-tuesday-handoff.sh" \
+  "$B/a1a2-20261124/a1-s9-public-smoke.sh" \
+  "$B/a1a2-20261124/a1-rawhead.sh" \
+  "$B/a1a2-20261124/a2-cron-observe.sh" \
+  "$B/a1a2-20261124/a2-helper-install.sh" \
+  "$B/kits/afldb-offhost-pull-daily.sh" \
+  "$B/kits/scheduled-pull-evidence.sh" \
+  "tools/maintenance/offhost-pull.sh" \
+  "tools/maintenance/revalidate-season.ts" \
+  "src/lib/acquisition/season-revalidation.ts" &&
+  sha256sum /tmp/afldb-r6-20261125-r4.tar
+```
+
+### R6 archive r4: transfer (workstation Git Bash; one line per host; never at minute :16–:18)
+
+The remote side writes with `noclobber`, as in r3: an existing path makes the transfer fail instead of writing into it.
+
+```bash
+C:/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes -i C:/Users/stuar/.ssh/afldb_dev arm@10.0.40.100 'set -C; cat > /tmp/afldb-r6-20261125-r4.tar' < /tmp/afldb-r6-20261125-r4.tar
+```
+
+```bash
+C:/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes afldb 'set -C; cat > /tmp/afldb-r6-20261125-r4.tar' < /tmp/afldb-r6-20261125-r4.tar
+```
+
+### R6 archive r4: staging and verification (run once on each host: workstation, production, streamanator)
+
+As r3: record the printed staging root; STOP unless the block prints 16 `: OK` lines and `R6 STAGE VERIFIED <path> (16 files)`.
+Manifest digest `426c07ff8267bb82a1e15fe04923350d6daa267bde4b9a09b5560d00814ee6f8` (r7 re-pin, 28 Nov 2026; r6 was `57c8aa50…` at `937c7d43`, r5 `182efbb6…` at `5553ecaf`, r4 `3c671c4b…` at `a203c927`). Every pin is the SHA-256 of the Git blob at the tested revision
+(`git cat-file blob 5c2c2280e4688a063a5f943512e4460e250b1135:<path> | sha256sum`). Three differ from r3: `r6-pre-verify.sh`
+(`48185fca…` → r4 `ea4355f0…` → r5 `64cc5166…` → r6 `eac16cec…` → r7 `97b85721…`, a comment only), `r6-post-verify.sh` (`478f85cd…` → `319c2e09…`) and `r6-tuesday-handoff.sh` (`92c1809b…` →
+r4 `be0fbca2…` → r5 `820f5d53…` → r6 `b5fb980b…`). The other thirteen are byte-identical to r3's, and Sunday's `a1-rawhead.sh` is still `cab4a43a…`. The
+verification lines are r3's, unchanged.
+
+```bash
+B=docs/v2/evidence/backlog-20261121
+STAGE=$(umask 077 && mktemp -d /tmp/afldb-r6-20261125-r4.XXXXXX) &&
+  (umask 077 && cd "$STAGE" && tar -xf /tmp/afldb-r6-20261125-r4.tar &&
+    [ ! -e R6-SHA256SUMS ] && [ ! -L R6-SHA256SUMS ] && cat > R6-SHA256SUMS) <<'R6_PINS' &&
+97b85721690ea31e2ddb5b73a6f2f4e88444363ed542c0923d1cfb49c2abe218  docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh
+429eec29acf254179c3b7ae7d6489a6c695981fd90996c5c2ce1301314bcc18c  docs/v2/evidence/backlog-20261121/r6-20261125/r6-offhost-verify.sh
+319c2e097fab61be823b175c25a2f3feb30929124b70af2a6acfe5937d557bd5  docs/v2/evidence/backlog-20261121/r6-20261125/r6-post-verify.sh
+de84f1205b4ab4cfec182b1fb7b0770ca916c8570f10a14539daa9a4e450bd9e  docs/v2/evidence/backlog-20261121/r6-20261125/r6-public-smoke.sh
+5e5ce991a5e4bf0875c49e01cc0f90db7da720a0f1c022507cec869d3cc067f0  docs/v2/evidence/backlog-20261121/r6-20261125/r6-revalidate-accept.sh
+7c3d0fc295512a2f990bdbed24ae9ddb97a49f5f13e9bf01019ea3fa7e1f0543  docs/v2/evidence/backlog-20261121/r6-20261125/r6-rawhead-check.sh
+b5fb980baed582adea5e944ac9ace00007d3eecad5eb16985fea815da31777b9  docs/v2/evidence/backlog-20261121/r6-20261125/r6-tuesday-handoff.sh
+babb660f7e7555a55281f2a0a07cb6d1147f39ebfa5ff9c119a677a1e2776a71  docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-s9-public-smoke.sh
+cab4a43af09e4b1729d913162c0f27faccd19315c56eb4ad1141c8bf748d81c0  docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-rawhead.sh
+2ac943b113af2247ab3acb3863e97201c8794ff830520338faa8b299268eeee5  docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-cron-observe.sh
+6c1b57e57c7dc57a6094f44354ba9cec91a1dec310e57b9fae371670be388e47  docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-helper-install.sh
+2ebac1c09b07e6b3bc1e060d7645efdbb1c2c7f169b5cfafd4e7f77508716e24  docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh
+d7574254997ba28dd1f750b7bcdc6f90c0a421b88ba6bb02aa104bd671b8572e  docs/v2/evidence/backlog-20261121/kits/scheduled-pull-evidence.sh
+a3775aea879b1d9ce05d0e96482e66d24c69deb62cf38e8fc0407c0d2653dc2b  tools/maintenance/offhost-pull.sh
+20ee3b452da9cb025a938a75c3200f44101fb094c1ad4662e70673df3d96b14e  tools/maintenance/revalidate-season.ts
+bd88c915c2643fc1bc8ec005c5c6825d43af0742b33ca83f0461e9348414dbc9  src/lib/acquisition/season-revalidation.ts
+R6_PINS
+  ([ -d "$STAGE" ] && [ ! -L "$STAGE" ] && cd "$STAGE" &&
+    [ "$(sha256sum < R6-SHA256SUMS | cut -c1-64)" = 426c07ff8267bb82a1e15fe04923350d6daa267bde4b9a09b5560d00814ee6f8 ] &&
+    [ -z "$(find . \( ! -uid "$(id -u)" -o -perm /022 -o \( -type f -links +1 \) \) -print)" ] &&
+    [ "$(find . -mindepth 1 -printf '%y %p\n' | LC_ALL=C sort)" = "$(awk '{p = "./" $2; print "f " p; while (sub(/\/[^\/]+$/, "", p) && p != ".") print "d " p} END {print "f ./R6-SHA256SUMS"}' R6-SHA256SUMS | LC_ALL=C sort -u)" ] &&
+    sha256sum -c R6-SHA256SUMS) &&
+  printf 'R6 STAGE VERIFIED %s (16 files)\n' "$STAGE" ||
+  { echo 'R6 STAGE STOP: do not use this staging root'; false; }
+```
+
+### R6 archive r4: re-check, immediately before each use (set `STAGE` to the recorded root first)
+
+```bash
+([ -d "$STAGE" ] && [ ! -L "$STAGE" ] && cd "$STAGE" &&
+    [ "$(sha256sum < R6-SHA256SUMS | cut -c1-64)" = 426c07ff8267bb82a1e15fe04923350d6daa267bde4b9a09b5560d00814ee6f8 ] &&
+    [ -z "$(find . \( ! -uid "$(id -u)" -o -perm /022 -o \( -type f -links +1 \) \) -print)" ] &&
+    [ "$(find . -mindepth 1 -printf '%y %p\n' | LC_ALL=C sort)" = "$(awk '{p = "./" $2; print "f " p; while (sub(/\/[^\/]+$/, "", p) && p != ".") print "d " p} END {print "f ./R6-SHA256SUMS"}' R6-SHA256SUMS | LC_ALL=C sort -u)" ] &&
+    sha256sum -c R6-SHA256SUMS) &&
+  echo "R6 STAGE OK $STAGE" || { echo "R6 STAGE STOP $STAGE"; false; }
+```
+
+### The handoff block in the Tuesday sitting record (r4 rules)
+
+The three `R6-HANDOFF` lines are as in r3. The record must also carry, verbatim, unindented and once each, every result line
+its outcome rests on, including the binding line that P5 or the rollback verify printed
+(`PASS running invocation = the owner's restart <INV>` / `… rollback restart <INV>`). Paste script output; do not retype or
+quote a result line in prose (a mention is a STOP). The handoff and A-2 commands are r3's, run from the r4 staging root:
+
+```bash
+bash "$STAGE/$B/r6-20261125/r6-tuesday-handoff.sh" "$TUESDAY_RECORD"
+```
+
+```bash
+bash "$STAGE/$B/r6-20261125/r6-pre-verify.sh" accepted "$CURRENT_ID" r3:yes "$R4" "$WINDOW" "$TUESDAY" "$ATTESTED"
+```
+
+### Wednesday F-1 (r4): public smoke with the BUILD_ID derived from the handoff
+
+Workstation (Git Bash), after the re-check of the workstation's staging root in the same shell, with `B`, `STAGE`,
+`TUESDAY_RECORD` and `CURRENT_ID` set as for A-2. The block re-runs the handoff parser on the record, requires its `CURRENT_ID`
+to equal the one in use, derives `BUILD_ID` from it and runs both smokes. It works for all three outcomes: after a rollback
+or a deferral it probes the retained build `XWruOm_9nLCSMY8nGPqYU`; no P3b value is needed.
+
+```bash
+HO=$(bash "$STAGE/$B/r6-20261125/r6-tuesday-handoff.sh" "$TUESDAY_RECORD") &&
+  grep -Fxq 'R6 HANDOFF RESULT PASS' <<< "$HO" &&
+  [ "$(grep -c '^R6-A2-CURRENT_ID ' <<< "$HO")" = 1 ] &&
+  F1_ID=$(sed -n 's/^R6-A2-CURRENT_ID //p' <<< "$HO") && [ "$F1_ID" = "$CURRENT_ID" ] &&
+  [[ $F1_ID =~ ^[0-9a-f]{12}-([A-Za-z0-9_-]{1,64})$ ]] && BUILD_ID=${BASH_REMATCH[1]} &&
+  echo "R6 F-1 BUILD_ID $BUILD_ID (from the handoff CURRENT_ID $F1_ID)" &&
+  bash "$STAGE/$B/r6-20261125/r6-public-smoke.sh" &&
+  bash "$STAGE/$B/a1a2-20261124/a1-s9-public-smoke.sh" "$BUILD_ID" &&
+  echo "R6 F-1 RESULT PASS build $BUILD_ID" || { echo 'R6 F-1 RESULT STOP: do not continue to F-2'; false; }
+```
+
+Expected: `R6 PUBLIC RESULT PASS`, `S9 RESULT PASS` and `R6 F-1 RESULT PASS build <BUILD_ID>`, exit 0. Anything else is STOP.
+
+**Rehearsal (streamanator and workstation, disposable, production not contacted):**
+[review-fixes-r4-20261127/README.md](r6-20261125/review-fixes-r4-20261127/README.md).

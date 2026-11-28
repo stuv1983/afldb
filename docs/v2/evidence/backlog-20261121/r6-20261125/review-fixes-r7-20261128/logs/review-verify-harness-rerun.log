@@ -1,0 +1,30 @@
+== reviewer re-run of verify-harness/r7v-run.sh --verify-rev 5c2c2280 rvw1v (R7V_KEEP_CTRS=1; log directory redirected; no other change)
+   97b85721690ea31e2ddb5b73a6f2f4e88444363ed542c0923d1cfb49c2abe218  docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh
+[TRANSPORT] pre-send verification against 5c2c2280e4688a063a5f943512e4460e250b1135:
+   untracked files in the sent directories: 0
+   result: every sent file equals its blob at 5c2c2280e4688a063a5f943512e4460e250b1135
+PASS bundle digest 5333d2155a1fa26de5e86af3e866f17c0ba0c207a00f94e6682d4fc3a85576e4; bundle/SHA256SUMS, wrapper pin and packet SHA256SUMS consistent
+workspace /home/arm/r7v-ws.ymh2DI
+== r7v rvw1v day 2026-11-28 containers r7v-rvw1v-prod r7v-rvw1v-offhost; transport ProxyCommand docker exec; client C:/Windows/System32/OpenSSH/ssh.exe (OpenSSH_for_Windows_9.5p2, LibreSSL 3.8.2)
+SCENARIO a PASS g0-success: exit 0; OWNER VERDICT G0 PASS transport=rehearsal ssh=ssh.exe date=2026-11-28 invocation=7f988a3efd794dd0ad3325a77541a4a7 dump=afldb_prod-20261128-022000.dump sha256=c2a131764b9640c287357838f508075f3efe3f706946abbf9fb4263497831eec dispatc
+SCENARIO c PASS a2-whole: the verifier's own STOP (exit 1, 13 FAIL / 25 PASS lines), backup-origin=attributed reported separately; FAILs: today is not the scheduled Wednesday (2026-11-25); re-p|running 6.8.0-151-generic (expected 6.8.0-137-generic)|installed kernel images are '' (expected exactly 137 an|missing /boot/vmlinuz-6.8.0-149-generic|missing /boot/initrd.img-6.8.0-149-generic|missing /boot/vmlinuz-6.8.0-137-generic|missing /boot/initrd.img-6.8.0-137-generic|a modules directory is missing|caddy inactive|Caddyfile  (r4:no expects 4f6972ec)|restore service lacks a matching timer dispatch, start |last-verify.json and restored dump do not match the sch|afldb_restore_test lacks the scheduled restore digest o|
+SCENARIO d PASS hostile-arm: owner-path verdicts and exits unchanged (g0: OWNER VERDICT G0 PASS transport=rehearsal ssh=ssh.exe date=2... exit 0; a2 STOP exit 1); CONTRAST old path forged 'G0 PROD RESULT PASS' + OFFHOST-COMPARE (exit 0) and 'R6 PRE RESULT PASS' (exit 0)
+SCENARIO e PASS stale-replay: fresh control accepted, replay/stale/wrong-bundle/exit-lie/two-RESULT refused (fresh:0 replay:1 stale:1 bundle:1 exitlie:1 tworesults:1 )
+SCENARIO f PASS keys: other-key-as-verify:ok arm-key-as-verify:ok verify-key-as-arm:ok verify-key-forced-tty:ok verify-key-no-command:ok verify-key-shell-command:ok verify-key-extra-words:ok verify-key-stdio-forward:ok arm-key-as-arm-control:ok 
+SCENARIO b PASS g0-refusal: exit 1, FAIL scheduled origin unproven: /var/lib/afldb-backup/published/afldb_prod-20261128-022000.dump has 3994 bytes, the seal says 3993; G0b not called, no OFFHOST-COMPARE
+logs: rvw1v-a-g0-success.log rvw1v-b-g0-refusal.log rvw1v-c-a2-whole.log rvw1v-d-hostile-arm.log rvw1v-e-stale-replay.log rvw1v-f-keys.log rvw1v-inputs.log rvw1v-setup.log rvw1v-summary.log 
+R7 VERIFY HARNESS RESULT PASS
+KEPT (development): containers and workspace /home/arm/r7v-ws.ymh2DI; remove with: bash '/home/arm/r7v-ws.ymh2DI/fix/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify-harness/r7v-host.sh' '/home/arm/r7v-ws.ymh2DI' 'rvw1v' down
+EXIT 0
+
+== summary
+== r7v rvw1v day 2026-11-28 containers r7v-rvw1v-prod r7v-rvw1v-offhost; transport ProxyCommand docker exec; client C:/Windows/System32/OpenSSH/ssh.exe (OpenSSH_for_Windows_9.5p2, LibreSSL 3.8.2)
+SCENARIO a PASS g0-success: exit 0; OWNER VERDICT G0 PASS transport=rehearsal ssh=ssh.exe date=2026-11-28 invocation=7f988a3efd794dd0ad3325a77541a4a7 dump=afldb_prod-20261128-022000.dump sha256=c2a131764b9640c287357838f508075f3efe3f706946abbf9fb4263497831eec dispatc
+SCENARIO c PASS a2-whole: the verifier's own STOP (exit 1, 13 FAIL / 25 PASS lines), backup-origin=attributed reported separately; FAILs: today is not the scheduled Wednesday (2026-11-25); re-p|running 6.8.0-151-generic (expected 6.8.0-137-generic)|installed kernel images are '' (expected exactly 137 an|missing /boot/vmlinuz-6.8.0-149-generic|missing /boot/initrd.img-6.8.0-149-generic|missing /boot/vmlinuz-6.8.0-137-generic|missing /boot/initrd.img-6.8.0-137-generic|a modules directory is missing|caddy inactive|Caddyfile  (r4:no expects 4f6972ec)|restore service lacks a matching timer dispatch, start |last-verify.json and restored dump do not match the sch|afldb_restore_test lacks the scheduled restore digest o|
+SCENARIO d PASS hostile-arm: owner-path verdicts and exits unchanged (g0: OWNER VERDICT G0 PASS transport=rehearsal ssh=ssh.exe date=2... exit 0; a2 STOP exit 1); CONTRAST old path forged 'G0 PROD RESULT PASS' + OFFHOST-COMPARE (exit 0) and 'R6 PRE RESULT PASS' (exit 0)
+SCENARIO e PASS stale-replay: fresh control accepted, replay/stale/wrong-bundle/exit-lie/two-RESULT refused (fresh:0 replay:1 stale:1 bundle:1 exitlie:1 tworesults:1 )
+SCENARIO f PASS keys: other-key-as-verify:ok arm-key-as-verify:ok verify-key-as-arm:ok verify-key-forced-tty:ok verify-key-no-command:ok verify-key-shell-command:ok verify-key-extra-words:ok verify-key-stdio-forward:ok arm-key-as-arm-control:ok 
+SCENARIO b PASS g0-refusal: exit 1, FAIL scheduled origin unproven: /var/lib/afldb-backup/published/afldb_prod-20261128-022000.dump has 3994 bytes, the seal says 3993; G0b not called, no OFFHOST-COMPARE
+logs: rvw1v-a-g0-success.log rvw1v-b-g0-refusal.log rvw1v-c-a2-whole.log rvw1v-d-hostile-arm.log rvw1v-e-stale-replay.log rvw1v-f-keys.log rvw1v-inputs.log rvw1v-setup.log rvw1v-summary.log 
+R7 VERIFY HARNESS RESULT PASS
+KEPT (development): containers and workspace /home/arm/r7v-ws.ymh2DI; remove with: bash '/home/arm/r7v-ws.ymh2DI/fix/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify-harness/r7v-host.sh' '/home/arm/r7v-ws.ymh2DI' 'rvw1v' down

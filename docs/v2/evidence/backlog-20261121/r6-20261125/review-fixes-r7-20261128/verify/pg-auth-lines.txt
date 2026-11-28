@@ -1,0 +1,6 @@
+# pg-auth-lines.txt (R6 r7, MED-2): PROSPECTIVE, owner-applied on production (PostgreSQL 16 cluster 16/main), then
+# `sudo systemctl reload postgresql@16-main`. Peer authentication, no secret.
+# /etc/postgresql/16/main/pg_ident.conf (append):
+afldbverify afldb-verify afldb_verify
+# /etc/postgresql/16/main/pg_hba.conf (insert BEFORE any broader "local" line):
+local afldb_prod afldb_verify peer map=afldbverify

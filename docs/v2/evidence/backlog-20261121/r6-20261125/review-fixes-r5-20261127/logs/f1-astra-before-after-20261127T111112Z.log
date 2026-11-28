@@ -1,0 +1,18 @@
+# before/after on the reconstructed Astra record, run 2026-11-27T11:11:12Z; bash 5.3.15(2)-release; MINGW64_NT-10.0-26300 3.6.10-5a1665c8.x86_64 x86_64
+# record: docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r5-20261127/cases/astra-released-interrupted-rollback.md sha256=c22f8215debe586db82b6fc552435ce968c6cb928391ccfc31afc06d01e77e25
+# BEFORE: bash docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r5-20261127/orig-f92d6e29/r6-tuesday-handoff.sh <record>   (f92d6e29 parser sha256=be0fbca2c067628000608d6c6a16c7229b5f50d0ea9f245d8dbf0e7967513720)
+== R6 Tuesday handoff 2026-11-27T11:11:13Z record=docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r5-20261127/cases/astra-released-interrupted-rollback.md sha256=c22f8215debe586db82b6fc552435ce968c6cb928391ccfc31afc06d01e77e25
+   complete result lines: P3B=1 P4P=1 INV5=1 P5A=1 P5T=0 P5C=0 RBL=0 INVR=0 RBV=0 RBF=0; P4 cutoff-refusal lines (not a result): 0
+R6-A2-TUESDAY tue:released
+R6-A2-CURRENT_ID 17822b29e6de-fixtureBuild0123456789
+R6-A2-ATTESTED inv:aaaaaaaaaaaaaaaaaaaaaaaaaaaa0001
+R6 HANDOFF RESULT PASS
+# exit code: 0
+
+# AFTER: bash docs/v2/evidence/backlog-20261121/r6-20261125/r6-tuesday-handoff.sh <record>   (corrected parser sha256=820f5d53fe1d8ac841bf5f41103e2b720e2ecf1159bd28a6090308d65cedc726)
+== R6 Tuesday handoff 2026-11-27T11:11:13Z record=docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r5-20261127/cases/astra-released-interrupted-rollback.md sha256=c22f8215debe586db82b6fc552435ce968c6cb928391ccfc31afc06d01e77e25
+   complete result lines: P3B=1 P4P=1 INV5=1 P5A=1 P5T=0 P5C=0 RBL=0 INVR=0 RBV=0 RBF=0; P4 cutoff-refusal lines (not a result): 0
+STOP released, but the record has 1 release.mjs 'release: ROLLED BACK ...' line(s): the rollback switched the links, so this is not released (an interrupted rollback prints no RESULT line)
+STOP released, but the record has 1 rollback trace line(s) (r1-rollback.sh header '== R1 rollback links|verify'): a rollback ran or was started, so this is not released
+R6 HANDOFF RESULT STOP (2): do not run A-2; R6 is NO-GO until the owner resolves the record
+# exit code: 1

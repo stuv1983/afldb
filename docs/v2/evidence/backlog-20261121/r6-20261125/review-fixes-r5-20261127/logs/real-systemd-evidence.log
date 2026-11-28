@@ -1,0 +1,61 @@
+== real-systemd scenario evidence
+host streamanator (arm); started 2026-11-27T11:34:09Z; container r5f2-r5f2220241-evidence; fake Melbourne offset 14:44:36 (the 02:20:00 dispatch is due at real 2026-11-27T11:35:24Z)
+gate scripts: G0 32d7315a97d3670f1a2317da8ffaadcd0e2b50afa04ca804f0eb5959e849c8c4
+              A-2 64cc5166fea21438e8c5880e919e61398ff7381dd70ae359f19c392d33d18c49
+              scheduled-backup.sh (r5) bab61796ba92081e98af3d99551fb8b228b3de22c3df8fa39c4b32c96b4597c3
+              f92d6e29 G0 bbc3d96f808e1d4293f052e1cf5e51f73fbee9cc08c647ad82776a293fc61d1b, A-2 ea4355f0a72f91125a3805a2ba70eefd1b7b5cc785a779ff93de140f495140d2, scheduled-backup.sh 234fca6a226da73b125ca3dceec9ac97b2192181fd93ad168a7ca50900cb192d
+6bc879a6e8829f58cd3ef49ff142de192df6915ab7b05eff71def466df6ddac1
+
+== environment
+systemd: systemd 255 (255.4-1ubuntu8.19); kernel 6.8.0-151-generic; image Ubuntu 24.04.4 LTS; PID 1: systemd; hostname afldb-prod
+date now (UTC) 2026-11-27T11:34:11; zone file in use: /usr/share/zoneinfo/Australia/Melbourne; local 2026-11-28 02:18:47 AEDT
+arm: uid=1000(arm) gid=1000(arm) groups=1000(arm) (journal-reading groups: none expected: adm= systemd-journal=)
+journal storage: drwxr-sr-x+ 1 root systemd-journal 4096 Nov 28 02:18 /var/lo; journald files: system.journal 
+
+== E1 two timer runs and a start by hand, one loaded unit (probe1.service / probe1.timer)
+   timer LastTriggerUSec (busctl, as arm): t 1795779271848902
+   -- timer run #1 done. Now a start by hand:
+   -- timer #2 (restart the timer; the service stays loaded):
+   timer LastTriggerUSec (busctl, as arm): t 1795779295849157
+   arm-reads: probe(probe1.service): inv=28269ab7132c46488210f50d846fca76 env TRIGGER_UNIT=probe1.timer TRIGGER_TIMER_REALTIME_USEC=1795779271848902
+   arm-reads: probe(probe1.service): job=151 JOB ActivationDetails: a(ss) 3 "trigger_unit" "probe1.timer" "trigger_timer_realtime_usec" "1795779271848902" "trigger_timer_monotonic_usec" "588792670351"
+   arm-reads: probe(probe1.service): UNIT ActivationDetails: a(ss) 3 "trigger_unit" "probe1.timer" "trigger_timer_realtime_usec" "1795779271848902" "trigger_timer_monotonic_usec" "588792670351"
+   arm-reads: probe(probe1.service): inv=28d08fec623046fd8690c727d49f9977 env TRIGGER_UNIT=probe1.timer TRIGGER_TIMER_REALTIME_USEC=1795779271848902
+   arm-reads: probe(probe1.service): job=209 JOB ActivationDetails: a(ss) 0
+   arm-reads: probe(probe1.service): UNIT ActivationDetails: a(ss) 3 "trigger_unit" "probe1.timer" "trigger_timer_realtime_usec" "1795779271848902" "trigger_timer_monotonic_usec" "588792670351"
+   arm-reads: probe(probe1.service): inv=20b7637c0fd049fab42180215fb48ada env TRIGGER_UNIT=probe1.timer TRIGGER_TIMER_REALTIME_USEC=1795779271848902
+   arm-reads: probe(probe1.service): job=325 JOB ActivationDetails: a(ss) 3 "trigger_unit" "probe1.timer" "trigger_timer_realtime_usec" "1795779295849157" "trigger_timer_monotonic_usec" "588816670605"
+   arm-reads: probe(probe1.service): UNIT ActivationDetails: a(ss) 3 "trigger_unit" "probe1.timer" "trigger_timer_realtime_usec" "1795779271848902" "trigger_timer_monotonic_usec" "588792670351"
+   systemctl show probe1.service -p ActivationDetails -> ActivationDetails=[unprintable]  (unprintable through systemctl)
+   as arm: busctl UNIT ActivationDetails after all three runs: a(ss) 3 "trigger_unit" "probe1.timer" "trigger_timer_realtime_usec" "1795779271848902" "trigger_timer_monotonic_usec" "588792670351"
+
+== E2 exec failure of the timer's run, then a start by hand 3 s later (probe2: ExecStart binary missing, then restored)
+   timer LastTriggerUSec (busctl, as arm): t 1795779319848886
+   service after the timer's run: Result=exit-code ExecMainStatus=203 ActiveState=failed 
+   as ROOT the journal says: Starting probe2.service - probe2...|probe2.service: Main process exited, code=exited, status=203/EXEC|probe2.service: Failed with result 'exit-code'.|Failed to start probe2.service - probe2.|
+   as ARM the journal says: [] (nothing: PID 1 alone logged it)
+   -- start by hand 4 s after the dispatch (LastTriggerUSec 1795779319848886):
+   arm-reads: probe(probe2.service): inv=9f14383245624da1864d7f0d6f78571a env TRIGGER_UNIT=probe2.timer TRIGGER_TIMER_REALTIME_USEC=1795779319848886
+   arm-reads: probe(probe2.service): job=499 JOB ActivationDetails: a(ss) 0
+   arm-reads: probe(probe2.service): UNIT ActivationDetails: a(ss) 3 "trigger_unit" "probe2.timer" "trigger_timer_realtime_usec" "1795779319848886" "trigger_timer_monotonic_usec" "588840670335"
+   => the hand-started run's ENVIRONMENT and the unit's ActivationDetails carry the timer's dispatch exactly (1795779319848886); its own start JOB carries none.
+
+== E3 a failed dependency, and a skipped condition, at the timer's dispatch (probe3 / probe4): no details are kept for the manual run
+   as ROOT (PID 1's lines): Starting probe3-dep.service - probe3 dependency...|probe3-dep.service: Main process exited, code=exited, status=1/FAILURE|probe3-dep.service: Failed with result 'exit-code'.|Failed to start probe3-dep.service - probe3 dependency.|Dependency failed for probe3.service - probe3.|probe3.service: Job probe3.service/start failed with result 'dependency'.|
+   as ROOT: probe4.service - probe4 was skipped because of an unmet condition check (ConditionPathExists=/run/probe4-go).|
+   as ARM: probe3 [] probe4 []
+   arm-reads: probe(probe3.service): inv=de00fbe7a1b1463b8e800d0b4969b929 env TRIGGER_UNIT=none TRIGGER_TIMER_REALTIME_USEC=none
+   arm-reads: probe(probe3.service): job=848 JOB ActivationDetails: a(ss) 0
+   arm-reads: probe(probe3.service): UNIT ActivationDetails: a(ss) 0
+   arm-reads: probe(probe4.service): inv=a6eb48ce4d7b470bba88d7375dccda7d env TRIGGER_UNIT=none TRIGGER_TIMER_REALTIME_USEC=none
+   arm-reads: probe(probe4.service): job=907 JOB ActivationDetails: a(ss) 0
+   arm-reads: probe(probe4.service): UNIT ActivationDetails: a(ss) 0
+
+== E4 what arm can read of the genuine timer run in E1: the journal's entries by _PID and _UID, and whether PID 1's lines show
+   root: 18 entries; by _PID/_UID:  9 "_PID":"1"; 3 "_PID":"132"; 3 "_PID":"142"; 3 "_PID":"152"; 9 "_UID":"0"; 9 "_UID":"1000";
+   arm: 9 entries; by _PID/_UID:  3 "_PID":"132"; 3 "_PID":"142"; 3 "_PID":"152"; 9 "_UID":"1000";
+   arm's journal files: -rw-r-----+ root systemd-journal /var/log/journal/155a93cbc1204523b836f9266e4b4880/user-1000.journal; system.journal: -rw-r-----+ root systemd-journal
+   arm without a user journal (volatile storage): switching journald to Storage=volatile and re-running a probe as arm:
+   as ROOT: 6 lines; as ARM: [No journal files were opened due to insufficient permissions.|]
+   (production's journal must be PERSISTENT with per-user files for arm to read its own service's lines; the existing gates already depend on it)
+== controller exit 0 (2026-11-27T11:35:49Z); container removed

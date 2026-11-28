@@ -1,0 +1,133 @@
+#!/usr/bin/bash
+# afldb-backup-attest: R6 r6 (28 Nov 2026) protected backup-origin writer. PREPARED, NOT INSTALLED (install-attest.sh installs it as
+# /usr/local/libexec/afldb/afldb-backup-attest, root:root 0755). Contract: review-fixes-r6-20261128/DESIGN.md sections 3 and 4.
+# Runs as ROOT, as `ExecStartPost=-+/usr/bin/env -i PATH=/usr/sbin:/usr/bin /usr/bin/bash --noprofile --norc <this file>` of
+# afldb-backup.service: after ExecStart (User=arm) exited 0, while the run's start job is still live (unit activating/start-post).
+# It reads PID 1's state (systemctl show, and busctl get-property on the live job and on the timer) and the kernel's boot_id,
+# and writes ONE record /var/lib/afldb-backup-attest/<invocation>.attest (root:root 0644; written as .<invocation>.tmp, then
+# renamed; an existing record is never overwritten). It records raw facts for every successful run, a start by hand included
+# (trigger_unit=none); the gates decide. It never sources or executes anything under /home or anything arm controls.
+# Record format 2 (28 Nov, independent review MED-1): the record also BINDS THE DUMP this run produced (dump=, dump_sha256=), so the
+# gates no longer depend on arm's node for the invocation-to-dump link. The dump is found and hashed with ARM's credentials, never
+# root's: a child under `setpriv --reuid=arm --regid=arm --clear-groups --no-new-privs --reset-env` running the constant script
+# CHILD below (root-owned helpers, absolute paths), bounded by a ROOT timeout. Candidates: entries named
+# afldb_prod-<8 digits>-<6 digits>.dump in the constant backup directory (the unit's AFLDB_BACKUP_DIR) whose mtime is at or after
+# this run's ExecMainStartTimestamp (whole seconds). Exactly one, and it a regular non-empty file: else dump=none and
+# dump_sha256=none (the gates refuse; one journal line says why). A symlink, FIFO or hard link can make the child read only what
+# arm itself can read.
+# Any other unreadable or malformed fact: no record, exit nonzero (the '-' prefix keeps the backup's own result; the gates refuse).
+# Success prints nothing (its output would be journal lines of the backup's own invocation).
+cd / || exit 90
+export LC_ALL=C PATH=/usr/sbin:/usr/bin
+umask 022
+set -u -o pipefail
+SELF=/usr/local/libexec/afldb/afldb-backup-attest
+DIR=/var/lib/afldb-backup-attest
+SVC=afldb-backup.service
+SOBJ=/org/freedesktop/systemd1/unit/afldb_2dbackup_2eservice
+TOBJ=/org/freedesktop/systemd1/unit/afldb_2dbackup_2etimer
+BUS=org.freedesktop.systemd1
+DUMPDIR=/home/arm/backups/afldb-scheduled                     # = deploy/afldb-backup.service Environment=AFLDB_BACKUP_DIR
+die() { printf 'afldb-backup-attest: no record: %s\n' "$1" >&2; exit 1; }
+tmo() { /usr/bin/timeout -k 2 5 "$@"; }                       # every systemctl / busctl call is bounded (TERM at 5 s, KILL 2 s later)
+NUM='^(0|[1-9][0-9]{0,17})$'                                  # at most 18 digits: safe in bash's 64-bit arithmetic (the gates compare them)
+
+# The service: ONE `systemctl show` (one GetAll, one consistent snapshot). Every value must match its own pattern.
+declare -A S
+out=$(tmo /usr/bin/systemctl show "$SVC" --timestamp=unix -p InvocationID -p Job -p ActiveState -p SubState -p ExecMainCode \
+  -p ExecMainStatus -p InactiveEnterTimestampMonotonic -p InactiveExitTimestampMonotonic -p ExecMainStartTimestampMonotonic \
+  -p ExecMainStartTimestamp) || die "systemctl show $SVC failed"
+while IFS= read -r l; do
+  [[ $l =~ ^([A-Za-z]{1,64})=(.*)$ ]] && [ -z "${S[${BASH_REMATCH[1]}]+x}" ] || die "unexpected line from systemctl show $SVC"
+  S[${BASH_REMATCH[1]}]=${BASH_REMATCH[2]}
+done <<< "$out"
+[ "${#S[@]}" = 10 ] || die "systemctl show $SVC printed ${#S[@]} properties, not 10"
+for k in InvocationID Job ActiveState SubState ExecMainCode ExecMainStatus InactiveEnterTimestampMonotonic InactiveExitTimestampMonotonic \
+  ExecMainStartTimestampMonotonic ExecMainStartTimestamp; do [ -n "${S[$k]+x}" ] || die "systemctl show $SVC did not print $k"; done
+inv=${S[InvocationID]}; job=${S[Job]}
+[[ $inv =~ ^[0-9a-f]{32}$ ]] || die "InvocationID unreadable"
+[[ $job =~ ^[1-9][0-9]{0,9}$ ]] || die "no live job"           # the start job exists only while the run is starting
+for k in ActiveState SubState; do [[ ${S[$k]} =~ ^[a-z-]{1,32}$ ]] || die "$k malformed"; done
+for k in ExecMainCode ExecMainStatus; do [[ ${S[$k]} =~ ^[0-9]{1,3}$ ]] || die "$k malformed"; done
+for k in InactiveEnterTimestampMonotonic InactiveExitTimestampMonotonic ExecMainStartTimestampMonotonic; do
+  [[ ${S[$k]} =~ $NUM ]] || die "$k malformed"; done
+[[ ${S[ExecMainStartTimestamp]} =~ ^@([1-9][0-9]{8,10})$ ]] || die "ExecMainStartTimestamp malformed"; mst=${BASH_REMATCH[1]}
+
+# The live start job (system bus, read-only): it must belong to this unit; its type and its OWN ActivationDetails (fresh per job:
+# a timer-created job carries trigger_unit and trigger_timer_realtime_usec; a job from `systemctl start` carries none).
+out=$(tmo /usr/bin/busctl get-property "$BUS" "/org/freedesktop/systemd1/job/$job" org.freedesktop.systemd1.Job Unit JobType ActivationDetails) \
+  || die "busctl: job $job unreadable"
+mapfile -t J <<< "$out"
+[ "${#J[@]}" = 3 ] || die "busctl printed ${#J[@]} lines for job $job"
+[ "${J[0]}" = "(so) \"$SVC\" \"$SOBJ\"" ] || die "job $job does not belong to $SVC"
+re='^s "([a-z-]{1,32})"$'; [[ ${J[1]} =~ $re ]] || die "JobType malformed"; jtype=${BASH_REMATCH[1]}
+re='^a\(ss\) (0|[1-9][0-9]?)(( "[a-z_]{1,64}" "[A-Za-z0-9_.@:-]{0,255}")*)$'
+[[ ${J[2]} =~ $re ]] || die "ActivationDetails malformed"
+cnt=${BASH_REMATCH[1]}; rest=${BASH_REMATCH[2]}; seen=0; tunit=none; tusec=none
+re='^ "([a-z_]+)" "([^"]*)"(.*)$'
+while [[ $rest =~ $re ]]; do
+  k=${BASH_REMATCH[1]}; v=${BASH_REMATCH[2]}; rest=${BASH_REMATCH[3]}; seen=$((seen + 1))
+  case $k in
+    trigger_unit) [ "$tunit" = none ] && [[ $v =~ ^[A-Za-z0-9_.@:-]{1,255}$ ]] || die "trigger_unit malformed or repeated"; tunit=$v;;
+    trigger_timer_realtime_usec) [ "$tusec" = none ] && [[ $v =~ ^[1-9][0-9]{0,17}$ ]] || die "trigger_timer_realtime_usec malformed or repeated"; tusec=$v;;
+  esac
+done
+[ -z "$rest" ] && [ "$seen" = "$cnt" ] || die "ActivationDetails count $cnt does not match its $seen pairs"
+
+# The timer: LastTriggerUSec (realtime, microseconds) and its monotonic twin (one busctl call), and when the timer unit itself
+# last became active (one systemctl show call): the gates print that difference as information (manual re-arm, boot catch-up).
+out=$(tmo /usr/bin/busctl get-property "$BUS" "$TOBJ" org.freedesktop.systemd1.Timer LastTriggerUSec LastTriggerUSecMonotonic) || die "busctl: timer unreadable"
+mapfile -t T <<< "$out"
+[ "${#T[@]}" = 2 ] && [[ ${T[0]} =~ ^t\ ([0-9]{1,18})$ ]] && tlu=${BASH_REMATCH[1]} && [[ ${T[1]} =~ ^t\ ([0-9]{1,18})$ ]] && tlm=${BASH_REMATCH[1]} \
+  && [[ $tlu =~ $NUM && $tlm =~ $NUM ]] || die "timer LastTriggerUSec malformed"
+out=$(tmo /usr/bin/systemctl show afldb-backup.timer -p ActiveEnterTimestampMonotonic) || die "systemctl show afldb-backup.timer failed"
+[[ $out =~ ^ActiveEnterTimestampMonotonic=([0-9]{1,18})$ ]] && tam=${BASH_REMATCH[1]} && [[ $tam =~ $NUM ]] || die "timer ActiveEnterTimestampMonotonic malformed"
+
+# The dump of this run, found and hashed AS ARM (see the header). The child's script is this constant; its only inputs are the two
+# arguments. It prints "<name> <sha256>" or "none <reason>". The root timeout bounds it (a FIFO, a stopped child): then dump=none.
+CHILD='set -u -o pipefail; export LC_ALL=C; cd / || exit 3
+d=$1; st=$2; n=0; hit=
+[ -d "$d" ] && [ ! -L "$d" ] || { echo "none the backup directory $d is missing or a symbolic link"; exit 0; }
+for f in "$d"/afldb_prod-*.dump; do
+  b=${f##*/}; [[ $b =~ ^afldb_prod-[0-9]{8}-[0-9]{6}\.dump$ ]] || continue
+  s=$(/usr/bin/stat -c "%Y|%F" -- "$f" 2>/dev/null) || continue
+  [ "${s%%|*}" -ge "$st" ] || continue
+  [ "${s#*|}" = "regular file" ] || { echo "none $b (modified in this run) is a ${s#*|}, not a regular non-empty file"; exit 0; }
+  n=$((n + 1)); hit=$f
+done
+[ "$n" = 1 ] || { echo "none $n dumps in $d were modified at or after the main start (epoch $st)"; exit 0; }
+h=$(/usr/bin/sha256sum < "$hit" 2>/dev/null) || { echo "none ${hit##*/} cannot be read as this uid"; exit 0; }
+[[ $h =~ ^([0-9a-f]{64})\ \ -$ ]] || { echo "none sha256sum output malformed"; exit 0; }
+echo "${hit##*/} ${BASH_REMATCH[1]}"'
+dump=none; dsha=none
+out=$(/usr/bin/timeout -k 5 600 /usr/bin/setpriv --reuid=arm --regid=arm --clear-groups --no-new-privs --reset-env \
+  /usr/bin/bash --noprofile --norc -c "$CHILD" afldb-backup-attest-dump "$DUMPDIR" "$mst" 2>/dev/null); rc=$?
+re='^(afldb_prod-[0-9]{8}-[0-9]{6}\.dump) ([0-9a-f]{64})$'
+if [ "$rc" = 0 ] && [[ $out =~ $re ]]; then dump=${BASH_REMATCH[1]}; dsha=${BASH_REMATCH[2]}
+else out=${out//[^A-Za-z0-9 ._:,()\/-]/?}; printf 'afldb-backup-attest: dump=none: %s (exit %s)\n' "${out:0:200}" "$rc" >&2; fi
+
+read -r boot < /proc/sys/kernel/random/boot_id || die "boot_id unreadable"
+boot=${boot//-/}; [[ $boot =~ ^[0-9a-f]{32}$ ]] || die "boot_id malformed"
+wsha=$(/usr/bin/sha256sum < "$SELF") || die "cannot hash $SELF"
+[[ $wsha =~ ^([0-9a-f]{64})\ \ -$ ]] && wsha=${BASH_REMATCH[1]} || die "sha256sum output malformed"
+
+# Consistency: the unit is still in the same invocation and the same job (the job read above was not of a later run).
+out=$(tmo /usr/bin/systemctl show "$SVC" -p InvocationID -p Job --value) || die "systemctl show $SVC (re-read) failed"
+mapfile -t R <<< "$out"
+[ "${#R[@]}" = 2 ] && { [ "${R[0]}/${R[1]}" = "$inv/$job" ] || [ "${R[0]}/${R[1]}" = "$job/$inv" ]; } || die "the invocation or job changed while reading"
+now=${EPOCHREALTIME/./}; [[ $now =~ ^[1-9][0-9]{15,17}$ ]] || die "clock unreadable"
+
+rec=$DIR/$inv.attest; tmp=$DIR/.$inv.tmp
+[ -d "$DIR" ] && [ ! -L "$DIR" ] || die "no record directory $DIR"
+[ ! -e "$rec" ] && [ ! -L "$rec" ] || die "a record for invocation $inv already exists (never overwritten)"
+set -C                                                        # noclobber: the temporary name must be new
+printf '%s\n' "afldb-backup-attest/2" "writer_sha256=$wsha" "unit=$SVC" "invocation=$inv" "job=$job" "job_type=$jtype" \
+  "active_state=${S[ActiveState]}" "sub_state=${S[SubState]}" "exec_main_code=${S[ExecMainCode]}" "exec_main_status=${S[ExecMainStatus]}" \
+  "inactive_enter_mono=${S[InactiveEnterTimestampMonotonic]}" "inactive_exit_mono=${S[InactiveExitTimestampMonotonic]}" \
+  "exec_main_start_mono=${S[ExecMainStartTimestampMonotonic]}" "trigger_unit=$tunit" "trigger_timer_realtime_usec=$tusec" \
+  "timer_last_trigger_usec=$tlu" "timer_last_trigger_mono=$tlm" "timer_active_enter_mono=$tam" "dump=$dump" "dump_sha256=$dsha" \
+  "boot_id=$boot" "written_realtime_usec=$now" > "$tmp" || die "cannot create $tmp"
+set +C
+/usr/bin/mv -n -T -- "$tmp" "$rec" || die "cannot rename $tmp"
+[ ! -e "$tmp" ] || die "a record for invocation $inv appeared; $tmp left in place"
+exit 0

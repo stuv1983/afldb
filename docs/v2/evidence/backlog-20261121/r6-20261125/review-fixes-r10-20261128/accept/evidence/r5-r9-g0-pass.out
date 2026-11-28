@@ -1,0 +1,19 @@
+== case r5-r9-g0-pass: bash afldb-gate-accept.sh --rehearsal --now 2026-11-28T07:30:00Z --gate release-g0 --owner-checks unmarked/fx-oc-4.4-bootid.txt --reverify unmarked/fx-reverify-4.5-bootid.txt --version unmarked/fx-r9-version.txt --verdict unmarked/fx-r9-g0-pass.txt --verdict-exit 0 --confirm unmarked/cf/r5-r9-g0-pass-confirm.txt
+== afldb-gate-accept 2026-11-28T11:41:17Z gate=release-g0 transport=rehearsal (read-only; inputs by sha256)
+   14e52b2ad67054e84ba72ce69aefef6dac7093c476d48a9d1feb8debf40d897c  unmarked/fx-oc-4.4-bootid.txt
+   0148aa15c980b840c5533e6b6f1ec603ac950f5de8548c87fd673fdd5816df88  unmarked/fx-reverify-4.5-bootid.txt
+   1416d39629fcd8f7d7d6dcf24731baf64cc1dd2f2387d18d1c1c953ad562254f  unmarked/fx-r9-version.txt
+   14625c438f9ef8452f8f1d8e6ecbb277f7e10b531f5d9b2717c7ad39716edf3e  unmarked/fx-r9-g0-pass.txt
+   5ecaefa65bfff6573f8fdf65c4178d72fd1fe4e9a929928de4f669caf07818bf  unmarked/cf/r5-r9-g0-pass-confirm.txt
+REHEARSAL: these inputs are rehearsal transcripts; whatever the result, it authorises no release and no reboot
+TEST CLOCK: --now 2026-11-28T07:30:00Z stands in for this workstation's clock (rehearsal only)
+ACCEPT owner-checks PASS post-Phase-4 PASS at 2026-11-28T05:21:46Z, boot c3524e4759ab4e0f8050875471b56b12 (B1, B2, B3 PASS; every CHECK line PASS)
+ACCEPT reverify PASS root 2026-11-28T05:21:40Z, --as-arm 2026-11-28T05:21:42Z (arm has no admin group), verify-install 2026-11-28T05:21:45Z, bundle 58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8, boot c3
+ACCEPT version PASS production VERSION PASS nonce=b00deaca86d21141ebe0c3e90b97df16 at=2026-11-28T06:18:01Z boot=c3524e4759ab4e0f8050875471b56b12, after (a) and (b), same boot as both; off-host VERSION PASS from r7v-offho
+ACCEPT verdict PASS OWNER VERDICT G0 PASS at=2026-11-28T07:16:16Z boot=c3524e4759ab4e0f8050875471b56b12, exit 0, after the version check
+ACCEPT confirm PASS production VERSION PASS nonce=23a740e15b1b7ed52e712d32d1f162c5 at=2026-11-28T07:29:00Z, after the verdict, same boot and bundle, 1 min before this check
+ACCEPT access PASS 4.4, 4.5, 4.6, the gate verdict and the confirm call all carry access epoch 5d1e0c2b9a8f7e6d5c4b3a2918070605: no access change was recorded from 4.4 to the confirm
+INFO pin: --pin-rev not given (rehearsal; the pin is then bound by the wrapper's qual-sha256 only)
+ACCEPT fresh PASS verdict 2026-11-28T07:16:16Z is 114 min after the older Phase 4 evidence (2026-11-28T05:21:40Z); checked 13 min later at 2026-11-28T07:30:00Z (test clock)
+GATE ACCEPT REHEARSAL RELEASE-G0 GO transport=rehearsal boot=c3524e4759ab4e0f8050875471b56b12 access-epoch=5d1e0c2b9a8f7e6d5c4b3a2918070605 owner-checks-at=2026-11-28T05:21:46Z reverify-at=2026-11-28T05:21:45Z version-at=2026-11-28T06:18:01Z verdict-at=2026-11-28T07:16:16Z confirm-at=2026-11-28T07:29:00Z checked-at=2026-11-28T07:30:00Z clock=test
+== exit 0

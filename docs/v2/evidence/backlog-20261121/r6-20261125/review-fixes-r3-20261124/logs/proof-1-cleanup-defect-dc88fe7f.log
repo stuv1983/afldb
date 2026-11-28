@@ -1,0 +1,1097 @@
+== R6 r3 driver proof 2026-11-23T21:08:17Z tested=dc88fe7f4128ce5d3b0997606382e70696ade24d review=cc59b2f2dfda940bd7826e7ef2b6d1dbb0e5a335 sentinel id=sentinel210817565 driver sha256 85bc6886beb9ffafed6db75cc9d2d377830f892033e8b830fa57e28ab5ed328c
+   sentinels made: workstation
+     /tmp/afldb-r6-20261125-r3.sentinel210817565 4bdd4c52667be08f
+     /tmp/afldb-r6-20261125-r2.sentinel210817565 5650d0362929155c
+     /tmp/r6reh.sentinel210817565 444e7d83ae65a7c4
+     /tmp/r6reh-ws.sentinel210817565 c6ac80374ba911ab
+   streamanator (last line = sentinel containers)
+     /tmp/afldb-r6-20261125-r3.sentinel210817565 4bdd4c52667be08f
+     /tmp/afldb-r6-20261125-r2.sentinel210817565 5650d0362929155c
+     /tmp/r6reh.sentinel210817565 444e7d83ae65a7c4
+     /tmp/r6reh-ws.sentinel210817565 c6ac80374ba911ab
+     1
+-- run 1: the tested driver, normal
+== R6 r3 printed blocks 2026-11-23T21:08:19Z run=20261123T210819Z-599-3703 workstation=Office review=cc59b2f2dfda940bd7826e7ef2b6d1dbb0e5a335
+   runbook at cc59b2f2dfda940bd7826e7ef2b6d1dbb0e5a335: sha256 88dd44a8d4def03a64628b3fcc4bfb49d6320d439f22e15f22299aac119f11ed
+   block 1: 20 lines, sha256 5152d440e582449c811b164da13ed314645e5f7c41c8a7f6823c5d56873aa5d2
+   block 2: 1 lines, sha256 31d9ee5b16a08bc059055fb6bfb831fb52aa3618c2a90028fe405370303a639d
+   block 3: 1 lines, sha256 034edc1f57ad4ee3162d1c6f8a6d69f2da0de975b36ea1041983c50eb895aaae
+   block 4: 28 lines, sha256 0b0f56692620f9fa6f46cc2e286ac4db07653366c572e397ddafdd3940950729
+   block 5: 6 lines, sha256 d28f399a248855df1a34bcb54805d3533888e28876071b6610345c8147a0eaeb
+   tested commit (block 1 CODE) dc88fe7f4128ce5d3b0997606382e70696ade24d; review commit cc59b2f2dfda940bd7826e7ef2b6d1dbb0e5a335
+   tree difference tested..review (paths):
+      docs/v2/evidence/backlog-20261121/ATTENDED-PLAN-R6-20261125.md | 229 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++--
+      1 file changed, 226 insertions(+), 3 deletions(-)
+   the verification lines of block 4 and block 5 are identical (5 lines, sha256 0917cf6fae503f22ac1263511165c623ced2b1b359faec783b6a3166e037888f)
+-- block 1 (archive), verbatim, workstation
+fb51ec77009c559b1b7dfe2717a032e2b9ff3e6358d76a8ea40b3e409d6334e3 */tmp/afldb-r6-20261125-r3.tar
+   STEP OK block 1 archive (expected exit 0, got 0)
+   archive sha256 fb51ec77009c559b1b7dfe2717a032e2b9ff3e6358d76a8ea40b3e409d6334e3
+-- block 4 (staging), verbatim, workstation (Git Bash)
+     | docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh: OK
+     | docs/v2/evidence/backlog-20261121/r6-20261125/r6-offhost-verify.sh: OK
+     | docs/v2/evidence/backlog-20261121/r6-20261125/r6-post-verify.sh: OK
+     | docs/v2/evidence/backlog-20261121/r6-20261125/r6-public-smoke.sh: OK
+     | docs/v2/evidence/backlog-20261121/r6-20261125/r6-revalidate-accept.sh: OK
+     | docs/v2/evidence/backlog-20261121/r6-20261125/r6-rawhead-check.sh: OK
+     | docs/v2/evidence/backlog-20261121/r6-20261125/r6-tuesday-handoff.sh: OK
+     | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-s9-public-smoke.sh: OK
+     | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-rawhead.sh: OK
+     | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-cron-observe.sh: OK
+     | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-helper-install.sh: OK
+     | docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh: OK
+     | docs/v2/evidence/backlog-20261121/kits/scheduled-pull-evidence.sh: OK
+     | tools/maintenance/offhost-pull.sh: OK
+     | tools/maintenance/revalidate-season.ts: OK
+     | src/lib/acquisition/season-revalidation.ts: OK
+     | R6 STAGE VERIFIED /tmp/afldb-r6-20261125-r3.dnMRCn (16 files)
+   STEP OK block 4 staging on the workstation (expected exit 0, got 0)
+-- block 5 (re-check), verbatim, workstation, against that root
+     | docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh: OK
+     | docs/v2/evidence/backlog-20261121/r6-20261125/r6-offhost-verify.sh: OK
+     | docs/v2/evidence/backlog-20261121/r6-20261125/r6-post-verify.sh: OK
+     | docs/v2/evidence/backlog-20261121/r6-20261125/r6-public-smoke.sh: OK
+     | docs/v2/evidence/backlog-20261121/r6-20261125/r6-revalidate-accept.sh: OK
+     | docs/v2/evidence/backlog-20261121/r6-20261125/r6-rawhead-check.sh: OK
+     | docs/v2/evidence/backlog-20261121/r6-20261125/r6-tuesday-handoff.sh: OK
+     | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-s9-public-smoke.sh: OK
+     | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-rawhead.sh: OK
+     | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-cron-observe.sh: OK
+     | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-helper-install.sh: OK
+     | docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh: OK
+     | docs/v2/evidence/backlog-20261121/kits/scheduled-pull-evidence.sh: OK
+     | tools/maintenance/offhost-pull.sh: OK
+     | tools/maintenance/revalidate-season.ts: OK
+     | src/lib/acquisition/season-revalidation.ts: OK
+     | R6 STAGE OK /tmp/afldb-r6-20261125-r3.dnMRCn
+   STEP OK block 5 re-check on the workstation (expected exit 0, got 0)
+-- block 2 (transfer to streamanator), verbatim
+   STEP OK block 2 transfer (expected exit 0, got 0)
+   streamanator /tmp/afldb-r6-20261125-r3.tar = fb51ec77009c559b1b7dfe2717a032e2b9ff3e6358d76a8ea40b3e409d6334e3 (same bytes)
+   STEP OK transferred bytes equal (expected exit 0, got 0)
+-- streamanator: private run directory, the archive copy, the blocks and a clean export of dc88fe7f4128ce5d3b0997606382e70696ade24d
+   run directory /tmp/r6reh.20261123T210819Z-599-3703.rQnwqv
+   fixture export of dc88fe7f4128ce5d3b0997606382e70696ade24d: sha256 22f8ebe997d4d1cfebc3ffd6507982fd3dc7d8255e971958ed47dd74316a9c85
+   STEP OK copy blocks and archive to the run directory (expected exit 0, got 0)
+   STEP OK fixture export to the run directory (expected exit 0, got 0)
+-- streamanator: printed-block cases and the A-2/handoff/F-4 suite in disposable containers (one connection)
+== R6 r3 REHEARSAL 2026-11-23T21:08:23Z host=streamanator user=arm run=/tmp/r6reh.20261123T210819Z-599-3703.rQnwqv
+   image sha256:d71c0b286c54a7cc48645aa8d4d9d0c57e4260128cb91a6fb18c29d7589205ba (linux/amd64 created 2026-05-05T20:43:14.149402711Z)
+   archive fb51ec77009c559b1b7dfe2717a032e2b9ff3e6358d76a8ea40b3e409d6334e3; block4 0b0f56692620f9fa6f46cc2e286ac4db07653366c572e397ddafdd3940950729; block5 d28f399a248855df1a34bcb54805d3533888e28876071b6610345c8147a0eaeb
+-- printed blocks, verbatim, one container per case (/tmp = the case's own directory under RUN)
+  == CASE b4-clean 2026-11-23T21:08:24Z uid=1000(ubuntu) umask=0002 image-os=Ubuntu 24.04.4 LTS
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-offhost-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-post-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-public-smoke.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-revalidate-accept.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-rawhead-check.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-tuesday-handoff.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-s9-public-smoke.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-rawhead.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-cron-observe.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-helper-install.sh: OK
+       | docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh: OK
+       | docs/v2/evidence/backlog-20261121/kits/scheduled-pull-evidence.sh: OK
+       | tools/maintenance/offhost-pull.sh: OK
+       | tools/maintenance/revalidate-season.ts: OK
+       | src/lib/acquisition/season-revalidation.ts: OK
+       | R6 STAGE VERIFIED /tmp/afldb-r6-20261125-r3.JoEDcE (16 files)
+     OK lines: 16; staged modes:      17 600      13 700 
+     diagnostics on /tmp/afldb-r6-20261125-r3.JoEDcE: hashes alone rc=0; r2 count rule (find -type f != manifest) = 16 (r2 wanted 15; r3 has 16 pinned)
+     [b4-clean] expected=pass got=pass rc=0 verdict='R6 STAGE VERIFIED /tmp/afldb-r6-20261125-r3.JoEDcE (16 files)'
+  CASE-RESULT b4-clean OK (passes, exit 0)
+  == CASE b4-changed-byte 2026-11-23T21:08:24Z uid=1000(ubuntu) umask=0002 image-os=Ubuntu 24.04.4 LTS
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh: FAILED
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-offhost-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-post-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-public-smoke.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-revalidate-accept.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-rawhead-check.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-tuesday-handoff.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-s9-public-smoke.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-rawhead.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-cron-observe.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-helper-install.sh: OK
+       | docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh: OK
+       | docs/v2/evidence/backlog-20261121/kits/scheduled-pull-evidence.sh: OK
+       | tools/maintenance/offhost-pull.sh: OK
+       | tools/maintenance/revalidate-season.ts: OK
+       | src/lib/acquisition/season-revalidation.ts: OK
+       | sha256sum: WARNING: 1 computed checksum did NOT match
+       | R6 STAGE STOP: do not use this staging root
+     diagnostics on /tmp/afldb-r6-20261125-r3.AzeqRV: hashes alone rc=1; r2 count rule (find -type f != manifest) = 16 (r2 wanted 15; r3 has 16 pinned)
+     [b4-changed-byte] expected=stop got=stop rc=1 verdict='R6 STAGE STOP: do not use this staging root'
+  CASE-RESULT b4-changed-byte OK (STOP, exit 1)
+  == CASE b4-missing-file 2026-11-23T21:08:24Z uid=1000(ubuntu) umask=0002 image-os=Ubuntu 24.04.4 LTS
+       | R6 STAGE STOP: do not use this staging root
+     diagnostics on /tmp/afldb-r6-20261125-r3.VmYu8b: hashes alone rc=1; r2 count rule (find -type f != manifest) = 15 (r2 wanted 15; r3 has 16 pinned)
+     [b4-missing-file] expected=stop got=stop rc=1 verdict='R6 STAGE STOP: do not use this staging root'
+  CASE-RESULT b4-missing-file OK (STOP, exit 1)
+  == CASE b4-extra-file 2026-11-23T21:08:25Z uid=1000(ubuntu) umask=0002 image-os=Ubuntu 24.04.4 LTS
+       | R6 STAGE STOP: do not use this staging root
+     diagnostics on /tmp/afldb-r6-20261125-r3.mZWleP: hashes alone rc=0; r2 count rule (find -type f != manifest) = 17 (r2 wanted 15; r3 has 16 pinned)
+     [b4-extra-file] expected=stop got=stop rc=1 verdict='R6 STAGE STOP: do not use this staging root'
+  CASE-RESULT b4-extra-file OK (STOP, exit 1)
+  == CASE b4-nested-manifest 2026-11-23T21:08:25Z uid=1000(ubuntu) umask=0002 image-os=Ubuntu 24.04.4 LTS
+       | R6 STAGE STOP: do not use this staging root
+     diagnostics on /tmp/afldb-r6-20261125-r3.A7qaVh: hashes alone rc=0; r2 count rule (find -type f != manifest) = 16 (r2 wanted 15; r3 has 16 pinned)
+     [b4-nested-manifest] expected=stop got=stop rc=1 verdict='R6 STAGE STOP: do not use this staging root'
+  CASE-RESULT b4-nested-manifest OK (STOP, exit 1)
+  == CASE b4-root-manifest 2026-11-23T21:08:26Z uid=1000(ubuntu) umask=0002 image-os=Ubuntu 24.04.4 LTS
+       | R6 STAGE STOP: do not use this staging root
+     diagnostics on /tmp/afldb-r6-20261125-r3.mOaaJP: hashes alone rc=1; r2 count rule (find -type f != manifest) = 16 (r2 wanted 15; r3 has 16 pinned)
+     [b4-root-manifest] expected=stop got=stop rc=1 verdict='R6 STAGE STOP: do not use this staging root'
+  CASE-RESULT b4-root-manifest OK (STOP, exit 1)
+  == CASE b4-extra-symlink 2026-11-23T21:08:26Z uid=1000(ubuntu) umask=0002 image-os=Ubuntu 24.04.4 LTS
+       | R6 STAGE STOP: do not use this staging root
+     diagnostics on /tmp/afldb-r6-20261125-r3.FsKRdT: hashes alone rc=0; r2 count rule (find -type f != manifest) = 16 (r2 wanted 15; r3 has 16 pinned)
+     [b4-extra-symlink] expected=stop got=stop rc=1 verdict='R6 STAGE STOP: do not use this staging root'
+  CASE-RESULT b4-extra-symlink OK (STOP, exit 1)
+  == CASE b4-symlink-identical 2026-11-23T21:08:26Z uid=1000(ubuntu) umask=0002 image-os=Ubuntu 24.04.4 LTS
+       | R6 STAGE STOP: do not use this staging root
+     diagnostics on /tmp/afldb-r6-20261125-r3.FJ9tPt: hashes alone rc=0; r2 count rule (find -type f != manifest) = 15 (r2 wanted 15; r3 has 16 pinned)
+     [b4-symlink-identical] expected=stop got=stop rc=1 verdict='R6 STAGE STOP: do not use this staging root'
+  CASE-RESULT b4-symlink-identical OK (STOP, exit 1)
+  == CASE b4-bad-archive 2026-11-23T21:08:27Z uid=1000(ubuntu) umask=0002 image-os=Ubuntu 24.04.4 LTS
+       | tar: Unexpected EOF in archive
+       | tar: Unexpected EOF in archive
+       | tar: Error is not recoverable: exiting now
+       | R6 STAGE STOP: do not use this staging root
+     [b4-bad-archive] expected=stop got=stop rc=1 verdict='R6 STAGE STOP: do not use this staging root'
+  CASE-RESULT b4-bad-archive OK (STOP, exit 1)
+  == CASE b4-not-a-tar 2026-11-23T21:08:27Z uid=1000(ubuntu) umask=0002 image-os=Ubuntu 24.04.4 LTS
+       | tar: This does not look like a tar archive
+       | tar: Exiting with failure status due to previous errors
+       | R6 STAGE STOP: do not use this staging root
+     [b4-not-a-tar] expected=stop got=stop rc=1 verdict='R6 STAGE STOP: do not use this staging root'
+  CASE-RESULT b4-not-a-tar OK (STOP, exit 1)
+  == CASE b5-unchanged 2026-11-23T21:08:27Z uid=1000(ubuntu) umask=0002 image-os=Ubuntu 24.04.4 LTS
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-offhost-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-post-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-public-smoke.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-revalidate-accept.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-rawhead-check.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-tuesday-handoff.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-s9-public-smoke.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-rawhead.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-cron-observe.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-helper-install.sh: OK
+       | docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh: OK
+       | docs/v2/evidence/backlog-20261121/kits/scheduled-pull-evidence.sh: OK
+       | tools/maintenance/offhost-pull.sh: OK
+       | tools/maintenance/revalidate-season.ts: OK
+       | src/lib/acquisition/season-revalidation.ts: OK
+       | R6 STAGE VERIFIED /tmp/afldb-r6-20261125-r3.ubX6aZ (16 files)
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-offhost-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-post-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-public-smoke.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-revalidate-accept.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-rawhead-check.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-tuesday-handoff.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-s9-public-smoke.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-rawhead.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-cron-observe.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-helper-install.sh: OK
+       | docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh: OK
+       | docs/v2/evidence/backlog-20261121/kits/scheduled-pull-evidence.sh: OK
+       | tools/maintenance/offhost-pull.sh: OK
+       | tools/maintenance/revalidate-season.ts: OK
+       | src/lib/acquisition/season-revalidation.ts: OK
+       | R6 STAGE OK /tmp/afldb-r6-20261125-r3.ubX6aZ
+     diagnostics on /tmp/afldb-r6-20261125-r3.ubX6aZ: hashes alone rc=0; r2 count rule (find -type f != manifest) = 16 (r2 wanted 15; r3 has 16 pinned)
+     [b5-unchanged] expected=pass got=pass rc=0 verdict='R6 STAGE OK /tmp/afldb-r6-20261125-r3.ubX6aZ'
+  CASE-RESULT b5-unchanged OK (passes, exit 0)
+  == CASE b5-changed-byte 2026-11-23T21:08:28Z uid=1000(ubuntu) umask=0002 image-os=Ubuntu 24.04.4 LTS
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-offhost-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-post-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-public-smoke.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-revalidate-accept.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-rawhead-check.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-tuesday-handoff.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-s9-public-smoke.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-rawhead.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-cron-observe.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-helper-install.sh: OK
+       | docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh: OK
+       | docs/v2/evidence/backlog-20261121/kits/scheduled-pull-evidence.sh: OK
+       | tools/maintenance/offhost-pull.sh: OK
+       | tools/maintenance/revalidate-season.ts: OK
+       | src/lib/acquisition/season-revalidation.ts: OK
+       | R6 STAGE VERIFIED /tmp/afldb-r6-20261125-r3.PCWaV0 (16 files)
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh: FAILED
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-offhost-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-post-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-public-smoke.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-revalidate-accept.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-rawhead-check.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-tuesday-handoff.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-s9-public-smoke.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-rawhead.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-cron-observe.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-helper-install.sh: OK
+       | docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh: OK
+       | docs/v2/evidence/backlog-20261121/kits/scheduled-pull-evidence.sh: OK
+       | tools/maintenance/offhost-pull.sh: OK
+       | tools/maintenance/revalidate-season.ts: OK
+       | src/lib/acquisition/season-revalidation.ts: OK
+       | sha256sum: WARNING: 1 computed checksum did NOT match
+       | R6 STAGE STOP /tmp/afldb-r6-20261125-r3.PCWaV0
+     diagnostics on /tmp/afldb-r6-20261125-r3.PCWaV0: hashes alone rc=1; r2 count rule (find -type f != manifest) = 16 (r2 wanted 15; r3 has 16 pinned)
+     [b5-changed-byte] expected=stop got=stop rc=1 verdict='R6 STAGE STOP /tmp/afldb-r6-20261125-r3.PCWaV0'
+  CASE-RESULT b5-changed-byte OK (STOP, exit 1)
+  == CASE b5-altered-manifest 2026-11-23T21:08:28Z uid=1000(ubuntu) umask=0002 image-os=Ubuntu 24.04.4 LTS
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-offhost-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-post-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-public-smoke.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-revalidate-accept.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-rawhead-check.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-tuesday-handoff.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-s9-public-smoke.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-rawhead.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-cron-observe.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-helper-install.sh: OK
+       | docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh: OK
+       | docs/v2/evidence/backlog-20261121/kits/scheduled-pull-evidence.sh: OK
+       | tools/maintenance/offhost-pull.sh: OK
+       | tools/maintenance/revalidate-season.ts: OK
+       | src/lib/acquisition/season-revalidation.ts: OK
+       | R6 STAGE VERIFIED /tmp/afldb-r6-20261125-r3.nLwXbW (16 files)
+       | R6 STAGE STOP /tmp/afldb-r6-20261125-r3.nLwXbW
+     diagnostics on /tmp/afldb-r6-20261125-r3.nLwXbW: hashes alone rc=0; r2 count rule (find -type f != manifest) = 16 (r2 wanted 15; r3 has 16 pinned)
+     [b5-altered-manifest] expected=stop got=stop rc=1 verdict='R6 STAGE STOP /tmp/afldb-r6-20261125-r3.nLwXbW'
+  CASE-RESULT b5-altered-manifest OK (STOP, exit 1)
+  == CASE b5-extra-file 2026-11-23T21:08:29Z uid=1000(ubuntu) umask=0002 image-os=Ubuntu 24.04.4 LTS
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-offhost-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-post-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-public-smoke.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-revalidate-accept.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-rawhead-check.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-tuesday-handoff.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-s9-public-smoke.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-rawhead.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-cron-observe.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-helper-install.sh: OK
+       | docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh: OK
+       | docs/v2/evidence/backlog-20261121/kits/scheduled-pull-evidence.sh: OK
+       | tools/maintenance/offhost-pull.sh: OK
+       | tools/maintenance/revalidate-season.ts: OK
+       | src/lib/acquisition/season-revalidation.ts: OK
+       | R6 STAGE VERIFIED /tmp/afldb-r6-20261125-r3.jGEWcJ (16 files)
+       | R6 STAGE STOP /tmp/afldb-r6-20261125-r3.jGEWcJ
+     diagnostics on /tmp/afldb-r6-20261125-r3.jGEWcJ: hashes alone rc=0; r2 count rule (find -type f != manifest) = 17 (r2 wanted 15; r3 has 16 pinned)
+     [b5-extra-file] expected=stop got=stop rc=1 verdict='R6 STAGE STOP /tmp/afldb-r6-20261125-r3.jGEWcJ'
+  CASE-RESULT b5-extra-file OK (STOP, exit 1)
+  == CASE b5-missing-file 2026-11-23T21:08:29Z uid=1000(ubuntu) umask=0002 image-os=Ubuntu 24.04.4 LTS
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-offhost-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-post-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-public-smoke.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-revalidate-accept.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-rawhead-check.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-tuesday-handoff.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-s9-public-smoke.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-rawhead.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-cron-observe.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-helper-install.sh: OK
+       | docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh: OK
+       | docs/v2/evidence/backlog-20261121/kits/scheduled-pull-evidence.sh: OK
+       | tools/maintenance/offhost-pull.sh: OK
+       | tools/maintenance/revalidate-season.ts: OK
+       | src/lib/acquisition/season-revalidation.ts: OK
+       | R6 STAGE VERIFIED /tmp/afldb-r6-20261125-r3.Oi3y09 (16 files)
+       | R6 STAGE STOP /tmp/afldb-r6-20261125-r3.Oi3y09
+     diagnostics on /tmp/afldb-r6-20261125-r3.Oi3y09: hashes alone rc=1; r2 count rule (find -type f != manifest) = 15 (r2 wanted 15; r3 has 16 pinned)
+     [b5-missing-file] expected=stop got=stop rc=1 verdict='R6 STAGE STOP /tmp/afldb-r6-20261125-r3.Oi3y09'
+  CASE-RESULT b5-missing-file OK (STOP, exit 1)
+  == CASE b5-nested-manifest 2026-11-23T21:08:29Z uid=1000(ubuntu) umask=0002 image-os=Ubuntu 24.04.4 LTS
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-offhost-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-post-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-public-smoke.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-revalidate-accept.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-rawhead-check.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-tuesday-handoff.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-s9-public-smoke.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-rawhead.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-cron-observe.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-helper-install.sh: OK
+       | docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh: OK
+       | docs/v2/evidence/backlog-20261121/kits/scheduled-pull-evidence.sh: OK
+       | tools/maintenance/offhost-pull.sh: OK
+       | tools/maintenance/revalidate-season.ts: OK
+       | src/lib/acquisition/season-revalidation.ts: OK
+       | R6 STAGE VERIFIED /tmp/afldb-r6-20261125-r3.GcgSnM (16 files)
+       | R6 STAGE STOP /tmp/afldb-r6-20261125-r3.GcgSnM
+     diagnostics on /tmp/afldb-r6-20261125-r3.GcgSnM: hashes alone rc=0; r2 count rule (find -type f != manifest) = 16 (r2 wanted 15; r3 has 16 pinned)
+     [b5-nested-manifest] expected=stop got=stop rc=1 verdict='R6 STAGE STOP /tmp/afldb-r6-20261125-r3.GcgSnM'
+  CASE-RESULT b5-nested-manifest OK (STOP, exit 1)
+  == CASE b5-extra-symlink 2026-11-23T21:08:30Z uid=1000(ubuntu) umask=0002 image-os=Ubuntu 24.04.4 LTS
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-offhost-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-post-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-public-smoke.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-revalidate-accept.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-rawhead-check.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-tuesday-handoff.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-s9-public-smoke.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-rawhead.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-cron-observe.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-helper-install.sh: OK
+       | docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh: OK
+       | docs/v2/evidence/backlog-20261121/kits/scheduled-pull-evidence.sh: OK
+       | tools/maintenance/offhost-pull.sh: OK
+       | tools/maintenance/revalidate-season.ts: OK
+       | src/lib/acquisition/season-revalidation.ts: OK
+       | R6 STAGE VERIFIED /tmp/afldb-r6-20261125-r3.ShuZXR (16 files)
+       | R6 STAGE STOP /tmp/afldb-r6-20261125-r3.ShuZXR
+     diagnostics on /tmp/afldb-r6-20261125-r3.ShuZXR: hashes alone rc=0; r2 count rule (find -type f != manifest) = 16 (r2 wanted 15; r3 has 16 pinned)
+     [b5-extra-symlink] expected=stop got=stop rc=1 verdict='R6 STAGE STOP /tmp/afldb-r6-20261125-r3.ShuZXR'
+  CASE-RESULT b5-extra-symlink OK (STOP, exit 1)
+  == CASE b5-symlink-identical 2026-11-23T21:08:30Z uid=1000(ubuntu) umask=0002 image-os=Ubuntu 24.04.4 LTS
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-offhost-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-post-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-public-smoke.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-revalidate-accept.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-rawhead-check.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-tuesday-handoff.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-s9-public-smoke.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-rawhead.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-cron-observe.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-helper-install.sh: OK
+       | docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh: OK
+       | docs/v2/evidence/backlog-20261121/kits/scheduled-pull-evidence.sh: OK
+       | tools/maintenance/offhost-pull.sh: OK
+       | tools/maintenance/revalidate-season.ts: OK
+       | src/lib/acquisition/season-revalidation.ts: OK
+       | R6 STAGE VERIFIED /tmp/afldb-r6-20261125-r3.feIlLd (16 files)
+       | R6 STAGE STOP /tmp/afldb-r6-20261125-r3.feIlLd
+     diagnostics on /tmp/afldb-r6-20261125-r3.feIlLd: hashes alone rc=0; r2 count rule (find -type f != manifest) = 15 (r2 wanted 15; r3 has 16 pinned)
+     [b5-symlink-identical] expected=stop got=stop rc=1 verdict='R6 STAGE STOP /tmp/afldb-r6-20261125-r3.feIlLd'
+  CASE-RESULT b5-symlink-identical OK (STOP, exit 1)
+  == CASE b5-manifest-symlink-identical 2026-11-23T21:08:31Z uid=1000(ubuntu) umask=0002 image-os=Ubuntu 24.04.4 LTS
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-offhost-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-post-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-public-smoke.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-revalidate-accept.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-rawhead-check.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-tuesday-handoff.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-s9-public-smoke.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-rawhead.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-cron-observe.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-helper-install.sh: OK
+       | docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh: OK
+       | docs/v2/evidence/backlog-20261121/kits/scheduled-pull-evidence.sh: OK
+       | tools/maintenance/offhost-pull.sh: OK
+       | tools/maintenance/revalidate-season.ts: OK
+       | src/lib/acquisition/season-revalidation.ts: OK
+       | R6 STAGE VERIFIED /tmp/afldb-r6-20261125-r3.xMMCZn (16 files)
+       | R6 STAGE STOP /tmp/afldb-r6-20261125-r3.xMMCZn
+     diagnostics on /tmp/afldb-r6-20261125-r3.xMMCZn: hashes alone rc=0; r2 count rule (find -type f != manifest) = 16 (r2 wanted 15; r3 has 16 pinned)
+     [b5-manifest-symlink-identical] expected=stop got=stop rc=1 verdict='R6 STAGE STOP /tmp/afldb-r6-20261125-r3.xMMCZn'
+  CASE-RESULT b5-manifest-symlink-identical OK (STOP, exit 1)
+  == CASE b5-hardlink-outside 2026-11-23T21:08:31Z uid=1000(ubuntu) umask=0002 image-os=Ubuntu 24.04.4 LTS
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-offhost-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-post-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-public-smoke.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-revalidate-accept.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-rawhead-check.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-tuesday-handoff.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-s9-public-smoke.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-rawhead.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-cron-observe.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-helper-install.sh: OK
+       | docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh: OK
+       | docs/v2/evidence/backlog-20261121/kits/scheduled-pull-evidence.sh: OK
+       | tools/maintenance/offhost-pull.sh: OK
+       | tools/maintenance/revalidate-season.ts: OK
+       | src/lib/acquisition/season-revalidation.ts: OK
+       | R6 STAGE VERIFIED /tmp/afldb-r6-20261125-r3.5iFZGT (16 files)
+       | R6 STAGE STOP /tmp/afldb-r6-20261125-r3.5iFZGT
+     diagnostics on /tmp/afldb-r6-20261125-r3.5iFZGT: hashes alone rc=0; r2 count rule (find -type f != manifest) = 16 (r2 wanted 15; r3 has 16 pinned)
+     [b5-hardlink-outside] expected=stop got=stop rc=1 verdict='R6 STAGE STOP /tmp/afldb-r6-20261125-r3.5iFZGT'
+  CASE-RESULT b5-hardlink-outside OK (STOP, exit 1)
+  == CASE b5-group-writable 2026-11-23T21:08:31Z uid=1000(ubuntu) umask=0002 image-os=Ubuntu 24.04.4 LTS
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-offhost-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-post-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-public-smoke.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-revalidate-accept.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-rawhead-check.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-tuesday-handoff.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-s9-public-smoke.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-rawhead.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-cron-observe.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-helper-install.sh: OK
+       | docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh: OK
+       | docs/v2/evidence/backlog-20261121/kits/scheduled-pull-evidence.sh: OK
+       | tools/maintenance/offhost-pull.sh: OK
+       | tools/maintenance/revalidate-season.ts: OK
+       | src/lib/acquisition/season-revalidation.ts: OK
+       | R6 STAGE VERIFIED /tmp/afldb-r6-20261125-r3.lQCrtC (16 files)
+       | R6 STAGE STOP /tmp/afldb-r6-20261125-r3.lQCrtC
+     diagnostics on /tmp/afldb-r6-20261125-r3.lQCrtC: hashes alone rc=0; r2 count rule (find -type f != manifest) = 16 (r2 wanted 15; r3 has 16 pinned)
+     [b5-group-writable] expected=stop got=stop rc=1 verdict='R6 STAGE STOP /tmp/afldb-r6-20261125-r3.lQCrtC'
+  CASE-RESULT b5-group-writable OK (STOP, exit 1)
+  == CASE b5-extra-empty-dir 2026-11-23T21:08:32Z uid=1000(ubuntu) umask=0002 image-os=Ubuntu 24.04.4 LTS
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-offhost-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-post-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-public-smoke.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-revalidate-accept.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-rawhead-check.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-tuesday-handoff.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-s9-public-smoke.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-rawhead.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-cron-observe.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-helper-install.sh: OK
+       | docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh: OK
+       | docs/v2/evidence/backlog-20261121/kits/scheduled-pull-evidence.sh: OK
+       | tools/maintenance/offhost-pull.sh: OK
+       | tools/maintenance/revalidate-season.ts: OK
+       | src/lib/acquisition/season-revalidation.ts: OK
+       | R6 STAGE VERIFIED /tmp/afldb-r6-20261125-r3.2l5Qzf (16 files)
+       | R6 STAGE STOP /tmp/afldb-r6-20261125-r3.2l5Qzf
+     diagnostics on /tmp/afldb-r6-20261125-r3.2l5Qzf: hashes alone rc=0; r2 count rule (find -type f != manifest) = 16 (r2 wanted 15; r3 has 16 pinned)
+     [b5-extra-empty-dir] expected=stop got=stop rc=1 verdict='R6 STAGE STOP /tmp/afldb-r6-20261125-r3.2l5Qzf'
+  CASE-RESULT b5-extra-empty-dir OK (STOP, exit 1)
+  == CASE b5-stage-is-symlink 2026-11-23T21:08:32Z uid=1000(ubuntu) umask=0002 image-os=Ubuntu 24.04.4 LTS
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-offhost-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-post-verify.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-public-smoke.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-revalidate-accept.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-rawhead-check.sh: OK
+       | docs/v2/evidence/backlog-20261121/r6-20261125/r6-tuesday-handoff.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-s9-public-smoke.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-rawhead.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-cron-observe.sh: OK
+       | docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-helper-install.sh: OK
+       | docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh: OK
+       | docs/v2/evidence/backlog-20261121/kits/scheduled-pull-evidence.sh: OK
+       | tools/maintenance/offhost-pull.sh: OK
+       | tools/maintenance/revalidate-season.ts: OK
+       | src/lib/acquisition/season-revalidation.ts: OK
+       | R6 STAGE VERIFIED /tmp/afldb-r6-20261125-r3.d8TpYX (16 files)
+       | R6 STAGE STOP /tmp/afldb-r6-stage-link
+     diagnostics on /tmp/afldb-r6-stage-link: hashes alone rc=0; r2 count rule (find -type f != manifest) = 16 (r2 wanted 15; r3 has 16 pinned)
+     [b5-stage-is-symlink] expected=stop got=stop rc=1 verdict='R6 STAGE STOP /tmp/afldb-r6-stage-link'
+  CASE-RESULT b5-stage-is-symlink OK (STOP, exit 1)
+-- A-2, handoff and F-4 suite (in-container.sh) against the staged root the clean block-4 case verified
+   staged root /tmp/afldb-r6-20261125-r3.JoEDcE (host /tmp/r6reh.20261123T210819Z-599-3703.rQnwqv/case-b4-clean/afldb-r6-20261125-r3.JoEDcE)
+  == R6 r3 in-container role=prod 2026-11-23T21:08:32Z hostname=afldb-prod image-os=Ubuntu 24.04.4 LTS
+     staged sha256: 48185fcaec83eff1cb26f1612febb32ba7d223f953cd4f6941fcc38c5eebebfb r6-pre-verify.sh; 7c3d0fc295512a2f990bdbed24ae9ddb97a49f5f13e9bf01019ea3fa7e1f0543 r6-rawhead-check.sh
+     staged sha256: 92c1809b61473ab8d326b5a65bc1a30bb1eaf16e272ad0adf90a030ec039f9d8 r6-tuesday-handoff.sh; cab4a43af09e4b1729d913162c0f27faccd19315c56eb4ad1141c8bf748d81c0 a1-rawhead.sh
+     staged modes: 600 1000 (staging umask 077); contrast copies: r2 0d9e97a5d5882203 58e35ce8 fa8d34f0bae6f4d3
+  made 17822b29e6de-R6fixRehearsalBuild01x: 3 files, manifest 69b425be1a79, supervisor 11190 B
+  made 7d92042fd110-XWruOm_9nLCSMY8nGPqYU: 3 files, manifest 2b32e8d15aba, supervisor 11190 B
+  made c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC: 3 files, manifest 5bf51921ada9, supervisor 11190 B
+     state released live=3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b: current -> releases/17822b29e6de-R6fixRehearsalBuild01x, previous -> releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU, primary 166 cwd /home/arm/afldb-releases/releases/17822b29e6de-R6fixRehearsalBuild01x, workers 2
+     baseline written by the staged a1-rawhead.sh (connections=24 mktemp-calls=1 env-opens=0)
+  -- H. r6-tuesday-handoff.sh on fixture records
+     [H-released] rc=0 R6-A2-TUESDAY tue:released|R6-A2-CURRENT_ID 17822b29e6de-R6fixRehearsalBuild01x|R6-A2-ATTESTED inv:3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b|R6 HANDOFF RESULT PASS|
+  REH PASS [H-released] handoff PASS with the expected arguments
+     [H-rolledback] rc=0 R6-A2-TUESDAY tue:rolledback|R6-A2-CURRENT_ID 7d92042fd110-XWruOm_9nLCSMY8nGPqYU|R6-A2-ATTESTED inv:5b4a39281706f5e4d3c2b1a098f7e6d5|R6 HANDOFF RESULT PASS|
+  REH PASS [H-rolledback] handoff PASS with the expected arguments
+     [H-deferred] rc=0 R6-A2-TUESDAY tue:deferred|R6-A2-CURRENT_ID 7d92042fd110-XWruOm_9nLCSMY8nGPqYU|R6-A2-ATTESTED inv:342040625f6d4012a35d598dfbf9afe6|R6 HANDOFF RESULT PASS|
+  REH PASS [H-deferred] handoff PASS with the expected arguments
+     [H-crlf-record] rc=0 R6-A2-TUESDAY tue:released|R6-A2-CURRENT_ID 17822b29e6de-R6fixRehearsalBuild01x|R6-A2-ATTESTED inv:3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b|R6 HANDOFF RESULT PASS|
+  REH PASS [H-crlf-record] handoff PASS with the expected arguments
+     [H-no-record] rc=2 STOP no readable Tuesday sitting record at '/tmp/fixture-records/absent.md': no Tuesday outcome, so R6 is NO-GO|
+  REH PASS [H-no-record] handoff exit 2, no arguments printed
+     [H-no-handoff-lines] rc=1 STOP the record has 0 lines mentioning R6-HANDOFF (need exactly 3: tuesday-outcome, current-id, attested-invocation)|STOP missing, repeated or ambiguous 'R6-HANDOFF tuesday-outcome released|rolledback|deferred' line|STOP missing, repeated or malformed 'R6-HANDOFF current-id <id>' line|STOP missing, repeated or malformed 'R6-HANDOFF attested-invocation <32 hex>' line|R6 HANDOFF RESULT STOP (4): do not run A-2; R6 is NO-GO until the owner resolves the record|
+  REH PASS [H-no-handoff-lines] handoff STOP (exit 1), no arguments printed
+     [H-repeated-outcome] rc=1 STOP the record has 4 lines mentioning R6-HANDOFF (need exactly 3: tuesday-outcome, current-id, attested-invocation)|STOP missing, repeated or ambiguous 'R6-HANDOFF tuesday-outcome released|rolledback|deferred' line|R6 HANDOFF RESULT STOP (2): do not run A-2; R6 is NO-GO until the owner resolves the record|
+  REH PASS [H-repeated-outcome] handoff STOP (exit 1), no arguments printed
+     [H-two-outcomes] rc=1 STOP the record has 4 lines mentioning R6-HANDOFF (need exactly 3: tuesday-outcome, current-id, attested-invocation)|STOP missing, repeated or ambiguous 'R6-HANDOFF tuesday-outcome released|rolledback|deferred' line|R6 HANDOFF RESULT STOP (2): do not run A-2; R6 is NO-GO until the owner resolves the record|
+  REH PASS [H-two-outcomes] handoff STOP (exit 1), no arguments printed
+     [H-ambiguous-outcome-value] rc=1 STOP missing, repeated or ambiguous 'R6-HANDOFF tuesday-outcome released|rolledback|deferred' line|R6 HANDOFF RESULT STOP (1): do not run A-2; R6 is NO-GO until the owner resolves the record|
+  REH PASS [H-ambiguous-outcome-value] handoff STOP (exit 1), no arguments printed
+     [H-missing-outcome] rc=1 STOP the record has 2 lines mentioning R6-HANDOFF (need exactly 3: tuesday-outcome, current-id, attested-invocation)|STOP missing, repeated or ambiguous 'R6-HANDOFF tuesday-outcome released|rolledback|deferred' line|R6 HANDOFF RESULT STOP (2): do not run A-2; R6 is NO-GO until the owner resolves the record|
+  REH PASS [H-missing-outcome] handoff STOP (exit 1), no arguments printed
+     [H-indented-line] rc=1 STOP missing, repeated or ambiguous 'R6-HANDOFF tuesday-outcome released|rolledback|deferred' line|R6 HANDOFF RESULT STOP (1): do not run A-2; R6 is NO-GO until the owner resolves the record|
+  REH PASS [H-indented-line] handoff STOP (exit 1), no arguments printed
+     [H-released-without-P5] rc=1 STOP released, but the record has no 'P5 RESULT ACCEPT PASS'|R6 HANDOFF RESULT STOP (1): do not run A-2; R6 is NO-GO until the owner resolves the record|
+  REH PASS [H-released-without-P5] handoff STOP (exit 1), no arguments printed
+     [H-released-with-rollback] rc=1 STOP released, but the record also has a ROLLBACK RESULT line: ambiguous|R6 HANDOFF RESULT STOP (1): do not run A-2; R6 is NO-GO until the owner resolves the record|
+  REH PASS [H-released-with-rollback] handoff STOP (exit 1), no arguments printed
+     [H-released-sunday-inv] rc=1 STOP released, but the attested InvocationID is Sunday's: Tuesday's restart was not recorded|R6 HANDOFF RESULT STOP (1): do not run A-2; R6 is NO-GO until the owner resolves the record|
+  REH PASS [H-released-sunday-inv] handoff STOP (exit 1), no arguments printed
+     [H-released-inv-only-on-handoff] rc=1 STOP the attested InvocationID 3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b appears only on the handoff line, not in the record's restart report|R6 HANDOFF RESULT STOP (1): do not run A-2; R6 is NO-GO until the owner resolves the record|
+  REH PASS [H-released-inv-only-on-handoff] handoff STOP (exit 1), no arguments printed
+     [H-released-old-id] rc=1 STOP released needs current-id 17822b29e6de-<BUILD_ID>, not '7d92042fd110-XWruOm_9nLCSMY8nGPqYU'|STOP released, but the record has no 'P3b RESULT BUILD PASS 7d92042fd110-XWruOm_9nLCSMY8nGPqYU'|R6 HANDOFF RESULT STOP (2): do not run A-2; R6 is NO-GO until the owner resolves the record|
+  REH PASS [H-released-old-id] handoff STOP (exit 1), no arguments printed
+     [H-rollback-unverified] rc=1 STOP rolledback, but the record has no 'ROLLBACK RESULT VERIFIED': an unverified rollback is NO-GO|R6 HANDOFF RESULT STOP (1): do not run A-2; R6 is NO-GO until the owner resolves the record|
+  REH PASS [H-rollback-unverified] handoff STOP (exit 1), no arguments printed
+     [H-rollback-sunday-inv] rc=1 STOP rolledback, but the attested InvocationID is Sunday's: the rollback restart was not recorded|R6 HANDOFF RESULT STOP (1): do not run A-2; R6 is NO-GO until the owner resolves the record|
+  REH PASS [H-rollback-sunday-inv] handoff STOP (exit 1), no arguments printed
+     [H-deferred-not-sunday] rc=1 STOP deferred needs Sunday's attested InvocationID 342040625f6d4012a35d598dfbf9afe6, not '3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b'|R6 HANDOFF RESULT STOP (1): do not run A-2; R6 is NO-GO until the owner resolves the record|
+  REH PASS [H-deferred-not-sunday] handoff STOP (exit 1), no arguments printed
+     [H-deferred-but-promoted] rc=1 STOP deferred, but the record has 'P4 RESULT PROMOTED': ambiguous|R6 HANDOFF RESULT STOP (1): do not run A-2; R6 is NO-GO until the owner resolves the record|
+  REH PASS [H-deferred-but-promoted] handoff STOP (exit 1), no arguments printed
+     [H-uppercase-inv] rc=1 STOP missing, repeated or malformed 'R6-HANDOFF attested-invocation <32 hex>' line|STOP the attested InvocationID ? appears only on the handoff line, not in the record's restart report|R6 HANDOFF RESULT STOP (2): do not run A-2; R6 is NO-GO until the owner resolves the record|
+  REH PASS [H-uppercase-inv] handoff STOP (exit 1), no arguments printed
+     [H-short-inv] rc=1 STOP missing, repeated or malformed 'R6-HANDOFF attested-invocation <32 hex>' line|STOP the attested InvocationID ? appears only on the handoff line, not in the record's restart report|R6 HANDOFF RESULT STOP (2): do not run A-2; R6 is NO-GO until the owner resolves the record|
+  REH PASS [H-short-inv] handoff STOP (exit 1), no arguments printed
+  -- U. A-2 argument rules (usage STOP, exit 2; nothing checked)
+     [U-old-5-arg-form] rc=2 fail-lines=0 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | STOP usage: accepted <CURRENT_ID> <r3:yes|no> <r4:yes|no> <10:00|14:00> <tue:released|tue:rolledback|tue:deferred> <inv:32-hex>
+  REH PASS [U-old-5-arg-form] events.log byte-identical across A-2
+  REH PASS [U-old-5-arg-form] A-2 exit 2 before any check (usage STOP)
+     [U-no-inv] rc=2 fail-lines=0 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | STOP usage: accepted <CURRENT_ID> <r3:yes|no> <r4:yes|no> <10:00|14:00> <tue:released|tue:rolledback|tue:deferred> <inv:32-hex>
+  REH PASS [U-no-inv] events.log byte-identical across A-2
+  REH PASS [U-no-inv] A-2 exit 2 before any check (usage STOP)
+     [U-extra-arg] rc=2 fail-lines=0 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | STOP usage: accepted <CURRENT_ID> <r3:yes|no> <r4:yes|no> <10:00|14:00> <tue:released|tue:rolledback|tue:deferred> <inv:32-hex>
+  REH PASS [U-extra-arg] events.log byte-identical across A-2
+  REH PASS [U-extra-arg] A-2 exit 2 before any check (usage STOP)
+     [U-no-tue] rc=2 fail-lines=0 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | STOP usage: accepted <CURRENT_ID> <r3:yes|no> <r4:yes|no> <10:00|14:00> <tue:released|tue:rolledback|tue:deferred> <inv:32-hex>
+  REH PASS [U-no-tue] events.log byte-identical across A-2
+  REH PASS [U-no-tue] A-2 exit 2 before any check (usage STOP)
+     [U-ambiguous-tue] rc=2 fail-lines=0 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | STOP usage: accepted <CURRENT_ID> <r3:yes|no> <r4:yes|no> <10:00|14:00> <tue:released|tue:rolledback|tue:deferred> <inv:32-hex>
+  REH PASS [U-ambiguous-tue] events.log byte-identical across A-2
+  REH PASS [U-ambiguous-tue] A-2 exit 2 before any check (usage STOP)
+     [U-empty-tue] rc=2 fail-lines=0 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | STOP usage: accepted <CURRENT_ID> <r3:yes|no> <r4:yes|no> <10:00|14:00> <tue:released|tue:rolledback|tue:deferred> <inv:32-hex>
+  REH PASS [U-empty-tue] events.log byte-identical across A-2
+  REH PASS [U-empty-tue] A-2 exit 2 before any check (usage STOP)
+     [U-inv-31-hex] rc=2 fail-lines=0 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | STOP usage: accepted <CURRENT_ID> <r3:yes|no> <r4:yes|no> <10:00|14:00> <tue:released|tue:rolledback|tue:deferred> <inv:32-hex>
+  REH PASS [U-inv-31-hex] events.log byte-identical across A-2
+  REH PASS [U-inv-31-hex] A-2 exit 2 before any check (usage STOP)
+     [U-inv-uppercase] rc=2 fail-lines=0 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | STOP usage: accepted <CURRENT_ID> <r3:yes|no> <r4:yes|no> <10:00|14:00> <tue:released|tue:rolledback|tue:deferred> <inv:32-hex>
+  REH PASS [U-inv-uppercase] events.log byte-identical across A-2
+  REH PASS [U-inv-uppercase] A-2 exit 2 before any check (usage STOP)
+     [U-inv-no-prefix] rc=2 fail-lines=0 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | STOP usage: accepted <CURRENT_ID> <r3:yes|no> <r4:yes|no> <10:00|14:00> <tue:released|tue:rolledback|tue:deferred> <inv:32-hex>
+  REH PASS [U-inv-no-prefix] events.log byte-identical across A-2
+  REH PASS [U-inv-no-prefix] A-2 exit 2 before any check (usage STOP)
+     [U-outcome-stopped] rc=2 fail-lines=0 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | STOP usage: accepted <CURRENT_ID> <r3:yes|no> <r4:yes|no> <10:00|14:00> <tue:released|tue:rolledback|tue:deferred> <inv:32-hex>
+  REH PASS [U-outcome-stopped] events.log byte-identical across A-2
+  REH PASS [U-outcome-stopped] A-2 exit 2 before any check (usage STOP)
+     [U-released-sunday-inv] rc=2 fail-lines=0 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | STOP CURRENT_ID 17822b29e6de-R6fixRehearsalBuild01x and attested InvocationID 342040625f6d4012a35d598dfbf9afe6 do not fit Tuesday outcome released (see the usage header)
+  REH PASS [U-released-sunday-inv] events.log byte-identical across A-2
+  REH PASS [U-released-sunday-inv] A-2 exit 2 before any check (usage STOP)
+     [U-released-old-id] rc=2 fail-lines=0 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | STOP CURRENT_ID 7d92042fd110-XWruOm_9nLCSMY8nGPqYU and attested InvocationID 3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b do not fit Tuesday outcome released (see the usage header)
+  REH PASS [U-released-old-id] events.log byte-identical across A-2
+  REH PASS [U-released-old-id] A-2 exit 2 before any check (usage STOP)
+     [U-rolledback-new-id] rc=2 fail-lines=0 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | STOP CURRENT_ID 17822b29e6de-R6fixRehearsalBuild01x and attested InvocationID 5b4a39281706f5e4d3c2b1a098f7e6d5 do not fit Tuesday outcome rolledback (see the usage header)
+  REH PASS [U-rolledback-new-id] events.log byte-identical across A-2
+  REH PASS [U-rolledback-new-id] A-2 exit 2 before any check (usage STOP)
+     [U-rolledback-sunday-inv] rc=2 fail-lines=0 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | STOP CURRENT_ID 7d92042fd110-XWruOm_9nLCSMY8nGPqYU and attested InvocationID 342040625f6d4012a35d598dfbf9afe6 do not fit Tuesday outcome rolledback (see the usage header)
+  REH PASS [U-rolledback-sunday-inv] events.log byte-identical across A-2
+  REH PASS [U-rolledback-sunday-inv] A-2 exit 2 before any check (usage STOP)
+     [U-deferred-other-inv] rc=2 fail-lines=0 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | STOP CURRENT_ID 7d92042fd110-XWruOm_9nLCSMY8nGPqYU and attested InvocationID 3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b do not fit Tuesday outcome deferred (see the usage header)
+  REH PASS [U-deferred-other-inv] events.log byte-identical across A-2
+  REH PASS [U-deferred-other-inv] A-2 exit 2 before any check (usage STOP)
+     [U-deferred-other-build] rc=2 fail-lines=0 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | STOP CURRENT_ID 7d92042fd110-OtherBuild and attested InvocationID 342040625f6d4012a35d598dfbf9afe6 do not fit Tuesday outcome deferred (see the usage header)
+  REH PASS [U-deferred-other-build] events.log byte-identical across A-2
+  REH PASS [U-deferred-other-build] A-2 exit 2 before any check (usage STOP)
+  -- O. the three Tuesday outcomes, A-2 arguments from the handoff helper's output
+     state released live=3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b: current -> releases/17822b29e6de-R6fixRehearsalBuild01x, previous -> releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU, primary 1368 cwd /home/arm/afldb-releases/releases/17822b29e6de-R6fixRehearsalBuild01x, workers 2
+     A-2 arguments from the record: accepted 17822b29e6de-R6fixRehearsalBuild01x r3:yes r4:yes 10:00 tue:released inv:3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b
+     [O-released] rc=0 fail-lines=0 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | PASS live InvocationID = the owner-attested 3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b (Tuesday released; from the sitting record)
+       | PASS exactly 2 worker processes
+       | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+       |      release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x
+       | PASS release.mjs status (read-only): exit 0, one result line 'STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x', no unattested restart
+       | R6 PRE RESULT PASS
+  REH PASS [O-released] events.log byte-identical across A-2
+  REH PASS [O-released] A-2 exit 0, R6 PRE RESULT PASS
+     state rolledback live=5b4a39281706f5e4d3c2b1a098f7e6d5: current -> releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU, previous -> releases/17822b29e6de-R6fixRehearsalBuild01x, primary 1844 cwd /home/arm/afldb-releases/releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU, workers 2
+     A-2 arguments from the record: accepted 7d92042fd110-XWruOm_9nLCSMY8nGPqYU r3:yes r4:yes 10:00 tue:rolledback inv:5b4a39281706f5e4d3c2b1a098f7e6d5
+     [O-rolledback] rc=0 fail-lines=0 events.log 798e26c9b60af59c -> 798e26c9b60af59c
+       | PASS live InvocationID = the owner-attested 5b4a39281706f5e4d3c2b1a098f7e6d5 (Tuesday rolledback; from the sitting record)
+       | PASS exactly 2 worker processes
+       | PASS current = 7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+       |      release: STATUS PASS 7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+       | PASS release.mjs status (read-only): exit 0, one result line 'STATUS PASS 7d92042fd110-XWruOm_9nLCSMY8nGPqYU', no unattested restart
+       | R6 PRE RESULT PASS
+  REH PASS [O-rolledback] events.log byte-identical across A-2
+  REH PASS [O-rolledback] A-2 exit 0, R6 PRE RESULT PASS
+     state deferred live=342040625f6d4012a35d598dfbf9afe6: current -> releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU, previous -> releases/c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC, primary 2318 cwd /home/arm/afldb-releases/releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU, workers 2
+     A-2 arguments from the record: accepted 7d92042fd110-XWruOm_9nLCSMY8nGPqYU r3:yes r4:yes 10:00 tue:deferred inv:342040625f6d4012a35d598dfbf9afe6
+     [O-deferred] rc=0 fail-lines=0 events.log d9a683702322cb4b -> d9a683702322cb4b
+       | PASS live InvocationID = the owner-attested 342040625f6d4012a35d598dfbf9afe6 (Tuesday deferred; from the sitting record)
+       | PASS exactly 2 worker processes
+       | PASS current = 7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+       |      release: STATUS PASS 7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+       | PASS release.mjs status (read-only): exit 0, one result line 'STATUS PASS 7d92042fd110-XWruOm_9nLCSMY8nGPqYU', no unattested restart
+       | R6 PRE RESULT PASS
+  REH PASS [O-deferred] events.log byte-identical across A-2
+  REH PASS [O-deferred] A-2 exit 0, R6 PRE RESULT PASS
+  -- R. later restart (new MainPID, InvocationID 9a8b7c6d5e4f30211203f4e5d6c7b8a9) that plain status cannot see
+     state released live=9a8b7c6d5e4f30211203f4e5d6c7b8a9: current -> releases/17822b29e6de-R6fixRehearsalBuild01x, previous -> releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU, primary 2828 cwd /home/arm/afldb-releases/releases/17822b29e6de-R6fixRehearsalBuild01x, workers 2
+     events.log unreadable (0, 4 lines)
+     [R-released-unreadable-r2] rc=0 fail-lines=0 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | PASS exactly 2 worker processes
+       | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+       |      release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x
+       | PASS release.mjs status (read-only): exit 0, one result line 'STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x', no unattested restart
+       | R6 PRE RESULT PASS
+  REH PASS [R-released-unreadable-r2] events.log byte-identical across A-2
+  REH PASS [R-released-unreadable-r2] the earlier A-2 exits 0 with R6 PRE RESULT PASS here: the false PASS reproduced
+  REH PASS [R-released-unreadable] plain status reports PASS with no restart note: the status gate alone cannot see this restart
+     [R-released-unreadable] rc=1 fail-lines=1 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | FAIL InvocationID: live InvocationID 9a8b7c6d5e4f30211203f4e5d6c7b8a9 != owner-attested 3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b (a restart nobody attested, or the wrong record)
+       | PASS exactly 2 worker processes
+       | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+       |      release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x
+       | PASS release.mjs status (read-only): exit 0, one result line 'STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x', no unattested restart
+       | R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+  REH PASS [R-released-unreadable] events.log byte-identical across A-2
+  REH PASS [R-released-unreadable] A-2 exit 1, STOP, 1 FAIL line(s) incl. /^FAIL InvocationID: live InvocationID 9a8b7c6d5e4f30211203f4e5d6c7b8a9 != owner-attested 3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b/
+  REH PASS [R-released-unreadable] the r3 status gate still passes: the InvocationID comparison alone STOPs it
+     state released live=9a8b7c6d5e4f30211203f4e5d6c7b8a9: current -> releases/17822b29e6de-R6fixRehearsalBuild01x, previous -> releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU, primary 3642 cwd /home/arm/afldb-releases/releases/17822b29e6de-R6fixRehearsalBuild01x, workers 2
+     events.log malformed (644, 4 lines)
+     [R-released-malformed-r2] rc=0 fail-lines=0 events.log 540e576e7a01d195 -> 540e576e7a01d195
+       | PASS exactly 2 worker processes
+       | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+       |      release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x
+       | PASS release.mjs status (read-only): exit 0, one result line 'STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x', no unattested restart
+       | R6 PRE RESULT PASS
+  REH PASS [R-released-malformed-r2] events.log byte-identical across A-2
+  REH PASS [R-released-malformed-r2] the earlier A-2 exits 0 with R6 PRE RESULT PASS here: the false PASS reproduced
+  REH PASS [R-released-malformed] plain status reports PASS with no restart note: the status gate alone cannot see this restart
+     [R-released-malformed] rc=1 fail-lines=1 events.log 540e576e7a01d195 -> 540e576e7a01d195
+       | FAIL InvocationID: live InvocationID 9a8b7c6d5e4f30211203f4e5d6c7b8a9 != owner-attested 3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b (a restart nobody attested, or the wrong record)
+       | PASS exactly 2 worker processes
+       | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+       |      release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x
+       | PASS release.mjs status (read-only): exit 0, one result line 'STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x', no unattested restart
+       | R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+  REH PASS [R-released-malformed] events.log byte-identical across A-2
+  REH PASS [R-released-malformed] A-2 exit 1, STOP, 1 FAIL line(s) incl. /^FAIL InvocationID: live InvocationID 9a8b7c6d5e4f30211203f4e5d6c7b8a9 != owner-attested 3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b/
+  REH PASS [R-released-malformed] the r3 status gate still passes: the InvocationID comparison alone STOPs it
+     state released live=9a8b7c6d5e4f30211203f4e5d6c7b8a9: current -> releases/17822b29e6de-R6fixRehearsalBuild01x, previous -> releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU, primary 4456 cwd /home/arm/afldb-releases/releases/17822b29e6de-R6fixRehearsalBuild01x, workers 2
+     events.log superseded (644, 5 lines)
+     [R-released-superseded-r2] rc=0 fail-lines=0 events.log 6386dfbdf0d42989 -> 6386dfbdf0d42989
+       | PASS exactly 2 worker processes
+       | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+       |      release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x
+       | PASS release.mjs status (read-only): exit 0, one result line 'STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x', no unattested restart
+       | R6 PRE RESULT PASS
+  REH PASS [R-released-superseded-r2] events.log byte-identical across A-2
+  REH PASS [R-released-superseded-r2] the earlier A-2 exits 0 with R6 PRE RESULT PASS here: the false PASS reproduced
+  REH PASS [R-released-superseded] plain status reports PASS with no restart note: the status gate alone cannot see this restart
+     [R-released-superseded] rc=1 fail-lines=1 events.log 6386dfbdf0d42989 -> 6386dfbdf0d42989
+       | FAIL InvocationID: live InvocationID 9a8b7c6d5e4f30211203f4e5d6c7b8a9 != owner-attested 3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b (a restart nobody attested, or the wrong record)
+       | PASS exactly 2 worker processes
+       | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+       |      release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x
+       | PASS release.mjs status (read-only): exit 0, one result line 'STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x', no unattested restart
+       | R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+  REH PASS [R-released-superseded] events.log byte-identical across A-2
+  REH PASS [R-released-superseded] A-2 exit 1, STOP, 1 FAIL line(s) incl. /^FAIL InvocationID: live InvocationID 9a8b7c6d5e4f30211203f4e5d6c7b8a9 != owner-attested 3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b/
+  REH PASS [R-released-superseded] the r3 status gate still passes: the InvocationID comparison alone STOPs it
+     state rolledback live=9a8b7c6d5e4f30211203f4e5d6c7b8a9: current -> releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU, previous -> releases/17822b29e6de-R6fixRehearsalBuild01x, primary 5305 cwd /home/arm/afldb-releases/releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU, workers 2
+     events.log unreadable (0, 6 lines)
+     [R-rolledback-unreadable-r2] rc=0 fail-lines=0 events.log 798e26c9b60af59c -> 798e26c9b60af59c
+       | PASS exactly 2 worker processes
+       | PASS current = 7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+       |      release: STATUS PASS 7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+       | PASS release.mjs status (read-only): exit 0, one result line 'STATUS PASS 7d92042fd110-XWruOm_9nLCSMY8nGPqYU', no unattested restart
+       | R6 PRE RESULT PASS
+  REH PASS [R-rolledback-unreadable-r2] events.log byte-identical across A-2
+  REH PASS [R-rolledback-unreadable-r2] the earlier A-2 exits 0 with R6 PRE RESULT PASS here: the false PASS reproduced
+  REH PASS [R-rolledback-unreadable] plain status reports PASS with no restart note: the status gate alone cannot see this restart
+     [R-rolledback-unreadable] rc=1 fail-lines=1 events.log 798e26c9b60af59c -> 798e26c9b60af59c
+       | FAIL InvocationID: live InvocationID 9a8b7c6d5e4f30211203f4e5d6c7b8a9 != owner-attested 5b4a39281706f5e4d3c2b1a098f7e6d5 (a restart nobody attested, or the wrong record)
+       | PASS exactly 2 worker processes
+       | PASS current = 7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+       |      release: STATUS PASS 7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+       | PASS release.mjs status (read-only): exit 0, one result line 'STATUS PASS 7d92042fd110-XWruOm_9nLCSMY8nGPqYU', no unattested restart
+       | R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+  REH PASS [R-rolledback-unreadable] events.log byte-identical across A-2
+  REH PASS [R-rolledback-unreadable] A-2 exit 1, STOP, 1 FAIL line(s) incl. /^FAIL InvocationID: live InvocationID 9a8b7c6d5e4f30211203f4e5d6c7b8a9 != owner-attested 5b4a39281706f5e4d3c2b1a098f7e6d5/
+  REH PASS [R-rolledback-unreadable] the r3 status gate still passes: the InvocationID comparison alone STOPs it
+     state rolledback live=9a8b7c6d5e4f30211203f4e5d6c7b8a9: current -> releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU, previous -> releases/17822b29e6de-R6fixRehearsalBuild01x, primary 6119 cwd /home/arm/afldb-releases/releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU, workers 2
+     events.log malformed (644, 6 lines)
+     [R-rolledback-malformed-r2] rc=0 fail-lines=0 events.log adf9ac516583dea4 -> adf9ac516583dea4
+       | PASS exactly 2 worker processes
+       | PASS current = 7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+       |      release: STATUS PASS 7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+       | PASS release.mjs status (read-only): exit 0, one result line 'STATUS PASS 7d92042fd110-XWruOm_9nLCSMY8nGPqYU', no unattested restart
+       | R6 PRE RESULT PASS
+  REH PASS [R-rolledback-malformed-r2] events.log byte-identical across A-2
+  REH PASS [R-rolledback-malformed-r2] the earlier A-2 exits 0 with R6 PRE RESULT PASS here: the false PASS reproduced
+  REH PASS [R-rolledback-malformed] plain status reports PASS with no restart note: the status gate alone cannot see this restart
+     [R-rolledback-malformed] rc=1 fail-lines=1 events.log adf9ac516583dea4 -> adf9ac516583dea4
+       | FAIL InvocationID: live InvocationID 9a8b7c6d5e4f30211203f4e5d6c7b8a9 != owner-attested 5b4a39281706f5e4d3c2b1a098f7e6d5 (a restart nobody attested, or the wrong record)
+       | PASS exactly 2 worker processes
+       | PASS current = 7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+       |      release: STATUS PASS 7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+       | PASS release.mjs status (read-only): exit 0, one result line 'STATUS PASS 7d92042fd110-XWruOm_9nLCSMY8nGPqYU', no unattested restart
+       | R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+  REH PASS [R-rolledback-malformed] events.log byte-identical across A-2
+  REH PASS [R-rolledback-malformed] A-2 exit 1, STOP, 1 FAIL line(s) incl. /^FAIL InvocationID: live InvocationID 9a8b7c6d5e4f30211203f4e5d6c7b8a9 != owner-attested 5b4a39281706f5e4d3c2b1a098f7e6d5/
+  REH PASS [R-rolledback-malformed] the r3 status gate still passes: the InvocationID comparison alone STOPs it
+     state rolledback live=9a8b7c6d5e4f30211203f4e5d6c7b8a9: current -> releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU, previous -> releases/17822b29e6de-R6fixRehearsalBuild01x, primary 6933 cwd /home/arm/afldb-releases/releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU, workers 2
+     events.log superseded (644, 7 lines)
+     [R-rolledback-superseded-r2] rc=0 fail-lines=0 events.log d8b8b6e454e7e9c6 -> d8b8b6e454e7e9c6
+       | PASS exactly 2 worker processes
+       | PASS current = 7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+       |      release: STATUS PASS 7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+       | PASS release.mjs status (read-only): exit 0, one result line 'STATUS PASS 7d92042fd110-XWruOm_9nLCSMY8nGPqYU', no unattested restart
+       | R6 PRE RESULT PASS
+  REH PASS [R-rolledback-superseded-r2] events.log byte-identical across A-2
+  REH PASS [R-rolledback-superseded-r2] the earlier A-2 exits 0 with R6 PRE RESULT PASS here: the false PASS reproduced
+  REH PASS [R-rolledback-superseded] plain status reports PASS with no restart note: the status gate alone cannot see this restart
+     [R-rolledback-superseded] rc=1 fail-lines=1 events.log d8b8b6e454e7e9c6 -> d8b8b6e454e7e9c6
+       | FAIL InvocationID: live InvocationID 9a8b7c6d5e4f30211203f4e5d6c7b8a9 != owner-attested 5b4a39281706f5e4d3c2b1a098f7e6d5 (a restart nobody attested, or the wrong record)
+       | PASS exactly 2 worker processes
+       | PASS current = 7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+       |      release: STATUS PASS 7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+       | PASS release.mjs status (read-only): exit 0, one result line 'STATUS PASS 7d92042fd110-XWruOm_9nLCSMY8nGPqYU', no unattested restart
+       | R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+  REH PASS [R-rolledback-superseded] events.log byte-identical across A-2
+  REH PASS [R-rolledback-superseded] A-2 exit 1, STOP, 1 FAIL line(s) incl. /^FAIL InvocationID: live InvocationID 9a8b7c6d5e4f30211203f4e5d6c7b8a9 != owner-attested 5b4a39281706f5e4d3c2b1a098f7e6d5/
+  REH PASS [R-rolledback-superseded] the r3 status gate still passes: the InvocationID comparison alone STOPs it
+     state deferred live=9a8b7c6d5e4f30211203f4e5d6c7b8a9: current -> releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU, previous -> releases/c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC, primary 7780 cwd /home/arm/afldb-releases/releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU, workers 2
+     events.log unreadable (0, 2 lines)
+     [R-deferred-unreadable-r2] rc=0 fail-lines=0 events.log d9a683702322cb4b -> d9a683702322cb4b
+       | PASS exactly 2 worker processes
+       | PASS current = 7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+       |      release: STATUS PASS 7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+       | PASS release.mjs status (read-only): exit 0, one result line 'STATUS PASS 7d92042fd110-XWruOm_9nLCSMY8nGPqYU', no unattested restart
+       | R6 PRE RESULT PASS
+  REH PASS [R-deferred-unreadable-r2] events.log byte-identical across A-2
+  REH PASS [R-deferred-unreadable-r2] the earlier A-2 exits 0 with R6 PRE RESULT PASS here: the false PASS reproduced
+  REH PASS [R-deferred-unreadable] plain status reports PASS with no restart note: the status gate alone cannot see this restart
+     [R-deferred-unreadable] rc=1 fail-lines=1 events.log d9a683702322cb4b -> d9a683702322cb4b
+       | FAIL InvocationID: live InvocationID 9a8b7c6d5e4f30211203f4e5d6c7b8a9 != owner-attested 342040625f6d4012a35d598dfbf9afe6 (a restart nobody attested, or the wrong record)
+       | PASS exactly 2 worker processes
+       | PASS current = 7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+       |      release: STATUS PASS 7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+       | PASS release.mjs status (read-only): exit 0, one result line 'STATUS PASS 7d92042fd110-XWruOm_9nLCSMY8nGPqYU', no unattested restart
+       | R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+  REH PASS [R-deferred-unreadable] events.log byte-identical across A-2
+  REH PASS [R-deferred-unreadable] A-2 exit 1, STOP, 1 FAIL line(s) incl. /^FAIL InvocationID: live InvocationID 9a8b7c6d5e4f30211203f4e5d6c7b8a9 != owner-attested 342040625f6d4012a35d598dfbf9afe6/
+  REH PASS [R-deferred-unreadable] the r3 status gate still passes: the InvocationID comparison alone STOPs it
+     state deferred live=9a8b7c6d5e4f30211203f4e5d6c7b8a9: current -> releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU, previous -> releases/c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC, primary 8594 cwd /home/arm/afldb-releases/releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU, workers 2
+     events.log malformed (644, 2 lines)
+     [R-deferred-malformed-r2] rc=0 fail-lines=0 events.log f9d2033980f78f92 -> f9d2033980f78f92
+       | PASS exactly 2 worker processes
+       | PASS current = 7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+       |      release: STATUS PASS 7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+       | PASS release.mjs status (read-only): exit 0, one result line 'STATUS PASS 7d92042fd110-XWruOm_9nLCSMY8nGPqYU', no unattested restart
+       | R6 PRE RESULT PASS
+  REH PASS [R-deferred-malformed-r2] events.log byte-identical across A-2
+  REH PASS [R-deferred-malformed-r2] the earlier A-2 exits 0 with R6 PRE RESULT PASS here: the false PASS reproduced
+  REH PASS [R-deferred-malformed] plain status reports PASS with no restart note: the status gate alone cannot see this restart
+     [R-deferred-malformed] rc=1 fail-lines=1 events.log f9d2033980f78f92 -> f9d2033980f78f92
+       | FAIL InvocationID: live InvocationID 9a8b7c6d5e4f30211203f4e5d6c7b8a9 != owner-attested 342040625f6d4012a35d598dfbf9afe6 (a restart nobody attested, or the wrong record)
+       | PASS exactly 2 worker processes
+       | PASS current = 7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+       |      release: STATUS PASS 7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+       | PASS release.mjs status (read-only): exit 0, one result line 'STATUS PASS 7d92042fd110-XWruOm_9nLCSMY8nGPqYU', no unattested restart
+       | R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+  REH PASS [R-deferred-malformed] events.log byte-identical across A-2
+  REH PASS [R-deferred-malformed] A-2 exit 1, STOP, 1 FAIL line(s) incl. /^FAIL InvocationID: live InvocationID 9a8b7c6d5e4f30211203f4e5d6c7b8a9 != owner-attested 342040625f6d4012a35d598dfbf9afe6/
+  REH PASS [R-deferred-malformed] the r3 status gate still passes: the InvocationID comparison alone STOPs it
+     state deferred live=9a8b7c6d5e4f30211203f4e5d6c7b8a9: current -> releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU, previous -> releases/c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC, primary 9408 cwd /home/arm/afldb-releases/releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU, workers 2
+     events.log superseded (644, 3 lines)
+     [R-deferred-superseded-r2] rc=0 fail-lines=0 events.log f39fe94a0a9ce245 -> f39fe94a0a9ce245
+       | PASS exactly 2 worker processes
+       | PASS current = 7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+       |      release: STATUS PASS 7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+       | PASS release.mjs status (read-only): exit 0, one result line 'STATUS PASS 7d92042fd110-XWruOm_9nLCSMY8nGPqYU', no unattested restart
+       | R6 PRE RESULT PASS
+  REH PASS [R-deferred-superseded-r2] events.log byte-identical across A-2
+  REH PASS [R-deferred-superseded-r2] the earlier A-2 exits 0 with R6 PRE RESULT PASS here: the false PASS reproduced
+  REH PASS [R-deferred-superseded] plain status reports PASS with no restart note: the status gate alone cannot see this restart
+     [R-deferred-superseded] rc=1 fail-lines=1 events.log f39fe94a0a9ce245 -> f39fe94a0a9ce245
+       | FAIL InvocationID: live InvocationID 9a8b7c6d5e4f30211203f4e5d6c7b8a9 != owner-attested 342040625f6d4012a35d598dfbf9afe6 (a restart nobody attested, or the wrong record)
+       | PASS exactly 2 worker processes
+       | PASS current = 7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+       |      release: STATUS PASS 7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+       | PASS release.mjs status (read-only): exit 0, one result line 'STATUS PASS 7d92042fd110-XWruOm_9nLCSMY8nGPqYU', no unattested restart
+       | R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+  REH PASS [R-deferred-superseded] events.log byte-identical across A-2
+  REH PASS [R-deferred-superseded] A-2 exit 1, STOP, 1 FAIL line(s) incl. /^FAIL InvocationID: live InvocationID 9a8b7c6d5e4f30211203f4e5d6c7b8a9 != owner-attested 342040625f6d4012a35d598dfbf9afe6/
+  REH PASS [R-deferred-superseded] the r3 status gate still passes: the InvocationID comparison alone STOPs it
+  -- I. A-2's own InvocationID read fails or is not one 32-hex ID (released state)
+     state released live=3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b: current -> releases/17822b29e6de-R6fixRehearsalBuild01x, previous -> releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU, primary 10221 cwd /home/arm/afldb-releases/releases/17822b29e6de-R6fixRehearsalBuild01x, workers 2
+     [I-fail] rc=1 fail-lines=1 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | FAIL InvocationID: systemctl show afldb failed (exit 1)
+       | PASS exactly 2 worker processes
+       | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+       |      release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x
+       | PASS release.mjs status (read-only): exit 0, one result line 'STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x', no unattested restart
+       | R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+  REH PASS [I-fail] events.log byte-identical across A-2
+  REH PASS [I-fail] A-2 exit 1, STOP, 1 FAIL line(s) incl. /^FAIL InvocationID: systemctl show afldb failed \(exit 1\)/
+     [I-empty] rc=1 fail-lines=1 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | FAIL InvocationID: the live InvocationID is empty
+       | PASS exactly 2 worker processes
+       | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+       |      release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x
+       | PASS release.mjs status (read-only): exit 0, one result line 'STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x', no unattested restart
+       | R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+  REH PASS [I-empty] events.log byte-identical across A-2
+  REH PASS [I-empty] A-2 exit 1, STOP, 1 FAIL line(s) incl. /^FAIL InvocationID: the live InvocationID is empty/
+     [I-malformed] rc=1 fail-lines=1 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | FAIL InvocationID: the live InvocationID 'not?an?id' is malformed
+       | PASS exactly 2 worker processes
+       | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+       |      release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x
+       | PASS release.mjs status (read-only): exit 0, one result line 'STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x', no unattested restart
+       | R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+  REH PASS [I-malformed] events.log byte-identical across A-2
+  REH PASS [I-malformed] A-2 exit 1, STOP, 1 FAIL line(s) incl. /^FAIL InvocationID: the live InvocationID .* is malformed/
+     [I-multi] rc=1 fail-lines=1 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | FAIL InvocationID: the live InvocationID '3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b?3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b' is malformed
+       | PASS exactly 2 worker processes
+       | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+       |      release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x
+       | PASS release.mjs status (read-only): exit 0, one result line 'STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x', no unattested restart
+       | R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+  REH PASS [I-multi] events.log byte-identical across A-2
+  REH PASS [I-multi] A-2 exit 1, STOP, 1 FAIL line(s) incl. /^FAIL InvocationID: the live InvocationID .* is malformed/
+     [I-upper] rc=1 fail-lines=1 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | FAIL InvocationID: the live InvocationID '3F1E5A0C9B7D4E2F8A6C1B0D9E8F7A6B' is malformed
+       | PASS exactly 2 worker processes
+       | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+       |      release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x
+       | PASS release.mjs status (read-only): exit 0, one result line 'STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x', no unattested restart
+       | R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+  REH PASS [I-upper] events.log byte-identical across A-2
+  REH PASS [I-upper] A-2 exit 1, STOP, 1 FAIL line(s) incl. /^FAIL InvocationID: the live InvocationID .* is malformed/
+  -- C. earlier cases, now with the r3 arguments
+     [C-wrong-build-id] rc=1 fail-lines=2 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | PASS live InvocationID = the owner-attested 3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b (Tuesday released; from the sitting record)
+       | PASS exactly 2 worker processes
+       | FAIL current = releases/17822b29e6de-R6fixRehearsalBuild01x (expected 17822b29e6de-WrongBuildId0000000000)
+       |      release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x
+       | FAIL release.mjs status does not prove 17822b29e6de-WrongBuildId0000000000 is serving: no line 'release: STATUS PASS 17822b29e6de-WrongBuildId0000000000'
+       | R6 PRE RESULT STOP (2 FAIL line(s)): do not reboot; take them to the owner
+  REH PASS [C-wrong-build-id] events.log byte-identical across A-2
+  REH PASS [C-wrong-build-id] A-2 exit 1, STOP, 2 FAIL line(s) incl. /^FAIL release\.mjs status does not prove/
+     state released live=9a8b7c6d5e4f30211203f4e5d6c7b8a9: current -> releases/17822b29e6de-R6fixRehearsalBuild01x, previous -> releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU, primary 12617 cwd /home/arm/afldb-releases/releases/17822b29e6de-R6fixRehearsalBuild01x, workers 2
+     [C-unattested-restart-events-intact] rc=1 fail-lines=2 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | FAIL InvocationID: live InvocationID 9a8b7c6d5e4f30211203f4e5d6c7b8a9 != owner-attested 3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b (a restart nobody attested, or the wrong record)
+       | PASS exactly 2 worker processes
+       | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+       |      release: note: the service restarted since the last attested PASS (InvocationID 3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b -> 9a8b7c6d5e4f30211203f4e5d6c7b8a9); compare with your maintenance log: this was not a restart you attested
+       |      release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x
+       | FAIL release.mjs status does not prove 17822b29e6de-R6fixRehearsalBuild01x is serving: the service restarted since the last attested PASS
+       | R6 PRE RESULT STOP (2 FAIL line(s)): do not reboot; take them to the owner
+  REH PASS [C-unattested-restart-events-intact] events.log byte-identical across A-2
+  REH PASS [C-unattested-restart-events-intact] A-2 exit 1, STOP, 2 FAIL line(s) incl. /restarted since the last attested PASS/
+     current = 17822b29e6de-R6fixRehearsalBuild01x and two workers, but the service still runs the previous release (promoted, not restarted)
+     state released live=3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b: current -> releases/17822b29e6de-R6fixRehearsalBuild01x, previous -> releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU, primary 13054 cwd /home/arm/afldb-releases/releases/17822b29e6de-R6fixRehearsalBuild01x, workers 2
+     [C-promoted-not-restarted] rc=1 fail-lines=1 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | PASS live InvocationID = the owner-attested 3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b (Tuesday released; from the sitting record)
+       | PASS exactly 2 worker processes
+       | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+       |      release: FAIL process 13105 runs in /home/arm/afldb-releases/releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU, not /home/arm/afldb-releases/releases/17822b29e6de-R6fixRehearsalBuild01x (restart pending?)
+       |      release: FAIL current BUILD_ID manifest answered 404
+       |      release: FAIL previous BUILD_ID manifest answered 200
+       |      release: STATUS FAIL
+       | FAIL release.mjs status does not prove 17822b29e6de-R6fixRehearsalBuild01x is serving: exit 1; no line 'release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x'
+       | R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+  REH PASS [C-promoted-not-restarted] events.log byte-identical across A-2
+  REH PASS [C-promoted-not-restarted] A-2 exit 1, STOP, 1 FAIL line(s) incl. /^FAIL release\.mjs status does not prove/
+     [C-promoted-not-restarted-58e35ce8] rc=0 fail-lines=0 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | PASS exactly 2 worker processes
+       | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+       |      release: FAIL process 13105 runs in /home/arm/afldb-releases/releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU, not /home/arm/afldb-releases/releases/17822b29e6de-R6fixRehearsalBuild01x (restart pending?)
+       |      release: FAIL current BUILD_ID manifest answered 404
+       |      release: FAIL previous BUILD_ID manifest answered 200
+       |      release: STATUS FAIL
+       | INFO release.mjs status exit 1
+       | R6 PRE RESULT PASS
+  REH PASS [C-promoted-not-restarted-58e35ce8] events.log byte-identical across A-2
+  REH PASS [C-promoted-not-restarted-58e35ce8] the earlier A-2 exits 0 with R6 PRE RESULT PASS here: the false PASS reproduced
+  -- S. stub release.mjs outputs (every other A-2 check passes; isolates the result-line rules)
+     state released live=3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b: current -> releases/17822b29e6de-R6fixRehearsalBuild01x, previous -> releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU, primary 13900 cwd /home/arm/afldb-releases/releases/17822b29e6de-R6fixRehearsalBuild01x, workers 2
+     [S-exact-pass] rc=0 fail-lines=0 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | PASS live InvocationID = the owner-attested 3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b (Tuesday released; from the sitting record)
+       | PASS exactly 2 worker processes
+       | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+       |      release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x
+       | PASS release.mjs status (read-only): exit 0, one result line 'STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x', no unattested restart
+       | R6 PRE RESULT PASS
+  REH PASS [S-exact-pass] events.log byte-identical across A-2
+  REH PASS [S-exact-pass] A-2 exit 0, R6 PRE RESULT PASS
+     [S-pass-line-exit-1] rc=1 fail-lines=1 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | PASS live InvocationID = the owner-attested 3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b (Tuesday released; from the sitting record)
+       | PASS exactly 2 worker processes
+       | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+       |      release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x
+       | FAIL release.mjs status does not prove 17822b29e6de-R6fixRehearsalBuild01x is serving: exit 1
+       | R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+  REH PASS [S-pass-line-exit-1] events.log byte-identical across A-2
+  REH PASS [S-pass-line-exit-1] A-2 exit 1, STOP, 1 FAIL line(s) incl. /does not prove.*exit 1/
+     [S-wrong-build-line] rc=1 fail-lines=1 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | PASS live InvocationID = the owner-attested 3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b (Tuesday released; from the sitting record)
+       | PASS exactly 2 worker processes
+       | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+       |      release: STATUS PASS 17822b29e6de-OtherBuild
+       | FAIL release.mjs status does not prove 17822b29e6de-R6fixRehearsalBuild01x is serving: no line 'release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x'
+       | R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+  REH PASS [S-wrong-build-line] events.log byte-identical across A-2
+  REH PASS [S-wrong-build-line] A-2 exit 1, STOP, 1 FAIL line(s) incl. /does not prove/
+     [S-longer-id-line] rc=1 fail-lines=1 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | PASS live InvocationID = the owner-attested 3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b (Tuesday released; from the sitting record)
+       | PASS exactly 2 worker processes
+       | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+       |      release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01xx
+       | FAIL release.mjs status does not prove 17822b29e6de-R6fixRehearsalBuild01x is serving: no line 'release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x'
+       | R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+  REH PASS [S-longer-id-line] events.log byte-identical across A-2
+  REH PASS [S-longer-id-line] A-2 exit 1, STOP, 1 FAIL line(s) incl. /does not prove/
+     [S-missing-result-line] rc=1 fail-lines=1 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | PASS live InvocationID = the owner-attested 3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b (Tuesday released; from the sitting record)
+       | PASS exactly 2 worker processes
+       | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+       | FAIL release.mjs status does not prove 17822b29e6de-R6fixRehearsalBuild01x is serving: 0 result lines (need exactly 1); no line 'release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x'
+       | R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+  REH PASS [S-missing-result-line] events.log byte-identical across A-2
+  REH PASS [S-missing-result-line] A-2 exit 1, STOP, 1 FAIL line(s) incl. /does not prove/
+     [S-duplicate-result-line] rc=1 fail-lines=1 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | PASS live InvocationID = the owner-attested 3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b (Tuesday released; from the sitting record)
+       | PASS exactly 2 worker processes
+       | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+       |      release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x
+       |      release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x
+       | FAIL release.mjs status does not prove 17822b29e6de-R6fixRehearsalBuild01x is serving: 2 result lines (need exactly 1)
+       | R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+  REH PASS [S-duplicate-result-line] events.log byte-identical across A-2
+  REH PASS [S-duplicate-result-line] A-2 exit 1, STOP, 1 FAIL line(s) incl. /does not prove/
+     [S-fail-and-pass-lines] rc=1 fail-lines=1 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | PASS live InvocationID = the owner-attested 3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b (Tuesday released; from the sitting record)
+       | PASS exactly 2 worker processes
+       | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+       |      release: STATUS FAIL
+       |      release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x
+       | FAIL release.mjs status does not prove 17822b29e6de-R6fixRehearsalBuild01x is serving: 2 result lines (need exactly 1)
+       | R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+  REH PASS [S-fail-and-pass-lines] events.log byte-identical across A-2
+  REH PASS [S-fail-and-pass-lines] A-2 exit 1, STOP, 1 FAIL line(s) incl. /does not prove/
+     [S-restart-note] rc=1 fail-lines=1 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | PASS live InvocationID = the owner-attested 3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b (Tuesday released; from the sitting record)
+       | PASS exactly 2 worker processes
+       | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+       |      release: note: the service restarted since the last attested PASS (InvocationID a -> b); x
+       |      release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x
+       | FAIL release.mjs status does not prove 17822b29e6de-R6fixRehearsalBuild01x is serving: the service restarted since the last attested PASS
+       | R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+  REH PASS [S-restart-note] events.log byte-identical across A-2
+  REH PASS [S-restart-note] A-2 exit 1, STOP, 1 FAIL line(s) incl. /does not prove/
+     [S-crlf-fail-lf-pass] rc=1 fail-lines=1 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | PASS live InvocationID = the owner-attested 3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b (Tuesday released; from the sitting record)
+       | PASS exactly 2 worker processes
+       | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+       |      release: STATUS FAIL
+       |      release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x
+       | FAIL release.mjs status does not prove 17822b29e6de-R6fixRehearsalBuild01x is serving: the output contains a carriage return; 2 result lines (need exactly 1)
+       | R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+  REH PASS [S-crlf-fail-lf-pass] events.log byte-identical across A-2
+  REH PASS [S-crlf-fail-lf-pass] A-2 exit 1, STOP, 1 FAIL line(s) incl. /does not prove.*carriage return.*2 result lines/
+     [S-crlf-fail-lf-pass-r2] rc=0 fail-lines=0 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | PASS exactly 2 worker processes
+       | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+       |      release: STATUS FAIL
+       |      release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x
+       | PASS release.mjs status (read-only): exit 0, one result line 'STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x', no unattested restart
+       | R6 PRE RESULT PASS
+  REH PASS [S-crlf-fail-lf-pass-r2] events.log byte-identical across A-2
+  REH PASS [S-crlf-fail-lf-pass-r2] the earlier A-2 exits 0 with R6 PRE RESULT PASS here: the false PASS reproduced
+     [S-crlf-pass-line] rc=1 fail-lines=1 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | PASS live InvocationID = the owner-attested 3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b (Tuesday released; from the sitting record)
+       | PASS exactly 2 worker processes
+       | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+       |      release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x
+       | FAIL release.mjs status does not prove 17822b29e6de-R6fixRehearsalBuild01x is serving: the output contains a carriage return; no line 'release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x'
+       | R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+  REH PASS [S-crlf-pass-line] events.log byte-identical across A-2
+  REH PASS [S-crlf-pass-line] A-2 exit 1, STOP, 1 FAIL line(s) incl. /does not prove.*carriage return/
+     [S-cr-elsewhere] rc=1 fail-lines=1 events.log 8d063994372b65f7 -> 8d063994372b65f7
+       | PASS live InvocationID = the owner-attested 3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b (Tuesday released; from the sitting record)
+       | PASS exactly 2 worker processes
+       | PASS current = 17822b29e6de-R6fixRehearsalBuild01x
+       |      release: STATUS PASS 17822b29e6de-R6fixRehearsalBuild01x
+       | FAIL release.mjs status does not prove 17822b29e6de-R6fixRehearsalBuild01x is serving: the output contains a carriage return
+       | R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+  REH PASS [S-cr-elsewhere] events.log byte-identical across A-2
+  REH PASS [S-cr-elsewhere] A-2 exit 1, STOP, 1 FAIL line(s) incl. /does not prove.*carriage return/
+  REH PASS real release.mjs restored
+  -- F. F-4 entry point (r6-rawhead-check.sh)
+       | == R6 F-4 raw-head entry 2026-11-24T22:25:00Z host=afldb-prod user=arm helper=cab4a43af09e4b1729d913162c0f27faccd19315c56eb4ad1141c8bf748d81c0 (executing the hashed bytes)
+       | == A1 rawhead check 2026-11-24T22:25:00Z
+       | {
+       | }
+       | RAWHEAD RESULT check PASS
+     [F4-valid] rc=0 connections=24 mktemp-calls=1 env-opens=0
+  REH PASS [F4-valid] arm@afldb-prod: probe ran (24 connections), RAWHEAD RESULT check PASS, exit 0
+     [F4-valid, .env as a FIFO detector] rc=0 connections=24 mktemp-calls=1 env-opens=2
+  REH PASS [F4-valid] the three detectors see a real run (.env opened, temp file created, requests made)
+       | STOP not arm@afldb-prod (host 'afldb-prod', user 'ops'): the raw-head probe was not started
+     [F4-wrong-user ops@afldb-prod] rc=2 connections=0 mktemp-calls=0 env-opens=0
+  REH PASS [F4-wrong-user] exit 2; .env never opened, no temp file, no request
+       | STOP /tmp/st2/docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-rawhead.sh is 4f25b6a43c0eb97cfd6a60effe6706f74ee301c1c3db1c80b3e6a960d7edd6e6, not Sunday's pinned cab4a43af09e4b1729d913162c0f27faccd19315c56eb4ad1141c8bf748d81c0
+     [F4-changed-helper] rc=2 connections=0 mktemp-calls=0 env-opens=0
+  REH PASS [F4-changed-helper] exit 2, probe not started
+  REH PASS Sunday-shaped baseline unchanged by every F-4 run
+  == in-container role=prod: 162 passed, 0 failed
+  CASE-RESULT suite-prod OK (exit 0)
+  == R6 r3 in-container role=wronghost 2026-11-23T21:09:17Z hostname=afldb-dev image-os=Ubuntu 24.04.4 LTS
+     staged sha256: 48185fcaec83eff1cb26f1612febb32ba7d223f953cd4f6941fcc38c5eebebfb r6-pre-verify.sh; 7c3d0fc295512a2f990bdbed24ae9ddb97a49f5f13e9bf01019ea3fa7e1f0543 r6-rawhead-check.sh
+     staged sha256: 92c1809b61473ab8d326b5a65bc1a30bb1eaf16e272ad0adf90a030ec039f9d8 r6-tuesday-handoff.sh; cab4a43af09e4b1729d913162c0f27faccd19315c56eb4ad1141c8bf748d81c0 a1-rawhead.sh
+     staged modes: 600 1000 (staging umask 077); contrast copies: r2 0d9e97a5d5882203 58e35ce8 fa8d34f0bae6f4d3
+  made 17822b29e6de-R6fixRehearsalBuild01x: 3 files, manifest 69b425be1a79, supervisor 11190 B
+  made 7d92042fd110-XWruOm_9nLCSMY8nGPqYU: 3 files, manifest 2b32e8d15aba, supervisor 11190 B
+  made c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC: 3 files, manifest 5bf51921ada9, supervisor 11190 B
+  -- F. F-4 entry point on the wrong host (afldb-dev) as arm
+     state released live=3f1e5a0c9b7d4e2f8a6c1b0d9e8f7a6b: current -> releases/17822b29e6de-R6fixRehearsalBuild01x, previous -> releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU, primary 168 cwd /home/arm/afldb-releases/releases/17822b29e6de-R6fixRehearsalBuild01x, workers 2
+       | STOP not arm@afldb-prod (host 'afldb-dev', user 'arm'): the raw-head probe was not started
+     [F4-wrong-host] rc=2 connections=0 mktemp-calls=0 env-opens=0
+  REH PASS [F4-wrong-host] exit 2; .env never opened, no temp file, no request
+     [contrast: Sunday's bare helper on the same wrong host] rc=1 connections=1 mktemp-calls=1 env-opens=2
+  REH PASS [contrast] the unguarded helper reads .env, creates its probe file and makes requests on the wrong host: the defect
+  == in-container role=wronghost: 2 passed, 0 failed
+  CASE-RESULT suite-wronghost OK (exit 0)
+== containers run: 25; left with label r6reh.run=20261123T210819Z-599-3703: 0; unexpected: 0
+R6 r3 REHEARSAL CONTAINERS PASS
+   STEP OK container rehearsal (every case as expected) (expected exit 0, got 0)
+   case results: 25 OK, 0 UNEXPECTED
+-- cleanup (only what run 20261123T210819Z-599-3703 created)
+bash: line 5: C:/Users/stuar/AppData/Local/Temp/afldb-r6-20261125-r3.tar: No such file or directory
+   containers labelled r6reh.run=20261123T210819Z-599-3703 left: 0
+   removed /tmp/afldb-r6-20261125-r3.dnMRCn (workstation staging root printed by block 4 in this run)
+   removed /tmp/afldb-r6-20261125-r3.tar (workstation; this run wrote it)
+   removed /tmp/r6reh-ws.20261123T210819Z-599-3703.flKp6o
+== done 2026-11-23T21:09:19Z: 9 steps, 0 unexpected
+R6 r3 REHEARSAL RESULT PASS
+   run 1 top-level exit 0 (expected 0)
+   SENTINELS INTACT after run 1 (4 workstation dirs, 4 streamanator dirs, 1 container)
+-- run 2: the tested driver with R6_REH_SABOTAGE=b5-symlink-identical (one negative fixture deliberately not tampered)
+== R6 r3 printed blocks 2026-11-23T21:09:20Z run=20261123T210920Z-750-18452 workstation=Office review=cc59b2f2dfda940bd7826e7ef2b6d1dbb0e5a335
+REFUSED: /tmp/afldb-r6-20261125-r3.tar already exists on streamanator (or ssh failed); left untouched
+   run 2 top-level exit 2 (expected nonzero)
+   SENTINELS INTACT after run 2 (4 workstation dirs, 4 streamanator dirs, 1 container)
+-- removing this wrapper's own sentinels (exact names)
+   removed container r6reh-sentinel210817565
+== proof: run1 exit 0, sentinels after run1 intact; run2 exit 2, the sabotaged case reported UNEXPECTED 0 time(s), sentinels after run2 intact
+R6 r3 DRIVER PROOF FAIL

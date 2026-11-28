@@ -1,0 +1,65 @@
+== f1 r6 boundary before/after 2026-11-27T19:17:12Z bash=5.3.15(2)-release
+   before = 624bf721 parser sha256=820f5d53fe1d8ac841bf5f41103e2b720e2ecf1159bd28a6090308d65cedc726
+   after  = working-tree parser sha256=b5fb980baed582adea5e944ac9ace00007d3eecad5eb16985fea815da31777b9
+| case                                                       | expected                       | before                 | after                  |
+| released, release: ROLLED BACK + backtick                  | STOP                           | exit 0 PASS tue:released | exit 1 STOP(1)         |
+| deferred, release: ROLLED BACK + backtick                  | STOP                           | exit 0 PASS tue:deferred | exit 1 STOP(1)         |
+| deferred, release: PROMOTED + backtick                     | STOP                           | exit 0 PASS tue:deferred | exit 1 STOP(1)         |
+| released, release: ROLLED BACK + dot                       | STOP                           | exit 0 PASS tue:released | exit 1 STOP(1)         |
+| deferred, release: ROLLED BACK + dot                       | STOP                           | exit 0 PASS tue:deferred | exit 1 STOP(1)         |
+| deferred, release: PROMOTED + dot                          | STOP                           | exit 0 PASS tue:deferred | exit 1 STOP(1)         |
+| released, release: ROLLED BACK + comma                     | STOP                           | exit 0 PASS tue:released | exit 1 STOP(1)         |
+| deferred, release: ROLLED BACK + comma                     | STOP                           | exit 0 PASS tue:deferred | exit 1 STOP(1)         |
+| deferred, release: PROMOTED + comma                        | STOP                           | exit 0 PASS tue:deferred | exit 1 STOP(1)         |
+| released, release: ROLLED BACK + semicolon                 | STOP                           | exit 0 PASS tue:released | exit 1 STOP(1)         |
+| deferred, release: ROLLED BACK + semicolon                 | STOP                           | exit 0 PASS tue:deferred | exit 1 STOP(1)         |
+| deferred, release: PROMOTED + semicolon                    | STOP                           | exit 0 PASS tue:deferred | exit 1 STOP(1)         |
+| released, release: ROLLED BACK + paren                     | STOP                           | exit 0 PASS tue:released | exit 1 STOP(1)         |
+| deferred, release: ROLLED BACK + paren                     | STOP                           | exit 0 PASS tue:deferred | exit 1 STOP(1)         |
+| deferred, release: PROMOTED + paren                        | STOP                           | exit 0 PASS tue:deferred | exit 1 STOP(1)         |
+| released, release: ROLLED BACK + colon                     | STOP                           | exit 0 PASS tue:released | exit 1 STOP(1)         |
+| deferred, release: ROLLED BACK + colon                     | STOP                           | exit 0 PASS tue:deferred | exit 1 STOP(1)         |
+| deferred, release: PROMOTED + colon                        | STOP                           | exit 0 PASS tue:deferred | exit 1 STOP(1)         |
+| released, release: ROLLED BACK + bracket                   | STOP                           | exit 0 PASS tue:released | exit 1 STOP(1)         |
+| deferred, release: ROLLED BACK + bracket                   | STOP                           | exit 0 PASS tue:deferred | exit 1 STOP(1)         |
+| deferred, release: PROMOTED + bracket                      | STOP                           | exit 0 PASS tue:deferred | exit 1 STOP(1)         |
+| released, release: ROLLED BACK + squote                    | STOP                           | exit 0 PASS tue:released | exit 1 STOP(1)         |
+| deferred, release: ROLLED BACK + squote                    | STOP                           | exit 0 PASS tue:deferred | exit 1 STOP(1)         |
+| deferred, release: PROMOTED + squote                       | STOP                           | exit 0 PASS tue:deferred | exit 1 STOP(1)         |
+| released, release: ROLLED BACK + dquote                    | STOP                           | exit 0 PASS tue:released | exit 1 STOP(1)         |
+| deferred, release: ROLLED BACK + dquote                    | STOP                           | exit 0 PASS tue:deferred | exit 1 STOP(1)         |
+| deferred, release: PROMOTED + dquote                       | STOP                           | exit 0 PASS tue:deferred | exit 1 STOP(1)         |
+| released, release: ROLLED BACK + star                      | STOP                           | exit 0 PASS tue:released | exit 1 STOP(1)         |
+| deferred, release: ROLLED BACK + star                      | STOP                           | exit 0 PASS tue:deferred | exit 1 STOP(1)         |
+| deferred, release: PROMOTED + star                         | STOP                           | exit 0 PASS tue:deferred | exit 1 STOP(1)         |
+| released, release: ROLLED BACK + ellipsis                  | STOP                           | exit 0 PASS tue:released | exit 1 STOP(1)         |
+| deferred, release: ROLLED BACK + ellipsis                  | STOP                           | exit 0 PASS tue:deferred | exit 1 STOP(1)         |
+| deferred, release: PROMOTED + ellipsis                     | STOP                           | exit 0 PASS tue:deferred | exit 1 STOP(1)         |
+| released, release: ROLLED BACK + eol                       | STOP                           | exit 1 STOP(1)         | exit 1 STOP(1)         |
+| deferred, release: ROLLED BACK + eol                       | STOP                           | exit 0 PASS tue:deferred | exit 1 STOP(1)         |
+| deferred, release: PROMOTED + eol                          | STOP                           | exit 0 PASS tue:deferred | exit 1 STOP(1)         |
+| released, `== R1 rollback links`                           | STOP                           | exit 0 PASS tue:released | exit 1 STOP(1)         |
+| released, == R1 rollback verify:                           | STOP                           | exit 0 PASS tue:released | exit 1 STOP(1)         |
+| deferred, `== R1 rollback links`.                          | STOP                           | exit 0 PASS tue:deferred | exit 1 STOP(1)         |
+| deferred, == R1 rollback verify.                           | STOP                           | exit 0 PASS tue:deferred | exit 1 STOP(1)         |
+| released, log_release: ROLLED BACK.                        | STOP                           | exit 0 PASS tue:released | exit 1 STOP(1)         |
+| released, release: ROLLED BACKUP (word)                    | PASS released (not token)      | exit 0 PASS tue:released | exit 0 PASS tue:released |
+| released, release: ROLLED BACK_2 (word)                    | PASS released (not token)      | exit 0 PASS tue:released | exit 0 PASS tue:released |
+| released, release: ROLLED BACK9 (word)                     | PASS released (not token)      | exit 0 PASS tue:released | exit 0 PASS tue:released |
+| deferred, release: PROMOTEDX (word)                        | PASS deferred (not token)      | exit 0 PASS tue:deferred | exit 0 PASS tue:deferred |
+| deferred, release: ROLLED BACKUP (word)                    | PASS deferred (not token)      | exit 0 PASS tue:deferred | exit 0 PASS tue:deferred |
+| released, == R1 rollback verifying (word)                  | PASS released (not token)      | exit 0 PASS tue:released | exit 0 PASS tue:released |
+| deferred, == R1 rollback linksX (word)                     | PASS deferred (not token)      | exit 0 PASS tue:deferred | exit 0 PASS tue:deferred |
+| released, prerelease: ROLLED BACK (left)                   | PASS released (left rule)      | exit 0 PASS tue:released | exit 0 PASS tue:released |
+| rolledback keeps boundary variants                         | PASS rolledback                | exit 0 PASS tue:rolledback | exit 0 PASS tue:rolledback |
+| deferred, prose + bare PASS current                        | PASS deferred                  | exit 0 PASS tue:deferred | exit 0 PASS tue:deferred |
+-- real SITTING-20261124.md: before exit 0, after exit 0; full output identical except the run timestamp: YES
+   diff (timestamp masked): empty
+   after: == R6 Tuesday handoff <ts> record=/d/dev/afldb-closeout-20261127/docs/v2/evidence/release-17822b29-20261124/SITTING-20261124.md sha256=ba3b59f191d6b49ae1ca789b2427a00161f7fcf71655d8ea40ecd8f631459905
+   after:    complete result lines: P3B=1 P4P=0 INV5=0 P5A=0 P5T=0 P5C=0 RBL=0 INVR=0 RBV=0 RBF=0; P4 cutoff-refusal lines (not a result): 1
+   after: R6-A2-TUESDAY tue:deferred
+   after: R6-A2-CURRENT_ID 7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+   after: R6-A2-ATTESTED inv:342040625f6d4012a35d598dfbf9afe6
+   after: R6-NOTE parser PASS means only that the record is internally consistent for 'deferred' (no P4, P5 or rollback result line). It does NOT decide whether the owner accepts this deferral as "before P4": that is the owner's ruling, recorded separately; this parser neither applies nor replaces it.
+   after: R6-NOTE the record has 1 P4 cutoff-refusal line(s) ('STOP past the promotion cutoff ...'): P4 was run and refused. A refusal is not a P4 RESULT line and is not judged here.
+   after: R6 HANDOFF RESULT PASS

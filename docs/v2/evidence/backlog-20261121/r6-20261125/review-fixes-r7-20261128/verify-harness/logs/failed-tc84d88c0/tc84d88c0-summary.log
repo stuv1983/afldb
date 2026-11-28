@@ -1,0 +1,3 @@
+STOP setup failed (see /d/dev/afldb-closeout-20261127/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify-harness/logs/tc84d88c0-setup.log)
+R7 VERIFY HARNESS RESULT FAIL
+ssh: connect to host 10.0.40.100 port 22: Network is unreachable

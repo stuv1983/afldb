@@ -1,0 +1,16 @@
+SCENARIO genuine FAIL expect=attributed so_rc=1: 1 harness failure(s): sealed_origin refused: malformed seal: /var/lib/afldb-backup/seals/35cc3b6ccdcc4f71b90dd1f4efae5ffc.seal is malformed (25 lines, need the 26-line afldb-backup-seal/4 format); 
+SCENARIO perm FAIL expect=attributed so_rc=1: 1 harness failure(s): sealed_origin refused: malformed seal: /var/lib/afldb-backup/seals/8d02fe7b1fd84c85af8e2eb9b0aec0e5.seal is malformed (25 lines, need the 26-line afldb-backup-seal/4 format); 
+SCENARIO review2 FAIL expect=attributed so_rc=1: 1 harness failure(s): sealed_origin refused: malformed seal: /var/lib/afldb-backup/seals/49c108ebe48041a8b6f92c04d8c28ad6.seal is malformed (25 lines, need the 26-line afldb-backup-seal/4 format); 
+SCENARIO hand-start FAIL expect=refused so_rc=1: 1 harness failure(s): refusal reason does not match /0 seals .* a start by hand never counts/; 
+SCENARIO timer-then-hand FAIL expect=refused so_rc=1: 1 harness failure(s): refusal reason does not match /another run of afldb-backup.service was sealed in the window/; 
+SCENARIO restart FAIL expect=refused so_rc=1: 1 harness failure(s): refusal reason does not match /entered inactive .* after the dispatch/; 
+SCENARIO rearm-in FAIL expect=attributed so_rc=1: 1 harness failure(s): sealed_origin refused: malformed seal: /var/lib/afldb-backup/seals/9d09daa38e8241cda0121b30491c72fc.seal is malformed (25 lines, need the 26-line afldb-backup-seal/4 format); 
+SCENARIO rearm-out FAIL expect=refused so_rc=1: 1 harness failure(s): refusal reason does not match /0 seals .* in the .* 02:20-02:31 window/; 
+SCENARIO pgdump-fails PASS expect=refused so_rc=1 reason=0 seals in /var/lib/afldb-backup/seals record a start job created by afldb-backup.timer with its dispatch in the 2026-11-28 02:20-02:31 window (need exactly 1; a start by hand never counts)
+SCENARIO seal-interrupted FAIL expect=refused so_rc=1: 1 harness failure(s): refusal reason does not match /published dump: .* missing/; 
+SCENARIO genuine-rd FAIL expect=attributed so_rc=1: 1 harness failure(s): sealed_origin refused: malformed seal: /var/lib/afldb-backup/seals/494ec530965d4f48beb5054700c52a66.seal is malformed (25 lines, need the 26-line afldb-backup-seal/4 format); 
+SCENARIO rearm-in-rd FAIL expect=attributed so_rc=1: 1 harness failure(s): sealed_origin refused: malformed seal: /var/lib/afldb-backup/seals/2e916d4dc649433b9767378115434431.seal is malformed (25 lines, need the 26-line afldb-backup-seal/4 format); 
+SCENARIO post-pub-fail FAIL expect=refused so_rc=1: 1 harness failure(s): refusal reason does not match /has no valid completion record/; 
+image r7b-sysd-tc84d88c0:1 removed
+containers left with label r7b.run=tc84d88c0: 0; images with label r7b.run=tc84d88c0: 0
+R7 BACKUP HARNESS RESULT FAIL (12 scenario(s) not as expected)

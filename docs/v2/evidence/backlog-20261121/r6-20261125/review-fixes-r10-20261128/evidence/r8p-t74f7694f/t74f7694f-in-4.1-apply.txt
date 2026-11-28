@@ -1,0 +1,9 @@
+afldb-phase4.sh: OK
+PHASE4 APPLY state /root/afldb-phase4/attempt-20261128T122400Z-065bb0c9 seal 6c29b949a9aa9bc82d93a3a5957af4c9bb4f2cf82474df59d98c63668e31061a verified; plan: change=group-only remove=
+PHASE4 APPLY access epoch none -> 4613d777d9de850ec9dee95a7f5079e0 written to /var/lib/afldb-access/epoch (apply of /root/afldb-phase4/attempt-20261128T122400Z-065bb0c9)
+PHASE4 APPLY VOID: STOP: every saved 4.4, 4.5 and 4.6 output and every gate verdict made before this moment is VOID, even on this boot and inside the freshness window. Before any gate: repeat 4.4, 4.5 and 4.6, then make a NEW gate call
+PHASE4 APPLY ran: gpasswd -d arm sudo
+PHASE4 APPLY check visudo-c PASS
+PHASE4 APPLY next: verify (4.2): (cd /root/afldb-r10-phase4 && sha256sum -c --strict SHA256SUMS) && env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/afldb-r10-phase4/afldb-phase4.sh verify --state /root/afldb-phase4/attempt-20261128T122400Z-065bb0c9 --seal 6c29b949a9aa9bc82d93a3a5957af4c9bb4f2cf82474df59d98c63668e31061a
+PHASE4 APPLY if 4.2 STOPs or 4.3 fails, back-out from [CON], also from a fresh console session: (cd /root/afldb-r10-phase4 && sha256sum -c --strict SHA256SUMS) && env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/afldb-r10-phase4/afldb-phase4.sh backout --state /root/afldb-phase4/attempt-20261128T122400Z-065bb0c9 --seal 6c29b949a9aa9bc82d93a3a5957af4c9bb4f2cf82474df59d98c63668e31061a
+PHASE4 APPLY RESULT PASS applied /root/afldb-phase4/attempt-20261128T122400Z-065bb0c9 (seal 6c29b949a9aa9bc82d93a3a5957af4c9bb4f2cf82474df59d98c63668e31061a): change=group-only remove=

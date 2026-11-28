@@ -1,0 +1,16 @@
+== case r4-r9-real-g0-pass-production: bash afldb-gate-accept.sh --gate release-g0 --owner-checks unmarked/fx-oc-4.4-bootid.txt --reverify unmarked/fx-reverify-4.5-bootid.txt --version inputs/real-r9-version-fixture-qualified.txt --verdict inputs/real-r9-g0-pass-fixture-qualified.txt --verdict-exit 0 --confirm unmarked/cf/r4-r9-real-g0-pass-production-confirm.txt
+== afldb-gate-accept 2026-11-28T11:41:14Z gate=release-g0 transport=production (read-only; inputs by sha256)
+   14e52b2ad67054e84ba72ce69aefef6dac7093c476d48a9d1feb8debf40d897c  unmarked/fx-oc-4.4-bootid.txt
+   0148aa15c980b840c5533e6b6f1ec603ac950f5de8548c87fd673fdd5816df88  unmarked/fx-reverify-4.5-bootid.txt
+   c2e036b710148164361bb8e373c6b9dbffac61971df8fd1ed61fb90be1a4d650  inputs/real-r9-version-fixture-qualified.txt
+   f16dc09b2266734da856168b769eaa87bdf7ee8402706fc82e5cddcb55736b13  inputs/real-r9-g0-pass-fixture-qualified.txt
+   9573405ac2508f5cf9595296587504bcd725c06e036591b4c8013ba8b8431bf0  unmarked/cf/r4-r9-real-g0-pass-production-confirm.txt
+ACCEPT owner-checks PASS post-Phase-4 PASS at 2026-11-28T05:21:46Z, boot c3524e4759ab4e0f8050875471b56b12 (B1, B2, B3 PASS; every CHECK line PASS)
+ACCEPT reverify PASS root 2026-11-28T05:21:40Z, --as-arm 2026-11-28T05:21:42Z (arm has no admin group), verify-install 2026-11-28T05:21:45Z, bundle 58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8, boot c3
+ACCEPT version FAIL transport=rehearsal, but this evaluation is production (only the exact token transport=production is production; a rehearsal is evaluated only with --rehearsal and never accepted for a real gate)
+ACCEPT verdict FAIL transport=rehearsal, but this evaluation is production (only the exact token transport=production is production; a rehearsal is evaluated only with --rehearsal and never accepted for a real gate)
+INFO confirm: not judged (the gate verdict did not pass); its access epoch 5d1e0c2b9a8f7e6d5c4b3a2918070605 is compared in (f)
+INFO access: the passing parts agree on epoch 5d1e0c2b9a8f7e6d5c4b3a2918070605; the failed or unjudged parts are not compared
+ACCEPT pin FAIL release-g0 needs --pin-rev <the reviewed commit that adds the qualification pin, whose git archive export ran 4.6 and the G0 call>
+GATE ACCEPT RELEASE-G0 NO-GO failed=version,verdict,pin reason="version: transport=rehearsal, but this evaluation is production (only the exact token transport=production is production; a rehearsal is evaluated only with --rehearsal and never accepted for a real gate)"
+== exit 1

@@ -1,0 +1,17 @@
+== dev-a2 2026-11-28T03:21:52Z Phase 0 facts, pubkey swap, Phase 1 at the console stand-in
+[HARNESS] console stand-in: docker exec as root; production's provider console root login is UNKNOWN (OWNER-PROCEDURE.md Phase 0)
+   id: uid=0(root) gid=0(root) groups=0(root)
+   loginuid: 4294967295
+   passwd -S root: L
+   ancestors: 321:bash:uid=0 
+R8P PHASE0 root-console=yes
+[FIXTURE-ATTACK] arm replaced the carried ~/afldb_admin.pub with another key (fingerprint SHA256:om4BNiW8Toa3BYGxMnluNqruUJohtdyUlyM+bvENi98)
+   carried key, root's copy: 256 SHA256:om4BNiW8Toa3BYGxMnluNqruUJohtdyUlyM+bvENi98 (ED25519) (1 line(s)); workstation fingerprint SHA256:hQvX1ZZm/kZMOIGDYbZbZpqn793BwBJMmQO9qz8mUe4
+R8P PHASE1 REFUSED (swap): the carried key's fingerprint is not the workstation's; nothing created
+R8P PUBKEY-SWAP exit 1
+   carried key, root's copy: 256 SHA256:hQvX1ZZm/kZMOIGDYbZbZpqn793BwBJMmQO9qz8mUe4 (ED25519) (1 line(s)); workstation fingerprint SHA256:hQvX1ZZm/kZMOIGDYbZbZpqn793BwBJMmQO9qz8mUe4
+   afldb-admin: uid=1001(afldb-admin) gid=1001(afldb-admin) groups=1001(afldb-admin),27(sudo); password P; home afldb-admin:afldb-admin 750; authorized_keys afldb-admin:afldb-admin 600 SHA256:hQvX1ZZm/kZMOIGDYbZbZpqn793BwBJMmQO9qz8mUe4
+sudo: unable to resolve host afldb-prod: Temporary failure in name resolution
+   sudo -l -U afldb-admin:  (ALL : ALL) ALL;
+R8P PHASE1 DONE (real)
+R8P PHASE1 exit 0

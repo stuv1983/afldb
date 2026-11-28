@@ -1,0 +1,41 @@
+
+ RUN  v4.1.10 /tmp/r4dev.coord.FY47Sk/u
+
+stdout | tests/deploy-release.test.ts > AFLDB-ISSUE-329 — route on Linux: failed builds never touch the serving release > review finding 6: promote --not-after moves no link after the deadline, even when it passes during validation; rollback has no deadline
+release: host gate (fixture, promote):
+release:   next apt-daily-upgrade in 1200 min
+release:   needrestart holds afldb and postgresql
+
+stdout | tests/deploy-release.test.ts > AFLDB-ISSUE-329 — route on Linux: failed builds never touch the serving release > review finding 6: promote --not-after moves no link after the deadline, even when it passes during validation; rollback has no deadline
+release: host gate (fixture, promote):
+release:   next apt-daily-upgrade in 1200 min
+release:   needrestart holds afldb and postgresql
+release: PROMOTED 6746d3d67db7-Ln_vChlbrOmtH0fJ; previous 24e5c36a5338-UbKGAXhAZZiWntKn. The running service is unchanged until it restarts.
+release: next, NOW and attended: sudo systemctl restart afldb
+release: then: node deploy/release.mjs status --expect 6746d3d67db7-Ln_vChlbrOmtH0fJ --root /tmp/afldb-329-route-mQx0vq/afldb-releases
+release: the activation window is OPEN: `current` names the new release but the service still runs the old one; any restart before yours (an unattended upgrade, a PostgreSQL restart) activates it without the gate (ISSUE-351)
+release: the database is not rolled back: migrations are forward-only (docs/deployment.md §11, including the ISSUE-257 guard); check a release older than an applied migration against it before the restart
+
+ ✓ tests/deploy-release.test.ts (62 tests) 26739ms
+     ✓ request tracing logs a route class, never the raw URL: a synthetic path/query sentinel is absent from the trace  368ms
+     ✓ check-node-modules exits 1 on drift, 0 on a matching or unrecorded tree; the settle wrapper only warns  300ms
+     ✓ builds outside the checkout, validates, boots the candidate and promotes it  2836ms
+     ✓ a failing build leaves the serving release, its assets and the links untouched  1194ms
+     ✓ a type error fails the build; off-host type-checking needs recorded evidence; nothing changes  1276ms
+     ✓ a build interrupted by SIGTERM is stopped with its whole process group; nothing changes  1191ms
+     ✓ a build interrupted by SIGHUP is stopped with its whole process group; nothing changes  1184ms
+     ✓ a SIGKILLed tool leaves an orphan only in its workspace; the next build reaps it  2437ms
+     ✓ the memory guard kills a build that drives MemAvailable below the floor; nothing changes  1923ms
+     ✓ promotes a second release, then rolls back to the retained one without building, even mid-build  6701ms
+     ✓ ISSUE-351: promote and rollback are attended; the host gate and the ledger check refuse before any link moves  604ms
+     ✓ ISSUE-351: status --expect fails a restart that coincides with an apt run, and names the owner's way past it  1437ms
+     ✓ review finding 6: promote --not-after moves no link after the deadline, even when it passes during validation; rollback has no deadline  892ms
+     ✓ fails a public asset whose bytes are not the release's, and one that is missing  418ms
+       ✓ forwards --confirm-restart-invocation, before or after the positionals, and says so  638ms
+       ✓ without it, status --expect gets no confirmation (legacy forms, with and without the previous BUILD_ID)  408ms
+
+ Test Files  1 passed (1)
+      Tests  62 passed (62)
+   Start at  21:16:26
+   Duration  27.63s (transform 354ms, setup 238ms, import 281ms, tests 26.74s, environment 0ms)
+

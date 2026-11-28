@@ -1,0 +1,41 @@
+== r9p-dev1 2026-11-28T07:34:52Z admin root session: Phase 4 through afldb-phase4.sh (4.0 entry, 4.1 gpasswd -d arm sudo, 4.2 verify)
+sudo: unable to resolve host afldb-prod: Temporary failure in name resolution
+== admin root session step phase4 2026-11-28T07:34:51Z: uid=0(root) gid=0(root) groups=0(root)
+   session: loginuid 1001; SUDO_USER=afldb-admin; parent chain: sudo:uid=1001 sshd:uid=1001 sshd:uid=0 sshd:uid=0 systemd:uid=0 
+---- Phase 4 (owner approval) through afldb-phase4.sh; the console stays open
+afldb-phase4.sh: OK
+---- 4.0 entry
+PHASE4 ENTRY match /etc/sudoers:53 token %sudo class group-only: %sudo?ALL=(ALL:ALL) ALL
+PHASE4 ENTRY pre-change: arm's groups: afldb-backup-read arm sudo (primary gid 1000)
+PHASE4 ENTRY pre-change: group line: sudo:x:27:arm,afldb-admin
+PHASE4 ENTRY pre-change: /etc/sudoers.d: 0 0 755 directory
+PHASE4 ENTRY pre-change: file /etc/sudoers uid gid mode sha256: 0 0 440 5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8
+PHASE4 ENTRY pre-change: file /etc/sudoers.d/README uid gid mode sha256: 0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8
+PHASE4 ENTRY pre-change: sudo -l -U arm: arm may run: (ALL : ALL) ALL;
+PHASE4 ENTRY pre-change: include directives: @includedir /etc/sudoers.d;
+PHASE4 ENTRY change 1 (group-only, step 4.1, [ADM-ROOT]): gpasswd -d arm sudo
+PHASE4 ENTRY back-out 1 ([CON]): gpasswd -a arm sudo; then id -Gn arm lists exactly: afldb-backup-read arm sudo 
+PHASE4 ENTRY back-out, all of it, in one command ([CON]): env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/afldb-r9-phase4/afldb-phase4.sh backout --state /root/afldb-phase4-state
+PHASE4 ENTRY realised change, after 4.1: env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/afldb-r9-phase4/afldb-phase4.sh verify --state /root/afldb-phase4-state
+PHASE4 ENTRY precondition, NOT checked by this script: the [CON] root session is open now and stays open until 4.7
+PHASE4 ENTRY precondition, NOT checked by this script: Phase 1 verified twice (1.13), two independently authenticated admin logins
+PHASE4 ENTRY precondition, NOT checked by this script: the owner's separate written approval of this privilege removal, given after reading this output
+PHASE4 ENTRY precondition, NOT checked by this script: every other Phase 2 FAIL resolved, every UNKNOWN resolved or accepted, the section 0 residual accepted
+PHASE4 ENTRY state /root/afldb-phase4-state seal sha256 ab41995e09a610100e0fc6178712f703a496e4a977ce59179fed65275733052e (write it down; verify and backout print it again)
+PHASE4 ENTRY RESULT PASS change=group-only matches=1 disposed=0 state=/root/afldb-phase4-state
+R8P P4-ENTRY exit 0
+---- 4.1 gpasswd -d arm sudo
+Removing user arm from group sudo
+R8P GPASSWD exit 0
+   id arm: uid=1000(arm) gid=1000(arm) groups=1000(arm),997(afldb-backup-read)
+---- 4.2 verify
+PHASE4 VERIFY state /root/afldb-phase4-state seal sha256 ab41995e09a610100e0fc6178712f703a496e4a977ce59179fed65275733052e (equal to the value entry printed); plan: change=group-only disposed=
+PHASE4 VERIFY check groups PASS arm's groups: afldb-backup-read arm (pre-change minus sudo)
+PHASE4 VERIFY check file PASS /etc/sudoers unchanged
+PHASE4 VERIFY check file PASS /etc/sudoers.d/README unchanged
+PHASE4 VERIFY check visudo-c PASS
+PHASE4 VERIFY check rescan PASS no sudoers line names arm, a group of arm or a grant form entry refuses, and no outside rule source
+PHASE4 VERIFY check sudo-l PASS sudo -l -U arm: arm is not allowed to run sudo
+PHASE4 VERIFY RESULT PASS the realised change equals the plan (change=group-only disposed=) and arm cannot sudo
+R8P P4-VERIFY exit 0
+R8P PHASE4 done

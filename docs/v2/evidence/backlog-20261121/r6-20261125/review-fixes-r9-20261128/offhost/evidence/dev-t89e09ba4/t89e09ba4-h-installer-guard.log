@@ -1,0 +1,88 @@
+== r7v-run t89e09ba4 2026-11-28T08:27:03Z workstation Office user stuar; worktree HEAD 89e09ba4ef26605641f5e66c0ef8764547ee828a
+[HARNESS] inputs sent (sha256, worktree):
+   96508d789484cd471a417b2b9bc65cf5d1a233a95de82a4593e880c77a0de62a  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify-harness/r7v-container.sh
+   574ccd11ca33d5e4f0cbc34ff23977c44c466997200d02b1259a9c4d789e0880  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify-harness/r7v-host.sh
+   67d0d1a1e90716b5c56baa1933e72520c25931d008d9b4bad12e198f8ed86494  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify-harness/r7v-run.sh
+   22b19b3f701406770f95ef8097b7963870f02e1688074af3393336be9892c395  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/README.md
+   c9910a87b977dc3c8857064a1a31aba3974fe1a6b0e2027a481d0cb00eb873da  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/SHA256SUMS
+   55c41fdcc29654a9574ae9dc4c2094b6418b0d58af147d56db599bc350c1eaec  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/afldb-verify-call.sh
+   ca739de772b31b466bdbb9c6295c8c4646f7b1746c71d7b618d92b606aee9bfb  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/authorized_keys.template
+   15fdd32cb7bb960d569358eb0306cf7b5aec03a9289c5167929156b2b3c9215a  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/build-sums.sh
+   8dff9dfb65f9978cc1fb980f290ef62ff1692f1e8d6cf799d8e5eccab66bbb43  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/60-afldb-verify.conf
+   3ea412092a3b024bd6520d9106694f874e45335974b6be96a85083ffac2ecb95  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/SHA256SUMS
+   175c4a85240ce554bf3bdbbc4677b7306186cf0d7bd590d8181ef4b973ea4b4c  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/a2-core.sh
+   d80838cbb7162c3877ab9bf0c87d70a575b55fbc7f902bcc74d4bc6f9e65abd8  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/afldb-settle-failure-status.sh
+   05cba1ecff3e01c5618130cd12da5d7e31a41cefee9fab2bb1bb56db0ebcdad2  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/afldb-verify-dispatch
+   048485260d5f16c3567c22f89548f5e87184584d4a069e46d876669e98145359  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/afldb-verify-entry
+   300827fe5e89a61ecd217ef1398ad944b90916e39406ccec17c3fe62a1157d7a  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/afldb-verify-py
+   6432de423012b5d097704c6e49c84979f2975910f3d6cbd51990d44c155c0acd  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/afldb-verify-rootfacts
+   d6ea0e0c9cc454e124de0af2860792d38e5ee0038589c7edc83c94a71276c093  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/afldb-verify-rootfacts.socket
+   f97c946d3e90c6deedc820c9dacdfb0c4661f8722e2d79d2ff22403777fb3bcc  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/afldb-verify-rootfacts@.service
+   d2afbe6177c4fc9b27a6d7609cf803175d2e99568142e52a3d0506d50ba8bb6f  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/g0-core.sh
+   7bd8e4970a9ce796ec8cd8532b3a398fe8a8e4955b5d373604d38d1d8b4115ff  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/g0b-core.sh
+   e8a0b13111d5564318ef5e5738386f3adb0262a081cd0d4a5f54b80683f2b369  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/lib.sh
+   a733e67b898879d03e76b7d446d0f8bfbe0dd13923a586c19b42cdffd828887e  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/sealed-origin.sh
+   f8c95fb103e7c394adcd837de6c7a55060361a38b45f9b829097dd79ce862417  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/install-verify.sh
+   062f2dd3ed1791f92059cc38438942406ba80c98dc46b069375d3ac0c07bdd3f  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/pg-auth-lines.txt
+   d7e71ed7bf8756d0b3d4d1bea38be7354f4c5cc22c79f6daa6fca0b9d7b99cd7  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/verifier-db.sql
+   4b3d5ed11cf9cb833f5ad6cb20acd885e2d640a4cd18e1663f0c441fd29ce9ff  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/verify-verify-install.sh
+   f8a18580e8638f0a0923519b4280c24c3e94f4eba5c82f23a03a65b7fb7fbdeb  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/70-afldb-backup-sealed.conf
+   e1dec9c218d9a25991a2e2e56ced05f49cbd1fbe8fcc6fa9f695ad2b21713d0f  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/README.md
+   e3a68821c6f97ec7a5775cbf845b4018198556f44d29e89ceb6ff0c4e2672e7d  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/SHA256SUMS
+   2c62ff919908cddadd4ccf57bd6f0344d3aba4be2ae49a413ab13a58e8658085  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/afldb-backup-run
+   793e94bef7e9797815709da530beab09652e4cce200f7a769fdd5fb092a2ece5  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/afldb-backup-seal
+   21c33fa42acbd083ac9368907d4fb243598fb33e264058d9cf64d40b52d68fff  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/install-backup.sh
+   a733e67b898879d03e76b7d446d0f8bfbe0dd13923a586c19b42cdffd828887e  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/sealed-origin.sh
+   66b5be10f7d6a94e24e0d9c2e44c7673a777bf9dbcce774e54435625f3e3d73a  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/verify-backup-install.sh
+   edf002913282e7b1b0fe39970f652ab0120d9963a52b1696768cf928893bbdc8  deploy/afldb-backup.service
+   76a7ab3ad73377a543434f4174f7948859ac4f28978013a3fa98215fff0e9d84  deploy/afldb-backup.timer
+   c6a5b5fe573c000a908ef6dd0d7c28fc16878e1eada8fdaf3bed034c823f8b61  deploy/afldb-backup-failed.service
+   df609046a6a322db3f651d9d2c9cf1820fdb9ca0d0d4d9ae9f67c3dede1be3be  tools/maintenance/backup.sh
+   4c99c7ae57a39ebfdb65740a01bc09669be9b734dc86ce814ad1db77681e4982  deploy/release.mjs
+   d80838cbb7162c3877ab9bf0c87d70a575b55fbc7f902bcc74d4bc6f9e65abd8  deploy/afldb-settle-failure-status.sh
+   183691d90ff3777ce199b8d3d154c812532aad6be4c195f324cc3141b506350e  deploy/host-policy/needrestart-afldb-hold.conf
+   4a277b8b6e7c7c8b8d2cb347f8949260941327cd24dbd5f3664b317611648810  deploy/host-policy/apt-52-afldb-unattended.conf
+   7e2b470aed441208b990204115f892b3c0c4e9c402800a4c038aadc386105903  tools/maintenance/scheduled-backup.sh
+   2ebac1c09b07e6b3bc1e060d7645efdbb1c2c7f169b5cfafd4e7f77508716e24  docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh
+   81f638dc03fd58039ae48527c6880c4679aaa8698a88dc9d5fe6b7e3bd3cb621  docs/v2/evidence/release-17822b29-20261124/scripts/r1-g0-dump.sh
+   97b85721690ea31e2ddb5b73a6f2f4e88444363ed542c0923d1cfb49c2abe218  docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh
+[TRANSPORT] pre-send verification against 89e09ba4ef26605641f5e66c0ef8764547ee828a:
+   untracked files in the sent directories: 0
+   result: every sent file equals its blob at 89e09ba4ef26605641f5e66c0ef8764547ee828a
+PASS bundle digest 3ea412092a3b024bd6520d9106694f874e45335974b6be96a85083ffac2ecb95; bundle/SHA256SUMS, wrapper pin and packet SHA256SUMS consistent
+[HARNESS] r8 contrast blobs (r7 revision 7e2ef51a): install-verify-r7.sh 7ab4ba61ef0785db... call-r7.sh fe49c3dd2580b1e6...
+[HARNESS] fresh keys: verify AAAAC3NzaC1lZDI1NTE5AAAA... other AAAAC3NzaC1lZDI1NTE5AAAA... arm AAAAC3NzaC1lZDI1NTE5AAAA...
+workspace /home/arm/r7v-ws.RT6oQc
+49
+[HARNESS] r9 FIXTURE qualification Q-ok (sha256 b3a3adc26c4acf25d16806163fef5d27d4327d412b463c279df14bfd575f63e9), record sha256 35584ca8d7e223ecc0574658e44eabaf94f3f07cb9552bc17498f0c5a1fbd051:
+   # FIXTURE qualification (r7v-run.sh t89e09ba4): rehearsal transport only
+   format=afldb-offhost-qualification-fixture-v1
+   host=r7v-offhost
+   address=r7v-offhost
+   hostkey=SHA256:6WsUlPs8PODk9bYggM/Ie2gQaJeWXi5RKvrROpef0QY
+   record-file=records/r7v-fixture.txt
+   record-sha256=35584ca8d7e223ecc0574658e44eabaf94f3f07cb9552bc17498f0c5a1fbd051
+   qualified-on=2026-11-28
+   rehearsal-utc-offset=-19321
+[HARNESS] r9 also: Q-streamanator (host=streamanator), Q-wrongkey (a host key not in the rehearsal known_hosts)
+
+== scenario h (2026-11-28T08:32:46Z)
+sudo: unable to resolve host afldb-prod: Temporary failure in name resolution
+[FIXTURE] /etc/sudoers.d/r8-arm-fixture: arm ALL=(ALL) NOPASSWD: ALL (this container only, scenario h); sudo Sudo version 1.9.15p5
+[HARNESS] verifier state digest before (account, /usr/local/lib/afldb-verify, /etc/afldb-verify, /etc/ssh/afldb-verify, sshd_config.d, units): 4041c2099150c761923611d535b1bd55d8fa9a116a5e47e5a1f15eb8f80b4f94
+-- [FIXTURE-ATTACK] ssh as arm (real login, arm's key) -> id; sudo -n bash /root/r7v-staging/install-verify.sh --role prod --key /root/r7v-staging/afldb_verify.pub; exit $?: exit 1
+   uid=1000(arm) gid=1000(arm) groups=1000(arm),996(afldb-backup-read)
+   sudo: unable to resolve host afldb-prod: Temporary failure in name resolution
+   REFUSED: root session descends from arm: test ancestor: pid 3497 (sudo) has real/effective uid 1000/0, arm is 1000; test ancestor: pid 3495 (bash) has real/effective uid 1000/1000, arm is 1000; test ancestor: pid 3494 (sshd) has real/effective uid 1000/1000, arm is 1000; test SUDO_USER: SUDO_USER=arm; test SUDO_UID: SUDO_UID=1000 (arm); test loginuid: /proc/3498/loginuid=1000 (arm)
+   INSTALL-VERIFY RESULT FAIL (nothing was changed)
+-- [FIXTURE-ATTACK] ssh as arm (real login, arm's key) -> id; sudo -n env -u SUDO_USER -u SUDO_UID -u SUDO_GID -u SUDO_COMMAND bash /root/r7v-staging/install-verify.sh --role prod --key /root/r7v-staging/afldb_verify.pub; exit $?: exit 1
+   uid=1000(arm) gid=1000(arm) groups=1000(arm),996(afldb-backup-read)
+   sudo: unable to resolve host afldb-prod: Temporary failure in name resolution
+   REFUSED: root session descends from arm: test ancestor: pid 3539 (sudo) has real/effective uid 1000/0, arm is 1000; test ancestor: pid 3537 (bash) has real/effective uid 1000/1000, arm is 1000; test ancestor: pid 3536 (sshd) has real/effective uid 1000/1000, arm is 1000; test loginuid: /proc/3540/loginuid=1000 (arm)
+   INSTALL-VERIFY RESULT FAIL (nothing was changed)
+[FIXTURE] arm's sudo removed
+[HARNESS] verifier state digest after: 4041c2099150c761923611d535b1bd55d8fa9a116a5e47e5a1f15eb8f80b4f94
+R8 STATE UNCHANGED 4041c2099150c761923611d535b1bd55d8fa9a116a5e47e5a1f15eb8f80b4f94
+[HARNESS] REFUSED lines:
+   REFUSED: root session descends from arm: test ancestor: pid 3497 (sudo) has real/effective uid 1000/0, arm is 1000; test ancestor: pid 3495 (bash) has real/effective uid 1000/1000, arm is 1000; test ancestor: pid 3494 (sshd) has real/effective uid 1000/1000, arm is 1000; test SUDO_USER: SUDO_USER=arm; test SUDO_UID: SUDO_UID=1000 (arm); test loginuid: /proc/3498/loginuid=1000 (arm)
+   REFUSED: root session descends from arm: test ancestor: pid 3539 (sudo) has real/effective uid 1000/0, arm is 1000; test ancestor: pid 3537 (bash) has real/effective uid 1000/1000, arm is 1000; test ancestor: pid 3536 (sshd) has real/effective uid 1000/1000, arm is 1000; test loginuid: /proc/3540/loginuid=1000 (arm)

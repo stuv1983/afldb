@@ -1,0 +1,300 @@
+== R7 sealed-backup scenario review2
+host streamanator (arm); started 2026-11-28T00:51:53Z; container r7b-tc84d88c0-review2; image r7b-sysd-tc84d88c0:1
+[FIXTURE] fake Melbourne offset 1:26:00: local 2026-11-28 02:20:00 is real 2026-11-28T00:54:00Z
+[TRANSPORT] workstation 2026-11-28T00:49:33Z: 16 worktree files, CR stripped (none expected)
+[TRANSPORT] pre-send verification: every worktree file sent vs its blob at c84d88c0c85494bbaa31d6a0c2c6bf1004a9d9ba (git show <rev>:<path> | sha256sum)
+   EQUAL 2c62ff919908cddadd4ccf57bd6f0344d3aba4be2ae49a413ab13a58e8658085  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/afldb-backup-run
+   EQUAL 143f4ba799a468cb99fb92c51adace29311062cd774d9946a2e98cc75a413d0b  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/afldb-backup-seal
+   EQUAL f8a18580e8638f0a0923519b4280c24c3e94f4eba5c82f23a03a65b7fb7fbdeb  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/70-afldb-backup-sealed.conf
+   EQUAL 1e5b5da45849beaf9f46ce191c15a50f6d2ea3e24ec8061a108d230e0c23703a  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/sealed-origin.sh
+   EQUAL f433b81ae3456ff8a8c0e69793de5217a8b99cd268ff8b76f51394f16f6f5019  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/install-backup.sh
+   EQUAL a2388fb619ad81dfd3ac23550ba27ff638a74b3c61d073e0d5034c2e493ce30d  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/verify-backup-install.sh
+   EQUAL 4a9d437f389a3845e0e09273aa98a171aa23a2ccb99d071909432d976b359a8f  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/SHA256SUMS
+   EQUAL 8ace4ab560dd52febd96bded75e86f9a7a033d5f3674b4838fbf6677c1993fb8  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-run.sh
+   EQUAL 0c464b21d335b2b2c4738fa057cd6ee90ef6e6fd41f9397bf3a98aa8c69f152b  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-host.sh
+   EQUAL 4c154eb959cc09496756d302e3ca213a663a41548d783b3510faa8154fb9e936  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-container.sh
+   EQUAL df609046a6a322db3f651d9d2c9cf1820fdb9ca0d0d4d9ae9f67c3dede1be3be  tools/maintenance/backup.sh
+   EQUAL a3775aea879b1d9ce05d0e96482e66d24c69deb62cf38e8fc0407c0d2653dc2b  tools/maintenance/offhost-pull.sh
+   EQUAL 7e2b470aed441208b990204115f892b3c0c4e9c402800a4c038aadc386105903  tools/maintenance/scheduled-backup.sh
+   EQUAL edf002913282e7b1b0fe39970f652ab0120d9963a52b1696768cf928893bbdc8  deploy/afldb-backup.service
+   EQUAL 76a7ab3ad73377a543434f4174f7948859ac4f28978013a3fa98215fff0e9d84  deploy/afldb-backup.timer
+   EQUAL c6a5b5fe573c000a908ef6dd0d7c28fc16878e1eada8fdaf3bed034c823f8b61  deploy/afldb-backup-failed.service
+   result: every sent file equals its blob at c84d88c0c85494bbaa31d6a0c2c6bf1004a9d9ba
+inputs (sha256, as sent):
+   c6a5b5fe573c000a908ef6dd0d7c28fc16878e1eada8fdaf3bed034c823f8b61  deploy/afldb-backup-failed.service
+   edf002913282e7b1b0fe39970f652ab0120d9963a52b1696768cf928893bbdc8  deploy/afldb-backup.service
+   76a7ab3ad73377a543434f4174f7948859ac4f28978013a3fa98215fff0e9d84  deploy/afldb-backup.timer
+   4c154eb959cc09496756d302e3ca213a663a41548d783b3510faa8154fb9e936  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-container.sh
+   0c464b21d335b2b2c4738fa057cd6ee90ef6e6fd41f9397bf3a98aa8c69f152b  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-host.sh
+   8ace4ab560dd52febd96bded75e86f9a7a033d5f3674b4838fbf6677c1993fb8  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup-harness/r7b-run.sh
+   f8a18580e8638f0a0923519b4280c24c3e94f4eba5c82f23a03a65b7fb7fbdeb  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/70-afldb-backup-sealed.conf
+   4a9d437f389a3845e0e09273aa98a171aa23a2ccb99d071909432d976b359a8f  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/SHA256SUMS
+   2c62ff919908cddadd4ccf57bd6f0344d3aba4be2ae49a413ab13a58e8658085  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/afldb-backup-run
+   143f4ba799a468cb99fb92c51adace29311062cd774d9946a2e98cc75a413d0b  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/afldb-backup-seal
+   f433b81ae3456ff8a8c0e69793de5217a8b99cd268ff8b76f51394f16f6f5019  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/install-backup.sh
+   1e5b5da45849beaf9f46ce191c15a50f6d2ea3e24ec8061a108d230e0c23703a  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/sealed-origin.sh
+   a2388fb619ad81dfd3ac23550ba27ff638a74b3c61d073e0d5034c2e493ce30d  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/verify-backup-install.sh
+   df609046a6a322db3f651d9d2c9cf1820fdb9ca0d0d4d9ae9f67c3dede1be3be  tools/maintenance/backup.sh
+   a3775aea879b1d9ce05d0e96482e66d24c69deb62cf38e8fc0407c0d2653dc2b  tools/maintenance/offhost-pull.sh
+   7e2b470aed441208b990204115f892b3c0c4e9c402800a4c038aadc386105903  tools/maintenance/scheduled-backup.sh
+container id: ddf574bf6867dc17162d1198e9a25e7c5925e8f42f68af537ff76ff422a7d295
+
+== environment
+[REAL-SYSTEMD] systemd: systemd 255 (255.4-1ubuntu8.19); kernel 6.8.0-151-generic; Ubuntu 24.04.4 LTS; PID 1: systemd
+[FIXTURE] zone: /usr/share/zoneinfo/Australia/Melbourne fixed offset (root:root 644 regular file); now UTC 2026-11-28T00:52:00, local 2026-11-28 02:18:00 AEDT; planned moment real 00:54:00Z = local 2026-11-28 02:20:00 AEDT
+[HARNESS] scenario review2: expect=attributed kind=scheduled timer=early lock-hold=0 seal-hold=0 retention-fixture=0 arm-suite=0 production-timing=0 refusal=''
+fs.protected_hardlinks=1 fs.protected_symlinks=1 kernel.yama.ptrace_scope=1
+
+== PostgreSQL 16 fixture database afldb_prod [REAL server, FIXTURE contents]
+[FIXTURE] afldb_prod: fixture 5000 rows, marker nonce r7b-43cf4ce9183cd6b5; role afldb_backup LOGIN + pg_read_all_data (production: the existing read-only role); PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1) on x86_64-p
+
+== units [REAL deploy/ files] and the timer timing drop-in [FIXTURE]
+timer effective: AccuracyUSec=1s RandomizedDelayUSec=0 Persistent=yes 
+service edf002913282e7b1b0fe39970f652ab0120d9963a52b1696768cf928893bbdc8 timer 76a7ab3ad73377a543434f4174f7948859ac4f28978013a3fa98215fff0e9d84 failed c6a5b5fe573c000a908ef6dd0d7c28fc16878e1eada8fdaf3bed034c823f8b61
+
+== owner install from a root-owned staging directory [REAL install-backup.sh]
+staging /opt/r7b-staging: -rw-r--r-- root:root 70-afldb-backup-sealed.conf; -rw-r--r-- root:root SHA256SUMS; -rw-r--r-- root:root afldb-backup-run; -rw-r--r-- root:root afldb-backup-seal; -rw-r--r-- root:root backup.sh; -rw-r--r-- root:root install-backup.sh; -rw-r--r-- root:root sealed-origin.sh; -rw-r--r-- root:root verify-backup-install.sh; 
+SHA256SUMS 4a9d437f389a3845e0e09273aa98a171aa23a2ccb99d071909432d976b359a8f; check: afldb-backup-run: OK afldb-backup-seal: OK 70-afldb-backup-sealed.conf: OK sealed-origin.sh: OK install-backup.sh: OK verify-backup-install.sh: OK backup.sh: OK 
+install-backup.sh /opt/r7b-staging (root): exit 0
+   | bundle /opt/r7b-staging verified: SHA256SUMS 4a9d437f389a3845e0e09273aa98a171aa23a2ccb99d071909432d976b359a8f (compare with README.md before going on; the install continues only on a match you have checked)
+   | accounts: uid=999(afldb-backup) gid=996(afldb-backup) groups=996(afldb-backup); arm: uid=1000(arm) gid=1000(arm) groups=1000(arm),997(afldb-backup-read) (a session started before this sees the new group only after a new login)
+   | sealed_origin_install: PASS (trusted paths, pinned digests, effective unit)
+   | OWNER STEPS STILL REQUIRED (not done by this script):
+   |  1. PostgreSQL peer authentication for the backup account, then reload (no restart):
+   |       pg_ident.conf, add:   afldbbackup afldb-backup afldb_backup
+   |       pg_hba.conf, add BEFORE any broader 'local' line:
+   |                             local afldb_prod afldb_backup peer map=afldbbackup
+   |       then:                 sudo -u postgres psql -c 'SELECT pg_reload_conf()'
+   |  2. Run verify-backup-install.sh as root, then as arm in a NEW login (both must print BACKUP INSTALL RESULT PASS).
+   |  3. streamanator: change the off-host pull source to <prod>:/var/lib/afldb-backup/published/ (offhost-pull.sh is unchanged).
+   |  4. Status probes: AFLDB_BACKUP_SEALED_STATE_DIR=/var/lib/afldb-backup/state for `scheduled-backup.sh status`.
+   |  5. Leave the timer as it is: the next 02:20 run is the first sealed one (seals/<invocation>.seal + published/<dump>).
+   | BACKUP INSTALL RESULT PASS (installed; owner steps above remain)
+verify-backup-install.sh as root BEFORE the owner's PostgreSQL step: exit 1 (expected FAIL: pg_hba/pg_ident lines absent)
+   | FAIL /etc/postgresql/16/main/pg_hba.conf: the first local line is 'local all postgres peer', not 'local afldb_prod afldb_backup peer map=afldbbackup'
+   | FAIL /etc/postgresql/16/main/pg_ident.conf lacks 'afldbbackup afldb-backup afldb_backup'
+   | FAIL no PostgreSQL configuration with both lines was found
+   | FAIL afldb-backup peer login: 'psql: error: connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed: FATAL:  Peer authentication failed for user "afldb_backup"' (reload PostgreSQL after the pg_hba/pg_ident lines?)
+   | BACKUP INSTALL RESULT FAIL
+[FIXTURE] owner step 1 applied as printed: pg_hba first line 'local afldb_prod afldb_backup peer map=afldbbackup', pg_ident 'afldbbackup afldb-backup afldb_backup', pg_reload_conf()
+verify-backup-install.sh as root: exit 0
+   | == verify-backup-install 2026-11-28T00:52:49Z as uid=0(root) gid=0(root) groups=0(root)
+   | PASS sealed_origin_install: trusted paths, pinned digests (run, sealer, backup.sh, drop-in), effective unit
+   | PASS /usr/local/lib/afldb-backup/SHA256SUMS matches the installed files
+   | PASS the r6 attest drop-in is absent
+   | PASS afldb-backup (uid 999): home /nonexistent, shell /usr/sbin/nologin
+   | PASS afldb-backup's only group is afldb-backup
+   | PASS group afldb-backup has no members
+   | PASS arm is in afldb-backup-read (account database)
+   | PASS arm is not in afldb-backup
+   | INFO timer: enabled=disabled active=inactive TimersCalendar={ OnCalendar=*-*-* 02:20:00 ; next_elapse=(null) } RandomizedDelayUSec=0 Persistent=yes 
+   | /opt/r7b-staging/verify-backup-install.sh: line 43: seals: bad array subscript
+   | INFO seals: 0; published dumps: 0; last seal: none
+   | PASS /etc/postgresql/16/main/pg_hba.conf: the first local line is the afldb_backup peer line
+   | PASS /etc/postgresql/16/main/pg_ident.conf maps afldb-backup to afldb_backup
+   | PASS afldb-backup authenticates by peer as afldb_backup (no secret)
+   | BACKUP INSTALL RESULT PASS
+verify-backup-install.sh as arm (new login, env -i): exit 0
+   | == verify-backup-install 2026-11-28T00:52:52Z as uid=1000(arm) gid=1000(arm) groups=1000(arm),997(afldb-backup-read)
+   | PASS sealed_origin_install: trusted paths, pinned digests (run, sealer, backup.sh, drop-in), effective unit
+   | PASS /usr/local/lib/afldb-backup/SHA256SUMS matches the installed files
+   | PASS the r6 attest drop-in is absent
+   | PASS afldb-backup (uid 999): home /nonexistent, shell /usr/sbin/nologin
+   | PASS afldb-backup's only group is afldb-backup
+   | PASS group afldb-backup has no members
+   | PASS arm is in afldb-backup-read (account database)
+   | PASS arm is not in afldb-backup
+   | INFO timer: enabled=disabled active=inactive TimersCalendar={ OnCalendar=*-*-* 02:20:00 ; next_elapse=(null) } RandomizedDelayUSec=0 Persistent=yes 
+   | /opt/r7b-staging/verify-backup-install.sh: line 43: seals: bad array subscript
+   | INFO seals: 0; published dumps: 0; last seal: none
+   | PASS this arm process carries afldb-backup-read
+   | PASS arm cannot list /var/lib/afldb-backup/staging (Permission denied)
+   | PASS arm cannot write /var/lib/afldb-backup
+   | PASS arm cannot write /var/lib/afldb-backup/staging
+   | PASS arm cannot write /var/lib/afldb-backup/seals
+   | PASS arm cannot write /var/lib/afldb-backup/published
+   | PASS arm cannot write /var/lib/afldb-backup/state
+   | PASS arm cannot write /usr/local/lib/afldb-backup
+   | PASS arm cannot write /usr/local/lib/afldb-backup/tools/maintenance
+   | PASS arm cannot write /etc/systemd/system/afldb-backup.service.d
+   | PASS arm can list /var/lib/afldb-backup/published (read only: off-host pull, restore)
+   | PASS arm cannot authenticate by peer as afldb_backup (psql: error: connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed: FATAL:  Peer authentication fail)
+   | BACKUP INSTALL RESULT PASS
+[HARNESS] ok verify-backup-install.sh PASS as root and as arm
+
+== effective unit and installed paths (REAL-SYSTEMD, as root)
+   service: ExecStartEx={ path=/usr/bin/bash ; argv[]=/usr/bin/bash --noprofile --norc /usr/local/lib/afldb-backup/afldb-backup-run ; flags= ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }
+   service: ExecStartPostEx={ path=/usr/bin/env ; argv[]=/usr/bin/env -i PATH=/usr/sbin:/usr/bin /usr/bin/bash --noprofile --norc /usr/local/lib/afldb-backup/afldb-backup-seal ; flags=privileged ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }
+   service: Environment=
+   service: UMask=0077
+   service: WorkingDirectory=/
+   service: User=afldb-backup
+   service: Group=afldb-backup
+   service: SupplementaryGroups=
+   service: ReadWritePaths=/var/lib/afldb-backup/staging
+   service: PrivateTmp=yes
+   service: ProtectHome=yes
+   service: ProtectSystem=strict
+   service: NoNewPrivileges=yes
+   service: OnFailure=afldb-backup-failed.service
+   service: FragmentPath=/etc/systemd/system/afldb-backup.service
+   service: DropInPaths=/etc/systemd/system/afldb-backup.service.d/70-afldb-backup-sealed.conf
+   timer: TimersCalendar={ OnCalendar=*-*-* 02:20:00 ; next_elapse=(null) }
+   timer: RandomizedDelayUSec=0
+   timer: Persistent=yes
+   timer: FragmentPath=/etc/systemd/system/afldb-backup.timer
+   timer: DropInPaths=/etc/systemd/system/afldb-backup.timer.d/50-r7b-fixture-timing.conf
+   drwxr-xr-x root:root links=3 directory /usr/local/lib/afldb-backup
+   -rw-r--r-- root:root links=1 regular file /usr/local/lib/afldb-backup/SHA256SUMS
+   -rwxr-xr-x root:root links=1 regular file /usr/local/lib/afldb-backup/afldb-backup-run
+   -rwxr-xr-x root:root links=1 regular file /usr/local/lib/afldb-backup/afldb-backup-seal
+   -rw-r--r-- root:root links=1 regular file /usr/local/lib/afldb-backup/sealed-origin.sh
+   drwxr-xr-x root:root links=3 directory /usr/local/lib/afldb-backup/tools
+   -rwxr-xr-x root:root links=1 regular file /usr/local/lib/afldb-backup/tools/maintenance/backup.sh
+   -rw-r--r-- root:root links=1 regular file /etc/systemd/system/afldb-backup.service.d/70-afldb-backup-sealed.conf
+   drwxr-xr-x root:root links=6 directory /var/lib/afldb-backup
+   drwxr-x--- root:afldb-backup-read links=2 directory /var/lib/afldb-backup/published
+   drwxr-xr-x root:root links=2 directory /var/lib/afldb-backup/seals
+   drwx------ afldb-backup:afldb-backup links=2 directory /var/lib/afldb-backup/staging
+   drwxr-x--- root:afldb-backup-read links=2 directory /var/lib/afldb-backup/state
+   arm: uid=1000(arm) gid=1000(arm) groups=1000(arm),997(afldb-backup-read); afldb-backup: uid=999(afldb-backup) gid=996(afldb-backup) groups=996(afldb-backup); r7reader: uid=1500(r7reader) gid=1500(r7reader) groups=1500(r7reader),997(afldb-backup-read)
+[REAL-SYSTEMD] timer started at 02:18:56: next elapse Sat 2026-11-28 02:20:00 AEDT
+[FIXTURE-ATTACK] review-2 watcher started as arm OUTSIDE the unit (setsid), before the dispatch
+[HARNESS] setup done 64 s before the planned moment; window 2026-11-28 02:20:00 AEDT .. 02:31:00
+[REAL-SYSTEMD] invocation 49c108ebe48041a8b6f92c04d8c28ad6 job 214 state activating/start
+
+== after the run (REAL-SYSTEMD, root)
+timer: LastTriggerUSec=Sat 2026-11-28 02:20:00 AEDT LastTriggerUSecMonotonic=1w 8h 52min 40.892223s Result=success ActiveEnterTimestampMonotonic=636696962029  busctl LastTriggerUSec=t 1795827240070774
+service: Result=success NRestarts=0 ExecMainCode=1 ExecMainStatus=0 ActiveState=inactive SubState=dead InvocationID=49c108ebe48041a8b6f92c04d8c28ad6 
+failed unit: Result=success ExecMainStartTimestamp= ; marker: cat: /home/arm/backups/afldb-scheduled/.state/FAILED-unit: No such file or directory
+journal (root) of afldb-backup.service:
+   | Nov 28 02:20:00.088999 r7b-rehearsal systemd[1]: Starting afldb-backup.service - AFLDB — scheduled database backup (ISSUE-352)...
+   | Nov 28 02:20:01.089228 r7b-rehearsal bash[13187]: ==> Backing up afldb_prod to /var/lib/afldb-backup/staging/afldb_prod-20261128-022000.dump
+   | Nov 28 02:20:01.089228 r7b-rehearsal bash[13187]:     wrote 108K in 1s
+   | Nov 28 02:20:01.089228 r7b-rehearsal bash[13187]:     archive readable, 5 objects
+   | Nov 28 02:20:01.089228 r7b-rehearsal bash[13187]:     a dump is not proven until restored: tools/maintenance/restore-test.sh
+   | Nov 28 02:20:01.089228 r7b-rehearsal bash[13187]: ==> Pruning backups older than the newest 1
+   | Nov 28 02:20:01.089228 r7b-rehearsal bash[13187]: ==> Done. 1 backup(s) of afldb_prod retained in /var/lib/afldb-backup/staging
+   | Nov 28 02:20:01.097925 r7b-rehearsal bash[13187]: backup ok: afldb_prod-20261128-022000.dump 110150 bytes sha256 1769cd08d6dd3aac offhost=skipped
+   | Nov 28 02:20:01.216643 r7b-rehearsal env[13577]: afldb-backup-seal: sealed 49c108ebe48041a8b6f92c04d8c28ad6 (scheduled, trigger afldb-backup.timer, dispatch 1795827240070774) and published afldb_prod-20261128-022000.dump sha256 1769cd08d6dd3aac
+   | Nov 28 02:20:01.217600 r7b-rehearsal systemd[1]: afldb-backup.service: Deactivated successfully.
+   | Nov 28 02:20:01.217805 r7b-rehearsal systemd[1]: Finished afldb-backup.service - AFLDB — scheduled database backup (ISSUE-352).
+seals and completion records:
+   -rw-r--r-- root:root links=1 size=854 /var/lib/afldb-backup/seals/49c108ebe48041a8b6f92c04d8c28ad6.seal
+      afldb-backup-seal/4sealer_sha256=143f4ba799a468cb99fb92c51adace29311062cd774d9946a2e98cc75a413d0b
+      unit=afldb-backup.service
+      invocation=49c108ebe48041a8b6f92c04d8c28ad6
+      job=214
+      job_type=start
+      active_state=activating
+      sub_state=start-post
+      exec_main_code=1
+      exec_main_status=0
+      service_user=afldb-backup
+      inactive_enter_mono=0
+      inactive_exit_mono=636760910422
+      exec_main_start_mono=636760910134
+      trigger_unit=afldb-backup.timer
+      trigger_timer_realtime_usec=1795827240070774
+      timer_last_trigger_usec=1795827240070774
+      timer_last_trigger_mono=636760892223
+      timer_active_enter_mono=636696962029
+      timer_active_enter_usec=1795827176140580
+      dispatch_kind=scheduled
+      dump=afldb_prod-20261128-022000.dump
+      dump_sha256=1769cd08d6dd3aac3bc7cacf2176bc4c507968fcb581d98eb8c15f89c1ccedf3
+      dump_bytes=110150
+      boot_id=c3524e4759ab4e0f8050875471b56b12
+      sealed_realtime_usec=1795827241194168
+   -rw-r--r-- root:root links=1 size=219 /var/lib/afldb-backup/seals/49c108ebe48041a8b6f92c04d8c28ad6.done
+      afldb-backup-done/1
+      invocation=49c108ebe48041a8b6f92c04d8c28ad6
+      dump=afldb_prod-20261128-022000.dump
+      dump_sha256=1769cd08d6dd3aac3bc7cacf2176bc4c507968fcb581d98eb8c15f89c1ccedf3
+      completed_realtime_usec=1795827241214328
+published: drwxr-x--- root:afldb-backup-read .;drwxr-xr-x root:root ..;-r--r----- root:afldb-backup-read afldb_prod-20261128-022000.dump;-r--r----- root:afldb-backup-read afldb_prod-20261128-022000.dump.sha256;
+state: drwxr-x--- root:afldb-backup-read .;drwxr-xr-x root:root ..;-r--r----- root:afldb-backup-read last-backup.json; last-backup.json: {"epoch":1795827241,"ts":"2026-11-28T00:54:01Z","file":"afldb_prod-20261128-022000.dump","sha256":"1769cd08d6dd3aac3bc7cacf2176bc4c507968fcb581d98eb8c15f89c1ccedf3","bytes":110150,"offhost":"skipped"}
+staging (root): drwx------ afldb-backup:afldb-backup .;drwxr-xr-x root:root ..;
+
+== sealed_origin 2026-11-28, run by r7reader (not arm, not root; groups r7reader,afldb-backup-read) from the INSTALLED library [REAL]
+   SO rc=1
+   SO SO_REASON=malformed seal: /var/lib/afldb-backup/seals/49c108ebe48041a8b6f92c04d8c28ad6.seal is malformed (25 lines, need the 26-line afldb-backup-seal/4 format)
+   SO SO_INVOCATION=
+   SO SO_DUMP=
+   SO SO_SHA=
+   SO SO_BYTES=
+   SO SO_DISPATCH_KIND=
+   SO SO_DISPATCH_DELAY_S=
+   SO SO_TIMER_USEC=
+   SO SO_SEAL=
+review-2 watcher log (arm, outside the unit):
+   | 02:18:56.164 watcher uid=1000(arm) gid=1000(arm) groups=1000(arm),997(afldb-backup-read) pid 901 cgroup 0::/
+   | 02:18:56.173 published before: empty
+   | 02:20:00.120 run process 13187 uid 999: /usr/bin/bash --noprofile --norc /usr/local/lib/afldb-backup/afldb-backup-run 
+   | 02:20:00.131 REFUSED rc=1: kill -STOP 13187 :: bash: line 1: kill: (13187) - Operation not permitted
+   | 02:20:00.140 REFUSED rc=1: mv -f /home/arm/evil.dump /var/lib/afldb-backup/staging/afldb_prod-20261128-022000.dump :: mv: cannot stat '/var/lib/afldb-backup/staging/afldb_prod-20261128-022000.dump': Permission denied
+   | 02:20:00.148 REFUSED rc=2: ls -A /var/lib/afldb-backup/staging :: ls: cannot open directory '/var/lib/afldb-backup/staging': Permission denied
+   | 02:20:00.155 REFUSED rc=1: kill -CONT 13187 :: bash: line 1: kill: (13187) - Operation not permitted
+   | 02:20:00.176 run process 13201 uid 999: /usr/bin/bash --noprofile --norc /usr/local/lib/afldb-backup/afldb-backup-run 
+   | 02:20:00.187 REFUSED rc=1: kill -STOP 13201 :: bash: line 1: kill: (13201) - Operation not permitted
+   | 02:20:00.197 REFUSED rc=1: mv -f /home/arm/evil.dump /var/lib/afldb-backup/staging/afldb_prod-20261128-022000.dump :: mv: cannot stat '/var/lib/afldb-backup/staging/afldb_prod-20261128-022000.dump': Permission denied
+   | 02:20:00.205 REFUSED rc=2: ls -A /var/lib/afldb-backup/staging :: ls: cannot open directory '/var/lib/afldb-backup/staging': Permission denied
+   | 02:20:00.212 REFUSED rc=1: kill -CONT 13201 :: bash: line 1: kill: (13201) - Operation not permitted
+   | 02:20:00.216 run process 13202 uid 999: /usr/bin/bash --noprofile --norc /usr/local/lib/afldb-backup/tools/maintenance/backup.sh --dir /var/lib/afldb-backup/sta
+   | 02:20:00.227 REFUSED rc=1: kill -STOP 13202 :: bash: line 1: kill: (13202) - Operation not permitted
+   | 02:20:00.237 REFUSED rc=1: mv -f /home/arm/evil.dump /var/lib/afldb-backup/staging/afldb_prod-20261128-022000.dump :: mv: cannot stat '/var/lib/afldb-backup/staging/afldb_prod-20261128-022000.dump': Permission denied
+   | 02:20:00.245 REFUSED rc=2: ls -A /var/lib/afldb-backup/staging :: ls: cannot open directory '/var/lib/afldb-backup/staging': Permission denied
+   | 02:20:00.251 REFUSED rc=1: kill -CONT 13202 :: bash: line 1: kill: (13202) - Operation not permitted
+   | 02:20:00.255 run process 13217 uid 999: /usr/lib/postgresql/16/bin/pg_dump postgresql://afldb_backup@/afldb_prod?host=/var/run/postgresql --format=custom --comp
+   | 02:20:00.265 REFUSED rc=1: kill -STOP 13217 :: bash: line 1: kill: (13217) - Operation not permitted
+   | 02:20:00.275 REFUSED rc=1: mv -f /home/arm/evil.dump /var/lib/afldb-backup/staging/afldb_prod-20261128-022000.dump :: mv: cannot stat '/var/lib/afldb-backup/staging/afldb_prod-20261128-022000.dump': Permission denied
+   | 02:20:00.283 REFUSED rc=2: ls -A /var/lib/afldb-backup/staging :: ls: cannot open directory '/var/lib/afldb-backup/staging': Permission denied
+   | 02:20:00.290 REFUSED rc=1: kill -CONT 13217 :: bash: line 1: kill: (13217) - Operation not permitted
+   | 02:20:00.973 run process 13467 uid 999: /usr/bin/perl /usr/bin/pg_restore --list /var/lib/afldb-backup/staging/afldb_prod-20261128-022000.dump.partial 
+   | 02:20:00.984 REFUSED rc=1: kill -STOP 13467 :: bash: line 1: kill: (13467) - Operation not permitted
+   | 02:20:00.994 REFUSED rc=1: mv -f /home/arm/evil.dump /var/lib/afldb-backup/staging/afldb_prod-20261128-022000.dump :: mv: cannot stat '/var/lib/afldb-backup/staging/afldb_prod-20261128-022000.dump': Permission denied
+   | 02:20:01.002 REFUSED rc=2: ls -A /var/lib/afldb-backup/staging :: ls: cannot open directory '/var/lib/afldb-backup/staging': Permission denied
+   | 02:20:01.008 REFUSED rc=1: kill -CONT 13467 :: bash: line 1: kill: (13467) - Operation not permitted
+   | 02:20:01.046 run process 13504 uid 999: /usr/bin/bash --noprofile --norc /usr/local/lib/afldb-backup/tools/maintenance/backup.sh --dir /var/lib/afldb-backup/sta
+   | 02:20:01.057 REFUSED rc=1: kill -STOP 13504 :: bash: line 1: kill: (13504) - Operation not permitted
+   | 02:20:01.067 REFUSED rc=1: mv -f /home/arm/evil.dump /var/lib/afldb-backup/staging/afldb_prod-20261128-022001.dump :: mv: cannot stat '/var/lib/afldb-backup/staging/afldb_prod-20261128-022001.dump': Permission denied
+   | 02:20:01.075 REFUSED rc=2: ls -A /var/lib/afldb-backup/staging :: ls: cannot open directory '/var/lib/afldb-backup/staging': Permission denied
+   | 02:20:01.082 REFUSED rc=1: kill -CONT 13504 :: bash: line 1: kill: (13504) - No such process
+   | /opt/r7b.watcher.sh: line 13: /proc/13505/cmdline: No such file or directory
+   | 02:20:01.085 run process 13505 uid stat: cannot statx '/proc/13505': No such file or directory: 
+   | 02:20:01.096 REFUSED rc=1: kill -STOP 13505 :: bash: line 1: kill: (13505) - No such process
+   | 02:20:01.106 REFUSED rc=1: mv -f /home/arm/evil.dump /var/lib/afldb-backup/staging/afldb_prod-20261128-022001.dump :: mv: cannot stat '/var/lib/afldb-backup/staging/afldb_prod-20261128-022001.dump': Permission denied
+   | 02:20:01.114 REFUSED rc=2: ls -A /var/lib/afldb-backup/staging :: ls: cannot open directory '/var/lib/afldb-backup/staging': Permission denied
+   | 02:20:01.121 REFUSED rc=1: kill -CONT 13505 :: bash: line 1: kill: (13505) - No such process
+   | /opt/r7b.watcher.sh: line 13: /proc/13506/cmdline: No such file or directory
+   | 02:20:01.124 run process 13506 uid stat: cannot statx '/proc/13506': No such file or directory: 
+   | 02:20:01.135 REFUSED rc=1: kill -STOP 13506 :: bash: line 1: kill: (13506) - No such process
+   | 02:20:01.145 REFUSED rc=1: mv -f /home/arm/evil.dump /var/lib/afldb-backup/staging/afldb_prod-20261128-022001.dump :: mv: cannot stat '/var/lib/afldb-backup/staging/afldb_prod-20261128-022001.dump': Permission denied
+   | 02:20:01.153 REFUSED rc=2: ls -A /var/lib/afldb-backup/staging :: ls: cannot open directory '/var/lib/afldb-backup/staging': Permission denied
+   | 02:20:01.160 REFUSED rc=1: kill -CONT 13506 :: bash: line 1: kill: (13506) - No such process
+   | 02:20:01.180 run process 13577 uid 0: /usr/bin/bash --noprofile --norc /usr/local/lib/afldb-backup/afldb-backup-seal 
+   | 02:20:01.192 REFUSED rc=1: kill -STOP 13577 :: bash: line 1: kill: (13577) - Operation not permitted
+   | 02:20:01.201 REFUSED rc=1: mv -f /home/arm/evil.dump /var/lib/afldb-backup/staging/afldb_prod-20261128-022001.dump :: mv: cannot stat '/var/lib/afldb-backup/staging/afldb_prod-20261128-022001.dump': Permission denied
+   | 02:20:01.210 REFUSED rc=2: ls -A /var/lib/afldb-backup/staging :: ls: cannot open directory '/var/lib/afldb-backup/staging': Permission denied
+   | 02:20:01.216 REFUSED rc=1: kill -CONT 13577 :: bash: line 1: kill: (13577) - Operation not permitted
+   | /opt/r7b.watcher.sh: line 13: /proc/13654/cmdline: No such file or directory
+   | 02:20:01.220 run process 13654 uid stat: cannot statx '/proc/13654': No such file or directory: 
+   | 02:20:01.231 REFUSED rc=1: kill -STOP 13654 :: bash: line 1: kill: (13654) - No such process
+   | 02:20:01.241 REFUSED rc=1: mv -f /home/arm/evil.dump /var/lib/afldb-backup/staging/afldb_prod-20261128-022001.dump :: mv: cannot stat '/var/lib/afldb-backup/staging/afldb_prod-20261128-022001.dump': Permission denied
+   | 02:20:01.249 REFUSED rc=2: ls -A /var/lib/afldb-backup/staging :: ls: cannot open directory '/var/lib/afldb-backup/staging': Permission denied
+   | 02:20:01.255 REFUSED rc=1: kill -CONT 13654 :: bash: line 1: kill: (13654) - No such process
+   | 02:20:01.259 published: afldb_prod-20261128-022000.dump root:afldb-backup-read 440 links=1
+   | 02:20:01.269 REFUSED rc=1: mv -f /home/arm/evil.dump /var/lib/afldb-backup/published/afldb_prod-20261128-022000.dump :: mv: cannot move '/home/arm/evil.dump' to '/var/lib/afldb-backup/published/afldb_prod-20261128-022000.dump': Permission denied
+   | 02:20:01.277 REFUSED rc=1: cp /home/arm/evil.dump /var/lib/afldb-backup/published/afldb_prod-20261128-022000.dump :: cp: cannot create regular file '/var/lib/afldb-backup/published/afldb_prod-20261128-022000.dump': Permission denied
+   | 02:20:01.283 REFUSED rc=1: echo x >> /var/lib/afldb-backup/published/afldb_prod-20261128-022000.dump :: bash: line 1: /var/lib/afldb-backup/published/afldb_prod-20261128-022000.dump: Permission denied
+   | 02:20:01.291 REFUSED rc=1: rm -f /var/lib/afldb-backup/published/afldb_prod-20261128-022000.dump :: rm: cannot remove '/var/lib/afldb-backup/published/afldb_prod-20261128-022000.dump': Permission denied
+   | 02:20:01.299 REFUSED rc=1: chmod 666 /var/lib/afldb-backup/published/afldb_prod-20261128-022000.dump :: chmod: changing permissions of '/var/lib/afldb-backup/published/afldb_prod-20261128-022000.dump': Operation not permitted
+   | 02:20:01.307 REFUSED rc=1: ln -f /home/arm/evil.dump /var/lib/afldb-backup/published/afldb_prod-20261128-022000.dump :: ln: failed to create hard link '/var/lib/afldb-backup/published/afldb_prod-20261128-022000.dump' => '/home/arm/evil.dump': Permission denied
+   | 02:20:01.315 REFUSED rc=1: mv -f /home/arm/evil.dump /var/lib/afldb-backup/published/afldb_prod-20261128-022000.dump.sha256 :: mv: cannot move '/home/arm/evil.dump' to '/var/lib/afldb-backup/published/afldb_prod-20261128-022000.dump.sha256': Permission denied
+   | 02:20:01.323 REFUSED rc=1: cp /home/arm/evil.dump /var/lib/afldb-backup/published/afldb_prod-20261128-022000.dump.sha256 :: cp: cannot create regular file '/var/lib/afldb-backup/published/afldb_prod-20261128-022000.dump.sha256': Permission denied
+   | 02:20:01.334 watcher end (published seen: 1; run processes seen: 13187 13201 13202 13217 13467 13504 13505 13506 13577 13654)
+
+== verdict [HARNESS]
+[HARNESS] FAIL sealed_origin refused: malformed seal: /var/lib/afldb-backup/seals/49c108ebe48041a8b6f92c04d8c28ad6.seal is malformed (25 lines, need the 26-line afldb-backup-seal/4 format)
+SCENARIO review2 FAIL expect=attributed so_rc=1: 1 harness failure(s): sealed_origin refused: malformed seal: /var/lib/afldb-backup/seals/49c108ebe48041a8b6f92c04d8c28ad6.seal is malformed (25 lines, need the 26-line afldb-backup-seal/4 format); 
+== controller exit 1 (2026-11-28T00:54:04Z); container removed

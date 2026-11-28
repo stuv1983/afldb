@@ -1,0 +1,4 @@
+799e6691954e4d7562cbc6b7af82f307cde0c8af71e450cd5f66f2af9994b398  afldb-backup-attest
+2a3a067ef408377ccf6deae7c97c38366854c581a16e3f33ce2265787abc440e  60-afldb-backup-attest.conf
+13e6ba4f13453ebbea41b36b776cf2f06f9ac5dc0ae12fcdbeb3a0cc4cd4bb6e  install-attest.sh
+337c8a37ea9482cc9694eaec0cf1fd831ff4e06a2727bbc98190c51c3fdf11d8  verify-attest-install.sh

@@ -1,0 +1,15 @@
+== case n2-a2-stop-attributed-exit0: bash afldb-gate-accept.sh --rehearsal --now 2026-11-28T05:40:00Z --gate ng-pre --owner-checks unmarked/fx-oc-4.4-bootid.txt --reverify unmarked/fx-reverify-4.5-bootid.txt --version unmarked/fx-version-post.txt --verdict unmarked/fx-a2-stop-attributed-post.txt --verdict-exit 0
+== afldb-gate-accept 2026-11-28T08:30:54Z gate=ng-pre transport=rehearsal (read-only; inputs by sha256)
+   938b9b87ad9dd4f76e11556c7a7308ba723b95a2a542d9691c7d8ad480f355eb  unmarked/fx-oc-4.4-bootid.txt
+   f111b9e19c834f813d0f2ad7832272526700fa69dd5774f01dec2daa8ae213f2  unmarked/fx-reverify-4.5-bootid.txt
+   644074318fb0b49c0bde30f9297a5dcfc8162539d3b49c37f7bfb3122065ebaa  unmarked/fx-version-post.txt
+   fb870c00a66b961548fc673063ca3ba719b16d247494a9365e3afbf62d01d892  unmarked/fx-a2-stop-attributed-post.txt
+REHEARSAL: these inputs are rehearsal transcripts; whatever the result, it authorises no release and no reboot
+TEST CLOCK: --now 2026-11-28T05:40:00Z stands in for this workstation's clock (rehearsal only)
+ACCEPT owner-checks PASS post-Phase-4 PASS at 2026-11-28T05:21:46Z, boot c3524e4759ab4e0f8050875471b56b12 (B1, B2, B3 PASS; every CHECK line PASS)
+ACCEPT reverify PASS root 2026-11-28T05:21:40Z, --as-arm 2026-11-28T05:21:42Z (arm has no admin group), verify-install 2026-11-28T05:21:45Z, bundle 58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8, boot c3
+INFO version off-host line (not an NG-PRE criterion): OWNER VERDICT VERSION PASS transport=rehearsal host=r9-fixture-offhost role=offhost nonce=27d7f312d4170019a563edacb1439fa2 qualification=FIXTURE qual-sha256=b17d8c78273a34ad1a2a41a3845404b4f4431869455c99c398a0727ef7b947ba
+ACCEPT version PASS production VERSION PASS nonce=23a740e15b1b7ed52e712d32d1f162c5 at=2026-11-28T05:23:54Z boot=c3524e4759ab4e0f8050875471b56b12, after (a) and (b), same boot as both
+ACCEPT verdict FAIL the last line is not 'OWNER VERDICT A2 PASS transport=rehearsal ...': (an A2 STOP; backup-origin=attributed does not satisfy NG-PRE) OWNER VERDICT A2 STOP transport=rehearsal ssh=ssh.exe current=17822
+GATE ACCEPT REHEARSAL NG-PRE NO-GO failed=verdict reason="verdict: the last line is not 'OWNER VERDICT A2 PASS transport=rehearsal ...': (an A2 STOP; backup-origin=attributed does not satisfy NG-PRE) OWNER VERDICT A2 STOP transport=rehearsal ssh=ssh.exe current=17822"
+== exit 1

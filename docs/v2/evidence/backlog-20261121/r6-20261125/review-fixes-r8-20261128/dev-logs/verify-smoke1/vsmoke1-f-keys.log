@@ -1,0 +1,76 @@
+== r7v-run vsmoke1 2026-11-28T03:16:59Z workstation Office user stuar; worktree HEAD 7e2ef51aa1682f6fded60158242b58ac07e2047b
+[HARNESS] inputs sent (sha256, worktree):
+   87e82d57b32f9ed35ed6aa73e50855761635af8e52cb7361481414a43ad7ce4a  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify-harness/r7v-container.sh
+   1aa3a625a327f8e9e9968644e020dfc0162cfaef2585b145c45827728f511c5a  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify-harness/r7v-host.sh
+   fdda98b650b5510530019fad1f1e7103c74ca845fa798f96dce35e7efccf5636  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify-harness/r7v-run.sh
+   dcd20cfd33488f3eae31bd6e62c30888f2b7f6afb7558251154924df9d3bf354  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/README.md
+   bf0e050e6020648bd71e51b8e57f4361a4a035ded8305a08a89644239c5cf656  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/SHA256SUMS
+   e98444ffe1caeacd2f2f801c7fe88b2356a92bd7eddb94d75463e61b49610139  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/afldb-verify-call.sh
+   ca739de772b31b466bdbb9c6295c8c4646f7b1746c71d7b618d92b606aee9bfb  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/authorized_keys.template
+   15fdd32cb7bb960d569358eb0306cf7b5aec03a9289c5167929156b2b3c9215a  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/build-sums.sh
+   8dff9dfb65f9978cc1fb980f290ef62ff1692f1e8d6cf799d8e5eccab66bbb43  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/60-afldb-verify.conf
+   28a23c64033d8cefc1b393d3edca5f797d374280c8832aba3a51d1ac202ccc0e  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/SHA256SUMS
+   175c4a85240ce554bf3bdbbc4677b7306186cf0d7bd590d8181ef4b973ea4b4c  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/a2-core.sh
+   d80838cbb7162c3877ab9bf0c87d70a575b55fbc7f902bcc74d4bc6f9e65abd8  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/afldb-settle-failure-status.sh
+   cb2b936d12d43db0cc041fb0da56ee9412cf76aadc2895dad769400bc1c3c082  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/afldb-verify-dispatch
+   048485260d5f16c3567c22f89548f5e87184584d4a069e46d876669e98145359  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/afldb-verify-entry
+   300827fe5e89a61ecd217ef1398ad944b90916e39406ccec17c3fe62a1157d7a  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/afldb-verify-py
+   6432de423012b5d097704c6e49c84979f2975910f3d6cbd51990d44c155c0acd  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/afldb-verify-rootfacts
+   d6ea0e0c9cc454e124de0af2860792d38e5ee0038589c7edc83c94a71276c093  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/afldb-verify-rootfacts.socket
+   f97c946d3e90c6deedc820c9dacdfb0c4661f8722e2d79d2ff22403777fb3bcc  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/afldb-verify-rootfacts@.service
+   d26c74b5334eae450fe8be6129ed2159a4ac658d3c92bdd5240f4e711c55344f  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/g0-core.sh
+   dc4ae9f5bb8027e98ef6ea4fb7d30f1ba041dbd5c7044dfbf3042ea819e24de0  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/g0b-core.sh
+   e8a0b13111d5564318ef5e5738386f3adb0262a081cd0d4a5f54b80683f2b369  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/lib.sh
+   1153df783e622623bc551522dd02b4242da92acb165d7af4978f9aa6d298bfa4  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/sealed-origin.sh
+   f8c95fb103e7c394adcd837de6c7a55060361a38b45f9b829097dd79ce862417  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/install-verify.sh
+   062f2dd3ed1791f92059cc38438942406ba80c98dc46b069375d3ac0c07bdd3f  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/pg-auth-lines.txt
+   d7e71ed7bf8756d0b3d4d1bea38be7354f4c5cc22c79f6daa6fca0b9d7b99cd7  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/verifier-db.sql
+   4b3d5ed11cf9cb833f5ad6cb20acd885e2d640a4cd18e1663f0c441fd29ce9ff  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/verify-verify-install.sh
+   f8a18580e8638f0a0923519b4280c24c3e94f4eba5c82f23a03a65b7fb7fbdeb  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/70-afldb-backup-sealed.conf
+   af7a9d4769ec522dd66238a17e2afdac5f522ccbeb39392c62052a726dfaaead  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/README.md
+   d1c11c25a35ba16aed0729617ea514078ece390e85b1b73a4eebe85cb2ad1682  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/SHA256SUMS
+   2c62ff919908cddadd4ccf57bd6f0344d3aba4be2ae49a413ab13a58e8658085  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/afldb-backup-run
+   793e94bef7e9797815709da530beab09652e4cce200f7a769fdd5fb092a2ece5  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/afldb-backup-seal
+   21c33fa42acbd083ac9368907d4fb243598fb33e264058d9cf64d40b52d68fff  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/install-backup.sh
+   1153df783e622623bc551522dd02b4242da92acb165d7af4978f9aa6d298bfa4  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/sealed-origin.sh
+   f1dcc7db69cbdf2b78d5a129fafb62e02dbeebe4c42e563327e9e693ca0777c3  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/verify-backup-install.sh
+   edf002913282e7b1b0fe39970f652ab0120d9963a52b1696768cf928893bbdc8  deploy/afldb-backup.service
+   76a7ab3ad73377a543434f4174f7948859ac4f28978013a3fa98215fff0e9d84  deploy/afldb-backup.timer
+   c6a5b5fe573c000a908ef6dd0d7c28fc16878e1eada8fdaf3bed034c823f8b61  deploy/afldb-backup-failed.service
+   df609046a6a322db3f651d9d2c9cf1820fdb9ca0d0d4d9ae9f67c3dede1be3be  tools/maintenance/backup.sh
+   7dee0dc7514a6ccd1eb05172b49b686739b09fa612fbad978755702e5d9bc07a  deploy/release.mjs
+   d80838cbb7162c3877ab9bf0c87d70a575b55fbc7f902bcc74d4bc6f9e65abd8  deploy/afldb-settle-failure-status.sh
+   183691d90ff3777ce199b8d3d154c812532aad6be4c195f324cc3141b506350e  deploy/host-policy/needrestart-afldb-hold.conf
+   4a277b8b6e7c7c8b8d2cb347f8949260941327cd24dbd5f3664b317611648810  deploy/host-policy/apt-52-afldb-unattended.conf
+   7e2b470aed441208b990204115f892b3c0c4e9c402800a4c038aadc386105903  tools/maintenance/scheduled-backup.sh
+   2ebac1c09b07e6b3bc1e060d7645efdbb1c2c7f169b5cfafd4e7f77508716e24  docs/v2/evidence/backlog-20261121/kits/afldb-offhost-pull-daily.sh
+   81f638dc03fd58039ae48527c6880c4679aaa8698a88dc9d5fe6b7e3bd3cb621  docs/v2/evidence/release-17822b29-20261124/scripts/r1-g0-dump.sh
+   97b85721690ea31e2ddb5b73a6f2f4e88444363ed542c0923d1cfb49c2abe218  docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh
+[TRANSPORT] no --verify-rev: the worktree as it stands (uncommitted files included)
+PASS bundle digest 28a23c64033d8cefc1b393d3edca5f797d374280c8832aba3a51d1ac202ccc0e; bundle/SHA256SUMS, wrapper pin and packet SHA256SUMS consistent
+[HARNESS] r8 contrast blobs (HEAD 7e2ef51a): install-verify-r7.sh 7ab4ba61ef0785db... call-r7.sh fe49c3dd2580b1e6...
+[HARNESS] fresh keys: verify AAAAC3NzaC1lZDI1NTE5AAAA... other AAAAC3NzaC1lZDI1NTE5AAAA... arm AAAAC3NzaC1lZDI1NTE5AAAA...
+workspace /home/arm/r7v-ws.LSpPE8
+49
+
+== scenario f (2026-11-28T03:24:38Z)
+-- other-key-as-verify: ssh -i C:/Users/stuar/AppData/Local/Temp/tmp.TH3u2Orbsu/other -T r7v-prod version 98c42dec4d7c604e4158f1e2b72debde -> exit 255
+   afldb-verify@r7v-prod: Permission denied (publickey).
+-- arm-key-as-verify: ssh -i C:/Users/stuar/AppData/Local/Temp/tmp.TH3u2Orbsu/arm -T r7v-prod version 98c42dec4d7c604e4158f1e2b72debde -> exit 255
+   afldb-verify@r7v-prod: Permission denied (publickey).
+-- verify-key-as-arm: ssh -i C:/Users/stuar/AppData/Local/Temp/tmp.TH3u2Orbsu/verify -T r7v-prod-arm id -> exit 255
+   arm@r7v-prod: Permission denied (publickey,password).
+-- verify-key-forced-tty: ssh -i C:/Users/stuar/AppData/Local/Temp/tmp.TH3u2Orbsu/verify -tt r7v-prod -> exit 255
+   PTY allocation request failed on channel 0
+-- verify-key-no-command: ssh -i C:/Users/stuar/AppData/Local/Temp/tmp.TH3u2Orbsu/verify -T r7v-prod -> exit 2
+   AFLDB-VERIFY USAGE refused: not single-space-separated plain words (grammar: g0 <date> <nonce> | a2 accepted <CURRENT_ID> <r3:yes|no> <r4:yes|no> <10:00|14:00> <tue:released|rolledback|deferred> <inv:32hex> <nonce> | g0b <date> <dump> <sha256> <nonce> | version <nonce>)
+-- verify-key-shell-command: ssh -i C:/Users/stuar/AppData/Local/Temp/tmp.TH3u2Orbsu/verify -T r7v-prod bash -i -> exit 2
+   AFLDB-VERIFY USAGE refused: unknown mode (grammar: g0 <date> <nonce> | a2 accepted <CURRENT_ID> <r3:yes|no> <r4:yes|no> <10:00|14:00> <tue:released|rolledback|deferred> <inv:32hex> <nonce> | g0b <date> <dump> <sha256> <nonce> | version <nonce>)
+-- verify-key-extra-words: ssh -i C:/Users/stuar/AppData/Local/Temp/tmp.TH3u2Orbsu/verify -T r7v-prod g0 2026-11-28 98c42dec4d7c604e4158f1e2b72debde; id -> exit 2
+   AFLDB-VERIFY USAGE refused: not single-space-separated plain words (grammar: g0 <date> <nonce> | a2 accepted <CURRENT_ID> <r3:yes|no> <r4:yes|no> <10:00|14:00> <tue:released|rolledback|deferred> <inv:32hex> <nonce> | g0b <date> <dump> <sha256> <nonce> | version <nonce>)
+-- verify-key-stdio-forward: ssh -i C:/Users/stuar/AppData/Local/Temp/tmp.TH3u2Orbsu/verify -W 127.0.0.1:22 r7v-prod -> exit 255
+   channel 0: open failed: administratively prohibited: open failed
+   stdio forwarding failed
+-- arm-key-as-arm-control: ssh -i C:/Users/stuar/AppData/Local/Temp/tmp.TH3u2Orbsu/arm -T r7v-prod-arm command -p id -> exit 0
+   ERROR: ld.so: object '/home/arm/evil.so' from LD_PRELOAD cannot be preloaded (cannot open shared object file): ignored.
+   uid=1000(arm) gid=1000(arm) groups=1000(arm),996(afldb-backup-read)

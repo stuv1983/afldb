@@ -1,0 +1,25 @@
+== round 2 pin checks 2026-11-28T04:51:07Z HEAD f8a63bb3f8f5e035829f17cb38fce84f2292186f [REAL: git objects at f8a63bb3 extracted by git archive]
+e3a68821c6f97ec7a5775cbf845b4018198556f44d29e89ceb6ff0c4e2672e7d  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/SHA256SUMS
+49e0fa7c84a549ba5153cec9d94c2fa2ca91d89aff34458dd9dc2fa9a4f13901  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/SHA256SUMS
+58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify/bundle/SHA256SUMS
+2568c25ffc8d23be4e95e15ef8d0cc47bcdfbb3b002fa3403d37e390dcc740ae  docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/owner-checks/SHA256SUMS
+backup SHA256SUMS: all OK
+verify SHA256SUMS: all OK
+bundle SHA256SUMS: all OK
+owner-checks SHA256SUMS: all OK
+BUNDLE_SHA in wrapper: BUNDLE_SHA=58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8
+FRAG_SHA in sealed-origin: FRAG_SHA=edf002913282e7b1b0fe39970f652ab0120d9963a52b1696768cf928893bbdc8; deploy/afldb-backup.service: edf002913282e7b1b0fe39970f652ab0120d9963a52b1696768cf928893bbdc8
+LIB_SHA in verify-backup-install: LIB_SHA=a733e67b898879d03e76b7d446d0f8bfbe0dd13923a586c19b42cdffd828887e; sealed-origin.sh backup a733e67b898879d03e76b7d446d0f8bfbe0dd13923a586c19b42cdffd828887e bundle a733e67b898879d03e76b7d446d0f8bfbe0dd13923a586c19b42cdffd828887e
+sealed-origin.sh copies byte-identical
+other pins in sealed-origin (unchanged files): 2c62ff919908 793e94bef7e9 f8a18580e863 
+-- build-sums --check (worktree, HEAD=f8a63bb3, status of R7/verify: 0 modified)
+PASS bundle digest 58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8; bundle/SHA256SUMS, wrapper pin and packet SHA256SUMS consistent
+-- bash -n
+syntax ok docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/sealed-origin.sh
+syntax ok docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/backup/verify-backup-install.sh
+syntax ok docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/owner-checks/afldb-owner-checks.sh
+-- fenced blocks vs 7e2ef51a
+0bbf23e2159e62e8 0bbf23e2159e62e8 IDENTICAL docs/v2/evidence/backlog-20261121/ATTENDED-PLAN-R6-20261125.md
+c92bac1c08a554d7 c92bac1c08a554d7 IDENTICAL docs/v2/evidence/release-17822b29-20261124/RUNBOOK.md
+-- unchanged gate files 89bd271e..f8a63bb3
+(empty line above = none changed)

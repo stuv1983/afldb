@@ -1,0 +1,31 @@
+[FIXTURE r9] [r10] fx-g0-pass-post.txt with access-epoch=0f1e2d3c4b5a69788796a5b4c3d2e1f0 on its production RESULT line: made BEFORE the access change
+== afldb-verify-call 2026-11-28T05:25:07Z mode=g0 transport=rehearsal pinned-bundle=58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8 key=C:/Users/stuar/AppData/Local/Temp/tmp.Mg7FVpmiUB/verify
+-- G0a: production, g0 2026-11-28
+== afldb-verify G0 host=afldb-prod role=prod boot=c3524e4759ab4e0f8050875471b56b12 bundle=58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8 identity: uid=997(afldb-verify) gid=994(afldb-verify) groups=994(afldb-verify),996(afldb-backup-read),999(systemd-journal) at 2026-11-28T05:25:13Z
+== the verifier ran its self-check: every bundle file matches SHA256SUMS, the installed unit, socket and sshd drop-in equal the bundle copies, every helper and PATH directory is root-owned and protected
+== R7 G0 (verifier) 2026-11-28T05:25:13Z local Sat 2026-11-28 02:22:13 AEDT day 2026-11-28
+  sealed-origin: seal /var/lib/afldb-backup/seals/ecd21ccff9db4219ad7fa849ea49ff01.seal: invocation ecd21ccff9db4219ad7fa849ea49ff01, job 394 created by afldb-backup.timer at 1795841820670419 us (2026-11-28 02:20:00 AEDT), dispatch=scheduled 114.1 s after timer activation, dump afldb_prod-20261128-022000.dump 3994 bytes sha256 cda2699cf1ea5a03e5bf61b13f644907b05533de6b075feeaf0aeca3d1ef18f2
+PASS afldb-backup.service scheduled run SEALED: timer dispatch Sat 2026-11-28 02:20:00 AEDT (1795841820670419 us), invocation ecd21ccff9db4219ad7fa849ea49ff01, root seal /var/lib/afldb-backup/seals/ecd21ccff9db4219ad7fa849ea49ff01.seal; published dump afldb_prod-20261128-022000.dump 3994 B, full re-hash = seal = root sidecar
+DISPATCH scheduled 114.1 s after timer activation
+BACKUP-EVIDENCE r7 ecd21ccff9db4219ad7fa849ea49ff01 1795841820670419 afldb_prod-20261128-022000.dump cda2699cf1ea5a03e5bf61b13f644907b05533de6b075feeaf0aeca3d1ef18f2 scheduled /var/lib/afldb-backup/seals/ecd21ccff9db4219ad7fa849ea49ff01.seal
+OFFHOST-COMPARE afldb_prod-20261128-022000.dump cda2699cf1ea5a03e5bf61b13f644907b05533de6b075feeaf0aeca3d1ef18f2
+PASS afldb-backup.service Result=success (PID 1: the last run did not fail)
+PASS no FAILED marker in /home/arm/backups/afldb-scheduled/.state (arm-produced evidence)
+INFO afldb-backup-verify.service last: success  0 (record; not a G0 criterion)
+G0 PROD RESULT PASS: the wrapper now runs g0b on streamanator with the dump and sha256 of this RESULT line
+AFLDB-VERIFY RESULT G0 PASS nonce=ae051e81562cd8a8068785167e3ab05f host=afldb-prod boot=c3524e4759ab4e0f8050875471b56b12 bundle=58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8 at=2026-11-28T05:25:16Z exit=0 date=2026-11-28 invocation=ecd21ccff9db4219ad7fa849ea49ff01 dump=afldb_prod-20261128-022000.dump sha256=cda2699cf1ea5a03e5bf61b13f644907b05533de6b075feeaf0aeca3d1ef18f2 dispatch=scheduled access-epoch=0f1e2d3c4b5a69788796a5b4c3d2e1f0
+-- G0b: streamanator, g0b 2026-11-28 afldb_prod-20261128-022000.dump cda2699cf1ea5a03e5bf61b13f644907b05533de6b075feeaf0aeca3d1ef18f2 (values from the authenticated G0a RESULT line only)
+== afldb-verify G0B host=r9-fixture-offhost role=offhost boot=c3524e4759ab4e0f8050875471b56b12 bundle=58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8 identity: uid=999(afldb-verify) gid=996(afldb-verify) groups=996(afldb-verify),999(systemd-journal) at 2026-11-28T05:25:22Z
+== the verifier ran its self-check: every bundle file matches SHA256SUMS, the installed unit, socket and sshd drop-in equal the bundle copies, every helper and PATH directory is root-owned and protected
+== R7 G0B (verifier) 2026-11-28T05:25:22Z host=r9-fixture-offhost day 2026-11-28 dump afldb_prod-20261128-022000.dump sha256 cda2699cf1ea5a03e5bf61b13f644907b05533de6b075feeaf0aeca3d1ef18f2
+COPY VERIFIED afldb_prod-20261128-022000.dump sha256=cda2699cf1ea5a03e5bf61b13f644907b05533de6b075feeaf0aeca3d1ef18f2 (bytes re-hashed by the root facts reader, named sidecar, verified marker, no hold) [the bytes: root re-hash; sidecar, marker and hold: ARM-PRODUCED]
+SCHEDULE crontab pair present: 10 3 * * * [ARM-PRODUCED: read from the root-only spool, but arm edits its crontab]
+DISPATCH journal: pid=953 at 2026-11-28 03:10:01 AEDT (a root syslog entry: _UID=0, SYSLOG_PID=_PID)
+INVOCATION linked to dispatch: run=2026-11-28T05:25:02Z-954 (lineage contains pid 953, started within 5 s of the journal record) [ARM-PRODUCED: the pull log is arm's; the dispatch is root cron's journald record]
+PASS scheduled pull date=2026-11-28 dispatch_pid=953 run=2026-11-28T05:25:02Z-954 completion=2026-11-28T05:25:02Z rc=0 [ARM-PRODUCED: invocation, completion and VERIFIED lines are arm's pull log]
+OFFHOST-COMPARE afldb_prod-20261128-022000.dump cda2699cf1ea5a03e5bf61b13f644907b05533de6b075feeaf0aeca3d1ef18f2
+RESULT SCHEDULED-COPY-VERIFIED
+R6 OFFHOST RESULT PASS
+AFLDB-VERIFY RESULT G0B PASS nonce=f965f3df444c0e1a0d2e1167c512ba35 host=r9-fixture-offhost boot=c3524e4759ab4e0f8050875471b56b12 bundle=58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8 at=2026-11-28T05:25:22Z exit=0 date=2026-11-28 dump=afldb_prod-20261128-022000.dump sha256=cda2699cf1ea5a03e5bf61b13f644907b05533de6b075feeaf0aeca3d1ef18f2
+G0 SCOPE: a PASS establishes that the sealed timer run (root seal, PID 1) produced afldb_prod-20261128-022000.dump with sha256 cda2699cf1ea5a03e5bf61b13f644907b05533de6b075feeaf0aeca3d1ef18f2 on production and that streamanator holds a root-re-hashed copy with those bytes after a root cron dispatch; the pull-log lines linking dispatch and copy are ARM-PRODUCED
+OWNER VERDICT G0 PASS transport=rehearsal ssh=ssh.exe date=2026-11-28 invocation=ecd21ccff9db4219ad7fa849ea49ff01 dump=afldb_prod-20261128-022000.dump sha256=cda2699cf1ea5a03e5bf61b13f644907b05533de6b075feeaf0aeca3d1ef18f2 dispatch=scheduled g0a-nonce=ae051e81562cd8a8068785167e3ab05f g0a-at=2026-11-28T05:25:16Z g0a-boot=c3524e4759ab4e0f8050875471b56b12 offhost=r9-fixture-offhost g0b-nonce=f965f3df444c0e1a0d2e1167c512ba35 g0b-at=2026-11-28T05:25:22Z qualification=FIXTURE qual-sha256=b17d8c78273a34ad1a2a41a3845404b4f4431869455c99c398a0727ef7b947ba

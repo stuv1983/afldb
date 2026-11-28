@@ -1,0 +1,27 @@
+SCENARIO setup PASS expect=arm-with-sudo got=[FIXTURE] arm as on production today: uid=1000(arm) gid=1000(arm) groups=1000(arm),27(sudo); sudo with its own password (passwd -S: P); arm's key installed
+SCENARIO console-phase0 PASS expect=root-console-session got= loginuid: 4294967295 (docker exec stands in for the provider console; production's is UNKNOWN)
+SCENARIO pubkey-swap PASS expect=refused got=refused (a key arm substituted for the carried .pub was not installed; nothing created)
+SCENARIO admin-bootstrap PASS expect=afldb-admin-with-workstation-key got=   afldb-admin: uid=1001(afldb-admin) gid=1001(afldb-admin) groups=1001(afldb-admin),27(sudo); password P; home afldb-admin:afldb-admin 750; authorized_keys afldb-admin:afldb-admin 600 SHA256:hhOqGs7w
+SCENARIO admin-login-1 PASS expect=id+sudo-v+sudo-l got=uid=1001(afldb-admin) gid=1001(afldb-admin) groups=1001(afldb-admin),27(sudo); sudo -v ok; (ALL : ALL) ALL
+SCENARIO admin-keys PASS expect=arm-key-refused-for-admin got=afldb-admin@r8p-host: Permission denied (publickey,password).
+SCENARIO stage FAIL expect=workstation-digests-match got=R8P STAGE STOP: backup bundle 
+SCENARIO checks-pre FAIL expect=BLOCKED(arm-can-sudo) got= 
+SCENARIO arm-sudo-checks FAIL expect=BLOCKED(A2) got=
+SCENARIO arm-sudo-installer FAIL expect=REFUSED got=R8P ARM-INSTALL exit 127 
+SCENARIO nothing-installed-via-arm PASS expect=nothing got=nothing (no account, group, drop-in or code directory)
+SCENARIO install-backup FAIL expect=install+PASS got=install 1 vbi-root 1
+SCENARIO verify-backup-as-arm FAIL expect=PASS got=exit 1 mode=as-arm
+SCENARIO install-verify FAIL expect=PASS got=install-verify 127 vvi 127
+SCENARIO checks-post-install PASS expect=BLOCKED(installs-alone-do-not-close-F1) got=OWNER CHECKS RESULT BLOCKED fail=B1,B2,F6 unknown=none
+SCENARIO wrapper-version FAIL expect=VERSION-PASS(afldb-prod) got=OWNER VERDICT VERSION STOP transport=rehearsal host=afldb-prod reason="0 RESULT lines (need exactly 1; ssh exit 255)" OWNER VERDICT VERSION STOP transport=rehearsal host=streamanator reason="0 RESULT lines (need exactly 1; ssh exit 255)" 
+SCENARIO phase4 PASS expect=arm-not-allowed-sudo got=   sudo -l -U arm: User arm is not allowed to run sudo on afldb-prod.
+SCENARIO admin-login-2 PASS expect=admin-login+sudo-after-phase4 got=   session: loginuid 1001; SUDO_USER=afldb-admin; parent chain: sudo:uid=1001 sshd:uid=1001 sshd:uid=0 sshd:uid=0 system
+SCENARIO reverify FAIL expect=PASS got=vbi-root 1 vbi-arm 1 vvi 127
+SCENARIO checks-post-access FAIL expect=PASS got=OWNER CHECKS RESULT BLOCKED fail=F6 unknown=none; CHECK F6 FAIL sshd for afldb-admin: forcecommand 'none', pubkeyauthentication yes|
+SCENARIO fc-pg-superuser PASS expect=BLOCKED(D1,D4 name afldb_owner) got=OWNER CHECKS RESULT BLOCKED fail=D1,D4,F6 unknown=none
+SCENARIO fc-group-writable FAIL expect=BLOCKED(E2) got=CHECK E2 PASS every component of the 42 protected paths: not arm-owned, not group/other-writable, no ACL, no link (14 absent, e.g. not installed yet)|OWNER CHECKS RESULT BLOCKED fail=F6 unknown=none|
+SCENARIO fc-no-admin PASS expect=BLOCKED(F5 no key; F1 no account) got=both BLOCKED
+SCENARIO control-after-revert FAIL expect=PASS got=CHECK F6 FAIL sshd for afldb-admin: forcecommand 'none', pubkeyauthentication yes|OWNER CHECKS RESULT BLOCKED fail=F6 unknown=none|
+SCENARIO no-secrets PASS expect=0 got=fixture DSN password 0, admin/arm passwords 0, private key blocks 0 in every log
+R8 PROCEDURE HARNESS RESULT FAIL (12 failed, 0 pending)
+removed 1 container(s); left: containers 0, images 0, workspace removed, other r8p workspaces: 0

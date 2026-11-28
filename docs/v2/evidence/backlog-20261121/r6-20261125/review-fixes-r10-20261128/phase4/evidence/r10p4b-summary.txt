@@ -1,0 +1,30 @@
+SCENARIO group-only PASS expect=entry=PASS(group-only),apply=PASS(epoch),verify=PASS,B1-B3,B5=PASS got=entry=PASS(group-only),apply=PASS(epoch),verify=PASS,B1-B3,B5=PASS
+SCENARIO group-only-backout PASS expect=entry=PASS,apply=PASS,verify=PASS,backout=PASS(fresh console),state=pre-change got=entry=PASS,apply=PASS,verify=PASS,backout=PASS(fresh console),state=pre-change
+SCENARIO grant-refused-then-retry PASS expect=entry1=REFUSED(token listed),entry2=PASS(new dir),wrong-dir-apply=REFUSED,apply=PASS,verify=PASS,fresh-console-backout=PASS(exact) got=entry1=REFUSED(token listed),entry2=PASS(new dir),wrong-dir-apply=REFUSED,apply=PASS,verify=PASS,fresh-console-backout=PASS(exact)
+SCENARIO two-grants-one-selected PASS expect=one-selected=REFUSED(line 4),duplicate=REFUSED,both=PASS,unrelated-kept,verify=PASS,backout=PASS(exact) got=one-selected=REFUSED(line 4),duplicate=REFUSED,both=PASS,unrelated-kept,verify=PASS,backout=PASS(exact)
+SCENARIO selection-refused PASS expect=span=REFUSED,text=REFUSED,malformed=REFUSED,unknown-file=REFUSED,--dispose=usage,changed-file=REFUSED got=span=REFUSED,text=REFUSED,malformed=REFUSED,unknown-file=REFUSED,--dispose=usage,changed-file=REFUSED
+SCENARIO old-snapshot-rejected PASS expect=attempt1=apply+backout,attempt2=apply,old-state=REFUSED,old-seal=REFUSED,apply-while-applied=REFUSED,backout2=PASS(exact),reapply1=REFUSED got=attempt1=apply+backout,attempt2=apply,old-state=REFUSED,old-seal=REFUSED,apply-while-applied=REFUSED,backout2=PASS(exact),reapply1=REFUSED
+SCENARIO etc-sudoers-grant PASS expect=entry=PASS(%sudo kept),apply=PASS,verify=PASS(admin-sudo-l),backout=PASS(exact) got=entry=PASS(%sudo kept),apply=PASS,verify=PASS(admin-sudo-l),backout=PASS(exact)
+SCENARIO refuse-select-percent-sudo PASS expect=select-%sudo=REFUSED,nothing-changed got=select-%sudo=REFUSED,nothing-changed
+SCENARIO refuse-mixed-line PASS expect=entry=REFUSED(86-mixed:2 %sudo shares the line),nothing-changed got=entry=REFUSED(86-mixed:2 %sudo shares the line),nothing-changed
+SCENARIO apply-host-changed PASS expect=apply=REFUSED(95-late added),nothing-changed,no-epoch got=apply=REFUSED(95-late added),nothing-changed,no-epoch
+SCENARIO invalidate PASS expect=invalidate=PASS(new epoch, logged, VOID),nothing-else-changed got=invalidate=PASS(new epoch, logged, VOID),nothing-else-changed
+SCENARIO late-grant PASS expect=verify=STOP(95-late added),backout=REFUSED(names 95-late),manual-rm,backout=PASS,state=pre-change got=verify=STOP(95-late added),backout=REFUSED(names 95-late),manual-rm,backout=PASS,state=pre-change
+SCENARIO unplanned-edit PASS expect=verify=STOP(README),backout=REFUSED(README),manual-restore,backout=PASS,state=pre-change got=verify=STOP(README),backout=REFUSED(README),manual-restore,backout=PASS,state=pre-change
+SCENARIO state-tamper PASS expect=tampered-record=REFUSED(seal),resealed=REFUSED(seal differs),nothing-changed got=tampered-record=REFUSED(seal),resealed=REFUSED(seal differs),nothing-changed
+SCENARIO refuse-90-arm PASS expect=entry=REFUSED(90-arm:1 arm),apply/backout of it=REFUSED,nothing-changed got=entry=REFUSED(90-arm:1 arm),apply/backout of it=REFUSED,nothing-changed
+SCENARIO refuse-user-alias PASS expect=entry=REFUSED(80-alias:1 arm),nothing-changed got=entry=REFUSED(80-alias:1 arm),nothing-changed
+SCENARIO refuse-group-adm PASS expect=entry=REFUSED(70-adm:1 %adm),nothing-changed got=entry=REFUSED(70-adm:1 %adm),nothing-changed
+SCENARIO refuse-admin-group PASS expect=entry=REFUSED(arm in admin),nothing-changed got=entry=REFUSED(arm in admin),nothing-changed
+SCENARIO refuse-include PASS expect=entry=REFUSED(@include /etc/sudoers.local),nothing-changed got=entry=REFUSED(@include /etc/sudoers.local),nothing-changed
+SCENARIO refuse-escaped-alias PASS expect=entry=REFUSED(84-esc:1 unparsed-alias-member),B3-blind,nothing-changed got=entry=REFUSED(84-esc:1 unparsed-alias-member),B3-blind,nothing-changed
+SCENARIO residual-uid PASS expect=entry=REFUSED(/etc/sudoers.d/91-uid:1 names uid:#1000),B3-blind,nothing-changed got=entry=REFUSED(/etc/sudoers.d/91-uid:1 names uid:#1000),B3-blind,nothing-changed
+SCENARIO residual-all PASS expect=entry=REFUSED(/etc/sudoers.d/92-all:1 names ALL-user),B3-blind,nothing-changed got=entry=REFUSED(/etc/sudoers.d/92-all:1 names ALL-user),B3-blind,nothing-changed
+SCENARIO refuse-uid-alias PASS expect=entry=REFUSED(81-uidalias:1 uid:#1000),nothing-changed got=entry=REFUSED(81-uidalias:1 uid:#1000),nothing-changed
+SCENARIO refuse-continued PASS expect=entry=REFUSED(82-cont:1 uid:#1000, joined line),nothing-changed got=entry=REFUSED(82-cont:1 uid:#1000, joined line),nothing-changed
+SCENARIO refuse-negated PASS expect=entry=REFUSED(83-neg:1 negated),nothing-changed got=entry=REFUSED(83-neg:1 negated),nothing-changed
+SCENARIO refuse-nsswitch PASS expect=entry=REFUSED(nsswitch sudoers: files sss),nothing-changed got=entry=REFUSED(nsswitch sudoers: files sss),nothing-changed
+R10P4 RESIDUE containers=0 images=0 workspace=removed r10p4-workspaces=0 base-image=sha256:d71c0b286c54 build-cache=[Cache entries, 0]
+R10P4 RESIDUE-CHECK 2026-11-28T09:43:53Z containers-this-run=0 containers-any-r10p4=0 images-any-r10p4=0 workspaces=0
+secret scan of r10p4b-run.txt: 0 match(es) for private key blocks, DSNs, password= assignments or crypt hashes
+R10 PHASE4 HARNESS RESULT PASS (26 of 26 scenarios; residue 0 containers, 0 images, 0 workspaces)

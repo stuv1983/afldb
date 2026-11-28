@@ -1,0 +1,14 @@
+== r9p-dev1 2026-11-28T07:36:09Z workstation: afldb-gate-accept.sh --gate ng-pre --rehearsal (counterexample): inputs r9p-dev1-in-3.12-owner-checks.log r9p-dev1-in-3-reverify.log r9p-dev1-in-3.13-version.log r9p-dev1-in-3.13a-a2.log exit 1
+== afldb-gate-accept 2026-11-28T07:36:07Z gate=ng-pre transport=rehearsal (read-only; inputs by sha256)
+   7a44b9d4ab752f64f9cb844c76db8c87d42015f4db96696ce790b675b902bca3  /d/dev/afldb-closeout-20261127/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/procedure-harness/logs/r9p-dev1-in-3.12-owner-checks.log
+   4c22ef6ac6e3d6335662af2f8a0792d40fd3a6687d15602d354da63ab61a4e6d  /d/dev/afldb-closeout-20261127/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/procedure-harness/logs/r9p-dev1-in-3-reverify.log
+   a4741e770940117f6975bb3fad013468199b7b8941697b2f4d5e4dc4ae63ca04  /d/dev/afldb-closeout-20261127/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/procedure-harness/logs/r9p-dev1-in-3.13-version.log
+   77fb990c920db0f94e1a53eeb8e701322cf7919f15988e3ea70a8254dd12efd5  /d/dev/afldb-closeout-20261127/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/procedure-harness/logs/r9p-dev1-in-3.13a-a2.log
+REHEARSAL: these inputs are rehearsal transcripts; whatever the result, it authorises no release and no reboot
+ACCEPT owner-checks FAIL BLOCKED, not PASS (a Phase 3.12 output is pre-Phase-4 evidence): OWNER CHECKS RESULT BLOCKED fail=B1,B2,B3 unknown=none
+ACCEPT reverify FAIL the --as-arm process still carries an admin group, so this was saved before Phase 4: BACKUP INSTALL RESULT PASS (as arm via setpriv, no login: uid=1000(arm) gid=1000(arm) groups=1000(arm),27(sudo),997
+INFO version off-host line (not an NG-PRE criterion): OWNER VERDICT VERSION STOP transport=rehearsal host=none role=offhost reason="no qualified off-host endpoint" qualification=none qual-sha256=none
+ACCEPT version PASS production VERSION PASS nonce=930e2299aa4366c3be3bd8bf85493472 at=2026-11-28T07:34:35Z, after (a) and (b)
+ACCEPT verdict FAIL the last line is not 'OWNER VERDICT A2 PASS transport=rehearsal ...': OWNER VERDICT A2 STOP transport=rehearsal ssh=ssh.exe current=000000000000-r8p-fixture tue=tue:deferred inv=197383ff6904332a43d03e
+GATE ACCEPT REHEARSAL NG-PRE NO-GO failed=owner-checks,reverify,verdict reason="owner-checks: BLOCKED, not PASS (a Phase 3.12 output is pre-Phase-4 evidence): OWNER CHECKS RESULT BLOCKED fail=B1,B2,B3 unknown=none"
+exit 1

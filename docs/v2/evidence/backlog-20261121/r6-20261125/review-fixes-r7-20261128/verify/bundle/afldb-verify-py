@@ -1,0 +1,120 @@
+#!/usr/bin/python3.12 -I -S
+# afldb-verify-py (R6 r7, MED-2): the verifier's parsing and transport helper. ROOT-OWNED, pinned by SHA256SUMS. Run ONLY as
+# `/usr/bin/python3.12 -I -S /usr/local/lib/afldb-verify/afldb-verify-py <mode> ...` by the cores (uid afldb-verify): -I ignores every
+# PYTHON* variable, the user site directory and the script's directory on sys.path; -S skips site. It replaces the gates' use of
+# arm's ~/.nvm node (journal JSON) and release.mjs's HTTP probe. It writes nothing. Modes:
+#   facts <request>                   ask the root facts reader (unix socket /run/afldb-verify-rootfacts.sock, group afldb-verify)
+#   journal-restore <since> <until>   afldb-backup-verify.service "verify ok" lines: "<invocation> <epoch> <file> <attempt>"
+#   journal-cron <since> <until>      cron daemon dispatch lines: "<epoch> CRON[<pid>]: <message>" (trusted fields only)
+#   http <url>                        GET of http://127.0.0.1:3100/... : "<status> <content-type>" or for /api/health
+#                                     "<status> status=<s> database=<d>"
+import json, re, socket, subprocess, sys
+
+JOURNALCTL = '/usr/bin/journalctl'
+SOCK = '/run/afldb-verify-rootfacts.sock'
+ENV = {'PATH': '/usr/sbin:/usr/bin', 'LC_ALL': 'C'}
+
+
+def san(s, n=400):
+    return re.sub(r'[^\x20-\x7e]', '?', str(s))[:n]
+
+
+def journal(args):
+    r = subprocess.run([JOURNALCTL] + args + ['-o', 'json', '--no-pager'], env=ENV, stdin=subprocess.DEVNULL,
+                       capture_output=True, timeout=100)
+    if r.returncode != 0:
+        sys.exit(10)
+    for line in r.stdout.decode('utf-8', 'replace').split('\n'):
+        if line:
+            try:
+                e = json.loads(line)
+            except ValueError:
+                sys.exit(3)
+            if not isinstance(e, dict):
+                sys.exit(3)
+            yield e
+
+
+def epoch_arg(v):
+    if not re.fullmatch(r'[0-9]{1,12}', v):
+        sys.exit(2)
+    return '@' + v
+
+
+def main(argv):
+    if len(argv) < 2:
+        sys.exit(2)
+    mode = argv[1]
+    if mode == 'facts' and len(argv) == 3:
+        req = argv[2]
+        if not re.fullmatch(r'[A-Za-z0-9 :._-]{1,120}', req):
+            sys.exit(2)
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.settimeout(890)
+        s.connect(SOCK)
+        s.sendall(req.encode() + b'\n')
+        s.shutdown(socket.SHUT_WR)
+        buf = bytearray()
+        while True:
+            chunk = s.recv(65536)
+            if not chunk:
+                break
+            buf += chunk
+            if len(buf) > 16 * 1024 * 1024:
+                sys.exit(4)
+        sys.stdout.write(buf.decode('ascii', 'replace'))
+        return
+    if mode == 'journal-restore' and len(argv) == 4:
+        rx = re.compile(r'^\S+ scheduled-backup: verify ok: (\S+) restored and proven \(attempt ([12])\)$')
+        for e in journal(['-u', 'afldb-backup-verify.service', '--since', epoch_arg(argv[2]), '--until', epoch_arg(argv[3])]):
+            m = e.get('MESSAGE')
+            ok = rx.match(m) if isinstance(m, str) else None
+            if ok and e.get('_SYSTEMD_UNIT') == 'afldb-backup-verify.service':
+                ts = e.get('__REALTIME_TIMESTAMP', '')
+                if not (isinstance(ts, str) and ts.isdigit()):
+                    sys.exit(4)
+                print(san(e.get('_SYSTEMD_INVOCATION_ID'), 64), int(ts) // 1000000, san(ok.group(1), 255), ok.group(2))
+        return
+    if mode == 'journal-cron' and len(argv) == 4:
+        for e in journal(['-t', 'CRON', '--since', epoch_arg(argv[2]), '--until', epoch_arg(argv[3])]):
+            m, ts, pid = e.get('MESSAGE'), e.get('__REALTIME_TIMESTAMP', ''), e.get('_PID')
+            # _UID is the kernel's SCM_CREDENTIALS (no uid-arm process can produce 0). _COMM and _EXE are NOT required: journald
+            # reads them from /proc after receipt, and the cron child execs /bin/sh right after logging CMD (rehearsal: _EXE was
+            # /usr/bin/dash on the genuine dispatch line), so they race and would refuse a genuine dispatch.
+            if (e.get('SYSLOG_IDENTIFIER') == 'CRON' and e.get('_UID') == '0' and e.get('_TRANSPORT') == 'syslog'
+                    and isinstance(pid, str) and pid.isdigit() and e.get('SYSLOG_PID') == pid
+                    and isinstance(m, str) and isinstance(ts, str) and ts.isdigit()):
+                print(int(ts) // 1000000, 'CRON[%s]: %s' % (pid, san(m, 1000)))
+        return
+    if mode == 'http' and len(argv) == 3:
+        import urllib.request, urllib.error
+        url = argv[2]
+        if not re.fullmatch(r'http://127\.0\.0\.1:3100/[A-Za-z0-9/._-]{1,200}', url):
+            sys.exit(2)
+        class NoRedirect(urllib.request.HTTPRedirectHandler):
+            # Review round 1 (INFO): never follow a redirect from arm's server; a 3xx is reported as its own status (not a PASS).
+            def redirect_request(self, req, fp, code, msg, headers, newurl):
+                return None
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
+        try:
+            r = opener.open(url, timeout=15)
+            status, ctype, body = r.status, r.headers.get('Content-Type', ''), r.read(65536)
+        except urllib.error.HTTPError as err:
+            status, ctype, body = err.code, err.headers.get('Content-Type', '') if err.headers else '', b''
+        except Exception as err:  # noqa: BLE001 - any transport failure is a failed probe
+            print('000 ' + san(type(err).__name__ + ': ' + str(err), 160))
+            sys.exit(1)
+        if url.endswith('/api/health'):
+            try:
+                j = json.loads(body.decode('utf-8', 'replace'))
+                print('%d status=%s database=%s' % (status, san(j.get('status'), 40), san(j.get('database'), 40)))
+            except (ValueError, AttributeError):
+                print('%d status=unparsable database=unparsable' % status)
+        else:
+            print('%d %s' % (status, san(ctype, 80)))
+        return
+    sys.exit(2)
+
+
+if __name__ == '__main__':
+    main(sys.argv)

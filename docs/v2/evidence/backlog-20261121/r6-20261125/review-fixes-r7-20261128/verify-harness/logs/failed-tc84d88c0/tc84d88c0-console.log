@@ -1,0 +1,39 @@
+   97b85721690ea31e2ddb5b73a6f2f4e88444363ed542c0923d1cfb49c2abe218  docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh
+[TRANSPORT] pre-send verification against c84d88c0c85494bbaa31d6a0c2c6bf1004a9d9ba:
+   untracked files in the sent directories: 0
+   result: every sent file equals its blob at c84d88c0c85494bbaa31d6a0c2c6bf1004a9d9ba
+PASS bundle digest f75ba83dc25072f7fd4846d86f6eed0791ec46205dcde8e417e1ccc700acdff9; bundle/SHA256SUMS, wrapper pin and packet SHA256SUMS consistent
+workspace /home/arm/r7v-ws.hz5r2N
+   | PASS sshd for afldb-verify: permittunnel no
+   | PASS sshd for afldb-verify: permituserenvironment no
+   | PASS sshd for afldb-verify: permituserrc no
+   | PASS sshd for afldb-verify: authorizedkeysfile /etc/ssh/afldb-verify/authorized_keys
+   | PASS sshd for afldb-verify: passwordauthentication no
+   | PASS sshd for arm: not forced into the verifier
+   | VERIFY-INSTALL RESULT PASS
+   | INSTALL-VERIFY RESULT PASS
+---- verify-verify-install.sh as arm (read-only; sshd checks skipped without root)
+   | == verify-verify-install 2026-11-28T00:55:12Z host=streamanator role=offhost as arm
+   | PASS bundle: 13 files match SHA256SUMS; bundle digest f75ba83dc25072f7fd4846d86f6eed0791ec46205dcde8e417e1ccc700acdff9
+   | PASS /etc/systemd/system/afldb-verify-rootfacts.socket = bundle copy
+   | PASS /etc/systemd/system/afldb-verify-rootfacts@.service = bundle copy
+   | PASS /etc/ssh/sshd_config.d/60-afldb-verify.conf = bundle copy
+   | PASS /usr/local/lib/afldb-verify/afldb-verify-entry executable
+   | PASS /usr/local/lib/afldb-verify/afldb-verify-dispatch executable
+   | PASS role file = offhost
+   | PASS authorized_keys: 1 key line(s), every one restrict + forced command
+   | PASS account: afldb-verify:x:999:996::/var/lib/afldb-verify:/bin/sh
+   | PASS groups: afldb-verify systemd-journal
+   | PASS group afldb-verify has no supplementary member (arm cannot reach the root facts socket)
+   | PASS arm is not in group afldb-verify
+   | PASS home /var/lib/afldb-verify root-owned and empty
+   | PASS afldb-verify-rootfacts.socket active and enabled
+   | PASS socket file root:afldb-verify 660 socket
+   | SKIPPED sshd -T checks (not root)
+   | VERIFY-INSTALL RESULT PASS
+[HARNESS] waiting for arm's real 03:10 cron job in r7v-tc84d88c0-offhost to finish
+Read from remote host 10.0.40.100: Connection reset by peer
+client_loop: send disconnect: Connection reset by peer
+STOP setup failed (see /d/dev/afldb-closeout-20261127/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/verify-harness/logs/tc84d88c0-setup.log)
+R7 VERIFY HARNESS RESULT FAIL
+ssh: connect to host 10.0.40.100 port 22: Network is unreachable

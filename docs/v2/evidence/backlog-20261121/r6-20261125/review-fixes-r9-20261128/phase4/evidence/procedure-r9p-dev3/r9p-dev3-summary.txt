@@ -1,0 +1,47 @@
+SCENARIO setup PASS expect=arm-with-sudo got=[FIXTURE] arm as on production today: uid=1000(arm) gid=1000(arm) groups=1000(arm),27(sudo); sudo with its own password (passwd -S: P); arm's key installed
+SCENARIO console-phase0 PASS expect=root-console-session got= loginuid: 4294967295 (docker exec stands in for the provider console; production's is UNKNOWN)
+SCENARIO pubkey-swap PASS expect=refused got=refused (a key arm substituted for the carried .pub was not installed; nothing created)
+SCENARIO pubkey-optprefix PASS expect=refused got=refused (the real key behind an options prefix, same fingerprint, was not installed)
+SCENARIO pubkey-crlf PASS expect=accepted got=accepted (the key with a CRLF line end passes the machine test after one CR is stripped; nothing created)
+SCENARIO admin-bootstrap PASS expect=afldb-admin-with-workstation-key got=   afldb-admin: uid=1001(afldb-admin) gid=1001(afldb-admin) groups=1001(afldb-admin),27(sudo); password P; home afldb-admin:afldb-admin 750; authorized_keys afldb-admin:afldb-admin 600 SHA256:AQLzPFWj
+SCENARIO admin-login-1 PASS expect=id+sudo-v+sudo-l got=uid=1001(afldb-admin) gid=1001(afldb-admin) groups=1001(afldb-admin),27(sudo); sudo -v ok; (ALL : ALL) ALL
+SCENARIO admin-keys PASS expect=arm-key-refused-for-admin got=afldb-admin@r8p-host: Permission denied (publickey,password).
+SCENARIO stage PASS expect=workstation-digests-match got=tar 945ce8dc487e665153718f85b3489eb2cba4e2295f831e552fe2e1dd4be90a2b, three SHA256SUMS and the verify key equal the workstation values
+SCENARIO checks-pre PASS expect=BLOCKED(arm-can-sudo) got=OWNER CHECKS RESULT BLOCKED fail=B1,B2,B3 unknown=none; CHECK B2 FAIL arm is in: sudo (arm's groups: arm sudo); session independent (CHECK A2 PASS )
+SCENARIO arm-sudo-checks PASS expect=BLOCKED(A2) got=OWNER CHECKS RESULT BLOCKED fail=A2,B1,B2,B3 unknown=none (session not independent: no result above counts)
+SCENARIO arm-sudo-installer PASS expect=REFUSED got=REFUSED: root session descends from arm: test ancestor: pid 18492 (sudo) has real/effective uid 1000/0, arm is 1000; test ancestor: pid 9521 (bash) has real/eff
+SCENARIO nothing-installed-via-arm PASS expect=nothing got=nothing (no account, group, drop-in or code directory)
+SCENARIO install-backup PASS expect=install+BACKUP-INSTALL-PASS(root) got=install exit 0, verify-backup-install root exit 0
+SCENARIO verify-backup-as-arm PASS expect=BACKUP-INSTALL-PASS(arm,no-startup-files) got=exit 0 mode=as-arm
+SCENARIO install-verify PASS expect=INSTALL-VERIFY+VERIFY-INSTALL-PASS got=install-verify exit 0, verify-verify-install exit 0
+SCENARIO checks-post-install PASS expect=BLOCKED(installs-alone-do-not-close-F1) got=OWNER CHECKS RESULT BLOCKED fail=B1,B2,B3 unknown=none
+SCENARIO wrapper-version PASS expect=VERSION-PASS(afldb-prod) got=OWNER VERDICT VERSION PASS transport=rehearsal host=afldb-prod role=prod nonce=f9de1ae2bfd2cb2a839ed9df9adca92a qualific; offhost: OWNER VERDICT VERSION STOP transport=rehearsal host=none role=offhost reason="no qualified off-host endpoint" 
+SCENARIO wrapper-a2-phase3 PASS expect=A2-STOP(container) got=exit 1; OWNER VERDICT A2 STOP transport=rehearsal ssh=ssh.exe current=000000000000-r8p-fixture tue=tue:deferred inv=e00e98d2dd00560a4cd44918577f6fef window=10:00 day=no
+SCENARIO phase4-entry PASS expect=ENTRY-PASS(group-only) got=PHASE4 ENTRY RESULT PASS change=group-only matches=1 disposed=0 state=/root/afldb-phase4-state; PHASE4 ENTRY match /etc/sudoers:53 token %sudo class group-only: %sudo?ALL=(ALL:ALL) ALL
+SCENARIO phase4 PASS expect=arm-removed-from-sudo got=   id arm: uid=1000(arm) gid=1000(arm) groups=1000(arm),997(afldb-backup-read)
+SCENARIO phase4-verify PASS expect=VERIFY-PASS got=PHASE4 VERIFY check sudo-l PASS sudo -l -U arm: arm is not allowed to run sudo
+SCENARIO admin-login-2 PASS expect=admin-login+sudo-after-phase4 got=   session: loginuid 1001; SUDO_USER=afldb-admin; parent chain: sudo:uid=1001 sshd:uid=1001 sshd:uid=0 sshd:uid=0 system
+SCENARIO checks-post-access PASS expect=PASS got=OWNER CHECKS RESULT PASS
+SCENARIO reverify PASS expect=both-install-checks-PASS got=vbi-root 0, vbi-arm 0, vvi 0
+SCENARIO saved-4.4-4.5 PASS expect=saved-files-copied-back got=4.4 d86cac0baf4daf0f, 4.5 6d54117b4fa9d935 (both begin with the same BOOT-ID line; last line of 4.4: OWNER CHECKS RESULT PASS)
+SCENARIO wrapper-version-post PASS expect=prod-PASS+offhost-STOP(no-qualified-endpoint) got=exit 1; OWNER VERDICT VERSION PASS transport=rehearsal host=afldb-prod role=prod nonce=b39deb2426b6954019a5051ff3cfbf1|OWNER VERDICT VERSION STOP transport=rehearsal host=none role=offhost reason="no qualified off-host endpoint" |
+SCENARIO wrapper-a2-post PASS expect=A2-STOP(container) got=exit 1; OWNER VERDICT A2 STOP transport=rehearsal ssh=ssh.exe current=000000000000-r8p-fixture tue=tue:deferred inv=e00e98d2dd00560a4cd44918577f6fef window=10:00 day=no
+SCENARIO wrapper-g0-post PASS expect=G0-STOP got=exit 1; OWNER VERDICT G0 STOP transport=rehearsal ssh=ssh.exe date=2026-11-28 step=G0a nonce=3168365c18914627a1c9222eb9ce5a8c at=2026-11-28T08:21:48Z exit=1 reason="the production verifier answered STOP" qual
+SCENARIO accept-counterexample-release-g0 PASS expect=NO-GO(owner-checks,reverify,version among failed) got=exit 1 failed=owner-checks,reverify,version,verdict
+SCENARIO accept-counterexample-ng-pre PASS expect=NO-GO(owner-checks,reverify,version among failed) got=exit 1 failed=owner-checks,reverify,version,verdict
+SCENARIO accept-post-phase4-ng-pre PASS expect=NO-GO(failed=verdict only: A2 STOPs in a container) got=exit 1 failed=verdict; parts a-c: owner-checks PASS,reverify PASS,version PASS,
+SCENARIO accept-post-phase4-release-g0 PASS expect=NO-GO(failed=version,verdict: off-host unqualified; owner-checks,reverify PASS) got=exit 1 failed=version,verdict
+SCENARIO accept-post-phase4-release-g0-g0verdict PASS expect=NO-GO(failed=version,verdict: off-host unqualified; owner-checks,reverify PASS) got=exit 1 failed=version,verdict
+SCENARIO fc-pg-superuser PASS expect=BLOCKED(D1,D4 name afldb_owner) got=OWNER CHECKS RESULT BLOCKED fail=D1,D4 unknown=none
+SCENARIO fc-group-writable PASS expect=BLOCKED(E2 names /usr/local/lib/afldb-verify) got=OWNER CHECKS RESULT BLOCKED fail=E2 unknown=none
+SCENARIO fc-no-admin PASS expect=BLOCKED(F5 no key; F1 no account) got=both BLOCKED
+SCENARIO fc-pg-nologin-super PASS expect=BLOCKED(D1,D4 name afldb_owner via r8p_super) got=OWNER CHECKS RESULT BLOCKED fail=D1,D4 unknown=none
+SCENARIO fc-admin-key-option PASS expect=BLOCKED(F5 options prefix) got=OWNER CHECKS RESULT BLOCKED fail=F5 unknown=none
+SCENARIO fc-admin-extra-key PASS expect=BLOCKED(F5 two key lines) got=OWNER CHECKS RESULT BLOCKED fail=F5 unknown=none
+SCENARIO fc-c3-gw-other PASS expect=PASS(C3 reports /opt/r8p-gw root:r8pgrp:775, arm not in the group) got=OWNER CHECKS RESULT PASS
+SCENARIO fc-c3-gw-arm PASS expect=BLOCKED(C3 /opt/r8p-gw group-writable by arm's group) got=OWNER CHECKS RESULT BLOCKED fail=C3 unknown=E3
+SCENARIO control-after-revert PASS expect=PASS got=OWNER CHECKS RESULT PASS (console session; every mutation reverted)
+SCENARIO phase4-backout PASS expect=BACKOUT-PASS(arm back in sudo, sudo -l as before) got=PHASE4 BACKOUT RESULT PASS the sudoers scope, arm's groups and sudo -l -U arm equal the pre-change record of /root/afldb;    id arm: uid=1000(arm) gid=1000(arm) groups=1000(arm),27(sudo),997(afldb-backup-read)
+SCENARIO no-secrets PASS expect=0 got=fixture DSN password 0, admin/arm passwords 0, private key blocks 0 in every log
+R8 PROCEDURE HARNESS RESULT PASS
+removed 1 container(s); left: containers 0, images 0, workspace removed, other r8p workspaces: 0

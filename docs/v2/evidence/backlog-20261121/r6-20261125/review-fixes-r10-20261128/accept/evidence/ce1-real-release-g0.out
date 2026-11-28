@@ -1,0 +1,19 @@
+== case ce1-real-release-g0: bash afldb-gate-accept.sh --rehearsal --now 2026-11-28T05:40:00Z --gate release-g0 --owner-checks inputs/real-oc-3.12-blocked.txt --reverify inputs/real-reverify-3.5-3.6-3.11-pre-phase4.txt --version inputs/real-version-3.13-pre-phase4.txt --verdict inputs/real-g0-pass.txt --verdict-exit 0 --confirm unmarked/cf/ce1-real-release-g0-confirm.txt
+== afldb-gate-accept 2026-11-28T11:38:47Z gate=release-g0 transport=rehearsal (read-only; inputs by sha256)
+   eff7599bd6446f20654aa5cc219431d45115890bb1e3a6064ad847b6f2782915  inputs/real-oc-3.12-blocked.txt
+   4e55fcc338c3c35cf91821ec4e65e2b87c1d9105e55bbec69f6a7651d5063f57  inputs/real-reverify-3.5-3.6-3.11-pre-phase4.txt
+   2fbf74dcd7a81fea6b919325db32ef5bdce5e00b3d8c1a0cec53034fdc449d79  inputs/real-version-3.13-pre-phase4.txt
+   40c79b55798eb56eca2bd2b61f756dddec91c879e62a9d2721b1efbb8040937a  inputs/real-g0-pass.txt
+   7d1ad7996fd600300f5cb14a43c2e16290e8872ec3c6960ce2ad414251b77e84  unmarked/cf/ce1-real-release-g0-confirm.txt
+REHEARSAL: these inputs are rehearsal transcripts; whatever the result, it authorises no release and no reboot
+TEST CLOCK: --now 2026-11-28T05:40:00Z stands in for this workstation's clock (rehearsal only)
+ACCEPT owner-checks FAIL BLOCKED, not PASS (a Phase 3.12 output is pre-Phase-4 evidence): OWNER CHECKS RESULT BLOCKED fail=B1,B2,B3 unknown=none
+ACCEPT reverify FAIL the --as-arm process still carries an admin group, so this was saved before Phase 4: BACKUP INSTALL RESULT PASS (as arm via setpriv, no login: uid=1000(arm) gid=1000(arm) groups=1000(arm),27(sudo),997
+ACCEPT version FAIL [after FAILED owner-checks,reverify] release-g0 needs exactly one off-host 'OWNER VERDICT VERSION PASS ... role=offhost ... qualification=FIXTURE qual-sha256=...'; off-host: OWNER VERDICT VERSION STOP
+ACCEPT verdict FAIL made at 2026-11-28T04:59:16Z, not after the version check (2026-11-28T05:21:26Z)
+INFO confirm: not judged (the gate verdict did not pass); its access epoch 5d1e0c2b9a8f7e6d5c4b3a2918070605 is compared in (f)
+INFO access: the passing parts agree on epoch 5d1e0c2b9a8f7e6d5c4b3a2918070605; the failed or unjudged parts are not compared
+INFO pin: --pin-rev not given (rehearsal; the pin is then bound by the wrapper's qual-sha256 only)
+ACCEPT fresh PASS verdict 2026-11-28T04:59:16Z is -21 min after the older Phase 4 evidence (2026-11-28T05:20:46Z); checked 40 min later at 2026-11-28T05:40:00Z (test clock)
+GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO failed=owner-checks,reverify,version,verdict reason="owner-checks: BLOCKED, not PASS (a Phase 3.12 output is pre-Phase-4 evidence): OWNER CHECKS RESULT BLOCKED fail=B1,B2,B3 unknown=none"
+== exit 1

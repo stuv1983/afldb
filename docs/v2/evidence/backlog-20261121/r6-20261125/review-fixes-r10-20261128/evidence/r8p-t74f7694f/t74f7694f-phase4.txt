@@ -1,0 +1,58 @@
+== t74f7694f 2026-11-28T12:24:01Z admin root session: Phase 4 through afldb-phase4.sh (4.0 entry, 4.1 and 4.2 as 4.0 printed them)
+sudo: unable to resolve host afldb-prod: Temporary failure in name resolution
+== admin root session step phase4 2026-11-28T12:24:00Z: uid=0(root) gid=0(root) groups=0(root)
+   session: loginuid 1001; SUDO_USER=afldb-admin; parent chain: sudo:uid=1001 sshd:uid=1001 sshd:uid=0 sshd:uid=0 systemd:uid=0 
+---- Phase 4 (owner approval) through afldb-phase4.sh; the console stays open
+afldb-phase4.sh: OK
+---- 4.0 entry (it creates its own state directory; the owner writes down the STATE, SEAL and printed commands)
+PHASE4 STATE /root/afldb-phase4/attempt-20261128T122400Z-065bb0c9
+PHASE4 ENTRY match /etc/sudoers:53 token %sudo class group-only: %sudo?ALL=(ALL:ALL) ALL
+PHASE4 ENTRY pre-change: arm's groups: afldb-backup-read arm sudo (primary gid 1000)
+PHASE4 ENTRY pre-change: group line: sudo:x:27:arm,afldb-admin
+PHASE4 ENTRY pre-change: /etc/sudoers.d: 0 0 755 directory
+PHASE4 ENTRY pre-change: file /etc/sudoers uid gid mode sha256: 0 0 440 5bac27ce5ff1a78ace8f3ef81bfd60cbd44810ac3f3d280da9d7649fe90c18f8
+PHASE4 ENTRY pre-change: file /etc/sudoers.d/README uid gid mode sha256: 0 0 440 b428c9b673c3c806370f2aa28a98293a9cb578c70c3a8a2d1a39031861b3dbd8
+PHASE4 ENTRY pre-change: sudo -l -U arm: arm may run: (ALL : ALL) ALL;
+PHASE4 ENTRY pre-change: sudo -l -U afldb-admin: (ALL : ALL) ALL;
+PHASE4 ENTRY pre-change: include directives: @includedir /etc/sudoers.d;
+PHASE4 ENTRY change 1 (group-only, step 4.1 by apply): gpasswd -d arm sudo; back-out: gpasswd -a arm sudo, after which id -Gn arm lists exactly: afldb-backup-read arm sudo 
+PHASE4 ENTRY precondition, NOT checked by this script: the [CON] root session is open now and stays open until 4.7
+PHASE4 ENTRY precondition, NOT checked by this script: Phase 1 verified twice (1.13), two independently authenticated admin logins
+PHASE4 ENTRY precondition, NOT checked by this script: the owner's separate written approval of THIS state directory and seal, given after reading this output
+PHASE4 ENTRY precondition, NOT checked by this script: every other Phase 2 FAIL resolved, every UNKNOWN resolved or accepted, the section 0 residual accepted
+PHASE4 ENTRY apply (4.1, [ADM-ROOT]): (cd /root/afldb-r10-phase4 && sha256sum -c --strict SHA256SUMS) && env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/afldb-r10-phase4/afldb-phase4.sh apply --state /root/afldb-phase4/attempt-20261128T122400Z-065bb0c9 --seal 6c29b949a9aa9bc82d93a3a5957af4c9bb4f2cf82474df59d98c63668e31061a
+PHASE4 ENTRY verify (4.2, [ADM-ROOT]): (cd /root/afldb-r10-phase4 && sha256sum -c --strict SHA256SUMS) && env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/afldb-r10-phase4/afldb-phase4.sh verify --state /root/afldb-phase4/attempt-20261128T122400Z-065bb0c9 --seal 6c29b949a9aa9bc82d93a3a5957af4c9bb4f2cf82474df59d98c63668e31061a
+PHASE4 ENTRY back-out ([CON], also from a fresh console session): (cd /root/afldb-r10-phase4 && sha256sum -c --strict SHA256SUMS) && env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/afldb-r10-phase4/afldb-phase4.sh backout --state /root/afldb-phase4/attempt-20261128T122400Z-065bb0c9 --seal 6c29b949a9aa9bc82d93a3a5957af4c9bb4f2cf82474df59d98c63668e31061a
+PHASE4 STATE /root/afldb-phase4/attempt-20261128T122400Z-065bb0c9
+PHASE4 SEAL 6c29b949a9aa9bc82d93a3a5957af4c9bb4f2cf82474df59d98c63668e31061a
+PHASE4 ENTRY RESULT PASS change=group-only matches=1 grants-removed=0 state=/root/afldb-phase4/attempt-20261128T122400Z-065bb0c9 seal=6c29b949a9aa9bc82d93a3a5957af4c9bb4f2cf82474df59d98c63668e31061a
+R8P P4-ENTRY exit 0
+   access epoch before 4.1: none
+---- 4.1 the apply command 4.0 printed, run as printed: (cd /root/afldb-r10-phase4 && sha256sum -c --strict SHA256SUMS) && env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/afldb-r10-phase4/afldb-phase4.sh apply --state /root/afldb-phase4/attempt-20261128T122400Z-065bb0c9 --seal 6c29b949a9aa9bc82d93a3a5957af4c9bb4f2cf82474df59d98c63668e31061a
+afldb-phase4.sh: OK
+PHASE4 APPLY state /root/afldb-phase4/attempt-20261128T122400Z-065bb0c9 seal 6c29b949a9aa9bc82d93a3a5957af4c9bb4f2cf82474df59d98c63668e31061a verified; plan: change=group-only remove=
+PHASE4 APPLY access epoch none -> 4613d777d9de850ec9dee95a7f5079e0 written to /var/lib/afldb-access/epoch (apply of /root/afldb-phase4/attempt-20261128T122400Z-065bb0c9)
+PHASE4 APPLY VOID: STOP: every saved 4.4, 4.5 and 4.6 output and every gate verdict made before this moment is VOID, even on this boot and inside the freshness window. Before any gate: repeat 4.4, 4.5 and 4.6, then make a NEW gate call
+PHASE4 APPLY ran: gpasswd -d arm sudo
+PHASE4 APPLY check visudo-c PASS
+PHASE4 APPLY next: verify (4.2): (cd /root/afldb-r10-phase4 && sha256sum -c --strict SHA256SUMS) && env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/afldb-r10-phase4/afldb-phase4.sh verify --state /root/afldb-phase4/attempt-20261128T122400Z-065bb0c9 --seal 6c29b949a9aa9bc82d93a3a5957af4c9bb4f2cf82474df59d98c63668e31061a
+PHASE4 APPLY if 4.2 STOPs or 4.3 fails, back-out from [CON], also from a fresh console session: (cd /root/afldb-r10-phase4 && sha256sum -c --strict SHA256SUMS) && env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/afldb-r10-phase4/afldb-phase4.sh backout --state /root/afldb-phase4/attempt-20261128T122400Z-065bb0c9 --seal 6c29b949a9aa9bc82d93a3a5957af4c9bb4f2cf82474df59d98c63668e31061a
+PHASE4 APPLY RESULT PASS applied /root/afldb-phase4/attempt-20261128T122400Z-065bb0c9 (seal 6c29b949a9aa9bc82d93a3a5957af4c9bb4f2cf82474df59d98c63668e31061a): change=group-only remove=
+R8P P4-APPLY exit 0
+   id arm: uid=1000(arm) gid=1000(arm) groups=1000(arm),997(afldb-backup-read)
+   access epoch after 4.1: 4613d777d9de850ec9dee95a7f5079e0
+---- 4.2 the verify command 4.0 printed, run as printed: (cd /root/afldb-r10-phase4 && sha256sum -c --strict SHA256SUMS) && env -i PATH=/usr/sbin:/usr/bin LC_ALL=C /usr/bin/bash --noprofile --norc /root/afldb-r10-phase4/afldb-phase4.sh verify --state /root/afldb-phase4/attempt-20261128T122400Z-065bb0c9 --seal 6c29b949a9aa9bc82d93a3a5957af4c9bb4f2cf82474df59d98c63668e31061a
+afldb-phase4.sh: OK
+PHASE4 VERIFY state /root/afldb-phase4/attempt-20261128T122400Z-065bb0c9 seal 6c29b949a9aa9bc82d93a3a5957af4c9bb4f2cf82474df59d98c63668e31061a verified; plan: change=group-only remove=
+PHASE4 VERIFY check applied PASS this host records /root/afldb-phase4/attempt-20261128T122400Z-065bb0c9 as the applied attempt
+PHASE4 VERIFY check groups PASS arm's groups: afldb-backup-read arm (pre-change minus sudo)
+PHASE4 VERIFY check file PASS /etc/sudoers unchanged
+PHASE4 VERIFY check file PASS /etc/sudoers.d/README unchanged
+PHASE4 VERIFY check admin-sudo-l PASS sudo -l -U afldb-admin equals the pre-change record: (ALL : ALL) ALL;
+PHASE4 VERIFY check visudo-c PASS
+PHASE4 VERIFY check rescan PASS no sudoers line names arm, a group of arm or a grant form entry refuses, and no outside rule source
+PHASE4 VERIFY check sudo-l PASS sudo -l -U arm: arm is not allowed to run sudo
+PHASE4 VERIFY RESULT PASS the realised change equals the plan (change=group-only remove=) and arm cannot sudo
+R8P P4-VERIFY exit 0
+   handed over: c52258973a413bf6 3.11-verify-verify-install.txt; 5eff8ea66bcdcabf 3.12-owner-checks.txt; 38b915bdb28bee6b 3.5-verify-backup-install.txt; 4cdc6b3f22d0789a 3.6-verify-backup-install-as-arm.txt; 090afae98aa07c33 4.0-entry.txt; 4bde619772271e67 4.1-apply.txt; 
+R8P PHASE4 done

@@ -1,0 +1,17 @@
+== case p4-ng-pre-production: bash afldb-gate-accept.sh --gate ng-pre --owner-checks unmarked/p4/fx-oc-4.4-bootid.txt --reverify unmarked/p4/fx-reverify-4.5-bootid.txt --version unmarked/p4/fx-version-post-offhost-unqualified-prod.txt --verdict unmarked/p4/fx-a2-pass-post-prod.txt --verdict-exit 0 --confirm unmarked/cf/p4-ng-pre-production-confirm.txt
+== afldb-gate-accept 2026-11-28T11:39:13Z gate=ng-pre transport=production (read-only; inputs by sha256)
+   c53b64953b83658499e10165b2b1f31fc2e9bf5d9de192fcb2de399253d5e7a6  unmarked/p4/fx-oc-4.4-bootid.txt
+   63c010d60ef8552d1a07bf6cc5df29589088e2c5876ba6613d67f70f88e2a6c5  unmarked/p4/fx-reverify-4.5-bootid.txt
+   3a0c4b7153ca44c9042d112f6bccae460d1689f92fc6956c5a5b5ca9e26ca20b  unmarked/p4/fx-version-post-offhost-unqualified-prod.txt
+   74f6f0fa2e64a30dda3adb5885cb16f46f96bd5d268c82eb7afbaf2523a12f10  unmarked/p4/fx-a2-pass-post-prod.txt
+   4d33822cd5ef62c759af4279af04c475cd9560c86bcfa2db6df71eb556d4db54  unmarked/cf/p4-ng-pre-production-confirm.txt
+ACCEPT owner-checks PASS post-Phase-4 PASS at 2026-11-28T11:33:25Z, boot c3524e4759ab4e0f8050875471b56b12 (B1, B2, B3 PASS; every CHECK line PASS)
+ACCEPT reverify PASS root 2026-11-28T11:33:19Z, --as-arm 2026-11-28T11:33:21Z (arm has no admin group), verify-install 2026-11-28T11:33:24Z, bundle 58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8, boot c3
+INFO version off-host line (not an NG-PRE criterion): OWNER VERDICT VERSION STOP transport=production host=none role=offhost reason="no qualified off-host endpoint" qualification=none qual-sha256=none
+ACCEPT version PASS production VERSION PASS nonce=23a740e15b1b7ed52e712d32d1f162c5 at=2026-11-28T11:35:33Z boot=c3524e4759ab4e0f8050875471b56b12, after (a) and (b), same boot as both
+ACCEPT verdict PASS OWNER VERDICT A2 PASS at=2026-11-28T11:37:12Z boot=c3524e4759ab4e0f8050875471b56b12, exit 0, after the version check
+ACCEPT confirm PASS production VERSION PASS nonce=23a740e15b1b7ed52e712d32d1f162c5 at=2026-11-28T11:38:13Z, after the verdict, same boot and bundle, 1 min before this check
+ACCEPT access PASS 4.4, 4.5, 4.6, the gate verdict and the confirm call all carry access epoch 5d1e0c2b9a8f7e6d5c4b3a2918070605: no access change was recorded from 4.4 to the confirm
+ACCEPT fresh PASS verdict 2026-11-28T11:37:12Z is 3 min after the older Phase 4 evidence (2026-11-28T11:33:19Z); checked 2 min later at 2026-11-28T11:39:13Z (workstation clock)
+GATE ACCEPT NG-PRE GO transport=production boot=c3524e4759ab4e0f8050875471b56b12 access-epoch=5d1e0c2b9a8f7e6d5c4b3a2918070605 owner-checks-at=2026-11-28T11:33:25Z reverify-at=2026-11-28T11:33:24Z version-at=2026-11-28T11:35:33Z verdict-at=2026-11-28T11:37:12Z confirm-at=2026-11-28T11:38:13Z checked-at=2026-11-28T11:39:13Z clock=workstation
+== exit 0

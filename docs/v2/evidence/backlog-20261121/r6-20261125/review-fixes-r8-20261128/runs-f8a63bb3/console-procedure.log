@@ -1,0 +1,29 @@
+== r8p-run tf8a63bb3 2026-11-28T04:52:09Z workstation Office id=[uid=197609(stuar) gid=197609 groups=197609]; worktree HEAD f8a63bb3f8f5e035829f17cb38fce84f2292186f
+[HARNESS] client C:/Windows/System32/OpenSSH/ssh.exe (OpenSSH_for_Windows_9.5p2, LibreSSL 3.8.2)
+[HARNESS] workstation values: stage tar (git archive f8a63bb3f8f5e035829f17cb38fce84f2292186f) 05e662a03c786bfad82403eb68260d96e2def3270e203dccc45d26b555ddc7f7; backup SHA256SUMS e3a68821c6f97ec7a5775cbf845b4018198556f44d29e89ceb6ff0c4e2672e7d; verify SHA256SUMS 49e0fa7c84a549ba5153cec9d94c2fa2ca91d89aff34458dd9dc2fa9a4f13901; owner-checks SHA256SUMS 2568c25ffc8d23be4e95e15ef8d0cc47bcdfbb3b002fa3403d37e390dcc740ae
+[HARNESS] fresh test keys: admin SHA256:WwatqvRMQnONnwOQ+EFmwaHdY1Atwjfx8JK2YWwwqog, verify SHA256:WRL8edDdp3Y0yrk5FzZPNYoQmzTSK1/D33qMhUIeNZo, arm SHA256:mvOecqTEFY1ypaXl4ORtruflPBElpcI3dLmO2qfGc8A, swap (arm's substitute) SHA256:xBu+zd5SKwaC+1TzAqahjZBGZ+n/9HcgtC0hKYh3AUA; admin and arm passwords random, never printed
+SCENARIO setup PASS expect=arm-with-sudo got=[FIXTURE] arm as on production today: uid=1000(arm) gid=1000(arm) groups=1000(arm),27(sudo); sudo with its own password (passwd -S: P); arm's key installed
+SCENARIO console-phase0 PASS expect=root-console-session got= loginuid: 4294967295 (docker exec stands in for the provider console; production's is UNKNOWN)
+SCENARIO pubkey-swap PASS expect=refused got=refused (a key arm substituted for the carried .pub was not installed; nothing created)
+SCENARIO pubkey-optprefix PASS expect=refused got=refused (the real key behind an options prefix, same fingerprint, was not installed)
+SCENARIO admin-bootstrap PASS expect=afldb-admin-with-workstation-key got=   afldb-admin: uid=1001(afldb-admin) gid=1001(afldb-admin) groups=1001(afldb-admin),27(sudo); password P; home afldb-admin:afldb-admin 750; authorized_keys afldb-admin:afldb-admin 600 SHA256:WwatqvRM
+SCENARIO admin-login-1 PASS expect=id+sudo-v+sudo-l got=uid=1001(afldb-admin) gid=1001(afldb-admin) groups=1001(afldb-admin),27(sudo); sudo -v ok; (ALL : ALL) ALL
+SCENARIO admin-keys PASS expect=arm-key-refused-for-admin got=afldb-admin@r8p-host: Permission denied (publickey,password).
+SCENARIO stage PASS expect=workstation-digests-match got=tar 05e662a03c786bfad82403eb68260d96e2def3270e203dccc45d26b555ddc7f7, three SHA256SUMS and the verify key equal the workstation values
+SCENARIO checks-pre PASS expect=BLOCKED(arm-can-sudo) got=OWNER CHECKS RESULT BLOCKED fail=B1,B2,B3 unknown=none; CHECK B2 FAIL arm is in: sudo (arm's groups: arm sudo); session independent (CHECK A2 PASS )
+SCENARIO arm-sudo-checks PASS expect=BLOCKED(A2) got=OWNER CHECKS RESULT BLOCKED fail=A2,B1,B2,B3 unknown=none (session not independent: no result above counts)
+SCENARIO arm-sudo-installer PASS expect=REFUSED got=REFUSED: root session descends from arm: test ancestor: pid 16788 (sudo) has real/effective uid 1000/0, arm is 1000; test ancestor: pid 8645 (bash) has real/eff
+SCENARIO nothing-installed-via-arm PASS expect=nothing got=nothing (no account, group, drop-in or code directory)
+SCENARIO install-backup PASS expect=install+BACKUP-INSTALL-PASS(root) got=install exit 0, verify-backup-install root exit 0
+SCENARIO verify-backup-as-arm PASS expect=BACKUP-INSTALL-PASS(arm,no-startup-files) got=exit 0 mode=as-arm
+SCENARIO install-verify PASS expect=INSTALL-VERIFY+VERIFY-INSTALL-PASS got=install-verify exit 0, verify-verify-install exit 0
+SCENARIO checks-post-install PASS expect=BLOCKED(installs-alone-do-not-close-F1) got=OWNER CHECKS RESULT BLOCKED fail=B1,B2,B3 unknown=none
+SCENARIO wrapper-version PASS expect=VERSION-PASS(afldb-prod) got=OWNER VERDICT VERSION PASS transport=rehearsal host=afldb-prod role=prod nonce=f8ee1722730231d4a8c1079ee94c0396; offhost: STOP (no off-host container in this harness, expected)
+SCENARIO phase4 PASS expect=arm-not-allowed-sudo got=   sudo -l -U arm: User arm is not allowed to run sudo on afldb-prod.
+SCENARIO admin-login-2 PASS expect=admin-login+sudo-after-phase4 got=   session: loginuid 1001; SUDO_USER=afldb-admin; parent chain: sudo:uid=1001 sshd:uid=1001 sshd:uid=0 sshd:uid=0 system
+SCENARIO reverify PASS expect=both-install-checks-PASS got=vbi-root 0, vbi-arm 0, vvi 0
+SCENARIO checks-post-access PASS expect=PASS got=OWNER CHECKS RESULT PASS
+docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/procedure-harness/r8p-run.sh: line 225: syntax error near unexpected token `||'
+docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/procedure-harness/r8p-run.sh: line 225: `|| res admin-login-2 FAIL "expect=admin-login got=$(head -3 <<< "$O" | tr '\n' ' ')"'
+removed 1 container(s); left: containers 0, images 0, workspace removed, other r8p workspaces: 0
+R8P-EXIT 2

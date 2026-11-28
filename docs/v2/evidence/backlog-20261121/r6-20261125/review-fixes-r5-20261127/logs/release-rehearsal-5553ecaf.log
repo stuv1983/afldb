@@ -1,0 +1,1355 @@
+== R1 REHEARSAL 2026-11-27T11:55:51Z host=streamanator user=arm workspace=/mnt/ssd/afldb-r1-rehearsal.QpqD1s stage=/tmp/r5coord.QxymtV/u
+-- A. static checks and the production host guard (each production script refuses off afldb-prod)
+REH PASS bash -n r1-g0-dump.sh
+REH PASS bash -n r1-p1-precheck.sh
+REH PASS bash -n r1-p2-ff.sh
+REH PASS bash -n r1-p3-build.sh
+REH PASS bash -n r1-p3b-build-check.sh
+REH PASS bash -n r1-p4-gate-promote.sh
+REH PASS bash -n r1-p5-accept.sh
+REH PASS bash -n r1-p6-observe.sh
+REH PASS bash -n r1-rawhead.sh
+REH PASS bash -n r1-rollback.sh
+REH PASS bash -n r1-s9-public-smoke.sh
+REH PASS node --check r1-browser.cjs
+REH PASS guard r1-g0-dump.sh
+REH PASS guard r1-p1-precheck.sh
+REH PASS guard r1-p2-ff.sh
+REH PASS guard r1-p3-build.sh
+REH PASS guard r1-p3b-build-check.sh
+REH PASS guard r1-p4-gate-promote.sh
+REH PASS guard r1-p5-accept.sh
+REH PASS guard r1-rawhead.sh
+REH PASS guard r1-p6-observe.sh
+REH PASS guard r1-rollback.sh
+REH PASS the guard runs wrote nothing in /home/arm (no r1-* file, no tmux session)
+bad S9_BASE
+REH PASS S9 refuses a non-loopback S9_BASE
+STOP rehearsal seams are refused against production
+REH PASS browser refuses rehearsal seams against production
+REH PASS serving_identity identical in P1, P5 and rollback
+REH PASS revalidate_ordinals identical in P5 and rollback
+REH PASS pick_overnight_dump identical to the reviewed R6 copy
+-- B. disposable Git: bare origin (main = 17822b29) and a checkout on main at 7d92042f
+REH PASS checkout on main at 7d92042f, clean, origin/main = 17822b29
+REH PASS .env is ignored (porcelain still empty)
+-- C. sandbox releases with the REAL supervisor blobs
+made c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC: 3 files, manifest 1c4e0ad7e346, supervisor 9882 B
+made 7d92042fd110-XWruOm_9nLCSMY8nGPqYU: 3 files, manifest 4ffaece7655e, supervisor 9882 B
+made 17822b29e6de-R1rehearsal0000000000a: 3 files, manifest 6bf71581393a, supervisor 11190 B
+PASS release.json revision = 7d92042fd11010eaa20966e2f49ae7a93e286568; supervisor = Git blob (d82f24c48e2bc310857826e8fecc2e5ad90381ec3267c0d1ddba5ae19a822865) and pinned in MANIFEST.sha256
+REH PASS 7d92042f release supervisor = pinned d82f24c48e2bc310857826e8fecc2e5ad90381ec3267c0d1ddba5ae19a822865 and in its MANIFEST
+PASS release.json revision = 17822b29e6de2b6248cd7ada4221800fd81e0003; supervisor = Git blob (4e8ea9b5be9cda02a6d1e7251a68ab95887be9a2bf055e67ed03703d1ff81a17) and pinned in MANIFEST.sha256
+REH PASS 17822b29 release supervisor = pinned 4e8ea9b5be9cda02a6d1e7251a68ab95887be9a2bf055e67ed03703d1ff81a17 and in its MANIFEST (P3b rule)
+STOP release supervisor sha256 c4ffd9db2a962f5dedaa35b47009487eeaecc83c5a22de17045496c33197c6be is not the pinned blob 4e8ea9b5be9cda02a6d1e7251a68ab95887be9a2bf055e67ed03703d1ff81a17; do NOT promote
+REH PASS P3b rule on a release whose supervisor changed by one byte (refused as expected)
+STOP release.json revision 17822b29e6de2b6248cd7ada4221800fd81e0003 is not 7d92042fd11010eaa20966e2f49ae7a93e286568; do NOT promote
+REH PASS P3b rule on the right bytes but the wrong revision (refused as expected)
+release: VERIFY PASS 17822b29e6de-R1rehearsal0000000000a (revision 17822b29e6de2b6248cd7ada4221800fd81e0003, BUILD_ID R1rehearsal0000000000a, 3 files)
+REH PASS release.mjs verify 17822b29e6de-R1rehearsal0000000000a (sandbox root)
+-- D. systemd user unit with the production shape
+serving line: [afldb] serving build XWruOm_9nLCSMY8nGPqYU release 7d92042fd110-XWruOm_9nLCSMY8nGPqYU revision 7d92042fd11010eaa20966e2f49ae7a93e286568
+  FragmentPath /home/arm/.config/systemd/user/afldb-r1-reh.service sha256 e54b1764c5ae20864fb19e673988d605826f49b40c3ea3dfac4f7cca9ccded46
+  DropInPaths /home/arm/.config/systemd/user/afldb-r1-reh.service.d/release-route.conf
+  WorkingDirectory /mnt/ssd/afldb-r1-rehearsal.QpqD1s/afldb-releases/current
+  ExecStart argv: /home/arm/.nvm/versions/node/v22.23.2/bin/node deploy/server-cluster.mjs (relative: resolved in WorkingDirectory)
+REH PASS P1 route check: drop-in loaded, WorkingDirectory=<root>/current, relative ExecStart
+  primary pid 47749 cwd /mnt/ssd/afldb-r1-rehearsal.QpqD1s/afldb-releases/releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+  primary argv /home/arm/.nvm/versions/node/v22.23.2/bin/node deploy/server-cluster.mjs 
+  supervisor in the primary's cwd: sha256 d82f24c48e2bc310857826e8fecc2e5ad90381ec3267c0d1ddba5ae19a822865
+  primary revalidation names (non-empty, counts only): URL 1 SECRET 1
+  worker pid 47760 ordinal 1 count 2 cwd /mnt/ssd/afldb-r1-rehearsal.QpqD1s/afldb-releases/releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU names 1/1
+  worker pid 47761 ordinal 2 count 2 cwd /mnt/ssd/afldb-r1-rehearsal.QpqD1s/afldb-releases/releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU names 1/1
+REH PASS P1 identity: primary in the 7d92042f release, supervisor d82f24c4, workers 1 and 2, names 1/1
+  primary pid 47749 cwd /mnt/ssd/afldb-r1-rehearsal.QpqD1s/afldb-releases/releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+  primary argv /home/arm/.nvm/versions/node/v22.23.2/bin/node deploy/server-cluster.mjs 
+  supervisor in the primary's cwd: sha256 d82f24c48e2bc310857826e8fecc2e5ad90381ec3267c0d1ddba5ae19a822865
+  identity FAIL: supervisor sha256 is not the pinned 4e8ea9b5be9cda02a6d1e7251a68ab95887be9a2bf055e67ed03703d1ff81a17
+  primary revalidation names (non-empty, counts only): URL 1 SECRET 1
+  worker pid 47760 ordinal 1 count 2 cwd /mnt/ssd/afldb-r1-rehearsal.QpqD1s/afldb-releases/releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU names 1/1
+  worker pid 47761 ordinal 2 count 2 cwd /mnt/ssd/afldb-r1-rehearsal.QpqD1s/afldb-releases/releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU names 1/1
+REH PASS P1 identity with the 17822b29 supervisor pin (refused as expected)
+REH PASS supervisor log names the 7d92042f release
+{
+ "mode": "baseline",
+ "pages": {
+  "/brownlow/2026": {
+   "title": "2026 Brownlow Medal — Winner, Votes & Leaderboard | AFLDB",
+   "robots": "noindex, nofollow",
+   "codes": [
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200
+   ],
+   "cache": [
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT"
+   ],
+   "workers": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "badges": [
+    14,
+    14,
+    14,
+    14,
+    14,
+    14,
+    14,
+    14
+   ]
+  },
+  "/seasons/2026": {
+   "title": "2026 AFL Season — Ladder, Results & Finals | AFLDB",
+   "robots": "noindex, nofollow",
+   "codes": [
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200
+   ],
+   "cache": [
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT"
+   ],
+   "workers": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "badges": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ]
+  }
+ },
+ "controls": {
+  "/brownlow/2099": [
+   {
+    "code": 404,
+    "title": "Page not found | AFLDB",
+    "won": false
+   },
+   {
+    "code": 404,
+    "title": "Page not found | AFLDB",
+    "won": false
+   },
+   {
+    "code": 404,
+    "title": "Page not found | AFLDB",
+    "won": false
+   },
+   {
+    "code": 404,
+    "title": "Page not found | AFLDB",
+    "won": false
+   }
+  ],
+  "/brownlow/02026": [
+   {
+    "code": 404,
+    "title": "Page not found | AFLDB",
+    "won": false
+   },
+   {
+    "code": 404,
+    "title": "Page not found | AFLDB",
+    "won": false
+   }
+  ]
+ },
+ "unaccepted": {
+  "/brownlow/1897": [
+   {
+    "code": 200,
+    "title": "1897 Brownlow Medal — Winner, Votes & Leaderboard | AFLDB",
+    "won": true
+   },
+   {
+    "code": 200,
+    "title": "1897 Brownlow Medal — Winner, Votes & Leaderboard | AFLDB",
+    "won": true
+   }
+  ]
+ },
+ "sitemap": {
+  "/sitemap.xml": {
+   "code": 404,
+   "sha256": "7b09d409c0da435f0b24c8901de4cf0a06c81397b11614996f32ee63433934dd"
+  },
+  "/sitemap/1.xml": {
+   "code": 404,
+   "sha256": "7b09d409c0da435f0b24c8901de4cf0a06c81397b11614996f32ee63433934dd"
+  },
+  "/robots.txt": {
+   "code": 200,
+   "sha256": "331ea9090db0c9f6f597bd9840fd5b171830f6e0b3ba1cb24dfa91f0c95aedc1"
+  }
+ },
+ "fails": [],
+ "bad": 0
+}
+RAWHEAD RESULT baseline PASS
+REH PASS raw-head baseline on the old build (records /brownlow/1897 = 200 as the ISSUE-367 live control)
+  tick: health=200:ok seasons=200:title-ok brownlow=200:title-ok
+REH PASS P6 tick on the old build
+-- E. P2: real fast-forward in the disposable checkout
+PASS start state 7d92042fd11010eaa20966e2f49ae7a93e286568 on main, clean
+origin/main = 17822b29e6de2b6248cd7ada4221800fd81e0003
+STOP unexpected remote drift: origin/main is 17822b29e6de2b6248cd7ada4221800fd81e0003, the approved pin is 0123456789abcdef0123456789abcdef01234567
+REH PASS P2 with an unexpected origin/main pin (remote drift stop) (refused as expected)
+REH PASS after the refusal the checkout is still 7d92042f
+PASS start state 7d92042fd11010eaa20966e2f49ae7a93e286568 on main, clean
+origin/main = 17822b29e6de2b6248cd7ada4221800fd81e0003
+PASS CAND is an ancestor of origin/main
+PASS start HEAD is an ancestor of (or equal to) CAND
+PASS tested 69538980 is an ancestor of CAND
+PASS 7d92042f..CAND raw delta = reviewed a5a86e972d9002681b8f4ae747819ec7509db42ad101b59c47cb591e5a50d628 (206 paths)
+PASS non-records part = reviewed 519f54c512bf3e2f900054fd530332e57f418a85801c03de97f4a7a61e110257:
+  deploy/server-cluster.mjs
+  legacy/offline/tools/rebuild/draftguru/acquire_draft.py
+  src/app/api/internal/revalidate-season/route.ts
+  src/app/brownlow/[year]/page.tsx
+  src/app/sitemap.ts
+  src/db/queries/brownlow.ts
+  src/lib/acquisition/season-revalidation.ts
+  src/lib/admin/award-season-fanout.ts
+  tests/db-test-rebuild.test.ts
+  tests/deploy-release.test.ts
+  tests/deploy-web-unit.test.ts
+  tests/draftguru-import.test.ts
+  tests/integration/brownlow-pending-projection.test.ts
+  tests/integration/database.test.ts
+  tests/integration/player-matching.test.ts
+  tests/python/aflw_race_guard.py
+  tests/python/aflw_race_guard_refusals.py
+  tests/python/aflw_race_loader.py
+  tests/python/aflw_staging_contract.py
+  tests/python/aflw_staging_race.py
+  tests/python/draftguru_reviewed_pin_contract.py
+  tests/settle-season-revalidation.test.ts
+  tests/v2-coleman-projection.test.ts
+  tests/v2-gap029-label-checks.test.ts
+  tools/aflw/README.md
+  tools/aflw/load_staging.py
+  tools/aflw/parse_aflw.py
+  tools/db/migrate.ts
+  tools/db/privileges.ts
+  tools/db/target-identity.ts
+  tools/maintenance/backup.sh
+  tools/maintenance/offhost-pull.sh
+  tools/maintenance/revalidate-season.ts
+  tools/maintenance/scheduled-backup.sh
+  tools/rebuild/draftguru/draftguru-contract.json
+  tools/rebuild/draftguru/import_draftguru.py
+  tools/rebuild/draftguru/parse_draft_snapshot.py
+  tools/v2/rebuild-tier-p.ts
+PASS no migration, dependency, Next config, unit or drop-in change
+PASS supervisor deploy/server-cluster.mjs at CAND = pinned 4e8ea9b5be9cda02a6d1e7251a68ab95887be9a2bf055e67ed03703d1ff81a17 (ISSUE-362 trace route class; inert while AFLDB_TRACE_REQUESTS is unset)
+PASS 69538980..CAND = records and tests/python only (10 paths)
+PASS application tree CAND = 69538980 = a8c3623f918ec01b913520329aa952d7e7d2b6409784ec6ed821c03af8c2ab7c
+Updating 7d92042f..17822b29
+Fast-forward
+ CHANGELOG.md                                       |   75 +-
+ IssuesIndex.md                                     |  141 +-
+ blockers.md                                        |    8 +
+ deploy/server-cluster.mjs                          |   20 +-
+ .../draftguru/annual-html-20261122.json            |  851 +++
+ ...-2027-season-operations-successor-2026-11-02.md |    2 +
+ .../evidence/backlog-20261121/A1-TIMING-OPTIONS.md |   74 +
+ .../backlog-20261121/ATTENDED-DRAFT-20261122b.md   |   47 +
+ .../ATTENDED-PLAN-A1-A2-20261124.md                |  350 +
+ .../backlog-20261121/ATTENDED-PLAN-R6-20261125.md  |  460 ++
+ .../backlog-20261121/DECISIONS-20261122c.md        |  148 +
+ .../backlog-20261121/DECISIONS-20261122d.md        |  116 +
+ .../backlog-20261121/DECISIONS-20261122e.md        |   88 +
+ .../backlog-20261121/DECISIONS-20261122f.md        |   90 +
+ .../backlog-20261121/FRESH-SESSION-PROMPT-A1A2.md  |   99 +
+ .../backlog-20261121/OPEN-ITEMS-AFTER-SITTINGS.md  |  102 +
+ .../backlog-20261121/R5-RETENTION-PROPOSAL.md      |  132 +
+ .../backlog-20261121/R8-OPENING-PLAN-2027-DRAFT.md |  108 +
+ docs/v2/evidence/backlog-20261121/RC-371-372.md    |  241 +-
+ docs/v2/evidence/backlog-20261121/RUN-20261122b.md |   94 +
+ .../backlog-20261121/SITTING-A1-A2-20261122.md     |  171 +
+ .../a1a2-20261124/a1-p1-precheck.sh                |   76 +
+ .../backlog-20261121/a1a2-20261124/a1-p2-ff.sh     |   57 +
+ .../backlog-20261121/a1a2-20261124/a1-p3-build.sh  |   27 +
+ .../a1a2-20261124/a1-p3b-build-check.sh            |   33 +
+ .../a1a2-20261124/a1-p4-gate-promote.sh            |   24 +
+ .../backlog-20261121/a1a2-20261124/a1-p5-accept.sh |   43 +
+ .../a1a2-20261124/a1-p6-observe.sh                 |   61 +
+ .../backlog-20261121/a1a2-20261124/a1-rawhead.sh   |   83 +
+ .../backlog-20261121/a1a2-20261124/a1-rollback.sh  |   34 +
+ .../a1a2-20261124/a1-s9-public-smoke.sh            |   24 +
+ .../a1a2-20261124/a2-cron-install.sh               |  147 +
+ .../a1a2-20261124/a2-cron-observe.sh               |   45 +
+ .../a1a2-20261124/a2-helper-install.sh             |  125 +
+ .../backlog-20261121/a1a2-20261124/a2-keyline.sh   |   37 +
+ .../backlog-20261121/a1a2-20261124/a2-p0-entry.sh  |   86 +
+ .../a1a2-20261124/a2-r3-firstcopy-restore.sh       |   42 +
+ .../a1a2-20261124/a2-r3-verify-target.sh           |   30 +
+ .../backlog-20261121/a1a2-20261124/a2-r4-probes.sh |   43 +
+ .../a1a2-20261124/dry-tests-20261122d/bash-n.txt   |   18 +
+ .../a1a2-20261124/dry-tests-20261122d/t-cron.log   |   57 +
+ .../a1a2-20261124/dry-tests-20261122d/t-cron.sh    |   86 +
+ .../dry-tests-20261122g/t-offhost-stamp.sh         |  114 +
+ .../dry-tests-20261122g/t-sunday-review.sh         |   96 +
+ .../dry-tests-20261123/t-352-preverify-selector.sh |   80 +
+ .../dry-tests-20261123/t-352-revalidate-accept.sh  |   33 +
+ .../dry-tests-20261123/t-352-scheduled-origin.sh   |  270 +
+ .../20261121T171248Z-prime-dryrun-prime.jsonl      |   31 +
+ ...20261121T171248Z-prime-dryrun-prime.summary.txt |   13 +
+ .../20261121T171410Z-prime-after-cli-prime.jsonl   |   31 +
+ ...61121T171410Z-prime-after-cli-prime.summary.txt |   13 +
+ .../20261121T173503Z-check-post-publish.jsonl      |   55 +
+ ...20261121T173503Z-check-post-publish.summary.txt |   14 +
+ .../20261121T174336Z-check-post-publish-371.jsonl  |   55 +
+ ...1121T174336Z-check-post-publish-371.summary.txt |   14 +
+ .../20261121T174431Z-standings-371.jsonl           |    8 +
+ .../backlog-20261121/dev-371-372/README.md         |  248 +
+ .../dev-371-372/apply-commit-20261121T173540Z.json |   37 +
+ .../dev-371-372/apply-dryrun-20261121T173535Z.json |   37 +
+ .../dev-371-372/attach-target-dev.json             |   10 +
+ .../evidence/backlog-20261121/dev-371-372/check.sh |    6 +
+ .../dev-371-372/deploy-7d92042f-excerpt.txt        |    8 +
+ .../evidence/backlog-20261121/dev-371-372/prime.sh |    6 +
+ .../backlog-20261121/dev-371-372/probe.mjs         |  127 +
+ .../backlog-20261121/dev-371-372/standings.mjs     |   43 +
+ .../backlog-20261121/fix-20261123/BLOB-PINS.md     |   41 +
+ .../fix-20261123/ISSUE-352-HANDOFF.md              |  131 +
+ .../issue348-acquisition/F2-DECISION-REVIEW.md     |  234 +
+ .../issue348-acquisition/LOAD-WINDOW-PROPOSAL.md   |  297 +
+ .../issue348-acquisition/SEALED-PLAN.md            |  123 +
+ .../issue348-acquisition/i348-postload-check.sh    |  385 ++
+ .../postload-dryrun-20261122d.log                  |  526 ++
+ .../privcheck-20261122e/i348-privcheck.sh          |   80 +
+ .../raw-output-prod-20261121T211224Z.txt           |   16 +
+ .../privcheck-20261122e/rehearsal-20261122e.log    |   84 +
+ .../sealed/draftguru-surface-digest.sql            |   44 +
+ .../issue348-acquisition/sealed/expected-post.txt  |   10 +
+ .../issue348-acquisition/sealed/expected-pre.txt   |   10 +
+ .../sealed/guard-report-annual-html-20261122.json  | 3412 +++++++++
+ .../issue348-acquisition/sealed/i348-load.sh       |  106 +
+ .../sealed/i348-transfer.SHA256SUMS                |   92 +
+ .../reconciliation-annual-html-20261122.json       | 7214 ++++++++++++++++++++
+ .../issue348-acquisition/sealed/scripts/char348.py |   33 +
+ .../issue348-acquisition/sealed/scripts/cmp348.py  |   61 +
+ .../issue348-acquisition/sealed/scripts/dig348.sh  |    8 +
+ .../sealed/scripts/pin_values.py                   |   25 +
+ .../sealed/scripts/recon348.py                     |  133 +
+ .../sealed/scripts/restore348.mjs                  |   21 +
+ .../sealed/scripts/runner348.sh                    |   27 +
+ .../issue348-acquisition/sealed/scripts/s348-db.sh |   72 +
+ .../sealed/scripts/s348-setup.sh                   |   28 +
+ .../sealed/scripts/state348.py                     |   87 +
+ .../issue348-acquisition/sealed/scripts/sync348.sh |   10 +
+ .../issue348-acquisition/sealed/scripts/t348.sh    |   14 +
+ .../backlog-20261121/issue363-tierp/README.md      |  143 +
+ .../issue363-tierp/host-scripts/compare.sh         |   17 +
+ .../issue363-tierp/host-scripts/fp.sql             |   13 +
+ .../host-scripts/gridley-summary.mjs               |   30 +
+ .../issue363-tierp/host-scripts/negctl.sh          |   21 +
+ .../issue363-tierp/host-scripts/setup.sh           |   72 +
+ .../issue363-tierp/host-scripts/tier-p.sh          |   78 +
+ .../issue363-tierp/runs/dry_SUMMARY.txt            |    3 +
+ .../issue363-tierp/runs/fp-S-after.txt             |   98 +
+ .../issue363-tierp/runs/fp-S-before.txt            |   98 +
+ .../issue363-tierp/runs/gp1_SUMMARY.txt            |   32 +
+ .../issue363-tierp/runs/gp1_gridley-summary.json   |    1 +
+ .../issue363-tierp/runs/gp2_SUMMARY.txt            |   32 +
+ .../issue363-tierp/runs/gp2_gridley-summary.json   |    1 +
+ .../issue363-tierp/runs/negctl.txt                 |   12 +
+ .../issue363-tierp/runs/p1_SUMMARY.txt             |   11 +
+ .../issue363-tierp/runs/p1_out_tier-p-report.json  |  193 +
+ .../issue363-tierp/runs/p2_SUMMARY.txt             |   11 +
+ .../issue363-tierp/runs/p2_out_tier-p-report.json  |  193 +
+ .../issue363-tierp/runs/s_SUMMARY.txt              |    2 +
+ .../issue363-tierp/runs/setup-bridge.log           |   17 +
+ .../issue363-tierp/runs/setup-checkout.log         |    4 +
+ .../issue363-tierp/runs/setup-s0.log               |    5 +
+ .../ACCEPTED-RESIDUAL-118.md                       |  146 +
+ .../issue373-gc-investigation/README.md            |  182 +
+ .../failing-cells-118.csv                          |  119 +
+ .../backlog-20261121/kits/KITS-20261122.md         |   34 +-
+ .../kits/afldb-offhost-pull-daily.sh               |   49 +-
+ .../backlog-20261121/kits/afldb-settle-check.sh    |    2 +-
+ .../kits/dry-tests-20261122b/t332.sh               |   46 +
+ .../kits/scheduled-pull-evidence.sh                |   96 +
+ .../r5-20270107/r5-retained-paths.sh               |   46 +
+ .../r6-20261125/ADVISORY-VERIFICATION.md           |   78 +
+ .../r6-20261125/dry-run-20261122e.log              |  363 +
+ .../r6-20261125/r6-offhost-verify.sh               |   14 +
+ .../backlog-20261121/r6-20261125/r6-post-verify.sh |  151 +
+ .../backlog-20261121/r6-20261125/r6-pre-verify.sh  |  230 +
+ .../r6-20261125/r6-public-smoke.sh                 |   28 +
+ .../r6-20261125/r6-revalidate-accept.sh            |   35 +
+ .../r6-kernel-check-20261122/README.md             |  132 +
+ .../r6-kernel-check-20261122/check.sh              |   92 +
+ .../r6-kernel-check-20261122/raw-output.txt        |  168 +
+ .../sunday-review-20261122/BLOB-PINS.md            |   16 +
+ .../sunday-review-20261122/CHANGED-FILES.md        |   31 +
+ .../sunday-review-20261122/README.md               |   96 +
+ .../sunday-review-20261122/SHA256SUMS              |   14 +
+ .../sunday-review-20261122/behaviour.log           |  101 +
+ .../sunday-review-20261122/pins-check.log          |   14 +
+ .../sunday-review-20261122/stamp-corrected.log     |   49 +
+ .../sunday-review-20261122/stamp-pre-fix.log       |   63 +
+ .../sunday-review-20261122/validation-status.txt   |   17 +
+ docs/v2/isolated-rebuild.md                        |   41 +
+ documentation/plans/PLAN-backlog-20261122b.md      |  145 +
+ documentation/plans/PLAN-backlog-20261122c.md      |  137 +
+ .../plans/PLAN-backlog-20261122d-REVIEW.md         |   58 +
+ documentation/plans/PLAN-backlog-20261122d.md      |  104 +
+ .../plans/PLAN-backlog-20261122e-REVIEW.md         |  251 +
+ documentation/plans/PLAN-backlog-20261122e.md      |   43 +
+ issues.md                                          |  259 +-
+ issues/open/AFLDB-ISSUE-367.md                     |   17 +
+ issues/open/AFLDB-ISSUE-368.md                     |   31 +
+ issues/open/AFLDB-ISSUE-374.md                     |   17 +
+ issues/open/AFLDB-ISSUE-375.md                     |   17 +
+ issues/open/AFLDB-ISSUE-376.md                     |   17 +
+ issues/open/AFLDB-ISSUE-377.md                     |   17 +
+ .../AFLDB-ASTRA-FIX-2026-11-23-FAILURES.txt        |  664 ++
+ issues/reviews/AFLDB-ASTRA-FIX-2026-11-23.md       |  129 +
+ issues/reviews/AFLDB-ASTRA-FOLLOWUP-2026-11-23.md  |   61 +
+ ...-ASTRA-PUSH-BLOCKER-2026-11-23-REFUSAL-RUNS.txt |  213 +
+ .../reviews/AFLDB-ASTRA-PUSH-BLOCKER-2026-11-23.md |  136 +
+ .../reviews/AFLDB-FULL-REVIEW-2026-11-22-FIXES.md  |   69 +
+ .../AFLDB-FULL-REVIEW-2026-11-22-RESULTS.txt       |  108 +
+ issues/reviews/AFLDB-FULL-REVIEW-2026-11-22.md     |  199 +
+ .../AFLDB-RE-REVIEW-2026-11-23-FAILURES.txt        |  606 ++
+ issues/reviews/AFLDB-RE-REVIEW-2026-11-23.md       |  127 +
+ .../tools/rebuild/draftguru/acquire_draft.py       |   99 +-
+ src/app/api/internal/revalidate-season/route.ts    |   41 +-
+ src/app/brownlow/[year]/page.tsx                   |   37 +-
+ src/app/sitemap.ts                                 |   13 +-
+ src/db/queries/brownlow.ts                         |   46 +
+ src/lib/acquisition/season-revalidation.ts         |   54 +-
+ src/lib/admin/award-season-fanout.ts               |   49 +-
+ tests/db-test-rebuild.test.ts                      |   69 +-
+ tests/deploy-release.test.ts                       |   59 +
+ tests/deploy-web-unit.test.ts                      |  115 +
+ tests/draftguru-import.test.ts                     |   26 +
+ .../brownlow-pending-projection.test.ts            |  142 +-
+ tests/integration/database.test.ts                 |   95 +
+ tests/integration/player-matching.test.ts          |  317 +-
+ tests/python/aflw_race_guard.py                    |   70 +
+ tests/python/aflw_race_guard_refusals.py           |  227 +
+ tests/python/aflw_race_loader.py                   |   26 +
+ tests/python/aflw_staging_contract.py              |  212 +-
+ tests/python/aflw_staging_race.py                  |  150 +
+ tests/python/draftguru_reviewed_pin_contract.py    |  415 ++
+ tests/settle-season-revalidation.test.ts           |  116 +
+ tests/v2-coleman-projection.test.ts                |   78 +
+ tests/v2-gap029-label-checks.test.ts               |  106 +
+ tools/aflw/README.md                               |   12 +
+ tools/aflw/load_staging.py                         |   80 +-
+ tools/aflw/parse_aflw.py                           |   30 +-
+ tools/db/migrate.ts                                |   64 +-
+ tools/db/privileges.ts                             |   17 +-
+ tools/db/target-identity.ts                        |   99 +
+ tools/maintenance/backup.sh                        |   23 +-
+ tools/maintenance/offhost-pull.sh                  |   31 +-
+ tools/maintenance/revalidate-season.ts             |    2 +-
+ tools/maintenance/scheduled-backup.sh              |   15 +-
+ tools/rebuild/draftguru/draftguru-contract.json    |   61 +
+ tools/rebuild/draftguru/import_draftguru.py        |   84 +-
+ tools/rebuild/draftguru/parse_draft_snapshot.py    |  120 +-
+ tools/v2/rebuild-tier-p.ts                         |  388 ++
+ 206 files changed, 29563 insertions(+), 258 deletions(-)
+ create mode 100644 docs/rebuild-manifests/draftguru/annual-html-20261122.json
+ create mode 100644 docs/v2/evidence/backlog-20261121/A1-TIMING-OPTIONS.md
+ create mode 100644 docs/v2/evidence/backlog-20261121/ATTENDED-DRAFT-20261122b.md
+ create mode 100644 docs/v2/evidence/backlog-20261121/ATTENDED-PLAN-A1-A2-20261124.md
+ create mode 100644 docs/v2/evidence/backlog-20261121/ATTENDED-PLAN-R6-20261125.md
+ create mode 100644 docs/v2/evidence/backlog-20261121/DECISIONS-20261122c.md
+ create mode 100644 docs/v2/evidence/backlog-20261121/DECISIONS-20261122d.md
+ create mode 100644 docs/v2/evidence/backlog-20261121/DECISIONS-20261122e.md
+ create mode 100644 docs/v2/evidence/backlog-20261121/DECISIONS-20261122f.md
+ create mode 100644 docs/v2/evidence/backlog-20261121/FRESH-SESSION-PROMPT-A1A2.md
+ create mode 100644 docs/v2/evidence/backlog-20261121/OPEN-ITEMS-AFTER-SITTINGS.md
+ create mode 100644 docs/v2/evidence/backlog-20261121/R5-RETENTION-PROPOSAL.md
+ create mode 100644 docs/v2/evidence/backlog-20261121/R8-OPENING-PLAN-2027-DRAFT.md
+ create mode 100644 docs/v2/evidence/backlog-20261121/RUN-20261122b.md
+ create mode 100644 docs/v2/evidence/backlog-20261121/SITTING-A1-A2-20261122.md
+ create mode 100644 docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-p1-precheck.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-p2-ff.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-p3-build.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-p3b-build-check.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-p4-gate-promote.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-p5-accept.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-p6-observe.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-rawhead.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-rollback.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/a1a2-20261124/a1-s9-public-smoke.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-cron-install.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-cron-observe.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-helper-install.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-keyline.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-p0-entry.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-r3-firstcopy-restore.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-r3-verify-target.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/a1a2-20261124/a2-r4-probes.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/a1a2-20261124/dry-tests-20261122d/bash-n.txt
+ create mode 100644 docs/v2/evidence/backlog-20261121/a1a2-20261124/dry-tests-20261122d/t-cron.log
+ create mode 100644 docs/v2/evidence/backlog-20261121/a1a2-20261124/dry-tests-20261122d/t-cron.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/a1a2-20261124/dry-tests-20261122g/t-offhost-stamp.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/a1a2-20261124/dry-tests-20261122g/t-sunday-review.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/a1a2-20261124/dry-tests-20261123/t-352-preverify-selector.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/a1a2-20261124/dry-tests-20261123/t-352-revalidate-accept.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/a1a2-20261124/dry-tests-20261123/t-352-scheduled-origin.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/dev-371-372/20261121T171248Z-prime-dryrun-prime.jsonl
+ create mode 100644 docs/v2/evidence/backlog-20261121/dev-371-372/20261121T171248Z-prime-dryrun-prime.summary.txt
+ create mode 100644 docs/v2/evidence/backlog-20261121/dev-371-372/20261121T171410Z-prime-after-cli-prime.jsonl
+ create mode 100644 docs/v2/evidence/backlog-20261121/dev-371-372/20261121T171410Z-prime-after-cli-prime.summary.txt
+ create mode 100644 docs/v2/evidence/backlog-20261121/dev-371-372/20261121T173503Z-check-post-publish.jsonl
+ create mode 100644 docs/v2/evidence/backlog-20261121/dev-371-372/20261121T173503Z-check-post-publish.summary.txt
+ create mode 100644 docs/v2/evidence/backlog-20261121/dev-371-372/20261121T174336Z-check-post-publish-371.jsonl
+ create mode 100644 docs/v2/evidence/backlog-20261121/dev-371-372/20261121T174336Z-check-post-publish-371.summary.txt
+ create mode 100644 docs/v2/evidence/backlog-20261121/dev-371-372/20261121T174431Z-standings-371.jsonl
+ create mode 100644 docs/v2/evidence/backlog-20261121/dev-371-372/README.md
+ create mode 100644 docs/v2/evidence/backlog-20261121/dev-371-372/apply-commit-20261121T173540Z.json
+ create mode 100644 docs/v2/evidence/backlog-20261121/dev-371-372/apply-dryrun-20261121T173535Z.json
+ create mode 100644 docs/v2/evidence/backlog-20261121/dev-371-372/attach-target-dev.json
+ create mode 100644 docs/v2/evidence/backlog-20261121/dev-371-372/check.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/dev-371-372/deploy-7d92042f-excerpt.txt
+ create mode 100644 docs/v2/evidence/backlog-20261121/dev-371-372/prime.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/dev-371-372/probe.mjs
+ create mode 100644 docs/v2/evidence/backlog-20261121/dev-371-372/standings.mjs
+ create mode 100644 docs/v2/evidence/backlog-20261121/fix-20261123/BLOB-PINS.md
+ create mode 100644 docs/v2/evidence/backlog-20261121/fix-20261123/ISSUE-352-HANDOFF.md
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue348-acquisition/F2-DECISION-REVIEW.md
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue348-acquisition/LOAD-WINDOW-PROPOSAL.md
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue348-acquisition/SEALED-PLAN.md
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue348-acquisition/i348-postload-check.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue348-acquisition/postload-dryrun-20261122d.log
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue348-acquisition/privcheck-20261122e/i348-privcheck.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue348-acquisition/privcheck-20261122e/raw-output-prod-20261121T211224Z.txt
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue348-acquisition/privcheck-20261122e/rehearsal-20261122e.log
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue348-acquisition/sealed/draftguru-surface-digest.sql
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue348-acquisition/sealed/expected-post.txt
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue348-acquisition/sealed/expected-pre.txt
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue348-acquisition/sealed/guard-report-annual-html-20261122.json
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue348-acquisition/sealed/i348-load.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue348-acquisition/sealed/i348-transfer.SHA256SUMS
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue348-acquisition/sealed/reconciliation-annual-html-20261122.json
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue348-acquisition/sealed/scripts/char348.py
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue348-acquisition/sealed/scripts/cmp348.py
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue348-acquisition/sealed/scripts/dig348.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue348-acquisition/sealed/scripts/pin_values.py
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue348-acquisition/sealed/scripts/recon348.py
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue348-acquisition/sealed/scripts/restore348.mjs
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue348-acquisition/sealed/scripts/runner348.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue348-acquisition/sealed/scripts/s348-db.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue348-acquisition/sealed/scripts/s348-setup.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue348-acquisition/sealed/scripts/state348.py
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue348-acquisition/sealed/scripts/sync348.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue348-acquisition/sealed/scripts/t348.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue363-tierp/README.md
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue363-tierp/host-scripts/compare.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue363-tierp/host-scripts/fp.sql
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue363-tierp/host-scripts/gridley-summary.mjs
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue363-tierp/host-scripts/negctl.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue363-tierp/host-scripts/setup.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue363-tierp/host-scripts/tier-p.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue363-tierp/runs/dry_SUMMARY.txt
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue363-tierp/runs/fp-S-after.txt
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue363-tierp/runs/fp-S-before.txt
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue363-tierp/runs/gp1_SUMMARY.txt
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue363-tierp/runs/gp1_gridley-summary.json
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue363-tierp/runs/gp2_SUMMARY.txt
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue363-tierp/runs/gp2_gridley-summary.json
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue363-tierp/runs/negctl.txt
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue363-tierp/runs/p1_SUMMARY.txt
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue363-tierp/runs/p1_out_tier-p-report.json
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue363-tierp/runs/p2_SUMMARY.txt
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue363-tierp/runs/p2_out_tier-p-report.json
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue363-tierp/runs/s_SUMMARY.txt
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue363-tierp/runs/setup-bridge.log
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue363-tierp/runs/setup-checkout.log
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue363-tierp/runs/setup-s0.log
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue373-gc-investigation/ACCEPTED-RESIDUAL-118.md
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue373-gc-investigation/README.md
+ create mode 100644 docs/v2/evidence/backlog-20261121/issue373-gc-investigation/failing-cells-118.csv
+ create mode 100644 docs/v2/evidence/backlog-20261121/kits/dry-tests-20261122b/t332.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/kits/scheduled-pull-evidence.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/r5-20270107/r5-retained-paths.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/r6-20261125/ADVISORY-VERIFICATION.md
+ create mode 100644 docs/v2/evidence/backlog-20261121/r6-20261125/dry-run-20261122e.log
+ create mode 100644 docs/v2/evidence/backlog-20261121/r6-20261125/r6-offhost-verify.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/r6-20261125/r6-post-verify.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/r6-20261125/r6-pre-verify.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/r6-20261125/r6-public-smoke.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/r6-20261125/r6-revalidate-accept.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/r6-kernel-check-20261122/README.md
+ create mode 100644 docs/v2/evidence/backlog-20261121/r6-kernel-check-20261122/check.sh
+ create mode 100644 docs/v2/evidence/backlog-20261121/r6-kernel-check-20261122/raw-output.txt
+ create mode 100644 docs/v2/evidence/backlog-20261121/sunday-review-20261122/BLOB-PINS.md
+ create mode 100644 docs/v2/evidence/backlog-20261121/sunday-review-20261122/CHANGED-FILES.md
+ create mode 100644 docs/v2/evidence/backlog-20261121/sunday-review-20261122/README.md
+ create mode 100644 docs/v2/evidence/backlog-20261121/sunday-review-20261122/SHA256SUMS
+ create mode 100644 docs/v2/evidence/backlog-20261121/sunday-review-20261122/behaviour.log
+ create mode 100644 docs/v2/evidence/backlog-20261121/sunday-review-20261122/pins-check.log
+ create mode 100644 docs/v2/evidence/backlog-20261121/sunday-review-20261122/stamp-corrected.log
+ create mode 100644 docs/v2/evidence/backlog-20261121/sunday-review-20261122/stamp-pre-fix.log
+ create mode 100644 docs/v2/evidence/backlog-20261121/sunday-review-20261122/validation-status.txt
+ create mode 100644 documentation/plans/PLAN-backlog-20261122b.md
+ create mode 100644 documentation/plans/PLAN-backlog-20261122c.md
+ create mode 100644 documentation/plans/PLAN-backlog-20261122d-REVIEW.md
+ create mode 100644 documentation/plans/PLAN-backlog-20261122d.md
+ create mode 100644 documentation/plans/PLAN-backlog-20261122e-REVIEW.md
+ create mode 100644 documentation/plans/PLAN-backlog-20261122e.md
+ create mode 100644 issues/open/AFLDB-ISSUE-367.md
+ create mode 100644 issues/open/AFLDB-ISSUE-368.md
+ create mode 100644 issues/open/AFLDB-ISSUE-374.md
+ create mode 100644 issues/open/AFLDB-ISSUE-375.md
+ create mode 100644 issues/open/AFLDB-ISSUE-376.md
+ create mode 100644 issues/open/AFLDB-ISSUE-377.md
+ create mode 100644 issues/reviews/AFLDB-ASTRA-FIX-2026-11-23-FAILURES.txt
+ create mode 100644 issues/reviews/AFLDB-ASTRA-FIX-2026-11-23.md
+ create mode 100644 issues/reviews/AFLDB-ASTRA-FOLLOWUP-2026-11-23.md
+ create mode 100644 issues/reviews/AFLDB-ASTRA-PUSH-BLOCKER-2026-11-23-REFUSAL-RUNS.txt
+ create mode 100644 issues/reviews/AFLDB-ASTRA-PUSH-BLOCKER-2026-11-23.md
+ create mode 100644 issues/reviews/AFLDB-FULL-REVIEW-2026-11-22-FIXES.md
+ create mode 100644 issues/reviews/AFLDB-FULL-REVIEW-2026-11-22-RESULTS.txt
+ create mode 100644 issues/reviews/AFLDB-FULL-REVIEW-2026-11-22.md
+ create mode 100644 issues/reviews/AFLDB-RE-REVIEW-2026-11-23-FAILURES.txt
+ create mode 100644 issues/reviews/AFLDB-RE-REVIEW-2026-11-23.md
+ create mode 100644 tests/python/aflw_race_guard.py
+ create mode 100644 tests/python/aflw_race_guard_refusals.py
+ create mode 100644 tests/python/aflw_race_loader.py
+ create mode 100644 tests/python/aflw_staging_race.py
+ create mode 100644 tests/python/draftguru_reviewed_pin_contract.py
+ create mode 100644 tools/db/target-identity.ts
+ create mode 100644 tools/v2/rebuild-tier-p.ts
+PASS HEAD = 17822b29e6de2b6248cd7ada4221800fd81e0003, porcelain empty
+-- checkout files run by units and acceptance (now the 17822b29 versions)
+  234fca6a226da73b125ca3dceec9ac97b2192181fd93ad168a7ca50900cb192d CHANGED tools/maintenance/scheduled-backup.sh
+  df609046a6a322db3f651d9d2c9cf1820fdb9ca0d0d4d9ae9f67c3dede1be3be CHANGED tools/maintenance/backup.sh
+  8a0ac676455523e484c78602cdb7a04197625348b55fa5950d9497e9a43955e8 same tools/maintenance/restore-test.sh
+  20ee3b452da9cb025a938a75c3200f44101fb094c1ad4662e70673df3d96b14e CHANGED tools/maintenance/revalidate-season.ts
+  bd88c915c2643fc1bc8ec005c5c6825d43af0742b33ca83f0461e9348414dbc9 CHANGED src/lib/acquisition/season-revalidation.ts
+  3d0bb2a995bb93403994dc3f6d99ab64be46c372ac15be16807e3f2187bb5419 same deploy/post-install-check.sh
+  88867c2e9afc3a9ac03b12c6093ace6be04a23eb0b6080804a8927cfde0a3e3b same deploy/afldb-settle-afl-api.sh
+  d80838cbb7162c3877ab9bf0c87d70a575b55fbc7f902bcc74d4bc6f9e65abd8 same deploy/afldb-settle-failure-status.sh
+  f00859d5c834be09f064d516ea4fa12612da379e377128e784b3523016a6086d same deploy/Caddyfile.production
+  183691d90ff3777ce199b8d3d154c812532aad6be4c195f324cc3141b506350e same deploy/host-policy/needrestart-afldb-hold.conf
+  4a277b8b6e7c7c8b8d2cb347f8949260941327cd24dbd5f3664b317611648810 same deploy/host-policy/apt-52-afldb-unattended.conf
+REH PASS P2 checks and --ff-only to exactly 17822b29
+REH PASS P2 re-run is idempotent (no merge)
+REVALIDATED season 2026: 2/2 worker(s) reached (2,1) in 2 request(s).
+  revalidate: 2/2, ordinals 2,1
+REH PASS 17822b29 revalidate CLI against the old-build cluster: 2/2, ordinals 1 and 2
+-- F. promote (real release.mjs): links switch, the running service does NOT change
+release: WARNING host gate skipped: r1 rehearsal sandbox
+release: PROMOTED 17822b29e6de-R1rehearsal0000000000a; previous 7d92042fd110-XWruOm_9nLCSMY8nGPqYU. The running service is unchanged until it restarts.
+release: next, NOW and attended: sudo systemctl restart afldb
+release: then: node deploy/release.mjs status --expect 17822b29e6de-R1rehearsal0000000000a --root /mnt/ssd/afldb-r1-rehearsal.QpqD1s/afldb-releases
+release: the activation window is OPEN: `current` names the new release but the service still runs the old one; any restart before yours (an unattended upgrade, a PostgreSQL restart) activates it without the gate (ISSUE-351)
+release: the database is not rolled back: migrations are forward-only (docs/deployment.md §11, including the ISSUE-257 guard); check a release older than an applied migration against it before the restart
+REH PASS links current=17822b29e6de-R1rehearsal0000000000a previous=7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+  primary pid 47749 cwd /mnt/ssd/afldb-r1-rehearsal.QpqD1s/afldb-releases/releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+  primary argv /home/arm/.nvm/versions/node/v22.23.2/bin/node deploy/server-cluster.mjs 
+  supervisor in the primary's cwd: sha256 d82f24c48e2bc310857826e8fecc2e5ad90381ec3267c0d1ddba5ae19a822865
+  primary revalidation names (non-empty, counts only): URL 1 SECRET 1
+  worker pid 47760 ordinal 1 count 2 cwd /mnt/ssd/afldb-r1-rehearsal.QpqD1s/afldb-releases/releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU names 1/1
+  worker pid 47761 ordinal 2 count 2 cwd /mnt/ssd/afldb-r1-rehearsal.QpqD1s/afldb-releases/releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU names 1/1
+REH PASS before the restart the primary and workers still run the 7d92042f supervisor
+killed worker 1 (pid 47760); workers now: 47761 48553 
+  primary pid 47749 cwd /mnt/ssd/afldb-r1-rehearsal.QpqD1s/afldb-releases/releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+  primary argv /home/arm/.nvm/versions/node/v22.23.2/bin/node deploy/server-cluster.mjs 
+  supervisor in the primary's cwd: sha256 d82f24c48e2bc310857826e8fecc2e5ad90381ec3267c0d1ddba5ae19a822865
+  primary revalidation names (non-empty, counts only): URL 1 SECRET 1
+  worker pid 47761 ordinal 2 count 2 cwd /mnt/ssd/afldb-r1-rehearsal.QpqD1s/afldb-releases/releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU names 1/1
+  worker pid 48553 ordinal 1 count 2 cwd /mnt/ssd/afldb-r1-rehearsal.QpqD1s/afldb-releases/releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU names 1/1
+REH PASS a crash re-fork (worker 1 killed) stays in the 7d92042f release, ordinals 1 and 2
+-- G. restart = the 17822b29 supervisor from the 17822b29 release
+serving line: [afldb] serving build R1rehearsal0000000000a release 17822b29e6de-R1rehearsal0000000000a revision 17822b29e6de2b6248cd7ada4221800fd81e0003
+  primary pid 48615 cwd /mnt/ssd/afldb-r1-rehearsal.QpqD1s/afldb-releases/releases/17822b29e6de-R1rehearsal0000000000a
+  primary argv /home/arm/.nvm/versions/node/v22.23.2/bin/node deploy/server-cluster.mjs 
+  supervisor in the primary's cwd: sha256 4e8ea9b5be9cda02a6d1e7251a68ab95887be9a2bf055e67ed03703d1ff81a17
+  primary revalidation names (non-empty, counts only): URL 1 SECRET 1
+  worker pid 48626 ordinal 1 count 2 cwd /mnt/ssd/afldb-r1-rehearsal.QpqD1s/afldb-releases/releases/17822b29e6de-R1rehearsal0000000000a names 1/1
+  worker pid 48627 ordinal 2 count 2 cwd /mnt/ssd/afldb-r1-rehearsal.QpqD1s/afldb-releases/releases/17822b29e6de-R1rehearsal0000000000a names 1/1
+REH PASS P5 identity: primary in releases/17822b29e6de-R1rehearsal0000000000a, supervisor 4e8ea9b5, workers 1 and 2, names 1/1
+REH PASS supervisor log names the 17822b29 release and revision
+REH PASS checkout supervisor untouched by promotion (still the 17822b29 blob only because P2 moved it)
+REVALIDATED season 2026: 2/2 worker(s) reached (2,1) in 2 request(s).
+  revalidate: 2/2, ordinals 2,1
+REH PASS P5 check 4: 2/2, ordinals 1 and 2
+{
+ "mode": "check",
+ "pages": {
+  "/brownlow/2026": {
+   "title": "2026 Brownlow Medal — Winner, Votes & Leaderboard | AFLDB",
+   "robots": "noindex, nofollow",
+   "codes": [
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200
+   ],
+   "cache": [
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT"
+   ],
+   "workers": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "badges": [
+    14,
+    14,
+    14,
+    14,
+    14,
+    14,
+    14,
+    14
+   ]
+  },
+  "/seasons/2026": {
+   "title": "2026 AFL Season — Ladder, Results & Finals | AFLDB",
+   "robots": "noindex, nofollow",
+   "codes": [
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200
+   ],
+   "cache": [
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT"
+   ],
+   "workers": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "badges": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ]
+  }
+ },
+ "controls": {
+  "/brownlow/2099": [
+   {
+    "code": 404,
+    "title": "Page not found | AFLDB",
+    "won": false
+   },
+   {
+    "code": 404,
+    "title": "Page not found | AFLDB",
+    "won": false
+   },
+   {
+    "code": 404,
+    "title": "Page not found | AFLDB",
+    "won": false
+   },
+   {
+    "code": 404,
+    "title": "Page not found | AFLDB",
+    "won": false
+   }
+  ],
+  "/brownlow/02026": [
+   {
+    "code": 404,
+    "title": "Page not found | AFLDB",
+    "won": false
+   },
+   {
+    "code": 404,
+    "title": "Page not found | AFLDB",
+    "won": false
+   }
+  ]
+ },
+ "unaccepted": {
+  "/brownlow/1897": [
+   {
+    "code": 404,
+    "title": "Page not found | AFLDB",
+    "won": false
+   },
+   {
+    "code": 404,
+    "title": "Page not found | AFLDB",
+    "won": false
+   }
+  ]
+ },
+ "sitemap": {
+  "/sitemap.xml": {
+   "code": 404,
+   "sha256": "1008940b35da7d8cff44f84d331176af01ef649290fd3b99c38464fedcef3f7f"
+  },
+  "/sitemap/1.xml": {
+   "code": 404,
+   "sha256": "1008940b35da7d8cff44f84d331176af01ef649290fd3b99c38464fedcef3f7f"
+  },
+  "/robots.txt": {
+   "code": 200,
+   "sha256": "331ea9090db0c9f6f597bd9840fd5b171830f6e0b3ba1cb24dfa91f0c95aedc1"
+  }
+ },
+ "fails": [],
+ "bad": 0
+}
+R6-NOTE none: titles and robots equal Sunday's a1-rawhead baseline (Wednesday's raw-head check stays valid)
+RAWHEAD RESULT check PASS
+REH PASS raw-head check: titles, robots, winner, 14 badges, genuine 404s, sitemap codes, /brownlow/1897 now 404
+  tick: health=200:ok seasons=200:title-ok brownlow=200:title-ok
+REH PASS P6 tick on the new build
+== R1 S9 2026-11-27T11:56:13Z base http://127.0.0.1:3271 serving R1rehearsal0000000000a
+  ok    health: 200 
+  ok    home: 307 http://127.0.0.1:3271/beta
+  ok    players: 307 http://127.0.0.1:3271/beta?from=%2Fplayers
+  ok    brownlow-2026: 307 http://127.0.0.1:3271/beta?from=%2Fbrownlow%2F2026
+  ok    admin: 307 http://127.0.0.1:3271/admin/login
+  ok    build-manifest: 200 
+  ok    other-build-manifest: 404 
+  ok    beta: 200 noindex, nofollow
+  rec   sitemap: 307 http://127.0.0.1:3271/beta?from=%2Fsitemap.xml
+  rec   robots: 200 
+S9 RESULT PASS
+REH PASS S9 (loopback seam): serving R1rehearsal0000000000a, XWruOm_9nLCSMY8nGPqYU 404
+AUTHENTICATED (rehearsal cookie)
+PASS desktop /brownlow/2026 HTTP 200, not bounced 200 /brownlow/2026
+PASS desktop /brownlow/2026 title 2026 Brownlow Medal — Winner, Votes & Leaderboard | AFLDB
+PASS desktop /brownlow/2026 robots meta noindex, nofollow
+PASS desktop /brownlow/2026 no rendered error 
+PASS desktop /brownlow/2026 no horizontal overflow 0
+PASS desktop /brownlow/2026 winner sentence 
+PASS desktop /brownlow/2026 14 ineligible badges 14
+PASS desktop /seasons/2026 HTTP 200, not bounced 200 /seasons/2026
+PASS desktop /seasons/2026 title 2026 AFL Season — Ladder, Results & Finals | AFLDB
+PASS desktop /seasons/2026 robots meta noindex, nofollow
+PASS desktop /seasons/2026 no rendered error 
+PASS desktop /seasons/2026 no horizontal overflow 0
+PASS desktop /brownlow/2099 HTTP 404, not bounced 404 /brownlow/2099
+PASS desktop /brownlow/2099 title Page not found | AFLDB
+PASS desktop /brownlow/1897 HTTP 404, not bounced 404 /brownlow/1897
+PASS desktop /brownlow/1897 title Page not found | AFLDB
+PASS desktop no page errors []
+PASS desktop no console errors []
+PASS mobile /brownlow/2026 HTTP 200, not bounced 200 /brownlow/2026
+PASS mobile /brownlow/2026 title 2026 Brownlow Medal — Winner, Votes & Leaderboard | AFLDB
+PASS mobile /brownlow/2026 robots meta noindex, nofollow
+PASS mobile /brownlow/2026 no rendered error 
+PASS mobile /brownlow/2026 no horizontal overflow 0
+PASS mobile /brownlow/2026 winner sentence 
+PASS mobile /brownlow/2026 14 ineligible badges 14
+PASS mobile /seasons/2026 HTTP 200, not bounced 200 /seasons/2026
+PASS mobile /seasons/2026 title 2026 AFL Season — Ladder, Results & Finals | AFLDB
+PASS mobile /seasons/2026 robots meta noindex, nofollow
+PASS mobile /seasons/2026 no rendered error 
+PASS mobile /seasons/2026 no horizontal overflow 0
+PASS mobile /brownlow/2099 HTTP 404, not bounced 404 /brownlow/2099
+PASS mobile /brownlow/2099 title Page not found | AFLDB
+PASS mobile /brownlow/1897 HTTP 404, not bounced 404 /brownlow/1897
+PASS mobile /brownlow/1897 title Page not found | AFLDB
+PASS mobile no page errors []
+PASS mobile no console errors []
+PASS anonymous beta gate preserved /brownlow/2026 307 http://127.0.0.1:3271/beta?from=%2Fbrownlow%2F2026
+PASS anonymous beta gate preserved /seasons/2026 307 http://127.0.0.1:3271/beta?from=%2Fseasons%2F2026
+VERDICT PASS 38/38 (screenshots in /mnt/ssd/afldb-r1-rehearsal.QpqD1s/browser)
+Browser closed; session discarded.
+REH PASS browser runner (headless seam, desktop + mobile): VERDICT PASS
+desktop-brownlow-1897.png desktop-brownlow-2026-full.png desktop-brownlow-2026.png desktop-brownlow-2099.png desktop-seasons-2026.png mobile-brownlow-1897.png mobile-brownlow-2026-full.png mobile-brownlow-2026.png mobile-brownlow-2099.png mobile-seasons-2026.png result.json 
+-- H. rollback (real release.mjs) and restart = the 7d92042f supervisor again
+release: warning: 7d92042fd110-XWruOm_9nLCSMY8nGPqYU has no recorded status PASS in events.log
+release: ledger: target migration head 118_fixtures_unconfirmed_participants.sql equals the ledger head
+release: WARNING host gate skipped: r1 rehearsal sandbox
+release: ROLLED BACK to 7d92042fd110-XWruOm_9nLCSMY8nGPqYU (no rebuild); previous is now 17822b29e6de-R1rehearsal0000000000a.
+release: next, NOW and attended: sudo systemctl restart afldb
+release: then: node deploy/release.mjs status --expect 7d92042fd110-XWruOm_9nLCSMY8nGPqYU --root /mnt/ssd/afldb-r1-rehearsal.QpqD1s/afldb-releases
+release: the activation window is OPEN: `current` names the new release but the service still runs the old one; any restart before yours (an unattended upgrade, a PostgreSQL restart) activates it without the gate (ISSUE-351)
+release: the database is not rolled back: migrations are forward-only (docs/deployment.md §11, including the ISSUE-257 guard); check a release older than an applied migration against it before the restart
+REH PASS links current=7d92042fd110-XWruOm_9nLCSMY8nGPqYU previous=17822b29e6de-R1rehearsal0000000000a
+  primary pid 48615 cwd /mnt/ssd/afldb-r1-rehearsal.QpqD1s/afldb-releases/releases/17822b29e6de-R1rehearsal0000000000a
+  primary argv /home/arm/.nvm/versions/node/v22.23.2/bin/node deploy/server-cluster.mjs 
+  supervisor in the primary's cwd: sha256 4e8ea9b5be9cda02a6d1e7251a68ab95887be9a2bf055e67ed03703d1ff81a17
+  primary revalidation names (non-empty, counts only): URL 1 SECRET 1
+  worker pid 48626 ordinal 1 count 2 cwd /mnt/ssd/afldb-r1-rehearsal.QpqD1s/afldb-releases/releases/17822b29e6de-R1rehearsal0000000000a names 1/1
+  worker pid 48627 ordinal 2 count 2 cwd /mnt/ssd/afldb-r1-rehearsal.QpqD1s/afldb-releases/releases/17822b29e6de-R1rehearsal0000000000a names 1/1
+REH PASS before the restart the 17822b29 supervisor still serves
+serving line: [afldb] serving build XWruOm_9nLCSMY8nGPqYU release 7d92042fd110-XWruOm_9nLCSMY8nGPqYU revision 7d92042fd11010eaa20966e2f49ae7a93e286568
+  primary pid 49050 cwd /mnt/ssd/afldb-r1-rehearsal.QpqD1s/afldb-releases/releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+  primary argv /home/arm/.nvm/versions/node/v22.23.2/bin/node deploy/server-cluster.mjs 
+  supervisor in the primary's cwd: sha256 d82f24c48e2bc310857826e8fecc2e5ad90381ec3267c0d1ddba5ae19a822865
+  primary revalidation names (non-empty, counts only): URL 1 SECRET 1
+  worker pid 49061 ordinal 1 count 2 cwd /mnt/ssd/afldb-r1-rehearsal.QpqD1s/afldb-releases/releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU names 1/1
+  worker pid 49062 ordinal 2 count 2 cwd /mnt/ssd/afldb-r1-rehearsal.QpqD1s/afldb-releases/releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU names 1/1
+REH PASS rollback verify 3: primary in the 7d92042f release, supervisor d82f24c4, workers 1 and 2
+REH PASS supervisor log names the 7d92042f release again
+  revalidate: 2/2, ordinals 2,1
+REH PASS rollback verify 4: 17822b29 CLI against the rolled-back cluster 2/2
+{
+ "mode": "check",
+ "pages": {
+  "/brownlow/2026": {
+   "title": "2026 Brownlow Medal — Winner, Votes & Leaderboard | AFLDB",
+   "robots": "noindex, nofollow",
+   "codes": [
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200
+   ],
+   "cache": [
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT"
+   ],
+   "workers": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "badges": [
+    14,
+    14,
+    14,
+    14,
+    14,
+    14,
+    14,
+    14
+   ]
+  },
+  "/seasons/2026": {
+   "title": "2026 AFL Season — Ladder, Results & Finals | AFLDB",
+   "robots": "noindex, nofollow",
+   "codes": [
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200
+   ],
+   "cache": [
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT"
+   ],
+   "workers": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "badges": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ]
+  }
+ },
+ "controls": {
+  "/brownlow/2099": [
+   {
+    "code": 404,
+    "title": "Page not found | AFLDB",
+    "won": false
+   },
+   {
+    "code": 404,
+    "title": "Page not found | AFLDB",
+    "won": false
+   },
+   {
+    "code": 404,
+    "title": "Page not found | AFLDB",
+    "won": false
+   },
+   {
+    "code": 404,
+    "title": "Page not found | AFLDB",
+    "won": false
+   }
+  ],
+  "/brownlow/02026": [
+   {
+    "code": 404,
+    "title": "Page not found | AFLDB",
+    "won": false
+   },
+   {
+    "code": 404,
+    "title": "Page not found | AFLDB",
+    "won": false
+   }
+  ]
+ },
+ "unaccepted": {},
+ "sitemap": {
+  "/sitemap.xml": {
+   "code": 404,
+   "sha256": "7b09d409c0da435f0b24c8901de4cf0a06c81397b11614996f32ee63433934dd"
+  },
+  "/sitemap/1.xml": {
+   "code": 404,
+   "sha256": "7b09d409c0da435f0b24c8901de4cf0a06c81397b11614996f32ee63433934dd"
+  },
+  "/robots.txt": {
+   "code": 200,
+   "sha256": "331ea9090db0c9f6f597bd9840fd5b171830f6e0b3ba1cb24dfa91f0c95aedc1"
+  }
+ },
+ "fails": [],
+ "bad": 0
+}
+R6-NOTE none: titles and robots equal Sunday's a1-rawhead baseline (Wednesday's raw-head check stays valid)
+RAWHEAD RESULT check PASS
+REH PASS raw-head check after rollback (no ISSUE-367 controls)
+{
+ "mode": "check",
+ "pages": {
+  "/brownlow/2026": {
+   "title": "2026 Brownlow Medal — Winner, Votes & Leaderboard | AFLDB",
+   "robots": "noindex, nofollow",
+   "codes": [
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200
+   ],
+   "cache": [
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT"
+   ],
+   "workers": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "badges": [
+    14,
+    14,
+    14,
+    14,
+    14,
+    14,
+    14,
+    14
+   ]
+  },
+  "/seasons/2026": {
+   "title": "2026 AFL Season — Ladder, Results & Finals | AFLDB",
+   "robots": "noindex, nofollow",
+   "codes": [
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200,
+    200
+   ],
+   "cache": [
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT",
+    "HIT"
+   ],
+   "workers": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "badges": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ]
+  }
+ },
+ "controls": {
+  "/brownlow/2099": [
+   {
+    "code": 404,
+    "title": "Page not found | AFLDB",
+    "won": false
+   },
+   {
+    "code": 404,
+    "title": "Page not found | AFLDB",
+    "won": false
+   },
+   {
+    "code": 404,
+    "title": "Page not found | AFLDB",
+    "won": false
+   },
+   {
+    "code": 404,
+    "title": "Page not found | AFLDB",
+    "won": false
+   }
+  ],
+  "/brownlow/02026": [
+   {
+    "code": 404,
+    "title": "Page not found | AFLDB",
+    "won": false
+   },
+   {
+    "code": 404,
+    "title": "Page not found | AFLDB",
+    "won": false
+   }
+  ]
+ },
+ "unaccepted": {
+  "/brownlow/1897": [
+   {
+    "code": 200,
+    "title": "1897 Brownlow Medal — Winner, Votes & Leaderboard | AFLDB",
+    "won": true
+   },
+   {
+    "code": 200,
+    "title": "1897 Brownlow Medal — Winner, Votes & Leaderboard | AFLDB",
+    "won": true
+   }
+  ]
+ },
+ "sitemap": {
+  "/sitemap.xml": {
+   "code": 404,
+   "sha256": "7b09d409c0da435f0b24c8901de4cf0a06c81397b11614996f32ee63433934dd"
+  },
+  "/sitemap/1.xml": {
+   "code": 404,
+   "sha256": "7b09d409c0da435f0b24c8901de4cf0a06c81397b11614996f32ee63433934dd"
+  },
+  "/robots.txt": {
+   "code": 200,
+   "sha256": "331ea9090db0c9f6f597bd9840fd5b171830f6e0b3ba1cb24dfa91f0c95aedc1"
+  }
+ },
+ "fails": [
+  "/brownlow/1897: ISSUE-367 live control {\"code\":200,\"title\":\"1897 Brownlow Medal — Winner, Votes & Leaderboard | AFLDB\",\"won\":true}",
+  "/brownlow/1897: ISSUE-367 live control {\"code\":200,\"title\":\"1897 Brownlow Medal — Winner, Votes & Leaderboard | AFLDB\",\"won\":true}"
+ ],
+ "bad": 2
+}
+RAWHEAD RESULT check FAIL (2)
+REH PASS raw-head check after rollback WITH the 1897 control (the old build serves it: the control has teeth) (refused as expected)
+== R1 S9 2026-11-27T11:56:18Z base http://127.0.0.1:3271 serving XWruOm_9nLCSMY8nGPqYU
+  ok    health: 200 
+  ok    home: 307 http://127.0.0.1:3271/beta
+  ok    players: 307 http://127.0.0.1:3271/beta?from=%2Fplayers
+  ok    brownlow-2026: 307 http://127.0.0.1:3271/beta?from=%2Fbrownlow%2F2026
+  ok    admin: 307 http://127.0.0.1:3271/admin/login
+  ok    build-manifest: 200 
+  ok    other-build-manifest: 404 
+  ok    beta: 200 noindex, nofollow
+  rec   sitemap: 307 http://127.0.0.1:3271/beta?from=%2Fsitemap.xml
+  rec   robots: 200 
+S9 RESULT PASS
+REH PASS S9 after rollback: serving XWruOm_9nLCSMY8nGPqYU, R1rehearsal0000000000a 404
+-- I. without the drop-in the checkout's supervisor would serve: P1 refuses that state
+  FragmentPath /home/arm/.config/systemd/user/afldb-r1-reh.service sha256 e54b1764c5ae20864fb19e673988d605826f49b40c3ea3dfac4f7cca9ccded46
+  DropInPaths 
+  route FAIL: no release-route.conf drop-in is loaded
+  WorkingDirectory /mnt/ssd/afldb-r1-rehearsal.QpqD1s/chk
+  route FAIL: WorkingDirectory is not /mnt/ssd/afldb-r1-rehearsal.QpqD1s/afldb-releases/current; the service would run the CHECKOUT's supervisor and bundle, which promotion and rollback do not select
+  ExecStart argv: /home/arm/.nvm/versions/node/v22.23.2/bin/node deploy/server-cluster.mjs (relative: resolved in WorkingDirectory)
+REH PASS P1 route check with no release-route.conf (refused as expected)
+primary cwd without the drop-in: /mnt/ssd/afldb-r1-rehearsal.QpqD1s/chk
+  primary pid 49244 cwd /mnt/ssd/afldb-r1-rehearsal.QpqD1s/chk
+  primary argv /home/arm/.nvm/versions/node/v22.23.2/bin/node deploy/server-cluster.mjs 
+  identity FAIL: the primary runs in /mnt/ssd/afldb-r1-rehearsal.QpqD1s/chk, not /mnt/ssd/afldb-r1-rehearsal.QpqD1s/afldb-releases/releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+  supervisor in the primary's cwd: sha256 4e8ea9b5be9cda02a6d1e7251a68ab95887be9a2bf055e67ed03703d1ff81a17
+  identity FAIL: supervisor sha256 is not the pinned d82f24c48e2bc310857826e8fecc2e5ad90381ec3267c0d1ddba5ae19a822865
+  primary revalidation names (non-empty, counts only): URL 1 SECRET 1
+  identity FAIL: workers 0, ordinals ' ' (need exactly 1 and 2)
+REH PASS P1 identity when systemd runs the checkout (refused as expected)
+  primary pid 50092 cwd /mnt/ssd/afldb-r1-rehearsal.QpqD1s/afldb-releases/releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+  primary argv /home/arm/.nvm/versions/node/v22.23.2/bin/node deploy/server-cluster.mjs 
+  supervisor in the primary's cwd: sha256 d82f24c48e2bc310857826e8fecc2e5ad90381ec3267c0d1ddba5ae19a822865
+  primary revalidation names (non-empty, counts only): URL 1 SECRET 1
+  worker pid 50104 ordinal 1 count 2 cwd /mnt/ssd/afldb-r1-rehearsal.QpqD1s/afldb-releases/releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU names 1/1
+  worker pid 50105 ordinal 2 count 2 cwd /mnt/ssd/afldb-r1-rehearsal.QpqD1s/afldb-releases/releases/7d92042fd110-XWruOm_9nLCSMY8nGPqYU names 1/1
+REH PASS drop-in restored: the release supervisor serves again
+-- J. rule fixtures (no service)
+  revalidate FAIL: reached 1 of 2
+REH PASS revalidate: 1/2 reached (refused as expected)
+  revalidate FAIL: ordinals '1,3' are not workers 1 and 2
+REH PASS revalidate: ordinals 1,3 (refused as expected)
+  revalidate FAIL: an INCOMPLETE line was printed
+REH PASS revalidate: INCOMPLETE line (refused as expected)
+  revalidate FAIL: the CLI exited 1
+REH PASS revalidate: exit 1 (refused as expected)
+  revalidate: 2/2, ordinals 2,1
+REH PASS revalidate: 2/2 (2,1)
+REH PASS G0 pick: unique, attributed, re-hash = sidecar
+REASON the service reported 'afldb_prod-20261124-022107.dump 0000000000000000', not afldb_prod-20261124-022107.dump sha256 4ef6765b921c8089: the same-window file is not the service's dump
+REH PASS G0 pick: journal names another digest (refused as expected)
+REASON the afldb-backup.service journal reports 0 'backup ok' lines (need exactly 1): dump attribution unproven
+REH PASS G0 pick: no journal line (unattributable) (refused as expected)
+REASON ambiguous: 2 dumps in the 02:2x/02:3x window (afldb_prod-20261124-022107.dump afldb_prod-20261124-023001.dump ): refusing to choose one
+REH PASS G0 pick: two same-window dumps (ambiguous) (refused as expected)
+-- K. R6 amendment: the exact CURRENT_ID gate lines of the amended scripts, and of the reviewed originals
+REH PASS amended pre-verify: the argument gate gate_pre7 evaluates is the expected 10 lines (the refusals below are not vacuous)
+REH PASS amended pre-verify admits 17822b29e6de-R1rehearsal0000000000a as tue:released
+REH PASS amended pre-verify admits 7d92042fd110-XWruOm_9nLCSMY8nGPqYU as tue:rolledback
+REH PASS amended pre-verify admits 7d92042fd110-XWruOm_9nLCSMY8nGPqYU as tue:deferred with Sunday's InvocationID
+REH PASS amended post-verify admits 17822b29e6de-R1rehearsal0000000000a
+REH PASS amended post-verify admits 7d92042fd110-XWruOm_9nLCSMY8nGPqYU
+REH PASS amended post-verify still admits c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC
+REH PASS amended pre-verify: c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC as tue:released (refused as expected)
+REH PASS amended pre-verify: c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC as tue:rolledback (refused as expected)
+REH PASS amended pre-verify: c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC as tue:deferred (refused as expected)
+REH PASS amended pre-verify: a foreign release id (refused as expected)
+REH PASS amended pre-verify: tue:released with Sunday's InvocationID (refused as expected)
+REH PASS reviewed original pre-verify on a 17822b29 release (why the amendment is needed) (refused as expected)
+REH PASS reviewed original post-verify on a 17822b29 release (refused as expected)
+REH PASS reviewed original pre-verify on the rollback target 7d92042fd110-XWruOm_9nLCSMY8nGPqYU (rollback/deferral need no amendment)
+
+REHEARSAL RESULT PASS: 92 passed, 0 failed (2026-11-27T11:56:56Z)
+CLEANUP unit removed, workspace /mnt/ssd/afldb-r1-rehearsal.QpqD1s removed: yes
+rehearse-exit=0

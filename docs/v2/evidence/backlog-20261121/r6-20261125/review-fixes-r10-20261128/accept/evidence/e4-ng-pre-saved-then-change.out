@@ -1,0 +1,19 @@
+== case e4-ng-pre-saved-then-change: bash afldb-gate-accept.sh --rehearsal --now 2026-11-28T05:40:00Z --gate ng-pre --owner-checks unmarked/fx-oc-4.4-bootid-epoch-before.txt --reverify unmarked/fx-reverify-4.5-bootid-epoch-before.txt --version unmarked/fx-version-post-offhost-unqualified-epoch-before.txt --verdict unmarked/fx-a2-pass-post.txt --verdict-exit 0 --confirm unmarked/cf/e4-ng-pre-saved-then-change-confirm.txt
+== afldb-gate-accept 2026-11-28T11:41:43Z gate=ng-pre transport=rehearsal (read-only; inputs by sha256)
+   4891e1b1e408ae2024a2eebee5298e99f9f31d9cb573190911b75b6f121590b9  unmarked/fx-oc-4.4-bootid-epoch-before.txt
+   a3167c6c8531c0a89325749ec26794a59a5ff52c77359b3da2b1aaf09563782a  unmarked/fx-reverify-4.5-bootid-epoch-before.txt
+   4a8e9b34b4920b0e859e2fa15a4a2616baaf60b2e1a81c56b22795cc9d3fe9da  unmarked/fx-version-post-offhost-unqualified-epoch-before.txt
+   afa57eaeb3037ce037d0345828ce9a6665f18bd1883d292c2dceec081cd3cb76  unmarked/fx-a2-pass-post.txt
+   7d1ad7996fd600300f5cb14a43c2e16290e8872ec3c6960ce2ad414251b77e84  unmarked/cf/e4-ng-pre-saved-then-change-confirm.txt
+REHEARSAL: these inputs are rehearsal transcripts; whatever the result, it authorises no release and no reboot
+TEST CLOCK: --now 2026-11-28T05:40:00Z stands in for this workstation's clock (rehearsal only)
+ACCEPT owner-checks PASS post-Phase-4 PASS at 2026-11-28T05:21:46Z, boot c3524e4759ab4e0f8050875471b56b12 (B1, B2, B3 PASS; every CHECK line PASS)
+ACCEPT reverify PASS root 2026-11-28T05:21:40Z, --as-arm 2026-11-28T05:21:42Z (arm has no admin group), verify-install 2026-11-28T05:21:45Z, bundle 58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8, boot c3
+INFO version off-host line (not an NG-PRE criterion): OWNER VERDICT VERSION STOP transport=rehearsal host=none role=offhost reason="no qualified off-host endpoint" qualification=none qual-sha256=none
+ACCEPT version PASS production VERSION PASS nonce=23a740e15b1b7ed52e712d32d1f162c5 at=2026-11-28T05:23:54Z boot=c3524e4759ab4e0f8050875471b56b12, after (a) and (b), same boot as both
+ACCEPT verdict PASS OWNER VERDICT A2 PASS at=2026-11-28T05:25:33Z boot=c3524e4759ab4e0f8050875471b56b12, exit 0, after the version check
+ACCEPT confirm PASS production VERSION PASS nonce=23a740e15b1b7ed52e712d32d1f162c5 at=2026-11-28T05:39:00Z, after the verdict, same boot and bundle, 1 min before this check
+ACCEPT access FAIL VOID: an access change was recorded after the saved 4.4, so 4.4-4.6 and every earlier gate verdict are void, same boot and window included; repeat 4.4-4.6, the gate call and the confirm (access epochs
+ACCEPT fresh PASS verdict 2026-11-28T05:25:33Z is 3 min after the older Phase 4 evidence (2026-11-28T05:21:40Z); checked 14 min later at 2026-11-28T05:40:00Z (test clock)
+GATE ACCEPT REHEARSAL NG-PRE NO-GO failed=access reason="access: VOID: an access change was recorded after the saved 4.4, so 4.4-4.6 and every earlier gate verdict are void, same boot and window included; repeat 4.4-4.6, the gate call and the confirm (access epochs"
+== exit 1

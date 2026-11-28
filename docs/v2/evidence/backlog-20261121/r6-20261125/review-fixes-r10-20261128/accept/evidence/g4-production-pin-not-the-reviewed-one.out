@@ -1,0 +1,17 @@
+== case g4-production-pin-not-the-reviewed-one: bash afldb-gate-accept.sh --gate release-g0 --owner-checks unmarked/g/fx-oc-4.4-bootid.txt --reverify unmarked/g/fx-reverify-4.5-bootid.txt --version unmarked/g2/fx-version-post-prod.txt --verdict unmarked/g2/fx-g0-pass-post-prod.txt --verdict-exit 0 --pin-rev 7ed7b316f54b55f8a0a13165be2b9f44b5588e52 --confirm unmarked/cf/g4-production-pin-not-the-reviewed-one-confirm.txt
+== afldb-gate-accept 2026-11-28T11:42:19Z gate=release-g0 transport=production (read-only; inputs by sha256)
+   1d85215f67e903b314574e47c9228beb48524811b8a53aa580e54920c2f599e2  unmarked/g/fx-oc-4.4-bootid.txt
+   769df206961b490d63e0fb81531222da2658ac7319e026f8f7dfde6d1a9f776d  unmarked/g/fx-reverify-4.5-bootid.txt
+   324b84817612609a806fea4d332b998827a62e2ec126730379fcdde82634c555  unmarked/g2/fx-version-post-prod.txt
+   654945ba2c220765b0dd4da468f68b01f2dd8ec0555314b536e30ef75f2895fe  unmarked/g2/fx-g0-pass-post-prod.txt
+   4a6f6ce2edf9afbd953cda82d7e589f37569e451317ed8bd8cb431371b70f147  unmarked/cf/g4-production-pin-not-the-reviewed-one-confirm.txt
+ACCEPT owner-checks PASS post-Phase-4 PASS at 2026-11-28T11:36:30Z, boot c3524e4759ab4e0f8050875471b56b12 (B1, B2, B3 PASS; every CHECK line PASS)
+ACCEPT reverify PASS root 2026-11-28T11:36:24Z, --as-arm 2026-11-28T11:36:26Z (arm has no admin group), verify-install 2026-11-28T11:36:29Z, bundle 58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8, boot c3
+ACCEPT version PASS production VERSION PASS nonce=23a740e15b1b7ed52e712d32d1f162c5 at=2026-11-28T11:38:38Z boot=c3524e4759ab4e0f8050875471b56b12, after (a) and (b), same boot as both; off-host VERSION PASS from r9-fixtur
+ACCEPT verdict PASS OWNER VERDICT G0 PASS at=2026-11-28T11:40:00Z boot=c3524e4759ab4e0f8050875471b56b12, exit 0, after the version check
+ACCEPT confirm PASS production VERSION PASS nonce=23a740e15b1b7ed52e712d32d1f162c5 at=2026-11-28T11:41:19Z, after the verdict, same boot and bundle, 1 min before this check
+ACCEPT access PASS 4.4, 4.5, 4.6, the gate verdict and the confirm call all carry access epoch 5d1e0c2b9a8f7e6d5c4b3a2918070605: no access change was recorded from 4.4 to the confirm
+ACCEPT pin FAIL the pin committed at 7ed7b316f54b55f8a0a13165be2b9f44b5588e52 hashes to eef0b5a1218e20bc4ad19f0e0b5cc59f5f5f7b64aa12b624d94a5f6b6547ace6, but 4.6 and the G0 call ran with qual-sha256=c2d5ba0aa524a949a
+ACCEPT fresh PASS verdict 2026-11-28T11:40:00Z is 3 min after the older Phase 4 evidence (2026-11-28T11:36:24Z); checked 2 min later at 2026-11-28T11:42:19Z (workstation clock)
+GATE ACCEPT RELEASE-G0 NO-GO failed=pin reason="pin: the pin committed at 7ed7b316f54b55f8a0a13165be2b9f44b5588e52 hashes to eef0b5a1218e20bc4ad19f0e0b5cc59f5f5f7b64aa12b624d94a5f6b6547ace6, but 4.6 and the G0 call ran with qual-sha256=c2d5ba0aa524a949a"
+== exit 1

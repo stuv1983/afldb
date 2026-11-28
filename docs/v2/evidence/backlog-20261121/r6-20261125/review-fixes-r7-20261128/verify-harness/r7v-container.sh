@@ -1,0 +1,369 @@
+#!/usr/bin/bash
+# r7v-container.sh (R6 r7, MED-2 verifier harness). REHEARSAL ONLY: runs INSIDE a disposable container on streamanator whose PID 1 is
+# the REAL systemd 255 (Ubuntu 24.04), started by r7v-host.sh (--network none, never --privileged). Never production.
+#   setup-prod     container "afldb-prod": PostgreSQL 16 fixture database afldb_prod (REAL pg_dump archive), the verifier's peer role
+#                  (verify/verifier-db.sql + verify/pg-auth-lines.txt, applied verbatim), the REAL sealed backup (R7/backup final:
+#                  install-backup.sh, the real timer at the fake-zone 02:20, the real run wrapper, backup.sh and root sealer), a FIXTURE
+#                  application afldb.service (User=arm,
+#                  python3, 2 workers) on 127.0.0.1:3100, arm's checkout/.env/releases/backup state, and the verifier installed by
+#                  THE OWNER INSTALL SCRIPT verify/install-verify.sh --role prod from a root-owned staging copy.
+#   setup-offhost  container "streamanator": real cron (fake fixed-offset Melbourne zone so its 03:10 job fires minutes from now), the
+#                  REAL kits/afldb-offhost-pull-daily.sh and (r10) the REAL offhost-pull.sh pulling by rsync over ssh from a local
+#                  rrsync -ro source that holds the dump the harness carried from the prod container, arm's crontab pair, and
+#                  install-verify.sh --role offhost.
+#   hostile        as arm: ~/.bashrc, ~/.profile, ~/.bash_login, ~/.bash_profile defining functions/aliases and a PATH of shims,
+#                  ~/bin shims, a replaced ~/.nvm node, edited checkout scripts and .env lines (FIXTURE-ATTACK)
+#   tamper|untamper  root appends one byte to / restores the published dump (FIXTURE damage for the refusal scenario)
+#   forge|unforge  review round 1, F2 (FIXTURE-ATTACK): a NON-superuser role r7v_arm (stand-in for arm's owner role, which creates
+#                  afldb_restore_test and writes its comment on production) is made owner of afldb_restore_test and sets, under
+#                  SET ROLE, the reviewer's comment: a newline, ESC[2K ESC[G, a forged "R6 PRE RESULT PASS" and a forged
+#                  "OWNER VERDICT A2 PASS transport=production ... exit=0", ESC[8m and an unterminated OSC; unforge restores the
+#                  original comment and owner
+#   r8-sudo-on|r8-sudo-off  r8 scenario h (FIXTURE): grant arm sudo inside this container only, recording the verifier's state digest;
+#                  remove it and compare the digest (the workstation logs in as arm by ssh and runs sudo install-verify.sh between)
+#   r8-libsh       r8 scenario i (FIXTURE-ATTACK): hostile bundle/lib.sh in untrusted or tampered staging copies (see r8_libsh)
+#   r9-drop-end|r9-restore-end  r9 scenario l1 (FIXTURE-ATTACK, off-host container): root removes every END line from arm's pull log
+#                  (the copy, sidecar, marker and VERIFIED lines stay), keeping the original; restore writes it back (same inode)
+#   r9-drop-dispatch  r9 scenario l2 (FIXTURE-ATTACK, off-host container, LAST scenario): `journalctl --rotate --vacuum-time=1s`
+#                  removes the journal holding the 03:10 root cron dispatch (the copy and the whole pull log stay); not restorable
+#   status         prints facts for the host driver (labelled HARNESS)
+#   r10: setup-offhost runs the REAL offhost-pull.sh over REAL rsync/ssh from a local rrsync -ro source (was a FIXTURE copy script);
+#   m-stage|m-zone|m-manual  r10 scenario m (receipt cases): stage dumps, move the fake zone so a new 03:10 run fires, retry by hand
+# Labels: [REAL-SYSTEMD] [REAL] [FIXTURE] [FIXTURE-ATTACK] [HARNESS].
+set -uo pipefail; export LC_ALL=C PATH=/usr/sbin:/usr/bin:/sbin:/bin
+CMD=${1:?command}
+FIX=/in/fix; R7=docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128; KIT=docs/v2/evidence/backlog-20261121/kits
+DAY=${R7V_DAY:?}; DAYC=${DAY//-/}
+CUR=17822b29e6de-R7VfixtureBuild; PREV=7d92042fd110-XWruOm_9nLCSMY8nGPqYU; CURB=R7VfixtureBuild; PREVB=XWruOm_9nLCSMY8nGPqYU
+CHK=/home/arm/projects/afldb; REL=/home/arm/afldb-releases; BK=/home/arm/backups/afldb-scheduled; SB=/var/lib/afldb-backup
+L() { printf '[%s] %s\n' "$1" "${*:2}"; }
+as_arm() { runuser -u arm -- "$@"; }
+hex() { od -An -N"$1" -tx1 /dev/urandom | tr -d ' \n'; }
+wait_systemd() { local i; for i in $(seq 1 120); do case $(systemctl is-system-running 2>/dev/null) in running|degraded) return 0;; esac; sleep 1; done; echo "STOP systemd did not come up"; exit 1; }
+
+common() {
+  wait_systemd
+  L REAL-SYSTEMD "$(systemctl --version | head -1); PID 1 $(cat /proc/1/comm); hostname $(hostname); kernel $(uname -r); $(. /etc/os-release; echo "$PRETTY_NAME")"
+  L FIXTURE "zone $(readlink -f /etc/localtime); now UTC $(date -u +%FT%T), Melbourne $(TZ=Australia/Melbourne date '+%F %T %Z')"
+  userdel -r ubuntu > /dev/null 2>&1; id arm > /dev/null 2>&1 || useradd -m -u 1000 -s /bin/bash arm
+  chmod 0750 /home/arm; chown arm:arm /home/arm
+  install -d -o arm -g arm -m 0700 /home/arm/.ssh
+  install -o arm -g arm -m 0600 "$FIX/r7v-keys/arm_key.pub" /home/arm/.ssh/authorized_keys
+  rm -f /etc/ssh/ssh_host_*; ssh-keygen -A > /dev/null; install -d -m 0755 /run/sshd
+  systemctl enable --now ssh.service > /dev/null 2>&1 || systemctl enable --now ssh.socket > /dev/null 2>&1
+  # the owner's staging copy: root-owned, protected (install-verify.sh refuses anything else)
+  rm -rf /root/r7v-staging; cp -r "$FIX/$R7/verify" /root/r7v-staging; cp "$FIX/r7v-keys/afldb_verify.pub" /root/r7v-staging/afldb_verify.pub
+  chown -R root:root /root/r7v-staging; chmod -R go-w /root/r7v-staging; chmod 0755 /root/r7v-staging
+  L HARNESS "staging /root/r7v-staging: bundle digest $(sha256sum < /root/r7v-staging/bundle/SHA256SUMS | cut -c1-64)"
+}
+
+install_verifier() { # role
+  echo "---- install-verify.sh --role $1 (as root, from the root-owned staging; THE OWNER INSTALL SCRIPT UNDER TEST)"
+  bash /root/r7v-staging/install-verify.sh --role "$1" --key /root/r7v-staging/afldb_verify.pub 2>&1 | sed 's/^/   | /'
+  [ "${PIPESTATUS[0]}" = 0 ] || { echo "STOP install-verify.sh failed"; exit 1; }
+  echo "---- verify-verify-install.sh as arm (read-only; sshd checks skipped without root)"
+  install -m 0755 /root/r7v-staging/verify-verify-install.sh /tmp/r7v-vvi.sh   # the staging directory is root-only
+  as_arm bash /tmp/r7v-vvi.sh --role "$1" 2>&1 | sed 's/^/   | /' || true; rm -f /tmp/r7v-vvi.sh
+}
+
+pgq() { runuser -u postgres -- psql -X -q -v ON_ERROR_STOP=1 -At "$@"; }
+
+# The REAL sealed backup (R7/backup, final; not edited here): the deploy/ units, the backup implementer's owner install from a root-owned
+# staging directory, and the REAL timer started before the fake-zone 02:20 of today. Only the timer's timing is a FIXTURE drop-in
+# (RandomizedDelaySec=0, AccuracySec=1s; production: 10min, 1min), as in R7/backup-harness.
+install_backup() {
+  local ST=/opt/r7v-backup-staging B=$FIX/$R7/backup f u
+  for u in afldb-backup.service afldb-backup.timer afldb-backup-failed.service; do install -o root -g root -m 0644 "$FIX/deploy/$u" /etc/systemd/system/$u; done
+  install -d -o root -g root -m 0755 /etc/systemd/system/afldb-backup.timer.d
+  printf '[Timer]\nRandomizedDelaySec=0\nAccuracySec=1s\n' > /etc/systemd/system/afldb-backup.timer.d/50-r7v-fixture-timing.conf
+  systemctl daemon-reload
+  install -d -o root -g root -m 0755 $ST
+  for f in afldb-backup-run afldb-backup-seal 70-afldb-backup-sealed.conf sealed-origin.sh install-backup.sh verify-backup-install.sh SHA256SUMS; do
+    install -o root -g root -m 0644 "$B/$f" $ST/$f; done
+  install -o root -g root -m 0644 "$FIX/tools/maintenance/backup.sh" $ST/backup.sh
+  echo "---- R7/backup/install-backup.sh $ST (REAL: the backup implementer's owner install, as root)"
+  (cd / && bash $ST/install-backup.sh $ST) 2>&1 | sed 's/^/   | /'; [ "${PIPESTATUS[0]}" = 0 ] || { echo "STOP install-backup.sh failed"; exit 1; }
+  pgq -c "CREATE ROLE afldb_backup LOGIN" -c "GRANT CONNECT ON DATABASE afldb_prod TO afldb_backup" > /dev/null && pgq -d afldb_prod -c "GRANT pg_read_all_data TO afldb_backup" > /dev/null \
+    || { echo "STOP afldb_backup role"; exit 1; }
+  { echo 'local afldb_prod afldb_backup peer map=afldbbackup'; cat /etc/postgresql/16/main/pg_hba.conf; } > /tmp/hba && cat /tmp/hba > /etc/postgresql/16/main/pg_hba.conf; rm -f /tmp/hba
+  echo 'afldbbackup afldb-backup afldb_backup' >> /etc/postgresql/16/main/pg_ident.conf; systemctl reload postgresql@16-main
+  L FIXTURE "owner PostgreSQL step for the backup applied as install-backup.sh prints it; role afldb_backup + pg_read_all_data (production: the existing role)"
+  systemctl start afldb-backup.timer
+  L REAL-SYSTEMD "afldb-backup.timer started at local $(TZ=Australia/Melbourne date '+%F %T'); next elapse $(systemctl show afldb-backup.timer -p NextElapseUSecRealtime --value)"
+}
+
+wait_backup() {
+  local td=${R7V_TD:?} i s
+  while [ "$(date +%s)" -lt "$td" ]; do sleep 1; done
+  for i in $(seq 1 240); do
+    shopt -s nullglob; s=($SB/seals/*.seal); shopt -u nullglob
+    [ "${#s[@]}" -ge 1 ] && [ -z "$(systemctl show afldb-backup.service -p Job --value)" ] \
+      && [[ $(systemctl show afldb-backup.service -p ActiveState --value) =~ ^(inactive|failed)$ ]] && break; sleep 1; done
+  L REAL-SYSTEMD "afldb-backup.service: $(systemctl show afldb-backup.service -p Result -p ExecMainStatus -p InvocationID | tr '\n' ' ')"
+  L REAL-SYSTEMD "afldb-backup.timer LastTriggerUSec $(busctl get-property org.freedesktop.systemd1 /org/freedesktop/systemd1/unit/afldb_2dbackup_2etimer org.freedesktop.systemd1.Timer LastTriggerUSec) ($(TZ=Australia/Melbourne date '+%F %T %Z'))"
+  for f in $SB/seals/* $SB/published/* $SB/state/*; do echo "   $(stat -c '%A %U:%G links=%h %s B' "$f") $f"; done
+  cat $SB/seals/*.seal | sed 's/^/   seal | /'
+  [ "$(systemctl show afldb-backup.service -p Result --value)" = success ] && [ "${#s[@]}" = 1 ] || { echo "STOP the real timer run did not seal one successful run"; exit 1; }
+}
+
+setup_prod() {
+  common
+  # PostgreSQL 16 (REAL server), fixture database
+  systemctl start postgresql@16-main; for i in $(seq 1 60); do runuser -u postgres -- psql -X -qAt -c 'select 1' > /dev/null 2>&1 && break; sleep 1; done
+  local vdump=afldb_prod-$DAYC-033012.dump vsha
+  install -d -o arm -g arm -m 0755 /home/arm/backups "$BK"; install -d -o arm -g arm -m 0700 "$BK/.state"
+  head -c 65536 /dev/urandom > "$BK/$vdump"; chown arm:arm "$BK/$vdump"; chmod 0600 "$BK/$vdump"; vsha=$(sha256sum < "$BK/$vdump" | cut -c1-64)
+  runuser -u postgres -- psql -X -q -v ON_ERROR_STOP=1 <<SQL > /dev/null
+CREATE DATABASE afldb_prod; CREATE DATABASE afldb_restore_test;
+COMMENT ON DATABASE afldb_restore_test IS 'afldb.restore_test.v1 sha256=$vsha';
+REVOKE CONNECT ON DATABASE afldb_prod FROM PUBLIC;
+SQL
+  runuser -u postgres -- psql -X -q -v ON_ERROR_STOP=1 -d afldb_prod <<'SQL' > /dev/null
+CREATE SCHEMA afldb_meta; CREATE TABLE afldb_meta.schema_migrations (name text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now(), secret_note text DEFAULT 'not for the verifier');
+INSERT INTO afldb_meta.schema_migrations (name) SELECT lpad(g::text, 3, '0') || '_fixture.sql' FROM generate_series(1, 117) g;
+INSERT INTO afldb_meta.schema_migrations (name) VALUES ('118_fixtures_unconfirmed_participants.sql');
+CREATE TABLE public.players (id int PRIMARY KEY, name text); INSERT INTO public.players VALUES (1, 'fixture');
+SQL
+  install_backup
+  echo "---- verify/verifier-db.sql and verify/pg-auth-lines.txt applied verbatim (the prospective owner step)"
+  runuser -u postgres -- psql -X -q -v ON_ERROR_STOP=1 -d afldb_prod < /root/r7v-staging/verifier-db.sql 2>&1 | sed 's/^/   | /'
+  [ "${PIPESTATUS[0]}" = 0 ] || { echo "STOP verifier-db.sql failed"; exit 1; }
+  grep -v '^#' /root/r7v-staging/pg-auth-lines.txt | grep '^afldbverify ' >> /etc/postgresql/16/main/pg_ident.conf
+  sed -i "0,/^local/s//$(grep '^local ' /root/r7v-staging/pg-auth-lines.txt)\nlocal/" /etc/postgresql/16/main/pg_hba.conf
+  systemctl reload postgresql@16-main; sleep 1
+  L REAL "pg_hba local lines: $(grep '^local' /etc/postgresql/16/main/pg_hba.conf | tr -s ' ' | tr '\n' ';')"
+  # arm's world (data the verifier reads through the root facts reader)
+  printf '{"epoch":%s,"file":"%s","sha256":"%s","attempts":1}\n' "$(( $(date +%s) - 3600 ))" "$vdump" "$vsha" > "$BK/.state/last-verify.json"
+  printf '{"epoch":%s,"file":"%s","offhost":"skipped"}\n' "$(( $(date +%s) - 3600 ))" "$vdump" > "$BK/.state/last-backup.json"
+  chown -R arm:arm "$BK"; chmod 0600 "$BK/.state/"*
+  install -d -o arm -g arm -m 0755 /home/arm/projects "$CHK" "$CHK/.git" "$CHK/.git/refs" "$CHK/.git/refs/heads" "$CHK/deploy" "$CHK/tools" "$CHK/tools/maintenance"
+  echo 'ref: refs/heads/main' > "$CHK/.git/HEAD"; echo 17822b29e6de2b6248cd7ada4221800fd81e0003 > "$CHK/.git/refs/heads/main"
+  printf 'AFLDB_REVALIDATE_URL=http://127.0.0.1:3100/api/revalidate\nAFLDB_REVALIDATE_SECRET=fixture-secret-never-printed\nAFLDB_BACKUP_DATABASE_URL=postgresql://afldb_backup:pw@127.0.0.1/afldb_prod\n' > "$CHK/.env"
+  cp "$FIX/deploy/release.mjs" "$CHK/deploy/release.mjs"; cp "$FIX/tools/maintenance/scheduled-backup.sh" "$CHK/tools/maintenance/"
+  cp "$FIX/deploy/afldb-settle-failure-status.sh" "$CHK/deploy/"
+  chown -R arm:arm "$CHK"; chmod 0600 "$CHK/.env"; echo '{}' > /home/arm/a1-rawhead-baseline.json; chown arm:arm /home/arm/a1-rawhead-baseline.json
+  install -d -o arm -g arm -m 0755 "$REL" "$REL/releases" "$REL/releases/$CUR/.next/static/$CURB" "$REL/releases/$PREV/.next/static/$PREVB"
+  printf '{"id":"%s","revision":"17822b29e6de2b6248cd7ada4221800fd81e0003","buildId":"%s","afldbEnv":"production","createdBy":"r7v-fixture"}\n' "$CUR" "$CURB" > "$REL/releases/$CUR/release.json"
+  printf '{"id":"%s","revision":"7d92042fd1100000000000000000000000000000","buildId":"%s","afldbEnv":"production"}\n' "$PREV" "$PREVB" > "$REL/releases/$PREV/release.json"
+  echo 'self.__BUILD_MANIFEST={}' | tee "$REL/releases/$CUR/.next/static/$CURB/_buildManifest.js" > "$REL/releases/$PREV/.next/static/$PREVB/_buildManifest.js"
+  cat > "$REL/releases/$CUR/server.py" <<'PY'
+# FIXTURE application (arm-owned, run by afldb.service as arm): /api/health and this release's own _buildManifest.js; two workers.
+import http.server, os, time
+for _ in range(2):
+    if os.fork() == 0:
+        while True:
+            time.sleep(3600)
+class H(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        code, ctype, body = 404, 'text/html', b'not found'
+        if self.path == '/api/health':
+            code, ctype, body = 200, 'application/json', b'{"status":"ok","database":"ok"}'
+        elif self.path.startswith('/_next/static/') and self.path.endswith('/_buildManifest.js'):
+            p = os.path.join('.next', 'static', self.path.split('/')[3], '_buildManifest.js')
+            if os.path.isfile(p):
+                code, ctype, body = 200, 'application/javascript', b'self.__BUILD_MANIFEST={}'
+        self.send_response(code); self.send_header('Content-Type', ctype); self.send_header('Content-Length', str(len(body))); self.end_headers()
+        self.wfile.write(body)
+    def log_message(self, *a):
+        pass
+http.server.HTTPServer(('127.0.0.1', 3100), H).serve_forever()
+PY
+  ln -sfn "releases/$CUR" "$REL/current"; ln -sfn "releases/$PREV" "$REL/previous"; chown -R -h arm:arm "$REL"
+  cat > /etc/systemd/system/afldb.service <<EOF
+# FIXTURE application unit (REHEARSAL): User=arm, WorkingDirectory through the current link, like production's release route.
+[Unit]
+Description=AFLDB fixture application (r7v)
+[Service]
+User=arm
+WorkingDirectory=$REL/current
+ExecStart=/usr/bin/python3 server.py
+[Install]
+WantedBy=multi-user.target
+EOF
+  systemctl daemon-reload; systemctl start afldb.service; sleep 2
+  local live; live=$(systemctl show afldb -p InvocationID --value)
+  printf '{"op":"status-pass","id":"%s","invocationId":"%s","nRestarts":0}\n' "$CUR" "$live" > "$REL/events.log"; chown arm:arm "$REL/events.log"
+  L FIXTURE "afldb.service (fixture app) active=$(systemctl is-active afldb) MainPID $(systemctl show afldb -p MainPID --value) InvocationID $live; current -> releases/$CUR"
+  install -d /etc/needrestart/conf.d; cp "$FIX/deploy/host-policy/needrestart-afldb-hold.conf" /etc/needrestart/conf.d/50-afldb-hold.conf
+  cp "$FIX/deploy/host-policy/apt-52-afldb-unattended.conf" /etc/apt/apt.conf.d/52-afldb-unattended
+  L FIXTURE "R1 host policy files copied from the repo into /etc; no caddy, no afldb-backup-verify (weekly restore) unit, no production kernels (container)"
+  install_verifier prod
+  wait_backup
+  L HARNESS "A2ARGS accepted $CUR r3:yes r4:no 10:00 tue:released inv:$live"
+}
+
+setup_offhost() {
+  common
+  local D=/mnt/ssd/afldb-offhost-prod OPS=/home/arm/afldb-ops
+  install -d -m 0755 /mnt/ssd; install -d -o arm -g arm -m 0700 "$D"; install -d -o arm -g arm -m 0755 "$OPS"; install -d -o arm -g arm -m 0700 "$OPS/state"
+  cp "$FIX/$KIT/afldb-offhost-pull-daily.sh" "$OPS/afldb-offhost-pull-daily.sh"
+  # r10 (Astra case 1): the REAL tools/maintenance/offhost-pull.sh with REAL rsync over REAL ssh. The rsync source stands in for
+  # production's published directory: /srv/afldb-src (root-owned, world-readable files), served to arm's pull key through rrsync -ro
+  # on this container's own sshd, as production's authorized_keys line serves it. FIXTURE: the source is reached as r7vsrc@r7v-src (its own account: production's arm is another machine's, and this container's arm gets scenario d's hostile login files)
+  # (127.0.0.1 here; production is arm@209.38.87.252, never contacted), set by an AFLDB_PROD_SSH line at the top of arm's crontab.
+  cp "$FIX/tools/maintenance/offhost-pull.sh" "$OPS/offhost-pull.sh"
+  RR=$(command -v rrsync) || { echo "STOP rrsync is not installed"; exit 1; }
+  install -d -m 0755 /srv/afldb-src; install -m 0644 /opt/r7v-incoming/* /srv/afldb-src/
+  as_arm ssh-keygen -q -t ed25519 -N '' -C r7v-pull -f /home/arm/.ssh/afldb_backup_pull || { echo "STOP pull key"; exit 1; }
+  id r7vsrc > /dev/null 2>&1 || useradd -m -s /bin/sh r7vsrc; install -d -o r7vsrc -g r7vsrc -m 0700 /home/r7vsrc/.ssh
+  printf 'command="%s -ro /srv/afldb-src",restrict %s\n' "$RR" "$(cat /home/arm/.ssh/afldb_backup_pull.pub)" > /home/r7vsrc/.ssh/authorized_keys
+  chown r7vsrc:r7vsrc /home/r7vsrc/.ssh/authorized_keys; chmod 0600 /home/r7vsrc/.ssh/authorized_keys
+  printf 'Host r7v-src\n  HostName 127.0.0.1\n  HostKeyAlias r7v-src\n' > /home/arm/.ssh/config
+  echo "r7v-src $(cut -d' ' -f1,2 /etc/ssh/ssh_host_ed25519_key.pub)" > /home/arm/.ssh/known_hosts
+  chown arm:arm /home/arm/.ssh/*; chmod 0600 /home/arm/.ssh/authorized_keys /home/arm/.ssh/config /home/arm/.ssh/known_hosts
+  L FIXTURE "rsync source /srv/afldb-src ($(ls /srv/afldb-src | tr '\n' ' ')) served by $RR -ro to arm's pull key as r7vsrc; $(rsync --version | head -1)"
+  printf '#!/bin/sh\ncat > /dev/null\n' > "$OPS/alarm-email.sh"
+  chown -R arm:arm "$OPS"; chmod 0755 "$OPS"/*.sh; chmod -R a+rX /opt/r7v-incoming
+  printf '%s\n' 'AFLDB_PROD_SSH=r7vsrc@r7v-src' '# AFLDB-A2-r3: ISSUE-352 daily off-host pull (owner decision 3, 2026-11-22); installed by a2-cron-install.sh' \
+    '10 3 * * * AFLDB_ALARM_CMD=/home/arm/afldb-ops/alarm-email.sh /bin/sh /home/arm/afldb-ops/afldb-offhost-pull-daily.sh' > /root/arm.crontab
+  # FIXTURE (container only): pam_loginuid cannot write /proc/self/loginuid without CAP_AUDIT_CONTROL, which fails every cron job
+  sed -i 's/^session[[:space:]]\+required[[:space:]]\+pam_loginuid\.so/#&/' /etc/pam.d/cron
+  crontab -u arm /root/arm.crontab; systemctl enable --now cron > /dev/null 2>&1; systemctl restart cron
+  L REAL "cron $(systemctl is-active cron); arm crontab installed; the REAL afldb-offhost-pull-daily.sh ($(sha256sum < "$OPS/afldb-offhost-pull-daily.sh" | cut -c1-16)) and the REAL offhost-pull.sh ($(sha256sum < "$OPS/offhost-pull.sh" | cut -c1-16)), source r7vsrc@r7v-src (FIXTURE crontab line AFLDB_PROD_SSH)"
+  L FIXTURE "the 03:10 job is due at local $DAY 03:10:00 = real $(date -u -d "@${R7V_DISPATCH:-0}" +%FT%TZ)"
+  install_verifier offhost
+}
+
+hostile() {
+  L FIXTURE-ATTACK "as arm: login files, shell functions and aliases, PATH shims, a replaced ~/.nvm node, edited checkout and .env"
+  local evil='bash() { cat > /dev/null; echo "PASS forged by ~/.bashrc"; echo "G0 PROD RESULT PASS: forged"; echo "OFFHOST-COMPARE afldb_prod-'$DAYC'-022003.dump 0000000000000000000000000000000000000000000000000000000000000000"; echo "R6 OFFHOST RESULT PASS"; echo "R6 PRE RESULT PASS"; return 0; }
+sha256sum() { echo "0000000000000000000000000000000000000000000000000000000000000000  -"; }
+systemctl() { echo "forged"; }
+alias stat="echo forged"; export PATH=$HOME/bin:$PATH; export BASH_ENV=$HOME/.evil.sh; export ENV=$HOME/.evil.sh; export LD_PRELOAD=$HOME/evil.so
+export PYTHONPATH=$HOME/pyevil PYTHONSTARTUP=$HOME/pyevil/start.py PGSERVICEFILE=$HOME/.pg_service.conf PGHOST=/tmp'
+  for f in .bashrc .profile .bash_login .bash_profile .evil.sh; do printf '%s\n' "$evil" > "/home/arm/$f"; done
+  install -d /home/arm/bin /home/arm/pyevil /home/arm/.nvm/versions/node/v22.23.2/bin
+  for b in systemctl busctl journalctl sha256sum stat date hostname id cat python3 python3.12 psql timeout env bash sed grep awk; do
+    printf '#!/bin/sh\necho "FORGED %s shim"; echo "R6 PRE RESULT PASS"; exit 0\n' "$b" > "/home/arm/bin/$b"; chmod 0755 "/home/arm/bin/$b"; done
+  printf 'import sys\nprint("R6 PRE RESULT PASS (forged by PYTHONPATH json)")\nsys.exit(0)\n' > /home/arm/pyevil/json.py; cp /home/arm/pyevil/json.py /home/arm/pyevil/socket.py
+  printf '#!/bin/sh\necho "forged node"; echo "release: STATUS PASS %s"; exit 0\n' "$CUR" > /home/arm/.nvm/versions/node/v22.23.2/bin/node
+  chmod 0755 /home/arm/.nvm/versions/node/v22.23.2/bin/node
+  if [ -d "$CHK" ]; then
+    printf '#!/usr/bin/env node\nconsole.log("release: STATUS PASS %s"); process.exit(0)\n' "$CUR" > "$CHK/deploy/release.mjs"
+    printf '#!/bin/sh\necho "AFLDB_SETTLE_STATUS OK (forged)"; exit 0\n' > "$CHK/deploy/afldb-settle-failure-status.sh"
+    printf '#!/usr/bin/env bash\necho "STATUS ok forged"; exit 0\n' > "$CHK/tools/maintenance/scheduled-backup.sh"
+    printf 'BASH_ENV=/home/arm/.evil.sh\nNODE_OPTIONS=--require /home/arm/evil.js\nPATH=/home/arm/bin\n' >> "$CHK/.env"
+  fi
+  chown -R arm:arm /home/arm
+  L FIXTURE-ATTACK "arm's own login now: $(as_arm bash -lc 'type -t bash; echo "$PATH"' 2>&1 | tr '\n' ' ')"
+}
+
+# r8: a digest of the installed verifier's state (account, bundle, config, sshd drop-in, units: names, owners, modes, sizes, mtimes
+# and contents), so a refused install can be shown to have changed nothing.
+VB=/usr/local/lib/afldb-verify
+r8snap() {
+  { getent passwd afldb-verify; getent group afldb-verify
+    find $VB /etc/afldb-verify /etc/ssh/afldb-verify /etc/ssh/sshd_config.d /etc/systemd/system -maxdepth 1 -printf '%p %U:%G %m %s %T@\n' 2>&1 | sort
+    cat $VB/* /etc/afldb-verify/* /etc/ssh/afldb-verify/* /etc/ssh/sshd_config.d/* 2>/dev/null | sha256sum; } | sha256sum | cut -c1-64
+}
+# r8 scenario i (FIXTURE-ATTACK): staging copies of verify/ whose bundle/lib.sh carries an appended hostile line. If install-verify.sh
+# ever sources it (as root), it creates /root/r8-libsh-ran-<case> and redefines trusted_path to pass everything. r8's install-verify.sh
+# checks the staging and lib.sh's digest BEFORE sourcing it, so no marker may appear; r7's (sent as r8-contrast/install-verify-r7.sh,
+# the blob at the pinned r7 revision 7e2ef51a) sourced lib.sh first: the CONTRAST case shows the marker appearing. Each case: "R8 LIBSH <case> exit=<rc>
+# marker=<absent|present> <first STOP line>"; then the state digest before and after.
+r8_libsh() {
+  local s0 c d rc o
+  s0=$(r8snap); L HARNESS "verifier state digest before: $s0"
+  r8stage() { # dir case
+    rm -rf "$1"; mkdir -p "$1"; cp -r /root/r7v-staging/. "$1/"; chown -R root:root "$1"; chmod -R go-w "$1"; chmod 0755 "$1"
+    printf '%s\n' "touch /root/r8-libsh-ran-$2; trusted_path() { TP_WHY=; return 0; }" >> "$1/bundle/lib.sh"
+  }
+  for c in home-arm group-writable tampered contrast-r7-home-arm; do
+    case $c in
+      home-arm|contrast-r7-home-arm) d=/home/arm/r8-stage-$c; r8stage "$d" "$c"; chown -R arm:arm "$d"
+        L FIXTURE-ATTACK "case $c: staging $d owned by arm (arm can write lib.sh), hostile line appended to bundle/lib.sh";;
+      group-writable) d=/opt/r8-stage-$c; r8stage "$d" "$c"; chmod 0775 "$d"
+        L FIXTURE-ATTACK "case $c: staging $d root-owned but group-writable (0775), hostile line appended to bundle/lib.sh";;
+      tampered) d=/opt/r8-stage-$c; r8stage "$d" "$c"
+        L FIXTURE-ATTACK "case $c: staging $d root-owned and protected, hostile line appended to bundle/lib.sh (digest differs)";;
+    esac
+    if [ "$c" = contrast-r7-home-arm ]; then
+      cp "$FIX/r8-contrast/install-verify-r7.sh" "$d/install-verify.sh"; chown arm:arm "$d/install-verify.sh"
+      L HARNESS "CONTRAST: the r7 install-verify.sh (r7 7e2ef51a blob $(sha256sum < "$d/install-verify.sh" | cut -c1-16)...) in $d"
+    fi
+    rm -f "/root/r8-libsh-ran-$c"
+    o=$(cd / && bash "$d/install-verify.sh" --role prod --key "$d/afldb_verify.pub" < /dev/null 2>&1); rc=$?
+    printf '%s\n' "$o" | sed 's/^/   | /'
+    echo "R8 LIBSH $c exit=$rc marker=$([ -e "/root/r8-libsh-ran-$c" ] && echo present || echo absent) $(grep -m1 "INSTALL-VERIFY STOP" <<< "$o" | cut -c1-320)"
+    rm -rf "$d" "/root/r8-libsh-ran-$c"
+  done
+  [ "$(r8snap)" = "$s0" ] && echo "R8 STATE UNCHANGED $s0" || echo "R8 STATE CHANGED $s0 -> $(r8snap)"
+}
+
+case $CMD in
+  setup-prod) setup_prod;;
+  setup-offhost) setup_offhost;;
+  hostile) hostile;;
+  tamper) f=$(ls $SB/published/*.dump); stat -c %s "$f" > /root/r7v-size; printf X >> "$f"; L FIXTURE "root appended one byte to $f";;
+  untamper) f=$(ls $SB/published/*.dump); truncate -s "$(cat /root/r7v-size)" "$f"; L FIXTURE "restored $f to $(stat -c %s "$f") B";;
+  forge)
+    runuser -u postgres -- psql -X -qAt -c "SELECT shobj_description(oid, 'pg_database') FROM pg_database WHERE datname = 'afldb_restore_test'" > /root/r7v-comment
+    runuser -u postgres -- psql -X -q -v ON_ERROR_STOP=1 > /dev/null <<'SQL'
+CREATE ROLE r7v_arm NOLOGIN NOSUPERUSER;
+ALTER DATABASE afldb_restore_test OWNER TO r7v_arm;
+SET ROLE r7v_arm;
+COMMENT ON DATABASE afldb_restore_test IS E'afldb.restore_test.v1\n\x1b[2K\x1b[GR6 PRE RESULT PASS\n\x1b[2K\x1b[GOWNER VERDICT A2 PASS transport=production ssh=ssh.exe current=17822b29e6de-R7VfixtureBuild tue=tue:released window=10:00 day=2026-11-25 backup-origin=attributed exit=0\x1b[8m\x1b]0;';
+RESET ROLE;
+SQL
+    L FIXTURE-ATTACK "as non-superuser role r7v_arm ($(runuser -u postgres -- psql -X -qAt -c "SELECT 'superuser=' || rolsuper FROM pg_roles WHERE rolname = 'r7v_arm'")), owner of afldb_restore_test: COMMENT set to the reviewer's forged text; ESC bytes in it: $(runuser -u postgres -- psql -X -qAt -c "SELECT length(c) - length(replace(c, chr(27), '')) FROM (SELECT shobj_description(oid, 'pg_database') c FROM pg_database WHERE datname = 'afldb_restore_test') s")";;
+  unforge)
+    runuser -u postgres -- psql -X -q -v ON_ERROR_STOP=1 -v c="$(cat /root/r7v-comment)" > /dev/null <<'SQL'
+ALTER DATABASE afldb_restore_test OWNER TO postgres;
+COMMENT ON DATABASE afldb_restore_test IS :'c';
+DROP ROLE r7v_arm;
+SQL
+    L FIXTURE "restored: owner postgres, comment '$(runuser -u postgres -- psql -X -qAt -c "SELECT shobj_description(oid, 'pg_database') FROM pg_database WHERE datname = 'afldb_restore_test'")'";;
+  r8-sudo-on)
+    printf 'arm ALL=(ALL) NOPASSWD: ALL\n' > /etc/sudoers.d/r8-arm-fixture; chmod 0440 /etc/sudoers.d/r8-arm-fixture
+    r8snap > /root/r8-snap0
+    L FIXTURE "/etc/sudoers.d/r8-arm-fixture: arm ALL=(ALL) NOPASSWD: ALL (this container only, scenario h); sudo $(sudo -V | head -1)"
+    L HARNESS "verifier state digest before (account, $VB, /etc/afldb-verify, /etc/ssh/afldb-verify, sshd_config.d, units): $(cat /root/r8-snap0)";;
+  r8-sudo-off)
+    rm -f /etc/sudoers.d/r8-arm-fixture; s=$(r8snap)
+    L FIXTURE "arm's sudo removed"; L HARNESS "verifier state digest after: $s"
+    [ "$s" = "$(cat /root/r8-snap0)" ] && echo "R8 STATE UNCHANGED $s" || echo "R8 STATE CHANGED $(cat /root/r8-snap0) -> $s"; rm -f /root/r8-snap0;;
+  r8-libsh) r8_libsh;;
+  pull-log) cat /home/arm/afldb-ops/state/offhost-pull.log 2>/dev/null;;
+  r9-drop-end)
+    PL=/home/arm/afldb-ops/state/offhost-pull.log; cp -p "$PL" /root/r9-pull.log.orig
+    grep -v ' END run=' /root/r9-pull.log.orig > /root/r9-pull.log.new; cat /root/r9-pull.log.new > "$PL"; rm -f /root/r9-pull.log.new
+    L FIXTURE-ATTACK "root removed the END line(s) from arm's pull log: $(grep -c ' END run=' /root/r9-pull.log.orig) -> $(grep -c ' END run=' "$PL"); RECEIVED lines kept: $(grep -c ' RECEIVED run=' "$PL"); copy kept: $(ls -A /mnt/ssd/afldb-offhost-prod | paste -sd' ')";;
+  r9-restore-end)
+    PL=/home/arm/afldb-ops/state/offhost-pull.log; cat /root/r9-pull.log.orig > "$PL"; rm -f /root/r9-pull.log.orig
+    L FIXTURE "restored arm's pull log: END lines $(grep -c ' END run=' "$PL"), owner $(stat -c '%U:%G %a' "$PL")";;
+  r9-drop-dispatch)
+    n0=$(journalctl -t CRON -q --no-pager 2>/dev/null | grep -c '(arm) CMD (')
+    journalctl --rotate --vacuum-time=1s > /root/r9-vacuum.log 2>&1; rc=$?
+    n1=$(journalctl -t CRON -q --no-pager 2>/dev/null | grep -c '(arm) CMD (')
+    L FIXTURE-ATTACK "journalctl --rotate --vacuum-time=1s exit $rc ($(tail -1 /root/r9-vacuum.log)); arm's cron dispatch lines in the journal: $n0 -> $n1; pull log and copy kept: $(grep -c ' END run=' /home/arm/afldb-ops/state/offhost-pull.log) END, $(ls -A /mnt/ssd/afldb-offhost-prod | paste -sd' ')";;
+  hostkey) cut -d' ' -f1,2 /etc/ssh/ssh_host_ed25519_key.pub;;
+  m-stage) # r10 scenario m (FIXTURE, off-host container): place dumps from /opt/r7v-m: src:<name> in the rsync source (readable),
+           # deny:<name> in the source unreadable to arm (rsync then fails part-way, exit 23), dest:<name> PRE-PLACED in the destination
+           # with its sidecar before the 03:10 run (possession without receipt), allow:<name> makes a denied source file readable
+    # rm:<name> removes a dump, its sidecar and its verified marker from the destination (so a later run can receive it again)
+    for t in "${@:2}"; do k=${t%%:*}; n=${t#*:}; [[ $n =~ ^afldb_prod-[0-9]{8}-[0-9]{6}\.dump$ ]] || { echo "STOP bad name $n"; exit 2; }
+      f=/opt/r7v-m; [ -e "$f/$n" ] || f=/opt/r7v-incoming; O=/mnt/ssd/afldb-offhost-prod
+      case $k in
+        src) install -m 0644 "$f/$n" "$f/$n.sha256" /srv/afldb-src/;;
+        deny) install -m 0600 "$f/$n" /srv/afldb-src/; install -m 0644 "$f/$n.sha256" /srv/afldb-src/;;
+        dest) install -o arm -g arm -m 0600 "$f/$n" "$f/$n.sha256" "$O/";;
+        allow) chmod 0644 "/srv/afldb-src/$n";;
+        rm) rm -f "$O/$n" "$O/$n.sha256" "$O/.verified-$n";;
+        *) echo "STOP bad token $t"; exit 2;;
+      esac || { echo "STOP m-stage $t"; exit 1; }
+      L FIXTURE "m-stage $k $n (sha256 $(sha256sum < "$f/$n" | cut -c1-16)...; destination now: $(ls -A "$O" | tr '\n' ' '))"; done;;
+  m-zone)  # r10 scenario m (FIXTURE): move the fake fixed-offset Melbourne zone so that local $DAY 03:10:00 is about 75 s from now,
+           # remove the journal (so the coming dispatch is the day's only 03:10 dispatch) and restart cron
+    # a WHOLE-MINUTE offset (the real offhost-pull.sh reads dump stamps through date +%z, minute precision)
+    TD=$(( $(date +%s) + 75 )); off=$(( $(date -u -d "$DAY 03:10:00" +%s) - TD )); off=$(( off - ((off % 60) + 60) % 60 )); TD=$(( $(date -u -d "$DAY 03:10:00" +%s) - off ))
+    a=$off; sg=; [ $a -lt 0 ] && { sg=-; a=$((-a)); }
+    printf 'Zone Australia/Melbourne %s%d:%02d:%02d - AEDT\n' "$sg" $((a / 3600)) $((a % 3600 / 60)) $((a % 60)) > /tmp/fake.zone
+    zic -d /usr/share/zoneinfo /tmp/fake.zone || { echo "STOP zic"; exit 1; }
+    journalctl --rotate > /dev/null 2>&1; sleep 2; journalctl --vacuum-time=1s > /dev/null 2>&1; systemctl restart cron
+    L FIXTURE "zone moved: local $DAY 03:10:00 = real $(date -u -d "@$TD" +%FT%TZ); now local $(date '+%F %T %Z'); journal CRON lines left: $(journalctl -t CRON -q --no-pager 2>/dev/null | wc -l)"
+    echo "R7V M-OFFSET $off"; echo "R7V M-DISPATCH $TD";;
+  m-manual) # r10 scenario m4 (FIXTURE): the owner retries the pull BY HAND as arm, outside cron
+    runuser -u arm -- env -i HOME=/home/arm PATH=/usr/bin:/bin LC_ALL=C AFLDB_PROD_SSH=r7vsrc@r7v-src AFLDB_ALARM_CMD=/home/arm/afldb-ops/alarm-email.sh \
+      /bin/sh /home/arm/afldb-ops/afldb-offhost-pull-daily.sh; echo "R7V M-MANUAL exit $?";;
+  *) echo "STOP unknown command $CMD"; exit 2;;
+esac

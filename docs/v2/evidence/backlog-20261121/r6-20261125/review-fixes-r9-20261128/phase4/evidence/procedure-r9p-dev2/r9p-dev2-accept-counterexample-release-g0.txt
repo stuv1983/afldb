@@ -1,0 +1,13 @@
+== r9p-dev2 2026-11-28T08:13:01Z workstation: afldb-gate-accept.sh --gate release-g0 --rehearsal (counterexample): inputs r9p-dev2-in-3.12-owner-checks.log r9p-dev2-in-3-reverify.log r9p-dev2-in-3.13-version.log r9p-dev2-in-3.13a-a2.log exit 1
+== afldb-gate-accept 2026-11-28T08:12:58Z gate=release-g0 transport=rehearsal (read-only; inputs by sha256)
+   2437f166e0935715598a4dc8f333c05ad6461d8934ee342ad5df54a0aea221b6  /d/dev/afldb-closeout-20261127/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/procedure-harness/logs/r9p-dev2-in-3.12-owner-checks.log
+   b8735a6dcafb793c82c8924f789543079e0f4b704f9334d40cc1a1da02548894  /d/dev/afldb-closeout-20261127/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/procedure-harness/logs/r9p-dev2-in-3-reverify.log
+   076fb7e1779c7ced6a2cea569127ff41ba396d6b4ce9cf2f885642f0e41ba018  /d/dev/afldb-closeout-20261127/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/procedure-harness/logs/r9p-dev2-in-3.13-version.log
+   38739731aefbdb24463fbf8fb08b1d348b24abf0092e443b1b6b6952ed0e7697  /d/dev/afldb-closeout-20261127/docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r8-20261128/procedure-harness/logs/r9p-dev2-in-3.13a-a2.log
+REHEARSAL: these inputs are rehearsal transcripts; whatever the result, it authorises no release and no reboot
+ACCEPT owner-checks FAIL BLOCKED, not PASS (a Phase 3.12 output is pre-Phase-4 evidence): OWNER CHECKS RESULT BLOCKED fail=B1,B2,B3 unknown=none
+ACCEPT reverify FAIL the --as-arm process still carries an admin group, so this was saved before Phase 4: BACKUP INSTALL RESULT PASS (as arm via setpriv, no login: uid=1000(arm) gid=1000(arm) groups=1000(arm),27(sudo),997
+ACCEPT version FAIL [after FAILED owner-checks,reverify] release-g0 needs exactly one off-host 'OWNER VERDICT VERSION PASS ... role=offhost ... qualification=FIXTURE qual-sha256=...'; off-host: OWNER VERDICT VERSION STOP
+ACCEPT verdict FAIL need exactly one wrapper header '== afldb-verify-call <ts> mode=g0', found 0
+GATE ACCEPT REHEARSAL RELEASE-G0 NO-GO failed=owner-checks,reverify,version,verdict reason="owner-checks: BLOCKED, not PASS (a Phase 3.12 output is pre-Phase-4 evidence): OWNER CHECKS RESULT BLOCKED fail=B1,B2,B3 unknown=none"
+exit 1

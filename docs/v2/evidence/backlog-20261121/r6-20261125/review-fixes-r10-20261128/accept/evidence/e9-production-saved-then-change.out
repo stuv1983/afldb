@@ -1,0 +1,17 @@
+== case e9-production-saved-then-change: bash afldb-gate-accept.sh --gate ng-pre --owner-checks unmarked/e9/fx-oc-4.4-bootid-epoch-before.txt --reverify unmarked/e9/fx-reverify-4.5-bootid-epoch-before.txt --version unmarked/e9/fx-version-post-offhost-unqualified-prod.txt --verdict unmarked/e9/fx-a2-pass-post-prod.txt --verdict-exit 0 --confirm unmarked/cf/e9-production-saved-then-change-confirm.txt
+== afldb-gate-accept 2026-11-28T11:42:02Z gate=ng-pre transport=production (read-only; inputs by sha256)
+   042204e6a2b17fb2aa02a4295f99189fab5863be51e9fc442d8291bd2a314ee9  unmarked/e9/fx-oc-4.4-bootid-epoch-before.txt
+   a0d56c2a6d8f8fbe0925deb0c29829a7395216f11c1d44000b8da4bc8f32dc5b  unmarked/e9/fx-reverify-4.5-bootid-epoch-before.txt
+   000a52aab4cfbad850d989f17120865a3019c1e82325e83cc490644c6e8ce7a3  unmarked/e9/fx-version-post-offhost-unqualified-prod.txt
+   39de2cb3bb0246a85bcaf5b751dcaba43ef6865e3310791aa25c4c6bfcffea86  unmarked/e9/fx-a2-pass-post-prod.txt
+   d9767d3cb946fce0884253570645e4b7a265f2c2f58e133c1a886ebb6c559e05  unmarked/cf/e9-production-saved-then-change-confirm.txt
+ACCEPT owner-checks PASS post-Phase-4 PASS at 2026-11-28T11:36:14Z, boot c3524e4759ab4e0f8050875471b56b12 (B1, B2, B3 PASS; every CHECK line PASS)
+ACCEPT reverify PASS root 2026-11-28T11:36:08Z, --as-arm 2026-11-28T11:36:10Z (arm has no admin group), verify-install 2026-11-28T11:36:13Z, bundle 58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8, boot c3
+INFO version off-host line (not an NG-PRE criterion): OWNER VERDICT VERSION STOP transport=production host=none role=offhost reason="no qualified off-host endpoint" qualification=none qual-sha256=none
+ACCEPT version PASS production VERSION PASS nonce=23a740e15b1b7ed52e712d32d1f162c5 at=2026-11-28T11:38:22Z boot=c3524e4759ab4e0f8050875471b56b12, after (a) and (b), same boot as both
+ACCEPT verdict PASS OWNER VERDICT A2 PASS at=2026-11-28T11:40:01Z boot=c3524e4759ab4e0f8050875471b56b12, exit 0, after the version check
+ACCEPT confirm PASS production VERSION PASS nonce=23a740e15b1b7ed52e712d32d1f162c5 at=2026-11-28T11:41:02Z, after the verdict, same boot and bundle, 1 min before this check
+ACCEPT access FAIL VOID: an access change was recorded after the saved 4.4, so 4.4-4.6 and every earlier gate verdict are void, same boot and window included; repeat 4.4-4.6, the gate call and the confirm (access epochs
+ACCEPT fresh PASS verdict 2026-11-28T11:40:01Z is 3 min after the older Phase 4 evidence (2026-11-28T11:36:08Z); checked 2 min later at 2026-11-28T11:42:02Z (workstation clock)
+GATE ACCEPT NG-PRE NO-GO failed=access reason="access: VOID: an access change was recorded after the saved 4.4, so 4.4-4.6 and every earlier gate verdict are void, same boot and window included; repeat 4.4-4.6, the gate call and the confirm (access epochs"
+== exit 1

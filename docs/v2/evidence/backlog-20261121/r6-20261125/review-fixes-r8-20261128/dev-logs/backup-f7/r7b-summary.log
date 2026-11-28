@@ -1,0 +1,8 @@
+SCENARIO genuine PASS expect=attributed so_rc=0 inv=5431c397f79347bf8c2c8cbaaf43ca7f dump=afldb_prod-20261128-022000.dump sha256=2189be44655a916cb126848d6a674311772ae6d0622c1ea5cb106dffaef1008c dispatch=scheduled delay=90.9s
+SCENARIO extra-dropin PASS extra afldb-backup.service drop-ins and a manager BASH_ENV refused by name (4/4: Environment=, BindReadOnlyPaths=, BindPaths= sorting before 70-, set-environment BASH_ENV); removed: attributed again; CONTRAST r7 library with the Environment= drop-in: attributed; inv=deb4415068014d86b0488a3dfd721169 sha256=62e80827eb086df591aa1cfac316cb6e862d4ac7dcfc53a2a2818e07814d1bac
+SCENARIO arm-sudo PASS installer refused 3 arm-descended root sessions (SUDO_USER; ancestor bash; ancestor sudo), state unchanged; owner install passed the session check; --as-arm PASS as uid=1000(arm) gid=1000(arm) groups=1000(arm),997(afldb-backup-read)
+SCENARIO genuine-rd PASS expect=attributed so_rc=0 inv=265859e010ac415291fcc986968b1bf4 dump=afldb_prod-20261128-022426.dump sha256=e5b6c4116e04069a33f44a0995ef24009b911d6b0110b7d75d25cae5d6767bd9 dispatch=scheduled delay=352.2s
+SCENARIO rearm-in PASS expect=attributed so_rc=0 inv=048a3d63260148ddb930a474d367d61f dump=afldb_prod-20261128-022015.dump sha256=74e92680911640947a68674ec208ce75b4962f9a565febde8aa2185172903dc3 dispatch=catch-up delay=0.0s
+image r7b-sysd-r8f7:1 removed
+containers left with label r7b.run=r8f7: 0; images with label r7b.run=r8f7: 0
+R7 BACKUP HARNESS RESULT PASS

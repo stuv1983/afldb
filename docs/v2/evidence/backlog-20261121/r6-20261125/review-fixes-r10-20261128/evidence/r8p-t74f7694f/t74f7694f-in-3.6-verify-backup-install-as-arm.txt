@@ -1,0 +1,32 @@
+BOOT-ID c3524e4759ab4e0f8050875471b56b12
+== verify-backup-install --as-arm 2026-11-28T12:23:04Z as uid=0(root) gid=0(root) groups=0(root)
+script /root/afldb-r8-backup/verify-backup-install.sh: file sha256 66b5be10f7d6a94e24e0d9c2e44c7673a777bf9dbcce774e54435625f3e3d73a, bytes passed to the arm process sha256 66b5be10f7d6a94e24e0d9c2e44c7673a777bf9dbcce774e54435625f3e3d73a
+drop: setsid -w setpriv --reuid=arm --regid=arm --init-groups --reset-env /usr/bin/bash --noprofile --norc -c <script> verify-backup-install.sh --as-arm-child < /dev/null
+dropped identity (setsid -w setpriv --reuid=arm --regid=arm --init-groups --reset-env /usr/bin/id): uid=1000(arm) gid=1000(arm) groups=1000(arm),27(sudo),997(afldb-backup-read)
+root's id arm:                                                            uid=1000(arm) gid=1000(arm) groups=1000(arm),27(sudo),997(afldb-backup-read)
+[as arm] == verify-backup-install 2026-11-28T12:23:04Z as uid=1000(arm) gid=1000(arm) groups=1000(arm),27(sudo),997(afldb-backup-read) (--as-arm child: started by root through setpriv, no login)
+[as arm] PASS sealed_origin_install: trusted paths, pinned digests (run, sealer, backup.sh, drop-in, base unit = deploy/afldb-backup.service), effective unit (exactly the drop-in, no environment or bind settings)
+[as arm] PASS /usr/local/lib/afldb-backup/SHA256SUMS matches the installed files
+[as arm] PASS the r6 attest drop-in is absent
+[as arm] PASS afldb-backup (uid 999): home /nonexistent, shell /usr/sbin/nologin
+[as arm] PASS afldb-backup's only group is afldb-backup
+[as arm] PASS group afldb-backup has no members
+[as arm] PASS arm is in afldb-backup-read (account database)
+[as arm] PASS arm is not in afldb-backup
+[as arm] INFO timer: enabled=disabled active=inactive TimersCalendar={ OnCalendar=*-*-* 02:20:00 ; next_elapse=(null) } RandomizedDelayUSec=10min Persistent=yes 
+[as arm] INFO seals: 0; published dumps: 0; last seal: none
+[as arm] PASS this arm process carries afldb-backup-read
+[as arm] PASS arm cannot list /var/lib/afldb-backup/staging (Permission denied)
+[as arm] PASS arm cannot write /var/lib/afldb-backup
+[as arm] PASS arm cannot write /var/lib/afldb-backup/staging
+[as arm] PASS arm cannot write /var/lib/afldb-backup/seals
+[as arm] PASS arm cannot write /var/lib/afldb-backup/published
+[as arm] PASS arm cannot write /var/lib/afldb-backup/state
+[as arm] PASS arm cannot write /usr/local/lib/afldb-backup
+[as arm] PASS arm cannot write /usr/local/lib/afldb-backup/tools/maintenance
+[as arm] PASS arm cannot write /etc/systemd/system/afldb-backup.service.d
+[as arm] PASS arm can list /var/lib/afldb-backup/published (read only: off-host pull, restore)
+[as arm] PASS arm cannot authenticate by peer as afldb_backup (psql: error: connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed: FATAL:  Peer authentication fail)
+[as arm] AS-ARM CHILD RESULT PASS
+arm process exit status 0
+BACKUP INSTALL RESULT PASS (as arm via setpriv, no login: uid=1000(arm) gid=1000(arm) groups=1000(arm),27(sudo),997(afldb-backup-read))

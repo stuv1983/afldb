@@ -1,0 +1,63 @@
+== Astra's case, BEFORE (f92d6e29 gates) and AFTER (r5 gates), fixture-based real mains; 2026-11-27T11:44:33Z host streamanator container; exit codes inside
+G0 f92d6e29 bbc3d96f808e1d4293f052e1cf5e51f73fbee9cc08c647ad82776a293fc61d1b r5 32d7315a97d3670f1a2317da8ffaadcd0e2b50afa04ca804f0eb5959e849c8c4
+A-2 f92d6e29 ea4355f0a72f91125a3805a2ba70eefd1b7b5cc785a779ff93de140f495140d2 r5 64cc5166fea21438e8c5880e919e61398ff7381dd70ae359f19c392d33d18c49
+##### BEFORE: f92d6e29 gates, journal as today's production script writes it
+== astra-case orig-f92d6e29 2026-11-27T11:44:33Z host=afldb-prod mode=current-production-script (F23_SCRIPT=current)
+   G0 bbc3d96f808e1d4293f052e1cf5e51f73fbee9cc08c647ad82776a293fc61d1b
+   A-2 ea4355f0a72f91125a3805a2ba70eefd1b7b5cc785a779ff93de140f495140d2
+   fixture: timer LastTriggerUSec 02:20:00; the only visible invocation c1c2c3c4c5c6c7c8c9c0cacbcccdcecf started 02:20:03 (+3 s), exit 02:20:25, success, status 0
+   fixture journal (what arm reads):
+     2026-11-24T15:20:03Z scheduled-backup: target: mode=backup dir=/home/arm/backups/afldb-scheduled keep=14 offhost=none tools=/home/arm/projects/afldb/tools/maintenance
+     2026-11-24T15:20:25Z scheduled-backup: backup ok: afldb_prod-20261125-022003.dump 4096 bytes sha256 2bec02d10352e913 offhost=skipped
+   dump afldb_prod-20261125-022003.dump sidecar ok; PID 1's lines about the timer's own failed invocation are not readable by arm
+-- g0: exit 0
+   PASS afldb-backup.service scheduled run: timer dispatch Wed 2026-11-25 02:20:00 AEDT, its start Wed 2026-11-25 02:20:03 AEDT, exit Wed 2026-11-25 02:20:25 AEDT, Result=success status=0; invocation c1c2c3c4c5c6c7c8c9c0cacbcccdcecf alone in the window journal, 'backup ok' at Wed 2026-11-25 02:20:25 AEDT
+   BACKUP-EVIDENCE c1c2c3c4c5c6c7c8c9c0cacbcccdcecf 1795533600 1795533603 1795533625 1795533625 afldb_prod-20261125-022003.dump 2bec02d10352e913
+   OFFHOST-COMPARE afldb_prod-20261125-022003.dump 2bec02d10352e913bbe10317e271be83fac48c4070a746a44101fa1cbf439b39
+   G0 PROD RESULT PASS: now on streamanator: r6-offhost-verify.sh 2026-11-25 <dump> <sha256> must exit 0
+   (OFFHOST-COMPARE lines: 1; FAIL lines in all: 0)
+-- a2: exit 0
+   PASS afldb-backup.service scheduled run: timer dispatch Wed 2026-11-25 02:20:00 AEDT, its start Wed 2026-11-25 02:20:03 AEDT, exit Wed 2026-11-25 02:20:25 AEDT, Result=success status=0; invocation c1c2c3c4c5c6c7c8c9c0cacbcccdcecf alone in the window journal, 'backup ok' at Wed 2026-11-25 02:20:25 AEDT
+   BACKUP-EVIDENCE c1c2c3c4c5c6c7c8c9c0cacbcccdcecf 1795533600 1795533603 1795533625 1795533625 afldb_prod-20261125-022003.dump 2bec02d10352e913
+   OFFHOST-COMPARE afldb_prod-20261125-022003.dump 2bec02d10352e913bbe10317e271be83fac48c4070a746a44101fa1cbf439b39
+   R6 PRE RESULT PASS
+   (OFFHOST-COMPARE lines: 1; FAIL lines in all: 0)
+##### AFTER: r5 gates, today's production script (no trigger line)
+== astra-case r5-gates 2026-11-27T11:44:36Z host=afldb-prod mode=current-production-script (F23_SCRIPT=current)
+   G0 32d7315a97d3670f1a2317da8ffaadcd0e2b50afa04ca804f0eb5959e849c8c4
+   A-2 64cc5166fea21438e8c5880e919e61398ff7381dd70ae359f19c392d33d18c49
+   fixture: timer LastTriggerUSec 02:20:00; the only visible invocation c1c2c3c4c5c6c7c8c9c0cacbcccdcecf started 02:20:03 (+3 s), exit 02:20:25, success, status 0
+   fixture journal (what arm reads):
+     2026-11-24T15:20:03Z scheduled-backup: target: mode=backup dir=/home/arm/backups/afldb-scheduled keep=14 offhost=none tools=/home/arm/projects/afldb/tools/maintenance
+     2026-11-24T15:20:25Z scheduled-backup: backup ok: afldb_prod-20261125-022003.dump 4096 bytes sha256 6001f8509658c5e1 offhost=skipped
+   dump afldb_prod-20261125-022003.dump sidecar ok; PID 1's lines about the timer's own failed invocation are not readable by arm
+-- g0: exit 1
+   FAIL afldb-backup.service scheduled run is not attributed to the backup timer: scheduled origin unproven: invocation c1c2c3c4c5c6c7c8c9c0cacbcccdcecf logged 0 trigger lines (need exactly 1): nothing arm can read binds the timer's dispatch to this run (production's scheduled-backup.sh logs no trigger line until the r5 change is i
+   INFO the 02:2x dump is not examined and no OFFHOST-COMPARE line is printed: without an attributed timer run, origin included, no dump is the scheduled one
+   G0 PROD RESULT FAIL: STOP, the release is deferred, production unchanged
+   (OFFHOST-COMPARE lines: 0; FAIL lines in all: 1)
+-- a2: exit 1
+   FAIL afldb-backup.service scheduled run is not attributed to the backup timer: scheduled origin unproven: invocation c1c2c3c4c5c6c7c8c9c0cacbcccdcecf logged 0 trigger lines (need exactly 1): nothing arm can read binds the timer's dispatch to this run (production's scheduled-backup.sh logs no trigger line until the r5 change is i
+   INFO the 02:2x dump is not examined and no OFFHOST-COMPARE line is printed: without an attributed timer run, origin included, no dump is the scheduled one
+   R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+   (OFFHOST-COMPARE lines: 0; FAIL lines in all: 1)
+##### AFTER: r5 gates, r5 script (the hand run logs a trigger line with unit=none)
+== astra-case r5-gates 2026-11-27T11:44:38Z host=afldb-prod mode=r5-script (F23_SCRIPT=r5)
+   G0 32d7315a97d3670f1a2317da8ffaadcd0e2b50afa04ca804f0eb5959e849c8c4
+   A-2 64cc5166fea21438e8c5880e919e61398ff7381dd70ae359f19c392d33d18c49
+   fixture: timer LastTriggerUSec 02:20:00; the only visible invocation c1c2c3c4c5c6c7c8c9c0cacbcccdcecf started 02:20:03 (+3 s), exit 02:20:25, success, status 0
+   fixture journal (what arm reads):
+     2026-11-24T15:20:03Z scheduled-backup: target: mode=backup dir=/home/arm/backups/afldb-scheduled keep=14 offhost=none tools=/home/arm/projects/afldb/tools/maintenance
+     2026-11-24T15:20:03Z scheduled-backup: trigger: invocation=c1c2c3c4c5c6c7c8c9c0cacbcccdcecf job=4242 unit=none realtime_usec=none
+     2026-11-24T15:20:25Z scheduled-backup: backup ok: afldb_prod-20261125-022003.dump 4096 bytes sha256 df6bb2accb224c9b offhost=skipped
+   dump afldb_prod-20261125-022003.dump sidecar ok; PID 1's lines about the timer's own failed invocation are not readable by arm
+-- g0: exit 1
+   FAIL afldb-backup.service scheduled run is not attributed to the backup timer: scheduled origin unproven: the run's start job names trigger unit 'none', not afldb-backup.timer (a start by hand, or by a dependency, carries no timer dispatch)
+   INFO the 02:2x dump is not examined and no OFFHOST-COMPARE line is printed: without an attributed timer run, origin included, no dump is the scheduled one
+   G0 PROD RESULT FAIL: STOP, the release is deferred, production unchanged
+   (OFFHOST-COMPARE lines: 0; FAIL lines in all: 1)
+-- a2: exit 1
+   FAIL afldb-backup.service scheduled run is not attributed to the backup timer: scheduled origin unproven: the run's start job names trigger unit 'none', not afldb-backup.timer (a start by hand, or by a dependency, carries no timer dispatch)
+   INFO the 02:2x dump is not examined and no OFFHOST-COMPARE line is printed: without an attributed timer run, origin included, no dump is the scheduled one
+   R6 PRE RESULT STOP (1 FAIL line(s)): do not reboot; take them to the owner
+   (OFFHOST-COMPARE lines: 0; FAIL lines in all: 1)

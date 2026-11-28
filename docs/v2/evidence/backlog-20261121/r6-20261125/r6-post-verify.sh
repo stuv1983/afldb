@@ -4,6 +4,11 @@
 # `release.mjs status` WITHOUT --expect (the --expect form, and post-install-check.sh, append to events.log: they are the separate,
 # named acceptance step A3 of the runbook); one read-only database transaction through the backup role (ledger count, the
 # afldb_restore_test catalog comment, the postmaster start time; no row data); one loopback GET of /api/health.
+# R6 r4 (review finding 3, 27 Nov 2026), full mode: the post-boot InvocationID is ONE validated read (exit 0, exactly one 32-hex
+# value) that must differ from PRE_INVOCATION_ID; a failed, empty or malformed read is a FAIL, and the INVOCATION_ID line prints
+# only that validated, new value (otherwise "INVOCATION_ID none ..."). The one plain `release.mjs status` run must exit 0 and
+# print exactly one result line, exactly "release: STATUS PASS <CURRENT_ID>", with no carriage return; anything else is a FAIL.
+# The note "restarted since the last attested PASS" is permitted here (plain status prints it and still exits 0 after a reboot).
 # Command inventory (closure allowlist): hostname id date cat uname uptime awk sed grep tr cut sort wc head tail sha256sum stat ls
 #   systemctl(show|is-active|is-enabled|--failed) journalctl(-b read forms) pgrep pg_isready readlink curl(GET) df printf echo test
 #   node deploy/release.mjs status | sh deploy/afldb-settle-failure-status.sh | bash tools/maintenance/scheduled-backup.sh status
@@ -42,6 +47,40 @@ check_revalidation_processes() { # primary PID, immutable release directory; fix
     [ "$u/$s/$un/$sn" = 1/1/1/1 ] || return 1
   done
 }
+# R6 r4 (review finding 3, 27 Nov 2026): ONE read of a unit's InvocationID, validated before anything uses or prints it. Sets
+# RI_ID to the value only when `systemctl show` exited 0 and printed exactly one lower-case 32-hex ID (otherwise RI_ID is empty)
+# and RI_WHY to the reason; returns 0 only for a valid ID. Callers print and compare RI_ID, never a second read.
+read_invocation() { # unit
+  local v rc
+  RI_ID=; RI_WHY=
+  v=$(systemctl show "$1" -p InvocationID --value 2>&1); rc=$?
+  if [ "$rc" != 0 ]; then RI_WHY="systemctl show $1 failed (exit $rc)"
+  elif [ -z "$v" ]; then RI_WHY="the live InvocationID is empty"
+  elif ! [[ $v =~ ^[0-9a-f]{32}$ ]]; then RI_WHY="the live InvocationID '$(printf '%s' "$v" | tr -c '[:alnum:]' '?' | cut -c1-80)' is malformed"
+  else RI_ID=$v; fi
+  [ -n "$RI_ID" ]
+}
+
+# The serving-release rule of r6-pre-verify.sh's serving_release, post-reboot form: the output and exit code of ONE
+# `release.mjs status` (never --expect: that form appends to events.log) must be exit 0, no carriage return, exactly one line
+# containing "STATUS PASS" or "STATUS FAIL", and that line exactly "release: STATUS PASS <CURRENT_ID>". The restart note
+# (deploy/release.mjs cmdStatus: logged without --expect when the last status-pass names another InvocationID; it adds no
+# problem, so the run still ends "STATUS PASS", exit 0) is recorded in SS_NOTE, not refused: the owner attests this boot at A3.
+# Prints the output indented; sets SS_WHY; returns 0 only when every condition holds. Run with cwd = the checkout.
+serving_status() { # node current-id
+  local out rc n
+  SS_WHY=; SS_NOTE=absent
+  out=$("$1" deploy/release.mjs status 2>&1); rc=$?
+  printf '%s\n' "$out" | sed 's/^/     /'
+  [ "$rc" = 0 ] || SS_WHY="$SS_WHY; exit $rc"
+  [[ $out != *$'\r'* ]] || SS_WHY="$SS_WHY; the output contains a carriage return"
+  n=$(grep -cE 'STATUS (PASS|FAIL)' <<< "$out")
+  [ "$n" = 1 ] || SS_WHY="$SS_WHY; $n result lines (need exactly 1)"
+  grep -Fxq "release: STATUS PASS $2" <<< "$out" || SS_WHY="$SS_WHY; no line 'release: STATUS PASS $2'"
+  ! grep -Fq 'restarted since the last attested PASS' <<< "$out" || SS_NOTE=present
+  SS_WHY=${SS_WHY#; }
+  [ -z "$SS_WHY" ]
+}
 main() {
 set -uo pipefail; export LC_ALL=C
 MODE=${1:-}
@@ -78,7 +117,7 @@ grub)
   ;;
 full)
   K=${2:-}; CUR=${3:-}; PB=${4:-}; PI=${5:-}; RS=${6:-}; R4=${7:-}; GB=${8:-}
-  [[ $K =~ ^6\.8\.0-(149|137)-generic$ ]] && [[ $CUR =~ ^(7d92042fd110-[A-Za-z0-9_-]{1,64}|c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC)$ ]] \
+  [[ $K =~ ^6\.8\.0-(149|137)-generic$ ]] && [[ $CUR =~ ^((7d92042fd110|17822b29e6de)-[A-Za-z0-9_-]{1,64}|c8d4202a4cb3-aATnIlFOIQjq2z5oDdoHC)$ ]] \
     && [[ $PB =~ ^[0-9a-f-]{36}$ ]] && [[ $PI =~ ^[0-9a-f]{32}$ ]] && [[ $RS =~ ^([0-9a-f]{64}|none)$ ]] && [[ $R4 =~ ^r4:(yes|no)$ ]] && [[ $GB =~ ^[0-9a-f]{64}$ ]] \
     || { echo "STOP usage: full <KERNEL> <CURRENT_ID> <PRE_BOOT_ID> <PRE_INVOCATION_ID> <RESTORE_SHA|none> <r4:yes|no> <GRUB_BASELINE>"; exit 2; }
   N=/home/arm/.nvm/versions/node/v22.23.2/bin/node; CHK=/home/arm/projects/afldb; ROOT=/home/arm/afldb-releases; BK=/home/arm/backups/afldb-scheduled; NOW=$(date +%s)
@@ -93,9 +132,10 @@ full)
   echo "-- 2. PostgreSQL, the application and Caddy"
   for u in postgresql@16-main afldb caddy; do [ "$(systemctl is-active "$u")" = active ] && ok "$u active" || bad "$u $(systemctl is-active "$u")"; done
   pg_isready -q -h /var/run/postgresql -p 5432; R=$?; [ $R = 0 ] && ok "pg_isready" || bad "pg_isready exit $R"
-  INV=$(systemctl show afldb -p InvocationID --value); NR=$(systemctl show afldb -p NRestarts --value)
-  [ "$INV" != "$PI" ] && ok "afldb InvocationID new: $INV (the owner attests it as the R6 boot for acceptance step A3)" || bad "afldb InvocationID unchanged"
-  echo "INVOCATION_ID $INV"
+  NR=$(systemctl show afldb -p NRestarts --value)
+  if ! read_invocation afldb; then bad "afldb InvocationID: $RI_WHY"; echo "INVOCATION_ID none (no validated post-boot InvocationID: nothing to attest at A3)"
+  elif [ "$RI_ID" = "$PI" ]; then bad "afldb InvocationID unchanged ($RI_ID is the pre-boot ID: the service did not restart)"; echo "INVOCATION_ID none (the InvocationID is the pre-boot one: nothing to attest at A3)"
+  else ok "afldb InvocationID new: $RI_ID (the owner attests it as the R6 boot for acceptance step A3)"; echo "INVOCATION_ID $RI_ID"; fi
   [ "$NR" = 0 ] && ok "afldb NRestarts 0" || bad "afldb NRestarts $NR (restart loop after boot?)"
   info "afldb active since $(systemctl show afldb -p ActiveEnterTimestamp --value)"
   MAIN=$(systemctl show afldb -p MainPID --value); NW=0; PIDS=''
@@ -104,7 +144,8 @@ full)
   check_revalidation_processes "$MAIN" "$ROOT/releases/$CUR" && ok 'revalidation configured 1/1 in primary and both release workers' || bad 'revalidation process identity or nonempty 1/1 configuration failed'
   if cd "$CHK" 2>/dev/null; then
     [ "$(readlink "$ROOT/current")" = "releases/$CUR" ] && ok "current = $CUR (unchanged by the reboot)" || bad "current = $(readlink "$ROOT/current")"
-    "$N" deploy/release.mjs status 2>&1 | sed 's/^/     /'; info "release.mjs status exit ${PIPESTATUS[0]} (a restart note is expected after a reboot)"
+    if serving_status "$N" "$CUR"; then ok "release.mjs status (read-only): exit 0, one result line 'STATUS PASS $CUR' (restart note $SS_NOTE; it is expected after a reboot)"
+    else bad "release.mjs status does not prove $CUR is serving after the boot: $SS_WHY"; fi
     CS=$(sha256sum < /etc/caddy/Caddyfile | cut -d' ' -f1)
     if [ "$R4" = r4:yes ]; then [ "$CS" = f00859d5c834be09f064d516ea4fa12612da379e377128e784b3523016a6086d ] && ok "Caddyfile f00859d5 unchanged" || bad "Caddyfile $CS"
     else [ "$CS" = 4f6972ec119f5d33fff4c16cbbce15c50a36b883654dcffcabdb01776d7af036 ] && ok "Caddyfile 4f6972ec unchanged" || bad "Caddyfile $CS"; fi

@@ -14,6 +14,10 @@
 # sidecar and read with pg_restore --list; a dump that fails either is moved to <dest-dir>/quarantine, never kept
 # as a good copy, and the run exits 1. A dump whose sidecar has not arrived yet is left for the next run.
 #
+# r10: a "RECEIVED <dump> sha256=<h> bytes=<b> size=<s>" line is printed only for a dump THIS run transferred in full and then
+# verified (see "Receipt" below); a copy that was already present is never reported as received. The same record goes to fd 3
+# when the caller opened it; callers parse fd 3 only (stdout also carries source-side text).
+#
 # This copies and verifies bytes. It does NOT prove a restore: that is scheduled-backup.sh verify, on the source host.
 # Dumps contain authentication data and audit history: the destination directory is mode 700, files 600; treat the machine
 # as holding production secrets.
@@ -32,8 +36,34 @@ log() { printf '%s offhost-pull: %s\n' "$(date -u +%FT%TZ)" "$*"; }
 log "pull $SRC -> $DEST keep=$KEEP"
 chmod 700 "$DEST"
 
-rsync -a --partial --partial-dir=.rsync-partial --ignore-existing --chmod=F600 \
-  --include='*.dump' --include='*.dump.sha256' --exclude='*' "$SRC" "$DEST/" || { log "rsync failed"; exit 1; }
+# Receipt (R6 r10, Astra case 1): what THIS run received, as opposed to what the directory already held. rsync itemises every
+# file it transfers (--out-format, one line per transfer: flags, file size, bytes rsync moved for it, name); --ignore-existing
+# skips, silently, every file already present, so a dump placed here before the run is never itemised. A dump counts as
+# RECEIVED by this run only when (1) rsync itemised it as a file created here (">f+++++++++"), (2) rsync moved at least the
+# file's size for it (a resume from an earlier partial copy moves less and is not a receipt), and (3) this run then verified
+# it below. Only then does this script print "RECEIVED <dump> sha256=<hash> bytes=<moved> size=<size>". A dump verified for
+# the first time without being received (it was already here) prints the ordinary "verified" line and no RECEIVED line.
+# Retention, the retry of a dump whose sidecar arrives later and quarantine are unchanged; the receipt is evidence only.
+# r10 round 2 (independent review F5, F6): (4) the dump was ABSENT here before rsync started, both as a file and as a partial
+# under .rsync-partial (a resumed transfer is not a receipt), and --whole-file sends every byte (no delta against any basis);
+# (5) the machine-readable receipt goes to file descriptor 3 when the caller opened it ("RECEIVED <dump> sha256=<h> bytes=<b>
+# size=<s>", one per line), and rsync and ssh run with fd 3 closed, so text the SOURCE side prints (ssh stderr, rsync messages)
+# can reach stdout/stderr but never fd 3. The stdout line stays for the log; callers must parse fd 3, never stdout.
+declare -A PRE=()
+for f in "$DEST"/*.dump "$DEST"/.rsync-partial/*.dump; do [[ -e "$f" ]] && PRE[$(basename -- "$f")]=1; done
+items=$(rsync -a --whole-file --partial --partial-dir=.rsync-partial --ignore-existing --chmod=F600 --out-format='%i %l %b %n' \
+  --include='*.dump' --include='*.dump.sha256' --exclude='*' "$SRC" "$DEST/" 3>&-); rrc=$?
+declare -A RECV=()
+while read -r iflags isize ibytes iname; do
+  [[ -n "${iname:-}" && "$iflags" == '>'* ]] || continue   # files received; not directory attribute lines
+  log "transferred $iname item=$iflags size=$isize bytes=$ibytes"
+  if [[ "$iflags" == '>f+++++++++' && "$iname" == *.dump && "$iname" != */* && "$isize" =~ ^[1-9][0-9]*$ && "$ibytes" =~ ^[0-9]+$ ]] \
+     && (( ibytes >= isize )); then
+    if [[ -n "${PRE[$iname]:-}" ]]; then log "not a receipt: $iname (or a partial of it) was here before this run"
+    else RECV[$iname]="$ibytes $isize"; fi
+  fi
+done <<< "$items"
+[[ $rrc -eq 0 ]] || { log "rsync failed (exit $rrc); no receipt is issued for any file of this run"; exit 1; }
 
 mkdir -p "$DEST/quarantine"
 bad=0 checked=0 pending=0
@@ -89,6 +119,10 @@ for dump in "$DEST"/*.dump; do
   actual=$(sha256sum < "$dump" | cut -d' ' -f1)
   if [[ "$actual" == "$expected" ]] && pg_restore --list "$dump" > /dev/null 2>&1; then
     : > "$DEST/.verified-$b"; checked=$((checked + 1)); log "verified $b"
+    if [[ -n "${RECV[$b]:-}" ]]; then
+      read -r rb rs <<< "${RECV[$b]}"; log "RECEIVED $b sha256=$actual bytes=$rb size=$rs"
+      { printf 'RECEIVED %s sha256=%s bytes=%s size=%s\n' "$b" "$actual" "$rb" "$rs" >&3; } 2> /dev/null || true
+    fi
   else
     quarantine "$b" "hash or archive check"
   fi

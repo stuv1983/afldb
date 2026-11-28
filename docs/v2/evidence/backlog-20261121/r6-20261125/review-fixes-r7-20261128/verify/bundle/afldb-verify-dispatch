@@ -1,0 +1,164 @@
+#!/usr/bin/bash
+# afldb-verify-dispatch (R6 r7, MED-2). ROOT-OWNED, pinned by SHA256SUMS. Started ONLY by afldb-verify-entry, i.e. already under
+# `env -i PATH=/usr/sbin:/usr/bin LC_ALL=C SSH_ORIGINAL_COMMAND=...` and `bash --noprofile --norc`, as uid afldb-verify.
+# 1. Strict grammar of SSH_ORIGINAL_COMMAND (DESIGN 5.1); anything else: "AFLDB-VERIFY USAGE refused", exit 2, no RESULT line.
+#      g0 <YYYY-MM-DD> <nonce>                                    production (role prod)
+#      a2 accepted <CURRENT_ID> <r3:yes|no> <r4:yes|no> <10:00|14:00> <tue:...> <inv:32hex> <nonce>   production (role prod)
+#      g0b <YYYY-MM-DD> <dump> <sha256> <nonce>                   off-host (role offhost)
+#      version <nonce>                                            either
+#    nonce = 32 lower-case hex, chosen by the caller (afldb-verify-call.sh) and echoed in the RESULT line.
+# 2. Self-check of the installed bundle and configuration on EVERY run (bundle_selfcheck): any failure is a STOP (exit 3).
+# 3. Runs the core under a root-owned timeout and prints its output line by line, except (a) its token-prefixed FIELD lines, which
+#    it consumes. Review round 1 (F2): every other line is printed with each byte outside printable ASCII replaced by '?' (no ESC,
+#    CR or other control byte reaches the client), and (b) any line that CONTAINS "AFLDB-VERIFY RESULT" or "OWNER VERDICT" anywhere
+#    (leading spaces or control bytes included) is prefixed "[neutralised] " (defence in depth: the cores already pass every
+#    arm-owned value through san(); the wrapper sanitises and neutralises again).
+# 4. Prints exactly one final line and exits with the core's exit status (sshd returns it to the client):
+#    AFLDB-VERIFY RESULT <G0|A2|G0B|VERSION> <PASS|STOP> nonce=<n> host=<h> boot=<b> bundle=<sha256 of SHA256SUMS> at=<UTC> exit=<n> <fields>
+#    r9: G0B's fields are date dump sha256 dispatch-at received-at complete-at received-sha256 rehash-sha256 (g0b-core.sh; `none` when
+#    the core did not establish one), and a G0B PASS without all five evidence fields is turned into an internal STOP.
+#    r10: every RESULT line ends access-epoch=<32 hex|none|untrusted|malformed|unread> (see AEF below).
+set -uo pipefail
+export LC_ALL=C PATH=/usr/sbin:/usr/bin
+umask 077
+cd / || exit 3
+VB=/usr/local/lib/afldb-verify; SUMS=$VB/SHA256SUMS
+usage() { echo "AFLDB-VERIFY USAGE refused: $1 (grammar: g0 <date> <nonce> | a2 accepted <CURRENT_ID> <r3:yes|no> <r4:yes|no> <10:00|14:00> <tue:released|rolledback|deferred> <inv:32hex> <nonce> | g0b <date> <dump> <sha256> <nonce> | version <nonce>)"; exit 2; }
+
+# ---- 1. grammar (before anything else is read)
+CMD=${SSH_ORIGINAL_COMMAND-}
+[ "${#CMD}" -le 400 ] || usage "command longer than 400 bytes"
+[[ $CMD =~ ^[A-Za-z0-9:._-]+(\ [A-Za-z0-9:._-]+){0,9}$ ]] || usage "not single-space-separated plain words"
+read -ra W <<< "$CMD"
+NONCE_RE='^[0-9a-f]{32}$'; DATE_RE='^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+case ${W[0]} in
+  g0)  [ "${#W[@]}" = 3 ] && [[ ${W[1]} =~ $DATE_RE && ${W[2]} =~ $NONCE_RE ]] || usage "g0 needs <YYYY-MM-DD> <nonce>"
+       MODE=G0; CORE=g0-core.sh; ARGS=("${W[1]}"); NONCE=${W[2]};;
+  a2)  [ "${#W[@]}" = 9 ] && [ "${W[1]}" = accepted ] && [[ ${W[2]} =~ ^[0-9a-f]{12}-[A-Za-z0-9_-]{1,64}$ && ${W[3]} =~ ^r3:(yes|no)$ \
+         && ${W[4]} =~ ^r4:(yes|no)$ && ${W[5]} =~ ^(10:00|14:00)$ && ${W[6]} =~ ^tue:(released|rolledback|deferred)$ \
+         && ${W[7]} =~ ^inv:[0-9a-f]{32}$ && ${W[8]} =~ $NONCE_RE ]] || usage "a2 needs the seven A-2 arguments and <nonce>"
+       MODE=A2; CORE=a2-core.sh; ARGS=("${W[@]:1:7}"); NONCE=${W[8]};;
+  g0b) [ "${#W[@]}" = 5 ] && [[ ${W[1]} =~ $DATE_RE && ${W[2]} =~ ^afldb_prod-[0-9]{8}-[0-9]{6}\.dump$ && ${W[3]} =~ ^[0-9a-f]{64}$ \
+         && ${W[4]} =~ $NONCE_RE ]] || usage "g0b needs <YYYY-MM-DD> <dump> <sha256> <nonce>"
+       MODE=G0B; CORE=g0b-core.sh; ARGS=("${W[@]:1:3}"); NONCE=${W[4]};;
+  version) [ "${#W[@]}" = 2 ] && [[ ${W[1]} =~ $NONCE_RE ]] || usage "version needs <nonce>"
+       MODE=VERSION; CORE=; ARGS=(); NONCE=${W[1]};;
+  *) usage "unknown mode";;
+esac
+
+# ---- 2. self-check. lib.sh is hashed against SHA256SUMS with a minimal inline check before it is sourced.
+HOST=$(cat /proc/sys/kernel/hostname 2>/dev/null); BOOT=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null); BOOT=${BOOT//-/}
+[[ $HOST =~ ^[A-Za-z0-9.-]{1,64}$ ]] || HOST=unknown; [[ $BOOT =~ ^[0-9a-f]{32}$ ]] || BOOT=none
+BSUM=$(sha256sum < "$SUMS" 2>/dev/null); BSUM=${BSUM%% *}; [[ $BSUM =~ ^[0-9a-f]{64}$ ]] || BSUM=none
+declare -A FLD=()
+# r10 (Astra case 3): the ACCESS EPOCH. afldb-phase4.sh (apply, backout, invalidate) writes a new random 32-hex value to the root-owned
+# /var/lib/afldb-access/epoch BEFORE every access change it makes or records. Every RESULT line ends access-epoch=<it> (none: no file;
+# untrusted: not a root-owned, protected, single-link regular file on a root-owned path; malformed; unread: before lib.sh), read when
+# the line is printed. The workstation acceptance check requires the epoch of the saved 4.4 and 4.5 outputs to equal the epoch of the
+# 4.6 version check and of the gate verdict, so any recorded access change after 4.4 voids 4.4-4.6 and every earlier verdict.
+AEF=/var/lib/afldb-access/epoch; AE=unread
+result() { # PASS|STOP exit
+  local f extra=
+  case $MODE in
+    G0)  FLD[date]=${ARGS[0]}; for f in date invocation dump sha256 dispatch; do extra+=" $f=${FLD[$f]:-none}"; done;;
+    A2)  FLD[outcome]=${ARGS[0]}; FLD[current]=${ARGS[1]}; FLD[r3]=${ARGS[2]}; FLD[r4]=${ARGS[3]}; FLD[window]=${ARGS[4]}
+         FLD[tue]=${ARGS[5]}; FLD[inv]=${ARGS[6]#inv:}
+         for f in outcome current r3 r4 window tue inv day backup-origin; do extra+=" $f=${FLD[$f]:-none}"; done;;
+    G0B) FLD[date]=${ARGS[0]}; FLD[dump]=${ARGS[1]}; FLD[sha256]=${ARGS[2]}; for f in date dump sha256; do extra+=" $f=${FLD[$f]}"; done
+         for f in dispatch-at received-at complete-at received-sha256 rehash-sha256; do extra+=" $f=${FLD[$f]:-none}"; done;;
+    VERSION) extra=" role=${FLD[role]:-none}";;
+  esac
+  type access_epoch > /dev/null 2>&1 && access_epoch
+  echo "AFLDB-VERIFY RESULT $MODE $1 nonce=$NONCE host=$HOST boot=$BOOT bundle=$BSUM at=$(date -u +%Y-%m-%dT%H:%M:%SZ) exit=$2$extra access-epoch=$AE"
+  exit "$2"
+}
+stop_selfcheck() { echo "STOP verifier self-check: $1"; result STOP 3; }
+o=$(stat -c '%u %a %F' -- / /usr /usr/local /usr/local/lib "$VB" "$VB/lib.sh" "$SUMS" 2>/dev/null) || stop_selfcheck "the bundle cannot be read"
+while read -r u a t; do [ "$u" = 0 ] && ! (( 8#$a & 8#022 )) && [ "$t" != "symbolic link" ] || stop_selfcheck "a bundle path is not root-owned and protected"; done <<< "$o"
+h=$(sha256sum < "$VB/lib.sh"); grep -qxF "${h%% *}  lib.sh" "$SUMS" || stop_selfcheck "lib.sh does not match SHA256SUMS"
+. "$VB/lib.sh"
+access_epoch() {
+  local v=
+  if [ ! -e "$AEF" ] && [ ! -L "$AEF" ]; then AE=none; return 0; fi
+  trusted_path "$AEF" record || { AE=untrusted; return 0; }
+  read -r -n 64 v < "$AEF" 2>/dev/null; [[ $v =~ ^[0-9a-f]{32}$ ]] && AE=$v || AE=malformed
+}
+
+bundle_selfcheck() {
+  local l n h want have p a; local -a L names=()
+  SC_WHY=
+  trusted_path "$VB" dir && trusted_path "$SUMS" file || { SC_WHY="bundle: $TP_WHY"; return 1; }
+  mapfile -t L < "$SUMS"
+  [ "${#L[@]}" -ge 10 ] || { SC_WHY="SHA256SUMS lists ${#L[@]} files"; return 1; }
+  for l in "${L[@]}"; do
+    [[ $l =~ ^([0-9a-f]{64})\ \ ([A-Za-z0-9@._-]{1,64})$ ]] || { SC_WHY="SHA256SUMS line '$(san "$l" 80)' is malformed"; return 1; }
+    want=${BASH_REMATCH[1]}; n=${BASH_REMATCH[2]}; names+=("$n")
+    trusted_path "$VB/$n" file || { SC_WHY="bundle file: $TP_WHY"; return 1; }
+    h=$(sha256sum < "$VB/$n"); [ "${h%% *}" = "$want" ] || { SC_WHY="$VB/$n has sha256 ${h:0:16}..., SHA256SUMS says ${want:0:16}..."; return 1; }
+  done
+  want=$(printf '%s\n' "${names[@]}" SHA256SUMS | sort); have=$(ls -A "$VB" | sort)
+  [ "$want" = "$have" ] || { SC_WHY="the bundle directory holds files SHA256SUMS does not list (or lacks some): $(san "$(printf '%s ' $have)" 300)"; return 1; }
+  for p in afldb-verify-rootfacts.socket:/etc/systemd/system/afldb-verify-rootfacts.socket \
+           afldb-verify-rootfacts@.service:/etc/systemd/system/afldb-verify-rootfacts@.service \
+           60-afldb-verify.conf:/etc/ssh/sshd_config.d/60-afldb-verify.conf; do
+    trusted_path "${p#*:}" file || { SC_WHY="installed copy: $TP_WHY"; return 1; }
+    a=$(sha256sum < "${p#*:}"); h=$(sha256sum < "$VB/${p%%:*}")
+    [ "${a%% *}" = "${h%% *}" ] || { SC_WHY="${p#*:} differs from the bundle's ${p%%:*}"; return 1; }
+  done
+  trusted_path /etc/ssh/afldb-verify/authorized_keys file || { SC_WHY="authorized_keys: $TP_WHY"; return 1; }
+  trusted_path /etc/afldb-verify/role file || { SC_WHY="role file: $TP_WHY"; return 1; }
+  trusted_path /usr/bin dir && trusted_path /usr/sbin dir || { SC_WHY="PATH: $TP_WHY"; return 1; }
+  for p in "${HELPERS[@]}"; do trusted_helper "$p" || { SC_WHY="helper: $TP_WHY"; return 1; }; done
+  [ "$(id -un)" = afldb-verify ] || { SC_WHY="running as $(id -un), not afldb-verify"; return 1; }
+  ! id -Gn | tr ' ' '\n' | grep -qx arm || { SC_WHY="afldb-verify is a member of group arm"; return 1; }
+}
+bundle_selfcheck || stop_selfcheck "$SC_WHY"
+ROLE=$(cat /etc/afldb-verify/role)
+case $ROLE:$MODE in prod:G0|prod:A2|offhost:G0B|*:VERSION) ;; prod:*|offhost:*) echo "STOP mode $MODE is not served on a $ROLE host"; result STOP 2;;
+  *) stop_selfcheck "role file says '$(san "$ROLE" 40)'";; esac
+
+echo "== afldb-verify $MODE host=$HOST role=$ROLE boot=$BOOT bundle=$BSUM identity: $(id) at $(date -u +%FT%TZ)"
+echo "== the verifier ran its self-check: every bundle file matches SHA256SUMS, the installed unit, socket and sshd drop-in equal the bundle copies, every helper and PATH directory is root-owned and protected"
+if [ "$MODE" = VERSION ]; then
+  FLD[role]=$ROLE
+  sed 's/^/   /' "$SUMS"
+  result PASS 0
+fi
+
+# ---- 3. the core
+TOK=$(cat /proc/sys/kernel/random/uuid); TOK=${TOK//-/}
+out=$(AFLDB_VERIFY_TOKEN=$TOK timeout -k 10 1500 /usr/bin/bash --noprofile --norc "$VB/$CORE" "${ARGS[@]}" < /dev/null 2>&1); rc=$?
+while IFS= read -r l; do
+  if [[ $l == "FIELD-$TOK "* ]]; then
+    l=${l#"FIELD-$TOK "}; [[ $l =~ ^([a-z0-9-]{1,32})=([A-Za-z0-9:._-]{1,200})$ ]] && FLD[${BASH_REMATCH[1]}]=${BASH_REMATCH[2]}
+  else
+    l=${l//[^[:print:]]/?}
+    if [[ $l == *"AFLDB-VERIFY RESULT"* || $l == *"OWNER VERDICT"* || $l == AFLDB-VERIFY* ]]; then printf '[neutralised] %s\n' "$l"
+    else printf '%s\n' "$l"; fi
+  fi
+done <<< "$out"
+[ "$rc" != 124 ] && [ "$rc" != 137 ] || echo "STOP the core did not finish within 1500 s (timeout, exit $rc)"
+for k in "${!FLD[@]}"; do
+  case $k in
+    invocation) [[ ${FLD[$k]} =~ ^[0-9a-f]{32}$ ]] || unset "FLD[$k]";;
+    dump) [[ ${FLD[$k]} =~ ^afldb_prod-[0-9]{8}-[0-9]{6}\.dump$ ]] || unset "FLD[$k]";;
+    sha256) [[ ${FLD[$k]} =~ ^[0-9a-f]{64}$ ]] || unset "FLD[$k]";;
+    dispatch) [[ ${FLD[$k]} =~ ^(scheduled|catch-up)$ ]] || unset "FLD[$k]";;
+    backup-origin) [[ ${FLD[$k]} =~ ^(attributed|refused)$ ]] || unset "FLD[$k]";;
+    day) [[ ${FLD[$k]} =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || unset "FLD[$k]";;
+    dispatch-at|received-at|complete-at) [ "$MODE" = G0B ] && [[ ${FLD[$k]} =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]] || unset "FLD[$k]";;
+    received-sha256|rehash-sha256) [ "$MODE" = G0B ] && [[ ${FLD[$k]} =~ ^[0-9a-f]{64}$ ]] || unset "FLD[$k]";;
+    *) unset "FLD[$k]";;
+  esac
+done
+if [ "$rc" = 0 ]; then
+  case $MODE in
+    G0) [ -n "${FLD[invocation]:-}" ] && [ -n "${FLD[dump]:-}" ] && [ -n "${FLD[sha256]:-}" ] && [ -n "${FLD[dispatch]:-}" ] \
+          || { echo "STOP internal: the G0 core exited 0 without a valid invocation, dump, sha256 and dispatch"; result STOP 3; };;
+    A2) [ "${FLD[backup-origin]:-}" = attributed ] || { echo "STOP internal: the A-2 core exited 0 without an attributed backup origin"; result STOP 3; };;
+    G0B) [ -n "${FLD[dispatch-at]:-}" ] && [ -n "${FLD[received-at]:-}" ] && [ -n "${FLD[complete-at]:-}" ] && [ -n "${FLD[received-sha256]:-}" ]            && [ -n "${FLD[rehash-sha256]:-}" ] || { echo "STOP internal: the G0B core exited 0 without the scheduled-transfer evidence fields"; result STOP 3; };;
+  esac
+  result PASS 0
+fi
+[ "$MODE" != G0 ] || { FLD[dump]=; FLD[sha256]=; }
+result STOP "$rc"

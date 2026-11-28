@@ -1,0 +1,46 @@
+[FIXTURE r9] fx-reverify-4.5-bootid.txt with the --as-arm part (its header through its result line) deleted
+BOOT-ID c3524e4759ab4e0f8050875471b56b12
+== verify-backup-install 2026-11-28T05:21:40Z as uid=0(root) gid=0(root) groups=0(root)
+PASS sealed_origin_install: trusted paths, pinned digests (run, sealer, backup.sh, drop-in, base unit = deploy/afldb-backup.service), effective unit (exactly the drop-in, no environment or bind settings)
+PASS /usr/local/lib/afldb-backup/SHA256SUMS matches the installed files
+PASS the r6 attest drop-in is absent
+PASS afldb-backup (uid 999): home /nonexistent, shell /usr/sbin/nologin
+PASS afldb-backup's only group is afldb-backup
+PASS group afldb-backup has no members
+PASS arm is in afldb-backup-read (account database)
+PASS arm is not in afldb-backup
+INFO timer: enabled=disabled active=inactive TimersCalendar={ OnCalendar=*-*-* 02:20:00 ; next_elapse=(null) } RandomizedDelayUSec=10min Persistent=yes 
+INFO seals: 0; published dumps: 0; last seal: none
+PASS /etc/postgresql/16/main/pg_hba.conf: the first local line is the afldb_backup peer line
+PASS /etc/postgresql/16/main/pg_ident.conf maps afldb-backup to afldb_backup
+PASS afldb-backup authenticates by peer as afldb_backup (no secret)
+INFO arm's checks: run 'bash verify-backup-install.sh --as-arm' in this root session (acceptance evidence)
+BACKUP INSTALL RESULT PASS
+== verify-verify-install 2026-11-28T05:21:45Z host=afldb-prod role=prod as root
+PASS bundle: 13 files match SHA256SUMS; bundle digest 58fceba650dcd25ede0e55b25bfcb8a8236c3a4fe6ae6ebd94535832bbd506c8
+PASS /etc/systemd/system/afldb-verify-rootfacts.socket = bundle copy
+PASS /etc/systemd/system/afldb-verify-rootfacts@.service = bundle copy
+PASS /etc/ssh/sshd_config.d/60-afldb-verify.conf = bundle copy
+PASS /usr/local/lib/afldb-verify/afldb-verify-entry executable
+PASS /usr/local/lib/afldb-verify/afldb-verify-dispatch executable
+PASS role file = prod
+PASS authorized_keys: 1 key line(s), every one restrict + forced command
+PASS account: afldb-verify:x:997:995::/var/lib/afldb-verify:/bin/sh
+PASS groups: afldb-backup-read afldb-verify systemd-journal
+PASS group afldb-verify has no supplementary member (arm cannot reach the root facts socket)
+PASS arm is not in group afldb-verify
+PASS home /var/lib/afldb-verify root-owned and empty
+PASS afldb-verify-rootfacts.socket active and enabled
+PASS socket file root:afldb-verify 660 socket
+PASS sshd for afldb-verify: forcecommand /usr/local/lib/afldb-verify/afldb-verify-entry
+PASS sshd for afldb-verify: permittty no
+PASS sshd for afldb-verify: allowtcpforwarding no
+PASS sshd for afldb-verify: allowagentforwarding no
+PASS sshd for afldb-verify: x11forwarding no
+PASS sshd for afldb-verify: permittunnel no
+PASS sshd for afldb-verify: permituserenvironment no
+PASS sshd for afldb-verify: permituserrc no
+PASS sshd for afldb-verify: authorizedkeysfile /etc/ssh/afldb-verify/authorized_keys
+PASS sshd for afldb-verify: passwordauthentication no
+PASS sshd for arm: not forced into the verifier
+VERIFY-INSTALL RESULT PASS
