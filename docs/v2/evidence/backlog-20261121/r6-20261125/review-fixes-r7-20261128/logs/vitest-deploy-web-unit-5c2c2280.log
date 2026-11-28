@@ -1,0 +1,61 @@
+== r7 (e) 2026-11-27T23:41:18Z host streamanator id uid=1000(arm) gid=1000(arm) groups=1000(arm),4(adm),24(cdrom),27(sudo),30(dip),44(video),46(plugdev),101(lxd),111(docker) workspace /home/arm/r7e-vitest.Y8Mc7a (git archive of tested 5c2c2280e4688a063a5f943512e4460e250b1135, docs/v2/evidence, issues and documentation excluded; node_modules -> /home/arm/afldb-i316-apply-876dadbfa024-20261024T001117Z/node_modules, vitest 4.1.10)
+test file sha256 ee7679e9b33bbdcb6088aa7a7d9d5ea2dcbf0f4cea9c3bac1171d112ab92e54e; scheduled-backup.sh sha256 7e2b470aed441208b990204115f892b3c0c4e9c402800a4c038aadc386105903
+node v22.23.2
+$ node node_modules/vitest/vitest.mjs run tests/deploy-web-unit.test.ts --reporter verbose
+
+ RUN  v4.1.10 /home/arm/r7e-vitest.Y8Mc7a
+
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-220 — web unit credential boundary > .env.example defines DSNs beyond the three the web process keeps 5ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-220 — web unit credential boundary > loads .env, then keeps exactly app, auth and import 2ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-220 — web unit credential boundary > has at least one DSN left to deny 0ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-220 — web unit credential boundary > unsets AFLDB_OWNER_DATABASE_URL 1ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-220 — web unit credential boundary > unsets AFLDB_TEST_DATABASE_URL 1ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-220 — web unit credential boundary > unsets AFLDB_TEST_IMPORT_DATABASE_URL 0ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-220 — web unit credential boundary > unsets AFLDB_TEST_AUTH_DATABASE_URL 1ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-220 — web unit credential boundary > unsets AFLDB_DEV_DATABASE_URL 0ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-220 — web unit credential boundary > unsets AFLDB_DEV_IMPORT_DATABASE_URL 1ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-220 — web unit credential boundary > unsets AFLDB_CODE_TEST_DATABASE_URL 1ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-220 — web unit credential boundary > unsets AFLDB_CODE_TEST_IMPORT_DATABASE_URL 0ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-220 — web unit credential boundary > unsets AFLDB_BACKUP_DATABASE_URL 0ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-220 — web unit credential boundary > unsets AFLDB_PROD_DATABASE_URL 0ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-220 — web unit credential boundary > unsets AFLDB_PROD_IMPORT_DATABASE_URL 0ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-220 — web unit credential boundary > unsets AFLDB_PROD_AUTH_DATABASE_URL 0ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-220 — standalone build ships no credential file > removes .env files copied into the standalone tree and leaves everything else 10ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-220 — standalone build ships no credential file > prepare-standalone.mjs refuses to ship if a .env file survives removal 1ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-220 — standalone build ships no credential file > detects a nested credential file that top-level cleanup leaves, and deletes nothing nested 9ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-220 — standalone build ships no credential file > reports sorted relative POSIX paths, deterministically 5ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-220 — standalone build ships no credential file > never follows a symlinked directory 3ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-220 — standalone build ships no credential file > works from names only: the helper never opens a file 1ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-220 — standalone build ships no credential file > prepare-standalone.mjs refuses to ship if a .env-named file survives anywhere in the tree 1ms
+ ✓ tests/deploy-web-unit.test.ts > V2-GAP-036 — standalone bundle ships the runtime reference files > src/lib/rollover/ is imported by no other src/ module, so its repository paths never run in the server 81ms
+ ✓ tests/deploy-web-unit.test.ts > V2-GAP-036 — standalone bundle ships the runtime reference files > lists every data/ and tools/ JSON file a src/ loader reads, and the Coleman contract among them 67ms
+ ✓ tests/deploy-web-unit.test.ts > V2-GAP-036 — standalone bundle ships the runtime reference files > every listed file exists in the repository 1ms
+ ✓ tests/deploy-web-unit.test.ts > V2-GAP-036 — standalone bundle ships the runtime reference files > copies the files into a standalone-shaped tree, where the Coleman and season loaders read them 23ms
+ ✓ tests/deploy-web-unit.test.ts > V2-GAP-036 — standalone bundle ships the runtime reference files > reports a bundle file that differs from the repository copy 14ms
+ ✓ tests/deploy-web-unit.test.ts > V2-GAP-036 — standalone bundle ships the runtime reference files > names a file missing from the repository instead of failing the copy 4ms
+ ✓ tests/deploy-web-unit.test.ts > V2-GAP-036 — standalone bundle ships the runtime reference files > prepare-standalone.mjs copies, then refuses to ship unless every file checks out 1ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-220 — docs/deployment.md agrees with the unit > documents the current three-DSN web process boundary, not the pre-066 one 1ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-220 — docs/deployment.md agrees with the unit > lists every DSN name .env.example defines 2ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-352 — scheduled backup wrapper and units > refuses to guess its target: no AFLDB_BACKUP_DIR, or a relative one, is a configuration error and writes nothing 22ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-352 — scheduled backup wrapper and units > backup: writes a verifiable sha256 sidecar and state, logs the resolved target first, drops orphaned sidecars 51ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-352 — scheduled backup wrapper and units > a failing backup exits 1 and leaves a FAILED marker naming the step; the next success clears it 76ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-352 — scheduled backup wrapper and units > verify: restores the FRESH dump itself, retries a failed parity check once, and fails loudly after the second 125ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-352 — scheduled backup wrapper and units > a backup success does not erase a failed verification; only a verify success does (review A-02) 271ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-352 — scheduled backup wrapper and units > an unwritable state record is a failure, never "backup ok": nonzero, prior record and marker kept, then a clean retry (review) 106ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-352 — scheduled backup wrapper and units > verify: an unwritable verification record (or backup record) fails, keeps the prior record and the FAILED marker, then a retry succeeds (review) 160ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-352 — scheduled backup wrapper and units > status: AFLDB_BACKUP_SEALED_STATE_DIR (absolute, opt-in) is where the backup check reads last-backup.json (R6 r7) 147ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-352 — scheduled backup wrapper and units > offhost-pull: binds each sidecar to its dump, refuses future stamps, and a flood cannot evict genuine copies (review A-03) 2121ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-352 — scheduled backup wrapper and units > off-host: copies, re-hashes and prunes at the destination; a missing destination keeps the local dump and fails the run 110ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-352 — scheduled backup wrapper and units > status is the monitor probe: ok after a recent backup and verification, failing on staleness or a never-verified restore 162ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-352 — scheduled backup wrapper and units > the prepared units sit outside the settle and apt windows, carry no credentials, and use a dedicated directory 3ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-352 review — backup.sh decodes the DSN password for PGPASSWORD > a percent-encoded password reaches pg_dump decoded in PGPASSWORD, and appears in no argv or output 32ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-352 review — backup.sh decodes the DSN password for PGPASSWORD > an ordinary password and an encoded backslash are passed through exactly; no password leaves PGPASSWORD unset 90ms
+ ✓ tests/deploy-web-unit.test.ts > AFLDB-ISSUE-352 review — backup.sh decodes the DSN password for PGPASSWORD > a password that cannot be decoded exactly is refused before pg_dump runs, without printing it 43ms
+
+ Test Files  1 passed (1)
+      Tests  46 passed (46)
+   Start at  10:41:19
+   Duration  4.94s (transform 601ms, setup 217ms, import 561ms, tests 3.76s, environment 0ms)
+
+VITEST-EXIT 0
+workspaces left: 0

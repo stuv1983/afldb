@@ -15,6 +15,25 @@ commit.
 
 ## [Unreleased]
 
+### R6 r7: sealed backup production and an owner verifier independent of arm (28 November 2026; on `claude/closeout-20261127`, draft PR 5; PROPOSED, independent review pending; nothing installed or deployed)
+
+- **`tools/maintenance/scheduled-backup.sh status` has an explicit opt-in, `AFLDB_BACKUP_SEALED_STATE_DIR=<absolute path>`.** It has no
+  default. When set, the nightly backup's freshness and off-host-failure checks read `<dir>/last-backup.json`, which on production
+  would be the sealed `/var/lib/afldb-backup/state`. Unset, behaviour is unchanged, and a relative path is a configuration error
+  (exit 2). The new `tests/deploy-web-unit.test.ts` case passed on Linux (46/46 in that file).
+- **Prospective sealed-backup bundle (not installed).** The nightly dump is produced by a system account `afldb-backup` with peer
+  authentication and no secret. A root `ExecStartPost` hashes a root-only copy, writes a root seal of PID 1's facts
+  (`afldb-backup-seal/3`) and only then publishes the copy root:afldb-backup-read 0440. The gate rule `sealed_origin` reads root facts
+  only, and catch-up dispatches are identified explicitly.
+- **Prospective owner verifier (not installed).** The account `afldb-verify` has a root-owned forced command, a dedicated key and a
+  root facts reader. Through the workstation wrapper `afldb-verify-call.sh`, Stu receives G0 (G0a then G0b) and whole-A-2 verdicts
+  bound to a nonce, the pinned bundle digest, the host and the exit status.
+- **Operator workflow.** The release runbook G0 and the R6 plan A-2/NG-PRE/NG-OFFHOST now take only the owner-path verdicts as GO
+  evidence. Verdicts printed by arm-run scripts are information only. The installation preconditions come before the qualifying
+  02:20 backup.
+- Tested revision `5c2c2280`, R6 manifest `426c07ff…`, release `scripts/SHA256SUMS` `52900a0e…` (gate comments only)
+  ([record](docs/v2/evidence/backlog-20261121/r6-20261125/review-fixes-r7-20261128/README.md)).
+
 ### R6 r6 and release G0: root-protected backup origin, real-systemd callers, parser boundary (28 November 2026; on `claude/closeout-20261127`, draft PR 5; PROPOSED, Astra re-review pending; nothing installed or deployed)
 
 - **Backup origin no longer trusts anything arm writes.** A prospective root-owned writer (`afldb-backup-attest`, run as `ExecStartPost=-+` through `env -i bash --noprofile --norc`) records, while the timer's start job is live, the invocation, the job's own `ActivationDetails`, the timer's dispatch stamps and the run's single dump with its full sha256 (hashed as uid arm) in `/var/lib/afldb-backup-attest/<invocation>.attest`. Release G0 and R6 A-2 verify the writer's and drop-in's pinned digests, the loaded unit, the helpers, every path component and the record, and require the record's dump to be the dump they compare off-host. The r5 `trigger:` line is no longer read, and `tools/maintenance/scheduled-backup.sh` is back to the production bytes. Until the writer is installed, both gates STOP by design.

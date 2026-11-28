@@ -1,0 +1,13 @@
+SCENARIO genuine PASS expect=attributed so_rc=0 inv=5796400e06b8436cbc5d207eb1598ba6 dump=afldb_prod-20261128-022000.dump sha256=8c70a12d2ffee3dbd5752976633ad45d9c0d25d0adc620e6f751fa73351fe4b0 dispatch=scheduled delay=84.4s
+SCENARIO perm PASS expect=attributed so_rc=0 inv=909783cb05dd4d9fac9267b8667dc83a dump=afldb_prod-20261128-022000.dump sha256=8c3cdaea58aa5794701bdee2af58b7632e27d5fff10b9ddc6c7ffb13263404d0 dispatch=scheduled delay=85.5s
+SCENARIO review2 PASS expect=attributed so_rc=0 inv=04e62863d18e48558536a7a0591b3c2f dump=afldb_prod-20261128-022000.dump sha256=27c90abe61cd5ea1f73d7188aa30454be12cd96a07efc1af77e27a7f7f5257ae dispatch=scheduled delay=83.0s
+SCENARIO hand-start PASS expect=refused so_rc=1 reason=0 seals in /var/lib/afldb-backup/seals record a start job created by afldb-backup.timer with its dispatch in the 2026-11-28 02:20-02:31 window (need exactly 1; a start by hand never counts)
+SCENARIO timer-then-hand PASS expect=refused so_rc=1 reason=another run of afldb-backup.service was sealed in the window (/var/lib/afldb-backup/seals/8a88029ed2224fa884945d0e5f252cae.seal, trigger none): ambiguous
+SCENARIO restart PASS expect=refused so_rc=1 reason=seal /var/lib/afldb-backup/seals/6b4b3c1f296a467484e67720ac05ece7.seal: the unit entered inactive (monotonic 632441307099) after the dispatch (632440988713): it stopped or failed between the dispatch and this invocation (a restart inside th
+SCENARIO rearm-in PASS expect=attributed so_rc=0 inv=967b5436af694746be661d9c2951bb97 dump=afldb_prod-20261128-022015.dump sha256=584961486f5152052004a4d6a712cf1f834536f757fa1e638906a40fff957e36 dispatch=catch-up delay=0.0s
+SCENARIO rearm-out PASS expect=refused so_rc=1 reason=0 seals in /var/lib/afldb-backup/seals record a start job created by afldb-backup.timer with its dispatch in the 2026-11-28 02:20-02:31 window (need exactly 1; a start by hand never counts)
+SCENARIO pgdump-fails PASS expect=refused so_rc=1 reason=0 seals in /var/lib/afldb-backup/seals record a start job created by afldb-backup.timer with its dispatch in the 2026-11-28 02:20-02:31 window (need exactly 1; a start by hand never counts)
+SCENARIO seal-interrupted PASS expect=refused so_rc=1 reason=published dump: /var/lib/afldb-backup/published/afldb_prod-20261128-022000.dump: missing, or a component cannot be read
+image r7b-sysd-t5c2c2280:1 removed
+containers left with label r7b.run=t5c2c2280: 0; images with label r7b.run=t5c2c2280: 0
+R7 BACKUP HARNESS RESULT PASS
