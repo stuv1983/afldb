@@ -170,7 +170,7 @@ seal=$SEALS/$inv.seal; stmp=$SEALS/.$inv.tmp
 [ ! -e "$seal" ] && [ ! -L "$seal" ] || die "a seal for invocation $inv already exists (never overwritten)"
 TMPS+=("$stmp"); umask 022
 set -C                                                        # noclobber: the temporary name must be new
-printf '%s\n' "afldb-backup-seal/4""sealer_sha256=$wsha" "unit=$SVC" "invocation=$inv" "job=$job" "job_type=$jtype" \
+printf '%s\n' "afldb-backup-seal/4" "sealer_sha256=$wsha" "unit=$SVC" "invocation=$inv" "job=$job" "job_type=$jtype" \
   "active_state=${S[ActiveState]}" "sub_state=${S[SubState]}" "exec_main_code=${S[ExecMainCode]}" "exec_main_status=${S[ExecMainStatus]}" \
   "service_user=$BUSER" "inactive_enter_mono=${S[InactiveEnterTimestampMonotonic]}" "inactive_exit_mono=${S[InactiveExitTimestampMonotonic]}" \
   "exec_main_start_mono=${S[ExecMainStartTimestampMonotonic]}" "trigger_unit=$tunit" "trigger_timer_realtime_usec=$tusec" \

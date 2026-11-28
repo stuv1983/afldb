@@ -220,13 +220,13 @@ G0b checks must hash to the sha256 from the authenticated G0a line, so streamana
 ## 7. Implementation deviations (coordinator record, 28 Nov 2026)
 
 The coordinator checked both deliveries against this contract.
-* The bundle's `sealed-origin.sh` is byte-identical to `backup/sealed-origin.sh` (`1e5b5da4…`).
-* The pins inside `sealed-origin.sh` equal the files: run `2c62ff91…`, sealer `143f4ba7…`, the repository `backup.sh` `df609046…`,
+* The bundle's `sealed-origin.sh` is byte-identical to `backup/sealed-origin.sh` (`1153df78…`).
+* The pins inside `sealed-origin.sh` equal the files: run `2c62ff91…`, sealer `793e94be…`, the repository `backup.sh` `df609046…`,
   drop-in `f8a18580…`.
-* `verify-backup-install.sh` pins the library `1e5b5da4…`.
-* `backup/SHA256SUMS` (`4a9d437f…`) matches its seven files.
-* `verify/bundle/SHA256SUMS` (`f75ba83d…`) matches its files and equals the wrapper's `BUNDLE_SHA`.
-* `verify/SHA256SUMS` (`237dee30…`) matches, and `build-sums.sh --check` gives PASS.
+* `verify-backup-install.sh` pins the library `1153df78…`.
+* `backup/SHA256SUMS` (`d0023d10…`) matches its seven files.
+* `verify/bundle/SHA256SUMS` (`df3457cc…`) matches its files and equals the wrapper's `BUNDLE_SHA`.
+* `verify/SHA256SUMS` (`221b254a…`) matches, and `build-sums.sh --check` gives PASS.
 * `a2-core.sh`'s host-policy pins equal `deploy/host-policy/*`, and the bundled `afldb-settle-failure-status.sh` equals the `17822b29` blob
   (`d80838cb…`).
 * The install order fits. `install-backup.sh` creates `afldb-backup-read` and adds arm to it. `install-verify.sh --role prod` refuses

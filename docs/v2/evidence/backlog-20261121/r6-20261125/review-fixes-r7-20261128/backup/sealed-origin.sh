@@ -104,7 +104,7 @@ so__parse() {
 sealed_origin_install() {
   local CODE=/usr/local/lib/afldb-backup RUN=/usr/local/lib/afldb-backup/afldb-backup-run SEALER=/usr/local/lib/afldb-backup/afldb-backup-seal
   local BKSH=/usr/local/lib/afldb-backup/tools/maintenance/backup.sh DI=/etc/systemd/system/afldb-backup.service.d/70-afldb-backup-sealed.conf
-  local RUN_SHA=2c62ff919908cddadd4ccf57bd6f0344d3aba4be2ae49a413ab13a58e8658085 SEAL_SHA=143f4ba799a468cb99fb92c51adace29311062cd774d9946a2e98cc75a413d0b
+  local RUN_SHA=2c62ff919908cddadd4ccf57bd6f0344d3aba4be2ae49a413ab13a58e8658085 SEAL_SHA=793e94bef7e9797815709da530beab09652e4cce200f7a769fdd5fb092a2ece5
   local BKSH_SHA=df609046a6a322db3f651d9d2c9cf1820fdb9ca0d0d4d9ae9f67c3dede1be3be DI_SHA=f8a18580e8638f0a0923519b4280c24c3e94f4eba5c82f23a03a65b7fb7fbdeb
   local XS='/usr/bin/bash --noprofile --norc /usr/local/lib/afldb-backup/afldb-backup-run'
   local XP='/usr/bin/env -i PATH=/usr/sbin:/usr/bin /usr/bin/bash --noprofile --norc /usr/local/lib/afldb-backup/afldb-backup-seal'
@@ -172,7 +172,7 @@ sealed_origin_install() {
 }
 
 sealed_origin() { # gate-date YYYY-MM-DD
-  local day=${1:-} SEAL_SHA=143f4ba799a468cb99fb92c51adace29311062cd774d9946a2e98cc75a413d0b SD=/var/lib/afldb-backup/seals PD=/var/lib/afldb-backup/published
+  local day=${1:-} SEAL_SHA=793e94bef7e9797815709da530beab09652e4cce200f7a769fdd5fb092a2ece5 SD=/var/lib/afldb-backup/seals PD=/var/lib/afldb-backup/published
   local b0 b1 tu out s c= cu cnt=0 other= f d ie tm ix xs ta tr kind h sz side sre hit dn dl; local -a seals DL; local -A F G
   SO_REASON=; SO_INVOCATION=; SO_DUMP=; SO_SHA=; SO_BYTES=; SO_DISPATCH_KIND=; SO_DISPATCH_DELAY_S=; SO_TIMER_USEC=; SO_SEAL=
   [[ $day =~ ^20[0-9]{2}-[01][0-9]-[0-3][0-9]$ ]] || { SO_REASON="invalid gate date '${day//[^0-9-]/?}'"; return 1; }

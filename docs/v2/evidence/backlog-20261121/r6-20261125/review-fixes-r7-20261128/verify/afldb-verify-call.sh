@@ -16,7 +16,7 @@
 # from the authenticated G0a RESULT line. NG-PRE consumes only "OWNER VERDICT A2 PASS"; release G0 only "OWNER VERDICT G0 PASS".
 # Exit: 0 PASS, 1 STOP, 2 usage.
 set -uo pipefail; export LC_ALL=C
-BUNDLE_SHA=f75ba83dc25072f7fd4846d86f6eed0791ec46205dcde8e417e1ccc700acdff9     # sha256 of verify/bundle/SHA256SUMS (= the installed /usr/local/lib/afldb-verify/SHA256SUMS); build-sums.sh sets it
+BUNDLE_SHA=df3457cca22b51d330fbc3a35b0d6ef302f638270b8728a2380ab2253961f42e     # sha256 of verify/bundle/SHA256SUMS (= the installed /usr/local/lib/afldb-verify/SHA256SUMS); build-sums.sh sets it
 PROD_NAME=afldb-prod; OFF_NAME=streamanator; OFF_ADDR=10.0.40.100; PROD_ALIAS=afldb
 SSHBIN=${AFLDB_VERIFY_SSH:-C:/Windows/System32/OpenSSH/ssh.exe}
 KEY=$HOME/.ssh/afldb_verify; TRANSPORT=production; CFG=

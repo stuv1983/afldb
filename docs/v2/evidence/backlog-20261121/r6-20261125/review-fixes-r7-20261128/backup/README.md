@@ -20,13 +20,13 @@ no arm-owned path and no arm-owned binary is read or executed for origin or the 
 | File (this directory) | Installed as (root:root unless stated) | sha256 |
 |---|---|---|
 | `afldb-backup-run` | `/usr/local/lib/afldb-backup/afldb-backup-run` 0755 (ExecStart, as afldb-backup) | `2c62ff91…` |
-| `afldb-backup-seal` | `/usr/local/lib/afldb-backup/afldb-backup-seal` 0755 (ExecStartPost, root) | `143f4ba7…` |
+| `afldb-backup-seal` | `/usr/local/lib/afldb-backup/afldb-backup-seal` 0755 (ExecStartPost, root) | `793e94be…` |
 | `70-afldb-backup-sealed.conf` | `/etc/systemd/system/afldb-backup.service.d/70-afldb-backup-sealed.conf` 0644 | `f8a18580…` |
-| `sealed-origin.sh` | `/usr/local/lib/afldb-backup/sealed-origin.sh` 0644 (gate library; the verifier sources its own byte-identical copy) | `1e5b5da4…` |
+| `sealed-origin.sh` | `/usr/local/lib/afldb-backup/sealed-origin.sh` 0644 (gate library; the verifier sources its own byte-identical copy) | `1153df78…` |
 | `install-backup.sh` | not installed (owner runs it from the staging directory) | `f433b81a…` |
-| `verify-backup-install.sh` | not installed (read-only check, run as root and as arm) | `a2388fb6…` |
+| `verify-backup-install.sh` | not installed (read-only check, run as root and as arm) | `f286ea7b…` |
 | repository `tools/maintenance/backup.sh` (staged as `backup.sh`) | `/usr/local/lib/afldb-backup/tools/maintenance/backup.sh` 0755, byte-identical | `df609046…` |
-| `SHA256SUMS` (the seven staged files) | not installed; `install-backup.sh` writes `/usr/local/lib/afldb-backup/SHA256SUMS` for the four installed code files | `4a9d437f…` |
+| `SHA256SUMS` (the seven staged files) | not installed; `install-backup.sh` writes `/usr/local/lib/afldb-backup/SHA256SUMS` for the four installed code files | `d0023d10…` |
 
 Full digests: `SHA256SUMS`. `sealed-origin.sh` pins the run, the sealer, `backup.sh` and the drop-in; `verify-backup-install.sh` pins
 `sealed-origin.sh`. If any of those bytes change, re-pin in that order (library, then verify script, then `SHA256SUMS`).
@@ -68,7 +68,7 @@ activation`, `OFFHOST-COMPARE $SO_DUMP $SO_SHA` on success, and `scheduled origi
 6. **Failure marker.** No new root marker: a failure is PID 1's `Result=` of the unit (root fact) plus the unchanged `OnFailure=`
    unit's `FAILED-unit` marker in arm's `.state` (arm-writable, informational, as before). `state/last-backup.json` is written only on success.
 7. **`sealed-origin.sh` is also installed** in `/usr/local/lib/afldb-backup` (the install's self-check and `verify-backup-install.sh`
-   source it); the verifier may source its own copy, which must be byte-identical (`1e5b5da4…`).
+   source it); the verifier may source its own copy, which must be byte-identical (`1153df78…`).
 8. **`scheduled-backup.sh`:** one explicit opt-in, `AFLDB_BACKUP_SEALED_STATE_DIR=<absolute path>` (status mode only, no default): the
    "backup" check and the off-host-failed check read `<dir>/last-backup.json`; verification, markers and every other mode are unchanged.
    This changes the checkout bytes (`234fca6a…` -> `7e2b470a…`); a probe that needs the nightly's freshness from arm's checkout needs a
@@ -88,7 +88,7 @@ write seals and published dumps). Creating such a path is a host-account change 
 unchecked. Every later root action (step 3's `sudo -u postgres`, rollback) must use the same path.
 
 1. Stage the bundle in a new root-owned directory outside `/home` (e.g. `install -d -m 0755 /root/afldb-r7-backup`): the seven files of
-   `SHA256SUMS`, with `backup.sh` = the repository's `tools/maintenance/backup.sh`. Check `sha256sum SHA256SUMS` = `4a9d437f…` (this README)
+   `SHA256SUMS`, with `backup.sh` = the repository's `tools/maintenance/backup.sh`. Check `sha256sum SHA256SUMS` = `d0023d10…` (this README)
    and `sha256sum -c SHA256SUMS`.
 2. `bash /root/afldb-r7-backup/install-backup.sh /root/afldb-r7-backup` as root. It refuses staging under `/home`, group/other-writable
    staging, any mismatch with `SHA256SUMS`, a library/bundle pin mismatch, a missing helper, an unloaded or untrusted base unit, the r6

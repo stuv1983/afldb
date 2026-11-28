@@ -196,7 +196,7 @@ read-only check, and **never writes arm's checkout**.
    r6 form (checked: r6-post-verify.sh does not parse it).
 8. **The sealed run's FAILED marker** is PID 1's `Result=` of afldb-backup.service (R7/backup README item 6: the sealed install writes
    no root marker file). G0 and A-2 require `Result=success`; arm's `.state` markers are still reported (arm-produced).
-9. **`bundle/sealed-origin.sh` is a byte-identical copy of the final `R7/backup/sealed-origin.sh`** (sha256 `1e5b5da4…`). Any later
+9. **`bundle/sealed-origin.sh` is a byte-identical copy of the final `R7/backup/sealed-origin.sh`** (sha256 `1153df78…`). Any later
    change there must be copied here and followed by `build-sums.sh` (the wrapper's pinned bundle digest changes with it).
 10. Harness image adds `python3`, `cron` and `tzdata` to r6's package list (the verifier needs python3.12; G0B needs a real cron).
 
