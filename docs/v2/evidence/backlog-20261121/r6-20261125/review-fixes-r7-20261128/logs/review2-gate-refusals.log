@@ -1,0 +1,85 @@
+== reviewer round 2 2026-11-28T01:29:36Z: gate refusals at the tested revision 7d693020, inside my kept harness container (host afldb-prod); root actions below are HARNESS (they model root-only changes or failures, not arm)
+[REAL] installed: sealed-origin 1153df783e622623 sealer 793e94bef7e97978 bundle df3457cca22b51d3
+---- seals directory
+   drwxr-xr-x 2 root root 4096 Nov 28 02:20 .
+   drwxr-xr-x 6 root root 4096 Nov 28 02:18 ..
+   -rw-r--r-- 1 root root  219 Nov 28 02:20 62396f4fe3f0459789d0bd3c08c26b69.done
+   -rw-r--r-- 1 root root  853 Nov 28 02:20 62396f4fe3f0459789d0bd3c08c26b69.seal
+      afldb-backup-done/1
+      invocation=62396f4fe3f0459789d0bd3c08c26b69
+      dump=afldb_prod-20261128-022000.dump
+      dump_sha256=0ba95ca6a6b87560a626f1c8d1116be9ffb03bdbdc7b0cb09ceda7c17e58d9d2
+      completed_realtime_usec=1795829041165464
+      afldb-backup-seal/4
+      timer_last_trigger_usec=1795829040670820
+      timer_last_trigger_mono=638561492269
+      timer_active_enter_mono=638449244478
+      timer_active_enter_usec=1795828928423029
+      dispatch_kind=scheduled
+---- T0 control: g0 2026-11-28 through the entry as afldb-verify
+   PASS afldb-backup.service scheduled run SEALED: timer dispatch Sat 2026-11-28 02:20:00 AEDT (1795829040670820 us), invocation 62396f4fe3f0459789d0bd3c08c26b69, root seal /var/lib/afldb-backup/seals/62396f4fe3f0459789d0bd3c08c26b69.seal; published dump afldb_prod-20261128-022000.dump 3993 B, full re-hash = seal = root sidecar
+   DISPATCH scheduled 112.2 s after timer activation
+   AFLDB-VERIFY RESULT G0 PASS nonce=63ecfff5e0904633ba3daac12c25d780 host=afldb-prod boot=c3524e4759ab4e0f8050875471b56b12 bundle=df3457cca22b51d330fbc3a35b0d6ef302f638270b8728a2380ab2253961f42e at=2026-11-28T01:29:43Z exit=0 date=2026-11-28 invocation=62396f4fe3f0459789d0bd3c08c26b69 dump=afldb_prod-20261128-022000.dump sha256=0b
+---- T1 root drop-in 80-review.conf: ExecStartPre=/usr/bin/true  (systemctl show ExecStartPreEx: ExecStartPreEx={ path=/usr/bin/true ; argv[]=/usr/bin/true ; flags= ; start_time=[n/a] ; s)
+   FAIL scheduled origin unproven: afldb-backup.service has a ExecStartPreEx command (only ExecStart and the sealer's ExecStartPost are allowed)
+   AFLDB-VERIFY RESULT G0 STOP nonce=0eea399d554b64686224dbb2b160c40b host=afldb-prod boot=c3524e4759ab4e0f8050875471b56b12 bundle=df3457cca22b51d330fbc3a35b0d6ef302f638270b8728a2380ab2253961f42e at=2026-11-28T01:29:49Z exit=1 date=2026-11-28 invocation=none dump=none sha256=none dispatch=none
+---- T1 root drop-in 80-review.conf: ExecCondition=/usr/bin/true  (systemctl show ExecConditionEx: ExecConditionEx={ path=/usr/bin/true ; argv[]=/usr/bin/true ; flags= ; start_time=[n/a] ; )
+   FAIL scheduled origin unproven: afldb-backup.service has a ExecConditionEx command (only ExecStart and the sealer's ExecStartPost are allowed)
+   AFLDB-VERIFY RESULT G0 STOP nonce=f75da79d9d3e245e668373606747e458 host=afldb-prod boot=c3524e4759ab4e0f8050875471b56b12 bundle=df3457cca22b51d330fbc3a35b0d6ef302f638270b8728a2380ab2253961f42e at=2026-11-28T01:29:54Z exit=1 date=2026-11-28 invocation=none dump=none sha256=none dispatch=none
+---- T1 root drop-in 80-review.conf: ExecStopPost=/usr/bin/true  (systemctl show ExecStopPostEx: ExecStopPostEx={ path=/usr/bin/true ; argv[]=/usr/bin/true ; flags= ; start_time=[n/a] ; s)
+   FAIL scheduled origin unproven: afldb-backup.service has a ExecStopPostEx command (only ExecStart and the sealer's ExecStartPost are allowed)
+   AFLDB-VERIFY RESULT G0 STOP nonce=02a986cd4ce3745012460f01fb68a737 host=afldb-prod boot=c3524e4759ab4e0f8050875471b56b12 bundle=df3457cca22b51d330fbc3a35b0d6ef302f638270b8728a2380ab2253961f42e at=2026-11-28T01:29:59Z exit=1 date=2026-11-28 invocation=none dump=none sha256=none dispatch=none
+---- T1 root drop-in 80-review.conf: ExecStop=/usr/bin/true  (systemctl show ExecStopEx: ExecStopEx={ path=/usr/bin/true ; argv[]=/usr/bin/true ; flags= ; start_time=[n/a] ; stop_)
+   FAIL scheduled origin unproven: afldb-backup.service has a ExecStopEx command (only ExecStart and the sealer's ExecStartPost are allowed)
+   AFLDB-VERIFY RESULT G0 STOP nonce=cb55fc32fa93a7e01e42831072f0fdeb host=afldb-prod boot=c3524e4759ab4e0f8050875471b56b12 bundle=df3457cca22b51d330fbc3a35b0d6ef302f638270b8728a2380ab2253961f42e at=2026-11-28T01:30:04Z exit=1 date=2026-11-28 invocation=none dump=none sha256=none dispatch=none
+---- T1 root drop-in 80-review.conf: ExecReload=/usr/bin/true  (systemctl show ExecReloadEx: ExecReloadEx={ path=/usr/bin/true ; argv[]=/usr/bin/true ; flags= ; start_time=[n/a] ; sto)
+   FAIL scheduled origin unproven: afldb-backup.service has a ExecReloadEx command (only ExecStart and the sealer's ExecStartPost are allowed)
+   AFLDB-VERIFY RESULT G0 STOP nonce=1566cfaf70e7602054e51aa150f98f4b host=afldb-prod boot=c3524e4759ab4e0f8050875471b56b12 bundle=df3457cca22b51d330fbc3a35b0d6ef302f638270b8728a2380ab2253961f42e at=2026-11-28T01:30:10Z exit=1 date=2026-11-28 invocation=none dump=none sha256=none dispatch=none
+---- T1 undone
+   PASS afldb-backup.service scheduled run SEALED: timer dispatch Sat 2026-11-28 02:20:00 AEDT (1795829040670820 us), invocation 62396f4fe3f0459789d0bd3c08c26b69, root seal /var/lib/afldb-backup/seals/62396f4fe3f0459789d0bd3c08c26b69.seal; published dump afldb_prod-20261128-022000.dump 3993 B, full re-hash = seal = root sidecar
+   DISPATCH scheduled 112.2 s after timer activation
+   AFLDB-VERIFY RESULT G0 PASS nonce=8cc79c6f1457e4cb4257627f53260934 host=afldb-prod boot=c3524e4759ab4e0f8050875471b56b12 bundle=df3457cca22b51d330fbc3a35b0d6ef302f638270b8728a2380ab2253961f42e at=2026-11-28T01:30:18Z exit=0 date=2026-11-28 invocation=62396f4fe3f0459789d0bd3c08c26b69 dump=afldb_prod-20261128-022000.dump sha256=0b
+---- T2 root creates /usr/local/lib/afldb-backup/.env (empty)
+   FAIL scheduled origin unproven: /usr/local/lib/afldb-backup/.env exists: backup.sh would source it
+   AFLDB-VERIFY RESULT G0 STOP nonce=35eb6e93ec3d336d7ff813c5b16692dc host=afldb-prod boot=c3524e4759ab4e0f8050875471b56b12 bundle=df3457cca22b51d330fbc3a35b0d6ef302f638270b8728a2380ab2253961f42e at=2026-11-28T01:30:24Z exit=1 date=2026-11-28 invocation=none dump=none sha256=none dispatch=none
+---- T3 completion record moved away (a run that did not reach its last step)
+   FAIL scheduled origin unproven: seal /var/lib/afldb-backup/seals/62396f4fe3f0459789d0bd3c08c26b69.seal has no valid completion record (the run did not finish after its seal): /var/lib/afldb-backup/seals/62396f4fe3f0459789d0bd3c08c26b69.done: missing, or a component cannot be read
+   AFLDB-VERIFY RESULT G0 STOP nonce=b01f41ee1499808c20106ded46e0d875 host=afldb-prod boot=c3524e4759ab4e0f8050875471b56b12 bundle=df3457cca22b51d330fbc3a35b0d6ef302f638270b8728a2380ab2253961f42e at=2026-11-28T01:30:32Z exit=1 date=2026-11-28 invocation=none dump=none sha256=none dispatch=none
+---- T3b completion record with another dump_sha256
+   FAIL scheduled origin unproven: /var/lib/afldb-backup/seals/62396f4fe3f0459789d0bd3c08c26b69.done is not the exact completion record of seal /var/lib/afldb-backup/seals/62396f4fe3f0459789d0bd3c08c26b69.seal
+   AFLDB-VERIFY RESULT G0 STOP nonce=f4485e22e042589c9f87fbd59ce0761d host=afldb-prod boot=c3524e4759ab4e0f8050875471b56b12 bundle=df3457cca22b51d330fbc3a35b0d6ef302f638270b8728a2380ab2253961f42e at=2026-11-28T01:30:40Z exit=1 date=2026-11-28 invocation=none dump=none sha256=none dispatch=none
+---- T3c completion record with a trailing extra line
+   FAIL scheduled origin unproven: /var/lib/afldb-backup/seals/62396f4fe3f0459789d0bd3c08c26b69.done is not the exact completion record of seal /var/lib/afldb-backup/seals/62396f4fe3f0459789d0bd3c08c26b69.seal
+   AFLDB-VERIFY RESULT G0 STOP nonce=2ea991fd890fd818a724c480eb3b4803 host=afldb-prod boot=c3524e4759ab4e0f8050875471b56b12 bundle=df3457cca22b51d330fbc3a35b0d6ef302f638270b8728a2380ab2253961f42e at=2026-11-28T01:30:48Z exit=1 date=2026-11-28 invocation=none dump=none sha256=none dispatch=none
+---- T3d completion record with a second hard link
+   FAIL scheduled origin unproven: seal /var/lib/afldb-backup/seals/62396f4fe3f0459789d0bd3c08c26b69.seal has no valid completion record (the run did not finish after its seal): /var/lib/afldb-backup/seals/62396f4fe3f0459789d0bd3c08c26b69.done has 2 hard links (need 1)
+   AFLDB-VERIFY RESULT G0 STOP nonce=72da5c1de42889c59d6adcdc66049d1c host=afldb-prod boot=c3524e4759ab4e0f8050875471b56b12 bundle=df3457cca22b51d330fbc3a35b0d6ef302f638270b8728a2380ab2253961f42e at=2026-11-28T01:30:55Z exit=1 date=2026-11-28 invocation=none dump=none sha256=none dispatch=none
+---- T3e a stray completion record without a seal (must not disturb)
+   PASS afldb-backup.service scheduled run SEALED: timer dispatch Sat 2026-11-28 02:20:00 AEDT (1795829040670820 us), invocation 62396f4fe3f0459789d0bd3c08c26b69, root seal /var/lib/afldb-backup/seals/62396f4fe3f0459789d0bd3c08c26b69.seal; published dump afldb_prod-20261128-022000.dump 3993 B, full re-hash = seal = root sidecar
+   DISPATCH scheduled 112.2 s after timer activation
+   AFLDB-VERIFY RESULT G0 PASS nonce=68eb58dfabc57e49bf62557ad0946a05 host=afldb-prod boot=c3524e4759ab4e0f8050875471b56b12 bundle=df3457cca22b51d330fbc3a35b0d6ef302f638270b8728a2380ab2253961f42e at=2026-11-28T01:31:03Z exit=0 date=2026-11-28 invocation=62396f4fe3f0459789d0bd3c08c26b69 dump=afldb_prod-20261128-022000.dump sha256=0b
+---- T3 restored
+   PASS afldb-backup.service scheduled run SEALED: timer dispatch Sat 2026-11-28 02:20:00 AEDT (1795829040670820 us), invocation 62396f4fe3f0459789d0bd3c08c26b69, root seal /var/lib/afldb-backup/seals/62396f4fe3f0459789d0bd3c08c26b69.seal; published dump afldb_prod-20261128-022000.dump 3993 B, full re-hash = seal = root sidecar
+   DISPATCH scheduled 112.2 s after timer activation
+   AFLDB-VERIFY RESULT G0 PASS nonce=361637596901de6eca2bc8dda56b19a4 host=afldb-prod boot=c3524e4759ab4e0f8050875471b56b12 bundle=df3457cca22b51d330fbc3a35b0d6ef302f638270b8728a2380ab2253961f42e at=2026-11-28T01:31:11Z exit=0 date=2026-11-28 invocation=62396f4fe3f0459789d0bd3c08c26b69 dump=afldb_prod-20261128-022000.dump sha256=0b
+---- T4 seal label flipped by root (dispatch_kind=catch-up, stamps unchanged): the gate recomputes
+   FAIL scheduled origin unproven: seal /var/lib/afldb-backup/seals/62396f4fe3f0459789d0bd3c08c26b69.seal says dispatch_kind=catch-up, its own stamps say scheduled (timer active at 1795828928423029 us, 112247791 us before the dispatch)
+   AFLDB-VERIFY RESULT G0 STOP nonce=1f52f8ccec9d6c0b266060cd643ca3ca host=afldb-prod boot=c3524e4759ab4e0f8050875471b56b12 bundle=df3457cca22b51d330fbc3a35b0d6ef302f638270b8728a2380ab2253961f42e at=2026-11-28T01:31:19Z exit=1 date=2026-11-28 invocation=none dump=none sha256=none dispatch=none
+---- T4b seal in the old /3 form (the timer_active_enter_usec line removed, header /3)
+   FAIL scheduled origin unproven: malformed seal: /var/lib/afldb-backup/seals/62396f4fe3f0459789d0bd3c08c26b69.seal is malformed (25 lines, need the 26-line afldb-backup-seal/4 format)
+   AFLDB-VERIFY RESULT G0 STOP nonce=d4a4c3e8f35b381428782c2aabb07598 host=afldb-prod boot=c3524e4759ab4e0f8050875471b56b12 bundle=df3457cca22b51d330fbc3a35b0d6ef302f638270b8728a2380ab2253961f42e at=2026-11-28T01:31:26Z exit=1 date=2026-11-28 invocation=none dump=none sha256=none dispatch=none
+---- T4 restored
+   PASS afldb-backup.service scheduled run SEALED: timer dispatch Sat 2026-11-28 02:20:00 AEDT (1795829040670820 us), invocation 62396f4fe3f0459789d0bd3c08c26b69, root seal /var/lib/afldb-backup/seals/62396f4fe3f0459789d0bd3c08c26b69.seal; published dump afldb_prod-20261128-022000.dump 3993 B, full re-hash = seal = root sidecar
+   DISPATCH scheduled 112.2 s after timer activation
+   AFLDB-VERIFY RESULT G0 PASS nonce=bea3fca9f43d914bc52a906725470033 host=afldb-prod boot=c3524e4759ab4e0f8050875471b56b12 bundle=df3457cca22b51d330fbc3a35b0d6ef302f638270b8728a2380ab2253961f42e at=2026-11-28T01:31:34Z exit=0 date=2026-11-28 invocation=62396f4fe3f0459789d0bd3c08c26b69 dump=afldb_prod-20261128-022000.dump sha256=0b
+---- T5 root facts reader: Type=oneshot TimeoutStartUSec=15min RuntimeMaxUSec=infinity 
+   uid=1000(arm) gid=1000(arm) groups=1000(arm),996(afldb-backup-read)
+   [ARM] as arm: a 17 GiB sparse file named as the restore dump, and last-verify.json naming it: arm 18253611008 bytes, 0 blocks
+   restore_dump	none larger than 17179869184 bytes
+   end	ok
+   reader answered in 0 s
+   [ARM] now 15 GiB sparse (under the cap)
+   restore_dump	afldb_prod-20261128-033000.dump 55a20aa6ffa6c4c931daa2fcf823213783ab13a8bd9e15e05fc93143b038c5c4
+   end	ok
+   reader answered in 75 s (limit 900 s)
+== done

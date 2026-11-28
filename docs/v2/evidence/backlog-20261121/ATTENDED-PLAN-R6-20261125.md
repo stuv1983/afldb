@@ -7,7 +7,9 @@
 **Authority.** Owner decision 2 of 2026-11-22, round 4 (`DECISIONS-20261122e.md` §2): R6 APPROVED for **Wed 25 Nov 2026 10:00-11:00
 AEDT, fallback 14:00-15:00 the same day**, on run d's verdict (`r6-kernel-check-20261122/README.md` §4) and with the owner's rule:
 **"IF BOOT RECOVERY IS STILL UNCERTAIN, PAUSE BEFORE REBOOTING."** This runbook is therefore **NO-GO by default**: it turns GO only
-when every named item of §7 holds on the day. Every `sudo` step is the owner's, one block at a time, in his own SSH session; Claude
+when every named item of §7 holds on the day. Every `sudo` step is the owner's, one block at a time, through a root path that does not pass through arm's login (r7 F1:
+an SSH session as arm lets a hostile arm login environment reuse the owner's sudo; see install precondition 0 and
+`review-fixes-r7-20261128/README.md` §4 item 9); Claude
 runs the read-only scripts of `r6-20261125/` and records. The ISSUE-348 load, R5 disposal, R7 and anything else are NOT in scope.
 
 **Prepared without production contact** (run e's only production session was the ISSUE-348 privilege check). Production facts come

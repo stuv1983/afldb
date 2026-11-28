@@ -3,6 +3,14 @@
 **Status: PROPOSED, review round 1 fixed (see "Review round 1 fixes" below). Nothing installed. Production was not contacted. R6 stays
 NO-GO. PR 5 stays draft. MED-2 and MED-3 stay OPEN: F1 (the root path, an owner decision) and owner installation.**
 
+**Independent review round 2** (judged `3af37aa7`, tested `7d693020`; [INDEPENDENT-REVIEW.md](INDEPENDENT-REVIEW.md) "Round 2",
+logs `logs/review2-*.log`): Q1 (can arm write or replace the accepted bytes before sealing) **NO**; Q2 (can arm change the verdict
+Stu receives, machine verdict and terminal display) **NO**; both **conditional on F1**: root on production must not be reached
+through arm's login. F1 HIGH open (documented, reproduced again); F2, F3, F4, F5 and the INFO items closed; no regressions. New: N1
+INFO (look-alike verdict text, recorded as §4 item 18) and N2 LOW (ATTENDED-PLAN line 10 still said every sudo step runs "in his own
+SSH session"; corrected in the round-2 record commit, prose outside every printed block, so no pin changes). Neither guarantee is
+met on production until the owner closes F1 and installs both bundles.
+
 Everything ran on the workstation (Git Bash) and on the DEV host streamanator as `arm`:
 * in private `mktemp` workspaces and disposable docker containers (`--network none` except image builds, never `--privileged`);
 * without host sudo, `lxc`/`lxd`, host packages or host accounts;
@@ -351,6 +359,10 @@ Added after the independent review (round 1), all nine items of its list, none d
     (for example `COPY … TO PROGRAM`), which owns `pg_hba.conf` and `pg_ident.conf`, the files holding both peer maps, so it could
     let arm authenticate as `afldb_backup` or `afldb_verify`. Check before installing (`SELECT rolsuper FROM pg_roles WHERE rolname
     = <arm's role>`, as postgres, through the F1 root path).
+18. **Look-alike verdict text (review round 2, N1, INFO).** The neutraliser prefixes only lines containing the exact phrases
+    `OWNER VERDICT` / `AFLDB-VERIFY RESULT`; arm-influenced text such as `OWNER  VERDICT`, `VERDlCT` or a phrase split across lines
+    reaches Stu's terminal as an indented data line. It is never the last line and never authenticated: only the wrapper's own
+    `OWNER VERDICT` line, and its exit status, are the verdict. Read nothing else as one.
 
 ## 5. Installation prerequisites and order (owner; nothing here was installed)
 

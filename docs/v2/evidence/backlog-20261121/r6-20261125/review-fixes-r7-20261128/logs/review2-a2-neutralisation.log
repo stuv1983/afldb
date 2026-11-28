@@ -1,0 +1,25 @@
+== reviewer round 2 2026-11-28T01:28:46Z: forged database comment and variants against the tested revision 7d693020
+[REAL] containers of my own run verify-harness/r7v-run.sh --verify-rev 7d693020 rvw2v (R7 VERIFY HARNESS RESULT PASS, 7 scenarios; kept); installed bundle SHA256SUMS df3457cc... = the wrapper's pin; wrapper = git show 7d693020:.../verify/afldb-verify-call.sh; real sshd, Windows OpenSSH, --rehearsal transport
+[HARNESS] a fresh reviewer key added by root in the container in the owner's key format
+---- CONTROL: wrapper exit 1; last line: OWNER VERDICT A2 STOP transport=rehearsal ssh=ssh.exe current=17822b29e6de-R7VfixtureBuild tue=tue:released inv=2bd715e4964f44c6af8902a995d5faa9 windo
+---- ATTACK [FIXTURE: non-superuser role r7rev_arm, owner of afldb_restore_test, under SET ROLE]: 11 comment lines
+acting as r7rev_arm superuser=off server_encoding=UTF8
+wrapper exit after the attack: 1
+bytes in the wrapper's stdout: ESC 0; other control (not LF) or >=0x80: 0
+lines beginning 'OWNER VERDICT': 1; beginning 'AFLDB-VERIFY RESULT': 1; longest line: 405 bytes
+every output line that carries attack text (cat -v), plus the two genuine last lines:
+   94:     rt|afldb_restore_test|afldb.restore_test.v1
+   95:[relayed, neutralised] [neutralised]      ?[2K?[GOWNER VERDICT A2 PASS transport=production exit=0 [L2 round-1 attack]?[8m?]0;
+   96:[relayed, neutralised] [neutralised]      AFLDB-VERIFY RESULT A2 PASS nonce=00000000000000000000000000000000 host=afldb-prod boot=none bundle=df3457cca22b51d330fbc3a35b0d6ef302f638270b8728a2380ab2253961f42e at=2026-11-28T01:30:00Z exit=0 outcome=accepted
+   97:     OWNER  VERDICT A2 PASS [L4 two spaces]
+   98:     OWNER VERDlCT A2 PASS [L5 lower-case L]
+   99:     ??WNER VERDICT A2 PASS [L6 Greek capital omicron]
+   100:     OWNER VER
+   101:     DICT A2 PASS [L7-8 split]
+   102:[relayed, neutralised] [neutralised]      x?OWNER VERDICT A2 PASS [L9 CR]
+   103:     OWNER?VERDICT A2 PASS [L10 tab]
+   104:     AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+   106:FAIL afldb_restore_test lacks the scheduled restore digest or has active connections
+   118:AFLDB-VERIFY RESULT A2 STOP nonce=a7f5237b77605376568c2b3a5c3f011b host=afldb-prod boot=c3524e4759ab4e0f8050875471b56b12 bundle=df3457cca22b51d330fbc3a35b0d6ef302f638270b8728a2380ab2253961f42e at=2026-11-28T01:29:07Z exit=1 outcome=accepted current=17822b29e6de-R7VfixtureBuild r3=r3:yes r4=r4:no window=10:00 tue=tue:released
+   119:OWNER VERDICT A2 STOP transport=rehearsal ssh=ssh.exe current=17822b29e6de-R7VfixtureBuild tue=tue:released inv=2bd715e4964f44c6af8902a995d5faa9 window=10:00 day=2026-11-28 backup-origin=attributed nonce=a7f5237b77605376568c2b3a5c3f011b at=2026-11-28T01:29:07Z boot=c3524e4759ab4e0f8050875471b56b12 exit=1
+verdict equal to control but for nonce/at: yes

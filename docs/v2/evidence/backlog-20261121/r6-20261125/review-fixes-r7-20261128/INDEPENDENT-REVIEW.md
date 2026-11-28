@@ -204,3 +204,75 @@ closed (`afldb-verify-dispatch:130-139`). arm can falsely **pass** only the chec
 | `review-sudo-via-arm-login.log` | F1 |
 | `review-a2-terminal-escape.log` | F2, and the root facts unit's `TimeoutStartUSec=infinity` (F5) |
 | `review-rearm-randomized-delay.log` | F3, with the two-line change to the harness printed at the top |
+
+## Round 2 (3af37aa7, tested 7d693020)
+
+Reviewed 28 November 2026 (runs finished about 12:45 AEDT, inside the 24..29 November gate dates). Same method as round 1: code
+read from git objects at `3af37aa7`; the code under `backup/`, `verify/` and both harnesses is identical at `7d693020` (the
+revisions differ by logs and documents only). Every run was on DEV in disposable containers; no production contact, no `lxc`, no
+host sudo. Residue after the runs: 0 containers, 0 images, 0 workspaces. Installed hashes in my containers: `sealed-origin.sh`
+`1153df78…`, sealer `793e94be…`, bundle `SHA256SUMS` `df3457cc…` (equal to the wrapper's pin).
+
+### Verdicts
+
+| Question | Round 2 | Basis |
+|---|---|---|
+| Q1: can arm write or replace the accepted bytes before sealing? | **NO** | Unchanged from round 1; my re-run of the backup harness passed all 13 scenarios (`logs/review2-backup-harness-rerun.log`). |
+| Q2: can arm change the verdict Stu receives? | **NO**, for the machine verdict and now also for what the terminal shows | The round-1 display attack and nine variants were neutralised; verdict and exit unchanged (`logs/review2-a2-neutralisation.log`). |
+
+Both answers still depend on F1: they hold only if root is not reached through arm's login. With F1 as it stands on production
+today, arm can obtain root and both answers become YES.
+
+### Status of the round-1 findings
+
+| ID | Grade | Status | Evidence at this revision |
+|---|---|---|---|
+| F1 | HIGH | **OPEN** (documented, not fixed in code; an owner decision) | Reproduced again: a uid-arm startup file obtained root from the owner's own `sudo` and wrote root-only trust anchors (`logs/review2-sudo-via-arm-login.log`). `README.md` §4 item 9 and §5, and `ATTENDED-PLAN-R6-20261125.md` lines 940 and 946, now require a root path that does not pass through arm's login. |
+| F2 | MED | **CLOSED** | Three layers, each read in code: `a2-core.sh` prints psql lines through `san`; `afldb-verify-dispatch:114-119` replaces non-printable bytes and prefixes `[neutralised] `; `afldb-verify-call.sh:48-54` does the same with `[relayed, neutralised] `, while `call()` (lines 70-74) still authenticates the raw output. Reproduction below. |
+| F3 | MED | **CLOSED** | `afldb-backup-seal:116` and `sealed-origin.sh:219` compute the label from the timer's realtime activation. With the timer file as shipped (`RandomizedDelaySec=10min`, no drop-in): re-arm inside the window gave `dispatch=catch-up` at delay 286.7 s; the genuine run gave `scheduled` at 679.0 s (`logs/review2-rearm-randomized-delay.log`). A seal whose label was flipped by hand is refused ("its own stamps say scheduled"). |
+| F4 | LOW | **CLOSED** | `.done` is the sealer's last step (`afldb-backup-seal:211`); gate rule 6 (`sealed-origin.sh:232-240`). Harness `post-pub-fail` refused (`logs/review2-post-publication-failure.log`). My own tests T3..T3e: missing, altered hash, extra line and second hard link are each refused; a stray `.done` without a seal does not disturb a valid run. |
+| F5 | LOW | **CLOSED** | Installed unit shows `TimeoutStartUSec=15min`. A 17 GiB file planted by arm as the restore dump is refused in 0 s ("larger than 17179869184 bytes"); a 15 GiB file was hashed in 75 s. |
+| INFO (unit commands, `.env`) | INFO | **CLOSED** | Drop-ins adding `ExecStartPre`, `ExecCondition`, `ExecStop`, `ExecStopPost` and `ExecReload` each gave G0 STOP; all five `…Ex` properties exist on the container's systemd. An empty `.env` in the code directory gave G0 STOP. All in `logs/review2-gate-refusals.log`. |
+| INFO (redirects in `afldb-verify-py`) | INFO | closed by reading only | The NoRedirect handler is present; I did not run a redirecting server against it. |
+
+### Reproduction of the forged comment and variants
+
+Run through the real wrapper from `7d693020`, real sshd and Windows OpenSSH, with a non-superuser role owning `afldb_restore_test`.
+The comment carried eleven lines: the round-1 escape sequence, a complete forged `AFLDB-VERIFY RESULT A2 PASS` line with the right
+bundle hash, a two-space variant, a lower-case-L variant, a Greek omicron, a line split across a newline, a carriage return, a tab,
+and the phrase after 500 filler bytes.
+
+- Wrapper exit 1 before and after; the verdict line equals the control apart from nonce and time.
+- Wrapper output: 0 ESC bytes, 0 other control bytes, 0 bytes at or above 0x80. Exactly one line begins `OWNER VERDICT` and exactly
+  one begins `AFLDB-VERIFY RESULT`: the genuine ones, and they are the last two lines.
+- The escape line, the forged RESULT line and the carriage-return line are shown as `[relayed, neutralised] [neutralised] …`.
+
+### Regressions looked for
+
+- **Seal format `/4`.** A `/3` seal (25 lines) is refused as malformed. Nothing is installed, so no `/3` seal exists to strand. None found.
+- **`.done`.** Written through `.<inv>.done.tmp` and renamed, after retention; an interruption leaves a seal without a record,
+  which the gate refuses. None found. INFO: a backward clock step between seal and record would give a false STOP (fail-closed).
+- **Neutralisation hiding the genuine line.** Not possible by this route: the dispatcher prints its RESULT line itself, outside the
+  relay loop, and the wrapper exempts only the last non-empty line when it begins `AFLDB-VERIFY RESULT `. Harness scenario e
+  (two RESULT lines, replay, stale, wrong bundle, exit lie) still refuses.
+- **Neutralisation letting a forged line through.** Not for the machine verdict. See N1 for the display.
+- **Unit refusals and reader limits.** Behave as stated; removing each test drop-in returned G0 to PASS.
+
+### New in round 2
+
+| ID | Grade | Finding |
+|---|---|---|
+| N1 | INFO | Look-alikes are not prefixed: `OWNER  VERDICT` (two spaces), `OWNER VERDlCT`, `OWNER?VERDICT` (tab replaced), `??WNER VERDICT` (omicron replaced) and a phrase split across two lines appear as ordinary data lines. Each is indented five spaces inside the A-2 listing, contains no control byte, and cannot be the last line. A reader who takes only the final column-0 `OWNER VERDICT` line is not misled. Worth one sentence in the runbook; no code change needed. |
+| N2 | LOW | `ATTENDED-PLAN-R6-20261125.md` line 10 still says every `sudo` step is the owner's "in his own SSH session", which contradicts lines 940 and 946 and is exactly the F1 path. Correct line 10. |
+
+### `README.md` §4
+
+Items 9 to 17 now list all nine dependencies I named in round 1 (root path, the two database-decided PASS lines, the psql output
+channel, process cwd, worker count, `events.log`, the off-host pull served by production arm, denial, and the unknown PostgreSQL
+superuser status). Still missing: N1's residual (arm can place look-alike text in the A-2 listing). Nothing else found.
+
+### Logs written this round
+
+`logs/review2-backup-harness-rerun.log`, `logs/review2-verify-harness-rerun.log`, `logs/review2-verify-harness-scenario-g.log`,
+`logs/review2-sudo-via-arm-login.log`, `logs/review2-a2-neutralisation.log`, `logs/review2-gate-refusals.log`,
+`logs/review2-rearm-randomized-delay.log`, `logs/review2-post-publication-failure.log`.
